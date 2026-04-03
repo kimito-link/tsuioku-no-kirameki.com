@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>E2E mock watch lv888888888</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 16px;
+      }
+      .body[role='rowgroup'] {
+        max-height: 220px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+      .table {
+        min-height: 1200px;
+        padding: 8px;
+      }
+      .table-row {
+        padding: 4px 0;
+        border-bottom: 1px solid #eee;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>nicolivelog E2E mock</h1>
+    <p>URL は <code>/watch/lv888888888/</code>。コメントパネル構造のみニコ生に近い。</p>
+
+    <div class="ga-ns-comment-panel comment-panel">
+      <div
+        class="comment-data-grid data-grid"
+        role="grid"
+        data-scroll-mode="y"
+        data-layout-type="pc"
+      >
+        <div class="body" role="rowgroup">
+          <div class="table" role="rowgroup" id="mock-table"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var root = document.getElementById('mock-table');
+        var html = '';
+        for (var i = 1; i <= 25; i++) {
+          html +=
+            '<div class="table-row" data-comment-type="normal" role="row">' +
+            '<span class="comment-number">' +
+            i +
+            '</span>' +
+            '<div class="content-area"><span class="comment-text">mock body ' +
+            i +
+            '</span></div>' +
+            '</div>';
+        }
+        root.innerHTML = html;
+      })();
+    </script>
+  </body>
+</html>

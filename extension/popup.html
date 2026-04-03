@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>nicolivelog</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        min-width: 280px;
+        max-width: min(100vw, 380px);
+        padding: 12px 14px;
+        font-size: 14px;
+        line-height: 1.45;
+        color: #111827;
+      }
+      p {
+        margin: 0 0 10px;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+      #liveId {
+        font-weight: 600;
+        word-break: break-all;
+      }
+      h2 {
+        margin: 14px 0 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #374151;
+        letter-spacing: 0.02em;
+      }
+      #userRoomList {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        max-height: min(50vh, 280px);
+        overflow-y: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+      #userRoomList li {
+        padding: 8px 10px;
+        border-bottom: 1px solid #eee;
+        font-size: 12px;
+      }
+      #userRoomList li:last-child {
+        border-bottom: none;
+      }
+      .room-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .room-name {
+        font-weight: 600;
+        color: #1f2937;
+        word-break: break-all;
+        flex: 1;
+        min-width: 0;
+      }
+      .room-count {
+        flex-shrink: 0;
+        font-size: 11px;
+        color: #6b7280;
+      }
+      .room-preview {
+        color: #4b5563;
+        font-size: 11px;
+        line-height: 1.35;
+        word-break: break-word;
+      }
+      .empty-hint {
+        font-size: 12px;
+        color: #6b7280;
+        padding: 10px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <p>放送: <span id="liveId">-</span></p>
+    <p>保存件数: <span id="count">-</span></p>
+    <label>
+      <input type="checkbox" id="recordToggle" />
+      このPCで記録する
+    </label>
+
+    <h2>ユーザー別（しおり）</h2>
+    <ul id="userRoomList" aria-live="polite"></ul>
+
+    <script src="dist/popup.js"></script>
+  </body>
+</html>

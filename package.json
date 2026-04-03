@@ -1,0 +1,18 @@
+{
+  "name": "nicolivelog",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ニコ生コメント記録プロトタイプ（拡張）",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "esbuild src/extension/content-entry.js --bundle --outfile=extension/dist/content.js --format=iife --platform=browser --target=chrome100 && esbuild src/extension/popup-entry.js --bundle --outfile=extension/dist/popup.js --format=iife --platform=browser --target=chrome100",
+    "build:watch": "node scripts/build-watch.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "happy-dom": "^20.8.9",
+    "vitest": "^3.0.0"
+  }
+}
