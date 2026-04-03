@@ -25,6 +25,15 @@ npm run build
 
 初回だけ拡張の読み込み（上記「拡張機能の読み込み」）が必要です。
 
+### GitHub Actions（CI）
+
+`.github/workflows/ci.yml` が **任意のブランチへの push** と **Pull Request** で動きます。リポジトリの **Actions** タブから **「CI」→「Run workflow」** でも手動実行できます。
+
+動かないときは次を確認してください。
+
+- このリポジトリを **GitHub に push** しているか（`git remote -v` でリモート確認）
+- リポジトリの **Settings → Actions → General** でワークフローが無効になっていないか
+
 ### E2E（Playwright・拡張の読み込み）
 
 実ニコ生ページはログインや配信状況に依存するため、**ローカル静的モック**（`http://127.0.0.1:3456/watch/lv888888888/`）で「記録 ON → `chrome.storage` にコメントが溜まる」経路を検証します。
