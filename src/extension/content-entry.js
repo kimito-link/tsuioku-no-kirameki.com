@@ -653,7 +653,6 @@ function ensureInlinePopupHost() {
   const iframe = document.createElement('iframe');
   iframe.id = INLINE_POPUP_IFRAME_ID;
   iframe.setAttribute('title', 'nicolivelog inline panel');
-  iframe.setAttribute('loading', 'lazy');
   iframe.setAttribute('allow', 'microphone');
   iframe.style.pointerEvents = 'auto';
   try {
