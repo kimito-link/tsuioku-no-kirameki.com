@@ -29,6 +29,36 @@
     <h1>nicolivelog E2E mock</h1>
     <p>URL は <code>/watch/lv888888888/</code>。コメントパネル構造のみニコ生に近い。</p>
 
+    <video
+      id="e2e-mock-video"
+      width="320"
+      height="180"
+      autoplay
+      muted
+      playsinline
+    ></video>
+    <script>
+      (function () {
+        var c = document.createElement('canvas');
+        c.width = 320;
+        c.height = 180;
+        var ctx = c.getContext('2d');
+        function draw() {
+          if (!ctx) return;
+          ctx.fillStyle = '#2244aa';
+          ctx.fillRect(0, 0, 320, 180);
+          ctx.fillStyle = '#fff';
+          ctx.font = '24px sans-serif';
+          ctx.fillText('mock video', 80, 100);
+          requestAnimationFrame(draw);
+        }
+        draw();
+        var stream = c.captureStream(30);
+        var v = document.getElementById('e2e-mock-video');
+        if (v) v.srcObject = stream;
+      })();
+    </script>
+
     <div class="ga-ns-comment-panel comment-panel">
       <div
         class="comment-data-grid data-grid"

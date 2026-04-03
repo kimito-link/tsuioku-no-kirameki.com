@@ -3,7 +3,7 @@
   "name": "nicolivelog",
   "version": "0.1.0",
   "description": "ニコニコ生放送のコメントをローカルに記録するプロトタイプ（オプトイン）",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "scripting", "downloads"],
   "host_permissions": [
     "https://live.nicovideo.jp/*",
     "http://127.0.0.1:3456/*",
@@ -13,8 +13,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "nicolivelog",
-    "default_popup": "popup.html"
+    "default_title": "nicolivelog"
   },
   "content_scripts": [
     {
@@ -23,8 +22,33 @@
         "http://127.0.0.1:3456/*",
         "http://localhost:3456/*"
       ],
+      "js": ["dist/page-intercept.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://live.nicovideo.jp/*",
+        "http://127.0.0.1:3456/*",
+        "http://localhost:3456/*"
+      ],
       "js": ["dist/content.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "popup.html",
+        "dist/popup.js",
+        "images/toumeilink.png",
+        "images/yukkuri-charactore-english/*/*.png"
+      ],
+      "matches": [
+        "https://live.nicovideo.jp/*",
+        "http://127.0.0.1:3456/*",
+        "http://localhost:3456/*"
+      ]
     }
   ]
 }

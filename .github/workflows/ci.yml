@@ -25,5 +25,39 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript (checkJs)
+        run: npm run typecheck
+
       - name: Build extension bundles
         run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install chromium --with-deps
+
+      - name: Build extension bundles
+        run: npm run build
+
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Playwright E2E (headed + virtual display)
+        env:
+          CI: true
+        run: xvfb-run -a npx playwright test

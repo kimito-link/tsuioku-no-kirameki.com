@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM"],
+    "types": ["chrome"]
+  },
+  "include": ["src/**/*.js", "src/**/*.d.ts", "extension/background.js"],
+  "exclude": ["**/node_modules", "extension/dist", "**/*.test.js"]
+}

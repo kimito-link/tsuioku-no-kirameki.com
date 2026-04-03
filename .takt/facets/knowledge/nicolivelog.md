@@ -7,8 +7,13 @@
 ## ビルド・テスト
 ```bash
 npm install
+npm run lint       # ESLint（src / extension / tests / scripts）
+npm run typecheck  # tsc --noEmit（noImplicitAny、*.test.js 除外、JSDoc で src / extension を検査）
+npm run verify     # テスト + lint + typecheck + ビルド（推奨）
 npm test
 npm run build
+npm run test:e2e # Playwright（ローカル、拡張読み込み・ビルド込み）
+npm run test:e2e:ci # ビルド後のみ E2E（CI の xvfb ジョブと同様に `npx playwright test`）
 npm run build:watch   # 開発時（esbuild watch）
 ```
 
@@ -21,6 +26,8 @@ Chrome で **パッケージ化されていない拡張機能** として **`ext
 
 ## ストレージ
 - `nls_recording_enabled`: `true` のときのみ記録（既定はオフ＝キー未設定もオフ扱い）。
+- `nls_last_watch_url`: コンテンツスクリプトが更新。ポップアップがアクティブタブ非 watch のときの表示用。
+- `nls_storage_write_error`: 保存失敗時のメタ（成功時に削除）。ポップアップで警告。
 - `nls_comments_<lv>`: コメントオブジェクトの配列（`commentRecord.js` の形）。
 
 ## 主要パス
@@ -29,6 +36,10 @@ Chrome で **パッケージ化されていない拡張機能** として **`ext
 - [`extension/dist/content.js`](../../../extension/dist/content.js) / [`popup.js`](../../../extension/dist/popup.js) — **`npm run build` 後**
 - [`src/extension/content-entry.js`](../../../src/extension/content-entry.js) / [`popup-entry.js`](../../../src/extension/popup-entry.js)
 - [`src/lib/nicoliveDom.js`](../../../src/lib/nicoliveDom.js) — **UI改修時はここだけ優先修正**
+- [`src/lib/commentHarvest.js`](../../../src/lib/commentHarvest.js) — パネル検出・仮想リスト走査
+- [`src/lib/observerTarget.js`](../../../src/lib/observerTarget.js) — MutationObserver 監視ルート（パネル優先）
+- [`src/lib/watchContext.js`](../../../src/lib/watchContext.js) — URL と lv 遷移の純関数
+- [`src/lib/storageErrorState.js`](../../../src/lib/storageErrorState.js) — ストレージエラー JSON 用
 
 ## TAKT タスク進捗（参考）
 1. `nico-url-parse` — 完了（`broadcastUrl.js`）
@@ -39,3 +50,10 @@ Chrome で **パッケージ化されていない拡張機能** として **`ext
 ## リスク
 - ニコ生DOM変更で抽出が壊れる → `nicoliveDom.js` のみ差し替え。
 - 仮想リストにより表示外コメントは取れない → 仕様として許容。
+- manifest は `permissions: ["storage"]` のみ（`tabs` なし）。ポップアップのタブ URL は host_permissions 範囲内で取得。
+
+## CI
+- `.github/workflows/ci.yml`: `test-and-build`（Vitest + **ESLint** + **tsc** + esbuild）と `e2e`（Ubuntu + xvfb + Playwright + 拡張読み込み）。
+
+## 外部 LLM 向けテンプレ
+- [`docs/llm-handoff-questions.md`](../../../docs/llm-handoff-questions.md)（§1 文脈・§2 残論点・§7 Kimito-Link Codex 用プロンプト）

@@ -8,7 +8,8 @@ import {
   extractUserIdFromLinks,
   extractUserIdFromDataAttributes,
   extractUserIdFromOuterHtml,
-  extractUserIdFromIconSrc
+  extractUserIdFromIconSrc,
+  extractUserIdFromReactFiber
 } from './nicoliveDom.js';
 
 describe('parseCommentLineText', () => {
@@ -28,6 +29,19 @@ describe('parseCommentLineText', () => {
 
   it('合致しない', () => {
     expect(parseCommentLineText('abc')).toBeNull();
+  });
+
+  it('空・空白のみは null', () => {
+    expect(parseCommentLineText('')).toBeNull();
+    expect(parseCommentLineText('   ')).toBeNull();
+  });
+
+  it('番号だけで本文が無いと null', () => {
+    expect(parseCommentLineText('12')).toBeNull();
+  });
+
+  it('改行だけの本文は null', () => {
+    expect(parseCommentLineText('5\n\n')).toBeNull();
   });
 });
 
@@ -112,6 +126,41 @@ describe('parseNicoLiveTableRow', () => {
     });
   });
 
+  it('comment-number が空・不正なら null', () => {
+    const mk = (num, txt) => {
+      const w = document.createElement('div');
+      w.innerHTML = `
+        <div class="table-row" role="row" data-comment-type="normal">
+          <span class="comment-number">${num}</span>
+          <span class="comment-text">${txt}</span>
+        </div>`;
+      return w.querySelector('.table-row');
+    };
+    expect(parseNicoLiveTableRow(mk('', 'a'))).toBeNull();
+    expect(parseNicoLiveTableRow(mk('  ', 'a'))).toBeNull();
+    expect(parseNicoLiveTableRow(mk('abc', 'a'))).toBeNull();
+  });
+
+  it('comment-text が空・空白のみなら null', () => {
+    const w = document.createElement('div');
+    w.innerHTML = `
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">1</span>
+        <span class="comment-text">   </span>
+      </div>`;
+    expect(parseNicoLiveTableRow(w.querySelector('.table-row'))).toBeNull();
+  });
+
+  it('番号が10桁超は拒否（1〜9桁）', () => {
+    const w = document.createElement('div');
+    w.innerHTML = `
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">1234567890</span>
+        <span class="comment-text">overflow</span>
+      </div>`;
+    expect(parseNicoLiveTableRow(w.querySelector('.table-row'))).toBeNull();
+  });
+
   it('generalSystemMessage は無視', () => {
     const wrap = document.createElement('div');
     wrap.innerHTML = `
@@ -187,5 +236,124 @@ describe('extractCommentsFromNode', () => {
     expect(list).toEqual([
       { commentNo: '10', text: '単独行', userId: null }
     ]);
+  });
+
+  it('同一番号・同一本文は重複除去', () => {
+    const panel = document.createElement('div');
+    panel.innerHTML = `
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">1</span><span class="comment-text">dup</span>
+      </div>
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">1</span><span class="comment-text">dup</span>
+      </div>`;
+    const list = extractCommentsFromNode(panel);
+    expect(list).toHaveLength(1);
+  });
+
+  it('.program-recommend-panel 内の li は無視', () => {
+    // table-row があるとルート結合 innerText パースをスキップし、ROW_QUERY 経路の除外だけを検証する
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">1</span><span class="comment-text">本編</span>
+      </div>
+      <div class="program-recommend-panel"><li>999 おすすめ</li></div>
+      <li>1000 本物</li>`;
+    const list = extractCommentsFromNode(root);
+    const nos = list.map((r) => r.commentNo).sort();
+    expect(nos).toContain('1');
+    expect(nos).toContain('1000');
+    expect(nos).not.toContain('999');
+  });
+
+  it('article.program-card 内も無視', () => {
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">1</span><span class="comment-text">本編</span>
+      </div>
+      <article class="program-card"><li>1 カード</li></article>
+      <li>2 通常</li>`;
+    const list = extractCommentsFromNode(root);
+    const texts = new Set(list.map((r) => r.text));
+    expect(texts.has('本編')).toBe(true);
+    expect(texts.has('通常')).toBe(true);
+    expect(texts.has('カード')).toBe(false);
+  });
+});
+
+describe('extractUserIdFromReactFiber', () => {
+  it('fiber の memoizedProps.userId を取得', () => {
+    const el = document.createElement('div');
+    el['__reactFiber$test123'] = {
+      memoizedProps: { userId: '8765432' },
+      return: null
+    };
+    expect(extractUserIdFromReactFiber(el)).toBe('8765432');
+  });
+
+  it('fiber のネストされた comment.userId を取得', () => {
+    const el = document.createElement('div');
+    el['__reactFiber$abc'] = {
+      memoizedProps: { comment: { userId: '1234567' } },
+      return: null
+    };
+    expect(extractUserIdFromReactFiber(el)).toBe('1234567');
+  });
+
+  it('親 fiber を遡って userId を発見', () => {
+    const el = document.createElement('div');
+    el['__reactFiber$xyz'] = {
+      memoizedProps: {},
+      return: {
+        memoizedProps: { data: { hashedUserId: 'abcdefghij1234567890' } },
+        return: null
+      }
+    };
+    expect(extractUserIdFromReactFiber(el)).toBe('abcdefghij1234567890');
+  });
+
+  it('fiber が無い要素は null', () => {
+    const el = document.createElement('div');
+    expect(extractUserIdFromReactFiber(el)).toBeNull();
+  });
+
+  it('userId が短すぎると無視', () => {
+    const el = document.createElement('div');
+    el['__reactFiber$short'] = {
+      memoizedProps: { userId: '123' },
+      return: null
+    };
+    expect(extractUserIdFromReactFiber(el)).toBeNull();
+  });
+
+  it('__reactInternalInstance$ キーでも動作', () => {
+    const el = document.createElement('div');
+    el['__reactInternalInstance$legacy'] = {
+      memoizedProps: { uid: '9988776' },
+      return: null
+    };
+    expect(extractUserIdFromReactFiber(el)).toBe('9988776');
+  });
+
+  it('parseNicoLiveTableRow が fiber 経由で userId を返す', () => {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="table-row" role="row" data-comment-type="normal">
+        <span class="comment-number">42</span>
+        <span class="comment-text">fiber test</span>
+      </div>`;
+    const row = wrap.querySelector('.table-row');
+    row['__reactFiber$fiberKey'] = {
+      memoizedProps: { comment: { userId: '5544332' } },
+      return: null
+    };
+    const result = parseNicoLiveTableRow(row);
+    expect(result).toEqual({
+      commentNo: '42',
+      text: 'fiber test',
+      userId: '5544332'
+    });
   });
 });

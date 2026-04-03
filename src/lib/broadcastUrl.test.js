@@ -18,6 +18,24 @@ describe('extractLiveIdFromUrl', () => {
     expect(extractLiveIdFromUrl('')).toBeNull();
     expect(extractLiveIdFromUrl('https://example.com/')).toBeNull();
   });
+
+  it('相対風の文字列でも lv を拾う（catch 経路）', () => {
+    expect(extractLiveIdFromUrl('path/watch/lv987654321')).toBe('lv987654321');
+  });
+
+  it('ハッシュは lv 抽出に影響しない', () => {
+    expect(
+      extractLiveIdFromUrl(
+        'https://live.nicovideo.jp/watch/lv111#comment'
+      )
+    ).toBe('lv111');
+  });
+
+  it('大文字 LV を小文字化', () => {
+    expect(
+      extractLiveIdFromUrl('https://live.nicovideo.jp/watch/LV42')
+    ).toBe('lv42');
+  });
 });
 
 describe('isNicoLiveWatchUrl', () => {
@@ -25,6 +43,15 @@ describe('isNicoLiveWatchUrl', () => {
     expect(isNicoLiveWatchUrl('https://live.nicovideo.jp/watch/lv350229229')).toBe(
       true
     );
+  });
+
+  it('空・null 相当は false', () => {
+    expect(isNicoLiveWatchUrl('')).toBe(false);
+    expect(isNicoLiveWatchUrl(/** @type {any} */ (null))).toBe(false);
+  });
+
+  it('live トップ（watch パスなし）は false', () => {
+    expect(isNicoLiveWatchUrl('https://live.nicovideo.jp/')).toBe(false);
   });
 
   it('動画 watch は false', () => {

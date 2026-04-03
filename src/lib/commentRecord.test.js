@@ -5,7 +5,6 @@ import {
   createCommentEntry,
   mergeNewComments
 } from './commentRecord.js';
-import { commentsStorageKey } from './storageKeys.js';
 
 describe('normalizeCommentText', () => {
   it('前後空白と改行を整える', () => {
@@ -14,6 +13,11 @@ describe('normalizeCommentText', () => {
 
   it('空は空文字', () => {
     expect(normalizeCommentText('   ')).toBe('');
+  });
+
+  it('null / undefined は空文字', () => {
+    expect(normalizeCommentText(/** @type {any} */ (null))).toBe('');
+    expect(normalizeCommentText(/** @type {any} */ (undefined))).toBe('');
   });
 });
 
@@ -37,6 +41,11 @@ describe('buildDedupeKey', () => {
       })
     ).toBe('lv1||hello|1700000000');
   });
+
+  it('同一秒・同一本文・番号なしは同じキー', () => {
+    const row = { commentNo: '', text: 'x', capturedAt: 5_000 };
+    expect(buildDedupeKey('lv1', row)).toBe(buildDedupeKey('lv1', row));
+  });
 });
 
 describe('createCommentEntry', () => {
@@ -53,6 +62,16 @@ describe('createCommentEntry', () => {
     expect(typeof e.id).toBe('string');
     expect(e.id.length).toBeGreaterThan(4);
     expect(typeof e.capturedAt).toBe('number');
+  });
+
+  it('liveId は小文字化', () => {
+    const e = createCommentEntry({
+      liveId: 'LV88',
+      commentNo: '1',
+      text: 'a',
+      userId: null
+    });
+    expect(e.liveId).toBe('lv88');
   });
 });
 
@@ -77,10 +96,55 @@ describe('mergeNewComments', () => {
     expect(next).toHaveLength(2);
     expect(next[0].id).toBe(firstId);
   });
-});
 
-describe('commentsStorageKey', () => {
-  it('小文字化', () => {
-    expect(commentsStorageKey('LV123')).toBe('nls_comments_lv123');
+  it('liveId 引数の大文字小文字を正規化', () => {
+    const { added, next } = mergeNewComments('LV1', [], [
+      { commentNo: '1', text: 'x', userId: null }
+    ]);
+    expect(added).toHaveLength(1);
+    expect(added[0].liveId).toBe('lv1');
+    expect(next[0].liveId).toBe('lv1');
+  });
+
+  it('incoming が空なら added も空', () => {
+    const existing = [
+      createCommentEntry({
+        liveId: 'lv1',
+        commentNo: '1',
+        text: 'a',
+        userId: null
+      })
+    ];
+    const { next, added } = mergeNewComments('lv1', existing, []);
+    expect(added).toHaveLength(0);
+    expect(next).toHaveLength(1);
+  });
+
+  it('本文が空の incoming はスキップ', () => {
+    const { added, next } = mergeNewComments('lv1', [], [
+      { commentNo: '1', text: '   ', userId: null },
+      { commentNo: '2', text: 'ok', userId: null }
+    ]);
+    expect(added).toHaveLength(1);
+    expect(added[0].commentNo).toBe('2');
+    expect(next).toHaveLength(1);
+  });
+
+  it('同じ番号でも本文が違えば別エントリ', () => {
+    const { added, next } = mergeNewComments('lv1', [], [
+      { commentNo: '5', text: 'first', userId: null },
+      { commentNo: '5', text: 'second', userId: null }
+    ]);
+    expect(added).toHaveLength(2);
+    expect(next.map((r) => r.text)).toEqual(['first', 'second']);
+  });
+
+  it('existing が欠損フィールドでも落ちない', () => {
+    const existing = /** @type {any[]} */ ([{ commentNo: '1', text: 'old' }]);
+    const { next, added } = mergeNewComments('lv1', existing, [
+      { commentNo: '2', text: 'new', userId: null }
+    ]);
+    expect(added).toHaveLength(1);
+    expect(next.length).toBeGreaterThanOrEqual(2);
   });
 });

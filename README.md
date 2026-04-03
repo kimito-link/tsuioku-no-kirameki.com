@@ -6,9 +6,11 @@
 
 ```bash
 npm install
-npm run verify    # テスト + ビルド（本番読み込み前の確認に使う）
+npm run verify    # テスト + ESLint + TypeScript(checkJs) + ビルド（本番読み込み前の確認に使う）
 # または
 npm test
+npm run lint
+npm run typecheck   # tsc --noEmit（noImplicitAny、**/*.test.js は対象外）
 npm run build
 ```
 
@@ -24,6 +26,16 @@ npm run build
 5. しばらく待つか、コメント一覧を少しスクロールすると件数が増えることがあります（仮想リストのため）。
 
 初回だけ拡張の読み込み（上記「拡張機能の読み込み」）が必要です。
+
+### 動作確認チェックリスト（手元）
+
+1. **`npm run verify`** が通っていること（上記「開発」）。  
+2. **`chrome://extensions`** で nicolivelog を **再読み込み**（ピン留めするとアイコンが出やすい）。  
+3. **パターン A（本番）**: `https://live.nicovideo.jp/watch/lv...` を開く → ポップアップで記録 ON → 件数が `-` から増えるか、コメント一覧を少しスクロールして再確認。  
+4. **パターン B（モック・ログイン不要）**: 別ターミナルで `npx serve tests/e2e/fixtures -l 3456` を起動し、`http://127.0.0.1:3456/watch/lv888888888/` を開く → 記録 ON → 件数が増えるか確認（または `npm run test:e2e` で同経路を自動確認）。  
+5. **開発者ツール**: 拡張の service worker または watch ページ上で **Application → Storage → Extension**（または該当拡張のストレージ）に `nls_recording_enabled` / `nls_comments_lv...` があるか。  
+6. **JSON エクスポート**: 件数が 1 以上で「JSONをダウンロード」が押せるか。  
+7. 保存に失敗したとき、ポップアップに **赤系の保存エラー表示**が出るか（容量超過などの再現は難しい場合あり）。
 
 ### GitHub Actions（CI）
 
@@ -43,7 +55,8 @@ npm run playwright:install   # 初回のみ Chromium を取得
 npm run test:e2e             # ビルド後、headed Chromium で実行（画面が開きます）
 ```
 
-- ディスプレイのない CI では `SKIP_E2E=1 npm run test:e2e` でスキップできます。
+- GitHub Actions では **xvfb** 上で `playwright test` を実行するジョブ（`.github/workflows/ci.yml` の `e2e`）があります。ローカルでビルド済みなら `npm run test:e2e:ci` で E2E のみ実行できます。
+- 手元で E2E を省略するときは `SKIP_E2E=1 npm run test:e2e` でスキップできます。
 - 拡張の読み込み都合で **headless 非対応**のため、ローカルではウィンドウが表示されます。
 
 ## 拡張機能の読み込み
@@ -67,9 +80,14 @@ npm run test:e2e             # ビルド後、headed Chromium で実行（画面
 
 ## 制限
 
-- コメント一覧は仮想スクロールのため、**開いた直後にスクロール走査で可能な限り拾い**、その後は新規 DOM と手動スクロールでも追記します。サーバにしかない全履歴の完全再現は保証しません。
+- コメント一覧は仮想スクロールのため、**開いた直後にスクロール走査で可能な限り拾い**、その後は **MutationObserver（子ノード＋テキスト変更）** と **約2秒ごとの表示範囲スキャン**で追記します（UI が行の中身だけ差し替えると `childList` だけでは取りこぼすため）。サーバにしかない全履歴の完全再現は保証しません。
 - 利用規約・ガイドラインは各自で確認してください
+
+### 権限（セキュリティメモ）
+
+- マニフェストの `permissions` は **`storage` のみ**（`tabs` は付与していない）。ポップアップが `chrome.tabs.query` でアクティブタブの URL を読むときは、**`host_permissions` に一致するオリジン**（例: `https://live.nicovideo.jp/*`）上のタブであれば URL を取得できる。一致しないタブでは URL が空になることがあり、その場合はコンテンツスクリプトが保存する **`nls_last_watch_url`** で件数・エクスポート対象を補います。
+- `chrome.storage.local` の容量を超えたなどで保存に失敗すると **`nls_storage_write_error`** が立ち、ポップアップに警告が出ます。成功した書き込みのあとに自動で消えます。
 
 ## Codex / Claude 向けの質問集
 
-外部の AI に設計レビューやデバッグ方針を聞くときのテンプレは [`docs/llm-handoff-questions.md`](docs/llm-handoff-questions.md) にまとめてあります。
+外部の AI に設計レビューやデバッグ方針を聞くときのテンプレは [`docs/llm-handoff-questions.md`](docs/llm-handoff-questions.md) にまとめてあります（§1 は現行実装の文脈、§2 は「既に入った対策」と「残りの論点」に分離済み）。**Kimito-Link を別セッションの Codex に任せるとき**は同ファイルの **§7** をコピペしてください。タイムシフト視聴時の DOM などの**調査メモ（非公式要約）**は [`docs/research-nicolive-pc-comments.md`](docs/research-nicolive-pc-comments.md) を参照してください。

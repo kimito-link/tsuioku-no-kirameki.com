@@ -27,6 +27,7 @@ export function parseCommentLineText(text) {
  */
 export function extractUserIdFromLinks(el) {
   if (!el || el.nodeType !== 1) return null;
+  /** @param {string | null | undefined} href */
   const tryHref = (href) => {
     const h = String(href || '');
     const m =
@@ -36,7 +37,7 @@ export function extractUserIdFromLinks(el) {
     return m ? m[1] : null;
   };
 
-  const anchors = el.querySelectorAll?.('a[href]') || [];
+  const anchors = el.querySelectorAll('a[href]');
   for (const a of anchors) {
     const id = tryHref(a.getAttribute('href'));
     if (id) return id;
@@ -90,13 +91,95 @@ export function extractUserIdFromDataAttributes(el) {
  */
 export function extractUserIdFromIconSrc(el) {
   if (!el || el.nodeType !== 1) return null;
-  const imgs = el.querySelectorAll?.('img[src*="usericon"], img[src*="nicoaccount"]') || [];
+  const imgs = el.querySelectorAll(
+    'img[src*="usericon"], img[src*="nicoaccount"]'
+  );
   for (const img of imgs) {
     const src = String(img.getAttribute('src') || '');
     let m = src.match(/\/usericon\/(?:s\/)?(\d+)\/(\d+)\./i);
     if (m?.[2]) return m[2];
     m = src.match(/nicoaccount\/usericon\/(\d+)/i);
     if (m?.[1] && m[1].length >= 5) return m[1];
+  }
+  return null;
+}
+
+/**
+ * React fiber の内部状態からユーザーIDを探索する。
+ * ニコ生は React 描画のため、table-row コンポーネントの props/state に
+ * userId / user_id / hashedUserId 等が含まれている場合がある。
+ * @param {Element} el
+ * @returns {string|null}
+ */
+export function extractUserIdFromReactFiber(el) {
+  if (!el || el.nodeType !== 1) return null;
+  const targets = [el, el.parentElement].filter(Boolean);
+  for (const node of targets) {
+    const fiber = getReactFiber(node);
+    if (!fiber) continue;
+    const id = walkFiberForUserId(fiber, 6);
+    if (id) return id;
+  }
+  return null;
+}
+
+/** @param {Element|null} el */
+function getReactFiber(el) {
+  if (!el) return null;
+  const keys = Object.keys(el);
+  for (const k of keys) {
+    if (k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')) {
+      return el[k] || null;
+    }
+  }
+  return null;
+}
+
+const USERID_PROP_KEYS = [
+  'userId', 'user_id', 'userid',
+  'hashedUserId', 'hashed_user_id',
+  'senderUserId', 'accountId', 'uid'
+];
+
+/**
+ * @param {unknown} fiber
+ * @param {number} maxDepth
+ * @returns {string|null}
+ */
+function walkFiberForUserId(fiber, maxDepth) {
+  let cur = fiber;
+  for (let i = 0; i < maxDepth && cur; i++) {
+    for (const bag of [cur.memoizedProps, cur.pendingProps]) {
+      const id = pickUserIdFromBag(bag);
+      if (id) return id;
+    }
+    cur = cur.return;
+  }
+  return null;
+}
+
+/** @param {unknown} bag @returns {string|null} */
+function pickUserIdFromBag(bag) {
+  if (!bag || typeof bag !== 'object') return null;
+  const obj = /** @type {Record<string, unknown>} */ (bag);
+  for (const key of USERID_PROP_KEYS) {
+    const v = obj[key];
+    if (v == null) continue;
+    const s = String(v).trim();
+    if (/^\d{5,14}$/.test(s)) return s;
+    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return s;
+  }
+  for (const key of ['comment', 'data', 'item', 'chat', 'message']) {
+    const nested = obj[key];
+    if (!nested || typeof nested !== 'object') continue;
+    const nestedObj = /** @type {Record<string, unknown>} */ (nested);
+    for (const uid of USERID_PROP_KEYS) {
+      const v = nestedObj[uid];
+      if (v == null) continue;
+      const s = String(v).trim();
+      if (/^\d{5,14}$/.test(s)) return s;
+      if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return s;
+    }
   }
   return null;
 }
@@ -150,6 +233,7 @@ export function resolveUserIdOnElement(el) {
   if (!userId) userId = extractUserIdFromLinks(el);
   if (!userId) userId = extractUserIdFromIconSrc(el);
   if (!userId) userId = extractUserIdFromDataAttributes(el);
+  if (!userId) userId = extractUserIdFromReactFiber(el);
   if (!userId) userId = extractUserIdFromOuterHtml(el);
   if (!userId) {
     let p = el.parentElement;
@@ -158,6 +242,7 @@ export function resolveUserIdOnElement(el) {
         extractUserIdFromLinks(p) ||
         extractUserIdFromIconSrc(p) ||
         extractUserIdFromDataAttributes(p) ||
+        extractUserIdFromReactFiber(p) ||
         extractUserIdFromOuterHtml(p);
       if (userId) break;
       p = p.parentElement;
@@ -207,7 +292,11 @@ export function parseCommentElement(el) {
 
   const userId = resolveUserIdOnElement(el);
 
-  const raw = (el.innerText || el.textContent || '')
+  const raw = (
+    ('innerText' in el ? /** @type {HTMLElement} */ (el).innerText : '') ||
+    el.textContent ||
+    ''
+  )
     .replace(/\u00a0/g, ' ')
     .trim();
   if (!raw) return null;
@@ -261,8 +350,10 @@ export function extractCommentsFromNode(root) {
   if (!root || root.nodeType !== 1) return [];
   const el = /** @type {Element} */ (root);
   const seen = new Set();
+  /** @type {{ commentNo: string, text: string, userId: string|null }[]} */
   const out = [];
 
+  /** @param {{ commentNo: string, text: string, userId: string|null } | null} parsed */
   function push(parsed) {
     if (!parsed) return;
     const k = `${parsed.commentNo}\t${parsed.text}`;

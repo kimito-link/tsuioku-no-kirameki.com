@@ -7,17 +7,25 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm test && npm run build",
-    "build": "esbuild src/extension/content-entry.js --bundle --outfile=extension/dist/content.js --format=iife --platform=browser --target=chrome100 && esbuild src/extension/popup-entry.js --bundle --outfile=extension/dist/popup.js --format=iife --platform=browser --target=chrome100",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm test && npm run lint && npm run typecheck && npm run build",
+    "build": "esbuild src/extension/page-intercept.js --bundle --outfile=extension/dist/page-intercept.js --format=iife --platform=browser --target=chrome111 && esbuild src/extension/content-entry.js --bundle --outfile=extension/dist/content.js --format=iife --platform=browser --target=chrome100 && esbuild src/extension/popup-entry.js --bundle --outfile=extension/dist/popup.js --format=iife --platform=browser --target=chrome100",
     "build:watch": "node scripts/build-watch.mjs",
     "test:e2e": "npm run build && node scripts/run-e2e.mjs",
+    "test:e2e:ci": "npx playwright test",
     "playwright:install": "playwright install chromium"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.51.0",
+    "@types/chrome": "^0.1.39",
     "esbuild": "^0.28.0",
+    "eslint": "^9.39.4",
+    "globals": "^15.15.0",
     "happy-dom": "^20.8.9",
     "serve": "^14.2.4",
+    "typescript": "^6.0.2",
     "vitest": "^3.0.0"
   }
 }

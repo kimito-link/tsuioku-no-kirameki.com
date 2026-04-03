@@ -8,8 +8,9 @@
  */
 export function findNicoCommentPanel(root = document) {
   if (!root || root.nodeType !== 9 && root.nodeType !== 1) return null;
-  const doc = root.nodeType === 9 ? root : root.ownerDocument || document;
-  const base = root.nodeType === 9 ? doc.documentElement : root;
+  /** @type {Document} */
+  const doc = root.nodeType === 9 ? /** @type {Document} */ (root) : root.ownerDocument || document;
+  const base = root.nodeType === 9 ? doc.documentElement : /** @type {Element} */ (root);
   try {
     return (
       doc.querySelector('.ga-ns-comment-panel') ||
@@ -35,6 +36,7 @@ export function findLargestVerticalScrollHost(el) {
   const win = doc.defaultView;
   if (!win) return null;
 
+  /** @param {Element} node */
   const walk = (node) => {
     if (node.nodeType !== 1) return;
     const st = win.getComputedStyle(node);
@@ -80,10 +82,12 @@ export function findCommentListScrollHost(doc = document) {
   return findLargestVerticalScrollHost(panel);
 }
 
+/** @param {number} ms */
 function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** @param {Document} doc */
 function raf(doc) {
   const win = doc.defaultView;
   if (!win?.requestAnimationFrame) return Promise.resolve();
@@ -107,6 +111,10 @@ export async function harvestVirtualCommentList(opts) {
   const scanRoot = panel || doc.body;
   if (!extract) return [];
 
+  /**
+   * @param {Map<string, { commentNo?: string, text: string, userId?: string|null }>} map
+   * @param {{ commentNo?: string, text: string, userId?: string|null }[]} rows
+   */
   const mergeInto = (map, rows) => {
     for (const row of rows) {
       const no = String(row.commentNo ?? '').trim();

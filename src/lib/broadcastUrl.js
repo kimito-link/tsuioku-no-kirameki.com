@@ -4,6 +4,10 @@
 
 const LV_RE = /\blv\d+/i;
 
+/**
+ * @param {string | null | undefined} url
+ * @returns {string | null}
+ */
 export function extractLiveIdFromUrl(url) {
   const s = String(url || '').trim();
   if (!s) return null;
@@ -20,6 +24,9 @@ export function extractLiveIdFromUrl(url) {
 /**
  * Playwright 用ローカルモック（127.0.0.1:3456 のみ）。本番ホストは従来どおり。
  */
+/**
+ * @param {URL} u
+ */
 function isLocalE2EWatchHost(u) {
   const host = u.hostname.toLowerCase();
   const port = u.port || (u.protocol === 'https:' ? '443' : '80');
@@ -30,6 +37,10 @@ function isLocalE2EWatchHost(u) {
   );
 }
 
+/**
+ * @param {string | null | undefined} url
+ * @returns {boolean}
+ */
 export function isNicoLiveWatchUrl(url) {
   try {
     const u = new URL(String(url || ''));
