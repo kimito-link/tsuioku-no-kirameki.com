@@ -1282,9 +1282,9 @@
       display: none;
       width: 100%;
       margin: 10px 0 2px;
-      pointer-events: none;
+      pointer-events: auto;
       position: relative;
-      z-index: 5;
+      z-index: 2147482000;
       border: none !important;
       outline: none !important;
       box-shadow: none !important;
@@ -1330,7 +1330,7 @@
     host.id = INLINE_POPUP_HOST_ID;
     host.setAttribute("aria-hidden", "true");
     host.style.display = "none";
-    host.style.pointerEvents = "none";
+    host.style.pointerEvents = "auto";
     host.style.width = "100%";
     const iframe = document.createElement("iframe");
     iframe.id = INLINE_POPUP_IFRAME_ID;
@@ -1352,6 +1352,7 @@
     const vr = video.getBoundingClientRect();
     if (vr.width < 260 || vr.height < 140) {
       host.style.display = "none";
+      host.setAttribute("aria-hidden", "true");
       return;
     }
     const pr = parent.getBoundingClientRect();
@@ -1375,6 +1376,8 @@
       host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
     );
     if (iframe) iframe.style.width = `${panelWidthPx}px`;
+    host.style.pointerEvents = "auto";
+    host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
   }
   function renderInlinePopupHost(target) {
@@ -1390,6 +1393,7 @@
     const currentRect = target.getBoundingClientRect();
     if (currentRect.width < 260 || currentRect.height < 140) {
       host.style.display = "none";
+      host.setAttribute("aria-hidden", "true");
       return;
     }
     if (host.parentElement !== parent || host.previousSibling !== target) {
@@ -1404,13 +1408,18 @@
     );
     if (iframe) iframe.style.width = `${panelWidth}px`;
     host.style.width = `${panelWidth}px`;
+    host.style.pointerEvents = "auto";
+    host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
   }
   function hidePageFrameOverlay() {
     const overlay = document.getElementById(PAGE_FRAME_OVERLAY_ID);
     if (overlay) overlay.style.display = "none";
     const host = document.getElementById(INLINE_POPUP_HOST_ID);
-    if (host) host.style.display = "none";
+    if (host) {
+      host.style.display = "none";
+      host.setAttribute("aria-hidden", "true");
+    }
     stableFrameTarget = null;
   }
   function applyPageFramePalette(frameId, custom) {
