@@ -2171,19 +2171,19 @@
 [DOM] ${Object.entries(dbg.dom).map(([k, v]) => `${k}=${v}`).join(" ")}`
           );
         }
-        if (dbg.gridKids && Array.isArray(dbg.gridKids)) {
+        if (dbg.tblRows && Array.isArray(dbg.tblRows)) {
           parts.push(`
-[GRID] kids=${dbg.gridKidCount}`);
-          for (const gk of dbg.gridKids) {
+[TBL] rows=${dbg.tblKids}`);
+          for (const tr of dbg.tblRows) {
             parts.push(`
-  <${gk.tag} cls="${gk.cls}" ch=${gk.childCount} ${gk.attrs}> "${gk.txt}"`);
-            if (gk.fc) parts.push(` fc=<${gk.fc}>`);
+  <${tr.tag} cls="${tr.cls}" ch=${tr.ch} role="${tr.role}" style="${tr.style}"> "${tr.txt}"`);
           }
         }
-        if (dbg.deepSample) {
-          parts.push(`
-[DEEP] <${dbg.deepSample.tag} cls="${dbg.deepSample.cls}"> "${dbg.deepSample.txt}"`);
-        }
+        parts.push(
+          `
+[FIBER] scans=${dbg.fbScans || "0"} found=${dbg.fbFound || "0"} rows=${dbg.fbRows || "0"}
+  probe=${dbg.fbProbe || "-"}`
+        );
       }
       noteEl.textContent = parts.join("");
     }
@@ -2791,7 +2791,7 @@
       renderUserRooms([]);
       return;
     }
-    const snapshotKey = `${lv}|${url}|s11`;
+    const snapshotKey = `${lv}|${url}|s12`;
     if (watchMetaCache.key !== snapshotKey || !watchMetaCache.snapshot) {
       watchMetaCache.key = snapshotKey;
       const { snapshot } = await requestWatchPageSnapshotFromOpenTab(url);

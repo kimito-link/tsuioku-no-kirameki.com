@@ -1607,6 +1607,27 @@ function collectWatchPageSnapshot() {
       }
     }
 
+    {
+      const g2 = document.querySelector('[class*="comment-data-grid"], [class*="data-grid"]');
+      if (g2) {
+        const bdy = g2.querySelector('[class*="body"]');
+        const tbl = bdy?.querySelector('[class*="table"]');
+        const rc = tbl || bdy;
+        if (rc) {
+          const rws = Array.from(rc.children).slice(0, 3);
+          _debug.tblKids = rc.children.length;
+          _debug.tblRows = rws.map(r => ({
+            tag: r.tagName,
+            cls: (r.className || '').substring(0, 80),
+            ch: r.children.length,
+            role: r.getAttribute('role') || '',
+            style: (r.getAttribute('style') || '').substring(0, 60),
+            txt: (r.textContent || '').substring(0, 50).replace(/\s+/g, ' '),
+          }));
+        }
+      }
+    }
+
     const docEl = document.documentElement;
     if (docEl) {
       _debug.pi = docEl.getAttribute('data-nls-page-intercept') || '';
@@ -1614,6 +1635,10 @@ function collectWatchPageSnapshot() {
       _debug.piPost = docEl.getAttribute('data-nls-page-intercept-posted') || '';
       _debug.piWs = docEl.getAttribute('data-nls-page-intercept-ws') || '';
       _debug.piFetch = docEl.getAttribute('data-nls-page-intercept-fetch') || '';
+      _debug.fbScans = docEl.getAttribute('data-nls-fiber-scans') || '';
+      _debug.fbFound = docEl.getAttribute('data-nls-fiber-found') || '';
+      _debug.fbRows = docEl.getAttribute('data-nls-fiber-rows') || '';
+      _debug.fbProbe = docEl.getAttribute('data-nls-fiber-probe') || '';
     }
   } catch { /* no-op */ }
 

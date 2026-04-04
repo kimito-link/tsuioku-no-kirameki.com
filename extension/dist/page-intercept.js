@@ -437,6 +437,119 @@
         return p;
       };
     }
+    const FIBER_SCAN_MS = 3500;
+    const FB_NO = ["no", "commentNo", "comment_no", "number", "vposNo"];
+    const FB_UID = ["userId", "user_id", "uid", "hashedUserId", "hashed_user_id", "senderUserId", "rawUserId", "raw_user_id"];
+    const FB_NAME = ["name", "nickname", "userName", "user_name", "displayName", "display_name"];
+    const FB_AV = ["iconUrl", "icon_url", "avatarUrl", "avatar_url", "userIconUrl"];
+    function getFiber(el) {
+      if (!el) return null;
+      for (const k of Object.keys(el)) {
+        if (k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$")) return el[k] || null;
+      }
+      return null;
+    }
+    function pickStr(obj, keys) {
+      if (!obj || typeof obj !== "object") return "";
+      for (const k of keys) {
+        const v = obj[k];
+        if (v != null && v !== "") return String(v);
+      }
+      return "";
+    }
+    function digFiber(fiber, depth) {
+      if (!fiber || depth > 6) return null;
+      const props = fiber.memoizedProps || fiber.pendingProps;
+      if (props && typeof props === "object" && !Array.isArray(props)) {
+        let no = pickStr(props, FB_NO);
+        let uid = pickStr(props, FB_UID);
+        let nm = pickStr(props, FB_NAME);
+        let av = normalizeAvatarUrl(pickStr(props, FB_AV));
+        const SUBS = ["data", "chat", "comment", "item", "message", "props", "value"];
+        for (const s of SUBS) {
+          const c = props[s];
+          if (!c || typeof c !== "object" || Array.isArray(c)) continue;
+          if (!no) no = pickStr(c, FB_NO);
+          if (!uid) uid = pickStr(c, FB_UID);
+          if (!nm) nm = pickStr(c, FB_NAME);
+          if (!av) av = normalizeAvatarUrl(pickStr(c, FB_AV));
+        }
+        if (no && uid) return { no, uid, nm, av };
+      }
+      let child = fiber.child;
+      while (child) {
+        const r = digFiber(child, depth + 1);
+        if (r) return r;
+        child = child.sibling;
+      }
+      return null;
+    }
+    let _fiberScanCount = 0;
+    let _fiberFoundCount = 0;
+    let _fiberRowCount = 0;
+    let _fiberProbeKeys = "";
+    function scanGridFibers() {
+      try {
+        const grid = document.querySelector('[class*="comment-data-grid"], [class*="data-grid"]');
+        if (!grid) return;
+        const body = grid.querySelector('[class*="body"]');
+        if (!body) return;
+        const table = body.querySelector('[class*="table"]');
+        const target = table || body;
+        const rows = target.children;
+        _fiberScanCount++;
+        _fiberRowCount = rows.length;
+        let found = 0;
+        for (let i = 0; i < rows.length && i < 300; i++) {
+          const row = rows[i];
+          const fb = getFiber(row);
+          if (!fb) continue;
+          if (_fiberProbeKeys === "" && i === 0) {
+            const p = fb.memoizedProps || fb.pendingProps || {};
+            const keys = Object.keys(p).slice(0, 20);
+            _fiberProbeKeys = keys.join(",");
+            for (const key of keys) {
+              if (typeof p[key] === "object" && p[key] !== null && !Array.isArray(p[key])) {
+                _fiberProbeKeys += " | " + key + ":{" + Object.keys(p[key]).slice(0, 15).join(",") + "}";
+                break;
+              }
+            }
+          }
+          const data = digFiber(fb, 0);
+          if (data) {
+            enqueue(data.no, data.uid, data.nm, data.av);
+            found++;
+          }
+        }
+        _fiberFoundCount += found;
+        const root = document.documentElement;
+        if (root) {
+          root.setAttribute("data-nls-fiber-scans", String(_fiberScanCount));
+          root.setAttribute("data-nls-fiber-found", String(_fiberFoundCount));
+          root.setAttribute("data-nls-fiber-rows", String(_fiberRowCount));
+          root.setAttribute("data-nls-fiber-probe", _fiberProbeKeys.substring(0, 300));
+        }
+      } catch {
+      }
+    }
+    function startFiberScan() {
+      let attempts = 0;
+      const tryStart = () => {
+        attempts++;
+        if (document.querySelector('[class*="comment-data-grid"], [class*="data-grid"]')) {
+          scanGridFibers();
+          setInterval(scanGridFibers, FIBER_SCAN_MS);
+          return;
+        }
+        if (attempts < 60) setTimeout(tryStart, 2e3);
+      };
+      tryStart();
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => setTimeout(startFiberScan, 1500), { once: true });
+    } else {
+      setTimeout(startFiberScan, 1500);
+    }
     const MSG_EMBEDDED_DATA = "NLS_INTERCEPT_EMBEDDED_DATA";
     function tryReadEmbeddedData() {
       try {
