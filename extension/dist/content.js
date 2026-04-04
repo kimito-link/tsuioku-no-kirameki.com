@@ -67,6 +67,7 @@
   var KEY_RECORDING = "nls_recording_enabled";
   var KEY_LAST_WATCH_URL = "nls_last_watch_url";
   var KEY_STORAGE_WRITE_ERROR = "nls_storage_write_error";
+  var KEY_AUTO_BACKUP_STATE = "nls_auto_backup_state";
   var KEY_POPUP_FRAME = "nls_popup_frame";
   var KEY_POPUP_FRAME_CUSTOM = "nls_popup_frame_custom";
   var KEY_THUMB_AUTO = "nls_thumb_auto_enabled";
@@ -1593,6 +1594,19 @@
     if (!Number.isFinite(n) || n < 0) return null;
     return n;
   }
+  function pickProgramBeginAt(props) {
+    if (!props || typeof props !== "object") return null;
+    const candidates = [
+      props?.program?.beginAt,
+      props?.program?.openTime,
+      props?.program?.schedule?.begin,
+      props?.program?.beginTime
+    ];
+    for (const c of candidates) {
+      if (c && typeof c === "string" && c.length >= 10) return c;
+    }
+    return null;
+  }
 
   // src/lib/concurrentEstimate.js
   var DEFAULT_WINDOW_MS = 5 * 60 * 1e3;
@@ -1618,6 +1632,7 @@
   var SELF_POST_NATIVE_DEDUPE_MS = 5e3;
   var SELF_POST_MATCH_LATE_MS = 10 * 60 * 1e3;
   var SELF_POST_MATCH_EARLY_MS = 30 * 1e3;
+  var AUTO_BACKUP_LIVES_MAX = 40;
   var SNAPSHOT_LINK_RELS = /* @__PURE__ */ new Set([
     "alternate",
     "icon",
@@ -1924,6 +1939,10 @@
       if (typeof v === "number" && Number.isFinite(v) && v >= 0) {
         wsViewerCount = v;
         wsViewerCountUpdatedAt = Date.now();
+      }
+      const c = e.data.comments;
+      if (typeof c === "number" && Number.isFinite(c) && c >= 0) {
+        wsCommentCount = c;
       }
       return;
     }
@@ -3087,6 +3106,16 @@
       viewerUserId: viewer.viewerUserId,
       broadcasterUserId,
       viewerCountFromDom,
+      totalComments: wsCommentCount,
+      streamAgeMin: (() => {
+        const props = extractEmbeddedDataProps(document);
+        const begin = props ? pickProgramBeginAt(props) : null;
+        if (!begin) return null;
+        const t = new Date(begin).getTime();
+        if (!Number.isFinite(t)) return null;
+        const age = (Date.now() - t) / 6e4;
+        return age >= 0 ? Math.round(age) : null;
+      })(),
       recentActiveUsers: countRecentActiveUsers(activeUserTimestamps, Date.now()),
       _debug
     };
@@ -3415,6 +3444,38 @@
       changed: true
     };
   }
+  function normalizeAutoBackupState(raw) {
+    const src = raw && typeof raw === "object" ? raw : {};
+    const rawLives = src && typeof src === "object" && "lives" in src && src.lives && typeof src.lives === "object" ? src.lives : {};
+    const lives = {};
+    for (const [liveId2, meta] of Object.entries(rawLives)) {
+      const lid = String(liveId2 || "").trim().toLowerCase();
+      if (!lid) continue;
+      const row = meta && typeof meta === "object" ? meta : {};
+      lives[lid] = {
+        liveId: lid,
+        commentCount: Math.max(0, Number(row.commentCount) || 0),
+        updatedAt: Math.max(0, Number(row.updatedAt) || 0),
+        lastCommentAt: Math.max(0, Number(row.lastCommentAt) || 0),
+        watchUrl: String(row.watchUrl || "").trim(),
+        lastBackupAt: Math.max(0, Number(row.lastBackupAt) || 0),
+        lastBackedUpdatedAt: Math.max(0, Number(row.lastBackedUpdatedAt) || 0),
+        lastBackupCount: Math.max(0, Number(row.lastBackupCount) || 0)
+      };
+    }
+    return { lives };
+  }
+  function pruneAutoBackupLives(state) {
+    const entries = Object.entries(state?.lives || {});
+    if (entries.length <= AUTO_BACKUP_LIVES_MAX) return state;
+    entries.sort((a, b) => {
+      const aAt = Math.max(Number(a[1]?.updatedAt) || 0, Number(a[1]?.lastBackupAt) || 0);
+      const bAt = Math.max(Number(b[1]?.updatedAt) || 0, Number(b[1]?.lastBackupAt) || 0);
+      return bAt - aAt;
+    });
+    state.lives = Object.fromEntries(entries.slice(0, AUTO_BACKUP_LIVES_MAX));
+    return state;
+  }
   async function persistCommentRows(rows) {
     if (!rows?.length || !recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
       return;
@@ -3422,7 +3483,12 @@
     const enriched = enrichRowsWithInterceptedUserIds(rows);
     const key = commentsStorageKey(liveId);
     try {
-      const bag = await chrome.storage.local.get([key, KEY_SELF_POSTED_RECENTS]);
+      const bag = await chrome.storage.local.get([
+        key,
+        KEY_SELF_POSTED_RECENTS,
+        KEY_AUTO_BACKUP_STATE,
+        KEY_LAST_WATCH_URL
+      ]);
       const existing = Array.isArray(bag[key]) ? bag[key] : [];
       const pendingRaw = bag[KEY_SELF_POSTED_RECENTS];
       const pendingItems = pendingRaw && typeof pendingRaw === "object" && Array.isArray(pendingRaw.items) ? pendingRaw.items.filter(
@@ -3446,8 +3512,30 @@
       }
       const pendingTouched = consumed.changed;
       if (!storageTouched && !pendingTouched) return;
+      const updatedAt = Date.now();
+      const lastCommentAt = Math.max(0, Number(next[next.length - 1]?.capturedAt || 0));
+      const rememberedWatchUrl = String(bag[KEY_LAST_WATCH_URL] || "").trim();
+      const backupWatchUrl = isNicoLiveWatchUrl(window.location.href) ? String(window.location.href || "") : extractLiveIdFromUrl(rememberedWatchUrl) === liveId ? rememberedWatchUrl : `https://live.nicovideo.jp/watch/${liveId}`;
+      const autoBackupState = normalizeAutoBackupState(bag[KEY_AUTO_BACKUP_STATE]);
+      const prevBackupMeta = autoBackupState.lives[String(liveId || "").trim().toLowerCase()] || {
+        lastBackupAt: 0,
+        lastBackedUpdatedAt: 0,
+        lastBackupCount: 0
+      };
+      autoBackupState.lives[String(liveId || "").trim().toLowerCase()] = {
+        liveId: String(liveId || "").trim().toLowerCase(),
+        commentCount: next.length,
+        updatedAt,
+        lastCommentAt,
+        watchUrl: backupWatchUrl,
+        lastBackupAt: Math.max(0, Number(prevBackupMeta.lastBackupAt) || 0),
+        lastBackedUpdatedAt: Math.max(0, Number(prevBackupMeta.lastBackedUpdatedAt) || 0),
+        lastBackupCount: Math.max(0, Number(prevBackupMeta.lastBackupCount) || 0)
+      };
+      pruneAutoBackupLives(autoBackupState);
       await chrome.storage.local.set({
         [key]: next,
+        [KEY_AUTO_BACKUP_STATE]: autoBackupState,
         ...pendingTouched ? { [KEY_SELF_POSTED_RECENTS]: { items: consumed.remainingItems } } : {}
       });
       await chrome.storage.local.remove(KEY_STORAGE_WRITE_ERROR);

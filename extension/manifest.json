@@ -3,7 +3,7 @@
   "name": "nicolivelog",
   "version": "0.1.0",
   "description": "ニコニコ生放送のコメントをローカルに記録するプロトタイプ（オプトイン）",
-  "permissions": ["storage", "scripting", "downloads"],
+  "permissions": ["storage", "scripting", "downloads", "alarms"],
   "host_permissions": [
     "https://*.nicovideo.jp/*",
     "http://127.0.0.1:3456/*",

@@ -52,3 +52,23 @@ export function pickWsUrlFromEmbeddedData(props) {
   if (!url || typeof url !== 'string') return null;
   return url;
 }
+
+/**
+ * embedded-data props から配信開始時刻(ISO 8601)を取得する。
+ * program.beginAt / program.openTime / program.schedule.begin 等を探す。
+ * @param {Record<string, any>} props
+ * @returns {string | null} ISO 8601 文字列 or null
+ */
+export function pickProgramBeginAt(props) {
+  if (!props || typeof props !== 'object') return null;
+  const candidates = [
+    props?.program?.beginAt,
+    props?.program?.openTime,
+    props?.program?.schedule?.begin,
+    props?.program?.beginTime,
+  ];
+  for (const c of candidates) {
+    if (c && typeof c === 'string' && c.length >= 10) return c;
+  }
+  return null;
+}

@@ -6,6 +6,7 @@ import {
   isNicoVideoJpHost
 } from '../lib/broadcastUrl.js';
 import {
+  KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
   KEY_LAST_WATCH_URL,
   KEY_POPUP_FRAME,
@@ -56,7 +57,8 @@ import { audioConstraintsForDevice } from '../lib/voiceInputDevices.js';
 import { pollUntil } from '../lib/pollUntil.js';
 import {
   extractEmbeddedDataProps,
-  pickViewerCountFromEmbeddedData
+  pickViewerCountFromEmbeddedData,
+  pickProgramBeginAt
 } from '../lib/embeddedDataExtract.js';
 import { countRecentActiveUsers } from '../lib/concurrentEstimate.js';
 
@@ -76,6 +78,7 @@ const SELF_POST_RECENT_TTL_MS = 24 * 60 * 60 * 1000;
 const SELF_POST_NATIVE_DEDUPE_MS = 5000;
 const SELF_POST_MATCH_LATE_MS = 10 * 60 * 1000;
 const SELF_POST_MATCH_EARLY_MS = 30 * 1000;
+const AUTO_BACKUP_LIVES_MAX = 40;
 const SNAPSHOT_LINK_RELS = new Set([
   'alternate',
   'icon',
@@ -465,6 +468,10 @@ window.addEventListener('message', (e) => {
     if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
       wsViewerCount = v;
       wsViewerCountUpdatedAt = Date.now();
+    }
+    const c = e.data.comments;
+    if (typeof c === 'number' && Number.isFinite(c) && c >= 0) {
+      wsCommentCount = c;
     }
     return;
   }
@@ -1906,6 +1913,16 @@ function collectWatchPageSnapshot() {
     viewerUserId: viewer.viewerUserId,
     broadcasterUserId,
     viewerCountFromDom,
+    totalComments: wsCommentCount,
+    streamAgeMin: (() => {
+      const props = extractEmbeddedDataProps(document);
+      const begin = props ? pickProgramBeginAt(props) : null;
+      if (!begin) return null;
+      const t = new Date(begin).getTime();
+      if (!Number.isFinite(t)) return null;
+      const age = (Date.now() - t) / 60000;
+      return age >= 0 ? Math.round(age) : null;
+    })(),
     recentActiveUsers: countRecentActiveUsers(activeUserTimestamps, Date.now()),
     _debug
   };
@@ -2314,6 +2331,55 @@ function consumeMatchedSelfPostedRecents(added, pendingItems, lid) {
   };
 }
 
+/**
+ * @param {unknown} raw
+ * @returns {{ lives: Record<string, { liveId: string, commentCount: number, updatedAt: number, lastCommentAt: number, watchUrl: string, lastBackupAt: number, lastBackedUpdatedAt: number, lastBackupCount: number }> }}
+ */
+function normalizeAutoBackupState(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const rawLives =
+    src &&
+    typeof src === 'object' &&
+    'lives' in src &&
+    src.lives &&
+    typeof src.lives === 'object'
+      ? src.lives
+      : {};
+  /** @type {Record<string, { liveId: string, commentCount: number, updatedAt: number, lastCommentAt: number, watchUrl: string, lastBackupAt: number, lastBackedUpdatedAt: number, lastBackupCount: number }>} */
+  const lives = {};
+  for (const [liveId, meta] of Object.entries(rawLives)) {
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!lid) continue;
+    const row = meta && typeof meta === 'object' ? meta : {};
+    lives[lid] = {
+      liveId: lid,
+      commentCount: Math.max(0, Number(row.commentCount) || 0),
+      updatedAt: Math.max(0, Number(row.updatedAt) || 0),
+      lastCommentAt: Math.max(0, Number(row.lastCommentAt) || 0),
+      watchUrl: String(row.watchUrl || '').trim(),
+      lastBackupAt: Math.max(0, Number(row.lastBackupAt) || 0),
+      lastBackedUpdatedAt: Math.max(0, Number(row.lastBackedUpdatedAt) || 0),
+      lastBackupCount: Math.max(0, Number(row.lastBackupCount) || 0)
+    };
+  }
+  return { lives };
+}
+
+/**
+ * @param {{ lives: Record<string, { liveId: string, commentCount: number, updatedAt: number, lastCommentAt: number, watchUrl: string, lastBackupAt: number, lastBackedUpdatedAt: number, lastBackupCount: number }> }} state
+ */
+function pruneAutoBackupLives(state) {
+  const entries = Object.entries(state?.lives || {});
+  if (entries.length <= AUTO_BACKUP_LIVES_MAX) return state;
+  entries.sort((a, b) => {
+    const aAt = Math.max(Number(a[1]?.updatedAt) || 0, Number(a[1]?.lastBackupAt) || 0);
+    const bAt = Math.max(Number(b[1]?.updatedAt) || 0, Number(b[1]?.lastBackupAt) || 0);
+    return bAt - aAt;
+  });
+  state.lives = Object.fromEntries(entries.slice(0, AUTO_BACKUP_LIVES_MAX));
+  return state;
+}
+
 /** @param {ParsedCommentRow[]|null|undefined} rows */
 async function persistCommentRows(rows) {
   if (
@@ -2328,7 +2394,12 @@ async function persistCommentRows(rows) {
   const enriched = enrichRowsWithInterceptedUserIds(rows);
   const key = commentsStorageKey(liveId);
   try {
-    const bag = await chrome.storage.local.get([key, KEY_SELF_POSTED_RECENTS]);
+    const bag = await chrome.storage.local.get([
+      key,
+      KEY_SELF_POSTED_RECENTS,
+      KEY_AUTO_BACKUP_STATE,
+      KEY_LAST_WATCH_URL
+    ]);
     const existing = Array.isArray(bag[key]) ? bag[key] : [];
     const pendingRaw = bag[KEY_SELF_POSTED_RECENTS];
     const pendingItems =
@@ -2359,8 +2430,34 @@ async function persistCommentRows(rows) {
     }
     const pendingTouched = consumed.changed;
     if (!storageTouched && !pendingTouched) return;
+    const updatedAt = Date.now();
+    const lastCommentAt = Math.max(0, Number(next[next.length - 1]?.capturedAt || 0));
+    const rememberedWatchUrl = String(bag[KEY_LAST_WATCH_URL] || '').trim();
+    const backupWatchUrl = isNicoLiveWatchUrl(window.location.href)
+      ? String(window.location.href || '')
+      : extractLiveIdFromUrl(rememberedWatchUrl) === liveId
+        ? rememberedWatchUrl
+        : `https://live.nicovideo.jp/watch/${liveId}`;
+    const autoBackupState = normalizeAutoBackupState(bag[KEY_AUTO_BACKUP_STATE]);
+    const prevBackupMeta = autoBackupState.lives[String(liveId || '').trim().toLowerCase()] || {
+      lastBackupAt: 0,
+      lastBackedUpdatedAt: 0,
+      lastBackupCount: 0
+    };
+    autoBackupState.lives[String(liveId || '').trim().toLowerCase()] = {
+      liveId: String(liveId || '').trim().toLowerCase(),
+      commentCount: next.length,
+      updatedAt,
+      lastCommentAt,
+      watchUrl: backupWatchUrl,
+      lastBackupAt: Math.max(0, Number(prevBackupMeta.lastBackupAt) || 0),
+      lastBackedUpdatedAt: Math.max(0, Number(prevBackupMeta.lastBackedUpdatedAt) || 0),
+      lastBackupCount: Math.max(0, Number(prevBackupMeta.lastBackupCount) || 0)
+    };
+    pruneAutoBackupLives(autoBackupState);
     await chrome.storage.local.set({
       [key]: next,
+      [KEY_AUTO_BACKUP_STATE]: autoBackupState,
       ...(pendingTouched
         ? { [KEY_SELF_POSTED_RECENTS]: { items: consumed.remainingItems } }
         : {})

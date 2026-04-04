@@ -10,6 +10,9 @@ export const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 /** 直近の chrome.storage.local 書き込み失敗（クォータ等）。成功時にコンテンツ側で削除する */
 export const KEY_STORAGE_WRITE_ERROR = 'nls_storage_write_error';
 
+/** 5分ごとの自動バックアップ状態（最終バックアップ時刻など） */
+export const KEY_AUTO_BACKUP_STATE = 'nls_auto_backup_state';
+
 /** ポップアップの着せ替えフレーム設定 */
 export const KEY_POPUP_FRAME = 'nls_popup_frame';
 

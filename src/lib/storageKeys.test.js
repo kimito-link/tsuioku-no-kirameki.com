@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  KEY_AUTO_BACKUP_STATE,
   KEY_COMMENT_ENTER_SEND,
   KEY_STORY_GROWTH_COLLAPSED,
   KEY_LAST_WATCH_URL,
@@ -19,6 +20,7 @@ describe('storage key constants', () => {
     expect(KEY_RECORDING).toMatch(/^nls_/);
     expect(KEY_LAST_WATCH_URL).toMatch(/^nls_/);
     expect(KEY_STORAGE_WRITE_ERROR).toMatch(/^nls_/);
+    expect(KEY_AUTO_BACKUP_STATE).toMatch(/^nls_/);
     expect(KEY_SELF_POSTED_RECENTS).toMatch(/^nls_/);
     expect(KEY_COMMENT_ENTER_SEND).toMatch(/^nls_/);
     expect(KEY_STORY_GROWTH_COLLAPSED).toMatch(/^nls_/);
