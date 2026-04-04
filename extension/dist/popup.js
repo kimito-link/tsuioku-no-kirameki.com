@@ -1193,7 +1193,11 @@
     hoverAnchorRect: (
       /** @type {DOMRect|null} */
       null
-    )
+    ),
+    /** ホバー再取得用の最後のポインタ座標 */
+    hoverClientX: Number.NaN,
+    /** ホバー再取得用の最後のポインタ座標 */
+    hoverClientY: Number.NaN
   };
   var STORY_SOURCE_STATE = {
     liveId: "",
@@ -1256,11 +1260,55 @@
       STORY_GROWTH_STATE.hoverAnchorRect = null;
     }
   }
+  function updateStoryHoverPointerFromEvent(ev) {
+    const x = Number(ev?.clientX);
+    const y = Number(ev?.clientY);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    STORY_GROWTH_STATE.hoverClientX = x;
+    STORY_GROWTH_STATE.hoverClientY = y;
+  }
+  function findStoryHoverIconFromPointer() {
+    const root = STORY_GROWTH_STATE.root;
+    const x = STORY_GROWTH_STATE.hoverClientX;
+    const y = STORY_GROWTH_STATE.hoverClientY;
+    if (Number.isFinite(x) && Number.isFinite(y) && typeof document.elementFromPoint === "function") {
+      const hit = document.elementFromPoint(x, y);
+      if (hit instanceof Element) {
+        const img = hit.closest("img.nl-story-growth-icon");
+        if (img instanceof HTMLImageElement && (!root || root.contains(img))) {
+          return img;
+        }
+        if ($("sceneStoryDetail")?.contains(hit)) return null;
+      }
+    }
+    if (!root) return null;
+    try {
+      const hovered = root.querySelector("img.nl-story-growth-icon:hover");
+      return hovered instanceof HTMLImageElement ? hovered : null;
+    } catch {
+      return null;
+    }
+  }
+  function reconcileStoryHoverPreviewFromPointer() {
+    if (STORY_GROWTH_STATE.pinnedCommentId) return false;
+    const img = findStoryHoverIconFromPointer();
+    if (!img) return false;
+    const sid = String(img.getAttribute("data-comment-id") || "").trim();
+    if (!sid) return false;
+    STORY_GROWTH_STATE.hoverPreviewCommentId = sid;
+    updateStoryHoverAnchorFromElement(img);
+    cancelStoryHoverClearTimer();
+    return true;
+  }
   function scheduleStoryHoverClear() {
     cancelStoryHoverClearTimer();
     STORY_GROWTH_STATE.hoverClearTimer = window.setTimeout(() => {
       STORY_GROWTH_STATE.hoverClearTimer = null;
       if (!STORY_GROWTH_STATE.pinnedCommentId) {
+        if (reconcileStoryHoverPreviewFromPointer()) {
+          renderStoryCommentDetailPanel();
+          return;
+        }
         STORY_GROWTH_STATE.hoverPreviewCommentId = null;
         STORY_GROWTH_STATE.hoverAnchorRect = null;
         renderStoryCommentDetailPanel();
@@ -1422,6 +1470,9 @@
       STORY_GROWTH_STATE.hoverPreviewCommentId = null;
       cancelStoryHoverClearTimer();
     }
+    if (!STORY_GROWTH_STATE.pinnedCommentId && STORY_GROWTH_STATE.hoverPreviewCommentId) {
+      reconcileStoryHoverPreviewFromPointer();
+    }
     syncGrowthIconSelection(STORY_GROWTH_STATE.root);
     renderStoryUserLane();
     renderStoryAvatarDiag();
@@ -1466,7 +1517,10 @@
       wrap.style.removeProperty("--nl-story-detail-arrow-left");
       return;
     }
-    const entry = getStoryEntryByStableId(effectiveId);
+    let entry = getStoryEntryByStableId(effectiveId);
+    if (!entry && isHoverBubble && reconcileStoryHoverPreviewFromPointer()) {
+      entry = getStoryEntryByStableId(STORY_GROWTH_STATE.hoverPreviewCommentId);
+    }
     if (!entry) {
       wrap.hidden = true;
       listEl.innerHTML = "";
@@ -1725,6 +1779,7 @@
     root.addEventListener("pointerover", (ev) => {
       if (!storyHoverPreviewEnabled()) return;
       if (STORY_GROWTH_STATE.pinnedCommentId) return;
+      updateStoryHoverPointerFromEvent(ev);
       const el = ev.target;
       const img = el instanceof Element ? el.closest("img.nl-story-growth-icon") : null;
       if (!img || !root.contains(img)) return;
@@ -1738,6 +1793,7 @@
     root.addEventListener("pointermove", (ev) => {
       if (!storyHoverPreviewEnabled()) return;
       if (STORY_GROWTH_STATE.pinnedCommentId) return;
+      updateStoryHoverPointerFromEvent(ev);
       const el = ev.target;
       const img = el instanceof Element ? el.closest("img.nl-story-growth-icon") : null;
       if (!img || !root.contains(img)) return;
@@ -1749,6 +1805,7 @@
     root.addEventListener("pointerout", (ev) => {
       if (!storyHoverPreviewEnabled()) return;
       if (STORY_GROWTH_STATE.pinnedCommentId) return;
+      updateStoryHoverPointerFromEvent(ev);
       const el = ev.target;
       const img = el instanceof Element ? el.closest("img.nl-story-growth-icon") : null;
       if (!img || !root.contains(img)) return;
