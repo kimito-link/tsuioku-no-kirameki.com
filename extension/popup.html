@@ -1913,10 +1913,34 @@
         margin-bottom: 3px;
       }
 
+      .nl-export-toolbar {
+        background: var(--nl-surface);
+        border: 1px solid var(--nl-border);
+        border-radius: var(--nl-radius);
+        padding: 7px 9px 8px;
+        margin-bottom: 6px;
+        box-shadow: var(--nl-shadow);
+      }
+
+      html.nl-inline body .nl-export-toolbar {
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        background: transparent;
+        padding-left: 0;
+        padding-right: 0;
+        margin-bottom: 4px;
+      }
+
       .nl-capture {
         margin-top: 8px;
         padding-top: 8px;
         border-top: 1px solid var(--nl-border);
+      }
+
+      .nl-export-toolbar .nl-capture {
+        margin-top: 6px;
+        padding-top: 6px;
       }
 
       .nl-capture .nl-btn-row {
@@ -2544,6 +2568,35 @@
         </div>
       </section>
 
+      <div class="nl-export-toolbar" aria-label="レポートとキャプチャ">
+        <div class="nl-btn-row">
+          <button type="button" id="exportJson" disabled>HTMLレポートを保存</button>
+        </div>
+        <p class="nl-export-note">
+          メタ情報・script・noopenerリンク・保存コメントをまとめて検索できるHTMLを出力します。
+        </p>
+        <section class="nl-capture" aria-label="画面キャプチャと定期サムネ">
+          <div class="nl-btn-row">
+            <button type="button" id="captureScreenshot" disabled>
+              画面を1枚保存
+            </button>
+          </div>
+          <p id="captureStatus" class="nl-export-note" aria-live="polite"></p>
+          <div class="nl-thumb-row">
+            <label for="thumbInterval">定期サムネ</label>
+            <select id="thumbInterval" aria-label="定期サムネの間隔">
+              <option value="0">オフ</option>
+              <option value="30000">30秒</option>
+              <option value="60000">1分</option>
+              <option value="300000">5分</option>
+            </select>
+            <span class="nl-thumb-count"
+              >サムネ <span id="thumbCount">-</span> 件（このPC内）</span
+            >
+          </div>
+        </section>
+      </div>
+
       <section class="nl-stats" aria-label="応援コメント数">
         <span id="liveId" hidden>-</span>
         <div class="nl-count-wrap">
@@ -2841,32 +2894,6 @@
             <input type="checkbox" id="commentEnterSend" checked />
             Enter でも送信
           </label>
-        </div>
-      </section>
-
-      <div class="nl-btn-row">
-        <button type="button" id="exportJson" disabled>HTMLレポートを保存</button>
-      </div>
-      <p class="nl-export-note">メタ情報・script・noopenerリンク・保存コメントをまとめて検索できるHTMLを出力します。</p>
-
-      <section class="nl-capture" aria-label="画面キャプチャと定期サムネ">
-        <div class="nl-btn-row">
-          <button type="button" id="captureScreenshot" disabled>
-            画面を1枚保存
-          </button>
-        </div>
-        <p id="captureStatus" class="nl-export-note" aria-live="polite"></p>
-        <div class="nl-thumb-row">
-          <label for="thumbInterval">定期サムネ</label>
-          <select id="thumbInterval" aria-label="定期サムネの間隔">
-            <option value="0">オフ</option>
-            <option value="30000">30秒</option>
-            <option value="60000">1分</option>
-            <option value="300000">5分</option>
-          </select>
-          <span class="nl-thumb-count"
-            >サムネ <span id="thumbCount">-</span> 件（このPC内）</span
-          >
         </div>
       </section>
 

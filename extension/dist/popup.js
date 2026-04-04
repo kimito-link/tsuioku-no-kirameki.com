@@ -491,6 +491,17 @@
     return errLid === v;
   }
 
+  // src/lib/watchAudienceCopy.js
+  var BODY_TEXT = "\u516C\u5F0F\u306E\u6570\u5024\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002\u6765\u5834\u8005\u306F NDGR / embedded \u304B\u3089\u7D0430\u79D2\u66F4\u65B0\u3002\u63A8\u5B9A\u540C\u6642\u63A5\u7D9A\u306F\u76F4\u8FD15\u5206\u306E\u30B3\u30E1\u30F3\u30BF\u30FC\xD7\u500D\u7387\u3068\u6EDE\u7559\u306E\u8907\u5408\u898B\u7A4D\u3082\u308A\u3067\u3059\u3002";
+  var TITLE_TEXT = "\u63A8\u5B9A\u540C\u6642\u63A5\u7D9A\u306F\u30B3\u30E1\u30F3\u30BF\u30FC\u6CD5\uFF085\u5206\u30E6\u30CB\u30FC\u30AF\xD7\u52D5\u7684\u500D\u7387\u30FB\u898F\u6A21\u306B\u5FDC\u30585\u301C28\uFF09\u3068\u6EDE\u7559\u6CD5\uFF08\u6765\u5834\u8005\xD7\u6B8B\u7559\u7387\u30FB\u7D4C\u904E\u6642\u9593\u3067\u6E1B\u8870\uFF09\u306E\u5E7E\u4F55\u5E73\u5747\u3002\u30E6\u30CB\u30FC\u30AF\u306F userId \u306E\u7A2E\u985E\u6570\uFF08\u672A\u53D6\u5F97\u6642\u306F https \u30A2\u30A4\u30B3\u30F3 URL \u7A2E\u985E\u6570\u3092 \u2248 \u8868\u793A\uFF09\u3002";
+  function buildWatchAudienceNote({ snapshot }) {
+    void snapshot;
+    return {
+      body: BODY_TEXT,
+      title: TITLE_TEXT
+    };
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -2464,7 +2475,10 @@
       uniqueEl.removeAttribute("title");
     }
     if (noIdEl) noIdEl.textContent = "\u2014";
-    if (noteEl) noteEl.textContent = "";
+    if (noteEl) {
+      noteEl.textContent = "";
+      noteEl.removeAttribute("title");
+    }
   }
   function renderWatchMetaCard(snapshot, commentEntries = []) {
     const wrap = $("watchMeta");
@@ -2538,13 +2552,6 @@
     const st = summarizeRecordedCommenters(
       Array.isArray(commentEntries) ? commentEntries : []
     );
-    const lid = String(snapshot?.liveId || STORY_SOURCE_STATE.liveId || "").trim().toLowerCase();
-    const ownMatched = getOwnPostedMatchedIdSet(
-      Array.isArray(commentEntries) ? commentEntries : [],
-      lid
-    ).size;
-    const ownPending = countPendingSelfPostedRecentsForLive(lid);
-    const ownShown = countOwnPostedEntries(commentEntries, lid);
     if (uniqueEl) {
       if (st.uniqueKnownUserIds > 0) {
         uniqueEl.textContent = String(st.uniqueKnownUserIds);
@@ -2559,64 +2566,9 @@
     }
     if (noIdEl) noIdEl.textContent = String(st.commentsWithoutUserId);
     if (noteEl) {
-      const parts = [
-        "\u516C\u5F0F\u306E\u6570\u5024\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002\u6765\u5834\u8005\u6570\u306F NDGR / embedded-data \u304B\u3089\u7D0430\u79D2\u66F4\u65B0\u3002",
-        "\u63A8\u5B9A\u540C\u6642\u63A5\u7D9A = \u30B3\u30E1\u30F3\u30BF\u30FC\u6CD5(5\u5206\u30E6\u30CB\u30FC\u30AF\xD7\u52D5\u7684\u500D\u7387) \u3068 \u6EDE\u7559\u6CD5(\u6765\u5834\u8005\xD7\u6B8B\u7559\u7387) \u306E\u5E7E\u4F55\u5E73\u5747\u3002",
-        "\u52D5\u7684\u500D\u7387\u306F\u914D\u4FE1\u898F\u6A21\u30675\u301C28\uFF08\u5927\u898F\u6A21\u307B\u3069\u30B3\u30E1\u7387\u4F4E\u4E0B\uFF09\u3002\u6EDE\u7559\u7387\u306F\u914D\u4FE1\u7D4C\u904E\u6642\u9593\u306748%\u21928%\u6E1B\u8870\u3002",
-        "\u30E6\u30CB\u30FC\u30AF\u306F userId \u306E\u7A2E\u985E\u6570\uFF08\u672A\u53D6\u5F97\u6642\u306F https \u30A2\u30A4\u30B3\u30F3 URL \u7A2E\u985E\u6570\u3092 \u2248 \u8868\u793A\uFF09\u3002"
-      ];
-      const dbg = snapshot?._debug;
-      if (dbg) {
-        parts.push(
-          `
-[DEBUG] wsVC=${dbg.wsViewerCount} wsCmt=${dbg.wsCommentCount} wsAge=${dbg.wsAge}ms intcpt=${dbg.intercept} embVC=${dbg.embeddedVC}`
-        );
-        parts.push(`
-[SELF] pending=${ownPending} shown=${ownShown} pendingMatch=${ownMatched}`);
-        if (dbg.poll) {
-          const pl = dbg.poll;
-          parts.push(
-            `
-[POLL] ran=${pl.ran} ok=${pl.ok} status=${pl.status} html=${pl.htmlLen} wc=${pl.wcMatch || "-"} err=${pl.err || "-"}`
-          );
-        }
-        parts.push(
-          `
-[PI] pi=${dbg.pi || "0"} enq=${dbg.piEnq || "0"} post=${dbg.piPost || "0"} ws=${dbg.piWs || "0"} fetch=${dbg.piFetch || "0"} xhr=${dbg.piXhr || "0"} phase=${dbg.piPhase || "-"}`
-        );
-        if (dbg.dom) {
-          parts.push(
-            `
-[DOM] ${Object.entries(dbg.dom).map(([k, v]) => `${k}=${v}`).join(" ")}`
-          );
-        }
-        if (dbg.tblRows && Array.isArray(dbg.tblRows)) {
-          parts.push(`
-[TBL] rows=${dbg.tblKids}`);
-          for (const tr of dbg.tblRows) {
-            parts.push(`
-  <${tr.tag} cls="${tr.cls}" ch=${tr.ch} role="${tr.role}" style="${tr.style}"> "${tr.txt}"`);
-          }
-        }
-        parts.push(
-          `
-[FIBER] scans=${dbg.fbScans || "0"} found=${dbg.fbFound || "0"} rows=${dbg.fbRows || "0"} step=${dbg.fbStep || "-"} att=${dbg.fbAttempts || "0"}` + (dbg.fbErr ? ` ERR=${dbg.fbErr}` : "") + `
-  probe=${dbg.fbProbe || "-"}`
-        );
-        if (dbg.fetchLog) {
-          parts.push(`
-[FETCH] ${dbg.fetchLog}`);
-        }
-        if (dbg.fetchOther) {
-          parts.push(`
-[FETCH-OTHER] ${dbg.fetchOther}`);
-        }
-        if (dbg.ndgr) {
-          parts.push(`
-[NDGR] ${dbg.ndgr}`);
-        }
-      }
-      noteEl.textContent = parts.join("");
+      const { body, title: title2 } = buildWatchAudienceNote({ snapshot });
+      noteEl.textContent = body;
+      noteEl.title = title2;
     }
     if (audience) audience.hidden = false;
     wrap.hidden = false;

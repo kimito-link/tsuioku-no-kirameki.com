@@ -51,6 +51,7 @@ import {
 } from '../lib/supportGrowthTileSrc.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
+import { buildWatchAudienceNote } from '../lib/watchAudienceCopy.js';
 
 /**
  * @typedef {{
@@ -2539,7 +2540,10 @@ function clearWatchMetaCard() {
     uniqueEl.removeAttribute('title');
   }
   if (noIdEl) noIdEl.textContent = '—';
-  if (noteEl) noteEl.textContent = '';
+  if (noteEl) {
+    noteEl.textContent = '';
+    noteEl.removeAttribute('title');
+  }
 }
 
 /**
@@ -2629,13 +2633,6 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   const st = summarizeRecordedCommenters(
     Array.isArray(commentEntries) ? commentEntries : []
   );
-  const lid = String(snapshot?.liveId || STORY_SOURCE_STATE.liveId || '').trim().toLowerCase();
-  const ownMatched = getOwnPostedMatchedIdSet(
-    Array.isArray(commentEntries) ? commentEntries : [],
-    lid
-  ).size;
-  const ownPending = countPendingSelfPostedRecentsForLive(lid);
-  const ownShown = countOwnPostedEntries(commentEntries, lid);
   if (uniqueEl) {
     if (st.uniqueKnownUserIds > 0) {
       uniqueEl.textContent = String(st.uniqueKnownUserIds);
@@ -2652,58 +2649,9 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   }
   if (noIdEl) noIdEl.textContent = String(st.commentsWithoutUserId);
   if (noteEl) {
-    const parts = [
-      '公式の数値ではありません。来場者数は NDGR / embedded-data から約30秒更新。',
-      '推定同時接続 = コメンター法(5分ユニーク×動的倍率) と 滞留法(来場者×残留率) の幾何平均。',
-      '動的倍率は配信規模で5〜28（大規模ほどコメ率低下）。滞留率は配信経過時間で48%→8%減衰。',
-      'ユニークは userId の種類数（未取得時は https アイコン URL 種類数を ≈ 表示）。'
-    ];
-    const dbg = snapshot?._debug;
-    if (dbg) {
-      parts.push(
-        `\n[DEBUG] wsVC=${dbg.wsViewerCount} wsCmt=${dbg.wsCommentCount} wsAge=${dbg.wsAge}ms` +
-        ` intcpt=${dbg.intercept} embVC=${dbg.embeddedVC}`
-      );
-      parts.push(`\n[SELF] pending=${ownPending} shown=${ownShown} pendingMatch=${ownMatched}`);
-      if (dbg.poll) {
-        const pl = dbg.poll;
-        parts.push(
-          `\n[POLL] ran=${pl.ran} ok=${pl.ok} status=${pl.status} html=${pl.htmlLen}` +
-          ` wc=${pl.wcMatch || '-'} err=${pl.err || '-'}`
-        );
-      }
-      parts.push(
-        `\n[PI] pi=${dbg.pi || '0'} enq=${dbg.piEnq || '0'} post=${dbg.piPost || '0'}` +
-        ` ws=${dbg.piWs || '0'} fetch=${dbg.piFetch || '0'} xhr=${dbg.piXhr || '0'} phase=${dbg.piPhase || '-'}`
-      );
-      if (dbg.dom) {
-        parts.push(
-          `\n[DOM] ${Object.entries(dbg.dom).map(([k,v]) => `${k}=${v}`).join(' ')}`
-        );
-      }
-      if (dbg.tblRows && Array.isArray(dbg.tblRows)) {
-        parts.push(`\n[TBL] rows=${dbg.tblKids}`);
-        for (const tr of dbg.tblRows) {
-          parts.push(`\n  <${tr.tag} cls="${tr.cls}" ch=${tr.ch} role="${tr.role}" style="${tr.style}"> "${tr.txt}"`);
-        }
-      }
-      parts.push(
-        `\n[FIBER] scans=${dbg.fbScans || '0'} found=${dbg.fbFound || '0'} rows=${dbg.fbRows || '0'}` +
-        ` step=${dbg.fbStep || '-'} att=${dbg.fbAttempts || '0'}` +
-        (dbg.fbErr ? ` ERR=${dbg.fbErr}` : '') +
-        `\n  probe=${dbg.fbProbe || '-'}`
-      );
-      if (dbg.fetchLog) {
-        parts.push(`\n[FETCH] ${dbg.fetchLog}`);
-      }
-      if (dbg.fetchOther) {
-        parts.push(`\n[FETCH-OTHER] ${dbg.fetchOther}`);
-      }
-      if (dbg.ndgr) {
-        parts.push(`\n[NDGR] ${dbg.ndgr}`);
-      }
-    }
-    noteEl.textContent = parts.join('');
+    const { body, title } = buildWatchAudienceNote({ snapshot });
+    noteEl.textContent = body;
+    noteEl.title = title;
   }
   if (audience) audience.hidden = false;
 
