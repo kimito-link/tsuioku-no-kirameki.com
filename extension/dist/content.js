@@ -39,6 +39,14 @@
   var KEY_POPUP_FRAME_CUSTOM = "nls_popup_frame_custom";
   var KEY_THUMB_AUTO = "nls_thumb_auto_enabled";
   var KEY_THUMB_INTERVAL_MS = "nls_thumb_interval_ms";
+  var KEY_INLINE_PANEL_WIDTH_MODE = "nls_inline_panel_width_mode";
+  var INLINE_PANEL_WIDTH_PLAYER_ROW = "player_row";
+  var INLINE_PANEL_WIDTH_VIDEO = "video";
+  function normalizeInlinePanelWidthMode(raw) {
+    const s = String(raw || "").trim();
+    if (s === INLINE_PANEL_WIDTH_VIDEO) return INLINE_PANEL_WIDTH_VIDEO;
+    return INLINE_PANEL_WIDTH_PLAYER_ROW;
+  }
   function commentsStorageKey(liveId2) {
     const id = String(liveId2 || "").trim().toLowerCase();
     return `nls_comments_${id}`;
@@ -786,6 +794,40 @@
     }
     return { panelWidthPx, marginLeftPx };
   }
+  function computeInlinePanelLayout(mode, args) {
+    const m = mode === "video" ? "video" : "player_row";
+    const {
+      videoRect,
+      rowRect,
+      parentRect,
+      viewport,
+      minWidth,
+      edgeMargin
+    } = args;
+    const opts = { minWidth, edgeMargin };
+    if (m === "video") {
+      return computeInlinePanelSizeAndOffset(videoRect, parentRect, viewport, opts);
+    }
+    if (rowRect == null) {
+      return computeInlinePanelSizeAndOffset(videoRect, parentRect, viewport, opts);
+    }
+    const minW = minWidth ?? DEFAULT_MIN_PANEL_WIDTH;
+    const em = edgeMargin ?? DEFAULT_EDGE_MARGIN;
+    const vw = Number(viewport.innerWidth) || 0;
+    const rLeft = Number(rowRect.left) || 0;
+    const rWidth = Number(rowRect.width) || 0;
+    let panelWidthPx = Math.max(minW, Math.round(rWidth));
+    const maxByViewport = Math.max(minW, Math.floor(vw - rLeft - em));
+    panelWidthPx = Math.min(panelWidthPx, maxByViewport);
+    let marginLeftPx = 0;
+    if (parentRect) {
+      marginLeftPx = Math.max(
+        0,
+        Math.round(rLeft - (Number(parentRect.left) || 0))
+      );
+    }
+    return { panelWidthPx, marginLeftPx };
+  }
 
   // src/lib/voiceComment.js
   var VOICE_COMMENT_MAX_CHARS = 250;
@@ -1281,7 +1323,7 @@
     #${INLINE_POPUP_HOST_ID} {
       display: none;
       width: 100%;
-      margin: 10px 0 2px;
+      margin: 2px 0 2px;
       pointer-events: auto;
       position: relative;
       z-index: 2147482000;
@@ -1366,6 +1408,50 @@
     }
     return best?.el || base;
   }
+  function unionViewRects(a, b) {
+    const right = Math.max(a.left + a.width, b.left + b.width);
+    const bottom = Math.max(a.top + a.height, b.top + b.height);
+    const left = Math.min(a.left, b.left);
+    const top = Math.min(a.top, b.top);
+    return { left, top, width: right - left, height: bottom - top };
+  }
+  function resolvePlayerRowRect(video, insertAfter) {
+    const vr = video.getBoundingClientRect();
+    let best = {
+      left: vr.left,
+      top: vr.top,
+      width: vr.width,
+      height: vr.height
+    };
+    const widenWithEl = (el) => {
+      if (!(el instanceof HTMLElement)) return;
+      const r = el.getBoundingClientRect();
+      if (r.width < 64 || r.height < 100) return;
+      const b = { left: r.left, top: r.top, width: r.width, height: r.height };
+      const u = unionViewRects(best, b);
+      if (u.width > best.width * 1.04) best = u;
+    };
+    try {
+      const panel = findNicoCommentPanel(document);
+      if (panel) widenWithEl(panel);
+    } catch {
+    }
+    try {
+      document.querySelectorAll('[class*="comment-data-grid" i]').forEach((n) => widenWithEl(n));
+    } catch {
+    }
+    const ar = insertAfter.getBoundingClientRect();
+    if (ar.width >= vr.width * 1.06 && ar.width >= best.width * 0.95) {
+      best = {
+        left: ar.left,
+        top: ar.top,
+        width: ar.width,
+        height: ar.height
+      };
+    }
+    return best;
+  }
+  var inlinePanelWidthMode = normalizeInlinePanelWidthMode(void 0);
   function renderInlineHostAnchoredToVideo(video) {
     const insertAfter = findFrameInsertAnchorFromVideo(video);
     const parent = insertAfter.parentElement;
@@ -1379,11 +1465,24 @@
     }
     const pr = parent.getBoundingClientRect();
     const viewport = nlsViewportSize();
-    const { panelWidthPx, marginLeftPx } = computeInlinePanelSizeAndOffset(
-      { width: vr.width, height: vr.height, top: vr.top, left: vr.left },
-      { width: pr.width, height: pr.height, top: pr.top, left: pr.left },
+    const mode = inlinePanelWidthMode === "video" ? "video" : "player_row";
+    const rowRect = mode === "player_row" ? resolvePlayerRowRect(video, insertAfter) : null;
+    const { panelWidthPx, marginLeftPx } = computeInlinePanelLayout(mode, {
+      videoRect: {
+        width: vr.width,
+        height: vr.height,
+        top: vr.top,
+        left: vr.left
+      },
+      rowRect,
+      parentRect: {
+        width: pr.width,
+        height: pr.height,
+        top: pr.top,
+        left: pr.left
+      },
       viewport
-    );
+    });
     const insertNext = insertAfter.nextSibling;
     const needsMove = host.parentElement !== parent || host.previousSibling !== insertAfter;
     if (needsMove) {
@@ -1543,8 +1642,12 @@
     if (!hasExtensionContext()) return;
     const bag = await chrome.storage.local.get([
       KEY_POPUP_FRAME,
-      KEY_POPUP_FRAME_CUSTOM
+      KEY_POPUP_FRAME_CUSTOM,
+      KEY_INLINE_PANEL_WIDTH_MODE
     ]);
+    inlinePanelWidthMode = normalizeInlinePanelWidthMode(
+      bag[KEY_INLINE_PANEL_WIDTH_MODE]
+    );
     const rawFrame = normalizePageFrameId(bag[KEY_POPUP_FRAME]);
     pageFrameState.frameId = rawFrame === "custom" || hasPageFramePreset(rawFrame) ? rawFrame : DEFAULT_PAGE_FRAME;
     pageFrameState.custom = sanitizePageFrameCustom(bag[KEY_POPUP_FRAME_CUSTOM]);
@@ -2148,6 +2251,12 @@
       if (changes[KEY_POPUP_FRAME] || changes[KEY_POPUP_FRAME_CUSTOM]) {
         loadPageFrameSettings().catch(() => {
         });
+      }
+      if (changes[KEY_INLINE_PANEL_WIDTH_MODE]) {
+        inlinePanelWidthMode = normalizeInlinePanelWidthMode(
+          changes[KEY_INLINE_PANEL_WIDTH_MODE].newValue
+        );
+        renderPageFrameOverlay();
       }
       if (changes[KEY_THUMB_AUTO] || changes[KEY_THUMB_INTERVAL_MS]) {
         readThumbSettings().then(() => applyThumbSchedule()).catch(() => {

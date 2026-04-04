@@ -89,3 +89,57 @@ export function computeInlinePanelSizeAndOffset(
 
   return { panelWidthPx, marginLeftPx };
 }
+
+/**
+ * @typedef {'video' | 'player_row'} InlinePanelWidthMode
+ */
+
+/**
+ * @param {InlinePanelWidthMode|string} mode
+ * @param {{
+ *   videoRect: ViewRect
+ *   rowRect: ViewRect | null
+ *   parentRect: ViewRect | null
+ *   viewport: ViewportSize
+ *   minWidth?: number
+ *   edgeMargin?: number
+ * }} args
+ * @returns {{ panelWidthPx: number, marginLeftPx: number }}
+ */
+export function computeInlinePanelLayout(mode, args) {
+  const m = mode === 'video' ? 'video' : 'player_row';
+  const {
+    videoRect,
+    rowRect,
+    parentRect,
+    viewport,
+    minWidth,
+    edgeMargin
+  } = args;
+  const opts = { minWidth, edgeMargin };
+  if (m === 'video') {
+    return computeInlinePanelSizeAndOffset(videoRect, parentRect, viewport, opts);
+  }
+  if (rowRect == null) {
+    return computeInlinePanelSizeAndOffset(videoRect, parentRect, viewport, opts);
+  }
+  const minW = minWidth ?? DEFAULT_MIN_PANEL_WIDTH;
+  const em = edgeMargin ?? DEFAULT_EDGE_MARGIN;
+  const vw = Number(viewport.innerWidth) || 0;
+  const rLeft = Number(rowRect.left) || 0;
+  const rWidth = Number(rowRect.width) || 0;
+
+  let panelWidthPx = Math.max(minW, Math.round(rWidth));
+  const maxByViewport = Math.max(minW, Math.floor(vw - rLeft - em));
+  panelWidthPx = Math.min(panelWidthPx, maxByViewport);
+
+  let marginLeftPx = 0;
+  if (parentRect) {
+    marginLeftPx = Math.max(
+      0,
+      Math.round(rLeft - (Number(parentRect.left) || 0))
+    );
+  }
+
+  return { panelWidthPx, marginLeftPx };
+}

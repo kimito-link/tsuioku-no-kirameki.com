@@ -1,6 +1,7 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl } from '../lib/broadcastUrl.js';
 import {
+  KEY_INLINE_PANEL_WIDTH_MODE,
   KEY_POPUP_FRAME,
   KEY_POPUP_FRAME_CUSTOM,
   KEY_LAST_WATCH_URL,
@@ -10,7 +11,10 @@ import {
   KEY_THUMB_INTERVAL_MS,
   KEY_VOICE_AUTOSEND,
   KEY_VOICE_INPUT_DEVICE,
-  commentsStorageKey
+  INLINE_PANEL_WIDTH_PLAYER_ROW,
+  INLINE_PANEL_WIDTH_VIDEO,
+  commentsStorageKey,
+  normalizeInlinePanelWidthMode
 } from '../lib/storageKeys.js';
 import {
   audioConstraintsForDevice,
@@ -1522,9 +1526,26 @@ async function refresh() {
 
   const { url, fromActiveTab } = await resolveWatchContextUrl();
 
-  const bagRec = await chrome.storage.local.get(KEY_RECORDING);
+  const bagRec = await chrome.storage.local.get([
+    KEY_RECORDING,
+    KEY_INLINE_PANEL_WIDTH_MODE
+  ]);
   toggle.checked = bagRec[KEY_RECORDING] === true;
   toggle.disabled = false;
+
+  const panelMode = normalizeInlinePanelWidthMode(
+    bagRec[KEY_INLINE_PANEL_WIDTH_MODE]
+  );
+  const radioPlayerRow = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelWidthPlayerRow')
+  );
+  const radioVideoOnly = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelWidthVideo')
+  );
+  if (radioPlayerRow && radioVideoOnly) {
+    radioPlayerRow.checked = panelMode === INLINE_PANEL_WIDTH_PLAYER_ROW;
+    radioVideoOnly.checked = panelMode === INLINE_PANEL_WIDTH_VIDEO;
+  }
   if (postBtn) postBtn.disabled = true;
   syncVoiceCommentButton();
   if (commentInput) {
@@ -2554,6 +2575,32 @@ function initPopup() {
   toggle.addEventListener('change', async () => {
     await chrome.storage.local.set({ [KEY_RECORDING]: toggle.checked });
     safeRefresh();
+  });
+
+  const saveInlinePanelWidthMode = async (value) => {
+    const v =
+      value === INLINE_PANEL_WIDTH_VIDEO
+        ? INLINE_PANEL_WIDTH_VIDEO
+        : INLINE_PANEL_WIDTH_PLAYER_ROW;
+    await chrome.storage.local.set({ [KEY_INLINE_PANEL_WIDTH_MODE]: v });
+    safeRefresh();
+  };
+
+  /** @type {HTMLInputElement|null} */
+  const radioPlayerRowEl = $('inlinePanelWidthPlayerRow');
+  /** @type {HTMLInputElement|null} */
+  const radioVideoOnlyEl = $('inlinePanelWidthVideo');
+  radioPlayerRowEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlinePanelWidthMode(INLINE_PANEL_WIDTH_PLAYER_ROW);
+    }
+  });
+  radioVideoOnlyEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlinePanelWidthMode(INLINE_PANEL_WIDTH_VIDEO);
+    }
   });
 
   for (const chip of frameChips) {

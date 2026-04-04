@@ -2,42 +2,65 @@ import { test, expect } from './fixtures.js';
 
 const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
+const KEY_INLINE_PANEL_WIDTH_MODE = 'nls_inline_panel_width_mode';
+
+async function extensionServiceWorker(context) {
+  let sw = context.serviceWorkers()[0];
+  if (!sw) {
+    sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
+  }
+  return sw;
+}
+
+function injectTwoColumnPlayerRow() {
+  const doc = globalThis.document;
+  const win = globalThis.window;
+  const oldVid = doc.getElementById('e2e-mock-video');
+  if (oldVid) oldVid.remove();
+  const panel = doc.querySelector('.ga-ns-comment-panel');
+  if (panel) panel.remove();
+
+  const row = doc.createElement('section');
+  row.id = 'mock-player-row';
+  row.style.cssText =
+    'display:flex;flex-direction:row;align-items:flex-start;gap:10px;width:640px;margin:12px 0;padding:8px;background:#1a1a1a;';
+
+  const v = doc.createElement('video');
+  v.setAttribute('playsinline', '');
+  v.setAttribute('width', '400');
+  v.setAttribute('height', '225');
+  v.style.cssText =
+    'display:block;width:400px;height:225px;flex-shrink:0;background:#000;';
+
+  const side = doc.createElement('div');
+  side.className = 'ga-ns-comment-panel comment-panel';
+  side.style.cssText =
+    'width:220px;min-height:280px;flex-shrink:0;background:#2a2a2a;';
+
+  row.appendChild(v);
+  row.appendChild(side);
+  doc.body.prepend(row);
+  win.scrollTo(0, 0);
+  win.dispatchEvent(new Event('resize'));
+}
 
 /**
- * インラインパネルが <video> の表示幅に合わせ、親内で左オフセットが付くこと（装飾ラッパーより狭い映像に寄せる）
+ * インラインパネルが 2 カラム視聴行の幅に合わせること（player_row 既定）、
+ * または video モードで動画幅に近いこと
  */
 test.describe('inline panel alignment', () => {
-  test('video が親より狭いときホストに margin-left が付く', async ({ context }) => {
-    let sw = context.serviceWorkers()[0];
-    if (!sw) {
-      sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
-    }
+  test('2カラム時 player_row ではホスト幅が動画単体より広い', async ({
+    context
+  }) => {
+    const sw = await extensionServiceWorker(context);
+    await sw.evaluate(async (key) => {
+      await chrome.storage.local.remove(key);
+    }, KEY_INLINE_PANEL_WIDTH_MODE);
 
     const page = await context.newPage();
     await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
 
-    await page.evaluate(() => {
-      const doc = globalThis.document;
-      const win = globalThis.window;
-      const old = doc.getElementById('e2e-mock-video');
-      if (old) old.remove();
-
-      const wrap = doc.createElement('section');
-      wrap.id = 'mock-player-wrap';
-      wrap.style.cssText =
-        'width:500px;margin:12px 0;display:flex;flex-direction:column;align-items:center;background:#111;';
-
-      const v = doc.createElement('video');
-      v.setAttribute('playsinline', '');
-      v.setAttribute('width', '400');
-      v.setAttribute('height', '225');
-      v.style.cssText = 'display:block;width:400px;height:225px;';
-      wrap.appendChild(v);
-
-      doc.body.prepend(wrap);
-      win.scrollTo(0, 0);
-      win.dispatchEvent(new Event('resize'));
-    });
+    await page.evaluate(injectTwoColumnPlayerRow);
 
     await page.waitForTimeout(2000);
 
@@ -54,11 +77,38 @@ test.describe('inline panel alignment', () => {
 
     expect(metrics, 'インラインホストが DOM にある').not.toBeNull();
     expect(metrics.display).toBe('block');
-    const ml = Number.parseFloat(metrics.marginLeft);
-    expect(ml).toBeGreaterThan(30);
-    expect(ml).toBeLessThan(70);
+    const w = Number.parseFloat(metrics.width);
+    expect(w).toBeGreaterThan(430);
+    expect(w).toBeLessThanOrEqual(660);
+  });
+
+  test('video モードではホスト幅が動画幅に近い', async ({ context }) => {
+    const sw = await extensionServiceWorker(context);
+    await sw.evaluate(async (key) => {
+      await chrome.storage.local.set({ [key]: 'video' });
+    }, KEY_INLINE_PANEL_WIDTH_MODE);
+
+    const page = await context.newPage();
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+
+    await page.evaluate(injectTwoColumnPlayerRow);
+
+    await page.waitForTimeout(2000);
+
+    const metrics = await page.evaluate((hostId) => {
+      const host = globalThis.document.getElementById(hostId);
+      if (!host) return null;
+      const st = globalThis.getComputedStyle(host);
+      return {
+        display: st.display,
+        width: st.width
+      };
+    }, INLINE_HOST_ID);
+
+    expect(metrics, 'インラインホストが DOM にある').not.toBeNull();
+    expect(metrics.display).toBe('block');
     const w = Number.parseFloat(metrics.width);
     expect(w).toBeGreaterThan(380);
-    expect(w).toBeLessThanOrEqual(420);
+    expect(w).toBeLessThan(430);
   });
 });

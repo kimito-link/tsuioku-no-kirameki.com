@@ -41,6 +41,14 @@
   var KEY_THUMB_INTERVAL_MS = "nls_thumb_interval_ms";
   var KEY_VOICE_AUTOSEND = "nls_voice_autosend";
   var KEY_VOICE_INPUT_DEVICE = "nls_voice_input_device";
+  var KEY_INLINE_PANEL_WIDTH_MODE = "nls_inline_panel_width_mode";
+  var INLINE_PANEL_WIDTH_PLAYER_ROW = "player_row";
+  var INLINE_PANEL_WIDTH_VIDEO = "video";
+  function normalizeInlinePanelWidthMode(raw) {
+    const s = String(raw || "").trim();
+    if (s === INLINE_PANEL_WIDTH_VIDEO) return INLINE_PANEL_WIDTH_VIDEO;
+    return INLINE_PANEL_WIDTH_PLAYER_ROW;
+  }
   function commentsStorageKey(liveId) {
     const id = String(liveId || "").trim().toLowerCase();
     return `nls_comments_${id}`;
@@ -1456,9 +1464,27 @@
     );
     await renderStorageErrorBanner();
     const { url, fromActiveTab } = await resolveWatchContextUrl();
-    const bagRec = await chrome.storage.local.get(KEY_RECORDING);
+    const bagRec = await chrome.storage.local.get([
+      KEY_RECORDING,
+      KEY_INLINE_PANEL_WIDTH_MODE
+    ]);
     toggle.checked = bagRec[KEY_RECORDING] === true;
     toggle.disabled = false;
+    const panelMode = normalizeInlinePanelWidthMode(
+      bagRec[KEY_INLINE_PANEL_WIDTH_MODE]
+    );
+    const radioPlayerRow = (
+      /** @type {HTMLInputElement|null} */
+      $("inlinePanelWidthPlayerRow")
+    );
+    const radioVideoOnly = (
+      /** @type {HTMLInputElement|null} */
+      $("inlinePanelWidthVideo")
+    );
+    if (radioPlayerRow && radioVideoOnly) {
+      radioPlayerRow.checked = panelMode === INLINE_PANEL_WIDTH_PLAYER_ROW;
+      radioVideoOnly.checked = panelMode === INLINE_PANEL_WIDTH_VIDEO;
+    }
     if (postBtn) postBtn.disabled = true;
     syncVoiceCommentButton();
     if (commentInput) {
@@ -2400,6 +2426,25 @@
     toggle.addEventListener("change", async () => {
       await chrome.storage.local.set({ [KEY_RECORDING]: toggle.checked });
       safeRefresh();
+    });
+    const saveInlinePanelWidthMode = async (value) => {
+      const v = value === INLINE_PANEL_WIDTH_VIDEO ? INLINE_PANEL_WIDTH_VIDEO : INLINE_PANEL_WIDTH_PLAYER_ROW;
+      await chrome.storage.local.set({ [KEY_INLINE_PANEL_WIDTH_MODE]: v });
+      safeRefresh();
+    };
+    const radioPlayerRowEl = $("inlinePanelWidthPlayerRow");
+    const radioVideoOnlyEl = $("inlinePanelWidthVideo");
+    radioPlayerRowEl?.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t instanceof HTMLInputElement && t.checked) {
+        void saveInlinePanelWidthMode(INLINE_PANEL_WIDTH_PLAYER_ROW);
+      }
+    });
+    radioVideoOnlyEl?.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t instanceof HTMLInputElement && t.checked) {
+        void saveInlinePanelWidthMode(INLINE_PANEL_WIDTH_VIDEO);
+      }
     });
     for (const chip of frameChips) {
       chip.addEventListener("click", () => {

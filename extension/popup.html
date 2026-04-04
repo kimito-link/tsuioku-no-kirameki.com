@@ -1051,6 +1051,37 @@
         font-weight: 600;
       }
 
+      .nl-panel-width {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+      }
+
+      .nl-panel-width-legend {
+        font-size: 12px;
+        color: var(--nl-muted);
+        font-weight: 600;
+      }
+
+      .nl-panel-width-radios {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .nl-panel-width-radios label {
+        flex: unset;
+        font-size: clamp(12px, calc(var(--nl-base-font) * 0.88), 15px);
+        font-weight: 500;
+      }
+
+      .nl-panel-width-radios input[type='radio'] {
+        width: 17px;
+        height: 17px;
+        accent-color: var(--nl-accent);
+        flex-shrink: 0;
+      }
+
       #recordToggle {
         width: 20px;
         height: 20px;
@@ -1933,6 +1964,36 @@
           <input type="checkbox" id="recordToggle" />
           このPCで記録する
         </label>
+      </div>
+
+      <div
+        class="nl-record nl-panel-width"
+        role="group"
+        aria-labelledby="inlinePanelWidthLegend"
+      >
+        <div id="inlinePanelWidthLegend" class="nl-panel-width-legend">
+          ページ内パネルの幅（watch）
+        </div>
+        <div class="nl-panel-width-radios">
+          <label>
+            <input
+              type="radio"
+              name="inlinePanelWidth"
+              value="player_row"
+              id="inlinePanelWidthPlayerRow"
+            />
+            視聴画面いっぱい（動画＋コメント列の下）
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="inlinePanelWidth"
+              value="video"
+              id="inlinePanelWidthVideo"
+            />
+            動画の幅だけ
+          </label>
+        </div>
       </div>
 
       <section class="nl-comment-compose" aria-label="コメント投稿">

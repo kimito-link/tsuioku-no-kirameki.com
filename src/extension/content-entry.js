@@ -1,6 +1,7 @@
 // @ts-nocheck — content script; DOM/Chrome API が広く any 相当
 import { isNicoLiveWatchUrl } from '../lib/broadcastUrl.js';
 import {
+  KEY_INLINE_PANEL_WIDTH_MODE,
   KEY_LAST_WATCH_URL,
   KEY_POPUP_FRAME,
   KEY_POPUP_FRAME_CUSTOM,
@@ -8,7 +9,8 @@ import {
   KEY_STORAGE_WRITE_ERROR,
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
-  commentsStorageKey
+  commentsStorageKey,
+  normalizeInlinePanelWidthMode
 } from '../lib/storageKeys.js';
 import {
   pickLargestVisibleVideo,
@@ -30,7 +32,7 @@ import { pickCommentMutationObserverRoot } from '../lib/observerTarget.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
-  computeInlinePanelSizeAndOffset,
+  computeInlinePanelLayout,
   selectBestPlayerRectIndex
 } from '../lib/inlinePanelLayout.js';
 import {
@@ -595,7 +597,7 @@ function ensurePageFrameStyle() {
     #${INLINE_POPUP_HOST_ID} {
       display: none;
       width: 100%;
-      margin: 10px 0 2px;
+      margin: 2px 0 2px;
       pointer-events: auto;
       position: relative;
       z-index: 2147482000;
@@ -700,8 +702,72 @@ function findFrameInsertAnchorFromVideo(base) {
   return best?.el || base;
 }
 
+/** @param {{ left: number, top: number, width: number, height: number }} a @param {{ left: number, top: number, width: number, height: number }} b */
+function unionViewRects(a, b) {
+  const right = Math.max(a.left + a.width, b.left + b.width);
+  const bottom = Math.max(a.top + a.height, b.top + b.height);
+  const left = Math.min(a.left, b.left);
+  const top = Math.min(a.top, b.top);
+  return { left, top, width: right - left, height: bottom - top };
+}
+
 /**
- * 幅・左位置は `<video>` の表示矩形に合わせ、DOM 上はプレイヤー列（findFrameInsertAnchorFromVideo）の直後に置く。
+ * 動画＋公式コメント列など、視聴行としての表示矩形（フォールバックは video のみ）
+ * @param {HTMLVideoElement} video
+ * @param {HTMLElement} insertAfter
+ */
+function resolvePlayerRowRect(video, insertAfter) {
+  const vr = video.getBoundingClientRect();
+  /** @type {{ left: number, top: number, width: number, height: number }} */
+  let best = {
+    left: vr.left,
+    top: vr.top,
+    width: vr.width,
+    height: vr.height
+  };
+
+  const widenWithEl = (el) => {
+    if (!(el instanceof HTMLElement)) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 64 || r.height < 100) return;
+    const b = { left: r.left, top: r.top, width: r.width, height: r.height };
+    const u = unionViewRects(best, b);
+    if (u.width > best.width * 1.04) best = u;
+  };
+
+  try {
+    const panel = findNicoCommentPanel(document);
+    if (panel) widenWithEl(panel);
+  } catch {
+    // no-op
+  }
+
+  try {
+    document
+      .querySelectorAll('[class*="comment-data-grid" i]')
+      .forEach((n) => widenWithEl(n));
+  } catch {
+    // no-op
+  }
+
+  const ar = insertAfter.getBoundingClientRect();
+  if (ar.width >= vr.width * 1.06 && ar.width >= best.width * 0.95) {
+    best = {
+      left: ar.left,
+      top: ar.top,
+      width: ar.width,
+      height: ar.height
+    };
+  }
+
+  return best;
+}
+
+/** インラインパネル幅モード（storage から更新） */
+let inlinePanelWidthMode = normalizeInlinePanelWidthMode(undefined);
+
+/**
+ * 幅はモードに応じて視聴行または video のみ。DOM 上はプレイヤー列（findFrameInsertAnchorFromVideo）の直後に置く。
  */
 function renderInlineHostAnchoredToVideo(video) {
   const insertAfter = findFrameInsertAnchorFromVideo(video);
@@ -716,11 +782,26 @@ function renderInlineHostAnchoredToVideo(video) {
   }
   const pr = parent.getBoundingClientRect();
   const viewport = nlsViewportSize();
-  const { panelWidthPx, marginLeftPx } = computeInlinePanelSizeAndOffset(
-    { width: vr.width, height: vr.height, top: vr.top, left: vr.left },
-    { width: pr.width, height: pr.height, top: pr.top, left: pr.left },
+  const mode =
+    inlinePanelWidthMode === 'video' ? 'video' : 'player_row';
+  const rowRect =
+    mode === 'player_row' ? resolvePlayerRowRect(video, insertAfter) : null;
+  const { panelWidthPx, marginLeftPx } = computeInlinePanelLayout(mode, {
+    videoRect: {
+      width: vr.width,
+      height: vr.height,
+      top: vr.top,
+      left: vr.left
+    },
+    rowRect,
+    parentRect: {
+      width: pr.width,
+      height: pr.height,
+      top: pr.top,
+      left: pr.left
+    },
     viewport
-  );
+  });
   const insertNext = insertAfter.nextSibling;
   const needsMove =
     host.parentElement !== parent ||
@@ -905,8 +986,12 @@ async function loadPageFrameSettings() {
   if (!hasExtensionContext()) return;
   const bag = await chrome.storage.local.get([
     KEY_POPUP_FRAME,
-    KEY_POPUP_FRAME_CUSTOM
+    KEY_POPUP_FRAME_CUSTOM,
+    KEY_INLINE_PANEL_WIDTH_MODE
   ]);
+  inlinePanelWidthMode = normalizeInlinePanelWidthMode(
+    bag[KEY_INLINE_PANEL_WIDTH_MODE]
+  );
   const rawFrame = normalizePageFrameId(bag[KEY_POPUP_FRAME]);
   pageFrameState.frameId =
     rawFrame === 'custom' || hasPageFramePreset(rawFrame)
@@ -1665,6 +1750,13 @@ async function start() {
 
     if (changes[KEY_POPUP_FRAME] || changes[KEY_POPUP_FRAME_CUSTOM]) {
       loadPageFrameSettings().catch(() => {});
+    }
+
+    if (changes[KEY_INLINE_PANEL_WIDTH_MODE]) {
+      inlinePanelWidthMode = normalizeInlinePanelWidthMode(
+        changes[KEY_INLINE_PANEL_WIDTH_MODE].newValue
+      );
+      renderPageFrameOverlay();
     }
 
     if (changes[KEY_THUMB_AUTO] || changes[KEY_THUMB_INTERVAL_MS]) {

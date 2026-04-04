@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeInlinePanelLayout,
   computeInlinePanelSizeAndOffset,
   isValidBroadcastPlayerRect,
   selectBestPlayerRectIndex
@@ -102,5 +103,44 @@ describe('computeInlinePanelSizeAndOffset', () => {
     );
     expect(r.marginLeftPx).toBe(0);
     expect(r.panelWidthPx).toBe(640);
+  });
+});
+
+describe('computeInlinePanelLayout', () => {
+  const video = { width: 400, height: 225, top: 80, left: 120 };
+  const parent = { width: 1200, height: 2000, top: 0, left: 16 };
+
+  it('video モードは computeInlinePanelSizeAndOffset と一致', () => {
+    const a = computeInlinePanelLayout('video', {
+      videoRect: video,
+      rowRect: { width: 900, height: 400, top: 80, left: 40 },
+      parentRect: parent,
+      viewport: VP
+    });
+    const b = computeInlinePanelSizeAndOffset(video, parent, VP);
+    expect(a).toEqual(b);
+  });
+
+  it('player_row で row が広いときは row 幅・row 左基準で margin', () => {
+    const rowRect = { width: 900, height: 500, top: 80, left: 40 };
+    const r = computeInlinePanelLayout('player_row', {
+      videoRect: video,
+      rowRect,
+      parentRect: parent,
+      viewport: VP
+    });
+    expect(r.panelWidthPx).toBe(900);
+    expect(r.marginLeftPx).toBe(24);
+  });
+
+  it('player_row で rowRect が null のときは video 基準にフォールバック', () => {
+    const a = computeInlinePanelLayout('player_row', {
+      videoRect: video,
+      rowRect: null,
+      parentRect: parent,
+      viewport: VP
+    });
+    const b = computeInlinePanelSizeAndOffset(video, parent, VP);
+    expect(a).toEqual(b);
   });
 });

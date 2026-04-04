@@ -3,7 +3,10 @@ import {
   KEY_LAST_WATCH_URL,
   KEY_RECORDING,
   KEY_STORAGE_WRITE_ERROR,
-  commentsStorageKey
+  INLINE_PANEL_WIDTH_PLAYER_ROW,
+  INLINE_PANEL_WIDTH_VIDEO,
+  commentsStorageKey,
+  normalizeInlinePanelWidthMode
 } from './storageKeys.js';
 
 describe('storage key constants', () => {
@@ -17,5 +20,16 @@ describe('storage key constants', () => {
     expect(commentsStorageKey('LV123')).toBe('nls_comments_lv123');
     expect(commentsStorageKey('  LV99  ')).toBe('nls_comments_lv99');
     expect(commentsStorageKey('')).toBe('nls_comments_');
+  });
+
+  it('normalizeInlinePanelWidthMode は video 以外は player_row', () => {
+    expect(normalizeInlinePanelWidthMode(undefined)).toBe(
+      INLINE_PANEL_WIDTH_PLAYER_ROW
+    );
+    expect(normalizeInlinePanelWidthMode('')).toBe(INLINE_PANEL_WIDTH_PLAYER_ROW);
+    expect(normalizeInlinePanelWidthMode('video')).toBe(INLINE_PANEL_WIDTH_VIDEO);
+    expect(normalizeInlinePanelWidthMode(INLINE_PANEL_WIDTH_VIDEO)).toBe(
+      INLINE_PANEL_WIDTH_VIDEO
+    );
   });
 });
