@@ -1,5 +1,5 @@
 /** @vitest-environment happy-dom */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   parseCommentLineText,
   parseCommentElement,
@@ -9,6 +9,7 @@ import {
   extractUserIdFromDataAttributes,
   extractUserIdFromOuterHtml,
   extractUserIdFromIconSrc,
+  extractUserIconUrlFromElement,
   extractUserIdFromReactFiber
 } from './nicoliveDom.js';
 
@@ -194,6 +195,57 @@ describe('extractUserIdFromIconSrc', () => {
   });
 });
 
+describe('extractUserIconUrlFromElement', () => {
+  it('src が空でも srcset から nicoaccount URL を拾う', () => {
+    const d = document.createElement('div');
+    d.innerHTML =
+      '<img alt="" src="" srcset="https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/12345.jpg 1x">';
+    expect(
+      extractUserIconUrlFromElement(
+        d,
+        'https://live.nicovideo.jp/watch/lv1'
+      )
+    ).toBe('https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/12345.jpg');
+  });
+
+  it('相対 src を base で絶対化', () => {
+    const d = document.createElement('div');
+    d.innerHTML =
+      '<img src="/nicoaccount/usericon/1/12345.jpg" alt="">';
+    expect(
+      extractUserIconUrlFromElement(
+        d,
+        'https://live.nicovideo.jp/watch/lv123'
+      )
+    ).toBe('https://live.nicovideo.jp/nicoaccount/usericon/1/12345.jpg');
+  });
+
+  it('表示サイズが 96px 超の img はスキップ', () => {
+    const d = document.createElement('div');
+    d.innerHTML =
+      '<img src="https://x/nicoaccount/usericon/s/1/2.jpg" width="120" height="120">';
+    const img = d.querySelector('img');
+    expect(img).toBeTruthy();
+    vi.spyOn(
+      /** @type {HTMLElement} */ (img),
+      'getBoundingClientRect'
+    ).mockReturnValue({
+      width: 120,
+      height: 120,
+      top: 0,
+      left: 0,
+      bottom: 120,
+      right: 120,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    });
+    expect(
+      extractUserIconUrlFromElement(/** @type {Element} */ (d), 'https://x/')
+    ).toBe('');
+  });
+});
+
 describe('extractCommentsFromNode', () => {
   it('ul 以下の複数 li', () => {
     const ul = document.createElement('ul');
@@ -212,6 +264,7 @@ describe('extractCommentsFromNode', () => {
       <div class="table" role="rowgroup">
         <div class="table-row" role="row" data-comment-type="normal">
           <span role="gridcell">
+            <img src="https://cdn.nimg.jp/nicoaccount/usericon/s/1/999.jpg" width="24" height="24" alt="">
             <span class="comment-number">756</span>
             <div class="content-area"><span class="comment-text">京都</span></div>
           </span>
@@ -222,7 +275,11 @@ describe('extractCommentsFromNode', () => {
       </div>`;
     const list = extractCommentsFromNode(panel);
     expect(list).toHaveLength(1);
-    expect(list[0]).toMatchObject({ commentNo: '756', text: '京都' });
+    expect(list[0]).toMatchObject({
+      commentNo: '756',
+      text: '京都',
+      avatarUrl: 'https://cdn.nimg.jp/nicoaccount/usericon/s/1/999.jpg'
+    });
   });
 
   it('MutationObserver が行要素だけ渡したときも拾う', () => {

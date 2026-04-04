@@ -36,3 +36,7 @@ async function injectIntoExistingTabs() {
 chrome.runtime.onInstalled.addListener(() => {
   injectIntoExistingTabs();
 });
+
+chrome.runtime.onStartup.addListener(() => {
+  injectIntoExistingTabs();
+});

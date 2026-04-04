@@ -52,4 +52,32 @@ describe('resolveWatchPageContext', () => {
     expect(r.liveId).toBe('lv777');
     expect(r.liveIdChanged).toBe(false);
   });
+
+  it('同一 lv でクエリだけ変わっても liveIdChanged false（SPA 内の URL 更新）', () => {
+    const prev = 'lv350235704';
+    const r = resolveWatchPageContext(
+      'https://live.nicovideo.jp/watch/lv350235704?from=notification',
+      prev
+    );
+    expect(r.liveId).toBe('lv350235704');
+    expect(r.isWatchPage).toBe(true);
+    expect(r.liveIdChanged).toBe(false);
+  });
+
+  it('同一 lv で末尾スラッシュの有無だけ変わっても liveIdChanged false', () => {
+    const prev = 'lv1';
+    const r = resolveWatchPageContext(
+      'https://live.nicovideo.jp/watch/lv1/',
+      prev
+    );
+    expect(r.liveId).toBe('lv1');
+    expect(r.liveIdChanged).toBe(false);
+  });
+
+  it('watch から離脱すると liveId null・liveIdChanged true', () => {
+    const r = resolveWatchPageContext('https://live.nicovideo.jp/', 'lv99');
+    expect(r.isWatchPage).toBe(false);
+    expect(r.liveId).toBeNull();
+    expect(r.liveIdChanged).toBe(true);
+  });
 });

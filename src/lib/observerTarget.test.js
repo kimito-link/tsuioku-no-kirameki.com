@@ -13,6 +13,16 @@ describe('pickCommentMutationObserverRoot', () => {
     expect(pickCommentMutationObserverRoot(document).id).toBe('panel');
   });
 
+  it('.comment-panel のみのときフォールバックでその要素を返す', () => {
+    document.documentElement.innerHTML = '<body></body>';
+    const body = document.body;
+    const panel = document.createElement('div');
+    panel.className = 'comment-panel';
+    panel.id = 'legacy-panel';
+    body.appendChild(panel);
+    expect(pickCommentMutationObserverRoot(document).id).toBe('legacy-panel');
+  });
+
   it('パネルが無いとき document.documentElement を返す', () => {
     document.documentElement.innerHTML = '<body><p>x</p></body>';
     expect(pickCommentMutationObserverRoot(document)).toBe(document.documentElement);

@@ -22,6 +22,7 @@ import {
   normalizeThumbIntervalMsForHost
 } from '../lib/thumbSettings.js';
 import { mergeNewComments } from '../lib/commentRecord.js';
+import { collectLoggedInViewerProfile } from '../lib/watchPageViewerProfile.js';
 import { extractCommentsFromNode } from '../lib/nicoliveDom.js';
 import {
   findCommentListScrollHost,
@@ -41,9 +42,10 @@ import {
   VOICE_COMMENT_MAX_CHARS
 } from '../lib/voiceComment.js';
 import { audioConstraintsForDevice } from '../lib/voiceInputDevices.js';
+import { pollUntil } from '../lib/pollUntil.js';
 
 /**
- * @typedef {{ commentNo: string, text: string, userId: string|null }} ParsedCommentRow
+ * @typedef {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string }} ParsedCommentRow
  */
 
 const DEBOUNCE_MS = 400;
@@ -1054,8 +1056,41 @@ function findCommentEditorElement() {
     '[contenteditable="true"][role="textbox"]',
     '[contenteditable="true"][aria-label*="コメント"]',
     '[class*="comment-input" i] textarea',
-    '[class*="comment-box" i] textarea'
+    '[class*="comment-box" i] textarea',
+    '[class*="CommentForm" i] textarea',
+    '[class*="commentForm" i] textarea',
+    '[data-testid*="comment" i] textarea',
+    '[data-testid*="Comment" i] textarea'
   ];
+
+  const panels = [
+    document.querySelector('.ga-ns-comment-panel'),
+    document.querySelector('.comment-panel'),
+    document.querySelector('[class*="comment-panel" i]'),
+    document.querySelector('[class*="CommentPanel" i]')
+  ].filter(Boolean);
+
+  for (const panel of panels) {
+    for (const selector of selectors) {
+      const list = panel.querySelectorAll(selector);
+      for (const node of list) {
+        if (!isVisibleElement(node)) continue;
+        if (
+          node instanceof HTMLTextAreaElement ||
+          node instanceof HTMLInputElement ||
+          node instanceof HTMLElement
+        ) {
+          return node;
+        }
+      }
+    }
+    const loose = panel.querySelectorAll('textarea');
+    for (const node of loose) {
+      if (!isVisibleElement(node)) continue;
+      if (node instanceof HTMLTextAreaElement) return node;
+    }
+  }
+
   for (const selector of selectors) {
     const list = document.querySelectorAll(selector);
     for (const node of list) {
@@ -1086,6 +1121,18 @@ function setEditorText(el, text) {
       el.value = text;
     }
     el.dispatchEvent(new Event('input', { bubbles: true }));
+    try {
+      el.dispatchEvent(
+        new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: text
+        })
+      );
+    } catch {
+      // InputEvent 非対応環境
+    }
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return;
   }
@@ -1101,6 +1148,24 @@ function setEditorText(el, text) {
  * @param {ParentNode} root
  * @returns {HTMLElement|null}
  */
+/**
+ * @param {HTMLTextAreaElement|HTMLInputElement|HTMLElement} editor
+ * @returns {HTMLElement|null}
+ */
+function findVisibleEnabledSubmitForEditor(editor) {
+  if (!(editor instanceof HTMLElement)) {
+    return findCommentSubmitButton(document);
+  }
+  const form = editor.closest('form');
+  const scope =
+    form ||
+    editor.closest('[class*="comment" i], [role="group"]') ||
+    document;
+  const inScope = findCommentSubmitButton(scope);
+  if (inScope) return inScope;
+  return findCommentSubmitButton(document);
+}
+
 function findCommentSubmitButton(root) {
   const selectors = [
     'button[type="submit"]',
@@ -1108,7 +1173,11 @@ function findCommentSubmitButton(root) {
     'button[aria-label*="コメント"]',
     'button[data-testid*="send" i]',
     'button[data-testid*="comment" i]',
-    '[role="button"][aria-label*="送信"]'
+    'button[data-testid*="Submit" i]',
+    '[role="button"][aria-label*="送信"]',
+    '[class*="send" i][role="button"]',
+    'button[class*="Send" i]',
+    'button[class*="submit" i]'
   ];
   for (const selector of selectors) {
     const list = root.querySelectorAll(selector);
@@ -1171,8 +1240,12 @@ function trySubmitComment(editor) {
   return true;
 }
 
-/** @param {string} rawText */
-function postCommentFromContent(rawText) {
+/**
+ * React 等が入力値を反映してから送信するまで短い待ちを入れる
+ * @param {string} rawText
+ * @returns {Promise<{ ok: boolean, error?: string }>}
+ */
+async function postCommentFromContentAsync(rawText) {
   if (!isNicoLiveWatchUrl(window.location.href)) {
     return { ok: false, error: 'watchページ以外では投稿できません。' };
   }
@@ -1181,17 +1254,45 @@ function postCommentFromContent(rawText) {
     return { ok: false, error: 'コメントが空です。' };
   }
 
-  const editor = findCommentEditorElement();
+  const editor = await pollUntil(findCommentEditorElement, {
+    timeoutMs: 8000,
+    intervalMs: 50
+  });
   if (!editor) {
-    return { ok: false, error: 'コメント入力欄が見つかりません。' };
+    return {
+      ok: false,
+      error:
+        'コメント入力欄が見つかりません。ページの再読み込み直後は数秒待ってから再度お試しください。'
+    };
   }
 
   try {
-    setEditorText(editor, text);
-    const submitted = trySubmitComment(editor);
-    if (!submitted) {
-      return { ok: false, error: '送信ボタンを見つけられませんでした。' };
+    if (editor instanceof HTMLElement) {
+      editor.focus();
     }
+    setEditorText(editor, text);
+    await new Promise((r) => {
+      requestAnimationFrame(() => requestAnimationFrame(r));
+    });
+    await new Promise((r) => setTimeout(r, 220));
+
+    const btn = await pollUntil(() => findVisibleEnabledSubmitForEditor(editor), {
+      timeoutMs: 6500,
+      intervalMs: 80
+    });
+    if (btn) {
+      btn.click();
+      return { ok: true };
+    }
+
+    trySubmitComment(editor);
+    await new Promise((r) => setTimeout(r, 280));
+    const btnLate = findVisibleEnabledSubmitForEditor(editor);
+    if (btnLate) {
+      btnLate.click();
+      return { ok: true };
+    }
+    trySubmitComment(editor);
     return { ok: true };
   } catch (err) {
     const message =
@@ -1215,7 +1316,10 @@ function postCommentFromContent(rawText) {
  *   links: { rel: string, href: string, as: string, type: string }[],
  *   metas: { key: string, value: string }[],
  *   scripts: { src: string, type: string }[],
- *   noopenerLinks: { text: string, href: string }[]
+ *   noopenerLinks: { text: string, href: string }[],
+ *   viewerAvatarUrl: string,
+ *   viewerNickname: string,
+ *   viewerUserId: string
  * }}
  */
 function collectWatchPageSnapshot() {
@@ -1346,6 +1450,8 @@ function collectWatchPageSnapshot() {
     return clean(m?.[1] || fromMeta);
   })();
 
+  const viewer = collectLoggedInViewerProfile(document, url);
+
   return {
     title: String(document.title || ''),
     url,
@@ -1358,8 +1464,20 @@ function collectWatchPageSnapshot() {
     links,
     metas,
     scripts,
-    noopenerLinks
+    noopenerLinks,
+    viewerAvatarUrl: viewer.viewerAvatarUrl,
+    viewerNickname: viewer.viewerNickname,
+    viewerUserId: viewer.viewerUserId
   };
+}
+
+/** ポップアップからの操作はトップの watch 文書を対象にする（iframe との sendResponse 競合を避ける） */
+function isWatchPageMainFrameForMessages() {
+  try {
+    return window.self === window.top;
+  } catch {
+    return true;
+  }
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -1367,6 +1485,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
 
   if (msg.type === 'NLS_CAPTURE_SCREENSHOT') {
+    if (!isWatchPageMainFrameForMessages()) return;
     void (async () => {
       try {
         if (!isNicoLiveWatchUrl(window.location.href)) {
@@ -1397,6 +1516,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === 'NLS_THUMB_STATS') {
+    if (!isWatchPageMainFrameForMessages()) return;
     void (async () => {
       try {
         if (!liveId) {
@@ -1413,13 +1533,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === 'NLS_POST_COMMENT') {
+    if (!isWatchPageMainFrameForMessages()) return;
     const text =
       'text' in msg ? String(/** @type {{ text?: unknown }} */ (msg).text || '') : '';
-    sendResponse(postCommentFromContent(text));
-    return;
+    void postCommentFromContentAsync(text)
+      .then((result) => sendResponse(result))
+      .catch((err) =>
+        sendResponse({
+          ok: false,
+          error:
+            err && typeof err === 'object' && 'message' in err
+              ? String(/** @type {{ message?: unknown }} */ (err).message || 'post_failed')
+              : 'post_failed'
+        })
+      );
+    return true;
   }
 
   if (msg.type === 'NLS_EXPORT_WATCH_SNAPSHOT') {
+    if (!isWatchPageMainFrameForMessages()) return;
     if (!isNicoLiveWatchUrl(window.location.href)) {
       sendResponse({
         ok: false,
@@ -1479,7 +1611,7 @@ function reconnectMutationObserver() {
 /**
  * DOM 抽出結果を interceptedUsers マップで補完（userId + nickname）
  * @param {ParsedCommentRow[]} rows
- * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string }[]}
+ * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, avatarUrl?: string }[]}
  */
 function enrichRowsWithInterceptedUserIds(rows) {
   if (!interceptedUsers.size && !interceptedNicknames.size) return rows;
@@ -1508,8 +1640,12 @@ async function persistCommentRows(rows) {
   try {
     const bag = await chrome.storage.local.get(key);
     const existing = Array.isArray(bag[key]) ? bag[key] : [];
-    const { next, added } = mergeNewComments(liveId, existing, enriched);
-    if (!added.length) return;
+    const { next, storageTouched } = mergeNewComments(
+      liveId,
+      existing,
+      enriched
+    );
+    if (!storageTouched) return;
     await chrome.storage.local.set({ [key]: next });
     await chrome.storage.local.remove(KEY_STORAGE_WRITE_ERROR);
   } catch (err) {

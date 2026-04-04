@@ -7,6 +7,12 @@ const common = {
   target: 'chrome100'
 };
 
+const ctxPageIntercept = await esbuild.context({
+  ...common,
+  target: 'chrome111',
+  entryPoints: ['src/extension/page-intercept-entry.js'],
+  outfile: 'extension/dist/page-intercept.js'
+});
 const ctxContent = await esbuild.context({
   ...common,
   entryPoints: ['src/extension/content-entry.js'],
@@ -18,5 +24,9 @@ const ctxPopup = await esbuild.context({
   outfile: 'extension/dist/popup.js'
 });
 
-await Promise.all([ctxContent.watch(), ctxPopup.watch()]);
-console.log('nicolivelog: esbuild watch (content + popup)');
+await Promise.all([
+  ctxPageIntercept.watch(),
+  ctxContent.watch(),
+  ctxPopup.watch()
+]);
+console.log('nicolivelog: esbuild watch (page-intercept + content + popup)');

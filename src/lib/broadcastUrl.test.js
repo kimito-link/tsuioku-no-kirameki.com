@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { extractLiveIdFromUrl, isNicoLiveWatchUrl } from './broadcastUrl.js';
+import {
+  extractLiveIdFromUrl,
+  isNicoLiveWatchUrl,
+  watchPageUrlsMatchForSnapshot
+} from './broadcastUrl.js';
 
 describe('extractLiveIdFromUrl', () => {
   it('watch URL から lv を取得', () => {
@@ -29,6 +33,20 @@ describe('extractLiveIdFromUrl', () => {
         'https://live.nicovideo.jp/watch/lv111#comment'
       )
     ).toBe('lv111');
+  });
+
+  it('pathname 末尾スラッシュ付きでも lv を取得', () => {
+    expect(
+      extractLiveIdFromUrl('https://live.nicovideo.jp/watch/lv350235704/')
+    ).toBe('lv350235704');
+  });
+
+  it('クエリ・ハッシュ併在でも pathname の lv を優先', () => {
+    expect(
+      extractLiveIdFromUrl(
+        'https://live.nicovideo.jp/watch/lv55/?ref=1#t=10m'
+      )
+    ).toBe('lv55');
   });
 
   it('大文字 LV を小文字化', () => {
@@ -68,5 +86,34 @@ describe('isNicoLiveWatchUrl', () => {
     expect(isNicoLiveWatchUrl('http://127.0.0.1:3456/other/lv888888888')).toBe(
       false
     );
+  });
+});
+
+describe('watchPageUrlsMatchForSnapshot', () => {
+  it('クエリ違いでも同一 lv なら一致', () => {
+    expect(
+      watchPageUrlsMatchForSnapshot(
+        'https://live.nicovideo.jp/watch/lv123',
+        'https://live.nicovideo.jp/watch/lv123?ref=foo'
+      )
+    ).toBe(true);
+  });
+
+  it('ハッシュのみ違いも一致', () => {
+    expect(
+      watchPageUrlsMatchForSnapshot(
+        'https://live.nicovideo.jp/watch/lv123',
+        'https://live.nicovideo.jp/watch/lv123#t=1h'
+      )
+    ).toBe(true);
+  });
+
+  it('別 lv は不一致', () => {
+    expect(
+      watchPageUrlsMatchForSnapshot(
+        'https://live.nicovideo.jp/watch/lv1',
+        'https://live.nicovideo.jp/watch/lv2'
+      )
+    ).toBe(false);
   });
 });

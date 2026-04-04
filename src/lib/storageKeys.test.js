@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   KEY_LAST_WATCH_URL,
   KEY_RECORDING,
+  KEY_SELF_POSTED_RECENTS,
   KEY_STORAGE_WRITE_ERROR,
   INLINE_PANEL_WIDTH_PLAYER_ROW,
   INLINE_PANEL_WIDTH_VIDEO,
@@ -14,6 +15,7 @@ describe('storage key constants', () => {
     expect(KEY_RECORDING).toMatch(/^nls_/);
     expect(KEY_LAST_WATCH_URL).toMatch(/^nls_/);
     expect(KEY_STORAGE_WRITE_ERROR).toMatch(/^nls_/);
+    expect(KEY_SELF_POSTED_RECENTS).toMatch(/^nls_/);
   });
 
   it('commentsStorageKey は trim + 小文字', () => {

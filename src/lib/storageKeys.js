@@ -28,6 +28,9 @@ export const KEY_VOICE_AUTOSEND = 'nls_voice_autosend';
 /** 音声入力: 使用するマイクの deviceId（空は既定） */
 export const KEY_VOICE_INPUT_DEVICE = 'nls_voice_input_device';
 
+/** 拡張から投稿したコメント（本文＋時刻）— 応援アイコンをこん太にする照合用 */
+export const KEY_SELF_POSTED_RECENTS = 'nls_self_posted_recents';
+
 /** 視聴ページインラインパネルの幅: 視聴ブロック全幅 or 動画幅のみ */
 export const KEY_INLINE_PANEL_WIDTH_MODE = 'nls_inline_panel_width_mode';
 

@@ -420,6 +420,7 @@
       }
 
       .nl-story-body {
+        --nl-story-icon-size: 14px;
         min-width: 0;
         width: 100%;
         overflow: hidden;
@@ -469,7 +470,6 @@
       }
 
       .nl-story-growth {
-        --nl-story-icon-size: 14px;
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(var(--nl-story-icon-size), var(--nl-story-icon-size)));
         grid-auto-flow: row;
@@ -493,10 +493,17 @@
         width: var(--nl-story-icon-size);
         height: var(--nl-story-icon-size);
         object-fit: contain;
+        object-position: center;
         filter: drop-shadow(0 1px 1px rgb(2 17 31 / 18%));
         border-radius: 4px;
         cursor: pointer;
         outline: none;
+        flex-shrink: 0;
+      }
+
+      /* ニコサムネなどリモート画像はタイルいっぱいに（りんくPNGと同じ枠の見え方） */
+      .nl-story-growth-icon.nl-story-growth-icon--remote {
+        object-fit: cover;
       }
 
       .nl-story-meter-label {
@@ -520,7 +527,9 @@
 
       .nl-story-growth-icon:focus-visible,
       .nl-story-growth-icon.is-selected {
-        box-shadow: 0 0 0 2px #0ea5e9;
+        box-shadow:
+          0 0 0 2px #ffffff,
+          0 0 0 4px #0284c7;
       }
 
       .nl-story-detail {
@@ -531,6 +540,16 @@
         background: color-mix(in srgb, var(--nl-surface) 90%, #e9f9ff 10%);
       }
 
+      .nl-story-detail.is-preview {
+        border-style: dashed;
+        opacity: 0.94;
+        background: color-mix(in srgb, var(--nl-surface) 88%, #dbeafe 12%);
+      }
+
+      .nl-story-detail.is-pinned-detail {
+        border-color: color-mix(in srgb, var(--nl-accent) 42%, var(--nl-border) 58%);
+      }
+
       .nl-story-detail-head {
         display: flex;
         align-items: center;
@@ -538,12 +557,20 @@
       }
 
       .nl-story-detail-img {
-        width: 24px;
-        height: 24px;
+        width: var(--nl-story-icon-size);
+        height: var(--nl-story-icon-size);
+        min-width: var(--nl-story-icon-size);
+        min-height: var(--nl-story-icon-size);
         object-fit: contain;
-        border-radius: 999px;
+        object-position: center;
+        border-radius: 4px;
         border: 1px solid var(--nl-border);
         background: #fff;
+        flex-shrink: 0;
+      }
+
+      .nl-story-detail-img.nl-story-detail-img--remote {
+        object-fit: cover;
       }
 
       .nl-story-detail-user {
@@ -1302,10 +1329,29 @@
         cursor: not-allowed;
       }
 
+      #reloadWatchTabBtn {
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        background: var(--nl-bg-soft);
+        color: var(--nl-text);
+        padding: 9px 12px;
+        min-height: 40px;
+        font-size: clamp(11px, calc(var(--nl-base-font) * 0.85), 15px);
+        font-weight: 700;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      #reloadWatchTabBtn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
       #postStatus {
         font-size: clamp(11px, calc(var(--nl-base-font) * 0.82), 14px);
         color: var(--nl-muted);
         line-height: 1.35;
+        white-space: pre-line;
       }
 
       #postStatus.error {
@@ -1314,6 +1360,17 @@
 
       #postStatus.success {
         color: #047857;
+      }
+
+      .nl-compose-troubleshoot {
+        margin: 6px 0 0;
+        padding: 8px 10px;
+        font-size: clamp(10px, calc(var(--nl-base-font) * 0.78), 13px);
+        color: var(--nl-muted);
+        line-height: 1.45;
+        background: rgb(248 250 252 / 90%);
+        border: 1px solid var(--nl-border);
+        border-radius: 8px;
       }
 
       .nl-voice-os-guide {
@@ -1804,10 +1861,6 @@
         display: none;
       }
 
-      body.nl-tight .nl-story-growth {
-        --nl-story-icon-size: 13px;
-      }
-
       body.nl-tight .nl-voice-device-row,
       body.nl-tight #voiceDeviceCheckStatus,
       body.nl-tight .nl-voice-level-row,
@@ -1852,10 +1905,6 @@
 
       body.nl-compact .nl-story-meter-label {
         display: none;
-      }
-
-      body.nl-compact .nl-story-growth {
-        --nl-story-icon-size: 12px;
       }
 
       body.nl-compact .nl-voice-device-row,
@@ -2000,8 +2049,21 @@
         <textarea id="commentInput" maxlength="250" placeholder="ここにコメントを書いて送信"></textarea>
         <div class="nl-compose-send-row">
           <button type="button" id="postCommentBtn" disabled>コメント送信</button>
+          <button
+            type="button"
+            id="reloadWatchTabBtn"
+            disabled
+            title="対象の watch タブを再読み込みします（F5 と同じ）"
+          >
+            watch再読み込み
+          </button>
           <span id="postStatus" aria-live="polite"></span>
         </div>
+        <p class="nl-compose-troubleshoot">
+          コメントの取得や送信がうまくいかないときは、<strong>watchページを再読み込み</strong>（F5）してください。拡張機能のファイルを差し替えたあとは、Chrome の
+          <strong>chrome://extensions</strong>
+          を開き、nicolivelog の<strong>「更新」</strong>を押してから、必要なら watch ページも再読み込みしてください（拡張は自動では再読み込みされません）。
+        </p>
         <details class="nl-voice-os-guide">
           <summary>PCの音声入力でも入れます（ガイド）</summary>
           <div class="nl-voice-os-guide-body">

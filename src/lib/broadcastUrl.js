@@ -53,3 +53,25 @@ export function isNicoLiveWatchUrl(url) {
     return false;
   }
 }
+
+/**
+ * スナップショット取得・コメント送信など「同じ watch 放送か」の緩い一致。
+ * クエリ・ハッシュの差でタブ URL と storage の URL がずれても lv が同じなら true。
+ * @param {string | null | undefined} a
+ * @param {string | null | undefined} b
+ */
+export function watchPageUrlsMatchForSnapshot(a, b) {
+  const la = extractLiveIdFromUrl(a);
+  const lb = extractLiveIdFromUrl(b);
+  if (la && lb) return la === lb;
+  try {
+    const ua = new URL(String(a || ''));
+    const ub = new URL(String(b || ''));
+    if (ua.origin !== ub.origin) return false;
+    const pa = ua.pathname.replace(/\/$/, '');
+    const pb = ub.pathname.replace(/\/$/, '');
+    return pa === pb;
+  } catch {
+    return String(a || '').trim() === String(b || '').trim();
+  }
+}

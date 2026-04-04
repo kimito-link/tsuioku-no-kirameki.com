@@ -106,6 +106,100 @@ export function extractUserIdFromIconSrc(el) {
 }
 
 /**
+ * img の src / srcset / data-* から URL 断片を集める（遅延読み込み対応）
+ * @param {HTMLImageElement} img
+ * @returns {string[]}
+ */
+export function collectNicoUserIconUrlPartsFromImg(img) {
+  if (!(img instanceof HTMLImageElement)) return [];
+  const urls = [];
+  for (const a of [
+    'src',
+    'data-src',
+    'data-original',
+    'data-lazy-src',
+    'data-url'
+  ]) {
+    const v = img.getAttribute(a);
+    if (v) urls.push(String(v).trim());
+  }
+  const srcset = img.getAttribute('srcset');
+  if (srcset) {
+    for (const chunk of srcset.split(',')) {
+      const token = chunk.trim().split(/\s+/)[0];
+      if (token) urls.push(token);
+    }
+  }
+  return urls;
+}
+
+/**
+ * @param {string} url
+ */
+export function looksLikeNicoUserIconUrl(url) {
+  const s = String(url || '');
+  if (!s) return false;
+  return /nicoaccount\/usericon|\/usericon\/|usericon\.nicovideo/i.test(s);
+}
+
+/**
+ * 1つの img 要素からニコユーザーアイコンの絶対 URL を試す
+ * @param {HTMLImageElement} img
+ * @param {string} baseHref
+ * @returns {string}
+ */
+export function absoluteNicoUserIconFromImg(img, baseHref) {
+  const base = String(baseHref || '').trim() || 'https://live.nicovideo.jp/';
+  if (!(img instanceof HTMLImageElement)) return '';
+  for (const raw of collectNicoUserIconUrlPartsFromImg(img)) {
+    if (!looksLikeNicoUserIconUrl(raw)) continue;
+    let abs = '';
+    try {
+      abs = new URL(raw, base).href;
+    } catch {
+      abs = raw;
+    }
+    if (!/^https?:\/\//i.test(abs)) continue;
+    const rect = img.getBoundingClientRect();
+    if (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      (rect.width > 96 || rect.height > 96)
+    ) {
+      continue;
+    }
+    return abs;
+  }
+  return '';
+}
+
+/**
+ * コメント行などからユーザーアイコン画像の絶対 URL を1つ返す
+ * @param {Element} el
+ * @param {string} [baseHref] new URL の基底（document.location 相当）
+ * @returns {string} 無ければ空文字
+ */
+export function extractUserIconUrlFromElement(el, baseHref) {
+  if (!el || el.nodeType !== 1) return '';
+  const base = String(baseHref || '').trim() || 'https://live.nicovideo.jp/';
+  const imgs = el.querySelectorAll('img');
+  for (const img of imgs) {
+    const abs = absoluteNicoUserIconFromImg(/** @type {HTMLImageElement} */ (img), base);
+    if (abs) return abs;
+  }
+  return '';
+}
+
+/** @param {Document|null|undefined} doc */
+function documentBaseHref(doc) {
+  try {
+    return String(doc?.defaultView?.location?.href || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+/**
  * React fiber の内部状態からユーザーIDを探索する。
  * ニコ生は React 描画のため、table-row コンポーネントの props/state に
  * userId / user_id / hashedUserId 等が含まれている場合がある。
@@ -255,7 +349,7 @@ export function resolveUserIdOnElement(el) {
 /**
  * 新ニコ生PC: div.table-row[data-comment-type="normal"] + .comment-number + .comment-text
  * @param {Element} el — 行要素またはその子孫
- * @returns {{ commentNo: string, text: string, userId: string|null } | null}
+ * @returns {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string } | null}
  */
 export function parseNicoLiveTableRow(el) {
   if (!el || el.nodeType !== 1) return null;
@@ -279,12 +373,17 @@ export function parseNicoLiveTableRow(el) {
   if (!text) return null;
 
   const userId = resolveUserIdOnElement(row);
-  return { commentNo, text, userId };
+  const base =
+    documentBaseHref(row.ownerDocument) || 'https://live.nicovideo.jp/';
+  const avatarUrl = extractUserIconUrlFromElement(row, base);
+  const out = { commentNo, text, userId };
+  if (avatarUrl) out.avatarUrl = avatarUrl;
+  return out;
 }
 
 /**
  * @param {Element} el
- * @returns {{ commentNo: string, text: string, userId: string|null } | null}
+ * @returns {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string } | null}
  */
 export function parseCommentElement(el) {
   if (!el || el.nodeType !== 1) return null;
@@ -292,6 +391,9 @@ export function parseCommentElement(el) {
   if (fromGrid) return fromGrid;
 
   const userId = resolveUserIdOnElement(el);
+  const base =
+    documentBaseHref(el.ownerDocument) || 'https://live.nicovideo.jp/';
+  const avatarUrl = extractUserIconUrlFromElement(el, base);
 
   const raw = (
     ('innerText' in el ? /** @type {HTMLElement} */ (el).innerText : '') ||
@@ -302,17 +404,23 @@ export function parseCommentElement(el) {
     .trim();
   if (!raw) return null;
 
+  const withAv = (/** @type {{ commentNo: string, text: string }} */ o) => ({
+    ...o,
+    userId,
+    ...(avatarUrl ? { avatarUrl } : {})
+  });
+
   const lines = raw
     .split(/\n+/)
     .map((l) => l.trim())
     .filter(Boolean);
   for (const line of lines) {
     const p = parseCommentLineText(line);
-    if (p) return { ...p, userId };
+    if (p) return withAv(p);
   }
   const oneLine = raw.replace(/\s+/g, ' ').trim();
   const p = parseCommentLineText(oneLine);
-  if (p) return { ...p, userId };
+  if (p) return withAv(p);
   return null;
 }
 
@@ -345,16 +453,16 @@ function collectNicoLiveTableRows(el) {
 /**
  * 追加されたノード以下からコメント行候補を集める
  * @param {Node} root
- * @returns {{ commentNo: string, text: string, userId: string|null }[]}
+ * @returns {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string }[]}
  */
 export function extractCommentsFromNode(root) {
   if (!root || root.nodeType !== 1) return [];
   const el = /** @type {Element} */ (root);
   const seen = new Set();
-  /** @type {{ commentNo: string, text: string, userId: string|null }[]} */
+  /** @type {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string }[]} */
   const out = [];
 
-  /** @param {{ commentNo: string, text: string, userId: string|null } | null} parsed */
+  /** @param {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string } | null} parsed */
   function push(parsed) {
     if (!parsed) return;
     const k = `${parsed.commentNo}\t${parsed.text}`;

@@ -14,6 +14,11 @@ describe('findNicoCommentPanel', () => {
       '<div class="comment-panel"></div><div class="ga-ns-comment-panel" id="g"></div>';
     expect(findNicoCommentPanel(document)?.id).toBe('g');
   });
+
+  it('.comment-panel のみでも取得（UI 世代差のフォールバック）', () => {
+    document.body.innerHTML = '<div class="comment-panel" id="cp"></div>';
+    expect(findNicoCommentPanel(document)?.id).toBe('cp');
+  });
 });
 
 describe('findCommentListScrollHost', () => {

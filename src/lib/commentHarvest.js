@@ -98,7 +98,7 @@ function raf(doc) {
  * 仮想リストを上→下へステップ送りし、各位置の table-row をマージして返す
  * @param {{
  *   document?: Document,
- *   extractCommentsFromNode: (el: Element) => { commentNo?: string, text: string, userId?: string|null }[],
+ *   extractCommentsFromNode: (el: Element) => { commentNo?: string, text: string, userId?: string|null, avatarUrl?: string }[],
  *   waitMs?: number,
  * }} opts
  */
@@ -112,8 +112,8 @@ export async function harvestVirtualCommentList(opts) {
   if (!extract) return [];
 
   /**
-   * @param {Map<string, { commentNo?: string, text: string, userId?: string|null }>} map
-   * @param {{ commentNo?: string, text: string, userId?: string|null }[]} rows
+   * @param {Map<string, { commentNo?: string, text: string, userId?: string|null, avatarUrl?: string }>} map
+   * @param {{ commentNo?: string, text: string, userId?: string|null, avatarUrl?: string }[]} rows
    */
   const mergeInto = (map, rows) => {
     for (const row of rows) {

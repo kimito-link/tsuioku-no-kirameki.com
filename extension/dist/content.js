@@ -242,6 +242,12 @@
     return v === true;
   }
 
+  // src/lib/supportGrowthTileSrc.js
+  function isHttpOrHttpsUrl(url) {
+    const s = String(url || "").trim();
+    return /^https?:\/\//i.test(s);
+  }
+
   // src/lib/commentRecord.js
   function normalizeCommentText(value) {
     return String(value || "").replace(/\r\n/g, "\n").split("\n").map((l) => l.trim()).join("\n").trim();
@@ -264,6 +270,8 @@
     const commentNo = String(p.commentNo ?? "").trim();
     const liveId2 = String(p.liveId || "").trim().toLowerCase();
     const nickname = p.nickname ? String(p.nickname).trim() : "";
+    const av = String(p.avatarUrl || "").trim();
+    const avatarUrl = isHttpOrHttpsUrl(av) ? av : "";
     const entry = {
       id: randomId(),
       liveId: liveId2,
@@ -271,9 +279,17 @@
       text,
       userId: p.userId ? String(p.userId) : null,
       ...nickname ? { nickname } : {},
+      ...avatarUrl ? { avatarUrl } : {},
       capturedAt
     };
     return entry;
+  }
+  function storedCommentDedupeKey(lid, ex) {
+    return buildDedupeKey(lid, {
+      commentNo: ex.commentNo,
+      text: ex.text,
+      capturedAt: ex.capturedAt
+    });
   }
   function mergeNewComments(liveId2, existing, incoming) {
     const lid = String(liveId2 || "").trim().toLowerCase();
@@ -283,17 +299,15 @@
         /** @type {StoredComment} */
         e
       );
-      keys.add(
-        buildDedupeKey(lid, {
-          commentNo: ex.commentNo,
-          text: ex.text,
-          capturedAt: ex.capturedAt
-        })
-      );
+      keys.add(storedCommentDedupeKey(lid, ex));
     }
     const added = [];
-    const next = [...existing];
+    const next = (
+      /** @type {StoredComment[]} */
+      [...existing]
+    );
     const now = Date.now();
+    let storageTouched = false;
     for (const row of incoming) {
       const text = normalizeCommentText(row.text);
       if (!text) continue;
@@ -303,19 +317,57 @@
         text,
         capturedAt: now
       });
-      if (keys.has(key)) continue;
+      const rawAv = String(row.avatarUrl || "").trim();
+      const validAvatar = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
+      if (keys.has(key)) {
+        const idx = next.findIndex((ex) => storedCommentDedupeKey(lid, ex) === key);
+        if (idx >= 0) {
+          const ex = (
+            /** @type {StoredComment} */
+            next[idx]
+          );
+          let patched = ex;
+          let touched = false;
+          if (validAvatar) {
+            const hasAv = Boolean(
+              ex.avatarUrl && isHttpOrHttpsUrl(String(ex.avatarUrl))
+            );
+            if (!hasAv) {
+              patched = { ...patched, avatarUrl: validAvatar };
+              touched = true;
+            }
+          }
+          const incUid = row.userId ? String(row.userId).trim() : "";
+          if (incUid && !ex.userId) {
+            patched = { ...patched, userId: incUid };
+            touched = true;
+          }
+          const incNick = String(row.nickname || "").trim();
+          if (incNick && !String(ex.nickname || "").trim()) {
+            patched = { ...patched, nickname: incNick };
+            touched = true;
+          }
+          if (touched) {
+            next[idx] = patched;
+            storageTouched = true;
+          }
+        }
+        continue;
+      }
       keys.add(key);
       const entry = createCommentEntry({
         liveId: lid,
         commentNo,
         text,
         userId: row.userId ?? null,
-        nickname: row.nickname || ""
+        nickname: row.nickname || "",
+        avatarUrl: validAvatar || void 0
       });
       added.push(entry);
       next.push(entry);
     }
-    return { next, added };
+    if (added.length) storageTouched = true;
+    return { next, added, storageTouched };
   }
 
   // src/lib/nicoliveDom.js
@@ -382,6 +434,74 @@
       if (m?.[1] && m[1].length >= 5) return m[1];
     }
     return null;
+  }
+  function collectNicoUserIconUrlPartsFromImg(img) {
+    if (!(img instanceof HTMLImageElement)) return [];
+    const urls = [];
+    for (const a of [
+      "src",
+      "data-src",
+      "data-original",
+      "data-lazy-src",
+      "data-url"
+    ]) {
+      const v = img.getAttribute(a);
+      if (v) urls.push(String(v).trim());
+    }
+    const srcset = img.getAttribute("srcset");
+    if (srcset) {
+      for (const chunk of srcset.split(",")) {
+        const token = chunk.trim().split(/\s+/)[0];
+        if (token) urls.push(token);
+      }
+    }
+    return urls;
+  }
+  function looksLikeNicoUserIconUrl(url) {
+    const s = String(url || "");
+    if (!s) return false;
+    return /nicoaccount\/usericon|\/usericon\/|usericon\.nicovideo/i.test(s);
+  }
+  function absoluteNicoUserIconFromImg(img, baseHref) {
+    const base = String(baseHref || "").trim() || "https://live.nicovideo.jp/";
+    if (!(img instanceof HTMLImageElement)) return "";
+    for (const raw of collectNicoUserIconUrlPartsFromImg(img)) {
+      if (!looksLikeNicoUserIconUrl(raw)) continue;
+      let abs = "";
+      try {
+        abs = new URL(raw, base).href;
+      } catch {
+        abs = raw;
+      }
+      if (!/^https?:\/\//i.test(abs)) continue;
+      const rect = img.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0 && (rect.width > 96 || rect.height > 96)) {
+        continue;
+      }
+      return abs;
+    }
+    return "";
+  }
+  function extractUserIconUrlFromElement(el, baseHref) {
+    if (!el || el.nodeType !== 1) return "";
+    const base = String(baseHref || "").trim() || "https://live.nicovideo.jp/";
+    const imgs = el.querySelectorAll("img");
+    for (const img of imgs) {
+      const abs = absoluteNicoUserIconFromImg(
+        /** @type {HTMLImageElement} */
+        img,
+        base
+      );
+      if (abs) return abs;
+    }
+    return "";
+  }
+  function documentBaseHref(doc) {
+    try {
+      return String(doc?.defaultView?.location?.href || "").trim();
+    } catch {
+      return "";
+    }
   }
   function extractUserIdFromReactFiber(el) {
     if (!el || el.nodeType !== 1) return null;
@@ -511,26 +631,37 @@
     const text = String(textEl.textContent || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
     if (!text) return null;
     const userId = resolveUserIdOnElement(row);
-    return { commentNo, text, userId };
+    const base = documentBaseHref(row.ownerDocument) || "https://live.nicovideo.jp/";
+    const avatarUrl = extractUserIconUrlFromElement(row, base);
+    const out = { commentNo, text, userId };
+    if (avatarUrl) out.avatarUrl = avatarUrl;
+    return out;
   }
   function parseCommentElement(el) {
     if (!el || el.nodeType !== 1) return null;
     const fromGrid = parseNicoLiveTableRow(el);
     if (fromGrid) return fromGrid;
     const userId = resolveUserIdOnElement(el);
+    const base = documentBaseHref(el.ownerDocument) || "https://live.nicovideo.jp/";
+    const avatarUrl = extractUserIconUrlFromElement(el, base);
     const raw = (("innerText" in el ? (
       /** @type {HTMLElement} */
       el.innerText
     ) : "") || el.textContent || "").replace(/\u00a0/g, " ").trim();
     if (!raw) return null;
+    const withAv = (o) => ({
+      ...o,
+      userId,
+      ...avatarUrl ? { avatarUrl } : {}
+    });
     const lines = raw.split(/\n+/).map((l) => l.trim()).filter(Boolean);
     for (const line of lines) {
       const p2 = parseCommentLineText(line);
-      if (p2) return { ...p2, userId };
+      if (p2) return withAv(p2);
     }
     const oneLine = raw.replace(/\s+/g, " ").trim();
     const p = parseCommentLineText(oneLine);
-    if (p) return { ...p, userId };
+    if (p) return withAv(p);
     return null;
   }
   var ROW_QUERY = [
@@ -589,6 +720,113 @@
       });
     }
     return out;
+  }
+
+  // src/lib/watchPageViewerProfile.js
+  var HEADER_BAND_MAX_TOP = 220;
+  function extractNicoUserIdFromHref(href) {
+    const m = String(href || "").match(/\/user\/(\d+)/);
+    return m ? m[1] : "";
+  }
+  function pickViewerUserIdFromRoots(uniqueRoots) {
+    const best = /* @__PURE__ */ new Map();
+    for (const root of uniqueRoots) {
+      for (const a of root.querySelectorAll('a[href*="/user/"]')) {
+        if (!(a instanceof HTMLAnchorElement)) continue;
+        const uid = extractNicoUserIdFromHref(a.getAttribute("href") || "");
+        if (!uid) continue;
+        let score = 1;
+        if (a.querySelector(
+          'img[src*="nicoaccount"], img[src*="/usericon/"], img[src*="usericon"]'
+        )) {
+          score += 4;
+        }
+        const hint = `${a.getAttribute("aria-label") || ""} ${a.textContent || ""}`;
+        if (/アカウント|マイページ|プロフィール|ログイン|ユーザー/i.test(hint)) score += 2;
+        if (/広場|フォロー|フォロワー|コミュニティ|チャンネル/i.test(hint)) score -= 2;
+        best.set(uid, Math.max(best.get(uid) || 0, score));
+      }
+    }
+    if (best.size === 0) return "";
+    return [...best.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  }
+  function collectLoggedInViewerProfile(doc, baseHref) {
+    const base = String(baseHref || "").trim() || "https://live.nicovideo.jp/";
+    const clean = (v) => String(v || "").replace(/\s+/g, " ").trim();
+    const roots = [];
+    const h = doc.querySelector("header");
+    if (h) roots.push(h);
+    doc.querySelectorAll('[role="banner"]').forEach((el) => roots.push(el));
+    const site = doc.querySelector(
+      '[class*="SiteHeader" i], [class*="GlobalHeader" i], [class*="site-header" i], [class*="siteHeader" i], [class*="AccountMenu" i], [class*="account-menu" i], [class*="UserMenu" i]'
+    );
+    if (site && !roots.includes(site)) roots.push(site);
+    const seen = /* @__PURE__ */ new Set();
+    const uniqueRoots = roots.filter((r) => {
+      if (seen.has(r)) return false;
+      seen.add(r);
+      return true;
+    });
+    let viewerAvatarUrl = "";
+    for (const root of uniqueRoots) {
+      const imgs = root.querySelectorAll("img");
+      for (const img of imgs) {
+        const u = absoluteNicoUserIconFromImg(
+          /** @type {HTMLImageElement} */
+          img,
+          base
+        );
+        if (u) {
+          viewerAvatarUrl = u;
+          break;
+        }
+      }
+      if (viewerAvatarUrl) break;
+    }
+    if (!viewerAvatarUrl) {
+      const all = [...doc.querySelectorAll("img")];
+      all.sort(
+        (a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top
+      );
+      for (const img of all) {
+        const rect = img.getBoundingClientRect();
+        if (rect.top > HEADER_BAND_MAX_TOP) break;
+        const u = absoluteNicoUserIconFromImg(
+          /** @type {HTMLImageElement} */
+          img,
+          base
+        );
+        if (u) {
+          viewerAvatarUrl = u;
+          break;
+        }
+      }
+    }
+    let viewerNickname = "";
+    for (const root of uniqueRoots) {
+      const nodes = root.querySelectorAll('button[aria-label], a[href*="/user/"]');
+      for (const b of nodes) {
+        const al = clean(b.getAttribute("aria-label") || "");
+        if (al && al.length >= 2 && al.length < 72 && !/^(開く|メニュー|通知|検索|ログアウト|設定|menu|open)/i.test(al)) {
+          if (/^P\s*ポイント|^ポイント購入/i.test(al)) continue;
+          viewerNickname = al;
+          break;
+        }
+        if (b instanceof HTMLAnchorElement) {
+          const href = String(b.getAttribute("href") || "");
+          if (/\/user\/\d+/.test(href)) {
+            const t = clean(b.textContent || "");
+            if (t && t.length < 72 && !/^https?:\/\//i.test(t)) {
+              viewerNickname = t;
+              break;
+            }
+          }
+        }
+      }
+      if (viewerNickname) break;
+    }
+    const viewerUserId = pickViewerUserIdFromRoots(uniqueRoots);
+    return { viewerAvatarUrl, viewerNickname, viewerUserId };
   }
 
   // src/lib/commentHarvest.js
@@ -862,6 +1100,19 @@
       return { audio: true };
     }
     return { audio: { deviceId: { ideal: id } } };
+  }
+
+  // src/lib/pollUntil.js
+  async function pollUntil(fn, opts = {}) {
+    const timeoutMs = opts.timeoutMs ?? 4e3;
+    const intervalMs = opts.intervalMs ?? 100;
+    const start2 = Date.now();
+    while (Date.now() - start2 < timeoutMs) {
+      const v = fn();
+      if (v) return v;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    return null;
   }
 
   // src/extension/content-entry.js
@@ -1696,8 +1947,34 @@
       '[contenteditable="true"][role="textbox"]',
       '[contenteditable="true"][aria-label*="\u30B3\u30E1\u30F3\u30C8"]',
       '[class*="comment-input" i] textarea',
-      '[class*="comment-box" i] textarea'
+      '[class*="comment-box" i] textarea',
+      '[class*="CommentForm" i] textarea',
+      '[class*="commentForm" i] textarea',
+      '[data-testid*="comment" i] textarea',
+      '[data-testid*="Comment" i] textarea'
     ];
+    const panels = [
+      document.querySelector(".ga-ns-comment-panel"),
+      document.querySelector(".comment-panel"),
+      document.querySelector('[class*="comment-panel" i]'),
+      document.querySelector('[class*="CommentPanel" i]')
+    ].filter(Boolean);
+    for (const panel of panels) {
+      for (const selector of selectors) {
+        const list = panel.querySelectorAll(selector);
+        for (const node of list) {
+          if (!isVisibleElement(node)) continue;
+          if (node instanceof HTMLTextAreaElement || node instanceof HTMLInputElement || node instanceof HTMLElement) {
+            return node;
+          }
+        }
+      }
+      const loose = panel.querySelectorAll("textarea");
+      for (const node of loose) {
+        if (!isVisibleElement(node)) continue;
+        if (node instanceof HTMLTextAreaElement) return node;
+      }
+    }
     for (const selector of selectors) {
       const list = document.querySelectorAll(selector);
       for (const node of list) {
@@ -1719,6 +1996,17 @@
         el.value = text;
       }
       el.dispatchEvent(new Event("input", { bubbles: true }));
+      try {
+        el.dispatchEvent(
+          new InputEvent("input", {
+            bubbles: true,
+            cancelable: true,
+            inputType: "insertText",
+            data: text
+          })
+        );
+      } catch {
+      }
       el.dispatchEvent(new Event("change", { bubbles: true }));
       return;
     }
@@ -1728,6 +2016,16 @@
       el.dispatchEvent(new InputEvent("input", { bubbles: true, data: text }));
     }
   }
+  function findVisibleEnabledSubmitForEditor(editor) {
+    if (!(editor instanceof HTMLElement)) {
+      return findCommentSubmitButton(document);
+    }
+    const form = editor.closest("form");
+    const scope = form || editor.closest('[class*="comment" i], [role="group"]') || document;
+    const inScope = findCommentSubmitButton(scope);
+    if (inScope) return inScope;
+    return findCommentSubmitButton(document);
+  }
   function findCommentSubmitButton(root) {
     const selectors = [
       'button[type="submit"]',
@@ -1735,7 +2033,11 @@
       'button[aria-label*="\u30B3\u30E1\u30F3\u30C8"]',
       'button[data-testid*="send" i]',
       'button[data-testid*="comment" i]',
-      '[role="button"][aria-label*="\u9001\u4FE1"]'
+      'button[data-testid*="Submit" i]',
+      '[role="button"][aria-label*="\u9001\u4FE1"]',
+      '[class*="send" i][role="button"]',
+      'button[class*="Send" i]',
+      'button[class*="submit" i]'
     ];
     for (const selector of selectors) {
       const list = root.querySelectorAll(selector);
@@ -1782,7 +2084,7 @@
     );
     return true;
   }
-  function postCommentFromContent(rawText) {
+  async function postCommentFromContentAsync(rawText) {
     if (!isNicoLiveWatchUrl(window.location.href)) {
       return { ok: false, error: "watch\u30DA\u30FC\u30B8\u4EE5\u5916\u3067\u306F\u6295\u7A3F\u3067\u304D\u307E\u305B\u3093\u3002" };
     }
@@ -1790,16 +2092,41 @@
     if (!text) {
       return { ok: false, error: "\u30B3\u30E1\u30F3\u30C8\u304C\u7A7A\u3067\u3059\u3002" };
     }
-    const editor = findCommentEditorElement();
+    const editor = await pollUntil(findCommentEditorElement, {
+      timeoutMs: 8e3,
+      intervalMs: 50
+    });
     if (!editor) {
-      return { ok: false, error: "\u30B3\u30E1\u30F3\u30C8\u5165\u529B\u6B04\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002" };
+      return {
+        ok: false,
+        error: "\u30B3\u30E1\u30F3\u30C8\u5165\u529B\u6B04\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002\u30DA\u30FC\u30B8\u306E\u518D\u8AAD\u307F\u8FBC\u307F\u76F4\u5F8C\u306F\u6570\u79D2\u5F85\u3063\u3066\u304B\u3089\u518D\u5EA6\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002"
+      };
     }
     try {
-      setEditorText(editor, text);
-      const submitted = trySubmitComment(editor);
-      if (!submitted) {
-        return { ok: false, error: "\u9001\u4FE1\u30DC\u30BF\u30F3\u3092\u898B\u3064\u3051\u3089\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002" };
+      if (editor instanceof HTMLElement) {
+        editor.focus();
       }
+      setEditorText(editor, text);
+      await new Promise((r) => {
+        requestAnimationFrame(() => requestAnimationFrame(r));
+      });
+      await new Promise((r) => setTimeout(r, 220));
+      const btn = await pollUntil(() => findVisibleEnabledSubmitForEditor(editor), {
+        timeoutMs: 6500,
+        intervalMs: 80
+      });
+      if (btn) {
+        btn.click();
+        return { ok: true };
+      }
+      trySubmitComment(editor);
+      await new Promise((r) => setTimeout(r, 280));
+      const btnLate = findVisibleEnabledSubmitForEditor(editor);
+      if (btnLate) {
+        btnLate.click();
+        return { ok: true };
+      }
+      trySubmitComment(editor);
       return { ok: true };
     } catch (err) {
       const message = err && typeof err === "object" && "message" in err ? String(
@@ -1902,6 +2229,7 @@
       );
       return clean(m?.[1] || fromMeta);
     })();
+    const viewer = collectLoggedInViewerProfile(document, url);
     return {
       title: String(document.title || ""),
       url,
@@ -1914,13 +2242,24 @@
       links,
       metas,
       scripts,
-      noopenerLinks
+      noopenerLinks,
+      viewerAvatarUrl: viewer.viewerAvatarUrl,
+      viewerNickname: viewer.viewerNickname,
+      viewerUserId: viewer.viewerUserId
     };
+  }
+  function isWatchPageMainFrameForMessages() {
+    try {
+      return window.self === window.top;
+    } catch {
+      return true;
+    }
   }
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!hasExtensionContext()) return;
     if (!msg || typeof msg !== "object" || !("type" in msg)) return;
     if (msg.type === "NLS_CAPTURE_SCREENSHOT") {
+      if (!isWatchPageMainFrameForMessages()) return;
       void (async () => {
         try {
           if (!isNicoLiveWatchUrl(window.location.href)) {
@@ -1950,6 +2289,7 @@
       return true;
     }
     if (msg.type === "NLS_THUMB_STATS") {
+      if (!isWatchPageMainFrameForMessages()) return;
       void (async () => {
         try {
           if (!liveId) {
@@ -1965,14 +2305,24 @@
       return true;
     }
     if (msg.type === "NLS_POST_COMMENT") {
+      if (!isWatchPageMainFrameForMessages()) return;
       const text = "text" in msg ? String(
         /** @type {{ text?: unknown }} */
         msg.text || ""
       ) : "";
-      sendResponse(postCommentFromContent(text));
-      return;
+      void postCommentFromContentAsync(text).then((result) => sendResponse(result)).catch(
+        (err) => sendResponse({
+          ok: false,
+          error: err && typeof err === "object" && "message" in err ? String(
+            /** @type {{ message?: unknown }} */
+            err.message || "post_failed"
+          ) : "post_failed"
+        })
+      );
+      return true;
     }
     if (msg.type === "NLS_EXPORT_WATCH_SNAPSHOT") {
+      if (!isWatchPageMainFrameForMessages()) return;
       if (!isNicoLiveWatchUrl(window.location.href)) {
         sendResponse({
           ok: false,
@@ -2043,8 +2393,12 @@
     try {
       const bag = await chrome.storage.local.get(key);
       const existing = Array.isArray(bag[key]) ? bag[key] : [];
-      const { next, added } = mergeNewComments(liveId, existing, enriched);
-      if (!added.length) return;
+      const { next, storageTouched } = mergeNewComments(
+        liveId,
+        existing,
+        enriched
+      );
+      if (!storageTouched) return;
       await chrome.storage.local.set({ [key]: next });
       await chrome.storage.local.remove(KEY_STORAGE_WRITE_ERROR);
     } catch (err) {
