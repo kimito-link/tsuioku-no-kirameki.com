@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "nicolivelog",
+  "name": "君斗りんくの追憶のきらめき",
   "version": "0.1.0",
-  "description": "ニコニコ生放送のコメントをローカルに記録するプロトタイプ（オプトイン）",
+  "description": "ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます（開発識別子: nicolivelog）。",
   "permissions": ["storage", "scripting", "downloads", "alarms"],
   "host_permissions": [
     "https://*.nicovideo.jp/*",
@@ -13,7 +13,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "nicolivelog"
+    "default_title": "君斗りんくの追憶のきらめき"
   },
   "content_scripts": [
     {

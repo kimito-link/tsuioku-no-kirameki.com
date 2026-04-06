@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Permissions-Policy" content="microphone=(self)" />
-    <title>nicolivelog</title>
+    <title>君斗りんくの追憶のきらめき</title>
     <style>
       :root {
         --nl-pop-width: 420px;
@@ -248,8 +248,10 @@
         position: relative;
         z-index: 1;
         font-weight: 800;
-        font-size: 1.15rem;
+        font-size: clamp(0.78rem, calc(var(--nl-base-font) * 0.82), 1.05rem);
         letter-spacing: -0.02em;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
       }
 
       .nl-sub {
@@ -824,6 +826,143 @@
         overflow-y: auto;
       }
 
+      .nl-usage-terms-gate {
+        position: fixed;
+        inset: 0;
+        z-index: 100000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: clamp(8px, 2.5vw, 16px);
+        box-sizing: border-box;
+        background: color-mix(in srgb, var(--nl-text) 42%, transparent);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+      }
+
+      html[data-nl-usage-terms-ack='1'] .nl-usage-terms-gate {
+        display: none !important;
+        pointer-events: none;
+      }
+
+      .nl-usage-terms-gate__panel {
+        width: min(100%, 400px);
+        max-height: min(92vh, 720px);
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        background: var(--nl-surface);
+        border: 1px solid var(--nl-border);
+        border-radius: var(--nl-radius);
+        box-shadow: var(--nl-shadow);
+        padding: clamp(10px, 3vw, 14px) clamp(12px, 3.5vw, 16px);
+      }
+
+      .nl-usage-terms-gate__title {
+        margin: 0 0 6px;
+        font-size: clamp(13px, calc(var(--nl-base-font) * 0.92), 15px);
+        font-weight: 800;
+        color: var(--nl-text);
+        line-height: 1.35;
+      }
+
+      .nl-usage-terms-gate__lead {
+        margin: 0 0 10px;
+        font-size: clamp(10px, calc(var(--nl-base-font) * 0.72), 12px);
+        color: var(--nl-muted);
+        line-height: 1.45;
+      }
+
+      .nl-usage-terms-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: clamp(10px, calc(var(--nl-base-font) * 0.72), 12px);
+        line-height: 1.4;
+        margin: 0 0 12px;
+      }
+
+      .nl-usage-terms-table th,
+      .nl-usage-terms-table td {
+        border: 1px solid var(--nl-border);
+        padding: 6px 8px;
+        vertical-align: top;
+        text-align: left;
+      }
+
+      .nl-usage-terms-table th {
+        width: 30%;
+        min-width: 5.5em;
+        background: color-mix(in srgb, var(--nl-bg-soft) 88%, var(--nl-surface) 12%);
+        font-weight: 700;
+        color: var(--nl-text);
+      }
+
+      .nl-usage-terms-table td {
+        color: var(--nl-text);
+        word-break: break-word;
+      }
+
+      .nl-usage-terms-table a {
+        color: var(--nl-accent);
+        font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        word-break: break-all;
+      }
+
+      .nl-usage-terms-table a:hover {
+        color: var(--nl-accent-hover);
+      }
+
+      .nl-usage-terms-gate__note {
+        margin: 0 0 10px;
+        font-size: clamp(9px, calc(var(--nl-base-font) * 0.68), 11px);
+        color: var(--nl-muted);
+        line-height: 1.4;
+      }
+
+      .nl-usage-terms-gate__ack {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin: 0 0 10px;
+        font-size: clamp(10px, calc(var(--nl-base-font) * 0.76), 12px);
+        line-height: 1.45;
+        color: var(--nl-text);
+        cursor: pointer;
+      }
+
+      .nl-usage-terms-gate__ack input {
+        margin-top: 3px;
+        flex-shrink: 0;
+      }
+
+      .nl-usage-terms-gate__continue {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: none;
+        font-size: clamp(12px, calc(var(--nl-base-font) * 0.88), 14px);
+        font-weight: 800;
+        cursor: pointer;
+        background: linear-gradient(
+          135deg,
+          var(--nl-header-start),
+          var(--nl-header-end)
+        );
+        color: #fff;
+        box-shadow: var(--nl-shadow);
+      }
+
+      .nl-usage-terms-gate__continue:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        filter: grayscale(0.25);
+      }
+
+      .nl-usage-terms-gate__continue:not(:disabled):hover {
+        filter: brightness(1.05);
+      }
+
       .nl-frame-switch {
         background: var(--nl-surface);
         border: 1px solid var(--nl-border);
@@ -835,6 +974,47 @@
 
       #userRoomList + .nl-frame-switch {
         margin-top: 10px;
+      }
+
+      #userRoomList + .nl-project-concept {
+        margin-top: 10px;
+      }
+
+      .nl-project-concept + .nl-frame-switch {
+        margin-top: 8px;
+      }
+
+      .nl-project-concept-hint {
+        font-size: 10px;
+        color: var(--nl-muted);
+        font-weight: 600;
+        line-height: 1.25;
+      }
+
+      .nl-project-concept-body {
+        padding-bottom: 4px;
+      }
+
+      .nl-project-concept-body p {
+        margin: 0 0 8px;
+        font-size: clamp(11px, calc(var(--nl-base-font) * 0.82), 13px);
+        color: var(--nl-text);
+        line-height: 1.45;
+      }
+
+      .nl-project-concept-body p:last-child {
+        margin-bottom: 0;
+      }
+
+      .nl-project-concept-body a {
+        color: var(--nl-accent);
+        font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+
+      .nl-project-concept-body a:hover {
+        color: var(--nl-accent-hover);
       }
 
       .nl-frame-theme-details {
@@ -3293,7 +3473,7 @@
           decoding="async"
         />
         <div class="nl-header-titles">
-          <div class="nl-logo">nicolivelog</div>
+          <div class="nl-logo">君斗りんくの追憶のきらめき</div>
           <p class="nl-sub">
             ニコ生の応援コメントを、このPCで見える化（記録は自分でON）
           </p>
@@ -3302,6 +3482,66 @@
     </header>
 
     <div class="nl-main">
+      <div
+        id="usageTermsGate"
+        class="nl-usage-terms-gate"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="usageTermsGateTitle"
+      >
+        <div class="nl-usage-terms-gate__panel">
+          <h2 id="usageTermsGateTitle" class="nl-usage-terms-gate__title">
+            利用の前に（ご確認ください）
+          </h2>
+          <p class="nl-usage-terms-gate__lead">
+            本拡張機能の利用にあたり、次の内容を読み、ご自身の責任でご判断ください（ニコニコの利用条件ページの写しではありません）。
+          </p>
+          <table class="nl-usage-terms-table">
+            <tbody>
+              <tr>
+                <th scope="row">記録・書き出し</th>
+                <td>
+                  コメントの記録、HTML・画像の保存などはこのPC上で行われます。保存データの管理・公開はご利用者の責任です。
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">外部表示</th>
+                <td>
+                  ユーザーアイコン等はニコニコのサーバーから読み込まれる場合があります。表示物の権利は各権利者に帰属します。
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">再配布</th>
+                <td>
+                  本拡張で得たデータを、権利者の許諾なく第三者へ再配布しないでください。
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">公式の案内</th>
+                <td>
+                  サービス利用については、ニコニコのお知らせ等もあわせてご確認ください（例:
+                  <a
+                    href="https://www.nicovideo.jp/topic/notice/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >https://www.nicovideo.jp/topic/notice/</a>）。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="nl-usage-terms-gate__note">
+            内容は拡張の説明用です。特定のライセンスや利用規約の全文の代替にはなりません。
+          </p>
+          <label class="nl-usage-terms-gate__ack" for="usageTermsAckCheckbox">
+            <input type="checkbox" id="usageTermsAckCheckbox" autocomplete="off" />
+            <span>上記を読み、自分の利用として同意します</span>
+          </label>
+          <button type="button" id="usageTermsContinueBtn" class="nl-usage-terms-gate__continue" disabled>
+            同意してポップアップを使う
+          </button>
+        </div>
+      </div>
+
       <div
         id="extensionContextBanner"
         class="nl-extension-context-banner"
@@ -3312,7 +3552,7 @@
         <strong>拡張の接続が切れました</strong>
         <p class="nl-extension-context-banner__body">
           <code>chrome://extensions</code>
-          を開き、nicolivelog の「更新」で拡張を再読み込みしてください。ページの再読み込みだけでは直らないことがあります。
+          を開き、「君斗りんくの追憶のきらめき」の「更新」で拡張を再読み込みしてください。ページの再読み込みだけでは直らないことがあります。
         </p>
       </div>
 
@@ -3511,7 +3751,7 @@
               <p class="nl-compose-troubleshoot-text">
                 コメントの取得や送信がうまくいかないときは、<strong>watchページを再読み込み</strong>（F5）してください。送信の横の「再読み込み」ボタンでも同じ操作ができます。拡張機能のファイルを差し替えたあとは、Chrome の
                 <strong>chrome://extensions</strong>
-                を開き、nicolivelog の<strong>「更新」</strong>を押してから、必要なら watch ページも再読み込みしてください（拡張は自動では再読み込みされません）。
+                を開き、「君斗りんくの追憶のきらめき」の<strong>「更新」</strong>を押してから、必要なら watch ページも再読み込みしてください（拡張は自動では再読み込みされません）。
               </p>
             </div>
           </div>
@@ -3814,6 +4054,51 @@
 
       <h2>応援可視化（ユーザー別）</h2>
       <ul id="userRoomList" aria-live="polite"></ul>
+
+      <section
+        class="nl-frame-switch nl-project-concept"
+        aria-label="この拡張について（君斗りんくの追憶のきらめき）"
+      >
+        <details class="nl-frame-theme-details" id="projectConceptDetails">
+          <summary class="nl-frame-theme-details__summary">
+            <span class="nl-frame-theme-details__summary-text">
+              <span class="nl-frame-theme-details__summary-label"
+                >この拡張について（君斗りんくの追憶のきらめき）</span
+              >
+              <span class="nl-project-concept-hint">応援の可視化</span>
+            </span>
+          </summary>
+          <div class="nl-frame-theme-details__body nl-project-concept-body">
+            <p>
+              この拡張の呼び名は<strong>君斗りんくの追憶のきらめき</strong>です。ダウンロードする
+              HTML のファイル名などには、開発識別子として <strong>nicolivelog</strong>
+              が含まれることがあります。ニコ生の<strong>応援コメントをこのPCに記録</strong>し、一覧や
+              HTML レポートで<strong>応援の可視化</strong>につなげます。保存した HTML
+              には「この拡張について」のゆっくり解説も入ります。
+            </p>
+            <p>
+              この取り組みは<strong>動員ちゃれんじ</strong>と文脈でリンクしています。詳しくは
+              <a
+                href="https://doin-challenge.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >doin-challenge.com</a
+              >
+              を参照してください。
+            </p>
+            <p>
+              Kimito-Link 全体の情報は
+              <a
+                href="https://kimito-link.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >kimito-link.com</a
+              >
+              、または下の Powered by からどうぞ。
+            </p>
+          </div>
+        </details>
+      </section>
 
       <section class="nl-frame-switch" aria-label="ポップアップの見た目（配色）">
         <details class="nl-frame-theme-details" id="frameThemeDetails">

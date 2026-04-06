@@ -18,6 +18,7 @@ import {
   KEY_COMMENT_ENTER_SEND,
   KEY_STORY_GROWTH_COLLAPSED,
   KEY_SUPPORT_VISUAL_EXPANDED,
+  KEY_USAGE_TERMS_ACK,
   KEY_VOICE_AUTOSEND,
   KEY_VOICE_INPUT_DEVICE,
   INLINE_PANEL_WIDTH_PLAYER_ROW,
@@ -25,6 +26,7 @@ import {
   commentsStorageKey,
   isCommentEnterSendEnabled,
   isRecordingEnabled,
+  isUsageTermsAcknowledged,
   normalizeInlinePanelWidthMode
 } from '../lib/storageKeys.js';
 import { normalizeSupportVisualExpanded } from '../lib/supportVisualExpanded.js';
@@ -53,6 +55,7 @@ import {
   resolveSupportGrowthTileSrc,
   isHttpOrHttpsUrl
 } from '../lib/supportGrowthTileSrc.js';
+import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
 import {
@@ -60,6 +63,10 @@ import {
   parseCommentPanelStatusPayload
 } from '../lib/commentPanelStatus.js';
 import { escapeHtml, escapeAttr } from '../lib/htmlEscape.js';
+import {
+  buildHtmlReportConceptGuideCardHtml,
+  buildHtmlReportSaveGuideCardHtml
+} from '../lib/htmlReportConceptGuide.js';
 import { buildWatchAudienceNote } from '../lib/watchAudienceCopy.js';
 
 /**
@@ -317,7 +324,7 @@ const COMMENT_POST_UI_STATE = {
 
 /** 拡張コンテキスト無効化・更新手順の共通文案（UI とヒントで揃える） */
 const EXTENSION_RELOAD_USER_GUIDE_JA =
-  'chrome://extensions を開き、nicolivelog の「更新」で拡張を再読み込みしてください。';
+  'chrome://extensions を開き、「君斗りんくの追憶のきらめき」の「更新」で拡張を再読み込みしてください。';
 
 /** コメント送信まわりのエラーに、再読み込み案内を1回だけ足す */
 function withCommentSendTroubleshootHint(message) {
@@ -776,6 +783,11 @@ function syncFrameShareInput() {
 const STORY_RINK_FACE_IMG = 'images/toumeilink.png';
 const STORY_RINK_TILE_IMG =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
+
+const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
+  fallbackSrc: STORY_RINK_TILE_IMG
+});
+
 const MAX_SELF_POSTED_ITEMS = 48;
 const SELF_POST_DUPLICATE_WINDOW_MS = 5000;
 /** コメント送信後、DOM 保存までに許容する遅延（ms） */
@@ -1705,11 +1717,13 @@ function renderStoryUserLane() {
   for (const p of picked) {
     const img = document.createElement('img');
     img.className = 'nl-story-userlane-avatar';
-    img.src = p.src;
+    const requestedLane = p.src;
+    img.src = storyAvatarLoadGuard.pickDisplaySrc(requestedLane);
+    storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
     img.alt = '';
     img.title = p.title;
     img.decoding = 'async';
-    if (isHttpOrHttpsUrl(p.src)) {
+    if (isHttpOrHttpsUrl(img.src)) {
       img.referrerPolicy = 'no-referrer';
     }
     frag.appendChild(img);
@@ -1871,10 +1885,12 @@ function renderStoryCommentDetailPanel() {
   ).trim();
 
   if (img) {
-    img.src = storyGrowthTileSrcForEntry(
+    const requestedDetail = storyGrowthTileSrcForEntry(
       entry,
       String(entry.liveId || STORY_SOURCE_STATE.liveId || '')
     );
+    img.src = storyAvatarLoadGuard.pickDisplaySrc(requestedDetail);
+    storyAvatarLoadGuard.noteRemoteAttempt(img, requestedDetail);
     if (isHttpOrHttpsUrl(img.src)) {
       img.referrerPolicy = 'no-referrer';
       img.classList.add('nl-story-detail-img--remote');
@@ -2303,7 +2319,9 @@ function applyStoryGrowthIconAttributes(img, index, isNew) {
   if (stable && STORY_GROWTH_STATE.pinnedCommentId === stable) {
     img.classList.add('is-selected');
   }
-  img.src = storyGrowthTileSrcForEntry(entry, STORY_SOURCE_STATE.liveId);
+  const requestedTile = storyGrowthTileSrcForEntry(entry, STORY_SOURCE_STATE.liveId);
+  img.src = storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
+  storyAvatarLoadGuard.noteRemoteAttempt(img, requestedTile);
   if (isHttpOrHttpsUrl(img.src)) {
     img.referrerPolicy = 'no-referrer';
     img.classList.add('nl-story-growth-icon--remote');
@@ -2407,6 +2425,9 @@ function syncStoryGrowth(liveId, count, root) {
 
   if (changedLive || changedRoot) {
     clearStoryGrowthTimer();
+    if (changedLive) {
+      storyAvatarLoadGuard.clearFailedUrls();
+    }
     STORY_GROWTH_STATE.liveId = nextLiveId;
     STORY_GROWTH_STATE.renderedCount = 0;
     STORY_GROWTH_STATE.targetCount = 0;
@@ -3431,6 +3452,39 @@ function cleanupSupportVisualScrollObserver() {
   }
 }
 
+let usageTermsGateWired = false;
+
+function setUsageTermsGateDismissedUi() {
+  document.documentElement.setAttribute('data-nl-usage-terms-ack', '1');
+}
+
+async function applyUsageTermsGateState() {
+  if (!hasExtensionContext()) {
+    setUsageTermsGateDismissedUi();
+    return;
+  }
+  const gate = $('usageTermsGate');
+  const chk = /** @type {HTMLInputElement|null} */ ($('usageTermsAckCheckbox'));
+  const btn = /** @type {HTMLButtonElement|null} */ ($('usageTermsContinueBtn'));
+  if (!usageTermsGateWired && gate && chk && btn) {
+    usageTermsGateWired = true;
+    const syncBtn = () => {
+      btn.disabled = !chk.checked;
+    };
+    chk.addEventListener('change', syncBtn);
+    btn.addEventListener('click', async () => {
+      if (!chk.checked || !hasExtensionContext()) return;
+      const ok = await storageSetSafe({ [KEY_USAGE_TERMS_ACK]: true });
+      if (!ok) return;
+      setUsageTermsGateDismissedUi();
+    });
+  }
+  const bag = await storageGetSafe(KEY_USAGE_TERMS_ACK, {});
+  if (isUsageTermsAcknowledged(bag[KEY_USAGE_TERMS_ACK])) {
+    setUsageTermsGateDismissedUi();
+  }
+}
+
 /**
  * refresh / applyResponsivePopupLayout 完了後に呼ぶ軽量補正。
  * details が開いているときだけ 1 回スクロール位置を確認・補正する。
@@ -4305,6 +4359,15 @@ async function buildHtmlReportDocument(
   const avatarRink = yukkuriReportAvatarHtml(dataRink, 'yukkuri-avatar--rink', 'り');
   const avatarKonta = yukkuriReportAvatarHtml(dataKonta, 'yukkuri-avatar--konta', 'こ');
   const avatarTanu = yukkuriReportAvatarHtml(dataTanu, 'yukkuri-avatar--tanu', 'た');
+  const yukkuriAvatars = {
+    avatarRinkHtml: avatarRink,
+    avatarKontaHtml: avatarKonta,
+    avatarTanuHtml: avatarTanu
+  };
+  const htmlReportConceptGuideCardHtml =
+    buildHtmlReportConceptGuideCardHtml(yukkuriAvatars);
+  const htmlReportSaveGuideCardHtml =
+    buildHtmlReportSaveGuideCardHtml(yukkuriAvatars);
 
   const roomRows = aggregateCommentsByUser(comments).map((room) => {
     const label = displayUserLabel(room.userKey, room.nickname);
@@ -4412,7 +4475,7 @@ async function buildHtmlReportDocument(
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>nicolivelog-report-${safeLiveId}</title>
+    <title>君斗りんくの追憶のきらめき レポート ${safeLiveId}</title>
     <style>
       :root {
         --bg: #0b1220;
@@ -4542,6 +4605,12 @@ async function buildHtmlReportDocument(
         font-size: 0.88rem;
         line-height: 1.45;
       }
+      .yukkuri-guide-card .guide-lead {
+        color: #cbd5e1;
+        font-size: clamp(0.85rem, 2.2vw, 0.93rem);
+        line-height: 1.62;
+        max-width: 52rem;
+      }
       .yukkuri-guide-card h2 { margin-bottom: 6px; }
       .yukkuri-guide {
         display: flex;
@@ -4554,8 +4623,9 @@ async function buildHtmlReportDocument(
         align-items: flex-start;
         gap: 12px;
       }
+      /* 右寄せアバターは本文列が極端に狭くなり日本語が崩れるため、常に左アバター＋右本文 */
       .yukkuri-row--reverse {
-        flex-direction: row-reverse;
+        flex-direction: row;
       }
       .yukkuri-avatar {
         width: clamp(48px, 12vw, 56px);
@@ -4599,15 +4669,157 @@ async function buildHtmlReportDocument(
         font-size: clamp(0.82rem, 2.4vw, 0.9rem);
         line-height: 1.5;
       }
-      .speech-bubble strong {
+      /* キャラ名は直下の strong のみブロック（本文内の strong はインラインのまま） */
+      .speech-bubble > strong {
         display: block;
         margin-bottom: 6px;
-        color: #7dd3fc;
-        font-size: 0.8rem;
+        color: #e0f2fe;
+        font-size: clamp(0.78rem, 2.2vw, 0.85rem);
+      }
+      .speech-bubble p strong {
+        display: inline;
+        color: #f0f9ff;
+        font-weight: 700;
       }
       .speech-bubble p {
         margin: 0;
         color: var(--text);
+        word-break: normal;
+        overflow-wrap: break-word;
+        line-height: 1.65;
+      }
+      .speech-bubble p + p {
+        margin-top: 10px;
+      }
+      details.concept-read-more {
+        margin-top: 10px;
+        background: #0f172a;
+        border: 1px solid #475569;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 0 rgb(148 163 184 / 12%);
+      }
+      details.concept-read-more:first-of-type {
+        margin-top: 12px;
+      }
+      .concept-read-more__summary {
+        cursor: pointer;
+        list-style: none;
+        padding: clamp(11px, 2.5vw, 14px) clamp(12px, 3.5vw, 18px);
+        font-weight: 700;
+        color: #f8fafc;
+        background: #1e293b;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 12px;
+        font-size: clamp(0.84rem, 2.5vw, 0.95rem);
+        line-height: 1.4;
+      }
+      .concept-read-more__summary::-webkit-details-marker {
+        display: none;
+      }
+      .concept-read-more__summary::before {
+        content: '';
+        width: 0.45em;
+        height: 0.45em;
+        border-right: 2.5px solid #38bdf8;
+        border-bottom: 2.5px solid #38bdf8;
+        transform: rotate(-45deg);
+        flex-shrink: 0;
+        margin-top: 0.05em;
+        transition: transform 0.15s ease;
+      }
+      details.concept-read-more[open] .concept-read-more__summary::before {
+        transform: rotate(45deg);
+        margin-top: 0.15em;
+      }
+      .concept-read-more__summary:focus-visible {
+        outline: 2px solid #7dd3fc;
+        outline-offset: 2px;
+      }
+      .concept-read-more__tag {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #0284c7;
+        color: #ffffff;
+        font-size: clamp(0.7rem, 2vw, 0.78rem);
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        border: 1px solid rgb(125 211 252 / 35%);
+      }
+      .concept-read-more__title {
+        flex: 1 1 min(100%, 14rem);
+        min-width: 0;
+        color: #f1f5f9;
+      }
+      .concept-read-more__body {
+        padding: clamp(14px, 3.2vw, 22px) clamp(12px, 4vw, 26px) clamp(16px, 3.5vw, 24px);
+        border-top: 1px solid #475569;
+        max-width: 52rem;
+        margin: 0 auto;
+        box-sizing: border-box;
+      }
+      .concept-read-more__prose {
+        margin: 0 0 clamp(10px, 2vw, 14px);
+        color: #e2e8f0;
+        font-size: clamp(0.84rem, 2.4vw, 0.92rem);
+        line-height: 1.72;
+      }
+      .concept-read-more__prose strong {
+        color: #f8fafc;
+        font-weight: 700;
+      }
+      .concept-read-more__prose a,
+      .concept-read-more__body a {
+        color: #7dd3fc;
+        font-weight: 600;
+        text-decoration: underline;
+        text-decoration-thickness: 1.5px;
+        text-underline-offset: 3px;
+      }
+      .concept-read-more__prose a:hover,
+      .concept-read-more__body a:hover {
+        color: #bae6fd;
+      }
+      .concept-read-more__prose a:focus-visible,
+      .concept-read-more__body a:focus-visible {
+        outline: 2px solid #7dd3fc;
+        outline-offset: 2px;
+        border-radius: 2px;
+      }
+      .concept-read-more__body .speech-bubble p {
+        line-height: 1.75;
+      }
+      /* アコーディオン内: 折り返しで1文字行・読点頭などを防ぐ（reverse で狭い列にならない） */
+      .concept-read-more__body .yukkuri-row {
+        flex-wrap: nowrap;
+        width: 100%;
+        align-items: flex-start;
+      }
+      .concept-read-more__body .speech-bubble {
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: 100%;
+        padding: 12px 16px;
+      }
+      .concept-read-more__body .yukkuri-avatar,
+      .concept-read-more__body .yukkuri-avatar-img {
+        flex-shrink: 0;
+      }
+      .concept-read-more__prose:last-child {
+        margin-bottom: 0;
+      }
+      @media (max-width: 420px) {
+        .concept-read-more__summary {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .concept-read-more__summary::before {
+          align-self: flex-start;
+          margin-top: 4px;
+        }
       }
       details.tech-dump {
         margin-top: 12px;
@@ -4652,7 +4864,7 @@ async function buildHtmlReportDocument(
   <body>
     <div class="wrap">
       <header class="hero">
-        <h1>nicolivelog HTMLレポート <span class="pill">${safeLiveId}</span></h1>
+        <h1>君斗りんくの追憶のきらめき HTMLレポート <span class="pill">${safeLiveId}</span></h1>
         <p>出力日時: ${escapeHtml(exportedAtJst)} / ISO: ${escapeHtml(exportedAtIso)}</p>
         <p class="mono">watch URL: ${safeWatchUrl}</p>
       </header>
@@ -4711,34 +4923,8 @@ async function buildHtmlReportDocument(
           </table>
         </section>
       </div>
-
-      <section class="card yukkuri-guide-card" style="margin-top:12px;">
-        <h2>なにこれ？（ゆっくりガイド）</h2>
-        <p class="guide-lead">このHTMLは、このPCに保存したコメントと、当時の放送ページから取れた情報をまとめた「振り返り用メモ」なのだ。</p>
-        <div class="yukkuri-guide">
-          <div class="yukkuri-row">
-            ${avatarRink}
-            <div class="speech-bubble">
-              <strong>ゆっくりりんく</strong>
-              <p>まずは上の「概要」でタイトルと配信者を確認するのだ。検索ボックスにキーワードを入れると、このページ全体から絞り込めるのだ。</p>
-            </div>
-          </div>
-          <div class="yukkuri-row yukkuri-row--reverse">
-            ${avatarKonta}
-            <div class="speech-bubble">
-              <strong>ゆっくりこん太</strong>
-              <p>「シェア・プレビュー向け」は、LINEやXでリンクを貼ったときに出やすいタイトルや説明文なのだ。細かい英語のキー名は気にしなくてよいのだ。</p>
-            </div>
-          </div>
-          <div class="yukkuri-row">
-            ${avatarTanu}
-            <div class="speech-bubble">
-              <strong>ゆっくりたぬ姉</strong>
-              <p>アプリ連携用の長いタグや script のURLは、下の折りたたみにまとめてあるのだ。調べものをするとき以外は開かなくて大丈夫なのだ。タグのチップは上の概要と同じだから、表では二度出さないのだ。</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      ${htmlReportConceptGuideCardHtml}
+      ${htmlReportSaveGuideCardHtml}
 
       <section class="card" style="margin-top:12px;">
         <h2>シェア・プレビュー向けの情報</h2>
@@ -4788,7 +4974,7 @@ async function buildHtmlReportDocument(
       </section>
 
       <p class="footer-note">
-        このHTMLは nicolivelog がローカル生成した振り返り用レポートです。ブラウザ内で検索して再利用できます。
+        このHTMLは「君斗りんくの追憶のきらめき」（開発識別子 nicolivelog）がローカル生成した振り返り用レポートです。ブラウザ内で検索して再利用できます。
       </p>
     </div>
 
@@ -4854,6 +5040,7 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
 function initPopup() {
   installExtensionContextErrorGuard();
   applyResponsivePopupLayout();
+  void applyUsageTermsGateState();
   if (INLINE_MODE) {
     const watchDetails = /** @type {HTMLDetailsElement|null} */ (
       document.querySelector('.nl-watch-settings-details')

@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures.js';
+import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
 
 const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
 const KEY_RECORDING = 'nls_recording_enabled';
@@ -8,6 +8,7 @@ const KEY_SUPPORT_VISUAL_EXPANDED = 'nls_support_visual_expanded';
 
 /** ポップアップ初期化（storage 反映・refresh）が終わるまで待つ */
 async function waitForPopupInteractive(popup) {
+  await dismissExtensionUsageTermsGate(popup);
   await expect(popup.locator('.nl-stats-bar')).toBeVisible({ timeout: 15_000 });
   await expect(popup.locator('#supportVisualDetails')).toBeAttached({
     timeout: 15_000
@@ -184,7 +185,7 @@ test.describe('popup layout', () => {
     const lightChip = popup.locator('.nl-frame-chip[data-frame-id="light"]');
     await expect(lightChip).not.toBeVisible();
 
-    await popup.locator('.nl-frame-theme-details__summary').click();
+    await popup.locator('#frameThemeDetails .nl-frame-theme-details__summary').click();
     await expect
       .poll(() => themeDetails.evaluate((el) => el.open), {
         timeout: 8000,

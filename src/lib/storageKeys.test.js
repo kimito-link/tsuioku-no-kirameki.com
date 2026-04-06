@@ -4,6 +4,7 @@ import {
   KEY_COMMENT_ENTER_SEND,
   KEY_STORY_GROWTH_COLLAPSED,
   KEY_SUPPORT_VISUAL_EXPANDED,
+  KEY_USAGE_TERMS_ACK,
   KEY_LAST_WATCH_URL,
   KEY_RECORDING,
   KEY_SELF_POSTED_RECENTS,
@@ -14,6 +15,7 @@ import {
   commentsStorageKey,
   isCommentEnterSendEnabled,
   isRecordingEnabled,
+  isUsageTermsAcknowledged,
   normalizeInlinePanelWidthMode
 } from './storageKeys.js';
 
@@ -28,6 +30,15 @@ describe('storage key constants', () => {
     expect(KEY_COMMENT_ENTER_SEND).toMatch(/^nls_/);
     expect(KEY_STORY_GROWTH_COLLAPSED).toMatch(/^nls_/);
     expect(KEY_SUPPORT_VISUAL_EXPANDED).toMatch(/^nls_/);
+    expect(KEY_USAGE_TERMS_ACK).toMatch(/^nls_/);
+  });
+
+  it('isUsageTermsAcknowledged は true のみ有効', () => {
+    expect(isUsageTermsAcknowledged(undefined)).toBe(false);
+    expect(isUsageTermsAcknowledged(null)).toBe(false);
+    expect(isUsageTermsAcknowledged(false)).toBe(false);
+    expect(isUsageTermsAcknowledged('true')).toBe(false);
+    expect(isUsageTermsAcknowledged(true)).toBe(true);
   });
 
   it('commentsStorageKey は trim + 小文字', () => {

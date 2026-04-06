@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures.js';
+import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
 
 const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
 const KEY_RECORDING = 'nls_recording_enabled';
@@ -67,6 +67,7 @@ test.describe('popup monkey', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await dismissExtensionUsageTermsGate(popup);
     await popup.waitForTimeout(600);
 
     const actionPool = [

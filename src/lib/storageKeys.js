@@ -40,6 +40,9 @@ export const KEY_STORY_GROWTH_COLLAPSED = 'nls_story_growth_collapsed';
 /** 応援ビジュアル詳細（ユーザーレーン・グリッド・診断ブロック）を開いているか */
 export const KEY_SUPPORT_VISUAL_EXPANDED = 'nls_support_visual_expanded';
 
+/** ポップアップ利用条件（外部アイコン・書き出し等）の同意済みフラグ */
+export const KEY_USAGE_TERMS_ACK = 'nls_usage_terms_ack_v1';
+
 /** 音声入力: 使用するマイクの deviceId（空は既定） */
 export const KEY_VOICE_INPUT_DEVICE = 'nls_voice_input_device';
 
@@ -67,6 +70,11 @@ export function isRecordingEnabled(raw) {
 /** @param {unknown} raw */
 export function isCommentEnterSendEnabled(raw) {
   return raw !== false;
+}
+
+/** @param {unknown} raw */
+export function isUsageTermsAcknowledged(raw) {
+  return raw === true;
 }
 
 /** @param {string} liveId lv123 */

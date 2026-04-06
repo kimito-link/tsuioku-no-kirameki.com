@@ -36,6 +36,13 @@ describe('buildWatchAudienceNote', () => {
     expect(body.length).toBeLessThanOrEqual(220);
   });
 
+  it('来場者数と NicoDB・ガイド定義の区別を含む', () => {
+    const { body } = buildWatchAudienceNote({ snapshot: {} });
+    expect(body).toContain('https://nicodb.net/');
+    expect(body).toMatch(/来場者数|累計視聴/);
+    expect(body).toMatch(/別定義|応援コメント/);
+  });
+
   it('空スナップショットでも落ちず、説明文を返す', () => {
     const { body, title } = buildWatchAudienceNote({ snapshot: null });
     expect(body.length).toBeGreaterThan(10);

@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures.js';
+import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
 
 const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
 
@@ -31,6 +31,7 @@ test.describe('smoke', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await dismissExtensionUsageTermsGate(popup);
     await expect(popup.locator('html[data-nl-support-wired]')).toBeAttached({
       timeout: 15_000
     });

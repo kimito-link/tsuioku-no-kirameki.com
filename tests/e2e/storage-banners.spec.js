@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures.js';
+import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
 
 const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
@@ -6,6 +6,7 @@ const KEY_STORAGE_WRITE_ERROR = 'nls_storage_write_error';
 const KEY_COMMENT_PANEL_STATUS = 'nls_comment_panel_status';
 
 async function waitForPopupWired(popup) {
+  await dismissExtensionUsageTermsGate(popup);
   await expect(popup.locator('html[data-nl-support-wired]')).toBeAttached({
     timeout: 15_000
   });
