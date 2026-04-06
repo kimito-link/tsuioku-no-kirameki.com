@@ -781,8 +781,16 @@ function syncFrameShareInput() {
 
 /** ストーリー枠は りんく上半身（応援カウンター） */
 const STORY_RINK_FACE_IMG = 'images/toumeilink.png';
-/** アイコンURLなし・リモート取得失敗時のみ（ニコ動プレイヤーを連想させるオリジナルTV・非公式ロゴ） */
-const STORY_GRID_PLACEHOLDER_IMG = 'images/nico-retro-tv-placeholder.svg';
+/**
+ * 応援グリッドで「そのコメントにサムネURLが無い」ときの既定タイル（ゆっくり。キャラ削除ではない）
+ */
+const STORY_GRID_DEFAULT_TILE_IMG =
+  'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
+/**
+ * https のサムネを試みたが 404 等で取れなかったときだけ（識別済みユーザー・URLありだが画像未取得）
+ */
+const STORY_REMOTE_FAILED_PLACEHOLDER_IMG =
+  'images/nico-retro-tv-placeholder.svg';
 
 /** @param {HTMLImageElement} img */
 function applyStoryAvatarTvFallbackClass(img) {
@@ -801,7 +809,7 @@ function applyStoryAvatarTvFallbackClass(img) {
 }
 
 const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
-  fallbackSrc: STORY_GRID_PLACEHOLDER_IMG,
+  fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
   onFallbackApplied: applyStoryAvatarTvFallbackClass
 });
 
@@ -1358,7 +1366,10 @@ function storyGrowthAvatarSrcCandidate(entry, liveId, entries = STORY_SOURCE_STA
  * @param {PopupCommentEntry[]|null|undefined} [entries]
  */
 function storyGrowthTileSrcForEntry(entry, liveId, entries = STORY_SOURCE_STATE.entries) {
-  return storyGrowthAvatarSrcCandidate(entry, liveId, entries) || STORY_GRID_PLACEHOLDER_IMG;
+  return (
+    storyGrowthAvatarSrcCandidate(entry, liveId, entries) ||
+    STORY_GRID_DEFAULT_TILE_IMG
+  );
 }
 
 const STORY_HOP_STATE = {
@@ -1740,7 +1751,7 @@ function renderStoryUserLane() {
     storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
     img.classList.toggle(
       'nl-avatar--tv-fallback',
-      displayLane === STORY_GRID_PLACEHOLDER_IMG
+      displayLane === STORY_REMOTE_FAILED_PLACEHOLDER_IMG
     );
     img.alt = '';
     img.title = p.title;
@@ -1916,7 +1927,7 @@ function renderStoryCommentDetailPanel() {
     storyAvatarLoadGuard.noteRemoteAttempt(img, requestedDetail);
     img.classList.toggle(
       'nl-story-detail-img--tv-fallback',
-      displayDetail === STORY_GRID_PLACEHOLDER_IMG
+      displayDetail === STORY_REMOTE_FAILED_PLACEHOLDER_IMG
     );
     if (isHttpOrHttpsUrl(img.src)) {
       img.referrerPolicy = 'no-referrer';
@@ -2352,7 +2363,7 @@ function applyStoryGrowthIconAttributes(img, index, isNew) {
   storyAvatarLoadGuard.noteRemoteAttempt(img, requestedTile);
   img.classList.toggle(
     'nl-story-growth-icon--tv-fallback',
-    displayTile === STORY_GRID_PLACEHOLDER_IMG
+    displayTile === STORY_REMOTE_FAILED_PLACEHOLDER_IMG
   );
   if (isHttpOrHttpsUrl(img.src)) {
     img.referrerPolicy = 'no-referrer';
@@ -2634,6 +2645,8 @@ function clearWatchMetaCard() {
   }
 }
 
+let _prevConcurrentEstimated = /** @type {number|null} */ (null);
+
 /**
  * @param {WatchPageSnapshot|null} snapshot
  * @param {PopupCommentEntry[]} [commentEntries]
@@ -2748,6 +2761,20 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
       });
       const directLike = resolved.method === 'official';
       concurrentEstEl.textContent = `${directLike ? '' : '~'}${resolved.estimated}`;
+
+      if (
+        _prevConcurrentEstimated != null &&
+        resolved.estimated !== _prevConcurrentEstimated &&
+        concurrentCard
+      ) {
+        const icon = concurrentCard.querySelector('.nl-live-stat-icon');
+        if (icon) {
+          icon.classList.remove('nl-konta-bounce');
+          void /** @type {HTMLElement} */ (icon).offsetWidth;
+          icon.classList.add('nl-konta-bounce');
+        }
+      }
+      _prevConcurrentEstimated = resolved.estimated;
 
       /** @type {string[]} */
       const parts = [];
@@ -5306,8 +5333,17 @@ function initPopup() {
       }
       const lv = res.liveId || extractLiveIdFromUrl(watchUrl) || 'unknown';
       const filename = buildScreenshotFilename(lv, 'png', Date.now());
-      await chrome.downloads.download({ url: res.dataUrl, filename, saveAs: false });
-      setCaptureStatus(captureStatus, '保存しました。', 'success');
+      await chrome.downloads.download({
+        url: res.dataUrl,
+        filename,
+        saveAs: false,
+        conflictAction: 'uniquify'
+      });
+      setCaptureStatus(
+        captureStatus,
+        'スクリーンショット フォルダに保存しました。',
+        'success'
+      );
       safeRefresh();
     } catch {
       setCaptureStatus(captureStatus, 'ダウンロードに失敗しました。', 'error');

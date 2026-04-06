@@ -1,6 +1,7 @@
 /**
- * 応援グリッド等のリモート avatar img が 404 / 失敗したときフォールバックへ差し替え、
+ * 応援グリッド等のリモート avatar img が 404 / 失敗したときだけ fallbackSrc へ差し替え、
  * 同一 URL の再試行を避ける。
+ * 「URLが無い」コメント用の既定画像は呼び出し側で別途与える（ゆっくりタイル等）。
  */
 
 import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';

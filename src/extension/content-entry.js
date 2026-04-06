@@ -622,6 +622,12 @@ function noteOfficialCommentSample(at) {
 }
 
 /**
+ * statistics 着信時のタイミング・コメント数を記録する。
+ *
+ * statistics.viewers / watchCount は「累計来場者数」であり同時接続ではないため、
+ * officialViewerCount には格納しない（= resolveConcurrentViewers の "official" パスを通さない）。
+ * 同時接続の推定は estimateConcurrentViewers の fallback（コメンター法＋滞留法）に任せる。
+ *
  * @param {{ viewers?: number|null, comments?: number|null, observedAt?: number }} stats
  */
 function updateOfficialStatistics(stats) {
@@ -635,7 +641,6 @@ function updateOfficialStatistics(stats) {
     Number.isFinite(stats.viewers) &&
     stats.viewers >= 0
   ) {
-    officialViewerCount = stats.viewers;
     officialStatsUpdatedAt = at;
     noteOfficialViewerTick(at);
     touched = true;

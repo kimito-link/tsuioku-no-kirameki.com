@@ -1380,6 +1380,19 @@
         border-color: color-mix(in srgb, #f59e0b 30%, var(--nl-border) 70%);
       }
 
+      .nl-live-stat-card--concurrent .nl-live-stat-icon.nl-konta-bounce {
+        animation: nl-konta-bounce 0.45s cubic-bezier(.34,1.56,.64,1) 1;
+      }
+
+      @keyframes nl-konta-bounce {
+        0%   { transform: translateY(0) rotate(0); }
+        20%  { transform: translateY(-6px) rotate(-4deg); }
+        40%  { transform: translateY(-2px) rotate(3deg); }
+        60%  { transform: translateY(-4px) rotate(-2deg); }
+        80%  { transform: translateY(-1px) rotate(1deg); }
+        100% { transform: translateY(0) rotate(0); }
+      }
+
       .nl-concurrent-body {
         width: 100%;
         min-width: 0;
@@ -3886,8 +3899,8 @@
                 <div class="nl-story-detail-head">
                   <img
                     id="sceneStoryDetailImg"
-                    class="nl-story-detail-img nl-story-detail-img--tv-fallback"
-                    src="images/nico-retro-tv-placeholder.svg"
+                    class="nl-story-detail-img"
+                    src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png"
                     alt=""
                     aria-hidden="true"
                   />

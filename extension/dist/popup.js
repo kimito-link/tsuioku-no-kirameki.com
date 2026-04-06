@@ -182,11 +182,12 @@
   }
 
   // src/lib/videoCapture.js
+  var SCREENSHOT_DOWNLOAD_SUBDIR = "\u30B9\u30AF\u30EA\u30FC\u30F3\u30B7\u30E7\u30C3\u30C8";
   function buildScreenshotFilename(liveId, ext, nowMs) {
     const safeLv = String(liveId || "unknown").replace(/[/\\:*?"<>|]/g, "").replace(/\.\./g, "").slice(0, 32) || "unknown";
     const e = String(ext || "png").replace(/^\./, "").toLowerCase() || "png";
     const ts = Math.floor(Number(nowMs) || Date.now());
-    return `nicolivelog-${safeLv}-${ts}.${e}`;
+    return `${SCREENSHOT_DOWNLOAD_SUBDIR}/nicolivelog-${safeLv}-${ts}.${e}`;
   }
 
   // src/lib/thumbSettings.js
@@ -1435,7 +1436,8 @@
     input.value = createFrameShareCode(popupFrameState.id, popupFrameState.custom);
   }
   var STORY_RINK_FACE_IMG = "images/toumeilink.png";
-  var STORY_GRID_PLACEHOLDER_IMG = "images/nico-retro-tv-placeholder.svg";
+  var STORY_GRID_DEFAULT_TILE_IMG = "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png";
+  var STORY_REMOTE_FAILED_PLACEHOLDER_IMG = "images/nico-retro-tv-placeholder.svg";
   function applyStoryAvatarTvFallbackClass(img) {
     if (!(img instanceof HTMLImageElement)) return;
     if (img.classList.contains("nl-story-userlane-avatar")) {
@@ -1451,7 +1453,7 @@
     }
   }
   var storyAvatarLoadGuard = createSupportAvatarLoadGuard({
-    fallbackSrc: STORY_GRID_PLACEHOLDER_IMG,
+    fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
     onFallbackApplied: applyStoryAvatarTvFallbackClass
   });
   var MAX_SELF_POSTED_ITEMS = 48;
@@ -1826,7 +1828,7 @@
     return isHttpOrHttpsUrl(src) ? src : "";
   }
   function storyGrowthTileSrcForEntry(entry, liveId, entries = STORY_SOURCE_STATE.entries) {
-    return storyGrowthAvatarSrcCandidate(entry, liveId, entries) || STORY_GRID_PLACEHOLDER_IMG;
+    return storyGrowthAvatarSrcCandidate(entry, liveId, entries) || STORY_GRID_DEFAULT_TILE_IMG;
   }
   var STORY_HOP_STATE = {
     clearTimer: (
@@ -2194,7 +2196,7 @@
       storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
       img.classList.toggle(
         "nl-avatar--tv-fallback",
-        displayLane === STORY_GRID_PLACEHOLDER_IMG
+        displayLane === STORY_REMOTE_FAILED_PLACEHOLDER_IMG
       );
       img.alt = "";
       img.title = p.title;
@@ -2345,7 +2347,7 @@
       storyAvatarLoadGuard.noteRemoteAttempt(img, requestedDetail);
       img.classList.toggle(
         "nl-story-detail-img--tv-fallback",
-        displayDetail === STORY_GRID_PLACEHOLDER_IMG
+        displayDetail === STORY_REMOTE_FAILED_PLACEHOLDER_IMG
       );
       if (isHttpOrHttpsUrl(img.src)) {
         img.referrerPolicy = "no-referrer";
@@ -2694,7 +2696,7 @@
     storyAvatarLoadGuard.noteRemoteAttempt(img, requestedTile);
     img.classList.toggle(
       "nl-story-growth-icon--tv-fallback",
-      displayTile === STORY_GRID_PLACEHOLDER_IMG
+      displayTile === STORY_REMOTE_FAILED_PLACEHOLDER_IMG
     );
     if (isHttpOrHttpsUrl(img.src)) {
       img.referrerPolicy = "no-referrer";
@@ -2922,6 +2924,10 @@
       noteEl.removeAttribute("title");
     }
   }
+  var _prevConcurrentEstimated = (
+    /** @type {number|null} */
+    null
+  );
   function renderWatchMetaCard(snapshot, commentEntries = []) {
     const wrap = $("watchMeta");
     const title = $("watchTitle");
@@ -2995,6 +3001,16 @@
         });
         const directLike = resolved.method === "official";
         concurrentEstEl.textContent = `${directLike ? "" : "~"}${resolved.estimated}`;
+        if (_prevConcurrentEstimated != null && resolved.estimated !== _prevConcurrentEstimated && concurrentCard) {
+          const icon = concurrentCard.querySelector(".nl-live-stat-icon");
+          if (icon) {
+            icon.classList.remove("nl-konta-bounce");
+            void /** @type {HTMLElement} */
+            icon.offsetWidth;
+            icon.classList.add("nl-konta-bounce");
+          }
+        }
+        _prevConcurrentEstimated = resolved.estimated;
         const parts = [];
         if (resolved.method === "official") {
           parts.push("watch WebSocket \u7531\u6765\u306E\u76F4\u63A5\u5024");
@@ -5266,8 +5282,17 @@
         }
         const lv = res.liveId || extractLiveIdFromUrl(watchUrl) || "unknown";
         const filename = buildScreenshotFilename(lv, "png", Date.now());
-        await chrome.downloads.download({ url: res.dataUrl, filename, saveAs: false });
-        setCaptureStatus(captureStatus, "\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002", "success");
+        await chrome.downloads.download({
+          url: res.dataUrl,
+          filename,
+          saveAs: false,
+          conflictAction: "uniquify"
+        });
+        setCaptureStatus(
+          captureStatus,
+          "\u30B9\u30AF\u30EA\u30FC\u30F3\u30B7\u30E7\u30C3\u30C8 \u30D5\u30A9\u30EB\u30C0\u306B\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002",
+          "success"
+        );
         safeRefresh();
       } catch {
         setCaptureStatus(captureStatus, "\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002", "error");

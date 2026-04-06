@@ -2124,7 +2124,6 @@
     const at = typeof stats?.observedAt === "number" && Number.isFinite(stats.observedAt) ? stats.observedAt : Date.now();
     let touched = false;
     if (typeof stats?.viewers === "number" && Number.isFinite(stats.viewers) && stats.viewers >= 0) {
-      officialViewerCount = stats.viewers;
       officialStatsUpdatedAt = at;
       noteOfficialViewerTick(at);
       touched = true;

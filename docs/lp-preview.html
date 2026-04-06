@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>君斗りんくの追憶のきらめき | LP Preview</title>
+    <link rel="icon" type="image/png" href="../extension/images/logo/kimito-rinku-app-icon-32.png">
+    <style>
+      :root{
+        --bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.92);--ink:#2c2117;--muted:#4f4338;
+        --line:rgba(88,62,28,.12);--gold:#c98e2b;--sky:#3d708d;--mint:#0f5e4f;--blue:#255d9b;
+        --violet:#5645ad;--brown:#8a3d19;--slate:#56534e;--red:#952b2a;--ruby:#d15d88;--amber:#f3aa25;
+        --text-primary:#2c2117;--text-secondary:#4f4338;--text-on-dark:#fff7ef;--text-on-dark-secondary:#e5d7cb;--text-on-dark-muted:#d6c6ba;
+        --shadow:0 18px 44px rgba(70,49,20,.12);--r1:34px;--r2:24px;--r3:18px;--maxw:1160px;
+      }
+      *{box-sizing:border-box} html{scroll-behavior:smooth}
+      body{
+        margin:0;color:var(--text-primary);font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;
+        background:
+          radial-gradient(circle at top right, rgba(132,184,207,.45), transparent 28%),
+          radial-gradient(circle at left 14% top 18%, rgba(248,221,186,.7), transparent 20%),
+          linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));
+      }
+      body::before{
+        content:"";position:fixed;inset:0;pointer-events:none;
+        background:
+          linear-gradient(rgba(95,70,36,.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(95,70,36,.04) 1px, transparent 1px);
+        background-size:30px 30px;mask-image:linear-gradient(180deg,rgba(0,0,0,.45),transparent 86%);
+      }
+      a{color:inherit}
+      .shell{width:min(calc(100% - 32px),var(--maxw));margin:0 auto}
+      .topbar{
+        position:sticky;top:0;z-index:20;background:rgba(250,244,235,.8);
+        backdrop-filter:blur(14px);border-bottom:1px solid rgba(88,62,28,.08)
+      }
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 0}
+      .brand{display:flex;align-items:center;gap:12px}
+      .brand img{width:46px;height:46px;border-radius:14px;object-fit:cover;box-shadow:0 12px 24px rgba(61,112,141,.18)}
+      .brand strong{display:block;font-family:"Yu Mincho","Hiragino Mincho ProN",serif;font-size:1rem}
+      .brand span{display:block;color:var(--text-secondary);font-size:.82rem}
+      .nav{display:flex;gap:16px;flex-wrap:wrap;font-size:.93rem}
+      .nav a{text-decoration:none;color:var(--text-secondary)}
+      .nav .cta{padding:10px 16px;border-radius:999px;background:linear-gradient(135deg,var(--gold),#ddb25d);color:#2e1606}
+      .hero{padding:54px 0 24px}
+      .hero-grid,.two-col,.impact-rowset,.solution-grid,.footer-card{display:grid;gap:24px}
+      .hero-grid{grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr)}
+      .card,.board,.hero-copy,.hero-stage,.footer-card{
+        background:var(--paper);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:var(--r1)
+      }
+      .hero-copy{padding:32px;position:relative;overflow:hidden}
+      .hero-copy::after{
+        content:"";position:absolute;right:-80px;bottom:-90px;width:260px;height:260px;border-radius:50%;
+        background:radial-gradient(circle, rgba(132,184,207,.42), transparent 68%)
+      }
+      .eyebrow{
+        display:inline-flex;padding:8px 14px;border-radius:999px;background:rgba(255,252,247,.95);
+        border:1px solid rgba(88,62,28,.1);font-size:.83rem;letter-spacing:.06em;color:#8a5a0a;text-transform:uppercase
+      }
+      h1,h2{font-family:"Yu Mincho","Hiragino Mincho ProN",serif;letter-spacing:.03em}
+      h1{margin:18px 0 16px;font-size:clamp(2.5rem,5vw,4.8rem);line-height:1.08}
+      h1 strong{color:#8f2f2a}
+      .lead{margin:0;color:var(--text-secondary);line-height:1.9;font-size:1.05rem}
+      .actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:24px}
+      .btn{
+        display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 20px;border-radius:999px;
+        text-decoration:none;font-weight:700
+      }
+      .btn.primary{background:linear-gradient(135deg,var(--sky),#5388a5);color:#f8fdff}
+      .btn.secondary{background:rgba(255,252,247,.96);border:1px solid rgba(88,62,28,.12)}
+      .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:24px}
+      .stat{padding:16px;border-radius:18px;background:rgba(255,252,247,.82);border:1px solid rgba(88,62,28,.1)}
+      .stat strong{display:block;font-family:"Yu Mincho",serif;font-size:1.35rem}
+      .stat span{display:block;margin-top:6px;color:var(--text-secondary);font-size:.84rem;line-height:1.6}
+      .hero-stage{
+        padding:22px;overflow:hidden;background:
+          radial-gradient(circle at top center, rgba(255,248,214,.84), transparent 26%),
+          linear-gradient(180deg, rgba(138,194,220,.74), rgba(255,235,196,.55) 58%, rgba(255,251,245,.92))
+      }
+      .mini-bubbles{display:grid;gap:12px}
+      .mini-bubble{
+        padding:14px 16px;border-radius:18px;background:rgba(255,252,247,.84);border:1px solid rgba(88,62,28,.1);
+        color:var(--text-secondary);line-height:1.75
+      }
+      .mini-bubble:nth-child(2){margin-left:auto;max-width:290px}
+      .mini-bubble:nth-child(3){max-width:280px}
+      .mini-bubble strong{color:var(--ink)}
+      .trio{display:flex;justify-content:center;align-items:flex-end;gap:12px;margin-top:18px}
+      .stand{width:min(30%,170px);min-width:94px;padding:12px 10px;border-radius:24px;background:rgba(255,252,247,.72);border:1px solid rgba(88,62,28,.1);text-align:center}
+      .stand img{width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 12px 20px rgba(79,56,23,.16));animation:floaty 4.8s ease-in-out infinite}
+      .stand:nth-child(2) img{animation-delay:-1.1s}.stand:nth-child(3) img{animation-delay:-2.4s}
+      .stand span{display:block;margin-top:6px;color:var(--text-secondary);font-size:.84rem}
+      .section{padding:18px 0 0}
+      .section-head{display:flex;justify-content:space-between;align-items:end;gap:18px;margin-bottom:18px}
+      .section-head h2{margin:0;font-size:clamp(1.9rem,3.2vw,2.9rem)}
+      .section-head p{max-width:580px;margin:0;color:var(--text-secondary);line-height:1.82}
+      .board{padding:24px;border-radius:var(--r2)}
+      .board h3{margin:0 0 8px;font-size:1.26rem}
+      .board p{margin:0;color:var(--text-secondary);line-height:1.8}
+      .yukkuri-thread{display:grid;gap:18px;margin-top:20px}
+      .y-row{display:grid;grid-template-columns:112px minmax(0,1fr);gap:16px;align-items:center}
+      .y-row.reverse{grid-template-columns:minmax(0,1fr) 112px}
+      .speaker{display:flex;flex-direction:column;align-items:center;gap:8px}
+      .speaker img{width:92px;height:92px;object-fit:contain;filter:drop-shadow(0 10px 16px rgba(79,56,23,.14))}
+      .speaker span{color:var(--text-secondary);font-size:.8rem}
+      .bubble{
+        position:relative;padding:18px 20px;border-radius:26px;background:rgba(255,253,248,.97);
+        border:1px solid rgba(88,62,28,.1);line-height:1.82
+      }
+      .bubble::after{
+        content:"";position:absolute;left:-10px;top:50%;width:18px;height:18px;transform:translateY(-50%) rotate(45deg);
+        background:rgba(255,253,248,.97);border-left:1px solid rgba(88,62,28,.1);border-bottom:1px solid rgba(88,62,28,.1)
+      }
+      .y-row.reverse .bubble::after{
+        left:auto;right:-10px;border-left:none;border-bottom:none;border-right:1px solid rgba(88,62,28,.1);border-top:1px solid rgba(88,62,28,.1)
+      }
+      .bubble strong,.mini-note strong{color:#8a5a0a}
+      .two-col{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:20px}
+      .lane{padding:18px;border-radius:22px;border:1px solid rgba(88,62,28,.1);background:rgba(255,252,247,.78)}
+      .lane.left{background:linear-gradient(180deg,rgba(253,243,241,.88),rgba(248,235,228,.84))}
+      .lane.right{background:linear-gradient(180deg,rgba(245,249,255,.9),rgba(236,244,249,.85))}
+      .lane-title{
+        display:inline-flex;padding:8px 12px;border-radius:999px;background:rgba(255,252,247,.9);
+        border:1px solid rgba(88,62,28,.1);font-size:.83rem;font-weight:700
+      }
+      .stack{display:grid;gap:12px;margin-top:16px}
+      .node,.impact-card,.flow-card{
+        border-radius:18px;padding:16px;color:var(--text-on-dark);box-shadow:0 16px 38px rgba(22,14,8,.18)
+      }
+      .node strong,.flow-card strong{display:block;margin-bottom:4px;font-size:1rem}
+      .node span,.flow-card p{display:block;color:var(--text-on-dark-secondary);line-height:1.68;font-size:.9rem}
+      .stack .node + .node::before{
+        content:"↓";position:absolute;top:-18px;left:50%;transform:translateX(-50%);color:rgba(88,62,28,.42);font-weight:700
+      }
+      .stack .node{position:relative}
+      .gold{background:linear-gradient(135deg,#9a5c08,#bc7c16)} .brick{background:linear-gradient(135deg,#8f3519,#b95b2f)}
+      .red{background:linear-gradient(135deg,#8d232a,#b43d45)} .green{background:linear-gradient(135deg,#0f5e4f,#19816c)}
+      .blue{background:linear-gradient(135deg,#1f568d,#3472b0)} .violet{background:linear-gradient(135deg,#5140a3,#6b59c7)}
+      .slate{background:linear-gradient(135deg,#46515f,#637081)}
+      .lane-note{margin-top:14px;color:var(--text-secondary);font-size:.92rem;line-height:1.76}
+      .impact-board{padding:24px;border-radius:28px;background:#101011;color:var(--text-on-dark);box-shadow:0 24px 64px rgba(22,14,8,.32)}
+      .impact-top{display:flex;justify-content:space-between;gap:16px;align-items:start;margin-bottom:18px}
+      .impact-top p{margin:0;color:var(--text-on-dark-secondary)}
+      .legend{min-width:178px}.legend strong{display:block;margin-bottom:10px}
+      .legend-bar{display:grid;grid-template-columns:repeat(5,1fr);overflow:hidden;border-radius:999px;border:1px solid rgba(255,246,239,.12)}
+      .legend-bar span{height:10px}.legend-bar span:nth-child(1){background:#97d67c}.legend-bar span:nth-child(2){background:#dcc35a}
+      .legend-bar span:nth-child(3){background:#eb9e4d}.legend-bar span:nth-child(4){background:#e06a85}.legend-bar span:nth-child(5){background:#cf589c}
+      .legend-scale{display:flex;justify-content:space-between;margin-top:6px;color:var(--text-on-dark-muted);font-size:.78rem}
+      .impact-rowset{grid-template-columns:1fr;gap:14px}
+      .impact-row{display:grid;grid-template-columns:minmax(0,1fr) 128px;gap:18px;align-items:center}
+      .impact-card h4{margin:0 0 6px;font-size:1.16rem}.impact-card p{margin:0;line-height:1.72;color:var(--text-on-dark-secondary)}
+      .i-green{background:rgba(13,106,90,.88)} .i-blue{background:rgba(36,91,152,.9)} .i-violet{background:rgba(82,67,163,.92)}
+      .i-brown{background:rgba(140,63,27,.92)} .i-slate{background:rgba(88,85,81,.92)} .i-red{background:rgba(148,37,41,.94)}
+      .pill{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 18px;border-radius:999px;font-weight:700;color:#2e1606}
+      .pill.amber{background:var(--amber)} .pill.red{background:#ef4e4e;color:#fff7ef} .pill.ruby{background:var(--ruby);color:#fff7ef}
+      .impact-footer{margin-top:18px;padding:20px;border-radius:22px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1)}
+      .impact-footer h4{margin:0 0 14px;text-align:center;font-size:1.1rem}
+      .impact-chain{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+      .impact-chain .node + .node::before{
+        content:"→";position:absolute;top:50%;left:-18px;transform:translateY(-50%);color:rgba(255,246,239,.44);font-weight:700
+      }
+      .impact-chain .node{position:relative}
+      .mini-notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:18px}
+      .mini-note{padding:16px 18px;border-radius:20px;background:rgba(255,252,247,.94);border:1px solid rgba(88,62,28,.1);line-height:1.76;color:var(--text-secondary)}
+      .comment-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:20px}
+      .flow-card{position:relative}.flow-card h4{margin:0 0 8px;font-size:1.04rem}.flow-card p{margin:0}
+      .comment-flow .flow-card + .flow-card::before{
+        content:"→";position:absolute;left:-18px;top:50%;transform:translateY(-50%);color:rgba(88,62,28,.46);font-weight:700
+      }
+      .solution-box{margin-top:18px;padding:20px 22px;border-radius:22px;background:linear-gradient(135deg,rgba(230,249,239,.97),rgba(244,255,250,.97));border:1px solid rgba(24,129,108,.22)}
+      .solution-box strong{display:block;margin-bottom:6px;color:var(--mint);font-size:1.05rem}
+      .solution-box p{margin:0;color:#306355;line-height:1.82}
+      .solution-grid{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:20px}
+      .solution-card{position:relative;padding:20px;border-radius:24px;background:rgba(255,253,248,.97);border:1px solid rgba(88,62,28,.1);box-shadow:var(--shadow)}
+      .solution-card::after{
+        content:"";position:absolute;left:24px;bottom:-10px;width:18px;height:18px;transform:rotate(45deg);
+        background:rgba(255,253,248,.97);border-right:1px solid rgba(88,62,28,.1);border-bottom:1px solid rgba(88,62,28,.1)
+      }
+      .solution-card h4{margin:0 0 8px;font-size:1.12rem}.solution-card p{margin:0;color:var(--text-secondary);line-height:1.8}
+      .avatar-line{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:18px}
+      .avatar-note{display:flex;align-items:center;gap:12px}
+      .avatar-note img{width:72px;height:72px;object-fit:contain;filter:drop-shadow(0 10px 16px rgba(79,56,23,.14))}
+      .avatar-note span{display:block;color:var(--text-secondary);font-size:.92rem;line-height:1.65}
+      .formula{
+        margin:14px 0 8px;padding:16px 20px;border-radius:16px;
+        background:linear-gradient(135deg,rgba(44,33,23,.06),rgba(44,33,23,.03));
+        border:1px solid rgba(88,62,28,.12);font-family:"Courier New",Consolas,monospace;
+        font-size:.95rem;line-height:2;color:var(--ink);overflow-x:auto
+      }
+      .formula .var{color:var(--sky);font-weight:700}
+      .formula .op{color:var(--brown);font-weight:700}
+      .formula .comment{color:var(--muted);font-style:italic;font-size:.85rem}
+      .formula-label{
+        display:inline-flex;padding:5px 10px;border-radius:999px;font-size:.78rem;font-weight:700;
+        margin-bottom:6px;color:#fff
+      }
+      .formula-label.sig-a{background:var(--sky)}
+      .formula-label.sig-b{background:var(--mint)}
+      .formula-label.combined{background:var(--violet)}
+      .formula-table{
+        width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:.88rem
+      }
+      .formula-table th,.formula-table td{
+        padding:8px 12px;text-align:left;border-bottom:1px solid rgba(88,62,28,.1)
+      }
+      .formula-table th{font-weight:700;color:var(--text-secondary);font-size:.82rem;white-space:nowrap}
+      .formula-table td:first-child{font-family:"Courier New",Consolas,monospace;white-space:nowrap}
+      .formula-table tr:last-child th,.formula-table tr:last-child td{border-bottom:none}
+      .footer-wrap{padding:24px 0 72px}
+      .footer-card{grid-template-columns:1.05fr auto;align-items:center;padding:30px;background:linear-gradient(135deg,rgba(255,250,242,.98),rgba(216,239,244,.86))}
+      .footer-card h2{margin:0 0 10px;font-size:clamp(1.9rem,3vw,2.7rem)}
+      .footer-card p{margin:0;color:var(--text-secondary);line-height:1.86}
+      .footer-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+      .footer-note{padding:0 0 30px;color:var(--text-secondary);font-size:.88rem}
+      .fade{opacity:0;transform:translateY(18px);animation:fadeUp .9s ease forwards}.d1{animation-delay:.08s}.d2{animation-delay:.16s}.d3{animation-delay:.24s}
+      @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+      @keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+      @media (max-width:1020px){
+        .hero-grid,.two-col,.stats,.solution-grid,.avatar-line,.mini-notes,.footer-card,.comment-flow,.impact-chain{grid-template-columns:1fr}
+        .impact-top{flex-direction:column}.impact-row{grid-template-columns:1fr}.impact-chain .node + .node::before,.comment-flow .flow-card + .flow-card::before{content:"↓";left:50%;top:-18px;transform:translateX(-50%)}
+      }
+      @media (max-width:760px){
+        .topbar{position:static}.topbar-inner,.section-head{flex-direction:column;align-items:flex-start}
+        .y-row,.y-row.reverse{grid-template-columns:1fr}
+        .bubble::after,.y-row.reverse .bubble::after{
+          left:24px;right:auto;top:auto;bottom:-10px;transform:rotate(45deg);border-right:1px solid rgba(88,62,28,.1);border-top:none;border-left:none;border-bottom:1px solid rgba(88,62,28,.1)
+        }
+        .trio{gap:10px}.stand{width:33%;min-width:0;padding:12px 8px 10px}
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <div class="brand">
+          <img src="../extension/images/logo/kimito-rinku-app-icon-128.png" alt="君斗りんくの追憶のきらめき アイコン">
+          <div>
+            <strong>君斗りんくの追憶のきらめき</strong>
+            <span>応援が消えてしまう心理に向き合う LP preview</span>
+          </div>
+        </div>
+        <nav class="nav" aria-label="主要リンク">
+          <a href="#problem">問題</a>
+          <a href="#impact">反応の階段</a>
+          <a href="#comments">配信コメント</a>
+          <a href="#algorithm">同接推定</a>
+          <a href="#solution" class="cta">解決の方向</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="shell hero-grid">
+          <article class="hero-copy fade">
+            <div class="eyebrow">Oshi Log, Not Approval Race</div>
+            <h1><strong>いいねゼロで消したくなる夜</strong>に、応援をなかったことにしない。</h1>
+            <p class="lead">
+              「君斗りんくの追憶のきらめき」は、反応がなければ消えてしまいやすい推し活の痕跡を、
+              このPCに静かに残すための Chrome 拡張です。競争を煽るためではなく、
+              <strong>応援したこと自体の証拠</strong>を失わせないためにあります。
+            </p>
+            <div class="actions">
+              <a class="btn primary" href="#problem">なぜ必要かを見る</a>
+              <a class="btn secondary" href="#solution">どう断ち切るかを見る</a>
+            </div>
+            <div class="stats">
+              <div class="stat"><strong>約3.5兆円</strong><span>推し活市場は巨大でも、発信基盤は反応競争に強く引っ張られます。</span></div>
+              <div class="stat"><strong>40〜54%</strong><span>SNS疲れを感じる層が広く、発信より見る専へ流れやすい状態です。</span></div>
+              <div class="stat"><strong>61%</strong><span>Z世代女性では特に疲れが深く、反応の少なさが自己評価に刺さりやすいです。</span></div>
+            </div>
+          </article>
+
+          <aside class="hero-stage fade d1" aria-label="キャラクター導入">
+            <div class="mini-bubbles">
+              <div class="mini-bubble"><strong>りんく</strong><br>「反応がないと、応援したことまで薄く見えてしまうのだ」</div>
+              <div class="mini-bubble"><strong>こん太</strong><br>「比べる相手が常に見えてしまうのが、SNSのしんどさなのだ」</div>
+              <div class="mini-bubble"><strong>たぬ姉</strong><br>「だから、まずは消えない形で残すのだ」</div>
+            </div>
+            <div class="trio">
+              <div class="stand"><img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="ゆっくりこん太"><span>こん太</span></div>
+              <div class="stand"><img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="ゆっくりりんく"><span>りんく</span></div>
+              <div class="stand"><img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" alt="ゆっくりたぬ姉"><span>たぬ姉</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section" id="problem">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2>ファンが投稿を消してしまうのは、弱さではなく構造です。</h2>
+            <p>
+              右側では「反応あり → 耐性形成 → もっと欲しい」が回り、左側では
+              「反応なし → 比較 → 認知の歪み → 削除 → 見る専化」が進みます。
+              推し活の発信は、この二つのループに同時にさらされています。
+            </p>
+          </div>
+
+          <div class="board fade d1">
+            <h3>まず、3人にしゃべってもらうとこうなります。</h3>
+            <p>LP 全体を、りんく・こん太・たぬ姉の吹き出しで説明する構成です。</p>
+            <div class="yukkuri-thread">
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりりんく">
+                  <span>ゆっくりりんく</span>
+                </div>
+                <div class="bubble"><strong>「いいねが付かないと、わたしの応援って邪魔だったのかな」</strong>みたいに感じて、投稿を残しておくこと自体が恥ずかしくなるのだ。</div>
+              </div>
+              <div class="y-row reverse">
+                <div class="bubble"><strong>「あの人は反応が多いのに、自分はゼロ」</strong>という比較が始まると、投稿の内容より先に、数字で自分を裁き始めるのだ。</div>
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりこん太">
+                  <span>ゆっくりこん太</span>
+                </div>
+              </div>
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりたぬ姉">
+                  <span>ゆっくりたぬ姉</span>
+                </div>
+                <div class="bubble"><strong>削除は、その場しのぎの防御なのだ。</strong>でも消したぶんだけ、あとから「応援した証拠」も薄くなって、次は最初から投稿しない「見る専」に寄っていくのだ。</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="board fade d2">
+            <h3>ファンが投稿を消してしまう心理サイクル</h3>
+            <p>推し活アプリ設計で重要なのは、左側のループをどこで断ち切るかです。</p>
+            <div class="two-col">
+              <section class="lane left">
+                <div class="lane-title">反応なしの負のスパイラル</div>
+                <div class="stack">
+                  <div class="node gold"><strong>期待の不発</strong><span>ドーパミンが出ず、まず不快感が残る。</span></div>
+                  <div class="node brick"><strong>社会的比較</strong><span>他人の反応数と並べて、自分の投稿価値を測り始める。</span></div>
+                  <div class="node red"><strong>認知の歪み</strong><span>「反応がない = 自分に価値がない」と受け取りやすくなる。</span></div>
+                  <div class="node red"><strong>拒否回避行動</strong><span>恥ずかしさを下げるため、投稿削除や鍵化に向かう。</span></div>
+                  <div class="node brick"><strong>見る専化</strong><span>最初から発信しない方が安全だと学習してしまう。</span></div>
+                </div>
+                <div class="lane-note">この流れは、個人の弱さではなく、数字が可視化される場で起こりやすい自然な防御反応です。</div>
+              </section>
+              <section class="lane right">
+                <div class="lane-title">反応ありでも終わらないループ</div>
+                <div class="stack">
+                  <div class="node green"><strong>反応が返る</strong><span>いいね・RT・リプライが承認として機能する。</span></div>
+                  <div class="node blue"><strong>報酬の学習</strong><span>「この形なら反応が来る」という期待値が形成される。</span></div>
+                  <div class="node violet"><strong>耐性形成</strong><span>前と同じ反応量では満足しにくくなり、基準が上がる。</span></div>
+                  <div class="node slate"><strong>もっと欲しい</strong><span>次の投稿で、より大きい反応を求めるループに入る。</span></div>
+                </div>
+                <div class="lane-note">つまり「反応がある人だけが楽」でもありません。反応ありの側でも、承認のハードルは上がり続けます。</div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="impact">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2>反応の種類ごとに、心理インパクトは違います。</h2>
+            <p>
+              重要なのは数の大小だけではなく、反応の「質」です。どの承認が浅く、
+              どの承認が深く、何が一番ダメージになるのかを見誤ると、設計もズレます。
+            </p>
+          </div>
+
+          <div class="impact-board fade d1">
+            <div class="impact-top">
+              <div>
+                <h3>SNS反応タイプ別の心理インパクト</h3>
+                <p>反応の「質」によって、承認欲求の満たされ方と傷つき方が変わります。</p>
+              </div>
+              <div class="legend">
+                <strong>承認インパクト</strong>
+                <div class="legend-bar"><span></span><span></span><span></span><span></span><span></span></div>
+                <div class="legend-scale"><span>低</span><span>高</span></div>
+              </div>
+            </div>
+
+            <div class="impact-rowset">
+              <div class="impact-row"><div class="impact-card i-green"><h4>♡ いいね</h4><p>最低コストな承認。数が可視化されるため、「0 vs 100」の格差が自己評価に直結しやすい。</p></div><div class="pill amber">中〜高</div></div>
+              <div class="impact-row"><div class="impact-card i-blue"><h4>🔁 RT / リポスト</h4><p>「拡散に値する」という評価。バズると報酬が強く、次回への期待も急騰します。</p></div><div class="pill red">高</div></div>
+              <div class="impact-row"><div class="impact-card i-violet"><h4>💬 リプライ / コメント</h4><p>時間を使った双方向承認。「あなたに時間を使った」という意味で最も深い承認です。</p></div><div class="pill ruby">最高</div></div>
+              <div class="impact-row"><div class="impact-card i-brown"><h4>👤 フォロー / フォロワー数</h4><p>継続的承認の約束。減少時のダメージが大きく、「10人減った」が削除の引き金になります。</p></div><div class="pill red">高</div></div>
+              <div class="impact-row"><div class="impact-card i-slate"><h4>👁 インプレッション / 閲覧数</h4><p>見られているのに反応されない「サイレント」を可視化し、「見てスルーされた」感覚を強めます。</p></div><div class="pill amber">中</div></div>
+              <div class="impact-row"><div class="impact-card i-red"><h4>● 完全無反応</h4><p>いいね0・閲覧不明。虚空に消えた感覚になりやすく、投稿削除へ最も直結しやすい状態です。</p></div><div class="pill ruby">破壊的</div></div>
+            </div>
+
+            <div class="impact-footer">
+              <h4>反応がないとき、ファンの脳内で起きること</h4>
+              <div class="impact-chain">
+                <div class="node gold"><strong>期待の不発</strong><span>ドーパミンが出ず、不快感が残る</span></div>
+                <div class="node brick"><strong>社会的比較</strong><span>他者の反応数と比べて自己評価が下がる</span></div>
+                <div class="node red"><strong>拒否回避行動</strong><span>「恥ずかしい」から投稿削除へ向かう</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mini-notes fade d2">
+            <div class="mini-note"><strong>りんく</strong><br>完全無反応がいちばん危ないのだ。反応が少ないより、「存在ごと受け取られていない」感じが刺さるのだ。</div>
+            <div class="mini-note"><strong>こん太</strong><br>リプライは承認としていちばん深いのだ。だから来ないときの落差も大きくなるのだ。</div>
+            <div class="mini-note"><strong>たぬ姉</strong><br>閲覧数は便利そうでいて、見えすぎると「見てスルー」が増幅するのだ。</div>
+          </div>
+
+          <div class="board fade d3" style="margin-top:20px">
+            <h3>発信者側にも、返しきれないストレスがあります。</h3>
+            <p>
+              アイドル、アーティスト、配信者は、応援が増えるほど全部に返信できなくなります。
+              でも沈黙が増えるほど、ファン側には「無視された」と見えやすい。
+              ここにも、構造的なしんどさがあります。
+            </p>
+
+            <div class="solution-grid">
+              <div class="solution-card">
+                <h4>1. 人数が増えるほど、全部に返すのは不可能</h4>
+                <p>
+                  反応が多いのは良いことでも、物理的には全件返信できません。
+                  人気が出るほど、個別対応の期待と現実の差が広がります。
+                </p>
+              </div>
+              <div class="solution-card">
+                <h4>2. 返せない沈黙が、罪悪感になる</h4>
+                <p>
+                  発信者側も「見ていないわけではないのに返せない」という負荷を抱えます。
+                  ファンの寂しさと、発信者の対応不能ストレスが同時に積み上がります。
+                </p>
+              </div>
+              <div class="solution-card">
+                <h4>3. 必要なのは、全部返すことではなく受領の可視化</h4>
+                <p>
+                  一件ずつ返事を強制するより、
+                  「ちゃんと届いていた」「応援は残っている」と分かる仕組みの方が、
+                  両側の消耗を減らしやすいです。
+                </p>
+              </div>
+            </div>
+
+            <div class="yukkuri-thread" style="margin-top:18px">
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png" alt="ゆっくりこん太">
+                  <span>ゆっくりこん太</span>
+                </div>
+                <div class="bubble">
+                  発信者側も、反応が多すぎるとしんどいのだ。
+                  <strong>全部に返せない = 冷たい</strong>ではないのに、そう見えてしまいやすいのだ。
+                </div>
+              </div>
+              <div class="y-row reverse">
+                <div class="bubble">
+                  だから大事なのは、全員に個別返信を義務化することではなくて、
+                  <strong>「ちゃんと受け取っていた」が別の形で見えること</strong>なのだ。
+                </div>
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.png" alt="ゆっくりたぬ姉">
+                  <span>ゆっくりたぬ姉</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="comments">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2>配信コメントは、さらに別の虚しさがあります。</h2>
+            <p>
+              SNS投稿では「消すか残すか」が苦しみになりますが、配信コメントではそもそも流れて消えるため、
+              <strong>削除する必要すらなく、最初から存在しなかったことになりやすい</strong>のが違いです。
+            </p>
+          </div>
+
+          <div class="board fade d1">
+            <h3>配信コメント特有の心理メカニズム</h3>
+            <p>君斗りんくの追憶のきらめきの刺さりどころは、反応の量を増やすことではなく、「証拠の不在」を埋めることです。</p>
+            <div class="comment-flow">
+              <div class="flow-card violet"><h4>1. コメントする</h4><p>その瞬間には、ちゃんと応援として投げている。</p></div>
+              <div class="flow-card slate"><h4>2. 画面を流れる</h4><p>リアルタイム性が高く、すぐに過去へ流れていく。</p></div>
+              <div class="flow-card red"><h4>3. 反応がなく残らない</h4><p>返信も記録もなければ、あとで痕跡を辿りにくい。</p></div>
+              <div class="flow-card red"><h4>4. 証拠の不在</h4><p>応援したのに、「本当にいたのか」が見返せなくなる。</p></div>
+            </div>
+            <div class="solution-box">
+              <strong>だから、このPCにローカル記録する。</strong>
+              <p>コメントの反応有無に依存せず、「書いた」「そこにいた」「応援した」という証拠を自分の手元に残す。それが、削除ループより前の段階で効く解決策です。</p>
+            </div>
+            <div class="yukkuri-thread" style="margin-top:18px">
+              <div class="y-row">
+                <div class="speaker"><img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-open.png" alt="ゆっくりりんく"><span>ゆっくりりんく</span></div>
+                <div class="bubble">SNS投稿は「消すかどうか」が苦しいけれど、配信コメントは<strong>最初から残らないこと自体</strong>が虚しいのだ。</div>
+              </div>
+              <div class="y-row reverse">
+                <div class="bubble">だから君斗りんくの追憶のきらめきは、反応を増やすより先に、<strong>応援の証拠を消えにくくする</strong>方向へ振っているのだ。</div>
+                <div class="speaker"><img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.png" alt="ゆっくりこん太"><span>ゆっくりこん太</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="algorithm">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2>「推定同時接続」は、どうやって計算しているの？</h2>
+            <p>
+              ニコ生には同時接続 API がありません。配信ページが表示する数字は累計来場者数（watchCount）です。
+              君斗りんくの追憶のきらめきは、コメントと来場者の情報から独自に推定しています。
+            </p>
+          </div>
+
+          <div class="board fade d1">
+            <h3>3人がアルゴリズムを解説するのだ</h3>
+            <p>推定同時接続は、2つのシグナルの幾何平均で算出しています。</p>
+            <div class="yukkuri-thread">
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりりんく">
+                  <span>ゆっくりりんく</span>
+                </div>
+                <div class="bubble">
+                  まず<strong>シグナル A「アクティブコメンター法」</strong>なのだ。<br>
+                  直近 5 分間にコメントしたユニークな人数を数えて、<strong>動的倍率</strong>をかけるのだ。
+                  <div class="formula">
+                    <span class="formula-label sig-a">Signal A</span><br>
+                    <span class="var">A</span> <span class="op">=</span> <span class="var">activeCommenters</span><sub>5min</sub> <span class="op">×</span> <span class="var">m</span>(<span class="var">visitors</span>)
+                    <br><span class="comment">activeCommenters = 直近5分のユニークコメンター数</span>
+                    <br><span class="comment">m(visitors) = 来場者数から対数補間で算出する動的倍率</span>
+                  </div>
+                  倍率は来場者数に応じて変わるのだ。大規模配信ほどコメント参加率が下がるから倍率が上がるのだ。
+                  <table class="formula-table">
+                    <tr><th>来場者数</th><th>倍率 m</th><th>意味</th></tr>
+                    <tr><td>〜50</td><td>×4</td><td>小規模：参加率が高い</td></tr>
+                    <tr><td>500</td><td>×6</td><td></td></tr>
+                    <tr><td>1,000</td><td>×7</td><td>中規模のデフォルト</td></tr>
+                    <tr><td>3,000</td><td>×10</td><td>Dさん較正ポイント</td></tr>
+                    <tr><td>8,000</td><td>×15</td><td>Aさん較正ポイント</td></tr>
+                    <tr><td>50,000〜</td><td>×25</td><td>大規模：lurker effect 最大</td></tr>
+                  </table>
+                  <span class="comment" style="font-size:.85rem">中間値は対数補間で滑らかに繋ぐのだ。ちくわちゃんランキング pts ≈ 同接として較正しているのだ。</span>
+                </div>
+              </div>
+              <div class="y-row reverse">
+                <div class="bubble">
+                  次に<strong>シグナル B「滞留率法」</strong>なのだ。<br>
+                  累計来場者数に、配信経過時間に応じた<strong>指数減衰の滞留率</strong>をかけるのだ。
+                  <div class="formula">
+                    <span class="formula-label sig-b">Signal B</span><br>
+                    <span class="var">B</span> <span class="op">=</span> <span class="var">visitors</span> <span class="op">×</span> <span class="var">r</span>(<span class="var">t</span>)
+                    <br><br>
+                    <span class="var">r</span>(<span class="var">t</span>) <span class="op">=</span> max( 0.08, &nbsp;0.48 <span class="op">×</span> e<sup><span class="op">−</span>0.005 <span class="op">×</span> <span class="var">t</span></sup> )
+                    <br><span class="comment">visitors = 累計来場者数、t = 配信経過分数</span>
+                    <br><span class="comment">0.48 = 開始直後のピーク滞留率、0.08 = 底値（長時間配信の下限）</span>
+                  </div>
+                  <table class="formula-table">
+                    <tr><th>経過</th><th>滞留率 r(t)</th><th>例：来場 3,000 人</th></tr>
+                    <tr><td>0分</td><td>48%</td><td>→ 1,440 人</td></tr>
+                    <tr><td>30分</td><td>41%</td><td>→ 1,230 人</td></tr>
+                    <tr><td>60分</td><td>35%</td><td>→ 1,050 人</td></tr>
+                    <tr><td>120分</td><td>26%</td><td>→ 780 人</td></tr>
+                    <tr><td>180分</td><td>20%</td><td>→ 600 人</td></tr>
+                    <tr><td>300分〜</td><td>8%（底値）</td><td>→ 240 人</td></tr>
+                  </table>
+                  来場者がたくさんいても、時間が経つと離脱していく自然な減り方を表現しているのだ。
+                </div>
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりこん太">
+                  <span>ゆっくりこん太</span>
+                </div>
+              </div>
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりたぬ姉">
+                  <span>ゆっくりたぬ姉</span>
+                </div>
+                <div class="bubble">
+                  最後にこの 2 つを<strong>幾何平均</strong>で統合するのだ。
+                  <div class="formula">
+                    <span class="formula-label combined">統合</span><br>
+                    <span class="var">estimated</span> <span class="op">=</span> √( <span class="var">A</span> <span class="op">×</span> <span class="var">B</span> )
+                    <br><span class="comment">算術平均 (A+B)/2 ではなく幾何平均を使うことで、片方が極端でも引っ張られにくいのだ</span>
+                  </div>
+                  でも A と B が両方揃わないこともあるのだ。そのときはこうなるのだ。
+                  <div class="formula">
+                    <span class="comment">■ 分岐ロジック</span><br>
+                    A &gt; 0 かつ B &gt; 0 → <span class="var">√(A × B)</span> &nbsp;<span class="comment">… combined</span><br>
+                    A &gt; 0 かつ B = 0 → <span class="var">A</span> &nbsp;<span class="comment">… active_only（配信経過不明）</span><br>
+                    A = 0 かつ B &gt; 0 → <span class="var">B</span> &nbsp;<span class="comment">… retention_only（コメントなし）</span><br>
+                    A = 0 かつ B = 0 → <span class="var">0</span> &nbsp;<span class="comment">… none（データ不足）</span>
+                  </div>
+                  <span class="comment" style="font-size:.85rem">active_only のときはソフトキャップ（visitors × 35%）がかかるのだ。combined なら幾何平均が自然に抑制するからキャップ不要なのだ。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="board fade d2" style="margin-top:20px">
+            <h3>較正データと安全弁</h3>
+            <div class="two-col">
+              <section class="lane left">
+                <div class="lane-title">較正ポイント</div>
+                <div class="stack">
+                  <div class="node gold"><strong>Dさん配信</strong><span>30 active / 2,580 来場 → 305 pts → 倍率 ≈ 10</span></div>
+                  <div class="node brick"><strong>Aさん配信</strong><span>60 active / 8,754 来場 → 929 pts → 倍率 ≈ 15</span></div>
+                  <div class="node red"><strong>Yさん配信</strong><span>94 active / 1,114 来場 → ソフトキャップ適用で ≈ 390</span></div>
+                </div>
+                <div class="formula" style="margin-top:14px">
+                  <span class="comment">■ Aさん配信の計算例</span><br>
+                  <span class="var">A</span> = 60 <span class="op">×</span> 15 = <strong>900</strong>
+                  <br><span class="var">B</span> = 8,754 <span class="op">×</span> r(173min) = 8,754 <span class="op">×</span> 0.20 ≈ <strong>1,751</strong>
+                  <br><span class="var">estimated</span> = √(900 × 1,751) ≈ <strong>1,255</strong>
+                  <br><span class="comment">実測（ちくわpt）929 → オーダーとして妥当</span>
+                </div>
+                <div class="lane-note">ちくわちゃんランキングのポイント ≈ 同時接続の代理指標として、実測と照合しているのだ。</div>
+              </section>
+              <section class="lane right">
+                <div class="lane-title">安全弁（キャップ）</div>
+                <div class="stack">
+                  <div class="node blue"><strong>ソフトキャップ</strong><span>コメンター法のみ（配信経過不明）のとき、来場者数 × 35% を上限にするのだ。高エンゲージメント配信での過大推定を防ぐ安全弁なのだ。</span></div>
+                  <div class="node slate"><strong>ハードキャップ</strong><span>どの方法でも、推定値は累計来場者数を超えないのだ。来場より多い同接はありえないのだ。</span></div>
+                </div>
+                <div class="lane-note">キャップはあくまで安全装置。幾何平均の統合だけで、ほとんどの配信で自然な範囲に収まるのだ。</div>
+              </section>
+            </div>
+          </div>
+
+          <div class="board fade d3" style="margin-top:20px">
+            <h3>なぜ「来場者数」と「推定同時接続」が違うの？</h3>
+            <div class="yukkuri-thread">
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-open.png" alt="ゆっくりりんく">
+                  <span>ゆっくりりんく</span>
+                </div>
+                <div class="bubble">
+                  ニコ生の配信ページにある数字（右上の 👁 アイコン）は<strong>累計来場者数</strong>なのだ。
+                  配信中にどんどん増えるけど、離脱した人も含むから「今何人見ているか」とは違うのだ。
+                </div>
+              </div>
+              <div class="y-row reverse">
+                <div class="bubble">
+                  たとえば来場 3,000 人 / 3 時間経過の配信を計算してみるのだ。
+                  <div class="formula">
+                    <span class="comment">■ 例：来場 3,000 / 経過 180 分 / 5分内コメンター 40 人</span><br>
+                    <span class="var">A</span> = 40 <span class="op">×</span> m(3000) = 40 <span class="op">×</span> 10 = <strong>400</strong><br>
+                    <span class="var">B</span> = 3,000 <span class="op">×</span> r(180) = 3,000 <span class="op">×</span> 0.20 = <strong>600</strong><br>
+                    <span class="var">推定同接</span> = √(400 × 600) ≈ <strong>~490 人</strong><br>
+                    <span class="comment">来場者数「3,000」とは大きく異なるのだ</span>
+                  </div>
+                  推定同時接続は「今、ここにいる人」の近似値なのだ。
+                </div>
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.png" alt="ゆっくりこん太">
+                  <span>ゆっくりこん太</span>
+                </div>
+              </div>
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.png" alt="ゆっくりたぬ姉">
+                  <span>ゆっくりたぬ姉</span>
+                </div>
+                <div class="bubble">
+                  あくまで独自推定なので、公式の同接表示ではないのだ。
+                  でも「応援してくれている人は今どのくらいいるんだろう」を見るための参考値として、
+                  <strong>反応の数字に振り回されにくい体験</strong>の助けになればいいのだ。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mini-notes fade d3" style="margin-top:18px">
+            <div class="mini-note"><strong>りんく</strong><br>公式に同接 API がないから、コメントと来場の複合で推定しているのだ。精度は完璧じゃないけど、「累計来場 = 今見てる人」という誤解よりはずっと近いのだ。</div>
+            <div class="mini-note"><strong>こん太</strong><br>動的倍率テーブルは実測で較正しているのだ。配信の規模が違えば倍率も変わる、対数補間方式なのだ。</div>
+            <div class="mini-note"><strong>たぬ姉</strong><br>コメントしていない「見る専」の人も滞留率法で拾えるのがポイントなのだ。コメンターだけ数えたら見る専の人が見えなくなるのだ。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="solution">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2>君斗りんくの追憶のきらめきが断ち切りたいのは、この左側のループです。</h2>
+            <p>
+              競争をもっと強くするのではなく、応援の痕跡を個人の手元に戻す。その設計にすると、
+              反応が少ない日の推し活も「無価値」ではなくなります。
+            </p>
+          </div>
+
+          <div class="board fade d1">
+            <h3>解決の方向</h3>
+            <p>吹き出し形式で言い切るなら、この3点です。</p>
+            <div class="solution-grid">
+              <div class="solution-card"><h4>1. 消える前に残す</h4><p>配信コメントをローカルに保存し、「反応があったかどうか」と切り離して痕跡を保持する。</p></div>
+              <div class="solution-card"><h4>2. 数字より痕跡を見る</h4><p>しおり集計、HTML保存、スクリーンショットなどで、反応数ではなく応援の中身をあとから振り返れるようにする。</p></div>
+              <div class="solution-card"><h4>3. 無反応でも無価値にしない</h4><p>返信ゼロでも、いいねゼロでも、「応援した事実」はこのPCに残っている状態をつくる。</p></div>
+            </div>
+            <div class="avatar-line">
+              <div class="avatar-note"><img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-closed.png" alt="ゆっくりりんく"><span><strong>りんく</strong><br>「反応がなくても、応援したことは消えないのだ」</span></div>
+              <div class="avatar-note"><img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-closed.png" alt="ゆっくりこん太"><span><strong>こん太</strong><br>「比較の前に、自分のログとして残せるのが大きいのだ」</span></div>
+              <div class="avatar-note"><img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-closed.png" alt="ゆっくりたぬ姉"><span><strong>たぬ姉</strong><br>「見る専になる前に、証拠を手元へ戻すのだ」</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="footer-wrap">
+        <div class="shell">
+          <div class="footer-card fade">
+            <div>
+              <h2>応援が消えやすい時代に、まずは手元の記録から守る。</h2>
+              <p>この LP は、推し活を「もっと投稿しろ」という方向ではなく、<strong>消えやすい応援をどう残すか</strong>に寄せて再構成したプレビューです。りんく、こん太、たぬ姉の吹き出しで、問題提起から解決まで一直線につなげています。</p>
+            </div>
+            <div class="footer-actions">
+              <a class="btn primary" href="#problem">問題から見直す</a>
+              <a class="btn secondary" href="../README.md">READMEを見る</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer-note">
+      <div class="shell">LP preview file: <code>docs/lp-preview.html</code></div>
+    </footer>
+  </body>
+</html>

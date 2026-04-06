@@ -4,6 +4,7 @@
  */
 
 const DEFAULT_MAX_EDGE = 1280;
+export const SCREENSHOT_DOWNLOAD_SUBDIR = 'スクリーンショット';
 
 /**
  * アスペクト比を保ちつつ maxW/maxH に収まる整数サイズ
@@ -29,6 +30,9 @@ export function fitThumbnailDimensions(srcW, srcH, maxW, maxH) {
 }
 
 /**
+ * Chrome 拡張は任意の絶対パスへは保存できないため、
+ * スクショはダウンロード先配下の `スクリーンショット/` に寄せる。
+ *
  * @param {string} liveId
  * @param {string} ext
  * @param {number} nowMs
@@ -40,7 +44,7 @@ export function buildScreenshotFilename(liveId, ext, nowMs) {
     .slice(0, 32) || 'unknown';
   const e = String(ext || 'png').replace(/^\./, '').toLowerCase() || 'png';
   const ts = Math.floor(Number(nowMs) || Date.now());
-  return `nicolivelog-${safeLv}-${ts}.${e}`;
+  return `${SCREENSHOT_DOWNLOAD_SUBDIR}/nicolivelog-${safeLv}-${ts}.${e}`;
 }
 
 /**

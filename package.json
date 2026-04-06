@@ -19,7 +19,8 @@
     "test:e2e:interaction": "npm run build && node scripts/run-e2e.mjs --headed tests/e2e/extension-interaction.spec.js",
     "test:e2e:ui": "npm run build && npx playwright test --ui",
     "test:e2e:ci": "npx playwright test",
-    "playwright:install": "playwright install chromium"
+    "playwright:install": "playwright install chromium",
+    "inspect:watch-stats": "node scripts/inspect-nicolive-watch-stats.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

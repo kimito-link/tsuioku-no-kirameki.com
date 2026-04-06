@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   fitThumbnailDimensions,
   buildScreenshotFilename,
+  SCREENSHOT_DOWNLOAD_SUBDIR,
   interpretCaptureError
 } from './videoCapture.js';
 
@@ -40,15 +41,18 @@ describe('fitThumbnailDimensions', () => {
 });
 
 describe('buildScreenshotFilename', () => {
-  it('lv とタイムスタンプを含む', () => {
+  it('スクショ用サブフォルダ配下に lv とタイムスタンプを含む', () => {
     const name = buildScreenshotFilename('lv12345', 'png', 1_700_000_000_000);
-    expect(name).toMatch(/^nicolivelog-lv12345-\d+\.png$/);
+    expect(name).toMatch(
+      new RegExp(`^${SCREENSHOT_DOWNLOAD_SUBDIR}/nicolivelog-lv12345-\\d+\\.png$`)
+    );
     expect(name).toContain('1700000000000');
   });
 
-  it('危険文字を除去', () => {
+  it('危険文字を除去して親ディレクトリへ逃がさない', () => {
     const name = buildScreenshotFilename('lv../../x', 'png', 1);
-    expect(name).not.toContain('/');
+    expect(name.startsWith(`${SCREENSHOT_DOWNLOAD_SUBDIR}/`)).toBe(true);
+    expect(name.slice(`${SCREENSHOT_DOWNLOAD_SUBDIR}/`.length)).not.toContain('/');
     expect(name).not.toContain('\\');
     expect(name).not.toContain('..');
   });
