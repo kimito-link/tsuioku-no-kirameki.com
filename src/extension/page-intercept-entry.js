@@ -14,6 +14,7 @@ import {
   collectInterceptSignalsFromObject,
   extractLearnUsersFromNicoUserIconUrlsInString
 } from '../lib/niconicoInterceptLearn.js';
+import { recordUnforwardedInterceptJsonForProbe } from '../lib/interceptVisitorProbeDebug.js';
 
 (() => {
   'use strict';
@@ -393,8 +394,9 @@ import {
    * type:"statistics" だけでなく、既知キーがあれば広く拾う。
    * @param {unknown} obj
    */
+  /** @returns {boolean} viewers を拾って転送したら true */
   function tryForwardStatistics(obj) {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
     const o = /** @type {Record<string, unknown>} */ (obj);
     const d = o.data;
     const target =
@@ -407,11 +409,20 @@ import {
       viewers = pickNum(o, VIEWER_KEYS, 50_000_000);
       comments = comments ?? pickNum(o, COMMENT_KEYS);
     }
-    if (viewers == null) return;
+    if (viewers == null) return false;
     window.postMessage(
       { type: MSG_STATISTICS, viewers, comments },
       '*'
     );
+    return true;
+  }
+
+  /** statistics 未転送 JSON の観測（sessionStorage フラグ ON のときのみ） */
+  function maybeRecordInterceptVisitorProbe(parsed) {
+    const snippet = recordUnforwardedInterceptJsonForProbe(parsed);
+    if (!snippet) return;
+    const root = document.documentElement;
+    if (root) root.setAttribute('data-nls-intercept-visitor-probe', snippet);
   }
 
   let _scheduleSent = false;
@@ -437,7 +448,7 @@ import {
       if (raw.length < 4 || raw.length > 1_000_000) return;
       try {
         const parsed = JSON.parse(raw);
-        tryForwardStatistics(parsed);
+        if (!tryForwardStatistics(parsed)) maybeRecordInterceptVisitorProbe(parsed);
         tryForwardSchedule(parsed);
         dig(parsed, 0);
       } catch {
@@ -545,7 +556,11 @@ import {
                     extractFromBinaryText(dec.decode(value));
                     const text = dec.decode(value, { stream: true });
                     if (text.length > 3 && text.length < 500000) {
-                      try { const j = JSON.parse(text); tryForwardStatistics(j); dig(j, 0); } catch { /* not JSON */ }
+                      try {
+                        const j = JSON.parse(text);
+                        if (!tryForwardStatistics(j)) maybeRecordInterceptVisitorProbe(j);
+                        dig(j, 0);
+                      } catch { /* not JSON */ }
                     }
                   }
                 }
@@ -600,8 +615,9 @@ import {
                   return;
                 }
                 if (rt === 'json') {
-                  tryForwardStatistics(this.response);
-                  dig(this.response, 0);
+                  const res = this.response;
+                  if (!tryForwardStatistics(res)) maybeRecordInterceptVisitorProbe(res);
+                  dig(res, 0);
                   return;
                 }
                 if (rt === 'arraybuffer' && this.response) {

@@ -16,6 +16,7 @@ import {
   KEY_SELF_POSTED_RECENTS,
   KEY_USER_COMMENT_PROFILE_CACHE,
   KEY_COMMENT_PANEL_STATUS,
+  KEY_COMMENT_INGEST_LOG,
   KEY_STORAGE_WRITE_ERROR,
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
@@ -90,6 +91,7 @@ import {
   pickStrongestAvatarUrlForUser
 } from '../lib/supportGrowthTileSrc.js';
 import { mergeUserIdForEnrichment } from '../lib/userIdPreference.js';
+import { maybeAppendCommentIngestLog } from '../lib/commentIngestLog.js';
 
 /**
  * @typedef {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string }} ParsedCommentRow
@@ -109,14 +111,18 @@ const DEEP_HARVEST_DELAY_MS = 1200;
  */
 const DEEP_HARVEST_QUIET_UI_MS = 3200;
 /** deep harvest 1ステップあたりの待ち（短すぎると仮想行の取りこぼし、長いと視覚的な走査時間が伸びる） */
-const DEEP_HARVEST_SCROLL_WAIT_MS = 55;
+const DEEP_HARVEST_SCROLL_WAIT_MS = 72;
+/** deep harvest 専用のステップ幅（既定より密く、仮想バッファの取りこぼしを減らす） */
+const DEEP_HARVEST_SCROLL_STEP_RATIO = 0.38;
 /** 2 周目の deep の直前ギャップ（仮想 DOM の再配置で取りこぼした行の再出現を待つ） */
 const DEEP_HARVEST_SECOND_PASS_GAP_MS = 180;
 /**
  * 長時間配信で仮想バッファ外の取りこぼしを減らす低頻度 deep（タブが visible で記録中のみ）。
  * QUIET UI は runDeepHarvest 内では使わず、定期経路も滝 UI 用ローディングは出さない。
  */
-const DEEP_HARVEST_PERIODIC_MS = 12 * 60 * 1000;
+const DEEP_HARVEST_PERIODIC_MS = 5 * 60 * 1000;
+/** 初回 deep 成功後、仮想リストが落ち着いてからの追い走査（1セッション1回まで） */
+const DEEP_HARVEST_STABILITY_FOLLOWUP_MS = 75_000;
 /** 長めの待ちのあいだ、ゆっくりりんくで「読み込み中」と示す（web_accessible と一致させる） */
 const DEEP_HARVEST_LOADING_HOST_ID = 'nl-deep-harvest-loading';
 const DEEP_HARVEST_LOADING_IMG_PATH =
@@ -531,7 +537,8 @@ const interceptedNicknames = new Map();
 /** userId→avatarUrl の補助マップ */
 /** @type {Map<string, string>} */
 const interceptedAvatars = new Map();
-const INTERCEPT_MAP_MAX = 8000;
+/** commentNo→ユーザー補完用。長時間・高流量で古い番号から削ると一覧再走査の取りこぼしが増えやすい */
+const INTERCEPT_MAP_MAX = 50_000;
 
 /** NDGR 本文 postMessage をデバウンスして storage 書き込み回数を抑える */
 /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string }[]} */
@@ -593,7 +600,7 @@ async function flushNdgrChatRowsBatch(batch) {
     const n = String(r.nickname || '').trim();
     if (u && n) interceptedNicknames.set(u, n);
   }
-  await persistCommentRows(merged);
+  await persistCommentRows(merged, { source: 'ndgr' });
 }
 
 /**
@@ -1531,7 +1538,7 @@ function startPageFrameLoop() {
 
 function hasExtensionContext() {
   try {
-    return Boolean(chrome?.runtime?.id);
+    return Boolean(chrome?.runtime?.id && chrome?.storage?.local);
   } catch {
     return false;
   }
@@ -2933,8 +2940,11 @@ function pruneAutoBackupLives(state) {
 /** NDGR・MutationObserver・deep harvest が同時に来ても storage の merge が壊れないよう直列化 */
 let persistCommentRowsChain = Promise.resolve();
 
-/** @param {ParsedCommentRow[]|null|undefined} rows */
-async function persistCommentRows(rows) {
+/**
+ * @param {ParsedCommentRow[]|null|undefined} rows
+ * @param {{ source?: string }} [opts] ndgr | mutation | deep | visible
+ */
+async function persistCommentRows(rows, opts = {}) {
   if (
     !rows?.length ||
     !recording ||
@@ -2944,13 +2954,16 @@ async function persistCommentRows(rows) {
   ) {
     return;
   }
-  const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(rows));
+  const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(rows, opts));
   persistCommentRowsChain = job.catch(() => {});
   await job;
 }
 
-/** @param {ParsedCommentRow[]|null|undefined} rows */
-async function persistCommentRowsImpl(rows) {
+/**
+ * @param {ParsedCommentRow[]|null|undefined} rows
+ * @param {{ source?: string }} [opts]
+ */
+async function persistCommentRowsImpl(rows, opts = {}) {
   if (
     !rows?.length ||
     !recording ||
@@ -2971,7 +2984,8 @@ async function persistCommentRowsImpl(rows) {
           KEY_SELF_POSTED_RECENTS,
           KEY_AUTO_BACKUP_STATE,
           KEY_LAST_WATCH_URL,
-          KEY_USER_COMMENT_PROFILE_CACHE
+          KEY_USER_COMMENT_PROFILE_CACHE,
+          KEY_COMMENT_INGEST_LOG
         ]),
       { attempts: 4, delaysMs: [0, 50, 120, 280] }
     );
@@ -3027,6 +3041,25 @@ async function persistCommentRowsImpl(rows) {
     if (Object.keys(profileMap).length !== profileKeysBefore) cacheTouched = true;
 
     if (!storageTouched && !pendingTouched && !cacheTouched) return;
+
+    /** @type {Record<string, unknown>|null} */
+    let ingestLogPayload = null;
+    if (storageTouched || pendingTouched) {
+      const src = String(opts?.source || 'unknown').slice(0, 32);
+      ingestLogPayload = maybeAppendCommentIngestLog(bag[KEY_COMMENT_INGEST_LOG], {
+        t: Date.now(),
+        liveId: String(liveId || '').trim().toLowerCase(),
+        source: src,
+        batchIn: rows.length,
+        added: added.length,
+        totalAfter: next.length,
+        official:
+          officialCommentCount != null && Number.isFinite(officialCommentCount)
+            ? Math.floor(officialCommentCount)
+            : null
+      });
+    }
+
     const updatedAt = Date.now();
     const lastCommentAt = Math.max(0, Number(next[next.length - 1]?.capturedAt || 0));
     const rememberedWatchUrl = String(bag[KEY_LAST_WATCH_URL] || '').trim();
@@ -3056,6 +3089,7 @@ async function persistCommentRowsImpl(rows) {
       await chrome.storage.local.set({
         [key]: next,
         [KEY_AUTO_BACKUP_STATE]: autoBackupState,
+        ...(ingestLogPayload ? { [KEY_COMMENT_INGEST_LOG]: ingestLogPayload } : {}),
         ...(pendingTouched
           ? { [KEY_SELF_POSTED_RECENTS]: { items: consumed.remainingItems } }
           : {}),
@@ -3135,6 +3169,7 @@ function syncLiveIdFromLocation() {
       void clearCommentHarvestPanelDiagnostic();
       pendingRoots.clear();
       clearNdgrChatRowsPending();
+      resetDeepHarvestStabilityFollowUp();
       interceptedUsers.clear();
       interceptedNicknames.clear();
       interceptedAvatars.clear();
@@ -3174,6 +3209,7 @@ function syncLiveIdFromLocation() {
       void clearCommentHarvestPanelDiagnostic();
       pendingRoots.clear();
       clearNdgrChatRowsPending();
+      resetDeepHarvestStabilityFollowUp();
       interceptedUsers.clear();
       interceptedNicknames.clear();
       interceptedAvatars.clear();
@@ -3241,7 +3277,7 @@ async function flushToStorage() {
   pendingRoots.clear();
 
   if (!rows.length) return;
-  await persistCommentRows(rows);
+  await persistCommentRows(rows, { source: 'mutation' });
 }
 
 function scheduleFlush() {
@@ -3255,6 +3291,18 @@ function scheduleFlush() {
 
 /** @type {number|null} */
 let deepHarvestTimer = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let deepHarvestStabilityFollowUpTimer = null;
+/** 同一視聴セッションで追い deep を二重に積まない */
+let deepHarvestStabilityFollowUpScheduled = false;
+
+function resetDeepHarvestStabilityFollowUp() {
+  if (deepHarvestStabilityFollowUpTimer != null) {
+    clearTimeout(deepHarvestStabilityFollowUpTimer);
+    deepHarvestStabilityFollowUpTimer = null;
+  }
+  deepHarvestStabilityFollowUpScheduled = false;
+}
 
 function removeDeepHarvestLoadingUi() {
   try {
@@ -3329,6 +3377,7 @@ function cancelPendingDeepHarvest() {
     clearTimeout(deepHarvestTimer);
     deepHarvestTimer = null;
   }
+  resetDeepHarvestStabilityFollowUp();
   removeDeepHarvestLoadingUi();
 }
 
@@ -3385,9 +3434,10 @@ async function runDeepHarvest() {
       extractCommentsFromNode,
       waitMs: DEEP_HARVEST_SCROLL_WAIT_MS,
       twoPass: true,
-      twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS
+      twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS,
+      scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO
     });
-    await persistCommentRows(rows);
+    await persistCommentRows(rows, { source: 'deep' });
     deepHarvestPipelineStats.lastCompletedAt = Date.now();
     deepHarvestPipelineStats.lastRowCount = rows.length;
     deepHarvestPipelineStats.runCount += 1;
@@ -3396,6 +3446,21 @@ async function runDeepHarvest() {
     deepHarvestPipelineStats.lastError = true;
   } finally {
     harvestRunning = false;
+    if (
+      !deepHarvestPipelineStats.lastError &&
+      recording &&
+      liveId &&
+      locationAllowsCommentRecording() &&
+      !deepHarvestStabilityFollowUpScheduled
+    ) {
+      deepHarvestStabilityFollowUpScheduled = true;
+      deepHarvestStabilityFollowUpTimer = setTimeout(() => {
+        deepHarvestStabilityFollowUpTimer = null;
+        if (recording && liveId && locationAllowsCommentRecording()) {
+          void runDeepHarvest();
+        }
+      }, DEEP_HARVEST_STABILITY_FOLLOWUP_MS);
+    }
   }
 }
 
@@ -3463,7 +3528,7 @@ function scanVisibleCommentsNow() {
   const panel = findNicoCommentPanel(document);
   const root = panel || document.body;
   const rows = extractCommentsFromNode(root);
-  void persistCommentRows(rows);
+  void persistCommentRows(rows, { source: 'visible' });
   void syncCommentHarvestPanelStatus();
 }
 

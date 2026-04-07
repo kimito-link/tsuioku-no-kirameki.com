@@ -3,9 +3,11 @@ import {
   calcCommentCaptureRatio,
   countRecentActiveUsers,
   DIRECT_VIEWERS_FRESH_MS,
+  DIRECT_VIEWERS_NOWCAST_MAX_MS,
   estimateConcurrentViewers,
   dynamicMultiplier,
   resolveConcurrentViewers,
+  resolveDirectViewersThresholds,
   retentionRate,
   DEFAULT_WINDOW_MS
 } from './concurrentEstimate.js';
@@ -323,6 +325,31 @@ describe('calcCommentCaptureRatio', () => {
   });
 });
 
+describe('resolveDirectViewersThresholds', () => {
+  /** @type {ReadonlyArray<{ hint: number|null|undefined, freshMs: number, nowcastMaxMs: number }>} */
+  const table = [
+    { hint: null, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
+    { hint: undefined, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
+    { hint: Number.NaN, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
+    { hint: 0, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
+    { hint: -1, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
+    { hint: 10_000, freshMs: 45_000, nowcastMaxMs: 90_000 },
+    { hint: 30_000, freshMs: 48_000, nowcastMaxMs: 120_000 },
+    { hint: 70_000, freshMs: 112_000, nowcastMaxMs: 280_000 },
+    { hint: 120_000, freshMs: 120_000, nowcastMaxMs: 300_000 }
+  ];
+
+  it.each(table)(
+    'interval hint=%s → freshMs=%i nowcastMaxMs=%i',
+    ({ hint, freshMs, nowcastMaxMs }) => {
+      const t = resolveDirectViewersThresholds(hint);
+      expect(t.freshMs).toBe(freshMs);
+      expect(t.nowcastMaxMs).toBe(nowcastMaxMs);
+      expect(t.nowcastMaxMs).toBeGreaterThanOrEqual(t.freshMs + 45_000);
+    }
+  );
+});
+
 describe('resolveConcurrentViewers', () => {
   it('fresh な official viewers があれば直値を返す', () => {
     const now = 1_000_000;
@@ -429,5 +456,47 @@ describe('resolveConcurrentViewers', () => {
     expect(withoutHint.method).toBe('nowcast');
     expect(withHint.method).toBe('official');
     expect(withHint.estimated).toBe(1000);
+  });
+
+  it.each([
+    {
+      label: 'default: freshness が freshMs ちょうどなら official',
+      nowMs: 1_000_000,
+      ageMs: DIRECT_VIEWERS_FRESH_MS,
+      intervalMs: undefined,
+      expected: 'official'
+    },
+    {
+      label: 'default: freshness が freshMs+1ms なら nowcast',
+      nowMs: 1_000_000,
+      ageMs: DIRECT_VIEWERS_FRESH_MS + 1,
+      intervalMs: undefined,
+      expected: 'nowcast'
+    },
+    {
+      label: 'default: freshness が nowcastMax ちょうどなら nowcast',
+      nowMs: 1_000_000,
+      ageMs: DIRECT_VIEWERS_NOWCAST_MAX_MS,
+      intervalMs: undefined,
+      expected: 'nowcast'
+    },
+    {
+      label: 'default: freshness が nowcastMax+1ms なら fallback',
+      nowMs: 1_000_000,
+      ageMs: DIRECT_VIEWERS_NOWCAST_MAX_MS + 1,
+      intervalMs: undefined,
+      expected: 'fallback'
+    }
+  ])('$label', ({ nowMs, ageMs, intervalMs, expected }) => {
+    const r = resolveConcurrentViewers({
+      nowMs,
+      officialViewers: 800,
+      officialUpdatedAtMs: nowMs - ageMs,
+      officialViewerIntervalMs: intervalMs,
+      recentActiveUsers: 40,
+      totalVisitors: 5000,
+      streamAgeMin: 30
+    });
+    expect(r.method).toBe(expected);
   });
 });

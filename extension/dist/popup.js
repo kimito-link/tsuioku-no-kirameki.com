@@ -95,6 +95,7 @@
   var KEY_LAST_WATCH_URL = "nls_last_watch_url";
   var KEY_STORAGE_WRITE_ERROR = "nls_storage_write_error";
   var KEY_COMMENT_PANEL_STATUS = "nls_comment_panel_status";
+  var KEY_COMMENT_INGEST_LOG = "nls_comment_ingest_log_v1";
   var KEY_POPUP_FRAME = "nls_popup_frame";
   var KEY_POPUP_FRAME_CUSTOM = "nls_popup_frame_custom";
   var KEY_THUMB_AUTO = "nls_thumb_auto_enabled";
@@ -671,6 +672,35 @@
     const vc = viewerCountFromDom;
     if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) return false;
     return true;
+  }
+
+  // src/lib/popupWatchMetaConcurrentGate.js
+  function watchMetaConcurrentGateFromSnapshot(snapshot) {
+    if (!snapshot) {
+      return { showConcurrent: false, sparseConcurrent: true };
+    }
+    const vc = snapshot.viewerCountFromDom;
+    const recentActive = typeof snapshot.recentActiveUsers === "number" ? snapshot.recentActiveUsers : 0;
+    const showConcurrent = shouldShowConcurrentEstimate({
+      recentActiveUsers: recentActive,
+      officialViewerCount: snapshot.officialViewerCount,
+      viewerCountFromDom: vc,
+      liveId: snapshot.liveId
+    });
+    const sparseConcurrent = concurrentEstimateIsSparseSignal({
+      recentActiveUsers: recentActive,
+      officialViewerCount: snapshot.officialViewerCount,
+      viewerCountFromDom: vc
+    });
+    return { showConcurrent, sparseConcurrent };
+  }
+
+  // src/lib/watchConcurrentEstimateUiCopy.js
+  var SPARSE_CONCURRENT_ESTIMATE_NOTE = "\u6765\u5834\u8005\u30FB\u7D71\u8A08\u304C\u672A\u53D6\u5F97\u306E\u305F\u3081\u63A8\u5B9A\u306F\u53C2\u8003\u5024";
+  function concurrentResolutionMethodTitlePart(method) {
+    if (method === "official") return "watch WebSocket \u7531\u6765\u306E\u76F4\u63A5\u5024";
+    if (method === "nowcast") return "watch WebSocket \u306E\u6700\u7D42\u5024\u304B\u3089\u77ED\u671F\u88DC\u9593";
+    return "\u30B3\u30E1\u30F3\u30C8/\u6765\u5834\u8005\u30D9\u30FC\u30B9\u306E\u63A8\u5B9A";
   }
 
   // src/lib/liveAudienceDom.js
@@ -1296,6 +1326,15 @@ ${body}`;
     const s = String(u || "").trim();
     return isHttpOrHttpsUrl(s) && !isWeakNiconicoUserIconHttpUrl(s);
   }
+  function supportGridTierHasPersonalThumb(userId, httpAvatarCandidate, storedAvatarUrl) {
+    const u = String(userId || "").trim();
+    const http = String(httpAvatarCandidate ?? "").trim();
+    const raw = String(storedAvatarUrl ?? "").trim();
+    const syn = u && /^\d{5,14}$/.test(u) ? String(niconicoDefaultUserIconUrl(u) || "").trim() : "";
+    if (goodUserThumbUrl(raw)) return true;
+    if (goodUserThumbUrl(http) && (!syn || http !== syn)) return true;
+    return false;
+  }
   function supportGridStrongNickname(nick, userId) {
     const n = String(nick ?? "").trim();
     if (!n) return false;
@@ -1313,7 +1352,7 @@ ${body}`;
     else {
       const httpCandidate = String(p.httpAvatarCandidate ?? "").trim();
       const rawAv = String(p.storedAvatarUrl ?? "").trim();
-      hasThumb = goodUserThumbUrl(httpCandidate) || goodUserThumbUrl(rawAv);
+      hasThumb = supportGridTierHasPersonalThumb(uid, httpCandidate, rawAv);
     }
     const nick = String(p?.nickname ?? "").trim();
     const strongNick = supportGridStrongNickname(nick, uid);
@@ -1515,6 +1554,43 @@ ${body}`;
     };
   }
 
+  // src/lib/commentIngestLog.js
+  var COMMENT_INGEST_LOG_VERSION = 1;
+  function parseCommentIngestLog(raw) {
+    if (!raw || typeof raw !== "object") {
+      return { v: COMMENT_INGEST_LOG_VERSION, items: [] };
+    }
+    const o = (
+      /** @type {Record<string, unknown>} */
+      raw
+    );
+    const v = Number(o.v) || COMMENT_INGEST_LOG_VERSION;
+    const items = Array.isArray(o.items) ? o.items : [];
+    const out = [];
+    for (const x of items) {
+      if (!x || typeof x !== "object") continue;
+      const it = (
+        /** @type {Record<string, unknown>} */
+        x
+      );
+      const t = Number(it.t);
+      if (!Number.isFinite(t)) continue;
+      const liveId = String(it.liveId || "").trim().toLowerCase();
+      if (!liveId) continue;
+      const source = String(it.source || "unknown").slice(0, 32);
+      const batchIn = Math.max(0, Math.floor(Number(it.batchIn) || 0));
+      const added = Math.max(0, Math.floor(Number(it.added) || 0));
+      const totalAfter = Math.max(0, Math.floor(Number(it.totalAfter) || 0));
+      let official = null;
+      if (it.official != null && Number.isFinite(Number(it.official))) {
+        const oc = Math.floor(Number(it.official));
+        official = oc >= 0 ? oc : null;
+      }
+      out.push({ t, liveId, source, batchIn, added, totalAfter, official });
+    }
+    return { v, items: out };
+  }
+
   // src/lib/devMonitorDebugSubset.js
   function pickDevMonitorDebugSubset(raw) {
     if (!raw || typeof raw !== "object") return {};
@@ -1666,6 +1742,28 @@ ${body}`;
   var MAX_SESSION_POINTS = 24;
   var MAX_PERSISTED_POINTS = 250;
   var MAX_AGE_MS = 7 * 24 * 60 * 60 * 1e3;
+  var TREND_CHROME_PERSIST_MIN_MS = 3e4;
+  var TREND_SESSION_APPEND_MIN_MS = 12e3;
+  var _lastChromeTrendPersistMs = /* @__PURE__ */ new Map();
+  var _lastSessionTrendAppendMs = /* @__PURE__ */ new Map();
+  function trendMetricsEqual(a, b) {
+    if (!a || !b) return false;
+    if (a.thumb !== b.thumb || a.idPct !== b.idPct || a.nick !== b.nick || a.comment !== b.comment) {
+      return false;
+    }
+    if (a.displayCount !== b.displayCount) return false;
+    if (a.storageCount !== b.storageCount) return false;
+    return true;
+  }
+  function latestTrendPointByTime(points) {
+    if (!Array.isArray(points) || !points.length) return null;
+    let best = null;
+    for (const p of points) {
+      if (!p || typeof p.t !== "number" || !Number.isFinite(p.t)) continue;
+      if (!best || p.t >= best.t) best = p;
+    }
+    return best;
+  }
   function sessionKeyFor(liveId) {
     return `${STORAGE_PREFIX}${String(liveId || "").trim() || "_"}`;
   }
@@ -1710,9 +1808,12 @@ ${body}`;
   function appendTrendPoint(win, liveId, sample) {
     const lid = String(liveId || "").trim();
     if (!lid) return;
+    const now0 = Date.now();
+    const lastS = _lastSessionTrendAppendMs.get(lid) || 0;
+    if (now0 - lastS < TREND_SESSION_APPEND_MIN_MS) return;
     const prev = readTrendSeries(win, lid);
     const comm = sample.commentPct != null && Number.isFinite(sample.commentPct) ? Math.max(0, Math.min(100, sample.commentPct)) : 0;
-    const now = Date.now();
+    const now = now0;
     const pt = {
       t: now,
       thumb: Math.max(0, Math.min(100, sample.thumb)),
@@ -1726,6 +1827,11 @@ ${body}`;
     if (typeof sample.storageCount === "number" && Number.isFinite(sample.storageCount)) {
       pt.storageCount = Math.max(0, Math.floor(sample.storageCount));
     }
+    const lastSess = latestTrendPointByTime(prev);
+    if (lastSess && trendMetricsEqual(lastSess, pt)) {
+      _lastSessionTrendAppendMs.set(lid, now);
+      return;
+    }
     const next = trimTrendByAgeAndCap(
       [...prev, pt],
       MAX_SESSION_POINTS,
@@ -1734,12 +1840,16 @@ ${body}`;
     );
     try {
       win.sessionStorage.setItem(sessionKeyFor(lid), JSON.stringify(next));
+      _lastSessionTrendAppendMs.set(lid, now);
     } catch {
     }
   }
   async function persistTrendPointChrome(liveId, sample) {
     const lid = String(liveId || "").trim();
     if (!lid) return;
+    const nowWall = Date.now();
+    const lastC = _lastChromeTrendPersistMs.get(lid) || 0;
+    if (nowWall - lastC < TREND_CHROME_PERSIST_MIN_MS) return;
     const key = devMonitorTrendStorageKey(lid);
     const chromeObj = typeof chrome !== "undefined" && chrome.storage && chrome.storage.local ? chrome.storage.local : null;
     if (!chromeObj) return;
@@ -1766,6 +1876,11 @@ ${body}`;
       }
     });
     const prev = parseTrendJsonArray(bag[key]);
+    const lastPersisted = latestTrendPointByTime(prev);
+    if (lastPersisted && trendMetricsEqual(lastPersisted, pt)) {
+      _lastChromeTrendPersistMs.set(lid, Date.now());
+      return;
+    }
     const merged = trimTrendByAgeAndCap(
       [...prev, pt],
       MAX_PERSISTED_POINTS,
@@ -1779,6 +1894,7 @@ ${body}`;
         resolve(void 0);
       }
     });
+    _lastChromeTrendPersistMs.set(lid, Date.now());
   }
   async function readMergedTrendSeries(win, liveId) {
     const lid = String(liveId || "").trim();
@@ -2919,7 +3035,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           }
         }
         officialEl.textContent = line;
-        officialEl.title = "\u516C\u5F0F\u306F\u30CB\u30B3\u751F\u304C\u8868\u793A\u3059\u308B\u7D2F\u8A08\u30B3\u30E1\u30F3\u30C8\u4EF6\u6570\u3067\u3059\u3002\u5DE6\u306E\u5927\u304D\u3044\u6570\u5B57\u306F\u3001\u3053\u306EPC\u306E\u30B9\u30C8\u30EC\u30FC\u30B8\u306B\u6B8B\u3063\u3066\u3044\u308B\u884C\u6570\u3060\u3051\u3067\u3059\u3002\u30B3\u30E1\u30F3\u30C8\u6B04\u306F\u4EEE\u60F3\u30EA\u30B9\u30C8\u306E\u305F\u3081\u753B\u9762\u4E0A\u306B\u8F09\u3063\u3066\u3044\u308B\u884C\u3057\u304B\u53D6\u308A\u8FBC\u3081\u305A\u3001\u8A18\u9332OFF\u306E\u6642\u9593\u30FB\u30DA\u30FC\u30B8\u975E\u8868\u793A\u30FB\u30BF\u30A4\u30E0\u30B7\u30D5\u30C8\u958B\u59CB\u524D\u30FB\u30B7\u30B9\u30C6\u30E0\u884C\u306E\u6271\u3044\u306E\u5DEE\u3067\u3082\u4EF6\u6570\u306F\u4E26\u3073\u307E\u305B\u3093\u3002";
+        officialEl.title = "\u516C\u5F0F\u306F\u914D\u4FE1\u958B\u59CB\u304B\u3089\u306E\u7D2F\u8A08\u3067\u3059\u3002\u540C\u3058\u30BF\u30D6\u3067\u898B\u7D9A\u3051\u3001NDGR\uFF08\u30DA\u30FC\u30B8\u5185\u30A4\u30F3\u30BF\u30FC\u30BB\u30D7\u30C8\uFF09\u304C\u52B9\u3044\u3066\u3044\u308B\u3068\u304D\u306F\u8A18\u9332\u304C\u516C\u5F0F\u306B\u304B\u306A\u308A\u8FD1\u3065\u304F\u4F7F\u3044\u65B9\u3082\u591A\u3044\u3067\u3059\u3002\u9014\u4E2D\u5165\u5BA4\u3060\u3068\u5165\u5BA4\u524D\u306E\u5206\u3060\u3051\u516C\u5F0F\u304C\u5148\u306B\u5897\u3048\u3001\u7387\u306F\u4E00\u6C17\u306B\u4F4E\u304F\u898B\u3048\u307E\u3059\u3002\u5DE6\u306F\u3053\u306EPC\u306E\u30B9\u30C8\u30EC\u30FC\u30B8\u306E\u884C\u6570\u3002\u4EEE\u60F3\u30EA\u30B9\u30C8\u30FB\u8A18\u9332OFF\u30FB\u975E\u8868\u793A\u30BF\u30D6\u30FB\u30B5\u30A4\u30C8\u6539\u4FEE\u30FB\u30B9\u30C8\u30EC\u30FC\u30B8\u4E0A\u9650\u3067\u3082\u5DEE\u304C\u51FA\u307E\u3059\u3002";
       } else {
         officialEl.hidden = true;
         officialEl.textContent = "";
@@ -3029,7 +3145,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   }
   function hasExtensionContext() {
     try {
-      return Boolean(globalThis.chrome?.runtime?.id);
+      return Boolean(
+        globalThis.chrome?.runtime?.id && globalThis.chrome?.storage?.local
+      );
     } catch {
       return false;
     }
@@ -5148,15 +5266,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     clearTimeout(STORY_GROWTH_STATE.timer);
     STORY_GROWTH_STATE.timer = null;
   }
-  function storyGrowthStepDelayMs() {
-    const remain = STORY_GROWTH_STATE.targetCount - STORY_GROWTH_STATE.renderedCount;
-    if (remain > 800) return 22;
-    if (remain > 400) return 28;
-    if (remain > 200) return 34;
-    if (remain > 80) return 42;
-    if (remain > 30) return 55;
-    return 72;
-  }
   function resolveStoryIconSize(count) {
     const total = Math.max(0, Math.floor(Number(count) || 0));
     const compact = document.body?.classList.contains("nl-compact") || document.body?.classList.contains("nl-tight");
@@ -5316,20 +5425,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     root.appendChild(frag);
   }
-  function runStoryGrowthTick() {
-    STORY_GROWTH_STATE.timer = null;
-    const root = STORY_GROWTH_STATE.root;
-    if (!root) return;
-    if (STORY_GROWTH_STATE.renderedCount >= STORY_GROWTH_STATE.targetCount) return;
-    const nextIndex = STORY_GROWTH_STATE.renderedCount;
-    STORY_GROWTH_STATE.renderedCount += 1;
-    try {
-      root.appendChild(createStoryGrowthCell(true, nextIndex));
-    } catch {
-    }
-    if (STORY_GROWTH_STATE.renderedCount >= STORY_GROWTH_STATE.targetCount) return;
-    STORY_GROWTH_STATE.timer = window.setTimeout(runStoryGrowthTick, storyGrowthStepDelayMs());
-  }
   function syncStoryGrowth(liveId, count, root) {
     const nextLiveId = String(liveId || "");
     const targetFull = Math.max(0, Math.floor(Number(count) || 0));
@@ -5364,17 +5459,22 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       STORY_GROWTH_STATE.renderedCount = STORY_GROWTH_STATE.targetCount;
       rebuildStoryGrowth(root, STORY_GROWTH_STATE.renderedCount);
     }
+    const tgt = STORY_GROWTH_STATE.targetCount;
+    const rnd = STORY_GROWTH_STATE.renderedCount;
+    if (rnd < tgt && tgt > 0) {
+      clearStoryGrowthTimer();
+      rebuildStoryGrowth(root, tgt);
+      STORY_GROWTH_STATE.renderedCount = tgt;
+      patchStoryGrowthIconsFromSource(root, { pulseLast: true });
+      STORY_GROWTH_STATE.sourceSig = storySourceSignature();
+    }
     const nextSig = storySourceSignature();
     const needSourceSync = STORY_GROWTH_STATE.renderedCount > 0 && STORY_GROWTH_STATE.renderedCount === STORY_GROWTH_STATE.targetCount && nextSig !== STORY_GROWTH_STATE.sourceSig;
     STORY_GROWTH_STATE.sourceSig = nextSig;
     if (needSourceSync) {
       patchStoryGrowthIconsFromSource(root, { pulseLast: true });
     }
-    if (STORY_GROWTH_STATE.renderedCount < STORY_GROWTH_STATE.targetCount) {
-      if (!STORY_GROWTH_STATE.timer) {
-        STORY_GROWTH_STATE.timer = window.setTimeout(runStoryGrowthTick, 0);
-      }
-    } else if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
+    if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
       root.innerHTML = "";
     }
   }
@@ -5572,17 +5672,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const recentActive = typeof snapshot.recentActiveUsers === "number" ? snapshot.recentActiveUsers : 0;
     if (concurrentEstEl) {
       const nowMs = Date.now();
-      const showConcurrent = shouldShowConcurrentEstimate({
-        recentActiveUsers: recentActive,
-        officialViewerCount: snapshot.officialViewerCount,
-        viewerCountFromDom: vc,
-        liveId: snapshot.liveId
-      });
-      const sparseConcurrent = concurrentEstimateIsSparseSignal({
-        recentActiveUsers: recentActive,
-        officialViewerCount: snapshot.officialViewerCount,
-        viewerCountFromDom: vc
-      });
+      const { showConcurrent, sparseConcurrent } = watchMetaConcurrentGateFromSnapshot(snapshot);
       if (showConcurrent) {
         if (concurrentLoadingEl) concurrentLoadingEl.hidden = true;
         if (concurrentReadyEl) concurrentReadyEl.hidden = false;
@@ -5612,13 +5702,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         }
         _prevConcurrentEstimated = resolved.estimated;
         const parts = [];
-        if (resolved.method === "official") {
-          parts.push("watch WebSocket \u7531\u6765\u306E\u76F4\u63A5\u5024");
-        } else if (resolved.method === "nowcast") {
-          parts.push("watch WebSocket \u306E\u6700\u7D42\u5024\u304B\u3089\u77ED\u671F\u88DC\u9593");
-        } else {
-          parts.push("\u30B3\u30E1\u30F3\u30C8/\u6765\u5834\u8005\u30D9\u30FC\u30B9\u306E\u63A8\u5B9A");
-        }
+        parts.push(concurrentResolutionMethodTitlePart(resolved.method));
         if (resolved.freshnessMs != null) {
           parts.push(`\u66F4\u65B0 ${Math.round(resolved.freshnessMs / 1e3)} \u79D2\u524D`);
         }
@@ -5637,7 +5721,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         }
         parts.push(`\u4FE1\u983C\u5EA6 ${Math.round(resolved.confidence * 100)}%`);
         if (sparseConcurrent) {
-          parts.push("\u6765\u5834\u8005\u30FB\u7D71\u8A08\u304C\u672A\u53D6\u5F97\u306E\u305F\u3081\u63A8\u5B9A\u306F\u53C2\u8003\u5024");
+          parts.push(SPARSE_CONCURRENT_ESTIMATE_NOTE);
         }
         concurrentEstEl.title = parts.join(" | ");
         if (concurrentSubEl) {
@@ -5770,7 +5854,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const html = models.map((m) => {
       const placeHtml = m.placeNumber != null ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>` : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
       const full = escapeAttr(m.fullLabelForTitle);
-      const thumbRp = m.thumbNeedsNoReferrer ? ' referrerpolicy="no-referrer"' : "";
+      const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(m.thumbSrc);
+      const thumbRp = isHttpOrHttpsUrl(displayThumb) ? ' referrerpolicy="no-referrer"' : "";
       const idText = escapeHtml(m.idShort);
       const nameText = escapeHtml(m.nameLine);
       const idTitle = m.isUnknown ? "" : escapeAttr(m.idTitle);
@@ -5784,13 +5869,21 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         ${placeHtml}
         <span class="nl-top-support-rank__count">${m.count}\u4EF6</span>
         <span class="nl-top-support-rank__thumb-wrap">
-          <img class="nl-top-support-rank__thumb" src="${escapeAttr(m.thumbSrc)}" alt="" decoding="async"${thumbRp} />
+          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
         </span>
         <span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>
         <span class="nl-top-support-rank__name">${nameText}</span>
       </div>`;
     }).join("");
     strip.innerHTML = `<p class="nl-top-support-rank__note">\u8A18\u9332\u5185\u30FB\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u5FDC\u63F4\u4EF6\u6570\u304C\u591A\u3044\u9806\u3067\u3059\u3002</p><div class="nl-top-support-rank__list" role="list">${html}</div>`;
+    const thumbs = strip.querySelectorAll("img.nl-top-support-rank__thumb");
+    models.forEach((m, i) => {
+      const img = thumbs[i];
+      if (!(img instanceof HTMLImageElement)) return;
+      if (isHttpOrHttpsUrl(m.thumbSrc)) {
+        storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
+      }
+    });
   }
   function renderUserRooms(entries, liveId = "") {
     const ul = (
@@ -5867,8 +5960,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         STORY_GRID_DEFAULT_TILE_IMG,
         STORY_REMOTE_FAILED_PLACEHOLDER_IMG
       );
-      const thumbRp = isHttpOrHttpsUrl(thumbSrc) ? ' referrerpolicy="no-referrer"' : "";
-      const avatarHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(thumbSrc)}" decoding="async"${thumbRp}>`;
+      const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(thumbSrc);
+      const thumbRp = isHttpOrHttpsUrl(displayThumb) ? ' referrerpolicy="no-referrer"' : "";
+      const avatarHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async"${thumbRp}>`;
       const totalPercent = Math.max(6, Math.min(100, r.count / maxTotal * 100));
       const recentPercent = r.recentCount > 0 ? Math.max(4, Math.min(100, r.recentCount / maxRecent * 100)) : 0;
       const deltaLabel = r.recentCount > 0 ? `+${r.recentCount} / 5\u5206` : "\xB10 / 5\u5206";
@@ -5904,6 +5998,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       </div>
     `;
       ul.appendChild(li);
+      const avImg = li.querySelector("img.room-card__avatar");
+      if (avImg instanceof HTMLImageElement && isHttpOrHttpsUrl(thumbSrc)) {
+        storyAvatarLoadGuard.noteRemoteAttempt(avImg, thumbSrc);
+      }
     }
     if (rankedRooms.length > visibleRooms.length) {
       const rest = rankedRooms.length - visibleRooms.length;
@@ -8249,7 +8347,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   }
   function initPopup() {
     installExtensionContextErrorGuard();
-    void chrome.storage.local.get(KEY_CALM_PANEL_MOTION).then((b) => {
+    void globalThis.chrome?.storage?.local?.get(KEY_CALM_PANEL_MOTION)?.then((b) => {
       applyCalmPanelMotionClass(
         normalizeCalmPanelMotion(b[KEY_CALM_PANEL_MOTION], {
           inlineDefault: INLINE_MODE
@@ -8394,6 +8492,44 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         }
       } catch {
         if (stEl) stEl.textContent = "\u30B3\u30D4\u30FC\u306B\u5931\u6557\u3057\u307E\u3057\u305F";
+      }
+    });
+    $("devMonitorExportIngestBtn")?.addEventListener("click", async () => {
+      const stEl = (
+        /** @type {HTMLElement|null} */
+        $("devMonitorExportTrendStatus")
+      );
+      try {
+        const bag = await chrome.storage.local.get(KEY_COMMENT_INGEST_LOG);
+        const parsed = parseCommentIngestLog(bag[KEY_COMMENT_INGEST_LOG]);
+        const prm = lastDevMonitorPanelParams;
+        const lid = String(prm?.liveId || "").trim().toLowerCase();
+        const items = lid ? parsed.items.filter((x) => x.liveId === lid) : parsed.items;
+        const out = {
+          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          filterLiveId: lid || null,
+          itemCount: items.length,
+          totalStored: parsed.items.length,
+          items
+        };
+        const ok = await copyTextToClipboard(JSON.stringify(out, null, 2));
+        if (stEl) {
+          stEl.textContent = ok ? `\u53D6\u308A\u8FBC\u307F\u30ED\u30B0 ${items.length} \u4EF6\u30B3\u30D4\u30FC\uFF08\u5168\u4F53 ${parsed.items.length}\uFF09` : "\u30B3\u30D4\u30FC\u306B\u5931\u6557\u3057\u307E\u3057\u305F";
+        }
+      } catch {
+        if (stEl) stEl.textContent = "\u30B3\u30D4\u30FC\u306B\u5931\u6557\u3057\u307E\u3057\u305F";
+      }
+    });
+    $("devMonitorClearIngestBtn")?.addEventListener("click", async () => {
+      const stEl = (
+        /** @type {HTMLElement|null} */
+        $("devMonitorExportTrendStatus")
+      );
+      try {
+        await chrome.storage.local.remove(KEY_COMMENT_INGEST_LOG);
+        if (stEl) stEl.textContent = "\u53D6\u308A\u8FBC\u307F\u30ED\u30B0\u3092\u6D88\u53BB\u3057\u307E\u3057\u305F";
+      } catch {
+        if (stEl) stEl.textContent = "\u6D88\u53BB\u306B\u5931\u6557\u3057\u307E\u3057\u305F";
       }
     });
     $("devMonitorExportMarketingBtn")?.addEventListener("click", async () => {

@@ -21,6 +21,7 @@ import {
   KEY_SELF_POSTED_RECENTS,
   KEY_USER_COMMENT_PROFILE_CACHE,
   KEY_COMMENT_PANEL_STATUS,
+  KEY_COMMENT_INGEST_LOG,
   KEY_STORAGE_WRITE_ERROR,
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
@@ -56,10 +57,11 @@ import {
 } from '../lib/commentRecord.js';
 import { summarizeRecordedCommenters } from '../lib/liveCommenterStats.js';
 import { resolveConcurrentViewers } from '../lib/concurrentEstimate.js';
+import { watchMetaConcurrentGateFromSnapshot } from '../lib/popupWatchMetaConcurrentGate.js';
 import {
-  concurrentEstimateIsSparseSignal,
-  shouldShowConcurrentEstimate
-} from '../lib/popupConcurrentEstimateGate.js';
+  concurrentResolutionMethodTitlePart,
+  SPARSE_CONCURRENT_ESTIMATE_NOTE
+} from '../lib/watchConcurrentEstimateUiCopy.js';
 import { parseViewerCountFromLooseText } from '../lib/liveAudienceDom.js';
 import { pickLatestCommentEntry } from '../lib/pickLatestComment.js';
 import {
@@ -124,6 +126,7 @@ import {
   buildHtmlReportSaveGuideCardHtml
 } from '../lib/htmlReportConceptGuide.js';
 import { buildWatchAudienceNote } from '../lib/watchAudienceCopy.js';
+import { parseCommentIngestLog } from '../lib/commentIngestLog.js';
 import { pickDevMonitorDebugSubset } from '../lib/devMonitorDebugSubset.js';
 import {
   summarizeStoredCommentAvatarStats,
@@ -432,7 +435,7 @@ function setCountDisplay(value, watchSnapshot = null) {
       }
       officialEl.textContent = line;
       officialEl.title =
-        '公式はニコ生が表示する累計コメント件数です。左の大きい数字は、このPCのストレージに残っている行数だけです。コメント欄は仮想リストのため画面上に載っている行しか取り込めず、記録OFFの時間・ページ非表示・タイムシフト開始前・システム行の扱いの差でも件数は並びません。';
+        '公式は配信開始からの累計です。同じタブで見続け、NDGR（ページ内インターセプト）が効いているときは記録が公式にかなり近づく使い方も多いです。途中入室だと入室前の分だけ公式が先に増え、率は一気に低く見えます。左はこのPCのストレージの行数。仮想リスト・記録OFF・非表示タブ・サイト改修・ストレージ上限でも差が出ます。';
     } else {
       officialEl.hidden = true;
       officialEl.textContent = '';
@@ -573,7 +576,9 @@ function isExtensionContextInvalidatedError(err) {
 
 function hasExtensionContext() {
   try {
-    return Boolean(globalThis.chrome?.runtime?.id);
+    return Boolean(
+      globalThis.chrome?.runtime?.id && globalThis.chrome?.storage?.local
+    );
   } catch {
     return false;
   }
@@ -3183,21 +3188,6 @@ function clearStoryGrowthTimer() {
   STORY_GROWTH_STATE.timer = null;
 }
 
-/** @returns {number} */
-function storyGrowthStepDelayMs() {
-  const remain = STORY_GROWTH_STATE.targetCount - STORY_GROWTH_STATE.renderedCount;
-  /*
-   * 1〜4ms/個は「勝手に凄いスピードで動く」原因になる（storage 連打で再開するとさらに酷い）。
-   * 人間が追える程度に抑える（大量件数は時間がかかってよい）。
-   */
-  if (remain > 800) return 22;
-  if (remain > 400) return 28;
-  if (remain > 200) return 34;
-  if (remain > 80) return 42;
-  if (remain > 30) return 55;
-  return 72;
-}
-
 /** @param {number} count */
 function resolveStoryIconSize(count) {
   const total = Math.max(0, Math.floor(Number(count) || 0));
@@ -3396,22 +3386,6 @@ function rebuildStoryGrowth(root, total) {
   root.appendChild(frag);
 }
 
-function runStoryGrowthTick() {
-  STORY_GROWTH_STATE.timer = null;
-  const root = STORY_GROWTH_STATE.root;
-  if (!root) return;
-  if (STORY_GROWTH_STATE.renderedCount >= STORY_GROWTH_STATE.targetCount) return;
-  const nextIndex = STORY_GROWTH_STATE.renderedCount;
-  STORY_GROWTH_STATE.renderedCount += 1;
-  try {
-    root.appendChild(createStoryGrowthCell(true, nextIndex));
-  } catch {
-    /* 1件の DOM 生成失敗でタイマー列が止まらないように */
-  }
-  if (STORY_GROWTH_STATE.renderedCount >= STORY_GROWTH_STATE.targetCount) return;
-  STORY_GROWTH_STATE.timer = window.setTimeout(runStoryGrowthTick, storyGrowthStepDelayMs());
-}
-
 /**
  * @param {string} liveId
  * @param {number} count
@@ -3457,6 +3431,20 @@ function syncStoryGrowth(liveId, count, root) {
     rebuildStoryGrowth(root, STORY_GROWTH_STATE.renderedCount);
   }
 
+  const tgt = STORY_GROWTH_STATE.targetCount;
+  const rnd = STORY_GROWTH_STATE.renderedCount;
+  /*
+   * 以前は setTimeout で1セルずつ追加していたが、開いた直後に「滝」のように見えるため、
+   * 件数が足りないときは常に一括で rebuild する（差分が1件だけでもタイマー列は使わない）。
+   */
+  if (rnd < tgt && tgt > 0) {
+    clearStoryGrowthTimer();
+    rebuildStoryGrowth(root, tgt);
+    STORY_GROWTH_STATE.renderedCount = tgt;
+    patchStoryGrowthIconsFromSource(root, { pulseLast: true });
+    STORY_GROWTH_STATE.sourceSig = storySourceSignature();
+  }
+
   const nextSig = storySourceSignature();
   const needSourceSync =
     STORY_GROWTH_STATE.renderedCount > 0 &&
@@ -3467,11 +3455,7 @@ function syncStoryGrowth(liveId, count, root) {
     patchStoryGrowthIconsFromSource(root, { pulseLast: true });
   }
 
-  if (STORY_GROWTH_STATE.renderedCount < STORY_GROWTH_STATE.targetCount) {
-    if (!STORY_GROWTH_STATE.timer) {
-      STORY_GROWTH_STATE.timer = window.setTimeout(runStoryGrowthTick, 0);
-    }
-  } else if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
+  if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
     root.innerHTML = '';
   }
 }
@@ -3698,19 +3682,9 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
     : 0;
   if (concurrentEstEl) {
     const nowMs = Date.now();
-    const showConcurrent = shouldShowConcurrentEstimate({
-      recentActiveUsers: recentActive,
-      officialViewerCount: snapshot.officialViewerCount,
-      viewerCountFromDom: vc,
-      liveId: snapshot.liveId
-    });
-    const sparseConcurrent = concurrentEstimateIsSparseSignal({
-      recentActiveUsers: recentActive,
-      officialViewerCount: snapshot.officialViewerCount,
-      viewerCountFromDom: vc
-    });
-    // shouldShowConcurrentEstimate が false のときは下の else でスピナー継続（aria-busy）。
-    // 条件は popupConcurrentEstimateGate.js と単体テストを参照（liveId のみ true・指標皆無は false 等）。
+    const { showConcurrent, sparseConcurrent } = watchMetaConcurrentGateFromSnapshot(snapshot);
+    // showConcurrent が false のときは下の else でスピナー継続（aria-busy）。
+    // 条件は popupWatchMetaConcurrentGate.js / popupConcurrentEstimateGate.js の単体テストを参照。
     if (showConcurrent) {
       if (concurrentLoadingEl) concurrentLoadingEl.hidden = true;
       if (concurrentReadyEl) concurrentReadyEl.hidden = false;
@@ -3775,13 +3749,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
 
       /** @type {string[]} */
       const parts = [];
-      if (resolved.method === 'official') {
-        parts.push('watch WebSocket 由来の直接値');
-      } else if (resolved.method === 'nowcast') {
-        parts.push('watch WebSocket の最終値から短期補間');
-      } else {
-        parts.push('コメント/来場者ベースの推定');
-      }
+      parts.push(concurrentResolutionMethodTitlePart(resolved.method));
       if (resolved.freshnessMs != null) {
         parts.push(`更新 ${Math.round(resolved.freshnessMs / 1000)} 秒前`);
       }
@@ -3811,7 +3779,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
       }
       parts.push(`信頼度 ${Math.round(resolved.confidence * 100)}%`);
       if (sparseConcurrent) {
-        parts.push('来場者・統計が未取得のため推定は参考値');
+        parts.push(SPARSE_CONCURRENT_ESTIMATE_NOTE);
       }
       concurrentEstEl.title = parts.join(' | ');
       if (concurrentSubEl) {
@@ -3968,7 +3936,8 @@ function renderTopSupportRankStrip(stripRooms) {
           ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>`
           : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
       const full = escapeAttr(m.fullLabelForTitle);
-      const thumbRp = m.thumbNeedsNoReferrer
+      const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(m.thumbSrc);
+      const thumbRp = isHttpOrHttpsUrl(displayThumb)
         ? ' referrerpolicy="no-referrer"'
         : '';
       const idText = escapeHtml(m.idShort);
@@ -3984,7 +3953,7 @@ function renderTopSupportRankStrip(stripRooms) {
         ${placeHtml}
         <span class="nl-top-support-rank__count">${m.count}件</span>
         <span class="nl-top-support-rank__thumb-wrap">
-          <img class="nl-top-support-rank__thumb" src="${escapeAttr(m.thumbSrc)}" alt="" decoding="async"${thumbRp} />
+          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
         </span>
         <span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>
         <span class="nl-top-support-rank__name">${nameText}</span>
@@ -3992,6 +3961,14 @@ function renderTopSupportRankStrip(stripRooms) {
     })
     .join('');
   strip.innerHTML = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${html}</div>`;
+  const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
+  models.forEach((m, i) => {
+    const img = thumbs[i];
+    if (!(img instanceof HTMLImageElement)) return;
+    if (isHttpOrHttpsUrl(m.thumbSrc)) {
+      storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
+    }
+  });
 }
 
 /**
@@ -4088,8 +4065,11 @@ function renderUserRooms(entries, liveId = '') {
       STORY_GRID_DEFAULT_TILE_IMG,
       STORY_REMOTE_FAILED_PLACEHOLDER_IMG
     );
-    const thumbRp = isHttpOrHttpsUrl(thumbSrc) ? ' referrerpolicy="no-referrer"' : '';
-    const avatarHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(thumbSrc)}" decoding="async"${thumbRp}>`;
+    const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(thumbSrc);
+    const thumbRp = isHttpOrHttpsUrl(displayThumb)
+      ? ' referrerpolicy="no-referrer"'
+      : '';
+    const avatarHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async"${thumbRp}>`;
     const totalPercent = Math.max(6, Math.min(100, (r.count / maxTotal) * 100));
     const recentPercent =
       r.recentCount > 0 ? Math.max(4, Math.min(100, (r.recentCount / maxRecent) * 100)) : 0;
@@ -4134,6 +4114,10 @@ function renderUserRooms(entries, liveId = '') {
       </div>
     `;
     ul.appendChild(li);
+    const avImg = li.querySelector('img.room-card__avatar');
+    if (avImg instanceof HTMLImageElement && isHttpOrHttpsUrl(thumbSrc)) {
+      storyAvatarLoadGuard.noteRemoteAttempt(avImg, thumbSrc);
+    }
   }
 
   if (rankedRooms.length > visibleRooms.length) {
@@ -4568,7 +4552,7 @@ let supportVisualScrollObserver = null;
 
 /**
  * details 展開後、コンテンツ body の高さ変化に追従してスクロール補正する。
- * runStoryGrowthTick によるアイコン追加など連続的な高さ変化にも対応できるよう
+ * 応援ビジュアル展開時の body 高さ変化（アイコングリッドの一括再描画など）にも追従できるよう
  * ResizeObserver で監視し、一定時間後に自動 disconnect する。
  * @param {HTMLDetailsElement|null} details
  */
@@ -6914,13 +6898,15 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
 
 function initPopup() {
   installExtensionContextErrorGuard();
-  void chrome.storage.local.get(KEY_CALM_PANEL_MOTION).then((b) => {
-    applyCalmPanelMotionClass(
-      normalizeCalmPanelMotion(b[KEY_CALM_PANEL_MOTION], {
-        inlineDefault: INLINE_MODE
-      })
-    );
-  });
+  void globalThis.chrome?.storage?.local
+    ?.get(KEY_CALM_PANEL_MOTION)
+    ?.then((b) => {
+      applyCalmPanelMotionClass(
+        normalizeCalmPanelMotion(b[KEY_CALM_PANEL_MOTION], {
+          inlineDefault: INLINE_MODE
+        })
+      );
+    });
   ensureStoryGrowthColorSchemeListener();
   applyResponsivePopupLayout();
   void applyUsageTermsGateState();
@@ -7012,6 +6998,44 @@ function initPopup() {
       }
     } catch {
       if (stEl) stEl.textContent = 'コピーに失敗しました';
+    }
+  });
+
+  $('devMonitorExportIngestBtn')?.addEventListener('click', async () => {
+    const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
+    try {
+      const bag = await chrome.storage.local.get(KEY_COMMENT_INGEST_LOG);
+      const parsed = parseCommentIngestLog(bag[KEY_COMMENT_INGEST_LOG]);
+      const prm = lastDevMonitorPanelParams;
+      const lid = String(prm?.liveId || '').trim().toLowerCase();
+      const items = lid
+        ? parsed.items.filter((x) => x.liveId === lid)
+        : parsed.items;
+      const out = {
+        exportedAt: new Date().toISOString(),
+        filterLiveId: lid || null,
+        itemCount: items.length,
+        totalStored: parsed.items.length,
+        items
+      };
+      const ok = await copyTextToClipboard(JSON.stringify(out, null, 2));
+      if (stEl) {
+        stEl.textContent = ok
+          ? `取り込みログ ${items.length} 件コピー（全体 ${parsed.items.length}）`
+          : 'コピーに失敗しました';
+      }
+    } catch {
+      if (stEl) stEl.textContent = 'コピーに失敗しました';
+    }
+  });
+
+  $('devMonitorClearIngestBtn')?.addEventListener('click', async () => {
+    const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
+    try {
+      await chrome.storage.local.remove(KEY_COMMENT_INGEST_LOG);
+      if (stEl) stEl.textContent = '取り込みログを消去しました';
+    } catch {
+      if (stEl) stEl.textContent = '消去に失敗しました';
     }
   });
 

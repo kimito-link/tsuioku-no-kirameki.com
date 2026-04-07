@@ -19,6 +19,12 @@ export const KEY_STORAGE_WRITE_ERROR = 'nls_storage_write_error';
 /** 記録ON時にコメントパネル DOM が見つからない状態の警告（サイト改修の検知用・PII なし） */
 export const KEY_COMMENT_PANEL_STATUS = 'nls_comment_panel_status';
 
+/**
+ * コメント取り込みの監査ログ（経路・件数のみ、最大件数は commentIngestLog で制限）。
+ * 開発監視から JSON コピー・消去可能。
+ */
+export const KEY_COMMENT_INGEST_LOG = 'nls_comment_ingest_log_v1';
+
 /** 5分ごとの自動バックアップ状態（最終バックアップ時刻など） */
 export const KEY_AUTO_BACKUP_STATE = 'nls_auto_backup_state';
 

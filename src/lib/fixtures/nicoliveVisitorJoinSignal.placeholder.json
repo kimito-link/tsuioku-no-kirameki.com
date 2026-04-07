@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "phase": "B0",
+    "note": "入室・来場の NDGR/WebSocket イベントはプロト名・フィールドが未確定。PII・生 Cookie・フル URL を含めない。観測した断片は hex/base64 の短いサンプルと、マスク済みメタのみを samples に追加する。",
+    "contractDraft": "信号未確定。観測手順: watch で DevTools を開き sessionStorage.setItem('nls_intercept_visitor_probe','1') 実行後リロード。statistics に転送されなかった JSON について、document.documentElement の data-nls-intercept-visitor-probe に type/キー名の要約が溜まる（値は出さない）。再現サンプルはこのファイルの samples に PII なしで追記し、nicoliveVisitorSignalProbe / パーサ TDD に回す。",
+    "probeSessionStorageKey": "nls_intercept_visitor_probe"
+  },
+  "samples": []
+}

@@ -5,7 +5,8 @@
 import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
 import {
   isHttpOrHttpsUrl,
-  isWeakNiconicoUserIconHttpUrl
+  isWeakNiconicoUserIconHttpUrl,
+  niconicoDefaultUserIconUrl
 } from './supportGrowthTileSrc.js';
 
 export const SUPPORT_GRID_TIER_RINK = 'rink';
@@ -16,6 +17,26 @@ export const SUPPORT_GRID_TIER_TANU = 'tanu';
 function goodUserThumbUrl(u) {
   const s = String(u || '').trim();
   return isHttpOrHttpsUrl(s) && !isWeakNiconicoUserIconHttpUrl(s);
+}
+
+/**
+ * りんく段階用: 記録上の URL がある、または「ID から式で組んだだけの canonical usericon URL」以外の https がある。
+ * canonical のみ（未取得・404 でグレー表示になりがち）は個人サムネ「あり」とみなさない。
+ *
+ * @param {string} userId
+ * @param {string} httpAvatarCandidate storyGrowthAvatarSrcCandidate 等
+ * @param {string} storedAvatarUrl entry.avatarUrl
+ */
+export function supportGridTierHasPersonalThumb(userId, httpAvatarCandidate, storedAvatarUrl) {
+  const u = String(userId || '').trim();
+  const http = String(httpAvatarCandidate ?? '').trim();
+  const raw = String(storedAvatarUrl ?? '').trim();
+  const syn =
+    u && /^\d{5,14}$/.test(u) ? String(niconicoDefaultUserIconUrl(u) || '').trim() : '';
+
+  if (goodUserThumbUrl(raw)) return true;
+  if (goodUserThumbUrl(http) && (!syn || http !== syn)) return true;
+  return false;
 }
 
 /**
@@ -52,8 +73,7 @@ export function supportGridDisplayTier(p) {
   else {
     const httpCandidate = String(p.httpAvatarCandidate ?? '').trim();
     const rawAv = String(p.storedAvatarUrl ?? '').trim();
-    hasThumb =
-      goodUserThumbUrl(httpCandidate) || goodUserThumbUrl(rawAv);
+    hasThumb = supportGridTierHasPersonalThumb(uid, httpCandidate, rawAv);
   }
 
   const nick = String(p?.nickname ?? '').trim();

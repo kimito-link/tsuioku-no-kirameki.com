@@ -174,14 +174,25 @@ describe('parseNicoLiveTableRow', () => {
     expect(parseNicoLiveTableRow(w.querySelector('.table-row'))).toBeNull();
   });
 
-  it('番号が10桁超は拒否（1〜9桁）', () => {
-    const w = document.createElement('div');
-    w.innerHTML = `
+  it('番号は1〜12桁まで受理（長時間配信の commentNo）、13桁以上は拒否', () => {
+    const ok = document.createElement('div');
+    ok.innerHTML = `
       <div class="table-row" data-comment-type="normal">
         <span class="comment-number">1234567890</span>
-        <span class="comment-text">overflow</span>
+        <span class="comment-text">ten digits</span>
       </div>`;
-    expect(parseNicoLiveTableRow(w.querySelector('.table-row'))).toBeNull();
+    expect(parseNicoLiveTableRow(ok.querySelector('.table-row'))).toEqual({
+      commentNo: '1234567890',
+      text: 'ten digits',
+      userId: null
+    });
+    const bad = document.createElement('div');
+    bad.innerHTML = `
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">1234567890123</span>
+        <span class="comment-text">too long</span>
+      </div>`;
+    expect(parseNicoLiveTableRow(bad.querySelector('.table-row'))).toBeNull();
   });
 
   it('generalSystemMessage でも comment-number が空なら null', () => {

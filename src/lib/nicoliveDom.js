@@ -3,8 +3,8 @@
  * ニコ生 watch ページのコメント一覧からの抽出（セレクタは実機で要調整）
  */
 
-/** 行頭: コメント番号 + 空白 + 本文 */
-const LINE_HEAD = /^(\d{1,8})\s+([\s\S]+)$/;
+/** 行頭: コメント番号 + 空白 + 本文（table-row 側と桁を揃え長時間配信でも落とさない） */
+const LINE_HEAD = /^(\d{1,12})\s+([\s\S]+)$/;
 
 /**
  * プレーンテキスト1行から { commentNo, text } を試す
@@ -802,7 +802,7 @@ export function parseNicoLiveTableRow(el) {
   if (!numEl || !textEl) return null;
 
   const commentNo = String(numEl.textContent || '').replace(/\s+/g, '').trim();
-  if (!commentNo || !/^\d{1,9}$/.test(commentNo)) return null;
+  if (!commentNo || !/^\d{1,12}$/.test(commentNo)) return null;
 
   const text = String(textEl.textContent || '')
     .replace(/\u00a0/g, ' ')

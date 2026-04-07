@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildWatchAudienceNote } from './watchAudienceCopy.js';
+import { concurrentResolutionMethodTitlePart } from './watchConcurrentEstimateUiCopy.js';
 
 describe('buildWatchAudienceNote', () => {
   it('本文に [DEBUG] / FIBER / POLL / FETCH 等を含まない（_debug 付きでも）', () => {
@@ -41,6 +42,15 @@ describe('buildWatchAudienceNote', () => {
     expect(body).toContain('https://nicodb.net/');
     expect(body).toMatch(/来場者数|累計視聴/);
     expect(body).toMatch(/別定義|応援コメント/);
+  });
+
+  it('観客メモの「推定同時接続」と、公式直接同接ツールチップ文言を混同しない', () => {
+    const { body, title } = buildWatchAudienceNote({ snapshot: {} });
+    expect(body).toContain('推定同時接続');
+    expect(title).toContain('推定同時接続');
+    const officialTip = concurrentResolutionMethodTitlePart('official');
+    expect(officialTip).toMatch(/直接|WebSocket/);
+    expect(officialTip).not.toContain('来場者');
   });
 
   it('空スナップショットでも落ちず、説明文を返す', () => {

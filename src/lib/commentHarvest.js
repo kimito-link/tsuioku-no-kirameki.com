@@ -7,8 +7,9 @@ import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
 /**
  * 仮想リスト走査のステップ幅（ホストの clientHeight に対する比率）。
  * 大きいほど速いがウィンドウ同士の重なりが減り、取りこぼしが増えやすい。
+ * ニコ生の仮想リストは 0.5 付近でも取りこぼすことがあるためやや密にする。
  */
-export const HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO = 0.58;
+export const HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO = 0.46;
 
 /**
  * 同一コメント（commentNo + text）について、スクロール位置ごとの抽出結果をマージする。

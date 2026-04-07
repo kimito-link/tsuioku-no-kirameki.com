@@ -495,6 +495,45 @@
     return { enqueues, learnUsers };
   }
 
+  // src/lib/interceptVisitorProbeDebug.js
+  var INTERCEPT_VISITOR_PROBE_SESSION_KEY = "nls_intercept_visitor_probe";
+  var _ring = [];
+  function isInterceptVisitorProbeDebugEnabled() {
+    try {
+      if (typeof sessionStorage === "undefined") return false;
+      return sessionStorage.getItem(INTERCEPT_VISITOR_PROBE_SESSION_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+  function formatInterceptJsonProbeSnippet(obj) {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return "";
+    const o = (
+      /** @type {Record<string, unknown>} */
+      obj
+    );
+    const type = typeof o.type === "string" ? o.type : "";
+    const keys = Object.keys(o).slice(0, 12);
+    const parts = [`type=${type || "-"}`, `keys=${keys.join(",")}`];
+    if (o.data && typeof o.data === "object" && !Array.isArray(o.data)) {
+      const dk = Object.keys(
+        /** @type {Record<string, unknown>} */
+        o.data
+      ).slice(0, 10);
+      parts.push(`dataKeys=${dk.join(",")}`);
+    }
+    return parts.join("|").slice(0, 200);
+  }
+  function recordUnforwardedInterceptJsonForProbe(obj, options = {}) {
+    const { maxRing = 8 } = options;
+    if (!isInterceptVisitorProbeDebugEnabled()) return null;
+    const s = formatInterceptJsonProbeSnippet(obj);
+    if (!s) return null;
+    _ring.push(`${Date.now() % 1e8}:${s}`);
+    if (_ring.length > maxRing) _ring = _ring.slice(-maxRing);
+    return _ring.join(" ;; ");
+  }
+
   // src/extension/page-intercept-entry.js
   (() => {
     "use strict";
@@ -809,7 +848,7 @@
       return null;
     }
     function tryForwardStatistics(obj) {
-      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false;
       const o = (
         /** @type {Record<string, unknown>} */
         obj
@@ -825,11 +864,18 @@
         viewers = pickNum(o, VIEWER_KEYS, 5e7);
         comments = comments ?? pickNum(o, COMMENT_KEYS);
       }
-      if (viewers == null) return;
+      if (viewers == null) return false;
       window.postMessage(
         { type: MSG_STATISTICS, viewers, comments },
         "*"
       );
+      return true;
+    }
+    function maybeRecordInterceptVisitorProbe(parsed) {
+      const snippet = recordUnforwardedInterceptJsonForProbe(parsed);
+      if (!snippet) return;
+      const root = document.documentElement;
+      if (root) root.setAttribute("data-nls-intercept-visitor-probe", snippet);
     }
     let _scheduleSent = false;
     function tryForwardSchedule(obj) {
@@ -857,7 +903,7 @@
         if (raw.length < 4 || raw.length > 1e6) return;
         try {
           const parsed = JSON.parse(raw);
-          tryForwardStatistics(parsed);
+          if (!tryForwardStatistics(parsed)) maybeRecordInterceptVisitorProbe(parsed);
           tryForwardSchedule(parsed);
           dig(parsed, 0);
         } catch {
@@ -955,7 +1001,7 @@
                       if (text.length > 3 && text.length < 5e5) {
                         try {
                           const j = JSON.parse(text);
-                          tryForwardStatistics(j);
+                          if (!tryForwardStatistics(j)) maybeRecordInterceptVisitorProbe(j);
                           dig(j, 0);
                         } catch {
                         }
@@ -1012,8 +1058,9 @@
                     return;
                   }
                   if (rt === "json") {
-                    tryForwardStatistics(this.response);
-                    dig(this.response, 0);
+                    const res = this.response;
+                    if (!tryForwardStatistics(res)) maybeRecordInterceptVisitorProbe(res);
+                    dig(res, 0);
                     return;
                   }
                   if (rt === "arraybuffer" && this.response) {

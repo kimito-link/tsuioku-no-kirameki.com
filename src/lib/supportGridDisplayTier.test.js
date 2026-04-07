@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { niconicoDefaultUserIconUrl } from './supportGrowthTileSrc.js';
 import {
   SUPPORT_GRID_TIER_RINK,
   SUPPORT_GRID_TIER_KONTA,
   SUPPORT_GRID_TIER_TANU,
   supportGridDisplayTier,
-  supportGridStrongNickname
+  supportGridStrongNickname,
+  supportGridTierHasPersonalThumb
 } from './supportGridDisplayTier.js';
 
 describe('supportGridStrongNickname', () => {
@@ -100,5 +102,40 @@ describe('supportGridDisplayTier', () => {
           'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/xx.jpg'
       })
     ).toBe(SUPPORT_GRID_TIER_KONTA);
+  });
+
+  it('強いニックでも候補が ID 式の canonical usericon のみなら rink にしない（グレー混入防止）', () => {
+    const uid = '124172391';
+    const syn = niconicoDefaultUserIconUrl(uid);
+    expect(syn).toContain('/124172391.jpg');
+    expect(
+      supportGridDisplayTier({
+        userId: uid,
+        nickname: 'ぱん',
+        httpAvatarCandidate: syn,
+        storedAvatarUrl: ''
+      })
+    ).toBe(SUPPORT_GRID_TIER_KONTA);
+  });
+
+});
+
+describe('supportGridTierHasPersonalThumb', () => {
+  it('記録 URL が無く候補が合成 canonical のみなら false', () => {
+    const uid = '88210441';
+    const syn = niconicoDefaultUserIconUrl(uid);
+    expect(
+      supportGridTierHasPersonalThumb(uid, syn, '')
+    ).toBe(false);
+  });
+
+  it('example.com のような非 canonical は true', () => {
+    expect(
+      supportGridTierHasPersonalThumb(
+        '88210441',
+        'https://example.com/u.jpg',
+        ''
+      )
+    ).toBe(true);
   });
 });

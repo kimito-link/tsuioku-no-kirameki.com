@@ -66,7 +66,7 @@ function clamp(value, min, max) {
  * @param {number|undefined|null} officialViewerIntervalMs
  * @returns {{ freshMs: number, nowcastMaxMs: number }}
  */
-function resolveDirectViewersThresholds(officialViewerIntervalMs) {
+export function resolveDirectViewersThresholds(officialViewerIntervalMs) {
   const hinted =
     typeof officialViewerIntervalMs === 'number' &&
     Number.isFinite(officialViewerIntervalMs) &&

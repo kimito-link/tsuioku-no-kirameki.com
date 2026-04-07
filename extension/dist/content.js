@@ -69,6 +69,7 @@
   var KEY_LAST_WATCH_URL = "nls_last_watch_url";
   var KEY_STORAGE_WRITE_ERROR = "nls_storage_write_error";
   var KEY_COMMENT_PANEL_STATUS = "nls_comment_panel_status";
+  var KEY_COMMENT_INGEST_LOG = "nls_comment_ingest_log_v1";
   var KEY_AUTO_BACKUP_STATE = "nls_auto_backup_state";
   var KEY_POPUP_FRAME = "nls_popup_frame";
   var KEY_POPUP_FRAME_CUSTOM = "nls_popup_frame_custom";
@@ -795,7 +796,7 @@
   }
 
   // src/lib/nicoliveDom.js
-  var LINE_HEAD = /^(\d{1,8})\s+([\s\S]+)$/;
+  var LINE_HEAD = /^(\d{1,12})\s+([\s\S]+)$/;
   function parseCommentLineText(text) {
     const t = String(text || "").replace(/\r\n/g, "\n").trim();
     if (!t) return null;
@@ -1374,7 +1375,7 @@
     const textEl = row.querySelector(".comment-text");
     if (!numEl || !textEl) return null;
     const commentNo = String(numEl.textContent || "").replace(/\s+/g, "").trim();
-    if (!commentNo || !/^\d{1,9}$/.test(commentNo)) return null;
+    if (!commentNo || !/^\d{1,12}$/.test(commentNo)) return null;
     const text = String(textEl.textContent || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
     if (!text) return null;
     const userId = resolveUserIdForNicoLiveCommentRow(row);
@@ -1760,7 +1761,7 @@
   }
 
   // src/lib/commentHarvest.js
-  var HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO = 0.58;
+  var HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO = 0.46;
   function mergeVirtualHarvestRows(prev, next) {
     const uidN = String(next.userId ?? "").trim();
     const uidP = String(prev.userId ?? "").trim();
@@ -2268,6 +2269,96 @@
     };
   }
 
+  // src/lib/commentIngestLog.js
+  var COMMENT_INGEST_LOG_VERSION = 1;
+  var COMMENT_INGEST_LOG_MAX_ITEMS = 500;
+  var INGEST_LOG_HF_SOURCES = (
+    /** @type {ReadonlySet<string>} */
+    /* @__PURE__ */ new Set(["ndgr", "visible"])
+  );
+  var COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS = 5e3;
+  var COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS = 4e3;
+  var INGEST_LOG_ALWAYS_LOG_ADDED = 5;
+  var INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA = 10;
+  function parseCommentIngestLog(raw) {
+    if (!raw || typeof raw !== "object") {
+      return { v: COMMENT_INGEST_LOG_VERSION, items: [] };
+    }
+    const o = (
+      /** @type {Record<string, unknown>} */
+      raw
+    );
+    const v = Number(o.v) || COMMENT_INGEST_LOG_VERSION;
+    const items = Array.isArray(o.items) ? o.items : [];
+    const out = [];
+    for (const x of items) {
+      if (!x || typeof x !== "object") continue;
+      const it = (
+        /** @type {Record<string, unknown>} */
+        x
+      );
+      const t = Number(it.t);
+      if (!Number.isFinite(t)) continue;
+      const liveId2 = String(it.liveId || "").trim().toLowerCase();
+      if (!liveId2) continue;
+      const source = String(it.source || "unknown").slice(0, 32);
+      const batchIn = Math.max(0, Math.floor(Number(it.batchIn) || 0));
+      const added = Math.max(0, Math.floor(Number(it.added) || 0));
+      const totalAfter = Math.max(0, Math.floor(Number(it.totalAfter) || 0));
+      let official = null;
+      if (it.official != null && Number.isFinite(Number(it.official))) {
+        const oc = Math.floor(Number(it.official));
+        official = oc >= 0 ? oc : null;
+      }
+      out.push({ t, liveId: liveId2, source, batchIn, added, totalAfter, official });
+    }
+    return { v, items: out };
+  }
+  function appendCommentIngestLog(prevRaw, entry, maxItems = COMMENT_INGEST_LOG_MAX_ITEMS) {
+    const base = parseCommentIngestLog(prevRaw);
+    const cap = Math.max(16, Math.min(5e3, Math.floor(maxItems)));
+    const official = entry.official != null && Number.isFinite(Number(entry.official)) ? Math.max(0, Math.floor(Number(entry.official))) : null;
+    const row = {
+      t: Math.max(0, Math.floor(Number(entry.t) || Date.now())),
+      liveId: String(entry.liveId || "").trim().toLowerCase(),
+      source: String(entry.source || "unknown").slice(0, 32),
+      batchIn: Math.max(0, Math.floor(Number(entry.batchIn) || 0)),
+      added: Math.max(0, Math.floor(Number(entry.added) || 0)),
+      totalAfter: Math.max(0, Math.floor(Number(entry.totalAfter) || 0)),
+      official
+    };
+    const nextItems = [...base.items, row].slice(-cap);
+    return { v: COMMENT_INGEST_LOG_VERSION, items: nextItems };
+  }
+  function maybeAppendCommentIngestLog(prevRaw, entry, maxItems = COMMENT_INGEST_LOG_MAX_ITEMS) {
+    const base = parseCommentIngestLog(prevRaw);
+    const lid = String(entry.liveId || "").trim().toLowerCase();
+    const src = String(entry.source || "unknown").slice(0, 32);
+    const t = Math.max(0, Math.floor(Number(entry.t) || Date.now()));
+    const added = Math.max(0, Math.floor(Number(entry.added) || 0));
+    const totalAfter = Math.max(0, Math.floor(Number(entry.totalAfter) || 0));
+    if (!INGEST_LOG_HF_SOURCES.has(src)) {
+      return appendCommentIngestLog(prevRaw, entry, maxItems);
+    }
+    const minMs = src === "ndgr" ? COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS : COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS;
+    let prevSame = null;
+    for (let i = base.items.length - 1; i >= 0; i--) {
+      const it = base.items[i];
+      if (it.liveId === lid && it.source === src) {
+        prevSame = it;
+        break;
+      }
+    }
+    if (prevSame) {
+      const dt = t - prevSame.t;
+      const totalDelta = totalAfter - prevSame.totalAfter;
+      if (dt >= 0 && dt < minMs && added < INGEST_LOG_ALWAYS_LOG_ADDED && totalDelta >= 0 && totalDelta < INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA) {
+        return null;
+      }
+    }
+    return appendCommentIngestLog(prevRaw, entry, maxItems);
+  }
+
   // src/extension/content-entry.js
   var DEBOUNCE_MS = 140;
   var LIVE_POLL_MS = 4e3;
@@ -2275,9 +2366,11 @@
   var LIVE_PANEL_SCAN_MS = 800;
   var DEEP_HARVEST_DELAY_MS = 1200;
   var DEEP_HARVEST_QUIET_UI_MS = 3200;
-  var DEEP_HARVEST_SCROLL_WAIT_MS = 55;
+  var DEEP_HARVEST_SCROLL_WAIT_MS = 72;
+  var DEEP_HARVEST_SCROLL_STEP_RATIO = 0.38;
   var DEEP_HARVEST_SECOND_PASS_GAP_MS = 180;
-  var DEEP_HARVEST_PERIODIC_MS = 12 * 60 * 1e3;
+  var DEEP_HARVEST_PERIODIC_MS = 5 * 60 * 1e3;
+  var DEEP_HARVEST_STABILITY_FOLLOWUP_MS = 75e3;
   var DEEP_HARVEST_LOADING_HOST_ID = "nl-deep-harvest-loading";
   var DEEP_HARVEST_LOADING_IMG_PATH = "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png";
   var BOOTSTRAP_DELAYS_MS = [400, 2e3, 4500];
@@ -2596,7 +2689,7 @@
   var ACTIVE_USER_MAP_MAX = 12e3;
   var interceptedNicknames = /* @__PURE__ */ new Map();
   var interceptedAvatars = /* @__PURE__ */ new Map();
-  var INTERCEPT_MAP_MAX = 8e3;
+  var INTERCEPT_MAP_MAX = 5e4;
   var ndgrChatRowsPending = [];
   var ndgrChatRowsFlushTimer = null;
   var NDGR_CHAT_ROWS_FLUSH_MS = 150;
@@ -2648,7 +2741,7 @@
       const n = String(r.nickname || "").trim();
       if (u && n) interceptedNicknames.set(u, n);
     }
-    await persistCommentRows(merged);
+    await persistCommentRows(merged, { source: "ndgr" });
   }
   function schedulePersistNdgrChatRows(rows) {
     if (!Array.isArray(rows) || !rows.length) return;
@@ -3399,7 +3492,7 @@
   }
   function hasExtensionContext() {
     try {
-      return Boolean(chrome?.runtime?.id);
+      return Boolean(chrome?.runtime?.id && chrome?.storage?.local);
     } catch {
       return false;
     }
@@ -4490,16 +4583,16 @@
     return state;
   }
   var persistCommentRowsChain = Promise.resolve();
-  async function persistCommentRows(rows) {
+  async function persistCommentRows(rows, opts = {}) {
     if (!rows?.length || !recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
       return;
     }
-    const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(rows));
+    const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(rows, opts));
     persistCommentRowsChain = job.catch(() => {
     });
     await job;
   }
-  async function persistCommentRowsImpl(rows) {
+  async function persistCommentRowsImpl(rows, opts = {}) {
     if (!rows?.length || !recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
       return;
     }
@@ -4513,7 +4606,8 @@
           KEY_SELF_POSTED_RECENTS,
           KEY_AUTO_BACKUP_STATE,
           KEY_LAST_WATCH_URL,
-          KEY_USER_COMMENT_PROFILE_CACHE
+          KEY_USER_COMMENT_PROFILE_CACHE,
+          KEY_COMMENT_INGEST_LOG
         ]),
         { attempts: 4, delaysMs: [0, 50, 120, 280] }
       );
@@ -4560,6 +4654,19 @@
       profileMap = pruneUserCommentProfileMap(profileMap);
       if (Object.keys(profileMap).length !== profileKeysBefore) cacheTouched = true;
       if (!storageTouched && !pendingTouched && !cacheTouched) return;
+      let ingestLogPayload = null;
+      if (storageTouched || pendingTouched) {
+        const src = String(opts?.source || "unknown").slice(0, 32);
+        ingestLogPayload = maybeAppendCommentIngestLog(bag[KEY_COMMENT_INGEST_LOG], {
+          t: Date.now(),
+          liveId: String(liveId || "").trim().toLowerCase(),
+          source: src,
+          batchIn: rows.length,
+          added: added.length,
+          totalAfter: next.length,
+          official: officialCommentCount != null && Number.isFinite(officialCommentCount) ? Math.floor(officialCommentCount) : null
+        });
+      }
       const updatedAt = Date.now();
       const lastCommentAt = Math.max(0, Number(next[next.length - 1]?.capturedAt || 0));
       const rememberedWatchUrl = String(bag[KEY_LAST_WATCH_URL] || "").trim();
@@ -4585,6 +4692,7 @@
         await chrome.storage.local.set({
           [key]: next,
           [KEY_AUTO_BACKUP_STATE]: autoBackupState,
+          ...ingestLogPayload ? { [KEY_COMMENT_INGEST_LOG]: ingestLogPayload } : {},
           ...pendingTouched ? { [KEY_SELF_POSTED_RECENTS]: { items: consumed.remainingItems } } : {},
           ...cacheTouched ? { [KEY_USER_COMMENT_PROFILE_CACHE]: profileMap } : {}
         });
@@ -4652,6 +4760,7 @@
         void clearCommentHarvestPanelDiagnostic();
         pendingRoots.clear();
         clearNdgrChatRowsPending();
+        resetDeepHarvestStabilityFollowUp();
         interceptedUsers.clear();
         interceptedNicknames.clear();
         interceptedAvatars.clear();
@@ -4690,6 +4799,7 @@
         void clearCommentHarvestPanelDiagnostic();
         pendingRoots.clear();
         clearNdgrChatRowsPending();
+        resetDeepHarvestStabilityFollowUp();
         interceptedUsers.clear();
         interceptedNicknames.clear();
         interceptedAvatars.clear();
@@ -4748,7 +4858,7 @@
     }
     pendingRoots.clear();
     if (!rows.length) return;
-    await persistCommentRows(rows);
+    await persistCommentRows(rows, { source: "mutation" });
   }
   function scheduleFlush() {
     if (!recording || !liveId) return;
@@ -4760,6 +4870,15 @@
     }, DEBOUNCE_MS);
   }
   var deepHarvestTimer = null;
+  var deepHarvestStabilityFollowUpTimer = null;
+  var deepHarvestStabilityFollowUpScheduled = false;
+  function resetDeepHarvestStabilityFollowUp() {
+    if (deepHarvestStabilityFollowUpTimer != null) {
+      clearTimeout(deepHarvestStabilityFollowUpTimer);
+      deepHarvestStabilityFollowUpTimer = null;
+    }
+    deepHarvestStabilityFollowUpScheduled = false;
+  }
   function removeDeepHarvestLoadingUi() {
     try {
       document.getElementById(DEEP_HARVEST_LOADING_HOST_ID)?.remove();
@@ -4824,6 +4943,7 @@
       clearTimeout(deepHarvestTimer);
       deepHarvestTimer = null;
     }
+    resetDeepHarvestStabilityFollowUp();
     removeDeepHarvestLoadingUi();
   }
   function scheduleDeepHarvest(reason) {
@@ -4864,9 +4984,10 @@
         extractCommentsFromNode,
         waitMs: DEEP_HARVEST_SCROLL_WAIT_MS,
         twoPass: true,
-        twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS
+        twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS,
+        scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO
       });
-      await persistCommentRows(rows);
+      await persistCommentRows(rows, { source: "deep" });
       deepHarvestPipelineStats.lastCompletedAt = Date.now();
       deepHarvestPipelineStats.lastRowCount = rows.length;
       deepHarvestPipelineStats.runCount += 1;
@@ -4875,6 +4996,15 @@
       deepHarvestPipelineStats.lastError = true;
     } finally {
       harvestRunning = false;
+      if (!deepHarvestPipelineStats.lastError && recording && liveId && locationAllowsCommentRecording() && !deepHarvestStabilityFollowUpScheduled) {
+        deepHarvestStabilityFollowUpScheduled = true;
+        deepHarvestStabilityFollowUpTimer = setTimeout(() => {
+          deepHarvestStabilityFollowUpTimer = null;
+          if (recording && liveId && locationAllowsCommentRecording()) {
+            void runDeepHarvest();
+          }
+        }, DEEP_HARVEST_STABILITY_FOLLOWUP_MS);
+      }
     }
   }
   var COMMENT_PANEL_MISS_THRESHOLD = 5;
@@ -4934,7 +5064,7 @@
     const panel = findNicoCommentPanel(document);
     const root = panel || document.body;
     const rows = extractCommentsFromNode(root);
-    void persistCommentRows(rows);
+    void persistCommentRows(rows, { source: "visible" });
     void syncCommentHarvestPanelStatus();
   }
   function attachCommentScrollHook() {
