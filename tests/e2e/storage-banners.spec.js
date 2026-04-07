@@ -1,6 +1,5 @@
 import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
-
-const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
+import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 const KEY_STORAGE_WRITE_ERROR = 'nls_storage_write_error';
 const KEY_COMMENT_PANEL_STATUS = 'nls_comment_panel_status';

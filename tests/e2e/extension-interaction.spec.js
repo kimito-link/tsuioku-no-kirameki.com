@@ -1,6 +1,5 @@
 import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
-
-const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
+import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
 const INLINE_IFRAME_ID = 'nls-inline-popup-iframe';
 const KEY_RECORDING = 'nls_recording_enabled';

@@ -32,7 +32,11 @@ npm run build
 1. **`npm run verify`** が通っていること（上記「開発」）。  
 2. **`chrome://extensions`** で nicolivelog を **再読み込み**（ピン留めするとアイコンが出やすい）。  
 3. **パターン A（本番）**: `https://live.nicovideo.jp/watch/lv...` を開く → ポップアップで記録 ON → 件数が `-` から増えるか、コメント一覧を少しスクロールして再確認。  
-4. **パターン B（モック・ログイン不要）**: 別ターミナルで `npx serve tests/e2e/fixtures -l 3456` を起動し、`http://127.0.0.1:3456/watch/lv888888888/` を開く → 記録 ON → 件数が増えるか確認（または `npm run test:e2e` で同経路を自動確認）。  
+4. **パターン B（モック・ログイン不要）**: 別ターミナルで下記のいずれかで静的サーバを起動し、`http://127.0.0.1:3456/watch/lv888888888/` を開く → 記録 ON → 件数が増えるか確認（または `npm run test:e2e` / CI 相当の `npx playwright test` で同経路を自動確認）。  
+   - **推奨（Playwright と同じ前提）**: リポジトリルートで  
+     `npx serve tests/e2e/fixtures -l tcp://127.0.0.1:3456 --no-port-switching`  
+     `3456` が埋まっていると **別ポートに逃げず失敗**するため、古い `serve` や別アプリが掴んでいないか確認する。  
+   - **代替**: `cd tests/e2e/fixtures` のうえで `npx serve . -l tcp://127.0.0.1:3456 --no-port-switching`（相対パスはカレント依存なので、うまくいかないときは上の1行を使う）。  
 5. **開発者ツール**: 拡張の service worker または watch ページ上で **Application → Storage → Extension**（または該当拡張のストレージ）に `nls_recording_enabled` / `nls_comments_lv...` があるか。  
 6. **JSON エクスポート**: 件数が 1 以上で「JSONをダウンロード」が押せるか。  
 7. 保存に失敗したとき、ポップアップに **赤系の保存エラー表示**が出るか（容量超過などの再現は難しい場合あり）。
@@ -53,11 +57,21 @@ npm run build
 ```bash
 npm run playwright:install   # 初回のみ Chromium を取得
 npm run test:e2e             # ビルド後、headed Chromium で実行（画面が開きます）
+npm run test:e2e:smoke-monkey # スモーク + ポップアップモンキーだけ（同上・ヘッド付き）
 ```
 
-- GitHub Actions では **xvfb** 上で `playwright test` を実行するジョブ（`.github/workflows/ci.yml` の `e2e`）があります。ローカルでビルド済みなら `npm run test:e2e:ci` で E2E のみ実行できます。
+- GitHub Actions では **xvfb** 上で `playwright test` を実行するジョブ（`.github/workflows/ci.yml` の `e2e`）があります。**`test-and-build`（`npm run verify`）が成功したあと**にだけ E2E が走ります。ローカルでビルド済みなら `npm run test:e2e:ci` で E2E のみ実行できます。
 - 手元で E2E を省略するときは `SKIP_E2E=1 npm run test:e2e` でスキップできます。
 - 拡張の読み込み都合で **headless 非対応**のため、ローカルではウィンドウが表示されます。
+
+#### 手動でモックサーバだけ立てるとき（E2E 以外の確認用）
+
+Playwright が起動する設定と揃えると取り違えが減ります。
+
+- コマンド例（ルートから）:  
+  `npx serve tests/e2e/fixtures -l tcp://127.0.0.1:3456 --no-port-switching`
+- **`--no-port-switching`**: 既定の `serve` はポート占有時に**別ポートへ自動退避**します。ブラウザやテストは `3456` 固定で繋ぐため、**見えているページと実際のサーバがずれる**ことがあります。手動・Playwright ともこのフラグで「3456 で取れなければ失敗」にします。
+- モック URL・`tabs.query` 用パターンはテスト側の単一ソース [`tests/e2e/constants.js`](tests/e2e/constants.js) と、マニフェストの `host_permissions`（`http://127.0.0.1:3456/*`）と一致させてあります。
 
 ## 拡張機能の読み込み
 
@@ -85,7 +99,7 @@ npm run test:e2e             # ビルド後、headed Chromium で実行（画面
 
 ### 権限（セキュリティメモ）
 
-- マニフェストの `permissions` は **`storage`・`scripting`・`downloads`・`alarms`**（`tabs` は付与していない）。`scripting` はページ側フックやタブ操作に、`downloads` は JSON エクスポートに、`alarms` はバックグラウンドの定期処理に使います。
+- マニフェストの `permissions` は **`storage`・`unlimitedStorage`・`scripting`・`downloads`・`alarms`・`tabs`・`sidePanel`**（現行 `extension/manifest.json` と一致させること）。`tabs` はアクティブタブの URL 取得などに、`scripting` はページ側フックに、`downloads` は JSON エクスポートに、`alarms` はバックグラウンドの定期処理に使います。
 - ポップアップが `chrome.tabs.query` でアクティブタブの URL を読むときは、**`host_permissions` に一致するオリジン**（例: `https://live.nicovideo.jp/*` および E2E 用 `http://127.0.0.1:3456/*`）上のタブであれば URL を取得できます。一致しないタブでは URL が空になることがあり、その場合はコンテンツスクリプトが保存する **`nls_last_watch_url`** で件数・エクスポート対象を補います。
 - `chrome.storage.local` の容量を超えたなどで保存に失敗すると **`nls_storage_write_error`** が立ち、ポップアップに警告が出ます。成功した書き込みのあとに自動で消えます。記録中にコメントパネル DOM が見つからない場合は **`nls_comment_panel_status`** で警告できます（サイト改修の検知用）。
 

@@ -1,0 +1,89 @@
+---
+description: AI汎用ルール（github/AI汎用ルール）を nicolivelog に最適化した要約。実装・レビュー時に従う。
+alwaysApply: true
+---
+
+# nicolivelog × AI汎用ルール（要約）
+
+## 汎用ルールの場所（詳細はここを開く）
+
+リポジトリ **nicolivelog** と同階層の **`AI汎用ルール/`**（例: `.../Resilio/github/AI汎用ルール`）に長文テンプレとワークフローがある。必要に応じて参照する。
+
+| 種別 | パス（汎用ルール内） |
+|------|----------------------|
+| 開発フロー・実装/レビュー分離 | `docs/workflows/ai-development-workflow.md` |
+| デプロイ前チェック・CI 失敗時 | `docs/workflows/FULL_ACTION_CHECK_WORKFLOW.md` |
+| 書き換え禁止・最小修正 | `docs/policies/DO_NOT_REWRITE.md` |
+| トークン・秘密情報 | `docs/policies/TOKEN_SECURITY_POLICY.md` |
+| CSS `!important` | `docs/policies/CSS_NO_IMPORTANT.md` |
+| コンポーネント分割の度合い | `docs/policies/COMPONENTIZATION_POLICY.md` |
+| 配色コントラスト（WCAG） | `CSS_COLOR_CONTRAST.md`（ルート） |
+
+ここでは **このプロジェクトで効く範囲**だけ固定する。
+
+## 書き換え方針（DO_NOT_REWRITE）
+
+- 動いていたパスを、理由なく別実装に置き換えない。
+- 不具合は **原因特定 → 最小差分で復旧**。アーキテクチャ変更はユーザーが明示したときのみ。
+- マニフェスト・`chrome.storage` キー・メッセージ型（`NLS_*`）は互換を壊しやすいので慎重に。
+
+## セキュリティ（TOKEN_SECURITY の適用）
+
+- API キー・トークン・Cookie をコードやコミットに埋め込まない。ログ・エラー出力・テストデータに含めない。
+- 必要なら **環境変数やローカル設定**で注入し、スクリプト内でだけ使う想定にする。
+- 目的が曖昧なときは、外部 API やシークレット操作を勝手に追加しない。
+
+## CSS（CSS_NO_IMPORTANT）
+
+- **新規スタイルでは `!important` を使わない。** 詳細度・読み込み順・クラス追加・CSS 変数で上書きする。
+- 既存の `popup.html` / content 注入スタイルに既にある `!important` は、**ニコ生 DOM との競合で必要なことが多い**。削るときは必ず理由と表示確認をセットにする。
+
+## アクセシビリティ・配色（CSS_COLOR_CONTRAST の短縮版）
+
+- ポップアップ・ページ注入 UI の **新規の文字色・背景色**は、可能な範囲で **WCAG AA（通常テキスト 4.5:1）** を意識する。薄背景＋薄字、`opacity` で潰した本文、低コントラストの `::placeholder` を増やさない。
+- 詳細・検証の考え方は汎用ルールの **`CSS_COLOR_CONTRAST.md`** を参照。
+
+## コンポーネント化（COMPONENTIZATION）
+
+- 変わる・再利用する部分だけ切り出す。静的な骨格を過剰に抽象化しない。
+- 拡張の `popup.html` は巨大でも、**無理にフレームワーク分割しない**（差分とリスクが増える）。
+
+## このリポジトリ固有
+
+- ソースの正は **`src/extension/*.js` と `src/lib/`**。バンドル成果物は **`npm run build`** で `extension/dist/` に出す。**`dist/*.js` を手で編集しない。**
+- マージ前は **`npm run verify`**（`test` + `lint` + `typecheck` + `build`）を推奨。CI の `test-and-build` ジョブもこれと同等。
+- 変更後は最低 **`npm test`**。拡張まわりを触ったら **`npm run build`** も推奨。
+- ユーザー向けルール: 日本語で返答。余計なドキュメントファイルを勝手に増やさない（依頼時のみ）。
+
+## デプロイ前・CI（FULL_ACTION_CHECK の nicolivelog 版）
+
+- **テストが通らない状態で次に進めない**（可能な範囲で）。Red → Green → 必要なら Refactor。
+- CI 失敗時は **`package-lock.json` と `npm ci` の整合**、Node バージョン（Actions は 20）、ログ先頭のエラーを先に確認する。
+- **`e2e` ジョブは `test-and-build` 成功後のみ実行**（無駄な E2E を避ける）。
+
+## 契約まわりを触ったときの E2E（手元または CI）
+
+次を変更したら、該当 spec の通過を確認する（ローカルなら `npm run test:e2e:ci` または個別ファイル。ヘッド付きなら `npm run test:e2e:smoke-monkey` など）。
+
+- **`chrome.tabs.sendMessage` / `frameId` / `NLS_EXPORT_WATCH_SNAPSHOT`**: [`tests/e2e/watch-messaging.spec.js`](tests/e2e/watch-messaging.spec.js)
+- **`NLS_POST_COMMENT`（遅延クリア含む）**: [`tests/e2e/comment-post.spec.js`](tests/e2e/comment-post.spec.js)
+- **ポップアップ初回ペイント・再描画**: [`tests/e2e/popup-open-performance.spec.js`](tests/e2e/popup-open-performance.spec.js)（`data-nl-popup-content-painted`）
+- **インラインパネル・ページフレーム**: [`tests/e2e/page-frame.spec.js`](tests/e2e/page-frame.spec.js)、[`tests/e2e/inline-panel-align.spec.js`](tests/e2e/inline-panel-align.spec.js)
+- **ストレージバナー**: [`tests/e2e/storage-banners.spec.js`](tests/e2e/storage-banners.spec.js)
+- **利用条件ゲート・iframe 内 popup**: [`tests/e2e/extension-interaction.spec.js`](tests/e2e/extension-interaction.spec.js)、[`tests/e2e/fixtures.js`](tests/e2e/fixtures.js) の `dismissExtensionUsageTermsGate`
+- **モック記録〜storage**: [`tests/e2e/extension-recording.spec.js`](tests/e2e/extension-recording.spec.js)、[`tests/e2e/smoke.spec.js`](tests/e2e/smoke.spec.js)
+- **`playwright.config.js`（webServer・ポート・serve 引数・stdio）**: **全 E2E**
+- **`tests/e2e/constants.js`（モック URL / tabs.query パターン）**: manifest・`src/lib/broadcastUrl.js`・`playwright.config.js` と **必ず整合**
+
+### E2E モック DOM・Playwright の注意（再発防止）
+
+- Playwright の **strict モード**では、`.comment-panel` など **1 locator に複数ヒット**すると落ちる。モック HTML では **意図した1ブロックだけ**に付与する。
+- `findNicoCommentPanel` は **先頭の `.ga-ns-comment-panel`** を選ぶ。モックでは **仮想リスト側をフォームより先**に置くなど、本番に近い順序を保つ。
+- `popup.html` / インライン iframe を操作する spec は、**`goto` の直後に `dismissExtensionUsageTermsGate`**（またはそれを含むヘルパ）を通す。
+
+## レビュー・品質（ai-development-workflow の短縮版）
+
+- 実装とレビューは **別チャット／別モデル**で回すと盲点が減る（可能なら）。
+- **`chrome.storage` キー、`NLS_*` メッセージ型、`frameId` 経路** を変えた PR は、実装チャットとは別にレビューし、**単体または上記 E2E で契約が守れているか** を必ず確認する。
+- 仕上げ前に **テストとビルド**で回帰を確認する。
+- レビュー時は **非同期漏れ・null DOM・拡張 messaging の失敗**を、再現手順つきで疑う（汎用 `docs/workflows/debug.md` の観点を圧縮）。

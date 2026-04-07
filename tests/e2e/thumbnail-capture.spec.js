@@ -1,6 +1,8 @@
 import { test, expect } from './fixtures.js';
-
-const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
+import {
+  E2E_MOCK_WATCH_URL as MOCK_WATCH,
+  E2E_MOCK_ORIGIN_PATTERN
+} from './constants.js';
 
 test.describe('画面キャプチャ（モック watch + video）', () => {
   test('NLS_CAPTURE_SCREENSHOT が PNG data URL を返す', async ({ context }) => {
@@ -21,8 +23,8 @@ test.describe('画面キャプチャ（モック watch + video）', () => {
     `);
     await page.waitForTimeout(600);
 
-    const result = await sw.evaluate(async () => {
-      const tabs = await chrome.tabs.query({ url: 'http://127.0.0.1:3456/*' });
+    const result = await sw.evaluate(async (tabUrlPattern) => {
+      const tabs = await chrome.tabs.query({ url: tabUrlPattern });
       const id = tabs[0]?.id;
       if (!id) return { ok: false, reason: 'no_tab' };
       try {
@@ -37,7 +39,7 @@ test.describe('画面キャプチャ（モック watch + video）', () => {
           reason: e && typeof e === 'object' && 'message' in e ? String(e.message) : 'send_failed'
         };
       }
-    });
+    }, E2E_MOCK_ORIGIN_PATTERN);
 
     expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
     expect(String(/** @type {{ dataUrl?: string }} */ (result).dataUrl || '')).toMatch(

@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures.js';
+import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 
-const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
 const STORAGE_COMMENTS = 'nls_comments_lv888888888';
 
 /**

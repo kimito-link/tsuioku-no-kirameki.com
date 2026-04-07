@@ -1,6 +1,5 @@
 import { test, expect } from './fixtures.js';
-
-const MOCK_WATCH = 'http://127.0.0.1:3456/watch/lv888888888/';
+import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const KEY_POPUP_FRAME = 'nls_popup_frame';
 
 test.describe('watch page frame', () => {
