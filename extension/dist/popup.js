@@ -3487,23 +3487,37 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (kind === "error") status.classList.add("error");
     if (kind === "success") status.classList.add("success");
   }
+  function copyTextViaExecCommand(text) {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "true");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    area.style.top = "0";
+    area.style.opacity = "0";
+    area.style.pointerEvents = "none";
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    const copied = document.execCommand("copy");
+    document.body.removeChild(area);
+    return copied;
+  }
   async function copyTextToClipboard(text) {
+    let embedded = false;
+    try {
+      embedded = window.self !== window.top;
+    } catch {
+      embedded = true;
+    }
+    if (embedded) {
+      return copyTextViaExecCommand(text);
+    }
     try {
       await navigator.clipboard.writeText(text);
       return true;
     } catch {
-      const area = document.createElement("textarea");
-      area.value = text;
-      area.setAttribute("readonly", "true");
-      area.style.position = "fixed";
-      area.style.opacity = "0";
-      area.style.pointerEvents = "none";
-      document.body.appendChild(area);
-      area.focus();
-      area.select();
-      const copied = document.execCommand("copy");
-      document.body.removeChild(area);
-      return copied;
+      return copyTextViaExecCommand(text);
     }
   }
   function syncFrameShareInput() {
@@ -8374,8 +8388,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           trendPointCount: trend.length,
           trend
         };
-        await navigator.clipboard.writeText(JSON.stringify(out, null, 2));
-        if (stEl) stEl.textContent = `\u30B3\u30D4\u30FC\u6E08\u307F\uFF08${trend.length} \u70B9\uFF09`;
+        const ok = await copyTextToClipboard(JSON.stringify(out, null, 2));
+        if (stEl) {
+          stEl.textContent = ok ? `\u30B3\u30D4\u30FC\u6E08\u307F\uFF08${trend.length} \u70B9\uFF09` : "\u30B3\u30D4\u30FC\u306B\u5931\u6557\u3057\u307E\u3057\u305F";
+        }
       } catch {
         if (stEl) stEl.textContent = "\u30B3\u30D4\u30FC\u306B\u5931\u6557\u3057\u307E\u3057\u305F";
       }

@@ -1144,23 +1144,44 @@ function setFrameShareStatus(message, kind = 'idle') {
   if (kind === 'success') status.classList.add('success');
 }
 
+/**
+ * watch 内インラインフレーム（`popup.html?inline=1`）では親ページの Permissions Policy により
+ * `navigator.clipboard` がブロックされることがあるため、埋め込み時は execCommand を優先する。
+ * @param {string} text
+ * @returns {Promise<boolean>}
+ */
+function copyTextViaExecCommand(text) {
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', 'true');
+  area.style.position = 'fixed';
+  area.style.left = '-9999px';
+  area.style.top = '0';
+  area.style.opacity = '0';
+  area.style.pointerEvents = 'none';
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(area);
+  return copied;
+}
+
 async function copyTextToClipboard(text) {
+  let embedded = false;
+  try {
+    embedded = window.self !== window.top;
+  } catch {
+    embedded = true;
+  }
+  if (embedded) {
+    return copyTextViaExecCommand(text);
+  }
   try {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
-    const area = document.createElement('textarea');
-    area.value = text;
-    area.setAttribute('readonly', 'true');
-    area.style.position = 'fixed';
-    area.style.opacity = '0';
-    area.style.pointerEvents = 'none';
-    document.body.appendChild(area);
-    area.focus();
-    area.select();
-    const copied = document.execCommand('copy');
-    document.body.removeChild(area);
-    return copied;
+    return copyTextViaExecCommand(text);
   }
 }
 
@@ -6983,8 +7004,12 @@ function initPopup() {
         trendPointCount: trend.length,
         trend
       };
-      await navigator.clipboard.writeText(JSON.stringify(out, null, 2));
-      if (stEl) stEl.textContent = `コピー済み（${trend.length} 点）`;
+      const ok = await copyTextToClipboard(JSON.stringify(out, null, 2));
+      if (stEl) {
+        stEl.textContent = ok
+          ? `コピー済み（${trend.length} 点）`
+          : 'コピーに失敗しました';
+      }
     } catch {
       if (stEl) stEl.textContent = 'コピーに失敗しました';
     }
