@@ -286,6 +286,16 @@
     return results;
   }
 
+  // src/lib/supportGrowthTileSrc.js
+  function niconicoDefaultUserIconUrl(userId) {
+    const s = String(userId || "").trim();
+    if (!/^\d{5,14}$/.test(s)) return "";
+    const n = Number(s);
+    if (!Number.isFinite(n) || n < 1) return "";
+    const bucket = Math.max(1, Math.floor(n / 1e4));
+    return `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${bucket}/${s}.jpg`;
+  }
+
   // src/lib/nicoAnonymousDisplay.js
   function isNiconicoAnonymousUserId(userId) {
     const s = String(userId ?? "").trim();
@@ -605,7 +615,52 @@
         if (av) return av;
       }
     }
+    const avatar = o.avatar;
+    if (typeof avatar === "string") {
+      const av = normalizeInterceptAvatarUrl(avatar);
+      if (av) return av;
+    }
     return "";
+  }
+  function normalizeViewerJoin(raw, nowMs) {
+    const now = typeof nowMs === "number" && Number.isFinite(nowMs) && nowMs > 0 ? nowMs : Date.now();
+    const empty = {
+      userId: "",
+      nickname: "",
+      iconUrl: "",
+      timestamp: now,
+      source: "network-intercept"
+    };
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return empty;
+    const rec = (
+      /** @type {Record<string, unknown>} */
+      raw
+    );
+    let userId = "";
+    for (const k of ["userId", "id", "uid"]) {
+      const x = rec[k];
+      if (x == null || x === "") continue;
+      const s = String(x).trim();
+      if (s) {
+        userId = s;
+        break;
+      }
+    }
+    if (!userId) userId = pickUserIdFromRecord(raw);
+    let nickname = pickNameFromRecord(raw);
+    if (!nickname && typeof rec.name === "string") nickname = rec.name.trim();
+    let iconUrl = pickAvatarFromRecord(raw);
+    if (!iconUrl && /^\d{5,14}$/.test(userId)) {
+      iconUrl = niconicoDefaultUserIconUrl(userId) || "";
+    }
+    nickname = anonymousNicknameFallback(userId, nickname);
+    return {
+      userId,
+      nickname,
+      iconUrl,
+      timestamp: now,
+      source: "network-intercept"
+    };
   }
   function looksLikeUserObjectArray(arr) {
     if (!Array.isArray(arr) || arr.length < 1 || arr.length > 250) return false;
@@ -806,18 +861,20 @@
         pruneViewerJoinDedupe(now);
         const out = [];
         for (const v of merged) {
-          const uid = String(v.userId || "").trim();
+          const row = normalizeViewerJoin(
+            {
+              userId: v.userId,
+              nickname: v.nickname,
+              iconUrl: v.iconUrl
+            },
+            now
+          );
+          const uid = row.userId;
           if (!uid) continue;
           const last = viewerJoinDedupeAt.get(uid) || 0;
           if (now - last < VIEWER_JOIN_SUPPRESS_MS) continue;
           viewerJoinDedupeAt.set(uid, now);
-          out.push({
-            userId: uid,
-            nickname: String(v.nickname || "").trim(),
-            iconUrl: String(v.iconUrl || "").trim(),
-            timestamp: now,
-            source: "network-intercept"
-          });
+          out.push(row);
         }
         if (out.length) {
           window.postMessage(
@@ -1108,9 +1165,9 @@
         if (raw.length < 4 || raw.length > 1e6) return;
         try {
           const parsed = JSON.parse(raw);
+          emitViewerJoinFromJsonRoot(parsed);
           if (!tryForwardStatistics(parsed)) maybeRecordInterceptVisitorProbe(parsed);
           tryForwardSchedule(parsed);
-          emitViewerJoinFromJsonRoot(parsed);
           dig(parsed, 0);
         } catch {
         }
@@ -1207,8 +1264,8 @@
                       if (text.length > 3 && text.length < 5e5) {
                         try {
                           const j = JSON.parse(text);
-                          if (!tryForwardStatistics(j)) maybeRecordInterceptVisitorProbe(j);
                           emitViewerJoinFromJsonRoot(j);
+                          if (!tryForwardStatistics(j)) maybeRecordInterceptVisitorProbe(j);
                           dig(j, 0);
                         } catch {
                         }
@@ -1266,8 +1323,8 @@
                   }
                   if (rt === "json") {
                     const res = this.response;
-                    if (!tryForwardStatistics(res)) maybeRecordInterceptVisitorProbe(res);
                     emitViewerJoinFromJsonRoot(res);
+                    if (!tryForwardStatistics(res)) maybeRecordInterceptVisitorProbe(res);
                     dig(res, 0);
                     return;
                   }

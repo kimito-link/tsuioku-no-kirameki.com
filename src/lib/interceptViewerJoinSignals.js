@@ -2,12 +2,14 @@
  * page-intercept 用: JSON から「視聴者入室・オーディエンス更新」らしいユーザ配列を抽出（純関数・PII は userId/表示名/アイコン URL のみ）
  */
 
+import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 import {
   INTERCEPT_AVATAR_KEYS,
   INTERCEPT_NAME_KEYS,
   INTERCEPT_UID_KEYS,
   normalizeInterceptAvatarUrl
 } from './niconicoInterceptLearn.js';
+import { niconicoDefaultUserIconUrl } from './supportGrowthTileSrc.js';
 
 /** 入室・オーディエンス系でよくある配列キー（statistics の viewers 数値と区別するためオブジェクト配列のみ採用） */
 export const VIEWER_JOIN_ARRAY_KEYS = Object.freeze([
@@ -91,7 +93,67 @@ function pickAvatarFromRecord(v) {
       if (av) return av;
     }
   }
+  const avatar = o.avatar;
+  if (typeof avatar === 'string') {
+    const av = normalizeInterceptAvatarUrl(avatar);
+    if (av) return av;
+  }
   return '';
+}
+
+/**
+ * 入室 API の生オブジェクトを postMessage 用に正規化（サムネは数値 userId なら CDN URL を補完）。
+ * content 側はこの形だけ見ればよい。
+ *
+ * @param {unknown} raw
+ * @param {number} [nowMs] 固定タイムスタンプ（単体テスト用。省略時は内部で Date.now()）
+ * @returns {{ userId: string, nickname: string, iconUrl: string, timestamp: number, source: 'network-intercept' }}
+ */
+export function normalizeViewerJoin(raw, nowMs) {
+  const now =
+    typeof nowMs === 'number' && Number.isFinite(nowMs) && nowMs > 0
+      ? nowMs
+      : Date.now();
+  const empty = {
+    userId: '',
+    nickname: '',
+    iconUrl: '',
+    timestamp: now,
+    source: 'network-intercept'
+  };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return empty;
+
+  const rec = /** @type {Record<string, unknown>} */ (raw);
+  let userId = '';
+  for (const k of ['userId', 'id', 'uid']) {
+    const x = rec[k];
+    if (x == null || x === '') continue;
+    const s = String(x).trim();
+    if (s) {
+      userId = s;
+      break;
+    }
+  }
+  if (!userId) userId = pickUserIdFromRecord(raw);
+
+  let nickname = pickNameFromRecord(raw);
+  if (!nickname && typeof rec.name === 'string') nickname = rec.name.trim();
+
+  let iconUrl = pickAvatarFromRecord(raw);
+
+  if (!iconUrl && /^\d{5,14}$/.test(userId)) {
+    iconUrl = niconicoDefaultUserIconUrl(userId) || '';
+  }
+
+  nickname = anonymousNicknameFallback(userId, nickname);
+
+  return {
+    userId,
+    nickname,
+    iconUrl,
+    timestamp: now,
+    source: 'network-intercept'
+  };
 }
 
 /**

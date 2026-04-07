@@ -17,6 +17,7 @@ import {
 import { recordUnforwardedInterceptJsonForProbe } from '../lib/interceptVisitorProbeDebug.js';
 import {
   dedupeViewerJoinUsersByUserId,
+  normalizeViewerJoin,
   walkJsonForViewerJoinUsers
 } from '../lib/interceptViewerJoinSignals.js';
 
@@ -170,18 +171,20 @@ import {
       /** @type {{ userId: string, nickname: string, iconUrl: string, timestamp: number, source: string }[]} */
       const out = [];
       for (const v of merged) {
-        const uid = String(v.userId || '').trim();
+        const row = normalizeViewerJoin(
+          {
+            userId: v.userId,
+            nickname: v.nickname,
+            iconUrl: v.iconUrl
+          },
+          now
+        );
+        const uid = row.userId;
         if (!uid) continue;
         const last = viewerJoinDedupeAt.get(uid) || 0;
         if (now - last < VIEWER_JOIN_SUPPRESS_MS) continue;
         viewerJoinDedupeAt.set(uid, now);
-        out.push({
-          userId: uid,
-          nickname: String(v.nickname || '').trim(),
-          iconUrl: String(v.iconUrl || '').trim(),
-          timestamp: now,
-          source: 'network-intercept'
-        });
+        out.push(row);
       }
       if (out.length) {
         window.postMessage(
@@ -505,9 +508,9 @@ import {
       if (raw.length < 4 || raw.length > 1_000_000) return;
       try {
         const parsed = JSON.parse(raw);
+        emitViewerJoinFromJsonRoot(parsed);
         if (!tryForwardStatistics(parsed)) maybeRecordInterceptVisitorProbe(parsed);
         tryForwardSchedule(parsed);
-        emitViewerJoinFromJsonRoot(parsed);
         dig(parsed, 0);
       } catch {
         /* not JSON */
@@ -616,8 +619,8 @@ import {
                     if (text.length > 3 && text.length < 500000) {
                       try {
                         const j = JSON.parse(text);
-                        if (!tryForwardStatistics(j)) maybeRecordInterceptVisitorProbe(j);
                         emitViewerJoinFromJsonRoot(j);
+                        if (!tryForwardStatistics(j)) maybeRecordInterceptVisitorProbe(j);
                         dig(j, 0);
                       } catch { /* not JSON */ }
                     }
@@ -675,8 +678,8 @@ import {
                 }
                 if (rt === 'json') {
                   const res = this.response;
-                  if (!tryForwardStatistics(res)) maybeRecordInterceptVisitorProbe(res);
                   emitViewerJoinFromJsonRoot(res);
+                  if (!tryForwardStatistics(res)) maybeRecordInterceptVisitorProbe(res);
                   dig(res, 0);
                   return;
                 }

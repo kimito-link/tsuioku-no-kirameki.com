@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   collectViewerJoinUsersFromObject,
   dedupeViewerJoinUsersByUserId,
+  normalizeViewerJoin,
   walkJsonForViewerJoinUsers
 } from './interceptViewerJoinSignals.js';
 
@@ -52,5 +53,35 @@ describe('interceptViewerJoinSignals', () => {
       }
     });
     expect(all.some((x) => x.userId === '99')).toBe(true);
+  });
+
+  it('normalizeViewerJoin が数値 userId で既定 usericon URL を補い timestamp を固定できる', () => {
+    const r = normalizeViewerJoin({ userId: '86255751', nickname: '' }, 9_000_000);
+    expect(r.userId).toBe('86255751');
+    expect(r.timestamp).toBe(9_000_000);
+    expect(r.source).toBe('network-intercept');
+    expect(r.iconUrl).toContain('86255751');
+    expect(r.iconUrl).toContain('nicoaccount/usericon');
+  });
+
+  it('normalizeViewerJoin が匿名IDに「匿名」を補う', () => {
+    const r = normalizeViewerJoin(
+      { userId: 'a:deadbeefcafe0123456789abcdef', nickname: '' },
+      1
+    );
+    expect(r.nickname).toBe('匿名');
+  });
+
+  it('joinUsers 内で同一 userId が連続しても dedupe で1件に畳まれる', () => {
+    const raw = walkJsonForViewerJoinUsers({
+      joinUsers: [
+        { userId: '42', nickname: 'First' },
+        { userId: '42', nickname: 'Second' }
+      ]
+    });
+    const d = dedupeViewerJoinUsersByUserId(raw);
+    expect(d).toHaveLength(1);
+    expect(d[0].userId).toBe('42');
+    expect(d[0].nickname).toBe('Second');
   });
 });

@@ -636,10 +636,14 @@ async function flushInterceptViewerJoin(viewers) {
   if (!Array.isArray(viewers) || !viewers.length) return;
   if (!liveId || !hasExtensionContext()) return;
   const seenNow = Date.now();
+  /** 同一 postMessage 内の重複 userId を除外（activeUserTimestamps では弾かない＝2回目以降のプロファイル更新を阻害しない） */
+  const seenInFlush = new Set();
   for (const v of viewers) {
     if (!v || typeof v !== 'object') continue;
     const uid = String(/** @type {{ userId?: unknown }} */ (v).userId || '').trim();
     if (!uid) continue;
+    if (seenInFlush.has(uid)) continue;
+    seenInFlush.add(uid);
     const nick = String(/** @type {{ nickname?: unknown }} */ (v).nickname || '').trim();
     const iconRaw = String(/** @type {{ iconUrl?: unknown }} */ (v).iconUrl || '').trim();
     const icon = isHttpAvatarUrl(iconRaw) ? iconRaw : '';
@@ -659,10 +663,13 @@ async function flushInterceptViewerJoin(viewers) {
     const bag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
     const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
     let cacheTouched = false;
+    const seenProfile = new Set();
     for (const v of viewers) {
       if (!v || typeof v !== 'object') continue;
       const uid = String(/** @type {{ userId?: unknown }} */ (v).userId || '').trim();
       if (!uid) continue;
+      if (seenProfile.has(uid)) continue;
+      seenProfile.add(uid);
       const nick = String(/** @type {{ nickname?: unknown }} */ (v).nickname || '').trim();
       const iconUrl = isHttpAvatarUrl(/** @type {{ iconUrl?: unknown }} */ (v).iconUrl)
         ? String(/** @type {{ iconUrl?: unknown }} */ (v).iconUrl || '').trim()

@@ -2768,6 +2768,7 @@
     if (!Array.isArray(viewers) || !viewers.length) return;
     if (!liveId || !hasExtensionContext()) return;
     const seenNow = Date.now();
+    const seenInFlush = /* @__PURE__ */ new Set();
     for (const v of viewers) {
       if (!v || typeof v !== "object") continue;
       const uid = String(
@@ -2775,6 +2776,8 @@
         v.userId || ""
       ).trim();
       if (!uid) continue;
+      if (seenInFlush.has(uid)) continue;
+      seenInFlush.add(uid);
       const nick = String(
         /** @type {{ nickname?: unknown }} */
         v.nickname || ""
@@ -2800,6 +2803,7 @@
       const bag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
       const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
       let cacheTouched = false;
+      const seenProfile = /* @__PURE__ */ new Set();
       for (const v of viewers) {
         if (!v || typeof v !== "object") continue;
         const uid = String(
@@ -2807,6 +2811,8 @@
           v.userId || ""
         ).trim();
         if (!uid) continue;
+        if (seenProfile.has(uid)) continue;
+        seenProfile.add(uid);
         const nick = String(
           /** @type {{ nickname?: unknown }} */
           v.nickname || ""
