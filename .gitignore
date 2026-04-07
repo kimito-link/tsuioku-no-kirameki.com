@@ -2,3 +2,8 @@ node_modules/
 test-results/
 playwright-report/
 blob-report/
+
+# ローカル調査・生成物（誤って add しない）
+.cursor/debug-*.log
+nicolivelog-marketing-*.html
+nicolivelog-extension-investigation.zip

@@ -147,4 +147,20 @@ describe('summarizeOfficialCommentHistory', () => {
       sampleWindowMs: 50_000
     });
   });
+
+  it('記録OFF中は統計コメント数だけ進み記録件数が平坦でも窓を取り captureRatio は 0', () => {
+    const r = summarizeOfficialCommentHistory({
+      history: [
+        { at: 0, statisticsComments: 1000, recordedComments: 800 },
+        { at: 45_000, statisticsComments: 1150, recordedComments: 800 }
+      ],
+      nowMs: 45_000,
+      targetWindowMs: 60_000,
+      minWindowMs: 15_000
+    });
+    expect(r).not.toBeNull();
+    expect(r?.receivedCommentsDelta).toBe(0);
+    expect(r?.statisticsCommentsDelta).toBe(150);
+    expect(r?.captureRatio).toBe(0);
+  });
 });
