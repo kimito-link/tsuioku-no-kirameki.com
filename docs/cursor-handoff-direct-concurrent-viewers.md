@@ -1,96 +1,67 @@
 # Cursor Handoff: Direct Concurrent Viewers
 
-最終更新: 2026-04-06
+最終更新: 2026-04-07
 
 ## 目的
 
-nicolivelog の「推定同時接続」まわりを Cursor に引き継ぐためのメモです。
-このブランチは同接ロジック以外の popup UI 改修も多く含むため、Cursor 側では対象範囲を絞って読んでください。
+nicolivelog の「推定同時接続」まわりを Cursor に引き継ぐためのメモです。  
+このリポジトリでは **複数ブランチ**で UI・記録・同接が並行して進むことがあるため、**実装の正は `src/lib/concurrentEstimate.js` と単体テスト**を優先してください。
 
-## 開始地点
+## 開始地点（2026-04-07 時点）
 
 - ワークスペース: `C:\Users\info\OneDrive\デスクトップ\Resilio\github\nicolivelog`
-- 引き継ぎブランチ: `research/direct-concurrent-viewers`
-- `master`: `718fa77` `Add concurrent viewer estimation with multi-signal combined model`
-- `origin/research/direct-concurrent-viewers`: `04316f0`
-- ローカル HEAD: `f8468f4`
+- 直近の作業ブランチ例: `feature/support-grid-phase1-visual`（ローカルで切り替えていることあり）
+- 同接推定の計算本体のベースは `master` の `718fa77` `Add concurrent viewer estimation with multi-signal combined model` を参照。
+- 旧メモの `research/direct-concurrent-viewers` は歴史的参照。未コミット作業がある場合は **勝手に捨てない**。
 
 ## 重要な前提
 
-- 同接推定の計算本体は `master` の `718fa77` に入っています。
-- `research/direct-concurrent-viewers` は、その上に popup の表示改善や周辺 UX を積んでいるブランチです。
-- 現在の作業ツリーは dirty です。未コミット変更は主に応援アイコンのプレースホルダ調整で、同接本体とは別件です。
-- 未コミット変更をむやみに捨てないでください。
+- **direct viewers の fresh / nowcast しきい値**
+  - **ヒント無し**（`officialViewerIntervalMs` 未取得）: `DIRECT_VIEWERS_FRESH_MS` = **90s**, `DIRECT_VIEWERS_NOWCAST_MAX_MS` = **210s**（`concurrentEstimate.js`）。WebSocket の statistics が **おおよそ 45–90s** で来る観測に合わせ、1 ティック遅延でも `official` が維持されやすいよう調整。
+  - **ヒントあり**: `resolveDirectViewersThresholds(hint)` — `freshMs = clamp(round(hint×1.6), 45s, 120s)`, `nowcastMaxMs = clamp(round(hint×4), freshMs+45s, 300s)`。
+  - **境界の単一ソース**: `src/lib/concurrentEstimate.test.js` の表形式テストと「導出しきい値」ブロックが **official / nowcast / fallback の切り替え**を固定している。
+- `content-entry.js` は statistics 更新の間隔を最大 8 本保持し **中央値を `officialViewerIntervalMs`** としてスナップショットに載せる。
 
 ## 関連ファイル
 
-- `src/lib/concurrentEstimate.js`
-- `src/lib/concurrentEstimate.test.js`
-- `src/lib/officialStatsWindow.js`
-- `src/extension/content-entry.js`
-- `src/extension/page-intercept-entry.js`
-- `src/extension/popup-entry.js`
+- `src/lib/concurrentEstimate.js` — 推定・`resolveConcurrentViewers`・しきい値
+- `src/lib/concurrentEstimate.test.js` — 表形式しきい値・境界テスト
+- `src/lib/officialStatsWindow.js` — `officialCommentHistory` → capture ratio 要約
+- `src/lib/popupWatchMetaConcurrentGate.js` — スナップショットから表示ゲート
+- `src/extension/content-entry.js` — official stats・間隔ヒント・スナップショット
+- `src/extension/page-intercept-entry.js` — statistics 傍受
+- `src/extension/popup-entry.js` — `renderWatchMetaCard()`
 - `extension/popup.html`
-- `src/lib/watchAudienceCopy.js`
+- `src/lib/watchAudienceCopy.js` / `src/lib/watchConcurrentEstimateUiCopy.js`
 
-## 実装済みの流れ
+## 実装済みの流れ（要約）
 
-- `page-intercept-entry.js`
-  - watch 側の `statistics` 系メッセージを広めに検出して `NLS_INTERCEPT_STATISTICS` を投げます。
-  - NDGR バイナリも decode して `viewers/comments` と chat rows を拾います。
-
-- `content-entry.js`
-  - `officialViewerCount` / `officialCommentCount` / `officialStatsUpdatedAt` を保持します。
-  - statistics 更新間隔から `officialViewerIntervalMs` を推定します。
-  - 記録済みコメント数との比較履歴を `officialCommentHistory` に持ち、capture ratio 用サマリを作ります。
-  - `activeUserTimestamps` で直近 5 分のユニーク userId 数を数えます。
-  - watch snapshot に `officialViewerCount`、`officialViewerIntervalMs`、`officialStatisticsCommentsDelta`、`officialReceivedCommentsDelta` などを載せます。
-
-- `concurrentEstimate.js`
-  - `estimateConcurrentViewers()` で `active commenters × dynamic multiplier` と `visitors × retention` を統合します。
-  - `resolveConcurrentViewers()` で `official -> nowcast -> fallback` の順に表示値を決めます。
-  - fresh な direct viewers はそのまま表示し、少し古い direct viewers は comment capture ratio を見ながら補間します。
-
-- `officialStatsWindow.js`
-  - `officialCommentHistory` から比較可能な 2 点を選び、`captureRatio` 算出に必要な要約を返します。
-
-- `popup-entry.js`
-  - watch メタカード内の「推定同時接続」カードを描画します。
-  - direct 値が fresh なら `直接値`、少し古ければ `補間`、それ以外は `5分内 active commenters` ベースの推定を出します。
-  - tooltip に freshness、capture ratio、base signal などを出します。
-
-- `popup.html`
-  - 「推定同時接続」カードと loading state を追加しています。
+- `page-intercept-entry.js`: watch 側の `statistics` を検出し `NLS_INTERCEPT_STATISTICS` 等を送信。NDGR decode で viewers/comments。
+- `content-entry.js`: `officialViewerCount` / `officialCommentCount` / 更新時刻、`officialViewerIntervalMs`（間隔中央値）、`officialCommentHistory`、`activeUserTimestamps` などを保持し watch snapshot に載せる。
+- `concurrentEstimate.js`: `estimateConcurrentViewers`（複合シグナル）、`resolveConcurrentViewers`（official → nowcast → fallback）、`calcCommentCaptureRatio`。
+- `officialStatsWindow.js`: 履歴から比較可能な 2 点を選び capture ratio 用サマリを返す。
+- `popup-entry.js`: 推定同時接続カード・ツールチップ（direct / 補間 / fallback）。
 
 ## まず読む場所
 
 - `src/lib/concurrentEstimate.js`
+- `src/lib/concurrentEstimate.test.js`（特に `resolveDirectViewersThresholds` と境界 describe）
 - `src/extension/content-entry.js` の official stats 周辺
 - `src/extension/popup-entry.js` の `renderWatchMetaCard()`
 
-## 未コミット変更について
-
-いまの未コミット差分は以下です。
-
-- `src/extension/popup-entry.js`
-- `extension/popup.html`
-- `src/lib/supportGrowthAvatarLoad.js`
-- `extension/dist/popup.js`
-
-内容は「応援グリッドで URL が無いときはゆっくり既定画像、URL はあるが読み込み失敗したときだけ TV プレースホルダにする」という調整で、同接ロジックとは別です。
-
 ## Cursor 側で見るときの観点
 
-- direct viewers の fresh 判定と nowcast しきい値が実測に合っているか
-- `officialCommentHistory` の窓選択が recording ON/OFF 切替時に破綻しないか
-- popup 表示文言が「来場者数」と「推定同接」を取り違えないか
+- direct viewers の **fresh / nowcast** と `officialViewerIntervalMs` の整合（テスト表と一致しているか）
+- `officialCommentHistory` の窓選択が **記録 ON/OFF** で破綻しないか（`officialStatsWindow.test.js` の記録 OFF ケース等）
+- popup 文言が **「来場者数」と「推定同接」**を取り違えないか
 - direct / nowcast / fallback の各状態に対するテストが十分か
 
 ## 確認コマンド
 
 - `npm test`
 - `npm run build`
-- 必要なら `npm run test:e2e`
+- 契約まわりを触った場合: `npm run test:e2e:ci`（事前に `npm run build` 推奨）
+- まとめて: `npm run verify`
 
 ## Cursor に渡すコピペ用
 
@@ -98,25 +69,24 @@ nicolivelog の「推定同時接続」まわりを Cursor に引き継ぐため
 nicolivelog の同時接続まわりを引き継いでください。
 
 前提:
-- ワークスペースは `C:\Users\info\OneDrive\デスクトップ\Resilio\github\nicolivelog`
-- 作業ブランチは `research/direct-concurrent-viewers`
-- 同接推定の計算本体は `master` の commit `718fa77` に入っている
-- いまの branch は、その上に popup 側の表示や周辺 UX を積んでいる
-- 現在の working tree は dirty。未コミット変更は主に応援アイコンの placeholder 調整で、同接本体とは別なので勝手に捨てない
+- ワークスペースは nicolivelog リポジトリ
+- しきい値・境界は src/lib/concurrentEstimate.js と concurrentEstimate.test.js が正
+- ヒント無し既定: fresh 90s / nowcast 上限 210s（2026-04-07 調整）。ヒントありは resolveDirectViewersThresholds
 
 まず読むファイル:
-- `src/lib/concurrentEstimate.js`
-- `src/lib/officialStatsWindow.js`
-- `src/extension/content-entry.js`
-- `src/extension/page-intercept-entry.js`
-- `src/extension/popup-entry.js`
-- `extension/popup.html`
+- src/lib/concurrentEstimate.js
+- src/lib/concurrentEstimate.test.js
+- src/lib/officialStatsWindow.js
+- src/extension/content-entry.js
+- src/extension/page-intercept-entry.js
+- src/extension/popup-entry.js
+- extension/popup.html
 
 把握してほしいこと:
 - official viewers/comments をどこで拾っているか
-- official viewers の更新間隔と freshness 判定
+- official viewers の更新間隔ヒントと freshness 判定
 - comment capture ratio をどう算出して nowcast に反映しているか
-- popup の「推定同時接続」カードが direct / nowcast / fallback をどう表示しているか
+- popup の「推定同時接続」が direct / nowcast / fallback をどう出すか
 
-必要なら `npm test` と `npm run build` で確認してください。
+必要なら npm test / npm run build / npm run test:e2e:ci で確認してください。
 ```

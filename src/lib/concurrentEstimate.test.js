@@ -326,21 +326,56 @@ describe('calcCommentCaptureRatio', () => {
 });
 
 describe('resolveDirectViewersThresholds', () => {
-  /** @type {ReadonlyArray<{ hint: number|null|undefined, freshMs: number, nowcastMaxMs: number }>} */
+  /**
+   * 実測ヒント（content-entry の更新間隔中央値）に対する期待値表。
+   * 式: freshMs = clamp(round(hint*1.6), 45_000, 120_000),
+   *     nowcastMaxMs = clamp(round(hint*4), freshMs+45_000, 300_000)
+   */
+  /** @type {ReadonlyArray<{ scenario: string, hint: number|null|undefined, freshMs: number, nowcastMaxMs: number }>} */
   const table = [
-    { hint: null, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
-    { hint: undefined, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
-    { hint: Number.NaN, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
-    { hint: 0, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
-    { hint: -1, freshMs: DIRECT_VIEWERS_FRESH_MS, nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS },
-    { hint: 10_000, freshMs: 45_000, nowcastMaxMs: 90_000 },
-    { hint: 30_000, freshMs: 48_000, nowcastMaxMs: 120_000 },
-    { hint: 70_000, freshMs: 112_000, nowcastMaxMs: 280_000 },
-    { hint: 120_000, freshMs: 120_000, nowcastMaxMs: 300_000 }
+    {
+      scenario: 'ヒントなし（既定）',
+      hint: null,
+      freshMs: DIRECT_VIEWERS_FRESH_MS,
+      nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS
+    },
+    {
+      scenario: 'ヒント undefined',
+      hint: undefined,
+      freshMs: DIRECT_VIEWERS_FRESH_MS,
+      nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS
+    },
+    {
+      scenario: 'ヒント NaN',
+      hint: Number.NaN,
+      freshMs: DIRECT_VIEWERS_FRESH_MS,
+      nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS
+    },
+    {
+      scenario: 'ヒント 0',
+      hint: 0,
+      freshMs: DIRECT_VIEWERS_FRESH_MS,
+      nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS
+    },
+    {
+      scenario: 'ヒント負',
+      hint: -1,
+      freshMs: DIRECT_VIEWERS_FRESH_MS,
+      nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS
+    },
+    { scenario: '速い更新 ~10s', hint: 10_000, freshMs: 45_000, nowcastMaxMs: 90_000 },
+    { scenario: 'やや速 ~30s（実測で多い帯）', hint: 30_000, freshMs: 48_000, nowcastMaxMs: 120_000 },
+    { scenario: '~45s', hint: 45_000, freshMs: 72_000, nowcastMaxMs: 180_000 },
+    { scenario: '~50s', hint: 50_000, freshMs: 80_000, nowcastMaxMs: 200_000 },
+    { scenario: '~55s', hint: 55_000, freshMs: 88_000, nowcastMaxMs: 220_000 },
+    { scenario: '~65s', hint: 65_000, freshMs: 104_000, nowcastMaxMs: 260_000 },
+    { scenario: '~70s（中央値寄り）', hint: 70_000, freshMs: 112_000, nowcastMaxMs: 280_000 },
+    { scenario: '~90s（遅め・fresh 上限張り付き）', hint: 90_000, freshMs: 120_000, nowcastMaxMs: 300_000 },
+    { scenario: '120s（両方クランプ上限）', hint: 120_000, freshMs: 120_000, nowcastMaxMs: 300_000 }
   ];
 
   it.each(table)(
-    'interval hint=%s → freshMs=%i nowcastMaxMs=%i',
+    '$scenario: hint=%j → freshMs=%i nowcastMaxMs=%i',
     ({ hint, freshMs, nowcastMaxMs }) => {
       const t = resolveDirectViewersThresholds(hint);
       expect(t.freshMs).toBe(freshMs);
@@ -348,6 +383,45 @@ describe('resolveDirectViewersThresholds', () => {
       expect(t.nowcastMaxMs).toBeGreaterThanOrEqual(t.freshMs + 45_000);
     }
   );
+
+  it('正のヒントでは fresh が単調非減（クランプ内）', () => {
+    const hints = [10_000, 30_000, 45_000, 55_000, 70_000, 90_000, 120_000];
+    let prev = 0;
+    for (const h of hints) {
+      const f = resolveDirectViewersThresholds(h).freshMs;
+      expect(f).toBeGreaterThanOrEqual(prev);
+      prev = f;
+    }
+  });
+});
+
+/** @param {number} ageMs @param {number|undefined} officialViewerIntervalMs */
+function concurrentMethodAtAge(ageMs, officialViewerIntervalMs) {
+  const now = 50_000_000;
+  return resolveConcurrentViewers({
+    nowMs: now,
+    officialViewers: 420,
+    officialUpdatedAtMs: now - ageMs,
+    officialViewerIntervalMs,
+    recentActiveUsers: 12,
+    totalVisitors: 2500,
+    streamAgeMin: 8
+  }).method;
+}
+
+describe('resolveConcurrentViewers / resolveDirectViewersThresholds 境界（導出しきい値）', () => {
+  it.each([
+    { label: 'ヒントなし', interval: undefined },
+    { label: '30s ヒント', interval: 30_000 },
+    { label: '70s ヒント', interval: 70_000 },
+    { label: '120s ヒント', interval: 120_000 }
+  ])('$label: fresh 以内は official、fresh+1ms で nowcast、nowcastMax+1ms で fallback', ({ interval }) => {
+    const th = resolveDirectViewersThresholds(interval);
+    expect(concurrentMethodAtAge(th.freshMs, interval)).toBe('official');
+    expect(concurrentMethodAtAge(th.freshMs + 1, interval)).toBe('nowcast');
+    expect(concurrentMethodAtAge(th.nowcastMaxMs, interval)).toBe('nowcast');
+    expect(concurrentMethodAtAge(th.nowcastMaxMs + 1, interval)).toBe('fallback');
+  });
 });
 
 describe('resolveConcurrentViewers', () => {

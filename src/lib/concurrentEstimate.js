@@ -20,8 +20,19 @@
 
 /** @type {number} */
 export const DEFAULT_WINDOW_MS = 5 * 60 * 1000;
-export const DIRECT_VIEWERS_FRESH_MS = 75 * 1000;
-export const DIRECT_VIEWERS_NOWCAST_MAX_MS = 180 * 1000;
+
+/**
+ * statistics.viewers 更新間隔ヒントが無いときの「直接値」許容経過時間。
+ * watch ページでは WebSocket の statistics がしばしば 45–90s 程度の間隔で来るため、
+ * 1 ティック遅延でも UI が official→nowcast に落ちにくいよう ~60s 帯の 1.5 倍を既定とする。
+ */
+export const DIRECT_VIEWERS_FRESH_MS = 90 * 1000;
+
+/**
+ * ヒント無し時の nowcast 上限（これを超えた経過はフォールバック）。
+ * 約 3.5 ティック分の猶予（60s 想定）で、遅延配信でも短期補間を試みる。
+ */
+export const DIRECT_VIEWERS_NOWCAST_MAX_MS = 210 * 1000;
 
 /**
  * 動的倍率テーブル（来場者数 → 倍率）

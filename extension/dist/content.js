@@ -2168,8 +2168,8 @@
 
   // src/lib/concurrentEstimate.js
   var DEFAULT_WINDOW_MS = 5 * 60 * 1e3;
-  var DIRECT_VIEWERS_FRESH_MS = 75 * 1e3;
-  var DIRECT_VIEWERS_NOWCAST_MAX_MS = 180 * 1e3;
+  var DIRECT_VIEWERS_FRESH_MS = 90 * 1e3;
+  var DIRECT_VIEWERS_NOWCAST_MAX_MS = 210 * 1e3;
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
