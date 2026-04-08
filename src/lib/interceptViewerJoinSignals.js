@@ -59,6 +59,10 @@ const VIEWER_JOIN_EXTRA_NAME_KEYS = Object.freeze([
   'profile_nickname'
 ]);
 
+/**
+ * @param {unknown} v
+ * @returns {string}
+ */
 function pickNameFromRecord(v) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return '';
   const o = /** @type {Record<string, unknown>} */ (v);
@@ -114,12 +118,15 @@ export function normalizeViewerJoin(raw, nowMs) {
     typeof nowMs === 'number' && Number.isFinite(nowMs) && nowMs > 0
       ? nowMs
       : Date.now();
+  /** @type {'network-intercept'} */
+  const source = 'network-intercept';
+  /** @type {{ userId: string, nickname: string, iconUrl: string, timestamp: number, source: 'network-intercept' }} */
   const empty = {
     userId: '',
     nickname: '',
     iconUrl: '',
     timestamp: now,
-    source: 'network-intercept'
+    source
   };
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return empty;
 
@@ -152,7 +159,7 @@ export function normalizeViewerJoin(raw, nowMs) {
     nickname,
     iconUrl,
     timestamp: now,
-    source: 'network-intercept'
+    source
   };
 }
 

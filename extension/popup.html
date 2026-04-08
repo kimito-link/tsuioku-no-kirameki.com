@@ -151,6 +151,14 @@
         padding-bottom: 6px;
       }
 
+      /* watch 埋め込み: 親ページの透過オーバーレイ等でクリックが奪われにくくする */
+      html.nl-inline-embed-watch body label.nl-record-hero__toggle,
+      html.nl-inline-embed-watch body .nl-record-hero__toggle input[type='checkbox'] {
+        pointer-events: auto;
+        position: relative;
+        z-index: 2;
+      }
+
       html.nl-inline body .nl-main {
         padding-top: 3px;
       }
@@ -3527,6 +3535,19 @@
         gap: 5px;
       }
 
+      .nl-panel-width-radios--width {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 55%, transparent);
+      }
+
+      .nl-panel-width-sublegend {
+        font-size: clamp(11px, calc(var(--nl-base-font) * 0.82), 13px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        margin-bottom: 1px;
+      }
+
       .nl-panel-width-radios label {
         flex: unset;
         font-size: clamp(12px, calc(var(--nl-base-font) * 0.88), 15px);
@@ -5317,7 +5338,7 @@
         <div
           class="nl-live-stat-card nl-live-stat-card--comments nl-live-stat-card--support-visual"
           id="supportVisualLiveCard"
-          title="この数字は、このPCに保存した応援コメントの件数です。画面に出ていない古いコメントは取り込めません。記録をオフにしていた時間やページを閉じていた間は増えません。下に出る公式の件数はニコ生の累計（別の意味）で、取り込みの割合も併記されます。"
+          title="この数字は、このPCに保存した応援コメントの件数です。画面に出ていない古いコメントは取り込めません。記録をオフにしていた時間やページを閉じていた間は増えません。下の「公式」は視聴セッションの statistics（comments / commentCount）由来で、プレイヤー付近のコメント数表示とは別経路のため数字が一致しないことがあります。取り込みの割合の比較はこの公式行を基準にしています。"
         >
           <img
             class="nl-live-stat-icon"
@@ -5506,7 +5527,7 @@
           class="nl-export-toolbar__hint nl-compose-toolbar-hint"
           id="exportToolbarHint"
         >
-          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。ちらつきや帯の動きを抑えたいときは直下の「動きを抑える」をオン。watch に埋め込むパネルの幅と、「表示がおかしいとき」の直し方はその下です。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
+          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。ちらつきや帯の動きを抑えたいときは直下の「動きを抑える」をオン。watch に埋め込むパネルの位置・幅と、「表示がおかしいとき」の直し方はその下です。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
         </p>
         <div
           class="nl-record nl-panel-width nl-compose-panel-width"
@@ -5514,9 +5535,41 @@
           aria-labelledby="inlinePanelWidthLegend"
         >
           <div id="inlinePanelWidthLegend" class="nl-panel-width-legend">
-            ページ内パネルの幅（watch）
+            ページ内パネルの位置・幅（watch）
           </div>
-          <div class="nl-panel-width-radios">
+          <div class="nl-panel-width-radios" role="group" aria-label="パネルの位置">
+            <span class="nl-panel-width-sublegend">位置</span>
+            <label>
+              <input
+                type="radio"
+                name="inlinePanelPlacement"
+                value="below"
+                id="inlinePanelPlacementBelow"
+                checked
+              />
+              プレイヤー行の下（ワイド画面で横に回り込まない）
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="inlinePanelPlacement"
+                value="beside"
+                id="inlinePanelPlacementBeside"
+              />
+              横付き（親のレイアウトに合わせる・従来に近い）
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="inlinePanelPlacement"
+                value="floating"
+                id="inlinePanelPlacementFloating"
+              />
+              ポップアップ風（画面右上に固定・ツールバー押下に近い）
+            </label>
+          </div>
+          <div class="nl-panel-width-radios nl-panel-width-radios--width" role="group" aria-label="パネルの幅">
+            <span class="nl-panel-width-sublegend">幅</span>
             <label>
               <input
                 type="radio"
@@ -5857,6 +5910,7 @@
             取得率チャート → 件数の比較・種類の内訳 → 表 → 技術用JSON）。コメント本文は出しません。
             <span class="nl-dev-monitor__hint-sub">
               困ったときの目安: ライブかタイムシフトか／「このPCで記録」がONか／対象のwatchタブを開いたままか。下の「watchタブ内の一時対応表」と「取り込んだ行数」が長く0のままなら、ページの再読み込み（F5）や拡張の更新も試してください。
+              パネルが出ない・不具合の報告には「AI 共有用にコピー（診断まとめ）」1 回で、ページ側の状態を AI に渡せます（開発者ツールの手コピーは不要です）。
             </span>
           </p>
           <div id="devMonitorAcquisition" class="nl-acquisition-wrap"></div>
@@ -5877,6 +5931,14 @@
             aria-label="開発者向け・技術用の要約JSON（任意）"
           ></pre>
           <div class="nl-dev-monitor__actions">
+            <button
+              type="button"
+              class="nl-dev-monitor__btn nl-dev-monitor__btn--accent"
+              id="devMonitorCopyAiBundleBtn"
+              title="ページ内の診断（パネル・プレイヤー検出・挿入先）をまとめてコピー。開発者ツールは不要です。"
+            >
+              AI 共有用にコピー（診断まとめ）
+            </button>
             <button type="button" class="nl-dev-monitor__btn" id="devMonitorRefresh">
               スナップショット再取得
             </button>

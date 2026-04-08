@@ -6,7 +6,8 @@ import {
   isHttpOrHttpsUrl,
   isNiconicoSyntheticDefaultUserIconUrl,
   isWeakNiconicoUserIconHttpUrl,
-  looksLikeNiconicoUserIconHttpUrl
+  looksLikeNiconicoUserIconHttpUrl,
+  niconicoDefaultUserIconUrl
 } from './supportGrowthTileSrc.js';
 import { pickStrongerUserId } from './userIdPreference.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
@@ -89,6 +90,11 @@ export function createCommentEntry(p) {
     if (fromAv) uid = fromAv;
   }
   const nickname = anonymousNicknameFallback(uid, p.nickname);
+  let storedAvatar = avatarUrl;
+  if (!storedAvatar && uid && /^\d{5,14}$/.test(uid)) {
+    const syn = niconicoDefaultUserIconUrl(uid);
+    if (syn) storedAvatar = syn;
+  }
   const entry = {
     id: randomId(),
     liveId,
@@ -96,7 +102,7 @@ export function createCommentEntry(p) {
     text,
     userId: uid || null,
     ...(nickname ? { nickname } : {}),
-    ...(avatarUrl ? { avatarUrl } : {}),
+    ...(storedAvatar ? { avatarUrl: storedAvatar } : {}),
     ...(p.vpos != null ? { vpos: p.vpos } : {}),
     ...(p.accountStatus != null ? { accountStatus: p.accountStatus } : {}),
     ...(p.is184 ? { is184: true } : {}),
@@ -219,6 +225,16 @@ export function mergeNewComments(liveId, existing, incoming) {
           }
         }
 
+        const avAfter = String(patched.avatarUrl || '').trim();
+        if (!avAfter || !isHttpOrHttpsUrl(avAfter)) {
+          const uHeal = String(patched.userId || '').trim();
+          const syn = niconicoDefaultUserIconUrl(uHeal);
+          if (syn) {
+            patched = { ...patched, avatarUrl: syn };
+            touched = true;
+          }
+        }
+
         if (touched) {
           next[idx] = patched;
           storageTouched = true;
@@ -243,4 +259,26 @@ export function mergeNewComments(liveId, existing, incoming) {
   }
   if (added.length) storageTouched = true;
   return { next, added, storageTouched };
+}
+
+/**
+ * ストレージ上のコメントに、数字 userId かつ avatarUrl 無しの行へ CDN 推定 URL を一括付与（取得率ダッシュボードのサムネ%向上）。
+ * @param {unknown[]} entries
+ * @returns {{ next: unknown[], patched: number }}
+ */
+export function backfillNumericSyntheticAvatarsOnStoredComments(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return { next: entries, patched: 0 };
+  }
+  let patched = 0;
+  const next = entries.map((e) => {
+    const av = String(/** @type {{ avatarUrl?: unknown }} */ (e)?.avatarUrl || '').trim();
+    if (av && isHttpOrHttpsUrl(av)) return e;
+    const uid = String(/** @type {{ userId?: unknown }} */ (e)?.userId || '').trim();
+    const syn = niconicoDefaultUserIconUrl(uid);
+    if (!syn) return e;
+    patched += 1;
+    return { .../** @type {object} */ (e), avatarUrl: syn };
+  });
+  return { next, patched };
 }

@@ -81,12 +81,22 @@
     KEY_USER_COMMENT_PROFILE_CACHE
   ]);
   var KEY_INLINE_PANEL_WIDTH_MODE = "nls_inline_panel_width_mode";
+  var KEY_INLINE_PANEL_PLACEMENT = "nls_inline_panel_placement";
+  var INLINE_PANEL_PLACEMENT_BELOW = "below";
+  var INLINE_PANEL_PLACEMENT_BESIDE = "beside";
+  var INLINE_PANEL_PLACEMENT_FLOATING = "floating";
   var INLINE_PANEL_WIDTH_PLAYER_ROW = "player_row";
   var INLINE_PANEL_WIDTH_VIDEO = "video";
   function normalizeInlinePanelWidthMode(raw) {
     const s = String(raw || "").trim();
     if (s === INLINE_PANEL_WIDTH_VIDEO) return INLINE_PANEL_WIDTH_VIDEO;
     return INLINE_PANEL_WIDTH_PLAYER_ROW;
+  }
+  function normalizeInlinePanelPlacement(raw) {
+    const s = String(raw || "").trim().toLowerCase();
+    if (s === INLINE_PANEL_PLACEMENT_BESIDE) return INLINE_PANEL_PLACEMENT_BESIDE;
+    if (s === INLINE_PANEL_PLACEMENT_FLOATING) return INLINE_PANEL_PLACEMENT_FLOATING;
+    return INLINE_PANEL_PLACEMENT_BELOW;
   }
   function isRecordingEnabled(raw) {
     return raw !== false;
@@ -438,6 +448,11 @@
       if (fromAv) uid = fromAv;
     }
     const nickname = anonymousNicknameFallback(uid, p.nickname);
+    let storedAvatar = avatarUrl;
+    if (!storedAvatar && uid && /^\d{5,14}$/.test(uid)) {
+      const syn = niconicoDefaultUserIconUrl(uid);
+      if (syn) storedAvatar = syn;
+    }
     const entry = {
       id: randomId(),
       liveId: liveId2,
@@ -445,7 +460,7 @@
       text,
       userId: uid || null,
       ...nickname ? { nickname } : {},
-      ...avatarUrl ? { avatarUrl } : {},
+      ...storedAvatar ? { avatarUrl: storedAvatar } : {},
       ...p.vpos != null ? { vpos: p.vpos } : {},
       ...p.accountStatus != null ? { accountStatus: p.accountStatus } : {},
       ...p.is184 ? { is184: true } : {},
@@ -545,6 +560,15 @@
               }
             }
           }
+          const avAfter = String(patched.avatarUrl || "").trim();
+          if (!avAfter || !isHttpOrHttpsUrl(avAfter)) {
+            const uHeal = String(patched.userId || "").trim();
+            const syn = niconicoDefaultUserIconUrl(uHeal);
+            if (syn) {
+              patched = { ...patched, avatarUrl: syn };
+              touched = true;
+            }
+          }
           if (touched) {
             next[idx] = patched;
             storageTouched = true;
@@ -569,6 +593,29 @@
     }
     if (added.length) storageTouched = true;
     return { next, added, storageTouched };
+  }
+  function backfillNumericSyntheticAvatarsOnStoredComments(entries) {
+    if (!Array.isArray(entries) || !entries.length) {
+      return { next: entries, patched: 0 };
+    }
+    let patched = 0;
+    const next = entries.map((e) => {
+      const av = String(
+        /** @type {{ avatarUrl?: unknown }} */
+        e?.avatarUrl || ""
+      ).trim();
+      if (av && isHttpOrHttpsUrl(av)) return e;
+      const uid = String(
+        /** @type {{ userId?: unknown }} */
+        e?.userId || ""
+      ).trim();
+      const syn = niconicoDefaultUserIconUrl(uid);
+      if (!syn) return e;
+      patched += 1;
+      return { .../** @type {object} */
+      e, avatarUrl: syn };
+    });
+    return { next, patched };
   }
 
   // src/lib/userCommentProfileCache.js
@@ -2253,14 +2300,18 @@
       officialViewerCount: officialViewerCount2,
       officialCommentCount: officialCommentCount2,
       officialStatsUpdatedAt: officialStatsUpdatedAt2,
+      officialCommentStatsUpdatedAt: ocStatsAtRaw,
       officialViewerIntervalMs: officialViewerIntervalMs2,
       officialCommentSummary
     } = p;
+    const officialCommentStatsUpdatedAt2 = typeof ocStatsAtRaw === "number" && Number.isFinite(ocStatsAtRaw) && ocStatsAtRaw > 0 ? ocStatsAtRaw : 0;
     return {
       officialViewerCount: typeof officialViewerCount2 === "number" && Number.isFinite(officialViewerCount2) && officialViewerCount2 >= 0 ? officialViewerCount2 : null,
       officialCommentCount: typeof officialCommentCount2 === "number" && Number.isFinite(officialCommentCount2) && officialCommentCount2 >= 0 ? officialCommentCount2 : null,
       officialStatsUpdatedAt: officialStatsUpdatedAt2 > 0 ? officialStatsUpdatedAt2 : null,
       officialStatsFreshnessMs: officialStatsUpdatedAt2 > 0 ? Math.max(0, nowMs - officialStatsUpdatedAt2) : null,
+      officialCommentStatsUpdatedAt: officialCommentStatsUpdatedAt2 > 0 ? officialCommentStatsUpdatedAt2 : null,
+      officialCommentStatsFreshnessMs: officialCommentStatsUpdatedAt2 > 0 ? Math.max(0, nowMs - officialCommentStatsUpdatedAt2) : null,
       officialViewerIntervalMs: typeof officialViewerIntervalMs2 === "number" && officialViewerIntervalMs2 > 0 ? officialViewerIntervalMs2 : null,
       officialStatisticsCommentsDelta: officialCommentSummary?.statisticsCommentsDelta ?? null,
       officialReceivedCommentsDelta: officialCommentSummary?.receivedCommentsDelta ?? null,
@@ -2395,6 +2446,7 @@
   var wsViewerCountUpdatedAt = 0;
   var officialViewerCount = null;
   var officialCommentCount = null;
+  var officialCommentStatsUpdatedAt = 0;
   var officialStatsUpdatedAt = 0;
   var officialViewerIntervalMs = null;
   var lastOfficialViewerTickAt = 0;
@@ -2687,6 +2739,7 @@
   var interceptedUsers = /* @__PURE__ */ new Map();
   var activeUserTimestamps = /* @__PURE__ */ new Map();
   var ACTIVE_USER_MAP_MAX = 12e3;
+  var VIEWER_JOIN_FLUSH_SUPPRESS_MS = 2500;
   var interceptedNicknames = /* @__PURE__ */ new Map();
   var interceptedAvatars = /* @__PURE__ */ new Map();
   var INTERCEPT_MAP_MAX = 5e4;
@@ -2769,6 +2822,7 @@
     if (!liveId || !hasExtensionContext()) return;
     const seenNow = Date.now();
     const seenInFlush = /* @__PURE__ */ new Set();
+    const applied = [];
     for (const v of viewers) {
       if (!v || typeof v !== "object") continue;
       const uid = String(
@@ -2777,15 +2831,22 @@
       ).trim();
       if (!uid) continue;
       if (seenInFlush.has(uid)) continue;
+      const lastActive = activeUserTimestamps.get(uid);
+      if (lastActive != null && seenNow - lastActive < VIEWER_JOIN_FLUSH_SUPPRESS_MS) {
+        continue;
+      }
       seenInFlush.add(uid);
-      const nick = String(
-        /** @type {{ nickname?: unknown }} */
-        v.nickname || ""
-      ).trim();
-      const iconRaw = String(
-        /** @type {{ iconUrl?: unknown }} */
-        v.iconUrl || ""
-      ).trim();
+      applied.push(
+        /** @type {Record<string, unknown>} */
+        v
+      );
+    }
+    if (!applied.length) return;
+    for (const v of applied) {
+      const uid = String(v.userId || "").trim();
+      if (!uid) continue;
+      const nick = String(v.nickname || "").trim();
+      const iconRaw = String(v.iconUrl || "").trim();
       const icon = isHttpAvatarUrl(iconRaw) ? iconRaw : "";
       if (nick) interceptedNicknames.set(uid, nick);
       if (icon) interceptedAvatars.set(uid, icon);
@@ -2803,27 +2864,11 @@
       const bag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
       const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
       let cacheTouched = false;
-      const seenProfile = /* @__PURE__ */ new Set();
-      for (const v of viewers) {
-        if (!v || typeof v !== "object") continue;
-        const uid = String(
-          /** @type {{ userId?: unknown }} */
-          v.userId || ""
-        ).trim();
+      for (const v of applied) {
+        const uid = String(v.userId || "").trim();
         if (!uid) continue;
-        if (seenProfile.has(uid)) continue;
-        seenProfile.add(uid);
-        const nick = String(
-          /** @type {{ nickname?: unknown }} */
-          v.nickname || ""
-        ).trim();
-        const iconUrl = isHttpAvatarUrl(
-          /** @type {{ iconUrl?: unknown }} */
-          v.iconUrl
-        ) ? String(
-          /** @type {{ iconUrl?: unknown }} */
-          v.iconUrl || ""
-        ).trim() : "";
+        const nick = String(v.nickname || "").trim();
+        const iconUrl = isHttpAvatarUrl(v.iconUrl) ? String(v.iconUrl || "").trim() : "";
         if (upsertUserCommentProfileFromEntry(profileMap, {
           userId: uid,
           nickname: nick,
@@ -2854,6 +2899,7 @@
   function resetOfficialStatsState() {
     officialViewerCount = null;
     officialCommentCount = null;
+    officialCommentStatsUpdatedAt = 0;
     officialStatsUpdatedAt = 0;
     officialViewerIntervalMs = null;
     lastOfficialViewerTickAt = 0;
@@ -2918,6 +2964,7 @@
     }
     if (typeof stats?.comments === "number" && Number.isFinite(stats.comments) && stats.comments >= 0) {
       officialCommentCount = stats.comments;
+      officialCommentStatsUpdatedAt = at;
       touched = true;
     }
     if (touched) noteOfficialCommentSample(at);
@@ -3077,6 +3124,27 @@
   var PAGE_FRAME_OVERLAY_ID = "nls-watch-prikura-frame";
   var INLINE_POPUP_HOST_ID = "nls-inline-popup-host";
   var INLINE_POPUP_IFRAME_ID = "nls-inline-popup-iframe";
+  var nlsInlinePopupHostSingleton = null;
+  var nlsInlinePanelRenderErrors = [];
+  var NLS_INLINE_PANEL_RENDER_ERR_MAX = 14;
+  function noteInlinePanelRenderError(where, err) {
+    try {
+      nlsInlinePanelRenderErrors.push({
+        t: Date.now(),
+        where: String(where || "").slice(0, 80),
+        message: String(
+          err && typeof err === "object" && "message" in err ? (
+            /** @type {{ message?: unknown }} */
+            err.message
+          ) : err || ""
+        ).slice(0, 500)
+      });
+      while (nlsInlinePanelRenderErrors.length > NLS_INLINE_PANEL_RENDER_ERR_MAX) {
+        nlsInlinePanelRenderErrors.shift();
+      }
+    } catch {
+    }
+  }
   var PAGE_FRAME_LOOP_MS = 360;
   var DEFAULT_PAGE_FRAME = "light";
   var LEGACY_PAGE_FRAME_ALIAS = {
@@ -3225,6 +3293,9 @@
       border: none !important;
       outline: none !important;
       box-shadow: none !important;
+      flex: 0 0 auto;
+      flex-shrink: 0;
+      align-self: flex-start;
     }
     #${INLINE_POPUP_HOST_ID}:focus,
     #${INLINE_POPUP_HOST_ID}:focus-within {
@@ -3250,6 +3321,9 @@
       outline: none !important;
       box-shadow: none !important;
     }
+    #${INLINE_POPUP_HOST_ID}.nls-inline-host--floating {
+      -webkit-overflow-scrolling: touch;
+    }
   `;
     document.head.appendChild(style);
   }
@@ -3265,7 +3339,13 @@
   }
   function ensureInlinePopupHost() {
     let host = document.getElementById(INLINE_POPUP_HOST_ID);
-    if (host) return host;
+    if (host) {
+      nlsInlinePopupHostSingleton = host;
+      return host;
+    }
+    if (nlsInlinePopupHostSingleton && nlsInlinePopupHostSingleton.id === INLINE_POPUP_HOST_ID) {
+      return nlsInlinePopupHostSingleton;
+    }
     host = document.createElement("div");
     host.id = INLINE_POPUP_HOST_ID;
     host.setAttribute("aria-hidden", "true");
@@ -3282,7 +3362,71 @@
     } catch {
     }
     host.appendChild(iframe);
+    nlsInlinePopupHostSingleton = host;
     return host;
+  }
+  function inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter) {
+    if (!(host instanceof HTMLElement) || !(insertAfter instanceof HTMLElement)) {
+      return host.parentNode === hostParent && host.previousSibling === insertAfter;
+    }
+    return host.parentNode === hostParent && host.previousElementSibling === insertAfter;
+  }
+  function clearInlineHostFloatingLayout(host) {
+    if (!(host instanceof HTMLElement)) return;
+    host.classList.remove("nls-inline-host--floating");
+    host.style.position = "";
+    host.style.top = "";
+    host.style.right = "";
+    host.style.left = "";
+    host.style.bottom = "";
+    host.style.maxHeight = "";
+    host.style.overflow = "";
+    host.style.overflowX = "";
+    host.style.overflowY = "";
+    host.style.boxShadow = "";
+    host.style.borderRadius = "";
+    host.style.background = "";
+    host.style.zIndex = "";
+  }
+  function renderInlinePanelFloatingHost() {
+    const host = ensureInlinePopupHost();
+    const viewport = nlsViewportSize();
+    const pad = 12;
+    const panelW = Math.min(420, Math.max(280, viewport.innerWidth - pad * 2));
+    const maxH = Math.min(Math.round(viewport.innerHeight * 0.92), 900);
+    const iframeH = Math.min(580, Math.round(viewport.innerHeight * 0.78));
+    if (host.parentNode !== document.body) {
+      document.body.appendChild(host);
+    }
+    host.classList.add("nls-inline-host--floating");
+    host.style.position = "fixed";
+    host.style.top = `${pad}px`;
+    host.style.right = `${pad}px`;
+    host.style.left = "";
+    host.style.bottom = "";
+    host.style.width = `${panelW}px`;
+    host.style.maxWidth = `${panelW}px`;
+    host.style.maxHeight = `${maxH}px`;
+    host.style.overflow = "auto";
+    host.style.overflowX = "hidden";
+    host.style.marginLeft = "0";
+    host.style.boxSizing = "border-box";
+    host.style.zIndex = "2147483646";
+    host.style.boxShadow = "0 12px 40px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.08)";
+    host.style.borderRadius = "14px";
+    host.style.background = "transparent";
+    const iframe = (
+      /** @type {HTMLIFrameElement|null} */
+      host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+    );
+    if (iframe) {
+      iframe.style.width = `${panelW}px`;
+      iframe.style.height = `${Math.min(iframeH, maxH - 12)}px`;
+      iframe.style.maxHeight = `${Math.min(iframeH, maxH - 12)}px`;
+    }
+    host.style.pointerEvents = "auto";
+    host.setAttribute("aria-hidden", "false");
+    host.style.display = "block";
   }
   function findFrameInsertAnchorFromVideo(base) {
     if (!(base instanceof HTMLElement)) return base;
@@ -3350,10 +3494,152 @@
     return best;
   }
   var inlinePanelWidthMode = normalizeInlinePanelWidthMode(void 0);
+  var inlinePanelPlacementMode = normalizeInlinePanelPlacement(void 0);
+  function insertionParentForElement(el) {
+    if (!(el instanceof HTMLElement)) return null;
+    if (el.parentElement) return el.parentElement;
+    const pn = el.parentNode;
+    if (pn && typeof pn.insertBefore === "function" && typeof pn.appendChild === "function") {
+      return (
+        /** @type {ParentNode} */
+        pn
+      );
+    }
+    return null;
+  }
+  function getInsertionContainerRect(hostParent, viewport) {
+    if (hostParent instanceof HTMLElement) {
+      const r = hostParent.getBoundingClientRect();
+      return {
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height
+      };
+    }
+    if (hostParent instanceof ShadowRoot) {
+      const h = hostParent.host;
+      if (h instanceof HTMLElement) {
+        const r = h.getBoundingClientRect();
+        return {
+          left: r.left,
+          top: r.top,
+          width: r.width,
+          height: r.height
+        };
+      }
+    }
+    return {
+      left: 0,
+      top: 0,
+      width: viewport.innerWidth,
+      height: viewport.innerHeight
+    };
+  }
+  function resolveInlinePanelInsertAnchor(domAnchor, placement) {
+    if (!(domAnchor instanceof HTMLElement)) {
+      return {
+        insertAfter: (
+          /** @type {HTMLElement} */
+          domAnchor
+        ),
+        hostParent: null
+      };
+    }
+    if (placement === INLINE_PANEL_PLACEMENT_FLOATING) {
+      return {
+        insertAfter: domAnchor,
+        hostParent: null
+      };
+    }
+    if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
+      return {
+        insertAfter: domAnchor,
+        hostParent: insertionParentForElement(domAnchor)
+      };
+    }
+    const rowLikeEl = domAnchor.parentElement;
+    if (!rowLikeEl) {
+      return {
+        insertAfter: domAnchor,
+        hostParent: insertionParentForElement(domAnchor)
+      };
+    }
+    try {
+      const cs = window.getComputedStyle(rowLikeEl);
+      const isRowFlex = cs.display === "flex" && (cs.flexDirection === "row" || cs.flexDirection === "row-reverse");
+      if (isRowFlex) {
+        const rowHostParent = insertionParentForElement(rowLikeEl);
+        if (rowHostParent) {
+          return { insertAfter: rowLikeEl, hostParent: rowHostParent };
+        }
+      }
+    } catch {
+    }
+    return {
+      insertAfter: domAnchor,
+      hostParent: insertionParentForElement(domAnchor)
+    };
+  }
+  function findBesideFlexRowColumnInsertion(video) {
+    if (!(video instanceof HTMLElement)) return null;
+    const vw = window.innerWidth;
+    const minRowW = Math.min(720, Math.max(400, vw * 0.46));
+    let node = video;
+    for (let depth = 0; depth < 24 && node && node !== document.body; depth++) {
+      const parent = node.parentElement;
+      if (!parent) break;
+      try {
+        const cs = window.getComputedStyle(parent);
+        const isRowFlex = cs.display === "flex" && (cs.flexDirection === "row" || cs.flexDirection === "row-reverse");
+        if (isRowFlex && node.parentElement === parent && parent.children.length >= 2) {
+          const rr = parent.getBoundingClientRect();
+          if (rr.width >= minRowW) {
+            return { insertAfter: node, hostParent: parent };
+          }
+        }
+      } catch {
+      }
+      node = parent;
+    }
+    return null;
+  }
   function renderInlineHostAnchoredToVideo(video) {
-    const insertAfter = findFrameInsertAnchorFromVideo(video);
-    const parent = insertAfter.parentElement;
-    if (!parent) return;
+    clearInlineHostFloatingLayout(ensureInlinePopupHost());
+    const domAnchor = findFrameInsertAnchorFromVideo(video);
+    const insertResolveAnchor = inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE ? video : domAnchor;
+    let insertAfter;
+    let hostParent;
+    let besideFlexRowColumn = false;
+    if (inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE) {
+      const col = findBesideFlexRowColumnInsertion(video);
+      if (col?.hostParent && col.insertAfter) {
+        insertAfter = col.insertAfter;
+        hostParent = col.hostParent;
+        besideFlexRowColumn = true;
+      } else {
+        const r = resolveInlinePanelInsertAnchor(
+          insertResolveAnchor,
+          inlinePanelPlacementMode
+        );
+        insertAfter = /** @type {HTMLElement} */
+        r.insertAfter;
+        hostParent = r.hostParent;
+      }
+    } else {
+      const r = resolveInlinePanelInsertAnchor(
+        domAnchor,
+        inlinePanelPlacementMode
+      );
+      insertAfter = /** @type {HTMLElement} */
+      r.insertAfter;
+      hostParent = r.hostParent;
+    }
+    let hostAttachFallbackBody = false;
+    if (!hostParent) {
+      hostParent = document.body;
+      hostAttachFallbackBody = true;
+    }
     const host = ensureInlinePopupHost();
     const vr = video.getBoundingClientRect();
     if (vr.width < 260 || vr.height < 140) {
@@ -3361,10 +3647,10 @@
       host.setAttribute("aria-hidden", "true");
       return;
     }
-    const pr = parent.getBoundingClientRect();
     const viewport = nlsViewportSize();
-    const mode = inlinePanelWidthMode === "video" ? "video" : "player_row";
-    const rowRect = mode === "player_row" ? resolvePlayerRowRect(video, insertAfter) : null;
+    const pr = getInsertionContainerRect(hostParent, viewport);
+    const mode = besideFlexRowColumn || inlinePanelWidthMode === "video" ? "video" : "player_row";
+    const rowRect = mode === "player_row" ? resolvePlayerRowRect(video, domAnchor) : null;
     const { panelWidthPx, marginLeftPx } = computeInlinePanelLayout(mode, {
       videoRect: {
         width: vr.width,
@@ -3381,53 +3667,103 @@
       },
       viewport
     });
-    const insertNext = insertAfter.nextSibling;
-    const needsMove = host.parentElement !== parent || host.previousSibling !== insertAfter;
-    if (needsMove) {
-      if (insertNext) parent.insertBefore(host, insertNext);
-      else parent.appendChild(host);
+    if (hostAttachFallbackBody) {
+      if (host.parentNode !== hostParent) hostParent.appendChild(host);
+    } else {
+      if (!inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter)) {
+        insertAfter.insertAdjacentElement("afterend", host);
+      }
     }
     host.style.boxSizing = "border-box";
-    host.style.marginLeft = `${marginLeftPx}px`;
+    host.style.marginLeft = hostAttachFallbackBody || besideFlexRowColumn ? "0" : `${marginLeftPx}px`;
     host.style.maxWidth = "100%";
-    host.style.width = `${panelWidthPx}px`;
+    host.style.width = hostAttachFallbackBody ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px` : `${panelWidthPx}px`;
     const iframe = (
       /** @type {HTMLIFrameElement|null} */
       host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
     );
-    if (iframe) iframe.style.width = `${panelWidthPx}px`;
+    if (iframe)
+      iframe.style.width = hostAttachFallbackBody ? host.style.width : `${panelWidthPx}px`;
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
   }
   function renderInlinePopupHost(target) {
+    if (!(target instanceof HTMLElement)) return;
+    clearInlineHostFloatingLayout(ensureInlinePopupHost());
+    let video = null;
     if (target instanceof HTMLVideoElement) {
-      renderInlineHostAnchoredToVideo(target);
+      video = target;
+    } else {
+      const cand = pickInlinePanelVideoWithinTarget(target);
+      if (cand) {
+        const vr = cand.getBoundingClientRect();
+        if (vr.width >= 260 && vr.height >= 140) {
+          video = cand;
+        }
+      }
+    }
+    if (video) {
+      renderInlineHostAnchoredToVideo(video);
       return;
     }
-    const parent = target.parentElement;
-    if (!parent) return;
-    const host = ensureInlinePopupHost();
-    host.style.marginLeft = "";
-    host.style.maxWidth = "";
     const currentRect = target.getBoundingClientRect();
+    const hostEarly = ensureInlinePopupHost();
     if (currentRect.width < 260 || currentRect.height < 140) {
-      host.style.display = "none";
-      host.setAttribute("aria-hidden", "true");
+      hostEarly.style.display = "none";
+      hostEarly.setAttribute("aria-hidden", "true");
       return;
     }
-    if (host.parentElement !== parent || host.previousSibling !== target) {
-      const next = target.nextSibling;
-      if (next) parent.insertBefore(host, next);
-      else parent.appendChild(host);
+    const { insertAfter, hostParent: resolvedHostParent } = resolveInlinePanelInsertAnchor(target, inlinePanelPlacementMode);
+    let hostParent = resolvedHostParent;
+    let hostAttachFallbackBody = false;
+    if (!hostParent) {
+      hostParent = document.body;
+      hostAttachFallbackBody = true;
     }
-    const panelWidth = Math.max(320, Math.round(currentRect.width));
+    const host = ensureInlinePopupHost();
+    const viewport = nlsViewportSize();
+    const pr = getInsertionContainerRect(hostParent, viewport);
+    const mode = inlinePanelWidthMode === "video" ? "video" : "player_row";
+    const rowRect = mode === "player_row" ? {
+      left: currentRect.left,
+      top: currentRect.top,
+      width: currentRect.width,
+      height: currentRect.height
+    } : null;
+    const { panelWidthPx, marginLeftPx } = computeInlinePanelLayout(mode, {
+      videoRect: {
+        width: currentRect.width,
+        height: currentRect.height,
+        top: currentRect.top,
+        left: currentRect.left
+      },
+      rowRect,
+      parentRect: {
+        width: pr.width,
+        height: pr.height,
+        top: pr.top,
+        left: pr.left
+      },
+      viewport
+    });
+    if (hostAttachFallbackBody) {
+      if (host.parentNode !== hostParent) hostParent.appendChild(host);
+    } else {
+      if (!inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter)) {
+        insertAfter.insertAdjacentElement("afterend", host);
+      }
+    }
+    host.style.boxSizing = "border-box";
+    host.style.marginLeft = hostAttachFallbackBody ? "0" : `${marginLeftPx}px`;
+    host.style.maxWidth = "100%";
+    host.style.width = hostAttachFallbackBody ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px` : `${panelWidthPx}px`;
     const iframe = (
       /** @type {HTMLIFrameElement|null} */
       host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
     );
-    if (iframe) iframe.style.width = `${panelWidth}px`;
-    host.style.width = `${panelWidth}px`;
+    if (iframe)
+      iframe.style.width = hostAttachFallbackBody ? host.style.width : `${panelWidthPx}px`;
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
@@ -3435,7 +3771,7 @@
   function hidePageFrameOverlay() {
     const overlay = document.getElementById(PAGE_FRAME_OVERLAY_ID);
     if (overlay) overlay.style.display = "none";
-    const host = document.getElementById(INLINE_POPUP_HOST_ID);
+    const host = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
     if (host) {
       host.style.display = "none";
       host.setAttribute("aria-hidden", "true");
@@ -3481,6 +3817,26 @@
     const st = window.getComputedStyle(video);
     if (st.visibility === "hidden" || st.display === "none") return null;
     return video;
+  }
+  function pickInlinePanelVideoWithinTarget(target) {
+    if (!(target instanceof HTMLElement)) return null;
+    if (target instanceof HTMLVideoElement) {
+      const r = target.getBoundingClientRect();
+      return r.width >= 260 && r.height >= 140 ? target : null;
+    }
+    const list = Array.from(target.querySelectorAll("video")).filter(
+      (v) => v instanceof HTMLVideoElement
+    );
+    for (const v of list) {
+      const r = v.getBoundingClientRect();
+      const st = window.getComputedStyle(v);
+      if (r.width >= 260 && r.height >= 140 && st.visibility !== "hidden" && st.display !== "none") {
+        return v;
+      }
+    }
+    const picked = pickBestInlinePanelVideo();
+    if (picked && target.contains(picked)) return picked;
+    return null;
   }
   function findWatchFrameTargetElement() {
     let video = pickBestInlinePanelVideo();
@@ -3540,19 +3896,27 @@
       hidePageFrameOverlay();
       return;
     }
-    const target = findWatchFrameTargetElement();
-    if (!target) {
-      hidePageFrameOverlay();
-      return;
+    try {
+      const overlay = ensurePageFrameOverlay();
+      overlay.style.display = "none";
+      if (inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_FLOATING) {
+        renderInlinePanelFloatingHost();
+      } else {
+        const target = findWatchFrameTargetElement();
+        if (!target) {
+          hidePageFrameOverlay();
+        } else {
+          const rect = target.getBoundingClientRect();
+          if (rect.width < 260 || rect.height < 140) {
+            hidePageFrameOverlay();
+          } else {
+            renderInlinePopupHost(target);
+          }
+        }
+      }
+    } catch (e) {
+      noteInlinePanelRenderError("renderPageFrameOverlay", e);
     }
-    const rect = target.getBoundingClientRect();
-    if (rect.width < 260 || rect.height < 140) {
-      hidePageFrameOverlay();
-      return;
-    }
-    const overlay = ensurePageFrameOverlay();
-    overlay.style.display = "none";
-    renderInlinePopupHost(target);
     startPageFrameLoop();
   }
   async function loadPageFrameSettings() {
@@ -3560,10 +3924,14 @@
     const bag = await chrome.storage.local.get([
       KEY_POPUP_FRAME,
       KEY_POPUP_FRAME_CUSTOM,
-      KEY_INLINE_PANEL_WIDTH_MODE
+      KEY_INLINE_PANEL_WIDTH_MODE,
+      KEY_INLINE_PANEL_PLACEMENT
     ]);
     inlinePanelWidthMode = normalizeInlinePanelWidthMode(
       bag[KEY_INLINE_PANEL_WIDTH_MODE]
+    );
+    inlinePanelPlacementMode = normalizeInlinePanelPlacement(
+      bag[KEY_INLINE_PANEL_PLACEMENT]
     );
     const rawFrame = normalizePageFrameId(bag[KEY_POPUP_FRAME]);
     pageFrameState.frameId = rawFrame === "custom" || hasPageFramePreset(rawFrame) ? rawFrame : DEFAULT_PAGE_FRAME;
@@ -4223,6 +4591,7 @@
         officialViewerCount,
         officialCommentCount,
         officialStatsUpdatedAt,
+        officialCommentStatsUpdatedAt,
         officialViewerIntervalMs,
         officialCommentSummary
       }),
@@ -4292,6 +4661,133 @@
     }
     const MAX = 12e3;
     return items.length > MAX ? items.slice(items.length - MAX) : items;
+  }
+  function buildAiSharePageDiagnostics() {
+    const g = typeof globalThis !== "undefined" ? globalThis : window;
+    const href = String(window.location.href || "");
+    let isTop = true;
+    try {
+      isTop = window.self === window.top;
+    } catch {
+      isTop = true;
+    }
+    const target = findWatchFrameTargetElement();
+    let insertionPlan = null;
+    if (inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_FLOATING) {
+      insertionPlan = {
+        mode: "floating",
+        description: "fixed top-right on viewport; not inserted into player DOM"
+      };
+    } else if (target instanceof HTMLElement) {
+      let video = null;
+      if (target instanceof HTMLVideoElement) {
+        video = target;
+      } else {
+        const cand = pickInlinePanelVideoWithinTarget(target);
+        if (cand) {
+          const vr = cand.getBoundingClientRect();
+          if (vr.width >= 260 && vr.height >= 140) video = cand;
+        }
+      }
+      let insertResolve = target;
+      if (video) {
+        const domAnchor = findFrameInsertAnchorFromVideo(video);
+        insertResolve = inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE ? video : domAnchor;
+      }
+      let insertAfter;
+      let hostParent;
+      let besideFlexRowColumnChosen = false;
+      if (video && inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE) {
+        const col = findBesideFlexRowColumnInsertion(video);
+        if (col?.hostParent && col.insertAfter) {
+          insertAfter = col.insertAfter;
+          hostParent = col.hostParent;
+          besideFlexRowColumnChosen = true;
+        } else {
+          const r = resolveInlinePanelInsertAnchor(
+            insertResolve,
+            inlinePanelPlacementMode
+          );
+          insertAfter = /** @type {HTMLElement} */
+          r.insertAfter;
+          hostParent = r.hostParent;
+        }
+      } else {
+        const r = resolveInlinePanelInsertAnchor(
+          insertResolve,
+          inlinePanelPlacementMode
+        );
+        insertAfter = /** @type {HTMLElement} */
+        r.insertAfter;
+        hostParent = r.hostParent;
+      }
+      const hpKind = hostParent == null ? "null" : hostParent instanceof ShadowRoot ? "ShadowRoot" : hostParent instanceof HTMLElement ? String(hostParent.nodeName || "").toLowerCase() : typeof hostParent;
+      insertionPlan = {
+        insertResolveTag: insertResolve instanceof HTMLElement ? String(insertResolve.tagName || "").toLowerCase() : "?",
+        insertAfterTag: insertAfter instanceof HTMLElement ? String(insertAfter.tagName || "").toLowerCase() : "?",
+        hostParentKind: hpKind,
+        usedVideoPath: Boolean(video),
+        besideFlexRowColumnChosen
+      };
+    }
+    const host = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+    let hostBrief = null;
+    if (host) {
+      const cs = window.getComputedStyle(host);
+      const r = host.getBoundingClientRect();
+      hostBrief = {
+        isConnected: host.isConnected,
+        inlineDisplay: host.style.display || "",
+        computedDisplay: cs.display,
+        computedVisibility: cs.visibility,
+        rectTop: Math.round(r.top),
+        rectLeft: Math.round(r.left),
+        rectW: Math.round(r.width),
+        rectH: Math.round(r.height),
+        parentNodeName: host.parentNode ? host.parentNode.nodeName : "",
+        parentIsShadowRoot: host.parentNode instanceof ShadowRoot
+      };
+    }
+    let targetBrief = null;
+    if (target instanceof HTMLElement) {
+      const r = target.getBoundingClientRect();
+      targetBrief = {
+        tag: String(target.tagName || "").toLowerCase(),
+        id: String(target.id || "").slice(0, 100),
+        cls: String(target.className || "").slice(0, 200),
+        rectW: Math.round(r.width),
+        rectH: Math.round(r.height)
+      };
+    }
+    return {
+      exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      frame: {
+        isTop,
+        href: href.slice(0, 500),
+        userAgent: String(navigator.userAgent || "").slice(0, 280)
+      },
+      contentScript: {
+        hasExtensionContext: hasExtensionContext(),
+        executionStarted: Boolean(g.__NLS_CONTENT_ENTRY_STARTED__),
+        dataNlsActive: document.documentElement?.getAttribute?.("data-nls-active") ?? null,
+        shouldRunWatchContentInThisFrame: shouldRunWatchContentInThisFrame()
+      },
+      watch: {
+        isNicoLiveWatchUrl: isNicoLiveWatchUrl(href)
+      },
+      player: {
+        videoCount: document.querySelectorAll("video").length,
+        frameTarget: targetBrief
+      },
+      inlinePanel: {
+        placementMode: inlinePanelPlacementMode,
+        widthMode: inlinePanelWidthMode,
+        insertionPlan,
+        host: hostBrief,
+        recentRenderErrors: nlsInlinePanelRenderErrors.slice()
+      },
+      pageFrameLoopTimerActive: Boolean(pageFrameLoopTimer)
+    };
   }
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!hasExtensionContext()) return;
@@ -4440,6 +4936,25 @@
       })();
       return true;
     }
+    if (msg.type === "NLS_AI_SHARE_PAGE_DIAGNOSTICS") {
+      try {
+        sendResponse({
+          ok: true,
+          diagnostics: buildAiSharePageDiagnostics()
+        });
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          error: String(
+            err && typeof err === "object" && "message" in err ? (
+              /** @type {{ message?: unknown }} */
+              err.message
+            ) : err || "diag_failed"
+          )
+        });
+      }
+      return true;
+    }
   });
   function rememberWatchPageUrl() {
     if (!hasExtensionContext()) return;
@@ -4532,9 +5047,6 @@
     return broadcasterUidCache;
   }
   function enrichRowsWithInterceptedUserIds(rows) {
-    if (!interceptedUsers.size && !interceptedNicknames.size && !interceptedAvatars.size) {
-      return rows;
-    }
     const broadcasterUid = detectBroadcasterUserIdFromDom();
     return rows.map((r) => {
       const no = String(r.commentNo ?? "").trim();
@@ -4741,6 +5253,11 @@
       const profileApplied = applyUserCommentProfileMapToEntries(next, profileMap);
       if (profileApplied.patched > 0) {
         next = profileApplied.next;
+        storageTouched = true;
+      }
+      const bfAv = backfillNumericSyntheticAvatarsOnStoredComments(next);
+      if (bfAv.patched > 0) {
+        next = bfAv.next;
         storageTouched = true;
       }
       const profileKeysBefore = Object.keys(profileMap).length;
@@ -5337,6 +5854,14 @@
           renderPageFrameOverlay();
         }
       }
+      if (changes[KEY_INLINE_PANEL_PLACEMENT]) {
+        if (isWatchInlinePanelTopFrame()) {
+          inlinePanelPlacementMode = normalizeInlinePanelPlacement(
+            changes[KEY_INLINE_PANEL_PLACEMENT].newValue
+          );
+          renderPageFrameOverlay();
+        }
+      }
       if (changes[KEY_THUMB_AUTO] || changes[KEY_THUMB_INTERVAL_MS]) {
         readThumbSettings().then(() => applyThumbSchedule()).catch(() => {
         });
@@ -5401,8 +5926,13 @@
       pollStatsFromPage();
     }, STATS_POLL_MS);
   }
-  if (!document.documentElement.hasAttribute("data-nls-active")) {
-    document.documentElement.setAttribute("data-nls-active", "1");
+  var __nlsBootGlobal = typeof globalThis !== "undefined" ? globalThis : window;
+  if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
+    __nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__ = true;
+    try {
+      document.documentElement.setAttribute("data-nls-active", "1");
+    } catch {
+    }
     start().catch(() => {
     });
   }

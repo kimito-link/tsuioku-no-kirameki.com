@@ -11,6 +11,10 @@ import {
 } from '../lib/nicoAnonymousDisplay.js';
 import {
   KEY_INLINE_PANEL_WIDTH_MODE,
+  KEY_INLINE_PANEL_PLACEMENT,
+  INLINE_PANEL_PLACEMENT_BELOW,
+  INLINE_PANEL_PLACEMENT_BESIDE,
+  INLINE_PANEL_PLACEMENT_FLOATING,
   KEY_CALM_PANEL_MOTION,
   EXTENSION_SOFT_CACHE_STORAGE_KEYS,
   KEY_POPUP_FRAME,
@@ -40,6 +44,7 @@ import {
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
+  normalizeInlinePanelPlacement,
   normalizeCalmPanelMotion
 } from '../lib/storageKeys.js';
 import { normalizeSupportVisualExpanded } from '../lib/supportVisualExpanded.js';
@@ -206,6 +211,8 @@ import {
  *   officialCommentCount?: number|null,
  *   officialStatsUpdatedAt?: number|null,
  *   officialStatsFreshnessMs?: number|null,
+ *   officialCommentStatsUpdatedAt?: number|null,
+ *   officialCommentStatsFreshnessMs?: number|null,
  *   officialViewerIntervalMs?: number|null,
  *   officialStatisticsCommentsDelta?: number|null,
  *   officialReceivedCommentsDelta?: number|null,
@@ -435,7 +442,7 @@ function setCountDisplay(value, watchSnapshot = null) {
       }
       officialEl.textContent = line;
       officialEl.title =
-        '公式は配信開始からの累計です。同じタブで見続け、NDGR（ページ内インターセプト）が効いているときは記録が公式にかなり近づく使い方も多いです。途中入室だと入室前の分だけ公式が先に増え、率は一気に低く見えます。左はこのPCのストレージの行数。仮想リスト・記録OFF・非表示タブ・サイト改修・ストレージ上限でも差が出ます。';
+        'この「公式」は視聴用WebSocket等の statistics メッセージ（comments / commentCount）の累計です。プレイヤー付近に出るコメント数とは別経路のため一致しないことがあります。比較の基準はこちらです。同じタブで見続け、NDGR（ページ内インターセプト）が効いているときは記録が近づきやすいです。途中入室・仮想リスト・記録OFF・非表示タブ・サイト改修・ストレージ上限でも差が出ます。';
     } else {
       officialEl.hidden = true;
       officialEl.textContent = '';
@@ -1188,6 +1195,35 @@ async function copyTextToClipboard(text) {
   } catch {
     return copyTextViaExecCommand(text);
   }
+}
+
+/**
+ * @param {{
+ *   extensionName: string;
+ *   extensionVersion: string;
+ *   watchUrlNote: string;
+ *   lastSendMessageError: string;
+ *   payload: Record<string, unknown>;
+ * }} parts
+ */
+function formatAiShareDiagnosticsMarkdown(parts) {
+  const lines = [];
+  lines.push('## nicolivelog 診断バンドル（AI 共有用）');
+  lines.push('');
+  lines.push(
+    '次の JSON ブロックをそのまま AI に貼ってください。拡張を再読み込みした直後は watch ページを **F5** してください。'
+  );
+  lines.push('');
+  lines.push(`- 拡張: ${parts.extensionName} v${parts.extensionVersion}`);
+  lines.push(`- タブ選択: ${parts.watchUrlNote}`);
+  if (parts.lastSendMessageError) {
+    lines.push(`- content への送信: \`${parts.lastSendMessageError}\``);
+  }
+  lines.push('');
+  lines.push('```json');
+  lines.push(JSON.stringify(parts.payload, null, 2));
+  lines.push('```');
+  return lines.join('\n');
 }
 
 function syncFrameShareInput() {
@@ -4737,7 +4773,17 @@ function renderAcquisitionDashboard(p) {
 
   const avs = p.avatarStats;
   const t = avs && typeof avs.total === 'number' ? Math.max(0, avs.total) : 0;
-  const thumb = t > 0 ? (avs.withHttpAvatar / t) * 100 : 0;
+  const withHttpStored =
+    avs && typeof avs.withHttpAvatar === 'number' && Number.isFinite(avs.withHttpAvatar)
+      ? Math.max(0, avs.withHttpAvatar)
+      : 0;
+  const resolvedRaw =
+    avs && typeof avs.withResolvedAvatar === 'number' && Number.isFinite(avs.withResolvedAvatar)
+      ? Math.max(0, avs.withResolvedAvatar)
+      : null;
+  const thumbNumerator =
+    resolvedRaw != null ? Math.min(resolvedRaw, t || resolvedRaw) : withHttpStored;
+  const thumb = t > 0 ? (thumbNumerator / t) * 100 : 0;
   const idPct = t > 0 ? ((t - avs.missingUserId) / t) * 100 : 0;
   const nick = t > 0 ? (avs.withNickname / t) * 100 : 0;
   const oc =
@@ -4829,7 +4875,13 @@ function renderAcquisitionDashboard(p) {
     commentPct != null
       ? 'コメント＝記録の表示件数÷公式コメント数（上限100%）。'
       : 'コメント率は公式件数が無いとき「—」（レーダー・円のコメント分は0扱い）。';
-  const foot = escapeHtml(footExtra ? `${footMain} ${footExtra}` : footMain);
+  const footThumb =
+    t > 0
+      ? ' サムネ＝応援レーンと同じく「表示に使える http(s) アイコン」まで解決できた割合（数字IDの既定CDN合成を含む。匿名形式はページ側の追加情報が無いと上がりにくい）。'
+      : '';
+  const foot = escapeHtml(
+    footExtra ? `${footMain}${footThumb} ${footExtra}` : `${footMain}${footThumb}`
+  );
 
   host.innerHTML =
     '<section class="nl-acquisition" aria-label="データ取得率">' +
@@ -4873,7 +4925,7 @@ function renderAcquisitionDashboard(p) {
     '</div>' +
     '</div>' +
     '<ul class="nl-acquisition__legend">' +
-    `<li><span class="nl-acquisition__dot nl-acquisition__dot--thumb" aria-hidden="true"></span>アイコン画像のURL（取れている割合）</li>` +
+    `<li><span class="nl-acquisition__dot nl-acquisition__dot--thumb" aria-hidden="true"></span>アイコン（表示解決・応援レーンと同じ基準）</li>` +
     `<li><span class="nl-acquisition__dot nl-acquisition__dot--id" aria-hidden="true"></span>ユーザーID（取れている割合）</li>` +
     `<li><span class="nl-acquisition__dot nl-acquisition__dot--nick" aria-hidden="true"></span>表示名・ニックネーム（付いている割合）</li>` +
     `<li><span class="nl-acquisition__dot nl-acquisition__dot--comment" aria-hidden="true"></span>コメント（記録÷公式）</li>` +
@@ -5039,6 +5091,43 @@ function renderDevMonitorPanel(p) {
   rows.push(['このPCに保存した件数', String(p.storageCount)]);
   rows.push(['一覧に出している件数', String(p.displayCount)]);
   rows.push(['公式の累計コメント数', oc != null ? String(oc) : '—']);
+  {
+    const DEV_OFFICIAL_COMMENT_STALE_MS = 120_000;
+    const ocsu =
+      snap &&
+      typeof snap.officialCommentStatsUpdatedAt === 'number' &&
+      Number.isFinite(snap.officialCommentStatsUpdatedAt) &&
+      snap.officialCommentStatsUpdatedAt > 0
+        ? snap.officialCommentStatsUpdatedAt
+        : null;
+    const ocf =
+      snap &&
+      typeof snap.officialCommentStatsFreshnessMs === 'number' &&
+      Number.isFinite(snap.officialCommentStatsFreshnessMs)
+        ? snap.officialCommentStatsFreshnessMs
+        : null;
+    if (ocsu != null) {
+      rows.push([
+        '公式コメント数・最終更新（ローカル時刻）',
+        new Date(ocsu).toLocaleString('ja-JP', { hour12: false })
+      ]);
+    }
+    if (ocf != null && ocsu != null) {
+      const sec = Math.max(0, Math.round(ocf / 1000));
+      const stale = ocf > DEV_OFFICIAL_COMMENT_STALE_MS;
+      rows.push([
+        '公式コメント数・更新からの経過',
+        stale
+          ? `${sec} 秒前（やや古い可能性: タブを前面に・通信確認・必要なら再読込）`
+          : `${sec} 秒前`
+      ]);
+    } else if (oc != null && ocsu == null) {
+      rows.push([
+        '公式コメント数・最終更新',
+        '未取得（statistics の comments がまだ来ていません）'
+      ]);
+    }
+  }
   rows.push(['公式との差（公式−一覧）', gap != null ? String(gap) : '—']);
   rows.push([
     '差が出る主な理由（参考）',
@@ -5057,6 +5146,19 @@ function renderDevMonitorPanel(p) {
       'アイコンURLがある割合',
       `${((avs.withHttpAvatar / avs.total) * 100).toFixed(1)}%`
     ]);
+    if (
+      typeof avs.withResolvedAvatar === 'number' &&
+      Number.isFinite(avs.withResolvedAvatar)
+    ) {
+      rows.push([
+        'アイコンが表示解決できた件数（応援レーン基準）',
+        String(avs.withResolvedAvatar)
+      ]);
+      rows.push([
+        '表示解決がある割合',
+        `${((avs.withResolvedAvatar / avs.total) * 100).toFixed(1)}%`
+      ]);
+    }
     rows.push(['既定アイコン相当のみの件数', String(avs.syntheticDefaultAvatar)]);
     rows.push(['表示名（ニックネーム）がある件数', String(avs.withNickname)]);
     rows.push(['表示名が無い件数', String(avs.withoutNickname)]);
@@ -5141,6 +5243,14 @@ function renderDevMonitorPanel(p) {
       : undefined
   );
   const outJson = { ...debugSub };
+  if (snap && typeof snap === 'object') {
+    if (snap.officialCommentStatsUpdatedAt != null) {
+      outJson.officialCommentStatsUpdatedAt = snap.officialCommentStatsUpdatedAt;
+    }
+    if (snap.officialCommentStatsFreshnessMs != null) {
+      outJson.officialCommentStatsFreshnessMs = snap.officialCommentStatsFreshnessMs;
+    }
+  }
   if (avs && avs.total > 0) {
     outJson.avatarStats = avs;
   }
@@ -5180,6 +5290,7 @@ async function refresh() {
       KEY_RECORDING,
       KEY_DEEP_HARVEST_QUIET_UI,
       KEY_INLINE_PANEL_WIDTH_MODE,
+      KEY_INLINE_PANEL_PLACEMENT,
       KEY_CALM_PANEL_MOTION,
       KEY_STORAGE_WRITE_ERROR,
       KEY_COMMENT_PANEL_STATUS
@@ -5227,6 +5338,28 @@ async function refresh() {
   if (radioPlayerRow && radioVideoOnly) {
     radioPlayerRow.checked = panelMode === INLINE_PANEL_WIDTH_PLAYER_ROW;
     radioVideoOnly.checked = panelMode === INLINE_PANEL_WIDTH_VIDEO;
+  }
+  const placementMode = normalizeInlinePanelPlacement(
+    openBag[KEY_INLINE_PANEL_PLACEMENT]
+  );
+  const radioPlacementBelow = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelPlacementBelow')
+  );
+  const radioPlacementBeside = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelPlacementBeside')
+  );
+  const radioPlacementFloating = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelPlacementFloating')
+  );
+  if (radioPlacementBelow) {
+    radioPlacementBelow.checked = placementMode === INLINE_PANEL_PLACEMENT_BELOW;
+  }
+  if (radioPlacementBeside) {
+    radioPlacementBeside.checked = placementMode === INLINE_PANEL_PLACEMENT_BESIDE;
+  }
+  if (radioPlacementFloating) {
+    radioPlacementFloating.checked =
+      placementMode === INLINE_PANEL_PLACEMENT_FLOATING;
   }
   syncVoiceCommentButton();
 
@@ -5469,14 +5602,18 @@ async function refresh() {
     const growthEl = /** @type {HTMLElement|null} */ ($('sceneStoryGrowth'));
     if (growthEl) patchStoryGrowthIconsFromSource(growthEl);
 
-    renderDevMonitorPanel({
-      snapshot: watchSnapshot,
-      liveId: lv,
-      displayCount: displayEntries.length,
-      storageCount: arr.length,
-      avatarStats: summarizeStoredCommentAvatarStats(arr),
-      profileGaps: summarizeStoredCommentProfileGaps(arr)
-    });
+    {
+      const baseAv = summarizeStoredCommentAvatarStats(arr);
+      const resolvedTotal = countResolvedAvatarEntries(arr, lv).total;
+      renderDevMonitorPanel({
+        snapshot: watchSnapshot,
+        liveId: lv,
+        displayCount: displayEntries.length,
+        storageCount: arr.length,
+        avatarStats: { ...baseAv, withResolvedAvatar: resolvedTotal },
+        profileGaps: summarizeStoredCommentProfileGaps(arr)
+      });
+    }
     updateCommentVelocityLine(
       /** @type {PopupCommentEntry[]} */ (displayEntries)
     );
@@ -6972,6 +7109,87 @@ function initPopup() {
     safeRefresh();
   });
 
+  $('devMonitorCopyAiBundleBtn')?.addEventListener('click', async () => {
+    const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
+    const exportBtn = /** @type {HTMLButtonElement|null} */ ($('exportJson'));
+    let watchUrl = String(exportBtn?.dataset.watchUrl || '').trim();
+    if (!watchUrl) {
+      try {
+        const bag = await chrome.storage.local.get(KEY_LAST_WATCH_URL);
+        watchUrl = String(bag[KEY_LAST_WATCH_URL] || '').trim();
+      } catch {
+        watchUrl = '';
+      }
+    }
+    if (stEl) stEl.textContent = '収集中…';
+    let lastErr = '';
+    /** @type {Record<string, unknown>} */
+    const payload = {
+      popup: {
+        exportedAt: new Date().toISOString(),
+        embedded: (() => {
+          try {
+            return window.self !== window.top;
+          } catch {
+            return true;
+          }
+        })()
+      },
+      content: null,
+      note:
+        'Chrome コンソールの ERR_BLOCKED_BY_CLIENT / 広告スクリプト失敗はブロッカー由来で多く、本拡張とは無関係なことがあります。'
+    };
+    try {
+      const manifest = chrome.runtime.getManifest();
+      const candidates = await collectWatchTabCandidates(watchUrl);
+      if (!candidates.length) {
+        lastErr = 'watch タブ候補なし（ニコ生 watch を開いた状態で試してください）';
+      } else {
+        for (const c of candidates) {
+          try {
+            const res = /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string }} */ (
+              await tabsSendMessageWithRetry(
+                c.id,
+                { type: 'NLS_AI_SHARE_PAGE_DIAGNOSTICS' },
+                { frameId: 0, maxAttempts: 8, delayMs: 80 }
+              )
+            );
+            if (res?.ok && res.diagnostics) {
+              payload.content = /** @type {Record<string, unknown>} */ (res.diagnostics);
+              payload.resolvedTabUrl = String(c.url || '').slice(0, 240);
+              lastErr = '';
+              break;
+            }
+            lastErr = String(res?.error || 'content が ok を返しませんでした');
+          } catch (e) {
+            lastErr = String(
+              e && typeof e === 'object' && 'message' in e
+                ? /** @type {{ message?: unknown }} */ (e).message
+                : e || 'send_failed'
+            );
+          }
+        }
+      }
+      const md = formatAiShareDiagnosticsMarkdown({
+        extensionName: manifest.name,
+        extensionVersion: manifest.version,
+        watchUrlNote: watchUrl
+          ? `記録中 URL 優先（${watchUrl.slice(0, 120)}）`
+          : '前面アクティブのニコ生 watch タブ優先',
+        lastSendMessageError: lastErr,
+        payload
+      });
+      const ok = await copyTextToClipboard(md);
+      if (stEl) {
+        stEl.textContent = ok
+          ? '診断まとめをコピーしました（AI に貼り付け可）'
+          : 'コピーに失敗しました';
+      }
+    } catch {
+      if (stEl) stEl.textContent = '収集に失敗しました';
+    }
+  });
+
   $('devMonitorExportTrendBtn')?.addEventListener('click', async () => {
     const prm = lastDevMonitorPanelParams;
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
@@ -7155,13 +7373,20 @@ function initPopup() {
   });
 
   toggle.addEventListener('change', async () => {
+    const next = toggle.checked;
     try {
-      const ok = await storageSetSafe({ [KEY_RECORDING]: toggle.checked });
-      if (!ok) return;
+      const ok = await storageSetSafe({ [KEY_RECORDING]: next });
+      if (!ok) {
+        toggle.checked = !next;
+        return;
+      }
       safeRefresh();
     } catch {
-      //
+      toggle.checked = !next;
     }
+  });
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
   });
 
   const deepHarvestQuietToggle = /** @type {HTMLInputElement|null} */ (
@@ -7188,6 +7413,18 @@ function initPopup() {
     safeRefresh();
   };
 
+  const saveInlinePanelPlacement = async (value) => {
+    const v =
+      value === INLINE_PANEL_PLACEMENT_BESIDE
+        ? INLINE_PANEL_PLACEMENT_BESIDE
+        : value === INLINE_PANEL_PLACEMENT_FLOATING
+          ? INLINE_PANEL_PLACEMENT_FLOATING
+          : INLINE_PANEL_PLACEMENT_BELOW;
+    const ok = await storageSetSafe({ [KEY_INLINE_PANEL_PLACEMENT]: v });
+    if (!ok) return;
+    safeRefresh();
+  };
+
   /** @type {HTMLInputElement|null} */
   const radioPlayerRowEl = $('inlinePanelWidthPlayerRow');
   /** @type {HTMLInputElement|null} */
@@ -7202,6 +7439,30 @@ function initPopup() {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       void saveInlinePanelWidthMode(INLINE_PANEL_WIDTH_VIDEO);
+    }
+  });
+
+  /** @type {HTMLInputElement|null} */
+  const radioPlacementBelowEl = $('inlinePanelPlacementBelow');
+  /** @type {HTMLInputElement|null} */
+  const radioPlacementBesideEl = $('inlinePanelPlacementBeside');
+  const radioPlacementFloatingEl = $('inlinePanelPlacementFloating');
+  radioPlacementBelowEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BELOW);
+    }
+  });
+  radioPlacementBesideEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BESIDE);
+    }
+  });
+  radioPlacementFloatingEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_FLOATING);
     }
   });
 

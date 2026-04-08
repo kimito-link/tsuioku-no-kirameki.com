@@ -624,12 +624,13 @@
   }
   function normalizeViewerJoin(raw, nowMs) {
     const now = typeof nowMs === "number" && Number.isFinite(nowMs) && nowMs > 0 ? nowMs : Date.now();
+    const source = "network-intercept";
     const empty = {
       userId: "",
       nickname: "",
       iconUrl: "",
       timestamp: now,
-      source: "network-intercept"
+      source
     };
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return empty;
     const rec = (
@@ -659,7 +660,7 @@
       nickname,
       iconUrl,
       timestamp: now,
-      source: "network-intercept"
+      source
     };
   }
   function looksLikeUserObjectArray(arr) {

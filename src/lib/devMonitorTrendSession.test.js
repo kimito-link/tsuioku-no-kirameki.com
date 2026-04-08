@@ -155,4 +155,30 @@ describe('devMonitorTrendSession', () => {
     expect(ar.displaySeries).toEqual([5]);
     expect(ar.storageSeries).toEqual([6]);
   });
+
+  it('commentPct が null のときトレンド点の comment は null（0% と混同しない）', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(3_000_000);
+    const store = new Map();
+    const win = {
+      sessionStorage: {
+        getItem: (k) => store.get(k) ?? null,
+        setItem: (k, v) => {
+          store.set(k, v);
+        }
+      }
+    };
+    appendTrendPoint(win, 'lvnull', {
+      thumb: 5,
+      idPct: 90,
+      nick: 90,
+      commentPct: null
+    });
+    const s = readTrendSeries(win, 'lvnull');
+    expect(s.length).toBe(1);
+    expect(s[0].comment).toBeNull();
+    const ar = trendToSparklineArrays(s);
+    expect(ar.commentSeries).toEqual([null]);
+    vi.useRealTimers();
+  });
 });

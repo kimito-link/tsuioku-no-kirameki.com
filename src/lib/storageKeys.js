@@ -82,6 +82,20 @@ export const EXTENSION_SOFT_CACHE_STORAGE_KEYS = Object.freeze([
 export const KEY_INLINE_PANEL_WIDTH_MODE = 'nls_inline_panel_width_mode';
 
 /**
+ * 視聴ページインラインパネルの DOM 位置。
+ * `below`＝プレイヤー行の直下（flex 行の「横並び」に挟まない）。`beside`＝従来どおり親の flex 次第で横に付くことがある。
+ * `floating`＝ツールバー型ポップアップのように画面右上付近に固定（プレイヤー DOM には挿入しない）。
+ */
+export const KEY_INLINE_PANEL_PLACEMENT = 'nls_inline_panel_placement';
+
+/** @type {'below'} */
+export const INLINE_PANEL_PLACEMENT_BELOW = 'below';
+/** @type {'beside'} */
+export const INLINE_PANEL_PLACEMENT_BESIDE = 'beside';
+/** @type {'floating'} */
+export const INLINE_PANEL_PLACEMENT_FLOATING = 'floating';
+
+/**
  * パネル内のループアニメ・チラ見せスクロールを止める（画面収録・スクショ向け）。
  * 未設定時は opts.inlineDefault に従う（埋め込みは既定でオン想定）。
  */
@@ -105,6 +119,14 @@ export function normalizeInlinePanelWidthMode(raw) {
   const s = String(raw || '').trim();
   if (s === INLINE_PANEL_WIDTH_VIDEO) return INLINE_PANEL_WIDTH_VIDEO;
   return INLINE_PANEL_WIDTH_PLAYER_ROW;
+}
+
+/** @param {unknown} raw */
+export function normalizeInlinePanelPlacement(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (s === INLINE_PANEL_PLACEMENT_BESIDE) return INLINE_PANEL_PLACEMENT_BESIDE;
+  if (s === INLINE_PANEL_PLACEMENT_FLOATING) return INLINE_PANEL_PLACEMENT_FLOATING;
+  return INLINE_PANEL_PLACEMENT_BELOW;
 }
 
 /** @param {unknown} raw */

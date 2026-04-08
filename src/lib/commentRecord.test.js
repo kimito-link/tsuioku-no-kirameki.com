@@ -3,7 +3,8 @@ import {
   normalizeCommentText,
   buildDedupeKey,
   createCommentEntry,
-  mergeNewComments
+  mergeNewComments,
+  backfillNumericSyntheticAvatarsOnStoredComments
 } from './commentRecord.js';
 
 describe('normalizeCommentText', () => {
@@ -519,5 +520,24 @@ describe('mergeNewComments', () => {
     expect(next[0].accountStatus).toBe(1);
     expect(next[0].is184).toBe(true);
     expect(storageTouched).toBe(false);
+  });
+});
+
+describe('backfillNumericSyntheticAvatarsOnStoredComments', () => {
+  it('数字 userId で avatar 無しの行に CDN URL を付与', () => {
+    const rows = [
+      { userId: '86255751', text: 'a' },
+      { userId: 'a:xx', text: 'b' },
+      {
+        userId: '12345678',
+        avatarUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1234/12345678.jpg',
+        text: 'c'
+      }
+    ];
+    const { next, patched } = backfillNumericSyntheticAvatarsOnStoredComments(rows);
+    expect(patched).toBe(1);
+    expect(String(next[0].avatarUrl || '')).toContain('usericon');
+    expect(next[1].avatarUrl).toBeUndefined();
+    expect(next[2].avatarUrl).toMatch(/12345678/);
   });
 });

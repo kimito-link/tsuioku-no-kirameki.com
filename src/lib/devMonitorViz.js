@@ -260,7 +260,7 @@ export function htmlWsStalenessBar(st) {
  *   thumbSeries: number[],
  *   idSeries: number[],
  *   nickSeries: number[],
- *   commentSeries: number[]
+ *   commentSeries: (number|null)[]
  * }} seriesArrays
  * @param {{ persisted?: boolean }} [opts]
  * @returns {string} SVG 4 連（スパークライン）
@@ -279,26 +279,46 @@ export function htmlAcquisitionSparklines(seriesArrays, opts = {}) {
   const innerH = H - pad * 2;
 
   /**
-   * @param {number[]} vals
+   * null / NaN は欠測（コメ系列で公式件数が無いサンプル等）— 折れ線を切る。
+   * @param {(number|null|undefined)[]} vals
    * @param {string} color
    */
   const lineOrDotSvg = (vals, color) => {
     if (!vals.length) return '';
     const n = vals.length;
-    if (n === 1) {
-      const v = vals[0];
-      const x = pad + innerW / 2;
-      const y = pad + innerH * (1 - Math.max(0, Math.min(100, v)) / 100);
-      return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.2" fill="${color}"/>`;
+    /** @param {number|null|undefined} v */
+    const missing = (v) => v == null || (typeof v === 'number' && !Number.isFinite(v));
+    /** @type {({ x: number, y: number }|null)[]} */
+    const coords = vals.map((v, i) => {
+      if (missing(v)) return null;
+      const vn = /** @type {number} */ (v);
+      const x =
+        n === 1 ? pad + innerW / 2 : pad + (innerW * i) / Math.max(1, n - 1);
+      const y = pad + innerH * (1 - Math.max(0, Math.min(100, vn)) / 100);
+      return { x, y };
+    });
+    const present = coords.filter(Boolean);
+    if (present.length === 0) return '';
+    if (present.length === 1) {
+      const c = /** @type {{ x: number, y: number }} */ (present[0]);
+      return `<circle cx="${c.x.toFixed(2)}" cy="${c.y.toFixed(2)}" r="2.2" fill="${color}"/>`;
     }
-    const pts = vals.map(
-      /** @param {number} v @param {number} i */ (v, i) => {
-        const x = pad + (innerW * i) / (n - 1);
-        const y = pad + innerH * (1 - Math.max(0, Math.min(100, v)) / 100);
-        return `${x.toFixed(2)},${y.toFixed(2)}`;
+    let d = '';
+    let pen = false;
+    for (let i = 0; i < n; i++) {
+      const c = coords[i];
+      if (!c) {
+        pen = false;
+        continue;
       }
-    );
-    return `<path fill="none" stroke="${color}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M ${pts.join(' L ')}"/>`;
+      d += pen
+        ? ` L ${c.x.toFixed(2)},${c.y.toFixed(2)}`
+        : `M ${c.x.toFixed(2)},${c.y.toFixed(2)}`;
+      pen = true;
+    }
+    return d
+      ? `<path fill="none" stroke="${color}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="${d}"/>`
+      : '';
   };
 
   const blocks = series
@@ -315,8 +335,8 @@ export function htmlAcquisitionSparklines(seriesArrays, opts = {}) {
     .join('');
 
   const note = opts.persisted
-    ? '4本とも「取れている割合」の推移です。このPCに少しずつ残ります（目安で最大約7日・250点）。'
-    : '4本とも「取れている割合」の推移です。ブラウザのタブを閉じるまでの履歴だけです。';
+    ? '4本とも「取れている割合」の推移です。このPCに少しずつ残ります（目安で最大約7日・250点）。コメは公式件数が無いサンプルでは欠測となり、折れ線が途切れることがあります。'
+    : '4本とも「取れている割合」の推移です。ブラウザのタブを閉じるまでの履歴だけです。コメは公式件数が無いサンプルでは欠測となり、折れ線が途切れることがあります。';
   return (
     '<section class="nl-viz-block" aria-label="データ取得率の推移">' +
     '<h4 class="nl-viz-block__title">取得率の推移（小さな折れ線）</h4>' +
@@ -398,7 +418,8 @@ export function htmlDualCountSparklines(displaySeries, storageSeries) {
  *   withoutNickname: number,
  *   numericUserId: number,
  *   nonNumericUserId: number,
- *   missingUserId: number
+ *   missingUserId: number,
+ *   withResolvedAvatar?: number
  * }} avs
  */
 export function htmlStoredCommentStackCharts(avs) {
@@ -532,7 +553,8 @@ export function htmlInterceptStorageBar(interceptCount, storageTotal) {
  *     withoutNickname: number,
  *     numericUserId: number,
  *     nonNumericUserId: number,
- *     missingUserId: number
+ *     missingUserId: number,
+ *     withResolvedAvatar?: number
  *   }
  * }} p
  */

@@ -30,7 +30,7 @@ export function resetDevMonitorTrendThrottleForTest() {
  *   thumb: number,
  *   idPct: number,
  *   nick: number,
- *   comment: number,
+ *   comment: number|null,
  *   displayCount?: number,
  *   storageCount?: number
  * }} DevMonitorTrendPoint
@@ -168,10 +168,11 @@ export function appendTrendPoint(win, liveId, sample) {
   if (now0 - lastS < TREND_SESSION_APPEND_MIN_MS) return;
 
   const prev = readTrendSeries(win, lid);
+  /** @type {number|null} */
   const comm =
     sample.commentPct != null && Number.isFinite(sample.commentPct)
       ? Math.max(0, Math.min(100, sample.commentPct))
-      : 0;
+      : null;
   const now = now0;
   /** @type {DevMonitorTrendPoint} */
   const pt = {
@@ -234,10 +235,11 @@ export async function persistTrendPointChrome(liveId, sample) {
       : null;
   if (!chromeObj) return;
 
+  /** @type {number|null} */
   const comm =
     sample.commentPct != null && Number.isFinite(sample.commentPct)
       ? Math.max(0, Math.min(100, sample.commentPct))
-      : 0;
+      : null;
   const now = Date.now();
   /** @type {DevMonitorTrendPoint} */
   const pt = {
@@ -317,7 +319,7 @@ export async function readMergedTrendSeries(win, liveId) {
  *   thumbSeries: number[],
  *   idSeries: number[],
  *   nickSeries: number[],
- *   commentSeries: number[],
+ *   commentSeries: (number|null)[],
  *   displaySeries: number[],
  *   storageSeries: number[]
  * }}
@@ -327,7 +329,9 @@ export function trendToSparklineArrays(points) {
     thumbSeries: points.map((p) => p.thumb),
     idSeries: points.map((p) => p.idPct),
     nickSeries: points.map((p) => p.nick),
-    commentSeries: points.map((p) => p.comment),
+    commentSeries: points.map((p) =>
+      p.comment != null && Number.isFinite(p.comment) ? p.comment : null
+    ),
     displaySeries: points.map((p) =>
       typeof p.displayCount === 'number' ? p.displayCount : 0
     ),

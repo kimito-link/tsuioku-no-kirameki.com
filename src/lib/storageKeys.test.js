@@ -16,6 +16,9 @@ import {
   KEY_COMMENT_PANEL_STATUS,
   INLINE_PANEL_WIDTH_PLAYER_ROW,
   INLINE_PANEL_WIDTH_VIDEO,
+  INLINE_PANEL_PLACEMENT_BELOW,
+  INLINE_PANEL_PLACEMENT_BESIDE,
+  INLINE_PANEL_PLACEMENT_FLOATING,
   commentsStorageKey,
   devMonitorTrendStorageKey,
   giftUsersStorageKey,
@@ -24,6 +27,8 @@ import {
   isDeepHarvestQuietUiEnabled,
   isUsageTermsAcknowledged,
   normalizeInlinePanelWidthMode,
+  normalizeInlinePanelPlacement,
+  KEY_INLINE_PANEL_PLACEMENT,
   normalizeEntitlementTier,
   normalizeCalmPanelMotion
 } from './storageKeys.js';
@@ -51,6 +56,7 @@ describe('storage key constants', () => {
     expect(KEY_SUPPORT_VISUAL_EXPANDED).toMatch(/^nls_/);
     expect(KEY_USAGE_TERMS_ACK).toMatch(/^nls_/);
     expect(KEY_NL_ENTITLEMENT_TIER).toMatch(/^nls_/);
+    expect(KEY_INLINE_PANEL_PLACEMENT).toMatch(/^nls_/);
   });
 
   it('normalizeEntitlementTier は free / pro / premium のみ通す', () => {
@@ -107,6 +113,25 @@ describe('storage key constants', () => {
     expect(normalizeInlinePanelWidthMode('video')).toBe(INLINE_PANEL_WIDTH_VIDEO);
     expect(normalizeInlinePanelWidthMode(INLINE_PANEL_WIDTH_VIDEO)).toBe(
       INLINE_PANEL_WIDTH_VIDEO
+    );
+  });
+
+  it('normalizeInlinePanelPlacement は below / beside / floating', () => {
+    expect(normalizeInlinePanelPlacement(undefined)).toBe(
+      INLINE_PANEL_PLACEMENT_BELOW
+    );
+    expect(normalizeInlinePanelPlacement('')).toBe(INLINE_PANEL_PLACEMENT_BELOW);
+    expect(normalizeInlinePanelPlacement('beside')).toBe(
+      INLINE_PANEL_PLACEMENT_BESIDE
+    );
+    expect(normalizeInlinePanelPlacement('BESIDE')).toBe(
+      INLINE_PANEL_PLACEMENT_BESIDE
+    );
+    expect(normalizeInlinePanelPlacement('floating')).toBe(
+      INLINE_PANEL_PLACEMENT_FLOATING
+    );
+    expect(normalizeInlinePanelPlacement('FLOATING')).toBe(
+      INLINE_PANEL_PLACEMENT_FLOATING
     );
   });
 

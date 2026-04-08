@@ -18,7 +18,8 @@ import {
  *   nonNumericUserId: number,
  *   missingUserId: number,
  *   withNickname: number,
- *   withoutNickname: number
+ *   withoutNickname: number,
+ *   withResolvedAvatar?: number
  * }} StoredCommentAvatarStats
  */
 

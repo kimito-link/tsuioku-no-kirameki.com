@@ -19,7 +19,9 @@ describe('buildWatchSnapshotOfficialFields', () => {
       officialViewerCount: null,
       officialCommentCount: null,
       officialStatsUpdatedAt: null,
-      officialStatsFreshnessMs: null
+      officialStatsFreshnessMs: null,
+      officialCommentStatsUpdatedAt: null,
+      officialCommentStatsFreshnessMs: null
     });
   });
 
@@ -38,11 +40,33 @@ describe('buildWatchSnapshotOfficialFields', () => {
       officialCommentCount: 10,
       officialStatsUpdatedAt: 90_000,
       officialStatsFreshnessMs: 10_000,
+      officialCommentStatsUpdatedAt: null,
+      officialCommentStatsFreshnessMs: null,
       officialViewerIntervalMs: 30_000,
       officialStatisticsCommentsDelta: null,
       officialReceivedCommentsDelta: null,
       officialCommentSampleWindowMs: null,
       officialCaptureRatio: null
+    });
+  });
+
+  it('公式コメント数の最終更新時刻と鮮度を返す', () => {
+    expect(
+      buildWatchSnapshotOfficialFields({
+        nowMs: 200_000,
+        officialViewerCount: null,
+        officialCommentCount: 99,
+        officialStatsUpdatedAt: 0,
+        officialCommentStatsUpdatedAt: 170_000,
+        officialViewerIntervalMs: null,
+        officialCommentSummary: null
+      })
+    ).toMatchObject({
+      officialCommentCount: 99,
+      officialCommentStatsUpdatedAt: 170_000,
+      officialCommentStatsFreshnessMs: 30_000,
+      officialStatsUpdatedAt: null,
+      officialStatsFreshnessMs: null
     });
   });
 

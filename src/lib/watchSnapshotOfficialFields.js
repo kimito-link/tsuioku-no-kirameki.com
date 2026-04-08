@@ -6,6 +6,7 @@
  *   officialViewerCount: unknown,
  *   officialCommentCount: unknown,
  *   officialStatsUpdatedAt: number,
+ *   officialCommentStatsUpdatedAt?: number,
  *   officialViewerIntervalMs: unknown,
  *   officialCommentSummary: {
  *     statisticsCommentsDelta?: number|null,
@@ -19,6 +20,8 @@
  *   officialCommentCount: number|null,
  *   officialStatsUpdatedAt: number|null,
  *   officialStatsFreshnessMs: number|null,
+ *   officialCommentStatsUpdatedAt: number|null,
+ *   officialCommentStatsFreshnessMs: number|null,
  *   officialViewerIntervalMs: number|null,
  *   officialStatisticsCommentsDelta: number|null,
  *   officialReceivedCommentsDelta: number|null,
@@ -32,9 +35,14 @@ export function buildWatchSnapshotOfficialFields(p) {
     officialViewerCount,
     officialCommentCount,
     officialStatsUpdatedAt,
+    officialCommentStatsUpdatedAt: ocStatsAtRaw,
     officialViewerIntervalMs,
     officialCommentSummary
   } = p;
+  const officialCommentStatsUpdatedAt =
+    typeof ocStatsAtRaw === 'number' && Number.isFinite(ocStatsAtRaw) && ocStatsAtRaw > 0
+      ? ocStatsAtRaw
+      : 0;
 
   return {
     officialViewerCount:
@@ -54,6 +62,12 @@ export function buildWatchSnapshotOfficialFields(p) {
     officialStatsFreshnessMs:
       officialStatsUpdatedAt > 0
         ? Math.max(0, nowMs - officialStatsUpdatedAt)
+        : null,
+    officialCommentStatsUpdatedAt:
+      officialCommentStatsUpdatedAt > 0 ? officialCommentStatsUpdatedAt : null,
+    officialCommentStatsFreshnessMs:
+      officialCommentStatsUpdatedAt > 0
+        ? Math.max(0, nowMs - officialCommentStatsUpdatedAt)
         : null,
     officialViewerIntervalMs:
       typeof officialViewerIntervalMs === 'number' && officialViewerIntervalMs > 0

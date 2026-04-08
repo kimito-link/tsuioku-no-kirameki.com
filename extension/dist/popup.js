@@ -112,6 +112,10 @@
     KEY_USER_COMMENT_PROFILE_CACHE
   ]);
   var KEY_INLINE_PANEL_WIDTH_MODE = "nls_inline_panel_width_mode";
+  var KEY_INLINE_PANEL_PLACEMENT = "nls_inline_panel_placement";
+  var INLINE_PANEL_PLACEMENT_BELOW = "below";
+  var INLINE_PANEL_PLACEMENT_BESIDE = "beside";
+  var INLINE_PANEL_PLACEMENT_FLOATING = "floating";
   var KEY_CALM_PANEL_MOTION = "nls_calm_panel_motion";
   function normalizeCalmPanelMotion(raw, opts = {}) {
     if (raw === true) return true;
@@ -124,6 +128,12 @@
     const s = String(raw || "").trim();
     if (s === INLINE_PANEL_WIDTH_VIDEO) return INLINE_PANEL_WIDTH_VIDEO;
     return INLINE_PANEL_WIDTH_PLAYER_ROW;
+  }
+  function normalizeInlinePanelPlacement(raw) {
+    const s = String(raw || "").trim().toLowerCase();
+    if (s === INLINE_PANEL_PLACEMENT_BESIDE) return INLINE_PANEL_PLACEMENT_BESIDE;
+    if (s === INLINE_PANEL_PLACEMENT_FLOATING) return INLINE_PANEL_PLACEMENT_FLOATING;
+    return INLINE_PANEL_PLACEMENT_BELOW;
   }
   function isRecordingEnabled(raw) {
     return raw !== false;
@@ -1812,7 +1822,7 @@ ${body}`;
     const lastS = _lastSessionTrendAppendMs.get(lid) || 0;
     if (now0 - lastS < TREND_SESSION_APPEND_MIN_MS) return;
     const prev = readTrendSeries(win, lid);
-    const comm = sample.commentPct != null && Number.isFinite(sample.commentPct) ? Math.max(0, Math.min(100, sample.commentPct)) : 0;
+    const comm = sample.commentPct != null && Number.isFinite(sample.commentPct) ? Math.max(0, Math.min(100, sample.commentPct)) : null;
     const now = now0;
     const pt = {
       t: now,
@@ -1853,7 +1863,7 @@ ${body}`;
     const key = devMonitorTrendStorageKey(lid);
     const chromeObj = typeof chrome !== "undefined" && chrome.storage && chrome.storage.local ? chrome.storage.local : null;
     if (!chromeObj) return;
-    const comm = sample.commentPct != null && Number.isFinite(sample.commentPct) ? Math.max(0, Math.min(100, sample.commentPct)) : 0;
+    const comm = sample.commentPct != null && Number.isFinite(sample.commentPct) ? Math.max(0, Math.min(100, sample.commentPct)) : null;
     const now = Date.now();
     const pt = {
       t: now,
@@ -1918,7 +1928,9 @@ ${body}`;
       thumbSeries: points.map((p) => p.thumb),
       idSeries: points.map((p) => p.idPct),
       nickSeries: points.map((p) => p.nick),
-      commentSeries: points.map((p) => p.comment),
+      commentSeries: points.map(
+        (p) => p.comment != null && Number.isFinite(p.comment) ? p.comment : null
+      ),
       displaySeries: points.map(
         (p) => typeof p.displayCount === "number" ? p.displayCount : 0
       ),
@@ -2363,27 +2375,44 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const lineOrDotSvg = (vals, color) => {
       if (!vals.length) return "";
       const n = vals.length;
-      if (n === 1) {
-        const v = vals[0];
-        const x = pad + innerW / 2;
-        const y = pad + innerH * (1 - Math.max(0, Math.min(100, v)) / 100);
-        return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.2" fill="${color}"/>`;
+      const missing = (v) => v == null || typeof v === "number" && !Number.isFinite(v);
+      const coords = vals.map((v, i) => {
+        if (missing(v)) return null;
+        const vn = (
+          /** @type {number} */
+          v
+        );
+        const x = n === 1 ? pad + innerW / 2 : pad + innerW * i / Math.max(1, n - 1);
+        const y = pad + innerH * (1 - Math.max(0, Math.min(100, vn)) / 100);
+        return { x, y };
+      });
+      const present = coords.filter(Boolean);
+      if (present.length === 0) return "";
+      if (present.length === 1) {
+        const c = (
+          /** @type {{ x: number, y: number }} */
+          present[0]
+        );
+        return `<circle cx="${c.x.toFixed(2)}" cy="${c.y.toFixed(2)}" r="2.2" fill="${color}"/>`;
       }
-      const pts = vals.map(
-        /** @param {number} v @param {number} i */
-        (v, i) => {
-          const x = pad + innerW * i / (n - 1);
-          const y = pad + innerH * (1 - Math.max(0, Math.min(100, v)) / 100);
-          return `${x.toFixed(2)},${y.toFixed(2)}`;
+      let d = "";
+      let pen = false;
+      for (let i = 0; i < n; i++) {
+        const c = coords[i];
+        if (!c) {
+          pen = false;
+          continue;
         }
-      );
-      return `<path fill="none" stroke="${color}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="M ${pts.join(" L ")}"/>`;
+        d += pen ? ` L ${c.x.toFixed(2)},${c.y.toFixed(2)}` : `M ${c.x.toFixed(2)},${c.y.toFixed(2)}`;
+        pen = true;
+      }
+      return d ? `<path fill="none" stroke="${color}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" d="${d}"/>` : "";
     };
     const blocks = series.map((s) => {
       const svgInner = lineOrDotSvg(s.vals, s.color);
       return `<div class="nl-viz-spark"><span class="nl-viz-spark__cap">${escapeHtml(s.label)}</span><svg class="nl-viz-spark__svg" viewBox="0 0 ${W} ${H}" aria-hidden="true"><rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="color-mix(in srgb, var(--nl-border) 70%, transparent)" stroke-width="0.6" rx="3"/>` + svgInner + "</svg></div>";
     }).join("");
-    const note = opts.persisted ? "4\u672C\u3068\u3082\u300C\u53D6\u308C\u3066\u3044\u308B\u5272\u5408\u300D\u306E\u63A8\u79FB\u3067\u3059\u3002\u3053\u306EPC\u306B\u5C11\u3057\u305A\u3064\u6B8B\u308A\u307E\u3059\uFF08\u76EE\u5B89\u3067\u6700\u5927\u7D047\u65E5\u30FB250\u70B9\uFF09\u3002" : "4\u672C\u3068\u3082\u300C\u53D6\u308C\u3066\u3044\u308B\u5272\u5408\u300D\u306E\u63A8\u79FB\u3067\u3059\u3002\u30D6\u30E9\u30A6\u30B6\u306E\u30BF\u30D6\u3092\u9589\u3058\u308B\u307E\u3067\u306E\u5C65\u6B74\u3060\u3051\u3067\u3059\u3002";
+    const note = opts.persisted ? "4\u672C\u3068\u3082\u300C\u53D6\u308C\u3066\u3044\u308B\u5272\u5408\u300D\u306E\u63A8\u79FB\u3067\u3059\u3002\u3053\u306EPC\u306B\u5C11\u3057\u305A\u3064\u6B8B\u308A\u307E\u3059\uFF08\u76EE\u5B89\u3067\u6700\u5927\u7D047\u65E5\u30FB250\u70B9\uFF09\u3002\u30B3\u30E1\u306F\u516C\u5F0F\u4EF6\u6570\u304C\u7121\u3044\u30B5\u30F3\u30D7\u30EB\u3067\u306F\u6B20\u6E2C\u3068\u306A\u308A\u3001\u6298\u308C\u7DDA\u304C\u9014\u5207\u308C\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002" : "4\u672C\u3068\u3082\u300C\u53D6\u308C\u3066\u3044\u308B\u5272\u5408\u300D\u306E\u63A8\u79FB\u3067\u3059\u3002\u30D6\u30E9\u30A6\u30B6\u306E\u30BF\u30D6\u3092\u9589\u3058\u308B\u307E\u3067\u306E\u5C65\u6B74\u3060\u3051\u3067\u3059\u3002\u30B3\u30E1\u306F\u516C\u5F0F\u4EF6\u6570\u304C\u7121\u3044\u30B5\u30F3\u30D7\u30EB\u3067\u306F\u6B20\u6E2C\u3068\u306A\u308A\u3001\u6298\u308C\u7DDA\u304C\u9014\u5207\u308C\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002";
     return `<section class="nl-viz-block" aria-label="\u30C7\u30FC\u30BF\u53D6\u5F97\u7387\u306E\u63A8\u79FB"><h4 class="nl-viz-block__title">\u53D6\u5F97\u7387\u306E\u63A8\u79FB\uFF08\u5C0F\u3055\u306A\u6298\u308C\u7DDA\uFF09</h4><p class="nl-viz-block__note">${escapeHtml(note)}</p><div class="nl-viz-spark-grid">${blocks}</div></section>`;
   }
   function htmlDualCountSparklines(displaySeries, storageSeries) {
@@ -3035,7 +3064,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           }
         }
         officialEl.textContent = line;
-        officialEl.title = "\u516C\u5F0F\u306F\u914D\u4FE1\u958B\u59CB\u304B\u3089\u306E\u7D2F\u8A08\u3067\u3059\u3002\u540C\u3058\u30BF\u30D6\u3067\u898B\u7D9A\u3051\u3001NDGR\uFF08\u30DA\u30FC\u30B8\u5185\u30A4\u30F3\u30BF\u30FC\u30BB\u30D7\u30C8\uFF09\u304C\u52B9\u3044\u3066\u3044\u308B\u3068\u304D\u306F\u8A18\u9332\u304C\u516C\u5F0F\u306B\u304B\u306A\u308A\u8FD1\u3065\u304F\u4F7F\u3044\u65B9\u3082\u591A\u3044\u3067\u3059\u3002\u9014\u4E2D\u5165\u5BA4\u3060\u3068\u5165\u5BA4\u524D\u306E\u5206\u3060\u3051\u516C\u5F0F\u304C\u5148\u306B\u5897\u3048\u3001\u7387\u306F\u4E00\u6C17\u306B\u4F4E\u304F\u898B\u3048\u307E\u3059\u3002\u5DE6\u306F\u3053\u306EPC\u306E\u30B9\u30C8\u30EC\u30FC\u30B8\u306E\u884C\u6570\u3002\u4EEE\u60F3\u30EA\u30B9\u30C8\u30FB\u8A18\u9332OFF\u30FB\u975E\u8868\u793A\u30BF\u30D6\u30FB\u30B5\u30A4\u30C8\u6539\u4FEE\u30FB\u30B9\u30C8\u30EC\u30FC\u30B8\u4E0A\u9650\u3067\u3082\u5DEE\u304C\u51FA\u307E\u3059\u3002";
+        officialEl.title = "\u3053\u306E\u300C\u516C\u5F0F\u300D\u306F\u8996\u8074\u7528WebSocket\u7B49\u306E statistics \u30E1\u30C3\u30BB\u30FC\u30B8\uFF08comments / commentCount\uFF09\u306E\u7D2F\u8A08\u3067\u3059\u3002\u30D7\u30EC\u30A4\u30E4\u30FC\u4ED8\u8FD1\u306B\u51FA\u308B\u30B3\u30E1\u30F3\u30C8\u6570\u3068\u306F\u5225\u7D4C\u8DEF\u306E\u305F\u3081\u4E00\u81F4\u3057\u306A\u3044\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002\u6BD4\u8F03\u306E\u57FA\u6E96\u306F\u3053\u3061\u3089\u3067\u3059\u3002\u540C\u3058\u30BF\u30D6\u3067\u898B\u7D9A\u3051\u3001NDGR\uFF08\u30DA\u30FC\u30B8\u5185\u30A4\u30F3\u30BF\u30FC\u30BB\u30D7\u30C8\uFF09\u304C\u52B9\u3044\u3066\u3044\u308B\u3068\u304D\u306F\u8A18\u9332\u304C\u8FD1\u3065\u304D\u3084\u3059\u3044\u3067\u3059\u3002\u9014\u4E2D\u5165\u5BA4\u30FB\u4EEE\u60F3\u30EA\u30B9\u30C8\u30FB\u8A18\u9332OFF\u30FB\u975E\u8868\u793A\u30BF\u30D6\u30FB\u30B5\u30A4\u30C8\u6539\u4FEE\u30FB\u30B9\u30C8\u30EC\u30FC\u30B8\u4E0A\u9650\u3067\u3082\u5DEE\u304C\u51FA\u307E\u3059\u3002";
       } else {
         officialEl.hidden = true;
         officialEl.textContent = "";
@@ -3637,6 +3666,25 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     } catch {
       return copyTextViaExecCommand(text);
     }
+  }
+  function formatAiShareDiagnosticsMarkdown(parts) {
+    const lines = [];
+    lines.push("## nicolivelog \u8A3A\u65AD\u30D0\u30F3\u30C9\u30EB\uFF08AI \u5171\u6709\u7528\uFF09");
+    lines.push("");
+    lines.push(
+      "\u6B21\u306E JSON \u30D6\u30ED\u30C3\u30AF\u3092\u305D\u306E\u307E\u307E AI \u306B\u8CBC\u3063\u3066\u304F\u3060\u3055\u3044\u3002\u62E1\u5F35\u3092\u518D\u8AAD\u307F\u8FBC\u307F\u3057\u305F\u76F4\u5F8C\u306F watch \u30DA\u30FC\u30B8\u3092 **F5** \u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+    );
+    lines.push("");
+    lines.push(`- \u62E1\u5F35: ${parts.extensionName} v${parts.extensionVersion}`);
+    lines.push(`- \u30BF\u30D6\u9078\u629E: ${parts.watchUrlNote}`);
+    if (parts.lastSendMessageError) {
+      lines.push(`- content \u3078\u306E\u9001\u4FE1: \`${parts.lastSendMessageError}\``);
+    }
+    lines.push("");
+    lines.push("```json");
+    lines.push(JSON.stringify(parts.payload, null, 2));
+    lines.push("```");
+    return lines.join("\n");
   }
   function syncFrameShareInput() {
     const input = (
@@ -6507,7 +6555,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     const avs = p.avatarStats;
     const t = avs && typeof avs.total === "number" ? Math.max(0, avs.total) : 0;
-    const thumb = t > 0 ? avs.withHttpAvatar / t * 100 : 0;
+    const withHttpStored = avs && typeof avs.withHttpAvatar === "number" && Number.isFinite(avs.withHttpAvatar) ? Math.max(0, avs.withHttpAvatar) : 0;
+    const resolvedRaw = avs && typeof avs.withResolvedAvatar === "number" && Number.isFinite(avs.withResolvedAvatar) ? Math.max(0, avs.withResolvedAvatar) : null;
+    const thumbNumerator = resolvedRaw != null ? Math.min(resolvedRaw, t || resolvedRaw) : withHttpStored;
+    const thumb = t > 0 ? thumbNumerator / t * 100 : 0;
     const idPct = t > 0 ? (t - avs.missingUserId) / t * 100 : 0;
     const nick = t > 0 ? avs.withNickname / t * 100 : 0;
     const oc = p.snapshot && typeof p.snapshot.officialCommentCount === "number" && Number.isFinite(p.snapshot.officialCommentCount) ? p.snapshot.officialCommentCount : null;
@@ -6573,7 +6624,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     const footExtra = t <= 0 ? "\u8A18\u93320\u4EF6\u306E\u305F\u3081\u30B5\u30E0\u30CD\u30FBID\u30FB\u540D\u524D\u306F0%\u3002\u30ED\u30B0\u30A4\u30F3\u4E0D\u8981\u3067\u8868\u793A\u3057\u307E\u3059\u3002" : "";
     const footMain = commentPct != null ? "\u30B3\u30E1\u30F3\u30C8\uFF1D\u8A18\u9332\u306E\u8868\u793A\u4EF6\u6570\xF7\u516C\u5F0F\u30B3\u30E1\u30F3\u30C8\u6570\uFF08\u4E0A\u9650100%\uFF09\u3002" : "\u30B3\u30E1\u30F3\u30C8\u7387\u306F\u516C\u5F0F\u4EF6\u6570\u304C\u7121\u3044\u3068\u304D\u300C\u2014\u300D\uFF08\u30EC\u30FC\u30C0\u30FC\u30FB\u5186\u306E\u30B3\u30E1\u30F3\u30C8\u5206\u306F0\u6271\u3044\uFF09\u3002";
-    const foot = escapeHtml(footExtra ? `${footMain} ${footExtra}` : footMain);
+    const footThumb = t > 0 ? " \u30B5\u30E0\u30CD\uFF1D\u5FDC\u63F4\u30EC\u30FC\u30F3\u3068\u540C\u3058\u304F\u300C\u8868\u793A\u306B\u4F7F\u3048\u308B http(s) \u30A2\u30A4\u30B3\u30F3\u300D\u307E\u3067\u89E3\u6C7A\u3067\u304D\u305F\u5272\u5408\uFF08\u6570\u5B57ID\u306E\u65E2\u5B9ACDN\u5408\u6210\u3092\u542B\u3080\u3002\u533F\u540D\u5F62\u5F0F\u306F\u30DA\u30FC\u30B8\u5074\u306E\u8FFD\u52A0\u60C5\u5831\u304C\u7121\u3044\u3068\u4E0A\u304C\u308A\u306B\u304F\u3044\uFF09\u3002" : "";
+    const foot = escapeHtml(
+      footExtra ? `${footMain}${footThumb} ${footExtra}` : `${footMain}${footThumb}`
+    );
     host.innerHTML = '<section class="nl-acquisition" aria-label="\u30C7\u30FC\u30BF\u53D6\u5F97\u7387"><h3 class="nl-acquisition__title">\u73FE\u5728\u306E\u30C7\u30FC\u30BF\u53D6\u5F97\u7387</h3><div class="nl-acquisition__charts"><div class="nl-acquisition__radar"><svg viewBox="0 0 120 120" aria-hidden="true">' + axisLines + `<polygon fill="none" stroke="#94a3b8" stroke-width="0.55" opacity="0.45" points="${ringPts}" /><polygon fill="none" stroke="#94a3b8" stroke-width="0.45" opacity="0.32" points="${midPts}" /><polygon fill="rgb(15 143 216 / 22%)" stroke="#0f8fd8" stroke-width="1.2" points="${polyPts}" /></svg><span class="nl-acquisition__cap">4\u9805\u76EE\u30D0\u30E9\u30F3\u30B9\uFF08\u30EC\u30FC\u30C0\u30FC\uFF09</span></div><div class="nl-acquisition__bars"><div class="nl-acquisition__bar-row"><p class="nl-acquisition__bar-label">\u30B5\u30E0\u30CD</p><div class="nl-acquisition__bar-track"><div class="nl-acquisition__bar-fill nl-acquisition__bar-fill--thumb" style="width:${Math.min(
       100,
       thumb
@@ -6591,7 +6645,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       fmt(nick)
     )}</p></div><div class="nl-acquisition__bar-row"><p class="nl-acquisition__bar-label">\u30B3\u30E1</p><div class="nl-acquisition__bar-track"><div class="nl-acquisition__bar-fill nl-acquisition__bar-fill--comment" style="width:${commentPct != null ? Math.min(100, commentPct) : 0}%"></div></div><p class="nl-acquisition__bar-pct">${escapeHtml(
       commentBar
-    )}</p></div></div><div class="nl-acquisition__pie"><div class="nl-acquisition__pie-disk"></div><span class="nl-acquisition__cap">\u69CB\u6210\u6BD4\uFF08\u5186\uFF09</span></div></div><ul class="nl-acquisition__legend"><li><span class="nl-acquisition__dot nl-acquisition__dot--thumb" aria-hidden="true"></span>\u30A2\u30A4\u30B3\u30F3\u753B\u50CF\u306EURL\uFF08\u53D6\u308C\u3066\u3044\u308B\u5272\u5408\uFF09</li><li><span class="nl-acquisition__dot nl-acquisition__dot--id" aria-hidden="true"></span>\u30E6\u30FC\u30B6\u30FCID\uFF08\u53D6\u308C\u3066\u3044\u308B\u5272\u5408\uFF09</li><li><span class="nl-acquisition__dot nl-acquisition__dot--nick" aria-hidden="true"></span>\u8868\u793A\u540D\u30FB\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0\uFF08\u4ED8\u3044\u3066\u3044\u308B\u5272\u5408\uFF09</li><li><span class="nl-acquisition__dot nl-acquisition__dot--comment" aria-hidden="true"></span>\u30B3\u30E1\u30F3\u30C8\uFF08\u8A18\u9332\xF7\u516C\u5F0F\uFF09</li></ul><p class="nl-acquisition__footnote">${foot}</p></section>`;
+    )}</p></div></div><div class="nl-acquisition__pie"><div class="nl-acquisition__pie-disk"></div><span class="nl-acquisition__cap">\u69CB\u6210\u6BD4\uFF08\u5186\uFF09</span></div></div><ul class="nl-acquisition__legend"><li><span class="nl-acquisition__dot nl-acquisition__dot--thumb" aria-hidden="true"></span>\u30A2\u30A4\u30B3\u30F3\uFF08\u8868\u793A\u89E3\u6C7A\u30FB\u5FDC\u63F4\u30EC\u30FC\u30F3\u3068\u540C\u3058\u57FA\u6E96\uFF09</li><li><span class="nl-acquisition__dot nl-acquisition__dot--id" aria-hidden="true"></span>\u30E6\u30FC\u30B6\u30FCID\uFF08\u53D6\u308C\u3066\u3044\u308B\u5272\u5408\uFF09</li><li><span class="nl-acquisition__dot nl-acquisition__dot--nick" aria-hidden="true"></span>\u8868\u793A\u540D\u30FB\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0\uFF08\u4ED8\u3044\u3066\u3044\u308B\u5272\u5408\uFF09</li><li><span class="nl-acquisition__dot nl-acquisition__dot--comment" aria-hidden="true"></span>\u30B3\u30E1\u30F3\u30C8\uFF08\u8A18\u9332\xF7\u516C\u5F0F\uFF09</li></ul><p class="nl-acquisition__footnote">${foot}</p></section>`;
     const disk = host.querySelector(".nl-acquisition__pie-disk");
     if (disk instanceof HTMLElement) {
       disk.style.background = pieDiskBackground;
@@ -6700,6 +6754,30 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     rows.push(["\u3053\u306EPC\u306B\u4FDD\u5B58\u3057\u305F\u4EF6\u6570", String(p.storageCount)]);
     rows.push(["\u4E00\u89A7\u306B\u51FA\u3057\u3066\u3044\u308B\u4EF6\u6570", String(p.displayCount)]);
     rows.push(["\u516C\u5F0F\u306E\u7D2F\u8A08\u30B3\u30E1\u30F3\u30C8\u6570", oc != null ? String(oc) : "\u2014"]);
+    {
+      const DEV_OFFICIAL_COMMENT_STALE_MS = 12e4;
+      const ocsu = snap && typeof snap.officialCommentStatsUpdatedAt === "number" && Number.isFinite(snap.officialCommentStatsUpdatedAt) && snap.officialCommentStatsUpdatedAt > 0 ? snap.officialCommentStatsUpdatedAt : null;
+      const ocf = snap && typeof snap.officialCommentStatsFreshnessMs === "number" && Number.isFinite(snap.officialCommentStatsFreshnessMs) ? snap.officialCommentStatsFreshnessMs : null;
+      if (ocsu != null) {
+        rows.push([
+          "\u516C\u5F0F\u30B3\u30E1\u30F3\u30C8\u6570\u30FB\u6700\u7D42\u66F4\u65B0\uFF08\u30ED\u30FC\u30AB\u30EB\u6642\u523B\uFF09",
+          new Date(ocsu).toLocaleString("ja-JP", { hour12: false })
+        ]);
+      }
+      if (ocf != null && ocsu != null) {
+        const sec = Math.max(0, Math.round(ocf / 1e3));
+        const stale = ocf > DEV_OFFICIAL_COMMENT_STALE_MS;
+        rows.push([
+          "\u516C\u5F0F\u30B3\u30E1\u30F3\u30C8\u6570\u30FB\u66F4\u65B0\u304B\u3089\u306E\u7D4C\u904E",
+          stale ? `${sec} \u79D2\u524D\uFF08\u3084\u3084\u53E4\u3044\u53EF\u80FD\u6027: \u30BF\u30D6\u3092\u524D\u9762\u306B\u30FB\u901A\u4FE1\u78BA\u8A8D\u30FB\u5FC5\u8981\u306A\u3089\u518D\u8AAD\u8FBC\uFF09` : `${sec} \u79D2\u524D`
+        ]);
+      } else if (oc != null && ocsu == null) {
+        rows.push([
+          "\u516C\u5F0F\u30B3\u30E1\u30F3\u30C8\u6570\u30FB\u6700\u7D42\u66F4\u65B0",
+          "\u672A\u53D6\u5F97\uFF08statistics \u306E comments \u304C\u307E\u3060\u6765\u3066\u3044\u307E\u305B\u3093\uFF09"
+        ]);
+      }
+    }
     rows.push(["\u516C\u5F0F\u3068\u306E\u5DEE\uFF08\u516C\u5F0F\u2212\u4E00\u89A7\uFF09", gap != null ? String(gap) : "\u2014"]);
     rows.push([
       "\u5DEE\u304C\u51FA\u308B\u4E3B\u306A\u7406\u7531\uFF08\u53C2\u8003\uFF09",
@@ -6717,6 +6795,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         "\u30A2\u30A4\u30B3\u30F3URL\u304C\u3042\u308B\u5272\u5408",
         `${(avs.withHttpAvatar / avs.total * 100).toFixed(1)}%`
       ]);
+      if (typeof avs.withResolvedAvatar === "number" && Number.isFinite(avs.withResolvedAvatar)) {
+        rows.push([
+          "\u30A2\u30A4\u30B3\u30F3\u304C\u8868\u793A\u89E3\u6C7A\u3067\u304D\u305F\u4EF6\u6570\uFF08\u5FDC\u63F4\u30EC\u30FC\u30F3\u57FA\u6E96\uFF09",
+          String(avs.withResolvedAvatar)
+        ]);
+        rows.push([
+          "\u8868\u793A\u89E3\u6C7A\u304C\u3042\u308B\u5272\u5408",
+          `${(avs.withResolvedAvatar / avs.total * 100).toFixed(1)}%`
+        ]);
+      }
       rows.push(["\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3\u76F8\u5F53\u306E\u307F\u306E\u4EF6\u6570", String(avs.syntheticDefaultAvatar)]);
       rows.push(["\u8868\u793A\u540D\uFF08\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0\uFF09\u304C\u3042\u308B\u4EF6\u6570", String(avs.withNickname)]);
       rows.push(["\u8868\u793A\u540D\u304C\u7121\u3044\u4EF6\u6570", String(avs.withoutNickname)]);
@@ -6792,6 +6880,14 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       ) : void 0
     );
     const outJson = { ...debugSub };
+    if (snap && typeof snap === "object") {
+      if (snap.officialCommentStatsUpdatedAt != null) {
+        outJson.officialCommentStatsUpdatedAt = snap.officialCommentStatsUpdatedAt;
+      }
+      if (snap.officialCommentStatsFreshnessMs != null) {
+        outJson.officialCommentStatsFreshnessMs = snap.officialCommentStatsFreshnessMs;
+      }
+    }
     if (avs && avs.total > 0) {
       outJson.avatarStats = avs;
     }
@@ -6883,14 +6979,18 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           $("sceneStoryGrowth")
         );
         if (growthEl) patchStoryGrowthIconsFromSource(growthEl);
-        renderDevMonitorPanel({
-          snapshot: watchSnapshot,
-          liveId: lv,
-          displayCount: displayEntries.length,
-          storageCount: arr.length,
-          avatarStats: summarizeStoredCommentAvatarStats(arr),
-          profileGaps: summarizeStoredCommentProfileGaps(arr)
-        });
+        {
+          const baseAv = summarizeStoredCommentAvatarStats(arr);
+          const resolvedTotal = countResolvedAvatarEntries(arr, lv).total;
+          renderDevMonitorPanel({
+            snapshot: watchSnapshot,
+            liveId: lv,
+            displayCount: displayEntries.length,
+            storageCount: arr.length,
+            avatarStats: { ...baseAv, withResolvedAvatar: resolvedTotal },
+            profileGaps: summarizeStoredCommentProfileGaps(arr)
+          });
+        }
         updateCommentVelocityLine(
           /** @type {PopupCommentEntry[]} */
           displayEntries
@@ -6905,6 +7005,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           KEY_RECORDING,
           KEY_DEEP_HARVEST_QUIET_UI,
           KEY_INLINE_PANEL_WIDTH_MODE,
+          KEY_INLINE_PANEL_PLACEMENT,
           KEY_CALM_PANEL_MOTION,
           KEY_STORAGE_WRITE_ERROR,
           KEY_COMMENT_PANEL_STATUS
@@ -6954,6 +7055,30 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (radioPlayerRow && radioVideoOnly) {
         radioPlayerRow.checked = panelMode === INLINE_PANEL_WIDTH_PLAYER_ROW;
         radioVideoOnly.checked = panelMode === INLINE_PANEL_WIDTH_VIDEO;
+      }
+      const placementMode = normalizeInlinePanelPlacement(
+        openBag[KEY_INLINE_PANEL_PLACEMENT]
+      );
+      const radioPlacementBelow = (
+        /** @type {HTMLInputElement|null} */
+        $("inlinePanelPlacementBelow")
+      );
+      const radioPlacementBeside = (
+        /** @type {HTMLInputElement|null} */
+        $("inlinePanelPlacementBeside")
+      );
+      const radioPlacementFloating = (
+        /** @type {HTMLInputElement|null} */
+        $("inlinePanelPlacementFloating")
+      );
+      if (radioPlacementBelow) {
+        radioPlacementBelow.checked = placementMode === INLINE_PANEL_PLACEMENT_BELOW;
+      }
+      if (radioPlacementBeside) {
+        radioPlacementBeside.checked = placementMode === INLINE_PANEL_PLACEMENT_BESIDE;
+      }
+      if (radioPlacementFloating) {
+        radioPlacementFloating.checked = placementMode === INLINE_PANEL_PLACEMENT_FLOATING;
       }
       syncVoiceCommentButton();
       if (!isNicoLiveWatchUrl(url)) {
@@ -8465,6 +8590,89 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       watchMetaCache.snapshot = null;
       safeRefresh();
     });
+    $("devMonitorCopyAiBundleBtn")?.addEventListener("click", async () => {
+      const stEl = (
+        /** @type {HTMLElement|null} */
+        $("devMonitorExportTrendStatus")
+      );
+      const exportBtn2 = (
+        /** @type {HTMLButtonElement|null} */
+        $("exportJson")
+      );
+      let watchUrl = String(exportBtn2?.dataset.watchUrl || "").trim();
+      if (!watchUrl) {
+        try {
+          const bag = await chrome.storage.local.get(KEY_LAST_WATCH_URL);
+          watchUrl = String(bag[KEY_LAST_WATCH_URL] || "").trim();
+        } catch {
+          watchUrl = "";
+        }
+      }
+      if (stEl) stEl.textContent = "\u53CE\u96C6\u4E2D\u2026";
+      let lastErr = "";
+      const payload = {
+        popup: {
+          exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          embedded: (() => {
+            try {
+              return window.self !== window.top;
+            } catch {
+              return true;
+            }
+          })()
+        },
+        content: null,
+        note: "Chrome \u30B3\u30F3\u30BD\u30FC\u30EB\u306E ERR_BLOCKED_BY_CLIENT / \u5E83\u544A\u30B9\u30AF\u30EA\u30D7\u30C8\u5931\u6557\u306F\u30D6\u30ED\u30C3\u30AB\u30FC\u7531\u6765\u3067\u591A\u304F\u3001\u672C\u62E1\u5F35\u3068\u306F\u7121\u95A2\u4FC2\u306A\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002"
+      };
+      try {
+        const manifest = chrome.runtime.getManifest();
+        const candidates = await collectWatchTabCandidates(watchUrl);
+        if (!candidates.length) {
+          lastErr = "watch \u30BF\u30D6\u5019\u88DC\u306A\u3057\uFF08\u30CB\u30B3\u751F watch \u3092\u958B\u3044\u305F\u72B6\u614B\u3067\u8A66\u3057\u3066\u304F\u3060\u3055\u3044\uFF09";
+        } else {
+          for (const c of candidates) {
+            try {
+              const res = (
+                /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string }} */
+                await tabsSendMessageWithRetry(
+                  c.id,
+                  { type: "NLS_AI_SHARE_PAGE_DIAGNOSTICS" },
+                  { frameId: 0, maxAttempts: 8, delayMs: 80 }
+                )
+              );
+              if (res?.ok && res.diagnostics) {
+                payload.content = /** @type {Record<string, unknown>} */
+                res.diagnostics;
+                payload.resolvedTabUrl = String(c.url || "").slice(0, 240);
+                lastErr = "";
+                break;
+              }
+              lastErr = String(res?.error || "content \u304C ok \u3092\u8FD4\u3057\u307E\u305B\u3093\u3067\u3057\u305F");
+            } catch (e) {
+              lastErr = String(
+                e && typeof e === "object" && "message" in e ? (
+                  /** @type {{ message?: unknown }} */
+                  e.message
+                ) : e || "send_failed"
+              );
+            }
+          }
+        }
+        const md = formatAiShareDiagnosticsMarkdown({
+          extensionName: manifest.name,
+          extensionVersion: manifest.version,
+          watchUrlNote: watchUrl ? `\u8A18\u9332\u4E2D URL \u512A\u5148\uFF08${watchUrl.slice(0, 120)}\uFF09` : "\u524D\u9762\u30A2\u30AF\u30C6\u30A3\u30D6\u306E\u30CB\u30B3\u751F watch \u30BF\u30D6\u512A\u5148",
+          lastSendMessageError: lastErr,
+          payload
+        });
+        const ok = await copyTextToClipboard(md);
+        if (stEl) {
+          stEl.textContent = ok ? "\u8A3A\u65AD\u307E\u3068\u3081\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\uFF08AI \u306B\u8CBC\u308A\u4ED8\u3051\u53EF\uFF09" : "\u30B3\u30D4\u30FC\u306B\u5931\u6557\u3057\u307E\u3057\u305F";
+        }
+      } catch {
+        if (stEl) stEl.textContent = "\u53CE\u96C6\u306B\u5931\u6557\u3057\u307E\u3057\u305F";
+      }
+    });
     $("devMonitorExportTrendBtn")?.addEventListener("click", async () => {
       const prm = lastDevMonitorPanelParams;
       const stEl = (
@@ -8649,12 +8857,20 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     });
     toggle.addEventListener("change", async () => {
+      const next = toggle.checked;
       try {
-        const ok = await storageSetSafe({ [KEY_RECORDING]: toggle.checked });
-        if (!ok) return;
+        const ok = await storageSetSafe({ [KEY_RECORDING]: next });
+        if (!ok) {
+          toggle.checked = !next;
+          return;
+        }
         safeRefresh();
       } catch {
+        toggle.checked = !next;
       }
+    });
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
     });
     const deepHarvestQuietToggle = (
       /** @type {HTMLInputElement|null} */
@@ -8675,6 +8891,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (!ok) return;
       safeRefresh();
     };
+    const saveInlinePanelPlacement = async (value) => {
+      const v = value === INLINE_PANEL_PLACEMENT_BESIDE ? INLINE_PANEL_PLACEMENT_BESIDE : value === INLINE_PANEL_PLACEMENT_FLOATING ? INLINE_PANEL_PLACEMENT_FLOATING : INLINE_PANEL_PLACEMENT_BELOW;
+      const ok = await storageSetSafe({ [KEY_INLINE_PANEL_PLACEMENT]: v });
+      if (!ok) return;
+      safeRefresh();
+    };
     const radioPlayerRowEl = $("inlinePanelWidthPlayerRow");
     const radioVideoOnlyEl = $("inlinePanelWidthVideo");
     radioPlayerRowEl?.addEventListener("change", (e) => {
@@ -8687,6 +8909,27 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const t = e.target;
       if (t instanceof HTMLInputElement && t.checked) {
         void saveInlinePanelWidthMode(INLINE_PANEL_WIDTH_VIDEO);
+      }
+    });
+    const radioPlacementBelowEl = $("inlinePanelPlacementBelow");
+    const radioPlacementBesideEl = $("inlinePanelPlacementBeside");
+    const radioPlacementFloatingEl = $("inlinePanelPlacementFloating");
+    radioPlacementBelowEl?.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t instanceof HTMLInputElement && t.checked) {
+        void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BELOW);
+      }
+    });
+    radioPlacementBesideEl?.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t instanceof HTMLInputElement && t.checked) {
+        void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BESIDE);
+      }
+    });
+    radioPlacementFloatingEl?.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t instanceof HTMLInputElement && t.checked) {
+        void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_FLOATING);
       }
     });
     const calmMotionEl = (
