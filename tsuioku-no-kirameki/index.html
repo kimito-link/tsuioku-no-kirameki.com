@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 
-    <meta name="description" content="Web・iOS・Android を前提とした体験のもと、ニコ生視聴まわりを支える Chrome 拡張。応援コメントを記録し、誰がどれだけ心を込めてくれたかを手元でひとめにできます。">
+    <meta name="description" content="Web・iOS・Android を前提とした体験のもと、ニコ生視聴まわりを支える Chrome 拡張。応援コメントを記録し、誰がどれだけ心を込めてくれたかを手元でひとめにできます。YouTube をはじめとした他プラットフォームへの対応も計画中です。">
     <meta name="theme-color" content="#0a1228">
     <link rel="manifest" href="site.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -23,14 +23,14 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://tsuioku-no-kirameki.com/">
     <meta property="og:title" content="君斗りんくの追憶のきらめき ― Web・iOS・Android と Chrome 拡張">
-    <meta property="og:description" content="流れ星みたいに消えていくコメントを、星座みたいに、つながりが残る世界へ。Web・モバイルを前提に、視聴まわりは Chrome 拡張で応援を手元に残します。">
+    <meta property="og:description" content="流れ星みたいに消えていくコメントを、星座みたいに、つながりが残る世界へ。Web・モバイルを前提に、視聴まわりは Chrome 拡張で応援を手元に残します。YouTube 等への対応も計画中です。">
     <meta property="og:image" content="https://tsuioku-no-kirameki.com/images/og-image.jpg">
     <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
     <meta property="og:locale" content="ja_JP">
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="君斗りんくの追憶のきらめき ― Web・iOS・Android と Chrome 拡張">
-    <meta name="twitter:description" content="Web・モバイルを前提に、視聴まわりは Chrome 拡張で応援を手元に残します。">
+    <meta name="twitter:description" content="Web・モバイルを前提に、視聴まわりは Chrome 拡張で応援を手元に残します。YouTube 等への対応も計画中です。">
     <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/images/og-image.jpg">
     <style>
       :root{
@@ -138,6 +138,10 @@
       }
       .brand strong{display:block;font-family:"Yu Mincho","Hiragino Mincho ProN",serif;font-size:1rem}
       .brand span{display:block;color:var(--text-secondary);font-size:.82rem;line-height:1.45;max-width:min(100%,28rem)}
+      .brand .lp-header__platform-note{
+        display:block;margin-top:.65em;font-size:.78rem;line-height:1.5;color:var(--muted);font-weight:400
+      }
+      .brand .lp-header__platform-note strong{color:var(--text-secondary);font-weight:600}
       @media (min-width:1024px){
         .brand span{max-width:min(100%,36rem)}
       }
@@ -2711,7 +2715,7 @@
           </div>
           <div>
             <strong>君斗りんくの追憶のきらめき</strong>
-            <span>Web・iOS・Android と Chrome 拡張を前提に、<br>応援が消えてしまう心理に向き合う LP preview（<a href="#marketing-features">マーケ分析HTML</a> 書き出しあり）</span>
+            <span>Web・iOS・Android と Chrome 拡張を前提に、<br>応援が消えてしまう心理に向き合う LP preview（<a href="#marketing-features">マーケ分析HTML</a> 書き出しあり）<br><small class="lp-header__platform-note">今後、<strong>YouTube</strong> をはじめとした<strong>他の配信プラットフォーム</strong>にも対応していく予定です。</small></span>
           </div>
         </div>
         <nav class="nav" aria-label="主要リンク">
@@ -2943,7 +2947,8 @@
               <p>
                 Web・iOS・Android を前提にした体験のなかで、<br>
                 応援コメントを記録して、誰がどれだけ心を込めてくれたかを<br>
-                ひとめでわかるようにする──まずは視聴ページから届ける Chrome 拡張。
+                ひとめでわかるようにする──まずは視聴ページから届ける Chrome 拡張。<br>
+                <strong>YouTube</strong> をはじめとした<strong>他の配信プラットフォーム</strong>にも、今後対応していく予定です。
               </p>
               <p>反応の数を競うためじゃない。</p>
               <p>
@@ -3137,7 +3142,7 @@
               <strong>自分の名前が呼ばれなかった</strong>ことまで、応援の熱が薄く感じられます。
               「君斗りんくの追憶のきらめき」は、<strong>Web・iOS・Android を前提にした体験</strong>を見据えつつ、
               まずはデスクトップの視聴ページで、そうした<strong>読まれなかった・呼ばれなかった</strong>のあとでも
-              痕跡を手元に静かに残すための Chrome 拡張です。競争を煽るためではなく、
+              痕跡を手元に静かに残すための Chrome 拡張です。<strong>YouTube</strong> をはじめとした<strong>他の配信プラットフォーム</strong>への対応も、今後の開発で視野に入れています。競争を煽るためではなく、
               <strong>応援したこと自体の証拠</strong>を失わせないためにあります。
               あわせて、記録データから<strong>KPI・タイムライン・セグメントなどが並ぶマーケ分析用HTML</strong>をダウンロードできる機能もあります（<a href="#marketing-features">機能の一覧</a>）。
             </p>
@@ -4917,7 +4922,7 @@
             </p>
             <h3 style="margin-top:var(--space-md)">ニコニコ生との関係（規約への配慮）</h3>
             <ul>
-              <li><strong>主な想定</strong>は<strong>ニコニコ生放送の視聴ページ</strong>です。YouTube など他のサイトは仕組みが別で、当拡張の主役ではありません。</li>
+              <li><strong>現時点の主な想定</strong>は<strong>ニコニコ生放送の視聴ページ</strong>です。<strong>YouTube</strong> をはじめとした<strong>他の配信プラットフォーム</strong>にも対応していく<strong>予定</strong>ですが、サイトごとに仕組みが異なるため<strong>段階的な展開</strong>になります（時期や範囲は、進捗に合わせて LP でもお知らせします）。</li>
               <li>ニコニコ側の<strong>一般向け公式 API に全面的に頼る形ではなく</strong>、<strong>ご本人がブラウザで視聴している範囲</strong>から取り込むイメージです。サイト側の仕様変更で挙動が変わることはあり得ます。</li>
               <li>尊重したい文書の例：<a href="https://account.nicovideo.jp/rules/account?language=ja-jp" rel="noopener noreferrer" target="_blank">ニコニコ利用規約</a>・<a href="https://site.nicovideo.jp/base/guideline" rel="noopener noreferrer" target="_blank">ニコニコ活動ガイドライン</a>・該当する個別規約。<strong>サーバーに過度の負担をかける使い方</strong>や<strong>運営の妨げになりうる使い方</strong>は避ける前提で考えています。</li>
             </ul>
