@@ -97,6 +97,40 @@ test.describe('lp-preview', () => {
     expect(narrow[2].y).toBeGreaterThanOrEqual(bottom1 - 8);
   });
 
+  test('モバイルファースト: 390幅でhero/voicesは1カラム表示', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
+
+    const heroItems = page.locator('.hero-grid > *');
+    await expect(heroItems).toHaveCount(2);
+    const heroBoxes = await allBoundingBoxes(heroItems);
+    expect(heroBoxes[1].y).toBeGreaterThanOrEqual(heroBoxes[0].y + heroBoxes[0].height - 4);
+
+    const voicesItems = page.locator('#voices .voices-mock-grid > *');
+    await expect(voicesItems).toHaveCount(2);
+    const voicesBoxes = await allBoundingBoxes(voicesItems);
+    expect(voicesBoxes[1].y).toBeGreaterThanOrEqual(voicesBoxes[0].y + voicesBoxes[0].height - 4);
+  });
+
+  test('モバイルファースト: 1280幅でhero/voicesは2カラム表示', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
+
+    const heroItems = page.locator('.hero-grid > *');
+    const heroBoxes = await allBoundingBoxes(heroItems);
+    const heroCy = (b) => b.y + b.height / 2;
+    expect(Math.abs(heroCy(heroBoxes[0]) - heroCy(heroBoxes[1]))).toBeLessThan(80);
+    expect(heroBoxes[1].x).toBeGreaterThan(heroBoxes[0].x + heroBoxes[0].width * 0.4);
+
+    const voicesGrid = page.locator('#voices .voices-mock-grid');
+    const voicesCols = await voicesGrid.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+    expect(voicesCols).toBeGreaterThanOrEqual(2);
+
+    const voicesItems = page.locator('#voices .voices-mock-grid > *');
+    const voicesBoxes = await allBoundingBoxes(voicesItems);
+    expect(voicesBoxes[1].x).toBeGreaterThan(voicesBoxes[0].x + voicesBoxes[0].width * 0.35);
+  });
+
   test('ゆっくり吹き出し: 狭い幅でも左右掛け合い・吹き出しが十分な幅', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
@@ -135,6 +169,60 @@ test.describe('lp-preview', () => {
     const s = await speaker.boundingBox();
     expect(b.width).toBeGreaterThan(120);
     expect(b.x).toBeGreaterThan(s.x);
+  });
+
+  test('キャラ会話: 主要セクションで常に左右掛け合い', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
+
+    for (const sectionId of ['#problem', '#multi-live', '#tanabata-preview']) {
+      const section = page.locator(sectionId);
+      await section.scrollIntoViewIfNeeded();
+
+      const left = section.locator('.y-row:not(.reverse)').first();
+      const leftB = await left.locator('.bubble').boundingBox();
+      const leftS = await left.locator('.speaker').boundingBox();
+      expect(leftB.width).toBeGreaterThan(110);
+      expect(leftB.x).toBeGreaterThan(leftS.x);
+
+      const right = section.locator('.y-row.reverse').first();
+      const rightB = await right.locator('.bubble').boundingBox();
+      const rightS = await right.locator('.speaker').boundingBox();
+      expect(rightB.width).toBeGreaterThan(110);
+      expect(rightS.x).toBeGreaterThan(rightB.x);
+    }
+  });
+
+  test('七夕プレビュー: 390幅で星カードが縦積み・横はみ出しなし', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
+
+    const section = page.locator('#tanabata-preview');
+    await section.scrollIntoViewIfNeeded();
+    await expect(section.getByRole('heading', { name: /七夕の世界観プレビュー/ })).toBeVisible();
+
+    const cards = section.locator('.tanabata-preview__star-card');
+    await expect(cards).toHaveCount(2);
+    const boxes = await allBoundingBoxes(cards);
+    expect(boxes[1].y).toBeGreaterThanOrEqual(boxes[0].y + boxes[0].height - 4);
+
+    const noOverflow = await section.evaluate((el) => el.scrollWidth <= el.clientWidth + 1);
+    expect(noOverflow).toBe(true);
+  });
+
+  test('七夕プレビュー: 1024幅で星カードが2列表示', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
+
+    const section = page.locator('#tanabata-preview');
+    await section.scrollIntoViewIfNeeded();
+    const stars = section.locator('.tanabata-preview__stars');
+    const cols = await stars.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+    expect(cols).toBeGreaterThanOrEqual(2);
+
+    const cards = section.locator('.tanabata-preview__star-card');
+    const boxes = await allBoundingBoxes(cards);
+    expect(boxes[1].x).toBeGreaterThan(boxes[0].x + boxes[0].width * 0.45);
   });
 
   test('深いリンク #lp-top-commenters: ハッシュ付き URL とスクロール先', async ({ page }) => {

@@ -213,7 +213,10 @@
       .nav .cta{padding:10px 16px;border-radius:999px;background:linear-gradient(135deg,var(--gold),#ddb25d);color:#2e1606}
       .hero{padding:var(--space-2xl) 0 var(--space-lg)}
       .hero-grid,.two-col,.impact-rowset,.solution-grid,.footer-card{display:grid;gap:24px}
-      .hero-grid{grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr)}
+      .hero-grid{grid-template-columns:1fr}
+      @media (min-width:1021px){
+        .hero-grid{grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr)}
+      }
       .card,.board,.hero-copy,.hero-stage,.footer-card{
         background:var(--paper);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:var(--r1)
       }
@@ -277,9 +280,43 @@
       .board p{margin:0;color:var(--text-secondary);line-height:var(--lh-body)}
       .board p + p{margin-top:var(--space-sm)}
       .yukkuri-thread{display:grid;gap:18px;margin-top:20px}
-      .y-row{display:grid;grid-template-columns:112px minmax(0,1fr);gap:16px;align-items:start}
-      .y-row.reverse{grid-template-columns:minmax(0,1fr) 112px}
+      .y-row{display:grid;grid-template-columns:minmax(50px,76px) minmax(0,1fr);gap:10px;align-items:start}
+      .y-row.reverse{grid-template-columns:minmax(0,1fr) minmax(50px,76px)}
       .y-row .bubble{min-width:0}
+      .y-row .speaker img{width:64px;height:64px}
+      .y-row .speaker span{font-size:.74rem}
+      .y-row .bubble{
+        padding:14px 16px;
+        border-radius:22px;
+        font-size:clamp(.88rem,2.9vw,.98rem)
+      }
+      .y-row .bubble::after{
+        left:-7px;top:18px;width:14px;height:14px;
+        transform:rotate(45deg)
+      }
+      .y-row.reverse .bubble::after{
+        left:auto;right:-7px;top:18px;
+        transform:rotate(45deg)
+      }
+      @media (min-width:761px){
+        .y-row{grid-template-columns:112px minmax(0,1fr);gap:16px}
+        .y-row.reverse{grid-template-columns:minmax(0,1fr) 112px}
+        .y-row .speaker img{width:92px;height:92px}
+        .y-row .speaker span{font-size:.8rem}
+        .y-row .bubble{
+          padding:18px 20px;
+          border-radius:26px;
+          font-size:1rem;
+        }
+        .y-row .bubble::after{
+          left:-10px;top:50%;width:18px;height:18px;
+          transform:translateY(-50%) rotate(45deg)
+        }
+        .y-row.reverse .bubble::after{
+          left:auto;right:-10px;top:50%;
+          transform:translateY(-50%) rotate(45deg)
+        }
+      }
       .speaker{display:flex;flex-direction:column;align-items:center;gap:8px}
       .speaker img{width:92px;height:92px;object-fit:contain;filter:drop-shadow(0 10px 16px rgba(79,56,23,.14))}
       .speaker span{color:var(--text-secondary);font-size:.8rem}
@@ -586,7 +623,7 @@
       @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
       @keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
       @media (max-width:1020px){
-        .hero-grid,.two-col,.stats,.solution-grid,.avatar-line,.mini-notes,.footer-card,.comment-flow,.impact-chain,.impact-dual,.voices-mock-grid{grid-template-columns:1fr}
+        .two-col,.stats,.solution-grid,.avatar-line,.mini-notes,.footer-card,.comment-flow,.impact-chain,.impact-dual{grid-template-columns:1fr}
         .live-ui-layout{grid-template-columns:1fr;min-height:0}
         .live-chat-col{border-left:none;border-top:1px solid rgba(255,255,255,.08)}
         .live-chat-scroll{max-height:220px}
@@ -597,32 +634,6 @@
       }
       @media (max-width:760px){
         :root{--anchor-offset:52px}
-        /* 狭い画面でも1列化せず、LINE風の左右掛け合いを維持（吹き出し幅の潰れ防止） */
-        .y-row{
-          grid-template-columns:minmax(50px,76px) minmax(0,1fr);
-          gap:10px;
-          align-items:start
-        }
-        .y-row.reverse{
-          grid-template-columns:minmax(0,1fr) minmax(50px,76px)
-        }
-        .y-row.reverse .speaker{order:unset}
-        .y-row .speaker img{width:64px;height:64px}
-        .y-row .speaker span{font-size:.74rem}
-        .y-row .bubble{
-          padding:14px 16px;
-          border-radius:22px;
-          font-size:clamp(.88rem,2.9vw,.98rem);
-          line-height:var(--lh-body)
-        }
-        .y-row .bubble::after{
-          left:-7px;top:18px;width:14px;height:14px;
-          transform:rotate(45deg)
-        }
-        .y-row.reverse .bubble::after{
-          left:auto;right:-7px;top:18px;
-          transform:rotate(45deg)
-        }
         .trio{gap:10px}.stand{width:33%;min-width:0;padding:12px 8px 10px}
         .mini-bubble:nth-child(2){margin-left:0;max-width:100%}
         .mini-bubble:nth-child(3){max-width:100%}
@@ -631,6 +642,150 @@
         .y-row{grid-template-columns:minmax(46px,64px) minmax(0,1fr);gap:8px}
         .y-row.reverse{grid-template-columns:minmax(0,1fr) minmax(46px,64px)}
         .y-row .speaker img{width:56px;height:56px}
+      }
+
+      /* 七夕プレビュー（織姫・彦星の距離と、応援が残る世界） */
+      .tanabata-preview{
+        border:1px solid rgba(79,172,254,.24);
+        background:
+          radial-gradient(ellipse 90% 60% at 12% 0%,rgba(145,190,255,.18),transparent 58%),
+          radial-gradient(ellipse 80% 55% at 88% 100%,rgba(255,200,120,.12),transparent 56%),
+          linear-gradient(165deg,rgba(248,252,255,.98),rgba(237,246,255,.94) 54%,rgba(251,247,240,.95));
+        box-shadow:0 18px 52px rgba(29,52,86,.12),inset 0 1px 0 rgba(255,255,255,.88);
+      }
+      .tanabata-preview p.tanabata-preview__intro{
+        margin:0;
+        color:#334155;
+        font-size:clamp(.9rem,2.05vw,.98rem);
+        line-height:var(--lh-body);
+        max-width:min(100%,48rem);
+      }
+      .tanabata-preview__scene{
+        position:relative;
+        margin-top:16px;
+        padding:16px;
+        border-radius:20px;
+        border:1px solid rgba(79,172,254,.3);
+        background:linear-gradient(180deg,#122246,#173062 62%,#10264f);
+        color:#edf4ff;
+        overflow:hidden;
+      }
+      .tanabata-preview__scene::before{
+        content:"";
+        position:absolute;
+        inset:0;
+        pointer-events:none;
+        background:
+          radial-gradient(circle at 9% 16%,rgba(255,255,255,.6) 0 1.1px,transparent 1.2px),
+          radial-gradient(circle at 17% 26%,rgba(255,245,195,.52) 0 1.3px,transparent 1.4px),
+          radial-gradient(circle at 27% 10%,rgba(255,255,255,.4) 0 1px,transparent 1.1px),
+          radial-gradient(circle at 40% 22%,rgba(255,252,220,.5) 0 1.1px,transparent 1.2px),
+          radial-gradient(circle at 52% 14%,rgba(255,255,255,.46) 0 1px,transparent 1.1px),
+          radial-gradient(circle at 68% 20%,rgba(255,245,200,.48) 0 1.2px,transparent 1.3px),
+          radial-gradient(circle at 83% 12%,rgba(255,255,255,.42) 0 1.1px,transparent 1.2px),
+          radial-gradient(circle at 92% 24%,rgba(255,252,220,.5) 0 1.2px,transparent 1.3px);
+        opacity:.64;
+      }
+      .tanabata-preview__milkyway{
+        position:absolute;
+        left:50%;
+        top:50%;
+        width:min(92%,44rem);
+        height:72px;
+        transform:translate(-50%,-50%) rotate(-8deg);
+        border-radius:999px;
+        background:
+          radial-gradient(ellipse at center,rgba(255,255,255,.56) 0%,rgba(176,219,255,.38) 36%,rgba(108,169,255,.2) 58%,rgba(23,51,94,.03) 100%);
+        filter:blur(.2px);
+        pointer-events:none;
+      }
+      .tanabata-preview__stars{
+        position:relative;
+        z-index:1;
+        display:grid;
+        grid-template-columns:minmax(0,1fr);
+        gap:10px;
+        align-items:start;
+      }
+      @media (min-width:680px){
+        .tanabata-preview__stars{
+          grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+        }
+      }
+      .tanabata-preview__star-card{
+        padding:12px 12px 10px;
+        border-radius:16px;
+        border:1px solid rgba(191,219,254,.36);
+        background:rgba(10,24,48,.86);
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+      }
+      .tanabata-preview__star-card h4{
+        margin:0 0 6px;
+        font-size:clamp(1rem,2.35vw,1.08rem);
+        line-height:var(--lh-heading);
+        color:#fef3c7;
+      }
+      .tanabata-preview__star-card p{
+        margin:0;
+        font-size:clamp(.88rem,2.15vw,.96rem);
+        line-height:1.74;
+        color:#eef4ff;
+      }
+      .tanabata-preview__dialog{
+        margin-top:14px;
+      }
+      .tanabata-preview__dialog .yukkuri-thread{
+        margin-top:0;
+      }
+      .tanabata-preview__dialog .bubble{
+        background:rgba(255,252,247,.97);
+        color:#1f2937;
+        border-color:rgba(88,62,28,.16);
+      }
+      .tanabata-preview__dialog .bubble::after{
+        background:rgba(255,252,247,.97);
+        border-color:rgba(88,62,28,.16);
+      }
+      .tanabata-preview__dialog .bubble strong{color:#8a5a0a}
+      .tanabata-preview__dialog .bubble a{
+        color:#255d9b;
+        text-decoration:underline;
+        text-underline-offset:.12em;
+      }
+      .tanabata-preview__dialog .bubble a:hover,.tanabata-preview__dialog .bubble a:focus-visible{color:#1f4f87}
+      .tanabata-preview__dialog .speaker img{
+        border-radius:50%;
+        background:rgba(255,255,255,.52);
+      }
+      .tanabata-preview__dialog .speaker span{
+        color:#f8fbff;
+        text-shadow:0 1px 0 rgba(0,0,0,.4);
+      }
+      .tanabata-preview p.tanabata-preview__foot{
+        margin-top:12px;
+        padding-top:10px;
+        border-top:1px dashed rgba(255,255,255,.44);
+        font-size:.9rem;
+        color:#f8fbff;
+        line-height:1.78;
+        text-shadow:0 1px 0 rgba(0,0,0,.32);
+      }
+      @media (max-width:760px){
+        .tanabata-preview{padding:var(--space-md)}
+        .tanabata-preview__scene{padding:12px}
+        .tanabata-preview__milkyway{height:58px}
+        .tanabata-preview__stars{gap:8px}
+        .tanabata-preview__star-card{padding:10px}
+        .tanabata-preview p.tanabata-preview__intro{font-size:clamp(.95rem,3.3vw,1rem)}
+        .tanabata-preview__star-card p{font-size:clamp(.9rem,3.05vw,.98rem)}
+        .tanabata-preview p.tanabata-preview__foot{font-size:.9rem}
+      }
+      @media (max-width:460px){
+        .tanabata-preview__milkyway{
+          width:120%;
+          transform:translate(-50%,-50%) rotate(-10deg);
+          opacity:.82;
+        }
       }
 
       /* X 風タイムライン（LP 用デザインイメージ・実在ポストではありません） */
@@ -695,8 +850,11 @@
       .x-voices-note{margin-top:var(--space-md);padding:var(--space-sm) var(--space-md);border-radius:16px;background:rgba(255,252,247,.9);
         border:1px solid rgba(88,62,28,.1);color:var(--text-secondary);font-size:.86rem;line-height:var(--lh-body);text-align:center}
       /* 配信UI風モック（LP デモ・特定サービスの完全再現ではありません） */
-      .voices-mock-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--space-md);align-items:start;margin-top:var(--space-md)}
+      .voices-mock-grid{display:grid;grid-template-columns:1fr;gap:var(--space-md);align-items:start;margin-top:var(--space-md)}
       .voices-mock-col{min-width:0}
+      @media (min-width:1021px){
+        .voices-mock-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+      }
       .voices-mock-label{
         margin:0 0 10px;font-size:.82rem;font-weight:700;color:var(--text-secondary);letter-spacing:.04em;text-transform:uppercase
       }
@@ -888,17 +1046,17 @@
       }
       .lp-multi-live-grid{
         display:grid;
-        grid-template-columns:repeat(3,minmax(0,1fr));
+        grid-template-columns:1fr;
         gap:14px;
         align-items:start;
+        max-width:440px;
+        margin-left:auto;
+        margin-right:auto;
       }
-      /* ヒーロー等の 1020px 折り返しと揃え、901〜1020px でだけ「上は1列・下は3列」の段差を防ぐ */
-      @media (max-width:1020px){
+      @media (min-width:1021px){
         .lp-multi-live-grid{
-          grid-template-columns:1fr;
-          max-width:440px;
-          margin-left:auto;
-          margin-right:auto;
+          grid-template-columns:repeat(3,minmax(0,1fr));
+          max-width:none;
         }
       }
       .lp-live-tab-strip{
@@ -3249,6 +3407,7 @@
       <p class="topbar__drawer-hint" aria-hidden="true">ページ内リンク</p>
       <nav class="topbar__nav" aria-label="主要リンク">
           <a href="#worldview">はじめに</a>
+          <a href="#tanabata-preview">七夕プレビュー</a>
           <a href="#voices">タイムライン</a>
           <a href="#multi-live">同時視聴</a>
           <a href="#extension-visual">拡張の見え方</a>
@@ -3663,6 +3822,59 @@
               <span lang="en">251016_logo_guide_kimitolink_ol.pdf</span>（正本）に準拠してください。
             </p>
           </article>
+        </div>
+      </section>
+
+      <section class="section" id="tanabata-preview" aria-labelledby="tanabata-preview-heading">
+        <div class="shell">
+          <div class="board tanabata-preview fade d1">
+            <h3 id="tanabata-preview-heading">七夕の世界観プレビュー：離れていても、痕跡はつなげられる</h3>
+            <p class="tanabata-preview__intro">
+              織姫と彦星のように、<strong>気持ちはあるのに距離が遠い</strong>とき、いちばん痛いのは「届かなかったかも」の不確かさです。
+              このLPでは、年に一度だけ会える話を、<strong>コメントが流れて見失いやすい配信体験</strong>の比喩として使います。
+            </p>
+            <div class="tanabata-preview__scene" role="img" aria-label="天の川を挟んだ二つの星と、応援の記録を残す比喩のプレビュー">
+              <div class="tanabata-preview__milkyway" aria-hidden="true"></div>
+              <div class="tanabata-preview__stars">
+                <article class="tanabata-preview__star-card">
+                  <h4>織姫側（ファンの気持ち）</h4>
+                  <p>文字を打っても流れが速いと、<strong>届いたか分からない</strong>。読まれなかった夜は、応援した実感まで遠くなる。</p>
+                </article>
+                <article class="tanabata-preview__star-card">
+                  <h4>彦星側（配信者の現実）</h4>
+                  <p>全部を拾うのは難しい。だからこそ、<strong>拾えなかった応援も「なかったこと」にしない設計</strong>が必要になる。</p>
+                </article>
+              </div>
+              <div class="tanabata-preview__dialog">
+                <div class="yukkuri-thread">
+                  <div class="y-row">
+                    <div class="speaker">
+                      <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりこん太" width="92" height="92" decoding="async">
+                      <span>こん太</span>
+                    </div>
+                    <div class="bubble">「読まれてないかも」で終わると、短冊みたいに書いた気持ちごと消えそうでこわいのだ。</div>
+                  </div>
+                  <div class="y-row reverse">
+                    <div class="bubble">全部は拾えなくても、<strong>応援した痕跡</strong>が残っていれば「届こうとしてた時間」は失われないのだ。</div>
+                    <div class="speaker">
+                      <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりりんく" width="92" height="92" decoding="async">
+                      <span>りんく</span>
+                    </div>
+                  </div>
+                  <div class="y-row">
+                    <div class="speaker">
+                      <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりたぬ姉" width="92" height="92" decoding="async">
+                      <span>たぬ姉</span>
+                    </div>
+                    <div class="bubble">年に一度の奇跡を待つより、毎回の応援を手元で見える化する。ここが「追憶のきらめき」の七夕解釈なのだ。</div>
+                  </div>
+                </div>
+              </div>
+              <p class="tanabata-preview__foot">
+                この枠は世界観の完成見本です。実運用では、星・天の川の表現を維持しつつ、各セクションの文脈に合わせて比喩の濃度を調整できます。
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
