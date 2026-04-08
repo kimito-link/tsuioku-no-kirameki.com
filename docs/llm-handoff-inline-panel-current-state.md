@@ -63,7 +63,6 @@
 - `src/lib/storageKeys.test.js`
 - `src/lib/watchSnapshotOfficialFields.js`
 - `src/lib/watchSnapshotOfficialFields.test.js`
-- untracked: `src/images/`
 
 要点:
 
