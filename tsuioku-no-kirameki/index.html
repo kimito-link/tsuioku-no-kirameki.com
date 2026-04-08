@@ -2556,6 +2556,41 @@
         font-size:clamp(1.35rem,3.4vw,1.55rem);
         letter-spacing:.07em
       }
+
+      /* ── Ripple line (蒼凪しずく metaphor) ── */
+      @keyframes lp-ripple-expand{
+        0%{width:0;height:0;opacity:.6;border-width:1.5px}
+        100%{width:clamp(80px,18vw,140px);height:clamp(28px,6vw,48px);opacity:0;border-width:.5px}
+      }
+      .lp-ripple-line{
+        position:relative;display:block;
+        padding-bottom:clamp(24px,5vw,40px)
+      }
+      .lp-ripple-line__text{position:relative;z-index:1}
+      .lp-ripple-line__rings{
+        position:absolute;
+        left:50%;bottom:0;
+        width:0;height:0;
+        pointer-events:none
+      }
+      .lp-ripple-line__ring{
+        position:absolute;
+        left:50%;top:50%;
+        transform:translate(-50%,-50%);
+        width:0;height:0;
+        border-radius:50%;
+        border:1.5px solid rgba(120,170,210,.35);
+        animation:lp-ripple-expand 3.6s ease-out infinite
+      }
+      .lp-ripple-line__ring:nth-child(2){animation-delay:1.2s}
+      .lp-ripple-line__ring:nth-child(3){animation-delay:2.4s}
+      .lp-dawn-arc .lp-ripple-line__ring{
+        border-color:rgba(160,200,240,.3)
+      }
+      @media (prefers-reduced-motion:reduce){
+        .lp-ripple-line__rings{display:none}
+        .lp-ripple-line{padding-bottom:0}
+      }
       .lp-collab{
         margin:1.5em 0;
         padding:clamp(24px,5vw,40px) clamp(16px,4vw,28px);
@@ -4032,7 +4067,14 @@
                   AIだからこそ寄り添える瞬間がある<br>
                   ってりんくは思ってる。
                 </p>
-                <p class="lp-worldview__epilogue-mid">蒼く静かな凪の夜にも、ひとしずくの言葉は波紋を残す。</p>
+                <p class="lp-worldview__epilogue-mid lp-ripple-line">
+                  <span class="lp-ripple-line__text">蒼く静かな凪の夜にも、ひとしずくの言葉は波紋を残す。</span>
+                  <span class="lp-ripple-line__rings" aria-hidden="true">
+                    <span class="lp-ripple-line__ring"></span>
+                    <span class="lp-ripple-line__ring"></span>
+                    <span class="lp-ripple-line__ring"></span>
+                  </span>
+                </p>
                 <p class="lp-worldview__epilogue-accent">想いが強いほど、届くから。</p>
                 <p class="lp-worldview__epilogue-accent lp-worldview__epilogue-climax">ここから、つながっていく。</p>
               </div>
