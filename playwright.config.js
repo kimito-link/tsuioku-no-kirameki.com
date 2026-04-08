@@ -18,11 +18,15 @@ const serveCliJs = path.join(__dirname, 'node_modules', 'serve', 'build', 'main.
  * SKIP_E2E=1 は npm スクリプト `scripts/run-e2e.mjs` 側で処理（Playwright 自体は起動しない）。
  *
  * E2E_NO_WEBSERVER=1 … モック watch 用の静的サーバを立てない（chrome-extension:// のみの spec 向け）。
+ *
+ * ローカルでは tests/e2e/global-setup.js が先に :3456 を用意し、webServer は reuse で拾う（Windows 等の起動不安定対策）。
  */
 const e2eNoWebServer = process.env.E2E_NO_WEBSERVER === '1';
 
 export default defineConfig({
   testDir: 'tests/e2e',
+  globalSetup: path.join(__dirname, 'tests', 'e2e', 'global-setup.js'),
+  globalTeardown: path.join(__dirname, 'tests', 'e2e', 'global-teardown.js'),
   fullyParallel: false,
   workers: 1,
   timeout: 120_000,
@@ -42,9 +46,9 @@ export default defineConfig({
           url: 'http://127.0.0.1:3456/watch/lv888888888/',
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
-          // Windows で子の stdout/stderr が背圧で詰まり serve が固まる／落ちるのを防ぐ
-          stdout: 'pipe',
-          stderr: 'pipe'
+          // pipe は環境によって背圧で子が詰まることがある。global-setup が先に起動した場合は再利用のみ。
+          stdout: 'ignore',
+          stderr: 'ignore'
         }
       })
 });
