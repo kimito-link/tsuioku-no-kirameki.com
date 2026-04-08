@@ -69,7 +69,8 @@ function sectionAdviceIntro() {
 </section>`;
 }
 
-/** KPI の直後 */
+/** KPI の直後
+ * @param {MarketingReport} r */
 function sectionAdviceAfterKpi(r) {
   const rinkLines = [
     'ピークの分やコメント／分は、枠のどこで盛り上がったかの目安になるのだ。全部のコメントに返せない日でも、波を知っておくと心の置きどころにはなるのだ。',
@@ -94,7 +95,8 @@ function sectionAdviceAfterKpi(r) {
   return `<div class="mkt-advice-after">${cards.join('')}</div>`;
 }
 
-/** タイムライン直後（チャートがあるときだけ） */
+/** タイムライン直後（チャートがあるときだけ）
+ * @param {MarketingReport} r */
 function sectionAdviceAfterTimeline(r) {
   if (r.timeline.length < 2) return '';
   return `<div class="mkt-advice-after">${adviceCard('rink', 'りんく', [
@@ -102,7 +104,8 @@ function sectionAdviceAfterTimeline(r) {
   ])}</div>`;
 }
 
-/** セグメント直後 */
+/** セグメント直後
+ * @param {MarketingReport} r */
 function sectionAdviceAfterSegment(r) {
   const u = r.uniqueUsers;
   const once = r.segmentPcts.once;
@@ -139,7 +142,8 @@ function sectionAdviceAfterSegment(r) {
   return `<div class="mkt-advice-after">${cards.join('')}</div>`;
 }
 
-/** ランキング直後 */
+/** ランキング直後
+ * @param {MarketingReport} r */
 function sectionAdviceAfterRank(r) {
   if (r.topUsers.length === 0) return '';
   return `<div class="mkt-advice-after">${adviceCard('tanu', 'たぬ姉', [
