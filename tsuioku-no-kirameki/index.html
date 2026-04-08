@@ -3563,8 +3563,45 @@
         background:rgba(255,252,245,.16);
         border-color:rgba(201,142,43,.55)
       }
+      /* ── Coda drop effect ── */
+      @keyframes lp-drop-fall{
+        0%{transform:translateY(-18px) scale(.6);opacity:0}
+        15%{opacity:1}
+        70%{opacity:.7}
+        100%{transform:translateY(clamp(120px,22vh,200px)) scale(1);opacity:0}
+      }
+      @keyframes lp-drop-ripple{
+        0%{transform:translate(-50%,-50%) scale(0);opacity:.5}
+        60%{opacity:.2}
+        100%{transform:translate(-50%,-50%) scale(1);opacity:0}
+      }
+      .lp-coda__drops{
+        position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden
+      }
+      .lp-coda__drop{
+        position:absolute;
+        width:6px;height:9px;
+        border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+        background:linear-gradient(180deg,rgba(180,210,240,.5),rgba(140,180,220,.25));
+        filter:blur(.5px);
+        animation:lp-drop-fall 4s ease-in infinite
+      }
+      .lp-coda__drop::after{
+        content:"";position:absolute;
+        left:50%;top:100%;
+        width:24px;height:8px;
+        border-radius:50%;
+        background:radial-gradient(ellipse,rgba(160,200,240,.2),transparent 70%);
+        animation:lp-drop-ripple 4s ease-out infinite;
+        animation-delay:inherit
+      }
+      .lp-coda__drop:nth-child(1){left:18%;top:22%;animation-delay:0s;animation-duration:4.2s}
+      .lp-coda__drop:nth-child(2){left:50%;top:18%;animation-delay:1.4s;animation-duration:3.6s;width:4px;height:7px}
+      .lp-coda__drop:nth-child(3){left:78%;top:25%;animation-delay:2.8s;animation-duration:4.8s;width:5px;height:8px}
+      .lp-coda__drop:nth-child(4){left:35%;top:15%;animation-delay:3.5s;animation-duration:3.9s;width:3px;height:5px;opacity:.6}
+      .lp-coda__drop:nth-child(5){left:65%;top:20%;animation-delay:0.7s;animation-duration:4.5s;width:5px;height:7px;opacity:.7}
       @media (prefers-reduced-motion:reduce){
-        .lp-coda__glow{display:none}
+        .lp-coda__glow,.lp-coda__drops{display:none}
       }
 
       /* ── In-app browser hint ── */
@@ -6190,6 +6227,13 @@
 
       <section class="lp-coda" aria-label="クロージングメッセージ">
         <div class="lp-coda__glow" aria-hidden="true"></div>
+        <div class="lp-coda__drops" aria-hidden="true">
+          <span class="lp-coda__drop"></span>
+          <span class="lp-coda__drop"></span>
+          <span class="lp-coda__drop"></span>
+          <span class="lp-coda__drop"></span>
+          <span class="lp-coda__drop"></span>
+        </div>
         <div class="shell lp-coda__inner">
           <p class="lp-coda__line lp-coda__line--first">キミの想いはもう受け取ったよ</p>
           <p class="lp-coda__line lp-coda__line--main">キミとボクの物語は<br>いつまでも色褪せない</p>
