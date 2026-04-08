@@ -16,6 +16,7 @@ import {
   INLINE_PANEL_PLACEMENT_BESIDE,
   INLINE_PANEL_PLACEMENT_FLOATING,
   KEY_CALM_PANEL_MOTION,
+  KEY_MARKETING_EXPORT_MASK_LABELS,
   EXTENSION_SOFT_CACHE_STORAGE_KEYS,
   KEY_POPUP_FRAME,
   KEY_POPUP_FRAME_CUSTOM,
@@ -45,7 +46,8 @@ import {
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
   normalizeInlinePanelPlacement,
-  normalizeCalmPanelMotion
+  normalizeCalmPanelMotion,
+  normalizeMarketingExportMaskLabels
 } from '../lib/storageKeys.js';
 import { normalizeSupportVisualExpanded } from '../lib/supportVisualExpanded.js';
 import { computeScrollDeltaToRevealInParent } from '../lib/nlMainScrollReveal.js';
@@ -5293,7 +5295,8 @@ async function refresh() {
       KEY_INLINE_PANEL_PLACEMENT,
       KEY_CALM_PANEL_MOTION,
       KEY_STORAGE_WRITE_ERROR,
-      KEY_COMMENT_PANEL_STATUS
+      KEY_COMMENT_PANEL_STATUS,
+      KEY_MARKETING_EXPORT_MASK_LABELS
     ])
   ]);
   applySelfPostedRecentsFromBag(openBag);
@@ -5303,6 +5306,12 @@ async function refresh() {
   applyCalmPanelMotionClass(calmOn);
   const calmMotionElHydrate = /** @type {HTMLInputElement|null} */ ($('calmPanelMotion'));
   if (calmMotionElHydrate) calmMotionElHydrate.checked = calmOn;
+  const mktMaskHydrate = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
+  if (mktMaskHydrate) {
+    mktMaskHydrate.checked = normalizeMarketingExportMaskLabels(
+      openBag[KEY_MARKETING_EXPORT_MASK_LABELS]
+    );
+  }
   const { url, fromActiveTab } = resolveWatchUrlFromTabAndStash(
     tabs[0],
     openBag[KEY_LAST_WATCH_URL]
@@ -7280,7 +7289,9 @@ function initPopup() {
         return;
       }
       const report = aggregateMarketingReport(comments, lid);
-      const html = buildMarketingDashboardHtml(report);
+      const maskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
+      const maskShare = Boolean(maskEl?.checked);
+      const html = buildMarketingDashboardHtml(report, { maskShareLabels: maskShare });
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -7472,6 +7483,17 @@ function initPopup() {
       const on = Boolean(calmMotionEl.checked);
       applyCalmPanelMotionClass(on);
       await storageSetSafe({ [KEY_CALM_PANEL_MOTION]: on });
+    } catch {
+      //
+    }
+  });
+
+  const mktMaskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
+  mktMaskEl?.addEventListener('change', async () => {
+    try {
+      await storageSetSafe({
+        [KEY_MARKETING_EXPORT_MASK_LABELS]: Boolean(mktMaskEl.checked)
+      });
     } catch {
       //
     }

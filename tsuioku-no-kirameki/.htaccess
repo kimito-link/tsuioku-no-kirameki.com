@@ -1,0 +1,15 @@
+# tsuioku-no-kirameki.com — public_html に配置してください
+# www なし・HTTPS 統一（Apache / Xserver 想定）
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # www → 正規ホスト（HTTPS）
+  RewriteCond %{HTTP_HOST} ^www\.tsuioku-no-kirameki\.com$ [NC]
+  RewriteRule ^ https://tsuioku-no-kirameki.com%{REQUEST_URI} [R=301,L]
+
+  # HTTP → HTTPS（正規ホストのみ）
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP_HOST} ^tsuioku-no-kirameki\.com$ [NC]
+  RewriteRule ^ https://tsuioku-no-kirameki.com%{REQUEST_URI} [R=301,L]
+</IfModule>

@@ -23,7 +23,8 @@
     "test:e2e:ci": "npx playwright test",
     "playwright:install": "playwright install chromium",
     "inspect:watch-stats": "node scripts/inspect-nicolive-watch-stats.mjs",
-    "vendor:visual-explainer": "node scripts/vendor-visual-explainer.mjs"
+    "vendor:visual-explainer": "node scripts/vendor-visual-explainer.mjs",
+    "gen:marketing-avatars": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/resize-marketing-html-avatars.ps1 && node scripts/encode-marketing-html-avatars.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

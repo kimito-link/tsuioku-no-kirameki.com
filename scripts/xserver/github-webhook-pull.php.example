@@ -1,0 +1,149 @@
+<?php
+/**
+ * GitHub Webhook → サーバで git pull（Xserver / Apache + PHP 想定）
+ *
+ * 【ヒントの正本（別リポジトリ）】
+ * 同じマシン上の kimito-link リポジトリに、本番運用の型がまとまっています。
+ *   Resilio/github/kimito-link/_docs/guides/deploy-instructions.md … SSH での git pull 1行・注意事項
+ *   Resilio/github/kimito-link/src/deploy.php … Webhook 署名検証 + git pull + rsync（設定をサイトごとに変える）
+ *   Resilio/github/kimito-link/src/_docs/SYMLINK-AND-MULTISITE-SAFETY.md … public_html 全削除・rsync --delete 禁止など
+ *   Resilio/github/kimito-link/scripts/webhook/setup-webhook.js … GitHub 画面操作の参考（URL は自サイトに差し替え）
+ * SSH ホスト例: ~/.ssh/config の Host xserver-besttrust（同ドキュメント参照）
+ *
+ * 使い方（概要）:
+ * 1. サーバに SSH で入り、このリポジトリを clone する（kimito-link と同型ならドメイン配下に _git/ を切る）。
+ * 2. このファイルをコピーし、Web から読める PHP として置く（下記「置き場所」）。
+ * 3. 定数 WEBHOOK_SECRET / REPO_DIR などを編集。シークレットは Git にコミットしない（kimito-link は deploy-webhook-secret.txt 方式）。
+ * 4. GitHub → Settings → Webhooks で Payload URL・Secret・application/json・push を登録。
+ *
+ * 置き場所の例:
+ * - https://tsuioku-no-kirameki.com/deploy-xxxxx.php （推測困難な名前）
+ * - 本番の詳細は kimito-link の deploy.php が Document Root にある前提の説明あり
+ *
+ * 注意:
+ * - php.ini で exec が無効だと動きません。
+ * - git のパスは `which git` で確認。
+ * - このリポジトリの公開物は tsuioku-no-kirameki/ サブディレクトリのみのため、pull 後に rsync で public_html へ反映する運用が安全なことが多いです。
+ */
+declare(strict_types=1);
+
+header('Content-Type: text/plain; charset=UTF-8');
+
+// ========= 必ず書き換え =========
+const WEBHOOK_SECRET = 'ここにGitHubのWebhookシークレットと同じ長いランダム文字列';
+/**
+ * git の作業ディレクトリ（.git があるフォルダの絶対パス）
+ * kimito-link と同じ besttrust サーバの例:
+ *   /home/besttrust/tsuioku-no-kirameki.com/_git/tsuioku-no-kirameki.com
+ * 実際のパスはサーバーパネル・pwd で確認してください。
+ */
+const REPO_DIR = '/home/besttrust/tsuioku-no-kirameki.com/_git/tsuioku-no-kirameki.com';
+const GIT_BIN = '/usr/bin/git';
+/** この ref の push だけ処理（どちらも使う場合は両方入れる） */
+const ALLOWED_REFS = ['refs/heads/master', 'refs/heads/main'];
+/**
+ * pull 成功後に追加で実行するシェル一行（任意）。null で無効。
+ * besttrust かつ LP のみ同期する例（パスは要確認・末尾スラッシュに注意）:
+ *   rsync -a --delete /home/besttrust/tsuioku-no-kirameki.com/_git/tsuioku-no-kirameki.com/tsuioku-no-kirameki/ /home/besttrust/tsuioku-no-kirameki.com/public_html/
+ * kimito-link の deploy.php は共有 public_html の安全チェック付き。運用を合わせるならそちらをベースに tsuioku 用設定でコピーするのが確実です。
+ */
+const POST_PULL_CMD = null;
+// ==============================
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    http_response_code(405);
+    echo 'Method Not Allowed';
+    exit;
+}
+
+$secret = WEBHOOK_SECRET;
+if ($secret === '' || str_contains($secret, 'ここに')) {
+    http_response_code(500);
+    echo 'Webhook not configured (WEBHOOK_SECRET)';
+    exit;
+}
+
+$payload = file_get_contents('php://input');
+if ($payload === false || $payload === '') {
+    http_response_code(400);
+    echo 'Empty body';
+    exit;
+}
+
+$sigHeader = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
+if ($sigHeader === '' || !str_starts_with($sigHeader, 'sha256=')) {
+    http_response_code(403);
+    echo 'Missing signature';
+    exit;
+}
+
+$expected = 'sha256=' . hash_hmac('sha256', $payload, $secret);
+if (!hash_equals($expected, $sigHeader)) {
+    http_response_code(403);
+    echo 'Invalid signature';
+    exit;
+}
+
+$data = json_decode($payload, true);
+if (!is_array($data)) {
+    http_response_code(400);
+    echo 'Invalid JSON';
+    exit;
+}
+
+$event = $_SERVER['HTTP_X_GITHUB_EVENT'] ?? '';
+if ($event === 'ping') {
+    http_response_code(200);
+    echo 'pong';
+    exit;
+}
+
+if ($event !== 'push') {
+    http_response_code(200);
+    echo 'Ignored event: ' . $event;
+    exit;
+}
+
+$ref = $data['ref'] ?? '';
+if (!in_array($ref, ALLOWED_REFS, true)) {
+    http_response_code(200);
+    echo 'Ignored ref: ' . $ref;
+    exit;
+}
+
+if (!is_dir(REPO_DIR) || !is_dir(REPO_DIR . '/.git')) {
+    http_response_code(500);
+    echo 'REPO_DIR is not a git repository';
+    exit;
+}
+
+$git = escapeshellcmd(GIT_BIN);
+$dir = escapeshellarg(REPO_DIR);
+$cmd = "cd {$dir} && {$git} pull --ff-only 2>&1";
+
+$output = [];
+$code = 0;
+exec($cmd, $output, $code);
+$out = implode("\n", $output);
+
+if ($code !== 0) {
+    http_response_code(500);
+    echo "git pull failed ({$code})\n" . $out;
+    exit;
+}
+
+$extra = '';
+if (POST_PULL_CMD !== null && POST_PULL_CMD !== '') {
+    $output2 = [];
+    $code2 = 0;
+    exec(POST_PULL_CMD . ' 2>&1', $output2, $code2);
+    $extra = "\n--- post ---\n" . implode("\n", $output2);
+    if ($code2 !== 0) {
+        http_response_code(500);
+        echo "git ok but post command failed ({$code2})\n" . $out . $extra;
+        exit;
+    }
+}
+
+http_response_code(200);
+echo "OK\n" . $out . $extra;

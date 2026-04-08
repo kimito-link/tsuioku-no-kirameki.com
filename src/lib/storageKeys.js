@@ -156,6 +156,17 @@ export function normalizeEntitlementTier(raw) {
   return 'free';
 }
 
+/**
+ * マーケ分析 HTML をダウンロードするとき、トップコメンター列の表示名を伏せ、アイコン画像を出さない。
+ * 他者への共有・掲載向け（既定 false）。
+ */
+export const KEY_MARKETING_EXPORT_MASK_LABELS = 'nls_marketing_export_mask_labels_v1';
+
+/** @param {unknown} raw */
+export function normalizeMarketingExportMaskLabels(raw) {
+  return raw === true;
+}
+
 /** 開発監視トレンド（liveId ごと・chrome.storage.local） */
 export const KEY_DEV_MONITOR_TREND_PREFIX = 'nls_dm_tr:';
 

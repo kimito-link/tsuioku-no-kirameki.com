@@ -30,7 +30,8 @@ import {
   normalizeInlinePanelPlacement,
   KEY_INLINE_PANEL_PLACEMENT,
   normalizeEntitlementTier,
-  normalizeCalmPanelMotion
+  normalizeCalmPanelMotion,
+  normalizeMarketingExportMaskLabels
 } from './storageKeys.js';
 
 describe('storage key constants', () => {
@@ -103,6 +104,12 @@ describe('storage key constants', () => {
     expect(
       normalizeCalmPanelMotion(undefined, { inlineDefault: false })
     ).toBe(false);
+  });
+
+  it('normalizeMarketingExportMaskLabels は true のみオン', () => {
+    expect(normalizeMarketingExportMaskLabels(true)).toBe(true);
+    expect(normalizeMarketingExportMaskLabels(false)).toBe(false);
+    expect(normalizeMarketingExportMaskLabels(undefined)).toBe(false);
   });
 
   it('normalizeInlinePanelWidthMode は video 以外は player_row', () => {

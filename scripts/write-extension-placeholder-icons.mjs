@@ -1,6 +1,6 @@
 /**
  * リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
- * 通常は manifest で kimito-rinku-app-icon-256.png を全サイズに指定すれば読み込めるため不要。
+ * 通常は manifest で images/logo/konta-yukkuri-icon-{16,32,48,128}.png を指定すれば不要。
  */
 import fs from 'fs';
 import path from 'path';

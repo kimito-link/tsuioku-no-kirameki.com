@@ -1,0 +1,30 @@
+{
+  "name": "君斗りんくの追憶のきらめき",
+  "short_name": "追憶のきらめき",
+  "description": "ニコ生の応援コメントを手元に残す。Web・iOS・Android と Chrome 拡張を前提とした体験。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f1e7",
+  "theme_color": "#0a1228",
+  "icons": [
+    {
+      "src": "images/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "images/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "images/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

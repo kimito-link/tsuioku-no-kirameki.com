@@ -73,4 +73,46 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).not.toContain('<script>alert');
     expect(html).toContain('&lt;script&gt;');
   });
+
+  it('りんく・こん太・たぬ姉の案内ブロックが含まれる', () => {
+    const html = buildMarketingDashboardHtml(minimal());
+    expect(html).toContain('りんく・こん太・たぬ姉から');
+    expect(html).toContain('mkt-advice--tanu');
+    expect(html).toContain('mkt-advice--rink');
+    expect(html).toContain('mkt-advice--konta');
+    expect(html).toContain('mkt-advice-row');
+    expect(html).toContain('mkt-advice__bubble');
+    expect(html).toContain('mkt-advice__avatar');
+    expect(html).toContain('data:image/png;base64,');
+    expect(html).toContain('追憶のきらめき');
+  });
+
+  it('冒頭案内にりんく・こん太・たぬ姉の吹き出しが各1つずつ', () => {
+    const html = buildMarketingDashboardHtml(minimal());
+    const start = html.indexOf('mkt-advice-stack--intro');
+    expect(start).toBeGreaterThan(-1);
+    const end = html.indexOf('<h2>KPI サマリ</h2>', start);
+    expect(end).toBeGreaterThan(start);
+    const introBlock = html.slice(start, end);
+    expect((introBlock.match(/mkt-advice-row mkt-advice--rink/g) || []).length).toBe(1);
+    expect((introBlock.match(/mkt-advice-row mkt-advice--konta/g) || []).length).toBe(1);
+    expect((introBlock.match(/mkt-advice-row mkt-advice--tanu/g) || []).length).toBe(1);
+  });
+
+  it('機能一覧とスタイル否定しない文言・分析メモの案内が含まれる', () => {
+    const html = buildMarketingDashboardHtml(minimal());
+    expect(html).toContain('このページでできること');
+    expect(html).toContain('mkt-section--features');
+    expect(html).toContain('分析メモ');
+    expect(html).toContain('どんな配信も否定しません');
+    expect(html).toContain('縛られる必要もありません');
+  });
+
+  it('maskShareLabels でトップコメンター名が伏せ字になり example.com のサムネURLが出ない', () => {
+    const html = buildMarketingDashboardHtml(minimal(), { maskShareLabels: true });
+    expect(html).toContain('共有向けに表示名を伏せた出力');
+    expect(html).not.toContain('Alice');
+    expect(html).toContain('A•••');
+    expect(html).not.toContain('example.com');
+  });
 });

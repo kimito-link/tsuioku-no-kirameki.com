@@ -3292,6 +3292,36 @@
         gap: 8px;
       }
 
+      .nl-dev-monitor__mask-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 8px 12px;
+        width: 100%;
+        margin: 4px 0 0;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(15, 143, 216, 0.06);
+        border: 1px solid rgba(15, 143, 216, 0.18);
+        font-size: clamp(10px, calc(var(--nl-base-font) * 0.78), 12px);
+        line-height: 1.45;
+        color: var(--nl-muted);
+      }
+
+      .nl-dev-monitor__mask-row label {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        cursor: pointer;
+        margin: 0;
+        max-width: 100%;
+      }
+
+      .nl-dev-monitor__mask-row input {
+        margin-top: 2px;
+        flex-shrink: 0;
+      }
+
       .nl-dev-monitor__export-status {
         font-size: clamp(9px, calc(var(--nl-base-font) * 0.72), 11px);
         color: var(--nl-muted);
@@ -5951,6 +5981,14 @@
             <button type="button" class="nl-dev-monitor__btn" id="devMonitorClearIngestBtn" title="取り込み監査ログを削除">
               取り込みログ消去
             </button>
+            <div class="nl-dev-monitor__mask-row" role="group" aria-label="マーケ分析DLのプライバシー">
+              <label>
+                <input type="checkbox" id="devMonitorExportMarketingMaskLabels" />
+                <span>
+                  共有・掲載用に、DLするHTMLの<strong>トップコメンター表示名を伏せ字</strong>にし、<strong>サムネ画像を出さない</strong>（URLにユーザーIDが含まれることがあるため）。他枠での行為までは制限できません。
+                </span>
+              </label>
+            </div>
             <button type="button" class="nl-dev-monitor__btn nl-dev-monitor__btn--accent" id="devMonitorExportMarketingBtn" disabled>
               📊 マーケ分析DL
             </button>

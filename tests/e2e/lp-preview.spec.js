@@ -1,5 +1,5 @@
 /**
- * docs/lp-preview.html のレスポンシブ挙動（拡張なし・file://）。
+ * tsuioku-no-kirameki/index.html（旧 docs/lp-preview.html）のレスポンシブ挙動（拡張なし・file://）。
  * ビルド不要: npx playwright test tests/e2e/lp-preview.spec.js
  */
 import { test, expect } from '@playwright/test';
@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const lpHref = pathToFileURL(path.join(repoRoot, 'docs', 'lp-preview.html')).href;
+const lpHref = pathToFileURL(path.join(repoRoot, 'tsuioku-no-kirameki', 'index.html')).href;
 
 /**
  * @param {import('@playwright/test').Locator} locator
