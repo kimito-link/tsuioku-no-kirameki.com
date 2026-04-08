@@ -3,9 +3,6 @@ test-results/
 playwright-report/
 blob-report/
 
-# ローカル用画像置き場（別サイトからのコピー等。正のアセットは extension/images/）
-src/images/
-
 # ローカル調査・生成物（誤って add しない）
 .cursor/debug-*.log
 nicolivelog-marketing-*.html
