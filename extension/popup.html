@@ -3587,6 +3587,15 @@
         font-weight: 500;
       }
 
+      .nl-panel-placement-hint {
+        display: block;
+        margin-top: 3px;
+        font-size: clamp(10px, calc(var(--nl-base-font) * 0.76), 12.5px);
+        font-weight: 500;
+        color: var(--nl-muted);
+        line-height: 1.35;
+      }
+
       .nl-panel-width-radios input[type='radio'] {
         width: 17px;
         height: 17px;
@@ -5610,6 +5619,8 @@
                   id="inlinePanelPlacementBeside"
                 />
                 横付き（親のレイアウトに合わせる・従来に近い）
+                <span class="nl-panel-placement-hint"
+                  >画面幅が約1200px未満では、公式UIとの競合を避けるため自動で下に表示します。</span>
               </label>
               <label>
                 <input

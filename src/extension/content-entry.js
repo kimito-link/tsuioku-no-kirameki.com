@@ -77,6 +77,7 @@ import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
   computeInlinePanelLayout,
+  effectiveInlinePanelPlacement,
   selectBestPlayerRectIndex
 } from '../lib/inlinePanelLayout.js';
 import {
@@ -1640,11 +1641,10 @@ function findBesideFlexRowColumnInsertion(video) {
  */
 function renderInlineHostAnchoredToVideo(video) {
   clearInlineHostFloatingLayout(ensureInlinePopupHost());
+  const placement = getEffectiveInlinePanelPlacement();
   const domAnchor = findFrameInsertAnchorFromVideo(video);
   const insertResolveAnchor =
-    inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE
-      ? video
-      : domAnchor;
+    placement === INLINE_PANEL_PLACEMENT_BESIDE ? video : domAnchor;
 
   /** @type {HTMLElement} */
   let insertAfter;
@@ -1653,7 +1653,7 @@ function renderInlineHostAnchoredToVideo(video) {
   /** flex 行の子として「動画列の次」に置けた（ニコ生の内側ラッパー脱出） */
   let besideFlexRowColumn = false;
 
-  if (inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE) {
+  if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
     const col = findBesideFlexRowColumnInsertion(video);
     if (col?.hostParent && col.insertAfter) {
       insertAfter = col.insertAfter;
@@ -1662,16 +1662,13 @@ function renderInlineHostAnchoredToVideo(video) {
     } else {
       const r = resolveInlinePanelInsertAnchor(
         insertResolveAnchor,
-        inlinePanelPlacementMode
+        placement
       );
       insertAfter = /** @type {HTMLElement} */ (r.insertAfter);
       hostParent = r.hostParent;
     }
   } else {
-    const r = resolveInlinePanelInsertAnchor(
-      domAnchor,
-      inlinePanelPlacementMode
-    );
+    const r = resolveInlinePanelInsertAnchor(domAnchor, placement);
     insertAfter = /** @type {HTMLElement} */ (r.insertAfter);
     hostParent = r.hostParent;
   }
@@ -1779,8 +1776,9 @@ function renderInlinePopupHost(target) {
     return;
   }
 
+  const placement = getEffectiveInlinePanelPlacement();
   const { insertAfter, hostParent: resolvedHostParent } =
-    resolveInlinePanelInsertAnchor(target, inlinePanelPlacementMode);
+    resolveInlinePanelInsertAnchor(target, placement);
   let hostParent = resolvedHostParent;
   let hostAttachFallbackBody = false;
   if (!hostParent) {
@@ -1888,6 +1886,14 @@ let stableFrameTarget = null;
 
 function nlsViewportSize() {
   return { innerWidth: window.innerWidth, innerHeight: window.innerHeight };
+}
+
+/** ストレージの配置に対し、狭いビューポートでは beside を下へ逃がす（保存値はそのまま） */
+function getEffectiveInlinePanelPlacement() {
+  return effectiveInlinePanelPlacement(
+    inlinePanelPlacementMode,
+    nlsViewportSize().innerWidth
+  );
 }
 
 /** メインの配信 video（表示矩形が最大・かつプレイヤーとして妥当）を選ぶ */
@@ -2026,7 +2032,7 @@ function renderPageFrameOverlay() {
   try {
     const overlay = ensurePageFrameOverlay();
     overlay.style.display = 'none';
-    if (inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_FLOATING) {
+    if (getEffectiveInlinePanelPlacement() === INLINE_PANEL_PLACEMENT_FLOATING) {
       renderInlinePanelFloatingHost();
     } else {
       const target = findWatchFrameTargetElement();
@@ -3031,9 +3037,10 @@ function buildAiSharePageDiagnostics() {
   }
 
   const target = findWatchFrameTargetElement();
+  const placementEffective = getEffectiveInlinePanelPlacement();
   /** @type {Record<string, unknown>|null} */
   let insertionPlan = null;
-  if (inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_FLOATING) {
+  if (placementEffective === INLINE_PANEL_PLACEMENT_FLOATING) {
     insertionPlan = {
       mode: 'floating',
       description: 'fixed top-right on viewport; not inserted into player DOM'
@@ -3053,7 +3060,7 @@ function buildAiSharePageDiagnostics() {
     if (video) {
       const domAnchor = findFrameInsertAnchorFromVideo(video);
       insertResolve =
-        inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE
+        placementEffective === INLINE_PANEL_PLACEMENT_BESIDE
           ? video
           : domAnchor;
     }
@@ -3062,7 +3069,7 @@ function buildAiSharePageDiagnostics() {
     /** @type {ParentNode|null} */
     let hostParent;
     let besideFlexRowColumnChosen = false;
-    if (video && inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE) {
+    if (video && placementEffective === INLINE_PANEL_PLACEMENT_BESIDE) {
       const col = findBesideFlexRowColumnInsertion(video);
       if (col?.hostParent && col.insertAfter) {
         insertAfter = col.insertAfter;
@@ -3071,7 +3078,7 @@ function buildAiSharePageDiagnostics() {
       } else {
         const r = resolveInlinePanelInsertAnchor(
           insertResolve,
-          inlinePanelPlacementMode
+          placementEffective
         );
         insertAfter = /** @type {HTMLElement} */ (r.insertAfter);
         hostParent = r.hostParent;
@@ -3079,7 +3086,7 @@ function buildAiSharePageDiagnostics() {
     } else {
       const r = resolveInlinePanelInsertAnchor(
         insertResolve,
-        inlinePanelPlacementMode
+        placementEffective
       );
       insertAfter = /** @type {HTMLElement} */ (r.insertAfter);
       hostParent = r.hostParent;
@@ -3164,6 +3171,11 @@ function buildAiSharePageDiagnostics() {
     },
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
+      placementEffective,
+      besideNarrowViewportFallback:
+        inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE &&
+        placementEffective !== inlinePanelPlacementMode,
+      viewportInnerWidth: nlsViewportSize().innerWidth,
       widthMode: inlinePanelWidthMode,
       insertionPlan,
       host: hostBrief,

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   computeInlinePanelLayout,
   computeInlinePanelSizeAndOffset,
+  effectiveInlinePanelPlacement,
+  INLINE_VIEWPORT_BESIDE_MIN_WIDTH,
   isValidBroadcastPlayerRect,
   selectBestPlayerRectIndex
 } from './inlinePanelLayout.js';
@@ -151,5 +153,33 @@ describe('computeInlinePanelLayout', () => {
     });
     const b = computeInlinePanelSizeAndOffset(video, parent, VP);
     expect(a).toEqual(b);
+  });
+});
+
+describe('effectiveInlinePanelPlacement', () => {
+  it('beside は広いビューポートのまま', () => {
+    expect(
+      effectiveInlinePanelPlacement(
+        'beside',
+        INLINE_VIEWPORT_BESIDE_MIN_WIDTH + 40
+      )
+    ).toBe('beside');
+  });
+
+  it('beside は狭いビューポートで below に落とす', () => {
+    expect(
+      effectiveInlinePanelPlacement('beside', INLINE_VIEWPORT_BESIDE_MIN_WIDTH - 1)
+    ).toBe('below');
+  });
+
+  it('閾値ちょうどでは beside を維持', () => {
+    expect(
+      effectiveInlinePanelPlacement('beside', INLINE_VIEWPORT_BESIDE_MIN_WIDTH)
+    ).toBe('beside');
+  });
+
+  it('floating / below は幅に関係なくそのまま', () => {
+    expect(effectiveInlinePanelPlacement('floating', 400)).toBe('floating');
+    expect(effectiveInlinePanelPlacement('below', 400)).toBe('below');
   });
 });

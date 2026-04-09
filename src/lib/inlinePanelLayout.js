@@ -144,3 +144,26 @@ export function computeInlinePanelLayout(mode, args) {
 
   return { panelWidthPx, marginLeftPx };
 }
+
+/**
+ * 横付き（beside）は公式コメント列・入力バーと幅を奪い合い、狭いウィンドウで欠けやすい。
+ * 保存された配置は変えず、実際の挿入・幅計算だけ「下（below）」に寄せる。
+ */
+export const INLINE_VIEWPORT_BESIDE_MIN_WIDTH = 1200;
+
+/**
+ * @param {string} storedPlacement `below` | `beside` | `floating`
+ * @param {number} viewportInnerWidth
+ * @returns {string}
+ */
+export function effectiveInlinePanelPlacement(
+  storedPlacement,
+  viewportInnerWidth
+) {
+  const s = String(storedPlacement || 'below');
+  const w = Number(viewportInnerWidth) || 0;
+  if (s === 'beside' && w > 0 && w < INLINE_VIEWPORT_BESIDE_MIN_WIDTH) {
+    return 'below';
+  }
+  return s;
+}

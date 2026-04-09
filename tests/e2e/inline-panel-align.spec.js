@@ -213,6 +213,29 @@ test.describe('inline panel alignment', () => {
     expect(metrics?.marginLeft).toBe('0px');
   });
 
+  test('beside でも狭いビューポートでは下（行の外）へ逃がす', async ({
+    context
+  }) => {
+    await setInlinePanelModes(context, {
+      widthMode: null,
+      placement: 'beside'
+    });
+
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 1100, height: 720 });
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    await page.evaluate(injectTwoColumnPlayerRow);
+
+    await expect
+      .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+      .toMatchObject({
+        display: 'block',
+        parentTag: 'BODY',
+        prevElementId: 'mock-player-row',
+        floatingClass: false
+      });
+  });
+
   test('beside では 空白 Text ノードが間にあっても毎tick再挿入しない', async ({
     context
   }) => {

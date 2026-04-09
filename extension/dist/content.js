@@ -2114,6 +2114,15 @@
     }
     return { panelWidthPx, marginLeftPx };
   }
+  var INLINE_VIEWPORT_BESIDE_MIN_WIDTH = 1200;
+  function effectiveInlinePanelPlacement(storedPlacement, viewportInnerWidth) {
+    const s = String(storedPlacement || "below");
+    const w = Number(viewportInnerWidth) || 0;
+    if (s === "beside" && w > 0 && w < INLINE_VIEWPORT_BESIDE_MIN_WIDTH) {
+      return "below";
+    }
+    return s;
+  }
 
   // src/lib/voiceComment.js
   var VOICE_COMMENT_MAX_CHARS = 250;
@@ -3606,12 +3615,13 @@
   }
   function renderInlineHostAnchoredToVideo(video) {
     clearInlineHostFloatingLayout(ensureInlinePopupHost());
+    const placement = getEffectiveInlinePanelPlacement();
     const domAnchor = findFrameInsertAnchorFromVideo(video);
-    const insertResolveAnchor = inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE ? video : domAnchor;
+    const insertResolveAnchor = placement === INLINE_PANEL_PLACEMENT_BESIDE ? video : domAnchor;
     let insertAfter;
     let hostParent;
     let besideFlexRowColumn = false;
-    if (inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE) {
+    if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
       const col = findBesideFlexRowColumnInsertion(video);
       if (col?.hostParent && col.insertAfter) {
         insertAfter = col.insertAfter;
@@ -3620,17 +3630,14 @@
       } else {
         const r = resolveInlinePanelInsertAnchor(
           insertResolveAnchor,
-          inlinePanelPlacementMode
+          placement
         );
         insertAfter = /** @type {HTMLElement} */
         r.insertAfter;
         hostParent = r.hostParent;
       }
     } else {
-      const r = resolveInlinePanelInsertAnchor(
-        domAnchor,
-        inlinePanelPlacementMode
-      );
+      const r = resolveInlinePanelInsertAnchor(domAnchor, placement);
       insertAfter = /** @type {HTMLElement} */
       r.insertAfter;
       hostParent = r.hostParent;
@@ -3714,7 +3721,8 @@
       hostEarly.setAttribute("aria-hidden", "true");
       return;
     }
-    const { insertAfter, hostParent: resolvedHostParent } = resolveInlinePanelInsertAnchor(target, inlinePanelPlacementMode);
+    const placement = getEffectiveInlinePanelPlacement();
+    const { insertAfter, hostParent: resolvedHostParent } = resolveInlinePanelInsertAnchor(target, placement);
     let hostParent = resolvedHostParent;
     let hostAttachFallbackBody = false;
     if (!hostParent) {
@@ -3800,6 +3808,12 @@
   var stableFrameTarget = null;
   function nlsViewportSize() {
     return { innerWidth: window.innerWidth, innerHeight: window.innerHeight };
+  }
+  function getEffectiveInlinePanelPlacement() {
+    return effectiveInlinePanelPlacement(
+      inlinePanelPlacementMode,
+      nlsViewportSize().innerWidth
+    );
   }
   function pickBestInlinePanelVideo() {
     const viewport = nlsViewportSize();
@@ -3899,7 +3913,7 @@
     try {
       const overlay = ensurePageFrameOverlay();
       overlay.style.display = "none";
-      if (inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_FLOATING) {
+      if (getEffectiveInlinePanelPlacement() === INLINE_PANEL_PLACEMENT_FLOATING) {
         renderInlinePanelFloatingHost();
       } else {
         const target = findWatchFrameTargetElement();
@@ -4672,8 +4686,9 @@
       isTop = true;
     }
     const target = findWatchFrameTargetElement();
+    const placementEffective = getEffectiveInlinePanelPlacement();
     let insertionPlan = null;
-    if (inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_FLOATING) {
+    if (placementEffective === INLINE_PANEL_PLACEMENT_FLOATING) {
       insertionPlan = {
         mode: "floating",
         description: "fixed top-right on viewport; not inserted into player DOM"
@@ -4692,12 +4707,12 @@
       let insertResolve = target;
       if (video) {
         const domAnchor = findFrameInsertAnchorFromVideo(video);
-        insertResolve = inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE ? video : domAnchor;
+        insertResolve = placementEffective === INLINE_PANEL_PLACEMENT_BESIDE ? video : domAnchor;
       }
       let insertAfter;
       let hostParent;
       let besideFlexRowColumnChosen = false;
-      if (video && inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE) {
+      if (video && placementEffective === INLINE_PANEL_PLACEMENT_BESIDE) {
         const col = findBesideFlexRowColumnInsertion(video);
         if (col?.hostParent && col.insertAfter) {
           insertAfter = col.insertAfter;
@@ -4706,7 +4721,7 @@
         } else {
           const r = resolveInlinePanelInsertAnchor(
             insertResolve,
-            inlinePanelPlacementMode
+            placementEffective
           );
           insertAfter = /** @type {HTMLElement} */
           r.insertAfter;
@@ -4715,7 +4730,7 @@
       } else {
         const r = resolveInlinePanelInsertAnchor(
           insertResolve,
-          inlinePanelPlacementMode
+          placementEffective
         );
         insertAfter = /** @type {HTMLElement} */
         r.insertAfter;
@@ -4781,6 +4796,9 @@
       },
       inlinePanel: {
         placementMode: inlinePanelPlacementMode,
+        placementEffective,
+        besideNarrowViewportFallback: inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE && placementEffective !== inlinePanelPlacementMode,
+        viewportInnerWidth: nlsViewportSize().innerWidth,
         widthMode: inlinePanelWidthMode,
         insertionPlan,
         host: hostBrief,
