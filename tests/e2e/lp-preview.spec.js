@@ -431,6 +431,35 @@ test.describe('lp-preview', () => {
     }
   });
 
+  test('匿名Identicon: #lp-anonymous-identicon に説明と data 属性', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto(`${lpHref}#lp-anonymous-identicon`, { waitUntil: 'domcontentloaded' });
+
+    const block = page.locator('#lp-anonymous-identicon');
+    await expect(block).toBeVisible();
+    await expect(block).toHaveAttribute('data-lp-feature', 'anonymous-identicon');
+    await expect(block.locator('[data-lp-identicon-lead]')).toBeVisible();
+    await expect(block).toContainText(/Identicon/);
+    await expect(block).toContainText(/何件/);
+    await expect(block).toContainText(/判別/);
+    await expect(block).toContainText(/識別/);
+    await expect(block).toContainText(/応援可視化（ユーザー別）/);
+
+    await block.scrollIntoViewIfNeeded();
+    await expect(block).toBeInViewport();
+  });
+
+  test('匿名Identicon: 390幅でリード表示・ブロック横はみ出しなし', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
+
+    const block = page.locator('#lp-anonymous-identicon');
+    await block.scrollIntoViewIfNeeded();
+    await expect(block.locator('[data-lp-identicon-lead]')).toBeVisible();
+    const noOverflow = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+    expect(noOverflow).toBe(true);
+  });
+
   test('深いリンク #lp-top-commenters: ハッシュ付き URL とスクロール先', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto(`${lpHref}#lp-top-commenters`, { waitUntil: 'domcontentloaded' });

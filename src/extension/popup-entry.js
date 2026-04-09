@@ -34,6 +34,7 @@ import {
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
   KEY_COMMENT_ENTER_SEND,
+  KEY_ANONYMOUS_IDENTICON_ENABLED,
   KEY_STORY_GROWTH_COLLAPSED,
   KEY_SUPPORT_VISUAL_EXPANDED,
   KEY_USAGE_TERMS_ACK,
@@ -51,7 +52,8 @@ import {
   normalizeInlinePanelPlacement,
   normalizeInlineFloatingAnchor,
   normalizeCalmPanelMotion,
-  normalizeMarketingExportMaskLabels
+  normalizeMarketingExportMaskLabels,
+  normalizeAnonymousIdenticonEnabled
 } from '../lib/storageKeys.js';
 import { normalizeSupportVisualExpanded } from '../lib/supportVisualExpanded.js';
 import { computeScrollDeltaToRevealInParent } from '../lib/nlMainScrollReveal.js';
@@ -101,11 +103,12 @@ import {
   isHttpOrHttpsUrl,
   isAnonymousStyleNicoUserId,
   isWeakNiconicoUserIconHttpUrl,
-  pickSupportGrowthFallbackTileSrc,
+  pickSupportGrowthTileWithOptionalIdenticon,
   userLaneDedupeKey,
   userLaneResolvedThumbScore,
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
 } from '../lib/supportGrowthTileSrc.js';
+import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
@@ -1326,6 +1329,57 @@ const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
   onFallbackApplied: applyStoryAvatarTvFallbackClass
 });
 
+/** @type {boolean} */
+let anonymousIdenticonRuntimeEnabled = true;
+/** @type {Map<string, string>} */
+const anonymousIdenticonDataUrlCache = new Map();
+
+/**
+ * @param {Record<string, unknown>|null|undefined} bag
+ */
+function applyAnonymousIdenticonRuntimeFromBag(bag) {
+  const on = normalizeAnonymousIdenticonEnabled(
+    bag?.[KEY_ANONYMOUS_IDENTICON_ENABLED]
+  );
+  if (on !== anonymousIdenticonRuntimeEnabled) {
+    anonymousIdenticonDataUrlCache.clear();
+  }
+  anonymousIdenticonRuntimeEnabled = on;
+}
+
+/**
+ * @param {unknown} userId
+ * @returns {string}
+ */
+function getCachedAnonymousIdenticonDataUrl(userId) {
+  if (!anonymousIdenticonRuntimeEnabled) return '';
+  const u = String(userId || '').trim();
+  if (!u || !isAnonymousStyleNicoUserId(u)) return '';
+  const hit = anonymousIdenticonDataUrlCache.get(u);
+  if (hit) return hit;
+  const gen = anonymousIdenticonDataUrl(u);
+  if (gen) anonymousIdenticonDataUrlCache.set(u, gen);
+  return gen;
+}
+
+/**
+ * @param {unknown} userId
+ * @param {unknown} httpCandidate
+ * @returns {string}
+ */
+function pickSupportGrowthTileForStory(userId, httpCandidate) {
+  return pickSupportGrowthTileWithOptionalIdenticon(
+    userId,
+    httpCandidate,
+    STORY_GRID_DEFAULT_TILE_IMG,
+    STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
+    {
+      anonymousIdenticonEnabled: anonymousIdenticonRuntimeEnabled,
+      anonymousIdenticonDataUrl: getCachedAnonymousIdenticonDataUrl(userId)
+    }
+  );
+}
+
 const MAX_SELF_POSTED_ITEMS = 48;
 const SELF_POST_DUPLICATE_WINDOW_MS = 5000;
 /** コメント送信後、DOM 保存までに許容する遅延（ms） */
@@ -1994,12 +2048,7 @@ function storyGrowthAvatarSrcCandidate(entry, liveId, entries = STORY_SOURCE_STA
 function storyGrowthTileSrcForEntry(entry, liveId, entries = STORY_SOURCE_STATE.entries) {
   const candidate = storyGrowthAvatarSrcCandidate(entry, liveId, entries);
   if (candidate) return candidate;
-  return pickSupportGrowthFallbackTileSrc(
-    entry?.userId,
-    '',
-    STORY_GRID_DEFAULT_TILE_IMG,
-    STORY_REMOTE_FAILED_PLACEHOLDER_IMG
-  );
+  return pickSupportGrowthTileForStory(entry?.userId, '');
 }
 
 /**
@@ -2558,12 +2607,7 @@ function renderStoryUserLane() {
     if (!dedupeKey) continue;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
-    const displaySrc = pickSupportGrowthFallbackTileSrc(
-      e?.userId,
-      httpCandidate,
-      STORY_GRID_DEFAULT_TILE_IMG,
-      STORY_REMOTE_FAILED_PLACEHOLDER_IMG
-    );
+    const displaySrc = pickSupportGrowthTileForStory(e?.userId, httpCandidate);
     if (!displaySrc) continue;
     const label = storyGrowthDisplayLabel(e, liveId) || 'ユーザー';
     const meta = storyUserLaneMetaLines(e, httpCandidate, dedupeKey);
@@ -3995,7 +4039,10 @@ function renderTopSupportRankStrip(stripRooms) {
   const models = topSupportRankLineModels(stripRooms, {
     defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
     anonymousFallbackThumbSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
-    colorScheme: rankScheme
+    colorScheme: rankScheme,
+    anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled
+      ? (uid) => getCachedAnonymousIdenticonDataUrl(uid)
+      : undefined
   });
   const html = models
     .map((m) => {
@@ -4127,12 +4174,7 @@ function renderUserRooms(entries, liveId = '') {
     const label = displayUserLabel(r.userKey, r.nickname);
     const isUnknown = r.userKey === UNKNOWN_USER_KEY;
     const uidForThumb = isUnknown ? '' : r.userKey;
-    const thumbSrc = pickSupportGrowthFallbackTileSrc(
-      uidForThumb,
-      r.avatarUrl,
-      STORY_GRID_DEFAULT_TILE_IMG,
-      STORY_REMOTE_FAILED_PLACEHOLDER_IMG
-    );
+    const thumbSrc = pickSupportGrowthTileForStory(uidForThumb, r.avatarUrl);
     const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(thumbSrc);
     const thumbRp = isHttpOrHttpsUrl(displayThumb)
       ? ' referrerpolicy="no-referrer"'
@@ -4576,6 +4618,17 @@ async function applyCommentEnterSendFromStorage() {
   if (!cb) return;
   const bag = await chrome.storage.local.get(KEY_COMMENT_ENTER_SEND);
   cb.checked = isCommentEnterSendEnabled(bag[KEY_COMMENT_ENTER_SEND]);
+}
+
+async function applyAnonymousIdenticonFromStorage() {
+  const cb = /** @type {HTMLInputElement|null} */ ($('anonymousIdenticonEnabled'));
+  const bag = await chrome.storage.local.get(KEY_ANONYMOUS_IDENTICON_ENABLED);
+  applyAnonymousIdenticonRuntimeFromBag(bag);
+  if (cb) {
+    cb.checked = normalizeAnonymousIdenticonEnabled(
+      bag[KEY_ANONYMOUS_IDENTICON_ENABLED]
+    );
+  }
 }
 
 /** storage 反映中は details の toggle で永続化しない */
@@ -5340,7 +5393,8 @@ async function refresh() {
       KEY_CALM_PANEL_MOTION,
       KEY_STORAGE_WRITE_ERROR,
       KEY_COMMENT_PANEL_STATUS,
-      KEY_MARKETING_EXPORT_MASK_LABELS
+      KEY_MARKETING_EXPORT_MASK_LABELS,
+      KEY_ANONYMOUS_IDENTICON_ENABLED
     ])
   ]);
   applySelfPostedRecentsFromBag(openBag);
@@ -5356,6 +5410,13 @@ async function refresh() {
       openBag[KEY_MARKETING_EXPORT_MASK_LABELS]
     );
   }
+  const anonIdnHydrate = /** @type {HTMLInputElement|null} */ ($('anonymousIdenticonEnabled'));
+  if (anonIdnHydrate) {
+    anonIdnHydrate.checked = normalizeAnonymousIdenticonEnabled(
+      openBag[KEY_ANONYMOUS_IDENTICON_ENABLED]
+    );
+  }
+  applyAnonymousIdenticonRuntimeFromBag(openBag);
   const { url, fromActiveTab } = resolveWatchUrlFromTabAndStash(
     tabs[0],
     openBag[KEY_LAST_WATCH_URL]
@@ -7150,6 +7211,9 @@ function initPopup() {
   const postBtn = /** @type {HTMLButtonElement} */ ($('postCommentBtn'));
   const voiceBtn = /** @type {HTMLButtonElement|null} */ ($('voiceCommentBtn'));
   const voiceAutoSend = /** @type {HTMLInputElement|null} */ ($('voiceAutoSend'));
+  const anonymousIdenticonEnabled = /** @type {HTMLInputElement|null} */ (
+    $('anonymousIdenticonEnabled')
+  );
   const commentEnterSend = /** @type {HTMLInputElement|null} */ ($('commentEnterSend'));
   const voiceDeviceSel = /** @type {HTMLSelectElement|null} */ ($('voiceInputDevice'));
   const voiceDeviceRefreshBtn = /** @type {HTMLButtonElement|null} */ ($('voiceDeviceRefresh'));
@@ -7884,6 +7948,18 @@ function initPopup() {
     }
   });
 
+  anonymousIdenticonEnabled?.addEventListener('change', async () => {
+    try {
+      await storageSetSafe({
+        [KEY_ANONYMOUS_IDENTICON_ENABLED]: anonymousIdenticonEnabled.checked
+      });
+    } catch {
+      //
+    }
+    await applyAnonymousIdenticonFromStorage();
+    safeRefresh();
+  });
+
   const storyGrowthCollapseBtn = $('storyGrowthCollapseBtn');
   storyGrowthCollapseBtn?.addEventListener('click', () => {
     void (async () => {
@@ -8212,6 +8288,7 @@ function initPopup() {
         void applyThumbSelectFromStorage().catch(() => {});
         void applyVoiceAutosendFromStorage().catch(() => {});
         void applyCommentEnterSendFromStorage().catch(() => {});
+        void applyAnonymousIdenticonFromStorage().catch(() => {});
         void applyStoryGrowthCollapsedFromStorage().catch(() => {});
         void refreshVoiceInputDeviceList().catch(() => {});
         await refreshDone;
@@ -8234,6 +8311,9 @@ function initPopup() {
         }
         if (changes[KEY_COMMENT_ENTER_SEND]) {
           applyCommentEnterSendFromStorage().catch(() => {});
+        }
+        if (changes[KEY_ANONYMOUS_IDENTICON_ENABLED]) {
+          applyAnonymousIdenticonFromStorage().catch(() => {});
         }
         if (changes[KEY_STORY_GROWTH_COLLAPSED]) {
           applyStoryGrowthCollapsedFromStorage().catch(() => {});

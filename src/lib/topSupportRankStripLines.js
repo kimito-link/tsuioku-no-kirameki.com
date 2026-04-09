@@ -1,5 +1,6 @@
 import {
   isHttpOrHttpsUrl,
+  isAnonymousStyleNicoUserId,
   pickSupportGrowthFallbackTileSrc
 } from './supportGrowthTileSrc.js';
 import {
@@ -40,7 +41,8 @@ import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
  * @param {{
  *   defaultThumbSrc: string,
  *   anonymousFallbackThumbSrc?: string,
- *   colorScheme?: 'light'|'dark'
+ *   colorScheme?: 'light'|'dark',
+ *   anonymousIdenticonResolver?: (userId: string) => string
  * }} opts
  * @returns {TopSupportRankLineModel[]}
  */
@@ -48,6 +50,10 @@ export function topSupportRankLineModels(stripRooms, opts) {
   const defaultThumb = String(opts?.defaultThumbSrc || '').trim();
   const anonThumb = String(opts?.anonymousFallbackThumbSrc || '').trim();
   const colorScheme = opts?.colorScheme === 'dark' ? 'dark' : 'light';
+  const idnResolver =
+    typeof opts?.anonymousIdenticonResolver === 'function'
+      ? opts.anonymousIdenticonResolver
+      : null;
   const rooms = Array.isArray(stripRooms) ? stripRooms : [];
   let knownRank = 0;
 
@@ -59,12 +65,31 @@ export function topSupportRankLineModels(stripRooms, opts) {
 
     const rawAv = String(r?.avatarUrl || '').trim();
     const uidForThumb = isUnknown ? '' : userKey;
-    const thumbSrc = pickSupportGrowthFallbackTileSrc(
-      uidForThumb,
-      rawAv,
-      defaultThumb,
-      anonThumb || defaultThumb
-    );
+    let thumbSrc = '';
+    if (isHttpOrHttpsUrl(rawAv)) {
+      thumbSrc = String(rawAv).trim();
+    } else if (
+      idnResolver &&
+      uidForThumb &&
+      isAnonymousStyleNicoUserId(uidForThumb)
+    ) {
+      const idn = String(idnResolver(uidForThumb) || '').trim();
+      thumbSrc = idn
+        ? idn
+        : pickSupportGrowthFallbackTileSrc(
+            uidForThumb,
+            rawAv,
+            defaultThumb,
+            anonThumb || defaultThumb
+          );
+    } else {
+      thumbSrc = pickSupportGrowthFallbackTileSrc(
+        uidForThumb,
+        rawAv,
+        defaultThumb,
+        anonThumb || defaultThumb
+      );
+    }
     const thumbNeedsNoReferrer = isHttpOrHttpsUrl(thumbSrc);
 
     const idTitle = isUnknown ? '' : String(r.userKey);

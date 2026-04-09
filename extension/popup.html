@@ -3919,6 +3919,43 @@
         flex-shrink: 0;
       }
 
+      .nl-anonymous-identicon-opt {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin: 6px 0 12px;
+        max-width: min(42rem, 100%);
+        font-size: clamp(11px, calc(var(--nl-base-font) * 0.82), 14px);
+        color: var(--nl-muted);
+        font-weight: 600;
+        cursor: pointer;
+        user-select: none;
+        line-height: 1.45;
+      }
+
+      .nl-anonymous-identicon-opt input {
+        width: 17px;
+        height: 17px;
+        margin-top: 2px;
+        accent-color: var(--nl-accent);
+        flex-shrink: 0;
+      }
+
+      .nl-anonymous-identicon-hint {
+        margin: 0 0 12px;
+        max-width: min(42rem, 100%);
+        padding: 0 0 0 2px;
+        font-size: clamp(10px, calc(var(--nl-base-font) * 0.78), 13px);
+        color: var(--nl-muted);
+        line-height: 1.5;
+      }
+
+      .nl-anonymous-identicon-hint a {
+        color: var(--nl-accent);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+
       .nl-voice-device-row {
         margin-top: 8px;
         display: flex;
@@ -6280,6 +6317,38 @@
       </div>
 
       <h2 data-nl-toolbar-only>応援可視化（ユーザー別）</h2>
+      <label
+        class="nl-anonymous-identicon-opt"
+        data-nl-toolbar-only
+        title="ニコ生公式の表示は変わりません。拡張の一覧・グリッド・ユーザーレーンなど手元の区別用です。既定はオン。オフにすると従来のフォールバック画像に戻ります。"
+      >
+        <input
+          type="checkbox"
+          id="anonymousIdenticonEnabled"
+          autocomplete="off"
+          checked
+          aria-describedby="anonymousIdenticonHint"
+        />
+        <span
+          >匿名コメントに Identicon を付ける（視聴ページでは同一シルエットになり得る ID
+          を、この拡張内で区別しやすくします）</span
+        >
+      </label>
+      <p
+        id="anonymousIdenticonHint"
+        class="nl-anonymous-identicon-hint"
+        data-nl-popup-copy="anonymous-identicon"
+        data-nl-toolbar-only
+      >
+        公式ページそのものは変わりません。一覧のタイルだけ、匿名 ID ごとに模様を付けます（<strong>既定オン</strong>）。詳しくはサイトの
+        <a
+          href="https://tsuioku-no-kirameki.com/#lp-anonymous-identicon"
+          target="_blank"
+          rel="noopener noreferrer"
+          >LP「匿名 Identicon」</a
+        >
+        もどうぞ。
+      </p>
       <ul id="userRoomList" aria-live="polite" data-nl-toolbar-only></ul>
 
       <section

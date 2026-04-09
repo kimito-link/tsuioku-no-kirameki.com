@@ -115,6 +115,43 @@ export function pickSupportGrowthFallbackTileSrc(
 }
 
 /**
+ * http サムネが無い匿名 userId に、Identicon data URL を差し込む（既定 ON、anonymousIdenticonEnabled が false のときだけ抑止）。
+ *
+ * @param {unknown} userId
+ * @param {unknown} httpCandidate
+ * @param {unknown} yukkuriSrc
+ * @param {unknown} tvSrc
+ * @param {{ anonymousIdenticonEnabled?: boolean, anonymousIdenticonDataUrl?: unknown }} [identiconOpts]
+ * @returns {string}
+ */
+export function pickSupportGrowthTileWithOptionalIdenticon(
+  userId,
+  httpCandidate,
+  yukkuriSrc,
+  tvSrc,
+  identiconOpts
+) {
+  if (isHttpOrHttpsUrl(httpCandidate)) {
+    return String(httpCandidate).trim();
+  }
+  const uid = String(userId || '').trim();
+  if (
+    identiconOpts?.anonymousIdenticonEnabled !== false &&
+    uid &&
+    isAnonymousStyleNicoUserId(uid)
+  ) {
+    const data = String(identiconOpts.anonymousIdenticonDataUrl || '').trim();
+    if (data) return data;
+  }
+  return pickSupportGrowthFallbackTileSrc(
+    userId,
+    httpCandidate,
+    yukkuriSrc,
+    tvSrc
+  );
+}
+
+/**
  * @param {{
  *   entryAvatarUrl?: string|null,
  *   userId?: string|null,

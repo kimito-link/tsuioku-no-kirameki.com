@@ -9,6 +9,7 @@ import {
   isAnonymousStyleNicoUserId,
   pickStrongestAvatarUrlForUser,
   pickSupportGrowthFallbackTileSrc,
+  pickSupportGrowthTileWithOptionalIdenticon,
   resolveSupportGrowthTileSrc,
   pickUserLaneDisplayTileSrc,
   userLaneDedupeKey,
@@ -276,6 +277,80 @@ describe('pickSupportGrowthFallbackTileSrc', () => {
   });
   it('数字IDで http 無しは yukkuriSrc（CDN は別経路で付く）', () => {
     expect(pickSupportGrowthFallbackTileSrc('86255751', '', y, tv)).toBe(y);
+  });
+});
+
+describe('pickSupportGrowthTileWithOptionalIdenticon', () => {
+  const y = 'images/yukkuri.png';
+  const tv = 'images/tv.svg';
+  const idn = 'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E';
+
+  it('http 候補があれば Identicon 設定より http を優先', () => {
+    expect(
+      pickSupportGrowthTileWithOptionalIdenticon(
+        'a:x',
+        'https://cdn.example/a.jpg',
+        y,
+        tv,
+        { anonymousIdenticonEnabled: true, anonymousIdenticonDataUrl: idn }
+      )
+    ).toBe('https://cdn.example/a.jpg');
+  });
+
+  it('ON・匿名・http 無し・data URL ありなら Identicon', () => {
+    expect(
+      pickSupportGrowthTileWithOptionalIdenticon('a:1', '', y, tv, {
+        anonymousIdenticonEnabled: true,
+        anonymousIdenticonDataUrl: idn
+      })
+    ).toBe(idn);
+  });
+
+  it('OFF なら従来 pick と同じ（匿名は tv）', () => {
+    expect(
+      pickSupportGrowthTileWithOptionalIdenticon('a:1', '', y, tv, {
+        anonymousIdenticonEnabled: false,
+        anonymousIdenticonDataUrl: idn
+      })
+    ).toBe(tv);
+  });
+
+  it('有効フラグ省略で data URL ありなら Identicon（既定 ON）', () => {
+    expect(
+      pickSupportGrowthTileWithOptionalIdenticon('a:1', '', y, tv, {
+        anonymousIdenticonDataUrl: idn
+      })
+    ).toBe(idn);
+  });
+
+  it('opts 空で data URL も無ければ従来 pick（匿名は tv）', () => {
+    expect(
+      pickSupportGrowthTileWithOptionalIdenticon('a:1', '', y, tv, {})
+    ).toBe(tv);
+  });
+
+  it('数字IDは Identicon を使わない', () => {
+    expect(
+      pickSupportGrowthTileWithOptionalIdenticon('86255751', '', y, tv, {
+        anonymousIdenticonEnabled: true,
+        anonymousIdenticonDataUrl: idn
+      })
+    ).toBe(y);
+  });
+
+  it('ON でも data URL 空ならフォールバック', () => {
+    expect(
+      pickSupportGrowthTileWithOptionalIdenticon('a:1', '', y, tv, {
+        anonymousIdenticonEnabled: true,
+        anonymousIdenticonDataUrl: ''
+      })
+    ).toBe(tv);
+  });
+
+  it('Identicon 表示でも userLaneResolvedThumbScore は http 無しのまま 0', () => {
+    expect(
+      userLaneResolvedThumbScore('a:1', '')
+    ).toBe(0);
   });
 });
 

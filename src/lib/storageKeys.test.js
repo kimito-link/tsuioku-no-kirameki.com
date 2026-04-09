@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   KEY_AUTO_BACKUP_STATE,
   KEY_COMMENT_ENTER_SEND,
+  KEY_ANONYMOUS_IDENTICON_ENABLED,
   KEY_STORY_GROWTH_COLLAPSED,
   KEY_SUPPORT_VISUAL_EXPANDED,
   KEY_USAGE_TERMS_ACK,
@@ -35,7 +36,8 @@ import {
   normalizeInlineFloatingAnchor,
   normalizeEntitlementTier,
   normalizeCalmPanelMotion,
-  normalizeMarketingExportMaskLabels
+  normalizeMarketingExportMaskLabels,
+  normalizeAnonymousIdenticonEnabled
 } from './storageKeys.js';
 
 describe('storage key constants', () => {
@@ -57,6 +59,7 @@ describe('storage key constants', () => {
     expect(KEY_SELF_POSTED_RECENTS).toMatch(/^nls_/);
     expect(KEY_USER_COMMENT_PROFILE_CACHE).toMatch(/^nls_/);
     expect(KEY_COMMENT_ENTER_SEND).toMatch(/^nls_/);
+    expect(KEY_ANONYMOUS_IDENTICON_ENABLED).toMatch(/^nls_/);
     expect(KEY_STORY_GROWTH_COLLAPSED).toMatch(/^nls_/);
     expect(KEY_SUPPORT_VISUAL_EXPANDED).toMatch(/^nls_/);
     expect(KEY_USAGE_TERMS_ACK).toMatch(/^nls_/);
@@ -115,6 +118,13 @@ describe('storage key constants', () => {
     expect(normalizeMarketingExportMaskLabels(true)).toBe(true);
     expect(normalizeMarketingExportMaskLabels(false)).toBe(false);
     expect(normalizeMarketingExportMaskLabels(undefined)).toBe(false);
+  });
+
+  it('normalizeAnonymousIdenticonEnabled は false のみオフ（未設定は既定オン）', () => {
+    expect(normalizeAnonymousIdenticonEnabled(true)).toBe(true);
+    expect(normalizeAnonymousIdenticonEnabled(false)).toBe(false);
+    expect(normalizeAnonymousIdenticonEnabled(undefined)).toBe(true);
+    expect(normalizeAnonymousIdenticonEnabled(null)).toBe(true);
   });
 
   it('normalizeInlinePanelWidthMode は video 以外は player_row', () => {

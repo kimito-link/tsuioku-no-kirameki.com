@@ -348,6 +348,20 @@
       .section-head p{
         max-width:var(--prose-width);margin:0;color:var(--text-secondary);line-height:var(--lh-body)
       }
+      .lp-feature-note{
+        max-width:var(--prose-width);
+        margin:0 0 var(--space-lg);
+        padding:14px 16px;
+        border-radius:var(--r2);
+        border:1px solid rgba(120,160,220,.28);
+        background:rgba(255,255,255,.05);
+        color:var(--text-secondary);
+        line-height:var(--lh-body);
+        font-size:clamp(.9rem,2.6vw,.98rem)
+      }
+      @media (max-width:640px){
+        .lp-feature-note{padding:12px 14px}
+      }
       .board{padding:var(--space-lg);border-radius:var(--r2)}
       @media (max-width:640px){
         .board{padding:clamp(14px,4.2vw,var(--space-lg))}
@@ -1356,6 +1370,95 @@
         display:grid;place-items:center;
         font-size:.55rem;font-weight:800;color:#64748b
       }
+      /* LP 見本: 実拡張の Identicon に近い「ID ごとにちがう模様」（写真ではない） */
+      .lp-mock-identicon{
+        width:32px;height:32px;border-radius:999px;flex-shrink:0;
+        border:1px solid rgba(100,140,180,.32);
+        box-sizing:border-box
+      }
+      .lp-mock-identicon--rank{width:28px;height:28px}
+      .lp-mock-identicon--a{
+        background:
+          radial-gradient(circle at 28% 32%,#7c3aed 0 38%,transparent 39%),
+          radial-gradient(circle at 72% 68%,#0ea5e9 0 32%,transparent 33%),
+          linear-gradient(145deg,#fdf4ff,#e9d5ff)
+      }
+      .lp-mock-identicon--b{
+        background:
+          radial-gradient(circle at 65% 28%,#ea580c 0 36%,transparent 37%),
+          radial-gradient(circle at 30% 75%,#16a34a 0 30%,transparent 31%),
+          linear-gradient(205deg,#fff7ed,#ffedd5)
+      }
+      .lp-mock-identicon--c{
+        background:
+          radial-gradient(circle at 50% 22%,#db2777 0 40%,transparent 41%),
+          radial-gradient(circle at 22% 60%,#6366f1 0 28%,transparent 29%),
+          linear-gradient(120deg,#fce7f3,#e0e7ff)
+      }
+      .lp-mock-identicon--d{
+        background:
+          radial-gradient(circle at 38% 70%,#0d9488 0 34%,transparent 35%),
+          radial-gradient(circle at 78% 40%,#ca8a04 0 30%,transparent 31%),
+          linear-gradient(60deg,#ecfdf5,#fef9c3)
+      }
+      .lp-mock-identicon--e{
+        background:
+          radial-gradient(circle at 55% 55%,#4f46e5 0 45%,transparent 46%),
+          radial-gradient(circle at 20% 30%,#f43f5e 0 26%,transparent 27%),
+          linear-gradient(200deg,#eef2ff,#ffe4e6)
+      }
+      .lp-site-look-mock__identicon-legend{
+        margin:0 0 12px;padding:12px 14px;
+        border-radius:12px;
+        border:1px solid rgba(79,172,254,.35);
+        background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(240,249,255,.88));
+        font-size:.78rem;line-height:1.65;color:#334155
+      }
+      .lp-site-look-mock__identicon-legend strong{color:#1e3a5c}
+      .lp-identicon-lead{
+        margin:0 0 10px;
+        font-size:clamp(.88rem,2.8vw,.98rem);
+        line-height:1.68;
+        color:#0f172a;
+        max-width:100%;
+        word-break:break-word
+      }
+      .lp-identicon-lead strong{color:#1e3a5c}
+      .lp-identicon-lead-sub{
+        margin:0 0 12px;
+        padding:0;
+        font-size:clamp(.78rem,2.5vw,.88rem);
+        line-height:1.6;
+        color:#475569;
+        max-width:100%;
+        word-break:break-word
+      }
+      .lp-identicon-guide-details{
+        margin:0;
+        border-top:1px solid rgba(79,172,254,.3);
+        padding-top:4px
+      }
+      .lp-identicon-guide-details summary{
+        cursor:pointer;
+        font-weight:700;
+        font-size:clamp(.76rem,2.4vw,.84rem);
+        color:#1e3a5c;
+        padding:10px 2px;
+        line-height:1.4;
+        list-style-position:outside
+      }
+      .lp-identicon-guide-details[open] summary{
+        margin-bottom:8px
+      }
+      @media (max-width:520px){
+        .lp-site-look-mock__identicon-legend{font-size:.74rem;padding:10px 12px}
+        .lp-identicon-guide-details summary{
+          min-height:44px;
+          display:flex;
+          align-items:center;
+          padding:10px 4px
+        }
+      }
       .lp-site-look-mock__kpi-grid{
         display:grid;
         grid-template-columns:repeat(3,minmax(0,1fr));
@@ -1422,15 +1525,43 @@
         min-width:1.4em;padding:2px 6px;font-size:.68rem;line-height:1.2;
         background:linear-gradient(145deg,#64748b,#475569)
       }
-      .lp-site-look-mock__rank-card:nth-child(1) .lp-site-look-mock__rank-badge{
+      .lp-site-look-mock__rank-scroll > .lp-site-look-mock__rank-card:not(.lp-site-look-mock__rank-card--aggregate):nth-child(2) .lp-site-look-mock__rank-badge{
         background:linear-gradient(145deg,#d4a017,#b8860b)
       }
-      .lp-site-look-mock__rank-card:nth-child(2) .lp-site-look-mock__rank-badge{
+      .lp-site-look-mock__rank-scroll > .lp-site-look-mock__rank-card:not(.lp-site-look-mock__rank-card--aggregate):nth-child(3) .lp-site-look-mock__rank-badge{
         background:linear-gradient(145deg,#94a3b8,#64748b)
       }
-      .lp-site-look-mock__rank-card:nth-child(3) .lp-site-look-mock__rank-badge{
+      .lp-site-look-mock__rank-scroll > .lp-site-look-mock__rank-card:not(.lp-site-look-mock__rank-card--aggregate):nth-child(4) .lp-site-look-mock__rank-badge{
         background:linear-gradient(145deg,#c97b6a,#a65d4f)
       }
+      .lp-site-look-mock__rank-card--aggregate{
+        min-width:62px;max-width:72px;
+        border:1px dashed rgba(100,130,170,.4);
+        background:rgba(248,250,252,.92)
+      }
+      .lp-site-look-mock__rank-agg-spacer{
+        display:block;min-height:22px;width:100%
+      }
+      .lp-site-look-mock__rank-agg-av{
+        width:28px;height:28px;border-radius:999px;
+        background:linear-gradient(180deg,#f1f5f9,#e2e8f0);
+        border:1px solid #cbd5e1;
+        display:grid;place-items:center;
+        font-size:.85rem;line-height:1;color:#64748b
+      }
+      .lp-identicon-guide-y.yukkuri-thread{
+        margin:0 0 4px;
+        gap:12px
+      }
+      .lp-identicon-guide-y .y-row .speaker img{
+        width:44px;height:44px
+      }
+      .lp-identicon-guide-y .y-row .bubble{
+        padding:11px 14px;
+        font-size:clamp(.74rem,2.4vw,.82rem);
+        line-height:1.55
+      }
+      .lp-identicon-guide-y .y-row .bubble strong{color:#1e3a5c}
       .lp-site-look-mock__rank-card img{
         width:28px;height:28px;border-radius:999px;object-fit:cover
       }
@@ -4043,6 +4174,7 @@
           <a href="#context-scale">背景の数字</a>
           <a href="#multi-live">同時視聴</a>
           <a href="#extension-visual">拡張の見え方</a>
+          <a href="#lp-anonymous-identicon">匿名 Identicon</a>
           <a href="#marketing-features">マーケ分析</a>
           <a href="#problem">問題</a>
           <a href="#impact">反応の階段</a>
@@ -5047,6 +5179,7 @@
             <h3>サイトの見え方（架空ダッシュボード）</h3>
             <p>
               実機の配色・文言とは一致しない場合があります。<strong>操作はできません</strong>（ボタン・折りたたみは見た目の見本です）。記録ブロック内の<strong>テキストボックス（Enterで送るイメージ）</strong>も同様で、<strong>実際の入力・送信は未実装・音声入力は環境依存</strong>の説明を配信デモと揃えて載せています。
+              下の<strong>上位コメンター列</strong>の上では、まず<strong>一文で仕組み</strong>（匿名の<strong>何件</strong>か・<strong>判別</strong>の模様）を書き、開くと<strong>りんく・こん太・たぬ姉</strong>の補足があります。列そのものは実画面に近い<strong>LP 用ダミー</strong>です。
             </p>
             <div class="lp-site-look-mock" role="region" aria-label="拡張パネル全体の架空プレビュー（操作できません）">
               <p class="lp-site-look-mock__tag">LP 用ダミー — 数値・ID・並びはすべて架空です</p>
@@ -5089,7 +5222,7 @@
                     <span>121127503</span><span>くりぷ</span>
                   </div>
                   <div class="lp-site-look-mock__avatar-cell">
-                    <div class="lp-site-look-mock__avatar-sil" aria-hidden="true">?</div>
+                    <div class="lp-mock-identicon lp-mock-identicon--a" aria-hidden="true" title="Identicon 見本"></div>
                     <span>a:HsWl…</span><span>匿名</span>
                   </div>
                   <div class="lp-site-look-mock__avatar-cell">
@@ -5097,7 +5230,7 @@
                     <span>88290112</span><span>ひなぷ</span>
                   </div>
                   <div class="lp-site-look-mock__avatar-cell">
-                    <div class="lp-site-look-mock__avatar-sil" aria-hidden="true">?</div>
+                    <div class="lp-mock-identicon lp-mock-identicon--b" aria-hidden="true" title="Identicon 見本"></div>
                     <span>a:nawQ…</span><span>匿名</span>
                   </div>
                   <div class="lp-site-look-mock__avatar-cell">
@@ -5105,7 +5238,7 @@
                     <span>30492811</span><span>えだ</span>
                   </div>
                   <div class="lp-site-look-mock__avatar-cell">
-                    <div class="lp-site-look-mock__avatar-sil" aria-hidden="true">?</div>
+                    <div class="lp-mock-identicon lp-mock-identicon--c" aria-hidden="true" title="Identicon 見本"></div>
                     <span>a:0u26…</span><span>匿名</span>
                   </div>
                   <div class="lp-site-look-mock__avatar-cell">
@@ -5135,50 +5268,154 @@
                   <div class="lp-site-look-mock__kpi-unit">人</div>
                 </div>
               </div>
-              <div class="lp-site-look-mock__rank-wrap" aria-hidden="true">
-                <p class="lp-site-look-mock__rank-note">記録内・ユーザー別の応援件数が多い順です。（LP 用ダミー）</p>
-                <div class="lp-site-look-mock__rank-scroll">
+              <div class="lp-site-look-mock__rank-wrap">
+                <p class="lp-site-look-mock__rank-note">記録内・ユーザー別の応援件数が多い順です。（左の -- はまとめ、1番からがひとりずつ・LP 用ダミー）</p>
+                <div
+                  id="lp-anonymous-identicon"
+                  class="lp-site-look-mock__identicon-legend"
+                  data-lp-feature="anonymous-identicon"
+                >
+                  <p
+                    class="lp-identicon-lead"
+                    data-lp-identicon-lead
+                  >
+                    匿名のまま応援コメントしても、<strong>同じ匿名さんが何件応援したか</strong>を手元の一覧で分かるように、その人だけ<strong>決まった判別用の模様（Identicon）</strong>と<strong>a: から始まる一行</strong>が付く仕組みです（顔写真の代わりの目印）。ニコ生の<strong>公式</strong>画面そのものは変わりません。下の横列は<strong>見本</strong>です（LP 用ダミー）。
+                  </p>
+                  <p class="lp-identicon-lead-sub">
+                    <strong>既定オン</strong>です。オフにする場合は、拡張ポップアップの<strong>応援可視化（ユーザー別）</strong>のチェックから外せます。
+                  </p>
+                  <details class="lp-identicon-guide-details">
+                    <summary>りんく・こん太・たぬ姉の補足（くわしく）</summary>
+                    <div
+                      class="lp-identicon-guide-y yukkuri-thread"
+                      role="group"
+                      aria-labelledby="lp-identicon-guide-title"
+                    >
+                      <p id="lp-identicon-guide-title" class="visually-hidden">
+                        匿名ランキング見本の補足説明
+                      </p>
+                      <div class="y-row">
+                        <div class="speaker">
+                          <img
+                            src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+                            width="44"
+                            height="44"
+                            alt=""
+                            decoding="async"
+                          /><span>こん太</span>
+                        </div>
+                        <div class="bubble">
+                          表示はみんな<strong>匿名</strong>でも、<strong>模様と a: の行</strong>がちがえば<strong>別の人</strong>として件数が分かるのだ。
+                        </div>
+                      </div>
+                      <div class="y-row reverse">
+                        <div class="speaker">
+                          <img
+                            src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png"
+                            width="44"
+                            height="44"
+                            alt=""
+                            decoding="async"
+                          /><span>りんく</span>
+                        </div>
+                        <div class="bubble">
+                          その<strong>識別</strong>の考え方が、いまの<strong>先頭の一文</strong>だよ。<strong>Identicon</strong>は拡張が ID から決めた模様だから、同じ人なら毎回同じ見た目になるの。
+                        </div>
+                      </div>
+                      <div class="y-row">
+                        <div class="speaker">
+                          <img
+                            src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png"
+                            width="44"
+                            height="44"
+                            alt=""
+                            decoding="async"
+                          /><span>たぬ姉</span>
+                        </div>
+                        <div class="bubble">
+                          いちばん左の<strong>「--」</strong>は<strong>ひとりに決めきれないまとまり</strong>、その右の<strong>1番・2番…</strong>が応援の多かった<strong>ひとりずつ</strong>のイメージなのだ。
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+                <div class="lp-site-look-mock__rank-scroll" aria-hidden="true">
+                  <div class="lp-site-look-mock__rank-card lp-site-look-mock__rank-card--aggregate">
+                    <span class="lp-site-look-mock__rank-agg-spacer" aria-hidden="true"></span>
+                    <span class="lp-site-look-mock__rank-count">71件</span>
+                    <div class="lp-site-look-mock__rank-agg-av" aria-hidden="true">☺</div>
+                    <span class="lp-site-look-mock__rank-id">--</span>
+                    <span class="lp-site-look-mock__rank-nick">--</span>
+                  </div>
                   <div class="lp-site-look-mock__rank-card">
                     <span class="lp-site-look-mock__rank-badge">1</span>
-                    <span class="lp-site-look-mock__rank-count">28件</span>
-                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="28" height="28" alt="" decoding="async">
-                    <span class="lp-site-look-mock__rank-id">a:GtWYGKAe…</span>
+                    <span class="lp-site-look-mock__rank-count">6件</span>
+                    <div class="lp-mock-identicon lp-mock-identicon--rank lp-mock-identicon--a"></div>
+                    <span class="lp-site-look-mock__rank-id">a:-KRVScoZNjKy…</span>
                     <span class="lp-site-look-mock__rank-nick">匿名</span>
                   </div>
                   <div class="lp-site-look-mock__rank-card">
                     <span class="lp-site-look-mock__rank-badge">2</span>
-                    <span class="lp-site-look-mock__rank-count">21件</span>
+                    <span class="lp-site-look-mock__rank-count">5件</span>
                     <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" width="28" height="28" alt="" decoding="async">
-                    <span class="lp-site-look-mock__rank-id">46231694</span>
-                    <span class="lp-site-look-mock__rank-nick">nora</span>
+                    <span class="lp-site-look-mock__rank-id">5911711</span>
+                    <span class="lp-site-look-mock__rank-nick">マカロン⚔️💗</span>
                   </div>
                   <div class="lp-site-look-mock__rank-card">
                     <span class="lp-site-look-mock__rank-badge">3</span>
-                    <span class="lp-site-look-mock__rank-count">16件</span>
-                    <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.png" width="28" height="28" alt="" decoding="async">
-                    <span class="lp-site-look-mock__rank-id">ななっこりー</span>
-                    <span class="lp-site-look-mock__rank-nick">なな</span>
+                    <span class="lp-site-look-mock__rank-count">5件</span>
+                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="28" height="28" alt="" decoding="async">
+                    <span class="lp-site-look-mock__rank-id">40454930</span>
+                    <span class="lp-site-look-mock__rank-nick">りす©X❤️</span>
                   </div>
                   <div class="lp-site-look-mock__rank-card">
                     <span class="lp-site-look-mock__rank-badge">4</span>
-                    <span class="lp-site-look-mock__rank-count">12件</span>
-                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png" width="28" height="28" alt="" decoding="async">
+                    <span class="lp-site-look-mock__rank-count">4件</span>
+                    <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.png" width="28" height="28" alt="" decoding="async">
                     <span class="lp-site-look-mock__rank-id">88210441</span>
-                    <span class="lp-site-look-mock__rank-nick">えだ</span>
+                    <span class="lp-site-look-mock__rank-nick">みかん</span>
                   </div>
                   <div class="lp-site-look-mock__rank-card">
                     <span class="lp-site-look-mock__rank-badge">5</span>
-                    <span class="lp-site-look-mock__rank-count">9件</span>
-                    <div class="lp-site-look-mock__avatar-sil lp-site-look-mock__rank-sil" aria-hidden="true">?</div>
-                    <span class="lp-site-look-mock__rank-id">a:b7Kq…</span>
+                    <span class="lp-site-look-mock__rank-count">4件</span>
+                    <div class="lp-mock-identicon lp-mock-identicon--rank lp-mock-identicon--d"></div>
+                    <span class="lp-site-look-mock__rank-id">a:vYoE4vv7Mftb…</span>
                     <span class="lp-site-look-mock__rank-nick">匿名</span>
                   </div>
                   <div class="lp-site-look-mock__rank-card">
                     <span class="lp-site-look-mock__rank-badge">6</span>
-                    <span class="lp-site-look-mock__rank-count">7件</span>
+                    <span class="lp-site-look-mock__rank-count">3件</span>
                     <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" width="28" height="28" alt="" decoding="async">
-                    <span class="lp-site-look-mock__rank-id">guest_07</span>
+                    <span class="lp-site-look-mock__rank-id">guest_08</span>
                     <span class="lp-site-look-mock__rank-nick">ゲスト</span>
+                  </div>
+                  <div class="lp-site-look-mock__rank-card">
+                    <span class="lp-site-look-mock__rank-badge">7</span>
+                    <span class="lp-site-look-mock__rank-count">3件</span>
+                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png" width="28" height="28" alt="" decoding="async">
+                    <span class="lp-site-look-mock__rank-id">30492811</span>
+                    <span class="lp-site-look-mock__rank-nick">えだ</span>
+                  </div>
+                  <div class="lp-site-look-mock__rank-card">
+                    <span class="lp-site-look-mock__rank-badge">8</span>
+                    <span class="lp-site-look-mock__rank-count">3件</span>
+                    <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-closed.png" width="28" height="28" alt="" decoding="async">
+                    <span class="lp-site-look-mock__rank-id">715502</span>
+                    <span class="lp-site-look-mock__rank-nick">--</span>
+                  </div>
+                  <div class="lp-site-look-mock__rank-card">
+                    <span class="lp-site-look-mock__rank-badge">9</span>
+                    <span class="lp-site-look-mock__rank-count">3件</span>
+                    <div class="lp-mock-identicon lp-mock-identicon--rank lp-mock-identicon--b"></div>
+                    <span class="lp-site-look-mock__rank-id">a:UV04gFOAIQ…</span>
+                    <span class="lp-site-look-mock__rank-nick">匿名</span>
+                  </div>
+                  <div class="lp-site-look-mock__rank-card">
+                    <span class="lp-site-look-mock__rank-badge">10</span>
+                    <span class="lp-site-look-mock__rank-count">2件</span>
+                    <div class="lp-mock-identicon lp-mock-identicon--rank lp-mock-identicon--c"></div>
+                    <span class="lp-site-look-mock__rank-id">a:0l80z2Gxxrd…</span>
+                    <span class="lp-site-look-mock__rank-nick">匿名</span>
                   </div>
                 </div>
               </div>

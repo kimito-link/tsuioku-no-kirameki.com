@@ -120,6 +120,48 @@ describe('topSupportRankLineModels', () => {
     expect(row.thumbNeedsNoReferrer).toBe(true);
   });
 
+  it('anonymousIdenticonResolver が返す data URL を匿名のサムネに使う', () => {
+    const tv = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/tv.jpg';
+    const idn = 'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E';
+    const [row] = topSupportRankLineModels(
+      [
+        {
+          userKey: 'a:AXaKZ_4ShxQHJVsX',
+          nickname: '',
+          count: 3,
+          avatarUrl: ''
+        }
+      ],
+      {
+        defaultThumbSrc: DEF_THUMB,
+        anonymousFallbackThumbSrc: tv,
+        anonymousIdenticonResolver: () => idn
+      }
+    );
+    expect(row.thumbSrc).toBe(idn);
+    expect(row.thumbNeedsNoReferrer).toBe(false);
+  });
+
+  it('resolver が空を返したら従来フォールバック', () => {
+    const tv = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/tv.jpg';
+    const [row] = topSupportRankLineModels(
+      [
+        {
+          userKey: 'a:AXaKZ_4ShxQHJVsX',
+          nickname: '',
+          count: 3,
+          avatarUrl: ''
+        }
+      ],
+      {
+        defaultThumbSrc: DEF_THUMB,
+        anonymousFallbackThumbSrc: tv,
+        anonymousIdenticonResolver: () => ''
+      }
+    );
+    expect(row.thumbSrc).toBe(tv);
+  });
+
   it('https avatar はその URL と no-referrer フラグ', () => {
     const [row] = topSupportRankLineModels(
       [

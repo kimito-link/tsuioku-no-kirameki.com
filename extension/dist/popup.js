@@ -103,6 +103,7 @@
   var KEY_VOICE_AUTOSEND = "nls_voice_autosend";
   var KEY_COMMENT_ENTER_SEND = "nls_comment_enter_send";
   var KEY_STORY_GROWTH_COLLAPSED = "nls_story_growth_collapsed";
+  var KEY_ANONYMOUS_IDENTICON_ENABLED = "nls_anonymous_identicon_enabled_v1";
   var KEY_SUPPORT_VISUAL_EXPANDED = "nls_support_visual_expanded";
   var KEY_USAGE_TERMS_ACK = "nls_usage_terms_ack_v1";
   var KEY_VOICE_INPUT_DEVICE = "nls_voice_input_device";
@@ -150,6 +151,9 @@
     return raw !== false;
   }
   function isCommentEnterSendEnabled(raw) {
+    return raw !== false;
+  }
+  function normalizeAnonymousIdenticonEnabled(raw) {
     return raw !== false;
   }
   var KEY_MARKETING_EXPORT_MASK_LABELS = "nls_marketing_export_mask_labels_v1";
@@ -330,6 +334,22 @@
     const y = String(yukkuriSrc || "").trim();
     const t = String(tvSrc || "").trim();
     return isAnonymousStyleNicoUserId(userId) ? t || y : y || t;
+  }
+  function pickSupportGrowthTileWithOptionalIdenticon(userId, httpCandidate, yukkuriSrc, tvSrc, identiconOpts) {
+    if (isHttpOrHttpsUrl(httpCandidate)) {
+      return String(httpCandidate).trim();
+    }
+    const uid = String(userId || "").trim();
+    if (identiconOpts?.anonymousIdenticonEnabled !== false && uid && isAnonymousStyleNicoUserId(uid)) {
+      const data = String(identiconOpts.anonymousIdenticonDataUrl || "").trim();
+      if (data) return data;
+    }
+    return pickSupportGrowthFallbackTileSrc(
+      userId,
+      httpCandidate,
+      yukkuriSrc,
+      tvSrc
+    );
   }
   function resolveSupportGrowthTileSrc(p) {
     const def = String(p.defaultSrc || "");
@@ -1145,6 +1165,50 @@
     return touched;
   }
 
+  // src/lib/anonymousIdenticon.js
+  function hashString(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i += 1) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function anonymousIdenticonDataUrl(userId, sizePx = 64) {
+    const s = String(userId || "").trim();
+    if (!s) return "";
+    const n = Math.max(16, Math.min(128, Number(sizePx) || 64));
+    const h = hashString(s);
+    const hue = (h >>> 15) % 360;
+    const bg = `hsl(${hue},48%,90%)`;
+    const fg = `hsl(${hue},55%,28%)`;
+    let bits = h & 32767;
+    const cell = n / 5;
+    let rects = "";
+    for (let r = 0; r < 5; r += 1) {
+      const a = (bits & 1) !== 0;
+      bits >>>= 1;
+      const b = (bits & 1) !== 0;
+      bits >>>= 1;
+      const c = (bits & 1) !== 0;
+      bits >>>= 1;
+      const cols = [
+        [0, a],
+        [4, a],
+        [1, b],
+        [3, b],
+        [2, c]
+      ];
+      for (const [ci, on] of cols) {
+        if (on) {
+          rects += `<rect x="${ci * cell}" y="${r * cell}" width="${cell}" height="${cell}" fill="${fg}"/>`;
+        }
+      }
+    }
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}"><rect width="100%" height="100%" fill="${bg}"/>${rects}</svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+
   // src/lib/supportGrowthAvatarLoad.js
   function defaultUrlKey(url) {
     const s = String(url || "").trim();
@@ -1270,6 +1334,7 @@
     const defaultThumb = String(opts?.defaultThumbSrc || "").trim();
     const anonThumb = String(opts?.anonymousFallbackThumbSrc || "").trim();
     const colorScheme = opts?.colorScheme === "dark" ? "dark" : "light";
+    const idnResolver = typeof opts?.anonymousIdenticonResolver === "function" ? opts.anonymousIdenticonResolver : null;
     const rooms = Array.isArray(stripRooms) ? stripRooms : [];
     let knownRank = 0;
     return rooms.map((r) => {
@@ -1279,12 +1344,25 @@
       const placeNumber = isUnknown ? null : knownRank;
       const rawAv = String(r?.avatarUrl || "").trim();
       const uidForThumb = isUnknown ? "" : userKey;
-      const thumbSrc = pickSupportGrowthFallbackTileSrc(
-        uidForThumb,
-        rawAv,
-        defaultThumb,
-        anonThumb || defaultThumb
-      );
+      let thumbSrc = "";
+      if (isHttpOrHttpsUrl(rawAv)) {
+        thumbSrc = String(rawAv).trim();
+      } else if (idnResolver && uidForThumb && isAnonymousStyleNicoUserId(uidForThumb)) {
+        const idn = String(idnResolver(uidForThumb) || "").trim();
+        thumbSrc = idn ? idn : pickSupportGrowthFallbackTileSrc(
+          uidForThumb,
+          rawAv,
+          defaultThumb,
+          anonThumb || defaultThumb
+        );
+      } else {
+        thumbSrc = pickSupportGrowthFallbackTileSrc(
+          uidForThumb,
+          rawAv,
+          defaultThumb,
+          anonThumb || defaultThumb
+        );
+      }
       const thumbNeedsNoReferrer = isHttpOrHttpsUrl(thumbSrc);
       const idTitle = isUnknown ? "" : String(r.userKey);
       const idShort = isUnknown ? "\u2014" : shortUserKeyDisplay(userKey) || String(userKey);
@@ -3944,6 +4022,39 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
     onFallbackApplied: applyStoryAvatarTvFallbackClass
   });
+  var anonymousIdenticonRuntimeEnabled = true;
+  var anonymousIdenticonDataUrlCache = /* @__PURE__ */ new Map();
+  function applyAnonymousIdenticonRuntimeFromBag(bag) {
+    const on = normalizeAnonymousIdenticonEnabled(
+      bag?.[KEY_ANONYMOUS_IDENTICON_ENABLED]
+    );
+    if (on !== anonymousIdenticonRuntimeEnabled) {
+      anonymousIdenticonDataUrlCache.clear();
+    }
+    anonymousIdenticonRuntimeEnabled = on;
+  }
+  function getCachedAnonymousIdenticonDataUrl(userId) {
+    if (!anonymousIdenticonRuntimeEnabled) return "";
+    const u = String(userId || "").trim();
+    if (!u || !isAnonymousStyleNicoUserId(u)) return "";
+    const hit = anonymousIdenticonDataUrlCache.get(u);
+    if (hit) return hit;
+    const gen = anonymousIdenticonDataUrl(u);
+    if (gen) anonymousIdenticonDataUrlCache.set(u, gen);
+    return gen;
+  }
+  function pickSupportGrowthTileForStory(userId, httpCandidate) {
+    return pickSupportGrowthTileWithOptionalIdenticon(
+      userId,
+      httpCandidate,
+      STORY_GRID_DEFAULT_TILE_IMG,
+      STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
+      {
+        anonymousIdenticonEnabled: anonymousIdenticonRuntimeEnabled,
+        anonymousIdenticonDataUrl: getCachedAnonymousIdenticonDataUrl(userId)
+      }
+    );
+  }
   var MAX_SELF_POSTED_ITEMS = 48;
   var SELF_POST_DUPLICATE_WINDOW_MS = 5e3;
   var SELF_POST_MATCH_LATE_MS = 10 * 60 * 1e3;
@@ -4398,12 +4509,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   function storyGrowthTileSrcForEntry(entry, liveId, entries = STORY_SOURCE_STATE.entries) {
     const candidate = storyGrowthAvatarSrcCandidate(entry, liveId, entries);
     if (candidate) return candidate;
-    return pickSupportGrowthFallbackTileSrc(
-      entry?.userId,
-      "",
-      STORY_GRID_DEFAULT_TILE_IMG,
-      STORY_REMOTE_FAILED_PLACEHOLDER_IMG
-    );
+    return pickSupportGrowthTileForStory(entry?.userId, "");
   }
   function userLaneProfileCompletenessTier(entry, httpCandidate) {
     const uid = String(entry?.userId || "").trim();
@@ -4944,12 +5050,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (!dedupeKey) continue;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
-      const displaySrc = pickSupportGrowthFallbackTileSrc(
-        e?.userId,
-        httpCandidate,
-        STORY_GRID_DEFAULT_TILE_IMG,
-        STORY_REMOTE_FAILED_PLACEHOLDER_IMG
-      );
+      const displaySrc = pickSupportGrowthTileForStory(e?.userId, httpCandidate);
       if (!displaySrc) continue;
       const label = storyGrowthDisplayLabel(e, liveId) || "\u30E6\u30FC\u30B6\u30FC";
       const meta = storyUserLaneMetaLines(e, httpCandidate, dedupeKey);
@@ -6112,7 +6213,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const models = topSupportRankLineModels(stripRooms, {
       defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
       anonymousFallbackThumbSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
-      colorScheme: rankScheme
+      colorScheme: rankScheme,
+      anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled ? (uid) => getCachedAnonymousIdenticonDataUrl(uid) : void 0
     });
     const html = models.map((m) => {
       const placeHtml = m.placeNumber != null ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>` : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
@@ -6217,12 +6319,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const label = displayUserLabel(r.userKey, r.nickname);
       const isUnknown = r.userKey === UNKNOWN_USER_KEY;
       const uidForThumb = isUnknown ? "" : r.userKey;
-      const thumbSrc = pickSupportGrowthFallbackTileSrc(
-        uidForThumb,
-        r.avatarUrl,
-        STORY_GRID_DEFAULT_TILE_IMG,
-        STORY_REMOTE_FAILED_PLACEHOLDER_IMG
-      );
+      const thumbSrc = pickSupportGrowthTileForStory(uidForThumb, r.avatarUrl);
       const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(thumbSrc);
       const thumbRp = isHttpOrHttpsUrl(displayThumb) ? ' referrerpolicy="no-referrer"' : "";
       const avatarHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async"${thumbRp}>`;
@@ -6583,6 +6680,19 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (!cb) return;
     const bag = await chrome.storage.local.get(KEY_COMMENT_ENTER_SEND);
     cb.checked = isCommentEnterSendEnabled(bag[KEY_COMMENT_ENTER_SEND]);
+  }
+  async function applyAnonymousIdenticonFromStorage() {
+    const cb = (
+      /** @type {HTMLInputElement|null} */
+      $("anonymousIdenticonEnabled")
+    );
+    const bag = await chrome.storage.local.get(KEY_ANONYMOUS_IDENTICON_ENABLED);
+    applyAnonymousIdenticonRuntimeFromBag(bag);
+    if (cb) {
+      cb.checked = normalizeAnonymousIdenticonEnabled(
+        bag[KEY_ANONYMOUS_IDENTICON_ENABLED]
+      );
+    }
   }
   var suppressSupportVisualTogglePersist = false;
   var ownSupportVisualPersistInFlight = false;
@@ -7232,7 +7342,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           KEY_CALM_PANEL_MOTION,
           KEY_STORAGE_WRITE_ERROR,
           KEY_COMMENT_PANEL_STATUS,
-          KEY_MARKETING_EXPORT_MASK_LABELS
+          KEY_MARKETING_EXPORT_MASK_LABELS,
+          KEY_ANONYMOUS_IDENTICON_ENABLED
         ])
       ]);
       applySelfPostedRecentsFromBag(openBag);
@@ -7254,6 +7365,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           openBag[KEY_MARKETING_EXPORT_MASK_LABELS]
         );
       }
+      const anonIdnHydrate = (
+        /** @type {HTMLInputElement|null} */
+        $("anonymousIdenticonEnabled")
+      );
+      if (anonIdnHydrate) {
+        anonIdnHydrate.checked = normalizeAnonymousIdenticonEnabled(
+          openBag[KEY_ANONYMOUS_IDENTICON_ENABLED]
+        );
+      }
+      applyAnonymousIdenticonRuntimeFromBag(openBag);
       const { url, fromActiveTab } = resolveWatchUrlFromTabAndStash(
         tabs[0],
         openBag[KEY_LAST_WATCH_URL]
@@ -8786,6 +8907,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       /** @type {HTMLInputElement|null} */
       $("voiceAutoSend")
     );
+    const anonymousIdenticonEnabled = (
+      /** @type {HTMLInputElement|null} */
+      $("anonymousIdenticonEnabled")
+    );
     const commentEnterSend = (
       /** @type {HTMLInputElement|null} */
       $("commentEnterSend")
@@ -9507,6 +9632,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       } catch {
       }
     });
+    anonymousIdenticonEnabled?.addEventListener("change", async () => {
+      try {
+        await storageSetSafe({
+          [KEY_ANONYMOUS_IDENTICON_ENABLED]: anonymousIdenticonEnabled.checked
+        });
+      } catch {
+      }
+      await applyAnonymousIdenticonFromStorage();
+      safeRefresh();
+    });
     const storyGrowthCollapseBtn = $("storyGrowthCollapseBtn");
     storyGrowthCollapseBtn?.addEventListener("click", () => {
       void (async () => {
@@ -9812,6 +9947,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         });
         void applyCommentEnterSendFromStorage().catch(() => {
         });
+        void applyAnonymousIdenticonFromStorage().catch(() => {
+        });
         void applyStoryGrowthCollapsedFromStorage().catch(() => {
         });
         void refreshVoiceInputDeviceList().catch(() => {
@@ -9838,6 +9975,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           }
           if (changes[KEY_COMMENT_ENTER_SEND]) {
             applyCommentEnterSendFromStorage().catch(() => {
+            });
+          }
+          if (changes[KEY_ANONYMOUS_IDENTICON_ENABLED]) {
+            applyAnonymousIdenticonFromStorage().catch(() => {
             });
           }
           if (changes[KEY_STORY_GROWTH_COLLAPSED]) {

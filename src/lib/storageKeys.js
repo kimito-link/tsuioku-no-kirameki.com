@@ -49,6 +49,12 @@ export const KEY_COMMENT_ENTER_SEND = 'nls_comment_enter_send';
 /** 応援アイコン列（りんくグリッド）を折りたたむか（true で非表示） */
 export const KEY_STORY_GROWTH_COLLAPSED = 'nls_story_growth_collapsed';
 
+/**
+ * 匿名・ハッシュ系 userId の応援タイルに、拡張内で一意の Identicon（SVG data URL）を出す。
+ * 未設定は既定 ON。明示 false のときだけ OFF（ニコ公式 blank 等の従来フォールバック）。
+ */
+export const KEY_ANONYMOUS_IDENTICON_ENABLED = 'nls_anonymous_identicon_enabled_v1';
+
 /** 応援ビジュアル詳細（ユーザーレーン・グリッド・診断ブロック）を開いているか */
 export const KEY_SUPPORT_VISUAL_EXPANDED = 'nls_support_visual_expanded';
 
@@ -156,6 +162,11 @@ export function isDeepHarvestQuietUiEnabled(raw) {
 
 /** @param {unknown} raw */
 export function isCommentEnterSendEnabled(raw) {
+  return raw !== false;
+}
+
+/** @param {unknown} raw */
+export function normalizeAnonymousIdenticonEnabled(raw) {
   return raw !== false;
 }
 
