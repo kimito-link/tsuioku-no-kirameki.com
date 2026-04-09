@@ -3432,6 +3432,32 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     } catch {
     }
   }
+  var popupPrimaryRevealDone = false;
+  function ensurePopupPrimaryCloakedBeforeFirstReveal() {
+    if (popupPrimaryRevealDone) return;
+    try {
+      document.documentElement.setAttribute("data-nl-popup-primary-cloak", "1");
+      const el = (
+        /** @type {HTMLElement|null} */
+        $("nlPopupPrimary")
+      );
+      if (el) el.setAttribute("aria-busy", "true");
+    } catch {
+    }
+  }
+  function revealPopupPrimaryOnce() {
+    if (popupPrimaryRevealDone) return;
+    popupPrimaryRevealDone = true;
+    try {
+      document.documentElement.removeAttribute("data-nl-popup-primary-cloak");
+      const el = (
+        /** @type {HTMLElement|null} */
+        $("nlPopupPrimary")
+      );
+      if (el) el.setAttribute("aria-busy", "false");
+    } catch {
+    }
+  }
   function hideCommentVelocityLine() {
     const el = $("commentVelocityLine");
     if (!el) return;
@@ -7096,6 +7122,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   async function refresh() {
     if (!hasExtensionContext()) {
       renderExtensionContextBanner(true);
+      revealPopupPrimaryOnce();
       return;
     }
     renderExtensionContextBanner(false);
@@ -7190,6 +7217,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           displayEntries
         );
       };
+      ensurePopupPrimaryCloakedBeforeFirstReveal();
       document.documentElement.removeAttribute("data-nl-popup-content-painted");
       const [tabs, openBag] = await Promise.all([
         chrome.tabs.query({ active: true, currentWindow: true }),
@@ -7354,6 +7382,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         void renderSessionSummaryComparePanel("");
         void renderGiftQuickStatsPanel("");
         markPopupRefreshContentPainted();
+        revealPopupPrimaryOnce();
         return;
       }
       const lv = extractLiveIdFromUrl(url);
@@ -7402,6 +7431,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         void renderSessionSummaryComparePanel("");
         void renderGiftQuickStatsPanel("");
         markPopupRefreshContentPainted();
+        revealPopupPrimaryOnce();
         return;
       }
       const snapshotKey = `${lv}|${url}|s17`;
@@ -7510,6 +7540,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (thumbCountEl) thumbCountEl.textContent = "\u2026";
       paintWatchPopupUi();
       markPopupRefreshContentPainted();
+      revealPopupPrimaryOnce();
       scheduleDeferredUserCommentProfileHydrate({
         refreshGen,
         commentsKey: key,
@@ -7623,6 +7654,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         }
       })();
     } catch (e) {
+      revealPopupPrimaryOnce();
       if (isExtensionContextInvalidatedError(e)) {
         renderExtensionContextBanner(true);
         return;

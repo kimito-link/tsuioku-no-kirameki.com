@@ -9,6 +9,12 @@
 
 どちらも同じ `chrome.storage.local` を共有します。
 
+## 初回メイン UI クローク（`data-nl-popup-primary-cloak`）
+
+- 利用条件ゲート（`#usageTermsGate`）の**外側の兄弟**として `.nl-popup-primary` を置き、`html[data-nl-popup-primary-cloak='1']` のあいだだけメイン領域を `visibility: hidden` にします（ゲート操作は常に可能）。
+- `popup-entry.js` は**最初の** `refresh()` が初回ペイント（`markPopupRefreshContentPainted`）まで進んだタイミングで一度だけ解除し、以降の `safeRefresh` では再クロークしません（定期更新で UI が一瞬消えるのを避けるため）。
+- E2E は `data-nl-popup-content-painted='1'` のあと、`data-nl-popup-primary-cloak` が付かないことを確認します。
+
 ## 応援ビジュアル（`nls_support_visual_expanded`）
 
 - 開閉状態はストレージキー **`nls_support_visual_expanded`** に保存されます。

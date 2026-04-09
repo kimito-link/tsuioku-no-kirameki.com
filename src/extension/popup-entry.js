@@ -682,6 +682,32 @@ function markPopupRefreshContentPainted() {
   }
 }
 
+/** 初回ハイドレート完了まで `.nl-popup-primary` を覆う（2 回目以降の safeRefresh では再クロークしない） */
+let popupPrimaryRevealDone = false;
+
+function ensurePopupPrimaryCloakedBeforeFirstReveal() {
+  if (popupPrimaryRevealDone) return;
+  try {
+    document.documentElement.setAttribute('data-nl-popup-primary-cloak', '1');
+    const el = /** @type {HTMLElement|null} */ ($('nlPopupPrimary'));
+    if (el) el.setAttribute('aria-busy', 'true');
+  } catch {
+    // no-op
+  }
+}
+
+function revealPopupPrimaryOnce() {
+  if (popupPrimaryRevealDone) return;
+  popupPrimaryRevealDone = true;
+  try {
+    document.documentElement.removeAttribute('data-nl-popup-primary-cloak');
+    const el = /** @type {HTMLElement|null} */ ($('nlPopupPrimary'));
+    if (el) el.setAttribute('aria-busy', 'false');
+  } catch {
+    // no-op
+  }
+}
+
 function hideCommentVelocityLine() {
   const el = $('commentVelocityLine');
   if (!el) return;
@@ -5285,6 +5311,7 @@ function applyRecordHeroRecordingDataset(toggle) {
 async function refresh() {
   if (!hasExtensionContext()) {
     renderExtensionContextBanner(true);
+    revealPopupPrimaryOnce();
     return;
   }
   renderExtensionContextBanner(false);
@@ -5298,6 +5325,7 @@ async function refresh() {
   const postBtn = /** @type {HTMLButtonElement} */ ($('postCommentBtn'));
 
   try {
+  ensurePopupPrimaryCloakedBeforeFirstReveal();
   document.documentElement.removeAttribute('data-nl-popup-content-painted');
   const [tabs, openBag] = await Promise.all([
     chrome.tabs.query({ active: true, currentWindow: true }),
@@ -5457,6 +5485,7 @@ async function refresh() {
     void renderSessionSummaryComparePanel('');
     void renderGiftQuickStatsPanel('');
     markPopupRefreshContentPainted();
+    revealPopupPrimaryOnce();
     return;
   }
 
@@ -5507,6 +5536,7 @@ async function refresh() {
     void renderSessionSummaryComparePanel('');
     void renderGiftQuickStatsPanel('');
     markPopupRefreshContentPainted();
+    revealPopupPrimaryOnce();
     return;
   }
 
@@ -5693,6 +5723,7 @@ async function refresh() {
   if (thumbCountEl) thumbCountEl.textContent = '…';
   paintWatchPopupUi();
   markPopupRefreshContentPainted();
+  revealPopupPrimaryOnce();
   scheduleDeferredUserCommentProfileHydrate({
     refreshGen,
     commentsKey: key,
@@ -5817,6 +5848,7 @@ async function refresh() {
     }
   })();
   } catch (e) {
+    revealPopupPrimaryOnce();
     if (isExtensionContextInvalidatedError(e)) {
       renderExtensionContextBanner(true);
       return;

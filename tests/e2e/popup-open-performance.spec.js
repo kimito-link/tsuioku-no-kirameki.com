@@ -28,6 +28,10 @@ test.describe('popup open performance', () => {
     await expect(
       popup.locator('html[data-nl-popup-content-painted="1"]')
     ).toBeAttached({ timeout: 15_000 });
+    await expect(popup.locator('html')).not.toHaveAttribute(
+      'data-nl-popup-primary-cloak',
+      '1'
+    );
 
     const elapsed = Date.now() - t0;
     expect(elapsed).toBeLessThan(45_000);
@@ -50,6 +54,10 @@ test.describe('popup open performance', () => {
     await expect(
       popup.locator('html[data-nl-popup-content-painted="1"]')
     ).toBeAttached({ timeout: 15_000 });
+    await expect(popup.locator('html')).not.toHaveAttribute(
+      'data-nl-popup-primary-cloak',
+      '1'
+    );
   });
 
   test('ポップアップ再読み込み後もコンテンツペイントマーカーが付く', async ({
@@ -81,5 +89,9 @@ test.describe('popup open performance', () => {
     await expect(
       popup.locator('html[data-nl-popup-content-painted="1"]')
     ).toBeAttached({ timeout: 15_000 });
+    await expect(popup.locator('html')).not.toHaveAttribute(
+      'data-nl-popup-primary-cloak',
+      '1'
+    );
   });
 });

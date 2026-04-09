@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja" data-nl-usage-terms-ack="1">
+<html lang="ja" data-nl-usage-terms-ack="1" data-nl-popup-primary-cloak="1">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -1139,6 +1139,12 @@
         padding: 5px 9px 4px;
         overflow-x: hidden;
         overflow-y: auto;
+      }
+
+      /* 初回のみ: メイン UI をハイドレート完了まで隠し、段階描画のちらつきを抑える（#usageTermsGate は外に出す） */
+      html[data-nl-popup-primary-cloak='1'] .nl-popup-primary {
+        visibility: hidden;
+        pointer-events: none;
       }
 
       .nl-usage-terms-gate {
@@ -5452,6 +5458,11 @@
       </div>
 
       <div
+        class="nl-popup-primary"
+        id="nlPopupPrimary"
+        aria-busy="true"
+      >
+      <div
         id="extensionContextBanner"
         class="nl-extension-context-banner"
         role="alert"
@@ -6458,6 +6469,8 @@
           />
         </a>
       </footer>
+      </div>
+
     </div>
 
     <script src="dist/popup.js"></script>
