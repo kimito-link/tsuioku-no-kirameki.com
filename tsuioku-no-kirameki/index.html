@@ -3256,6 +3256,23 @@
         color:#1f568d;font-weight:600
       }
       .lp-worldview__brand-note a:hover,.lp-worldview__brand-note a:focus-visible{color:#153d66}
+      .lp-worldview__moonwater-figure{
+        margin:clamp(18px,4vw,28px) 0 0;
+        padding:0;
+        border:0;
+        max-width:100%
+      }
+      .lp-worldview__moonwater-figure .lp-worldview__moonwater{margin-top:0}
+      .lp-worldview__moonwater__caption{
+        margin:clamp(10px,2.2vw,14px) auto 0;
+        max-width:min(100%,36rem);
+        padding:0 clamp(4px,2vw,12px);
+        font-size:.84rem;
+        line-height:var(--lh-body);
+        text-align:center;
+        letter-spacing:.02em;
+        color:var(--text-secondary)
+      }
 
       /* 前半：銀河 → 夜明け（天の川がふわっと流れる）＋ヒーローでコメントが「むくむ」 */
       .lp-dawn-arc{
@@ -3676,6 +3693,7 @@
       }
       .lp-dawn-arc .lp-worldview__brand-note a{color:#b8e0ff}
       .lp-dawn-arc .lp-worldview__brand-note a:hover,.lp-dawn-arc .lp-worldview__brand-note a:focus-visible{color:#e0f2ff}
+      .lp-dawn-arc .lp-worldview__moonwater__caption{color:rgba(220,212,200,.84)}
       .lp-dawn-arc .lp-worldview__cc-poster{
         border-color:rgba(255,255,255,.14);
         box-shadow:0 18px 48px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);
@@ -3690,6 +3708,7 @@
       @media (prefers-contrast:more){
         .lp-dawn-arc .lp-worldview__metaphor-whisper__line{color:#fff;opacity:1}
         .lp-dawn-arc .lp-worldview__metaphor-whisper__sub{color:rgba(255,245,230,.85);opacity:1}
+        .lp-dawn-arc .lp-worldview__moonwater__caption{color:rgba(245,238,228,.92)}
       }
 
       .lp-dawn-arc .hero{
@@ -4584,11 +4603,16 @@
               の世界観（夜空・銀河・温かい光）に寄せています。ロゴや表記の正式ルールは、Kimito-Link リポジトリのブランドガイド
               <span lang="en">251016_logo_guide_kimitolink_ol.pdf</span>（正本）に準拠してください。
             </p>
-            <div class="lp-worldview__moonwater" aria-hidden="true">
-              <div class="lp-worldview__moonwater__surface"></div>
-              <div class="lp-worldview__moonwater__murk"></div>
-              <div class="lp-worldview__moonwater__reflection"></div>
-            </div>
+            <figure class="lp-worldview__moonwater-figure">
+              <div class="lp-worldview__moonwater" aria-hidden="true">
+                <div class="lp-worldview__moonwater__surface"></div>
+                <div class="lp-worldview__moonwater__murk"></div>
+                <div class="lp-worldview__moonwater__reflection"></div>
+              </div>
+              <figcaption class="lp-worldview__moonwater__caption">
+                月が水面に映ると、濁りまでゆっくり透けていく——そんな夜の気配を、上の夜空のあとに水鏡のように重ねた装飾です。「蒼く静かな凪の夜にも、ひとしずくの言葉は波紋を残す」とも、静かにつながるイメージです。
+              </figcaption>
+            </figure>
           </article>
         </div>
       </section>
