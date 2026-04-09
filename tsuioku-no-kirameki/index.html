@@ -3138,6 +3138,31 @@
         color:var(--text-secondary);
         letter-spacing:.02em
       }
+      .lp-worldview__cc-poster{
+        margin:clamp(10px,2.8vw,18px) 0 clamp(6px,1.5vw,12px);
+        max-width:100%;
+        padding:0;
+        border-radius:var(--r3);
+        overflow:hidden;
+        border:1px solid rgba(88,62,28,.1);
+        box-shadow:0 12px 36px rgba(15,24,42,.12);
+        background:rgba(255,252,247,.06)
+      }
+      .lp-worldview__cc-poster__link{
+        display:block;
+        line-height:0;
+        border-radius:calc(var(--r3) - 1px)
+      }
+      .lp-worldview__cc-poster__link:focus-visible{
+        outline:2px solid rgba(79,172,254,.85);
+        outline-offset:3px
+      }
+      .lp-worldview__cc-poster__img{
+        display:block;
+        width:100%;
+        max-width:100%;
+        height:auto
+      }
       .lp-worldview__brand-note{
         margin:var(--space-md) 0 0;
         padding:12px 14px;border-radius:var(--r3);
@@ -3570,6 +3595,11 @@
       }
       .lp-dawn-arc .lp-worldview__brand-note a{color:#b8e0ff}
       .lp-dawn-arc .lp-worldview__brand-note a:hover,.lp-dawn-arc .lp-worldview__brand-note a:focus-visible{color:#e0f2ff}
+      .lp-dawn-arc .lp-worldview__cc-poster{
+        border-color:rgba(255,255,255,.14);
+        box-shadow:0 18px 48px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);
+        background:rgba(8,12,28,.42)
+      }
       .lp-dawn-arc .lp-worldview__metaphor-whisper__line{color:rgba(255,248,236,.78);opacity:.9}
       .lp-dawn-arc .lp-worldview__metaphor-whisper__sub{color:rgba(255,240,220,.55);opacity:1}
       .lp-dawn-arc .lp-worldview__metaphor-whisper::before{
@@ -4449,6 +4479,25 @@
                 <figcaption class="lp-worldview__logo-band__cap">クリエイタークロス参加（ニコニ・コモンズ）</figcaption>
               </figure>
             </div>
+            <figure class="lp-worldview__cc-poster">
+              <a
+                href="https://commons.nicovideo.jp/works/nc321221"
+                rel="noopener noreferrer"
+                target="_blank"
+                class="lp-worldview__cc-poster__link"
+                aria-label="クリエイタークロス参加ポスター（ニコニ・コモンズ nc321221、新しいタブ）"
+              >
+                <img
+                  class="lp-worldview__cc-poster__img"
+                  src="images/creatorcrossposter.png"
+                  width="3580"
+                  height="965"
+                  alt="クリエイタークロス参加ポスター"
+                  loading="lazy"
+                  decoding="async"
+                >
+              </a>
+            </figure>
             <p class="lp-worldview__brand-note" role="note">
               ビジュアルの空間・星・流れ星は、<a href="https://kimito-link.com/" rel="noopener noreferrer">Kimito-Link Project（キミトリンクプロジェクト）</a>
               の世界観（夜空・銀河・温かい光）に寄せています。ロゴや表記の正式ルールは、Kimito-Link リポジトリのブランドガイド
