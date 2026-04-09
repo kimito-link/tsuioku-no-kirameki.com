@@ -3255,23 +3255,40 @@
         transform:translateX(-50%);
         pointer-events:none;
         background:linear-gradient(180deg,
-          rgba(255,253,248,.45) 0%,
-          rgba(210,228,248,.3) 18%,
-          rgba(160,195,225,.18) 40%,
-          rgba(120,165,200,.08) 65%,
-          transparent 90%);
+          rgba(255,253,248,.5) 0%,
+          rgba(210,228,248,.32) 16%,
+          rgba(160,195,225,.2) 38%,
+          rgba(120,165,200,.1) 62%,
+          transparent 88%);
         filter:blur(2px);
         mix-blend-mode:screen;
-        opacity:.85;
+        opacity:.88;
         animation:lp-mw-shimmer 7s ease-in-out infinite
       }
-      /* 揺らぎの横広がり */
-      .lp-worldview__moonwater__reflection::after{
-        content:"";position:absolute;
-        top:4%;left:-80%;width:260%;height:22%;
+      /* 映り込みの波紋（同心円リング） */
+      .lp-worldview__moonwater__ripples{
+        position:absolute;z-index:5;
+        left:50%;top:54%;
+        width:0;height:0;
+        transform:translateX(-50%);
+        pointer-events:none
+      }
+      .lp-worldview__moonwater__ripples .lp-mw-ring{
+        position:absolute;
+        left:50%;top:50%;
         border-radius:50%;
-        background:radial-gradient(ellipse 100% 100%,rgba(220,240,255,.18),transparent 55%);
-        filter:blur(3px)
+        border:1px solid rgba(200,225,250,.22);
+        background:transparent;
+        transform:translate(-50%,-50%) scale(.3);
+        opacity:0;
+        animation:lp-mw-ring-expand 5s ease-out infinite
+      }
+      .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(2){animation-delay:1.6s}
+      .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(3){animation-delay:3.2s}
+      @keyframes lp-mw-ring-expand{
+        0%{width:clamp(10px,2.5vw,18px);height:clamp(6px,1.4vw,10px);opacity:.55;transform:translate(-50%,-50%) scale(.4)}
+        60%{opacity:.22}
+        100%{width:clamp(80px,18vw,160px);height:clamp(24px,5vw,44px);opacity:0;transform:translate(-50%,-50%) scale(1)}
       }
       /* 濁りレイヤー（底から茶→透明へ） */
       .lp-worldview__moonwater__murk{
@@ -3306,9 +3323,11 @@
         .lp-worldview__moonwater__surface::before,
         .lp-worldview__moonwater__surface::after,
         .lp-worldview__moonwater__murk,
-        .lp-worldview__moonwater__reflection{animation:none}
+        .lp-worldview__moonwater__reflection,
+        .lp-worldview__moonwater__ripples .lp-mw-ring{animation:none}
         .lp-worldview__moonwater__murk{opacity:.35;filter:none}
         .lp-worldview__moonwater__reflection{opacity:.8;transform:translateX(-50%)}
+        .lp-worldview__moonwater__ripples .lp-mw-ring{opacity:.15;transform:translate(-50%,-50%) scale(.7);width:clamp(40px,9vw,80px);height:clamp(14px,3vw,24px)}
       }
       .lp-worldview__brand-note{
         margin:var(--space-md) 0 0;
@@ -4627,11 +4646,16 @@
                     <div class="lp-worldview__moonwater__stars"></div>
                     <div class="lp-worldview__moonwater__moon"></div>
                     <div class="lp-worldview__moonwater__reflection"></div>
+                    <div class="lp-worldview__moonwater__ripples" aria-hidden="true">
+                      <span class="lp-mw-ring"></span>
+                      <span class="lp-mw-ring"></span>
+                      <span class="lp-mw-ring"></span>
+                    </div>
                     <div class="lp-worldview__moonwater__murk"></div>
                   </div>
                   <figcaption class="lp-worldview__moonwater__caption">
-                    濁った水面でも、月が映ると少しずつ底が透けてくる。<br>
-                    想いも同じで、<strong>灯すことをやめなければ</strong>、いつか水底まで届く。
+                    泥水でも、月が映れば澄んでくる。<br>
+                    泥水でも、花は綺麗に咲く。
                   </figcaption>
                 </figure>
                 <p class="lp-worldview__epilogue-accent">想いが強いほど、届くから。</p>
