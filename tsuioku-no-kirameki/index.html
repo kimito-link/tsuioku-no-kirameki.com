@@ -2951,7 +2951,61 @@
         margin-top:clamp(10px,2.5vw,16px);
         margin-bottom:clamp(12px,3vw,18px)
       }
-      .lp-worldview__logo-band--bottom{margin-bottom:0}
+      .lp-worldview__logo-band--bottom{
+        margin-bottom:0;
+        position:relative
+      }
+      /* クリエイタークロス帯：スクロールで視界に入ったあと、桜が散る（装飾のみ・pointer-events なし） */
+      .lp-cc-sakura{
+        position:absolute;
+        inset:0;
+        z-index:0;
+        pointer-events:none;
+        overflow:hidden;
+        border-radius:inherit
+      }
+      .lp-worldview__logo-band--bottom .lp-worldview__logo-band__fig{
+        position:relative;
+        z-index:1
+      }
+      .lp-cc-sakura__petal{
+        position:absolute;
+        top:-12%;
+        width:clamp(7px,1.8vw,11px);
+        height:clamp(9px,2.2vw,14px);
+        border-radius:50% 2px 50% 2px;
+        transform-origin:50% 50%;
+        opacity:0;
+        background:linear-gradient(148deg,rgba(255,232,240,.95),rgba(230,150,175,.72) 48%,rgba(200,120,155,.55));
+        box-shadow:0 0 8px rgba(255,200,215,.22)
+      }
+      @keyframes lp-cc-sakura-fall{
+        0%{transform:translate3d(0,-12%,0) rotate(0deg);opacity:0}
+        6%{opacity:.88}
+        94%{opacity:.72}
+        100%{transform:translate3d(var(--lp-cc-drift,16px),118%,0) rotate(560deg);opacity:0}
+      }
+      .lp-worldview__logo-band--bottom.lp-cc-sakura--active .lp-cc-sakura__petal{
+        animation:lp-cc-sakura-fall linear infinite
+      }
+      .lp-cc-sakura__petal:nth-child(1){left:4%;--lp-cc-drift:14px;animation-duration:5.8s;animation-delay:0s}
+      .lp-cc-sakura__petal:nth-child(2){left:14%;--lp-cc-drift:-18px;animation-duration:6.4s;animation-delay:.7s}
+      .lp-cc-sakura__petal:nth-child(3){left:24%;--lp-cc-drift:22px;animation-duration:5.2s;animation-delay:1.1s}
+      .lp-cc-sakura__petal:nth-child(4){left:34%;--lp-cc-drift:-12px;animation-duration:6.9s;animation-delay:.3s}
+      .lp-cc-sakura__petal:nth-child(5){left:44%;--lp-cc-drift:19px;animation-duration:5.5s;animation-delay:1.6s}
+      .lp-cc-sakura__petal:nth-child(6){left:52%;--lp-cc-drift:-24px;animation-duration:6.2s;animation-delay:.9s}
+      .lp-cc-sakura__petal:nth-child(7){left:62%;--lp-cc-drift:11px;animation-duration:5.9s;animation-delay:2s}
+      .lp-cc-sakura__petal:nth-child(8){left:72%;--lp-cc-drift:-16px;animation-duration:6.6s;animation-delay:.5s}
+      .lp-cc-sakura__petal:nth-child(9){left:82%;--lp-cc-drift:20px;animation-duration:5.4s;animation-delay:1.3s}
+      .lp-cc-sakura__petal:nth-child(10){left:92%;--lp-cc-drift:-20px;animation-duration:6.1s;animation-delay:1.8s}
+      .lp-cc-sakura__petal:nth-child(11){left:18%;--lp-cc-drift:8px;animation-duration:7.2s;animation-delay:2.4s}
+      .lp-cc-sakura__petal:nth-child(12){left:76%;--lp-cc-drift:-9px;animation-duration:6.8s;animation-delay:2.1s}
+      @media (prefers-reduced-motion:reduce){
+        .lp-worldview__logo-band--bottom.lp-cc-sakura--active .lp-cc-sakura__petal{
+          animation:none;
+          opacity:0
+        }
+      }
       .lp-worldview__logo-band__fig{
         margin:0;
         padding:0;
@@ -4276,6 +4330,20 @@
               </div>
             </div>
             <div class="lp-worldview__logo-band lp-worldview__logo-band--bottom" role="group" aria-label="クリエイタークロス参加ロゴ">
+              <div class="lp-cc-sakura" aria-hidden="true">
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+                <span class="lp-cc-sakura__petal"></span>
+              </div>
               <figure class="lp-worldview__logo-band__fig">
                 <a
                   href="https://commons.nicovideo.jp/works/nc321221"
@@ -6716,6 +6784,30 @@
           }
         }, { rootMargin: '0px 0px -40px 0px', threshold: 0 });
         for (var k = 0; k < els.length; k++) io.observe(els[k]);
+      })();
+    </script>
+
+    <script>
+      (function () {
+        'use strict';
+        var host = document.querySelector('.lp-worldview__logo-band--bottom');
+        if (!host) return;
+        if (!('IntersectionObserver' in window)) {
+          host.classList.add('lp-cc-sakura--active');
+          return;
+        }
+        var io = new IntersectionObserver(
+          function (entries) {
+            for (var i = 0; i < entries.length; i++) {
+              if (entries[i].isIntersecting) {
+                host.classList.add('lp-cc-sakura--active');
+                io.unobserve(host);
+              }
+            }
+          },
+          { rootMargin: '0px 0px -10% 0px', threshold: 0.15 }
+        );
+        io.observe(host);
       })();
     </script>
   </body>
