@@ -2165,19 +2165,22 @@
         margin-bottom: 8px;
       }
 
-      html.nl-inline body .nl-record--first-view .nl-record-sub {
-        flex: 1 1 100%;
+      html.nl-inline body .nl-popup-settings .nl-record-sub {
         margin-top: 0;
-        padding-top: 6px;
-        border-top: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
+        padding-top: 0;
+        border-top: none;
       }
 
-      html.nl-inline body .nl-record--first-view .nl-record-sub__hint {
+      html.nl-inline body .nl-popup-settings .nl-record-sub__hint {
         display: none;
       }
 
-      html.nl-inline body .nl-record--first-view .nl-record-sub__label {
+      html.nl-inline body .nl-popup-settings .nl-record-sub__label {
         font-size: clamp(11px, calc(var(--nl-base-font) * 0.82), 14px);
+      }
+
+      html.nl-inline body .nl-popup-settings {
+        margin-bottom: 6px;
       }
 
       .nl-live-stat-cards ~ .nl-comment-compose--primary {
@@ -3651,6 +3654,83 @@
         margin-top: 2px;
       }
 
+      .nl-popup-settings {
+        margin: 0 0 8px;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 85%, transparent);
+        border-radius: 10px;
+        background: rgb(255 255 255 / 42%);
+      }
+
+      html.nl-inline body .nl-popup-settings {
+        background: rgb(255 255 255 / 32%);
+      }
+
+      .nl-popup-settings__summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 10px 12px;
+        min-height: 44px;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: clamp(11px, calc(var(--nl-base-font) * 0.86), 14px);
+        font-weight: 700;
+        color: var(--nl-accent);
+        line-height: 1.25;
+      }
+
+      .nl-popup-settings__summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .nl-popup-settings__summary::before {
+        content: '';
+        width: 0.45em;
+        height: 0.45em;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(-45deg);
+        flex-shrink: 0;
+        margin-top: -0.15em;
+        transition: transform 0.15s ease;
+      }
+
+      .nl-popup-settings[open] .nl-popup-settings__summary::before {
+        transform: rotate(45deg);
+        margin-top: 0.1em;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .nl-popup-settings__summary::before {
+          transition: none;
+        }
+      }
+
+      .nl-popup-settings__summary:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
+        border-radius: 9px;
+      }
+
+      .nl-popup-settings__body {
+        padding: 0 12px 12px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 55%, transparent);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .nl-popup-settings__body > .nl-record-sub {
+        margin-top: 0;
+      }
+
+      .nl-settings-panel-layout {
+        margin-top: 0;
+        padding-top: 8px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 60%, transparent);
+      }
+
       .nl-comment-compose {
         background: var(--nl-surface);
         border: 1px solid var(--nl-border);
@@ -4474,7 +4554,9 @@
       }
 
       body.nl-tight .nl-export-toolbar__summary,
-      body.nl-compact .nl-export-toolbar__summary {
+      body.nl-compact .nl-export-toolbar__summary,
+      body.nl-tight .nl-popup-settings__summary,
+      body.nl-compact .nl-popup-settings__summary {
         min-height: 40px;
         padding: 8px 10px;
       }
@@ -5478,22 +5560,134 @@
             </label>
           </div>
         </div>
-        <div class="nl-record-sub">
-          <label for="deepHarvestQuietUiToggle" class="nl-record-sub__label">
-            <input
-              type="checkbox"
-              id="deepHarvestQuietUiToggle"
-              checked
-              aria-label="コメント一覧の取り込み開始を遅らせ、読み込み中を表示する"
-            />
-            <span>
-              一覧の取り込みをゆっくり始める（読み込み表示・滝を抑える）
-              <span class="nl-record-sub__hint"
-                >OFF にすると早く記録されやすいが、右のコメント欄が動きやすくなります。</span>
-            </span>
-          </label>
-        </div>
       </div>
+
+      <details id="nlPopupSettings" class="nl-popup-settings">
+        <summary class="nl-popup-settings__summary">
+          詳細設定（取り込み・パネル位置・動き・表示トラブル）
+        </summary>
+        <div class="nl-popup-settings__body">
+          <div class="nl-record-sub">
+            <label for="deepHarvestQuietUiToggle" class="nl-record-sub__label">
+              <input
+                type="checkbox"
+                id="deepHarvestQuietUiToggle"
+                checked
+                aria-label="コメント一覧の取り込み開始を遅らせ、読み込み中を表示する"
+              />
+              <span>
+                一覧の取り込みをゆっくり始める（読み込み表示・滝を抑える）
+                <span class="nl-record-sub__hint"
+                  >OFF にすると早く記録されやすいが、右のコメント欄が動きやすくなります。</span>
+              </span>
+            </label>
+          </div>
+          <div
+            class="nl-record nl-panel-width nl-settings-panel-layout"
+            role="group"
+            aria-labelledby="inlinePanelWidthLegend"
+          >
+            <div id="inlinePanelWidthLegend" class="nl-panel-width-legend">
+              ページ内パネルの位置・幅（watch）
+            </div>
+            <div class="nl-panel-width-radios" role="group" aria-label="パネルの位置">
+              <span class="nl-panel-width-sublegend">位置</span>
+              <label>
+                <input
+                  type="radio"
+                  name="inlinePanelPlacement"
+                  value="below"
+                  id="inlinePanelPlacementBelow"
+                  checked
+                />
+                プレイヤー行の下（ワイド画面で横に回り込まない）
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="inlinePanelPlacement"
+                  value="beside"
+                  id="inlinePanelPlacementBeside"
+                />
+                横付き（親のレイアウトに合わせる・従来に近い）
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="inlinePanelPlacement"
+                  value="floating"
+                  id="inlinePanelPlacementFloating"
+                />
+                ポップアップ風（画面右上に固定・ツールバー押下に近い）
+              </label>
+            </div>
+            <div class="nl-panel-width-radios nl-panel-width-radios--width" role="group" aria-label="パネルの幅">
+              <span class="nl-panel-width-sublegend">幅</span>
+              <label>
+                <input
+                  type="radio"
+                  name="inlinePanelWidth"
+                  value="player_row"
+                  id="inlinePanelWidthPlayerRow"
+                />
+                視聴画面いっぱい（動画＋コメント列の下）
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="inlinePanelWidth"
+                  value="video"
+                  id="inlinePanelWidthVideo"
+                />
+                動画の幅だけ
+              </label>
+            </div>
+            <div class="nl-panel-calm-motion">
+              <label for="calmPanelMotion">
+                <input type="checkbox" id="calmPanelMotion" />
+                <span>パネル内の動きを抑える（ループアニメ・帯など）</span>
+              </label>
+            </div>
+            <div
+              class="nl-display-help"
+              role="region"
+              aria-labelledby="nlDisplayHelpTitle"
+            >
+              <div id="nlDisplayHelpTitle" class="nl-display-help__title">
+                表示がおかしいとき
+              </div>
+              <p class="nl-display-help__text" id="nlDisplayHelpDesc">
+                まず<strong>watch を再読み込み</strong>（ページをやり直す）。それでも名前やアイコンだけ変なときだけ、
+                <strong>表示キャッシュを消す</strong>（このPCが覚えた表示名・アイコンURLを忘れる。記録した応援コメントや設定は消えません）。
+              </p>
+              <div class="nl-display-help__actions">
+                <button
+                  type="button"
+                  id="reloadWatchTabPanelBtn"
+                  class="nl-panel-reload-btn"
+                  aria-describedby="nlDisplayHelpDesc"
+                >
+                  watch を再読み込み
+                </button>
+                <button
+                  type="button"
+                  id="extensionCacheClearBtn"
+                  class="nl-extension-cache-clear-btn"
+                  aria-describedby="nlDisplayHelpDesc"
+                  title="記録したコメントや設定は消しません。表示名・アイコンURLの覚えだけ消します。"
+                >
+                  表示キャッシュを消す
+                </button>
+              </div>
+              <span
+                id="extensionCacheClearStatus"
+                class="nl-extension-cache-clear-status nl-display-help__status"
+                aria-live="polite"
+              ></span>
+            </div>
+          </div>
+        </div>
+      </details>
 
       <div class="nl-vdh-divider" role="presentation">
         <span>コメント・書き出し</span>
@@ -5557,112 +5751,8 @@
           class="nl-export-toolbar__hint nl-compose-toolbar-hint"
           id="exportToolbarHint"
         >
-          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。ちらつきや帯の動きを抑えたいときは直下の「動きを抑える」をオン。watch に埋め込むパネルの位置・幅と、「表示がおかしいとき」の直し方はその下です。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
+          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
         </p>
-        <div
-          class="nl-record nl-panel-width nl-compose-panel-width"
-          role="group"
-          aria-labelledby="inlinePanelWidthLegend"
-        >
-          <div id="inlinePanelWidthLegend" class="nl-panel-width-legend">
-            ページ内パネルの位置・幅（watch）
-          </div>
-          <div class="nl-panel-width-radios" role="group" aria-label="パネルの位置">
-            <span class="nl-panel-width-sublegend">位置</span>
-            <label>
-              <input
-                type="radio"
-                name="inlinePanelPlacement"
-                value="below"
-                id="inlinePanelPlacementBelow"
-                checked
-              />
-              プレイヤー行の下（ワイド画面で横に回り込まない）
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="inlinePanelPlacement"
-                value="beside"
-                id="inlinePanelPlacementBeside"
-              />
-              横付き（親のレイアウトに合わせる・従来に近い）
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="inlinePanelPlacement"
-                value="floating"
-                id="inlinePanelPlacementFloating"
-              />
-              ポップアップ風（画面右上に固定・ツールバー押下に近い）
-            </label>
-          </div>
-          <div class="nl-panel-width-radios nl-panel-width-radios--width" role="group" aria-label="パネルの幅">
-            <span class="nl-panel-width-sublegend">幅</span>
-            <label>
-              <input
-                type="radio"
-                name="inlinePanelWidth"
-                value="player_row"
-                id="inlinePanelWidthPlayerRow"
-              />
-              視聴画面いっぱい（動画＋コメント列の下）
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="inlinePanelWidth"
-                value="video"
-                id="inlinePanelWidthVideo"
-              />
-              動画の幅だけ
-            </label>
-          </div>
-          <div class="nl-panel-calm-motion">
-            <label for="calmPanelMotion">
-              <input type="checkbox" id="calmPanelMotion" />
-              <span>パネル内の動きを抑える（ループアニメ・帯など）</span>
-            </label>
-          </div>
-          <div
-            class="nl-display-help"
-            role="region"
-            aria-labelledby="nlDisplayHelpTitle"
-          >
-            <div id="nlDisplayHelpTitle" class="nl-display-help__title">
-              表示がおかしいとき
-            </div>
-            <p class="nl-display-help__text" id="nlDisplayHelpDesc">
-              まず<strong>watch を再読み込み</strong>（ページをやり直す）。それでも名前やアイコンだけ変なときだけ、
-              <strong>表示キャッシュを消す</strong>（このPCが覚えた表示名・アイコンURLを忘れる。記録した応援コメントや設定は消えません）。
-            </p>
-            <div class="nl-display-help__actions">
-              <button
-                type="button"
-                id="reloadWatchTabPanelBtn"
-                class="nl-panel-reload-btn"
-                aria-describedby="nlDisplayHelpDesc"
-              >
-                watch を再読み込み
-              </button>
-              <button
-                type="button"
-                id="extensionCacheClearBtn"
-                class="nl-extension-cache-clear-btn"
-                aria-describedby="nlDisplayHelpDesc"
-                title="記録したコメントや設定は消しません。表示名・アイコンURLの覚えだけ消します。"
-              >
-                表示キャッシュを消す
-              </button>
-            </div>
-            <span
-              id="extensionCacheClearStatus"
-              class="nl-extension-cache-clear-status nl-display-help__status"
-              aria-live="polite"
-            ></span>
-          </div>
-        </div>
         <details
           class="nl-export-toolbar__details nl-compose-primary-more"
           data-nl-toolbar-only
