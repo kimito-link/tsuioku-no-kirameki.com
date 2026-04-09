@@ -11,6 +11,8 @@ import {
   KEY_INLINE_PANEL_PLACEMENT,
   INLINE_PANEL_PLACEMENT_BESIDE,
   INLINE_PANEL_PLACEMENT_FLOATING,
+  KEY_INLINE_FLOATING_ANCHOR,
+  INLINE_FLOATING_ANCHOR_BOTTOM_LEFT,
   KEY_LAST_WATCH_URL,
   KEY_POPUP_FRAME,
   KEY_POPUP_FRAME_CUSTOM,
@@ -28,7 +30,8 @@ import {
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
-  normalizeInlinePanelPlacement
+  normalizeInlinePanelPlacement,
+  normalizeInlineFloatingAnchor
 } from '../lib/storageKeys.js';
 import {
   pickLargestVisibleVideo,
@@ -1340,7 +1343,8 @@ function clearInlineHostFloatingLayout(host) {
 }
 
 /**
- * 拡張アイコンを押したときのポップアップに近い、画面右上固定のパネル（プレイヤー DOM 非依存）。
+ * 拡張アイコンを押したときのポップアップに近い、画面角に fixed するパネル（プレイヤー DOM 非依存）。
+ * 角は `inlineFloatingAnchor`（storage: nls_inline_floating_anchor）。
  */
 function renderInlinePanelFloatingHost() {
   const host = ensureInlinePopupHost();
@@ -1355,10 +1359,17 @@ function renderInlinePanelFloatingHost() {
   }
   host.classList.add('nls-inline-host--floating');
   host.style.position = 'fixed';
-  host.style.top = `${pad}px`;
-  host.style.right = `${pad}px`;
-  host.style.left = '';
-  host.style.bottom = '';
+  if (inlineFloatingAnchor === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT) {
+    host.style.top = '';
+    host.style.right = '';
+    host.style.bottom = `calc(${pad}px + env(safe-area-inset-bottom, 0px))`;
+    host.style.left = `calc(${pad}px + env(safe-area-inset-left, 0px))`;
+  } else {
+    host.style.bottom = '';
+    host.style.left = '';
+    host.style.top = `calc(${pad}px + env(safe-area-inset-top, 0px))`;
+    host.style.right = `calc(${pad}px + env(safe-area-inset-right, 0px))`;
+  }
   host.style.width = `${panelW}px`;
   host.style.maxWidth = `${panelW}px`;
   host.style.maxHeight = `${maxH}px`;
@@ -1491,6 +1502,9 @@ let inlinePanelWidthMode = normalizeInlinePanelWidthMode(undefined);
 
 /** インラインパネル配置（below＝プレイヤー行の下・beside＝親 flex 任せ） */
 let inlinePanelPlacementMode = normalizeInlinePanelPlacement(undefined);
+
+/** floating 時の画面角（top_right＝従来・bottom_left＝左下固定） */
+let inlineFloatingAnchor = normalizeInlineFloatingAnchor(undefined);
 
 /**
  * ShadowRoot 直下ノードは parentElement が null でも、parentNode 上では insertBefore 可能。
@@ -2063,13 +2077,17 @@ async function loadPageFrameSettings() {
     KEY_POPUP_FRAME,
     KEY_POPUP_FRAME_CUSTOM,
     KEY_INLINE_PANEL_WIDTH_MODE,
-    KEY_INLINE_PANEL_PLACEMENT
+    KEY_INLINE_PANEL_PLACEMENT,
+    KEY_INLINE_FLOATING_ANCHOR
   ]);
   inlinePanelWidthMode = normalizeInlinePanelWidthMode(
     bag[KEY_INLINE_PANEL_WIDTH_MODE]
   );
   inlinePanelPlacementMode = normalizeInlinePanelPlacement(
     bag[KEY_INLINE_PANEL_PLACEMENT]
+  );
+  inlineFloatingAnchor = normalizeInlineFloatingAnchor(
+    bag[KEY_INLINE_FLOATING_ANCHOR]
   );
   const rawFrame = normalizePageFrameId(bag[KEY_POPUP_FRAME]);
   pageFrameState.frameId =
@@ -3177,6 +3195,7 @@ function buildAiSharePageDiagnostics() {
         placementEffective !== inlinePanelPlacementMode,
       viewportInnerWidth: nlsViewportSize().innerWidth,
       widthMode: inlinePanelWidthMode,
+      floatingAnchor: inlineFloatingAnchor,
       insertionPlan,
       host: hostBrief,
       recentRenderErrors: nlsInlinePanelRenderErrors.slice()
@@ -4485,6 +4504,15 @@ async function start() {
       if (isWatchInlinePanelTopFrame()) {
         inlinePanelPlacementMode = normalizeInlinePanelPlacement(
           changes[KEY_INLINE_PANEL_PLACEMENT].newValue
+        );
+        renderPageFrameOverlay();
+      }
+    }
+
+    if (changes[KEY_INLINE_FLOATING_ANCHOR]) {
+      if (isWatchInlinePanelTopFrame()) {
+        inlineFloatingAnchor = normalizeInlineFloatingAnchor(
+          changes[KEY_INLINE_FLOATING_ANCHOR].newValue
         );
         renderPageFrameOverlay();
       }

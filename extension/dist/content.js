@@ -85,6 +85,9 @@
   var INLINE_PANEL_PLACEMENT_BELOW = "below";
   var INLINE_PANEL_PLACEMENT_BESIDE = "beside";
   var INLINE_PANEL_PLACEMENT_FLOATING = "floating";
+  var KEY_INLINE_FLOATING_ANCHOR = "nls_inline_floating_anchor";
+  var INLINE_FLOATING_ANCHOR_TOP_RIGHT = "top_right";
+  var INLINE_FLOATING_ANCHOR_BOTTOM_LEFT = "bottom_left";
   var INLINE_PANEL_WIDTH_PLAYER_ROW = "player_row";
   var INLINE_PANEL_WIDTH_VIDEO = "video";
   function normalizeInlinePanelWidthMode(raw) {
@@ -97,6 +100,11 @@
     if (s === INLINE_PANEL_PLACEMENT_BESIDE) return INLINE_PANEL_PLACEMENT_BESIDE;
     if (s === INLINE_PANEL_PLACEMENT_FLOATING) return INLINE_PANEL_PLACEMENT_FLOATING;
     return INLINE_PANEL_PLACEMENT_BELOW;
+  }
+  function normalizeInlineFloatingAnchor(raw) {
+    const s = String(raw || "").trim().toLowerCase();
+    if (s === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT) return INLINE_FLOATING_ANCHOR_BOTTOM_LEFT;
+    return INLINE_FLOATING_ANCHOR_TOP_RIGHT;
   }
   function isRecordingEnabled(raw) {
     return raw !== false;
@@ -3409,10 +3417,17 @@
     }
     host.classList.add("nls-inline-host--floating");
     host.style.position = "fixed";
-    host.style.top = `${pad}px`;
-    host.style.right = `${pad}px`;
-    host.style.left = "";
-    host.style.bottom = "";
+    if (inlineFloatingAnchor === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT) {
+      host.style.top = "";
+      host.style.right = "";
+      host.style.bottom = `calc(${pad}px + env(safe-area-inset-bottom, 0px))`;
+      host.style.left = `calc(${pad}px + env(safe-area-inset-left, 0px))`;
+    } else {
+      host.style.bottom = "";
+      host.style.left = "";
+      host.style.top = `calc(${pad}px + env(safe-area-inset-top, 0px))`;
+      host.style.right = `calc(${pad}px + env(safe-area-inset-right, 0px))`;
+    }
     host.style.width = `${panelW}px`;
     host.style.maxWidth = `${panelW}px`;
     host.style.maxHeight = `${maxH}px`;
@@ -3504,6 +3519,7 @@
   }
   var inlinePanelWidthMode = normalizeInlinePanelWidthMode(void 0);
   var inlinePanelPlacementMode = normalizeInlinePanelPlacement(void 0);
+  var inlineFloatingAnchor = normalizeInlineFloatingAnchor(void 0);
   function insertionParentForElement(el) {
     if (!(el instanceof HTMLElement)) return null;
     if (el.parentElement) return el.parentElement;
@@ -3939,13 +3955,17 @@
       KEY_POPUP_FRAME,
       KEY_POPUP_FRAME_CUSTOM,
       KEY_INLINE_PANEL_WIDTH_MODE,
-      KEY_INLINE_PANEL_PLACEMENT
+      KEY_INLINE_PANEL_PLACEMENT,
+      KEY_INLINE_FLOATING_ANCHOR
     ]);
     inlinePanelWidthMode = normalizeInlinePanelWidthMode(
       bag[KEY_INLINE_PANEL_WIDTH_MODE]
     );
     inlinePanelPlacementMode = normalizeInlinePanelPlacement(
       bag[KEY_INLINE_PANEL_PLACEMENT]
+    );
+    inlineFloatingAnchor = normalizeInlineFloatingAnchor(
+      bag[KEY_INLINE_FLOATING_ANCHOR]
     );
     const rawFrame = normalizePageFrameId(bag[KEY_POPUP_FRAME]);
     pageFrameState.frameId = rawFrame === "custom" || hasPageFramePreset(rawFrame) ? rawFrame : DEFAULT_PAGE_FRAME;
@@ -4800,6 +4820,7 @@
         besideNarrowViewportFallback: inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE && placementEffective !== inlinePanelPlacementMode,
         viewportInnerWidth: nlsViewportSize().innerWidth,
         widthMode: inlinePanelWidthMode,
+        floatingAnchor: inlineFloatingAnchor,
         insertionPlan,
         host: hostBrief,
         recentRenderErrors: nlsInlinePanelRenderErrors.slice()
@@ -5876,6 +5897,14 @@
         if (isWatchInlinePanelTopFrame()) {
           inlinePanelPlacementMode = normalizeInlinePanelPlacement(
             changes[KEY_INLINE_PANEL_PLACEMENT].newValue
+          );
+          renderPageFrameOverlay();
+        }
+      }
+      if (changes[KEY_INLINE_FLOATING_ANCHOR]) {
+        if (isWatchInlinePanelTopFrame()) {
+          inlineFloatingAnchor = normalizeInlineFloatingAnchor(
+            changes[KEY_INLINE_FLOATING_ANCHOR].newValue
           );
           renderPageFrameOverlay();
         }

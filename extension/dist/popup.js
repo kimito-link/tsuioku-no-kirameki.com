@@ -116,6 +116,9 @@
   var INLINE_PANEL_PLACEMENT_BELOW = "below";
   var INLINE_PANEL_PLACEMENT_BESIDE = "beside";
   var INLINE_PANEL_PLACEMENT_FLOATING = "floating";
+  var KEY_INLINE_FLOATING_ANCHOR = "nls_inline_floating_anchor";
+  var INLINE_FLOATING_ANCHOR_TOP_RIGHT = "top_right";
+  var INLINE_FLOATING_ANCHOR_BOTTOM_LEFT = "bottom_left";
   var KEY_CALM_PANEL_MOTION = "nls_calm_panel_motion";
   function normalizeCalmPanelMotion(raw, opts = {}) {
     if (raw === true) return true;
@@ -134,6 +137,11 @@
     if (s === INLINE_PANEL_PLACEMENT_BESIDE) return INLINE_PANEL_PLACEMENT_BESIDE;
     if (s === INLINE_PANEL_PLACEMENT_FLOATING) return INLINE_PANEL_PLACEMENT_FLOATING;
     return INLINE_PANEL_PLACEMENT_BELOW;
+  }
+  function normalizeInlineFloatingAnchor(raw) {
+    const s = String(raw || "").trim().toLowerCase();
+    if (s === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT) return INLINE_FLOATING_ANCHOR_BOTTOM_LEFT;
+    return INLINE_FLOATING_ANCHOR_TOP_RIGHT;
   }
   function isRecordingEnabled(raw) {
     return raw !== false;
@@ -7080,6 +7088,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   function applyCalmPanelMotionClass(enabled) {
     document.documentElement.classList.toggle("nl-calm-motion", Boolean(enabled));
   }
+  function applyRecordHeroRecordingDataset(toggle) {
+    const hero = document.querySelector(".nl-record-hero");
+    if (!(hero instanceof HTMLElement)) return;
+    hero.dataset.nlRecording = toggle.checked ? "on" : "off";
+  }
   async function refresh() {
     if (!hasExtensionContext()) {
       renderExtensionContextBanner(true);
@@ -7187,6 +7200,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           KEY_DEEP_HARVEST_QUIET_UI,
           KEY_INLINE_PANEL_WIDTH_MODE,
           KEY_INLINE_PANEL_PLACEMENT,
+          KEY_INLINE_FLOATING_ANCHOR,
           KEY_CALM_PANEL_MOTION,
           KEY_STORAGE_WRITE_ERROR,
           KEY_COMMENT_PANEL_STATUS,
@@ -7222,6 +7236,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       applyCommentHarvestBannerFromBag(openBag, viewerLvForError);
       toggle.checked = isRecordingEnabled(openBag[KEY_RECORDING]);
       toggle.disabled = false;
+      applyRecordHeroRecordingDataset(toggle);
       const deepHarvestQuietEl = (
         /** @type {HTMLInputElement|null} */
         $("deepHarvestQuietUiToggle")
@@ -7270,6 +7285,30 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
       if (radioPlacementFloating) {
         radioPlacementFloating.checked = placementMode === INLINE_PANEL_PLACEMENT_FLOATING;
+      }
+      const floatingAnchorMode = normalizeInlineFloatingAnchor(
+        openBag[KEY_INLINE_FLOATING_ANCHOR]
+      );
+      const radioFloatingAnchorTR = (
+        /** @type {HTMLInputElement|null} */
+        $("inlineFloatingAnchorTopRight")
+      );
+      const radioFloatingAnchorBL = (
+        /** @type {HTMLInputElement|null} */
+        $("inlineFloatingAnchorBottomLeft")
+      );
+      if (radioFloatingAnchorTR && radioFloatingAnchorBL) {
+        radioFloatingAnchorTR.checked = floatingAnchorMode !== INLINE_FLOATING_ANCHOR_BOTTOM_LEFT;
+        radioFloatingAnchorBL.checked = floatingAnchorMode === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT;
+      }
+      const floatingAnchorWrap = $("nlFloatingAnchorWrap");
+      if (floatingAnchorWrap instanceof HTMLElement) {
+        const showFloatingAnchorOpts = placementMode === INLINE_PANEL_PLACEMENT_FLOATING;
+        floatingAnchorWrap.hidden = !showFloatingAnchorOpts;
+        floatingAnchorWrap.setAttribute(
+          "aria-hidden",
+          showFloatingAnchorOpts ? "false" : "true"
+        );
       }
       syncVoiceCommentButton();
       if (!isNicoLiveWatchUrl(url)) {
@@ -9093,6 +9132,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (!ok) return;
       safeRefresh();
     };
+    const saveInlineFloatingAnchor = async (value) => {
+      const v = value === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT ? INLINE_FLOATING_ANCHOR_BOTTOM_LEFT : INLINE_FLOATING_ANCHOR_TOP_RIGHT;
+      const ok = await storageSetSafe({ [KEY_INLINE_FLOATING_ANCHOR]: v });
+      if (!ok) return;
+      safeRefresh();
+    };
     const radioPlayerRowEl = $("inlinePanelWidthPlayerRow");
     const radioVideoOnlyEl = $("inlinePanelWidthVideo");
     radioPlayerRowEl?.addEventListener("change", (e) => {
@@ -9110,22 +9155,46 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const radioPlacementBelowEl = $("inlinePanelPlacementBelow");
     const radioPlacementBesideEl = $("inlinePanelPlacementBeside");
     const radioPlacementFloatingEl = $("inlinePanelPlacementFloating");
+    const syncFloatingAnchorWrapFromPlacementRadios = () => {
+      const wrap = $("nlFloatingAnchorWrap");
+      if (!(wrap instanceof HTMLElement)) return;
+      const show = Boolean(radioPlacementFloatingEl?.checked);
+      wrap.hidden = !show;
+      wrap.setAttribute("aria-hidden", show ? "false" : "true");
+    };
     radioPlacementBelowEl?.addEventListener("change", (e) => {
       const t = e.target;
       if (t instanceof HTMLInputElement && t.checked) {
+        syncFloatingAnchorWrapFromPlacementRadios();
         void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BELOW);
       }
     });
     radioPlacementBesideEl?.addEventListener("change", (e) => {
       const t = e.target;
       if (t instanceof HTMLInputElement && t.checked) {
+        syncFloatingAnchorWrapFromPlacementRadios();
         void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BESIDE);
       }
     });
     radioPlacementFloatingEl?.addEventListener("change", (e) => {
       const t = e.target;
       if (t instanceof HTMLInputElement && t.checked) {
+        syncFloatingAnchorWrapFromPlacementRadios();
         void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_FLOATING);
+      }
+    });
+    const radioFloatingAnchorTopRightEl = $("inlineFloatingAnchorTopRight");
+    const radioFloatingAnchorBottomLeftEl = $("inlineFloatingAnchorBottomLeft");
+    radioFloatingAnchorTopRightEl?.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t instanceof HTMLInputElement && t.checked) {
+        void saveInlineFloatingAnchor(INLINE_FLOATING_ANCHOR_TOP_RIGHT);
+      }
+    });
+    radioFloatingAnchorBottomLeftEl?.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t instanceof HTMLInputElement && t.checked) {
+        void saveInlineFloatingAnchor(INLINE_FLOATING_ANCHOR_BOTTOM_LEFT);
       }
     });
     const calmMotionEl = (

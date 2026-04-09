@@ -95,6 +95,14 @@ export const INLINE_PANEL_PLACEMENT_BESIDE = 'beside';
 /** @type {'floating'} */
 export const INLINE_PANEL_PLACEMENT_FLOATING = 'floating';
 
+/** floating 配置時の画面角（ビューポート fixed）。未設定は top_right（従来挙動） */
+export const KEY_INLINE_FLOATING_ANCHOR = 'nls_inline_floating_anchor';
+
+/** @type {'top_right'} */
+export const INLINE_FLOATING_ANCHOR_TOP_RIGHT = 'top_right';
+/** @type {'bottom_left'} */
+export const INLINE_FLOATING_ANCHOR_BOTTOM_LEFT = 'bottom_left';
+
 /**
  * パネル内のループアニメ・チラ見せスクロールを止める（画面収録・スクショ向け）。
  * 未設定時は opts.inlineDefault に従う（埋め込みは既定でオン想定）。
@@ -127,6 +135,13 @@ export function normalizeInlinePanelPlacement(raw) {
   if (s === INLINE_PANEL_PLACEMENT_BESIDE) return INLINE_PANEL_PLACEMENT_BESIDE;
   if (s === INLINE_PANEL_PLACEMENT_FLOATING) return INLINE_PANEL_PLACEMENT_FLOATING;
   return INLINE_PANEL_PLACEMENT_BELOW;
+}
+
+/** @param {unknown} raw */
+export function normalizeInlineFloatingAnchor(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (s === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT) return INLINE_FLOATING_ANCHOR_BOTTOM_LEFT;
+  return INLINE_FLOATING_ANCHOR_TOP_RIGHT;
 }
 
 /** @param {unknown} raw */

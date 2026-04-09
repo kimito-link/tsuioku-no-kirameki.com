@@ -15,6 +15,9 @@ import {
   INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_BESIDE,
   INLINE_PANEL_PLACEMENT_FLOATING,
+  KEY_INLINE_FLOATING_ANCHOR,
+  INLINE_FLOATING_ANCHOR_TOP_RIGHT,
+  INLINE_FLOATING_ANCHOR_BOTTOM_LEFT,
   KEY_CALM_PANEL_MOTION,
   KEY_MARKETING_EXPORT_MASK_LABELS,
   EXTENSION_SOFT_CACHE_STORAGE_KEYS,
@@ -46,6 +49,7 @@ import {
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
   normalizeInlinePanelPlacement,
+  normalizeInlineFloatingAnchor,
   normalizeCalmPanelMotion,
   normalizeMarketingExportMaskLabels
 } from '../lib/storageKeys.js';
@@ -5267,6 +5271,17 @@ function applyCalmPanelMotionClass(enabled) {
   document.documentElement.classList.toggle('nl-calm-motion', Boolean(enabled));
 }
 
+/**
+ * H1（SA 知覚）: 記録 ON/OFF を `.nl-record-hero` に data 属性で同期（E2E・スタイル用）。
+ * 真実の状態は `#recordToggle` の checked に合わせる。
+ * @param {HTMLInputElement} toggle
+ */
+function applyRecordHeroRecordingDataset(toggle) {
+  const hero = document.querySelector('.nl-record-hero');
+  if (!(hero instanceof HTMLElement)) return;
+  hero.dataset.nlRecording = toggle.checked ? 'on' : 'off';
+}
+
 async function refresh() {
   if (!hasExtensionContext()) {
     renderExtensionContextBanner(true);
@@ -5293,6 +5308,7 @@ async function refresh() {
       KEY_DEEP_HARVEST_QUIET_UI,
       KEY_INLINE_PANEL_WIDTH_MODE,
       KEY_INLINE_PANEL_PLACEMENT,
+      KEY_INLINE_FLOATING_ANCHOR,
       KEY_CALM_PANEL_MOTION,
       KEY_STORAGE_WRITE_ERROR,
       KEY_COMMENT_PANEL_STATUS,
@@ -5324,6 +5340,7 @@ async function refresh() {
 
   toggle.checked = isRecordingEnabled(openBag[KEY_RECORDING]);
   toggle.disabled = false;
+  applyRecordHeroRecordingDataset(toggle);
 
   const deepHarvestQuietEl = /** @type {HTMLInputElement|null} */ (
     $('deepHarvestQuietUiToggle')
@@ -5369,6 +5386,31 @@ async function refresh() {
   if (radioPlacementFloating) {
     radioPlacementFloating.checked =
       placementMode === INLINE_PANEL_PLACEMENT_FLOATING;
+  }
+  const floatingAnchorMode = normalizeInlineFloatingAnchor(
+    openBag[KEY_INLINE_FLOATING_ANCHOR]
+  );
+  const radioFloatingAnchorTR = /** @type {HTMLInputElement|null} */ (
+    $('inlineFloatingAnchorTopRight')
+  );
+  const radioFloatingAnchorBL = /** @type {HTMLInputElement|null} */ (
+    $('inlineFloatingAnchorBottomLeft')
+  );
+  if (radioFloatingAnchorTR && radioFloatingAnchorBL) {
+    radioFloatingAnchorTR.checked =
+      floatingAnchorMode !== INLINE_FLOATING_ANCHOR_BOTTOM_LEFT;
+    radioFloatingAnchorBL.checked =
+      floatingAnchorMode === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT;
+  }
+  const floatingAnchorWrap = $('nlFloatingAnchorWrap');
+  if (floatingAnchorWrap instanceof HTMLElement) {
+    const showFloatingAnchorOpts =
+      placementMode === INLINE_PANEL_PLACEMENT_FLOATING;
+    floatingAnchorWrap.hidden = !showFloatingAnchorOpts;
+    floatingAnchorWrap.setAttribute(
+      'aria-hidden',
+      showFloatingAnchorOpts ? 'false' : 'true'
+    );
   }
   syncVoiceCommentButton();
 
@@ -7436,6 +7478,16 @@ function initPopup() {
     safeRefresh();
   };
 
+  const saveInlineFloatingAnchor = async (value) => {
+    const v =
+      value === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT
+        ? INLINE_FLOATING_ANCHOR_BOTTOM_LEFT
+        : INLINE_FLOATING_ANCHOR_TOP_RIGHT;
+    const ok = await storageSetSafe({ [KEY_INLINE_FLOATING_ANCHOR]: v });
+    if (!ok) return;
+    safeRefresh();
+  };
+
   /** @type {HTMLInputElement|null} */
   const radioPlayerRowEl = $('inlinePanelWidthPlayerRow');
   /** @type {HTMLInputElement|null} */
@@ -7457,23 +7509,51 @@ function initPopup() {
   const radioPlacementBelowEl = $('inlinePanelPlacementBelow');
   /** @type {HTMLInputElement|null} */
   const radioPlacementBesideEl = $('inlinePanelPlacementBeside');
+  /** @type {HTMLInputElement|null} */
   const radioPlacementFloatingEl = $('inlinePanelPlacementFloating');
+  const syncFloatingAnchorWrapFromPlacementRadios = () => {
+    const wrap = $('nlFloatingAnchorWrap');
+    if (!(wrap instanceof HTMLElement)) return;
+    const show = Boolean(radioPlacementFloatingEl?.checked);
+    wrap.hidden = !show;
+    wrap.setAttribute('aria-hidden', show ? 'false' : 'true');
+  };
   radioPlacementBelowEl?.addEventListener('change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
+      syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BELOW);
     }
   });
   radioPlacementBesideEl?.addEventListener('change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
+      syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BESIDE);
     }
   });
   radioPlacementFloatingEl?.addEventListener('change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
+      syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_FLOATING);
+    }
+  });
+
+  /** @type {HTMLInputElement|null} */
+  const radioFloatingAnchorTopRightEl = $('inlineFloatingAnchorTopRight');
+  /** @type {HTMLInputElement|null} */
+  const radioFloatingAnchorBottomLeftEl = $('inlineFloatingAnchorBottomLeft');
+  radioFloatingAnchorTopRightEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlineFloatingAnchor(INLINE_FLOATING_ANCHOR_TOP_RIGHT);
+    }
+  });
+  radioFloatingAnchorBottomLeftEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlineFloatingAnchor(INLINE_FLOATING_ANCHOR_BOTTOM_LEFT);
     }
   });
 

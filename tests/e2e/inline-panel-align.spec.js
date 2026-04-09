@@ -3,13 +3,18 @@ import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
 const KEY_INLINE_PANEL_WIDTH_MODE = 'nls_inline_panel_width_mode';
 const KEY_INLINE_PANEL_PLACEMENT = 'nls_inline_panel_placement';
+const KEY_INLINE_FLOATING_ANCHOR = 'nls_inline_floating_anchor';
 
 async function extensionServiceWorker(context) {
-  let sw = context.serviceWorkers()[0];
-  if (!sw) {
-    sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
+  const pickExt = () =>
+    context.serviceWorkers().find((w) => w.url().startsWith('chrome-extension://'));
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const ext = pickExt();
+    if (ext) return ext;
+    await new Promise((r) => setTimeout(r, 100));
   }
-  return sw;
+  throw new Error('extension service worker not found');
 }
 
 function injectTwoColumnPlayerRow() {
@@ -46,30 +51,53 @@ function injectTwoColumnPlayerRow() {
 
 /**
  * @param {import('@playwright/test').BrowserContext} context
- * @param {{ widthMode?: string|null, placement?: string|null }} opts
+ * @param {{
+ *   widthMode?: string|null,
+ *   placement?: string|null,
+ *   floatingAnchor?: string|null,
+ *   touchFloatingAnchor?: boolean
+ * }} opts
  */
 async function setInlinePanelModes(context, opts = {}) {
   const sw = await extensionServiceWorker(context);
-  await sw.evaluate(async ({ widthMode, placement, widthKey, placementKey }) => {
-    const removeKeys = [];
-    /** @type {Record<string, string>} */
-    const save = {};
-    if (widthMode == null) removeKeys.push(widthKey);
-    else save[widthKey] = widthMode;
-    if (placement == null) removeKeys.push(placementKey);
-    else save[placementKey] = placement;
-    if (removeKeys.length) {
-      await chrome.storage.local.remove(removeKeys);
+  await sw.evaluate(
+    async ({
+      widthMode,
+      placement,
+      floatingAnchor,
+      touchFloatingAnchor,
+      widthKey,
+      placementKey,
+      anchorKey
+    }) => {
+      const removeKeys = [];
+      /** @type {Record<string, string>} */
+      const save = {};
+      if (widthMode == null) removeKeys.push(widthKey);
+      else save[widthKey] = widthMode;
+      if (placement == null) removeKeys.push(placementKey);
+      else save[placementKey] = placement;
+      if (touchFloatingAnchor) {
+        if (floatingAnchor == null) removeKeys.push(anchorKey);
+        else save[anchorKey] = floatingAnchor;
+      }
+      if (removeKeys.length) {
+        await chrome.storage.local.remove(removeKeys);
+      }
+      if (Object.keys(save).length) {
+        await chrome.storage.local.set(save);
+      }
+    },
+    {
+      widthMode: opts.widthMode ?? null,
+      placement: opts.placement ?? null,
+      floatingAnchor: opts.floatingAnchor ?? null,
+      touchFloatingAnchor: opts.touchFloatingAnchor === true,
+      widthKey: KEY_INLINE_PANEL_WIDTH_MODE,
+      placementKey: KEY_INLINE_PANEL_PLACEMENT,
+      anchorKey: KEY_INLINE_FLOATING_ANCHOR
     }
-    if (Object.keys(save).length) {
-      await chrome.storage.local.set(save);
-    }
-  }, {
-    widthMode: opts.widthMode ?? null,
-    placement: opts.placement ?? null,
-    widthKey: KEY_INLINE_PANEL_WIDTH_MODE,
-    placementKey: KEY_INLINE_PANEL_PLACEMENT
-  });
+  );
 }
 
 /**
@@ -92,6 +120,25 @@ async function hostPlacementMetrics(page) {
       prevElementTag: host.previousElementSibling?.tagName || '',
       prevElementId: host.previousElementSibling?.id || '',
       prevSiblingType: host.previousSibling?.nodeType || null,
+      floatingClass: host.classList.contains('nls-inline-host--floating')
+    };
+  }, INLINE_HOST_ID);
+}
+
+/**
+ * @param {import('@playwright/test').Page} page
+ */
+async function hostFloatingCornerMetrics(page) {
+  return page.evaluate((hostId) => {
+    const host = globalThis.document.getElementById(hostId);
+    if (!host) return null;
+    const st = globalThis.getComputedStyle(host);
+    return {
+      position: st.position,
+      top: st.top,
+      right: st.right,
+      bottom: st.bottom,
+      left: st.left,
       floatingClass: host.classList.contains('nls-inline-host--floating')
     };
   }, INLINE_HOST_ID);
@@ -272,6 +319,39 @@ test.describe('inline panel alignment', () => {
         prevElementTag: 'VIDEO',
         prevSiblingType: 3
       });
+  });
+
+  test('floating + bottom_left では fixed で左下に寄せる', async ({ context }) => {
+    await setInlinePanelModes(context, {
+      widthMode: null,
+      placement: 'floating',
+      floatingAnchor: 'bottom_left',
+      touchFloatingAnchor: true
+    });
+
+    const page = await context.newPage();
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    await page.evaluate(injectTwoColumnPlayerRow);
+
+    // Chromium の getComputedStyle は top/right が auto でもレイアウト後のピクセル値を返すことがある。
+    // 左下固定は bottom・left がパディング付近で、top は top_right（~12px）より大きくなる。
+    await expect
+      .poll(() => hostFloatingCornerMetrics(page), { timeout: 25_000 })
+      .toMatchObject({
+        position: 'fixed',
+        floatingClass: true
+      });
+
+    const m = await hostFloatingCornerMetrics(page);
+    const bottom = Number.parseFloat(String(m?.bottom || ''));
+    const left = Number.parseFloat(String(m?.left || ''));
+    const top = Number.parseFloat(String(m?.top || ''));
+    expect(Number.isFinite(bottom)).toBe(true);
+    expect(Number.isFinite(left)).toBe(true);
+    expect(Number.isFinite(top)).toBe(true);
+    expect(bottom).toBeLessThanOrEqual(24);
+    expect(left).toBeLessThanOrEqual(24);
+    expect(top).toBeGreaterThan(80);
   });
 
   test('floating から beside へ切り替えると fixed 表示を外して row 内へ戻る', async ({

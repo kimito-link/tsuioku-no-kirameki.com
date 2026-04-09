@@ -29,6 +29,10 @@ import {
   normalizeInlinePanelWidthMode,
   normalizeInlinePanelPlacement,
   KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_FLOATING_ANCHOR,
+  INLINE_FLOATING_ANCHOR_TOP_RIGHT,
+  INLINE_FLOATING_ANCHOR_BOTTOM_LEFT,
+  normalizeInlineFloatingAnchor,
   normalizeEntitlementTier,
   normalizeCalmPanelMotion,
   normalizeMarketingExportMaskLabels
@@ -58,6 +62,7 @@ describe('storage key constants', () => {
     expect(KEY_USAGE_TERMS_ACK).toMatch(/^nls_/);
     expect(KEY_NL_ENTITLEMENT_TIER).toMatch(/^nls_/);
     expect(KEY_INLINE_PANEL_PLACEMENT).toMatch(/^nls_/);
+    expect(KEY_INLINE_FLOATING_ANCHOR).toMatch(/^nls_/);
   });
 
   it('normalizeEntitlementTier は free / pro / premium のみ通す', () => {
@@ -139,6 +144,22 @@ describe('storage key constants', () => {
     );
     expect(normalizeInlinePanelPlacement('FLOATING')).toBe(
       INLINE_PANEL_PLACEMENT_FLOATING
+    );
+  });
+
+  it('normalizeInlineFloatingAnchor は bottom_left 以外は top_right', () => {
+    expect(normalizeInlineFloatingAnchor(undefined)).toBe(
+      INLINE_FLOATING_ANCHOR_TOP_RIGHT
+    );
+    expect(normalizeInlineFloatingAnchor('')).toBe(INLINE_FLOATING_ANCHOR_TOP_RIGHT);
+    expect(normalizeInlineFloatingAnchor('top_right')).toBe(
+      INLINE_FLOATING_ANCHOR_TOP_RIGHT
+    );
+    expect(normalizeInlineFloatingAnchor('BOTTOM_LEFT')).toBe(
+      INLINE_FLOATING_ANCHOR_BOTTOM_LEFT
+    );
+    expect(normalizeInlineFloatingAnchor('garbage')).toBe(
+      INLINE_FLOATING_ANCHOR_TOP_RIGHT
     );
   });
 

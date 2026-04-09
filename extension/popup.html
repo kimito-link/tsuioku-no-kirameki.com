@@ -3596,6 +3596,16 @@
         line-height: 1.35;
       }
 
+      .nl-floating-anchor-wrap {
+        margin-top: 6px;
+        padding-top: 8px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 55%, transparent);
+      }
+
+      .nl-floating-anchor-wrap[hidden] {
+        display: none;
+      }
+
       .nl-panel-width-radios input[type='radio'] {
         width: 17px;
         height: 17px;
@@ -5538,7 +5548,12 @@
       </div>
 
       <div class="nl-record nl-record--first-view">
-        <div class="nl-record-hero" role="group" aria-labelledby="nlRecordHeroTitle">
+        <div
+          class="nl-record-hero"
+          role="group"
+          aria-labelledby="nlRecordHeroTitle"
+          data-nl-recording="on"
+        >
           <img
             class="nl-record-hero__rink"
             src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
@@ -5629,8 +5644,41 @@
                   value="floating"
                   id="inlinePanelPlacementFloating"
                 />
-                ポップアップ風（画面右上に固定・ツールバー押下に近い）
+                ポップアップ風（ページから分離して固定・角は下で選べます）
               </label>
+            </div>
+            <div
+              id="nlFloatingAnchorWrap"
+              class="nl-floating-anchor-wrap"
+              hidden
+              aria-hidden="true"
+            >
+              <span class="nl-panel-width-sublegend">ポップアップ風の角</span>
+              <div
+                class="nl-panel-width-radios nl-floating-anchor-radios"
+                role="group"
+                aria-label="浮遊パネルを置く画面の角"
+              >
+                <label>
+                  <input
+                    type="radio"
+                    name="inlineFloatingAnchor"
+                    value="top_right"
+                    id="inlineFloatingAnchorTopRight"
+                    checked
+                  />
+                  右上（既定）
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="inlineFloatingAnchor"
+                    value="bottom_left"
+                    id="inlineFloatingAnchorBottomLeft"
+                  />
+                  左下
+                </label>
+              </div>
             </div>
             <div class="nl-panel-width-radios nl-panel-width-radios--width" role="group" aria-label="パネルの幅">
               <span class="nl-panel-width-sublegend">幅</span>
