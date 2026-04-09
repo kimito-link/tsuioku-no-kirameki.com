@@ -3176,27 +3176,28 @@
         border:1px solid rgba(88,62,28,.12);
         box-shadow:inset 0 1px 0 rgba(255,255,255,.12)
       }
-      /* 上半分＝夜空、下半分＝水面 */
+      /* 上半分＝夜空、下半分＝泥水（茶濁り） */
       .lp-worldview__moonwater__surface{
         position:absolute;inset:0;z-index:0;
         background:
           linear-gradient(180deg,
             rgba(12,18,32,1) 0%,
             rgba(18,28,48,.98) 38%,
-            rgba(28,48,72,.92) 48%,
-            rgba(34,62,88,.96) 52%,
-            rgba(28,52,78,.98) 62%,
-            rgba(18,36,56,1) 100%)
+            rgba(28,42,58,.92) 47%,
+            rgba(52,44,34,.96) 53%,
+            rgba(58,48,36,.97) 62%,
+            rgba(48,40,30,.98) 78%,
+            rgba(38,32,24,1) 100%)
       }
       /* 水平線のきらめき */
       .lp-worldview__moonwater__surface::before{
         content:"";position:absolute;z-index:4;
-        left:0;right:0;top:48%;height:4%;
+        left:0;right:0;top:48%;height:5%;
         background:linear-gradient(90deg,
-          transparent 5%,rgba(200,220,245,.12) 18%,rgba(255,255,255,.22) 35%,
-          rgba(220,240,255,.35) 48%,rgba(255,255,255,.22) 62%,
-          rgba(200,220,245,.12) 80%,transparent 95%);
-        filter:blur(.5px);
+          transparent 5%,rgba(200,210,220,.1) 18%,rgba(255,250,240,.2) 35%,
+          rgba(240,235,220,.32) 48%,rgba(255,250,240,.2) 62%,
+          rgba(200,210,220,.1) 80%,transparent 95%);
+        filter:blur(.6px);
         animation:lp-mw-horizon-glint 6s ease-in-out infinite alternate
       }
       /* 水面下のリップル（横の細い波紋） */
@@ -3204,9 +3205,9 @@
         content:"";position:absolute;z-index:3;
         left:0;right:0;top:52%;bottom:0;
         background:repeating-linear-gradient(180deg,
-          transparent 0,transparent 5px,
-          rgba(180,210,240,.06) 5px,rgba(180,210,240,.06) 6px);
-        animation:lp-mw-ripple 4.5s linear infinite;
+          transparent 0,transparent 4px,
+          rgba(220,200,160,.08) 4px,rgba(220,200,160,.08) 5px);
+        animation:lp-mw-ripple 4s linear infinite;
         pointer-events:none
       }
       /* 夜空の星（水平線より上だけ） */
@@ -3265,10 +3266,10 @@
         opacity:.88;
         animation:lp-mw-shimmer 7s ease-in-out infinite
       }
-      /* 映り込みの波紋（同心円リング） */
+      /* 映り込みの波紋（同心円リング、常に広がり続ける） */
       .lp-worldview__moonwater__ripples{
-        position:absolute;z-index:5;
-        left:50%;top:54%;
+        position:absolute;z-index:7;
+        left:50%;top:55%;
         width:0;height:0;
         transform:translateX(-50%);
         pointer-events:none
@@ -3277,32 +3278,45 @@
         position:absolute;
         left:50%;top:50%;
         border-radius:50%;
-        border:1px solid rgba(200,225,250,.22);
+        border:1.2px solid rgba(220,235,255,.35);
+        box-shadow:0 0 3px rgba(200,225,250,.12);
         background:transparent;
-        transform:translate(-50%,-50%) scale(.3);
+        transform:translate(-50%,-50%) scale(.2);
         opacity:0;
-        animation:lp-mw-ring-expand 5s ease-out infinite
+        animation:lp-mw-ring-expand 4s ease-out infinite
       }
-      .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(2){animation-delay:1.6s}
-      .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(3){animation-delay:3.2s}
+      .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(2){animation-delay:.8s}
+      .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(3){animation-delay:1.6s}
+      .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(4){animation-delay:2.4s}
+      .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(5){animation-delay:3.2s}
       @keyframes lp-mw-ring-expand{
-        0%{width:clamp(10px,2.5vw,18px);height:clamp(6px,1.4vw,10px);opacity:.55;transform:translate(-50%,-50%) scale(.4)}
-        60%{opacity:.22}
-        100%{width:clamp(80px,18vw,160px);height:clamp(24px,5vw,44px);opacity:0;transform:translate(-50%,-50%) scale(1)}
+        0%{
+          width:clamp(8px,2vw,14px);height:clamp(4px,1vw,7px);
+          opacity:.6;transform:translate(-50%,-50%) scale(.3)
+        }
+        40%{opacity:.4}
+        75%{opacity:.18}
+        100%{
+          width:clamp(120px,28vw,240px);height:clamp(32px,7vw,60px);
+          opacity:0;transform:translate(-50%,-50%) scale(1)
+        }
       }
-      /* 濁りレイヤー（底から茶→透明へ） */
+      /* 濁りレイヤー（泥水の茶色→月光で少し澄むループ） */
       .lp-worldview__moonwater__murk{
         position:absolute;z-index:6;
-        left:0;right:0;top:52%;bottom:0;
+        left:0;right:0;top:50%;bottom:0;
         pointer-events:none;
-        background:linear-gradient(0deg,
-          rgba(45,38,28,.72) 0%,rgba(55,48,38,.52) 28%,
-          rgba(48,52,48,.32) 55%,transparent 85%);
-        animation:lp-mw-murk-clear 12s ease-in-out infinite
+        background:
+          radial-gradient(ellipse 60% 80% at 50% 20%,transparent 30%,rgba(62,48,32,.6) 70%),
+          linear-gradient(0deg,
+            rgba(55,42,28,.85) 0%,rgba(65,50,34,.72) 22%,
+            rgba(58,48,36,.58) 45%,rgba(50,44,34,.35) 68%,
+            transparent 90%);
+        animation:lp-mw-murk-clear 14s ease-in-out infinite
       }
       @keyframes lp-mw-murk-clear{
-        0%,100%{opacity:1;filter:brightness(.82)}
-        45%,60%{opacity:.15;filter:brightness(1.08)}
+        0%,100%{opacity:1;filter:brightness(.78) saturate(.9)}
+        42%,58%{opacity:.3;filter:brightness(1.1) saturate(1.05)}
       }
       @keyframes lp-mw-shimmer{
         0%,100%{transform:translateX(-50%) scaleX(1);opacity:.7}
@@ -3327,7 +3341,9 @@
         .lp-worldview__moonwater__ripples .lp-mw-ring{animation:none}
         .lp-worldview__moonwater__murk{opacity:.35;filter:none}
         .lp-worldview__moonwater__reflection{opacity:.8;transform:translateX(-50%)}
-        .lp-worldview__moonwater__ripples .lp-mw-ring{opacity:.15;transform:translate(-50%,-50%) scale(.7);width:clamp(40px,9vw,80px);height:clamp(14px,3vw,24px)}
+        .lp-worldview__moonwater__ripples .lp-mw-ring{opacity:.18;transform:translate(-50%,-50%) scale(.6);width:clamp(50px,12vw,100px);height:clamp(16px,3.5vw,28px)}
+        .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(2){width:clamp(70px,16vw,140px);height:clamp(22px,5vw,40px);opacity:.12}
+        .lp-worldview__moonwater__ripples .lp-mw-ring:nth-child(3){width:clamp(90px,20vw,180px);height:clamp(26px,6vw,48px);opacity:.08}
       }
       .lp-worldview__brand-note{
         margin:var(--space-md) 0 0;
@@ -4647,6 +4663,8 @@
                     <div class="lp-worldview__moonwater__moon"></div>
                     <div class="lp-worldview__moonwater__reflection"></div>
                     <div class="lp-worldview__moonwater__ripples" aria-hidden="true">
+                      <span class="lp-mw-ring"></span>
+                      <span class="lp-mw-ring"></span>
                       <span class="lp-mw-ring"></span>
                       <span class="lp-mw-ring"></span>
                       <span class="lp-mw-ring"></span>
