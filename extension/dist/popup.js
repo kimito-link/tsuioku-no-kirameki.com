@@ -3720,7 +3720,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     root.classList.toggle("nl-inline-embed-watch", INLINE_EMBED_WATCH);
     body.classList.toggle("nl-inline-embed-watch", INLINE_EMBED_WATCH);
     root.classList.toggle("nl-skin-panel-dark", !INLINE_MODE || INLINE_SIDE_PANEL);
-    body.classList.toggle("nl-skin-panel-dark", !INLINE_MODE || INLINE_SIDE_PANEL);
+    body.classList.remove("nl-skin-panel-dark");
     if (INLINE_MODE) {
       const iw = Math.round(window.innerWidth || 360);
       const ih = Math.round(window.innerHeight || 400);

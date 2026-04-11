@@ -14,6 +14,8 @@
         --nl-bg-soft: #eef8ff;
         --nl-surface: #ffffff;
         --nl-text: #1f2937;
+        /* 補助ラベル（未定義だと var 全体が無効になりコントラストが崩れることがある） */
+        --nl-text-sub: #4b5563;
         --nl-muted: #5b6475;
         --nl-border: #d5e3f5;
         --nl-accent: #0f8fd8;
@@ -1733,6 +1735,15 @@
       }
 
       .nl-concurrent-loading[hidden] {
+        display: none !important;
+      }
+
+      /*
+       * 推定同時接続: 通常は JS が ready / loading の hidden を切り替える。
+       * 更新タイミングのズレで一瞬だけ二系統が重なって見えるのを抑止する。
+       */
+      .nl-concurrent-body:has(#watchConcurrentLoading:not([hidden]))
+        #watchConcurrentReady {
         display: none !important;
       }
 
@@ -5317,6 +5328,7 @@
         --nl-bg-soft: #121820;
         --nl-surface: #161d27;
         --nl-text: #e8edf4;
+        --nl-text-sub: #cbd5e1;
         --nl-muted: #8d9bb5;
         --nl-border: rgb(71 85 105 / 48%);
         --nl-accent: #3b82f6;
@@ -5436,14 +5448,29 @@
       }
 
       html.nl-skin-panel-dark .nl-story-userlane-guide__line {
-        background: linear-gradient(180deg, #292524 0%, #1c1917 100%);
-        border-color: rgb(245 158 11 / 45%);
-        color: #fde68a;
-        box-shadow: 0 2px 8px rgb(0 0 0 / 32%);
+        background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+        border-color: rgb(251 191 36 / 55%);
+        color: #fffbeb;
+        box-shadow: 0 2px 10px rgb(0 0 0 / 38%);
       }
 
       html.nl-skin-panel-dark .nl-story-userlane-guide__count {
-        color: #fcd34d;
+        color: #fef08a;
+      }
+
+      html.nl-skin-panel-dark .nl-story-userlane-meta__id {
+        color: var(--nl-text-sub);
+        font-weight: 700;
+      }
+
+      html.nl-skin-panel-dark .nl-story-userlane-meta__name {
+        color: #f8fafc;
+        font-weight: 600;
+      }
+
+      html.nl-skin-panel-dark body.nl-compact .nl-story-userlane-guide__line {
+        font-size: 10.5px;
+        padding: 6px 9px;
       }
 
       html.nl-skin-panel-dark .nl-story-userlane-tier-hint {

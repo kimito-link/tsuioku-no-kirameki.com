@@ -295,8 +295,9 @@ function applyResponsivePopupLayout() {
   body.classList.toggle('nl-inline', INLINE_MODE);
   root.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
   body.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
+  /* ダークカード系は html のみ（CSS セレクタも html 起点。body に二重で付けない） */
   root.classList.toggle('nl-skin-panel-dark', !INLINE_MODE || INLINE_SIDE_PANEL);
-  body.classList.toggle('nl-skin-panel-dark', !INLINE_MODE || INLINE_SIDE_PANEL);
+  body.classList.remove('nl-skin-panel-dark');
 
   if (INLINE_MODE) {
     const iw = Math.round(window.innerWidth || 360);

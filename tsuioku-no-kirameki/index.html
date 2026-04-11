@@ -909,7 +909,7 @@
         }
       }
 
-      /* X 風タイムライン（LP 用デザインイメージ・実在ポストではありません） */
+      /* X 風タイムライン（告知ページのデザインイメージ・実在ポストではありません） */
       .x-voices-section .x-feed-mock{
         max-width:min(100%,440px);margin:20px auto 0;border-radius:20px;border:1px solid rgba(15,20,25,.12);
         background:#fff;box-shadow:0 8px 32px rgba(15,20,25,.08);overflow:hidden;
@@ -1238,6 +1238,38 @@
       }
 
       /* extension-visual: サイト全体の見え方（架空ダッシュボード風・静止） */
+      .lp-demo-plain-callout{
+        margin-bottom:clamp(12px,3vw,20px);
+        padding:clamp(12px,3vw,18px) clamp(14px,3.5vw,22px);
+        border-radius:var(--r2);
+        border:1px solid rgba(79,172,254,.32);
+        background:linear-gradient(180deg,rgba(240,248,255,.96),rgba(228,241,252,.9));
+        text-align:left;
+        max-width:100%;
+        box-sizing:border-box;
+        overflow-x:clip
+      }
+      .lp-demo-plain-callout .yukkuri-thread{max-width:100%}
+      .lp-demo-plain-callout__lead{
+        margin:0;
+        font-size:clamp(.85rem,2.1vw,.98rem);
+        line-height:1.72;
+        color:#2a3d52
+      }
+      .lp-demo-plain-callout__trio .y-row .bubble{
+        font-size:clamp(.82rem,2vw,.95rem)
+      }
+      @media (max-width:420px){
+        .lp-demo-plain-callout{padding:clamp(10px,3vw,14px) clamp(10px,3.2vw,16px)}
+        .lp-demo-plain-callout__trio .y-row{
+          grid-template-columns:minmax(40px,54px) minmax(0,1fr);
+          gap:6px
+        }
+        .lp-demo-plain-callout__trio .y-row.reverse{
+          grid-template-columns:minmax(0,1fr) minmax(40px,54px)
+        }
+        .lp-demo-plain-callout__trio .speaker img{width:52px;height:52px}
+      }
       .lp-site-look-mock{
         margin-top:12px;
         padding:clamp(12px,3.2vw,20px);
@@ -3174,6 +3206,179 @@
         color:var(--sky);text-decoration:underline;text-underline-offset:.15em
       }
       .lp-worldview__body a:hover,.lp-worldview__body a:focus-visible{color:#2a4d63}
+      /* ── 横一直線の光が彗星のように伸び、夜明けと重なる節 ── */
+      .lp-kindness-in-dark{
+        --kpad-x:clamp(16px,4vw,28px);
+        position:relative;overflow:hidden;
+        isolation:isolate;
+        margin:clamp(28px,6vw,48px) auto clamp(18px,3.5vw,28px);
+        max-width:min(100%,52rem);
+        padding:clamp(28px,5.2vw,44px) var(--kpad-x) clamp(32px,6vw,52px);
+        border-radius:var(--r2);
+        border:1px solid rgba(255,255,255,.1);
+        text-align:center;
+        background:
+          radial-gradient(ellipse 85% 90% at 50% 108%,rgba(79,172,254,.1),transparent 52%),
+          radial-gradient(ellipse 70% 55% at 50% 0%,rgba(180,90,100,.06),transparent 48%),
+          linear-gradient(175deg,#060a16 0%,#0c1430 42%,#101c3c 100%);
+        box-shadow:0 20px 52px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.06)
+      }
+      .lp-kindness-in-dark::before{
+        content:"";position:absolute;left:50%;top:0;
+        width:min(94%,38rem);height:clamp(4.75rem,24vw,9rem);
+        transform:translate3d(-50%,-6%,0);
+        z-index:0;pointer-events:none;border-radius:50%;
+        background:radial-gradient(ellipse 72% 100% at 50% 0%,rgba(255,252,248,.34) 0%,rgba(255,246,238,.16) 44%,rgba(255,236,245,.08) 58%,transparent 76%);
+        opacity:.88
+      }
+      .lp-kindness-in-dark__dawn{
+        position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:inherit;
+        background:
+          radial-gradient(ellipse 95% 70% at 50% 118%,rgba(255,236,210,.55),rgba(255,220,185,.22) 42%,transparent 62%),
+          linear-gradient(188deg,transparent 0%,transparent 38%,rgba(255,248,238,.22) 72%,rgba(255,252,248,.5) 100%);
+        opacity:0;
+        animation:lp-kindness-dawn-rise 15s ease-in-out infinite alternate
+      }
+      @keyframes lp-kindness-dawn-rise{
+        0%{opacity:0}
+        38%{opacity:.38}
+        100%{opacity:.94}
+      }
+      .lp-kindness-in-dark__slurry{
+        position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none;
+        opacity:1;
+        filter:blur(.45px);
+        mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent);
+        -webkit-mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent)
+      }
+      .lp-kindness-in-dark__slurry-word{
+        position:absolute;left:0;white-space:nowrap;
+        font-size:clamp(.38rem,1.05vw,.55rem);
+        font-weight:400;letter-spacing:.02em;
+        color:rgba(14,6,32,.22);
+        animation:lp-kindness-slurry-drift linear infinite;
+        will-change:transform
+      }
+      .lp-kindness-in-dark__slurry-word--b{color:rgba(12,5,30,.3)}
+      .lp-kindness-in-dark__slurry-word--faint{color:rgba(10,4,28,.14)}
+      .lp-kindness-in-dark__slurry-word--rev{animation-name:lp-kindness-slurry-drift-rev}
+      .lp-kindness-in-dark__slurry-ribbon{
+        position:absolute;left:0;white-space:nowrap;
+        font-size:clamp(.34rem,.95vw,.48rem);
+        font-weight:400;letter-spacing:.01em;
+        color:rgba(8,3,24,.16);
+        animation:lp-kindness-slurry-drift linear infinite;
+        will-change:transform;
+        line-height:1.05
+      }
+      .lp-kindness-in-dark__slurry-ribbon--rev{animation-name:lp-kindness-slurry-drift-rev}
+      @keyframes lp-kindness-slurry-drift{
+        0%{transform:translate3d(108vw,0,0)}
+        100%{transform:translate3d(-165%,0,0)}
+      }
+      @keyframes lp-kindness-slurry-drift-rev{
+        0%{transform:translate3d(-108vw,0,0)}
+        100%{transform:translate3d(165%,0,0)}
+      }
+      .lp-kindness-in-dark__comet-rail{
+        position:relative;z-index:2;
+        width:min(92%,34rem);margin:0 auto clamp(1.25rem,4vw,2rem);
+        height:clamp(2.75rem,10vw,3.75rem);
+        pointer-events:none
+      }
+      .lp-kindness-in-dark__comet-rail--in-prose{
+        align-self:stretch;
+        width:calc(100% + 2 * var(--kpad-x));
+        max-width:none;
+        margin:.35em calc(-1 * var(--kpad-x)) .45em;
+        height:clamp(1.85rem,6.5vw,2.65rem)
+      }
+      .lp-kindness-in-dark__comet-rail--in-prose .lp-kindness-in-dark__comet-baseline{
+        background:linear-gradient(90deg,rgba(190,208,232,.2) 0%,rgba(230,238,252,.4) 48%,rgba(200,215,240,.22) 100%);
+        opacity:.88
+      }
+      .lp-kindness-in-dark__comet-baseline{
+        position:absolute;left:0;right:0;top:50%;
+        height:1px;margin-top:-0.5px;
+        background:linear-gradient(90deg,transparent 0%,rgba(200,215,240,.22) 12%,rgba(230,238,252,.42) 50%,rgba(200,215,240,.22) 88%,transparent 100%);
+        opacity:.9
+      }
+      .lp-kindness-in-dark__comet-beam{
+        position:absolute;left:0;right:0;top:50%;
+        height:clamp(3px,.5vw,5px);
+        margin-top:clamp(-2px,-0.25vw,-2.5px);
+        border-radius:999px;
+        transform:scaleX(.06);
+        transform-origin:0 50%;
+        background:linear-gradient(90deg,
+          #fff 0%,
+          rgba(255,252,248,.98) 5%,
+          rgba(255,236,205,.78) 18%,
+          rgba(200,225,255,.38) 45%,
+          rgba(100,150,220,.16) 72%,
+          transparent 100%);
+        box-shadow:
+          0 0 10px rgba(255,220,170,.4),
+          0 0 22px rgba(130,175,255,.28),
+          0 0 36px rgba(255,245,220,.15);
+        animation:lp-kindness-comet-grow 15s ease-in-out infinite alternate;
+        will-change:transform
+      }
+      @keyframes lp-kindness-comet-grow{
+        0%{transform:scaleX(.05) scaleY(.92);opacity:.55;filter:brightness(.88)}
+        100%{transform:scaleX(1) scaleY(1.08);opacity:1;filter:brightness(1.1)}
+      }
+      .lp-kindness-in-dark__inner{
+        position:relative;z-index:4;
+        display:flex;flex-direction:column;align-items:center;
+        width:100%
+      }
+      .lp-kindness-in-dark__prose{
+        margin:0 auto;
+        max-width:min(36rem,100%);
+        font-family:"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif;
+        font-size:clamp(.88rem,2.3vw,1.05rem);
+        line-height:1.82;
+        letter-spacing:.04em;
+        color:rgba(228,222,214,.9);
+        text-align:center;
+        text-wrap:balance
+      }
+      .lp-kindness-in-dark__prose p{
+        margin:0;
+        font-size:inherit;line-height:inherit;letter-spacing:inherit;color:inherit
+      }
+      .lp-kindness-in-dark__prose strong{color:rgba(255,238,215,.96);font-weight:600}
+      .lp-kindness-in-dark__prose-dawn{
+        display:flex;flex-direction:column;align-items:stretch;
+        align-self:stretch;width:100%;
+        margin-top:.65em;
+        font-size:clamp(.82rem,2.05vw,.98rem);
+        line-height:1.75;
+        color:rgba(218,228,240,.82);
+        animation:lp-kindness-prose-dawn 15s ease-in-out infinite alternate
+      }
+      .lp-kindness-in-dark__prose-dawn-head,
+      .lp-kindness-in-dark__prose-dawn-tail{
+        align-self:center;margin:0;max-width:min(36rem,100%);width:100%;
+        text-align:center;color:inherit
+      }
+      .lp-kindness-in-dark__prose-dawn-tail{margin-top:.12em}
+      .lp-kindness-in-dark__prose-dawn strong{color:rgba(255,244,228,.94);font-weight:600}
+      @keyframes lp-kindness-prose-dawn{
+        0%{color:rgba(200,210,225,.55)}
+        100%{color:rgba(236,242,252,.94)}
+      }
+      @media (prefers-reduced-motion:reduce){
+        .lp-kindness-in-dark::before{opacity:.7}
+        .lp-kindness-in-dark__comet-beam{animation:none;transform:scaleX(.52) scaleY(1);transform-origin:0 50%;opacity:.88;filter:brightness(1)}
+        .lp-kindness-in-dark__dawn,.lp-kindness-in-dark__prose-dawn{animation:none}
+        .lp-kindness-in-dark__dawn{opacity:.55}
+        .lp-kindness-in-dark__prose-dawn{color:rgba(228,236,248,.88)}
+        .lp-kindness-in-dark__slurry{filter:none}
+        .lp-kindness-in-dark__slurry-word,
+        .lp-kindness-in-dark__slurry-ribbon{animation:none;opacity:.14}
+      }
       .lp-worldview__logo-band{
         display:flex;
         justify-content:center;
@@ -3628,6 +3833,81 @@
         letter-spacing:.04em;
         color:rgba(220,215,205,.7)
       }
+      .lp-title-stage__verse{
+        position:absolute;z-index:1;margin:0;pointer-events:none;
+        font-family:"Yu Mincho","Hiragino Mincho ProN","Noto Serif JP",serif;
+        font-size:clamp(.82rem,3.9vw,1.12rem);
+        font-weight:600;
+        line-height:1.38;
+        letter-spacing:.06em;
+        color:rgba(218,232,255,.9);
+        text-shadow:0 1px 12px rgba(0,8,24,.58),0 0 20px rgba(60,120,200,.18);
+        overflow-wrap:anywhere;word-break:break-word;
+        text-wrap:balance
+      }
+      .lp-title-stage__verse--tl{
+        top:clamp(6px,1.8vw,14px);
+        left:clamp(6px,2.2vw,16px);
+        max-width:min(58%,15.5em);
+        text-align:left
+      }
+      .lp-title-stage__verse--br{
+        bottom:clamp(6px,1.8vw,14px);
+        right:clamp(6px,2.2vw,16px);
+        max-width:min(58%,14em);
+        text-align:right
+      }
+      @media (min-width:720px){
+        .lp-title-stage__verse{font-size:clamp(.88rem,2.4vw,1.18rem);letter-spacing:.07em}
+        .lp-title-stage__verse--tl{max-width:min(52%,17em)}
+        .lp-title-stage__verse--br{max-width:min(52%,15.5em)}
+      }
+      @media (max-width:380px){
+        .lp-title-stage__verse{font-size:clamp(.78rem,4.1vw,1rem);letter-spacing:.05em}
+      }
+      .lp-title-stage__drops{
+        position:absolute;z-index:2;top:clamp(6px,1.8vw,14px);right:clamp(6px,2vw,16px);
+        width:min(14vw,2.85rem);max-width:52px;
+        height:clamp(4.1rem,25vw,6.75rem);
+        pointer-events:none;opacity:.94;overflow:visible;
+        filter:drop-shadow(0 3px 12px rgba(30,80,160,.38))
+      }
+      @media (min-width:720px){
+        .lp-title-stage__drops{
+          width:min(12vw,3rem);max-width:56px;height:clamp(4.35rem,20vw,7.25rem);
+          top:clamp(10px,2vw,18px);right:clamp(10px,2.4vw,22px)
+        }
+      }
+      @media (max-width:340px){
+        .lp-title-stage__drops{width:min(15vw,2.5rem);max-width:44px;height:clamp(3.6rem,28vw,5.5rem);opacity:.9}
+      }
+      .lp-title-stage__tear-layer{position:absolute;inset:0;pointer-events:none}
+      .lp-title-stage__tear-drop{
+        position:absolute;left:50%;top:10%;
+        width:clamp(4px,1.1vw,6px);height:clamp(7px,2vw,11px);margin-left:0;
+        border-radius:50% 50% 50% 50%/38% 38% 62% 62%;
+        background:linear-gradient(185deg,rgba(230,245,255,.98) 0%,rgba(130,175,235,.55) 55%,rgba(80,120,190,.2) 100%);
+        box-shadow:0 0 7px rgba(140,195,255,.65),0 0 2px rgba(255,255,255,.5) inset;
+        opacity:0;
+        animation:lp-title-tear-stream 2.75s ease-in infinite;
+        transform:translate3d(-50%,0,0) scaleY(.9)
+      }
+      .lp-title-stage__tear-drop--b{
+        left:calc(50% + 18%);top:14%;width:clamp(3px,.9vw,4.5px);height:clamp(5px,1.5vw,8px);
+        animation-delay:1.35s;animation-duration:2.45s;
+        opacity:0
+      }
+      .lp-title-stage__tear-drop--c{
+        left:calc(50% - 18%);top:8%;width:clamp(2.5px,.75vw,4px);height:clamp(4px,1.2vw,7px);
+        animation-delay:.55s;animation-duration:2.2s;
+        opacity:0
+      }
+      @keyframes lp-title-tear-stream{
+        0%{transform:translate3d(-50%,0,0) scale(.75,.85);opacity:0}
+        7%{opacity:.94}
+        88%{opacity:.72}
+        100%{transform:translate3d(-50%,clamp(2.85rem,16vw,5.5rem),0) scale(1,1.12);opacity:0}
+      }
       .lp-title-stage__glow{
         position:absolute;left:50%;top:50%;
         width:min(380px,85vw);height:min(380px,85vw);
@@ -3643,10 +3923,16 @@
       }
       @media (prefers-reduced-motion:reduce){
         .lp-title-stage__stars,.lp-title-stage__shoot,.lp-title-stage__shoot--soft,.lp-title-comment,.lp-title-stage__glow,
-        .lp-title-stage__sparkle{animation:none}
+        .lp-title-stage__sparkle,.lp-title-stage__tear-drop{animation:none}
         .lp-title-stage__stars{opacity:.7}
         .lp-title-stage__glow{opacity:.7;transform:translate(-50%,-50%)}
         .lp-title-comment{display:none}
+        .lp-title-stage__tear-drop,.lp-title-stage__tear-drop--b,.lp-title-stage__tear-drop--c{
+          opacity:.5;
+          transform:translate3d(-50%,2.05rem,0) scale(.9)
+        }
+        .lp-title-stage__tear-drop--b{transform:translate3d(-50%,2.1rem,0) scale(.85)}
+        .lp-title-stage__tear-drop--c{transform:translate3d(-50%,1.85rem,0) scale(.8)}
       }
       @media (min-width:720px){
         .lp-title-stage{padding:clamp(56px,8vw,96px) clamp(24px,4vw,48px) clamp(48px,7vw,80px)}
@@ -3767,6 +4053,18 @@
           linear-gradient(122deg,transparent 30%,rgba(230,190,210,.12) 44%,rgba(200,225,255,.16) 54%,transparent 70%)
       }
       .lp-dawn-arc .lp-worldview__logo-band__cap{color:var(--text-secondary)}
+      .lp-dawn-arc .lp-kindness-in-dark{
+        border-color:rgba(255,255,255,.17);
+        box-shadow:
+          0 20px 52px rgba(0,0,0,.3),
+          inset 0 1px 0 rgba(255,255,255,.09),
+          0 0 40px rgba(100,160,255,.1),
+          0 0 72px rgba(79,172,254,.07)
+      }
+      .lp-dawn-arc .lp-kindness-in-dark::before{
+        background:radial-gradient(ellipse 68% 100% at 50% 0%,rgba(255,252,248,.4) 0%,rgba(255,248,250,.22) 40%,rgba(255,236,245,.1) 56%,transparent 74%);
+        opacity:.92
+      }
       .lp-dawn-arc .lp-worldview__brand-note{
         color:rgba(232,224,212,.9);
         background:transparent;
@@ -4273,7 +4571,16 @@
             <h2 id="worldview-heading" class="lp-worldview__heading">届いていたかな、って思ったこと</h2>
             <p class="lp-worldview__kl-eyebrow">キミとつながる、シンセカイの実現へ</p>
 
-            <div class="lp-title-stage" role="img" aria-label="君斗りんくの 追憶の煌めき（きらめき）— 流れ星とコメントが流れるイメージ">
+            <div class="lp-title-stage" role="img" aria-label="君斗りんくの 追憶の煌めき（きらめき）。蒼く流れるキミの涙を、ボクは受け止める。雫の装飾、流れ星とコメントが流れるイメージ">
+              <p class="lp-title-stage__verse lp-title-stage__verse--tl" lang="ja" aria-hidden="true">蒼く流れるキミの涙を</p>
+              <p class="lp-title-stage__verse lp-title-stage__verse--br" lang="ja" aria-hidden="true">ボクは受け止める</p>
+              <div class="lp-title-stage__drops" aria-hidden="true">
+                <div class="lp-title-stage__tear-layer">
+                  <span class="lp-title-stage__tear-drop"></span>
+                  <span class="lp-title-stage__tear-drop lp-title-stage__tear-drop--b"></span>
+                  <span class="lp-title-stage__tear-drop lp-title-stage__tear-drop--c"></span>
+                </div>
+              </div>
               <div class="lp-title-stage__stars" aria-hidden="true"></div>
               <span class="lp-title-stage__shoot" style="top:12%;left:5%;animation-delay:0s" aria-hidden="true"></span>
               <span class="lp-title-stage__shoot lp-title-stage__shoot--warm" style="top:28%;left:62%;animation-delay:1.6s" aria-hidden="true"></span>
@@ -4532,6 +4839,70 @@
                   </p>
                 </div>
               </div>
+
+              <section class="lp-kindness-in-dark" id="kindness-in-dark" aria-labelledby="lp-kindness-in-dark-heading">
+                <h3 id="lp-kindness-in-dark-heading" class="visually-hidden">背景に濃い紫の文字で誹謗中傷の言葉が流れる演出と、横に伸びる光がだんだん大きくなり夜明けへつながるイメージ</h3>
+                <div class="lp-kindness-in-dark__slurry" aria-hidden="true">
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:2%;animation-duration:11s;animation-delay:0s">つまらない　興味ない　否定　冷たい　ひどい　中傷　嘲笑　無視　不快　陰口　決めつけ　誹謗　炎上　たたみかけ　きつい言葉　冷たい視線　人格否定　どうでもいい　もう見ない　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon lp-kindness-in-dark__slurry-ribbon--rev" style="top:7%;animation-duration:9s;animation-delay:.8s">笑えない　いらない　うるさい　否定ばかり　責めるだけ　見捨てる　中傷　ひどい　無視　嘲笑　不快　陰口　決めつけ　つまらない　興味ない　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:12%;animation-duration:13s;animation-delay:2.1s">誹謗中傷　冷たい　否定　ひどい　中傷　無視　陰口　たたみかけ　きつい言葉　冷たい視線　炎上　どうでもいい　笑えない　いらない　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon lp-kindness-in-dark__slurry-ribbon--rev" style="top:17%;animation-duration:10s;animation-delay:1.2s">否定　嘲笑　不快　決めつけ　見捨てる　中傷　ひどい　無視　陰口　つまらない　興味ない　もう見ない　責めるだけ　誹謗　炎上　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:22%;animation-duration:12s;animation-delay:3.4s">冷たい視線　人格否定　否定ばかり　たたみかけ　冷たい　ひどい　中傷　嘲笑　無視　不快　陰口　つまらない　興味ない　いらない　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon lp-kindness-in-dark__slurry-ribbon--rev" style="top:27%;animation-duration:8.5s;animation-delay:.4s">うざい　きもい　黙れ　否定　冷たい　ひどい　中傷　無視　陰口　決めつけ　笑えない　どうでもいい　もう見ない　誹謗中傷　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:32%;animation-duration:14s;animation-delay:4.2s">炎上　たたみかけ　きつい言葉　冷たい視線　否定　嘲笑　不快　見捨てる　責めるだけ　中傷　ひどい　無視　つまらない　興味ない　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon lp-kindness-in-dark__slurry-ribbon--rev" style="top:37%;animation-duration:9.5s;animation-delay:2.7s">誹謗　陰口　決めつけ　否定ばかり　冷たい　ひどい　中傷　嘲笑　無視　いらない　笑えない　どうでもいい　もう見ない　不快　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:42%;animation-duration:11.5s;animation-delay:5.1s">人格否定　たたみかけ　冷たい視線　否定　ひどい　中傷　無視　陰口　つまらない　興味ない　うるさい　炎上　きつい言葉　嘲笑　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon lp-kindness-in-dark__slurry-ribbon--rev" style="top:47%;animation-duration:10.2s;animation-delay:1.9s">冷たい　決めつけ　見捨てる　責めるだけ　中傷　ひどい　無視　不快　陰口　否定　笑えない　いらない　誹謗中傷　どうでもいい　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:52%;animation-duration:12.8s;animation-delay:3s">もう見ない　嘲笑　たたみかけ　冷たい視線　否定ばかり　炎上　つまらない　興味ない　冷たい　ひどい　中傷　無視　陰口　決めつけ　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon lp-kindness-in-dark__slurry-ribbon--rev" style="top:57%;animation-duration:8.8s;animation-delay:6.3s">不快　きつい言葉　人格否定　否定　ひどい　中傷　嘲笑　無視　見捨てる　責めるだけ　つまらない　興味ない　いらない　誹謗　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:62%;animation-duration:11s;animation-delay:.2s">陰口　たたみかけ　冷たい　決めつけ　笑えない　どうでもいい　もう見ない　うるさい　否定　中傷　ひどい　無視　不快　炎上　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon lp-kindness-in-dark__slurry-ribbon--rev" style="top:67%;animation-duration:9.2s;animation-delay:4.6s">冷たい視線　否定ばかり　嘲笑　つまらない　興味ない　冷たい　ひどい　中傷　無視　陰口　見捨てる　きつい言葉　誹謗中傷　人格否定　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:72%;animation-duration:13.5s;animation-delay:2.3s">責めるだけ　たたみかけ　否定　笑えない　いらない　どうでもいい　ひどい　中傷　嘲笑　無視　不快　決めつけ　もう見ない　炎上　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon lp-kindness-in-dark__slurry-ribbon--rev" style="top:77%;animation-duration:10.6s;animation-delay:7.2s">つまらない　興味ない　冷たい　陰口　否定　ひどい　中傷　無視　冷たい視線　たたみかけ　きつい言葉　誹謗　嘲笑　不快　否定ばかり　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:82%;animation-duration:12.2s;animation-delay:1.1s">見捨てる　責めるだけ　人格否定　笑えない　いらない　うるさい　つまらない　興味ない　冷たい　ひどい　中傷　無視　陰口　決めつけ　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon lp-kindness-in-dark__slurry-ribbon--rev" style="top:87%;animation-duration:9.8s;animation-delay:5.5s">どうでもいい　もう見ない　炎上　たたみかけ　冷たい視線　否定　嘲笑　不快　中傷　ひどい　無視　見捨てる　誹謗中傷　きつい言葉　</span>
+                  <span class="lp-kindness-in-dark__slurry-ribbon" style="top:92%;animation-duration:11.3s;animation-delay:3.8s">陰口　つまらない　興味ない　否定ばかり　冷たい　ひどい　中傷　嘲笑　無視　不快　決めつけ　笑えない　いらない　責めるだけ　炎上　</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:4.5%;animation-duration:14s;animation-delay:.6s">無視</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint lp-kindness-in-dark__slurry-word--rev" style="top:9.5%;animation-duration:12s;animation-delay:2.4s">否定</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:14.5%;animation-duration:16s;animation-delay:1s">ひどい</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint lp-kindness-in-dark__slurry-word--rev" style="top:19.5%;animation-duration:11s;animation-delay:4.1s">中傷</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:24.5%;animation-duration:15s;animation-delay:.9s">嘲笑</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint lp-kindness-in-dark__slurry-word--rev" style="top:29.5%;animation-duration:13s;animation-delay:3.3s">陰口</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:34.5%;animation-duration:10s;animation-delay:5.7s">不快</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint lp-kindness-in-dark__slurry-word--rev" style="top:39.5%;animation-duration:14s;animation-delay:2s">炎上</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:44.5%;animation-duration:12s;animation-delay:6.4s">冷たい</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint lp-kindness-in-dark__slurry-word--rev" style="top:49.5%;animation-duration:11s;animation-delay:1.5s">決めつけ</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:54.5%;animation-duration:15s;animation-delay:4.8s">無視</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint lp-kindness-in-dark__slurry-word--rev" style="top:59.5%;animation-duration:9s;animation-delay:.7s">否定</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:64.5%;animation-duration:13s;animation-delay:3.9s">ひどい</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint lp-kindness-in-dark__slurry-word--rev" style="top:69.5%;animation-duration:14s;animation-delay:5.2s">中傷</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:74.5%;animation-duration:10s;animation-delay:2.8s">嘲笑</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint lp-kindness-in-dark__slurry-word--rev" style="top:79.5%;animation-duration:12s;animation-delay:7s">陰口</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:84.5%;animation-duration:11s;animation-delay:1.8s">不快</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint lp-kindness-in-dark__slurry-word--rev" style="top:89.5%;animation-duration:15s;animation-delay:4.3s">炎上</span>
+                  <span class="lp-kindness-in-dark__slurry-word lp-kindness-in-dark__slurry-word--faint" style="top:96%;animation-duration:13s;animation-delay:.1s">つまらない</span>
+                </div>
+                <div class="lp-kindness-in-dark__dawn" aria-hidden="true"></div>
+                <div class="lp-kindness-in-dark__inner">
+                  <div class="lp-kindness-in-dark__prose">
+                    <p>たとえ、ボクの心が<strong>暗い闇</strong>に覆われてしまっても、<br>
+                    たったひとつ、短くて<strong>あたたかい言葉</strong>があれば、<br>
+                    それは小さな<strong>光</strong>になって、やがて闇をほどいていく。</p>
+                  </div>
+                  <div class="lp-kindness-in-dark__prose-dawn">
+                    <p class="lp-kindness-in-dark__prose-dawn-head">その<strong>ひとすじの光</strong>は、</p>
+                    <div class="lp-kindness-in-dark__comet-rail lp-kindness-in-dark__comet-rail--in-prose" aria-hidden="true">
+                      <div class="lp-kindness-in-dark__comet-baseline"></div>
+                      <div class="lp-kindness-in-dark__comet-beam"></div>
+                    </div>
+                    <p class="lp-kindness-in-dark__prose-dawn-tail">
+                      <strong>夜が明ける</strong>ように<br>
+                      だんだんおおきくなっていく。
+                    </p>
+                  </div>
+                </div>
+              </section>
+
               <p class="lp-worldview__event">いよいよ、ニコニコ超会議。</p>
               <p>この想いを、カタチにして届けるよ。</p>
               <p class="lp-worldview__credit">
@@ -4926,7 +5297,7 @@
                     りんくがリプ返せないのは分かってる。それでも「届いてたかどうか」が見えないと、応援した気持ちが宙ぶらりんになる。
                   </p>
                   <div class="x-media x-media--rinku">
-                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="200" height="200" alt="推し・ゆっくりりんく（LP用）" decoding="async">
+                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="200" height="200" alt="推し・ゆっくりりんく（告知の見本画像）" decoding="async">
                     <span class="x-media-caption">推し・りんくのイメージ（こん太の保存フォルダ感・LPデモ）</span>
                   </div>
                   <div class="x-actions after-media" aria-hidden="true">
@@ -4947,7 +5318,7 @@
           <div class="live-ui-mock" role="region" aria-label="配信画面風の架空UI例">
             <div class="live-ui-top">
               <span class="live-ui-badge">LIVE</span>
-              <span class="live-ui-title">デモ：武道館級アリーナ配信（LP 用・架空）</span>
+              <span class="live-ui-title">デモ：武道館級アリーナ配信（架空の見本）</span>
               <span class="live-ui-stats" aria-hidden="true">
                 <span>視聴 12,480</span>
                 <span>コメント 382</span>
@@ -5005,7 +5376,7 @@
                 <button type="button" disabled>コメント</button>
               </div>
               <p class="live-input-roadmap" role="note">
-                この1行は<strong>配信画面の公式コメント欄のデモ</strong>で、LP 上では<strong>送信できません</strong>。拡張側は<strong>ポップアップの入力欄</strong>から watch ページの送信 UI へ届ける流れを別途用意しています（<a href="#lp-comment-compose-guide">コメント送信の流れ</a>・<a href="#extension-guide-comment-voice">用語⑧</a>）。
+                この1行は<strong>配信画面の公式コメント欄のデモ</strong>で、このページ上では<strong>送信できません</strong>。拡張側は<strong>ポップアップの入力欄</strong>から watch ページの送信 UI へ届ける流れを別途用意しています（<a href="#lp-comment-compose-guide">コメント送信の流れ</a>・<a href="#extension-guide-comment-voice">用語⑧</a>）。
                 <strong>音声入力</strong>は、<strong>ブラウザやOSの音声入力</strong>で文字をテキストボックスに流し込み、確定したうえで<strong>Enter</strong>など通常どおり送る想定です（Chrome・Edge・Windows など<strong>環境ごとに可否が異なります</strong>）。
               </p>
               <p class="live-ui-caption">特定サービスの画面コピーではなく、コメントの流れ・通知・読み上げの重さを並べて見せるためのLPデモです。</p>
@@ -5024,10 +5395,10 @@
                 <div class="lp-live-tab-strip" aria-hidden="true">
                   <span class="lp-live-tab-pill">タブ 1</span>
                 </div>
-                <div class="live-ui-mock live-ui-mock--tile" role="img" aria-label="LP用ミニデモ：メインで開いている配信タブのイメージ">
+                <div class="live-ui-mock live-ui-mock--tile" role="img" aria-label="ミニ見本：メインで開いている配信タブのイメージ">
                   <div class="live-ui-top">
                     <span class="live-ui-badge">LIVE</span>
-                    <span class="live-ui-title">ミニ① メイン視聴・りんく枠（LP 架空）</span>
+                    <span class="live-ui-title">ミニ① メイン視聴・りんく枠（架空の見本）</span>
                     <span class="live-ui-stats" aria-hidden="true">
                       <span>視聴 12,480</span>
                       <span>コメ 382</span>
@@ -5068,10 +5439,10 @@
                 <div class="lp-live-tab-strip" aria-hidden="true">
                   <span class="lp-live-tab-pill">タブ 2</span>
                 </div>
-                <div class="live-ui-mock live-ui-mock--tile" role="img" aria-label="LP用ミニデモ：別の配信を別タブで開いているイメージ">
+                <div class="live-ui-mock live-ui-mock--tile" role="img" aria-label="ミニ見本：別の配信を別タブで開いているイメージ">
                   <div class="live-ui-top">
                     <span class="live-ui-badge">LIVE</span>
-                    <span class="live-ui-title">ミニ② 別枠・友だち推しデモ（LP 架空）</span>
+                    <span class="live-ui-title">ミニ② 別枠・友だち推しデモ（架空の見本）</span>
                     <span class="live-ui-stats" aria-hidden="true">
                       <span>視聴 3,210</span>
                       <span>コメ 156</span>
@@ -5112,10 +5483,10 @@
                 <div class="lp-live-tab-strip" aria-hidden="true">
                   <span class="lp-live-tab-pill">タブ 3</span>
                 </div>
-                <div class="live-ui-mock live-ui-mock--tile" role="img" aria-label="LP用ミニデモ：三つ目の配信タブのイメージ">
+                <div class="live-ui-mock live-ui-mock--tile" role="img" aria-label="ミニ見本：三つ目の配信タブのイメージ">
                   <div class="live-ui-top">
                     <span class="live-ui-badge">LIVE</span>
-                    <span class="live-ui-title">ミニ③ おすすめ枠デモ（LP 架空）</span>
+                    <span class="live-ui-title">ミニ③ おすすめ枠デモ（架空の見本）</span>
                     <span class="live-ui-stats" aria-hidden="true">
                       <span>視聴 890</span>
                       <span>コメ 42</span>
@@ -5218,24 +5589,51 @@
           <div class="section-head fade">
             <h2 id="extension-visual-heading">拡張の見え方：アイコンの「群れ」と上位コメンター</h2>
             <p>
-              まず下の枠では、<strong>拡張パネル全体のライトブルーUI</strong>（応援カウント・進捗バー・注意メモ・数値カード・記録トグル・内訳グリッド）を<strong>架空の静止デモ</strong>でまとめて見せています。
-              実際のポップアップでは、アイコン列・グリッド・取得診断を開けます。ここでは<strong>たくさんのユーザーが並ぶ圧</strong>と、
-              <strong>コメント件数の多い順に並ぶ上位枠</strong>を、LP 用の静的モックで並べています（数値・ID は架空です）。
-              記録の見え方に加え、<a href="#marketing-features">配信マーケ分析（グラフ付き HTML）</a>も用意しています。
-              <a href="#lp-comment-compose-guide">ポップアップからのコメント送信</a>と<a href="#extension-guide-kindness-nudge">やさしい注意 POP</a>の説明も続けて載せています。
-              画面上の言葉の意味は<a href="#extension-guide">画面の見方（やさしい説明）</a>で整理しています。
+              下の枠では、<strong>拡張パネル全体のライトブルーUI</strong>（応援カウント・進捗バー・注意メモ・数値カード・記録トグル・内訳グリッド）と、<strong>応援が多い順のコメンター並び</strong>を<strong>ひと目で</strong>追えるようにしています。実際のポップアップでは、アイコン列・グリッド・取得診断を開けられます。
+              記録の見え方はもちろん、<a href="#marketing-features">配信マーケ分析（グラフ付き HTML）</a>、
+              <a href="#lp-comment-compose-guide">ポップアップからのコメント送信</a>、<a href="#extension-guide-kindness-nudge">やさしい注意 POP</a>へもつながります。
+              くわしい用語は<a href="#extension-guide">画面の見方（やさしい説明）</a>へ。
             </p>
+          </div>
+
+          <div class="board fade d1 lp-demo-plain-callout" data-lp-plain="page-demo-note">
+            <p class="lp-demo-plain-callout__lead">
+              このページに載っている<strong>配信まわりやパネル</strong>は、ブラウザ上で<strong>動きません</strong>（見た目の<strong>見本</strong>です）。<strong>数字・ID・並びはすべて架空</strong>です。
+            </p>
+            <div class="yukkuri-thread lp-demo-plain-callout__trio" data-lp-plain="trio-extension-visual" style="margin-top:12px">
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.png" alt="" width="72" height="72" decoding="async">
+                  <span>たぬ姉</span>
+                </div>
+                <div class="bubble">上の一文が<strong>共通の注意</strong>なのだ。くわしい語は下のアコーディオンに逃がしてあるのだ。</div>
+              </div>
+              <div class="y-row reverse">
+                <div class="bubble">押しても動かなくてヘコむ前に、「見本だからね」と思ってほしいのだ。</div>
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                  <span>こん太</span>
+                </div>
+              </div>
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                  <span>りんく</span>
+                </div>
+                <div class="bubble">ほんものの操作は<strong>拡張ポップアップ</strong>と<strong>いつもの視聴タブ</strong>の組み合わせで試せるのだ。</div>
+              </div>
+            </div>
           </div>
 
           <div class="board fade d1" id="extension-site-look">
             <h3>サイトの見え方（架空ダッシュボード）</h3>
             <p>
-              実機の配色・文言とは一致しない場合があります。<strong>操作はできません</strong>（ボタン・折りたたみは見た目の見本です）。記録ブロック内の<strong>コメント欄の見本</strong>は<strong>LP 用の静止デモ</strong>で、ここからは送れません。実際の送信は<strong>拡張ポップアップの入力欄</strong>から行います（手順は<a href="#lp-comment-compose-guide">コメント送信の流れ</a>）。
+              実機の配色・文言とは一致しない場合があります。<strong>操作はできません</strong>（ボタン・折りたたみは見た目の見本です）。記録ブロック内の<strong>コメント欄の見本</strong>も<strong>動かない見本</strong>で、ここからは送れません。実際の送信は<strong>拡張ポップアップの入力欄</strong>から行います（手順は<a href="#lp-comment-compose-guide">コメント送信の流れ</a>）。
               <strong>音声入力</strong>は OS・ブラウザの機能で文字を入れたあと、通常どおり送信する想定です（環境依存）。
-              下の<strong>上位コメンター列</strong>の上では、まず<strong>一文で仕組み</strong>（匿名の<strong>何件</strong>か・<strong>判別</strong>の模様）を書き、開くと<strong>りんく・こん太・たぬ姉</strong>の補足があります。列そのものは実画面に近い<strong>LP 用ダミー</strong>です。
+              下の<strong>上位コメンター列</strong>の上では、まず<strong>一文で仕組み</strong>（匿名の<strong>何件</strong>か・<strong>判別</strong>の模様）を書き、開くと<strong>りんく・こん太・たぬ姉</strong>の補足があります。列そのものも<strong>見本の並び</strong>です。
             </p>
             <div class="lp-site-look-mock" role="region" aria-label="拡張パネル全体の架空プレビュー（操作できません）">
-              <p class="lp-site-look-mock__tag">LP 用ダミー — 数値・ID・並びはすべて架空です</p>
+              <p class="lp-site-look-mock__tag">見本（架空）— 数値・ID・並びはすべて作りものです</p>
               <div class="lp-site-look-mock__toolbar" aria-hidden="true">
                 <button type="button" class="lp-site-look-mock__tbtn" disabled>視聴を再読込</button>
                 <button type="button" class="lp-site-look-mock__tbtn" disabled>表示キャッシュを消す</button>
@@ -5255,7 +5653,7 @@
               <div class="lp-site-look-mock__tips" aria-hidden="true">
                 <div class="lp-site-look-mock__tip">
                   <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" width="28" height="28" alt="" decoding="async">
-                  <span>アイコン列は<strong>取得できた順</strong>に近いイメージで並びます（LP では省略しています）。</span>
+                  <span>アイコン列は<strong>取得できた順</strong>に近いイメージで並びます（見本では端を短くしています）。</span>
                 </div>
                 <div class="lp-site-look-mock__tip">
                   <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" width="28" height="28" alt="" decoding="async">
@@ -5322,7 +5720,7 @@
                 </div>
               </div>
               <div class="lp-site-look-mock__rank-wrap">
-                <p class="lp-site-look-mock__rank-note">記録内・ユーザー別の応援件数が多い順です。（左の -- はまとめ、1番からがひとりずつ・LP 用ダミー）</p>
+                <p class="lp-site-look-mock__rank-note">記録内・ユーザー別の応援件数が多い順です。（左の -- はまとめ、1番からがひとりずつ・見本）</p>
                 <div
                   id="lp-anonymous-identicon"
                   class="lp-site-look-mock__identicon-legend"
@@ -5332,7 +5730,7 @@
                     class="lp-identicon-lead"
                     data-lp-identicon-lead
                   >
-                    匿名のまま応援コメントしても、<strong>同じ匿名さんが何件応援したか</strong>を手元の一覧で分かるように、その人だけ<strong>決まった判別用の模様（Identicon）</strong>と<strong>a: から始まる一行</strong>が付く仕組みです（顔写真の代わりの目印）。ニコ生の<strong>公式</strong>画面そのものは変わりません。下の横列は<strong>見本</strong>です（LP 用ダミー）。
+                    匿名のまま応援コメントしても、<strong>同じ匿名さんが何件応援したか</strong>を手元の一覧で分かるように、その人だけ<strong>決まった判別用の模様（Identicon）</strong>と<strong>a: から始まる一行</strong>が付く仕組みです（顔写真の代わりの目印）。ニコ生の<strong>公式</strong>画面そのものは変わりません。下の横列は<strong>見本</strong>です。
                   </p>
                   <p class="lp-identicon-lead-sub">
                     <strong>既定オン</strong>です。オフにする場合は、拡張ポップアップの<strong>応援可視化（ユーザー別）</strong>のチェックから外せます。
@@ -5488,7 +5886,7 @@
                 <div class="lp-site-look-mock__comment-block">
                   <h6>ポップアップのコメント欄（実機の流れに近い見本）</h6>
                   <div class="lp-site-look-mock__comment-row lp-site-look-mock__comment-row--stack">
-                    <textarea class="lp-site-look-mock__textarea" readonly rows="2" placeholder="応援や返事を入力（LPの静止デモ・ここからは送れません）" aria-label="コメント用（LP見本・操作不可）"></textarea>
+                    <textarea class="lp-site-look-mock__textarea" readonly rows="2" placeholder="応援や返事を入力（見本・ここからは送れません）" aria-label="コメント用（見本・操作不可）"></textarea>
                     <div class="lp-site-look-mock__comment-actions">
                       <button type="button" disabled tabindex="-1">コメント送信</button>
                     </div>
@@ -5501,7 +5899,7 @@
                     </div>
                   </div>
                   <p class="lp-site-look-mock__comment-roadmap" role="note">
-                    <strong>実機では拡張ポップアップの <code>#commentInput</code> と「コメント送信」</strong>から、watch ページ上の送信 UI へ <strong>メッセージ（<code>NLS_POST_COMMENT</code>）</strong>が届きます。この枠は<strong>LP の静止デモ</strong>で、<strong>入力・送信はできません</strong>。
+                    <strong>実機では拡張ポップアップの <code>#commentInput</code> と「コメント送信」</strong>から、watch ページ上の送信 UI へ <strong>メッセージ（<code>NLS_POST_COMMENT</code>）</strong>が届きます。この枠は<strong>動かない見本</strong>で、<strong>入力・送信はできません</strong>。
                     手順・トラブル時は<a href="#lp-comment-compose-guide">コメント送信の流れ</a>、語句は<a href="#extension-guide-comment-voice">用語⑧</a>・<a href="#extension-guide-kindness-nudge">用語⑨</a>へ。
                     <strong>音声入力</strong>は<strong>ブラウザやOSの音声入力</strong>で文字を入れ、確定したあと<strong>Enter</strong>など通常どおり送る想定です（環境依存）。
                   </p>
@@ -5554,15 +5952,15 @@
           </div>
 
           <div class="board fade d2">
-            <h3>アイコン列・グリッド・診断（LP 用モック）</h3>
+            <h3>アイコン列・グリッド・診断（見本）</h3>
             <p>
-              拡張の一覧では<strong>サムネ（アイコン）がいちばん目に入る</strong>。下のモックでは、<strong>りんく→こん太→たぬ姉の吹き出しのすぐ下</strong>に、そのランクにだけ当てはまるカードを並べ、段が混ざらないようにしています（架空データです）。
+              拡張の一覧では<strong>サムネ（アイコン）がいちばん目に入る</strong>。下の見本では、<strong>りんく→こん太→たぬ姉の吹き出しのすぐ下</strong>に、そのランクにだけ当てはまるカードを並べ、段が混ざらないようにしています（架空データです）。
             </p>
             <div class="lp-dev-grid-mock" aria-label="拡張UIの架空プレビュー">
               <p class="lp-dev-grid-mock__title">アイコン列・グリッド・診断を表示</p>
               <div class="lp-dev-grid-mock__lead">
                 <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="36" height="36" alt="" decoding="async">
-                <p>このモックでは、<strong>りんくの吹き出しのすぐ下＝いちばん上のランク</strong>、<strong>こん太の下＝その次</strong>、<strong>たぬ姉の下＝もう一段下</strong>と、段が混ざらないように並べているのだ（実機のポップアップも同じ優先の気持ちで並べるのだ）。</p>
+                <p>この見本では、<strong>りんくの吹き出しのすぐ下＝いちばん上のランク</strong>、<strong>こん太の下＝その次</strong>、<strong>たぬ姉の下＝もう一段下</strong>と、段が混ざらないように並べているのだ（実機のポップアップも同じ優先の気持ちで並べるのだ）。</p>
               </div>
 
               <div class="lp-dev-grid-mock__tier-block" aria-label="優先1・りんくとそのグリッド">
@@ -5717,18 +6115,18 @@
                   <span><strong>たぬ姉</strong>：<strong>もう一段下の吹き出しの下</strong>が優先3なのだ。診断行で欠けを数字で追うのだ。</span>
                 </div>
               </div>
-              <p class="lp-dev-grid-mock__debug" aria-label="架空の取得診断行">avatar保存 26/286 · uid 166/286 · nickname 240/286 · 公式コメント比 54%（LP 用ダミー）</p>
+              <p class="lp-dev-grid-mock__debug" aria-label="架空の取得診断行">avatar保存 26/286 · uid 166/286 · nickname 240/286 · 公式コメント比 54%（見本）</p>
             </div>
           </div>
 
           <div class="board lp-top-commenters-board fade d3" id="lp-top-commenters" style="margin-top:var(--space-md)">
             <h3>数値カードの下に「コメント多い順・上位10」（イメージ）</h3>
             <p>
-              実際の視聴タブでは、<strong>動画と公式コメント列の下あたり</strong>に拡張のパネルが載ります。下はその<strong>並びを真似た静止デモ</strong>なのだ（見た目は実機に寄せつつ、数値・ID は架空なのだ）。
+              実際の視聴タブでは、<strong>動画と公式コメント列の下あたり</strong>に拡張のパネルが載ります。下はその<strong>並びを真似た見本</strong>なのだ（見た目は実機に寄せつつ、数値・ID は架空なのだ）。
               動画まわりのデモは<strong>アイコン画像は置かず</strong>、コメントが<strong>流れ星のように斜めに大量に過ぎるイメージ</strong>で世界観に寄せています。
               記録した応援コメントをユーザー別に数え、<strong>件数の多い順に最大10名</strong>をカード列の下に横並び表示します（<strong>狭いと横スクロール</strong>。実機と同じで、無理に1画面に詰めないのだ）。
             </p>
-            <div class="lp-faux-watch-chrome" role="group" aria-label="視聴ページと拡張パネル位置の静止デモ">
+            <div class="lp-faux-watch-chrome" role="group" aria-label="視聴ページと拡張パネル位置の見本">
               <div class="lp-faux-watch-chrome__player lp-faux-watch-chrome__player--meteor-field">
                 <div class="lp-faux-watch-mini-fx" aria-hidden="true">
                   <span class="lp-faux-meteor lp-faux-meteor--warm lp-faux-meteor--burst" style="top:5%;left:4%;animation-delay:0s"></span>
@@ -5808,7 +6206,7 @@
               </div>
             </div>
             <div class="lp-ext-strip" aria-label="架空の上位コメンター列">
-              <p class="lp-ext-strip__note">記録内・ユーザー別の応援件数が多い順です。（LP 用ダミー）</p>
+              <p class="lp-ext-strip__note">記録内・ユーザー別の応援件数が多い順です。（見本）</p>
               <div class="lp-ext-strip__list" role="list">
                 <div class="lp-ext-strip__item" role="listitem">
                   <span class="lp-ext-strip__place" aria-hidden="true">1</span>
@@ -5932,7 +6330,7 @@
                 <span>たぬ姉</span>
               </div>
               <div class="bubble">
-                LP のダッシュボード見本や配信デモの入力欄は<strong>静止画</strong>なのだ。実際に試すのは<strong>拡張ポップアップ</strong>と<strong>本物の watch</strong>の組み合わせなのだ。
+                このページのダッシュボード見本や配信デモの入力欄は<strong>静止画</strong>なのだ。実際に試すのは<strong>拡張ポップアップ</strong>と<strong>本物の watch</strong>の組み合わせなのだ。
               </div>
             </div>
           </div>
@@ -6368,7 +6766,7 @@
               </div>
             </div>
 
-            <figure class="creator-scale-figure fade d2" aria-label="LP用の図解：大観衆のシルエットと、りんく・こん太の立ち絵で届きを示すイメージ">
+            <figure class="creator-scale-figure fade d2" aria-label="見本の図解：大観衆のシルエットと、りんく・こん太の立ち絵で届きを示すイメージ">
               <svg viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg" focusable="false" aria-hidden="true">
                 <defs>
                   <linearGradient id="cs-sky" x1="0" y1="0" x2="0" y2="1">
@@ -6431,7 +6829,7 @@
                 <text x="628" y="152" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#0f5e4f">届いた / 残る</text>
               </svg>
               <figcaption class="creator-scale-caption">
-                下段は<strong>人型シルエットを多数タイル状に敷いた観客席</strong>のイメージです。金色の輪が<strong>ファン・こん太</strong>、ステージ上が<strong>配信者・りんく</strong>（拡張同梱の立ち絵）。万人規模のなかのひとりの「届き」を示すLP用図です。
+                下段は<strong>人型シルエットを多数タイル状に敷いた観客席</strong>のイメージです。金色の輪が<strong>ファン・こん太</strong>、ステージ上が<strong>配信者・りんく</strong>（拡張同梱の立ち絵）。万人規模のなかのひとりの「届き」を示す見本の図です。
               </figcaption>
             </figure>
 
@@ -6585,7 +6983,7 @@
                       <span>りんく</span>
                     </div>
                     <div class="bubble">
-                      <dfn>記録（このPCに保存）</dfn>は <strong>chrome.storage.local</strong> に残る応援コメントの件数なのだ。拡張が取り込めた行だけが増えるのだ。
+                      まず<strong>三つの数の名前</strong>だけ押さえるのだ。<dfn>記録（このPCに保存）</dfn>は <strong>chrome.storage.local</strong> に残る応援コメントの件数なのだ。拡張が取り込めた行だけが増えるのだ。
                       <dfn>公式の累計コメント数</dfn>はニコ生が出す放送全体のカウントで、定義が違うから一致しないのが普通なのだ。
                       <dfn>一覧に出している件数</dfn>はポップアップの表示用で、保存件数と同じとは限らないのだ。
                     </div>
@@ -6625,7 +7023,7 @@
                       <span>りんく</span>
                     </div>
                     <div class="bubble">
-                      <dfn>匿名やハッシュ型ID</dfn>だと、公式と同じ形でアイコンURLを組めないことがあるのだ。<dfn>http/https のアイコンURL</dfn>が無い行は「欠損」扱いになりやすいのだ。
+                      <strong>写真や名前が欠ける</strong>のは、IDの種類で<strong>公式と同じ形のアイコンURLを組めない</strong>ことがあるからなのだ。<dfn>匿名やハッシュ型ID</dfn>が典型なのだ。<dfn>http/https のアイコンURL</dfn>が無い行は「欠損」扱いになりやすいのだ。
                       グリッド近くの「内訳・用語」は、<strong>状態の説明</strong>で、本文を外部に送るためのものではないのだ。
                     </div>
                   </div>
@@ -6664,7 +7062,7 @@
                       <span>りんく</span>
                     </div>
                     <div class="bubble">
-                      配信ページが読む通信から、<dfn>表示名やアイコンを足すための補助情報</dfn>を、拡張が<strong>手元だけ</strong>で使うことがあるのだ。
+                      一言でいうと、ページの通信から<strong>名前や絵を足す材料</strong>を<strong>このPCの中だけ</strong>で借りるのだ。配信ページが読む通信から<dfn>表示名やアイコンを足すための補助情報</dfn>を拾う経路なのだ。
                       <dfn>一時対応表</dfn>はコメント番号と利用者のメモで、<strong>タブのメモリ</strong>に近いのだ。閉じると消えるイメージなのだ。
                       開発文脈では <dfn>intercept</dfn> と呼ぶ経路のことで、UIでは「視聴ページ内の利用者メモ」などと書いているのだ。
                     </div>
@@ -6865,7 +7263,7 @@
                     <div class="bubble">
                       拡張の<strong>ポップアップ</strong>（やページ内パネルが同じ UI を載せる場合）に<strong>コメント入力欄</strong>があり、<strong>コメント送信</strong>で watch ページ側の送信 UI を動かすのだ。
                       内部では <code>NLS_POST_COMMENT</code> という<strong>メッセージ</strong>が content script に届き、<strong>ローカル</strong>のタブの中だけで完結するのだ。
-                      LP のダッシュボード見本や配信デモの入力欄は<strong>静止デモ</strong>で、そこからは送れないのだ。
+                      このページのダッシュボード見本や配信デモの入力欄は<strong>動かない見本</strong>で、そこからは送れないのだ。
                     </div>
                   </div>
                   <div class="y-row reverse">
@@ -6923,7 +7321,7 @@
                       <span>たぬ姉</span>
                     </div>
                     <div class="bubble">
-                      LP の架空ダッシュボードには<strong>見本の吹き出し</strong>も載せたのだ。見た目の参考は<a href="#extension-visual">拡張の見え方</a>のモックなのだ。
+                      このページのダッシュボード見本には<strong>吹き出しの見本</strong>も載せたのだ。見た目の参考は<a href="#extension-visual">拡張の見え方</a>の見本枠なのだ。
                     </div>
                   </div>
                 </div>

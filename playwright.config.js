@@ -32,8 +32,8 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: {
-    // 既定はヘッド付き（ブラウザが見える）。CI は xvfb など仮想ディスプレイで同設定を流用。
-    headless: false,
+    // ローカルはヘッド付き（ブラウザが見える）。CI / PW_HEADLESS=1 ではヘッドレス。
+    headless: process.env.CI === 'true' || process.env.PW_HEADLESS === '1',
     trace: 'on-first-retry'
   },
   ...(e2eNoWebServer

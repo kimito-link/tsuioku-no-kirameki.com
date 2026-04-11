@@ -515,4 +515,37 @@ test.describe('lp-preview', () => {
     const noOverflow = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
     expect(noOverflow).toBe(true);
   });
+
+  test('平易化注釈: #extension-visual に data-lp-plain が見え・主要幅ではみ出しなし', async ({ page }) => {
+    const callout = page.locator('[data-lp-plain="page-demo-note"]');
+    const trio = page.locator('[data-lp-plain="trio-extension-visual"]');
+    const section = page.locator('#extension-visual');
+
+    for (const w of [320, 390, 768, 1024]) {
+      await page.setViewportSize({ width: w, height: 900 });
+      await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
+      await section.scrollIntoViewIfNeeded();
+      await expect(callout).toBeVisible();
+      await expect(trio).toBeVisible();
+
+      const okSection = await section.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+      expect(okSection, `extension-visual scrollWidth at ${w}px`).toBe(true);
+
+      await callout.scrollIntoViewIfNeeded();
+      const okCallout = await callout.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+      expect(okCallout, `page-demo-note scrollWidth at ${w}px`).toBe(true);
+
+      const okTrio = await trio.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+      expect(okTrio, `trio-extension-visual scrollWidth at ${w}px`).toBe(true);
+
+      const bubbles = trio.locator('.bubble');
+      await expect(bubbles).toHaveCount(3);
+      const minBubble = w <= 360 ? 88 : 110;
+      for (let i = 0; i < 3; i++) {
+        const bb = await bubbles.nth(i).boundingBox();
+        expect(bb, `bubble ${i} at ${w}`).not.toBeNull();
+        expect(bb.width, `bubble ${i} width at ${w}`).toBeGreaterThanOrEqual(minBubble);
+      }
+    }
+  });
 });
