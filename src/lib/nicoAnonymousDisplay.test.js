@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   isNiconicoAnonymousUserId,
   anonymousNicknameFallback,
-  compactNicoLaneUserId
+  compactNicoLaneUserId,
+  isNiconicoAutoUserPlaceholderNickname
 } from './nicoAnonymousDisplay.js';
 
 describe('nicoAnonymousDisplay', () => {
@@ -21,6 +22,15 @@ describe('nicoAnonymousDisplay', () => {
     expect(anonymousNicknameFallback('a:xx', 'nora')).toBe('nora');
     expect(anonymousNicknameFallback('999', '')).toBe('');
     expect(anonymousNicknameFallback('999', '太郎')).toBe('太郎');
+  });
+
+  it('isNiconicoAutoUserPlaceholderNickname', () => {
+    expect(isNiconicoAutoUserPlaceholderNickname('')).toBe(false);
+    expect(isNiconicoAutoUserPlaceholderNickname('user')).toBe(false);
+    expect(isNiconicoAutoUserPlaceholderNickname('user 0539Z74OJ13')).toBe(true);
+    expect(isNiconicoAutoUserPlaceholderNickname('USER  abc12')).toBe(true);
+    expect(isNiconicoAutoUserPlaceholderNickname('たろう')).toBe(false);
+    expect(isNiconicoAutoUserPlaceholderNickname('user_name')).toBe(false);
   });
 
   it('compactNicoLaneUserId', () => {

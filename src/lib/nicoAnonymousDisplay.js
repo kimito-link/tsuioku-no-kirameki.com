@@ -15,6 +15,16 @@ export function isNiconicoAnonymousUserId(userId) {
 }
 
 /**
+ * ニコ生が匿名コメントに付けることがある「user + 英数字」形式の自動表示名。
+ * 実質プロフィールではないので応援段の「強い表示名」には使わない。
+ * @param {unknown} nickname
+ */
+export function isNiconicoAutoUserPlaceholderNickname(nickname) {
+  const n = String(nickname ?? '').trim();
+  return /^user\s+[A-Za-z0-9]+$/i.test(n);
+}
+
+/**
  * 既にニックネームがあるときはそのまま。無ければ匿名IDなら「匿名」。
  * @param {unknown} userId
  * @param {unknown} nickname

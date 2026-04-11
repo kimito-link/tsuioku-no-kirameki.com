@@ -23,6 +23,13 @@ describe('supportGridStrongNickname', () => {
   it('匿名IDで1文字は弱い', () => {
     expect(supportGridStrongNickname('K', 'a:longEnoughSuffixHere')).toBe(false);
   });
+
+  it('匿名の user+英数字 自動名は弱い', () => {
+    expect(supportGridStrongNickname('user 0539Z74OJ13', 'a:AbCdEfGhIjKlMnOp')).toBe(
+      false
+    );
+    expect(supportGridStrongNickname('nora', 'a:AbCdEfGhIjKlMnOp')).toBe(true);
+  });
 });
 
 describe('supportGridDisplayTier', () => {
@@ -100,6 +107,26 @@ describe('supportGridDisplayTier', () => {
         nickname: 'x',
         httpAvatarCandidate:
           'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/xx.jpg'
+      })
+    ).toBe(SUPPORT_GRID_TIER_KONTA);
+  });
+
+  it('匿名 ID でも強ニック＋良サムネなら rink には上げない（こん太まで）', () => {
+    expect(
+      supportGridDisplayTier({
+        userId: 'a:AbCdEfGhIjKlMnOp',
+        nickname: 'のら',
+        httpAvatarCandidate: 'https://example.com/u.jpg'
+      })
+    ).toBe(SUPPORT_GRID_TIER_KONTA);
+  });
+
+  it('匿名の自動名＋良サムネは konta（rink にしない）', () => {
+    expect(
+      supportGridDisplayTier({
+        userId: 'a:AbCdEfGhIjKlMnOp',
+        nickname: 'user 0539Z74OJ13',
+        httpAvatarCandidate: 'https://example.com/u.jpg'
       })
     ).toBe(SUPPORT_GRID_TIER_KONTA);
   });

@@ -2,7 +2,10 @@
  * 応援ユーザーの「表示の立ち位置」（LP モック・ユーザーレーン並びの共通ルール）
  */
 
-import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
+import {
+  isNiconicoAnonymousUserId,
+  isNiconicoAutoUserPlaceholderNickname
+} from './nicoAnonymousDisplay.js';
 import {
   isHttpOrHttpsUrl,
   isWeakNiconicoUserIconHttpUrl,
@@ -50,6 +53,12 @@ export function supportGridStrongNickname(nick, userId) {
   if (n === '（未取得）' || n === '(未取得)') return false;
   if (n === '匿名') return false;
   if (isNiconicoAnonymousUserId(userId) && n.length <= 1) return false;
+  if (
+    isNiconicoAnonymousUserId(userId) &&
+    isNiconicoAutoUserPlaceholderNickname(n)
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -79,7 +88,18 @@ export function supportGridDisplayTier(p) {
   const nick = String(p?.nickname ?? '').trim();
   const strongNick = supportGridStrongNickname(nick, uid);
 
-  if (strongNick && hasThumb) return SUPPORT_GRID_TIER_RINK;
-  if (strongNick || hasThumb) return SUPPORT_GRID_TIER_KONTA;
-  return SUPPORT_GRID_TIER_TANU;
+  /** @type {'rink'|'konta'|'tanu'} */
+  let tier;
+  if (strongNick && hasThumb) tier = SUPPORT_GRID_TIER_RINK;
+  else if (strongNick || hasThumb) tier = SUPPORT_GRID_TIER_KONTA;
+  else tier = SUPPORT_GRID_TIER_TANU;
+
+  /*
+   * りんく列は「ログイン識別で揃ったプロフィール」向け。匿名 a: ID は最上段に上げない
+   * （強ニック＋サムネでもこん太まで。匿名の自動名は strongNick から除外済み）。
+   */
+  if (isNiconicoAnonymousUserId(uid) && tier === SUPPORT_GRID_TIER_RINK) {
+    return SUPPORT_GRID_TIER_KONTA;
+  }
+  return tier;
 }

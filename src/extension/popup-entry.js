@@ -2976,7 +2976,7 @@ function renderStoryUserLane() {
 
   stack.setAttribute(
     'aria-label',
-    `最近の応援ユーザーサムネイル 合計${picked.length}件`
+    `最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段）合計${picked.length}件。続きはこの枠内をスクロール`
   );
   stack.hidden = false;
 

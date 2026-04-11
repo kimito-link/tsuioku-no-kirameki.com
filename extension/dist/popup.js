@@ -135,6 +135,10 @@
     const rest = s.slice(2).trim();
     return rest.length >= 2;
   }
+  function isNiconicoAutoUserPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return /^user\s+[A-Za-z0-9]+$/i.test(n);
+  }
   function anonymousNicknameFallback(userId, nickname) {
     const nick = String(nickname ?? "").trim();
     if (nick) return nick;
@@ -1545,6 +1549,9 @@ ${body}`;
     if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)") return false;
     if (n === "\u533F\u540D") return false;
     if (isNiconicoAnonymousUserId(userId) && n.length <= 1) return false;
+    if (isNiconicoAnonymousUserId(userId) && isNiconicoAutoUserPlaceholderNickname(n)) {
+      return false;
+    }
     return true;
   }
   function supportGridDisplayTier(p) {
@@ -1560,9 +1567,14 @@ ${body}`;
     }
     const nick = String(p?.nickname ?? "").trim();
     const strongNick = supportGridStrongNickname(nick, uid);
-    if (strongNick && hasThumb) return SUPPORT_GRID_TIER_RINK;
-    if (strongNick || hasThumb) return SUPPORT_GRID_TIER_KONTA;
-    return SUPPORT_GRID_TIER_TANU;
+    let tier;
+    if (strongNick && hasThumb) tier = SUPPORT_GRID_TIER_RINK;
+    else if (strongNick || hasThumb) tier = SUPPORT_GRID_TIER_KONTA;
+    else tier = SUPPORT_GRID_TIER_TANU;
+    if (isNiconicoAnonymousUserId(uid) && tier === SUPPORT_GRID_TIER_RINK) {
+      return SUPPORT_GRID_TIER_KONTA;
+    }
+    return tier;
   }
 
   // src/lib/storyUserLaneBuckets.js
@@ -1591,7 +1603,7 @@ ${body}`;
     return storyUserLaneGuideLine(
       faceRink,
       escapeHtml(
-        "\u308A\u3093\u304F: \u30CB\u30B3\u751F\u306E\u30E6\u30FC\u30B6\u30FC\u8B58\u5225\u5B50\uFF08\u6570\u5024ID\u30FB\u533F\u540D\u306E a: \u5F62\u5F0F\uFF09\u304C\u4ED8\u3044\u305F\u5FDC\u63F4\u3060\u3051\u304C\u3053\u306E\u5217\u306B\u8F09\u308B\u3088\u3002\u4E26\u3073\u3067\u306F\u3001\u500B\u4EBA\u30B5\u30E0\u30CD\u3068\u300C\u533F\u540D\u300D\u300C\uFF08\u672A\u53D6\u5F97\uFF09\u300D\u4EE5\u5916\u306E\u8868\u793A\u540D\u304C\u305D\u308D\u3063\u305F\u4EBA\u3092\u3044\u3061\u3070\u3093\u624B\u524D\u306B\u5BC4\u305B\u308B\u3088\u3002\u30B5\u30E0\u30CD\u3068\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u3092\u6574\u3048\u3066\u3044\u308B\u3068\u3001\u914D\u4FE1\u8005\u5074\u304B\u3089\u3082\u898B\u3064\u3051\u3084\u3059\u304F\u306A\u308A\u3084\u3059\u3044\u3001\u3068\u3044\u3046\u6587\u8108\u3067\u3082\u3042\u308B\u3088\u3002"
+        "\u308A\u3093\u304F: \u30CB\u30B3\u751F\u306E\u30E6\u30FC\u30B6\u30FC\u8B58\u5225\u5B50\uFF08\u6570\u5024ID\u30FB\u533F\u540D\u306E a: \u5F62\u5F0F\uFF09\u304C\u4ED8\u3044\u305F\u5FDC\u63F4\u3060\u3051\u304C\u3053\u306E\u5217\u306B\u8F09\u308B\u3088\u3002\u4E26\u3073\u3067\u306F\u3001\u500B\u4EBA\u30B5\u30E0\u30CD\u3068\u300C\u533F\u540D\u300D\u300C\uFF08\u672A\u53D6\u5F97\uFF09\u300D\u300Cuser \u3068\u82F1\u6570\u5B57\u3060\u3051\u306E\u81EA\u52D5\u540D\u300D\u4EE5\u5916\u306E\u8868\u793A\u540D\u304C\u305D\u308D\u3063\u305F\u4EBA\u3092\u3044\u3061\u3070\u3093\u624B\u524D\u306B\u5BC4\u305B\u308B\u3088\u3002\u533F\u540D ID \u306F\u6700\u4E0A\u6BB5\uFF08\u308A\u3093\u304F\u5217\uFF09\u306B\u306F\u4E0A\u3052\u305A\u3001\u3053\u3093\u592A\u5217\u307E\u3067\u306B\u7559\u3081\u308B\u3088\u3002\u30B5\u30E0\u30CD\u3068\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u3092\u6574\u3048\u3066\u3044\u308B\u3068\u3001\u914D\u4FE1\u8005\u5074\u304B\u3089\u3082\u898B\u3064\u3051\u3084\u3059\u304F\u306A\u308A\u3084\u3059\u3044\u3001\u3068\u3044\u3046\u6587\u8108\u3067\u3082\u3042\u308B\u3088\u3002"
       )
     );
   }
@@ -5867,7 +5879,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     stack.setAttribute(
       "aria-label",
-      `\u6700\u8FD1\u306E\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30B5\u30E0\u30CD\u30A4\u30EB \u5408\u8A08${picked.length}\u4EF6`
+      `\u6700\u8FD1\u306E\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30B5\u30E0\u30CD\u30A4\u30EB\uFF08\u308A\u3093\u304F\u30FB\u3053\u3093\u592A\u30FB\u305F\u306C\u59C9\u306E\u4E09\u6BB5\uFF09\u5408\u8A08${picked.length}\u4EF6\u3002\u7D9A\u304D\u306F\u3053\u306E\u67A0\u5185\u3092\u30B9\u30AF\u30ED\u30FC\u30EB`
     );
     stack.hidden = false;
     if (guideLinesTop) {
