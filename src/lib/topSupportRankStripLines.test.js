@@ -4,6 +4,7 @@ import {
   accentSlotFromUserKey
 } from './userSupportGridAccent.js';
 import { UNKNOWN_USER_KEY } from './userRooms.js';
+import { niconicoDefaultUserIconUrl } from './supportGrowthTileSrc.js';
 import { topSupportRankLineModels } from './topSupportRankStripLines.js';
 
 const DEF_THUMB = 'images/yukkuri-default.png';
@@ -87,7 +88,7 @@ describe('topSupportRankLineModels', () => {
     }
   });
 
-  it('avatarUrl が非 http のとき defaultThumbSrc（数字IDはゆっくり既定を優先）', () => {
+  it('avatarUrl が非 http のとき数字IDはニコ既定 usericon', () => {
     const [row] = topSupportRankLineModels(
       [
         {
@@ -99,8 +100,8 @@ describe('topSupportRankLineModels', () => {
       ],
       { defaultThumbSrc: DEF_THUMB }
     );
-    expect(row.thumbSrc).toBe(DEF_THUMB);
-    expect(row.thumbNeedsNoReferrer).toBe(false);
+    expect(row.thumbSrc).toBe(niconicoDefaultUserIconUrl('86255751'));
+    expect(row.thumbNeedsNoReferrer).toBe(true);
   });
 
   it('匿名IDで http サムネが無いとき anonymousFallbackThumbSrc を使う', () => {

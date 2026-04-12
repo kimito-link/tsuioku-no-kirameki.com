@@ -92,7 +92,7 @@ export function isAnonymousStyleNicoUserId(userId) {
 }
 
 /**
- * http のサムネが無いとき: 匿名系は TV プレースホルダ、それ以外はゆっくり既定タイル。
+ * http のサムネが無いとき: 匿名系は TV プレースホルダ、数字IDはニコの式 CDN（公式寄り）、それ以外はゆっくり既定。
  *
  * @param {unknown} userId
  * @param {unknown} httpCandidate storyGrowthAvatarSrcCandidate 等（空可）
@@ -111,7 +111,12 @@ export function pickSupportGrowthFallbackTileSrc(
   }
   const y = String(yukkuriSrc || '').trim();
   const t = String(tvSrc || '').trim();
-  return isAnonymousStyleNicoUserId(userId) ? t || y : y || t;
+  if (isAnonymousStyleNicoUserId(userId)) {
+    return t || y;
+  }
+  const syn = niconicoDefaultUserIconUrl(userId);
+  if (isHttpOrHttpsUrl(syn)) return syn;
+  return y || t;
 }
 
 /**

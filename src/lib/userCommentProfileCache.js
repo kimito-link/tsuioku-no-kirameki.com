@@ -7,6 +7,8 @@ import {
   isHttpOrHttpsUrl,
   isWeakNiconicoUserIconHttpUrl
 } from './supportGrowthTileSrc.js';
+import { isNiconicoAutoUserPlaceholderNickname } from './nicoAnonymousDisplay.js';
+import { supportGridStrongNickname } from './supportGridDisplayTier.js';
 
 /** 保持するエントリ数の上限（chrome.storage.local 容量対策） */
 export const USER_COMMENT_PROFILE_CACHE_MAX = 5000;
@@ -127,6 +129,18 @@ export function upsertUserCommentProfileFromIntercept(map, it) {
 }
 
 /**
+ * 記録行の表示名が「匿名」等のプレースホルダだけのとき true（キャッシュの本物で置き換えてよい）。
+ * @param {string} nick
+ */
+function isWeakMergedDisplayNickname(nick) {
+  const n = String(nick || '').trim();
+  if (!n) return true;
+  if (n === '（未取得）' || n === '(未取得)' || n === '匿名') return true;
+  if (isNiconicoAutoUserPlaceholderNickname(n)) return true;
+  return false;
+}
+
+/**
  * @template T
  * @param {T[]} entries
  * @param {Record<string, UserCommentProfileCacheEntry>} map
@@ -157,9 +171,16 @@ export function applyUserCommentProfileMapToEntries(entries, map) {
     let out = /** @type {T} */ (e);
     let changed = false;
 
-    if (candNick && (!curNick || candNick.length > curNick.length)) {
-      out = { ...out, nickname: candNick };
-      changed = true;
+    if (candNick) {
+      const preferNick =
+        !curNick ||
+        candNick.length > curNick.length ||
+        (isWeakMergedDisplayNickname(curNick) &&
+          supportGridStrongNickname(candNick, uid));
+      if (preferNick && candNick !== curNick) {
+        out = { ...out, nickname: candNick };
+        changed = true;
+      }
     }
     if (
       candAv &&

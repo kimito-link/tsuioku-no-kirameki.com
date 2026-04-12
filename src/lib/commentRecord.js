@@ -6,8 +6,7 @@ import {
   isHttpOrHttpsUrl,
   isNiconicoSyntheticDefaultUserIconUrl,
   isWeakNiconicoUserIconHttpUrl,
-  looksLikeNiconicoUserIconHttpUrl,
-  niconicoDefaultUserIconUrl
+  looksLikeNiconicoUserIconHttpUrl
 } from './supportGrowthTileSrc.js';
 import { pickStrongerUserId } from './userIdPreference.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
@@ -36,6 +35,7 @@ function userIdFromNicoUserIconHttpUrl(url) {
  *   userId?: string|null,
  *   nickname?: string,
  *   avatarUrl?: string,
+ *   avatarObserved?: boolean,
  *   selfPosted?: boolean,
  *   capturedAt?: number,
  *   vpos?: number|null,
@@ -75,7 +75,7 @@ function randomId() {
 }
 
 /**
- * @param {{ liveId: string, commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, vpos?: number|null, accountStatus?: number|null, is184?: boolean }} p
+ * @param {{ liveId: string, commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean }} p
  */
 export function createCommentEntry(p) {
   const capturedAt = Date.now();
@@ -90,11 +90,7 @@ export function createCommentEntry(p) {
     if (fromAv) uid = fromAv;
   }
   const nickname = anonymousNicknameFallback(uid, p.nickname);
-  let storedAvatar = avatarUrl;
-  if (!storedAvatar && uid && /^\d{5,14}$/.test(uid)) {
-    const syn = niconicoDefaultUserIconUrl(uid);
-    if (syn) storedAvatar = syn;
-  }
+  const storedAvatar = avatarUrl;
   const entry = {
     id: randomId(),
     liveId,
@@ -103,6 +99,7 @@ export function createCommentEntry(p) {
     userId: uid || null,
     ...(nickname ? { nickname } : {}),
     ...(storedAvatar ? { avatarUrl: storedAvatar } : {}),
+    ...(p.avatarObserved ? { avatarObserved: true } : {}),
     ...(p.vpos != null ? { vpos: p.vpos } : {}),
     ...(p.accountStatus != null ? { accountStatus: p.accountStatus } : {}),
     ...(p.is184 ? { is184: true } : {}),
@@ -126,7 +123,7 @@ function storedCommentDedupeKey(lid, ex) {
 /**
  * @param {string} liveId
  * @param {StoredComment[]} existing
- * @param {{ commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]} incoming
+ * @param {{ commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]} incoming
  * @returns {{ next: StoredComment[], added: StoredComment[], storageTouched: boolean }}
  */
 export function mergeNewComments(liveId, existing, incoming) {
@@ -225,14 +222,9 @@ export function mergeNewComments(liveId, existing, incoming) {
           }
         }
 
-        const avAfter = String(patched.avatarUrl || '').trim();
-        if (!avAfter || !isHttpOrHttpsUrl(avAfter)) {
-          const uHeal = String(patched.userId || '').trim();
-          const syn = niconicoDefaultUserIconUrl(uHeal);
-          if (syn) {
-            patched = { ...patched, avatarUrl: syn };
-            touched = true;
-          }
+        if (row.avatarObserved && !patched.avatarObserved) {
+          patched = { ...patched, avatarObserved: true };
+          touched = true;
         }
 
         if (touched) {
@@ -250,6 +242,7 @@ export function mergeNewComments(liveId, existing, incoming) {
       userId: row.userId ?? null,
       nickname: row.nickname || '',
       avatarUrl: validAvatar || undefined,
+      avatarObserved: row.avatarObserved || false,
       vpos: row.vpos,
       accountStatus: row.accountStatus,
       is184: row.is184
@@ -262,7 +255,10 @@ export function mergeNewComments(liveId, existing, incoming) {
 }
 
 /**
- * ストレージ上のコメントに、数字 userId かつ avatarUrl 無しの行へ CDN 推定 URL を一括付与（取得率ダッシュボードのサムネ%向上）。
+ * ストレージ上のコメントから合成 canonical URL を除去（ティア判定の誤昇格を防ぐ）。
+ * 合成 URL = `niconicoDefaultUserIconUrl(userId)` と完全一致する URL。
+ * DOM/intercept で実際に観測された URL は残す（合成 URL とは URL 形式が同じだが、
+ * 過去の backfill で書き込まれたものだけ除去対象）。
  * @param {unknown[]} entries
  * @returns {{ next: unknown[], patched: number }}
  */
@@ -273,12 +269,15 @@ export function backfillNumericSyntheticAvatarsOnStoredComments(entries) {
   let patched = 0;
   const next = entries.map((e) => {
     const av = String(/** @type {{ avatarUrl?: unknown }} */ (e)?.avatarUrl || '').trim();
-    if (av && isHttpOrHttpsUrl(av)) return e;
+    if (!av || !isHttpOrHttpsUrl(av)) return e;
     const uid = String(/** @type {{ userId?: unknown }} */ (e)?.userId || '').trim();
-    const syn = niconicoDefaultUserIconUrl(uid);
-    if (!syn) return e;
-    patched += 1;
-    return { .../** @type {object} */ (e), avatarUrl: syn };
+    if (/^\d{5,14}$/.test(uid) && isNiconicoSyntheticDefaultUserIconUrl(av, uid)) {
+      patched += 1;
+      const copy = { .../** @type {object} */ (e) };
+      delete /** @type {Record<string,unknown>} */ (copy).avatarUrl;
+      return copy;
+    }
+    return e;
   });
   return { next, patched };
 }

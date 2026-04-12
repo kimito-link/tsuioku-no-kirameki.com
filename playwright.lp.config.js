@@ -6,6 +6,7 @@
  */
 import { defineConfig } from '@playwright/test';
 import path from 'node:path';
+import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(fileURLToPath(import.meta.url));

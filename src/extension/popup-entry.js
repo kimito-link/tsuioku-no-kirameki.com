@@ -111,6 +111,12 @@ import {
   userLaneResolvedThumbScore,
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
 } from '../lib/supportGrowthTileSrc.js';
+import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
+import {
+  paintStoryUserLaneDomEmptyGuides,
+  paintStoryUserLaneDomFilled,
+  resetStoryUserLaneDom
+} from './story/renderStoryUserLaneDom.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
@@ -124,20 +130,11 @@ import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 import { TOP_SUPPORT_RANK_STRIP_MAX } from '../lib/topSupportRankStripConfig.js';
 import { topSupportRankStripStableKey } from '../lib/topSupportRankStripStableKey.js';
 import {
-  SUPPORT_GRID_TIER_KONTA,
-  SUPPORT_GRID_TIER_RINK,
-  supportGridDisplayTier
-} from '../lib/supportGridDisplayTier.js';
-import {
   bucketStoryUserLanePicks,
   flattenStoryUserLaneBuckets
 } from '../lib/storyUserLaneBuckets.js';
-import {
-  buildStoryUserLaneGuideFootHtml,
-  buildStoryUserLaneGuideKontaHtml,
-  buildStoryUserLaneGuideTanuHtml,
-  buildStoryUserLaneGuideTopHtml
-} from '../lib/storyUserLaneGuideHtml.js';
+import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js';
+import { explainSupportGridDisplayTier } from '../lib/supportGridDisplayTier.js';
 import {
   buildHtmlReportConceptGuideCardHtml,
   buildHtmlReportSaveGuideCardHtml
@@ -465,7 +462,7 @@ function setCountDisplay(value, watchSnapshot = null) {
   const num = parseInt(value, 10);
   if (!Number.isNaN(num) && _prevSupportCount != null && num > _prevSupportCount) {
     const card = document.getElementById('supportVisualLiveCard');
-    const icon = card?.querySelector('.nl-live-stat-icon');
+    const icon = card?.querySelector(':scope > img.nl-live-stat-icon');
     triggerCharaReaction(icon ?? null, {
       delta: num - _prevSupportCount,
       thresholds: [1, 3, 10],
@@ -2264,30 +2261,11 @@ function storyGrowthAvatarSrcCandidate(entry, liveId, entries = STORY_SOURCE_STA
  */
 function storyGrowthTileSrcForEntry(entry, liveId, entries = STORY_SOURCE_STATE.entries) {
   const candidate = storyGrowthAvatarSrcCandidate(entry, liveId, entries);
-  if (candidate) return candidate;
-  return pickSupportGrowthTileForStory(entry?.userId, '');
-}
-
-/**
- * 応援ユーザーレーンの並び順。大きいほど「個人サムネ＋強い表示名」に近い（supportGridDisplayTier と一致）。
- * @param {PopupCommentEntry|null|undefined} entry
- * @param {string} httpCandidate storyGrowthAvatarSrcCandidate
- * @returns {0|1|2|3}
- */
-function userLaneProfileCompletenessTier(entry, httpCandidate) {
   const uid = String(entry?.userId || '').trim();
-  if (!uid) return 0;
-  const nick = String(entry?.nickname || '').trim();
-  const rawAv = String(entry?.avatarUrl || '').trim();
-  const t = supportGridDisplayTier({
-    userId: uid,
-    nickname: nick,
-    httpAvatarCandidate: httpCandidate,
-    storedAvatarUrl: rawAv
-  });
-  if (t === SUPPORT_GRID_TIER_RINK) return 3;
-  if (t === SUPPORT_GRID_TIER_KONTA) return 2;
-  return 1;
+  const raw = String(entry?.avatarUrl || '').trim();
+  const merged = userLaneHttpForTilePick(uid, candidate, raw);
+  if (merged) return merged;
+  return pickSupportGrowthTileForStory(entry?.userId, '');
 }
 
 /**
@@ -2538,7 +2516,14 @@ const STORY_AVATAR_DIAG_STATE = {
   /** 直近 export 試行の理由コード（no_watch_tab / export_rejected / message_failed / ok_empty / ok 等） */
   interceptExportCode: '',
   /** export 失敗時の短い補足（PII なし） */
-  interceptExportDetail: ''
+  interceptExportDetail: '',
+  /** ユーザーレーン dedupe 後の候補数（explainSupportGridDisplayTier 集計用） */
+  userLaneDeduped: 0,
+  userLaneTier3: 0,
+  userLaneTier2: 0,
+  userLaneTier1: 0,
+  userLaneStrongNick: 0,
+  userLanePersonalThumb: 0
 };
 
 /** renderStoryUserLane の見た目が同じなら DOM を付け直さない（高流量時のちらつき抑制） */
@@ -2767,28 +2752,40 @@ function renderStoryUserLane() {
   const guideLinesBottom = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesBottom'));
   if (!stack || !laneRink || !laneKonta || !laneTanu) return;
 
-  const clearMidGuides = () => {
-    if (guideMidKonta) guideMidKonta.hidden = true;
-    if (guideLinesMidKonta) guideLinesMidKonta.innerHTML = '';
-    if (guideMidTanu) guideMidTanu.hidden = true;
-    if (guideLinesMidTanu) guideLinesMidTanu.innerHTML = '';
+  const els = {
+    stack,
+    laneRink,
+    laneKonta,
+    laneTanu,
+    hintRink,
+    rinkWrap,
+    guideTop,
+    guideLinesTop,
+    guideMidKonta,
+    guideLinesMidKonta,
+    guideMidTanu,
+    guideLinesMidTanu,
+    guideBottom,
+    guideLinesBottom
   };
 
-  const resetLaneTierCells = () => {
-    laneRink.innerHTML = '';
-    laneKonta.innerHTML = '';
-    laneTanu.innerHTML = '';
-    laneRink.hidden = true;
-    laneKonta.hidden = true;
-    laneTanu.hidden = true;
-    if (hintRink) hintRink.hidden = true;
-    if (rinkWrap) rinkWrap.hidden = true;
+  const faces = {
+    faceRink: STORY_GUIDE_FACE_RINK,
+    faceKonta: STORY_GUIDE_FACE_KONTA,
+    faceTanu: STORY_GUIDE_FACE_TANU
   };
 
-  const hideUserLaneStackFully = () => {
-    resetLaneTierCells();
-    clearMidGuides();
-    stack.hidden = true;
+  const laneDomIo = {
+    storyAvatarLoadGuard,
+    isHttpOrHttpsUrl,
+    storyTileUsesYukkuriTvStyle
+  };
+
+  const lanePickCtx = {
+    yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
+    tvSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
+    anonymousIdenticonEnabled: anonymousIdenticonRuntimeEnabled,
+    anonymousIdenticonDataUrl: ''
   };
 
   const entries = Array.isArray(STORY_SOURCE_STATE.entries)
@@ -2796,7 +2793,13 @@ function renderStoryUserLane() {
     : [];
   if (!entries.length) {
     storyUserLaneLastRenderSig = '';
-    hideUserLaneStackFully();
+    STORY_AVATAR_DIAG_STATE.userLaneDeduped = 0;
+    STORY_AVATAR_DIAG_STATE.userLaneTier3 = 0;
+    STORY_AVATAR_DIAG_STATE.userLaneTier2 = 0;
+    STORY_AVATAR_DIAG_STATE.userLaneTier1 = 0;
+    STORY_AVATAR_DIAG_STATE.userLaneStrongNick = 0;
+    STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = 0;
+    resetStoryUserLaneDom(els);
     if (guideTop) guideTop.hidden = true;
     if (guideLinesTop) guideLinesTop.innerHTML = '';
     if (guideBottom) guideBottom.hidden = true;
@@ -2811,11 +2814,17 @@ function renderStoryUserLane() {
 
   /** @type {{ entryIndex: number, profileTier: number, thumbScore: number, displaySrc: string, title: string, entry: PopupCommentEntry, meta: { idLine: string, nameLine: string } }[]} */
   const candidates = [];
+  let laneDiagDeduped = 0;
+  let laneDiagT3 = 0;
+  let laneDiagT2 = 0;
+  let laneDiagT1 = 0;
+  let laneDiagStrongNick = 0;
+  let laneDiagPersonalThumb = 0;
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const e = entries[i];
     const uidRaw = String(e?.userId || '').trim();
     if (!uidRaw) continue;
-    const httpCandidate = storyGrowthAvatarSrcCandidate(e, liveId);
+    const httpFromGrowth = storyGrowthAvatarSrcCandidate(e, liveId);
     const dedupeKey = userLaneDedupeKey({
       userId: uidRaw,
       avatarHttpCandidate: '',
@@ -2824,22 +2833,41 @@ function renderStoryUserLane() {
     if (!dedupeKey) continue;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
-    const displaySrc = pickSupportGrowthTileForStory(e?.userId, httpCandidate);
-    if (!displaySrc) continue;
+    lanePickCtx.anonymousIdenticonDataUrl =
+      getCachedAnonymousIdenticonDataUrl(e?.userId);
+    const row = buildStoryUserLaneCandidateRow(e, i, httpFromGrowth, lanePickCtx);
+    if (!row) continue;
+    const ex = explainSupportGridDisplayTier({
+      userId: uidRaw,
+      nickname: e?.nickname,
+      httpAvatarCandidate: row.httpForLane,
+      storedAvatarUrl: e?.avatarUrl
+    });
+    laneDiagDeduped += 1;
+    if (ex.strongNick) laneDiagStrongNick += 1;
+    if (ex.hasPersonalThumb) laneDiagPersonalThumb += 1;
+    if (row.profileTier === 3) laneDiagT3 += 1;
+    else if (row.profileTier === 2) laneDiagT2 += 1;
+    else laneDiagT1 += 1;
     const label = storyGrowthDisplayLabel(e, liveId) || 'ユーザー';
-    const meta = storyUserLaneMetaLines(e, httpCandidate, dedupeKey);
-    const thumbScore = userLaneResolvedThumbScore(e?.userId, httpCandidate);
-    const profileTier = userLaneProfileCompletenessTier(e, httpCandidate);
+    const meta = storyUserLaneMetaLines(e, row.httpForLane, dedupeKey);
     candidates.push({
-      entryIndex: i,
-      profileTier,
-      thumbScore,
-      displaySrc,
+      entryIndex: row.entryIndex,
+      profileTier: row.profileTier,
+      thumbScore: row.thumbScore,
+      displaySrc: row.displaySrc,
       title: label,
-      entry: e,
+      entry: row.entry,
       meta
     });
   }
+
+  STORY_AVATAR_DIAG_STATE.userLaneDeduped = laneDiagDeduped;
+  STORY_AVATAR_DIAG_STATE.userLaneTier3 = laneDiagT3;
+  STORY_AVATAR_DIAG_STATE.userLaneTier2 = laneDiagT2;
+  STORY_AVATAR_DIAG_STATE.userLaneTier1 = laneDiagT1;
+  STORY_AVATAR_DIAG_STATE.userLaneStrongNick = laneDiagStrongNick;
+  STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = laneDiagPersonalThumb;
 
   const laneUidSortRank = (uidRaw) => {
     const s = String(uidRaw || '').trim();
@@ -2875,134 +2903,11 @@ function renderStoryUserLane() {
   storyUserLaneLastRenderSig = laneSig;
 
   if (!picked.length) {
-    resetLaneTierCells();
-    stack.hidden = false;
-    if (guideLinesTop) {
-      guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(
-        STORY_GUIDE_FACE_RINK
-      );
-    }
-    if (guideTop) guideTop.hidden = false;
-    if (guideLinesMidKonta) {
-      guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
-        STORY_GUIDE_FACE_KONTA
-      );
-    }
-    if (guideMidKonta) guideMidKonta.hidden = false;
-    if (guideLinesMidTanu) {
-      guideLinesMidTanu.innerHTML = buildStoryUserLaneGuideTanuHtml(
-        STORY_GUIDE_FACE_TANU
-      );
-    }
-    if (guideMidTanu) guideMidTanu.hidden = false;
-    if (guideLinesBottom) {
-      guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(0);
-    }
-    if (guideBottom) guideBottom.hidden = false;
+    paintStoryUserLaneDomEmptyGuides(els, faces);
     return;
   }
 
-  /**
-   * @param {HTMLElement} el
-   * @param {typeof candidates[number][]} items
-   */
-  const fillLaneTier = (el, items) => {
-    el.innerHTML = '';
-    if (!items.length) {
-      el.hidden = true;
-      return;
-    }
-    el.hidden = false;
-    const frag = document.createDocumentFragment();
-    for (const p of items) {
-      const cell = document.createElement('span');
-      cell.className = 'nl-story-userlane-cell';
-
-      const img = document.createElement('img');
-      img.className = 'nl-story-userlane-avatar';
-      const requestedLane = p.displaySrc;
-      const displayLane = storyAvatarLoadGuard.pickDisplaySrc(requestedLane);
-      img.src = displayLane;
-      storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
-      img.classList.toggle(
-        'nl-avatar--tv-fallback',
-        storyTileUsesYukkuriTvStyle(requestedLane, displayLane)
-      );
-      img.alt = '';
-      const fullUid = String(p.entry?.userId || '').trim();
-      const tip =
-        fullUid && fullUid !== p.meta.idLine
-          ? `${p.title} | ${fullUid}`
-          : p.title;
-      img.title = tip;
-      cell.title = tip;
-      img.decoding = 'async';
-      if (isHttpOrHttpsUrl(img.src)) {
-        img.referrerPolicy = 'no-referrer';
-      }
-
-      const metaEl = document.createElement('span');
-      metaEl.className = 'nl-story-userlane-meta';
-      const idRow = document.createElement('span');
-      idRow.className = 'nl-story-userlane-meta__id';
-      idRow.textContent = p.meta.idLine;
-      const nameRow = document.createElement('span');
-      nameRow.className = 'nl-story-userlane-meta__name';
-      nameRow.textContent = p.meta.nameLine;
-      metaEl.appendChild(idRow);
-      metaEl.appendChild(nameRow);
-
-      cell.appendChild(img);
-      cell.appendChild(metaEl);
-      frag.appendChild(cell);
-    }
-    el.appendChild(frag);
-  };
-
-  fillLaneTier(laneRink, buckets.rink);
-  fillLaneTier(laneKonta, buckets.konta);
-  fillLaneTier(laneTanu, buckets.tanu);
-
-  if (hintRink) {
-    const showRinkHint =
-      buckets.rink.length === 0 &&
-      (buckets.konta.length > 0 || buckets.tanu.length > 0);
-    hintRink.hidden = !showRinkHint;
-  }
-
-  if (rinkWrap) {
-    const showRinkWrap = !laneRink.hidden || (hintRink && !hintRink.hidden);
-    rinkWrap.hidden = !showRinkWrap;
-  }
-
-  stack.setAttribute(
-    'aria-label',
-    `最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段）合計${picked.length}件。続きはこの枠内をスクロール`
-  );
-  stack.hidden = false;
-
-  if (guideLinesTop) {
-    guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(
-      STORY_GUIDE_FACE_RINK
-    );
-  }
-  if (guideTop) guideTop.hidden = false;
-  if (guideLinesMidKonta) {
-    guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
-      STORY_GUIDE_FACE_KONTA
-    );
-  }
-  if (guideMidKonta) guideMidKonta.hidden = false;
-  if (guideLinesMidTanu) {
-    guideLinesMidTanu.innerHTML = buildStoryUserLaneGuideTanuHtml(
-      STORY_GUIDE_FACE_TANU
-    );
-  }
-  if (guideMidTanu) guideMidTanu.hidden = false;
-  if (guideLinesBottom) {
-    guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(picked.length);
-  }
-  if (guideBottom) guideBottom.hidden = false;
+  paintStoryUserLaneDomFilled(els, faces, buckets, picked.length, laneDomIo);
 }
 
 function renderStoryAvatarDiag() {
@@ -3039,6 +2944,12 @@ function resetStoryAvatarDiagState() {
   STORY_AVATAR_DIAG_STATE.interceptExportRows = 0;
   STORY_AVATAR_DIAG_STATE.interceptExportCode = '';
   STORY_AVATAR_DIAG_STATE.interceptExportDetail = '';
+  STORY_AVATAR_DIAG_STATE.userLaneDeduped = 0;
+  STORY_AVATAR_DIAG_STATE.userLaneTier3 = 0;
+  STORY_AVATAR_DIAG_STATE.userLaneTier2 = 0;
+  STORY_AVATAR_DIAG_STATE.userLaneTier1 = 0;
+  STORY_AVATAR_DIAG_STATE.userLaneStrongNick = 0;
+  STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = 0;
   renderStoryAvatarDiag();
 }
 
@@ -3997,7 +3908,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   if (typeof vc === 'number' && Number.isFinite(vc) && vc >= 0) {
     if (_prevViewerCount != null && vc > _prevViewerCount) {
       const visitorsCard = viewerDomEl?.closest('.nl-live-stat-card');
-      const icon = visitorsCard?.querySelector('.nl-live-stat-icon');
+      const icon = visitorsCard?.querySelector(':scope > img.nl-live-stat-icon');
       triggerCharaReaction(icon ?? null, {
         delta: vc - _prevViewerCount,
         thresholds: [1, 10, 50],
@@ -4067,7 +3978,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
         resolved.estimated !== _prevConcurrentEstimated &&
         concurrentCard
       ) {
-        const icon = concurrentCard.querySelector('.nl-live-stat-icon');
+        const icon = concurrentCard.querySelector(':scope > img.nl-live-stat-icon');
         triggerCharaReaction(icon, {
           delta: Math.abs(resolved.estimated - _prevConcurrentEstimated),
           thresholds: [1, 20, 100],
@@ -4742,31 +4653,35 @@ function stripViewerAvatarContamination(entries, liveId, snapshot) {
     return { next: entries, patched: 0 };
   }
 
+  const isBroadcasterViewing = Boolean(viewerUid && broadcasterUid && viewerUid === broadcasterUid);
   const ownPostedIds = getOwnPostedMatchedIdSet(entries, liveId);
   let patched = 0;
   const next = entries.map((e) => {
     let changed = false;
     const out = { ...e };
     const isOwn = e?.selfPosted || ownPostedIds.has(popupEntryStableId(e, liveId));
+    const av = String(e?.avatarUrl || '').trim();
+    const avatarAlsoMatches = isHttpOrHttpsUrl(viewerAvatar) && av && isSameAvatarUrl(av, viewerAvatar);
     if (viewerUid && String(e?.userId || '').trim() === viewerUid) {
       if (!isOwn) {
-        delete out.userId;
-        changed = true;
+        if (isBroadcasterViewing) {
+          if (avatarAlsoMatches) {
+            delete out.userId;
+            changed = true;
+          }
+        } else {
+          delete out.userId;
+          changed = true;
+        }
       }
     }
-    if (broadcasterUid && String(e?.userId || '').trim() === broadcasterUid) {
+    if (broadcasterUid && !isBroadcasterViewing && String(e?.userId || '').trim() === broadcasterUid) {
       if (!isOwn) {
         delete out.userId;
         changed = true;
       }
     }
-    const av = String(e?.avatarUrl || '').trim();
-    if (
-      isHttpOrHttpsUrl(viewerAvatar) &&
-      av &&
-      isSameAvatarUrl(av, viewerAvatar) &&
-      !isOwn
-    ) {
+    if (avatarAlsoMatches && !isOwn) {
       delete out.avatarUrl;
       changed = true;
     }
@@ -5585,6 +5500,7 @@ async function refresh() {
     return;
   }
   renderExtensionContextBanner(false);
+  setTimeout(revealPopupPrimaryOnce, 1200);
 
   const liveEl = $('liveId');
   const toggle = /** @type {HTMLInputElement} */ ($('recordToggle'));
@@ -5985,6 +5901,7 @@ async function refresh() {
   if (!snapshotCacheHit) {
     paintWatchPopupUi();
     markPopupRefreshContentPainted();
+    revealPopupPrimaryOnce();
     const snapResult = await requestWatchPageSnapshotFromOpenTab(url);
     watchMetaCache.snapshot = snapResult.snapshot;
     watchSnapshot = watchMetaCache.snapshot;
@@ -7412,13 +7329,6 @@ function initPopup() {
   ensureStoryGrowthColorSchemeListener();
   applyResponsivePopupLayout();
   if (INLINE_EMBED_WATCH) {
-    const compose = document.querySelector('section.nl-comment-compose--primary');
-    if (compose instanceof HTMLElement) {
-      compose.setAttribute(
-        'aria-label',
-        '書き出しと再読み込み（コメント送信は watch の公式欄から）'
-      );
-    }
     const supportVisualDetails = /** @type {HTMLDetailsElement|null} */ (
       $('supportVisualDetails')
     );

@@ -275,8 +275,10 @@ describe('pickSupportGrowthFallbackTileSrc', () => {
     expect(pickSupportGrowthFallbackTileSrc('', '', y, tv)).toBe(tv);
     expect(pickSupportGrowthFallbackTileSrc('a:1', '', y, tv)).toBe(tv);
   });
-  it('数字IDで http 無しは yukkuriSrc（CDN は別経路で付く）', () => {
-    expect(pickSupportGrowthFallbackTileSrc('86255751', '', y, tv)).toBe(y);
+  it('数字IDで http 無しはニコ既定 usericon（こん太段のゆっくり誤表示を避ける）', () => {
+    expect(pickSupportGrowthFallbackTileSrc('86255751', '', y, tv)).toBe(
+      niconicoDefaultUserIconUrl('86255751')
+    );
   });
 });
 
@@ -329,13 +331,13 @@ describe('pickSupportGrowthTileWithOptionalIdenticon', () => {
     ).toBe(tv);
   });
 
-  it('数字IDは Identicon を使わない', () => {
+  it('数字IDは Identicon を使わずニコ既定 usericon', () => {
     expect(
       pickSupportGrowthTileWithOptionalIdenticon('86255751', '', y, tv, {
         anonymousIdenticonEnabled: true,
         anonymousIdenticonDataUrl: idn
       })
-    ).toBe(y);
+    ).toBe(niconicoDefaultUserIconUrl('86255751'));
   });
 
   it('ON でも data URL 空ならフォールバック', () => {

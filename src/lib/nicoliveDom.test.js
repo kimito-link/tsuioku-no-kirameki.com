@@ -174,7 +174,7 @@ describe('parseNicoLiveTableRow', () => {
     expect(parseNicoLiveTableRow(w.querySelector('.table-row'))).toBeNull();
   });
 
-  it('番号は1〜12桁まで受理（長時間配信の commentNo）、13桁以上は拒否', () => {
+  it('番号は1〜18桁まで受理（長時間配信の commentNo）、19桁以上は拒否', () => {
     const ok = document.createElement('div');
     ok.innerHTML = `
       <div class="table-row" data-comment-type="normal">
@@ -186,10 +186,21 @@ describe('parseNicoLiveTableRow', () => {
       text: 'ten digits',
       userId: null
     });
+    const ok13 = document.createElement('div');
+    ok13.innerHTML = `
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">1234567890123</span>
+        <span class="comment-text">13 digits</span>
+      </div>`;
+    expect(parseNicoLiveTableRow(ok13.querySelector('.table-row'))).toEqual({
+      commentNo: '1234567890123',
+      text: '13 digits',
+      userId: null
+    });
     const bad = document.createElement('div');
     bad.innerHTML = `
       <div class="table-row" data-comment-type="normal">
-        <span class="comment-number">1234567890123</span>
+        <span class="comment-number">1234567890123456789</span>
         <span class="comment-text">too long</span>
       </div>`;
     expect(parseNicoLiveTableRow(bad.querySelector('.table-row'))).toBeNull();
@@ -438,6 +449,18 @@ describe('extractCommentsFromNode', () => {
     expect(list).toHaveLength(2);
     expect(list[0].commentNo).toBe('1011');
     expect(list[1].commentNo).toBe('1012');
+  });
+
+  it('コメント番号が 12 桁超でも table-row を抽出する', () => {
+    const row = document.createElement('div');
+    row.className = 'table-row';
+    row.setAttribute('role', 'row');
+    row.innerHTML =
+      '<span class="comment-number">1234567890123</span><span class="comment-text">高桁</span>';
+    const list = extractCommentsFromNode(row);
+    expect(list).toEqual([
+      { commentNo: '1234567890123', text: '高桁', userId: null }
+    ]);
   });
 
   it('コメントパネル内の table-row を抽出（実DOMに近い）', () => {

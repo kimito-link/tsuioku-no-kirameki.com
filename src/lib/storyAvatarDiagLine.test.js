@@ -70,6 +70,19 @@ describe('formatStoryAvatarDiagLine', () => {
     expect(line).toContain('[ok_empty]');
     expect(line).toContain('(test)');
   });
+
+  it('ユーザーレーン候補の集計サフィックス', () => {
+    const line = formatStoryAvatarDiagLine({
+      ...base,
+      userLaneDeduped: 8,
+      userLaneTier3: 1,
+      userLaneTier2: 2,
+      userLaneTier1: 5,
+      userLaneStrongNick: 3,
+      userLanePersonalThumb: 4
+    });
+    expect(line).toContain('レーン候補8（り1/こ2/た5・強名3/個サ4）');
+  });
 });
 
 describe('buildStoryAvatarDiagHtml', () => {
@@ -83,5 +96,20 @@ describe('buildStoryAvatarDiagHtml', () => {
     expect(h).toContain('記録している応援コメント');
     expect(h).toContain('内訳・用語（詳しく見る）');
     expect(h).toContain('視聴ページの通信から拾った利用者情報');
+  });
+
+  it('ユーザーレーンの段の説明をリードに含められる', () => {
+    const h = buildStoryAvatarDiagHtml({
+      ...base,
+      userLaneDeduped: 6,
+      userLaneTier3: 0,
+      userLaneTier2: 1,
+      userLaneTier1: 5,
+      userLaneStrongNick: 2,
+      userLanePersonalThumb: 2
+    });
+    expect(h).toContain('ユーザーレーンの候補');
+    expect(h).toContain('りんく列相当 <strong>0</strong>');
+    expect(h).toContain('ユーザーレーンの段');
   });
 });

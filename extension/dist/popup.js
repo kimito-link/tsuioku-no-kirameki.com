@@ -324,7 +324,12 @@
     }
     const y = String(yukkuriSrc || "").trim();
     const t = String(tvSrc || "").trim();
-    return isAnonymousStyleNicoUserId(userId) ? t || y : y || t;
+    if (isAnonymousStyleNicoUserId(userId)) {
+      return t || y;
+    }
+    const syn = niconicoDefaultUserIconUrl(userId);
+    if (isHttpOrHttpsUrl(syn)) return syn;
+    return y || t;
   }
   function pickSupportGrowthTileWithOptionalIdenticon(userId, httpCandidate, yukkuriSrc, tvSrc, identiconOpts) {
     if (isHttpOrHttpsUrl(httpCandidate)) {
@@ -1066,6 +1071,84 @@
     return n;
   }
 
+  // src/lib/supportGridDisplayTier.js
+  var SUPPORT_GRID_TIER_RINK = "rink";
+  var SUPPORT_GRID_TIER_KONTA = "konta";
+  var SUPPORT_GRID_TIER_TANU = "tanu";
+  function supportGridPersonalThumbPreferredUrl(userId, httpAvatarCandidate, storedAvatarUrl) {
+    const u = String(userId || "").trim();
+    const http = String(httpAvatarCandidate ?? "").trim();
+    const raw = String(storedAvatarUrl ?? "").trim();
+    if (commentEnrichmentAvatarScore(u, raw) >= 2) return raw;
+    if (commentEnrichmentAvatarScore(u, http) >= 2) return http;
+    return "";
+  }
+  function supportGridTierHasPersonalThumb(userId, httpAvatarCandidate, storedAvatarUrl) {
+    return Boolean(
+      supportGridPersonalThumbPreferredUrl(userId, httpAvatarCandidate, storedAvatarUrl)
+    );
+  }
+  function supportGridStrongNickname(nick, userId) {
+    const n = String(nick ?? "").trim();
+    if (!n) return false;
+    if (isNiconicoAutoUserPlaceholderNickname(n)) return false;
+    if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)") return false;
+    if (n === "\u533F\u540D") return false;
+    if (isNiconicoAnonymousUserId(userId) && n.length <= 1) return false;
+    return true;
+  }
+  function bestAvatarScore(uid, httpCandidate, rawAv) {
+    const a = commentEnrichmentAvatarScore(uid, rawAv);
+    const b = commentEnrichmentAvatarScore(uid, httpCandidate);
+    return (
+      /** @type {0|1|2} */
+      Math.max(a, b)
+    );
+  }
+  function explainSupportGridDisplayTier(p) {
+    const uid = String(p?.userId ?? "").trim();
+    const nick = String(p?.nickname ?? "").trim();
+    const httpCandidate = String(p.httpAvatarCandidate ?? "").trim();
+    const rawAv = String(p.storedAvatarUrl ?? "").trim();
+    const strongNick = uid ? supportGridStrongNickname(nick, uid) : false;
+    const observed = Boolean(p?.avatarObserved);
+    let hasThumb = false;
+    if (p.lpMockHasCustomAvatar === true) hasThumb = true;
+    else if (p.lpMockHasCustomAvatar === false) hasThumb = false;
+    else if (uid) {
+      hasThumb = supportGridTierHasPersonalThumb(uid, httpCandidate, rawAv);
+    }
+    const avatarScore = uid ? bestAvatarScore(uid, httpCandidate, rawAv) : 0;
+    const hasAnyAvatar = avatarScore >= 1 || observed;
+    const storedAvatarScore = uid ? commentEnrichmentAvatarScore(uid, rawAv) : 0;
+    const hasObservedAvatar = storedAvatarScore >= 1;
+    const isNumericId = /^\d{5,14}$/.test(uid);
+    const TIER_RULES = [
+      { tier: SUPPORT_GRID_TIER_RINK, match: (f) => f.observed },
+      { tier: SUPPORT_GRID_TIER_RINK, match: (f) => f.strongNick && f.hasThumb },
+      { tier: SUPPORT_GRID_TIER_RINK, match: (f) => f.strongNick && f.isNumericId && f.hasObservedAvatar },
+      { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.strongNick || f.hasThumb },
+      { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.hasAnyAvatar },
+      { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.isNumericId }
+    ];
+    const flags = { observed, strongNick, hasThumb, hasAnyAvatar, hasObservedAvatar, isNumericId };
+    const tier = !uid ? SUPPORT_GRID_TIER_TANU : TIER_RULES.find((r) => r.match(flags))?.tier ?? SUPPORT_GRID_TIER_TANU;
+    const demotedAnonymousRinkToKonta = false;
+    return {
+      tier,
+      strongNick,
+      hasPersonalThumb: hasThumb,
+      hasAnyAvatar,
+      avatarObserved: observed,
+      demotedAnonymousRinkToKonta,
+      httpCandidateNonEmpty: Boolean(httpCandidate),
+      storedAvatarNonEmpty: Boolean(rawAv)
+    };
+  }
+  function supportGridDisplayTier(p) {
+    return explainSupportGridDisplayTier(p).tier;
+  }
+
   // src/lib/userCommentProfileCache.js
   var USER_COMMENT_PROFILE_CACHE_MAX = 5e3;
   function normalizeUserCommentProfileMap(raw) {
@@ -1144,6 +1227,13 @@
       avatarUrl: av
     });
   }
+  function isWeakMergedDisplayNickname(nick) {
+    const n = String(nick || "").trim();
+    if (!n) return true;
+    if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)" || n === "\u533F\u540D") return true;
+    if (isNiconicoAutoUserPlaceholderNickname(n)) return true;
+    return false;
+  }
   function applyUserCommentProfileMapToEntries(entries, map) {
     if (!Array.isArray(entries) || !entries.length || !Object.keys(map).length) {
       return { next: entries, patched: 0 };
@@ -1172,9 +1262,12 @@
         e
       );
       let changed = false;
-      if (candNick && (!curNick || candNick.length > curNick.length)) {
-        out = { ...out, nickname: candNick };
-        changed = true;
+      if (candNick) {
+        const preferNick = !curNick || candNick.length > curNick.length || isWeakMergedDisplayNickname(curNick) && supportGridStrongNickname(candNick, uid);
+        if (preferNick && candNick !== curNick) {
+          out = { ...out, nickname: candNick };
+          changed = true;
+        }
       }
       if (candAv && isHttpOrHttpsUrl(candAv) && !isWeakNiconicoUserIconHttpUrl(candAv)) {
         const curStrong = curAv && isHttpOrHttpsUrl(curAv) && !isWeakNiconicoUserIconHttpUrl(curAv);
@@ -1277,6 +1370,258 @@
       touched = true;
     }
     return touched;
+  }
+
+  // src/lib/storyUserLaneDisplaySrc.js
+  function userLaneHttpForTilePick(userId, primaryHttp, storedRaw) {
+    const preferred = supportGridPersonalThumbPreferredUrl(
+      String(userId ?? ""),
+      String(primaryHttp ?? ""),
+      String(storedRaw ?? "")
+    );
+    if (preferred) return preferred;
+    const h = String(primaryHttp ?? "").trim();
+    if (!isHttpOrHttpsUrl(h)) return "";
+    return h;
+  }
+  function pickStoryUserLaneCellDisplaySrc(p) {
+    const uid = String(p?.userId ?? "").trim();
+    const tier = Math.max(0, Math.floor(Number(p?.profileTier) || 0));
+    const httpRaw = String(p?.httpCandidate ?? "").trim();
+    const stripHttp = tier < 3 && isNiconicoAnonymousUserId(uid);
+    const http = stripHttp ? "" : httpRaw;
+    return pickSupportGrowthTileWithOptionalIdenticon(
+      uid,
+      http,
+      p.yukkuriSrc,
+      p.tvSrc,
+      p.identiconOpts
+    );
+  }
+
+  // src/lib/htmlEscape.js
+  function escapeHtml(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s);
+  }
+
+  // src/lib/storyUserLaneGuideHtml.js
+  function storyUserLaneGuideLine(src, textEscaped) {
+    return `<div class="nl-story-userlane-guide__line"><img class="nl-story-userlane-guide__face" src="${escapeAttr(src)}" alt="" width="24" height="24" decoding="async" /><span class="nl-story-userlane-guide__text">${textEscaped}</span></div>`;
+  }
+  function buildStoryUserLaneGuideTopHtml(faceRink) {
+    return storyUserLaneGuideLine(
+      faceRink,
+      escapeHtml(
+        "\u308A\u3093\u304F: \u30CB\u30B3\u751F\u306E\u30E6\u30FC\u30B6\u30FC\u8B58\u5225\u5B50\uFF08\u6570\u5024ID\u30FB\u533F\u540D\u306E a: \u5F62\u5F0F\uFF09\u304C\u4ED8\u3044\u305F\u5FDC\u63F4\u3060\u3051\u304C\u3053\u306E\u5217\u306B\u8F09\u308B\u3088\u3002\u4E26\u3073\u3067\u306F\u3001\u500B\u4EBA\u30B5\u30E0\u30CD\u3068\u300C\u533F\u540D\u300D\u300C\uFF08\u672A\u53D6\u5F97\uFF09\u300D\u300Cuser \u3068\u82F1\u6570\u5B57\u3060\u3051\u306E\u81EA\u52D5\u540D\u300D\u4EE5\u5916\u306E\u8868\u793A\u540D\u304C\u305D\u308D\u3063\u305F\u4EBA\u3092\u3044\u3061\u3070\u3093\u624B\u524D\u306B\u5BC4\u305B\u308B\u3088\u3002a: \u5F62\u5F0F\u3067\u3082\u3053\u306E\u6761\u4EF6\u3092\u6E80\u305F\u305B\u3070\u6700\u4E0A\u6BB5\u306B\u4E26\u3076\u3088\uFF08\u516C\u5F0F\u8868\u793A\u304C\u300C\u533F\u540D\u300D\u306E\u307E\u307E\u3060\u3068\u6BB5\u306F\u4E0A\u304C\u308A\u306B\u304F\u3044\uFF09\u3002\u30B5\u30E0\u30CD\u3068\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u3092\u6574\u3048\u3066\u3044\u308B\u3068\u3001\u914D\u4FE1\u8005\u5074\u304B\u3089\u3082\u898B\u3064\u3051\u3084\u3059\u304F\u306A\u308A\u3084\u3059\u3044\u3001\u3068\u3044\u3046\u6587\u8108\u3067\u3082\u3042\u308B\u3088\u3002"
+      )
+    );
+  }
+  function buildStoryUserLaneGuideKontaHtml(faceKonta) {
+    return storyUserLaneGuideLine(
+      faceKonta,
+      escapeHtml(
+        "\u3053\u3093\u592A: 2\u756A\u76EE\u306E\u512A\u5148\u3068\u3057\u3066\u3001\u8868\u793A\u540D\u304B\u500B\u4EBA\u30B5\u30E0\u30CD\u306E\u3069\u3061\u3089\u304B\u307E\u3067\u53D6\u308C\u305F\u4EBA\u306F\u3001\u305D\u306E\u6B21\u306E\u6BB5\u3068\u3057\u3066\u4E26\u3073\u3084\u3059\u3044\u3088\uFF08\u5168\u54E1\u3092\u96A0\u3059\u308F\u3051\u3058\u3083\u306A\u3044\u3088\uFF09\u3002"
+      )
+    );
+  }
+  function buildStoryUserLaneGuideTanuHtml(faceTanu) {
+    return storyUserLaneGuideLine(
+      faceTanu,
+      escapeHtml(
+        "\u305F\u306C\u59C9: ID\u304C\u53D6\u308C\u3066\u3044\u306A\u3044\u30B3\u30E1\u30F3\u30C8\u306F\u3001\u3053\u306E\u5217\u306B\u306F\u8F09\u305B\u306A\u3044\u3088\uFF08\u533A\u5225\u3067\u304D\u306A\u3044\u304B\u3089\uFF09\u3002\u3042\u3068\u53D6\u5F97\u304C\u8584\u3044\u4EBA\u306F\u4E26\u3073\u306E\u5F8C\u308D\u5BC4\u308A\u306B\u306A\u308A\u3084\u3059\u3044\u304B\u3089\u3001\u4E0B\u306E\u300C\u72B6\u6CC1\u306E\u8A73\u7D30\u300D\u3067\u6B20\u3051\u3092\u78BA\u8A8D\u3057\u3066\u306D\u3002"
+      )
+    );
+  }
+  function buildStoryUserLaneGuideFootHtml(displayCount) {
+    const n = Math.max(0, Math.floor(Number(displayCount) || 0));
+    return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(`\u3044\u307E ${n} \u4EF6\u3092\u8868\u793A\u4E2D`)}</p>`;
+  }
+
+  // src/extension/story/renderStoryUserLaneDom.js
+  function resetStoryUserLaneDom(els) {
+    const {
+      stack,
+      laneRink,
+      laneKonta,
+      laneTanu,
+      hintRink,
+      rinkWrap,
+      guideTop,
+      guideLinesTop,
+      guideMidKonta,
+      guideLinesMidKonta,
+      guideMidTanu,
+      guideLinesMidTanu,
+      guideBottom,
+      guideLinesBottom
+    } = els;
+    laneRink.innerHTML = "";
+    laneKonta.innerHTML = "";
+    laneTanu.innerHTML = "";
+    laneRink.hidden = true;
+    laneKonta.hidden = true;
+    laneTanu.hidden = true;
+    if (hintRink) hintRink.hidden = true;
+    if (rinkWrap) rinkWrap.hidden = true;
+    if (guideMidKonta) guideMidKonta.hidden = true;
+    if (guideLinesMidKonta) guideLinesMidKonta.innerHTML = "";
+    if (guideMidTanu) guideMidTanu.hidden = true;
+    if (guideLinesMidTanu) guideLinesMidTanu.innerHTML = "";
+    stack.hidden = true;
+    if (guideTop) guideTop.hidden = true;
+    if (guideLinesTop) guideLinesTop.innerHTML = "";
+    if (guideBottom) guideBottom.hidden = true;
+    if (guideLinesBottom) guideLinesBottom.innerHTML = "";
+  }
+  function fillLaneTier(el, items, io) {
+    el.innerHTML = "";
+    if (!items.length) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    const frag = document.createDocumentFragment();
+    for (const p of items) {
+      const cell = document.createElement("span");
+      cell.className = "nl-story-userlane-cell";
+      const img = document.createElement("img");
+      img.className = "nl-story-userlane-avatar";
+      const requestedLane = p.displaySrc;
+      const displayLane = io.storyAvatarLoadGuard.pickDisplaySrc(requestedLane);
+      img.src = displayLane;
+      io.storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
+      img.classList.toggle(
+        "nl-avatar--tv-fallback",
+        io.storyTileUsesYukkuriTvStyle(requestedLane, displayLane)
+      );
+      img.alt = "";
+      const fullUid = String(p.entry?.userId || "").trim();
+      const tip = fullUid && fullUid !== p.meta.idLine ? `${p.title} | ${fullUid}` : p.title;
+      img.title = tip;
+      cell.title = tip;
+      img.decoding = "async";
+      if (io.isHttpOrHttpsUrl(img.src)) {
+        img.referrerPolicy = "no-referrer";
+      }
+      const metaEl = document.createElement("span");
+      metaEl.className = "nl-story-userlane-meta";
+      const idRow = document.createElement("span");
+      idRow.className = "nl-story-userlane-meta__id";
+      idRow.textContent = p.meta.idLine;
+      const nameRow = document.createElement("span");
+      nameRow.className = "nl-story-userlane-meta__name";
+      nameRow.textContent = p.meta.nameLine;
+      metaEl.appendChild(idRow);
+      metaEl.appendChild(nameRow);
+      cell.appendChild(img);
+      cell.appendChild(metaEl);
+      frag.appendChild(cell);
+    }
+    el.appendChild(frag);
+  }
+  function paintStoryUserLaneDomFilled(els, faces, buckets, pickedLength, io) {
+    const {
+      stack,
+      laneRink,
+      laneKonta,
+      laneTanu,
+      hintRink,
+      rinkWrap,
+      guideTop,
+      guideLinesTop,
+      guideMidKonta,
+      guideLinesMidKonta,
+      guideMidTanu,
+      guideLinesMidTanu,
+      guideBottom,
+      guideLinesBottom
+    } = els;
+    fillLaneTier(laneRink, buckets.rink, io);
+    fillLaneTier(laneKonta, buckets.konta, io);
+    fillLaneTier(laneTanu, buckets.tanu, io);
+    if (hintRink) {
+      const showRinkHint = buckets.rink.length === 0 && (buckets.konta.length > 0 || buckets.tanu.length > 0);
+      hintRink.hidden = !showRinkHint;
+    }
+    if (rinkWrap) {
+      const showRinkWrap = !laneRink.hidden || hintRink && !hintRink.hidden;
+      rinkWrap.hidden = !showRinkWrap;
+    }
+    stack.setAttribute(
+      "aria-label",
+      `\u6700\u8FD1\u306E\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30B5\u30E0\u30CD\u30A4\u30EB\uFF08\u308A\u3093\u304F\u30FB\u3053\u3093\u592A\u30FB\u305F\u306C\u59C9\u306E\u4E09\u6BB5\uFF09\u5408\u8A08${pickedLength}\u4EF6`
+    );
+    stack.hidden = false;
+    if (guideLinesTop) {
+      guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceRink);
+    }
+    if (guideTop) guideTop.hidden = false;
+    if (guideLinesMidKonta) {
+      guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
+        faces.faceKonta
+      );
+    }
+    if (guideMidKonta) guideMidKonta.hidden = false;
+    if (guideLinesMidTanu) {
+      guideLinesMidTanu.innerHTML = buildStoryUserLaneGuideTanuHtml(
+        faces.faceTanu
+      );
+    }
+    if (guideMidTanu) guideMidTanu.hidden = false;
+    if (guideLinesBottom) {
+      guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(pickedLength);
+    }
+    if (guideBottom) guideBottom.hidden = false;
+  }
+  function paintStoryUserLaneDomEmptyGuides(els, faces) {
+    const {
+      stack,
+      laneRink,
+      laneKonta,
+      laneTanu,
+      hintRink,
+      rinkWrap,
+      guideTop,
+      guideLinesTop,
+      guideMidKonta,
+      guideLinesMidKonta,
+      guideMidTanu,
+      guideLinesMidTanu,
+      guideBottom,
+      guideLinesBottom
+    } = els;
+    laneRink.innerHTML = "";
+    laneKonta.innerHTML = "";
+    laneTanu.innerHTML = "";
+    laneRink.hidden = true;
+    laneKonta.hidden = true;
+    laneTanu.hidden = true;
+    if (hintRink) hintRink.hidden = true;
+    if (rinkWrap) rinkWrap.hidden = true;
+    stack.hidden = false;
+    if (guideLinesTop) {
+      guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceRink);
+    }
+    if (guideTop) guideTop.hidden = false;
+    if (guideLinesMidKonta) {
+      guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
+        faces.faceKonta
+      );
+    }
+    if (guideMidKonta) guideMidKonta.hidden = false;
+    if (guideLinesMidTanu) {
+      guideLinesMidTanu.innerHTML = buildStoryUserLaneGuideTanuHtml(
+        faces.faceTanu
+      );
+    }
+    if (guideMidTanu) guideMidTanu.hidden = false;
+    if (guideLinesBottom) {
+      guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(0);
+    }
+    if (guideBottom) guideBottom.hidden = false;
   }
 
   // src/lib/anonymousIdenticon.js
@@ -1435,14 +1780,6 @@
     return errLid === v;
   }
 
-  // src/lib/htmlEscape.js
-  function escapeHtml(s) {
-    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
-  function escapeAttr(s) {
-    return escapeHtml(s);
-  }
-
   // src/lib/topSupportRankStripLines.js
   function topSupportRankLineModels(stripRooms, opts) {
     const defaultThumb = String(opts?.defaultThumbSrc || "").trim();
@@ -1532,55 +1869,6 @@ ${n}
 ${body}`;
   }
 
-  // src/lib/supportGridDisplayTier.js
-  var SUPPORT_GRID_TIER_RINK = "rink";
-  var SUPPORT_GRID_TIER_KONTA = "konta";
-  var SUPPORT_GRID_TIER_TANU = "tanu";
-  function goodUserThumbUrl(u) {
-    const s = String(u || "").trim();
-    return isHttpOrHttpsUrl(s) && !isWeakNiconicoUserIconHttpUrl(s);
-  }
-  function supportGridTierHasPersonalThumb(userId, httpAvatarCandidate, storedAvatarUrl) {
-    const u = String(userId || "").trim();
-    const http = String(httpAvatarCandidate ?? "").trim();
-    const raw = String(storedAvatarUrl ?? "").trim();
-    const syn = u && /^\d{5,14}$/.test(u) ? String(niconicoDefaultUserIconUrl(u) || "").trim() : "";
-    if (goodUserThumbUrl(raw)) return true;
-    if (goodUserThumbUrl(http) && (!syn || http !== syn)) return true;
-    return false;
-  }
-  function supportGridStrongNickname(nick, userId) {
-    const n = String(nick ?? "").trim();
-    if (!n) return false;
-    if (isNiconicoAutoUserPlaceholderNickname(n)) return false;
-    if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)") return false;
-    if (n === "\u533F\u540D") return false;
-    if (isNiconicoAnonymousUserId(userId) && n.length <= 1) return false;
-    return true;
-  }
-  function supportGridDisplayTier(p) {
-    const uid = String(p?.userId ?? "").trim();
-    if (!uid) return SUPPORT_GRID_TIER_TANU;
-    let hasThumb = false;
-    if (p.lpMockHasCustomAvatar === true) hasThumb = true;
-    else if (p.lpMockHasCustomAvatar === false) hasThumb = false;
-    else {
-      const httpCandidate = String(p.httpAvatarCandidate ?? "").trim();
-      const rawAv = String(p.storedAvatarUrl ?? "").trim();
-      hasThumb = supportGridTierHasPersonalThumb(uid, httpCandidate, rawAv);
-    }
-    const nick = String(p?.nickname ?? "").trim();
-    const strongNick = supportGridStrongNickname(nick, uid);
-    let tier;
-    if (strongNick && hasThumb) tier = SUPPORT_GRID_TIER_RINK;
-    else if (strongNick || hasThumb) tier = SUPPORT_GRID_TIER_KONTA;
-    else tier = SUPPORT_GRID_TIER_TANU;
-    if (isNiconicoAnonymousUserId(uid) && tier === SUPPORT_GRID_TIER_RINK) {
-      return SUPPORT_GRID_TIER_KONTA;
-    }
-    return tier;
-  }
-
   // src/lib/storyUserLaneBuckets.js
   function bucketStoryUserLanePicks(sortedCandidates, maxTotal) {
     const n = Math.max(0, Math.floor(Number(maxTotal) || 0));
@@ -1599,37 +1887,51 @@ ${body}`;
     return [...b.rink, ...b.konta, ...b.tanu];
   }
 
-  // src/lib/storyUserLaneGuideHtml.js
-  function storyUserLaneGuideLine(src, textEscaped) {
-    return `<div class="nl-story-userlane-guide__line"><img class="nl-story-userlane-guide__face" src="${escapeAttr(src)}" alt="" width="24" height="24" decoding="async" /><span class="nl-story-userlane-guide__text">${textEscaped}</span></div>`;
+  // src/lib/storyUserLaneRowModel.js
+  function userLaneProfileCompletenessTier(entry, httpAvatarCandidate) {
+    const uid = String(entry?.userId || "").trim();
+    if (!uid) return 0;
+    const nick = String(entry?.nickname || "").trim();
+    const rawAv = String(entry?.avatarUrl || "").trim();
+    const t = supportGridDisplayTier({
+      userId: uid,
+      nickname: nick,
+      httpAvatarCandidate: String(httpAvatarCandidate ?? "").trim(),
+      storedAvatarUrl: rawAv,
+      avatarObserved: Boolean(entry?.avatarObserved)
+    });
+    if (t === SUPPORT_GRID_TIER_RINK) return 3;
+    if (t === SUPPORT_GRID_TIER_KONTA) return 2;
+    return 1;
   }
-  function buildStoryUserLaneGuideTopHtml(faceRink) {
-    return storyUserLaneGuideLine(
-      faceRink,
-      escapeHtml(
-        "\u308A\u3093\u304F: \u30CB\u30B3\u751F\u306E\u30E6\u30FC\u30B6\u30FC\u8B58\u5225\u5B50\uFF08\u6570\u5024ID\u30FB\u533F\u540D\u306E a: \u5F62\u5F0F\uFF09\u304C\u4ED8\u3044\u305F\u5FDC\u63F4\u3060\u3051\u304C\u3053\u306E\u5217\u306B\u8F09\u308B\u3088\u3002\u4E26\u3073\u3067\u306F\u3001\u500B\u4EBA\u30B5\u30E0\u30CD\u3068\u300C\u533F\u540D\u300D\u300C\uFF08\u672A\u53D6\u5F97\uFF09\u300D\u300Cuser \u3068\u82F1\u6570\u5B57\u3060\u3051\u306E\u81EA\u52D5\u540D\u300D\u4EE5\u5916\u306E\u8868\u793A\u540D\u304C\u305D\u308D\u3063\u305F\u4EBA\u3092\u3044\u3061\u3070\u3093\u624B\u524D\u306B\u5BC4\u305B\u308B\u3088\u3002\u533F\u540D ID \u306F\u6700\u4E0A\u6BB5\uFF08\u308A\u3093\u304F\u5217\uFF09\u306B\u306F\u4E0A\u3052\u305A\u3001\u3053\u3093\u592A\u5217\u307E\u3067\u306B\u7559\u3081\u308B\u3088\u3002\u30B5\u30E0\u30CD\u3068\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u3092\u6574\u3048\u3066\u3044\u308B\u3068\u3001\u914D\u4FE1\u8005\u5074\u304B\u3089\u3082\u898B\u3064\u3051\u3084\u3059\u304F\u306A\u308A\u3084\u3059\u3044\u3001\u3068\u3044\u3046\u6587\u8108\u3067\u3082\u3042\u308B\u3088\u3002"
-      )
-    );
-  }
-  function buildStoryUserLaneGuideKontaHtml(faceKonta) {
-    return storyUserLaneGuideLine(
-      faceKonta,
-      escapeHtml(
-        "\u3053\u3093\u592A: 2\u756A\u76EE\u306E\u512A\u5148\u3068\u3057\u3066\u3001\u8868\u793A\u540D\u304B\u500B\u4EBA\u30B5\u30E0\u30CD\u306E\u3069\u3061\u3089\u304B\u307E\u3067\u53D6\u308C\u305F\u4EBA\u306F\u3001\u305D\u306E\u6B21\u306E\u6BB5\u3068\u3057\u3066\u4E26\u3073\u3084\u3059\u3044\u3088\uFF08\u5168\u54E1\u3092\u96A0\u3059\u308F\u3051\u3058\u3083\u306A\u3044\u3088\uFF09\u3002"
-      )
-    );
-  }
-  function buildStoryUserLaneGuideTanuHtml(faceTanu) {
-    return storyUserLaneGuideLine(
-      faceTanu,
-      escapeHtml(
-        "\u305F\u306C\u59C9: ID\u304C\u53D6\u308C\u3066\u3044\u306A\u3044\u30B3\u30E1\u30F3\u30C8\u306F\u3001\u3053\u306E\u5217\u306B\u306F\u8F09\u305B\u306A\u3044\u3088\uFF08\u533A\u5225\u3067\u304D\u306A\u3044\u304B\u3089\uFF09\u3002\u3042\u3068\u53D6\u5F97\u304C\u8584\u3044\u4EBA\u306F\u4E26\u3073\u306E\u5F8C\u308D\u5BC4\u308A\u306B\u306A\u308A\u3084\u3059\u3044\u304B\u3089\u3001\u4E0B\u306E\u300C\u72B6\u6CC1\u306E\u8A73\u7D30\u300D\u3067\u6B20\u3051\u3092\u78BA\u8A8D\u3057\u3066\u306D\u3002"
-      )
-    );
-  }
-  function buildStoryUserLaneGuideFootHtml(displayCount) {
-    const n = Math.max(0, Math.floor(Number(displayCount) || 0));
-    return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(`\u3044\u307E ${n} \u4EF6\u3092\u8868\u793A\u4E2D`)}</p>`;
+  function buildStoryUserLaneCandidateRow(entry, entryIndex, httpFromGrowth, pickCtx) {
+    const uidRaw = String(entry?.userId || "").trim();
+    if (!uidRaw) return null;
+    const rawAvStored = String(entry?.avatarUrl || "").trim();
+    const httpTrim = String(httpFromGrowth ?? "").trim();
+    const httpForLane = userLaneHttpForTilePick(uidRaw, httpTrim, rawAvStored);
+    const profileTier = userLaneProfileCompletenessTier(entry, rawAvStored);
+    const displaySrc = pickStoryUserLaneCellDisplaySrc({
+      userId: entry?.userId,
+      httpCandidate: httpForLane,
+      profileTier,
+      yukkuriSrc: pickCtx.yukkuriSrc,
+      tvSrc: pickCtx.tvSrc,
+      identiconOpts: {
+        anonymousIdenticonEnabled: pickCtx.anonymousIdenticonEnabled,
+        anonymousIdenticonDataUrl: String(pickCtx.anonymousIdenticonDataUrl ?? "")
+      }
+    });
+    if (!displaySrc) return null;
+    const thumbScore = userLaneResolvedThumbScore(entry?.userId, httpForLane);
+    return {
+      entryIndex,
+      profileTier,
+      thumbScore,
+      displaySrc,
+      httpForLane,
+      entry
+    };
   }
 
   // src/lib/htmlReportConceptGuide.js
@@ -3381,6 +3683,15 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (exCode) line += ` [${exCode}]`;
       if (exDetail) line += ` (${exDetail})`;
     }
+    const ulDed = Math.max(0, Math.floor(Number(s.userLaneDeduped) || 0));
+    if (ulDed > 0) {
+      const t3 = Math.max(0, Math.floor(Number(s.userLaneTier3) || 0));
+      const t2 = Math.max(0, Math.floor(Number(s.userLaneTier2) || 0));
+      const t1 = Math.max(0, Math.floor(Number(s.userLaneTier1) || 0));
+      const sn = Math.max(0, Math.floor(Number(s.userLaneStrongNick) || 0));
+      const th = Math.max(0, Math.floor(Number(s.userLanePersonalThumb) || 0));
+      line += ` / \u30EC\u30FC\u30F3\u5019\u88DC${ulDed}\uFF08\u308A${t3}/\u3053${t2}/\u305F${t1}\u30FB\u5F37\u540D${sn}/\u500B\u30B5${th}\uFF09`;
+    }
     return line;
   }
   function buildStoryAvatarDiagHtml(s) {
@@ -3405,6 +3716,17 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         `\u8996\u8074\u30DA\u30FC\u30B8\u306E\u901A\u4FE1\u304B\u3089\u62FE\u3063\u305F\u5229\u7528\u8005\u60C5\u5831\uFF08\u30A2\u30A4\u30B3\u30F3\u3084\u540D\u524D\u306E\u88DC\u52A9\uFF09\u304C <strong>${s.interceptItems}</strong> \u4EF6\u5206\u3042\u308A\u307E\u3059\u3002`
       );
     }
+    const ulDed = Math.max(0, Math.floor(Number(s.userLaneDeduped) || 0));
+    if (ulDed > 0) {
+      const t3 = Math.max(0, Math.floor(Number(s.userLaneTier3) || 0));
+      const t2 = Math.max(0, Math.floor(Number(s.userLaneTier2) || 0));
+      const t1 = Math.max(0, Math.floor(Number(s.userLaneTier1) || 0));
+      const sn = Math.max(0, Math.floor(Number(s.userLaneStrongNick) || 0));
+      const th = Math.max(0, Math.floor(Number(s.userLanePersonalThumb) || 0));
+      leadParts.push(
+        `\u30E6\u30FC\u30B6\u30FC\u30EC\u30FC\u30F3\u306E\u5019\u88DC\uFF08\u91CD\u8907\u306E\u306A\u3044\u5229\u7528\u8005\uFF09<strong>${ulDed}</strong> \u4EF6\u306E\u3046\u3061\u3001\u308A\u3093\u304F\u5217\u76F8\u5F53 <strong>${t3}</strong>\u30FB\u3053\u3093\u592A <strong>${t2}</strong>\u30FB\u305F\u306C\u59C9 <strong>${t1}</strong>\u3002\u5F37\u3044\u8868\u793A\u540D\u3068\u3057\u3066\u6271\u3048\u305F\u306E\u306F <strong>${sn}</strong> \u4EF6\u3001\u500B\u4EBA\u30B5\u30E0\u30CD\u3042\u308A\u306F <strong>${th}</strong> \u4EF6\u3067\u3059\uFF08\u30CB\u30B3\u306E\u300Cuser \u82F1\u6570\u5B57\u300D\u4EEE\u540D\u306F\u5F37\u3044\u8868\u793A\u540D\u306B\u5165\u308A\u307E\u305B\u3093\uFF09\u3002`
+      );
+    }
     const mapOn = typeof s.interceptMapOnPage === "number" && s.interceptMapOnPage >= 0 ? s.interceptMapOnPage : null;
     const exCode = String(s.interceptExportCode || "").trim();
     if (mapOn != null || exCode) {
@@ -3427,7 +3749,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       leadParts.push(extra.join(" "));
     }
     const technical = formatStoryAvatarDiagLine(s);
-    const glossary = '<ul class="nl-story-diag__list"><li><strong>\u4FDD\u5B58\u30A2\u30A4\u30B3\u30F3</strong>\uFF1A\u3053\u306EPC\u306E\u8A18\u9332\u306B\u3001\u30A2\u30A4\u30B3\u30F3\u306EURL\u3068\u3057\u3066\u6B8B\u3063\u3066\u3044\u308B\u4EF6\u6570\u3067\u3059\u3002</li><li><strong>\u8868\u793A\u30A2\u30A4\u30B3\u30F3</strong>\uFF1A\u30B0\u30EA\u30C3\u30C9\u306A\u3069\u3067\u5B9F\u969B\u306B\u753B\u50CF\u3068\u3057\u3066\u4F7F\u3048\u3066\u3044\u308B\u4EF6\u6570\u3067\u3059\u3002</li><li><strong>\u30DA\u30FC\u30B8\u304B\u3089\u62FE\u3063\u305F\u88DC\u52A9</strong>\uFF1A\u30CB\u30B3\u751F\u306E\u30DA\u30FC\u30B8\u304C\u8AAD\u307F\u53D6\u308B\u901A\u4FE1\u304B\u3089\u3001\u62E1\u5F35\u304C\u5229\u7528\u8005\u8868\u793A\u3092\u88DC\u3046\u305F\u3081\u306B\u4F7F\u3046\u60C5\u5831\u3067\u3059\uFF08\u672C\u6587\u306F\u4FDD\u5B58\u3057\u307E\u305B\u3093\uFF09\u3002</li><li><strong>\u4E00\u6642\u5BFE\u5FDC\u8868</strong>\uFF1A\u958B\u3044\u3066\u3044\u308B watch \u30BF\u30D6\u306E\u30E1\u30E2\u30EA\u4E0A\u3060\u3051\u306B\u3042\u308B\u5BFE\u5FDC\u8868\u3067\u3001\u30AD\u30E3\u30C3\u30B7\u30E5\u3068\u306F\u5225\u3067\u3059\u3002</li></ul>';
+    const glossary = '<ul class="nl-story-diag__list"><li><strong>\u4FDD\u5B58\u30A2\u30A4\u30B3\u30F3</strong>\uFF1A\u3053\u306EPC\u306E\u8A18\u9332\u306B\u3001\u30A2\u30A4\u30B3\u30F3\u306EURL\u3068\u3057\u3066\u6B8B\u3063\u3066\u3044\u308B\u4EF6\u6570\u3067\u3059\u3002</li><li><strong>\u8868\u793A\u30A2\u30A4\u30B3\u30F3</strong>\uFF1A\u30B0\u30EA\u30C3\u30C9\u306A\u3069\u3067\u5B9F\u969B\u306B\u753B\u50CF\u3068\u3057\u3066\u4F7F\u3048\u3066\u3044\u308B\u4EF6\u6570\u3067\u3059\u3002</li><li><strong>\u30DA\u30FC\u30B8\u304B\u3089\u62FE\u3063\u305F\u88DC\u52A9</strong>\uFF1A\u30CB\u30B3\u751F\u306E\u30DA\u30FC\u30B8\u304C\u8AAD\u307F\u53D6\u308B\u901A\u4FE1\u304B\u3089\u3001\u62E1\u5F35\u304C\u5229\u7528\u8005\u8868\u793A\u3092\u88DC\u3046\u305F\u3081\u306B\u4F7F\u3046\u60C5\u5831\u3067\u3059\uFF08\u672C\u6587\u306F\u4FDD\u5B58\u3057\u307E\u305B\u3093\uFF09\u3002</li><li><strong>\u4E00\u6642\u5BFE\u5FDC\u8868</strong>\uFF1A\u958B\u3044\u3066\u3044\u308B watch \u30BF\u30D6\u306E\u30E1\u30E2\u30EA\u4E0A\u3060\u3051\u306B\u3042\u308B\u5BFE\u5FDC\u8868\u3067\u3001\u30AD\u30E3\u30C3\u30B7\u30E5\u3068\u306F\u5225\u3067\u3059\u3002</li><li><strong>\u30E6\u30FC\u30B6\u30FC\u30EC\u30FC\u30F3\u306E\u6BB5</strong>\uFF1A\u8A18\u9332\u30B3\u30E1\u30F3\u30C8\u306E\u8868\u793A\u540D\u30FB\u30B5\u30E0\u30CDURL\u30FB\u6210\u9577\u30BF\u30A4\u30EB\u7528\u306E\u89E3\u6C7A\u7D50\u679C\u304B\u3089\u300C\u5F37\u3044\u540D\u524D\u300D\u300C\u500B\u4EBA\u30B5\u30E0\u30CD\u300D\u3092\u5224\u5B9A\u3057\u3066\u3044\u307E\u3059\u3002\u516C\u5F0F\u306E\u4EEE\u540D\u306E\u307E\u307E\u3060\u3068\u3053\u3093\u592A\u30FB\u305F\u306C\u59C9\u306B\u5BC4\u308A\u3084\u3059\u3044\u3067\u3059\u3002</li></ul>';
     return `<div class="nl-story-diag"><p class="nl-story-diag__lead">${leadParts.join(" ")}</p><details class="nl-story-diag__more"><summary class="nl-story-diag__summary">\u5185\u8A33\u30FB\u7528\u8A9E\uFF08\u8A73\u3057\u304F\u898B\u308B\uFF09</summary><div class="nl-story-diag__body">` + glossary + (technical ? `<p class="nl-story-diag__technical">${escapeHtml(technical)}</p>` : "") + `</div></details></div>`;
   }
 
@@ -3869,7 +4191,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const num = parseInt(value, 10);
     if (!Number.isNaN(num) && _prevSupportCount != null && num > _prevSupportCount) {
       const card = document.getElementById("supportVisualLiveCard");
-      const icon = card?.querySelector(".nl-live-stat-icon");
+      const icon = card?.querySelector(":scope > img.nl-live-stat-icon");
       triggerCharaReaction(icon ?? null, {
         delta: num - _prevSupportCount,
         thresholds: [1, 3, 10],
@@ -5210,23 +5532,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   }
   function storyGrowthTileSrcForEntry(entry, liveId, entries = STORY_SOURCE_STATE.entries) {
     const candidate = storyGrowthAvatarSrcCandidate(entry, liveId, entries);
-    if (candidate) return candidate;
-    return pickSupportGrowthTileForStory(entry?.userId, "");
-  }
-  function userLaneProfileCompletenessTier(entry, httpCandidate) {
     const uid = String(entry?.userId || "").trim();
-    if (!uid) return 0;
-    const nick = String(entry?.nickname || "").trim();
-    const rawAv = String(entry?.avatarUrl || "").trim();
-    const t = supportGridDisplayTier({
-      userId: uid,
-      nickname: nick,
-      httpAvatarCandidate: httpCandidate,
-      storedAvatarUrl: rawAv
-    });
-    if (t === SUPPORT_GRID_TIER_RINK) return 3;
-    if (t === SUPPORT_GRID_TIER_KONTA) return 2;
-    return 1;
+    const raw = String(entry?.avatarUrl || "").trim();
+    const merged = userLaneHttpForTilePick(uid, candidate, raw);
+    if (merged) return merged;
+    return pickSupportGrowthTileForStory(entry?.userId, "");
   }
   function storyUserLaneMetaLines(entry, httpCandidate, userLaneDedupeKey2 = "") {
     const uid = String(entry?.userId || "").trim();
@@ -5473,7 +5783,14 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     /** 直近 export 試行の理由コード（no_watch_tab / export_rejected / message_failed / ok_empty / ok 等） */
     interceptExportCode: "",
     /** export 失敗時の短い補足（PII なし） */
-    interceptExportDetail: ""
+    interceptExportDetail: "",
+    /** ユーザーレーン dedupe 後の候補数（explainSupportGridDisplayTier 集計用） */
+    userLaneDeduped: 0,
+    userLaneTier3: 0,
+    userLaneTier2: 0,
+    userLaneTier1: 0,
+    userLaneStrongNick: 0,
+    userLanePersonalThumb: 0
   };
   var storyUserLaneLastRenderSig = "";
   function commentStableId(entry) {
@@ -5703,31 +6020,48 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       $("sceneStoryUserLaneGuideLinesBottom")
     );
     if (!stack || !laneRink || !laneKonta || !laneTanu) return;
-    const clearMidGuides = () => {
-      if (guideMidKonta) guideMidKonta.hidden = true;
-      if (guideLinesMidKonta) guideLinesMidKonta.innerHTML = "";
-      if (guideMidTanu) guideMidTanu.hidden = true;
-      if (guideLinesMidTanu) guideLinesMidTanu.innerHTML = "";
+    const els = {
+      stack,
+      laneRink,
+      laneKonta,
+      laneTanu,
+      hintRink,
+      rinkWrap,
+      guideTop,
+      guideLinesTop,
+      guideMidKonta,
+      guideLinesMidKonta,
+      guideMidTanu,
+      guideLinesMidTanu,
+      guideBottom,
+      guideLinesBottom
     };
-    const resetLaneTierCells = () => {
-      laneRink.innerHTML = "";
-      laneKonta.innerHTML = "";
-      laneTanu.innerHTML = "";
-      laneRink.hidden = true;
-      laneKonta.hidden = true;
-      laneTanu.hidden = true;
-      if (hintRink) hintRink.hidden = true;
-      if (rinkWrap) rinkWrap.hidden = true;
+    const faces = {
+      faceRink: STORY_GUIDE_FACE_RINK,
+      faceKonta: STORY_GUIDE_FACE_KONTA,
+      faceTanu: STORY_GUIDE_FACE_TANU
     };
-    const hideUserLaneStackFully = () => {
-      resetLaneTierCells();
-      clearMidGuides();
-      stack.hidden = true;
+    const laneDomIo = {
+      storyAvatarLoadGuard,
+      isHttpOrHttpsUrl,
+      storyTileUsesYukkuriTvStyle
+    };
+    const lanePickCtx = {
+      yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
+      tvSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
+      anonymousIdenticonEnabled: anonymousIdenticonRuntimeEnabled,
+      anonymousIdenticonDataUrl: ""
     };
     const entries = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
     if (!entries.length) {
       storyUserLaneLastRenderSig = "";
-      hideUserLaneStackFully();
+      STORY_AVATAR_DIAG_STATE.userLaneDeduped = 0;
+      STORY_AVATAR_DIAG_STATE.userLaneTier3 = 0;
+      STORY_AVATAR_DIAG_STATE.userLaneTier2 = 0;
+      STORY_AVATAR_DIAG_STATE.userLaneTier1 = 0;
+      STORY_AVATAR_DIAG_STATE.userLaneStrongNick = 0;
+      STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = 0;
+      resetStoryUserLaneDom(els);
       if (guideTop) guideTop.hidden = true;
       if (guideLinesTop) guideLinesTop.innerHTML = "";
       if (guideBottom) guideBottom.hidden = true;
@@ -5739,11 +6073,17 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const liveId = String(STORY_SOURCE_STATE.liveId || "");
     const laneScheme = getStoryColorScheme();
     const candidates = [];
+    let laneDiagDeduped = 0;
+    let laneDiagT3 = 0;
+    let laneDiagT2 = 0;
+    let laneDiagT1 = 0;
+    let laneDiagStrongNick = 0;
+    let laneDiagPersonalThumb = 0;
     for (let i = entries.length - 1; i >= 0; i -= 1) {
       const e = entries[i];
       const uidRaw = String(e?.userId || "").trim();
       if (!uidRaw) continue;
-      const httpCandidate = storyGrowthAvatarSrcCandidate(e, liveId);
+      const httpFromGrowth = storyGrowthAvatarSrcCandidate(e, liveId);
       const dedupeKey = userLaneDedupeKey({
         userId: uidRaw,
         avatarHttpCandidate: "",
@@ -5752,22 +6092,39 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (!dedupeKey) continue;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
-      const displaySrc = pickSupportGrowthTileForStory(e?.userId, httpCandidate);
-      if (!displaySrc) continue;
+      lanePickCtx.anonymousIdenticonDataUrl = getCachedAnonymousIdenticonDataUrl(e?.userId);
+      const row = buildStoryUserLaneCandidateRow(e, i, httpFromGrowth, lanePickCtx);
+      if (!row) continue;
+      const ex = explainSupportGridDisplayTier({
+        userId: uidRaw,
+        nickname: e?.nickname,
+        httpAvatarCandidate: row.httpForLane,
+        storedAvatarUrl: e?.avatarUrl
+      });
+      laneDiagDeduped += 1;
+      if (ex.strongNick) laneDiagStrongNick += 1;
+      if (ex.hasPersonalThumb) laneDiagPersonalThumb += 1;
+      if (row.profileTier === 3) laneDiagT3 += 1;
+      else if (row.profileTier === 2) laneDiagT2 += 1;
+      else laneDiagT1 += 1;
       const label = storyGrowthDisplayLabel(e, liveId) || "\u30E6\u30FC\u30B6\u30FC";
-      const meta = storyUserLaneMetaLines(e, httpCandidate, dedupeKey);
-      const thumbScore = userLaneResolvedThumbScore(e?.userId, httpCandidate);
-      const profileTier = userLaneProfileCompletenessTier(e, httpCandidate);
+      const meta = storyUserLaneMetaLines(e, row.httpForLane, dedupeKey);
       candidates.push({
-        entryIndex: i,
-        profileTier,
-        thumbScore,
-        displaySrc,
+        entryIndex: row.entryIndex,
+        profileTier: row.profileTier,
+        thumbScore: row.thumbScore,
+        displaySrc: row.displaySrc,
         title: label,
-        entry: e,
+        entry: row.entry,
         meta
       });
     }
+    STORY_AVATAR_DIAG_STATE.userLaneDeduped = laneDiagDeduped;
+    STORY_AVATAR_DIAG_STATE.userLaneTier3 = laneDiagT3;
+    STORY_AVATAR_DIAG_STATE.userLaneTier2 = laneDiagT2;
+    STORY_AVATAR_DIAG_STATE.userLaneTier1 = laneDiagT1;
+    STORY_AVATAR_DIAG_STATE.userLaneStrongNick = laneDiagStrongNick;
+    STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = laneDiagPersonalThumb;
     const laneUidSortRank = (uidRaw) => {
       const s = String(uidRaw || "").trim();
       if (/^\d{5,14}$/.test(s)) return 0;
@@ -5798,116 +6155,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     storyUserLaneLastRenderSig = laneSig;
     if (!picked.length) {
-      resetLaneTierCells();
-      stack.hidden = false;
-      if (guideLinesTop) {
-        guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(
-          STORY_GUIDE_FACE_RINK
-        );
-      }
-      if (guideTop) guideTop.hidden = false;
-      if (guideLinesMidKonta) {
-        guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
-          STORY_GUIDE_FACE_KONTA
-        );
-      }
-      if (guideMidKonta) guideMidKonta.hidden = false;
-      if (guideLinesMidTanu) {
-        guideLinesMidTanu.innerHTML = buildStoryUserLaneGuideTanuHtml(
-          STORY_GUIDE_FACE_TANU
-        );
-      }
-      if (guideMidTanu) guideMidTanu.hidden = false;
-      if (guideLinesBottom) {
-        guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(0);
-      }
-      if (guideBottom) guideBottom.hidden = false;
+      paintStoryUserLaneDomEmptyGuides(els, faces);
       return;
     }
-    const fillLaneTier = (el, items) => {
-      el.innerHTML = "";
-      if (!items.length) {
-        el.hidden = true;
-        return;
-      }
-      el.hidden = false;
-      const frag = document.createDocumentFragment();
-      for (const p of items) {
-        const cell = document.createElement("span");
-        cell.className = "nl-story-userlane-cell";
-        const img = document.createElement("img");
-        img.className = "nl-story-userlane-avatar";
-        const requestedLane = p.displaySrc;
-        const displayLane = storyAvatarLoadGuard.pickDisplaySrc(requestedLane);
-        img.src = displayLane;
-        storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
-        img.classList.toggle(
-          "nl-avatar--tv-fallback",
-          storyTileUsesYukkuriTvStyle(requestedLane, displayLane)
-        );
-        img.alt = "";
-        const fullUid = String(p.entry?.userId || "").trim();
-        const tip = fullUid && fullUid !== p.meta.idLine ? `${p.title} | ${fullUid}` : p.title;
-        img.title = tip;
-        cell.title = tip;
-        img.decoding = "async";
-        if (isHttpOrHttpsUrl(img.src)) {
-          img.referrerPolicy = "no-referrer";
-        }
-        const metaEl = document.createElement("span");
-        metaEl.className = "nl-story-userlane-meta";
-        const idRow = document.createElement("span");
-        idRow.className = "nl-story-userlane-meta__id";
-        idRow.textContent = p.meta.idLine;
-        const nameRow = document.createElement("span");
-        nameRow.className = "nl-story-userlane-meta__name";
-        nameRow.textContent = p.meta.nameLine;
-        metaEl.appendChild(idRow);
-        metaEl.appendChild(nameRow);
-        cell.appendChild(img);
-        cell.appendChild(metaEl);
-        frag.appendChild(cell);
-      }
-      el.appendChild(frag);
-    };
-    fillLaneTier(laneRink, buckets.rink);
-    fillLaneTier(laneKonta, buckets.konta);
-    fillLaneTier(laneTanu, buckets.tanu);
-    if (hintRink) {
-      const showRinkHint = buckets.rink.length === 0 && (buckets.konta.length > 0 || buckets.tanu.length > 0);
-      hintRink.hidden = !showRinkHint;
-    }
-    if (rinkWrap) {
-      const showRinkWrap = !laneRink.hidden || hintRink && !hintRink.hidden;
-      rinkWrap.hidden = !showRinkWrap;
-    }
-    stack.setAttribute(
-      "aria-label",
-      `\u6700\u8FD1\u306E\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30B5\u30E0\u30CD\u30A4\u30EB\uFF08\u308A\u3093\u304F\u30FB\u3053\u3093\u592A\u30FB\u305F\u306C\u59C9\u306E\u4E09\u6BB5\uFF09\u5408\u8A08${picked.length}\u4EF6\u3002\u7D9A\u304D\u306F\u3053\u306E\u67A0\u5185\u3092\u30B9\u30AF\u30ED\u30FC\u30EB`
-    );
-    stack.hidden = false;
-    if (guideLinesTop) {
-      guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(
-        STORY_GUIDE_FACE_RINK
-      );
-    }
-    if (guideTop) guideTop.hidden = false;
-    if (guideLinesMidKonta) {
-      guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
-        STORY_GUIDE_FACE_KONTA
-      );
-    }
-    if (guideMidKonta) guideMidKonta.hidden = false;
-    if (guideLinesMidTanu) {
-      guideLinesMidTanu.innerHTML = buildStoryUserLaneGuideTanuHtml(
-        STORY_GUIDE_FACE_TANU
-      );
-    }
-    if (guideMidTanu) guideMidTanu.hidden = false;
-    if (guideLinesBottom) {
-      guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(picked.length);
-    }
-    if (guideBottom) guideBottom.hidden = false;
+    paintStoryUserLaneDomFilled(els, faces, buckets, picked.length, laneDomIo);
   }
   function renderStoryAvatarDiag() {
     const el = (
@@ -5945,6 +6196,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     STORY_AVATAR_DIAG_STATE.interceptExportRows = 0;
     STORY_AVATAR_DIAG_STATE.interceptExportCode = "";
     STORY_AVATAR_DIAG_STATE.interceptExportDetail = "";
+    STORY_AVATAR_DIAG_STATE.userLaneDeduped = 0;
+    STORY_AVATAR_DIAG_STATE.userLaneTier3 = 0;
+    STORY_AVATAR_DIAG_STATE.userLaneTier2 = 0;
+    STORY_AVATAR_DIAG_STATE.userLaneTier1 = 0;
+    STORY_AVATAR_DIAG_STATE.userLaneStrongNick = 0;
+    STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = 0;
     renderStoryAvatarDiag();
   }
   function syncInterceptMapDiagFromSnapshot(snap) {
@@ -6726,7 +6983,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) {
       if (_prevViewerCount != null && vc > _prevViewerCount) {
         const visitorsCard = viewerDomEl?.closest(".nl-live-stat-card");
-        const icon = visitorsCard?.querySelector(".nl-live-stat-icon");
+        const icon = visitorsCard?.querySelector(":scope > img.nl-live-stat-icon");
         triggerCharaReaction(icon ?? null, {
           delta: vc - _prevViewerCount,
           thresholds: [1, 10, 50],
@@ -6759,7 +7016,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         const directLike = resolved.method === "official";
         concurrentEstEl.textContent = `${directLike ? "" : "~"}${resolved.estimated}`;
         if (_prevConcurrentEstimated != null && resolved.estimated !== _prevConcurrentEstimated && concurrentCard) {
-          const icon = concurrentCard.querySelector(".nl-live-stat-icon");
+          const icon = concurrentCard.querySelector(":scope > img.nl-live-stat-icon");
           triggerCharaReaction(icon, {
             delta: Math.abs(resolved.estimated - _prevConcurrentEstimated),
             thresholds: [1, 20, 100],
@@ -7298,26 +7555,35 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (!isHttpOrHttpsUrl(viewerAvatar) && !viewerUid && !broadcasterUid) {
       return { next: entries, patched: 0 };
     }
+    const isBroadcasterViewing = Boolean(viewerUid && broadcasterUid && viewerUid === broadcasterUid);
     const ownPostedIds = getOwnPostedMatchedIdSet(entries, liveId);
     let patched = 0;
     const next = entries.map((e) => {
       let changed = false;
       const out = { ...e };
       const isOwn = e?.selfPosted || ownPostedIds.has(popupEntryStableId(e, liveId));
+      const av = String(e?.avatarUrl || "").trim();
+      const avatarAlsoMatches = isHttpOrHttpsUrl(viewerAvatar) && av && isSameAvatarUrl(av, viewerAvatar);
       if (viewerUid && String(e?.userId || "").trim() === viewerUid) {
         if (!isOwn) {
-          delete out.userId;
-          changed = true;
+          if (isBroadcasterViewing) {
+            if (avatarAlsoMatches) {
+              delete out.userId;
+              changed = true;
+            }
+          } else {
+            delete out.userId;
+            changed = true;
+          }
         }
       }
-      if (broadcasterUid && String(e?.userId || "").trim() === broadcasterUid) {
+      if (broadcasterUid && !isBroadcasterViewing && String(e?.userId || "").trim() === broadcasterUid) {
         if (!isOwn) {
           delete out.userId;
           changed = true;
         }
       }
-      const av = String(e?.avatarUrl || "").trim();
-      if (isHttpOrHttpsUrl(viewerAvatar) && av && isSameAvatarUrl(av, viewerAvatar) && !isOwn) {
+      if (avatarAlsoMatches && !isOwn) {
         delete out.avatarUrl;
         changed = true;
       }
@@ -7938,6 +8204,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       return;
     }
     renderExtensionContextBanner(false);
+    setTimeout(revealPopupPrimaryOnce, 1200);
     const liveEl = $("liveId");
     const toggle = (
       /** @type {HTMLInputElement} */
@@ -8339,6 +8606,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (!snapshotCacheHit) {
         paintWatchPopupUi();
         markPopupRefreshContentPainted();
+        revealPopupPrimaryOnce();
         const snapResult = await requestWatchPageSnapshotFromOpenTab(url);
         watchMetaCache.snapshot = snapResult.snapshot;
         watchSnapshot = watchMetaCache.snapshot;
@@ -9561,13 +9829,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     ensureStoryGrowthColorSchemeListener();
     applyResponsivePopupLayout();
     if (INLINE_EMBED_WATCH) {
-      const compose = document.querySelector("section.nl-comment-compose--primary");
-      if (compose instanceof HTMLElement) {
-        compose.setAttribute(
-          "aria-label",
-          "\u66F8\u304D\u51FA\u3057\u3068\u518D\u8AAD\u307F\u8FBC\u307F\uFF08\u30B3\u30E1\u30F3\u30C8\u9001\u4FE1\u306F watch \u306E\u516C\u5F0F\u6B04\u304B\u3089\uFF09"
-        );
-      }
       const supportVisualDetails = (
         /** @type {HTMLDetailsElement|null} */
         $("supportVisualDetails")

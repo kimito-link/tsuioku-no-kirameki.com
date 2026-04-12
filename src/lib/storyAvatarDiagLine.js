@@ -26,7 +26,13 @@ import { escapeHtml } from './htmlEscape.js';
  *   interceptMapOnPage?: number,
  *   interceptExportRows?: number,
  *   interceptExportCode?: string,
- *   interceptExportDetail?: string
+ *   interceptExportDetail?: string,
+ *   userLaneDeduped?: number,
+ *   userLaneTier3?: number,
+ *   userLaneTier2?: number,
+ *   userLaneTier1?: number,
+ *   userLaneStrongNick?: number,
+ *   userLanePersonalThumb?: number
  * }} StoryAvatarDiagSnapshot
  */
 
@@ -94,6 +100,16 @@ export function formatStoryAvatarDiagLine(s) {
     if (exDetail) line += ` (${exDetail})`;
   }
 
+  const ulDed = Math.max(0, Math.floor(Number(s.userLaneDeduped) || 0));
+  if (ulDed > 0) {
+    const t3 = Math.max(0, Math.floor(Number(s.userLaneTier3) || 0));
+    const t2 = Math.max(0, Math.floor(Number(s.userLaneTier2) || 0));
+    const t1 = Math.max(0, Math.floor(Number(s.userLaneTier1) || 0));
+    const sn = Math.max(0, Math.floor(Number(s.userLaneStrongNick) || 0));
+    const th = Math.max(0, Math.floor(Number(s.userLanePersonalThumb) || 0));
+    line += ` / レーン候補${ulDed}（り${t3}/こ${t2}/た${t1}・強名${sn}/個サ${th}）`;
+  }
+
   return line;
 }
 
@@ -123,6 +139,18 @@ export function buildStoryAvatarDiagHtml(s) {
   if (s.interceptItems > 0) {
     leadParts.push(
       `視聴ページの通信から拾った利用者情報（アイコンや名前の補助）が <strong>${s.interceptItems}</strong> 件分あります。`
+    );
+  }
+
+  const ulDed = Math.max(0, Math.floor(Number(s.userLaneDeduped) || 0));
+  if (ulDed > 0) {
+    const t3 = Math.max(0, Math.floor(Number(s.userLaneTier3) || 0));
+    const t2 = Math.max(0, Math.floor(Number(s.userLaneTier2) || 0));
+    const t1 = Math.max(0, Math.floor(Number(s.userLaneTier1) || 0));
+    const sn = Math.max(0, Math.floor(Number(s.userLaneStrongNick) || 0));
+    const th = Math.max(0, Math.floor(Number(s.userLanePersonalThumb) || 0));
+    leadParts.push(
+      `ユーザーレーンの候補（重複のない利用者）<strong>${ulDed}</strong> 件のうち、りんく列相当 <strong>${t3}</strong>・こん太 <strong>${t2}</strong>・たぬ姉 <strong>${t1}</strong>。強い表示名として扱えたのは <strong>${sn}</strong> 件、個人サムネありは <strong>${th}</strong> 件です（ニコの「user 英数字」仮名は強い表示名に入りません）。`
     );
   }
 
@@ -158,6 +186,7 @@ export function buildStoryAvatarDiagHtml(s) {
     '<li><strong>表示アイコン</strong>：グリッドなどで実際に画像として使えている件数です。</li>' +
     '<li><strong>ページから拾った補助</strong>：ニコ生のページが読み取る通信から、拡張が利用者表示を補うために使う情報です（本文は保存しません）。</li>' +
     '<li><strong>一時対応表</strong>：開いている watch タブのメモリ上だけにある対応表で、キャッシュとは別です。</li>' +
+    '<li><strong>ユーザーレーンの段</strong>：記録コメントの表示名・サムネURL・成長タイル用の解決結果から「強い名前」「個人サムネ」を判定しています。公式の仮名のままだとこん太・たぬ姉に寄りやすいです。</li>' +
     '</ul>';
 
   return (

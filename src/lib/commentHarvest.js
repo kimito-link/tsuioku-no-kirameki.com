@@ -170,6 +170,7 @@ export function pageUserLikelyTypingIn(doc) {
  *   twoPass?: boolean,
  *   twoPassGapMs?: number,
  *   scrollStepClientHeightRatio?: number,
+ *   quietScroll?: boolean,
  *   onBetweenVirtualPasses?: () => void
  * }} opts
  */
@@ -184,6 +185,7 @@ export async function harvestVirtualCommentList(opts) {
     typeof opts.scrollStepClientHeightRatio === 'number'
       ? opts.scrollStepClientHeightRatio
       : HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO;
+  const quietScroll = Boolean(opts.quietScroll);
 
   const panel = findNicoCommentPanel(doc);
   const scanRoot = panel || doc.body;
@@ -213,7 +215,7 @@ export async function harvestVirtualCommentList(opts) {
    * @param {boolean} restoreFocusAfter
    */
   const runVirtualScrollSweep = async (map, restoreFocusAfter) => {
-    const host = panel ? findCommentListScrollHost(doc) : null;
+    const host = panel ? /** @type {HTMLElement|null} */ (findCommentListScrollHost(doc)) : null;
     if (!host || host.scrollHeight <= host.clientHeight + 10) {
       mergeInto(map, extract(scanRoot));
       return;
@@ -224,30 +226,49 @@ export async function harvestVirtualCommentList(opts) {
       return;
     }
 
-    const saved = host.scrollTop;
-    const max = Math.max(0, host.scrollHeight - host.clientHeight);
-    const step = Math.max(64, Math.floor(host.clientHeight * scrollStepRatio));
+    const qsOrig = quietScroll ? {
+      opacity: host.style.opacity,
+      pointerEvents: host.style.pointerEvents,
+      transition: host.style.transition
+    } : null;
+    if (quietScroll) {
+      host.style.transition = 'none';
+      host.style.opacity = '0';
+      host.style.pointerEvents = 'none';
+    }
 
-    host.scrollTop = 0;
-    await raf(doc);
-    await delay(waitMs);
-    mergeInto(map, extract(scanRoot));
+    try {
+      const saved = host.scrollTop;
+      const max = Math.max(0, host.scrollHeight - host.clientHeight);
+      const step = Math.max(64, Math.floor(host.clientHeight * scrollStepRatio));
 
-    for (let y = 0; y <= max; y += step) {
-      host.scrollTop = Math.min(y, max);
+      host.scrollTop = 0;
       await raf(doc);
       await delay(waitMs);
       mergeInto(map, extract(scanRoot));
+
+      for (let y = 0; y <= max; y += step) {
+        host.scrollTop = Math.min(y, max);
+        await raf(doc);
+        await delay(waitMs);
+        mergeInto(map, extract(scanRoot));
+      }
+
+      host.scrollTop = max;
+      await raf(doc);
+      await delay(waitMs);
+      mergeInto(map, extract(scanRoot));
+
+      host.scrollTop = saved;
+      await raf(doc);
+      await delay(30);
+    } finally {
+      if (qsOrig) {
+        host.style.opacity = qsOrig.opacity;
+        host.style.pointerEvents = qsOrig.pointerEvents;
+        host.style.transition = qsOrig.transition;
+      }
     }
-
-    host.scrollTop = max;
-    await raf(doc);
-    await delay(waitMs);
-    mergeInto(map, extract(scanRoot));
-
-    host.scrollTop = saved;
-    await raf(doc);
-    await delay(30);
 
     if (restoreFocusAfter && focusEl && focusEl.isConnected) {
       try {

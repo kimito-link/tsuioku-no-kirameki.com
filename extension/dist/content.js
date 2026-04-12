@@ -419,6 +419,10 @@
     const rest = s.slice(2).trim();
     return rest.length >= 2;
   }
+  function isNiconicoAutoUserPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return /^user\s+[A-Za-z0-9]+$/i.test(n);
+  }
   function anonymousNicknameFallback(userId, nickname) {
     const nick = String(nickname ?? "").trim();
     if (nick) return nick;
@@ -463,11 +467,7 @@
       if (fromAv) uid = fromAv;
     }
     const nickname = anonymousNicknameFallback(uid, p.nickname);
-    let storedAvatar = avatarUrl;
-    if (!storedAvatar && uid && /^\d{5,14}$/.test(uid)) {
-      const syn = niconicoDefaultUserIconUrl(uid);
-      if (syn) storedAvatar = syn;
-    }
+    const storedAvatar = avatarUrl;
     const entry = {
       id: randomId(),
       liveId: liveId2,
@@ -476,6 +476,7 @@
       userId: uid || null,
       ...nickname ? { nickname } : {},
       ...storedAvatar ? { avatarUrl: storedAvatar } : {},
+      ...p.avatarObserved ? { avatarObserved: true } : {},
       ...p.vpos != null ? { vpos: p.vpos } : {},
       ...p.accountStatus != null ? { accountStatus: p.accountStatus } : {},
       ...p.is184 ? { is184: true } : {},
@@ -575,14 +576,9 @@
               }
             }
           }
-          const avAfter = String(patched.avatarUrl || "").trim();
-          if (!avAfter || !isHttpOrHttpsUrl(avAfter)) {
-            const uHeal = String(patched.userId || "").trim();
-            const syn = niconicoDefaultUserIconUrl(uHeal);
-            if (syn) {
-              patched = { ...patched, avatarUrl: syn };
-              touched = true;
-            }
+          if (row.avatarObserved && !patched.avatarObserved) {
+            patched = { ...patched, avatarObserved: true };
+            touched = true;
           }
           if (touched) {
             next[idx] = patched;
@@ -599,6 +595,7 @@
         userId: row.userId ?? null,
         nickname: row.nickname || "",
         avatarUrl: validAvatar || void 0,
+        avatarObserved: row.avatarObserved || false,
         vpos: row.vpos,
         accountStatus: row.accountStatus,
         is184: row.is184
@@ -619,18 +616,33 @@
         /** @type {{ avatarUrl?: unknown }} */
         e?.avatarUrl || ""
       ).trim();
-      if (av && isHttpOrHttpsUrl(av)) return e;
+      if (!av || !isHttpOrHttpsUrl(av)) return e;
       const uid = String(
         /** @type {{ userId?: unknown }} */
         e?.userId || ""
       ).trim();
-      const syn = niconicoDefaultUserIconUrl(uid);
-      if (!syn) return e;
-      patched += 1;
-      return { .../** @type {object} */
-      e, avatarUrl: syn };
+      if (/^\d{5,14}$/.test(uid) && isNiconicoSyntheticDefaultUserIconUrl(av, uid)) {
+        patched += 1;
+        const copy = { .../** @type {object} */
+        e };
+        delete /** @type {Record<string,unknown>} */
+        copy.avatarUrl;
+        return copy;
+      }
+      return e;
     });
     return { next, patched };
+  }
+
+  // src/lib/supportGridDisplayTier.js
+  function supportGridStrongNickname(nick, userId) {
+    const n = String(nick ?? "").trim();
+    if (!n) return false;
+    if (isNiconicoAutoUserPlaceholderNickname(n)) return false;
+    if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)") return false;
+    if (n === "\u533F\u540D") return false;
+    if (isNiconicoAnonymousUserId(userId) && n.length <= 1) return false;
+    return true;
   }
 
   // src/lib/userCommentProfileCache.js
@@ -702,6 +714,13 @@
       avatarUrl: String(entry?.avatarUrl || "").trim()
     });
   }
+  function isWeakMergedDisplayNickname(nick) {
+    const n = String(nick || "").trim();
+    if (!n) return true;
+    if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)" || n === "\u533F\u540D") return true;
+    if (isNiconicoAutoUserPlaceholderNickname(n)) return true;
+    return false;
+  }
   function applyUserCommentProfileMapToEntries(entries, map) {
     if (!Array.isArray(entries) || !entries.length || !Object.keys(map).length) {
       return { next: entries, patched: 0 };
@@ -730,9 +749,12 @@
         e
       );
       let changed = false;
-      if (candNick && (!curNick || candNick.length > curNick.length)) {
-        out = { ...out, nickname: candNick };
-        changed = true;
+      if (candNick) {
+        const preferNick = !curNick || candNick.length > curNick.length || isWeakMergedDisplayNickname(curNick) && supportGridStrongNickname(candNick, uid);
+        if (preferNick && candNick !== curNick) {
+          out = { ...out, nickname: candNick };
+          changed = true;
+        }
       }
       if (candAv && isHttpOrHttpsUrl(candAv) && !isWeakNiconicoUserIconHttpUrl(candAv)) {
         const curStrong = curAv && isHttpOrHttpsUrl(curAv) && !isWeakNiconicoUserIconHttpUrl(curAv);
@@ -1528,7 +1550,7 @@
     const textEl = row.querySelector(".comment-text");
     if (!numEl || !textEl) return null;
     const commentNo = String(numEl.textContent || "").replace(/\s+/g, "").trim();
-    if (!commentNo || !/^\d{1,12}$/.test(commentNo)) return null;
+    if (!commentNo || !/^\d{1,18}$/.test(commentNo)) return null;
     const text = String(textEl.textContent || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
     if (!text) return null;
     const userId = resolveUserIdForNicoLiveCommentRow(row);
@@ -2021,6 +2043,7 @@
     const twoPass = Boolean(opts.twoPass);
     const twoPassGapMs = opts.twoPassGapMs ?? 140;
     const scrollStepRatio = typeof opts.scrollStepClientHeightRatio === "number" ? opts.scrollStepClientHeightRatio : HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO;
+    const quietScroll = Boolean(opts.quietScroll);
     const panel = findNicoCommentPanel(doc);
     const scanRoot = panel || doc.body;
     if (!extract) return [];
@@ -2039,7 +2062,10 @@
       }
     };
     const runVirtualScrollSweep = async (map, restoreFocusAfter) => {
-      const host = panel ? findCommentListScrollHost(doc) : null;
+      const host = panel ? (
+        /** @type {HTMLElement|null} */
+        findCommentListScrollHost(doc)
+      ) : null;
       if (!host || host.scrollHeight <= host.clientHeight + 10) {
         mergeInto(map, extract(scanRoot));
         return;
@@ -2048,26 +2074,44 @@
         mergeInto(map, extract(scanRoot));
         return;
       }
-      const saved = host.scrollTop;
-      const max = Math.max(0, host.scrollHeight - host.clientHeight);
-      const step = Math.max(64, Math.floor(host.clientHeight * scrollStepRatio));
-      host.scrollTop = 0;
-      await raf(doc);
-      await delay(waitMs);
-      mergeInto(map, extract(scanRoot));
-      for (let y = 0; y <= max; y += step) {
-        host.scrollTop = Math.min(y, max);
+      const qsOrig = quietScroll ? {
+        opacity: host.style.opacity,
+        pointerEvents: host.style.pointerEvents,
+        transition: host.style.transition
+      } : null;
+      if (quietScroll) {
+        host.style.transition = "none";
+        host.style.opacity = "0";
+        host.style.pointerEvents = "none";
+      }
+      try {
+        const saved = host.scrollTop;
+        const max = Math.max(0, host.scrollHeight - host.clientHeight);
+        const step = Math.max(64, Math.floor(host.clientHeight * scrollStepRatio));
+        host.scrollTop = 0;
         await raf(doc);
         await delay(waitMs);
         mergeInto(map, extract(scanRoot));
+        for (let y = 0; y <= max; y += step) {
+          host.scrollTop = Math.min(y, max);
+          await raf(doc);
+          await delay(waitMs);
+          mergeInto(map, extract(scanRoot));
+        }
+        host.scrollTop = max;
+        await raf(doc);
+        await delay(waitMs);
+        mergeInto(map, extract(scanRoot));
+        host.scrollTop = saved;
+        await raf(doc);
+        await delay(30);
+      } finally {
+        if (qsOrig) {
+          host.style.opacity = qsOrig.opacity;
+          host.style.pointerEvents = qsOrig.pointerEvents;
+          host.style.transition = qsOrig.transition;
+        }
       }
-      host.scrollTop = max;
-      await raf(doc);
-      await delay(waitMs);
-      mergeInto(map, extract(scanRoot));
-      host.scrollTop = saved;
-      await raf(doc);
-      await delay(30);
       if (restoreFocusAfter && focusEl && focusEl.isConnected) {
         try {
           focusEl.focus({ preventScroll: true });
@@ -2546,21 +2590,54 @@
     return { changed: true };
   }
 
+  // src/lib/persistThrottle.js
+  function createPersistCoalescer(flushFn, minIntervalMs = 300) {
+    let buffer = [];
+    let timer = null;
+    let lastFlushTime = 0;
+    function enqueue(rows) {
+      buffer.push(...rows);
+      if (timer) return;
+      const delay2 = lastFlushTime ? Math.max(0, minIntervalMs - (Date.now() - lastFlushTime)) : minIntervalMs;
+      timer = setTimeout(flush, delay2);
+    }
+    async function flush() {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (!buffer.length) return;
+      const batch = buffer;
+      buffer = [];
+      lastFlushTime = Date.now();
+      await flushFn(batch);
+    }
+    function clear() {
+      buffer = [];
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    }
+    return { enqueue, flush, clear, pending: () => buffer.length };
+  }
+
   // src/extension/content-entry.js
-  var DEBOUNCE_MS = 140;
+  var DEBOUNCE_MS = 80;
   var LIVE_POLL_MS = 4e3;
   var STATS_POLL_MS = 45e3;
-  var LIVE_PANEL_SCAN_MS = 800;
-  var DEEP_HARVEST_DELAY_MS = 1200;
-  var DEEP_HARVEST_QUIET_UI_MS = 3200;
-  var DEEP_HARVEST_SCROLL_WAIT_MS = 72;
-  var DEEP_HARVEST_SCROLL_STEP_RATIO = 0.38;
+  var LIVE_PANEL_SCAN_MS = 550;
+  var DEEP_HARVEST_DELAY_MS = 600;
+  var DEEP_HARVEST_QUIET_UI_MS = 800;
+  var DEEP_HARVEST_SCROLL_WAIT_MS = 48;
+  var DEEP_HARVEST_SCROLL_STEP_RATIO = 0.52;
   var DEEP_HARVEST_SECOND_PASS_GAP_MS = 180;
-  var DEEP_HARVEST_PERIODIC_MS = 5 * 60 * 1e3;
-  var DEEP_HARVEST_STABILITY_FOLLOWUP_MS = 75e3;
+  var DEEP_HARVEST_PERIODIC_MS = 45 * 1e3;
+  var DEEP_HARVEST_STABILITY_FOLLOWUP_MS = 9e4;
   var DEEP_HARVEST_LOADING_HOST_ID = "nl-deep-harvest-loading";
   var DEEP_HARVEST_LOADING_IMG_PATH = "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png";
   var BOOTSTRAP_DELAYS_MS = [400, 2e3, 4500];
+  var tabVisibleHarvestDebounceTimer = null;
   var MAX_SELF_POSTED_ITEMS = 48;
   var SELF_POST_RECENT_TTL_MS = 24 * 60 * 60 * 1e3;
   var SELF_POST_NATIVE_DEDUPE_MS = 5e3;
@@ -2934,6 +3011,7 @@
   }
   function schedulePersistNdgrChatRows(rows) {
     if (!Array.isArray(rows) || !rows.length) return;
+    if (!recording || !liveId || !locationAllowsCommentRecording()) return;
     ndgrChatRowsPending.push(...rows);
     if (ndgrChatRowsPending.length >= NDGR_PENDING_FLUSH_THRESHOLD) {
       if (ndgrChatRowsFlushTimer != null) {
@@ -3423,6 +3501,8 @@
       display: none;
       width: 100%;
       margin: 2px 0 2px;
+      opacity: 0;
+      transition: opacity 0.25s ease-in-out;
       pointer-events: auto;
       position: relative;
       z-index: 2147482000;
@@ -3510,6 +3590,14 @@
       iframe.src = chrome.runtime.getURL("popup.html") + "?inline=1";
     } catch {
     }
+    iframe.addEventListener("load", () => {
+      requestAnimationFrame(() => {
+        host.style.opacity = "1";
+      });
+    }, { once: true });
+    setTimeout(() => {
+      host.style.opacity = "1";
+    }, 2e3);
     host.appendChild(iframe);
     nlsInlinePopupHostSingleton = host;
     return host;
@@ -5313,18 +5401,18 @@
       const rowAv = String(r.avatarUrl || "").trim();
       const interceptEntryAv = canUseInterceptMeta && isHttpAvatarUrl(entry?.av) ? String(entry?.av || "").trim() : "";
       const interceptMapAv = userId && isHttpAvatarUrl(interceptedAvatars.get(String(userId))) ? String(interceptedAvatars.get(String(userId)) || "").trim() : "";
-      const derivedIcon = userId ? niconicoDefaultUserIconUrl(String(userId)) : "";
       const av = pickStrongestAvatarUrlForUser(userId, [
         interceptEntryAv,
         interceptMapAv,
-        rowAv,
-        derivedIcon
+        rowAv
       ]);
+      const observed = Boolean(av || rowAv || interceptEntryAv || interceptMapAv);
       return {
         ...r,
         userId,
         ...nickname ? { nickname } : {},
-        ...av ? { avatarUrl: av } : {}
+        ...av ? { avatarUrl: av } : {},
+        ...observed ? { avatarObserved: true } : {}
       };
     });
   }
@@ -5433,14 +5521,21 @@
     return state;
   }
   var persistCommentRowsChain = Promise.resolve();
-  async function persistCommentRows(rows, opts = {}) {
-    if (!rows?.length || !recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
-      return;
-    }
-    const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(rows, opts));
+  var MIN_PERSIST_INTERVAL_MS = 300;
+  var persistCoalescer = createPersistCoalescer(async (batch) => {
+    const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(batch));
     persistCommentRowsChain = job.catch(() => {
     });
     await job;
+  }, MIN_PERSIST_INTERVAL_MS);
+  function persistCommentRows(rows, opts = {}) {
+    if (!rows?.length || !recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
+      return;
+    }
+    persistCoalescer.enqueue(
+      /** @type {ParsedCommentRow[]} */
+      rows
+    );
   }
   async function persistCommentRowsImpl(rows, opts = {}) {
     if (!rows?.length || !recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
@@ -5696,8 +5791,16 @@
     }
   }
   async function flushToStorage() {
-    if (!recording || !liveId || !locationAllowsCommentRecording() || !pendingRoots.size) {
+    if (!pendingRoots.size) return;
+    if (!hasExtensionContext()) {
       pendingRoots.clear();
+      return;
+    }
+    if (!recording) {
+      pendingRoots.clear();
+      return;
+    }
+    if (!liveId || !locationAllowsCommentRecording()) {
       return;
     }
     const rows = [];
@@ -5822,18 +5925,34 @@
       if (isWatchInlinePanelTopFrame() && isNicoLiveWatchUrl(window.location.href)) {
         renderPageFrameOverlay();
       }
-      runDeepHarvest().catch(() => {
+      resetDeepHarvestStabilityFollowUp();
+      runDeepHarvest({ armStabilityFollowUp: true }).catch(() => {
       });
     }, delayMs);
   }
-  function tryPeriodicDeepHarvest() {
+  function tryPeriodicQuietDeepHarvest() {
     if (!hasExtensionContext()) return;
     if (!recording || !liveId || !locationAllowsCommentRecording()) return;
     if (document.hidden) return;
     if (harvestRunning) return;
-    void runDeepHarvest();
+    resetDeepHarvestStabilityFollowUp();
+    void runDeepHarvest({ stabilityFollowUp: true });
   }
-  async function runDeepHarvest() {
+  function onTabVisibleForCommentHarvest() {
+    if (document.visibilityState !== "visible") return;
+    if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+    scanVisibleCommentsNow();
+    if (tabVisibleHarvestDebounceTimer != null) {
+      clearTimeout(tabVisibleHarvestDebounceTimer);
+    }
+    tabVisibleHarvestDebounceTimer = setTimeout(() => {
+      tabVisibleHarvestDebounceTimer = null;
+      if (recording && liveId && locationAllowsCommentRecording() && !document.hidden) {
+        scheduleDeepHarvest("tab-visible");
+      }
+    }, 850);
+  }
+  async function runDeepHarvest(opts = {}) {
     if (harvestRunning || !recording || !liveId || !locationAllowsCommentRecording()) {
       return;
     }
@@ -5843,9 +5962,11 @@
         document,
         extractCommentsFromNode,
         waitMs: DEEP_HARVEST_SCROLL_WAIT_MS,
-        twoPass: true,
+        twoPass: !opts.stabilityFollowUp,
         twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS,
-        scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO
+        scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO,
+        quietScroll: true,
+        respectTyping: false
       });
       await persistCommentRows(rows, { source: "deep" });
       deepHarvestPipelineStats.lastCompletedAt = Date.now();
@@ -5856,12 +5977,12 @@
       deepHarvestPipelineStats.lastError = true;
     } finally {
       harvestRunning = false;
-      if (!deepHarvestPipelineStats.lastError && recording && liveId && locationAllowsCommentRecording() && !deepHarvestStabilityFollowUpScheduled) {
+      if (opts.armStabilityFollowUp === true && !opts.stabilityFollowUp && !deepHarvestPipelineStats.lastError && recording && liveId && locationAllowsCommentRecording() && !deepHarvestStabilityFollowUpScheduled) {
         deepHarvestStabilityFollowUpScheduled = true;
         deepHarvestStabilityFollowUpTimer = setTimeout(() => {
           deepHarvestStabilityFollowUpTimer = null;
           if (recording && liveId && locationAllowsCommentRecording()) {
-            void runDeepHarvest();
+            void runDeepHarvest({ stabilityFollowUp: true });
           }
         }, DEEP_HARVEST_STABILITY_FOLLOWUP_MS);
       }
@@ -6180,8 +6301,9 @@
       scanVisibleCommentsNow();
     }, LIVE_PANEL_SCAN_MS);
     setInterval(() => {
-      tryPeriodicDeepHarvest();
+      tryPeriodicQuietDeepHarvest();
     }, DEEP_HARVEST_PERIODIC_MS);
+    document.addEventListener("visibilitychange", onTabVisibleForCommentHarvest);
     pollStatsFromPage();
     setInterval(() => {
       if (!hasExtensionContext()) return;

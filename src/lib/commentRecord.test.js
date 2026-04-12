@@ -523,21 +523,120 @@ describe('mergeNewComments', () => {
   });
 });
 
+describe('avatarObserved フラグ', () => {
+  it('createCommentEntry で avatarObserved=true が保存される', () => {
+    const e = createCommentEntry({
+      liveId: 'lv1',
+      commentNo: '1',
+      text: 'x',
+      userId: '88210441',
+      avatarUrl: 'https://example.com/u.jpg',
+      avatarObserved: true
+    });
+    expect(e.avatarObserved).toBe(true);
+  });
+
+  it('createCommentEntry で avatarObserved 未指定は省略される', () => {
+    const e = createCommentEntry({
+      liveId: 'lv1',
+      commentNo: '1',
+      text: 'x',
+      userId: '88210441'
+    });
+    expect(e).not.toHaveProperty('avatarObserved');
+  });
+
+  it('createCommentEntry で avatarObserved=false は省略される', () => {
+    const e = createCommentEntry({
+      liveId: 'lv1',
+      commentNo: '1',
+      text: 'x',
+      userId: '88210441',
+      avatarObserved: false
+    });
+    expect(e).not.toHaveProperty('avatarObserved');
+  });
+
+  it('mergeNewComments 新規行の avatarObserved=true が保存される', () => {
+    const { added } = mergeNewComments('lv1', [], [
+      {
+        commentNo: '1',
+        text: 'hello',
+        userId: '88210441',
+        avatarUrl: 'https://example.com/u.jpg',
+        avatarObserved: true
+      }
+    ]);
+    expect(added).toHaveLength(1);
+    expect(added[0].avatarObserved).toBe(true);
+  });
+
+  it('mergeNewComments で重複行に avatarObserved=true を後付けする', () => {
+    const existing = [
+      createCommentEntry({
+        liveId: 'lv1',
+        commentNo: '1',
+        text: 'a',
+        userId: '88210441',
+        avatarUrl: 'https://example.com/u.jpg'
+      })
+    ];
+    expect(existing[0]).not.toHaveProperty('avatarObserved');
+    const { next, storageTouched } = mergeNewComments('lv1', existing, [
+      {
+        commentNo: '1',
+        text: 'a',
+        userId: '88210441',
+        avatarUrl: 'https://example.com/u.jpg',
+        avatarObserved: true
+      }
+    ]);
+    expect(next[0].avatarObserved).toBe(true);
+    expect(storageTouched).toBe(true);
+  });
+
+  it('重複行の既存 avatarObserved=true は incoming で消えない', () => {
+    const existing = [
+      createCommentEntry({
+        liveId: 'lv1',
+        commentNo: '1',
+        text: 'a',
+        userId: '88210441',
+        avatarUrl: 'https://example.com/u.jpg',
+        avatarObserved: true
+      })
+    ];
+    const { next, storageTouched } = mergeNewComments('lv1', existing, [
+      {
+        commentNo: '1',
+        text: 'a',
+        userId: '88210441'
+      }
+    ]);
+    expect(next[0].avatarObserved).toBe(true);
+    expect(storageTouched).toBe(false);
+  });
+});
+
 describe('backfillNumericSyntheticAvatarsOnStoredComments', () => {
-  it('数字 userId で avatar 無しの行に CDN URL を付与', () => {
+  it('合成 canonical URL を avatarUrl から除去（ティア判定の誤昇格を防ぐ）', () => {
     const rows = [
-      { userId: '86255751', text: 'a' },
+      {
+        userId: '86255751',
+        avatarUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/8625/86255751.jpg',
+        text: 'a'
+      },
       { userId: 'a:xx', text: 'b' },
       {
         userId: '12345678',
-        avatarUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1234/12345678.jpg',
+        avatarUrl: 'https://example.com/real-avatar.jpg',
         text: 'c'
       }
     ];
     const { next, patched } = backfillNumericSyntheticAvatarsOnStoredComments(rows);
     expect(patched).toBe(1);
-    expect(String(next[0].avatarUrl || '')).toContain('usericon');
+    expect(next[0].avatarUrl).toBeUndefined();
     expect(next[1].avatarUrl).toBeUndefined();
-    expect(next[2].avatarUrl).toMatch(/12345678/);
+    expect(next[2].avatarUrl).toBe('https://example.com/real-avatar.jpg');
   });
 });

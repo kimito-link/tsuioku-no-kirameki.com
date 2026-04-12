@@ -802,7 +802,8 @@ export function parseNicoLiveTableRow(el) {
   if (!numEl || !textEl) return null;
 
   const commentNo = String(numEl.textContent || '').replace(/\s+/g, '').trim();
-  if (!commentNo || !/^\d{1,12}$/.test(commentNo)) return null;
+  /* 長時間・高流量配信で番号桁が伸びても拾えるよう上限は寛め（従来 12 桁で落ちる取りこぼし防止） */
+  if (!commentNo || !/^\d{1,18}$/.test(commentNo)) return null;
 
   const text = String(textEl.textContent || '')
     .replace(/\u00a0/g, ' ')

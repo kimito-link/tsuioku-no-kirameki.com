@@ -143,6 +143,23 @@ describe('applyUserCommentProfileMapToEntries', () => {
     expect(patched).toBe(1);
     expect(next[0].avatarUrl).toBe(strongAv);
   });
+
+  it('「匿名」と同じ文字数の本名でも、キャッシュが強い表示名なら上書き（レーン段の取りこぼし防止）', () => {
+    const map = normalizeUserCommentProfileMap({
+      'a:AbCdEfGhIjKlMnOp': { nickname: '花子', avatarUrl: '', updatedAt: 1 }
+    });
+    const entries = [
+      {
+        userId: 'a:AbCdEfGhIjKlMnOp',
+        nickname: '匿名',
+        avatarUrl: '',
+        commentNo: '1'
+      }
+    ];
+    const { next, patched } = applyUserCommentProfileMapToEntries(entries, map);
+    expect(patched).toBe(1);
+    expect(next[0].nickname).toBe('花子');
+  });
 });
 
 describe('readStorageBagWithRetry', () => {

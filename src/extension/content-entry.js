@@ -101,48 +101,56 @@ import { countRecentActiveUsers } from '../lib/concurrentEstimate.js';
 import { summarizeOfficialCommentHistory } from '../lib/officialStatsWindow.js';
 import { buildWatchSnapshotOfficialFields } from '../lib/watchSnapshotOfficialFields.js';
 import {
-  niconicoDefaultUserIconUrl,
   pickStrongestAvatarUrlForUser
 } from '../lib/supportGrowthTileSrc.js';
 import { mergeUserIdForEnrichment } from '../lib/userIdPreference.js';
 import { maybeAppendCommentIngestLog } from '../lib/commentIngestLog.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
+import { createPersistCoalescer } from '../lib/persistThrottle.js';
 
 /**
- * @typedef {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string }} ParsedCommentRow
+ * @typedef {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string, avatarObserved?: boolean }} ParsedCommentRow
  */
 
-const DEBOUNCE_MS = 140;
+const DEBOUNCE_MS = 80;
 const LIVE_POLL_MS = 4000;
 const STATS_POLL_MS = 45_000;
 /** 返信サジェスト等と同様に DOM 更新がテキスト差し替えだけのときの取りこぼし防止 */
-const LIVE_PANEL_SCAN_MS = 800;
-const DEEP_HARVEST_DELAY_MS = 1200;
+const LIVE_PANEL_SCAN_MS = 550;
+const DEEP_HARVEST_DELAY_MS = 600;
 /**
  * 仮想コメント一覧の deep harvest はスクロールホストの scrollTop を段階的に動かすため、
  * 視聴ページを開いた直後に「メインのコメントが滝のように流れる」ように見える。
  * 初回・録画ON 直後だけ遅らせ、ユーザーが画面に慣れてから走査する。
  * 長すぎるとこの間は仮想バッファ外の過去コメントが deep で拾えず、記録件数が伸びにくい。
  */
-const DEEP_HARVEST_QUIET_UI_MS = 3200;
-/** deep harvest 1ステップあたりの待ち（短すぎると仮想行の取りこぼし、長いと視覚的な走査時間が伸びる） */
-const DEEP_HARVEST_SCROLL_WAIT_MS = 72;
-/** deep harvest 専用のステップ幅（既定より密く、仮想バッファの取りこぼしを減らす） */
-const DEEP_HARVEST_SCROLL_STEP_RATIO = 0.38;
+const DEEP_HARVEST_QUIET_UI_MS = 800;
+/**
+ * runDeepHarvest の仮想走査: 待ちを短く・ステップを粗くし「滝」時間を圧縮（2pass で取りこぼし吸収）。
+ * インターセプト export の deep は別途 waitMs を指定。
+ */
+const DEEP_HARVEST_SCROLL_WAIT_MS = 48;
+const DEEP_HARVEST_SCROLL_STEP_RATIO = 0.52;
 /** 2 周目の deep の直前ギャップ（仮想 DOM の再配置で取りこぼした行の再出現を待つ） */
 const DEEP_HARVEST_SECOND_PASS_GAP_MS = 180;
 /**
  * 長時間配信で仮想バッファ外の取りこぼしを減らす低頻度 deep（タブが visible で記録中のみ）。
  * QUIET UI は runDeepHarvest 内では使わず、定期経路も滝 UI 用ローディングは出さない。
+ * quietScroll で滝を不可視にしつつ 90 秒間隔で走査。可視のみだと取りこぼしが大きい。
  */
-const DEEP_HARVEST_PERIODIC_MS = 5 * 60 * 1000;
-/** 初回 deep 成功後、仮想リストが落ち着いてからの追い走査（1セッション1回まで） */
-const DEEP_HARVEST_STABILITY_FOLLOWUP_MS = 75_000;
+const DEEP_HARVEST_PERIODIC_MS = 45 * 1000;
+/**
+ * 初回（scheduleDeepHarvest 経由）の deep 成功後、仮想 DOM が落ち着いてからの軽い追い走査。
+ * 定期 deep 直後に同タイマーが重なると「滝が二度続く」ため、定期開始時はタイマーを解除する。
+ */
+const DEEP_HARVEST_STABILITY_FOLLOWUP_MS = 90_000;
 /** 長めの待ちのあいだ、ゆっくりりんくで「読み込み中」と示す（web_accessible と一致させる） */
 const DEEP_HARVEST_LOADING_HOST_ID = 'nl-deep-harvest-loading';
 const DEEP_HARVEST_LOADING_IMG_PATH =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
 const BOOTSTRAP_DELAYS_MS = [400, 2000, 4500];
+/** @type {ReturnType<typeof setTimeout>|null} */
+let tabVisibleHarvestDebounceTimer = null;
 const MAX_SELF_POSTED_ITEMS = 48;
 const SELF_POST_RECENT_TTL_MS = 24 * 60 * 60 * 1000;
 const SELF_POST_NATIVE_DEDUPE_MS = 5000;
@@ -627,6 +635,8 @@ async function flushNdgrChatRowsBatch(batch) {
  */
 function schedulePersistNdgrChatRows(rows) {
   if (!Array.isArray(rows) || !rows.length) return;
+  /* 記録 OFF 時に NDGR だけが流れてもバッチを捨てない（flush 側の no-op で行が消えるのを防ぐ） */
+  if (!recording || !liveId || !locationAllowsCommentRecording()) return;
   ndgrChatRowsPending.push(...rows);
   if (ndgrChatRowsPending.length >= NDGR_PENDING_FLUSH_THRESHOLD) {
     if (ndgrChatRowsFlushTimer != null) {
@@ -1219,6 +1229,8 @@ function ensurePageFrameStyle() {
       display: none;
       width: 100%;
       margin: 2px 0 2px;
+      opacity: 0;
+      transition: opacity 0.25s ease-in-out;
       pointer-events: auto;
       position: relative;
       z-index: 2147482000;
@@ -1314,6 +1326,10 @@ function ensureInlinePopupHost() {
   } catch {
     // no-op
   }
+  iframe.addEventListener('load', () => {
+    requestAnimationFrame(() => { host.style.opacity = '1'; });
+  }, { once: true });
+  setTimeout(() => { host.style.opacity = '1'; }, 2000);
   host.appendChild(iframe);
   nlsInlinePopupHostSingleton = host;
   return host;
@@ -3614,9 +3630,9 @@ function detectBroadcasterUserIdFromDom() {
 
 /**
  * DOM 抽出結果を interceptedUsers マップで補完（userId + nickname + av）。
- * `niconicoDefaultUserIconUrl` による CDN 推定はストレージ上書き時に `mergeNewComments` が DOM 実 URL へ差し替え可能（推定 URL のみ）。
+ * intercept / DOM 経由で取得したアバター URL のみをマージ（合成 CDN URL は含めない）。
  * @param {ParsedCommentRow[]} rows
- * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, avatarUrl?: string }[]}
+ * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, avatarUrl?: string, avatarObserved?: boolean }[]}
  */
 function enrichRowsWithInterceptedUserIds(rows) {
   /** intercept マップが空でも、数字 userId なら CDN 推定サムネを付与する（NDGR 単独時の取得率向上） */
@@ -3658,18 +3674,18 @@ function enrichRowsWithInterceptedUserIds(rows) {
       userId && isHttpAvatarUrl(interceptedAvatars.get(String(userId)))
         ? String(interceptedAvatars.get(String(userId)) || '').trim()
         : '';
-    const derivedIcon = userId ? niconicoDefaultUserIconUrl(String(userId)) : '';
     const av = pickStrongestAvatarUrlForUser(userId, [
       interceptEntryAv,
       interceptMapAv,
-      rowAv,
-      derivedIcon
+      rowAv
     ]);
+    const observed = Boolean(av || rowAv || interceptEntryAv || interceptMapAv);
     return {
       ...r,
       userId,
       ...(nickname ? { nickname } : {}),
-      ...(av ? { avatarUrl: av } : {})
+      ...(av ? { avatarUrl: av } : {}),
+      ...(observed ? { avatarObserved: true } : {})
     };
   });
 }
@@ -3822,11 +3838,19 @@ function pruneAutoBackupLives(state) {
 /** NDGR・MutationObserver・deep harvest が同時に来ても storage の merge が壊れないよう直列化 */
 let persistCommentRowsChain = Promise.resolve();
 
+const MIN_PERSIST_INTERVAL_MS = 300;
+
+const persistCoalescer = createPersistCoalescer(async (/** @type {ParsedCommentRow[]} */ batch) => {
+  const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(batch));
+  persistCommentRowsChain = job.catch(() => {});
+  await job;
+}, MIN_PERSIST_INTERVAL_MS);
+
 /**
  * @param {ParsedCommentRow[]|null|undefined} rows
  * @param {{ source?: string }} [opts] ndgr | mutation | deep | visible
  */
-async function persistCommentRows(rows, opts = {}) {
+function persistCommentRows(rows, _opts = {}) {
   if (
     !rows?.length ||
     !recording ||
@@ -3836,9 +3860,7 @@ async function persistCommentRows(rows, opts = {}) {
   ) {
     return;
   }
-  const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(rows, opts));
-  persistCommentRowsChain = job.catch(() => {});
-  await job;
+  persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (rows));
 }
 
 /**
@@ -4142,13 +4164,20 @@ function enqueueNode(node) {
 }
 
 async function flushToStorage() {
-  if (
-    !recording ||
-    !liveId ||
-    !locationAllowsCommentRecording() ||
-    !pendingRoots.size
-  ) {
+  if (!pendingRoots.size) return;
+  if (!hasExtensionContext()) {
     pendingRoots.clear();
+    return;
+  }
+  if (!recording) {
+    pendingRoots.clear();
+    return;
+  }
+  /*
+   * liveId 未取得・iframe 判定の一瞬だけ false になる場合でも pending を捨てない。
+   * syncLiveIdFromLocation が body を積み直すまで保持し、取りこぼしを減らす。
+   */
+  if (!liveId || !locationAllowsCommentRecording()) {
     return;
   }
 
@@ -4295,23 +4324,49 @@ function scheduleDeepHarvest(reason) {
     if (isWatchInlinePanelTopFrame() && isNicoLiveWatchUrl(window.location.href)) {
       renderPageFrameOverlay();
     }
-    runDeepHarvest().catch(() => {});
+    resetDeepHarvestStabilityFollowUp();
+    runDeepHarvest({ armStabilityFollowUp: true }).catch(() => {});
   }, delayMs);
 }
 
 /**
- * 低頻度の追加 deep（定期・タブ可視時）。`scheduleDeepHarvest` とは別タイマーで競合しないよう
- * `harvestRunning` を見てスキップする。
+ * 定期の取りこぼし拾い。quietScroll 付き単一パス deep で仮想リスト全域を走査する。
+ * opacity:0 なので視覚的な「滝」は起きない。安定フォローは積まない。
  */
-function tryPeriodicDeepHarvest() {
+function tryPeriodicQuietDeepHarvest() {
   if (!hasExtensionContext()) return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
   if (document.hidden) return;
   if (harvestRunning) return;
-  void runDeepHarvest();
+  resetDeepHarvestStabilityFollowUp();
+  void runDeepHarvest({ stabilityFollowUp: true });
 }
 
-async function runDeepHarvest() {
+/**
+ * バックグラウンドに回したあと visible に戻ったとき、仮想リストの取りこぼしを拾い直す。
+ * 連打で deep が積まないよう短いデバウンスのみ。
+ */
+function onTabVisibleForCommentHarvest() {
+  if (document.visibilityState !== 'visible') return;
+  if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  scanVisibleCommentsNow();
+  if (tabVisibleHarvestDebounceTimer != null) {
+    clearTimeout(tabVisibleHarvestDebounceTimer);
+  }
+  tabVisibleHarvestDebounceTimer = setTimeout(() => {
+    tabVisibleHarvestDebounceTimer = null;
+    if (recording && liveId && locationAllowsCommentRecording() && !document.hidden) {
+      scheduleDeepHarvest('tab-visible');
+    }
+  }, 850);
+}
+
+/**
+ * @param {{ armStabilityFollowUp?: boolean, stabilityFollowUp?: boolean }} [opts]
+ *   armStabilityFollowUp: true のときだけ成功後に遅延フォロー deep を積む（scheduleDeepHarvest 経路のみ）。
+ *   stabilityFollowUp: 遅延フォロー本体。1 パスのみで「滝」を短くする。
+ */
+async function runDeepHarvest(opts = {}) {
   if (
     harvestRunning ||
     !recording ||
@@ -4326,9 +4381,11 @@ async function runDeepHarvest() {
       document,
       extractCommentsFromNode,
       waitMs: DEEP_HARVEST_SCROLL_WAIT_MS,
-      twoPass: true,
+      twoPass: !opts.stabilityFollowUp,
       twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS,
-      scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO
+      scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO,
+      quietScroll: true,
+      respectTyping: false
     });
     await persistCommentRows(rows, { source: 'deep' });
     deepHarvestPipelineStats.lastCompletedAt = Date.now();
@@ -4340,6 +4397,8 @@ async function runDeepHarvest() {
   } finally {
     harvestRunning = false;
     if (
+      opts.armStabilityFollowUp === true &&
+      !opts.stabilityFollowUp &&
       !deepHarvestPipelineStats.lastError &&
       recording &&
       liveId &&
@@ -4350,7 +4409,7 @@ async function runDeepHarvest() {
       deepHarvestStabilityFollowUpTimer = setTimeout(() => {
         deepHarvestStabilityFollowUpTimer = null;
         if (recording && liveId && locationAllowsCommentRecording()) {
-          void runDeepHarvest();
+          void runDeepHarvest({ stabilityFollowUp: true });
         }
       }, DEEP_HARVEST_STABILITY_FOLLOWUP_MS);
     }
@@ -4722,8 +4781,10 @@ async function start() {
   }, LIVE_PANEL_SCAN_MS);
 
   setInterval(() => {
-    tryPeriodicDeepHarvest();
+    tryPeriodicQuietDeepHarvest();
   }, DEEP_HARVEST_PERIODIC_MS);
+
+  document.addEventListener('visibilitychange', onTabVisibleForCommentHarvest);
 
   pollStatsFromPage();
   setInterval(() => {

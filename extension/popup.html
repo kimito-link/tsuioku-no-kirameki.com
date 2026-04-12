@@ -127,28 +127,8 @@
         display: none;
       }
 
-      /* watch 埋め込み: 公式コメント欄と二重になるためテキストエリア・送信ボタンは隠し、書き出しツールバーは残す */
-      html.nl-inline-embed-watch body .nl-comment-compose--primary > textarea,
-      html.nl-inline-embed-watch body .nl-comment-compose--primary > #commentKindnessPopover,
-      html.nl-inline-embed-watch
-        body
-        .nl-comment-compose--primary
-        .nl-compose-send-actions
-        > #postCommentBtn {
-        display: none !important;
-      }
-
       html.nl-inline-embed-watch body .nl-comment-compose--primary > #exportToolbarHint {
         display: none;
-      }
-
-      html.nl-inline-embed-watch body .nl-comment-compose--primary::before {
-        content: 'コメント送信は watch の公式欄から。ここでは HTML 保存・スクショ・再読み込みが使えます。';
-        display: block;
-        font-size: 12.5px;
-        line-height: 1.45;
-        color: var(--nl-text-sub, #64748b);
-        margin: 0 0 8px;
       }
 
       html.nl-inline-embed-watch body .nl-comment-compose--primary {
@@ -591,23 +571,18 @@
         margin-top: 1px;
       }
 
+      /*
+       * 応援ユーザーレーン（りんく・こん太・たぬ姉）: 候補組み立ては src/lib/storyUserLaneRowModel.js、
+       * DOM 同期は src/extension/story/renderStoryUserLaneDom.js、描画トリガは popup-entry の renderStoryUserLane。
+       */
       .nl-story-userlane-stack {
         display: flex;
         flex-direction: column;
         gap: 8px;
-        /* こん太・たぬ姉の吹き出しが内側にあるため、やや高めにしてスクロールで発見しやすくする */
-        max-height: min(320px, 58vh);
         overflow-x: hidden;
-        overflow-y: auto;
+        overflow-y: visible;
         margin: 0 0 4px;
         min-height: 0;
-        -webkit-overflow-scrolling: touch;
-        scroll-padding-bottom: 10px;
-        box-shadow: inset 0 -10px 12px -12px rgb(15 23 42 / 12%);
-      }
-
-      html.nl-inline body .nl-story-userlane-stack {
-        max-height: min(300px, 56vh);
       }
 
       .nl-story-userlane-tier-wrap {
@@ -632,7 +607,7 @@
       .nl-story-userlane {
         display: flex;
         flex-wrap: wrap;
-        align-items: flex-start;
+        align-items: center;
         align-content: flex-start;
         gap: 6px 8px;
         margin: 0;
@@ -651,6 +626,7 @@
 
       html.nl-inline body .nl-story-userlane-stack .nl-story-userlane {
         max-height: none;
+        overflow-y: visible;
       }
 
       /* 識別色はラッパー背景・外枠のみ（既定のリンクゆっくり画像の見え方は変えない） */
@@ -1155,6 +1131,12 @@
       html[data-nl-popup-primary-cloak='1'] .nl-popup-primary {
         visibility: hidden;
         pointer-events: none;
+      }
+
+      /* cloak 中の inline-embed-watch: 親ホストの暗い背景を透かして白フラッシュを防ぐ */
+      html.nl-inline-embed-watch[data-nl-popup-primary-cloak='1'],
+      html.nl-inline-embed-watch[data-nl-popup-primary-cloak='1'] body {
+        background: transparent !important;
       }
 
       .nl-usage-terms-gate {
@@ -2522,6 +2504,7 @@
         max-width: 100%;
       }
 
+      /* 応援ビジュアル折りたたみ: 開閉・storage は popup-entry（wireSupportVisualUi）。白フラッシュ緩和は __body の背景と keyframes。 */
       .nl-support-visual-details {
         margin: 8px 0 0;
         border: 1px solid color-mix(in srgb, var(--nl-border) 85%, transparent);
@@ -2592,16 +2575,22 @@
         /* scrollIntoView / プログラムスクロール時にヘッダー直後で本文が隠れにくくする */
         scroll-margin-block-start: 10px;
         transform-origin: top center;
+        /* 開いた直後のレイアウト確定前に透過＋白ベースだけが見えてフラッシュしないよう不透明に寄せる */
+        background: color-mix(in srgb, var(--nl-surface) 94%, var(--nl-bg-soft) 6%);
+      }
+
+      html.nl-inline body .nl-support-visual-details__body {
+        background: color-mix(in srgb, var(--nl-surface) 90%, var(--nl-bg-soft) 10%);
       }
 
       .nl-support-visual-details[open] > .nl-support-visual-details__body {
-        animation: nl-support-visual-body-open 0.22s ease-out;
+        animation: nl-support-visual-body-open 0.2s ease-out;
       }
 
       @keyframes nl-support-visual-body-open {
         from {
-          opacity: 0.65;
-          transform: translateY(-6px);
+          opacity: 1;
+          transform: translateY(-3px);
         }
         to {
           opacity: 1;
@@ -5466,6 +5455,10 @@
         box-shadow: 0 8px 26px rgb(0 0 0 / 28%);
       }
 
+      html.nl-skin-panel-dark .nl-support-visual-details__body {
+        background: rgb(15 23 42 / 82%);
+      }
+
       html.nl-skin-panel-dark .nl-story-userlane-guide__line {
         background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
         border-color: rgb(251 191 36 / 55%);
@@ -5490,10 +5483,6 @@
       html.nl-skin-panel-dark body.nl-compact .nl-story-userlane-guide__line {
         font-size: 10.5px;
         padding: 6px 9px;
-      }
-
-      html.nl-skin-panel-dark .nl-story-userlane-stack {
-        box-shadow: inset 0 -10px 14px -12px rgb(0 0 0 / 45%);
       }
 
       html.nl-skin-panel-dark .nl-story-userlane-tier-hint {
@@ -6169,8 +6158,8 @@
                     <div
                       id="sceneStoryUserLaneStack"
                       class="nl-story-userlane-stack"
-                      aria-label="最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段。続きはこの枠内をスクロール）"
-                      title="アイコンが多いときは、この枠内をスクロールするとこん太・たぬ姉の説明と続きの列が見えます"
+                      aria-label="最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段）"
+                      title="応援ユーザーを、プロフィールの揃い具合の三段に分けて並べています"
                       hidden
                     >
                       <div

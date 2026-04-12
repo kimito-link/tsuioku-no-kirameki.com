@@ -339,6 +339,49 @@ describe('harvestVirtualCommentList', () => {
     expect(keys.has('2\tb')).toBe(true);
   });
 
+  it('quietScroll でスクロールホストに opacity:0 を設定し終了後に復元', async () => {
+    document.body.innerHTML = `
+      <div class="ga-ns-comment-panel">
+        <div class="body" role="rowgroup" style="height:50px;overflow:auto;width:200px">
+          <div id="qs-slot"></div>
+        </div>
+      </div>`;
+    const body = /** @type {HTMLElement} */ (document.querySelector('.body'));
+    Object.defineProperty(body, 'clientHeight', { value: 50, configurable: true });
+    Object.defineProperty(body, 'scrollHeight', { value: 500, configurable: true });
+    let scrollTop = 0;
+    Object.defineProperty(body, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (v) => { scrollTop = v; }
+    });
+    body.style.opacity = '1';
+
+    let opacityDuringExtract = '';
+    const slot = document.getElementById('qs-slot');
+    const extract = () => {
+      opacityDuringExtract = body.style.opacity;
+      const idx = Math.min(9, Math.max(0, Math.floor(scrollTop / 60)));
+      slot.innerHTML = `
+        <div class="table-row" data-comment-type="normal">
+          <span class="comment-number">${idx + 1}</span>
+          <span class="comment-text">qs</span>
+        </div>
+        <div style="height:800px"></div>`;
+      return extractCommentsFromNode(document.querySelector('.ga-ns-comment-panel'));
+    };
+
+    const rows = await harvestVirtualCommentList({
+      document,
+      extractCommentsFromNode: extract,
+      waitMs: 0,
+      quietScroll: true
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(opacityDuringExtract).toBe('0');
+    expect(body.style.opacity).toBe('1');
+  });
+
   it('HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO は取りこぼし対策で 0.72 未満', () => {
     expect(HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO).toBeLessThan(0.72);
     expect(HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO).toBeGreaterThan(0.4);
