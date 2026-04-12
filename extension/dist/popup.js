@@ -6099,7 +6099,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         userId: uidRaw,
         nickname: e?.nickname,
         httpAvatarCandidate: row.httpForLane,
-        storedAvatarUrl: e?.avatarUrl
+        storedAvatarUrl: e?.avatarUrl,
+        avatarObserved: Boolean(e?.avatarObserved)
       });
       laneDiagDeduped += 1;
       if (ex.strongNick) laneDiagStrongNick += 1;

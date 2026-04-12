@@ -333,8 +333,8 @@ test.describe('inline panel alignment', () => {
     await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
     await page.evaluate(injectTwoColumnPlayerRow);
 
-    // Chromium の getComputedStyle は top/right が auto でもレイアウト後のピクセル値を返すことがある。
-    // 左下固定は bottom・left がパディング付近で、top は top_right（~12px）より大きくなる。
+    await expect(page.locator(`#${INLINE_HOST_ID}`)).toBeVisible({ timeout: 25_000 });
+
     await expect
       .poll(() => hostFloatingCornerMetrics(page), { timeout: 25_000 })
       .toMatchObject({
@@ -365,6 +365,8 @@ test.describe('inline panel alignment', () => {
     const page = await context.newPage();
     await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
     await page.evaluate(injectTwoColumnPlayerRow);
+
+    await expect(page.locator(`#${INLINE_HOST_ID}`)).toBeVisible({ timeout: 25_000 });
 
     await expect
       .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })

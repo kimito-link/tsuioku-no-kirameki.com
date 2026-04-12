@@ -107,6 +107,7 @@ import { mergeUserIdForEnrichment } from '../lib/userIdPreference.js';
 import { maybeAppendCommentIngestLog } from '../lib/commentIngestLog.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { createPersistCoalescer } from '../lib/persistThrottle.js';
+import { enrichmentAvatarWithCanonicalFallback } from '../lib/enrichmentAvatarFallback.js';
 
 /**
  * @typedef {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string, avatarObserved?: boolean }} ParsedCommentRow
@@ -3674,12 +3675,16 @@ function enrichRowsWithInterceptedUserIds(rows) {
       userId && isHttpAvatarUrl(interceptedAvatars.get(String(userId)))
         ? String(interceptedAvatars.get(String(userId)) || '').trim()
         : '';
+    const canonicalFallback = enrichmentAvatarWithCanonicalFallback(
+      userId, interceptEntryAv, interceptMapAv, rowAv
+    );
     const av = pickStrongestAvatarUrlForUser(userId, [
       interceptEntryAv,
       interceptMapAv,
-      rowAv
+      rowAv,
+      canonicalFallback
     ]);
-    const observed = Boolean(av || rowAv || interceptEntryAv || interceptMapAv);
+    const observed = Boolean(rowAv || interceptEntryAv || interceptMapAv);
     return {
       ...r,
       userId,

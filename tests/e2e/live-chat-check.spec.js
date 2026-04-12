@@ -7,6 +7,10 @@ import { test, expect } from './fixtures.js';
  * 実行: npx playwright test tests/e2e/live-chat-check.spec.js --headed
  */
 test.describe('実ニコ生コメント取得チェック', () => {
+  test.skip(
+    () => process.env.CI === 'true',
+    '外部サービス（live.nicovideo.jp）依存のためCIではスキップ'
+  );
   test.setTimeout(180_000);
 
   test('ニコ生視聴ページでコメントが storage に蓄積される', async ({ context }) => {

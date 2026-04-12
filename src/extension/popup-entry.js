@@ -2841,7 +2841,8 @@ function renderStoryUserLane() {
       userId: uidRaw,
       nickname: e?.nickname,
       httpAvatarCandidate: row.httpForLane,
-      storedAvatarUrl: e?.avatarUrl
+      storedAvatarUrl: e?.avatarUrl,
+      avatarObserved: Boolean(e?.avatarObserved)
     });
     laneDiagDeduped += 1;
     if (ex.strongNick) laneDiagStrongNick += 1;

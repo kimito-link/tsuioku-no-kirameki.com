@@ -29,10 +29,10 @@ export default defineConfig({
   globalTeardown: path.join(__dirname, 'tests', 'e2e', 'global-teardown.js'),
   fullyParallel: false,
   workers: 1,
+  retries: process.env.CI === 'true' ? 1 : 0,
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: {
-    // ローカルはヘッド付き（ブラウザが見える）。CI / PW_HEADLESS=1 ではヘッドレス。
     headless: process.env.CI === 'true' || process.env.PW_HEADLESS === '1',
     trace: 'on-first-retry'
   },

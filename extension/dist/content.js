@@ -2622,6 +2622,12 @@
     return { enqueue, flush, clear, pending: () => buffer.length };
   }
 
+  // src/lib/enrichmentAvatarFallback.js
+  function enrichmentAvatarWithCanonicalFallback(userId, interceptEntryAv, interceptMapAv, rowAv) {
+    if (interceptEntryAv || interceptMapAv || rowAv) return "";
+    return niconicoDefaultUserIconUrl(userId);
+  }
+
   // src/extension/content-entry.js
   var DEBOUNCE_MS = 80;
   var LIVE_POLL_MS = 4e3;
@@ -5401,12 +5407,19 @@
       const rowAv = String(r.avatarUrl || "").trim();
       const interceptEntryAv = canUseInterceptMeta && isHttpAvatarUrl(entry?.av) ? String(entry?.av || "").trim() : "";
       const interceptMapAv = userId && isHttpAvatarUrl(interceptedAvatars.get(String(userId))) ? String(interceptedAvatars.get(String(userId)) || "").trim() : "";
-      const av = pickStrongestAvatarUrlForUser(userId, [
+      const canonicalFallback = enrichmentAvatarWithCanonicalFallback(
+        userId,
         interceptEntryAv,
         interceptMapAv,
         rowAv
+      );
+      const av = pickStrongestAvatarUrlForUser(userId, [
+        interceptEntryAv,
+        interceptMapAv,
+        rowAv,
+        canonicalFallback
       ]);
-      const observed = Boolean(av || rowAv || interceptEntryAv || interceptMapAv);
+      const observed = Boolean(rowAv || interceptEntryAv || interceptMapAv);
       return {
         ...r,
         userId,
@@ -5528,7 +5541,7 @@
     });
     await job;
   }, MIN_PERSIST_INTERVAL_MS);
-  function persistCommentRows(rows, opts = {}) {
+  function persistCommentRows(rows, _opts = {}) {
     if (!rows?.length || !recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
       return;
     }
