@@ -1,3 +1,5 @@
+import { niconicoDefaultUserIconUrl } from './supportGrowthTileSrc.js';
+
 /**
  * enrichRowsWithInterceptedUserIds 内で、全ソースにアバターURLがない場合に
  * 数値 userId から canonical CDN URL をフォールバック生成する（純関数）。
@@ -11,8 +13,6 @@
  * @param {string} rowAv
  * @returns {string} canonical URL or ''
  */
-import { niconicoDefaultUserIconUrl } from './supportGrowthTileSrc.js';
-
 export function enrichmentAvatarWithCanonicalFallback(
   userId,
   interceptEntryAv,
