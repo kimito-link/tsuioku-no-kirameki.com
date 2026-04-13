@@ -2980,7 +2980,7 @@
         /** @type {{ avatarUrl?: unknown }} */
         e?.avatarUrl || ""
       ).trim();
-      let out = (
+      const out = (
         /** @type {Record<string, unknown>} */
         { .../** @type {object} */
         e }
@@ -5681,6 +5681,17 @@
       viewerNickname: viewer.viewerNickname,
       viewerUserId: viewer.viewerUserId,
       broadcasterUserId,
+      broadcasterLevel: (() => {
+        try {
+          const props = extractEmbeddedDataProps(document);
+          const lv = props?.program?.supplier?.level ?? props?.socialGroup?.level ?? props?.user?.userLevel;
+          if (typeof lv === "number" && Number.isFinite(lv) && lv > 0) return lv;
+          const parsed = parseInt(String(lv), 10);
+          return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+        } catch {
+          return null;
+        }
+      })(),
       viewerCountFromDom,
       viewerCountSource,
       ...buildWatchSnapshotOfficialFields({

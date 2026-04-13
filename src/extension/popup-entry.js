@@ -215,6 +215,7 @@ import {
  *   viewerNickname?: string,
  *   viewerUserId?: string,
  *   broadcasterUserId?: string,
+ *   broadcasterLevel?: number|null,
  *   viewerCountFromDom?: number|null,
  *   viewerCountSource?: 'ws'|'embedded'|'dom'|'none',
  *   officialViewerCount?: number|null,
@@ -4040,7 +4041,9 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   const casterFollow = /** @type {HTMLAnchorElement|null} */ ($('casterBannerFollow'));
   const casterUid = String(snapshot.broadcasterUserId || '').trim();
   if (casterBanner && casterNameEl && broadcasterText !== '-' && casterUid) {
-    casterNameEl.textContent = broadcasterText;
+    const lvNum = Number(snapshot.broadcasterLevel);
+    const lvSuffix = Number.isFinite(lvNum) && lvNum > 0 ? ` LV${lvNum}` : '';
+    casterNameEl.textContent = broadcasterText + lvSuffix;
     const userPageUrl = `https://www.nicovideo.jp/user/${casterUid}`;
     if (casterLink) casterLink.href = userPageUrl;
     if (casterFollow) casterFollow.href = userPageUrl;

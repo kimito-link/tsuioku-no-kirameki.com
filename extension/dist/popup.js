@@ -7248,7 +7248,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     );
     const casterUid = String(snapshot.broadcasterUserId || "").trim();
     if (casterBanner && casterNameEl && broadcasterText !== "-" && casterUid) {
-      casterNameEl.textContent = broadcasterText;
+      const lvNum = Number(snapshot.broadcasterLevel);
+      const lvSuffix = Number.isFinite(lvNum) && lvNum > 0 ? ` LV${lvNum}` : "";
+      casterNameEl.textContent = broadcasterText + lvSuffix;
       const userPageUrl = `https://www.nicovideo.jp/user/${casterUid}`;
       if (casterLink) casterLink.href = userPageUrl;
       if (casterFollow) casterFollow.href = userPageUrl;

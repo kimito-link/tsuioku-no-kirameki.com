@@ -3171,6 +3171,7 @@ function bindNativeSelfPostedRecorder() {
  *   viewerNickname: string,
  *   viewerUserId: string,
  *   broadcasterUserId: string,
+ *   broadcasterLevel: number|null,
  *   viewerCountFromDom: number|null,
  *   viewerCountSource: 'ws'|'embedded'|'dom'|'none',
  *   officialViewerCount: number|null,
@@ -3516,6 +3517,15 @@ function collectWatchPageSnapshot() {
     viewerNickname: viewer.viewerNickname,
     viewerUserId: viewer.viewerUserId,
     broadcasterUserId,
+    broadcasterLevel: (() => {
+      try {
+        const props = extractEmbeddedDataProps(document);
+        const lv = props?.program?.supplier?.level ?? props?.socialGroup?.level ?? props?.user?.userLevel;
+        if (typeof lv === 'number' && Number.isFinite(lv) && lv > 0) return lv;
+        const parsed = parseInt(String(lv), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+      } catch { return null; }
+    })(),
     viewerCountFromDom,
     viewerCountSource,
     ...buildWatchSnapshotOfficialFields({
