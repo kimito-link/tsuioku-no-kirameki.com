@@ -34,6 +34,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     headless: process.env.CI === 'true' || process.env.PW_HEADLESS === '1',
+    reducedMotion: 'reduce',
     trace: 'on-first-retry'
   },
   ...(e2eNoWebServer

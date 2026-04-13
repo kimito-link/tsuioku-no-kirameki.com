@@ -19,8 +19,8 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: {
-    // CI ではヘッドレス。ローカルではブラウザ表示（レイアウト確認しやすい）。
     headless: process.env.CI === 'true' || process.env.PW_HEADLESS === '1',
+    reducedMotion: 'reduce',
     trace: 'on-first-retry'
   }
 });
