@@ -33,7 +33,7 @@ describe('userLaneProfileCompletenessTier', () => {
     ).toBe(2);
   });
 
-  it('avatarObserved=true のエントリは tier 3（rink）', () => {
+  it('avatarObserved=true でも個人サムネなしは tier 2（konta）', () => {
     expect(
       userLaneProfileCompletenessTier(
         {
@@ -44,7 +44,48 @@ describe('userLaneProfileCompletenessTier', () => {
         },
         ''
       )
+    ).toBe(2);
+  });
+
+  it('数値ID + 強ニック + avatarObserved=true でも個人サムネなしは tier 2（konta）', () => {
+    expect(
+      userLaneProfileCompletenessTier(
+        {
+          userId: '25221924',
+          nickname: 'レコ',
+          avatarUrl: '',
+          avatarObserved: true
+        },
+        ''
+      )
+    ).toBe(2);
+  });
+
+  it('個人サムネがあれば表示名が弱くても tier 3（link）', () => {
+    expect(
+      userLaneProfileCompletenessTier(
+        {
+          userId: '25221924',
+          nickname: 'ゲスト',
+          avatarUrl: 'https://example.com/personal.jpg',
+          avatarObserved: true
+        },
+        'https://example.com/personal.jpg'
+      )
     ).toBe(3);
+  });
+
+  it('個人サムネなし + 表示名が弱い場合は tier 1（tanu）', () => {
+    expect(
+      userLaneProfileCompletenessTier(
+        {
+          userId: '715502',
+          nickname: 'ゲスト',
+          avatarUrl: ''
+        },
+        ''
+      )
+    ).toBe(1);
   });
 
   it('avatarObserved なしの数値ID＋強ニックは tier 2（konta）', () => {
@@ -79,7 +120,7 @@ describe('buildStoryUserLaneCandidateRow', () => {
     expect(row).not.toBeNull();
     expect(row?.httpForLane).toBe(personal);
     expect(row?.displaySrc).toBe(personal);
-    expect(row?.profileTier).toBe(2);
+    expect(row?.profileTier).toBe(3);
   });
 
   it('匿名・こん太相当では表示 src は Identicon（メタ用 http はマージ結果のまま）', () => {
@@ -97,5 +138,20 @@ describe('buildStoryUserLaneCandidateRow', () => {
     expect(row).not.toBeNull();
     expect(row?.httpForLane).toBe(http);
     expect(row?.displaySrc).toBe(pickCtx.anonymousIdenticonDataUrl);
+  });
+
+  it('httpForLane が個人サムネなら tier 判定にも反映される', () => {
+    const row = buildStoryUserLaneCandidateRow(
+      {
+        userId: '88210441',
+        nickname: 'nora',
+        avatarUrl: ''
+      },
+      2,
+      'https://example.com/u.jpg',
+      pickCtx
+    );
+    expect(row).not.toBeNull();
+    expect(row?.profileTier).toBe(3);
   });
 });

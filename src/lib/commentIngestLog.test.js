@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendCommentIngestLog,
+  COMMENT_INGEST_SOURCE,
   COMMENT_INGEST_LOG_MAX_ITEMS,
+  COMMENT_INGEST_LOG_NDGR_MIN_ADDED,
   COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS,
+  COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED,
   COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS,
   maybeAppendCommentIngestLog,
   parseCommentIngestLog
@@ -174,5 +177,65 @@ describe('commentIngestLog', () => {
       official: null
     });
     expect(vis2).toBeNull();
+  });
+
+  it('source が未知の値なら unknown として保存する', () => {
+    const cur = appendCommentIngestLog({ v: 1, items: [] }, {
+      t: 1,
+      liveId: 'lvx',
+      source: 'network-intercept',
+      batchIn: 1,
+      added: 1,
+      totalAfter: 1,
+      official: null
+    });
+    expect(cur.items).toHaveLength(1);
+    expect(cur.items[0].source).toBe(COMMENT_INGEST_SOURCE.UNKNOWN);
+  });
+
+  it('ndgr は短間隔でも added が閾値以上なら記録する', () => {
+    const t0 = 2_000_000;
+    const a = maybeAppendCommentIngestLog({ v: 1, items: [] }, {
+      t: t0,
+      liveId: 'lv1',
+      source: COMMENT_INGEST_SOURCE.NDGR,
+      batchIn: 1,
+      added: 1,
+      totalAfter: 10,
+      official: null
+    });
+    const b = maybeAppendCommentIngestLog(a, {
+      t: t0 + COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS - 1,
+      liveId: 'lv1',
+      source: COMMENT_INGEST_SOURCE.NDGR,
+      batchIn: 10,
+      added: COMMENT_INGEST_LOG_NDGR_MIN_ADDED,
+      totalAfter: 10 + COMMENT_INGEST_LOG_NDGR_MIN_ADDED,
+      official: null
+    });
+    expect(b?.items).toHaveLength(2);
+  });
+
+  it('visible は短間隔で added が閾値未満なら間引く', () => {
+    const t0 = 3_000_000;
+    const a = maybeAppendCommentIngestLog({ v: 1, items: [] }, {
+      t: t0,
+      liveId: 'lv1',
+      source: COMMENT_INGEST_SOURCE.VISIBLE,
+      batchIn: 10,
+      added: 2,
+      totalAfter: 20,
+      official: null
+    });
+    const b = maybeAppendCommentIngestLog(a, {
+      t: t0 + COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS - 1,
+      liveId: 'lv1',
+      source: COMMENT_INGEST_SOURCE.VISIBLE,
+      batchIn: 10,
+      added: COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED - 1,
+      totalAfter: 20 + COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED - 1,
+      official: null
+    });
+    expect(b).toBeNull();
   });
 });

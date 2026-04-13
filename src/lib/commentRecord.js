@@ -11,6 +11,9 @@ import {
 import { pickStrongerUserId } from './userIdPreference.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 
+/** コメント本文の上限（storage肥大化を抑制） */
+export const COMMENT_TEXT_MAX_CHARS = 1000;
+
 /**
  * 保存済み・取り込み済みの usericon URL から数字 userId を復元（DOM 側で ID 欠けのみの救済）
  * @param {string} url
@@ -53,7 +56,8 @@ export function normalizeCommentText(value) {
     .split('\n')
     .map((l) => l.trim())
     .join('\n')
-    .trim();
+    .trim()
+    .slice(0, COMMENT_TEXT_MAX_CHARS);
 }
 
 /**
@@ -128,10 +132,13 @@ function storedCommentDedupeKey(lid, ex) {
  */
 export function mergeNewComments(liveId, existing, incoming) {
   const lid = String(liveId || '').trim().toLowerCase();
-  const keys = new Set();
-  for (const e of existing) {
+  /** @type {Map<string, number>} */
+  const keyToIndex = new Map();
+  for (let i = 0; i < existing.length; i += 1) {
+    const e = existing[i];
     const ex = /** @type {StoredComment} */ (e);
-    keys.add(storedCommentDedupeKey(lid, ex));
+    const key = storedCommentDedupeKey(lid, ex);
+    if (!keyToIndex.has(key)) keyToIndex.set(key, i);
   }
   const added = [];
   const next = /** @type {StoredComment[]} */ ([...existing]);
@@ -154,9 +161,8 @@ export function mergeNewComments(liveId, existing, incoming) {
       if (fromAv) incUid = fromAv;
     }
 
-    if (keys.has(key)) {
-      const idx = next.findIndex((ex) => storedCommentDedupeKey(lid, ex) === key);
-      if (idx >= 0) {
+    const idx = keyToIndex.get(key);
+    if (idx != null && idx >= 0 && idx < next.length) {
         const ex = /** @type {StoredComment} */ (next[idx]);
         let patched = ex;
         let touched = false;
@@ -231,10 +237,9 @@ export function mergeNewComments(liveId, existing, incoming) {
           next[idx] = patched;
           storageTouched = true;
         }
-      }
       continue;
     }
-    keys.add(key);
+    keyToIndex.set(key, next.length);
     const entry = createCommentEntry({
       liveId: lid,
       commentNo,

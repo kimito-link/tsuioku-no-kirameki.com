@@ -10,10 +10,12 @@ import { resolveConcurrentViewers } from './concurrentEstimate.js';
 import { shouldShowConcurrentEstimate } from './popupConcurrentEstimateGate.js';
 import { summarizeRecordedCommenters } from './liveCommenterStats.js';
 import { giftUsersStorageKey } from './storageKeys.js';
+import { readStorageBagWithRetry } from './userCommentProfileCache.js';
 
 const FLUSH_MIN_INTERVAL_MS = 60_000;
 
 let lastFlushAt = 0;
+const BROADCAST_SESSION_SUMMARY_LOG_PREFIX = '[broadcastSessionSummaryFlush]';
 
 /**
  * @param {Record<string, unknown>|null|undefined} snapshot
@@ -122,12 +124,19 @@ export async function maybeFlushBroadcastSessionSummarySample(input) {
   let giftUserCount = 0;
   try {
     if (typeof chrome !== 'undefined' && chrome.storage?.local?.get) {
-      const bag = await chrome.storage.local.get(giftUsersStorageKey(lid));
       const key = giftUsersStorageKey(lid);
+      const bag = await readStorageBagWithRetry(
+        async () => await chrome.storage.local.get(key),
+        { attempts: 4, delaysMs: [0, 50, 120, 280] }
+      );
       const raw = bag[key];
       giftUserCount = Array.isArray(raw) ? raw.length : 0;
     }
-  } catch {
+  } catch (err) {
+    console.warn(
+      `${BROADCAST_SESSION_SUMMARY_LOG_PREFIX} failed to read gift users from storage`,
+      err
+    );
     giftUserCount = 0;
   }
 
@@ -165,13 +174,19 @@ export async function maybeFlushBroadcastSessionSummarySample(input) {
   try {
     db = await openBroadcastSessionSummaryDb();
     await appendBroadcastSessionSummarySample(db, row);
-  } catch {
-    // no-op（IDB 不可・容量など）
+  } catch (err) {
+    console.warn(
+      `${BROADCAST_SESSION_SUMMARY_LOG_PREFIX} failed to append summary sample`,
+      err
+    );
   } finally {
     try {
       db?.close();
-    } catch {
-      // no-op
+    } catch (err) {
+      console.debug(
+        `${BROADCAST_SESSION_SUMMARY_LOG_PREFIX} failed to close IndexedDB handle`,
+        err
+      );
     }
   }
 }

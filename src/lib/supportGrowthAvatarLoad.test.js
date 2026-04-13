@@ -1,10 +1,14 @@
 /** @vitest-environment happy-dom */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createSupportAvatarLoadGuard } from './supportGrowthAvatarLoad.js';
 import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc.js';
 
 const FALLBACK = NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS;
 const REMOTE = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/123456789.jpg';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('createSupportAvatarLoadGuard', () => {
   it('pickDisplaySrc はローカル相対パスをそのまま返す', () => {
@@ -73,6 +77,28 @@ describe('createSupportAvatarLoadGuard', () => {
     g.markFailedForTests(REMOTE);
     expect(g.pickDisplaySrc(REMOTE)).toBe(FALLBACK);
     g.clearFailedUrls();
+    expect(g.pickDisplaySrc(REMOTE)).toBe(REMOTE);
+  });
+
+  it('noteRemoteAttempt は timeoutMs 経過で fallback に切り替える', () => {
+    vi.useFakeTimers();
+    const g = createSupportAvatarLoadGuard({ fallbackSrc: FALLBACK, timeoutMs: 3000 });
+    const img = document.createElement('img');
+    img.src = REMOTE;
+    g.noteRemoteAttempt(img, REMOTE);
+    vi.advanceTimersByTime(3001);
+    expect(img.src).toContain('nicoaccount/usericon/defaults');
+    expect(g.pickDisplaySrc(REMOTE)).toBe(FALLBACK);
+  });
+
+  it('load 済みなら timeout 経過しても fallback しない', () => {
+    vi.useFakeTimers();
+    const g = createSupportAvatarLoadGuard({ fallbackSrc: FALLBACK, timeoutMs: 3000 });
+    const img = document.createElement('img');
+    img.src = REMOTE;
+    g.noteRemoteAttempt(img, REMOTE);
+    img.dispatchEvent(new Event('load'));
+    vi.advanceTimersByTime(3001);
     expect(g.pickDisplaySrc(REMOTE)).toBe(REMOTE);
   });
 });

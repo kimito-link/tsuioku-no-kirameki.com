@@ -6,14 +6,45 @@
 export const COMMENT_INGEST_LOG_VERSION = 1;
 export const COMMENT_INGEST_LOG_MAX_ITEMS = 500;
 
-/** NDGR / visible は1コメずつ永続化が走りやすい → 同系統の細かい行を間引く */
-const INGEST_LOG_HF_SOURCES = /** @type {ReadonlySet<string>} */ (
-  new Set(['ndgr', 'visible'])
+/** @enum {string} */
+export const COMMENT_INGEST_SOURCE = {
+  NDGR: 'ndgr',
+  VISIBLE: 'visible',
+  MUTATION: 'mutation',
+  DEEP: 'deep',
+  UNKNOWN: 'unknown'
+};
+
+const INGEST_LOG_VALID_SOURCES = /** @type {ReadonlySet<string>} */ (
+  new Set(Object.values(COMMENT_INGEST_SOURCE))
 );
 export const COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS = 5000;
 export const COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS = 4000;
-const INGEST_LOG_ALWAYS_LOG_ADDED = 5;
+export const COMMENT_INGEST_LOG_NDGR_MIN_ADDED = 3;
+export const COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED = 5;
 const INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA = 10;
+
+const INGEST_LOG_COOLDOWN_RULES = /** @type {Readonly<Record<string, { minIntervalMs: number, minAdded: number, minTotalDelta: number }>>} */ ({
+  [COMMENT_INGEST_SOURCE.NDGR]: {
+    minIntervalMs: COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS,
+    minAdded: COMMENT_INGEST_LOG_NDGR_MIN_ADDED,
+    minTotalDelta: INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA
+  },
+  [COMMENT_INGEST_SOURCE.VISIBLE]: {
+    minIntervalMs: COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS,
+    minAdded: COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED,
+    minTotalDelta: INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA
+  }
+});
+
+/**
+ * @param {unknown} src
+ * @returns {string}
+ */
+function normalizeIngestSource(src) {
+  const s = String(src || '').trim().toLowerCase().slice(0, 32);
+  return INGEST_LOG_VALID_SOURCES.has(s) ? s : COMMENT_INGEST_SOURCE.UNKNOWN;
+}
 
 /**
  * @typedef {{
@@ -47,7 +78,7 @@ export function parseCommentIngestLog(raw) {
     if (!Number.isFinite(t)) continue;
     const liveId = String(it.liveId || '').trim().toLowerCase();
     if (!liveId) continue;
-    const source = String(it.source || 'unknown').slice(0, 32);
+    const source = normalizeIngestSource(it.source);
     const batchIn = Math.max(0, Math.floor(Number(it.batchIn) || 0));
     const added = Math.max(0, Math.floor(Number(it.added) || 0));
     const totalAfter = Math.max(0, Math.floor(Number(it.totalAfter) || 0));
@@ -78,7 +109,7 @@ export function appendCommentIngestLog(prevRaw, entry, maxItems = COMMENT_INGEST
   const row = {
     t: Math.max(0, Math.floor(Number(entry.t) || Date.now())),
     liveId: String(entry.liveId || '').trim().toLowerCase(),
-    source: String(entry.source || 'unknown').slice(0, 32),
+    source: normalizeIngestSource(entry.source),
     batchIn: Math.max(0, Math.floor(Number(entry.batchIn) || 0)),
     added: Math.max(0, Math.floor(Number(entry.added) || 0)),
     totalAfter: Math.max(0, Math.floor(Number(entry.totalAfter) || 0)),
@@ -99,19 +130,15 @@ export function appendCommentIngestLog(prevRaw, entry, maxItems = COMMENT_INGEST
 export function maybeAppendCommentIngestLog(prevRaw, entry, maxItems = COMMENT_INGEST_LOG_MAX_ITEMS) {
   const base = parseCommentIngestLog(prevRaw);
   const lid = String(entry.liveId || '').trim().toLowerCase();
-  const src = String(entry.source || 'unknown').slice(0, 32);
+  const src = normalizeIngestSource(entry.source);
   const t = Math.max(0, Math.floor(Number(entry.t) || Date.now()));
   const added = Math.max(0, Math.floor(Number(entry.added) || 0));
   const totalAfter = Math.max(0, Math.floor(Number(entry.totalAfter) || 0));
 
-  if (!INGEST_LOG_HF_SOURCES.has(src)) {
+  const cooldownRule = INGEST_LOG_COOLDOWN_RULES[src];
+  if (!cooldownRule) {
     return appendCommentIngestLog(prevRaw, entry, maxItems);
   }
-
-  const minMs =
-    src === 'ndgr'
-      ? COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS
-      : COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS;
 
   /** @type {CommentIngestLogItem|null} */
   let prevSame = null;
@@ -128,10 +155,10 @@ export function maybeAppendCommentIngestLog(prevRaw, entry, maxItems = COMMENT_I
     const totalDelta = totalAfter - prevSame.totalAfter;
     if (
       dt >= 0 &&
-      dt < minMs &&
-      added < INGEST_LOG_ALWAYS_LOG_ADDED &&
+      dt < cooldownRule.minIntervalMs &&
+      added < cooldownRule.minAdded &&
       totalDelta >= 0 &&
-      totalDelta < INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA
+      totalDelta < cooldownRule.minTotalDelta
     ) {
       return null;
     }

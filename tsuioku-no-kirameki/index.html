@@ -856,10 +856,73 @@
       .fade{opacity:0;transform:translateY(18px);transition:opacity .9s ease,transform .9s ease}
       .fade.is-visible{opacity:1;transform:translateY(0)}
       .d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}.d4{transition-delay:.32s}
+      .y-row.lp-pop-row{
+        opacity:0;
+        transform:translateY(22px) scale(.96);
+      }
+      .y-row.lp-pop-row .bubble{
+        transform:translateY(8px) scale(.98);
+        opacity:.01;
+      }
+      .y-row.lp-pop-row .speaker{
+        transform:translateY(10px) scale(.94);
+        opacity:.01;
+      }
+      .y-row.lp-pop-row.is-pop-visible{
+        opacity:1;
+        transform:translateY(0) scale(1);
+        transition:
+          opacity .58s ease,
+          transform .58s cubic-bezier(.2,.84,.28,1.2);
+        transition-delay:var(--pop-delay,0ms);
+      }
+      .y-row.lp-pop-row.is-pop-visible .bubble{
+        opacity:1;
+        transform:translateY(0) scale(1);
+        transition:
+          opacity .54s ease,
+          transform .54s cubic-bezier(.16,.86,.24,1.2);
+        transition-delay:calc(var(--pop-delay,0ms) + 70ms);
+      }
+      .y-row.lp-pop-row.is-pop-visible .speaker{
+        opacity:1;
+        transform:translateY(0) scale(1);
+        transition:
+          opacity .5s ease,
+          transform .5s cubic-bezier(.16,.86,.24,1.2);
+        transition-delay:calc(var(--pop-delay,0ms) + 20ms);
+      }
+      .y-row.lp-pop-row.is-pop-visible .speaker img{
+        animation:yukkuriFloat var(--float-duration,4.4s) ease-in-out infinite;
+        animation-delay:var(--float-delay,0s);
+      }
+      .y-row.lp-pop-row.is-pop-visible .bubble{
+        animation:yukkuriBubbleFloat var(--bubble-float-duration,5.4s) ease-in-out infinite;
+        animation-delay:var(--bubble-float-delay,.2s);
+      }
       @media (prefers-reduced-motion:reduce){
         .fade{transition:none;opacity:1;transform:none}
+        .y-row.lp-pop-row,
+        .y-row.lp-pop-row .bubble,
+        .y-row.lp-pop-row .speaker{
+          opacity:1;
+          transform:none;
+          transition:none;
+        }
+        .y-row.lp-pop-row.is-pop-visible .speaker img,
+        .y-row.lp-pop-row.is-pop-visible .bubble{
+          animation:none;
+        }
       }
       @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+      @keyframes yukkuriFloat{
+        0%,100%{transform:translateY(0) rotate(0deg)}
+        50%{transform:translateY(-8px) rotate(-1.4deg)}
+      }
+      @keyframes yukkuriBubbleFloat{
+        0%,100%{transform:translateY(0)}
+        50%{transform:translateY(-4px)}
+      }
       @media (max-width:1020px){
         .two-col,.stats,.solution-grid,.avatar-line,.mini-notes,.footer-card,.comment-flow,.impact-chain,.impact-dual{grid-template-columns:1fr}
         .live-ui-layout{grid-template-columns:1fr;min-height:0}
@@ -8694,6 +8757,42 @@
           }
         }, { rootMargin: '0px 0px -40px 0px', threshold: 0 });
         for (var k = 0; k < els.length; k++) io.observe(els[k]);
+      })();
+    </script>
+
+    <script>
+      (function () {
+        'use strict';
+        var rows = document.querySelectorAll('.yukkuri-thread .y-row');
+        if (!rows.length) return;
+
+        for (var i = 0; i < rows.length; i++) {
+          var row = rows[i];
+          row.classList.add('lp-pop-row');
+          row.style.setProperty('--pop-delay', String((i % 3) * 80) + 'ms');
+          row.style.setProperty('--float-duration', String(4 + (i % 3) * 0.4) + 's');
+          row.style.setProperty('--float-delay', String((i % 4) * 0.18) + 's');
+          row.style.setProperty('--bubble-float-duration', String(5.2 + (i % 3) * 0.35) + 's');
+          row.style.setProperty('--bubble-float-delay', String(0.15 + (i % 3) * 0.07) + 's');
+        }
+
+        if (!('IntersectionObserver' in window)) {
+          for (var j = 0; j < rows.length; j++) rows[j].classList.add('is-pop-visible');
+          return;
+        }
+
+        var io = new IntersectionObserver(
+          function (entries) {
+            for (var k = 0; k < entries.length; k++) {
+              if (entries[k].isIntersecting) {
+                entries[k].target.classList.add('is-pop-visible');
+                io.unobserve(entries[k].target);
+              }
+            }
+          },
+          { rootMargin: '0px 0px -12% 0px', threshold: 0.22 }
+        );
+        for (var m = 0; m < rows.length; m++) io.observe(rows[m]);
       })();
     </script>
 

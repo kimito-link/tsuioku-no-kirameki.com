@@ -54,7 +54,8 @@ import {
   normalizeUserCommentProfileMap,
   pruneUserCommentProfileMap,
   readStorageBagWithRetry,
-  upsertUserCommentProfileFromEntry
+  upsertUserCommentProfileFromEntry,
+  upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
 import { mergeGiftUsers } from '../lib/giftRecord.js';
 import {
@@ -104,47 +105,71 @@ import {
   pickStrongestAvatarUrlForUser
 } from '../lib/supportGrowthTileSrc.js';
 import { mergeUserIdForEnrichment } from '../lib/userIdPreference.js';
-import { maybeAppendCommentIngestLog } from '../lib/commentIngestLog.js';
+import {
+  COMMENT_INGEST_SOURCE,
+  maybeAppendCommentIngestLog
+} from '../lib/commentIngestLog.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { enrichmentAvatarWithCanonicalFallback } from '../lib/enrichmentAvatarFallback.js';
+import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
+import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
+import { trimMapToMax } from '../lib/trimMap.js';
+import { diagnosePersistGate } from '../lib/commentSubmitSteps.js';
+import { INGEST_TIMING, SUBMIT_TIMING, MAP_LIMITS, HARVEST_TIMING } from '../lib/timingConstants.js';
+import {
+  shouldForceDeepHarvestForReason,
+  shouldSkipDeepHarvest
+} from '../lib/shouldSkipDeepHarvest.js';
+import { DEEP_HARVEST_REASONS } from '../lib/deepHarvestReason.js';
+import { planDeepExportSweep } from '../lib/deepExportPolicy.js';
+import {
+  mergeNdgrBacklogWithCap,
+  shouldDeferNdgrFlushUntilLiveId
+} from '../lib/ndgrBacklog.js';
+import { mergeStoredCommentsWithIntercept } from '../lib/mergeStoredCommentsWithIntercept.js';
+import {
+  isWatchProgramEndedText,
+  shouldRunEndedBulkHarvest
+} from '../lib/watchProgramEndState.js';
+import { hydrateInterceptAvatarMapFromProfile } from '../lib/interceptAvatarHydration.js';
 
 /**
  * @typedef {{ commentNo: string, text: string, userId: string|null, avatarUrl?: string, avatarObserved?: boolean }} ParsedCommentRow
  */
 
-const DEBOUNCE_MS = 80;
-const LIVE_POLL_MS = 4000;
-const STATS_POLL_MS = 45_000;
+const DEBOUNCE_MS = INGEST_TIMING.debounceMs;
+const LIVE_POLL_MS = INGEST_TIMING.livePollMs;
+const STATS_POLL_MS = INGEST_TIMING.statsPollMs;
 /** 返信サジェスト等と同様に DOM 更新がテキスト差し替えだけのときの取りこぼし防止 */
-const LIVE_PANEL_SCAN_MS = 550;
-const DEEP_HARVEST_DELAY_MS = 600;
+const LIVE_PANEL_SCAN_MS = INGEST_TIMING.panelScanMs;
+const DEEP_HARVEST_DELAY_MS = HARVEST_TIMING.delayMs;
 /**
  * 仮想コメント一覧の deep harvest はスクロールホストの scrollTop を段階的に動かすため、
  * 視聴ページを開いた直後に「メインのコメントが滝のように流れる」ように見える。
  * 初回・録画ON 直後だけ遅らせ、ユーザーが画面に慣れてから走査する。
  * 長すぎるとこの間は仮想バッファ外の過去コメントが deep で拾えず、記録件数が伸びにくい。
  */
-const DEEP_HARVEST_QUIET_UI_MS = 800;
+const DEEP_HARVEST_QUIET_UI_MS = HARVEST_TIMING.quietUiMs;
 /**
  * runDeepHarvest の仮想走査: 待ちを短く・ステップを粗くし「滝」時間を圧縮（2pass で取りこぼし吸収）。
  * インターセプト export の deep は別途 waitMs を指定。
  */
-const DEEP_HARVEST_SCROLL_WAIT_MS = 48;
+const DEEP_HARVEST_SCROLL_WAIT_MS = HARVEST_TIMING.scrollWaitMs;
 const DEEP_HARVEST_SCROLL_STEP_RATIO = 0.52;
 /** 2 周目の deep の直前ギャップ（仮想 DOM の再配置で取りこぼした行の再出現を待つ） */
-const DEEP_HARVEST_SECOND_PASS_GAP_MS = 180;
+const DEEP_HARVEST_SECOND_PASS_GAP_MS = HARVEST_TIMING.secondPassGapMs;
 /**
  * 長時間配信で仮想バッファ外の取りこぼしを減らす低頻度 deep（タブが visible で記録中のみ）。
  * QUIET UI は runDeepHarvest 内では使わず、定期経路も滝 UI 用ローディングは出さない。
  * quietScroll で滝を不可視にしつつ 90 秒間隔で走査。可視のみだと取りこぼしが大きい。
  */
-const DEEP_HARVEST_PERIODIC_MS = 45 * 1000;
+const DEEP_HARVEST_PERIODIC_MS = HARVEST_TIMING.periodicMs;
 /**
  * 初回（scheduleDeepHarvest 経由）の deep 成功後、仮想 DOM が落ち着いてからの軽い追い走査。
  * 定期 deep 直後に同タイマーが重なると「滝が二度続く」ため、定期開始時はタイマーを解除する。
  */
-const DEEP_HARVEST_STABILITY_FOLLOWUP_MS = 90_000;
+const DEEP_HARVEST_STABILITY_FOLLOWUP_MS = HARVEST_TIMING.stabilityFollowUpMs;
 /** 長めの待ちのあいだ、ゆっくりりんくで「読み込み中」と示す（web_accessible と一致させる） */
 const DEEP_HARVEST_LOADING_HOST_ID = 'nl-deep-harvest-loading';
 const DEEP_HARVEST_LOADING_IMG_PATH =
@@ -152,6 +177,9 @@ const DEEP_HARVEST_LOADING_IMG_PATH =
 const BOOTSTRAP_DELAYS_MS = [400, 2000, 4500];
 /** @type {ReturnType<typeof setTimeout>|null} */
 let tabVisibleHarvestDebounceTimer = null;
+/** visible 復帰時の重い再走査を抑える冷却時間 */
+const TAB_VISIBLE_HARVEST_MIN_MS = 12_000;
+let lastTabVisibleHarvestAt = 0;
 const MAX_SELF_POSTED_ITEMS = 48;
 const SELF_POST_RECENT_TTL_MS = 24 * 60 * 60 * 1000;
 const SELF_POST_NATIVE_DEDUPE_MS = 5000;
@@ -221,6 +249,8 @@ const deepHarvestPipelineStats = {
 };
 /** 直近の persistCommentRowsImpl に渡った行数（0 = 未実行またはスキップ） */
 let lastPersistCommentBatchSize = 0;
+/** @type {string[]} */
+let lastPersistGateFailures = [];
 /** @type {WeakMap<Element, true>} */
 const scrollHooked = new WeakMap();
 
@@ -556,7 +586,7 @@ const interceptedUsers = new Map();
 /** userId → lastSeenAt（同時接続推定用） */
 /** @type {Map<string, number>} */
 const activeUserTimestamps = new Map();
-const ACTIVE_USER_MAP_MAX = 12000;
+const ACTIVE_USER_MAP_MAX = MAP_LIMITS.activeUserMax;
 /** flushInterceptViewerJoin と page 側 viewerJoinDedupeAt と揃えた短時間重複抑制（ms） */
 const VIEWER_JOIN_FLUSH_SUPPRESS_MS = 2500;
 /** userId→nickname の補助マップ */
@@ -566,16 +596,34 @@ const interceptedNicknames = new Map();
 /** @type {Map<string, string>} */
 const interceptedAvatars = new Map();
 /** commentNo→ユーザー補完用。長時間・高流量で古い番号から削ると一覧再走査の取りこぼしが増えやすい */
-const INTERCEPT_MAP_MAX = 50_000;
+const INTERCEPT_MAP_MAX = MAP_LIMITS.interceptMax;
+
+/** NDGR が最後にデータを送ってきた時刻（deep harvest スキップ判定用） */
+let ndgrLastReceivedAt = 0;
 
 /** NDGR 本文 postMessage をデバウンスして storage 書き込み回数を抑える */
 /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string }[]} */
 let ndgrChatRowsPending = [];
 /** @type {ReturnType<typeof setTimeout>|null} */
 let ndgrChatRowsFlushTimer = null;
-const NDGR_CHAT_ROWS_FLUSH_MS = 150;
+const NDGR_CHAT_ROWS_FLUSH_MS = INGEST_TIMING.ndgrFlushMs;
 /** バックログが大きいときはタイマーを待たずに flush（高流量時の遅延・競合緩和） */
-const NDGR_PENDING_FLUSH_THRESHOLD = 240;
+const NDGR_PENDING_FLUSH_THRESHOLD = INGEST_TIMING.ndgrPendingThreshold;
+/** liveId 未確定時の一時保持上限（古い行から切り捨て） */
+const NDGR_PENDING_MAX = INGEST_TIMING.ndgrPendingMax;
+const INTERCEPT_RECONCILE_MS = INGEST_TIMING.interceptReconcileMs;
+const ENDED_HARVEST_CHECK_MS = INGEST_TIMING.endedHarvestCheckMs;
+
+/** @type {{ no: string, uid: string, name: string, av: string }[]} */
+let interceptReconcilePendingEntries = [];
+/** @type {{ uid: string, name: string, av: string }[]} */
+let interceptReconcilePendingUsers = [];
+/** @type {ReturnType<typeof setTimeout>|null} */
+let interceptReconcileTimer = null;
+/** 配信終了後の一括 deep harvest 実行済み liveId */
+let endedBulkHarvestTriggeredLiveId = '';
+/** 配信終了判定の最終チェック時刻 */
+let endedBulkHarvestLastCheckedAt = 0;
 
 function clearNdgrChatRowsPending() {
   ndgrChatRowsPending.length = 0;
@@ -585,11 +633,190 @@ function clearNdgrChatRowsPending() {
   }
 }
 
+function clearInterceptReconcilePending() {
+  interceptReconcilePendingEntries.length = 0;
+  interceptReconcilePendingUsers.length = 0;
+  if (interceptReconcileTimer != null) {
+    clearTimeout(interceptReconcileTimer);
+    interceptReconcileTimer = null;
+  }
+}
+
+/**
+ * 視聴ページから「配信終了」らしき文言を軽量に拾う。
+ * @returns {boolean}
+ */
+function detectWatchProgramEndedFromDom() {
+  const candidates = [];
+  const pushText = (v) => {
+    const s = String(v || '').trim();
+    if (!s) return;
+    candidates.push(s.slice(0, 600));
+  };
+  try {
+    pushText(document.querySelector('[class*="program" i] [class*="status" i]')?.textContent);
+    pushText(document.querySelector('[class*="timeshift" i]')?.textContent);
+    pushText(document.querySelector('main')?.textContent);
+  } catch {
+    // no-op
+  }
+  if (!candidates.length) return false;
+  return candidates.some((t) => isWatchProgramEndedText(t));
+}
+
+function maybeRunEndedBulkHarvest() {
+  if (!hasExtensionContext()) return;
+  const now = Date.now();
+  if (now - endedBulkHarvestLastCheckedAt < ENDED_HARVEST_CHECK_MS) return;
+  endedBulkHarvestLastCheckedAt = now;
+  const endedDetected = detectWatchProgramEndedFromDom();
+  if (
+    !shouldRunEndedBulkHarvest({
+      recording,
+      liveId,
+      locationAllows: locationAllowsCommentRecording(),
+      endedDetected,
+      lastTriggeredLiveId: endedBulkHarvestTriggeredLiveId
+    })
+  ) {
+    return;
+  }
+  endedBulkHarvestTriggeredLiveId = String(liveId || '').trim();
+  void runDeepHarvest({ force: true }).catch((err) =>
+    reportSilentErrorToStorage('endedBulkHarvest', err)
+  );
+}
+
+/**
+ * @param {{ no: string, uid: string, name: string, av: string }[]} entries
+ * @param {{ uid: string, name: string, av: string }[]} users
+ */
+function queueInterceptReconcile(entries, users) {
+  if (!entries.length && !users.length) return;
+  interceptReconcilePendingEntries.push(...entries);
+  interceptReconcilePendingUsers.push(...users);
+  if (interceptReconcileTimer != null) return;
+  interceptReconcileTimer = setTimeout(() => {
+    interceptReconcileTimer = null;
+    const entrySlice = interceptReconcilePendingEntries;
+    const userSlice = interceptReconcilePendingUsers;
+    interceptReconcilePendingEntries = [];
+    interceptReconcilePendingUsers = [];
+    void runInterceptReconcile(entrySlice, userSlice);
+  }, INTERCEPT_RECONCILE_MS);
+}
+
+/**
+ * @param {{ no: string, uid: string, name: string, av: string }[]} entries
+ * @param {{ uid: string, name: string, av: string }[]} users
+ */
+async function runInterceptReconcile(entries, users) {
+  if (!recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
+    return;
+  }
+  const lidAtQueue = liveId;
+  const mergedByNo = new Map();
+  for (const it of entries) {
+    const no = String(it?.no || '').trim();
+    if (!no) continue;
+    const prev = mergedByNo.get(no) || { no, uid: '', name: '', av: '' };
+    const uid = String(it?.uid || '').trim() || prev.uid;
+    const name = String(it?.name || '').trim() || prev.name;
+    const av = isHttpAvatarUrl(it?.av) ? String(it.av || '').trim() : prev.av;
+    if (!uid && !name && !av) continue;
+    mergedByNo.set(no, { no, uid, name, av });
+  }
+  const mergedUsersByUid = new Map();
+  for (const u of users) {
+    const uid = String(u?.uid || '').trim();
+    if (!uid) continue;
+    const prev = mergedUsersByUid.get(uid) || { uid, name: '', av: '' };
+    const name = String(u?.name || '').trim() || prev.name;
+    const av = isHttpAvatarUrl(u?.av) ? String(u.av || '').trim() : prev.av;
+    mergedUsersByUid.set(uid, { uid, name, av });
+  }
+  const mergedItems = [...mergedByNo.values()];
+  const mergedUsers = [...mergedUsersByUid.values()];
+  if (!mergedItems.length && !mergedUsers.length) return;
+
+  const key = commentsStorageKey(lidAtQueue);
+  const job = persistCommentRowsChain.then(async () => {
+    const bag = await readStorageBagWithRetry(
+      () => chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
+      { attempts: 4, delaysMs: [0, 50, 120, 280] }
+    );
+    const existing = Array.isArray(bag[key]) ? bag[key] : [];
+    let next = existing;
+    let commentsTouched = false;
+    if (mergedItems.length) {
+      const merged = mergeStoredCommentsWithIntercept(existing, mergedItems);
+      if (merged.patched > 0) {
+        next = merged.next;
+        commentsTouched = true;
+      }
+    }
+
+    let profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
+    let cacheTouched = false;
+    for (const it of mergedItems) {
+      if (upsertUserCommentProfileFromIntercept(profileMap, { uid: it.uid, name: it.name, av: it.av })) {
+        cacheTouched = true;
+      }
+    }
+    for (const u of mergedUsers) {
+      if (upsertUserCommentProfileFromIntercept(profileMap, u)) {
+        cacheTouched = true;
+      }
+    }
+    const applied = applyUserCommentProfileMapToEntries(next, profileMap);
+    if (applied.patched > 0) {
+      next = applied.next;
+      commentsTouched = true;
+    }
+    const pruned = pruneUserCommentProfileMap(profileMap);
+    if (Object.keys(pruned).length !== Object.keys(profileMap).length) {
+      profileMap = pruned;
+      cacheTouched = true;
+    }
+    if (!commentsTouched && !cacheTouched) return;
+    /** @type {Record<string, unknown>} */
+    const saveBag = {};
+    if (commentsTouched) saveBag[key] = next;
+    if (cacheTouched) saveBag[KEY_USER_COMMENT_PROFILE_CACHE] = profileMap;
+    await chrome.storage.local.set(saveBag);
+  });
+  persistCommentRowsChain = job.catch((err) => reportSilentErrorToStorage('interceptReconcile', err));
+  await job;
+}
+
 /**
  * @param {{ commentNo: string, text: string, userId: string|null, nickname?: string }[]} batch
  */
 async function flushNdgrChatRowsBatch(batch) {
   if (!batch.length) return;
+  if (
+    shouldDeferNdgrFlushUntilLiveId({
+      recording,
+      locationAllows: locationAllowsCommentRecording(),
+      liveId
+    })
+  ) {
+    ndgrChatRowsPending = mergeNdgrBacklogWithCap(
+      ndgrChatRowsPending,
+      batch,
+      NDGR_PENDING_MAX
+    );
+    if (ndgrChatRowsFlushTimer == null) {
+      ndgrChatRowsFlushTimer = setTimeout(() => {
+        ndgrChatRowsFlushTimer = null;
+        const slice = ndgrChatRowsPending;
+        ndgrChatRowsPending = [];
+        void flushNdgrChatRowsBatch(slice);
+      }, NDGR_CHAT_ROWS_FLUSH_MS);
+    }
+    return;
+  }
+  if (!recording || !liveId || !locationAllowsCommentRecording()) return;
   const byKey = new Map();
   for (const r of batch) {
     if (!r || typeof r !== 'object') continue;
@@ -628,7 +855,7 @@ async function flushNdgrChatRowsBatch(batch) {
     const n = String(r.nickname || '').trim();
     if (u && n) interceptedNicknames.set(u, n);
   }
-  await persistCommentRows(merged, { source: 'ndgr' });
+  await persistCommentRows(merged, { source: COMMENT_INGEST_SOURCE.NDGR });
 }
 
 /**
@@ -636,9 +863,13 @@ async function flushNdgrChatRowsBatch(batch) {
  */
 function schedulePersistNdgrChatRows(rows) {
   if (!Array.isArray(rows) || !rows.length) return;
-  /* 記録 OFF 時に NDGR だけが流れてもバッチを捨てない（flush 側の no-op で行が消えるのを防ぐ） */
-  if (!recording || !liveId || !locationAllowsCommentRecording()) return;
-  ndgrChatRowsPending.push(...rows);
+  if (!recording || !locationAllowsCommentRecording()) return;
+  ndgrLastReceivedAt = Date.now();
+  ndgrChatRowsPending = mergeNdgrBacklogWithCap(
+    ndgrChatRowsPending,
+    rows,
+    NDGR_PENDING_MAX
+  );
   if (ndgrChatRowsPending.length >= NDGR_PENDING_FLUSH_THRESHOLD) {
     if (ndgrChatRowsFlushTimer != null) {
       clearTimeout(ndgrChatRowsFlushTimer);
@@ -935,23 +1166,7 @@ window.addEventListener('message', (e) => {
   if (e.data.type === 'NLS_INTERCEPT_CHAT_ROWS') {
     const raw = e.data.rows;
     if (Array.isArray(raw) && raw.length) {
-      /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]} */
-      const cleaned = [];
-      for (const x of raw) {
-        if (!x || typeof x !== 'object') continue;
-        const commentNo = String(x.commentNo ?? '').trim();
-        const text = String(x.text ?? '');
-        if (!commentNo) continue;
-        const uid = String(x.userId ?? '').trim();
-        /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }} */
-        const row = { commentNo, text, userId: uid || null };
-        const nick = String(x.nickname ?? '').trim();
-        if (nick) row.nickname = nick;
-        if (x.vpos != null) row.vpos = x.vpos;
-        if (x.accountStatus != null) row.accountStatus = x.accountStatus;
-        if (x.is184) row.is184 = true;
-        cleaned.push(row);
-      }
+      const cleaned = cleanNdgrChatRows(raw);
       if (cleaned.length) schedulePersistNdgrChatRows(cleaned);
     }
     return;
@@ -975,7 +1190,20 @@ window.addEventListener('message', (e) => {
             }
           });
         }
-      }).catch(() => {});
+      }).catch((err) => reportSilentErrorToStorage('gift', err));
+    }
+    return;
+  }
+
+  if (e.data.type === 'NLS_INTERCEPT_COMMENT_POST') {
+    const body = e.data.body;
+    if (body && typeof body === 'object') {
+      const no = String(body.no ?? body.commentNo ?? '').trim();
+      const text = String(body.body ?? body.text ?? '').trim();
+      if (no && text) {
+        const uid = String(body.userId ?? body.user_id ?? '').trim() || null;
+        persistCommentRows([{ commentNo: no, text, userId: uid }]);
+      }
     }
     return;
   }
@@ -984,6 +1212,10 @@ window.addEventListener('message', (e) => {
   const entries = e.data.entries;
   const users = e.data.users;
   const seenNow = Date.now();
+  /** @type {{ uid: string, name: string, av: string }[]} */
+  const reconcileUsers = [];
+  /** @type {{ no: string, uid: string, name: string, av: string }[]} */
+  const reconcileEntries = [];
   if (Array.isArray(users)) {
     for (const { uid, name, av } of users) {
       const sUid = String(uid || '').trim();
@@ -993,48 +1225,38 @@ window.addEventListener('message', (e) => {
       if (sName) interceptedNicknames.set(sUid, sName);
       if (sAv) interceptedAvatars.set(sUid, sAv);
       activeUserTimestamps.set(sUid, seenNow);
+      reconcileUsers.push({ uid: sUid, name: sName, av: sAv });
     }
   }
-  if (!Array.isArray(entries)) return;
-  for (const { no, uid, name, av } of entries) {
-    const sNo = String(no || '').trim();
-    if (!sNo) continue;
-    const sUid = String(uid || '').trim();
-    const sName = String(name || '').trim();
-    const sAv = isHttpAvatarUrl(av) ? String(av).trim() : '';
-    if (!sUid && !sName && !sAv) continue;
-    const prev = interceptedUsers.get(sNo);
-    const prevUid = String(prev?.uid || '').trim();
-    const prevName = String(prev?.name || '').trim();
-    const prevAv = isHttpAvatarUrl(prev?.av) ? String(prev?.av || '').trim() : '';
-    const nextUid = sUid || prevUid;
-    const nextName = sName || prevName;
-    const nextAv = sAv || prevAv;
-    interceptedUsers.set(sNo, {
-      ...(nextUid ? { uid: nextUid } : {}),
-      ...(nextName ? { name: nextName } : {}),
-      ...(nextAv ? { av: nextAv } : {})
-    });
-    if (sName && sUid) interceptedNicknames.set(sUid, sName);
-    if (sAv && sUid) interceptedAvatars.set(sUid, sAv);
-    if (sUid) activeUserTimestamps.set(sUid, seenNow);
-  }
-  if (activeUserTimestamps.size > ACTIVE_USER_MAP_MAX) {
-    const excess = activeUserTimestamps.size - ACTIVE_USER_MAP_MAX;
-    const iter = activeUserTimestamps.keys();
-    for (let i = 0; i < excess; i++) {
-      const key = iter.next().value;
-      if (key != null) activeUserTimestamps.delete(key);
+  if (Array.isArray(entries)) {
+    for (const { no, uid, name, av } of entries) {
+      const sNo = String(no || '').trim();
+      if (!sNo) continue;
+      const sUid = String(uid || '').trim();
+      const sName = String(name || '').trim();
+      const sAv = isHttpAvatarUrl(av) ? String(av).trim() : '';
+      if (!sUid && !sName && !sAv) continue;
+      const prev = interceptedUsers.get(sNo);
+      const prevUid = String(prev?.uid || '').trim();
+      const prevName = String(prev?.name || '').trim();
+      const prevAv = isHttpAvatarUrl(prev?.av) ? String(prev?.av || '').trim() : '';
+      const nextUid = sUid || prevUid;
+      const nextName = sName || prevName;
+      const nextAv = sAv || prevAv;
+      interceptedUsers.set(sNo, {
+        ...(nextUid ? { uid: nextUid } : {}),
+        ...(nextName ? { name: nextName } : {}),
+        ...(nextAv ? { av: nextAv } : {})
+      });
+      if (sName && sUid) interceptedNicknames.set(sUid, sName);
+      if (sAv && sUid) interceptedAvatars.set(sUid, sAv);
+      if (sUid) activeUserTimestamps.set(sUid, seenNow);
+      reconcileEntries.push({ no: sNo, uid: sUid, name: sName, av: sAv });
     }
   }
-  if (interceptedUsers.size > INTERCEPT_MAP_MAX) {
-    const excess = interceptedUsers.size - INTERCEPT_MAP_MAX;
-    const iter = interceptedUsers.keys();
-    for (let i = 0; i < excess; i++) {
-      const key = iter.next().value;
-      if (key != null) interceptedUsers.delete(key);
-    }
-  }
+  trimMapToMax(activeUserTimestamps, ACTIVE_USER_MAP_MAX);
+  trimMapToMax(interceptedUsers, INTERCEPT_MAP_MAX);
+  queueInterceptReconcile(reconcileEntries, reconcileUsers);
 });
 /** @type {number|null} */
 let lastWatchUrlTimer = null;
@@ -1043,6 +1265,7 @@ const PAGE_FRAME_STYLE_ID = 'nls-watch-prikura-style';
 const PAGE_FRAME_OVERLAY_ID = 'nls-watch-prikura-frame';
 const INLINE_POPUP_HOST_ID = 'nls-inline-popup-host';
 const INLINE_POPUP_IFRAME_ID = 'nls-inline-popup-iframe';
+const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
 
 /** getElementById はツリー未接続ノードに効かないため、ホストは参照を保持する */
 /** @type {HTMLDivElement|null} */
@@ -1070,7 +1293,7 @@ function noteInlinePanelRenderError(where, err) {
     // no-op
   }
 }
-const PAGE_FRAME_LOOP_MS = 360;
+const PAGE_FRAME_LOOP_MS = INGEST_TIMING.pageFrameLoopMs;
 const DEFAULT_PAGE_FRAME = 'light';
 const LEGACY_PAGE_FRAME_ALIAS = {
   trio: 'light',
@@ -1115,6 +1338,7 @@ const pageFrameState = {
 
 /** @type {number|null} */
 let pageFrameLoopTimer = null;
+let aiShareFastDiagLastPersistAt = 0;
 
 /** @param {string} id */
 function hasPageFramePreset(id) {
@@ -1272,15 +1496,15 @@ function ensurePageFrameStyle() {
     #${INLINE_POPUP_HOST_ID}.nls-inline-host--dock-bottom {
       -webkit-overflow-scrolling: touch;
       min-height: 200px;
-      /* iframe 描画前の白フラッシュを抑える */
-      background: rgb(15 23 42 / 92%);
+      /* 読み込み遅延時に黒ベタ面が残らないよう透明寄りにする */
+      background: transparent;
     }
     #${INLINE_POPUP_HOST_ID}.nls-inline-host--dock-bottom iframe {
       width: 100% !important;
       height: min(520px, 52vh);
       min-height: 220px;
       max-height: min(680px, 56vh);
-      background: rgb(17 24 39);
+      background: transparent;
     }
   `;
   document.head.appendChild(style);
@@ -1298,9 +1522,76 @@ function ensurePageFrameOverlay() {
   return overlay;
 }
 
+/**
+ * 重複 host を掃除し、使うべき inline host を 1 つに決める。
+ * @returns {HTMLDivElement|null}
+ */
+function pickPrimaryInlinePopupHostFromDom() {
+  /** @type {HTMLDivElement[]} */
+  const hosts = Array.from(
+    document.querySelectorAll(`#${INLINE_POPUP_HOST_ID}`)
+  ).filter((n) => n instanceof HTMLDivElement);
+  if (!hosts.length) return null;
+  const connected = hosts.filter((h) => h.isConnected);
+  const primary = connected[0] || hosts[0];
+  for (const h of hosts) {
+    if (h === primary) continue;
+    try {
+      h.remove();
+    } catch {
+      // no-op
+    }
+  }
+  return primary;
+}
+
+/** @param {HTMLDivElement} host */
+function ensureInlinePopupIframe(host) {
+  if (!(host instanceof HTMLDivElement)) return;
+  let iframe = /** @type {HTMLIFrameElement|null} */ (
+    host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+  );
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = INLINE_POPUP_IFRAME_ID;
+    iframe.setAttribute('title', 'nicolivelog inline panel');
+    iframe.setAttribute('allow', 'microphone');
+    iframe.style.pointerEvents = 'auto';
+    iframe.style.visibility = 'hidden';
+    host.appendChild(iframe);
+  }
+  const expectedSrc = (() => {
+    try {
+      return chrome.runtime.getURL('popup.html') + '?inline=1';
+    } catch {
+      return '';
+    }
+  })();
+  const currentSrc = String(iframe.getAttribute('src') || '').trim();
+  if (expectedSrc && currentSrc !== expectedSrc) {
+    iframe.setAttribute('src', expectedSrc);
+  }
+  iframe.addEventListener(
+    'load',
+    () => {
+      requestAnimationFrame(() => {
+        iframe.style.visibility = 'visible';
+        host.style.opacity = '1';
+      });
+    },
+    { once: true }
+  );
+  setTimeout(() => {
+    iframe.style.visibility = 'visible';
+    host.style.opacity = '1';
+  }, 2000);
+}
+
 function ensureInlinePopupHost() {
-  let host = document.getElementById(INLINE_POPUP_HOST_ID);
+  let host = pickPrimaryInlinePopupHostFromDom();
   if (host) {
+    ensureInlinePopupIframe(host);
+    if (host.style.opacity !== '1') host.style.opacity = '1';
     nlsInlinePopupHostSingleton = host;
     return host;
   }
@@ -1308,6 +1599,7 @@ function ensureInlinePopupHost() {
     nlsInlinePopupHostSingleton &&
     nlsInlinePopupHostSingleton.id === INLINE_POPUP_HOST_ID
   ) {
+    ensureInlinePopupIframe(nlsInlinePopupHostSingleton);
     return nlsInlinePopupHostSingleton;
   }
   host = document.createElement('div');
@@ -1317,21 +1609,7 @@ function ensureInlinePopupHost() {
   host.style.pointerEvents = 'auto';
   host.style.width = '100%';
 
-  const iframe = document.createElement('iframe');
-  iframe.id = INLINE_POPUP_IFRAME_ID;
-  iframe.setAttribute('title', 'nicolivelog inline panel');
-  iframe.setAttribute('allow', 'microphone');
-  iframe.style.pointerEvents = 'auto';
-  try {
-    iframe.src = chrome.runtime.getURL('popup.html') + '?inline=1';
-  } catch {
-    // no-op
-  }
-  iframe.addEventListener('load', () => {
-    requestAnimationFrame(() => { host.style.opacity = '1'; });
-  }, { once: true });
-  setTimeout(() => { host.style.opacity = '1'; }, 2000);
-  host.appendChild(iframe);
+  ensureInlinePopupIframe(host);
   nlsInlinePopupHostSingleton = host;
   return host;
 }
@@ -1431,6 +1709,7 @@ function renderInlinePanelFloatingHost() {
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
+  host.style.opacity = '1';
 }
 
 /**
@@ -1470,7 +1749,7 @@ function renderInlinePanelDockBottomHost() {
   host.style.boxShadow =
     '0 -10px 36px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.06)';
   host.style.borderRadius = '14px 14px 0 0';
-  host.style.background = 'rgb(15 23 42 / 92%)';
+  host.style.background = 'transparent';
 
   const iframe = /** @type {HTMLIFrameElement|null} */ (
     host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
@@ -1483,6 +1762,7 @@ function renderInlinePanelDockBottomHost() {
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
+  host.style.opacity = '1';
 }
 
 /**
@@ -1853,6 +2133,7 @@ function renderInlineHostAnchoredToVideo(video) {
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
+  host.style.opacity = '1';
 }
 
 /** @param {HTMLElement} target */
@@ -1965,6 +2246,7 @@ function renderInlinePopupHost(target) {
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
+  host.style.opacity = '1';
 }
 
 function hidePageFrameOverlay() {
@@ -1979,6 +2261,135 @@ function hidePageFrameOverlay() {
   }
   stableFrameTarget = null;
   syncWatchPageDockBodyReserve();
+}
+
+function inlineHostLooksVisible() {
+  const host =
+    nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+  if (!(host instanceof HTMLElement)) return false;
+  if (!host.isConnected) return false;
+  const cs = window.getComputedStyle(host);
+  if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+  const r = host.getBoundingClientRect();
+  return r.width >= 120 && r.height >= 120;
+}
+
+function buildAiShareFastDiagnosticsPayload() {
+  const href = String(window.location.href || '');
+  let isTop = true;
+  try {
+    isTop = window.self === window.top;
+  } catch {
+    isTop = true;
+  }
+  const target = findWatchFrameTargetElement();
+  /** @type {Record<string, unknown>|null} */
+  let targetBrief = null;
+  if (target instanceof HTMLElement) {
+    const r = target.getBoundingClientRect();
+    targetBrief = {
+      tag: String(target.tagName || '').toLowerCase(),
+      id: String(target.id || '').slice(0, 100),
+      cls: String(target.className || '').slice(0, 200),
+      rectW: Math.round(r.width),
+      rectH: Math.round(r.height)
+    };
+  }
+  const host =
+    nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+  /** @type {Record<string, unknown>|null} */
+  let hostBrief = null;
+  if (host instanceof HTMLElement) {
+    const cs = window.getComputedStyle(host);
+    const r = host.getBoundingClientRect();
+    hostBrief = {
+      isConnected: host.isConnected,
+      inlineDisplay: host.style.display || '',
+      computedDisplay: cs.display,
+      computedVisibility: cs.visibility,
+      rectTop: Math.round(r.top),
+      rectLeft: Math.round(r.left),
+      rectW: Math.round(r.width),
+      rectH: Math.round(r.height),
+      parentNodeName: host.parentNode ? host.parentNode.nodeName : '',
+      parentIsShadowRoot: host.parentNode instanceof ShadowRoot
+    };
+  }
+  return {
+    exportedAt: new Date().toISOString(),
+    frame: {
+      isTop,
+      href: href.slice(0, 500),
+      userAgent: String(navigator.userAgent || '').slice(0, 280)
+    },
+    contentScript: {
+      hasExtensionContext: hasExtensionContext(),
+      executionStarted: true,
+      dataNlsActive: document.documentElement?.getAttribute?.('data-nls-active') ?? null,
+      shouldRunWatchContentInThisFrame: shouldRunWatchContentInThisFrame()
+    },
+    watch: {
+      isNicoLiveWatchUrl: isNicoLiveWatchUrl(href)
+    },
+    player: {
+      videoCount: document.querySelectorAll('video').length,
+      frameTarget: targetBrief
+    },
+    inlinePanel: {
+      placementMode: inlinePanelPlacementMode,
+      placementEffective: getEffectiveInlinePanelPlacement(),
+      viewportInnerWidth: nlsViewportSize().innerWidth,
+      widthMode: inlinePanelWidthMode,
+      floatingAnchor: inlineFloatingAnchor,
+      host: hostBrief,
+      recentRenderErrors: nlsInlinePanelRenderErrors.slice()
+    },
+    pageFrameLoopTimerActive: Boolean(pageFrameLoopTimer),
+    romiDebug: {
+      recording,
+      liveId: String(liveId || ''),
+      harvestRunning,
+      deepHarvestRunCount: deepHarvestPipelineStats.runCount,
+      deepHarvestLastRowCount: deepHarvestPipelineStats.lastRowCount,
+      deepHarvestLastCompletedAt: deepHarvestPipelineStats.lastCompletedAt || 0,
+      deepHarvestLastError: deepHarvestPipelineStats.lastError,
+      ndgrPending: ndgrChatRowsPending.length,
+      ndgrLastReceivedAgo:
+        ndgrLastReceivedAt > 0 ? Math.max(0, Date.now() - ndgrLastReceivedAt) : null,
+      interceptMapSize: interceptedUsers.size,
+      interceptNicknameSize: interceptedNicknames.size,
+      interceptAvatarSize: interceptedAvatars.size,
+      lastPersistBatch: lastPersistCommentBatchSize,
+      persistGateFailures: Array.isArray(lastPersistGateFailures)
+        ? lastPersistGateFailures.slice(0, 8)
+        : [],
+      endedBulkHarvestTriggeredLiveId: String(endedBulkHarvestTriggeredLiveId || ''),
+      endedBulkHarvestLastCheckedAgo:
+        endedBulkHarvestLastCheckedAt > 0
+          ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
+          : null
+    }
+  };
+}
+
+function persistAiShareFastDiagnostics() {
+  if (!hasExtensionContext()) return;
+  const now = Date.now();
+  if (now - aiShareFastDiagLastPersistAt < 1500) return;
+  aiShareFastDiagLastPersistAt = now;
+  try {
+    const payload = {
+      popup: null,
+      content: buildAiShareFastDiagnosticsPayload(),
+      note:
+        'Chrome コンソールの ERR_BLOCKED_BY_CLIENT / 広告スクリプト失敗はブロッカー由来で多く、本拡張とは無関係なことがあります。',
+      resolvedTabUrl: String(window.location.href || '').slice(0, 500),
+      persistedAt: new Date().toISOString()
+    };
+    void chrome.storage.local.set({ [KEY_AI_SHARE_FAST_DIAG]: payload });
+  } catch {
+    // no-op
+  }
 }
 
 /** @param {string} frameId @param {{ headerStart: string, headerEnd: string, accent: string }} custom */
@@ -2204,8 +2615,18 @@ function renderPageFrameOverlay() {
         }
       }
     }
+    if (!inlineHostLooksVisible()) {
+      /* 例外は出ていないが host が見えていないケースを救済 */
+      renderInlinePanelDockBottomHost();
+    }
   } catch (e) {
     noteInlinePanelRenderError('renderPageFrameOverlay', e);
+    try {
+      /* 途中失敗時の最終フォールバック（何も出ない状態を避ける） */
+      renderInlinePanelDockBottomHost();
+    } catch (fallbackErr) {
+      noteInlinePanelRenderError('renderPageFrameOverlay:fallback', fallbackErr);
+    }
   } finally {
     syncWatchPageDockBodyReserve();
   }
@@ -2249,6 +2670,8 @@ function startPageFrameLoop() {
   const tick = () => {
     if (!hasExtensionContext()) return;
     renderPageFrameOverlay();
+    maybeRunEndedBulkHarvest();
+    persistAiShareFastDiagnostics();
   };
 
   pageFrameLoopTimer = setInterval(tick, PAGE_FRAME_LOOP_MS);
@@ -2268,11 +2691,16 @@ function hasExtensionContext() {
 
 /** @param {unknown} err */
 function isContextInvalidatedError(err) {
-  const msg =
-    err && typeof err === 'object' && 'message' in err
-      ? String(/** @type {{ message?: unknown }} */ (err).message || '')
-      : String(err || '');
-  return msg.includes('Extension context invalidated');
+  return isCtxInvalidated(err);
+}
+
+/** @param {string} context @param {unknown} err */
+function reportSilentErrorToStorage(context, err) {
+  const p = buildSilentErrorPayload(context, err, liveId);
+  if (!p.shouldReport || !hasExtensionContext()) return;
+  try {
+    chrome.storage.local.set({ [KEY_STORAGE_WRITE_ERROR]: { at: p.at, ...(p.liveId ? { liveId: p.liveId } : {}), ...(p.message ? { message: p.message } : {}) } });
+  } catch { /* best-effort */ }
 }
 
 /** @param {Element|null|undefined} el */
@@ -2508,8 +2936,8 @@ async function postCommentFromContentAsync(rawText) {
   }
 
   const editor = await pollUntil(findCommentEditorElement, {
-    timeoutMs: 8000,
-    intervalMs: 50
+    timeoutMs: SUBMIT_TIMING.editorPollTimeoutMs,
+    intervalMs: SUBMIT_TIMING.editorPollIntervalMs
   });
   if (!editor) {
     return {
@@ -2527,12 +2955,12 @@ async function postCommentFromContentAsync(rawText) {
     await new Promise((r) => {
       requestAnimationFrame(() => requestAnimationFrame(r));
     });
-    await new Promise((r) => setTimeout(r, 220));
+    await new Promise((r) => setTimeout(r, SUBMIT_TIMING.reactSettleMs));
 
     const submitOnce = async () => {
       const btn = await pollUntil(() => findVisibleEnabledSubmitForEditor(editor), {
-        timeoutMs: 1200,
-        intervalMs: 80
+        timeoutMs: SUBMIT_TIMING.buttonPollTimeoutMs,
+        intervalMs: SUBMIT_TIMING.buttonPollIntervalMs
       });
       if (btn) {
         btn.click();
@@ -2935,11 +3363,16 @@ function collectWatchPageSnapshot() {
       wsCommentCount,
       wsAge: wsViewerCountUpdatedAt ? Date.now() - wsViewerCountUpdatedAt : -1,
       intercept: interceptedUsers.size,
+      interceptNicknames: interceptedNicknames.size,
+      interceptAvatars: interceptedAvatars.size,
+      fiberDiag: document.documentElement?.getAttribute('data-nls-fiber-diag') || '',
       harvestPipeline: {
         ...deepHarvestPipelineStats,
         harvestRunning,
         ndgrPending: ndgrChatRowsPending.length,
-        lastPersistBatch: lastPersistCommentBatchSize
+        ndgrLastReceivedAgo: ndgrLastReceivedAt > 0 ? Date.now() - ndgrLastReceivedAt : null,
+        lastPersistBatch: lastPersistCommentBatchSize,
+        persistGateFailures: lastPersistGateFailures
       },
       embeddedVC: _edProps ? pickViewerCountFromEmbeddedData(_edProps) : null,
       officialVsRecorded:
@@ -3338,7 +3771,31 @@ function buildAiSharePageDiagnostics() {
       host: hostBrief,
       recentRenderErrors: nlsInlinePanelRenderErrors.slice()
     },
-    pageFrameLoopTimerActive: Boolean(pageFrameLoopTimer)
+    pageFrameLoopTimerActive: Boolean(pageFrameLoopTimer),
+    romiDebug: {
+      recording,
+      liveId: String(liveId || ''),
+      harvestRunning,
+      deepHarvestRunCount: deepHarvestPipelineStats.runCount,
+      deepHarvestLastRowCount: deepHarvestPipelineStats.lastRowCount,
+      deepHarvestLastCompletedAt: deepHarvestPipelineStats.lastCompletedAt || 0,
+      deepHarvestLastError: deepHarvestPipelineStats.lastError,
+      ndgrPending: ndgrChatRowsPending.length,
+      ndgrLastReceivedAgo:
+        ndgrLastReceivedAt > 0 ? Math.max(0, Date.now() - ndgrLastReceivedAt) : null,
+      interceptMapSize: interceptedUsers.size,
+      interceptNicknameSize: interceptedNicknames.size,
+      interceptAvatarSize: interceptedAvatars.size,
+      lastPersistBatch: lastPersistCommentBatchSize,
+      persistGateFailures: Array.isArray(lastPersistGateFailures)
+        ? lastPersistGateFailures.slice(0, 8)
+        : [],
+      endedBulkHarvestTriggeredLiveId: String(endedBulkHarvestTriggeredLiveId || ''),
+      endedBulkHarvestLastCheckedAgo:
+        endedBulkHarvestLastCheckedAt > 0
+          ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
+          : null
+    }
   };
 }
 
@@ -3461,12 +3918,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             'deep' in msg &&
             /** @type {{ deep?: unknown }} */ (msg).deep
           );
-        if (deep && locationAllowsCommentRecording()) {
+        const deepPlan = planDeepExportSweep({
+          deep,
+          ndgrLastReceivedAt,
+          now: Date.now(),
+          thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
+        });
+        if (deepPlan.shouldRunSweep && locationAllowsCommentRecording()) {
           const rows = await harvestVirtualCommentList({
             document,
             extractCommentsFromNode,
             waitMs: 42,
-            respectTyping: false
+            respectTyping: false,
+            quietScroll: deepPlan.quietScroll
           });
           for (const r of rows) {
             const no = String(r?.commentNo || '').trim();
@@ -3506,6 +3970,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === 'NLS_AI_SHARE_PAGE_DIAGNOSTICS') {
     try {
+      persistAiShareFastDiagnostics();
       sendResponse({
         ok: true,
         diagnostics: buildAiSharePageDiagnostics()
@@ -3843,11 +4308,11 @@ function pruneAutoBackupLives(state) {
 /** NDGR・MutationObserver・deep harvest が同時に来ても storage の merge が壊れないよう直列化 */
 let persistCommentRowsChain = Promise.resolve();
 
-const MIN_PERSIST_INTERVAL_MS = 300;
+const MIN_PERSIST_INTERVAL_MS = INGEST_TIMING.coalescerMinMs;
 
 const persistCoalescer = createPersistCoalescer(async (/** @type {ParsedCommentRow[]} */ batch) => {
   const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(batch));
-  persistCommentRowsChain = job.catch(() => {});
+  persistCommentRowsChain = job.catch((err) => reportSilentErrorToStorage('persist', err));
   await job;
 }, MIN_PERSIST_INTERVAL_MS);
 
@@ -3856,15 +4321,20 @@ const persistCoalescer = createPersistCoalescer(async (/** @type {ParsedCommentR
  * @param {{ source?: string }} [opts] ndgr | mutation | deep | visible
  */
 function persistCommentRows(rows, _opts = {}) {
-  if (
-    !rows?.length ||
-    !recording ||
-    !liveId ||
-    !locationAllowsCommentRecording() ||
-    !hasExtensionContext()
-  ) {
+  const gate = diagnosePersistGate({
+    hasRows: !!rows?.length,
+    recording,
+    liveId: liveId || '',
+    locationAllows: locationAllowsCommentRecording(),
+    hasExtensionContext: hasExtensionContext()
+  });
+  if (!gate.pass) {
+    if (gate.failures.length && rows?.length) {
+      lastPersistGateFailures = gate.failures;
+    }
     return;
   }
+  lastPersistGateFailures = [];
   persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (rows));
 }
 
@@ -3953,6 +4423,18 @@ async function persistCommentRowsImpl(rows, opts = {}) {
     const profileKeysBefore = Object.keys(profileMap).length;
     profileMap = pruneUserCommentProfileMap(profileMap);
     if (Object.keys(profileMap).length !== profileKeysBefore) cacheTouched = true;
+
+    /* 次バッチの enrich 精度向上: current live で観測済み userId のみ補完（他配信混入を避ける） */
+    const liveObservedUserIds = new Set();
+    for (const item of next) {
+      const uid = String(item?.userId || '').trim();
+      if (uid) liveObservedUserIds.add(uid);
+    }
+    hydrateInterceptAvatarMapFromProfile(
+      interceptedAvatars,
+      profileMap,
+      liveObservedUserIds
+    );
 
     if (!storageTouched && !pendingTouched && !cacheTouched) return;
 
@@ -4083,6 +4565,9 @@ function syncLiveIdFromLocation() {
       void clearCommentHarvestPanelDiagnostic();
       pendingRoots.clear();
       clearNdgrChatRowsPending();
+      clearInterceptReconcilePending();
+      endedBulkHarvestTriggeredLiveId = '';
+      endedBulkHarvestLastCheckedAt = 0;
       resetDeepHarvestStabilityFollowUp();
       interceptedUsers.clear();
       interceptedNicknames.clear();
@@ -4095,15 +4580,21 @@ function syncLiveIdFromLocation() {
       wsViewerCountUpdatedAt = 0;
       resetOfficialStatsState();
       programBeginAtMs = null;
+      ndgrLastReceivedAt = 0;
       liveId = ctx.liveId;
       reconnectMutationObserver();
       pendingRoots.add(document.body);
       scheduleFlush();
-      scheduleDeepHarvest('live-id-change');
+      scheduleDeepHarvest(DEEP_HARVEST_REASONS.liveIdChange);
       applyThumbSchedule();
     } else {
       liveId = ctx.liveId;
       reconnectMutationObserver();
+      if (ndgrChatRowsPending.length) {
+        const slice = ndgrChatRowsPending;
+        ndgrChatRowsPending = [];
+        void flushNdgrChatRowsBatch(slice);
+      }
     }
     renderPageFrameOverlay();
     return;
@@ -4123,6 +4614,9 @@ function syncLiveIdFromLocation() {
       void clearCommentHarvestPanelDiagnostic();
       pendingRoots.clear();
       clearNdgrChatRowsPending();
+      clearInterceptReconcilePending();
+      endedBulkHarvestTriggeredLiveId = '';
+      endedBulkHarvestLastCheckedAt = 0;
       resetDeepHarvestStabilityFollowUp();
       interceptedUsers.clear();
       interceptedNicknames.clear();
@@ -4135,24 +4629,34 @@ function syncLiveIdFromLocation() {
       wsViewerCountUpdatedAt = 0;
       resetOfficialStatsState();
       programBeginAtMs = null;
+      ndgrLastReceivedAt = 0;
       liveId = next;
       reconnectMutationObserver();
       pendingRoots.add(document.body);
       scheduleFlush();
-      scheduleDeepHarvest('live-id-change');
+      scheduleDeepHarvest(DEEP_HARVEST_REASONS.liveIdChange);
       applyThumbSchedule();
     } else {
       liveId = next;
       reconnectMutationObserver();
+      if (ndgrChatRowsPending.length) {
+        const slice = ndgrChatRowsPending;
+        ndgrChatRowsPending = [];
+        void flushNdgrChatRowsBatch(slice);
+      }
     }
     renderPageFrameOverlay();
     return;
   }
 
   liveId = null;
+  ndgrLastReceivedAt = 0;
   cancelPendingDeepHarvest();
   void clearCommentHarvestPanelDiagnostic();
   clearNdgrChatRowsPending();
+  clearInterceptReconcilePending();
+  endedBulkHarvestTriggeredLiveId = '';
+  endedBulkHarvestLastCheckedAt = 0;
   clearThumbTimer();
   reconnectMutationObserver();
   hidePageFrameOverlay();
@@ -4198,7 +4702,7 @@ async function flushToStorage() {
   pendingRoots.clear();
 
   if (!rows.length) return;
-  await persistCommentRows(rows, { source: 'mutation' });
+  await persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.MUTATION });
 }
 
 function scheduleFlush() {
@@ -4206,7 +4710,7 @@ function scheduleFlush() {
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = setTimeout(() => {
     flushTimer = null;
-    flushToStorage().catch(() => {});
+    flushToStorage().catch((err) => reportSilentErrorToStorage('flush', err));
   }, DEBOUNCE_MS);
 }
 
@@ -4330,7 +4834,10 @@ function scheduleDeepHarvest(reason) {
       renderPageFrameOverlay();
     }
     resetDeepHarvestStabilityFollowUp();
-    runDeepHarvest({ armStabilityFollowUp: true }).catch(() => {});
+    runDeepHarvest({
+      armStabilityFollowUp: true,
+      force: shouldForceDeepHarvestForReason(reason)
+    }).catch((err) => reportSilentErrorToStorage('deepHarvest', err));
   }, delayMs);
 }
 
@@ -4354,20 +4861,25 @@ function tryPeriodicQuietDeepHarvest() {
 function onTabVisibleForCommentHarvest() {
   if (document.visibilityState !== 'visible') return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  // 軽い走査は毎回実行して、画面復帰直後の取りこぼしを減らす。
   scanVisibleCommentsNow();
+  const now = Date.now();
+  // 重い deep harvest だけを間引く。
+  if (now - lastTabVisibleHarvestAt < TAB_VISIBLE_HARVEST_MIN_MS) return;
+  lastTabVisibleHarvestAt = now;
   if (tabVisibleHarvestDebounceTimer != null) {
     clearTimeout(tabVisibleHarvestDebounceTimer);
   }
   tabVisibleHarvestDebounceTimer = setTimeout(() => {
     tabVisibleHarvestDebounceTimer = null;
     if (recording && liveId && locationAllowsCommentRecording() && !document.hidden) {
-      scheduleDeepHarvest('tab-visible');
+      void runDeepHarvest({ stabilityFollowUp: true });
     }
   }, 850);
 }
 
 /**
- * @param {{ armStabilityFollowUp?: boolean, stabilityFollowUp?: boolean }} [opts]
+ * @param {{ armStabilityFollowUp?: boolean, stabilityFollowUp?: boolean, force?: boolean }} [opts]
  *   armStabilityFollowUp: true のときだけ成功後に遅延フォロー deep を積む（scheduleDeepHarvest 経路のみ）。
  *   stabilityFollowUp: 遅延フォロー本体。1 パスのみで「滝」を短くする。
  */
@@ -4377,6 +4889,16 @@ async function runDeepHarvest(opts = {}) {
     !recording ||
     !liveId ||
     !locationAllowsCommentRecording()
+  ) {
+    return;
+  }
+  if (
+    !opts.force &&
+    shouldSkipDeepHarvest({
+      ndgrLastReceivedAt,
+      now: Date.now(),
+      thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
+    })
   ) {
     return;
   }
@@ -4392,7 +4914,7 @@ async function runDeepHarvest(opts = {}) {
       quietScroll: true,
       respectTyping: false
     });
-    await persistCommentRows(rows, { source: 'deep' });
+    await persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.DEEP });
     deepHarvestPipelineStats.lastCompletedAt = Date.now();
     deepHarvestPipelineStats.lastRowCount = rows.length;
     deepHarvestPipelineStats.runCount += 1;
@@ -4485,7 +5007,7 @@ function scanVisibleCommentsNow() {
   const panel = findNicoCommentPanel(document);
   const root = panel || document.body;
   const rows = extractCommentsFromNode(root);
-  void persistCommentRows(rows, { source: 'visible' });
+  void persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.VISIBLE });
   void syncCommentHarvestPanelStatus();
 }
 
@@ -4500,7 +5022,7 @@ function attachCommentScrollHook() {
     () => {
       if (!recording || !liveId) return;
       clearTimeout(t);
-      t = setTimeout(() => scanVisibleCommentsNow(), 380);
+      t = setTimeout(() => scanVisibleCommentsNow(), INGEST_TIMING.visibleScanDelayMs);
     },
     { passive: true }
   );
@@ -4731,7 +5253,7 @@ async function start() {
         deepHarvestTimer
       ) {
         cancelPendingDeepHarvest();
-        scheduleDeepHarvest('live-id-change');
+        scheduleDeepHarvest(DEEP_HARVEST_REASONS.liveIdChange);
       } else if (!deepHarvestQuietUi) {
         removeDeepHarvestLoadingUi();
       }
@@ -4743,9 +5265,10 @@ async function start() {
         pendingRoots.add(document.body);
         reconnectMutationObserver();
         scheduleFlush();
-        scheduleDeepHarvest('recording-on');
+        scheduleDeepHarvest(DEEP_HARVEST_REASONS.recordingOn);
         tryAttachScrollHookSoon();
       } else {
+        ndgrLastReceivedAt = 0;
         cancelPendingDeepHarvest();
         resetOfficialCommentSamplingState();
         void clearCommentHarvestPanelDiagnostic();
@@ -4756,7 +5279,7 @@ async function start() {
   if (recording && liveId) {
     pendingRoots.add(document.body);
     scheduleFlush();
-    scheduleDeepHarvest('startup');
+    scheduleDeepHarvest(DEEP_HARVEST_REASONS.startup);
     tryAttachScrollHookSoon();
     for (const ms of BOOTSTRAP_DELAYS_MS) {
       setTimeout(() => {
@@ -4810,5 +5333,5 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   } catch {
     // no-op
   }
-  start().catch(() => {});
+  start().catch((err) => reportSilentErrorToStorage('start', err));
 }

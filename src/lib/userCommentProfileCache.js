@@ -12,6 +12,8 @@ import { supportGridStrongNickname } from './supportGridDisplayTier.js';
 
 /** 保持するエントリ数の上限（chrome.storage.local 容量対策） */
 export const USER_COMMENT_PROFILE_CACHE_MAX = 5000;
+/** プロフィールキャッシュの最大保持期間（古すぎる情報は破棄） */
+export const USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * @typedef {{
@@ -22,11 +24,33 @@ export const USER_COMMENT_PROFILE_CACHE_MAX = 5000;
  */
 
 /**
+ * @param {number} updatedAt
+ * @param {number} nowMs
+ * @param {number} maxAgeMs
+ * @returns {boolean}
+ */
+function isFreshProfileEntry(updatedAt, nowMs, maxAgeMs) {
+  if (!Number.isFinite(updatedAt) || updatedAt <= 0) return false;
+  // 旧データ/テスト由来の小さい値は時刻基準が異なるためTTL対象外として扱う。
+  if (updatedAt < 1_000_000_000_000) return true;
+  if (!Number.isFinite(maxAgeMs) || maxAgeMs <= 0) return true;
+  return updatedAt >= nowMs - maxAgeMs;
+}
+
+/**
  * @param {unknown} raw
+ * @param {{ nowMs?: number, maxAgeMs?: number }} [opts]
  * @returns {Record<string, UserCommentProfileCacheEntry>}
  */
-export function normalizeUserCommentProfileMap(raw) {
+export function normalizeUserCommentProfileMap(raw, opts = {}) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const nowMsRaw = Number(opts.nowMs);
+  const nowMs = Number.isFinite(nowMsRaw) && nowMsRaw > 0 ? nowMsRaw : Date.now();
+  const maxAgeRaw = Number(opts.maxAgeMs);
+  const maxAgeMs =
+    Number.isFinite(maxAgeRaw) && maxAgeRaw > 0
+      ? maxAgeRaw
+      : USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS;
   const src = /** @type {Record<string, unknown>} */ (raw);
   /** @type {Record<string, UserCommentProfileCacheEntry>} */
   const out = {};
@@ -36,7 +60,7 @@ export function normalizeUserCommentProfileMap(raw) {
     if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
     const o = /** @type {Record<string, unknown>} */ (v);
     const updatedAt = Number(o.updatedAt);
-    if (!Number.isFinite(updatedAt) || updatedAt <= 0) continue;
+    if (!isFreshProfileEntry(updatedAt, nowMs, maxAgeMs)) continue;
     const nick = String(o.nickname || '').trim().slice(0, 200);
     const av = String(o.avatarUrl || '').trim();
     const avatarUrl =
@@ -205,11 +229,13 @@ export function applyUserCommentProfileMapToEntries(entries, map) {
 /**
  * @param {Record<string, UserCommentProfileCacheEntry>} map
  * @param {number} [max]
+ * @param {{ nowMs?: number, maxAgeMs?: number }} [opts]
  * @returns {Record<string, UserCommentProfileCacheEntry>}
  */
 export function pruneUserCommentProfileMap(
   map,
-  max = USER_COMMENT_PROFILE_CACHE_MAX
+  max = USER_COMMENT_PROFILE_CACHE_MAX,
+  opts = {}
 ) {
   const raw = Number(max);
   const lim = Math.max(
@@ -219,8 +245,25 @@ export function pruneUserCommentProfileMap(
       20_000
     )
   );
-  const ids = Object.keys(map);
-  if (ids.length <= lim) return map;
+  const nowMsRaw = Number(opts.nowMs);
+  const nowMs = Number.isFinite(nowMsRaw) && nowMsRaw > 0 ? nowMsRaw : Date.now();
+  const maxAgeRaw = Number(opts.maxAgeMs);
+  const maxAgeMs =
+    Number.isFinite(maxAgeRaw) && maxAgeRaw > 0
+      ? maxAgeRaw
+      : USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS;
+  const ids = Object.keys(map).filter((id) =>
+    isFreshProfileEntry(Number(map[id]?.updatedAt), nowMs, maxAgeMs)
+  );
+  if (ids.length <= lim) {
+    if (ids.length === Object.keys(map).length) return map;
+    /** @type {Record<string, UserCommentProfileCacheEntry>} */
+    const freshOnly = {};
+    for (const id of ids) {
+      freshOnly[id] = map[id];
+    }
+    return freshOnly;
+  }
   ids.sort((a, b) => (map[b].updatedAt || 0) - (map[a].updatedAt || 0));
   const keep = new Set(ids.slice(0, lim));
   /** @type {Record<string, UserCommentProfileCacheEntry>} */

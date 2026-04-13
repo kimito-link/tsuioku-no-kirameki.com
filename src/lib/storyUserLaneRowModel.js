@@ -3,18 +3,25 @@
  */
 
 import {
+  explainSupportGridDisplayTier,
   SUPPORT_GRID_TIER_KONTA,
-  SUPPORT_GRID_TIER_RINK,
-  supportGridDisplayTier
+  SUPPORT_GRID_TIER_RINK
 } from './supportGridDisplayTier.js';
+import {
+  isAnonymousStyleNicoUserId,
+  userLaneResolvedThumbScore
+} from './supportGrowthTileSrc.js';
 import {
   pickStoryUserLaneCellDisplaySrc,
   userLaneHttpForTilePick
 } from './storyUserLaneDisplaySrc.js';
-import { userLaneResolvedThumbScore } from './supportGrowthTileSrc.js';
 
 /**
- * 応援ユーザーレーンの並び順。大きいほど「個人サムネ＋強い表示名」に近い（supportGridDisplayTier と一致）。
+ * 応援ユーザーレーンの並び順。大きいほど「個人サムネ＋表示名」に近い。
+ * レーン専用ルール:
+ * - link(3): 個人サムネあり
+ * - konta(2): 個人サムネなし + 強い表示名あり
+ * - tanu(1): それ以外
  * @param {{ userId?: unknown, nickname?: unknown, avatarUrl?: unknown, avatarObserved?: boolean }|null|undefined} entry
  * @param {string} httpAvatarCandidate storyGrowth と stored をマージした `userLaneHttpForTilePick` 結果推奨（表示セルと段を一致させる）
  * @returns {0|1|2|3}
@@ -22,15 +29,26 @@ import { userLaneResolvedThumbScore } from './supportGrowthTileSrc.js';
 export function userLaneProfileCompletenessTier(entry, httpAvatarCandidate) {
   const uid = String(entry?.userId || '').trim();
   if (!uid) return 0;
-  const nick = String(entry?.nickname || '').trim();
-  const rawAv = String(entry?.avatarUrl || '').trim();
-  const t = supportGridDisplayTier({
+  const numericUid = /^\d{5,14}$/.test(uid);
+  const ex = explainSupportGridDisplayTier({
     userId: uid,
-    nickname: nick,
+    nickname: String(entry?.nickname || '').trim(),
     httpAvatarCandidate: String(httpAvatarCandidate ?? '').trim(),
-    storedAvatarUrl: rawAv,
+    storedAvatarUrl: String(entry?.avatarUrl || '').trim(),
     avatarObserved: Boolean(entry?.avatarObserved)
   });
+  /** レーンは supportGrid より厳格にし、混入を抑える */
+  let t = 'tanu';
+  if (ex.hasPersonalThumb) {
+    /**
+     * 匿名 a: は、個人サムネが見えていても weak nick のままなら link に上げない。
+     * （自動画像/誤結合の混入を抑える）
+     */
+    const anon = isAnonymousStyleNicoUserId(uid);
+    t = anon && !ex.strongNick ? SUPPORT_GRID_TIER_KONTA : SUPPORT_GRID_TIER_RINK;
+  } else if (ex.strongNick) {
+    t = SUPPORT_GRID_TIER_KONTA;
+  }
   if (t === SUPPORT_GRID_TIER_RINK) return 3;
   if (t === SUPPORT_GRID_TIER_KONTA) return 2;
   return 1;
@@ -63,7 +81,7 @@ export function buildStoryUserLaneCandidateRow(
   const rawAvStored = String(entry?.avatarUrl || '').trim();
   const httpTrim = String(httpFromGrowth ?? '').trim();
   const httpForLane = userLaneHttpForTilePick(uidRaw, httpTrim, rawAvStored);
-  const profileTier = userLaneProfileCompletenessTier(entry, rawAvStored);
+  const profileTier = userLaneProfileCompletenessTier(entry, httpForLane);
   const displaySrc = pickStoryUserLaneCellDisplaySrc({
     userId: entry?.userId,
     httpCandidate: httpForLane,

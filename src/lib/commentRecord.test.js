@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  COMMENT_TEXT_MAX_CHARS,
   normalizeCommentText,
   buildDedupeKey,
   createCommentEntry,
@@ -19,6 +20,13 @@ describe('normalizeCommentText', () => {
   it('null / undefined は空文字', () => {
     expect(normalizeCommentText(/** @type {any} */ (null))).toBe('');
     expect(normalizeCommentText(/** @type {any} */ (undefined))).toBe('');
+  });
+
+  it('最大長を超える本文は切り詰める', () => {
+    const long = `  ${'a'.repeat(COMMENT_TEXT_MAX_CHARS + 50)}  `;
+    const out = normalizeCommentText(long);
+    expect(out).toHaveLength(COMMENT_TEXT_MAX_CHARS);
+    expect(out).toBe('a'.repeat(COMMENT_TEXT_MAX_CHARS));
   });
 });
 

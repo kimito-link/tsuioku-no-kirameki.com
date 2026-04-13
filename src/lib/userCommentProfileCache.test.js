@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   USER_COMMENT_PROFILE_CACHE_MAX,
+  USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS,
   applyUserCommentProfileMapToEntries,
   hydrateUserCommentProfileMapFromStorage,
   normalizeUserCommentProfileMap,
@@ -36,6 +37,21 @@ describe('normalizeUserCommentProfileMap', () => {
     expect(m.u1?.nickname).toBe('n');
     expect(m.u1?.avatarUrl).toBe(strongAv);
     expect(m.u1?.updatedAt).toBe(100);
+  });
+
+  it('TTLを超えた古いエントリは除外する', () => {
+    const now = 1_800_000_000_000;
+    const oldAt = now - USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS - 1;
+    const freshAt = now - USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS + 1;
+    const m = normalizeUserCommentProfileMap(
+      {
+        old: { nickname: 'old', avatarUrl: strongAv, updatedAt: oldAt },
+        fresh: { nickname: 'fresh', avatarUrl: strongAv, updatedAt: freshAt }
+      },
+      { nowMs: now }
+    );
+    expect(m.old).toBeUndefined();
+    expect(m.fresh?.nickname).toBe('fresh');
   });
 });
 
@@ -231,5 +247,19 @@ describe('pruneUserCommentProfileMap', () => {
     expect(pruneUserCommentProfileMap(map, USER_COMMENT_PROFILE_CACHE_MAX)).toBe(
       map
     );
+  });
+
+  it('上限以内でもTTL切れは除外する', () => {
+    const now = 3_000_000;
+    const oldAt = now - USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS - 5;
+    const map = {
+      stale: { nickname: 'stale', updatedAt: oldAt },
+      fresh: { nickname: 'fresh', updatedAt: now }
+    };
+    const pruned = pruneUserCommentProfileMap(map, USER_COMMENT_PROFILE_CACHE_MAX, {
+      nowMs: now
+    });
+    expect(pruned.stale).toBeUndefined();
+    expect(pruned.fresh?.nickname).toBe('fresh');
   });
 });

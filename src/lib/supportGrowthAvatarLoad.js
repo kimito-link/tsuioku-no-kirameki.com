@@ -25,7 +25,8 @@ function defaultUrlKey(url) {
  * @param {{
  *   fallbackSrc: string,
  *   urlKey?: (s: string) => string,
- *   onFallbackApplied?: (img: HTMLImageElement) => void
+ *   onFallbackApplied?: (img: HTMLImageElement) => void,
+ *   timeoutMs?: number
  * }} options
  */
 export function createSupportAvatarLoadGuard(options) {
@@ -36,6 +37,8 @@ export function createSupportAvatarLoadGuard(options) {
     typeof options?.onFallbackApplied === 'function'
       ? options.onFallbackApplied
       : null;
+  const timeoutRaw = Number(options?.timeoutMs);
+  const timeoutMs = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : 3000;
 
   /** @type {Set<string>} */
   const failedKeys = new Set();
@@ -65,12 +68,38 @@ export function createSupportAvatarLoadGuard(options) {
     const key = urlKeyFn(req);
     if (!key) return;
 
-    const onError = () => {
+    let settled = false;
+    /** @type {ReturnType<typeof setTimeout>|null} */
+    let timer = null;
+    const cleanup = () => {
+      if (timer != null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      img.removeEventListener('load', onLoad);
+      img.removeEventListener('error', onError);
+    };
+    const applyFallback = () => {
+      if (settled) return;
+      settled = true;
       failedKeys.add(key);
       img.src = fallbackSrc;
       onFallbackApplied?.(img);
+      cleanup();
     };
+    const onLoad = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+    };
+    const onError = () => {
+      applyFallback();
+    };
+    img.addEventListener('load', onLoad, { once: true });
     img.addEventListener('error', onError, { once: true });
+    timer = setTimeout(() => {
+      applyFallback();
+    }, timeoutMs);
   }
 
   function clearFailedUrls() {

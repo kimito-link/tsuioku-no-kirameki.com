@@ -3,6 +3,7 @@
  */
 
 import { devMonitorTrendStorageKey } from './storageKeys.js';
+import { readStorageBagWithRetry } from './userCommentProfileCache.js';
 
 const STORAGE_PREFIX = 'nl-dev-monitor-trend:';
 const MAX_SESSION_POINTS = 24;
@@ -17,6 +18,31 @@ const TREND_SESSION_APPEND_MIN_MS = 12_000;
 /** @type {Map<string, number>} liveId -> last persist/append ms */
 const _lastChromeTrendPersistMs = new Map();
 const _lastSessionTrendAppendMs = new Map();
+
+const DEV_MONITOR_TREND_LOG_PREFIX = '[devMonitorTrendSession]';
+
+/**
+ * key ごとの最小間隔 throttling 判定。
+ * @param {Map<string, number>} bucket
+ * @param {string} key
+ * @param {number} minIntervalMs
+ * @param {number} nowMs
+ * @returns {boolean}
+ */
+function shouldPassThrottle(bucket, key, minIntervalMs, nowMs) {
+  const last = bucket.get(key) || 0;
+  return nowMs - last >= minIntervalMs;
+}
+
+/**
+ * key ごとの最終実行時刻を更新。
+ * @param {Map<string, number>} bucket
+ * @param {string} key
+ * @param {number} nowMs
+ */
+function touchThrottle(bucket, key, nowMs) {
+  bucket.set(key, nowMs);
+}
 
 /** 単体テスト用 */
 export function resetDevMonitorTrendThrottleForTest() {
@@ -143,7 +169,11 @@ export function readTrendSeries(win, liveId) {
   try {
     const raw = win.sessionStorage.getItem(sessionKeyFor(liveId));
     return parseTrendJsonArray(raw);
-  } catch {
+  } catch (err) {
+    console.warn(
+      `${DEV_MONITOR_TREND_LOG_PREFIX} readTrendSeries: sessionStorage read failed`,
+      err
+    );
     return [];
   }
 }
@@ -164,8 +194,9 @@ export function appendTrendPoint(win, liveId, sample) {
   const lid = String(liveId || '').trim();
   if (!lid) return;
   const now0 = Date.now();
-  const lastS = _lastSessionTrendAppendMs.get(lid) || 0;
-  if (now0 - lastS < TREND_SESSION_APPEND_MIN_MS) return;
+  if (!shouldPassThrottle(_lastSessionTrendAppendMs, lid, TREND_SESSION_APPEND_MIN_MS, now0)) {
+    return;
+  }
 
   const prev = readTrendSeries(win, lid);
   /** @type {number|null} */
@@ -190,7 +221,7 @@ export function appendTrendPoint(win, liveId, sample) {
   }
   const lastSess = latestTrendPointByTime(prev);
   if (lastSess && trendMetricsEqual(lastSess, pt)) {
-    _lastSessionTrendAppendMs.set(lid, now);
+    touchThrottle(_lastSessionTrendAppendMs, lid, now);
     return;
   }
 
@@ -202,10 +233,38 @@ export function appendTrendPoint(win, liveId, sample) {
   );
   try {
     win.sessionStorage.setItem(sessionKeyFor(lid), JSON.stringify(next));
-    _lastSessionTrendAppendMs.set(lid, now);
-  } catch {
-    // quota / private mode
+    touchThrottle(_lastSessionTrendAppendMs, lid, now);
+  } catch (err) {
+    console.debug(
+      `${DEV_MONITOR_TREND_LOG_PREFIX} appendTrendPoint: sessionStorage write skipped (quota/private mode)`,
+      err
+    );
   }
+}
+
+/**
+ * @param {Storage} chromeObj
+ * @param {string} key
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function readChromeStorageBag(chromeObj, key) {
+  return readStorageBagWithRetry(
+    async () =>
+      await new Promise((resolve, reject) => {
+        try {
+          chromeObj.get(key, (r) => {
+            if (r && typeof r === 'object' && !Array.isArray(r)) {
+              resolve(r);
+              return;
+            }
+            resolve({});
+          });
+        } catch (err) {
+          reject(err);
+        }
+      }),
+    { attempts: 4, delaysMs: [0, 50, 120, 280] }
+  );
 }
 
 /**
@@ -225,8 +284,9 @@ export async function persistTrendPointChrome(liveId, sample) {
   const lid = String(liveId || '').trim();
   if (!lid) return;
   const nowWall = Date.now();
-  const lastC = _lastChromeTrendPersistMs.get(lid) || 0;
-  if (nowWall - lastC < TREND_CHROME_PERSIST_MIN_MS) return;
+  if (!shouldPassThrottle(_lastChromeTrendPersistMs, lid, TREND_CHROME_PERSIST_MIN_MS, nowWall)) {
+    return;
+  }
 
   const key = devMonitorTrendStorageKey(lid);
   const chromeObj =
@@ -256,17 +316,11 @@ export async function persistTrendPointChrome(liveId, sample) {
     pt.storageCount = Math.max(0, Math.floor(sample.storageCount));
   }
 
-  const bag = await new Promise((resolve) => {
-    try {
-      chromeObj.get(key, (r) => resolve(r && typeof r === 'object' ? r : {}));
-    } catch {
-      resolve({});
-    }
-  });
+  const bag = await readChromeStorageBag(chromeObj, key);
   const prev = parseTrendJsonArray(bag[key]);
   const lastPersisted = latestTrendPointByTime(prev);
   if (lastPersisted && trendMetricsEqual(lastPersisted, pt)) {
-    _lastChromeTrendPersistMs.set(lid, Date.now());
+    touchThrottle(_lastChromeTrendPersistMs, lid, Date.now());
     return;
   }
 
@@ -279,11 +333,15 @@ export async function persistTrendPointChrome(liveId, sample) {
   await new Promise((resolve) => {
     try {
       chromeObj.set({ [key]: JSON.stringify(merged) }, () => resolve(undefined));
-    } catch {
+    } catch (err) {
+      console.warn(
+        `${DEV_MONITOR_TREND_LOG_PREFIX} persistTrendPointChrome: chrome.storage.local.set failed`,
+        err
+      );
       resolve(undefined);
     }
   });
-  _lastChromeTrendPersistMs.set(lid, Date.now());
+  touchThrottle(_lastChromeTrendPersistMs, lid, Date.now());
 }
 
 /**
@@ -302,13 +360,7 @@ export async function readMergedTrendSeries(win, liveId) {
   if (!chromeObj) return mergeTrendArrays(sess, []);
 
   const key = devMonitorTrendStorageKey(lid);
-  const bag = await new Promise((resolve) => {
-    try {
-      chromeObj.get(key, (r) => resolve(r && typeof r === 'object' ? r : {}));
-    } catch {
-      resolve({});
-    }
-  });
+  const bag = await readChromeStorageBag(chromeObj, key);
   const persisted = parseTrendJsonArray(bag[key]);
   return mergeTrendArrays(sess, persisted);
 }
