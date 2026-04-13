@@ -14,10 +14,10 @@ function storyUserLaneGuideLine(src, textEscaped) {
   );
 }
 
-/** @param {string} faceRink 案内アイコン URL */
-export function buildStoryUserLaneGuideTopHtml(faceRink) {
+/** @param {string} faceLink 案内アイコン URL */
+export function buildStoryUserLaneGuideTopHtml(faceLink) {
   return storyUserLaneGuideLine(
-    faceRink,
+    faceLink,
     escapeHtml(
       'link: ニコ生のユーザー識別子（数値ID・匿名の a: 形式）が付いた応援だけがこの列に載るよ。並びでは、個人サムネが取れた人をいちばん手前に寄せるよ。表示名が弱い場合でも、サムネが確実なら link に残す設計だよ。'
     )

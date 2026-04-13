@@ -134,6 +134,7 @@ import {
   flattenStoryUserLaneBuckets
 } from '../lib/storyUserLaneBuckets.js';
 import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js';
+import { shouldSkipStoryUserLaneCandidateByContamination } from '../lib/storyUserLaneContaminationGuard.js';
 import { explainSupportGridDisplayTier } from '../lib/supportGridDisplayTier.js';
 import {
   buildHtmlReportConceptGuideCardHtml,
@@ -778,6 +779,7 @@ function paintCommentComposeUi() {
 /** 拡張コンテキスト無効化・更新手順の共通文案（UI とヒントで揃える） */
 const EXTENSION_RELOAD_USER_GUIDE_JA =
   '改善しなければ chrome://extensions を開き、「君斗りんくの追憶のきらめき」の「更新」で拡張を再読み込みしてください。';
+const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
 
 /** コメント送信まわりのエラーに、再読み込み案内を1回だけ足す */
 function withCommentSendTroubleshootHint(message) {
@@ -1089,7 +1091,7 @@ const DEFAULT_FRAME_ID = 'light';
 
 const LEGACY_FRAME_ALIAS = {
   trio: 'light',
-  rink: 'light',
+  link: 'light',
   konta: 'sunset',
   tanunee: 'midnight'
 };
@@ -1447,6 +1449,115 @@ async function copyTextToClipboard(text) {
 }
 
 /**
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} ms
+ * @param {string} timeoutCode
+ * @returns {Promise<T>}
+ */
+async function withTimeout(promise, ms, timeoutCode = 'timeout') {
+  let timer = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(timeoutCode)), ms);
+      })
+    ]);
+  } finally {
+    if (timer != null) clearTimeout(timer);
+  }
+}
+
+/**
+ * クリップボード API が拒否されたときの最終フォールバック。
+ * @param {string} text
+ */
+function openManualCopyOverlay(text) {
+  const existing = document.getElementById('nl-manual-copy-overlay');
+  if (existing) existing.remove();
+  const host = document.createElement('div');
+  host.id = 'nl-manual-copy-overlay';
+  host.style.cssText = [
+    'position:fixed',
+    'inset:0',
+    'z-index:2147483647',
+    'background:rgba(15,23,42,0.6)',
+    'display:flex',
+    'align-items:center',
+    'justify-content:center',
+    'padding:12px'
+  ].join(';');
+  const box = document.createElement('div');
+  box.style.cssText = [
+    'width:min(920px,96vw)',
+    'max-height:90vh',
+    'background:#fff',
+    'border-radius:12px',
+    'box-shadow:0 20px 60px rgba(2,6,23,0.35)',
+    'padding:12px',
+    'display:flex',
+    'flex-direction:column',
+    'gap:8px'
+  ].join(';');
+  const title = document.createElement('div');
+  title.textContent = 'コピーに失敗したため、下のテキストを手動でコピーしてください（Ctrl+C）';
+  title.style.cssText = 'font-size:13px;color:#0f172a;font-weight:600';
+  const ta = document.createElement('textarea');
+  ta.value = String(text || '');
+  ta.readOnly = true;
+  ta.style.cssText = [
+    'width:100%',
+    'height:min(62vh,560px)',
+    'resize:vertical',
+    'font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+    'font-size:12px',
+    'line-height:1.45'
+  ].join(';');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;justify-content:flex-end;gap:8px';
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.textContent = '閉じる';
+  closeBtn.style.cssText =
+    'padding:6px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;cursor:pointer';
+  closeBtn.addEventListener('click', () => host.remove());
+  row.appendChild(closeBtn);
+  box.appendChild(title);
+  box.appendChild(ta);
+  box.appendChild(row);
+  host.appendChild(box);
+  host.addEventListener('click', (ev) => {
+    if (ev.target === host) host.remove();
+  });
+  document.body.appendChild(host);
+  ta.focus();
+  ta.select();
+}
+
+/** @param {string} msg */
+function isContextInvalidatedMessageText(msg) {
+  return /Extension context invalidated/i.test(String(msg || ''));
+}
+
+/**
+ * 改善切り分けに必要な観測データ（ロミ式: 入口/経路/出口を最短で絞る）
+ * @returns {string[]}
+ */
+function romiDebugDataChecklist() {
+  return [
+    'watch URL（lv番号）',
+    'popup exportedAt',
+    'content exportedAt',
+    'intercept map size（_debug.intercept）',
+    'ndgr pending / ndgrLastReceivedAgo',
+    'lastPersistBatch / persistGateFailures',
+    'intercept export code/detail',
+    'first view 10件の userId/nickname/avatar有無'
+  ];
+}
+
+/**
  * @param {{
  *   extensionName: string;
  *   extensionVersion: string;
@@ -1468,6 +1579,9 @@ function formatAiShareDiagnosticsMarkdown(parts) {
   if (parts.lastSendMessageError) {
     lines.push(`- content への送信: \`${parts.lastSendMessageError}\``);
   }
+  lines.push(
+    '- 重点確認: `content.romiDebug`（取り込み入口/補完/保存ゲートの全体像。ここを見ると不具合の段が特定しやすいです）'
+  );
   lines.push('');
   lines.push('```json');
   lines.push(JSON.stringify(parts.payload, null, 2));
@@ -1491,7 +1605,7 @@ const STORY_RINK_COLLECTING_JPG = 'images/icon/kewXCUOt_400x400.jpg';
 const STORY_GRID_DEFAULT_TILE_IMG =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
 /** ユーザーレーン案内（りんく・こん太・たぬ姉） */
-const STORY_GUIDE_FACE_RINK =
+const STORY_GUIDE_FACE_LINK =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
 const STORY_GUIDE_FACE_KONTA =
   'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png';
@@ -2528,6 +2642,8 @@ const STORY_AVATAR_DIAG_STATE = {
 
 /** renderStoryUserLane の見た目が同じなら DOM を付け直さない（高流量時のちらつき抑制） */
 let storyUserLaneLastRenderSig = '';
+/** renderStoryAvatarDiag の同内容再描画を抑止（診断パネルのチカつき抑制） */
+let storyAvatarDiagLastRenderSig = '';
 
 /** @param {PopupCommentEntry|null|undefined} entry */
 function commentStableId(entry) {
@@ -2737,11 +2853,11 @@ function storyUserLaneRenderSignature(
 
 function renderStoryUserLane() {
   const stack = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneStack'));
-  const laneRink = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneRink'));
+  const laneLink = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLink'));
   const laneKonta = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneKonta'));
   const laneTanu = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneTanu'));
-  const hintRink = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneRinkHint'));
-  const rinkWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneRinkWrap'));
+  const hintLink = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkHint'));
+  const linkWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkWrap'));
   const guideTop = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideTop'));
   const guideLinesTop = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesTop'));
   const guideMidKonta = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidKonta'));
@@ -2750,15 +2866,15 @@ function renderStoryUserLane() {
   const guideLinesMidTanu = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidTanu'));
   const guideBottom = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideBottom'));
   const guideLinesBottom = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesBottom'));
-  if (!stack || !laneRink || !laneKonta || !laneTanu) return;
+  if (!stack || !laneLink || !laneKonta || !laneTanu) return;
 
   const els = {
     stack,
-    laneRink,
+    laneLink,
     laneKonta,
     laneTanu,
-    hintRink,
-    rinkWrap,
+    hintLink,
+    linkWrap,
     guideTop,
     guideLinesTop,
     guideMidKonta,
@@ -2770,7 +2886,7 @@ function renderStoryUserLane() {
   };
 
   const faces = {
-    faceRink: STORY_GUIDE_FACE_RINK,
+    faceLink: STORY_GUIDE_FACE_LINK,
     faceKonta: STORY_GUIDE_FACE_KONTA,
     faceTanu: STORY_GUIDE_FACE_TANU
   };
@@ -2811,6 +2927,8 @@ function renderStoryUserLane() {
   const seen = new Set();
   const liveId = String(STORY_SOURCE_STATE.liveId || '');
   const laneScheme = getStoryColorScheme();
+  const viewerUid = String(watchMetaCache.snapshot?.viewerUserId || '').trim();
+  const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
 
   /** @type {{ entryIndex: number, profileTier: number, thumbScore: number, displaySrc: string, title: string, entry: PopupCommentEntry, meta: { idLine: string, nameLine: string } }[]} */
   const candidates = [];
@@ -2824,6 +2942,16 @@ function renderStoryUserLane() {
     const e = entries[i];
     const uidRaw = String(e?.userId || '').trim();
     if (!uidRaw) continue;
+    if (
+      shouldSkipStoryUserLaneCandidateByContamination({
+        candidateUserId: uidRaw,
+        viewerUserId: viewerUid,
+        broadcasterUserId: broadcasterUid,
+        isOwnPosted: isOwnPostedSupportComment(e, liveId, entries)
+      })
+    ) {
+      continue;
+    }
     const httpFromGrowth = storyGrowthAvatarSrcCandidate(e, liveId);
     const dedupeKey = userLaneDedupeKey({
       userId: uidRaw,
@@ -2916,12 +3044,16 @@ function renderStoryAvatarDiag() {
   if (!el) return;
   const html = buildStoryAvatarDiagHtml(STORY_AVATAR_DIAG_STATE);
   if (html == null) {
+    if (storyAvatarDiagLastRenderSig === '__hidden__') return;
     el.hidden = true;
     el.innerHTML = '';
+    storyAvatarDiagLastRenderSig = '__hidden__';
     return;
   }
+  if (storyAvatarDiagLastRenderSig === html && !el.hidden) return;
   el.innerHTML = html;
   el.hidden = false;
+  storyAvatarDiagLastRenderSig = html;
 }
 
 function resetStoryAvatarDiagState() {
@@ -6497,7 +6629,7 @@ function partitionMetasForHtmlReport(metas) {
 
 /** HTMLレポート用（保存ファイルに埋め込むため data URL 化する） */
 const YUKKURI_REPORT_IMAGES = {
-  rink: 'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png',
+  link: 'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png',
   konta: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
   tanu: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png'
 };
@@ -6569,16 +6701,16 @@ async function buildHtmlReportDocument(
     ? snapshot.tags.filter((v) => String(v || '').trim())
     : [];
 
-  const [dataRink, dataKonta, dataTanu] = await Promise.all([
-    fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.rink),
+  const [dataLink, dataKonta, dataTanu] = await Promise.all([
+    fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.link),
     fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.konta),
     fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.tanu)
   ]);
-  const avatarRink = yukkuriReportAvatarHtml(dataRink, 'yukkuri-avatar--rink', 'り');
+  const avatarLink = yukkuriReportAvatarHtml(dataLink, 'yukkuri-avatar--link', 'り');
   const avatarKonta = yukkuriReportAvatarHtml(dataKonta, 'yukkuri-avatar--konta', 'こ');
   const avatarTanu = yukkuriReportAvatarHtml(dataTanu, 'yukkuri-avatar--tanu', 'た');
   const yukkuriAvatars = {
-    avatarRinkHtml: avatarRink,
+    avatarLinkHtml: avatarLink,
     avatarKontaHtml: avatarKonta,
     avatarTanuHtml: avatarTanu
   };
@@ -6859,7 +6991,7 @@ async function buildHtmlReportDocument(
         border: 2px solid rgba(255, 255, 255, 0.28);
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
       }
-      .yukkuri-avatar--rink {
+      .yukkuri-avatar--link {
         background: linear-gradient(145deg, #fecdd3, #fda4af);
       }
       .yukkuri-avatar--konta {
@@ -7403,6 +7535,8 @@ function initPopup() {
 
   $('devMonitorCopyAiBundleBtn')?.addEventListener('click', async () => {
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
+    const aiCopyBtn = /** @type {HTMLButtonElement|null} */ ($('devMonitorCopyAiBundleBtn'));
+    if (aiCopyBtn) aiCopyBtn.disabled = true;
     const exportBtn = /** @type {HTMLButtonElement|null} */ ($('exportJson'));
     let watchUrl = String(exportBtn?.dataset.watchUrl || '').trim();
     if (!watchUrl) {
@@ -7414,6 +7548,7 @@ function initPopup() {
       }
     }
     if (stEl) stEl.textContent = '収集中…';
+    else setPostStatus('診断データを収集中…', 'idle');
     let lastErr = '';
     /** @type {Record<string, unknown>} */
     const payload = {
@@ -7432,33 +7567,71 @@ function initPopup() {
         'Chrome コンソールの ERR_BLOCKED_BY_CLIENT / 広告スクリプト失敗はブロッカー由来で多く、本拡張とは無関係なことがあります。'
     };
     try {
+      /** まず content 側の高速キャッシュを読む（タイムアウト回避） */
+      let fastCache = null;
+      try {
+        const fastBag = await withTimeout(
+          chrome.storage.local.get(KEY_AI_SHARE_FAST_DIAG),
+          1200,
+          'ai_share_fast_cache_timeout'
+        );
+        fastCache = fastBag?.[KEY_AI_SHARE_FAST_DIAG] || null;
+      } catch {
+        fastCache = null;
+      }
+      const fastContent =
+        fastCache &&
+        typeof fastCache === 'object' &&
+        !Array.isArray(fastCache) &&
+        fastCache.content &&
+        typeof fastCache.content === 'object'
+          ? fastCache.content
+          : null;
+      if (fastContent) {
+        payload.content = /** @type {Record<string, unknown>} */ (fastContent);
+        const resolvedFastUrl = String(fastCache?.resolvedTabUrl || '').trim();
+        if (resolvedFastUrl) payload.resolvedTabUrl = resolvedFastUrl.slice(0, 240);
+        const persistedAt = String(fastCache?.persistedAt || '').trim();
+        if (persistedAt) payload.cachedAt = persistedAt;
+      }
+
       const manifest = chrome.runtime.getManifest();
-      const candidates = await collectWatchTabCandidates(watchUrl);
-      if (!candidates.length) {
-        lastErr = 'watch タブ候補なし（ニコ生 watch を開いた状態で試してください）';
-      } else {
-        for (const c of candidates) {
-          try {
-            const res = /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string }} */ (
-              await tabsSendMessageWithRetry(
-                c.id,
-                { type: 'NLS_AI_SHARE_PAGE_DIAGNOSTICS' },
-                { frameId: 0, maxAttempts: 8, delayMs: 80 }
-              )
-            );
-            if (res?.ok && res.diagnostics) {
-              payload.content = /** @type {Record<string, unknown>} */ (res.diagnostics);
-              payload.resolvedTabUrl = String(c.url || '').slice(0, 240);
-              lastErr = '';
-              break;
+      if (!payload.content) {
+        const candidates = await withTimeout(
+          collectWatchTabCandidates(watchUrl),
+          8_000,
+          'collect_watch_tabs_timeout'
+        );
+        if (!candidates.length) {
+          lastErr = 'watch タブ候補なし（ニコ生 watch を開いた状態で試してください）';
+        } else {
+          for (const c of candidates) {
+            try {
+              const res = /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string }} */ (
+                await withTimeout(
+                  tabsSendMessageWithRetry(
+                    c.id,
+                    { type: 'NLS_AI_SHARE_PAGE_DIAGNOSTICS' },
+                    { frameId: 0, maxAttempts: 8, delayMs: 80 }
+                  ),
+                  6_500,
+                  'diag_send_timeout'
+                )
+              );
+              if (res?.ok && res.diagnostics) {
+                payload.content = /** @type {Record<string, unknown>} */ (res.diagnostics);
+                payload.resolvedTabUrl = String(c.url || '').slice(0, 240);
+                lastErr = '';
+                break;
+              }
+              lastErr = String(res?.error || 'content が ok を返しませんでした');
+            } catch (e) {
+              lastErr = String(
+                e && typeof e === 'object' && 'message' in e
+                  ? /** @type {{ message?: unknown }} */ (e).message
+                  : e || 'send_failed'
+              );
             }
-            lastErr = String(res?.error || 'content が ok を返しませんでした');
-          } catch (e) {
-            lastErr = String(
-              e && typeof e === 'object' && 'message' in e
-                ? /** @type {{ message?: unknown }} */ (e).message
-                : e || 'send_failed'
-            );
           }
         }
       }
@@ -7475,10 +7648,83 @@ function initPopup() {
       if (stEl) {
         stEl.textContent = ok
           ? '診断まとめをコピーしました（AI に貼り付け可）'
-          : 'コピーに失敗しました';
+          : 'コピー失敗。手動コピー画面を開きました';
+      } else {
+        setPostStatus(
+          ok ? '診断まとめをコピーしました。' : 'コピー失敗。手動コピー画面を開きました。',
+          ok ? 'success' : 'error'
+        );
       }
-    } catch {
-      if (stEl) stEl.textContent = '収集に失敗しました';
+      if (!ok) {
+        openManualCopyOverlay(md);
+      }
+    } catch (e) {
+      const msg = String(
+        e && typeof e === 'object' && 'message' in e
+          ? /** @type {{ message?: unknown }} */ (e).message
+          : e || '収集に失敗しました'
+      );
+      if (isContextInvalidatedMessageText(msg)) {
+        const fallbackPayload = {
+          popup: {
+            exportedAt: new Date().toISOString(),
+            embedded: (() => {
+              try {
+                return window.self !== window.top;
+              } catch {
+                return true;
+              }
+            })(),
+            error: 'Extension context invalidated',
+            romiDebugChecklist: romiDebugDataChecklist()
+          },
+          content: null,
+          note: 'ポップアップの拡張コンテキストが再読み込みで切り替わりました。ポップアップを閉じて開き直し、再試行してください。'
+        };
+        const manifestSafe =
+          typeof chrome !== 'undefined' && chrome?.runtime?.getManifest
+            ? chrome.runtime.getManifest()
+            : { name: 'nicolivelog', version: 'unknown' };
+        const md = formatAiShareDiagnosticsMarkdown({
+          extensionName: String(manifestSafe.name || 'nicolivelog'),
+          extensionVersion: String(manifestSafe.version || 'unknown'),
+          watchUrlNote: watchUrl
+            ? `記録中 URL 優先（${watchUrl.slice(0, 120)}）`
+            : '前面アクティブのニコ生 watch タブ優先',
+          lastSendMessageError: msg,
+          payload: fallbackPayload
+        });
+        const copied = await copyTextToClipboard(md);
+        if (stEl) {
+          stEl.textContent = copied
+            ? '拡張再読み込みエラー情報をコピーしました（開き直して再試行）'
+            : 'コピー失敗。手動コピー画面を開きました';
+        } else {
+          setPostStatus(
+            copied
+              ? '拡張再読み込みエラー情報をコピーしました。'
+              : 'コピー失敗。手動コピー画面を開きました。',
+            copied ? 'success' : 'error'
+          );
+        }
+        if (!copied) openManualCopyOverlay(md);
+        return;
+      }
+      if (stEl) {
+        stEl.textContent =
+          msg === 'collect_watch_tabs_timeout' || msg === 'diag_send_timeout'
+            ? '収集がタイムアウトしました（watchをF5後に再実行）'
+            : `収集に失敗しました: ${msg}`;
+      } else {
+        setPostStatus(
+          msg === 'collect_watch_tabs_timeout' || msg === 'diag_send_timeout'
+            ? '診断収集がタイムアウトしました。watchをF5後に再実行してください。'
+            : `診断収集に失敗: ${msg}`,
+          'error'
+        );
+      }
+    } finally {
+      if (aiCopyBtn) aiCopyBtn.disabled = false;
     }
   });
 
@@ -7562,7 +7808,11 @@ function initPopup() {
     if (stEl) stEl.textContent = '分析中…';
     try {
       const sKey = commentsStorageKey(lid);
-      const data = await chrome.storage.local.get(sKey);
+      const data = await withTimeout(
+        chrome.storage.local.get(sKey),
+        8_000,
+        'marketing_storage_timeout'
+      );
       const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
         Array.isArray(data[sKey]) ? data[sKey] : []
       );
@@ -7588,7 +7838,55 @@ function initPopup() {
       }, 1000);
       if (stEl) stEl.textContent = `DL完了（${report.totalComments}件 / ${report.uniqueUsers}人）`;
     } catch (e) {
-      if (stEl) stEl.textContent = 'エラー: ' + String(e?.message || e);
+      const msg = String(
+        e && typeof e === 'object' && 'message' in e
+          ? /** @type {{ message?: unknown }} */ (e).message
+          : e || 'marketing_dl_error'
+      );
+      if (isContextInvalidatedMessageText(msg)) {
+        const fallbackComments = Array.isArray(STORY_SOURCE_STATE.entries)
+          ? STORY_SOURCE_STATE.entries
+          : [];
+        if (fallbackComments.length > 0) {
+          try {
+            const report = aggregateMarketingReport(
+              /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
+                fallbackComments
+              ),
+              lid || String(STORY_SOURCE_STATE.liveId || '').trim()
+            );
+            const maskEl = /** @type {HTMLInputElement|null} */ (
+              $('devMonitorExportMarketingMaskLabels')
+            );
+            const maskShare = Boolean(maskEl?.checked);
+            const html = buildMarketingDashboardHtml(report, { maskShareLabels: maskShare });
+            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nicolivelog-marketing-fallback-${lid || 'unknown'}-${Date.now()}.html`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+              a.remove();
+            }, 1000);
+            if (stEl) {
+              stEl.textContent =
+                '拡張再読み込み中のためメモリデータでDLしました（開き直して再実行推奨）';
+            }
+            return;
+          } catch {
+            // 通常エラー表示にフォールスルー
+          }
+        }
+      }
+      if (stEl) {
+        stEl.textContent =
+          msg === 'marketing_storage_timeout'
+            ? '分析がタイムアウトしました（再試行してください）'
+            : `エラー: ${msg}`;
+      }
     } finally {
       if (btn) btn.disabled = false;
     }

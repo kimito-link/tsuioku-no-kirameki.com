@@ -9,7 +9,7 @@ import { MKT_ADVISOR_AVATAR_DATA_URI } from './marketingHtmlAdvisorAvatars.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
 
 /**
- * @param {'tanu' | 'rink' | 'konta'} role
+ * @param {'tanu' | 'link' | 'konta'} role
  * @param {string} displayName 「たぬ姉」など（未エスケープ）
  * @param {string[]} lines 本文（未エスケープ・1行ずつ <p>）
  */
@@ -20,7 +20,7 @@ function adviceCard(role, displayName, lines) {
     .join('');
   const avatarSrc = MKT_ADVISOR_AVATAR_DATA_URI[role];
   const alt =
-    role === 'rink' ? 'りんく' : role === 'konta' ? 'こん太' : 'たぬ姉';
+    role === 'link' ? 'りんく' : role === 'konta' ? 'こん太' : 'たぬ姉';
   return `<article class="mkt-advice-row mkt-advice--${role}" role="note">
 <div class="mkt-advice__avatar-wrap">
 <img class="mkt-advice__avatar" src="${avatarSrc}" alt="${escapeHtml(alt)}" width="56" height="56" loading="lazy" decoding="async">
@@ -56,7 +56,7 @@ function sectionFeaturesOverview() {
 /** ページ冒頭：この画面の限界と三人の登場（3人それぞれ吹き出し） */
 function sectionAdviceIntro() {
   const cards = [
-    adviceCard('rink', 'りんく', [
+    adviceCard('link', 'りんく', [
       'このページは、配信している側から見ても「手元の記録で枠を振り返る」ためのメモに近いのだ。',
       '下のグラフのあいだに、俺・こん太・たぬ姉から短いメモが挟まるのだ。数字ひとつで配信の価値が決まるわけじゃないから、肩の力は抜いて読んでほしいのだ。',
     ]),
@@ -78,15 +78,15 @@ function sectionAdviceIntro() {
 /** KPI の直後
  * @param {MarketingReport} r */
 function sectionAdviceAfterKpi(r) {
-  const rinkLines = [
+  const linkLines = [
     'ピークの分やコメント／分は、枠のどこで盛り上がったかの目安になるのだ。全部のコメントに返せない日でも、波を知っておくと心の置きどころにはなるのだ。',
   ];
   if (r.peakMinuteCount >= 3 && r.durationMinutes >= 5) {
-    rinkLines.push(
+    linkLines.push(
       'ピークがはっきりしていれば、次の枠で企画を畳むタイミングの参考にするくらいの軽さで十分なのだ。'
     );
   }
-  const cards = [adviceCard('rink', 'りんく', rinkLines)];
+  const cards = [adviceCard('link', 'りんく', linkLines)];
 
   const med = r.medianCommentsPerUser;
   const avg = r.avgCommentsPerUser;
@@ -300,7 +300,7 @@ ${yLabelsL}${yLabelsR}${xLabels}
 /** @param {MarketingReport} r */
 function sectionAdviceAfterDerivedTimeline(r) {
   if (r.timeline.length < 2) return '';
-  return `<div class="mkt-advice-after">${adviceCard('rink', 'りんく', [
+  return `<div class="mkt-advice-after">${adviceCard('link', 'りんく', [
     '紫の5分窓は「直近で一気に増えたか」の目安になるのだ。累積（緑）は単調に増えるから、波を読むなら紫の方が分かりやすいことが多いのだ。',
   ])}</div>`;
 }
@@ -345,7 +345,7 @@ function sectionVposThirds(r) {
  * @param {MarketingReport} r */
 function sectionAdviceAfterTimeline(r) {
   if (r.timeline.length < 2) return '';
-  return `<div class="mkt-advice-after">${adviceCard('rink', 'りんく', [
+  return `<div class="mkt-advice-after">${adviceCard('link', 'りんく', [
     '青（コメント数）とオレンジ（その分のユニーク人数）のズレは、「同じ人が続けて話していた」「新しい顔が増えた」などの肌感のヒントになることがあるのだ。断定はできないから、眺めの補助として使ってほしいのだ。',
   ])}</div>`;
 }
@@ -697,10 +697,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-advice__bubble{flex:1;min-width:0;position:relative;background:#0f172a;border:1px solid #334155;border-radius:14px;padding:clamp(.8rem,2.8vw,1.05rem) clamp(.85rem,3vw,1.15rem);box-shadow:0 2px 10px rgba(0,0,0,.12);overflow-wrap:break-word;word-wrap:break-word}
 .mkt-advice__bubble::before{content:"";position:absolute;left:-7px;top:18px;width:12px;height:12px;background:#0f172a;border-left:1px solid #334155;border-bottom:1px solid #334155;transform:rotate(45deg)}
 .mkt-advice--tanu .mkt-advice__bubble{border-top:1px solid rgba(196,181,253,.35)}
-.mkt-advice--rink .mkt-advice__bubble{border-top:1px solid rgba(56,189,248,.35)}
+.mkt-advice--link .mkt-advice__bubble{border-top:1px solid rgba(56,189,248,.35)}
 .mkt-advice--konta .mkt-advice__bubble{border-top:1px solid rgba(251,146,60,.35)}
 .mkt-advice--tanu .mkt-advice__bubble{border-left:3px solid #c4b5fd}
-.mkt-advice--rink .mkt-advice__bubble{border-left:3px solid #38bdf8}
+.mkt-advice--link .mkt-advice__bubble{border-left:3px solid #38bdf8}
 .mkt-advice--konta .mkt-advice__bubble{border-left:3px solid #fb923c}
 .mkt-advice__name{font-size:clamp(.78rem,2.2vw,.85rem);font-weight:700;color:#f8fafc;margin:0 0 .5rem;letter-spacing:.02em;line-height:1.45}
 .mkt-advice__p{margin:.55rem 0 0;font-size:clamp(.8rem,2.3vw,.875rem);color:#cbd5e1;line-height:1.8}

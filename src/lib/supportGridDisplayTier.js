@@ -8,7 +8,7 @@ import {
 } from './nicoAnonymousDisplay.js';
 import { commentEnrichmentAvatarScore } from './supportGrowthTileSrc.js';
 
-export const SUPPORT_GRID_TIER_RINK = 'rink';
+export const SUPPORT_GRID_TIER_LINK = 'link';
 export const SUPPORT_GRID_TIER_KONTA = 'konta';
 export const SUPPORT_GRID_TIER_TANU = 'tanu';
 
@@ -79,7 +79,7 @@ function bestAvatarScore(uid, httpCandidate, rawAv) {
  * 応援レーン・グリッドの段付け理由（デバッグ・診断用。PII は含めずフラグのみ）。
  *
  * avatarObserved=true : DOM / intercept でアバターが実際に観測された
- *   → URL の形式に関係なく rink
+ *   → URL の形式に関係なく link
  * avatarObserved=false / 未指定 : 従来の URL スコアで判定（後方互換）
  *
  * @param {{
@@ -91,15 +91,15 @@ function bestAvatarScore(uid, httpCandidate, rawAv) {
  *   avatarObserved?: boolean
  * }} p
  * @returns {{
- *   tier: 'rink'|'konta'|'tanu',
+ *   tier: 'link'|'konta'|'tanu',
  *   strongNick: boolean,
  *   hasPersonalThumb: boolean,
  *   hasAnyAvatar: boolean,
  *   avatarObserved: boolean,
- *   demotedAnonymousRinkToKonta: boolean,
+ *   demotedAnonymousLinkToKonta: boolean,
  *   httpCandidateNonEmpty: boolean,
  *   storedAvatarNonEmpty: boolean
- * }} demotedAnonymousRinkToKonta は互換のため常に false
+ * }} demotedAnonymousLinkToKonta は互換のため常に false
  */
 export function explainSupportGridDisplayTier(p) {
   const uid = String(p?.userId ?? '').trim();
@@ -124,11 +124,11 @@ export function explainSupportGridDisplayTier(p) {
 
   const isNumericId = /^\d{5,14}$/.test(uid);
 
-  /** @type {ReadonlyArray<{tier: 'rink'|'konta'|'tanu', match: (f: typeof flags) => boolean}>} */
+  /** @type {ReadonlyArray<{tier: 'link'|'konta'|'tanu', match: (f: typeof flags) => boolean}>} */
   const TIER_RULES = [
-    { tier: SUPPORT_GRID_TIER_RINK,  match: (f) => f.observed },
-    { tier: SUPPORT_GRID_TIER_RINK,  match: (f) => f.strongNick && f.hasThumb },
-    { tier: SUPPORT_GRID_TIER_RINK,  match: (f) => f.strongNick && f.isNumericId && f.hasObservedAvatar },
+    { tier: SUPPORT_GRID_TIER_LINK,  match: (f) => f.observed },
+    { tier: SUPPORT_GRID_TIER_LINK,  match: (f) => f.strongNick && f.hasThumb },
+    { tier: SUPPORT_GRID_TIER_LINK,  match: (f) => f.strongNick && f.isNumericId && f.hasObservedAvatar },
     { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.strongNick || f.hasThumb },
     { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.hasAnyAvatar },
     { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.isNumericId },
@@ -136,12 +136,12 @@ export function explainSupportGridDisplayTier(p) {
 
   const flags = { observed, strongNick, hasThumb, hasAnyAvatar, hasObservedAvatar, isNumericId };
 
-  /** @type {'rink'|'konta'|'tanu'} */
+  /** @type {'link'|'konta'|'tanu'} */
   const tier = !uid
     ? SUPPORT_GRID_TIER_TANU
     : (TIER_RULES.find(r => r.match(flags))?.tier ?? SUPPORT_GRID_TIER_TANU);
 
-  const demotedAnonymousRinkToKonta = false;
+  const demotedAnonymousLinkToKonta = false;
 
   return {
     tier,
@@ -149,7 +149,7 @@ export function explainSupportGridDisplayTier(p) {
     hasPersonalThumb: hasThumb,
     hasAnyAvatar,
     avatarObserved: observed,
-    demotedAnonymousRinkToKonta,
+    demotedAnonymousLinkToKonta,
     httpCandidateNonEmpty: Boolean(httpCandidate),
     storedAvatarNonEmpty: Boolean(rawAv)
   };
@@ -164,7 +164,7 @@ export function explainSupportGridDisplayTier(p) {
  *   lpMockHasCustomAvatar?: boolean,
  *   avatarObserved?: boolean
  * }} p
- * @returns {'rink'|'konta'|'tanu'}
+ * @returns {'link'|'konta'|'tanu'}
  */
 export function supportGridDisplayTier(p) {
   return explainSupportGridDisplayTier(p).tier;

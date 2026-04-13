@@ -5,7 +5,7 @@
  * @template T
  * @param {Array<T & { profileTier: number }>} sortedCandidates profileTier 降順で整列済み
  * @param {number} maxTotal
- * @returns {{ rink: T[], konta: T[], tanu: T[] }}
+ * @returns {{ link: T[], konta: T[], tanu: T[] }}
  */
 export function bucketStoryUserLanePicks(sortedCandidates, maxTotal) {
   const n = Math.max(0, Math.floor(Number(maxTotal) || 0));
@@ -13,18 +13,18 @@ export function bucketStoryUserLanePicks(sortedCandidates, maxTotal) {
   const a2 = sortedCandidates.filter((c) => c.profileTier === 2);
   const a1 = sortedCandidates.filter((c) => c.profileTier === 1);
   let rem = n;
-  const rink = a3.slice(0, rem);
-  rem -= rink.length;
+  const link = a3.slice(0, rem);
+  rem -= link.length;
   const konta = a2.slice(0, rem);
   rem -= konta.length;
   const tanu = a1.slice(0, rem);
-  return { rink, konta, tanu };
+  return { link, konta, tanu };
 }
 
 /**
- * @param {{ rink: unknown[], konta: unknown[], tanu: unknown[] }} b
+ * @param {{ link: unknown[], konta: unknown[], tanu: unknown[] }} b
  * @returns {unknown[]}
  */
 export function flattenStoryUserLaneBuckets(b) {
-  return [...b.rink, ...b.konta, ...b.tanu];
+  return [...b.link, ...b.konta, ...b.tanu];
 }

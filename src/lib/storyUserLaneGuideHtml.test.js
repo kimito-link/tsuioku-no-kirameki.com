@@ -6,25 +6,25 @@ import {
   buildStoryUserLaneGuideTopHtml
 } from './storyUserLaneGuideHtml.js';
 
-const FACE_RINK = 'https://example.test/rink.png';
+const FACE_LINK = 'https://example.test/link.png';
 const FACE_KONTA = 'https://example.test/konta.png';
 const FACE_TANU = 'https://example.test/tanu.png';
 
 describe('storyUserLaneGuideHtml', () => {
   it('Top / Konta / Tanu を別 HTML に分離し、本文に XSS 用記号を含めない', () => {
-    const top = buildStoryUserLaneGuideTopHtml(FACE_RINK);
+    const top = buildStoryUserLaneGuideTopHtml(FACE_LINK);
     const konta = buildStoryUserLaneGuideKontaHtml(FACE_KONTA);
     const tanu = buildStoryUserLaneGuideTanuHtml(FACE_TANU);
     expect(top).toContain('link:');
     expect(top).not.toContain('こん太:');
     expect(top).not.toContain('たぬ姉:');
     expect(konta).toContain('こん太:');
-    expect(konta).not.toContain('りんく:');
+    expect(konta).not.toContain('link:');
     expect(konta).not.toContain('たぬ姉:');
     expect(tanu).toContain('たぬ姉:');
     expect(tanu).not.toContain('こん太:');
     expect(top + konta + tanu).not.toMatch(/<script/i);
-    expect(top).toMatch(/src="https:\/\/example\.test\/rink\.png"/);
+    expect(top).toMatch(/src="https:\/\/example\.test\/link\.png"/);
   });
 
   it('face URL の属性値をエスケープする', () => {

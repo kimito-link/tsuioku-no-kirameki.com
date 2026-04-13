@@ -83,7 +83,7 @@ describe('buildMarketingDashboardHtml', () => {
     const html = buildMarketingDashboardHtml(minimal());
     expect(html).toContain('りんく・こん太・たぬ姉から');
     expect(html).toContain('mkt-advice--tanu');
-    expect(html).toContain('mkt-advice--rink');
+    expect(html).toContain('mkt-advice--link');
     expect(html).toContain('mkt-advice--konta');
     expect(html).toContain('mkt-advice-row');
     expect(html).toContain('mkt-advice__bubble');
@@ -99,7 +99,7 @@ describe('buildMarketingDashboardHtml', () => {
     const end = html.indexOf('<h2>KPI サマリ</h2>', start);
     expect(end).toBeGreaterThan(start);
     const introBlock = html.slice(start, end);
-    expect((introBlock.match(/mkt-advice-row mkt-advice--rink/g) || []).length).toBe(1);
+    expect((introBlock.match(/mkt-advice-row mkt-advice--link/g) || []).length).toBe(1);
     expect((introBlock.match(/mkt-advice-row mkt-advice--konta/g) || []).length).toBe(1);
     expect((introBlock.match(/mkt-advice-row mkt-advice--tanu/g) || []).length).toBe(1);
   });

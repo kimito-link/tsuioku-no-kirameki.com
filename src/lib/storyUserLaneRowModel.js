@@ -5,7 +5,7 @@
 import {
   explainSupportGridDisplayTier,
   SUPPORT_GRID_TIER_KONTA,
-  SUPPORT_GRID_TIER_RINK
+  SUPPORT_GRID_TIER_LINK
 } from './supportGridDisplayTier.js';
 import {
   isAnonymousStyleNicoUserId,
@@ -29,7 +29,6 @@ import {
 export function userLaneProfileCompletenessTier(entry, httpAvatarCandidate) {
   const uid = String(entry?.userId || '').trim();
   if (!uid) return 0;
-  const numericUid = /^\d{5,14}$/.test(uid);
   const ex = explainSupportGridDisplayTier({
     userId: uid,
     nickname: String(entry?.nickname || '').trim(),
@@ -45,11 +44,11 @@ export function userLaneProfileCompletenessTier(entry, httpAvatarCandidate) {
      * （自動画像/誤結合の混入を抑える）
      */
     const anon = isAnonymousStyleNicoUserId(uid);
-    t = anon && !ex.strongNick ? SUPPORT_GRID_TIER_KONTA : SUPPORT_GRID_TIER_RINK;
+    t = anon && !ex.strongNick ? SUPPORT_GRID_TIER_KONTA : SUPPORT_GRID_TIER_LINK;
   } else if (ex.strongNick) {
     t = SUPPORT_GRID_TIER_KONTA;
   }
-  if (t === SUPPORT_GRID_TIER_RINK) return 3;
+  if (t === SUPPORT_GRID_TIER_LINK) return 3;
   if (t === SUPPORT_GRID_TIER_KONTA) return 2;
   return 1;
 }

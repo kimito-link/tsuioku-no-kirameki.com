@@ -119,7 +119,7 @@ describe('isNiconicoSyntheticDefaultUserIconUrl', () => {
 });
 
 describe('resolveSupportGrowthTileSrc', () => {
-  const rink = 'images/default-rink.png';
+  const link = 'images/default-link.png';
 
   it('entryAvatarUrl が https なら最優先', () => {
     expect(
@@ -127,7 +127,7 @@ describe('resolveSupportGrowthTileSrc', () => {
         entryAvatarUrl: 'https://u.example/icon.jpg',
         isOwnPosted: true,
         viewerAvatarUrl: 'https://me.example/me.jpg',
-        defaultSrc: rink
+        defaultSrc: link
       })
     ).toBe('https://u.example/icon.jpg');
   });
@@ -138,7 +138,7 @@ describe('resolveSupportGrowthTileSrc', () => {
         entryAvatarUrl: '',
         isOwnPosted: true,
         viewerAvatarUrl: 'https://me.example/me.jpg',
-        defaultSrc: rink
+        defaultSrc: link
       })
     ).toBe('https://me.example/me.jpg');
   });
@@ -150,9 +150,9 @@ describe('resolveSupportGrowthTileSrc', () => {
         userId: null,
         isOwnPosted: false,
         viewerAvatarUrl: 'https://me.example/me.jpg',
-        defaultSrc: rink
+        defaultSrc: link
       })
-    ).toBe(rink);
+    ).toBe(link);
   });
 
   it('他人で DOM アイコン無しでも数字 userId があれば既定 usericon', () => {
@@ -162,7 +162,7 @@ describe('resolveSupportGrowthTileSrc', () => {
         userId: '12345678',
         isOwnPosted: false,
         viewerAvatarUrl: 'https://me.example/me.jpg',
-        defaultSrc: rink
+        defaultSrc: link
       })
     ).toBe(
       'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1234/12345678.jpg'
@@ -176,9 +176,9 @@ describe('resolveSupportGrowthTileSrc', () => {
         userId: 'a:deadbeefcafe',
         isOwnPosted: false,
         viewerAvatarUrl: 'https://me.example/me.jpg',
-        defaultSrc: rink
+        defaultSrc: link
       })
-    ).toBe(rink);
+    ).toBe(link);
   });
 
   it('ハッシュのみの userId でも CDN 推定しない', () => {
@@ -188,9 +188,9 @@ describe('resolveSupportGrowthTileSrc', () => {
         userId: 'AbCdEfGhIjKlMnOpQrStUv',
         isOwnPosted: false,
         viewerAvatarUrl: '',
-        defaultSrc: rink
+        defaultSrc: link
       })
-    ).toBe(rink);
+    ).toBe(link);
   });
 
   it('他人で entry にアイコンがあれば採用', () => {
@@ -199,7 +199,7 @@ describe('resolveSupportGrowthTileSrc', () => {
         entryAvatarUrl: 'https://other.example/o.png',
         isOwnPosted: false,
         viewerAvatarUrl: 'https://me.example/me.jpg',
-        defaultSrc: rink
+        defaultSrc: link
       })
     ).toBe('https://other.example/o.png');
   });
@@ -210,9 +210,9 @@ describe('resolveSupportGrowthTileSrc', () => {
         entryAvatarUrl: '',
         isOwnPosted: true,
         viewerAvatarUrl: '',
-        defaultSrc: rink
+        defaultSrc: link
       })
-    ).toBe(rink);
+    ).toBe(link);
   });
 });
 

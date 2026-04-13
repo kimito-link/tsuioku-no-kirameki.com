@@ -119,9 +119,11 @@ import { diagnosePersistGate } from '../lib/commentSubmitSteps.js';
 import { INGEST_TIMING, SUBMIT_TIMING, MAP_LIMITS, HARVEST_TIMING } from '../lib/timingConstants.js';
 import {
   shouldForceDeepHarvestForReason,
+  shouldForceDeepHarvestRecovery,
   shouldSkipDeepHarvest
 } from '../lib/shouldSkipDeepHarvest.js';
 import { DEEP_HARVEST_REASONS } from '../lib/deepHarvestReason.js';
+import { formatPipelinePhase } from '../lib/commentPipelineLog.js';
 import { planDeepExportSweep } from '../lib/deepExportPolicy.js';
 import {
   mergeNdgrBacklogWithCap,
@@ -170,6 +172,7 @@ const DEEP_HARVEST_PERIODIC_MS = HARVEST_TIMING.periodicMs;
  * 定期 deep 直後に同タイマーが重なると「滝が二度続く」ため、定期開始時はタイマーを解除する。
  */
 const DEEP_HARVEST_STABILITY_FOLLOWUP_MS = HARVEST_TIMING.stabilityFollowUpMs;
+const DEEP_HARVEST_RECOVERY_MS = HARVEST_TIMING.deepRecoveryMs;
 /** 長めの待ちのあいだ、ゆっくりりんくで「読み込み中」と示す（web_accessible と一致させる） */
 const DEEP_HARVEST_LOADING_HOST_ID = 'nl-deep-harvest-loading';
 const DEEP_HARVEST_LOADING_IMG_PATH =
@@ -1297,7 +1300,7 @@ const PAGE_FRAME_LOOP_MS = INGEST_TIMING.pageFrameLoopMs;
 const DEFAULT_PAGE_FRAME = 'light';
 const LEGACY_PAGE_FRAME_ALIAS = {
   trio: 'light',
-  rink: 'light',
+  link: 'light',
   konta: 'sunset',
   tanunee: 'midnight'
 };
@@ -4353,6 +4356,7 @@ async function persistCommentRowsImpl(rows, opts = {}) {
     return;
   }
   lastPersistCommentBatchSize = rows.length;
+  const pipelineT0 = Date.now();
   const enriched = enrichRowsWithInterceptedUserIds(rows);
   const key = commentsStorageKey(liveId);
   try {
@@ -4369,6 +4373,11 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       { attempts: 4, delaysMs: [0, 50, 120, 280] }
     );
     const existing = Array.isArray(bag[key]) ? bag[key] : [];
+    console.debug(formatPipelinePhase('start', {
+      liveId,
+      existingCount: existing.length,
+      incomingCount: enriched.length
+    }));
     const pendingRaw = bag[KEY_SELF_POSTED_RECENTS];
     const pendingItems =
       pendingRaw && typeof pendingRaw === 'object' && Array.isArray(pendingRaw.items)
@@ -4389,6 +4398,10 @@ async function persistCommentRowsImpl(rows, opts = {}) {
     observedRecordedCommentCount = next.length;
     noteOfficialCommentSample(Date.now());
     const { added } = mergedRows;
+    console.debug(formatPipelinePhase('merge', {
+      added: added.length,
+      storageTouched
+    }));
     const consumed = consumeMatchedSelfPostedRecents(added, pendingItems, liveId);
     if (consumed.markedIds.size) {
       next = next.map((entry) => {
@@ -4436,7 +4449,10 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       liveObservedUserIds
     );
 
-    if (!storageTouched && !pendingTouched && !cacheTouched) return;
+    if (!storageTouched && !pendingTouched && !cacheTouched) {
+      console.debug(formatPipelinePhase('skip', { reason: 'no changes' }));
+      return;
+    }
 
     /** @type {Record<string, unknown>|null} */
     let ingestLogPayload = null;
@@ -4499,6 +4515,12 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       });
     }
     await chrome.storage.local.remove(KEY_STORAGE_WRITE_ERROR);
+    const keysWritten = (storageTouched || pendingTouched ? 2 : 0) + (cacheTouched ? 1 : 0) + (ingestLogPayload ? 1 : 0);
+    console.debug(formatPipelinePhase('commit', { keysWritten }));
+    console.debug(formatPipelinePhase('done', {
+      totalCount: next.length,
+      elapsedMs: Date.now() - pipelineT0
+    }));
   } catch (err) {
     if (isContextInvalidatedError(err) || !hasExtensionContext()) return;
     try {
@@ -4851,7 +4873,15 @@ function tryPeriodicQuietDeepHarvest() {
   if (document.hidden) return;
   if (harvestRunning) return;
   resetDeepHarvestStabilityFollowUp();
-  void runDeepHarvest({ stabilityFollowUp: true });
+  const needsRecovery = shouldForceDeepHarvestRecovery({
+    lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
+    now: Date.now(),
+    recoveryMs: DEEP_HARVEST_RECOVERY_MS
+  });
+  void runDeepHarvest({
+    stabilityFollowUp: !needsRecovery,
+    force: needsRecovery
+  });
 }
 
 /**
@@ -4861,11 +4891,14 @@ function tryPeriodicQuietDeepHarvest() {
 function onTabVisibleForCommentHarvest() {
   if (document.visibilityState !== 'visible') return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
-  // 軽い走査は毎回実行して、画面復帰直後の取りこぼしを減らす。
   scanVisibleCommentsNow();
   const now = Date.now();
-  // 重い deep harvest だけを間引く。
-  if (now - lastTabVisibleHarvestAt < TAB_VISIBLE_HARVEST_MIN_MS) return;
+  const needsRecovery = shouldForceDeepHarvestRecovery({
+    lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
+    now,
+    recoveryMs: DEEP_HARVEST_RECOVERY_MS
+  });
+  if (!needsRecovery && now - lastTabVisibleHarvestAt < TAB_VISIBLE_HARVEST_MIN_MS) return;
   lastTabVisibleHarvestAt = now;
   if (tabVisibleHarvestDebounceTimer != null) {
     clearTimeout(tabVisibleHarvestDebounceTimer);
@@ -4873,7 +4906,10 @@ function onTabVisibleForCommentHarvest() {
   tabVisibleHarvestDebounceTimer = setTimeout(() => {
     tabVisibleHarvestDebounceTimer = null;
     if (recording && liveId && locationAllowsCommentRecording() && !document.hidden) {
-      void runDeepHarvest({ stabilityFollowUp: true });
+      void runDeepHarvest({
+        stabilityFollowUp: !needsRecovery,
+        force: needsRecovery
+      });
     }
   }, 850);
 }

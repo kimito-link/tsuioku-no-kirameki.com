@@ -5,7 +5,7 @@ import {
 } from './htmlReportConceptGuide.js';
 
 const avatars = {
-  avatarRinkHtml: '<span data-test="rink"></span>',
+  avatarLinkHtml: '<span data-test="link"></span>',
   avatarKontaHtml: '<span data-test="konta"></span>',
   avatarTanuHtml: '<span data-test="tanu"></span>'
 };
@@ -38,7 +38,7 @@ describe('buildHtmlReportConceptGuideCardHtml', () => {
 
   it('3 行のゆっくりガイドとアバタープレースホルダを出力する', () => {
     const html = buildHtmlReportConceptGuideCardHtml(avatars);
-    expect(html).toContain('data-test="rink"');
+    expect(html).toContain('data-test="link"');
     expect(html).toContain('data-test="konta"');
     expect(html).toContain('data-test="tanu"');
     expect(html).toContain('ゆっくりりんく');

@@ -13,11 +13,11 @@ import {
 /**
  * @typedef {{
  *   stack: HTMLElement,
- *   laneRink: HTMLElement,
+ *   laneLink: HTMLElement,
  *   laneKonta: HTMLElement,
  *   laneTanu: HTMLElement,
- *   hintRink: HTMLElement | null,
- *   rinkWrap: HTMLElement | null,
+ *   hintLink: HTMLElement | null,
+ *   linkWrap: HTMLElement | null,
  *   guideTop: HTMLElement | null,
  *   guideLinesTop: HTMLElement | null,
  *   guideMidKonta: HTMLElement | null,
@@ -41,11 +41,11 @@ import {
 export function resetStoryUserLaneDom(els) {
   const {
     stack,
-    laneRink,
+    laneLink,
     laneKonta,
     laneTanu,
-    hintRink,
-    rinkWrap,
+    hintLink,
+    linkWrap,
     guideTop,
     guideLinesTop,
     guideMidKonta,
@@ -55,14 +55,14 @@ export function resetStoryUserLaneDom(els) {
     guideBottom,
     guideLinesBottom
   } = els;
-  laneRink.innerHTML = '';
+  laneLink.innerHTML = '';
   laneKonta.innerHTML = '';
   laneTanu.innerHTML = '';
-  laneRink.hidden = true;
+  laneLink.hidden = true;
   laneKonta.hidden = true;
   laneTanu.hidden = true;
-  if (hintRink) hintRink.hidden = true;
-  if (rinkWrap) rinkWrap.hidden = true;
+  if (hintLink) hintLink.hidden = true;
+  if (linkWrap) linkWrap.hidden = true;
   if (guideMidKonta) guideMidKonta.hidden = true;
   if (guideLinesMidKonta) guideLinesMidKonta.innerHTML = '';
   if (guideMidTanu) guideMidTanu.hidden = true;
@@ -134,8 +134,8 @@ function fillLaneTier(el, items, io) {
 
 /**
  * @param {StoryUserLaneDomElements} els
- * @param {{ faceRink: string, faceKonta: string, faceTanu: string }} faces
- * @param {{ rink: unknown[], konta: unknown[], tanu: unknown[] }} buckets
+ * @param {{ faceLink: string, faceKonta: string, faceTanu: string }} faces
+ * @param {{ link: unknown[], konta: unknown[], tanu: unknown[] }} buckets
  * @param {number} pickedLength
  * @param {StoryUserLaneDomIo} io
  */
@@ -148,11 +148,11 @@ export function paintStoryUserLaneDomFilled(
 ) {
   const {
     stack,
-    laneRink,
+    laneLink,
     laneKonta,
     laneTanu,
-    hintRink,
-    rinkWrap,
+    hintLink,
+    linkWrap,
     guideTop,
     guideLinesTop,
     guideMidKonta,
@@ -163,19 +163,19 @@ export function paintStoryUserLaneDomFilled(
     guideLinesBottom
   } = els;
 
-  fillLaneTier(laneRink, buckets.rink, io);
+  fillLaneTier(laneLink, buckets.link, io);
   fillLaneTier(laneKonta, buckets.konta, io);
   fillLaneTier(laneTanu, buckets.tanu, io);
 
-  if (hintRink) {
-    const showRinkHint =
-      buckets.rink.length === 0 &&
+  if (hintLink) {
+    const showLinkHint =
+      buckets.link.length === 0 &&
       (buckets.konta.length > 0 || buckets.tanu.length > 0);
-    hintRink.hidden = !showRinkHint;
+    hintLink.hidden = !showLinkHint;
   }
-  if (rinkWrap) {
-    const showRinkWrap = !laneRink.hidden || (hintRink && !hintRink.hidden);
-    rinkWrap.hidden = !showRinkWrap;
+  if (linkWrap) {
+    const showLinkWrap = !laneLink.hidden || (hintLink && !hintLink.hidden);
+    linkWrap.hidden = !showLinkWrap;
   }
 
   stack.setAttribute(
@@ -185,7 +185,7 @@ export function paintStoryUserLaneDomFilled(
   stack.hidden = false;
 
   if (guideLinesTop) {
-    guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceRink);
+    guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceLink);
   }
   if (guideTop) guideTop.hidden = false;
   if (guideLinesMidKonta) {
@@ -209,16 +209,16 @@ export function paintStoryUserLaneDomFilled(
 /**
  * 候補ゼロだがエントリはあるときのガイドのみ表示。
  * @param {StoryUserLaneDomElements} els
- * @param {{ faceRink: string, faceKonta: string, faceTanu: string }} faces
+ * @param {{ faceLink: string, faceKonta: string, faceTanu: string }} faces
  */
 export function paintStoryUserLaneDomEmptyGuides(els, faces) {
   const {
     stack,
-    laneRink,
+    laneLink,
     laneKonta,
     laneTanu,
-    hintRink,
-    rinkWrap,
+    hintLink,
+    linkWrap,
     guideTop,
     guideLinesTop,
     guideMidKonta,
@@ -228,17 +228,17 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces) {
     guideBottom,
     guideLinesBottom
   } = els;
-  laneRink.innerHTML = '';
+  laneLink.innerHTML = '';
   laneKonta.innerHTML = '';
   laneTanu.innerHTML = '';
-  laneRink.hidden = true;
+  laneLink.hidden = true;
   laneKonta.hidden = true;
   laneTanu.hidden = true;
-  if (hintRink) hintRink.hidden = true;
-  if (rinkWrap) rinkWrap.hidden = true;
+  if (hintLink) hintLink.hidden = true;
+  if (linkWrap) linkWrap.hidden = true;
   stack.hidden = false;
   if (guideLinesTop) {
-    guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceRink);
+    guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceLink);
   }
   if (guideTop) guideTop.hidden = false;
   if (guideLinesMidKonta) {

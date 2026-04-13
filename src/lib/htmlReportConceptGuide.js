@@ -3,7 +3,7 @@
  * 表示名「君斗りんくの追憶のきらめき」。ファイル名等の識別子に nicolivelog が残る。「動員ちゃれんじ」（doin-challenge.com）と文脈でリンク。
  */
 
-/** @typedef {{ avatarRinkHtml: string, avatarKontaHtml: string, avatarTanuHtml: string }} YukkuriReportAvatars */
+/** @typedef {{ avatarLinkHtml: string, avatarKontaHtml: string, avatarTanuHtml: string }} YukkuriReportAvatars */
 
 const CONCEPT_H2 = 'この拡張について（君斗りんくの追憶のきらめき）';
 /** 折りたたみ前に常に見える短いリード */
@@ -63,7 +63,7 @@ function yukkuriGuideRowHtml(avatarHtml, speakerLabel, body, reverse) {
   return yukkuriGuideRowMultiHtml(avatarHtml, speakerLabel, [body], reverse);
 }
 
-const RINK_PARAS = [
+const LINK_PARAS = [
   '応援は、消えやすいのだ。外のプラットフォームだけだと、いいねも返信もつきにくく、自分だけ浮いているように感じて、投稿やコメントを消してしまう人もいるのだ。それは応援した人が悪いのではなく、<strong>届いたかどうかが見えにくい</strong>からなのだ。アイドルや配信の現場でも、応援投稿して反応がなくて消す、という話はよく聞くのだ。',
   'だから「<strong>応援ログ</strong>」の考え方があるのだ。ファンには「ちゃんと応援したことが、ここに残る」、主催には「ちゃんと見ているよ」を、返信の本数だけに頼らず伝えやすくするのだ。すべてに手で返すことが正解とは限らないのだ。',
   '今後 X なども視野に入れるなら、ハッシュタグやメンションなど「これをしたら記録対象」といったルールをそろえていくイメージなのだ。削除や非公開になった投稿は、プラットフォーム側の都合で追いにくいこともあるのだ。',
@@ -109,12 +109,12 @@ function conceptReadMoreHtml(summaryTitle, bodyHtml) {
  * @returns {string}
  */
 export function buildHtmlReportConceptGuideCardHtml(avatars) {
-  const { avatarRinkHtml, avatarKontaHtml, avatarTanuHtml } = avatars;
+  const { avatarLinkHtml, avatarKontaHtml, avatarTanuHtml } = avatars;
 
-  const rinkRow = yukkuriGuideRowMultiHtml(
-    avatarRinkHtml,
+  const linkRow = yukkuriGuideRowMultiHtml(
+    avatarLinkHtml,
     'ゆっくりりんく',
-    RINK_PARAS,
+    LINK_PARAS,
     false
   );
   const kontaRow = yukkuriGuideRowMultiHtml(
@@ -132,7 +132,7 @@ export function buildHtmlReportConceptGuideCardHtml(avatars) {
 
   const accordions = [
     conceptReadMoreHtml('ねらい・名前・動員ちゃれんじとの関係', CONCEPT_READ_MORE_1_BODY),
-    conceptReadMoreHtml('ゆっくりりんく：応援ログと可視化', rinkRow),
+    conceptReadMoreHtml('ゆっくりりんく：応援ログと可視化', linkRow),
     conceptReadMoreHtml('ゆっくりこん太：主催の「見ている」と熱量', kontaRow),
     conceptReadMoreHtml('ゆっくりたぬ姉：来場・会場・定義の話', tanuRow)
   ].join('');
@@ -150,10 +150,10 @@ export function buildHtmlReportConceptGuideCardHtml(avatars) {
  * @returns {string}
  */
 export function buildHtmlReportSaveGuideCardHtml(avatars) {
-  const { avatarRinkHtml, avatarKontaHtml, avatarTanuHtml } = avatars;
+  const { avatarLinkHtml, avatarKontaHtml, avatarTanuHtml } = avatars;
   const rows = [
     yukkuriGuideRowHtml(
-      avatarRinkHtml,
+      avatarLinkHtml,
       'ゆっくりりんく',
       'まずは上の「概要」でタイトルと配信者を確認するのだ。検索ボックスにキーワードを入れると、このページ全体から絞り込めるのだ。',
       false

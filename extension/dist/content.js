@@ -430,6 +430,7 @@
   }
 
   // src/lib/commentRecord.js
+  var COMMENT_TEXT_MAX_CHARS = 1e3;
   function userIdFromNicoUserIconHttpUrl(url) {
     const s = String(url || "");
     if (!isHttpOrHttpsUrl(s)) return "";
@@ -440,7 +441,7 @@
     return "";
   }
   function normalizeCommentText(value) {
-    return String(value || "").replace(/\r\n/g, "\n").split("\n").map((l) => l.trim()).join("\n").trim();
+    return String(value || "").replace(/\r\n/g, "\n").split("\n").map((l) => l.trim()).join("\n").trim().slice(0, COMMENT_TEXT_MAX_CHARS);
   }
   function buildDedupeKey(liveId2, rec) {
     const text = normalizeCommentText(rec.text);
@@ -491,15 +492,79 @@
       capturedAt: ex.capturedAt
     });
   }
+  function patchExistingComment(existing, incoming) {
+    const rawAv = String(incoming.avatarUrl || "").trim();
+    const validAvatar = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
+    let incUid = incoming.userId ? String(incoming.userId).trim() : "";
+    if (!incUid && validAvatar) {
+      const fromAv = userIdFromNicoUserIconHttpUrl(validAvatar);
+      if (fromAv) incUid = fromAv;
+    }
+    let entry = (
+      /** @type {StoredComment} */
+      existing
+    );
+    let touched = false;
+    if (validAvatar) {
+      const exAv = String(entry.avatarUrl || "").trim();
+      const hasAv = Boolean(exAv && isHttpOrHttpsUrl(exAv));
+      let uidForSynthetic = String(entry.userId || incUid || "").trim();
+      if (!uidForSynthetic && exAv) {
+        uidForSynthetic = userIdFromNicoUserIconHttpUrl(exAv);
+      }
+      const canUpgradeSynthetic = hasAv && looksLikeNiconicoUserIconHttpUrl(validAvatar) && validAvatar !== exAv && isNiconicoSyntheticDefaultUserIconUrl(exAv, uidForSynthetic);
+      const canUpgradeWeakPlaceholder = hasAv && isWeakNiconicoUserIconHttpUrl(exAv) && looksLikeNiconicoUserIconHttpUrl(validAvatar) && !isWeakNiconicoUserIconHttpUrl(validAvatar) && validAvatar !== exAv;
+      if (!hasAv) {
+        entry = { ...entry, avatarUrl: validAvatar };
+        touched = true;
+      } else if (canUpgradeSynthetic) {
+        entry = { ...entry, avatarUrl: validAvatar };
+        touched = true;
+      } else if (canUpgradeWeakPlaceholder) {
+        entry = { ...entry, avatarUrl: validAvatar };
+        touched = true;
+      }
+    }
+    const exUid = String(entry.userId || "").trim();
+    const chosenUid = pickStrongerUserId(exUid, incUid);
+    if (incUid && chosenUid !== exUid) {
+      entry = { ...entry, userId: chosenUid ? chosenUid : null };
+      touched = true;
+    }
+    const incNickRaw = String(incoming.nickname || "").trim();
+    const incNick = incNickRaw || anonymousNicknameFallback(String(entry.userId || incUid || ""), "");
+    const exNick = String(entry.nickname || "").trim();
+    if (incNick && (!exNick || incNick.length > exNick.length)) {
+      entry = { ...entry, nickname: incNick };
+      touched = true;
+    }
+    if (!String(entry.userId || "").trim()) {
+      const avHeal = String(entry.avatarUrl || "").trim();
+      if (isHttpOrHttpsUrl(avHeal)) {
+        const h = userIdFromNicoUserIconHttpUrl(avHeal);
+        if (h) {
+          entry = { ...entry, userId: h };
+          touched = true;
+        }
+      }
+    }
+    if (incoming.avatarObserved && !entry.avatarObserved) {
+      entry = { ...entry, avatarObserved: true };
+      touched = true;
+    }
+    return { entry, touched };
+  }
   function mergeNewComments(liveId2, existing, incoming) {
     const lid = String(liveId2 || "").trim().toLowerCase();
-    const keys = /* @__PURE__ */ new Set();
-    for (const e of existing) {
+    const keyToIndex = /* @__PURE__ */ new Map();
+    for (let i = 0; i < existing.length; i += 1) {
+      const e = existing[i];
       const ex = (
         /** @type {StoredComment} */
         e
       );
-      keys.add(storedCommentDedupeKey(lid, ex));
+      const key = storedCommentDedupeKey(lid, ex);
+      if (!keyToIndex.has(key)) keyToIndex.set(key, i);
     }
     const added = [];
     const next = (
@@ -517,84 +582,23 @@
         text,
         capturedAt: now
       });
-      const rawAv = String(row.avatarUrl || "").trim();
-      const validAvatar = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
-      let incUid = row.userId ? String(row.userId).trim() : "";
-      if (!incUid && validAvatar) {
-        const fromAv = userIdFromNicoUserIconHttpUrl(validAvatar);
-        if (fromAv) incUid = fromAv;
-      }
-      if (keys.has(key)) {
-        const idx = next.findIndex((ex) => storedCommentDedupeKey(lid, ex) === key);
-        if (idx >= 0) {
-          const ex = (
-            /** @type {StoredComment} */
-            next[idx]
-          );
-          let patched = ex;
-          let touched = false;
-          if (validAvatar) {
-            const exAv = String(ex.avatarUrl || "").trim();
-            const hasAv = Boolean(exAv && isHttpOrHttpsUrl(exAv));
-            let uidForSynthetic = String(ex.userId || incUid || "").trim();
-            if (!uidForSynthetic && exAv) {
-              uidForSynthetic = userIdFromNicoUserIconHttpUrl(exAv);
-            }
-            const canUpgradeSynthetic = hasAv && looksLikeNiconicoUserIconHttpUrl(validAvatar) && validAvatar !== exAv && isNiconicoSyntheticDefaultUserIconUrl(exAv, uidForSynthetic);
-            const canUpgradeWeakPlaceholder = hasAv && isWeakNiconicoUserIconHttpUrl(exAv) && looksLikeNiconicoUserIconHttpUrl(validAvatar) && !isWeakNiconicoUserIconHttpUrl(validAvatar) && validAvatar !== exAv;
-            if (!hasAv) {
-              patched = { ...patched, avatarUrl: validAvatar };
-              touched = true;
-            } else if (canUpgradeSynthetic) {
-              patched = { ...patched, avatarUrl: validAvatar };
-              touched = true;
-            } else if (canUpgradeWeakPlaceholder) {
-              patched = { ...patched, avatarUrl: validAvatar };
-              touched = true;
-            }
-          }
-          const exUid = String(patched.userId || "").trim();
-          const chosenUid = pickStrongerUserId(exUid, incUid);
-          if (incUid && chosenUid !== exUid) {
-            patched = { ...patched, userId: chosenUid ? chosenUid : null };
-            touched = true;
-          }
-          const incNickRaw = String(row.nickname || "").trim();
-          const incNick = incNickRaw || anonymousNicknameFallback(String(patched.userId || incUid || ""), "");
-          const exNick = String(patched.nickname || "").trim();
-          if (incNick && (!exNick || incNick.length > exNick.length)) {
-            patched = { ...patched, nickname: incNick };
-            touched = true;
-          }
-          if (!String(patched.userId || "").trim()) {
-            const avHeal = String(patched.avatarUrl || "").trim();
-            if (isHttpOrHttpsUrl(avHeal)) {
-              const h = userIdFromNicoUserIconHttpUrl(avHeal);
-              if (h) {
-                patched = { ...patched, userId: h };
-                touched = true;
-              }
-            }
-          }
-          if (row.avatarObserved && !patched.avatarObserved) {
-            patched = { ...patched, avatarObserved: true };
-            touched = true;
-          }
-          if (touched) {
-            next[idx] = patched;
-            storageTouched = true;
-          }
+      const idx = keyToIndex.get(key);
+      if (idx != null && idx >= 0 && idx < next.length) {
+        const result = patchExistingComment(next[idx], row);
+        if (result.touched) {
+          next[idx] = result.entry;
+          storageTouched = true;
         }
         continue;
       }
-      keys.add(key);
+      keyToIndex.set(key, next.length);
       const entry = createCommentEntry({
         liveId: lid,
         commentNo,
         text,
         userId: row.userId ?? null,
         nickname: row.nickname || "",
-        avatarUrl: validAvatar || void 0,
+        avatarUrl: row.avatarUrl || void 0,
         avatarObserved: row.avatarObserved || false,
         vpos: row.vpos,
         accountStatus: row.accountStatus,
@@ -641,14 +645,26 @@
     if (isNiconicoAutoUserPlaceholderNickname(n)) return false;
     if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)") return false;
     if (n === "\u533F\u540D") return false;
+    if (n === "\u30B2\u30B9\u30C8" || /^guest$/i.test(n)) return false;
     if (isNiconicoAnonymousUserId(userId) && n.length <= 1) return false;
     return true;
   }
 
   // src/lib/userCommentProfileCache.js
   var USER_COMMENT_PROFILE_CACHE_MAX = 5e3;
-  function normalizeUserCommentProfileMap(raw) {
+  var USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
+  function isFreshProfileEntry(updatedAt, nowMs, maxAgeMs) {
+    if (!Number.isFinite(updatedAt) || updatedAt <= 0) return false;
+    if (updatedAt < 1e12) return true;
+    if (!Number.isFinite(maxAgeMs) || maxAgeMs <= 0) return true;
+    return updatedAt >= nowMs - maxAgeMs;
+  }
+  function normalizeUserCommentProfileMap(raw, opts = {}) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const nowMsRaw = Number(opts.nowMs);
+    const nowMs = Number.isFinite(nowMsRaw) && nowMsRaw > 0 ? nowMsRaw : Date.now();
+    const maxAgeRaw = Number(opts.maxAgeMs);
+    const maxAgeMs = Number.isFinite(maxAgeRaw) && maxAgeRaw > 0 ? maxAgeRaw : USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS;
     const src = (
       /** @type {Record<string, unknown>} */
       raw
@@ -663,7 +679,7 @@
         v
       );
       const updatedAt = Number(o.updatedAt);
-      if (!Number.isFinite(updatedAt) || updatedAt <= 0) continue;
+      if (!isFreshProfileEntry(updatedAt, nowMs, maxAgeMs)) continue;
       const nick = String(o.nickname || "").trim().slice(0, 200);
       const av = String(o.avatarUrl || "").trim();
       const avatarUrl = av && isHttpOrHttpsUrl(av) && !isWeakNiconicoUserIconHttpUrl(av) ? av.slice(0, 2e3) : "";
@@ -712,6 +728,15 @@
     return mergeIntoMap(map, uid, {
       nickname: String(entry?.nickname || "").trim(),
       avatarUrl: String(entry?.avatarUrl || "").trim()
+    });
+  }
+  function upsertUserCommentProfileFromIntercept(map, it) {
+    const uid = String(it?.uid || "").trim();
+    if (!uid) return false;
+    const av = String(it?.av || "").trim();
+    return mergeIntoMap(map, uid, {
+      nickname: String(it?.name || "").trim(),
+      avatarUrl: av
     });
   }
   function isWeakMergedDisplayNickname(nick) {
@@ -768,7 +793,7 @@
     });
     return { next, patched };
   }
-  function pruneUserCommentProfileMap(map, max = USER_COMMENT_PROFILE_CACHE_MAX) {
+  function pruneUserCommentProfileMap(map, max = USER_COMMENT_PROFILE_CACHE_MAX, opts = {}) {
     const raw = Number(max);
     const lim = Math.max(
       1,
@@ -777,8 +802,21 @@
         2e4
       )
     );
-    const ids = Object.keys(map);
-    if (ids.length <= lim) return map;
+    const nowMsRaw = Number(opts.nowMs);
+    const nowMs = Number.isFinite(nowMsRaw) && nowMsRaw > 0 ? nowMsRaw : Date.now();
+    const maxAgeRaw = Number(opts.maxAgeMs);
+    const maxAgeMs = Number.isFinite(maxAgeRaw) && maxAgeRaw > 0 ? maxAgeRaw : USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS;
+    const ids = Object.keys(map).filter(
+      (id) => isFreshProfileEntry(Number(map[id]?.updatedAt), nowMs, maxAgeMs)
+    );
+    if (ids.length <= lim) {
+      if (ids.length === Object.keys(map).length) return map;
+      const freshOnly = {};
+      for (const id of ids) {
+        freshOnly[id] = map[id];
+      }
+      return freshOnly;
+    }
     ids.sort((a, b) => (map[b].updatedAt || 0) - (map[a].updatedAt || 0));
     const keep = new Set(ids.slice(0, lim));
     const out = {};
@@ -1375,7 +1413,11 @@
     "hashed_user_id",
     "senderUserId",
     "accountId",
-    "uid"
+    "uid",
+    "rawUserId",
+    "raw_user_id",
+    "anonymousUserId",
+    "userIdHash"
   ];
   function walkFiberForUserId(fiber, maxDepth) {
     let cur = fiber;
@@ -1394,6 +1436,13 @@
     }
     return null;
   }
+  function looksLikeUserId(s) {
+    if (!s) return false;
+    if (/^\d{4,14}$/.test(s)) return true;
+    if (/^[a-zA-Z0-9_-]{8,64}$/.test(s)) return true;
+    if (/^[a-zA-Z0-9]{2}:[a-zA-Z0-9_-]{4,}$/.test(s)) return true;
+    return false;
+  }
   function pickUserIdFromBag(bag) {
     if (!bag || typeof bag !== "object") return null;
     const obj = (
@@ -1404,10 +1453,9 @@
       const v = obj[key];
       if (v == null) continue;
       const s = String(v).trim();
-      if (/^\d{5,14}$/.test(s)) return s;
-      if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return s;
+      if (looksLikeUserId(s)) return s;
     }
-    for (const key of ["comment", "data", "item", "chat", "message"]) {
+    for (const key of ["comment", "data", "item", "chat", "message", "user", "sender", "commenter"]) {
       const nested = obj[key];
       if (!nested || typeof nested !== "object") continue;
       const nestedObj = (
@@ -1418,9 +1466,16 @@
         const v = nestedObj[uid];
         if (v == null) continue;
         const s = String(v).trim();
-        if (/^\d{5,14}$/.test(s)) return s;
-        if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return s;
+        if (looksLikeUserId(s)) return s;
       }
+    }
+    if (typeof obj.user === "object" && obj.user) {
+      const u = (
+        /** @type {Record<string, unknown>} */
+        obj.user
+      );
+      if (typeof u.id === "number" && u.id > 0) return String(u.id);
+      if (typeof u.id === "string" && looksLikeUserId(String(u.id).trim())) return String(u.id).trim();
     }
     return null;
   }
@@ -2483,14 +2538,41 @@
   // src/lib/commentIngestLog.js
   var COMMENT_INGEST_LOG_VERSION = 1;
   var COMMENT_INGEST_LOG_MAX_ITEMS = 500;
-  var INGEST_LOG_HF_SOURCES = (
+  var COMMENT_INGEST_SOURCE = {
+    NDGR: "ndgr",
+    VISIBLE: "visible",
+    MUTATION: "mutation",
+    DEEP: "deep",
+    UNKNOWN: "unknown"
+  };
+  var INGEST_LOG_VALID_SOURCES = (
     /** @type {ReadonlySet<string>} */
-    /* @__PURE__ */ new Set(["ndgr", "visible"])
+    new Set(Object.values(COMMENT_INGEST_SOURCE))
   );
   var COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS = 5e3;
   var COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS = 4e3;
-  var INGEST_LOG_ALWAYS_LOG_ADDED = 5;
+  var COMMENT_INGEST_LOG_NDGR_MIN_ADDED = 3;
+  var COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED = 5;
   var INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA = 10;
+  var INGEST_LOG_COOLDOWN_RULES = (
+    /** @type {Readonly<Record<string, { minIntervalMs: number, minAdded: number, minTotalDelta: number }>>} */
+    {
+      [COMMENT_INGEST_SOURCE.NDGR]: {
+        minIntervalMs: COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS,
+        minAdded: COMMENT_INGEST_LOG_NDGR_MIN_ADDED,
+        minTotalDelta: INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA
+      },
+      [COMMENT_INGEST_SOURCE.VISIBLE]: {
+        minIntervalMs: COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS,
+        minAdded: COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED,
+        minTotalDelta: INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA
+      }
+    }
+  );
+  function normalizeIngestSource(src) {
+    const s = String(src || "").trim().toLowerCase().slice(0, 32);
+    return INGEST_LOG_VALID_SOURCES.has(s) ? s : COMMENT_INGEST_SOURCE.UNKNOWN;
+  }
   function parseCommentIngestLog(raw) {
     if (!raw || typeof raw !== "object") {
       return { v: COMMENT_INGEST_LOG_VERSION, items: [] };
@@ -2512,7 +2594,7 @@
       if (!Number.isFinite(t)) continue;
       const liveId2 = String(it.liveId || "").trim().toLowerCase();
       if (!liveId2) continue;
-      const source = String(it.source || "unknown").slice(0, 32);
+      const source = normalizeIngestSource(it.source);
       const batchIn = Math.max(0, Math.floor(Number(it.batchIn) || 0));
       const added = Math.max(0, Math.floor(Number(it.added) || 0));
       const totalAfter = Math.max(0, Math.floor(Number(it.totalAfter) || 0));
@@ -2532,7 +2614,7 @@
     const row = {
       t: Math.max(0, Math.floor(Number(entry.t) || Date.now())),
       liveId: String(entry.liveId || "").trim().toLowerCase(),
-      source: String(entry.source || "unknown").slice(0, 32),
+      source: normalizeIngestSource(entry.source),
       batchIn: Math.max(0, Math.floor(Number(entry.batchIn) || 0)),
       added: Math.max(0, Math.floor(Number(entry.added) || 0)),
       totalAfter: Math.max(0, Math.floor(Number(entry.totalAfter) || 0)),
@@ -2544,14 +2626,14 @@
   function maybeAppendCommentIngestLog(prevRaw, entry, maxItems = COMMENT_INGEST_LOG_MAX_ITEMS) {
     const base = parseCommentIngestLog(prevRaw);
     const lid = String(entry.liveId || "").trim().toLowerCase();
-    const src = String(entry.source || "unknown").slice(0, 32);
+    const src = normalizeIngestSource(entry.source);
     const t = Math.max(0, Math.floor(Number(entry.t) || Date.now()));
     const added = Math.max(0, Math.floor(Number(entry.added) || 0));
     const totalAfter = Math.max(0, Math.floor(Number(entry.totalAfter) || 0));
-    if (!INGEST_LOG_HF_SOURCES.has(src)) {
+    const cooldownRule = INGEST_LOG_COOLDOWN_RULES[src];
+    if (!cooldownRule) {
       return appendCommentIngestLog(prevRaw, entry, maxItems);
     }
-    const minMs = src === "ndgr" ? COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS : COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS;
     let prevSame = null;
     for (let i = base.items.length - 1; i >= 0; i--) {
       const it = base.items[i];
@@ -2563,7 +2645,7 @@
     if (prevSame) {
       const dt = t - prevSame.t;
       const totalDelta = totalAfter - prevSame.totalAfter;
-      if (dt >= 0 && dt < minMs && added < INGEST_LOG_ALWAYS_LOG_ADDED && totalDelta >= 0 && totalDelta < INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA) {
+      if (dt >= 0 && dt < cooldownRule.minIntervalMs && added < cooldownRule.minAdded && totalDelta >= 0 && totalDelta < cooldownRule.minTotalDelta) {
         return null;
       }
     }
@@ -2628,22 +2710,368 @@
     return niconicoDefaultUserIconUrl(userId);
   }
 
+  // src/lib/reportSilentError.js
+  var MESSAGE_MAX2 = 200;
+  function isContextInvalidatedError(err) {
+    const msg = err && typeof err === "object" && "message" in err ? String(
+      /** @type {{ message?: unknown }} */
+      err.message || ""
+    ) : String(err || "");
+    return msg.includes("Extension context invalidated");
+  }
+  function buildSilentErrorPayload(context, err, liveId2) {
+    const invalidated = isContextInvalidatedError(err);
+    let message;
+    if (err !== null && typeof err === "object" && "message" in err && typeof /** @type {{ message?: unknown }} */
+    err.message === "string") {
+      message = /** @type {{ message: string }} */
+      err.message.slice(0, MESSAGE_MAX2);
+    } else if (typeof err === "string") {
+      message = err.slice(0, MESSAGE_MAX2);
+    }
+    const id = liveId2 == null ? void 0 : String(liveId2).trim() || void 0;
+    return {
+      context,
+      at: Date.now(),
+      shouldReport: !invalidated,
+      ...message !== void 0 ? { message } : {},
+      ...id ? { liveId: id } : {}
+    };
+  }
+
+  // src/lib/cleanNdgrChatRows.js
+  function cleanNdgrChatRows(raw) {
+    const cleaned = [];
+    for (const x of raw) {
+      if (!x || typeof x !== "object") continue;
+      const commentNo = String(
+        /** @type {any} */
+        x.commentNo ?? ""
+      ).trim();
+      const text = String(
+        /** @type {any} */
+        x.text ?? ""
+      );
+      if (!commentNo) continue;
+      const uid = String(
+        /** @type {any} */
+        x.userId ?? ""
+      ).trim();
+      const row = { commentNo, text, userId: uid || null };
+      const nick = String(
+        /** @type {any} */
+        x.nickname ?? ""
+      ).trim();
+      if (nick) row.nickname = nick;
+      if (
+        /** @type {any} */
+        x.vpos != null
+      ) row.vpos = /** @type {any} */
+      x.vpos;
+      if (
+        /** @type {any} */
+        x.accountStatus != null
+      ) row.accountStatus = /** @type {any} */
+      x.accountStatus;
+      if (
+        /** @type {any} */
+        x.is184
+      ) row.is184 = true;
+      cleaned.push(row);
+    }
+    return cleaned;
+  }
+
+  // src/lib/trimMap.js
+  function trimMapToMax(map, max) {
+    if (map.size <= max) return;
+    const excess = map.size - max;
+    const iter = map.keys();
+    for (let i = 0; i < excess; i++) {
+      const key = iter.next().value;
+      if (key != null) map.delete(key);
+    }
+  }
+
+  // src/lib/commentSubmitSteps.js
+  function diagnosePersistGate(input) {
+    const CHECKS = [
+      { key: "hasRows", check: (v) => !!v },
+      { key: "recording", check: (v) => !!v },
+      { key: "liveId", check: (v) => !!v },
+      { key: "locationAllows", check: (v) => !!v },
+      { key: "hasExtensionContext", check: (v) => !!v }
+    ];
+    const failures = CHECKS.filter((c) => !c.check(input[c.key])).map((c) => c.key);
+    return { pass: failures.length === 0, failures };
+  }
+
+  // src/lib/timingConstants.js
+  var INGEST_TIMING = (
+    /** @type {const} */
+    {
+      debounceMs: 80,
+      livePollMs: 4e3,
+      statsPollMs: 45e3,
+      panelScanMs: 550,
+      ndgrFlushMs: 150,
+      ndgrPendingThreshold: 240,
+      ndgrPendingMax: 1200,
+      interceptReconcileMs: 320,
+      endedHarvestCheckMs: 4e3,
+      coalescerMinMs: 300,
+      visibleScanDelayMs: 380,
+      pageFrameLoopMs: 360
+    }
+  );
+  var SUBMIT_TIMING = (
+    /** @type {const} */
+    {
+      editorPollTimeoutMs: 8e3,
+      editorPollIntervalMs: 50,
+      reactSettleMs: 220,
+      buttonPollTimeoutMs: 1200,
+      buttonPollIntervalMs: 80
+    }
+  );
+  var MAP_LIMITS = (
+    /** @type {const} */
+    {
+      activeUserMax: 12e3,
+      interceptMax: 5e4
+    }
+  );
+  var HARVEST_TIMING = (
+    /** @type {const} */
+    {
+      delayMs: 600,
+      scrollWaitMs: 48,
+      secondPassGapMs: 180,
+      quietUiMs: 800,
+      periodicMs: 12e4,
+      stabilityFollowUpMs: 9e4,
+      ndgrActiveThresholdMs: 6e4,
+      deepRecoveryMs: 3e5
+    }
+  );
+
+  // src/lib/deepHarvestReason.js
+  var DEEP_HARVEST_REASONS = (
+    /** @type {const} */
+    {
+      startup: "startup",
+      recordingOn: "recording-on",
+      liveIdChange: "live-id-change",
+      tabVisible: "tab-visible"
+    }
+  );
+
+  // src/lib/shouldSkipDeepHarvest.js
+  function shouldSkipDeepHarvest({ ndgrLastReceivedAt: ndgrLastReceivedAt2, now, thresholdMs = 6e4 }) {
+    if (!ndgrLastReceivedAt2 || ndgrLastReceivedAt2 <= 0) return false;
+    const elapsed = now - ndgrLastReceivedAt2;
+    return elapsed < thresholdMs;
+  }
+  function shouldForceDeepHarvestForReason(reason) {
+    return String(reason || "").trim() === DEEP_HARVEST_REASONS.startup;
+  }
+  function shouldForceDeepHarvestRecovery({ lastCompletedAt, now, recoveryMs = 3e5 }) {
+    if (!lastCompletedAt || lastCompletedAt <= 0) return true;
+    return now - lastCompletedAt > recoveryMs;
+  }
+
+  // src/lib/commentPipelineLog.js
+  var PIPELINE_LOG_PREFIX = "[comment-pipeline]";
+  function formatPipelinePhase(phase, data) {
+    const p = PIPELINE_LOG_PREFIX;
+    switch (phase) {
+      case "start":
+        return `${p} \u958B\u59CB: liveId=${data.liveId}, existing=${data.existingCount}, incoming=${data.incomingCount}`;
+      case "merge":
+        return `${p} \u30DE\u30FC\u30B8: +${data.added}\u4EF6\u8FFD\u52A0, touched=${data.storageTouched}`;
+      case "commit":
+        return `${p} \u4FDD\u5B58: ${data.keysWritten}\u30AD\u30FC`;
+      case "done":
+        return `${p} \u5B8C\u4E86: \u5408\u8A08${data.totalCount}\u4EF6 (${data.elapsedMs}ms)`;
+      case "skip":
+        return `${p} \u30B9\u30AD\u30C3\u30D7: ${data.reason}`;
+      default:
+        return `${p} ${phase}: ${JSON.stringify(data)}`;
+    }
+  }
+
+  // src/lib/deepExportPolicy.js
+  function planDeepExportSweep(opts) {
+    if (!opts.deep) {
+      return {
+        shouldRunSweep: false,
+        quietScroll: true,
+        skipReason: "not_deep_request"
+      };
+    }
+    if (shouldSkipDeepHarvest({
+      ndgrLastReceivedAt: opts.ndgrLastReceivedAt,
+      now: opts.now,
+      thresholdMs: opts.thresholdMs
+    })) {
+      return {
+        shouldRunSweep: false,
+        quietScroll: true,
+        skipReason: "ndgr_active"
+      };
+    }
+    return {
+      shouldRunSweep: true,
+      quietScroll: true,
+      skipReason: ""
+    };
+  }
+
+  // src/lib/ndgrBacklog.js
+  function shouldDeferNdgrFlushUntilLiveId(opts) {
+    const recording2 = Boolean(opts?.recording);
+    const locationAllows = Boolean(opts?.locationAllows);
+    const liveId2 = String(opts?.liveId || "").trim();
+    return recording2 && locationAllows && !liveId2;
+  }
+  function mergeNdgrBacklogWithCap(existing, incoming, cap) {
+    const max = Number.isFinite(cap) ? Math.max(1, Math.floor(cap)) : 1;
+    const merged = [...incoming, ...existing];
+    if (merged.length <= max) return merged;
+    return merged.slice(0, max);
+  }
+
+  // src/lib/mergeStoredCommentsWithIntercept.js
+  function mergeStoredCommentsWithIntercept(entries, items) {
+    if (!Array.isArray(entries) || !entries.length || !Array.isArray(items) || !items.length) {
+      return { next: Array.isArray(entries) ? entries : [], patched: 0 };
+    }
+    const byNo = /* @__PURE__ */ new Map();
+    for (const raw of items) {
+      const no = String(raw?.no || "").trim();
+      if (!no) continue;
+      const prev = byNo.get(no) || { uid: "", name: "", av: "" };
+      const uid = String(raw?.uid || "").trim() || prev.uid;
+      const name = String(raw?.name || "").trim() || prev.name;
+      const avRaw = String(raw?.av || "").trim();
+      const av = (isHttpOrHttpsUrl(avRaw) ? avRaw : "") || prev.av;
+      if (!uid && !name && !av) continue;
+      byNo.set(no, { uid, name, av });
+    }
+    if (!byNo.size) return { next: entries, patched: 0 };
+    let patched = 0;
+    const next = entries.map((e) => {
+      const no = String(
+        /** @type {{ commentNo?: unknown }} */
+        e?.commentNo || ""
+      ).trim();
+      if (!no) return e;
+      const hit = byNo.get(no);
+      if (!hit) return e;
+      const curUid = String(
+        /** @type {{ userId?: unknown }} */
+        e?.userId || ""
+      ).trim();
+      const curNick = String(
+        /** @type {{ nickname?: unknown }} */
+        e?.nickname || ""
+      ).trim();
+      const curAv = String(
+        /** @type {{ avatarUrl?: unknown }} */
+        e?.avatarUrl || ""
+      ).trim();
+      let out = (
+        /** @type {Record<string, unknown>} */
+        { .../** @type {object} */
+        e }
+      );
+      let changed = false;
+      if (hit.uid) {
+        const chosen = pickStrongerUserId(curUid, hit.uid);
+        if (chosen !== curUid) {
+          out.userId = chosen || null;
+          changed = true;
+        }
+      }
+      const curNickWeak = curNick === "\u533F\u540D" || curNick === "\uFF08\u672A\u53D6\u5F97\uFF09" || curNick === "(\u672A\u53D6\u5F97)";
+      if (hit.name && (!curNick || curNickWeak || hit.name.length > curNick.length)) {
+        out.nickname = hit.name;
+        changed = true;
+      }
+      const uidForAv = String(out.userId || "").trim();
+      const pickedAv = pickStrongestAvatarUrlForUser(uidForAv, [hit.av, curAv]);
+      if (pickedAv && pickedAv !== curAv) {
+        out.avatarUrl = pickedAv;
+        changed = true;
+      }
+      if (hit.av && out.avatarObserved !== true) {
+        out.avatarObserved = true;
+        changed = true;
+      }
+      if (changed) {
+        patched += 1;
+        return out;
+      }
+      return e;
+    });
+    return { next, patched };
+  }
+
+  // src/lib/watchProgramEndState.js
+  function isWatchProgramEndedText(text) {
+    const s = String(text || "").trim();
+    if (!s) return false;
+    return /(公開終了|放送は終了|番組は終了|次回の放送をお楽しみ|タイムシフト)/.test(s);
+  }
+  function shouldRunEndedBulkHarvest(p) {
+    if (!p?.recording) return false;
+    if (!p?.locationAllows) return false;
+    if (!p?.endedDetected) return false;
+    const liveId2 = String(p?.liveId || "").trim();
+    if (!liveId2) return false;
+    const last = String(p?.lastTriggeredLiveId || "").trim();
+    return liveId2 !== last;
+  }
+
+  // src/lib/interceptAvatarHydration.js
+  function hydrateInterceptAvatarMapFromProfile(avatarMap, profileMap, allowedUserIds) {
+    if (!(avatarMap instanceof Map) || !profileMap || typeof profileMap !== "object") {
+      return 0;
+    }
+    const hasAllowSet = allowedUserIds instanceof Set && allowedUserIds.size > 0;
+    let added = 0;
+    for (const [uidRaw, rec] of Object.entries(profileMap)) {
+      const uid = String(uidRaw || "").trim();
+      if (hasAllowSet && !allowedUserIds.has(uid)) continue;
+      if (!uid || avatarMap.has(uid)) continue;
+      const av = String(rec?.avatarUrl || "").trim();
+      if (!isHttpOrHttpsUrl(av)) continue;
+      if (isWeakNiconicoUserIconHttpUrl(av)) continue;
+      avatarMap.set(uid, av);
+      added += 1;
+    }
+    return added;
+  }
+
   // src/extension/content-entry.js
-  var DEBOUNCE_MS = 80;
-  var LIVE_POLL_MS = 4e3;
-  var STATS_POLL_MS = 45e3;
-  var LIVE_PANEL_SCAN_MS = 550;
-  var DEEP_HARVEST_DELAY_MS = 600;
-  var DEEP_HARVEST_QUIET_UI_MS = 800;
-  var DEEP_HARVEST_SCROLL_WAIT_MS = 48;
+  var DEBOUNCE_MS = INGEST_TIMING.debounceMs;
+  var LIVE_POLL_MS = INGEST_TIMING.livePollMs;
+  var STATS_POLL_MS = INGEST_TIMING.statsPollMs;
+  var LIVE_PANEL_SCAN_MS = INGEST_TIMING.panelScanMs;
+  var DEEP_HARVEST_DELAY_MS = HARVEST_TIMING.delayMs;
+  var DEEP_HARVEST_QUIET_UI_MS = HARVEST_TIMING.quietUiMs;
+  var DEEP_HARVEST_SCROLL_WAIT_MS = HARVEST_TIMING.scrollWaitMs;
   var DEEP_HARVEST_SCROLL_STEP_RATIO = 0.52;
-  var DEEP_HARVEST_SECOND_PASS_GAP_MS = 180;
-  var DEEP_HARVEST_PERIODIC_MS = 45 * 1e3;
-  var DEEP_HARVEST_STABILITY_FOLLOWUP_MS = 9e4;
+  var DEEP_HARVEST_SECOND_PASS_GAP_MS = HARVEST_TIMING.secondPassGapMs;
+  var DEEP_HARVEST_PERIODIC_MS = HARVEST_TIMING.periodicMs;
+  var DEEP_HARVEST_STABILITY_FOLLOWUP_MS = HARVEST_TIMING.stabilityFollowUpMs;
+  var DEEP_HARVEST_RECOVERY_MS = HARVEST_TIMING.deepRecoveryMs;
   var DEEP_HARVEST_LOADING_HOST_ID = "nl-deep-harvest-loading";
   var DEEP_HARVEST_LOADING_IMG_PATH = "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png";
   var BOOTSTRAP_DELAYS_MS = [400, 2e3, 4500];
   var tabVisibleHarvestDebounceTimer = null;
+  var TAB_VISIBLE_HARVEST_MIN_MS = 12e3;
+  var lastTabVisibleHarvestAt = 0;
   var MAX_SELF_POSTED_ITEMS = 48;
   var SELF_POST_RECENT_TTL_MS = 24 * 60 * 60 * 1e3;
   var SELF_POST_NATIVE_DEDUPE_MS = 5e3;
@@ -2687,6 +3115,7 @@
     lastError: false
   };
   var lastPersistCommentBatchSize = 0;
+  var lastPersistGateFailures = [];
   var scrollHooked = /* @__PURE__ */ new WeakMap();
   var thumbAuto = false;
   var thumbIntervalMs = 0;
@@ -2957,15 +3386,24 @@
   });
   var interceptedUsers = /* @__PURE__ */ new Map();
   var activeUserTimestamps = /* @__PURE__ */ new Map();
-  var ACTIVE_USER_MAP_MAX = 12e3;
+  var ACTIVE_USER_MAP_MAX = MAP_LIMITS.activeUserMax;
   var VIEWER_JOIN_FLUSH_SUPPRESS_MS = 2500;
   var interceptedNicknames = /* @__PURE__ */ new Map();
   var interceptedAvatars = /* @__PURE__ */ new Map();
-  var INTERCEPT_MAP_MAX = 5e4;
+  var INTERCEPT_MAP_MAX = MAP_LIMITS.interceptMax;
+  var ndgrLastReceivedAt = 0;
   var ndgrChatRowsPending = [];
   var ndgrChatRowsFlushTimer = null;
-  var NDGR_CHAT_ROWS_FLUSH_MS = 150;
-  var NDGR_PENDING_FLUSH_THRESHOLD = 240;
+  var NDGR_CHAT_ROWS_FLUSH_MS = INGEST_TIMING.ndgrFlushMs;
+  var NDGR_PENDING_FLUSH_THRESHOLD = INGEST_TIMING.ndgrPendingThreshold;
+  var NDGR_PENDING_MAX = INGEST_TIMING.ndgrPendingMax;
+  var INTERCEPT_RECONCILE_MS = INGEST_TIMING.interceptReconcileMs;
+  var ENDED_HARVEST_CHECK_MS = INGEST_TIMING.endedHarvestCheckMs;
+  var interceptReconcilePendingEntries = [];
+  var interceptReconcilePendingUsers = [];
+  var interceptReconcileTimer = null;
+  var endedBulkHarvestTriggeredLiveId = "";
+  var endedBulkHarvestLastCheckedAt = 0;
   function clearNdgrChatRowsPending() {
     ndgrChatRowsPending.length = 0;
     if (ndgrChatRowsFlushTimer != null) {
@@ -2973,8 +3411,162 @@
       ndgrChatRowsFlushTimer = null;
     }
   }
+  function clearInterceptReconcilePending() {
+    interceptReconcilePendingEntries.length = 0;
+    interceptReconcilePendingUsers.length = 0;
+    if (interceptReconcileTimer != null) {
+      clearTimeout(interceptReconcileTimer);
+      interceptReconcileTimer = null;
+    }
+  }
+  function detectWatchProgramEndedFromDom() {
+    const candidates = [];
+    const pushText = (v) => {
+      const s = String(v || "").trim();
+      if (!s) return;
+      candidates.push(s.slice(0, 600));
+    };
+    try {
+      pushText(document.querySelector('[class*="program" i] [class*="status" i]')?.textContent);
+      pushText(document.querySelector('[class*="timeshift" i]')?.textContent);
+      pushText(document.querySelector("main")?.textContent);
+    } catch {
+    }
+    if (!candidates.length) return false;
+    return candidates.some((t) => isWatchProgramEndedText(t));
+  }
+  function maybeRunEndedBulkHarvest() {
+    if (!hasExtensionContext()) return;
+    const now = Date.now();
+    if (now - endedBulkHarvestLastCheckedAt < ENDED_HARVEST_CHECK_MS) return;
+    endedBulkHarvestLastCheckedAt = now;
+    const endedDetected = detectWatchProgramEndedFromDom();
+    if (!shouldRunEndedBulkHarvest({
+      recording,
+      liveId,
+      locationAllows: locationAllowsCommentRecording(),
+      endedDetected,
+      lastTriggeredLiveId: endedBulkHarvestTriggeredLiveId
+    })) {
+      return;
+    }
+    endedBulkHarvestTriggeredLiveId = String(liveId || "").trim();
+    void runDeepHarvest({ force: true }).catch(
+      (err) => reportSilentErrorToStorage("endedBulkHarvest", err)
+    );
+  }
+  function queueInterceptReconcile(entries, users) {
+    if (!entries.length && !users.length) return;
+    interceptReconcilePendingEntries.push(...entries);
+    interceptReconcilePendingUsers.push(...users);
+    if (interceptReconcileTimer != null) return;
+    interceptReconcileTimer = setTimeout(() => {
+      interceptReconcileTimer = null;
+      const entrySlice = interceptReconcilePendingEntries;
+      const userSlice = interceptReconcilePendingUsers;
+      interceptReconcilePendingEntries = [];
+      interceptReconcilePendingUsers = [];
+      void runInterceptReconcile(entrySlice, userSlice);
+    }, INTERCEPT_RECONCILE_MS);
+  }
+  async function runInterceptReconcile(entries, users) {
+    if (!recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
+      return;
+    }
+    const lidAtQueue = liveId;
+    const mergedByNo = /* @__PURE__ */ new Map();
+    for (const it of entries) {
+      const no = String(it?.no || "").trim();
+      if (!no) continue;
+      const prev = mergedByNo.get(no) || { no, uid: "", name: "", av: "" };
+      const uid = String(it?.uid || "").trim() || prev.uid;
+      const name = String(it?.name || "").trim() || prev.name;
+      const av = isHttpAvatarUrl(it?.av) ? String(it.av || "").trim() : prev.av;
+      if (!uid && !name && !av) continue;
+      mergedByNo.set(no, { no, uid, name, av });
+    }
+    const mergedUsersByUid = /* @__PURE__ */ new Map();
+    for (const u of users) {
+      const uid = String(u?.uid || "").trim();
+      if (!uid) continue;
+      const prev = mergedUsersByUid.get(uid) || { uid, name: "", av: "" };
+      const name = String(u?.name || "").trim() || prev.name;
+      const av = isHttpAvatarUrl(u?.av) ? String(u.av || "").trim() : prev.av;
+      mergedUsersByUid.set(uid, { uid, name, av });
+    }
+    const mergedItems = [...mergedByNo.values()];
+    const mergedUsers = [...mergedUsersByUid.values()];
+    if (!mergedItems.length && !mergedUsers.length) return;
+    const key = commentsStorageKey(lidAtQueue);
+    const job = persistCommentRowsChain.then(async () => {
+      const bag = await readStorageBagWithRetry(
+        () => chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
+        { attempts: 4, delaysMs: [0, 50, 120, 280] }
+      );
+      const existing = Array.isArray(bag[key]) ? bag[key] : [];
+      let next = existing;
+      let commentsTouched = false;
+      if (mergedItems.length) {
+        const merged = mergeStoredCommentsWithIntercept(existing, mergedItems);
+        if (merged.patched > 0) {
+          next = merged.next;
+          commentsTouched = true;
+        }
+      }
+      let profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
+      let cacheTouched = false;
+      for (const it of mergedItems) {
+        if (upsertUserCommentProfileFromIntercept(profileMap, { uid: it.uid, name: it.name, av: it.av })) {
+          cacheTouched = true;
+        }
+      }
+      for (const u of mergedUsers) {
+        if (upsertUserCommentProfileFromIntercept(profileMap, u)) {
+          cacheTouched = true;
+        }
+      }
+      const applied = applyUserCommentProfileMapToEntries(next, profileMap);
+      if (applied.patched > 0) {
+        next = applied.next;
+        commentsTouched = true;
+      }
+      const pruned = pruneUserCommentProfileMap(profileMap);
+      if (Object.keys(pruned).length !== Object.keys(profileMap).length) {
+        profileMap = pruned;
+        cacheTouched = true;
+      }
+      if (!commentsTouched && !cacheTouched) return;
+      const saveBag = {};
+      if (commentsTouched) saveBag[key] = next;
+      if (cacheTouched) saveBag[KEY_USER_COMMENT_PROFILE_CACHE] = profileMap;
+      await chrome.storage.local.set(saveBag);
+    });
+    persistCommentRowsChain = job.catch((err) => reportSilentErrorToStorage("interceptReconcile", err));
+    await job;
+  }
   async function flushNdgrChatRowsBatch(batch) {
     if (!batch.length) return;
+    if (shouldDeferNdgrFlushUntilLiveId({
+      recording,
+      locationAllows: locationAllowsCommentRecording(),
+      liveId
+    })) {
+      ndgrChatRowsPending = mergeNdgrBacklogWithCap(
+        ndgrChatRowsPending,
+        batch,
+        NDGR_PENDING_MAX
+      );
+      if (ndgrChatRowsFlushTimer == null) {
+        ndgrChatRowsFlushTimer = setTimeout(() => {
+          ndgrChatRowsFlushTimer = null;
+          const slice = ndgrChatRowsPending;
+          ndgrChatRowsPending = [];
+          void flushNdgrChatRowsBatch(slice);
+        }, NDGR_CHAT_ROWS_FLUSH_MS);
+      }
+      return;
+    }
+    if (!recording || !liveId || !locationAllowsCommentRecording()) return;
     const byKey = /* @__PURE__ */ new Map();
     for (const r of batch) {
       if (!r || typeof r !== "object") continue;
@@ -3013,12 +3605,17 @@
       const n = String(r.nickname || "").trim();
       if (u && n) interceptedNicknames.set(u, n);
     }
-    await persistCommentRows(merged, { source: "ndgr" });
+    await persistCommentRows(merged, { source: COMMENT_INGEST_SOURCE.NDGR });
   }
   function schedulePersistNdgrChatRows(rows) {
     if (!Array.isArray(rows) || !rows.length) return;
-    if (!recording || !liveId || !locationAllowsCommentRecording()) return;
-    ndgrChatRowsPending.push(...rows);
+    if (!recording || !locationAllowsCommentRecording()) return;
+    ndgrLastReceivedAt = Date.now();
+    ndgrChatRowsPending = mergeNdgrBacklogWithCap(
+      ndgrChatRowsPending,
+      rows,
+      NDGR_PENDING_MAX
+    );
     if (ndgrChatRowsPending.length >= NDGR_PENDING_FLUSH_THRESHOLD) {
       if (ndgrChatRowsFlushTimer != null) {
         clearTimeout(ndgrChatRowsFlushTimer);
@@ -3102,7 +3699,7 @@
       }
       await chrome.storage.local.remove(KEY_STORAGE_WRITE_ERROR);
     } catch (err) {
-      if (isContextInvalidatedError(err) || !hasExtensionContext()) return;
+      if (isContextInvalidatedError2(err) || !hasExtensionContext()) return;
       try {
         await chrome.storage.local.set({
           [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(liveId, err)
@@ -3240,21 +3837,7 @@
     if (e.data.type === "NLS_INTERCEPT_CHAT_ROWS") {
       const raw = e.data.rows;
       if (Array.isArray(raw) && raw.length) {
-        const cleaned = [];
-        for (const x of raw) {
-          if (!x || typeof x !== "object") continue;
-          const commentNo = String(x.commentNo ?? "").trim();
-          const text = String(x.text ?? "");
-          if (!commentNo) continue;
-          const uid = String(x.userId ?? "").trim();
-          const row = { commentNo, text, userId: uid || null };
-          const nick = String(x.nickname ?? "").trim();
-          if (nick) row.nickname = nick;
-          if (x.vpos != null) row.vpos = x.vpos;
-          if (x.accountStatus != null) row.accountStatus = x.accountStatus;
-          if (x.is184) row.is184 = true;
-          cleaned.push(row);
-        }
+        const cleaned = cleanNdgrChatRows(raw);
         if (cleaned.length) schedulePersistNdgrChatRows(cleaned);
       }
       return;
@@ -3268,7 +3851,7 @@
           const { next, storageTouched } = mergeGiftUsers(existing, raw);
           if (storageTouched) {
             chrome.storage.local.set({ [key]: next }).catch((err) => {
-              if (!isContextInvalidatedError(err) && hasExtensionContext()) {
+              if (!isContextInvalidatedError2(err) && hasExtensionContext()) {
                 try {
                   chrome.storage.local.set({
                     [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(liveId, err)
@@ -3278,8 +3861,19 @@
               }
             });
           }
-        }).catch(() => {
-        });
+        }).catch((err) => reportSilentErrorToStorage("gift", err));
+      }
+      return;
+    }
+    if (e.data.type === "NLS_INTERCEPT_COMMENT_POST") {
+      const body = e.data.body;
+      if (body && typeof body === "object") {
+        const no = String(body.no ?? body.commentNo ?? "").trim();
+        const text = String(body.body ?? body.text ?? "").trim();
+        if (no && text) {
+          const uid = String(body.userId ?? body.user_id ?? "").trim() || null;
+          persistCommentRows([{ commentNo: no, text, userId: uid }]);
+        }
       }
       return;
     }
@@ -3287,6 +3881,8 @@
     const entries = e.data.entries;
     const users = e.data.users;
     const seenNow = Date.now();
+    const reconcileUsers = [];
+    const reconcileEntries = [];
     if (Array.isArray(users)) {
       for (const { uid, name, av } of users) {
         const sUid = String(uid || "").trim();
@@ -3296,54 +3892,45 @@
         if (sName) interceptedNicknames.set(sUid, sName);
         if (sAv) interceptedAvatars.set(sUid, sAv);
         activeUserTimestamps.set(sUid, seenNow);
+        reconcileUsers.push({ uid: sUid, name: sName, av: sAv });
       }
     }
-    if (!Array.isArray(entries)) return;
-    for (const { no, uid, name, av } of entries) {
-      const sNo = String(no || "").trim();
-      if (!sNo) continue;
-      const sUid = String(uid || "").trim();
-      const sName = String(name || "").trim();
-      const sAv = isHttpAvatarUrl(av) ? String(av).trim() : "";
-      if (!sUid && !sName && !sAv) continue;
-      const prev = interceptedUsers.get(sNo);
-      const prevUid = String(prev?.uid || "").trim();
-      const prevName = String(prev?.name || "").trim();
-      const prevAv = isHttpAvatarUrl(prev?.av) ? String(prev?.av || "").trim() : "";
-      const nextUid = sUid || prevUid;
-      const nextName = sName || prevName;
-      const nextAv = sAv || prevAv;
-      interceptedUsers.set(sNo, {
-        ...nextUid ? { uid: nextUid } : {},
-        ...nextName ? { name: nextName } : {},
-        ...nextAv ? { av: nextAv } : {}
-      });
-      if (sName && sUid) interceptedNicknames.set(sUid, sName);
-      if (sAv && sUid) interceptedAvatars.set(sUid, sAv);
-      if (sUid) activeUserTimestamps.set(sUid, seenNow);
-    }
-    if (activeUserTimestamps.size > ACTIVE_USER_MAP_MAX) {
-      const excess = activeUserTimestamps.size - ACTIVE_USER_MAP_MAX;
-      const iter = activeUserTimestamps.keys();
-      for (let i = 0; i < excess; i++) {
-        const key = iter.next().value;
-        if (key != null) activeUserTimestamps.delete(key);
+    if (Array.isArray(entries)) {
+      for (const { no, uid, name, av } of entries) {
+        const sNo = String(no || "").trim();
+        if (!sNo) continue;
+        const sUid = String(uid || "").trim();
+        const sName = String(name || "").trim();
+        const sAv = isHttpAvatarUrl(av) ? String(av).trim() : "";
+        if (!sUid && !sName && !sAv) continue;
+        const prev = interceptedUsers.get(sNo);
+        const prevUid = String(prev?.uid || "").trim();
+        const prevName = String(prev?.name || "").trim();
+        const prevAv = isHttpAvatarUrl(prev?.av) ? String(prev?.av || "").trim() : "";
+        const nextUid = sUid || prevUid;
+        const nextName = sName || prevName;
+        const nextAv = sAv || prevAv;
+        interceptedUsers.set(sNo, {
+          ...nextUid ? { uid: nextUid } : {},
+          ...nextName ? { name: nextName } : {},
+          ...nextAv ? { av: nextAv } : {}
+        });
+        if (sName && sUid) interceptedNicknames.set(sUid, sName);
+        if (sAv && sUid) interceptedAvatars.set(sUid, sAv);
+        if (sUid) activeUserTimestamps.set(sUid, seenNow);
+        reconcileEntries.push({ no: sNo, uid: sUid, name: sName, av: sAv });
       }
     }
-    if (interceptedUsers.size > INTERCEPT_MAP_MAX) {
-      const excess = interceptedUsers.size - INTERCEPT_MAP_MAX;
-      const iter = interceptedUsers.keys();
-      for (let i = 0; i < excess; i++) {
-        const key = iter.next().value;
-        if (key != null) interceptedUsers.delete(key);
-      }
-    }
+    trimMapToMax(activeUserTimestamps, ACTIVE_USER_MAP_MAX);
+    trimMapToMax(interceptedUsers, INTERCEPT_MAP_MAX);
+    queueInterceptReconcile(reconcileEntries, reconcileUsers);
   });
   var lastWatchUrlTimer = null;
   var PAGE_FRAME_STYLE_ID = "nls-watch-prikura-style";
   var PAGE_FRAME_OVERLAY_ID = "nls-watch-prikura-frame";
   var INLINE_POPUP_HOST_ID = "nls-inline-popup-host";
   var INLINE_POPUP_IFRAME_ID = "nls-inline-popup-iframe";
+  var KEY_AI_SHARE_FAST_DIAG = "nls_ai_share_fast_diag_v1";
   var nlsInlinePopupHostSingleton = null;
   var nlsInlinePanelRenderErrors = [];
   var NLS_INLINE_PANEL_RENDER_ERR_MAX = 14;
@@ -3365,11 +3952,11 @@
     } catch {
     }
   }
-  var PAGE_FRAME_LOOP_MS = 360;
+  var PAGE_FRAME_LOOP_MS = INGEST_TIMING.pageFrameLoopMs;
   var DEFAULT_PAGE_FRAME = "light";
   var LEGACY_PAGE_FRAME_ALIAS = {
     trio: "light",
-    rink: "light",
+    link: "light",
     konta: "sunset",
     tanunee: "midnight"
   };
@@ -3405,6 +3992,7 @@
     custom: { ...DEFAULT_PAGE_FRAME_CUSTOM }
   };
   var pageFrameLoopTimer = null;
+  var aiShareFastDiagLastPersistAt = 0;
   function hasPageFramePreset(id) {
     return Object.prototype.hasOwnProperty.call(PAGE_FRAME_PRESETS, id);
   }
@@ -3549,15 +4137,15 @@
     #${INLINE_POPUP_HOST_ID}.nls-inline-host--dock-bottom {
       -webkit-overflow-scrolling: touch;
       min-height: 200px;
-      /* iframe \u63CF\u753B\u524D\u306E\u767D\u30D5\u30E9\u30C3\u30B7\u30E5\u3092\u6291\u3048\u308B */
-      background: rgb(15 23 42 / 92%);
+      /* \u8AAD\u307F\u8FBC\u307F\u9045\u5EF6\u6642\u306B\u9ED2\u30D9\u30BF\u9762\u304C\u6B8B\u3089\u306A\u3044\u3088\u3046\u900F\u660E\u5BC4\u308A\u306B\u3059\u308B */
+      background: transparent;
     }
     #${INLINE_POPUP_HOST_ID}.nls-inline-host--dock-bottom iframe {
       width: 100% !important;
       height: min(520px, 52vh);
       min-height: 220px;
       max-height: min(680px, 56vh);
-      background: rgb(17 24 39);
+      background: transparent;
     }
   `;
     document.head.appendChild(style);
@@ -3572,13 +4160,73 @@
     document.documentElement.appendChild(overlay);
     return overlay;
   }
+  function pickPrimaryInlinePopupHostFromDom() {
+    const hosts = Array.from(
+      document.querySelectorAll(`#${INLINE_POPUP_HOST_ID}`)
+    ).filter((n) => n instanceof HTMLDivElement);
+    if (!hosts.length) return null;
+    const connected = hosts.filter((h) => h.isConnected);
+    const primary = connected[0] || hosts[0];
+    for (const h of hosts) {
+      if (h === primary) continue;
+      try {
+        h.remove();
+      } catch {
+      }
+    }
+    return primary;
+  }
+  function ensureInlinePopupIframe(host) {
+    if (!(host instanceof HTMLDivElement)) return;
+    let iframe = (
+      /** @type {HTMLIFrameElement|null} */
+      host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+    );
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = INLINE_POPUP_IFRAME_ID;
+      iframe.setAttribute("title", "nicolivelog inline panel");
+      iframe.setAttribute("allow", "microphone");
+      iframe.style.pointerEvents = "auto";
+      iframe.style.visibility = "hidden";
+      host.appendChild(iframe);
+    }
+    const expectedSrc = (() => {
+      try {
+        return chrome.runtime.getURL("popup.html") + "?inline=1";
+      } catch {
+        return "";
+      }
+    })();
+    const currentSrc = String(iframe.getAttribute("src") || "").trim();
+    if (expectedSrc && currentSrc !== expectedSrc) {
+      iframe.setAttribute("src", expectedSrc);
+    }
+    iframe.addEventListener(
+      "load",
+      () => {
+        requestAnimationFrame(() => {
+          iframe.style.visibility = "visible";
+          host.style.opacity = "1";
+        });
+      },
+      { once: true }
+    );
+    setTimeout(() => {
+      iframe.style.visibility = "visible";
+      host.style.opacity = "1";
+    }, 2e3);
+  }
   function ensureInlinePopupHost() {
-    let host = document.getElementById(INLINE_POPUP_HOST_ID);
+    let host = pickPrimaryInlinePopupHostFromDom();
     if (host) {
+      ensureInlinePopupIframe(host);
+      if (host.style.opacity !== "1") host.style.opacity = "1";
       nlsInlinePopupHostSingleton = host;
       return host;
     }
     if (nlsInlinePopupHostSingleton && nlsInlinePopupHostSingleton.id === INLINE_POPUP_HOST_ID) {
+      ensureInlinePopupIframe(nlsInlinePopupHostSingleton);
       return nlsInlinePopupHostSingleton;
     }
     host = document.createElement("div");
@@ -3587,24 +4235,7 @@
     host.style.display = "none";
     host.style.pointerEvents = "auto";
     host.style.width = "100%";
-    const iframe = document.createElement("iframe");
-    iframe.id = INLINE_POPUP_IFRAME_ID;
-    iframe.setAttribute("title", "nicolivelog inline panel");
-    iframe.setAttribute("allow", "microphone");
-    iframe.style.pointerEvents = "auto";
-    try {
-      iframe.src = chrome.runtime.getURL("popup.html") + "?inline=1";
-    } catch {
-    }
-    iframe.addEventListener("load", () => {
-      requestAnimationFrame(() => {
-        host.style.opacity = "1";
-      });
-    }, { once: true });
-    setTimeout(() => {
-      host.style.opacity = "1";
-    }, 2e3);
-    host.appendChild(iframe);
+    ensureInlinePopupIframe(host);
     nlsInlinePopupHostSingleton = host;
     return host;
   }
@@ -3681,6 +4312,7 @@
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
+    host.style.opacity = "1";
   }
   function renderInlinePanelDockBottomHost() {
     const host = ensureInlinePopupHost();
@@ -3713,7 +4345,7 @@
     host.style.zIndex = "2147483646";
     host.style.boxShadow = "0 -10px 36px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.06)";
     host.style.borderRadius = "14px 14px 0 0";
-    host.style.background = "rgb(15 23 42 / 92%)";
+    host.style.background = "transparent";
     const iframe = (
       /** @type {HTMLIFrameElement|null} */
       host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
@@ -3726,6 +4358,7 @@
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
+    host.style.opacity = "1";
   }
   function findFrameInsertAnchorFromVideo(base) {
     if (!(base instanceof HTMLElement)) return base;
@@ -3993,6 +4626,7 @@
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
+    host.style.opacity = "1";
   }
   function renderInlinePopupHost(target) {
     if (!(target instanceof HTMLElement)) return;
@@ -4083,6 +4717,7 @@
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
+    host.style.opacity = "1";
   }
   function hidePageFrameOverlay() {
     const overlay = document.getElementById(PAGE_FRAME_OVERLAY_ID);
@@ -4094,6 +4729,120 @@
     }
     stableFrameTarget = null;
     syncWatchPageDockBodyReserve();
+  }
+  function inlineHostLooksVisible() {
+    const host = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+    if (!(host instanceof HTMLElement)) return false;
+    if (!host.isConnected) return false;
+    const cs = window.getComputedStyle(host);
+    if (cs.display === "none" || cs.visibility === "hidden") return false;
+    const r = host.getBoundingClientRect();
+    return r.width >= 120 && r.height >= 120;
+  }
+  function buildAiShareFastDiagnosticsPayload() {
+    const href = String(window.location.href || "");
+    let isTop = true;
+    try {
+      isTop = window.self === window.top;
+    } catch {
+      isTop = true;
+    }
+    const target = findWatchFrameTargetElement();
+    let targetBrief = null;
+    if (target instanceof HTMLElement) {
+      const r = target.getBoundingClientRect();
+      targetBrief = {
+        tag: String(target.tagName || "").toLowerCase(),
+        id: String(target.id || "").slice(0, 100),
+        cls: String(target.className || "").slice(0, 200),
+        rectW: Math.round(r.width),
+        rectH: Math.round(r.height)
+      };
+    }
+    const host = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+    let hostBrief = null;
+    if (host instanceof HTMLElement) {
+      const cs = window.getComputedStyle(host);
+      const r = host.getBoundingClientRect();
+      hostBrief = {
+        isConnected: host.isConnected,
+        inlineDisplay: host.style.display || "",
+        computedDisplay: cs.display,
+        computedVisibility: cs.visibility,
+        rectTop: Math.round(r.top),
+        rectLeft: Math.round(r.left),
+        rectW: Math.round(r.width),
+        rectH: Math.round(r.height),
+        parentNodeName: host.parentNode ? host.parentNode.nodeName : "",
+        parentIsShadowRoot: host.parentNode instanceof ShadowRoot
+      };
+    }
+    return {
+      exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      frame: {
+        isTop,
+        href: href.slice(0, 500),
+        userAgent: String(navigator.userAgent || "").slice(0, 280)
+      },
+      contentScript: {
+        hasExtensionContext: hasExtensionContext(),
+        executionStarted: true,
+        dataNlsActive: document.documentElement?.getAttribute?.("data-nls-active") ?? null,
+        shouldRunWatchContentInThisFrame: shouldRunWatchContentInThisFrame()
+      },
+      watch: {
+        isNicoLiveWatchUrl: isNicoLiveWatchUrl(href)
+      },
+      player: {
+        videoCount: document.querySelectorAll("video").length,
+        frameTarget: targetBrief
+      },
+      inlinePanel: {
+        placementMode: inlinePanelPlacementMode,
+        placementEffective: getEffectiveInlinePanelPlacement(),
+        viewportInnerWidth: nlsViewportSize().innerWidth,
+        widthMode: inlinePanelWidthMode,
+        floatingAnchor: inlineFloatingAnchor,
+        host: hostBrief,
+        recentRenderErrors: nlsInlinePanelRenderErrors.slice()
+      },
+      pageFrameLoopTimerActive: Boolean(pageFrameLoopTimer),
+      romiDebug: {
+        recording,
+        liveId: String(liveId || ""),
+        harvestRunning,
+        deepHarvestRunCount: deepHarvestPipelineStats.runCount,
+        deepHarvestLastRowCount: deepHarvestPipelineStats.lastRowCount,
+        deepHarvestLastCompletedAt: deepHarvestPipelineStats.lastCompletedAt || 0,
+        deepHarvestLastError: deepHarvestPipelineStats.lastError,
+        ndgrPending: ndgrChatRowsPending.length,
+        ndgrLastReceivedAgo: ndgrLastReceivedAt > 0 ? Math.max(0, Date.now() - ndgrLastReceivedAt) : null,
+        interceptMapSize: interceptedUsers.size,
+        interceptNicknameSize: interceptedNicknames.size,
+        interceptAvatarSize: interceptedAvatars.size,
+        lastPersistBatch: lastPersistCommentBatchSize,
+        persistGateFailures: Array.isArray(lastPersistGateFailures) ? lastPersistGateFailures.slice(0, 8) : [],
+        endedBulkHarvestTriggeredLiveId: String(endedBulkHarvestTriggeredLiveId || ""),
+        endedBulkHarvestLastCheckedAgo: endedBulkHarvestLastCheckedAt > 0 ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt) : null
+      }
+    };
+  }
+  function persistAiShareFastDiagnostics() {
+    if (!hasExtensionContext()) return;
+    const now = Date.now();
+    if (now - aiShareFastDiagLastPersistAt < 1500) return;
+    aiShareFastDiagLastPersistAt = now;
+    try {
+      const payload = {
+        popup: null,
+        content: buildAiShareFastDiagnosticsPayload(),
+        note: "Chrome \u30B3\u30F3\u30BD\u30FC\u30EB\u306E ERR_BLOCKED_BY_CLIENT / \u5E83\u544A\u30B9\u30AF\u30EA\u30D7\u30C8\u5931\u6557\u306F\u30D6\u30ED\u30C3\u30AB\u30FC\u7531\u6765\u3067\u591A\u304F\u3001\u672C\u62E1\u5F35\u3068\u306F\u7121\u95A2\u4FC2\u306A\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002",
+        resolvedTabUrl: String(window.location.href || "").slice(0, 500),
+        persistedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      void chrome.storage.local.set({ [KEY_AI_SHARE_FAST_DIAG]: payload });
+    } catch {
+    }
   }
   function applyPageFramePalette(frameId, custom) {
     const overlay = ensurePageFrameOverlay();
@@ -4253,8 +5002,16 @@
           }
         }
       }
+      if (!inlineHostLooksVisible()) {
+        renderInlinePanelDockBottomHost();
+      }
     } catch (e) {
       noteInlinePanelRenderError("renderPageFrameOverlay", e);
+      try {
+        renderInlinePanelDockBottomHost();
+      } catch (fallbackErr) {
+        noteInlinePanelRenderError("renderPageFrameOverlay:fallback", fallbackErr);
+      }
     } finally {
       syncWatchPageDockBodyReserve();
     }
@@ -4289,6 +5046,8 @@
     const tick = () => {
       if (!hasExtensionContext()) return;
       renderPageFrameOverlay();
+      maybeRunEndedBulkHarvest();
+      persistAiShareFastDiagnostics();
     };
     pageFrameLoopTimer = setInterval(tick, PAGE_FRAME_LOOP_MS);
     window.addEventListener("scroll", tick, { passive: true });
@@ -4303,12 +5062,16 @@
       return false;
     }
   }
-  function isContextInvalidatedError(err) {
-    const msg = err && typeof err === "object" && "message" in err ? String(
-      /** @type {{ message?: unknown }} */
-      err.message || ""
-    ) : String(err || "");
-    return msg.includes("Extension context invalidated");
+  function isContextInvalidatedError2(err) {
+    return isContextInvalidatedError(err);
+  }
+  function reportSilentErrorToStorage(context, err) {
+    const p = buildSilentErrorPayload(context, err, liveId);
+    if (!p.shouldReport || !hasExtensionContext()) return;
+    try {
+      chrome.storage.local.set({ [KEY_STORAGE_WRITE_ERROR]: { at: p.at, ...p.liveId ? { liveId: p.liveId } : {}, ...p.message ? { message: p.message } : {} } });
+    } catch {
+    }
   }
   function isVisibleElement(el) {
     if (!el || !(el instanceof HTMLElement)) return false;
@@ -4472,8 +5235,8 @@
       return { ok: false, error: "\u30B3\u30E1\u30F3\u30C8\u304C\u7A7A\u3067\u3059\u3002" };
     }
     const editor = await pollUntil(findCommentEditorElement, {
-      timeoutMs: 8e3,
-      intervalMs: 50
+      timeoutMs: SUBMIT_TIMING.editorPollTimeoutMs,
+      intervalMs: SUBMIT_TIMING.editorPollIntervalMs
     });
     if (!editor) {
       return {
@@ -4489,11 +5252,11 @@
       await new Promise((r) => {
         requestAnimationFrame(() => requestAnimationFrame(r));
       });
-      await new Promise((r) => setTimeout(r, 220));
+      await new Promise((r) => setTimeout(r, SUBMIT_TIMING.reactSettleMs));
       const submitOnce = async () => {
         const btn = await pollUntil(() => findVisibleEnabledSubmitForEditor(editor), {
-          timeoutMs: 1200,
-          intervalMs: 80
+          timeoutMs: SUBMIT_TIMING.buttonPollTimeoutMs,
+          intervalMs: SUBMIT_TIMING.buttonPollIntervalMs
         });
         if (btn) {
           btn.click();
@@ -4775,11 +5538,16 @@
         wsCommentCount,
         wsAge: wsViewerCountUpdatedAt ? Date.now() - wsViewerCountUpdatedAt : -1,
         intercept: interceptedUsers.size,
+        interceptNicknames: interceptedNicknames.size,
+        interceptAvatars: interceptedAvatars.size,
+        fiberDiag: document.documentElement?.getAttribute("data-nls-fiber-diag") || "",
         harvestPipeline: {
           ...deepHarvestPipelineStats,
           harvestRunning,
           ndgrPending: ndgrChatRowsPending.length,
-          lastPersistBatch: lastPersistCommentBatchSize
+          ndgrLastReceivedAgo: ndgrLastReceivedAt > 0 ? Date.now() - ndgrLastReceivedAt : null,
+          lastPersistBatch: lastPersistCommentBatchSize,
+          persistGateFailures: lastPersistGateFailures
         },
         embeddedVC: _edProps ? pickViewerCountFromEmbeddedData(_edProps) : null,
         officialVsRecorded: officialCommentCount != null && Number.isFinite(officialCommentCount) && officialCommentCount >= 0 ? {
@@ -5125,7 +5893,25 @@
         host: hostBrief,
         recentRenderErrors: nlsInlinePanelRenderErrors.slice()
       },
-      pageFrameLoopTimerActive: Boolean(pageFrameLoopTimer)
+      pageFrameLoopTimerActive: Boolean(pageFrameLoopTimer),
+      romiDebug: {
+        recording,
+        liveId: String(liveId || ""),
+        harvestRunning,
+        deepHarvestRunCount: deepHarvestPipelineStats.runCount,
+        deepHarvestLastRowCount: deepHarvestPipelineStats.lastRowCount,
+        deepHarvestLastCompletedAt: deepHarvestPipelineStats.lastCompletedAt || 0,
+        deepHarvestLastError: deepHarvestPipelineStats.lastError,
+        ndgrPending: ndgrChatRowsPending.length,
+        ndgrLastReceivedAgo: ndgrLastReceivedAt > 0 ? Math.max(0, Date.now() - ndgrLastReceivedAt) : null,
+        interceptMapSize: interceptedUsers.size,
+        interceptNicknameSize: interceptedNicknames.size,
+        interceptAvatarSize: interceptedAvatars.size,
+        lastPersistBatch: lastPersistCommentBatchSize,
+        persistGateFailures: Array.isArray(lastPersistGateFailures) ? lastPersistGateFailures.slice(0, 8) : [],
+        endedBulkHarvestTriggeredLiveId: String(endedBulkHarvestTriggeredLiveId || ""),
+        endedBulkHarvestLastCheckedAgo: endedBulkHarvestLastCheckedAt > 0 ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt) : null
+      }
     };
   }
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -5236,12 +6022,19 @@
         try {
           const deep = !!(msg && typeof msg === "object" && "deep" in msg && /** @type {{ deep?: unknown }} */
           msg.deep);
-          if (deep && locationAllowsCommentRecording()) {
+          const deepPlan = planDeepExportSweep({
+            deep,
+            ndgrLastReceivedAt,
+            now: Date.now(),
+            thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
+          });
+          if (deepPlan.shouldRunSweep && locationAllowsCommentRecording()) {
             const rows = await harvestVirtualCommentList({
               document,
               extractCommentsFromNode,
               waitMs: 42,
-              respectTyping: false
+              respectTyping: false,
+              quietScroll: deepPlan.quietScroll
             });
             for (const r of rows) {
               const no = String(r?.commentNo || "").trim();
@@ -5277,6 +6070,7 @@
     }
     if (msg.type === "NLS_AI_SHARE_PAGE_DIAGNOSTICS") {
       try {
+        persistAiShareFastDiagnostics();
         sendResponse({
           ok: true,
           diagnostics: buildAiSharePageDiagnostics()
@@ -5534,17 +6328,27 @@
     return state;
   }
   var persistCommentRowsChain = Promise.resolve();
-  var MIN_PERSIST_INTERVAL_MS = 300;
+  var MIN_PERSIST_INTERVAL_MS = INGEST_TIMING.coalescerMinMs;
   var persistCoalescer = createPersistCoalescer(async (batch) => {
     const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(batch));
-    persistCommentRowsChain = job.catch(() => {
-    });
+    persistCommentRowsChain = job.catch((err) => reportSilentErrorToStorage("persist", err));
     await job;
   }, MIN_PERSIST_INTERVAL_MS);
   function persistCommentRows(rows, _opts = {}) {
-    if (!rows?.length || !recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
+    const gate = diagnosePersistGate({
+      hasRows: !!rows?.length,
+      recording,
+      liveId: liveId || "",
+      locationAllows: locationAllowsCommentRecording(),
+      hasExtensionContext: hasExtensionContext()
+    });
+    if (!gate.pass) {
+      if (gate.failures.length && rows?.length) {
+        lastPersistGateFailures = gate.failures;
+      }
       return;
     }
+    lastPersistGateFailures = [];
     persistCoalescer.enqueue(
       /** @type {ParsedCommentRow[]} */
       rows
@@ -5555,6 +6359,7 @@
       return;
     }
     lastPersistCommentBatchSize = rows.length;
+    const pipelineT0 = Date.now();
     const enriched = enrichRowsWithInterceptedUserIds(rows);
     const key = commentsStorageKey(liveId);
     try {
@@ -5570,6 +6375,11 @@
         { attempts: 4, delaysMs: [0, 50, 120, 280] }
       );
       const existing = Array.isArray(bag[key]) ? bag[key] : [];
+      console.debug(formatPipelinePhase("start", {
+        liveId,
+        existingCount: existing.length,
+        incomingCount: enriched.length
+      }));
       const pendingRaw = bag[KEY_SELF_POSTED_RECENTS];
       const pendingItems = pendingRaw && typeof pendingRaw === "object" && Array.isArray(pendingRaw.items) ? pendingRaw.items.filter(
         (x) => x && typeof x.liveId === "string" && typeof x.textNorm === "string" && typeof x.at === "number"
@@ -5583,6 +6393,10 @@
       observedRecordedCommentCount = next.length;
       noteOfficialCommentSample(Date.now());
       const { added } = mergedRows;
+      console.debug(formatPipelinePhase("merge", {
+        added: added.length,
+        storageTouched
+      }));
       const consumed = consumeMatchedSelfPostedRecents(added, pendingItems, liveId);
       if (consumed.markedIds.size) {
         next = next.map((entry) => {
@@ -5616,7 +6430,20 @@
       const profileKeysBefore = Object.keys(profileMap).length;
       profileMap = pruneUserCommentProfileMap(profileMap);
       if (Object.keys(profileMap).length !== profileKeysBefore) cacheTouched = true;
-      if (!storageTouched && !pendingTouched && !cacheTouched) return;
+      const liveObservedUserIds = /* @__PURE__ */ new Set();
+      for (const item of next) {
+        const uid = String(item?.userId || "").trim();
+        if (uid) liveObservedUserIds.add(uid);
+      }
+      hydrateInterceptAvatarMapFromProfile(
+        interceptedAvatars,
+        profileMap,
+        liveObservedUserIds
+      );
+      if (!storageTouched && !pendingTouched && !cacheTouched) {
+        console.debug(formatPipelinePhase("skip", { reason: "no changes" }));
+        return;
+      }
       let ingestLogPayload = null;
       if (storageTouched || pendingTouched) {
         const src = String(opts?.source || "unknown").slice(0, 32);
@@ -5665,8 +6492,14 @@
         });
       }
       await chrome.storage.local.remove(KEY_STORAGE_WRITE_ERROR);
+      const keysWritten = (storageTouched || pendingTouched ? 2 : 0) + (cacheTouched ? 1 : 0) + (ingestLogPayload ? 1 : 0);
+      console.debug(formatPipelinePhase("commit", { keysWritten }));
+      console.debug(formatPipelinePhase("done", {
+        totalCount: next.length,
+        elapsedMs: Date.now() - pipelineT0
+      }));
     } catch (err) {
-      if (isContextInvalidatedError(err) || !hasExtensionContext()) return;
+      if (isContextInvalidatedError2(err) || !hasExtensionContext()) return;
       try {
         await chrome.storage.local.set({
           [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(liveId, err)
@@ -5723,6 +6556,9 @@
         void clearCommentHarvestPanelDiagnostic();
         pendingRoots.clear();
         clearNdgrChatRowsPending();
+        clearInterceptReconcilePending();
+        endedBulkHarvestTriggeredLiveId = "";
+        endedBulkHarvestLastCheckedAt = 0;
         resetDeepHarvestStabilityFollowUp();
         interceptedUsers.clear();
         interceptedNicknames.clear();
@@ -5735,15 +6571,21 @@
         wsViewerCountUpdatedAt = 0;
         resetOfficialStatsState();
         programBeginAtMs = null;
+        ndgrLastReceivedAt = 0;
         liveId = ctx.liveId;
         reconnectMutationObserver();
         pendingRoots.add(document.body);
         scheduleFlush();
-        scheduleDeepHarvest("live-id-change");
+        scheduleDeepHarvest(DEEP_HARVEST_REASONS.liveIdChange);
         applyThumbSchedule();
       } else {
         liveId = ctx.liveId;
         reconnectMutationObserver();
+        if (ndgrChatRowsPending.length) {
+          const slice = ndgrChatRowsPending;
+          ndgrChatRowsPending = [];
+          void flushNdgrChatRowsBatch(slice);
+        }
       }
       renderPageFrameOverlay();
       return;
@@ -5762,6 +6604,9 @@
         void clearCommentHarvestPanelDiagnostic();
         pendingRoots.clear();
         clearNdgrChatRowsPending();
+        clearInterceptReconcilePending();
+        endedBulkHarvestTriggeredLiveId = "";
+        endedBulkHarvestLastCheckedAt = 0;
         resetDeepHarvestStabilityFollowUp();
         interceptedUsers.clear();
         interceptedNicknames.clear();
@@ -5774,23 +6619,33 @@
         wsViewerCountUpdatedAt = 0;
         resetOfficialStatsState();
         programBeginAtMs = null;
+        ndgrLastReceivedAt = 0;
         liveId = next;
         reconnectMutationObserver();
         pendingRoots.add(document.body);
         scheduleFlush();
-        scheduleDeepHarvest("live-id-change");
+        scheduleDeepHarvest(DEEP_HARVEST_REASONS.liveIdChange);
         applyThumbSchedule();
       } else {
         liveId = next;
         reconnectMutationObserver();
+        if (ndgrChatRowsPending.length) {
+          const slice = ndgrChatRowsPending;
+          ndgrChatRowsPending = [];
+          void flushNdgrChatRowsBatch(slice);
+        }
       }
       renderPageFrameOverlay();
       return;
     }
     liveId = null;
+    ndgrLastReceivedAt = 0;
     cancelPendingDeepHarvest();
     void clearCommentHarvestPanelDiagnostic();
     clearNdgrChatRowsPending();
+    clearInterceptReconcilePending();
+    endedBulkHarvestTriggeredLiveId = "";
+    endedBulkHarvestLastCheckedAt = 0;
     clearThumbTimer();
     reconnectMutationObserver();
     hidePageFrameOverlay();
@@ -5829,15 +6684,14 @@
     }
     pendingRoots.clear();
     if (!rows.length) return;
-    await persistCommentRows(rows, { source: "mutation" });
+    await persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.MUTATION });
   }
   function scheduleFlush() {
     if (!recording || !liveId) return;
     if (flushTimer) clearTimeout(flushTimer);
     flushTimer = setTimeout(() => {
       flushTimer = null;
-      flushToStorage().catch(() => {
-      });
+      flushToStorage().catch((err) => reportSilentErrorToStorage("flush", err));
     }, DEBOUNCE_MS);
   }
   var deepHarvestTimer = null;
@@ -5939,8 +6793,10 @@
         renderPageFrameOverlay();
       }
       resetDeepHarvestStabilityFollowUp();
-      runDeepHarvest({ armStabilityFollowUp: true }).catch(() => {
-      });
+      runDeepHarvest({
+        armStabilityFollowUp: true,
+        force: shouldForceDeepHarvestForReason(reason)
+      }).catch((err) => reportSilentErrorToStorage("deepHarvest", err));
     }, delayMs);
   }
   function tryPeriodicQuietDeepHarvest() {
@@ -5949,24 +6805,50 @@
     if (document.hidden) return;
     if (harvestRunning) return;
     resetDeepHarvestStabilityFollowUp();
-    void runDeepHarvest({ stabilityFollowUp: true });
+    const needsRecovery = shouldForceDeepHarvestRecovery({
+      lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
+      now: Date.now(),
+      recoveryMs: DEEP_HARVEST_RECOVERY_MS
+    });
+    void runDeepHarvest({
+      stabilityFollowUp: !needsRecovery,
+      force: needsRecovery
+    });
   }
   function onTabVisibleForCommentHarvest() {
     if (document.visibilityState !== "visible") return;
     if (!recording || !liveId || !locationAllowsCommentRecording()) return;
     scanVisibleCommentsNow();
+    const now = Date.now();
+    const needsRecovery = shouldForceDeepHarvestRecovery({
+      lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
+      now,
+      recoveryMs: DEEP_HARVEST_RECOVERY_MS
+    });
+    if (!needsRecovery && now - lastTabVisibleHarvestAt < TAB_VISIBLE_HARVEST_MIN_MS) return;
+    lastTabVisibleHarvestAt = now;
     if (tabVisibleHarvestDebounceTimer != null) {
       clearTimeout(tabVisibleHarvestDebounceTimer);
     }
     tabVisibleHarvestDebounceTimer = setTimeout(() => {
       tabVisibleHarvestDebounceTimer = null;
       if (recording && liveId && locationAllowsCommentRecording() && !document.hidden) {
-        scheduleDeepHarvest("tab-visible");
+        void runDeepHarvest({
+          stabilityFollowUp: !needsRecovery,
+          force: needsRecovery
+        });
       }
     }, 850);
   }
   async function runDeepHarvest(opts = {}) {
     if (harvestRunning || !recording || !liveId || !locationAllowsCommentRecording()) {
+      return;
+    }
+    if (!opts.force && shouldSkipDeepHarvest({
+      ndgrLastReceivedAt,
+      now: Date.now(),
+      thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
+    })) {
       return;
     }
     harvestRunning = true;
@@ -5981,7 +6863,7 @@
         quietScroll: true,
         respectTyping: false
       });
-      await persistCommentRows(rows, { source: "deep" });
+      await persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.DEEP });
       deepHarvestPipelineStats.lastCompletedAt = Date.now();
       deepHarvestPipelineStats.lastRowCount = rows.length;
       deepHarvestPipelineStats.runCount += 1;
@@ -6011,7 +6893,7 @@
     try {
       await chrome.storage.local.remove(KEY_COMMENT_PANEL_STATUS);
     } catch (err) {
-      if (!isContextInvalidatedError(err)) {
+      if (!isContextInvalidatedError2(err)) {
       }
     }
   }
@@ -6029,7 +6911,7 @@
         try {
           await chrome.storage.local.remove(KEY_COMMENT_PANEL_STATUS);
         } catch (err) {
-          if (!isContextInvalidatedError(err)) {
+          if (!isContextInvalidatedError2(err)) {
           }
         }
       }
@@ -6049,7 +6931,7 @@
         }
       });
     } catch (err) {
-      if (!isContextInvalidatedError(err)) {
+      if (!isContextInvalidatedError2(err)) {
       }
     }
   }
@@ -6058,7 +6940,7 @@
     const panel = findNicoCommentPanel(document);
     const root = panel || document.body;
     const rows = extractCommentsFromNode(root);
-    void persistCommentRows(rows, { source: "visible" });
+    void persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.VISIBLE });
     void syncCommentHarvestPanelStatus();
   }
   function attachCommentScrollHook() {
@@ -6071,7 +6953,7 @@
       () => {
         if (!recording || !liveId) return;
         clearTimeout(t);
-        t = setTimeout(() => scanVisibleCommentsNow(), 380);
+        t = setTimeout(() => scanVisibleCommentsNow(), INGEST_TIMING.visibleScanDelayMs);
       },
       { passive: true }
     );
@@ -6268,7 +7150,7 @@
         );
         if (!deepHarvestQuietUi && recording && liveId && locationAllowsCommentRecording() && deepHarvestTimer) {
           cancelPendingDeepHarvest();
-          scheduleDeepHarvest("live-id-change");
+          scheduleDeepHarvest(DEEP_HARVEST_REASONS.liveIdChange);
         } else if (!deepHarvestQuietUi) {
           removeDeepHarvestLoadingUi();
         }
@@ -6279,9 +7161,10 @@
           pendingRoots.add(document.body);
           reconnectMutationObserver();
           scheduleFlush();
-          scheduleDeepHarvest("recording-on");
+          scheduleDeepHarvest(DEEP_HARVEST_REASONS.recordingOn);
           tryAttachScrollHookSoon();
         } else {
+          ndgrLastReceivedAt = 0;
           cancelPendingDeepHarvest();
           resetOfficialCommentSamplingState();
           void clearCommentHarvestPanelDiagnostic();
@@ -6291,7 +7174,7 @@
     if (recording && liveId) {
       pendingRoots.add(document.body);
       scheduleFlush();
-      scheduleDeepHarvest("startup");
+      scheduleDeepHarvest(DEEP_HARVEST_REASONS.startup);
       tryAttachScrollHookSoon();
       for (const ms of BOOTSTRAP_DELAYS_MS) {
         setTimeout(() => {
@@ -6330,7 +7213,6 @@
       document.documentElement.setAttribute("data-nls-active", "1");
     } catch {
     }
-    start().catch(() => {
-    });
+    start().catch((err) => reportSilentErrorToStorage("start", err));
   }
 })();
