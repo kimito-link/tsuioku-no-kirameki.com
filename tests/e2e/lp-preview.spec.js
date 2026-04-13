@@ -411,7 +411,8 @@ test.describe('lp-preview', () => {
 
     for (let i = 0; i < fCount; i++) {
       const f = formulas.nth(i);
-      await f.scrollIntoViewIfNeeded();
+      await f.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      await page.waitForTimeout(100);
       const box = await f.boundingBox();
       expect(box, `formula ${i} visible`).not.toBeNull();
       expect(box.width).toBeLessThanOrEqual(390);
@@ -424,7 +425,7 @@ test.describe('lp-preview', () => {
 
     for (let i = 0; i < tCount; i++) {
       const t = tables.nth(i);
-      await t.scrollIntoViewIfNeeded();
+      await t.evaluate((el) => el.scrollIntoView({ block: 'center' }));
       const noOverflow = await t.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
       expect(noOverflow, `formula-table ${i} no horizontal overflow`).toBe(true);
     }
@@ -438,7 +439,8 @@ test.describe('lp-preview', () => {
     const fCount = await formulas.count();
     for (let i = 0; i < fCount; i++) {
       const f = formulas.nth(i);
-      await f.scrollIntoViewIfNeeded();
+      await f.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      await page.waitForTimeout(100);
       const box = await f.boundingBox();
       expect(box, `formula ${i} at 320`).not.toBeNull();
       expect(box.width).toBeLessThanOrEqual(320);
@@ -448,7 +450,7 @@ test.describe('lp-preview', () => {
     const tCount = await tables.count();
     for (let i = 0; i < tCount; i++) {
       const t = tables.nth(i);
-      await t.scrollIntoViewIfNeeded();
+      await t.evaluate((el) => el.scrollIntoView({ block: 'center' }));
       const noOverflow = await t.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
       expect(noOverflow, `formula-table ${i} at 320`).toBe(true);
     }
