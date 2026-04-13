@@ -1641,6 +1641,68 @@
         border-top: 1px solid var(--nl-border);
       }
 
+      .nl-caster-banner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        margin-bottom: 6px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-accent, #3b82f6) 8%, var(--nl-surface));
+        border: 1px solid color-mix(in srgb, var(--nl-accent, #3b82f6) 18%, var(--nl-border));
+      }
+
+      .nl-caster-banner[hidden] {
+        display: none !important;
+      }
+
+      .nl-caster-banner__link {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+        text-decoration: none;
+        color: var(--nl-text);
+      }
+
+      .nl-caster-banner__icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid color-mix(in srgb, var(--nl-accent, #3b82f6) 30%, transparent);
+        flex-shrink: 0;
+        background: var(--nl-surface);
+      }
+
+      .nl-caster-banner__name {
+        font-size: clamp(12px, calc(var(--nl-base-font, 14px) * 0.92), 15px);
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+      }
+
+      .nl-caster-banner__follow {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: clamp(10px, calc(var(--nl-base-font, 14px) * 0.78), 13px);
+        font-weight: 700;
+        text-decoration: none;
+        color: #fff;
+        background: var(--nl-accent, #3b82f6);
+        transition: opacity 0.15s;
+      }
+
+      .nl-caster-banner__follow:hover {
+        opacity: 0.85;
+      }
+
       .nl-live-stat-cards {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -5637,6 +5699,14 @@
           <code>chrome://extensions</code>
           を開き、「君斗りんくの追憶のきらめき」の「更新」で拡張を再読み込みしてください。ページの再読み込みだけでは直らないことがあります。
         </p>
+      </div>
+
+      <div id="casterBanner" class="nl-caster-banner" hidden>
+        <a id="casterBannerLink" class="nl-caster-banner__link" target="_blank" rel="noopener noreferrer" title="配信者ページを開く">
+          <img id="casterBannerIcon" class="nl-caster-banner__icon" alt="" width="36" height="36" decoding="async" />
+          <span id="casterBannerName" class="nl-caster-banner__name"></span>
+        </a>
+        <a id="casterBannerFollow" class="nl-caster-banner__follow" target="_blank" rel="noopener noreferrer">フォロー</a>
       </div>
 
       <div class="nl-live-stat-cards" id="liveStatCards">

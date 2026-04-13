@@ -7152,6 +7152,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (concurrentLoadingEl) concurrentLoadingEl.hidden = true;
     if (concurrentReadyEl) concurrentReadyEl.hidden = false;
     if (concurrentCard) concurrentCard.removeAttribute("aria-busy");
+    const casterBanner = $("casterBanner");
+    if (casterBanner) casterBanner.hidden = true;
     wrap.hidden = true;
     title.textContent = "-";
     broadcaster.textContent = "-";
@@ -7229,6 +7231,39 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     } else {
       thumb.hidden = true;
       thumb.removeAttribute("src");
+    }
+    const casterBanner = $("casterBanner");
+    const casterIcon = (
+      /** @type {HTMLImageElement|null} */
+      $("casterBannerIcon")
+    );
+    const casterNameEl = $("casterBannerName");
+    const casterLink = (
+      /** @type {HTMLAnchorElement|null} */
+      $("casterBannerLink")
+    );
+    const casterFollow = (
+      /** @type {HTMLAnchorElement|null} */
+      $("casterBannerFollow")
+    );
+    const casterUid = String(snapshot.broadcasterUserId || "").trim();
+    if (casterBanner && casterNameEl && broadcasterText !== "-" && casterUid) {
+      casterNameEl.textContent = broadcasterText;
+      const userPageUrl = `https://www.nicovideo.jp/user/${casterUid}`;
+      if (casterLink) casterLink.href = userPageUrl;
+      if (casterFollow) casterFollow.href = userPageUrl;
+      const iconBucket = Math.floor(Number(casterUid) / 1e4);
+      const iconUrl = `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/${iconBucket}/${casterUid}.jpg`;
+      if (casterIcon) {
+        casterIcon.src = iconUrl;
+        casterIcon.alt = broadcasterText;
+        casterIcon.onerror = () => {
+          casterIcon.style.display = "none";
+        };
+      }
+      casterBanner.hidden = false;
+    } else if (casterBanner) {
+      casterBanner.hidden = true;
     }
     const vc = snapshot.viewerCountFromDom;
     if (viewerDomEl) {
