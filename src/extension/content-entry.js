@@ -1211,6 +1211,11 @@ window.addEventListener('message', (e) => {
     return;
   }
 
+  if (e.data.type === 'NLS_SPA_NAVIGATION') {
+    syncLiveIdFromLocation();
+    return;
+  }
+
   if (e.data.type !== 'NLS_INTERCEPT_USERID') return;
   const entries = e.data.entries;
   const users = e.data.users;

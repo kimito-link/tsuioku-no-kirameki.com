@@ -19,7 +19,7 @@ export function createPersistCoalescer(flushFn, minIntervalMs = 300) {
     if (timer) return;
     const delay = lastFlushTime
       ? Math.max(0, minIntervalMs - (Date.now() - lastFlushTime))
-      : minIntervalMs;
+      : 0;
     timer = setTimeout(flush, delay);
   }
 

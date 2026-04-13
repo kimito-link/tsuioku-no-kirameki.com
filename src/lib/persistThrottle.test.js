@@ -5,32 +5,46 @@ beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe('createPersistCoalescer', () => {
-  it('enqueue 後 minIntervalMs 以内は flush されない', () => {
-    const flush = vi.fn();
+  it('初回 enqueue は delay=0 で即 flush される', async () => {
+    const flush = vi.fn().mockResolvedValue(undefined);
     const c = createPersistCoalescer(flush, 300);
     c.enqueue([{ id: '1' }]);
+    vi.advanceTimersByTime(0);
+    await vi.runAllTimersAsync();
+    expect(flush).toHaveBeenCalledTimes(1);
+    expect(c.pending()).toBe(0);
+  });
+
+  it('2回目の enqueue 後 minIntervalMs 以内は flush されない', async () => {
+    const flush = vi.fn().mockResolvedValue(undefined);
+    const c = createPersistCoalescer(flush, 300);
+    c.enqueue([{ id: '1' }]);
+    vi.advanceTimersByTime(0);
+    await vi.runAllTimersAsync();
+    expect(flush).toHaveBeenCalledTimes(1);
+    c.enqueue([{ id: '2' }]);
     vi.advanceTimersByTime(200);
-    expect(flush).not.toHaveBeenCalled();
+    expect(flush).toHaveBeenCalledTimes(1);
     expect(c.pending()).toBe(1);
   });
 
-  it('minIntervalMs 経過後に蓄積行がまとめて flush される', async () => {
+  it('初回の複数 enqueue は delay=0 でまとめて flush される', async () => {
     const flush = vi.fn().mockResolvedValue(undefined);
     const c = createPersistCoalescer(flush, 300);
     c.enqueue([{ id: '1' }]);
     c.enqueue([{ id: '2' }, { id: '3' }]);
-    vi.advanceTimersByTime(300);
+    vi.advanceTimersByTime(0);
     await vi.runAllTimersAsync();
     expect(flush).toHaveBeenCalledTimes(1);
     expect(flush).toHaveBeenCalledWith([{ id: '1' }, { id: '2' }, { id: '3' }]);
     expect(c.pending()).toBe(0);
   });
 
-  it('連続 enqueue は1回の flush にまとまる', async () => {
+  it('初回の連続 enqueue は delay=0 で1回の flush にまとまる', async () => {
     const flush = vi.fn().mockResolvedValue(undefined);
     const c = createPersistCoalescer(flush, 300);
     for (let i = 0; i < 10; i++) c.enqueue([{ id: String(i) }]);
-    vi.advanceTimersByTime(300);
+    vi.advanceTimersByTime(0);
     await vi.runAllTimersAsync();
     expect(flush).toHaveBeenCalledTimes(1);
     expect(flush.mock.calls[0][0]).toHaveLength(10);

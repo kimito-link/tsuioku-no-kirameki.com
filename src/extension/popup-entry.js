@@ -7435,6 +7435,8 @@ let storageRefreshCoalesceTimer = null;
 let storageRefreshMaxWaitTimer = null;
 const STORAGE_REFRESH_COALESCE_MS = 550;
 const STORAGE_REFRESH_MAX_WAIT_MS = 2200;
+/** 初回 refresh が完了するまではコアレスをバイパスし即時反映する */
+let initialRefreshDone = false;
 
 /** @param {string} key */
 function isHighFrequencyCommentRelatedStorageKey(key) {
@@ -7453,6 +7455,10 @@ function isHighFrequencyCommentRelatedStorageKey(key) {
 function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   const keys = Object.keys(changes || {});
   if (!keys.length) return;
+  if (!initialRefreshDone) {
+    runRefresh();
+    return;
+  }
   const allHighFreq = keys.every((k) =>
     isHighFrequencyCommentRelatedStorageKey(k)
   );
@@ -7562,6 +7568,7 @@ function initPopup() {
         }
       })
       .finally(() => {
+        initialRefreshDone = true;
         requestAnimationFrame(() => {
           applyResponsivePopupLayout();
           correctSupportVisualScrollIfOpen();
@@ -8853,13 +8860,28 @@ function initPopup() {
     // no-op
   }
 
+  const POLL_INTERVAL_MS = INLINE_MODE ? 10_000 : 30_000;
   setInterval(() => {
     if (!hasExtensionContext()) return;
     if (typeof document !== 'undefined' && document.hidden) return;
     watchMetaCache.key = '';
     watchMetaCache.snapshot = null;
     safeRefresh();
-  }, 30_000);
+  }, POLL_INTERVAL_MS);
+
+  if (INLINE_MODE || INLINE_SIDE_PANEL) {
+    let lastVisibilityRefresh = Date.now();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!hasExtensionContext()) return;
+      const now = Date.now();
+      if (now - lastVisibilityRefresh < POLL_INTERVAL_MS) return;
+      lastVisibilityRefresh = now;
+      watchMetaCache.key = '';
+      watchMetaCache.snapshot = null;
+      safeRefresh();
+    });
+  }
 }
 
 if (document.readyState === 'loading') {

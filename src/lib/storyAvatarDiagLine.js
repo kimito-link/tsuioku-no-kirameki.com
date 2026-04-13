@@ -120,7 +120,15 @@ export function formatStoryAvatarDiagLine(s) {
  */
 export function buildStoryAvatarDiagHtml(s) {
   const total = typeof s.total === 'number' && s.total > 0 ? s.total : 0;
-  if (total <= 0) return null;
+  if (total <= 0) {
+    return (
+      '<div class="nl-story-diag nl-story-diag--empty">' +
+      '<p class="nl-story-diag__lead">' +
+      'まだ応援コメントが記録されていません。' +
+      'ニコ生の配信ページを開いた状態でしばらくお待ちください。コメントが届くと自動的に反映されます。' +
+      '</p></div>'
+    );
+  }
 
   const leadParts = [];
   leadParts.push(

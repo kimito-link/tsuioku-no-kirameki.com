@@ -2682,7 +2682,7 @@
     function enqueue(rows) {
       buffer.push(...rows);
       if (timer) return;
-      const delay2 = lastFlushTime ? Math.max(0, minIntervalMs - (Date.now() - lastFlushTime)) : minIntervalMs;
+      const delay2 = lastFlushTime ? Math.max(0, minIntervalMs - (Date.now() - lastFlushTime)) : 0;
       timer = setTimeout(flush, delay2);
     }
     async function flush() {
@@ -3877,6 +3877,10 @@
           persistCommentRows([{ commentNo: no, text, userId: uid }]);
         }
       }
+      return;
+    }
+    if (e.data.type === "NLS_SPA_NAVIGATION") {
+      syncLiveIdFromLocation();
       return;
     }
     if (e.data.type !== "NLS_INTERCEPT_USERID") return;

@@ -86,8 +86,11 @@ describe('formatStoryAvatarDiagLine', () => {
 });
 
 describe('buildStoryAvatarDiagHtml', () => {
-  it('total が 0 以下なら null', () => {
-    expect(buildStoryAvatarDiagHtml({ ...base, total: 0 })).toBeNull();
+  it('total が 0 以下なら空状態メッセージを返す', () => {
+    const html = buildStoryAvatarDiagHtml({ ...base, total: 0 });
+    expect(html).not.toBeNull();
+    expect(html).toContain('nl-story-diag--empty');
+    expect(html).toContain('まだ応援コメントが記録されていません');
   });
 
   it('平易なリードと折りたたみを含む', () => {

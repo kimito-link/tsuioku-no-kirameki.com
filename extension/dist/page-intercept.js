@@ -1709,5 +1709,28 @@
       };
     } catch {
     }
+    try {
+      let lastNotifiedHref = String(window.location.href || "");
+      const notifySpaNavigation = () => {
+        const cur = String(window.location.href || "");
+        if (cur === lastNotifiedHref) return;
+        lastNotifiedHref = cur;
+        window.postMessage({ type: "NLS_SPA_NAVIGATION", url: cur }, "*");
+      };
+      const origPushState = history.pushState;
+      const origReplaceState = history.replaceState;
+      history.pushState = function(...args) {
+        const result = origPushState.apply(this, args);
+        notifySpaNavigation();
+        return result;
+      };
+      history.replaceState = function(...args) {
+        const result = origReplaceState.apply(this, args);
+        notifySpaNavigation();
+        return result;
+      };
+      window.addEventListener("popstate", notifySpaNavigation);
+    } catch {
+    }
   })();
 })();

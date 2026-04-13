@@ -3858,7 +3858,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   }
   function buildStoryAvatarDiagHtml(s) {
     const total = typeof s.total === "number" && s.total > 0 ? s.total : 0;
-    if (total <= 0) return null;
+    if (total <= 0) {
+      return '<div class="nl-story-diag nl-story-diag--empty"><p class="nl-story-diag__lead">\u307E\u3060\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u304C\u8A18\u9332\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002\u30CB\u30B3\u751F\u306E\u914D\u4FE1\u30DA\u30FC\u30B8\u3092\u958B\u3044\u305F\u72B6\u614B\u3067\u3057\u3070\u3089\u304F\u304A\u5F85\u3061\u304F\u3060\u3055\u3044\u3002\u30B3\u30E1\u30F3\u30C8\u304C\u5C4A\u304F\u3068\u81EA\u52D5\u7684\u306B\u53CD\u6620\u3055\u308C\u307E\u3059\u3002</p></div>';
+    }
     const leadParts = [];
     leadParts.push(
       `\u8A18\u9332\u3057\u3066\u3044\u308B\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8 <strong>${total}</strong> \u4EF6\u306E\u3046\u3061\u3001\u4E00\u89A7\u3067\u30A2\u30A4\u30B3\u30F3\u307E\u3067\u8868\u793A\u3067\u304D\u3066\u3044\u308B\u306E\u306F <strong>${s.resolvedAvatar}</strong> \u4EF6\u3001\u30E6\u30FC\u30B6\u30FCID\u304C\u4ED8\u3044\u3066\u3044\u308B\u306E\u306F <strong>${s.withUid}</strong> \u4EF6\u3067\u3059\u3002`
@@ -10106,6 +10108,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   var storageRefreshMaxWaitTimer = null;
   var STORAGE_REFRESH_COALESCE_MS = 550;
   var STORAGE_REFRESH_MAX_WAIT_MS = 2200;
+  var initialRefreshDone = false;
   function isHighFrequencyCommentRelatedStorageKey(key) {
     const k = String(key || "");
     if (/^nls_comments_/i.test(k)) return true;
@@ -10117,6 +10120,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   function scheduleCoalescedStorageRefresh(changes, runRefresh) {
     const keys = Object.keys(changes || {});
     if (!keys.length) return;
+    if (!initialRefreshDone) {
+      runRefresh();
+      return;
+    }
     const allHighFreq = keys.every(
       (k) => isHighFrequencyCommentRelatedStorageKey(k)
     );
@@ -10272,6 +10279,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         if (!isExtensionContextInvalidatedError(e)) {
         }
       }).finally(() => {
+        initialRefreshDone = true;
         requestAnimationFrame(() => {
           applyResponsivePopupLayout();
           correctSupportVisualScrollIfOpen();
@@ -11468,13 +11476,27 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     } catch {
     }
+    const POLL_INTERVAL_MS = INLINE_MODE ? 1e4 : 3e4;
     setInterval(() => {
       if (!hasExtensionContext()) return;
       if (typeof document !== "undefined" && document.hidden) return;
       watchMetaCache.key = "";
       watchMetaCache.snapshot = null;
       safeRefresh();
-    }, 3e4);
+    }, POLL_INTERVAL_MS);
+    if (INLINE_MODE || INLINE_SIDE_PANEL) {
+      let lastVisibilityRefresh = Date.now();
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") return;
+        if (!hasExtensionContext()) return;
+        const now = Date.now();
+        if (now - lastVisibilityRefresh < POLL_INTERVAL_MS) return;
+        lastVisibilityRefresh = now;
+        watchMetaCache.key = "";
+        watchMetaCache.snapshot = null;
+        safeRefresh();
+      });
+    }
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initPopup);
