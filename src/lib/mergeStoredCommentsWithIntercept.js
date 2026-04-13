@@ -41,7 +41,7 @@ export function mergeStoredCommentsWithIntercept(entries, items) {
     const curNick = String(/** @type {{ nickname?: unknown }} */ (e)?.nickname || '').trim();
     const curAv = String(/** @type {{ avatarUrl?: unknown }} */ (e)?.avatarUrl || '').trim();
 
-    let out = /** @type {Record<string, unknown>} */ ({ .../** @type {object} */ (e) });
+    const out = /** @type {Record<string, unknown>} */ ({ .../** @type {object} */ (e) });
     let changed = false;
 
     if (hit.uid) {
