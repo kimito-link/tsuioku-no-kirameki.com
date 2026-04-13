@@ -15,7 +15,7 @@ describe('storyUserLaneGuideHtml', () => {
     const top = buildStoryUserLaneGuideTopHtml(FACE_RINK);
     const konta = buildStoryUserLaneGuideKontaHtml(FACE_KONTA);
     const tanu = buildStoryUserLaneGuideTanuHtml(FACE_TANU);
-    expect(top).toContain('りんく:');
+    expect(top).toContain('link:');
     expect(top).not.toContain('こん太:');
     expect(top).not.toContain('たぬ姉:');
     expect(konta).toContain('こん太:');

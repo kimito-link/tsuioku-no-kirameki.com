@@ -57,6 +57,7 @@ export function supportGridStrongNickname(nick, userId) {
   if (isNiconicoAutoUserPlaceholderNickname(n)) return false;
   if (n === '（未取得）' || n === '(未取得)') return false;
   if (n === '匿名') return false;
+  if (n === 'ゲスト' || /^guest$/i.test(n)) return false;
   if (isNiconicoAnonymousUserId(userId) && n.length <= 1) return false;
   return true;
 }

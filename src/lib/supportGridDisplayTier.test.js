@@ -16,6 +16,8 @@ describe('supportGridStrongNickname', () => {
     expect(supportGridStrongNickname('', '1')).toBe(false);
     expect(supportGridStrongNickname('（未取得）', '1')).toBe(false);
     expect(supportGridStrongNickname('匿名', 'a:abc')).toBe(false);
+    expect(supportGridStrongNickname('ゲスト', '12345')).toBe(false);
+    expect(supportGridStrongNickname('guest', '12345')).toBe(false);
   });
 
   it('通常の表示名は強い', () => {
