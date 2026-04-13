@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>君斗りんくの追憶の煌めき ― Web・iOS・Android と Chrome 拡張を前提に</title>
+    <title>君斗りんくの追憶の煌めき ― 取りこぼしにくく、あとから育つコメント記録へ</title>
 
     <link rel="icon" href="images/favicon.ico" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 
-    <meta name="description" content="Web・iOS・Android を前提とした体験のもと、ニコ生視聴まわりを支える Chrome 拡張。応援コメントを記録し、誰がどれだけ心を込めてくれたかを手元でひとめにできます。YouTube をはじめとした他プラットフォームへの対応も計画中です。">
+    <meta name="description" content="記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。長時間配信でもコメント記録を貯めて育てやすく、画面が一時的に不安定でも復元しやすい運用を目指します。">
     <meta name="theme-color" content="#0a1228">
     <link rel="manifest" href="site.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -22,8 +22,8 @@
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://tsuioku-no-kirameki.com/">
-    <meta property="og:title" content="君斗りんくの追憶の煌めき ― Web・iOS・Android と Chrome 拡張">
-    <meta property="og:description" content="流れ星みたいに消えていくコメントを、星座みたいに、つながりが残る世界へ。Web・モバイルを前提に、視聴まわりは Chrome 拡張で応援を手元に残します。YouTube 等への対応も計画中です。">
+    <meta property="og:title" content="君斗りんくの追憶の煌めき ― 取りこぼしにくく、あとから育つコメント記録へ">
+    <meta property="og:description" content="記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。コメント記録をその場だけで終わらせず、長時間配信でも積み上げやすい運用を目指します。">
     <meta property="og:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">
@@ -33,8 +33,8 @@
     <meta property="og:locale" content="ja_JP">
 
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="君斗りんくの追憶の煌めき ― Web・iOS・Android と Chrome 拡張">
-    <meta name="twitter:description" content="Web・モバイルを前提に、視聴まわりは Chrome 拡張で応援を手元に残します。YouTube 等への対応も計画中です。">
+    <meta name="twitter:title" content="君斗りんくの追憶の煌めき ― 取りこぼしにくく、あとから育つコメント記録へ">
+    <meta name="twitter:description" content="記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。コメント記録を貯めて育てやすい導線を、誇張せずに整理しています。">
     <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
     <meta name="twitter:image:alt" content="追憶の煌めき ― 流れ星みたいに消えていくコメントを、星座みたいに、つながりが残る世界へ。">
     <style>
@@ -369,6 +369,51 @@
       .board h3{margin:0 0 var(--space-sm);font-size:clamp(1.12rem,3.8vw,1.26rem);line-height:var(--lh-heading)}
       .board p{margin:0;color:var(--text-secondary);line-height:var(--lh-body)}
       .board p + p{margin-top:var(--space-sm)}
+      .lp-record-hero-stats{margin-top:18px}
+      .lp-record-grid,.lp-record-proof{
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));
+        gap:16px
+      }
+      .lp-record-card,.lp-record-proof__item{
+        padding:clamp(18px,3vw,22px);
+        border-radius:24px;
+        background:rgba(255,252,247,.88);
+        border:1px solid rgba(88,62,28,.1);
+        box-shadow:var(--shadow)
+      }
+      .lp-record-card h3,.lp-record-proof__item h3{
+        margin:0 0 10px;
+        font-size:clamp(1.04rem,2.8vw,1.18rem);
+        line-height:var(--lh-heading)
+      }
+      .lp-record-card p,.lp-record-proof__item p{
+        margin:0;
+        color:var(--text-secondary);
+        line-height:var(--lh-body)
+      }
+      .lp-record-proof__item strong{
+        display:block;
+        margin-bottom:8px;
+        color:var(--ink);
+        font-size:.86rem;
+        letter-spacing:.04em;
+        text-transform:uppercase
+      }
+      .lp-record-transparency-list{
+        margin:16px 0 0;
+        padding-left:1.2rem;
+        color:var(--text-secondary);
+        line-height:var(--lh-body)
+      }
+      .lp-record-transparency-list li + li{margin-top:10px}
+      .lp-record-cta__actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:20px}
+      .lp-record-cta__note{
+        margin-top:16px;
+        color:var(--text-secondary);
+        line-height:var(--lh-body);
+        font-size:clamp(.9rem,2.5vw,.96rem)
+      }
       .yukkuri-thread{display:grid;gap:18px;margin-top:20px}
       .y-row{display:grid;grid-template-columns:minmax(50px,76px) minmax(0,1fr);gap:10px;align-items:start}
       .y-row.reverse{grid-template-columns:minmax(0,1fr) minmax(50px,76px)}
@@ -498,6 +543,55 @@
       }
       .lp-mkt-advice-lead--before-list{margin-bottom:10px}
       .lp-feature-board .lp-mkt-yukkuri{margin-top:2px}
+      .lp-html-report-preview__surface{
+        border-radius:22px;
+        border:1px solid rgba(100,140,180,.18);
+        background:linear-gradient(180deg,rgba(247,250,255,.98),rgba(236,244,252,.94));
+        box-shadow:0 18px 44px rgba(70,49,20,.08);
+        padding:clamp(16px,3vw,22px)
+      }
+      .lp-html-report-preview__toolbar{
+        display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center
+      }
+      .lp-html-report-preview__file{
+        display:inline-flex;align-items:center;min-height:32px;padding:0 12px;border-radius:999px;
+        background:rgba(255,255,255,.92);border:1px solid rgba(88,62,28,.12);
+        color:#1e3a5c;font-size:.78rem;font-weight:700;line-height:1.35
+      }
+      .lp-html-report-preview__pill{
+        display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;
+        background:#fff7e6;border:1px solid rgba(201,142,43,.28);
+        color:#8a5a0a;font-size:.72rem;font-weight:700;line-height:1.3
+      }
+      .lp-html-report-preview__search{
+        display:flex;align-items:center;gap:10px;
+        margin-top:14px;padding:12px 14px;border-radius:16px;
+        background:rgba(255,255,255,.96);border:1px solid rgba(100,140,180,.2)
+      }
+      .lp-html-report-preview__search-icon{
+        display:grid;place-items:center;
+        width:28px;height:28px;border-radius:999px;
+        background:rgba(37,93,155,.08);color:#255d9b;font-size:.98rem;font-weight:700;flex-shrink:0
+      }
+      .lp-html-report-preview__search-label{
+        color:var(--text-secondary);font-size:.82rem;line-height:var(--lh-ui)
+      }
+      .lp-html-report-preview__panel{
+        margin-top:14px;padding:16px 14px;border-radius:18px;
+        background:rgba(255,255,255,.92);border:1px solid rgba(100,140,180,.18)
+      }
+      .lp-html-report-preview__panel h3{
+        margin:0 0 8px;font-size:clamp(1.02rem,2.8vw,1.15rem);line-height:var(--lh-heading)
+      }
+      .lp-html-report-preview__panel p{
+        margin:0;color:var(--text-secondary);line-height:var(--lh-body)
+      }
+      .lp-html-report-preview__note{
+        margin-top:10px;
+        font-size:.78rem;
+        line-height:1.6;
+        color:#5f6472
+      }
       /* マーケ分析 .html のレイアウト見本（実ファイルと同系のダークUI・架空データ） */
       .lp-mkt-html-preview{
         margin:var(--space-lg) auto 0;width:100%;max-width:min(100%,64rem)
@@ -537,6 +631,7 @@
       .lp-mkt-mock-ul{margin:.35rem 0 0;padding-left:1.1rem;color:#cbd5e1;font-size:.72em;line-height:1.55}
       .lp-mkt-mock-ul li{margin:.3em 0 0}
       .lp-mkt-mock-advice{display:flex;gap:.55rem;align-items:flex-start;margin-top:.45rem}
+      .lp-mkt-mock-advice + .lp-mkt-mock-advice{margin-top:.55rem}
       .lp-mkt-mock-advice img{
         width:clamp(40px,10vw,48px);height:clamp(40px,10vw,48px);object-fit:contain;flex-shrink:0;
         border-radius:10px;background:#0f172a;border:1px solid #334155
@@ -562,6 +657,34 @@
       .lp-mkt-mock-legend{display:flex;flex-direction:column;gap:.25rem;font-size:.68em}
       .lp-mkt-mock-legend span{display:flex;align-items:center;gap:.3rem}
       .lp-mkt-mock-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+      .lp-mkt-mock-visitors{
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));
+        gap:.45rem;
+        margin-top:.35rem
+      }
+      .lp-mkt-mock-visitor{
+        display:flex;align-items:center;gap:.45rem;
+        padding:.4rem .45rem;border-radius:10px;
+        background:#0f172a;border:1px solid #334155
+      }
+      .lp-mkt-mock-visitor img,.lp-mkt-mock-visitor .lp-mock-identicon{
+        width:28px;height:28px;flex-shrink:0
+      }
+      .lp-mkt-mock-visitor .lp-mock-identicon{border-color:rgba(148,163,184,.3)}
+      .lp-mkt-mock-visitor-text{
+        min-width:0;
+        display:grid;
+        gap:.08rem
+      }
+      .lp-mkt-mock-visitor-id{
+        font-size:.62em;color:#94a3b8;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+      }
+      .lp-mkt-mock-visitor-name{
+        font-size:.7em;color:#f8fafc;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+      }
       .lp-mkt-mock-table{width:100%;border-collapse:collapse;font-size:.68em;margin-top:.35rem}
       .lp-mkt-mock-table td{padding:.28rem .3rem;border-bottom:1px solid #0f172a;vertical-align:middle}
       .lp-mkt-mock-table .n{width:1.5rem;color:#64748b;text-align:right}
@@ -709,6 +832,11 @@
         text-align:center;
         color:rgba(200,192,180,.72);font-size:clamp(.78rem,2.4vw,.85rem);line-height:1.55;
         background:#080f22
+      }
+      .footer-note__credit{
+        margin-top:6px;
+        color:rgba(212,228,240,.72);
+        font-size:clamp(.72rem,2.2vw,.8rem)
       }
       .lp-policy-board{
         border:1px solid rgba(88,62,28,.12);
@@ -4312,7 +4440,7 @@
       /* ── Epilogue coda (closing mirror of hero) ── */
       .lp-coda{
         position:relative;overflow:hidden;
-        padding:clamp(64px,12vw,120px) 0 clamp(56px,10vw,100px);
+        padding:clamp(64px,12vw,120px) 0 clamp(104px,18vw,168px);
         background:
           linear-gradient(180deg,
             var(--bg2) 0%,
@@ -4372,8 +4500,17 @@
         color:rgba(240,232,220,.85);
         font-style:italic
       }
+      .lp-coda__nagi{
+        margin:clamp(20px,4vw,30px) auto 0;
+        max-width:min(36rem,88vw);
+        font-family:"Yu Mincho","Hiragino Mincho ProN",serif;
+        font-size:clamp(.95rem,2.45vw,1.08rem);
+        line-height:1.9;
+        letter-spacing:.06em;
+        color:rgba(218,232,242,.84)
+      }
       .lp-coda__dots{
-        margin:clamp(28px,5vw,44px) 0 0;
+        margin:clamp(22px,4vw,34px) 0 0;
         font-size:1.1rem;line-height:2;
         color:rgba(200,192,180,.35);
         letter-spacing:.2em
@@ -4413,41 +4550,172 @@
       }
       /* ── Coda drop effect ── */
       @keyframes lp-drop-fall{
-        0%{transform:translateY(-18px) scale(.6);opacity:0}
-        15%{opacity:1}
-        70%{opacity:.7}
-        100%{transform:translateY(clamp(120px,22vh,200px)) scale(1);opacity:0}
+        0%{transform:translateY(-20px) scale(.58);opacity:0}
+        18%{opacity:1}
+        58%{transform:translateY(clamp(150px,24vh,230px)) scale(.92);opacity:.84}
+        100%{transform:translateY(clamp(290px,48vh,430px)) scale(1.04);opacity:0}
       }
-      @keyframes lp-drop-ripple{
-        0%{transform:translate(-50%,-50%) scale(0);opacity:.5}
-        60%{opacity:.2}
-        100%{transform:translate(-50%,-50%) scale(1);opacity:0}
+      @keyframes lp-coda-pool-breathe{
+        0%,100%{transform:translateX(-50%) scaleX(.95) scaleY(.94);opacity:.82}
+        50%{transform:translateX(-50%) scaleX(1.04) scaleY(1);opacity:.96}
+      }
+      @keyframes lp-coda-pool-sheen{
+        0%{transform:translateX(-58%)}
+        100%{transform:translateX(58%)}
+      }
+      @keyframes lp-coda-pool-drop{
+        0%{transform:translate(-50%,var(--fall-start,-92px)) scale(.72);opacity:0}
+        18%{opacity:.96}
+        84%{opacity:.92}
+        100%{transform:translate(-50%,-4px) scale(.98);opacity:0}
+      }
+      @keyframes lp-coda-pool-impact{
+        0%{transform:translate(-50%,-50%) scale(.2);opacity:0}
+        22%{opacity:.95}
+        100%{transform:translate(-50%,-50%) scale(1.5);opacity:0}
+      }
+      @keyframes lp-coda-pool-ripple{
+        0%{transform:translate(-50%,-50%) scale(.16);opacity:0}
+        12%{opacity:.72}
+        100%{transform:translate(-50%,-50%) scale(1.18);opacity:0}
       }
       .lp-coda__drops{
         position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden
       }
       .lp-coda__drop{
         position:absolute;
-        width:6px;height:9px;
+        width:7px;height:11px;
         border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
-        background:linear-gradient(180deg,rgba(180,210,240,.5),rgba(140,180,220,.25));
-        filter:blur(.5px);
+        background:linear-gradient(180deg,rgba(215,236,255,.72),rgba(123,178,226,.34));
+        box-shadow:0 0 10px rgba(158,210,255,.18);
+        filter:blur(.35px);
         animation:lp-drop-fall 4s ease-in infinite
       }
       .lp-coda__drop::after{
         content:"";position:absolute;
-        left:50%;top:100%;
-        width:24px;height:8px;
-        border-radius:50%;
-        background:radial-gradient(ellipse,rgba(160,200,240,.2),transparent 70%);
-        animation:lp-drop-ripple 4s ease-out infinite;
-        animation-delay:inherit
+        left:1px;right:1px;top:1px;
+        height:55%;
+        border-radius:inherit;
+        background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,0));
+        opacity:.9
       }
-      .lp-coda__drop:nth-child(1){left:18%;top:22%;animation-delay:0s;animation-duration:4.2s}
-      .lp-coda__drop:nth-child(2){left:50%;top:18%;animation-delay:1.4s;animation-duration:3.6s;width:4px;height:7px}
-      .lp-coda__drop:nth-child(3){left:78%;top:25%;animation-delay:2.8s;animation-duration:4.8s;width:5px;height:8px}
-      .lp-coda__drop:nth-child(4){left:35%;top:15%;animation-delay:3.5s;animation-duration:3.9s;width:3px;height:5px;opacity:.6}
-      .lp-coda__drop:nth-child(5){left:65%;top:20%;animation-delay:0.7s;animation-duration:4.5s;width:5px;height:7px;opacity:.7}
+      .lp-coda__drop:nth-child(1){left:16%;top:20%;animation-delay:0s;animation-duration:4.2s}
+      .lp-coda__drop:nth-child(2){left:32%;top:16%;animation-delay:1s;animation-duration:3.7s;width:4px;height:7px;opacity:.7}
+      .lp-coda__drop:nth-child(3){left:49%;top:18%;animation-delay:1.8s;animation-duration:4.4s;width:5px;height:8px}
+      .lp-coda__drop:nth-child(4){left:66%;top:15%;animation-delay:2.9s;animation-duration:3.9s;width:4px;height:6px;opacity:.68}
+      .lp-coda__drop:nth-child(5){left:81%;top:21%;animation-delay:.6s;animation-duration:4.8s;width:6px;height:9px;opacity:.74}
+      .lp-coda__drop:nth-child(6){left:57%;top:11%;animation-delay:3.4s;animation-duration:4.1s;width:3px;height:5px;opacity:.6}
+      .lp-coda__drop:nth-child(7){left:24%;top:12%;animation-delay:2.3s;animation-duration:4.6s;width:5px;height:7px;opacity:.64}
+      .lp-coda__waterscape{
+        position:absolute;left:0;right:0;bottom:0;height:clamp(132px,24vw,196px);
+        pointer-events:none;z-index:0;overflow:hidden
+      }
+      .lp-coda__waterscape::before{
+        content:"";position:absolute;left:50%;bottom:-6%;
+        width:min(860px,110vw);height:100%;
+        transform:translateX(-50%);
+        background:
+          radial-gradient(ellipse at 50% 72%,rgba(155,212,255,.24) 0%,rgba(79,140,214,.12) 38%,rgba(8,16,38,0) 74%),
+          radial-gradient(ellipse at 50% 92%,rgba(7,13,31,.62) 0%,rgba(7,13,31,0) 74%)
+      }
+      .lp-coda__pool{
+        position:absolute;left:50%;bottom:clamp(10px,2vw,18px);
+        width:min(720px,88vw);height:clamp(62px,10vw,94px);
+        transform:translateX(-50%);
+        overflow:visible;
+        border-radius:50%;
+        border:1px solid rgba(182,222,250,.18);
+        background:
+          radial-gradient(ellipse at 50% 38%,rgba(232,247,255,.34) 0%,rgba(176,217,246,.18) 18%,rgba(80,132,190,.2) 44%,rgba(13,31,67,.7) 78%,rgba(8,16,38,.08) 100%);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.24),
+          0 -10px 28px rgba(77,147,214,.16),
+          0 30px 56px rgba(0,0,0,.28);
+        opacity:.84;
+        animation:lp-coda-pool-breathe 8s ease-in-out infinite
+      }
+      .lp-coda__pool::before{
+        content:"";position:absolute;left:16%;right:16%;top:18%;height:24%;
+        border-radius:50%;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.34),transparent);
+        filter:blur(4px);
+        animation:lp-coda-pool-sheen 8s linear infinite
+      }
+      .lp-coda__pool::after{
+        content:"";position:absolute;left:50%;bottom:26%;
+        width:min(460px,64vw);height:clamp(12px,1.9vw,18px);
+        transform:translateX(-50%);
+        border-radius:50%;
+        background:radial-gradient(ellipse,rgba(215,238,255,.28),rgba(215,238,255,0) 72%);
+        opacity:.7
+      }
+      .lp-coda__pool-event{
+        position:absolute;
+        left:50%;top:45%;
+        width:0;height:0;
+        pointer-events:none
+      }
+      .lp-coda__pool-fall{
+        position:absolute;
+        left:0;top:0;
+        width:8px;height:14px;
+        border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+        background:linear-gradient(180deg,rgba(238,249,255,.98),rgba(157,210,248,.78) 58%,rgba(103,163,214,.18));
+        box-shadow:0 0 10px rgba(173,225,255,.18);
+        transform:translate(-50%,-92px);
+        opacity:0
+      }
+      .lp-coda__pool-fall::after{
+        content:"";
+        position:absolute;left:1px;right:1px;top:1px;height:54%;
+        border-radius:inherit;
+        background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,0))
+      }
+      .lp-coda__pool-impact{
+        position:absolute;
+        left:0;top:0;
+        width:18px;height:9px;
+        border-radius:50%;
+        background:radial-gradient(ellipse,rgba(236,249,255,.92),rgba(167,220,255,.28) 55%,rgba(167,220,255,0) 74%);
+        transform:translate(-50%,-50%) scale(.2);
+        opacity:0
+      }
+      .lp-coda__pool-ripple{
+        position:absolute;
+        left:0;top:0;
+        width:clamp(70px,12vw,120px);height:clamp(20px,3vw,30px);
+        border-radius:50%;
+        border:1px solid rgba(199,232,255,.42);
+        transform:translate(-50%,-50%) scale(.18);
+        opacity:0
+      }
+      .lp-coda__pool-ripple::after{
+        content:"";
+        position:absolute;inset:0;
+        border-radius:inherit;
+        border:inherit;
+        opacity:0
+      }
+      .lp-coda__pool-event.is-active .lp-coda__pool-fall{
+        animation:lp-coda-pool-drop .66s cubic-bezier(.2,.72,.18,1) both
+      }
+      .lp-coda__pool-event.is-active .lp-coda__pool-impact{
+        animation:lp-coda-pool-impact .88s ease-out .48s both
+      }
+      .lp-coda__pool-event.is-active .lp-coda__pool-ripple{
+        animation:lp-coda-pool-ripple 1.28s ease-out .46s both
+      }
+      .lp-coda__pool-event.is-active .lp-coda__pool-ripple::after{
+        animation:lp-coda-pool-ripple 1.46s ease-out .66s both;
+        border-color:rgba(210,238,255,.24)
+      }
+      .lp-coda--active .lp-coda__pool{
+        opacity:.98;
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.28),
+          0 -12px 34px rgba(104,183,255,.22),
+          0 30px 60px rgba(0,0,0,.3)
+      }
       /* ── Coda verse ripple ── */
       @keyframes lp-coda-ripple{
         0%{width:0;height:0;opacity:.45;border-width:1.5px}
@@ -4472,7 +4740,7 @@
       .lp-coda__verse-ripple:nth-child(2){animation-delay:1.3s}
       .lp-coda__verse-ripple:nth-child(3){animation-delay:2.6s}
       @media (prefers-reduced-motion:reduce){
-        .lp-coda__glow,.lp-coda__drops,.lp-coda__verse-ripples{display:none}
+        .lp-coda__glow,.lp-coda__drops,.lp-coda__verse-ripples,.lp-coda__pool-event{display:none}
       }
 
       /* ── In-app browser hint ── */
@@ -4496,6 +4764,8 @@
     <div id="page-top" aria-hidden="true"></div>
     <audio id="lp-bgm" loop preload="none" playsinline style="display:none"
            src="https://kimito-link.com/kobou/reply-copilot-story/music/shooting-star-wish-music.mp3"></audio>
+    <audio id="lp-water-drop" preload="auto" playsinline style="display:none"
+           src="../src/sound/Water_Drop01/Water_Drop01-5(Low-Dry).mp3"></audio>
 
     <header class="topbar" id="site-header">
       <div class="shell topbar-inner">
@@ -4516,6 +4786,9 @@
       <p class="topbar__drawer-hint" aria-hidden="true">ページ内リンク</p>
       <nav class="topbar__nav" aria-label="主要リンク">
           <a href="#worldview">はじめに</a>
+          <a href="#record-foundation">記録安定</a>
+          <a href="#record-results">改善実績</a>
+          <a href="#record-transparency">透明性</a>
           <a href="#tanabata-preview">七夕プレビュー</a>
           <a href="#voices">タイムライン</a>
           <a href="#context-scale">背景の数字</a>
@@ -4523,6 +4796,7 @@
           <a href="#extension-visual">拡張の見え方</a>
           <a href="#lp-comment-compose-guide">コメント送信</a>
           <a href="#lp-anonymous-identicon">匿名 Identicon</a>
+          <a href="#html-save">HTML保存</a>
           <a href="#marketing-features">マーケ分析</a>
           <a href="#marketing-what-you-can-do">分析の読み方</a>
           <a href="#problem">問題</a>
@@ -4530,8 +4804,9 @@
           <a href="#comments">配信コメント</a>
           <a href="#extension-guide">画面の見方</a>
           <a href="#algorithm">同接推定</a>
+          <a href="#solution">解決の方向</a>
           <a href="#product-policy">提供の考え方</a>
-          <a href="#solution" class="cta">解決の方向</a>
+          <a href="#record-cta" class="cta">導入・試用</a>
         </nav>
       <p class="topbar__drawer-intro">
         <strong>君斗りんくの追憶の煌めき</strong> — 応援が流れてしまう現実と、「なかったことにしたくない」気持ちに寄り添うページです。Web・iOS・Android と Chrome 拡張を前提に整理しています。見え方や仕組みは、上のリンクから章ごとにたどれます。今後、<strong>YouTube</strong> をはじめとした<strong>他の配信プラットフォーム</strong>への対応も視野に入れています。
@@ -4571,9 +4846,9 @@
             <h2 id="worldview-heading" class="lp-worldview__heading">届いていたかな、って思ったこと</h2>
             <p class="lp-worldview__kl-eyebrow">キミとつながる、シンセカイの実現へ</p>
 
-            <div class="lp-title-stage" role="img" aria-label="君斗りんくの 追憶の煌めき（きらめき）。蒼く流れるキミの涙を、ボクは受け止める。雫の装飾、流れ星とコメントが流れるイメージ">
-              <p class="lp-title-stage__verse lp-title-stage__verse--tl" lang="ja" aria-hidden="true">蒼く流れるキミの涙を</p>
-              <p class="lp-title-stage__verse lp-title-stage__verse--br" lang="ja" aria-hidden="true">ボクは受け止める</p>
+            <div class="lp-title-stage" role="img" aria-label="君斗りんくの 追憶の煌めき（きらめき）。蒼く流れるキミの涙のしずくを、ボクは全部受け止める。雫の装飾、流れ星とコメントが流れるイメージ">
+              <p class="lp-title-stage__verse lp-title-stage__verse--tl" lang="ja" aria-hidden="true">蒼く流れるキミの涙のしずくを</p>
+              <p class="lp-title-stage__verse lp-title-stage__verse--br" lang="ja" aria-hidden="true">ボクは全部受け止める</p>
               <div class="lp-title-stage__drops" aria-hidden="true">
                 <div class="lp-title-stage__tear-layer">
                   <span class="lp-title-stage__tear-drop"></span>
@@ -5144,17 +5419,16 @@
       <section class="hero">
         <div class="shell hero-grid">
           <article class="hero-copy fade">
-            <div class="eyebrow">Oshi Log, Not Approval Race</div>
+            <div class="eyebrow">Comment Record, Built To Recover</div>
             <h1>
-              <strong>いいねゼロ</strong>だけじゃない。
-              <strong>コメントを読んでもらえたか分からない</strong>、配信で<strong>名前を呼んでもらえなかった</strong>──
-              応援をなかったことにしない。
+              <strong>取りこぼしにくく、</strong>
+              あとから育つコメント記録へ。
             </h1>
             <p class="lead">
-              SNS の「いいね」に限らず、ライブ配信では<strong>コメントが流れて拾われなかった気がする</strong>、
-              <strong>自分の名前が呼ばれなかった</strong>ことまで、応援の熱が薄く感じられます。
-              ここではまず、<strong>読まれなかった・呼ばれなかった</strong>あとの静かな胸のあたりに寄り添う語りから入ります。
-              仕組みの説明や数字・機能の話は、そのあとで続けます。
+              ファイル保存も含む保存基盤を強めたことで、コメントが<strong>あとから増える</strong>だけではなく、
+              <strong>記録データを残す土台そのもの</strong>を安定させました。
+              配信中の保存、保存済みデータへの<strong>後補完</strong>、配信終了後の一括 deep harvest による<strong>配信終了後回収</strong>を分けて積み上げ、
+              長時間配信でも「記録を貯めて育てる」運用に寄せています。完全保証とは書かず、欠落を減らし、復元しやすい前提を丁寧に整える方向です。
             </p>
             <ul class="lp-partner-logos lp-partner-logos--hero lp-partner-logos--single" aria-label="Kimito-Link Project（キミトリンクプロジェクト）ワードマーク">
               <li>
@@ -5164,8 +5438,22 @@
               </li>
             </ul>
             <div class="actions">
-              <a class="btn primary" href="#problem">なぜ必要かを見る</a>
-              <a class="btn secondary" href="#solution">どう断ち切るかを見る</a>
+              <a class="btn primary" href="#record-foundation">なぜ強いかを見る</a>
+              <a class="btn secondary" href="#record-cta">導入・試用へ進む</a>
+            </div>
+            <div class="stats lp-record-hero-stats" aria-label="記録改善の3つの要点">
+              <div class="stat">
+                <strong>記録安定</strong>
+                <span>保存基盤を強め、初回保存の欠落を減らしやすい土台へ。</span>
+              </div>
+              <div class="stat">
+                <strong>後補完</strong>
+                <span>保存済みデータにあとから情報を足し、記録を育てやすくしました。</span>
+              </div>
+              <div class="stat">
+                <strong>配信終了後回収</strong>
+                <span>終了後の一括取得で、配信中に追い切れなかった分の回収余地を残します。</span>
+              </div>
             </div>
           </article>
 
@@ -5199,6 +5487,114 @@
               <div class="stand"><img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" alt="ゆっくりたぬ姉"><span>たぬ姉</span></div>
         </div>
       </aside>
+        </div>
+      </section>
+
+      <section class="section lp-record-foundation" id="record-foundation" aria-labelledby="record-foundation-heading">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="record-foundation-heading">なぜ強いか: 保存基盤 + 後補完 + 配信終了後回収</h2>
+            <p>
+              コメントが後から増えるだけでは、土台が弱いままです。保存経路を先に強め、
+              保存済みデータへの後補完と配信終了後の一括回収を分けて設計することで、
+              配信中も配信後もコメント記録を積み上げやすくしています。
+            </p>
+          </div>
+          <div class="lp-record-grid">
+            <article class="lp-record-card fade d1">
+              <h3>1. 保存基盤を先に強くする</h3>
+              <p>
+                ファイル保存も含む保存基盤を見直し、流れている最中のコメントをまず記録として残しやすくしました。
+                最初の取り込みで全部そろわなくても、記録の核が残る前提に寄せています。
+              </p>
+            </article>
+            <article class="lp-record-card fade d2">
+              <h3>2. 保存済みデータへ後補完できる</h3>
+              <p>
+                初動で userId・表示名・アイコン列の材料を取りこぼしても、
+                保存済みデータへあとから足せる設計です。コメント記録を「その瞬間だけ」で終わらせません。
+              </p>
+            </article>
+            <article class="lp-record-card fade d3">
+              <h3>3. 配信終了後も深掘り回収を狙える</h3>
+              <p>
+                配信終了後の一括取得で deep harvest を走らせ、配信中に追いつかなかった分の回収を狙えます。
+                長時間配信でも、記録データを貯めて育てる運用に向く構成です。
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="record-results" aria-labelledby="record-results-heading">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="record-results-heading">改善実績: 取得安定と回収力の底上げ</h2>
+            <p>
+              ここで言う改善実績は「完全に残る」という意味ではありません。
+              取りこぼしにくさ、あとから埋め直せる余地、配信終了後に回収を狙える幅が前より増えたことを丁寧に伝えます。
+            </p>
+          </div>
+          <div class="lp-record-proof">
+            <article class="lp-record-proof__item fade d1">
+              <strong>取得安定</strong>
+              <h3>初回保存の欠落を減らしやすく</h3>
+              <p>コメントがあとから増える前提だけに頼らず、まず保存の土台を安定させる方向で改善しています。</p>
+            </article>
+            <article class="lp-record-proof__item fade d2">
+              <strong>回収力向上</strong>
+              <h3>後補完と終了後回収を両立</h3>
+              <p>保存済みデータへの後補完と、配信終了後の一括 deep harvest を組み合わせ、初動で落ちた情報の回復余地を増やしました。</p>
+            </article>
+            <article class="lp-record-proof__item fade d3">
+              <strong>復元しやすさ</strong>
+              <h3>画面が不安定でも記録を起点に戻しやすい</h3>
+              <p>配信画面が一時的に崩れても、残っている記録データをもとに補完や再集計を進めやすい構造です。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="record-transparency" aria-labelledby="record-transparency-heading">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="record-transparency-heading">まだ改善中の点も、先に書きます</h2>
+            <p>
+              信頼感のために、強いところだけではなく限界も明記します。
+              LP では「どこまで改善したか」と「まだ改善中の課題」を分けて示します。
+            </p>
+          </div>
+          <div class="board fade d1">
+            <h3>透明性のある前提</h3>
+            <p>改善は進んでいますが、完全保証とは書きません。実運用で起きるズレも、最初から共有します。</p>
+            <ul class="lp-record-transparency-list">
+              <li><strong>完全保証ではありません。</strong> 記録安定・後補完・配信終了後回収を積み上げていますが、放送の全コメントが必ず残るとは言い切りません。</li>
+              <li><strong>アイコン列の精度は改善中です。</strong> アイコンやプロフィール情報は別経路で遅れて届くことがあり、後補完でそろう場面もあれば欠ける場面もあります。</li>
+              <li><strong>UI変化の影響は受けます。</strong> 画面が不安定でも復元しやすくしていますが、元データ側に現れなかった情報まで無条件に戻せるわけではありません。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="record-cta" aria-labelledby="record-cta-heading">
+        <div class="shell">
+          <div class="board fade d1">
+            <div class="section-head" style="margin-bottom:0">
+              <h2 id="record-cta-heading">導入前に、試用判断に必要なところだけ見る</h2>
+              <p>
+                導入イメージと、実際に何がどこまで残るかを先に確認できます。
+                誇張ではなく、使い始める前に把握しておきたい要点へすぐ飛べる CTA にしています。
+              </p>
+            </div>
+            <div class="lp-record-cta__actions">
+              <a class="btn primary" href="#extension-visual">導入イメージを見る</a>
+              <a class="btn secondary" href="#extension-guide">試用前に記録の流れを見る</a>
+            </div>
+            <p class="lp-record-cta__note">
+              価格ページのようなディレクトリ導線を増やす前でも、LP 内で
+              「何が強くなったか」「どこがまだ改善中か」「どこから試すか」を迷わず追える構成です。
+            </p>
+          </div>
         </div>
       </section>
       </div>
@@ -6337,6 +6733,110 @@
         </div>
       </section>
 
+      <section class="section" id="html-save" aria-labelledby="html-save-heading">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="html-save-heading">HTML保存: 来てくれた人がサムネ付きで分かる</h2>
+            <p>
+              まず残したいのは、グラフより前に<strong>その枠に誰が来てくれたか</strong>をあとから辿れることです。
+              HTML保存では、記録に残ったコメントを<strong>サムネ・表示名・匿名 Identicon</strong>付きで振り返りやすくし、
+              長時間配信でも顔ぶれの記憶を残しやすい方向をLP上で見せます。
+            </p>
+          </div>
+          <div class="board fade d1">
+            <div class="lp-html-report-preview__surface" data-lp-feature="html-save-avatar-preview">
+              <div class="lp-html-report-preview__toolbar">
+                <span class="lp-html-report-preview__file">nicolivelog-report-lv123456789.html</span>
+                <span class="lp-html-report-preview__pill">ローカル保存</span>
+                <span class="lp-html-report-preview__pill">検索可</span>
+                <span class="lp-html-report-preview__pill">サムネ付き振り返り</span>
+              </div>
+              <div class="lp-html-report-preview__search" aria-hidden="true">
+                <span class="lp-html-report-preview__search-icon">⌕</span>
+                <span class="lp-html-report-preview__search-label">来てくれた人・コメント本文を、この保存ファイルの中から探せるイメージ</span>
+              </div>
+              <div class="lp-html-report-preview__panel">
+                <h3>来てくれた人がサムネ付きで分かる</h3>
+                <p>
+                  この枠で記録に残った応援コメントの人を、あとから辿りやすくする見本です。
+                  数字の合計だけで終わらず、「誰が来てくれたか」を思い出しやすくします。
+                </p>
+                <div class="lp-site-look-mock__avatar-scroll" aria-hidden="true">
+                  <div class="lp-site-look-mock__avatar-cell">
+                    <div class="lp-mock-identicon lp-mock-identicon--a" aria-hidden="true" title="Identicon 見本"></div>
+                    <span>a:0zxK...</span><span>匿名</span>
+                  </div>
+                  <div class="lp-site-look-mock__avatar-cell">
+                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" width="32" height="32" alt="" decoding="async">
+                    <span>119410388</span><span>ちんたまくん</span>
+                  </div>
+                  <div class="lp-site-look-mock__avatar-cell">
+                    <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" width="32" height="32" alt="" decoding="async">
+                    <span>123192997</span><span>ガチブリ</span>
+                  </div>
+                  <div class="lp-site-look-mock__avatar-cell">
+                    <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" width="32" height="32" alt="" decoding="async">
+                    <span>125222316</span><span>user520...</span>
+                  </div>
+                  <div class="lp-site-look-mock__avatar-cell">
+                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-open.png" width="32" height="32" alt="" decoding="async">
+                    <span>134004020</span><span>sigh2525</span>
+                  </div>
+                  <div class="lp-site-look-mock__avatar-cell">
+                    <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" width="32" height="32" alt="" decoding="async">
+                    <span>27380116</span><span>Tくん</span>
+                  </div>
+                  <div class="lp-site-look-mock__avatar-cell">
+                    <div class="lp-mock-identicon lp-mock-identicon--b" aria-hidden="true" title="Identicon 見本"></div>
+                    <span>a:2YTC...</span><span>匿名</span>
+                  </div>
+                  <div class="lp-site-look-mock__avatar-cell">
+                    <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-closed.png" width="32" height="32" alt="" decoding="async">
+                    <span>91428901</span><span>ネギトロ</span>
+                  </div>
+                  <div class="lp-site-look-mock__avatar-cell">
+                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="32" height="32" alt="" decoding="async">
+                    <span>17403248</span><span>本隊</span>
+                  </div>
+                </div>
+                <p class="lp-html-report-preview__note">
+                  ※「来てくれた人」は、このPCで記録できたコメントと識別情報の範囲です。全視聴者の完全一覧ではありません。
+                </p>
+              </div>
+            </div>
+            <div class="yukkuri-thread fade d2 lp-mkt-yukkuri">
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりりんく" width="92" height="92" loading="lazy" decoding="async">
+                  <span>りんく</span>
+                </div>
+                <div class="bubble">
+                  HTML保存で最初に見たいのは、<strong>その枠に来てくれた人の顔ぶれ</strong>なのだ。グラフの前に、サムネと表示名で「この人たちがいた」を残せると、振り返りの温度がかなり変わるのだ。
+                </div>
+              </div>
+              <div class="y-row reverse">
+                <div class="bubble">
+                  こん太としては、<strong>件数だけよりサムネ付き</strong>のほうがうれしいのだ。あとから見返したとき、「あ、この人も来てたんだ」が分かると、実際の配信の空気を思い出しやすいのだ。
+                </div>
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" alt="ゆっくりこん太" width="92" height="92" loading="lazy" decoding="async">
+                  <span>こん太</span>
+                </div>
+              </div>
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.png" alt="ゆっくりたぬ姉" width="92" height="92" loading="lazy" decoding="async">
+                  <span>たぬ姉</span>
+                </div>
+                <div class="bubble">
+                  将来の有料化を考えるなら、<strong>HTML保存で来てくれた人が分かる土台</strong>は基本機能として残しやすいのだ。料金が乗りやすいのは、この先の比較・深掘り・自動化の層なのだ。
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="marketing-features" aria-labelledby="marketing-features-heading">
         <div class="shell">
           <div class="section-head fade">
@@ -6345,6 +6845,7 @@
               拡張で<strong>このPCに記録した応援コメント</strong>から、<strong>グラフと表が並んだ HTML</strong>（手元用のマーケ分析ページ）を書き出せます。
               ポップアップ内の<strong>開発者向けモニタ</strong>を開き、<strong>「📊 マーケ分析DL」</strong>から保存する流れです（記録が0件のときはボタンが無効になります）。
               生成される .html の末尾には<strong>同じ集計の JSON</strong>も埋め込まれ、表計算や自作スクリプトに渡しやすくなっています（共有向けの伏せ字で保存したときは JSON 内の表示名も同様にマスクします）。
+              HTML保存で<strong>来てくれた人のサムネ一覧</strong>を残し、その先で<strong>KPI・タイムライン・セグメント</strong>まで深掘りする層、と読むと位置づけが分かりやすいです。
               ページのあいだには<strong>りんく・こん太・たぬ姉</strong>の短い<strong>分析メモ</strong>が挟まり、指標の読み方や注意を補います。
               用語のひも解きは<a href="#extension-guide">画面の見方</a>、数字の根っこは<a href="#algorithm">同接推定</a>の節も参照してください。
               <a href="#marketing-html-preview">生成される HTML のレイアウト見本</a>は次の枠、<a href="#marketing-what-you-can-do">表の読み方（三人のアドバイス）</a>はその下です。
@@ -6352,7 +6853,7 @@
           </div>
           <figure class="lp-mkt-html-preview fade d2" id="marketing-html-preview" aria-labelledby="marketing-html-preview-cap">
             <figcaption id="marketing-html-preview-cap" class="lp-mkt-html-preview__cap">
-              <strong>ダウンロードされる .html の見た目（イメージ）</strong> — 保存してブラウザで開く<strong>単体ファイル</strong>で、次のようなダーク基調のページになります（見出し・KPI・グラフ・表のあいだに<strong>りんく・こん太・たぬ姉</strong>の吹き出しが挟まります）。<strong>下の数値・グラフは架空の見本</strong>です。
+              <strong>ダウンロードされる .html の見た目（イメージ）</strong> — 保存してブラウザで開く<strong>単体ファイル</strong>で、次のようなダーク基調のページになります（見出し・<strong>来てくれた人のサムネ一覧</strong>・KPI・グラフ・表のあいだに<strong>りんく・こん太・たぬ姉</strong>の吹き出しが挟まります）。<strong>下の数値・グラフは架空の見本</strong>です。
             </figcaption>
             <div class="lp-mkt-html-preview__body" aria-hidden="true">
               <header class="lp-mkt-mock-header">
@@ -6373,7 +6874,59 @@
                     <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="48" height="48" alt="" loading="lazy" decoding="async">
                     <div class="lp-mkt-mock-bubble">
                       <strong>りんく</strong>
-                      このページは手元の記録で枠を振り返るためのメモに近いのだ。数字ひとつで価値が決まるわけじゃないのだ。（見本テキスト）
+                      <strong>KPI</strong>と<strong>タイムライン</strong>を見ると、どの場面でコメントが増えたか、同じ人が続けていたのか、新しい人が入ってきたのかの<strong>気配</strong>が見えるのだ。枠の長さや山場の置き方を振り返る材料にはなるのだ。
+                    </div>
+                  </div>
+                  <div class="lp-mkt-mock-advice">
+                    <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" width="48" height="48" alt="" loading="lazy" decoding="async">
+                    <div class="lp-mkt-mock-bubble">
+                      <strong>こん太</strong>
+                      <strong>セグメント</strong>と<strong>トップコメンター</strong>は、誰が偉いかを決める表じゃないのだ。常連が支えていた枠なのか、初見さんが入りやすい枠なのか、応援の<strong>混ざり方</strong>を見るためのメモなのだ。
+                    </div>
+                  </div>
+                  <div class="lp-mkt-mock-advice">
+                    <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.png" width="48" height="48" alt="" loading="lazy" decoding="async">
+                    <div class="lp-mkt-mock-bubble">
+                      <strong>たぬ姉</strong>
+                      <strong>時間帯ヒートマップ</strong>や深掘りの<strong>四分位・5分窓・末尾 JSON</strong>まで見ると、いつ反応が集まりやすいか、あとで表計算や自作メモへどう渡すかまで分かるのだ。運用の改善に使うための橋渡しなのだ。
+                    </div>
+                  </div>
+                </section>
+                <section class="lp-mkt-mock-section" aria-hidden="true">
+                  <h4 class="lp-mkt-mock-h2">来てくれた人（サムネ付き）</h4>
+                  <p class="lp-mkt-mock-note">このPCに記録できたコメントの顔ぶれを、サムネと表示名で見返す見本</p>
+                  <div class="lp-mkt-mock-visitors">
+                    <div class="lp-mkt-mock-visitor">
+                      <div class="lp-mock-identicon lp-mock-identicon--rank lp-mock-identicon--a" aria-hidden="true"></div>
+                      <div class="lp-mkt-mock-visitor-text"><span class="lp-mkt-mock-visitor-id">a:0zxK...</span><span class="lp-mkt-mock-visitor-name">匿名</span></div>
+                    </div>
+                    <div class="lp-mkt-mock-visitor">
+                      <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" width="28" height="28" alt="" loading="lazy" decoding="async">
+                      <div class="lp-mkt-mock-visitor-text"><span class="lp-mkt-mock-visitor-id">119410388</span><span class="lp-mkt-mock-visitor-name">ちんたまくん</span></div>
+                    </div>
+                    <div class="lp-mkt-mock-visitor">
+                      <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" width="28" height="28" alt="" loading="lazy" decoding="async">
+                      <div class="lp-mkt-mock-visitor-text"><span class="lp-mkt-mock-visitor-id">123192997</span><span class="lp-mkt-mock-visitor-name">ガチブリ</span></div>
+                    </div>
+                    <div class="lp-mkt-mock-visitor">
+                      <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" width="28" height="28" alt="" loading="lazy" decoding="async">
+                      <div class="lp-mkt-mock-visitor-text"><span class="lp-mkt-mock-visitor-id">125222316</span><span class="lp-mkt-mock-visitor-name">user520...</span></div>
+                    </div>
+                    <div class="lp-mkt-mock-visitor">
+                      <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-open.png" width="28" height="28" alt="" loading="lazy" decoding="async">
+                      <div class="lp-mkt-mock-visitor-text"><span class="lp-mkt-mock-visitor-id">134004020</span><span class="lp-mkt-mock-visitor-name">sigh2525</span></div>
+                    </div>
+                    <div class="lp-mkt-mock-visitor">
+                      <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" width="28" height="28" alt="" loading="lazy" decoding="async">
+                      <div class="lp-mkt-mock-visitor-text"><span class="lp-mkt-mock-visitor-id">27380116</span><span class="lp-mkt-mock-visitor-name">Tくん</span></div>
+                    </div>
+                    <div class="lp-mkt-mock-visitor">
+                      <div class="lp-mock-identicon lp-mock-identicon--rank lp-mock-identicon--b" aria-hidden="true"></div>
+                      <div class="lp-mkt-mock-visitor-text"><span class="lp-mkt-mock-visitor-id">a:2YTC...</span><span class="lp-mkt-mock-visitor-name">匿名</span></div>
+                    </div>
+                    <div class="lp-mkt-mock-visitor">
+                      <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-closed.png" width="28" height="28" alt="" loading="lazy" decoding="async">
+                      <div class="lp-mkt-mock-visitor-text"><span class="lp-mkt-mock-visitor-id">91428901</span><span class="lp-mkt-mock-visitor-name">ネギトロ</span></div>
                     </div>
                   </div>
                 </section>
@@ -6453,6 +7006,27 @@
               <p class="lp-mkt-mock-footer">追憶の煌めき · マーケ分析（手元用） — 見本フッタ</p>
             </div>
           </figure>
+          <div class="board fade d3 lp-feature-board" id="marketing-pricing-plan" data-lp-feature="marketing-pricing-plan">
+            <h3>将来有料にするなら、この切り分けが自然です</h3>
+            <p class="lp-mkt-advice-lead">
+              まず無料側に残しやすいのは、<strong>HTML保存で来てくれた人がサムネ付きで分かる土台</strong>です。
+              その先の<strong>比較・深掘り・自動化</strong>を有料候補にすると、記録の基礎価値を壊さずに追加価値として説明しやすくなります。
+            </p>
+            <div class="lp-record-grid">
+              <article class="lp-record-card">
+                <h3>基本で残しやすい核</h3>
+                <p>単発の HTML保存、来てくれた人のサムネ一覧、検索、コメント本文の振り返り、匿名 Identicon を含む最低限の記録閲覧。</p>
+              </article>
+              <article class="lp-record-card">
+                <h3>有料候補にしやすい層</h3>
+                <p>複数配信の比較、期間比較、継続率の深掘り、CSV / JSON 連携の拡張、自動レポート、共有用の整形など、時間短縮や意思決定に直結する分析機能。</p>
+              </article>
+              <article class="lp-record-card">
+                <h3>この分け方の理由</h3>
+                <p>「誰が来てくれたか」を振り返れることは応援記録の土台です。料金が乗るのは、その記録を横断して比較・要約・自動化する追加価値のほうが、ユーザーにも伝わりやすいです。</p>
+              </article>
+            </div>
+          </div>
           <div class="board fade d1 lp-feature-board" id="marketing-what-you-can-do" data-lp-feature="marketing-advice-intro">
             <h3>この表がわかると、何ができる？（りんく・こん太・たぬ姉のアドバイス）</h3>
             <p class="lp-mkt-advice-lead">
@@ -7663,6 +8237,16 @@
           <span class="lp-coda__drop"></span>
           <span class="lp-coda__drop"></span>
           <span class="lp-coda__drop"></span>
+          <span class="lp-coda__drop"></span>
+          <span class="lp-coda__drop"></span>
+        </div>
+        <div class="lp-coda__waterscape" aria-hidden="true">
+          <div class="lp-coda__pool">
+            <span class="lp-coda__pool-event"><span class="lp-coda__pool-fall"></span><span class="lp-coda__pool-impact"></span><span class="lp-coda__pool-ripple"></span></span>
+            <span class="lp-coda__pool-event"><span class="lp-coda__pool-fall"></span><span class="lp-coda__pool-impact"></span><span class="lp-coda__pool-ripple"></span></span>
+            <span class="lp-coda__pool-event"><span class="lp-coda__pool-fall"></span><span class="lp-coda__pool-impact"></span><span class="lp-coda__pool-ripple"></span></span>
+            <span class="lp-coda__pool-event"><span class="lp-coda__pool-fall"></span><span class="lp-coda__pool-impact"></span><span class="lp-coda__pool-ripple"></span></span>
+          </div>
         </div>
         <div class="shell lp-coda__inner">
           <p class="lp-coda__line lp-coda__line--first">キミの想いはもう受け取ったよ</p>
@@ -7677,6 +8261,7 @@
             <p>恋人とのメッセージの返信を心待ちにするような気持ちで</p>
             <p class="lp-coda__verse-last">いつでも君の言葉（コメント）を待ち望んでいるよ</p>
           </div>
+          <p class="lp-coda__nagi">風がやみ、波も穏やかになった凪の水面に、キミのしずくが静かに溜まっていく。</p>
           <p class="lp-coda__dots" aria-hidden="true">・<br>・<br>・<br>・</p>
           <p class="lp-coda__line lp-coda__line--resolve">届いてる　届いてる</p>
           <p class="lp-coda__line lp-coda__line--resolve">もう大丈夫</p>
@@ -7688,10 +8273,13 @@
     </main>
 
     <footer class="footer-note">
-      <div class="shell">追憶の煌めき v0.1.0 ― Kimito-Link Project</div>
+      <div class="shell">
+        <div>追憶の煌めき v0.1.0 ― Kimito-Link Project</div>
+        <div class="footer-note__credit">水滴SE: OtoLogic「Water Drop 01 Low-Dry」使用 / CC BY 4.0</div>
+      </div>
     </footer>
 
-    <button type="button" id="lp-bgm-toggle" aria-label="BGMを再生">&#9835;</button>
+    <button type="button" id="lp-bgm-toggle" aria-label="音を再生">&#9835;</button>
 
     <script>
       (function () {
@@ -7759,6 +8347,7 @@
         'use strict';
         var FADE_MS = 1400;
         var FADE_STEPS = 18;
+        var BGM_MAX_VOLUME = 0.72;
         var el = document.getElementById('lp-bgm');
         var btn = document.getElementById('lp-bgm-toggle');
         if (!el || !btn) return;
@@ -7769,12 +8358,25 @@
 
         var mutedAutoplay = false;
         var unlocked = false;
+        var soundEnabled = false;
+        var codaSoundOnly = false;
+
+        function setSoundEnabled(next) {
+          next = Boolean(next);
+          if (soundEnabled === next) return;
+          soundEnabled = next;
+          document.dispatchEvent(new CustomEvent('lp-audio-state', { detail: { enabled: soundEnabled } }));
+        }
+
+        function applySoundEnabled(next) {
+          setSoundEnabled(next);
+          sync();
+        }
 
         function sync() {
-          var playing = !el.paused && !el.muted && el.volume > 0;
-          btn.textContent = playing ? '\u266A' : '\u266B';
-          btn.setAttribute('aria-label', playing ? 'BGMを停止' : 'BGMを再生');
-          if (playing) {
+          btn.textContent = soundEnabled ? '\u266A' : '\u266B';
+          btn.setAttribute('aria-label', soundEnabled ? '音を停止' : '音を再生');
+          if (soundEnabled) {
             btn.setAttribute('data-bgm-playing', '');
           } else {
             btn.removeAttribute('data-bgm-playing');
@@ -7796,15 +8398,42 @@
           }, iv);
         }
 
+        function fadeOut(done) {
+          var step = 0;
+          var iv = FADE_MS / FADE_STEPS;
+          var startVol = Math.max(Number(el.volume) || 0, 0);
+          var t = setInterval(function () {
+            step++;
+            try { el.volume = Math.max(0, startVol * (1 - (step / FADE_STEPS))); } catch (e) {}
+            if (step >= FADE_STEPS) {
+              clearInterval(t);
+              try {
+                el.volume = 0;
+                el.pause();
+              } catch (e) {}
+              if (done) done();
+            }
+          }, iv);
+        }
+
         function playWithFade(done) {
+          if (codaSoundOnly) {
+            try {
+              el.pause();
+              el.volume = 0;
+            } catch (e) {}
+            sync();
+            if (done) done(true);
+            return;
+          }
           try { el.muted = false; el.volume = 0; } catch (e) {}
           try {
             var p = el.play();
             if (p && typeof p.then === 'function') {
-              p.then(function () { fadeIn(1, function () { sync(); if (done) done(true); }); })
+              p.then(function () { fadeIn(BGM_MAX_VOLUME, function () { sync(); if (done) done(true); }); })
                 .catch(function () { sync(); if (done) done(false); });
             } else if (!el.paused) {
-              fadeIn(1, function () { sync(); if (done) done(true); });
+              fadeIn(BGM_MAX_VOLUME, function () { sync(); if (done) done(true); });
             } else {
               if (done) done(false);
             }
@@ -7827,8 +8456,16 @@
           if (unlocked) return;
           unlocked = true;
           removeListeners();
+          applySoundEnabled(true);
+          if (codaSoundOnly) {
+            try {
+              el.pause();
+              el.volume = 0;
+            } catch (e) {}
+            return;
+          }
           if (mutedAutoplay && !el.paused) {
-            fadeIn(1, function () { sync(); });
+            fadeIn(BGM_MAX_VOLUME, function () { sync(); });
             return;
           }
           playWithFade(function (ok) { if (!ok) unlocked = false; });
@@ -7850,12 +8487,31 @@
 
         btn.addEventListener('click', function (ev) {
           ev.stopPropagation();
-          if (!el.paused && !el.muted && el.volume > 0) {
+          if (soundEnabled) {
+            applySoundEnabled(false);
             try { el.pause(); } catch (e) {}
-            sync();
           } else {
+            applySoundEnabled(true);
             playWithFade();
           }
+        });
+
+        document.addEventListener('lp-coda-sound', function (ev) {
+          codaSoundOnly = Boolean(ev.detail && ev.detail.enabled);
+          if (!soundEnabled) {
+            try {
+              el.pause();
+              el.volume = 0;
+            } catch (e) {}
+            return;
+          }
+          if (codaSoundOnly) {
+            if (!el.paused || el.volume > 0) {
+              fadeOut(function () { sync(); });
+            }
+            return;
+          }
+          playWithFade();
         });
 
         var scrollTimer;
@@ -7866,8 +8522,158 @@
         }, { passive: true });
 
         el.preload = 'auto';
+        sync();
         tryMutedAutoplay();
         addListeners();
+      })();
+    </script>
+
+    <script>
+      (function () {
+        'use strict';
+        var host = document.querySelector('.lp-coda');
+        var sample = document.getElementById('lp-water-drop');
+        if (!host || !sample) return;
+
+        var events = host.querySelectorAll('.lp-coda__pool-event');
+        var audioEnabled = false;
+        var inView = false;
+        var dripTimer = 0;
+        var echoTimers = [];
+        var pool = [];
+        var POOL_SIZE = 4;
+        var DROP_VOLUME = 0.58;
+        var DROP_ECHO_VOLUME = 0.16;
+        var DROP_ECHO_DELAY = 180;
+        var visualIndex = 0;
+
+        function clearTimers() {
+          clearTimeout(dripTimer);
+          dripTimer = 0;
+          for (var i = 0; i < echoTimers.length; i++) {
+            clearTimeout(echoTimers[i]);
+          }
+          echoTimers = [];
+        }
+
+        function shouldRun() {
+          return audioEnabled && inView && !document.hidden;
+        }
+
+        function ensurePool() {
+          if (pool.length) return;
+          for (var i = 0; i < POOL_SIZE; i++) {
+            var player = /** @type {HTMLAudioElement} */ (sample.cloneNode());
+            player.removeAttribute('id');
+            player.preload = 'auto';
+            player.volume = DROP_VOLUME;
+            pool.push(player);
+          }
+        }
+
+        function stopPlayers() {
+          for (var i = 0; i < pool.length; i++) {
+            try {
+              pool[i].pause();
+              pool[i].currentTime = 0;
+              pool[i].playbackRate = 1;
+            } catch (e) {}
+          }
+        }
+
+        function pickPlayer() {
+          ensurePool();
+          for (var i = 0; i < pool.length; i++) {
+            if (pool[i].paused || pool[i].ended) return pool[i];
+          }
+          return pool[0];
+        }
+
+        function playClip(volume, rate) {
+          var player = pickPlayer();
+          try {
+            player.pause();
+            player.currentTime = 0;
+            player.playbackRate = rate || 1;
+            player.volume = volume;
+            var p = player.play();
+            if (p && typeof p.catch === 'function') p.catch(function () {});
+          } catch (e) {}
+        }
+
+        function scheduleEcho() {
+          var tid = window.setTimeout(function () {
+            echoTimers = echoTimers.filter(function (id) { return id !== tid; });
+            if (!shouldRun()) return;
+            playClip(DROP_ECHO_VOLUME, 0.965);
+          }, DROP_ECHO_DELAY);
+          echoTimers.push(tid);
+        }
+
+        function triggerPoolImpact() {
+          if (!events.length) return;
+          var ev = events[visualIndex % events.length];
+          visualIndex++;
+          ev.style.left = (24 + Math.random() * 52) + '%';
+          ev.style.top = (38 + Math.random() * 16) + '%';
+          ev.style.setProperty('--fall-start', '-' + (78 + Math.random() * 30) + 'px');
+          ev.classList.remove('is-active');
+          void ev.offsetWidth;
+          ev.classList.add('is-active');
+        }
+
+        function playDrip() {
+          triggerPoolImpact();
+          playClip(DROP_VOLUME, 1);
+          scheduleEcho();
+        }
+
+        function queueDrips() {
+          clearTimeout(dripTimer);
+          if (!shouldRun()) return;
+          dripTimer = window.setTimeout(function () {
+            if (!shouldRun()) return;
+            playDrip();
+            queueDrips();
+          }, 2600 + Math.random() * 2200);
+        }
+
+        function refresh() {
+          var running = shouldRun();
+          host.classList.toggle('lp-coda--active', inView);
+          document.dispatchEvent(new CustomEvent('lp-coda-sound', { detail: { enabled: inView } }));
+          if (!running) {
+            clearTimers();
+            stopPlayers();
+            return;
+          }
+          ensurePool();
+          playDrip();
+          queueDrips();
+        }
+
+        document.addEventListener('lp-audio-state', function (ev) {
+          audioEnabled = Boolean(ev.detail && ev.detail.enabled);
+          refresh();
+        });
+        document.addEventListener('visibilitychange', refresh);
+
+        if (!('IntersectionObserver' in window)) {
+          inView = true;
+          refresh();
+          return;
+        }
+
+        var io = new IntersectionObserver(function (entries) {
+          for (var i = 0; i < entries.length; i++) {
+            if (entries[i].target === host) {
+              inView = entries[i].isIntersecting && entries[i].intersectionRatio > 0.22;
+            }
+          }
+          refresh();
+        }, { threshold: [0, 0.22, 0.45] });
+
+        io.observe(host);
       })();
     </script>
 

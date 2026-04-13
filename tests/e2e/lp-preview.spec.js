@@ -25,6 +25,29 @@ async function allBoundingBoxes(locator) {
 }
 
 test.describe('lp-preview', () => {
+  test('SEOメタ: 記録安定・後補完・配信終了後回収が主要メタに入る', async ({ page }) => {
+    await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
+
+    await expect(page).toHaveTitle(/取りこぼしにくく、あとから育つコメント記録へ/);
+
+    const description = await page.locator('meta[name="description"]').getAttribute('content');
+    expect(description).toContain('記録安定');
+    expect(description).toContain('後補完');
+    expect(description).toContain('配信終了後回収');
+
+    const ogDescription = await page
+      .locator('meta[property="og:description"]')
+      .getAttribute('content');
+    expect(ogDescription).toContain('後補完');
+    expect(ogDescription).toContain('配信終了後回収');
+
+    const twitterDescription = await page
+      .locator('meta[name="twitter:description"]')
+      .getAttribute('content');
+    expect(twitterDescription).toContain('記録安定');
+    expect(twitterDescription).toContain('後補完');
+  });
+
   test('hero会話: 390幅で3つの吹き出しが左右交互', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
@@ -74,6 +97,38 @@ test.describe('lp-preview', () => {
 
     const stats = page.locator('#context-scale .stat');
     await expect(stats).toHaveCount(3);
+  });
+
+  test('記録価値訴求: 390幅で新セクションとCTAが見え、横はみ出ししない', async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${lpHref}#record-foundation`, { waitUntil: 'domcontentloaded' });
+
+    const heroCopy = page.locator('.hero-copy');
+    await expect(heroCopy.locator('h1')).toContainText('取りこぼしにくく');
+    await expect(heroCopy.locator('.lp-record-hero-stats .stat')).toHaveCount(3);
+
+    const foundation = page.locator('#record-foundation');
+    await foundation.scrollIntoViewIfNeeded();
+    await expect(foundation).toContainText(/保存基盤/);
+    await expect(foundation).toContainText(/後補完/);
+    await expect(foundation).toContainText(/配信終了後回収/);
+    const foundationNoOverflow = await foundation.evaluate(
+      (el) => el.scrollWidth <= el.clientWidth + 2
+    );
+    expect(foundationNoOverflow).toBe(true);
+
+    const transparency = page.locator('#record-transparency');
+    await expect(transparency).toContainText(/アイコン列の精度は改善中/);
+
+    const cta = page.locator('#record-cta');
+    await cta.scrollIntoViewIfNeeded();
+    await expect(cta.locator('a.btn')).toHaveCount(2);
+    await expect(cta.locator('a.btn').nth(0)).toHaveAttribute('href', '#extension-visual');
+    await expect(cta.locator('a.btn').nth(1)).toHaveAttribute('href', '#extension-guide');
+    const ctaNoOverflow = await cta.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+    expect(ctaNoOverflow).toBe(true);
   });
 
   test('context-scale: 1280幅でstatsが横3列', async ({ page }) => {
@@ -495,6 +550,26 @@ test.describe('lp-preview', () => {
     ).toBeVisible();
   });
 
+  test('HTML保存: #html-save にサムネ付き来場見本があり、390幅ではみ出しなし', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${lpHref}#html-save`, { waitUntil: 'domcontentloaded' });
+
+    const block = page.locator('#html-save');
+    await expect(block).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /HTML保存: 来てくれた人がサムネ付きで分かる/ }),
+    ).toBeVisible();
+
+    const preview = block.locator('[data-lp-feature="html-save-avatar-preview"]');
+    await expect(preview).toBeVisible();
+    await expect(preview.locator('.lp-site-look-mock__avatar-cell')).toHaveCount(9);
+    await expect(block).toContainText(/来てくれた人がサムネ付きで分かる/);
+
+    await block.scrollIntoViewIfNeeded();
+    const noOverflow = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+    expect(noOverflow).toBe(true);
+  });
+
   test('マーケ深掘り: #marketing-deep-features に四分位と nl-marketing-export-v1', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto(`${lpHref}#marketing-deep-features`, { waitUntil: 'domcontentloaded' });
@@ -504,6 +579,44 @@ test.describe('lp-preview', () => {
     await expect(block).toContainText(/四分位/);
     await expect(block).toContainText('nl-marketing-export-v1');
     await expect(block).toContainText('schemaVersion');
+  });
+
+  test('マーケ見本: #marketing-html-preview に三人の解説が入り、このデータで何が分かるか読める', async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${lpHref}#marketing-html-preview`, { waitUntil: 'domcontentloaded' });
+
+    const block = page.locator('#marketing-html-preview');
+    await expect(block).toBeVisible();
+    await expect(block).toContainText(/りんく・こん太・たぬ姉から/);
+    await expect(block.locator('.lp-mkt-mock-advice')).toHaveCount(3);
+    await expect(block.locator('.lp-mkt-mock-visitor')).toHaveCount(8);
+    await expect(block).toContainText(/KPI/);
+    await expect(block).toContainText(/セグメント/);
+    await expect(block).toContainText(/時間帯ヒートマップ/);
+
+    await block.scrollIntoViewIfNeeded();
+    const noOverflow = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+    expect(noOverflow).toBe(true);
+  });
+
+  test('マーケ方針: #marketing-pricing-plan に無料の核と有料候補の切り分けがある', async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${lpHref}#marketing-pricing-plan`, { waitUntil: 'domcontentloaded' });
+
+    const block = page.locator('#marketing-pricing-plan');
+    await expect(block).toBeVisible();
+    await expect(block).toHaveAttribute('data-lp-feature', 'marketing-pricing-plan');
+    await expect(block).toContainText(/基本で残しやすい核/);
+    await expect(block).toContainText(/有料候補にしやすい層/);
+    await expect(block).toContainText(/誰が来てくれたか/);
+
+    await block.scrollIntoViewIfNeeded();
+    const noOverflow = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+    expect(noOverflow).toBe(true);
   });
 
   test('マーケ読み方: #marketing-what-you-can-do に3人の吹き出し・390幅ではみ出しなし', async ({ page }) => {
@@ -517,6 +630,31 @@ test.describe('lp-preview', () => {
     await block.scrollIntoViewIfNeeded();
     const noOverflow = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
     expect(noOverflow).toBe(true);
+  });
+
+  test('クロージング: 390幅で凪の文と水面演出が見え、音ボタンが切り替わる', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
+
+    const section = page.locator('.lp-coda');
+    await section.scrollIntoViewIfNeeded();
+    await expect(section).toHaveClass(/lp-coda--active/);
+    await expect(section.locator('.lp-coda__pool')).toBeVisible();
+    await expect(section.locator('.lp-coda__pool-event')).toHaveCount(4);
+    await expect(section.locator('.lp-coda__pool-ripple')).toHaveCount(4);
+    await expect(section.locator('.lp-coda__nagi')).toContainText(/風がやみ、波も穏やかになった凪/);
+    await expect(page.locator('#lp-water-drop')).toHaveAttribute('src', /Water_Drop01-5\(Low-Dry\)\.mp3/);
+    await expect(page.locator('.footer-note')).toContainText(/OtoLogic/);
+    await expect(page.locator('.footer-note')).toContainText(/CC BY 4.0/);
+
+    const noOverflow = await section.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+    expect(noOverflow).toBe(true);
+
+    const audioButton = page.locator('#lp-bgm-toggle');
+    await expect(audioButton).toHaveAttribute('aria-label', '音を再生');
+    await page.mouse.click(24, 24);
+    await expect(audioButton).toHaveAttribute('aria-label', '音を停止');
+    await expect(section.locator('.lp-coda__pool-event.is-active')).toHaveCount(1);
   });
 
   test('平易化注釈: #extension-visual に data-lp-plain が見え・主要幅ではみ出しなし', async ({ page }) => {
