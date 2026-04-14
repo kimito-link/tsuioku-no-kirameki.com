@@ -1212,6 +1212,21 @@ window.addEventListener('message', (e) => {
   }
 
   if (e.data.type === 'NLS_SPA_NAVIGATION') {
+    const newUrl = String(e.data.url || '');
+    const prevUrl = String(e.data.prevUrl || '');
+    const newIsWatch = isNicoLiveWatchUrl(newUrl);
+    const prevIsWatch = isNicoLiveWatchUrl(prevUrl);
+
+    if (!newIsWatch) {
+      syncLiveIdFromLocation();
+      return;
+    }
+    if (newIsWatch && prevIsWatch && extractLiveIdFromUrl(newUrl) === extractLiveIdFromUrl(prevUrl)) {
+      return;
+    }
+    const now = Date.now();
+    if (now < spaNavThrottleUntil) return;
+    spaNavThrottleUntil = now + 300;
     syncLiveIdFromLocation();
     return;
   }
@@ -1278,6 +1293,13 @@ const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
 /** getElementById はツリー未接続ノードに効かないため、ホストは参照を保持する */
 /** @type {HTMLDivElement|null} */
 let nlsInlinePopupHostSingleton = null;
+/** ensureInlinePopupIframe のフォールバック visibility タイマー（重複防止） */
+/** @type {ReturnType<typeof setTimeout>|null} */
+let inlineIframeVisibilityTimer = null;
+/** renderPageFrameOverlay のリエントラント防止 */
+let renderingPageFrame = false;
+/** SPA 遷移 throttle: 即実行し、その後このクールダウン中は無視 */
+let spaNavThrottleUntil = 0;
 
 /** インラインパネル描画の例外（AI 共有・切り分け用） */
 const nlsInlinePanelRenderErrors = [];
@@ -1556,9 +1578,20 @@ function pickPrimaryInlinePopupHostFromDom() {
 /** @param {HTMLDivElement} host */
 function ensureInlinePopupIframe(host) {
   if (!(host instanceof HTMLDivElement)) return;
-  let iframe = /** @type {HTMLIFrameElement|null} */ (
+  const expectedSrc = (() => {
+    try {
+      return chrome.runtime.getURL('popup.html') + '?inline=1';
+    } catch {
+      return '';
+    }
+  })();
+  const existing = /** @type {HTMLIFrameElement|null} */ (
     host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
   );
+  if (existing && String(existing.getAttribute('src') || '').trim() === expectedSrc) {
+    return;
+  }
+  let iframe = existing;
   if (!iframe) {
     iframe = document.createElement('iframe');
     iframe.id = INLINE_POPUP_IFRAME_ID;
@@ -1568,20 +1601,16 @@ function ensureInlinePopupIframe(host) {
     iframe.style.visibility = 'hidden';
     host.appendChild(iframe);
   }
-  const expectedSrc = (() => {
-    try {
-      return chrome.runtime.getURL('popup.html') + '?inline=1';
-    } catch {
-      return '';
-    }
-  })();
-  const currentSrc = String(iframe.getAttribute('src') || '').trim();
-  if (expectedSrc && currentSrc !== expectedSrc) {
+  if (expectedSrc) {
     iframe.setAttribute('src', expectedSrc);
   }
   iframe.addEventListener(
     'load',
     () => {
+      if (inlineIframeVisibilityTimer) {
+        clearTimeout(inlineIframeVisibilityTimer);
+        inlineIframeVisibilityTimer = null;
+      }
       requestAnimationFrame(() => {
         iframe.style.visibility = 'visible';
         host.style.opacity = '1';
@@ -1589,7 +1618,9 @@ function ensureInlinePopupIframe(host) {
     },
     { once: true }
   );
-  setTimeout(() => {
+  if (inlineIframeVisibilityTimer) clearTimeout(inlineIframeVisibilityTimer);
+  inlineIframeVisibilityTimer = setTimeout(() => {
+    inlineIframeVisibilityTimer = null;
     iframe.style.visibility = 'visible';
     host.style.opacity = '1';
   }, 2000);
@@ -1599,7 +1630,6 @@ function ensureInlinePopupHost() {
   let host = pickPrimaryInlinePopupHostFromDom();
   if (host) {
     ensureInlinePopupIframe(host);
-    if (host.style.opacity !== '1') host.style.opacity = '1';
     nlsInlinePopupHostSingleton = host;
     return host;
   }
@@ -2260,6 +2290,10 @@ function renderInlinePopupHost(target) {
 function hidePageFrameOverlay() {
   const overlay = document.getElementById(PAGE_FRAME_OVERLAY_ID);
   if (overlay) overlay.style.display = 'none';
+  if (inlineIframeVisibilityTimer) {
+    clearTimeout(inlineIframeVisibilityTimer);
+    inlineIframeVisibilityTimer = null;
+  }
   const host =
     nlsInlinePopupHostSingleton ||
     document.getElementById(INLINE_POPUP_HOST_ID);
@@ -2589,6 +2623,7 @@ function isWatchInlinePanelTopFrame() {
 
 /** 視聴ページの動画周り装飾枠（#nls-watch-prikura-frame）は表示しない。インライン用ホストの配置のみ行う。 */
 function renderPageFrameOverlay() {
+  if (renderingPageFrame) return;
   if (!isWatchInlinePanelTopFrame()) {
     hidePageFrameOverlay();
     return;
@@ -2598,6 +2633,7 @@ function renderPageFrameOverlay() {
     return;
   }
 
+  renderingPageFrame = true;
   try {
     const overlay = ensurePageFrameOverlay();
     overlay.style.display = 'none';
@@ -2636,6 +2672,7 @@ function renderPageFrameOverlay() {
       noteInlinePanelRenderError('renderPageFrameOverlay:fallback', fallbackErr);
     }
   } finally {
+    renderingPageFrame = false;
     syncWatchPageDockBodyReserve();
   }
   /*

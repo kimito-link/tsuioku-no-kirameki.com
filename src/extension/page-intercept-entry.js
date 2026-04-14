@@ -1093,10 +1093,11 @@ import {
   try {
     let lastNotifiedHref = String(window.location.href || '');
     const notifySpaNavigation = () => {
+      const prev = lastNotifiedHref;
       const cur = String(window.location.href || '');
-      if (cur === lastNotifiedHref) return;
+      if (cur === prev) return;
       lastNotifiedHref = cur;
-      window.postMessage({ type: 'NLS_SPA_NAVIGATION', url: cur }, '*');
+      window.postMessage({ type: 'NLS_SPA_NAVIGATION', url: cur, prevUrl: prev }, '*');
     };
     const origPushState = history.pushState;
     const origReplaceState = history.replaceState;

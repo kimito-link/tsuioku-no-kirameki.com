@@ -3880,6 +3880,20 @@
       return;
     }
     if (e.data.type === "NLS_SPA_NAVIGATION") {
+      const newUrl = String(e.data.url || "");
+      const prevUrl = String(e.data.prevUrl || "");
+      const newIsWatch = isNicoLiveWatchUrl(newUrl);
+      const prevIsWatch = isNicoLiveWatchUrl(prevUrl);
+      if (!newIsWatch) {
+        syncLiveIdFromLocation();
+        return;
+      }
+      if (newIsWatch && prevIsWatch && extractLiveIdFromUrl(newUrl) === extractLiveIdFromUrl(prevUrl)) {
+        return;
+      }
+      const now = Date.now();
+      if (now < spaNavThrottleUntil) return;
+      spaNavThrottleUntil = now + 300;
       syncLiveIdFromLocation();
       return;
     }
@@ -3938,6 +3952,9 @@
   var INLINE_POPUP_IFRAME_ID = "nls-inline-popup-iframe";
   var KEY_AI_SHARE_FAST_DIAG = "nls_ai_share_fast_diag_v1";
   var nlsInlinePopupHostSingleton = null;
+  var inlineIframeVisibilityTimer = null;
+  var renderingPageFrame = false;
+  var spaNavThrottleUntil = 0;
   var nlsInlinePanelRenderErrors = [];
   var NLS_INLINE_PANEL_RENDER_ERR_MAX = 14;
   function noteInlinePanelRenderError(where, err) {
@@ -4184,10 +4201,21 @@
   }
   function ensureInlinePopupIframe(host) {
     if (!(host instanceof HTMLDivElement)) return;
-    let iframe = (
+    const expectedSrc = (() => {
+      try {
+        return chrome.runtime.getURL("popup.html") + "?inline=1";
+      } catch {
+        return "";
+      }
+    })();
+    const existing = (
       /** @type {HTMLIFrameElement|null} */
       host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
     );
+    if (existing && String(existing.getAttribute("src") || "").trim() === expectedSrc) {
+      return;
+    }
+    let iframe = existing;
     if (!iframe) {
       iframe = document.createElement("iframe");
       iframe.id = INLINE_POPUP_IFRAME_ID;
@@ -4197,20 +4225,16 @@
       iframe.style.visibility = "hidden";
       host.appendChild(iframe);
     }
-    const expectedSrc = (() => {
-      try {
-        return chrome.runtime.getURL("popup.html") + "?inline=1";
-      } catch {
-        return "";
-      }
-    })();
-    const currentSrc = String(iframe.getAttribute("src") || "").trim();
-    if (expectedSrc && currentSrc !== expectedSrc) {
+    if (expectedSrc) {
       iframe.setAttribute("src", expectedSrc);
     }
     iframe.addEventListener(
       "load",
       () => {
+        if (inlineIframeVisibilityTimer) {
+          clearTimeout(inlineIframeVisibilityTimer);
+          inlineIframeVisibilityTimer = null;
+        }
         requestAnimationFrame(() => {
           iframe.style.visibility = "visible";
           host.style.opacity = "1";
@@ -4218,7 +4242,9 @@
       },
       { once: true }
     );
-    setTimeout(() => {
+    if (inlineIframeVisibilityTimer) clearTimeout(inlineIframeVisibilityTimer);
+    inlineIframeVisibilityTimer = setTimeout(() => {
+      inlineIframeVisibilityTimer = null;
       iframe.style.visibility = "visible";
       host.style.opacity = "1";
     }, 2e3);
@@ -4227,7 +4253,6 @@
     let host = pickPrimaryInlinePopupHostFromDom();
     if (host) {
       ensureInlinePopupIframe(host);
-      if (host.style.opacity !== "1") host.style.opacity = "1";
       nlsInlinePopupHostSingleton = host;
       return host;
     }
@@ -4728,6 +4753,10 @@
   function hidePageFrameOverlay() {
     const overlay = document.getElementById(PAGE_FRAME_OVERLAY_ID);
     if (overlay) overlay.style.display = "none";
+    if (inlineIframeVisibilityTimer) {
+      clearTimeout(inlineIframeVisibilityTimer);
+      inlineIframeVisibilityTimer = null;
+    }
     const host = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
     if (host) {
       host.style.display = "none";
@@ -4979,6 +5008,7 @@
     }
   }
   function renderPageFrameOverlay() {
+    if (renderingPageFrame) return;
     if (!isWatchInlinePanelTopFrame()) {
       hidePageFrameOverlay();
       return;
@@ -4987,6 +5017,7 @@
       hidePageFrameOverlay();
       return;
     }
+    renderingPageFrame = true;
     try {
       const overlay = ensurePageFrameOverlay();
       overlay.style.display = "none";
@@ -5019,6 +5050,7 @@
         noteInlinePanelRenderError("renderPageFrameOverlay:fallback", fallbackErr);
       }
     } finally {
+      renderingPageFrame = false;
       syncWatchPageDockBodyReserve();
     }
     startPageFrameLoop();
