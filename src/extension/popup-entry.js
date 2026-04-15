@@ -7623,8 +7623,29 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   }
 }
 
+/**
+ * ビルド反映確認バッジを塗る（chrome://extensions で「更新」済みかの確認用）。
+ * 表示例: v0.1.5・b0415-2311
+ * bMMDD-HHMM は scripts/build.mjs が esbuild --define で埋め込むビルド時刻（JST）。
+ * 新ビルドを当てたのに反映されていない時は「更新」を押してもここが変わらない。
+ */
+function paintVersionBadge() {
+  const valueEl = /** @type {HTMLElement|null} */ ($('nlVersionBadgeValue'));
+  if (!valueEl) return;
+  try {
+    const manifest = chrome.runtime.getManifest();
+    const version = String(manifest?.version || '').trim() || '?';
+    const buildId =
+      typeof NL_BUILD_ID !== 'undefined' && NL_BUILD_ID ? String(NL_BUILD_ID) : 'dev';
+    valueEl.textContent = `v${version}・b${buildId}`;
+  } catch {
+    valueEl.textContent = '—';
+  }
+}
+
 function initPopup() {
   installExtensionContextErrorGuard();
+  paintVersionBadge();
   void globalThis.chrome?.storage?.local
     ?.get(KEY_CALM_PANEL_MOTION)
     ?.then((b) => {

@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "verify": "npm test && npm run lint && npm run typecheck && npm run build",
-    "build": "esbuild src/extension/page-intercept-entry.js --bundle --outfile=extension/dist/page-intercept.js --format=iife --platform=browser --target=chrome111 && esbuild src/extension/content-entry.js --bundle --outfile=extension/dist/content.js --format=iife --platform=browser --target=chrome100 && esbuild src/extension/popup-entry.js --bundle --outfile=extension/dist/popup.js --format=iife --platform=browser --target=chrome100",
+    "build": "node scripts/build.mjs",
     "build:watch": "node scripts/build-watch.mjs",
     "test:e2e": "npm run build && node scripts/run-e2e.mjs",
     "test:e2e:headed": "npm run build && node scripts/run-e2e.mjs --headed",

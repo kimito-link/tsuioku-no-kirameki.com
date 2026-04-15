@@ -10266,8 +10266,24 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }, STORAGE_REFRESH_MAX_WAIT_MS);
     }
   }
+  function paintVersionBadge() {
+    const valueEl = (
+      /** @type {HTMLElement|null} */
+      $("nlVersionBadgeValue")
+    );
+    if (!valueEl) return;
+    try {
+      const manifest = chrome.runtime.getManifest();
+      const version = String(manifest?.version || "").trim() || "?";
+      const buildId = "0416-0519" ? String("0416-0519") : "dev";
+      valueEl.textContent = `v${version}\u30FBb${buildId}`;
+    } catch {
+      valueEl.textContent = "\u2014";
+    }
+  }
   function initPopup() {
     installExtensionContextErrorGuard();
+    paintVersionBadge();
     void globalThis.chrome?.storage?.local?.get(KEY_CALM_PANEL_MOTION)?.then((b) => {
       applyCalmPanelMotionClass(
         normalizeCalmPanelMotion(b[KEY_CALM_PANEL_MOTION], {

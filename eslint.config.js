@@ -16,7 +16,9 @@ export default [
       sourceType: 'module',
       globals: {
         ...browserChrome,
-        Node: 'readonly'
+        Node: 'readonly',
+        // scripts/build.mjs が esbuild --define で popup-entry.js に注入するビルド時刻
+        NL_BUILD_ID: 'readonly'
       }
     },
     rules: {

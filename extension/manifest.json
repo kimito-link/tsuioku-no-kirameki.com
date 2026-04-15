@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "君斗りんくの追憶のきらめき",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます（開発識別子: nicolivelog）。",
   "icons": {
     "16": "images/logo/konta-yukkuri-icon-16.png",

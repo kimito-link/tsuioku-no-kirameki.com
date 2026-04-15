@@ -1147,6 +1147,34 @@
         background: transparent !important;
       }
 
+      .nl-version-badge {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 4px;
+        padding: 3px 8px;
+        margin: 0 0 6px auto;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 10%, transparent);
+        border: 1px solid color-mix(in srgb, var(--nl-accent, #0f8fd8) 35%, transparent);
+        color: var(--nl-accent, #0f8fd8);
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+        width: fit-content;
+        cursor: help;
+      }
+
+      .nl-version-badge__label {
+        opacity: 0.7;
+        font-weight: 600;
+      }
+
+      .nl-version-badge__value {
+        font-weight: 800;
+      }
+
       .nl-usage-terms-gate {
         position: fixed;
         inset: 0;
@@ -5723,6 +5751,16 @@
         id="nlPopupPrimary"
         aria-busy="true"
       >
+      <div
+        id="nlVersionBadge"
+        class="nl-version-badge"
+        role="status"
+        aria-label="拡張バージョン（新ビルド反映の確認用）"
+        title="ここの数字が変わっていれば、新しいビルドが読み込まれています。反映されていない場合は chrome://extensions で「更新」→ watch ページを再読み込みしてください。"
+      >
+        <span class="nl-version-badge__label">ビルド</span>
+        <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
+      </div>
       <div
         id="extensionContextBanner"
         class="nl-extension-context-banner"
