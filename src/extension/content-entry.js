@@ -2316,6 +2316,40 @@ function inlineHostLooksVisible() {
   return r.width >= 120 && r.height >= 120;
 }
 
+/**
+ * ツールバーから：ページ内インラインパネルを前面化（スクロール＋ iframe フォーカス）。
+ * @returns {boolean} ホストが見つかれば true
+ */
+function focusInlinePanelHostFromToolbar() {
+  if (!isWatchInlinePanelTopFrame()) return false;
+  if (!isNicoLiveWatchUrl(window.location.href)) return false;
+  const host =
+    nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+  if (!(host instanceof HTMLElement) || !host.isConnected) return false;
+  const cs = window.getComputedStyle(host);
+  if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+  const r = host.getBoundingClientRect();
+  if (r.width < 120 || r.height < 120) return false;
+  try {
+    host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  } catch {
+    try {
+      host.scrollIntoView();
+    } catch {
+      // no-op
+    }
+  }
+  const iframe = host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`);
+  if (iframe instanceof HTMLIFrameElement) {
+    try {
+      iframe.focus();
+    } catch {
+      // no-op
+    }
+  }
+  return true;
+}
+
 function buildAiShareFastDiagnosticsPayload() {
   const href = String(window.location.href || '');
   let isTop = true;
@@ -3864,6 +3898,15 @@ function buildAiSharePageDiagnostics() {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!hasExtensionContext()) return;
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
+
+  if (msg.type === 'NLS_FOCUS_INLINE_PANEL') {
+    if (!isWatchInlinePanelTopFrame()) {
+      return false;
+    }
+    const focused = focusInlinePanelHostFromToolbar();
+    sendResponse({ ok: true, focused });
+    return false;
+  }
 
   if (msg.type === 'NLS_CAPTURE_SCREENSHOT') {
     if (!isWatchPageMainFrameForMessages()) return;

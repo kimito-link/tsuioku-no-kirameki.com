@@ -273,7 +273,8 @@ async function reloadExistingWatchTabs() {
 
 /**
  * manifest に side_panel があると、環境によってツールバー押下がサイドパネル側に取られ、
- * iframe 経由の表示が空に見えることがある。action.default_popup を確実に使わせる。
+ * iframe 経由の表示が空に見えることがある。サイドパネル自動オープンは抑止する。
+ * （ツールバー本体は onClicked でインライン前面化 or popup 窓。default_popup は使わない）
  */
 function ensureToolbarOpensPopupNotSidePanel() {
   try {
@@ -333,4 +334,86 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm?.name !== AUTO_BACKUP_ALARM) return;
   void runAutoBackupCycle();
+});
+
+/* ------------------------------------------------------------------ */
+/* ツールバー: ページ内インラインがあれば前面化、なければ popup 窓（src/lib/uiUxOpenStrategy と整合） */
+/* ------------------------------------------------------------------ */
+
+const KEY_TOOLBAR_ACTION_POLICY = 'nls_toolbar_action_policy';
+
+/**
+ * @returns {'prefer_focus_inline' | 'always_open_popup'}
+ */
+async function getToolbarActionPolicy() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_TOOLBAR_ACTION_POLICY);
+    const v = String(bag[KEY_TOOLBAR_ACTION_POLICY] || '').trim();
+    if (v === 'always_open_popup') return 'always_open_popup';
+    return 'prefer_focus_inline';
+  } catch {
+    return 'prefer_focus_inline';
+  }
+}
+
+/**
+ * 既存の popup 窓があれば前面化、なければ作成（default_popup 廃止後の代替）。
+ */
+async function openOrFocusPopupWindow() {
+  const url = chrome.runtime.getURL('popup.html');
+  const urlBase = url.replace(/[?#].*$/, '');
+  try {
+    const all = await chrome.windows.getAll({ populate: true });
+    for (const w of all) {
+      if (w.type !== 'popup' || w.id == null) continue;
+      const t = w.tabs && w.tabs[0];
+      const u = String(t?.url || '');
+      if (u && (u === url || u.startsWith(urlBase))) {
+        await chrome.windows.update(w.id, { focused: true });
+        return;
+      }
+    }
+  } catch {
+    // no-op
+  }
+  try {
+    await chrome.windows.create({
+      url,
+      type: 'popup',
+      width: 420,
+      height: 780,
+      focused: true
+    });
+  } catch {
+    // no-op
+  }
+}
+
+/**
+ * @param {import('chrome').tabs.Tab|undefined} tab
+ */
+async function handleBrowserActionClick(tab) {
+  const policy = await getToolbarActionPolicy();
+  if (policy === 'always_open_popup') {
+    await openOrFocusPopupWindow();
+    return;
+  }
+  const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
+  if (tid === chrome.tabs.TAB_ID_NONE) {
+    await openOrFocusPopupWindow();
+    return;
+  }
+  try {
+    const res = await chrome.tabs.sendMessage(tid, {
+      type: 'NLS_FOCUS_INLINE_PANEL'
+    });
+    if (res && res.focused) return;
+  } catch {
+    // コンテンツ未注入・対象外 URL
+  }
+  await openOrFocusPopupWindow();
+}
+
+chrome.action.onClicked.addListener((tab) => {
+  void handleBrowserActionClick(tab);
 });

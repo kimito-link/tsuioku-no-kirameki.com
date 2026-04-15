@@ -30,7 +30,6 @@
     "default_path": "sidepanel.html"
   },
   "action": {
-    "default_popup": "popup.html",
     "default_title": "君斗りんくの追憶のきらめき",
     "default_icon": {
       "16": "images/logo/konta-yukkuri-icon-16.png",
