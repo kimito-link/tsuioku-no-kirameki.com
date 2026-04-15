@@ -3723,40 +3723,17 @@
         color:var(--text-secondary);
         letter-spacing:.02em
       }
-      .lp-worldview__cc-poster{
-        margin:clamp(10px,2.8vw,18px) 0 clamp(6px,1.5vw,12px);
-        max-width:100%;
-        padding:0;
-        border-radius:var(--r3);
-        overflow:hidden;
-        border:1px solid rgba(88,62,28,.1);
-        box-shadow:0 12px 36px rgba(15,24,42,.12);
-        background:rgba(255,252,247,.06)
-      }
-      .lp-worldview__cc-poster__link{
-        display:block;
-        line-height:0;
-        border-radius:calc(var(--r3) - 1px)
-      }
-      .lp-worldview__cc-poster__link:focus-visible{
-        outline:2px solid rgba(79,172,254,.85);
-        outline-offset:3px
-      }
-      .lp-worldview__cc-poster__img{
-        display:block;
-        width:100%;
-        max-width:100%;
-        height:auto
-      }
-      
       .lp-worldview__brand-note{
-        margin:var(--space-md) 0 0;
-        padding:12px 14px;border-radius:var(--r3);
+        box-sizing:border-box;margin:var(--space-md) auto 0;width:100%;max-width:min(100%,42rem);
+        padding:12px clamp(12px,3.5vw,16px);border-radius:var(--r3);
+        text-align:center;text-wrap:balance;
         font-size:.82rem;line-height:var(--lh-body);
         color:var(--text-secondary);
         background:rgba(0,66,123,.04);
-        border:1px solid rgba(0,66,123,.1)
+        border:1px solid rgba(0,66,123,.1);
+        overflow-wrap:anywhere;word-break:normal;line-break:strict
       }
+      .lp-worldview__brand-note__keep{white-space:nowrap}
       .lp-worldview__brand-note a{
         color:#1f568d;font-weight:600
       }
@@ -4268,19 +4245,15 @@
       .lp-dawn-arc .lp-worldview__brand-note{
         color:rgba(232,224,212,.9);
         background:transparent;
-        border:1px solid rgba(255,255,255,.1);
-        border-left:3px solid rgba(79,172,254,.38);
+        border:1px solid rgba(255,255,255,.12);
+        border-top:2px solid rgba(79,172,254,.42);
         box-shadow:none;
-        padding-left:15px
+        text-align:center
       }
+      .lp-dawn-arc .lp-worldview__panel .lp-worldview__brand-note{text-align:center}
       .lp-dawn-arc .lp-worldview__brand-note a{color:#b8e0ff}
       .lp-dawn-arc .lp-worldview__brand-note a:hover,.lp-dawn-arc .lp-worldview__brand-note a:focus-visible{color:#e0f2ff}
       
-      .lp-dawn-arc .lp-worldview__cc-poster{
-        border-color:rgba(255,255,255,.14);
-        box-shadow:0 18px 48px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);
-        background:rgba(8,12,28,.42)
-      }
       .lp-dawn-arc .lp-worldview__metaphor-whisper__line{color:rgba(255,248,236,.78);opacity:.9}
       .lp-dawn-arc .lp-worldview__metaphor-whisper__sub{color:rgba(255,240,220,.55);opacity:1}
       .lp-dawn-arc .lp-worldview__metaphor-whisper::before{
@@ -4513,21 +4486,152 @@
       .lp-coda{
         position:relative;overflow:hidden;
         padding:clamp(64px,12vw,120px) 0 clamp(104px,18vw,168px);
-        background:linear-gradient(180deg,#3a2f28 0%,#2a221c 22%,#1a1410 52%,#0f0c0a 78%,#080706 100%);
+        background:#070510;
         text-align:center;color:#fff7ef
       }
-      .lp-coda__glow{
-        position:absolute;top:30%;left:50%;width:min(600px,90vw);height:min(400px,60vw);
-        transform:translate(-50%,-50%);pointer-events:none;
-        background:radial-gradient(ellipse,rgba(201,142,43,.1) 0%,transparent 70%);
-        filter:blur(40px)
+      .lp-coda__bg{
+        position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden
       }
-      .lp-coda__inner{position:relative;z-index:1}
+      .lp-coda__dawn-layer{
+        position:absolute;inset:0;
+        background:
+          radial-gradient(ellipse 110% 58% at 50% -8%,
+            rgba(255,236,214,.24) 0%,
+            rgba(170,205,255,.14) 22%,
+            transparent 58%),
+          linear-gradient(180deg,
+            #1c2548 0%,
+            #101428 18%,
+            #0a0c1c 42%,
+            #05040d 72%,
+            #020208 100%);
+        animation:lp-coda-dawn-breathe 52s ease-in-out infinite alternate
+      }
+      .lp-coda__starfield{
+        position:absolute;inset:0;opacity:.62;mix-blend-mode:screen;
+        background-image:
+          radial-gradient(1.2px 1.2px at 7% 11%,rgba(255,255,255,.95),transparent),
+          radial-gradient(1px 1px at 14% 42%,rgba(255,255,255,.72),transparent),
+          radial-gradient(1.3px 1.3px at 22% 18%,rgba(255,250,235,.9),transparent),
+          radial-gradient(1px 1px at 31% 55%,rgba(255,255,255,.65),transparent),
+          radial-gradient(1.1px 1.1px at 38% 28%,rgba(255,255,255,.82),transparent),
+          radial-gradient(1.2px 1.2px at 46% 62%,rgba(255,255,255,.58),transparent),
+          radial-gradient(1px 1px at 54% 12%,rgba(255,255,255,.78),transparent),
+          radial-gradient(1.2px 1.2px at 61% 48%,rgba(255,255,255,.68),transparent),
+          radial-gradient(1px 1px at 69% 25%,rgba(255,255,255,.85),transparent),
+          radial-gradient(1.3px 1.3px at 76% 58%,rgba(255,255,255,.62),transparent),
+          radial-gradient(1px 1px at 84% 14%,rgba(255,255,255,.88),transparent),
+          radial-gradient(1.1px 1.1px at 91% 44%,rgba(255,255,255,.7),transparent),
+          radial-gradient(1px 1px at 11% 68%,rgba(255,255,255,.55),transparent),
+          radial-gradient(1.2px 1.2px at 19% 82%,rgba(255,255,255,.52),transparent),
+          radial-gradient(1px 1px at 73% 78%,rgba(255,255,255,.48),transparent),
+          radial-gradient(1.1px 1.1px at 42% 88%,rgba(255,255,255,.5),transparent),
+          radial-gradient(1px 1px at 56% 92%,rgba(255,255,255,.45),transparent),
+          radial-gradient(1px 1px at 88% 84%,rgba(255,255,255,.42),transparent);
+        background-size:100% 100%;
+        animation:lp-coda-star-twinkle 5.5s ease-in-out infinite alternate
+      }
+      .lp-coda__starfield-soft{
+        position:absolute;inset:-4% 0 0 0;height:78%;
+        opacity:.38;
+        background-image:
+          radial-gradient(1px 1px at 12% 24%,rgba(200,220,255,.45),transparent),
+          radial-gradient(1px 1px at 45% 36%,rgba(255,255,255,.35),transparent),
+          radial-gradient(1px 1px at 78% 18%,rgba(255,245,230,.4),transparent),
+          radial-gradient(1.1px 1.1px at 66% 52%,rgba(255,255,255,.38),transparent),
+          radial-gradient(1px 1px at 30% 64%,rgba(220,235,255,.42),transparent);
+        background-size:100% 100%;
+        animation:lp-coda-star-twinkle 7.2s ease-in-out infinite alternate-reverse
+      }
+      .lp-coda__meteors{
+        position:absolute;inset:-6% -4% 0 -4%;
+        overflow:hidden;
+        pointer-events:none;
+        z-index:1
+      }
+      .lp-coda__meteor{
+        position:absolute;
+        width:2px;height:2px;border-radius:50%;
+        background:rgba(255,255,255,.94);
+        box-shadow:0 0 8px rgba(255,255,255,.45);
+        opacity:0;
+        animation:lp-coda-meteor-dr 5s ease-in-out infinite
+      }
+      .lp-coda__meteor::before{
+        content:"";
+        position:absolute;right:0;top:50%;
+        width:min(96px,22vw);height:1px;
+        transform:translateY(-50%) rotate(40deg);
+        transform-origin:right center;
+        background:linear-gradient(90deg,rgba(255,255,255,.84),transparent)
+      }
+      .lp-coda__meteor--warm{
+        background:rgba(255,215,170,.96);
+        box-shadow:0 0 10px rgba(255,190,130,.38);
+        animation-name:lp-coda-meteor-dr-w
+      }
+      .lp-coda__meteor--warm::before{
+        background:linear-gradient(90deg,rgba(255,210,170,.78),transparent)
+      }
+      .lp-coda__meteor--left{
+        animation-name:lp-coda-meteor-dl
+      }
+      .lp-coda__meteor--left::before{
+        left:0;right:auto;transform-origin:left center;
+        transform:translateY(-50%) rotate(-40deg);
+        background:linear-gradient(270deg,rgba(255,255,255,.82),transparent)
+      }
+      .lp-coda__meteor:nth-child(1){left:6%;top:4%;animation-delay:0s;animation-duration:4.9s}
+      .lp-coda__meteor:nth-child(2){left:17%;top:2%;animation-delay:.85s;animation-duration:5.6s}
+      .lp-coda__meteor:nth-child(3){left:28%;top:5%;animation-delay:1.9s;animation-duration:4.4s}
+      .lp-coda__meteor:nth-child(4){left:39%;top:1%;animation-delay:.3s;animation-duration:5.9s}
+      .lp-coda__meteor:nth-child(5){left:51%;top:6%;animation-delay:2.6s;animation-duration:4.7s}
+      .lp-coda__meteor:nth-child(6){left:62%;top:3%;animation-delay:1.1s;animation-duration:5.3s}
+      .lp-coda__meteor:nth-child(7){left:73%;top:7%;animation-delay:3.4s;animation-duration:4.2s}
+      .lp-coda__meteor:nth-child(8){left:84%;top:2%;animation-delay:4.2s;animation-duration:5.8s}
+      .lp-coda__meteor:nth-child(9){left:12%;top:14%;animation-delay:.55s;animation-duration:5.1s}
+      .lp-coda__meteor:nth-child(10){left:25%;top:11%;animation-delay:3.1s;animation-duration:4.6s}
+      .lp-coda__meteor:nth-child(11){left:46%;top:13%;animation-delay:2.15s;animation-duration:5.4s}
+      .lp-coda__meteor:nth-child(12){left:68%;top:12%;animation-delay:4.8s;animation-duration:4.3s}
+      .lp-coda__meteor:nth-child(13){left:88%;top:10%;animation-delay:1.65s;animation-duration:5.65s}
+      .lp-coda__meteor:nth-child(14){left:33%;top:18%;animation-delay:3.9s;animation-duration:4.95s}
+      .lp-coda__meteor:nth-child(15){left:55%;top:16%;animation-delay:.2s;animation-duration:5.25s}
+      .lp-coda__meteor:nth-child(16){left:76%;top:19%;animation-delay:2.35s;animation-duration:4.55s}
+      .lp-coda__meteor:nth-child(17){left:9%;top:21%;animation-delay:4.5s;animation-duration:5.5s}
+      .lp-coda__meteor:nth-child(18){left:92%;top:17%;animation-delay:3.55s;animation-duration:4.75s}
+      @keyframes lp-coda-dawn-breathe{
+        0%{filter:brightness(.72) saturate(.95);opacity:.94}
+        50%{filter:brightness(1.14) saturate(1.06);opacity:1}
+        100%{filter:brightness(.82) saturate(.98);opacity:.97}
+      }
+      @keyframes lp-coda-star-twinkle{
+        0%{opacity:.38;transform:scale(.992)}
+        100%{opacity:.78;transform:scale(1)}
+      }
+      @keyframes lp-coda-meteor-dr{
+        0%,88%{opacity:0;transform:translate3d(0,0,0)}
+        90%{opacity:.76}
+        100%{opacity:0;transform:translate3d(118px,82px,0)}
+      }
+      @keyframes lp-coda-meteor-dr-w{
+        0%,87%{opacity:0;transform:translate3d(0,0,0) scale(.92)}
+        89%{opacity:.78}
+        100%{opacity:0;transform:translate3d(132px,94px,0) scale(.88)}
+      }
+      @keyframes lp-coda-meteor-dl{
+        0%,88%{opacity:0;transform:translate3d(0,0,0)}
+        90%{opacity:.74}
+        100%{opacity:0;transform:translate3d(-116px,86px,0)}
+      }
+      .lp-coda--active .lp-coda__dawn-layer{animation-duration:40s}
+      .lp-coda--active .lp-coda__starfield{opacity:.72}
+      .lp-coda__inner{position:relative;z-index:2}
       .lp-coda__line{
         margin:0;
         font-family:"Yu Mincho","Hiragino Mincho ProN",serif;
         letter-spacing:.06em;
-        line-height:1.5
+        line-height:1.5;
+        text-shadow:0 1px 18px rgba(0,4,20,.45)
       }
       .lp-coda__line--first{
         font-size:clamp(1.15rem,3vw,1.5rem);
@@ -4550,7 +4654,8 @@
         font-family:"Yu Mincho","Hiragino Mincho ProN",serif;
         font-size:clamp(.95rem,2.4vw,1.1rem);
         line-height:1.8;letter-spacing:.05em;
-        color:rgba(220,212,200,.7)
+        color:rgba(220,212,200,.7);
+        text-shadow:0 1px 14px rgba(0,4,20,.4)
       }
       .lp-coda__verse p + p{margin-top:.8em}
       .lp-coda__verse-last{
@@ -4566,7 +4671,8 @@
         font-size:clamp(.95rem,2.45vw,1.08rem);
         line-height:1.9;
         letter-spacing:.06em;
-        color:rgba(240,232,220,.88)
+        color:rgba(240,232,220,.88);
+        text-shadow:0 1px 16px rgba(0,4,20,.42)
       }
       .lp-coda__dots{
         margin:clamp(22px,4vw,34px) 0 0;
@@ -4607,199 +4713,10 @@
         background:rgba(255,252,245,.16);
         border-color:rgba(201,142,43,.55)
       }
-      /* ── Coda drop effect ── */
-      @keyframes lp-drop-fall{
-        0%{transform:translateY(-20px) scale(.58);opacity:0}
-        18%{opacity:1}
-        58%{transform:translateY(clamp(150px,24vh,230px)) scale(.92);opacity:.84}
-        100%{transform:translateY(clamp(290px,48vh,430px)) scale(1.04);opacity:0}
-      }
-      @keyframes lp-coda-pool-breathe{
-        0%,100%{transform:translateX(-50%) scaleX(.95) scaleY(.94);opacity:.82}
-        50%{transform:translateX(-50%) scaleX(1.04) scaleY(1);opacity:.96}
-      }
-      @keyframes lp-coda-pool-sheen{
-        0%{transform:translateX(-58%)}
-        100%{transform:translateX(58%)}
-      }
-      @keyframes lp-coda-pool-drop{
-        0%{transform:translate(-50%,var(--fall-start,-92px)) scale(.72);opacity:0}
-        18%{opacity:.96}
-        84%{opacity:.92}
-        100%{transform:translate(-50%,-4px) scale(.98);opacity:0}
-      }
-      @keyframes lp-coda-pool-impact{
-        0%{transform:translate(-50%,-50%) scale(.2);opacity:0}
-        22%{opacity:.95}
-        100%{transform:translate(-50%,-50%) scale(1.5);opacity:0}
-      }
-      @keyframes lp-coda-pool-ripple{
-        0%{transform:translate(-50%,-50%) scale(.16);opacity:0}
-        12%{opacity:.72}
-        100%{transform:translate(-50%,-50%) scale(1.18);opacity:0}
-      }
-      .lp-coda__drops{
-        position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden
-      }
-      .lp-coda__drop{
-        position:absolute;
-        width:7px;height:11px;
-        border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
-        background:linear-gradient(180deg,rgba(215,236,255,.72),rgba(123,178,226,.34));
-        box-shadow:0 0 10px rgba(158,210,255,.18);
-        filter:blur(.35px);
-        animation:lp-drop-fall 4s ease-in infinite
-      }
-      .lp-coda__drop::after{
-        content:"";position:absolute;
-        left:1px;right:1px;top:1px;
-        height:55%;
-        border-radius:inherit;
-        background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,0));
-        opacity:.9
-      }
-      .lp-coda__drop:nth-child(1){left:16%;top:20%;animation-delay:0s;animation-duration:4.2s}
-      .lp-coda__drop:nth-child(2){left:32%;top:16%;animation-delay:1s;animation-duration:3.7s;width:4px;height:7px;opacity:.7}
-      .lp-coda__drop:nth-child(3){left:49%;top:18%;animation-delay:1.8s;animation-duration:4.4s;width:5px;height:8px}
-      .lp-coda__drop:nth-child(4){left:66%;top:15%;animation-delay:2.9s;animation-duration:3.9s;width:4px;height:6px;opacity:.68}
-      .lp-coda__drop:nth-child(5){left:81%;top:21%;animation-delay:.6s;animation-duration:4.8s;width:6px;height:9px;opacity:.74}
-      .lp-coda__drop:nth-child(6){left:57%;top:11%;animation-delay:3.4s;animation-duration:4.1s;width:3px;height:5px;opacity:.6}
-      .lp-coda__drop:nth-child(7){left:24%;top:12%;animation-delay:2.3s;animation-duration:4.6s;width:5px;height:7px;opacity:.64}
-      .lp-coda__waterscape{
-        position:absolute;left:0;right:0;bottom:0;height:clamp(132px,24vw,196px);
-        pointer-events:none;z-index:0;overflow:hidden
-      }
-      .lp-coda__waterscape::before{
-        content:"";position:absolute;left:50%;bottom:-6%;
-        width:min(860px,110vw);height:100%;
-        transform:translateX(-50%);
-        background:
-          radial-gradient(ellipse at 50% 72%,rgba(155,212,255,.24) 0%,rgba(79,140,214,.12) 38%,rgba(8,16,38,0) 74%),
-          radial-gradient(ellipse at 50% 92%,rgba(7,13,31,.62) 0%,rgba(7,13,31,0) 74%)
-      }
-      .lp-coda__pool{
-        position:absolute;left:50%;bottom:clamp(10px,2vw,18px);
-        width:min(720px,88vw);height:clamp(62px,10vw,94px);
-        transform:translateX(-50%);
-        overflow:visible;
-        border-radius:50%;
-        border:1px solid rgba(182,222,250,.18);
-        background:
-          radial-gradient(ellipse at 50% 38%,rgba(232,247,255,.34) 0%,rgba(176,217,246,.18) 18%,rgba(80,132,190,.2) 44%,rgba(13,31,67,.7) 78%,rgba(8,16,38,.08) 100%);
-        box-shadow:
-          inset 0 1px 0 rgba(255,255,255,.24),
-          0 -10px 28px rgba(77,147,214,.16),
-          0 30px 56px rgba(0,0,0,.28);
-        opacity:.84;
-        animation:lp-coda-pool-breathe 8s ease-in-out infinite
-      }
-      .lp-coda__pool::before{
-        content:"";position:absolute;left:16%;right:16%;top:18%;height:24%;
-        border-radius:50%;
-        background:linear-gradient(90deg,transparent,rgba(255,255,255,.34),transparent);
-        filter:blur(4px);
-        animation:lp-coda-pool-sheen 8s linear infinite
-      }
-      .lp-coda__pool::after{
-        content:"";position:absolute;left:50%;bottom:26%;
-        width:min(460px,64vw);height:clamp(12px,1.9vw,18px);
-        transform:translateX(-50%);
-        border-radius:50%;
-        background:radial-gradient(ellipse,rgba(215,238,255,.28),rgba(215,238,255,0) 72%);
-        opacity:.7
-      }
-      .lp-coda__pool-event{
-        position:absolute;
-        left:50%;top:45%;
-        width:0;height:0;
-        pointer-events:none
-      }
-      .lp-coda__pool-fall{
-        position:absolute;
-        left:0;top:0;
-        width:8px;height:14px;
-        border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
-        background:linear-gradient(180deg,rgba(238,249,255,.98),rgba(157,210,248,.78) 58%,rgba(103,163,214,.18));
-        box-shadow:0 0 10px rgba(173,225,255,.18);
-        transform:translate(-50%,-92px);
-        opacity:0
-      }
-      .lp-coda__pool-fall::after{
-        content:"";
-        position:absolute;left:1px;right:1px;top:1px;height:54%;
-        border-radius:inherit;
-        background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,0))
-      }
-      .lp-coda__pool-impact{
-        position:absolute;
-        left:0;top:0;
-        width:18px;height:9px;
-        border-radius:50%;
-        background:radial-gradient(ellipse,rgba(236,249,255,.92),rgba(167,220,255,.28) 55%,rgba(167,220,255,0) 74%);
-        transform:translate(-50%,-50%) scale(.2);
-        opacity:0
-      }
-      .lp-coda__pool-ripple{
-        position:absolute;
-        left:0;top:0;
-        width:clamp(70px,12vw,120px);height:clamp(20px,3vw,30px);
-        border-radius:50%;
-        border:1px solid rgba(199,232,255,.42);
-        transform:translate(-50%,-50%) scale(.18);
-        opacity:0
-      }
-      .lp-coda__pool-ripple::after{
-        content:"";
-        position:absolute;inset:0;
-        border-radius:inherit;
-        border:inherit;
-        opacity:0
-      }
-      .lp-coda__pool-event.is-active .lp-coda__pool-fall{
-        animation:lp-coda-pool-drop .66s cubic-bezier(.2,.72,.18,1) both
-      }
-      .lp-coda__pool-event.is-active .lp-coda__pool-impact{
-        animation:lp-coda-pool-impact .88s ease-out .48s both
-      }
-      .lp-coda__pool-event.is-active .lp-coda__pool-ripple{
-        animation:lp-coda-pool-ripple 1.28s ease-out .46s both
-      }
-      .lp-coda__pool-event.is-active .lp-coda__pool-ripple::after{
-        animation:lp-coda-pool-ripple 1.46s ease-out .66s both;
-        border-color:rgba(210,238,255,.24)
-      }
-      .lp-coda--active .lp-coda__pool{
-        opacity:.98;
-        box-shadow:
-          inset 0 1px 0 rgba(255,255,255,.28),
-          0 -12px 34px rgba(104,183,255,.22),
-          0 30px 60px rgba(0,0,0,.3)
-      }
-      /* ── Coda verse ripple ── */
-      @keyframes lp-coda-ripple{
-        0%{width:0;height:0;opacity:.45;border-width:1.5px}
-        100%{width:clamp(100px,22vw,180px);height:clamp(32px,7vw,54px);opacity:0;border-width:.3px}
-      }
-      .lp-coda__verse-drop{position:relative}
-      .lp-coda__verse-ripples{
-        display:block;position:relative;
-        height:clamp(20px,4vw,32px);
-        margin:clamp(6px,1.5vw,12px) auto;
-        width:0
-      }
-      .lp-coda__verse-ripple{
-        position:absolute;
-        left:50%;top:50%;
-        transform:translate(-50%,-50%);
-        width:0;height:0;
-        border-radius:50%;
-        border:1.5px solid rgba(160,200,240,.28);
-        animation:lp-coda-ripple 4s ease-out infinite
-      }
-      .lp-coda__verse-ripple:nth-child(2){animation-delay:1.3s}
-      .lp-coda__verse-ripple:nth-child(3){animation-delay:2.6s}
       @media (prefers-reduced-motion:reduce){
-        .lp-coda__glow{display:none}
+        .lp-coda__dawn-layer,.lp-coda__starfield,.lp-coda__starfield-soft,.lp-coda__meteor{animation:none}
+        .lp-coda__dawn-layer{filter:none;opacity:1}
+        .lp-coda__starfield{opacity:.5}
       }
 
       /* ── In-app browser hint ── */
@@ -4845,23 +4762,36 @@
 
       /* ── 忘却曲線 ── */
       .lp-forgetting{
+        display:flex;flex-direction:column;align-items:center;
         text-align:center;padding:clamp(24px,5vw,48px) 0;
-        position:relative
+        position:relative;
+        box-sizing:border-box
       }
       .lp-forgetting__heading{
+        box-sizing:border-box;width:100%;
+        text-align:center;
         font-size:clamp(1.05rem,2.6vw,1.4rem);font-weight:700;
         color:rgba(255,248,238,.88);line-height:var(--lh-tight);
         margin:0 0 clamp(16px,3vw,28px);letter-spacing:.03em
       }
       .lp-forgetting__chart{
         display:block;margin:0 auto;
-        width:min(100%,560px);height:auto
+        width:min(100%,560px);height:auto;flex-shrink:0
       }
       .lp-forgetting__caption{
-        margin:clamp(12px,2vw,20px) auto 0;
-        max-width:min(100%,28rem);
+        box-sizing:border-box;
+        margin:clamp(12px,2vw,20px) 0 0;
+        width:min(100%,28rem);max-width:100%;
+        padding-inline:clamp(0px,3vw,12px);
+        text-align:center;
+        text-wrap:balance;
         font-size:clamp(.78rem,1.8vw,.92rem);
         color:rgba(255,248,238,.52);line-height:var(--lh-body)
+      }
+      .lp-forgetting__nw{white-space:nowrap}
+      .lp-dawn-arc .lp-worldview__body .lp-forgetting .lp-forgetting__heading,
+      .lp-dawn-arc .lp-worldview__body .lp-forgetting .lp-forgetting__caption{
+        text-align:center
       }
       .lp-fc-fade{animation:lp-fc-draw 2.5s ease-out both}
       .lp-fc-save{animation:lp-fc-draw 2.5s ease-out .6s both}
@@ -5327,7 +5257,7 @@
                   <text x="516" y="82" fill="rgba(140,210,255,.7)" font-size="10" text-anchor="end">追憶の煌めきで記録</text>
                 </svg>
                 <p class="lp-forgetting__caption">
-                  エビングハウスの忘却曲線──人の記憶は20分で42%、1日で74%失われる。<br>
+                  エビングハウスの忘却曲線──人の記憶は20分で42%、<span class="lp-forgetting__nw">1日</span>で74%失われる。<br>
                   でも、記録として残せば、応援の痕跡は消えない。
                 </p>
               </div>
@@ -5488,28 +5418,9 @@
                 <figcaption class="lp-worldview__logo-band__cap">クリエイタークロス参加（ニコニ・コモンズ）</figcaption>
               </figure>
             </div>
-            <figure class="lp-worldview__cc-poster">
-              <a
-                href="https://commons.nicovideo.jp/works/nc321221"
-                rel="noopener noreferrer"
-                target="_blank"
-                class="lp-worldview__cc-poster__link"
-                aria-label="クリエイタークロス参加ポスター（ニコニ・コモンズ nc321221、新しいタブ）"
-              >
-                <img
-                  class="lp-worldview__cc-poster__img"
-                  src="images/creatorcrossposter.png"
-                  width="3580"
-                  height="965"
-                  alt="クリエイタークロス参加ポスター"
-                  loading="lazy"
-                  decoding="async"
-                >
-              </a>
-            </figure>
             <p class="lp-worldview__brand-note" role="note">
               ビジュアルの空間・星・流れ星は、<a href="https://kimito-link.com/" rel="noopener noreferrer">Kimito-Link Project（キミトリンクプロジェクト）</a>
-              の世界観（夜空・銀河・温かい光）に寄せています。ロゴや表記の正式ルールは、Kimito-Link リポジトリのブランドガイド
+              の世界観（夜空・銀河・温かい光）に寄せています。ロゴや<span class="lp-worldview__brand-note__keep">表記</span>の正式ルールは、Kimito-Link リポジトリのブランドガイド
               <span lang="en">251016_logo_guide_kimitolink_ol.pdf</span>（正本）に準拠してください。
             </p>
           </article>
@@ -8384,11 +8295,36 @@
       </section>
 
       <section class="lp-coda" aria-label="クロージングメッセージ">
+        <div class="lp-coda__bg" aria-hidden="true">
+          <div class="lp-coda__dawn-layer"></div>
+          <div class="lp-coda__starfield"></div>
+          <div class="lp-coda__starfield-soft"></div>
+          <div class="lp-coda__meteors">
+            <span class="lp-coda__meteor"></span>
+            <span class="lp-coda__meteor lp-coda__meteor--warm"></span>
+            <span class="lp-coda__meteor"></span>
+            <span class="lp-coda__meteor lp-coda__meteor--left"></span>
+            <span class="lp-coda__meteor"></span>
+            <span class="lp-coda__meteor lp-coda__meteor--warm"></span>
+            <span class="lp-coda__meteor"></span>
+            <span class="lp-coda__meteor"></span>
+            <span class="lp-coda__meteor lp-coda__meteor--left"></span>
+            <span class="lp-coda__meteor lp-coda__meteor--warm"></span>
+            <span class="lp-coda__meteor lp-coda__meteor--left"></span>
+            <span class="lp-coda__meteor"></span>
+            <span class="lp-coda__meteor"></span>
+            <span class="lp-coda__meteor lp-coda__meteor--warm"></span>
+            <span class="lp-coda__meteor lp-coda__meteor--left"></span>
+            <span class="lp-coda__meteor"></span>
+            <span class="lp-coda__meteor"></span>
+            <span class="lp-coda__meteor lp-coda__meteor--left"></span>
+          </div>
+        </div>
         <div class="shell lp-coda__inner">
           <p class="lp-coda__line lp-coda__line--first">キミの想いはもう受け取ったよ</p>
           <p class="lp-coda__line lp-coda__line--main">キミとボクの物語は<br>いつまでも色褪せない</p>
           <div class="lp-coda__verse">
-            <p class="lp-coda__verse-drop">ずっと待っていた返事が、ようやく胸に届いたように</p>
+            <p>ずっと待っていた返事が、ようやく胸に届いたように</p>
             <p>恋人とのメッセージの返信を心待ちにするような気持ちで</p>
             <p class="lp-coda__verse-last">いつでも君の言葉（コメント）を待ち望んでいるよ</p>
           </div>
