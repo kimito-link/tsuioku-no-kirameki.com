@@ -6,7 +6,7 @@
 ## 実装ログ（フェーズ A・C の一部）
 
 - **`isNiconicoAutoUserPlaceholderNickname`**（`user` + 英数字の自動名）を追加し、`supportGridStrongNickname` で弱扱いにした。
-- **`a:` 匿名 ID** は `supportGridDisplayTier` で **rink にならない**（最上段はこん太まで）。カスタム表示名＋良サムネでも rink に上げない。
+- **`a:` 匿名 ID** は **こん太（konta）段に載せない**（[`demoteNiconicoAnonymousFromKontaTier`](../src/lib/supportGridDisplayTier.js) とレーン末尾ガード）。りんく（link）条件を満たす場合のみ最上段、それ以外はたぬ姉側。
 - **案内文**（`storyUserLaneGuideHtml.js`）を上記ルールに合わせて更新。
 - **スクロール枠**（`.nl-story-userlane-stack`）: `max-height` を緩め、`scroll-padding-bottom`・内側シャドウ、`title` / `aria-label` で「下に三段あること」を明示。`popup-entry` の動的 `aria-label` も同趣旨に更新。
 - **残タスク（フェーズ B）**: Identicon 表示と tier 判定の URL 入力の完全一致は未着手（計画セクション 5.B 参照）。

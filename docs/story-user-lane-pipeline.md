@@ -14,6 +14,11 @@
 
 集約先: [`src/lib/storyUserLaneRowModel.js`](../src/lib/storyUserLaneRowModel.js) の `buildStoryUserLaneCandidateRow` が上記のうち tier / http マージ / displaySrc / thumbScore を一括生成。
 
+### ニコ匿名 ID（`a:`）と「こん太」段
+
+- **応援グリッド**（[`supportGridDisplayTier`](../src/lib/supportGridDisplayTier.js)）: ルール適用後に `demoteNiconicoAnonymousFromKontaTier` で、**`isNiconicoAnonymousUserId`（`a:` 形式）かつ tier が konta のときだけ tanu に落とす**。数値 ID の konta は据え置き。
+- **ユーザーレーン**（[`userLaneProfileCompletenessTier`](../src/lib/storyUserLaneRowModel.js)）: レーン専用分岐のあと、**`a:` かつ profileTier 2（こん太相当）→ 1（たぬ姉）** に揃え、グリッドと同趣旨にする。
+
 ## 応援グリッド（`sceneStoryGrowth` / `applyStoryGrowthIconAttributes`）
 
 | 段 | 入力・関数 | 備考 |

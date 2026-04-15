@@ -1076,6 +1076,11 @@
   var SUPPORT_GRID_TIER_LINK = "link";
   var SUPPORT_GRID_TIER_KONTA = "konta";
   var SUPPORT_GRID_TIER_TANU = "tanu";
+  function demoteNiconicoAnonymousFromKontaTier(userId, tier) {
+    if (tier !== SUPPORT_GRID_TIER_KONTA) return tier;
+    if (!isNiconicoAnonymousUserId(userId)) return tier;
+    return SUPPORT_GRID_TIER_TANU;
+  }
   function supportGridPersonalThumbPreferredUrl(userId, httpAvatarCandidate, storedAvatarUrl) {
     const u = String(userId || "").trim();
     const http = String(httpAvatarCandidate ?? "").trim();
@@ -1135,7 +1140,9 @@
       { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.isNumericId }
     ];
     const flags = { observed, strongNick, hasThumb, hasAnyAvatar, hasObservedAvatar, isNumericId, isAnonymous };
-    const tier = !uid ? SUPPORT_GRID_TIER_TANU : TIER_RULES.find((r) => r.match(flags))?.tier ?? SUPPORT_GRID_TIER_TANU;
+    const tierRaw = !uid ? SUPPORT_GRID_TIER_TANU : TIER_RULES.find((r) => r.match(flags))?.tier ?? SUPPORT_GRID_TIER_TANU;
+    const tier = demoteNiconicoAnonymousFromKontaTier(uid, tierRaw);
+    const demotedAnonymousKontaToTanu = tierRaw === SUPPORT_GRID_TIER_KONTA && tier === SUPPORT_GRID_TIER_TANU;
     const demotedAnonymousLinkToKonta = false;
     return {
       tier,
@@ -1144,6 +1151,7 @@
       hasAnyAvatar,
       avatarObserved: observed,
       demotedAnonymousLinkToKonta,
+      demotedAnonymousKontaToTanu,
       httpCandidateNonEmpty: Boolean(httpCandidate),
       storedAvatarNonEmpty: Boolean(rawAv)
     };
@@ -1447,7 +1455,7 @@
     return storyUserLaneGuideLine(
       faceKonta,
       escapeHtml(
-        "\u3053\u3093\u592A: 2\u756A\u76EE\u306E\u512A\u5148\u3068\u3057\u3066\u3001\u8868\u793A\u540D\u304B\u500B\u4EBA\u30B5\u30E0\u30CD\u306E\u3069\u3061\u3089\u304B\u307E\u3067\u53D6\u308C\u305F\u4EBA\u306F\u3001\u305D\u306E\u6B21\u306E\u6BB5\u3068\u3057\u3066\u4E26\u3073\u3084\u3059\u3044\u3088\uFF08\u5168\u54E1\u3092\u96A0\u3059\u308F\u3051\u3058\u3083\u306A\u3044\u3088\uFF09\u3002"
+        "\u3053\u3093\u592A: 2\u756A\u76EE\u306E\u512A\u5148\u3068\u3057\u3066\u3001\u6570\u5024ID\u306E\u30A2\u30AB\u30A6\u30F3\u30C8\u3067\u8868\u793A\u540D\u304B\u500B\u4EBA\u30B5\u30E0\u30CD\u306E\u3069\u3061\u3089\u304B\u307E\u3067\u53D6\u308C\u305F\u4EBA\u306F\u3001\u305D\u306E\u6B21\u306E\u6BB5\u3068\u3057\u3066\u4E26\u3073\u3084\u3059\u3044\u3088\u3002\u30CB\u30B3\u306E\u533F\u540DID\uFF08a: \u5F62\u5F0F\uFF09\u306F\u3053\u3053\u306B\u306F\u8F09\u305B\u305A\u3001\u308A\u3093\u304F\u6761\u4EF6\u3092\u6E80\u305F\u3059\u3068\u304D\u3060\u3051\u308A\u3093\u304F\u3001\u305D\u308C\u4EE5\u5916\u306F\u305F\u306C\u59C9\u5074\u3060\u3088\u3002"
       )
     );
   }
@@ -1987,9 +1995,12 @@ ${body}`;
     } else if (ex.strongNick) {
       t = SUPPORT_GRID_TIER_KONTA;
     }
-    if (t === SUPPORT_GRID_TIER_LINK) return 3;
-    if (t === SUPPORT_GRID_TIER_KONTA) return 2;
-    return 1;
+    let n;
+    if (t === SUPPORT_GRID_TIER_LINK) n = 3;
+    else if (t === SUPPORT_GRID_TIER_KONTA) n = 2;
+    else n = 1;
+    if (isNiconicoAnonymousUserId(uid) && n === 2) return 1;
+    return n;
   }
   function buildStoryUserLaneCandidateRow(entry, entryIndex, httpFromGrowth, pickCtx) {
     const uidRaw = String(entry?.userId || "").trim();

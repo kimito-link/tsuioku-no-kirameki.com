@@ -29,7 +29,7 @@ export function buildStoryUserLaneGuideKontaHtml(faceKonta) {
   return storyUserLaneGuideLine(
     faceKonta,
     escapeHtml(
-      'こん太: 2番目の優先として、表示名か個人サムネのどちらかまで取れた人は、その次の段として並びやすいよ（全員を隠すわけじゃないよ）。'
+      'こん太: 2番目の優先として、数値IDのアカウントで表示名か個人サムネのどちらかまで取れた人は、その次の段として並びやすいよ。ニコの匿名ID（a: 形式）はここには載せず、りんく条件を満たすときだけりんく、それ以外はたぬ姉側だよ。'
     )
   );
 }

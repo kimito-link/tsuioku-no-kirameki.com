@@ -19,6 +19,8 @@ describe('storyUserLaneGuideHtml', () => {
     expect(top).not.toContain('こん太:');
     expect(top).not.toContain('たぬ姉:');
     expect(konta).toContain('こん太:');
+    expect(konta).toContain('数値ID');
+    expect(konta).toContain('a: 形式');
     expect(konta).not.toContain('りんく:');
     expect(konta).not.toContain('たぬ姉:');
     expect(tanu).toContain('たぬ姉:');

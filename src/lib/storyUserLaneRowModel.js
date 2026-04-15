@@ -15,12 +15,13 @@ import {
   pickStoryUserLaneCellDisplaySrc,
   userLaneHttpForTilePick
 } from './storyUserLaneDisplaySrc.js';
+import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
 
 /**
  * 応援ユーザーレーンの並び順。大きいほど「個人サムネ＋表示名」に近い。
  * レーン専用ルール:
  * - link(3): 個人サムネあり
- * - konta(2): 個人サムネなし + 強い表示名あり
+ * - konta(2): 個人サムネなし + 強い表示名あり（a: 匿名 ID はここに載せず 1 へ）
  * - tanu(1): それ以外
  * @param {{ userId?: unknown, nickname?: unknown, avatarUrl?: unknown, avatarObserved?: boolean }|null|undefined} entry
  * @param {string} httpAvatarCandidate storyGrowth と stored をマージした `userLaneHttpForTilePick` 結果推奨（表示セルと段を一致させる）
@@ -46,9 +47,13 @@ export function userLaneProfileCompletenessTier(entry, httpAvatarCandidate) {
   } else if (ex.strongNick) {
     t = SUPPORT_GRID_TIER_KONTA;
   }
-  if (t === SUPPORT_GRID_TIER_LINK) return 3;
-  if (t === SUPPORT_GRID_TIER_KONTA) return 2;
-  return 1;
+  /** @type {1|2|3} */
+  let n;
+  if (t === SUPPORT_GRID_TIER_LINK) n = 3;
+  else if (t === SUPPORT_GRID_TIER_KONTA) n = 2;
+  else n = 1;
+  if (isNiconicoAnonymousUserId(uid) && n === 2) return 1;
+  return n;
 }
 
 /**

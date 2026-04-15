@@ -47,7 +47,7 @@ describe('userLaneProfileCompletenessTier', () => {
     ).toBe(3);
   });
 
-  it('匿名ID + 強ニック + avatarObserved=true で個人サムネなしは tier 2（konta）', () => {
+  it('匿名ID + 強ニック + avatarObserved=true で個人サムネなしは tier 1（a: はこん太に載せない）', () => {
     expect(
       userLaneProfileCompletenessTier(
         {
@@ -58,7 +58,7 @@ describe('userLaneProfileCompletenessTier', () => {
         },
         ''
       )
-    ).toBe(2);
+    ).toBe(1);
   });
 
   it('個人サムネがあれば表示名が弱くても tier 3（link）', () => {
@@ -123,7 +123,7 @@ describe('buildStoryUserLaneCandidateRow', () => {
     expect(row?.profileTier).toBe(3);
   });
 
-  it('匿名・こん太相当では表示 src は Identicon（メタ用 http はマージ結果のまま）', () => {
+  it('匿名・たぬ姉相当では表示 src は Identicon（メタ用 http はマージ結果のまま）', () => {
     const http = 'https://cdn.example/a.jpg';
     const row = buildStoryUserLaneCandidateRow(
       {
@@ -137,6 +137,7 @@ describe('buildStoryUserLaneCandidateRow', () => {
     );
     expect(row).not.toBeNull();
     expect(row?.httpForLane).toBe(http);
+    expect(row?.profileTier).toBe(1);
     expect(row?.displaySrc).toBe(pickCtx.anonymousIdenticonDataUrl);
   });
 

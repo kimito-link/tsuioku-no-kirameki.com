@@ -13,6 +13,18 @@ export const SUPPORT_GRID_TIER_KONTA = 'konta';
 export const SUPPORT_GRID_TIER_TANU = 'tanu';
 
 /**
+ * ニコの匿名 ID（a:）は「こん太」段に載せず、ルール上 konta でもたぬ姉へ落とす。
+ * @param {string} userId
+ * @param {'link'|'konta'|'tanu'} tier
+ * @returns {'link'|'konta'|'tanu'}
+ */
+export function demoteNiconicoAnonymousFromKontaTier(userId, tier) {
+  if (tier !== SUPPORT_GRID_TIER_KONTA) return tier;
+  if (!isNiconicoAnonymousUserId(userId)) return tier;
+  return SUPPORT_GRID_TIER_TANU;
+}
+
+/**
  * 個人サムネとして採用する https（記録 URL 優先）。合成 canonical のみは返さない。
  * @param {string} userId
  * @param {string} httpAvatarCandidate
@@ -97,6 +109,7 @@ function bestAvatarScore(uid, httpCandidate, rawAv) {
  *   hasAnyAvatar: boolean,
  *   avatarObserved: boolean,
  *   demotedAnonymousLinkToKonta: boolean,
+ *   demotedAnonymousKontaToTanu: boolean,
  *   httpCandidateNonEmpty: boolean,
  *   storedAvatarNonEmpty: boolean
  * }} demotedAnonymousLinkToKonta は互換のため常に false
@@ -138,10 +151,13 @@ export function explainSupportGridDisplayTier(p) {
   const flags = { observed, strongNick, hasThumb, hasAnyAvatar, hasObservedAvatar, isNumericId, isAnonymous };
 
   /** @type {'link'|'konta'|'tanu'} */
-  const tier = !uid
+  const tierRaw = !uid
     ? SUPPORT_GRID_TIER_TANU
     : (TIER_RULES.find(r => r.match(flags))?.tier ?? SUPPORT_GRID_TIER_TANU);
 
+  const tier = demoteNiconicoAnonymousFromKontaTier(uid, tierRaw);
+  const demotedAnonymousKontaToTanu =
+    tierRaw === SUPPORT_GRID_TIER_KONTA && tier === SUPPORT_GRID_TIER_TANU;
   const demotedAnonymousLinkToKonta = false;
 
   return {
@@ -151,6 +167,7 @@ export function explainSupportGridDisplayTier(p) {
     hasAnyAvatar,
     avatarObserved: observed,
     demotedAnonymousLinkToKonta,
+    demotedAnonymousKontaToTanu,
     httpCandidateNonEmpty: Boolean(httpCandidate),
     storedAvatarNonEmpty: Boolean(rawAv)
   };
