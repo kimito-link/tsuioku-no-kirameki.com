@@ -777,9 +777,18 @@
         background:linear-gradient(165deg,rgba(255,253,248,.98),rgba(236,244,249,.88));
         padding:var(--space-md) var(--space-sm);box-shadow:var(--shadow);overflow:hidden
       }
-      .creator-scale-figure svg{display:block;width:100%;height:auto;max-height:min(52vw,340px)}
+      /* viewBox 800x320: max-height only fights width:100% and squashes the diagram; lock aspect ratio */
+      .creator-scale-figure svg{
+        display:block;width:100%;max-width:min(100%,800px);height:auto;aspect-ratio:800 / 320;margin-inline:auto
+      }
       .creator-scale-caption{
-        margin:var(--space-sm) 4px 0;font-size:.8rem;line-height:var(--lh-body);color:var(--text-secondary);text-align:center
+        margin:var(--space-sm) clamp(2px,1vw,8px) 0;
+        padding-inline:max(0px, env(safe-area-inset-left, 0px)) max(0px, env(safe-area-inset-right, 0px));
+        font-size:clamp(.74rem,2.2vw,.82rem);line-height:var(--lh-body);color:var(--text-secondary);text-align:center;
+        max-width:52rem;margin-inline:auto;text-wrap:balance
+      }
+      @media (max-width:420px){
+        .creator-scale-figure{padding:12px max(10px, env(safe-area-inset-right, 0px)) 12px max(10px, env(safe-area-inset-left, 0px))}
       }
       .solution-grid{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:20px}
       .solution-card{position:relative;padding:20px;border-radius:24px;background:rgba(255,253,248,.97);border:1px solid rgba(88,62,28,.1);box-shadow:var(--shadow)}
