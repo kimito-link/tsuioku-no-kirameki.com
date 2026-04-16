@@ -6535,6 +6535,29 @@
         >
         もどうぞ。
       </p>
+      <label
+        class="nl-anonymous-identicon-opt"
+        data-nl-toolbar-only
+        title="応援ランクストリップ（上部の小さなサムネ行）で、匿名（a:xxxxx やハッシュ系）ユーザーを件数上位でも後ろに回し、数値IDのユーザーを先に並べます。既定オン。"
+      >
+        <input
+          type="checkbox"
+          id="foldAnonymousInRankStrip"
+          autocomplete="off"
+          checked
+          aria-describedby="foldAnonymousInRankStripHint"
+        />
+        <span
+          >応援ランク上位を固定ファン優先にする（匿名大量のときでも数値 ID のユーザーを前に出します）</span
+        >
+      </label>
+      <p
+        id="foldAnonymousInRankStripHint"
+        class="nl-anonymous-identicon-hint"
+        data-nl-toolbar-only
+      >
+        匿名コメント（アイコンが取れない <code>a:xxxxx</code> 等）が件数トップに並ぶと、顔の見える固定ファンが折り畳まれて見えなくなるのを防ぎます（<strong>既定オン</strong>）。
+      </p>
       <ul id="userRoomList" aria-live="polite" data-nl-toolbar-only></ul>
 
       <section

@@ -175,6 +175,7 @@
   var KEY_COMMENT_ENTER_SEND = "nls_comment_enter_send";
   var KEY_STORY_GROWTH_COLLAPSED = "nls_story_growth_collapsed";
   var KEY_ANONYMOUS_IDENTICON_ENABLED = "nls_anonymous_identicon_enabled_v1";
+  var KEY_FOLD_ANONYMOUS_IN_RANK_STRIP = "nls_fold_anonymous_in_rank_strip_v1";
   var KEY_SUPPORT_VISUAL_EXPANDED = "nls_support_visual_expanded";
   var KEY_USAGE_TERMS_ACK = "nls_usage_terms_ack_v1";
   var KEY_VOICE_INPUT_DEVICE = "nls_voice_input_device";
@@ -233,6 +234,9 @@
   function normalizeAnonymousIdenticonEnabled(raw) {
     return raw !== false;
   }
+  function normalizeFoldAnonymousInRankStrip(raw) {
+    return raw !== false;
+  }
   var KEY_MARKETING_EXPORT_MASK_LABELS = "nls_marketing_export_mask_labels_v1";
   function normalizeMarketingExportMaskLabels(raw) {
     return raw === true;
@@ -248,40 +252,6 @@
   function giftUsersStorageKey(liveId) {
     const id = String(liveId || "").trim().toLowerCase();
     return `nls_gift_users_${id}`;
-  }
-
-  // src/lib/supportVisualExpanded.js
-  function normalizeSupportVisualExpanded(raw, opts = {}) {
-    const inlineMode = opts.inlineMode === true;
-    if (raw === true) return true;
-    if (raw === false) return false;
-    return inlineMode;
-  }
-
-  // src/lib/nlMainScrollReveal.js
-  function computeScrollDeltaToRevealInParent(parentRect, elRect, pad = 12) {
-    const deltaTop = elRect.top - parentRect.top;
-    const deltaBottom = elRect.bottom - parentRect.bottom;
-    if (deltaTop < pad) {
-      return deltaTop - pad;
-    }
-    if (deltaBottom > -pad) {
-      return deltaBottom + pad;
-    }
-    return 0;
-  }
-
-  // src/lib/commentComposeShortcuts.js
-  function commentComposeKeyAction(p) {
-    if (p.key !== "Enter") return "default";
-    if (p.isComposing) return "default";
-    const mod = Boolean(p.ctrlKey || p.metaKey);
-    if (mod) return "submit";
-    if (p.enterSendsComment) {
-      if (p.shiftKey) return "default";
-      return "submit";
-    }
-    return "default";
   }
 
   // src/lib/supportGrowthTileSrc.js
@@ -386,6 +356,121 @@
     const u = String(userId || "").trim();
     if (/^\d{5,14}$/.test(u) && isNiconicoSyntheticDefaultUserIconUrl(c, u)) return 1;
     return 2;
+  }
+
+  // src/lib/userRooms.js
+  var UNKNOWN_USER_KEY = "__unknown__";
+  function shortUserKeyDisplay(userKey) {
+    if (!userKey || userKey === UNKNOWN_USER_KEY) return "";
+    const s = String(userKey);
+    return s.length <= 18 ? s : `${s.slice(0, 8)}\u2026${s.slice(-6)}`;
+  }
+  function displayUserLabel(userKey, nickname) {
+    if (!userKey || userKey === UNKNOWN_USER_KEY) {
+      return "ID\u672A\u53D6\u5F97\uFF08DOM\u306B\u6295\u7A3F\u8005\u60C5\u5831\u306A\u3057\uFF09";
+    }
+    const name = anonymousNicknameFallback(userKey, nickname);
+    const shortId = shortUserKeyDisplay(userKey);
+    if (name) return `${name}\uFF08${shortId}\uFF09`;
+    return shortId;
+  }
+  function aggregateCommentsByUser(entries) {
+    const list = Array.isArray(entries) ? entries : [];
+    const map = /* @__PURE__ */ new Map();
+    for (const e of list) {
+      const uid = e?.userId ? String(e.userId).trim() : "";
+      const userKey = uid || UNKNOWN_USER_KEY;
+      const capturedAt = Number(e?.capturedAt || 0);
+      const text = String(e?.text || "").trim();
+      const nickname = String(e?.nickname || "").trim();
+      const rawAv = String(e?.avatarUrl || "").trim();
+      const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
+      if (!map.has(userKey)) {
+        map.set(userKey, {
+          userKey,
+          nickname: "",
+          count: 0,
+          lastAt: 0,
+          lastText: "",
+          avatarUrl: ""
+        });
+      }
+      const row = map.get(userKey);
+      row.count += 1;
+      if (nickname) {
+        if (!row.nickname) row.nickname = nickname;
+        else if (nickname.length > row.nickname.length) row.nickname = nickname;
+      }
+      if (capturedAt >= row.lastAt) {
+        row.lastAt = capturedAt;
+        row.lastText = text.length > 60 ? `${text.slice(0, 60)}\u2026` : text;
+        if (userKey !== UNKNOWN_USER_KEY && avatarCandidate) row.avatarUrl = avatarCandidate;
+      }
+    }
+    return [...map.values()].sort((a, b) => b.lastAt - a.lastAt);
+  }
+
+  // src/lib/topSupportRankAnonymousFold.js
+  function isAnonymousLikeRoomKey(userKey) {
+    const key = String(userKey || "").trim();
+    if (!key) return true;
+    if (key === UNKNOWN_USER_KEY) return false;
+    return isAnonymousStyleNicoUserId(key);
+  }
+  function partitionRankedRoomsForStrip(ranked, opts) {
+    const list = Array.isArray(ranked) ? ranked : [];
+    const foldAnonymous = opts?.foldAnonymous !== false;
+    if (!foldAnonymous) return list.slice();
+    const unknownBucket = [];
+    const knownBucket = [];
+    const anonymousBucket = [];
+    for (const row of list) {
+      const key = String(row?.userKey ?? "");
+      if (key === UNKNOWN_USER_KEY) {
+        unknownBucket.push(row);
+        continue;
+      }
+      if (isAnonymousLikeRoomKey(key)) {
+        anonymousBucket.push(row);
+      } else {
+        knownBucket.push(row);
+      }
+    }
+    return [...unknownBucket, ...knownBucket, ...anonymousBucket];
+  }
+
+  // src/lib/supportVisualExpanded.js
+  function normalizeSupportVisualExpanded(raw, opts = {}) {
+    const inlineMode = opts.inlineMode === true;
+    if (raw === true) return true;
+    if (raw === false) return false;
+    return inlineMode;
+  }
+
+  // src/lib/nlMainScrollReveal.js
+  function computeScrollDeltaToRevealInParent(parentRect, elRect, pad = 12) {
+    const deltaTop = elRect.top - parentRect.top;
+    const deltaBottom = elRect.bottom - parentRect.bottom;
+    if (deltaTop < pad) {
+      return deltaTop - pad;
+    }
+    if (deltaBottom > -pad) {
+      return deltaBottom + pad;
+    }
+    return 0;
+  }
+
+  // src/lib/commentComposeShortcuts.js
+  function commentComposeKeyAction(p) {
+    if (p.key !== "Enter") return "default";
+    if (p.isComposing) return "default";
+    const mod = Boolean(p.ctrlKey || p.metaKey);
+    if (mod) return "submit";
+    if (p.enterSendsComment) {
+      if (p.shiftKey) return "default";
+      return "submit";
+    }
+    return "default";
   }
 
   // src/lib/userIdPreference.js
@@ -857,6 +942,27 @@
     return { showConcurrent, sparseConcurrent };
   }
 
+  // src/lib/popupWatchSnapshotRetry.js
+  async function retrySnapshotRequestUntilReady(requestOnce, opts = {}) {
+    const rawMax = opts.maxAttempts != null ? Number(opts.maxAttempts) : 3;
+    const maxAttempts = Number.isFinite(rawMax) && rawMax >= 1 ? Math.floor(rawMax) : 1;
+    const rawDelay = opts.baseDelayMs != null ? Number(opts.baseDelayMs) : 450;
+    const baseDelayMs = Number.isFinite(rawDelay) && rawDelay >= 0 ? Math.floor(rawDelay) : 450;
+    const sleep = typeof opts.sleep === "function" ? opts.sleep : (
+      /** @param {number} ms */
+      (ms) => new Promise((r) => setTimeout(r, ms))
+    );
+    let last;
+    for (let i = 0; i < maxAttempts; i++) {
+      last = await requestOnce();
+      if (last && last.snapshot != null) return last;
+      if (i < maxAttempts - 1) {
+        await sleep(baseDelayMs * (i + 1));
+      }
+    }
+    return last;
+  }
+
   // src/lib/watchConcurrentEstimateUiCopy.js
   var SPARSE_CONCURRENT_ESTIMATE_NOTE = "\u6765\u5834\u8005\u30FB\u7D71\u8A08\u304C\u672A\u53D6\u5F97\u306E\u305F\u3081\u63A8\u5B9A\u306F\u53C2\u8003\u5024";
   function concurrentResolutionMethodTitlePart(method) {
@@ -931,58 +1037,6 @@
       best = pickNewer(list[i], best);
     }
     return best;
-  }
-
-  // src/lib/userRooms.js
-  var UNKNOWN_USER_KEY = "__unknown__";
-  function shortUserKeyDisplay(userKey) {
-    if (!userKey || userKey === UNKNOWN_USER_KEY) return "";
-    const s = String(userKey);
-    return s.length <= 18 ? s : `${s.slice(0, 8)}\u2026${s.slice(-6)}`;
-  }
-  function displayUserLabel(userKey, nickname) {
-    if (!userKey || userKey === UNKNOWN_USER_KEY) {
-      return "ID\u672A\u53D6\u5F97\uFF08DOM\u306B\u6295\u7A3F\u8005\u60C5\u5831\u306A\u3057\uFF09";
-    }
-    const name = anonymousNicknameFallback(userKey, nickname);
-    const shortId = shortUserKeyDisplay(userKey);
-    if (name) return `${name}\uFF08${shortId}\uFF09`;
-    return shortId;
-  }
-  function aggregateCommentsByUser(entries) {
-    const list = Array.isArray(entries) ? entries : [];
-    const map = /* @__PURE__ */ new Map();
-    for (const e of list) {
-      const uid = e?.userId ? String(e.userId).trim() : "";
-      const userKey = uid || UNKNOWN_USER_KEY;
-      const capturedAt = Number(e?.capturedAt || 0);
-      const text = String(e?.text || "").trim();
-      const nickname = String(e?.nickname || "").trim();
-      const rawAv = String(e?.avatarUrl || "").trim();
-      const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
-      if (!map.has(userKey)) {
-        map.set(userKey, {
-          userKey,
-          nickname: "",
-          count: 0,
-          lastAt: 0,
-          lastText: "",
-          avatarUrl: ""
-        });
-      }
-      const row = map.get(userKey);
-      row.count += 1;
-      if (nickname) {
-        if (!row.nickname) row.nickname = nickname;
-        else if (nickname.length > row.nickname.length) row.nickname = nickname;
-      }
-      if (capturedAt >= row.lastAt) {
-        row.lastAt = capturedAt;
-        row.lastText = text.length > 60 ? `${text.slice(0, 60)}\u2026` : text;
-        if (userKey !== UNKNOWN_USER_KEY && avatarCandidate) row.avatarUrl = avatarCandidate;
-      }
-    }
-    return [...map.values()].sort((a, b) => b.lastAt - a.lastAt);
   }
 
   // src/lib/userSupportGridAccent.js
@@ -5434,6 +5488,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   });
   var anonymousIdenticonRuntimeEnabled = true;
   var anonymousIdenticonDataUrlCache = /* @__PURE__ */ new Map();
+  var foldAnonymousInRankStripRuntimeEnabled = true;
   function applyAnonymousIdenticonRuntimeFromBag(bag) {
     const on = normalizeAnonymousIdenticonEnabled(
       bag?.[KEY_ANONYMOUS_IDENTICON_ENABLED]
@@ -5442,6 +5497,15 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       anonymousIdenticonDataUrlCache.clear();
     }
     anonymousIdenticonRuntimeEnabled = on;
+  }
+  function applyFoldAnonymousInRankStripRuntimeFromBag(bag) {
+    const on = normalizeFoldAnonymousInRankStrip(
+      bag?.[KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]
+    );
+    if (on !== foldAnonymousInRankStripRuntimeEnabled) {
+      _lastTopSupportRankStripStableKey = null;
+    }
+    foldAnonymousInRankStripRuntimeEnabled = on;
   }
   function getCachedAnonymousIdenticonDataUrl(userId) {
     if (!anonymousIdenticonRuntimeEnabled) return "";
@@ -7745,7 +7809,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const denseLayout = document.body?.classList.contains("nl-tight") || document.body?.classList.contains("nl-compact");
     const compactRooms = !INLINE_MODE;
     const MAX_VISIBLE_ROOMS = compactRooms ? 1 : denseLayout ? 2 : 3;
-    const stripSlice = rankedRooms.slice(0, TOP_SUPPORT_RANK_STRIP_MAX);
+    const stripCandidates = partitionRankedRoomsForStrip(rankedRooms, {
+      foldAnonymous: foldAnonymousInRankStripRuntimeEnabled
+    });
+    const stripSlice = stripCandidates.slice(0, TOP_SUPPORT_RANK_STRIP_MAX);
     const stripKey = topSupportRankStripStableKey(liveId, list.length, stripSlice);
     if (stripKey !== _lastTopSupportRankStripStableKey) {
       _lastTopSupportRankStripStableKey = stripKey;
@@ -8141,6 +8208,19 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (cb) {
       cb.checked = normalizeAnonymousIdenticonEnabled(
         bag[KEY_ANONYMOUS_IDENTICON_ENABLED]
+      );
+    }
+  }
+  async function applyFoldAnonymousInRankStripFromStorage() {
+    const cb = (
+      /** @type {HTMLInputElement|null} */
+      $("foldAnonymousInRankStrip")
+    );
+    const bag = await chrome.storage.local.get(KEY_FOLD_ANONYMOUS_IN_RANK_STRIP);
+    applyFoldAnonymousInRankStripRuntimeFromBag(bag);
+    if (cb) {
+      cb.checked = normalizeFoldAnonymousInRankStrip(
+        bag[KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]
       );
     }
   }
@@ -8819,7 +8899,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           KEY_STORAGE_WRITE_ERROR,
           KEY_COMMENT_PANEL_STATUS,
           KEY_MARKETING_EXPORT_MASK_LABELS,
-          KEY_ANONYMOUS_IDENTICON_ENABLED
+          KEY_ANONYMOUS_IDENTICON_ENABLED,
+          KEY_FOLD_ANONYMOUS_IN_RANK_STRIP
         ])
       ]);
       applySelfPostedRecentsFromBag(openBag);
@@ -8851,6 +8932,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         );
       }
       applyAnonymousIdenticonRuntimeFromBag(openBag);
+      const foldAnonHydrate = (
+        /** @type {HTMLInputElement|null} */
+        $("foldAnonymousInRankStrip")
+      );
+      if (foldAnonHydrate) {
+        foldAnonHydrate.checked = normalizeFoldAnonymousInRankStrip(
+          openBag[KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]
+        );
+      }
+      applyFoldAnonymousInRankStripRuntimeFromBag(openBag);
       const { url, fromActiveTab } = resolveWatchUrlFromTabAndStash(
         tabs[0],
         openBag[KEY_LAST_WATCH_URL]
@@ -9473,7 +9564,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     throw lastErr;
   }
-  async function requestWatchPageSnapshotFromOpenTab(watchUrl) {
+  async function requestWatchPageSnapshotFromOpenTabOnce(watchUrl) {
     const candidates = await collectWatchTabCandidates(watchUrl);
     if (!candidates.length) {
       return {
@@ -9517,6 +9608,15 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       snapshot: null,
       error: "watch\u30DA\u30FC\u30B8\u304B\u3089\u306E\u60C5\u5831\u53D6\u5F97\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u653E\u9001\u30BF\u30D6\u3092\u958B\u3044\u305F\u72B6\u614B\u3067\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u3092\u518D\u5EA6\u958B\u3044\u3066\u304F\u3060\u3055\u3044\u3002"
     };
+  }
+  async function requestWatchPageSnapshotFromOpenTab(watchUrl, opts = {}) {
+    return retrySnapshotRequestUntilReady(
+      () => requestWatchPageSnapshotFromOpenTabOnce(watchUrl),
+      {
+        maxAttempts: opts.maxAttempts ?? 3,
+        baseDelayMs: opts.baseDelayMs ?? 450
+      }
+    );
   }
   async function requestPostCommentToOpenTab(text, watchUrl) {
     const trimmed = String(text || "").trim();
@@ -10360,7 +10460,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0416-1709" ? String("0416-1709") : "dev";
+      const buildId = "0417-0435" ? String("0417-0435") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -10431,6 +10531,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const anonymousIdenticonEnabled = (
       /** @type {HTMLInputElement|null} */
       $("anonymousIdenticonEnabled")
+    );
+    const foldAnonymousInRankStrip = (
+      /** @type {HTMLInputElement|null} */
+      $("foldAnonymousInRankStrip")
     );
     const commentEnterSend = (
       /** @type {HTMLInputElement|null} */
@@ -11321,6 +11425,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       await applyAnonymousIdenticonFromStorage();
       safeRefresh();
     });
+    foldAnonymousInRankStrip?.addEventListener("change", async () => {
+      try {
+        await storageSetSafe({
+          [KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]: foldAnonymousInRankStrip.checked
+        });
+      } catch {
+      }
+      await applyFoldAnonymousInRankStripFromStorage();
+      safeRefresh();
+    });
     const storyGrowthCollapseBtn = $("storyGrowthCollapseBtn");
     storyGrowthCollapseBtn?.addEventListener("click", () => {
       void (async () => {
@@ -11668,6 +11782,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           }
           if (changes[KEY_ANONYMOUS_IDENTICON_ENABLED]) {
             applyAnonymousIdenticonFromStorage().catch(() => {
+            });
+          }
+          if (changes[KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]) {
+            applyFoldAnonymousInRankStripFromStorage().catch(() => {
             });
           }
           if (changes[KEY_STORY_GROWTH_COLLAPSED]) {

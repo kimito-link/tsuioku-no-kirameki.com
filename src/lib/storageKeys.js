@@ -55,6 +55,13 @@ export const KEY_STORY_GROWTH_COLLAPSED = 'nls_story_growth_collapsed';
  */
 export const KEY_ANONYMOUS_IDENTICON_ENABLED = 'nls_anonymous_identicon_enabled_v1';
 
+/**
+ * 応援ランクストリップで匿名（a:xxxxx / ハッシュ系）ユーザーを折り畳む。
+ * true（既定）のとき、数値 userId のユーザーを先に出し、匿名ユーザーは件数上位でも後ろに回す。
+ * false のときは従来どおり件数順で純粋に並べる。
+ */
+export const KEY_FOLD_ANONYMOUS_IN_RANK_STRIP = 'nls_fold_anonymous_in_rank_strip_v1';
+
 /** 応援ビジュアル詳細（ユーザーレーン・グリッド・診断ブロック）を開いているか */
 export const KEY_SUPPORT_VISUAL_EXPANDED = 'nls_support_visual_expanded';
 
@@ -186,6 +193,11 @@ export function isCommentEnterSendEnabled(raw) {
 
 /** @param {unknown} raw */
 export function normalizeAnonymousIdenticonEnabled(raw) {
+  return raw !== false;
+}
+
+/** @param {unknown} raw */
+export function normalizeFoldAnonymousInRankStrip(raw) {
   return raw !== false;
 }
 

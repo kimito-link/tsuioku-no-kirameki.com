@@ -37,6 +37,7 @@ import {
   KEY_THUMB_INTERVAL_MS,
   KEY_COMMENT_ENTER_SEND,
   KEY_ANONYMOUS_IDENTICON_ENABLED,
+  KEY_FOLD_ANONYMOUS_IN_RANK_STRIP,
   KEY_STORY_GROWTH_COLLAPSED,
   KEY_SUPPORT_VISUAL_EXPANDED,
   KEY_USAGE_TERMS_ACK,
@@ -55,8 +56,10 @@ import {
   normalizeInlineFloatingAnchor,
   normalizeCalmPanelMotion,
   normalizeMarketingExportMaskLabels,
-  normalizeAnonymousIdenticonEnabled
+  normalizeAnonymousIdenticonEnabled,
+  normalizeFoldAnonymousInRankStrip
 } from '../lib/storageKeys.js';
+import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold.js';
 import { normalizeSupportVisualExpanded } from '../lib/supportVisualExpanded.js';
 import { computeScrollDeltaToRevealInParent } from '../lib/nlMainScrollReveal.js';
 import { commentComposeKeyAction } from '../lib/commentComposeShortcuts.js';
@@ -74,6 +77,7 @@ import {
 import { summarizeRecordedCommenters } from '../lib/liveCommenterStats.js';
 import { resolveConcurrentViewers } from '../lib/concurrentEstimate.js';
 import { watchMetaConcurrentGateFromSnapshot } from '../lib/popupWatchMetaConcurrentGate.js';
+import { retrySnapshotRequestUntilReady } from '../lib/popupWatchSnapshotRetry.js';
 import {
   concurrentResolutionMethodTitlePart,
   SPARSE_CONCURRENT_ESTIMATE_NOTE
@@ -1769,6 +1773,13 @@ let anonymousIdenticonRuntimeEnabled = true;
 const anonymousIdenticonDataUrlCache = new Map();
 
 /**
+ * 応援ランクストリップで匿名ユーザーを後送り（折り畳み）するか。
+ * 既定 true。false にすると件数順で並べる従来挙動。
+ * @type {boolean}
+ */
+let foldAnonymousInRankStripRuntimeEnabled = true;
+
+/**
  * @param {Record<string, unknown>|null|undefined} bag
  */
 function applyAnonymousIdenticonRuntimeFromBag(bag) {
@@ -1779,6 +1790,20 @@ function applyAnonymousIdenticonRuntimeFromBag(bag) {
     anonymousIdenticonDataUrlCache.clear();
   }
   anonymousIdenticonRuntimeEnabled = on;
+}
+
+/**
+ * @param {Record<string, unknown>|null|undefined} bag
+ */
+function applyFoldAnonymousInRankStripRuntimeFromBag(bag) {
+  const on = normalizeFoldAnonymousInRankStrip(
+    bag?.[KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]
+  );
+  if (on !== foldAnonymousInRankStripRuntimeEnabled) {
+    // 並び順が切り替わるので、ストリップ差分検知をリセットして強制再描画
+    _lastTopSupportRankStripStableKey = null;
+  }
+  foldAnonymousInRankStripRuntimeEnabled = on;
 }
 
 /**
@@ -4600,7 +4625,13 @@ function renderUserRooms(entries, liveId = '') {
     document.body?.classList.contains('nl-compact');
   const compactRooms = !INLINE_MODE;
   const MAX_VISIBLE_ROOMS = compactRooms ? 1 : denseLayout ? 2 : 3;
-  const stripSlice = rankedRooms.slice(0, TOP_SUPPORT_RANK_STRIP_MAX);
+  // 応援ランクストリップは 11 枠しかないため、件数トップを匿名ユーザー（a:xxxxx／ハッシュ系）に
+  // 埋め尽くされると個人アイコンの固定ファン層が折り畳まれて見えなくなる。
+  // toggle が ON のときは数値 ID を先に並べ、匿名は後段へ送る（総件数の表現は保ちつつ優先順だけ入替）。
+  const stripCandidates = partitionRankedRoomsForStrip(rankedRooms, {
+    foldAnonymous: foldAnonymousInRankStripRuntimeEnabled
+  });
+  const stripSlice = stripCandidates.slice(0, TOP_SUPPORT_RANK_STRIP_MAX);
   const stripKey = topSupportRankStripStableKey(liveId, list.length, stripSlice);
   if (stripKey !== _lastTopSupportRankStripStableKey) {
     _lastTopSupportRankStripStableKey = stripKey;
@@ -5073,6 +5104,19 @@ async function applyAnonymousIdenticonFromStorage() {
   if (cb) {
     cb.checked = normalizeAnonymousIdenticonEnabled(
       bag[KEY_ANONYMOUS_IDENTICON_ENABLED]
+    );
+  }
+}
+
+async function applyFoldAnonymousInRankStripFromStorage() {
+  const cb = /** @type {HTMLInputElement|null} */ (
+    $('foldAnonymousInRankStrip')
+  );
+  const bag = await chrome.storage.local.get(KEY_FOLD_ANONYMOUS_IN_RANK_STRIP);
+  applyFoldAnonymousInRankStripRuntimeFromBag(bag);
+  if (cb) {
+    cb.checked = normalizeFoldAnonymousInRankStrip(
+      bag[KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]
     );
   }
 }
@@ -5883,7 +5927,8 @@ async function refresh() {
       KEY_STORAGE_WRITE_ERROR,
       KEY_COMMENT_PANEL_STATUS,
       KEY_MARKETING_EXPORT_MASK_LABELS,
-      KEY_ANONYMOUS_IDENTICON_ENABLED
+      KEY_ANONYMOUS_IDENTICON_ENABLED,
+      KEY_FOLD_ANONYMOUS_IN_RANK_STRIP
     ])
   ]);
   applySelfPostedRecentsFromBag(openBag);
@@ -5906,6 +5951,15 @@ async function refresh() {
     );
   }
   applyAnonymousIdenticonRuntimeFromBag(openBag);
+  const foldAnonHydrate = /** @type {HTMLInputElement|null} */ (
+    $('foldAnonymousInRankStrip')
+  );
+  if (foldAnonHydrate) {
+    foldAnonHydrate.checked = normalizeFoldAnonymousInRankStrip(
+      openBag[KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]
+    );
+  }
+  applyFoldAnonymousInRankStripRuntimeFromBag(openBag);
   const { url, fromActiveTab } = resolveWatchUrlFromTabAndStash(
     tabs[0],
     openBag[KEY_LAST_WATCH_URL]
@@ -6274,6 +6328,9 @@ async function refresh() {
       markPopupRefreshContentPainted();
       revealPopupPrimaryOnce();
     }
+    // 視聴タブのリロード直後は content script が readiness 揃わず、単発の
+    // NLS_EXPORT_WATCH_SNAPSHOT が snapshot=null で返る瞬間がある。
+    // その状態で polling 周期（10〜30秒）まで待たされないように、内部で短いバックオフで再試行する。
     const snapResult = await requestWatchPageSnapshotFromOpenTab(url);
     if (!isFreshRefresh()) return;
     watchMetaCache.snapshot = snapResult.snapshot;
@@ -6689,7 +6746,7 @@ async function tabsSendMessageWithRetry(tabId, message, retryOpts = {}) {
  * @param {string} watchUrl
  * @returns {Promise<{ snapshot: WatchPageSnapshot|null, error: string }>}
  */
-async function requestWatchPageSnapshotFromOpenTab(watchUrl) {
+async function requestWatchPageSnapshotFromOpenTabOnce(watchUrl) {
   const candidates = await collectWatchTabCandidates(watchUrl);
 
   if (!candidates.length) {
@@ -6738,6 +6795,25 @@ async function requestWatchPageSnapshotFromOpenTab(watchUrl) {
     error:
       'watchページからの情報取得に失敗しました。放送タブを開いた状態でポップアップを再度開いてください。'
   };
+}
+
+/**
+ * 視聴タブのリロード直後は content script の再注入完了前に返答が取れず
+ * `{snapshot: null}` で確定してしまい、polling 周期まで同接カードが更新されない。
+ * 短いバックオフで数回やり直して救済する（retry 本体は popupWatchSnapshotRetry.js）。
+ *
+ * @param {string} watchUrl
+ * @param {{ maxAttempts?: number, baseDelayMs?: number }} [opts]
+ * @returns {Promise<{ snapshot: WatchPageSnapshot|null, error: string }>}
+ */
+async function requestWatchPageSnapshotFromOpenTab(watchUrl, opts = {}) {
+  return retrySnapshotRequestUntilReady(
+    () => requestWatchPageSnapshotFromOpenTabOnce(watchUrl),
+    {
+      maxAttempts: opts.maxAttempts ?? 3,
+      baseDelayMs: opts.baseDelayMs ?? 450
+    }
+  );
 }
 
 /**
@@ -7759,6 +7835,9 @@ function initPopup() {
   const anonymousIdenticonEnabled = /** @type {HTMLInputElement|null} */ (
     $('anonymousIdenticonEnabled')
   );
+  const foldAnonymousInRankStrip = /** @type {HTMLInputElement|null} */ (
+    $('foldAnonymousInRankStrip')
+  );
   const commentEnterSend = /** @type {HTMLInputElement|null} */ ($('commentEnterSend'));
   const voiceDeviceSel = /** @type {HTMLSelectElement|null} */ ($('voiceInputDevice'));
   const voiceDeviceRefreshBtn = /** @type {HTMLButtonElement|null} */ ($('voiceDeviceRefresh'));
@@ -8693,6 +8772,18 @@ function initPopup() {
     safeRefresh();
   });
 
+  foldAnonymousInRankStrip?.addEventListener('change', async () => {
+    try {
+      await storageSetSafe({
+        [KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]: foldAnonymousInRankStrip.checked
+      });
+    } catch {
+      //
+    }
+    await applyFoldAnonymousInRankStripFromStorage();
+    safeRefresh();
+  });
+
   const storyGrowthCollapseBtn = $('storyGrowthCollapseBtn');
   storyGrowthCollapseBtn?.addEventListener('click', () => {
     void (async () => {
@@ -9057,6 +9148,9 @@ function initPopup() {
         }
         if (changes[KEY_ANONYMOUS_IDENTICON_ENABLED]) {
           applyAnonymousIdenticonFromStorage().catch(() => {});
+        }
+        if (changes[KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]) {
+          applyFoldAnonymousInRankStripFromStorage().catch(() => {});
         }
         if (changes[KEY_STORY_GROWTH_COLLAPSED]) {
           applyStoryGrowthCollapsedFromStorage().catch(() => {});
