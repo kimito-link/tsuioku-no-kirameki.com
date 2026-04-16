@@ -1,4 +1,9 @@
-import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
+import {
+  test,
+  expect,
+  dismissExtensionUsageTermsGate,
+  openNlPopupSettings
+} from './fixtures.js';
 
 async function extensionIdFromContext(context) {
   let sw = context.serviceWorkers()[0];
@@ -9,7 +14,7 @@ async function extensionIdFromContext(context) {
 }
 
 test.describe('popup 詳細設定（折りたたみ）', () => {
-  test('記録トグルは常に見える・詳細設定は閉じた初期状態で取り込み等は折りたたみ内', async ({
+  test('記録トグルは詳細設定を開くまで非表示・詳細設定は閉じた初期状態で取り込み等は折りたたみ内', async ({
     context
   }) => {
     const extensionId = await extensionIdFromContext(context);
@@ -20,16 +25,17 @@ test.describe('popup 詳細設定（折りたたみ）', () => {
     });
     await dismissExtensionUsageTermsGate(popup);
 
-    await expect(popup.locator('#recordToggle')).toBeVisible();
     const details = popup.locator('#nlPopupSettings');
     await expect(details).toBeAttached();
     await expect(details).toHaveJSProperty('open', false);
+    await expect(popup.locator('#recordToggle')).not.toBeVisible();
 
     await expect(popup.locator('#deepHarvestQuietUiToggle')).not.toBeVisible();
     await expect(popup.locator('#inlinePanelPlacementBelow')).not.toBeVisible();
     await expect(popup.locator('#calmPanelMotion')).not.toBeVisible();
 
-    await details.locator('summary').click();
+    await openNlPopupSettings(popup);
+    await expect(popup.locator('#recordToggle')).toBeVisible();
     await expect(popup.locator('#deepHarvestQuietUiToggle')).toBeVisible();
     await expect(popup.locator('#inlinePanelPlacementBelow')).toBeVisible();
     await expect(popup.locator('#calmPanelMotion')).toBeVisible();
@@ -44,12 +50,13 @@ test.describe('popup 詳細設定（折りたたみ）', () => {
     });
     await dismissExtensionUsageTermsGate(page);
 
-    await expect(page.locator('#recordToggle')).toBeVisible();
     const details = page.locator('#nlPopupSettings');
     await expect(details).toBeAttached();
     await expect(details).toHaveJSProperty('open', false);
+    await expect(page.locator('#recordToggle')).not.toBeVisible();
 
-    await details.locator('summary').click();
+    await openNlPopupSettings(page);
+    await expect(page.locator('#recordToggle')).toBeVisible();
     await expect(page.locator('#inlinePanelWidthLegend')).toBeVisible();
   });
 });

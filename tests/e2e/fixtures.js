@@ -33,4 +33,17 @@ export async function dismissExtensionUsageTermsGate(popup) {
   });
 }
 
+/**
+ * 記録 ON/OFF などが `#nlPopupSettings` 内にある場合に、折りたたみを開く。
+ * @param {import('@playwright/test').Page | import('@playwright/test').FrameLocator} pageOrFrame
+ */
+export async function openNlPopupSettings(pageOrFrame) {
+  const details = pageOrFrame.locator('#nlPopupSettings');
+  await expect(details).toBeAttached();
+  if (!(await details.evaluate((el) => el.open))) {
+    await details.locator('summary').click();
+  }
+  await expect(details).toHaveJSProperty('open', true);
+}
+
 export { expect };

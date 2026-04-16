@@ -2,7 +2,12 @@
  * H1-Perception / H1-a11y / H2-Consistency
  * @see docs/ux-tdd-hypothesis-matrix.md
  */
-import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
+import {
+  test,
+  expect,
+  dismissExtensionUsageTermsGate,
+  openNlPopupSettings
+} from './fixtures.js';
 
 const KEY_RECORDING = 'nls_recording_enabled';
 
@@ -53,6 +58,7 @@ test.describe('popup 記録状態 SA（data-nl-recording / H1）', () => {
       timeout: 60_000
     });
     await dismissExtensionUsageTermsGate(popup);
+    await openNlPopupSettings(popup);
 
     const toggle = popup.locator('#recordToggle');
     const hero = popup.locator('.nl-record-hero');
@@ -73,6 +79,7 @@ test.describe('popup 記録状態 SA（data-nl-recording / H1）', () => {
       timeout: 60_000
     });
     await dismissExtensionUsageTermsGate(popup);
+    await openNlPopupSettings(popup);
 
     const toggle = popup.locator('#recordToggle');
     const hero = popup.locator('.nl-record-hero');
@@ -88,6 +95,7 @@ test.describe('popup 記録状態 SA（data-nl-recording / H1）', () => {
       timeout: 60_000
     });
     await dismissExtensionUsageTermsGate(popup);
+    await openNlPopupSettings(popup);
 
     const toggle = popup.locator('#recordToggle');
     await expect(toggle).toHaveAttribute('aria-label', /.+/);
@@ -107,6 +115,7 @@ test.describe('popup と inline=1 の記録表示一貫性（H2）', () => {
       timeout: 60_000
     });
     await dismissExtensionUsageTermsGate(popup);
+    await openNlPopupSettings(popup);
     await expect(popup.locator('.nl-record-hero')).toHaveAttribute(
       'data-nl-recording',
       'off'
@@ -118,6 +127,7 @@ test.describe('popup と inline=1 の記録表示一貫性（H2）', () => {
       timeout: 60_000
     });
     await dismissExtensionUsageTermsGate(inline);
+    await openNlPopupSettings(inline);
     await expect(inline.locator('.nl-record-hero')).toHaveAttribute(
       'data-nl-recording',
       'off'

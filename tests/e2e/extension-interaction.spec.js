@@ -1,4 +1,9 @@
-import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
+import {
+  test,
+  expect,
+  dismissExtensionUsageTermsGate,
+  openNlPopupSettings
+} from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
 const INLINE_IFRAME_ID = 'nls-inline-popup-iframe';
@@ -30,6 +35,7 @@ test.describe('extension interaction', () => {
     });
     await dismissExtensionUsageTermsGate(popup);
     await popup.waitForTimeout(400);
+    await openNlPopupSettings(popup);
 
     const toggle = popup.locator('#recordToggle');
     await expect(toggle).toBeVisible();
@@ -93,6 +99,7 @@ test.describe('extension interaction', () => {
     await expect(panel.locator('.nl-main')).toBeVisible({ timeout: 25_000 });
     await dismissExtensionUsageTermsGate(panel);
     await page.waitForTimeout(400);
+    await openNlPopupSettings(panel);
 
     const toggle = panel.locator('#recordToggle');
     await expect(toggle).toBeVisible();

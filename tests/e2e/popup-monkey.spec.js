@@ -1,4 +1,9 @@
-import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
+import {
+  test,
+  expect,
+  dismissExtensionUsageTermsGate,
+  openNlPopupSettings
+} from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const KEY_RECORDING = 'nls_recording_enabled';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
@@ -68,6 +73,7 @@ test.describe('popup monkey', () => {
     });
     await dismissExtensionUsageTermsGate(popup);
     await popup.waitForTimeout(600);
+    await openNlPopupSettings(popup);
 
     const actionPool = [
       async () => {

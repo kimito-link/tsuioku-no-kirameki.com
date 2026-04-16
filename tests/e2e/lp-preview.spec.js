@@ -654,6 +654,56 @@ test.describe('lp-preview', () => {
     await expect(audioButton).toHaveAttribute('aria-label', '音を停止');
   });
 
+  test('拡張疑似体験: #lp-extension-pseudo-flow がハッシュ付きで見え、主要幅ではみ出しなし', async ({ page }) => {
+    const block = page.locator('#lp-extension-pseudo-flow');
+    for (const w of [320, 390, 768, 1024]) {
+      await page.setViewportSize({ width: w, height: 900 });
+      await page.goto(`${lpHref}#lp-extension-pseudo-flow`, { waitUntil: 'domcontentloaded' });
+      await expect(page).toHaveURL(/#lp-extension-pseudo-flow/);
+      await expect(block).toBeVisible();
+      await block.scrollIntoViewIfNeeded();
+      const ok = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+      expect(ok, `lp-extension-pseudo-flow scrollWidth at ${w}px`).toBe(true);
+    }
+  });
+
+  test('拡張疑似フロー: リード本文の文字色が暗背景で十分明るい（.board p 由来の薄字に戻らない）', async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto(`${lpHref}#lp-extension-pseudo-flow`, { waitUntil: 'domcontentloaded' });
+    const lead = page.locator('#lp-extension-pseudo-flow .lp-pseudo-flow__lead');
+    await lead.scrollIntoViewIfNeeded();
+    const rgb = await lead.evaluate((el) => {
+      const { color } = getComputedStyle(el);
+      const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (!m) return null;
+      return {
+        r: Number(m[1]),
+        g: Number(m[2]),
+        b: Number(m[3])
+      };
+    });
+    expect(rgb).not.toBeNull();
+    expect(rgb.r + rgb.g + rgb.b).toBeGreaterThan(520);
+    expect(rgb.r).toBeGreaterThan(170);
+    expect(rgb.g).toBeGreaterThan(175);
+    expect(rgb.b).toBeGreaterThan(185);
+  });
+
+  test('拡張 live scene: #lp-extension-live-scene がハッシュ付きで見え、主要幅ではみ出しなし', async ({ page }) => {
+    const block = page.locator('#lp-extension-live-scene');
+    for (const w of [320, 390, 768, 1024]) {
+      await page.setViewportSize({ width: w, height: 900 });
+      await page.goto(`${lpHref}#lp-extension-live-scene`, { waitUntil: 'domcontentloaded' });
+      await expect(page).toHaveURL(/#lp-extension-live-scene/);
+      await expect(block).toBeVisible();
+      await block.scrollIntoViewIfNeeded();
+      const ok = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+      expect(ok, `lp-extension-live-scene scrollWidth at ${w}px`).toBe(true);
+    }
+  });
+
   test('平易化注釈: #extension-visual に data-lp-plain が見え・主要幅ではみ出しなし', async ({ page }) => {
     const callout = page.locator('[data-lp-plain="page-demo-note"]');
     const trio = page.locator('[data-lp-plain="trio-extension-visual"]');

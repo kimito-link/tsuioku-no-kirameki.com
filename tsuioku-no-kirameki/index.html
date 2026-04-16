@@ -1489,6 +1489,138 @@
         }
         .lp-demo-plain-callout__trio .speaker img{width:52px;height:52px}
       }
+
+      /* extension-visual: 疑似体験フロー（見本・装飾のみ動く場合あり）
+         ダーク枠には class board を付けない（.board p 一括指定と混在させない） */
+      .lp-extension-pseudo-flow{
+        position:relative;
+        margin-bottom:clamp(12px,3vw,20px);
+        padding:clamp(14px,4.2vw,var(--space-lg));
+        border-radius:var(--r2);
+        border:1px solid rgba(129,140,248,.35);
+        box-shadow:var(--shadow);
+        background:linear-gradient(165deg,rgba(15,23,42,.92),rgba(30,41,59,.88));
+        color:#e2e8f0;
+        overflow-x:clip;
+        max-width:100%;
+        box-sizing:border-box
+      }
+      .lp-pseudo-flow__decor{
+        position:absolute;
+        inset:0;
+        pointer-events:none;
+        overflow:hidden;
+        border-radius:inherit;
+        opacity:.5
+      }
+      .lp-pseudo-flow__decor::after{
+        content:"";
+        position:absolute;
+        top:18%;
+        right:8%;
+        width:min(72px,18vw);
+        height:2px;
+        border-radius:2px;
+        background:linear-gradient(90deg,transparent,rgba(196,181,253,.95),transparent);
+        transform:rotate(-18deg);
+        transform-origin:center;
+        box-shadow:0 0 12px rgba(167,139,250,.45)
+      }
+      @media (prefers-reduced-motion:no-preference){
+        .lp-pseudo-flow__decor::after{
+          animation:lpPseudoMeteor 6s ease-in-out infinite;
+          animation-delay:1s
+        }
+      }
+      @keyframes lpPseudoMeteor{
+        0%{opacity:.25;transform:rotate(-18deg) translate(40px,20px)}
+        35%{opacity:1;transform:rotate(-18deg) translate(-12px,-8px)}
+        100%{opacity:.2;transform:rotate(-18deg) translate(-56px,28px)}
+      }
+      @media (prefers-reduced-motion:reduce){
+        .lp-pseudo-flow__decor::after{
+          animation:none;
+          opacity:.8;
+          right:12%;
+          top:22%
+        }
+      }
+      .lp-extension-pseudo-flow h3#lp-pseudo-flow-heading{
+        position:relative;
+        z-index:1;
+        margin:0 0 .65rem;
+        font-size:clamp(1.02rem,2.8vw,1.25rem);
+        font-weight:800;
+        letter-spacing:.02em;
+        color:#f8fafc;
+        line-height:var(--lh-heading)
+      }
+      .lp-pseudo-flow__lead,
+      .lp-pseudo-flow__contrast,
+      .lp-pseudo-flow__demo-tag{
+        position:relative;
+        z-index:1;
+        margin:0 0 .55rem;
+        font-size:clamp(.82rem,2.1vw,.95rem);
+        line-height:1.68;
+        color:#e8edf5
+      }
+      .lp-pseudo-flow__contrast strong{color:#f8fafc}
+      .lp-pseudo-flow__demo-tag{
+        margin-bottom:.75rem;
+        padding:.45rem .65rem;
+        border-radius:10px;
+        border:1px solid rgba(148,163,184,.45);
+        background:rgba(15,23,42,.72);
+        font-size:clamp(.78rem,2vw,.88rem);
+        color:#e2e8f0
+      }
+      .lp-pseudo-flow__steps{
+        position:relative;
+        z-index:1;
+        margin:0;
+        padding-left:1.35rem;
+        list-style:decimal;
+        color:#e2e8f0;
+        font-size:clamp(.8rem,2vw,.92rem);
+        line-height:1.55
+      }
+      .lp-pseudo-flow__step{
+        margin:.55rem 0 0;
+        padding-left:.2rem
+      }
+      .lp-pseudo-flow__step-title{
+        display:block;
+        font-weight:700;
+        color:#f1f5f9;
+        margin-bottom:.2rem
+      }
+      .lp-pseudo-flow__step-body{
+        display:block;
+        font-weight:400;
+        color:#e2e8f0;
+        font-size:.92em;
+        line-height:1.62
+      }
+      @media (max-width:420px){
+        .lp-pseudo-flow__steps{padding-left:1.1rem}
+      }
+
+      /* extension-visual: 配信タブ見本（voices と同型の live-ui-mock） */
+      .lp-extension-live-scene{
+        min-width:0;
+        max-width:100%;
+        box-sizing:border-box;
+        overflow-x:clip;
+        margin-bottom:clamp(12px,3vw,20px)
+      }
+      .lp-extension-live-scene__lead{
+        margin:0 0 12px;
+        font-size:clamp(.82rem,2.1vw,.95rem);
+        line-height:1.68;
+        color:var(--text-secondary)
+      }
+
       .lp-site-look-mock{
         margin-top:12px;
         padding:clamp(12px,3.2vw,20px);
@@ -1762,25 +1894,25 @@
       }
       .lp-site-look-mock__rank-note{
         margin:0 0 10px;text-align:center;
-        font-size:.76rem;line-height:var(--lh-ui);color:#3d4f66
+        font-size:clamp(.78rem,2.1vw,.88rem);line-height:var(--lh-ui);color:#1e293b;font-weight:600
       }
       .lp-site-look-mock__rank-scroll{
-        display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;
-        overflow-x:auto;padding:4px 2px 8px;-webkit-overflow-scrolling:touch
+        display:flex;flex-direction:row;flex-wrap:nowrap;gap:10px;
+        overflow-x:auto;padding:4px 2px 10px;-webkit-overflow-scrolling:touch
       }
       .lp-site-look-mock__rank-card{
         flex:0 0 auto;
-        display:flex;flex-direction:column;align-items:center;gap:5px;
-        min-width:68px;max-width:82px;
-        padding:8px 6px 10px;
+        display:flex;flex-direction:column;align-items:center;gap:6px;
+        min-width:clamp(86px,22vw,108px);max-width:118px;
+        padding:10px 8px 12px;
         border-radius:12px;
-        border:1px solid rgba(88,62,28,.1);
-        background:rgba(255,255,255,.95);
-        font-size:.65rem;color:var(--text-secondary)
+        border:1px solid rgba(51,65,85,.22);
+        background:#fff;
+        font-size:.74rem;color:#334155
       }
       .lp-site-look-mock__rank-badge{
         font-weight:800;color:#fff;border-radius:999px;
-        min-width:1.4em;padding:2px 6px;font-size:.68rem;line-height:1.2;
+        min-width:1.45em;padding:3px 6px;font-size:.75rem;line-height:1.2;
         background:linear-gradient(145deg,#64748b,#475569)
       }
       .lp-site-look-mock__rank-scroll > .lp-site-look-mock__rank-card:not(.lp-site-look-mock__rank-card--aggregate):nth-child(2) .lp-site-look-mock__rank-badge{
@@ -1793,7 +1925,7 @@
         background:linear-gradient(145deg,#c97b6a,#a65d4f)
       }
       .lp-site-look-mock__rank-card--aggregate{
-        min-width:62px;max-width:72px;
+        min-width:clamp(82px,20vw,96px);max-width:104px;
         border:1px dashed rgba(100,130,170,.4);
         background:rgba(248,250,252,.92)
       }
@@ -1826,9 +1958,12 @@
       .lp-site-look-mock__rank-sil{
         width:28px;height:28px;font-size:.5rem
       }
-      .lp-site-look-mock__rank-count{font-weight:800;color:#0f766e}
+      .lp-site-look-mock__rank-count{
+        font-weight:800;font-size:clamp(.78rem,2vw,.88rem);color:#0d9488
+      }
       .lp-site-look-mock__rank-id,.lp-site-look-mock__rank-nick{
-        max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+        max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+        font-size:clamp(.68rem,1.85vw,.78rem);line-height:1.35;font-weight:600;color:#1e293b
       }
       .lp-site-look-mock__record{
         margin-top:16px;padding:12px 12px 14px;
@@ -6131,6 +6266,114 @@
                   <span>りんく</span>
                 </div>
                 <div class="bubble">ほんものの操作は<strong>拡張ポップアップ</strong>と<strong>いつもの視聴タブ</strong>の組み合わせで試せるのだ。</div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="fade d1 lp-extension-pseudo-flow"
+            id="lp-extension-pseudo-flow"
+            data-lp-feature="extension-pseudo-flow"
+            aria-labelledby="lp-pseudo-flow-heading"
+          >
+            <div class="lp-pseudo-flow__decor" aria-hidden="true"></div>
+            <h3 id="lp-pseudo-flow-heading">流れ星のように流れる横の時間を、手元で拾う（見本の導線）</h3>
+            <p class="lp-pseudo-flow__lead">
+              配信画面の応援コメントは、チャットに流れていき、すぐ見えなくなっていきます（<strong>流れ星</strong>のように見えることもあります）。
+              この拡張は、応援コメントを<strong>この PC に記録</strong>し、あとから見直しや可視化につなげるためのものです。
+            </p>
+            <p class="lp-pseudo-flow__contrast">
+              <strong>別のサービス</strong>では、<strong>短時間で消える</strong>一言だけを残す設計もあります。ここでの「拾う」は、<strong>記録としてこの PC に残す</strong>ことです（この枠は<strong>操作はできません</strong>。下のダッシュボード見本も同様です）。
+            </p>
+            <p class="lp-pseudo-flow__demo-tag" role="note">このブロックは<strong>見本</strong>です。<strong>押しても動きません</strong>。</p>
+            <ol class="lp-pseudo-flow__steps" aria-label="拡張を使うまでの流れ（見本）">
+              <li class="lp-pseudo-flow__step">
+                <span class="lp-pseudo-flow__step-title">ニコニコ生放送の視聴ページを開く</span>
+                <span class="lp-pseudo-flow__step-body">いつもどおり配信を開きます。</span>
+              </li>
+              <li class="lp-pseudo-flow__step">
+                <span class="lp-pseudo-flow__step-title">拡張のポップアップまたはページ内パネルを開く</span>
+                <span class="lp-pseudo-flow__step-body">ツールバーのアイコンからポップアップを開くか、視聴ページに埋め込んだパネルを使います（お好みの表示設定によります）。<strong>詳細設定を開くと先頭に「応援コメントの記録」の ON/OFF</strong>があり、ここで蓄積の切り替えができます。</span>
+              </li>
+            </ol>
+          </div>
+
+          <!-- extension-visual: voices「ライブ配信・コメント欄風」（#voices）と同型。変更時は両方揃える -->
+          <div
+            class="board fade d1 lp-extension-live-scene"
+            id="lp-extension-live-scene"
+            data-lp-feature="extension-live-scene"
+            aria-labelledby="lp-extension-live-scene-heading"
+          >
+            <h3 id="lp-extension-live-scene-heading">視聴タブの見本（拡張パネルの直前）</h3>
+            <p class="lp-extension-live-scene__lead">
+              続く「サイトの見え方」と<strong>合わせて読む</strong>ための、配信画面まわりの見本です。<strong>操作はできません</strong>。特定サービスの画面コピーではありません（<a href="#lp-comment-compose-guide">コメント送信の流れ</a>は別セクション）。
+            </p>
+            <div class="live-ui-mock" role="region" aria-label="拡張の見え方セクション内：配信画面風の架空UI例（見本）">
+              <div class="live-ui-top">
+                <span class="live-ui-badge">LIVE</span>
+                <span class="live-ui-title">デモ：武道館級アリーナ配信（架空の見本）</span>
+                <span class="live-ui-stats" aria-hidden="true">
+                  <span>視聴 12,480</span>
+                  <span>コメント 382</span>
+                  <span>経過 6:55:00</span>
+                </span>
+              </div>
+              <div class="live-ui-layout">
+                <div class="live-video-wrap">
+                  <div class="live-video-stage" role="img" aria-label="拡張の見え方セクション内：会場イメージとりんく立ち絵・流れるコメントのLPデモ">
+                    <div class="live-venue-bg" aria-hidden="true"></div>
+                    <p class="live-venue-caption">会場イメージ：ライブハウス〜武道館級の観客規模（実在の会場・写真ではありません）</p>
+                    <div class="live-rinku-spotlight">
+                      <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="128" height="128" alt="" decoding="async">
+                      <p class="live-rinku-name">りんく</p>
+                      <p class="live-rinku-sub">配信者・アイドル側のりんく（LPデモ）</p>
+                    </div>
+                    <div class="nico-danmaku" aria-hidden="true">
+                      <span class="nico-text" style="top:10%;--nico-dur:19s;--nico-delay:-2s">ｗｗｗｗｗｗ</span>
+                      <span class="nico-text" style="top:18%;--nico-dur:16s;--nico-delay:-8s;color:#9fd4ff">こん太だよー　りんくちゃんみてる</span>
+                      <span class="nico-text" style="top:26%;--nico-dur:22s;--nico-delay:-4s">かわいい</span>
+                      <span class="nico-text" style="top:34%;--nico-dur:14s;--nico-delay:-11s;color:#a8d4ff">今日も楽しみにしてました</span>
+                      <span class="nico-text" style="top:42%;--nico-dur:18s;--nico-delay:-6s">こわいｗ</span>
+                      <span class="nico-text nico-text--rinku" style="top:48%;--nico-dur:32s;--nico-delay:-6s">りんくちゃんさいこう！！</span>
+                      <span class="nico-text nico-text--rinku" style="top:56%;--nico-dur:28s;--nico-delay:-18s">りんくさんきたあああ</span>
+                      <span class="nico-text" style="top:64%;--nico-dur:17s;--nico-delay:-3s">888888888</span>
+                      <span class="nico-text" style="top:72%;--nico-dur:21s;--nico-delay:-9s">読み上げてくれてありがとう</span>
+                    </div>
+                    <div class="live-video-overlay">1人（プレミアム会員1人）が放送者をフォローしました</div>
+                  </div>
+                  <div class="live-video-bar">
+                    <span class="live-progress" title="デモ"><i></i></span>
+                    <span class="live-time">LIVE · 6:55:00 / 24:00:00</span>
+                  </div>
+                </div>
+                <div class="live-chat-col">
+                  <div class="live-chat-head">コメント（番号はイメージ）</div>
+                  <div class="live-chat-scroll">
+                    <div class="live-chat-line"><span class="live-chat-num">374</span><span class="live-chat-text">かわいい</span></div>
+                    <div class="live-chat-line"><span class="live-chat-num">375</span><span class="live-chat-text">こわいｗ</span></div>
+                    <div class="live-chat-line live-chat-sys"><span class="live-chat-num"></span><span class="live-chat-text">1人（プレミアム会員1人）が放送者をフォローしました</span></div>
+                    <div class="live-chat-line"><span class="live-chat-num">376</span><span class="live-chat-text"><span class="em-konta">こん太</span>　初見です　いま来ました</span></div>
+                    <div class="live-read-aloud" role="note">
+                      <strong>読み上げ・名前イメージ：</strong>配信者<strong>りんく</strong>の声で「<span class="em-konta">こん太</span>さん、フォローありがとう！」「376さんのコメント見えてるよ」──ファンにとってこの瞬間がいちばんの承認になりやすい。万人規模だと拾えないコメントも増え、流れて<strong>公式履歴に残りにくい</strong>。
+                    </div>
+                    <div class="live-chat-line"><span class="live-chat-num">377</span><span class="live-chat-text">ｗｗｗ</span></div>
+                    <div class="live-chat-line"><span class="live-chat-num">378</span><span class="live-chat-text">今日も楽しみにしてました</span></div>
+                    <div class="live-chat-line"><span class="live-chat-num">379</span><span class="live-chat-text"><span class="em-rinku">りんく</span>ちゃんさいこう！！</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="live-ui-foot">
+                <p class="live-gift-hint">あと 1,000pt ギフトを贈ると、放送者に福引券1枚が届きます（文言はイメージ）</p>
+                <div class="live-input-row">
+                  <input type="text" readonly value="" placeholder="願いや応援をひとこと…（デモ・送信は見た目のみ）" aria-label="拡張の見え方セクション内：コメント用テキストボックス（デモのみ）">
+                  <button type="button" disabled>コメント</button>
+                </div>
+                <p class="live-input-roadmap" role="note">
+                  この1行は<strong>配信画面の公式コメント欄のデモ</strong>で、このページ上では<strong>送信できません</strong>。拡張側は<strong>ポップアップの入力欄</strong>から watch ページの送信 UI へ届ける流れを別途用意しています（<a href="#lp-comment-compose-guide">コメント送信の流れ</a>・<a href="#extension-guide-comment-voice">用語⑧</a>）。
+                  <strong>音声入力</strong>は、<strong>ブラウザやOSの音声入力</strong>で文字をテキストボックスに流し込み、確定したうえで<strong>Enter</strong>など通常どおり送る想定です（Chrome・Edge・Windows など<strong>環境ごとに可否が異なります</strong>）。
+                </p>
+                <p class="live-ui-caption">特定サービスの画面コピーではなく、コメントの流れ・通知・読み上げの重さを並べて見せるためのLPデモです。</p>
               </div>
             </div>
           </div>

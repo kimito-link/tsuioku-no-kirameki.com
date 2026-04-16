@@ -2230,15 +2230,17 @@
         font-size: clamp(18px, 5vw, 28px);
       }
 
-      /* ファーストビュー: 統計カードの直下で記録ON/OFF（中に要素が挟まっても ~ で追う） */
-      html.nl-inline body .nl-record--first-view {
+      /* 統計直下の案内 / 詳細設定内の記録ブロック（旧 first-view と同系） */
+      html.nl-inline body .nl-record--first-view,
+      html.nl-inline body .nl-record--in-settings {
         margin-bottom: 6px;
         flex-wrap: wrap;
         align-items: flex-start;
         row-gap: 6px;
       }
 
-      html.nl-inline body .nl-record--first-view .nl-record-hero__lead {
+      html.nl-inline body .nl-record--first-view .nl-record-hero__lead,
+      html.nl-inline body .nl-record--in-settings .nl-record-hero__lead {
         margin-bottom: 8px;
       }
 
@@ -2757,12 +2759,35 @@
         font-weight: 600;
       }
 
-      /* ファーストビュー: りんく＋「応援コメントの記録」ON/OFF を一目で */
-      .nl-record--first-view {
+      /* 旧: ファーストビュー直置き。詳細設定先頭は .nl-record--in-settings */
+      .nl-record--first-view,
+      .nl-record--in-settings {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
         padding: 10px 10px;
+      }
+
+      .nl-record-nav-hint {
+        margin: 0 10px 10px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-surface);
+        font-size: clamp(11px, calc(var(--nl-base-font) * 0.85), 14px);
+        line-height: 1.5;
+        color: var(--nl-text);
+      }
+
+      .nl-record-nav-hint strong {
+        color: var(--nl-text);
+        font-weight: 700;
+      }
+
+      .nl-popup-settings__body > .nl-record--in-settings {
+        margin: 0 0 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--nl-border);
       }
 
       .nl-record-hero {
@@ -5817,50 +5842,54 @@
         ></div>
       </div>
 
-      <div class="nl-record nl-record--first-view">
-        <div
-          class="nl-record-hero"
-          role="group"
-          aria-labelledby="nlRecordHeroTitle"
-          data-nl-recording="on"
-        >
-          <img
-            class="nl-record-hero__link"
-            src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
-            alt=""
-            width="56"
-            height="56"
-            decoding="async"
-          />
-          <div class="nl-record-hero__main">
-            <span class="nl-record-hero__eyebrow">りんくより</span>
-            <div id="nlRecordHeroTitle" class="nl-record-hero__title">応援コメントの記録</div>
-            <p class="nl-record-hero__lead">
-              チェックを付けると、この放送の応援コメントがこのPCにたまります。外すと<strong>OFF</strong>で増えません。
-            </p>
-            <label class="nl-record-hero__toggle" for="recordToggle">
-              <input
-                type="checkbox"
-                id="recordToggle"
-                checked
-                aria-label="応援コメントをこのPCに記録する（ONで記録、OFFで停止）"
-              />
-              <span class="nl-record-hero__pill" aria-hidden="true"></span>
-              <span class="nl-record-hero__toggle-text">
-                <span class="nl-record-hero__toggle-line">記録を ON / OFF</span>
-                <span class="nl-record-hero__toggle-sub"
-                  >ON＝件数が増える · OFF＝見るだけ（保存されない）</span>
-              </span>
-            </label>
-          </div>
-        </div>
-      </div>
+      <p class="nl-record-nav-hint">
+        <strong>応援コメントの記録</strong>の ON/OFF は、下の「<strong>詳細設定</strong>」を開くと<strong>先頭</strong>にあります（ファーストビューを広く保つための配置です）。
+      </p>
 
       <details id="nlPopupSettings" class="nl-popup-settings">
         <summary class="nl-popup-settings__summary">
-          詳細設定（取り込み・パネル位置・動き・表示トラブル）
+          詳細設定（記録のON/OFF・取り込み・パネル位置・動き・表示トラブル）
         </summary>
         <div class="nl-popup-settings__body">
+          <div class="nl-record nl-record--in-settings">
+            <div
+              class="nl-record-hero"
+              role="group"
+              aria-labelledby="nlRecordHeroTitle"
+              data-nl-recording="on"
+            >
+              <img
+                class="nl-record-hero__link"
+                src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+                alt=""
+                width="56"
+                height="56"
+                decoding="async"
+              />
+              <div class="nl-record-hero__main">
+                <span class="nl-record-hero__eyebrow">りんくより</span>
+                <div id="nlRecordHeroTitle" class="nl-record-hero__title">応援コメントの記録</div>
+                <p class="nl-record-hero__lead">
+                  チェックを付けると、この放送の応援コメントがこのPCにたまります。外すと<strong>OFF</strong>で増えません。
+                </p>
+                <label class="nl-record-hero__toggle" for="recordToggle">
+                  <input
+                    type="checkbox"
+                    id="recordToggle"
+                    checked
+                    aria-label="応援コメントをこのPCに記録する（ONで記録、OFFで停止）"
+                  />
+                  <span class="nl-record-hero__pill" aria-hidden="true"></span>
+                  <span class="nl-record-hero__toggle-text">
+                    <span class="nl-record-hero__toggle-line">記録を ON / OFF</span>
+                    <span class="nl-record-hero__toggle-sub"
+                      >ON＝件数が増える · OFF＝見るだけ（保存されない）</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
           <div class="nl-record-sub">
             <label for="deepHarvestQuietUiToggle" class="nl-record-sub__label">
               <input
