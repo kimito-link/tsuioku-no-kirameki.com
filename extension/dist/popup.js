@@ -4094,6 +4094,34 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   var FLUSH_MIN_INTERVAL_MS = 6e4;
   var lastFlushAt = 0;
   var BROADCAST_SESSION_SUMMARY_LOG_PREFIX = "[broadcastSessionSummaryFlush]";
+  var TRANSIENT_IDB_ERROR_NAMES = /* @__PURE__ */ new Set([
+    "InvalidStateError",
+    "AbortError",
+    "QuotaExceededError",
+    "TransactionInactiveError",
+    "TimeoutError",
+    "UnknownError"
+  ]);
+  function describeIdbError(err) {
+    if (err && typeof err === "object" && "name" in err) {
+      const e = (
+        /** @type {{ name?: string, message?: string }} */
+        err
+      );
+      const name = String(e.name || "Error");
+      const msg = String(e.message || "").trim();
+      return msg ? `${name}: ${msg}` : name;
+    }
+    return String(err);
+  }
+  function isTransientIdbError(err) {
+    if (!err || typeof err !== "object") return false;
+    const name = String(
+      /** @type {{ name?: string }} */
+      err.name || ""
+    );
+    return TRANSIENT_IDB_ERROR_NAMES.has(name);
+  }
   function peakConcurrentEstimateFromSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== "object") return null;
     const vcRaw = snapshot.viewerCountFromDom;
@@ -4181,10 +4209,17 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       db = await openBroadcastSessionSummaryDb();
       await appendBroadcastSessionSummarySample(db, row);
     } catch (err) {
-      console.warn(
-        `${BROADCAST_SESSION_SUMMARY_LOG_PREFIX} failed to append summary sample`,
-        err
-      );
+      const detail = describeIdbError(err);
+      if (isTransientIdbError(err)) {
+        console.debug(
+          `${BROADCAST_SESSION_SUMMARY_LOG_PREFIX} transient IndexedDB error, skipping sample: ${detail}`
+        );
+      } else {
+        console.warn(
+          `${BROADCAST_SESSION_SUMMARY_LOG_PREFIX} failed to append summary sample: ${detail}`,
+          err
+        );
+      }
     } finally {
       try {
         db?.close();
@@ -10325,7 +10360,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0416-1648" ? String("0416-1648") : "dev";
+      const buildId = "0416-1709" ? String("0416-1709") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

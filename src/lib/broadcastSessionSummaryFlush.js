@@ -18,6 +18,51 @@ let lastFlushAt = 0;
 const BROADCAST_SESSION_SUMMARY_LOG_PREFIX = '[broadcastSessionSummaryFlush]';
 
 /**
+ * IndexedDB 書き込みで起こりうる「一過性・想定内」の DOMException 名。
+ * 拡張機能の「エラー」一覧に警告として積み上がるとユーザー視点で不安を煽るので、
+ * このセットに該当する場合は debug ログに落として記録サマリ機能だけ次回に見送る。
+ * 背景:
+ * - InvalidStateError: ポップアップが閉じる等で DB ハンドルが先にクローズされた
+ * - AbortError: タブ遷移や別バージョンからの versionchange でトランザクション中断
+ * - QuotaExceededError: 端末のストレージ逼迫（本機能は失っても構わない軽量サマリ）
+ * - TransactionInactiveError: 非同期タイムアウトでトランザクションが終了
+ * - TimeoutError / UnknownError: ブラウザ側の一過性不調
+ */
+const TRANSIENT_IDB_ERROR_NAMES = new Set([
+  'InvalidStateError',
+  'AbortError',
+  'QuotaExceededError',
+  'TransactionInactiveError',
+  'TimeoutError',
+  'UnknownError'
+]);
+
+/**
+ * DOMException を人間可読な短い説明に整形する（console.warn/debug 用）。
+ * @param {unknown} err
+ * @returns {string}
+ */
+export function describeIdbError(err) {
+  if (err && typeof err === 'object' && 'name' in err) {
+    const e = /** @type {{ name?: string, message?: string }} */ (err);
+    const name = String(e.name || 'Error');
+    const msg = String(e.message || '').trim();
+    return msg ? `${name}: ${msg}` : name;
+  }
+  return String(err);
+}
+
+/**
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+export function isTransientIdbError(err) {
+  if (!err || typeof err !== 'object') return false;
+  const name = String(/** @type {{ name?: string }} */ (err).name || '');
+  return TRANSIENT_IDB_ERROR_NAMES.has(name);
+}
+
+/**
  * @param {Record<string, unknown>|null|undefined} snapshot
  * @returns {number|null}
  */
@@ -175,10 +220,20 @@ export async function maybeFlushBroadcastSessionSummarySample(input) {
     db = await openBroadcastSessionSummaryDb();
     await appendBroadcastSessionSummarySample(db, row);
   } catch (err) {
-    console.warn(
-      `${BROADCAST_SESSION_SUMMARY_LOG_PREFIX} failed to append summary sample`,
-      err
-    );
+    // 拡張機能の「エラー」一覧を汚さないため、想定内の一過性 DOMException は debug に降格。
+    // 本機能（放送セッション軽量サマリ）は落としても他の記録機能に影響しないので、
+    // 黙って次の 60 秒後のフラッシュで再試行させる。
+    const detail = describeIdbError(err);
+    if (isTransientIdbError(err)) {
+      console.debug(
+        `${BROADCAST_SESSION_SUMMARY_LOG_PREFIX} transient IndexedDB error, skipping sample: ${detail}`
+      );
+    } else {
+      console.warn(
+        `${BROADCAST_SESSION_SUMMARY_LOG_PREFIX} failed to append summary sample: ${detail}`,
+        err
+      );
+    }
   } finally {
     try {
       db?.close();
