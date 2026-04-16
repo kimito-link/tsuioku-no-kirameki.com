@@ -2078,6 +2078,755 @@
       .lp-compose-steps li{margin-bottom:.35em}
       .lp-compose-guide-foot{margin-bottom:0}
       .lp-compose-yuki{margin-top:8px}
+      .lp-voice-section{
+        margin-top:var(--space-md);
+        padding:var(--space-lg);
+        border-radius:var(--r2);
+        border:1px solid rgba(30,80,130,.18);
+        background:linear-gradient(165deg,rgba(240,248,255,.95),rgba(228,238,255,.88));
+        box-shadow:var(--shadow);
+      }
+      .lp-voice-section__lead{
+        margin:0 0 var(--space-sm);
+        font-size:clamp(.88rem,2.6vw,1rem);
+        line-height:var(--lh-ui);
+        color:var(--text-secondary);
+      }
+      .lp-voice-section__lead a{color:#1d4ed8;text-decoration:underline;text-underline-offset:.12em}
+      .lp-voice-section__lead a:hover,.lp-voice-section__lead a:focus-visible{color:#1e40af}
+      .lp-voice-section__lead + .lp-voice-section__lead{margin-top:.65em}
+      .lp-voice-why{
+        margin:0 0 var(--space-md);
+        padding:12px 12px 14px;
+        border-radius:12px;
+        border:1px solid rgba(37,99,235,.2);
+        background:rgba(239,246,255,.85);
+        font-size:.72rem;
+        line-height:var(--lh-ui);
+        color:#1e3a5c;
+      }
+      .lp-voice-why__title{
+        margin:0 0 8px;
+        font-size:.78rem;
+        font-weight:800;
+        color:#1e40af;
+      }
+      .lp-voice-why__lead{margin:0 0 8px}
+      .lp-voice-why__list{
+        margin:0 0 10px;
+        padding-left:1.15rem;
+      }
+      .lp-voice-why__list li{margin-bottom:.35em}
+      .lp-voice-why__list li:last-child{margin-bottom:0}
+      .lp-voice-why__note{
+        margin:0;
+        padding:8px 10px;
+        border-radius:8px;
+        border:1px dashed rgba(100,116,139,.4);
+        background:rgba(255,255,255,.65);
+        font-size:.68rem;
+        color:#475569;
+      }
+      .lp-voice-benefits-yukkuri{
+        margin:0 0 var(--space-md);
+        padding:12px 10px 14px;
+        border-radius:14px;
+        border:1px solid rgba(167,139,250,.4);
+        background:linear-gradient(180deg,rgba(250,245,255,.92),rgba(243,232,255,.78));
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
+      }
+      .lp-voice-benefits-yukkuri__ribbon{
+        margin:0 0 10px;
+        font-size:.62rem;
+        font-weight:800;
+        color:#6b21a8;
+        text-align:center;
+        letter-spacing:.02em;
+      }
+      .lp-voice-benefits-yukkuri .yukkuri-thread{margin-top:0;gap:11px}
+      .lp-voice-benefits-yukkuri .y-row .bubble{
+        font-size:.68rem;
+        line-height:var(--lh-ui);
+      }
+      .lp-voice-section__steps{
+        margin:0 0 var(--space-md);
+        padding-left:1.25rem;
+        line-height:var(--lh-ui);
+        font-size:clamp(.88rem,2.6vw,1rem);
+        color:var(--text-secondary);
+      }
+      .lp-voice-section__steps li{margin-bottom:.35em}
+      .lp-voice-section__collab{
+        margin:0 0 var(--space-md);
+        padding:10px 12px;
+        border-radius:10px;
+        border:1px solid rgba(37,99,235,.22);
+        background:rgba(224,236,255,.65);
+        font-size:.72rem;
+        line-height:var(--lh-ui);
+        color:#1e3a5c;
+      }
+      .lp-voice-section__rinku{
+        margin:var(--space-md) 0 var(--space-sm);
+      }
+      .lp-voice-section__rinku .bubble{
+        font-size:clamp(.82rem,2.4vw,.92rem);
+        line-height:var(--lh-ui);
+      }
+      .lp-voice-section__rinku a{color:#1d4ed8;text-decoration:underline;text-underline-offset:.12em}
+      .lp-voice-section__rinku a:hover,.lp-voice-section__rinku a:focus-visible{color:#1e40af}
+      .lp-voice-kobou-mock{
+        margin-top:var(--space-sm);
+        padding:clamp(16px,4vw,22px);
+        border-radius:20px;
+        border:1px solid rgba(109,78,196,.22);
+        background:linear-gradient(165deg,rgba(250,248,255,.98),rgba(237,233,254,.92));
+        box-shadow:0 12px 36px rgba(49,46,129,.12);
+      }
+      .lp-voice-kobou-mock__ribbon{
+        margin:0 0 12px;
+        font-size:.7rem;
+        line-height:var(--lh-ui);
+        color:#4338ca;
+        font-weight:700;
+        text-align:center;
+      }
+      .lp-voice-kobou-trio{
+        display:flex;
+        flex-wrap:nowrap;
+        justify-content:center;
+        align-items:flex-end;
+        gap:clamp(6px,2vw,12px);
+        max-width:min(100%,28rem);
+        margin:0 auto 16px;
+        padding:12px 10px;
+        border-radius:18px;
+        border:1px solid rgba(148,163,184,.35);
+        background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(241,245,249,.75));
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+      }
+      .lp-voice-kobou-char{
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        flex:1 1 0;
+        min-width:0;
+      }
+      .lp-voice-kobou-char--lead{flex:1.15 1 0}
+      .lp-voice-kobou-char img{
+        width:clamp(52px,14vw,76px);
+        height:auto;
+        border-radius:50%;
+        box-shadow:0 6px 18px rgba(15,23,42,.18);
+      }
+      .lp-voice-kobou-char__name{
+        margin-top:6px;
+        font-size:.72rem;
+        font-weight:800;
+        color:#475569;
+      }
+      .lp-voice-kobou-char--lead .lp-voice-kobou-char__name{font-size:.78rem}
+      .lp-voice-kobou-char--link{
+        text-decoration:none;
+        color:inherit;
+        border-radius:12px;
+      }
+      .lp-voice-kobou-char--link:focus-visible{
+        outline:2px solid rgba(91,79,212,.45);
+        outline-offset:3px;
+      }
+      .lp-voice-kobou-char--link .lp-voice-kobou-char__name{
+        color:#5b4fd4;
+        text-decoration:none;
+        border-bottom:1px solid rgba(91,79,212,.35);
+      }
+      .lp-voice-kobou-char--link:hover .lp-voice-kobou-char__name,
+      .lp-voice-kobou-char--link:focus-visible .lp-voice-kobou-char__name{
+        color:#4338ca;
+        border-bottom-color:#4338ca;
+      }
+      .lp-voice-kobou-cards{
+        display:grid;
+        grid-template-columns:1fr;
+        gap:14px;
+      }
+      @media (min-width:720px){
+        .lp-voice-kobou-cards{grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+      }
+      .lp-voice-kobou-card{
+        border-radius:16px;
+        overflow:hidden;
+        border:1px solid rgba(203,213,225,.95);
+        background:#fff;
+        box-shadow:0 8px 28px rgba(15,23,42,.08);
+      }
+      .lp-voice-kobou-card__head{
+        margin:0;
+        padding:10px 12px;
+        font-size:.78rem;
+        font-weight:800;
+        color:#fff;
+        background:linear-gradient(90deg,#6d4ec4,#8b7ae8);
+        letter-spacing:.02em;
+      }
+      .lp-voice-kobou-nico{padding:10px 10px 12px}
+      .lp-voice-kobou-nico__bar{
+        height:36px;
+        border-radius:8px;
+        margin-bottom:8px;
+        background:linear-gradient(90deg,#1e293b,#334155);
+        opacity:.9;
+      }
+      .lp-voice-kobou-ext{
+        display:flex;
+        gap:6px;
+        margin-bottom:10px;
+        flex-wrap:wrap;
+      }
+      .lp-voice-kobou-ext__stat{
+        flex:1 1 80px;
+        min-width:0;
+        padding:6px 8px;
+        border-radius:10px;
+        border:1px solid rgba(129,140,248,.35);
+        background:rgba(238,242,255,.85);
+        font-size:.58rem;
+        color:#312e81;
+        text-align:center;
+      }
+      .lp-voice-kobou-ext__stat strong{display:block;font-size:.95rem;font-weight:800;color:#3730a3}
+      .lp-voice-kobou-comment__hint{
+        margin:0 0 4px;
+        font-size:.62rem;
+        color:#6366f1;
+        font-weight:700;
+      }
+      .lp-voice-kobou-comment__field{
+        padding:10px 11px;
+        border-radius:10px;
+        border:1px dashed rgba(99,102,241,.45);
+        background:rgba(249,250,251,.95);
+        font-size:.72rem;
+        color:#334155;
+      }
+      .lp-voice-kobou-chrome{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:8px 10px;
+        background:#1e293b;
+      }
+      .lp-voice-kobou-chrome__dots{display:flex;gap:5px}
+      .lp-voice-kobou-chrome__dots span{
+        width:8px;height:8px;border-radius:50%;
+        background:#64748b;
+      }
+      .lp-voice-kobou-chrome__dots span:nth-child(1){background:#f87171}
+      .lp-voice-kobou-chrome__dots span:nth-child(2){background:#fbbf24}
+      .lp-voice-kobou-chrome__dots span:nth-child(3){background:#34d399}
+      .lp-voice-kobou-chrome__url{
+        flex:1;
+        min-width:0;
+        padding:5px 8px;
+        border-radius:6px;
+        background:#0f172a;
+        font-size:.58rem;
+        color:#e2e8f0;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
+      .lp-voice-kobou-pop{
+        padding:10px 12px 12px;
+        background:#1a1d24;
+        color:#e5e7eb;
+        font-size:.65rem;
+      }
+      .lp-voice-kobou-pop__row{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:6px 0;
+        border-bottom:1px solid rgba(148,163,184,.2);
+      }
+      .lp-voice-kobou-pop__row:last-child{border-bottom:none}
+      .lp-voice-kobou-pop__badge{
+        margin-left:auto;
+        padding:2px 7px;
+        border-radius:999px;
+        background:rgba(59,130,246,.35);
+        color:#dbeafe;
+        font-weight:700;
+        font-size:.58rem;
+      }
+      .lp-voice-kobou-pop__select{
+        margin-top:6px;
+        padding:7px 9px;
+        border-radius:8px;
+        border:1px solid rgba(148,163,184,.45);
+        background:#0f172a;
+        color:#cbd5e1;
+      }
+      .lp-voice-kobou-foot{
+        margin:14px 0 0;
+        padding:9px 11px;
+        border-radius:10px;
+        border:1px solid rgba(167,139,250,.35);
+        background:rgba(245,243,255,.9);
+        font-size:.68rem;
+        line-height:var(--lh-ui);
+        color:#3730a3;
+      }
+      .lp-voice-userlink{
+        margin-top:16px;
+        padding:14px 12px;
+        border-radius:16px;
+        border:1px solid rgba(125,211,252,.45);
+        background:linear-gradient(180deg,rgba(240,249,255,.95),rgba(224,242,254,.75));
+      }
+      .lp-voice-userlink__title{
+        margin:0 0 8px;
+        font-size:clamp(.88rem,2.5vw,.98rem);
+        font-weight:800;
+        color:#0c4a6e;
+      }
+      .lp-voice-userlink-yukkuri{
+        margin:0 0 14px;
+        padding:12px 10px 14px;
+        border-radius:14px;
+        border:1px solid rgba(167,139,250,.4);
+        background:linear-gradient(180deg,rgba(250,245,255,.92),rgba(243,232,255,.78));
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
+      }
+      .lp-voice-userlink-yukkuri__ribbon{
+        margin:0 0 10px;
+        font-size:.62rem;
+        font-weight:800;
+        color:#6b21a8;
+        text-align:center;
+        letter-spacing:.02em;
+      }
+      .lp-voice-userlink-yukkuri .yukkuri-thread{
+        margin-top:0;
+        gap:12px;
+      }
+      .lp-voice-userlink-yukkuri .y-row .bubble{
+        font-size:.68rem;
+        line-height:var(--lh-ui);
+      }
+      .lp-voice-userlink__lead{
+        margin:0 0 12px;
+        font-size:.72rem;
+        line-height:var(--lh-ui);
+        color:#164e63;
+      }
+      .lp-voice-userlink__demo{
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+      }
+      .lp-voice-userlink__comment{
+        display:flex;
+        flex-wrap:wrap;
+        align-items:center;
+        gap:4px 6px;
+        padding:10px 12px;
+        border-radius:12px;
+        background:rgba(224,242,254,.9);
+        border:1px solid rgba(56,189,248,.35);
+        font-size:.72rem;
+        color:#0f172a;
+      }
+      .lp-voice-userlink__who{
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        text-decoration:none;
+        color:#0369a1;
+        font-weight:700;
+        border-radius:8px;
+        padding:2px 4px;
+        margin:-2px -4px;
+      }
+      .lp-voice-userlink__who:hover,.lp-voice-userlink__who:focus-visible{
+        background:rgba(14,165,233,.15);
+        outline:none;
+      }
+      .lp-voice-userlink__who img{
+        width:28px;height:28px;border-radius:50%;
+        object-fit:cover;
+        border:1px solid rgba(14,165,233,.35);
+      }
+      .lp-voice-userlink__sep{color:#64748b;font-weight:600}
+      .lp-voice-userlink__msg{color:#1e293b}
+      .lp-voice-userlink__profile-snippet{
+        display:flex;
+        flex-wrap:wrap;
+        align-items:center;
+        gap:8px;
+        font-size:.68rem;
+      }
+      .lp-voice-userlink__profile-link{
+        display:inline-flex;
+        flex-direction:column;
+        align-items:flex-start;
+        gap:2px;
+        padding:8px 10px;
+        border-radius:10px;
+        border:1px solid rgba(14,165,233,.4);
+        background:#fff;
+        text-decoration:none;
+        color:#0369a1;
+      }
+      .lp-voice-userlink__profile-link:hover,.lp-voice-userlink__profile-link:focus-visible{
+        background:rgba(224,242,254,.6);
+        outline:none;
+      }
+      .lp-voice-userlink__profile-id{font-weight:800;font-variant-numeric:tabular-nums}
+      .lp-voice-userlink__profile-nick{color:#0f172a;font-weight:700}
+      .lp-voice-userlink__note{font-size:.62rem;color:#64748b}
+      .lp-voice-userlink__strip{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px;
+        justify-content:center;
+      }
+      .lp-voice-userlink__card{
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        gap:4px;
+        min-width:min(100%,7.5rem);
+        padding:10px 8px 8px;
+        border-radius:14px;
+        border:1px solid rgba(45,212,191,.45);
+        background:rgba(255,255,255,.92);
+        text-decoration:none;
+        color:#115e59;
+        font-size:.62rem;
+        box-shadow:0 4px 14px rgba(15,118,110,.1);
+      }
+      .lp-voice-userlink__card:hover,.lp-voice-userlink__card:focus-visible{
+        border-color:#14b8a6;
+        background:rgba(240,253,250,.95);
+        outline:none;
+      }
+      .lp-voice-userlink__badge{
+        display:grid;
+        place-items:center;
+        width:22px;height:22px;
+        border-radius:50%;
+        background:#22c55e;
+        color:#fff;
+        font-size:.58rem;
+        font-weight:800;
+      }
+      .lp-voice-userlink__count{font-weight:800;color:#0f766e}
+      .lp-voice-userlink__card-av{
+        width:40px;height:40px;border-radius:50%;
+        object-fit:cover;
+        border:1px solid rgba(20,184,166,.35);
+      }
+      .lp-voice-userlink__id{font-weight:800;font-variant-numeric:tabular-nums;color:#0e7490}
+      .lp-voice-userlink__nick{
+        font-weight:700;color:#134e4a;
+        text-align:center;line-height:1.25;max-width:100%;
+      }
+      .lp-voice-userlink__fineprint{
+        margin:10px 0 0;
+        font-size:.62rem;
+        color:#475569;
+      }
+      .lp-voice-userlink__who--stack{align-items:flex-start}
+      .lp-voice-userlink__anon-stack{
+        display:flex;
+        flex-direction:column;
+        align-items:flex-start;
+        gap:1px;
+        line-height:1.25;
+      }
+      .lp-voice-userlink__anon-hash{
+        font-size:.62rem;
+        font-weight:800;
+        font-variant-numeric:tabular-nums;
+        color:#0369a1;
+      }
+      .lp-voice-userlink__anon-label{
+        font-size:.65rem;
+        font-weight:700;
+        color:#0f172a;
+      }
+      .lp-voice-userlink__boxed{
+        padding:8px 10px;
+        border-radius:12px;
+        border:1px solid rgba(251,146,60,.55);
+        background:rgba(255,247,237,.92);
+      }
+      .lp-voice-userlink__boxed-link{
+        display:flex;
+        align-items:flex-start;
+        gap:8px;
+        text-decoration:none;
+        color:#1e293b;
+        font-size:.68rem;
+        line-height:var(--lh-ui);
+        border-radius:10px;
+        padding:2px;
+        margin:-2px;
+      }
+      .lp-voice-userlink__boxed-link:hover,.lp-voice-userlink__boxed-link:focus-visible{
+        background:rgba(254,215,170,.35);
+        outline:none;
+      }
+      .lp-voice-userlink__boxed-link img{
+        width:28px;height:28px;
+        border-radius:50%;
+        object-fit:cover;
+        border:1px solid rgba(251,146,60,.4);
+        flex-shrink:0;
+      }
+      .lp-voice-userlink__boxed-name{font-weight:800;color:#c2410c}
+      .lp-voice-userlink__nip{
+        padding:10px 12px;
+        border-radius:12px;
+        border:1px solid rgba(148,163,184,.45);
+        background:rgba(255,255,255,.92);
+      }
+      .lp-voice-userlink__nip-label{
+        margin:0 0 8px;
+        font-size:.62rem;
+        font-weight:700;
+        color:#64748b;
+      }
+      .lp-voice-userlink__nip-link{
+        display:flex;
+        align-items:center;
+        gap:10px;
+        text-decoration:none;
+        color:#0f172a;
+        border-radius:10px;
+        padding:4px;
+        margin:-4px;
+      }
+      .lp-voice-userlink__nip-link:hover,.lp-voice-userlink__nip-link:focus-visible{
+        background:rgba(224,242,254,.65);
+        outline:none;
+      }
+      .lp-voice-userlink__nip-link img{
+        width:48px;height:48px;
+        border-radius:50%;
+        object-fit:cover;
+        border:1px solid rgba(14,165,233,.35);
+      }
+      .lp-voice-userlink__nip-text{
+        display:flex;
+        flex-direction:column;
+        align-items:flex-start;
+        gap:2px;
+      }
+      .lp-voice-userlink__nip-name{
+        font-size:.85rem;
+        font-weight:800;
+        color:#0369a1;
+      }
+      .lp-voice-userlink__nip-meta{
+        font-size:.62rem;
+        color:#475569;
+        font-variant-numeric:tabular-nums;
+      }
+      .lp-voice-userlink__variants{
+        margin-top:4px;
+        padding-top:12px;
+        border-top:1px dashed rgba(14,165,233,.35);
+      }
+      .lp-voice-userlink__variants-title{
+        margin:0 0 6px;
+        font-size:.68rem;
+        font-weight:800;
+        color:#0e7490;
+      }
+      .lp-voice-userlink__variants-lead{
+        margin:0 0 10px;
+        font-size:.62rem;
+        line-height:var(--lh-ui);
+        color:#475569;
+      }
+      .lp-voice-userlink__variant-row{
+        display:flex;
+        flex-wrap:wrap;
+        align-items:center;
+        gap:6px 8px;
+        margin-bottom:10px;
+        padding:8px 10px;
+        border-radius:10px;
+        background:rgba(255,255,255,.75);
+        border:1px solid rgba(125,211,252,.4);
+        font-size:.65rem;
+        color:#334155;
+      }
+      .lp-voice-userlink__variant-row:last-child{margin-bottom:0}
+      .lp-voice-userlink__variant-label{
+        flex:0 0 auto;
+        font-size:.58rem;
+        font-weight:800;
+        color:#64748b;
+        min-width:5.5rem;
+      }
+      .lp-voice-userlink__placeholder-av{
+        flex-shrink:0;
+        width:32px;height:32px;
+        border-radius:50%;
+        background:linear-gradient(165deg,#cbd5e1,#94a3b8);
+        border:1px solid rgba(100,116,139,.45);
+      }
+      .lp-voice-userlink__text-link{
+        font-weight:800;
+        color:#0369a1;
+        text-decoration:underline;
+        text-underline-offset:.12em;
+      }
+      .lp-voice-userlink__text-link:hover,.lp-voice-userlink__text-link:focus-visible{
+        color:#1e40af;
+      }
+      .lp-voice-konta-page{
+        margin-top:14px;
+        padding:14px 12px 16px;
+        border-radius:16px;
+        border:1px solid rgba(148,163,184,.45);
+        background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.95));
+        scroll-margin-top:14px;
+      }
+      .lp-voice-konta-page__ribbon{
+        margin:0 0 8px;
+        font-size:.62rem;
+        font-weight:700;
+        color:#64748b;
+      }
+      .lp-voice-konta-page__hero{
+        display:flex;
+        flex-wrap:wrap;
+        align-items:flex-start;
+        gap:12px 16px;
+        padding-bottom:12px;
+        border-bottom:1px solid rgba(148,163,184,.35);
+      }
+      .lp-voice-konta-page__hero-av{
+        width:64px;height:64px;
+        border-radius:50%;
+        object-fit:cover;
+        border:1px solid rgba(56,189,248,.4);
+        flex-shrink:0;
+      }
+      .lp-voice-konta-page__hero-body{min-width:0;flex:1}
+      .lp-voice-konta-page__hero-name{
+        margin:0 0 4px;
+        font-size:clamp(1rem,3vw,1.15rem);
+        font-weight:800;
+        color:#0f172a;
+      }
+      .lp-voice-konta-page__hero-meta{
+        margin:0;
+        font-size:.62rem;
+        color:#475569;
+        line-height:var(--lh-ui);
+      }
+      .lp-voice-konta-page__stats{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px 14px;
+        margin:8px 0 0;
+        font-size:.62rem;
+        color:#334155;
+      }
+      .lp-voice-konta-page__stats strong{color:#0369a1}
+      .lp-voice-konta-page__tabs{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px 16px;
+        margin:12px 0 0;
+        padding:0 0 8px;
+        border-bottom:1px solid rgba(148,163,184,.35);
+        font-size:.72rem;
+        font-weight:700;
+        color:#64748b;
+      }
+      .lp-voice-konta-page__tabs span.is-active{
+        color:#0369a1;
+        box-shadow:0 2px 0 0 #2563eb;
+      }
+      .lp-voice-konta-page__main{
+        display:grid;
+        grid-template-columns:minmax(0,7rem) 1fr;
+        gap:12px;
+        margin-top:10px;
+        font-size:.62rem;
+      }
+      @media (max-width:520px){
+        .lp-voice-konta-page__main{grid-template-columns:1fr}
+      }
+      .lp-voice-konta-page__aside{
+        font-size:.6rem;
+        color:#475569;
+        line-height:1.45;
+      }
+      .lp-voice-konta-page__aside strong{display:block;margin-bottom:4px;color:#334155}
+      .lp-voice-konta-page__empty{
+        margin:0;
+        padding:10px 8px;
+        border-radius:12px;
+        background:rgba(241,245,249,.85);
+        border:1px dashed rgba(148,163,184,.35);
+        color:#64748b;
+        text-align:center;
+        min-height:56px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+      }
+      .lp-voice-konta-page__value{
+        margin:0 0 10px;
+        font-size:.62rem;
+        line-height:var(--lh-ui);
+        color:#475569;
+      }
+      .lp-voice-konta-page__nudge-badge{
+        display:inline-block;
+        margin:0 0 10px;
+        padding:5px 9px;
+        border-radius:999px;
+        font-size:.58rem;
+        font-weight:700;
+        color:#9d174d;
+        background:linear-gradient(180deg,rgba(252,231,243,.95),rgba(251,207,232,.88));
+        border:1px solid rgba(244,114,182,.45);
+      }
+      .lp-voice-konta-page__body-col{
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        min-width:0;
+      }
+      .lp-voice-konta-page__ach{
+        padding:10px 10px 8px;
+        border-radius:12px;
+        border:1px solid rgba(56,189,248,.35);
+        background:rgba(240,249,255,.9);
+        font-size:.6rem;
+        color:#334155;
+        line-height:1.45;
+      }
+      .lp-voice-konta-page__ach h5{
+        margin:0 0 6px;
+        font-size:.65rem;
+        font-weight:800;
+        color:#0c4a6e;
+      }
+      .lp-voice-konta-page__ach ul{
+        margin:0;
+        padding-left:1.1em;
+      }
+      .lp-voice-konta-page__ach li{margin-bottom:4px}
+      .lp-voice-konta-page__ach li:last-child{margin-bottom:0}
       .lp-site-look-mock__comment-roadmap{
         margin:10px 0 0;
         padding:9px 11px;border-radius:10px;
@@ -5020,6 +5769,7 @@
           <a href="#multi-live">同時視聴</a>
           <a href="#extension-visual">拡張の見え方</a>
           <a href="#lp-comment-compose-guide">コメント送信</a>
+          <a href="#lp-voice-comment">音声コメント</a>
           <a href="#lp-anonymous-identicon">匿名 Identicon</a>
           <a href="#html-save">HTML保存</a>
           <a href="#marketing-features">マーケ分析</a>
@@ -6022,7 +6772,7 @@
               </div>
               <p class="live-input-roadmap" role="note">
                 この1行は<strong>配信画面の公式コメント欄のデモ</strong>で、このページ上では<strong>送信できません</strong>。拡張側は<strong>ポップアップの入力欄</strong>から watch ページの送信 UI へ届ける流れを別途用意しています（<a href="#lp-comment-compose-guide">コメント送信の流れ</a>・<a href="#extension-guide-comment-voice">用語⑧</a>）。
-                <strong>音声入力</strong>は、<strong>ブラウザやOSの音声入力</strong>で文字をテキストボックスに流し込み、確定したうえで<strong>Enter</strong>など通常どおり送る想定です（Chrome・Edge・Windows など<strong>環境ごとに可否が異なります</strong>）。
+                <strong>音声入力</strong>は、<strong>ブラウザやOSの音声入力</strong>で文字をテキストボックスに流し込み、確定したうえで<strong>Enter</strong>など通常どおり送る想定です（Chrome・Edge・Windows など<strong>環境ごとに可否が異なります</strong>）。<strong>Windows 10/11</strong>では <strong>Windows キー + H</strong> で音声入力パネルを開けます。
               </p>
               <p class="live-ui-caption">特定サービスの画面コピーではなく、コメントの流れ・通知・読み上げの重さを並べて見せるためのLPデモです。</p>
             </div>
@@ -6371,7 +7121,7 @@
                 </div>
                 <p class="live-input-roadmap" role="note">
                   この1行は<strong>配信画面の公式コメント欄のデモ</strong>で、このページ上では<strong>送信できません</strong>。拡張側は<strong>ポップアップの入力欄</strong>から watch ページの送信 UI へ届ける流れを別途用意しています（<a href="#lp-comment-compose-guide">コメント送信の流れ</a>・<a href="#extension-guide-comment-voice">用語⑧</a>）。
-                  <strong>音声入力</strong>は、<strong>ブラウザやOSの音声入力</strong>で文字をテキストボックスに流し込み、確定したうえで<strong>Enter</strong>など通常どおり送る想定です（Chrome・Edge・Windows など<strong>環境ごとに可否が異なります</strong>）。
+                  <strong>音声入力</strong>は、<strong>ブラウザやOSの音声入力</strong>で文字をテキストボックスに流し込み、確定したうえで<strong>Enter</strong>など通常どおり送る想定です（Chrome・Edge・Windows など<strong>環境ごとに可否が異なります</strong>）。<strong>Windows 10/11</strong>では <strong>Windows キー + H</strong> で音声入力パネルを開けます。
                 </p>
                 <p class="live-ui-caption">特定サービスの画面コピーではなく、コメントの流れ・通知・読み上げの重さを並べて見せるためのLPデモです。</p>
               </div>
@@ -6382,7 +7132,7 @@
             <h3>サイトの見え方（架空ダッシュボード）</h3>
             <p>
               実機の配色・文言とは一致しない場合があります。<strong>操作はできません</strong>（ボタン・折りたたみは見た目の見本です）。記録ブロック内の<strong>コメント欄の見本</strong>も<strong>動かない見本</strong>で、ここからは送れません。実際の送信は<strong>拡張ポップアップの入力欄</strong>から行います（手順は<a href="#lp-comment-compose-guide">コメント送信の流れ</a>）。
-              <strong>音声入力</strong>は OS・ブラウザの機能で文字を入れたあと、通常どおり送信する想定です（環境依存）。
+              <strong>音声入力</strong>は OS・ブラウザの機能で文字を入れたあと、通常どおり送信する想定です（環境依存）。<strong>Windows 10/11</strong>では<strong>Windows キー + H</strong>で音声入力を開始できます。
               下の<strong>上位コメンター列</strong>の上では、まず<strong>一文で仕組み</strong>（匿名の<strong>何件</strong>か・<strong>判別</strong>の模様）を書き、開くと<strong>りんく・こん太・たぬ姉</strong>の補足があります。列そのものも<strong>見本の並び</strong>です。
             </p>
             <div class="lp-site-look-mock" role="region" aria-label="拡張パネル全体の架空プレビュー（操作できません）">
@@ -6654,7 +7404,7 @@
                   <p class="lp-site-look-mock__comment-roadmap" role="note">
                     <strong>実機では拡張ポップアップの <code>#commentInput</code> と「コメント送信」</strong>から、watch ページ上の送信 UI へ <strong>メッセージ（<code>NLS_POST_COMMENT</code>）</strong>が届きます。この枠は<strong>動かない見本</strong>で、<strong>入力・送信はできません</strong>。
                     手順・トラブル時は<a href="#lp-comment-compose-guide">コメント送信の流れ</a>、語句は<a href="#extension-guide-comment-voice">用語⑧</a>・<a href="#extension-guide-kindness-nudge">用語⑨</a>へ。
-                    <strong>音声入力</strong>は<strong>ブラウザやOSの音声入力</strong>で文字を入れ、確定したあと<strong>Enter</strong>など通常どおり送る想定です（環境依存）。
+                    <strong>音声入力</strong>は<strong>ブラウザやOSの音声入力</strong>で文字を入れ、確定したあと<strong>Enter</strong>など通常どおり送る想定です（環境依存）。<strong>Windows 10/11</strong>では<strong>Windows キー + H</strong>で音声入力パネルを開けます。
                   </p>
                 </div>
                 <p class="lp-site-look-mock__foot-hint" aria-hidden="true">ページ内パネルの位置・幅（watch）… などの細かい設定行のイメージ</p>
@@ -7055,7 +7805,7 @@
               <li>結果はポップアップの表示で確認。長く止まるときは watch の<strong>再読み込み</strong>、<strong>別タブが前面</strong>になっていないか、<strong>拡張更新後のタブ再読み込み</strong>を試す。</li>
             </ol>
             <p class="lp-feature-note lp-compose-guide-foot">
-              メッセージ名や JSON の話は<a href="#extension-guide-comment-voice">用語⑧</a>と<a href="#extension-guide">画面の見方</a>のほかの項目へ。マーケ分析と末尾 JSON は<a href="#marketing-deep-features">分析の深掘り</a>・<a href="#extension-guide-marketing-export">用語⑩</a>です。
+              <strong>Windows 10/11</strong>では<strong>Windows キー + H</strong>で音声入力パネルを開き、入力欄へ文字を入れてから送れます（環境・設定により利用できない場合があります）。手順の図と、<strong>声で入力するイメージ</strong>の補足は<a href="#lp-voice-comment">音声コメント（Windows）</a>へ。メッセージ名や JSON の話は<a href="#extension-guide-comment-voice">用語⑧</a>と<a href="#extension-guide">画面の見方</a>のほかの項目へ。マーケ分析と末尾 JSON は<a href="#marketing-deep-features">分析の深掘り</a>・<a href="#extension-guide-marketing-export">用語⑩</a>です。
             </p>
           </div>
           <div class="yukkuri-thread fade d2 lp-compose-yuki">
@@ -7085,6 +7835,386 @@
               <div class="bubble">
                 このページのダッシュボード見本や配信デモの入力欄は<strong>静止画</strong>なのだ。実際に試すのは<strong>拡張ポップアップ</strong>と<strong>本物の watch</strong>の組み合わせなのだ。
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="section"
+        id="lp-voice-comment"
+        aria-labelledby="lp-voice-comment-heading"
+        data-lp-feature="voice-comment-windows"
+      >
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="lp-voice-comment-heading">音声でもコメントできる（Windows）</h2>
+            <p class="lp-voice-section__lead">
+              音声入力は、キーボードで打つ代わりに<strong>話した内容を文字として入力欄に置く</strong>手段のひとつです。<strong>向くことがある</strong>人・場面もあります（環境や設定により使えません）。
+            </p>
+            <p class="lp-voice-section__lead">
+              拡張の<strong>コメント入力欄</strong>は、キーボードのほか<strong>Windows の音声入力</strong>でも文字を入れられます。音声は<strong>OS の機能</strong>で、拡張がマイクを直接取る仕組みではありません。下の<strong>見本</strong>は、<a href="https://kimito-link.com/kobou/" rel="noopener noreferrer">君斗りんく工房</a>のページのような雰囲気の<strong>示意図</strong>です（実ブラウザのキャプチャではありません）。くわしくは<a href="#extension-guide-comment-voice">用語⑧</a>も参照してください。
+            </p>
+          </div>
+          <div class="board fade d1 lp-voice-section">
+            <h3 class="visually-hidden">音声入力の流れ</h3>
+            <div class="lp-voice-why" data-lp-feature="voice-comment-why">
+              <p class="lp-voice-why__title">向くことがある人・場面（例）</p>
+              <p class="lp-voice-why__lead">
+                次のようなとき、<strong>音声で文字を入れる</strong>のが<strong>向くことがあります</strong>（個人差があります）。
+              </p>
+              <ul class="lp-voice-why__list">
+                <li><strong>タイピング</strong>や<strong>変換のやり直し</strong>に時間がかかるとき</li>
+                <li><strong>片手</strong>がふさがっている・<strong>マウス操作</strong>が中心のとき</li>
+                <li><strong>勢い</strong>や<strong>話し言葉</strong>の方が先に出るとき（あとから整えて送れる）</li>
+                <li><strong>体や環境の事情</strong>でキーボードを長く打ちにくいとき</li>
+              </ul>
+              <p class="lp-voice-why__note" role="note">
+                <strong>注意:</strong> 職場・公共の場では使いにくいことがあります。<strong>認識ミス</strong>もあるため、<strong>送信前に内容を確認</strong>してください。使えるかは<strong>端末・OS・ブラウザ・配信ページ</strong>の状態によります。細かい手順のつまずきは<a href="#lp-comment-compose-guide">コメント送信ガイド</a>へ。
+              </p>
+            </div>
+            <div class="lp-voice-benefits-yukkuri" data-lp-feature="voice-comment-benefits-yukkuri">
+              <p class="lp-voice-benefits-yukkuri__ribbon">ゆっくり解説（便利さと限界）</p>
+              <h4 class="visually-hidden">りんく・こん太・たぬ姉の解説</h4>
+              <div class="yukkuri-thread">
+                <div class="y-row">
+                  <div class="speaker">
+                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                    <span>りんく</span>
+                  </div>
+                  <div class="bubble">
+                    音声入力は<strong>キーボードの別ルート</strong>なのだ。<strong>誰にでも・いつでも最高</strong>というわけじゃないから、合わなきゃ普通に打てばいいのだ。
+                  </div>
+                </div>
+                <div class="y-row reverse">
+                  <div class="bubble">
+                    タイピングがだるい日とか、手がキーボードから離せないとき、<strong>喋ってから直す</strong>のがラクなこともあるのだ。勢いで応援したいときにも向くことがあるのだ。
+                  </div>
+                  <div class="speaker">
+                    <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                    <span>こん太</span>
+                  </div>
+                </div>
+                <div class="y-row">
+                  <div class="speaker">
+                    <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                    <span>たぬ姉</span>
+                  </div>
+                  <div class="bubble">
+                    <strong>OS の音声入力</strong>と、ブラウザがサイトに渡す<strong>マイク</strong>は<strong>別物</strong>なのだ。変な文字になったら<strong>直してから送る</strong>のが無難なのだ。つまずいたら<a href="#lp-comment-compose-guide">コメント送信ガイド</a>も見るのだ。
+                  </div>
+                </div>
+                <div class="y-row reverse">
+                  <div class="bubble">
+                    技術の細かい話は<a href="#extension-guide-comment-voice">用語⑧</a>に任せて、このあとは<strong>手順と図</strong>で追うのだ。
+                  </div>
+                  <div class="speaker">
+                    <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                    <span>りんく</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <ol class="lp-voice-section__steps">
+              <li>拡張の<strong>ポップアップ</strong>で<strong>コメント入力欄</strong>をクリックし、カーソルを置く。</li>
+              <li><strong>Windows キー + H</strong>で音声入力パネルを開く（Windows 10/11。環境・設定により使えない場合があります）。</li>
+              <li>話した内容が文字になったら<strong>確定</strong>し、必要なら編集する。</li>
+              <li><strong>コメント送信</strong>で watch ページ側へ届ける（<a href="#lp-comment-compose-guide">基本の流れ</a>と同じ）。</li>
+            </ol>
+            <p class="lp-voice-section__collab" role="note">
+              <strong>まるで画面に向かって話しかけるように</strong>、声で文字を入れてコメントできます。配信の見え方（コメント欄の位置など）は番組や端末によって変わりますが、<strong>ニコ生の watch で公式コメント欄が使える状態なら</strong>、上の流れと考え方は通常の視聴と同じです。
+            </p>
+            <div class="lp-voice-section__rinku yukkuri-thread" data-lp-feature="voice-comment-rinku">
+              <div class="y-row">
+                <div class="speaker">
+                  <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                  <span>りんく</span>
+                </div>
+                <div class="bubble">
+                  このあとの<strong>図はスクリーンショットじゃない</strong>のだ。<strong>カードと紫のトーン</strong>は<a href="https://kimito-link.com/kobou/" rel="noopener noreferrer">君斗りんく工房</a>の雰囲気の<strong>示意図</strong>なのだ。左はコメント欄＋<strong>Windows キー + H</strong>、右は<strong>サイト情報</strong>の<strong>見本</strong>なのだ。実機と違っても許してほしいのだ。
+                </div>
+              </div>
+            </div>
+            <div class="lp-voice-kobou-mock" data-lp-feature="voice-comment-kobou-mock" aria-label="音声コメントの流れの見本（君斗りんく工房風の示意図。実画面のキャプチャではありません）">
+              <p class="lp-voice-kobou-mock__ribbon">示意図（工房ページ風の見本・実ブラウザのキャプチャではありません）</p>
+              <div class="lp-voice-kobou-trio">
+                <a
+                  class="lp-voice-kobou-char lp-voice-kobou-char--link"
+                  href="https://kimito-link.com/yukkurikonta/"
+                  rel="noopener noreferrer"
+                >
+                  <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="" width="120" height="120" decoding="async">
+                  <span class="lp-voice-kobou-char__name">こん太</span>
+                </a>
+                <a
+                  class="lp-voice-kobou-char lp-voice-kobou-char--lead lp-voice-kobou-char--link"
+                  href="https://kimito-link.com/yukkurilink/"
+                  rel="noopener noreferrer"
+                >
+                  <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" width="140" height="140" decoding="async">
+                  <span class="lp-voice-kobou-char__name">りんく</span>
+                </a>
+                <a
+                  class="lp-voice-kobou-char lp-voice-kobou-char--link"
+                  href="https://kimito-link.com/yukkuritanunee/"
+                  rel="noopener noreferrer"
+                >
+                  <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" alt="" width="120" height="120" decoding="async">
+                  <span class="lp-voice-kobou-char__name">たぬ姉</span>
+                </a>
+              </div>
+              <div class="lp-voice-kobou-cards">
+                <section class="lp-voice-kobou-card" aria-label="視聴ページと拡張の見本">
+                  <h4 class="lp-voice-kobou-card__head">配信の下・コメント入力欄（見本）</h4>
+                  <div class="lp-voice-kobou-nico">
+                    <div class="lp-voice-kobou-nico__bar" aria-hidden="true"></div>
+                    <div class="lp-voice-kobou-ext">
+                      <div class="lp-voice-kobou-ext__stat"><span>記録</span><strong>388</strong></div>
+                      <div class="lp-voice-kobou-ext__stat"><span>推定同接</span><strong>~314</strong></div>
+                      <div class="lp-voice-kobou-ext__stat"><span>来場</span><strong>2689</strong></div>
+                    </div>
+                    <p class="lp-voice-kobou-comment__hint">Windows キー + H → 音声入力</p>
+                    <div class="lp-voice-kobou-comment__field" aria-hidden="true">応援してる！　がんばって</div>
+                  </div>
+                </section>
+                <section class="lp-voice-kobou-card" aria-label="サイト情報でマイクを選ぶ見本">
+                  <h4 class="lp-voice-kobou-card__head">ブラウザのサイト情報（見本）</h4>
+                  <div class="lp-voice-kobou-chrome">
+                    <div class="lp-voice-kobou-chrome__dots" aria-hidden="true"><span></span><span></span><span></span></div>
+                    <div class="lp-voice-kobou-chrome__url">https://live.nicovideo.jp/watch/lv…</div>
+                  </div>
+                  <div class="lp-voice-kobou-pop">
+                    <div class="lp-voice-kobou-pop__row">
+                      <span>マイク</span>
+                      <span class="lp-voice-kobou-pop__badge">許可</span>
+                    </div>
+                    <div class="lp-voice-kobou-pop__row">
+                      <span>音声</span>
+                      <span class="lp-voice-kobou-pop__badge">オン</span>
+                    </div>
+                    <div class="lp-voice-kobou-pop__select">入力デバイス：ヘッドセット（例）を選択 ▼</div>
+                  </div>
+                </section>
+              </div>
+              <p class="lp-voice-kobou-foot">※ 実際のボタン名・位置はブラウザと配信ページの版で異なります。<strong>サイト情報</strong>から<strong>マイクを許可</strong>し、<strong>入力デバイスを切り替え</strong>られることがあります。<strong>Windows キー + H</strong>の音声入力（OS）と、<strong>サイトに渡すマイク</strong>は別のことがあります。</p>
+              <div class="lp-voice-userlink" data-lp-feature="voice-comment-userlink-mock">
+                <h4 class="lp-voice-userlink__title">アイコン・表示名・ID をクリック（見本）</h4>
+                <div class="lp-voice-userlink-yukkuri" data-lp-feature="voice-comment-userlink-yukkuri">
+                  <p class="lp-voice-userlink-yukkuri__ribbon">ゆっくり解説（ユーザーページへ飛ぶときのメリット）</p>
+                  <h5 class="visually-hidden">りんく・こん太・たぬ姉の解説</h5>
+                  <div class="yukkuri-thread">
+                    <div class="y-row">
+                      <div class="speaker">
+                        <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                        <span>りんく</span>
+                      </div>
+                      <div class="bubble">
+                        ニコニコのコメント欄やランキングでは、<strong>アイコン</strong>・<strong>表示名</strong>・<strong>ユーザーID</strong>や<strong>匿名の a: 行</strong>をクリックすると、その人の<strong>ユーザーページ</strong>を開けることがあるのだ。<strong>画面の版</strong>や<strong>ログイン状態</strong>で<strong>違う</strong>のだ。
+                      </div>
+                    </div>
+                    <div class="y-row reverse">
+                      <div class="bubble">
+                        <strong>サムネと表示名がそろってる</strong>と「誰の行か」が一発で分かるから、<strong>プロフィールへ進みやすい</strong>こともあるのだ。逆に<strong>サムネなし</strong>・<strong>ハンドルだけ</strong>・<strong>匿名</strong>もあって、<strong>見え方はバラバラ</strong>なのだ。
+                      </div>
+                      <div class="speaker">
+                        <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                        <span>こん太</span>
+                      </div>
+                    </div>
+                    <div class="y-row">
+                      <div class="speaker">
+                        <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                        <span>たぬ姉</span>
+                      </div>
+                      <div class="bubble">
+                        <strong>このLP</strong>では下のクリックで<strong>同じページ内</strong>の<strong>ゆっくりこん太</strong>の<strong>見本</strong>へスクロールするだけで、<strong>外部サイトには飛ばない</strong>のだ。本番のニコニコでは飛んだ先に<strong>投稿・生放送・実績</strong>など<strong>活動の記録</strong>がまとまっていると、<strong>気に留めてもらいやすい</strong>こともあるのだ（<strong>版やアカウントで違う</strong>のだ）。
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p class="lp-voice-userlink__lead">
+                  上の<strong>ゆっくり解説</strong>の要点を、下の<strong>クリック見本</strong>と<strong>ユーザーページ見本</strong>で確認できます。ニコニコ本番では<strong>外部のユーザーページ</strong>に遷移することがあります。
+                </p>
+                <div class="lp-voice-userlink__demo">
+                  <div class="lp-voice-userlink__comment">
+                    <a
+                      class="lp-voice-userlink__who lp-voice-userlink__who--stack"
+                      href="#lp-voice-konta-userpage-mock"
+                    >
+                      <img
+                        src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png"
+                        alt=""
+                        width="32"
+                        height="32"
+                        decoding="async"
+                      >
+                      <span class="lp-voice-userlink__anon-stack">
+                        <span class="lp-voice-userlink__anon-hash">a:7eBN…</span>
+                        <span class="lp-voice-userlink__anon-label">ゆっくりこん太</span>
+                      </span>
+                    </a>
+                    <span class="lp-voice-userlink__sep">:</span>
+                    <span class="lp-voice-userlink__msg">スタバに勝てないやろ（仮コメント）</span>
+                  </div>
+                  <div class="lp-voice-userlink__profile-snippet">
+                    <a
+                      class="lp-voice-userlink__profile-link"
+                      href="#lp-voice-konta-userpage-mock"
+                    >
+                      <span class="lp-voice-userlink__profile-id">a:7eBN…</span>
+                      <span class="lp-voice-userlink__profile-nick">ゆっくりこん太</span>
+                    </a>
+                    <span class="lp-voice-userlink__note">吹き出し風の ID＋表示名もクリックでユーザーページ（このLPでは下の見本へ）</span>
+                  </div>
+                  <div class="lp-voice-userlink__strip">
+                    <a
+                      class="lp-voice-userlink__card"
+                      href="#lp-voice-konta-userpage-mock"
+                    >
+                      <span class="lp-voice-userlink__badge" aria-hidden="true">2</span>
+                      <span class="lp-voice-userlink__count">2件</span>
+                      <img
+                        class="lp-voice-userlink__card-av"
+                        src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png"
+                        alt=""
+                        width="40"
+                        height="40"
+                        decoding="async"
+                      >
+                      <span class="lp-voice-userlink__id">a:7eBN…</span>
+                      <span class="lp-voice-userlink__nick">ゆっくりこん太</span>
+                    </a>
+                  </div>
+                  <div class="lp-voice-userlink__boxed">
+                    <a class="lp-voice-userlink__boxed-link" href="#lp-voice-konta-userpage-mock">
+                      <img
+                        src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png"
+                        alt=""
+                        width="28"
+                        height="28"
+                        decoding="async"
+                      >
+                      <span class="lp-voice-userlink__boxed-text"><span class="lp-voice-userlink__boxed-name">こん太</span>：2番目の優先として、表示名か…（見本）</span>
+                    </a>
+                  </div>
+                  <div class="lp-voice-userlink__nip" aria-label="プロフィールヘッダー風の見本">
+                    <p class="lp-voice-userlink__nip-label">プロフィールヘッダー風（見本）</p>
+                    <a class="lp-voice-userlink__nip-link" href="#lp-voice-konta-userpage-mock">
+                      <img
+                        src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+                        alt=""
+                        width="48"
+                        height="48"
+                        decoding="async"
+                      >
+                      <span class="lp-voice-userlink__nip-text">
+                        <span class="lp-voice-userlink__nip-name">こん太</span>
+                        <span class="lp-voice-userlink__nip-meta">a:7eBN… ・ ゆっくりこん太</span>
+                      </span>
+                    </a>
+                  </div>
+                  <div class="lp-voice-userlink__variants" data-lp-feature="voice-comment-userlink-variants-mock" aria-label="表示パターンの見本">
+                    <p class="lp-voice-userlink__variants-title">表示のばらつき（見本）</p>
+                    <p class="lp-voice-userlink__variants-lead">
+                      実際の画面では次のような違いがあります。いずれも<strong>このLPでは</strong>同じ見本へリンクします。
+                    </p>
+                    <div class="lp-voice-userlink__variant-row">
+                      <span class="lp-voice-userlink__variant-label">匿名＋Identicon</span>
+                      <a
+                        class="lp-voice-userlink__who lp-voice-userlink__who--stack"
+                        href="#lp-voice-konta-userpage-mock"
+                      >
+                        <div class="lp-mock-identicon lp-mock-identicon--b" aria-hidden="true" title="Identicon 見本"></div>
+                        <span class="lp-voice-userlink__anon-stack">
+                          <span class="lp-voice-userlink__anon-hash">a:k9mX…</span>
+                          <span class="lp-voice-userlink__anon-label">匿名</span>
+                        </span>
+                      </a>
+                      <span class="lp-voice-userlink__sep">:</span>
+                      <span class="lp-voice-userlink__msg">（仮コメント）</span>
+                    </div>
+                    <div class="lp-voice-userlink__variant-row">
+                      <span class="lp-voice-userlink__variant-label">サムネなし・ハンドル</span>
+                      <a class="lp-voice-userlink__who" href="#lp-voice-konta-userpage-mock">
+                        <span class="lp-voice-userlink__placeholder-av" aria-hidden="true"></span>
+                        <span class="lp-voice-userlink__anon-hash">@yukkurikonta</span>
+                      </a>
+                      <span class="lp-voice-userlink__sep">:</span>
+                      <span class="lp-voice-userlink__msg">名前だけの行（見本）</span>
+                    </div>
+                    <div class="lp-voice-userlink__variant-row">
+                      <span class="lp-voice-userlink__variant-label">テキストリンクのみ</span>
+                      <span>コメント内の</span>
+                      <a class="lp-voice-userlink__text-link" href="#lp-voice-konta-userpage-mock">ゆっくりこん太</a>
+                      <span>だけがリンクのとき（見本）</span>
+                    </div>
+                  </div>
+                </div>
+                <p class="lp-voice-userlink__fineprint">
+                  ※ 表示は<strong>仮データ</strong>です。実際のニコニコでは外部のユーザーページに遷移することがあります。匿名や仕様変更でリンクが出ない場合もあります。上のブロックは<strong>複数パターンの見本</strong>です。
+                </p>
+              </div>
+              <section
+                class="lp-voice-konta-page"
+                id="lp-voice-konta-userpage-mock"
+                data-lp-feature="voice-comment-konta-userpage-mock"
+                aria-labelledby="lp-voice-konta-userpage-mock-heading"
+              >
+                <p class="lp-voice-konta-page__ribbon">このLP内の見本（外部サイトへは飛びません）</p>
+                <p class="lp-voice-konta-page__value">
+                  本番のユーザーページでは、<strong>アイコンと表示名</strong>がそろっていると「誰のページか」が伝わりやすく、さらに<strong>投稿・生放送・実績</strong>など<strong>活動の記録</strong>がまとまっていると、訪れた人が<strong>気に留めてくれやすい</strong>こともあります（画面の版やアカウントで異なります）。
+                </p>
+                <div class="lp-voice-konta-page__hero">
+                  <img
+                    class="lp-voice-konta-page__hero-av"
+                    src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+                    alt=""
+                    width="64"
+                    height="64"
+                    decoding="async"
+                  >
+                  <div class="lp-voice-konta-page__hero-body">
+                    <h4 class="lp-voice-konta-page__hero-name" id="lp-voice-konta-userpage-mock-heading">ゆっくりこん太</h4>
+                    <p class="lp-voice-konta-page__hero-meta">
+                      a:7eBN…（匿名の見本）・<strong>LP上の仮ユーザーページ</strong>・ファン視点のキャラ
+                    </p>
+                    <p class="lp-voice-konta-page__nudge-badge" role="presentation">ニコニコ風・架空のバッジ見本（LP）</p>
+                    <div class="lp-voice-konta-page__stats" role="presentation">
+                      <span><strong>フォロー中</strong> 0</span>
+                      <span><strong>フォロワー</strong> 0</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="lp-voice-konta-page__tabs" role="presentation">
+                  <span class="is-active">新着</span>
+                  <span>フォロー</span>
+                  <span>マイリスト</span>
+                  <span>動画</span>
+                  <span>生放送</span>
+                  <span>実績</span>
+                </div>
+                <div class="lp-voice-konta-page__main">
+                  <div class="lp-voice-konta-page__aside">
+                    <strong>表示切替（見本）</strong>
+                    投稿したコンテンツ
+                  </div>
+                  <div class="lp-voice-konta-page__body-col">
+                    <p class="lp-voice-konta-page__empty">
+                      アクティビティは存在しないか、表示期限を過ぎています（見本の文面です）
+                    </p>
+                    <div class="lp-voice-konta-page__ach" data-lp-feature="voice-comment-konta-ach-mock">
+                      <h5>実績（見本）</h5>
+                      <p>
+                        実際のサービスでは、視聴・配信のマイルストーンや参加イベントなどが一覧になることがあります。下は<strong>架空の仮データ</strong>です。
+                      </p>
+                      <ul>
+                        <li>累計コメント参加（見本） 1,000 回達成（仮）</li>
+                        <li>ニコニコ生放送アワード（見本） ノミネート（仮）</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
         </div>
@@ -8200,7 +9330,7 @@
                   <div class="y-row reverse">
                     <div class="bubble">
                       うまくいかないときは、watch を<strong>再読み込み</strong>したか、<strong>コメント欄が出たあと</strong>か、<strong>別タブが前面</strong>になっていないかを見るのだ。拡張を更新したあとはタブの<strong>F5</strong>も忘れずに。
-                      <dfn>音声入力</dfn>は、OS やブラウザで文字を入力欄に流し込み、<strong>IME の確定のあと Enter</strong>や送信、といういつもの日本語入力の感じを想定しているのだ。
+                      <dfn>音声入力</dfn>は、OS やブラウザで文字を入力欄に流し込み、<strong>IME の確定のあと Enter</strong>や送信、といういつもの日本語入力の感じを想定しているのだ。Windows 10/11 では、<strong>Windows キー + H</strong> で音声入力のパネルを開き、マイクに向かって話せばコメント欄に文字を入れられるのだ。
                     </div>
                     <div class="speaker">
                       <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" alt="" width="72" height="72" decoding="async">

@@ -553,6 +553,69 @@ test.describe('lp-preview', () => {
     ).toBeVisible();
   });
 
+  test('音声コメント（Windows）: #lp-voice-comment と390幅ではみ出しなし', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${lpHref}#lp-voice-comment`, { waitUntil: 'domcontentloaded' });
+
+    const block = page.locator('#lp-voice-comment');
+    await expect(block).toBeVisible();
+    await expect(block).toHaveAttribute('data-lp-feature', 'voice-comment-windows');
+    await expect(page.getByRole('heading', { name: /音声でもコメントできる/ })).toBeVisible();
+    await expect(block.locator('[data-lp-feature="voice-comment-why"]')).toBeVisible();
+    await expect(block.locator('[data-lp-feature="voice-comment-benefits-yukkuri"]')).toBeVisible();
+    await expect(block).toContainText(/向く/);
+    await expect(block).toContainText(/タイピング/);
+    await expect(block.locator('[data-lp-feature="voice-comment-rinku"]')).toContainText(/りんく/);
+    const kobouMock = block.locator('[data-lp-feature="voice-comment-kobou-mock"]');
+    await expect(kobouMock).toBeVisible();
+    await kobouMock.scrollIntoViewIfNeeded();
+    await expect(block).toContainText(/示意図/);
+    await expect(block).toContainText(/見本/);
+    await expect(kobouMock.locator('a[href="https://kimito-link.com/yukkurikonta/"]')).toHaveCount(1);
+    await expect(kobouMock.locator('a[href="https://kimito-link.com/yukkurilink/"]')).toHaveCount(1);
+    await expect(kobouMock.locator('a[href="https://kimito-link.com/yukkuritanunee/"]')).toHaveCount(1);
+    await expect(block).toContainText(/Windows キー\s*\+\s*H/);
+    await expect(block).toContainText(/話しかける/);
+    await expect(block).toContainText(/サイト情報/);
+    await expect(block).toContainText(/切り替え/);
+
+    const userlinkMock = block.locator('[data-lp-feature="voice-comment-userlink-mock"]');
+    await expect(userlinkMock).toBeVisible();
+    await userlinkMock.scrollIntoViewIfNeeded();
+    await expect(block.locator('[data-lp-feature="voice-comment-userlink-yukkuri"]')).toBeVisible();
+    await expect(block).toContainText(/ゆっくり解説/);
+    await expect(block).toContainText(/ユーザーページ/);
+    await expect(userlinkMock).toContainText(/仮データ/);
+    const kontaAnchor = '#lp-voice-konta-userpage-mock';
+    await expect(userlinkMock.locator(`a[href="${kontaAnchor}"]`)).toHaveCount(8);
+    await expect(userlinkMock.locator('a[href*="nicovideo"]')).toHaveCount(0);
+    await expect(block.locator('[data-lp-feature="voice-comment-userlink-variants-mock"]')).toBeVisible();
+    await expect(block).toContainText(/表示のばらつき/);
+
+    const kontaUserpage = block.locator('#lp-voice-konta-userpage-mock');
+    await expect(kontaUserpage).toBeVisible();
+    await expect(kontaUserpage).toHaveAttribute('data-lp-feature', 'voice-comment-konta-userpage-mock');
+    await expect(block).toContainText(/匿名/);
+    await expect(kontaUserpage).toContainText(/こん太/);
+    await expect(kontaUserpage).toContainText(/このLP内/);
+    await expect(kontaUserpage).toContainText(/活動の記録/);
+    await expect(kontaUserpage).toContainText(/実績/);
+    await expect(kontaUserpage.locator('[data-lp-feature="voice-comment-konta-ach-mock"]')).toBeVisible();
+
+    await block.scrollIntoViewIfNeeded();
+    const noOverflow = await block.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
+    expect(noOverflow).toBe(true);
+  });
+
+  test('音声コメント: #lp-voice-konta-userpage-mock をハッシュで開ける', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${lpHref}#lp-voice-konta-userpage-mock`, { waitUntil: 'domcontentloaded' });
+    const target = page.locator('#lp-voice-konta-userpage-mock');
+    await expect(target).toBeVisible();
+    await expect(target).toHaveAttribute('data-lp-feature', 'voice-comment-konta-userpage-mock');
+    await expect(page.getByRole('heading', { name: /ゆっくりこん太/ })).toBeVisible();
+  });
+
   test('HTML保存: #html-save にサムネ付き来場見本があり、390幅ではみ出しなし', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${lpHref}#html-save`, { waitUntil: 'domcontentloaded' });

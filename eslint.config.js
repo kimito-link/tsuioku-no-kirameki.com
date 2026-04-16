@@ -7,7 +7,7 @@ const browserChrome = {
 };
 
 export default [
-  { ignores: ['extension/dist/**', 'node_modules/**'] },
+  { ignores: ['extension/dist/**', 'node_modules/**', '.claude/**'] },
   js.configs.recommended,
   {
     files: ['src/**/*.js'],
