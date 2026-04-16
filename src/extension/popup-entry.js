@@ -78,10 +78,7 @@ import { summarizeRecordedCommenters } from '../lib/liveCommenterStats.js';
 import { resolveConcurrentViewers } from '../lib/concurrentEstimate.js';
 import { watchMetaConcurrentGateFromSnapshot } from '../lib/popupWatchMetaConcurrentGate.js';
 import { retrySnapshotRequestUntilReady } from '../lib/popupWatchSnapshotRetry.js';
-import {
-  buildCommentTickerNameHref,
-  canLinkCommentTickerName
-} from '../lib/commentTickerNameLink.js';
+import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
 import {
   concurrentResolutionMethodTitlePart,
   SPARSE_CONCURRENT_ESTIMATE_NOTE
@@ -621,26 +618,23 @@ function renderCommentTicker(comments) {
   const tip = label
     ? `${noPrefix}${label}：${rawText || '（コメント本文なし）'}`
     : `${noPrefix}${rawText || '（コメント本文なし）'}`;
-  // 数値 ID を持つユーザー名は niconico のユーザーページにリンクする（匿名・ハッシュ系は通常の span のまま）
-  const canLinkName = canLinkCommentTickerName(latest.userId);
-  const nameHref = canLinkName ? buildCommentTickerNameHref(latest.userId) : '';
-  const nameSpanHtml = `<span class="nl-ticker-latest__name">${escapeHtml(label)}</span>`;
-  const nameHtml = nameHref
-    ? `<a class="nl-ticker-latest__name-link" href="${escapeAttr(nameHref)}" target="_blank" rel="noopener noreferrer" title="ニコニコのユーザーページを開く">${nameSpanHtml}</a>`
-    : nameSpanHtml;
   const labelHtml = label
-    ? `${nameHtml}<span class="nl-ticker-latest__colon">：</span>`
+    ? `<span class="nl-ticker-latest__name">${escapeHtml(label)}</span>` +
+      `<span class="nl-ticker-latest__colon">：</span>`
     : '';
-
-  segA.innerHTML =
-    `<span class="nl-ticker-item nl-ticker-latest" aria-live="polite">` +
+  // 数値 ID を持つユーザーの場合、行全体（アバター＋名前＋本文）を niconico ユーザーページへのリンクにする。
+  // 匿名（a:xxx）やハッシュ風 ID は buildCommentTickerNameHref が '' を返すので、リンクにはならない span のまま。
+  const userPageHref = buildCommentTickerNameHref(latest.userId);
+  const rowInnerHtml =
     `<span class="nl-ticker-latest__row">` +
     `<img class="nl-ticker-latest__avatar" alt="" src="${escapeHtml(avatarSrc)}">` +
     labelHtml +
     `<span class="nl-ticker-latest__text">${escapeHtml(textShown)}</span>` +
-    `</span>` +
     `</span>`;
-  const line = /** @type {HTMLSpanElement|null} */ (segA.querySelector('.nl-ticker-latest'));
+  segA.innerHTML = userPageHref
+    ? `<a class="nl-ticker-item nl-ticker-latest nl-ticker-latest--linkable" aria-live="polite" href="${escapeAttr(userPageHref)}" target="_blank" rel="noopener noreferrer">${rowInnerHtml}</a>`
+    : `<span class="nl-ticker-item nl-ticker-latest" aria-live="polite">${rowInnerHtml}</span>`;
+  const line = /** @type {HTMLElement|null} */ (segA.querySelector('.nl-ticker-latest'));
   if (line) line.title = tip;
   const avatar = /** @type {HTMLImageElement|null} */ (
     segA.querySelector('.nl-ticker-latest__avatar')

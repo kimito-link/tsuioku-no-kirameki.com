@@ -2521,25 +2521,28 @@
         white-space: nowrap;
       }
 
-      /* 数値 ID ユーザーの名前を niconico ユーザーページへのリンクに。
-         ティッカー内の視覚ノイズを避けるため、既定は下線なし・色は継承。 */
-      .nl-ticker-latest__name-link {
-        display: inline-flex;
-        min-width: 0;
-        max-width: 100%;
+      /* 数値 ID ユーザーの場合、ティッカーの行全体を niconico ユーザーページへの
+         リンクに。既定は下線なし・色は継承で、視覚ノイズを抑える。
+         hover/focus 時は名前に下線＋背景を薄く色付けして可視化。 */
+      .nl-ticker-latest--linkable {
         color: inherit;
         text-decoration: none;
-        border-radius: 3px;
+        border-radius: 6px;
+        transition: background-color 120ms ease;
       }
 
-      .nl-ticker-latest__name-link:hover .nl-ticker-latest__name,
-      .nl-ticker-latest__name-link:focus-visible .nl-ticker-latest__name {
+      .nl-ticker-latest--linkable:hover {
+        background-color: rgb(59 130 246 / 8%);
+      }
+
+      .nl-ticker-latest--linkable:hover .nl-ticker-latest__name,
+      .nl-ticker-latest--linkable:focus-visible .nl-ticker-latest__name {
         text-decoration: underline;
         text-decoration-thickness: 1px;
         text-underline-offset: 2px;
       }
 
-      .nl-ticker-latest__name-link:focus-visible {
+      .nl-ticker-latest--linkable:focus-visible {
         outline: 2px solid rgb(59 130 246 / 75%);
         outline-offset: 1px;
       }
