@@ -190,6 +190,127 @@ describe('userLaneProfileCompletenessTier', () => {
   });
 });
 
+/**
+ * 再発防止用の「契約（invariants）」テスト。
+ *
+ * このスイートの各ケースは「応援レーンの視認性／混入の既知バグ」を 1 本ずつ釘で留めるための
+ * 不変条件を書き出している。以下のいずれかが落ちたら、過去に fix 済みのバグが再発した可能性が高い:
+ *
+ *  I1: 匿名 (a:xxxx / ハッシュ風 ID) は強ニック・個人サムネ・avatarObserved
+ *      があっても tier 1 から上げない（「こん太への匿名混入」「りんくへの匿名昇格」防止）
+ *  I2: 非匿名 + avatarObserved=true は合成 canonical URL（ニコ生の大多数の個人サムネ）
+ *      であっても tier 3（「良質ユーザーがこん太に漏れる」「りんくが実質空」防止）
+ *  I3: 非匿名 + 明確な個人サムネ（非合成・外部 CDN）は observed が未確定でも tier 3
+ *  I4: 非匿名 + 強ニック + URL も avatarObserved も無いときは tier 2（こん太段が枯れない）
+ *  I5: userId 空／null／欠損は tier 0（候補から除外、UI に「空ユーザー」は出さない）
+ *
+ * いずれも過去に少なくとも 1 度は退行が確認されているため、ここでは「具体値」ではなく
+ * 複数サンプルで繰り返しチェックして、条件分岐の 1 本が壊れても気付ける形にする。
+ */
+describe('userLaneProfileCompletenessTier: 再発防止の契約テスト', () => {
+  const anonymousIds = [
+    'a:AbCdEfGhIjKlMnOp',
+    'a:xyz123',
+    'a:ZyWvUtSrQpOnMlKj',
+    'KqwErTyUiOpAsDfGh', // ハッシュ風 — isAnonymousStyleNicoUserId が true を返す
+    'unknown-12345-x' // ハッシュ風（10〜26 文字の英数_-）
+  ];
+  const numericIds = ['88210441', '25221924', '2201069'];
+
+  describe('I1: 匿名 ID は何があっても tier 1 から上げない', () => {
+    for (const uid of anonymousIds) {
+      it(`${uid} + 強ニック + 個人URL + observed でも tier 1`, () => {
+        expect(
+          userLaneProfileCompletenessTier(
+            {
+              userId: uid,
+              nickname: 'プロ配信者',
+              avatarUrl: 'https://cdn.example/personal.jpg',
+              avatarObserved: true
+            },
+            'https://cdn.example/personal.jpg'
+          )
+        ).toBe(1);
+      });
+    }
+  });
+
+  describe('I2: 非匿名 + avatarObserved=true は URL 形式に関係なく tier 3', () => {
+    for (const uid of numericIds) {
+      it(`${uid} observed=true + 合成 canonical URL でも tier 3`, () => {
+        // 合成 canonical URL: ニコ生の大多数の個人サムネが流れてくる形
+        const bucket = uid.slice(0, Math.max(1, uid.length - 4));
+        expect(
+          userLaneProfileCompletenessTier(
+            {
+              userId: uid,
+              nickname: 'レコ',
+              avatarUrl: '',
+              avatarObserved: true
+            },
+            `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${bucket}/${uid}.jpg`
+          )
+        ).toBe(3);
+      });
+    }
+  });
+
+  describe('I3: 非匿名 + 個人サムネ（非合成 URL）は observed 無しでも tier 3', () => {
+    for (const uid of numericIds) {
+      it(`${uid} + 外部 CDN 個人 URL（observed 無し）→ tier 3`, () => {
+        expect(
+          userLaneProfileCompletenessTier(
+            {
+              userId: uid,
+              nickname: '',
+              avatarUrl: 'https://cdn.example/face.png'
+            },
+            'https://cdn.example/face.png'
+          )
+        ).toBe(3);
+      });
+    }
+  });
+
+  describe('I4: 非匿名 + 強ニック + URL 無し + observed 無し → tier 2（こん太段が枯れない）', () => {
+    for (const uid of numericIds) {
+      it(`${uid} 強ニックだけ → tier 2`, () => {
+        expect(
+          userLaneProfileCompletenessTier(
+            { userId: uid, nickname: 'たろう', avatarUrl: '' },
+            ''
+          )
+        ).toBe(2);
+      });
+    }
+  });
+
+  describe('I5: userId 欠損は tier 0（候補から除外）', () => {
+    it('空文字 → 0', () => {
+      expect(
+        userLaneProfileCompletenessTier(
+          { userId: '', nickname: 'のら', avatarUrl: '' },
+          ''
+        )
+      ).toBe(0);
+    });
+    it('null → 0', () => {
+      expect(
+        userLaneProfileCompletenessTier(
+          { userId: null, nickname: 'のら', avatarUrl: '' },
+          ''
+        )
+      ).toBe(0);
+    });
+    it('entry 自体が null → 0', () => {
+      expect(userLaneProfileCompletenessTier(null, '')).toBe(0);
+    });
+    it('entry 自体が undefined → 0', () => {
+      expect(userLaneProfileCompletenessTier(undefined, '')).toBe(0);
+    });
+  });
+});
+
 describe('buildStoryUserLaneCandidateRow', () => {
   it('http が合成でも stored が個人なら display に個人 URL が使われる', () => {
     const uid = '21552210';
