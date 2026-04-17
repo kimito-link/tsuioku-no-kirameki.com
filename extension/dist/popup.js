@@ -1878,7 +1878,7 @@
     return storyUserLaneGuideLine(
       faceLink,
       escapeHtml(
-        "\u308A\u3093\u304F: \u30CB\u30B3\u751F\u306E\u30E6\u30FC\u30B6\u30FC\u8B58\u5225\u5B50\uFF08\u6570\u5024ID\u30FB\u533F\u540D\u306E a: \u5F62\u5F0F\uFF09\u304C\u4ED8\u3044\u305F\u5FDC\u63F4\u3060\u3051\u304C\u3053\u306E\u5217\u306B\u8F09\u308B\u3088\u3002\u4E26\u3073\u3067\u306F\u3001\u500B\u4EBA\u30B5\u30E0\u30CD\u304C\u53D6\u308C\u305F\u4EBA\u3092\u3044\u3061\u3070\u3093\u624B\u524D\u306B\u5BC4\u305B\u308B\u3088\u3002\u8868\u793A\u540D\u304C\u5F31\u3044\u5834\u5408\u3067\u3082\u3001\u30B5\u30E0\u30CD\u304C\u78BA\u5B9F\u306A\u3089 \u308A\u3093\u304F \u306B\u6B8B\u3059\u8A2D\u8A08\u3060\u3088\u3002"
+        "\u308A\u3093\u304F: \u6570\u5024\u30E6\u30FC\u30B6\u30FCID\uFF0B\u500B\u4EBA\u30B5\u30E0\u30CD\u304C\u63C3\u3063\u305F\u5FDC\u63F4\u3060\u3051\u3001\u3053\u306E\u5217\u306B\u8F09\u305B\u308B\u3088\u3002\u533F\u540D\uFF08a:\uFF09\u306F\u30AB\u30B9\u30BF\u30E0\u8868\u793A\u540D\u3084\u30B5\u30E0\u30CD\u304C\u898B\u3048\u3066\u3044\u3066\u3082\u4E0A\u306B\u306F\u51FA\u3055\u305A\u3001\u4E0B\u306E\u6BB5\u306B\u6D41\u3059\u8A2D\u8A08\u3060\u3088\u3002"
       )
     );
   }
@@ -1886,7 +1886,7 @@
     return storyUserLaneGuideLine(
       faceKonta,
       escapeHtml(
-        "\u3053\u3093\u592A: 2\u756A\u76EE\u306E\u512A\u5148\u3068\u3057\u3066\u3001\u8868\u793A\u540D\u304B\u500B\u4EBA\u30B5\u30E0\u30CD\u306E\u3069\u3061\u3089\u304B\u307E\u3067\u53D6\u308C\u305F\u4EBA\u306F\u3001\u305D\u306E\u6B21\u306E\u6BB5\u3068\u3057\u3066\u4E26\u3073\u3084\u3059\u3044\u3088\uFF08\u5168\u54E1\u3092\u96A0\u3059\u308F\u3051\u3058\u3083\u306A\u3044\u3088\uFF09\u3002"
+        "\u3053\u3093\u592A: \u6570\u5024\u30E6\u30FC\u30B6\u30FCID\u3067\u3001\u8868\u793A\u540D\u306F\u5F37\u3044\uFF08\u300C\u533F\u540D\u300D\u300C\u30B2\u30B9\u30C8\u300D\u306A\u3069\u306E\u81EA\u52D5\u540D\u3067\u306A\u3044\uFF09\u3051\u308C\u3069\u3001\u500B\u4EBA\u30B5\u30E0\u30CD\u304C\u307E\u3060\u78BA\u8A8D\u3067\u304D\u3066\u3044\u306A\u3044\u4EBA\u3092\u4E2D\u6BB5\u306B\u7F6E\u304F\u3088\u3002\u533F\u540D\uFF08a:\uFF09\u306F\u3053\u3053\u306B\u306F\u6DF7\u305C\u306A\u3044\u3088\u3002"
       )
     );
   }
@@ -1894,7 +1894,7 @@
     return storyUserLaneGuideLine(
       faceTanu,
       escapeHtml(
-        "\u305F\u306C\u59C9: ID\u304C\u53D6\u308C\u3066\u3044\u306A\u3044\u30B3\u30E1\u30F3\u30C8\u306F\u3001\u3053\u306E\u5217\u306B\u306F\u8F09\u305B\u306A\u3044\u3088\uFF08\u533A\u5225\u3067\u304D\u306A\u3044\u304B\u3089\uFF09\u3002\u3042\u3068\u53D6\u5F97\u304C\u8584\u3044\u4EBA\u306F\u4E26\u3073\u306E\u5F8C\u308D\u5BC4\u308A\u306B\u306A\u308A\u3084\u3059\u3044\u304B\u3089\u3001\u4E0B\u306E\u300C\u72B6\u6CC1\u306E\u8A73\u7D30\u300D\u3067\u6B20\u3051\u3092\u78BA\u8A8D\u3057\u3066\u306D\u3002"
+        "\u305F\u306C\u59C9: \u533F\u540D\uFF08a:\uFF09\u306E\u5FDC\u63F4\u3001\u8868\u793A\u540D\u3084\u30B5\u30E0\u30CD\u304C\u63C3\u308F\u306A\u3044\u5FDC\u63F4\u3001ID \u4E0D\u660E\u306F\u305C\u3093\u3076\u3053\u306E\u6BB5\u306B\u96C6\u3081\u308B\u3088\u3002\u4E0B\u306E\u300C\u72B6\u6CC1\u306E\u8A73\u7D30\u300D\u3067\u3069\u3053\u306E\u60C5\u5831\u304C\u6B20\u3051\u3066\u3044\u308B\u304B\u78BA\u8A8D\u3057\u3066\u306D\u3002"
       )
     );
   }
@@ -2418,6 +2418,7 @@ ${body}`;
   function userLaneProfileCompletenessTier(entry, httpAvatarCandidate) {
     const uid = String(entry?.userId || "").trim();
     if (!uid) return 0;
+    if (isAnonymousStyleNicoUserId(uid)) return 1;
     const ex = explainSupportGridDisplayTier({
       userId: uid,
       nickname: String(entry?.nickname || "").trim(),
@@ -2425,17 +2426,8 @@ ${body}`;
       storedAvatarUrl: String(entry?.avatarUrl || "").trim(),
       avatarObserved: Boolean(entry?.avatarObserved)
     });
-    let t = "tanu";
-    if (ex.hasPersonalThumb) {
-      const anon = isAnonymousStyleNicoUserId(uid);
-      t = anon && !ex.strongNick ? SUPPORT_GRID_TIER_KONTA : SUPPORT_GRID_TIER_LINK;
-    } else if (ex.strongNick && !isAnonymousStyleNicoUserId(uid)) {
-      t = SUPPORT_GRID_TIER_LINK;
-    } else if (ex.strongNick) {
-      t = SUPPORT_GRID_TIER_KONTA;
-    }
-    if (t === SUPPORT_GRID_TIER_LINK) return 3;
-    if (t === SUPPORT_GRID_TIER_KONTA) return 2;
+    if (ex.hasPersonalThumb) return 3;
+    if (ex.strongNick) return 2;
     return 1;
   }
   function buildStoryUserLaneCandidateRow(entry, entryIndex, httpFromGrowth, pickCtx) {
@@ -10589,7 +10581,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0417-1637" ? String("0417-1637") : "dev";
+      const buildId = "0417-1646" ? String("0417-1646") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

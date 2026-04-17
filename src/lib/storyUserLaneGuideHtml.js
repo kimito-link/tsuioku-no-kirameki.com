@@ -19,7 +19,7 @@ export function buildStoryUserLaneGuideTopHtml(faceLink) {
   return storyUserLaneGuideLine(
     faceLink,
     escapeHtml(
-      'りんく: ニコ生のユーザー識別子（数値ID・匿名の a: 形式）が付いた応援だけがこの列に載るよ。並びでは、個人サムネが取れた人をいちばん手前に寄せるよ。表示名が弱い場合でも、サムネが確実なら りんく に残す設計だよ。'
+      'りんく: 数値ユーザーID＋個人サムネが揃った応援だけ、この列に載せるよ。匿名（a:）はカスタム表示名やサムネが見えていても上には出さず、下の段に流す設計だよ。'
     )
   );
 }
@@ -29,7 +29,7 @@ export function buildStoryUserLaneGuideKontaHtml(faceKonta) {
   return storyUserLaneGuideLine(
     faceKonta,
     escapeHtml(
-      'こん太: 2番目の優先として、表示名か個人サムネのどちらかまで取れた人は、その次の段として並びやすいよ（全員を隠すわけじゃないよ）。'
+      'こん太: 数値ユーザーIDで、表示名は強い（「匿名」「ゲスト」などの自動名でない）けれど、個人サムネがまだ確認できていない人を中段に置くよ。匿名（a:）はここには混ぜないよ。'
     )
   );
 }
@@ -39,7 +39,7 @@ export function buildStoryUserLaneGuideTanuHtml(faceTanu) {
   return storyUserLaneGuideLine(
     faceTanu,
     escapeHtml(
-      'たぬ姉: IDが取れていないコメントは、この列には載せないよ（区別できないから）。あと取得が薄い人は並びの後ろ寄りになりやすいから、下の「状況の詳細」で欠けを確認してね。'
+      'たぬ姉: 匿名（a:）の応援、表示名やサムネが揃わない応援、ID 不明はぜんぶこの段に集めるよ。下の「状況の詳細」でどこの情報が欠けているか確認してね。'
     )
   );
 }
