@@ -7,7 +7,8 @@ import { escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { MKT_ADVISOR_AVATAR_DATA_URI } from './marketingHtmlAdvisorAvatars.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
-import { buildMarketingUserLabelLinkedHtml } from './userProfileLinkHtml.js';
+import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
+import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -600,16 +601,17 @@ function sectionTopUsers(r, maskShare = false) {
         maskShare || !u.avatarUrl
           ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>'
           : `<img src="${escapeHtml(u.avatarUrl)}" class="mkt-rank-av" alt="" loading="lazy">`;
-      const rawName = u.nickname || u.userId || '—';
-      // 共有向けはマスク優先（リンクにしても名前が伏せ字になっていれば識別不能）。
-      // 手元用は数値 ID のときだけ niconico ユーザーページへのリンクで包む
-      // （a:xxxx 等の匿名はリンクにならない = buildMarketingUserLabelLinkedHtml 内で判定）。
+      // ランキング内で複数の匿名 (a:xxxx) ユーザーがすべて「匿名」と表示されて
+      // 識別不能になる問題を避けるため、共通の displayUserLabel を通して
+      // 「nickname（shortId）」形にする。数値 ID のときは niconico プロフィール
+      // へのリンクで包む。maskShare 時はリンクにせず、マスクだけ適用する。
+      const uidForLabel = u.userId || UNKNOWN_USER_KEY;
+      const rawLabel = u.userId
+        ? displayUserLabel(u.userId, u.nickname || '')
+        : u.nickname || '—';
       const nameCellHtml = maskShare
-        ? escapeHtml(maskLabelForShare(rawName))
-        : buildMarketingUserLabelLinkedHtml({
-            userId: u.userId || '',
-            nickname: u.nickname || ''
-          });
+        ? escapeHtml(maskLabelForShare(rawLabel))
+        : buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
       return `<tr>
 <td class="mkt-rank-n">${i + 1}</td>
 <td>${avImg}</td>
