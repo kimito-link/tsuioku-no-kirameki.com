@@ -82,6 +82,19 @@ import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
 import { createBooleanSettingController } from '../lib/popupBooleanSettingController.js';
 import { createBooleanSettingsRegistry } from '../lib/popupBooleanSettingsRegistry.js';
 import {
+  DEFAULT_CUSTOM_FRAME,
+  DEFAULT_FRAME_ID,
+  frameLabel,
+  hasFramePreset,
+  normalizeFrameId,
+  resolveFrameVars,
+  sanitizeCustomFrame
+} from '../lib/popupFramePresets.js';
+import {
+  createFrameShareCode,
+  parseFrameShareCode
+} from '../lib/popupFrameCodec.js';
+import {
   concurrentResolutionMethodTitlePart,
   SPARSE_CONCURRENT_ESTIMATE_NOTE
 } from '../lib/watchConcurrentEstimateUiCopy.js';
@@ -1190,179 +1203,11 @@ const INTERCEPT_BACKFILL_STATE = {
   deepTried: false
 };
 
-const DEFAULT_FRAME_ID = 'light';
-
-const LEGACY_FRAME_ALIAS = {
-  trio: 'light',
-  link: 'light',
-  konta: 'sunset',
-  tanunee: 'midnight'
-};
-
-const FRAME_PRESETS = {
-  light: {
-    label: 'ライト',
-    vars: {
-      '--nl-bg': '#fffaf2',
-      '--nl-bg-soft': '#eef8ff',
-      '--nl-surface': '#ffffff',
-      '--nl-text': '#1f2937',
-      '--nl-muted': '#5b6475',
-      '--nl-border': '#d5e3f5',
-      '--nl-accent': '#0f8fd8',
-      '--nl-accent-hover': '#0b73ad',
-      '--nl-header-start': '#0f8fd8',
-      '--nl-header-end': '#14b8a6',
-      '--nl-frame-outline': 'rgb(255 255 255 / 22%)'
-    }
-  },
-  dark: {
-    label: 'ダーク',
-    vars: {
-      '--nl-bg': '#0b1220',
-      '--nl-bg-soft': '#111827',
-      '--nl-surface': '#0f172a',
-      '--nl-text': '#e5e7eb',
-      '--nl-muted': '#94a3b8',
-      '--nl-border': '#243244',
-      '--nl-accent': '#60a5fa',
-      '--nl-accent-hover': '#3b82f6',
-      '--nl-header-start': '#1e293b',
-      '--nl-header-end': '#334155',
-      '--nl-frame-outline': 'rgb(255 255 255 / 18%)'
-    }
-  },
-  midnight: {
-    label: 'ミッドナイト',
-    vars: {
-      '--nl-bg': '#0b1022',
-      '--nl-bg-soft': '#1b1f3a',
-      '--nl-surface': '#10182f',
-      '--nl-text': '#e2e8f0',
-      '--nl-muted': '#9fb1ca',
-      '--nl-border': '#2a3761',
-      '--nl-accent': '#7dd3fc',
-      '--nl-accent-hover': '#38bdf8',
-      '--nl-header-start': '#1e1b4b',
-      '--nl-header-end': '#1d4ed8',
-      '--nl-frame-outline': 'rgb(255 255 255 / 22%)'
-    }
-  },
-  sunset: {
-    label: 'サンセット',
-    vars: {
-      '--nl-bg': '#fff7ed',
-      '--nl-bg-soft': '#ffedd5',
-      '--nl-surface': '#fffbf6',
-      '--nl-text': '#1f2937',
-      '--nl-muted': '#6b7280',
-      '--nl-border': '#f5d0b5',
-      '--nl-accent': '#ea580c',
-      '--nl-accent-hover': '#c2410c',
-      '--nl-header-start': '#fb923c',
-      '--nl-header-end': '#f43f5e',
-      '--nl-frame-outline': 'rgb(255 255 255 / 30%)'
-    }
-  }
-};
-
-const DEFAULT_CUSTOM_FRAME = Object.freeze({
-  headerStart: '#0f8fd8',
-  headerEnd: '#14b8a6',
-  accent: '#0f8fd8'
-});
-
-/** @param {string} id */
-function hasFramePreset(id) {
-  return Object.prototype.hasOwnProperty.call(FRAME_PRESETS, id);
-}
-
-/** @param {unknown} raw */
-function normalizeFrameId(raw) {
-  const id = String(raw || '').trim().toLowerCase();
-  if (!id) return '';
-  return (
-    LEGACY_FRAME_ALIAS[/** @type {keyof typeof LEGACY_FRAME_ALIAS} */ (id)] || id
-  );
-}
-
-/** @param {string} id */
-function getFramePreset(id) {
-  return hasFramePreset(id)
-    ? FRAME_PRESETS[/** @type {keyof typeof FRAME_PRESETS} */ (id)]
-    : null;
-}
-
 /** @type {{ id: string, custom: { headerStart: string, headerEnd: string, accent: string } }} */
 const popupFrameState = {
   id: DEFAULT_FRAME_ID,
   custom: { ...DEFAULT_CUSTOM_FRAME }
 };
-
-/** @param {unknown} value @param {string} fallback */
-function normalizeHexColor(value, fallback) {
-  const s = String(value || '').trim();
-  return /^#[0-9a-f]{6}$/i.test(s) ? s.toLowerCase() : fallback;
-}
-
-/** @param {string} hex @param {number} ratio */
-function darkenHexColor(hex, ratio) {
-  const source = normalizeHexColor(hex, '#0f8fd8').slice(1);
-  const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
-  const r = clamp(parseInt(source.slice(0, 2), 16) * (1 - ratio));
-  const g = clamp(parseInt(source.slice(2, 4), 16) * (1 - ratio));
-  const b = clamp(parseInt(source.slice(4, 6), 16) * (1 - ratio));
-  return `#${r.toString(16).padStart(2, '0')}${g
-    .toString(16)
-    .padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
-
-/** @param {unknown} raw */
-function sanitizeCustomFrame(raw) {
-  const source = raw && typeof raw === 'object' ? raw : {};
-  return {
-    headerStart: normalizeHexColor(
-      /** @type {{ headerStart?: unknown }} */ (source).headerStart,
-      DEFAULT_CUSTOM_FRAME.headerStart
-    ),
-    headerEnd: normalizeHexColor(
-      /** @type {{ headerEnd?: unknown }} */ (source).headerEnd,
-      DEFAULT_CUSTOM_FRAME.headerEnd
-    ),
-    accent: normalizeHexColor(
-      /** @type {{ accent?: unknown }} */ (source).accent,
-      DEFAULT_CUSTOM_FRAME.accent
-    )
-  };
-}
-
-/** @param {string} frameId @param {{ headerStart: string, headerEnd: string, accent: string }} custom */
-function resolveFrameVars(frameId, custom) {
-  if (frameId !== 'custom') {
-    return getFramePreset(frameId)?.vars || FRAME_PRESETS[DEFAULT_FRAME_ID].vars;
-  }
-  const safe = sanitizeCustomFrame(custom);
-  return {
-    '--nl-bg': '#f7fbff',
-    '--nl-bg-soft': '#e8f4ff',
-    '--nl-surface': '#ffffff',
-    '--nl-text': '#1f2937',
-    '--nl-muted': '#5b6475',
-    '--nl-border': '#cfe0f4',
-    '--nl-accent': safe.accent,
-    '--nl-accent-hover': darkenHexColor(safe.accent, 0.2),
-    '--nl-header-start': safe.headerStart,
-    '--nl-header-end': safe.headerEnd,
-    '--nl-frame-outline': 'rgb(255 255 255 / 28%)'
-  };
-}
-
-/** @param {string} frameId */
-function frameLabel(frameId) {
-  return frameId === 'custom'
-    ? 'カスタム'
-    : getFramePreset(frameId)?.label || FRAME_PRESETS[DEFAULT_FRAME_ID].label;
-}
 
 /** @param {string} frameId */
 function renderFrameSelection(frameId) {
@@ -1433,71 +1278,6 @@ async function savePopupFrameSettings() {
     [KEY_POPUP_FRAME]: popupFrameState.id,
     [KEY_POPUP_FRAME_CUSTOM]: popupFrameState.custom
   });
-}
-
-/** @param {string} text */
-function encodeBase64UrlUtf8(text) {
-  const bytes = new TextEncoder().encode(text);
-  let binary = '';
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-/** @param {string} text */
-function decodeBase64UrlUtf8(text) {
-  let base64 = text.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = base64.length % 4;
-  if (pad) base64 += '='.repeat(4 - pad);
-  const binary = atob(base64);
-  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
-}
-
-/**
- * @param {string} frameId
- * @param {{ headerStart: string, headerEnd: string, accent: string }} custom
- */
-function createFrameShareCode(frameId, custom) {
-  const normalized = normalizeFrameId(frameId);
-  const safeId =
-    normalized === 'custom' || hasFramePreset(normalized)
-      ? normalized
-      : DEFAULT_FRAME_ID;
-  const payload = {
-    v: 1,
-    frame: safeId,
-    custom: sanitizeCustomFrame(custom)
-  };
-  const encoded = encodeBase64UrlUtf8(JSON.stringify(payload));
-  return `nlsframe.${encoded}`;
-}
-
-/** @param {string} raw */
-function parseFrameShareCode(raw) {
-  const code = String(raw || '').trim();
-  if (!code) {
-    throw new Error('共有コードが空です。');
-  }
-
-  const payloadText = code.startsWith('nlsframe.')
-    ? decodeBase64UrlUtf8(code.slice('nlsframe.'.length))
-    : code;
-  const payload = JSON.parse(payloadText);
-  const source = payload && typeof payload === 'object' ? payload : {};
-  const frameValue = normalizeFrameId(
-    /** @type {{ frame?: unknown }} */ (source).frame || ''
-  );
-  const frameId =
-    frameValue === 'custom' || hasFramePreset(frameValue)
-      ? frameValue
-      : DEFAULT_FRAME_ID;
-
-  return {
-    frameId,
-    custom: sanitizeCustomFrame(
-      /** @type {{ custom?: unknown }} */ (source).custom || {}
-    )
-  };
 }
 
 /** @param {string} message @param {'idle'|'error'|'success'} kind */

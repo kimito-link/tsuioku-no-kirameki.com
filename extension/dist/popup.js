@@ -1035,6 +1035,208 @@
     };
   }
 
+  // src/lib/popupFramePresets.js
+  var DEFAULT_FRAME_ID = "light";
+  var LEGACY_FRAME_ALIAS = Object.freeze({
+    trio: "light",
+    link: "light",
+    konta: "sunset",
+    tanunee: "midnight"
+  });
+  var FRAME_PRESETS = Object.freeze({
+    light: Object.freeze({
+      label: "\u30E9\u30A4\u30C8",
+      vars: Object.freeze({
+        "--nl-bg": "#fffaf2",
+        "--nl-bg-soft": "#eef8ff",
+        "--nl-surface": "#ffffff",
+        "--nl-text": "#1f2937",
+        "--nl-muted": "#5b6475",
+        "--nl-border": "#d5e3f5",
+        "--nl-accent": "#0f8fd8",
+        "--nl-accent-hover": "#0b73ad",
+        "--nl-header-start": "#0f8fd8",
+        "--nl-header-end": "#14b8a6",
+        "--nl-frame-outline": "rgb(255 255 255 / 22%)"
+      })
+    }),
+    dark: Object.freeze({
+      label: "\u30C0\u30FC\u30AF",
+      vars: Object.freeze({
+        "--nl-bg": "#0b1220",
+        "--nl-bg-soft": "#111827",
+        "--nl-surface": "#0f172a",
+        "--nl-text": "#e5e7eb",
+        "--nl-muted": "#94a3b8",
+        "--nl-border": "#243244",
+        "--nl-accent": "#60a5fa",
+        "--nl-accent-hover": "#3b82f6",
+        "--nl-header-start": "#1e293b",
+        "--nl-header-end": "#334155",
+        "--nl-frame-outline": "rgb(255 255 255 / 18%)"
+      })
+    }),
+    midnight: Object.freeze({
+      label: "\u30DF\u30C3\u30C9\u30CA\u30A4\u30C8",
+      vars: Object.freeze({
+        "--nl-bg": "#0b1022",
+        "--nl-bg-soft": "#1b1f3a",
+        "--nl-surface": "#10182f",
+        "--nl-text": "#e2e8f0",
+        "--nl-muted": "#9fb1ca",
+        "--nl-border": "#2a3761",
+        "--nl-accent": "#7dd3fc",
+        "--nl-accent-hover": "#38bdf8",
+        "--nl-header-start": "#1e1b4b",
+        "--nl-header-end": "#1d4ed8",
+        "--nl-frame-outline": "rgb(255 255 255 / 22%)"
+      })
+    }),
+    sunset: Object.freeze({
+      label: "\u30B5\u30F3\u30BB\u30C3\u30C8",
+      vars: Object.freeze({
+        "--nl-bg": "#fff7ed",
+        "--nl-bg-soft": "#ffedd5",
+        "--nl-surface": "#fffbf6",
+        "--nl-text": "#1f2937",
+        "--nl-muted": "#6b7280",
+        "--nl-border": "#f5d0b5",
+        "--nl-accent": "#ea580c",
+        "--nl-accent-hover": "#c2410c",
+        "--nl-header-start": "#fb923c",
+        "--nl-header-end": "#f43f5e",
+        "--nl-frame-outline": "rgb(255 255 255 / 30%)"
+      })
+    })
+  });
+  var DEFAULT_CUSTOM_FRAME = Object.freeze({
+    headerStart: "#0f8fd8",
+    headerEnd: "#14b8a6",
+    accent: "#0f8fd8"
+  });
+  function hasFramePreset(id) {
+    return Object.prototype.hasOwnProperty.call(FRAME_PRESETS, id);
+  }
+  function normalizeFrameId(raw) {
+    const id = String(raw || "").trim().toLowerCase();
+    if (!id) return "";
+    return LEGACY_FRAME_ALIAS[
+      /** @type {keyof typeof LEGACY_FRAME_ALIAS} */
+      id
+    ] || id;
+  }
+  function getFramePreset(id) {
+    return hasFramePreset(id) ? FRAME_PRESETS[
+      /** @type {keyof typeof FRAME_PRESETS} */
+      id
+    ] : null;
+  }
+  function frameLabel(frameId) {
+    return frameId === "custom" ? "\u30AB\u30B9\u30BF\u30E0" : getFramePreset(frameId)?.label || FRAME_PRESETS[DEFAULT_FRAME_ID].label;
+  }
+  function normalizeHexColor(value, fallback) {
+    const s = String(value || "").trim();
+    return /^#[0-9a-f]{6}$/i.test(s) ? s.toLowerCase() : fallback;
+  }
+  function darkenHexColor(hex, ratio) {
+    const source = normalizeHexColor(hex, "#0f8fd8").slice(1);
+    const clamp2 = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    const r = clamp2(parseInt(source.slice(0, 2), 16) * (1 - ratio));
+    const g = clamp2(parseInt(source.slice(2, 4), 16) * (1 - ratio));
+    const b = clamp2(parseInt(source.slice(4, 6), 16) * (1 - ratio));
+    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+  }
+  function sanitizeCustomFrame(raw) {
+    const source = raw && typeof raw === "object" ? raw : {};
+    return {
+      headerStart: normalizeHexColor(
+        /** @type {{ headerStart?: unknown }} */
+        source.headerStart,
+        DEFAULT_CUSTOM_FRAME.headerStart
+      ),
+      headerEnd: normalizeHexColor(
+        /** @type {{ headerEnd?: unknown }} */
+        source.headerEnd,
+        DEFAULT_CUSTOM_FRAME.headerEnd
+      ),
+      accent: normalizeHexColor(
+        /** @type {{ accent?: unknown }} */
+        source.accent,
+        DEFAULT_CUSTOM_FRAME.accent
+      )
+    };
+  }
+  function resolveFrameVars(frameId, custom) {
+    if (frameId !== "custom") {
+      return (
+        /** @type {Record<string, string>} */
+        getFramePreset(frameId)?.vars || FRAME_PRESETS[DEFAULT_FRAME_ID].vars
+      );
+    }
+    const safe = sanitizeCustomFrame(custom);
+    return {
+      "--nl-bg": "#f7fbff",
+      "--nl-bg-soft": "#e8f4ff",
+      "--nl-surface": "#ffffff",
+      "--nl-text": "#1f2937",
+      "--nl-muted": "#5b6475",
+      "--nl-border": "#cfe0f4",
+      "--nl-accent": safe.accent,
+      "--nl-accent-hover": darkenHexColor(safe.accent, 0.2),
+      "--nl-header-start": safe.headerStart,
+      "--nl-header-end": safe.headerEnd,
+      "--nl-frame-outline": "rgb(255 255 255 / 28%)"
+    };
+  }
+
+  // src/lib/popupFrameCodec.js
+  function encodeBase64UrlUtf8(text) {
+    const bytes = new TextEncoder().encode(text);
+    let binary = "";
+    for (const b of bytes) binary += String.fromCharCode(b);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+  function decodeBase64UrlUtf8(text) {
+    let base64 = String(text || "").replace(/-/g, "+").replace(/_/g, "/");
+    const pad = base64.length % 4;
+    if (pad) base64 += "=".repeat(4 - pad);
+    const binary = atob(base64);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
+  function createFrameShareCode(frameId, custom) {
+    const normalized = normalizeFrameId(frameId);
+    const safeId = normalized === "custom" || hasFramePreset(normalized) ? normalized : DEFAULT_FRAME_ID;
+    const payload = {
+      v: 1,
+      frame: safeId,
+      custom: sanitizeCustomFrame(custom)
+    };
+    const encoded = encodeBase64UrlUtf8(JSON.stringify(payload));
+    return `nlsframe.${encoded}`;
+  }
+  function parseFrameShareCode(raw) {
+    const code = String(raw || "").trim();
+    if (!code) {
+      throw new Error("\u5171\u6709\u30B3\u30FC\u30C9\u304C\u7A7A\u3067\u3059\u3002");
+    }
+    const payloadText = code.startsWith("nlsframe.") ? decodeBase64UrlUtf8(code.slice("nlsframe.".length)) : code;
+    const payload = JSON.parse(payloadText);
+    const source = payload && typeof payload === "object" ? payload : {};
+    const frameValue = normalizeFrameId(
+      /** @type {{ frame?: unknown }} */
+      source.frame || ""
+    );
+    const frameId = frameValue === "custom" || hasFramePreset(frameValue) ? frameValue : DEFAULT_FRAME_ID;
+    return {
+      frameId,
+      custom: sanitizeCustomFrame(
+        /** @type {{ custom?: unknown }} */
+        source.custom || {}
+      )
+    };
+  }
+
   // src/lib/watchConcurrentEstimateUiCopy.js
   var SPARSE_CONCURRENT_ESTIMATE_NOTE = "\u6765\u5834\u8005\u30FB\u7D71\u8A08\u304C\u672A\u53D6\u5F97\u306E\u305F\u3081\u63A8\u5B9A\u306F\u53C2\u8003\u5024";
   function concurrentResolutionMethodTitlePart(method) {
@@ -5088,159 +5290,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     liveId: "",
     deepTried: false
   };
-  var DEFAULT_FRAME_ID = "light";
-  var LEGACY_FRAME_ALIAS = {
-    trio: "light",
-    link: "light",
-    konta: "sunset",
-    tanunee: "midnight"
-  };
-  var FRAME_PRESETS = {
-    light: {
-      label: "\u30E9\u30A4\u30C8",
-      vars: {
-        "--nl-bg": "#fffaf2",
-        "--nl-bg-soft": "#eef8ff",
-        "--nl-surface": "#ffffff",
-        "--nl-text": "#1f2937",
-        "--nl-muted": "#5b6475",
-        "--nl-border": "#d5e3f5",
-        "--nl-accent": "#0f8fd8",
-        "--nl-accent-hover": "#0b73ad",
-        "--nl-header-start": "#0f8fd8",
-        "--nl-header-end": "#14b8a6",
-        "--nl-frame-outline": "rgb(255 255 255 / 22%)"
-      }
-    },
-    dark: {
-      label: "\u30C0\u30FC\u30AF",
-      vars: {
-        "--nl-bg": "#0b1220",
-        "--nl-bg-soft": "#111827",
-        "--nl-surface": "#0f172a",
-        "--nl-text": "#e5e7eb",
-        "--nl-muted": "#94a3b8",
-        "--nl-border": "#243244",
-        "--nl-accent": "#60a5fa",
-        "--nl-accent-hover": "#3b82f6",
-        "--nl-header-start": "#1e293b",
-        "--nl-header-end": "#334155",
-        "--nl-frame-outline": "rgb(255 255 255 / 18%)"
-      }
-    },
-    midnight: {
-      label: "\u30DF\u30C3\u30C9\u30CA\u30A4\u30C8",
-      vars: {
-        "--nl-bg": "#0b1022",
-        "--nl-bg-soft": "#1b1f3a",
-        "--nl-surface": "#10182f",
-        "--nl-text": "#e2e8f0",
-        "--nl-muted": "#9fb1ca",
-        "--nl-border": "#2a3761",
-        "--nl-accent": "#7dd3fc",
-        "--nl-accent-hover": "#38bdf8",
-        "--nl-header-start": "#1e1b4b",
-        "--nl-header-end": "#1d4ed8",
-        "--nl-frame-outline": "rgb(255 255 255 / 22%)"
-      }
-    },
-    sunset: {
-      label: "\u30B5\u30F3\u30BB\u30C3\u30C8",
-      vars: {
-        "--nl-bg": "#fff7ed",
-        "--nl-bg-soft": "#ffedd5",
-        "--nl-surface": "#fffbf6",
-        "--nl-text": "#1f2937",
-        "--nl-muted": "#6b7280",
-        "--nl-border": "#f5d0b5",
-        "--nl-accent": "#ea580c",
-        "--nl-accent-hover": "#c2410c",
-        "--nl-header-start": "#fb923c",
-        "--nl-header-end": "#f43f5e",
-        "--nl-frame-outline": "rgb(255 255 255 / 30%)"
-      }
-    }
-  };
-  var DEFAULT_CUSTOM_FRAME = Object.freeze({
-    headerStart: "#0f8fd8",
-    headerEnd: "#14b8a6",
-    accent: "#0f8fd8"
-  });
-  function hasFramePreset(id) {
-    return Object.prototype.hasOwnProperty.call(FRAME_PRESETS, id);
-  }
-  function normalizeFrameId(raw) {
-    const id = String(raw || "").trim().toLowerCase();
-    if (!id) return "";
-    return LEGACY_FRAME_ALIAS[
-      /** @type {keyof typeof LEGACY_FRAME_ALIAS} */
-      id
-    ] || id;
-  }
-  function getFramePreset(id) {
-    return hasFramePreset(id) ? FRAME_PRESETS[
-      /** @type {keyof typeof FRAME_PRESETS} */
-      id
-    ] : null;
-  }
   var popupFrameState = {
     id: DEFAULT_FRAME_ID,
     custom: { ...DEFAULT_CUSTOM_FRAME }
   };
-  function normalizeHexColor(value, fallback) {
-    const s = String(value || "").trim();
-    return /^#[0-9a-f]{6}$/i.test(s) ? s.toLowerCase() : fallback;
-  }
-  function darkenHexColor(hex, ratio) {
-    const source = normalizeHexColor(hex, "#0f8fd8").slice(1);
-    const clamp2 = (v) => Math.max(0, Math.min(255, Math.round(v)));
-    const r = clamp2(parseInt(source.slice(0, 2), 16) * (1 - ratio));
-    const g = clamp2(parseInt(source.slice(2, 4), 16) * (1 - ratio));
-    const b = clamp2(parseInt(source.slice(4, 6), 16) * (1 - ratio));
-    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
-  }
-  function sanitizeCustomFrame(raw) {
-    const source = raw && typeof raw === "object" ? raw : {};
-    return {
-      headerStart: normalizeHexColor(
-        /** @type {{ headerStart?: unknown }} */
-        source.headerStart,
-        DEFAULT_CUSTOM_FRAME.headerStart
-      ),
-      headerEnd: normalizeHexColor(
-        /** @type {{ headerEnd?: unknown }} */
-        source.headerEnd,
-        DEFAULT_CUSTOM_FRAME.headerEnd
-      ),
-      accent: normalizeHexColor(
-        /** @type {{ accent?: unknown }} */
-        source.accent,
-        DEFAULT_CUSTOM_FRAME.accent
-      )
-    };
-  }
-  function resolveFrameVars(frameId, custom) {
-    if (frameId !== "custom") {
-      return getFramePreset(frameId)?.vars || FRAME_PRESETS[DEFAULT_FRAME_ID].vars;
-    }
-    const safe = sanitizeCustomFrame(custom);
-    return {
-      "--nl-bg": "#f7fbff",
-      "--nl-bg-soft": "#e8f4ff",
-      "--nl-surface": "#ffffff",
-      "--nl-text": "#1f2937",
-      "--nl-muted": "#5b6475",
-      "--nl-border": "#cfe0f4",
-      "--nl-accent": safe.accent,
-      "--nl-accent-hover": darkenHexColor(safe.accent, 0.2),
-      "--nl-header-start": safe.headerStart,
-      "--nl-header-end": safe.headerEnd,
-      "--nl-frame-outline": "rgb(255 255 255 / 28%)"
-    };
-  }
-  function frameLabel(frameId) {
-    return frameId === "custom" ? "\u30AB\u30B9\u30BF\u30E0" : getFramePreset(frameId)?.label || FRAME_PRESETS[DEFAULT_FRAME_ID].label;
-  }
   function renderFrameSelection(frameId) {
     const labelEl = $("frameCurrentLabel");
     if (labelEl) labelEl.textContent = frameLabel(frameId);
@@ -5307,52 +5360,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       [KEY_POPUP_FRAME]: popupFrameState.id,
       [KEY_POPUP_FRAME_CUSTOM]: popupFrameState.custom
     });
-  }
-  function encodeBase64UrlUtf8(text) {
-    const bytes = new TextEncoder().encode(text);
-    let binary = "";
-    for (const b of bytes) binary += String.fromCharCode(b);
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  }
-  function decodeBase64UrlUtf8(text) {
-    let base64 = text.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = base64.length % 4;
-    if (pad) base64 += "=".repeat(4 - pad);
-    const binary = atob(base64);
-    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-    return new TextDecoder().decode(bytes);
-  }
-  function createFrameShareCode(frameId, custom) {
-    const normalized = normalizeFrameId(frameId);
-    const safeId = normalized === "custom" || hasFramePreset(normalized) ? normalized : DEFAULT_FRAME_ID;
-    const payload = {
-      v: 1,
-      frame: safeId,
-      custom: sanitizeCustomFrame(custom)
-    };
-    const encoded = encodeBase64UrlUtf8(JSON.stringify(payload));
-    return `nlsframe.${encoded}`;
-  }
-  function parseFrameShareCode(raw) {
-    const code = String(raw || "").trim();
-    if (!code) {
-      throw new Error("\u5171\u6709\u30B3\u30FC\u30C9\u304C\u7A7A\u3067\u3059\u3002");
-    }
-    const payloadText = code.startsWith("nlsframe.") ? decodeBase64UrlUtf8(code.slice("nlsframe.".length)) : code;
-    const payload = JSON.parse(payloadText);
-    const source = payload && typeof payload === "object" ? payload : {};
-    const frameValue = normalizeFrameId(
-      /** @type {{ frame?: unknown }} */
-      source.frame || ""
-    );
-    const frameId = frameValue === "custom" || hasFramePreset(frameValue) ? frameValue : DEFAULT_FRAME_ID;
-    return {
-      frameId,
-      custom: sanitizeCustomFrame(
-        /** @type {{ custom?: unknown }} */
-        source.custom || {}
-      )
-    };
   }
   function setFrameShareStatus(message, kind = "idle") {
     const status = $("frameShareStatus");
@@ -10513,7 +10520,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0417-0939" ? String("0417-0939") : "dev";
+      const buildId = "0417-0949" ? String("0417-0949") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
