@@ -4382,11 +4382,25 @@ function renderUserRooms(entries, liveId = '') {
     return;
   }
 
+  // aggregateCommentsByUser は「そのユーザーが個別コメントに貼っていた avatarUrl」しか
+  // 拾わないため、過去コメントで一度学習しただけ（直近 list には持ち込まれていない）の
+  // 個人サムネが落ちる。りんく列（story user lane）と同じく popupUserCommentProfileMap
+  // から後追いで補完しておくと、ランクストリップ／上位カード両方で個人サムネが復活し、
+  // 下のソートで使う userLaneResolvedThumbScore のスコアも正しく上がる。
   const rankedRooms = rooms
-    .map((room) => ({
-      ...room,
-      recentCount: recentMap.get(room.userKey) || 0
-    }))
+    .map((room) => {
+      const ownAvatar = String(room.avatarUrl || '').trim();
+      const enrichedAvatar =
+        ownAvatar ||
+        (room.userKey && room.userKey !== UNKNOWN_USER_KEY
+          ? rememberedAvatarUrlForUserId(room.userKey)
+          : '');
+      return {
+        ...room,
+        avatarUrl: enrichedAvatar,
+        recentCount: recentMap.get(room.userKey) || 0
+      };
+    })
     .sort((a, b) => {
       if (b.count !== a.count) return b.count - a.count;
       const uidA = a.userKey === UNKNOWN_USER_KEY ? '' : a.userKey;

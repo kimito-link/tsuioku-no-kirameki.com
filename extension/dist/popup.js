@@ -7974,10 +7974,15 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       ul.appendChild(li);
       return;
     }
-    const rankedRooms = rooms.map((room) => ({
-      ...room,
-      recentCount: recentMap.get(room.userKey) || 0
-    })).sort((a, b) => {
+    const rankedRooms = rooms.map((room) => {
+      const ownAvatar = String(room.avatarUrl || "").trim();
+      const enrichedAvatar = ownAvatar || (room.userKey && room.userKey !== UNKNOWN_USER_KEY ? rememberedAvatarUrlForUserId(room.userKey) : "");
+      return {
+        ...room,
+        avatarUrl: enrichedAvatar,
+        recentCount: recentMap.get(room.userKey) || 0
+      };
+    }).sort((a, b) => {
       if (b.count !== a.count) return b.count - a.count;
       const uidA = a.userKey === UNKNOWN_USER_KEY ? "" : a.userKey;
       const uidB = b.userKey === UNKNOWN_USER_KEY ? "" : b.userKey;
@@ -10584,7 +10589,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0417-1618" ? String("0417-1618") : "dev";
+      const buildId = "0417-1637" ? String("0417-1637") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
