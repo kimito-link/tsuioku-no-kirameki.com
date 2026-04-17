@@ -65,6 +65,57 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('Alice');
   });
 
+  it('トップコメンターの数値 ID は niconico ユーザーページへのリンクで包まれる（手元用）', () => {
+    // minimal() の user u1..u10 は数値でないため、リンク化されない。
+    // 数値 ID を持つレポートを作って挙動を確認する。
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      {
+        id: 'x1',
+        liveId: 'lv123',
+        commentNo: '1',
+        text: 'hello',
+        userId: '88210441',
+        nickname: 'のら',
+        avatarUrl: '',
+        capturedAt: Date.now(),
+        vpos: 0,
+        is184: false,
+        selfPosted: false
+      }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'));
+    expect(html).toContain('href="https://www.nicovideo.jp/user/88210441"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('>のら</a>');
+  });
+
+  it('maskShareLabels のときはトップコメンター名をリンクにしない（共有配慮）', () => {
+    // 伏せ字名をリンクで包むと、リンク先（/user/<uid>）から本人を特定できて台無しになる。
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      {
+        id: 'x1',
+        liveId: 'lv123',
+        commentNo: '1',
+        text: 'hello',
+        userId: '88210441',
+        nickname: 'のら',
+        avatarUrl: '',
+        capturedAt: Date.now(),
+        vpos: 0,
+        is184: false,
+        selfPosted: false
+      }
+    ];
+    const html = buildMarketingDashboardHtml(
+      aggregateMarketingReport(comments, 'lv123'),
+      { maskShareLabels: true }
+    );
+    expect(html).not.toContain('href="https://www.nicovideo.jp/user/88210441"');
+  });
+
   it('時間帯ヒートマップが含まれる', () => {
     const html = buildMarketingDashboardHtml(minimal());
     expect(html).toContain('時間帯ヒートマップ');

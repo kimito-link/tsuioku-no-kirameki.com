@@ -79,6 +79,7 @@ import { resolveConcurrentViewers } from '../lib/concurrentEstimate.js';
 import { watchMetaConcurrentGateFromSnapshot } from '../lib/popupWatchMetaConcurrentGate.js';
 import { retrySnapshotRequestUntilReady } from '../lib/popupWatchSnapshotRetry.js';
 import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
+import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
 import { createBooleanSettingController } from '../lib/popupBooleanSettingController.js';
 import { createBooleanSettingsRegistry } from '../lib/popupBooleanSettingsRegistry.js';
 import {
@@ -6793,12 +6794,15 @@ async function buildHtmlReportDocument(
 
   const roomRows = aggregateCommentsByUser(comments).map((room) => {
     const label = displayUserLabel(room.userKey, room.nickname);
+    // 数値 ID のときだけ niconico ユーザーページへのリンクで包む
+    // （匿名・ハッシュ・未取得は escapeHtml されたテキストのみ）。
+    const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
     const search = escapeAttr(
       `${label} ${room.nickname || ''} ${room.userKey} ${room.lastText || ''} ${room.count}`.toLowerCase()
     );
     return `
       <tr class="search-item" data-search="${search}">
-        <td>${escapeHtml(label)}</td>
+        <td>${labelHtml}</td>
         <td>${room.count}</td>
         <td>${escapeHtml(room.lastText || '')}</td>
       </tr>
@@ -6810,6 +6814,7 @@ async function buildHtmlReportDocument(
     const text = String(c.text || '').trim();
     const userId = c.userId ? String(c.userId) : '';
     const userLabel = displayUserLabel(userId || UNKNOWN_USER_KEY);
+    const userLabelHtml = buildUserProfileLinkedLabelHtml(userId, userLabel);
     const search = escapeAttr(
       `${commentNo} ${text} ${userId} ${userLabel} ${c.liveId || ''}`.toLowerCase()
     );
@@ -6817,7 +6822,7 @@ async function buildHtmlReportDocument(
       <tr class="search-item" data-search="${search}">
         <td>${idx + 1}</td>
         <td>${escapeHtml(commentNo || '-')}</td>
-        <td>${escapeHtml(userLabel)}</td>
+        <td>${userLabelHtml}</td>
         <td>${escapeHtml(text || '-')}</td>
         <td>${escapeHtml(formatDateTime(c.capturedAt || 0))}</td>
       </tr>
@@ -6967,6 +6972,12 @@ async function buildHtmlReportDocument(
       }
       th { color: #bfdbfe; font-weight: 700; font-size: 11px; }
       td { color: var(--text); }
+      .nl-user-profile-link {
+        color: #93c5fd;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .nl-user-profile-link:hover { color: #bfdbfe; }
       .pill {
         display: inline-block;
         border-radius: 999px;

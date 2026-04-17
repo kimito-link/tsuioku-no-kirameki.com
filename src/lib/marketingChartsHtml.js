@@ -7,6 +7,7 @@ import { escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { MKT_ADVISOR_AVATAR_DATA_URI } from './marketingHtmlAdvisorAvatars.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
+import { buildMarketingUserLabelLinkedHtml } from './userProfileLinkHtml.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -600,11 +601,19 @@ function sectionTopUsers(r, maskShare = false) {
           ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>'
           : `<img src="${escapeHtml(u.avatarUrl)}" class="mkt-rank-av" alt="" loading="lazy">`;
       const rawName = u.nickname || u.userId || '—';
-      const name = maskShare ? maskLabelForShare(rawName) : rawName;
+      // 共有向けはマスク優先（リンクにしても名前が伏せ字になっていれば識別不能）。
+      // 手元用は数値 ID のときだけ niconico ユーザーページへのリンクで包む
+      // （a:xxxx 等の匿名はリンクにならない = buildMarketingUserLabelLinkedHtml 内で判定）。
+      const nameCellHtml = maskShare
+        ? escapeHtml(maskLabelForShare(rawName))
+        : buildMarketingUserLabelLinkedHtml({
+            userId: u.userId || '',
+            nickname: u.nickname || ''
+          });
       return `<tr>
 <td class="mkt-rank-n">${i + 1}</td>
 <td>${avImg}</td>
-<td class="mkt-rank-name">${escapeHtml(name)}</td>
+<td class="mkt-rank-name">${nameCellHtml}</td>
 <td class="mkt-rank-bar"><div class="mkt-rank-bar__fill" style="width:${pct.toFixed(1)}%"></div><span class="mkt-rank-bar__label">${u.count}</span></td>
 </tr>`;
     })
@@ -671,6 +680,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-rank-av{width:28px;height:28px;border-radius:50%;object-fit:cover;display:block}
 .mkt-rank-av--empty{background:#334155}
 .mkt-rank-name{font-size:.85rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mkt-rank-name .nl-user-profile-link{color:#93c5fd;text-decoration:underline;text-underline-offset:2px}
+.mkt-rank-name .nl-user-profile-link:hover{color:#bfdbfe}
 .mkt-rank-bar{position:relative;height:22px;background:#0f172a;border-radius:4px;overflow:hidden}
 .mkt-rank-bar__fill{height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:4px}
 .mkt-rank-bar__label{position:absolute;right:6px;top:2px;font-size:.75rem;color:#f8fafc;font-weight:600}
