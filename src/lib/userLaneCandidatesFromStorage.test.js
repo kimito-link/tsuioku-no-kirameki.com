@@ -210,39 +210,57 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
 
   it.each([
     {
-      name: 'I11: フィルタが大文字 LV でも行 liveId が lv 小文字なら集約される',
-      liveIdFilter: 'LV12345',
+      name: "I7: row.liveId='lv123', input='123'        → 集約 1 件",
+      liveIdFilter: '123',
       storedComments: [
         {
           userId: '141965615',
           nickname: 'nora',
-          liveId: 'lv12345',
+          liveId: 'lv123',
+          avatarObserved: false
+        },
+        {
+          userId: '99999999',
+          nickname: 'other',
+          liveId: 'lv999',
           avatarObserved: false
         }
       ],
       expectedUserId: '141965615'
     },
     {
-      name: 'I11: 行は lvId のみ・表記ゆれでもフィルタ lv と一致すれば集約される',
-      liveIdFilter: 'lv12345',
+      name: "I8: row.lvId='123'(liveId無), input='lv123' → 集約 1 件",
+      liveIdFilter: 'lv123',
       storedComments: [
         {
           userId: '141965615',
           nickname: 'nora',
-          lvId: 'LV12345',
+          lvId: '123',
+          avatarObserved: false
+        },
+        {
+          userId: '99999999',
+          nickname: 'other',
+          lvId: '999',
           avatarObserved: false
         }
       ],
       expectedUserId: '141965615'
     },
     {
-      name: 'I11: フィルタに lv 接頭辞なし・行は lv 付きでも同一放送として集約される',
-      liveIdFilter: '12345',
+      name: "I9: row.liveId='LV123',  input='lv123'     → 集約 1 件",
+      liveIdFilter: 'lv123',
       storedComments: [
         {
           userId: '141965615',
           nickname: 'nora',
-          lvId: 'lv12345',
+          liveId: 'LV123',
+          avatarObserved: false
+        },
+        {
+          userId: '99999999',
+          nickname: 'other',
+          liveId: 'LV999',
           avatarObserved: false
         }
       ],
@@ -250,8 +268,8 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
     }
   ])('$name', ({ liveIdFilter, storedComments, expectedUserId }) => {
     const out = userLaneCandidatesFromStorage(storedComments, liveIdFilter);
-    expect(out.length).toBeGreaterThan(0);
-    expect(out.some((row) => row.userId === expectedUserId)).toBe(true);
+    expect(out).toHaveLength(1);
+    expect(out[0].userId).toBe(expectedUserId);
   });
 
   it.each([
