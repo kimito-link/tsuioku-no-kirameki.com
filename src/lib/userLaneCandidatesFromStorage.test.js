@@ -13,6 +13,8 @@
  *     かつ avatarObserved の合成ルールは数値 ID と同じ挙動
  * I10: 同じ userId の nickname が両方とも弱ニックなら、いずれか 1 つを採用
  *      （'匿名' 同士なら '匿名' を返す）
+ * I11: 第2引数 liveId フィルタと行の liveId/lvId の表記ゆれ（lv 接頭辞・大小）でも
+ *      集約結果が 0 件にならない（同一放送として扱われる）
  */
 
 import { describe, expect, it } from 'vitest';
@@ -204,6 +206,52 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
     expect(out[0].userId).toBe(userId);
     expect(out[0].nickname).toBe(expectedNickname);
     expect(out[0].avatarObserved).toBe(expectedObserved);
+  });
+
+  it.each([
+    {
+      name: 'I11: フィルタが大文字 LV でも行 liveId が lv 小文字なら集約される',
+      liveIdFilter: 'LV12345',
+      storedComments: [
+        {
+          userId: '141965615',
+          nickname: 'nora',
+          liveId: 'lv12345',
+          avatarObserved: false
+        }
+      ],
+      expectedUserId: '141965615'
+    },
+    {
+      name: 'I11: 行は lvId のみ・表記ゆれでもフィルタ lv と一致すれば集約される',
+      liveIdFilter: 'lv12345',
+      storedComments: [
+        {
+          userId: '141965615',
+          nickname: 'nora',
+          lvId: 'LV12345',
+          avatarObserved: false
+        }
+      ],
+      expectedUserId: '141965615'
+    },
+    {
+      name: 'I11: フィルタに lv 接頭辞なし・行は lv 付きでも同一放送として集約される',
+      liveIdFilter: '12345',
+      storedComments: [
+        {
+          userId: '141965615',
+          nickname: 'nora',
+          lvId: 'lv12345',
+          avatarObserved: false
+        }
+      ],
+      expectedUserId: '141965615'
+    }
+  ])('$name', ({ liveIdFilter, storedComments, expectedUserId }) => {
+    const out = userLaneCandidatesFromStorage(storedComments, liveIdFilter);
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.some((row) => row.userId === expectedUserId)).toBe(true);
   });
 
   it.each([
