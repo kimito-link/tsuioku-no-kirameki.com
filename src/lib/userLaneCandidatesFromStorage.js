@@ -5,6 +5,7 @@
  * popup からは当放送の lvId を渡し、別放送の行を混ぜない。
  */
 
+import { normalizeLv as normalizeLvCanonical } from '../shared/niconico/liveId.js';
 import { pickStrongestAvatarUrlForUser } from './supportGrowthTileSrc.js';
 import { supportGridStrongNickname } from './supportGridDisplayTier.js';
 
@@ -21,13 +22,14 @@ import { supportGridStrongNickname } from './supportGridDisplayTier.js';
 
 /**
  * lvId の表記ゆれ（lv 接頭辞・大文字小文字）を揃える。
+ *
+ * @deprecated 正本は `src/shared/niconico/liveId.js#normalizeLv`。
+ *             このファイルからの re-export は既存 import 互換のための shim。
  * @param {unknown} v
  * @returns {string}
  */
 export function normalizeLv(v) {
-  const s = String(v ?? '').trim().toLowerCase();
-  if (!s) return '';
-  return s.startsWith('lv') ? s : `lv${s}`;
+  return normalizeLvCanonical(v);
 }
 
 /**
