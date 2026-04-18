@@ -2319,6 +2319,85 @@
         text-align: center;
       }
 
+      /*
+       * 配信者タイル: ランクストリップ末尾（10位の右）に並ぶ運営者情報。
+       * 旧 .nl-caster-banner（記録カードの上に full-width 帯）は廃し、
+       * ここでストリップのタイル群と同じ並びに統合する（ユーザ要望 2026-04-18）。
+       */
+      .nl-top-support-rank__caster {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        flex: 0 0 auto;
+        min-width: 74px;
+        max-width: 112px;
+        padding: 5px 6px 6px;
+        box-sizing: border-box;
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, var(--nl-accent, #3b82f6) 35%, var(--nl-border) 65%);
+        background: color-mix(in srgb, var(--nl-accent, #3b82f6) 10%, var(--nl-surface) 90%);
+        text-decoration: none;
+        color: var(--nl-text);
+      }
+
+      .nl-top-support-rank__caster-label {
+        font-size: clamp(7px, 1.7vw, 9px);
+        font-weight: 700;
+        color: color-mix(in srgb, var(--nl-accent, #3b82f6) 75%, var(--nl-text) 25%);
+        letter-spacing: 0.04em;
+        line-height: 1.1;
+      }
+
+      .nl-top-support-rank__caster-thumb {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--nl-surface);
+        border: 2px solid color-mix(in srgb, var(--nl-accent, #3b82f6) 30%, transparent);
+        flex-shrink: 0;
+      }
+
+      .nl-top-support-rank__caster-name {
+        font-size: clamp(7px, 1.75vw, 9px);
+        font-weight: 600;
+        line-height: 1.15;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: center;
+      }
+
+      .nl-top-support-rank__caster-follow {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: clamp(7px, 1.7vw, 9px);
+        font-weight: 700;
+        text-decoration: none;
+        color: #fff;
+        background: var(--nl-accent, #3b82f6);
+        transition: opacity 0.15s;
+      }
+
+      .nl-top-support-rank__caster-follow:hover {
+        opacity: 0.85;
+      }
+
+      html.nl-inline body .nl-top-support-rank__caster-thumb {
+        width: 28px;
+        height: 28px;
+      }
+
+      html.nl-inline body .nl-top-support-rank__caster-name,
+      html.nl-inline body .nl-top-support-rank__caster-label,
+      html.nl-inline body .nl-top-support-rank__caster-follow {
+        font-size: clamp(8px, 1.9vw, 10px);
+      }
+
       html.nl-inline body .nl-top-support-rank:not(.nl-top-support-rank--below-cards) .nl-top-support-rank__line {
         font-size: clamp(9px, 2.3vw, 11px);
         grid-template-columns: auto auto minmax(24px, 28px) minmax(0, 1fr) minmax(0, 1fr);
@@ -5921,12 +6000,18 @@
         </p>
       </div>
 
-      <div id="casterBanner" class="nl-caster-banner" hidden>
-        <a id="casterBannerLink" class="nl-caster-banner__link" target="_blank" rel="noopener noreferrer" title="配信者ページを開く">
-          <img id="casterBannerIcon" class="nl-caster-banner__icon" alt="" width="36" height="36" decoding="async" />
-          <span id="casterBannerName" class="nl-caster-banner__name"></span>
+      <!--
+        旧配置: stat card 群の上に full-width 帯として配信者情報（icon + name + フォロー）を出していた。
+        ユーザ要望で 2026-04-18 より、ランクストリップ末尾（10 位の右）に並ぶタイル表示へ移行。
+        データ同期用の隠し要素として casterBannerIcon / Name / Link / Follow は残すが、
+        画面には出さず、renderTopSupportRankStrip がストリップ内に新しいタイルを作って表示する。
+      -->
+      <div id="casterBanner" class="nl-caster-banner" hidden style="display:none !important">
+        <a id="casterBannerLink" target="_blank" rel="noopener noreferrer" title="配信者ページを開く">
+          <img id="casterBannerIcon" alt="" width="36" height="36" decoding="async" />
+          <span id="casterBannerName"></span>
         </a>
-        <a id="casterBannerFollow" class="nl-caster-banner__follow" target="_blank" rel="noopener noreferrer">フォロー</a>
+        <a id="casterBannerFollow" target="_blank" rel="noopener noreferrer">フォロー</a>
       </div>
 
       <div class="nl-live-stat-cards" id="liveStatCards">

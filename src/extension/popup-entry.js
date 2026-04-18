@@ -4322,16 +4322,60 @@ function renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText) 
 }
 
 /**
+ * 配信者タイル（10 位の右に並ぶ「運営者アイコン + 名前 + フォロー」）の HTML を返す。
+ * データが揃っていない（未取得・非公式ページ等）ときは空文字。
+ * @returns {string}
+ */
+function topSupportRankStripCasterTileHtml() {
+  const snap = watchMetaCache.snapshot;
+  const name = String(snap?.broadcasterName || '').trim();
+  const uid = String(snap?.broadcasterUserId || '').trim();
+  if (!name || !uid || !/^\d+$/.test(uid)) return '';
+  const lvNum = Number(snap?.broadcasterLevel);
+  const lvSuffix = Number.isFinite(lvNum) && lvNum > 0 ? ` LV${lvNum}` : '';
+  const nameWithLv = name + lvSuffix;
+  const userPageUrl = `https://www.nicovideo.jp/user/${uid}`;
+  const iconBucket = Math.floor(Number(uid) / 10000);
+  const iconUrl = `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/${iconBucket}/${uid}.jpg`;
+  const fullTitle = `配信者 ${nameWithLv}（クリックでユーザーページ）`;
+  return (
+    `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}">` +
+    `<span class="nl-top-support-rank__caster-label">配信者</span>` +
+    `<a class="nl-top-support-rank__caster-link" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` +
+    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" />` +
+    `<span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span>` +
+    `</a>` +
+    `<a class="nl-top-support-rank__caster-follow" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer">フォロー</a>` +
+    `</div>`
+  );
+}
+
+/**
  * 応援カード直下に、上位ユーザーの順位・件数・サムネ・ID・表示名を出す（記録コメントの集計）。
  * @param {{ userKey: string, nickname: string, count: number, avatarUrl?: string }[]} stripRooms
  */
 function renderTopSupportRankStrip(stripRooms) {
   const strip = /** @type {HTMLElement|null} */ ($('topSupportRankStrip'));
   if (!strip) return;
+  const casterTileHtml = topSupportRankStripCasterTileHtml();
   if (!stripRooms.length) {
-    strip.hidden = true;
-    strip.innerHTML = '';
-    strip.setAttribute('aria-hidden', 'true');
+    /*
+     * ランク対象のコメントがまだ無いときも、配信者タイルだけは見せたい。
+     * （新規放送開始直後に「コメントを入れたい」ユーザーの動線として）
+     * 配信者タイルすら作れない（uid 未取得）ときのみストリップごと隠す。
+     */
+    if (!casterTileHtml) {
+      strip.hidden = true;
+      strip.innerHTML = '';
+      strip.setAttribute('aria-hidden', 'true');
+      return;
+    }
+    strip.hidden = false;
+    strip.removeAttribute('aria-hidden');
+    strip.setAttribute('aria-label', '配信者情報');
+    strip.innerHTML =
+      `<p class="nl-top-support-rank__note">まだ応援コメントがありません。まずは配信者のフォローから。</p>` +
+      `<div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
     return;
   }
   strip.hidden = false;
@@ -4386,7 +4430,13 @@ function renderTopSupportRankStrip(stripRooms) {
         : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${innerHtml}</div>`;
     })
     .join('');
-  strip.innerHTML = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${html}</div>`;
+  /*
+   * ランクタイル群の末尾（10 位の右）に配信者タイルを並べる。
+   * データ未取得（`topSupportRankStripCasterTileHtml()` が空文字）のときはランクのみ。
+   * スクロール前提のタイル列なので、末尾の追加がレイアウトを壊さない。
+   */
+  const listInner = `${html}${casterTileHtml}`;
+  strip.innerHTML = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
   const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
   models.forEach((m, i) => {
     const img = thumbs[i];
@@ -4490,7 +4540,21 @@ function renderUserRooms(entries, liveId = '') {
     foldAnonymous: foldAnonymousInRankStripRuntimeEnabled
   });
   const stripSlice = stripCandidates.slice(0, TOP_SUPPORT_RANK_STRIP_MAX);
-  const stripKey = topSupportRankStripStableKey(liveId, list.length, stripSlice);
+  /*
+   * 配信者タイルをランク末尾に並べるため、broadcaster uid / name / level が遅延到着したら
+   * ストリップ全体を確実に再レンダリングしたい。stable key に caster の識別子を混ぜて、
+   * 未取得 → 取得済みへ変わった瞬間を差分として検出する。
+   */
+  const casterSnap = watchMetaCache.snapshot;
+  const casterKeyPart = [
+    String(casterSnap?.broadcasterUserId || ''),
+    String(casterSnap?.broadcasterName || ''),
+    String(casterSnap?.broadcasterLevel ?? '')
+  ].join('|');
+  const stripKey =
+    topSupportRankStripStableKey(liveId, list.length, stripSlice) +
+    '::caster=' +
+    casterKeyPart;
   if (stripKey !== _lastTopSupportRankStripStableKey) {
     _lastTopSupportRankStripStableKey = stripKey;
     renderTopSupportRankStrip(stripSlice);

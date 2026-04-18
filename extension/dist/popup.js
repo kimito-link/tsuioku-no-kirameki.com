@@ -8709,16 +8709,38 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     fill.style.width = `${Math.max(0, Math.min(100, Number(heatPercent) || 0)).toFixed(2)}%`;
     note.textContent = `${heatText}\uFF08\u3053\u306E5\u5206\u3067\u5897\u3048\u305F\u4EF6\u6570\uFF09`;
   }
+  function topSupportRankStripCasterTileHtml() {
+    const snap = watchMetaCache.snapshot;
+    const name = String(snap?.broadcasterName || "").trim();
+    const uid = String(snap?.broadcasterUserId || "").trim();
+    if (!name || !uid || !/^\d+$/.test(uid)) return "";
+    const lvNum = Number(snap?.broadcasterLevel);
+    const lvSuffix = Number.isFinite(lvNum) && lvNum > 0 ? ` LV${lvNum}` : "";
+    const nameWithLv = name + lvSuffix;
+    const userPageUrl = `https://www.nicovideo.jp/user/${uid}`;
+    const iconBucket = Math.floor(Number(uid) / 1e4);
+    const iconUrl = `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/${iconBucket}/${uid}.jpg`;
+    const fullTitle = `\u914D\u4FE1\u8005 ${nameWithLv}\uFF08\u30AF\u30EA\u30C3\u30AF\u3067\u30E6\u30FC\u30B6\u30FC\u30DA\u30FC\u30B8\uFF09`;
+    return `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}"><span class="nl-top-support-rank__caster-label">\u914D\u4FE1\u8005</span><a class="nl-top-support-rank__caster-link" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;"><img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" /><span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span></a><a class="nl-top-support-rank__caster-follow" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer">\u30D5\u30A9\u30ED\u30FC</a></div>`;
+  }
   function renderTopSupportRankStrip(stripRooms) {
     const strip = (
       /** @type {HTMLElement|null} */
       $("topSupportRankStrip")
     );
     if (!strip) return;
+    const casterTileHtml = topSupportRankStripCasterTileHtml();
     if (!stripRooms.length) {
-      strip.hidden = true;
-      strip.innerHTML = "";
-      strip.setAttribute("aria-hidden", "true");
+      if (!casterTileHtml) {
+        strip.hidden = true;
+        strip.innerHTML = "";
+        strip.setAttribute("aria-hidden", "true");
+        return;
+      }
+      strip.hidden = false;
+      strip.removeAttribute("aria-hidden");
+      strip.setAttribute("aria-label", "\u914D\u4FE1\u8005\u60C5\u5831");
+      strip.innerHTML = `<p class="nl-top-support-rank__note">\u307E\u3060\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u304C\u3042\u308A\u307E\u305B\u3093\u3002\u307E\u305A\u306F\u914D\u4FE1\u8005\u306E\u30D5\u30A9\u30ED\u30FC\u304B\u3089\u3002</p><div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
       return;
     }
     strip.hidden = false;
@@ -8759,7 +8781,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         <span class="nl-top-support-rank__name">${nameText}</span>`;
       return isLinkable ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${innerHtml}</a>` : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${innerHtml}</div>`;
     }).join("");
-    strip.innerHTML = `<p class="nl-top-support-rank__note">\u8A18\u9332\u5185\u30FB\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u5FDC\u63F4\u4EF6\u6570\u304C\u591A\u3044\u9806\u3067\u3059\u3002</p><div class="nl-top-support-rank__list" role="list">${html}</div>`;
+    const listInner = `${html}${casterTileHtml}`;
+    strip.innerHTML = `<p class="nl-top-support-rank__note">\u8A18\u9332\u5185\u30FB\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u5FDC\u63F4\u4EF6\u6570\u304C\u591A\u3044\u9806\u3067\u3059\u3002</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
     const thumbs = strip.querySelectorAll("img.nl-top-support-rank__thumb");
     models.forEach((m, i) => {
       const img = thumbs[i];
@@ -8832,7 +8855,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       foldAnonymous: foldAnonymousInRankStripRuntimeEnabled
     });
     const stripSlice = stripCandidates.slice(0, TOP_SUPPORT_RANK_STRIP_MAX);
-    const stripKey = topSupportRankStripStableKey(liveId, list.length, stripSlice);
+    const casterSnap = watchMetaCache.snapshot;
+    const casterKeyPart = [
+      String(casterSnap?.broadcasterUserId || ""),
+      String(casterSnap?.broadcasterName || ""),
+      String(casterSnap?.broadcasterLevel ?? "")
+    ].join("|");
+    const stripKey = topSupportRankStripStableKey(liveId, list.length, stripSlice) + "::caster=" + casterKeyPart;
     if (stripKey !== _lastTopSupportRankStripStableKey) {
       _lastTopSupportRankStripStableKey = stripKey;
       renderTopSupportRankStrip(stripSlice);
@@ -11454,7 +11483,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0418-2329" ? String("0418-2329") : "dev";
+      const buildId = "0418-2338" ? String("0418-2338") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
