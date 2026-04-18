@@ -7774,23 +7774,34 @@ function initPopup() {
         initialRefreshDone = true;
         requestAnimationFrame(() => {
           applyResponsivePopupLayout();
-          if (wasInitialRefresh && INLINE_MODE) {
+          if (INLINE_MODE) {
             /*
-             * インライン iframe の初回描画では、上部の stat card
-             * （記録 / 推定同時接続 / 来場者数）を必ず見せたい。
+             * インライン iframe では refresh（毎回の storage 変更で頻発する）を起点に
+             * 下方向の reveal スクロールをかけない。以前は `else` 分岐で
+             * correctSupportVisualScrollIfOpen() を呼んでいたが、
+             *   - 初回 refresh の scrollTop=0 を、直後の 2nd refresh が下方向に上書き
+             *   - ユーザが stat card を見ようと上にスクロールしても、次の refresh で
+             *     押し戻される（ユーザ報告: 「うえにいってコメント数みようとすると
+             *     もどされます」）
+             * という二重のスクロール奪取が起きていた。
              *
-             * supportVisualDetails が inline デフォルトで open のとき、
-             * 展開された本文（アイコングリッド）が .nl-main より高いと
-             * correctSupportVisualScrollIfOpen が body.bottom を合わせに
-             * 下方向スクロールをかけ、上端の stat card が隠れてしまう。
-             * ユーザ操作なしの初回描画時に限り、reveal scroll をスキップして
-             * scrollTop=0 に寄せ、stat card を起点に表示する。
+             * インライン方針: 初回のみ scrollTop=0 に寄せ（stat card を起点に表示）、
+             * 以降の refresh では .nl-main の scrollTop を一切触らない。
+             * 応援ビジュアル展開時の reveal は <details> の ontoggle（ユーザ操作）
+             * に限定し、自動 refresh 経由では行わない。
              */
-            const main = /** @type {HTMLElement|null} */ (
-              document.querySelector('.nl-main')
-            );
-            if (main) main.scrollTop = 0;
+            if (wasInitialRefresh) {
+              const main = /** @type {HTMLElement|null} */ (
+                document.querySelector('.nl-main')
+              );
+              if (main) main.scrollTop = 0;
+            }
           } else {
+            /*
+             * スタンドアロン popup 窓では従来どおり details 展開位置に追従する。
+             * iframe とは違い、ユーザは window サイズ＝ビューポートで操作しているため、
+             * refresh 起点の reveal スクロールが UX を壊す度合いが小さい。
+             */
             correctSupportVisualScrollIfOpen();
           }
         });
