@@ -19,12 +19,36 @@ import { supportGridStrongNickname } from './supportGridDisplayTier.js';
  */
 
 /**
+ * lvId の表記ゆれ（lv 接頭辞・大文字小文字）を揃える。
+ * @param {unknown} v
+ * @returns {string}
+ */
+export function normalizeLv(v) {
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s) return '';
+  return s.startsWith('lv') ? s : `lv${s}`;
+}
+
+/**
  * @param {unknown} row
  * @returns {string}
  */
 function rowLiveId(row) {
   const o = /** @type {{ liveId?: unknown, lvId?: unknown }} */ (row);
   return String(o?.liveId ?? o?.lvId ?? '').trim();
+}
+
+/**
+ * @param {unknown} row
+ * @param {string} targetNorm normalizeLv 済みの比較キー
+ * @returns {boolean}
+ */
+function rowMatchesLiveFilter(row, targetNorm) {
+  if (!targetNorm) return true;
+  const o = /** @type {{ liveId?: unknown, lvId?: unknown }} */ (row);
+  const a = normalizeLv(o?.liveId);
+  const b = normalizeLv(o?.lvId);
+  return (Boolean(a) && a === targetNorm) || (Boolean(b) && b === targetNorm);
 }
 
 /**
@@ -45,11 +69,19 @@ export function userLaneCandidatesFromStorage(storedComments, liveId) {
   const filterByLive =
     arguments.length >= 2 && liveId != null && String(liveId).trim() !== '';
   const lidNorm = filterByLive ? String(liveId).trim() : '';
-  const lidLower = lidNorm.toLowerCase();
+  const targetNorm = filterByLive ? normalizeLv(lidNorm) : '';
 
-  const rows = (Array.isArray(storedComments) ? storedComments : []).filter(
-    (e) => !filterByLive || rowLiveId(e).toLowerCase() === lidLower
-  );
+  const allRows = Array.isArray(storedComments) ? storedComments : [];
+  let rows = filterByLive
+    ? allRows.filter((e) => rowMatchesLiveFilter(e, targetNorm))
+    : allRows;
+  /** 集約結果の liveId 表示に lid を使うか（フォールバック後は行ベース） */
+  let useLidForOutput = filterByLive;
+  if (filterByLive && rows.length === 0) {
+    console.warn('[lane] filter matched 0, fallback all');
+    rows = allRows;
+    useLidForOutput = false;
+  }
 
   /** @type {Map<string, unknown[]>} */
   const byUid = new Map();
@@ -98,7 +130,7 @@ export function userLaneCandidatesFromStorage(storedComments, liveId) {
 
     const lastCapturedAt = Math.max(0, ...chronological.map(rowCapturedAt));
 
-    const outLiveId = filterByLive
+    const outLiveId = useLidForOutput
       ? lidNorm
       : rowLiveId(newestFirst[0] || chronological[chronological.length - 1] || {});
 

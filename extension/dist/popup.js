@@ -2523,12 +2523,27 @@ ${body}`;
   }
 
   // src/lib/userLaneCandidatesFromStorage.js
+  function normalizeLv(v) {
+    const s = String(v ?? "").trim().toLowerCase();
+    if (!s) return "";
+    return s.startsWith("lv") ? s : `lv${s}`;
+  }
   function rowLiveId(row) {
     const o = (
       /** @type {{ liveId?: unknown, lvId?: unknown }} */
       row
     );
     return String(o?.liveId ?? o?.lvId ?? "").trim();
+  }
+  function rowMatchesLiveFilter(row, targetNorm) {
+    if (!targetNorm) return true;
+    const o = (
+      /** @type {{ liveId?: unknown, lvId?: unknown }} */
+      row
+    );
+    const a = normalizeLv(o?.liveId);
+    const b = normalizeLv(o?.lvId);
+    return Boolean(a) && a === targetNorm || Boolean(b) && b === targetNorm;
   }
   function rowCapturedAt(row) {
     const n = Number(
@@ -2540,10 +2555,15 @@ ${body}`;
   function userLaneCandidatesFromStorage(storedComments, liveId) {
     const filterByLive = arguments.length >= 2 && liveId != null && String(liveId).trim() !== "";
     const lidNorm = filterByLive ? String(liveId).trim() : "";
-    const lidLower = lidNorm.toLowerCase();
-    const rows = (Array.isArray(storedComments) ? storedComments : []).filter(
-      (e) => !filterByLive || rowLiveId(e).toLowerCase() === lidLower
-    );
+    const targetNorm = filterByLive ? normalizeLv(lidNorm) : "";
+    const allRows = Array.isArray(storedComments) ? storedComments : [];
+    let rows = filterByLive ? allRows.filter((e) => rowMatchesLiveFilter(e, targetNorm)) : allRows;
+    let useLidForOutput = filterByLive;
+    if (filterByLive && rows.length === 0) {
+      console.warn("[lane] filter matched 0, fallback all");
+      rows = allRows;
+      useLidForOutput = false;
+    }
     const byUid = /* @__PURE__ */ new Map();
     for (const row of rows) {
       const uid = String(
@@ -2597,7 +2617,7 @@ ${body}`;
         ).trim();
       }
       const lastCapturedAt = Math.max(0, ...chronological.map(rowCapturedAt));
-      const outLiveId = filterByLive ? lidNorm : rowLiveId(newestFirst[0] || chronological[chronological.length - 1] || {});
+      const outLiveId = useLidForOutput ? lidNorm : rowLiveId(newestFirst[0] || chronological[chronological.length - 1] || {});
       built.push({
         userId,
         nickname,
@@ -9172,9 +9192,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         updateCommentPostUiContext(url, lv, relevantCommentPanelCode);
         paintCommentComposeUi();
         setReloadWatchTabUiDisabled(false);
-        const storageRowsForLane = arr.filter(
-          (e) => String(e?.liveId || "").trim().toLowerCase() === String(lv || "").trim().toLowerCase()
-        );
+        const laneLvKey = normalizeLv(lv);
+        const storageRowsForLane = !laneLvKey ? arr : arr.filter((e) => {
+          const a = normalizeLv(e?.liveId);
+          const b = normalizeLv(e?.lvId);
+          return Boolean(a) && a === laneLvKey || Boolean(b) && b === laneLvKey;
+        });
         syncStorySourceEntries(lv, displayEntries, storageRowsForLane);
         renderUserRooms(arr, lv);
         renderCharacterScene({
@@ -10773,7 +10796,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0418-1444" ? String("0418-1444") : "dev";
+      const buildId = "0418-1533" ? String("0418-1533") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

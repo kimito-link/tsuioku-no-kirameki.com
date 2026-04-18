@@ -163,7 +163,10 @@ import {
   flattenStoryUserLaneBuckets
 } from '../lib/storyUserLaneBuckets.js';
 import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js';
-import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
+import {
+  normalizeLv,
+  userLaneCandidatesFromStorage
+} from '../lib/userLaneCandidatesFromStorage.js';
 import { shouldSkipStoryUserLaneCandidateByContamination } from '../lib/storyUserLaneContaminationGuard.js';
 import { explainSupportGridDisplayTier } from '../lib/supportGridDisplayTier.js';
 import {
@@ -6051,12 +6054,17 @@ async function refresh() {
     updateCommentPostUiContext(url, lv, relevantCommentPanelCode);
     paintCommentComposeUi();
     setReloadWatchTabUiDisabled(false);
-    const storageRowsForLane = arr.filter(
-      (e) =>
-        String(e?.liveId || '')
-          .trim()
-          .toLowerCase() === String(lv || '').trim().toLowerCase()
-    );
+    const laneLvKey = normalizeLv(lv);
+    const storageRowsForLane = !laneLvKey
+      ? arr
+      : arr.filter((e) => {
+          const a = normalizeLv(e?.liveId);
+          const b = normalizeLv(e?.lvId);
+          return (
+            (Boolean(a) && a === laneLvKey) ||
+            (Boolean(b) && b === laneLvKey)
+          );
+        });
     syncStorySourceEntries(lv, displayEntries, storageRowsForLane);
     renderUserRooms(arr, lv);
     renderCharacterScene({
