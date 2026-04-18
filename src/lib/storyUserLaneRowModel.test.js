@@ -27,15 +27,16 @@ describe('userLaneProfileCompletenessTier', () => {
     ).toBe(3);
   });
 
-  it('数値ID + 強ニック + 個人サムネなし → こん太(2)', () => {
-    // ★ 旧実装は link(3) に格上げしていたためこん太列がほぼ空になっていた。
-    // 非匿名 + 強ニック + 個人サムネなし は こん太 段で正しく拾う。
+  it('数値ID + 強ニック + 個人サムネなし → りんく(3) [Phase 1.5 revised]', () => {
+    // Phase 1.5 で挙動変更。旧設計では konta(2) に落ちていたが、ニコ生の大多数の
+    // 個人タイルが konta に吸われて link 段が空になる退行を招いていた。
+    // 新 policy では「非匿名 + 強ニック」の組で link 昇格（観測なしでも）。
     expect(
       userLaneProfileCompletenessTier(
         { userId: '12345', nickname: 'たろう', avatarUrl: '' },
         ''
       )
-    ).toBe(2);
+    ).toBe(3);
   });
 
   it('数値ID + 強ニック + avatarObserved=true は tier 3（りんく）— DOM でアバター描画を確認している', () => {
@@ -57,9 +58,8 @@ describe('userLaneProfileCompletenessTier', () => {
     ).toBe(3);
   });
 
-  it('avatarObserved なしの数値ID＋強ニック＋URL 無しは tier 2（こん太）', () => {
-    // まだ DOM/intercept がアバターを観測できていない中間状態。
-    // 強ニックはあるので たぬ姉(1) まで落とさず こん太(2) に置く。
+  it('avatarObserved なしの数値ID＋強ニック＋URL 無しは tier 3（りんく）[Phase 1.5 revised]', () => {
+    // Phase 1.5 で挙動変更。strongNick + 数値 ID は link 段で受ける（観測なしでも）。
     expect(
       userLaneProfileCompletenessTier(
         {
@@ -69,18 +69,18 @@ describe('userLaneProfileCompletenessTier', () => {
         },
         ''
       )
-    ).toBe(2);
+    ).toBe(3);
   });
 
-  it('avatarObserved なしで httpCandidate が合成 canonical（/usericon/s/<bucket>/<uid>.jpg）だけでも tier 2（こん太）', () => {
-    // 直前実装はここで 2 を返して「こん太列が枯れない」を達成していたが、
-    // avatarObserved=true のケースでは true を返すべき（別テストで担保）。
+  it('avatarObserved なしで httpCandidate が合成 canonical だけでも数値ID+強ニックは tier 3 [Phase 1.5 revised]', () => {
+    // Phase 1.5 で挙動変更。strongNick が決まっているので link に昇格。
+    // 合成 canonical URL は link 判定の根拠にはならないが、strongNick だけで十分。
     expect(
       userLaneProfileCompletenessTier(
         { userId: '2201069', nickname: 'ソウルブラザー', avatarUrl: '' },
         'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/220/2201069.jpg'
       )
-    ).toBe(2);
+    ).toBe(3);
   });
 
   it('avatarObserved=true のユーザは httpCandidate が合成 canonical でも tier 3（りんく）', () => {
@@ -167,7 +167,10 @@ describe('userLaneProfileCompletenessTier', () => {
     ).toBe(3);
   });
 
-  it('個人サムネなし + 表示名が弱い場合は tier 1（tanu）', () => {
+  it('個人サムネなし + 表示名が弱い場合は tier 2（konta 過渡状態）[Phase 1.5 revised]', () => {
+    // Phase 1.5 で挙動変更。非匿名なら link / konta の 2 値のみ候補になり、
+    // link に昇格できなければ konta に置く（たぬ姉は匿名専用）。
+    // 旧実装は tier 1（tanu）に落としていたが、匿名でない以上 tanu には入れない。
     expect(
       userLaneProfileCompletenessTier(
         {
@@ -177,7 +180,7 @@ describe('userLaneProfileCompletenessTier', () => {
         },
         ''
       )
-    ).toBe(1);
+    ).toBe(2);
   });
 
   it('userId 空は tier 0（候補から除外される）', () => {
@@ -272,15 +275,20 @@ describe('userLaneProfileCompletenessTier: 再発防止の契約テスト', () =
     }
   });
 
-  describe('I4: 非匿名 + 強ニック + URL 無し + observed 無し → tier 2（こん太段が枯れない）', () => {
+  describe('I4 (revised, Phase 1.5): 非匿名 + 強ニック → tier 3（りんく段が枯れない）', () => {
+    // 旧契約: strongNick のみ → konta(2)
+    // 新契約: strongNick のみ → link(3)
+    //   旧挙動だとニコ生の大多数の個人タイルが konta に落ちて link が実質空になる
+    //   退行を招いていた（docs/lane-architecture-redesign.md §1.3）。
+    //   新 policy では「非匿名 + 強ニック」の組で link 昇格する。
     for (const uid of numericIds) {
-      it(`${uid} 強ニックだけ → tier 2`, () => {
+      it(`${uid} 強ニックだけ → tier 3`, () => {
         expect(
           userLaneProfileCompletenessTier(
             { userId: uid, nickname: 'たろう', avatarUrl: '' },
             ''
           )
-        ).toBe(2);
+        ).toBe(3);
       });
     }
   });

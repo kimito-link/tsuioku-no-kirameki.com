@@ -48,7 +48,10 @@ describe('popup ストレージ重複マージ → ユーザーレーン tier（
     expect(row?.profileTier).toBe(3);
   });
 
-  it('マージで avatarObserved が落ちた場合は合成 canonical のみでは tier 2（退行の再発防止）', () => {
+  it('マージで avatarObserved が落ちても strongNick があれば link(3) [Phase 1.5 revised]', () => {
+    // Phase 1.5 で挙動変更。strongNick 'りん' + 数値 ID で link 昇格（観測なしでも）。
+    // 旧実装は合成 canonical のみで konta(2) に落としていたが、それが「link が枯れる」
+    // 元凶だったため、新 policy では strongNick を独立した link 根拠として扱う。
     const uid = '141965615';
     const http = niconicoDefaultUserIconUrl(uid);
     const entryMissingObserved = {
@@ -65,7 +68,7 @@ describe('popup ストレージ重複マージ → ユーザーレーン tier（
       http,
       lanePickCtx
     );
-    expect(row?.profileTier).toBe(2);
+    expect(row?.profileTier).toBe(3);
   });
 });
 
