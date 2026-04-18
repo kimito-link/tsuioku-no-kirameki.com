@@ -3125,6 +3125,7 @@
   // src/lib/commentPanelHealthProbe.js
   var LATEST_COMMENT_BUTTON_SELECTOR = 'button.indicator[aria-label="\u6700\u65B0\u30B3\u30E1\u30F3\u30C8\u306B\u623B\u308B"]';
   var COMMENT_PANEL_RESTORE_COOLDOWN_MS = 10 * 1e3;
+  var COMMENT_PANEL_USER_SCROLL_LOCKOUT_MS = 5 * 1e3;
   var COMMENT_PANEL_SCROLLED_UP_THRESHOLD_PX = 200;
   var COMMENT_PANEL_OUT_OF_VIEWPORT_RATIO = 0.9;
   var KEY_COMMENT_PANEL_AUTO_RESTORE = "nls_comment_panel_auto_restore_enabled";
@@ -3143,6 +3144,14 @@
     const now = Number(i.now) || 0;
     if (lastAt > 0 && now - lastAt < cooldownMs) {
       return { action: "none", reason: "cooldown" };
+    }
+    const userScrollAt = Number(i.lastUserScrollAt) || 0;
+    const userScrollLockoutMs = Number.isFinite(i.userScrollLockoutMs) ? (
+      /** @type {number} */
+      i.userScrollLockoutMs
+    ) : COMMENT_PANEL_USER_SCROLL_LOCKOUT_MS;
+    if (userScrollAt > 0 && now - userScrollAt < userScrollLockoutMs) {
+      return { action: "none", reason: "user_scrolling" };
     }
     if (!i.panelPresent) return { action: "none", reason: "panel_missing" };
     const vh = Number(i.viewportHeight) || 0;
@@ -7141,6 +7150,29 @@
   }
   var commentPanelAutoRestoreEnabled = true;
   var lastCommentPanelRestoreActionAt = 0;
+  var lastUserInitiatedScrollAt = 0;
+  function noteUserInitiatedScroll() {
+    lastUserInitiatedScrollAt = Date.now();
+  }
+  var userScrollListenersAttached = false;
+  function attachUserScrollListeners() {
+    if (userScrollListenersAttached) return;
+    if (typeof window === "undefined" || !window.addEventListener) return;
+    userScrollListenersAttached = true;
+    const opts = { passive: true, capture: true };
+    window.addEventListener("wheel", noteUserInitiatedScroll, opts);
+    window.addEventListener("touchmove", noteUserInitiatedScroll, opts);
+    window.addEventListener(
+      "keydown",
+      (ev) => {
+        const k = ev && ev.key;
+        if (k === "PageUp" || k === "PageDown" || k === "Home" || k === "End" || k === "ArrowUp" || k === "ArrowDown" || k === " " || k === "Spacebar") {
+          noteUserInitiatedScroll();
+        }
+      },
+      opts
+    );
+  }
   async function readCommentPanelAutoRestoreFromStorage() {
     if (!hasExtensionContext()) return;
     try {
@@ -7187,6 +7219,7 @@
       enabled: true,
       now: Date.now(),
       lastActionAt: lastCommentPanelRestoreActionAt,
+      lastUserScrollAt: lastUserInitiatedScrollAt,
       panelPresent: !!panel,
       panelRect,
       viewportHeight: Number(window.innerHeight) || 0,
@@ -7327,6 +7360,7 @@
     recording = await readRecordingFlag();
     await readDeepHarvestQuietUiFromStorage();
     await readCommentPanelAutoRestoreFromStorage();
+    attachUserScrollListeners();
     if (isWatchInlinePanelTopFrame()) {
       ensurePageFrameStyle();
       await migrateFloatingInlinePanelToDockOnce({

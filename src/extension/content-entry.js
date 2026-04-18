@@ -5201,6 +5201,50 @@ let commentPanelAutoRestoreEnabled = true;
  */
 let lastCommentPanelRestoreActionAt = 0;
 
+/**
+ * ユーザが能動的にスクロール操作した最後の epoch ms。
+ * wheel / touchmove / PageUp / PageDown / 矢印キー / Space / Home / End で更新。
+ * probeAndRestoreCommentPanelHealth が直近操作中（既定 5 秒以内）は自動復旧を
+ * 抑止するためのフラグ（ユーザが上にスクロール中に panel.scrollIntoView で
+ * 強制的に戻される問題の根治）。
+ * @type {number}
+ */
+let lastUserInitiatedScrollAt = 0;
+
+/** wheel/touchmove/スクロール系キー で呼び、ユーザ意図のスクロール時刻を刻む。 */
+function noteUserInitiatedScroll() {
+  lastUserInitiatedScrollAt = Date.now();
+}
+
+let userScrollListenersAttached = false;
+function attachUserScrollListeners() {
+  if (userScrollListenersAttached) return;
+  if (typeof window === 'undefined' || !window.addEventListener) return;
+  userScrollListenersAttached = true;
+  const opts = { passive: true, capture: true };
+  window.addEventListener('wheel', noteUserInitiatedScroll, opts);
+  window.addEventListener('touchmove', noteUserInitiatedScroll, opts);
+  window.addEventListener(
+    'keydown',
+    (ev) => {
+      const k = ev && ev.key;
+      if (
+        k === 'PageUp' ||
+        k === 'PageDown' ||
+        k === 'Home' ||
+        k === 'End' ||
+        k === 'ArrowUp' ||
+        k === 'ArrowDown' ||
+        k === ' ' ||
+        k === 'Spacebar'
+      ) {
+        noteUserInitiatedScroll();
+      }
+    },
+    opts
+  );
+}
+
 async function readCommentPanelAutoRestoreFromStorage() {
   if (!hasExtensionContext()) return;
   try {
@@ -5262,6 +5306,7 @@ async function probeAndRestoreCommentPanelHealth() {
     enabled: true,
     now: Date.now(),
     lastActionAt: lastCommentPanelRestoreActionAt,
+    lastUserScrollAt: lastUserInitiatedScrollAt,
     panelPresent: !!panel,
     panelRect,
     viewportHeight: Number(window.innerHeight) || 0,
@@ -5431,6 +5476,9 @@ async function start() {
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
   await readCommentPanelAutoRestoreFromStorage();
+  // ユーザの能動的スクロール操作を検出し、probeAndRestoreCommentPanelHealth が
+  // 直近操作中は自動復旧を抑止できるようにする（手動で上に押し上げても戻される問題の対策）。
+  attachUserScrollListeners();
   if (isWatchInlinePanelTopFrame()) {
     ensurePageFrameStyle();
     await migrateFloatingInlinePanelToDockOnce({

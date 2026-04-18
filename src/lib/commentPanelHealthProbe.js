@@ -26,6 +26,15 @@ export const LATEST_COMMENT_BUTTON_SELECTOR =
 export const COMMENT_PANEL_RESTORE_COOLDOWN_MS = 10 * 1000;
 
 /**
+ * ユーザがホイール／タッチ／スクロール系キーを操作した直後の自動復旧ロックアウト（ms）。
+ *
+ * 既定クールダウンは「前回復旧アクション→次の復旧アクション」の間隔で、ユーザが自分で
+ * 上にスクロールしている最中の 1 発目を抑えられない。5 秒あれば「ユーザがいま能動的に
+ * スクロール中」と「もう動かしていない静止状態」を安全に分離できる。
+ */
+export const COMMENT_PANEL_USER_SCROLL_LOCKOUT_MS = 5 * 1000;
+
+/**
  * scrollHost の下端との距離がこの値を超えたら「スクロールが古い位置にある」とみなす。
  * 数行分の余裕を持たせて、普通に最下部に張り付いているときに誤発火しない値。
  */
@@ -56,6 +65,8 @@ export function normalizeCommentPanelAutoRestoreEnabled(raw) {
  * @property {number} now                   現在時刻 epoch ms
  * @property {number} lastActionAt          前回アクションした epoch ms（0 or 負 = なし）
  * @property {number} [cooldownMs]          クールダウン（既定 COMMENT_PANEL_RESTORE_COOLDOWN_MS）
+ * @property {number} [lastUserScrollAt]    ユーザがホイール/タッチ/スクロールキーを触った epoch ms
+ * @property {number} [userScrollLockoutMs] ユーザスクロール後のロックアウト（既定 5000）
  * @property {boolean} panelPresent         パネル要素が DOM にあるか
  * @property {{ top: number, height: number }|null} panelRect パネルの viewport 相対矩形
  * @property {number} viewportHeight        window.innerHeight（0 や負値は判定スキップ）
@@ -84,6 +95,20 @@ export function decideCommentPanelRestoreAction(input) {
   const now = Number(i.now) || 0;
   if (lastAt > 0 && now - lastAt < cooldownMs) {
     return { action: 'none', reason: 'cooldown' };
+  }
+
+  /*
+   * ユーザが能動的にスクロール操作中ならアクションを 1 回も出さない。
+   * cooldown は「前回復旧→次の復旧」の間隔なので、ユーザがいま上に押し上げている
+   * 初回をブロックできない。wheel/touchmove/PageUp 等のイベントで更新された
+   * lastUserScrollAt を参照して、直近 5 秒以内の操作があれば自動復旧を棚上げする。
+   */
+  const userScrollAt = Number(i.lastUserScrollAt) || 0;
+  const userScrollLockoutMs = Number.isFinite(i.userScrollLockoutMs)
+    ? /** @type {number} */ (i.userScrollLockoutMs)
+    : COMMENT_PANEL_USER_SCROLL_LOCKOUT_MS;
+  if (userScrollAt > 0 && now - userScrollAt < userScrollLockoutMs) {
+    return { action: 'none', reason: 'user_scrolling' };
   }
 
   // パネルそのものが無い状態は既存の `no_comment_panel` 警告に任せる。
