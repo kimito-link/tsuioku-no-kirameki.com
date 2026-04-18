@@ -357,6 +357,22 @@
     if (/^\d{5,14}$/.test(u) && isNiconicoSyntheticDefaultUserIconUrl(c, u)) return 1;
     return 2;
   }
+  function pickStrongestAvatarUrlForUser(userId, orderedCandidates) {
+    const u = String(userId || "").trim();
+    let best = "";
+    let bestSc = 0;
+    if (!Array.isArray(orderedCandidates)) return "";
+    for (const raw of orderedCandidates) {
+      const c = String(raw || "").trim();
+      if (!c) continue;
+      const sc = commentEnrichmentAvatarScore(u, c);
+      if (sc > bestSc) {
+        bestSc = sc;
+        best = c;
+      }
+    }
+    return best;
+  }
 
   // src/lib/userRooms.js
   var UNKNOWN_USER_KEY = "__unknown__";
@@ -2504,6 +2520,109 @@ ${body}`;
       httpForLane,
       entry
     };
+  }
+
+  // src/lib/userLaneCandidatesFromStorage.js
+  function rowLiveId(row) {
+    const o = (
+      /** @type {{ liveId?: unknown, lvId?: unknown }} */
+      row
+    );
+    return String(o?.liveId ?? o?.lvId ?? "").trim();
+  }
+  function rowCapturedAt(row) {
+    const n = Number(
+      /** @type {{ capturedAt?: unknown }} */
+      row?.capturedAt
+    );
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+  function userLaneCandidatesFromStorage(storedComments, liveId) {
+    const filterByLive = arguments.length >= 2 && liveId != null && String(liveId).trim() !== "";
+    const lidNorm = filterByLive ? String(liveId).trim() : "";
+    const lidLower = lidNorm.toLowerCase();
+    const rows = (Array.isArray(storedComments) ? storedComments : []).filter(
+      (e) => !filterByLive || rowLiveId(e).toLowerCase() === lidLower
+    );
+    const byUid = /* @__PURE__ */ new Map();
+    for (const row of rows) {
+      const uid = String(
+        /** @type {{ userId?: unknown }} */
+        row?.userId ?? ""
+      ).trim();
+      if (!uid) continue;
+      const g = byUid.get(uid);
+      if (g) g.push(row);
+      else byUid.set(uid, [row]);
+    }
+    const built = [];
+    for (const [userId, group] of byUid) {
+      const chronological = [...group].sort(
+        (a, b) => rowCapturedAt(a) - rowCapturedAt(b)
+      );
+      let observed = false;
+      const urls = [];
+      for (const g of chronological) {
+        if (
+          /** @type {{ avatarObserved?: boolean }} */
+          g.avatarObserved === true
+        ) {
+          observed = true;
+        }
+        const u = String(
+          /** @type {{ avatarUrl?: unknown }} */
+          g.avatarUrl ?? ""
+        ).trim();
+        if (u) urls.push(u);
+      }
+      const avatarUrl = pickStrongestAvatarUrlForUser(userId, urls);
+      const newestFirst = [...chronological].sort(
+        (a, b) => rowCapturedAt(b) - rowCapturedAt(a)
+      );
+      let nickname = "";
+      for (const g of newestFirst) {
+        const n = String(
+          /** @type {{ nickname?: unknown }} */
+          g.nickname ?? ""
+        ).trim();
+        if (supportGridStrongNickname(n, userId)) {
+          nickname = n;
+          break;
+        }
+      }
+      if (!nickname && newestFirst.length > 0) {
+        nickname = String(
+          /** @type {{ nickname?: unknown }} */
+          newestFirst[0].nickname ?? ""
+        ).trim();
+      }
+      const lastCapturedAt = Math.max(0, ...chronological.map(rowCapturedAt));
+      const outLiveId = filterByLive ? lidNorm : rowLiveId(newestFirst[0] || chronological[chronological.length - 1] || {});
+      built.push({
+        userId,
+        nickname,
+        avatarUrl,
+        avatarObserved: observed,
+        liveId: outLiveId,
+        _laneSortAt: lastCapturedAt
+      });
+    }
+    built.sort((a, b) => (b._laneSortAt || 0) - (a._laneSortAt || 0));
+    const frozen = Object.freeze(
+      built.map(
+        (row) => Object.freeze({
+          userId: row.userId,
+          nickname: row.nickname,
+          avatarUrl: row.avatarUrl,
+          avatarObserved: row.avatarObserved,
+          liveId: row.liveId
+        })
+      )
+    );
+    return (
+      /** @type {readonly Readonly<UserLaneCandidateFromStorage>[]} */
+      frozen
+    );
   }
 
   // src/lib/storyUserLaneContaminationGuard.js
@@ -6425,6 +6544,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     entries: (
       /** @type {PopupCommentEntry[]} */
       []
+    ),
+    /** nls_comments 由来で当該 liveId のみ（応援レーン userId 集約の入力） */
+    storageRowsForCurrentLive: (
+      /** @type {PopupCommentEntry[]} */
+      []
+    ),
+    /** userLaneCandidatesFromStorage の戻り（イミュータブル配列） */
+    laneAggregates: (
+      /** @type {readonly unknown[]} */
+      Object.freeze([])
     )
   };
   var lastDevMonitorPanelParams = (
@@ -6726,6 +6855,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       anonymousIdenticonDataUrl: ""
     };
     const entries = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
+    const aggList = Array.isArray(STORY_SOURCE_STATE.laneAggregates) ? STORY_SOURCE_STATE.laneAggregates : [];
+    const storageCtx = STORY_SOURCE_STATE.storageRowsForCurrentLive.length ? STORY_SOURCE_STATE.storageRowsForCurrentLive : entries;
     if (!entries.length) {
       storyUserLaneLastRenderSig = "";
       STORY_AVATAR_DIAG_STATE.userLaneDeduped = 0;
@@ -6754,19 +6885,32 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     let laneDiagT1 = 0;
     let laneDiagStrongNick = 0;
     let laneDiagPersonalThumb = 0;
-    for (let i = entries.length - 1; i >= 0; i -= 1) {
-      const e = entries[i];
-      const uidRaw = String(e?.userId || "").trim();
+    for (let i = aggList.length - 1; i >= 0; i -= 1) {
+      const agg = (
+        /** @type {{ userId: string, nickname?: string, avatarUrl?: string, avatarObserved?: boolean }} */
+        aggList[i]
+      );
+      const uidRaw = String(agg?.userId || "").trim();
       if (!uidRaw) continue;
+      const e = {
+        id: `nl-lane:${uidRaw}`,
+        liveId,
+        userId: uidRaw,
+        nickname: String(agg.nickname || ""),
+        avatarUrl: String(agg.avatarUrl || ""),
+        ...agg.avatarObserved ? { avatarObserved: true } : {},
+        text: "",
+        commentNo: ""
+      };
       if (shouldSkipStoryUserLaneCandidateByContamination({
         candidateUserId: uidRaw,
         viewerUserId: viewerUid,
         broadcasterUserId: broadcasterUid,
-        isOwnPosted: isOwnPostedSupportComment(e, liveId, entries)
+        isOwnPosted: isOwnPostedSupportComment(e, liveId, storageCtx)
       })) {
         continue;
       }
-      const httpFromGrowth = storyGrowthAvatarSrcCandidate(e, liveId);
+      const httpFromGrowth = storyGrowthAvatarSrcCandidate(e, liveId, storageCtx);
       const dedupeKey = userLaneDedupeKey({
         userId: uidRaw,
         avatarHttpCandidate: "",
@@ -6832,7 +6976,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       liveId,
       laneScheme,
       picked,
-      entries.length
+      aggList.length
     );
     if (laneSig === storyUserLaneLastRenderSig) {
       return;
@@ -6915,9 +7059,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const d = snap?._debug;
     STORY_AVATAR_DIAG_STATE.interceptMapOnPage = d && typeof d.intercept === "number" && Number.isFinite(d.intercept) && d.intercept >= 0 ? Math.floor(d.intercept) : -1;
   }
-  function syncStorySourceEntries(liveId, arr) {
+  function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
     const nextLiveId = String(liveId || "");
-    const list = Array.isArray(arr) ? arr : [];
+    const list = Array.isArray(displayList) ? displayList : [];
     if (STORY_SOURCE_STATE.liveId !== nextLiveId) {
       STORY_SOURCE_STATE.liveId = nextLiveId;
       STORY_GROWTH_STATE.pinnedCommentId = null;
@@ -6925,6 +7069,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       cancelStoryHoverClearTimer();
     }
     STORY_SOURCE_STATE.entries = list;
+    STORY_SOURCE_STATE.storageRowsForCurrentLive = Array.isArray(storageRowsForLane) ? storageRowsForLane : [];
+    STORY_SOURCE_STATE.laneAggregates = nextLiveId ? userLaneCandidatesFromStorage(STORY_SOURCE_STATE.storageRowsForCurrentLive, nextLiveId) : Object.freeze([]);
     const pin = STORY_GROWTH_STATE.pinnedCommentId;
     if (pin && !list.some((e) => commentStableId(e) === pin)) {
       STORY_GROWTH_STATE.pinnedCommentId = null;
@@ -9026,7 +9172,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         updateCommentPostUiContext(url, lv, relevantCommentPanelCode);
         paintCommentComposeUi();
         setReloadWatchTabUiDisabled(false);
-        syncStorySourceEntries(lv, displayEntries);
+        const storageRowsForLane = arr.filter(
+          (e) => String(e?.liveId || "").trim().toLowerCase() === String(lv || "").trim().toLowerCase()
+        );
+        syncStorySourceEntries(lv, displayEntries, storageRowsForLane);
         renderUserRooms(arr, lv);
         renderCharacterScene({
           hasWatch: true,
@@ -10624,7 +10773,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0418-1404" ? String("0418-1404") : "dev";
+      const buildId = "0418-1444" ? String("0418-1444") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

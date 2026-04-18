@@ -163,6 +163,7 @@ import {
   flattenStoryUserLaneBuckets
 } from '../lib/storyUserLaneBuckets.js';
 import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js';
+import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
 import { shouldSkipStoryUserLaneCandidateByContamination } from '../lib/storyUserLaneContaminationGuard.js';
 import { explainSupportGridDisplayTier } from '../lib/supportGridDisplayTier.js';
 import {
@@ -2511,7 +2512,11 @@ function ensureStoryGrowthColorSchemeListener() {
 /** アイコン列が参照するコメント（全件） */
 const STORY_SOURCE_STATE = {
   liveId: '',
-  entries: /** @type {PopupCommentEntry[]} */ ([])
+  entries: /** @type {PopupCommentEntry[]} */ ([]),
+  /** nls_comments 由来で当該 liveId のみ（応援レーン userId 集約の入力） */
+  storageRowsForCurrentLive: /** @type {PopupCommentEntry[]} */ ([]),
+  /** userLaneCandidatesFromStorage の戻り（イミュータブル配列） */
+  laneAggregates: /** @type {readonly unknown[]} */ (Object.freeze([]))
 };
 
 /** 開発監視エクスポート用・直近の render 引数 */
@@ -2818,6 +2823,12 @@ function renderStoryUserLane() {
   const entries = Array.isArray(STORY_SOURCE_STATE.entries)
     ? STORY_SOURCE_STATE.entries
     : [];
+  const aggList = Array.isArray(STORY_SOURCE_STATE.laneAggregates)
+    ? STORY_SOURCE_STATE.laneAggregates
+    : [];
+  const storageCtx = STORY_SOURCE_STATE.storageRowsForCurrentLive.length
+    ? STORY_SOURCE_STATE.storageRowsForCurrentLive
+    : entries;
   if (!entries.length) {
     storyUserLaneLastRenderSig = '';
     STORY_AVATAR_DIAG_STATE.userLaneDeduped = 0;
@@ -2849,21 +2860,34 @@ function renderStoryUserLane() {
   let laneDiagT1 = 0;
   let laneDiagStrongNick = 0;
   let laneDiagPersonalThumb = 0;
-  for (let i = entries.length - 1; i >= 0; i -= 1) {
-    const e = entries[i];
-    const uidRaw = String(e?.userId || '').trim();
+  for (let i = aggList.length - 1; i >= 0; i -= 1) {
+    const agg = /** @type {{ userId: string, nickname?: string, avatarUrl?: string, avatarObserved?: boolean }} */ (
+      aggList[i]
+    );
+    const uidRaw = String(agg?.userId || '').trim();
     if (!uidRaw) continue;
+    /** @type {PopupCommentEntry} */
+    const e = {
+      id: `nl-lane:${uidRaw}`,
+      liveId,
+      userId: uidRaw,
+      nickname: String(agg.nickname || ''),
+      avatarUrl: String(agg.avatarUrl || ''),
+      ...(agg.avatarObserved ? { avatarObserved: true } : {}),
+      text: '',
+      commentNo: ''
+    };
     if (
       shouldSkipStoryUserLaneCandidateByContamination({
         candidateUserId: uidRaw,
         viewerUserId: viewerUid,
         broadcasterUserId: broadcasterUid,
-        isOwnPosted: isOwnPostedSupportComment(e, liveId, entries)
+        isOwnPosted: isOwnPostedSupportComment(e, liveId, storageCtx)
       })
     ) {
       continue;
     }
-    const httpFromGrowth = storyGrowthAvatarSrcCandidate(e, liveId);
+    const httpFromGrowth = storyGrowthAvatarSrcCandidate(e, liveId, storageCtx);
     const dedupeKey = userLaneDedupeKey({
       userId: uidRaw,
       avatarHttpCandidate: '',
@@ -2935,7 +2959,7 @@ function renderStoryUserLane() {
     liveId,
     laneScheme,
     picked,
-    entries.length
+    aggList.length
   );
   if (laneSig === storyUserLaneLastRenderSig) {
     return;
@@ -3027,11 +3051,12 @@ function syncInterceptMapDiagFromSnapshot(snap) {
 
 /**
  * @param {string} liveId
- * @param {PopupCommentEntry[]} arr
+ * @param {PopupCommentEntry[]} displayList アイコン列・ストーリー UI 用（表示専用行を含む）
+ * @param {PopupCommentEntry[]|null|undefined} [storageRowsForLane] nls_comments 相当・当放送のみ。省略時は応援レーン候補は空扱い。
  */
-function syncStorySourceEntries(liveId, arr) {
+function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
   const nextLiveId = String(liveId || '');
-  const list = Array.isArray(arr) ? arr : [];
+  const list = Array.isArray(displayList) ? displayList : [];
 
   if (STORY_SOURCE_STATE.liveId !== nextLiveId) {
     STORY_SOURCE_STATE.liveId = nextLiveId;
@@ -3041,6 +3066,12 @@ function syncStorySourceEntries(liveId, arr) {
   }
 
   STORY_SOURCE_STATE.entries = list;
+  STORY_SOURCE_STATE.storageRowsForCurrentLive = Array.isArray(storageRowsForLane)
+    ? storageRowsForLane
+    : [];
+  STORY_SOURCE_STATE.laneAggregates = nextLiveId
+    ? userLaneCandidatesFromStorage(STORY_SOURCE_STATE.storageRowsForCurrentLive, nextLiveId)
+    : Object.freeze([]);
 
   const pin = STORY_GROWTH_STATE.pinnedCommentId;
   if (pin && !list.some((e) => commentStableId(e) === pin)) {
@@ -6020,7 +6051,13 @@ async function refresh() {
     updateCommentPostUiContext(url, lv, relevantCommentPanelCode);
     paintCommentComposeUi();
     setReloadWatchTabUiDisabled(false);
-    syncStorySourceEntries(lv, displayEntries);
+    const storageRowsForLane = arr.filter(
+      (e) =>
+        String(e?.liveId || '')
+          .trim()
+          .toLowerCase() === String(lv || '').trim().toLowerCase()
+    );
+    syncStorySourceEntries(lv, displayEntries, storageRowsForLane);
     renderUserRooms(arr, lv);
     renderCharacterScene({
       hasWatch: true,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mergeStoredCommentDedupeVariants } from '../lib/storedCommentDedupeMerge.js';
 import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js';
 import { niconicoDefaultUserIconUrl } from '../lib/supportGrowthTileSrc.js';
+import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
 
 const lanePickCtx = {
   yukkuriSrc: 'images/yukkuri.png',
@@ -65,5 +66,89 @@ describe('popup ストレージ重複マージ → ユーザーレーン tier（
       lanePickCtx
     );
     expect(row?.profileTier).toBe(2);
+  });
+});
+
+describe('userLaneCandidatesFromStorage → buildStoryUserLaneCandidateRow（storage 集約）', () => {
+  const eightNumericUids = [
+    '125628526',
+    '130123037',
+    '134010736',
+    '13714254',
+    '30678345',
+    '4348420',
+    '91428901',
+    '97561760'
+  ];
+
+  it('8 名の数値IDで avatarObserved が行のどれかに分散していても集約後は全員 tier 3', () => {
+    const lv = 'lv_eight_lane';
+    /** @type {Record<string, unknown>[]} */
+    const stored = [];
+    let t = 1;
+    for (const uid of eightNumericUids) {
+      const http = niconicoDefaultUserIconUrl(uid);
+      stored.push({
+        liveId: lv,
+        commentNo: String(t++),
+        text: 'x',
+        userId: uid,
+        nickname: 'ゲスト',
+        avatarUrl: http,
+        capturedAt: 1000 + t
+      });
+      stored.push({
+        liveId: lv,
+        commentNo: String(t++),
+        text: 'y',
+        userId: uid,
+        nickname: 'ゲスト',
+        avatarUrl: '',
+        avatarObserved: true,
+        capturedAt: 2000 + t
+      });
+    }
+
+    const agg = userLaneCandidatesFromStorage(stored, lv);
+    expect(agg.length).toBe(8);
+    for (const a of agg) {
+      expect(a.avatarObserved).toBe(true);
+      const http = niconicoDefaultUserIconUrl(a.userId);
+      const row = buildStoryUserLaneCandidateRow(
+        {
+          liveId: lv,
+          userId: a.userId,
+          nickname: a.nickname,
+          avatarUrl: a.avatarUrl,
+          ...(a.avatarObserved ? { avatarObserved: true } : {})
+        },
+        0,
+        http,
+        lanePickCtx
+      );
+      expect(row?.profileTier).toBe(3);
+    }
+  });
+
+  it('別 liveId の行は集約に混ざらない', () => {
+    const targetLv = 'lv_only';
+    const rows = [
+      {
+        liveId: targetLv,
+        userId: '100001',
+        nickname: 'A',
+        text: 'a',
+        capturedAt: 1
+      },
+      {
+        liveId: 'lv_intruder',
+        userId: '999999',
+        nickname: 'Intruder',
+        text: 'b',
+        capturedAt: 2
+      }
+    ];
+    const agg = userLaneCandidatesFromStorage(rows, targetLv);
+    expect(agg.map((x) => x.userId).sort()).toEqual(['100001']);
   });
 });
