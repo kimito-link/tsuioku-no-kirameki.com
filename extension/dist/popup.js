@@ -1018,7 +1018,7 @@
     return `https://www.nicovideo.jp/user/${encodeURIComponent(s)}`;
   }
 
-  // src/lib/htmlEscape.js
+  // src/shared/html/escape.js
   function escapeHtml(s) {
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
@@ -2529,23 +2529,91 @@ ${body}`;
     return [...b.link, ...b.konta, ...b.tanu];
   }
 
+  // src/domain/user/identity.js
+  function isAnonymousStyleNicoUserId2(userId) {
+    const s = String(userId || "").trim();
+    if (!s) return true;
+    if (/^\d{5,14}$/.test(s)) return false;
+    if (/^a:/i.test(s)) return true;
+    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return true;
+    return true;
+  }
+
+  // src/domain/user/nickname.js
+  function isNiconicoAutoUserPlaceholderNickname2(nick) {
+    const n = String(nick ?? "").trim();
+    if (!n) return false;
+    return /^user[0-9A-Za-z]{4,20}$/i.test(n);
+  }
+  function isStrongNickname(nick, userId) {
+    const n = String(nick ?? "").trim();
+    if (!n) return false;
+    if (isNiconicoAutoUserPlaceholderNickname2(n)) return false;
+    if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)") return false;
+    if (n === "\u533F\u540D") return false;
+    if (n === "\u30B2\u30B9\u30C8" || /^guest$/i.test(n)) return false;
+    if (isAnonymousStyleNicoUserId2(userId) && n.length <= 1) return false;
+    return true;
+  }
+
+  // src/domain/lane/columns/linkPolicy.js
+  function matchesLinkPolicy(entry) {
+    const uid = String(entry?.userId || "").trim();
+    if (!uid) return false;
+    if (isAnonymousStyleNicoUserId2(uid)) return false;
+    const kinds = entry?.avatarObservationKinds;
+    const observedAny = kinds instanceof Set && kinds.size > 0 || Array.isArray(kinds) && kinds.length > 0 || Boolean(entry?.avatarObserved);
+    if (observedAny) return true;
+    if (entry?.hasNonCanonicalPersonalUrl) return true;
+    if (isStrongNickname(entry?.nickname, uid)) return true;
+    return false;
+  }
+
+  // src/domain/lane/columns/kontaPolicy.js
+  function matchesKontaPolicy(entry) {
+    const uid = String(entry?.userId || "").trim();
+    if (!uid) return false;
+    if (isAnonymousStyleNicoUserId2(uid)) return false;
+    if (matchesLinkPolicy(entry)) return false;
+    return true;
+  }
+
+  // src/domain/lane/columns/tanuPolicy.js
+  function matchesTanuPolicy(entry) {
+    const uid = String(entry?.userId || "").trim();
+    if (!uid) return false;
+    return isAnonymousStyleNicoUserId2(uid);
+  }
+
+  // src/domain/lane/tier.js
+  function resolveLaneTier(entry) {
+    const uid = String(entry?.userId || "").trim();
+    if (!uid) return 0;
+    if (matchesTanuPolicy(entry)) return 1;
+    if (matchesLinkPolicy(entry)) return 3;
+    if (matchesKontaPolicy(entry)) return 2;
+    return 1;
+  }
+
   // src/lib/storyUserLaneRowModel.js
   function userLaneProfileCompletenessTier(entry, httpAvatarCandidate) {
     const uid = String(entry?.userId || "").trim();
     if (!uid) return 0;
-    if (isAnonymousStyleNicoUserId(uid)) return 1;
+    const nickname = String(entry?.nickname || "").trim();
     const observed = Boolean(entry?.avatarObserved);
     const ex = explainSupportGridDisplayTier({
       userId: uid,
-      nickname: String(entry?.nickname || "").trim(),
+      nickname,
       httpAvatarCandidate: String(httpAvatarCandidate ?? "").trim(),
       storedAvatarUrl: String(entry?.avatarUrl || "").trim(),
       avatarObserved: observed
     });
-    if (observed) return 3;
-    if (ex.hasPersonalThumb) return 3;
-    if (ex.strongNick) return 2;
-    return 1;
+    return resolveLaneTier({
+      userId: uid,
+      nickname,
+      avatarObserved: observed,
+      hasNonCanonicalPersonalUrl: Boolean(ex.hasPersonalThumb)
+    });
   }
   function buildStoryUserLaneCandidateRow(entry, entryIndex, httpFromGrowth, pickCtx) {
     const uidRaw = String(entry?.userId || "").trim();
@@ -11044,7 +11112,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0418-1904" ? String("0418-1904") : "dev";
+      const buildId = "0418-1931" ? String("0418-1931") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
