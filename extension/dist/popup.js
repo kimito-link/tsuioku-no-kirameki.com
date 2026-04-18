@@ -2645,6 +2645,161 @@ ${body}`;
     );
   }
 
+  // src/lib/userLaneDiagSnapshot.js
+  function normalizeLv2(v) {
+    const s = String(v ?? "").trim().toLowerCase();
+    if (!s) return "";
+    return s.startsWith("lv") ? s : `lv${s}`;
+  }
+  function rowLiveIdRaw(row) {
+    const o = (
+      /** @type {{ liveId?: unknown, lvId?: unknown }} */
+      row
+    );
+    return String(o?.liveId ?? o?.lvId ?? "").trim();
+  }
+  function sanitizeStorageRowSample(row) {
+    const o = (
+      /** @type {{ liveId?: unknown, lvId?: unknown, userId?: unknown, avatarUrl?: unknown, avatarObserved?: unknown, capturedAt?: unknown }} */
+      row
+    );
+    return {
+      liveIdNorm: normalizeLv2(o?.liveId),
+      lvIdNorm: normalizeLv2(o?.lvId),
+      hasUserId: Boolean(String(o?.userId ?? "").trim()),
+      avatarUrl: Boolean(o?.avatarUrl),
+      avatarObserved: o?.avatarObserved === true,
+      capturedAt: Number.isFinite(Number(o?.capturedAt)) ? Number(o?.capturedAt) : 0
+    };
+  }
+  function sanitizeAggregateSample(row) {
+    const o = (
+      /** @type {{ userId?: unknown, nickname?: unknown, avatarUrl?: unknown, avatarObserved?: unknown, liveId?: unknown }} */
+      row
+    );
+    return {
+      hasUserId: Boolean(String(o?.userId ?? "").trim()),
+      hasNickname: Boolean(String(o?.nickname ?? "").trim()),
+      avatarUrl: Boolean(o?.avatarUrl),
+      avatarObserved: o?.avatarObserved === true,
+      liveIdNorm: normalizeLv2(o?.liveId)
+    };
+  }
+  function sanitizeEntrySample(row) {
+    const o = (
+      /** @type {{ liveId?: unknown, lvId?: unknown, userId?: unknown, avatarUrl?: unknown, avatarObserved?: unknown }} */
+      row
+    );
+    return {
+      liveIdNorm: normalizeLv2(o?.liveId),
+      lvIdNorm: normalizeLv2(o?.lvId),
+      hasUserId: Boolean(String(o?.userId ?? "").trim()),
+      avatarUrl: Boolean(o?.avatarUrl),
+      avatarObserved: o?.avatarObserved === true
+    };
+  }
+  function buildUserLaneDiagSnapshot(state) {
+    const empty = () => ({
+      meta: { liveId: "", timestamp: "" },
+      counts: {
+        storageRows: 0,
+        entries: 0,
+        laneAggregates: 0,
+        observedUsers: 0
+      },
+      liveIdCheck: { sampleRowLiveIds: (
+        /** @type {string[]} */
+        []
+      ) },
+      samples: {
+        storageRows: (
+          /** @type {ReturnType<typeof sanitizeStorageRowSample>[]} */
+          []
+        ),
+        laneAggregates: (
+          /** @type {ReturnType<typeof sanitizeAggregateSample>[]} */
+          []
+        ),
+        entries: (
+          /** @type {ReturnType<typeof sanitizeEntrySample>[]} */
+          []
+        )
+      },
+      invariants: {
+        hasStorageRows: false,
+        hasLaneAggregates: false,
+        observedExists: false
+      }
+    });
+    try {
+      const liveId = String(state?.liveId ?? "").trim();
+      const storageRows = Array.isArray(state?.storageRowsForCurrentLive) ? state.storageRowsForCurrentLive : [];
+      const laneAggregates = Array.isArray(state?.laneAggregates) ? state.laneAggregates : [];
+      const entries = Array.isArray(state?.entries) ? state.entries : [];
+      const sampleRowLiveIds = storageRows.slice(0, 5).map((row) => rowLiveIdRaw(row));
+      let observedUsers = 0;
+      if (laneAggregates.length) {
+        observedUsers = laneAggregates.filter((a) => {
+          const o = (
+            /** @type {{ avatarObserved?: unknown }} */
+            a
+          );
+          return o?.avatarObserved === true;
+        }).length;
+      } else {
+        observedUsers = entries.filter((e) => {
+          const o = (
+            /** @type {{ avatarObserved?: unknown }} */
+            e
+          );
+          return o?.avatarObserved === true;
+        }).length;
+      }
+      const hasStorageRows = storageRows.length > 0;
+      const hasLaneAggregates = laneAggregates.length > 0;
+      const observedExists = laneAggregates.some((a) => {
+        const o = (
+          /** @type {{ avatarObserved?: unknown }} */
+          a
+        );
+        return o?.avatarObserved === true;
+      }) || entries.some((e) => {
+        const o = (
+          /** @type {{ avatarObserved?: unknown }} */
+          e
+        );
+        return o?.avatarObserved === true;
+      });
+      return {
+        meta: {
+          liveId,
+          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        },
+        counts: {
+          storageRows: storageRows.length,
+          entries: entries.length,
+          laneAggregates: laneAggregates.length,
+          observedUsers
+        },
+        liveIdCheck: {
+          sampleRowLiveIds
+        },
+        samples: {
+          storageRows: storageRows.slice(0, 5).map((r) => sanitizeStorageRowSample(r)),
+          laneAggregates: laneAggregates.slice(0, 5).map((r) => sanitizeAggregateSample(r)),
+          entries: entries.slice(0, 5).map((r) => sanitizeEntrySample(r))
+        },
+        invariants: {
+          hasStorageRows,
+          hasLaneAggregates,
+          observedExists
+        }
+      };
+    } catch {
+      return empty();
+    }
+  }
+
   // src/lib/storyUserLaneContaminationGuard.js
   function shouldSkipStoryUserLaneCandidateByContamination(opts) {
     const uid = String(opts.candidateUserId || "").trim();
@@ -7007,6 +7162,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       return;
     }
     paintStoryUserLaneDomFilled(els, faces, buckets, picked.length, laneDomIo);
+    setTimeout(() => {
+      if (typeof window !== "undefined" && window.__NLS_LANE_DIAG__) {
+        window.__NLS_LANE_DIAG__();
+      }
+    }, 3e3);
   }
   function renderStoryAvatarDiag() {
     const el = (
@@ -10796,7 +10956,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0418-1533" ? String("0418-1533") : "dev";
+      const buildId = "0418-1548" ? String("0418-1548") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -12137,6 +12297,14 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         watchMetaCache.snapshot = null;
         safeRefresh();
       });
+    }
+    if (typeof window !== "undefined") {
+      window.__NLS_LANE_DIAG__ = function() {
+        const snap = buildUserLaneDiagSnapshot(STORY_SOURCE_STATE);
+        console.log("=== NLS_LANE_DIAG ===");
+        console.log(JSON.stringify(snap, null, 2));
+        return snap;
+      };
     }
   }
   if (document.readyState === "loading") {

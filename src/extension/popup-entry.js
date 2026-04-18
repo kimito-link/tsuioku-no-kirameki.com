@@ -167,6 +167,7 @@ import {
   normalizeLv,
   userLaneCandidatesFromStorage
 } from '../lib/userLaneCandidatesFromStorage.js';
+import { buildUserLaneDiagSnapshot } from '../lib/userLaneDiagSnapshot.js';
 import { shouldSkipStoryUserLaneCandidateByContamination } from '../lib/storyUserLaneContaminationGuard.js';
 import { explainSupportGridDisplayTier } from '../lib/supportGridDisplayTier.js';
 import {
@@ -2975,6 +2976,11 @@ function renderStoryUserLane() {
   }
 
   paintStoryUserLaneDomFilled(els, faces, buckets, picked.length, laneDomIo);
+  setTimeout(() => {
+    if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
+      window.__NLS_LANE_DIAG__();
+    }
+  }, 3000);
 }
 
 function renderStoryAvatarDiag() {
@@ -8975,6 +8981,15 @@ function initPopup() {
       watchMetaCache.snapshot = null;
       safeRefresh();
     });
+  }
+
+  if (typeof window !== 'undefined') {
+    window.__NLS_LANE_DIAG__ = function () {
+      const snap = buildUserLaneDiagSnapshot(STORY_SOURCE_STATE);
+      console.log('=== NLS_LANE_DIAG ===');
+      console.log(JSON.stringify(snap, null, 2));
+      return snap;
+    };
   }
 }
 
