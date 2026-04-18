@@ -9,6 +9,8 @@ import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
   KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
+  normalizeInlinePanelAutoshowEnabled,
   INLINE_PANEL_PLACEMENT_BESIDE,
   INLINE_PANEL_PLACEMENT_FLOATING,
   INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
@@ -1915,6 +1917,19 @@ let inlinePanelPlacementMode = normalizeInlinePanelPlacement(undefined);
 let inlineFloatingAnchor = normalizeInlineFloatingAnchor(undefined);
 
 /**
+ * 視聴ページで extension のインラインパネルを自動表示するかどうか（storage から更新）。
+ * false のときはページを開いてもパネルは出ず、ツールバーアイコンを押すまで非表示。
+ * 「こん太を押す前から勝手に出る」UX 不一致を回避するための opt-out スイッチ。
+ */
+let inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(undefined);
+
+/**
+ * このタブで一度でもツールバーアイコンを押したか（セッション局所フラグ、storage には持たない）。
+ * autoshow が false でも、ユーザがツールバーを押した瞬間から同じタブでは表示する。
+ */
+let toolbarInitiatedShowThisSession = false;
+
+/**
  * ShadowRoot 直下ノードは parentElement が null でも、parentNode 上では insertBefore 可能。
  * ここを無視すると hostParent が常に null になりパネルが一度も DOM に載らない。
  * @param {HTMLElement} el
@@ -2670,6 +2685,15 @@ function renderPageFrameOverlay() {
     hidePageFrameOverlay();
     return;
   }
+  /*
+   * autoshow 設定が明示的に OFF、かつユーザがこのタブでまだツールバーを押していない場合は、
+   * インラインパネルを一切表示しない（ユーザー要望「こん太を押す前は extension を出さない」）。
+   * ツールバークリックで toolbarInitiatedShowThisSession が立つと以降は通常どおり表示する。
+   */
+  if (!inlinePanelAutoshowEnabled && !toolbarInitiatedShowThisSession) {
+    hidePageFrameOverlay();
+    return;
+  }
 
   renderingPageFrame = true;
   try {
@@ -2741,7 +2765,8 @@ async function loadPageFrameSettings() {
     KEY_POPUP_FRAME_CUSTOM,
     KEY_INLINE_PANEL_WIDTH_MODE,
     KEY_INLINE_PANEL_PLACEMENT,
-    KEY_INLINE_FLOATING_ANCHOR
+    KEY_INLINE_FLOATING_ANCHOR,
+    KEY_INLINE_PANEL_AUTOSHOW_ENABLED
   ]);
   inlinePanelWidthMode = normalizeInlinePanelWidthMode(
     bag[KEY_INLINE_PANEL_WIDTH_MODE]
@@ -2751,6 +2776,9 @@ async function loadPageFrameSettings() {
   );
   inlineFloatingAnchor = normalizeInlineFloatingAnchor(
     bag[KEY_INLINE_FLOATING_ANCHOR]
+  );
+  inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(
+    bag[KEY_INLINE_PANEL_AUTOSHOW_ENABLED]
   );
   const rawFrame = normalizePageFrameId(bag[KEY_POPUP_FRAME]);
   pageFrameState.frameId =
@@ -3941,6 +3969,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'NLS_FOCUS_INLINE_PANEL') {
     if (!isWatchInlinePanelTopFrame()) {
       return false;
+    }
+    /*
+     * ユーザが明示的にツールバーを押した瞬間から、このタブでは autoshow 設定に
+     * 関わらずインラインパネルを表示する（opt-in の opt-out: 「一度開いてみたい」に応える）。
+     * autoshow=true のユーザには何の影響もない（既に表示中）。
+     */
+    toolbarInitiatedShowThisSession = true;
+    // gate 条件が変わるので即再描画（次の tick を待たずに panel が出る）
+    try {
+      renderPageFrameOverlay();
+    } catch {
+      // no-op: 初回描画の例外は tick loop 側で回収される
     }
     const focused = focusInlinePanelHostFromToolbar();
     sendResponse({ ok: true, focused });
@@ -5589,6 +5629,19 @@ async function start() {
         inlinePanelPlacementMode = normalizeInlinePanelPlacement(
           changes[KEY_INLINE_PANEL_PLACEMENT].newValue
         );
+        renderPageFrameOverlay();
+      }
+    }
+
+    if (changes[KEY_INLINE_PANEL_AUTOSHOW_ENABLED]) {
+      if (isWatchInlinePanelTopFrame()) {
+        inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(
+          changes[KEY_INLINE_PANEL_AUTOSHOW_ENABLED].newValue
+        );
+        // OFF にしたときは toolbar セッションフラグもリセットして完全非表示に戻す
+        if (!inlinePanelAutoshowEnabled) {
+          toolbarInitiatedShowThisSession = false;
+        }
         renderPageFrameOverlay();
       }
     }

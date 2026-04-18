@@ -29,6 +29,7 @@ import {
   KEY_LAST_WATCH_URL,
   KEY_RECORDING,
   KEY_DEEP_HARVEST_QUIET_UI,
+  KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
   KEY_SELF_POSTED_RECENTS,
   KEY_USER_COMMENT_PROFILE_CACHE,
   KEY_COMMENT_PANEL_STATUS,
@@ -52,6 +53,7 @@ import {
   isCommentEnterSendEnabled,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
+  normalizeInlinePanelAutoshowEnabled,
   normalizeInlinePanelWidthMode,
   normalizeInlinePanelPlacement,
   normalizeInlineFloatingAnchor,
@@ -5818,6 +5820,7 @@ async function refresh() {
       KEY_LAST_WATCH_URL,
       KEY_RECORDING,
       KEY_DEEP_HARVEST_QUIET_UI,
+      KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
       KEY_INLINE_PANEL_WIDTH_MODE,
       KEY_INLINE_PANEL_PLACEMENT,
       KEY_INLINE_FLOATING_ANCHOR,
@@ -5876,6 +5879,18 @@ async function refresh() {
       openBag[KEY_DEEP_HARVEST_QUIET_UI]
     );
     deepHarvestQuietEl.disabled = false;
+  }
+
+  // 視聴ページでインラインパネルを自動表示するかどうか。
+  // 既定 true（従来動作）。OFF にするとツールバーアイコンを押すまで出てこない。
+  const inlinePanelAutoshowEl = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelAutoshowToggle')
+  );
+  if (inlinePanelAutoshowEl) {
+    inlinePanelAutoshowEl.checked = normalizeInlinePanelAutoshowEnabled(
+      openBag[KEY_INLINE_PANEL_AUTOSHOW_ENABLED]
+    );
+    inlinePanelAutoshowEl.disabled = false;
   }
 
   const panelMode = normalizeInlinePanelWidthMode(
@@ -8226,6 +8241,21 @@ function initPopup() {
         [KEY_DEEP_HARVEST_QUIET_UI]: deepHarvestQuietToggle.checked
       });
       if (!ok) return;
+    } catch {
+      //
+    }
+  });
+
+  // 視聴ページの自動表示 ON/OFF：OFF のときはツールバーアイコンを押すまで
+  // インラインパネルを出さない（こん太を押す前から勝手に出るのを避ける）。
+  const inlinePanelAutoshowToggle = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelAutoshowToggle')
+  );
+  inlinePanelAutoshowToggle?.addEventListener('change', async () => {
+    try {
+      await storageSetSafe({
+        [KEY_INLINE_PANEL_AUTOSHOW_ENABLED]: inlinePanelAutoshowToggle.checked
+      });
     } catch {
       //
     }

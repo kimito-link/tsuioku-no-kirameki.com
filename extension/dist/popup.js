@@ -248,6 +248,10 @@
   ]);
   var KEY_INLINE_PANEL_WIDTH_MODE = "nls_inline_panel_width_mode";
   var KEY_INLINE_PANEL_PLACEMENT = "nls_inline_panel_placement";
+  var KEY_INLINE_PANEL_AUTOSHOW_ENABLED = "nls_inline_panel_autoshow_enabled";
+  function normalizeInlinePanelAutoshowEnabled(raw) {
+    return raw !== false;
+  }
   var INLINE_PANEL_PLACEMENT_BELOW = "below";
   var INLINE_PANEL_PLACEMENT_BESIDE = "beside";
   var INLINE_PANEL_PLACEMENT_FLOATING = "floating";
@@ -9912,6 +9916,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           KEY_LAST_WATCH_URL,
           KEY_RECORDING,
           KEY_DEEP_HARVEST_QUIET_UI,
+          KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
           KEY_INLINE_PANEL_WIDTH_MODE,
           KEY_INLINE_PANEL_PLACEMENT,
           KEY_INLINE_FLOATING_ANCHOR,
@@ -9967,6 +9972,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           openBag[KEY_DEEP_HARVEST_QUIET_UI]
         );
         deepHarvestQuietEl.disabled = false;
+      }
+      const inlinePanelAutoshowEl = (
+        /** @type {HTMLInputElement|null} */
+        $("inlinePanelAutoshowToggle")
+      );
+      if (inlinePanelAutoshowEl) {
+        inlinePanelAutoshowEl.checked = normalizeInlinePanelAutoshowEnabled(
+          openBag[KEY_INLINE_PANEL_AUTOSHOW_ENABLED]
+        );
+        inlinePanelAutoshowEl.disabled = false;
       }
       const panelMode = normalizeInlinePanelWidthMode(
         openBag[KEY_INLINE_PANEL_WIDTH_MODE]
@@ -11439,7 +11454,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0418-2229" ? String("0418-2229") : "dev";
+      const buildId = "0418-2238" ? String("0418-2238") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -12021,6 +12036,18 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           [KEY_DEEP_HARVEST_QUIET_UI]: deepHarvestQuietToggle.checked
         });
         if (!ok) return;
+      } catch {
+      }
+    });
+    const inlinePanelAutoshowToggle = (
+      /** @type {HTMLInputElement|null} */
+      $("inlinePanelAutoshowToggle")
+    );
+    inlinePanelAutoshowToggle?.addEventListener("change", async () => {
+      try {
+        await storageSetSafe({
+          [KEY_INLINE_PANEL_AUTOSHOW_ENABLED]: inlinePanelAutoshowToggle.checked
+        });
       } catch {
       }
     });

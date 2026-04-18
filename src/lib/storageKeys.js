@@ -109,6 +109,25 @@ export const KEY_INLINE_PANEL_PLACEMENT = 'nls_inline_panel_placement';
 export const KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED =
   'nls_inline_panel_float_to_dock_migrated';
 
+/**
+ * 視聴ページで extension のインラインパネルを自動表示するかどうか。
+ * 既定 true（従来動作）。false を明示保存したときだけ OFF。
+ *
+ * OFF のときは視聴ページを開いてもパネルが出ず、ツールバーアイコンを押したときに
+ * 前面化する（ユーザーが明示的に操作した場合のみ見える）挙動になる。
+ * 「こん太アイコンを押す前から勝手に拡張がでる」という UX 不一致を設定で吸収する手段。
+ */
+export const KEY_INLINE_PANEL_AUTOSHOW_ENABLED =
+  'nls_inline_panel_autoshow_enabled';
+
+/**
+ * @param {unknown} raw
+ * @returns {boolean}
+ */
+export function normalizeInlinePanelAutoshowEnabled(raw) {
+  return raw !== false;
+}
+
 /** @type {'below'} */
 export const INLINE_PANEL_PLACEMENT_BELOW = 'below';
 /** @type {'beside'} */

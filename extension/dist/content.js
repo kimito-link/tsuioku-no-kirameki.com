@@ -83,6 +83,10 @@
   var KEY_INLINE_PANEL_WIDTH_MODE = "nls_inline_panel_width_mode";
   var KEY_INLINE_PANEL_PLACEMENT = "nls_inline_panel_placement";
   var KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED = "nls_inline_panel_float_to_dock_migrated";
+  var KEY_INLINE_PANEL_AUTOSHOW_ENABLED = "nls_inline_panel_autoshow_enabled";
+  function normalizeInlinePanelAutoshowEnabled(raw) {
+    return raw !== false;
+  }
   var INLINE_PANEL_PLACEMENT_BELOW = "below";
   var INLINE_PANEL_PLACEMENT_BESIDE = "beside";
   var INLINE_PANEL_PLACEMENT_FLOATING = "floating";
@@ -4571,6 +4575,8 @@
   var inlinePanelWidthMode = normalizeInlinePanelWidthMode(void 0);
   var inlinePanelPlacementMode = normalizeInlinePanelPlacement(void 0);
   var inlineFloatingAnchor = normalizeInlineFloatingAnchor(void 0);
+  var inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(void 0);
+  var toolbarInitiatedShowThisSession = false;
   function insertionParentForElement(el) {
     if (!(el instanceof HTMLElement)) return null;
     if (el.parentElement) return el.parentElement;
@@ -5156,6 +5162,10 @@
       hidePageFrameOverlay();
       return;
     }
+    if (!inlinePanelAutoshowEnabled && !toolbarInitiatedShowThisSession) {
+      hidePageFrameOverlay();
+      return;
+    }
     renderingPageFrame = true;
     try {
       const overlay = ensurePageFrameOverlay();
@@ -5201,7 +5211,8 @@
       KEY_POPUP_FRAME_CUSTOM,
       KEY_INLINE_PANEL_WIDTH_MODE,
       KEY_INLINE_PANEL_PLACEMENT,
-      KEY_INLINE_FLOATING_ANCHOR
+      KEY_INLINE_FLOATING_ANCHOR,
+      KEY_INLINE_PANEL_AUTOSHOW_ENABLED
     ]);
     inlinePanelWidthMode = normalizeInlinePanelWidthMode(
       bag[KEY_INLINE_PANEL_WIDTH_MODE]
@@ -5211,6 +5222,9 @@
     );
     inlineFloatingAnchor = normalizeInlineFloatingAnchor(
       bag[KEY_INLINE_FLOATING_ANCHOR]
+    );
+    inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(
+      bag[KEY_INLINE_PANEL_AUTOSHOW_ENABLED]
     );
     const rawFrame = normalizePageFrameId(bag[KEY_POPUP_FRAME]);
     pageFrameState.frameId = rawFrame === "custom" || hasPageFramePreset(rawFrame) ? rawFrame : DEFAULT_PAGE_FRAME;
@@ -6124,6 +6138,11 @@
     if (msg.type === "NLS_FOCUS_INLINE_PANEL") {
       if (!isWatchInlinePanelTopFrame()) {
         return false;
+      }
+      toolbarInitiatedShowThisSession = true;
+      try {
+        renderPageFrameOverlay();
+      } catch {
       }
       const focused = focusInlinePanelHostFromToolbar();
       sendResponse({ ok: true, focused });
@@ -7450,6 +7469,17 @@
           inlinePanelPlacementMode = normalizeInlinePanelPlacement(
             changes[KEY_INLINE_PANEL_PLACEMENT].newValue
           );
+          renderPageFrameOverlay();
+        }
+      }
+      if (changes[KEY_INLINE_PANEL_AUTOSHOW_ENABLED]) {
+        if (isWatchInlinePanelTopFrame()) {
+          inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(
+            changes[KEY_INLINE_PANEL_AUTOSHOW_ENABLED].newValue
+          );
+          if (!inlinePanelAutoshowEnabled) {
+            toolbarInitiatedShowThisSession = false;
+          }
           renderPageFrameOverlay();
         }
       }
