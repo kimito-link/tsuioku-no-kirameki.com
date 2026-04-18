@@ -3982,6 +3982,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     } catch {
       // no-op: 初回描画の例外は tick loop 側で回収される
     }
+    /*
+     * kon-ta 押下時点で deep harvest がまだ pending（timer 生存）かつ quiet UI 有効なら、
+     * ゲートで抑止していた loading インジケータをここで出す。
+     * autoshow OFF で視聴を開始 → harvest は裏で動いているが UI は沈黙 → kon-ta 押下で顕在化、の筋。
+     */
+    try {
+      if (deepHarvestTimer != null && deepHarvestQuietUi) {
+        ensureDeepHarvestLoadingUi();
+      }
+    } catch {
+      // no-op: loading UI は補助表示なので失敗しても本筋に影響しない
+    }
     const focused = focusInlinePanelHostFromToolbar();
     sendResponse({ ok: true, focused });
     return false;
@@ -4941,6 +4953,13 @@ function removeDeepHarvestLoadingUi() {
 
 function ensureDeepHarvestLoadingUi() {
   if (!hasExtensionContext()) return;
+  /*
+   * 拡張起点の UI は autoshow OFF（既定）かつツールバー未押下のあいだは一切描画しない。
+   * 「こん太アイコンを押すまで視聴ページに何も出ない」という opt-in 契約を、
+   * インラインパネル本体だけでなく loading インジケータにも貫徹するためのゲート。
+   * autoshow=true のユーザ／toolbar 押下後のタブでは従来どおり表示される。
+   */
+  if (!inlinePanelAutoshowEnabled && !toolbarInitiatedShowThisSession) return;
   if (document.getElementById(DEEP_HARVEST_LOADING_HOST_ID)) return;
   let imgUrl = '';
   try {
@@ -5641,6 +5660,8 @@ async function start() {
         // OFF にしたときは toolbar セッションフラグもリセットして完全非表示に戻す
         if (!inlinePanelAutoshowEnabled) {
           toolbarInitiatedShowThisSession = false;
+          // gate が閉じたあとも残っていた loading UI を即掃除（パネル本体は hidePageFrameOverlay 側）
+          removeDeepHarvestLoadingUi();
         }
         renderPageFrameOverlay();
       }

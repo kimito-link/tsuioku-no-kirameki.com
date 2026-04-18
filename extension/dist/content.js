@@ -6144,6 +6144,12 @@
         renderPageFrameOverlay();
       } catch {
       }
+      try {
+        if (deepHarvestTimer != null && deepHarvestQuietUi) {
+          ensureDeepHarvestLoadingUi();
+        }
+      } catch {
+      }
       const focused = focusInlinePanelHostFromToolbar();
       sendResponse({ ok: true, focused });
       return false;
@@ -6937,6 +6943,7 @@
   }
   function ensureDeepHarvestLoadingUi() {
     if (!hasExtensionContext()) return;
+    if (!inlinePanelAutoshowEnabled && !toolbarInitiatedShowThisSession) return;
     if (document.getElementById(DEEP_HARVEST_LOADING_HOST_ID)) return;
     let imgUrl = "";
     try {
@@ -7479,6 +7486,7 @@
           );
           if (!inlinePanelAutoshowEnabled) {
             toolbarInitiatedShowThisSession = false;
+            removeDeepHarvestLoadingUi();
           }
           renderPageFrameOverlay();
         }
