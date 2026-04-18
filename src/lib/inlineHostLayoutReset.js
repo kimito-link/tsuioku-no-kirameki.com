@@ -21,6 +21,13 @@
  * placement 切替時に空文字でクリアすべき host 要素のインラインスタイル名リスト。
  * 順序には意味はないが、追加漏れを防ぐ意図で floating / dock_bottom が set する
  * プロパティを網羅する。
+ *
+ * 【重要】display / opacity / pointerEvents と aria-hidden は「visibility state」であって
+ * 「placement」ではない。ensureInlinePopupHost() は新規作成時に display:none +
+ * aria-hidden:true でホストを「デフォルト非表示」にする。もしこのリストに display を
+ * 入れてしまうと、placement リセット（毎レンダ先頭で走る）が初期の非表示を剥がして
+ * ホストを勝手に可視化してしまい、ユーザーがクリックしていないのに panel がページ上に
+ * いきなり出る症状を招く。visibility 系は render 側の責務として触らない。
  */
 export const INLINE_HOST_RESETTABLE_STYLE_PROPERTIES = Object.freeze([
   'position',
@@ -39,10 +46,7 @@ export const INLINE_HOST_RESETTABLE_STYLE_PROPERTIES = Object.freeze([
   'boxShadow',
   'borderRadius',
   'background',
-  'zIndex',
-  'display',
-  'opacity',
-  'pointerEvents'
+  'zIndex'
 ]);
 
 /** placement 切替時に必ず外すクラス名リスト（現状は floating / dock-bottom のみ）。 */
@@ -58,10 +62,17 @@ export const INLINE_HOST_PLACEMENT_CLASSES = Object.freeze([
  * テストやコールサイトの単純化のため、host が HTMLElement でなくても
  * classList.remove / style[prop] = '' の shape だけ満たせば動くようにしてある。
  *
+ * 【意図的に触らないもの】
+ *   - style.display / opacity / pointerEvents
+ *   - aria-hidden 属性
+ *   これらは visibility state であり、render 側（renderInlineHostAnchoredToVideo /
+ *   renderInlinePanelFloatingHost など）が条件に応じて書き込む責務を持つ。
+ *   placement reset がこれらに触ると、ensureInlinePopupHost() が初期に付けた
+ *   display:none / aria-hidden:true を剥がして panel を勝手に可視化してしまう。
+ *
  * @param {{
  *   classList?: { remove: (name: string) => void },
- *   style?: Record<string, string>,
- *   removeAttribute?: (name: string) => void
+ *   style?: Record<string, string>
  * } | null | undefined} host
  */
 export function applyInlineHostPlacementReset(host) {
@@ -75,9 +86,5 @@ export function applyInlineHostPlacementReset(host) {
     for (const prop of INLINE_HOST_RESETTABLE_STYLE_PROPERTIES) {
       host.style[prop] = '';
     }
-  }
-  // aria-hidden は placement によって別途書き換えるため、ここでは落としておく。
-  if (typeof host.removeAttribute === 'function') {
-    host.removeAttribute('aria-hidden');
   }
 }

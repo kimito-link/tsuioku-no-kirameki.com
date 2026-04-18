@@ -2976,10 +2976,7 @@
     "boxShadow",
     "borderRadius",
     "background",
-    "zIndex",
-    "display",
-    "opacity",
-    "pointerEvents"
+    "zIndex"
   ]);
   var INLINE_HOST_PLACEMENT_CLASSES = Object.freeze([
     "nls-inline-host--floating",
@@ -2996,9 +2993,6 @@
       for (const prop of INLINE_HOST_RESETTABLE_STYLE_PROPERTIES) {
         host.style[prop] = "";
       }
-    }
-    if (typeof host.removeAttribute === "function") {
-      host.removeAttribute("aria-hidden");
     }
   }
 
