@@ -5,6 +5,7 @@ import {
   watchPageUrlsMatchForSnapshot
 } from '../lib/broadcastUrl.js';
 import { resolveWatchUrlFromTabAndStash } from '../lib/popupWatchUrlResolve.js';
+import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import {
   anonymousNicknameFallback,
@@ -7611,12 +7612,20 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
   URL.revokeObjectURL(blobUrl);
 }
 
-/** コメント・ギフト・トレンド等の storage 連打で refresh が毎回走り、応援レーンが激しくちらつくのを防ぐ */
-let storageRefreshCoalesceTimer = null;
-/** コメント連打で onChanged が途切れないとき、デバウンスだけだと refresh が永遠に遅延するのを防ぐ */
-let storageRefreshMaxWaitTimer = null;
-const STORAGE_REFRESH_COALESCE_MS = 550;
-const STORAGE_REFRESH_MAX_WAIT_MS = 2200;
+/**
+ * popup / inline の再描画スケジューラ（バグ #4 "コメント数がスムーズに撮れてない" の修正）。
+ *
+ * 旧実装は storage.onChanged のたびに 550ms のデバウンスを張り直し、2200ms の
+ * 最大待機を設けていたため、コメント連打中はデバウンスが毎回リセットされ、
+ * 結果として最大 2.2 秒単位でしか画面が更新されず「飛び飛び」に見えていた。
+ *
+ * 新実装は createCoalescedRefreshScheduler による先行＋末尾のスロットルで、
+ * バースト中でも throttleMs（=450ms）ごとに必ず一度は描画が走るようにする。
+ * 純関数側は src/lib/popupStorageRefreshCoalesce.js にあり、ユニットテスト済み。
+ */
+const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
+  throttleMs: 450
+});
 /** 初回 refresh が完了するまではコアレスをバイパスし即時反映する */
 let initialRefreshDone = false;
 
@@ -7637,45 +7646,13 @@ function isHighFrequencyCommentRelatedStorageKey(key) {
 function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   const keys = Object.keys(changes || {});
   if (!keys.length) return;
-  if (!initialRefreshDone) {
-    runRefresh();
-    return;
-  }
   const allHighFreq = keys.every((k) =>
     isHighFrequencyCommentRelatedStorageKey(k)
   );
-  if (!allHighFreq) {
-    if (storageRefreshCoalesceTimer) {
-      clearTimeout(storageRefreshCoalesceTimer);
-      storageRefreshCoalesceTimer = null;
-    }
-    if (storageRefreshMaxWaitTimer) {
-      clearTimeout(storageRefreshMaxWaitTimer);
-      storageRefreshMaxWaitTimer = null;
-    }
-    runRefresh();
-    return;
-  }
-  if (storageRefreshCoalesceTimer) clearTimeout(storageRefreshCoalesceTimer);
-  storageRefreshCoalesceTimer = setTimeout(() => {
-    storageRefreshCoalesceTimer = null;
-    if (storageRefreshMaxWaitTimer) {
-      clearTimeout(storageRefreshMaxWaitTimer);
-      storageRefreshMaxWaitTimer = null;
-    }
-    runRefresh();
-  }, STORAGE_REFRESH_COALESCE_MS);
-
-  if (!storageRefreshMaxWaitTimer) {
-    storageRefreshMaxWaitTimer = setTimeout(() => {
-      storageRefreshMaxWaitTimer = null;
-      if (storageRefreshCoalesceTimer) {
-        clearTimeout(storageRefreshCoalesceTimer);
-        storageRefreshCoalesceTimer = null;
-      }
-      runRefresh();
-    }, STORAGE_REFRESH_MAX_WAIT_MS);
-  }
+  coalescedRefreshScheduler.schedule(
+    { allHighFreq, initialDone: initialRefreshDone },
+    runRefresh
+  );
 }
 
 /**

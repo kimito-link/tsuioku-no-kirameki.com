@@ -61,6 +61,68 @@
     return { url: "", fromActiveTab: true };
   }
 
+  // src/lib/popupStorageRefreshCoalesce.js
+  function createCoalescedRefreshScheduler(opts = {}) {
+    const throttleMs = Number.isFinite(opts.throttleMs) ? Math.max(
+      0,
+      /** @type {number} */
+      opts.throttleMs
+    ) : 450;
+    const nowFn = opts.deps?.now || (() => Date.now());
+    const setT = opts.deps?.setTimer || ((fn, ms) => setTimeout(fn, ms));
+    const clearT = opts.deps?.clearTimer || ((id) => clearTimeout(
+      /** @type {any} */
+      id
+    ));
+    let lastPaintAt = Number.NEGATIVE_INFINITY;
+    let trailingTimer = null;
+    function clearTrailing() {
+      if (trailingTimer != null) {
+        clearT(trailingTimer);
+        trailingTimer = null;
+      }
+    }
+    function schedule(ctx, runRefresh) {
+      if (!ctx.initialDone) {
+        clearTrailing();
+        runRefresh();
+        lastPaintAt = nowFn();
+        return;
+      }
+      if (!ctx.allHighFreq) {
+        clearTrailing();
+        runRefresh();
+        lastPaintAt = nowFn();
+        return;
+      }
+      const now = nowFn();
+      const sinceLast = now - lastPaintAt;
+      if (sinceLast >= throttleMs) {
+        clearTrailing();
+        runRefresh();
+        lastPaintAt = nowFn();
+        return;
+      }
+      if (trailingTimer == null) {
+        const delay = Math.max(0, throttleMs - sinceLast);
+        trailingTimer = setT(() => {
+          trailingTimer = null;
+          runRefresh();
+          lastPaintAt = nowFn();
+        }, delay);
+      }
+    }
+    function cancel() {
+      clearTrailing();
+    }
+    return {
+      schedule,
+      cancel,
+      /** 読み取り専用: 最後に runRefresh が呼ばれた時刻（テスト用） */
+      lastPaintAtForTest: () => lastPaintAt
+    };
+  }
+
   // src/lib/commentPostUi.js
   function deriveCommentPostUiState(input) {
     const hasWatchUrl = Boolean(input?.hasWatchUrl);
@@ -11345,10 +11407,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     a.click();
     URL.revokeObjectURL(blobUrl);
   }
-  var storageRefreshCoalesceTimer = null;
-  var storageRefreshMaxWaitTimer = null;
-  var STORAGE_REFRESH_COALESCE_MS = 550;
-  var STORAGE_REFRESH_MAX_WAIT_MS = 2200;
+  var coalescedRefreshScheduler = createCoalescedRefreshScheduler({
+    throttleMs: 450
+  });
   var initialRefreshDone = false;
   function isHighFrequencyCommentRelatedStorageKey(key) {
     const k = String(key || "");
@@ -11361,44 +11422,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   function scheduleCoalescedStorageRefresh(changes, runRefresh) {
     const keys = Object.keys(changes || {});
     if (!keys.length) return;
-    if (!initialRefreshDone) {
-      runRefresh();
-      return;
-    }
     const allHighFreq = keys.every(
       (k) => isHighFrequencyCommentRelatedStorageKey(k)
     );
-    if (!allHighFreq) {
-      if (storageRefreshCoalesceTimer) {
-        clearTimeout(storageRefreshCoalesceTimer);
-        storageRefreshCoalesceTimer = null;
-      }
-      if (storageRefreshMaxWaitTimer) {
-        clearTimeout(storageRefreshMaxWaitTimer);
-        storageRefreshMaxWaitTimer = null;
-      }
-      runRefresh();
-      return;
-    }
-    if (storageRefreshCoalesceTimer) clearTimeout(storageRefreshCoalesceTimer);
-    storageRefreshCoalesceTimer = setTimeout(() => {
-      storageRefreshCoalesceTimer = null;
-      if (storageRefreshMaxWaitTimer) {
-        clearTimeout(storageRefreshMaxWaitTimer);
-        storageRefreshMaxWaitTimer = null;
-      }
-      runRefresh();
-    }, STORAGE_REFRESH_COALESCE_MS);
-    if (!storageRefreshMaxWaitTimer) {
-      storageRefreshMaxWaitTimer = setTimeout(() => {
-        storageRefreshMaxWaitTimer = null;
-        if (storageRefreshCoalesceTimer) {
-          clearTimeout(storageRefreshCoalesceTimer);
-          storageRefreshCoalesceTimer = null;
-        }
-        runRefresh();
-      }, STORAGE_REFRESH_MAX_WAIT_MS);
-    }
+    coalescedRefreshScheduler.schedule(
+      { allHighFreq, initialDone: initialRefreshDone },
+      runRefresh
+    );
   }
   function paintVersionBadge() {
     const valueEl = (
@@ -11409,7 +11439,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0418-2113" ? String("0418-2113") : "dev";
+      const buildId = "0418-2116" ? String("0418-2116") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
