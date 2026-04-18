@@ -14,7 +14,8 @@ import { supportGridStrongNickname } from './supportGridDisplayTier.js';
  *   nickname: string,
  *   avatarUrl: string,
  *   avatarObserved: boolean,
- *   liveId: string
+ *   liveId: string,
+ *   _laneSortAt?: number
  * }} UserLaneCandidateFromStorage
  */
 

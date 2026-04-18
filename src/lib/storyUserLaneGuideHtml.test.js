@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildStoryUserLaneEmptyNoteKontaHtml,
+  buildStoryUserLaneEmptyNoteLinkHtml,
+  buildStoryUserLaneEmptyNoteTanuHtml,
   buildStoryUserLaneGuideFootHtml,
   buildStoryUserLaneGuideKontaHtml,
   buildStoryUserLaneGuideTanuHtml,
@@ -42,5 +45,21 @@ describe('storyUserLaneGuideHtml', () => {
     expect(foot).not.toContain('こん太:');
     expect(foot).not.toContain('たぬ姉:');
     expect(foot).toContain('nl-story-userlane-guide__foot');
+  });
+
+  it('空段ノートは段ごとに別文面で、増える一文は共通', () => {
+    const link = buildStoryUserLaneEmptyNoteLinkHtml();
+    const konta = buildStoryUserLaneEmptyNoteKontaHtml();
+    const tanu = buildStoryUserLaneEmptyNoteTanuHtml();
+    expect(link).toContain('数値ユーザーID＋個人サムネ');
+    expect(konta).toContain('表示名か個人サムネのどちらかまで取れた');
+    expect(tanu).toContain('匿名（a:）');
+    expect(link).not.toContain('こん太:');
+    expect(konta).not.toContain('りんく');
+    const common = '条件を満たす応援が届くと自動で増えます。';
+    expect(link).toContain(common);
+    expect(konta).toContain(common);
+    expect(tanu).toContain(common);
+    expect(link + konta + tanu).not.toMatch(/<script/i);
   });
 });

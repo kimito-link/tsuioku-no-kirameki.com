@@ -1962,8 +1962,46 @@
     const n = Math.max(0, Math.floor(Number(displayCount) || 0));
     return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(`\u3044\u307E ${n} \u4EF6\u3092\u8868\u793A\u4E2D`)}</p>`;
   }
+  function storyUserLaneEmptyNoteTwoLines(line1, line2) {
+    return `<p class="nl-story-userlane__empty-note-p">${escapeHtml(line1)}</p><p class="nl-story-userlane__empty-note-p">${escapeHtml(line2)}</p>`;
+  }
+  function buildStoryUserLaneEmptyNoteLinkHtml() {
+    return storyUserLaneEmptyNoteTwoLines(
+      "\u3053\u306E\u6BB5\u306F\u300C\u6570\u5024\u30E6\u30FC\u30B6\u30FCID\uFF0B\u500B\u4EBA\u30B5\u30E0\u30CD\u304C\u305D\u308D\u3063\u305F\u5FDC\u63F4\u300D\u3060\u3051\u304C\u4E26\u3076\u3088\u3002\u3044\u307E\u306E\u8A18\u9332\u3067\u306F\u8A72\u5F53\u8005\u304C\u3044\u307E\u305B\u3093\u3002",
+      "\u6761\u4EF6\u3092\u6E80\u305F\u3059\u5FDC\u63F4\u304C\u5C4A\u304F\u3068\u81EA\u52D5\u3067\u5897\u3048\u307E\u3059\u3002"
+    );
+  }
+  function buildStoryUserLaneEmptyNoteKontaHtml() {
+    return storyUserLaneEmptyNoteTwoLines(
+      "\u3053\u306E\u6BB5\u306F\u300C\u6570\u5024ID\u3067\u3001\u8868\u793A\u540D\u304B\u500B\u4EBA\u30B5\u30E0\u30CD\u306E\u3069\u3061\u3089\u304B\u307E\u3067\u53D6\u308C\u305F\u5FDC\u63F4\u300D\u3060\u3051\u304C\u4E26\u3076\u3088\u3002\u3044\u307E\u306E\u8A18\u9332\u3067\u306F\u8A72\u5F53\u8005\u304C\u3044\u307E\u305B\u3093\u3002",
+      "\u6761\u4EF6\u3092\u6E80\u305F\u3059\u5FDC\u63F4\u304C\u5C4A\u304F\u3068\u81EA\u52D5\u3067\u5897\u3048\u307E\u3059\u3002"
+    );
+  }
+  function buildStoryUserLaneEmptyNoteTanuHtml() {
+    return storyUserLaneEmptyNoteTwoLines(
+      "\u3053\u306E\u6BB5\u306F\u300C\u533F\u540D\uFF08a:\uFF09\u3084\u8868\u793A\u540D\u30FB\u30B5\u30E0\u30CD\u304C\u63C3\u308F\u306A\u3044\u5FDC\u63F4\u3001ID \u4E0D\u660E\u300D\u3060\u3051\u304C\u4E26\u3076\u3088\u3002\u3044\u307E\u306E\u8A18\u9332\u3067\u306F\u8A72\u5F53\u8005\u304C\u3044\u307E\u305B\u3093\u3002",
+      "\u6761\u4EF6\u3092\u6E80\u305F\u3059\u5FDC\u63F4\u304C\u5C4A\u304F\u3068\u81EA\u52D5\u3067\u5897\u3048\u307E\u3059\u3002"
+    );
+  }
 
   // src/extension/story/renderStoryUserLaneDom.js
+  function removeStoryUserLaneEmptyNotesUnder(root) {
+    if (!root) return;
+    root.querySelectorAll(".nl-story-userlane__empty-note").forEach((n) => {
+      n.remove();
+    });
+  }
+  function syncStoryUserLaneTierEmptyNote(laneEl, show, innerHtml) {
+    const next = laneEl.nextElementSibling;
+    if (next && next.classList.contains("nl-story-userlane__empty-note")) {
+      next.remove();
+    }
+    if (!show || !innerHtml) return;
+    const box = document.createElement("div");
+    box.className = "nl-story-userlane__empty-note";
+    box.innerHTML = innerHtml;
+    laneEl.insertAdjacentElement("afterend", box);
+  }
   function resetStoryUserLaneDom(els) {
     const {
       stack,
@@ -1981,6 +2019,7 @@
       guideBottom,
       guideLinesBottom
     } = els;
+    removeStoryUserLaneEmptyNotesUnder(stack);
     laneLink.innerHTML = "";
     laneKonta.innerHTML = "";
     laneTanu.innerHTML = "";
@@ -2072,6 +2111,21 @@
     fillLaneTier(laneLink, buckets.link, io);
     fillLaneTier(laneKonta, buckets.konta, io);
     fillLaneTier(laneTanu, buckets.tanu, io);
+    syncStoryUserLaneTierEmptyNote(
+      laneLink,
+      buckets.link.length === 0,
+      buildStoryUserLaneEmptyNoteLinkHtml()
+    );
+    syncStoryUserLaneTierEmptyNote(
+      laneKonta,
+      buckets.konta.length === 0,
+      buildStoryUserLaneEmptyNoteKontaHtml()
+    );
+    syncStoryUserLaneTierEmptyNote(
+      laneTanu,
+      buckets.tanu.length === 0,
+      buildStoryUserLaneEmptyNoteTanuHtml()
+    );
     if (hintLink) {
       const showLinkHint = buckets.link.length === 0 && (buckets.konta.length > 0 || buckets.tanu.length > 0);
       hintLink.hidden = !showLinkHint;
@@ -2123,6 +2177,7 @@
       guideBottom,
       guideLinesBottom
     } = els;
+    removeStoryUserLaneEmptyNotesUnder(stack);
     laneLink.innerHTML = "";
     laneKonta.innerHTML = "";
     laneTanu.innerHTML = "";
@@ -4608,9 +4663,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
   }
   function formatStoryAvatarDiagLine(s) {
-    const total = typeof s.total === "number" && s.total > 0 ? s.total : 0;
-    if (total <= 0) return null;
-    let line = `\u8A3A\u65AD(\u6280\u8853): \u4FDD\u5B58\u30A2\u30A4\u30B3\u30F3URL ${s.withAvatar}/${s.total}\uFF08\u7A2E\u985E ${s.uniqueAvatar}\uFF09 / \u8868\u793A\u306B\u4F7F\u3048\u305F\u30A2\u30A4\u30B3\u30F3 ${s.resolvedAvatar}/${s.total}\uFF08\u7A2E\u985E ${s.resolvedUniqueAvatar}\uFF09 / \u30E6\u30FC\u30B6\u30FCID ${s.withUid}/${s.total} / \u81EA\u5206\u306E\u6295\u7A3F \u8868\u793A${s.selfShown}\u4EF6\uFF08\u4FDD\u5B58\u6E08${s.selfSaved}, \u5F85\u3061${s.selfPending}, \u4E00\u81F4${s.selfPendingMatched}\uFF09 / \u30DA\u30FC\u30B8\u304B\u3089\u62FE\u3063\u305F\u88DC\u52A9 ${s.interceptItems}\u4EF6\uFF08ID${s.interceptWithUid}, \u30A2\u30A4\u30B3\u30F3${s.interceptWithAvatar}\uFF09 / \u5F8C\u304B\u3089\u88DC\u5B8C ${s.mergedPatched}\u4EF6`;
+    const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
+    if (totalNum <= 0) return null;
+    let line = `\u8A3A\u65AD(\u6280\u8853): \u4FDD\u5B58\u30A2\u30A4\u30B3\u30F3URL ${s.withAvatar}/${totalNum}\uFF08\u7A2E\u985E ${s.uniqueAvatar}\uFF09 / \u8868\u793A\u306B\u4F7F\u3048\u305F\u30A2\u30A4\u30B3\u30F3 ${s.resolvedAvatar}/${totalNum}\uFF08\u7A2E\u985E ${s.resolvedUniqueAvatar}\uFF09 / \u30E6\u30FC\u30B6\u30FCID ${s.withUid}/${totalNum} / \u81EA\u5206\u306E\u6295\u7A3F \u8868\u793A${s.selfShown}\u4EF6\uFF08\u4FDD\u5B58\u6E08${s.selfSaved}, \u5F85\u3061${s.selfPending}, \u4E00\u81F4${s.selfPendingMatched}\uFF09 / \u30DA\u30FC\u30B8\u304B\u3089\u62FE\u3063\u305F\u88DC\u52A9 ${s.interceptItems}\u4EF6\uFF08ID${s.interceptWithUid}, \u30A2\u30A4\u30B3\u30F3${s.interceptWithAvatar}\uFF09 / \u5F8C\u304B\u3089\u88DC\u5B8C ${s.mergedPatched}\u4EF6`;
     if (s.mergedUidReplaced > 0) {
       line += `\uFF08ID\u5DEE\u3057\u66FF\u3048 ${s.mergedUidReplaced}\uFF09`;
     }
@@ -4639,12 +4694,18 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return line;
   }
   function buildStoryAvatarDiagVerboseHtml(s) {
-    const total = typeof s.total === "number" && s.total > 0 ? s.total : 0;
-    if (total <= 0) return "";
+    const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
+    const withUidRaw = Math.max(0, Math.floor(Number(s?.withUid) || 0));
+    const resolvedRaw = Math.max(0, Math.floor(Number(s?.resolvedAvatar) || 0));
+    const withUidN = totalNum <= 0 ? 0 : withUidRaw;
+    const resolvedN = totalNum <= 0 ? 0 : resolvedRaw;
     const leadParts = [];
     leadParts.push(
-      `\u8A18\u9332\u3057\u3066\u3044\u308B\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8 <strong>${total}</strong> \u4EF6\u306E\u3046\u3061\u3001\u4E00\u89A7\u3067\u30A2\u30A4\u30B3\u30F3\u307E\u3067\u8868\u793A\u3067\u304D\u3066\u3044\u308B\u306E\u306F <strong>${s.resolvedAvatar}</strong> \u4EF6\u3001\u30E6\u30FC\u30B6\u30FCID\u304C\u4ED8\u3044\u3066\u3044\u308B\u306E\u306F <strong>${s.withUid}</strong> \u4EF6\u3067\u3059\u3002`
+      `\u8A18\u9332\u3057\u3066\u3044\u308B\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8 <strong>${totalNum}</strong> \u4EF6\u306E\u3046\u3061\u3001\u4E00\u89A7\u3067\u30A2\u30A4\u30B3\u30F3\u307E\u3067\u8868\u793A\u3067\u304D\u3066\u3044\u308B\u306E\u306F <strong>${resolvedN}</strong> \u4EF6\u3001\u30E6\u30FC\u30B6\u30FCID\u304C\u4ED8\u3044\u3066\u3044\u308B\u306E\u306F <strong>${withUidN}</strong> \u4EF6\u3067\u3059\u3002`
     );
+    if (totalNum <= 0) {
+      return `<div class="nl-story-diag nl-story-diag--verbose"><p class="nl-story-diag__lead">${leadParts.join(" ")}</p></div>`;
+    }
     if (s.mergedPatched > 0) {
       leadParts.push(
         `\u3042\u3068\u304B\u3089\u60C5\u5831\u304C\u8DB3\u308A\u3066\u57CB\u307E\u3063\u305F\u884C\u304C <strong>${s.mergedPatched}</strong> \u4EF6\u3042\u308A\u307E\u3059\u3002`
@@ -4695,13 +4756,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return `<div class="nl-story-diag nl-story-diag--verbose"><p class="nl-story-diag__lead">${leadParts.join(" ")}</p></div>`;
   }
   function buildStoryAvatarDiagHtml(s) {
-    const total = typeof s.total === "number" && s.total > 0 ? s.total : 0;
-    if (total <= 0) {
-      return '<div class="nl-story-diag nl-story-diag--empty"><p class="nl-story-diag__lead">\u307E\u3060\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u304C\u8A18\u9332\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002\u30CB\u30B3\u751F\u306E\u914D\u4FE1\u30DA\u30FC\u30B8\u3092\u958B\u3044\u305F\u72B6\u614B\u3067\u3057\u3070\u3089\u304F\u304A\u5F85\u3061\u304F\u3060\u3055\u3044\u3002\u30B3\u30E1\u30F3\u30C8\u304C\u5C4A\u304F\u3068\u81EA\u52D5\u7684\u306B\u53CD\u6620\u3055\u308C\u307E\u3059\u3002</p></div>';
+    const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
+    if (totalNum <= 0) {
+      return '<div class="nl-story-diag nl-story-diag--compact"><p class="nl-story-diag__lead">\u8A18\u9332\u3057\u3066\u3044\u308B\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8 <strong>0</strong> \u4EF6\u3067\u3059\u3002</p></div>';
     }
     const technical = formatStoryAvatarDiagLine(s);
     const glossary = '<ul class="nl-story-diag__list"><li><strong>\u4FDD\u5B58\u30A2\u30A4\u30B3\u30F3</strong>\uFF1A\u3053\u306EPC\u306E\u8A18\u9332\u306B\u3001\u30A2\u30A4\u30B3\u30F3\u306EURL\u3068\u3057\u3066\u6B8B\u3063\u3066\u3044\u308B\u4EF6\u6570\u3067\u3059\u3002</li><li><strong>\u8868\u793A\u30A2\u30A4\u30B3\u30F3</strong>\uFF1A\u30B0\u30EA\u30C3\u30C9\u306A\u3069\u3067\u5B9F\u969B\u306B\u753B\u50CF\u3068\u3057\u3066\u4F7F\u3048\u3066\u3044\u308B\u4EF6\u6570\u3067\u3059\u3002</li><li><strong>\u30DA\u30FC\u30B8\u304B\u3089\u62FE\u3063\u305F\u88DC\u52A9</strong>\uFF1A\u30CB\u30B3\u751F\u306E\u30DA\u30FC\u30B8\u304C\u8AAD\u307F\u53D6\u308B\u901A\u4FE1\u304B\u3089\u3001\u62E1\u5F35\u304C\u5229\u7528\u8005\u8868\u793A\u3092\u88DC\u3046\u305F\u3081\u306B\u4F7F\u3046\u60C5\u5831\u3067\u3059\uFF08\u672C\u6587\u306F\u4FDD\u5B58\u3057\u307E\u305B\u3093\uFF09\u3002</li><li><strong>\u4E00\u6642\u5BFE\u5FDC\u8868</strong>\uFF1A\u958B\u3044\u3066\u3044\u308B watch \u30BF\u30D6\u306E\u30E1\u30E2\u30EA\u4E0A\u3060\u3051\u306B\u3042\u308B\u5BFE\u5FDC\u8868\u3067\u3001\u30AD\u30E3\u30C3\u30B7\u30E5\u3068\u306F\u5225\u3067\u3059\u3002</li><li><strong>\u30E6\u30FC\u30B6\u30FC\u30EC\u30FC\u30F3\u306E\u6BB5</strong>\uFF1A\u8A18\u9332\u30B3\u30E1\u30F3\u30C8\u306E\u8868\u793A\u540D\u30FB\u30B5\u30E0\u30CDURL\u30FB\u6210\u9577\u30BF\u30A4\u30EB\u7528\u306E\u89E3\u6C7A\u7D50\u679C\u304B\u3089\u300C\u5F37\u3044\u540D\u524D\u300D\u300C\u500B\u4EBA\u30B5\u30E0\u30CD\u300D\u3092\u5224\u5B9A\u3057\u3066\u3044\u307E\u3059\u3002\u516C\u5F0F\u306E\u4EEE\u540D\u306E\u307E\u307E\u3060\u3068\u3053\u3093\u592A\u30FB\u305F\u306C\u59C9\u306B\u5BC4\u308A\u3084\u3059\u3044\u3067\u3059\u3002</li></ul>';
-    const compactLead = `\u8A18\u9332\u3057\u3066\u3044\u308B\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8 <strong>${total}</strong> \u4EF6\u3067\u3059\u3002\u4EF6\u6570\u306E\u5185\u8A33\uFF08\u30A2\u30A4\u30B3\u30F3\u30FB\u30E6\u30FC\u30B6\u30FCID\u30FB\u30EC\u30FC\u30F3\u30FB\u53D6\u308A\u8FBC\u307F\u306A\u3069\uFF09\u306F\u3001\u4E0B\u306E\u300C\u8A73\u3057\u3044\u72B6\u6CC1\uFF08\u958B\u767A\u30FB\u5207\u308A\u5206\u3051\u7528\uFF09\u300D\u3092\u958B\u304F\u3068\u8AAD\u3081\u307E\u3059\u3002`;
+    const compactLead = `\u8A18\u9332\u3057\u3066\u3044\u308B\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8 <strong>${totalNum}</strong> \u4EF6\u3067\u3059\u3002\u4EF6\u6570\u306E\u5185\u8A33\uFF08\u30A2\u30A4\u30B3\u30F3\u30FB\u30E6\u30FC\u30B6\u30FCID\u30FB\u30EC\u30FC\u30F3\u30FB\u53D6\u308A\u8FBC\u307F\u306A\u3069\uFF09\u306F\u3001\u4E0B\u306E\u300C\u8A73\u3057\u3044\u72B6\u6CC1\uFF08\u958B\u767A\u30FB\u5207\u308A\u5206\u3051\u7528\uFF09\u300D\u3092\u958B\u304F\u3068\u8AAD\u3081\u307E\u3059\u3002`;
     return `<div class="nl-story-diag nl-story-diag--compact"><p class="nl-story-diag__lead">${compactLead}</p><details class="nl-story-diag__more"><summary class="nl-story-diag__summary">\u5185\u8A33\u30FB\u7528\u8A9E\uFF08\u8A73\u3057\u304F\u898B\u308B\uFF09</summary><div class="nl-story-diag__body">` + glossary + (technical ? `<p class="nl-story-diag__technical">${escapeHtml(technical)}</p>` : "") + `</div></details></div>`;
   }
 
@@ -5160,13 +5221,30 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     _prevConcurrentEstimated = null;
   }
   function setCountDisplay(value, watchSnapshot = null) {
+    let recordedNum = null;
+    let text = "";
+    if (typeof value === "number" && Number.isFinite(value)) {
+      recordedNum = value;
+      text = value.toLocaleString("ja-JP");
+    } else {
+      const s = String(value ?? "");
+      if (/^\d+$/.test(s.trim())) {
+        recordedNum = Number(s.trim());
+        text = recordedNum.toLocaleString("ja-JP");
+      } else {
+        text = s;
+      }
+    }
     const countEl = $("count");
     if (countEl) {
-      countEl.textContent = value;
-      countEl.classList.toggle("is-placeholder", value === "-" || value === "");
+      countEl.textContent = text;
+      countEl.classList.toggle(
+        "is-placeholder",
+        text === "-" || text === "" || text === "\u2014"
+      );
     }
     const liveStatEl = $("liveStatComments");
-    if (liveStatEl) liveStatEl.textContent = value;
+    if (liveStatEl) liveStatEl.textContent = text;
     const officialEl = (
       /** @type {HTMLElement|null} */
       $("liveStatCommentsOfficial")
@@ -5175,7 +5253,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const oc = watchSnapshot?.officialCommentCount;
       if (typeof oc === "number" && Number.isFinite(oc) && oc >= 0) {
         officialEl.hidden = false;
-        const recorded = parseInt(value, 10);
+        const recorded = recordedNum != null && Number.isFinite(recordedNum) ? recordedNum : parseInt(String(text).replace(/[,，]/g, ""), 10);
         let line = `\u516C\u5F0F ${oc.toLocaleString("ja-JP")} \u4EF6`;
         if (!Number.isNaN(recorded) && recorded >= 0 && oc > 0) {
           if (recorded <= oc) {
@@ -5192,7 +5270,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         officialEl.removeAttribute("title");
       }
     }
-    const num = parseInt(value, 10);
+    const num = recordedNum != null && Number.isFinite(recordedNum) ? recordedNum : parseInt(String(text).replace(/[,，]/g, ""), 10);
     if (!Number.isNaN(num) && _prevSupportCount != null && num > _prevSupportCount) {
       const card = document.getElementById("supportVisualLiveCard");
       const icon = card?.querySelector(":scope > img.nl-live-stat-icon");
@@ -7949,9 +8027,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     thumb.removeAttribute("src");
     tags.innerHTML = "";
     if (audience) audience.hidden = true;
-    if (viewerDomEl) viewerDomEl.textContent = "\u2014";
+    if (viewerDomEl) viewerDomEl.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
     if (concurrentEstEl) {
-      concurrentEstEl.textContent = "\u2014";
+      concurrentEstEl.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
       concurrentEstEl.removeAttribute("title");
     }
     if (concurrentSubEl) concurrentSubEl.textContent = "\u4EBA";
@@ -7959,7 +8037,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       uniqueEl.textContent = "\u2014";
       uniqueEl.removeAttribute("title");
     }
-    if (noIdEl) noIdEl.textContent = "\u2014";
+    if (noIdEl) noIdEl.textContent = "0";
     if (noteEl) {
       noteEl.textContent = "";
       noteEl.removeAttribute("title");
@@ -8056,8 +8134,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       casterBanner.hidden = true;
     }
     const vc = snapshot.viewerCountFromDom;
+    const recentActive = typeof snapshot.recentActiveUsers === "number" ? snapshot.recentActiveUsers : 0;
+    const { showConcurrent, sparseConcurrent } = watchMetaConcurrentGateFromSnapshot(snapshot);
     if (viewerDomEl) {
-      viewerDomEl.textContent = typeof vc === "number" && Number.isFinite(vc) && vc >= 0 ? String(vc) : "\u2014";
+      if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) {
+        viewerDomEl.textContent = vc.toLocaleString("ja-JP");
+      } else if (!showConcurrent) {
+        viewerDomEl.textContent = "\u8A08\u6E2C\u4E2D\u2026";
+      } else {
+        viewerDomEl.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
+      }
     }
     if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) {
       if (_prevViewerCount != null && vc > _prevViewerCount) {
@@ -8071,10 +8157,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
       _prevViewerCount = vc;
     }
-    const recentActive = typeof snapshot.recentActiveUsers === "number" ? snapshot.recentActiveUsers : 0;
     if (concurrentEstEl) {
       const nowMs = Date.now();
-      const { showConcurrent, sparseConcurrent } = watchMetaConcurrentGateFromSnapshot(snapshot);
       if (showConcurrent) {
         if (concurrentLoadingEl) concurrentLoadingEl.hidden = true;
         if (concurrentReadyEl) concurrentReadyEl.hidden = false;
@@ -8093,7 +8177,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           streamAgeMin: streamAge
         });
         const directLike = resolved.method === "official";
-        concurrentEstEl.textContent = `${directLike ? "" : "~"}${resolved.estimated}`;
+        const estStr = resolved.estimated.toLocaleString("ja-JP");
+        concurrentEstEl.textContent = `${directLike ? "" : "~"}${estStr}`;
         if (_prevConcurrentEstimated != null && resolved.estimated !== _prevConcurrentEstimated && concurrentCard) {
           const icon = concurrentCard.querySelector(":scope > img.nl-live-stat-icon");
           triggerCharaReaction(icon, {
@@ -8141,9 +8226,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         if (concurrentLoadingEl) concurrentLoadingEl.hidden = false;
         if (concurrentReadyEl) concurrentReadyEl.hidden = true;
         if (concurrentCard) concurrentCard.setAttribute("aria-busy", "true");
-        concurrentEstEl.textContent = "";
+        concurrentEstEl.textContent = "\u8A08\u6E2C\u4E2D\u2026";
         concurrentEstEl.removeAttribute("title");
-        if (concurrentSubEl) concurrentSubEl.textContent = "";
+        if (concurrentSubEl) concurrentSubEl.textContent = "\u4EBA";
       }
     }
     const st = summarizeRecordedCommenters(
@@ -8151,7 +8236,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     );
     if (uniqueEl) {
       if (st.uniqueKnownUserIds > 0) {
-        uniqueEl.textContent = String(st.uniqueKnownUserIds);
+        uniqueEl.textContent = st.uniqueKnownUserIds.toLocaleString("ja-JP");
         uniqueEl.title = "userId \u304C\u53D6\u308C\u305F\u30B3\u30E1\u30F3\u30C8\u306B\u3064\u3044\u3066\u306E distinct \u6570";
       } else if (st.distinctAvatarUrls > 0) {
         uniqueEl.textContent = `\u2248${st.distinctAvatarUrls}`;
@@ -8161,7 +8246,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         uniqueEl.title = "userId \u3082\u6709\u52B9\u306A avatarUrl \u3082\u7121\u3044\u30B3\u30E1\u30F3\u30C8\u306E\u307F\u306E\u3068\u304D\u306F 0 \u306E\u307E\u307E\u3067\u3059";
       }
     }
-    if (noIdEl) noIdEl.textContent = String(st.commentsWithoutUserId);
+    if (noIdEl) {
+      const n = Math.max(0, Math.floor(Number(st.commentsWithoutUserId) || 0));
+      noIdEl.textContent = n.toLocaleString("ja-JP");
+    }
     if (noteEl) {
       const { body, title: title2 } = buildWatchAudienceNote({ snapshot });
       noteEl.textContent = body;
@@ -9335,7 +9423,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
         const displayEntries = buildDisplayCommentEntries(arr, lv);
         STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
-        setCountDisplay(String(displayEntries.length), watchSnapshot);
+        setCountDisplay(displayEntries.length, watchSnapshot);
         void updateIngestHeartbeatDisplay(lv);
         renderCommentTicker(
           /** @type {PopupCommentEntry[]} */
@@ -9530,7 +9618,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         if (!isFreshRefresh()) return;
         resetPerBroadcastPopupCachesIfLiveIdChanged("");
         if (liveEl) liveEl.textContent = "\uFF08\u30CB\u30B3\u751Fwatch\u3092\u958B\u3044\u3066\u304F\u3060\u3055\u3044\uFF09";
-        setCountDisplay("-");
+        setCountDisplay("\uFF08\u3053\u306E\u914D\u4FE1\u306F\u672A\u53D6\u5F97\uFF09");
         renderCommentTicker([]);
         exportBtn.disabled = true;
         exportBtn.dataset.watchUrl = "";
@@ -9579,7 +9667,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (!lv) {
         if (!isFreshRefresh()) return;
         resetPerBroadcastPopupCachesIfLiveIdChanged("");
-        setCountDisplay("-");
+        setCountDisplay("\uFF08\u3053\u306E\u914D\u4FE1\u306F\u672A\u53D6\u5F97\uFF09");
         renderCommentTicker([]);
         exportBtn.disabled = true;
         exportBtn.dataset.watchUrl = "";
@@ -10956,7 +11044,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0418-1820" ? String("0418-1820") : "dev";
+      const buildId = "0418-1838" ? String("0418-1838") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

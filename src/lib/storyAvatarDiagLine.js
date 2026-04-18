@@ -66,13 +66,13 @@ export function interceptExportCodeUserLabel(code, detail = '') {
  * @returns {string|null}
  */
 export function formatStoryAvatarDiagLine(s) {
-  const total = typeof s.total === 'number' && s.total > 0 ? s.total : 0;
-  if (total <= 0) return null;
+  const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
+  if (totalNum <= 0) return null;
 
   let line =
-    `診断(技術): 保存アイコンURL ${s.withAvatar}/${s.total}（種類 ${s.uniqueAvatar}）` +
-    ` / 表示に使えたアイコン ${s.resolvedAvatar}/${s.total}（種類 ${s.resolvedUniqueAvatar}）` +
-    ` / ユーザーID ${s.withUid}/${s.total}` +
+    `診断(技術): 保存アイコンURL ${s.withAvatar}/${totalNum}（種類 ${s.uniqueAvatar}）` +
+    ` / 表示に使えたアイコン ${s.resolvedAvatar}/${totalNum}（種類 ${s.resolvedUniqueAvatar}）` +
+    ` / ユーザーID ${s.withUid}/${totalNum}` +
     ` / 自分の投稿 表示${s.selfShown}件（保存済${s.selfSaved}, 待ち${s.selfPending}, 一致${s.selfPendingMatched}）` +
     ` / ページから拾った補助 ${s.interceptItems}件（ID${s.interceptWithUid}, アイコン${s.interceptWithAvatar}）` +
     ` / 後から補完 ${s.mergedPatched}件`;
@@ -116,16 +116,26 @@ export function formatStoryAvatarDiagLine(s) {
 /**
  * 件数の細かい内訳（ポーリングで数字が変わりやすい）—「詳しい状況」内に出す HTML。
  * @param {StoryAvatarDiagSnapshot} s
- * @returns {string} 表示なしのときは空文字
+ * @returns {string} 常に1ブロックの HTML（0件も明示）
  */
 export function buildStoryAvatarDiagVerboseHtml(s) {
-  const total = typeof s.total === 'number' && s.total > 0 ? s.total : 0;
-  if (total <= 0) return '';
+  const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
+  const withUidRaw = Math.max(0, Math.floor(Number(s?.withUid) || 0));
+  const resolvedRaw = Math.max(0, Math.floor(Number(s?.resolvedAvatar) || 0));
+  const withUidN = totalNum <= 0 ? 0 : withUidRaw;
+  const resolvedN = totalNum <= 0 ? 0 : resolvedRaw;
 
   const leadParts = [];
   leadParts.push(
-    `記録している応援コメント <strong>${total}</strong> 件のうち、一覧でアイコンまで表示できているのは <strong>${s.resolvedAvatar}</strong> 件、ユーザーIDが付いているのは <strong>${s.withUid}</strong> 件です。`
+    `記録している応援コメント <strong>${totalNum}</strong> 件のうち、一覧でアイコンまで表示できているのは <strong>${resolvedN}</strong> 件、ユーザーIDが付いているのは <strong>${withUidN}</strong> 件です。`
   );
+  if (totalNum <= 0) {
+    return (
+      `<div class="nl-story-diag nl-story-diag--verbose">` +
+      `<p class="nl-story-diag__lead">${leadParts.join(' ')}</p>` +
+      `</div>`
+    );
+  }
   if (s.mergedPatched > 0) {
     leadParts.push(
       `あとから情報が足りて埋まった行が <strong>${s.mergedPatched}</strong> 件あります。`
@@ -192,13 +202,12 @@ export function buildStoryAvatarDiagVerboseHtml(s) {
  * @returns {string|null}
  */
 export function buildStoryAvatarDiagHtml(s) {
-  const total = typeof s.total === 'number' && s.total > 0 ? s.total : 0;
-  if (total <= 0) {
+  const totalNum = Math.max(0, Math.floor(Number(s?.total) || 0));
+  if (totalNum <= 0) {
     return (
-      '<div class="nl-story-diag nl-story-diag--empty">' +
+      '<div class="nl-story-diag nl-story-diag--compact">' +
       '<p class="nl-story-diag__lead">' +
-      'まだ応援コメントが記録されていません。' +
-      'ニコ生の配信ページを開いた状態でしばらくお待ちください。コメントが届くと自動的に反映されます。' +
+      '記録している応援コメント <strong>0</strong> 件です。' +
       '</p></div>'
     );
   }
@@ -214,7 +223,7 @@ export function buildStoryAvatarDiagHtml(s) {
     '</ul>';
 
   const compactLead =
-    `記録している応援コメント <strong>${total}</strong> 件です。` +
+    `記録している応援コメント <strong>${totalNum}</strong> 件です。` +
     `件数の内訳（アイコン・ユーザーID・レーン・取り込みなど）は、下の「詳しい状況（開発・切り分け用）」を開くと読めます。`;
 
   return (

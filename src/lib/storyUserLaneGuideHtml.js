@@ -49,3 +49,35 @@ export function buildStoryUserLaneGuideFootHtml(displayCount) {
   const n = Math.max(0, Math.floor(Number(displayCount) || 0));
   return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(`いま ${n} 件を表示中`)}</p>`;
 }
+
+/** @param {string} line1 @param {string} line2 */
+function storyUserLaneEmptyNoteTwoLines(line1, line2) {
+  return (
+    `<p class="nl-story-userlane__empty-note-p">${escapeHtml(line1)}</p>` +
+    `<p class="nl-story-userlane__empty-note-p">${escapeHtml(line2)}</p>`
+  );
+}
+
+/** りんく段・件数 0 のとき（案内文の条件は buildStoryUserLaneGuideTopHtml に揃える） */
+export function buildStoryUserLaneEmptyNoteLinkHtml() {
+  return storyUserLaneEmptyNoteTwoLines(
+    'この段は「数値ユーザーID＋個人サムネがそろった応援」だけが並ぶよ。いまの記録では該当者がいません。',
+    '条件を満たす応援が届くと自動で増えます。'
+  );
+}
+
+/** こん太段・件数 0 */
+export function buildStoryUserLaneEmptyNoteKontaHtml() {
+  return storyUserLaneEmptyNoteTwoLines(
+    'この段は「数値IDで、表示名か個人サムネのどちらかまで取れた応援」だけが並ぶよ。いまの記録では該当者がいません。',
+    '条件を満たす応援が届くと自動で増えます。'
+  );
+}
+
+/** たぬ姉段・件数 0 */
+export function buildStoryUserLaneEmptyNoteTanuHtml() {
+  return storyUserLaneEmptyNoteTwoLines(
+    'この段は「匿名（a:）や表示名・サムネが揃わない応援、ID 不明」だけが並ぶよ。いまの記録では該当者がいません。',
+    '条件を満たす応援が届くと自動で増えます。'
+  );
+}

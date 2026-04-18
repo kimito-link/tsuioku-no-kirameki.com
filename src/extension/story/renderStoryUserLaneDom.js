@@ -4,6 +4,9 @@
  */
 
 import {
+  buildStoryUserLaneEmptyNoteKontaHtml,
+  buildStoryUserLaneEmptyNoteLinkHtml,
+  buildStoryUserLaneEmptyNoteTanuHtml,
   buildStoryUserLaneGuideFootHtml,
   buildStoryUserLaneGuideKontaHtml,
   buildStoryUserLaneGuideTanuHtml,
@@ -37,6 +40,32 @@ import {
  * }} StoryUserLaneDomIo
  */
 
+/** @param {HTMLElement | null} root */
+function removeStoryUserLaneEmptyNotesUnder(root) {
+  if (!root) return;
+  root.querySelectorAll('.nl-story-userlane__empty-note').forEach((n) => {
+    n.remove();
+  });
+}
+
+/**
+ * 段の直下に空状態ノートを付け外しする（display:none は使わない）。
+ * @param {HTMLElement} laneEl
+ * @param {boolean} show
+ * @param {string} innerHtml trusted HTML from storyUserLaneGuideHtml
+ */
+function syncStoryUserLaneTierEmptyNote(laneEl, show, innerHtml) {
+  const next = laneEl.nextElementSibling;
+  if (next && next.classList.contains('nl-story-userlane__empty-note')) {
+    next.remove();
+  }
+  if (!show || !innerHtml) return;
+  const box = document.createElement('div');
+  box.className = 'nl-story-userlane__empty-note';
+  box.innerHTML = innerHtml;
+  laneEl.insertAdjacentElement('afterend', box);
+}
+
 /** @param {StoryUserLaneDomElements} els */
 export function resetStoryUserLaneDom(els) {
   const {
@@ -55,6 +84,7 @@ export function resetStoryUserLaneDom(els) {
     guideBottom,
     guideLinesBottom
   } = els;
+  removeStoryUserLaneEmptyNotesUnder(stack);
   laneLink.innerHTML = '';
   laneKonta.innerHTML = '';
   laneTanu.innerHTML = '';
@@ -178,6 +208,22 @@ export function paintStoryUserLaneDomFilled(
   fillLaneTier(laneKonta, buckets.konta, io);
   fillLaneTier(laneTanu, buckets.tanu, io);
 
+  syncStoryUserLaneTierEmptyNote(
+    laneLink,
+    buckets.link.length === 0,
+    buildStoryUserLaneEmptyNoteLinkHtml()
+  );
+  syncStoryUserLaneTierEmptyNote(
+    laneKonta,
+    buckets.konta.length === 0,
+    buildStoryUserLaneEmptyNoteKontaHtml()
+  );
+  syncStoryUserLaneTierEmptyNote(
+    laneTanu,
+    buckets.tanu.length === 0,
+    buildStoryUserLaneEmptyNoteTanuHtml()
+  );
+
   if (hintLink) {
     const showLinkHint =
       buckets.link.length === 0 &&
@@ -239,6 +285,7 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces) {
     guideBottom,
     guideLinesBottom
   } = els;
+  removeStoryUserLaneEmptyNotesUnder(stack);
   laneLink.innerHTML = '';
   laneKonta.innerHTML = '';
   laneTanu.innerHTML = '';

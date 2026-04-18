@@ -617,6 +617,7 @@
         border: 1px solid color-mix(in srgb, var(--nl-border) 75%, #c9a227 25%);
       }
 
+      /* 縦スクロールは .nl-main のみ。ここは横並びが長いときの横スクロールのみ。 */
       .nl-story-userlane {
         display: flex;
         flex-wrap: wrap;
@@ -625,9 +626,9 @@
         gap: 6px 8px;
         margin: 0;
         min-height: 0;
-        max-height: min(132px, 38vh);
+        max-height: none;
         overflow-x: auto;
-        overflow-y: auto;
+        overflow-y: visible;
         -webkit-overflow-scrolling: touch;
       }
 
@@ -796,6 +797,26 @@
         font-weight: 800;
         color: var(--nl-muted);
         line-height: 1.35;
+      }
+
+      .nl-story-userlane__empty-note {
+        margin: 4px 0 2px;
+        padding: 8px 10px;
+        font-size: clamp(10px, 2.4vw, 11px);
+        line-height: 1.45;
+        font-weight: 600;
+        color: var(--nl-text-sub);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
+      }
+
+      .nl-story-userlane__empty-note-p {
+        margin: 0 0 6px;
+      }
+
+      .nl-story-userlane__empty-note-p:last-child {
+        margin-bottom: 0;
       }
 
       .nl-story-userlane-guide__count {

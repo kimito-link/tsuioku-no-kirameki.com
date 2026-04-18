@@ -87,11 +87,12 @@ describe('formatStoryAvatarDiagLine', () => {
 });
 
 describe('buildStoryAvatarDiagHtml', () => {
-  it('total が 0 以下なら空状態メッセージを返す', () => {
+  it('total が 0 なら 0 件を明示する', () => {
     const html = buildStoryAvatarDiagHtml({ ...base, total: 0 });
     expect(html).not.toBeNull();
-    expect(html).toContain('nl-story-diag--empty');
-    expect(html).toContain('まだ応援コメントが記録されていません');
+    expect(html).toContain('nl-story-diag--compact');
+    expect(html).toContain('記録している応援コメント');
+    expect(html).toContain('0</strong> 件です');
   });
 
   it('コンパクトなリードと折りたたみを含む（長い内訳は verbose 側）', () => {
@@ -108,6 +109,15 @@ describe('buildStoryAvatarDiagHtml', () => {
     const v = buildStoryAvatarDiagVerboseHtml(base);
     expect(v).toContain('視聴ページの通信から拾った利用者情報');
     expect(v).toContain('記録している応援コメント');
+  });
+
+  it('verbose は total 0 でもリードを返す', () => {
+    const v = buildStoryAvatarDiagVerboseHtml({ ...base, total: 0 });
+    expect(v).toContain('nl-story-diag--verbose');
+    expect(v).toContain('<strong>0</strong> 件のうち');
+    expect(v).toContain(
+      '一覧でアイコンまで表示できているのは <strong>0</strong> 件、ユーザーIDが付いているのは <strong>0</strong> 件です'
+    );
   });
 
   it('ユーザーレーンの段の説明は verbose 側', () => {

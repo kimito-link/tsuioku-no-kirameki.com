@@ -486,24 +486,46 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
 }
 
 /**
- * @param {string} value
+ * @param {string|number} value 数値は toLocaleString('ja-JP') で表示。未取得時は明示文言。
  * @param {WatchPageSnapshot|null} [watchSnapshot] 公式コメント数の併記用
  */
 function setCountDisplay(value, watchSnapshot = null) {
+  /** @type {number|null} */
+  let recordedNum = null;
+  let text = '';
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    recordedNum = value;
+    text = value.toLocaleString('ja-JP');
+  } else {
+    const s = String(value ?? '');
+    if (/^\d+$/.test(s.trim())) {
+      recordedNum = Number(s.trim());
+      text = recordedNum.toLocaleString('ja-JP');
+    } else {
+      text = s;
+    }
+  }
+
   const countEl = $('count');
   if (countEl) {
-    countEl.textContent = value;
-    countEl.classList.toggle('is-placeholder', value === '-' || value === '');
+    countEl.textContent = text;
+    countEl.classList.toggle(
+      'is-placeholder',
+      text === '-' || text === '' || text === '—'
+    );
   }
   const liveStatEl = $('liveStatComments');
-  if (liveStatEl) liveStatEl.textContent = value;
+  if (liveStatEl) liveStatEl.textContent = text;
 
   const officialEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsOfficial'));
   if (officialEl) {
     const oc = watchSnapshot?.officialCommentCount;
     if (typeof oc === 'number' && Number.isFinite(oc) && oc >= 0) {
       officialEl.hidden = false;
-      const recorded = parseInt(value, 10);
+      const recorded =
+        recordedNum != null && Number.isFinite(recordedNum)
+          ? recordedNum
+          : parseInt(String(text).replace(/[,，]/g, ''), 10);
       let line = `公式 ${oc.toLocaleString('ja-JP')} 件`;
       if (!Number.isNaN(recorded) && recorded >= 0 && oc > 0) {
         if (recorded <= oc) {
@@ -522,7 +544,10 @@ function setCountDisplay(value, watchSnapshot = null) {
     }
   }
 
-  const num = parseInt(value, 10);
+  const num =
+    recordedNum != null && Number.isFinite(recordedNum)
+      ? recordedNum
+      : parseInt(String(text).replace(/[,，]/g, ''), 10);
   if (!Number.isNaN(num) && _prevSupportCount != null && num > _prevSupportCount) {
     const card = document.getElementById('supportVisualLiveCard');
     const icon = card?.querySelector(':scope > img.nl-live-stat-icon');
@@ -3939,9 +3964,9 @@ function clearWatchMetaCard() {
   thumb.removeAttribute('src');
   tags.innerHTML = '';
   if (audience) audience.hidden = true;
-  if (viewerDomEl) viewerDomEl.textContent = '—';
+  if (viewerDomEl) viewerDomEl.textContent = '（取得不可）';
   if (concurrentEstEl) {
-    concurrentEstEl.textContent = '—';
+    concurrentEstEl.textContent = '（取得不可）';
     concurrentEstEl.removeAttribute('title');
   }
   if (concurrentSubEl) concurrentSubEl.textContent = '人';
@@ -3949,7 +3974,7 @@ function clearWatchMetaCard() {
     uniqueEl.textContent = '—';
     uniqueEl.removeAttribute('title');
   }
-  if (noIdEl) noIdEl.textContent = '—';
+  if (noIdEl) noIdEl.textContent = '0';
   if (noteEl) {
     noteEl.textContent = '';
     noteEl.removeAttribute('title');
@@ -4036,11 +4061,20 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   }
 
   const vc = snapshot.viewerCountFromDom;
+  const recentActive = typeof snapshot.recentActiveUsers === 'number'
+    ? snapshot.recentActiveUsers
+    : 0;
+  const { showConcurrent, sparseConcurrent } =
+    watchMetaConcurrentGateFromSnapshot(snapshot);
+
   if (viewerDomEl) {
-    viewerDomEl.textContent =
-      typeof vc === 'number' && Number.isFinite(vc) && vc >= 0
-        ? String(vc)
-        : '—';
+    if (typeof vc === 'number' && Number.isFinite(vc) && vc >= 0) {
+      viewerDomEl.textContent = vc.toLocaleString('ja-JP');
+    } else if (!showConcurrent) {
+      viewerDomEl.textContent = '計測中…';
+    } else {
+      viewerDomEl.textContent = '（取得不可）';
+    }
   }
   if (typeof vc === 'number' && Number.isFinite(vc) && vc >= 0) {
     if (_prevViewerCount != null && vc > _prevViewerCount) {
@@ -4054,12 +4088,8 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
     }
     _prevViewerCount = vc;
   }
-  const recentActive = typeof snapshot.recentActiveUsers === 'number'
-    ? snapshot.recentActiveUsers
-    : 0;
   if (concurrentEstEl) {
     const nowMs = Date.now();
-    const { showConcurrent, sparseConcurrent } = watchMetaConcurrentGateFromSnapshot(snapshot);
     // showConcurrent が false のときは下の else でスピナー継続（aria-busy）。
     // 条件は popupWatchMetaConcurrentGate.js / popupConcurrentEstimateGate.js の単体テストを参照。
     if (showConcurrent) {
@@ -4108,7 +4138,8 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
         streamAgeMin: streamAge
       });
       const directLike = resolved.method === 'official';
-      concurrentEstEl.textContent = `${directLike ? '' : '~'}${resolved.estimated}`;
+      const estStr = resolved.estimated.toLocaleString('ja-JP');
+      concurrentEstEl.textContent = `${directLike ? '' : '~'}${estStr}`;
 
       if (
         _prevConcurrentEstimated != null &&
@@ -4178,9 +4209,9 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
       if (concurrentLoadingEl) concurrentLoadingEl.hidden = false;
       if (concurrentReadyEl) concurrentReadyEl.hidden = true;
       if (concurrentCard) concurrentCard.setAttribute('aria-busy', 'true');
-      concurrentEstEl.textContent = '';
+      concurrentEstEl.textContent = '計測中…';
       concurrentEstEl.removeAttribute('title');
-      if (concurrentSubEl) concurrentSubEl.textContent = '';
+      if (concurrentSubEl) concurrentSubEl.textContent = '人';
     }
   }
   const st = summarizeRecordedCommenters(
@@ -4188,7 +4219,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   );
   if (uniqueEl) {
     if (st.uniqueKnownUserIds > 0) {
-      uniqueEl.textContent = String(st.uniqueKnownUserIds);
+      uniqueEl.textContent = st.uniqueKnownUserIds.toLocaleString('ja-JP');
       uniqueEl.title = 'userId が取れたコメントについての distinct 数';
     } else if (st.distinctAvatarUrls > 0) {
       uniqueEl.textContent = `≈${st.distinctAvatarUrls}`;
@@ -4200,7 +4231,10 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
         'userId も有効な avatarUrl も無いコメントのみのときは 0 のままです';
     }
   }
-  if (noIdEl) noIdEl.textContent = String(st.commentsWithoutUserId);
+  if (noIdEl) {
+    const n = Math.max(0, Math.floor(Number(st.commentsWithoutUserId) || 0));
+    noIdEl.textContent = n.toLocaleString('ja-JP');
+  }
   if (noteEl) {
     const { body, title } = buildWatchAudienceNote({ snapshot });
     noteEl.textContent = body;
@@ -5846,7 +5880,7 @@ async function refresh() {
     if (!isFreshRefresh()) return;
     resetPerBroadcastPopupCachesIfLiveIdChanged('');
     if (liveEl) liveEl.textContent = '（ニコ生watchを開いてください）';
-    setCountDisplay('-');
+    setCountDisplay('（この配信は未取得）');
     renderCommentTicker([]);
     exportBtn.disabled = true;
     exportBtn.dataset.watchUrl = '';
@@ -5897,7 +5931,7 @@ async function refresh() {
   if (!lv) {
     if (!isFreshRefresh()) return;
     resetPerBroadcastPopupCachesIfLiveIdChanged('');
-    setCountDisplay('-');
+    setCountDisplay('（この配信は未取得）');
     renderCommentTicker([]);
     exportBtn.disabled = true;
     exportBtn.dataset.watchUrl = '';
@@ -6054,7 +6088,7 @@ async function refresh() {
     STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
     const displayEntries = buildDisplayCommentEntries(arr, lv);
     STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
-    setCountDisplay(String(displayEntries.length), watchSnapshot);
+    setCountDisplay(displayEntries.length, watchSnapshot);
     void updateIngestHeartbeatDisplay(lv);
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));
     exportBtn.disabled = false;
