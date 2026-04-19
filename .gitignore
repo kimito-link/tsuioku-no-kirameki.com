@@ -8,3 +8,6 @@ docs/.visual-explainer/
 .cursor/debug-*.log
 nicolivelog-marketing-*.html
 nicolivelog-extension-investigation.zip
+
+# Chrome Web Store 申請用ビルド成果物
+build/
