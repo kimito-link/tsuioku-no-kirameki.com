@@ -124,9 +124,10 @@ test.describe('lp-preview', () => {
 
     const cta = page.locator('#record-cta');
     await cta.scrollIntoViewIfNeeded();
-    await expect(cta.locator('a.btn')).toHaveCount(2);
-    await expect(cta.locator('a.btn').nth(0)).toHaveAttribute('href', '#extension-visual');
-    await expect(cta.locator('a.btn').nth(1)).toHaveAttribute('href', '#extension-guide');
+    await expect(cta.locator('a.btn')).toHaveCount(3);
+    await expect(cta.locator('a.btn').nth(0)).toHaveAttribute('href', /chromewebstore/);
+    await expect(cta.locator('a.btn').nth(1)).toHaveAttribute('href', '#extension-visual');
+    await expect(cta.locator('a.btn').nth(2)).toHaveAttribute('href', '#extension-guide');
     const ctaNoOverflow = await cta.evaluate((el) => el.scrollWidth <= el.clientWidth + 2);
     expect(ctaNoOverflow).toBe(true);
   });
