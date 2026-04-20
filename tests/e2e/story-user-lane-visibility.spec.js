@@ -123,10 +123,6 @@ test.describe('応援レーン可視性の契約（Phase 0 baseline）', () => {
 
     // link / konta / tanu のどこかに非匿名 userId のタイルが 1 つ以上ある
     // （個別列の位置は現行 / 新設計で変わり得るので、3 段合算で検証）
-    const link = popup.locator('#sceneStoryUserLaneLink');
-    const konta = popup.locator('#sceneStoryUserLaneKonta');
-    const tanu = popup.locator('#sceneStoryUserLaneTanu');
-
     // 非匿名 userId のタイル（'132035068' もしくは '13318026'）が少なくとも 1 つ存在
     const anyNonAnonymousTile = popup.locator(
       '#sceneStoryUserLaneLink a[data-user-id^="1"], ' +

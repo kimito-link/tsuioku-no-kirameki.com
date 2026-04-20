@@ -188,7 +188,7 @@ describe('layer-dependency contract', () => {
         )
       ]
         .map((m) => m[0])
-        .filter((token) => {
+        .filter((_token) => {
           // コメント内・文字列リテラル内は見逃す（粗い検出でよい）
           return true;
         });
