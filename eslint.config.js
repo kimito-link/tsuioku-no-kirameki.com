@@ -7,7 +7,25 @@ const browserChrome = {
 };
 
 export default [
-  { ignores: ['extension/dist/**', 'node_modules/**', '.claude/**'] },
+  {
+    /*
+     * 以下は ESLint が lint してはならない生成物・ベンダ成果物。
+     * build/** は CWS 提出用 ZIP のために一時 staging される submission-<ver>/dist/*.js を含む
+     * （AGENTS.md §4 参照）。esbuild 由来の minified 出力のため、そのまま lint すると
+     * no-unused-vars / no-empty などで 900+ エラーに膨れ、lint が CI ゲートとして機能しなくなる。
+     *
+     * test-results/** と playwright-report/** は Playwright の per-run 出力で、
+     * .gitignore 側でも除外済み。念のため lint 対象からも外す。
+     */
+    ignores: [
+      'extension/dist/**',
+      'node_modules/**',
+      '.claude/**',
+      'build/**',
+      'test-results/**',
+      'playwright-report/**'
+    ]
+  },
   js.configs.recommended,
   {
     files: ['src/**/*.js'],

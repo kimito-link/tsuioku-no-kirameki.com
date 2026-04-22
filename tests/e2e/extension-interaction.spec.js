@@ -2,7 +2,8 @@ import {
   test,
   expect,
   dismissExtensionUsageTermsGate,
-  openNlPopupSettings
+  openNlPopupSettings,
+  enableInlinePanelAutoshow
 } from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
@@ -64,6 +65,13 @@ test.describe('extension interaction', () => {
     await sw.evaluate(async (key) => {
       await chrome.storage.local.set({ [key]: false });
     }, KEY_RECORDING);
+
+    /*
+     * 0.1.6 以降、視聴ページのインラインパネルは既定で非表示（autoshow opt-in）。
+     * この spec は「視聴ページ埋め込み iframe から記録トグルを操作できる」ことを検証したいので、
+     * 事前に autoshow を ON にして #nls-inline-popup-host を確実に露出させる。
+     */
+    await enableInlinePanelAutoshow(context);
 
     const page = await context.newPage();
     await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });

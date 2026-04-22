@@ -1,9 +1,14 @@
-import { test, expect } from './fixtures.js';
+import { test, expect, enableInlinePanelAutoshow } from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
 const KEY_INLINE_PANEL_WIDTH_MODE = 'nls_inline_panel_width_mode';
 const KEY_INLINE_PANEL_PLACEMENT = 'nls_inline_panel_placement';
 const KEY_INLINE_FLOATING_ANCHOR = 'nls_inline_floating_anchor';
+/*
+ * autoshow は 0.1.6 以降 opt-in（既定 OFF）のため、E2E ではテストごとに明示 ON にする。
+ * ここではフラグ名を storage key 定数経由でなくリテラルで持つと本体実装とのキー揺れに
+ * 気づきにくいので、共通ヘルパ経由で ON にする（fixtures.js の enableInlinePanelAutoshow）。
+ */
 /*
  * 拡張は「初回起動で floating を一度だけ dock_bottom に寄せる」旧利用者向け移行を
  * background.js と content-entry.js の両方で持っている（migrateFloatingInlinePanelToDockOnce）。
@@ -68,6 +73,11 @@ function injectTwoColumnPlayerRow() {
  * }} opts
  */
 async function setInlinePanelModes(context, opts = {}) {
+  /*
+   * 既定 OFF 化された autoshow を必ず ON にしてから配置モードを設定する。
+   * ここで毎回 ON にしても storage.set は冪等なので副作用はない。
+   */
+  await enableInlinePanelAutoshow(context);
   const sw = await extensionServiceWorker(context);
   await sw.evaluate(
     async ({
