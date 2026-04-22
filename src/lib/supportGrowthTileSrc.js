@@ -92,7 +92,7 @@ export function isAnonymousStyleNicoUserId(userId) {
 }
 
 /**
- * http のサムネが無いとき: 匿名系は TV プレースホルダ、数字IDはニコの式 CDN（公式寄り）、それ以外はゆっくり既定。
+ * http のサムネが無いとき: 匿名系は TV プレースホルダ、数字IDはニコの式 CDN（公式寄り）、それ以外はキャラ既定。
  *
  * @param {unknown} userId
  * @param {unknown} httpCandidate storyGrowthAvatarSrcCandidate 等（空可）

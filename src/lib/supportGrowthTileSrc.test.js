@@ -275,7 +275,7 @@ describe('pickSupportGrowthFallbackTileSrc', () => {
     expect(pickSupportGrowthFallbackTileSrc('', '', y, tv)).toBe(tv);
     expect(pickSupportGrowthFallbackTileSrc('a:1', '', y, tv)).toBe(tv);
   });
-  it('数字IDで http 無しはニコ既定 usericon（こん太段のゆっくり誤表示を避ける）', () => {
+  it('数字IDで http 無しはニコ既定 usericon（こん太段のキャラ誤表示を避ける）', () => {
     expect(pickSupportGrowthFallbackTileSrc('86255751', '', y, tv)).toBe(
       niconicoDefaultUserIconUrl('86255751')
     );

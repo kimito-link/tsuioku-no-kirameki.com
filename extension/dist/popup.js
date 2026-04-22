@@ -3314,7 +3314,7 @@ ${body}`;
     "\u71B1\u91CF\u306E\u968E\u6BB5\u3092\u30A4\u30E1\u30FC\u30B8\u3059\u308B\u3068\u3001\u8996\u8074\u30FB\u540C\u3058\u6642\u9593\u5E2F\u306B\u3044\u308B\u3001\u30C7\u30B8\u30BF\u30EB\u4E0A\u306E\u5FDC\u63F4\uFF08\u30B3\u30E1\u30F3\u30C8\u3084\u30A2\u30A4\u30C6\u30E0\uFF09\u3001\u305D\u3057\u3066<strong>\u30A4\u30D9\u30F3\u30C8\u5F53\u65E5\u3001\u8EAB\u4F53\u3092\u52D5\u304B\u3057\u3066\u30E9\u30A4\u30D6\u4F1A\u5834\u306B\u6765\u3066\u304F\u308C\u305F\u3053\u3068</strong>\u3092\u3001\u3044\u3061\u3070\u3093\u91CD\u3044\u53C2\u52A0\u3068\u3057\u3066\u7F6E\u304D\u305F\u3044\u306E\u3060\u3002\u30AA\u30F3\u30E9\u30A4\u30F3\u306E\u5FDC\u63F4\u3092\u8EFD\u304F\u3059\u308B\u8A71\u3067\u306F\u306A\u3044\u306E\u3060\u3002<strong>\u6765\u3089\u308C\u306A\u3044\u7406\u7531</strong>\u306F\u4EBA\u305D\u308C\u305E\u308C\u3060\u304B\u3089\u3001\u5225\u8EF8\u3067\u5C0A\u91CD\u3059\u308B\u306E\u3060\u3002",
     "\u5168\u4F53\u306E\u300C\u30E6\u30CB\u30FC\u30AF\u30E6\u30FC\u30B6\u30FC\u300D\u3092\u30D7\u30E9\u30C3\u30C8\u30D5\u30A9\u30FC\u30E0\u6A2A\u65AD\u3067\u6B63\u78BA\u306B\u4E00\u3064\u306B\u307E\u3068\u3081\u308B\u306E\u306F\u96E3\u3057\u3044\u306E\u3060\u3002\u3060\u304B\u3089\u300C\u3053\u306E\u62E1\u5F35\u3068\u30EC\u30DD\u30FC\u30C8\u3067\u4F55\u3092\u6570\u3048\u308B\u304B\u300D\u3092\u3001\u6587\u7AE0\u3067\u5171\u6709\u3057\u3066\u304A\u304F\u306E\u3060\u3002"
   ];
-  var SAVE_H2 = "\u306A\u306B\u3053\u308C\uFF1F\uFF08\u3086\u3063\u304F\u308A\u30AC\u30A4\u30C9\uFF09";
+  var SAVE_H2 = "\u306A\u306B\u3053\u308C\uFF1F\uFF08\u30AD\u30E3\u30E9\u30AC\u30A4\u30C9\uFF09";
   var SAVE_LEAD = "\u3053\u306EHTML\u306F\u3001\u3053\u306EPC\u306B\u4FDD\u5B58\u3057\u305F\u30B3\u30E1\u30F3\u30C8\u3068\u3001\u5F53\u6642\u306E\u653E\u9001\u30DA\u30FC\u30B8\u304B\u3089\u53D6\u308C\u305F\u60C5\u5831\u3092\u307E\u3068\u3081\u305F\u300C\u632F\u308A\u8FD4\u308A\u7528\u30E1\u30E2\u300D\u306A\u306E\u3060\u3002\u5FDC\u63F4\u306E\u75D5\u8DE1\u3092\u6B8B\u3059\u305F\u3081\u306E\u8A18\u9332\u3067\u3082\u3042\u308B\u306E\u3060\u3002";
   function conceptReadMoreHtml(summaryTitle, bodyHtml) {
     return `
@@ -3330,27 +3330,27 @@ ${body}`;
     const { avatarLinkHtml, avatarKontaHtml, avatarTanuHtml } = avatars;
     const linkRow = yukkuriGuideRowMultiHtml(
       avatarLinkHtml,
-      "\u3086\u3063\u304F\u308A\u308A\u3093\u304F",
+      "\u30AC\u30A4\u30C9\u30AD\u30E3\u30E9\u308A\u3093\u304F",
       LINK_PARAS,
       false
     );
     const kontaRow = yukkuriGuideRowMultiHtml(
       avatarKontaHtml,
-      "\u3086\u3063\u304F\u308A\u3053\u3093\u592A",
+      "\u30AC\u30A4\u30C9\u30AD\u30E3\u30E9\u3053\u3093\u592A",
       KONTA_PARAS,
       true
     );
     const tanuRow = yukkuriGuideRowMultiHtml(
       avatarTanuHtml,
-      "\u3086\u3063\u304F\u308A\u305F\u306C\u59C9",
+      "\u30AC\u30A4\u30C9\u30AD\u30E3\u30E9\u305F\u306C\u59C9",
       TANU_PARAS,
       false
     );
     const accordions = [
       conceptReadMoreHtml("\u306D\u3089\u3044\u30FB\u540D\u524D\u30FB\u52D5\u54E1\u3061\u3083\u308C\u3093\u3058\u3068\u306E\u95A2\u4FC2", CONCEPT_READ_MORE_1_BODY),
-      conceptReadMoreHtml("\u3086\u3063\u304F\u308A\u308A\u3093\u304F\uFF1A\u5FDC\u63F4\u30ED\u30B0\u3068\u53EF\u8996\u5316", linkRow),
-      conceptReadMoreHtml("\u3086\u3063\u304F\u308A\u3053\u3093\u592A\uFF1A\u4E3B\u50AC\u306E\u300C\u898B\u3066\u3044\u308B\u300D\u3068\u71B1\u91CF", kontaRow),
-      conceptReadMoreHtml("\u3086\u3063\u304F\u308A\u305F\u306C\u59C9\uFF1A\u6765\u5834\u30FB\u4F1A\u5834\u30FB\u5B9A\u7FA9\u306E\u8A71", tanuRow)
+      conceptReadMoreHtml("\u30AC\u30A4\u30C9\u30AD\u30E3\u30E9\u308A\u3093\u304F\uFF1A\u5FDC\u63F4\u30ED\u30B0\u3068\u53EF\u8996\u5316", linkRow),
+      conceptReadMoreHtml("\u30AC\u30A4\u30C9\u30AD\u30E3\u30E9\u3053\u3093\u592A\uFF1A\u4E3B\u50AC\u306E\u300C\u898B\u3066\u3044\u308B\u300D\u3068\u71B1\u91CF", kontaRow),
+      conceptReadMoreHtml("\u30AC\u30A4\u30C9\u30AD\u30E3\u30E9\u305F\u306C\u59C9\uFF1A\u6765\u5834\u30FB\u4F1A\u5834\u30FB\u5B9A\u7FA9\u306E\u8A71", tanuRow)
     ].join("");
     return `
       <section class="card yukkuri-guide-card" style="margin-top:12px;">
@@ -3364,19 +3364,19 @@ ${body}`;
     const rows = [
       yukkuriGuideRowHtml(
         avatarLinkHtml,
-        "\u3086\u3063\u304F\u308A\u308A\u3093\u304F",
+        "\u30AC\u30A4\u30C9\u30AD\u30E3\u30E9\u308A\u3093\u304F",
         "\u307E\u305A\u306F\u4E0A\u306E\u300C\u6982\u8981\u300D\u3067\u30BF\u30A4\u30C8\u30EB\u3068\u914D\u4FE1\u8005\u3092\u78BA\u8A8D\u3059\u308B\u306E\u3060\u3002\u691C\u7D22\u30DC\u30C3\u30AF\u30B9\u306B\u30AD\u30FC\u30EF\u30FC\u30C9\u3092\u5165\u308C\u308B\u3068\u3001\u3053\u306E\u30DA\u30FC\u30B8\u5168\u4F53\u304B\u3089\u7D5E\u308A\u8FBC\u3081\u308B\u306E\u3060\u3002",
         false
       ),
       yukkuriGuideRowHtml(
         avatarKontaHtml,
-        "\u3086\u3063\u304F\u308A\u3053\u3093\u592A",
+        "\u30AC\u30A4\u30C9\u30AD\u30E3\u30E9\u3053\u3093\u592A",
         "\u300C\u30B7\u30A7\u30A2\u30FB\u30D7\u30EC\u30D3\u30E5\u30FC\u5411\u3051\u300D\u306F\u3001LINE\u3084X\u3067\u30EA\u30F3\u30AF\u3092\u8CBC\u3063\u305F\u3068\u304D\u306B\u51FA\u3084\u3059\u3044\u30BF\u30A4\u30C8\u30EB\u3084\u8AAC\u660E\u6587\u306A\u306E\u3060\u3002\u7D30\u304B\u3044\u82F1\u8A9E\u306E\u30AD\u30FC\u540D\u306F\u6C17\u306B\u3057\u306A\u304F\u3066\u3088\u3044\u306E\u3060\u3002",
         true
       ),
       yukkuriGuideRowHtml(
         avatarTanuHtml,
-        "\u3086\u3063\u304F\u308A\u305F\u306C\u59C9",
+        "\u30AC\u30A4\u30C9\u30AD\u30E3\u30E9\u305F\u306C\u59C9",
         "\u30A2\u30D7\u30EA\u9023\u643A\u7528\u306E\u9577\u3044\u30BF\u30B0\u3084 script \u306EURL\u306F\u3001\u4E0B\u306E\u6298\u308A\u305F\u305F\u307F\u306B\u307E\u3068\u3081\u3066\u3042\u308B\u306E\u3060\u3002\u8ABF\u3079\u3082\u306E\u3092\u3059\u308B\u3068\u304D\u4EE5\u5916\u306F\u958B\u304B\u306A\u304F\u3066\u5927\u4E08\u592B\u306A\u306E\u3060\u3002\u30BF\u30B0\u306E\u30C1\u30C3\u30D7\u306F\u4E0A\u306E\u6982\u8981\u3068\u540C\u3058\u3060\u304B\u3089\u3001\u8868\u3067\u306F\u4E8C\u5EA6\u51FA\u3055\u306A\u3044\u306E\u3060\u3002",
         false
       )
@@ -6678,6 +6678,25 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       lid
     );
   }
+  function hasOwnPostedEntryForUserId(entries, userId, liveId) {
+    const uid = String(userId || "").trim();
+    if (!uid) return false;
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length) return false;
+    const lid = String(liveId || STORY_SOURCE_STATE.liveId || "").trim().toLowerCase();
+    if (!lid) return false;
+    let matchedIdsLazy = (
+      /** @type {Set<string>|null} */
+      null
+    );
+    for (const entry of list) {
+      if (String(entry?.userId || "").trim() !== uid) continue;
+      if (entry?.selfPosted) return true;
+      if (!matchedIdsLazy) matchedIdsLazy = getOwnPostedMatchedIdSet(list, lid);
+      if (matchedIdsLazy.has(popupEntryStableId(entry, lid))) return true;
+    }
+    return false;
+  }
   var popupUserCommentProfileMap = (
     /** @type {null|Record<string, { nickname?: string, avatarUrl?: string, updatedAt: number }>} */
     null
@@ -7537,6 +7556,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       );
       const uidRaw = String(agg?.userId || "").trim();
       if (!uidRaw) continue;
+      const ownPostedForUid = hasOwnPostedEntryForUserId(storageCtx, uidRaw, liveId);
       const e = {
         id: `nl-lane:${uidRaw}`,
         liveId,
@@ -7544,6 +7564,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         nickname: String(agg.nickname || ""),
         avatarUrl: String(agg.avatarUrl || ""),
         ...agg.avatarObserved ? { avatarObserved: true } : {},
+        ...ownPostedForUid ? { selfPosted: true } : {},
         text: "",
         commentNo: ""
       };
@@ -7551,7 +7572,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         candidateUserId: uidRaw,
         viewerUserId: viewerUid,
         broadcasterUserId: broadcasterUid,
-        isOwnPosted: isOwnPostedSupportComment(e, liveId, storageCtx)
+        isOwnPosted: ownPostedForUid
       })) {
         continue;
       }
@@ -9899,13 +9920,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         paintCommentComposeUi();
         setReloadWatchTabUiDisabled(false);
         const laneLvKey = normalizeLv2(lv);
-        const storageRowsForLane = !laneLvKey ? arr : arr.filter((e) => {
+        const laneFeedEntries = !laneLvKey ? displayEntries : displayEntries.filter((e) => {
           const a = normalizeLv2(e?.liveId);
           const b = normalizeLv2(e?.lvId);
           return Boolean(a) && a === laneLvKey || Boolean(b) && b === laneLvKey;
         });
-        syncStorySourceEntries(lv, displayEntries, storageRowsForLane);
-        renderUserRooms(arr, lv);
+        syncStorySourceEntries(lv, displayEntries, laneFeedEntries);
+        renderUserRooms(laneFeedEntries, lv);
         renderCharacterScene({
           hasWatch: true,
           recording: toggle.checked,
@@ -11483,7 +11504,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0418-2338" ? String("0418-2338") : "dev";
+      const buildId = "0423-0541" ? String("0423-0541") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

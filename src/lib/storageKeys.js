@@ -5,7 +5,7 @@
 export const KEY_RECORDING = 'nls_recording_enabled';
 
 /**
- * 記録ON時、初回のコメント一覧 deep harvest を遅らせる＋ゆっくりローディングを出す。
+ * 記録ON時、初回のコメント一覧 deep harvest を遅らせる＋キャラローディングを出す。
  * false のときは従来どおり短い遅延のみ（記録が伸びやすいが一覧が動きやすい）。
  */
 export const KEY_DEEP_HARVEST_QUIET_UI = 'nls_deep_harvest_quiet_ui';

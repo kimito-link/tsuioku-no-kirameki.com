@@ -36,14 +36,14 @@ describe('buildHtmlReportConceptGuideCardHtml', () => {
     expect(html).toContain('details class="concept-read-more"');
   });
 
-  it('3 行のゆっくりガイドとアバタープレースホルダを出力する', () => {
+  it('3 行のキャラガイドとアバタープレースホルダを出力する', () => {
     const html = buildHtmlReportConceptGuideCardHtml(avatars);
     expect(html).toContain('data-test="link"');
     expect(html).toContain('data-test="konta"');
     expect(html).toContain('data-test="tanu"');
-    expect(html).toContain('ゆっくりりんく');
-    expect(html).toContain('ゆっくりこん太');
-    expect(html).toContain('ゆっくりたぬ姉');
+    expect(html).toContain('ガイドキャラりんく');
+    expect(html).toContain('ガイドキャラこん太');
+    expect(html).toContain('ガイドキャラたぬ姉');
     const rowMatches = html.match(/class="yukkuri-row/g);
     expect(rowMatches?.length).toBe(3);
   });
@@ -69,7 +69,7 @@ describe('buildHtmlReportConceptGuideCardHtml', () => {
 describe('buildHtmlReportSaveGuideCardHtml', () => {
   it('振り返り用メモと応援の痕跡のリードを含む', () => {
     const html = buildHtmlReportSaveGuideCardHtml(avatars);
-    expect(html).toContain('なにこれ？（ゆっくりガイド）');
+    expect(html).toContain('なにこれ？（キャラガイド）');
     expect(html).toContain('振り返り用メモ');
     expect(html).toContain('応援の痕跡');
   });

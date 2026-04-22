@@ -1,5 +1,5 @@
 /**
- * HTML レポート用ゆっくりガイド（この拡張の説明／保存ページの使い方）
+ * HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
  * 表示名「君斗りんくの追憶のきらめき」。ファイル名等の識別子に nicolivelog が残る。「動員ちゃれんじ」（doin-challenge.com）と文脈でリンク。
  */
 
@@ -84,7 +84,7 @@ const TANU_PARAS = [
   '全体の「ユニークユーザー」をプラットフォーム横断で正確に一つにまとめるのは難しいのだ。だから「この拡張とレポートで何を数えるか」を、文章で共有しておくのだ。'
 ];
 
-const SAVE_H2 = 'なにこれ？（ゆっくりガイド）';
+const SAVE_H2 = 'なにこれ？（キャラガイド）';
 const SAVE_LEAD =
   'このHTMLは、このPCに保存したコメントと、当時の放送ページから取れた情報をまとめた「振り返り用メモ」なのだ。応援の痕跡を残すための記録でもあるのだ。';
 
@@ -113,28 +113,28 @@ export function buildHtmlReportConceptGuideCardHtml(avatars) {
 
   const linkRow = yukkuriGuideRowMultiHtml(
     avatarLinkHtml,
-    'ゆっくりりんく',
+    'ガイドキャラりんく',
     LINK_PARAS,
     false
   );
   const kontaRow = yukkuriGuideRowMultiHtml(
     avatarKontaHtml,
-    'ゆっくりこん太',
+    'ガイドキャラこん太',
     KONTA_PARAS,
     true
   );
   const tanuRow = yukkuriGuideRowMultiHtml(
     avatarTanuHtml,
-    'ゆっくりたぬ姉',
+    'ガイドキャラたぬ姉',
     TANU_PARAS,
     false
   );
 
   const accordions = [
     conceptReadMoreHtml('ねらい・名前・動員ちゃれんじとの関係', CONCEPT_READ_MORE_1_BODY),
-    conceptReadMoreHtml('ゆっくりりんく：応援ログと可視化', linkRow),
-    conceptReadMoreHtml('ゆっくりこん太：主催の「見ている」と熱量', kontaRow),
-    conceptReadMoreHtml('ゆっくりたぬ姉：来場・会場・定義の話', tanuRow)
+    conceptReadMoreHtml('ガイドキャラりんく：応援ログと可視化', linkRow),
+    conceptReadMoreHtml('ガイドキャラこん太：主催の「見ている」と熱量', kontaRow),
+    conceptReadMoreHtml('ガイドキャラたぬ姉：来場・会場・定義の話', tanuRow)
   ].join('');
 
   return `
@@ -154,19 +154,19 @@ export function buildHtmlReportSaveGuideCardHtml(avatars) {
   const rows = [
     yukkuriGuideRowHtml(
       avatarLinkHtml,
-      'ゆっくりりんく',
+      'ガイドキャラりんく',
       'まずは上の「概要」でタイトルと配信者を確認するのだ。検索ボックスにキーワードを入れると、このページ全体から絞り込めるのだ。',
       false
     ),
     yukkuriGuideRowHtml(
       avatarKontaHtml,
-      'ゆっくりこん太',
+      'ガイドキャラこん太',
       '「シェア・プレビュー向け」は、LINEやXでリンクを貼ったときに出やすいタイトルや説明文なのだ。細かい英語のキー名は気にしなくてよいのだ。',
       true
     ),
     yukkuriGuideRowHtml(
       avatarTanuHtml,
-      'ゆっくりたぬ姉',
+      'ガイドキャラたぬ姉',
       'アプリ連携用の長いタグや script のURLは、下の折りたたみにまとめてあるのだ。調べものをするとき以外は開かなくて大丈夫なのだ。タグのチップは上の概要と同じだから、表では二度出さないのだ。',
       false
     )

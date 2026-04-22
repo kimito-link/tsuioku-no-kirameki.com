@@ -1536,7 +1536,7 @@ const STORY_RINK_FACE_IMG = 'images/toumeilink.png';
 /** 記録ON・件数0のときのストーリー顔（PNG タイル既定とは別の差し絵） */
 const STORY_RINK_COLLECTING_JPG = 'images/icon/kewXCUOt_400x400.jpg';
 /**
- * 応援グリッドで「そのコメントにサムネURLが無い」ときの既定タイル（ゆっくり。キャラ削除ではない）
+ * 応援グリッドで「そのコメントにサムネURLが無い」ときの既定タイル（キャラ追加時の設定による）
  */
 const STORY_GRID_DEFAULT_TILE_IMG =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
@@ -1553,7 +1553,7 @@ const STORY_GUIDE_FACE_TANU =
 const STORY_REMOTE_FAILED_PLACEHOLDER_IMG = NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS;
 
 /**
- * ゆっくり既定タイル向けの「枠付き」スタイル。公式 usericon / defaults には付けない。
+ * キャラ既定タイル向けの「枠付き」スタイル。公式 usericon / defaults には付けない。
  * @param {string} requestedSrc
  * @param {string} displaySrc
  */
@@ -1902,6 +1902,35 @@ function isOwnPostedSupportComment(entry, liveId, entries = STORY_SOURCE_STATE.e
     selfPostedRecentsCache,
     lid
   );
+}
+
+/**
+ * りんく段候補（レーン集約）や上位ランク集約のように、元コメントではなく
+ * 「userId でまとめた集約エントリ」に対して isOwnPosted を判定する場合、
+ * popupEntryStableId では一致しない合成 id が付くため、個別エントリ id での
+ * 一致検査は必ず false になる。代わりに list 側の同一 userId のエントリのうち
+ * いずれかが自己投稿なら own-posted とみなす。
+ *
+ * @param {PopupCommentEntry[]|null|undefined} entries
+ * @param {string} userId
+ * @param {string} liveId
+ * @returns {boolean}
+ */
+function hasOwnPostedEntryForUserId(entries, userId, liveId) {
+  const uid = String(userId || '').trim();
+  if (!uid) return false;
+  const list = Array.isArray(entries) ? entries : [];
+  if (!list.length) return false;
+  const lid = String(liveId || STORY_SOURCE_STATE.liveId || '').trim().toLowerCase();
+  if (!lid) return false;
+  let matchedIdsLazy = /** @type {Set<string>|null} */ (null);
+  for (const entry of list) {
+    if (String(entry?.userId || '').trim() !== uid) continue;
+    if (entry?.selfPosted) return true;
+    if (!matchedIdsLazy) matchedIdsLazy = getOwnPostedMatchedIdSet(list, lid);
+    if (matchedIdsLazy.has(popupEntryStableId(entry, lid))) return true;
+  }
+  return false;
 }
 
 /** 永続プロファイルキャッシュ（refresh ごとに再読込） */
@@ -2909,6 +2938,12 @@ function renderStoryUserLane() {
     );
     const uidRaw = String(agg?.userId || '').trim();
     if (!uidRaw) continue;
+    // 集約エントリは合成 id なので、`isOwnPostedSupportComment` の id 一致検査は
+    // 必ず false になり、viewer uid と一致する自分のコメントまで contamination
+    // guard で除外されてしまう（= りんくレーンに自コメが出ない）。
+    // 同一 userId の storage エントリに1件でも self-posted があるなら own-posted
+    // 扱いし、synthetic `e.selfPosted = true` を立てて下流にも正しく伝える。
+    const ownPostedForUid = hasOwnPostedEntryForUserId(storageCtx, uidRaw, liveId);
     /** @type {PopupCommentEntry} */
     const e = {
       id: `nl-lane:${uidRaw}`,
@@ -2917,6 +2952,7 @@ function renderStoryUserLane() {
       nickname: String(agg.nickname || ''),
       avatarUrl: String(agg.avatarUrl || ''),
       ...(agg.avatarObserved ? { avatarObserved: true } : {}),
+      ...(ownPostedForUid ? { selfPosted: true } : {}),
       text: '',
       commentNo: ''
     };
@@ -2925,7 +2961,7 @@ function renderStoryUserLane() {
         candidateUserId: uidRaw,
         viewerUserId: viewerUid,
         broadcasterUserId: broadcasterUid,
-        isOwnPosted: isOwnPostedSupportComment(e, liveId, storageCtx)
+        isOwnPosted: ownPostedForUid
       })
     ) {
       continue;
@@ -6258,9 +6294,13 @@ async function refresh() {
     paintCommentComposeUi();
     setReloadWatchTabUiDisabled(false);
     const laneLvKey = normalizeLv(lv);
-    const storageRowsForLane = !laneLvKey
-      ? arr
-      : arr.filter((e) => {
+    // 保存済みコメント＋pending な自己投稿（まだ storage に届いていない分）を
+    // レーン集約・上位ランクの両方で合流させる。これがないと、自分で送った直後の
+    // コメントがりんくレーンにも上部ランクにも現れない（storage に届くまでは
+    // 存在しないユーザー扱いになっていた）。
+    const laneFeedEntries = !laneLvKey
+      ? displayEntries
+      : displayEntries.filter((e) => {
           const a = normalizeLv(e?.liveId);
           const b = normalizeLv(e?.lvId);
           return (
@@ -6268,8 +6308,8 @@ async function refresh() {
             (Boolean(b) && b === laneLvKey)
           );
         });
-    syncStorySourceEntries(lv, displayEntries, storageRowsForLane);
-    renderUserRooms(arr, lv);
+    syncStorySourceEntries(lv, displayEntries, laneFeedEntries);
+    renderUserRooms(laneFeedEntries, lv);
     renderCharacterScene({
       hasWatch: true,
       recording: toggle.checked,

@@ -6989,7 +6989,7 @@
     if (imgUrl) img.src = imgUrl;
     const text = document.createElement("div");
     text.style.cssText = "min-width:0";
-    text.innerHTML = '<div style="font-weight:600;margin:0 0 2px">\u8AAD\u307F\u8FBC\u307F\u4E2D\u2026</div><div style="font-size:12px;opacity:0.78;margin:0;line-height:1.35">\u30B3\u30E1\u30F3\u30C8\u8A18\u9332\u306E\u6E96\u5099\u3092\u3057\u3066\u3044\u307E\u3059\u3002\u3086\u3063\u304F\u308A\u3057\u3066\u3044\u3063\u3066\u306D\uFF01</div>';
+    text.innerHTML = '<div style="font-weight:600;margin:0 0 2px">\u8AAD\u307F\u8FBC\u307F\u4E2D\u2026</div><div style="font-size:12px;opacity:0.78;margin:0;line-height:1.35">\u30B3\u30E1\u30F3\u30C8\u8A18\u9332\u306E\u6E96\u5099\u3092\u3057\u3066\u3044\u307E\u3059\u3002\u3082\u3046\u5C11\u3057\u5F85\u3063\u3066\u3066\u306D\uFF01</div>';
     host.appendChild(img);
     host.appendChild(text);
     try {

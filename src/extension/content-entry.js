@@ -179,7 +179,7 @@ const DEEP_HARVEST_PERIODIC_MS = HARVEST_TIMING.periodicMs;
  */
 const DEEP_HARVEST_STABILITY_FOLLOWUP_MS = HARVEST_TIMING.stabilityFollowUpMs;
 const DEEP_HARVEST_RECOVERY_MS = HARVEST_TIMING.deepRecoveryMs;
-/** 長めの待ちのあいだ、ゆっくりりんくで「読み込み中」と示す（web_accessible と一致させる） */
+/** 長めの待ちのあいだ、オリジナルキャラクターりんくで「読み込み中」と示す（web_accessible と一致させる） */
 const DEEP_HARVEST_LOADING_HOST_ID = 'nl-deep-harvest-loading';
 const DEEP_HARVEST_LOADING_IMG_PATH =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
@@ -5009,7 +5009,7 @@ function ensureDeepHarvestLoadingUi() {
   text.innerHTML =
     '<div style="font-weight:600;margin:0 0 2px">読み込み中…</div>' +
     '<div style="font-size:12px;opacity:0.78;margin:0;line-height:1.35">' +
-    'コメント記録の準備をしています。ゆっくりしていってね！' +
+    'コメント記録の準備をしています。もう少し待っててね！' +
     '</div>';
   host.appendChild(img);
   host.appendChild(text);
