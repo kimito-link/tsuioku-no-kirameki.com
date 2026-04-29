@@ -3000,6 +3000,33 @@
     }
   }
 
+  // src/lib/selfPostedMatcher.js
+  var SELF_POST_MATCH_EARLY_MS = 30 * 1e3;
+  var SELF_POST_MATCH_LATE_MS = 10 * 60 * 1e3;
+  var SELF_POST_RECENT_TTL_MS = 24 * 60 * 60 * 1e3;
+  function filterValidSelfPostedRecents(raw, now = Date.now()) {
+    if (!raw || typeof raw !== "object") return [];
+    const items = (
+      /** @type {{ items?: unknown }} */
+      raw.items
+    );
+    if (!Array.isArray(items)) return [];
+    const out = [];
+    for (const x of items) {
+      if (!x || typeof x !== "object") continue;
+      const rec = (
+        /** @type {{liveId?: unknown, at?: unknown, textNorm?: unknown, textRaw?: unknown}} */
+        x
+      );
+      if (typeof rec.liveId === "string" && typeof rec.textNorm === "string" && typeof rec.at === "number" && now - rec.at < SELF_POST_RECENT_TTL_MS) {
+        const item = { liveId: rec.liveId, textNorm: rec.textNorm, at: rec.at };
+        if (typeof rec.textRaw === "string") item.textRaw = rec.textRaw;
+        out.push(item);
+      }
+    }
+    return out;
+  }
+
   // src/lib/ndgrBacklog.js
   function shouldDeferNdgrFlushUntilLiveId(opts) {
     const recording2 = Boolean(opts?.recording);
@@ -3205,10 +3232,10 @@
   var TAB_VISIBLE_HARVEST_MIN_MS = 12e3;
   var lastTabVisibleHarvestAt = 0;
   var MAX_SELF_POSTED_ITEMS = 48;
-  var SELF_POST_RECENT_TTL_MS = 24 * 60 * 60 * 1e3;
+  var SELF_POST_RECENT_TTL_MS2 = 24 * 60 * 60 * 1e3;
   var SELF_POST_NATIVE_DEDUPE_MS = 5e3;
-  var SELF_POST_MATCH_LATE_MS = 10 * 60 * 1e3;
-  var SELF_POST_MATCH_EARLY_MS = 30 * 1e3;
+  var SELF_POST_MATCH_LATE_MS2 = 10 * 60 * 1e3;
+  var SELF_POST_MATCH_EARLY_MS2 = 30 * 1e3;
   var AUTO_BACKUP_LIVES_MAX = 40;
   var SNAPSHOT_LINK_RELS = /* @__PURE__ */ new Set([
     "alternate",
@@ -5517,13 +5544,15 @@
       const raw = bag[KEY_SELF_POSTED_RECENTS];
       const items = raw && typeof raw === "object" && Array.isArray(raw.items) ? raw.items : [];
       const next = items.filter(
-        (x) => x && typeof x.liveId === "string" && typeof x.textNorm === "string" && typeof x.at === "number" && now - x.at < SELF_POST_RECENT_TTL_MS
+        (x) => x && typeof x.liveId === "string" && typeof x.textNorm === "string" && typeof x.at === "number" && now - x.at < SELF_POST_RECENT_TTL_MS2
       );
       const duplicated = next.some(
         (it) => String(it.liveId || "").trim().toLowerCase() === lid && String(it.textNorm || "") === textNorm && Math.abs(now - (Number(it.at) || 0)) < SELF_POST_NATIVE_DEDUPE_MS
       );
       if (duplicated) return;
-      next.push({ liveId: lid, at: now, textNorm });
+      const item = { liveId: lid, at: now, textNorm };
+      if (typeof rawText === "string" && rawText) item.textRaw = rawText;
+      next.push(item);
       while (next.length > MAX_SELF_POSTED_ITEMS) next.shift();
       await chrome.storage.local.set({
         [KEY_SELF_POSTED_RECENTS]: { items: next }
@@ -6501,11 +6530,11 @@
       for (const candidate of bucket) {
         if (markedIds.has(candidate.id)) continue;
         const cap = candidate.capturedAt;
-        if (cap < recent.at - SELF_POST_MATCH_EARLY_MS || cap > recent.at + SELF_POST_MATCH_LATE_MS) {
+        if (cap < recent.at - SELF_POST_MATCH_EARLY_MS2 || cap > recent.at + SELF_POST_MATCH_LATE_MS2) {
           continue;
         }
         const delta = cap - recent.at;
-        const score = Math.abs(delta) + (delta >= 0 ? 0 : SELF_POST_MATCH_EARLY_MS + 1);
+        const score = Math.abs(delta) + (delta >= 0 ? 0 : SELF_POST_MATCH_EARLY_MS2 + 1);
         if (score < bestScore || score === bestScore && candidate.index < bestIndex) {
           best = candidate;
           bestScore = score;
@@ -6612,9 +6641,7 @@
         incomingCount: enriched.length
       }));
       const pendingRaw = bag[KEY_SELF_POSTED_RECENTS];
-      const pendingItems = pendingRaw && typeof pendingRaw === "object" && Array.isArray(pendingRaw.items) ? pendingRaw.items.filter(
-        (x) => x && typeof x.liveId === "string" && typeof x.textNorm === "string" && typeof x.at === "number"
-      ) : [];
+      const pendingItems = filterValidSelfPostedRecents(pendingRaw);
       const mergedRows = mergeNewComments(
         liveId,
         existing,

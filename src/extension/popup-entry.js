@@ -1835,7 +1835,13 @@ async function appendSelfPostedComment(liveId, rawText) {
       Math.abs(at - (Number(it.at) || 0)) < SELF_POST_DUPLICATE_WINDOW_MS
   );
   if (duplicated) return;
-  next.push({ liveId: lid, at, textNorm });
+  /** @type {{liveId: string, at: number, textNorm: string, textRaw?: string}} */
+  const item = { liveId: lid, at, textNorm };
+  // pending 表示で改行・前後空白などを保持するため、生本文も optional で持つ。
+  // これがないと normalize 後の本文だけになり、ndgr 観測で本物の text に置き換わる
+  // 瞬間に「改行が出現する」ちらつきが起きる。
+  if (typeof rawText === 'string' && rawText) item.textRaw = rawText;
+  next.push(item);
   while (next.length > MAX_SELF_POSTED_ITEMS) next.shift();
   selfPostedRecentsCache = next;
   try {
@@ -2301,6 +2307,13 @@ function buildDisplayCommentEntries(entries, liveId) {
       userId: viewerUid || null,
       nickname: viewerNick,
       avatarUrl: isHttpOrHttpsUrl(viewerAvatarUrl) ? viewerAvatarUrl : '',
+      // pending entry は「viewer 自身が今送ったコメント」が確定しているので、
+      // linkPolicy の `avatarObserved` 経路を通して link 段に上げる。これがないと、
+      // snapshot 未取得 / viewerNick・viewerAvatarUrl 未取得の paint #1 タイミングで
+      // linkPolicy 不該当 → 防御的に tanu 段（匿名段）に落ちて、その後 paint #2 で
+      // りんく段に昇格する「自コメが一瞬たぬ姉段に出てから移動する」見え方になる
+      // （Self-comment M1）。匿名 ID の場合は linkPolicy 内で弾かれるので影響なし。
+      avatarObserved: true,
       selfPosted: true,
       capturedAt: Number(it?.at) || Date.now()
     }));

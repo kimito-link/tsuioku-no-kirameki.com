@@ -28,6 +28,8 @@ export const SELF_POST_RECENT_TTL_MS = 24 * 60 * 60 * 1000;
  * @property {string} liveId 放送 ID（大小区別しない、呼び出し側で lowercase 想定）
  * @property {number} at epoch ms で送信した時刻
  * @property {string} textNorm 正規化済コメント本文
+ * @property {string} [textRaw] 正規化前の生本文（改行・空白を保持）。pending 表示時に
+ *   normalize 済み本文だけだと改行・トリム差で UI がちらつくため、optional で持つ。
  */
 
 /**
@@ -61,14 +63,17 @@ export function filterValidSelfPostedRecents(raw, now = Date.now()) {
   const out = [];
   for (const x of items) {
     if (!x || typeof x !== 'object') continue;
-    const rec = /** @type {{liveId?: unknown, at?: unknown, textNorm?: unknown}} */ (x);
+    const rec = /** @type {{liveId?: unknown, at?: unknown, textNorm?: unknown, textRaw?: unknown}} */ (x);
     if (
       typeof rec.liveId === 'string' &&
       typeof rec.textNorm === 'string' &&
       typeof rec.at === 'number' &&
       now - rec.at < SELF_POST_RECENT_TTL_MS
     ) {
-      out.push({ liveId: rec.liveId, textNorm: rec.textNorm, at: rec.at });
+      /** @type {SelfPostedRecent} */
+      const item = { liveId: rec.liveId, textNorm: rec.textNorm, at: rec.at };
+      if (typeof rec.textRaw === 'string') item.textRaw = rec.textRaw;
+      out.push(item);
     }
   }
   return out;

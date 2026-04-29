@@ -69,6 +69,33 @@ describe('filterValidSelfPostedRecents', () => {
       { liveId: 'lv', textNorm: 'x', at: 1_000 }
     ]);
   });
+
+  it('textRaw が string なら pass-through で保持する', () => {
+    const raw = {
+      items: [
+        { liveId: 'lv', textNorm: 'あいう', at: NOW, textRaw: 'あい\nう' }
+      ]
+    };
+    const out = filterValidSelfPostedRecents(raw, NOW);
+    expect(out).toEqual([
+      { liveId: 'lv', textNorm: 'あいう', at: NOW, textRaw: 'あい\nう' }
+    ]);
+  });
+
+  it('textRaw が string でない場合は出力に含めない', () => {
+    const raw = {
+      items: [
+        { liveId: 'lv', textNorm: 'x', at: NOW, textRaw: 123 },
+        { liveId: 'lv', textNorm: 'y', at: NOW, textRaw: null },
+        { liveId: 'lv', textNorm: 'z', at: NOW }
+      ]
+    };
+    const out = filterValidSelfPostedRecents(raw, NOW);
+    for (const item of out) {
+      expect(item).not.toHaveProperty('textRaw');
+    }
+    expect(out.map((it) => it.textNorm)).toEqual(['x', 'y', 'z']);
+  });
 });
 
 describe('prepareSelfPostedMatchRecents', () => {

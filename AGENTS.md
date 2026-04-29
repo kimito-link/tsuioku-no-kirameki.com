@@ -20,13 +20,28 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **最新提出バージョン**: 0.1.7（2026-04-23 更新申請提出済 / 審査中）
+- **次回提出バージョン**: 0.1.8（2026-04-29 ローカル準備 / CWS 提出待ち）
+- **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開済み）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
-- **ステータス**: 0.1.7 を CWS に提出済み（審査待ち）。承認後は自動公開 ON。
+- **ステータス**: 0.1.7 が公開中。0.1.8 は自コメ表示の追加安定化分。
 - **拡張 ID**: `cjbabignmmodaickpeckiojjabnlogdb`
 - **CWS Developer Dashboard**: 投稿者「君斗りんく」
 - **ホスト権限**: `https://*.nicovideo.jp/*` のみ（`localhost` / `127.0.0.1` は
  提出版から除外済み）
+- **0.1.8 の主変更**:
+ 1. **不具合修正（Storage H8）**: 24h を超えた self-posted recent が翌日同テキストの他人
+ コメントと誤マッチして `selfPosted: true` を永続的に焼き込む不具合。`content-entry.js`
+ の `pendingItems` フィルタを `filterValidSelfPostedRecents`（TTL 適用）に統一。
+ 2. **不具合修正（Self-comment M1）**: 自コメ初投稿で、snapshot 取得前 paint で
+ viewerNick・viewerAvatarUrl が空のため linkPolicy 不該当 → 一瞬たぬ姉段に出て、
+ 後でりんく段に昇格する見え方になっていた。pending entry に `avatarObserved: true`
+ を立てて、linkPolicy 経路で安定して link 段に入るようにする。
+ 3. **不具合修正（textRaw 永続化）**: pending 表示の本文が normalize 済みの
+ `textNorm` 由来だったため、ndgr 観測で本物の `text` に置き換わる瞬間に改行・空白が
+ 復活する「ちらつき」が起きていた。`appendSelfPostedComment` /
+ `rememberNativeSelfPostedComment` で生本文を optional `textRaw` として保持し、
+ `filterValidSelfPostedRecents` を pass-through 化。
+ 4. 権限・ネットワーク・保存キーの追加**無し**（保存値の optional フィールド 1 つ追加）。
 - **0.1.7 の主変更**:
  1. **不具合修正**: 自分で送信したコメントが上部ランキング・りんくレーンに即時反映されない不具合
  （`src/extension/popup-entry.js`）。送信直後から正しく表示されるようになる。
@@ -100,7 +115,20 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 
 ---
 
-## 5. 直近セッションで入った変更（2026-04-23）
+## 5. 直近セッションで入った変更（2026-04-29）
+
+**0.1.8 バンプまでに入った修正（自コメ表示の追加安定化）**:
+
+- `fix(content)`: pendingItems フィルタを `filterValidSelfPostedRecents` に統一し
+ 24h TTL を強制（Storage H8）。前日の自コメ recent が翌日の他人コメントに焼き込まれる
+ 永続汚染を防止。
+- `fix(popup)`: pending self-posted entry に `avatarObserved: true` を立てる
+ （Self-comment M1）。snapshot 取得前 paint でも linkPolicy 経路を通って link 段に
+ 安定配属されるようにする。
+- `fix(popup, content)`: `appendSelfPostedComment` / `rememberNativeSelfPostedComment`
+ で生本文を optional `textRaw` として保持。`selfPostedMatcher.filterValidSelfPostedRecents`
+ を pass-through 化。pending → 本物 entry 切替時の改行・空白ちらつきを抑止。
+- `test(lib)`: `selfPostedMatcher.test.js` に textRaw 保持・型不正時の除外ケース 2 件追加。
 
 **0.1.7 バンプまでに入った修正**:
 

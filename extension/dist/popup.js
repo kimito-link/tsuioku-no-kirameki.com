@@ -1378,11 +1378,13 @@
     for (const x of items) {
       if (!x || typeof x !== "object") continue;
       const rec = (
-        /** @type {{liveId?: unknown, at?: unknown, textNorm?: unknown}} */
+        /** @type {{liveId?: unknown, at?: unknown, textNorm?: unknown, textRaw?: unknown}} */
         x
       );
       if (typeof rec.liveId === "string" && typeof rec.textNorm === "string" && typeof rec.at === "number" && now - rec.at < SELF_POST_RECENT_TTL_MS) {
-        out.push({ liveId: rec.liveId, textNorm: rec.textNorm, at: rec.at });
+        const item = { liveId: rec.liveId, textNorm: rec.textNorm, at: rec.at };
+        if (typeof rec.textRaw === "string") item.textRaw = rec.textRaw;
+        out.push(item);
       }
     }
     return out;
@@ -6624,7 +6626,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       (it) => String(it.liveId || "").trim().toLowerCase() === lid && String(it.textNorm || "") === textNorm && Math.abs(at - (Number(it.at) || 0)) < SELF_POST_DUPLICATE_WINDOW_MS
     );
     if (duplicated) return;
-    next.push({ liveId: lid, at, textNorm });
+    const item = { liveId: lid, at, textNorm };
+    if (typeof rawText === "string" && rawText) item.textRaw = rawText;
+    next.push(item);
     while (next.length > MAX_SELF_POSTED_ITEMS) next.shift();
     selfPostedRecentsCache = next;
     try {
@@ -6952,6 +6956,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       userId: viewerUid || null,
       nickname: viewerNick,
       avatarUrl: isHttpOrHttpsUrl(viewerAvatarUrl) ? viewerAvatarUrl : "",
+      // pending entry は「viewer 自身が今送ったコメント」が確定しているので、
+      // linkPolicy の `avatarObserved` 経路を通して link 段に上げる。これがないと、
+      // snapshot 未取得 / viewerNick・viewerAvatarUrl 未取得の paint #1 タイミングで
+      // linkPolicy 不該当 → 防御的に tanu 段（匿名段）に落ちて、その後 paint #2 で
+      // りんく段に昇格する「自コメが一瞬たぬ姉段に出てから移動する」見え方になる
+      // （Self-comment M1）。匿名 ID の場合は linkPolicy 内で弾かれるので影響なし。
+      avatarObserved: true,
       selfPosted: true,
       capturedAt: Number(it?.at) || Date.now()
     }));
@@ -11504,7 +11515,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0423-0541" ? String("0423-0541") : "dev";
+      const buildId = "0429-1527" ? String("0429-1527") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

@@ -125,6 +125,7 @@ import { DEEP_HARVEST_REASONS } from '../lib/deepHarvestReason.js';
 import { formatPipelinePhase } from '../lib/commentPipelineLog.js';
 import { planDeepExportSweep } from '../lib/deepExportPolicy.js';
 import { applyInlineHostPlacementReset } from '../lib/inlineHostLayoutReset.js';
+import { filterValidSelfPostedRecents } from '../lib/selfPostedMatcher.js';
 import {
   mergeNdgrBacklogWithCap,
   shouldDeferNdgrFlushUntilLiveId
@@ -3185,7 +3186,12 @@ async function rememberNativeSelfPostedComment(rawText) {
         Math.abs(now - (Number(it.at) || 0)) < SELF_POST_NATIVE_DEDUPE_MS
     );
     if (duplicated) return;
-    next.push({ liveId: lid, at: now, textNorm });
+    /** @type {{liveId: string, at: number, textNorm: string, textRaw?: string}} */
+    const item = { liveId: lid, at: now, textNorm };
+    // popup 側の appendSelfPostedComment と同じく、pending 表示の改行・空白保持の
+    // ため生本文を optional で保持する（filterValidSelfPostedRecents が pass-through）。
+    if (typeof rawText === 'string' && rawText) item.textRaw = rawText;
+    next.push(item);
     while (next.length > MAX_SELF_POSTED_ITEMS) next.shift();
     await chrome.storage.local.set({
       [KEY_SELF_POSTED_RECENTS]: { items: next }
@@ -4571,16 +4577,12 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       incomingCount: enriched.length
     }));
     const pendingRaw = bag[KEY_SELF_POSTED_RECENTS];
-    const pendingItems =
-      pendingRaw && typeof pendingRaw === 'object' && Array.isArray(pendingRaw.items)
-        ? pendingRaw.items.filter(
-            (x) =>
-              x &&
-              typeof x.liveId === 'string' &&
-              typeof x.textNorm === 'string' &&
-              typeof x.at === 'number'
-          )
-        : [];
+    // TTL 切れ（24h 超過）の self-posted recent を除外する。これがないと、前日に
+    // 同じ放送（再生・リプレイ・タイトル流用など）で投稿した自コメ recent が、
+    // 翌日同テキストの他人コメントと誤マッチして `selfPosted: true` を永続的に
+    // 焼き込んでしまう（Storage H8）。型ガードと TTL を `filterValidSelfPostedRecents`
+    // に集約。
+    const pendingItems = filterValidSelfPostedRecents(pendingRaw);
     const mergedRows = mergeNewComments(
       liveId,
       existing,
