@@ -311,11 +311,96 @@ async function migrateFloatingPanelToDockProfileOnce() {
   }
 }
 
+/**
+ * 0.1.7 / 0.1.8 / 0.1.9 で焼き込まれた古い `selfPosted: true` を全 `nls_comments_*` から
+ * 剥がす後方互換 migration（D-4）。SW は ESM バンドル外のため、純関数を import せず
+ * 同等ロジックを SW 内にハードコピー（`migrateInlinePanelFloatToDockProfileOnce` と同パターン）。
+ *
+ * 起動条件:
+ *   ・details.previousVersion が `'0.1.0'`〜`'0.1.9'` のいずれか（fresh install では走らない）
+ *   ・nls_migration_clear_stale_selfposted_done_v1 がまだ true でない
+ *
+ * 動作:
+ *   ・chrome.storage.local の全 key を走査し、`nls_comments_` プレフィックスを集める
+ *   ・各配列の各行から `selfPosted` フィールドを物理削除
+ *   ・done flag を立てて再実行を防ぐ
+ *
+ * 副作用:
+ *   ・真に自コメだった行は、次の persist サイクルで content-entry の
+ *     `consumeMatchedSelfPostedRecents` が KEY_SELF_POSTED_RECENTS の pending と
+ *     再マッチして `selfPosted: true` を再付与する（24h TTL 内なら）。
+ *
+ * @param {string|undefined} previousVersion
+ */
+async function migrateClearStaleSelfPostedOnce(previousVersion) {
+  const K_DONE = 'nls_migration_clear_stale_selfposted_done_v1';
+  const BASELINE = '0.1.10';
+  try {
+    // semver 比較（major.minor.patch）。不正な値は走らせない（fresh install を含む）。
+    const m = String(previousVersion || '').trim().match(/^(\d+)\.(\d+)\.(\d+)$/);
+    if (!m) return;
+    const prev = [Number(m[1]), Number(m[2]), Number(m[3])];
+    const base = BASELINE.split('.').map(Number);
+    let runRequired = false;
+    for (let i = 0; i < 3; i += 1) {
+      if (prev[i] < base[i]) {
+        runRequired = true;
+        break;
+      }
+      if (prev[i] > base[i]) break;
+    }
+    if (!runRequired) return;
+
+    const allBag = await chrome.storage.local.get(null);
+    if (allBag[K_DONE] === true) return;
+
+    /** @type {Record<string, unknown>} */
+    const writes = {};
+    let touchedKeys = 0;
+    let strippedRows = 0;
+    for (const [key, value] of Object.entries(allBag)) {
+      if (!key.startsWith('nls_comments_')) continue;
+      if (!Array.isArray(value)) continue;
+      let changed = false;
+      const next = value.map((row) => {
+        if (row == null || typeof row !== 'object') return row;
+        if (!('selfPosted' in row)) return row;
+        if (row.selfPosted === true) strippedRows += 1;
+        const cleaned = { ...row };
+        delete cleaned.selfPosted;
+        changed = true;
+        return cleaned;
+      });
+      if (changed) {
+        writes[key] = next;
+        touchedKeys += 1;
+      }
+    }
+    writes[K_DONE] = true;
+    await chrome.storage.local.set(writes);
+    if (typeof console !== 'undefined' && console?.info) {
+      console.info(
+        `[nicolivelog] stale selfPosted cleanup migration: ${strippedRows} rows ` +
+          `stripped across ${touchedKeys} live(s) (previousVersion=${previousVersion})`
+      );
+    }
+  } catch (err) {
+    if (typeof console !== 'undefined' && console?.warn) {
+      console.warn('[nicolivelog] stale selfPosted cleanup migration failed:', err);
+    }
+  }
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   ensureToolbarOpensPopupNotSidePanel();
   void ensureAutoBackupAlarm();
   void (async () => {
     await migrateFloatingPanelToDockProfileOnce();
+    // D-4: 0.1.10 未満からの自動更新で「他人コメントへの誤焼き込み selfPosted」を剥がす。
+    // 'install'（fresh）では走らないよう previousVersion を渡す。
+    if (details?.reason === 'update') {
+      await migrateClearStaleSelfPostedOnce(details?.previousVersion);
+    }
     if (details?.reason === 'update') {
       await reloadExistingWatchTabs();
     } else {

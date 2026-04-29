@@ -575,6 +575,17 @@
     return tiePrefer === "existing" ? ex : inc;
   }
 
+  // src/shared/avatar/clampAvatarUrl.js
+  var AVATAR_URL_DEFAULT_MAX = 2e3;
+  function clampAvatarUrl(raw, max = AVATAR_URL_DEFAULT_MAX) {
+    if (typeof raw !== "string") return "";
+    const s = raw.trim();
+    if (!s) return "";
+    const cap = Math.floor(Number(max));
+    if (!Number.isFinite(cap) || cap <= 0) return "";
+    return s.length <= cap ? s : s.slice(0, cap);
+  }
+
   // src/lib/commentRecord.js
   var COMMENT_TEXT_MAX_CHARS = 1e3;
   function normalizeCommentText(value) {
@@ -1330,6 +1341,17 @@
     };
   }
 
+  // src/lib/popupEntryPendingSelfPost.js
+  function isPendingSelfPostEntry(entry) {
+    if (!entry || typeof entry !== "object") return false;
+    const id = (
+      /** @type {{id?: unknown}} */
+      entry.id
+    );
+    if (typeof id !== "string") return false;
+    return id.startsWith("pending-self:");
+  }
+
   // src/lib/popupFrameCodec.js
   function encodeBase64UrlUtf8(text) {
     const bytes = new TextEncoder().encode(text);
@@ -1770,8 +1792,8 @@
       const updatedAt = Number(o.updatedAt);
       if (!isFreshProfileEntry(updatedAt, nowMs, maxAgeMs)) continue;
       const nick = String(o.nickname || "").trim().slice(0, 200);
-      const av = String(o.avatarUrl || "").trim();
-      const avatarUrl = av && isHttpOrHttpsUrl(av) && !isWeakNiconicoUserIconHttpUrl(av) ? av.slice(0, 2e3) : "";
+      const av = clampAvatarUrl(o.avatarUrl);
+      const avatarUrl = av && isHttpOrHttpsUrl(av) && !isWeakNiconicoUserIconHttpUrl(av) ? av : "";
       if (!nick && !avatarUrl) continue;
       out[uid] = {
         updatedAt,
@@ -7870,7 +7892,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       return;
     }
     const userId = String(entry.userId || "").trim();
-    const isPendingSelf = String(entry?.id || "").startsWith("pending-self:");
+    const isPendingSelf = isPendingSelfPostEntry(entry);
     const lidForOwn = String(entry.liveId || STORY_SOURCE_STATE.liveId || "");
     const ownPosted = isOwnPostedSupportComment(
       entry,
@@ -8223,6 +8245,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const viewerNick = String(snap?.viewerNickname || "").trim();
     const viewerUid = String(snap?.viewerUserId || "").trim();
     if (ownPosted) {
+      if (isPendingSelfPostEntry(entry)) {
+        return viewerNick || "\u81EA\u5206\uFF08\u9001\u4FE1\u4E2D\uFF09";
+      }
       if (userId) return displayUserLabel(userId, nickname || viewerNick);
       if (viewerUid) return displayUserLabel(viewerUid, nickname || viewerNick);
       if (viewerNick) return viewerNick;
@@ -11573,7 +11598,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0429-1648" ? String("0429-1648") : "dev";
+      const buildId = "0430-0833" ? String("0430-0833") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

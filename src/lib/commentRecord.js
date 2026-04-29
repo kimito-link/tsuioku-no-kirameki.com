@@ -10,6 +10,7 @@ import {
 } from './supportGrowthTileSrc.js';
 import { pickStrongerUserId } from './userIdPreference.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
+import { clampAvatarUrl } from '../shared/avatar/clampAvatarUrl.js';
 
 /** コメント本文の上限（storage肥大化を抑制） */
 export const COMMENT_TEXT_MAX_CHARS = 1000;
@@ -86,10 +87,10 @@ export function createCommentEntry(p) {
   const text = normalizeCommentText(p.text);
   const commentNo = String(p.commentNo ?? '').trim();
   const liveId = String(p.liveId || '').trim().toLowerCase();
-  // avatar URL の長さ上限。userCommentProfileCache.js が 2000 字 slice しているのと
-  // 揃える。これがないと数十 KB の URL を流し込まれて storage quota を圧迫される
-  // 経路（DoS）が残る（Security S-13）。
-  const av = String(p.avatarUrl || '').trim().slice(0, 2000);
+  // avatar URL の長さ上限を共通 helper（src/shared/avatar/clampAvatarUrl.js）に
+  // 一元化（H2 / D-5）。createCommentEntry / patchExistingComment / merge /
+  // userCommentProfileCache すべてが同じ閾値（既定 2000 字）を参照する。
+  const av = clampAvatarUrl(p.avatarUrl);
   const avatarUrl = isHttpOrHttpsUrl(av) ? av : '';
   let uid = p.userId ? String(p.userId).trim() : '';
   if (!uid && avatarUrl) {
@@ -136,7 +137,10 @@ function storedCommentDedupeKey(lid, ex) {
  * @returns {{ entry: StoredComment, touched: boolean }}
  */
 export function patchExistingComment(existing, incoming) {
-  const rawAv = String(incoming.avatarUrl || '').trim();
+  // incoming の avatarUrl も clampAvatarUrl で揃える（H2 / D-5）。
+  // 既存行の avatarUrl が 2000 字超の場合、後続の equality 比較で「短いものに
+  // 上書き済み」と認識されるよう、必要なら同じ slice を当てる。
+  const rawAv = clampAvatarUrl(incoming.avatarUrl);
   const validAvatar = isHttpOrHttpsUrl(rawAv) ? rawAv : '';
   let incUid = incoming.userId ? String(incoming.userId).trim() : '';
   if (!incUid && validAvatar) {
@@ -148,7 +152,9 @@ export function patchExistingComment(existing, incoming) {
   let touched = false;
 
   if (validAvatar) {
-    const exAv = String(entry.avatarUrl || '').trim();
+    // 既存 avatarUrl が 0.1.9 以前で書かれた巨大 URL（2KB 超）の場合があるので、
+    // 比較・upgrade 経路に入る前に clampAvatarUrl で揃える（D-5）。
+    const exAv = clampAvatarUrl(entry.avatarUrl);
     const hasAv = Boolean(exAv && isHttpOrHttpsUrl(exAv));
     let uidForSynthetic = String(entry.userId || incUid || '').trim();
     if (!uidForSynthetic && exAv) {

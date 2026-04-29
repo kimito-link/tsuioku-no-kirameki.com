@@ -95,6 +95,7 @@ import {
   resolveFrameVars,
   sanitizeCustomFrame
 } from '../lib/popupFramePresets.js';
+import { isPendingSelfPostEntry } from '../lib/popupEntryPendingSelfPost.js';
 import {
   createFrameShareCode,
   parseFrameShareCode
@@ -3298,8 +3299,10 @@ function renderStoryCommentDetailPanel() {
   // 184 投稿だった場合、ndgr 観測後 entry.userId は a:HASH になるが、観測前は
   // viewer の数値 userId を載せている（buildDisplayCommentEntries の設計上）。
   // この瞬間のスクリーンショットや画面共有で viewer の本物 ID が露出するのを
-  // 避けるため、Story Detail カードでは pending self-post の ID 表示を抑制する。
-  const isPendingSelf = String(entry?.id || '').startsWith('pending-self:');
+  // 避けるため、表示経路ごとに pending self-post の ID 表示を抑制する。
+  // 0.1.11 で `isPendingSelfPostEntry` 共通 helper に切り出した（同じ判定が
+  // Story Detail / Growth ラベル / 他経路で散らばらないように）。
+  const isPendingSelf = isPendingSelfPostEntry(entry);
   const lidForOwn = String(entry.liveId || STORY_SOURCE_STATE.liveId || '');
   const ownPosted = isOwnPostedSupportComment(
     entry,
@@ -3729,6 +3732,13 @@ function storyGrowthDisplayLabel(entry, liveId) {
   const viewerNick = String(snap?.viewerNickname || '').trim();
   const viewerUid = String(snap?.viewerUserId || '').trim();
   if (ownPosted) {
+    // pending self-post（ndgr 観測前）は viewer の数値 ID を `displayUserLabel`
+    // 経由でリンク化させない（プライバシー保護: H1 / E-15）。viewerNick だけで
+    // 「自分が送った」ことを伝える。観測後は entry.userId が a:HASH（184）か
+    // 数値（通常）に切り替わり、下の userId ブランチで正しく表示される。
+    if (isPendingSelfPostEntry(entry)) {
+      return viewerNick || '自分（送信中）';
+    }
     if (userId) return displayUserLabel(userId, nickname || viewerNick);
     if (viewerUid) return displayUserLabel(viewerUid, nickname || viewerNick);
     if (viewerNick) return viewerNick;

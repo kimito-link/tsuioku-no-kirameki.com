@@ -433,6 +433,17 @@
     return isNiconicoAnonymousUserId(userId) ? "\u533F\u540D" : "";
   }
 
+  // src/shared/avatar/clampAvatarUrl.js
+  var AVATAR_URL_DEFAULT_MAX = 2e3;
+  function clampAvatarUrl(raw, max = AVATAR_URL_DEFAULT_MAX) {
+    if (typeof raw !== "string") return "";
+    const s = raw.trim();
+    if (!s) return "";
+    const cap = Math.floor(Number(max));
+    if (!Number.isFinite(cap) || cap <= 0) return "";
+    return s.length <= cap ? s : s.slice(0, cap);
+  }
+
   // src/lib/commentRecord.js
   var COMMENT_TEXT_MAX_CHARS = 1e3;
   function userIdFromNicoUserIconHttpUrl(url) {
@@ -464,7 +475,7 @@
     const text = normalizeCommentText(p.text);
     const commentNo = String(p.commentNo ?? "").trim();
     const liveId2 = String(p.liveId || "").trim().toLowerCase();
-    const av = String(p.avatarUrl || "").trim().slice(0, 2e3);
+    const av = clampAvatarUrl(p.avatarUrl);
     const avatarUrl = isHttpOrHttpsUrl(av) ? av : "";
     let uid = p.userId ? String(p.userId).trim() : "";
     if (!uid && avatarUrl) {
@@ -497,7 +508,7 @@
     });
   }
   function patchExistingComment(existing, incoming) {
-    const rawAv = String(incoming.avatarUrl || "").trim();
+    const rawAv = clampAvatarUrl(incoming.avatarUrl);
     const validAvatar = isHttpOrHttpsUrl(rawAv) ? rawAv : "";
     let incUid = incoming.userId ? String(incoming.userId).trim() : "";
     if (!incUid && validAvatar) {
@@ -510,7 +521,7 @@
     );
     let touched = false;
     if (validAvatar) {
-      const exAv = String(entry.avatarUrl || "").trim();
+      const exAv = clampAvatarUrl(entry.avatarUrl);
       const hasAv = Boolean(exAv && isHttpOrHttpsUrl(exAv));
       let uidForSynthetic = String(entry.userId || incUid || "").trim();
       if (!uidForSynthetic && exAv) {
@@ -687,8 +698,8 @@
       const updatedAt = Number(o.updatedAt);
       if (!isFreshProfileEntry(updatedAt, nowMs, maxAgeMs)) continue;
       const nick = String(o.nickname || "").trim().slice(0, 200);
-      const av = String(o.avatarUrl || "").trim();
-      const avatarUrl = av && isHttpOrHttpsUrl(av) && !isWeakNiconicoUserIconHttpUrl(av) ? av.slice(0, 2e3) : "";
+      const av = clampAvatarUrl(o.avatarUrl);
+      const avatarUrl = av && isHttpOrHttpsUrl(av) && !isWeakNiconicoUserIconHttpUrl(av) ? av : "";
       if (!nick && !avatarUrl) continue;
       out[uid] = {
         updatedAt,
@@ -7625,25 +7636,58 @@
         }, ms);
       }
     }
+    let liveIdPollIntervalId = null;
+    let livePanelScanIntervalId = null;
+    let deepHarvestPeriodicIntervalId = null;
+    let statsPollIntervalId = null;
+    const stopContentIntervalsIfContextInvalidated = () => {
+      if (hasExtensionContext()) return false;
+      if (liveIdPollIntervalId != null) {
+        clearInterval(liveIdPollIntervalId);
+        liveIdPollIntervalId = null;
+      }
+      if (livePanelScanIntervalId != null) {
+        clearInterval(livePanelScanIntervalId);
+        livePanelScanIntervalId = null;
+      }
+      if (deepHarvestPeriodicIntervalId != null) {
+        clearInterval(deepHarvestPeriodicIntervalId);
+        deepHarvestPeriodicIntervalId = null;
+      }
+      if (statsPollIntervalId != null) {
+        clearInterval(statsPollIntervalId);
+        statsPollIntervalId = null;
+      }
+      return true;
+    };
+    liveIdPollIntervalId = /** @type {number} */
+    /** @type {unknown} */
     setInterval(() => {
-      if (!hasExtensionContext()) return;
+      if (stopContentIntervalsIfContextInvalidated()) return;
       syncLiveIdFromLocation();
     }, LIVE_POLL_MS);
+    livePanelScanIntervalId = /** @type {number} */
+    /** @type {unknown} */
     setInterval(() => {
-      if (!hasExtensionContext()) return;
+      if (stopContentIntervalsIfContextInvalidated()) return;
       if (!recording || !liveId || !locationAllowsCommentRecording()) {
         return;
       }
       scanVisibleCommentsNow();
       void probeAndRestoreCommentPanelHealth();
     }, LIVE_PANEL_SCAN_MS);
+    deepHarvestPeriodicIntervalId = /** @type {number} */
+    /** @type {unknown} */
     setInterval(() => {
+      if (stopContentIntervalsIfContextInvalidated()) return;
       tryPeriodicQuietDeepHarvest();
     }, DEEP_HARVEST_PERIODIC_MS);
     document.addEventListener("visibilitychange", onTabVisibleForCommentHarvest);
     pollStatsFromPage();
+    statsPollIntervalId = /** @type {number} */
+    /** @type {unknown} */
     setInterval(() => {
-      if (!hasExtensionContext()) return;
+      if (stopContentIntervalsIfContextInvalidated()) return;
       pollStatsFromPage();
     }, STATS_POLL_MS);
   }

@@ -20,12 +20,20 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **最新提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
-- **同日内包した前バージョン**: 0.1.9（master の 6f36a24）/ 0.1.8（master の b18de07）— いずれも CWS 未提出のまま 0.1.10 にロールアップ済み
+- **次回提出バージョン**: 0.1.11（2026-04-30 ローカル準備）
+- **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
-- **ステータス**: 0.1.7 が公開中。0.1.10 を CWS に提出済（審査中）。承認後は自動公開 ON。
+- **ステータス**: 0.1.7 が公開中。0.1.10 を CWS に審査依頼中。0.1.11 は 0.1.10 提出後に
+ ディープリサーチで発見された残課題（privacy.html × 実装の整合不足、過去焼き込みデータの
+ 後方修復、184 自コメ viewerUid の他経路露出、avatarUrl cap の他経路漏れ、content-entry
+ setInterval cleanup）を一括修正。0.1.10 が承認 → 公開された後、続けて 0.1.11 を提出予定。
 - **0.1.10 内訳**: 0.1.8 自コメ修正 + 0.1.9 シナリオ調査 8 件 + 0.1.10 Privacy 整合 / XSS 対策 / a11y 修正 / 出自不明アセット差し替え 13 件 をロールアップ。
+- **0.1.11 内訳**: privacy.html を IDB 3 つ・記録クリア言及で実装と整合 / 0.1.10 未満からの
+ 自動更新ユーザーで誤焼き込み `selfPosted:true` を 1 度だけ剥がす migration / 184 自コメの
+ viewerUid 露出を表示経路で共通 helper でガード / avatarUrl 2KB cap を共通 helper 化して
+ patchExistingComment と userCommentProfileCache に拡張 / content-entry.js の setInterval を
+ context invalidate 時に clearInterval。
 - **拡張 ID**: `cjbabignmmodaickpeckiojjabnlogdb`
 - **CWS Developer Dashboard**: 投稿者「君斗りんく」
 - **ホスト権限**: `https://*.nicovideo.jp/*` のみ（`localhost` / `127.0.0.1` は
@@ -155,6 +163,32 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
   （`build/store-listing/` は中間生成物扱い）。
 
 ---
+
+## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.11 バンプまでに入った修正（残課題の後方修復・整合・回帰防止 6 件）**:
+
+- `fix(privacy)`: privacy.html §3「保存場所」を「`chrome.storage.local` に限る」から
+ IndexedDB 3 つ（`nls_thumb_v1` / `nls_broadcast_summary_v1` / `nls_auto_backup_v1`）併用に
+ 整合させる。§9「記録クリア」言及も実装に合わせて「キャッシュクリア + アンインストール」
+ 構成に書き直し。アンインストール = 完全データロスのため事前 export 推奨を明示。
+- `feat(migration)`: `src/lib/migrateClearStaleSelfPosted.js` を新設。0.1.10 未満から自動
+ 更新したユーザー向けに、過去の TTL ガード抜けで誤って焼き込まれた `selfPosted:true` を
+ 全 `nls_comments_*` 行から 1 度だけ剥がす後方互換 migration。done flag
+ (`nls_migration_clear_stale_selfposted_done_v1`) で再実行を防止。background.js の
+ `onInstalled('update')` で `details.previousVersion < 0.1.10` のときだけ走る。
+- `feat(lib)`: `src/lib/popupEntryPendingSelfPost.js` (`isPendingSelfPostEntry`) を新設し、
+ popup-entry.js の Story Detail / `storyGrowthDisplayLabel` で共通利用。pending self-post
+ entry（ndgr 観測前）に対して viewer の数値 ID を表示・リンク化しない（H1 / E-15）。
+- `feat(shared)`: `src/shared/avatar/clampAvatarUrl.js` を新設して 2KB 上限を一元管理。
+ `commentRecord.createCommentEntry` / `patchExistingComment` / `userCommentProfileCache.normalizeUserCommentProfileMap`
+ で参照させる（H2 / D-5）。既存行の avatarUrl が 0.1.9 以前で書かれた長すぎる URL でも
+ patch 経路で短縮される。
+- `fix(content)`: content-entry.js の 4 つの `setInterval`（liveId poll / live panel scan /
+ deep harvest periodic / stats poll）を id 保持化し、`hasExtensionContext()` が false に
+ なった tick で `clearInterval`（ML1: 0.1.9-5 で popup 側だけ修正したのを content にも揃える）。
+- `test`: `migrateClearStaleSelfPosted.test.js` (14 ケース) / `popupEntryPendingSelfPost.test.js`
+ (7 ケース) / `clampAvatarUrl.test.js` (11 ケース) を新規追加。テスト先行で実装。
 
 ## 5. 直近セッションで入った変更（2026-04-29）
 

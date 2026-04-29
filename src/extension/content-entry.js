@@ -5804,35 +5804,85 @@ async function start() {
     }
   }
 
-  setInterval(() => {
-    if (!hasExtensionContext()) return;
-    syncLiveIdFromLocation();
-  }, LIVE_POLL_MS);
-
-  setInterval(() => {
-    if (!hasExtensionContext()) return;
-    if (
-      !recording ||
-      !liveId ||
-      !locationAllowsCommentRecording()
-    ) {
-      return;
+  // 拡張 context invalidated（chrome://extensions の再読み込み等）後は、
+  // 各 setInterval が「early return するだけの空 tick」を永続的に走らせ続ける。
+  // タブを閉じない限り CPU を食うので、id を保持して invalidate 時に
+  // clearInterval する（ML1: 0.1.9-5 で popup 側だけ修正したのを content にも揃える）。
+  /** @type {number|null} */
+  let liveIdPollIntervalId = null;
+  /** @type {number|null} */
+  let livePanelScanIntervalId = null;
+  /** @type {number|null} */
+  let deepHarvestPeriodicIntervalId = null;
+  /** @type {number|null} */
+  let statsPollIntervalId = null;
+  const stopContentIntervalsIfContextInvalidated = () => {
+    if (hasExtensionContext()) return false;
+    if (liveIdPollIntervalId != null) {
+      clearInterval(liveIdPollIntervalId);
+      liveIdPollIntervalId = null;
     }
-    scanVisibleCommentsNow();
-    void probeAndRestoreCommentPanelHealth();
-  }, LIVE_PANEL_SCAN_MS);
+    if (livePanelScanIntervalId != null) {
+      clearInterval(livePanelScanIntervalId);
+      livePanelScanIntervalId = null;
+    }
+    if (deepHarvestPeriodicIntervalId != null) {
+      clearInterval(deepHarvestPeriodicIntervalId);
+      deepHarvestPeriodicIntervalId = null;
+    }
+    if (statsPollIntervalId != null) {
+      clearInterval(statsPollIntervalId);
+      statsPollIntervalId = null;
+    }
+    return true;
+  };
 
-  setInterval(() => {
-    tryPeriodicQuietDeepHarvest();
-  }, DEEP_HARVEST_PERIODIC_MS);
+  liveIdPollIntervalId = /** @type {number} */ (
+    /** @type {unknown} */ (
+      setInterval(() => {
+        if (stopContentIntervalsIfContextInvalidated()) return;
+        syncLiveIdFromLocation();
+      }, LIVE_POLL_MS)
+    )
+  );
+
+  livePanelScanIntervalId = /** @type {number} */ (
+    /** @type {unknown} */ (
+      setInterval(() => {
+        if (stopContentIntervalsIfContextInvalidated()) return;
+        if (
+          !recording ||
+          !liveId ||
+          !locationAllowsCommentRecording()
+        ) {
+          return;
+        }
+        scanVisibleCommentsNow();
+        void probeAndRestoreCommentPanelHealth();
+      }, LIVE_PANEL_SCAN_MS)
+    )
+  );
+
+  deepHarvestPeriodicIntervalId = /** @type {number} */ (
+    /** @type {unknown} */ (
+      setInterval(() => {
+        if (stopContentIntervalsIfContextInvalidated()) return;
+        tryPeriodicQuietDeepHarvest();
+      }, DEEP_HARVEST_PERIODIC_MS)
+    )
+  );
 
   document.addEventListener('visibilitychange', onTabVisibleForCommentHarvest);
 
   pollStatsFromPage();
-  setInterval(() => {
-    if (!hasExtensionContext()) return;
-    pollStatsFromPage();
-  }, STATS_POLL_MS);
+  statsPollIntervalId = /** @type {number} */ (
+    /** @type {unknown} */ (
+      setInterval(() => {
+        if (stopContentIntervalsIfContextInvalidated()) return;
+        pollStatsFromPage();
+      }, STATS_POLL_MS)
+    )
+  );
 }
 
 /*

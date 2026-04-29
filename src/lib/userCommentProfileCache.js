@@ -9,6 +9,7 @@ import {
 } from './supportGrowthTileSrc.js';
 import { isNiconicoAutoUserPlaceholderNickname } from './nicoAnonymousDisplay.js';
 import { supportGridStrongNickname } from './supportGridDisplayTier.js';
+import { clampAvatarUrl } from '../shared/avatar/clampAvatarUrl.js';
 
 /** 保持するエントリ数の上限（chrome.storage.local 容量対策） */
 export const USER_COMMENT_PROFILE_CACHE_MAX = 5000;
@@ -62,10 +63,12 @@ export function normalizeUserCommentProfileMap(raw, opts = {}) {
     const updatedAt = Number(o.updatedAt);
     if (!isFreshProfileEntry(updatedAt, nowMs, maxAgeMs)) continue;
     const nick = String(o.nickname || '').trim().slice(0, 200);
-    const av = String(o.avatarUrl || '').trim();
+    // avatar URL の長さ上限を `clampAvatarUrl` で一元化（H2 / D-5）。
+    // `commentRecord.js` の create / patch 経路と同じ既定 2000 字を適用。
+    const av = clampAvatarUrl(o.avatarUrl);
     const avatarUrl =
       av && isHttpOrHttpsUrl(av) && !isWeakNiconicoUserIconHttpUrl(av)
-        ? av.slice(0, 2000)
+        ? av
         : '';
     if (!nick && !avatarUrl) continue;
     out[uid] = {

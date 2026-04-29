@@ -526,9 +526,16 @@
               記録は <b>Chrome の <code>chrome.storage.local</code></b> に保存されるよ。これは <b>あなたのパソコン専用の保管庫</b> で、他の端末には自動で同期されないタイプの領域なんだ。
             </div>
           </div>
-          <p>本拡張が扱う情報の保存先は、利用者の端末上の Chrome 拡張機能ストレージ（<code>chrome.storage.local</code>）に限ります。ブラウザアカウント経由の自動同期（<code>chrome.storage.sync</code>）は使用していません。</p>
-          <p>保存期間は利用者が能動的に削除操作を行うまで（または拡張機能をアンインストールするまで）です。利用者は拡張ポップアップ内の「キャッシュクリア」「記録クリア」操作、または Chrome の拡張管理画面からのアンインストールにより、いつでも全データを削除できます。</p>
-          <div class="note"><b>たぬ姉メモ：</b><code>chrome.storage.local</code> は <b>ブラウザのサンドボックス領域</b>で、他のウェブサイトや他の拡張機能からは読み書きできません。</div>
+          <p>本拡張が扱う情報は、いずれも利用者の端末ローカル（同じ Chrome プロファイル内のサンドボックス領域）に限って保存されます。具体的には次の 4 つの保管場所を併用しています:</p>
+          <ul>
+            <li><b>Chrome 拡張ストレージ</b>（<code>chrome.storage.local</code>）— 設定値・コメント記録・自己投稿履歴・取り込みログなど大半のデータ。</li>
+            <li><b>IndexedDB <code>nls_thumb_v1</code></b> — 定期サムネイル（PNG Blob）を放送ごとに 500 件まで FIFO で保存。</li>
+            <li><b>IndexedDB <code>nls_broadcast_summary_v1</code></b> — 時系列サマリー（同接・件数等の集計サンプル）を最大 5,000 行保存。</li>
+            <li><b>IndexedDB <code>nls_auto_backup_v1</code></b> — 5 分ごとの自動バックアップ（コメント記録のスナップショット、放送ごとに最新 24 件まで保持）。</li>
+          </ul>
+          <p>いずれもブラウザアカウント経由の自動同期（<code>chrome.storage.sync</code>）には書き出さず、Chrome のサンドボックス領域内に閉じています。他のウェブサイトや他の拡張機能からは読み書きできません。</p>
+          <p>保存期間は利用者が能動的に削除操作を行うまで（または拡張機能をアンインストールするまで）です。<strong>拡張ポップアップ内の「キャッシュクリア」操作</strong>では派生キャッシュ（<code>nls_user_comment_profile_v1</code> 等）のみが削除されます。<strong>すべての保存データを削除したい場合</strong>は、Chrome の拡張管理画面から本拡張を <strong>アンインストール</strong> してください（<code>chrome.storage.local</code> と上記の IndexedDB 3 つがまとめて削除されます）。アンインストールするとデータの復元はできないため、必要に応じて事前にコメントログを HTML / JSON でエクスポートすることをおすすめします。</p>
+          <div class="note"><b>たぬ姉メモ：</b><code>chrome.storage.local</code> も IndexedDB も <b>ブラウザのサンドボックス領域</b>で、他のウェブサイトや他の拡張機能からは読み書きできません。Chrome のプロファイルを分けて使っている場合は、プロファイルごとに別の保管場所になります。</div>
         </section>
 
         <section class="box" id="s4">
@@ -627,11 +634,11 @@
               <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" width="64" height="64" alt="">
             </div>
             <div class="guide__body">
-              自分の記録は <b>自分で消せるし、自分で書き出せる</b>。「キャッシュクリア」で派生データ、「記録クリア」でコメント本体、アンインストールで全部ごっそり消えるよ。
+              自分の記録は <b>自分で消せるし、自分で書き出せる</b>。「キャッシュクリア」で派生データだけが消えて、<b>アンインストール</b>すれば本体記録も IndexedDB もまとめて消えるよ。書き出してから消すのが安心。
             </div>
           </div>
           <ul>
-            <li><strong>削除：</strong>拡張ポップアップ内の「キャッシュクリア」または「記録クリア」操作、もしくは Chrome の拡張管理画面からのアンインストールにより、本拡張が保存した全データを削除できます。</li>
+            <li><strong>削除：</strong>拡張ポップアップ内の「キャッシュクリア」操作で派生キャッシュ（<code>nls_user_comment_profile_v1</code> 等）が削除されます。コメント記録本体や IndexedDB の全データを削除したい場合は Chrome の拡張管理画面から本拡張を <strong>アンインストール</strong> してください（<code>chrome.storage.local</code> と本ポリシー §3 記載の IndexedDB 3 つがまとめて削除されます）。アンインストール後の復元はできないため、必要に応じて事前のエクスポートをおすすめします。</li>
             <li><strong>書き出し：</strong>記録済みの応援コメント・集計データは、拡張の書き出し機能から JSON / HTML 形式でローカルファイルとして取得できます。</li>
             <li><strong>開示請求：</strong>保存データは利用者端末にのみ存在するため、利用者自身によるアクセスが可能です。なお、当プロジェクト側には利用者データの保管・提供に関する開示義務の対象となる情報は存在しません。</li>
           </ul>
