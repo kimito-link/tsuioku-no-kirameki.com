@@ -1654,6 +1654,12 @@
       try {
         const pageUrl = window.location.href;
         if (!pageUrl || !pageUrl.startsWith("http")) return;
+        let parsed = null;
+        try {
+          parsed = new URL(pageUrl);
+        } catch {
+        }
+        if (!parsed || !isNicoHost(parsed.host) || !isWatchLikePath(parsed.pathname)) return;
         origFetch(pageUrl, { credentials: "same-origin" }).then((res) => {
           if (!res.ok) return;
           return res.text();

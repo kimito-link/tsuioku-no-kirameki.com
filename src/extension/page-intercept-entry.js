@@ -1030,6 +1030,12 @@ import {
     try {
       const pageUrl = window.location.href;
       if (!pageUrl || !pageUrl.startsWith('http')) return;
+      // SPA 遷移で非 watch ページに変わってもこの setInterval は止まらないため、
+      // 都度 URL が watch like かを再判定する。クロージャで isNicoHost / isWatchLikePath
+      // が参照可能なので IIFE ブート時と同じ判定を流用する。
+      let parsed = null;
+      try { parsed = new URL(pageUrl); } catch { /* no-op */ }
+      if (!parsed || !isNicoHost(parsed.host) || !isWatchLikePath(parsed.pathname)) return;
       origFetch(pageUrl, { credentials: 'same-origin' })
         .then((res) => {
           if (!res.ok) return;

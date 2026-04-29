@@ -4100,6 +4100,8 @@
     }
     trimMapToMax(activeUserTimestamps, ACTIVE_USER_MAP_MAX);
     trimMapToMax(interceptedUsers, INTERCEPT_MAP_MAX);
+    trimMapToMax(interceptedNicknames, INTERCEPT_MAP_MAX);
+    trimMapToMax(interceptedAvatars, INTERCEPT_MAP_MAX);
     queueInterceptReconcile(reconcileEntries, reconcileUsers);
   });
   var lastWatchUrlTimer = null;
@@ -7381,6 +7383,10 @@
       const href = window.location.href;
       if (!href || !href.startsWith("http")) {
         _pollDiag.err = "bad-href";
+        return;
+      }
+      if (!isNicoLiveWatchUrl(href)) {
+        _pollDiag.err = "not-watch";
         return;
       }
       const url = new URL(href);

@@ -669,7 +669,17 @@
           if (buf[i] > peak) peak = buf[i];
         }
         await new Promise((r) => {
-          requestAnimationFrame(r);
+          let settled = false;
+          const done = () => {
+            if (settled) return;
+            settled = true;
+            r();
+          };
+          try {
+            requestAnimationFrame(done);
+          } catch {
+          }
+          setTimeout(done, 32);
         });
       }
       const ok = peak >= VOICE_MIC_LEVEL_THRESHOLD;
@@ -6040,11 +6050,49 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       throw e;
     }
   }
+  function renderOfflineBanner(visible) {
+    const el = $("offlineBanner");
+    if (!el) return;
+    if (visible) el.removeAttribute("hidden");
+    else el.setAttribute("hidden", "");
+  }
+  var offlineBannerInitialized = false;
+  function initOfflineBannerOnce() {
+    if (offlineBannerInitialized) return;
+    offlineBannerInitialized = true;
+    const update = () => {
+      try {
+        const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+        renderOfflineBanner(offline);
+      } catch {
+      }
+    };
+    update();
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      try {
+        window.addEventListener("online", update);
+        window.addEventListener("offline", update);
+      } catch {
+      }
+    }
+  }
   function renderExtensionContextBanner(visible) {
     const el = $("extensionContextBanner");
     if (!el) return;
     if (visible) el.removeAttribute("hidden");
     else el.setAttribute("hidden", "");
+    if (visible) {
+      const btn = $("extensionContextBannerReload");
+      if (btn instanceof HTMLButtonElement && !btn.dataset.nlBound) {
+        btn.dataset.nlBound = "1";
+        btn.addEventListener("click", () => {
+          try {
+            window.location.reload();
+          } catch {
+          }
+        });
+      }
+    }
   }
   var watchMetaCache = {
     key: "",
@@ -7816,6 +7864,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       return;
     }
     const userId = String(entry.userId || "").trim();
+    const isPendingSelf = String(entry?.id || "").startsWith("pending-self:");
     const lidForOwn = String(entry.liveId || STORY_SOURCE_STATE.liveId || "");
     const ownPosted = isOwnPostedSupportComment(
       entry,
@@ -7849,8 +7898,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     }
     userEl.textContent = storyGrowthDisplayLabel(entry, lidForOwn);
-    const detailLinkableUid = /^\d{5,14}$/.test(userId) ? userId : /^\d{5,14}$/.test(viewerUid) && ownPosted ? viewerUid : "";
-    if (userId) {
+    const detailLinkableUid = /^\d{5,14}$/.test(userId) && !isPendingSelf ? userId : /^\d{5,14}$/.test(viewerUid) && ownPosted && !isPendingSelf ? viewerUid : "";
+    if (isPendingSelf && ownPosted) {
+      userMetaEl.textContent = "\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8\uFF08\u9001\u4FE1\u4E2D\uFF09";
+    } else if (userId) {
       if (detailLinkableUid) {
         const a = document.createElement("a");
         a.href = `https://www.nicovideo.jp/user/${detailLinkableUid}`;
@@ -11481,7 +11532,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     a.href = blobUrl;
     a.download = `nicolivelog-${liveId}-${Date.now()}.html`;
     a.click();
-    URL.revokeObjectURL(blobUrl);
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 6e4);
   }
   var coalescedRefreshScheduler = createCoalescedRefreshScheduler({
     throttleMs: 450
@@ -11515,7 +11566,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0429-1527" ? String("0429-1527") : "dev";
+      const buildId = "0429-1608" ? String("0429-1608") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -11523,6 +11574,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   }
   function initPopup() {
     installExtensionContextErrorGuard();
+    initOfflineBannerOnce();
     paintVersionBadge();
     void globalThis.chrome?.storage?.local?.get(KEY_CALM_PANEL_MOTION)?.then((b) => {
       applyCalmPanelMotionClass(
@@ -12860,8 +12912,20 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     } catch {
     }
     const POLL_INTERVAL_MS = INLINE_MODE ? 1e4 : 3e4;
+    let popupPollIntervalId = (
+      /** @type {number|null} */
+      null
+    );
+    popupPollIntervalId = /** @type {number} */
+    /** @type {unknown} */
     setInterval(() => {
-      if (!hasExtensionContext()) return;
+      if (!hasExtensionContext()) {
+        if (popupPollIntervalId != null) {
+          clearInterval(popupPollIntervalId);
+          popupPollIntervalId = null;
+        }
+        return;
+      }
       if (typeof document !== "undefined" && document.hidden) return;
       watchMetaCache.key = "";
       watchMetaCache.snapshot = null;

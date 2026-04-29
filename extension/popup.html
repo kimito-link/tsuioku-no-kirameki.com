@@ -5140,6 +5140,31 @@
         margin: 6px 0 0;
       }
 
+      .nl-extension-context-banner__reload {
+        margin: 0;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-family: inherit;
+        color: inherit;
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid currentColor;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .nl-extension-context-banner__reload:hover {
+        background: rgba(255, 255, 255, 0.9);
+      }
+      .nl-offline-banner {
+        background: #fff7ed;
+        color: #9a3412;
+        border: 1px solid #fdba74;
+      }
+      html.nl-skin-panel-dark .nl-offline-banner {
+        background: #2a1a09;
+        color: #fed7aa;
+        border-color: #b45309;
+      }
+
       .nl-comment-harvest-banner {
         display: none;
         margin: 0 0 8px;
@@ -5987,6 +6012,19 @@
         <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
       </div>
       <div
+        id="offlineBanner"
+        class="nl-extension-context-banner nl-offline-banner"
+        role="status"
+        aria-live="polite"
+        hidden
+      >
+        <strong>オフラインです</strong>
+        <p class="nl-extension-context-banner__body">
+          ネットワークに接続できないため、コメントの取得やスナップショットが失敗します。
+          接続が戻ると自動的にバナーは消えます。
+        </p>
+      </div>
+      <div
         id="extensionContextBanner"
         class="nl-extension-context-banner"
         role="alert"
@@ -5997,6 +6035,13 @@
         <p class="nl-extension-context-banner__body">
           <code>chrome://extensions</code>
           を開き、「君斗りんくの追憶のきらめき」の「更新」で拡張を再読み込みしてください。ページの再読み込みだけでは直らないことがあります。
+        </p>
+        <p class="nl-extension-context-banner__body">
+          <button
+            type="button"
+            id="extensionContextBannerReload"
+            class="nl-extension-context-banner__reload"
+          >このパネルを再読み込み</button>
         </p>
       </div>
 

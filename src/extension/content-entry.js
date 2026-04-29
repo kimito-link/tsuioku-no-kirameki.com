@@ -1286,6 +1286,13 @@ window.addEventListener('message', (e) => {
   }
   trimMapToMax(activeUserTimestamps, ACTIVE_USER_MAP_MAX);
   trimMapToMax(interceptedUsers, INTERCEPT_MAP_MAX);
+  // interceptedNicknames / interceptedAvatars も同じ userId キーで蓄積するが、
+  // 従来 trim 対象外だったため、長時間配信（数千〜数万 commenter）で無制限に
+  // 成長してメモリを圧迫していた（plan_scenario_audit.md の S5-1）。
+  // VIEWER_JOIN flush は短間隔で走るので、ここで揃って trim すれば最古エントリが
+  // 順次落ちる。Map.set は既存キーを更新するだけなので「現役」のものは残る。
+  trimMapToMax(interceptedNicknames, INTERCEPT_MAP_MAX);
+  trimMapToMax(interceptedAvatars, INTERCEPT_MAP_MAX);
   queueInterceptReconcile(reconcileEntries, reconcileUsers);
 });
 /** @type {number|null} */
@@ -5527,6 +5534,10 @@ async function pollStatsFromPage() {
   try {
     const href = window.location.href;
     if (!href || !href.startsWith('http')) { _pollDiag.err = 'bad-href'; return; }
+    // SPA 遷移で watch から非 watch（/my/follow など）に移ってもこの interval は
+    // 止まらないため、毎回 URL が watch かを再判定する。watch でなければ
+    // 12 秒ごとに別ページを fetch することになるので確実に skip する。
+    if (!isNicoLiveWatchUrl(href)) { _pollDiag.err = 'not-watch'; return; }
     const url = new URL(href);
     url.searchParams.delete('_nls_t');
     const resp = await fetch(url.href, {

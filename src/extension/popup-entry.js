@@ -1039,11 +1039,66 @@ async function storageGetSafe(key, fallback) {
   }
 }
 
+/**
+ * `#offlineBanner` の表示制御。`navigator.onLine` の `online` / `offline` event を
+ * 監視して、ネットワーク切断時にユーザーへ可視化する。これがないと、ndgr fetch や
+ * snapshot 取得が黙って失敗するだけで、ユーザーは「コメントが流れてこない」を拡張側
+ * の不具合と誤解しがちだった。
+ *
+ * @param {boolean} visible
+ */
+function renderOfflineBanner(visible) {
+  const el = $('offlineBanner');
+  if (!el) return;
+  if (visible) el.removeAttribute('hidden');
+  else el.setAttribute('hidden', '');
+}
+
+let offlineBannerInitialized = false;
+function initOfflineBannerOnce() {
+  if (offlineBannerInitialized) return;
+  offlineBannerInitialized = true;
+  const update = () => {
+    try {
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      renderOfflineBanner(offline);
+    } catch {
+      // no-op
+    }
+  };
+  update();
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    try {
+      window.addEventListener('online', update);
+      window.addEventListener('offline', update);
+    } catch {
+      // no-op
+    }
+  }
+}
+
 function renderExtensionContextBanner(visible) {
   const el = $('extensionContextBanner');
   if (!el) return;
   if (visible) el.removeAttribute('hidden');
   else el.setAttribute('hidden', '');
+  // 「このパネルを再読み込み」ボタン: context invalidated 直後はバナー以外の操作が
+  // すべて停止するため、popup ドキュメント自身を reload する単純な復帰経路を提供する。
+  // window.location.reload() は popup window / inline iframe のどちらでも有効。
+  // 二重バインドを避けるため dataset でガード。
+  if (visible) {
+    const btn = $('extensionContextBannerReload');
+    if (btn instanceof HTMLButtonElement && !btn.dataset.nlBound) {
+      btn.dataset.nlBound = '1';
+      btn.addEventListener('click', () => {
+        try {
+          window.location.reload();
+        } catch {
+          // no-op
+        }
+      });
+    }
+  }
 }
 
 /** @type {{ key: string, snapshot: WatchPageSnapshot|null }} */
@@ -3237,6 +3292,12 @@ function renderStoryCommentDetailPanel() {
   }
 
   const userId = String(entry.userId || '').trim();
+  // pending self-post（ndgr 観測前）は `pending-self:` プレフィックス id で識別する。
+  // 184 投稿だった場合、ndgr 観測後 entry.userId は a:HASH になるが、観測前は
+  // viewer の数値 userId を載せている（buildDisplayCommentEntries の設計上）。
+  // この瞬間のスクリーンショットや画面共有で viewer の本物 ID が露出するのを
+  // 避けるため、Story Detail カードでは pending self-post の ID 表示を抑制する。
+  const isPendingSelf = String(entry?.id || '').startsWith('pending-self:');
   const lidForOwn = String(entry.liveId || STORY_SOURCE_STATE.liveId || '');
   const ownPosted = isOwnPostedSupportComment(
     entry,
@@ -3272,10 +3333,16 @@ function renderStoryCommentDetailPanel() {
   }
   userEl.textContent = storyGrowthDisplayLabel(entry, lidForOwn);
   // 数値 ID のユーザーはプレビューからユーザーページにリンク
-  const detailLinkableUid = /^\d{5,14}$/.test(userId) ? userId
-    : /^\d{5,14}$/.test(viewerUid) && ownPosted ? viewerUid
+  // pending self-post（送信中・ndgr 観測前）は viewerUid を載せない（プライバシー保護）
+  const detailLinkableUid = /^\d{5,14}$/.test(userId) && !isPendingSelf ? userId
+    : /^\d{5,14}$/.test(viewerUid) && ownPosted && !isPendingSelf ? viewerUid
     : '';
-  if (userId) {
+  if (isPendingSelf && ownPosted) {
+    // pending self-post: ID 表示を抑制し、送信中であることだけ伝える。
+    // 184 投稿の場合、ndgr 観測後は entry.userId が a:HASH に切り替わって
+    // 通常の `if (userId)` 分岐から表示される（その時点では a:HASH なので問題なし）。
+    userMetaEl.textContent = '自分のコメント（送信中）';
+  } else if (userId) {
     if (detailLinkableUid) {
       const a = document.createElement('a');
       a.href = `https://www.nicovideo.jp/user/${detailLinkableUid}`;
@@ -7745,7 +7812,10 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
   a.href = blobUrl;
   a.download = `nicolivelog-${liveId}-${Date.now()}.html`;
   a.click();
-  URL.revokeObjectURL(blobUrl);
+  // a.click() の直後に同期 revoke すると、巨大 HTML（数万コメント）でブラウザが
+  // ダウンロードを開始する前に URL が無効化されて silent failure になる。
+  // downloadSessionSummaryJson と同じく 60 秒遅延 revoke に揃える。
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
 }
 
 /**
@@ -7813,6 +7883,7 @@ function paintVersionBadge() {
 
 function initPopup() {
   installExtensionContextErrorGuard();
+  initOfflineBannerOnce();
   paintVersionBadge();
   void globalThis.chrome?.storage?.local
     ?.get(KEY_CALM_PANEL_MOTION)
@@ -9232,13 +9303,28 @@ function initPopup() {
   }
 
   const POLL_INTERVAL_MS = INLINE_MODE ? 10_000 : 30_000;
-  setInterval(() => {
-    if (!hasExtensionContext()) return;
-    if (typeof document !== 'undefined' && document.hidden) return;
-    watchMetaCache.key = '';
-    watchMetaCache.snapshot = null;
-    safeRefresh();
-  }, POLL_INTERVAL_MS);
+  // setInterval の id を保持し、拡張 context invalidated（chrome://extensions の
+  // 再読み込みなど）後はループから抜けて clearInterval する。これがないと、popup
+  // を閉じない限り「early return するだけの空 tick」が永続的に走り続けて、
+  // inline iframe では特にリソースを食う。
+  let popupPollIntervalId = /** @type {number|null} */ (null);
+  popupPollIntervalId = /** @type {number} */ (
+    /** @type {unknown} */ (
+      setInterval(() => {
+        if (!hasExtensionContext()) {
+          if (popupPollIntervalId != null) {
+            clearInterval(popupPollIntervalId);
+            popupPollIntervalId = null;
+          }
+          return;
+        }
+        if (typeof document !== 'undefined' && document.hidden) return;
+        watchMetaCache.key = '';
+        watchMetaCache.snapshot = null;
+        safeRefresh();
+      }, POLL_INTERVAL_MS)
+    )
+  );
 
   if (INLINE_MODE || INLINE_SIDE_PANEL) {
     let lastVisibilityRefresh = Date.now();

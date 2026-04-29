@@ -56,8 +56,24 @@ export async function probeMicrophoneLevel(constraints, sampleMs = VOICE_MIC_PRO
       for (let i = 0; i < buf.length; i++) {
         if (buf[i] > peak) peak = buf[i];
       }
+      // requestAnimationFrame だけだと popup window やタブが backgrounded された
+      // 瞬間に RAF が pause し、`Date.now() < end` を満たしているのに resolve が
+      // 来なくて永久に進まない（マイク確認ボタンが「確認中…」のまま固まる）。
+      // 32ms の setTimeout を並走させ、どちらが先に発火しても 1 回だけ resolve する
+      // ことで backgrounded ハングを防ぐ。
       await new Promise((r) => {
-        requestAnimationFrame(r);
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          r();
+        };
+        try {
+          requestAnimationFrame(done);
+        } catch {
+          // no-op
+        }
+        setTimeout(done, 32);
       });
     }
     const ok = peak >= VOICE_MIC_LEVEL_THRESHOLD;
