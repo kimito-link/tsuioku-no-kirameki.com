@@ -47,6 +47,9 @@ export const FRAME_PRESETS = Object.freeze({
       '--nl-bg-soft': '#111827',
       '--nl-surface': '#0f172a',
       '--nl-text': '#e5e7eb',
+      // ダーク背景上で WCAG AA を満たす補助テキスト色。:root デフォルト
+      // `--nl-text-sub: #4b5563` のままだとコントラスト 2.5:1 で読めない（A2）。
+      '--nl-text-sub': '#cbd5e1',
       '--nl-muted': '#94a3b8',
       '--nl-border': '#243244',
       '--nl-accent': '#60a5fa',
@@ -63,6 +66,8 @@ export const FRAME_PRESETS = Object.freeze({
       '--nl-bg-soft': '#1b1f3a',
       '--nl-surface': '#10182f',
       '--nl-text': '#e2e8f0',
+      // ミッドナイト背景でも `--nl-text-sub` のコントラストを補正（A2）。
+      '--nl-text-sub': '#cbd5e1',
       '--nl-muted': '#9fb1ca',
       '--nl-border': '#2a3761',
       '--nl-accent': '#7dd3fc',

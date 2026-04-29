@@ -2214,7 +2214,12 @@
       .nl-top-support-rank__count {
         font-weight: 800;
         font-variant-numeric: tabular-nums;
-        color: #0f766e;
+        /* ダーク背景でも読めるよう CSS 変数経由に。:root で teal の基準色を
+           置き、html.nl-skin-panel-dark で明るいシアンに上書きする（A8）。 */
+        color: var(--nl-rank-count, #0f766e);
+      }
+      html.nl-skin-panel-dark .nl-top-support-rank__count {
+        --nl-rank-count: #5eead4;
       }
 
       .nl-top-support-rank__thumb-wrap {
@@ -3990,6 +3995,12 @@
         height: 20px;
         accent-color: var(--nl-record-on);
         flex-shrink: 0;
+      }
+      /* キーボードフォーカス時にアクセントの outline を出す（A7）。
+         拡張のコア toggle なので SR / 視覚弱者にとって最重要 UI。 */
+      #recordToggle:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 2px;
       }
 
       .nl-record-sub {
@@ -6385,7 +6396,7 @@
         class="nl-comment-compose nl-comment-compose--primary"
         aria-label="コメント投稿"
       >
-        <textarea id="commentInput" maxlength="250" placeholder="ここにコメントを書いて送信"></textarea>
+        <textarea id="commentInput" maxlength="250" placeholder="ここにコメントを書いて送信" aria-label="コメント本文（250文字まで）"></textarea>
         <div
           id="commentKindnessPopover"
           class="nl-comment-kindness"
@@ -6921,7 +6932,7 @@
         </div>
       </section>
 
-      <div id="storageErrorBanner" role="alert" aria-live="polite">
+      <div id="storageErrorBanner" role="alert">
         <strong>保存に失敗しました</strong>
         <span id="storageErrorDetail"></span>
         <div class="storage-error-actions">

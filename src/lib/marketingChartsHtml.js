@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml } from './htmlEscape.js';
+import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { MKT_ADVISOR_AVATAR_DATA_URI } from './marketingHtmlAdvisorAvatars.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
@@ -597,10 +598,13 @@ function sectionTopUsers(r, maskShare = false) {
   const rows = r.topUsers.slice(0, 20)
     .map((u, i) => {
       const pct = (u.count / Math.max(1, maxCount)) * 100;
+      // avatar URL は http/https のみ許可（Security S-2: data:image/svg+xml で
+      // 保存 HTML 開封時 XSS、javascript:/blob: での意図せぬ実行を防止）。
+      const safeAvatarUrl = isHttpOrHttpsUrl(u.avatarUrl) ? u.avatarUrl : '';
       const avImg =
-        maskShare || !u.avatarUrl
+        maskShare || !safeAvatarUrl
           ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>'
-          : `<img src="${escapeHtml(u.avatarUrl)}" class="mkt-rank-av" alt="" loading="lazy">`;
+          : `<img src="${escapeHtml(safeAvatarUrl)}" class="mkt-rank-av" alt="" loading="lazy">`;
       // ランキング内で複数の匿名 (a:xxxx) ユーザーがすべて「匿名」と表示されて
       // 識別不能になる問題を避けるため、共通の displayUserLabel を通して
       // 「nickname（shortId）」形にする。数値 ID のときは niconico プロフィール

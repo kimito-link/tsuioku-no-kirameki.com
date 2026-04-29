@@ -20,15 +20,41 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.9（2026-04-29 ローカル準備 / CWS 提出待ち）
-- **同日入った前バージョン**: 0.1.8（master の b18de07、CWS 未提出のまま 0.1.9 にロールアップ）
+- **次回提出バージョン**: 0.1.10（2026-04-29 ローカル準備 / CWS 提出待ち）
+- **同日入った前バージョン**: 0.1.9（master の 6f36a24、CWS 未提出のまま 0.1.10 にロールアップ）/ 0.1.8（master の b18de07、CWS 未提出）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
-- **ステータス**: 0.1.7 が公開中。0.1.9 として 0.1.8 の自コメ修正＋シナリオ調査由来の小修正を一括提出予定。
+- **ステータス**: 0.1.7 が公開中。0.1.10 として 0.1.8 / 0.1.9 を内包し、Privacy 整合・XSS 対策・a11y 修正・出自不明アセット差し替えなどを一括提出予定。
 - **拡張 ID**: `cjbabignmmodaickpeckiojjabnlogdb`
 - **CWS Developer Dashboard**: 投稿者「君斗りんく」
 - **ホスト権限**: `https://*.nicovideo.jp/*` のみ（`localhost` / `127.0.0.1` は
  提出版から除外済み）
+- **0.1.10 の主変更（0.1.8 / 0.1.9 込みのロールアップ）**:
+ 1. **【Privacy】privacy.html §6 OpenRouter 連携を「未実装・将来予定」に書き換え**: 実装と
+ 文書の齟齬を解消（CWS 審査の差し戻しリスクを回避）。`tsuioku-no-kirameki/privacy.html` の
+ §6 全体・要約・目次・§4-2・§10・meta description / OG 系を一掃。
+ 2. **【ブランド】「煌めき」→「きらめき」hiragana 統一**: LP / privacy.html / site.webmanifest /
+ OG title / schema.org JSON で表記揺れを解消。意匠ルビ `<ruby>煌めき<rt>きらめき</rt></ruby>` のみ残置。
+ 3. **【アセット】出自不明アセット `kewXCUOt_400x400.jpg` を削除**: ファイル名が外部 CDN 命名規則
+ だったため、`STORY_RINK_COLLECTING_JPG` を `link-yukkuri-blink-mouth-closed.png` に差し替え。
+ 提出 ZIP のホワイトリストからも除外。
+ 4. **【セキュリティ】HTML レポート / マーケ HTML の `<img src>` で URL scheme 検証**:
+ `data:image/svg+xml,<svg onload=...>` での保存 HTML 開封時 XSS を防止。
+ 5. **【セキュリティ】`escapeHtml` で single quote エスケープ**: `'` も `&#39;` に変換し、
+ single-quoted 属性での XSS も防御（ユニットテストも追加）。
+ 6. **【セキュリティ】`commentRecord.js` の `avatarUrl` に 2KB 上限**: storage quota DoS 防止。
+ 7. **【a11y】dark/midnight プリセットに `--nl-text-sub` 追加**: 補助テキストの WCAG AA を確保。
+ 8. **【a11y】`storageErrorBanner` の `role/aria-live` 矛盾を解消**（aria-live 削除、role=alert に統一）。
+ 9. **【a11y】`#recordToggle` に `:focus-visible`**: キーボードユーザーが録画 ON/OFF を見失わない。
+ 10. **【a11y】rank strip count を CSS 変数化**: ダークパネルでも読める色に切替。
+ 11. **【a11y】`commentInput` textarea に `aria-label`**: スクリーンリーダ向けの名前付与。
+ 12. **【a11y】floating panel に「× 閉じる」ボタン**: 設定画面に行かずに非表示にできる導線追加。
+ 13. **【0.1.9 から継承】設定変更の慎重実装 8 件**: 184 自コメ viewerUid 非表示、HTML 保存 URL revoke
+ 60 秒遅延、interceptedMaps の trim、pollStats URL 再チェック、setInterval cleanup、コンテキスト切れ
+ banner reload ボタン、navigator.onLine、probeMicrophoneLevel ハング修正。
+ 14. **【0.1.8 から継承】自コメ表示の追加安定化 3 件**: Storage H8 / Self-comment M1 / textRaw 永続化。
+ 15. 権限・ネットワーク・保存キーの追加**無し**。
+
 - **0.1.9 の主変更（0.1.8 込みのロールアップ）**:
  1. **【Privacy】184 自コメで viewerUid を表示しない**: pending self-post が ndgr 観測前に
  viewer の数値 ID を Story Detail カードへ露出させていた。`pending-self:` プレフィックスで
@@ -64,11 +90,14 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 3. 重要な設計判断（今後も踏襲すること）
 
-### 3.1 「ゆっくり」という言葉は使わない
-- description / LP / store listing に **意図的に** 入れていない。
-- 代替表現: 「3 匹のガイドキャラ」「オリジナルキャラクター」
-  「やわらかい雰囲気のキャラ案内」。
-- 過去の他拡張の審査通過実績に合わせて、このトーンで統一している。
+### 3.1 「ゆっくり」という言葉の扱い（2026-04-29 方針更新）
+- 本拡張のオリジナルキャラクター（りんく・こん太・たぬ姉）は **東方Project の
+  二次創作キャラクター（霊夢・魔理沙）ではない**ため、「ゆっくり〜」という呼称や
+  「ゆっくり解説」という表現を使っても問題ない、という方針。
+- 一方で description / store listing では 3 キャラの独自性を伝えるため、
+  「3 匹のガイドキャラ」「オリジナルキャラクター」「やわらかい雰囲気のキャラ案内」
+  など、必ずしも「ゆっくり」を多用しなくてもよい言い回しも併用する。
+- popup UI / LP 内では「ゆっくり始める」「ゆっくり解説」等の文言を従来どおり使用してよい。
 
 ### 3.2 3 キャラの役割（ブレさせない）
 | キャラ | 役割 | レーン |
@@ -127,6 +156,29 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-29）
+
+**0.1.10 バンプまでに入った修正（セキュリティ・Privacy・a11y・出自整理 13 件）**:
+
+- `fix(privacy)`: privacy.html §6 OpenRouter を「未実装・将来予定」に書き換え。
+ 要約・目次・§4-2・§10・meta description / OG / 章間相互参照を一掃。
+- `fix(brand)`: 「煌めき」→「きらめき」hiragana 統一（LP / privacy / site.webmanifest /
+ OG / schema.org）。意匠ルビ `<ruby>煌めき<rt>きらめき</rt></ruby>` のみ残置。
+- `chore(asset)`: `extension/images/icon/kewXCUOt_400x400.jpg` を削除し、`STORY_RINK_COLLECTING_JPG`
+ を `images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.png` に差し替え。
+ stage-submission.py のホワイトリストからも除外。
+- `fix(security)`: HTML レポート（popup-entry.js）/ マーケ HTML（marketingChartsHtml.js）の
+ `<img src>` で `isHttpOrHttpsUrl` チェック必須化。data:URL 経由の保存 HTML 開封時 XSS を防止。
+- `fix(security)`: `src/shared/html/escape.js` で single quote `'` → `&#39;` 追加 + 単体テスト。
+- `fix(security)`: `src/lib/commentRecord.js` で `avatarUrl` を 2000 字 slice。
+- `fix(a11y)`: `popupFramePresets.js` の dark / midnight に `--nl-text-sub: #cbd5e1` 追加。
+- `fix(a11y)`: `#storageErrorBanner` の `role="alert"` と `aria-live="polite"` の矛盾を解消。
+- `fix(a11y)`: `#recordToggle` に `:focus-visible { outline: 2px solid var(--nl-accent) }`。
+- `fix(a11y)`: `.nl-top-support-rank__count` を `var(--nl-rank-count)` 経由にし、ダーク時に
+ `#5eead4` で上書き。
+- `fix(a11y)`: `<textarea id="commentInput">` に `aria-label="コメント本文（250文字まで）"`。
+- `feat(content)`: floating placement の host に「× パネルを閉じる」ボタン追加（A30）。
+- `docs(agents)`: §3.1「ゆっくり」方針を「東方Project の二次創作キャラと別物なので使用 OK」に
+ 更新。
 
 **0.1.9 バンプまでに入った修正（シナリオ調査の小修正 8 件）**:
 

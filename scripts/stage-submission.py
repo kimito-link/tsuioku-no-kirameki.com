@@ -78,7 +78,9 @@ def stage(version: str) -> Path:
     #    「この拡張が読めるリソースが少ない＝審査ノイズが少ない」観点で提出物から落とす。
     included_images = [
         'toumeilink.png',
-        'icon/kewXCUOt_400x400.jpg',
+        # icon/kewXCUOt_400x400.jpg は出自の不明な外部命名規則のファイルだったため
+        # 0.1.10 で差し替え。STORY_RINK_COLLECTING_JPG は yukkuri-charactore-english/link/
+        # 配下の既存オリキャラ画像（blink-mouth-closed）を参照する。
         'logo/kimito-link-color.png',
         'logo/kimito-maru-black.png',
         'logo/konta-yukkuri-icon-16.png',

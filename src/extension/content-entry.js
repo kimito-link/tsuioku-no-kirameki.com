@@ -1759,6 +1759,59 @@ function renderInlinePanelFloatingHost() {
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
   host.style.opacity = '1';
+  // 閉じるボタン（A30）。floating placement では panel を非表示にする手段が
+  // なく、ユーザーは設定画面で placement を変えないと消せなかった。
+  // 一度だけ生成して再利用する（dataset.nlBound でガード）。
+  ensureInlineFloatingCloseButton(host);
+}
+
+/**
+ * floating placement の host に「× 閉じる」ボタンを 1 つだけ用意する。
+ * 押下時は host を hide + `inlinePanelToolbarShownThisSession` を false に戻し、
+ * autoshow 設定でも次回ロードまで再表示しない（ユーザーが明示的に閉じた状態を尊重）。
+ * @param {HTMLElement} host
+ */
+function ensureInlineFloatingCloseButton(host) {
+  if (!host) return;
+  let btn = /** @type {HTMLButtonElement|null} */ (
+    host.querySelector('[data-nls-inline-close]')
+  );
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('data-nls-inline-close', '1');
+    btn.setAttribute('aria-label', 'パネルを閉じる');
+    btn.title = 'パネルを閉じる';
+    btn.textContent = '×';
+    btn.style.cssText = [
+      'position:absolute',
+      'top:4px',
+      'right:8px',
+      'z-index:2147483647',
+      'width:24px',
+      'height:24px',
+      'border:none',
+      'border-radius:999px',
+      'background:rgba(15,23,42,0.65)',
+      'color:#fff',
+      'font-size:16px',
+      'line-height:1',
+      'cursor:pointer',
+      'box-shadow:0 1px 3px rgba(0,0,0,0.2)'
+    ].join(';');
+    btn.addEventListener('click', () => {
+      try {
+        host.style.display = 'none';
+        host.style.opacity = '0';
+        host.setAttribute('aria-hidden', 'true');
+        host.style.pointerEvents = 'none';
+        toolbarInitiatedShowThisSession = false;
+      } catch {
+        // no-op
+      }
+    });
+    host.appendChild(btn);
+  }
 }
 
 /**

@@ -1096,7 +1096,7 @@
 
   // src/shared/html/escape.js
   function escapeHtml(s) {
-    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   function escapeAttr(s) {
     return escapeHtml(s);
@@ -1203,6 +1203,9 @@
         "--nl-bg-soft": "#111827",
         "--nl-surface": "#0f172a",
         "--nl-text": "#e5e7eb",
+        // ダーク背景上で WCAG AA を満たす補助テキスト色。:root デフォルト
+        // `--nl-text-sub: #4b5563` のままだとコントラスト 2.5:1 で読めない（A2）。
+        "--nl-text-sub": "#cbd5e1",
         "--nl-muted": "#94a3b8",
         "--nl-border": "#243244",
         "--nl-accent": "#60a5fa",
@@ -1219,6 +1222,8 @@
         "--nl-bg-soft": "#1b1f3a",
         "--nl-surface": "#10182f",
         "--nl-text": "#e2e8f0",
+        // ミッドナイト背景でも `--nl-text-sub` のコントラストを補正（A2）。
+        "--nl-text-sub": "#cbd5e1",
         "--nl-muted": "#9fb1ca",
         "--nl-border": "#2a3761",
         "--nl-accent": "#7dd3fc",
@@ -4610,7 +4615,8 @@ ${yLabelsC}${xLabels}${bars}
     const maxCount = r.topUsers[0].count;
     const rows = r.topUsers.slice(0, 20).map((u, i) => {
       const pct = u.count / Math.max(1, maxCount) * 100;
-      const avImg = maskShare || !u.avatarUrl ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>' : `<img src="${escapeHtml(u.avatarUrl)}" class="mkt-rank-av" alt="" loading="lazy">`;
+      const safeAvatarUrl = isHttpOrHttpsUrl(u.avatarUrl) ? u.avatarUrl : "";
+      const avImg = maskShare || !safeAvatarUrl ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>' : `<img src="${escapeHtml(safeAvatarUrl)}" class="mkt-rank-av" alt="" loading="lazy">`;
       const uidForLabel = u.userId || UNKNOWN_USER_KEY;
       const rawLabel = u.userId ? displayUserLabel(u.userId, u.nickname || "") : u.nickname || "\u2014";
       const nameCellHtml = maskShare ? escapeHtml(maskLabelForShare(rawLabel)) : buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
@@ -6480,7 +6486,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     input.value = createFrameShareCode(popupFrameState.id, popupFrameState.custom);
   }
   var STORY_RINK_FACE_IMG = "images/toumeilink.png";
-  var STORY_RINK_COLLECTING_JPG = "images/icon/kewXCUOt_400x400.jpg";
+  var STORY_RINK_COLLECTING_JPG = "images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.png";
   var STORY_GRID_DEFAULT_TILE_IMG = "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png";
   var STORY_GUIDE_FACE_LINK = "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png";
   var STORY_GUIDE_FACE_KONTA = "images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png";
@@ -10882,7 +10888,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     );
     const safeBroadcasterName = escapeHtml(snapshot?.broadcasterName || "-");
     const safeStartAtText = escapeHtml(snapshot?.startAtText || "-");
-    const safeThumbnailUrl = escapeAttr(snapshot?.thumbnailUrl || "");
+    const rawThumbnailUrl = String(snapshot?.thumbnailUrl || "").trim();
+    const safeThumbnailUrl = isHttpOrHttpsUrl(rawThumbnailUrl) ? escapeAttr(rawThumbnailUrl) : "";
     const safeSnapshotError = snapshotError ? escapeHtml(snapshotError) : "";
     const tags = Array.isArray(snapshot?.tags) ? snapshot.tags.filter((v) => String(v || "").trim()) : [];
     const [dataLink, dataKonta, dataTanu] = await Promise.all([
@@ -11566,7 +11573,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0429-1608" ? String("0429-1608") : "dev";
+      const buildId = "0429-1648" ? String("0429-1648") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

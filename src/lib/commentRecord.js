@@ -86,7 +86,10 @@ export function createCommentEntry(p) {
   const text = normalizeCommentText(p.text);
   const commentNo = String(p.commentNo ?? '').trim();
   const liveId = String(p.liveId || '').trim().toLowerCase();
-  const av = String(p.avatarUrl || '').trim();
+  // avatar URL の長さ上限。userCommentProfileCache.js が 2000 字 slice しているのと
+  // 揃える。これがないと数十 KB の URL を流し込まれて storage quota を圧迫される
+  // 経路（DoS）が残る（Security S-13）。
+  const av = String(p.avatarUrl || '').trim().slice(0, 2000);
   const avatarUrl = isHttpOrHttpsUrl(av) ? av : '';
   let uid = p.userId ? String(p.userId).trim() : '';
   if (!uid && avatarUrl) {

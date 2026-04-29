@@ -1,6 +1,6 @@
 {
-  "name": "君斗りんくの追憶の煌めき",
-  "short_name": "追憶の煌めき",
+  "name": "君斗りんくの追憶のきらめき",
+  "short_name": "追憶のきらめき",
   "description": "ニコ生の応援コメントを手元に残す。Web・iOS・Android と Chrome 拡張を前提とした体験。",
   "start_url": "./",
   "scope": "./",

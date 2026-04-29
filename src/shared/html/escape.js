@@ -14,7 +14,11 @@ export function escapeHtml(s) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    // single quote もエスケープする。double-quoted 属性が中心の現コードでは
+    // breakout は起きないが、`<a href='${escapeAttr(href)}'>` のような
+    // single-quoted 属性に書き換わった瞬間に XSS になるため、防御的に閉じておく。
+    .replace(/'/g, '&#39;');
 }
 
 /** @param {unknown} s */

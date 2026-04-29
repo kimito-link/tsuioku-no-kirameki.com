@@ -464,7 +464,7 @@
     const text = normalizeCommentText(p.text);
     const commentNo = String(p.commentNo ?? "").trim();
     const liveId2 = String(p.liveId || "").trim().toLowerCase();
-    const av = String(p.avatarUrl || "").trim();
+    const av = String(p.avatarUrl || "").trim().slice(0, 2e3);
     const avatarUrl = isHttpOrHttpsUrl(av) ? av : "";
     let uid = p.userId ? String(p.userId).trim() : "";
     if (!uid && avatarUrl) {
@@ -4489,6 +4489,49 @@
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
     host.style.opacity = "1";
+    ensureInlineFloatingCloseButton(host);
+  }
+  function ensureInlineFloatingCloseButton(host) {
+    if (!host) return;
+    let btn = (
+      /** @type {HTMLButtonElement|null} */
+      host.querySelector("[data-nls-inline-close]")
+    );
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.setAttribute("data-nls-inline-close", "1");
+      btn.setAttribute("aria-label", "\u30D1\u30CD\u30EB\u3092\u9589\u3058\u308B");
+      btn.title = "\u30D1\u30CD\u30EB\u3092\u9589\u3058\u308B";
+      btn.textContent = "\xD7";
+      btn.style.cssText = [
+        "position:absolute",
+        "top:4px",
+        "right:8px",
+        "z-index:2147483647",
+        "width:24px",
+        "height:24px",
+        "border:none",
+        "border-radius:999px",
+        "background:rgba(15,23,42,0.65)",
+        "color:#fff",
+        "font-size:16px",
+        "line-height:1",
+        "cursor:pointer",
+        "box-shadow:0 1px 3px rgba(0,0,0,0.2)"
+      ].join(";");
+      btn.addEventListener("click", () => {
+        try {
+          host.style.display = "none";
+          host.style.opacity = "0";
+          host.setAttribute("aria-hidden", "true");
+          host.style.pointerEvents = "none";
+          toolbarInitiatedShowThisSession = false;
+        } catch {
+        }
+      });
+      host.appendChild(btn);
+    }
   }
   function renderInlinePanelDockBottomHost() {
     const host = ensureInlinePopupHost();

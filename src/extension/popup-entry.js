@@ -1589,7 +1589,9 @@ function syncFrameShareInput() {
 /** ストーリー枠は りんく上半身（応援カウンター） */
 const STORY_RINK_FACE_IMG = 'images/toumeilink.png';
 /** 記録ON・件数0のときのストーリー顔（PNG タイル既定とは別の差し絵） */
-const STORY_RINK_COLLECTING_JPG = 'images/icon/kewXCUOt_400x400.jpg';
+// 記録 ON・件数 0 のときの待機顔。出自の不明な外部命名規則のファイル
+// （旧: images/icon/kewXCUOt_400x400.jpg）から、オリジナルキャラ画像に差し替え。
+const STORY_RINK_COLLECTING_JPG = 'images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.png';
 /**
  * 応援グリッドで「そのコメントにサムネURLが無い」ときの既定タイル（キャラ追加時の設定による）
  */
@@ -7113,7 +7115,11 @@ async function buildHtmlReportDocument(
   );
   const safeBroadcasterName = escapeHtml(snapshot?.broadcasterName || '-');
   const safeStartAtText = escapeHtml(snapshot?.startAtText || '-');
-  const safeThumbnailUrl = escapeAttr(snapshot?.thumbnailUrl || '');
+  // <img src> に流す URL は http/https のみ許可。data:image/svg+xml,<svg onload=...>
+  // のような scheme で SVG を仕込まれると、保存 HTML を file:// で開いた瞬間に
+  // XSS が成立するため、scheme 検証を必須にする（Security S-2）。
+  const rawThumbnailUrl = String(snapshot?.thumbnailUrl || '').trim();
+  const safeThumbnailUrl = isHttpOrHttpsUrl(rawThumbnailUrl) ? escapeAttr(rawThumbnailUrl) : '';
   const safeSnapshotError = snapshotError ? escapeHtml(snapshotError) : '';
   const tags = Array.isArray(snapshot?.tags)
     ? snapshot.tags.filter((v) => String(v || '').trim())
