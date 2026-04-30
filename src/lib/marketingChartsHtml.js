@@ -641,7 +641,7 @@ function sectionSilenceZones(zones) {
 }
 
 /**
- * 0.1.22 (W): L4 アヘ顔密度（笑い反応指標）。
+ * 0.1.22 (W): L4 笑い密度（盛り上がり指標）。
  * 30 秒粒度の笑い系コメ件数とその比率を時系列で。
  * @param {import('./commentVelocityTimeline.js').LaughterDensityTimeline} laugh
  */
@@ -667,7 +667,7 @@ function sectionLaughterDensity(laugh) {
     })
     .join('');
   return `<section class="mkt-section" id="mkt-laughter">
-<h2>アヘ顔密度（笑い反応指標）<span class="mkt-pro-tag">PRO</span></h2>
+<h2>笑い密度（盛り上がり指標）<span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">w / 草 / 8888 / 笑 / 爆笑 / ワロタ 等の出現を 30 秒粒度で。全体の笑い比率 ${(laugh.overallRatio * 100).toFixed(1)}% / ピーク: ${laugh.peakBucket != null ? `${Math.floor(laugh.peakBucket / 2)}分${(laugh.peakBucket % 2) * 30}秒〜` : '-'}（${laugh.peakValue}件）（ラテラル分析 L4）</p>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
@@ -1411,7 +1411,10 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     uniqueCommentersInWindow: recentActiveCommenters
   });
 
-  const tocItems = [
+  // 0.1.26 (AA): TOC は「実際に描画されたセクション」だけ表示する。
+  // 沈黙ゾーンやコメ伝染など、データ不足で空文字を返すセクションをクリックしても
+  // 何も起こらない／謎のスクロール挙動になる問題を解消する。
+  const allTocItems = [
     { id: 'mkt-kpi', label: 'KPI サマリ' },
     { id: 'mkt-content', label: 'コメント本文・属性の傾向' },
     { id: 'mkt-quarter', label: '冒頭・終盤（四分位）' },
@@ -1419,7 +1422,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-velocity', label: 'コメ速度カーブ（PRO）' },
     { id: 'mkt-concurrent', label: '同接推移カーブ（PRO）' },
     { id: 'mkt-silence', label: '沈黙ゾーン × 沈黙の質（PRO）' },
-    { id: 'mkt-laughter', label: 'アヘ顔密度（PRO）' },
+    { id: 'mkt-laughter', label: '笑い密度（PRO）' },
     { id: 'mkt-new-vs-repeat', label: '新規 vs 常連（PRO）' },
     { id: 'mkt-survival', label: 'コメンター生存曲線（PRO）' },
     { id: 'mkt-departed', label: '離反コメンター TOP（PRO）' },
@@ -1445,22 +1448,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-json', label: '表計算・ツール向け JSON' }
   ];
 
-  return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>配信マーケ分析 — ${escapeHtml(r.liveId)}</title>
-<style>${CSS_BODY}</style>
-</head>
-<body>
-<header class="mkt-header">
-<h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
-<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
-</header>
-<main class="mkt-main">
-${sectionFeaturesOverview()}
-${sectionToc(tocItems)}
+  const bodyHtml = `${sectionFeaturesOverview()}
+__NL_TOC_PLACEHOLDER__
 ${sectionAdviceIntro()}
 ${idWrap('mkt-kpi', sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
@@ -1498,7 +1487,25 @@ ${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broad
 ${sectionAdviceAfterRank(r)}
 ${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
 ${idWrap('mkt-vpos', sectionVposThirds(r))}
-${idWrap('mkt-hour', sectionHourHeatmap(r))}
+${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
+  const tocItems = allTocItems.filter((t) => bodyHtml.includes(`id="${t.id}"`));
+  const finalBody = bodyHtml.replace('__NL_TOC_PLACEHOLDER__', sectionToc(tocItems));
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>配信マーケ分析 — ${escapeHtml(r.liveId)}</title>
+<style>${CSS_BODY}</style>
+</head>
+<body>
+<header class="mkt-header">
+<h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
+<p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
+</header>
+<main class="mkt-main">
+${finalBody}
 </main>
 <footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — ${escapeHtml(exportedAtIso)}</footer>
 ${idWrap('mkt-json', sectionMachineReadableJson(embedJson, maskShare))}

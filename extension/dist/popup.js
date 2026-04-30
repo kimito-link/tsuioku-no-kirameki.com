@@ -700,6 +700,17 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.26",
+      date: "2026-04-30",
+      summary: "\u8868\u73FE\u4FEE\u6B63\u30FB\u76EE\u6B21\u306E\u81EA\u52D5\u7D5E\u308A\u8FBC\u307F\u30FB\u30DE\u30FC\u30B1DL\u30DC\u30BF\u30F3\u8FFD\u52A0",
+      items: Object.freeze([
+        "\u300C\u30A2\u30D8\u9854\u5BC6\u5EA6\u300D\u30BB\u30AF\u30B7\u30E7\u30F3\u3092\u300C\u7B11\u3044\u5BC6\u5EA6\u300D\uFF08\u76DB\u308A\u4E0A\u304C\u308A\u6307\u6A19\uFF09\u306B\u6539\u540D",
+        "HTML \u4FDD\u5B58\u30DC\u30BF\u30F3\u306E\u6A2A\u306B\u300C\u{1F4CA} \u30DE\u30FC\u30B1\u300D\u30AF\u30A4\u30C3\u30AF\u30DC\u30BF\u30F3\u3092\u8FFD\u52A0\uFF08\u30DE\u30FC\u30B1\u5206\u6790HTML\u3092\u305D\u3053\u304B\u3089\u3059\u3050\u4FDD\u5B58\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790HTML\u3068HTML\u30EC\u30DD\u30FC\u30C8\u306E\u76EE\u6B21\uFF08TOC\uFF09\u3092\u81EA\u52D5\u7D5E\u308A\u8FBC\u307F\uFF08\u30C7\u30FC\u30BF\u7121\u3057\u3067\u63CF\u753B\u3055\u308C\u306A\u3044\u30BB\u30AF\u30B7\u30E7\u30F3\u306E\u30EA\u30F3\u30AF\u3092\u76EE\u6B21\u304B\u3089\u9664\u5916\uFF09",
+        "\u76EE\u6B21\u306E\u30A2\u30F3\u30AB\u30FC\u30EA\u30F3\u30AF\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u305F\u3068\u304D\u4F55\u3082\u8D77\u3053\u3089\u306A\u304B\u3063\u305F\u4E0D\u5177\u5408\u3092\u89E3\u6D88"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.25",
       date: "2026-04-30",
       summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u6587\u5316\u5206\u6790 7 \u7A2E\u8FFD\u52A0",
@@ -745,7 +756,7 @@
         "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\u300D\u3092\u8FFD\u52A0\uFF08\u30D4\u30FC\u30AF\u5230\u9054\u5206\u30FB\u7D42\u4E86\u6642\u4FDD\u6301\u7387\u30FB\u534A\u6E1B\u70B9\u3092\u4F75\u8A18\u3001\u8996\u8074\u7DAD\u6301\u7387\u306E\u4EE3\u66FF\u6307\u6A19\uFF09",
         "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u30B3\u30E1\u901F\u5EA6\u30AB\u30FC\u30D6\u300D\uFF08CPM 1\u5206\u7C92\u5EA6\uFF0B5\u5206\u79FB\u52D5\u5E73\u5747\uFF09\u3092\u8FFD\u52A0",
         "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u6C88\u9ED9\u30BE\u30FC\u30F3\u300D\u691C\u51FA\u3092\u8FFD\u52A0\uFF0860\u79D2\u4EE5\u4E0A\u306E\u30B3\u30E1\u7121\u3057\u533A\u9593 + \u6C88\u9ED9\u306E\u8CEA\u3092 \u30AC\u30F3\u898B\u7CFB/\u96E2\u8131\u7CFB/\u3075\u3064\u3046 \u306B\u81EA\u52D5\u5206\u985E\uFF09",
-        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u30A2\u30D8\u9854\u5BC6\u5EA6\u300D\uFF08\u7B11\u3044\u53CD\u5FDC\u6307\u6A19\uFF09\u3092\u8FFD\u52A0\uFF08w/\u8349/8888/\u7B11/\u7206\u7B11 \u7B49\u3092 30\u79D2\u7C92\u5EA6\u3067\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u7B11\u3044\u5BC6\u5EA6\u300D\uFF08\u76DB\u308A\u4E0A\u304C\u308A\u6307\u6A19\uFF09\u3092\u8FFD\u52A0\uFF08w/\u8349/8888/\u7B11/\u7206\u7B11 \u7B49\u3092 30\u79D2\u7C92\u5EA6\u3067\uFF09",
         "HTML \u30EC\u30DD\u30FC\u30C8\u3068\u30DE\u30FC\u30B1\u5206\u6790\u306E\u4E21\u65B9\u306B\u76EE\u6B21\uFF08\u30A2\u30F3\u30AB\u30FC\u30EA\u30F3\u30AF\uFF09\u3092\u8FFD\u52A0"
       ])
     }),
@@ -6488,7 +6499,7 @@ ${yLabels}
       return `<rect x="${x.toFixed(1)}" y="${(pad + innerH - h).toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="#fbbf24" opacity="0.85"><title>${halfMin}\u5206${halfSec}\u79D2\u301C: \u7B11\u3044 ${b.count}\u4EF6 / \u7DCF ${b.total}\u4EF6 (${(b.ratio * 100).toFixed(0)}%)</title></rect>`;
     }).join("");
     return `<section class="mkt-section" id="mkt-laughter">
-<h2>\u30A2\u30D8\u9854\u5BC6\u5EA6\uFF08\u7B11\u3044\u53CD\u5FDC\u6307\u6A19\uFF09<span class="mkt-pro-tag">PRO</span></h2>
+<h2>\u7B11\u3044\u5BC6\u5EA6\uFF08\u76DB\u308A\u4E0A\u304C\u308A\u6307\u6A19\uFF09<span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">w / \u8349 / 8888 / \u7B11 / \u7206\u7B11 / \u30EF\u30ED\u30BF \u7B49\u306E\u51FA\u73FE\u3092 30 \u79D2\u7C92\u5EA6\u3067\u3002\u5168\u4F53\u306E\u7B11\u3044\u6BD4\u7387 ${(laugh.overallRatio * 100).toFixed(1)}% / \u30D4\u30FC\u30AF: ${laugh.peakBucket != null ? `${Math.floor(laugh.peakBucket / 2)}\u5206${laugh.peakBucket % 2 * 30}\u79D2\u301C` : "-"}\uFF08${laugh.peakValue}\u4EF6\uFF09\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L4\uFF09</p>
 <div class="mkt-chart-wrap">
 <svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
@@ -7031,7 +7042,7 @@ ${lineFor("confusion", "#94a3b8")}
       currentConcurrent: lastPoint ? lastPoint.value : NaN,
       uniqueCommentersInWindow: recentActiveCommenters
     });
-    const tocItems = [
+    const allTocItems = [
       { id: "mkt-kpi", label: "KPI \u30B5\u30DE\u30EA" },
       { id: "mkt-content", label: "\u30B3\u30E1\u30F3\u30C8\u672C\u6587\u30FB\u5C5E\u6027\u306E\u50BE\u5411" },
       { id: "mkt-quarter", label: "\u5192\u982D\u30FB\u7D42\u76E4\uFF08\u56DB\u5206\u4F4D\uFF09" },
@@ -7039,7 +7050,7 @@ ${lineFor("confusion", "#94a3b8")}
       { id: "mkt-velocity", label: "\u30B3\u30E1\u901F\u5EA6\u30AB\u30FC\u30D6\uFF08PRO\uFF09" },
       { id: "mkt-concurrent", label: "\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\uFF08PRO\uFF09" },
       { id: "mkt-silence", label: "\u6C88\u9ED9\u30BE\u30FC\u30F3 \xD7 \u6C88\u9ED9\u306E\u8CEA\uFF08PRO\uFF09" },
-      { id: "mkt-laughter", label: "\u30A2\u30D8\u9854\u5BC6\u5EA6\uFF08PRO\uFF09" },
+      { id: "mkt-laughter", label: "\u7B11\u3044\u5BC6\u5EA6\uFF08PRO\uFF09" },
       { id: "mkt-new-vs-repeat", label: "\u65B0\u898F vs \u5E38\u9023\uFF08PRO\uFF09" },
       { id: "mkt-survival", label: "\u30B3\u30E1\u30F3\u30BF\u30FC\u751F\u5B58\u66F2\u7DDA\uFF08PRO\uFF09" },
       { id: "mkt-departed", label: "\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP\uFF08PRO\uFF09" },
@@ -7064,22 +7075,8 @@ ${lineFor("confusion", "#94a3b8")}
       { id: "mkt-hour", label: "\u6642\u9593\u5E2F\u30D2\u30FC\u30C8\u30DE\u30C3\u30D7" },
       { id: "mkt-json", label: "\u8868\u8A08\u7B97\u30FB\u30C4\u30FC\u30EB\u5411\u3051 JSON" }
     ];
-    return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>\u914D\u4FE1\u30DE\u30FC\u30B1\u5206\u6790 \u2014 ${escapeHtml(r.liveId)}</title>
-<style>${CSS_BODY}</style>
-</head>
-<body>
-<header class="mkt-header">
-<h1 class="mkt-header__title">\u{1F4CA} \u914D\u4FE1\u30DE\u30FC\u30B1\u30C6\u30A3\u30F3\u30B0\u5206\u6790</h1>
-<p class="mkt-header__sub">${escapeHtml(r.liveId)} \u2014 ${(/* @__PURE__ */ new Date()).toLocaleString("ja-JP")} \u51FA\u529B${escapeHtml(subSuffix)} \xB7 JSON\u57CB\u3081\u8FBC\u307F ${escapeHtml(exportedAtIso)}</p>
-</header>
-<main class="mkt-main">
-${sectionFeaturesOverview()}
-${sectionToc(tocItems)}
+    const bodyHtml = `${sectionFeaturesOverview()}
+__NL_TOC_PLACEHOLDER__
 ${sectionAdviceIntro()}
 ${idWrap("mkt-kpi", sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
@@ -7117,7 +7114,24 @@ ${idWrap("mkt-top-users", sectionTopUsers(r, maskShare, identiconResolver, broad
 ${sectionAdviceAfterRank(r)}
 ${idWrap("mkt-thumb-grid", sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
 ${idWrap("mkt-vpos", sectionVposThirds(r))}
-${idWrap("mkt-hour", sectionHourHeatmap(r))}
+${idWrap("mkt-hour", sectionHourHeatmap(r))}`;
+    const tocItems = allTocItems.filter((t) => bodyHtml.includes(`id="${t.id}"`));
+    const finalBody = bodyHtml.replace("__NL_TOC_PLACEHOLDER__", sectionToc(tocItems));
+    return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>\u914D\u4FE1\u30DE\u30FC\u30B1\u5206\u6790 \u2014 ${escapeHtml(r.liveId)}</title>
+<style>${CSS_BODY}</style>
+</head>
+<body>
+<header class="mkt-header">
+<h1 class="mkt-header__title">\u{1F4CA} \u914D\u4FE1\u30DE\u30FC\u30B1\u30C6\u30A3\u30F3\u30B0\u5206\u6790</h1>
+<p class="mkt-header__sub">${escapeHtml(r.liveId)} \u2014 ${(/* @__PURE__ */ new Date()).toLocaleString("ja-JP")} \u51FA\u529B${escapeHtml(subSuffix)} \xB7 JSON\u57CB\u3081\u8FBC\u307F ${escapeHtml(exportedAtIso)}</p>
+</header>
+<main class="mkt-main">
+${finalBody}
 </main>
 <footer class="mkt-footer">\u8FFD\u61B6\u306E\u304D\u3089\u3081\u304D \xB7 \u30DE\u30FC\u30B1\u5206\u6790\uFF08\u624B\u5143\u7528\uFF09 \u2014 ${escapeHtml(exportedAtIso)}</footer>
 ${idWrap("mkt-json", sectionMachineReadableJson(embedJson, maskShare))}
@@ -12445,6 +12459,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       $("devMonitorExportMarketingBtn")
     );
     if (mktBtn) mktBtn.disabled = !String(p.liveId || "").trim();
+    const mktQuickBtn = (
+      /** @type {HTMLButtonElement|null} */
+      $("exportMarketingQuickBtn")
+    );
+    if (mktQuickBtn) mktQuickBtn.disabled = !String(p.liveId || "").trim();
     const statsEl = $("devMonitorStats");
     const jsonEl = $("devMonitorJson");
     const dlChartsEl = $("devMonitorDlCharts");
@@ -14439,7 +14458,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           <li><a href="#sec-overview">\u6982\u8981\u30FB\u30B5\u30E0\u30CD\u30FB\u30BF\u30B0</a></li>
           <li><a href="#sec-user-summary">\u30E6\u30FC\u30B6\u30FC\u5225\uFF08\u3057\u304A\u308A\u96C6\u8A08\uFF09</a></li>
           <li><a href="#sec-id-breakdown">\u5185\u8A33\u7D71\u8A08\uFF08ID \u7A2E\u5225\u6BD4\u7387\uFF09</a></li>
-          <li><a href="#sec-thumb-grid">\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</a></li>
+          ${thumbedUsersSectionHtml ? '<li><a href="#sec-thumb-grid">\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</a></li>' : ""}
           <li><a href="#sec-self-comments">\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8\u629C\u7C8B</a></li>
           <li><a href="#sec-all-comments">\u4FDD\u5B58\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7\uFF08CSV \u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3042\u308A\uFF09</a></li>
           <li><a href="#sec-share-meta">\u30B7\u30A7\u30A2\u30FB\u30D7\u30EC\u30D3\u30E5\u30FC\u5411\u3051\u306E\u60C5\u5831</a></li>
@@ -14674,7 +14693,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1416" ? String("0430-1416") : "dev";
+      const buildId = "0430-1450" ? String("0430-1450") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -15074,6 +15093,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       } catch {
         if (stEl) stEl.textContent = "\u6D88\u53BB\u306B\u5931\u6557\u3057\u307E\u3057\u305F";
       }
+    });
+    $("exportMarketingQuickBtn")?.addEventListener("click", () => {
+      const original = (
+        /** @type {HTMLButtonElement|null} */
+        $("devMonitorExportMarketingBtn")
+      );
+      if (original && !original.disabled) original.click();
     });
     $("devMonitorExportMarketingBtn")?.addEventListener("click", async () => {
       const prm = lastDevMonitorPanelParams;

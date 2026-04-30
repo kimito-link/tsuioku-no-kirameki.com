@@ -5797,6 +5797,9 @@ function renderDevMonitorPanel(p) {
   lastDevMonitorPanelParams = p;
   const mktBtn = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
   if (mktBtn) mktBtn.disabled = !String(p.liveId || '').trim();
+  // 0.1.26 (AA): HTML 保存ボタン横の「マーケ」クイックボタンも有効化を同期。
+  const mktQuickBtn = /** @type {HTMLButtonElement|null} */ ($('exportMarketingQuickBtn'));
+  if (mktQuickBtn) mktQuickBtn.disabled = !String(p.liveId || '').trim();
   const statsEl = $('devMonitorStats');
   const jsonEl = $('devMonitorJson');
   const dlChartsEl = $('devMonitorDlCharts');
@@ -8156,7 +8159,7 @@ async function buildHtmlReportDocument(
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
           <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
           <li><a href="#sec-id-breakdown">内訳統計（ID 種別比率）</a></li>
-          <li><a href="#sec-thumb-grid">サムネ付きユーザー一覧</a></li>
+          ${thumbedUsersSectionHtml ? '<li><a href="#sec-thumb-grid">サムネ付きユーザー一覧</a></li>' : ''}
           <li><a href="#sec-self-comments">自分のコメント抜粋</a></li>
           <li><a href="#sec-all-comments">保存コメント一覧（CSV ダウンロードあり）</a></li>
           <li><a href="#sec-share-meta">シェア・プレビュー向けの情報</a></li>
@@ -8835,6 +8838,13 @@ function initPopup() {
     } catch {
       if (stEl) stEl.textContent = '消去に失敗しました';
     }
+  });
+
+  // 0.1.26 (AA): HTML 保存ツールバー横の「マーケ」クイックボタン → 元の DL ボタンを click する
+  // ことでハンドラ重複定義を避ける（status 表記やマスク設定もそのまま使える）。
+  $('exportMarketingQuickBtn')?.addEventListener('click', () => {
+    const original = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
+    if (original && !original.disabled) original.click();
   });
 
   $('devMonitorExportMarketingBtn')?.addEventListener('click', async () => {
