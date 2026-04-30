@@ -371,8 +371,24 @@ function applyResponsivePopupLayout() {
   body.classList.toggle('nl-inline', INLINE_MODE);
   root.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
   body.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
-  /* ダークカード系は html のみ（CSS セレクタも html 起点。body に二重で付けない） */
-  root.classList.toggle('nl-skin-panel-dark', !INLINE_MODE || INLINE_SIDE_PANEL);
+  /*
+   * 0.1.50 (AF): popup window / side panel の dark theme 強制を撤去。
+   *   旧コードは `!INLINE_MODE || INLINE_SIDE_PANEL` で常に dark を当てていたが、
+   *   ユーザー報告「真っ黒で視認性が悪い」「OS は dark に切り替えていない」
+   *   が継続。OS の `prefers-color-scheme: dark` のときだけ dark を当てる
+   *   ようにし、light の OS 環境では popup も light 配色になる。
+   *   INLINE_MODE は親ページの背景に同化するので影響なし。
+   */
+  const prefersDark = (() => {
+    try {
+      return Boolean(window.matchMedia?.('(prefers-color-scheme: dark)')?.matches);
+    } catch {
+      return false;
+    }
+  })();
+  const shouldForceDark =
+    (!INLINE_MODE || INLINE_SIDE_PANEL) && prefersDark;
+  root.classList.toggle('nl-skin-panel-dark', shouldForceDark);
   body.classList.remove('nl-skin-panel-dark');
 
   if (INLINE_MODE) {

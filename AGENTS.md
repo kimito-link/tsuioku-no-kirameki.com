@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.49（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.50（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,21 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.50 バンプで入った修正（popup 黒テーマ強制を撤去 AF）**:
+
+- ユーザー報告: 「OS は dark に切り替えていないのに popup が真っ黒で視認性悪い」
+  が継続。watch ページ以外（ブラウザのトップページ・他サイト等）でツールバー
+  から popup を開くと standalone popup window が常に dark テーマで開いていた。
+- 原因: `applyResponsivePopupLayout` (popup-entry.js:374-375) が
+  `!INLINE_MODE || INLINE_SIDE_PANEL` で常に `nl-skin-panel-dark` クラスを
+  当てる固定挙動だった。INLINE_MODE は親ページに同化するので影響なしだが、
+  standalone popup window と side panel は OS 設定に関わらず dark に
+  なってしまう。
+- 修正: `window.matchMedia('(prefers-color-scheme: dark)')` を見て、
+  OS が dark のときだけ `nl-skin-panel-dark` を当てるよう変更。OS が light
+  なら popup も :root の light 配色（cream-ish #fffaf2 背景）になる。
+- 副作用: dark を使っていたユーザーは OS 設定で切り替えれば従来どおり。
 
 **0.1.49 バンプで入った修正（marketingDynamicAdvice 配線 AE）**:
 

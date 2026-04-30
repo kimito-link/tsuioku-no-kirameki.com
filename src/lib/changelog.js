@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.50',
+    date: '2026-04-30',
+    summary: 'popup の黒テーマ強制を撤去',
+    items: Object.freeze([
+      'ツールバーから popup を開いた時に常に真っ黒で視認性が悪かった問題を修正。OS のダークモード設定が dark のときだけ dark 配色になり、light のときは light 配色（クリーム色背景）になります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.49',
     date: '2026-04-30',
     summary: 'マーケ分析に動的アドバイスを追加',
