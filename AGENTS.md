@@ -28,8 +28,10 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
  ディープリサーチで発見された残課題（privacy.html × 実装の整合不足、過去焼き込みデータの
  後方修復、184 自コメ viewerUid の他経路露出、avatarUrl cap の他経路漏れ、content-entry
  setInterval cleanup）+ A1 視認性根治・B1 前面化レース・B2 dock_bottom 閉じるボタンを
- 一括修正。0.1.12 で「盛り上げワード ワンクリック挿入パレット」（C）と「更新履歴 popup
- 表示」（D）を追加した。0.1.10 が承認 → 公開された後、続けて 0.1.12 を提出予定。
+ 一括修正。0.1.12 で「盛り上げワード ワンクリック挿入パレット」（C）・「更新履歴 popup
+ 表示」（D）・CSP 違反 onerror 属性の撤去（E）・HTML レポート / マーケ分析の「最低サムネ
+ フォールバック + サムネ付きユーザー一覧」（F）を追加した。0.1.10 が承認 → 公開された後、
+ 続けて 0.1.12 を提出予定。
 - **0.1.10 内訳**: 0.1.8 自コメ修正 + 0.1.9 シナリオ調査 8 件 + 0.1.10 Privacy 整合 / XSS 対策 / a11y 修正 / 出自不明アセット差し替え 13 件 をロールアップ。
 - **0.1.11 内訳**: privacy.html を IDB 3 つ・記録クリア言及で実装と整合 / 0.1.10 未満からの
  自動更新ユーザーで誤焼き込み `selfPosted:true` を 1 度だけ剥がす migration / 184 自コメの
@@ -174,7 +176,32 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 
 ## 5. 直近セッションで入った変更（2026-04-30）
 
-**0.1.12 バンプで追加した機能（盛り上げワード パレット + 更新履歴 popup 表示 2 件）**:
+**0.1.12 バンプで追加した機能（盛り上げワード C / 更新履歴 D / CSP 修正 E / 最低サムネ + 一覧 F）**:
+
+- `fix(popup-csp)`: `onerror="this.style.visibility='hidden'"` という inline 属性ハンドラが
+ MV3 strict CSP で実行できず、画像読み込み失敗のたびに CSP 違反ログを吐いていた問題を解消。
+ `topSupportRankStripCasterTileHtml()` の inline onerror を `data-on-error-hide="1"` マーカーに
+ 置換し、`bindOnErrorHideHandlersWithin(root)` で `addEventListener('error', ...)` を貼り直す
+ 方式に変更（`{ once: true }` + dataset 二重バインド防止）。
+- `feat(report)`: HTML レポート / マーケ分析の各ユーザー行に「最低サムネ」を必ず出すフォール
+ バックを追加。優先順位は ① avatarUrl が http(s) → 採用、② 数値 ID（5〜14 桁）→ ニコ既定
+ user icon CDN URL（`secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/<bucket>/<uid>.jpg`）、
+ ③ 匿名 a:... + identiconResolver → SVG data URL、④ 該当なし → 空。`src/lib/reportUserThumb.js`
+ に `resolveReportUserThumbSrc` / `buildNiconicoDefaultUserIconUrl` として切り出し（純粋関数・
+ vitest 単体検証）。
+- `feat(report)`: HTML レポート / マーケ分析に「サムネ付きユーザー一覧」グリッドセクションを
+ 追加。サムネが解決できた応援ユーザーをコメント件数の多い順にカード表示（HTML レポート 80 件
+ / マーケ 60 件、共有伏せ字時は出さない）。
+- `feat(popup)`: `buildMarketingDashboardHtml(r, opts)` に `anonymousIdenticonResolver` を
+ 追加し、popup-entry の 2 箇所の呼び出しを `getCachedAnonymousIdenticonDataUrl` 経由で
+ thread。`buildHtmlReportDocument` 側のユーザーテーブルにサムネ列を追加し、`<tr>` の
+ colspan を 4 に変更。
+- `test`: `reportUserThumb.test.js` を新規（17 ケース：bucket 計算、5 桁境界、scheme 検証、
+ priority、resolver 呼び出し、UNKNOWN ケース、短い数字の誤識別防止）。
+ `marketingChartsHtml.test.js` に F の 5 ケースを追加（数値 ID → CDN URL、匿名 + identicon、
+ avatar 優先、maskShare 時のセクション非表示、avatar 画像非表示）。
+
+
 
 - `feat(popup)`: popup 内に「更新履歴」セクションを追加。`<details id="changelogDetails">`
  既定折り畳みで、開かない限りスペースを取らない（UIUX 阻害ゼロ）。`src/lib/changelog.js`

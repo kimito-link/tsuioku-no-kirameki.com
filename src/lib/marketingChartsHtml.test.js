@@ -245,4 +245,146 @@ describe('buildMarketingDashboardHtml', () => {
     expect(nick).not.toContain('Alice');
     expect(nick.length).toBeGreaterThan(0);
   });
+
+  /*
+   * 0.1.12 (F1/F3) — 「最低サムネ」と「サムネ付きユーザー一覧」の追加。
+   * - sectionTopUsers: avatarUrl 無しの数値 ID にニコ既定 CDN URL を当てる、
+   *   匿名 a:... には identiconResolver を呼ぶ。
+   * - sectionUsersWithThumbnails: 解決できたユーザーをグリッド表示。共有伏せ字は出さない。
+   */
+  it('数値 ID に avatarUrl 無しなら、ニコ既定 user icon CDN URL を最低サムネとして当てる', () => {
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      {
+        id: 'x1',
+        liveId: 'lv123',
+        commentNo: '1',
+        text: 'hello',
+        userId: '4046119',
+        nickname: '配信者応援ちゃんねる',
+        avatarUrl: '',
+        capturedAt: Date.now(),
+        vpos: 0,
+        is184: false,
+        selfPosted: false
+      }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'));
+    expect(html).toContain(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/404/4046119.jpg'
+    );
+    // ランキング表とサムネ付き一覧の両方に出る
+    expect(html).toContain('class="mkt-rank-av"');
+    expect(html).toContain('mkt-section--thumb-grid');
+    expect(html).toContain('class="mkt-thumb-grid__avatar"');
+  });
+
+  it('匿名 a: には identiconResolver の戻りを最低サムネとして当てる', () => {
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      {
+        id: 'a1',
+        liveId: 'lv123',
+        commentNo: '1',
+        text: 'hi',
+        userId: 'a:qkmBBq0GJKpVURQb',
+        nickname: '匿名',
+        avatarUrl: '',
+        capturedAt: Date.now(),
+        vpos: 0,
+        is184: true,
+        selfPosted: false
+      }
+    ];
+    const html = buildMarketingDashboardHtml(
+      aggregateMarketingReport(comments, 'lv123'),
+      {
+        anonymousIdenticonResolver: (uid) =>
+          `data:image/svg+xml;utf8,<svg data-uid="${uid}"/>`
+      }
+    );
+    expect(html).toContain('data-uid=&quot;a:qkmBBq0GJKpVURQb&quot;');
+    expect(html).toContain('mkt-section--thumb-grid');
+  });
+
+  it('avatarUrl が http/https ならそれを優先（identiconResolver より優先）', () => {
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      {
+        id: 'a1',
+        liveId: 'lv123',
+        commentNo: '1',
+        text: 'hi',
+        userId: 'a:abcdefghij',
+        nickname: '匿名',
+        avatarUrl: 'https://example.test/real-avatar.jpg',
+        capturedAt: Date.now(),
+        vpos: 0,
+        is184: true,
+        selfPosted: false
+      }
+    ];
+    const html = buildMarketingDashboardHtml(
+      aggregateMarketingReport(comments, 'lv123'),
+      {
+        anonymousIdenticonResolver: () => 'data:image/svg+xml,<svg/>'
+      }
+    );
+    expect(html).toContain('https://example.test/real-avatar.jpg');
+    expect(html).not.toContain('data:image/svg+xml,<svg/>');
+  });
+
+  it('maskShareLabels=true のときは「サムネ付きユーザー一覧」セクションを出さない', () => {
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      {
+        id: 'x1',
+        liveId: 'lv123',
+        commentNo: '1',
+        text: 'hello',
+        userId: '4046119',
+        nickname: 'のら',
+        avatarUrl: '',
+        capturedAt: Date.now(),
+        vpos: 0,
+        is184: false,
+        selfPosted: false
+      }
+    ];
+    const html = buildMarketingDashboardHtml(
+      aggregateMarketingReport(comments, 'lv123'),
+      { maskShareLabels: true }
+    );
+    // CSS の class 名は <style> ブロックに常時含まれるので、section 要素そのものが
+    // レンダリングされていないかをチェックする（aria-label 文言は section 内にしか出ない）。
+    expect(html).not.toContain('aria-label="サムネ付きユーザー一覧"');
+    expect(html).not.toContain('<h2>サムネ付きユーザー一覧</h2>');
+    expect(html).not.toContain('class="mkt-thumb-grid__cell"');
+  });
+
+  it('maskShareLabels=true は sectionTopUsers でも avatar 画像を出さない（識別補助しない）', () => {
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      {
+        id: 'x1',
+        liveId: 'lv123',
+        commentNo: '1',
+        text: 'hello',
+        userId: '4046119',
+        nickname: 'のら',
+        avatarUrl: 'https://example.test/real-avatar.jpg',
+        capturedAt: Date.now(),
+        vpos: 0,
+        is184: false,
+        selfPosted: false
+      }
+    ];
+    const html = buildMarketingDashboardHtml(
+      aggregateMarketingReport(comments, 'lv123'),
+      { maskShareLabels: true }
+    );
+    expect(html).toContain('mkt-rank-av--empty');
+    expect(html).not.toContain('https://example.test/real-avatar.jpg');
+    expect(html).not.toContain('https://secure-dcdn.cdn.nimg.jp/nicoaccount/');
+  });
 });

@@ -162,6 +162,7 @@ import {
   resetStoryUserLaneDom
 } from './story/renderStoryUserLaneDom.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
@@ -7209,7 +7210,8 @@ async function buildHtmlReportDocument(
   const htmlReportSaveGuideCardHtml =
     buildHtmlReportSaveGuideCardHtml(yukkuriAvatars);
 
-  const roomRows = aggregateCommentsByUser(comments).map((room) => {
+  const aggregatedRooms = aggregateCommentsByUser(comments);
+  const roomRows = aggregatedRooms.map((room) => {
     const label = displayUserLabel(room.userKey, room.nickname);
     // 数値 ID のときだけ niconico ユーザーページへのリンクで包む
     // （匿名・ハッシュ・未取得は escapeHtml されたテキストのみ）。
@@ -7217,14 +7219,61 @@ async function buildHtmlReportDocument(
     const search = escapeAttr(
       `${label} ${room.nickname || ''} ${room.userKey} ${room.lastText || ''} ${room.count}`.toLowerCase()
     );
+    // 0.1.12 (F): 「最低サムネ」を必ず出す。avatarUrl が空でも数値 ID なら
+    // ニコ既定 CDN URL、匿名 a:... なら identicon SVG data URL を使う。
+    const avatarSrc = resolveReportUserThumbSrc({
+      userId: room.userKey,
+      avatarUrl: room.avatarUrl || '',
+      identiconResolver: getCachedAnonymousIdenticonDataUrl
+    });
+    const avatarCell = avatarSrc
+      ? `<img class="report-room-av" src="${escapeAttr(avatarSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+      : '<span class="report-room-av report-room-av--empty"></span>';
     return `
       <tr class="search-item" data-search="${search}">
+        <td>${avatarCell}</td>
         <td>${labelHtml}</td>
         <td>${room.count}</td>
         <td>${escapeHtml(room.lastText || '')}</td>
       </tr>
     `;
   });
+
+  /*
+   * 0.1.12 (F3): サムネ付きユーザー一覧（HTML レポート版）。
+   * aggregatedRooms から「サムネが解決できた人」だけを件数の多い順に並べた
+   * グリッドカード（最大 80 名）。マーケ分析側と同じ責務だが、HTML レポートは
+   * 全行を出すのが目的なのでこちらは件数の多い順に絞る。
+   */
+  const thumbedRoomCells = [...aggregatedRooms]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 80)
+    .map((room) => {
+      const src = resolveReportUserThumbSrc({
+        userId: room.userKey,
+        avatarUrl: room.avatarUrl || '',
+        identiconResolver: getCachedAnonymousIdenticonDataUrl
+      });
+      if (!src) return '';
+      const label = displayUserLabel(room.userKey, room.nickname);
+      const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
+      return `<li class="report-thumb-grid__cell">
+        <span class="report-thumb-grid__avatar-wrap"><img class="report-thumb-grid__avatar" src="${escapeAttr(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+        <span class="report-thumb-grid__label">${labelHtml}</span>
+        <span class="report-thumb-grid__count">${room.count}件</span>
+      </li>`;
+    })
+    .filter((s) => s !== '');
+  const thumbedUsersSectionHtml =
+    thumbedRoomCells.length > 0
+      ? `
+        <section class="card">
+          <h2>サムネ付きユーザー一覧</h2>
+          <p class="guide-lead">アイコンが解決できた応援ユーザーを件数の多い順に並べたのだ（最大 80 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順なのだ。</p>
+          <ol class="report-thumb-grid">${thumbedRoomCells.join('')}</ol>
+        </section>
+      `
+      : '';
 
   const commentRows = comments.map((c, idx) => {
     const commentNo = String(c.commentNo || '').trim();
@@ -7709,6 +7758,68 @@ async function buildHtmlReportDocument(
         margin-top: 0;
       }
       .hide { display: none !important; }
+      /* 0.1.12 (F): ユーザー別テーブルのサムネ列。最低 28px の丸サムネ。 */
+      .report-room-av {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        object-fit: cover;
+        display: block;
+      }
+      .report-room-av--empty {
+        background: #cbd5e1;
+      }
+      /* 0.1.12 (F3): サムネ付きユーザー一覧グリッド。可変列で詰めて並べる。 */
+      .report-thumb-grid {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+        gap: 10px;
+      }
+      .report-thumb-grid__cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 6px;
+        background: var(--panel-bg, #ffffff);
+        border: 1px solid var(--panel-border, #e2e8f0);
+        border-radius: 10px;
+        text-align: center;
+        min-width: 0;
+      }
+      .report-thumb-grid__avatar-wrap {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .report-thumb-grid__avatar {
+        width: 48px;
+        height: 48px;
+        object-fit: cover;
+        display: block;
+      }
+      .report-thumb-grid__label {
+        font-size: 0.78rem;
+        line-height: 1.25;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 100%;
+      }
+      .report-thumb-grid__count {
+        font-size: 0.72rem;
+        color: var(--muted, #64748b);
+      }
     </style>
   </head>
   <body>
@@ -7768,10 +7879,11 @@ async function buildHtmlReportDocument(
         <section class="card">
           <h2>ユーザー別（しおり集計）</h2>
           <table>
-            <thead><tr><th>ユーザー</th><th>件数</th><th>最新コメント</th></tr></thead>
-            <tbody>${roomRows.join('') || '<tr><td colspan="3">データなし</td></tr>'}</tbody>
+            <thead><tr><th>サムネ</th><th>ユーザー</th><th>件数</th><th>最新コメント</th></tr></thead>
+            <tbody>${roomRows.join('') || '<tr><td colspan="4">データなし</td></tr>'}</tbody>
           </table>
         </section>
+        ${thumbedUsersSectionHtml}
       </div>
       ${htmlReportConceptGuideCardHtml}
       ${htmlReportSaveGuideCardHtml}
@@ -8365,7 +8477,13 @@ function initPopup() {
       const report = aggregateMarketingReport(comments, lid);
       const maskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
       const maskShare = Boolean(maskEl?.checked);
-      const html = buildMarketingDashboardHtml(report, { maskShareLabels: maskShare });
+      // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
+      // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
+      // ユーザーの opt-out が尊重される）。
+      const html = buildMarketingDashboardHtml(report, {
+        maskShareLabels: maskShare,
+        anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl
+      });
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -8400,7 +8518,10 @@ function initPopup() {
               $('devMonitorExportMarketingMaskLabels')
             );
             const maskShare = Boolean(maskEl?.checked);
-            const html = buildMarketingDashboardHtml(report, { maskShareLabels: maskShare });
+            const html = buildMarketingDashboardHtml(report, {
+              maskShareLabels: maskShare,
+              anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl
+            });
             const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');

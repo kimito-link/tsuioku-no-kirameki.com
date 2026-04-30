@@ -4,12 +4,12 @@
  */
 
 import { escapeHtml } from './htmlEscape.js';
-import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { MKT_ADVISOR_AVATAR_DATA_URI } from './marketingHtmlAdvisorAvatars.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
+import { resolveReportUserThumbSrc } from './reportUserThumb.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -402,11 +402,20 @@ function sectionAdviceAfterRank(r) {
 
 /**
  * @param {MarketingReport} r
- * @param {{ maskShareLabels?: boolean }} [opts]
+ * @param {{
+ *   maskShareLabels?: boolean,
+ *   anonymousIdenticonResolver?: (uid: string) => string
+ * }} [opts]
  * @returns {string}
  */
 export function buildMarketingDashboardHtml(r, opts = {}) {
   const maskShare = opts.maskShareLabels === true;
+  // 0.1.12 (F1/F3): 匿名 a:... に identicon SVG data URL を当てるための resolver。
+  // popup-entry 側で事前計算したマップを引いてもらう（ここからは識別の責務は持たない）。
+  const identiconResolver =
+    typeof opts.anonymousIdenticonResolver === 'function'
+      ? opts.anonymousIdenticonResolver
+      : undefined;
   const exportedAtIso = new Date().toISOString();
   const embedJson = buildMarketingEmbedScriptInnerText(r, {
     maskShareLabels: maskShare,
@@ -441,14 +450,58 @@ ${sectionDerivedTimeline(r)}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${sectionSegment(r)}
 ${sectionAdviceAfterSegment(r)}
-${sectionTopUsers(r, maskShare)}
+${sectionTopUsers(r, maskShare, identiconResolver)}
 ${sectionAdviceAfterRank(r)}
+${sectionUsersWithThumbnails(r, maskShare, identiconResolver)}
 ${sectionVposThirds(r)}
 ${sectionHourHeatmap(r)}
 </main>
 <footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — ${escapeHtml(exportedAtIso)}</footer>
 ${sectionMachineReadableJson(embedJson, maskShare)}
 </body></html>`;
+}
+
+/**
+ * 0.1.12 (F3): サムネ付きユーザー一覧。topUsers のうち「サムネが解決できた人」だけを
+ * グリッドで並べ、視覚的に「どんな人たちが応援してくれたか」を一目で見られるようにする。
+ * 順序は topUsers と同じ（コメ件数の多い順）。最大 60 件。共有向け伏せ字時は丸ごと出さない
+ * （アイコン残存で識別される懸念があるため）。
+ *
+ * @param {MarketingReport} r
+ * @param {boolean} maskShare
+ * @param {((uid: string) => string) | undefined} identiconResolver
+ */
+function sectionUsersWithThumbnails(r, maskShare, identiconResolver) {
+  if (maskShare) return '';
+  if (!Array.isArray(r.topUsers) || r.topUsers.length === 0) return '';
+  const items = r.topUsers
+    .slice(0, 60)
+    .map((u) => {
+      const src = resolveReportUserThumbSrc({
+        userId: u.userId || '',
+        avatarUrl: u.avatarUrl || '',
+        identiconResolver
+      });
+      if (!src) return null;
+      const uidForLabel = u.userId || UNKNOWN_USER_KEY;
+      const rawLabel = u.userId
+        ? displayUserLabel(u.userId, u.nickname || '')
+        : u.nickname || '—';
+      const labelHtml = buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
+      const countText = `${u.count}件`;
+      return `<li class="mkt-thumb-grid__cell">
+<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+<span class="mkt-thumb-grid__label">${labelHtml}</span>
+<span class="mkt-thumb-grid__count">${escapeHtml(countText)}</span>
+</li>`;
+    })
+    .filter((s) => s !== null);
+  if (items.length === 0) return '';
+  return `<section class="mkt-section mkt-section--thumb-grid" aria-label="サムネ付きユーザー一覧">
+<h2>サムネ付きユーザー一覧</h2>
+<p class="mkt-note">アイコンが解決できた応援ユーザーをコメ件数の多い順に並べました（最大 60 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順で選びます。</p>
+<ol class="mkt-thumb-grid">${items.join('')}</ol>
+</section>`;
 }
 
 /**
@@ -591,20 +644,33 @@ function sectionSegment(r) {
 /**
  * @param {MarketingReport} r
  * @param {boolean} [maskShare] 共有向けに表示名を伏せ、サムネ URL を出さない
+ * @param {((uid: string) => string) | undefined} [identiconResolver]
+ *   匿名 a:... ユーザー向けの identicon SVG data URL を返す関数（呼び出し側で
+ *   事前計算したマップを引いてもらう）。null/undefined のときは匿名は空。
  */
-function sectionTopUsers(r, maskShare = false) {
+function sectionTopUsers(r, maskShare = false, identiconResolver = undefined) {
   if (r.topUsers.length === 0) return '';
   const maxCount = r.topUsers[0].count;
   const rows = r.topUsers.slice(0, 20)
     .map((u, i) => {
       const pct = (u.count / Math.max(1, maxCount)) * 100;
-      // avatar URL は http/https のみ許可（Security S-2: data:image/svg+xml で
-      // 保存 HTML 開封時 XSS、javascript:/blob: での意図せぬ実行を防止）。
-      const safeAvatarUrl = isHttpOrHttpsUrl(u.avatarUrl) ? u.avatarUrl : '';
+      // 0.1.12 (F1): 「最低サムネ」を必ず出す方針へ。
+      // 1) avatarUrl が http/https → 採用（プロフィール由来の本物）
+      // 2) 数値 ID → ニコ既定 user icon CDN URL（プレミアム会員に限らず誰でも）
+      // 3) 匿名 a: + identiconResolver → SVG data URL
+      // 4) 上記いずれも該当しない → 既存の空プレースホルダ
+      // maskShare=true（共有向け伏せ字）のときは何も出さない（識別補助しない）。
+      const resolvedAvatar = maskShare
+        ? ''
+        : resolveReportUserThumbSrc({
+            userId: u.userId || '',
+            avatarUrl: u.avatarUrl || '',
+            identiconResolver
+          });
       const avImg =
-        maskShare || !safeAvatarUrl
+        !resolvedAvatar
           ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>'
-          : `<img src="${escapeHtml(safeAvatarUrl)}" class="mkt-rank-av" alt="" loading="lazy">`;
+          : `<img src="${escapeHtml(resolvedAvatar)}" class="mkt-rank-av" alt="" loading="lazy" referrerpolicy="no-referrer">`;
       // ランキング内で複数の匿名 (a:xxxx) ユーザーがすべて「匿名」と表示されて
       // 識別不能になる問題を避けるため、共通の displayUserLabel を通して
       // 「nickname（shortId）」形にする。数値 ID のときは niconico プロフィール
@@ -691,6 +757,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-rank-bar{position:relative;height:22px;background:#0f172a;border-radius:4px;overflow:hidden}
 .mkt-rank-bar__fill{height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:4px}
 .mkt-rank-bar__label{position:absolute;right:6px;top:2px;font-size:.75rem;color:#f8fafc;font-weight:600}
+/* 0.1.12 (F3): サムネ付きユーザー一覧グリッド。トップコメンター表とは別軸で、
+   どんな顔ぶれが応援してくれたかを視覚的に振り返るための面。 */
+.mkt-section--thumb-grid h2{border-left-color:#fb923c}
+.mkt-thumb-grid{list-style:none;margin:.6rem 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.mkt-thumb-grid__cell{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 6px;background:#1e293b;border:1px solid #334155;border-radius:10px;min-width:0;text-align:center}
+.mkt-thumb-grid__avatar-wrap{width:48px;height:48px;border-radius:50%;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mkt-thumb-grid__avatar{width:48px;height:48px;object-fit:cover;display:block}
+.mkt-thumb-grid__label{font-size:.74rem;line-height:1.25;color:#e2e8f0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
+.mkt-thumb-grid__label .nl-user-profile-link{color:#93c5fd}
+.mkt-thumb-grid__count{font-size:.7rem;color:#94a3b8}
 .mkt-hour-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
 .mkt-hour{border-radius:6px;text-align:center;padding:.5rem .2rem;min-height:52px;display:flex;flex-direction:column;justify-content:center;border:1px solid #334155}
 .mkt-hour__label{font-size:.7rem;color:#94a3b8}

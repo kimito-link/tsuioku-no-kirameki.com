@@ -2624,6 +2624,31 @@
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   }
 
+  // src/lib/reportUserThumb.js
+  var NICO_USER_ICON_CDN_BASE = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
+  function buildNiconicoDefaultUserIconUrl(uid) {
+    const s = String(uid || "").trim();
+    if (!/^\d{5,14}$/.test(s)) return "";
+    const bucket = Math.floor(Number(s) / 1e4);
+    return `${NICO_USER_ICON_CDN_BASE}/${bucket}/${s}.jpg`;
+  }
+  function resolveReportUserThumbSrc(opts) {
+    const userId = String(opts?.userId || "").trim();
+    const avatarUrl = String(opts?.avatarUrl || "").trim();
+    if (isHttpOrHttpsUrl(avatarUrl)) {
+      return avatarUrl;
+    }
+    if (!userId || userId === "__unknown__") return "";
+    if (/^\d{5,14}$/.test(userId)) {
+      return buildNiconicoDefaultUserIconUrl(userId);
+    }
+    if (typeof opts?.identiconResolver === "function") {
+      const r = opts.identiconResolver(userId);
+      if (typeof r === "string" && r.length > 0) return r;
+    }
+    return "";
+  }
+
   // src/lib/supportGrowthAvatarLoad.js
   function defaultUrlKey(url) {
     const s = String(url || "").trim();
@@ -4754,6 +4779,7 @@ ${yLabelsL}${yLabelsR}${xLabels}
   }
   function buildMarketingDashboardHtml(r, opts = {}) {
     const maskShare = opts.maskShareLabels === true;
+    const identiconResolver = typeof opts.anonymousIdenticonResolver === "function" ? opts.anonymousIdenticonResolver : void 0;
     const exportedAtIso = (/* @__PURE__ */ new Date()).toISOString();
     const embedJson = buildMarketingEmbedScriptInnerText(r, {
       maskShareLabels: maskShare,
@@ -4788,14 +4814,42 @@ ${sectionDerivedTimeline(r)}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${sectionSegment(r)}
 ${sectionAdviceAfterSegment(r)}
-${sectionTopUsers(r, maskShare)}
+${sectionTopUsers(r, maskShare, identiconResolver)}
 ${sectionAdviceAfterRank(r)}
+${sectionUsersWithThumbnails(r, maskShare, identiconResolver)}
 ${sectionVposThirds(r)}
 ${sectionHourHeatmap(r)}
 </main>
 <footer class="mkt-footer">\u8FFD\u61B6\u306E\u304D\u3089\u3081\u304D \xB7 \u30DE\u30FC\u30B1\u5206\u6790\uFF08\u624B\u5143\u7528\uFF09 \u2014 ${escapeHtml(exportedAtIso)}</footer>
 ${sectionMachineReadableJson(embedJson, maskShare)}
 </body></html>`;
+  }
+  function sectionUsersWithThumbnails(r, maskShare, identiconResolver) {
+    if (maskShare) return "";
+    if (!Array.isArray(r.topUsers) || r.topUsers.length === 0) return "";
+    const items = r.topUsers.slice(0, 60).map((u) => {
+      const src = resolveReportUserThumbSrc({
+        userId: u.userId || "",
+        avatarUrl: u.avatarUrl || "",
+        identiconResolver
+      });
+      if (!src) return null;
+      const uidForLabel = u.userId || UNKNOWN_USER_KEY;
+      const rawLabel = u.userId ? displayUserLabel(u.userId, u.nickname || "") : u.nickname || "\u2014";
+      const labelHtml = buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
+      const countText = `${u.count}\u4EF6`;
+      return `<li class="mkt-thumb-grid__cell">
+<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+<span class="mkt-thumb-grid__label">${labelHtml}</span>
+<span class="mkt-thumb-grid__count">${escapeHtml(countText)}</span>
+</li>`;
+    }).filter((s) => s !== null);
+    if (items.length === 0) return "";
+    return `<section class="mkt-section mkt-section--thumb-grid" aria-label="\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7">
+<h2>\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</h2>
+<p class="mkt-note">\u30A2\u30A4\u30B3\u30F3\u304C\u89E3\u6C7A\u3067\u304D\u305F\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u3092\u30B3\u30E1\u4EF6\u6570\u306E\u591A\u3044\u9806\u306B\u4E26\u3079\u307E\u3057\u305F\uFF08\u6700\u5927 60 \u540D\uFF09\u3002\u30A2\u30A4\u30B3\u30F3\u306F \u2460 \u500B\u4EBA\u30B5\u30E0\u30CD \u2461 \u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 \u2462 \u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon \u306E\u512A\u5148\u9806\u3067\u9078\u3073\u307E\u3059\u3002</p>
+<ol class="mkt-thumb-grid">${items.join("")}</ol>
+</section>`;
   }
   function sectionMachineReadableJson(embedJson, maskShare) {
     const maskNote = maskShare ? "\u3053\u306E\u51FA\u529B\u3067\u306F\u5171\u6709\u5411\u3051\u306B<strong>\u4F0F\u305B\u5B57</strong>\u3092\u4ED8\u3051\u3066\u304A\u308A\u3001JSON \u5185\u306E\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC\u306E\u8868\u793A\u540D\u30FBID \u3082\u4F0F\u305B\u3001\u30A2\u30A4\u30B3\u30F3 URL \u306F\u7A7A\u3067\u3059\u3002" : "\u624B\u5143\u7528\u306E\u305F\u3081 ID \u304C\u305D\u306E\u307E\u307E\u5165\u308A\u307E\u3059\u3002\u7B2C\u4E09\u8005\u306B\u6E21\u3059\u3068\u304D\u306F\u62E1\u5F35\u306E\u300C\u4F0F\u305B\u5B57\u300D\u30C1\u30A7\u30C3\u30AF\u4ED8\u304D\u3067\u66F8\u304D\u51FA\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
@@ -4898,13 +4952,17 @@ ${yLabelsC}${xLabels}${bars}
 <div class="mkt-seg-legend">${legend}</div>
 </div></section>`;
   }
-  function sectionTopUsers(r, maskShare = false) {
+  function sectionTopUsers(r, maskShare = false, identiconResolver = void 0) {
     if (r.topUsers.length === 0) return "";
     const maxCount = r.topUsers[0].count;
     const rows = r.topUsers.slice(0, 20).map((u, i) => {
       const pct = u.count / Math.max(1, maxCount) * 100;
-      const safeAvatarUrl = isHttpOrHttpsUrl(u.avatarUrl) ? u.avatarUrl : "";
-      const avImg = maskShare || !safeAvatarUrl ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>' : `<img src="${escapeHtml(safeAvatarUrl)}" class="mkt-rank-av" alt="" loading="lazy">`;
+      const resolvedAvatar = maskShare ? "" : resolveReportUserThumbSrc({
+        userId: u.userId || "",
+        avatarUrl: u.avatarUrl || "",
+        identiconResolver
+      });
+      const avImg = !resolvedAvatar ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>' : `<img src="${escapeHtml(resolvedAvatar)}" class="mkt-rank-av" alt="" loading="lazy" referrerpolicy="no-referrer">`;
       const uidForLabel = u.userId || UNKNOWN_USER_KEY;
       const rawLabel = u.userId ? displayUserLabel(u.userId, u.nickname || "") : u.nickname || "\u2014";
       const nameCellHtml = maskShare ? escapeHtml(maskLabelForShare(rawLabel)) : buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
@@ -4974,6 +5032,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-rank-bar{position:relative;height:22px;background:#0f172a;border-radius:4px;overflow:hidden}
 .mkt-rank-bar__fill{height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:4px}
 .mkt-rank-bar__label{position:absolute;right:6px;top:2px;font-size:.75rem;color:#f8fafc;font-weight:600}
+/* 0.1.12 (F3): \u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7\u30B0\u30EA\u30C3\u30C9\u3002\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC\u8868\u3068\u306F\u5225\u8EF8\u3067\u3001
+   \u3069\u3093\u306A\u9854\u3076\u308C\u304C\u5FDC\u63F4\u3057\u3066\u304F\u308C\u305F\u304B\u3092\u8996\u899A\u7684\u306B\u632F\u308A\u8FD4\u308B\u305F\u3081\u306E\u9762\u3002 */
+.mkt-section--thumb-grid h2{border-left-color:#fb923c}
+.mkt-thumb-grid{list-style:none;margin:.6rem 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.mkt-thumb-grid__cell{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 6px;background:#1e293b;border:1px solid #334155;border-radius:10px;min-width:0;text-align:center}
+.mkt-thumb-grid__avatar-wrap{width:48px;height:48px;border-radius:50%;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mkt-thumb-grid__avatar{width:48px;height:48px;object-fit:cover;display:block}
+.mkt-thumb-grid__label{font-size:.74rem;line-height:1.25;color:#e2e8f0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
+.mkt-thumb-grid__label .nl-user-profile-link{color:#93c5fd}
+.mkt-thumb-grid__count{font-size:.7rem;color:#94a3b8}
 .mkt-hour-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
 .mkt-hour{border-radius:6px;text-align:center;padding:.5rem .2rem;min-height:52px;display:flex;flex-direction:column;justify-content:center;border:1px solid #334155}
 .mkt-hour__label{font-size:.7rem;color:#94a3b8}
@@ -11222,20 +11290,50 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     };
     const htmlReportConceptGuideCardHtml = buildHtmlReportConceptGuideCardHtml(yukkuriAvatars);
     const htmlReportSaveGuideCardHtml = buildHtmlReportSaveGuideCardHtml(yukkuriAvatars);
-    const roomRows = aggregateCommentsByUser(comments).map((room) => {
+    const aggregatedRooms = aggregateCommentsByUser(comments);
+    const roomRows = aggregatedRooms.map((room) => {
       const label = displayUserLabel(room.userKey, room.nickname);
       const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
       const search = escapeAttr(
         `${label} ${room.nickname || ""} ${room.userKey} ${room.lastText || ""} ${room.count}`.toLowerCase()
       );
+      const avatarSrc = resolveReportUserThumbSrc({
+        userId: room.userKey,
+        avatarUrl: room.avatarUrl || "",
+        identiconResolver: getCachedAnonymousIdenticonDataUrl
+      });
+      const avatarCell = avatarSrc ? `<img class="report-room-av" src="${escapeAttr(avatarSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="report-room-av report-room-av--empty"></span>';
       return `
       <tr class="search-item" data-search="${search}">
+        <td>${avatarCell}</td>
         <td>${labelHtml}</td>
         <td>${room.count}</td>
         <td>${escapeHtml(room.lastText || "")}</td>
       </tr>
     `;
     });
+    const thumbedRoomCells = [...aggregatedRooms].sort((a, b) => b.count - a.count).slice(0, 80).map((room) => {
+      const src = resolveReportUserThumbSrc({
+        userId: room.userKey,
+        avatarUrl: room.avatarUrl || "",
+        identiconResolver: getCachedAnonymousIdenticonDataUrl
+      });
+      if (!src) return "";
+      const label = displayUserLabel(room.userKey, room.nickname);
+      const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
+      return `<li class="report-thumb-grid__cell">
+        <span class="report-thumb-grid__avatar-wrap"><img class="report-thumb-grid__avatar" src="${escapeAttr(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+        <span class="report-thumb-grid__label">${labelHtml}</span>
+        <span class="report-thumb-grid__count">${room.count}\u4EF6</span>
+      </li>`;
+    }).filter((s) => s !== "");
+    const thumbedUsersSectionHtml = thumbedRoomCells.length > 0 ? `
+        <section class="card">
+          <h2>\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</h2>
+          <p class="guide-lead">\u30A2\u30A4\u30B3\u30F3\u304C\u89E3\u6C7A\u3067\u304D\u305F\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u3092\u4EF6\u6570\u306E\u591A\u3044\u9806\u306B\u4E26\u3079\u305F\u306E\u3060\uFF08\u6700\u5927 80 \u540D\uFF09\u3002\u30A2\u30A4\u30B3\u30F3\u306F \u2460 \u500B\u4EBA\u30B5\u30E0\u30CD \u2461 \u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 \u2462 \u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon \u306E\u512A\u5148\u9806\u306A\u306E\u3060\u3002</p>
+          <ol class="report-thumb-grid">${thumbedRoomCells.join("")}</ol>
+        </section>
+      ` : "";
     const commentRows = comments.map((c, idx) => {
       const commentNo = String(c.commentNo || "").trim();
       const text = String(c.text || "").trim();
@@ -11704,6 +11802,68 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         margin-top: 0;
       }
       .hide { display: none !important; }
+      /* 0.1.12 (F): \u30E6\u30FC\u30B6\u30FC\u5225\u30C6\u30FC\u30D6\u30EB\u306E\u30B5\u30E0\u30CD\u5217\u3002\u6700\u4F4E 28px \u306E\u4E38\u30B5\u30E0\u30CD\u3002 */
+      .report-room-av {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        object-fit: cover;
+        display: block;
+      }
+      .report-room-av--empty {
+        background: #cbd5e1;
+      }
+      /* 0.1.12 (F3): \u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7\u30B0\u30EA\u30C3\u30C9\u3002\u53EF\u5909\u5217\u3067\u8A70\u3081\u3066\u4E26\u3079\u308B\u3002 */
+      .report-thumb-grid {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+        gap: 10px;
+      }
+      .report-thumb-grid__cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 6px;
+        background: var(--panel-bg, #ffffff);
+        border: 1px solid var(--panel-border, #e2e8f0);
+        border-radius: 10px;
+        text-align: center;
+        min-width: 0;
+      }
+      .report-thumb-grid__avatar-wrap {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .report-thumb-grid__avatar {
+        width: 48px;
+        height: 48px;
+        object-fit: cover;
+        display: block;
+      }
+      .report-thumb-grid__label {
+        font-size: 0.78rem;
+        line-height: 1.25;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 100%;
+      }
+      .report-thumb-grid__count {
+        font-size: 0.72rem;
+        color: var(--muted, #64748b);
+      }
     </style>
   </head>
   <body>
@@ -11748,10 +11908,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         <section class="card">
           <h2>\u30E6\u30FC\u30B6\u30FC\u5225\uFF08\u3057\u304A\u308A\u96C6\u8A08\uFF09</h2>
           <table>
-            <thead><tr><th>\u30E6\u30FC\u30B6\u30FC</th><th>\u4EF6\u6570</th><th>\u6700\u65B0\u30B3\u30E1\u30F3\u30C8</th></tr></thead>
-            <tbody>${roomRows.join("") || '<tr><td colspan="3">\u30C7\u30FC\u30BF\u306A\u3057</td></tr>'}</tbody>
+            <thead><tr><th>\u30B5\u30E0\u30CD</th><th>\u30E6\u30FC\u30B6\u30FC</th><th>\u4EF6\u6570</th><th>\u6700\u65B0\u30B3\u30E1\u30F3\u30C8</th></tr></thead>
+            <tbody>${roomRows.join("") || '<tr><td colspan="4">\u30C7\u30FC\u30BF\u306A\u3057</td></tr>'}</tbody>
           </table>
         </section>
+        ${thumbedUsersSectionHtml}
       </div>
       ${htmlReportConceptGuideCardHtml}
       ${htmlReportSaveGuideCardHtml}
@@ -11888,7 +12049,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-0953" ? String("0430-0953") : "dev";
+      const buildId = "0430-1017" ? String("0430-1017") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -12328,7 +12489,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           $("devMonitorExportMarketingMaskLabels")
         );
         const maskShare = Boolean(maskEl?.checked);
-        const html = buildMarketingDashboardHtml(report, { maskShareLabels: maskShare });
+        const html = buildMarketingDashboardHtml(report, {
+          maskShareLabels: maskShare,
+          anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl
+        });
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -12362,7 +12526,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
                 $("devMonitorExportMarketingMaskLabels")
               );
               const maskShare = Boolean(maskEl?.checked);
-              const html = buildMarketingDashboardHtml(report, { maskShareLabels: maskShare });
+              const html = buildMarketingDashboardHtml(report, {
+                maskShareLabels: maskShare,
+                anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl
+              });
               const blob = new Blob([html], { type: "text/html;charset=utf-8" });
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
