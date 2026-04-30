@@ -6825,11 +6825,11 @@
       </div>
 
       <!--
-        0.1.52 (AH): watch ページ以外で popup を開いたときに「ニコ生のランキング」へ
-        飛べる導線を出す。普段は hidden で、popup-entry.js が watchUrl 未検出のとき
-        だけ hidden を外す。
+        0.1.52 (AH) → 0.1.55 (AK): standalone popup window では常時表示が
+        欲しいため、デフォルトを「表示」に変更。INLINE_MODE（watch ページ
+        内 iframe）のときだけ JS が hidden 属性を付ける。
       -->
-      <section id="noWatchRankingHint" class="nl-no-watch-hint" aria-label="ニコ生 ランキング" hidden>
+      <section id="noWatchRankingHint" class="nl-no-watch-hint" aria-label="ニコ生 ランキング">
         <p class="nl-no-watch-hint__lead">
           watch ページが見つかりません。気になる放送を探してみますか？
         </p>

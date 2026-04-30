@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.55',
+    date: '2026-05-01',
+    summary: 'ランキング導線を確実に表示',
+    items: Object.freeze([
+      'popup を開いてもランキング導線が出ない問題を確実に修正。HTML の hidden 属性デフォルトを撤去し、popup window では最初から表示状態に変更（watch ページ内のパネル iframe では JS で hidden を付ける）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.54',
     date: '2026-04-30',
     summary: 'ランキング導線を常時表示に',

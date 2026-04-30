@@ -6263,17 +6263,21 @@ async function refresh() {
   syncVoiceCommentButton();
 
   /*
-   * 0.1.54 (AJ): ランキング導線を「standalone popup なら常時表示」に変更。
-   *   0.1.53 では source ベースで判定していたが、複数 window や複数モニタ等で
-   *   `chrome.windows.getLastFocused` の挙動が想定と違い、ユーザーが Google を
-   *   見ているのに source='lastFocusedNormal' で導線が出ない事象が継続していた。
-   *   standalone popup window はユーザーが明示的にツールバーアイコンから
-   *   開いた状態で、ランキング導線を出してもデメリットが少ない。INLINE_MODE
-   *   （watch ページ内 iframe）のときだけ hidden にする。
+   * 0.1.55 (AK): ランキング導線が popup で出ない件を確実に直す。
+   *   popup.html 側で hidden 属性を撤去したため、本来は何もしなくても
+   *   表示されるはず。INLINE_MODE（watch ページ内 iframe）のときだけ
+   *   removeAttribute / setAttribute で明示的に切り替え、念のため inline style
+   *   も設定して CSS の影響を遮断する。
    */
   const noWatchHint = $('noWatchRankingHint');
   if (noWatchHint instanceof HTMLElement) {
-    noWatchHint.hidden = INLINE_MODE;
+    if (INLINE_MODE) {
+      noWatchHint.setAttribute('hidden', '');
+      noWatchHint.style.display = 'none';
+    } else {
+      noWatchHint.removeAttribute('hidden');
+      noWatchHint.style.display = 'block';
+    }
   }
 
   if (!isNicoLiveWatchUrl(url)) {

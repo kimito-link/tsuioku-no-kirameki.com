@@ -708,6 +708,14 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.55",
+      date: "2026-05-01",
+      summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u3092\u78BA\u5B9F\u306B\u8868\u793A",
+      items: Object.freeze([
+        "popup \u3092\u958B\u3044\u3066\u3082\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u304C\u51FA\u306A\u3044\u554F\u984C\u3092\u78BA\u5B9F\u306B\u4FEE\u6B63\u3002HTML \u306E hidden \u5C5E\u6027\u30C7\u30D5\u30A9\u30EB\u30C8\u3092\u64A4\u53BB\u3057\u3001popup window \u3067\u306F\u6700\u521D\u304B\u3089\u8868\u793A\u72B6\u614B\u306B\u5909\u66F4\uFF08watch \u30DA\u30FC\u30B8\u5185\u306E\u30D1\u30CD\u30EB iframe \u3067\u306F JS \u3067 hidden \u3092\u4ED8\u3051\u308B\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.54",
       date: "2026-04-30",
       summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u3092\u5E38\u6642\u8868\u793A\u306B",
@@ -14272,7 +14280,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       syncVoiceCommentButton();
       const noWatchHint = $("noWatchRankingHint");
       if (noWatchHint instanceof HTMLElement) {
-        noWatchHint.hidden = INLINE_MODE;
+        if (INLINE_MODE) {
+          noWatchHint.setAttribute("hidden", "");
+          noWatchHint.style.display = "none";
+        } else {
+          noWatchHint.removeAttribute("hidden");
+          noWatchHint.style.display = "block";
+        }
       }
       if (!isNicoLiveWatchUrl(url)) {
         if (!isFreshRefresh()) return;
@@ -16005,7 +16019,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2328" ? String("0430-2328") : "dev";
+      const buildId = "0501-0003" ? String("0501-0003") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
