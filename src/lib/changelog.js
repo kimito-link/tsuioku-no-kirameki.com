@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.43',
+    date: '2026-04-30',
+    summary: 'パネルが開かない事象の修正',
+    items: Object.freeze([
+      'kon-ta クリックしてもパネルが開かない事象を修正。focus 判定を強化し、host が DOM 上でも display:none / visibility:hidden の場合は popup window へフォールバックするよう変更（純粋関数 + テスト 7 ケース追加）',
+      '内部: content script の onMessage listener を idempotent に変更（SPA 再注入時の二重応答 → port closed エラー対策）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.42',
     date: '2026-04-30',
     summary: 'パネル準備の競合解消',

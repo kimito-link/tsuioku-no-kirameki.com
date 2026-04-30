@@ -123,15 +123,74 @@ describe('shouldRespondFocusedNowFromToolbar', () => {
     expect(shouldRespondFocusedNowFromToolbar({ isConnected: 1 })).toBe(false);
   });
 
-  it('isInlinePanelHostReadyForFocus が false でも、shouldRespond は true になりうる（責務が違う）', () => {
-    // host は DOM 上にあるが display:none → focus はまだできない（ready=false）
-    // でも応答は即 true（panel 自体は exists、popup は不要）
+  it('isConnected=true, deps 無し → true（旧挙動の互換）', () => {
+    // 古い呼び出し互換: deps 省略時は isConnected のみで判定
     const host = { isConnected: true };
-    const readyDeps = {
-      getComputedStyle: () => ({ display: 'none', visibility: 'visible' }),
-      getBoundingClientRect: () => ({ width: 0, height: 0 })
-    };
-    expect(isInlinePanelHostReadyForFocus(host, readyDeps)).toBe(false);
     expect(shouldRespondFocusedNowFromToolbar(host)).toBe(true);
+  });
+
+  /*
+   * 0.1.43 (Y): prewarm された host が display:none で残ったケースの検出。
+   * renderPageFrameOverlay が何らかの理由で host を可視化できなかった場合、
+   * focused=true を返すと background が popup window fallback しないため
+   * 「kon-ta 押しても何も出ない」現象になる。computedStyle で見える状態を
+   * 確認して、不可視なら false を返して background に fallback を任せる。
+   */
+  describe('0.1.43 (Y): computedStyle deps を渡したとき', () => {
+    it('host が display:none → false（popup window fallback を促す）', () => {
+      const host = { isConnected: true };
+      const deps = {
+        getComputedStyle: () => ({ display: 'none', visibility: 'visible' })
+      };
+      expect(shouldRespondFocusedNowFromToolbar(host, deps)).toBe(false);
+    });
+
+    it('host が visibility:hidden → false', () => {
+      const host = { isConnected: true };
+      const deps = {
+        getComputedStyle: () => ({ display: 'block', visibility: 'hidden' })
+      };
+      expect(shouldRespondFocusedNowFromToolbar(host, deps)).toBe(false);
+    });
+
+    it('host が display:block, visibility:visible → true', () => {
+      const host = { isConnected: true };
+      const deps = {
+        getComputedStyle: () => ({ display: 'block', visibility: 'visible' })
+      };
+      expect(shouldRespondFocusedNowFromToolbar(host, deps)).toBe(true);
+    });
+
+    it('display: flex, visibility: visible → true（block 以外でも OK）', () => {
+      const host = { isConnected: true };
+      const deps = {
+        getComputedStyle: () => ({ display: 'flex', visibility: 'visible' })
+      };
+      expect(shouldRespondFocusedNowFromToolbar(host, deps)).toBe(true);
+    });
+
+    it('isConnected=false なら deps があっても false', () => {
+      const host = { isConnected: false };
+      const deps = {
+        getComputedStyle: () => ({ display: 'block', visibility: 'visible' })
+      };
+      expect(shouldRespondFocusedNowFromToolbar(host, deps)).toBe(false);
+    });
+
+    it('getComputedStyle が throw → 保守的に true（popup window race 回避）', () => {
+      const host = { isConnected: true };
+      const deps = {
+        getComputedStyle: () => { throw new Error('detached'); }
+      };
+      expect(shouldRespondFocusedNowFromToolbar(host, deps)).toBe(true);
+    });
+
+    it('deps.getComputedStyle が関数でない → true（旧互換扱い）', () => {
+      const host = { isConnected: true };
+      // @ts-expect-error - 不正な deps
+      expect(shouldRespondFocusedNowFromToolbar(host, {})).toBe(true);
+      // @ts-expect-error
+      expect(shouldRespondFocusedNowFromToolbar(host, { getComputedStyle: 'not-a-fn' })).toBe(true);
+    });
   });
 });

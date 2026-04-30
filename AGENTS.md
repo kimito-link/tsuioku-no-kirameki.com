@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.42（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.43（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,35 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.43 バンプで入った修正（パネルが開かない事象 + listener 二重登録 AR）**:
+
+ユーザー報告と並行で deep audit エージェントを 2 件走らせ、未解決 2 件 +
+新規発見 17 件のうち最も user-impacting な 2 件を修正。
+
+- **症状 B (Y): kon-ta クリックしてもパネルが開かない**
+  - 原因: 0.1.18 以降の prewarm 機構で、host が DOM 上にあっても
+    `display:none` / offscreen のまま「見えない」状態が増えた。
+    `shouldRespondFocusedNowFromToolbar` は `host.isConnected` だけで
+    判定していたため、prewarmed host が renderPageFrameOverlay で
+    可視化されないケース（プレイヤー未検出・タブ非アクティブ等）でも
+    `focused=true` を返し、background.js は popup window fallback を
+    起動せず → ユーザーから「kon-ta 押しても何も起きない」現象になっていた。
+  - 修正: `shouldRespondFocusedNowFromToolbar` に optional の
+    `getComputedStyle` deps を追加し、computedStyle が取れる環境では
+    `display !== 'none'` && `visibility !== 'hidden'` を確認する。
+    不可視なら false → background が popup window fallback を起動し、
+    ユーザーに何かしら表示される。テスト 7 ケース追加。
+
+- **B11: content script の onMessage listener が二重登録**
+  - 原因: `chrome.runtime.onMessage.addListener` を content-entry.js の
+    トップレベルで呼んでいたため、SPA navigation で再注入されると
+    listener が累積。複数フレームから NLS_FOCUS_INLINE_PANEL に応答し
+    sendResponse の port が複数解釈されて Chrome が "The message port
+    closed before a response was received" エラーを投げ、background.js
+    側が popup window fallback を誤発火する原因になっていた。
+  - 修正: `globalThis.__NLS_CONTENT_MSG_LISTENER_BOUND__` フラグで
+    listener 登録を idempotent にし、再注入時は二重登録しない。
 
 **0.1.42 バンプで入った修正（複数タブ並行時の prewarm 競合解消 AQ）**:
 

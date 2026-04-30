@@ -708,6 +708,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.43",
+      date: "2026-04-30",
+      summary: "\u30D1\u30CD\u30EB\u304C\u958B\u304B\u306A\u3044\u4E8B\u8C61\u306E\u4FEE\u6B63",
+      items: Object.freeze([
+        "kon-ta \u30AF\u30EA\u30C3\u30AF\u3057\u3066\u3082\u30D1\u30CD\u30EB\u304C\u958B\u304B\u306A\u3044\u4E8B\u8C61\u3092\u4FEE\u6B63\u3002focus \u5224\u5B9A\u3092\u5F37\u5316\u3057\u3001host \u304C DOM \u4E0A\u3067\u3082 display:none / visibility:hidden \u306E\u5834\u5408\u306F popup window \u3078\u30D5\u30A9\u30FC\u30EB\u30D0\u30C3\u30AF\u3059\u308B\u3088\u3046\u5909\u66F4\uFF08\u7D14\u7C8B\u95A2\u6570 + \u30C6\u30B9\u30C8 7 \u30B1\u30FC\u30B9\u8FFD\u52A0\uFF09",
+        "\u5185\u90E8: content script \u306E onMessage listener \u3092 idempotent \u306B\u5909\u66F4\uFF08SPA \u518D\u6CE8\u5165\u6642\u306E\u4E8C\u91CD\u5FDC\u7B54 \u2192 port closed \u30A8\u30E9\u30FC\u5BFE\u7B56\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.42",
       date: "2026-04-30",
       summary: "\u30D1\u30CD\u30EB\u6E96\u5099\u306E\u7AF6\u5408\u89E3\u6D88",
@@ -15161,7 +15170,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2111" ? String("0430-2111") : "dev";
+      const buildId = "0430-2134" ? String("0430-2134") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

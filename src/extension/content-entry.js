@@ -2454,7 +2454,16 @@ async function focusInlinePanelHostFromToolbar() {
   const host =
     nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
   if (!(host instanceof HTMLElement)) return false;
-  if (!shouldRespondFocusedNowFromToolbar(host)) return false;
+  /*
+   * 0.1.43 (Y): prewarm された host が DOM 上にあっても display:none で残った
+   *   ケースで、background に focused=true を返すと popup window fallback が
+   *   起動せず「kon-ta 押しても何も出ない」現象になる。computedStyle で
+   *   実際の可視状態を確認し、不可視なら false を返して background fallback
+   *   に任せる。
+   */
+  if (!shouldRespondFocusedNowFromToolbar(host, {
+    getComputedStyle: (el) => window.getComputedStyle(/** @type {Element} */ (el))
+  })) return false;
 
   // fire-and-forget: rect 確定を待ってから scroll + iframe focus を試行。
   // 結果は応答に反映しない（応答は既に true で返している）。
@@ -4318,6 +4327,24 @@ function buildAiSharePageDiagnostics() {
   };
 }
 
+/*
+ * 0.1.43 (Y): content.js は manifest.json の all_frames:true で iframe を含む
+ *   全フレームに注入される。さらに SPA navigation で再注入されると、トップ
+ *   レベルで `chrome.runtime.onMessage.addListener` を呼ぶたびに listener が
+ *   累積し、NLS_FOCUS_INLINE_PANEL に複数フレームから応答 → sendResponse の
+ *   port が複数解釈されて Chrome が「The message port closed before a response
+ *   was received」を投げ、background.js 側が popup window fallback を誤発火
+ *   する原因になる。globalThis に bound flag を立てて idempotent にする。
+ */
+const __NLS_MSG_LISTENER_BOUND_KEY__ = '__NLS_CONTENT_MSG_LISTENER_BOUND__';
+const nlsContentMsgListenerHost =
+  typeof globalThis !== 'undefined' ? globalThis : window;
+if (!(/** @type {Record<string, unknown>} */ (nlsContentMsgListenerHost))[__NLS_MSG_LISTENER_BOUND_KEY__]) {
+  /** @type {Record<string, unknown>} */ (nlsContentMsgListenerHost)[__NLS_MSG_LISTENER_BOUND_KEY__] = true;
+  bindContentScriptMessageListener();
+}
+
+function bindContentScriptMessageListener() {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!hasExtensionContext()) return;
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
@@ -4556,6 +4583,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 });
+}
 
 function rememberWatchPageUrl() {
   if (!hasExtensionContext()) return;

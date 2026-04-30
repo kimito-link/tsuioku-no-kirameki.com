@@ -2409,9 +2409,19 @@
     const min = typeof deps.minSize === "number" ? deps.minSize : 120;
     return r.width >= min && r.height >= min;
   }
-  function shouldRespondFocusedNowFromToolbar(host) {
+  function shouldRespondFocusedNowFromToolbar(host, deps) {
     if (!host) return false;
-    return host.isConnected === true;
+    if (host.isConnected !== true) return false;
+    if (!deps || typeof deps.getComputedStyle !== "function") return true;
+    try {
+      const cs = deps.getComputedStyle(host);
+      if (!cs || typeof cs !== "object") return true;
+      if (cs.display === "none") return false;
+      if (cs.visibility === "hidden") return false;
+      return true;
+    } catch {
+      return true;
+    }
   }
 
   // src/lib/embeddedDataExtract.js
@@ -5141,7 +5151,12 @@
     if (!isNicoLiveWatchUrl(window.location.href)) return false;
     const host = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
     if (!(host instanceof HTMLElement)) return false;
-    if (!shouldRespondFocusedNowFromToolbar(host)) return false;
+    if (!shouldRespondFocusedNowFromToolbar(host, {
+      getComputedStyle: (el) => window.getComputedStyle(
+        /** @type {Element} */
+        el
+      )
+    })) return false;
     void (async () => {
       try {
         const ready = await pollUntil(
@@ -6556,209 +6571,218 @@
       }
     };
   }
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (!hasExtensionContext()) return;
-    if (!msg || typeof msg !== "object" || !("type" in msg)) return;
-    if (msg.type === "NLS_FOCUS_INLINE_PANEL") {
-      if (!isWatchInlinePanelTopFrame()) {
-        return false;
-      }
-      toolbarInitiatedShowThisSession = true;
-      try {
-        renderPageFrameOverlay();
-      } catch {
-      }
-      try {
-        if (deepHarvestTimer != null && deepHarvestQuietUi) {
-          ensureDeepHarvestLoadingUi();
+  var __NLS_MSG_LISTENER_BOUND_KEY__ = "__NLS_CONTENT_MSG_LISTENER_BOUND__";
+  var nlsContentMsgListenerHost = typeof globalThis !== "undefined" ? globalThis : window;
+  if (!/** @type {Record<string, unknown>} */
+  nlsContentMsgListenerHost[__NLS_MSG_LISTENER_BOUND_KEY__]) {
+    nlsContentMsgListenerHost[__NLS_MSG_LISTENER_BOUND_KEY__] = true;
+    bindContentScriptMessageListener();
+  }
+  function bindContentScriptMessageListener() {
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (!hasExtensionContext()) return;
+      if (!msg || typeof msg !== "object" || !("type" in msg)) return;
+      if (msg.type === "NLS_FOCUS_INLINE_PANEL") {
+        if (!isWatchInlinePanelTopFrame()) {
+          return false;
         }
-      } catch {
-      }
-      void (async () => {
-        let focused = false;
+        toolbarInitiatedShowThisSession = true;
         try {
-          focused = await focusInlinePanelHostFromToolbar();
+          renderPageFrameOverlay();
         } catch {
         }
         try {
-          sendResponse({ ok: true, focused });
+          if (deepHarvestTimer != null && deepHarvestQuietUi) {
+            ensureDeepHarvestLoadingUi();
+          }
         } catch {
         }
-      })();
-      return true;
-    }
-    if (msg.type === "NLS_CAPTURE_SCREENSHOT") {
-      if (!isWatchPageMainFrameForMessages()) return;
-      void (async () => {
-        try {
-          if (!isNicoLiveWatchUrl(window.location.href)) {
-            sendResponse({ ok: false, errorCode: "not_watch" });
-            return;
+        void (async () => {
+          let focused = false;
+          try {
+            focused = await focusInlinePanelHostFromToolbar();
+          } catch {
           }
-          const video = pickLargestVisibleVideo(document);
-          if (!video) {
-            sendResponse({ ok: false, errorCode: "no_video" });
-            return;
+          try {
+            sendResponse({ ok: true, focused });
+          } catch {
           }
-          const cap = await captureVideoToPngDataUrl(video);
-          if (cap.ok === false) {
-            sendResponse({ ok: false, errorCode: cap.errorCode });
-            return;
-          }
-          sendResponse({
-            ok: true,
-            mime: cap.mime,
-            dataUrl: cap.dataUrl,
-            liveId: liveId || ""
-          });
-        } catch {
-          sendResponse({ ok: false, errorCode: "capture_failed" });
-        }
-      })();
-      return true;
-    }
-    if (msg.type === "NLS_THUMB_STATS") {
-      if (!isWatchPageMainFrameForMessages()) return;
-      void (async () => {
-        try {
-          if (!liveId) {
-            sendResponse({ ok: true, count: 0 });
-            return;
-          }
-          const count = await countThumbsForLive(liveId);
-          sendResponse({ ok: true, count });
-        } catch {
-          sendResponse({ ok: false, count: 0 });
-        }
-      })();
-      return true;
-    }
-    if (msg.type === "NLS_POST_COMMENT") {
-      if (!canPostCommentInThisFrame()) {
-        sendResponse({
-          ok: false,
-          error: "\u3053\u306E\u30D5\u30EC\u30FC\u30E0\u306B\u306F\u30B3\u30E1\u30F3\u30C8\u6B04\u304C\u3042\u308A\u307E\u305B\u3093\u3002"
-        });
+        })();
         return true;
       }
-      const text = "text" in msg ? String(
-        /** @type {{ text?: unknown }} */
-        msg.text || ""
-      ) : "";
-      void postCommentFromContentAsync(text).then((result) => sendResponse(result)).catch(
-        (err) => sendResponse({
-          ok: false,
-          error: err && typeof err === "object" && "message" in err ? String(
-            /** @type {{ message?: unknown }} */
-            err.message || "post_failed"
-          ) : "post_failed"
-        })
-      );
-      return true;
-    }
-    if (msg.type === "NLS_EXPORT_WATCH_SNAPSHOT") {
-      if (!canExportWatchSnapshotFromThisFrame()) {
-        sendResponse({
-          ok: false,
-          error: "watch\u30DA\u30FC\u30B8\u4EE5\u5916\u3067\u306F\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093"
-        });
-        return;
-      }
-      syncLiveIdFromLocation();
-      try {
-        sendResponse({
-          ok: true,
-          snapshot: collectWatchPageSnapshot()
-        });
-      } catch (err) {
-        sendResponse({
-          ok: false,
-          error: err && typeof err === "object" && "message" in err ? String(
-            /** @type {{ message?: unknown }} */
-            err.message || "snapshot_error"
-          ) : "snapshot_error"
-        });
-      }
-    }
-    if (msg.type === "NLS_EXPORT_INTERCEPT_CACHE") {
-      if (!canExportWatchSnapshotFromThisFrame()) {
-        sendResponse({
-          ok: false,
-          error: "watch\u30DA\u30FC\u30B8\u4EE5\u5916\u3067\u306F\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093"
-        });
-        return;
-      }
-      void (async () => {
-        try {
-          const deep = !!(msg && typeof msg === "object" && "deep" in msg && /** @type {{ deep?: unknown }} */
-          msg.deep);
-          const deepPlan = planDeepExportSweep({
-            deep,
-            ndgrLastReceivedAt,
-            now: Date.now(),
-            thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
-          });
-          if (deepPlan.shouldRunSweep && locationAllowsCommentRecording()) {
-            const rows = await harvestVirtualCommentList({
-              document,
-              extractCommentsFromNode,
-              waitMs: 42,
-              respectTyping: false,
-              quietScroll: deepPlan.quietScroll
-            });
-            for (const r of rows) {
-              const no = String(r?.commentNo || "").trim();
-              const uid = String(r?.userId || "").trim();
-              if (!no) continue;
-              const av = isHttpAvatarUrl(r?.avatarUrl) ? String(r.avatarUrl).trim() : "";
-              if (!uid && !av) continue;
-              const prev = interceptedUsers.get(no);
-              const name = String(prev?.name || "").trim();
-              const prevUid = String(prev?.uid || "").trim();
-              const prevAv = isHttpAvatarUrl(prev?.av) ? String(prev?.av || "").trim() : "";
-              interceptedUsers.set(no, {
-                ...uid || prevUid ? { uid: uid || prevUid } : {},
-                ...name ? { name } : {},
-                ...av || prevAv ? { av: av || prevAv } : {}
-              });
-              if (uid && av) interceptedAvatars.set(uid, av);
+      if (msg.type === "NLS_CAPTURE_SCREENSHOT") {
+        if (!isWatchPageMainFrameForMessages()) return;
+        void (async () => {
+          try {
+            if (!isNicoLiveWatchUrl(window.location.href)) {
+              sendResponse({ ok: false, errorCode: "not_watch" });
+              return;
             }
+            const video = pickLargestVisibleVideo(document);
+            if (!video) {
+              sendResponse({ ok: false, errorCode: "no_video" });
+              return;
+            }
+            const cap = await captureVideoToPngDataUrl(video);
+            if (cap.ok === false) {
+              sendResponse({ ok: false, errorCode: cap.errorCode });
+              return;
+            }
+            sendResponse({
+              ok: true,
+              mime: cap.mime,
+              dataUrl: cap.dataUrl,
+              liveId: liveId || ""
+            });
+          } catch {
+            sendResponse({ ok: false, errorCode: "capture_failed" });
           }
-          sendResponse({ ok: true, items: buildInterceptCacheExportItems() });
-        } catch (err) {
-          const msg2 = err && typeof err === "object" && "message" in err ? String(
-            /** @type {{ message?: unknown }} */
-            err.message || "intercept_export_error"
-          ) : "intercept_export_error";
+        })();
+        return true;
+      }
+      if (msg.type === "NLS_THUMB_STATS") {
+        if (!isWatchPageMainFrameForMessages()) return;
+        void (async () => {
+          try {
+            if (!liveId) {
+              sendResponse({ ok: true, count: 0 });
+              return;
+            }
+            const count = await countThumbsForLive(liveId);
+            sendResponse({ ok: true, count });
+          } catch {
+            sendResponse({ ok: false, count: 0 });
+          }
+        })();
+        return true;
+      }
+      if (msg.type === "NLS_POST_COMMENT") {
+        if (!canPostCommentInThisFrame()) {
           sendResponse({
             ok: false,
-            error: msg2.length > 220 ? `${msg2.slice(0, 220)}\u2026` : msg2
+            error: "\u3053\u306E\u30D5\u30EC\u30FC\u30E0\u306B\u306F\u30B3\u30E1\u30F3\u30C8\u6B04\u304C\u3042\u308A\u307E\u305B\u3093\u3002"
+          });
+          return true;
+        }
+        const text = "text" in msg ? String(
+          /** @type {{ text?: unknown }} */
+          msg.text || ""
+        ) : "";
+        void postCommentFromContentAsync(text).then((result) => sendResponse(result)).catch(
+          (err) => sendResponse({
+            ok: false,
+            error: err && typeof err === "object" && "message" in err ? String(
+              /** @type {{ message?: unknown }} */
+              err.message || "post_failed"
+            ) : "post_failed"
+          })
+        );
+        return true;
+      }
+      if (msg.type === "NLS_EXPORT_WATCH_SNAPSHOT") {
+        if (!canExportWatchSnapshotFromThisFrame()) {
+          sendResponse({
+            ok: false,
+            error: "watch\u30DA\u30FC\u30B8\u4EE5\u5916\u3067\u306F\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093"
+          });
+          return;
+        }
+        syncLiveIdFromLocation();
+        try {
+          sendResponse({
+            ok: true,
+            snapshot: collectWatchPageSnapshot()
+          });
+        } catch (err) {
+          sendResponse({
+            ok: false,
+            error: err && typeof err === "object" && "message" in err ? String(
+              /** @type {{ message?: unknown }} */
+              err.message || "snapshot_error"
+            ) : "snapshot_error"
           });
         }
-      })();
-      return true;
-    }
-    if (msg.type === "NLS_AI_SHARE_PAGE_DIAGNOSTICS") {
-      try {
-        persistAiShareFastDiagnostics();
-        sendResponse({
-          ok: true,
-          diagnostics: buildAiSharePageDiagnostics()
-        });
-      } catch (err) {
-        sendResponse({
-          ok: false,
-          error: String(
-            err && typeof err === "object" && "message" in err ? (
-              /** @type {{ message?: unknown }} */
-              err.message
-            ) : err || "diag_failed"
-          )
-        });
       }
-      return true;
-    }
-  });
+      if (msg.type === "NLS_EXPORT_INTERCEPT_CACHE") {
+        if (!canExportWatchSnapshotFromThisFrame()) {
+          sendResponse({
+            ok: false,
+            error: "watch\u30DA\u30FC\u30B8\u4EE5\u5916\u3067\u306F\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093"
+          });
+          return;
+        }
+        void (async () => {
+          try {
+            const deep = !!(msg && typeof msg === "object" && "deep" in msg && /** @type {{ deep?: unknown }} */
+            msg.deep);
+            const deepPlan = planDeepExportSweep({
+              deep,
+              ndgrLastReceivedAt,
+              now: Date.now(),
+              thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
+            });
+            if (deepPlan.shouldRunSweep && locationAllowsCommentRecording()) {
+              const rows = await harvestVirtualCommentList({
+                document,
+                extractCommentsFromNode,
+                waitMs: 42,
+                respectTyping: false,
+                quietScroll: deepPlan.quietScroll
+              });
+              for (const r of rows) {
+                const no = String(r?.commentNo || "").trim();
+                const uid = String(r?.userId || "").trim();
+                if (!no) continue;
+                const av = isHttpAvatarUrl(r?.avatarUrl) ? String(r.avatarUrl).trim() : "";
+                if (!uid && !av) continue;
+                const prev = interceptedUsers.get(no);
+                const name = String(prev?.name || "").trim();
+                const prevUid = String(prev?.uid || "").trim();
+                const prevAv = isHttpAvatarUrl(prev?.av) ? String(prev?.av || "").trim() : "";
+                interceptedUsers.set(no, {
+                  ...uid || prevUid ? { uid: uid || prevUid } : {},
+                  ...name ? { name } : {},
+                  ...av || prevAv ? { av: av || prevAv } : {}
+                });
+                if (uid && av) interceptedAvatars.set(uid, av);
+              }
+            }
+            sendResponse({ ok: true, items: buildInterceptCacheExportItems() });
+          } catch (err) {
+            const msg2 = err && typeof err === "object" && "message" in err ? String(
+              /** @type {{ message?: unknown }} */
+              err.message || "intercept_export_error"
+            ) : "intercept_export_error";
+            sendResponse({
+              ok: false,
+              error: msg2.length > 220 ? `${msg2.slice(0, 220)}\u2026` : msg2
+            });
+          }
+        })();
+        return true;
+      }
+      if (msg.type === "NLS_AI_SHARE_PAGE_DIAGNOSTICS") {
+        try {
+          persistAiShareFastDiagnostics();
+          sendResponse({
+            ok: true,
+            diagnostics: buildAiSharePageDiagnostics()
+          });
+        } catch (err) {
+          sendResponse({
+            ok: false,
+            error: String(
+              err && typeof err === "object" && "message" in err ? (
+                /** @type {{ message?: unknown }} */
+                err.message
+              ) : err || "diag_failed"
+            )
+          });
+        }
+        return true;
+      }
+    });
+  }
   function rememberWatchPageUrl() {
     if (!hasExtensionContext()) return;
     if (!isNicoLiveWatchUrl(window.location.href)) return;
