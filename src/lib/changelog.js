@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.42',
+    date: '2026-04-30',
+    summary: 'パネル準備の競合解消',
+    items: Object.freeze([
+      '複数 watch タブ並行時に kon-ta クリック→パネル表示までが遅くなる問題を修正。chrome.storage.local の lease を使って同時にパネル準備（prewarm）を走らせるタブを 1 つに絞り、CPU 取り合いを抑止（純粋関数 + 10 ケース TDD）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.41',
     date: '2026-04-30',
     summary: '深層監査の結果を反映',

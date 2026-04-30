@@ -142,6 +142,7 @@ import {
 import { hydrateInterceptAvatarMapFromProfile } from '../lib/interceptAvatarHydration.js';
 import { extractBroadcasterUserId } from '../lib/broadcasterUserId.js';
 import { resolveChannelBroadcasterMeta } from '../lib/channelBroadcasterMeta.js';
+import { decidePrewarmLeaseAction } from '../lib/prewarmCoordinator.js';
 import {
   KEY_COMMENT_PANEL_AUTO_RESTORE,
   LATEST_COMMENT_BUTTON_SELECTOR,
@@ -2978,31 +2979,106 @@ function schedulePrewarmInlinePopupIframe() {
   }, 800);
 }
 
+/*
+ * 0.1.42 (X): prewarm lease を chrome.storage.local で取り合う。
+ *   複数 watch タブが visible 並行状態のとき、全タブが popup.html を並列
+ *   ロードして CPU を取り合うため、kon-ta 押下時のパネル表示が遅くなる
+ *   問題への対策。一度に prewarm するタブを 1 つに絞り、完了後に他タブが
+ *   順次 prewarm する。
+ */
+const PREWARM_LEASE_KEY = 'nls_prewarm_lease_v1';
+const PREWARM_LEASE_TIMEOUT_MS = 10_000;
+const PREWARM_LEASE_RETRY_MS = 1_500;
+const prewarmInstanceId = (() => {
+  try {
+    return `nlpw-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  } catch {
+    return `nlpw-fallback-${Date.now().toString(36)}`;
+  }
+})();
+
+async function tryAcquirePrewarmLease() {
+  try {
+    const bag = await chrome.storage.local.get(PREWARM_LEASE_KEY);
+    const cur = /** @type {{holder?: string, at?: number}|null} */ (bag[PREWARM_LEASE_KEY] ?? null);
+    const action = decidePrewarmLeaseAction({
+      currentLeaseHolder: cur?.holder,
+      currentLeaseAt: cur?.at,
+      selfId: prewarmInstanceId,
+      now: Date.now(),
+      leaseTimeoutMs: PREWARM_LEASE_TIMEOUT_MS
+    });
+    if (action === 'proceed') return true;
+    if (action === 'defer') return false;
+    // 'claim' → 自分の名前で書き込む
+    await chrome.storage.local.set({
+      [PREWARM_LEASE_KEY]: { holder: prewarmInstanceId, at: Date.now() }
+    });
+    return true;
+  } catch {
+    // storage 失敗時は coordination 諦めて prewarm 実行（fail-open）
+    return true;
+  }
+}
+
+async function releasePrewarmLeaseIfMine() {
+  try {
+    const bag = await chrome.storage.local.get(PREWARM_LEASE_KEY);
+    const cur = /** @type {{holder?: string}|null} */ (bag[PREWARM_LEASE_KEY] ?? null);
+    if (cur?.holder === prewarmInstanceId) {
+      await chrome.storage.local.set({
+        [PREWARM_LEASE_KEY]: { holder: '', at: 0 }
+      });
+    }
+  } catch {
+    // no-op
+  }
+}
+
 function prewarmInlinePopupIframe() {
   if (prewarmInlinePopupDone) return;
   if (!hasExtensionContext()) return;
   if (!isWatchInlinePanelTopFrame()) return;
   if (!isNicoLiveWatchUrl(window.location.href)) return;
-  try {
-    const host = ensureInlinePopupHost();
-    if (!(host instanceof HTMLElement)) return;
-    if (host.parentNode !== document.body) {
-      // 画面に出さないままで body に挿入。iframe は display:none でも load する。
-      host.style.display = 'none';
-      host.setAttribute('aria-hidden', 'true');
-      // レイアウトに影響しないよう offscreen に固定。
-      host.style.position = 'fixed';
-      host.style.top = '-99999px';
-      host.style.left = '-99999px';
-      host.style.width = '420px';
-      host.style.height = '600px';
-      host.style.pointerEvents = 'none';
-      document.body.appendChild(host);
+  void (async () => {
+    const acquired = await tryAcquirePrewarmLease();
+    if (!acquired) {
+      // 他タブが prewarm 中。一定時間後に再試行。
+      if (!prewarmInlinePopupDone && !prewarmInlinePopupTimer) {
+        prewarmInlinePopupTimer = setTimeout(() => {
+          prewarmInlinePopupTimer = null;
+          prewarmInlinePopupIframe();
+        }, PREWARM_LEASE_RETRY_MS);
+      }
+      return;
     }
-    prewarmInlinePopupDone = true;
-  } catch {
-    // 失敗しても致命的ではない（kon-ta 押下時に通常パスで host が作られる）
-  }
+    try {
+      const host = ensureInlinePopupHost();
+      if (!(host instanceof HTMLElement)) {
+        await releasePrewarmLeaseIfMine();
+        return;
+      }
+      if (host.parentNode !== document.body) {
+        // 画面に出さないままで body に挿入。iframe は display:none でも load する。
+        host.style.display = 'none';
+        host.setAttribute('aria-hidden', 'true');
+        // レイアウトに影響しないよう offscreen に固定。
+        host.style.position = 'fixed';
+        host.style.top = '-99999px';
+        host.style.left = '-99999px';
+        host.style.width = '420px';
+        host.style.height = '600px';
+        host.style.pointerEvents = 'none';
+        document.body.appendChild(host);
+      }
+      prewarmInlinePopupDone = true;
+    } catch {
+      // 失敗しても致命的ではない（kon-ta 押下時に通常パスで host が作られる）
+    } finally {
+      // lease は次のタブが直ぐ prewarm 始められるよう速やかに release
+      await releasePrewarmLeaseIfMine();
+    }
+  })();
 }
 
 function hasExtensionContext() {

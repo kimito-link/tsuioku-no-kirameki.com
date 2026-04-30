@@ -3292,6 +3292,27 @@
     return { kind: "channel", name, pageUrl, iconUrl };
   }
 
+  // src/lib/prewarmCoordinator.js
+  function decidePrewarmLeaseAction(input) {
+    const selfId = String(input.selfId || "").trim();
+    if (!selfId) return "defer";
+    const now = Number(input.now);
+    const leaseTimeoutMs = Number(input.leaseTimeoutMs ?? 1e4);
+    const holder = String(input.currentLeaseHolder ?? "").trim();
+    const heldAt = Number(input.currentLeaseAt ?? 0);
+    if (!holder) return "claim";
+    if (holder === selfId) return "proceed";
+    if (!Number.isFinite(heldAt) || heldAt <= 0) {
+      return "defer";
+    }
+    if (heldAt > now) return "defer";
+    const elapsed = now - heldAt;
+    if (elapsed > leaseTimeoutMs) {
+      return "claim";
+    }
+    return "defer";
+  }
+
   // src/lib/commentPanelHealthProbe.js
   var LATEST_COMMENT_BUTTON_SELECTOR = 'button.indicator[aria-label="\u6700\u65B0\u30B3\u30E1\u30F3\u30C8\u306B\u623B\u308B"]';
   var COMMENT_PANEL_RESTORE_COOLDOWN_MS = 10 * 1e3;
@@ -5510,28 +5531,94 @@
       prewarmInlinePopupIframe();
     }, 800);
   }
+  var PREWARM_LEASE_KEY = "nls_prewarm_lease_v1";
+  var PREWARM_LEASE_TIMEOUT_MS = 1e4;
+  var PREWARM_LEASE_RETRY_MS = 1500;
+  var prewarmInstanceId = (() => {
+    try {
+      return `nlpw-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    } catch {
+      return `nlpw-fallback-${Date.now().toString(36)}`;
+    }
+  })();
+  async function tryAcquirePrewarmLease() {
+    try {
+      const bag = await chrome.storage.local.get(PREWARM_LEASE_KEY);
+      const cur = (
+        /** @type {{holder?: string, at?: number}|null} */
+        bag[PREWARM_LEASE_KEY] ?? null
+      );
+      const action = decidePrewarmLeaseAction({
+        currentLeaseHolder: cur?.holder,
+        currentLeaseAt: cur?.at,
+        selfId: prewarmInstanceId,
+        now: Date.now(),
+        leaseTimeoutMs: PREWARM_LEASE_TIMEOUT_MS
+      });
+      if (action === "proceed") return true;
+      if (action === "defer") return false;
+      await chrome.storage.local.set({
+        [PREWARM_LEASE_KEY]: { holder: prewarmInstanceId, at: Date.now() }
+      });
+      return true;
+    } catch {
+      return true;
+    }
+  }
+  async function releasePrewarmLeaseIfMine() {
+    try {
+      const bag = await chrome.storage.local.get(PREWARM_LEASE_KEY);
+      const cur = (
+        /** @type {{holder?: string}|null} */
+        bag[PREWARM_LEASE_KEY] ?? null
+      );
+      if (cur?.holder === prewarmInstanceId) {
+        await chrome.storage.local.set({
+          [PREWARM_LEASE_KEY]: { holder: "", at: 0 }
+        });
+      }
+    } catch {
+    }
+  }
   function prewarmInlinePopupIframe() {
     if (prewarmInlinePopupDone) return;
     if (!hasExtensionContext()) return;
     if (!isWatchInlinePanelTopFrame()) return;
     if (!isNicoLiveWatchUrl(window.location.href)) return;
-    try {
-      const host = ensureInlinePopupHost();
-      if (!(host instanceof HTMLElement)) return;
-      if (host.parentNode !== document.body) {
-        host.style.display = "none";
-        host.setAttribute("aria-hidden", "true");
-        host.style.position = "fixed";
-        host.style.top = "-99999px";
-        host.style.left = "-99999px";
-        host.style.width = "420px";
-        host.style.height = "600px";
-        host.style.pointerEvents = "none";
-        document.body.appendChild(host);
+    void (async () => {
+      const acquired = await tryAcquirePrewarmLease();
+      if (!acquired) {
+        if (!prewarmInlinePopupDone && !prewarmInlinePopupTimer) {
+          prewarmInlinePopupTimer = setTimeout(() => {
+            prewarmInlinePopupTimer = null;
+            prewarmInlinePopupIframe();
+          }, PREWARM_LEASE_RETRY_MS);
+        }
+        return;
       }
-      prewarmInlinePopupDone = true;
-    } catch {
-    }
+      try {
+        const host = ensureInlinePopupHost();
+        if (!(host instanceof HTMLElement)) {
+          await releasePrewarmLeaseIfMine();
+          return;
+        }
+        if (host.parentNode !== document.body) {
+          host.style.display = "none";
+          host.setAttribute("aria-hidden", "true");
+          host.style.position = "fixed";
+          host.style.top = "-99999px";
+          host.style.left = "-99999px";
+          host.style.width = "420px";
+          host.style.height = "600px";
+          host.style.pointerEvents = "none";
+          document.body.appendChild(host);
+        }
+        prewarmInlinePopupDone = true;
+      } catch {
+      } finally {
+        await releasePrewarmLeaseIfMine();
+      }
+    })();
   }
   function hasExtensionContext() {
     try {
