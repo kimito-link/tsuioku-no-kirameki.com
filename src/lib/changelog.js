@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.19',
+    date: '2026-04-30',
+    summary: '来場者数カードの「取得不可」を状態別に',
+    items: Object.freeze([
+      '来場者数 / 推定同時接続カードが「（取得不可）」のままになる場合があった表示を改善',
+      '取得中は「（接続中…）」、放送側が来場者数を非公開にしている場合は「（数字非公開）」と区別表示',
+      '「（取得不可）」は通信そのものが取れない最終フォールバック時のみに変更'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.18',
     date: '2026-04-30',
     summary: 'こん太ボタン押下時の体感速度を改善',

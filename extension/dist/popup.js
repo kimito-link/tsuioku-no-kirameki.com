@@ -700,6 +700,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.19",
+      date: "2026-04-30",
+      summary: "\u6765\u5834\u8005\u6570\u30AB\u30FC\u30C9\u306E\u300C\u53D6\u5F97\u4E0D\u53EF\u300D\u3092\u72B6\u614B\u5225\u306B",
+      items: Object.freeze([
+        "\u6765\u5834\u8005\u6570 / \u63A8\u5B9A\u540C\u6642\u63A5\u7D9A\u30AB\u30FC\u30C9\u304C\u300C\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09\u300D\u306E\u307E\u307E\u306B\u306A\u308B\u5834\u5408\u304C\u3042\u3063\u305F\u8868\u793A\u3092\u6539\u5584",
+        "\u53D6\u5F97\u4E2D\u306F\u300C\uFF08\u63A5\u7D9A\u4E2D\u2026\uFF09\u300D\u3001\u653E\u9001\u5074\u304C\u6765\u5834\u8005\u6570\u3092\u975E\u516C\u958B\u306B\u3057\u3066\u3044\u308B\u5834\u5408\u306F\u300C\uFF08\u6570\u5B57\u975E\u516C\u958B\uFF09\u300D\u3068\u533A\u5225\u8868\u793A",
+        "\u300C\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09\u300D\u306F\u901A\u4FE1\u305D\u306E\u3082\u306E\u304C\u53D6\u308C\u306A\u3044\u6700\u7D42\u30D5\u30A9\u30FC\u30EB\u30D0\u30C3\u30AF\u6642\u306E\u307F\u306B\u5909\u66F4"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.18",
       date: "2026-04-30",
       summary: "\u3053\u3093\u592A\u30DC\u30BF\u30F3\u62BC\u4E0B\u6642\u306E\u4F53\u611F\u901F\u5EA6\u3092\u6539\u5584",
@@ -1343,6 +1353,81 @@
     });
     return { showConcurrent, sparseConcurrent };
   }
+
+  // src/lib/watchMetaCardStateGate.js
+  var LOADING_LABEL = "\uFF08\u63A5\u7D9A\u4E2D\u2026\uFF09";
+  var FETCH_FAILED_LABEL = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
+  var DATA_MISSING_LABEL = "\uFF08\u6570\u5B57\u975E\u516C\u958B\uFF09";
+  var PRE_MEASUREMENT_LABEL = "\u8A08\u6E2C\u4E2D\u2026";
+  function resolveWatchMetaCardState(input) {
+    const params = input && typeof input === "object" ? input : {};
+    const snapshot = params.snapshot;
+    const inflight = params.snapshotFetchInflight === true;
+    if (!snapshot || typeof snapshot !== "object") {
+      if (inflight) {
+        return {
+          state: "loading",
+          viewerLabel: LOADING_LABEL,
+          concurrentLabel: LOADING_LABEL,
+          shouldUseSnapshotForViewer: false,
+          shouldUseSnapshotForConcurrent: false
+        };
+      }
+      return {
+        state: "fetch_failed",
+        viewerLabel: FETCH_FAILED_LABEL,
+        concurrentLabel: FETCH_FAILED_LABEL,
+        shouldUseSnapshotForViewer: false,
+        shouldUseSnapshotForConcurrent: false
+      };
+    }
+    const rawVc = snapshot.viewerCountFromDom;
+    const hasViewerCount = typeof rawVc === "number" && Number.isFinite(rawVc) && rawVc >= 0;
+    const recentActive = typeof snapshot.recentActiveUsers === "number" && Number.isFinite(snapshot.recentActiveUsers) ? snapshot.recentActiveUsers : 0;
+    const hasOfficial = typeof snapshot.officialViewerCount === "number" && Number.isFinite(snapshot.officialViewerCount);
+    const hasLiveId = Boolean(String(snapshot.liveId || "").trim());
+    const showConcurrent = recentActive > 0 || hasOfficial || hasViewerCount || hasLiveId;
+    if (hasViewerCount) {
+      if (showConcurrent) {
+        return {
+          state: "ok",
+          viewerLabel: "",
+          concurrentLabel: "",
+          shouldUseSnapshotForViewer: true,
+          shouldUseSnapshotForConcurrent: true
+        };
+      }
+      return {
+        state: "ok",
+        viewerLabel: "",
+        concurrentLabel: "",
+        shouldUseSnapshotForViewer: true,
+        shouldUseSnapshotForConcurrent: true
+      };
+    }
+    if (showConcurrent) {
+      return {
+        state: "data_missing",
+        viewerLabel: DATA_MISSING_LABEL,
+        concurrentLabel: "",
+        shouldUseSnapshotForViewer: false,
+        shouldUseSnapshotForConcurrent: true
+      };
+    }
+    return {
+      state: "pre_measurement",
+      viewerLabel: PRE_MEASUREMENT_LABEL,
+      concurrentLabel: PRE_MEASUREMENT_LABEL,
+      shouldUseSnapshotForViewer: false,
+      shouldUseSnapshotForConcurrent: false
+    };
+  }
+  var WATCH_META_CARD_LABELS = Object.freeze({
+    LOADING: LOADING_LABEL,
+    FETCH_FAILED: FETCH_FAILED_LABEL,
+    DATA_MISSING: DATA_MISSING_LABEL,
+    PRE_MEASUREMENT: PRE_MEASUREMENT_LABEL
+  });
 
   // src/lib/popupWatchSnapshotRetry.js
   async function retrySnapshotRequestUntilReady(requestOnce, opts = {}) {
@@ -6611,7 +6696,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   }
   var watchMetaCache = {
     key: "",
-    snapshot: null
+    snapshot: null,
+    fetchInflight: false,
+    fetchError: ""
   };
   var watchPopupRefreshGeneration = 0;
   var watchPopupLastPaintedLiveId = "";
@@ -8988,7 +9075,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     );
   }
-  function clearWatchMetaCard() {
+  function clearWatchMetaCard(opts = {}) {
     const wrap = $("watchMeta");
     const title = $("watchTitle");
     const broadcaster = $("watchBroadcaster");
@@ -9023,9 +9110,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     thumb.removeAttribute("src");
     tags.innerHTML = "";
     if (audience) audience.hidden = true;
-    if (viewerDomEl) viewerDomEl.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
+    const inflight = typeof opts.inflight === "boolean" ? opts.inflight : Boolean(watchMetaCache.fetchInflight);
+    const error = typeof opts.error === "string" ? opts.error : String(watchMetaCache.fetchError || "");
+    const gate = resolveWatchMetaCardState({
+      snapshot: null,
+      snapshotFetchInflight: inflight,
+      snapshotFetchError: error
+    });
+    if (viewerDomEl) viewerDomEl.textContent = gate.viewerLabel;
     if (concurrentEstEl) {
-      concurrentEstEl.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
+      concurrentEstEl.textContent = gate.concurrentLabel;
       concurrentEstEl.removeAttribute("title");
     }
     if (concurrentSubEl) concurrentSubEl.textContent = "\u4EBA";
@@ -9132,13 +9226,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const vc = snapshot.viewerCountFromDom;
     const recentActive = typeof snapshot.recentActiveUsers === "number" ? snapshot.recentActiveUsers : 0;
     const { showConcurrent, sparseConcurrent } = watchMetaConcurrentGateFromSnapshot(snapshot);
+    const stateGate = resolveWatchMetaCardState({
+      snapshot,
+      snapshotFetchInflight: false,
+      snapshotFetchError: ""
+    });
     if (viewerDomEl) {
-      if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) {
+      if (stateGate.shouldUseSnapshotForViewer && typeof vc === "number") {
         viewerDomEl.textContent = vc.toLocaleString("ja-JP");
-      } else if (!showConcurrent) {
-        viewerDomEl.textContent = "\u8A08\u6E2C\u4E2D\u2026";
       } else {
-        viewerDomEl.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
+        viewerDomEl.textContent = stateGate.viewerLabel;
       }
     }
     if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) {
@@ -10723,6 +10820,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         if (thumbCountEl) thumbCountEl.textContent = "-";
         watchMetaCache.key = "";
         watchMetaCache.snapshot = null;
+        watchMetaCache.fetchInflight = false;
+        watchMetaCache.fetchError = "";
         clearWatchMetaCard();
         popupUserCommentProfileMap = null;
         syncStorySourceEntries("", []);
@@ -10773,6 +10872,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         if (thumbCountEl) thumbCountEl.textContent = "-";
         watchMetaCache.key = "";
         watchMetaCache.snapshot = null;
+        watchMetaCache.fetchInflight = false;
+        watchMetaCache.fetchError = "";
         clearWatchMetaCard();
         popupUserCommentProfileMap = null;
         syncStorySourceEntries("", []);
@@ -10892,12 +10993,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const shouldDeep = !INTERCEPT_BACKFILL_STATE.deepTried && arr.length >= 30 && missingIdCount >= Math.ceil(arr.length * 0.4);
       resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
       if (!snapshotCacheHit) {
+        watchMetaCache.fetchInflight = true;
+        watchMetaCache.fetchError = "";
         if (isFreshRefresh()) {
           paintWatchPopupUi();
           markPopupRefreshContentPainted();
           revealPopupPrimaryOnce();
         }
         const snapResult = await requestWatchPageSnapshotFromOpenTab(url);
+        watchMetaCache.fetchInflight = false;
+        watchMetaCache.fetchError = String(snapResult.error || "");
         if (!isFreshRefresh()) return;
         watchMetaCache.snapshot = snapResult.snapshot;
         watchSnapshot = watchMetaCache.snapshot;
@@ -12302,7 +12407,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1210" ? String("0430-1210") : "dev";
+      const buildId = "0430-1239" ? String("0430-1239") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

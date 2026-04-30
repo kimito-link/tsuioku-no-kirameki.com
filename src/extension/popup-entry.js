@@ -91,6 +91,7 @@ import { mergeStoredCommentDedupeVariants } from '../lib/storedCommentDedupeMerg
 import { summarizeRecordedCommenters } from '../lib/liveCommenterStats.js';
 import { resolveConcurrentViewers } from '../lib/concurrentEstimate.js';
 import { watchMetaConcurrentGateFromSnapshot } from '../lib/popupWatchMetaConcurrentGate.js';
+import { resolveWatchMetaCardState } from '../lib/watchMetaCardStateGate.js';
 import { retrySnapshotRequestUntilReady } from '../lib/popupWatchSnapshotRetry.js';
 import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
 import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
@@ -1110,10 +1111,19 @@ function renderExtensionContextBanner(visible) {
   }
 }
 
-/** @type {{ key: string, snapshot: WatchPageSnapshot|null }} */
+/**
+ * @type {{
+ *   key: string,
+ *   snapshot: WatchPageSnapshot|null,
+ *   fetchInflight: boolean,
+ *   fetchError: string
+ * }}
+ */
 const watchMetaCache = {
   key: '',
-  snapshot: null
+  snapshot: null,
+  fetchInflight: false,
+  fetchError: ''
 };
 
 /** 遅延フェーズの描画が直近の refresh に属するか判定する */
@@ -4085,7 +4095,15 @@ function renderCharacterScene(state) {
   );
 }
 
-function clearWatchMetaCard() {
+/**
+ * snapshot 不在時のメタカードリセット。
+ * 0.1.19 (T) 以降は `resolveWatchMetaCardState` で「取得中／取得失敗／計測中」を
+ * 文言で出し分ける。`watchMetaCache.fetchInflight` / `.fetchError` から自動的に
+ * 状態を決めるが、外から override したい場合は opts で渡す。
+ *
+ * @param {{ inflight?: boolean, error?: string }} [opts]
+ */
+function clearWatchMetaCard(opts = {}) {
   const wrap = $('watchMeta');
   const title = $('watchTitle');
   const broadcaster = $('watchBroadcaster');
@@ -4114,9 +4132,20 @@ function clearWatchMetaCard() {
   thumb.removeAttribute('src');
   tags.innerHTML = '';
   if (audience) audience.hidden = true;
-  if (viewerDomEl) viewerDomEl.textContent = '（取得不可）';
+  const inflight =
+    typeof opts.inflight === 'boolean'
+      ? opts.inflight
+      : Boolean(watchMetaCache.fetchInflight);
+  const error =
+    typeof opts.error === 'string' ? opts.error : String(watchMetaCache.fetchError || '');
+  const gate = resolveWatchMetaCardState({
+    snapshot: null,
+    snapshotFetchInflight: inflight,
+    snapshotFetchError: error
+  });
+  if (viewerDomEl) viewerDomEl.textContent = gate.viewerLabel;
   if (concurrentEstEl) {
-    concurrentEstEl.textContent = '（取得不可）';
+    concurrentEstEl.textContent = gate.concurrentLabel;
     concurrentEstEl.removeAttribute('title');
   }
   if (concurrentSubEl) concurrentSubEl.textContent = '人';
@@ -4216,14 +4245,21 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
     : 0;
   const { showConcurrent, sparseConcurrent } =
     watchMetaConcurrentGateFromSnapshot(snapshot);
+  // 0.1.19 (T): snapshot は取れたが viewerCountFromDom だけ null なケースを
+  // 「（取得不可）」ではなく「（数字非公開）」と出す。番組によっては運営側が
+  // 来場者数を非公開にしているのが普通で、ここを「取得不可」と書くと利用者が
+  // 拡張のバグだと誤解する。状態判定は watchMetaCardStateGate.js で一元化。
+  const stateGate = resolveWatchMetaCardState({
+    snapshot,
+    snapshotFetchInflight: false,
+    snapshotFetchError: ''
+  });
 
   if (viewerDomEl) {
-    if (typeof vc === 'number' && Number.isFinite(vc) && vc >= 0) {
+    if (stateGate.shouldUseSnapshotForViewer && typeof vc === 'number') {
       viewerDomEl.textContent = vc.toLocaleString('ja-JP');
-    } else if (!showConcurrent) {
-      viewerDomEl.textContent = '計測中…';
     } else {
-      viewerDomEl.textContent = '（取得不可）';
+      viewerDomEl.textContent = stateGate.viewerLabel;
     }
   }
   if (typeof vc === 'number' && Number.isFinite(vc) && vc >= 0) {
@@ -6222,6 +6258,8 @@ async function refresh() {
     if (thumbCountEl) thumbCountEl.textContent = '-';
     watchMetaCache.key = '';
     watchMetaCache.snapshot = null;
+    watchMetaCache.fetchInflight = false;
+    watchMetaCache.fetchError = '';
     clearWatchMetaCard();
     popupUserCommentProfileMap = null;
     syncStorySourceEntries('', []);
@@ -6276,6 +6314,8 @@ async function refresh() {
     if (thumbCountEl) thumbCountEl.textContent = '-';
     watchMetaCache.key = '';
     watchMetaCache.snapshot = null;
+    watchMetaCache.fetchInflight = false;
+    watchMetaCache.fetchError = '';
     clearWatchMetaCard();
     popupUserCommentProfileMap = null;
     syncStorySourceEntries('', []);
@@ -6489,6 +6529,12 @@ async function refresh() {
   resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
 
   if (!snapshotCacheHit) {
+    // 0.1.19 (T): 取得中フラグを立ててから最初の paint を出す。
+    // clearWatchMetaCard が `watchMetaCache.fetchInflight` を読んで「（接続中…）」
+    // を出してくれるので、ユーザーは取得失敗（取得不可）と取得中（接続中）を
+    // 視覚的に区別できるようになる。
+    watchMetaCache.fetchInflight = true;
+    watchMetaCache.fetchError = '';
     if (isFreshRefresh()) {
       paintWatchPopupUi();
       markPopupRefreshContentPainted();
@@ -6498,6 +6544,8 @@ async function refresh() {
     // NLS_EXPORT_WATCH_SNAPSHOT が snapshot=null で返る瞬間がある。
     // その状態で polling 周期（10〜30秒）まで待たされないように、内部で短いバックオフで再試行する。
     const snapResult = await requestWatchPageSnapshotFromOpenTab(url);
+    watchMetaCache.fetchInflight = false;
+    watchMetaCache.fetchError = String(snapResult.error || '');
     if (!isFreshRefresh()) return;
     watchMetaCache.snapshot = snapResult.snapshot;
     watchSnapshot = watchMetaCache.snapshot;

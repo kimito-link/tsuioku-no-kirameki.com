@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.18（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.19（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,38 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.19 バンプで追加した改善（来場者数カード状態化 T）**:
+
+- ユーザー報告: 「来場者数 / 推定同時接続」カードに「（取得不可）」が出ることが
+ ある。ランクストリップにはコメントが流れているので content script 自体は動い
+ ているが、watch メタカードの数字だけ常時「取得不可」表示になる症状。
+- 真因切り分け: `viewerCountFromDom` は WS → embedded-data#statistics.watchCount →
+ DOM scan の三段で取りに行くが、番組によっては運営側が来場者数を非公開に
+ している（toi の API が `watchCount` を返さない）。この場合、snapshot 自体は
+ 取れているが `viewerCountFromDom = null` で確定し、popup-entry が「（取得不可）」
+ と表示してしまっていた。`liveAudienceDom.js` の正規表現自体は健在。
+- 修正: `src/lib/watchMetaCardStateGate.js` を新設し、純粋関数
+ `resolveWatchMetaCardState({ snapshot, snapshotFetchInflight, snapshotFetchError })`
+ で 5 状態に分類:
+  1. `loading` … snapshot 取得中 → 「（接続中…）」
+  2. `fetch_failed` … snapshot 取得失敗 → 「（取得不可）」（最終フォールバック）
+  3. `data_missing` … snapshot は取れたが viewerCountFromDom 無し →
+     来場者だけ「（数字非公開）」、推定同時接続は既存ロジックで継続表示
+  4. `pre_measurement` … 既存挙動「計測中…」（vc 無し・他シグナルも無し）
+  5. `ok` … 来場者・同接ともに数値表示可能
+- `popup-entry.js` の `clearWatchMetaCard()` / `renderWatchMetaCard()` を gate 経由に
+ 書き換え、`watchMetaCache` に `fetchInflight` / `fetchError` を追加。snapshot 取得の
+ 直前で inflight=true・直後に false にして文言を切替。
+- `lib(new)`: `src/lib/watchMetaCardStateGate.js`（5 状態 + ラベル正本）。
+- `test`: `watchMetaCardStateGate.test.js` 23 ケース新設（loading / fetch_failed /
+ data_missing / pre_measurement / ok の各境界・引数耐性）。`changelog.test.js` の
+ manifest 期待値を 0.1.19 に更新。
+- 副次調査（broadcast race の他に該当無いか）: 0.1.16 で `chrome.tabs.sendMessage`
+ に `{ frameId: 0 }` を投入したのは `extension/background.js#handleBrowserActionClick`
+ のみで、popup→content の sendMessage は全て `tabsSendMessageWithRetry`（既定
+ frameId=0）経由。content-entry の onMessage listener は非対象フレームを sync で
+ 弾くので broadcast race の追加箇所は無いことを確認。
 
 **0.1.18 バンプで追加した改善（kon-ta 体感速度 S）**:
 
