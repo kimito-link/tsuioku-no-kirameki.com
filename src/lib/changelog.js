@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.67',
+    date: '2026-05-01',
+    summary: '関係ないタブで開く時のパネルを Chrome 統合に',
+    items: Object.freeze([
+      'watch じゃないタブで拡張アイコンを押した時、これまでは独立した popup window が Chrome から離れて表示されることがありました。これを Chrome 標準のサイドパネル（画面右側に統合）に変更しました。Chrome のウィンドウから離れて表示される問題が根本解決し、配信視聴中の inline panel と同じような一体感のある UX になります',
+      '従来の popup window は、サイドパネルが使えない環境では fallback として残ります。設定で「常に popup window を開く」を選んでいた人は従来通りの挙動です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.66',
     date: '2026-05-01',
     summary: '横付きパネルの幅・高さをどの画面サイズでも最適化',

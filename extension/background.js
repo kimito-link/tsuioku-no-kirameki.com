@@ -557,39 +557,68 @@ async function openOrFocusPopupWindow() {
 }
 
 /**
+ * 0.1.67 (AW): 関係ないタブ（watch じゃない）でツールバーアイコンを押した時、
+ *   旧来の standalone popup window ではなく Chrome 統合の **side panel** を
+ *   開くよう変更。ユーザー報告「(配信中の inline panel と違って) 関係ない
+ *   タブで開いた popup が Chrome から離れて見える」への対応で、視覚的に
+ *   Chrome window と一体化させる。
+ *
+ *   - watch ページ: 従来通り inline panel に focus（NLS_FOCUS_INLINE_PANEL）
+ *   - watch じゃないタブ: chrome.sidePanel.open({windowId}) で side panel
+ *   - 旧 popup window は API 不在・エラー時の fallback として残す
+ *   - getToolbarActionPolicy() === 'always_open_popup' は旧挙動を保つ（互換）
+ *
+ *   sidepanel.html は popup.html?inline=1&dock=sidepanel を iframe で読み込む
+ *   既存実装。popup-entry.js の sidepanel 用 UI 切り替えロジック (search param
+ *   `dock=sidepanel`) がそのまま機能する。
+ *
  * @param {import('chrome').tabs.Tab|undefined} tab
  */
 async function handleBrowserActionClick(tab) {
   const policy = await getToolbarActionPolicy();
   if (policy === 'always_open_popup') {
+    // 旧設定の人は popup window を維持（互換）
     await openOrFocusPopupWindow();
     return;
   }
   const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
-  if (tid === chrome.tabs.TAB_ID_NONE) {
-    await openOrFocusPopupWindow();
-    return;
+  if (tid !== chrome.tabs.TAB_ID_NONE) {
+    try {
+      /*
+       * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
+       * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
+       * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
+       * フレームに broadcast され、iframe の listener が
+       *   if (!isWatchInlinePanelTopFrame()) return false;
+       * で同期 false を返して port を閉じてしまう。top frame の async listener が
+       * sendResponse({focused:true}) する前に port closed エラーになり、
+       * background が popup 窓を fallback として開いてしまう（user 報告：
+       * インラインパネル + popup 窓が同時に出る）。
+       */
+      const res = await chrome.tabs.sendMessage(
+        tid,
+        { type: 'NLS_FOCUS_INLINE_PANEL' },
+        { frameId: 0 }
+      );
+      if (res && res.focused) return;
+    } catch {
+      // コンテンツ未注入・対象外 URL
+    }
   }
+  // 0.1.67 (AW): watch じゃないタブ → Chrome 統合の side panel を試みる
   try {
-    /*
-     * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
-     * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
-     * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
-     * フレームに broadcast され、iframe の listener が
-     *   if (!isWatchInlinePanelTopFrame()) return false;
-     * で同期 false を返して port を閉じてしまう。top frame の async listener が
-     * sendResponse({focused:true}) する前に port closed エラーになり、
-     * background が popup 窓を fallback として開いてしまう（user 報告：
-     * インラインパネル + popup 窓が同時に出る）。
-     */
-    const res = await chrome.tabs.sendMessage(
-      tid,
-      { type: 'NLS_FOCUS_INLINE_PANEL' },
-      { frameId: 0 }
-    );
-    if (res && res.focused) return;
+    if (
+      tab &&
+      typeof tab.windowId === 'number' &&
+      typeof chrome !== 'undefined' &&
+      chrome.sidePanel &&
+      typeof chrome.sidePanel.open === 'function'
+    ) {
+      await chrome.sidePanel.open({ windowId: tab.windowId });
+      return;
+    }
   } catch {
-    // コンテンツ未注入・対象外 URL
+    // sidePanel.open が使えない / user gesture が失われた / 環境制約 → popup window へ fallback
   }
   await openOrFocusPopupWindow();
 }

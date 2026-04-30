@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.66（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.67（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,36 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.67 バンプで入った修正（関係ないタブを side panel に統合 AW）**:
+
+- ユーザー報告（0.1.66 リリース後）: 「関係ないところでひらくと POP が
+  離れています」「配信の時の POP と同じでいい気がします」。watch じゃない
+  タブで拡張アイコンを押すと standalone popup window が独立した OS window
+  として開き、Chrome から「離れて」見える違和感（0.1.62-0.1.64 で popup の
+  位置調整を重ねたが、OS 上は別 window なので根本的に「枠 2 つ感」が残る
+  問題があった）。
+- 修正方針（B 案 / 推奨）:
+  Chrome 標準の **side panel API** に切り替え。watch じゃないタブで拡張
+  アイコンを押すと chrome.sidePanel.open({windowId}) で Chrome window 内に
+  統合された side panel が右側に開く。視覚的に Chrome と完全に一体化、
+  「枠 2 つ感」が完全に消える。
+- 実装:
+  - background.js の `handleBrowserActionClick` を変更。
+    - watch ページ: 従来通り inline panel に focus（NLS_FOCUS_INLINE_PANEL）
+    - watch じゃないタブ: chrome.sidePanel.open() で side panel を開く（user
+      gesture context で chrome.action.onClicked から呼ぶので user gesture は
+      満たされる）
+    - sidePanel.open が使えない / 失敗時: 旧 openOrFocusPopupWindow() に fallback
+    - getToolbarActionPolicy() === 'always_open_popup' の旧設定は popup window
+      を維持（互換）
+  - sidepanel.html / popup.html?inline=1&dock=sidepanel の既存実装はそのまま
+    使う（変更なし）。popup-entry.js の sidepanel 用 UI 切り替えロジック
+    （search param `dock=sidepanel`）が機能する。
+  - manifest.json の sidePanel permission / side_panel.default_path: 'sidepanel.html'
+    は既に存在（permissions 追加なし、CWS 審査負担を最小化）。
+  - 0.1.62-0.1.64 で実装した popup window の位置調整（右内側 / 多モニタ対応）
+    は **fallback 経路として残す**。
 
 **0.1.66 バンプで入った修正（beside panel 幅・高さ最適化 AV）**:
 
