@@ -443,7 +443,14 @@ async function getToolbarActionPolicy() {
 
 /**
  * 既存の popup 窓があれば前面化、なければ作成（default_popup 廃止後の代替）。
+ *
+ * 0.1.58 (AN): popup window のサイズを毎回 420×780 に強制リセット。
+ *   ユーザーが popup を resize した状態を Chrome が記憶し、次回開いた時に
+ *   横長で開いて右側が空白の cream 領域になる「レイアウトガタガタ」現象が
+ *   発生していた。focused だけでなく width/height も update で揃える。
  */
+const POPUP_WINDOW_WIDTH = 420;
+const POPUP_WINDOW_HEIGHT = 780;
 async function openOrFocusPopupWindow() {
   const url = chrome.runtime.getURL('popup.html');
   const urlBase = url.replace(/[?#].*$/, '');
@@ -454,7 +461,11 @@ async function openOrFocusPopupWindow() {
       const t = w.tabs && w.tabs[0];
       const u = String(t?.url || '');
       if (u && (u === url || u.startsWith(urlBase))) {
-        await chrome.windows.update(w.id, { focused: true });
+        await chrome.windows.update(w.id, {
+          focused: true,
+          width: POPUP_WINDOW_WIDTH,
+          height: POPUP_WINDOW_HEIGHT
+        });
         return;
       }
     }
@@ -465,8 +476,8 @@ async function openOrFocusPopupWindow() {
     await chrome.windows.create({
       url,
       type: 'popup',
-      width: 420,
-      height: 780,
+      width: POPUP_WINDOW_WIDTH,
+      height: POPUP_WINDOW_HEIGHT,
       focused: true
     });
   } catch {

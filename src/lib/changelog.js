@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.58',
+    date: '2026-05-01',
+    summary: 'popup window サイズを毎回 420×780 にリセット',
+    items: Object.freeze([
+      'popup window が横に間延びして右側が空白だらけになる「レイアウトガタガタ」現象を修正。Chrome が以前のサイズを記憶していた問題で、popup を開くたびに 420×780 に強制リセットするよう変更'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.57',
     date: '2026-05-01',
     summary: '何もない時は前放送データを出さない',
