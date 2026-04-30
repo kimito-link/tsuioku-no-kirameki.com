@@ -2463,6 +2463,59 @@
     return clamp2(fallback, "fallback");
   }
 
+  // src/lib/inlineHostBesideSizing.js
+  var DEFAULT_BESIDE_PANEL_LIMITS = Object.freeze({
+    minWidth: 280,
+    minHeight: 240,
+    maxHeightRatio: 0.72,
+    safeRight: 12
+  });
+  function calculateBesidePanelLayout(input, overrides = {}) {
+    const limits = { ...DEFAULT_BESIDE_PANEL_LIMITS, ...overrides };
+    const { videoRect, playerRowRect, viewport, contentNaturalHeight } = input;
+    const vw = Math.max(0, Number(viewport.width) || 0);
+    const vh = Math.max(0, Number(viewport.height) || 0);
+    const vRight = Math.max(0, videoRect.left + videoRect.width);
+    const videoWidth = Math.max(0, videoRect.width);
+    const videoHeight = Math.max(0, videoRect.height);
+    const availableRight = vw - vRight - limits.safeRight;
+    if (availableRight < limits.minWidth) {
+      return null;
+    }
+    let panelWidth = Math.min(videoWidth, availableRight);
+    if (panelWidth < limits.minWidth) {
+      panelWidth = Math.min(limits.minWidth, availableRight);
+      if (panelWidth < limits.minWidth) {
+        return null;
+      }
+    }
+    let baseSource = "video-fallback";
+    let baseHeight = videoHeight;
+    if (playerRowRect && Number.isFinite(playerRowRect.height) && playerRowRect.height >= limits.minHeight) {
+      baseHeight = playerRowRect.height;
+      baseSource = "player-rect";
+    }
+    const safetyMax = Math.max(
+      limits.minHeight,
+      Math.round(vh * limits.maxHeightRatio)
+    );
+    let panelHeight = Math.min(baseHeight, safetyMax);
+    let source = baseSource;
+    if (contentNaturalHeight != null && Number.isFinite(contentNaturalHeight)) {
+      const cnClamped = Math.max(limits.minHeight, contentNaturalHeight);
+      if (cnClamped < panelHeight) {
+        panelHeight = cnClamped;
+        source = "content-fit";
+      }
+    }
+    panelHeight = Math.max(limits.minHeight, Math.round(panelHeight));
+    return {
+      panelWidth: Math.round(panelWidth),
+      panelHeight,
+      source
+    };
+  }
+
   // src/lib/voiceComment.js
   var VOICE_COMMENT_MAX_CHARS = 250;
   function isVoiceCommentSupported() {
@@ -4900,24 +4953,30 @@
       iframe.style.height = `${iframeInnerH}px`;
       iframe.style.maxHeight = `${iframeInnerH}px`;
     }
-    ensureDockBottomReflowListener();
+    ensureInlineHostReflowListener();
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
     host.style.opacity = "1";
     ensureInlinePanelCloseButton(host);
   }
-  var __dockBottomReflowListenerRegistered = false;
-  function ensureDockBottomReflowListener() {
-    if (__dockBottomReflowListenerRegistered) return;
-    __dockBottomReflowListenerRegistered = true;
+  var __inlineHostReflowListenerRegistered = false;
+  function ensureInlineHostReflowListener() {
+    if (__inlineHostReflowListenerRegistered) return;
+    __inlineHostReflowListenerRegistered = true;
     let timer = null;
     const reflow = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         try {
-          if (getEffectiveInlinePanelPlacement() === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
+          const placement = getEffectiveInlinePanelPlacement();
+          if (placement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
             renderInlinePanelDockBottomHost();
+          } else if (placement === INLINE_PANEL_PLACEMENT_BESIDE || placement === INLINE_PANEL_PLACEMENT_BELOW) {
+            const v = document.querySelector("video");
+            if (v instanceof HTMLVideoElement && v.getBoundingClientRect().height >= 100) {
+              renderInlineHostAnchoredToVideo(v);
+            }
           }
         } catch {
         }
@@ -5133,12 +5192,45 @@
     let insertAfter;
     let hostParent;
     let besideFlexRowColumn = false;
+    let besideLayout = null;
     if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
       const col = findBesideFlexRowColumnInsertion(video);
       if (col?.hostParent && col.insertAfter) {
-        insertAfter = col.insertAfter;
-        hostParent = col.hostParent;
-        besideFlexRowColumn = true;
+        const vrCheck = video.getBoundingClientRect();
+        const playerRect = col.insertAfter instanceof HTMLElement ? resolvePlayerRowRect(video, col.insertAfter) : null;
+        const layoutCheck = calculateBesidePanelLayout({
+          videoRect: {
+            left: vrCheck.left,
+            top: vrCheck.top,
+            width: vrCheck.width,
+            height: vrCheck.height
+          },
+          playerRowRect: playerRect ? {
+            left: playerRect.left,
+            top: playerRect.top,
+            width: playerRect.width,
+            height: playerRect.height
+          } : null,
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
+          },
+          contentNaturalHeight: null
+        });
+        if (layoutCheck) {
+          insertAfter = col.insertAfter;
+          hostParent = col.hostParent;
+          besideFlexRowColumn = true;
+          besideLayout = layoutCheck;
+        } else {
+          const r = resolveInlinePanelInsertAnchor(
+            domAnchor,
+            INLINE_PANEL_PLACEMENT_BELOW
+          );
+          insertAfter = /** @type {HTMLElement} */
+          r.insertAfter;
+          hostParent = r.hostParent;
+        }
       } else {
         const r = resolveInlinePanelInsertAnchor(
           insertResolveAnchor,
@@ -5196,17 +5288,26 @@
     host.style.boxSizing = "border-box";
     host.style.marginLeft = hostAttachFallbackBody || besideFlexRowColumn ? "0" : `${marginLeftPx}px`;
     host.style.maxWidth = "100%";
-    host.style.width = hostAttachFallbackBody ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px` : `${panelWidthPx}px`;
+    const finalPanelWidthPx = besideLayout?.panelWidth ?? panelWidthPx;
+    host.style.width = hostAttachFallbackBody ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px` : `${finalPanelWidthPx}px`;
     const iframe = (
       /** @type {HTMLIFrameElement|null} */
       host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
     );
     if (iframe)
-      iframe.style.width = hostAttachFallbackBody ? host.style.width : `${panelWidthPx}px`;
+      iframe.style.width = hostAttachFallbackBody ? host.style.width : `${finalPanelWidthPx}px`;
+    if (besideLayout) {
+      host.style.maxHeight = `${besideLayout.panelHeight}px`;
+      if (iframe) {
+        iframe.style.height = `${besideLayout.panelHeight}px`;
+        iframe.style.maxHeight = `${besideLayout.panelHeight}px`;
+      }
+    }
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
     host.style.opacity = "1";
+    ensureInlineHostReflowListener();
   }
   function renderInlinePopupHost(target) {
     if (!(target instanceof HTMLElement)) return;

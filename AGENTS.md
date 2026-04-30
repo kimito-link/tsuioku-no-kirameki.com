@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.65（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.66（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,33 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.66 バンプで入った修正（beside panel 幅・高さ最適化 AV）**:
+
+- ユーザー報告（0.1.65 リリース後の段階的フィードバック）:
+  - ~1700px: OK（動画+コメ列+panel の三段構成、バランス良）
+  - ~1920px: panel が viewport 右端からはみ出し「来場者数」見切れ
+  - ~2000px: panel が縦に間延びして下半分 cream 空白
+- 旧実装（仮説 + deep research 結果）:
+  - 幅: `inlinePanelLayout.js` の `min(videoRect.width, viewport.width - vLeft - 12)`
+    で clamp 済みだが、SPA の構造で video の右側 right edge との関係が
+    厳密に取れていないケースで panel が viewport を超える。
+  - 高さ: JS 設定なし、CSS で `min(560px, 58vh)` 固定 → playerRow の自然
+    高さに連動せず、大画面で下半分空白。
+- 修正:
+  - 純粋関数 `calculateBesidePanelLayout` (`src/lib/inlineHostBesideSizing.js`、
+    TDD 21 ケース) を新設。
+  - 幅: `min(videoRect.width, viewport.width - videoRect.right - 12)` を厳密に
+    計算し、利用可能幅が `minWidth` (280px) を下回ったら **null を返す → 呼出元
+    `renderInlineHostAnchoredToVideo` で自動的に below フォールバック**。1920px
+    の見切れケースは「beside で破綻するなら自動で下に逃がす」設計で根治。
+  - 高さ: `resolvePlayerRowRect` の戻り値（player+コメ列の自然高さ）を採用、
+    `contentNaturalHeight` が分かれば短い方、最終的に `viewport*0.72` で
+    safety clamp、最低 240px 保証。CSS 固定値依存をやめた。
+  - iframe.height を JS で明示設定するロジックを追加。
+- 0.1.65 で導入した `ensureDockBottomReflowListener` を `ensureInlineHostReflowListener`
+  にリネーム拡張、beside と below もカバー。viewport / video rect 変化に
+  追従して再描画（debounce 150ms）。
 
 **0.1.65 バンプで入った修正（dock_bottom panel 高さ最適化 AU）**:
 

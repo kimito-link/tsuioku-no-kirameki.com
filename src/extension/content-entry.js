@@ -12,6 +12,7 @@ import {
   KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
   normalizeInlinePanelAutoshowEnabled,
   INLINE_PANEL_PLACEMENT_BESIDE,
+  INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_FLOATING,
   INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
   KEY_INLINE_FLOATING_ANCHOR,
@@ -90,6 +91,7 @@ import {
 } from '../lib/inlinePanelLayout.js';
 import { scoreInlineHostAnchorCandidate } from '../lib/inlineHostAnchorScoring.js';
 import { calculateDockBottomPanelHeight } from '../lib/inlineHostDockSizing.js';
+import { calculateBesidePanelLayout } from '../lib/inlineHostBesideSizing.js';
 import {
   applyRecognitionResult,
   isVoiceCommentSupported,
@@ -1848,7 +1850,8 @@ function ensureInlinePanelCloseButton(host) {
  * 0.1.65 (AU): panel 高さの計算を `calculateDockBottomPanelHeight` (純粋関数)
  *   に切り出し。video + コメ列の bottom が取れれば残りスペースに合わせ、取れ
  *   なければ viewport*0.4 のフォールバック。viewport / player 変化は
- *   `ensureDockBottomReflowListener` の resize listener で再呼び出しして追従する。
+
+ *   `ensureInlineHostReflowListener` の resize listener で再呼び出しして追従する。
  */
 function renderInlinePanelDockBottomHost() {
   const host = ensureInlinePopupHost();
@@ -1921,7 +1924,7 @@ function renderInlinePanelDockBottomHost() {
     iframe.style.height = `${iframeInnerH}px`;
     iframe.style.maxHeight = `${iframeInnerH}px`;
   }
-  ensureDockBottomReflowListener();
+  ensureInlineHostReflowListener();
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
@@ -1933,26 +1936,37 @@ function renderInlinePanelDockBottomHost() {
 }
 
 /**
- * dock_bottom モード時に viewport / player rect 変化に追従するための resize listener。
- * 一度だけ登録し、以降 resize で 150ms debounce 後に再描画する。dock_bottom 以外の
- * モードに切り替わっている時は何もしない（renderInlinePanelDockBottomHost の中で
- * placement を再判定するので、無駄な再描画にはならない）。
+ * inline panel host が viewport / player rect 変化に追従するための共通 resize
+ * listener。0.1.65 (AU) で dock_bottom 用に導入、0.1.66 (AV) で beside / below
+ * にも対応。一度だけ登録し、以降 resize で 150ms debounce 後に再描画する。
+ * 対象 placement に該当しない時は何もしない（renderInline* の中で placement
+ * を再判定するので無駄な再描画にはならない）。
  */
-let __dockBottomReflowListenerRegistered = false;
-function ensureDockBottomReflowListener() {
-  if (__dockBottomReflowListenerRegistered) return;
-  __dockBottomReflowListenerRegistered = true;
+let __inlineHostReflowListenerRegistered = false;
+function ensureInlineHostReflowListener() {
+  if (__inlineHostReflowListenerRegistered) return;
+  __inlineHostReflowListenerRegistered = true;
   /** @type {ReturnType<typeof setTimeout>|null} */
   let timer = null;
   const reflow = () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       try {
-        if (
-          getEffectiveInlinePanelPlacement() ===
-          INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
-        ) {
+        const placement = getEffectiveInlinePanelPlacement();
+        if (placement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
           renderInlinePanelDockBottomHost();
+        } else if (
+          placement === INLINE_PANEL_PLACEMENT_BESIDE ||
+          placement === INLINE_PANEL_PLACEMENT_BELOW
+        ) {
+          // beside / below は video 必須。video が取れる時だけ再描画
+          const v = document.querySelector('video');
+          if (
+            v instanceof HTMLVideoElement &&
+            v.getBoundingClientRect().height >= 100
+          ) {
+            renderInlineHostAnchoredToVideo(v);
+          }
         }
       } catch {
         // no-op
@@ -2274,13 +2288,58 @@ function renderInlineHostAnchoredToVideo(video) {
   let hostParent;
   /** flex 行の子として「動画列の次」に置けた（ニコ生の内側ラッパー脱出） */
   let besideFlexRowColumn = false;
+  /**
+   * 0.1.66 (AV): beside 用の純粋関数で計算した panel 幅・高さ。null の時は
+   * 利用可能幅不足で below フォールバック中（既存の computeInlinePanelLayout
+   * を使う）。
+   * @type {{ panelWidth: number, panelHeight: number, source: string } | null}
+   */
+  let besideLayout = null;
 
   if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
     const col = findBesideFlexRowColumnInsertion(video);
     if (col?.hostParent && col.insertAfter) {
-      insertAfter = col.insertAfter;
-      hostParent = col.hostParent;
-      besideFlexRowColumn = true;
+      // beside 用の幅・高さを純粋関数で再計算
+      const vrCheck = video.getBoundingClientRect();
+      const playerRect =
+        col.insertAfter instanceof HTMLElement
+          ? resolvePlayerRowRect(video, col.insertAfter)
+          : null;
+      const layoutCheck = calculateBesidePanelLayout({
+        videoRect: {
+          left: vrCheck.left,
+          top: vrCheck.top,
+          width: vrCheck.width,
+          height: vrCheck.height
+        },
+        playerRowRect: playerRect
+          ? {
+              left: playerRect.left,
+              top: playerRect.top,
+              width: playerRect.width,
+              height: playerRect.height
+            }
+          : null,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        },
+        contentNaturalHeight: null
+      });
+      if (layoutCheck) {
+        insertAfter = col.insertAfter;
+        hostParent = col.hostParent;
+        besideFlexRowColumn = true;
+        besideLayout = layoutCheck;
+      } else {
+        // 利用可能幅不足 → below フォールバック（player の真下に DOM 内挿入）
+        const r = resolveInlinePanelInsertAnchor(
+          domAnchor,
+          INLINE_PANEL_PLACEMENT_BELOW
+        );
+        insertAfter = /** @type {HTMLElement} */ (r.insertAfter);
+        hostParent = r.hostParent;
+      }
     } else {
       const r = resolveInlinePanelInsertAnchor(
         insertResolveAnchor,
@@ -2348,20 +2407,32 @@ function renderInlineHostAnchoredToVideo(video) {
   host.style.marginLeft =
     hostAttachFallbackBody || besideFlexRowColumn ? '0' : `${marginLeftPx}px`;
   host.style.maxWidth = '100%';
+  // 0.1.66 (AV): beside で純粋関数結果が取れていればそれを優先（幅・高さ）
+  const finalPanelWidthPx = besideLayout?.panelWidth ?? panelWidthPx;
   host.style.width = hostAttachFallbackBody
     ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px`
-    : `${panelWidthPx}px`;
+    : `${finalPanelWidthPx}px`;
   const iframe = /** @type {HTMLIFrameElement|null} */ (
     host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
   );
   if (iframe)
     iframe.style.width = hostAttachFallbackBody
       ? host.style.width
-      : `${panelWidthPx}px`;
+      : `${finalPanelWidthPx}px`;
+  // beside の高さを動画行の自然高さに揃える（縦間延びの解消）
+  if (besideLayout) {
+    host.style.maxHeight = `${besideLayout.panelHeight}px`;
+    if (iframe) {
+      iframe.style.height = `${besideLayout.panelHeight}px`;
+      iframe.style.maxHeight = `${besideLayout.panelHeight}px`;
+    }
+  }
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
   host.style.opacity = '1';
+  // 0.1.66 (AV): viewport / video rect 変化に追従
+  ensureInlineHostReflowListener();
 }
 
 /** @param {HTMLElement} target */
