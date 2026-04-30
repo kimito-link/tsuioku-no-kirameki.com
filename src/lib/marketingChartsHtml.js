@@ -936,6 +936,7 @@ function sectionDepartedHeavy(departed, maskShare, identiconResolver) {
   return `<section class="mkt-section" id="mkt-departed">
 <h2>離反コメンター TOP <span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">過去の配信で 5+ コメだったが、今回は記録に居ないユーザー（ラテラル分析 L8）。引き留め / 復帰アプローチの候補。</p>
+<p class="mkt-spec-note">※ 表示名・サムネはコメ記録時点のもの（仕様）。配信者がハンドルを変えた場合、niconico 側の最新と異なることがあります。ID クリックで現在のユーザーページに移動します。</p>
 <table class="mkt-rank">
 <thead><tr><th>#</th><th>サムネ</th><th>ユーザー</th><th>ID</th><th>過去累計コメ</th><th>過去参加放送数</th></tr></thead>
 <tbody>${rows}</tbody>
@@ -989,6 +990,7 @@ ${cells}
   return `<section class="mkt-section" id="mkt-attendance">
 <h2>常連出席カレンダー <span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">直近 ${matrix.broadcasts.length} 配信 × TOP ${matrix.users.length} コメンター（ラテラル分析 L9）。● = 出席 / · = 不参加。各列の横軸は左→右が古→新。</p>
+<p class="mkt-spec-note">※ 表示名・サムネはコメ記録時点のもの（仕様）。配信者がハンドルを変えた場合、niconico 側の最新と異なることがあります。</p>
 <div class="mkt-chart-wrap">
 <table class="mkt-rank mkt-attendance">
 <thead><tr><th>サムネ</th><th>ユーザー</th>${headCols}<th>累計</th></tr></thead>
@@ -1779,6 +1781,7 @@ function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcaster
   return `<section class="mkt-section mkt-section--thumb-grid" aria-label="サムネ付きユーザー一覧">
 <h2>サムネ付きユーザー一覧</h2>
 <p class="mkt-note">アイコンが解決できた応援ユーザーをコメ件数の多い順、種別ごとに並べました（各カテゴリ最大 60 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順で選びます。</p>
+<p class="mkt-spec-note">※ 表示名はコメ記録時点のもの（仕様）。配信者がニコニコでハンドル名を変更した場合、ここの表示と niconico の最新表示が異なることがあります。リアルタイム取得は行っていないため（API 連発によるレート制限を避けるため）、最新名は ID クリック先のユーザーページで確認できます。</p>
 ${numericBlock}
 ${anonymousBlock}
 </section>`;
@@ -2037,6 +2040,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-departed-thumb{width:24px;height:24px;border-radius:6px;object-fit:cover;display:inline-block;background:#0f172a}
 .mkt-departed-thumb--empty{border:1px dashed #334155}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
+.mkt-spec-note{font-size:.72rem;color:#fbbf24;background:rgba(251,191,36,0.08);border-left:3px solid #fbbf24;padding:.4rem .6rem;margin:0 0 .8rem;border-radius:0 4px 4px 0}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}
 .mkt-kpi__icon{font-size:1.4rem;display:block}

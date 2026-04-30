@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.35',
+    date: '2026-04-30',
+    summary: '仕様注記の追加と内部分割の小さな一歩',
+    items: Object.freeze([
+      'マーケ分析の離反/出席/サムネ一覧に「表示名はコメ記録時点のもの（仕様）」の注記を追加。配信者がハンドルを変えた場合の挙動を明記',
+      '内部リファクタ: popup-entry.js から formatDateTime を src/lib/formatDateTime.js に切り出し（コンポーネント分割の第一歩）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.34',
     date: '2026-04-30',
     summary: '離反/出席にニックネームを表示',

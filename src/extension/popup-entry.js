@@ -250,6 +250,7 @@ import {
 } from '../lib/broadcastSessionSummaryDb.js';
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
+import { formatDateTime } from '../lib/formatDateTime.js';
 
 /**
  * @typedef {{
@@ -6741,23 +6742,8 @@ async function refresh() {
   }
 }
 
-/** @param {number|string} value */
-function formatDateTime(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return '-';
-  try {
-    return new Date(n).toLocaleString('ja-JP', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  } catch {
-    return '-';
-  }
-}
+// 0.1.35 (AJ): formatDateTime を src/lib/formatDateTime.js に切り出し済み。
+// popup-entry.js のコンポーネント分割の第一歩。
 
 /**
  * pathname+search が一致するタブを優先（別クエリの同 lv タブより先）

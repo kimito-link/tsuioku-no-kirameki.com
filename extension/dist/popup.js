@@ -700,6 +700,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.35",
+      date: "2026-04-30",
+      summary: "\u4ED5\u69D8\u6CE8\u8A18\u306E\u8FFD\u52A0\u3068\u5185\u90E8\u5206\u5272\u306E\u5C0F\u3055\u306A\u4E00\u6B69",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306E\u96E2\u53CD/\u51FA\u5E2D/\u30B5\u30E0\u30CD\u4E00\u89A7\u306B\u300C\u8868\u793A\u540D\u306F\u30B3\u30E1\u8A18\u9332\u6642\u70B9\u306E\u3082\u306E\uFF08\u4ED5\u69D8\uFF09\u300D\u306E\u6CE8\u8A18\u3092\u8FFD\u52A0\u3002\u914D\u4FE1\u8005\u304C\u30CF\u30F3\u30C9\u30EB\u3092\u5909\u3048\u305F\u5834\u5408\u306E\u6319\u52D5\u3092\u660E\u8A18",
+        "\u5185\u90E8\u30EA\u30D5\u30A1\u30AF\u30BF: popup-entry.js \u304B\u3089 formatDateTime \u3092 src/lib/formatDateTime.js \u306B\u5207\u308A\u51FA\u3057\uFF08\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u5206\u5272\u306E\u7B2C\u4E00\u6B69\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.34",
       date: "2026-04-30",
       summary: "\u96E2\u53CD/\u51FA\u5E2D\u306B\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0\u3092\u8868\u793A",
@@ -6792,6 +6801,7 @@ ${dots}
     return `<section class="mkt-section" id="mkt-departed">
 <h2>\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP <span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">\u904E\u53BB\u306E\u914D\u4FE1\u3067 5+ \u30B3\u30E1\u3060\u3063\u305F\u304C\u3001\u4ECA\u56DE\u306F\u8A18\u9332\u306B\u5C45\u306A\u3044\u30E6\u30FC\u30B6\u30FC\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L8\uFF09\u3002\u5F15\u304D\u7559\u3081 / \u5FA9\u5E30\u30A2\u30D7\u30ED\u30FC\u30C1\u306E\u5019\u88DC\u3002</p>
+<p class="mkt-spec-note">\u203B \u8868\u793A\u540D\u30FB\u30B5\u30E0\u30CD\u306F\u30B3\u30E1\u8A18\u9332\u6642\u70B9\u306E\u3082\u306E\uFF08\u4ED5\u69D8\uFF09\u3002\u914D\u4FE1\u8005\u304C\u30CF\u30F3\u30C9\u30EB\u3092\u5909\u3048\u305F\u5834\u5408\u3001niconico \u5074\u306E\u6700\u65B0\u3068\u7570\u306A\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002ID \u30AF\u30EA\u30C3\u30AF\u3067\u73FE\u5728\u306E\u30E6\u30FC\u30B6\u30FC\u30DA\u30FC\u30B8\u306B\u79FB\u52D5\u3057\u307E\u3059\u3002</p>
 <table class="mkt-rank">
 <thead><tr><th>#</th><th>\u30B5\u30E0\u30CD</th><th>\u30E6\u30FC\u30B6\u30FC</th><th>ID</th><th>\u904E\u53BB\u7D2F\u8A08\u30B3\u30E1</th><th>\u904E\u53BB\u53C2\u52A0\u653E\u9001\u6570</th></tr></thead>
 <tbody>${rows}</tbody>
@@ -6826,6 +6836,7 @@ ${cells}
     return `<section class="mkt-section" id="mkt-attendance">
 <h2>\u5E38\u9023\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC <span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">\u76F4\u8FD1 ${matrix.broadcasts.length} \u914D\u4FE1 \xD7 TOP ${matrix.users.length} \u30B3\u30E1\u30F3\u30BF\u30FC\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L9\uFF09\u3002\u25CF = \u51FA\u5E2D / \xB7 = \u4E0D\u53C2\u52A0\u3002\u5404\u5217\u306E\u6A2A\u8EF8\u306F\u5DE6\u2192\u53F3\u304C\u53E4\u2192\u65B0\u3002</p>
+<p class="mkt-spec-note">\u203B \u8868\u793A\u540D\u30FB\u30B5\u30E0\u30CD\u306F\u30B3\u30E1\u8A18\u9332\u6642\u70B9\u306E\u3082\u306E\uFF08\u4ED5\u69D8\uFF09\u3002\u914D\u4FE1\u8005\u304C\u30CF\u30F3\u30C9\u30EB\u3092\u5909\u3048\u305F\u5834\u5408\u3001niconico \u5074\u306E\u6700\u65B0\u3068\u7570\u306A\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002</p>
 <div class="mkt-chart-wrap">
 <table class="mkt-rank mkt-attendance">
 <thead><tr><th>\u30B5\u30E0\u30CD</th><th>\u30E6\u30FC\u30B6\u30FC</th>${headCols}<th>\u7D2F\u8A08</th></tr></thead>
@@ -7417,6 +7428,7 @@ ${idWrap("mkt-json", sectionMachineReadableJson(embedJson, maskShare))}
     return `<section class="mkt-section mkt-section--thumb-grid" aria-label="\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7">
 <h2>\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</h2>
 <p class="mkt-note">\u30A2\u30A4\u30B3\u30F3\u304C\u89E3\u6C7A\u3067\u304D\u305F\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u3092\u30B3\u30E1\u4EF6\u6570\u306E\u591A\u3044\u9806\u3001\u7A2E\u5225\u3054\u3068\u306B\u4E26\u3079\u307E\u3057\u305F\uFF08\u5404\u30AB\u30C6\u30B4\u30EA\u6700\u5927 60 \u540D\uFF09\u3002\u30A2\u30A4\u30B3\u30F3\u306F \u2460 \u500B\u4EBA\u30B5\u30E0\u30CD \u2461 \u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 \u2462 \u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon \u306E\u512A\u5148\u9806\u3067\u9078\u3073\u307E\u3059\u3002</p>
+<p class="mkt-spec-note">\u203B \u8868\u793A\u540D\u306F\u30B3\u30E1\u8A18\u9332\u6642\u70B9\u306E\u3082\u306E\uFF08\u4ED5\u69D8\uFF09\u3002\u914D\u4FE1\u8005\u304C\u30CB\u30B3\u30CB\u30B3\u3067\u30CF\u30F3\u30C9\u30EB\u540D\u3092\u5909\u66F4\u3057\u305F\u5834\u5408\u3001\u3053\u3053\u306E\u8868\u793A\u3068 niconico \u306E\u6700\u65B0\u8868\u793A\u304C\u7570\u306A\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u53D6\u5F97\u306F\u884C\u3063\u3066\u3044\u306A\u3044\u305F\u3081\uFF08API \u9023\u767A\u306B\u3088\u308B\u30EC\u30FC\u30C8\u5236\u9650\u3092\u907F\u3051\u308B\u305F\u3081\uFF09\u3001\u6700\u65B0\u540D\u306F ID \u30AF\u30EA\u30C3\u30AF\u5148\u306E\u30E6\u30FC\u30B6\u30FC\u30DA\u30FC\u30B8\u3067\u78BA\u8A8D\u3067\u304D\u307E\u3059\u3002</p>
 ${numericBlock}
 ${anonymousBlock}
 </section>`;
@@ -7598,6 +7610,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-departed-thumb{width:24px;height:24px;border-radius:6px;object-fit:cover;display:inline-block;background:#0f172a}
 .mkt-departed-thumb--empty{border:1px dashed #334155}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
+.mkt-spec-note{font-size:.72rem;color:#fbbf24;background:rgba(251,191,36,0.08);border-left:3px solid #fbbf24;padding:.4rem .6rem;margin:0 0 .8rem;border-radius:0 4px 4px 0}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}
 .mkt-kpi__icon{font-size:1.4rem;display:block}
@@ -8519,6 +8532,24 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       return queue.length;
     }
     return { enqueue, flushAll, size };
+  }
+
+  // src/lib/formatDateTime.js
+  function formatDateTime(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return "-";
+    try {
+      return new Date(n).toLocaleString("ja-JP", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      });
+    } catch {
+      return "-";
+    }
   }
 
   // src/extension/popup-entry.js
@@ -13599,22 +13630,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       throw e;
     }
   }
-  function formatDateTime(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0) return "-";
-    try {
-      return new Date(n).toLocaleString("ja-JP", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
-      });
-    } catch {
-      return "-";
-    }
-  }
   function prioritizeWatchTabCandidates(candidates, watchUrl) {
     const w = String(watchUrl || "").trim();
     if (!w) return candidates;
@@ -15024,7 +15039,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1837" ? String("0430-1837") : "dev";
+      const buildId = "0430-1847" ? String("0430-1847") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
