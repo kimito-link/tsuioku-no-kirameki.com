@@ -475,10 +475,14 @@ async function openOrFocusPopupWindow() {
     // no-op
   }
   /*
-   * 0.1.60 (AP): 複数モニタ環境でユーザーが今使っている Chrome window と
-   *   別のモニタに popup が開く問題を修正。`chrome.windows.getLastFocused`
-   *   で「直前にフォーカスされていた通常 window」を取得し、その中央に
-   *   popup を配置することで、ユーザーが見ているモニタに popup が出る。
+   * 0.1.60 (AP) → 0.1.61 (AQ): 複数モニタ環境で「同じモニタ」に出すのは OK
+   *   になったが、中央配置だと Chrome ウィンドウの中身に被さって不自然
+   *   （ユーザー報告: 高さがずれている、ボックスの中にあるかんじ）。
+   *   Chrome の右側に隣接させる形に変更。
+   *     - left = Chrome window の右端 - popup の幅 - 余白
+   *     - top  = Chrome window の上端 + tab/toolbar 分の小さなオフセット
+   *   これで Chrome のメイン content に被さらず、右上付近に popup が出る。
+   *   画面端からはみ出る場合は workArea に合わせて clamp。
    */
   /** @type {{ left?: number, top?: number }} */
   const positionHint = {};
@@ -493,15 +497,14 @@ async function openOrFocusPopupWindow() {
       typeof lastNormal.width === 'number' &&
       typeof lastNormal.height === 'number'
     ) {
-      // last focused normal window の中央に popup の中央を合わせる
-      const left = Math.round(
-        lastNormal.left + (lastNormal.width - POPUP_WINDOW_WIDTH) / 2
-      );
-      const top = Math.round(
-        lastNormal.top + (lastNormal.height - POPUP_WINDOW_HEIGHT) / 2
-      );
-      positionHint.left = Math.max(0, left);
-      positionHint.top = Math.max(0, top);
+      const POPUP_RIGHT_MARGIN = 16;
+      const POPUP_TOP_OFFSET = 80;
+      // Chrome の右上アイコン付近に popup を配置。Chrome の content に被らない。
+      const left = lastNormal.left + lastNormal.width - POPUP_WINDOW_WIDTH - POPUP_RIGHT_MARGIN;
+      const top = lastNormal.top + POPUP_TOP_OFFSET;
+      // モニタの最低限の境界（負値防止）
+      positionHint.left = Math.max(0, Math.round(left));
+      positionHint.top = Math.max(0, Math.round(top));
     }
   } catch {
     // no-op: getLastFocused が取れなければ Chrome のデフォルト位置にする

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.61',
+    date: '2026-05-01',
+    summary: 'popup を Chrome の右側に隣接配置',
+    items: Object.freeze([
+      'popup が Chrome ウィンドウの中央に被さって「ボックスの中にあるかんじ」になる問題を修正。Chrome ウィンドウの右側に隣接する位置に popup を配置するよう変更（Chrome の content に重ならない）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.60',
     date: '2026-05-01',
     summary: '複数モニタ時に popup を同じ画面に出す',
