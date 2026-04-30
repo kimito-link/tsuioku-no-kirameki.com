@@ -26,11 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.51',
+    date: '2026-04-30',
+    summary: 'popup の dark を完全に撤去',
+    items: Object.freeze([
+      'popup を開いたときに dark テーマで真っ黒になる問題を完全修正。0.1.50 で OS の dark 設定検出に切り替えたが、Chrome のテーマや Windows のシステム配色で誤って dark と判定されるケースが残ったので、light 配色（クリーム色背景）固定に変更'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.50',
     date: '2026-04-30',
-    summary: 'popup の黒テーマ強制を撤去',
+    summary: 'popup の黒テーマ強制を撤去（部分）',
     items: Object.freeze([
-      'ツールバーから popup を開いた時に常に真っ黒で視認性が悪かった問題を修正。OS のダークモード設定が dark のときだけ dark 配色になり、light のときは light 配色（クリーム色背景）になります'
+      'ツールバーから popup を開いた時に常に真っ黒だった件の対策（OS の dark 設定検出に切替、後の 0.1.51 でさらに完全 light 化）'
     ])
   }),
   Object.freeze({

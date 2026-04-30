@@ -708,11 +708,19 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.51",
+      date: "2026-04-30",
+      summary: "popup \u306E dark \u3092\u5B8C\u5168\u306B\u64A4\u53BB",
+      items: Object.freeze([
+        "popup \u3092\u958B\u3044\u305F\u3068\u304D\u306B dark \u30C6\u30FC\u30DE\u3067\u771F\u3063\u9ED2\u306B\u306A\u308B\u554F\u984C\u3092\u5B8C\u5168\u4FEE\u6B63\u30020.1.50 \u3067 OS \u306E dark \u8A2D\u5B9A\u691C\u51FA\u306B\u5207\u308A\u66FF\u3048\u305F\u304C\u3001Chrome \u306E\u30C6\u30FC\u30DE\u3084 Windows \u306E\u30B7\u30B9\u30C6\u30E0\u914D\u8272\u3067\u8AA4\u3063\u3066 dark \u3068\u5224\u5B9A\u3055\u308C\u308B\u30B1\u30FC\u30B9\u304C\u6B8B\u3063\u305F\u306E\u3067\u3001light \u914D\u8272\uFF08\u30AF\u30EA\u30FC\u30E0\u8272\u80CC\u666F\uFF09\u56FA\u5B9A\u306B\u5909\u66F4"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.50",
       date: "2026-04-30",
-      summary: "popup \u306E\u9ED2\u30C6\u30FC\u30DE\u5F37\u5236\u3092\u64A4\u53BB",
+      summary: "popup \u306E\u9ED2\u30C6\u30FC\u30DE\u5F37\u5236\u3092\u64A4\u53BB\uFF08\u90E8\u5206\uFF09",
       items: Object.freeze([
-        "\u30C4\u30FC\u30EB\u30D0\u30FC\u304B\u3089 popup \u3092\u958B\u3044\u305F\u6642\u306B\u5E38\u306B\u771F\u3063\u9ED2\u3067\u8996\u8A8D\u6027\u304C\u60AA\u304B\u3063\u305F\u554F\u984C\u3092\u4FEE\u6B63\u3002OS \u306E\u30C0\u30FC\u30AF\u30E2\u30FC\u30C9\u8A2D\u5B9A\u304C dark \u306E\u3068\u304D\u3060\u3051 dark \u914D\u8272\u306B\u306A\u308A\u3001light \u306E\u3068\u304D\u306F light \u914D\u8272\uFF08\u30AF\u30EA\u30FC\u30E0\u8272\u80CC\u666F\uFF09\u306B\u306A\u308A\u307E\u3059"
+        "\u30C4\u30FC\u30EB\u30D0\u30FC\u304B\u3089 popup \u3092\u958B\u3044\u305F\u6642\u306B\u5E38\u306B\u771F\u3063\u9ED2\u3060\u3063\u305F\u4EF6\u306E\u5BFE\u7B56\uFF08OS \u306E dark \u8A2D\u5B9A\u691C\u51FA\u306B\u5207\u66FF\u3001\u5F8C\u306E 0.1.51 \u3067\u3055\u3089\u306B\u5B8C\u5168 light \u5316\uFF09"
       ])
     }),
     Object.freeze({
@@ -9588,15 +9596,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     body.classList.toggle("nl-inline", INLINE_MODE);
     root.classList.toggle("nl-inline-embed-watch", INLINE_EMBED_WATCH);
     body.classList.toggle("nl-inline-embed-watch", INLINE_EMBED_WATCH);
-    const prefersDark = (() => {
-      try {
-        return Boolean(window.matchMedia?.("(prefers-color-scheme: dark)")?.matches);
-      } catch {
-        return false;
-      }
-    })();
-    const shouldForceDark = (!INLINE_MODE || INLINE_SIDE_PANEL) && prefersDark;
-    root.classList.toggle("nl-skin-panel-dark", shouldForceDark);
+    root.classList.remove("nl-skin-panel-dark");
     body.classList.remove("nl-skin-panel-dark");
     if (INLINE_MODE) {
       const iw = Math.round(window.innerWidth || 360);
@@ -15977,7 +15977,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2249" ? String("0430-2249") : "dev";
+      const buildId = "0430-2257" ? String("0430-2257") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

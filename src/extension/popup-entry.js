@@ -372,23 +372,15 @@ function applyResponsivePopupLayout() {
   root.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
   body.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
   /*
-   * 0.1.50 (AF): popup window / side panel の dark theme 強制を撤去。
-   *   旧コードは `!INLINE_MODE || INLINE_SIDE_PANEL` で常に dark を当てていたが、
-   *   ユーザー報告「真っ黒で視認性が悪い」「OS は dark に切り替えていない」
-   *   が継続。OS の `prefers-color-scheme: dark` のときだけ dark を当てる
-   *   ようにし、light の OS 環境では popup も light 配色になる。
-   *   INLINE_MODE は親ページの背景に同化するので影響なし。
+   * 0.1.51 (AG): popup window で dark テーマが消えない件の追跡修正。
+   *   0.1.50 で `prefers-color-scheme: dark` 検出に切り替えたが、
+   *   Chrome のテーマ設定 / Windows のシステム配色が dark 寄りだと
+   *   matchMedia が true を返してしまい、ユーザー視点の「OS は light」と
+   *   食い違って dark のままだった。完全に light 強制（dark クラスを
+   *   一切付けない）に変更する。dark を望むユーザー向けには将来 設定
+   *   トグルを追加する。
    */
-  const prefersDark = (() => {
-    try {
-      return Boolean(window.matchMedia?.('(prefers-color-scheme: dark)')?.matches);
-    } catch {
-      return false;
-    }
-  })();
-  const shouldForceDark =
-    (!INLINE_MODE || INLINE_SIDE_PANEL) && prefersDark;
-  root.classList.toggle('nl-skin-panel-dark', shouldForceDark);
+  root.classList.remove('nl-skin-panel-dark');
   body.classList.remove('nl-skin-panel-dark');
 
   if (INLINE_MODE) {
