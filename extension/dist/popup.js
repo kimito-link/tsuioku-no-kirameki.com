@@ -9092,6 +9092,25 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     fill.style.width = `${Math.max(0, Math.min(100, Number(heatPercent) || 0)).toFixed(2)}%`;
     note.textContent = `${heatText}\uFF08\u3053\u306E5\u5206\u3067\u5897\u3048\u305F\u4EF6\u6570\uFF09`;
   }
+  function bindOnErrorHideHandlersWithin(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    const imgs = root.querySelectorAll('img[data-on-error-hide="1"]');
+    imgs.forEach((node) => {
+      if (!(node instanceof HTMLImageElement)) return;
+      if (node.dataset.nlOnErrorHideBound === "1") return;
+      node.dataset.nlOnErrorHideBound = "1";
+      node.addEventListener(
+        "error",
+        () => {
+          try {
+            node.style.visibility = "hidden";
+          } catch {
+          }
+        },
+        { once: true }
+      );
+    });
+  }
   function topSupportRankStripCasterTileHtml() {
     const snap = watchMetaCache.snapshot;
     const name = String(snap?.broadcasterName || "").trim();
@@ -9104,7 +9123,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const iconBucket = Math.floor(Number(uid) / 1e4);
     const iconUrl = `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/${iconBucket}/${uid}.jpg`;
     const fullTitle = `\u914D\u4FE1\u8005 ${nameWithLv}\uFF08\u30AF\u30EA\u30C3\u30AF\u3067\u30E6\u30FC\u30B6\u30FC\u30DA\u30FC\u30B8\uFF09`;
-    return `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}"><span class="nl-top-support-rank__caster-label">\u914D\u4FE1\u8005</span><a class="nl-top-support-rank__caster-link" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;"><img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" /><span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span></a><a class="nl-top-support-rank__caster-follow" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer">\u30D5\u30A9\u30ED\u30FC</a></div>`;
+    return `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}"><span class="nl-top-support-rank__caster-label">\u914D\u4FE1\u8005</span><a class="nl-top-support-rank__caster-link" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;"><img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" /><span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span></a><a class="nl-top-support-rank__caster-follow" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer">\u30D5\u30A9\u30ED\u30FC</a></div>`;
   }
   function renderTopSupportRankStrip(stripRooms) {
     const strip = (
@@ -9124,6 +9143,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       strip.removeAttribute("aria-hidden");
       strip.setAttribute("aria-label", "\u914D\u4FE1\u8005\u60C5\u5831");
       strip.innerHTML = `<p class="nl-top-support-rank__note">\u307E\u3060\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u304C\u3042\u308A\u307E\u305B\u3093\u3002\u307E\u305A\u306F\u914D\u4FE1\u8005\u306E\u30D5\u30A9\u30ED\u30FC\u304B\u3089\u3002</p><div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
+      bindOnErrorHideHandlersWithin(strip);
       return;
     }
     strip.hidden = false;
@@ -9166,6 +9186,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }).join("");
     const listInner = `${html}${casterTileHtml}`;
     strip.innerHTML = `<p class="nl-top-support-rank__note">\u8A18\u9332\u5185\u30FB\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u5FDC\u63F4\u4EF6\u6570\u304C\u591A\u3044\u9806\u3067\u3059\u3002</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
+    bindOnErrorHideHandlersWithin(strip);
     const thumbs = strip.querySelectorAll("img.nl-top-support-rank__thumb");
     models.forEach((m, i) => {
       const img = thumbs[i];
@@ -11867,7 +11888,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-0932" ? String("0430-0932") : "dev";
+      const buildId = "0430-0953" ? String("0430-0953") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

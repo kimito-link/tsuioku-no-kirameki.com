@@ -4473,6 +4473,37 @@ function renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText) 
  * データが揃っていない（未取得・非公式ページ等）ときは空文字。
  * @returns {string}
  */
+/**
+ * 0.1.12 (E): innerHTML で流し込んだ HTML 文字列の中に `data-on-error-hide="1"`
+ * 付きの <img> がある場合、画像読み込み失敗時に該当要素を visibility:hidden に
+ * する。MV3 strict CSP で `onerror="this.style.visibility='hidden'"` のような
+ * インライン属性ハンドラは実行できず CSP 違反ログが毎回発生していたので、
+ * 同等の挙動をプログラム的に再現する。
+ *
+ * @param {ParentNode | null | undefined} root
+ */
+function bindOnErrorHideHandlersWithin(root) {
+  if (!root || typeof root.querySelectorAll !== 'function') return;
+  const imgs = root.querySelectorAll('img[data-on-error-hide="1"]');
+  imgs.forEach((node) => {
+    if (!(node instanceof HTMLImageElement)) return;
+    // 二重バインド防止（再描画でも一度だけ）
+    if (node.dataset.nlOnErrorHideBound === '1') return;
+    node.dataset.nlOnErrorHideBound = '1';
+    node.addEventListener(
+      'error',
+      () => {
+        try {
+          node.style.visibility = 'hidden';
+        } catch {
+          // no-op
+        }
+      },
+      { once: true }
+    );
+  });
+}
+
 function topSupportRankStripCasterTileHtml() {
   const snap = watchMetaCache.snapshot;
   const name = String(snap?.broadcasterName || '').trim();
@@ -4489,7 +4520,11 @@ function topSupportRankStripCasterTileHtml() {
     `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}">` +
     `<span class="nl-top-support-rank__caster-label">配信者</span>` +
     `<a class="nl-top-support-rank__caster-link" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` +
-    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" />` +
+    // 0.1.12 (E): MV3 strict CSP は onerror="..." 等のインライン属性ハンドラを実行できない。
+    // 旧コードの `onerror="this.style.visibility='hidden'"` は CSP 違反のログを毎回吐いていた。
+    // 代わりに data-on-error-hide マーカーを付けて、innerHTML 流し込み直後に
+    // addEventListener('error') で同等の挙動を貼り直す（renderTopSupportRankStrip 内）。
+    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" />` +
     `<span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span>` +
     `</a>` +
     `<a class="nl-top-support-rank__caster-follow" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer">フォロー</a>` +
@@ -4523,6 +4558,7 @@ function renderTopSupportRankStrip(stripRooms) {
     strip.innerHTML =
       `<p class="nl-top-support-rank__note">まだ応援コメントがありません。まずは配信者のフォローから。</p>` +
       `<div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
+    bindOnErrorHideHandlersWithin(strip);
     return;
   }
   strip.hidden = false;
@@ -4584,6 +4620,7 @@ function renderTopSupportRankStrip(stripRooms) {
    */
   const listInner = `${html}${casterTileHtml}`;
   strip.innerHTML = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
+  bindOnErrorHideHandlersWithin(strip);
   const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
   models.forEach((m, i) => {
     const img = thumbs[i];
