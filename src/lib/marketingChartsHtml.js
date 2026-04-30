@@ -18,6 +18,13 @@ import {
   buildCommentVelocityTimeline,
   buildLaughterDensityTimeline
 } from './commentVelocityTimeline.js';
+import {
+  classifyCommentersAgainstHistory,
+  findDepartedHeavyCommenters,
+  buildCommenterAttendanceMatrix
+} from './commenterHistoricalAnalytics.js';
+import { buildCommenterSurvivalCurve } from './commenterSurvivalCurve.js';
+import { diagnoseKeyboardTypes } from './keyboardTypeDiagnostic.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -650,13 +657,209 @@ ${bars}
 }
 
 /**
+ * 0.1.23 (X): 新規 vs 常連分類セクション。
+ * @param {ReturnType<typeof classifyCommentersAgainstHistory>} c
+ */
+function sectionNewVsRepeat(c) {
+  if (!c || c.totalCurrent === 0) return '';
+  /** @param {number} n */
+  const pct = (n) => `${(n * 100).toFixed(1)}%`;
+  return `<section class="mkt-section" id="mkt-new-vs-repeat">
+<h2>新規 vs 常連 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">過去の記録した配信と突合して、今回のコメンターを 3 区分に分類（過去 5+ コメ実績ありが「ヘビー常連」）。${c.totalCurrent} 名中。</p>
+<table class="mkt-rank">
+<thead><tr><th>分類</th><th>人数</th><th>比率</th></tr></thead>
+<tbody>
+<tr><th>新規（このアカウントで初めて記録）</th><td>${c.newCount}</td><td>${pct(c.newRatio)}</td></tr>
+<tr><th>リピーター（過去にも記録あり）</th><td>${c.repeatCount}</td><td>${pct(c.repeatRatio)}</td></tr>
+<tr><th>うちヘビー常連（過去 5+ コメ）</th><td>${c.heavyCount}</td><td>${pct(c.heavyRatio)}</td></tr>
+</tbody>
+</table>
+</section>`;
+}
+
+/**
+ * 0.1.23 (X): コメンター生存曲線（B6）。
+ * @param {ReturnType<typeof buildCommenterSurvivalCurve>} curve
+ */
+function sectionSurvivalCurve(curve) {
+  if (!curve || curve.segments.length < 2) return '';
+  const W = 900;
+  const H = 200;
+  const pad = 40;
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  const n = curve.segments.length;
+  /** @param {number} i */
+  const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
+  /** @param {number} pct */
+  const yOf = (pct) => pad + innerH - (Math.min(100, pct) / 100) * innerH;
+  const linePts = curve.segments
+    .map((s, i) => `${xOf(i).toFixed(1)},${yOf(s.retentionPct).toFixed(1)}`)
+    .join(' ');
+  const dots = curve.segments
+    .map(
+      (s, i) =>
+        `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(s.retentionPct).toFixed(1)}" r="3" fill="#a78bfa"><title>区間${i + 1} (${s.startMin}〜${s.endMin}分): ${s.retentionPct}% (${s.presentCount}名)</title></circle>`
+    )
+    .join('');
+  const xLabels = curve.segments
+    .map(
+      (s, i) =>
+        `<text x="${xOf(i).toFixed(1)}" y="${H - 4}" text-anchor="middle" class="mkt-axis">${s.startMin}m</text>`
+    )
+    .join('');
+  const yLabels = [0, 25, 50, 75, 100]
+    .map(
+      (v) =>
+        `<text x="${pad - 4}" y="${yOf(v) + 4}" text-anchor="end" class="mkt-axis">${v}%</text>`
+    )
+    .join('');
+  return `<section class="mkt-section" id="mkt-survival">
+<h2>コメンター生存曲線 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">配信を ${n} 等分し、最初の区間に居た「base ${curve.baseUserCount} 名」のうち各区間にも居た % を表示。「コメント参加維持率」=コメ書く層の残存。</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${yLabels}${xLabels}
+<polyline points="${linePts}" fill="none" stroke="#a78bfa" stroke-width="2"/>
+${dots}
+</svg>
+</div></section>`;
+}
+
+/**
+ * 0.1.23 (X): 離反コメンター TOP（L8）。
+ * @param {ReturnType<typeof findDepartedHeavyCommenters>} departed
+ * @param {boolean} maskShare
+ */
+function sectionDepartedHeavy(departed, maskShare) {
+  if (!Array.isArray(departed) || departed.length === 0) return '';
+  if (maskShare) return ''; // 個人特定リストなので共有モードでは出さない
+  const rows = departed
+    .map((d, i) => {
+      const labelHtml = buildUserProfileLinkedLabelHtml(
+        d.userId,
+        displayUserLabel(d.userId, '')
+      );
+      return `<tr>
+<td>${i + 1}</td>
+<td>${labelHtml}</td>
+<td>${d.totalComments}</td>
+<td>${d.broadcastCount}</td>
+</tr>`;
+    })
+    .join('');
+  return `<section class="mkt-section" id="mkt-departed">
+<h2>離反コメンター TOP <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">過去の配信で 5+ コメだったが、今回は記録に居ないユーザー（ラテラル分析 L8）。引き留め / 復帰アプローチの候補。</p>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>ユーザー</th><th>過去累計コメ</th><th>過去参加放送数</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+}
+
+/**
+ * 0.1.23 (X): 常連出席カレンダー（L9）。
+ * @param {ReturnType<typeof buildCommenterAttendanceMatrix>} matrix
+ * @param {boolean} maskShare
+ */
+function sectionAttendanceMatrix(matrix, maskShare) {
+  if (!matrix || matrix.users.length === 0 || matrix.broadcasts.length < 2) return '';
+  if (maskShare) return '';
+  const headCols = matrix.broadcasts
+    .map((b, i) => `<th title="${escapeHtml(b.liveId)}">配信${i + 1}</th>`)
+    .join('');
+  const rows = matrix.users
+    .map((u) => {
+      const labelHtml = buildUserProfileLinkedLabelHtml(
+        u.userId,
+        displayUserLabel(u.userId, '')
+      );
+      const cells = u.attendance
+        .map(
+          (v) =>
+            v
+              ? '<td class="mkt-att-cell mkt-att-cell--on" aria-label="出席">●</td>'
+              : '<td class="mkt-att-cell mkt-att-cell--off" aria-label="不参加">·</td>'
+        )
+        .join('');
+      return `<tr>
+<td>${labelHtml}</td>
+${cells}
+<td>${u.totalComments}</td>
+</tr>`;
+    })
+    .join('');
+  return `<section class="mkt-section" id="mkt-attendance">
+<h2>常連出席カレンダー <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">直近 ${matrix.broadcasts.length} 配信 × TOP ${matrix.users.length} コメンター（ラテラル分析 L9）。● = 出席 / · = 不参加。各列の横軸は左→右が古→新。</p>
+<div class="mkt-chart-wrap">
+<table class="mkt-rank mkt-attendance">
+<thead><tr><th>ユーザー</th>${headCols}<th>累計</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</div></section>`;
+}
+
+/**
+ * 0.1.23 (X): キーボード型診断（L12）。
+ * @param {ReturnType<typeof diagnoseKeyboardTypes>} report
+ */
+function sectionKeyboardTypes(report) {
+  if (!report) return '';
+  const { counts } = report;
+  const total =
+    counts.emoji + counts.short + counts.long + counts.quiet + counts.balanced;
+  if (total === 0) return '';
+  /** @param {number} n */
+  const pct = (n) => `${((n / total) * 100).toFixed(1)}%`;
+  const labels = {
+    emoji: '絵文字派（絵文字率 30%+）',
+    short: '短文派（平均 5字未満）',
+    long: 'ロング派（平均 25字以上）',
+    quiet: '無口観戦派（1コメ以下）',
+    balanced: 'バランス派'
+  };
+  const colors = {
+    emoji: '#fb923c',
+    short: '#22c55e',
+    long: '#a78bfa',
+    quiet: '#94a3b8',
+    balanced: '#3b82f6'
+  };
+  const rows = /** @type {Array<keyof typeof labels>} */ (
+    ['emoji', 'short', 'long', 'long', 'quiet', 'balanced']
+  )
+    .filter((k, i, arr) => arr.indexOf(k) === i)
+    .map((k) => {
+      return `<tr>
+<td><span class="mkt-leg__dot" style="background:${colors[k]}"></span> ${escapeHtml(labels[k])}</td>
+<td>${counts[k]}</td>
+<td>${pct(counts[k])}</td>
+</tr>`;
+    })
+    .join('');
+  return `<section class="mkt-section" id="mkt-keyboard">
+<h2>キーボード型診断 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">コメンター ${total} 名を 5 つの型に自動分類（ラテラル分析 L12）。配信スタイルとファン層の傾向把握用。</p>
+<table class="mkt-rank">
+<thead><tr><th>型</th><th>人数</th><th>比率</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+}
+
+/**
  * @param {MarketingReport} r
  * @param {{
  *   maskShareLabels?: boolean,
  *   anonymousIdenticonResolver?: (uid: string) => string,
  *   broadcasterUserId?: string,
  *   sessionSummaryRows?: import('./concurrentTimelineSeries.js').ConcurrentTimelineRow[],
- *   commentsForAnalytics?: import('./commentVelocityTimeline.js').VelocityCommentInput[]
+ *   commentsForAnalytics?: import('./commentVelocityTimeline.js').VelocityCommentInput[],
+ *   pastBroadcasts?: import('./commenterHistoricalAnalytics.js').BroadcastBundle[]
  * }} [opts]
  * @returns {string}
  */
@@ -704,6 +907,52 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     bucketMs: 30_000
   });
 
+  // 0.1.23 (X): 過去 N 配信を突き合わせるユーザー層分析。pastBroadcasts 未渡しなら
+  // 空集計が返る（純粋関数側で吸収）。配信者本人は除外する。
+  const pastBroadcasts = Array.isArray(opts.pastBroadcasts) ? opts.pastBroadcasts : [];
+  /** @type {(cs: any) => any[]} */
+  const filterBroadcaster = broadcasterUserId
+    ? (cs) =>
+        Array.isArray(cs)
+          ? cs.filter((c) => String(c?.userId || '').trim() !== broadcasterUserId)
+          : []
+    : (cs) => (Array.isArray(cs) ? cs : []);
+  const currentCommentsForLayer = filterBroadcaster(commentsForAnalytics);
+  const pastBroadcastsForLayer = pastBroadcasts.map((b) => ({
+    liveId: String(b?.liveId || ''),
+    comments: filterBroadcaster(b?.comments)
+  }));
+  const newVsRepeat = classifyCommentersAgainstHistory({
+    currentLiveId: r.liveId,
+    currentComments: currentCommentsForLayer,
+    pastBroadcasts: pastBroadcastsForLayer,
+    heavyThreshold: 5
+  });
+  const survivalCurve = buildCommenterSurvivalCurve(currentCommentsForLayer, {
+    segmentCount: 5
+  });
+  const departedHeavy = findDepartedHeavyCommenters({
+    currentComments: currentCommentsForLayer,
+    pastBroadcasts: pastBroadcastsForLayer.filter(
+      (b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase()
+    ),
+    heavyThreshold: 5,
+    topN: 15
+  });
+  // 出席カレンダーは「過去 + 現在」を含めた 全 N 配信 で
+  const attendanceMatrix = buildCommenterAttendanceMatrix({
+    broadcasts: [
+      ...pastBroadcastsForLayer.filter(
+        (b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase()
+      ),
+      { liveId: r.liveId, comments: currentCommentsForLayer }
+    ],
+    topN: 20
+  });
+  const keyboardTypes = diagnoseKeyboardTypes(commentsForAnalytics, {
+    broadcasterUserId
+  });
+
   const tocItems = [
     { id: 'mkt-kpi', label: 'KPI サマリ' },
     { id: 'mkt-content', label: 'コメント本文・属性の傾向' },
@@ -713,6 +962,11 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-concurrent', label: '同接推移カーブ（PRO）' },
     { id: 'mkt-silence', label: '沈黙ゾーン × 沈黙の質（PRO）' },
     { id: 'mkt-laughter', label: 'アヘ顔密度（PRO）' },
+    { id: 'mkt-new-vs-repeat', label: '新規 vs 常連（PRO）' },
+    { id: 'mkt-survival', label: 'コメンター生存曲線（PRO）' },
+    { id: 'mkt-departed', label: '離反コメンター TOP（PRO）' },
+    { id: 'mkt-attendance', label: '常連出席カレンダー（PRO）' },
+    { id: 'mkt-keyboard', label: 'キーボード型診断（PRO）' },
     { id: 'mkt-derived', label: '累積コメント数と5分窓' },
     { id: 'mkt-segment', label: 'ユーザーセグメント' },
     { id: 'mkt-top-users', label: 'トップコメンター TOP 20' },
@@ -751,6 +1005,11 @@ ${sectionCommentVelocityCurve(velocityTimeline)}
 ${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
 ${sectionSilenceZones(silenceZones)}
 ${sectionLaughterDensity(laughterDensity)}
+${sectionNewVsRepeat(newVsRepeat)}
+${sectionSurvivalCurve(survivalCurve)}
+${sectionDepartedHeavy(departedHeavy, maskShare)}
+${sectionAttendanceMatrix(attendanceMatrix, maskShare)}
+${sectionKeyboardTypes(keyboardTypes)}
 ${idWrap('mkt-derived', sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap('mkt-segment', sectionSegment(r))}
@@ -1084,6 +1343,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-mini-stats li{margin-bottom:.15rem}
 .mkt-quality-pill{display:inline-block;border-radius:6px;padding:1px 8px;color:#0f172a;font-size:.72rem;font-weight:600}
 .mkt-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;color:#cbd5e1;word-break:break-all}
+.mkt-attendance{font-size:.75rem}
+.mkt-attendance th,.mkt-attendance td{padding:.25rem .35rem;text-align:center}
+.mkt-attendance th:first-child,.mkt-attendance td:first-child{text-align:left;min-width:140px}
+.mkt-att-cell{font-family:ui-monospace,monospace;font-weight:700}
+.mkt-att-cell--on{color:#22c55e}
+.mkt-att-cell--off{color:#475569}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}

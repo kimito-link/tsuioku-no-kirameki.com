@@ -8874,6 +8874,25 @@ function initPopup() {
       } catch {
         // DB が無い / 失敗しても本体は通す
       }
+      // 0.1.23 (X): 過去 N 配信のコメントを横断分析するため最大 10 件分を読み込む。
+      // 直近の `nls_comments_*` キーを scan して、現在の lid と異なるものを liveId 順に
+      // 取得する。重い時は途中で打ち切り（個別 timeout なし、全体 8 秒の中で）。
+      const pastBroadcasts = [];
+      try {
+        const allKeys = await chrome.storage.local.get(null);
+        const pastKeys = Object.keys(allKeys)
+          .filter((k) => /^nls_comments_lv\d+$/.test(k) && k !== sKey)
+          .slice(0, 10);
+        for (const k of pastKeys) {
+          const lvMatch = k.match(/lv\d+$/);
+          if (!lvMatch) continue;
+          const cs = Array.isArray(allKeys[k]) ? allKeys[k] : [];
+          if (!cs.length) continue;
+          pastBroadcasts.push({ liveId: lvMatch[0], comments: cs });
+        }
+      } catch {
+        // ストレージ読み取り失敗 → 過去配信無しで続行
+      }
       // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
       // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
       // ユーザーの opt-out が尊重される）。
@@ -8886,7 +8905,8 @@ function initPopup() {
           watchMetaCache.snapshot?.broadcasterUserId || ''
         ).trim(),
         sessionSummaryRows,
-        commentsForAnalytics: comments
+        commentsForAnalytics: comments,
+        pastBroadcasts
       });
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);

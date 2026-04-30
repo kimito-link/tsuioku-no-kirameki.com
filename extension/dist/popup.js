@@ -700,6 +700,18 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.23",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u30E6\u30FC\u30B6\u30FC\u5C64\u52D5\u5411 5 \u7A2E\u8FFD\u52A0",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u65B0\u898F vs \u5E38\u9023\u300D\u5206\u985E\u3092\u8FFD\u52A0\uFF08\u904E\u53BB\u914D\u4FE1\u3068\u7A81\u5408\u3057\u3066\u30D8\u30D3\u30FC\u5E38\u9023\u3082\u691C\u51FA\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u30B3\u30E1\u30F3\u30BF\u30FC\u751F\u5B58\u66F2\u7DDA\u300D\u3092\u8FFD\u52A0\uFF08\u6700\u521D\u306E\u533A\u9593\u306E base \u30E6\u30FC\u30B6\u30FC\u304C\u5404\u533A\u9593\u306B\u4F55 % \u6B8B\u3063\u3066\u3044\u308B\u304B\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP\u300D\u3092\u8FFD\u52A0\uFF08\u904E\u53BB\u30D8\u30D3\u30FC\u3060\u3063\u305F\u304C\u4ECA\u56DE\u4E0D\u53C2\u52A0\u306E\u30E6\u30FC\u30B6\u30FC\u3001\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L8\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u5E38\u9023\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC\u300D\u3092\u8FFD\u52A0\uFF08\u904E\u53BB N \u914D\u4FE1 \xD7 TOP 20 \u30B3\u30E1\u30F3\u30BF\u30FC\u306E\u51FA\u5E2D\u30DE\u30C8\u30EA\u30AF\u30B9\u3001\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L9\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u30AD\u30FC\u30DC\u30FC\u30C9\u578B\u8A3A\u65AD\u300D\u3092\u8FFD\u52A0\uFF08\u7D75\u6587\u5B57\u6D3E/\u77ED\u6587\u6D3E/\u30ED\u30F3\u30B0\u6D3E/\u7121\u53E3\u89B3\u6226\u6D3E/\u30D0\u30E9\u30F3\u30B9\u6D3E\u3001\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L12\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.22",
       date: "2026-04-30",
       summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u540C\u63A5\u63A8\u79FB\u306A\u3069 4 \u7A2E\u8FFD\u52A0",
@@ -5203,6 +5215,225 @@ ${body}`;
     };
   }
 
+  // src/lib/commenterHistoricalAnalytics.js
+  function cleanUid(v) {
+    if (v == null) return "";
+    return String(v).trim();
+  }
+  function indexPastUsers(pastBroadcasts, currentLiveId) {
+    const map = /* @__PURE__ */ new Map();
+    const currentLid = cleanUid(currentLiveId).toLowerCase();
+    const list = Array.isArray(pastBroadcasts) ? pastBroadcasts : [];
+    for (const b of list) {
+      if (!b || typeof b !== "object") continue;
+      const lid = cleanUid(b.liveId).toLowerCase();
+      if (!lid) continue;
+      if (lid === currentLid) continue;
+      const cs = Array.isArray(b.comments) ? b.comments : [];
+      for (const c of cs) {
+        const uid = cleanUid(c?.userId);
+        if (!uid) continue;
+        let row = map.get(uid);
+        if (!row) {
+          row = { userId: uid, totalComments: 0, broadcastIds: /* @__PURE__ */ new Set() };
+          map.set(uid, row);
+        }
+        row.totalComments += 1;
+        row.broadcastIds.add(lid);
+      }
+    }
+    return map;
+  }
+  function classifyCommentersAgainstHistory(input) {
+    const params = input && typeof input === "object" ? input : {};
+    const currentLiveId = cleanUid(params.currentLiveId);
+    const currentComments = Array.isArray(params.currentComments) ? params.currentComments : [];
+    const pastBroadcasts = Array.isArray(params.pastBroadcasts) ? params.pastBroadcasts : [];
+    const heavyThreshold = typeof params.heavyThreshold === "number" && params.heavyThreshold > 0 ? params.heavyThreshold : 5;
+    const past = indexPastUsers(pastBroadcasts, currentLiveId);
+    const currentUsers = /* @__PURE__ */ new Set();
+    for (const c of currentComments) {
+      const uid = cleanUid(c?.userId);
+      if (!uid) continue;
+      currentUsers.add(uid);
+    }
+    let newCount = 0;
+    let repeatCount = 0;
+    let heavyCount = 0;
+    for (const uid of currentUsers) {
+      const past_ = past.get(uid);
+      if (!past_) {
+        newCount += 1;
+      } else {
+        repeatCount += 1;
+        if (past_.totalComments >= heavyThreshold) heavyCount += 1;
+      }
+    }
+    const total = currentUsers.size;
+    const ratio = (n) => total > 0 ? Math.round(n / total * 1e3) / 1e3 : 0;
+    return {
+      totalCurrent: total,
+      newCount,
+      repeatCount,
+      heavyCount,
+      newRatio: ratio(newCount),
+      repeatRatio: ratio(repeatCount),
+      heavyRatio: ratio(heavyCount)
+    };
+  }
+  function findDepartedHeavyCommenters(input) {
+    const params = input && typeof input === "object" ? input : {};
+    const currentComments = Array.isArray(params.currentComments) ? params.currentComments : [];
+    const pastBroadcasts = Array.isArray(params.pastBroadcasts) ? params.pastBroadcasts : [];
+    const heavyThreshold = typeof params.heavyThreshold === "number" && params.heavyThreshold > 0 ? params.heavyThreshold : 5;
+    const topN = typeof params.topN === "number" && params.topN > 0 ? Math.floor(params.topN) : 10;
+    const past = indexPastUsers(pastBroadcasts, "");
+    const currentUsers = /* @__PURE__ */ new Set();
+    for (const c of currentComments) {
+      const uid = cleanUid(c?.userId);
+      if (uid) currentUsers.add(uid);
+    }
+    const departed = [];
+    for (const [uid, row] of past) {
+      if (currentUsers.has(uid)) continue;
+      if (row.totalComments < heavyThreshold) continue;
+      departed.push({
+        userId: uid,
+        totalComments: row.totalComments,
+        broadcastCount: row.broadcastIds.size
+      });
+    }
+    departed.sort((a, b) => b.totalComments - a.totalComments);
+    return departed.slice(0, topN);
+  }
+  function buildCommenterAttendanceMatrix(input) {
+    const params = input && typeof input === "object" ? input : {};
+    const broadcasts = Array.isArray(params.broadcasts) ? params.broadcasts : [];
+    const topN = typeof params.topN === "number" && params.topN > 0 ? Math.floor(params.topN) : 20;
+    if (!broadcasts.length) return { users: [], broadcasts: [] };
+    const perBroadcast = [];
+    const totals = /* @__PURE__ */ new Map();
+    for (const b of broadcasts) {
+      if (!b || typeof b !== "object") continue;
+      const lid = cleanUid(b.liveId);
+      if (!lid) continue;
+      const userCount = /* @__PURE__ */ new Map();
+      const cs = Array.isArray(b.comments) ? b.comments : [];
+      for (const c of cs) {
+        const uid = cleanUid(c?.userId);
+        if (!uid) continue;
+        userCount.set(uid, (userCount.get(uid) || 0) + 1);
+        totals.set(uid, (totals.get(uid) || 0) + 1);
+      }
+      perBroadcast.push({ liveId: lid, users: userCount });
+    }
+    const ranked = [...totals.entries()].map(([uid, n]) => ({ userId: uid, totalComments: n })).sort((a, b) => b.totalComments - a.totalComments).slice(0, topN);
+    const users = ranked.map((u) => ({
+      userId: u.userId,
+      totalComments: u.totalComments,
+      attendance: perBroadcast.map((b) => b.users.has(u.userId) ? 1 : 0)
+    }));
+    return {
+      users,
+      broadcasts: perBroadcast.map((b) => ({
+        liveId: b.liveId,
+        totalComments: [...b.users.values()].reduce((a, x) => a + x, 0)
+      }))
+    };
+  }
+
+  // src/lib/commenterSurvivalCurve.js
+  function buildCommenterSurvivalCurve(comments, opts = {}) {
+    const segmentCount = typeof opts?.segmentCount === "number" && opts.segmentCount > 0 ? Math.floor(opts.segmentCount) : 4;
+    const list = Array.isArray(comments) ? comments : [];
+    const valid = [];
+    for (const c of list) {
+      if (!c || typeof c !== "object") continue;
+      const at = c.capturedAt;
+      if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) continue;
+      const uid = c.userId == null ? "" : String(c.userId).trim();
+      if (!uid) continue;
+      valid.push({ at, uid });
+    }
+    if (!valid.length) return { baseUserCount: 0, segments: [] };
+    valid.sort((a, b) => a.at - b.at);
+    const firstAt = valid[0].at;
+    const lastAt = valid[valid.length - 1].at;
+    const totalSpan = Math.max(1, lastAt - firstAt);
+    const segSpan = totalSpan / segmentCount;
+    const segUsers = Array.from({ length: segmentCount }, () => /* @__PURE__ */ new Set());
+    for (const v of valid) {
+      let idx = Math.floor((v.at - firstAt) / segSpan);
+      if (idx >= segmentCount) idx = segmentCount - 1;
+      if (idx < 0) idx = 0;
+      segUsers[idx].add(v.uid);
+    }
+    const baseUsers = segUsers[0];
+    const baseUserCount = baseUsers.size;
+    const segments = segUsers.map((users, i) => {
+      let present = 0;
+      for (const u of baseUsers) if (users.has(u)) present += 1;
+      const retentionPct = baseUserCount > 0 ? Math.round(present / baseUserCount * 1e3) / 10 : 0;
+      return {
+        segmentIndex: i,
+        startMin: Math.round(i * segSpan / 6e4),
+        endMin: Math.round((i + 1) * segSpan / 6e4),
+        presentCount: present,
+        retentionPct
+      };
+    });
+    return { baseUserCount, segments };
+  }
+
+  // src/lib/keyboardTypeDiagnostic.js
+  var EMOJI_REGEX = new RegExp("\\p{Extended_Pictographic}", "gu");
+  function countEmojis(text) {
+    if (!text) return 0;
+    const m = String(text).match(EMOJI_REGEX);
+    return m ? m.length : 0;
+  }
+  function classifyKeyboardType(stats) {
+    const count = typeof stats?.count === "number" ? stats.count : 0;
+    const totalChars = typeof stats?.totalChars === "number" ? stats.totalChars : 0;
+    const emojiCount = typeof stats?.emojiCount === "number" ? stats.emojiCount : 0;
+    if (count <= 1) return "quiet";
+    if (totalChars > 0 && emojiCount / totalChars >= 0.3) return "emoji";
+    const avg = totalChars / count;
+    if (avg < 5) return "short";
+    if (avg >= 25) return "long";
+    return "balanced";
+  }
+  function diagnoseKeyboardTypes(comments, opts = {}) {
+    const broadcasterUid = typeof opts?.broadcasterUserId === "string" ? opts.broadcasterUserId.trim() : "";
+    const list = Array.isArray(comments) ? comments : [];
+    const map = /* @__PURE__ */ new Map();
+    for (const c of list) {
+      if (!c || typeof c !== "object") continue;
+      const uid = c.userId == null ? "" : String(c.userId).trim();
+      if (!uid) continue;
+      if (broadcasterUid && uid === broadcasterUid) continue;
+      const text = c.text == null ? "" : String(c.text);
+      const len = text.length;
+      const emoji = countEmojis(text);
+      let row = map.get(uid);
+      if (!row) {
+        row = { count: 0, totalChars: 0, emojiCount: 0 };
+        map.set(uid, row);
+      }
+      row.count += 1;
+      row.totalChars += len;
+      row.emojiCount += emoji;
+    }
+    const userTypeMap = {};
+    const counts = { emoji: 0, short: 0, long: 0, quiet: 0, balanced: 0 };
+    for (const [uid, stats] of map) {
+      const t = classifyKeyboardType(stats);
+      userTypeMap[uid] = t;
+      counts[t] += 1;
+    }
+    return { userTypeMap, counts };
+  }
+
   // src/lib/marketingChartsHtml.js
   function adviceCard(role, displayName, lines) {
     const ps = lines.filter((s) => s && String(s).trim()).map((line) => `<p class="mkt-advice__p">${escapeHtml(line)}</p>`).join("");
@@ -5688,6 +5919,145 @@ ${bars}
 </svg>
 </div></section>`;
   }
+  function sectionNewVsRepeat(c) {
+    if (!c || c.totalCurrent === 0) return "";
+    const pct = (n) => `${(n * 100).toFixed(1)}%`;
+    return `<section class="mkt-section" id="mkt-new-vs-repeat">
+<h2>\u65B0\u898F vs \u5E38\u9023 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u904E\u53BB\u306E\u8A18\u9332\u3057\u305F\u914D\u4FE1\u3068\u7A81\u5408\u3057\u3066\u3001\u4ECA\u56DE\u306E\u30B3\u30E1\u30F3\u30BF\u30FC\u3092 3 \u533A\u5206\u306B\u5206\u985E\uFF08\u904E\u53BB 5+ \u30B3\u30E1\u5B9F\u7E3E\u3042\u308A\u304C\u300C\u30D8\u30D3\u30FC\u5E38\u9023\u300D\uFF09\u3002${c.totalCurrent} \u540D\u4E2D\u3002</p>
+<table class="mkt-rank">
+<thead><tr><th>\u5206\u985E</th><th>\u4EBA\u6570</th><th>\u6BD4\u7387</th></tr></thead>
+<tbody>
+<tr><th>\u65B0\u898F\uFF08\u3053\u306E\u30A2\u30AB\u30A6\u30F3\u30C8\u3067\u521D\u3081\u3066\u8A18\u9332\uFF09</th><td>${c.newCount}</td><td>${pct(c.newRatio)}</td></tr>
+<tr><th>\u30EA\u30D4\u30FC\u30BF\u30FC\uFF08\u904E\u53BB\u306B\u3082\u8A18\u9332\u3042\u308A\uFF09</th><td>${c.repeatCount}</td><td>${pct(c.repeatRatio)}</td></tr>
+<tr><th>\u3046\u3061\u30D8\u30D3\u30FC\u5E38\u9023\uFF08\u904E\u53BB 5+ \u30B3\u30E1\uFF09</th><td>${c.heavyCount}</td><td>${pct(c.heavyRatio)}</td></tr>
+</tbody>
+</table>
+</section>`;
+  }
+  function sectionSurvivalCurve(curve) {
+    if (!curve || curve.segments.length < 2) return "";
+    const W = 900;
+    const H = 200;
+    const pad = 40;
+    const innerW = W - pad * 2;
+    const innerH = H - pad * 2;
+    const n = curve.segments.length;
+    const xOf = (i) => pad + innerW * i / Math.max(1, n - 1);
+    const yOf = (pct) => pad + innerH - Math.min(100, pct) / 100 * innerH;
+    const linePts = curve.segments.map((s, i) => `${xOf(i).toFixed(1)},${yOf(s.retentionPct).toFixed(1)}`).join(" ");
+    const dots = curve.segments.map(
+      (s, i) => `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(s.retentionPct).toFixed(1)}" r="3" fill="#a78bfa"><title>\u533A\u9593${i + 1} (${s.startMin}\u301C${s.endMin}\u5206): ${s.retentionPct}% (${s.presentCount}\u540D)</title></circle>`
+    ).join("");
+    const xLabels = curve.segments.map(
+      (s, i) => `<text x="${xOf(i).toFixed(1)}" y="${H - 4}" text-anchor="middle" class="mkt-axis">${s.startMin}m</text>`
+    ).join("");
+    const yLabels = [0, 25, 50, 75, 100].map(
+      (v) => `<text x="${pad - 4}" y="${yOf(v) + 4}" text-anchor="end" class="mkt-axis">${v}%</text>`
+    ).join("");
+    return `<section class="mkt-section" id="mkt-survival">
+<h2>\u30B3\u30E1\u30F3\u30BF\u30FC\u751F\u5B58\u66F2\u7DDA <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u914D\u4FE1\u3092 ${n} \u7B49\u5206\u3057\u3001\u6700\u521D\u306E\u533A\u9593\u306B\u5C45\u305F\u300Cbase ${curve.baseUserCount} \u540D\u300D\u306E\u3046\u3061\u5404\u533A\u9593\u306B\u3082\u5C45\u305F % \u3092\u8868\u793A\u3002\u300C\u30B3\u30E1\u30F3\u30C8\u53C2\u52A0\u7DAD\u6301\u7387\u300D=\u30B3\u30E1\u66F8\u304F\u5C64\u306E\u6B8B\u5B58\u3002</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${yLabels}${xLabels}
+<polyline points="${linePts}" fill="none" stroke="#a78bfa" stroke-width="2"/>
+${dots}
+</svg>
+</div></section>`;
+  }
+  function sectionDepartedHeavy(departed, maskShare) {
+    if (!Array.isArray(departed) || departed.length === 0) return "";
+    if (maskShare) return "";
+    const rows = departed.map((d, i) => {
+      const labelHtml = buildUserProfileLinkedLabelHtml(
+        d.userId,
+        displayUserLabel(d.userId, "")
+      );
+      return `<tr>
+<td>${i + 1}</td>
+<td>${labelHtml}</td>
+<td>${d.totalComments}</td>
+<td>${d.broadcastCount}</td>
+</tr>`;
+    }).join("");
+    return `<section class="mkt-section" id="mkt-departed">
+<h2>\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u904E\u53BB\u306E\u914D\u4FE1\u3067 5+ \u30B3\u30E1\u3060\u3063\u305F\u304C\u3001\u4ECA\u56DE\u306F\u8A18\u9332\u306B\u5C45\u306A\u3044\u30E6\u30FC\u30B6\u30FC\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L8\uFF09\u3002\u5F15\u304D\u7559\u3081 / \u5FA9\u5E30\u30A2\u30D7\u30ED\u30FC\u30C1\u306E\u5019\u88DC\u3002</p>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>\u30E6\u30FC\u30B6\u30FC</th><th>\u904E\u53BB\u7D2F\u8A08\u30B3\u30E1</th><th>\u904E\u53BB\u53C2\u52A0\u653E\u9001\u6570</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+  }
+  function sectionAttendanceMatrix(matrix, maskShare) {
+    if (!matrix || matrix.users.length === 0 || matrix.broadcasts.length < 2) return "";
+    if (maskShare) return "";
+    const headCols = matrix.broadcasts.map((b, i) => `<th title="${escapeHtml(b.liveId)}">\u914D\u4FE1${i + 1}</th>`).join("");
+    const rows = matrix.users.map((u) => {
+      const labelHtml = buildUserProfileLinkedLabelHtml(
+        u.userId,
+        displayUserLabel(u.userId, "")
+      );
+      const cells = u.attendance.map(
+        (v) => v ? '<td class="mkt-att-cell mkt-att-cell--on" aria-label="\u51FA\u5E2D">\u25CF</td>' : '<td class="mkt-att-cell mkt-att-cell--off" aria-label="\u4E0D\u53C2\u52A0">\xB7</td>'
+      ).join("");
+      return `<tr>
+<td>${labelHtml}</td>
+${cells}
+<td>${u.totalComments}</td>
+</tr>`;
+    }).join("");
+    return `<section class="mkt-section" id="mkt-attendance">
+<h2>\u5E38\u9023\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u76F4\u8FD1 ${matrix.broadcasts.length} \u914D\u4FE1 \xD7 TOP ${matrix.users.length} \u30B3\u30E1\u30F3\u30BF\u30FC\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L9\uFF09\u3002\u25CF = \u51FA\u5E2D / \xB7 = \u4E0D\u53C2\u52A0\u3002\u5404\u5217\u306E\u6A2A\u8EF8\u306F\u5DE6\u2192\u53F3\u304C\u53E4\u2192\u65B0\u3002</p>
+<div class="mkt-chart-wrap">
+<table class="mkt-rank mkt-attendance">
+<thead><tr><th>\u30E6\u30FC\u30B6\u30FC</th>${headCols}<th>\u7D2F\u8A08</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</div></section>`;
+  }
+  function sectionKeyboardTypes(report) {
+    if (!report) return "";
+    const { counts } = report;
+    const total = counts.emoji + counts.short + counts.long + counts.quiet + counts.balanced;
+    if (total === 0) return "";
+    const pct = (n) => `${(n / total * 100).toFixed(1)}%`;
+    const labels = {
+      emoji: "\u7D75\u6587\u5B57\u6D3E\uFF08\u7D75\u6587\u5B57\u7387 30%+\uFF09",
+      short: "\u77ED\u6587\u6D3E\uFF08\u5E73\u5747 5\u5B57\u672A\u6E80\uFF09",
+      long: "\u30ED\u30F3\u30B0\u6D3E\uFF08\u5E73\u5747 25\u5B57\u4EE5\u4E0A\uFF09",
+      quiet: "\u7121\u53E3\u89B3\u6226\u6D3E\uFF081\u30B3\u30E1\u4EE5\u4E0B\uFF09",
+      balanced: "\u30D0\u30E9\u30F3\u30B9\u6D3E"
+    };
+    const colors = {
+      emoji: "#fb923c",
+      short: "#22c55e",
+      long: "#a78bfa",
+      quiet: "#94a3b8",
+      balanced: "#3b82f6"
+    };
+    const rows = (
+      /** @type {Array<keyof typeof labels>} */
+      ["emoji", "short", "long", "long", "quiet", "balanced"].filter((k, i, arr) => arr.indexOf(k) === i).map((k) => {
+        return `<tr>
+<td><span class="mkt-leg__dot" style="background:${colors[k]}"></span> ${escapeHtml(labels[k])}</td>
+<td>${counts[k]}</td>
+<td>${pct(counts[k])}</td>
+</tr>`;
+      }).join("")
+    );
+    return `<section class="mkt-section" id="mkt-keyboard">
+<h2>\u30AD\u30FC\u30DC\u30FC\u30C9\u578B\u8A3A\u65AD <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u30B3\u30E1\u30F3\u30BF\u30FC ${total} \u540D\u3092 5 \u3064\u306E\u578B\u306B\u81EA\u52D5\u5206\u985E\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L12\uFF09\u3002\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u3068\u30D5\u30A1\u30F3\u5C64\u306E\u50BE\u5411\u628A\u63E1\u7528\u3002</p>
+<table class="mkt-rank">
+<thead><tr><th>\u578B</th><th>\u4EBA\u6570</th><th>\u6BD4\u7387</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+  }
   function buildMarketingDashboardHtml(r, opts = {}) {
     const maskShare = opts.maskShareLabels === true;
     const identiconResolver = typeof opts.anonymousIdenticonResolver === "function" ? opts.anonymousIdenticonResolver : void 0;
@@ -5713,6 +6083,42 @@ ${bars}
     const laughterDensity = buildLaughterDensityTimeline(commentsForAnalytics, {
       bucketMs: 3e4
     });
+    const pastBroadcasts = Array.isArray(opts.pastBroadcasts) ? opts.pastBroadcasts : [];
+    const filterBroadcaster = broadcasterUserId ? (cs) => Array.isArray(cs) ? cs.filter((c) => String(c?.userId || "").trim() !== broadcasterUserId) : [] : (cs) => Array.isArray(cs) ? cs : [];
+    const currentCommentsForLayer = filterBroadcaster(commentsForAnalytics);
+    const pastBroadcastsForLayer = pastBroadcasts.map((b) => ({
+      liveId: String(b?.liveId || ""),
+      comments: filterBroadcaster(b?.comments)
+    }));
+    const newVsRepeat = classifyCommentersAgainstHistory({
+      currentLiveId: r.liveId,
+      currentComments: currentCommentsForLayer,
+      pastBroadcasts: pastBroadcastsForLayer,
+      heavyThreshold: 5
+    });
+    const survivalCurve = buildCommenterSurvivalCurve(currentCommentsForLayer, {
+      segmentCount: 5
+    });
+    const departedHeavy = findDepartedHeavyCommenters({
+      currentComments: currentCommentsForLayer,
+      pastBroadcasts: pastBroadcastsForLayer.filter(
+        (b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase()
+      ),
+      heavyThreshold: 5,
+      topN: 15
+    });
+    const attendanceMatrix = buildCommenterAttendanceMatrix({
+      broadcasts: [
+        ...pastBroadcastsForLayer.filter(
+          (b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase()
+        ),
+        { liveId: r.liveId, comments: currentCommentsForLayer }
+      ],
+      topN: 20
+    });
+    const keyboardTypes = diagnoseKeyboardTypes(commentsForAnalytics, {
+      broadcasterUserId
+    });
     const tocItems = [
       { id: "mkt-kpi", label: "KPI \u30B5\u30DE\u30EA" },
       { id: "mkt-content", label: "\u30B3\u30E1\u30F3\u30C8\u672C\u6587\u30FB\u5C5E\u6027\u306E\u50BE\u5411" },
@@ -5722,6 +6128,11 @@ ${bars}
       { id: "mkt-concurrent", label: "\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\uFF08PRO\uFF09" },
       { id: "mkt-silence", label: "\u6C88\u9ED9\u30BE\u30FC\u30F3 \xD7 \u6C88\u9ED9\u306E\u8CEA\uFF08PRO\uFF09" },
       { id: "mkt-laughter", label: "\u30A2\u30D8\u9854\u5BC6\u5EA6\uFF08PRO\uFF09" },
+      { id: "mkt-new-vs-repeat", label: "\u65B0\u898F vs \u5E38\u9023\uFF08PRO\uFF09" },
+      { id: "mkt-survival", label: "\u30B3\u30E1\u30F3\u30BF\u30FC\u751F\u5B58\u66F2\u7DDA\uFF08PRO\uFF09" },
+      { id: "mkt-departed", label: "\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP\uFF08PRO\uFF09" },
+      { id: "mkt-attendance", label: "\u5E38\u9023\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC\uFF08PRO\uFF09" },
+      { id: "mkt-keyboard", label: "\u30AD\u30FC\u30DC\u30FC\u30C9\u578B\u8A3A\u65AD\uFF08PRO\uFF09" },
       { id: "mkt-derived", label: "\u7D2F\u7A4D\u30B3\u30E1\u30F3\u30C8\u6570\u30685\u5206\u7A93" },
       { id: "mkt-segment", label: "\u30E6\u30FC\u30B6\u30FC\u30BB\u30B0\u30E1\u30F3\u30C8" },
       { id: "mkt-top-users", label: "\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC TOP 20" },
@@ -5759,6 +6170,11 @@ ${sectionCommentVelocityCurve(velocityTimeline)}
 ${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
 ${sectionSilenceZones(silenceZones)}
 ${sectionLaughterDensity(laughterDensity)}
+${sectionNewVsRepeat(newVsRepeat)}
+${sectionSurvivalCurve(survivalCurve)}
+${sectionDepartedHeavy(departedHeavy, maskShare)}
+${sectionAttendanceMatrix(attendanceMatrix, maskShare)}
+${sectionKeyboardTypes(keyboardTypes)}
 ${idWrap("mkt-derived", sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap("mkt-segment", sectionSegment(r))}
@@ -5975,6 +6391,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-mini-stats li{margin-bottom:.15rem}
 .mkt-quality-pill{display:inline-block;border-radius:6px;padding:1px 8px;color:#0f172a;font-size:.72rem;font-weight:600}
 .mkt-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;color:#cbd5e1;word-break:break-all}
+.mkt-attendance{font-size:.75rem}
+.mkt-attendance th,.mkt-attendance td{padding:.25rem .35rem;text-align:center}
+.mkt-attendance th:first-child,.mkt-attendance td:first-child{text-align:left;min-width:140px}
+.mkt-att-cell{font-family:ui-monospace,monospace;font-weight:700}
+.mkt-att-cell--on{color:#22c55e}
+.mkt-att-cell--off{color:#475569}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}
@@ -13313,7 +13735,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1343" ? String("0430-1343") : "dev";
+      const buildId = "0430-1400" ? String("0430-1400") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -13759,6 +14181,19 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           sessionSummaryRows = await listBroadcastSessionSummaryForLive(db, lid, 200);
         } catch {
         }
+        const pastBroadcasts = [];
+        try {
+          const allKeys = await chrome.storage.local.get(null);
+          const pastKeys = Object.keys(allKeys).filter((k) => /^nls_comments_lv\d+$/.test(k) && k !== sKey).slice(0, 10);
+          for (const k of pastKeys) {
+            const lvMatch = k.match(/lv\d+$/);
+            if (!lvMatch) continue;
+            const cs = Array.isArray(allKeys[k]) ? allKeys[k] : [];
+            if (!cs.length) continue;
+            pastBroadcasts.push({ liveId: lvMatch[0], comments: cs });
+          }
+        } catch {
+        }
         const html = buildMarketingDashboardHtml(report, {
           maskShareLabels: maskShare,
           anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
@@ -13766,7 +14201,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
             watchMetaCache.snapshot?.broadcasterUserId || ""
           ).trim(),
           sessionSummaryRows,
-          commentsForAnalytics: comments
+          commentsForAnalytics: comments,
+          pastBroadcasts
         });
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
