@@ -117,6 +117,23 @@ export const KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED =
   'nls_inline_panel_float_to_dock_migrated';
 
 /**
+ * 0.1.63 (AS): `below` → `dock_bottom` のワンショット移行済み（再実行で上書きしない）。
+ *
+ * 経緯: ニコ生の SPA リライト（toi）以降、`renderInlineHostAnchoredToVideo` の
+ *   親要素探索（`findFrameInsertAnchorFromVideo`）が「視聴行 + コメント欄 +
+ *   バナー一式を含む大きなラッパー」にヒットしてしまい、その直後 = description /
+ *   Amazon / 関連配信の直前 にパネルが挿入されてしまう問題が発生。ユーザー証言
+ *   「前はちゃんと出ていたが、いつからかページ最下部に出るようになった」の
+ *   原因。`below` を選択しているユーザーを `dock_bottom`（fixed bottom 0）に
+ *   ワンショットで移行して、まずは player と panel が常に viewport 上で
+ *   セットで見える状態に戻す。
+ *
+ * @see migrateInlinePanelBelowToDock.js
+ */
+export const KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED =
+  'nls_inline_panel_below_to_dock_migrated';
+
+/**
  * 視聴ページで extension のインラインパネルを自動表示するかどうか。
  * 既定 false（opt-in）。true を明示保存したときだけ自動で出る。
  *

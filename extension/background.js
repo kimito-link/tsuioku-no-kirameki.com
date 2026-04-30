@@ -312,6 +312,31 @@ async function migrateFloatingPanelToDockProfileOnce() {
 }
 
 /**
+ * 0.1.63 (AS): below → dock_bottom のワンショット移行（SW 側コピー）。
+ * 内容は src/lib/migrateInlinePanelBelowToDock.js と同一。
+ */
+async function migrateBelowPanelToDockProfileOnce() {
+  const K_PLACEMENT = 'nls_inline_panel_placement';
+  const K_DONE = 'nls_inline_panel_below_to_dock_migrated';
+  try {
+    const bag = await chrome.storage.local.get([K_PLACEMENT, K_DONE]);
+    if (bag[K_DONE] === true) return;
+    const p = String(bag[K_PLACEMENT] || '').trim().toLowerCase();
+    if (p !== 'below') {
+      // 既に dock_bottom 等なら値は変えず flag だけ立てる
+      await chrome.storage.local.set({ [K_DONE]: true });
+      return;
+    }
+    await chrome.storage.local.set({
+      [K_PLACEMENT]: 'dock_bottom',
+      [K_DONE]: true
+    });
+  } catch {
+    // no-op
+  }
+}
+
+/**
  * 0.1.7 / 0.1.8 / 0.1.9 で焼き込まれた古い `selfPosted: true` を全 `nls_comments_*` から
  * 剥がす後方互換 migration（D-4）。SW は ESM バンドル外のため、純関数を import せず
  * 同等ロジックを SW 内にハードコピー（`migrateInlinePanelFloatToDockProfileOnce` と同パターン）。
@@ -396,6 +421,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   void ensureAutoBackupAlarm();
   void (async () => {
     await migrateFloatingPanelToDockProfileOnce();
+    await migrateBelowPanelToDockProfileOnce();
     // D-4: 0.1.10 未満からの自動更新で「他人コメントへの誤焼き込み selfPosted」を剥がす。
     // 'install'（fresh）では走らないよう previousVersion を渡す。
     if (details?.reason === 'update') {
@@ -413,6 +439,7 @@ chrome.runtime.onStartup.addListener(() => {
   ensureToolbarOpensPopupNotSidePanel();
   void ensureAutoBackupAlarm();
   void migrateFloatingPanelToDockProfileOnce();
+  void migrateBelowPanelToDockProfileOnce();
   void injectIntoExistingTabs();
 });
 

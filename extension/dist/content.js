@@ -83,6 +83,7 @@
   var KEY_INLINE_PANEL_WIDTH_MODE = "nls_inline_panel_width_mode";
   var KEY_INLINE_PANEL_PLACEMENT = "nls_inline_panel_placement";
   var KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED = "nls_inline_panel_float_to_dock_migrated";
+  var KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED = "nls_inline_panel_below_to_dock_migrated";
   var KEY_INLINE_PANEL_AUTOSHOW_ENABLED = "nls_inline_panel_autoshow_enabled";
   function normalizeInlinePanelAutoshowEnabled(raw) {
     return raw === true;
@@ -2729,6 +2730,29 @@
     await storage.set({
       [KEY_INLINE_PANEL_PLACEMENT]: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
       [KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED]: true
+    });
+    return { changed: true };
+  }
+
+  // src/lib/migrateInlinePanelBelowToDock.js
+  async function migrateBelowInlinePanelToDockOnce(storage) {
+    const bag = await storage.get([
+      KEY_INLINE_PANEL_PLACEMENT,
+      KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED
+    ]);
+    if (bag[KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED] === true) {
+      return { changed: false };
+    }
+    const p = String(bag[KEY_INLINE_PANEL_PLACEMENT] ?? "").trim().toLowerCase();
+    if (p !== INLINE_PANEL_PLACEMENT_BELOW) {
+      await storage.set({
+        [KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED]: true
+      });
+      return { changed: false };
+    }
+    await storage.set({
+      [KEY_INLINE_PANEL_PLACEMENT]: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
+      [KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED]: true
     });
     return { changed: true };
   }
@@ -7919,6 +7943,10 @@
     if (isWatchInlinePanelTopFrame()) {
       ensurePageFrameStyle();
       await migrateFloatingInlinePanelToDockOnce({
+        get: (keys) => chrome.storage.local.get(keys),
+        set: (obj) => chrome.storage.local.set(obj)
+      }).catch(() => ({ changed: false }));
+      await migrateBelowInlinePanelToDockOnce({
         get: (keys) => chrome.storage.local.get(keys),
         set: (obj) => chrome.storage.local.set(obj)
       }).catch(() => ({ changed: false }));

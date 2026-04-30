@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.63',
+    date: '2026-05-01',
+    summary: '配信時のパネル位置を player の近くに戻す',
+    items: Object.freeze([
+      'watch ページのパネルが「ページ最下部（amazon・関連配信の後ろ）」に出るようになっていた問題を修正。「プレイヤー行の下」設定の人を「画面下いっぱい（既定）」に一度だけ自動移行し、player と panel が常に viewport 上でセットで見える状態に戻します（意図して「下」を選んでいた場合は設定画面から再度切り替え可能）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.62',
     date: '2026-05-01',
     summary: 'popup を Chrome 右端に密着',

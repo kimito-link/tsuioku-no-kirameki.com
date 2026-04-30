@@ -113,6 +113,7 @@ import {
   maybeAppendCommentIngestLog
 } from '../lib/commentIngestLog.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
+import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
 import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
@@ -6048,6 +6049,16 @@ async function start() {
   if (isWatchInlinePanelTopFrame()) {
     ensurePageFrameStyle();
     await migrateFloatingInlinePanelToDockOnce({
+      get: (keys) => chrome.storage.local.get(keys),
+      set: (obj) => chrome.storage.local.set(obj)
+    }).catch(() => ({ changed: false }));
+    /*
+     * 0.1.63 (AS): below → dock_bottom のワンショット migration。
+     *   ニコ生 SPA の親要素レイアウト変更により、`below` モードでパネルが
+     *   ページ最下部に出てしまう問題（ユーザー報告「前はちゃんと出ていたが
+     *   いつからかおかしくなった」）の暫定対策。
+     */
+    await migrateBelowInlinePanelToDockOnce({
       get: (keys) => chrome.storage.local.get(keys),
       set: (obj) => chrome.storage.local.set(obj)
     }).catch(() => ({ changed: false }));
