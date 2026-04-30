@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.33',
+    date: '2026-04-30',
+    summary: 'パネル準備時間を短縮（2秒→0.8秒）',
+    items: Object.freeze([
+      'パネルiframe の事前ロード（prewarm）の起動タイミングを 2 秒後 → 0.8 秒後に短縮。kon-ta 即押し時の体感反応を改善'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.32',
     date: '2026-04-30',
     summary: '複数タブ時の panel 反応性を改善',

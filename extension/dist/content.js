@@ -5399,7 +5399,7 @@
     prewarmInlinePopupTimer = setTimeout(() => {
       prewarmInlinePopupTimer = null;
       prewarmInlinePopupIframe();
-    }, 2e3);
+    }, 800);
   }
   function prewarmInlinePopupIframe() {
     if (prewarmInlinePopupDone) return;

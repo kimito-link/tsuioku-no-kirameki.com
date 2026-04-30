@@ -2968,10 +2968,12 @@ function schedulePrewarmInlinePopupIframe() {
   if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
     return;
   }
+  // 0.1.33 (AH): 2 秒 → 800ms に短縮。kon-ta 即押し時の体感反応を上げる。
+  // 可視タブのみ対象なので CPU 取り合いは少ないはず。
   prewarmInlinePopupTimer = setTimeout(() => {
     prewarmInlinePopupTimer = null;
     prewarmInlinePopupIframe();
-  }, 2000);
+  }, 800);
 }
 
 function prewarmInlinePopupIframe() {
