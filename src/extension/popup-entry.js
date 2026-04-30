@@ -7275,20 +7275,49 @@ async function buildHtmlReportDocument(
       `
       : '';
 
+  /*
+   * 0.1.12 (F2 追加): 全コメント一覧の各行にも「最低サムネ」を表示する。
+   *   ・ユーザー列に小さい 20px サムネをインライン配置（行高さを増やさず識別性 UP）
+   *   ・解決優先順位は集計テーブルと同じ resolveReportUserThumbSrc に揃える。
+   *   ・aggregatedRooms から userKey -> avatarUrl 解決済みの map を作って各行で参照
+   *     （comment.avatarUrl が古い場合は集計側の最新を採用）。
+   */
+  const userKeyToResolvedThumb = new Map();
+  for (const room of aggregatedRooms) {
+    const src = resolveReportUserThumbSrc({
+      userId: room.userKey,
+      avatarUrl: room.avatarUrl || '',
+      identiconResolver: getCachedAnonymousIdenticonDataUrl
+    });
+    userKeyToResolvedThumb.set(room.userKey, src);
+  }
   const commentRows = comments.map((c, idx) => {
     const commentNo = String(c.commentNo || '').trim();
     const text = String(c.text || '').trim();
     const userId = c.userId ? String(c.userId) : '';
-    const userLabel = displayUserLabel(userId || UNKNOWN_USER_KEY);
+    const userKey = userId || UNKNOWN_USER_KEY;
+    const userLabel = displayUserLabel(userKey);
     const userLabelHtml = buildUserProfileLinkedLabelHtml(userId, userLabel);
     const search = escapeAttr(
       `${commentNo} ${text} ${userId} ${userLabel} ${c.liveId || ''}`.toLowerCase()
     );
+    // 集計済みマップに無いユーザー（理論上ありえないが念のため）はその場で解決
+    let avatarSrc = userKeyToResolvedThumb.get(userKey);
+    if (avatarSrc === undefined) {
+      avatarSrc = resolveReportUserThumbSrc({
+        userId: userKey,
+        avatarUrl: c.avatarUrl || '',
+        identiconResolver: getCachedAnonymousIdenticonDataUrl
+      });
+    }
+    const avatarInlineHtml = avatarSrc
+      ? `<img class="report-comment-av" src="${escapeAttr(avatarSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+      : '<span class="report-comment-av report-comment-av--empty"></span>';
     return `
       <tr class="search-item" data-search="${search}">
         <td>${idx + 1}</td>
         <td>${escapeHtml(commentNo || '-')}</td>
-        <td>${userLabelHtml}</td>
+        <td><span class="report-user-cell">${avatarInlineHtml}<span class="report-user-cell__label">${userLabelHtml}</span></span></td>
         <td>${escapeHtml(text || '-')}</td>
         <td>${escapeHtml(formatDateTime(c.capturedAt || 0))}</td>
       </tr>
@@ -7767,6 +7796,30 @@ async function buildHtmlReportDocument(
         display: block;
       }
       .report-room-av--empty {
+        background: #cbd5e1;
+      }
+      /* 0.1.12 (F2 追加): 全コメント一覧のユーザーセル内インラインサムネ。
+         行高さを増やさないよう 20px に抑え、ラベルとは 6px のギャップ。 */
+      .report-user-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+      .report-user-cell__label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .report-comment-av {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex-shrink: 0;
+        display: block;
+      }
+      .report-comment-av--empty {
         background: #cbd5e1;
       }
       /* 0.1.12 (F3): サムネ付きユーザー一覧グリッド。可変列で詰めて並べる。 */

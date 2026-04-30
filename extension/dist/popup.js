@@ -11334,20 +11334,39 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           <ol class="report-thumb-grid">${thumbedRoomCells.join("")}</ol>
         </section>
       ` : "";
+    const userKeyToResolvedThumb = /* @__PURE__ */ new Map();
+    for (const room of aggregatedRooms) {
+      const src = resolveReportUserThumbSrc({
+        userId: room.userKey,
+        avatarUrl: room.avatarUrl || "",
+        identiconResolver: getCachedAnonymousIdenticonDataUrl
+      });
+      userKeyToResolvedThumb.set(room.userKey, src);
+    }
     const commentRows = comments.map((c, idx) => {
       const commentNo = String(c.commentNo || "").trim();
       const text = String(c.text || "").trim();
       const userId = c.userId ? String(c.userId) : "";
-      const userLabel = displayUserLabel(userId || UNKNOWN_USER_KEY);
+      const userKey = userId || UNKNOWN_USER_KEY;
+      const userLabel = displayUserLabel(userKey);
       const userLabelHtml = buildUserProfileLinkedLabelHtml(userId, userLabel);
       const search = escapeAttr(
         `${commentNo} ${text} ${userId} ${userLabel} ${c.liveId || ""}`.toLowerCase()
       );
+      let avatarSrc = userKeyToResolvedThumb.get(userKey);
+      if (avatarSrc === void 0) {
+        avatarSrc = resolveReportUserThumbSrc({
+          userId: userKey,
+          avatarUrl: c.avatarUrl || "",
+          identiconResolver: getCachedAnonymousIdenticonDataUrl
+        });
+      }
+      const avatarInlineHtml = avatarSrc ? `<img class="report-comment-av" src="${escapeAttr(avatarSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="report-comment-av report-comment-av--empty"></span>';
       return `
       <tr class="search-item" data-search="${search}">
         <td>${idx + 1}</td>
         <td>${escapeHtml(commentNo || "-")}</td>
-        <td>${userLabelHtml}</td>
+        <td><span class="report-user-cell">${avatarInlineHtml}<span class="report-user-cell__label">${userLabelHtml}</span></span></td>
         <td>${escapeHtml(text || "-")}</td>
         <td>${escapeHtml(formatDateTime(c.capturedAt || 0))}</td>
       </tr>
@@ -11813,6 +11832,30 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       .report-room-av--empty {
         background: #cbd5e1;
       }
+      /* 0.1.12 (F2 \u8FFD\u52A0): \u5168\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7\u306E\u30E6\u30FC\u30B6\u30FC\u30BB\u30EB\u5185\u30A4\u30F3\u30E9\u30A4\u30F3\u30B5\u30E0\u30CD\u3002
+         \u884C\u9AD8\u3055\u3092\u5897\u3084\u3055\u306A\u3044\u3088\u3046 20px \u306B\u6291\u3048\u3001\u30E9\u30D9\u30EB\u3068\u306F 6px \u306E\u30AE\u30E3\u30C3\u30D7\u3002 */
+      .report-user-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+      }
+      .report-user-cell__label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .report-comment-av {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex-shrink: 0;
+        display: block;
+      }
+      .report-comment-av--empty {
+        background: #cbd5e1;
+      }
       /* 0.1.12 (F3): \u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7\u30B0\u30EA\u30C3\u30C9\u3002\u53EF\u5909\u5217\u3067\u8A70\u3081\u3066\u4E26\u3079\u308B\u3002 */
       .report-thumb-grid {
         list-style: none;
@@ -12049,7 +12092,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1017" ? String("0430-1017") : "dev";
+      const buildId = "0430-1045" ? String("0430-1045") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
