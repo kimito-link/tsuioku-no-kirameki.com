@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.40（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.41（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,50 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.41 バンプで入った修正（深層監査結果の反映 AP）**:
+
+ユーザー報告の「配信者タイル消える / multi-tab 混信 / 取り込み率 17%」を
+deep audit エージェントで原因特定し、3 件まとめて修正。
+
+- **W1: 配信者タイル「出たと思ったら消える」**
+  - 原因: popup-entry.js が 10〜30 秒の polling で `watchMetaCache.snapshot`
+    を無条件上書きしていた。content-entry.js の collectWatchPageSnapshot は
+    `embedded-data` から broadcaster 系を引くが、niconico SPA は時間経過で
+    `#embedded-data` を一瞬書き換えるため、運悪く polling がそのタイミング
+    に当たると broadcaster フィールドが空文字の snapshot で旧値を消して
+    しまっていた。
+  - 修正: 新規 lib `src/lib/watchSnapshotPartialMerge.js`
+    （`mergeWatchSnapshotPreservingBroadcaster`、純粋関数 + 11 ケース TDD）。
+    broadcaster identity 5 フィールド（name / pageUrl / iconUrl / userId /
+    level）は新値が空なら旧値を保つ partial-merge にする。
+
+- **W2: 複数タブで kon-ta パネルが混信**
+  - 原因: standalone popup window では `chrome.tabs.query({active:true,
+    currentWindow:true})` が popup window 自身を currentWindow とみなし、
+    popup.html の URL を返す。これは niconico URL ではないので storage
+    `nls_last_watch_url` へ fallback していたが、この値は全 watch タブの
+    content script が last-write-wins で書き換えるため、複数タブで popup
+    を順に開くと **すべて同じ「直近 1 つの watch タブ URL」を見る** 状態に
+    なり、データが混信する。
+  - 修正: 新規 lib `src/lib/popupWatchUrlResolveMultiTab.js`
+    （`pickWatchUrlFromMultipleSources`、純粋関数 + 8 ケース TDD）。
+    `chrome.windows.getLastFocused({windowTypes:['normal']})` で「直前の
+    通常 window のアクティブタブ」を取得し、storage より優先する 3 段
+    判定（activeTab → lastFocusedNormal → storage）に変更。
+
+- **W3: コメ取り込み率 17%**
+  - 原因: `runDeepHarvest` が `!opts.force && shouldSkipDeepHarvest()` で
+    NDGR active 中は早期 return していた。`tryPeriodicQuietDeepHarvest` /
+    `onTabVisibleForCommentHarvest` 経路は recovery を計算して force=true
+    を渡していたが、`scheduleDeepHarvest` 経路（liveIdChange / recordingOn /
+    tabVisible reason）は `shouldForceDeepHarvestForReason` が startup
+    のみ true を返すため、ライブ参加直後の backlog（既に積まれていた数百
+    件のコメント）が NDGR active のせいで永遠に取れなかった。
+  - 修正: `runDeepHarvest` 内に `shouldForceDeepHarvestRecovery`（既に
+    lib 化済みだったが結線されていなかった）を OR 条件で追加。
+    NDGR active でも前回 deep から 5 分以上経っていれば force 実行する
+    defense-in-depth。
 
 **0.1.40 バンプで入った修正（公式チャンネル放送の配信者タイル復活 AO）**:
 

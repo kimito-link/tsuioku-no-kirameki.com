@@ -5438,15 +5438,31 @@ async function runDeepHarvest(opts = {}) {
   ) {
     return;
   }
-  if (
-    !opts.force &&
-    shouldSkipDeepHarvest({
+  /*
+   * 0.1.41 (W): NDGR が active な間 deep harvest を全 skip すると、配信途中
+   *   参加時の backlog（既に積まれていた数百件のコメント）が永遠に取れない
+   *   現象が発生していた（ユーザー報告: 公式 324 件・記録 55 件 = 17%）。
+   *   `tryPeriodicQuietDeepHarvest` / `onTabVisibleForCommentHarvest` は
+   *   recovery を計算して force=true を渡しているが、`scheduleDeepHarvest`
+   *   経路（liveIdChange / recordingOn / tabVisible reason）は force=false
+   *   のため NDGR active で skip されていた。runDeepHarvest 自体に
+   *   recovery 判定を OR で入れる defense-in-depth。
+   */
+  if (!opts.force) {
+    const nowMs = Date.now();
+    const ndgrSkip = shouldSkipDeepHarvest({
       ndgrLastReceivedAt,
-      now: Date.now(),
+      now: nowMs,
       thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
-    })
-  ) {
-    return;
+    });
+    const needsRecovery = shouldForceDeepHarvestRecovery({
+      lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
+      now: nowMs,
+      recoveryMs: HARVEST_TIMING.deepRecoveryMs
+    });
+    if (ndgrSkip && !needsRecovery) {
+      return;
+    }
   }
   harvestRunning = true;
   try {

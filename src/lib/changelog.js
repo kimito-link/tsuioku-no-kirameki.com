@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.41',
+    date: '2026-04-30',
+    summary: '深層監査の結果を反映',
+    items: Object.freeze([
+      '配信者タイルが「出たと思ったら消える」事象を修正（30 秒ごとの再取得で broadcaster 系が空のとき旧値を保つ partial-merge を導入、純粋関数 + 11 ケース TDD）',
+      '複数タブで kon-ta パネルの記録件数 / ランクストリップが混信する事象を修正（standalone popup window から「直前の通常 window のアクティブタブ」を拾うよう判定追加、純粋関数 + 8 ケース TDD）',
+      'コメ取り込み率が 17% 程度に低下していた事象を修正（NDGR が active な間 deep harvest を全 skip していたが、5 分以上 deep が走っていなければ強制実行する recovery を runDeepHarvest 内部にも結線）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.40',
     date: '2026-04-30',
     summary: '公式チャンネル放送の配信者タイル復活',

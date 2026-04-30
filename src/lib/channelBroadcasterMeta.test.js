@@ -49,6 +49,39 @@ describe('resolveChannelBroadcasterMeta - 公式チャンネル放送 (にじさ
     expect(r.pageUrl).toBe('https://ch.nicovideo.jp/channel/ch2642506');
     expect(r.iconUrl).toBe('https://secure-dcdn.cdn.nimg.jp/comch/channel-icon/128x128/ch2642506.jpg?1741569257');
   });
+
+  it('テレビ朝日（ニコニコ実況）: 同じ channel 構造 → kind=channel', () => {
+    // 実データ（無料チャンネル: isPayChannel=false の場合も channel と判定）
+    const tvAsahiProps = {
+      program: {
+        providerType: 'channel',
+        supplier: {
+          supplierType: 'channel',
+          name: '株式会社ドワンゴ'
+        }
+      },
+      socialGroup: {
+        type: 'channel',
+        id: 'ch2646439',
+        broadcastHistoryPageUrl: 'https://ch.nicovideo.jp/channel/ch2646439/live',
+        description: 'ニコニコ実況は、放送中のテレビ番組や...',
+        name: 'テレビ朝日（ニコニコ実況）',
+        socialGroupPageUrl: 'https://ch.nicovideo.jp/channel/ch2646439',
+        thumbnailImageUrl: 'https://secure-dcdn.cdn.nimg.jp/comch/channel-icon/128x128/ch2646439.jpg',
+        thumbnailSmallImageUrl: 'https://secure-dcdn.cdn.nimg.jp/comch/channel-icon/64x64/ch2646439.jpg',
+        companyName: '株式会社ドワンゴ',
+        isPayChannel: false,
+        isFollowed: false,
+        isJoined: false,
+        isCPSEnabled: true
+      }
+    };
+    const r = resolveChannelBroadcasterMeta(tvAsahiProps);
+    expect(r.kind).toBe('channel');
+    expect(r.name).toBe('テレビ朝日（ニコニコ実況）');
+    expect(r.pageUrl).toBe('https://ch.nicovideo.jp/channel/ch2646439');
+    expect(r.iconUrl).toBe('https://secure-dcdn.cdn.nimg.jp/comch/channel-icon/128x128/ch2646439.jpg');
+  });
 });
 
 describe('resolveChannelBroadcasterMeta - チャンネル判定の各経路', () => {

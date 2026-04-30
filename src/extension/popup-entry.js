@@ -4,7 +4,7 @@ import {
   isNicoLiveWatchUrl,
   watchPageUrlsMatchForSnapshot
 } from '../lib/broadcastUrl.js';
-import { resolveWatchUrlFromTabAndStash } from '../lib/popupWatchUrlResolve.js';
+import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import {
@@ -255,6 +255,7 @@ import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
+import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 
 /**
  * @typedef {{
@@ -6082,8 +6083,19 @@ async function refresh() {
   try {
   ensurePopupPrimaryCloakedBeforeFirstReveal();
   document.documentElement.removeAttribute('data-nl-popup-content-painted');
-  const [tabs, openBag] = await Promise.all([
+  /*
+   * 0.1.41 (W): standalone popup window 時の multi-tab 混信修正。
+   *   popup window から見ると `chrome.tabs.query({active:true, currentWindow:true})`
+   *   は popup 自身の URL を返してしまう。directly opened した場合の
+   *   「直前の通常 window のアクティブタブ」も並行取得して、
+   *   pickWatchUrlFromMultipleSources で優先順を判定する。
+   *   INLINE_MODE（popup が watch ページ iframe）では従来どおり
+   *   activeTab が watch URL に直接マッチする。
+   */
+  const [tabs, lastFocusedNormal, openBag] = await Promise.all([
     chrome.tabs.query({ active: true, currentWindow: true }),
+    chrome.windows.getLastFocused({ populate: true, windowTypes: ['normal'] })
+      .catch(() => /** @type {chrome.windows.Window|null} */ (null)),
     chrome.storage.local.get([
       KEY_SELF_POSTED_RECENTS,
       KEY_LAST_WATCH_URL,
@@ -6101,6 +6113,8 @@ async function refresh() {
       KEY_FOLD_ANONYMOUS_IN_RANK_STRIP
     ])
   ]);
+  const lastFocusedNormalActiveTab =
+    lastFocusedNormal?.tabs?.find((t) => t?.active) ?? null;
   applySelfPostedRecentsFromBag(openBag);
   const calmOn = normalizeCalmPanelMotion(openBag[KEY_CALM_PANEL_MOTION], {
     inlineDefault: INLINE_MODE
@@ -6118,10 +6132,19 @@ async function refresh() {
   // （checkbox.checked + runtime 変数 + キャッシュクリア / 再描画キー破棄などの
   //  副作用をコントローラが内包）
   popupBooleanSettingsRegistry.applyFromBag(openBag);
-  const { url, fromActiveTab } = resolveWatchUrlFromTabAndStash(
-    tabs[0],
-    openBag[KEY_LAST_WATCH_URL]
-  );
+  /*
+   * 0.1.41 (W): pickWatchUrlFromMultipleSources で 3 ソース統合判定。
+   *   従来の resolveWatchUrlFromTabAndStash は activeTab → storage の 2 段だが、
+   *   standalone popup ではこの間に「直前の通常 window のアクティブタブ」を
+   *   挟むと complex multi-tab で正しい URL が拾える。
+   */
+  const watchUrlPick = pickWatchUrlFromMultipleSources({
+    activeTab: tabs[0],
+    lastFocusedNormalActiveTab,
+    lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL]
+  });
+  const url = watchUrlPick.url;
+  const fromActiveTab = watchUrlPick.source === 'activeTab';
   const resolvedLv = extractLiveIdFromUrl(url);
   const viewerLvForError =
     isNicoLiveWatchUrl(url) && resolvedLv ? resolvedLv : '';
@@ -6535,7 +6558,18 @@ async function refresh() {
     watchMetaCache.fetchInflight = false;
     watchMetaCache.fetchError = String(snapResult.error || '');
     if (!isFreshRefresh()) return;
-    watchMetaCache.snapshot = snapResult.snapshot;
+    /*
+     * 0.1.41 (W): 配信者タイル「出たと思ったら消える」の対策。
+     *   30 秒ごとの polling で snapshot を無条件上書きしていたため、
+     *   niconico SPA が #embedded-data を一瞬書き換えるタイミングに当たると
+     *   broadcaster 系（name/pageUrl/iconUrl/userId/level）が空の snapshot で
+     *   旧値を消してしまっていた。partial-merge で broadcaster identity 系
+     *   フィールドだけは「新値が空なら旧値を保つ」にする。
+     */
+    watchMetaCache.snapshot = mergeWatchSnapshotPreservingBroadcaster(
+      watchMetaCache.snapshot,
+      snapResult.snapshot
+    );
     watchSnapshot = watchMetaCache.snapshot;
     const strippedAfterSnap = stripViewerAvatarContamination(
       arr,

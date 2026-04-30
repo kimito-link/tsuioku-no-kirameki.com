@@ -49,16 +49,24 @@
     }
   }
 
-  // src/lib/popupWatchUrlResolve.js
-  function resolveWatchUrlFromTabAndStash(tab, lastWatchUrlRaw) {
-    const tabUrl = tab?.url || "";
-    if (isNicoLiveWatchUrl(tabUrl)) {
-      return { url: tabUrl, fromActiveTab: true };
+  // src/lib/popupWatchUrlResolveMultiTab.js
+  function pickWatchUrlFromMultipleSources(input) {
+    if (!input || typeof input !== "object") {
+      return { url: "", source: "none" };
     }
-    if (typeof lastWatchUrlRaw === "string" && isNicoLiveWatchUrl(lastWatchUrlRaw)) {
-      return { url: lastWatchUrlRaw, fromActiveTab: false };
+    const activeUrl = String(input.activeTab?.url ?? "").trim();
+    if (isNicoLiveWatchUrl(activeUrl)) {
+      return { url: activeUrl, source: "activeTab" };
     }
-    return { url: "", fromActiveTab: true };
+    const lastFocusedUrl = String(input.lastFocusedNormalActiveTab?.url ?? "").trim();
+    if (isNicoLiveWatchUrl(lastFocusedUrl)) {
+      return { url: lastFocusedUrl, source: "lastFocusedNormal" };
+    }
+    const stashed = typeof input.lastWatchUrlRaw === "string" ? input.lastWatchUrlRaw.trim() : "";
+    if (isNicoLiveWatchUrl(stashed)) {
+      return { url: stashed, source: "storage" };
+    }
+    return { url: "", source: "none" };
   }
 
   // src/lib/popupStorageRefreshCoalesce.js
@@ -699,6 +707,16 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.41",
+      date: "2026-04-30",
+      summary: "\u6DF1\u5C64\u76E3\u67FB\u306E\u7D50\u679C\u3092\u53CD\u6620",
+      items: Object.freeze([
+        "\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u304C\u300C\u51FA\u305F\u3068\u601D\u3063\u305F\u3089\u6D88\u3048\u308B\u300D\u4E8B\u8C61\u3092\u4FEE\u6B63\uFF0830 \u79D2\u3054\u3068\u306E\u518D\u53D6\u5F97\u3067 broadcaster \u7CFB\u304C\u7A7A\u306E\u3068\u304D\u65E7\u5024\u3092\u4FDD\u3064 partial-merge \u3092\u5C0E\u5165\u3001\u7D14\u7C8B\u95A2\u6570 + 11 \u30B1\u30FC\u30B9 TDD\uFF09",
+        "\u8907\u6570\u30BF\u30D6\u3067 kon-ta \u30D1\u30CD\u30EB\u306E\u8A18\u9332\u4EF6\u6570 / \u30E9\u30F3\u30AF\u30B9\u30C8\u30EA\u30C3\u30D7\u304C\u6DF7\u4FE1\u3059\u308B\u4E8B\u8C61\u3092\u4FEE\u6B63\uFF08standalone popup window \u304B\u3089\u300C\u76F4\u524D\u306E\u901A\u5E38 window \u306E\u30A2\u30AF\u30C6\u30A3\u30D6\u30BF\u30D6\u300D\u3092\u62FE\u3046\u3088\u3046\u5224\u5B9A\u8FFD\u52A0\u3001\u7D14\u7C8B\u95A2\u6570 + 8 \u30B1\u30FC\u30B9 TDD\uFF09",
+        "\u30B3\u30E1\u53D6\u308A\u8FBC\u307F\u7387\u304C 17% \u7A0B\u5EA6\u306B\u4F4E\u4E0B\u3057\u3066\u3044\u305F\u4E8B\u8C61\u3092\u4FEE\u6B63\uFF08NDGR \u304C active \u306A\u9593 deep harvest \u3092\u5168 skip \u3057\u3066\u3044\u305F\u304C\u30015 \u5206\u4EE5\u4E0A deep \u304C\u8D70\u3063\u3066\u3044\u306A\u3051\u308C\u3070\u5F37\u5236\u5B9F\u884C\u3059\u308B recovery \u3092 runDeepHarvest \u5185\u90E8\u306B\u3082\u7D50\u7DDA\uFF09"
+      ])
+    }),
     Object.freeze({
       version: "0.1.40",
       date: "2026-04-30",
@@ -8664,6 +8682,42 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return Boolean(ka && kb && ka === kb);
   }
 
+  // src/lib/watchSnapshotPartialMerge.js
+  var PROTECTED_STRING_FIELDS = (
+    /** @type {const} */
+    [
+      "broadcasterName",
+      "broadcasterPageUrl",
+      "broadcasterIconUrl",
+      "broadcasterUserId"
+    ]
+  );
+  function asTrimmedString(v) {
+    if (v == null) return "";
+    return String(v).trim();
+  }
+  function mergeWatchSnapshotPreservingBroadcaster(prev, next) {
+    if (next == null) return null;
+    if (prev == null) return next;
+    const merged = { ...next };
+    for (const key of PROTECTED_STRING_FIELDS) {
+      const nextStr = asTrimmedString(next[key]);
+      if (!nextStr) {
+        const prevStr = asTrimmedString(prev[key]);
+        if (prevStr) {
+          merged[key] = prev[key];
+        }
+      }
+    }
+    const nextLv = next.broadcasterLevel;
+    if (nextLv == null) {
+      if (prev.broadcasterLevel != null) {
+        merged.broadcasterLevel = prev.broadcasterLevel;
+      }
+    }
+    return merged;
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -13215,8 +13269,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       };
       ensurePopupPrimaryCloakedBeforeFirstReveal();
       document.documentElement.removeAttribute("data-nl-popup-content-painted");
-      const [tabs, openBag] = await Promise.all([
+      const [tabs, lastFocusedNormal, openBag] = await Promise.all([
         chrome.tabs.query({ active: true, currentWindow: true }),
+        chrome.windows.getLastFocused({ populate: true, windowTypes: ["normal"] }).catch(() => (
+          /** @type {chrome.windows.Window|null} */
+          null
+        )),
         chrome.storage.local.get([
           KEY_SELF_POSTED_RECENTS,
           KEY_LAST_WATCH_URL,
@@ -13234,6 +13292,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           KEY_FOLD_ANONYMOUS_IN_RANK_STRIP
         ])
       ]);
+      const lastFocusedNormalActiveTab = lastFocusedNormal?.tabs?.find((t) => t?.active) ?? null;
       applySelfPostedRecentsFromBag(openBag);
       const calmOn = normalizeCalmPanelMotion(openBag[KEY_CALM_PANEL_MOTION], {
         inlineDefault: INLINE_MODE
@@ -13254,10 +13313,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         );
       }
       popupBooleanSettingsRegistry.applyFromBag(openBag);
-      const { url, fromActiveTab } = resolveWatchUrlFromTabAndStash(
-        tabs[0],
-        openBag[KEY_LAST_WATCH_URL]
-      );
+      const watchUrlPick = pickWatchUrlFromMultipleSources({
+        activeTab: tabs[0],
+        lastFocusedNormalActiveTab,
+        lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL]
+      });
+      const url = watchUrlPick.url;
+      const fromActiveTab = watchUrlPick.source === "activeTab";
       const resolvedLv = extractLiveIdFromUrl(url);
       const viewerLvForError = isNicoLiveWatchUrl(url) && resolvedLv ? resolvedLv : "";
       const commentPanelPayload = parseCommentPanelStatusPayload(
@@ -13559,7 +13621,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         watchMetaCache.fetchInflight = false;
         watchMetaCache.fetchError = String(snapResult.error || "");
         if (!isFreshRefresh()) return;
-        watchMetaCache.snapshot = snapResult.snapshot;
+        watchMetaCache.snapshot = mergeWatchSnapshotPreservingBroadcaster(
+          watchMetaCache.snapshot,
+          snapResult.snapshot
+        );
         watchSnapshot = watchMetaCache.snapshot;
         const strippedAfterSnap = stripViewerAvatarContamination(
           arr,
@@ -15088,7 +15153,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1939" ? String("0430-1939") : "dev";
+      const buildId = "0430-2059" ? String("0430-2059") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

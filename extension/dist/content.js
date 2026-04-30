@@ -7433,12 +7433,21 @@
     if (harvestRunning || !recording || !liveId || !locationAllowsCommentRecording()) {
       return;
     }
-    if (!opts.force && shouldSkipDeepHarvest({
-      ndgrLastReceivedAt,
-      now: Date.now(),
-      thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
-    })) {
-      return;
+    if (!opts.force) {
+      const nowMs = Date.now();
+      const ndgrSkip = shouldSkipDeepHarvest({
+        ndgrLastReceivedAt,
+        now: nowMs,
+        thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
+      });
+      const needsRecovery = shouldForceDeepHarvestRecovery({
+        lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
+        now: nowMs,
+        recoveryMs: HARVEST_TIMING.deepRecoveryMs
+      });
+      if (ndgrSkip && !needsRecovery) {
+        return;
+      }
     }
     harvestRunning = true;
     try {
