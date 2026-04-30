@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.57',
+    date: '2026-05-01',
+    summary: '何もない時は前放送データを出さない',
+    items: Object.freeze([
+      'watch ページ以外で popup を開いた時に、storage 由来の前放送データ（記録 N 件・(取得不可) など）が表示されてレイアウトがガタガタになる問題を修正。アクティブな watch タブが無いときは「（ニコ生 watch を開いてください）」placeholder + ランキング導線のみのスッキリ表示に統一'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.56',
     date: '2026-05-01',
     summary: 'ランキング導線を最上部に固定表示',

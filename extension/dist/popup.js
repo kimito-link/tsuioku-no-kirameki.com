@@ -708,6 +708,14 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.57",
+      date: "2026-05-01",
+      summary: "\u4F55\u3082\u306A\u3044\u6642\u306F\u524D\u653E\u9001\u30C7\u30FC\u30BF\u3092\u51FA\u3055\u306A\u3044",
+      items: Object.freeze([
+        "watch \u30DA\u30FC\u30B8\u4EE5\u5916\u3067 popup \u3092\u958B\u3044\u305F\u6642\u306B\u3001storage \u7531\u6765\u306E\u524D\u653E\u9001\u30C7\u30FC\u30BF\uFF08\u8A18\u9332 N \u4EF6\u30FB(\u53D6\u5F97\u4E0D\u53EF) \u306A\u3069\uFF09\u304C\u8868\u793A\u3055\u308C\u3066\u30EC\u30A4\u30A2\u30A6\u30C8\u304C\u30AC\u30BF\u30AC\u30BF\u306B\u306A\u308B\u554F\u984C\u3092\u4FEE\u6B63\u3002\u30A2\u30AF\u30C6\u30A3\u30D6\u306A watch \u30BF\u30D6\u304C\u7121\u3044\u3068\u304D\u306F\u300C\uFF08\u30CB\u30B3\u751F watch \u3092\u958B\u3044\u3066\u304F\u3060\u3055\u3044\uFF09\u300Dplaceholder + \u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u306E\u307F\u306E\u30B9\u30C3\u30AD\u30EA\u8868\u793A\u306B\u7D71\u4E00"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.56",
       date: "2026-05-01",
       summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u3092\u6700\u4E0A\u90E8\u306B\u56FA\u5B9A\u8868\u793A",
@@ -14296,7 +14304,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           noWatchHint.style.display = "block";
         }
       }
-      if (!isNicoLiveWatchUrl(url)) {
+      const treatAsNoActiveWatch = !isNicoLiveWatchUrl(url) || watchUrlPick.source === "storage" || watchUrlPick.source === "none";
+      if (treatAsNoActiveWatch) {
         if (!isFreshRefresh()) return;
         resetPerBroadcastPopupCachesIfLiveIdChanged("");
         if (liveEl) liveEl.textContent = "\uFF08\u30CB\u30B3\u751Fwatch\u3092\u958B\u3044\u3066\u304F\u3060\u3055\u3044\uFF09";
@@ -16027,7 +16036,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-0009" ? String("0501-0009") : "dev";
+      const buildId = "0501-0016" ? String("0501-0016") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

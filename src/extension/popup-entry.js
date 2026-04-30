@@ -6280,7 +6280,19 @@ async function refresh() {
     }
   }
 
-  if (!isNicoLiveWatchUrl(url)) {
+  /*
+   * 0.1.57 (AM): source='storage'/'none' のときは stale な watch URL を持ち出して
+   *   前の放送のデータを表示してしまっていたのを止め、「watch を開いてください」
+   *   状態の placeholder を出す。これで標準 popup を非 watch ページで開いた時、
+   *   ランキング導線（オレンジカード）と空状態の placeholder だけのスッキリ表示
+   *   になる。INLINE_MODE / activeTab / lastFocusedNormal なら従来どおりデータ表示。
+   */
+  const treatAsNoActiveWatch =
+    !isNicoLiveWatchUrl(url) ||
+    watchUrlPick.source === 'storage' ||
+    watchUrlPick.source === 'none';
+
+  if (treatAsNoActiveWatch) {
     if (!isFreshRefresh()) return;
     resetPerBroadcastPopupCachesIfLiveIdChanged('');
     if (liveEl) liveEl.textContent = '（ニコ生watchを開いてください）';
