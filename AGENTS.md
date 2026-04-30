@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.51（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.52（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,21 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.52 バンプで入った変更（ニコ生ランキング導線 AH）**:
+
+- ユーザー要望: 「何もないところの場合、ニコニコの生放送ランキングに飛ぶ
+  のはどうでしょうか？ ちくらんとか？」
+- 内容: watch ページ以外で popup を開いた時、これまでは「（ニコ生 watch を
+  開いてください）」のテキストだけだったのを、ニコ生のランキング系ページ
+  への導線リンクを **light 配色のカード** で出すよう変更:
+   - 🏠 ニコニコ生放送 トップ (live.nicovideo.jp/)
+   - 📊 生放送ランキング (live.nicovideo.jp/ranking)
+   - 🎯 ちくらん（コミュニティ生放送ランキング）(com.nicovideo.jp/ranking/live)
+   - 🆕 開始したばかりの放送 (live.nicovideo.jp/recent)
+- 実装: popup.html に `<section id="noWatchRankingHint">` を hidden で配置、
+  popup-entry.js の refresh で `!isNicoLiveWatchUrl(url)` のとき hidden を
+  外す。すべての URL は target="_blank" rel="noopener noreferrer"。
 
 **0.1.51 バンプで入った修正（popup の dark を完全撤去 AG）**:
 

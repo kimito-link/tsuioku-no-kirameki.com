@@ -6262,6 +6262,17 @@ async function refresh() {
   }
   syncVoiceCommentButton();
 
+  /*
+   * 0.1.52 (AH): watch ページ未検出時に「ニコ生ランキング」リンクを popup に出す。
+   *   watch ページなら hidden、watch ページじゃなければ表示。
+   *   ユーザー要望「何もないところの場合、ニコニコの生放送ランキングにとぶのは
+   *   どうでしょうか？ ちくらんとか？」への対応。
+   */
+  const noWatchHint = $('noWatchRankingHint');
+  if (noWatchHint instanceof HTMLElement) {
+    noWatchHint.hidden = isNicoLiveWatchUrl(url);
+  }
+
   if (!isNicoLiveWatchUrl(url)) {
     if (!isFreshRefresh()) return;
     resetPerBroadcastPopupCachesIfLiveIdChanged('');

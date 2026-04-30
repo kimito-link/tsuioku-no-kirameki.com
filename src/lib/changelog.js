@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.52',
+    date: '2026-04-30',
+    summary: '何もない時はニコ生ランキング導線',
+    items: Object.freeze([
+      'watch ページ以外で popup を開いた時に、ニコ生トップ・生放送ランキング・ちくらん・直近開始の放送 へのリンクを表示。気になる放送をすぐ探せるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.51',
     date: '2026-04-30',
     summary: 'popup の dark を完全に撤去',

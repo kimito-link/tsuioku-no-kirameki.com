@@ -5924,6 +5924,59 @@
         display: none;
       }
 
+      /* 0.1.52 (AH): watch ページが見つからないときに popup へ出す
+         ニコ生ランキング導線。light 配色固定（0.1.51 の dark 撤去と
+         整合）。 */
+      .nl-no-watch-hint {
+        margin: 8px 10px 4px;
+        padding: 10px 12px 12px;
+        background: linear-gradient(160deg, #fff8ed, #eaf5ff);
+        border: 1px solid #d5e3f5;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgb(15 23 42 / 6%);
+      }
+
+      .nl-no-watch-hint__lead {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #1f2937;
+        line-height: 1.4;
+      }
+
+      .nl-no-watch-hint__links {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .nl-no-watch-hint__links li {
+        margin: 0;
+      }
+
+      .nl-no-watch-hint__links a {
+        display: block;
+        padding: 8px 10px;
+        background: #ffffff;
+        border: 1px solid #d5e3f5;
+        border-radius: 8px;
+        color: #0b73ad;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background 120ms ease, border-color 120ms ease;
+      }
+
+      .nl-no-watch-hint__links a:hover,
+      .nl-no-watch-hint__links a:focus-visible {
+        background: #e0f2fe;
+        border-color: #0f8fd8;
+        outline: none;
+      }
+
       html.nl-skin-panel-dark {
         color-scheme: dark;
         --nl-bg: #0a0e14;
@@ -6770,6 +6823,39 @@
       <div class="nl-vdh-divider" role="presentation">
         <span>応援の記録と表示</span>
       </div>
+
+      <!--
+        0.1.52 (AH): watch ページ以外で popup を開いたときに「ニコ生のランキング」へ
+        飛べる導線を出す。普段は hidden で、popup-entry.js が watchUrl 未検出のとき
+        だけ hidden を外す。
+      -->
+      <section id="noWatchRankingHint" class="nl-no-watch-hint" aria-label="ニコ生 ランキング" hidden>
+        <p class="nl-no-watch-hint__lead">
+          watch ページが見つかりません。気になる放送を探してみますか？
+        </p>
+        <ul class="nl-no-watch-hint__links">
+          <li>
+            <a href="https://live.nicovideo.jp/" target="_blank" rel="noopener noreferrer">
+              🏠 ニコニコ生放送 トップ
+            </a>
+          </li>
+          <li>
+            <a href="https://live.nicovideo.jp/ranking" target="_blank" rel="noopener noreferrer">
+              📊 生放送ランキング
+            </a>
+          </li>
+          <li>
+            <a href="https://com.nicovideo.jp/ranking/live" target="_blank" rel="noopener noreferrer">
+              🎯 ちくらん（コミュニティ生放送ランキング）
+            </a>
+          </li>
+          <li>
+            <a href="https://live.nicovideo.jp/recent" target="_blank" rel="noopener noreferrer">
+              🆕 開始したばかりの放送（recent）
+            </a>
+          </li>
+        </ul>
+      </section>
 
       <section class="nl-stats" aria-label="応援コメント数">
         <span id="liveId" hidden>-</span>

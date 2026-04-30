@@ -708,6 +708,14 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.52",
+      date: "2026-04-30",
+      summary: "\u4F55\u3082\u306A\u3044\u6642\u306F\u30CB\u30B3\u751F\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA",
+      items: Object.freeze([
+        "watch \u30DA\u30FC\u30B8\u4EE5\u5916\u3067 popup \u3092\u958B\u3044\u305F\u6642\u306B\u3001\u30CB\u30B3\u751F\u30C8\u30C3\u30D7\u30FB\u751F\u653E\u9001\u30E9\u30F3\u30AD\u30F3\u30B0\u30FB\u3061\u304F\u3089\u3093\u30FB\u76F4\u8FD1\u958B\u59CB\u306E\u653E\u9001 \u3078\u306E\u30EA\u30F3\u30AF\u3092\u8868\u793A\u3002\u6C17\u306B\u306A\u308B\u653E\u9001\u3092\u3059\u3050\u63A2\u305B\u308B\u3088\u3046\u306B\u3057\u307E\u3057\u305F"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.51",
       date: "2026-04-30",
       summary: "popup \u306E dark \u3092\u5B8C\u5168\u306B\u64A4\u53BB",
@@ -14246,6 +14254,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         );
       }
       syncVoiceCommentButton();
+      const noWatchHint = $("noWatchRankingHint");
+      if (noWatchHint instanceof HTMLElement) {
+        noWatchHint.hidden = isNicoLiveWatchUrl(url);
+      }
       if (!isNicoLiveWatchUrl(url)) {
         if (!isFreshRefresh()) return;
         resetPerBroadcastPopupCachesIfLiveIdChanged("");
@@ -15977,7 +15989,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2257" ? String("0430-2257") : "dev";
+      const buildId = "0430-2302" ? String("0430-2302") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
