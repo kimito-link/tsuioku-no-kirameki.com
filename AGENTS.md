@@ -20,14 +20,16 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.11（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.12（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
 - **ステータス**: 0.1.7 が公開中。0.1.10 を CWS に審査依頼中。0.1.11 は 0.1.10 提出後に
  ディープリサーチで発見された残課題（privacy.html × 実装の整合不足、過去焼き込みデータの
  後方修復、184 自コメ viewerUid の他経路露出、avatarUrl cap の他経路漏れ、content-entry
- setInterval cleanup）を一括修正。0.1.10 が承認 → 公開された後、続けて 0.1.11 を提出予定。
+ setInterval cleanup）+ A1 視認性根治・B1 前面化レース・B2 dock_bottom 閉じるボタンを
+ 一括修正。0.1.12 で「盛り上げワード ワンクリック挿入パレット」（C）を追加した。
+ 0.1.10 が承認 → 公開された後、続けて 0.1.12 を提出予定。
 - **0.1.10 内訳**: 0.1.8 自コメ修正 + 0.1.9 シナリオ調査 8 件 + 0.1.10 Privacy 整合 / XSS 対策 / a11y 修正 / 出自不明アセット差し替え 13 件 をロールアップ。
 - **0.1.11 内訳**: privacy.html を IDB 3 つ・記録クリア言及で実装と整合 / 0.1.10 未満からの
  自動更新ユーザーで誤焼き込み `selfPosted:true` を 1 度だけ剥がす migration / 184 自コメの
@@ -171,6 +173,30 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.12 バンプで追加した機能（盛り上げワード ワンクリック挿入パレット 1 件）**:
+
+- `feat(popup)`: コメント textarea に「✨ 盛り上げワード パレット」を追加。
+ 既存の `.nl-compose-send-actions` に 36px の toggle ボタンを 1 つ差し込み、押下時のみ
+ chip ポップオーバー（4 列グリッド）が `position:absolute` で上方向に開く。textarea や
+ 送信ボタンを押し下げない（UIUX 阻害ゼロを目標）。
+ - プリセット 12 個（拍手・笑い・顔文字・歓声・〆）。`8888` / `wwww` / `パチパチ` /
+ `👏👏👏` / `🎉🎉🎉` / `草` / `(*^▽^*)` / `(/・ω・)/` / `ｷﾀ━(ﾟ∀ﾟ)━!` / `すごい！` /
+ `ナイス！` / `乙でした`。複数行 AA はニコ生で改行が無視されて 1 行に潰れるため、
+ 1 行で映えるパターンに限定。
+ - chip クリック → `insertCommentTextAtCursor` で textarea のカーソル位置（or 選択範囲）
+ に挿入し `input` イベントを dispatch（既存の文字数表示・送信ボタン enable 連動が走る）。
+ 250 字超過は no-op + 軽い通知。
+ - 最近使った 5 件は `chrome.storage.local[KEY_CHEER_RECENT_V1]` に保存し、再オープン時に
+ 先頭に並ぶ（よく使うワードが上に来る学習動作）。次回オープン時に lazy 再描画。
+ - 閉じる経路 4 つ: ① toggle 再押下 / ② chip 押下 / ③ Esc キー / ④ 外側クリック。
+ chip 押下後は textarea にフォーカスを戻して即送信できる導線。
+ - storageKeys.js に `KEY_CHEER_RECENT_V1='nls_cheer_recent_v1'` を追加。
+- `lib(new)`: `src/lib/cheerPalette.js` を新設し、preset 定義 / `insertCommentTextAtCursor` /
+ `rankCheerPresetsByRecent` / `pushRecentCheerKey` / `normalizeRecentCheerKeys` を分離。
+ DOM/storage 非依存の純粋関数群で vitest 単体検証可能（happy-dom 環境）。
+- `test`: `cheerPalette.test.js` を新規追加（32 ケース：境界・選択範囲置換・最大長拒否・
+ input 発火・recent ランク並べ・上限カット・不正値正規化）。
 
 **0.1.11 バンプまでに入った修正（残課題の後方修復・整合・回帰防止 6 件）**:
 

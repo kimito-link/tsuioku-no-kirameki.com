@@ -235,6 +235,7 @@
   var KEY_THUMB_INTERVAL_MS = "nls_thumb_interval_ms";
   var KEY_VOICE_AUTOSEND = "nls_voice_autosend";
   var KEY_COMMENT_ENTER_SEND = "nls_comment_enter_send";
+  var KEY_CHEER_RECENT_V1 = "nls_cheer_recent_v1";
   var KEY_STORY_GROWTH_COLLAPSED = "nls_story_growth_collapsed";
   var KEY_ANONYMOUS_IDENTICON_ENABLED = "nls_anonymous_identicon_enabled_v1";
   var KEY_FOLD_ANONYMOUS_IN_RANK_STRIP = "nls_fold_anonymous_in_rank_strip_v1";
@@ -553,6 +554,142 @@
       return "submit";
     }
     return "default";
+  }
+
+  // src/lib/cheerPalette.js
+  var DEFAULT_CHEER_PRESETS = Object.freeze([
+    Object.freeze({ key: "p_8888", label: "8888", text: "8888", category: "applause" }),
+    Object.freeze({
+      key: "p_pachipachi",
+      label: "\u30D1\u30C1\u30D1\u30C1",
+      text: "\u30D1\u30C1\u30D1\u30C1",
+      category: "applause"
+    }),
+    Object.freeze({
+      key: "p_clap_emoji",
+      label: "\u{1F44F}",
+      text: "\u{1F44F}\u{1F44F}\u{1F44F}",
+      category: "applause"
+    }),
+    Object.freeze({
+      key: "p_party",
+      label: "\u{1F389}",
+      text: "\u{1F389}\u{1F389}\u{1F389}",
+      category: "applause"
+    }),
+    Object.freeze({ key: "p_wwww", label: "wwww", text: "wwww", category: "laugh" }),
+    Object.freeze({ key: "p_kusa", label: "\u8349", text: "\u8349", category: "laugh" }),
+    Object.freeze({
+      key: "p_smile",
+      label: "(*^\u25BD^*)",
+      text: "(*^\u25BD^*)",
+      category: "kaomoji"
+    }),
+    Object.freeze({
+      key: "p_excited",
+      label: "(/\u30FB\u03C9\u30FB)/",
+      text: "(/\u30FB\u03C9\u30FB)/",
+      category: "kaomoji"
+    }),
+    Object.freeze({
+      key: "p_kita",
+      label: "\uFF77\uFF80\u2501(\uFF9F\u2200\uFF9F)\u2501!",
+      text: "\uFF77\uFF80\u2501(\uFF9F\u2200\uFF9F)\u2501!",
+      category: "cheer"
+    }),
+    Object.freeze({
+      key: "p_sugoi",
+      label: "\u3059\u3054\u3044\uFF01",
+      text: "\u3059\u3054\u3044\uFF01",
+      category: "cheer"
+    }),
+    Object.freeze({
+      key: "p_nice",
+      label: "\u30CA\u30A4\u30B9\uFF01",
+      text: "\u30CA\u30A4\u30B9\uFF01",
+      category: "cheer"
+    }),
+    Object.freeze({
+      key: "p_otsu",
+      label: "\u4E59\u3067\u3057\u305F",
+      text: "\u4E59\u3067\u3057\u305F",
+      category: "thanks"
+    })
+  ]);
+  function getDefaultCheerPresets() {
+    return DEFAULT_CHEER_PRESETS;
+  }
+  function findCheerPresetByKey(key) {
+    if (typeof key !== "string" || !key) return null;
+    return DEFAULT_CHEER_PRESETS.find((p) => p.key === key) || null;
+  }
+  function insertCommentTextAtCursor(ta, text, opts) {
+    if (!ta || typeof ta.value !== "string") {
+      return { ok: false, reason: "no_textarea" };
+    }
+    if (typeof text !== "string" || text.length === 0) {
+      return { ok: false, reason: "empty_text" };
+    }
+    const max = Number.isFinite(opts?.maxLength) ? Number(opts.maxLength) : 250;
+    const before = ta.value;
+    const start = Number.isFinite(ta.selectionStart) ? Number(ta.selectionStart) : before.length;
+    const end = Number.isFinite(ta.selectionEnd) ? Number(ta.selectionEnd) : before.length;
+    const safeStart = Math.max(0, Math.min(start, before.length));
+    const safeEnd = Math.max(safeStart, Math.min(end, before.length));
+    const next = before.slice(0, safeStart) + text + before.slice(safeEnd);
+    if (next.length > max) {
+      return { ok: false, reason: "exceeds_max_length" };
+    }
+    ta.value = next;
+    const cursor = safeStart + text.length;
+    try {
+      ta.setSelectionRange(cursor, cursor);
+    } catch {
+    }
+    try {
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+    } catch {
+    }
+    return { ok: true, newLength: next.length };
+  }
+  function rankCheerPresetsByRecent(presets, recent) {
+    const out = [];
+    const taken = /* @__PURE__ */ new Set();
+    for (const k of recent) {
+      const found = presets.find((p) => p.key === k);
+      if (found && !taken.has(found.key)) {
+        out.push(found);
+        taken.add(found.key);
+      }
+    }
+    for (const p of presets) {
+      if (!taken.has(p.key)) {
+        out.push(p);
+        taken.add(p.key);
+      }
+    }
+    return out;
+  }
+  function pushRecentCheerKey(recent, key, opts) {
+    if (typeof key !== "string" || !key) {
+      return Array.isArray(recent) ? [...recent] : [];
+    }
+    const max = Number.isFinite(opts?.max) ? Number(opts.max) : 5;
+    const dedup = [key, ...(Array.isArray(recent) ? recent : []).filter((k) => k !== key)];
+    return dedup.slice(0, Math.max(1, max));
+  }
+  function normalizeRecentCheerKeys(raw) {
+    if (!Array.isArray(raw)) return [];
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const v of raw) {
+      if (typeof v !== "string" || !v) continue;
+      if (seen.has(v)) continue;
+      seen.add(v);
+      out.push(v);
+      if (out.length >= 20) break;
+    }
+    return out;
   }
 
   // src/lib/userIdPreference.js
@@ -11660,7 +11797,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-0913" ? String("0430-0913") : "dev";
+      const buildId = "0430-0926" ? String("0430-0926") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -12957,6 +13094,119 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       clearCommentPostNotice();
       paintCommentComposeUi();
     });
+    const cheerToggleBtn = (
+      /** @type {HTMLButtonElement|null} */
+      $("cheerToggleBtn")
+    );
+    const cheerPaletteEl = (
+      /** @type {HTMLDivElement|null} */
+      $("cheerPalette")
+    );
+    if (cheerToggleBtn && cheerPaletteEl && commentInput) {
+      let cheerRecent = [];
+      let cheerPaletteRendered = false;
+      const closeCheerPalette = () => {
+        cheerPaletteEl.hidden = true;
+        cheerToggleBtn.setAttribute("aria-expanded", "false");
+      };
+      const renderCheerPalette = () => {
+        const presets = getDefaultCheerPresets();
+        const ranked = rankCheerPresetsByRecent(presets, cheerRecent);
+        while (cheerPaletteEl.firstChild) {
+          cheerPaletteEl.removeChild(cheerPaletteEl.firstChild);
+        }
+        const head = document.createElement("div");
+        head.className = "nl-cheer-palette__head";
+        head.textContent = "\u76DB\u308A\u4E0A\u3052\u30EF\u30FC\u30C9\uFF08\u30AB\u30FC\u30BD\u30EB\u4F4D\u7F6E\u306B\u633F\u5165\uFF09";
+        cheerPaletteEl.appendChild(head);
+        for (const preset of ranked) {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "nl-cheer-chip";
+          chip.dataset.cheerKey = preset.key;
+          chip.title = `\u300C${preset.text}\u300D\u3092\u633F\u5165`;
+          chip.setAttribute("aria-label", `${preset.label} \u3092\u633F\u5165`);
+          chip.textContent = preset.label;
+          cheerPaletteEl.appendChild(chip);
+        }
+        cheerPaletteRendered = true;
+      };
+      const openCheerPalette = () => {
+        if (!cheerPaletteRendered) renderCheerPalette();
+        cheerPaletteEl.hidden = false;
+        cheerToggleBtn.setAttribute("aria-expanded", "true");
+      };
+      cheerToggleBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const expanded = cheerToggleBtn.getAttribute("aria-expanded") === "true";
+        if (expanded) {
+          closeCheerPalette();
+        } else {
+          openCheerPalette();
+        }
+      });
+      cheerPaletteEl.addEventListener("click", (e) => {
+        const target = e.target instanceof Element ? e.target.closest(".nl-cheer-chip") : null;
+        if (!(target instanceof HTMLButtonElement)) return;
+        const key = String(target.dataset.cheerKey || "");
+        const preset = findCheerPresetByKey(key);
+        if (!preset) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (commentInput.readOnly || commentInput.disabled) return;
+        const result = insertCommentTextAtCursor(commentInput, preset.text, {
+          maxLength: 250
+        });
+        if (!result.ok) {
+          if (result.reason === "exceeds_max_length") {
+            setCommentPostNotice("\u6587\u5B57\u6570\u306E\u4E0A\u9650\u3092\u8D85\u3048\u308B\u305F\u3081\u633F\u5165\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002", "idle");
+          }
+          return;
+        }
+        cheerRecent = pushRecentCheerKey(cheerRecent, preset.key, { max: 5 });
+        try {
+          void chrome.storage.local.set({ [KEY_CHEER_RECENT_V1]: cheerRecent });
+        } catch {
+        }
+        cheerPaletteRendered = false;
+        closeCheerPalette();
+        try {
+          commentInput.focus();
+        } catch {
+        }
+      });
+      document.addEventListener(
+        "click",
+        (e) => {
+          if (cheerPaletteEl.hidden) return;
+          const t = e.target instanceof Node ? e.target : null;
+          if (!t) return;
+          if (cheerPaletteEl.contains(t) || cheerToggleBtn.contains(t)) return;
+          closeCheerPalette();
+        },
+        { capture: true }
+      );
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        if (cheerPaletteEl.hidden) return;
+        e.stopPropagation();
+        closeCheerPalette();
+        try {
+          cheerToggleBtn.focus();
+        } catch {
+        }
+      });
+      void (async () => {
+        try {
+          const bag = await chrome.storage.local.get(KEY_CHEER_RECENT_V1);
+          cheerRecent = normalizeRecentCheerKeys(bag[KEY_CHEER_RECENT_V1]);
+        } catch {
+          cheerRecent = [];
+        }
+        if (cheerPaletteRendered) renderCheerPalette();
+      })();
+    }
     loadPopupFrameSettings().catch(() => {
       applyPopupFrame(popupFrameState.id, popupFrameState.custom);
     }).finally(() => {

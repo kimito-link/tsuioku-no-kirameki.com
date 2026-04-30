@@ -46,6 +46,13 @@ export const KEY_VOICE_AUTOSEND = 'nls_voice_autosend';
 /** ポップアップコメント欄: Enter のみでも送信するか（ニコ生互換。既定オン） */
 export const KEY_COMMENT_ENTER_SEND = 'nls_comment_enter_send';
 
+/**
+ * 盛り上げパレット（8888 / wwww / 顔文字 等）で最近使った key を先頭に並べるための配列。
+ * 上限 5 件想定（cheerPalette.js）。値は preset key の文字列配列。
+ * @see src/lib/cheerPalette.js
+ */
+export const KEY_CHEER_RECENT_V1 = 'nls_cheer_recent_v1';
+
 /** 応援アイコン列（りんくグリッド）を折りたたむか（true で非表示） */
 export const KEY_STORY_GROWTH_COLLAPSED = 'nls_story_growth_collapsed';
 

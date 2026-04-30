@@ -38,6 +38,7 @@ import {
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
   KEY_COMMENT_ENTER_SEND,
+  KEY_CHEER_RECENT_V1,
   KEY_ANONYMOUS_IDENTICON_ENABLED,
   KEY_FOLD_ANONYMOUS_IN_RANK_STRIP,
   KEY_STORY_GROWTH_COLLAPSED,
@@ -66,6 +67,14 @@ import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold
 import { normalizeSupportVisualExpanded } from '../lib/supportVisualExpanded.js';
 import { computeScrollDeltaToRevealInParent } from '../lib/nlMainScrollReveal.js';
 import { commentComposeKeyAction } from '../lib/commentComposeShortcuts.js';
+import {
+  getDefaultCheerPresets,
+  findCheerPresetByKey,
+  insertCommentTextAtCursor,
+  rankCheerPresetsByRecent,
+  pushRecentCheerKey,
+  normalizeRecentCheerKeys
+} from '../lib/cheerPalette.js';
 import { detectCommentKindnessNudge } from '../lib/commentKindnessNudge.js';
 import {
   audioConstraintsForDevice,
@@ -9269,6 +9278,150 @@ function initPopup() {
     clearCommentPostNotice();
     paintCommentComposeUi();
   });
+
+  /*
+   * 0.1.12 (C): 盛り上げワード パレット（8888 / wwww / 顔文字 等）。
+   *
+   * 設計方針:
+   *   - 既存レイアウトを動かさない（toggle ボタンは既存 send-actions の 36px 幅 1 アイテム、
+   *     ポップオーバーは position:absolute で textarea/送信ボタンを押し下げない）。
+   *   - 最近使った 5 件は KEY_CHEER_RECENT_V1（chrome.storage.local）に保存し、再オープン時に
+   *     先頭に並ぶ（よく使うワードが上に来る学習動作）。
+   *   - chip クリックは insertCommentTextAtCursor でカーソル位置に挿入 → input イベント発火 →
+   *     既存の paintCommentComposeUi で送信ボタンの enable / 文字数表示が連動。
+   *   - フォーカス管理: chip 押下後は textarea にフォーカスを戻し、続けてキーボードで送信できる。
+   *   - 閉じる経路: ① toggle 再押下、② chip 押下、③ Esc キー、④ 外側クリック。
+   */
+  const cheerToggleBtn = /** @type {HTMLButtonElement|null} */ ($('cheerToggleBtn'));
+  const cheerPaletteEl = /** @type {HTMLDivElement|null} */ ($('cheerPalette'));
+  if (cheerToggleBtn && cheerPaletteEl && commentInput) {
+    /** @type {readonly string[]} */
+    let cheerRecent = [];
+    let cheerPaletteRendered = false;
+
+    const closeCheerPalette = () => {
+      cheerPaletteEl.hidden = true;
+      cheerToggleBtn.setAttribute('aria-expanded', 'false');
+    };
+
+    const renderCheerPalette = () => {
+      const presets = getDefaultCheerPresets();
+      const ranked = rankCheerPresetsByRecent(presets, cheerRecent);
+      // 既存子要素を全消去 → header + chip ボタン群を再生成。textContent 派なので
+      // 末端で escape を意識しなくて良い（preset.label は信頼できる組み込み定数）。
+      while (cheerPaletteEl.firstChild) {
+        cheerPaletteEl.removeChild(cheerPaletteEl.firstChild);
+      }
+      const head = document.createElement('div');
+      head.className = 'nl-cheer-palette__head';
+      head.textContent = '盛り上げワード（カーソル位置に挿入）';
+      cheerPaletteEl.appendChild(head);
+      for (const preset of ranked) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'nl-cheer-chip';
+        chip.dataset.cheerKey = preset.key;
+        chip.title = `「${preset.text}」を挿入`;
+        chip.setAttribute('aria-label', `${preset.label} を挿入`);
+        chip.textContent = preset.label;
+        cheerPaletteEl.appendChild(chip);
+      }
+      cheerPaletteRendered = true;
+    };
+
+    const openCheerPalette = () => {
+      if (!cheerPaletteRendered) renderCheerPalette();
+      cheerPaletteEl.hidden = false;
+      cheerToggleBtn.setAttribute('aria-expanded', 'true');
+    };
+
+    cheerToggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const expanded = cheerToggleBtn.getAttribute('aria-expanded') === 'true';
+      if (expanded) {
+        closeCheerPalette();
+      } else {
+        openCheerPalette();
+      }
+    });
+
+    cheerPaletteEl.addEventListener('click', (e) => {
+      const target = e.target instanceof Element ? e.target.closest('.nl-cheer-chip') : null;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const key = String(target.dataset.cheerKey || '');
+      const preset = findCheerPresetByKey(key);
+      if (!preset) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // input が読み取り専用（送信中など）なら挿入しない
+      if (commentInput.readOnly || commentInput.disabled) return;
+      const result = insertCommentTextAtCursor(commentInput, preset.text, {
+        maxLength: 250
+      });
+      if (!result.ok) {
+        // 250 字超過 → 軽い通知だけ（既存のステータス枠を使い回す）
+        if (result.reason === 'exceeds_max_length') {
+          setCommentPostNotice('文字数の上限を超えるため挿入できませんでした。', 'idle');
+        }
+        return;
+      }
+      // 最近使った key を先頭に。次のオープン時に並び替えに反映。
+      cheerRecent = pushRecentCheerKey(cheerRecent, preset.key, { max: 5 });
+      try {
+        void chrome.storage.local.set({ [KEY_CHEER_RECENT_V1]: cheerRecent });
+      } catch {
+        // storage 書き込み失敗（容量・コンテキスト切れ）は致命ではない
+      }
+      // 並び替え反映のため次回オープン時に再描画
+      cheerPaletteRendered = false;
+      closeCheerPalette();
+      // 連続でキー入力 / 送信 できるよう textarea にフォーカスを戻す
+      try {
+        commentInput.focus();
+      } catch {
+        // no-op
+      }
+    });
+
+    // 外側クリックで閉じる（toggle ボタンと palette 自体は除外）
+    document.addEventListener(
+      'click',
+      (e) => {
+        if (cheerPaletteEl.hidden) return;
+        const t = e.target instanceof Node ? e.target : null;
+        if (!t) return;
+        if (cheerPaletteEl.contains(t) || cheerToggleBtn.contains(t)) return;
+        closeCheerPalette();
+      },
+      { capture: true }
+    );
+
+    // Esc キーで閉じる（document-level なので popup 内のどこからでも効く）
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (cheerPaletteEl.hidden) return;
+      e.stopPropagation();
+      closeCheerPalette();
+      try {
+        cheerToggleBtn.focus();
+      } catch {
+        // no-op
+      }
+    });
+
+    // 初回 storage 読み出し（失敗してもフォールバックは空配列）
+    void (async () => {
+      try {
+        const bag = await chrome.storage.local.get(KEY_CHEER_RECENT_V1);
+        cheerRecent = normalizeRecentCheerKeys(bag[KEY_CHEER_RECENT_V1]);
+      } catch {
+        cheerRecent = [];
+      }
+      // 既に開かれていた場合に備えて再描画
+      if (cheerPaletteRendered) renderCheerPalette();
+    })();
+  }
 
   loadPopupFrameSettings()
     .catch(() => {
