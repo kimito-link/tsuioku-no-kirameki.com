@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.56',
+    date: '2026-05-01',
+    summary: 'ランキング導線を最上部に固定表示',
+    items: Object.freeze([
+      'popup でランキング導線が出ない問題を確定的に修正。section 配置を version badge の直下（最上部）に移動し、display:block !important + 目立つオレンジ色枠線で必ず見える形にしました（INLINE_MODE のときだけ display:none）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.55',
     date: '2026-05-01',
     summary: 'ランキング導線を確実に表示',
