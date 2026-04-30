@@ -2930,6 +2930,10 @@ function startPageFrameLoop() {
     renderPageFrameOverlay();
     maybeRunEndedBulkHarvest();
     persistAiShareFastDiagnostics();
+    // 0.1.32 (AG): バックグラウンドで prewarm を skip した分、tick で再 schedule
+    // を試みる。visibilitychange は tick を呼ぶので、可視化された瞬間に prewarm
+    // が再開する（schedulePrewarmInlinePopupIframe は done flag で idempotent）。
+    schedulePrewarmInlinePopupIframe();
   };
 
   pageFrameLoopTimer = setInterval(tick, PAGE_FRAME_LOOP_MS);
@@ -2947,11 +2951,23 @@ function startPageFrameLoop() {
 let prewarmInlinePopupTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
 let prewarmInlinePopupDone = false;
 
+/**
+ * 0.1.32 (AG): バックグラウンドタブでは prewarm をスキップ（CPU・帯域の節約）。
+ * 複数の watch タブを同時に開いたときに、visible でないタブの popup.html
+ * 並列ロードが kon-ta 押下時の体感反応を悪化させる現象を抑止。可視化された
+ * 時点で改めて schedulePrewarmInlinePopupIframe が呼ばれる（visibilitychange
+ * リスナーが startPageFrameLoop の tick を発火させ、tick の最後で prewarm
+ * schedule が再走る）。
+ */
 function schedulePrewarmInlinePopupIframe() {
   if (prewarmInlinePopupDone) return;
   if (prewarmInlinePopupTimer) return;
   if (!isWatchInlinePanelTopFrame()) return;
   if (!isNicoLiveWatchUrl(window.location.href)) return;
+  // 可視タブのみ prewarm。background タブはユーザー操作までは何もしない。
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+    return;
+  }
   prewarmInlinePopupTimer = setTimeout(() => {
     prewarmInlinePopupTimer = null;
     prewarmInlinePopupIframe();

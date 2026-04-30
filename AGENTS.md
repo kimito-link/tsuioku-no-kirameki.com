@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.31（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.32（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,23 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.32 バンプで入った修正（複数タブ時の panel 反応性 AG）**:
+
+- ユーザー報告: 「クリックしてもすぐ反応しない / 複数開くと発生する現象」。
+- 原因切り分け: 0.1.18 で入った `prewarmInlinePopupIframe`（watch ページ
+ 表示の +2 秒後に popup.html を裏で iframe ロードしておく仕組み）が
+ 「全タブで並列実行」になり、複数の watch タブを同時に開くと CPU・帯域の
+ 取り合いで個々の prewarm が遅延 → kon-ta 押下時に iframe が未ロードのまま
+ panel が出る → 体感が悪い。
+- 修正:
+  - `schedulePrewarmInlinePopupIframe` 冒頭で `document.visibilityState !==
+   'visible'` なら早期 return（バックグラウンドタブではスケジュールしない）
+  - `startPageFrameLoop` の `tick` 内で `schedulePrewarmInlinePopupIframe()`
+   を呼ぶ（idempotent: done flag で再走り済みは skip、未スケジュールなら
+   schedule）
+  - 既存の `document.addEventListener('visibilitychange', tick)` が tick を
+   呼ぶので、タブが visible になった瞬間に prewarm が再開する流れになる
 
 **0.1.31 バンプで入った修正（連続 DL の memory pressure 削減 AF）**:
 

@@ -5374,6 +5374,7 @@
       renderPageFrameOverlay();
       maybeRunEndedBulkHarvest();
       persistAiShareFastDiagnostics();
+      schedulePrewarmInlinePopupIframe();
     };
     pageFrameLoopTimer = setInterval(tick, PAGE_FRAME_LOOP_MS);
     window.addEventListener("scroll", tick, { passive: true });
@@ -5392,6 +5393,9 @@
     if (prewarmInlinePopupTimer) return;
     if (!isWatchInlinePanelTopFrame()) return;
     if (!isNicoLiveWatchUrl(window.location.href)) return;
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      return;
+    }
     prewarmInlinePopupTimer = setTimeout(() => {
       prewarmInlinePopupTimer = null;
       prewarmInlinePopupIframe();

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.32',
+    date: '2026-04-30',
+    summary: '複数タブ時の panel 反応性を改善',
+    items: Object.freeze([
+      'バックグラウンドのタブでは panel iframe の事前ロード（prewarm）をスキップ。複数の watch タブを同時に開いた時、CPU/帯域の取り合いで kon-ta 押下時の体感反応が悪化していた問題を抑止',
+      'タブが可視化された時に prewarm が自動再スケジュールされる仕組みを追加'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.31',
     date: '2026-04-30',
     summary: '連続DL時のメモリ使用量を削減',
