@@ -6679,6 +6679,11 @@ async function refresh() {
             saveIc[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
           }
           if (Object.keys(saveIc).length) {
+            // 0.1.28 (AC): storage write 直前にも世代チェック。
+            // 旧 refresh がここまで来た時点で新 refresh が start していたら、
+            // stale な arr で storage を上書きして「新しい refresh の arr」を
+            // 巻き戻すリスクがある。書く前に世代を確認して skip する。
+            if (refreshGen !== watchPopupRefreshGeneration) return;
             await storageSetSafe(saveIc);
           }
         }
@@ -6691,6 +6696,8 @@ async function refresh() {
       if (reconciledOwnPosted.changed || reconciledOwnPosted.pendingChanged) {
         arr = reconciledOwnPosted.next;
         selfPostedRecentsCache = reconciledOwnPosted.remaining;
+        // 0.1.28 (AC): 同上。stale 世代の writeback を抑止。
+        if (refreshGen !== watchPopupRefreshGeneration) return;
         await storageSetSafe({
           [key]: arr,
           [KEY_SELF_POSTED_RECENTS]: { items: selfPostedRecentsCache }

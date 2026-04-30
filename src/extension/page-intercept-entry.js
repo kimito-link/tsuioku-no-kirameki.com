@@ -935,6 +935,11 @@ import {
     if (_r2) _r2.setAttribute('data-nls-pi-phase', 'pre-fiber-start');
   } catch { /* no-op */ }
   let _fiberRunning = false;
+  // 0.1.28 (AC): SPA 遷移時に clearInterval できるよう id を保持する。
+  let _fiberScanIntervalId = /** @type {number|null} */ (null);
+  let _mainPollIntervalId = /** @type {number|null} */ (null);
+  let _spaUrlCheckIntervalId = /** @type {number|null} */ (null);
+  let _lastObservedHref = window.location.href;
   const _bST = window.setTimeout.bind(window);
   const _bSI = window.setInterval.bind(window);
   function fiberTick() {
@@ -953,7 +958,8 @@ import {
         publishFiberDiag();
         _fiberRunning = true;
         scanCommentFibers();
-        _bSI(scanCommentFibers, FIBER_SCAN_MS);
+        // 0.1.28 (AC): id を保持して SPA 遷移で clearInterval できるようにする。
+        _fiberScanIntervalId = _bSI(scanCommentFibers, FIBER_SCAN_MS);
         return;
       }
     } catch (e) {
@@ -1071,8 +1077,39 @@ import {
   function initEmbeddedAndPoll() {
     tryReadEmbeddedData();
     setTimeout(mainWorldPollStats, 8000);
-    setInterval(mainWorldPollStats, MAIN_POLL_MS);
+    // 0.1.28 (AC): id を保持し、SPA 遷移で非 watch ページに変わったら clearInterval。
+    if (_mainPollIntervalId != null) {
+      try { clearInterval(_mainPollIntervalId); } catch { /* no-op */ }
+    }
+    _mainPollIntervalId = setInterval(mainWorldPollStats, MAIN_POLL_MS);
   }
+
+  // 0.1.28 (AC): SPA 遷移検知。href が変わったときに watch like でなければ
+  // 全 timer を一旦止める（次に watch like に戻ったとき initEmbeddedAndPoll
+  // で再起動）。直接 history API を hook するのは MAIN world で副作用が
+  // 大きいので、軽量 polling（10 秒）で十分。
+  _spaUrlCheckIntervalId = setInterval(() => {
+    try {
+      const cur = window.location.href;
+      if (cur === _lastObservedHref) return;
+      _lastObservedHref = cur;
+      let parsed = null;
+      try { parsed = new URL(cur); } catch { /* no-op */ }
+      const isWatch = parsed && isNicoHost(parsed.host) && isWatchLikePath(parsed.pathname);
+      if (!isWatch) {
+        if (_fiberScanIntervalId != null) {
+          try { clearInterval(_fiberScanIntervalId); } catch { /* no-op */ }
+          _fiberScanIntervalId = null;
+        }
+        if (_mainPollIntervalId != null) {
+          try { clearInterval(_mainPollIntervalId); } catch { /* no-op */ }
+          _mainPollIntervalId = null;
+        }
+        _fiberRunning = false;
+      }
+    } catch { /* no-op */ }
+  }, 10000);
+  void _spaUrlCheckIntervalId; // 未使用警告抑止（ID 保持目的）
 
   // Don't rely on DOMContentLoaded — use setTimeout polling
   let _embeddedPollStarted = false;

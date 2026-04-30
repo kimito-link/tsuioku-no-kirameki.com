@@ -1577,6 +1577,19 @@
     } catch {
     }
     let _fiberRunning = false;
+    let _fiberScanIntervalId = (
+      /** @type {number|null} */
+      null
+    );
+    let _mainPollIntervalId = (
+      /** @type {number|null} */
+      null
+    );
+    let _spaUrlCheckIntervalId = (
+      /** @type {number|null} */
+      null
+    );
+    let _lastObservedHref = window.location.href;
     const _bST = window.setTimeout.bind(window);
     const _bSI = window.setInterval.bind(window);
     function fiberTick() {
@@ -1590,7 +1603,7 @@
           publishFiberDiag();
           _fiberRunning = true;
           scanCommentFibers();
-          _bSI(scanCommentFibers, FIBER_SCAN_MS);
+          _fiberScanIntervalId = _bSI(scanCommentFibers, FIBER_SCAN_MS);
           return;
         }
       } catch (e) {
@@ -1698,8 +1711,46 @@
     function initEmbeddedAndPoll() {
       tryReadEmbeddedData();
       setTimeout(mainWorldPollStats, 8e3);
-      setInterval(mainWorldPollStats, MAIN_POLL_MS);
+      if (_mainPollIntervalId != null) {
+        try {
+          clearInterval(_mainPollIntervalId);
+        } catch {
+        }
+      }
+      _mainPollIntervalId = setInterval(mainWorldPollStats, MAIN_POLL_MS);
     }
+    _spaUrlCheckIntervalId = setInterval(() => {
+      try {
+        const cur = window.location.href;
+        if (cur === _lastObservedHref) return;
+        _lastObservedHref = cur;
+        let parsed = null;
+        try {
+          parsed = new URL(cur);
+        } catch {
+        }
+        const isWatch = parsed && isNicoHost(parsed.host) && isWatchLikePath(parsed.pathname);
+        if (!isWatch) {
+          if (_fiberScanIntervalId != null) {
+            try {
+              clearInterval(_fiberScanIntervalId);
+            } catch {
+            }
+            _fiberScanIntervalId = null;
+          }
+          if (_mainPollIntervalId != null) {
+            try {
+              clearInterval(_mainPollIntervalId);
+            } catch {
+            }
+            _mainPollIntervalId = null;
+          }
+          _fiberRunning = false;
+        }
+      } catch {
+      }
+    }, 1e4);
+    void _spaUrlCheckIntervalId;
     let _embeddedPollStarted = false;
     const _embPollId = setInterval(() => {
       if (_embeddedPollStarted) return;

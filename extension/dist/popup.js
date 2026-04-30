@@ -700,6 +700,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.28",
+      date: "2026-04-30",
+      summary: "\u6DF1\u5C64\u76E3\u67FB\u306E\u9AD8\u512A\u5148\u5EA6 race / leak \u3092\u4FEE\u6B63",
+      items: Object.freeze([
+        "page-intercept \u306E setInterval\uFF08fiber \u30B9\u30AD\u30E3\u30F3\u30FBstats poll\uFF09\u306E id \u3092\u4FDD\u6301\u3057\u3001SPA \u9077\u79FB\u3067\u975E watch \u30DA\u30FC\u30B8\u306B\u5909\u308F\u3063\u305F\u6642\u306B clearInterval \u3059\u308B\u4ED5\u7D44\u307F\u3092\u8FFD\u52A0\uFF08CPU\u30FB\u5E2F\u57DF\u6D88\u8CBB\u306E\u84C4\u7A4D\u3092\u9632\u6B62\uFF09",
+        "popup \u306E refresh \u7D4C\u8DEF\u3067\u30B9\u30C8\u30EC\u30FC\u30B8\u66F8\u304D\u8FBC\u307F\u76F4\u524D\u306E\u4E16\u4EE3\u30C1\u30A7\u30C3\u30AF\u3092\u8FFD\u52A0\uFF08\u53E4\u3044 refresh \u304C\u65B0\u3057\u3044 refresh \u306E\u53D6\u5F97\u7D50\u679C\u3092\u4E0A\u66F8\u304D\u3059\u308B\u30B3\u30E1\u6C5A\u67D3\u30EA\u30B9\u30AF\u3092\u6291\u6B62\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.27",
       date: "2026-04-30",
       summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306E\u8868\u793A\u6539\u5584\uFF0B\u30D1\u30CD\u30EB\u5B89\u5B9A\u5316",
@@ -13393,6 +13402,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
                 saveIc[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
               }
               if (Object.keys(saveIc).length) {
+                if (refreshGen !== watchPopupRefreshGeneration) return;
                 await storageSetSafe(saveIc);
               }
             }
@@ -13405,6 +13415,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           if (reconciledOwnPosted.changed || reconciledOwnPosted.pendingChanged) {
             arr = reconciledOwnPosted.next;
             selfPostedRecentsCache = reconciledOwnPosted.remaining;
+            if (refreshGen !== watchPopupRefreshGeneration) return;
             await storageSetSafe({
               [key]: arr,
               [KEY_SELF_POSTED_RECENTS]: { items: selfPostedRecentsCache }
@@ -14864,7 +14875,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1510" ? String("0430-1510") : "dev";
+      const buildId = "0430-1529" ? String("0430-1529") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

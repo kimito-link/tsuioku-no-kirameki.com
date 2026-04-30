@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.28',
+    date: '2026-04-30',
+    summary: '深層監査の高優先度 race / leak を修正',
+    items: Object.freeze([
+      'page-intercept の setInterval（fiber スキャン・stats poll）の id を保持し、SPA 遷移で非 watch ページに変わった時に clearInterval する仕組みを追加（CPU・帯域消費の蓄積を防止）',
+      'popup の refresh 経路でストレージ書き込み直前の世代チェックを追加（古い refresh が新しい refresh の取得結果を上書きするコメ汚染リスクを抑止）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.27',
     date: '2026-04-30',
     summary: 'マーケ分析の表示改善＋パネル安定化',

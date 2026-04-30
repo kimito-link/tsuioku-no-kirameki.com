@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.27（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.28（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,22 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.28 バンプで入った修正（深層監査の高優先度 fix AC）**:
+
+- 並列で 3 領域 deep audit を実施（レース / データ整合 / 性能）。計 60+ 件の発見、
+ 詳細は memory `plan_deep_audit_findings_0_1_27.md` に保存。
+- データ整合性・XSS・PII の四大リスクは健全（既存防御が機能）。
+- 高優先度から 2 件投入:
+  - **page-intercept setInterval ライフサイクル**: `_fiberScanIntervalId` /
+   `_mainPollIntervalId` / `_spaUrlCheckIntervalId` を保持。10 秒ごとの URL
+   poll で SPA 遷移検知 → 非 watch ページに変わったら全 timer を clearInterval。
+   旧 timer が SPA 遷移後も走り続けて CPU・帯域を消費する問題を抑止。
+  - **popup-entry refresh 経路の storage write 世代ガード**: `void async`
+   IIFE 内の `await storageSetSafe(...)` 直前にも `if (refreshGen !==
+   watchPopupRefreshGeneration) return` を追加。古い refresh が新しい
+   refresh の取得結果を上書きする「コメ汚染」リスクを抑止。
+- 中・低優先度の残り発見は version-by-version で追加対応予定（roadmap 参照）。
 
 **0.1.27 バンプで入った修正（表示改善・パネル安定化 AB）**:
 
