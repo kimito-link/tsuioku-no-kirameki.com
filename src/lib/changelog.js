@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.48',
+    date: '2026-04-30',
+    summary: '大規模配信のマーケ分析を安定化',
+    items: Object.freeze([
+      '人気配信者の 8 万コメ超放送でマーケ分析がスタックオーバーフローで無症状失敗していた問題を修正（Math.min/max の spread を for ループ化）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.47',
     date: '2026-04-30',
     summary: '同接カーブと連打事故防止',

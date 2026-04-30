@@ -708,6 +708,14 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.48",
+      date: "2026-04-30",
+      summary: "\u5927\u898F\u6A21\u914D\u4FE1\u306E\u30DE\u30FC\u30B1\u5206\u6790\u3092\u5B89\u5B9A\u5316",
+      items: Object.freeze([
+        "\u4EBA\u6C17\u914D\u4FE1\u8005\u306E 8 \u4E07\u30B3\u30E1\u8D85\u653E\u9001\u3067\u30DE\u30FC\u30B1\u5206\u6790\u304C\u30B9\u30BF\u30C3\u30AF\u30AA\u30FC\u30D0\u30FC\u30D5\u30ED\u30FC\u3067\u7121\u75C7\u72B6\u5931\u6557\u3057\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\uFF08Math.min/max \u306E spread \u3092 for \u30EB\u30FC\u30D7\u5316\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.47",
       date: "2026-04-30",
       summary: "\u540C\u63A5\u30AB\u30FC\u30D6\u3068\u9023\u6253\u4E8B\u6545\u9632\u6B62",
@@ -4904,8 +4912,17 @@ ${body}`;
     users.sort((a, b) => b.count - a.count);
     const counts = users.map((u) => u.count).sort((a, b) => a - b);
     const median = counts.length === 0 ? 0 : counts.length % 2 === 1 ? counts[Math.floor(counts.length / 2)] : (counts[counts.length / 2 - 1] + counts[counts.length / 2]) / 2;
-    const minT = timestamps.length ? Math.min(...timestamps) : 0;
-    const maxT = timestamps.length ? Math.max(...timestamps) : 0;
+    let minT = 0;
+    let maxT = 0;
+    if (timestamps.length) {
+      minT = timestamps[0];
+      maxT = timestamps[0];
+      for (let i = 1; i < timestamps.length; i++) {
+        const t = timestamps[i];
+        if (t < minT) minT = t;
+        if (t > maxT) maxT = t;
+      }
+    }
     const durationMs = maxT - minT;
     const durationMinutes = Math.max(1, Math.round(durationMs / 6e4));
     const bucketMap = /* @__PURE__ */ new Map();
@@ -5092,7 +5109,10 @@ ${body}`;
   function computeVposThirds(filtered) {
     const vps = filtered.map((c) => c.vpos).filter((v) => typeof v === "number" && Number.isFinite(v) && v >= 0);
     if (vps.length < 5) return null;
-    const maxV = Math.max(...vps);
+    let maxV = vps[0];
+    for (let i = 1; i < vps.length; i++) {
+      if (vps[i] > maxV) maxV = vps[i];
+    }
     let early = 0;
     let mid = 0;
     let late = 0;
@@ -15218,7 +15238,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2222" ? String("0430-2222") : "dev";
+      const buildId = "0430-2227" ? String("0430-2227") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
