@@ -251,6 +251,7 @@ import {
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
+import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 
 /**
  * @typedef {{
@@ -6746,32 +6747,9 @@ async function refresh() {
 // popup-entry.js のコンポーネント分割の第一歩。
 
 /**
- * pathname+search が一致するタブを優先（別クエリの同 lv タブより先）
- * @param {{ id: number, url: string }[]} candidates
- * @param {string} watchUrl
+ * 0.1.36 (AK): prioritizeWatchTabCandidates を src/lib/watchTabPrioritize.js
+ * に切り出し済み。chrome 依存なしの純粋関数。
  */
-function prioritizeWatchTabCandidates(candidates, watchUrl) {
-  const w = String(watchUrl || '').trim();
-  if (!w) return candidates;
-  try {
-    const ref = new URL(w);
-    const refKey = `${ref.pathname.replace(/\/$/, '')}${ref.search}`;
-    return [...candidates].sort((a, b) => {
-      const rank = (url) => {
-        try {
-          const u = new URL(url);
-          const k = `${u.pathname.replace(/\/$/, '')}${u.search}`;
-          return k === refKey ? 0 : 1;
-        } catch {
-          return 2;
-        }
-      };
-      return rank(a.url) - rank(b.url);
-    });
-  } catch {
-    return candidates;
-  }
-}
 
 /**
  * 対象 watch と同じ lv のタブだけ集める（前面が別放送なら除外）

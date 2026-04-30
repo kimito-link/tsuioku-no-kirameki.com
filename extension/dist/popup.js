@@ -700,6 +700,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.36",
+      date: "2026-04-30",
+      summary: "\u5185\u90E8\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u5206\u5272\u306E\u7D9A\u304D",
+      items: Object.freeze([
+        "popup-entry.js \u304B\u3089 watch \u30BF\u30D6\u306E\u4E26\u3073\u66FF\u3048\u95A2\u6570\uFF08prioritizeWatchTabCandidates\uFF09\u3092 src/lib/watchTabPrioritize.js \u306B\u5207\u308A\u51FA\u3057",
+        "\u7D14\u7C8B\u95A2\u6570 + TDD 9 \u30B1\u30FC\u30B9\u3067\u5358\u4F53\u691C\u8A3C\u53EF\u80FD\u306B\u3002\u4ECA\u5F8C\u306E\u6319\u52D5\u4FEE\u6B63\u3067\u30EA\u30B9\u30AF\u3092\u4E0B\u3052\u308B\u6E96\u5099"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.35",
       date: "2026-04-30",
       summary: "\u4ED5\u69D8\u6CE8\u8A18\u306E\u8FFD\u52A0\u3068\u5185\u90E8\u5206\u5272\u306E\u5C0F\u3055\u306A\u4E00\u6B69",
@@ -8552,6 +8561,30 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
   }
 
+  // src/lib/watchTabPrioritize.js
+  function prioritizeWatchTabCandidates(candidates, watchUrl) {
+    const arr = Array.isArray(candidates) ? candidates : [];
+    const w = String(watchUrl == null ? "" : watchUrl).trim();
+    if (!w) return arr;
+    let refKey = "";
+    try {
+      const ref = new URL(w);
+      refKey = `${ref.pathname.replace(/\/$/, "")}${ref.search}`;
+    } catch {
+      return arr;
+    }
+    const rank = (url) => {
+      try {
+        const u = new URL(url);
+        const k = `${u.pathname.replace(/\/$/, "")}${u.search}`;
+        return k === refKey ? 0 : 1;
+      } catch {
+        return 2;
+      }
+    };
+    return [...arr].sort((a, b) => rank(a.url) - rank(b.url));
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -13630,28 +13663,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       throw e;
     }
   }
-  function prioritizeWatchTabCandidates(candidates, watchUrl) {
-    const w = String(watchUrl || "").trim();
-    if (!w) return candidates;
-    try {
-      const ref = new URL(w);
-      const refKey = `${ref.pathname.replace(/\/$/, "")}${ref.search}`;
-      return [...candidates].sort((a, b) => {
-        const rank = (url) => {
-          try {
-            const u = new URL(url);
-            const k = `${u.pathname.replace(/\/$/, "")}${u.search}`;
-            return k === refKey ? 0 : 1;
-          } catch {
-            return 2;
-          }
-        };
-        return rank(a.url) - rank(b.url);
-      });
-    } catch {
-      return candidates;
-    }
-  }
   async function collectWatchTabCandidates(watchUrl) {
     const out = [];
     const w = String(watchUrl || "").trim();
@@ -15039,7 +15050,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1847" ? String("0430-1847") : "dev";
+      const buildId = "0430-1850" ? String("0430-1850") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

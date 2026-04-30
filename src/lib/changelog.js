@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.36',
+    date: '2026-04-30',
+    summary: '内部コンポーネント分割の続き',
+    items: Object.freeze([
+      'popup-entry.js から watch タブの並び替え関数（prioritizeWatchTabCandidates）を src/lib/watchTabPrioritize.js に切り出し',
+      '純粋関数 + TDD 9 ケースで単体検証可能に。今後の挙動修正でリスクを下げる準備'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.35',
     date: '2026-04-30',
     summary: '仕様注記の追加と内部分割の小さな一歩',
