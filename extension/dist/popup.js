@@ -700,6 +700,18 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.24",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u6A2A\u65AD\u6BD4\u8F03\u7CFB 5 \u7A2E\u8FFD\u52A0",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u76F4\u8FD1 5 \u914D\u4FE1\u306E\u6BD4\u8F03\u300D\uFF08\u30B3\u30E1\u6570+\u30E6\u30CB\u30FC\u30AF\u4E26\u5217\u30D0\u30FC\uFF09\u3092\u8FFD\u52A0",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u66DC\u65E5 \xD7 \u6642\u9593\u5E2F \u30D2\u30FC\u30C8\u30DE\u30C3\u30D7\u300D\u3092\u8FFD\u52A0\uFF08\u6A2A\u65AD\u30FB\u5168\u914D\u4FE1\u306E\u30B3\u30E1\u5BC6\u5EA6\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u6210\u9577\u30E1\u30FC\u30BF\u30FC\u300D\uFF08\u904E\u53BB\u5E73\u5747\u3068\u306E\u504F\u5DEE\u30FBz-score\uFF09\u3092\u8FFD\u52A0",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u5192\u982D 5 \u5206\u306E\u4E88\u5146\u300D\u6563\u5E03\u56F3\u3092\u8FFD\u52A0\uFF08\u5192\u982D CPM \xD7 \u30D4\u30FC\u30AF CPM \u306E Pearson \u76F8\u95A2\u3001\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L13\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u4F3C\u3066\u308B\u914D\u4FE1\u300D\u4E00\u89A7\u3092\u8FFD\u52A0\uFF08CPM \u30AB\u30FC\u30D6\u3092 16 \u6B21\u5143\u306B\u6B63\u898F\u5316\u3057\u3066\u30B3\u30B5\u30A4\u30F3\u985E\u4F3C\u5EA6\u3001\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L3\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.23",
       date: "2026-04-30",
       summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u30E6\u30FC\u30B6\u30FC\u5C64\u52D5\u5411 5 \u7A2E\u8FFD\u52A0",
@@ -5434,6 +5446,225 @@ ${body}`;
     return { userTypeMap, counts };
   }
 
+  // src/lib/broadcastCrossCompare.js
+  function spanOfComments(comments) {
+    let first = null;
+    let last = null;
+    for (const c of comments) {
+      if (!c || typeof c !== "object") continue;
+      const at = c.capturedAt;
+      if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) continue;
+      if (first == null || at < first) first = at;
+      if (last == null || at > last) last = at;
+    }
+    return { first, last };
+  }
+  function buildRecentBroadcastComparison(input) {
+    const params = input && typeof input === "object" ? input : {};
+    const broadcasts = Array.isArray(params.broadcasts) ? params.broadcasts : [];
+    const limit = typeof params.limit === "number" && params.limit > 0 ? Math.floor(params.limit) : 5;
+    const all = [];
+    for (const b of broadcasts) {
+      if (!b || typeof b !== "object") continue;
+      const lid = String(b.liveId || "").trim();
+      if (!lid) continue;
+      const cs = Array.isArray(b.comments) ? b.comments : [];
+      const { first, last } = spanOfComments(cs);
+      const uniq = /* @__PURE__ */ new Set();
+      for (const c of cs) {
+        const uid = c?.userId == null ? "" : String(c.userId).trim();
+        if (uid) uniq.add(uid);
+      }
+      all.push({
+        liveId: lid,
+        totalComments: cs.length,
+        uniqueUsers: uniq.size,
+        durationMin: first != null && last != null ? Math.round((last - first) / 6e4) : 0,
+        firstCapturedAt: first
+      });
+    }
+    all.sort((a, b) => {
+      const av = a.firstCapturedAt == null ? -Infinity : a.firstCapturedAt;
+      const bv = b.firstCapturedAt == null ? -Infinity : b.firstCapturedAt;
+      return av - bv;
+    });
+    const bars = all.slice(Math.max(0, all.length - limit));
+    return { bars };
+  }
+  function buildWeekdayHourHeatmap(input) {
+    const params = input && typeof input === "object" ? input : {};
+    const broadcasts = Array.isArray(params.broadcasts) ? params.broadcasts : [];
+    const matrix = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    for (const b of broadcasts) {
+      if (!b || typeof b !== "object") continue;
+      const cs = Array.isArray(b.comments) ? b.comments : [];
+      for (const c of cs) {
+        const at = c?.capturedAt;
+        if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) continue;
+        const d = new Date(at);
+        const dow = d.getDay();
+        const hour = d.getHours();
+        if (dow >= 0 && dow < 7 && hour >= 0 && hour < 24) {
+          matrix[dow][hour] += 1;
+        }
+      }
+    }
+    let maxValue = 0;
+    for (const row of matrix) {
+      for (const v of row) if (v > maxValue) maxValue = v;
+    }
+    return { matrix, maxValue };
+  }
+  function computeBroadcastGrowthScore(input) {
+    const params = input && typeof input === "object" ? input : {};
+    const past = Array.isArray(params.pastValues) ? params.pastValues.filter((v) => typeof v === "number" && Number.isFinite(v)) : [];
+    const current = typeof params.currentValue === "number" && Number.isFinite(params.currentValue) ? params.currentValue : 0;
+    if (!past.length) {
+      return { average: null, stdDev: null, zScore: null, deltaPct: null };
+    }
+    const sum = past.reduce((a, b) => a + b, 0);
+    const avg = sum / past.length;
+    const variance = past.reduce((a, b) => a + (b - avg) ** 2, 0) / past.length;
+    const stdDev = Math.sqrt(variance);
+    const zScore = stdDev > 0 ? Math.round((current - avg) / stdDev * 100) / 100 : null;
+    const deltaPct = avg > 0 ? Math.round((current - avg) / avg * 1e4) / 1e4 : 0;
+    return {
+      average: Math.round(avg * 100) / 100,
+      stdDev: Math.round(stdDev * 100) / 100,
+      zScore,
+      deltaPct
+    };
+  }
+
+  // src/lib/openingFiveMinuteCorrelation.js
+  var FIVE_MIN_MS = 5 * 6e4;
+  function summarizeOpeningAndPeak(comments) {
+    const ats = [];
+    for (const c of comments) {
+      if (!c || typeof c !== "object") continue;
+      const at = c.capturedAt;
+      if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) continue;
+      ats.push(at);
+    }
+    if (!ats.length) return { openingComments: 0, peakCpm: 0, firstAt: null };
+    ats.sort((a, b) => a - b);
+    const first = ats[0];
+    let opening = 0;
+    const minuteBuckets = /* @__PURE__ */ new Map();
+    for (const at of ats) {
+      if (at - first < FIVE_MIN_MS) opening += 1;
+      const m = Math.floor((at - first) / 6e4);
+      minuteBuckets.set(m, (minuteBuckets.get(m) || 0) + 1);
+    }
+    let peakCpm = 0;
+    for (const v of minuteBuckets.values()) {
+      if (v > peakCpm) peakCpm = v;
+    }
+    return { openingComments: opening, peakCpm, firstAt: first };
+  }
+  function buildOpeningFiveMinutePoints(broadcasts) {
+    const list = Array.isArray(broadcasts) ? broadcasts : [];
+    const points = [];
+    for (const b of list) {
+      if (!b || typeof b !== "object") continue;
+      const lid = String(b.liveId || "").trim();
+      if (!lid) continue;
+      const cs = Array.isArray(b.comments) ? b.comments : [];
+      const sum = summarizeOpeningAndPeak(cs);
+      if (sum.firstAt == null) continue;
+      points.push({
+        liveId: lid,
+        openingComments: sum.openingComments,
+        openingCpm: Math.round(sum.openingComments / 5 * 100) / 100,
+        peakCpm: sum.peakCpm
+      });
+    }
+    let correlation = null;
+    if (points.length >= 2) {
+      const n = points.length;
+      const xs = points.map((p) => p.openingCpm);
+      const ys = points.map((p) => p.peakCpm);
+      const xMean = xs.reduce((a, b) => a + b, 0) / n;
+      const yMean = ys.reduce((a, b) => a + b, 0) / n;
+      let num = 0;
+      let dx2 = 0;
+      let dy2 = 0;
+      for (let i = 0; i < n; i++) {
+        const dx = xs[i] - xMean;
+        const dy = ys[i] - yMean;
+        num += dx * dy;
+        dx2 += dx * dx;
+        dy2 += dy * dy;
+      }
+      const denom = Math.sqrt(dx2 * dy2);
+      correlation = denom > 0 ? Math.round(num / denom * 1e3) / 1e3 : null;
+    }
+    return { points, correlation };
+  }
+
+  // src/lib/broadcastWaveformFingerprint.js
+  function buildBroadcastWaveformFingerprint(comments, opts = {}) {
+    const dim = typeof opts?.dimensions === "number" && opts.dimensions > 0 ? Math.floor(opts.dimensions) : 16;
+    const list = Array.isArray(comments) ? comments : [];
+    const ats = [];
+    for (const c of list) {
+      if (!c || typeof c !== "object") continue;
+      const at = c.capturedAt;
+      if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) continue;
+      ats.push(at);
+    }
+    if (!ats.length) return null;
+    ats.sort((a, b) => a - b);
+    const first = ats[0];
+    const last = ats[ats.length - 1];
+    const span = Math.max(1, last - first);
+    const counts = new Array(dim).fill(0);
+    for (const at of ats) {
+      let idx = Math.floor((at - first) / span * dim);
+      if (idx >= dim) idx = dim - 1;
+      if (idx < 0) idx = 0;
+      counts[idx] += 1;
+    }
+    const peak = counts.reduce((a, b) => Math.max(a, b), 0);
+    const vector = counts.map((v) => peak > 0 ? Math.round(v / peak * 1e3) / 1e3 : 0);
+    return { vector, totalCount: ats.length };
+  }
+  function cosineSimilarity(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b)) return null;
+    if (a.length !== b.length || a.length === 0) return null;
+    let dot = 0;
+    let na = 0;
+    let nb = 0;
+    for (let i = 0; i < a.length; i++) {
+      const av = Number(a[i]) || 0;
+      const bv = Number(b[i]) || 0;
+      dot += av * bv;
+      na += av * av;
+      nb += bv * bv;
+    }
+    if (na === 0 || nb === 0) return null;
+    return Math.round(dot / Math.sqrt(na * nb) * 1e3) / 1e3;
+  }
+  function findSimilarBroadcasts(current, pastFingerprints, opts = {}) {
+    if (!current || !current.vector) return [];
+    const past = Array.isArray(pastFingerprints) ? pastFingerprints : [];
+    const topN = typeof opts?.topN === "number" && opts.topN > 0 ? Math.floor(opts.topN) : 5;
+    const out = [];
+    for (const p of past) {
+      if (!p || typeof p !== "object") continue;
+      if (p.liveId === current.liveId) continue;
+      const sim = cosineSimilarity(current.vector, p.vector);
+      if (sim == null) continue;
+      out.push({
+        liveId: String(p.liveId || ""),
+        similarity: sim,
+        totalCount: typeof p.totalCount === "number" ? p.totalCount : 0
+      });
+    }
+    out.sort((a, b) => b.similarity - a.similarity);
+    return out.slice(0, topN);
+  }
+
   // src/lib/marketingChartsHtml.js
   function adviceCard(role, displayName, lines) {
     const ps = lines.filter((s) => s && String(s).trim()).map((line) => `<p class="mkt-advice__p">${escapeHtml(line)}</p>`).join("");
@@ -6058,6 +6289,125 @@ ${cells}
 </table>
 </section>`;
   }
+  function sectionRecentComparison(cmp) {
+    if (!cmp || cmp.bars.length < 2) return "";
+    const W = 900;
+    const H = 220;
+    const pad = 40;
+    const innerW = W - pad * 2;
+    const innerH = H - pad * 2;
+    const n = cmp.bars.length;
+    const maxC = Math.max(1, ...cmp.bars.map((b) => b.totalComments));
+    const maxU = Math.max(1, ...cmp.bars.map((b) => b.uniqueUsers));
+    const groupW = innerW / n;
+    const barW = Math.max(2, groupW / 3 - 2);
+    const bars = cmp.bars.map((b, i) => {
+      const xBase = pad + groupW * i + (groupW - barW * 2 - 2) / 2;
+      const hC = b.totalComments / maxC * innerH;
+      const hU = b.uniqueUsers / maxU * innerH;
+      const labelX = pad + groupW * i + groupW / 2;
+      const liveLabel = b.liveId.length > 12 ? `${b.liveId.slice(0, 11)}\u2026` : b.liveId;
+      return `<rect x="${xBase.toFixed(1)}" y="${(pad + innerH - hC).toFixed(1)}" width="${barW}" height="${hC.toFixed(1)}" fill="#3b82f6" opacity="0.85"><title>${b.liveId}: ${b.totalComments}\u30B3\u30E1 / ${b.durationMin}\u5206</title></rect>
+<rect x="${(xBase + barW + 2).toFixed(1)}" y="${(pad + innerH - hU).toFixed(1)}" width="${barW}" height="${hU.toFixed(1)}" fill="#22c55e" opacity="0.85"><title>${b.liveId}: ${b.uniqueUsers}\u4EBA</title></rect>
+<text x="${labelX.toFixed(1)}" y="${H - 4}" text-anchor="middle" class="mkt-axis">${escapeHtml(liveLabel)}</text>`;
+    }).join("");
+    return `<section class="mkt-section" id="mkt-recent-cmp">
+<h2>\u76F4\u8FD1 ${n} \u914D\u4FE1\u306E\u6BD4\u8F03 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u9752\uFF1D\u7DCF\u30B3\u30E1\u6570\u3001\u7DD1\uFF1D\u30E6\u30CB\u30FC\u30AF\u30B3\u30E1\u30F3\u30BF\u30FC\u6570\u3002\u53E4\u2192\u65B0\u3067\u5DE6\u304B\u3089\u4E26\u3073\u307E\u3059\u3002</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${bars}
+</svg>
+</div></section>`;
+  }
+  function sectionWeekdayHourHeatmap(heat) {
+    if (!heat || heat.maxValue === 0) return "";
+    const dayLabels = ["\u65E5", "\u6708", "\u706B", "\u6C34", "\u6728", "\u91D1", "\u571F"];
+    const cells = heat.matrix.map((row, dow) => {
+      const tds = row.map((v, h) => {
+        const intensity = heat.maxValue > 0 ? v / heat.maxValue : 0;
+        const bg = `rgba(59, 130, 246, ${intensity.toFixed(2)})`;
+        return `<td class="mkt-heat-cell" style="background:${bg}" title="${dayLabels[dow]}\u66DC ${h}\u6642: ${v}\u4EF6">${v > 0 ? v : ""}</td>`;
+      }).join("");
+      return `<tr><th>${dayLabels[dow]}</th>${tds}</tr>`;
+    }).join("");
+    const hourCols = Array.from({ length: 24 }, (_, h) => `<th>${h}</th>`).join("");
+    return `<section class="mkt-section" id="mkt-weekday-heat">
+<h2>\u66DC\u65E5 \xD7 \u6642\u9593\u5E2F \u30D2\u30FC\u30C8\u30DE\u30C3\u30D7 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u904E\u53BB\u5168\u914D\u4FE1\u3092\u6A2A\u65AD\u3057\u305F\u30B3\u30E1\u5BC6\u5EA6\u3002\u6700\u3082\u6FC3\u3044\u6642\u9593\u5E2F\u304C\u30A2\u30AF\u30C6\u30A3\u30D6\u306A\u8996\u8074\u8005\u5C64\u306E\u6D3B\u52D5\u6642\u9593\u3002</p>
+<div class="mkt-chart-wrap">
+<table class="mkt-rank mkt-heatmap">
+<thead><tr><th></th>${hourCols}</tr></thead>
+<tbody>${cells}</tbody>
+</table>
+</div></section>`;
+  }
+  function sectionGrowthMeter(growth, label) {
+    if (!growth || growth.average == null) return "";
+    const deltaPct = growth.deltaPct != null ? `${(growth.deltaPct * 100).toFixed(1)}%` : "-";
+    const z = growth.zScore != null ? growth.zScore.toFixed(2) : "-";
+    const sign = growth.deltaPct != null && growth.deltaPct > 0 ? "\uFF0B" : "";
+    return `<section class="mkt-section" id="mkt-growth-meter">
+<h2>\u6210\u9577\u30E1\u30FC\u30BF\u30FC <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">${escapeHtml(label)}\uFF1A\u904E\u53BB\u914D\u4FE1\u306E\u5E73\u5747\uFF08${growth.average}\uFF09\u3068\u6BD4\u3079\u3066<strong>${sign}${escapeHtml(deltaPct)}</strong>\uFF08z-score=${escapeHtml(z)}\uFF09\u3002</p>
+<table class="mkt-rank">
+<thead><tr><th>\u6307\u6A19</th><th>\u5024</th></tr></thead>
+<tbody>
+<tr><th>\u904E\u53BB\u5E73\u5747</th><td>${growth.average}</td></tr>
+<tr><th>\u6A19\u6E96\u504F\u5DEE</th><td>${growth.stdDev}</td></tr>
+<tr><th>\u504F\u5DEE\uFF08%\uFF09</th><td>${escapeHtml(deltaPct)}</td></tr>
+<tr><th>z-score</th><td>${escapeHtml(z)}</td></tr>
+</tbody>
+</table>
+</section>`;
+  }
+  function sectionOpeningFivePrediction(pts) {
+    if (!pts || pts.points.length < 2) return "";
+    const W = 600;
+    const H = 240;
+    const pad = 40;
+    const innerW = W - pad * 2;
+    const innerH = H - pad * 2;
+    const maxX = Math.max(1, ...pts.points.map((p) => p.openingCpm));
+    const maxY = Math.max(1, ...pts.points.map((p) => p.peakCpm));
+    const xOf = (v) => pad + innerW * v / maxX;
+    const yOf = (v) => pad + innerH - innerH * v / maxY;
+    const dots = pts.points.map(
+      (p) => `<circle cx="${xOf(p.openingCpm).toFixed(1)}" cy="${yOf(p.peakCpm).toFixed(1)}" r="4" fill="#a855f7" opacity="0.7"><title>${p.liveId}: \u5192\u982D ${p.openingCpm} CPM \u2192 \u30D4\u30FC\u30AF ${p.peakCpm} CPM</title></circle>`
+    ).join("");
+    const corrLabel = pts.correlation != null ? `\u76F8\u95A2\u4FC2\u6570 r=${pts.correlation.toFixed(2)}\uFF08${pts.correlation > 0.5 ? "\u5F37\u3044\u6B63\u306E\u76F8\u95A2" : pts.correlation > 0.2 ? "\u5F31\u3044\u6B63\u306E\u76F8\u95A2" : "\u76F8\u95A2\u5F31"}\uFF09` : "\u76F8\u95A2\u306F\u8981\u4EF6\u4E0D\u8DB3";
+    return `<section class="mkt-section" id="mkt-opening-five">
+<h2>\u5192\u982D 5 \u5206\u306E\u4E88\u5146 \u2192 \u30D4\u30FC\u30AF\uFF08\u30E9\u30C6\u30E9\u30EB L13\uFF09<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u6A2A\u8EF8\uFF1D\u5192\u982D 5 \u5206\u306E CPM\u3001\u7E26\u8EF8\uFF1D\u5168\u4F53\u30D4\u30FC\u30AF CPM\u3002${escapeHtml(corrLabel)}\u3002\u914D\u4FE1\u958B\u59CB 5 \u5206\u306E\u76DB\u308A\u4E0A\u304C\u308A\u304C\u7D50\u679C\u306B\u52B9\u304F\u304B\u306E\u4EEE\u8AAC\u691C\u8A3C\u3002</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+<text x="${(W / 2).toFixed(0)}" y="${H - 4}" text-anchor="middle" class="mkt-axis">\u5192\u982D 5 \u5206\u306E CPM</text>
+<text x="12" y="${(H / 2).toFixed(0)}" text-anchor="middle" class="mkt-axis" transform="rotate(-90, 12, ${(H / 2).toFixed(0)})">\u30D4\u30FC\u30AF CPM</text>
+${dots}
+</svg>
+</div></section>`;
+  }
+  function sectionWaveformSimilarity(similar) {
+    if (!Array.isArray(similar) || similar.length === 0) return "";
+    const rows = similar.map(
+      (s, i) => `<tr>
+<td>${i + 1}</td>
+<td class="mkt-mono">${escapeHtml(s.liveId)}</td>
+<td>${(s.similarity * 100).toFixed(1)}%</td>
+<td>${s.totalCount}</td>
+</tr>`
+    ).join("");
+    return `<section class="mkt-section" id="mkt-waveform">
+<h2>\u4F3C\u3066\u308B\u914D\u4FE1\uFF08\u30B3\u30E1\u6CE2\u5F62\u6307\u7D0B\uFF09<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">CPM \u30AB\u30FC\u30D6\u3092 16 \u6B21\u5143\u30D9\u30AF\u30C8\u30EB\u306B\u3057\u3066\u30B3\u30B5\u30A4\u30F3\u985E\u4F3C\u5EA6\u3067\u6BD4\u8F03\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L3\uFF09\u3002\u76DB\u308A\u4E0A\u304C\u308A\u65B9\u306E "\u5F62" \u304C\u4ECA\u56DE\u3068\u4F3C\u3066\u3044\u308B\u904E\u53BB\u914D\u4FE1\u3002</p>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>liveId</th><th>\u985E\u4F3C\u5EA6</th><th>\u7DCF\u30B3\u30E1</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+  }
   function buildMarketingDashboardHtml(r, opts = {}) {
     const maskShare = opts.maskShareLabels === true;
     const identiconResolver = typeof opts.anonymousIdenticonResolver === "function" ? opts.anonymousIdenticonResolver : void 0;
@@ -6119,6 +6469,38 @@ ${cells}
     const keyboardTypes = diagnoseKeyboardTypes(commentsForAnalytics, {
       broadcasterUserId
     });
+    const allBroadcastsForCompare = [
+      ...pastBroadcastsForLayer.filter(
+        (b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase()
+      ),
+      { liveId: String(r.liveId || ""), comments: currentCommentsForLayer }
+    ];
+    const recentComparison = buildRecentBroadcastComparison({
+      broadcasts: allBroadcastsForCompare,
+      limit: 5
+    });
+    const weekdayHourHeat = buildWeekdayHourHeatmap({
+      broadcasts: allBroadcastsForCompare
+    });
+    const pastTotalsForGrowth = pastBroadcastsForLayer.filter((b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase()).map((b) => Array.isArray(b.comments) ? b.comments.length : 0).filter((n) => n > 0);
+    const growth = computeBroadcastGrowthScore({
+      currentValue: r.totalComments || currentCommentsForLayer.length,
+      pastValues: pastTotalsForGrowth
+    });
+    const openingFivePts = buildOpeningFiveMinutePoints(allBroadcastsForCompare);
+    const currentFingerprint = buildBroadcastWaveformFingerprint(currentCommentsForLayer);
+    const pastFingerprints = pastBroadcastsForLayer.filter((b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase()).map((b) => {
+      const fp = buildBroadcastWaveformFingerprint(b.comments);
+      return fp ? { liveId: b.liveId, vector: fp.vector, totalCount: fp.totalCount } : null;
+    }).filter(
+      /** @returns {x is { liveId: string, vector: number[], totalCount: number }} */
+      (x) => x != null
+    );
+    const similarBroadcasts = currentFingerprint ? findSimilarBroadcasts(
+      { liveId: String(r.liveId || ""), vector: currentFingerprint.vector, totalCount: currentFingerprint.totalCount },
+      pastFingerprints,
+      { topN: 5 }
+    ) : [];
     const tocItems = [
       { id: "mkt-kpi", label: "KPI \u30B5\u30DE\u30EA" },
       { id: "mkt-content", label: "\u30B3\u30E1\u30F3\u30C8\u672C\u6587\u30FB\u5C5E\u6027\u306E\u50BE\u5411" },
@@ -6133,6 +6515,11 @@ ${cells}
       { id: "mkt-departed", label: "\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP\uFF08PRO\uFF09" },
       { id: "mkt-attendance", label: "\u5E38\u9023\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC\uFF08PRO\uFF09" },
       { id: "mkt-keyboard", label: "\u30AD\u30FC\u30DC\u30FC\u30C9\u578B\u8A3A\u65AD\uFF08PRO\uFF09" },
+      { id: "mkt-recent-cmp", label: "\u76F4\u8FD1 5 \u914D\u4FE1\u306E\u6BD4\u8F03\uFF08PRO\uFF09" },
+      { id: "mkt-weekday-heat", label: "\u66DC\u65E5\xD7\u6642\u9593\u5E2F\u30D2\u30FC\u30C8\u30DE\u30C3\u30D7\uFF08PRO\uFF09" },
+      { id: "mkt-growth-meter", label: "\u6210\u9577\u30E1\u30FC\u30BF\u30FC\uFF08PRO\uFF09" },
+      { id: "mkt-opening-five", label: "\u5192\u982D 5 \u5206\u306E\u4E88\u5146\uFF08PRO\uFF09" },
+      { id: "mkt-waveform", label: "\u4F3C\u3066\u308B\u914D\u4FE1\uFF08\u6CE2\u5F62\u6307\u7D0B\uFF09\uFF08PRO\uFF09" },
       { id: "mkt-derived", label: "\u7D2F\u7A4D\u30B3\u30E1\u30F3\u30C8\u6570\u30685\u5206\u7A93" },
       { id: "mkt-segment", label: "\u30E6\u30FC\u30B6\u30FC\u30BB\u30B0\u30E1\u30F3\u30C8" },
       { id: "mkt-top-users", label: "\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC TOP 20" },
@@ -6175,6 +6562,11 @@ ${sectionSurvivalCurve(survivalCurve)}
 ${sectionDepartedHeavy(departedHeavy, maskShare)}
 ${sectionAttendanceMatrix(attendanceMatrix, maskShare)}
 ${sectionKeyboardTypes(keyboardTypes)}
+${sectionRecentComparison(recentComparison)}
+${sectionWeekdayHourHeatmap(weekdayHourHeat)}
+${sectionGrowthMeter(growth, "\u4ECA\u56DE\u306E\u7DCF\u30B3\u30E1\u6570")}
+${sectionOpeningFivePrediction(openingFivePts)}
+${sectionWaveformSimilarity(similarBroadcasts)}
 ${idWrap("mkt-derived", sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap("mkt-segment", sectionSegment(r))}
@@ -6397,6 +6789,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-att-cell{font-family:ui-monospace,monospace;font-weight:700}
 .mkt-att-cell--on{color:#22c55e}
 .mkt-att-cell--off{color:#475569}
+.mkt-heatmap{font-size:.65rem}
+.mkt-heatmap th,.mkt-heatmap td{padding:.15rem .25rem;text-align:center;min-width:1.6rem}
+.mkt-heat-cell{color:#f8fafc;font-weight:700}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}
@@ -13735,7 +14130,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1400" ? String("0430-1400") : "dev";
+      const buildId = "0430-1407" ? String("0430-1407") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

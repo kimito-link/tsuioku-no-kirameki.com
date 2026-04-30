@@ -25,6 +25,16 @@ import {
 } from './commenterHistoricalAnalytics.js';
 import { buildCommenterSurvivalCurve } from './commenterSurvivalCurve.js';
 import { diagnoseKeyboardTypes } from './keyboardTypeDiagnostic.js';
+import {
+  buildRecentBroadcastComparison,
+  buildWeekdayHourHeatmap,
+  computeBroadcastGrowthScore
+} from './broadcastCrossCompare.js';
+import { buildOpeningFiveMinutePoints } from './openingFiveMinuteCorrelation.js';
+import {
+  buildBroadcastWaveformFingerprint,
+  findSimilarBroadcasts
+} from './broadcastWaveformFingerprint.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -852,6 +862,167 @@ function sectionKeyboardTypes(report) {
 }
 
 /**
+ * 0.1.24 (Y): 直近 N 配信の比較バー。
+ * @param {ReturnType<typeof buildRecentBroadcastComparison>} cmp
+ */
+function sectionRecentComparison(cmp) {
+  if (!cmp || cmp.bars.length < 2) return '';
+  const W = 900;
+  const H = 220;
+  const pad = 40;
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  const n = cmp.bars.length;
+  const maxC = Math.max(1, ...cmp.bars.map((b) => b.totalComments));
+  const maxU = Math.max(1, ...cmp.bars.map((b) => b.uniqueUsers));
+  const groupW = innerW / n;
+  const barW = Math.max(2, groupW / 3 - 2);
+  const bars = cmp.bars
+    .map((b, i) => {
+      const xBase = pad + groupW * i + (groupW - barW * 2 - 2) / 2;
+      const hC = (b.totalComments / maxC) * innerH;
+      const hU = (b.uniqueUsers / maxU) * innerH;
+      const labelX = pad + groupW * i + groupW / 2;
+      const liveLabel = b.liveId.length > 12 ? `${b.liveId.slice(0, 11)}…` : b.liveId;
+      return `<rect x="${xBase.toFixed(1)}" y="${(pad + innerH - hC).toFixed(1)}" width="${barW}" height="${hC.toFixed(1)}" fill="#3b82f6" opacity="0.85"><title>${b.liveId}: ${b.totalComments}コメ / ${b.durationMin}分</title></rect>
+<rect x="${(xBase + barW + 2).toFixed(1)}" y="${(pad + innerH - hU).toFixed(1)}" width="${barW}" height="${hU.toFixed(1)}" fill="#22c55e" opacity="0.85"><title>${b.liveId}: ${b.uniqueUsers}人</title></rect>
+<text x="${labelX.toFixed(1)}" y="${H - 4}" text-anchor="middle" class="mkt-axis">${escapeHtml(liveLabel)}</text>`;
+    })
+    .join('');
+  return `<section class="mkt-section" id="mkt-recent-cmp">
+<h2>直近 ${n} 配信の比較 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">青＝総コメ数、緑＝ユニークコメンター数。古→新で左から並びます。</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${bars}
+</svg>
+</div></section>`;
+}
+
+/**
+ * 0.1.24 (Y): 曜日 × 時間帯 ヒートマップ（横断）。
+ * @param {ReturnType<typeof buildWeekdayHourHeatmap>} heat
+ */
+function sectionWeekdayHourHeatmap(heat) {
+  if (!heat || heat.maxValue === 0) return '';
+  const dayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+  const cells = heat.matrix
+    .map((row, dow) => {
+      const tds = row
+        .map((v, h) => {
+          const intensity = heat.maxValue > 0 ? v / heat.maxValue : 0;
+          const bg = `rgba(59, 130, 246, ${intensity.toFixed(2)})`;
+          return `<td class="mkt-heat-cell" style="background:${bg}" title="${dayLabels[dow]}曜 ${h}時: ${v}件">${v > 0 ? v : ''}</td>`;
+        })
+        .join('');
+      return `<tr><th>${dayLabels[dow]}</th>${tds}</tr>`;
+    })
+    .join('');
+  const hourCols = Array.from({ length: 24 }, (_, h) => `<th>${h}</th>`).join('');
+  return `<section class="mkt-section" id="mkt-weekday-heat">
+<h2>曜日 × 時間帯 ヒートマップ <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">過去全配信を横断したコメ密度。最も濃い時間帯がアクティブな視聴者層の活動時間。</p>
+<div class="mkt-chart-wrap">
+<table class="mkt-rank mkt-heatmap">
+<thead><tr><th></th>${hourCols}</tr></thead>
+<tbody>${cells}</tbody>
+</table>
+</div></section>`;
+}
+
+/**
+ * 0.1.24 (Y): 成長メーター（過去 N 配信平均との偏差）。
+ * @param {ReturnType<typeof computeBroadcastGrowthScore>} growth
+ * @param {string} label
+ */
+function sectionGrowthMeter(growth, label) {
+  if (!growth || growth.average == null) return '';
+  const deltaPct = growth.deltaPct != null ? `${(growth.deltaPct * 100).toFixed(1)}%` : '-';
+  const z = growth.zScore != null ? growth.zScore.toFixed(2) : '-';
+  const sign = growth.deltaPct != null && growth.deltaPct > 0 ? '＋' : '';
+  return `<section class="mkt-section" id="mkt-growth-meter">
+<h2>成長メーター <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">${escapeHtml(label)}：過去配信の平均（${growth.average}）と比べて<strong>${sign}${escapeHtml(deltaPct)}</strong>（z-score=${escapeHtml(z)}）。</p>
+<table class="mkt-rank">
+<thead><tr><th>指標</th><th>値</th></tr></thead>
+<tbody>
+<tr><th>過去平均</th><td>${growth.average}</td></tr>
+<tr><th>標準偏差</th><td>${growth.stdDev}</td></tr>
+<tr><th>偏差（%）</th><td>${escapeHtml(deltaPct)}</td></tr>
+<tr><th>z-score</th><td>${escapeHtml(z)}</td></tr>
+</tbody>
+</table>
+</section>`;
+}
+
+/**
+ * 0.1.24 (Y): 冒頭 5 分の予兆 → ピーク CPM 散布図（ラテラル L13）。
+ * @param {ReturnType<typeof buildOpeningFiveMinutePoints>} pts
+ */
+function sectionOpeningFivePrediction(pts) {
+  if (!pts || pts.points.length < 2) return '';
+  const W = 600;
+  const H = 240;
+  const pad = 40;
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  const maxX = Math.max(1, ...pts.points.map((p) => p.openingCpm));
+  const maxY = Math.max(1, ...pts.points.map((p) => p.peakCpm));
+  /** @param {number} v */
+  const xOf = (v) => pad + (innerW * v) / maxX;
+  /** @param {number} v */
+  const yOf = (v) => pad + innerH - (innerH * v) / maxY;
+  const dots = pts.points
+    .map(
+      (p) =>
+        `<circle cx="${xOf(p.openingCpm).toFixed(1)}" cy="${yOf(p.peakCpm).toFixed(1)}" r="4" fill="#a855f7" opacity="0.7"><title>${p.liveId}: 冒頭 ${p.openingCpm} CPM → ピーク ${p.peakCpm} CPM</title></circle>`
+    )
+    .join('');
+  const corrLabel =
+    pts.correlation != null
+      ? `相関係数 r=${pts.correlation.toFixed(2)}（${pts.correlation > 0.5 ? '強い正の相関' : pts.correlation > 0.2 ? '弱い正の相関' : '相関弱'}）`
+      : '相関は要件不足';
+  return `<section class="mkt-section" id="mkt-opening-five">
+<h2>冒頭 5 分の予兆 → ピーク（ラテラル L13）<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">横軸＝冒頭 5 分の CPM、縦軸＝全体ピーク CPM。${escapeHtml(corrLabel)}。配信開始 5 分の盛り上がりが結果に効くかの仮説検証。</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+<text x="${(W / 2).toFixed(0)}" y="${H - 4}" text-anchor="middle" class="mkt-axis">冒頭 5 分の CPM</text>
+<text x="12" y="${(H / 2).toFixed(0)}" text-anchor="middle" class="mkt-axis" transform="rotate(-90, 12, ${(H / 2).toFixed(0)})">ピーク CPM</text>
+${dots}
+</svg>
+</div></section>`;
+}
+
+/**
+ * 0.1.24 (Y): コメ波形フィンガープリント（ラテラル L3）。
+ * @param {ReturnType<typeof findSimilarBroadcasts>} similar
+ */
+function sectionWaveformSimilarity(similar) {
+  if (!Array.isArray(similar) || similar.length === 0) return '';
+  const rows = similar
+    .map(
+      (s, i) => `<tr>
+<td>${i + 1}</td>
+<td class="mkt-mono">${escapeHtml(s.liveId)}</td>
+<td>${(s.similarity * 100).toFixed(1)}%</td>
+<td>${s.totalCount}</td>
+</tr>`
+    )
+    .join('');
+  return `<section class="mkt-section" id="mkt-waveform">
+<h2>似てる配信（コメ波形指紋）<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">CPM カーブを 16 次元ベクトルにしてコサイン類似度で比較（ラテラル分析 L3）。盛り上がり方の "形" が今回と似ている過去配信。</p>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>liveId</th><th>類似度</th><th>総コメ</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+}
+
+/**
  * @param {MarketingReport} r
  * @param {{
  *   maskShareLabels?: boolean,
@@ -953,6 +1124,47 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     broadcasterUserId
   });
 
+  // 0.1.24 (Y): 横断比較・予兆・波形指紋。
+  const allBroadcastsForCompare = [
+    ...pastBroadcastsForLayer.filter(
+      (b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase()
+    ),
+    { liveId: String(r.liveId || ''), comments: currentCommentsForLayer }
+  ];
+  const recentComparison = buildRecentBroadcastComparison({
+    broadcasts: allBroadcastsForCompare,
+    limit: 5
+  });
+  const weekdayHourHeat = buildWeekdayHourHeatmap({
+    broadcasts: allBroadcastsForCompare
+  });
+  // 成長メーター: 「総コメ数」を指標に
+  const pastTotalsForGrowth = pastBroadcastsForLayer
+    .filter((b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase())
+    .map((b) => (Array.isArray(b.comments) ? b.comments.length : 0))
+    .filter((n) => n > 0);
+  const growth = computeBroadcastGrowthScore({
+    currentValue: r.totalComments || currentCommentsForLayer.length,
+    pastValues: pastTotalsForGrowth
+  });
+  const openingFivePts = buildOpeningFiveMinutePoints(allBroadcastsForCompare);
+  // 波形指紋: 現在 + 各過去配信の指紋を作って類似度上位を出す
+  const currentFingerprint = buildBroadcastWaveformFingerprint(currentCommentsForLayer);
+  const pastFingerprints = pastBroadcastsForLayer
+    .filter((b) => String(b.liveId).toLowerCase() !== String(r.liveId).toLowerCase())
+    .map((b) => {
+      const fp = buildBroadcastWaveformFingerprint(b.comments);
+      return fp ? { liveId: b.liveId, vector: fp.vector, totalCount: fp.totalCount } : null;
+    })
+    .filter(/** @returns {x is { liveId: string, vector: number[], totalCount: number }} */ (x) => x != null);
+  const similarBroadcasts = currentFingerprint
+    ? findSimilarBroadcasts(
+        { liveId: String(r.liveId || ''), vector: currentFingerprint.vector, totalCount: currentFingerprint.totalCount },
+        pastFingerprints,
+        { topN: 5 }
+      )
+    : [];
+
   const tocItems = [
     { id: 'mkt-kpi', label: 'KPI サマリ' },
     { id: 'mkt-content', label: 'コメント本文・属性の傾向' },
@@ -967,6 +1179,11 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-departed', label: '離反コメンター TOP（PRO）' },
     { id: 'mkt-attendance', label: '常連出席カレンダー（PRO）' },
     { id: 'mkt-keyboard', label: 'キーボード型診断（PRO）' },
+    { id: 'mkt-recent-cmp', label: '直近 5 配信の比較（PRO）' },
+    { id: 'mkt-weekday-heat', label: '曜日×時間帯ヒートマップ（PRO）' },
+    { id: 'mkt-growth-meter', label: '成長メーター（PRO）' },
+    { id: 'mkt-opening-five', label: '冒頭 5 分の予兆（PRO）' },
+    { id: 'mkt-waveform', label: '似てる配信（波形指紋）（PRO）' },
     { id: 'mkt-derived', label: '累積コメント数と5分窓' },
     { id: 'mkt-segment', label: 'ユーザーセグメント' },
     { id: 'mkt-top-users', label: 'トップコメンター TOP 20' },
@@ -1010,6 +1227,11 @@ ${sectionSurvivalCurve(survivalCurve)}
 ${sectionDepartedHeavy(departedHeavy, maskShare)}
 ${sectionAttendanceMatrix(attendanceMatrix, maskShare)}
 ${sectionKeyboardTypes(keyboardTypes)}
+${sectionRecentComparison(recentComparison)}
+${sectionWeekdayHourHeatmap(weekdayHourHeat)}
+${sectionGrowthMeter(growth, '今回の総コメ数')}
+${sectionOpeningFivePrediction(openingFivePts)}
+${sectionWaveformSimilarity(similarBroadcasts)}
 ${idWrap('mkt-derived', sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap('mkt-segment', sectionSegment(r))}
@@ -1349,6 +1571,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-att-cell{font-family:ui-monospace,monospace;font-weight:700}
 .mkt-att-cell--on{color:#22c55e}
 .mkt-att-cell--off{color:#475569}
+.mkt-heatmap{font-size:.65rem}
+.mkt-heatmap th,.mkt-heatmap td{padding:.15rem .25rem;text-align:center;min-width:1.6rem}
+.mkt-heat-cell{color:#f8fafc;font-weight:700}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}

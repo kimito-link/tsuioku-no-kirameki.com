@@ -26,6 +26,18 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.24',
+    date: '2026-04-30',
+    summary: 'マーケ分析に横断比較系 5 種追加',
+    items: Object.freeze([
+      'マーケ分析に「直近 5 配信の比較」（コメ数+ユニーク並列バー）を追加',
+      'マーケ分析に「曜日 × 時間帯 ヒートマップ」を追加（横断・全配信のコメ密度）',
+      'マーケ分析に「成長メーター」（過去平均との偏差・z-score）を追加',
+      'マーケ分析に「冒頭 5 分の予兆」散布図を追加（冒頭 CPM × ピーク CPM の Pearson 相関、ラテラル分析 L13）',
+      'マーケ分析に「似てる配信」一覧を追加（CPM カーブを 16 次元に正規化してコサイン類似度、ラテラル分析 L3）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.23',
     date: '2026-04-30',
     summary: 'マーケ分析にユーザー層動向 5 種追加',
