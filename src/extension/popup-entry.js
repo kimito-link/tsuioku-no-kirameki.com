@@ -235,6 +235,7 @@ import {
   commentsPerMinuteFromWindow
 } from '../lib/commentVelocityWindow.js';
 import { maybeFlushBroadcastSessionSummarySample } from '../lib/broadcastSessionSummaryFlush.js';
+import { isContextInvalidatedError as isExtensionContextInvalidatedError } from '../lib/reportSilentError.js';
 import {
   listBroadcastSessionSummaryForLive,
   openBroadcastSessionSummaryDb
@@ -974,15 +975,9 @@ function withCommentSendTroubleshootHint(message) {
   return hintLines.length ? `${s}\n※うまくいかないとき: ${hintLines.join('\n')}` : s;
 }
 
-/** @param {unknown} err */
-function isExtensionContextInvalidatedError(err) {
-  const msg =
-    err && typeof err === 'object' && 'message' in err
-      ? String(/** @type {{ message?: unknown }} */ (err).message || '')
-      : String(err || '');
-  return /Extension context invalidated/i.test(msg);
-}
-
+// 0.1.16 (Q): isExtensionContextInvalidatedError の重複定義を撤去し
+// `../lib/reportSilentError.js#isContextInvalidatedError` に一本化（同名 alias 経由で
+// 既存呼び出し点 9 箇所を変えずに切替）。content-entry.js は既に lib 版を import 済み。
 function hasExtensionContext() {
   try {
     return Boolean(

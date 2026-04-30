@@ -5955,6 +5955,15 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
   }
 
+  // src/lib/reportSilentError.js
+  function isContextInvalidatedError(err) {
+    const msg = err && typeof err === "object" && "message" in err ? String(
+      /** @type {{ message?: unknown }} */
+      err.message || ""
+    ) : String(err || "");
+    return msg.includes("Extension context invalidated");
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -6473,13 +6482,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return hintLines.length ? `${s}
 \u203B\u3046\u307E\u304F\u3044\u304B\u306A\u3044\u3068\u304D: ${hintLines.join("\n")}` : s;
   }
-  function isExtensionContextInvalidatedError(err) {
-    const msg = err && typeof err === "object" && "message" in err ? String(
-      /** @type {{ message?: unknown }} */
-      err.message || ""
-    ) : String(err || "");
-    return /Extension context invalidated/i.test(msg);
-  }
   function hasExtensionContext() {
     try {
       return Boolean(
@@ -6494,11 +6496,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (extensionContextErrorGuardInstalled) return;
     extensionContextErrorGuardInstalled = true;
     globalThis.addEventListener("unhandledrejection", (ev) => {
-      if (!isExtensionContextInvalidatedError(ev.reason)) return;
+      if (!isContextInvalidatedError(ev.reason)) return;
       ev.preventDefault();
     });
     globalThis.addEventListener("error", (ev) => {
-      if (!isExtensionContextInvalidatedError(ev.error || ev.message)) return;
+      if (!isContextInvalidatedError(ev.error || ev.message)) return;
       ev.preventDefault();
     });
   }
@@ -6508,7 +6510,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       await chrome.storage.local.set(bag);
       return true;
     } catch (e) {
-      if (isExtensionContextInvalidatedError(e)) return false;
+      if (isContextInvalidatedError(e)) return false;
       throw e;
     }
   }
@@ -6518,7 +6520,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       await chrome.storage.local.remove(key);
       return true;
     } catch (e) {
-      if (isExtensionContextInvalidatedError(e)) return false;
+      if (isContextInvalidatedError(e)) return false;
       throw e;
     }
   }
@@ -6530,7 +6532,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         await chrome.storage.local.get(key)
       );
     } catch (e) {
-      if (isExtensionContextInvalidatedError(e)) return fallback;
+      if (isContextInvalidatedError(e)) return fallback;
       throw e;
     }
   }
@@ -7296,7 +7298,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (refreshGen !== watchPopupRefreshGeneration) return;
       paint();
     } catch (e) {
-      if (isExtensionContextInvalidatedError(e)) return;
+      if (isContextInvalidatedError(e)) return;
     }
   }
   function scheduleDeferredUserCommentProfileHydrate(ctx) {
@@ -10990,7 +10992,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           }
           paintWatchPopupUi();
         } catch (e) {
-          if (isExtensionContextInvalidatedError(e)) {
+          if (isContextInvalidatedError(e)) {
             renderExtensionContextBanner(true);
             return;
           }
@@ -11001,7 +11003,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       })();
     } catch (e) {
       revealPopupPrimaryOnce();
-      if (isExtensionContextInvalidatedError(e)) {
+      if (isContextInvalidatedError(e)) {
         renderExtensionContextBanner(true);
         return;
       }
@@ -12262,7 +12264,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1148" ? String("0430-1148") : "dev";
+      const buildId = "0430-1151" ? String("0430-1151") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -12391,7 +12393,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const safeRefresh = () => {
       if (!hasExtensionContext()) return Promise.resolve();
       return refresh().catch((e) => {
-        if (!isExtensionContextInvalidatedError(e)) {
+        if (!isContextInvalidatedError(e)) {
         }
       }).finally(() => {
         const wasInitialRefresh = !initialRefreshDone;
@@ -13192,7 +13194,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           await revertLastSelfPostedComment(lvPost, text).catch(() => {
           });
         }
-        if (isExtensionContextInvalidatedError(e) || !hasExtensionContext()) return;
+        if (isContextInvalidatedError(e) || !hasExtensionContext()) return;
         throw e;
       } finally {
         COMMENT_POST_UI_STATE.submitting = false;
