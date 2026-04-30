@@ -474,6 +474,38 @@ async function openOrFocusPopupWindow() {
   } catch {
     // no-op
   }
+  /*
+   * 0.1.60 (AP): 複数モニタ環境でユーザーが今使っている Chrome window と
+   *   別のモニタに popup が開く問題を修正。`chrome.windows.getLastFocused`
+   *   で「直前にフォーカスされていた通常 window」を取得し、その中央に
+   *   popup を配置することで、ユーザーが見ているモニタに popup が出る。
+   */
+  /** @type {{ left?: number, top?: number }} */
+  const positionHint = {};
+  try {
+    const lastNormal = await chrome.windows.getLastFocused({
+      windowTypes: ['normal']
+    });
+    if (
+      lastNormal &&
+      typeof lastNormal.left === 'number' &&
+      typeof lastNormal.top === 'number' &&
+      typeof lastNormal.width === 'number' &&
+      typeof lastNormal.height === 'number'
+    ) {
+      // last focused normal window の中央に popup の中央を合わせる
+      const left = Math.round(
+        lastNormal.left + (lastNormal.width - POPUP_WINDOW_WIDTH) / 2
+      );
+      const top = Math.round(
+        lastNormal.top + (lastNormal.height - POPUP_WINDOW_HEIGHT) / 2
+      );
+      positionHint.left = Math.max(0, left);
+      positionHint.top = Math.max(0, top);
+    }
+  } catch {
+    // no-op: getLastFocused が取れなければ Chrome のデフォルト位置にする
+  }
   try {
     await chrome.windows.create({
       url,
@@ -481,7 +513,8 @@ async function openOrFocusPopupWindow() {
       width: POPUP_WINDOW_WIDTH,
       height: POPUP_WINDOW_HEIGHT,
       focused: true,
-      state: 'normal'
+      state: 'normal',
+      ...positionHint
     });
   } catch {
     // no-op

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.60',
+    date: '2026-05-01',
+    summary: '複数モニタ時に popup を同じ画面に出す',
+    items: Object.freeze([
+      'モニタが複数あるとき popup が別モニタに開く問題を修正。直前に使っていた Chrome ウィンドウの中央に popup を配置するよう変更（同じモニタに出る）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.59',
     date: '2026-05-01',
     summary: 'popup を毎回作り直して横長を確実に解消',
