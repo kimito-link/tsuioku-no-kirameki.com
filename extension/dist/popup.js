@@ -700,10 +700,19 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.40",
+      date: "2026-04-30",
+      summary: "\u516C\u5F0F\u30C1\u30E3\u30F3\u30CD\u30EB\u653E\u9001\u306E\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u5FA9\u6D3B",
+      items: Object.freeze([
+        "\u516C\u5F0F\u30C1\u30E3\u30F3\u30CD\u30EB\u653E\u9001\uFF08\u904B\u55B6\u30FB\u696D\u8005\uFF09\u3067\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u304C\u51FA\u3066\u3044\u306A\u304B\u3063\u305F\u4E8B\u8C61\u3092\u4FEE\u6B63\u3002embedded-data \u306E supplier.name \u306F\u63D0\u4F9B\u4F1A\u793E\u540D\uFF08\u4F8B\u300C\u682A\u5F0F\u4F1A\u793E\u30C9\u30EF\u30F3\u30B4\u300D\uFF09\u3067\u30C1\u30E3\u30F3\u30CD\u30EB\u540D\u3067\u306F\u306A\u3044\u305F\u3081\u3001socialGroup.name / socialGroup.socialGroupPageUrl \u3092\u512A\u5148\u3059\u308B\u3088\u3046\u306B\u5909\u66F4\u3002\u30A2\u30A4\u30B3\u30F3\u3082 socialGroup.thumbnailImageUrl \u7B49\u3092\u8AAD\u3080\u3088\u3046\u306B\u8FFD\u52A0\uFF08\u7D14\u7C8B\u95A2\u6570 + 19 \u30B1\u30FC\u30B9 TDD\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.39",
       date: "2026-04-30",
-      summary: "\u5185\u90E8\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u5206\u5272\u306E\u7D9A\u304D",
+      summary: "\u914D\u4FE1\u8005\u30EA\u30F3\u30AF\u8AA4\u691C\u51FA\u306E\u518D\u767A\u9632\u6B62",
       items: Object.freeze([
+        "\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u304C\u95A2\u9023\u914D\u4FE1\u67A0\u306E\u5225\u4EBA\u3092\u6307\u3057\u3066\u3057\u307E\u3046\u4E8B\u8C61\uFF080.1.38 \u306E\u8FFD\u52A0\u5BFE\u7B56\uFF09\u3002DOM \u5019\u88DC\u304B\u3089 ?ref=watch_user_information \u30DE\u30FC\u30AB\u4ED8\u304D anchor \u3092\u6700\u512A\u5148\u306B\u3057\u3066\u4E8C\u91CD\u9632\u5FA1\u3002\u540C\u7A2E\u306E\u691C\u51FA\u30ED\u30B8\u30C3\u30AF\u3092\u4F7F\u3046\u5225\u95A2\u6570\uFF08detectBroadcasterUserIdFromDom\uFF09\u3082\u540C\u3058\u9632\u5FA1\u306B\u7D71\u4E00",
         "\u30A2\u30D0\u30BF\u30FC URL \u6BD4\u8F03\u30D8\u30EB\u30D1\uFF08avatarCompareKey / isSameAvatarUrl\uFF09\u3092 src/lib/avatarUrlCompare.js \u306B\u5207\u308A\u51FA\u3057\uFF08\u7D14\u7C8B\u95A2\u6570 + 14 \u30B1\u30FC\u30B9 TDD\uFF09\u3002query/hash \u9055\u3044\u3092\u300C\u540C\u3058\u30A2\u30D0\u30BF\u30FC\u300D\u3068\u3057\u3066\u6271\u3046\u30ED\u30B8\u30C3\u30AF\u306E\u5358\u4F53\u691C\u8A3C\u3092\u5F37\u5316"
       ])
     }),
@@ -15079,7 +15088,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1924" ? String("0430-1924") : "dev";
+      const buildId = "0430-1939" ? String("0430-1939") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

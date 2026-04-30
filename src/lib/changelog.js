@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.40',
+    date: '2026-04-30',
+    summary: '公式チャンネル放送の配信者タイル復活',
+    items: Object.freeze([
+      '公式チャンネル放送（運営・業者）で配信者タイルが出ていなかった事象を修正。embedded-data の supplier.name は提供会社名（例「株式会社ドワンゴ」）でチャンネル名ではないため、socialGroup.name / socialGroup.socialGroupPageUrl を優先するように変更。アイコンも socialGroup.thumbnailImageUrl 等を読むように追加（純粋関数 + 19 ケース TDD）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.39',
     date: '2026-04-30',
     summary: '配信者リンク誤検出の再発防止',

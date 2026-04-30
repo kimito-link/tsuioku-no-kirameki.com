@@ -141,6 +141,7 @@ import {
 } from '../lib/watchProgramEndState.js';
 import { hydrateInterceptAvatarMapFromProfile } from '../lib/interceptAvatarHydration.js';
 import { extractBroadcasterUserId } from '../lib/broadcasterUserId.js';
+import { resolveChannelBroadcasterMeta } from '../lib/channelBroadcasterMeta.js';
 import {
   KEY_COMMENT_PANEL_AUTO_RESTORE,
   LATEST_COMMENT_BUTTON_SELECTOR,
@@ -3631,8 +3632,18 @@ function collectWatchPageSnapshot() {
   const embeddedProps = (() => {
     try { return extractEmbeddedDataProps(document); } catch { return null; }
   })();
+  /*
+   * 0.1.40 (V): 公式チャンネル放送（運営・業者）の broadcaster メタを抽出。
+   *   一般ユーザー放送と embedded-data の構造が違い、`supplier.name` は提供
+   *   会社名（"株式会社ドワンゴ" 等）で、画面で見える本来のチャンネル名は
+   *   `socialGroup.name`、URL は `socialGroup.socialGroupPageUrl`。
+   *   詳細は lib/channelBroadcasterMeta.js。
+   */
+  const channelMeta = resolveChannelBroadcasterMeta(embeddedProps);
   const broadcasterNameFromEmbedded = clean(
-    embeddedProps?.program?.supplier?.name ?? ''
+    channelMeta.kind === 'channel'
+      ? channelMeta.name
+      : (embeddedProps?.program?.supplier?.name ?? '')
   );
   const broadcasterNameFromMeta = clean(
     metaGet(metaMap, ['author', 'twitter:creator', 'profile:username'])
@@ -3669,11 +3680,19 @@ function collectWatchPageSnapshot() {
    * なる。生 URL を snapshot に持ち出して popup 側で channel タイルに切替える。
    */
   const broadcasterPageUrl = (() => {
+    // 0.1.40 (V): チャンネル放送は socialGroup 側に URL があるので最優先
+    if (channelMeta.kind === 'channel' && channelMeta.pageUrl) {
+      return channelMeta.pageUrl;
+    }
     const raw = String(embeddedProps?.program?.supplier?.pageUrl ?? '').trim();
     if (/^https?:\/\//i.test(raw)) return raw;
     return '';
   })();
   const broadcasterIconUrl = (() => {
+    // 0.1.40 (V): チャンネル放送は socialGroup.thumbnailImageUrl を最優先
+    if (channelMeta.kind === 'channel' && channelMeta.iconUrl) {
+      return channelMeta.iconUrl;
+    }
     const supplier = embeddedProps?.program?.supplier;
     /** @type {string[]} */
     const candidates = [];
@@ -3689,7 +3708,13 @@ function collectWatchPageSnapshot() {
     }
     const sg = embeddedProps?.socialGroup;
     if (sg && typeof sg === 'object') {
-      for (const key of ['thumbnailUrl', 'thumbnailSmallUrl']) {
+      // 新フィールド名（thumbnailImageUrl）+ 旧フィールド名 両方を後方互換で見る
+      for (const key of [
+        'thumbnailImageUrl',
+        'thumbnailSmallImageUrl',
+        'thumbnailUrl',
+        'thumbnailSmallUrl'
+      ]) {
         const v = /** @type {Record<string, unknown>} */ (sg)[key];
         if (typeof v === 'string') candidates.push(v);
       }

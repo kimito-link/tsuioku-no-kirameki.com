@@ -3233,6 +3233,65 @@
     return "";
   }
 
+  // src/lib/channelBroadcasterMeta.js
+  var NONE_RESULT = Object.freeze({
+    kind: (
+      /** @type {const} */
+      "none"
+    ),
+    name: "",
+    pageUrl: "",
+    iconUrl: ""
+  });
+  function asTrimmedString2(v) {
+    if (v == null) return "";
+    return String(v).trim();
+  }
+  function isHttpUrl(url) {
+    return /^https?:\/\//i.test(url);
+  }
+  function resolveChannelBroadcasterMeta(embeddedProps) {
+    if (!embeddedProps || typeof embeddedProps !== "object") {
+      return { ...NONE_RESULT };
+    }
+    const program = embeddedProps.program ?? null;
+    const supplier = program?.supplier ?? null;
+    const socialGroup = embeddedProps.socialGroup ?? null;
+    const supplierType = asTrimmedString2(supplier?.supplierType);
+    const providerType = asTrimmedString2(program?.providerType);
+    const sgType = asTrimmedString2(socialGroup?.type);
+    const isChannel = supplierType === "channel" || providerType === "channel" || sgType === "channel";
+    if (!isChannel) return { ...NONE_RESULT };
+    if (!socialGroup || typeof socialGroup !== "object") {
+      return { ...NONE_RESULT };
+    }
+    const name = asTrimmedString2(socialGroup.name);
+    if (!name) return { ...NONE_RESULT };
+    let pageUrl = asTrimmedString2(socialGroup.socialGroupPageUrl);
+    if (!isHttpUrl(pageUrl)) {
+      const sgId = asTrimmedString2(socialGroup.id);
+      if (/^ch\d+$/.test(sgId)) {
+        pageUrl = `https://ch.nicovideo.jp/channel/${sgId}`;
+      } else {
+        pageUrl = "";
+      }
+    }
+    let iconUrl = "";
+    for (const key of [
+      "thumbnailImageUrl",
+      "thumbnailSmallImageUrl",
+      "thumbnailUrl",
+      "thumbnailSmallUrl"
+    ]) {
+      const v = asTrimmedString2(socialGroup[key]);
+      if (isHttpUrl(v)) {
+        iconUrl = v;
+        break;
+      }
+    }
+    return { kind: "channel", name, pageUrl, iconUrl };
+  }
+
   // src/lib/commentPanelHealthProbe.js
   var LATEST_COMMENT_BUTTON_SELECTOR = 'button.indicator[aria-label="\u6700\u65B0\u30B3\u30E1\u30F3\u30C8\u306B\u623B\u308B"]';
   var COMMENT_PANEL_RESTORE_COOLDOWN_MS = 10 * 1e3;
@@ -5906,8 +5965,9 @@
         return null;
       }
     })();
+    const channelMeta = resolveChannelBroadcasterMeta(embeddedProps);
     const broadcasterNameFromEmbedded = clean(
-      embeddedProps?.program?.supplier?.name ?? ""
+      channelMeta.kind === "channel" ? channelMeta.name : embeddedProps?.program?.supplier?.name ?? ""
     );
     const broadcasterNameFromMeta = clean(
       metaGet(metaMap, ["author", "twitter:creator", "profile:username"])
@@ -5924,11 +5984,17 @@
       streamLinkHrefCandidates
     });
     const broadcasterPageUrl = (() => {
+      if (channelMeta.kind === "channel" && channelMeta.pageUrl) {
+        return channelMeta.pageUrl;
+      }
       const raw = String(embeddedProps?.program?.supplier?.pageUrl ?? "").trim();
       if (/^https?:\/\//i.test(raw)) return raw;
       return "";
     })();
     const broadcasterIconUrl = (() => {
+      if (channelMeta.kind === "channel" && channelMeta.iconUrl) {
+        return channelMeta.iconUrl;
+      }
       const supplier = embeddedProps?.program?.supplier;
       const candidates = [];
       if (supplier && typeof supplier === "object") {
@@ -5946,7 +6012,12 @@
       }
       const sg = embeddedProps?.socialGroup;
       if (sg && typeof sg === "object") {
-        for (const key of ["thumbnailUrl", "thumbnailSmallUrl"]) {
+        for (const key of [
+          "thumbnailImageUrl",
+          "thumbnailSmallImageUrl",
+          "thumbnailUrl",
+          "thumbnailSmallUrl"
+        ]) {
           const v = (
             /** @type {Record<string, unknown>} */
             sg[key]

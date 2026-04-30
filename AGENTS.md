@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.39（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.40（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,35 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.40 バンプで入った修正（公式チャンネル放送の配信者タイル復活 AO）**:
+
+- ユーザー報告: lv350162154（にじさんじオフィシャル ニコニコチャンネル）の
+ watch ページで、配信者タイルが popup に出ない。一般ユーザー放送（kyoncy
+ さん枠）では正しく出るので、公式チャンネル特有の事象。
+- 原因: 公式チャンネル放送では embedded-data の構造が違う。
+   - `program.supplier.name` = "株式会社ドワンゴ"（提供会社名で、画面で
+    見える本来のチャンネル名ではない）
+   - `program.supplier.pageUrl` は無い
+   - 真のチャンネル名は `socialGroup.name`（"にじさんじオフィシャル
+    ニコニコチャンネル"）、URL は `socialGroup.socialGroupPageUrl`
+    (`https://ch.nicovideo.jp/channel/ch{id}`)、アイコンは
+    `socialGroup.thumbnailImageUrl`
+   - 既存 `collectWatchPageSnapshot` は supplier 側だけ見ていたため
+    `broadcasterPageUrl` が空になり、popup の `resolveBroadcasterFollowTarget`
+    が kind=none を返してタイルが消えていた。さらに既存のアイコン fallback
+    は旧フィールド名 `thumbnailUrl` のみ参照していて、新フィールド
+    `thumbnailImageUrl` を読まなかった。
+- 修正: 新規 lib `src/lib/channelBroadcasterMeta.js`（純粋関数 + 19 ケース
+ TDD）。3 経路（supplier.supplierType / program.providerType /
+ socialGroup.type のいずれかが `"channel"`）でチャンネル放送を判定し、
+ socialGroup から name / pageUrl / iconUrl を抽出する。
+- `collectWatchPageSnapshot` で kind=channel のときは socialGroup 由来の
+ 値を broadcasterName / broadcasterPageUrl / broadcasterIconUrl に入れる。
+ アイコンは `thumbnailImageUrl` / `thumbnailSmallImageUrl` を旧フィールド
+ より優先。
+- 効果: にじさんじオフィシャルでも配信者タイルが出て、フォロー先が
+ 正しい channel ページに飛ぶ。
 
 **0.1.39 バンプで入った修正（配信者リンク誤検出の再発防止 + 切り出し AN）**:
 
