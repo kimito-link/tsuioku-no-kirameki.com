@@ -75,6 +75,7 @@ import {
   pushRecentCheerKey,
   normalizeRecentCheerKeys
 } from '../lib/cheerPalette.js';
+import { EXTENSION_CHANGELOG } from '../lib/changelog.js';
 import { detectCommentKindnessNudge } from '../lib/commentKindnessNudge.js';
 import {
   audioConstraintsForDevice,
@@ -9421,6 +9422,55 @@ function initPopup() {
       // 既に開かれていた場合に備えて再描画
       if (cheerPaletteRendered) renderCheerPalette();
     })();
+  }
+
+  /*
+   * 0.1.12 (D): 更新履歴を <details id="changelogDetails"> の中に動的描画。
+   *
+   * 設計方針:
+   *   - <details> は既定で折り畳まれているので、開かない限り UIUX 阻害ゼロ。
+   *   - HTML 直書きにすると version bump の度に 2 箇所更新が必要で drift するので、
+   *     正本は src/lib/changelog.js（テストで semver 単調・日付形式を保護）に集約し、
+   *     ここで textContent 派の DOM 構築をする（XSS 安全）。
+   *   - summary 行に「最新: 0.1.12」を出して、開かなくてもバージョンが分かるように。
+   */
+  const changelogListEl = /** @type {HTMLOListElement|null} */ ($('changelogList'));
+  const changelogLatestLabelEl = $('changelogLatestLabel');
+  if (changelogListEl) {
+    while (changelogListEl.firstChild) {
+      changelogListEl.removeChild(changelogListEl.firstChild);
+    }
+    for (const entry of EXTENSION_CHANGELOG) {
+      const li = document.createElement('li');
+      li.className = 'nl-changelog-entry';
+      const head = document.createElement('div');
+      head.className = 'nl-changelog-entry__head';
+      const ver = document.createElement('span');
+      ver.className = 'nl-changelog-entry__version';
+      ver.textContent = `v${entry.version}`;
+      const date = document.createElement('span');
+      date.className = 'nl-changelog-entry__date';
+      date.textContent = entry.date;
+      const summary = document.createElement('span');
+      summary.className = 'nl-changelog-entry__summary';
+      summary.textContent = entry.summary;
+      head.appendChild(ver);
+      head.appendChild(date);
+      head.appendChild(summary);
+      const ul = document.createElement('ul');
+      ul.className = 'nl-changelog-entry__items';
+      for (const item of entry.items) {
+        const itemLi = document.createElement('li');
+        itemLi.textContent = item;
+        ul.appendChild(itemLi);
+      }
+      li.appendChild(head);
+      li.appendChild(ul);
+      changelogListEl.appendChild(li);
+    }
+  }
+  if (changelogLatestLabelEl && EXTENSION_CHANGELOG.length > 0) {
+    changelogLatestLabelEl.textContent = `v${EXTENSION_CHANGELOG[0].version}`;
   }
 
   loadPopupFrameSettings()

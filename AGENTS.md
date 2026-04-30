@@ -28,8 +28,8 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
  ディープリサーチで発見された残課題（privacy.html × 実装の整合不足、過去焼き込みデータの
  後方修復、184 自コメ viewerUid の他経路露出、avatarUrl cap の他経路漏れ、content-entry
  setInterval cleanup）+ A1 視認性根治・B1 前面化レース・B2 dock_bottom 閉じるボタンを
- 一括修正。0.1.12 で「盛り上げワード ワンクリック挿入パレット」（C）を追加した。
- 0.1.10 が承認 → 公開された後、続けて 0.1.12 を提出予定。
+ 一括修正。0.1.12 で「盛り上げワード ワンクリック挿入パレット」（C）と「更新履歴 popup
+ 表示」（D）を追加した。0.1.10 が承認 → 公開された後、続けて 0.1.12 を提出予定。
 - **0.1.10 内訳**: 0.1.8 自コメ修正 + 0.1.9 シナリオ調査 8 件 + 0.1.10 Privacy 整合 / XSS 対策 / a11y 修正 / 出自不明アセット差し替え 13 件 をロールアップ。
 - **0.1.11 内訳**: privacy.html を IDB 3 つ・記録クリア言及で実装と整合 / 0.1.10 未満からの
  自動更新ユーザーで誤焼き込み `selfPosted:true` を 1 度だけ剥がす migration / 184 自コメの
@@ -174,7 +174,22 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 
 ## 5. 直近セッションで入った変更（2026-04-30）
 
-**0.1.12 バンプで追加した機能（盛り上げワード ワンクリック挿入パレット 1 件）**:
+**0.1.12 バンプで追加した機能（盛り上げワード パレット + 更新履歴 popup 表示 2 件）**:
+
+- `feat(popup)`: popup 内に「更新履歴」セクションを追加。`<details id="changelogDetails">`
+ 既定折り畳みで、開かない限りスペースを取らない（UIUX 阻害ゼロ）。`src/lib/changelog.js`
+ の `EXTENSION_CHANGELOG` をデータ正本とし、`popup-entry.js` で textContent 派の
+ DOM 構築（XSS 安全）。summary 行に「最新: v0.1.12」を出して、開かなくても現行
+ バージョンが分かる。version bump 時は `EXTENSION_CHANGELOG` 先頭にエントリを足す
+ だけで popup と LP（将来）の両方に反映。
+- `lib(new)`: `src/lib/changelog.js` を新設（`EXTENSION_CHANGELOG` /
+ `getLatestChangelogEntry` / `compareSemver`）。compareSemver は 0.1.10 vs 0.1.9 の
+ ような数値比較を文字列比較ではなく数値で行う（`'10' < '9'` 罠の回避）。
+- `test`: `changelog.test.js` を新規追加（14 ケース：frozen 構造 / 各エントリの
+ 必須フィールド / version 単調降順 / version 重複なし / manifest と先頭が一致 /
+ summary 35 字以内 / 項目に HTML タグなし / compareSemver の境界値）。
+
+
 
 - `feat(popup)`: コメント textarea に「✨ 盛り上げワード パレット」を追加。
  既存の `.nl-compose-send-actions` に 36px の toggle ボタンを 1 つ差し込み、押下時のみ

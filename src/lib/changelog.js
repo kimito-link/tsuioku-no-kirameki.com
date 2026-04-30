@@ -1,0 +1,121 @@
+/**
+ * 拡張の更新履歴データと semver 比較ヘルパ。
+ *
+ * 設計（0.1.12 D: 更新履歴 popup 表示）:
+ *   ・version 文字列・日付・概要・項目配列を JSON-like なデータ構造で保持。
+ *   ・popup-entry.js が `<details id="changelogPanel">` の中身として
+ *     描画する。<details> は既定折り畳みなので、開かない限り存在感ゼロ
+ *     （UIUX 阻害ゼロ）。
+ *   ・各項目は HTML を含まずプレーンテキスト（テキストノードで出す）。
+ *     CWS 審査で問題になる外部リソース取得や script 系も入れない。
+ *
+ * 注：このファイルは「ユーザに見せる更新履歴」の正本。AGENTS.md §5 と
+ *     重複する内容もあるが、AGENTS.md は開発者向けの詳細、ここはユーザ向けの
+ *     要約という棲み分け。
+ */
+
+/**
+ * @typedef {{
+ *   version: string,
+ *   date: string,
+ *   summary: string,
+ *   items: readonly string[]
+ * }} ChangelogEntry
+ */
+
+/** @type {readonly ChangelogEntry[]} */
+export const EXTENSION_CHANGELOG = Object.freeze([
+  Object.freeze({
+    version: '0.1.12',
+    date: '2026-04-30',
+    summary: '盛り上げワード ワンクリック挿入',
+    items: Object.freeze([
+      '✨ボタンから 8888 / wwww / 拍手 / 顔文字 等を 1 タップで挿入できるパレットを追加',
+      '最近使ったワードが先頭に並ぶ学習動作（5 件まで保存）',
+      '既存の入力欄レイアウトは動かさず、ポップオーバー方式で表示',
+      '更新履歴をこの popup から確認できるようにしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.11',
+    date: '2026-04-30',
+    summary: '視認性・前面化バグ修正',
+    items: Object.freeze([
+      '配色プリセット切替時に文字色が読みにくくなる不具合を根治',
+      'コメント入力欄の placeholder がダーク背景で読めない問題を修正',
+      'ツールバー押下時にパネルが小さく出るタイミング競合を修正',
+      '画面下固定（dock_bottom）配置にも × 閉じるボタンを追加'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.10',
+    date: '2026-04-29',
+    summary: 'セキュリティ・プライバシー・a11y 整備',
+    items: Object.freeze([
+      'プライバシーポリシーを実装と整合（OpenRouter は「未実装・将来予定」）',
+      '保存 HTML を開いたときの XSS 経路を防御',
+      'avatarUrl の容量上限（2KB）を導入してストレージ枯渇を防止',
+      'ダーク配色で補助テキストの読みやすさ（WCAG AA）を確保',
+      '視聴ページの × 閉じるボタン、補助テキストの a11y 改善',
+      '「煌めき」→「きらめき」に表記統一（意匠ルビは保持）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.9',
+    date: '2026-04-28',
+    summary: '184 匿名コメントとパフォーマンス',
+    items: Object.freeze([
+      '送信中の自コメ表示で 184 viewer ID を露出しないように修正',
+      '長時間配信でメモリが無制限に増殖するのを上限カットで防止',
+      '視聴ページ離脱後の余分な fetch を停止（CPU・帯域・プライバシー）',
+      'マイク確認中にバックグラウンドでハングする不具合を修正',
+      '拡張接続切れバナーに「再読み込み」ボタンを追加'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.8',
+    date: '2026-04-27',
+    summary: '自コメ表示の安定化',
+    items: Object.freeze([
+      'りんくレーンに自コメが表示されない症状を根治（textRaw 永続化など）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.7',
+    date: '2026-04-23',
+    summary: '初公開バージョン',
+    items: Object.freeze([
+      'CWS 初リリース',
+      'ニコ生応援コメントの記録と 3 レーン可視化（りんく / こん太 / たぬ姉）',
+      'HTML レポート / スクショ / マーケ分析チャート の書き出し',
+      'プライバシー優先（外部送信なし・広告なし・計測なし・完全ローカル保存）'
+    ])
+  })
+]);
+
+/**
+ * 先頭（最新）の changelog エントリを返す。
+ * @returns {ChangelogEntry}
+ */
+export function getLatestChangelogEntry() {
+  return EXTENSION_CHANGELOG[0];
+}
+
+/**
+ * `MAJOR.MINOR.PATCH` の semver を数値として比較する。
+ *   compareSemver('0.1.10', '0.1.9') > 0  // 文字列比較だと逆になるので注意
+ * @param {string} a
+ * @param {string} b
+ * @returns {number} a > b で正、a < b で負、同値で 0
+ */
+export function compareSemver(a, b) {
+  const pa = String(a || '0.0.0').split('.').map((n) => Number(n) || 0);
+  const pb = String(b || '0.0.0').split('.').map((n) => Number(n) || 0);
+  const len = Math.max(pa.length, pb.length, 3);
+  for (let i = 0; i < len; i++) {
+    const va = pa[i] ?? 0;
+    const vb = pb[i] ?? 0;
+    if (va !== vb) return va - vb;
+  }
+  return 0;
+}

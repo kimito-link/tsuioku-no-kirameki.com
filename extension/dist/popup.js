@@ -692,6 +692,76 @@
     return out;
   }
 
+  // src/lib/changelog.js
+  var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.12",
+      date: "2026-04-30",
+      summary: "\u76DB\u308A\u4E0A\u3052\u30EF\u30FC\u30C9 \u30EF\u30F3\u30AF\u30EA\u30C3\u30AF\u633F\u5165",
+      items: Object.freeze([
+        "\u2728\u30DC\u30BF\u30F3\u304B\u3089 8888 / wwww / \u62CD\u624B / \u9854\u6587\u5B57 \u7B49\u3092 1 \u30BF\u30C3\u30D7\u3067\u633F\u5165\u3067\u304D\u308B\u30D1\u30EC\u30C3\u30C8\u3092\u8FFD\u52A0",
+        "\u6700\u8FD1\u4F7F\u3063\u305F\u30EF\u30FC\u30C9\u304C\u5148\u982D\u306B\u4E26\u3076\u5B66\u7FD2\u52D5\u4F5C\uFF085 \u4EF6\u307E\u3067\u4FDD\u5B58\uFF09",
+        "\u65E2\u5B58\u306E\u5165\u529B\u6B04\u30EC\u30A4\u30A2\u30A6\u30C8\u306F\u52D5\u304B\u3055\u305A\u3001\u30DD\u30C3\u30D7\u30AA\u30FC\u30D0\u30FC\u65B9\u5F0F\u3067\u8868\u793A",
+        "\u66F4\u65B0\u5C65\u6B74\u3092\u3053\u306E popup \u304B\u3089\u78BA\u8A8D\u3067\u304D\u308B\u3088\u3046\u306B\u3057\u307E\u3057\u305F"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.11",
+      date: "2026-04-30",
+      summary: "\u8996\u8A8D\u6027\u30FB\u524D\u9762\u5316\u30D0\u30B0\u4FEE\u6B63",
+      items: Object.freeze([
+        "\u914D\u8272\u30D7\u30EA\u30BB\u30C3\u30C8\u5207\u66FF\u6642\u306B\u6587\u5B57\u8272\u304C\u8AAD\u307F\u306B\u304F\u304F\u306A\u308B\u4E0D\u5177\u5408\u3092\u6839\u6CBB",
+        "\u30B3\u30E1\u30F3\u30C8\u5165\u529B\u6B04\u306E placeholder \u304C\u30C0\u30FC\u30AF\u80CC\u666F\u3067\u8AAD\u3081\u306A\u3044\u554F\u984C\u3092\u4FEE\u6B63",
+        "\u30C4\u30FC\u30EB\u30D0\u30FC\u62BC\u4E0B\u6642\u306B\u30D1\u30CD\u30EB\u304C\u5C0F\u3055\u304F\u51FA\u308B\u30BF\u30A4\u30DF\u30F3\u30B0\u7AF6\u5408\u3092\u4FEE\u6B63",
+        "\u753B\u9762\u4E0B\u56FA\u5B9A\uFF08dock_bottom\uFF09\u914D\u7F6E\u306B\u3082 \xD7 \u9589\u3058\u308B\u30DC\u30BF\u30F3\u3092\u8FFD\u52A0"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.10",
+      date: "2026-04-29",
+      summary: "\u30BB\u30AD\u30E5\u30EA\u30C6\u30A3\u30FB\u30D7\u30E9\u30A4\u30D0\u30B7\u30FC\u30FBa11y \u6574\u5099",
+      items: Object.freeze([
+        "\u30D7\u30E9\u30A4\u30D0\u30B7\u30FC\u30DD\u30EA\u30B7\u30FC\u3092\u5B9F\u88C5\u3068\u6574\u5408\uFF08OpenRouter \u306F\u300C\u672A\u5B9F\u88C5\u30FB\u5C06\u6765\u4E88\u5B9A\u300D\uFF09",
+        "\u4FDD\u5B58 HTML \u3092\u958B\u3044\u305F\u3068\u304D\u306E XSS \u7D4C\u8DEF\u3092\u9632\u5FA1",
+        "avatarUrl \u306E\u5BB9\u91CF\u4E0A\u9650\uFF082KB\uFF09\u3092\u5C0E\u5165\u3057\u3066\u30B9\u30C8\u30EC\u30FC\u30B8\u67AF\u6E07\u3092\u9632\u6B62",
+        "\u30C0\u30FC\u30AF\u914D\u8272\u3067\u88DC\u52A9\u30C6\u30AD\u30B9\u30C8\u306E\u8AAD\u307F\u3084\u3059\u3055\uFF08WCAG AA\uFF09\u3092\u78BA\u4FDD",
+        "\u8996\u8074\u30DA\u30FC\u30B8\u306E \xD7 \u9589\u3058\u308B\u30DC\u30BF\u30F3\u3001\u88DC\u52A9\u30C6\u30AD\u30B9\u30C8\u306E a11y \u6539\u5584",
+        "\u300C\u714C\u3081\u304D\u300D\u2192\u300C\u304D\u3089\u3081\u304D\u300D\u306B\u8868\u8A18\u7D71\u4E00\uFF08\u610F\u5320\u30EB\u30D3\u306F\u4FDD\u6301\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.9",
+      date: "2026-04-28",
+      summary: "184 \u533F\u540D\u30B3\u30E1\u30F3\u30C8\u3068\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9",
+      items: Object.freeze([
+        "\u9001\u4FE1\u4E2D\u306E\u81EA\u30B3\u30E1\u8868\u793A\u3067 184 viewer ID \u3092\u9732\u51FA\u3057\u306A\u3044\u3088\u3046\u306B\u4FEE\u6B63",
+        "\u9577\u6642\u9593\u914D\u4FE1\u3067\u30E1\u30E2\u30EA\u304C\u7121\u5236\u9650\u306B\u5897\u6B96\u3059\u308B\u306E\u3092\u4E0A\u9650\u30AB\u30C3\u30C8\u3067\u9632\u6B62",
+        "\u8996\u8074\u30DA\u30FC\u30B8\u96E2\u8131\u5F8C\u306E\u4F59\u5206\u306A fetch \u3092\u505C\u6B62\uFF08CPU\u30FB\u5E2F\u57DF\u30FB\u30D7\u30E9\u30A4\u30D0\u30B7\u30FC\uFF09",
+        "\u30DE\u30A4\u30AF\u78BA\u8A8D\u4E2D\u306B\u30D0\u30C3\u30AF\u30B0\u30E9\u30A6\u30F3\u30C9\u3067\u30CF\u30F3\u30B0\u3059\u308B\u4E0D\u5177\u5408\u3092\u4FEE\u6B63",
+        "\u62E1\u5F35\u63A5\u7D9A\u5207\u308C\u30D0\u30CA\u30FC\u306B\u300C\u518D\u8AAD\u307F\u8FBC\u307F\u300D\u30DC\u30BF\u30F3\u3092\u8FFD\u52A0"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.8",
+      date: "2026-04-27",
+      summary: "\u81EA\u30B3\u30E1\u8868\u793A\u306E\u5B89\u5B9A\u5316",
+      items: Object.freeze([
+        "\u308A\u3093\u304F\u30EC\u30FC\u30F3\u306B\u81EA\u30B3\u30E1\u304C\u8868\u793A\u3055\u308C\u306A\u3044\u75C7\u72B6\u3092\u6839\u6CBB\uFF08textRaw \u6C38\u7D9A\u5316\u306A\u3069\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.7",
+      date: "2026-04-23",
+      summary: "\u521D\u516C\u958B\u30D0\u30FC\u30B8\u30E7\u30F3",
+      items: Object.freeze([
+        "CWS \u521D\u30EA\u30EA\u30FC\u30B9",
+        "\u30CB\u30B3\u751F\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u306E\u8A18\u9332\u3068 3 \u30EC\u30FC\u30F3\u53EF\u8996\u5316\uFF08\u308A\u3093\u304F / \u3053\u3093\u592A / \u305F\u306C\u59C9\uFF09",
+        "HTML \u30EC\u30DD\u30FC\u30C8 / \u30B9\u30AF\u30B7\u30E7 / \u30DE\u30FC\u30B1\u5206\u6790\u30C1\u30E3\u30FC\u30C8 \u306E\u66F8\u304D\u51FA\u3057",
+        "\u30D7\u30E9\u30A4\u30D0\u30B7\u30FC\u512A\u5148\uFF08\u5916\u90E8\u9001\u4FE1\u306A\u3057\u30FB\u5E83\u544A\u306A\u3057\u30FB\u8A08\u6E2C\u306A\u3057\u30FB\u5B8C\u5168\u30ED\u30FC\u30AB\u30EB\u4FDD\u5B58\uFF09"
+      ])
+    })
+  ]);
+
   // src/lib/userIdPreference.js
   function userIdObservationStrength(userId) {
     const s = String(userId ?? "").trim();
@@ -11797,7 +11867,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-0926" ? String("0430-0926") : "dev";
+      const buildId = "0430-0932" ? String("0430-0932") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -13206,6 +13276,47 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         }
         if (cheerPaletteRendered) renderCheerPalette();
       })();
+    }
+    const changelogListEl = (
+      /** @type {HTMLOListElement|null} */
+      $("changelogList")
+    );
+    const changelogLatestLabelEl = $("changelogLatestLabel");
+    if (changelogListEl) {
+      while (changelogListEl.firstChild) {
+        changelogListEl.removeChild(changelogListEl.firstChild);
+      }
+      for (const entry of EXTENSION_CHANGELOG) {
+        const li = document.createElement("li");
+        li.className = "nl-changelog-entry";
+        const head = document.createElement("div");
+        head.className = "nl-changelog-entry__head";
+        const ver = document.createElement("span");
+        ver.className = "nl-changelog-entry__version";
+        ver.textContent = `v${entry.version}`;
+        const date = document.createElement("span");
+        date.className = "nl-changelog-entry__date";
+        date.textContent = entry.date;
+        const summary = document.createElement("span");
+        summary.className = "nl-changelog-entry__summary";
+        summary.textContent = entry.summary;
+        head.appendChild(ver);
+        head.appendChild(date);
+        head.appendChild(summary);
+        const ul = document.createElement("ul");
+        ul.className = "nl-changelog-entry__items";
+        for (const item of entry.items) {
+          const itemLi = document.createElement("li");
+          itemLi.textContent = item;
+          ul.appendChild(itemLi);
+        }
+        li.appendChild(head);
+        li.appendChild(ul);
+        changelogListEl.appendChild(li);
+      }
+    }
+    if (changelogLatestLabelEl && EXTENSION_CHANGELOG.length > 0) {
+      changelogLatestLabelEl.textContent = `v${EXTENSION_CHANGELOG[0].version}`;
     }
     loadPopupFrameSettings().catch(() => {
       applyPopupFrame(popupFrameState.id, popupFrameState.custom);
