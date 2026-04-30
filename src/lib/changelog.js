@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.44',
+    date: '2026-04-30',
+    summary: '裏側のメモリ効率と整合性',
+    items: Object.freeze([
+      'サムネイル保存時に過去の全サムネを毎回メモリ展開していた処理を cursor + count() ベースに変更。長時間視聴のメモリスパイクを抑止',
+      '自動バックアップの状態管理で content と background SW の同時書き込みによる重複バックアップを抑止（write 直前に fresh re-read で merge）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.43',
     date: '2026-04-30',
     summary: 'パネルが開かない事象の修正',

@@ -254,21 +254,32 @@
         });
         addReq.onerror = () => reject(addReq.error);
         addReq.onsuccess = () => {
-          const getReq = idx.getAll(lid);
-          getReq.onerror = () => reject(getReq.error);
-          getReq.onsuccess = () => {
-            const all = (
-              /** @type {{ id: number, capturedAt: number }[]} */
-              getReq.result || []
-            );
-            all.sort((a, b) => a.capturedAt - b.capturedAt);
-            const toDrop = thumbIdsToDropForFifo(
-              all.map((r) => ({ id: r.id, capturedAt: r.capturedAt })),
-              MAX_THUMBS_PER_LIVE
-            );
-            for (const id of toDrop) {
-              store.delete(id);
+          const summaries = [];
+          const curReq = idx.openCursor(IDBKeyRange.only(lid));
+          curReq.onerror = () => reject(curReq.error);
+          curReq.onsuccess = () => {
+            const cursor = curReq.result;
+            if (!cursor) {
+              summaries.sort((a, b) => a.capturedAt - b.capturedAt);
+              const toDrop = thumbIdsToDropForFifo(
+                summaries,
+                MAX_THUMBS_PER_LIVE
+              );
+              for (const id2 of toDrop) {
+                store.delete(id2);
+              }
+              return;
             }
+            const v = (
+              /** @type {{ capturedAt?: number }} */
+              cursor.value || {}
+            );
+            const id = typeof cursor.primaryKey === "number" ? cursor.primaryKey : Number(cursor.primaryKey);
+            const capturedAt = typeof v.capturedAt === "number" ? v.capturedAt : 0;
+            if (Number.isFinite(id) && id > 0 && capturedAt > 0) {
+              summaries.push({ id, capturedAt });
+            }
+            cursor.continue();
           };
         };
         tx.oncomplete = () => resolve(void 0);
@@ -288,8 +299,11 @@
       return await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE, "readonly");
         const idx = tx.objectStore(STORE).index("byLive");
-        const r = idx.getAll(lid);
-        r.onsuccess = () => resolve((r.result || []).length);
+        const r = idx.count(IDBKeyRange.only(lid));
+        r.onsuccess = () => {
+          const n = Number(r.result);
+          resolve(Number.isFinite(n) && n >= 0 ? n : 0);
+        };
         r.onerror = () => reject(r.error);
       });
     } finally {
@@ -7160,21 +7174,24 @@
       const lastCommentAt = Math.max(0, Number(next[next.length - 1]?.capturedAt || 0));
       const rememberedWatchUrl = String(bag[KEY_LAST_WATCH_URL] || "").trim();
       const backupWatchUrl = isNicoLiveWatchUrl(window.location.href) ? String(window.location.href || "") : extractLiveIdFromUrl(rememberedWatchUrl) === liveId ? rememberedWatchUrl : `https://live.nicovideo.jp/watch/${liveId}`;
-      const autoBackupState = normalizeAutoBackupState(bag[KEY_AUTO_BACKUP_STATE]);
-      const prevBackupMeta = autoBackupState.lives[String(liveId || "").trim().toLowerCase()] || {
+      const lidLowerForBackup = String(liveId || "").trim().toLowerCase();
+      const freshBackupBag = await chrome.storage.local.get(KEY_AUTO_BACKUP_STATE);
+      const autoBackupState = normalizeAutoBackupState(freshBackupBag[KEY_AUTO_BACKUP_STATE]);
+      const freshLiveMeta = autoBackupState.lives[lidLowerForBackup] || {
         lastBackupAt: 0,
         lastBackedUpdatedAt: 0,
         lastBackupCount: 0
       };
-      autoBackupState.lives[String(liveId || "").trim().toLowerCase()] = {
-        liveId: String(liveId || "").trim().toLowerCase(),
+      autoBackupState.lives[lidLowerForBackup] = {
+        liveId: lidLowerForBackup,
         commentCount: next.length,
         updatedAt,
         lastCommentAt,
         watchUrl: backupWatchUrl,
-        lastBackupAt: Math.max(0, Number(prevBackupMeta.lastBackupAt) || 0),
-        lastBackedUpdatedAt: Math.max(0, Number(prevBackupMeta.lastBackedUpdatedAt) || 0),
-        lastBackupCount: Math.max(0, Number(prevBackupMeta.lastBackupCount) || 0)
+        // background SW 所有: fresh 値をそのまま使う（content では更新しない）
+        lastBackupAt: Math.max(0, Number(freshLiveMeta.lastBackupAt) || 0),
+        lastBackedUpdatedAt: Math.max(0, Number(freshLiveMeta.lastBackedUpdatedAt) || 0),
+        lastBackupCount: Math.max(0, Number(freshLiveMeta.lastBackupCount) || 0)
       };
       pruneAutoBackupLives(autoBackupState);
       if (storageTouched || pendingTouched) {

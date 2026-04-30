@@ -5087,21 +5087,35 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       : extractLiveIdFromUrl(rememberedWatchUrl) === liveId
         ? rememberedWatchUrl
         : `https://live.nicovideo.jp/watch/${liveId}`;
-    const autoBackupState = normalizeAutoBackupState(bag[KEY_AUTO_BACKUP_STATE]);
-    const prevBackupMeta = autoBackupState.lives[String(liveId || '').trim().toLowerCase()] || {
+    /*
+     * 0.1.44 (Z): KEY_AUTO_BACKUP_STATE は content（commentCount/updatedAt
+     *   /lastCommentAt/watchUrl 担当）と background SW（lastBackupAt/
+     *   lastBackedUpdatedAt/lastBackupCount 担当）の両方が更新する。
+     *   旧コードは bag を冒頭で 1 回読んだだけで write したため、その間に
+     *   background が更新した backup 系フィールドを stale 値で上書きする
+     *   race があった（重複バックアップが IDB に溜まる原因）。
+     *   write 直前に再 read → background 担当フィールドは fresh 値、content
+     *   担当フィールドは新規値で merge し、他の live のエントリは fresh state
+     *   をそのまま使う。
+     */
+    const lidLowerForBackup = String(liveId || '').trim().toLowerCase();
+    const freshBackupBag = await chrome.storage.local.get(KEY_AUTO_BACKUP_STATE);
+    const autoBackupState = normalizeAutoBackupState(freshBackupBag[KEY_AUTO_BACKUP_STATE]);
+    const freshLiveMeta = autoBackupState.lives[lidLowerForBackup] || {
       lastBackupAt: 0,
       lastBackedUpdatedAt: 0,
       lastBackupCount: 0
     };
-    autoBackupState.lives[String(liveId || '').trim().toLowerCase()] = {
-      liveId: String(liveId || '').trim().toLowerCase(),
+    autoBackupState.lives[lidLowerForBackup] = {
+      liveId: lidLowerForBackup,
       commentCount: next.length,
       updatedAt,
       lastCommentAt,
       watchUrl: backupWatchUrl,
-      lastBackupAt: Math.max(0, Number(prevBackupMeta.lastBackupAt) || 0),
-      lastBackedUpdatedAt: Math.max(0, Number(prevBackupMeta.lastBackedUpdatedAt) || 0),
-      lastBackupCount: Math.max(0, Number(prevBackupMeta.lastBackupCount) || 0)
+      // background SW 所有: fresh 値をそのまま使う（content では更新しない）
+      lastBackupAt: Math.max(0, Number(freshLiveMeta.lastBackupAt) || 0),
+      lastBackedUpdatedAt: Math.max(0, Number(freshLiveMeta.lastBackedUpdatedAt) || 0),
+      lastBackupCount: Math.max(0, Number(freshLiveMeta.lastBackupCount) || 0)
     };
     pruneAutoBackupLives(autoBackupState);
     if (storageTouched || pendingTouched) {

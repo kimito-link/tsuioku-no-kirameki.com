@@ -708,6 +708,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.44",
+      date: "2026-04-30",
+      summary: "\u88CF\u5074\u306E\u30E1\u30E2\u30EA\u52B9\u7387\u3068\u6574\u5408\u6027",
+      items: Object.freeze([
+        "\u30B5\u30E0\u30CD\u30A4\u30EB\u4FDD\u5B58\u6642\u306B\u904E\u53BB\u306E\u5168\u30B5\u30E0\u30CD\u3092\u6BCE\u56DE\u30E1\u30E2\u30EA\u5C55\u958B\u3057\u3066\u3044\u305F\u51E6\u7406\u3092 cursor + count() \u30D9\u30FC\u30B9\u306B\u5909\u66F4\u3002\u9577\u6642\u9593\u8996\u8074\u306E\u30E1\u30E2\u30EA\u30B9\u30D1\u30A4\u30AF\u3092\u6291\u6B62",
+        "\u81EA\u52D5\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u306E\u72B6\u614B\u7BA1\u7406\u3067 content \u3068 background SW \u306E\u540C\u6642\u66F8\u304D\u8FBC\u307F\u306B\u3088\u308B\u91CD\u8907\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u3092\u6291\u6B62\uFF08write \u76F4\u524D\u306B fresh re-read \u3067 merge\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.43",
       date: "2026-04-30",
       summary: "\u30D1\u30CD\u30EB\u304C\u958B\u304B\u306A\u3044\u4E8B\u8C61\u306E\u4FEE\u6B63",
@@ -15170,7 +15179,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2134" ? String("0430-2134") : "dev";
+      const buildId = "0430-2142" ? String("0430-2142") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

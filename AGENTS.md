@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.43（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.44（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,38 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.44 バンプで入った修正（裏側のメモリ効率と整合性 AS）**:
+
+deep audit エージェントが発見した中優先度のバグ 2 件を修正。
+
+- **B8 (Z): thumbDb のメモリスパイク**
+  - 原因: `addThumbBlob` が 30 秒ごとのサムネ保存で `idx.getAll(lid)` を
+    呼び、過去の全 thumbnail（最大 500 枚 × 数百KB の Blob）を一括で
+    deserialize → メモリ展開していた。長時間視聴で各回 100MB 級の
+    瞬時アロケーションが発生し、低スペック端末で UI hitch を引き起こす。
+    `countThumbsForLive` も `idx.getAll(lid).length` で同じ無駄をしていた。
+  - 修正:
+    - `addThumbBlob`: `idx.getAll` → `idx.openCursor` で 1 件ずつ
+      iterate、id と capturedAt だけ抽出した summary 配列を作る形に変更。
+      Blob 参照を都度作っては捨てるので peak メモリが大幅減。
+    - `countThumbsForLive`: `idx.getAll(lid).length` → `idx.count(IDBKeyRange.only(lid))`
+      で値を読まず件数だけ返す（高速・省メモリ）。
+
+- **B2 (Z): KEY_AUTO_BACKUP_STATE の last-write-wins race**
+  - 原因: `KEY_AUTO_BACKUP_STATE` は **content（commentCount/updatedAt
+    /lastCommentAt/watchUrl 担当）** と **background SW（lastBackupAt/
+    lastBackedUpdatedAt/lastBackupCount 担当）** の両方が更新する。
+    旧 content コードは `bag` を冒頭で 1 回読んだだけで write したため、
+    その間に background が更新した backup 系フィールドを stale 値で
+    上書きする race があり、結果として **次サイクルで同じスナップショット
+    を再保存し IDB に重複バックアップが溜まる**（24件枠の中身が全部同じ
+    になる）現象を引き起こしていた。
+  - 修正: content の persist 直前で `KEY_AUTO_BACKUP_STATE` を再 read。
+    background 担当フィールドは fresh 値、content 担当フィールドは新規値
+    で merge する。他の live のエントリは fresh state をそのまま使う。
+    background 側は既に 0.1.x で fresh re-read パターンになっていた
+    （対称化）。
 
 **0.1.43 バンプで入った修正（パネルが開かない事象 + listener 二重登録 AR）**:
 
