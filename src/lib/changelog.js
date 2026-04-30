@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.18',
+    date: '2026-04-30',
+    summary: 'こん太ボタン押下時の体感速度を改善',
+    items: Object.freeze([
+      'こん太（ツールバー）押下時にパネルが「ぱっと」出るよう、watch ページ表示から約 2 秒後に裏で popup.html を読み込んで待機',
+      '画面外（display:none + offscreen）で iframe をブートしておくので押下時のロード待ちが解消'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.17',
     date: '2026-04-30',
     summary: '配信者本人を応援者リストから除外',

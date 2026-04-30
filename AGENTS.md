@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.17（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.18（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,19 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.18 バンプで追加した改善（kon-ta 体感速度 S）**:
+
+- ユーザー報告: 「こん太アイコンを押したとき、もうすこしささっと出るようにしてほしい」。
+- 0.1.16 で popup 同時出現 race は根治済みだが、初回 kon-ta 押下時は popup.html
+ を iframe 内で cold-start するため ~100–200ms の体感遅延が残っていた。
+- 修正: `src/extension/content-entry.js#prewarmInlinePopupIframe` を新設し、watch
+ ページ表示から ~2 秒後に host + iframe を `display:none` + offscreen で body に
+ append。iframe は display:none でも popup.html をロードするので、押下時には
+ popup.html はすでにパース済み → ほぼ即時に visible 化できる。
+ - `schedulePrewarmInlinePopupIframe` を `startPageFrameLoop` から呼ぶ。
+ - `prewarmInlinePopupDone` フラグで idempotent。
+ - watch URL 以外 / iframe 内では何もしない（gate 二重）。
 
 **0.1.17 バンプで追加した修正（配信者除外 R）**:
 

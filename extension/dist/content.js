@@ -5369,6 +5369,45 @@
     window.addEventListener("resize", tick);
     document.addEventListener("visibilitychange", tick);
     tick();
+    schedulePrewarmInlinePopupIframe();
+  }
+  var prewarmInlinePopupTimer = (
+    /** @type {ReturnType<typeof setTimeout>|null} */
+    null
+  );
+  var prewarmInlinePopupDone = false;
+  function schedulePrewarmInlinePopupIframe() {
+    if (prewarmInlinePopupDone) return;
+    if (prewarmInlinePopupTimer) return;
+    if (!isWatchInlinePanelTopFrame()) return;
+    if (!isNicoLiveWatchUrl(window.location.href)) return;
+    prewarmInlinePopupTimer = setTimeout(() => {
+      prewarmInlinePopupTimer = null;
+      prewarmInlinePopupIframe();
+    }, 2e3);
+  }
+  function prewarmInlinePopupIframe() {
+    if (prewarmInlinePopupDone) return;
+    if (!hasExtensionContext()) return;
+    if (!isWatchInlinePanelTopFrame()) return;
+    if (!isNicoLiveWatchUrl(window.location.href)) return;
+    try {
+      const host = ensureInlinePopupHost();
+      if (!(host instanceof HTMLElement)) return;
+      if (host.parentNode !== document.body) {
+        host.style.display = "none";
+        host.setAttribute("aria-hidden", "true");
+        host.style.position = "fixed";
+        host.style.top = "-99999px";
+        host.style.left = "-99999px";
+        host.style.width = "420px";
+        host.style.height = "600px";
+        host.style.pointerEvents = "none";
+        document.body.appendChild(host);
+      }
+      prewarmInlinePopupDone = true;
+    } catch {
+    }
   }
   function hasExtensionContext() {
     try {

@@ -2912,6 +2912,52 @@ function startPageFrameLoop() {
   window.addEventListener('resize', tick);
   document.addEventListener('visibilitychange', tick);
   tick();
+  // 0.1.17 (S): kon-ta 押下時の体感遅延を縮めるため、watch ページ表示から
+  // ~2 秒経ったら裏で popup.html iframe を boot しておく。host は display:none
+  // のまま append するので画面には出ないが、iframe は読み込みを進めてくれる。
+  // 押下時にはすでに popup.html がパース済みなので「ぱっと出る」。
+  schedulePrewarmInlinePopupIframe();
+}
+
+let prewarmInlinePopupTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
+let prewarmInlinePopupDone = false;
+
+function schedulePrewarmInlinePopupIframe() {
+  if (prewarmInlinePopupDone) return;
+  if (prewarmInlinePopupTimer) return;
+  if (!isWatchInlinePanelTopFrame()) return;
+  if (!isNicoLiveWatchUrl(window.location.href)) return;
+  prewarmInlinePopupTimer = setTimeout(() => {
+    prewarmInlinePopupTimer = null;
+    prewarmInlinePopupIframe();
+  }, 2000);
+}
+
+function prewarmInlinePopupIframe() {
+  if (prewarmInlinePopupDone) return;
+  if (!hasExtensionContext()) return;
+  if (!isWatchInlinePanelTopFrame()) return;
+  if (!isNicoLiveWatchUrl(window.location.href)) return;
+  try {
+    const host = ensureInlinePopupHost();
+    if (!(host instanceof HTMLElement)) return;
+    if (host.parentNode !== document.body) {
+      // 画面に出さないままで body に挿入。iframe は display:none でも load する。
+      host.style.display = 'none';
+      host.setAttribute('aria-hidden', 'true');
+      // レイアウトに影響しないよう offscreen に固定。
+      host.style.position = 'fixed';
+      host.style.top = '-99999px';
+      host.style.left = '-99999px';
+      host.style.width = '420px';
+      host.style.height = '600px';
+      host.style.pointerEvents = 'none';
+      document.body.appendChild(host);
+    }
+    prewarmInlinePopupDone = true;
+  } catch {
+    // 失敗しても致命的ではない（kon-ta 押下時に通常パスで host が作られる）
+  }
 }
 
 function hasExtensionContext() {
