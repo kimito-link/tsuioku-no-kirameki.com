@@ -5255,7 +5255,8 @@
       exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
       frame: {
         isTop,
-        href: href.slice(0, 500),
+        // 0.1.45 (AA): query/fragment は strip して個人情報漏れを防ぐ
+        href: sanitizeWatchUrlForDiag(href),
         userAgent: String(navigator.userAgent || "").slice(0, 280)
       },
       contentScript: {
@@ -5301,6 +5302,16 @@
       }
     };
   }
+  function sanitizeWatchUrlForDiag(rawHref) {
+    const s = String(rawHref || "");
+    if (!s) return "";
+    try {
+      const u = new URL(s);
+      return `${u.origin}${u.pathname}`.slice(0, 500);
+    } catch {
+      return s.split("?")[0].split("#")[0].slice(0, 500);
+    }
+  }
   function persistAiShareFastDiagnostics() {
     if (!hasExtensionContext()) return;
     const now = Date.now();
@@ -5311,7 +5322,7 @@
         popup: null,
         content: buildAiShareFastDiagnosticsPayload(),
         note: "Chrome \u30B3\u30F3\u30BD\u30FC\u30EB\u306E ERR_BLOCKED_BY_CLIENT / \u5E83\u544A\u30B9\u30AF\u30EA\u30D7\u30C8\u5931\u6557\u306F\u30D6\u30ED\u30C3\u30AB\u30FC\u7531\u6765\u3067\u591A\u304F\u3001\u672C\u62E1\u5F35\u3068\u306F\u7121\u95A2\u4FC2\u306A\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002",
-        resolvedTabUrl: String(window.location.href || "").slice(0, 500),
+        resolvedTabUrl: sanitizeWatchUrlForDiag(window.location.href),
         persistedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
       void chrome.storage.local.set({ [KEY_AI_SHARE_FAST_DIAG]: payload });
@@ -6537,7 +6548,8 @@
       exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
       frame: {
         isTop,
-        href: href.slice(0, 500),
+        // 0.1.45 (AA): query/fragment は strip して個人情報漏れを防ぐ
+        href: sanitizeWatchUrlForDiag(href),
         userAgent: String(navigator.userAgent || "").slice(0, 280)
       },
       contentScript: {
@@ -8087,6 +8099,13 @@
         } catch {
         }
         thumbTimerId = null;
+      }
+      if (pageFrameLoopTimer != null) {
+        try {
+          clearInterval(pageFrameLoopTimer);
+        } catch {
+        }
+        pageFrameLoopTimer = null;
       }
       return true;
     };

@@ -708,6 +708,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.45",
+      date: "2026-04-30",
+      summary: "\u88CF\u5074\u306E\u30AF\u30EA\u30FC\u30F3\u30A2\u30C3\u30D7\u3068\u30D7\u30E9\u30A4\u30D0\u30B7\u30FC",
+      items: Object.freeze([
+        "\u62E1\u5F35\u30EA\u30ED\u30FC\u30C9\u5F8C\u306B\u9577\u6642\u9593\u653E\u7F6E\u3059\u308B\u3068\u88CF\u3067\u30BF\u30A4\u30DE\u30FC\u304C\u56DE\u308A\u7D9A\u3051\u3066 CPU \u3092\u6D88\u8CBB\u3057\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\uFF08pageFrameLoopTimer \u3082\u505C\u6B62\u5BFE\u8C61\u306B\u8FFD\u52A0\uFF09",
+        "AI \u8A3A\u65AD\uFF08\u5171\u6709\u30C6\u30AD\u30B9\u30C8\uFF09\u306B\u4FDD\u5B58\u3059\u308B watch URL \u304B\u3089 query / fragment \u3092\u524A\u9664\uFF08\u4E07\u4E00\u500B\u4EBA\u60C5\u5831\u3092\u542B\u3080 token \u304C\u4E57\u3063\u3066\u3044\u305F\u5834\u5408\u306E\u6F0F\u6D29\u3092\u6291\u6B62\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.44",
       date: "2026-04-30",
       summary: "\u88CF\u5074\u306E\u30E1\u30E2\u30EA\u52B9\u7387\u3068\u6574\u5408\u6027",
@@ -15179,7 +15188,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2142" ? String("0430-2142") : "dev";
+      const buildId = "0430-2149" ? String("0430-2149") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

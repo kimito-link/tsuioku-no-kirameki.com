@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.45',
+    date: '2026-04-30',
+    summary: '裏側のクリーンアップとプライバシー',
+    items: Object.freeze([
+      '拡張リロード後に長時間放置すると裏でタイマーが回り続けて CPU を消費していた問題を修正（pageFrameLoopTimer も停止対象に追加）',
+      'AI 診断（共有テキスト）に保存する watch URL から query / fragment を削除（万一個人情報を含む token が乗っていた場合の漏洩を抑止）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.44',
     date: '2026-04-30',
     summary: '裏側のメモリ効率と整合性',

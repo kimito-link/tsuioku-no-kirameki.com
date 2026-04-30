@@ -2559,7 +2559,8 @@ function buildAiShareFastDiagnosticsPayload() {
     exportedAt: new Date().toISOString(),
     frame: {
       isTop,
-      href: href.slice(0, 500),
+      // 0.1.45 (AA): query/fragment は strip して個人情報漏れを防ぐ
+      href: sanitizeWatchUrlForDiag(href),
       userAgent: String(navigator.userAgent || '').slice(0, 280)
     },
     contentScript: {
@@ -2612,6 +2613,24 @@ function buildAiShareFastDiagnosticsPayload() {
   };
 }
 
+/**
+ * 0.1.45 (AA): AI 診断に保存する watch URL から query/fragment を strip。
+ *   旧コードは `location.href.slice(0, 500)` をそのまま保存していたため、
+ *   ニコ生の querystring に session token / referrer / user 識別子等が
+ *   乗っていた場合、診断 dump を AI に貼ったり開発者に送ったりする際に
+ *   個人情報が漏れる懸念があった。liveId と path だけ残す。
+ */
+function sanitizeWatchUrlForDiag(rawHref) {
+  const s = String(rawHref || '');
+  if (!s) return '';
+  try {
+    const u = new URL(s);
+    return `${u.origin}${u.pathname}`.slice(0, 500);
+  } catch {
+    return s.split('?')[0].split('#')[0].slice(0, 500);
+  }
+}
+
 function persistAiShareFastDiagnostics() {
   if (!hasExtensionContext()) return;
   const now = Date.now();
@@ -2623,7 +2642,7 @@ function persistAiShareFastDiagnostics() {
       content: buildAiShareFastDiagnosticsPayload(),
       note:
         'Chrome コンソールの ERR_BLOCKED_BY_CLIENT / 広告スクリプト失敗はブロッカー由来で多く、本拡張とは無関係なことがあります。',
-      resolvedTabUrl: String(window.location.href || '').slice(0, 500),
+      resolvedTabUrl: sanitizeWatchUrlForDiag(window.location.href),
       persistedAt: new Date().toISOString()
     };
     void chrome.storage.local.set({ [KEY_AI_SHARE_FAST_DIAG]: payload });
@@ -4269,7 +4288,8 @@ function buildAiSharePageDiagnostics() {
     exportedAt: new Date().toISOString(),
     frame: {
       isTop,
-      href: href.slice(0, 500),
+      // 0.1.45 (AA): query/fragment は strip して個人情報漏れを防ぐ
+      href: sanitizeWatchUrlForDiag(href),
       userAgent: String(navigator.userAgent || '').slice(0, 280)
     },
     contentScript: {
@@ -6244,6 +6264,17 @@ async function start() {
         // no-op
       }
       thumbTimerId = null;
+    }
+    // 0.1.45 (AA): pageFrameLoopTimer も止める。旧コードはこの timer を
+    // 止めずに tick の冒頭で early return するだけだったため、setInterval
+    // slot と CPU が tab 寿命まで消費され続ける問題があった。
+    if (pageFrameLoopTimer != null) {
+      try {
+        clearInterval(pageFrameLoopTimer);
+      } catch {
+        // no-op
+      }
+      pageFrameLoopTimer = null;
     }
     return true;
   };

@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.44（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.45（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,32 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.45 バンプで入った修正（裏側クリーンアップ + プライバシー AT）**:
+
+deep audit 発見の中優先度バグ 2 件:
+
+- **B5: `pageFrameLoopTimer` 停止漏れ**
+  - 原因: `chrome://extensions` で拡張をリロードすると `hasExtensionContext()`
+    が false に転じるが、`pageFrameLoopTimer`（360ms 周期で
+    renderPageFrameOverlay/maybeRunEndedBulkHarvest を回す）は
+    `stopContentIntervalsIfContextInvalidated` の停止対象に入っておらず、
+    tick の冒頭で early return するだけ。setInterval slot と CPU が
+    タブ寿命まで消費され続ける（特に多数の watch タブを長時間開いた後の
+    ヘビーリロード時に蓄積）。
+  - 修正: `stopContentIntervalsIfContextInvalidated` で `pageFrameLoopTimer`
+    も `clearInterval` する。
+
+- **B14: AI 診断 URL に query/fragment が残る**
+  - 原因: `persistAiShareFastDiagnostics` と `buildAiShareFastDiagnosticsPayload`
+    が `window.location.href.slice(0, 500)` をそのまま保存していた。ニコ生
+    の querystring に session token / referrer / user 識別子が乗っていた
+    場合、診断 dump を AI に貼ったり開発者に送ったりする際に個人情報が漏れる
+    懸念。
+  - 修正: 新規 helper `sanitizeWatchUrlForDiag` で `URL.origin + pathname`
+    のみ残し query/fragment を strip。`buildAiShareFastDiagnosticsPayload`
+    の 2 箇所と `persistAiShareFastDiagnostics` の 1 箇所、計 3 ヶ所を
+    更新。
 
 **0.1.44 バンプで入った修正（裏側のメモリ効率と整合性 AS）**:
 
