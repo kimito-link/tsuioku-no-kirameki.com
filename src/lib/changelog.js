@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.65',
+    date: '2026-05-01',
+    summary: '画面下パネルの高さをどの画面サイズでも最適化',
+    items: Object.freeze([
+      '「画面下いっぱい」モードのパネル高さが viewport の 50% で固定だったため、大画面では下半分占有・小画面では動画圧迫の両極端になっていた問題を根本修正。動画+公式コメ列が画面で実際に占めている縦範囲を測定し、その残りスペースに自動でパネルを収めるよう変更。720p ノートから 4K 縦置きまで、どの画面サイズでも自動最適化されます',
+      'ウィンドウサイズ変更（リサイズ・全画面切替・モニタ移動など）にもリアルタイム追従するようになりました（debounce 150ms）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.64',
     date: '2026-05-01',
     summary: 'パネル位置の根治＋popup 表示まわりの不具合修正',

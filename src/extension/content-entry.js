@@ -89,6 +89,7 @@ import {
   selectBestPlayerRectIndex
 } from '../lib/inlinePanelLayout.js';
 import { scoreInlineHostAnchorCandidate } from '../lib/inlineHostAnchorScoring.js';
+import { calculateDockBottomPanelHeight } from '../lib/inlineHostDockSizing.js';
 import {
   applyRecognitionResult,
   isVoiceCommentSupported,
@@ -1843,6 +1844,11 @@ function ensureInlinePanelCloseButton(host) {
 /**
  * 視聴ページ下部にビューポート固定で広げる（ポップアップ風より視認しやすい既定用）。
  * プレイヤー DOM 非依存のため、ターゲット video の遅延があっても先に出せる。
+ *
+ * 0.1.65 (AU): panel 高さの計算を `calculateDockBottomPanelHeight` (純粋関数)
+ *   に切り出し。video + コメ列の bottom が取れれば残りスペースに合わせ、取れ
+ *   なければ viewport*0.4 のフォールバック。viewport / player 変化は
+ *   `ensureDockBottomReflowListener` の resize listener で再呼び出しして追従する。
  */
 function renderInlinePanelDockBottomHost() {
   const host = ensureInlinePopupHost();
@@ -1852,11 +1858,39 @@ function renderInlinePanelDockBottomHost() {
   const viewport = nlsViewportSize();
   let vh = Number(viewport.innerHeight) || 0;
   if (vh < 280) vh = 720;
-  const maxDockH = watchDockPanelMaxHeightPx();
-  const iframeInnerH = Math.max(
-    200,
-    Math.min(maxDockH - 16, Math.round(vh * 0.5))
-  );
+
+  // video + コメ列の bottom を取得（取れなければ null=フォールバック）
+  let playerRowBottom = null;
+  try {
+    const video = document.querySelector('video');
+    if (
+      video instanceof HTMLVideoElement &&
+      video.getBoundingClientRect().height >= 100
+    ) {
+      const insertAfter = findFrameInsertAnchorFromVideo(video);
+      if (insertAfter instanceof HTMLElement) {
+        const playerRect = resolvePlayerRowRect(video, insertAfter);
+        if (
+          playerRect &&
+          Number.isFinite(playerRect.top) &&
+          Number.isFinite(playerRect.height) &&
+          playerRect.height > 0
+        ) {
+          playerRowBottom = playerRect.top + playerRect.height;
+        }
+      }
+    }
+  } catch {
+    // no-op: 取れなければ fallback ratio が効く
+  }
+
+  const sizing = calculateDockBottomPanelHeight({
+    viewportHeight: vh,
+    playerRowBottom,
+    contentNaturalHeight: null
+  });
+  const iframeInnerH = sizing.height;
+  const hostMaxH = iframeInnerH + 16; // 上下の余白
 
   if (host.parentNode !== document.body) {
     document.body.appendChild(host);
@@ -1868,7 +1902,7 @@ function renderInlinePanelDockBottomHost() {
   host.style.top = '';
   host.style.width = '100%';
   host.style.maxWidth = '100%';
-  host.style.maxHeight = `${maxDockH}px`;
+  host.style.maxHeight = `${hostMaxH}px`;
   host.style.marginLeft = '0';
   host.style.overflow = 'auto';
   host.style.overflowX = 'hidden';
@@ -1887,6 +1921,7 @@ function renderInlinePanelDockBottomHost() {
     iframe.style.height = `${iframeInnerH}px`;
     iframe.style.maxHeight = `${iframeInnerH}px`;
   }
+  ensureDockBottomReflowListener();
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
@@ -1895,6 +1930,40 @@ function renderInlinePanelDockBottomHost() {
   // 元は floating だけで「× 閉じる」を出していたが、dock_bottom も同じ理由で
   // ユーザーが明示的に閉じる手段が必要だった（設定画面に行かないと消せない）。
   ensureInlinePanelCloseButton(host);
+}
+
+/**
+ * dock_bottom モード時に viewport / player rect 変化に追従するための resize listener。
+ * 一度だけ登録し、以降 resize で 150ms debounce 後に再描画する。dock_bottom 以外の
+ * モードに切り替わっている時は何もしない（renderInlinePanelDockBottomHost の中で
+ * placement を再判定するので、無駄な再描画にはならない）。
+ */
+let __dockBottomReflowListenerRegistered = false;
+function ensureDockBottomReflowListener() {
+  if (__dockBottomReflowListenerRegistered) return;
+  __dockBottomReflowListenerRegistered = true;
+  /** @type {ReturnType<typeof setTimeout>|null} */
+  let timer = null;
+  const reflow = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      try {
+        if (
+          getEffectiveInlinePanelPlacement() ===
+          INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
+        ) {
+          renderInlinePanelDockBottomHost();
+        }
+      } catch {
+        // no-op
+      }
+    }, 150);
+  };
+  try {
+    window.addEventListener('resize', reflow, { passive: true });
+  } catch {
+    // no-op: addEventListener が使えない環境（test 等）はスキップ
+  }
 }
 
 /**
@@ -2696,18 +2765,6 @@ let stableFrameTarget = null;
 
 function nlsViewportSize() {
   return { innerWidth: window.innerWidth, innerHeight: window.innerHeight };
-}
-
-/** ドックパネルと同じ上限高さ（padding-bottom 予約と共有） */
-function watchDockPanelMaxHeightPx() {
-  let ih = Number(nlsViewportSize().innerHeight) || 0;
-  /*
-   * バックグラウンドタブ・描画直前など innerHeight が 0 に近いと maxDockH=0 になり
-   * パネルが完全に潰れることがある。
-   */
-  if (ih < 280) ih = 720;
-  const capped = Math.min(Math.round(ih * 0.58), 720);
-  return Math.max(260, capped);
 }
 
 /**

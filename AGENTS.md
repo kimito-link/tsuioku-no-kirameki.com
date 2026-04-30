@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.64（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.65（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,28 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.65 バンプで入った修正（dock_bottom panel 高さ最適化 AU）**:
+
+- ユーザー報告（0.1.64 リリース後）: 「画面下いっぱい」モードでパネルが画面の
+  下半分を占有してバランスがおかしい。一時的な数値調整ではなく、どの画面サイズ
+  でも最適化される根本対処の要望。
+- 旧実装: panel 高さ = `viewport * 0.5` 固定（最大 720px）。1080p で 540px の
+  panel になり「下半分占有」、720p では動画 + 上部 content + panel で足りなく
+  なる懸念があった。
+- 修正: 純粋関数 `calculateDockBottomPanelHeight`
+  (`src/lib/inlineHostDockSizing.js`、TDD 16 ケース) を新設し、`resolvePlayerRowRect`
+  で得られる「動画 + 公式コメ列」の bottom を起点に、その下の残りスペースを
+  panel に割り当てる設計に変更。
+  - playerRowBottom が取れる: `viewport - playerRowBottom - 8px` を使える空間
+  - contentNaturalHeight が分かれば（将来拡張）それでさらに縮める
+  - playerRowBottom が取れない: viewport * 0.4 のフォールバック
+  - 全結果は最終的に `viewport * 0.55` で safety clamp、最低 220px 保証
+- ResizeObserver の代わりに `window.addEventListener('resize')` で 150ms
+  debounce 後に再描画する `ensureDockBottomReflowListener` を追加。
+  全画面切替・モニタ移動・SPA 再描画に追従。dock_bottom 以外のモードに
+  切り替わっている時は再描画をスキップ（無駄走行ゼロ）。
+- 旧 `watchDockPanelMaxHeightPx` は使われなくなったため削除。
 
 **0.1.64 バンプで入った修正（findFrame 根治 + popup 系まとめ AT/AT2/AT3/AT4）**:
 

@@ -2426,6 +2426,43 @@
     return { eligible: true, score, reason: "ok" };
   }
 
+  // src/lib/inlineHostDockSizing.js
+  var DEFAULT_DOCK_PANEL_LIMITS = Object.freeze({
+    minHeight: 220,
+    maxRatio: 0.55,
+    bottomPadding: 8,
+    fallbackRatio: 0.4
+  });
+  function calculateDockBottomPanelHeight(input, overrides = {}) {
+    const limits = { ...DEFAULT_DOCK_PANEL_LIMITS, ...overrides };
+    const vh = Math.max(280, Number(input.viewportHeight) || 0);
+    const safetyMax = Math.max(
+      limits.minHeight,
+      Math.round(vh * limits.maxRatio)
+    );
+    const clamp2 = (h, source) => ({
+      height: Math.max(limits.minHeight, Math.min(safetyMax, Math.round(h))),
+      source
+    });
+    const pb = input.playerRowBottom;
+    if (pb != null && Number.isFinite(pb) && pb > 0) {
+      const available = vh - pb - limits.bottomPadding;
+      if (available >= limits.minHeight) {
+        const cn = input.contentNaturalHeight;
+        if (cn != null && Number.isFinite(cn)) {
+          const cnClamped = Math.max(limits.minHeight, cn);
+          if (cnClamped < available) {
+            return clamp2(cnClamped, "content-fit");
+          }
+        }
+        return clamp2(available, "player-rect");
+      }
+      return { height: limits.minHeight, source: "min" };
+    }
+    const fallback = Math.round(vh * limits.fallbackRatio);
+    return clamp2(fallback, "fallback");
+  }
+
   // src/lib/voiceComment.js
   var VOICE_COMMENT_MAX_CHARS = 250;
   function isVoiceCommentSupported() {
@@ -4814,11 +4851,27 @@
     const viewport = nlsViewportSize();
     let vh = Number(viewport.innerHeight) || 0;
     if (vh < 280) vh = 720;
-    const maxDockH = watchDockPanelMaxHeightPx();
-    const iframeInnerH = Math.max(
-      200,
-      Math.min(maxDockH - 16, Math.round(vh * 0.5))
-    );
+    let playerRowBottom = null;
+    try {
+      const video = document.querySelector("video");
+      if (video instanceof HTMLVideoElement && video.getBoundingClientRect().height >= 100) {
+        const insertAfter = findFrameInsertAnchorFromVideo(video);
+        if (insertAfter instanceof HTMLElement) {
+          const playerRect = resolvePlayerRowRect(video, insertAfter);
+          if (playerRect && Number.isFinite(playerRect.top) && Number.isFinite(playerRect.height) && playerRect.height > 0) {
+            playerRowBottom = playerRect.top + playerRect.height;
+          }
+        }
+      }
+    } catch {
+    }
+    const sizing = calculateDockBottomPanelHeight({
+      viewportHeight: vh,
+      playerRowBottom,
+      contentNaturalHeight: null
+    });
+    const iframeInnerH = sizing.height;
+    const hostMaxH = iframeInnerH + 16;
     if (host.parentNode !== document.body) {
       document.body.appendChild(host);
     }
@@ -4829,7 +4882,7 @@
     host.style.top = "";
     host.style.width = "100%";
     host.style.maxWidth = "100%";
-    host.style.maxHeight = `${maxDockH}px`;
+    host.style.maxHeight = `${hostMaxH}px`;
     host.style.marginLeft = "0";
     host.style.overflow = "auto";
     host.style.overflowX = "hidden";
@@ -4847,11 +4900,33 @@
       iframe.style.height = `${iframeInnerH}px`;
       iframe.style.maxHeight = `${iframeInnerH}px`;
     }
+    ensureDockBottomReflowListener();
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
     host.style.opacity = "1";
     ensureInlinePanelCloseButton(host);
+  }
+  var __dockBottomReflowListenerRegistered = false;
+  function ensureDockBottomReflowListener() {
+    if (__dockBottomReflowListenerRegistered) return;
+    __dockBottomReflowListenerRegistered = true;
+    let timer = null;
+    const reflow = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          if (getEffectiveInlinePanelPlacement() === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
+            renderInlinePanelDockBottomHost();
+          }
+        } catch {
+        }
+      }, 150);
+    };
+    try {
+      window.addEventListener("resize", reflow, { passive: true });
+    } catch {
+    }
   }
   function findFrameInsertAnchorFromVideo(base) {
     if (!(base instanceof HTMLElement)) return base;
@@ -5444,12 +5519,6 @@
   var stableFrameTarget = null;
   function nlsViewportSize() {
     return { innerWidth: window.innerWidth, innerHeight: window.innerHeight };
-  }
-  function watchDockPanelMaxHeightPx() {
-    let ih = Number(nlsViewportSize().innerHeight) || 0;
-    if (ih < 280) ih = 720;
-    const capped = Math.min(Math.round(ih * 0.58), 720);
-    return Math.max(260, capped);
   }
   function syncWatchPageDockBodyReserve() {
     if (!isWatchInlinePanelTopFrame()) return;
