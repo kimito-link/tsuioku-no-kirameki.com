@@ -700,6 +700,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.16",
+      date: "2026-04-30",
+      summary: "\u30D1\u30CD\u30EB\u540C\u6642\u51FA\u73FE\u306E\u771F\u56E0\u4FEE\u6B63",
+      items: Object.freeze([
+        "kon-ta \u62BC\u4E0B\u6642\u306B\u30A4\u30F3\u30E9\u30A4\u30F3\u30D1\u30CD\u30EB\u3068\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u7A93\u304C\u540C\u6642\u306B\u51FA\u308B\u4E0D\u5177\u5408\u306E\u771F\u56E0\u3092\u7279\u5B9A\u3057\u3066\u4FEE\u6B63\uFF08iframe broadcast race \u306E\u89E3\u6D88\uFF09",
+        "background \u304B\u3089 content script \u3078\u306E\u9001\u4FE1\u3092\u300C\u753B\u9762\u30C8\u30C3\u30D7\u30D5\u30EC\u30FC\u30E0\u306E\u307F\u300D\u306B\u7D5E\u308A\u8FBC\u307F\u3001niconico \u30DA\u30FC\u30B8\u5185\u306E\u5404\u7A2E iframe \u304C\u5FDC\u7B54 port \u3092\u5148\u53D6\u308A\u3059\u308B\u306E\u3092\u9632\u6B62",
+        "\u7D50\u679C\u3068\u3057\u3066\u3001kon-ta \u62BC\u4E0B\u6642\u306E\u8868\u793A\u9045\u5EF6\u3082\u89E3\u6D88"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.15",
       date: "2026-04-30",
       summary: "\u30B5\u30E0\u30CD\u4E00\u89A7\u306E\u5206\u985E\u3068\u30D1\u30CD\u30EB\u52D5\u4F5C\u6539\u5584",
@@ -12252,7 +12262,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1129" ? String("0430-1129") : "dev";
+      const buildId = "0430-1148" ? String("0430-1148") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

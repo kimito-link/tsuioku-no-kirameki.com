@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.16',
+    date: '2026-04-30',
+    summary: 'パネル同時出現の真因修正',
+    items: Object.freeze([
+      'kon-ta 押下時にインラインパネルとポップアップ窓が同時に出る不具合の真因を特定して修正（iframe broadcast race の解消）',
+      'background から content script への送信を「画面トップフレームのみ」に絞り込み、niconico ページ内の各種 iframe が応答 port を先取りするのを防止',
+      '結果として、kon-ta 押下時の表示遅延も解消'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.15',
     date: '2026-04-30',
     summary: 'サムネ一覧の分類とパネル動作改善',

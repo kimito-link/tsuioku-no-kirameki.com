@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.15（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.16（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,22 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.16 バンプで追加した修正（パネル同時出現の真因 P）**:
+
+- 真因: `manifest.json` で content.js を `all_frames: true` で iframe にも注入していたため、
+ `chrome.tabs.sendMessage(tid, msg)` が tab 内の全フレームに broadcast され、watch ページ
+ 内の各種 iframe（プレイヤー埋込・広告 frame 等）の listener が同期的に
+ `if (!isWatchInlinePanelTopFrame()) return false;` で port を closed にしてしまう。top frame
+ の async listener が `sendResponse({ focused: true })` する前に「The message port closed
+ before a response was received」エラーで background の `await chrome.tabs.sendMessage` が
+ reject → catch → `openOrFocusPopupWindow()` が走って popup 窓も同時に開いていた。
+- 修正: `extension/background.js#handleBrowserActionClick` で `chrome.tabs.sendMessage`
+ に `{ frameId: 0 }` を渡して top frame だけに送るように変更。iframe 側の listener は
+ message を受け取らないので port を奪わない。これで「panel + popup 窓が同時に出る」
+ user 報告現象を根治。kon-ta 押下時の表示遅延（race の影響で 100-300ms）も解消。
+- 既に popup-entry.js の `tabsSendMessageWithRetry` は `frameId: 0` 既定で同じ対策を
+ 取っていたので、background.js もそれに揃えた形。
 
 **0.1.15 バンプで追加した修正（カテゴリ分類 L / popup 同時出現 M / kon-ta 即時 N）**:
 

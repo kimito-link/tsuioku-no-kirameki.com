@@ -489,9 +489,22 @@ async function handleBrowserActionClick(tab) {
     return;
   }
   try {
-    const res = await chrome.tabs.sendMessage(tid, {
-      type: 'NLS_FOCUS_INLINE_PANEL'
-    });
+    /*
+     * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
+     * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
+     * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
+     * フレームに broadcast され、iframe の listener が
+     *   if (!isWatchInlinePanelTopFrame()) return false;
+     * で同期 false を返して port を閉じてしまう。top frame の async listener が
+     * sendResponse({focused:true}) する前に port closed エラーになり、
+     * background が popup 窓を fallback として開いてしまう（user 報告：
+     * インラインパネル + popup 窓が同時に出る）。
+     */
+    const res = await chrome.tabs.sendMessage(
+      tid,
+      { type: 'NLS_FOCUS_INLINE_PANEL' },
+      { frameId: 0 }
+    );
     if (res && res.focused) return;
   } catch {
     // コンテンツ未注入・対象外 URL
