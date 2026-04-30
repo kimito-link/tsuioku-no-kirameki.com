@@ -11,6 +11,13 @@ import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
 import { resolveReportUserThumbSrc } from './reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from './userThumbGrid.js';
+import { buildConcurrentTimelineSeries } from './concurrentTimelineSeries.js';
+import { analyzeConcurrentPeak } from './concurrentPeakAnalysis.js';
+import { detectCommentSilenceZones } from './commentSilenceZones.js';
+import {
+  buildCommentVelocityTimeline,
+  buildLaughterDensityTimeline
+} from './commentVelocityTimeline.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -402,11 +409,254 @@ function sectionAdviceAfterRank(r) {
 }
 
 /**
+ * 0.1.22 (W): TOC（目次）。各セクションの id に飛ぶアンカーリンク。
+ * @param {Array<{ id: string, label: string }>} items
+ */
+function sectionToc(items) {
+  if (!items || !items.length) return '';
+  const lis = items
+    .map(
+      (it) =>
+        `<li><a href="#${escapeHtml(it.id)}" class="mkt-toc__link">${escapeHtml(it.label)}</a></li>`
+    )
+    .join('');
+  return `<nav class="mkt-section mkt-section--toc" aria-label="目次">
+<h2>目次</h2>
+<p class="mkt-note">各セクションへ飛べます（PRO 印は将来有料）</p>
+<ol class="mkt-toc">${lis}</ol>
+</nav>`;
+}
+
+/**
+ * 0.1.22 (W): 同接推移カーブ（PRO）。
+ * `broadcastSessionSummary_v1` IDB から取得した sessionRows から SVG line chart を構築。
+ * 視聴維持率の代替指標として、ピーク到達分・半減点・終了保持率も併記。
+ *
+ * @param {import('./concurrentTimelineSeries.js').ConcurrentTimelineSeries} series
+ * @param {import('./concurrentPeakAnalysis.js').ConcurrentPeakAnalysis} peak
+ */
+function sectionConcurrentTimeline(series, peak) {
+  if (!series || series.points.length < 2) {
+    return `<section class="mkt-section" id="mkt-concurrent">
+<h2>同接推移カーブ <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">配信中の同接サンプル（来場者数の時系列）が <strong>2 サンプル以上</strong> 取れていれば描画されます。今回は ${series ? series.points.length : 0} サンプルのみです。</p>
+</section>`;
+  }
+  const W = 900;
+  const H = 220;
+  const pad = 40;
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  const n = series.points.length;
+  const maxV = Math.max(1, series.maxValue);
+  const lastMin = series.points[n - 1].minute;
+  /** @param {number} i */
+  const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
+  /** @param {number} v */
+  const yOf = (v) => pad + innerH - (v / maxV) * innerH;
+  const linePts = series.points
+    .map((p, i) => `${xOf(i).toFixed(1)},${yOf(p.value).toFixed(1)}`)
+    .join(' ');
+  const dots = series.points
+    .map(
+      (p, i) =>
+        `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(p.value).toFixed(1)}" r="2.5" fill="#22d3ee"><title>${p.minute}分: ${p.value.toLocaleString('ja-JP')}人</title></circle>`
+    )
+    .join('');
+  const yLabels = Array.from({ length: 5 }, (_, i) => {
+    const v = Math.round((maxV * (4 - i)) / 4);
+    const y = pad + (innerH * i) / 4;
+    return `<text x="${pad - 4}" y="${y + 4}" text-anchor="end" class="mkt-axis">${v.toLocaleString('ja-JP')}</text>`;
+  }).join('');
+  const xLabels = (() => {
+    const step = Math.max(1, Math.floor(n / 8));
+    return series.points
+      .filter((_, i) => i % step === 0 || i === n - 1)
+      .map((p, _idx) => {
+        const i = series.points.indexOf(p);
+        return `<text x="${xOf(i).toFixed(1)}" y="${H - 4}" text-anchor="middle" class="mkt-axis">${p.minute}m</text>`;
+      })
+      .join('');
+  })();
+  const peakMarker =
+    peak && typeof peak.peakMinute === 'number'
+      ? (() => {
+          const idx = series.points.findIndex((p) => p.minute === peak.peakMinute);
+          if (idx < 0) return '';
+          const x = xOf(idx);
+          const y = yOf(peak.peakValue);
+          return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="none" stroke="#fbbf24" stroke-width="2"><title>ピーク: ${peak.peakMinute}分目 / ${peak.peakValue.toLocaleString('ja-JP')}人</title></circle>`;
+        })()
+      : '';
+  const halfDecayMarker =
+    peak && typeof peak.halfDecayMinute === 'number'
+      ? (() => {
+          const idx = series.points.findIndex((p) => p.minute === peak.halfDecayMinute);
+          if (idx < 0) return '';
+          const x = xOf(idx);
+          const y = yOf(series.points[idx].value);
+          return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="none" stroke="#f87171" stroke-width="2"><title>半減点: ${peak.halfDecayMinute}分目（ピークの 50% を割った）</title></circle>`;
+        })()
+      : '';
+  const sourceLabel = series.source === 'official' ? '公式来場者数' : '同接推定値';
+  const peakSummary = peak && peak.peakMinute != null
+    ? `<ul class="mkt-mini-stats">
+<li><strong>ピーク到達:</strong> ${peak.peakMinute}分目 / ${peak.peakValue.toLocaleString('ja-JP')}人</li>
+<li><strong>開始時:</strong> ${peak.startValue.toLocaleString('ja-JP')}人</li>
+<li><strong>終了時:</strong> ${peak.endValue.toLocaleString('ja-JP')}人</li>
+<li><strong>終了時保持率:</strong> ${peak.endRetentionRatio != null ? `${(peak.endRetentionRatio * 100).toFixed(1)}%` : '-'}（終了時 / ピーク）</li>
+<li><strong>半減点:</strong> ${peak.halfDecayMinute != null ? `${peak.halfDecayMinute}分目` : '到達なし'}（ピークの 50% を割った最初の分）</li>
+</ul>`
+    : '';
+  return `<section class="mkt-section" id="mkt-concurrent">
+<h2>同接推移カーブ <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">${escapeHtml(sourceLabel)}を時系列で表示。黄丸＝ピーク / 赤丸＝半減点。${lastMin}分間で ${n} サンプル。</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${yLabels}${xLabels}
+<polyline points="${linePts}" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+${dots}${peakMarker}${halfDecayMarker}
+</svg>
+</div>
+${peakSummary}
+</section>`;
+}
+
+/**
+ * 0.1.22 (W): コメ速度カーブ（CPM 1分粒度・5分 rolling）。
+ * 既存 sectionTimeline はバーチャートで「コメ件数 + ユーザー数」を出すが、
+ * こちらは滑らかな線グラフで CPM の変動を見やすく出す。
+ * @param {import('./commentVelocityTimeline.js').CommentVelocityTimeline} series
+ */
+function sectionCommentVelocityCurve(series) {
+  if (!series || series.buckets.length < 2) return '';
+  const W = 900;
+  const H = 200;
+  const pad = 40;
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  const n = series.buckets.length;
+  const maxV = Math.max(1, series.peakValue);
+  /** @param {number} i */
+  const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
+  /** @param {number} v */
+  const yOfRaw = (v) => pad + innerH - (v / maxV) * innerH;
+  const linePts = series.buckets
+    .map((b, i) => `${xOf(i).toFixed(1)},${yOfRaw(b.count).toFixed(1)}`)
+    .join(' ');
+  const rollingPts = series.buckets
+    .map((b, i) => `${xOf(i).toFixed(1)},${yOfRaw(b.rolling5).toFixed(1)}`)
+    .join(' ');
+  const yLabels = Array.from({ length: 5 }, (_, i) => {
+    const v = Math.round((maxV * (4 - i)) / 4);
+    const y = pad + (innerH * i) / 4;
+    return `<text x="${pad - 4}" y="${y + 4}" text-anchor="end" class="mkt-axis">${v}</text>`;
+  }).join('');
+  return `<section class="mkt-section" id="mkt-velocity">
+<h2>コメ速度カーブ（CPM）<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">水色＝1分ごとのコメ件数 / オレンジ点線＝5分移動平均。ピーク: ${series.peakMinute != null ? `${series.peakMinute}分目（${series.peakValue}件）` : '-'}</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${yLabels}
+<polyline points="${linePts}" fill="none" stroke="#38bdf8" stroke-width="1.6" stroke-linecap="round"/>
+<polyline points="${rollingPts}" fill="none" stroke="#fb923c" stroke-width="2" stroke-dasharray="4 3"/>
+</svg>
+</div></section>`;
+}
+
+/**
+ * 0.1.22 (W): 沈黙ゾーン（連続 60 秒以上のコメ無し区間）+ L2 沈黙の質判定。
+ * @param {import('./commentSilenceZones.js').CommentSilenceZone[] | null | undefined} zones
+ */
+function sectionSilenceZones(zones) {
+  if (!Array.isArray(zones) || zones.length === 0) return '';
+  const sorted = [...zones].sort((a, b) => b.durationMs - a.durationMs);
+  const top = sorted.slice(0, 10);
+  /** @param {string} q */
+  const qualityLabel = (q) =>
+    q === 'engaged' ? 'ガン見系（皆ガン見・話芸ピーク候補）'
+    : q === 'departed' ? '離脱系（盛り下がり）'
+    : q === 'neutral' ? 'ふつう'
+    : '判定なし';
+  /** @param {string} q */
+  const qualityColor = (q) =>
+    q === 'engaged' ? '#22c55e'
+    : q === 'departed' ? '#ef4444'
+    : q === 'neutral' ? '#94a3b8'
+    : '#64748b';
+  const rows = top
+    .map((z) => {
+      const sec = Math.round(z.durationMs / 1000);
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      const dur = m > 0 ? `${m}分${s}秒` : `${s}秒`;
+      const color = qualityColor(z.quality);
+      return `<tr>
+<td>${escapeHtml(dur)}</td>
+<td><span class="mkt-quality-pill" style="background:${color}">${escapeHtml(qualityLabel(z.quality))}</span></td>
+<td>${z.afterCount}</td>
+<td class="mkt-mono">${escapeHtml(z.beforeText)}</td>
+<td class="mkt-mono">${escapeHtml(z.afterText)}</td>
+</tr>`;
+    })
+    .join('');
+  return `<section class="mkt-section" id="mkt-silence">
+<h2>沈黙ゾーン × 沈黙の質 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">60 秒以上コメが流れなかった区間 ${zones.length} 件のうち、長い順に最大 10 件。沈黙後 30 秒以内のコメ件数で「ガン見系（5+件）」「離脱系（0-1件）」「ふつう（2-4件）」に分類（ラテラル分析 L2）。</p>
+<table class="mkt-rank">
+<thead><tr><th>長さ</th><th>沈黙の質</th><th>直後30秒のコメ数</th><th>沈黙直前のコメ</th><th>沈黙明けのコメ</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+}
+
+/**
+ * 0.1.22 (W): L4 アヘ顔密度（笑い反応指標）。
+ * 30 秒粒度の笑い系コメ件数とその比率を時系列で。
+ * @param {import('./commentVelocityTimeline.js').LaughterDensityTimeline} laugh
+ */
+function sectionLaughterDensity(laugh) {
+  if (!laugh || laugh.buckets.length < 2) return '';
+  const W = 900;
+  const H = 180;
+  const pad = 36;
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  const n = laugh.buckets.length;
+  const maxV = Math.max(1, laugh.peakValue);
+  /** @param {number} i */
+  const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
+  const barW = Math.max(1, Math.min(8, innerW / n - 1));
+  const bars = laugh.buckets
+    .map((b, i) => {
+      const x = xOf(i);
+      const h = (b.count / maxV) * innerH;
+      const halfMin = Math.floor(b.minute / 2);
+      const halfSec = (b.minute % 2) * 30;
+      return `<rect x="${x.toFixed(1)}" y="${(pad + innerH - h).toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="#fbbf24" opacity="0.85"><title>${halfMin}分${halfSec}秒〜: 笑い ${b.count}件 / 総 ${b.total}件 (${(b.ratio * 100).toFixed(0)}%)</title></rect>`;
+    })
+    .join('');
+  return `<section class="mkt-section" id="mkt-laughter">
+<h2>アヘ顔密度（笑い反応指標）<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">w / 草 / 8888 / 笑 / 爆笑 / ワロタ 等の出現を 30 秒粒度で。全体の笑い比率 ${(laugh.overallRatio * 100).toFixed(1)}% / ピーク: ${laugh.peakBucket != null ? `${Math.floor(laugh.peakBucket / 2)}分${(laugh.peakBucket % 2) * 30}秒〜` : '-'}（${laugh.peakValue}件）（ラテラル分析 L4）</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${bars}
+</svg>
+</div></section>`;
+}
+
+/**
  * @param {MarketingReport} r
  * @param {{
  *   maskShareLabels?: boolean,
  *   anonymousIdenticonResolver?: (uid: string) => string,
- *   broadcasterUserId?: string
+ *   broadcasterUserId?: string,
+ *   sessionSummaryRows?: import('./concurrentTimelineSeries.js').ConcurrentTimelineRow[],
+ *   commentsForAnalytics?: import('./commentVelocityTimeline.js').VelocityCommentInput[]
  * }} [opts]
  * @returns {string}
  */
@@ -422,12 +672,56 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // から除外する（配信者は応援される側で、応援する側ではない）。
   const broadcasterUserId =
     typeof opts.broadcasterUserId === 'string' ? opts.broadcasterUserId : '';
+  // 0.1.22 (W): 同接推移は IDB から取得した session sample を popup 側で渡す。
+  const sessionSummaryRows = Array.isArray(opts.sessionSummaryRows)
+    ? opts.sessionSummaryRows
+    : [];
   const exportedAtIso = new Date().toISOString();
   const embedJson = buildMarketingEmbedScriptInnerText(r, {
     maskShareLabels: maskShare,
     exportedAt: exportedAtIso
   });
   const subSuffix = maskShare ? ' · 共有向けに表示名を伏せた出力' : '';
+
+  // 0.1.22 (W): 純粋関数で全集計を回し、各セクションに渡す。
+  const concurrentSeries = buildConcurrentTimelineSeries(sessionSummaryRows);
+  const concurrentPeak = analyzeConcurrentPeak(concurrentSeries);
+  // velocity / silence / laughter は MarketingReport には乗っていないので、
+  // r 経由で comments 全件は取れない。代わりに r.timeline の 1 分 bucket を流用するか、
+  // opts.commentsForTimeline を別経路で受ける。今回は opts.commentsForAnalytics を採用。
+  const commentsForAnalytics = Array.isArray(opts.commentsForAnalytics)
+    ? opts.commentsForAnalytics
+    : [];
+  const velocityTimeline = buildCommentVelocityTimeline(commentsForAnalytics, {
+    bucketMs: 60_000,
+    rollingWindowMin: 5
+  });
+  const silenceZones = detectCommentSilenceZones(commentsForAnalytics, {
+    thresholdMs: 60_000,
+    quality: { windowMs: 30_000 }
+  });
+  const laughterDensity = buildLaughterDensityTimeline(commentsForAnalytics, {
+    bucketMs: 30_000
+  });
+
+  const tocItems = [
+    { id: 'mkt-kpi', label: 'KPI サマリ' },
+    { id: 'mkt-content', label: 'コメント本文・属性の傾向' },
+    { id: 'mkt-quarter', label: '冒頭・終盤（四分位）' },
+    { id: 'mkt-timeline', label: 'コメントタイムライン' },
+    { id: 'mkt-velocity', label: 'コメ速度カーブ（PRO）' },
+    { id: 'mkt-concurrent', label: '同接推移カーブ（PRO）' },
+    { id: 'mkt-silence', label: '沈黙ゾーン × 沈黙の質（PRO）' },
+    { id: 'mkt-laughter', label: 'アヘ顔密度（PRO）' },
+    { id: 'mkt-derived', label: '累積コメント数と5分窓' },
+    { id: 'mkt-segment', label: 'ユーザーセグメント' },
+    { id: 'mkt-top-users', label: 'トップコメンター TOP 20' },
+    { id: 'mkt-thumb-grid', label: 'サムネ付きユーザー一覧' },
+    { id: 'mkt-vpos', label: 'vpos 三分割（再生位置）' },
+    { id: 'mkt-hour', label: '時間帯ヒートマップ' },
+    { id: 'mkt-json', label: '表計算・ツール向け JSON' }
+  ];
+
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -443,28 +737,45 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
 </header>
 <main class="mkt-main">
 ${sectionFeaturesOverview()}
+${sectionToc(tocItems)}
 ${sectionAdviceIntro()}
-${sectionKpi(r)}
+${idWrap('mkt-kpi', sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
-${sectionContentShape(r)}
+${idWrap('mkt-content', sectionContentShape(r))}
 ${sectionAdviceAfterContentShape(r)}
-${sectionQuarterEngagement(r)}
+${idWrap('mkt-quarter', sectionQuarterEngagement(r))}
 ${sectionAdviceAfterQuarterEngagement(r)}
-${sectionTimeline(r)}
+${idWrap('mkt-timeline', sectionTimeline(r))}
 ${sectionAdviceAfterTimeline(r)}
-${sectionDerivedTimeline(r)}
+${sectionCommentVelocityCurve(velocityTimeline)}
+${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
+${sectionSilenceZones(silenceZones)}
+${sectionLaughterDensity(laughterDensity)}
+${idWrap('mkt-derived', sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
-${sectionSegment(r)}
+${idWrap('mkt-segment', sectionSegment(r))}
 ${sectionAdviceAfterSegment(r)}
-${sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId)}
+${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId))}
 ${sectionAdviceAfterRank(r)}
-${sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId)}
-${sectionVposThirds(r)}
-${sectionHourHeatmap(r)}
+${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
+${idWrap('mkt-vpos', sectionVposThirds(r))}
+${idWrap('mkt-hour', sectionHourHeatmap(r))}
 </main>
 <footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — ${escapeHtml(exportedAtIso)}</footer>
-${sectionMachineReadableJson(embedJson, maskShare)}
+${idWrap('mkt-json', sectionMachineReadableJson(embedJson, maskShare))}
 </body></html>`;
+}
+
+/**
+ * 0.1.22 (W): 既存 sectionXxx() の出力に id 属性を後付けで挟むラッパ。
+ * 既存セクションを書き換えずアンカーリンクの target にできるようにする。
+ * @param {string} id
+ * @param {string} html
+ */
+function idWrap(id, html) {
+  if (!html) return '';
+  // 既存実装は `<section class="mkt-section">...` で始まるので最初の出現箇所だけ id を差し込む。
+  return html.replace(/<section\b/, `<section id="${id}"`);
 }
 
 /**
@@ -757,13 +1068,22 @@ function sectionHourHeatmap(r) {
 
 const CSS_BODY = `
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6;scroll-behavior:smooth}
 .mkt-header{padding:2rem 1.5rem 1rem;background:linear-gradient(135deg,#1e293b,#0f172a);border-bottom:1px solid #334155}
 .mkt-header__title{margin:0;font-size:1.6rem;font-weight:700}
 .mkt-header__sub{margin:.3rem 0 0;font-size:.85rem;color:#94a3b8}
 .mkt-main{max-width:960px;margin:0 auto;padding:1.5rem 1rem}
-.mkt-section{background:#1e293b;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1.2rem;border:1px solid #334155}
+.mkt-section{background:#1e293b;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1.2rem;border:1px solid #334155;scroll-margin-top:1rem}
 .mkt-section h2{margin:0 0 .8rem;font-size:1.1rem;color:#f8fafc;border-left:4px solid #3b82f6;padding-left:.6rem}
+.mkt-section--toc{background:#0f172a}
+.mkt-toc{margin:0;padding-left:1.5rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.3rem .8rem}
+.mkt-toc__link{color:#93c5fd;text-decoration:none;font-size:.85rem}
+.mkt-toc__link:hover{text-decoration:underline}
+.mkt-pro-tag{display:inline-block;font-size:.68rem;font-weight:700;color:#f0f9ff;background:linear-gradient(135deg,#a855f7,#7c3aed);border-radius:6px;padding:1px 6px;margin-left:.4rem;vertical-align:middle;letter-spacing:.04em}
+.mkt-mini-stats{margin:.6rem 0 0;padding-left:1.2rem;font-size:.85rem;color:#cbd5e1}
+.mkt-mini-stats li{margin-bottom:.15rem}
+.mkt-quality-pill{display:inline-block;border-radius:6px;padding:1px 8px;color:#0f172a;font-size:.72rem;font-weight:600}
+.mkt-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;color:#cbd5e1;word-break:break-all}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}

@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.21（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.22（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,38 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.22 バンプで追加した機能（マーケ分析有料コア W）**:
+
+- 方針: 0.1.22-0.1.25 で「マーケ分析（将来有料）」に分析機能を 28 件追加するロード
+ マップの第 1 弾。各セクションに `<span class="mkt-pro-tag">PRO</span>` バッジを
+ 仕込んで、将来課金ゲートで切り替えられるようにする（0.1.26 以降）。
+- 追加した分析（マーケ HTML、有料側）:
+  - **同接推移カーブ**: `broadcastSessionSummary_v1` IDB の 1分粒度サンプルから
+   SVG 折れ線。`officialViewerCount` 優先で `peakConcurrentEstimate` フォールバック。
+   ピーク到達分（黄丸）・半減点（赤丸）・終了時保持率（=終了/ピーク）を併記。
+   YouTube/Twitch 流の per-viewer retention は不可だが、配信全体の視聴維持の特性を
+   1 行で要約できる。
+  - **コメ速度カーブ**: 1 分粒度 CPM 折れ線 + 5 分移動平均（オレンジ点線）。既存
+   `sectionTimeline` の bar chart と別 view（こちらは滑らか）。
+  - **沈黙ゾーン × 沈黙の質（L2）**: 60 秒以上の沈黙区間を検出 + 沈黙後 30 秒以内の
+   コメ件数で「ガン見系（5+件）/離脱系（0-1件）/ふつう（2-4件）」に分類。
+   ラテラル思考 L2。長い順 TOP 10 を表で表示し、沈黙直前/直後のコメも併記。
+  - **アヘ顔密度（L4）**: w/ｗ/草/8888/笑/爆笑/ワロタ 等の出現を 30 秒粒度で。
+   全体の笑い比率とピーク（30秒バケット）を表示。ラテラル思考 L4。
+- TOC（アンカーリンク）を HTML レポートとマーケ分析の両方に追加。各セクションに
+ `id="..."` を付け、ナビゲーション一覧から飛べるように。
+- 新規 lib（純粋関数 + TDD）:
+  - `src/lib/concurrentTimelineSeries.js`（11 ケース）
+  - `src/lib/concurrentPeakAnalysis.js`（9 ケース）
+  - `src/lib/commentVelocityTimeline.js`（32 ケース、`isLaughterText` の判定込み）
+  - `src/lib/commentSilenceZones.js`（13 ケース）
+- popup-entry.js のマーケ DL 経路で `openBroadcastSessionSummaryDb` から sessionRows
+ を取得し、`buildMarketingDashboardHtml` の `sessionSummaryRows` /
+ `commentsForAnalytics` opts に thread。fallback 経路（context invalidate 中）は
+ sessionRows 空で comments のみ。
+- 残りロードマップ: 0.1.23 (X: ユーザー層) / 0.1.24 (Y: 横断比較) / 0.1.25 (Z: 文化分析)
+ で 23 件の追加分析を投入予定。
 
 **0.1.21 バンプで追加した機能（HTML レポート無料拡張 V）**:
 

@@ -700,6 +700,18 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.22",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u540C\u63A5\u63A8\u79FB\u306A\u3069 4 \u7A2E\u8FFD\u52A0",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\u300D\u3092\u8FFD\u52A0\uFF08\u30D4\u30FC\u30AF\u5230\u9054\u5206\u30FB\u7D42\u4E86\u6642\u4FDD\u6301\u7387\u30FB\u534A\u6E1B\u70B9\u3092\u4F75\u8A18\u3001\u8996\u8074\u7DAD\u6301\u7387\u306E\u4EE3\u66FF\u6307\u6A19\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u30B3\u30E1\u901F\u5EA6\u30AB\u30FC\u30D6\u300D\uFF08CPM 1\u5206\u7C92\u5EA6\uFF0B5\u5206\u79FB\u52D5\u5E73\u5747\uFF09\u3092\u8FFD\u52A0",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u6C88\u9ED9\u30BE\u30FC\u30F3\u300D\u691C\u51FA\u3092\u8FFD\u52A0\uFF0860\u79D2\u4EE5\u4E0A\u306E\u30B3\u30E1\u7121\u3057\u533A\u9593 + \u6C88\u9ED9\u306E\u8CEA\u3092 \u30AC\u30F3\u898B\u7CFB/\u96E2\u8131\u7CFB/\u3075\u3064\u3046 \u306B\u81EA\u52D5\u5206\u985E\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u30A2\u30D8\u9854\u5BC6\u5EA6\u300D\uFF08\u7B11\u3044\u53CD\u5FDC\u6307\u6A19\uFF09\u3092\u8FFD\u52A0\uFF08w/\u8349/8888/\u7B11/\u7206\u7B11 \u7B49\u3092 30\u79D2\u7C92\u5EA6\u3067\uFF09",
+        "HTML \u30EC\u30DD\u30FC\u30C8\u3068\u30DE\u30FC\u30B1\u5206\u6790\u306E\u4E21\u65B9\u306B\u76EE\u6B21\uFF08\u30A2\u30F3\u30AB\u30FC\u30EA\u30F3\u30AF\uFF09\u3092\u8FFD\u52A0"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.21",
       date: "2026-04-30",
       summary: "HTML \u30EC\u30DD\u30FC\u30C8\u306B\u5206\u6790\u9805\u76EE\u3092\u8FFD\u52A0",
@@ -4893,6 +4905,304 @@ ${body}`;
     return JSON.stringify(payload).replace(/</g, "\\u003c");
   }
 
+  // src/lib/concurrentTimelineSeries.js
+  function isFiniteNonNegative(v) {
+    return typeof v === "number" && Number.isFinite(v) && v >= 0;
+  }
+  function buildConcurrentTimelineSeries(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+      return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: "none" };
+    }
+    let hasOfficial = false;
+    let hasEstimated = false;
+    for (const r of list) {
+      if (!r || typeof r !== "object") continue;
+      if (typeof r.capturedAt !== "number" || !Number.isFinite(r.capturedAt)) continue;
+      if (isFiniteNonNegative(r.officialViewerCount)) hasOfficial = true;
+      if (isFiniteNonNegative(r.peakConcurrentEstimate)) hasEstimated = true;
+    }
+    const source = hasOfficial ? "official" : hasEstimated ? "estimated" : "none";
+    if (source === "none") {
+      return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: "none" };
+    }
+    const collected = [];
+    for (const r of list) {
+      if (!r || typeof r !== "object") continue;
+      if (typeof r.capturedAt !== "number" || !Number.isFinite(r.capturedAt)) continue;
+      const v = source === "official" ? r.officialViewerCount : r.peakConcurrentEstimate;
+      if (!isFiniteNonNegative(v)) continue;
+      collected.push({ at: r.capturedAt, value: v });
+    }
+    collected.sort((a, b) => a.at - b.at);
+    if (!collected.length) {
+      return { points: [], maxValue: 0, firstAt: null, lastAt: null, source };
+    }
+    const firstAt = collected[0].at;
+    const lastAt = collected[collected.length - 1].at;
+    let maxValue = 0;
+    const points = collected.map((p) => {
+      if (p.value > maxValue) maxValue = p.value;
+      return {
+        at: p.at,
+        value: p.value,
+        minute: Math.max(0, Math.floor((p.at - firstAt) / 6e4))
+      };
+    });
+    return { points, maxValue, firstAt, lastAt, source };
+  }
+
+  // src/lib/concurrentPeakAnalysis.js
+  var EMPTY = Object.freeze({
+    peakValue: 0,
+    peakMinute: null,
+    startValue: 0,
+    endValue: 0,
+    endRetentionRatio: null,
+    halfDecayMinute: null
+  });
+  function analyzeConcurrentPeak(series) {
+    if (!series || typeof series !== "object") return { ...EMPTY };
+    const points = Array.isArray(series.points) ? series.points : [];
+    if (!points.length) return { ...EMPTY };
+    let peakValue = points[0].value;
+    let peakIdx = 0;
+    for (let i = 1; i < points.length; i++) {
+      if (points[i].value > peakValue) {
+        peakValue = points[i].value;
+        peakIdx = i;
+      }
+    }
+    const peak = points[peakIdx];
+    const start = points[0];
+    const end = points[points.length - 1];
+    const endRetentionRatio = peakValue > 0 ? Math.round(end.value / peakValue * 1e3) / 1e3 : null;
+    let halfDecayMinute = null;
+    if (peakValue > 0) {
+      const threshold = peakValue / 2;
+      for (let i = peakIdx + 1; i < points.length; i++) {
+        if (points[i].value < threshold) {
+          halfDecayMinute = points[i].minute;
+          break;
+        }
+      }
+    }
+    return {
+      peakValue,
+      peakMinute: peak.minute,
+      startValue: start.value,
+      endValue: end.value,
+      endRetentionRatio,
+      halfDecayMinute
+    };
+  }
+
+  // src/lib/commentSilenceZones.js
+  function detectCommentSilenceZones(comments, opts = {}) {
+    const list = Array.isArray(comments) ? comments : [];
+    const threshold = typeof opts.thresholdMs === "number" && opts.thresholdMs > 0 ? opts.thresholdMs : 6e4;
+    const qualityCfg = opts.quality;
+    const qualityWindowMs = qualityCfg && typeof qualityCfg.windowMs === "number" && qualityCfg.windowMs > 0 ? qualityCfg.windowMs : 0;
+    const valid = [];
+    for (const c of list) {
+      if (!c || typeof c !== "object") continue;
+      const at = c.capturedAt;
+      if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) continue;
+      valid.push(c);
+    }
+    valid.sort(
+      (a, b) => (
+        /** @type {number} */
+        a.capturedAt - /** @type {number} */
+        b.capturedAt
+      )
+    );
+    if (valid.length < 2) return [];
+    const zones = [];
+    for (let i = 1; i < valid.length; i++) {
+      const prev = valid[i - 1];
+      const cur = valid[i];
+      const prevAt = (
+        /** @type {number} */
+        prev.capturedAt
+      );
+      const curAt = (
+        /** @type {number} */
+        cur.capturedAt
+      );
+      const gap = curAt - prevAt;
+      if (gap < threshold) continue;
+      let quality = "unknown";
+      let afterCount = 0;
+      if (qualityWindowMs > 0) {
+        const windowEnd = curAt + qualityWindowMs;
+        for (let j = i; j < valid.length; j++) {
+          const at = (
+            /** @type {number} */
+            valid[j].capturedAt
+          );
+          if (at > windowEnd) break;
+          afterCount += 1;
+        }
+        if (afterCount >= 5) quality = "engaged";
+        else if (afterCount <= 1) quality = "departed";
+        else quality = "neutral";
+      }
+      zones.push({
+        startAt: prevAt,
+        endAt: curAt,
+        durationMs: gap,
+        quality,
+        afterCount,
+        beforeText: String(prev.text || "").slice(0, 60),
+        afterText: String(cur.text || "").slice(0, 60)
+      });
+    }
+    return zones;
+  }
+
+  // src/lib/commentVelocityTimeline.js
+  function collectValidSorted(comments) {
+    const list = Array.isArray(comments) ? comments : [];
+    const valid = [];
+    for (const c of list) {
+      if (!c || typeof c !== "object") continue;
+      const at = (
+        /** @type {any} */
+        c.capturedAt
+      );
+      if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) continue;
+      valid.push(c);
+    }
+    if (!valid.length) return null;
+    valid.sort(
+      (a, b) => (
+        /** @type {number} */
+        a.capturedAt - /** @type {number} */
+        b.capturedAt
+      )
+    );
+    return {
+      valid,
+      firstAt: (
+        /** @type {number} */
+        valid[0].capturedAt
+      ),
+      lastAt: (
+        /** @type {number} */
+        valid[valid.length - 1].capturedAt
+      )
+    };
+  }
+  function buildCommentVelocityTimeline(comments, opts = {}) {
+    const bucketMs = typeof opts.bucketMs === "number" && opts.bucketMs > 0 ? opts.bucketMs : 6e4;
+    const rollingWindowMin = typeof opts.rollingWindowMin === "number" && opts.rollingWindowMin > 0 ? opts.rollingWindowMin : 5;
+    const collected = collectValidSorted(comments);
+    if (!collected) return { buckets: [], peakValue: 0, peakMinute: null, totalCount: 0 };
+    const { valid, firstAt, lastAt } = collected;
+    const totalBuckets = Math.max(1, Math.floor((lastAt - firstAt) / bucketMs) + 1);
+    const buckets = [];
+    for (let m = 0; m < totalBuckets; m++) {
+      buckets.push({ minute: m, atStart: firstAt + m * bucketMs, count: 0, rolling5: 0 });
+    }
+    for (const c of valid) {
+      const idx = Math.floor(
+        /** @type {number} */
+        (c.capturedAt - firstAt) / bucketMs
+      );
+      if (idx >= 0 && idx < buckets.length) buckets[idx].count += 1;
+    }
+    const win = rollingWindowMin;
+    for (let i = 0; i < buckets.length; i++) {
+      const start = Math.max(0, i - win + 1);
+      let sum = 0;
+      let n = 0;
+      for (let j = start; j <= i; j++) {
+        sum += buckets[j].count;
+        n += 1;
+      }
+      buckets[i].rolling5 = n > 0 ? Math.round(sum / n * 100) / 100 : 0;
+    }
+    let peakValue = 0;
+    let peakMinute = null;
+    for (const b of buckets) {
+      if (b.count > peakValue) {
+        peakValue = b.count;
+        peakMinute = b.minute;
+      }
+    }
+    return { buckets, peakValue, peakMinute, totalCount: valid.length };
+  }
+  function isLaughterText(text) {
+    const s = String(text || "");
+    if (!s) return false;
+    if (/^[wｗ]{2,}$/i.test(s.trim())) return true;
+    if (/[wｗ]{2,}/i.test(s)) {
+      return true;
+    }
+    if (/8{4,}/.test(s)) return true;
+    if (new RegExp("^\u8349[\u30A1\u30A1\u3063\u3041\u3041\uFF01\uFF1F!?\u3002\u3001  ]*$").test(s.trim())) return true;
+    if (s === "\u8349") return true;
+    if (/草不可避|大草原|草生える|草生やす/.test(s)) return true;
+    if (/(?:^|[^一-龥])(笑)(?:[^一-龥]|$)/.test(s)) return true;
+    if (/\(笑\)|（笑）/.test(s)) return true;
+    if (/爆笑|ワロタ|わろた|ｗｗ/i.test(s)) return true;
+    return false;
+  }
+  function buildLaughterDensityTimeline(comments, opts = {}) {
+    const bucketMs = typeof opts.bucketMs === "number" && opts.bucketMs > 0 ? opts.bucketMs : 3e4;
+    const collected = collectValidSorted(comments);
+    if (!collected) {
+      return {
+        buckets: [],
+        peakBucket: null,
+        peakValue: 0,
+        totalLaughter: 0,
+        totalCount: 0,
+        overallRatio: 0
+      };
+    }
+    const { valid, firstAt, lastAt } = collected;
+    const totalBuckets = Math.max(1, Math.floor((lastAt - firstAt) / bucketMs) + 1);
+    const buckets = [];
+    for (let m = 0; m < totalBuckets; m++) {
+      buckets.push({ minute: m, atStart: firstAt + m * bucketMs, count: 0, total: 0, ratio: 0 });
+    }
+    let totalLaughter = 0;
+    for (const c of valid) {
+      const idx = Math.floor(
+        /** @type {number} */
+        (c.capturedAt - firstAt) / bucketMs
+      );
+      if (idx < 0 || idx >= buckets.length) continue;
+      buckets[idx].total += 1;
+      if (isLaughterText(
+        /** @type {any} */
+        c.text
+      )) {
+        buckets[idx].count += 1;
+        totalLaughter += 1;
+      }
+    }
+    let peakValue = 0;
+    let peakBucket = null;
+    for (const b of buckets) {
+      b.ratio = b.total > 0 ? Math.round(b.count / b.total * 1e3) / 1e3 : 0;
+      if (b.count > peakValue) {
+        peakValue = b.count;
+        peakBucket = b.minute;
+      }
+    }
+    return {
+      buckets,
+      peakBucket,
+      peakValue,
+      totalLaughter,
+      totalCount: valid.length,
+      overallRatio: valid.length > 0 ? Math.round(totalLaughter / valid.length * 1e3) / 1e3 : 0
+    };
+  }
+
   // src/lib/marketingChartsHtml.js
   function adviceCard(role, displayName, lines) {
     const ps = lines.filter((s) => s && String(s).trim()).map((line) => `<p class="mkt-advice__p">${escapeHtml(line)}</p>`).join("");
@@ -5211,16 +5521,215 @@ ${yLabelsL}${yLabelsR}${xLabels}
       "\u30E9\u30F3\u30AD\u30F3\u30B0\u306F\u8868\u793A\u9806\u306E\u305F\u3081\u3067\u3001\u4E0B\u306E\u4EBA\u307B\u3069\u4FA1\u5024\u304C\u4F4E\u3044\u3068\u3044\u3046\u8A71\u306B\u306F\u306A\u3089\u306A\u3044\u306E\u3060\u3002\u62FE\u3048\u305F\u8A18\u9332\u306E\u7BC4\u56F2\u3067\u306E\u4E26\u3073\u306A\u306E\u3060\u3002"
     ])}</div>`;
   }
+  function sectionToc(items) {
+    if (!items || !items.length) return "";
+    const lis = items.map(
+      (it) => `<li><a href="#${escapeHtml(it.id)}" class="mkt-toc__link">${escapeHtml(it.label)}</a></li>`
+    ).join("");
+    return `<nav class="mkt-section mkt-section--toc" aria-label="\u76EE\u6B21">
+<h2>\u76EE\u6B21</h2>
+<p class="mkt-note">\u5404\u30BB\u30AF\u30B7\u30E7\u30F3\u3078\u98DB\u3079\u307E\u3059\uFF08PRO \u5370\u306F\u5C06\u6765\u6709\u6599\uFF09</p>
+<ol class="mkt-toc">${lis}</ol>
+</nav>`;
+  }
+  function sectionConcurrentTimeline(series, peak) {
+    if (!series || series.points.length < 2) {
+      return `<section class="mkt-section" id="mkt-concurrent">
+<h2>\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u914D\u4FE1\u4E2D\u306E\u540C\u63A5\u30B5\u30F3\u30D7\u30EB\uFF08\u6765\u5834\u8005\u6570\u306E\u6642\u7CFB\u5217\uFF09\u304C <strong>2 \u30B5\u30F3\u30D7\u30EB\u4EE5\u4E0A</strong> \u53D6\u308C\u3066\u3044\u308C\u3070\u63CF\u753B\u3055\u308C\u307E\u3059\u3002\u4ECA\u56DE\u306F ${series ? series.points.length : 0} \u30B5\u30F3\u30D7\u30EB\u306E\u307F\u3067\u3059\u3002</p>
+</section>`;
+    }
+    const W = 900;
+    const H = 220;
+    const pad = 40;
+    const innerW = W - pad * 2;
+    const innerH = H - pad * 2;
+    const n = series.points.length;
+    const maxV = Math.max(1, series.maxValue);
+    const lastMin = series.points[n - 1].minute;
+    const xOf = (i) => pad + innerW * i / Math.max(1, n - 1);
+    const yOf = (v) => pad + innerH - v / maxV * innerH;
+    const linePts = series.points.map((p, i) => `${xOf(i).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(" ");
+    const dots = series.points.map(
+      (p, i) => `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(p.value).toFixed(1)}" r="2.5" fill="#22d3ee"><title>${p.minute}\u5206: ${p.value.toLocaleString("ja-JP")}\u4EBA</title></circle>`
+    ).join("");
+    const yLabels = Array.from({ length: 5 }, (_, i) => {
+      const v = Math.round(maxV * (4 - i) / 4);
+      const y = pad + innerH * i / 4;
+      return `<text x="${pad - 4}" y="${y + 4}" text-anchor="end" class="mkt-axis">${v.toLocaleString("ja-JP")}</text>`;
+    }).join("");
+    const xLabels = (() => {
+      const step = Math.max(1, Math.floor(n / 8));
+      return series.points.filter((_, i) => i % step === 0 || i === n - 1).map((p, _idx) => {
+        const i = series.points.indexOf(p);
+        return `<text x="${xOf(i).toFixed(1)}" y="${H - 4}" text-anchor="middle" class="mkt-axis">${p.minute}m</text>`;
+      }).join("");
+    })();
+    const peakMarker = peak && typeof peak.peakMinute === "number" ? (() => {
+      const idx = series.points.findIndex((p) => p.minute === peak.peakMinute);
+      if (idx < 0) return "";
+      const x = xOf(idx);
+      const y = yOf(peak.peakValue);
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="none" stroke="#fbbf24" stroke-width="2"><title>\u30D4\u30FC\u30AF: ${peak.peakMinute}\u5206\u76EE / ${peak.peakValue.toLocaleString("ja-JP")}\u4EBA</title></circle>`;
+    })() : "";
+    const halfDecayMarker = peak && typeof peak.halfDecayMinute === "number" ? (() => {
+      const idx = series.points.findIndex((p) => p.minute === peak.halfDecayMinute);
+      if (idx < 0) return "";
+      const x = xOf(idx);
+      const y = yOf(series.points[idx].value);
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="none" stroke="#f87171" stroke-width="2"><title>\u534A\u6E1B\u70B9: ${peak.halfDecayMinute}\u5206\u76EE\uFF08\u30D4\u30FC\u30AF\u306E 50% \u3092\u5272\u3063\u305F\uFF09</title></circle>`;
+    })() : "";
+    const sourceLabel = series.source === "official" ? "\u516C\u5F0F\u6765\u5834\u8005\u6570" : "\u540C\u63A5\u63A8\u5B9A\u5024";
+    const peakSummary = peak && peak.peakMinute != null ? `<ul class="mkt-mini-stats">
+<li><strong>\u30D4\u30FC\u30AF\u5230\u9054:</strong> ${peak.peakMinute}\u5206\u76EE / ${peak.peakValue.toLocaleString("ja-JP")}\u4EBA</li>
+<li><strong>\u958B\u59CB\u6642:</strong> ${peak.startValue.toLocaleString("ja-JP")}\u4EBA</li>
+<li><strong>\u7D42\u4E86\u6642:</strong> ${peak.endValue.toLocaleString("ja-JP")}\u4EBA</li>
+<li><strong>\u7D42\u4E86\u6642\u4FDD\u6301\u7387:</strong> ${peak.endRetentionRatio != null ? `${(peak.endRetentionRatio * 100).toFixed(1)}%` : "-"}\uFF08\u7D42\u4E86\u6642 / \u30D4\u30FC\u30AF\uFF09</li>
+<li><strong>\u534A\u6E1B\u70B9:</strong> ${peak.halfDecayMinute != null ? `${peak.halfDecayMinute}\u5206\u76EE` : "\u5230\u9054\u306A\u3057"}\uFF08\u30D4\u30FC\u30AF\u306E 50% \u3092\u5272\u3063\u305F\u6700\u521D\u306E\u5206\uFF09</li>
+</ul>` : "";
+    return `<section class="mkt-section" id="mkt-concurrent">
+<h2>\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">${escapeHtml(sourceLabel)}\u3092\u6642\u7CFB\u5217\u3067\u8868\u793A\u3002\u9EC4\u4E38\uFF1D\u30D4\u30FC\u30AF / \u8D64\u4E38\uFF1D\u534A\u6E1B\u70B9\u3002${lastMin}\u5206\u9593\u3067 ${n} \u30B5\u30F3\u30D7\u30EB\u3002</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${yLabels}${xLabels}
+<polyline points="${linePts}" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+${dots}${peakMarker}${halfDecayMarker}
+</svg>
+</div>
+${peakSummary}
+</section>`;
+  }
+  function sectionCommentVelocityCurve(series) {
+    if (!series || series.buckets.length < 2) return "";
+    const W = 900;
+    const H = 200;
+    const pad = 40;
+    const innerW = W - pad * 2;
+    const innerH = H - pad * 2;
+    const n = series.buckets.length;
+    const maxV = Math.max(1, series.peakValue);
+    const xOf = (i) => pad + innerW * i / Math.max(1, n - 1);
+    const yOfRaw = (v) => pad + innerH - v / maxV * innerH;
+    const linePts = series.buckets.map((b, i) => `${xOf(i).toFixed(1)},${yOfRaw(b.count).toFixed(1)}`).join(" ");
+    const rollingPts = series.buckets.map((b, i) => `${xOf(i).toFixed(1)},${yOfRaw(b.rolling5).toFixed(1)}`).join(" ");
+    const yLabels = Array.from({ length: 5 }, (_, i) => {
+      const v = Math.round(maxV * (4 - i) / 4);
+      const y = pad + innerH * i / 4;
+      return `<text x="${pad - 4}" y="${y + 4}" text-anchor="end" class="mkt-axis">${v}</text>`;
+    }).join("");
+    return `<section class="mkt-section" id="mkt-velocity">
+<h2>\u30B3\u30E1\u901F\u5EA6\u30AB\u30FC\u30D6\uFF08CPM\uFF09<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u6C34\u8272\uFF1D1\u5206\u3054\u3068\u306E\u30B3\u30E1\u4EF6\u6570 / \u30AA\u30EC\u30F3\u30B8\u70B9\u7DDA\uFF1D5\u5206\u79FB\u52D5\u5E73\u5747\u3002\u30D4\u30FC\u30AF: ${series.peakMinute != null ? `${series.peakMinute}\u5206\u76EE\uFF08${series.peakValue}\u4EF6\uFF09` : "-"}</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${yLabels}
+<polyline points="${linePts}" fill="none" stroke="#38bdf8" stroke-width="1.6" stroke-linecap="round"/>
+<polyline points="${rollingPts}" fill="none" stroke="#fb923c" stroke-width="2" stroke-dasharray="4 3"/>
+</svg>
+</div></section>`;
+  }
+  function sectionSilenceZones(zones) {
+    if (!Array.isArray(zones) || zones.length === 0) return "";
+    const sorted = [...zones].sort((a, b) => b.durationMs - a.durationMs);
+    const top = sorted.slice(0, 10);
+    const qualityLabel = (q) => q === "engaged" ? "\u30AC\u30F3\u898B\u7CFB\uFF08\u7686\u30AC\u30F3\u898B\u30FB\u8A71\u82B8\u30D4\u30FC\u30AF\u5019\u88DC\uFF09" : q === "departed" ? "\u96E2\u8131\u7CFB\uFF08\u76DB\u308A\u4E0B\u304C\u308A\uFF09" : q === "neutral" ? "\u3075\u3064\u3046" : "\u5224\u5B9A\u306A\u3057";
+    const qualityColor = (q) => q === "engaged" ? "#22c55e" : q === "departed" ? "#ef4444" : q === "neutral" ? "#94a3b8" : "#64748b";
+    const rows = top.map((z) => {
+      const sec = Math.round(z.durationMs / 1e3);
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      const dur = m > 0 ? `${m}\u5206${s}\u79D2` : `${s}\u79D2`;
+      const color = qualityColor(z.quality);
+      return `<tr>
+<td>${escapeHtml(dur)}</td>
+<td><span class="mkt-quality-pill" style="background:${color}">${escapeHtml(qualityLabel(z.quality))}</span></td>
+<td>${z.afterCount}</td>
+<td class="mkt-mono">${escapeHtml(z.beforeText)}</td>
+<td class="mkt-mono">${escapeHtml(z.afterText)}</td>
+</tr>`;
+    }).join("");
+    return `<section class="mkt-section" id="mkt-silence">
+<h2>\u6C88\u9ED9\u30BE\u30FC\u30F3 \xD7 \u6C88\u9ED9\u306E\u8CEA <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">60 \u79D2\u4EE5\u4E0A\u30B3\u30E1\u304C\u6D41\u308C\u306A\u304B\u3063\u305F\u533A\u9593 ${zones.length} \u4EF6\u306E\u3046\u3061\u3001\u9577\u3044\u9806\u306B\u6700\u5927 10 \u4EF6\u3002\u6C88\u9ED9\u5F8C 30 \u79D2\u4EE5\u5185\u306E\u30B3\u30E1\u4EF6\u6570\u3067\u300C\u30AC\u30F3\u898B\u7CFB\uFF085+\u4EF6\uFF09\u300D\u300C\u96E2\u8131\u7CFB\uFF080-1\u4EF6\uFF09\u300D\u300C\u3075\u3064\u3046\uFF082-4\u4EF6\uFF09\u300D\u306B\u5206\u985E\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L2\uFF09\u3002</p>
+<table class="mkt-rank">
+<thead><tr><th>\u9577\u3055</th><th>\u6C88\u9ED9\u306E\u8CEA</th><th>\u76F4\u5F8C30\u79D2\u306E\u30B3\u30E1\u6570</th><th>\u6C88\u9ED9\u76F4\u524D\u306E\u30B3\u30E1</th><th>\u6C88\u9ED9\u660E\u3051\u306E\u30B3\u30E1</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+  }
+  function sectionLaughterDensity(laugh) {
+    if (!laugh || laugh.buckets.length < 2) return "";
+    const W = 900;
+    const H = 180;
+    const pad = 36;
+    const innerW = W - pad * 2;
+    const innerH = H - pad * 2;
+    const n = laugh.buckets.length;
+    const maxV = Math.max(1, laugh.peakValue);
+    const xOf = (i) => pad + innerW * i / Math.max(1, n - 1);
+    const barW = Math.max(1, Math.min(8, innerW / n - 1));
+    const bars = laugh.buckets.map((b, i) => {
+      const x = xOf(i);
+      const h = b.count / maxV * innerH;
+      const halfMin = Math.floor(b.minute / 2);
+      const halfSec = b.minute % 2 * 30;
+      return `<rect x="${x.toFixed(1)}" y="${(pad + innerH - h).toFixed(1)}" width="${barW}" height="${h.toFixed(1)}" fill="#fbbf24" opacity="0.85"><title>${halfMin}\u5206${halfSec}\u79D2\u301C: \u7B11\u3044 ${b.count}\u4EF6 / \u7DCF ${b.total}\u4EF6 (${(b.ratio * 100).toFixed(0)}%)</title></rect>`;
+    }).join("");
+    return `<section class="mkt-section" id="mkt-laughter">
+<h2>\u30A2\u30D8\u9854\u5BC6\u5EA6\uFF08\u7B11\u3044\u53CD\u5FDC\u6307\u6A19\uFF09<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">w / \u8349 / 8888 / \u7B11 / \u7206\u7B11 / \u30EF\u30ED\u30BF \u7B49\u306E\u51FA\u73FE\u3092 30 \u79D2\u7C92\u5EA6\u3067\u3002\u5168\u4F53\u306E\u7B11\u3044\u6BD4\u7387 ${(laugh.overallRatio * 100).toFixed(1)}% / \u30D4\u30FC\u30AF: ${laugh.peakBucket != null ? `${Math.floor(laugh.peakBucket / 2)}\u5206${laugh.peakBucket % 2 * 30}\u79D2\u301C` : "-"}\uFF08${laugh.peakValue}\u4EF6\uFF09\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L4\uFF09</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${bars}
+</svg>
+</div></section>`;
+  }
   function buildMarketingDashboardHtml(r, opts = {}) {
     const maskShare = opts.maskShareLabels === true;
     const identiconResolver = typeof opts.anonymousIdenticonResolver === "function" ? opts.anonymousIdenticonResolver : void 0;
     const broadcasterUserId = typeof opts.broadcasterUserId === "string" ? opts.broadcasterUserId : "";
+    const sessionSummaryRows = Array.isArray(opts.sessionSummaryRows) ? opts.sessionSummaryRows : [];
     const exportedAtIso = (/* @__PURE__ */ new Date()).toISOString();
     const embedJson = buildMarketingEmbedScriptInnerText(r, {
       maskShareLabels: maskShare,
       exportedAt: exportedAtIso
     });
     const subSuffix = maskShare ? " \xB7 \u5171\u6709\u5411\u3051\u306B\u8868\u793A\u540D\u3092\u4F0F\u305B\u305F\u51FA\u529B" : "";
+    const concurrentSeries = buildConcurrentTimelineSeries(sessionSummaryRows);
+    const concurrentPeak = analyzeConcurrentPeak(concurrentSeries);
+    const commentsForAnalytics = Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics : [];
+    const velocityTimeline = buildCommentVelocityTimeline(commentsForAnalytics, {
+      bucketMs: 6e4,
+      rollingWindowMin: 5
+    });
+    const silenceZones = detectCommentSilenceZones(commentsForAnalytics, {
+      thresholdMs: 6e4,
+      quality: { windowMs: 3e4 }
+    });
+    const laughterDensity = buildLaughterDensityTimeline(commentsForAnalytics, {
+      bucketMs: 3e4
+    });
+    const tocItems = [
+      { id: "mkt-kpi", label: "KPI \u30B5\u30DE\u30EA" },
+      { id: "mkt-content", label: "\u30B3\u30E1\u30F3\u30C8\u672C\u6587\u30FB\u5C5E\u6027\u306E\u50BE\u5411" },
+      { id: "mkt-quarter", label: "\u5192\u982D\u30FB\u7D42\u76E4\uFF08\u56DB\u5206\u4F4D\uFF09" },
+      { id: "mkt-timeline", label: "\u30B3\u30E1\u30F3\u30C8\u30BF\u30A4\u30E0\u30E9\u30A4\u30F3" },
+      { id: "mkt-velocity", label: "\u30B3\u30E1\u901F\u5EA6\u30AB\u30FC\u30D6\uFF08PRO\uFF09" },
+      { id: "mkt-concurrent", label: "\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\uFF08PRO\uFF09" },
+      { id: "mkt-silence", label: "\u6C88\u9ED9\u30BE\u30FC\u30F3 \xD7 \u6C88\u9ED9\u306E\u8CEA\uFF08PRO\uFF09" },
+      { id: "mkt-laughter", label: "\u30A2\u30D8\u9854\u5BC6\u5EA6\uFF08PRO\uFF09" },
+      { id: "mkt-derived", label: "\u7D2F\u7A4D\u30B3\u30E1\u30F3\u30C8\u6570\u30685\u5206\u7A93" },
+      { id: "mkt-segment", label: "\u30E6\u30FC\u30B6\u30FC\u30BB\u30B0\u30E1\u30F3\u30C8" },
+      { id: "mkt-top-users", label: "\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC TOP 20" },
+      { id: "mkt-thumb-grid", label: "\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7" },
+      { id: "mkt-vpos", label: "vpos \u4E09\u5206\u5272\uFF08\u518D\u751F\u4F4D\u7F6E\uFF09" },
+      { id: "mkt-hour", label: "\u6642\u9593\u5E2F\u30D2\u30FC\u30C8\u30DE\u30C3\u30D7" },
+      { id: "mkt-json", label: "\u8868\u8A08\u7B97\u30FB\u30C4\u30FC\u30EB\u5411\u3051 JSON" }
+    ];
     return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -5236,28 +5745,37 @@ ${yLabelsL}${yLabelsR}${xLabels}
 </header>
 <main class="mkt-main">
 ${sectionFeaturesOverview()}
+${sectionToc(tocItems)}
 ${sectionAdviceIntro()}
-${sectionKpi(r)}
+${idWrap("mkt-kpi", sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
-${sectionContentShape(r)}
+${idWrap("mkt-content", sectionContentShape(r))}
 ${sectionAdviceAfterContentShape(r)}
-${sectionQuarterEngagement(r)}
+${idWrap("mkt-quarter", sectionQuarterEngagement(r))}
 ${sectionAdviceAfterQuarterEngagement(r)}
-${sectionTimeline(r)}
+${idWrap("mkt-timeline", sectionTimeline(r))}
 ${sectionAdviceAfterTimeline(r)}
-${sectionDerivedTimeline(r)}
+${sectionCommentVelocityCurve(velocityTimeline)}
+${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
+${sectionSilenceZones(silenceZones)}
+${sectionLaughterDensity(laughterDensity)}
+${idWrap("mkt-derived", sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
-${sectionSegment(r)}
+${idWrap("mkt-segment", sectionSegment(r))}
 ${sectionAdviceAfterSegment(r)}
-${sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId)}
+${idWrap("mkt-top-users", sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId))}
 ${sectionAdviceAfterRank(r)}
-${sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId)}
-${sectionVposThirds(r)}
-${sectionHourHeatmap(r)}
+${idWrap("mkt-thumb-grid", sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
+${idWrap("mkt-vpos", sectionVposThirds(r))}
+${idWrap("mkt-hour", sectionHourHeatmap(r))}
 </main>
 <footer class="mkt-footer">\u8FFD\u61B6\u306E\u304D\u3089\u3081\u304D \xB7 \u30DE\u30FC\u30B1\u5206\u6790\uFF08\u624B\u5143\u7528\uFF09 \u2014 ${escapeHtml(exportedAtIso)}</footer>
-${sectionMachineReadableJson(embedJson, maskShare)}
+${idWrap("mkt-json", sectionMachineReadableJson(embedJson, maskShare))}
 </body></html>`;
+  }
+  function idWrap(id, html) {
+    if (!html) return "";
+    return html.replace(/<section\b/, `<section id="${id}"`);
   }
   function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId) {
     if (maskShare) return "";
@@ -5441,13 +5959,22 @@ ${note}
   }
   var CSS_BODY = `
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6}
+body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.6;scroll-behavior:smooth}
 .mkt-header{padding:2rem 1.5rem 1rem;background:linear-gradient(135deg,#1e293b,#0f172a);border-bottom:1px solid #334155}
 .mkt-header__title{margin:0;font-size:1.6rem;font-weight:700}
 .mkt-header__sub{margin:.3rem 0 0;font-size:.85rem;color:#94a3b8}
 .mkt-main{max-width:960px;margin:0 auto;padding:1.5rem 1rem}
-.mkt-section{background:#1e293b;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1.2rem;border:1px solid #334155}
+.mkt-section{background:#1e293b;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1.2rem;border:1px solid #334155;scroll-margin-top:1rem}
 .mkt-section h2{margin:0 0 .8rem;font-size:1.1rem;color:#f8fafc;border-left:4px solid #3b82f6;padding-left:.6rem}
+.mkt-section--toc{background:#0f172a}
+.mkt-toc{margin:0;padding-left:1.5rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.3rem .8rem}
+.mkt-toc__link{color:#93c5fd;text-decoration:none;font-size:.85rem}
+.mkt-toc__link:hover{text-decoration:underline}
+.mkt-pro-tag{display:inline-block;font-size:.68rem;font-weight:700;color:#f0f9ff;background:linear-gradient(135deg,#a855f7,#7c3aed);border-radius:6px;padding:1px 6px;margin-left:.4rem;vertical-align:middle;letter-spacing:.04em}
+.mkt-mini-stats{margin:.6rem 0 0;padding-left:1.2rem;font-size:.85rem;color:#cbd5e1}
+.mkt-mini-stats li{margin-bottom:.15rem}
+.mkt-quality-pill{display:inline-block;border-radius:6px;padding:1px 8px;color:#0f172a;font-size:.72rem;font-weight:600}
+.mkt-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem;color:#cbd5e1;word-break:break-all}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}
@@ -11833,7 +12360,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           <ol class="report-thumb-grid">${thumbAnonymousUsers.map(reportThumbCellHtml).join("")}</ol>
         ` : "";
     const thumbedUsersSectionHtml = thumbNumericUsers.length > 0 || thumbAnonymousUsers.length > 0 ? `
-        <section class="card">
+        <section class="card" id="sec-thumb-grid">
           <h2>\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</h2>
           <p class="guide-lead">\u30A2\u30A4\u30B3\u30F3\u304C\u89E3\u6C7A\u3067\u304D\u305F\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u3092\u4EF6\u6570\u306E\u591A\u3044\u9806\u3001\u7A2E\u5225\u3054\u3068\u306B\u4E26\u3079\u305F\u306E\u3060\uFF08\u5404\u30AB\u30C6\u30B4\u30EA\u6700\u5927 80 \u540D\uFF09\u3002\u30A2\u30A4\u30B3\u30F3\u306F \u2460 \u500B\u4EBA\u30B5\u30E0\u30CD \u2461 \u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 \u2462 \u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon \u306E\u512A\u5148\u9806\u306A\u306E\u3060\u3002</p>
           ${thumbNumericBlockHtml}
@@ -12101,6 +12628,34 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         color: var(--muted);
         font-size: 11px;
       }
+      html { scroll-behavior: smooth; }
+      .toc {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+      }
+      .toc__heading {
+        margin: 0 0 8px;
+        font-size: 0.85rem;
+        color: #cbd5e1;
+        font-weight: 700;
+      }
+      .toc__list {
+        margin: 0;
+        padding-left: 1.4em;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 4px 12px;
+      }
+      .toc__list li { font-size: 0.85rem; }
+      .toc__list a {
+        color: #93c5fd;
+        text-decoration: none;
+      }
+      .toc__list a:hover { text-decoration: underline; }
+      section.card[id], details[id] { scroll-margin-top: 12px; }
       .nl-report-csv-btn {
         display: inline-block;
         background: #1d4ed8;
@@ -12517,8 +13072,22 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         <div id="searchResult" class="hint">\u691C\u7D22\u5BFE\u8C61: <span id="totalCount">0</span> \u4EF6</div>
       </div>
 
+      <nav class="toc" aria-label="\u76EE\u6B21">
+        <h2 class="toc__heading">\u76EE\u6B21\uFF08\u30AF\u30EA\u30C3\u30AF\u3067\u8A72\u5F53\u30BB\u30AF\u30B7\u30E7\u30F3\u3078\uFF09</h2>
+        <ol class="toc__list">
+          <li><a href="#sec-overview">\u6982\u8981\u30FB\u30B5\u30E0\u30CD\u30FB\u30BF\u30B0</a></li>
+          <li><a href="#sec-user-summary">\u30E6\u30FC\u30B6\u30FC\u5225\uFF08\u3057\u304A\u308A\u96C6\u8A08\uFF09</a></li>
+          <li><a href="#sec-id-breakdown">\u5185\u8A33\u7D71\u8A08\uFF08ID \u7A2E\u5225\u6BD4\u7387\uFF09</a></li>
+          <li><a href="#sec-thumb-grid">\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</a></li>
+          <li><a href="#sec-self-comments">\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8\u629C\u7C8B</a></li>
+          <li><a href="#sec-all-comments">\u4FDD\u5B58\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7\uFF08CSV \u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3042\u308A\uFF09</a></li>
+          <li><a href="#sec-share-meta">\u30B7\u30A7\u30A2\u30FB\u30D7\u30EC\u30D3\u30E5\u30FC\u5411\u3051\u306E\u60C5\u5831</a></li>
+          <li><a href="#sec-tech-dump">\u30DA\u30FC\u30B8\u306E\u88CF\u5074\u30C7\u30FC\u30BF\uFF08\u4E0A\u7D1A\u8005\u5411\u3051\uFF09</a></li>
+        </ol>
+      </nav>
+
       <div class="grid">
-        <section class="card">
+        <section class="card" id="sec-overview">
           <h2>\u6982\u8981</h2>
           <table>
             <tbody>
@@ -12551,14 +13120,14 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           ${safeSnapshotError ? `<div class="warn">${safeSnapshotError}</div>` : ""}
         </section>
 
-        <section class="card">
+        <section class="card" id="sec-user-summary">
           <h2>\u30E6\u30FC\u30B6\u30FC\u5225\uFF08\u3057\u304A\u308A\u96C6\u8A08\uFF09</h2>
           <table>
             <thead><tr><th>\u30B5\u30E0\u30CD</th><th>\u30E6\u30FC\u30B6\u30FC</th><th>\u4EF6\u6570</th><th>\u7D2F\u8A08\u5B57\u6570</th><th>\u6700\u65B0\u30B3\u30E1\u30F3\u30C8</th></tr></thead>
             <tbody>${roomRows.join("") || '<tr><td colspan="5">\u30C7\u30FC\u30BF\u306A\u3057</td></tr>'}</tbody>
           </table>
         </section>
-        <section class="card">
+        <section class="card" id="sec-id-breakdown">
           <h2>\u5185\u8A33\u7D71\u8A08\uFF08\u7121\u6599\uFF09</h2>
           <p class="guide-lead">\u8A18\u9332\u3057\u305F\u30B3\u30E1\u30F3\u30C8\u306E\u5185\u8A33\u3092\u3001\u767B\u5834\u3057\u305F\u8B58\u5225\u5B50\u306E\u7A2E\u985E\u5225\u306B\u307E\u3068\u3081\u305F\u306E\u3060\u3002\u533F\u540D\uFF08184\uFF09\u3068\u6570\u5024ID\u3001\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8\u306E\u6BD4\u7387\u304C\u308F\u304B\u308B\u306E\u3060\u3002</p>
           <table>
@@ -12577,7 +13146,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       ${htmlReportConceptGuideCardHtml}
       ${htmlReportSaveGuideCardHtml}
 
-      <section class="card" style="margin-top:12px;">
+      <section class="card" id="sec-share-meta" style="margin-top:12px;">
         <h2>\u30B7\u30A7\u30A2\u30FB\u30D7\u30EC\u30D3\u30E5\u30FC\u5411\u3051\u306E\u60C5\u5831</h2>
         <p class="guide-lead">SNS\u3084\u30D6\u30E9\u30A6\u30B6\u306E\u30D7\u30EC\u30D3\u30E5\u30FC\u306B\u4F7F\u308F\u308C\u308B\u3053\u3068\u304C\u591A\u3044\u9805\u76EE\u3060\u3051\u3001\u65E5\u672C\u8A9E\u306E\u898B\u51FA\u3057\u306B\u76F4\u3057\u3066\u8F09\u305B\u3066\u3044\u308B\u306E\u3060\u3002</p>
         <table>
@@ -12586,7 +13155,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         </table>
       </section>
 
-      <details class="tech-dump">
+      <details class="tech-dump" id="sec-tech-dump">
         <summary>\u30DA\u30FC\u30B8\u306E\u88CF\u5074\u30C7\u30FC\u30BF\uFF08\u30A2\u30D7\u30EA\u9023\u643A\u30FB\u8ABF\u67FB\u7528\u30FB\u4E0A\u7D1A\u8005\u5411\u3051\uFF09\u2014 \u30AF\u30EA\u30C3\u30AF\u3067\u958B\u304F</summary>
         <div class="tech-dump-inner">
           <p class="tech-dump-hint">al:android \u3084 twitter:card \u306A\u3069\u3001\u3075\u3060\u3093\u8AAD\u307E\u306A\u304F\u3066\u3088\u3044\u884C\u304C\u4E26\u3076\u306E\u3060\u3002\u30DA\u30FC\u30B8\u306E\u89E3\u6790\u3084\u30C8\u30E9\u30D6\u30EB\u8ABF\u67FB\u306E\u3068\u304D\u306B\u4F7F\u3046\u306E\u3060\u3002</p>
@@ -12613,7 +13182,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         </div>
       </details>
 
-      <section class="card" style="margin-top:12px;">
+      <section class="card" id="sec-self-comments" style="margin-top:12px;">
         <h2>\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8\u629C\u7C8B\uFF08${selfPostedComments.length}\u4EF6\uFF09</h2>
         <p class="guide-lead">\u81EA\u5206\u304C\u9001\u3063\u305F\u30B3\u30E1\u30F3\u30C8\u3060\u3051\u3092\u629C\u304D\u51FA\u3057\u305F\u306E\u3060\u3002\u5F8C\u304B\u3089\u81EA\u5206\u306E\u5FDC\u63F4\u3092\u632F\u308A\u8FD4\u308B\u3068\u304D\u7528\u306A\u306E\u3060\u3002</p>
         <table>
@@ -12622,7 +13191,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         </table>
       </section>
 
-      <section class="card" style="margin-top:12px;">
+      <section class="card" id="sec-all-comments" style="margin-top:12px;">
         <h2>\u4FDD\u5B58\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7</h2>
         <p class="guide-lead">
           <button type="button" id="nlReportCsvDownloadBtn" class="nl-report-csv-btn">CSV \u3092\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9</button>
@@ -12744,7 +13313,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1316" ? String("0430-1316") : "dev";
+      const buildId = "0430-1343" ? String("0430-1343") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -13184,12 +13753,20 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           $("devMonitorExportMarketingMaskLabels")
         );
         const maskShare = Boolean(maskEl?.checked);
+        let sessionSummaryRows = [];
+        try {
+          const db = await openBroadcastSessionSummaryDb();
+          sessionSummaryRows = await listBroadcastSessionSummaryForLive(db, lid, 200);
+        } catch {
+        }
         const html = buildMarketingDashboardHtml(report, {
           maskShareLabels: maskShare,
           anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
           broadcasterUserId: String(
             watchMetaCache.snapshot?.broadcasterUserId || ""
-          ).trim()
+          ).trim(),
+          sessionSummaryRows,
+          commentsForAnalytics: comments
         });
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
@@ -13229,7 +13806,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
                 anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
                 broadcasterUserId: String(
                   watchMetaCache.snapshot?.broadcasterUserId || ""
-                ).trim()
+                ).trim(),
+                // fallback 経路では IDB アクセスは諦める（拡張再読み込み中でも分析だけは出す）
+                sessionSummaryRows: [],
+                commentsForAnalytics: fallbackComments
               });
               const blob = new Blob([html], { type: "text/html;charset=utf-8" });
               const url = URL.createObjectURL(blob);

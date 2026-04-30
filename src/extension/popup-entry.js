@@ -7387,7 +7387,7 @@ async function buildHtmlReportDocument(
   const thumbedUsersSectionHtml =
     thumbNumericUsers.length > 0 || thumbAnonymousUsers.length > 0
       ? `
-        <section class="card">
+        <section class="card" id="sec-thumb-grid">
           <h2>サムネ付きユーザー一覧</h2>
           <p class="guide-lead">アイコンが解決できた応援ユーザーを件数の多い順、種別ごとに並べたのだ（各カテゴリ最大 80 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順なのだ。</p>
           ${thumbNumericBlockHtml}
@@ -7706,6 +7706,34 @@ async function buildHtmlReportDocument(
         color: var(--muted);
         font-size: 11px;
       }
+      html { scroll-behavior: smooth; }
+      .toc {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+      }
+      .toc__heading {
+        margin: 0 0 8px;
+        font-size: 0.85rem;
+        color: #cbd5e1;
+        font-weight: 700;
+      }
+      .toc__list {
+        margin: 0;
+        padding-left: 1.4em;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 4px 12px;
+      }
+      .toc__list li { font-size: 0.85rem; }
+      .toc__list a {
+        color: #93c5fd;
+        text-decoration: none;
+      }
+      .toc__list a:hover { text-decoration: underline; }
+      section.card[id], details[id] { scroll-margin-top: 12px; }
       .nl-report-csv-btn {
         display: inline-block;
         background: #1d4ed8;
@@ -8122,8 +8150,22 @@ async function buildHtmlReportDocument(
         <div id="searchResult" class="hint">検索対象: <span id="totalCount">0</span> 件</div>
       </div>
 
+      <nav class="toc" aria-label="目次">
+        <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
+        <ol class="toc__list">
+          <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
+          <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
+          <li><a href="#sec-id-breakdown">内訳統計（ID 種別比率）</a></li>
+          <li><a href="#sec-thumb-grid">サムネ付きユーザー一覧</a></li>
+          <li><a href="#sec-self-comments">自分のコメント抜粋</a></li>
+          <li><a href="#sec-all-comments">保存コメント一覧（CSV ダウンロードあり）</a></li>
+          <li><a href="#sec-share-meta">シェア・プレビュー向けの情報</a></li>
+          <li><a href="#sec-tech-dump">ページの裏側データ（上級者向け）</a></li>
+        </ol>
+      </nav>
+
       <div class="grid">
-        <section class="card">
+        <section class="card" id="sec-overview">
           <h2>概要</h2>
           <table>
             <tbody>
@@ -8171,14 +8213,14 @@ async function buildHtmlReportDocument(
           }
         </section>
 
-        <section class="card">
+        <section class="card" id="sec-user-summary">
           <h2>ユーザー別（しおり集計）</h2>
           <table>
             <thead><tr><th>サムネ</th><th>ユーザー</th><th>件数</th><th>累計字数</th><th>最新コメント</th></tr></thead>
             <tbody>${roomRows.join('') || '<tr><td colspan="5">データなし</td></tr>'}</tbody>
           </table>
         </section>
-        <section class="card">
+        <section class="card" id="sec-id-breakdown">
           <h2>内訳統計（無料）</h2>
           <p class="guide-lead">記録したコメントの内訳を、登場した識別子の種類別にまとめたのだ。匿名（184）と数値ID、自分のコメントの比率がわかるのだ。</p>
           <table>
@@ -8197,7 +8239,7 @@ async function buildHtmlReportDocument(
       ${htmlReportConceptGuideCardHtml}
       ${htmlReportSaveGuideCardHtml}
 
-      <section class="card" style="margin-top:12px;">
+      <section class="card" id="sec-share-meta" style="margin-top:12px;">
         <h2>シェア・プレビュー向けの情報</h2>
         <p class="guide-lead">SNSやブラウザのプレビューに使われることが多い項目だけ、日本語の見出しに直して載せているのだ。</p>
         <table>
@@ -8209,7 +8251,7 @@ async function buildHtmlReportDocument(
         </table>
       </section>
 
-      <details class="tech-dump">
+      <details class="tech-dump" id="sec-tech-dump">
         <summary>ページの裏側データ（アプリ連携・調査用・上級者向け）— クリックで開く</summary>
         <div class="tech-dump-inner">
           <p class="tech-dump-hint">al:android や twitter:card など、ふだん読まなくてよい行が並ぶのだ。ページの解析やトラブル調査のときに使うのだ。</p>
@@ -8236,7 +8278,7 @@ async function buildHtmlReportDocument(
         </div>
       </details>
 
-      <section class="card" style="margin-top:12px;">
+      <section class="card" id="sec-self-comments" style="margin-top:12px;">
         <h2>自分のコメント抜粋（${selfPostedComments.length}件）</h2>
         <p class="guide-lead">自分が送ったコメントだけを抜き出したのだ。後から自分の応援を振り返るとき用なのだ。</p>
         <table>
@@ -8248,7 +8290,7 @@ async function buildHtmlReportDocument(
         </table>
       </section>
 
-      <section class="card" style="margin-top:12px;">
+      <section class="card" id="sec-all-comments" style="margin-top:12px;">
         <h2>保存コメント一覧</h2>
         <p class="guide-lead">
           <button type="button" id="nlReportCsvDownloadBtn" class="nl-report-csv-btn">CSV をダウンロード</button>
@@ -8824,6 +8866,14 @@ function initPopup() {
       const report = aggregateMarketingReport(comments, lid);
       const maskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
       const maskShare = Boolean(maskEl?.checked);
+      // 0.1.22 (W): 同接推移カーブ用のサンプル行を IDB から取得。失敗しても本体出力は継続。
+      let sessionSummaryRows = [];
+      try {
+        const db = await openBroadcastSessionSummaryDb();
+        sessionSummaryRows = await listBroadcastSessionSummaryForLive(db, lid, 200);
+      } catch {
+        // DB が無い / 失敗しても本体は通す
+      }
       // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
       // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
       // ユーザーの opt-out が尊重される）。
@@ -8834,7 +8884,9 @@ function initPopup() {
         anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
         broadcasterUserId: String(
           watchMetaCache.snapshot?.broadcasterUserId || ''
-        ).trim()
+        ).trim(),
+        sessionSummaryRows,
+        commentsForAnalytics: comments
       });
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -8875,7 +8927,10 @@ function initPopup() {
               anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
               broadcasterUserId: String(
                 watchMetaCache.snapshot?.broadcasterUserId || ''
-              ).trim()
+              ).trim(),
+              // fallback 経路では IDB アクセスは諦める（拡張再読み込み中でも分析だけは出す）
+              sessionSummaryRows: [],
+              commentsForAnalytics: fallbackComments
             });
             const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
             const url = URL.createObjectURL(blob);
