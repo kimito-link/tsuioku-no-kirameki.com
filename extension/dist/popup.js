@@ -1190,6 +1190,26 @@
     konta: "sunset",
     tanunee: "midnight"
   });
+  var KNOWN_FRAME_VARS = Object.freeze([
+    "--nl-bg",
+    "--nl-bg-soft",
+    "--nl-surface",
+    "--nl-text",
+    "--nl-text-sub",
+    "--nl-muted",
+    "--nl-border",
+    "--nl-accent",
+    "--nl-accent-hover",
+    "--nl-header-start",
+    "--nl-header-end",
+    "--nl-frame-outline",
+    "--nl-rank-count",
+    "--nl-stat-card-bg-start",
+    "--nl-stat-card-bg-end",
+    "--nl-stat-card-border",
+    "--nl-stat-card-shadow",
+    "--nl-placeholder"
+  ]);
   var FRAME_PRESETS = Object.freeze({
     light: Object.freeze({
       label: "\u30E9\u30A4\u30C8",
@@ -1198,13 +1218,27 @@
         "--nl-bg-soft": "#eef8ff",
         "--nl-surface": "#ffffff",
         "--nl-text": "#1f2937",
+        // light 背景上で WCAG AA を満たす補助テキスト色。:root のデフォルト
+        // (#4b5563) と同値だが inline で固定して、CSS rule 経由の dark 値
+        // (`html.nl-skin-panel-dark { --nl-text-sub: #cbd5e1 }`) が toolbar
+        // standalone（nl-skin-panel-dark あり）でも上書きされないようにする。
+        "--nl-text-sub": "#4b5563",
         "--nl-muted": "#5b6475",
         "--nl-border": "#d5e3f5",
         "--nl-accent": "#0f8fd8",
         "--nl-accent-hover": "#0b73ad",
         "--nl-header-start": "#0f8fd8",
         "--nl-header-end": "#14b8a6",
-        "--nl-frame-outline": "rgb(255 255 255 / 22%)"
+        "--nl-frame-outline": "rgb(255 255 255 / 22%)",
+        // ランクの「件」数字。dark 側で teal を明るくする A8 修正の light 側固定。
+        "--nl-rank-count": "#0f766e",
+        // stat card の背景・枠・影。light フレームでは light tint なグラデ。
+        "--nl-stat-card-bg-start": "#ffffff",
+        "--nl-stat-card-bg-end": "#eef6ff",
+        "--nl-stat-card-border": "#d5e3f5",
+        "--nl-stat-card-shadow": "0 2px 6px rgb(2 17 31 / 10%)",
+        // textarea / input の placeholder 色。light 背景上での視認性確保。
+        "--nl-placeholder": "#6b7280"
       })
     }),
     dark: Object.freeze({
@@ -1214,8 +1248,7 @@
         "--nl-bg-soft": "#111827",
         "--nl-surface": "#0f172a",
         "--nl-text": "#e5e7eb",
-        // ダーク背景上で WCAG AA を満たす補助テキスト色。:root デフォルト
-        // `--nl-text-sub: #4b5563` のままだとコントラスト 2.5:1 で読めない（A2）。
+        // ダーク背景上で WCAG AA を満たす補助テキスト色。
         "--nl-text-sub": "#cbd5e1",
         "--nl-muted": "#94a3b8",
         "--nl-border": "#243244",
@@ -1223,7 +1256,14 @@
         "--nl-accent-hover": "#3b82f6",
         "--nl-header-start": "#1e293b",
         "--nl-header-end": "#334155",
-        "--nl-frame-outline": "rgb(255 255 255 / 18%)"
+        "--nl-frame-outline": "rgb(255 255 255 / 18%)",
+        "--nl-rank-count": "#5eead4",
+        "--nl-stat-card-bg-start": "#1a2330",
+        "--nl-stat-card-bg-end": "#141b24",
+        "--nl-stat-card-border": "rgb(100 116 139 / 32%)",
+        "--nl-stat-card-shadow": "0 4px 16px rgb(0 0 0 / 38%)",
+        // dark 背景上で読める明るめの placeholder。
+        "--nl-placeholder": "#94a3b8"
       })
     }),
     midnight: Object.freeze({
@@ -1233,7 +1273,6 @@
         "--nl-bg-soft": "#1b1f3a",
         "--nl-surface": "#10182f",
         "--nl-text": "#e2e8f0",
-        // ミッドナイト背景でも `--nl-text-sub` のコントラストを補正（A2）。
         "--nl-text-sub": "#cbd5e1",
         "--nl-muted": "#9fb1ca",
         "--nl-border": "#2a3761",
@@ -1241,7 +1280,13 @@
         "--nl-accent-hover": "#38bdf8",
         "--nl-header-start": "#1e1b4b",
         "--nl-header-end": "#1d4ed8",
-        "--nl-frame-outline": "rgb(255 255 255 / 22%)"
+        "--nl-frame-outline": "rgb(255 255 255 / 22%)",
+        "--nl-rank-count": "#5eead4",
+        "--nl-stat-card-bg-start": "#1b2444",
+        "--nl-stat-card-bg-end": "#141a32",
+        "--nl-stat-card-border": "rgb(100 116 139 / 32%)",
+        "--nl-stat-card-shadow": "0 4px 16px rgb(0 0 0 / 42%)",
+        "--nl-placeholder": "#9fb1ca"
       })
     }),
     sunset: Object.freeze({
@@ -1251,13 +1296,20 @@
         "--nl-bg-soft": "#ffedd5",
         "--nl-surface": "#fffbf6",
         "--nl-text": "#1f2937",
+        "--nl-text-sub": "#7c3a16",
         "--nl-muted": "#6b7280",
         "--nl-border": "#f5d0b5",
         "--nl-accent": "#ea580c",
         "--nl-accent-hover": "#c2410c",
         "--nl-header-start": "#fb923c",
         "--nl-header-end": "#f43f5e",
-        "--nl-frame-outline": "rgb(255 255 255 / 30%)"
+        "--nl-frame-outline": "rgb(255 255 255 / 30%)",
+        "--nl-rank-count": "#9a3412",
+        "--nl-stat-card-bg-start": "#fffbf6",
+        "--nl-stat-card-bg-end": "#ffedd5",
+        "--nl-stat-card-border": "#f5d0b5",
+        "--nl-stat-card-shadow": "0 2px 6px rgb(120 53 15 / 10%)",
+        "--nl-placeholder": "#92614a"
       })
     })
   });
@@ -1331,13 +1383,20 @@
       "--nl-bg-soft": "#e8f4ff",
       "--nl-surface": "#ffffff",
       "--nl-text": "#1f2937",
+      "--nl-text-sub": "#4b5563",
       "--nl-muted": "#5b6475",
       "--nl-border": "#cfe0f4",
       "--nl-accent": safe.accent,
       "--nl-accent-hover": darkenHexColor(safe.accent, 0.2),
       "--nl-header-start": safe.headerStart,
       "--nl-header-end": safe.headerEnd,
-      "--nl-frame-outline": "rgb(255 255 255 / 28%)"
+      "--nl-frame-outline": "rgb(255 255 255 / 28%)",
+      "--nl-rank-count": "#0f766e",
+      "--nl-stat-card-bg-start": "#ffffff",
+      "--nl-stat-card-bg-end": "#e8f4ff",
+      "--nl-stat-card-border": "#cfe0f4",
+      "--nl-stat-card-shadow": "0 2px 6px rgb(2 17 31 / 10%)",
+      "--nl-placeholder": "#6b7280"
     };
   }
 
@@ -6315,6 +6374,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const normalized = normalizeFrameId(frameId);
     const selectedFrame = normalized === "custom" || hasFramePreset(normalized) ? normalized : DEFAULT_FRAME_ID;
     const vars = resolveFrameVars(selectedFrame, custom);
+    for (const key of KNOWN_FRAME_VARS) {
+      root.style.removeProperty(key);
+    }
     for (const [key, value] of Object.entries(vars)) {
       root.style.setProperty(key, value);
     }
@@ -11598,7 +11660,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-0833" ? String("0430-0833") : "dev";
+      const buildId = "0430-0913" ? String("0430-0913") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

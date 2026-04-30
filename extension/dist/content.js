@@ -2395,6 +2395,16 @@
     return null;
   }
 
+  // src/lib/inlinePanelFocusGate.js
+  function isInlinePanelHostReadyForFocus(host, deps) {
+    if (!host || !host.isConnected) return false;
+    const cs = deps.getComputedStyle(host);
+    if (cs.display === "none" || cs.visibility === "hidden") return false;
+    const r = deps.getBoundingClientRect(host);
+    const min = typeof deps.minSize === "number" ? deps.minSize : 120;
+    return r.width >= min && r.height >= min;
+  }
+
   // src/lib/embeddedDataExtract.js
   function extractEmbeddedDataProps(doc) {
     if (!doc) return null;
@@ -4500,9 +4510,9 @@
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
     host.style.opacity = "1";
-    ensureInlineFloatingCloseButton(host);
+    ensureInlinePanelCloseButton(host);
   }
-  function ensureInlineFloatingCloseButton(host) {
+  function ensureInlinePanelCloseButton(host) {
     if (!host) return;
     let btn = (
       /** @type {HTMLButtonElement|null} */
@@ -4589,6 +4599,7 @@
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
     host.style.opacity = "1";
+    ensureInlinePanelCloseButton(host);
   }
   function findFrameInsertAnchorFromVideo(base) {
     if (!(base instanceof HTMLElement)) return base;
@@ -4975,15 +4986,28 @@
     const r = host.getBoundingClientRect();
     return r.width >= 120 && r.height >= 120;
   }
-  function focusInlinePanelHostFromToolbar() {
+  async function focusInlinePanelHostFromToolbar() {
     if (!isWatchInlinePanelTopFrame()) return false;
     if (!isNicoLiveWatchUrl(window.location.href)) return false;
-    const host = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
-    if (!(host instanceof HTMLElement) || !host.isConnected) return false;
-    const cs = window.getComputedStyle(host);
-    if (cs.display === "none" || cs.visibility === "hidden") return false;
-    const r = host.getBoundingClientRect();
-    if (r.width < 120 || r.height < 120) return false;
+    const host = await pollUntil(
+      () => {
+        const h = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+        if (!(h instanceof HTMLElement)) return null;
+        const ready = isInlinePanelHostReadyForFocus(h, {
+          getComputedStyle: (el) => window.getComputedStyle(
+            /** @type {Element} */
+            el
+          ),
+          getBoundingClientRect: (el) => (
+            /** @type {Element} */
+            el.getBoundingClientRect()
+          )
+        });
+        return ready ? h : null;
+      },
+      { timeoutMs: 500, intervalMs: 30 }
+    );
+    if (!host) return false;
     try {
       suppressOwnScrollCountingFor(1e3);
       host.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -6235,9 +6259,18 @@
         }
       } catch {
       }
-      const focused = focusInlinePanelHostFromToolbar();
-      sendResponse({ ok: true, focused });
-      return false;
+      void (async () => {
+        let focused = false;
+        try {
+          focused = await focusInlinePanelHostFromToolbar();
+        } catch {
+        }
+        try {
+          sendResponse({ ok: true, focused });
+        } catch {
+        }
+      })();
+      return true;
     }
     if (msg.type === "NLS_CAPTURE_SCREENSHOT") {
       if (!isWatchPageMainFrameForMessages()) return;

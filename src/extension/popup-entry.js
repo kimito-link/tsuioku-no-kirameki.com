@@ -91,6 +91,7 @@ import {
   DEFAULT_FRAME_ID,
   frameLabel,
   hasFramePreset,
+  KNOWN_FRAME_VARS,
   normalizeFrameId,
   resolveFrameVars,
   sanitizeCustomFrame
@@ -1351,6 +1352,14 @@ function applyPopupFrame(frameId, custom) {
       ? normalized
       : DEFAULT_FRAME_ID;
   const vars = resolveFrameVars(selectedFrame, custom);
+  // 0.1.11 (A1 親バグ根治): プリセット切替で前プリセットの inline 値が残留すると、
+  // 例えば dark→light 切替時に `--nl-text-sub: #cbd5e1` が残って light 背景上で
+  // 読めなくなる。新プリセットを書く前に既知キーを一括 removeProperty して、
+  // CSS rule の値（`html.nl-skin-panel-dark` の dark 値 など）に一旦戻してから
+  // 新プリセットの inline で上書きする。これで切替の度に綺麗にリセットされる。
+  for (const key of KNOWN_FRAME_VARS) {
+    root.style.removeProperty(key);
+  }
   for (const [key, value] of Object.entries(vars)) {
     root.style.setProperty(key, value);
   }

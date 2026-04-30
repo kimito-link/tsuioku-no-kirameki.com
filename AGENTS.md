@@ -33,7 +33,13 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
  自動更新ユーザーで誤焼き込み `selfPosted:true` を 1 度だけ剥がす migration / 184 自コメの
  viewerUid 露出を表示経路で共通 helper でガード / avatarUrl 2KB cap を共通 helper 化して
  patchExistingComment と userCommentProfileCache に拡張 / content-entry.js の setInterval を
- context invalidate 時に clearInterval。
+ context invalidate 時に clearInterval。**追加（A+B 視認性・前面化レース 3 件）**: 全フレーム
+ プリセットに `KNOWN_FRAME_VARS` を強制して切替残留を防止（A1 親バグ：light/sunset 選択時に
+ `html.nl-skin-panel-dark` の dark 値が抜けて読めない症状を根治）/ `--nl-placeholder` を 4
+ プリセット + :root + dark スキンに揃え、`textarea`/`input::placeholder` を全プリセットで
+ WCAG AA / `focusInlinePanelHostFromToolbar` を pollUntil + 500ms async 化（B1 race：toolbar
+ 押下直後に host rect が未確定で false 返却 → 小さい toolbar popup だけが出る症状を根治）/
+ dock_bottom にも「× 閉じる」ボタンを設置（B2: A30 を floating だけでなく dock_bottom にも展開）。
 - **拡張 ID**: `cjbabignmmodaickpeckiojjabnlogdb`
 - **CWS Developer Dashboard**: 投稿者「君斗りんく」
 - **ホスト権限**: `https://*.nicovideo.jp/*` のみ（`localhost` / `127.0.0.1` は
@@ -189,6 +195,34 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
  なった tick で `clearInterval`（ML1: 0.1.9-5 で popup 側だけ修正したのを content にも揃える）。
 - `test`: `migrateClearStaleSelfPosted.test.js` (14 ケース) / `popupEntryPendingSelfPost.test.js`
  (7 ケース) / `clampAvatarUrl.test.js` (11 ケース) を新規追加。テスト先行で実装。
+
+**0.1.11 への追加修正（CWS 提出前に発見した A+B：視認性 + 前面化レース 3 件）**:
+
+- `fix(a11y/preset)`: `src/lib/popupFramePresets.js` に `KNOWN_FRAME_VARS` を export し、
+ 全 4 プリセット（light / dark / midnight / sunset）+ custom resolver に
+ `--nl-text-sub` / `--nl-rank-count` / `--nl-stat-card-bg-start` / `--nl-stat-card-bg-end` /
+ `--nl-stat-card-border` / `--nl-stat-card-shadow` / `--nl-placeholder` を強制追加。
+ 経緯（A1 親バグ）: light / sunset 選択時、popup.html の `html.nl-skin-panel-dark` 配下の
+ ダーク色（`#cbd5e1` 等）が inline で上書きされず残留し、白背景上で薄水色の補助テキストが
+ 読めなくなる症状があった（toolbar standalone は INLINE_MODE=false で常に
+ `nl-skin-panel-dark` が付く）。`popup-entry.js#applyPopupFrame()` で新プリセット適用前に
+ `KNOWN_FRAME_VARS` を一括 `removeProperty()` し、必ず新プリセットの値で塗り直す。
+- `fix(a11y/popup)`: `extension/popup.html` の `.nl-live-stat-card` を `var(--nl-stat-card-bg-start)`
+ 等に変数化（旧 `html.nl-skin-panel-dark .nl-live-stat-card` の dark ハードコード上書きを削除）。
+ `--nl-placeholder` を `:root` と `html.nl-skin-panel-dark` に追加し、`input::placeholder` /
+ `textarea::placeholder` でフレーム由来色 + `opacity:1` を強制。
+- `fix(content)`: `src/extension/content-entry.js#focusInlinePanelHostFromToolbar` を async
+ 化し、`pollUntil` で host rect ≥120×120 になるまで最大 500ms 待つ（rAF 約 16 フレーム相当）。
+ 経緯（B1 race）: toolbar 押下 → `renderPageFrameOverlay()` で host 挿入直後の layout 未確定
+ タイミングで `r.width < 120` 即時判定が false を返し、「toolbar popup だけが小さく出てインラインに
+ 前面化されない」症状の原因だった。判定条件を `src/lib/inlinePanelFocusGate.js` に純粋関数として
+ 切り出し、unit test（11 ケース）を併設。`onMessage` listener は `return true` でチャネルを
+ 維持し IIFE 内で sendResponse する Chrome MV3 標準パターンへ移行。
+- `fix(content)`: dock_bottom placement にも「× 閉じる」ボタンを設置。元 `ensureInlineFloatingCloseButton`
+ を `ensureInlinePanelCloseButton` に改称し、`renderInlinePanelDockBottomHost` 末尾でも呼ぶ
+ （0.1.10 で floating だけに付けた A30 を、dock_bottom にも展開：F-7 残課題）。
+- `test`: `inlinePanelFocusGate.test.js` (11 ケース新設) / `popupFramePresets.test.js` の
+ KNOWN_FRAME_VARS 契約テスト 8 ケース追加（33 → 41）。
 
 ## 5. 直近セッションで入った変更（2026-04-29）
 

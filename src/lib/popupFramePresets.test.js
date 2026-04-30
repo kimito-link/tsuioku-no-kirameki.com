@@ -3,6 +3,7 @@ import {
   DEFAULT_CUSTOM_FRAME,
   DEFAULT_FRAME_ID,
   FRAME_PRESETS,
+  KNOWN_FRAME_VARS,
   LEGACY_FRAME_ALIAS,
   darkenHexColor,
   frameLabel,
@@ -43,6 +44,74 @@ describe('popupFramePresets: 定数と凍結', () => {
     expect(DEFAULT_CUSTOM_FRAME.headerEnd).toMatch(/^#[0-9a-f]{6}$/);
     expect(DEFAULT_CUSTOM_FRAME.accent).toMatch(/^#[0-9a-f]{6}$/);
     expect(Object.isFrozen(DEFAULT_CUSTOM_FRAME)).toBe(true);
+  });
+});
+
+describe('KNOWN_FRAME_VARS（A1 親バグ根治契約）', () => {
+  it('KNOWN_FRAME_VARS は凍結されており、必須 18 キーすべてを含む', () => {
+    expect(Array.isArray(KNOWN_FRAME_VARS)).toBe(true);
+    expect(Object.isFrozen(KNOWN_FRAME_VARS)).toBe(true);
+    const expected = [
+      '--nl-bg',
+      '--nl-bg-soft',
+      '--nl-surface',
+      '--nl-text',
+      '--nl-text-sub',
+      '--nl-muted',
+      '--nl-border',
+      '--nl-accent',
+      '--nl-accent-hover',
+      '--nl-header-start',
+      '--nl-header-end',
+      '--nl-frame-outline',
+      '--nl-rank-count',
+      '--nl-stat-card-bg-start',
+      '--nl-stat-card-bg-end',
+      '--nl-stat-card-border',
+      '--nl-stat-card-shadow',
+      '--nl-placeholder'
+    ];
+    for (const key of expected) {
+      expect(KNOWN_FRAME_VARS).toContain(key);
+    }
+  });
+
+  // A1 親バグの再発防止: 各プリセットが KNOWN_FRAME_VARS のすべてを定義していないと、
+  // toolbar standalone の `html.nl-skin-panel-dark` 配下の CSS rule が dark 値で
+  // 生残り、light/sunset プリセット選択時に「白背景 + dark 用文字色」の不整合が発生する。
+  it.each(['light', 'dark', 'midnight', 'sunset'])(
+    'プリセット "%s" は KNOWN_FRAME_VARS のすべてを定義する',
+    (frameId) => {
+      const vars = FRAME_PRESETS[frameId].vars;
+      for (const key of KNOWN_FRAME_VARS) {
+        expect(vars[key], `${frameId} に ${key} が無い`).toBeDefined();
+        expect(typeof vars[key]).toBe('string');
+        expect(vars[key].length).toBeGreaterThan(0);
+      }
+    }
+  );
+
+  it('resolveFrameVars("custom", DEFAULT_CUSTOM_FRAME) も KNOWN_FRAME_VARS を網羅する', () => {
+    const vars = resolveFrameVars('custom', DEFAULT_CUSTOM_FRAME);
+    for (const key of KNOWN_FRAME_VARS) {
+      expect(vars[key], `custom に ${key} が無い`).toBeDefined();
+      expect(typeof vars[key]).toBe('string');
+      expect(vars[key].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('resolveFrameVars("light", ...) は light プリセットの vars を返し、--nl-rank-count などの追加キーも持つ', () => {
+    const vars = resolveFrameVars('light', DEFAULT_CUSTOM_FRAME);
+    expect(vars['--nl-text-sub']).toBe('#4b5563');
+    expect(vars['--nl-rank-count']).toBe('#0f766e');
+    expect(vars['--nl-placeholder']).toBe('#6b7280');
+  });
+
+  it('resolveFrameVars("dark", ...) は dark プリセットの vars を返し、--nl-rank-count などの追加キーも持つ', () => {
+    const vars = resolveFrameVars('dark', DEFAULT_CUSTOM_FRAME);
+    expect(vars['--nl-text-sub']).toBe('#cbd5e1');
+    expect(vars['--nl-rank-count']).toBe('#5eead4');
+    expect(vars['--nl-placeholder']).toBe('#94a3b8');
   });
 });
 

@@ -28,10 +28,23 @@
         --nl-radius: 14px;
         --nl-shadow: 0 8px 18px rgb(15 23 42 / 10%);
         --nl-frame-outline: rgb(255 255 255 / 22%);
+        /* 0.1.11 (A1): textarea / input の placeholder 色。プリセット未適用な
+           toolbar standalone でも light 背景上で WCAG AA を満たす値を持たせる。 */
+        --nl-placeholder: #6b7280;
       }
 
       * {
         box-sizing: border-box;
+      }
+
+      /* 0.1.11 (A1 親バグ根治): すべての input / textarea で placeholder の色を
+         フレーム由来の `--nl-placeholder` に統一。個別ルールで上書きしている箇所
+         （.nl-comment-compose textarea / .nl-frame-share textarea）は明示優先。
+         opacity:1 を入れないと UA デフォルトで再度半透明化される。 */
+      input::placeholder,
+      textarea::placeholder {
+        color: var(--nl-placeholder, var(--nl-muted));
+        opacity: 1;
       }
 
       html {
@@ -1638,6 +1651,11 @@
         color: #1e293b;
       }
 
+      .nl-frame-share textarea::placeholder {
+        color: var(--nl-placeholder, #6b7280);
+        opacity: 1;
+      }
+
       .nl-frame-share-actions {
         display: flex;
         justify-content: flex-end;
@@ -1821,9 +1839,21 @@
         text-align: center;
         padding: 7px 4px 6px;
         border-radius: 12px;
-        border: 1px solid var(--nl-border);
-        background: linear-gradient(155deg, var(--nl-surface), var(--nl-bg-soft));
-        box-shadow: 0 2px 6px rgb(2 17 31 / 10%);
+        /* 0.1.11 (A1 親バグ根治): 背景・枠・影をプリセット由来の CSS 変数に統一。
+           以前は base ルールが light tint な `var(--nl-surface), var(--nl-bg-soft)` を、
+           `html.nl-skin-panel-dark` 配下の上書きルールが dark のハードコード色
+           （linear-gradient(160deg, #1a2330, #141b24) など）を持っていた。
+           toolbar standalone は INLINE_MODE=false で常に nl-skin-panel-dark が付き、
+           light/sunset プリセット選択時でも dark カードが当たる不整合があった。
+           プリセットの vars に追加した `--nl-stat-card-*` を使うことで、4 プリセット
+           それぞれの背景・枠・影が一貫して反映される（dark 上書きルールは削除）。 */
+        border: 1px solid var(--nl-stat-card-border, var(--nl-border));
+        background: linear-gradient(
+          155deg,
+          var(--nl-stat-card-bg-start, var(--nl-surface)),
+          var(--nl-stat-card-bg-end, var(--nl-bg-soft))
+        );
+        box-shadow: var(--nl-stat-card-shadow, 0 2px 6px rgb(2 17 31 / 10%));
         min-width: 0;
       }
 
@@ -4150,6 +4180,17 @@
         background: var(--nl-surface);
       }
 
+      /* 0.1.11 (A1 親バグ根治): Chrome のデフォルト placeholder 色は
+         `color-scheme: light dark` 配下で半透明 system color となり、dark 背景
+         （toolbar standalone は INLINE_MODE=false で常に nl-skin-panel-dark）
+         で「ここにコメントを書いて送信」が極端に薄くなる。フレームに紐づく
+         `--nl-placeholder` を使い、4 プリセットすべてで AA コントラストを確保。
+         opacity:1 を明示しないと一部 UA で再度半透明化される。 */
+      .nl-comment-compose textarea::placeholder {
+        color: var(--nl-placeholder, var(--nl-muted));
+        opacity: 1;
+      }
+
       .nl-comment-compose textarea:focus-visible {
         outline: 2px solid #7dd3fc;
         outline-offset: 1px;
@@ -5735,6 +5776,9 @@
         --nl-danger-text: #fecaca;
         --nl-shadow: 0 12px 32px rgb(0 0 0 / 55%);
         --nl-frame-outline: rgb(100 116 139 / 35%);
+        /* 0.1.11 (A1): dark 背景上で読める明るめ placeholder。デフォルトの
+           #6b7280 は #0a0e14〜#161d27 の dark 面に対しコントラスト不足。 */
+        --nl-placeholder: #94a3b8;
       }
 
       html.nl-skin-panel-dark body {
@@ -5778,11 +5822,12 @@
         line-height: 1.25;
       }
 
-      html.nl-skin-panel-dark .nl-live-stat-card {
-        background: linear-gradient(160deg, #1a2330 0%, #141b24 100%);
-        box-shadow: 0 4px 16px rgb(0 0 0 / 38%);
-        border-color: rgb(100 116 139 / 32%);
-      }
+      /* 0.1.11 (A1 親バグ根治): 旧
+         `html.nl-skin-panel-dark .nl-live-stat-card { background: linear-gradient(160deg, #1a2330, #141b24); ... }`
+         はハードコード色のため light/sunset プリセット選択時にも dark カードが
+         当たる不整合があった。base `.nl-live-stat-card` ルールを `var(--nl-stat-card-*)`
+         に変数化し、各プリセット（light/dark/midnight/sunset/custom）が自分の vars を
+         提供することで、フレーム選択にカードの見た目が追従するようになった。 */
 
       html.nl-skin-panel-dark #postCommentBtn {
         background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);

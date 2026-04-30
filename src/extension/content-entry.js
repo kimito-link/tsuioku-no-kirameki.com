@@ -95,6 +95,7 @@ import {
 } from '../lib/voiceComment.js';
 import { audioConstraintsForDevice } from '../lib/voiceInputDevices.js';
 import { pollUntil } from '../lib/pollUntil.js';
+import { isInlinePanelHostReadyForFocus } from '../lib/inlinePanelFocusGate.js';
 import {
   extractEmbeddedDataProps,
   pickViewerCountFromEmbeddedData,
@@ -1759,19 +1760,20 @@ function renderInlinePanelFloatingHost() {
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
   host.style.opacity = '1';
-  // 閉じるボタン（A30）。floating placement では panel を非表示にする手段が
-  // なく、ユーザーは設定画面で placement を変えないと消せなかった。
-  // 一度だけ生成して再利用する（dataset.nlBound でガード）。
-  ensureInlineFloatingCloseButton(host);
+  // 閉じるボタン（A30）。元は floating 専用だったが、0.1.11 (B2) で dock_bottom
+  // にも追加（dock_bottom も同様に panel を非表示にする手段が無く、設定画面で
+  // placement を変えないと消せなかった）。一度だけ生成して再利用する。
+  ensureInlinePanelCloseButton(host);
 }
 
 /**
- * floating placement の host に「× 閉じる」ボタンを 1 つだけ用意する。
- * 押下時は host を hide + `inlinePanelToolbarShownThisSession` を false に戻し、
- * autoshow 設定でも次回ロードまで再表示しない（ユーザーが明示的に閉じた状態を尊重）。
+ * インラインパネル host に「× 閉じる」ボタンを 1 つだけ用意する（floating /
+ * dock_bottom 共通）。押下時は host を hide + `toolbarInitiatedShowThisSession`
+ * を false に戻し、autoshow 設定でも次回ロードまで再表示しない（ユーザーが
+ * 明示的に閉じた状態を尊重）。
  * @param {HTMLElement} host
  */
-function ensureInlineFloatingCloseButton(host) {
+function ensureInlinePanelCloseButton(host) {
   if (!host) return;
   let btn = /** @type {HTMLButtonElement|null} */ (
     host.querySelector('[data-nls-inline-close]')
@@ -1865,6 +1867,10 @@ function renderInlinePanelDockBottomHost() {
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
   host.style.opacity = '1';
+  // 0.1.11 (B2): dock_bottom でも閉じるボタンを設置（floating と共通）。
+  // 元は floating だけで「× 閉じる」を出していたが、dock_bottom も同じ理由で
+  // ユーザーが明示的に閉じる手段が必要だった（設定画面に行かないと消せない）。
+  ensureInlinePanelCloseButton(host);
 }
 
 /**
@@ -2395,18 +2401,33 @@ function inlineHostLooksVisible() {
 
 /**
  * ツールバーから：ページ内インラインパネルを前面化（スクロール＋ iframe フォーカス）。
- * @returns {boolean} ホストが見つかれば true
+ *
+ * 0.1.11 (B1 race fix): 旧実装は同期で即時判定しており、msg=NLS_FOCUS_INLINE_PANEL
+ *   受信 → renderPageFrameOverlay() で host 挿入直後の layout 未確定（rect=0）
+ *   タイミングで `r.width < 120` で false を返すケースがあった（toolbar popup
+ *   だけ出てインラインに前面化されない症状）。pollUntil で最大 500ms（rAF 約 16
+ *   フレーム相当）rect 確定を待ってから scrollIntoView + iframe.focus する。
+ *
+ * @returns {Promise<boolean>} ホストが見つかれば true
  */
-function focusInlinePanelHostFromToolbar() {
+async function focusInlinePanelHostFromToolbar() {
   if (!isWatchInlinePanelTopFrame()) return false;
   if (!isNicoLiveWatchUrl(window.location.href)) return false;
-  const host =
-    nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
-  if (!(host instanceof HTMLElement) || !host.isConnected) return false;
-  const cs = window.getComputedStyle(host);
-  if (cs.display === 'none' || cs.visibility === 'hidden') return false;
-  const r = host.getBoundingClientRect();
-  if (r.width < 120 || r.height < 120) return false;
+  const host = await pollUntil(
+    () => {
+      const h =
+        nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+      if (!(h instanceof HTMLElement)) return null;
+      const ready = isInlinePanelHostReadyForFocus(h, {
+        getComputedStyle: (el) => window.getComputedStyle(/** @type {Element} */ (el)),
+        getBoundingClientRect: (el) =>
+          /** @type {Element} */ (el).getBoundingClientRect()
+      });
+      return ready ? h : null;
+    },
+    { timeoutMs: 500, intervalMs: 30 }
+  );
+  if (!host) return false;
   try {
     // ツールバーからの前面化は意図的な大きなスクロール変化になり得るので、
     // 発生する scroll イベントを user-scroll として誤カウントしないよう抑止窓を張る。
@@ -4060,9 +4081,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     } catch {
       // no-op: loading UI は補助表示なので失敗しても本筋に影響しない
     }
-    const focused = focusInlinePanelHostFromToolbar();
-    sendResponse({ ok: true, focused });
-    return false;
+    /*
+     * 0.1.11 (B1 race fix): focusInlinePanelHostFromToolbar が async になったので
+     * sendResponse は IIFE 末尾で呼び、listener は `return true` でチャネルを
+     * 維持する（Chrome MV3: 非同期 sendResponse の必須パターン）。
+     */
+    void (async () => {
+      let focused = false;
+      try {
+        focused = await focusInlinePanelHostFromToolbar();
+      } catch {
+        // no-op: poll/scroll 失敗は致命的ではない
+      }
+      try {
+        sendResponse({ ok: true, focused });
+      } catch {
+        // no-op: 呼び出し元が消えていることもある
+      }
+    })();
+    return true;
   }
 
   if (msg.type === 'NLS_CAPTURE_SCREENSHOT') {
