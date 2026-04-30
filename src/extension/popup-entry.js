@@ -8838,7 +8838,13 @@ function initPopup() {
         if (btn) btn.disabled = false;
         return;
       }
-      const report = aggregateMarketingReport(comments, lid);
+      // 0.1.46 (AB): 配信者本人のコメ（合いの手等）を KPI 集計から除外
+      const reportBroadcasterUid = String(
+        watchMetaCache.snapshot?.broadcasterUserId || ''
+      ).trim();
+      const report = aggregateMarketingReport(comments, lid, {
+        broadcasterUserId: reportBroadcasterUid
+      });
       const maskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
       const maskShare = Boolean(maskEl?.checked);
       // 0.1.22 (W): 同接推移カーブ用のサンプル行を IDB から取得。失敗しても本体出力は継続。
@@ -8911,11 +8917,16 @@ function initPopup() {
           : [];
         if (fallbackComments.length > 0) {
           try {
+            // 0.1.46 (AB): fallback 経路でも配信者本人を集計除外する
+            const fallbackBroadcasterUid = String(
+              watchMetaCache.snapshot?.broadcasterUserId || ''
+            ).trim();
             const report = aggregateMarketingReport(
               /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
                 fallbackComments
               ),
-              lid || String(STORY_SOURCE_STATE.liveId || '').trim()
+              lid || String(STORY_SOURCE_STATE.liveId || '').trim(),
+              { broadcasterUserId: fallbackBroadcasterUid }
             );
             const maskEl = /** @type {HTMLInputElement|null} */ (
               $('devMonitorExportMarketingMaskLabels')

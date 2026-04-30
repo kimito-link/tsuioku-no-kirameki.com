@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.45（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.46（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,38 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.46 バンプで入った修正（マーケ分析の精度向上 AB）**:
+
+並列で 3 件の deep audit エージェントを走らせ（popup-entry / 性能 / マーケ分析）、
+合計 43 件の発見のうち高優先度・低リスクの 2 件を修正。
+
+- **M1 (AB): aggregateMarketingReport の配信者除外漏れ**
+  - 原因: 0.1.17 で `sectionTopUsers` と `sectionUsersWithThumbnails` の
+    表示時フィルタは入っていたが、`aggregateMarketingReport` の集計層は
+    `broadcasterUserId` を引数で受け取らず、配信者本人のコメ（合いの手等）
+    が KPI / CPM / uniqueUsers / timeline / segment / coreReturning に
+    そのまま入っていた。配信者が合いの手 50 コメ打つと CPM が +1〜2、
+    selfPosted% も歪む。
+  - 修正: `aggregateMarketingReport(comments, liveId, { broadcasterUserId })`
+    に optional 引数を追加し、`filtered` 段階で配信者 uid のコメを除外。
+    popup-entry.js の 2 ヶ所（dev export ボタン経路 + STORY_SOURCE_STATE
+    fallback 経路）から `watchMetaCache.snapshot.broadcasterUserId` を
+    渡す形に更新。テスト 5 ケース追加。
+
+- **M5 (AB): commentNo 欠落時の dedupe key に userId が無い**
+  - 原因: `buildDedupeKey` は `commentNo` ありなら `${liveId}|${no}|${text}`、
+    無しなら `${liveId}||${text}|${sec}` だった。NDGR 経由ではない DOM
+    intercept fallback や、commentNo が拾えない局面で複数ユーザーが同じ
+    1 秒内に同じ短文（"8888" / "草" 等）を打つと、最初の 1 件だけ採用
+    され残りは patch 扱いになる。マーケ分析の **L1 コメ伝染** / **L5
+    コメ被り瞬間** の `detectCommentSyncBursts` は minDistinctUsers=3 を
+    要求するが、複数ユーザーが 1 件にマージされて条件を満たさなくなり
+    検出不能だった。
+  - 修正: commentNo 欠落時のフォールバック key に userId を含める
+    （`${liveId}||${text}|${sec}|${uid}`）。同秒・同テキスト・別ユーザー
+    が別行として扱われるようになる。テスト 3 ケース追加（後方互換 +
+    別ユーザーの key 区別）。
 
 **0.1.45 バンプで入った修正（裏側クリーンアップ + プライバシー AT）**:
 

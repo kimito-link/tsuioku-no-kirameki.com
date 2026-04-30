@@ -484,7 +484,8 @@
       return `${liveId2}|${no}|${text}`;
     }
     const sec = Math.floor(Number(rec.capturedAt || 0) / 1e3);
-    return `${liveId2}||${text}|${sec}`;
+    const uid = String(rec.userId ?? "").trim();
+    return `${liveId2}||${text}|${sec}|${uid}`;
   }
   function randomId() {
     return `c_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;

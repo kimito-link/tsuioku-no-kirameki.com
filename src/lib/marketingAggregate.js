@@ -87,13 +87,27 @@
 
 /**
  * StoredComment の配列からマーケティング分析用の集計を行う。
+ *
+ * 0.1.46 (AB): 配信者本人を KPI / CPM / uniqueUsers / timeline / segment /
+ *   coreReturning 等の集計から除外する `broadcasterUserId` パラメータを追加。
+ *   0.1.17 で `sectionTopUsers` と `sectionUsersWithThumbnails` の表示時
+ *   フィルタは入っていたが、aggregate 層は配信者を含めたままで KPI が
+ *   歪んでいた（合いの手 50 コメで CPM が +1〜2、selfPosted% も歪む）。
+ *
  * @param {StoredComment[]} comments
  * @param {string} liveId
+ * @param {{ broadcasterUserId?: string }} [opts]
  * @returns {MarketingReport}
  */
-export function aggregateMarketingReport(comments, liveId) {
+export function aggregateMarketingReport(comments, liveId, opts = {}) {
+  const broadcasterUid = String(opts?.broadcasterUserId || '').trim();
   const filtered = comments.filter(
-    (c) => c.liveId === liveId && c.text && c.text.trim()
+    (c) =>
+      c.liveId === liveId &&
+      c.text &&
+      c.text.trim() &&
+      // 配信者本人のコメを除外（broadcasterUid が指定されたとき）
+      !(broadcasterUid && String(c.userId || '').trim() === broadcasterUid)
   );
 
   /** @type {Map<string, UserCommentProfile>} */

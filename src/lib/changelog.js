@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.46',
+    date: '2026-04-30',
+    summary: 'マーケ分析の精度向上',
+    items: Object.freeze([
+      'マーケ分析の KPI 集計から配信者本人のコメント（合いの手等）を除外（CPM・ユニーク・タイムラインが歪んでいた問題）',
+      'コメ被り検出（伝染・被り瞬間）が複数人の同時バーストを 1 件として扱っていた問題を修正（同秒・同テキスト・別ユーザーを別行扱いに）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.45',
     date: '2026-04-30',
     summary: '裏側のクリーンアップとプライバシー',

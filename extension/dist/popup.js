@@ -708,6 +708,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.46",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306E\u7CBE\u5EA6\u5411\u4E0A",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306E KPI \u96C6\u8A08\u304B\u3089\u914D\u4FE1\u8005\u672C\u4EBA\u306E\u30B3\u30E1\u30F3\u30C8\uFF08\u5408\u3044\u306E\u624B\u7B49\uFF09\u3092\u9664\u5916\uFF08CPM\u30FB\u30E6\u30CB\u30FC\u30AF\u30FB\u30BF\u30A4\u30E0\u30E9\u30A4\u30F3\u304C\u6B6A\u3093\u3067\u3044\u305F\u554F\u984C\uFF09",
+        "\u30B3\u30E1\u88AB\u308A\u691C\u51FA\uFF08\u4F1D\u67D3\u30FB\u88AB\u308A\u77AC\u9593\uFF09\u304C\u8907\u6570\u4EBA\u306E\u540C\u6642\u30D0\u30FC\u30B9\u30C8\u3092 1 \u4EF6\u3068\u3057\u3066\u6271\u3063\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\uFF08\u540C\u79D2\u30FB\u540C\u30C6\u30AD\u30B9\u30C8\u30FB\u5225\u30E6\u30FC\u30B6\u30FC\u3092\u5225\u884C\u6271\u3044\u306B\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.45",
       date: "2026-04-30",
       summary: "\u88CF\u5074\u306E\u30AF\u30EA\u30FC\u30F3\u30A2\u30C3\u30D7\u3068\u30D7\u30E9\u30A4\u30D0\u30B7\u30FC",
@@ -1143,7 +1152,8 @@
       return `${liveId}|${no}|${text}`;
     }
     const sec = Math.floor(Number(rec.capturedAt || 0) / 1e3);
-    return `${liveId}||${text}|${sec}`;
+    const uid = String(rec.userId ?? "").trim();
+    return `${liveId}||${text}|${sec}|${uid}`;
   }
 
   // src/lib/commentKindnessNudge.js
@@ -4851,9 +4861,11 @@ ${body}`;
   }
 
   // src/lib/marketingAggregate.js
-  function aggregateMarketingReport(comments, liveId) {
+  function aggregateMarketingReport(comments, liveId, opts = {}) {
+    const broadcasterUid = String(opts?.broadcasterUserId || "").trim();
     const filtered = comments.filter(
-      (c) => c.liveId === liveId && c.text && c.text.trim()
+      (c) => c.liveId === liveId && c.text && c.text.trim() && // 配信者本人のコメを除外（broadcasterUid が指定されたとき）
+      !(broadcasterUid && String(c.userId || "").trim() === broadcasterUid)
     );
     const userMap = /* @__PURE__ */ new Map();
     const timestamps = [];
@@ -15188,7 +15200,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2149" ? String("0430-2149") : "dev";
+      const buildId = "0430-2215" ? String("0430-2215") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -15629,7 +15641,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           if (btn) btn.disabled = false;
           return;
         }
-        const report = aggregateMarketingReport(comments, lid);
+        const reportBroadcasterUid = String(
+          watchMetaCache.snapshot?.broadcasterUserId || ""
+        ).trim();
+        const report = aggregateMarketingReport(comments, lid, {
+          broadcasterUserId: reportBroadcasterUid
+        });
         const maskEl = (
           /** @type {HTMLInputElement|null} */
           $("devMonitorExportMarketingMaskLabels")
@@ -15692,10 +15709,14 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           const fallbackComments = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
           if (fallbackComments.length > 0) {
             try {
+              const fallbackBroadcasterUid = String(
+                watchMetaCache.snapshot?.broadcasterUserId || ""
+              ).trim();
               const report = aggregateMarketingReport(
                 /** @type {import('../lib/commentRecord.js').StoredComment[]} */
                 fallbackComments,
-                lid || String(STORY_SOURCE_STATE.liveId || "").trim()
+                lid || String(STORY_SOURCE_STATE.liveId || "").trim(),
+                { broadcasterUserId: fallbackBroadcasterUid }
               );
               const maskEl = (
                 /** @type {HTMLInputElement|null} */

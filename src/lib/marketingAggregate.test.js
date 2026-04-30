@@ -131,3 +131,70 @@ describe('aggregateMarketingReport', () => {
     expect(r.quarterEngagement.uniqueCommentersBothQuarters).toBe(1);
   });
 });
+
+/*
+ * 0.1.46 (AB): aggregateMarketingReport が broadcasterUserId 指定時に
+ *   配信者本人のコメントを集計から除外する純粋ロジックの確認。
+ */
+describe('aggregateMarketingReport - broadcaster 除外', () => {
+  it('broadcasterUserId 指定 → 該当ユーザーのコメは KPI / unique / timeline 全部から除外', () => {
+    const comments = [
+      c(1, 'broadcaster-uid', '配信者の合いの手 1', 0),
+      c(2, 'broadcaster-uid', '配信者の合いの手 2', 1_000),
+      c(3, 'viewer-uid-1', '視聴者 1', 2_000),
+      c(4, 'viewer-uid-2', '視聴者 2', 3_000),
+      c(5, 'viewer-uid-1', '視聴者 1 again', 4_000)
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1', {
+      broadcasterUserId: 'broadcaster-uid'
+    });
+    expect(r.totalComments).toBe(3);
+    expect(r.uniqueUsers).toBe(2);  // 視聴者 1, 視聴者 2
+    expect(r.topUsers.find((u) => u.userId === 'broadcaster-uid')).toBeUndefined();
+  });
+
+  it('broadcasterUserId 未指定（旧挙動）→ 全員集計', () => {
+    const comments = [
+      c(1, 'broadcaster-uid', '合いの手', 0),
+      c(2, 'viewer-uid-1', '視聴者', 1_000)
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1');
+    expect(r.totalComments).toBe(2);
+    expect(r.uniqueUsers).toBe(2);
+  });
+
+  it('broadcasterUserId が空文字 → 全員集計（除外条件を満たさない）', () => {
+    const comments = [
+      c(1, 'broadcaster-uid', '合いの手', 0),
+      c(2, 'viewer-uid-1', '視聴者', 1_000)
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1', {
+      broadcasterUserId: ''
+    });
+    expect(r.totalComments).toBe(2);
+  });
+
+  it('broadcasterUserId が前後空白 → trim して比較', () => {
+    const comments = [
+      c(1, '12345', '配信者', 0),
+      c(2, 'viewer-1', '視聴者', 1_000)
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1', {
+      broadcasterUserId: '  12345  '
+    });
+    expect(r.totalComments).toBe(1);
+    expect(r.topUsers.find((u) => u.userId === '12345')).toBeUndefined();
+  });
+
+  it('userId 空のコメは broadcaster と一致しないので除外されない', () => {
+    const comments = [
+      c(1, '', '匿名コメ', 0),
+      c(2, 'broadcaster', '合いの手', 1_000)
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1', {
+      broadcasterUserId: 'broadcaster'
+    });
+    expect(r.totalComments).toBe(1);
+    expect(r.topUsers.find((u) => u.userId.startsWith('anon:'))).toBeDefined();
+  });
+});
