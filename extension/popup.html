@@ -156,6 +156,17 @@
         display: none;
       }
 
+      /* 0.1.64 (AT2): standalone popup window でも Chrome 自身のタイトルバー
+         （拡張アイコン + 拡張名）が出ているため、内部の nl-header（ロゴ帯）は
+         冗長で「枠が 2 つ」に見える。INLINE_MODE 時はクラス nl-inline で既に
+         hidden だが、それ以外（standalone window / ツールバー popup）でも
+         non-watch でランキング導線を出すケースで二重表示が目立つので非表示に
+         揃える。watch ページ埋め込み (nl-inline) は元から hidden、ここで
+         standalone も hidden に拡張するだけなので、表示が出るパスは無い。 */
+      body .nl-header {
+        display: none;
+      }
+
       /* ページ内パネル（inline=1）: ツールバー向けのブロックは出さない */
       html.nl-inline body [data-nl-toolbar-only] {
         display: none;
@@ -4043,6 +4054,19 @@
         line-height: 1.35;
       }
 
+      /* 0.1.64 (AT4): 「横付き」を選んでも 1200px 未満だと『プレイヤー行の下』
+         と同じ動作になり、ユーザーから「切り替えても何も変わらない」報告が
+         あった。ヒント文を warning 調に強調して見落とされないようにする。 */
+      .nl-panel-placement-hint--warning {
+        background: #fff7e0;
+        border: 1px solid #f6c869;
+        border-radius: 6px;
+        padding: 4px 8px;
+        margin-top: 4px;
+        color: #7a4f00;
+        font-weight: 700;
+      }
+
       .nl-floating-anchor-wrap {
         margin-top: 6px;
         padding-top: 8px;
@@ -6573,8 +6597,8 @@
                   id="inlinePanelPlacementBeside"
                 />
                 横付き（親のレイアウトに合わせる・従来に近い）
-                <span class="nl-panel-placement-hint"
-                  >画面幅が約1200px未満では、公式UIとの競合を避けるため自動で下に表示します。</span>
+                <span class="nl-panel-placement-hint nl-panel-placement-hint--warning"
+                  >⚠️ 画面幅が約1200px未満では、選んでも『プレイヤー行の下』と同じ動作になります（公式UIとの競合回避のため自動で下に表示）。広いウィンドウで使ってください。</span>
               </label>
               <label>
                 <input

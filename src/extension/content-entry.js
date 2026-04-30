@@ -88,6 +88,7 @@ import {
   effectiveInlinePanelPlacement,
   selectBestPlayerRectIndex
 } from '../lib/inlinePanelLayout.js';
+import { scoreInlineHostAnchorCandidate } from '../lib/inlineHostAnchorScoring.js';
 import {
   applyRecognitionResult,
   isVoiceCommentSupported,
@@ -1900,11 +1901,29 @@ function renderInlinePanelDockBottomHost() {
  * video から親を辿り、プレイヤー列（映像＋公式コメント欄を含むブロック）相当の要素を選ぶ。
  * その要素の「直後」にホストを置くと、コメント入力バーの下〜列の下に自然に付く（video 直後だけだとバーの上に挟まることがある）。
  * body / documentElement は候補にしない（誤って最外に出さない）。
+ *
+ * 0.1.64 (AT): 旧スコアリング (aspect <= 3.4 / area <= viewport*0.92) は緩く、
+ *   ニコ生 SPA で「視聴行 + コメント欄 + バナー一式」を含む巨大ラッパーがヒット
+ *   して、その直後（description / Amazon / 関連配信の直前）にパネルが挿入される
+ *   事象が頻発していた。`scoreInlineHostAnchorCandidate` (純粋関数) に切り出し、
+ *   video rect とのジオメトリ整合（幅比 0.95–1.6 / 高さ比上限 / top オフセット
+ *   上限）まで含めて厳格化した。0.1.63 で below → dock_bottom の応急 migration
+ *   を入れているが、本関数の改善で `below` モードを再度推奨できる品質に戻す
+ *   下地ができた。詳細は src/lib/inlineHostAnchorScoring.js のヘッダコメント参照。
  * @param {HTMLElement} base
  */
 function findFrameInsertAnchorFromVideo(base) {
   if (!(base instanceof HTMLElement)) return base;
-  const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const videoEl =
+    base instanceof HTMLVideoElement ? base : base.querySelector?.('video');
+  const vr = (videoEl ?? base).getBoundingClientRect();
+  const videoRect = {
+    left: vr.left,
+    top: vr.top,
+    width: vr.width,
+    height: vr.height
+  };
   /** @type {{ el: HTMLElement, score: number }|null} */
   let best = null;
   let cur = base;
@@ -1914,18 +1933,14 @@ function findFrameInsertAnchorFromVideo(base) {
       cur = cur.parentElement;
       continue;
     }
-    const rect = cur.getBoundingClientRect();
-    const area = rect.width * rect.height;
-    const aspect = rect.width / Math.max(rect.height, 1);
-    if (
-      rect.width >= 260 &&
-      rect.height >= 140 &&
-      area <= viewportArea * 0.92 &&
-      aspect >= 1 &&
-      aspect <= 3.4
-    ) {
-      const score = area * (1.25 - Math.min(Math.abs(aspect - 1.78), 1.1) * 0.2);
-      if (!best || score > best.score) best = { el: cur, score };
+    const r = cur.getBoundingClientRect();
+    const result = scoreInlineHostAnchorCandidate({
+      rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+      viewport,
+      videoRect
+    });
+    if (result.eligible && (!best || result.score > best.score)) {
+      best = { el: cur, score: result.score };
     }
     cur = cur.parentElement;
   }

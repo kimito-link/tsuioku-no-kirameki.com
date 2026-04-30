@@ -2368,6 +2368,64 @@
     return s;
   }
 
+  // src/lib/inlineHostAnchorScoring.js
+  var DEFAULT_INLINE_HOST_ANCHOR_LIMITS = Object.freeze({
+    minWidth: 260,
+    minHeight: 140,
+    maxAreaRatio: 0.6,
+    minAspect: 1,
+    maxAspect: 2.6,
+    minWidthRatioToVideo: 0.95,
+    maxWidthRatioToVideo: 1.6,
+    maxHeightRatioToVideo: 3.5,
+    maxTopOffsetFromVideo: 120
+  });
+  var ASPECT_IDEAL = 16 / 9;
+  var IDEAL_WIDTH_RATIO = 1.15;
+  function scoreInlineHostAnchorCandidate(input, overrides = {}) {
+    const limits = { ...DEFAULT_INLINE_HOST_ANCHOR_LIMITS, ...overrides };
+    const { rect, viewport, videoRect } = input;
+    const viewportArea = Math.max(1, viewport.width * viewport.height);
+    const area = Math.max(0, rect.width * rect.height);
+    const aspect = rect.width / Math.max(rect.height, 1);
+    if (rect.width < limits.minWidth) {
+      return { eligible: false, score: 0, reason: "width<min" };
+    }
+    if (rect.height < limits.minHeight) {
+      return { eligible: false, score: 0, reason: "height<min" };
+    }
+    if (area > viewportArea * limits.maxAreaRatio) {
+      return { eligible: false, score: 0, reason: "area>max" };
+    }
+    if (aspect < limits.minAspect) {
+      return { eligible: false, score: 0, reason: "aspect<min" };
+    }
+    if (aspect > limits.maxAspect) {
+      return { eligible: false, score: 0, reason: "aspect>max" };
+    }
+    const videoWidth = Math.max(1, videoRect.width);
+    const videoHeight = Math.max(1, videoRect.height);
+    const widthRatio = rect.width / videoWidth;
+    const heightRatio = rect.height / videoHeight;
+    const topOffset = Math.abs(rect.top - videoRect.top);
+    if (widthRatio < limits.minWidthRatioToVideo) {
+      return { eligible: false, score: 0, reason: "width<videoMin" };
+    }
+    if (widthRatio > limits.maxWidthRatioToVideo) {
+      return { eligible: false, score: 0, reason: "width>videoMax" };
+    }
+    if (heightRatio > limits.maxHeightRatioToVideo) {
+      return { eligible: false, score: 0, reason: "height>videoMax" };
+    }
+    if (topOffset > limits.maxTopOffsetFromVideo) {
+      return { eligible: false, score: 0, reason: "topOffset>max" };
+    }
+    const aspectPenalty = Math.min(Math.abs(aspect - ASPECT_IDEAL), 1.1) * 0.18;
+    const widthPenalty = Math.min(Math.abs(widthRatio - IDEAL_WIDTH_RATIO), 0.6) * 0.15;
+    const score = area * (1 - aspectPenalty - widthPenalty);
+    return { eligible: true, score, reason: "ok" };
+  }
+
   // src/lib/voiceComment.js
   var VOICE_COMMENT_MAX_CHARS = 250;
   function isVoiceCommentSupported() {
@@ -4797,7 +4855,15 @@
   }
   function findFrameInsertAnchorFromVideo(base) {
     if (!(base instanceof HTMLElement)) return base;
-    const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const videoEl = base instanceof HTMLVideoElement ? base : base.querySelector?.("video");
+    const vr = (videoEl ?? base).getBoundingClientRect();
+    const videoRect = {
+      left: vr.left,
+      top: vr.top,
+      width: vr.width,
+      height: vr.height
+    };
     let best = null;
     let cur = base;
     for (let i = 0; i < 8 && cur; i++) {
@@ -4806,12 +4872,14 @@
         cur = cur.parentElement;
         continue;
       }
-      const rect = cur.getBoundingClientRect();
-      const area = rect.width * rect.height;
-      const aspect = rect.width / Math.max(rect.height, 1);
-      if (rect.width >= 260 && rect.height >= 140 && area <= viewportArea * 0.92 && aspect >= 1 && aspect <= 3.4) {
-        const score = area * (1.25 - Math.min(Math.abs(aspect - 1.78), 1.1) * 0.2);
-        if (!best || score > best.score) best = { el: cur, score };
+      const r = cur.getBoundingClientRect();
+      const result = scoreInlineHostAnchorCandidate({
+        rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+        viewport,
+        videoRect
+      });
+      if (result.eligible && (!best || result.score > best.score)) {
+        best = { el: cur, score: result.score };
       }
       cur = cur.parentElement;
     }

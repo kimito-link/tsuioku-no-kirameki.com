@@ -502,12 +502,23 @@ async function openOrFocusPopupWindow() {
     // no-op
   }
   /*
-   * 0.1.61 (AQ) → 0.1.62 (AR): popup を Chrome の右端に「密着」させる。
-   *   ユーザー報告「くっついてない時点でおかしい」への対応。
-   *     - left = Chrome の右端そのもの（popup は Chrome の外側に隣接）
-   *     - top  = Chrome の上端と揃える
-   *   Chrome window の右隣に popup が並ぶ形になる。Chrome の content に
-   *   被らず、視覚的にも一体感が出る。画面右端からはみ出る場合は clamp。
+   * 0.1.61 (AQ) → 0.1.62 (AR) → 0.1.64 (AT3): popup を Chrome window の
+   *   「右内側」に配置する。
+   *
+   *   経緯:
+   *     0.1.62 では Chrome の右**外**側 (left = lastNormal.left + width) に
+   *     置いていた。Chrome がモニタ A の右寄りにいると、外側＝モニタ B
+   *     （隣のモニタ）になる。多モニタ環境（5 モニタ等）では popup が別の
+   *     モニタに飛んでしまう報告。
+   *   修正:
+   *     popup の left を「Chrome の右端 - POPUP_WIDTH」にし、Chrome window の
+   *     **内側**右上に出す。Chrome content の右側と少し被るが、必ず Chrome の
+   *     いるモニタに popup が出るので「別モニタに飛ぶ」事故を完全に防げる。
+   *     ユーザー要望「Chrome から離れて出るのはおかしい」（=右側に並べたい）の
+   *     趣旨も保つ。
+   *     Chrome window が POPUP_WIDTH より狭い極端ケースでは window 全体に
+   *     被るが、その場合は元々が異常状態なので無視（左端を超えない clamp で
+   *     十分）。
    */
   /** @type {{ left?: number, top?: number }} */
   const positionHint = {};
@@ -521,11 +532,10 @@ async function openOrFocusPopupWindow() {
       typeof lastNormal.top === 'number' &&
       typeof lastNormal.width === 'number'
     ) {
-      // Chrome の右端ぴったりに popup の左端を合わせる
-      const left = lastNormal.left + lastNormal.width;
-      // Chrome の上端と揃える（タイトルバーが少しずれるのは Chrome 仕様）
+      // Chrome window の右**内側**に popup の右端を合わせる（content の右側と被るが必ず同モニタ）
+      const left = lastNormal.left + lastNormal.width - POPUP_WINDOW_WIDTH;
       const top = lastNormal.top;
-      positionHint.left = Math.max(0, Math.round(left));
+      positionHint.left = Math.max(lastNormal.left, Math.round(left));
       positionHint.top = Math.max(0, Math.round(top));
     }
   } catch {

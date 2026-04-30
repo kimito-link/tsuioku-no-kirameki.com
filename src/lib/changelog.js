@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.64',
+    date: '2026-05-01',
+    summary: 'パネル位置の根治＋popup 表示まわりの不具合修正',
+    items: Object.freeze([
+      'watch ページのパネルが「ページ最下部（amazon・関連配信の後ろ）」に出る現象の根本原因（祖先候補の選定が緩く、視聴行+コメ欄+バナー一式の巨大ラッパーまで拾っていた）を修正。判定を純粋関数に切り出し、video の rect とのジオメトリ整合（幅比 0.95–1.6・top オフセット 120px・aspect 上限 2.6・面積上限 viewport 60%）まで含めて厳格化しました（0.1.63 の応急 migration と組み合わせて二重で改善）',
+      'ツールバーから popup を開いた時、popup window の中に冗長な「君斗りんくの追憶のきらめき」ロゴ帯が出ていて Chrome 自身のタイトルバーと「枠が 2 つ」に見えていた問題を修正。standalone window では内部ヘッダーを非表示にしました',
+      '5 モニタなどの多モニタ環境で、popup window が Chrome window の隣のモニタに飛んでしまう問題を修正。popup を Chrome window の右内側に配置するよう変更し、必ず Chrome のいるモニタに popup が出るようになりました（Chrome の content 右側と少し被るのは許容）',
+      '画面幅が約1200px未満で「横付き」を選んでも自動で「プレイヤー行の下」と同じ動作になる仕様について、見落とされやすかったヒント文を警告調（黄色背景 + 太字）に強調しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.63',
     date: '2026-05-01',
     summary: '配信時のパネル位置を player の近くに戻す',

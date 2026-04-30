@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.63（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.64（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,45 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.64 バンプで入った修正（findFrame 根治 + popup 系まとめ AT/AT2/AT3/AT4）**:
+
+- **AT2 (popup 内部ヘッダー非表示)**: standalone popup window でも内部の
+  `<header class="nl-header">` ロゴ帯が表示され、Chrome 自身のタイトルバーと
+  「枠が 2 つ」に見える問題。`body .nl-header { display: none; }` を追加して
+  全モードで内部ヘッダーを非表示に揃えた（INLINE_MODE は元から hidden）。
+- **AT3 (popup 多モニタ対応)**: 0.1.62 (AR) で popup を Chrome の右**外**側に
+  配置していたが、5 モニタ環境では Chrome のいるモニタの境界を越えて popup が
+  別モニタに飛んでしまうユーザー報告。popup の left を `lastNormal.left +
+  width - POPUP_WIDTH` に変更し、Chrome window の**内側**右上に出すよう修正。
+  Chrome content の右側と少し被るが、必ず Chrome のいるモニタに popup が出る。
+  `chrome.system.display` permission は追加せず、CWS 審査を増やさない設計。
+- **AT4 (横付きヒント強調)**: 1200px 未満で「横付き」を選んでも自動 fallback で
+  「プレイヤー行の下」と同じ動作になる仕様について、ユーザー報告「切り替えても
+  何も変わらない」。ヒント文を `nl-panel-placement-hint--warning` クラスで黄色
+  背景 + 太字に強調して見落とされないようにした。
+
+**0.1.64 バンプで入った修正（findFrame 根治 AT）**:
+
+- 経緯: 0.1.63 (AS) で `below` → `dock_bottom` の応急 migration を入れたが、
+  ユーザー要望「応急処置でなく将来を見据えての設計に」に応えるための本格修正。
+  watch ページのパネルが「ページ最下部（amazon・関連配信の後ろ）」に出る根本
+  原因は `findFrameInsertAnchorFromVideo` (content-entry.js:1905) のスコアリング
+  が緩いこと（`aspect <= 3.4 && area <= viewport*0.92` のみ）で、ニコ生 SPA の
+  「視聴行 + コメ欄 + バナー一式」の巨大ラッパーがヒットしていた。
+- 修正: スコアリング部分を純粋関数 `scoreInlineHostAnchorCandidate`
+  (`src/lib/inlineHostAnchorScoring.js` 新設、TDD 16 ケース) に切り出し、以下の
+  ジオメトリ制約を追加:
+  - aspect 上限: 3.4 → **2.6**（横並び layout に余裕を持たせつつ巨大ラッパー除外）
+  - 面積上限: viewport の 92% → **60%**
+  - **video 幅比**: 候補幅 / video 幅 ∈ [0.95, 1.6]（コメ列を含む程度に絞る）
+  - **video 高さ比**: 候補高 / video 高 ≤ 3.5
+  - **top オフセット**: |候補 top − video top| ≤ 120px（視聴行から離れた要素を除外）
+- DOM 走査ループ部分（祖先 8 段辿り）は content-entry.js に残し、純粋関数を
+  呼ぶように書き換え。`scoreInlineHostAnchorCandidate` は jsdom 不要でテスト可能。
+- これで `below` モードを再度推奨できる品質に近づいたが、0.1.63 の migration
+  flag は維持しつつ、設定 UI で意図的に `below` を再選択したユーザーには新しい
+  スコアリングが適用される。
 
 **0.1.54 バンプで入った変更（ランキング導線を常時表示 AJ）**:
 
