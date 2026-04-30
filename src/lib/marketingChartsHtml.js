@@ -907,9 +907,10 @@ function sectionDepartedHeavy(departed, maskShare, identiconResolver) {
   if (maskShare) return ''; // 個人特定リストなので共有モードでは出さない
   const rows = departed
     .map((d, i) => {
+      // 0.1.34 (AI): 過去配信から拾えた nickname を表示する
       const labelHtml = buildUserProfileLinkedLabelHtml(
         d.userId,
-        displayUserLabel(d.userId, '')
+        displayUserLabel(d.userId, d.nickname || '')
       );
       // 0.1.27 (AB): 数値 ID なら CDN usericon、a:プレフィックスなら identicon
       // を出す。avatarUrl は離反者なので過去配信のものが来る保証がないため、
@@ -956,9 +957,10 @@ function sectionAttendanceMatrix(matrix, maskShare, identiconResolver) {
     .join('');
   const rows = matrix.users
     .map((u) => {
+      // 0.1.34 (AI): 過去配信から拾えた nickname を表示する
       const labelHtml = buildUserProfileLinkedLabelHtml(
         u.userId,
-        displayUserLabel(u.userId, '')
+        displayUserLabel(u.userId, u.nickname || '')
       );
       const thumbSrc = resolveReportUserThumbSrc({
         userId: u.userId,

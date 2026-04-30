@@ -700,6 +700,32 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.34",
+      date: "2026-04-30",
+      summary: "\u96E2\u53CD/\u51FA\u5E2D\u306B\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0\u3092\u8868\u793A",
+      items: Object.freeze([
+        "\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP / \u5E38\u9023\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC\u3067\u3001\u904E\u53BB\u914D\u4FE1\u304B\u3089\u62FE\u3048\u305F\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0\u3092\u30E6\u30FC\u30B6\u30FC\u6B04\u306B\u8868\u793A",
+        "ID \u3060\u3051\u3067\u306F\u8AB0\u304B\u601D\u3044\u51FA\u305B\u306A\u3044\u554F\u984C\u3092\u6539\u5584\uFF08\u6570\u5024 ID \u3082\u30CF\u30F3\u30C9\u30EB\u540D\u3064\u304D\u3067\u8868\u793A\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.33",
+      date: "2026-04-30",
+      summary: "\u30D1\u30CD\u30EB\u6E96\u5099\u6642\u9593\u3092\u77ED\u7E2E\uFF082\u79D2\u21920.8\u79D2\uFF09",
+      items: Object.freeze([
+        "\u30D1\u30CD\u30EBiframe \u306E\u4E8B\u524D\u30ED\u30FC\u30C9\uFF08prewarm\uFF09\u306E\u8D77\u52D5\u30BF\u30A4\u30DF\u30F3\u30B0\u3092 2 \u79D2\u5F8C \u2192 0.8 \u79D2\u5F8C\u306B\u77ED\u7E2E\u3002kon-ta \u5373\u62BC\u3057\u6642\u306E\u4F53\u611F\u53CD\u5FDC\u3092\u6539\u5584"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.32",
+      date: "2026-04-30",
+      summary: "\u8907\u6570\u30BF\u30D6\u6642\u306E panel \u53CD\u5FDC\u6027\u3092\u6539\u5584",
+      items: Object.freeze([
+        "\u30D0\u30C3\u30AF\u30B0\u30E9\u30A6\u30F3\u30C9\u306E\u30BF\u30D6\u3067\u306F panel iframe \u306E\u4E8B\u524D\u30ED\u30FC\u30C9\uFF08prewarm\uFF09\u3092\u30B9\u30AD\u30C3\u30D7\u3002\u8907\u6570\u306E watch \u30BF\u30D6\u3092\u540C\u6642\u306B\u958B\u3044\u305F\u6642\u3001CPU/\u5E2F\u57DF\u306E\u53D6\u308A\u5408\u3044\u3067 kon-ta \u62BC\u4E0B\u6642\u306E\u4F53\u611F\u53CD\u5FDC\u304C\u60AA\u5316\u3057\u3066\u3044\u305F\u554F\u984C\u3092\u6291\u6B62",
+        "\u30BF\u30D6\u304C\u53EF\u8996\u5316\u3055\u308C\u305F\u6642\u306B prewarm \u304C\u81EA\u52D5\u518D\u30B9\u30B1\u30B8\u30E5\u30FC\u30EB\u3055\u308C\u308B\u4ED5\u7D44\u307F\u3092\u8FFD\u52A0"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.31",
       date: "2026-04-30",
       summary: "\u9023\u7D9ADL\u6642\u306E\u30E1\u30E2\u30EA\u4F7F\u7528\u91CF\u3092\u524A\u6E1B",
@@ -5318,13 +5344,17 @@ ${body}`;
       for (const c of cs) {
         const uid = cleanUid(c?.userId);
         if (!uid) continue;
+        const nick = String(c?.nickname == null ? "" : c.nickname).trim();
         let row = map.get(uid);
         if (!row) {
-          row = { userId: uid, totalComments: 0, broadcastIds: /* @__PURE__ */ new Set() };
+          row = { userId: uid, totalComments: 0, broadcastIds: /* @__PURE__ */ new Set(), nickname: "" };
           map.set(uid, row);
         }
         row.totalComments += 1;
         row.broadcastIds.add(lid);
+        if (nick && nick.length > row.nickname.length) {
+          row.nickname = nick;
+        }
       }
     }
     return map;
@@ -5384,6 +5414,8 @@ ${body}`;
       if (row.totalComments < heavyThreshold) continue;
       departed.push({
         userId: uid,
+        // 0.1.34 (AI): 表示用 nickname も返す（過去配信から最も詳しいハンドル名）。
+        nickname: row.nickname || "",
         totalComments: row.totalComments,
         broadcastCount: row.broadcastIds.size
       });
@@ -5398,6 +5430,7 @@ ${body}`;
     if (!broadcasts.length) return { users: [], broadcasts: [] };
     const perBroadcast = [];
     const totals = /* @__PURE__ */ new Map();
+    const nicknames = /* @__PURE__ */ new Map();
     for (const b of broadcasts) {
       if (!b || typeof b !== "object") continue;
       const lid = cleanUid(b.liveId);
@@ -5409,12 +5442,18 @@ ${body}`;
         if (!uid) continue;
         userCount.set(uid, (userCount.get(uid) || 0) + 1);
         totals.set(uid, (totals.get(uid) || 0) + 1);
+        const nick = String(c?.nickname == null ? "" : c.nickname).trim();
+        if (nick) {
+          const cur = nicknames.get(uid) || "";
+          if (nick.length > cur.length) nicknames.set(uid, nick);
+        }
       }
       perBroadcast.push({ liveId: lid, users: userCount });
     }
     const ranked = [...totals.entries()].map(([uid, n]) => ({ userId: uid, totalComments: n })).sort((a, b) => b.totalComments - a.totalComments).slice(0, topN);
     const users = ranked.map((u) => ({
       userId: u.userId,
+      nickname: nicknames.get(u.userId) || "",
       totalComments: u.totalComments,
       attendance: perBroadcast.map((b) => b.users.has(u.userId) ? 1 : 0)
     }));
@@ -6733,7 +6772,7 @@ ${dots}
     const rows = departed.map((d, i) => {
       const labelHtml = buildUserProfileLinkedLabelHtml(
         d.userId,
-        displayUserLabel(d.userId, "")
+        displayUserLabel(d.userId, d.nickname || "")
       );
       const thumbSrc = resolveReportUserThumbSrc({
         userId: d.userId,
@@ -6766,7 +6805,7 @@ ${dots}
     const rows = matrix.users.map((u) => {
       const labelHtml = buildUserProfileLinkedLabelHtml(
         u.userId,
-        displayUserLabel(u.userId, "")
+        displayUserLabel(u.userId, u.nickname || "")
       );
       const thumbSrc = resolveReportUserThumbSrc({
         userId: u.userId,
@@ -14985,7 +15024,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1807" ? String("0430-1807") : "dev";
+      const buildId = "0430-1837" ? String("0430-1837") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

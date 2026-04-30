@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.34',
+    date: '2026-04-30',
+    summary: '離反/出席にニックネームを表示',
+    items: Object.freeze([
+      '離反コメンター TOP / 常連出席カレンダーで、過去配信から拾えたニックネームをユーザー欄に表示',
+      'ID だけでは誰か思い出せない問題を改善（数値 ID もハンドル名つきで表示）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.33',
     date: '2026-04-30',
     summary: 'パネル準備時間を短縮（2秒→0.8秒）',

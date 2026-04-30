@@ -11,7 +11,7 @@
  */
 
 /**
- * @typedef {{ userId?: string|null }} HistoricalCommentInput
+ * @typedef {{ userId?: string|null, nickname?: string|null }} HistoricalCommentInput
  */
 
 /**
@@ -31,13 +31,17 @@ function cleanUid(v) {
 }
 
 /**
- * 過去配信から「userId → 累積コメ数 / 出現放送数」の Map を作る（currentLiveId 除外）。
+ * 過去配信から「userId → 累積コメ数 / 出現放送数 / nickname」の Map を作る
+ * （currentLiveId 除外）。0.1.34 (AI): 表示用に nickname も同時に集約する。
+ * 同じ userId で nickname が複数あった場合は「最も長い」候補を採用（ハンドル名は
+ * 詳しいほどよい想定）。
+ *
  * @param {BroadcastBundle[]} pastBroadcasts
  * @param {string} currentLiveId
- * @returns {Map<string, { userId: string, totalComments: number, broadcastIds: Set<string> }>}
+ * @returns {Map<string, { userId: string, totalComments: number, broadcastIds: Set<string>, nickname: string }>}
  */
 function indexPastUsers(pastBroadcasts, currentLiveId) {
-  /** @type {Map<string, { userId: string, totalComments: number, broadcastIds: Set<string> }>} */
+  /** @type {Map<string, { userId: string, totalComments: number, broadcastIds: Set<string>, nickname: string }>} */
   const map = new Map();
   const currentLid = cleanUid(currentLiveId).toLowerCase();
   const list = Array.isArray(pastBroadcasts) ? pastBroadcasts : [];
@@ -50,13 +54,18 @@ function indexPastUsers(pastBroadcasts, currentLiveId) {
     for (const c of cs) {
       const uid = cleanUid(c?.userId);
       if (!uid) continue;
+      const nick = String(c?.nickname == null ? '' : c.nickname).trim();
       let row = map.get(uid);
       if (!row) {
-        row = { userId: uid, totalComments: 0, broadcastIds: new Set() };
+        row = { userId: uid, totalComments: 0, broadcastIds: new Set(), nickname: '' };
         map.set(uid, row);
       }
       row.totalComments += 1;
       row.broadcastIds.add(lid);
+      // 0.1.34 (AI): より「詳しい」nickname（長い方）を残す
+      if (nick && nick.length > row.nickname.length) {
+        row.nickname = nick;
+      }
     }
   }
   return map;
@@ -133,7 +142,7 @@ export function classifyCommentersAgainstHistory(input) {
  *   heavyThreshold?: number,
  *   topN?: number
  * } | null | undefined} input
- * @returns {{ userId: string, totalComments: number, broadcastCount: number }[]}
+ * @returns {{ userId: string, nickname: string, totalComments: number, broadcastCount: number }[]}
  */
 export function findDepartedHeavyCommenters(input) {
   const params = input && typeof input === 'object' ? input : {};
@@ -160,6 +169,8 @@ export function findDepartedHeavyCommenters(input) {
     if (row.totalComments < heavyThreshold) continue;
     departed.push({
       userId: uid,
+      // 0.1.34 (AI): 表示用 nickname も返す（過去配信から最も詳しいハンドル名）。
+      nickname: row.nickname || '',
       totalComments: row.totalComments,
       broadcastCount: row.broadcastIds.size
     });
@@ -176,6 +187,7 @@ export function findDepartedHeavyCommenters(input) {
  * @returns {{
  *   users: {
  *     userId: string,
+ *     nickname: string,
  *     totalComments: number,
  *     attendance: number[]
  *   }[],
@@ -194,6 +206,8 @@ export function buildCommenterAttendanceMatrix(input) {
   const perBroadcast = [];
   /** @type {Map<string, number>} */
   const totals = new Map();
+  /** @type {Map<string, string>} 0.1.34 (AI): userId -> 最も詳しい nickname */
+  const nicknames = new Map();
   for (const b of broadcasts) {
     if (!b || typeof b !== 'object') continue;
     const lid = cleanUid(b.liveId);
@@ -206,6 +220,11 @@ export function buildCommenterAttendanceMatrix(input) {
       if (!uid) continue;
       userCount.set(uid, (userCount.get(uid) || 0) + 1);
       totals.set(uid, (totals.get(uid) || 0) + 1);
+      const nick = String(c?.nickname == null ? '' : c.nickname).trim();
+      if (nick) {
+        const cur = nicknames.get(uid) || '';
+        if (nick.length > cur.length) nicknames.set(uid, nick);
+      }
     }
     perBroadcast.push({ liveId: lid, users: userCount });
   }
@@ -216,9 +235,10 @@ export function buildCommenterAttendanceMatrix(input) {
     .sort((a, b) => b.totalComments - a.totalComments)
     .slice(0, topN);
 
-  /** @type {{ userId: string, totalComments: number, attendance: number[] }[]} */
+  /** @type {{ userId: string, nickname: string, totalComments: number, attendance: number[] }[]} */
   const users = ranked.map((u) => ({
     userId: u.userId,
+    nickname: nicknames.get(u.userId) || '',
     totalComments: u.totalComments,
     attendance: perBroadcast.map((b) => (b.users.has(u.userId) ? 1 : 0))
   }));

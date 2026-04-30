@@ -9,7 +9,10 @@ function bcast(liveId, users) {
   return {
     liveId,
     comments: users.flatMap((u) =>
-      Array.from({ length: u.count || 1 }, () => ({ userId: u.userId }))
+      Array.from({ length: u.count || 1 }, () => ({
+        userId: u.userId,
+        nickname: u.nickname
+      }))
     )
   };
 }
@@ -157,6 +160,29 @@ describe('findDepartedHeavyCommenters', () => {
     expect(r[0].totalComments).toBe(7);
   });
 
+  it('0.1.34: nickname も返す（最も詳しいハンドルを採用）', () => {
+    const r = findDepartedHeavyCommenters({
+      currentComments: [],
+      pastBroadcasts: [
+        bcast('lv1', [{ userId: 'X', count: 3, nickname: 'もび' }]),
+        bcast('lv2', [{ userId: 'X', count: 4, nickname: 'もびー' }])
+      ],
+      heavyThreshold: 5,
+      topN: 5
+    });
+    expect(r[0].nickname).toBe('もびー');
+  });
+
+  it('0.1.34: nickname 無いコメから取れた場合は空文字', () => {
+    const r = findDepartedHeavyCommenters({
+      currentComments: [],
+      pastBroadcasts: [bcast('lv1', [{ userId: 'X', count: 6 }])],
+      heavyThreshold: 5,
+      topN: 5
+    });
+    expect(r[0].nickname).toBe('');
+  });
+
   it('null/empty 入力 → 空配列', () => {
     expect(findDepartedHeavyCommenters({})).toEqual([]);
     expect(findDepartedHeavyCommenters(null)).toEqual([]);
@@ -224,5 +250,16 @@ describe('buildCommenterAttendanceMatrix', () => {
     });
     expect(r.users.length).toBe(1);
     expect(r.users[0].userId).toBe('a:abc');
+  });
+
+  it('0.1.34: 各 user に nickname も返る（複数候補なら最も詳しいもの）', () => {
+    const r = buildCommenterAttendanceMatrix({
+      broadcasts: [
+        bcast('lv1', [{ userId: 'A', count: 3, nickname: 'たろ' }]),
+        bcast('lv2', [{ userId: 'A', count: 2, nickname: 'たろう' }])
+      ],
+      topN: 5
+    });
+    expect(r.users[0].nickname).toBe('たろう');
   });
 });

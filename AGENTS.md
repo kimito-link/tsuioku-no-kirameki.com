@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.33（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.34（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,20 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.34 バンプで入った修正（離反/出席にニックネーム表示 AI）**:
+
+- ユーザー指摘: 離反 TOP の数値 ID 行が「134268998」のように ID だけ表示
+ → 「もびー（134268998）」みたいに名前も出してほしい。
+- 修正:
+  - `commenterHistoricalAnalytics.js#indexPastUsers` で nickname を集約
+   （同 userId で複数候補なら最も詳しい＝最長のものを採用）。
+  - `findDepartedHeavyCommenters` / `buildCommenterAttendanceMatrix` の
+   出力に `nickname` フィールドを追加。
+  - `marketingChartsHtml.js` の `sectionDepartedHeavy` /
+   `sectionAttendanceMatrix` で `displayUserLabel(uid, nickname)` に nickname
+   を渡すよう変更。
+- TDD: 2 ケース追加（合計 19 ケース）。
 
 **0.1.33 バンプで入った修正（パネル準備時間短縮 AH）**:
 
