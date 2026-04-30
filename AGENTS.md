@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.28（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.29（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,20 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.29 バンプで入った修正（observer / timer lifecycle AD）**:
+
+- 深層監査の中優先度 2 件を投入。
+  - **MutationObserver disconnect**: `stopContentIntervalsIfContextInvalidated`
+   に `mutationObserver?.disconnect()` を追加。拡張リロード後に旧 observer が
+   DOM 変化のたびに走り続けて CPU を消費する問題を抑止。
+  - **start() 冒頭の defensive disconnect**: まれに content script が二重
+   起動した時に旧 observer が残留しないよう、新 observer 作成前に必ず
+   旧 observer を disconnect する。
+  - **thumbTimerId**: 拡張リロード時に明示的に clearInterval（既存の
+   `runThumbCaptureTick` 内 hasExtensionContext check に加えて二重防御）。
+- ResizeObserver（`supportVisualScrollObserver`）は既に singleton + 冪等な
+ cleanup で問題なし（再確認のみ）。
 
 **0.1.28 バンプで入った修正（深層監査の高優先度 fix AC）**:
 

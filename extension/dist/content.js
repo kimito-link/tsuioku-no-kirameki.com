@@ -7643,6 +7643,14 @@
       }
     }
     bindNativeSelfPostedRecorder();
+    if (mutationObserver) {
+      try {
+        mutationObserver.disconnect();
+      } catch {
+      }
+      mutationObserver = null;
+      observedMutationRoot = null;
+    }
     mutationObserver = new MutationObserver((records) => {
       if (!recording || !liveId || !locationAllowsCommentRecording()) {
         return;
@@ -7795,6 +7803,17 @@
       if (statsPollIntervalId != null) {
         clearInterval(statsPollIntervalId);
         statsPollIntervalId = null;
+      }
+      try {
+        mutationObserver?.disconnect();
+      } catch {
+      }
+      if (typeof thumbTimerId === "number") {
+        try {
+          clearInterval(thumbTimerId);
+        } catch {
+        }
+        thumbTimerId = null;
       }
       return true;
     };

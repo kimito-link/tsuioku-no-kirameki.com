@@ -700,6 +700,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.29",
+      date: "2026-04-30",
+      summary: "\u62E1\u5F35\u66F4\u65B0\u6642\u306E\u7247\u4ED8\u3051\u3092\u5F37\u5316",
+      items: Object.freeze([
+        "\u62E1\u5F35\u30EA\u30ED\u30FC\u30C9\u5F8C\u306B\u65E7 MutationObserver \u304C DOM \u5909\u5316\u306E\u305F\u3073\u306B\u8D70\u308A\u7D9A\u3051\u308B\u554F\u984C\u3092\u6291\u6B62\uFF08context invalidate \u6642\u306B disconnect\uFF09",
+        "\u30B5\u30E0\u30CD\u81EA\u52D5\u64AE\u5F71\u30BF\u30A4\u30DE\u30FC\uFF08thumbTimerId\uFF09\u3082\u62E1\u5F35\u30EA\u30ED\u30FC\u30C9\u6642\u306B\u505C\u6B62",
+        "\u307E\u308C\u306B content script \u304C\u4E8C\u5EA6\u8D77\u52D5\u3057\u305F\u6642\u306E\u65E7 observer \u6B8B\u7559\u3092\u9632\u3050 start() \u5192\u982D\u306E defensive disconnect \u3092\u8FFD\u52A0"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.28",
       date: "2026-04-30",
       summary: "\u6DF1\u5C64\u76E3\u67FB\u306E\u9AD8\u512A\u5148\u5EA6 race / leak \u3092\u4FEE\u6B63",
@@ -14875,7 +14885,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1529" ? String("0430-1529") : "dev";
+      const buildId = "0430-1540" ? String("0430-1540") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

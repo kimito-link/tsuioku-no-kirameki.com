@@ -5831,6 +5831,15 @@ async function start() {
   }
   bindNativeSelfPostedRecorder();
 
+  // 0.1.29 (AD): start() が二度呼ばれた場合に旧 observer を必ず disconnect。
+  // 通常は __nlsBootGlobal flag で二重 start を防いでいるが、SPA 遷移や
+  // 拡張再注入の特殊系で守りに作る。
+  if (mutationObserver) {
+    try { mutationObserver.disconnect(); } catch { /* no-op */ }
+    mutationObserver = null;
+    observedMutationRoot = null;
+  }
+
   mutationObserver = new MutationObserver((/** @type {MutationRecord[]} */ records) => {
     if (
       !recording ||
@@ -6009,6 +6018,25 @@ async function start() {
     if (statsPollIntervalId != null) {
       clearInterval(statsPollIntervalId);
       statsPollIntervalId = null;
+    }
+    // 0.1.29 (AD): 拡張リロード後、旧 MutationObserver が DOM 変化のたびに
+    // 走り続けて CPU を消費する。callback 内の hasExtensionContext() check で
+    // 早期 return するが、observer 自体を disconnect しておく方が確実。
+    try {
+      mutationObserver?.disconnect();
+    } catch {
+      // no-op: 既に disconnect 済み・参照不正
+    }
+    // 0.1.29 (AD): thumbTimerId も同様に止める。runThumbCaptureTick 内で
+    // hasExtensionContext check しているがここで明示的に止めれば
+    // 無駄な setInterval tick を完全に消せる。
+    if (typeof thumbTimerId === 'number') {
+      try {
+        clearInterval(thumbTimerId);
+      } catch {
+        // no-op
+      }
+      thumbTimerId = null;
     }
     return true;
   };

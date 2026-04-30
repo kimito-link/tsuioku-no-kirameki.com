@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.29',
+    date: '2026-04-30',
+    summary: '拡張更新時の片付けを強化',
+    items: Object.freeze([
+      '拡張リロード後に旧 MutationObserver が DOM 変化のたびに走り続ける問題を抑止（context invalidate 時に disconnect）',
+      'サムネ自動撮影タイマー（thumbTimerId）も拡張リロード時に停止',
+      'まれに content script が二度起動した時の旧 observer 残留を防ぐ start() 冒頭の defensive disconnect を追加'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.28',
     date: '2026-04-30',
     summary: '深層監査の高優先度 race / leak を修正',
