@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.53',
+    date: '2026-04-30',
+    summary: 'ランキング導線の表示条件を厳密化',
+    items: Object.freeze([
+      'watch 以外のページで popup を開いてもランキング導線が出ず、前に見た放送のデータが表示される問題を修正。アクティブタブが watch ページじゃない時は必ずランキング導線を出すように変更（storage fallback の影響を受けないよう判定強化）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.52',
     date: '2026-04-30',
     summary: '何もない時はニコ生ランキング導線',

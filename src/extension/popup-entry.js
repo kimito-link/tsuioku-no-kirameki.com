@@ -6263,14 +6263,21 @@ async function refresh() {
   syncVoiceCommentButton();
 
   /*
-   * 0.1.52 (AH): watch ページ未検出時に「ニコ生ランキング」リンクを popup に出す。
-   *   watch ページなら hidden、watch ページじゃなければ表示。
-   *   ユーザー要望「何もないところの場合、ニコニコの生放送ランキングにとぶのは
-   *   どうでしょうか？ ちくらんとか？」への対応。
+   * 0.1.53 (AI): ランキング導線の表示条件を「アクティブタブが watch」のみに限定。
+   *   0.1.52 では `!isNicoLiveWatchUrl(url)` で判定していたが、url は
+   *   pickWatchUrlFromMultipleSources の fallback で storage の last_watch_url
+   *   を返すことがあり、Google 等の非 watch タブでも url=watch URL となって
+   *   ランキング導線が出ない問題があった。ユーザー報告「何もないところを
+   *   クリックすると前ひらいた放送につながっている」への対応。
+   *   source が 'activeTab' / 'lastFocusedNormal' 以外（= 'storage' / 'none'）
+   *   なら「アクティブな watch タブは無い」と判断して導線を出す。
    */
+  const isLiveActiveSource =
+    watchUrlPick.source === 'activeTab' ||
+    watchUrlPick.source === 'lastFocusedNormal';
   const noWatchHint = $('noWatchRankingHint');
   if (noWatchHint instanceof HTMLElement) {
-    noWatchHint.hidden = isNicoLiveWatchUrl(url);
+    noWatchHint.hidden = isLiveActiveSource;
   }
 
   if (!isNicoLiveWatchUrl(url)) {

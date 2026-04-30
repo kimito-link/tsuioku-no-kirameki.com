@@ -708,6 +708,14 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.53",
+      date: "2026-04-30",
+      summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u306E\u8868\u793A\u6761\u4EF6\u3092\u53B3\u5BC6\u5316",
+      items: Object.freeze([
+        "watch \u4EE5\u5916\u306E\u30DA\u30FC\u30B8\u3067 popup \u3092\u958B\u3044\u3066\u3082\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u304C\u51FA\u305A\u3001\u524D\u306B\u898B\u305F\u653E\u9001\u306E\u30C7\u30FC\u30BF\u304C\u8868\u793A\u3055\u308C\u308B\u554F\u984C\u3092\u4FEE\u6B63\u3002\u30A2\u30AF\u30C6\u30A3\u30D6\u30BF\u30D6\u304C watch \u30DA\u30FC\u30B8\u3058\u3083\u306A\u3044\u6642\u306F\u5FC5\u305A\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u3092\u51FA\u3059\u3088\u3046\u306B\u5909\u66F4\uFF08storage fallback \u306E\u5F71\u97FF\u3092\u53D7\u3051\u306A\u3044\u3088\u3046\u5224\u5B9A\u5F37\u5316\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.52",
       date: "2026-04-30",
       summary: "\u4F55\u3082\u306A\u3044\u6642\u306F\u30CB\u30B3\u751F\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA",
@@ -14254,9 +14262,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         );
       }
       syncVoiceCommentButton();
+      const isLiveActiveSource = watchUrlPick.source === "activeTab" || watchUrlPick.source === "lastFocusedNormal";
       const noWatchHint = $("noWatchRankingHint");
       if (noWatchHint instanceof HTMLElement) {
-        noWatchHint.hidden = isNicoLiveWatchUrl(url);
+        noWatchHint.hidden = isLiveActiveSource;
       }
       if (!isNicoLiveWatchUrl(url)) {
         if (!isFreshRefresh()) return;
@@ -15989,7 +15998,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2302" ? String("0430-2302") : "dev";
+      const buildId = "0430-2321" ? String("0430-2321") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
