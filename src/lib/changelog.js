@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.31',
+    date: '2026-04-30',
+    summary: '連続DL時のメモリ使用量を削減',
+    items: Object.freeze([
+      'HTMLレポート/マーケ分析/セッション要約のダウンロード時、blob URL の片付けを 60 秒待機 → 15 秒待機 + 同時 3 個までの queue 管理に変更',
+      '連続でダウンロードしたときに blob データがメモリに長く残る問題を抑止'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.30',
     date: '2026-04-30',
     summary: 'マーケDLの読み込み負荷を削減',

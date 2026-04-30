@@ -249,6 +249,7 @@ import {
   openBroadcastSessionSummaryDb
 } from '../lib/broadcastSessionSummaryDb.js';
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
+import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 
 /**
  * @typedef {{
@@ -1129,6 +1130,10 @@ function renderExtensionContextBanner(visible) {
  *   fetchError: string
  * }}
  */
+// 0.1.31 (AF): blob URL の revoke を queue 管理。15 秒で revoke / 同時 3 個まで。
+// 連続 DL でメモリが滞留する問題を抑止。詳細は src/lib/objectUrlRevokeQueue.js。
+const objectUrlRevokeQueue = createObjectUrlRevokeQueue();
+
 const watchMetaCache = {
   key: '',
   snapshot: null,
@@ -1322,7 +1327,7 @@ async function downloadSessionSummaryJson(liveId) {
         conflictAction: 'uniquify'
       });
     } finally {
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      objectUrlRevokeQueue.enqueue(url);
     }
   } catch {
     // no-op
@@ -8356,7 +8361,7 @@ async function buildHtmlReportDocument(
               a.href = url;
               a.download = ${JSON.stringify(reportCsvFilename)};
               a.click();
-              setTimeout(() => URL.revokeObjectURL(url), 60000);
+              setTimeout(() => URL.revokeObjectURL(url), 15000);
             } catch (e) {
               console.warn('csv download failed', e);
             }
@@ -8398,8 +8403,9 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
   a.click();
   // a.click() の直後に同期 revoke すると、巨大 HTML（数万コメント）でブラウザが
   // ダウンロードを開始する前に URL が無効化されて silent failure になる。
-  // downloadSessionSummaryJson と同じく 60 秒遅延 revoke に揃える。
-  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  // 0.1.31 (AF): 60 秒固定 setTimeout から queue 管理（15 秒 / 同時 3 個）に変更し、
+  // 連続 DL でメモリが滞留する問題を抑止。詳細 src/lib/objectUrlRevokeQueue.js。
+  objectUrlRevokeQueue.enqueue(blobUrl);
 }
 
 /**
@@ -8938,10 +8944,9 @@ function initPopup() {
       a.download = `nicolivelog-marketing-${lid}-${Date.now()}.html`;
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        a.remove();
-      }, 1000);
+      // 0.1.31 (AF): a.remove は 1 秒で十分・revoke は queue 管理（最大 15 秒）。
+      setTimeout(() => { a.remove(); }, 1000);
+      objectUrlRevokeQueue.enqueue(url);
       if (stEl) stEl.textContent = `DL完了（${report.totalComments}件 / ${report.uniqueUsers}人）`;
     } catch (e) {
       const msg = String(
@@ -8982,10 +8987,9 @@ function initPopup() {
             a.download = `nicolivelog-marketing-fallback-${lid || 'unknown'}-${Date.now()}.html`;
             document.body.appendChild(a);
             a.click();
-            setTimeout(() => {
-              URL.revokeObjectURL(url);
-              a.remove();
-            }, 1000);
+            // 0.1.31 (AF): a.remove は 1 秒・revoke は queue 管理（最大 15 秒）。
+            setTimeout(() => { a.remove(); }, 1000);
+            objectUrlRevokeQueue.enqueue(url);
             if (stEl) {
               stEl.textContent =
                 '拡張再読み込み中のためメモリデータでDLしました（開き直して再実行推奨）';

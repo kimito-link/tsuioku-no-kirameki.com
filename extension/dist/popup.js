@@ -700,6 +700,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.31",
+      date: "2026-04-30",
+      summary: "\u9023\u7D9ADL\u6642\u306E\u30E1\u30E2\u30EA\u4F7F\u7528\u91CF\u3092\u524A\u6E1B",
+      items: Object.freeze([
+        "HTML\u30EC\u30DD\u30FC\u30C8/\u30DE\u30FC\u30B1\u5206\u6790/\u30BB\u30C3\u30B7\u30E7\u30F3\u8981\u7D04\u306E\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u6642\u3001blob URL \u306E\u7247\u4ED8\u3051\u3092 60 \u79D2\u5F85\u6A5F \u2192 15 \u79D2\u5F85\u6A5F + \u540C\u6642 3 \u500B\u307E\u3067\u306E queue \u7BA1\u7406\u306B\u5909\u66F4",
+        "\u9023\u7D9A\u3067\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3057\u305F\u3068\u304D\u306B blob \u30C7\u30FC\u30BF\u304C\u30E1\u30E2\u30EA\u306B\u9577\u304F\u6B8B\u308B\u554F\u984C\u3092\u6291\u6B62"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.30",
       date: "2026-04-30",
       summary: "\u30DE\u30FC\u30B1DL\u306E\u8AAD\u307F\u8FBC\u307F\u8CA0\u8377\u3092\u524A\u6E1B",
@@ -8427,6 +8436,52 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     });
   }
 
+  // src/lib/objectUrlRevokeQueue.js
+  var DEFAULT_TIMEOUT_MS = 15e3;
+  var DEFAULT_MAX_CONCURRENT = 3;
+  function createObjectUrlRevokeQueue(opts = {}) {
+    const timeoutMs = typeof opts?.timeoutMs === "number" && opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_TIMEOUT_MS;
+    const maxConcurrent = typeof opts?.maxConcurrent === "number" && opts.maxConcurrent > 0 ? Math.floor(opts.maxConcurrent) : DEFAULT_MAX_CONCURRENT;
+    const revokeFn = typeof opts?.revoke === "function" ? opts.revoke : (
+      /** @param {string} u */
+      (u) => {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {
+        }
+      }
+    );
+    const scheduleFn = typeof opts?.schedule === "function" ? opts.schedule : setTimeout;
+    const cancelFn = typeof opts?.cancel === "function" ? opts.cancel : clearTimeout;
+    const queue = [];
+    function enqueue(url) {
+      if (!url) return;
+      while (queue.length >= maxConcurrent) {
+        const oldest = queue.shift();
+        if (oldest?.timer != null) cancelFn(oldest.timer);
+        if (oldest?.url) revokeFn(oldest.url);
+      }
+      const entry = { url, timer: null };
+      entry.timer = scheduleFn(() => {
+        const idx = queue.indexOf(entry);
+        if (idx >= 0) queue.splice(idx, 1);
+        revokeFn(entry.url);
+      }, timeoutMs);
+      queue.push(entry);
+    }
+    function flushAll() {
+      while (queue.length > 0) {
+        const e = queue.shift();
+        if (e?.timer != null) cancelFn(e.timer);
+        if (e?.url) revokeFn(e.url);
+      }
+    }
+    function size() {
+      return queue.length;
+    }
+    return { enqueue, flushAll, size };
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -9043,6 +9098,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     }
   }
+  var objectUrlRevokeQueue = createObjectUrlRevokeQueue();
   var watchMetaCache = {
     key: "",
     snapshot: null,
@@ -9186,7 +9242,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           conflictAction: "uniquify"
         });
       } finally {
-        window.setTimeout(() => URL.revokeObjectURL(url), 6e4);
+        objectUrlRevokeQueue.enqueue(url);
       }
     } catch {
     } finally {
@@ -14862,7 +14918,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
               a.href = url;
               a.download = ${JSON.stringify(reportCsvFilename)};
               a.click();
-              setTimeout(() => URL.revokeObjectURL(url), 60000);
+              setTimeout(() => URL.revokeObjectURL(url), 15000);
             } catch (e) {
               console.warn('csv download failed', e);
             }
@@ -14895,7 +14951,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     a.href = blobUrl;
     a.download = `nicolivelog-${liveId}-${Date.now()}.html`;
     a.click();
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 6e4);
+    objectUrlRevokeQueue.enqueue(blobUrl);
   }
   var coalescedRefreshScheduler = createCoalescedRefreshScheduler({
     throttleMs: 450
@@ -14929,7 +14985,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1800" ? String("0430-1800") : "dev";
+      const buildId = "0430-1807" ? String("0430-1807") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -15418,9 +15474,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         document.body.appendChild(a);
         a.click();
         setTimeout(() => {
-          URL.revokeObjectURL(url);
           a.remove();
         }, 1e3);
+        objectUrlRevokeQueue.enqueue(url);
         if (stEl) stEl.textContent = `DL\u5B8C\u4E86\uFF08${report.totalComments}\u4EF6 / ${report.uniqueUsers}\u4EBA\uFF09`;
       } catch (e) {
         const msg = String(
@@ -15461,9 +15517,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
               document.body.appendChild(a);
               a.click();
               setTimeout(() => {
-                URL.revokeObjectURL(url);
                 a.remove();
               }, 1e3);
+              objectUrlRevokeQueue.enqueue(url);
               if (stEl) {
                 stEl.textContent = "\u62E1\u5F35\u518D\u8AAD\u307F\u8FBC\u307F\u4E2D\u306E\u305F\u3081\u30E1\u30E2\u30EA\u30C7\u30FC\u30BF\u3067DL\u3057\u307E\u3057\u305F\uFF08\u958B\u304D\u76F4\u3057\u3066\u518D\u5B9F\u884C\u63A8\u5968\uFF09";
               }

@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.30（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.31（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,20 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.31 バンプで入った修正（連続 DL の memory pressure 削減 AF）**:
+
+- 旧実装は HTML レポート / マーケ分析 / セッション要約 の 4 箇所で
+ `setTimeout(() => URL.revokeObjectURL(url), 60_000)` 固定。連続 DL すると
+ blob データがメモリに 60 秒滞留し、5 回 DL で 100MB+ の memory pressure。
+- 新規 lib: `src/lib/objectUrlRevokeQueue.js`（`createObjectUrlRevokeQueue`、
+ 6 ケースの TDD）。15 秒で revoke + 同時 3 個までの queue 管理。上限超過時は
+ 最古から即 revoke。
+- popup-entry の 3 箇所（HTML レポート保存・マーケ分析・マーケ分析 fallback）
+ と セッション要約 JSON DL に queue を thread。
+- 注意: HTML レポート内の CSV ダウンロード ボタン（保存 HTML 中の inline
+ script）は popup の queue を共有できないので、こちらは個別に 60 秒 → 15
+ 秒 に短縮（ファイルあたり 1 回しか押されないので queue 不要）。
 
 **0.1.30 バンプで入った修正（マーケ DL 負荷削減 AE）**:
 
