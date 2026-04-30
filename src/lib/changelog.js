@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.20',
+    date: '2026-04-30',
+    summary: '公式チャンネル放送でも配信者タイル表示',
+    items: Object.freeze([
+      '運営・業者・公式チャンネル放送で「配信者」タイルとフォロー導線が出ない不具合を修正',
+      'ニコニコ競馬等のチャンネル放送（ch.nicovideo.jp）の配信者ページにもボタンから飛べるように',
+      'ボタン文言は「フォロー」（個人）／「チャンネルを見る」（公式）で出し分け'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.19',
     date: '2026-04-30',
     summary: '来場者数カードの「取得不可」を状態別に',

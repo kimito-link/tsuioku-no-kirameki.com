@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.19（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.20（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,29 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.20 バンプで追加した修正（公式チャンネル放送のフォロー導線 U）**:
+
+- ユーザー報告: 「運営とか業者だとフォローボタンがつかない気もする」。
+- 真因: `topSupportRankStripCasterTileHtml()` が `broadcasterUserId` の数値判定
+ （`/^\d+$/`）でだけタイルを出していたため、`supplier.pageUrl` が
+ `https://ch.nicovideo.jp/<handle>` 形式（公式チャンネル / 業者 / 運営）の放送では
+ 数値 uid が無く、配信者タイル＋フォロー導線が消えていた。
+- 修正: 純粋関数 `src/lib/broadcasterFollowTarget.js#resolveBroadcasterFollowTarget`
+ を新設。`{ kind: 'user' | 'channel' | 'none', name, level, pageUrl, iconUrl,
+ followLabel }` を返す。
+  - 数値 uid あり → `kind=user`、CDN usericon URL（`buildNiconicoDefaultUserIconUrl`
+   と同じ計算）+ ボタン「フォロー」
+  - pageUrl が `ch.nicovideo.jp/...` → `kind=channel`、生 URL + ボタン「チャンネルを見る」
+  - 名前無し / どちらの URL も無し → `kind=none`（タイル非表示）
+- 副次：`content-entry.js` の snapshot に `broadcasterPageUrl` /
+ `broadcasterIconUrl` を追加。`supplier.pageUrl`（http(s) のみ）と
+ `supplier.icons.uri150x150` 等を拾う。
+- `popup-entry.js` の `topSupportRankStripCasterTileHtml` と
+ `renderWatchMetaCard#casterBanner` ブロックを上記ヘルパ経由に書き換え。
+- `lib(new)`: `src/lib/broadcasterFollowTarget.js` / `broadcasterFollowTarget.test.js`
+ （17 ケース：user / channel / none / URL 安全性 / 数値 uid 優先）。
+ `changelog.test.js` の manifest 期待値を 0.1.20 に更新。
 
 **0.1.19 バンプで追加した改善（来場者数カード状態化 T）**:
 

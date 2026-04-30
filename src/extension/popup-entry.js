@@ -92,6 +92,7 @@ import { summarizeRecordedCommenters } from '../lib/liveCommenterStats.js';
 import { resolveConcurrentViewers } from '../lib/concurrentEstimate.js';
 import { watchMetaConcurrentGateFromSnapshot } from '../lib/popupWatchMetaConcurrentGate.js';
 import { resolveWatchMetaCardState } from '../lib/watchMetaCardStateGate.js';
+import { resolveBroadcasterFollowTarget } from '../lib/broadcasterFollowTarget.js';
 import { retrySnapshotRequestUntilReady } from '../lib/popupWatchSnapshotRetry.js';
 import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
 import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
@@ -274,6 +275,8 @@ import {
  *   viewerNickname?: string,
  *   viewerUserId?: string,
  *   broadcasterUserId?: string,
+ *   broadcasterPageUrl?: string,
+ *   broadcasterIconUrl?: string,
  *   broadcasterLevel?: number|null,
  *   viewerCountFromDom?: number|null,
  *   viewerCountSource?: 'ws'|'embedded'|'dom'|'none',
@@ -4219,20 +4222,30 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   const casterNameEl = $('casterBannerName');
   const casterLink = /** @type {HTMLAnchorElement|null} */ ($('casterBannerLink'));
   const casterFollow = /** @type {HTMLAnchorElement|null} */ ($('casterBannerFollow'));
-  const casterUid = String(snapshot.broadcasterUserId || '').trim();
-  if (casterBanner && casterNameEl && broadcasterText !== '-' && casterUid) {
-    const lvNum = Number(snapshot.broadcasterLevel);
-    const lvSuffix = Number.isFinite(lvNum) && lvNum > 0 ? ` LV${lvNum}` : '';
-    casterNameEl.textContent = broadcasterText + lvSuffix;
-    const userPageUrl = `https://www.nicovideo.jp/user/${casterUid}`;
-    if (casterLink) casterLink.href = userPageUrl;
-    if (casterFollow) casterFollow.href = userPageUrl;
-    const iconBucket = Math.floor(Number(casterUid) / 10000);
-    const iconUrl = `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/${iconBucket}/${casterUid}.jpg`;
+  // 0.1.20 (U): 公式チャンネル（運営・業者）放送でも banner を出すため、
+  // 数値 uid だけでなく channel pageUrl からも判定する純粋関数を経由する。
+  const followTarget = resolveBroadcasterFollowTarget(snapshot);
+  if (casterBanner && casterNameEl && followTarget.kind !== 'none') {
+    const lvSuffix = followTarget.level != null ? ` LV${followTarget.level}` : '';
+    casterNameEl.textContent = followTarget.name + lvSuffix;
+    if (casterLink) casterLink.href = followTarget.pageUrl;
+    if (casterFollow) {
+      casterFollow.href = followTarget.pageUrl;
+      casterFollow.textContent = followTarget.followLabel;
+    }
     if (casterIcon) {
-      casterIcon.src = iconUrl;
-      casterIcon.alt = broadcasterText;
-      casterIcon.onerror = () => { casterIcon.style.display = 'none'; };
+      if (followTarget.iconUrl) {
+        casterIcon.src = followTarget.iconUrl;
+        casterIcon.alt = followTarget.name;
+        casterIcon.style.display = '';
+        casterIcon.onerror = () => { casterIcon.style.display = 'none'; };
+      } else {
+        // チャンネル放送で icon が取れていない場合は非表示にして
+        // 名前 + 「チャンネルを見る」だけを残す
+        casterIcon.removeAttribute('src');
+        casterIcon.alt = '';
+        casterIcon.style.display = 'none';
+      }
     }
     casterBanner.hidden = false;
   } else if (casterBanner) {
@@ -4538,29 +4551,34 @@ function bindOnErrorHideHandlersWithin(root) {
 }
 
 function topSupportRankStripCasterTileHtml() {
-  const snap = watchMetaCache.snapshot;
-  const name = String(snap?.broadcasterName || '').trim();
-  const uid = String(snap?.broadcasterUserId || '').trim();
-  if (!name || !uid || !/^\d+$/.test(uid)) return '';
-  const lvNum = Number(snap?.broadcasterLevel);
-  const lvSuffix = Number.isFinite(lvNum) && lvNum > 0 ? ` LV${lvNum}` : '';
-  const nameWithLv = name + lvSuffix;
-  const userPageUrl = `https://www.nicovideo.jp/user/${uid}`;
-  const iconBucket = Math.floor(Number(uid) / 10000);
-  const iconUrl = `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/${iconBucket}/${uid}.jpg`;
-  const fullTitle = `配信者 ${nameWithLv}（クリックでユーザーページ）`;
+  // 0.1.20 (U): 公式チャンネル放送（運営・業者）でも follow 導線を出す。
+  // 旧コードは broadcasterUserId が数値のときだけタイルを出していたため、
+  // ニコニコ競馬等の `https://ch.nicovideo.jp/<handle>` 形式の supplier.pageUrl
+  // ではタイルが出ず「フォロー」導線が消えていた。判定は純粋関数
+  // `resolveBroadcasterFollowTarget` に集約。
+  const target = resolveBroadcasterFollowTarget(watchMetaCache.snapshot);
+  if (target.kind === 'none') return '';
+  const lvSuffix = target.level != null ? ` LV${target.level}` : '';
+  const nameWithLv = target.name + lvSuffix;
+  const fullTitle =
+    target.kind === 'channel'
+      ? `配信者 ${nameWithLv}（クリックでチャンネルページ）`
+      : `配信者 ${nameWithLv}（クリックでユーザーページ）`;
+  const iconHtml = target.iconUrl
+    ? `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" />`
+    // チャンネル放送で icon が無い時はスペーサーを置いて高さを揃える
+    : `<span class="nl-top-support-rank__caster-thumb" aria-hidden="true"></span>`;
   return (
     `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}">` +
     `<span class="nl-top-support-rank__caster-label">配信者</span>` +
-    `<a class="nl-top-support-rank__caster-link" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` +
+    `<a class="nl-top-support-rank__caster-link" href="${escapeAttr(target.pageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` +
     // 0.1.12 (E): MV3 strict CSP は onerror="..." 等のインライン属性ハンドラを実行できない。
-    // 旧コードの `onerror="this.style.visibility='hidden'"` は CSP 違反のログを毎回吐いていた。
     // 代わりに data-on-error-hide マーカーを付けて、innerHTML 流し込み直後に
     // addEventListener('error') で同等の挙動を貼り直す（renderTopSupportRankStrip 内）。
-    `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" />` +
+    iconHtml +
     `<span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span>` +
     `</a>` +
-    `<a class="nl-top-support-rank__caster-follow" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer">フォロー</a>` +
+    `<a class="nl-top-support-rank__caster-follow" href="${escapeAttr(target.pageUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(target.followLabel)}</a>` +
     `</div>`
   );
 }

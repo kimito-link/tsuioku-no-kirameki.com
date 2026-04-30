@@ -700,6 +700,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.20",
+      date: "2026-04-30",
+      summary: "\u516C\u5F0F\u30C1\u30E3\u30F3\u30CD\u30EB\u653E\u9001\u3067\u3082\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u8868\u793A",
+      items: Object.freeze([
+        "\u904B\u55B6\u30FB\u696D\u8005\u30FB\u516C\u5F0F\u30C1\u30E3\u30F3\u30CD\u30EB\u653E\u9001\u3067\u300C\u914D\u4FE1\u8005\u300D\u30BF\u30A4\u30EB\u3068\u30D5\u30A9\u30ED\u30FC\u5C0E\u7DDA\u304C\u51FA\u306A\u3044\u4E0D\u5177\u5408\u3092\u4FEE\u6B63",
+        "\u30CB\u30B3\u30CB\u30B3\u7AF6\u99AC\u7B49\u306E\u30C1\u30E3\u30F3\u30CD\u30EB\u653E\u9001\uFF08ch.nicovideo.jp\uFF09\u306E\u914D\u4FE1\u8005\u30DA\u30FC\u30B8\u306B\u3082\u30DC\u30BF\u30F3\u304B\u3089\u98DB\u3079\u308B\u3088\u3046\u306B",
+        "\u30DC\u30BF\u30F3\u6587\u8A00\u306F\u300C\u30D5\u30A9\u30ED\u30FC\u300D\uFF08\u500B\u4EBA\uFF09\uFF0F\u300C\u30C1\u30E3\u30F3\u30CD\u30EB\u3092\u898B\u308B\u300D\uFF08\u516C\u5F0F\uFF09\u3067\u51FA\u3057\u5206\u3051"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.19",
       date: "2026-04-30",
       summary: "\u6765\u5834\u8005\u6570\u30AB\u30FC\u30C9\u306E\u300C\u53D6\u5F97\u4E0D\u53EF\u300D\u3092\u72B6\u614B\u5225\u306B",
@@ -1428,6 +1438,83 @@
     DATA_MISSING: DATA_MISSING_LABEL,
     PRE_MEASUREMENT: PRE_MEASUREMENT_LABEL
   });
+
+  // src/lib/reportUserThumb.js
+  var NICO_USER_ICON_CDN_BASE = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
+  function buildNiconicoDefaultUserIconUrl(uid) {
+    const s = String(uid || "").trim();
+    if (!/^\d{5,14}$/.test(s)) return "";
+    const bucket = Math.floor(Number(s) / 1e4);
+    return `${NICO_USER_ICON_CDN_BASE}/${bucket}/${s}.jpg`;
+  }
+  function resolveReportUserThumbSrc(opts) {
+    const userId = String(opts?.userId || "").trim();
+    const avatarUrl = String(opts?.avatarUrl || "").trim();
+    if (isHttpOrHttpsUrl(avatarUrl)) {
+      return avatarUrl;
+    }
+    if (!userId || userId === "__unknown__") return "";
+    if (/^\d{5,14}$/.test(userId)) {
+      return buildNiconicoDefaultUserIconUrl(userId);
+    }
+    if (typeof opts?.identiconResolver === "function") {
+      const r = opts.identiconResolver(userId);
+      if (typeof r === "string" && r.length > 0) return r;
+    }
+    return "";
+  }
+
+  // src/lib/broadcasterFollowTarget.js
+  var NONE_RESULT = Object.freeze({
+    kind: (
+      /** @type {const} */
+      "none"
+    ),
+    name: "",
+    level: null,
+    pageUrl: "",
+    iconUrl: "",
+    followLabel: ""
+  });
+  function isHttpOrHttpsUrl2(url) {
+    if (!url) return false;
+    return /^https?:\/\//i.test(url);
+  }
+  function clean(v) {
+    return String(v == null ? "" : v).trim();
+  }
+  function resolveBroadcasterFollowTarget(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") return { ...NONE_RESULT };
+    const name = clean(snapshot.broadcasterName);
+    if (!name || name === "-") return { ...NONE_RESULT };
+    const uid = clean(snapshot.broadcasterUserId);
+    const pageUrlRaw = clean(snapshot.broadcasterPageUrl);
+    const iconUrlRaw = clean(snapshot.broadcasterIconUrl);
+    const lvNum = Number(snapshot.broadcasterLevel);
+    const level = Number.isFinite(lvNum) && lvNum > 0 ? lvNum : null;
+    if (/^\d+$/.test(uid)) {
+      const iconFromCdn = buildNiconicoDefaultUserIconUrl(uid);
+      return {
+        kind: "user",
+        name,
+        level,
+        pageUrl: `https://www.nicovideo.jp/user/${uid}`,
+        iconUrl: iconFromCdn,
+        followLabel: "\u30D5\u30A9\u30ED\u30FC"
+      };
+    }
+    if (isHttpOrHttpsUrl2(pageUrlRaw) && /\bch\.nicovideo\.jp\b/.test(pageUrlRaw)) {
+      return {
+        kind: "channel",
+        name,
+        level,
+        pageUrl: pageUrlRaw,
+        iconUrl: isHttpOrHttpsUrl2(iconUrlRaw) ? iconUrlRaw : "",
+        followLabel: "\u30C1\u30E3\u30F3\u30CD\u30EB\u3092\u898B\u308B"
+      };
+    }
+    return { ...NONE_RESULT };
+  }
 
   // src/lib/popupWatchSnapshotRetry.js
   async function retrySnapshotRequestUntilReady(requestOnce, opts = {}) {
@@ -2772,31 +2859,6 @@
     }
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}"><rect width="100%" height="100%" fill="${bg}"/>${rects}</svg>`;
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  }
-
-  // src/lib/reportUserThumb.js
-  var NICO_USER_ICON_CDN_BASE = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon";
-  function buildNiconicoDefaultUserIconUrl(uid) {
-    const s = String(uid || "").trim();
-    if (!/^\d{5,14}$/.test(s)) return "";
-    const bucket = Math.floor(Number(s) / 1e4);
-    return `${NICO_USER_ICON_CDN_BASE}/${bucket}/${s}.jpg`;
-  }
-  function resolveReportUserThumbSrc(opts) {
-    const userId = String(opts?.userId || "").trim();
-    const avatarUrl = String(opts?.avatarUrl || "").trim();
-    if (isHttpOrHttpsUrl(avatarUrl)) {
-      return avatarUrl;
-    }
-    if (!userId || userId === "__unknown__") return "";
-    if (/^\d{5,14}$/.test(userId)) {
-      return buildNiconicoDefaultUserIconUrl(userId);
-    }
-    if (typeof opts?.identiconResolver === "function") {
-      const r = opts.identiconResolver(userId);
-      if (typeof r === "string" && r.length > 0) return r;
-    }
-    return "";
   }
 
   // src/lib/userThumbGrid.js
@@ -9202,22 +9264,28 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       /** @type {HTMLAnchorElement|null} */
       $("casterBannerFollow")
     );
-    const casterUid = String(snapshot.broadcasterUserId || "").trim();
-    if (casterBanner && casterNameEl && broadcasterText !== "-" && casterUid) {
-      const lvNum = Number(snapshot.broadcasterLevel);
-      const lvSuffix = Number.isFinite(lvNum) && lvNum > 0 ? ` LV${lvNum}` : "";
-      casterNameEl.textContent = broadcasterText + lvSuffix;
-      const userPageUrl = `https://www.nicovideo.jp/user/${casterUid}`;
-      if (casterLink) casterLink.href = userPageUrl;
-      if (casterFollow) casterFollow.href = userPageUrl;
-      const iconBucket = Math.floor(Number(casterUid) / 1e4);
-      const iconUrl = `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/${iconBucket}/${casterUid}.jpg`;
+    const followTarget = resolveBroadcasterFollowTarget(snapshot);
+    if (casterBanner && casterNameEl && followTarget.kind !== "none") {
+      const lvSuffix = followTarget.level != null ? ` LV${followTarget.level}` : "";
+      casterNameEl.textContent = followTarget.name + lvSuffix;
+      if (casterLink) casterLink.href = followTarget.pageUrl;
+      if (casterFollow) {
+        casterFollow.href = followTarget.pageUrl;
+        casterFollow.textContent = followTarget.followLabel;
+      }
       if (casterIcon) {
-        casterIcon.src = iconUrl;
-        casterIcon.alt = broadcasterText;
-        casterIcon.onerror = () => {
+        if (followTarget.iconUrl) {
+          casterIcon.src = followTarget.iconUrl;
+          casterIcon.alt = followTarget.name;
+          casterIcon.style.display = "";
+          casterIcon.onerror = () => {
+            casterIcon.style.display = "none";
+          };
+        } else {
+          casterIcon.removeAttribute("src");
+          casterIcon.alt = "";
           casterIcon.style.display = "none";
-        };
+        }
       }
       casterBanner.hidden = false;
     } else if (casterBanner) {
@@ -9430,18 +9498,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     });
   }
   function topSupportRankStripCasterTileHtml() {
-    const snap = watchMetaCache.snapshot;
-    const name = String(snap?.broadcasterName || "").trim();
-    const uid = String(snap?.broadcasterUserId || "").trim();
-    if (!name || !uid || !/^\d+$/.test(uid)) return "";
-    const lvNum = Number(snap?.broadcasterLevel);
-    const lvSuffix = Number.isFinite(lvNum) && lvNum > 0 ? ` LV${lvNum}` : "";
-    const nameWithLv = name + lvSuffix;
-    const userPageUrl = `https://www.nicovideo.jp/user/${uid}`;
-    const iconBucket = Math.floor(Number(uid) / 1e4);
-    const iconUrl = `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/${iconBucket}/${uid}.jpg`;
-    const fullTitle = `\u914D\u4FE1\u8005 ${nameWithLv}\uFF08\u30AF\u30EA\u30C3\u30AF\u3067\u30E6\u30FC\u30B6\u30FC\u30DA\u30FC\u30B8\uFF09`;
-    return `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}"><span class="nl-top-support-rank__caster-label">\u914D\u4FE1\u8005</span><a class="nl-top-support-rank__caster-link" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;"><img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" /><span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span></a><a class="nl-top-support-rank__caster-follow" href="${escapeAttr(userPageUrl)}" target="_blank" rel="noopener noreferrer">\u30D5\u30A9\u30ED\u30FC</a></div>`;
+    const target = resolveBroadcasterFollowTarget(watchMetaCache.snapshot);
+    if (target.kind === "none") return "";
+    const lvSuffix = target.level != null ? ` LV${target.level}` : "";
+    const nameWithLv = target.name + lvSuffix;
+    const fullTitle = target.kind === "channel" ? `\u914D\u4FE1\u8005 ${nameWithLv}\uFF08\u30AF\u30EA\u30C3\u30AF\u3067\u30C1\u30E3\u30F3\u30CD\u30EB\u30DA\u30FC\u30B8\uFF09` : `\u914D\u4FE1\u8005 ${nameWithLv}\uFF08\u30AF\u30EA\u30C3\u30AF\u3067\u30E6\u30FC\u30B6\u30FC\u30DA\u30FC\u30B8\uFF09`;
+    const iconHtml = target.iconUrl ? `<img class="nl-top-support-rank__caster-thumb" src="${escapeAttr(target.iconUrl)}" alt="" decoding="async" referrerpolicy="no-referrer" data-on-error-hide="1" />` : `<span class="nl-top-support-rank__caster-thumb" aria-hidden="true"></span>`;
+    return `<div class="nl-top-support-rank__caster" role="listitem" title="${escapeAttr(fullTitle)}"><span class="nl-top-support-rank__caster-label">\u914D\u4FE1\u8005</span><a class="nl-top-support-rank__caster-link" href="${escapeAttr(target.pageUrl)}" target="_blank" rel="noopener noreferrer" style="display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:inherit;min-width:0;max-width:100%;">` + // 0.1.12 (E): MV3 strict CSP は onerror="..." 等のインライン属性ハンドラを実行できない。
+    // 代わりに data-on-error-hide マーカーを付けて、innerHTML 流し込み直後に
+    // addEventListener('error') で同等の挙動を貼り直す（renderTopSupportRankStrip 内）。
+    iconHtml + `<span class="nl-top-support-rank__caster-name">${escapeHtml(nameWithLv)}</span></a><a class="nl-top-support-rank__caster-follow" href="${escapeAttr(target.pageUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(target.followLabel)}</a></div>`;
   }
   function renderTopSupportRankStrip(stripRooms) {
     const strip = (
@@ -12407,7 +12473,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1239" ? String("0430-1239") : "dev";
+      const buildId = "0430-1256" ? String("0430-1256") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

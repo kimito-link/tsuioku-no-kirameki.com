@@ -3452,6 +3452,8 @@ function bindNativeSelfPostedRecorder() {
  *   viewerNickname: string,
  *   viewerUserId: string,
  *   broadcasterUserId: string,
+ *   broadcasterPageUrl: string,
+ *   broadcasterIconUrl: string,
  *   broadcasterLevel: number|null,
  *   viewerCountFromDom: number|null,
  *   viewerCountSource: 'ws'|'embedded'|'dom'|'none',
@@ -3604,6 +3606,44 @@ function collectWatchPageSnapshot() {
     const pageUrl = String(embeddedProps?.program?.supplier?.pageUrl ?? '');
     const m2 = pageUrl.match(/\/user\/(\d+)/);
     return m2 ? m2[1] : '';
+  })();
+
+  /*
+   * 0.1.20 (U): 公式チャンネル / 業者放送のフォロー導線。
+   * `broadcasterUserId` が数値で取れるのはユーザー / コミュ放送までで、運営・業者の
+   * チャンネル放送は `supplier.pageUrl` が `https://ch.nicovideo.jp/<handle>` 形式に
+   * なる。生 URL を snapshot に持ち出して popup 側で channel タイルに切替える。
+   */
+  const broadcasterPageUrl = (() => {
+    const raw = String(embeddedProps?.program?.supplier?.pageUrl ?? '').trim();
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return '';
+  })();
+  const broadcasterIconUrl = (() => {
+    const supplier = embeddedProps?.program?.supplier;
+    /** @type {string[]} */
+    const candidates = [];
+    if (supplier && typeof supplier === 'object') {
+      const icons = /** @type {Record<string, unknown>|null} */ (supplier.icons ?? null);
+      if (icons && typeof icons === 'object') {
+        for (const key of ['uri150x150', 'uri90x90', 'uri50x50']) {
+          const v = icons[key];
+          if (typeof v === 'string') candidates.push(v);
+        }
+      }
+      if (typeof supplier.iconUrl === 'string') candidates.push(supplier.iconUrl);
+    }
+    const sg = embeddedProps?.socialGroup;
+    if (sg && typeof sg === 'object') {
+      for (const key of ['thumbnailUrl', 'thumbnailSmallUrl']) {
+        const v = /** @type {Record<string, unknown>} */ (sg)[key];
+        if (typeof v === 'string') candidates.push(v);
+      }
+    }
+    for (const c of candidates) {
+      if (/^https?:\/\//i.test(c)) return c;
+    }
+    return '';
   })();
 
   const thumbnailUrl = toAbsoluteUrl(
@@ -3828,6 +3868,8 @@ function collectWatchPageSnapshot() {
     viewerNickname: viewer.viewerNickname,
     viewerUserId: viewer.viewerUserId,
     broadcasterUserId,
+    broadcasterPageUrl,
+    broadcasterIconUrl,
     broadcasterLevel: (() => {
       try {
         const lv = embeddedProps?.program?.supplier?.level ?? embeddedProps?.socialGroup?.level ?? embeddedProps?.user?.userLevel;
