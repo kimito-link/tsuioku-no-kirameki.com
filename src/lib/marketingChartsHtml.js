@@ -35,6 +35,17 @@ import {
   buildBroadcastWaveformFingerprint,
   findSimilarBroadcasts
 } from './broadcastWaveformFingerprint.js';
+import {
+  detectCommentPropagation,
+  detectCommentSyncBursts
+} from './commentEchoDetector.js';
+import {
+  buildCommenterFirstSecondLatency,
+  detectTalentPeakMoments,
+  scoreSentimentTimeline,
+  suggestUniqueWords,
+  computeReachCoefficient
+} from './commenterCulturalAnalytics.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -1023,6 +1034,191 @@ function sectionWaveformSimilarity(similar) {
 }
 
 /**
+ * 0.1.25 (Z): コメ伝染（L1）+ コメ被り（L5）。
+ * @param {ReturnType<typeof detectCommentPropagation>} propagation
+ * @param {ReturnType<typeof detectCommentSyncBursts>} sync
+ */
+function sectionEchoBursts(propagation, sync) {
+  if ((!propagation || propagation.length === 0) && (!sync || sync.length === 0)) return '';
+  const propRows = (propagation || [])
+    .slice(0, 10)
+    .map(
+      (b, i) => `<tr>
+<td>${i + 1}</td>
+<td class="mkt-mono">${escapeHtml(b.text)}</td>
+<td>${b.userCount}</td>
+<td>${b.commentCount}</td>
+<td>${Math.round((b.lastAt - b.firstAt) / 1000)}秒</td>
+</tr>`
+    )
+    .join('');
+  const syncRows = (sync || [])
+    .slice(0, 10)
+    .map(
+      (b, i) => `<tr>
+<td>${i + 1}</td>
+<td class="mkt-mono">${escapeHtml(b.text)}</td>
+<td>${b.userCount}</td>
+<td>${b.commentCount}</td>
+</tr>`
+    )
+    .join('');
+  return `<section class="mkt-section" id="mkt-echo">
+<h2>コメ伝染 × コメ被り <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">短時間に同じ語が複数ユーザーから出る瞬間を 2 通りの粒度で検出（ラテラル分析 L1 / L5）。</p>
+${propRows ? `<h3 style="font-size:.95rem;margin:.6rem 0 .4rem">伝染（30秒窓・3名以上、L1）</h3>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>語</th><th>ユーザー数</th><th>件数</th><th>持続</th></tr></thead>
+<tbody>${propRows}</tbody>
+</table>` : ''}
+${syncRows ? `<h3 style="font-size:.95rem;margin:.8rem 0 .4rem">被り瞬間（5秒窓・3名以上、L5）</h3>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>語</th><th>ユーザー数</th><th>件数</th></tr></thead>
+<tbody>${syncRows}</tbody>
+</table>` : ''}
+</section>`;
+}
+
+/**
+ * 0.1.25 (Z): 初コメ → 2 コメ目 latency（L6）。
+ * @param {ReturnType<typeof buildCommenterFirstSecondLatency>} latency
+ */
+function sectionFirstSecondLatency(latency) {
+  if (!latency || latency.totalUsers === 0) return '';
+  const max = Math.max(1, ...Object.values(latency.distribution));
+  const labels = Object.keys(latency.distribution);
+  const rows = labels
+    .map((k) => {
+      const v = latency.distribution[k];
+      const w = Math.round((v / max) * 100);
+      return `<tr>
+<th>${escapeHtml(k)}</th>
+<td><div class="mkt-bar"><span class="mkt-bar__fill" style="width:${w}%;background:#0ea5e9"></span></div></td>
+<td>${v}</td>
+</tr>`;
+    })
+    .join('');
+  return `<section class="mkt-section" id="mkt-first-second">
+<h2>初コメ → 2 コメ目 latency <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">2 コメ目を打ったユーザー ${latency.totalUsers} 名の「最初のコメから 2 コメ目までの間隔」分布（ラテラル分析 L6）。短いほど "乗ってきた" 派、長いほど "様子見" 派。</p>
+<table class="mkt-rank">
+<thead><tr><th>区間</th><th>分布</th><th>件数</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+}
+
+/**
+ * 0.1.25 (Z): 配信者の話芸ピーク（L10）。
+ * @param {ReturnType<typeof detectTalentPeakMoments>} moments
+ */
+function sectionTalentPeak(moments) {
+  if (!Array.isArray(moments) || moments.length === 0) return '';
+  const rows = moments
+    .slice(0, 10)
+    .map(
+      (m, i) => `<tr>
+<td>${i + 1}</td>
+<td>${Math.round(m.silenceMs / 1000)}秒</td>
+<td>${m.afterCount}</td>
+</tr>`
+    )
+    .join('');
+  return `<section class="mkt-section" id="mkt-talent-peak">
+<h2>配信者の話芸ピーク <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">沈黙（60秒以上）→ 30秒以内に 5+ コメ反応 = 配信者の話芸／リアクション要素が即効性を出した瞬間（ラテラル分析 L10）。${moments.length} 件検出。</p>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>沈黙の長さ</th><th>沈黙明け 30秒の反応コメ数</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+}
+
+/**
+ * 0.1.25 (Z): 感情曲線（L11）。
+ * @param {ReturnType<typeof scoreSentimentTimeline>} sentiment
+ */
+function sectionSentimentCurve(sentiment) {
+  if (!sentiment || sentiment.buckets.length < 2) return '';
+  const W = 900;
+  const H = 200;
+  const pad = 36;
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  const n = sentiment.buckets.length;
+  const maxV = Math.max(
+    1,
+    ...sentiment.buckets.flatMap((b) => [b.positive, b.negative, b.surprise, b.confusion])
+  );
+  /** @param {number} i */
+  const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
+  /** @param {number} v */
+  const yOf = (v) => pad + innerH - (innerH * v) / maxV;
+  /** @param {keyof Pick<typeof sentiment.buckets[number], 'positive' | 'negative' | 'surprise' | 'confusion'>} key
+   *  @param {string} color */
+  const lineFor = (key, color) => {
+    const pts = sentiment.buckets.map((b, i) => `${xOf(i).toFixed(1)},${yOf(b[key]).toFixed(1)}`).join(' ');
+    return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2"/>`;
+  };
+  return `<section class="mkt-section" id="mkt-sentiment">
+<h2>感情曲線 <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">語彙辞書ベースで「ポジ／ネガ／驚き／困惑」を 1 分粒度で時系列表示（ラテラル分析 L11）。総計：ポジ ${sentiment.totals.positive} / ネガ ${sentiment.totals.negative} / 驚き ${sentiment.totals.surprise} / 困惑 ${sentiment.totals.confusion}。</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${lineFor('positive', '#22c55e')}
+${lineFor('negative', '#ef4444')}
+${lineFor('surprise', '#fbbf24')}
+${lineFor('confusion', '#94a3b8')}
+</svg>
+</div>
+<div class="mkt-seg-legend">
+<span class="mkt-leg"><span class="mkt-leg__dot" style="background:#22c55e"></span>ポジティブ</span>
+<span class="mkt-leg"><span class="mkt-leg__dot" style="background:#ef4444"></span>ネガティブ</span>
+<span class="mkt-leg"><span class="mkt-leg__dot" style="background:#fbbf24"></span>驚き</span>
+<span class="mkt-leg"><span class="mkt-leg__dot" style="background:#94a3b8"></span>困惑</span>
+</div></section>`;
+}
+
+/**
+ * 0.1.25 (Z): 自分が言わなかった人気語 TOP（L14）。
+ * @param {ReturnType<typeof suggestUniqueWords>} suggestions
+ */
+function sectionUniqueWordSuggestions(suggestions) {
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return '';
+  const rows = suggestions
+    .map(
+      (s, i) => `<tr>
+<td>${i + 1}</td>
+<td class="mkt-mono">${escapeHtml(s.word)}</td>
+<td>${s.count}</td>
+</tr>`
+    )
+    .join('');
+  return `<section class="mkt-section" id="mkt-unique-words">
+<h2>自分が言わなかった人気語 TOP <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">配信全体で頻出だが、自分のコメントには 1 度も使っていない語（ラテラル分析 L14）。"次回試したい弾" の自動抽出。</p>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>語</th><th>出現回数</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+}
+
+/**
+ * 0.1.25 (Z): リーチ係数（L15）。
+ * @param {ReturnType<typeof computeReachCoefficient>} reach
+ */
+function sectionReachCoefficient(reach) {
+  if (!reach || reach.coefficient == null) return '';
+  return `<section class="mkt-section" id="mkt-reach">
+<h2>リーチ係数（同接 / コメンター比）<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">「現在の同接 ÷ 直近 5 分のユニークコメンター数」= 1 コメンターあたりの観戦者比率（ラテラル分析 L15）。</p>
+<div class="mkt-kpi-grid"><div class="mkt-kpi"><span class="mkt-kpi__icon">📡</span><span class="mkt-kpi__val">${reach.coefficient.toFixed(2)}</span><span class="mkt-kpi__label">リーチ係数</span></div></div>
+</section>`;
+}
+
+/**
  * @param {MarketingReport} r
  * @param {{
  *   maskShareLabels?: boolean,
@@ -1165,6 +1361,56 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
       )
     : [];
 
+  // 0.1.25 (Z): 文化分析 7 件。
+  const echoPropagation = detectCommentPropagation(currentCommentsForLayer, {
+    windowMs: 30_000,
+    minDistinctUsers: 3
+  });
+  const echoSync = detectCommentSyncBursts(currentCommentsForLayer, {
+    windowMs: 5_000,
+    minDistinctUsers: 3
+  });
+  const firstSecondLatency = buildCommenterFirstSecondLatency(currentCommentsForLayer);
+  const talentPeaks = detectTalentPeakMoments(currentCommentsForLayer);
+  const sentimentCurve = scoreSentimentTimeline(currentCommentsForLayer, {
+    bucketMs: 60_000
+  });
+  // 自コメ抜粋: selfPosted=true のもの
+  const selfComments = Array.isArray(opts.commentsForAnalytics)
+    ? opts.commentsForAnalytics.filter((c) =>
+        Boolean(/** @type {{ selfPosted?: any }} */ (c)?.selfPosted)
+      )
+    : [];
+  const uniqueWords = suggestUniqueWords({
+    allComments: currentCommentsForLayer,
+    selfComments,
+    topN: 15,
+    minOccurrence: 3
+  });
+  // リーチ係数: 直近 5 分の active commenters と現在の concurrent estimate
+  const lastPoint = concurrentSeries.points[concurrentSeries.points.length - 1];
+  const recentActiveCommenters = (() => {
+    if (!currentCommentsForLayer.length) return 0;
+    const last = currentCommentsForLayer.reduce(
+      (mx, c) => (typeof c?.capturedAt === 'number' && c.capturedAt > mx ? c.capturedAt : mx),
+      0
+    );
+    if (!last) return 0;
+    const since = last - 5 * 60_000;
+    /** @type {Set<string>} */
+    const recent = new Set();
+    for (const c of currentCommentsForLayer) {
+      if (typeof c?.capturedAt !== 'number' || c.capturedAt < since) continue;
+      const uid = c.userId == null ? '' : String(c.userId).trim();
+      if (uid) recent.add(uid);
+    }
+    return recent.size;
+  })();
+  const reach = computeReachCoefficient({
+    currentConcurrent: lastPoint ? lastPoint.value : NaN,
+    uniqueCommentersInWindow: recentActiveCommenters
+  });
+
   const tocItems = [
     { id: 'mkt-kpi', label: 'KPI サマリ' },
     { id: 'mkt-content', label: 'コメント本文・属性の傾向' },
@@ -1184,6 +1430,12 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-growth-meter', label: '成長メーター（PRO）' },
     { id: 'mkt-opening-five', label: '冒頭 5 分の予兆（PRO）' },
     { id: 'mkt-waveform', label: '似てる配信（波形指紋）（PRO）' },
+    { id: 'mkt-echo', label: 'コメ伝染 × 被り（PRO）' },
+    { id: 'mkt-first-second', label: '初コメ→2コメ目 latency（PRO）' },
+    { id: 'mkt-talent-peak', label: '配信者の話芸ピーク（PRO）' },
+    { id: 'mkt-sentiment', label: '感情曲線（PRO）' },
+    { id: 'mkt-unique-words', label: '言わなかった人気語 TOP（PRO）' },
+    { id: 'mkt-reach', label: 'リーチ係数（PRO）' },
     { id: 'mkt-derived', label: '累積コメント数と5分窓' },
     { id: 'mkt-segment', label: 'ユーザーセグメント' },
     { id: 'mkt-top-users', label: 'トップコメンター TOP 20' },
@@ -1232,6 +1484,12 @@ ${sectionWeekdayHourHeatmap(weekdayHourHeat)}
 ${sectionGrowthMeter(growth, '今回の総コメ数')}
 ${sectionOpeningFivePrediction(openingFivePts)}
 ${sectionWaveformSimilarity(similarBroadcasts)}
+${sectionEchoBursts(echoPropagation, echoSync)}
+${sectionFirstSecondLatency(firstSecondLatency)}
+${sectionTalentPeak(talentPeaks)}
+${sectionSentimentCurve(sentimentCurve)}
+${sectionUniqueWordSuggestions(uniqueWords)}
+${sectionReachCoefficient(reach)}
 ${idWrap('mkt-derived', sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap('mkt-segment', sectionSegment(r))}
@@ -1574,6 +1832,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-heatmap{font-size:.65rem}
 .mkt-heatmap th,.mkt-heatmap td{padding:.15rem .25rem;text-align:center;min-width:1.6rem}
 .mkt-heat-cell{color:#f8fafc;font-weight:700}
+.mkt-bar{background:#1e3a5a;border-radius:4px;height:14px;width:100%;overflow:hidden}
+.mkt-bar__fill{display:block;height:100%}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}

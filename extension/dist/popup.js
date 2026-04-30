@@ -700,6 +700,20 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.25",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u6587\u5316\u5206\u6790 7 \u7A2E\u8FFD\u52A0",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u30B3\u30E1\u4F1D\u67D3\u300D\u3068\u300C\u30B3\u30E1\u88AB\u308A\u77AC\u9593\u300D\u3092\u8FFD\u52A0\uFF08\u77ED\u6642\u9593\u306B\u540C\u3058\u8A9E\u304C\u8907\u6570\u30E6\u30FC\u30B6\u30FC\u304B\u3089\u51FA\u308B\u30D1\u30BF\u30FC\u30F3\u3001\u30E9\u30C6\u30E9\u30EB L1/L5\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u521D\u30B3\u30E1\u21922\u30B3\u30E1\u76EE latency\u300D\u5206\u5E03\u3092\u8FFD\u52A0\uFF08\u4E57\u3063\u3066\u304D\u305F\u6D3E vs \u69D8\u5B50\u898B\u6D3E\u3001\u30E9\u30C6\u30E9\u30EB L6\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u914D\u4FE1\u8005\u306E\u8A71\u82B8\u30D4\u30FC\u30AF\u300D\u3092\u8FFD\u52A0\uFF08\u6C88\u9ED9\u2192\u5373\u53CD\u5FDC\u306E\u691C\u51FA\u3001\u30E9\u30C6\u30E9\u30EB L10\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u611F\u60C5\u66F2\u7DDA\u300D\u3092\u8FFD\u52A0\uFF08\u30DD\u30B8/\u30CD\u30AC/\u9A5A\u304D/\u56F0\u60D1\u306E\u8A9E\u5F59\u8F9E\u66F8\u3092\u6642\u7CFB\u5217\u3001\u30E9\u30C6\u30E9\u30EB L11\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u81EA\u5206\u304C\u8A00\u308F\u306A\u304B\u3063\u305F\u4EBA\u6C17\u8A9E TOP\u300D\u3092\u8FFD\u52A0\uFF08\u6B21\u56DE\u8A66\u3057\u305F\u3044\u5F3E\u306E\u81EA\u52D5\u62BD\u51FA\u3001\u30E9\u30C6\u30E9\u30EB L14\uFF09",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u300C\u30EA\u30FC\u30C1\u4FC2\u6570\u300D\u3092\u8FFD\u52A0\uFF08\u540C\u63A5 \xF7 5\u5206\u5185\u30E6\u30CB\u30FC\u30AF = 1\u30B3\u30E1\u30F3\u30BF\u30FC\u3042\u305F\u308A\u4F55\u4EBA\u304C\u89B3\u3066\u308B\u304B\u3001\u30E9\u30C6\u30E9\u30EB L15\uFF09",
+        "0.1.21\u301C0.1.25 \u3067\u8A08 28 \u4EF6\u306E\u5206\u6790\u6A5F\u80FD\u3092\u6295\u5165\u5B8C\u4E86"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.24",
       date: "2026-04-30",
       summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u6A2A\u65AD\u6BD4\u8F03\u7CFB 5 \u7A2E\u8FFD\u52A0",
@@ -5665,6 +5679,339 @@ ${body}`;
     return out.slice(0, topN);
   }
 
+  // src/lib/commentEchoDetector.js
+  function normalizeForEcho(text) {
+    let s = String(text == null ? "" : text);
+    s = s.replace(/[Ｗｗ]/g, "w");
+    s = s.toLowerCase();
+    s = s.replace(/[!?！？。、,．\s]/g, "");
+    s = s.trim();
+    if (s.length === 0) return "";
+    if (s.length === 1) {
+      if (s.charCodeAt(0) < 128) return "";
+    }
+    return s;
+  }
+  function collectKeys(comments) {
+    const list = Array.isArray(comments) ? comments : [];
+    const out = [];
+    for (const c of list) {
+      if (!c || typeof c !== "object") continue;
+      const at = c.capturedAt;
+      if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) continue;
+      const uid = c.userId == null ? "" : String(c.userId).trim();
+      if (!uid) continue;
+      const key = normalizeForEcho(c.text);
+      if (!key) continue;
+      out.push({ at, uid, key });
+    }
+    out.sort((a, b) => a.at - b.at);
+    return out;
+  }
+  function detectClusters(comments, cfg) {
+    const items = collectKeys(comments);
+    if (items.length === 0) return [];
+    const open = /* @__PURE__ */ new Map();
+    const bursts = [];
+    for (const it of items) {
+      const cur = open.get(it.key);
+      if (cur && it.at - cur.firstAt <= cfg.windowMs) {
+        cur.lastAt = it.at;
+        cur.users.add(it.uid);
+        cur.commentCount += 1;
+      } else {
+        if (cur && cur.users.size >= cfg.minDistinctUsers) {
+          bursts.push({
+            text: it.key,
+            firstAt: cur.firstAt,
+            lastAt: cur.lastAt,
+            userCount: cur.users.size,
+            commentCount: cur.commentCount
+          });
+        }
+        open.set(it.key, {
+          firstAt: it.at,
+          lastAt: it.at,
+          users: /* @__PURE__ */ new Set([it.uid]),
+          commentCount: 1
+        });
+      }
+    }
+    for (const [key, cur] of open) {
+      if (cur.users.size >= cfg.minDistinctUsers) {
+        bursts.push({
+          text: key,
+          firstAt: cur.firstAt,
+          lastAt: cur.lastAt,
+          userCount: cur.users.size,
+          commentCount: cur.commentCount
+        });
+      }
+    }
+    bursts.sort((a, b) => b.userCount - a.userCount || b.commentCount - a.commentCount);
+    return bursts;
+  }
+  function detectCommentPropagation(comments, opts = {}) {
+    const windowMs = typeof opts?.windowMs === "number" && opts.windowMs > 0 ? opts.windowMs : 3e4;
+    const minDistinctUsers = typeof opts?.minDistinctUsers === "number" && opts.minDistinctUsers > 0 ? opts.minDistinctUsers : 3;
+    return detectClusters(comments || [], { windowMs, minDistinctUsers });
+  }
+  function detectCommentSyncBursts(comments, opts = {}) {
+    const windowMs = typeof opts?.windowMs === "number" && opts.windowMs > 0 ? opts.windowMs : 5e3;
+    const minDistinctUsers = typeof opts?.minDistinctUsers === "number" && opts.minDistinctUsers > 0 ? opts.minDistinctUsers : 3;
+    return detectClusters(comments || [], { windowMs, minDistinctUsers });
+  }
+
+  // src/lib/commenterCulturalAnalytics.js
+  function collectValid(comments) {
+    const list = Array.isArray(comments) ? comments : [];
+    const out = [];
+    for (const c of list) {
+      if (!c || typeof c !== "object") continue;
+      const at = c.capturedAt;
+      if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) continue;
+      const uid = c.userId == null ? "" : String(c.userId).trim();
+      const text = c.text == null ? "" : String(c.text);
+      out.push({ at, uid, text });
+    }
+    out.sort((a, b) => a.at - b.at);
+    return out;
+  }
+  function buildCommenterFirstSecondLatency(comments) {
+    const valid = collectValid(comments || []);
+    const userTimes = /* @__PURE__ */ new Map();
+    for (const v of valid) {
+      if (!v.uid) continue;
+      let list = userTimes.get(v.uid);
+      if (!list) {
+        list = [];
+        userTimes.set(v.uid, list);
+      }
+      list.push(v.at);
+    }
+    const distribution = {
+      "<10s": 0,
+      "10-30s": 0,
+      "30-60s": 0,
+      "1-2m": 0,
+      "2-5m": 0,
+      "5-10m": 0,
+      "10m+": 0
+    };
+    let totalUsers = 0;
+    for (const ats of userTimes.values()) {
+      if (ats.length < 2) continue;
+      totalUsers += 1;
+      const dt = ats[1] - ats[0];
+      if (dt < 1e4) distribution["<10s"] += 1;
+      else if (dt < 3e4) distribution["10-30s"] += 1;
+      else if (dt < 6e4) distribution["30-60s"] += 1;
+      else if (dt < 12e4) distribution["1-2m"] += 1;
+      else if (dt < 3e5) distribution["2-5m"] += 1;
+      else if (dt < 6e5) distribution["5-10m"] += 1;
+      else distribution["10m+"] += 1;
+    }
+    return { distribution, totalUsers };
+  }
+  function detectTalentPeakMoments(comments, opts = {}) {
+    const silenceMin = typeof opts?.silenceMinMs === "number" && opts.silenceMinMs > 0 ? opts.silenceMinMs : 6e4;
+    const after = typeof opts?.afterWindowMs === "number" && opts.afterWindowMs > 0 ? opts.afterWindowMs : 3e4;
+    const minAfter = typeof opts?.minAfterCount === "number" && opts.minAfterCount > 0 ? opts.minAfterCount : 5;
+    const valid = collectValid(comments || []);
+    const out = [];
+    for (let i = 1; i < valid.length; i++) {
+      const gap = valid[i].at - valid[i - 1].at;
+      if (gap < silenceMin) continue;
+      const windowEnd = valid[i].at + after;
+      let cnt = 0;
+      for (let j = i; j < valid.length; j++) {
+        if (valid[j].at > windowEnd) break;
+        cnt += 1;
+      }
+      if (cnt >= minAfter) {
+        out.push({
+          silenceStartAt: valid[i - 1].at,
+          silenceEndAt: valid[i].at,
+          silenceMs: gap,
+          afterCount: cnt
+        });
+      }
+    }
+    return out;
+  }
+  var SENTIMENT_LEXICON = {
+    positive: [
+      /楽し[いさみ]/,
+      /嬉し[いさ]/,
+      /うれし/,
+      /ありがと/,
+      /すご[いき]/,
+      /神回/,
+      /最高/,
+      /好[きく]/,
+      /素敵/,
+      /可愛/,
+      /かわい/,
+      /やった/,
+      /応援/,
+      /ほっこり/,
+      /幸[せ]/
+    ],
+    negative: [
+      /つら[いさ]/,
+      /辛[いさ]/,
+      /悲し/,
+      /やばい/,
+      /ひどい/,
+      /酷い/,
+      /疲れ/,
+      /嫌[いだ]/,
+      /きら[いだ]/,
+      /怖[いさ]/,
+      /こわい/,
+      /無理/,
+      /もう無理/,
+      /お先真っ暗/
+    ],
+    surprise: [
+      /マジ/,
+      /まじ/,
+      /えっ/,
+      /うそ/,
+      /ウソ/,
+      /ホント/,
+      /まさか/,
+      /びっくり/,
+      /びっくし/,
+      /おお[ぉー]/
+    ],
+    confusion: [
+      /うーん/,
+      /ううむ/,
+      /わからん/,
+      /分から[なな]/,
+      /謎/,
+      /なんで/,
+      /どうゆう/,
+      /どういう/,
+      /混乱/
+    ]
+  };
+  function scoreSentimentTimeline(comments, opts = {}) {
+    const bucketMs = typeof opts?.bucketMs === "number" && opts.bucketMs > 0 ? opts.bucketMs : 6e4;
+    const valid = collectValid(comments || []);
+    const totals = { positive: 0, negative: 0, surprise: 0, confusion: 0 };
+    if (!valid.length) return { buckets: [], totals };
+    const first = valid[0].at;
+    const last = valid[valid.length - 1].at;
+    const total = Math.max(1, Math.floor((last - first) / bucketMs) + 1);
+    const buckets = Array.from({ length: total }, (_, m) => ({
+      minute: m,
+      atStart: first + m * bucketMs,
+      total: 0,
+      positive: 0,
+      negative: 0,
+      surprise: 0,
+      confusion: 0
+    }));
+    for (const v of valid) {
+      const idx = Math.floor((v.at - first) / bucketMs);
+      if (idx < 0 || idx >= buckets.length) continue;
+      const bucket = buckets[idx];
+      bucket.total += 1;
+      for (const [k, regs] of Object.entries(SENTIMENT_LEXICON)) {
+        for (const r of regs) {
+          if (r.test(v.text)) {
+            bucket[
+              /** @type {'positive'|'negative'|'surprise'|'confusion'} */
+              k
+            ] += 1;
+            totals[
+              /** @type {'positive'|'negative'|'surprise'|'confusion'} */
+              k
+            ] += 1;
+            break;
+          }
+        }
+      }
+    }
+    return { buckets, totals };
+  }
+  var STOP_WORDS = /* @__PURE__ */ new Set([
+    "\u3067\u3059",
+    "\u307E\u3059",
+    "\u3059\u308B",
+    "\u3044\u308B",
+    "\u3042\u308B",
+    "\u306A\u308B",
+    "\u3053\u3068",
+    "\u3082\u306E",
+    "\u3088\u3046",
+    "\u3063\u3066",
+    "\u3051\u3069",
+    "\u3051\u308C\u3069",
+    "\u3067\u3082",
+    "\u3053\u308C",
+    "\u305D\u308C",
+    "\u3042\u308C",
+    "\u3069\u308C",
+    "\u3066\u308B",
+    "\u305F\u3044",
+    "\u306A\u3044",
+    "\u307E\u3059",
+    "\u307E\u3057",
+    "\u307F\u305F\u3044"
+  ]);
+  function tokenizeSimple(text) {
+    const s = String(text || "").replace(/[\s!?！？。、,．]+/g, " ").trim();
+    if (!s) return [];
+    const tokens = [];
+    const re = /([ぁ-んー]+|[ァ-ヴー]+|[一-龥]+|[a-zA-Z0-9ｗＷ]+)/gu;
+    let m;
+    while ((m = re.exec(s)) !== null) {
+      const t = m[1];
+      if (t.length < 2) continue;
+      if (STOP_WORDS.has(t)) continue;
+      tokens.push(t.toLowerCase());
+    }
+    return tokens;
+  }
+  function suggestUniqueWords(input) {
+    if (!input || typeof input !== "object") return [];
+    const allList = Array.isArray(input.allComments) ? input.allComments : [];
+    const selfList = Array.isArray(input.selfComments) ? input.selfComments : [];
+    const topN = typeof input.topN === "number" && input.topN > 0 ? Math.floor(input.topN) : 10;
+    const minOccurrence = typeof input.minOccurrence === "number" && input.minOccurrence > 0 ? input.minOccurrence : 3;
+    const selfTokens = /* @__PURE__ */ new Set();
+    for (const c of selfList) {
+      for (const t of tokenizeSimple(c?.text)) selfTokens.add(t);
+    }
+    const allCount = /* @__PURE__ */ new Map();
+    for (const c of allList) {
+      const local = new Set(tokenizeSimple(c?.text));
+      for (const t of local) {
+        allCount.set(t, (allCount.get(t) || 0) + 1);
+      }
+    }
+    const out = [];
+    for (const [t, n] of allCount) {
+      if (n < minOccurrence) continue;
+      if (selfTokens.has(t)) continue;
+      out.push({ word: t, count: n });
+    }
+    out.sort((a, b) => b.count - a.count);
+    return out.slice(0, topN);
+  }
+  function computeReachCoefficient(input) {
+    if (!input || typeof input !== "object") return { coefficient: null };
+    const c = typeof input.currentConcurrent === "number" && Number.isFinite(input.currentConcurrent) ? input.currentConcurrent : NaN;
+    const u = typeof input.uniqueCommentersInWindow === "number" && Number.isFinite(input.uniqueCommentersInWindow) ? input.uniqueCommentersInWindow : NaN;
+    if (!Number.isFinite(c) || c < 0 || !Number.isFinite(u) || u <= 0) {
+      return { coefficient: null };
+    }
+    return { coefficient: Math.round(c / u * 100) / 100 };
+  }
+
   // src/lib/marketingChartsHtml.js
   function adviceCard(role, displayName, lines) {
     const ps = lines.filter((s) => s && String(s).trim()).map((line) => `<p class="mkt-advice__p">${escapeHtml(line)}</p>`).join("");
@@ -6408,6 +6755,143 @@ ${dots}
 </table>
 </section>`;
   }
+  function sectionEchoBursts(propagation, sync) {
+    if ((!propagation || propagation.length === 0) && (!sync || sync.length === 0)) return "";
+    const propRows = (propagation || []).slice(0, 10).map(
+      (b, i) => `<tr>
+<td>${i + 1}</td>
+<td class="mkt-mono">${escapeHtml(b.text)}</td>
+<td>${b.userCount}</td>
+<td>${b.commentCount}</td>
+<td>${Math.round((b.lastAt - b.firstAt) / 1e3)}\u79D2</td>
+</tr>`
+    ).join("");
+    const syncRows = (sync || []).slice(0, 10).map(
+      (b, i) => `<tr>
+<td>${i + 1}</td>
+<td class="mkt-mono">${escapeHtml(b.text)}</td>
+<td>${b.userCount}</td>
+<td>${b.commentCount}</td>
+</tr>`
+    ).join("");
+    return `<section class="mkt-section" id="mkt-echo">
+<h2>\u30B3\u30E1\u4F1D\u67D3 \xD7 \u30B3\u30E1\u88AB\u308A <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u77ED\u6642\u9593\u306B\u540C\u3058\u8A9E\u304C\u8907\u6570\u30E6\u30FC\u30B6\u30FC\u304B\u3089\u51FA\u308B\u77AC\u9593\u3092 2 \u901A\u308A\u306E\u7C92\u5EA6\u3067\u691C\u51FA\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L1 / L5\uFF09\u3002</p>
+${propRows ? `<h3 style="font-size:.95rem;margin:.6rem 0 .4rem">\u4F1D\u67D3\uFF0830\u79D2\u7A93\u30FB3\u540D\u4EE5\u4E0A\u3001L1\uFF09</h3>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>\u8A9E</th><th>\u30E6\u30FC\u30B6\u30FC\u6570</th><th>\u4EF6\u6570</th><th>\u6301\u7D9A</th></tr></thead>
+<tbody>${propRows}</tbody>
+</table>` : ""}
+${syncRows ? `<h3 style="font-size:.95rem;margin:.8rem 0 .4rem">\u88AB\u308A\u77AC\u9593\uFF085\u79D2\u7A93\u30FB3\u540D\u4EE5\u4E0A\u3001L5\uFF09</h3>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>\u8A9E</th><th>\u30E6\u30FC\u30B6\u30FC\u6570</th><th>\u4EF6\u6570</th></tr></thead>
+<tbody>${syncRows}</tbody>
+</table>` : ""}
+</section>`;
+  }
+  function sectionFirstSecondLatency(latency) {
+    if (!latency || latency.totalUsers === 0) return "";
+    const max = Math.max(1, ...Object.values(latency.distribution));
+    const labels = Object.keys(latency.distribution);
+    const rows = labels.map((k) => {
+      const v = latency.distribution[k];
+      const w = Math.round(v / max * 100);
+      return `<tr>
+<th>${escapeHtml(k)}</th>
+<td><div class="mkt-bar"><span class="mkt-bar__fill" style="width:${w}%;background:#0ea5e9"></span></div></td>
+<td>${v}</td>
+</tr>`;
+    }).join("");
+    return `<section class="mkt-section" id="mkt-first-second">
+<h2>\u521D\u30B3\u30E1 \u2192 2 \u30B3\u30E1\u76EE latency <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">2 \u30B3\u30E1\u76EE\u3092\u6253\u3063\u305F\u30E6\u30FC\u30B6\u30FC ${latency.totalUsers} \u540D\u306E\u300C\u6700\u521D\u306E\u30B3\u30E1\u304B\u3089 2 \u30B3\u30E1\u76EE\u307E\u3067\u306E\u9593\u9694\u300D\u5206\u5E03\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L6\uFF09\u3002\u77ED\u3044\u307B\u3069 "\u4E57\u3063\u3066\u304D\u305F" \u6D3E\u3001\u9577\u3044\u307B\u3069 "\u69D8\u5B50\u898B" \u6D3E\u3002</p>
+<table class="mkt-rank">
+<thead><tr><th>\u533A\u9593</th><th>\u5206\u5E03</th><th>\u4EF6\u6570</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+  }
+  function sectionTalentPeak(moments) {
+    if (!Array.isArray(moments) || moments.length === 0) return "";
+    const rows = moments.slice(0, 10).map(
+      (m, i) => `<tr>
+<td>${i + 1}</td>
+<td>${Math.round(m.silenceMs / 1e3)}\u79D2</td>
+<td>${m.afterCount}</td>
+</tr>`
+    ).join("");
+    return `<section class="mkt-section" id="mkt-talent-peak">
+<h2>\u914D\u4FE1\u8005\u306E\u8A71\u82B8\u30D4\u30FC\u30AF <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u6C88\u9ED9\uFF0860\u79D2\u4EE5\u4E0A\uFF09\u2192 30\u79D2\u4EE5\u5185\u306B 5+ \u30B3\u30E1\u53CD\u5FDC = \u914D\u4FE1\u8005\u306E\u8A71\u82B8\uFF0F\u30EA\u30A2\u30AF\u30B7\u30E7\u30F3\u8981\u7D20\u304C\u5373\u52B9\u6027\u3092\u51FA\u3057\u305F\u77AC\u9593\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L10\uFF09\u3002${moments.length} \u4EF6\u691C\u51FA\u3002</p>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>\u6C88\u9ED9\u306E\u9577\u3055</th><th>\u6C88\u9ED9\u660E\u3051 30\u79D2\u306E\u53CD\u5FDC\u30B3\u30E1\u6570</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+  }
+  function sectionSentimentCurve(sentiment) {
+    if (!sentiment || sentiment.buckets.length < 2) return "";
+    const W = 900;
+    const H = 200;
+    const pad = 36;
+    const innerW = W - pad * 2;
+    const innerH = H - pad * 2;
+    const n = sentiment.buckets.length;
+    const maxV = Math.max(
+      1,
+      ...sentiment.buckets.flatMap((b) => [b.positive, b.negative, b.surprise, b.confusion])
+    );
+    const xOf = (i) => pad + innerW * i / Math.max(1, n - 1);
+    const yOf = (v) => pad + innerH - innerH * v / maxV;
+    const lineFor = (key, color) => {
+      const pts = sentiment.buckets.map((b, i) => `${xOf(i).toFixed(1)},${yOf(b[key]).toFixed(1)}`).join(" ");
+      return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2"/>`;
+    };
+    return `<section class="mkt-section" id="mkt-sentiment">
+<h2>\u611F\u60C5\u66F2\u7DDA <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u8A9E\u5F59\u8F9E\u66F8\u30D9\u30FC\u30B9\u3067\u300C\u30DD\u30B8\uFF0F\u30CD\u30AC\uFF0F\u9A5A\u304D\uFF0F\u56F0\u60D1\u300D\u3092 1 \u5206\u7C92\u5EA6\u3067\u6642\u7CFB\u5217\u8868\u793A\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L11\uFF09\u3002\u7DCF\u8A08\uFF1A\u30DD\u30B8 ${sentiment.totals.positive} / \u30CD\u30AC ${sentiment.totals.negative} / \u9A5A\u304D ${sentiment.totals.surprise} / \u56F0\u60D1 ${sentiment.totals.confusion}\u3002</p>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${lineFor("positive", "#22c55e")}
+${lineFor("negative", "#ef4444")}
+${lineFor("surprise", "#fbbf24")}
+${lineFor("confusion", "#94a3b8")}
+</svg>
+</div>
+<div class="mkt-seg-legend">
+<span class="mkt-leg"><span class="mkt-leg__dot" style="background:#22c55e"></span>\u30DD\u30B8\u30C6\u30A3\u30D6</span>
+<span class="mkt-leg"><span class="mkt-leg__dot" style="background:#ef4444"></span>\u30CD\u30AC\u30C6\u30A3\u30D6</span>
+<span class="mkt-leg"><span class="mkt-leg__dot" style="background:#fbbf24"></span>\u9A5A\u304D</span>
+<span class="mkt-leg"><span class="mkt-leg__dot" style="background:#94a3b8"></span>\u56F0\u60D1</span>
+</div></section>`;
+  }
+  function sectionUniqueWordSuggestions(suggestions) {
+    if (!Array.isArray(suggestions) || suggestions.length === 0) return "";
+    const rows = suggestions.map(
+      (s, i) => `<tr>
+<td>${i + 1}</td>
+<td class="mkt-mono">${escapeHtml(s.word)}</td>
+<td>${s.count}</td>
+</tr>`
+    ).join("");
+    return `<section class="mkt-section" id="mkt-unique-words">
+<h2>\u81EA\u5206\u304C\u8A00\u308F\u306A\u304B\u3063\u305F\u4EBA\u6C17\u8A9E TOP <span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u914D\u4FE1\u5168\u4F53\u3067\u983B\u51FA\u3060\u304C\u3001\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8\u306B\u306F 1 \u5EA6\u3082\u4F7F\u3063\u3066\u3044\u306A\u3044\u8A9E\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L14\uFF09\u3002"\u6B21\u56DE\u8A66\u3057\u305F\u3044\u5F3E" \u306E\u81EA\u52D5\u62BD\u51FA\u3002</p>
+<table class="mkt-rank">
+<thead><tr><th>#</th><th>\u8A9E</th><th>\u51FA\u73FE\u56DE\u6570</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+</section>`;
+  }
+  function sectionReachCoefficient(reach) {
+    if (!reach || reach.coefficient == null) return "";
+    return `<section class="mkt-section" id="mkt-reach">
+<h2>\u30EA\u30FC\u30C1\u4FC2\u6570\uFF08\u540C\u63A5 / \u30B3\u30E1\u30F3\u30BF\u30FC\u6BD4\uFF09<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">\u300C\u73FE\u5728\u306E\u540C\u63A5 \xF7 \u76F4\u8FD1 5 \u5206\u306E\u30E6\u30CB\u30FC\u30AF\u30B3\u30E1\u30F3\u30BF\u30FC\u6570\u300D= 1 \u30B3\u30E1\u30F3\u30BF\u30FC\u3042\u305F\u308A\u306E\u89B3\u6226\u8005\u6BD4\u7387\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L15\uFF09\u3002</p>
+<div class="mkt-kpi-grid"><div class="mkt-kpi"><span class="mkt-kpi__icon">\u{1F4E1}</span><span class="mkt-kpi__val">${reach.coefficient.toFixed(2)}</span><span class="mkt-kpi__label">\u30EA\u30FC\u30C1\u4FC2\u6570</span></div></div>
+</section>`;
+  }
   function buildMarketingDashboardHtml(r, opts = {}) {
     const maskShare = opts.maskShareLabels === true;
     const identiconResolver = typeof opts.anonymousIdenticonResolver === "function" ? opts.anonymousIdenticonResolver : void 0;
@@ -6501,6 +6985,52 @@ ${dots}
       pastFingerprints,
       { topN: 5 }
     ) : [];
+    const echoPropagation = detectCommentPropagation(currentCommentsForLayer, {
+      windowMs: 3e4,
+      minDistinctUsers: 3
+    });
+    const echoSync = detectCommentSyncBursts(currentCommentsForLayer, {
+      windowMs: 5e3,
+      minDistinctUsers: 3
+    });
+    const firstSecondLatency = buildCommenterFirstSecondLatency(currentCommentsForLayer);
+    const talentPeaks = detectTalentPeakMoments(currentCommentsForLayer);
+    const sentimentCurve = scoreSentimentTimeline(currentCommentsForLayer, {
+      bucketMs: 6e4
+    });
+    const selfComments = Array.isArray(opts.commentsForAnalytics) ? opts.commentsForAnalytics.filter(
+      (c) => Boolean(
+        /** @type {{ selfPosted?: any }} */
+        c?.selfPosted
+      )
+    ) : [];
+    const uniqueWords = suggestUniqueWords({
+      allComments: currentCommentsForLayer,
+      selfComments,
+      topN: 15,
+      minOccurrence: 3
+    });
+    const lastPoint = concurrentSeries.points[concurrentSeries.points.length - 1];
+    const recentActiveCommenters = (() => {
+      if (!currentCommentsForLayer.length) return 0;
+      const last = currentCommentsForLayer.reduce(
+        (mx, c) => typeof c?.capturedAt === "number" && c.capturedAt > mx ? c.capturedAt : mx,
+        0
+      );
+      if (!last) return 0;
+      const since = last - 5 * 6e4;
+      const recent = /* @__PURE__ */ new Set();
+      for (const c of currentCommentsForLayer) {
+        if (typeof c?.capturedAt !== "number" || c.capturedAt < since) continue;
+        const uid = c.userId == null ? "" : String(c.userId).trim();
+        if (uid) recent.add(uid);
+      }
+      return recent.size;
+    })();
+    const reach = computeReachCoefficient({
+      currentConcurrent: lastPoint ? lastPoint.value : NaN,
+      uniqueCommentersInWindow: recentActiveCommenters
+    });
     const tocItems = [
       { id: "mkt-kpi", label: "KPI \u30B5\u30DE\u30EA" },
       { id: "mkt-content", label: "\u30B3\u30E1\u30F3\u30C8\u672C\u6587\u30FB\u5C5E\u6027\u306E\u50BE\u5411" },
@@ -6520,6 +7050,12 @@ ${dots}
       { id: "mkt-growth-meter", label: "\u6210\u9577\u30E1\u30FC\u30BF\u30FC\uFF08PRO\uFF09" },
       { id: "mkt-opening-five", label: "\u5192\u982D 5 \u5206\u306E\u4E88\u5146\uFF08PRO\uFF09" },
       { id: "mkt-waveform", label: "\u4F3C\u3066\u308B\u914D\u4FE1\uFF08\u6CE2\u5F62\u6307\u7D0B\uFF09\uFF08PRO\uFF09" },
+      { id: "mkt-echo", label: "\u30B3\u30E1\u4F1D\u67D3 \xD7 \u88AB\u308A\uFF08PRO\uFF09" },
+      { id: "mkt-first-second", label: "\u521D\u30B3\u30E1\u21922\u30B3\u30E1\u76EE latency\uFF08PRO\uFF09" },
+      { id: "mkt-talent-peak", label: "\u914D\u4FE1\u8005\u306E\u8A71\u82B8\u30D4\u30FC\u30AF\uFF08PRO\uFF09" },
+      { id: "mkt-sentiment", label: "\u611F\u60C5\u66F2\u7DDA\uFF08PRO\uFF09" },
+      { id: "mkt-unique-words", label: "\u8A00\u308F\u306A\u304B\u3063\u305F\u4EBA\u6C17\u8A9E TOP\uFF08PRO\uFF09" },
+      { id: "mkt-reach", label: "\u30EA\u30FC\u30C1\u4FC2\u6570\uFF08PRO\uFF09" },
       { id: "mkt-derived", label: "\u7D2F\u7A4D\u30B3\u30E1\u30F3\u30C8\u6570\u30685\u5206\u7A93" },
       { id: "mkt-segment", label: "\u30E6\u30FC\u30B6\u30FC\u30BB\u30B0\u30E1\u30F3\u30C8" },
       { id: "mkt-top-users", label: "\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC TOP 20" },
@@ -6567,6 +7103,12 @@ ${sectionWeekdayHourHeatmap(weekdayHourHeat)}
 ${sectionGrowthMeter(growth, "\u4ECA\u56DE\u306E\u7DCF\u30B3\u30E1\u6570")}
 ${sectionOpeningFivePrediction(openingFivePts)}
 ${sectionWaveformSimilarity(similarBroadcasts)}
+${sectionEchoBursts(echoPropagation, echoSync)}
+${sectionFirstSecondLatency(firstSecondLatency)}
+${sectionTalentPeak(talentPeaks)}
+${sectionSentimentCurve(sentimentCurve)}
+${sectionUniqueWordSuggestions(uniqueWords)}
+${sectionReachCoefficient(reach)}
 ${idWrap("mkt-derived", sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap("mkt-segment", sectionSegment(r))}
@@ -6792,6 +7334,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-heatmap{font-size:.65rem}
 .mkt-heatmap th,.mkt-heatmap td{padding:.15rem .25rem;text-align:center;min-width:1.6rem}
 .mkt-heat-cell{color:#f8fafc;font-weight:700}
+.mkt-bar{background:#1e3a5a;border-radius:4px;height:14px;width:100%;overflow:hidden}
+.mkt-bar__fill{display:block;height:100%}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}
@@ -14130,7 +14674,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1407" ? String("0430-1407") : "dev";
+      const buildId = "0430-1416" ? String("0430-1416") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
