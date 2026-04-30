@@ -700,6 +700,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.37",
+      date: "2026-04-30",
+      summary: "\u5185\u90E8\u306E\u91CD\u8907\u5B9A\u7FA9\u3092\u6574\u7406",
+      items: Object.freeze([
+        "\u30B9\u30C8\u30FC\u30EA\u30FC\u30BF\u30A4\u30EB\u306E\u300C\u3086\u3063\u304F\u308A\u98A8\u30AD\u30E3\u30E9\u753B\u50CF\u304B\u5224\u5B9A\u300D\u3092 src/lib/storyTileTvStyle.js \u306B\u5207\u308A\u51FA\u3057",
+        "isContextInvalidatedMessageText \u306E\u91CD\u8907\u5B9A\u7FA9\u3092\u64A4\u53BB\uFF08\u65E2\u5B58\u306E isContextInvalidatedError \u306B\u4E00\u672C\u5316\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.36",
       date: "2026-04-30",
       summary: "\u5185\u90E8\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u5206\u5272\u306E\u7D9A\u304D",
@@ -8585,6 +8594,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return [...arr].sort((a, b) => rank(a.url) - rank(b.url));
   }
 
+  // src/lib/storyTileTvStyle.js
+  function storyTileUsesYukkuriTvStyle(requestedSrc, displaySrc) {
+    const r = String(requestedSrc == null ? "" : requestedSrc);
+    const d = String(displaySrc == null ? "" : displaySrc);
+    return r.includes("yukkuri-charactore-english") || d.includes("yukkuri-charactore-english");
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -9547,9 +9563,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     ta.focus();
     ta.select();
   }
-  function isContextInvalidatedMessageText(msg) {
-    return /Extension context invalidated/i.test(String(msg || ""));
-  }
   function romiDebugDataChecklist() {
     return [
       "watch URL\uFF08lv\u756A\u53F7\uFF09",
@@ -9599,11 +9612,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   var STORY_GUIDE_FACE_KONTA = "images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png";
   var STORY_GUIDE_FACE_TANU = "images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png";
   var STORY_REMOTE_FAILED_PLACEHOLDER_IMG = NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS;
-  function storyTileUsesYukkuriTvStyle(requestedSrc, displaySrc) {
-    const r = String(requestedSrc || "");
-    const d = String(displaySrc || "");
-    return r.includes("yukkuri-charactore-english") || d.includes("yukkuri-charactore-english");
-  }
   function applyStoryAvatarTvFallbackClass(img) {
     if (!(img instanceof HTMLImageElement)) return;
     try {
@@ -15050,7 +15058,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1850" ? String("0430-1850") : "dev";
+      const buildId = "0430-1858" ? String("0430-1858") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -15335,7 +15343,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
             e.message
           ) : e || "\u53CE\u96C6\u306B\u5931\u6557\u3057\u307E\u3057\u305F"
         );
-        if (isContextInvalidatedMessageText(msg)) {
+        if (isContextInvalidatedError(msg)) {
           const fallbackPayload = {
             popup: {
               exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -15550,7 +15558,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
             e.message
           ) : e || "marketing_dl_error"
         );
-        if (isContextInvalidatedMessageText(msg)) {
+        if (isContextInvalidatedError(msg)) {
           const fallbackComments = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
           if (fallbackComments.length > 0) {
             try {

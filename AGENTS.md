@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.36（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.37（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,15 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.37 バンプで入った修正（重複定義整理 + 切り出し AL）**:
+
+- `popup-entry.js` から `storyTileUsesYukkuriTvStyle` を
+ `src/lib/storyTileTvStyle.js` に切り出し（純粋関数 + 6 ケース TDD）。
+ ストーリータイルの「ゆっくり風キャラ画像かどうか」の判定ロジック。
+- `isContextInvalidatedMessageText` の重複定義を撤去し、既存の
+ `isContextInvalidatedError`（`reportSilentError.js`）に一本化（同名 alias
+ `isExtensionContextInvalidatedError` 経由で popup-entry が使用）。
 
 **0.1.36 バンプで入った修正（コンポーネント分割の続き AK）**:
 

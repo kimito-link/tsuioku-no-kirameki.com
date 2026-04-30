@@ -252,6 +252,7 @@ import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
+import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 
 /**
  * @typedef {{
@@ -1570,10 +1571,9 @@ function openManualCopyOverlay(text) {
   ta.select();
 }
 
-/** @param {string} msg */
-function isContextInvalidatedMessageText(msg) {
-  return /Extension context invalidated/i.test(String(msg || ''));
-}
+// 0.1.37 (AL): isContextInvalidatedMessageText を撤去、`reportSilentError.js` の
+// isContextInvalidatedError（import 経由 isExtensionContextInvalidatedError）に
+// 統一済み。同関数は string でも Error オブジェクトでも受けられる。
 
 /**
  * 改善切り分けに必要な観測データ（ロミ式: 入口/経路/出口を最短で絞る）
@@ -1653,19 +1653,8 @@ const STORY_GUIDE_FACE_TANU =
  */
 const STORY_REMOTE_FAILED_PLACEHOLDER_IMG = NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS;
 
-/**
- * キャラ既定タイル向けの「枠付き」スタイル。公式 usericon / defaults には付けない。
- * @param {string} requestedSrc
- * @param {string} displaySrc
- */
-function storyTileUsesYukkuriTvStyle(requestedSrc, displaySrc) {
-  const r = String(requestedSrc || '');
-  const d = String(displaySrc || '');
-  return (
-    r.includes('yukkuri-charactore-english') ||
-    d.includes('yukkuri-charactore-english')
-  );
-}
+// 0.1.37 (AL): storyTileUsesYukkuriTvStyle を src/lib/storyTileTvStyle.js に
+// 切り出し済み。chrome / DOM 依存なしの純粋関数。
 
 /** @param {HTMLImageElement} img */
 function applyStoryAvatarTvFallbackClass(img) {
@@ -8687,7 +8676,7 @@ function initPopup() {
           ? /** @type {{ message?: unknown }} */ (e).message
           : e || '収集に失敗しました'
       );
-      if (isContextInvalidatedMessageText(msg)) {
+      if (isExtensionContextInvalidatedError(msg)) {
         const fallbackPayload = {
           popup: {
             exportedAt: new Date().toISOString(),
@@ -8918,7 +8907,7 @@ function initPopup() {
           ? /** @type {{ message?: unknown }} */ (e).message
           : e || 'marketing_dl_error'
       );
-      if (isContextInvalidatedMessageText(msg)) {
+      if (isExtensionContextInvalidatedError(msg)) {
         const fallbackComments = Array.isArray(STORY_SOURCE_STATE.entries)
           ? STORY_SOURCE_STATE.entries
           : [];

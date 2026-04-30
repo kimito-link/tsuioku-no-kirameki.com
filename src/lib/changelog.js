@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.37',
+    date: '2026-04-30',
+    summary: '内部の重複定義を整理',
+    items: Object.freeze([
+      'ストーリータイルの「ゆっくり風キャラ画像か判定」を src/lib/storyTileTvStyle.js に切り出し',
+      'isContextInvalidatedMessageText の重複定義を撤去（既存の isContextInvalidatedError に一本化）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.36',
     date: '2026-04-30',
     summary: '内部コンポーネント分割の続き',
