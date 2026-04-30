@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.29（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.30（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,21 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.30 バンプで入った修正（マーケ DL 負荷削減 AE）**:
+
+- 0.1.23 で入ったマーケ DL 経路の `chrome.storage.local.get(null)` で全
+ ストレージを走査して 10 件分のコメ key を取り出すロジックを廃止。
+- 代わりに `broadcastSessionSummary_v1` IDB の `byCapturedAt` index を
+ 新→古で iterate して unique liveId を最大 10 件抜き、その liveId から
+ `nls_comments_<lid>` キーリストを作って `storage.local.get([...keys])` で
+ 必要分だけ取得するように変更。
+- 新規 lib: `src/lib/recentBroadcastLiveIds.js`
+ （`listRecentUniqueBroadcastLiveIds`）。
+- 配信記録が多いユーザ（200+ 配信ぶんのストレージを持つ場合）でマーケ DL の
+ 待ち時間とメモリ消費を削減。
+- 副調査: `userCommentProfileMap` は既に `USER_COMMENT_PROFILE_CACHE_MAX = 5000`
+ で頭打ち + 30 日 freshness で prune 済みのため追加対応不要。
 
 **0.1.29 バンプで入った修正（observer / timer lifecycle AD）**:
 

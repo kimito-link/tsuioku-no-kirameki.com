@@ -248,6 +248,7 @@ import {
   listBroadcastSessionSummaryForLive,
   openBroadcastSessionSummaryDb
 } from '../lib/broadcastSessionSummaryDb.js';
+import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
 
 /**
  * @typedef {{
@@ -8892,23 +8893,28 @@ function initPopup() {
         // DB が無い / 失敗しても本体は通す
       }
       // 0.1.23 (X): 過去 N 配信のコメントを横断分析するため最大 10 件分を読み込む。
-      // 直近の `nls_comments_*` キーを scan して、現在の lid と異なるものを liveId 順に
-      // 取得する。重い時は途中で打ち切り（個別 timeout なし、全体 8 秒の中で）。
+      // 0.1.30 (AE): broadcastSessionSummary IDB の byCapturedAt index で
+      // 直近 unique liveId を 10 件抜き、`nls_comments_<lid>` キーだけを
+      // 明示的に get する。旧実装の `storage.local.get(null)` で全 storage を
+      // 読み込む方式は 200+ 配信あるユーザでメモリを浪費していた。
       const pastBroadcasts = [];
       try {
-        const allKeys = await chrome.storage.local.get(null);
-        const pastKeys = Object.keys(allKeys)
-          .filter((k) => /^nls_comments_lv\d+$/.test(k) && k !== sKey)
-          .slice(0, 10);
-        for (const k of pastKeys) {
-          const lvMatch = k.match(/lv\d+$/);
-          if (!lvMatch) continue;
-          const cs = Array.isArray(allKeys[k]) ? allKeys[k] : [];
-          if (!cs.length) continue;
-          pastBroadcasts.push({ liveId: lvMatch[0], comments: cs });
+        const sumDb = await openBroadcastSessionSummaryDb();
+        const recentLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
+          limit: 10,
+          excludeLiveId: lid
+        });
+        if (recentLiveIds.length) {
+          const keys = recentLiveIds.map((id) => `nls_comments_${id}`);
+          const bag = await chrome.storage.local.get(keys);
+          for (const id of recentLiveIds) {
+            const k = `nls_comments_${id}`;
+            const cs = Array.isArray(bag[k]) ? bag[k] : [];
+            if (cs.length) pastBroadcasts.push({ liveId: id, comments: cs });
+          }
         }
       } catch {
-        // ストレージ読み取り失敗 → 過去配信無しで続行
+        // IDB / storage 失敗 → 過去配信無しで続行
       }
       // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
       // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので

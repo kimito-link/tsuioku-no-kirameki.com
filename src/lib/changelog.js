@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.30',
+    date: '2026-04-30',
+    summary: 'マーケDLの読み込み負荷を削減',
+    items: Object.freeze([
+      'マーケ分析DL時、過去配信の読み込み方法を「全ストレージ走査」から「最近10配信を IDB index で特定して該当キーだけ取得」に変更',
+      '配信記録が多いユーザでマーケ分析DLが重かった問題を改善'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.29',
     date: '2026-04-30',
     summary: '拡張更新時の片付けを強化',

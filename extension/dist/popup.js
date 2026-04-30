@@ -700,6 +700,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.30",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1DL\u306E\u8AAD\u307F\u8FBC\u307F\u8CA0\u8377\u3092\u524A\u6E1B",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790DL\u6642\u3001\u904E\u53BB\u914D\u4FE1\u306E\u8AAD\u307F\u8FBC\u307F\u65B9\u6CD5\u3092\u300C\u5168\u30B9\u30C8\u30EC\u30FC\u30B8\u8D70\u67FB\u300D\u304B\u3089\u300C\u6700\u8FD110\u914D\u4FE1\u3092 IDB index \u3067\u7279\u5B9A\u3057\u3066\u8A72\u5F53\u30AD\u30FC\u3060\u3051\u53D6\u5F97\u300D\u306B\u5909\u66F4",
+        "\u914D\u4FE1\u8A18\u9332\u304C\u591A\u3044\u30E6\u30FC\u30B6\u3067\u30DE\u30FC\u30B1\u5206\u6790DL\u304C\u91CD\u304B\u3063\u305F\u554F\u984C\u3092\u6539\u5584"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.29",
       date: "2026-04-30",
       summary: "\u62E1\u5F35\u66F4\u65B0\u6642\u306E\u7247\u4ED8\u3051\u3092\u5F37\u5316",
@@ -8383,6 +8392,41 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return msg.includes("Extension context invalidated");
   }
 
+  // src/lib/recentBroadcastLiveIds.js
+  async function listRecentUniqueBroadcastLiveIds(db, opts = {}) {
+    const limit = typeof opts.limit === "number" && opts.limit > 0 ? Math.floor(opts.limit) : 10;
+    const exclude = String(opts.excludeLiveId || "").trim().toLowerCase();
+    if (!db) return [];
+    return new Promise((resolve, reject) => {
+      let tx;
+      try {
+        tx = db.transaction(BROADCAST_SUMMARY_STORE, "readonly");
+      } catch (e) {
+        reject(e);
+        return;
+      }
+      const store = tx.objectStore(BROADCAST_SUMMARY_STORE);
+      const idx = store.index("byCapturedAt");
+      const req = idx.openCursor(null, "prev");
+      const seen = /* @__PURE__ */ new Set();
+      const out = [];
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const cur = req.result;
+        if (!cur || out.length >= limit) {
+          resolve(out);
+          return;
+        }
+        const lid = String(cur.value?.liveId || "").trim().toLowerCase();
+        if (lid && lid !== exclude && !seen.has(lid)) {
+          seen.add(lid);
+          out.push(lid);
+        }
+        cur.continue();
+      };
+    });
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -14885,7 +14929,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1540" ? String("0430-1540") : "dev";
+      const buildId = "0430-1800" ? String("0430-1800") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -15340,14 +15384,19 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         }
         const pastBroadcasts = [];
         try {
-          const allKeys = await chrome.storage.local.get(null);
-          const pastKeys = Object.keys(allKeys).filter((k) => /^nls_comments_lv\d+$/.test(k) && k !== sKey).slice(0, 10);
-          for (const k of pastKeys) {
-            const lvMatch = k.match(/lv\d+$/);
-            if (!lvMatch) continue;
-            const cs = Array.isArray(allKeys[k]) ? allKeys[k] : [];
-            if (!cs.length) continue;
-            pastBroadcasts.push({ liveId: lvMatch[0], comments: cs });
+          const sumDb = await openBroadcastSessionSummaryDb();
+          const recentLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
+            limit: 10,
+            excludeLiveId: lid
+          });
+          if (recentLiveIds.length) {
+            const keys = recentLiveIds.map((id) => `nls_comments_${id}`);
+            const bag = await chrome.storage.local.get(keys);
+            for (const id of recentLiveIds) {
+              const k = `nls_comments_${id}`;
+              const cs = Array.isArray(bag[k]) ? bag[k] : [];
+              if (cs.length) pastBroadcasts.push({ liveId: id, comments: cs });
+            }
           }
         } catch {
         }
