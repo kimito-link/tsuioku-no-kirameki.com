@@ -7296,7 +7296,10 @@ async function buildHtmlReportDocument(
     const text = String(c.text || '').trim();
     const userId = c.userId ? String(c.userId) : '';
     const userKey = userId || UNKNOWN_USER_KEY;
-    const userLabel = displayUserLabel(userKey);
+    // 0.1.13 (I): nickname も渡す。集計テーブル側はずっと渡していたが、全コメント
+    // 一覧の各行は引数を落としていて、ハンドル名（「かんぺい」等）が出ていなかった。
+    // anonymousNicknameFallback 側で「ゲスト」「user XXXX」placeholder は filter する。
+    const userLabel = displayUserLabel(userKey, c.nickname || '');
     const userLabelHtml = buildUserProfileLinkedLabelHtml(userId, userLabel);
     const search = escapeAttr(
       `${commentNo} ${text} ${userId} ${userLabel} ${c.liveId || ''}`.toLowerCase()
@@ -7823,6 +7826,11 @@ async function buildHtmlReportDocument(
         background: #cbd5e1;
       }
       /* 0.1.12 (F3): サムネ付きユーザー一覧グリッド。可変列で詰めて並べる。 */
+      /* 0.1.14 (J): HTML レポートの dark テーマ (--bg #0b1220 / --panel #111b2e) に
+         合わせて、明示色で書く。旧 CSS は var(--panel-bg, #ffffff) を使っていて、
+         --panel-bg は report 側で未定義 → 白 fallback が当たり、しかも text 色は
+         --text (light gray) を継承していたため「白×ライトグレー」で読めない状態
+         だった（ユーザー報告の視認性問題）。 */
       .report-thumb-grid {
         list-style: none;
         margin: 0;
@@ -7837,8 +7845,9 @@ async function buildHtmlReportDocument(
         align-items: center;
         gap: 4px;
         padding: 8px 6px;
-        background: var(--panel-bg, #ffffff);
-        border: 1px solid var(--panel-border, #e2e8f0);
+        /* --panel より一段明るくして、card 内でカード感を出す */
+        background: #1a2540;
+        border: 1px solid #2a3a5e;
         border-radius: 10px;
         text-align: center;
         min-width: 0;
@@ -7848,7 +7857,7 @@ async function buildHtmlReportDocument(
         height: 48px;
         border-radius: 50%;
         overflow: hidden;
-        background: #f1f5f9;
+        background: #0b1220;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -7863,15 +7872,23 @@ async function buildHtmlReportDocument(
       .report-thumb-grid__label {
         font-size: 0.78rem;
         line-height: 1.25;
+        /* dark bg 上で WCAG AA 確保のため明示 */
+        color: #e2e8f0;
+        font-weight: 600;
         max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         width: 100%;
       }
+      .report-thumb-grid__label .nl-user-profile-link {
+        color: #93c5fd;
+      }
       .report-thumb-grid__count {
         font-size: 0.72rem;
-        color: var(--muted, #64748b);
+        /* --muted #93a4be より一段明るくして読みやすく */
+        color: #cbd5e1;
+        font-weight: 600;
       }
     </style>
   </head>

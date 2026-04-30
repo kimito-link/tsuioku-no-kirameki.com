@@ -201,9 +201,14 @@
     const n = String(nickname ?? "").trim();
     return /^user\s+[A-Za-z0-9]+$/i.test(n);
   }
+  function isNiconicoGuestPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return n === "\u30B2\u30B9\u30C8";
+  }
   function anonymousNicknameFallback(userId, nickname) {
     const nick = String(nickname ?? "").trim();
-    if (nick) return nick;
+    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
+    if (nick && !isPlaceholder) return nick;
     return isNiconicoAnonymousUserId(userId) ? "\u533F\u540D" : "";
   }
   function compactNicoLaneUserId(userId) {
@@ -694,6 +699,27 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.14",
+      date: "2026-04-30",
+      summary: "\u30B2\u30B9\u30C8\u5224\u5B9A\u3068\u30B5\u30E0\u30CD\u4E00\u89A7\u306E\u8996\u8A8D\u6027\u6539\u5584",
+      items: Object.freeze([
+        "\u30CF\u30F3\u30C9\u30EB\u540D\u304C\u300C\u30B2\u30B9\u30C8\u300D\uFF08\u30CB\u30B3\u65E2\u5B9A\u306E placeholder\uFF09\u306E\u5834\u5408\u306F ID \u306E\u307F\u3067\u8868\u793A\u3057\u3001\u72EC\u81EA\u30CF\u30F3\u30C9\u30EB\u3068\u306F\u533A\u5225",
+        "\u5168\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7\u306E\u5404\u884C\u306B\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0\u8868\u793A\u304C\u51FA\u3066\u3044\u306A\u304B\u3063\u305F\u30D0\u30B0\u3092\u4FEE\u6B63",
+        "\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7\u306E\u6587\u5B57\u8272\u3092 WCAG AA \u306B\u5408\u308F\u305B\u3066\u8AAD\u307F\u3084\u3059\u304F\u6539\u5584\uFF08\u30C0\u30FC\u30AF\u80CC\u666F\u4E0A\u306E\u767D\u6587\u5B57\u306B\u7D71\u4E00\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.13",
+      date: "2026-04-30",
+      summary: "HTML \u30EC\u30DD\u30FC\u30C8\u306E\u30B5\u30E0\u30CD\u5F37\u5316\u3068 CSP \u4FEE\u6B63",
+      items: Object.freeze([
+        "HTML \u30EC\u30DD\u30FC\u30C8 / \u30DE\u30FC\u30B1\u5206\u6790\u306E\u5404\u30E6\u30FC\u30B6\u30FC\u306B\u300C\u6700\u4F4E\u30B5\u30E0\u30CD\u300D\u3092\u5FC5\u305A\u8868\u793A\uFF08\u500B\u4EBA\u30B5\u30E0\u30CD\u304C\u7121\u304F\u3066\u3082\u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 or identicon \u3092\u5145\u5F53\uFF09",
+        "\u300C\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7\u300D\u30BB\u30AF\u30B7\u30E7\u30F3\u3092 HTML \u30EC\u30DD\u30FC\u30C8 / \u30DE\u30FC\u30B1\u5206\u6790\u306E\u4E21\u65B9\u306B\u8FFD\u52A0\uFF08\u30AB\u30FC\u30C9\u30B0\u30EA\u30C3\u30C9\u5F62\u5F0F\uFF09",
+        "\u5168\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7\u306E\u5404\u884C\u306E\u30E6\u30FC\u30B6\u30FC\u6B04\u306B\u3082 20px \u306E\u30A4\u30F3\u30E9\u30A4\u30F3\u30B5\u30E0\u30CD\u3092\u8868\u793A",
+        "chrome://extensions \u306E\u30A8\u30E9\u30FC\u30BF\u30D6\u306B\u6BCE\u56DE\u51FA\u3066\u3044\u305F CSP \u9055\u53CD\uFF08onerror \u5C5E\u6027\uFF09\u3092\u89E3\u6D88"
+      ])
+    }),
     Object.freeze({
       version: "0.1.12",
       date: "2026-04-30",
@@ -11348,7 +11374,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const text = String(c.text || "").trim();
       const userId = c.userId ? String(c.userId) : "";
       const userKey = userId || UNKNOWN_USER_KEY;
-      const userLabel = displayUserLabel(userKey);
+      const userLabel = displayUserLabel(userKey, c.nickname || "");
       const userLabelHtml = buildUserProfileLinkedLabelHtml(userId, userLabel);
       const search = escapeAttr(
         `${commentNo} ${text} ${userId} ${userLabel} ${c.liveId || ""}`.toLowerCase()
@@ -11857,6 +11883,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         background: #cbd5e1;
       }
       /* 0.1.12 (F3): \u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7\u30B0\u30EA\u30C3\u30C9\u3002\u53EF\u5909\u5217\u3067\u8A70\u3081\u3066\u4E26\u3079\u308B\u3002 */
+      /* 0.1.14 (J): HTML \u30EC\u30DD\u30FC\u30C8\u306E dark \u30C6\u30FC\u30DE (--bg #0b1220 / --panel #111b2e) \u306B
+         \u5408\u308F\u305B\u3066\u3001\u660E\u793A\u8272\u3067\u66F8\u304F\u3002\u65E7 CSS \u306F var(--panel-bg, #ffffff) \u3092\u4F7F\u3063\u3066\u3044\u3066\u3001
+         --panel-bg \u306F report \u5074\u3067\u672A\u5B9A\u7FA9 \u2192 \u767D fallback \u304C\u5F53\u305F\u308A\u3001\u3057\u304B\u3082 text \u8272\u306F
+         --text (light gray) \u3092\u7D99\u627F\u3057\u3066\u3044\u305F\u305F\u3081\u300C\u767D\xD7\u30E9\u30A4\u30C8\u30B0\u30EC\u30FC\u300D\u3067\u8AAD\u3081\u306A\u3044\u72B6\u614B
+         \u3060\u3063\u305F\uFF08\u30E6\u30FC\u30B6\u30FC\u5831\u544A\u306E\u8996\u8A8D\u6027\u554F\u984C\uFF09\u3002 */
       .report-thumb-grid {
         list-style: none;
         margin: 0;
@@ -11871,8 +11902,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         align-items: center;
         gap: 4px;
         padding: 8px 6px;
-        background: var(--panel-bg, #ffffff);
-        border: 1px solid var(--panel-border, #e2e8f0);
+        /* --panel \u3088\u308A\u4E00\u6BB5\u660E\u308B\u304F\u3057\u3066\u3001card \u5185\u3067\u30AB\u30FC\u30C9\u611F\u3092\u51FA\u3059 */
+        background: #1a2540;
+        border: 1px solid #2a3a5e;
         border-radius: 10px;
         text-align: center;
         min-width: 0;
@@ -11882,7 +11914,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         height: 48px;
         border-radius: 50%;
         overflow: hidden;
-        background: #f1f5f9;
+        background: #0b1220;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -11897,15 +11929,23 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       .report-thumb-grid__label {
         font-size: 0.78rem;
         line-height: 1.25;
+        /* dark bg \u4E0A\u3067 WCAG AA \u78BA\u4FDD\u306E\u305F\u3081\u660E\u793A */
+        color: #e2e8f0;
+        font-weight: 600;
         max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         width: 100%;
       }
+      .report-thumb-grid__label .nl-user-profile-link {
+        color: #93c5fd;
+      }
       .report-thumb-grid__count {
         font-size: 0.72rem;
-        color: var(--muted, #64748b);
+        /* --muted #93a4be \u3088\u308A\u4E00\u6BB5\u660E\u308B\u304F\u3057\u3066\u8AAD\u307F\u3084\u3059\u304F */
+        color: #cbd5e1;
+        font-weight: 600;
       }
     </style>
   </head>
@@ -12092,7 +12132,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1045" ? String("0430-1045") : "dev";
+      const buildId = "0430-1108" ? String("0430-1108") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

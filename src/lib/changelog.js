@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.14',
+    date: '2026-04-30',
+    summary: 'ゲスト判定とサムネ一覧の視認性改善',
+    items: Object.freeze([
+      'ハンドル名が「ゲスト」（ニコ既定の placeholder）の場合は ID のみで表示し、独自ハンドルとは区別',
+      '全コメント一覧の各行にニックネーム表示が出ていなかったバグを修正',
+      'サムネ付きユーザー一覧の文字色を WCAG AA に合わせて読みやすく改善（ダーク背景上の白文字に統一）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.13',
     date: '2026-04-30',
     summary: 'HTML レポートのサムネ強化と CSP 修正',

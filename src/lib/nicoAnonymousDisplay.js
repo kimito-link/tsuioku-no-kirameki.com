@@ -25,14 +25,36 @@ export function isNiconicoAutoUserPlaceholderNickname(nickname) {
 }
 
 /**
+ * 数値 ID ユーザーがハンドル名を未設定のとき、ニコ既定で表示される「ゲスト」。
+ * これも実質プロフィールではないので、レポートでハンドルがあるかのように
+ * 「ゲスト（123456）」と表示すると誤解を招く。完全一致のみ placeholder 判定し、
+ * 「ゲスト123」「ゲストさん」のような派生は本人がカスタム設定した名前として尊重する。
+ * @param {unknown} nickname
+ */
+export function isNiconicoGuestPlaceholderNickname(nickname) {
+  const n = String(nickname ?? '').trim();
+  return n === 'ゲスト';
+}
+
+/**
  * 既にニックネームがあるときはそのまま。無ければ匿名IDなら「匿名」。
+ *
+ * 0.1.13 (I): ニコ既定 placeholder（「ゲスト」「user XXXX」）は無いものとして扱う。
+ *   - 数値 ID + nickname=ゲスト → 空文字（呼び出し側で「ID のみ」表示）
+ *   - 数値 ID + nickname=「user 0539Z74OJ13」→ 同上
+ *   - 匿名 a: + nickname=ゲスト → 「匿名」（フォールバック）
+ *
  * @param {unknown} userId
  * @param {unknown} nickname
- * @returns {string} 空文字可（非匿名かつ名無し）
+ * @returns {string} 空文字可（非匿名かつ名無し or 既定 placeholder）
  */
 export function anonymousNicknameFallback(userId, nickname) {
   const nick = String(nickname ?? '').trim();
-  if (nick) return nick;
+  // 既定 placeholder は「ハンドル無し」として扱う（実名と区別する）
+  const isPlaceholder =
+    isNiconicoGuestPlaceholderNickname(nick) ||
+    isNiconicoAutoUserPlaceholderNickname(nick);
+  if (nick && !isPlaceholder) return nick;
   return isNiconicoAnonymousUserId(userId) ? '匿名' : '';
 }
 

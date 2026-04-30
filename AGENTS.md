@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.13（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.14（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,23 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.14 バンプで追加した修正（ゲスト判定 I / 視認性 J）**:
+
+- `fix(report)`: `nicoAnonymousDisplay.js` に `isNiconicoGuestPlaceholderNickname`
+ を新設し、`anonymousNicknameFallback` で「ゲスト」「user XXXX」placeholder を
+ ハンドル無しと同等扱いに変更。HTML レポート / 集計テーブル / 全コメント一覧で
+ 「ゲスト（144049418）」が独自ハンドルのように出ていたのを ID のみ表示に揃えた。
+ 「ゲスト123」「ゲストさん」のような派生はカスタム名として尊重（完全一致のみ判定）。
+- `fix(report)`: HTML レポートの全コメント一覧で `displayUserLabel(userKey)`
+ が nickname 引数を落としていたバグを修正。「かんぺい（143106966）」のような
+ ハンドル付き表示が出るようになった（旧: 数値 ID のみ表示）。
+- `fix(a11y)`: HTML レポート `.report-thumb-grid__cell` の CSS で
+ `var(--panel-bg, #ffffff)` を使っていたが、HTML レポート側は `--panel-bg` を
+ 定義しておらず白 fallback が当たり、テキスト色は親から `--text` (light gray)
+ を継承していたため「白×ライトグレー」で読めなかった。dark テーマ
+ （--bg #0b1220 / --panel #111b2e）に合わせ明示色（cell #1a2540 / label #e2e8f0
+ + font-weight 600 / count #cbd5e1）で書き直し WCAG AA 達成。
 
 **0.1.13 バンプで追加した修正（CSP 修正 E / 最低サムネ + 一覧 F / 全コメント一覧 inline サムネ G）**:
 
