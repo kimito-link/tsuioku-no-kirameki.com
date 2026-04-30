@@ -3593,9 +3593,17 @@ function collectWatchPageSnapshot() {
   const h1Text = clean(document.querySelector('h1')?.textContent || '');
   const broadcastTitle = titleFromMeta || h1Text || titleFromDocument;
 
-  const streamLink = Array.from(
+  /*
+   * 0.1.39 (U): /user/{id}/live_programs 形式 anchor を全件収集して
+   *   `extractBroadcasterUserId` の defense-in-depth に渡す。
+   *   関連配信サイドバーに他配信者リンクが先に並ぶケース（lv350421699 RIO）
+   *   でも、本配信者リンクの `?ref=watch_user_information` を見つけられる。
+   *   `streamLink` (配信者名取り出し用) 自体は従来どおり「先頭 hit」を採るが、
+   *   broadcasterUserId の方は配列を渡して ref マーカ付きを優先する。
+   */
+  const streamLinkAnchors = Array.from(
     document.querySelectorAll('a[href*="/user/"]')
-  ).find((a) => {
+  ).filter((a) => {
     const href = String(a.getAttribute('href') || '');
     const text = clean(a.textContent);
     return (
@@ -3605,6 +3613,10 @@ function collectWatchPageSnapshot() {
       !/^https?:\/\//i.test(text)
     );
   });
+  const streamLink = streamLinkAnchors[0];
+  const streamLinkHrefCandidates = streamLinkAnchors.map((a) =>
+    String(a.getAttribute('href') || '')
+  );
   /*
    * 配信者名の優先順位:
    *   1. embedded-data の program.supplier.name  — ニコ生が表示する「配信表示名」そのもの
@@ -3647,7 +3659,7 @@ function collectWatchPageSnapshot() {
     embeddedSupplierProgramProviderId: embeddedProps?.program?.supplier?.programProviderId,
     embeddedSupplierId: embeddedProps?.program?.supplier?.id,
     embeddedSupplierPageUrl: embeddedProps?.program?.supplier?.pageUrl,
-    streamLinkHref: streamLink?.getAttribute('href') ?? ''
+    streamLinkHrefCandidates
   });
 
   /*
@@ -4530,9 +4542,15 @@ function detectBroadcasterUserIdFromDom() {
     return broadcasterUidCache;
   }
   const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim();
-  const streamLink = Array.from(
+  /*
+   * 0.1.39 (U): collectWatchPageSnapshot と同じ defense-in-depth ロジックを
+   *   ここでも使う。embedded-data も読めるなら supplier.programProviderId を
+   *   最優先にし、DOM フォールバック時も `?ref=watch_user_information` 付き
+   *   anchor を優先する。3 秒キャッシュは引き続き有効。
+   */
+  const streamLinkAnchors = Array.from(
     document.querySelectorAll('a[href*="/user/"]')
-  ).find((a) => {
+  ).filter((a) => {
     const href = String(a.getAttribute('href') || '');
     const text = clean(a.textContent);
     return (
@@ -4542,9 +4560,22 @@ function detectBroadcasterUserIdFromDom() {
       !/^https?:\/\//i.test(text)
     );
   });
-  const href = String(streamLink?.getAttribute('href') || '');
-  const m = href.match(/\/user\/(\d+)/);
-  broadcasterUidCache = m ? m[1] : '';
+  const streamLinkHrefCandidates = streamLinkAnchors.map((a) =>
+    String(a.getAttribute('href') || '')
+  );
+  let embeddedSupplier = null;
+  try {
+    const props = extractEmbeddedDataProps(document);
+    embeddedSupplier = props?.program?.supplier ?? null;
+  } catch {
+    embeddedSupplier = null;
+  }
+  broadcasterUidCache = extractBroadcasterUserId({
+    embeddedSupplierProgramProviderId: embeddedSupplier?.programProviderId,
+    embeddedSupplierId: embeddedSupplier?.id,
+    embeddedSupplierPageUrl: embeddedSupplier?.pageUrl,
+    streamLinkHrefCandidates
+  });
   broadcasterUidCacheAt = now;
   return broadcasterUidCache;
 }

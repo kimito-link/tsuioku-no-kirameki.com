@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.38（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.39（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,31 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.39 バンプで入った修正（配信者リンク誤検出の再発防止 + 切り出し AN）**:
+
+- ユーザー報告: lv350421699（配信者 = ᖇIO / userId 143899079）の watch
+ ページで、0.1.38 修正適用前は配信者タイルからクリックすると関連配信枠
+ の覇成 赤（43068016, 1 度もコメしていない別人）に飛んでいた。
+- 原因（追加調査）: watch ページの DOM には `/user/{id}/live_programs`
+ 形式 anchor が **5 件** 含まれていた:
+   1. 関連配信サイドバー → 覇成 赤 (43068016)
+   2. 関連配信サイドバー → アライ (94392112)
+   3. 関連配信サイドバー → シルメリア (23600899)
+   4. 関連配信サイドバー → ヒナたん (131913660)
+   5. 配信者ペイン → ᖇIO (143899079) ← `?ref=watch_user_information` 付き
+ 0.1.38 で `embedded-data.program.supplier.programProviderId` 最優先にしたが、
+ 万一 embedded-data が読めない場合に DOM フォールバックが先頭 hit を採るため
+ 別人を返してしまう。
+- 修正: `extractBroadcasterUserId` の API を拡張して
+ `streamLinkHrefCandidates: string[]` を受け取るようにし、DOM 候補配列から
+ `?ref=watch_user_information` 付き anchor を最優先（無ければ先頭）で 1 つに
+ 絞ってから uid を抽出する。embedded-data があれば従来どおり最優先。
+- 同じパターンを使う `detectBroadcasterUserIdFromDom`（こん太レーン汚染検出
+ 等で使用）も同じ defense-in-depth に統一。
+- TDD: 13 → 22 ケースに拡張（lv350421699 case を含む 9 ケース追加）。
+- 同梱: アバター URL 比較ヘルパ（`avatarCompareKey` / `isSameAvatarUrl`）を
+ `src/lib/avatarUrlCompare.js` に切り出し（純粋関数 + 14 ケース TDD）。
 
 **0.1.38 バンプで入った修正（配信者 UID 取り違え修正 + 切り出し AM）**:
 

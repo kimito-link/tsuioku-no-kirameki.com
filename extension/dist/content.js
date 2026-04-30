@@ -3184,6 +3184,7 @@
   }
 
   // src/lib/broadcasterUserId.js
+  var WATCH_USER_INFO_REF_RE = /[?&]ref=watch_user_information(?:&|$)/;
   function asTrimmedString(v) {
     if (v == null) return "";
     return String(v).trim();
@@ -3196,6 +3197,18 @@
     const m = url.match(/\/user\/(\d+)/);
     return m ? m[1] : "";
   }
+  function pickBestStreamLinkHref(candidates) {
+    const cleaned = [];
+    for (const c of candidates) {
+      const s = asTrimmedString(c);
+      if (s) cleaned.push(s);
+    }
+    if (cleaned.length === 0) return "";
+    for (const c of cleaned) {
+      if (WATCH_USER_INFO_REF_RE.test(c)) return c;
+    }
+    return cleaned[0];
+  }
   function extractBroadcasterUserId(input) {
     if (!input || typeof input !== "object") return "";
     const ppid = asTrimmedString(input.embeddedSupplierProgramProviderId);
@@ -3205,8 +3218,17 @@
     const pageUrl = asTrimmedString(input.embeddedSupplierPageUrl);
     const fromPageUrl = pickUserIdFromUrl(pageUrl);
     if (fromPageUrl) return fromPageUrl;
-    const streamHref = asTrimmedString(input.streamLinkHref);
-    const fromStream = pickUserIdFromUrl(streamHref);
+    let candidateList = (
+      /** @type {unknown[]} */
+      []
+    );
+    if (Array.isArray(input.streamLinkHrefCandidates)) {
+      candidateList = input.streamLinkHrefCandidates;
+    } else if (input.streamLinkHref != null) {
+      candidateList = [input.streamLinkHref];
+    }
+    const bestHref = pickBestStreamLinkHref(candidateList);
+    const fromStream = pickUserIdFromUrl(bestHref);
     if (fromStream) return fromStream;
     return "";
   }
@@ -5866,13 +5888,17 @@
     );
     const h1Text = clean(document.querySelector("h1")?.textContent || "");
     const broadcastTitle = titleFromMeta || h1Text || titleFromDocument;
-    const streamLink = Array.from(
+    const streamLinkAnchors = Array.from(
       document.querySelectorAll('a[href*="/user/"]')
-    ).find((a) => {
+    ).filter((a) => {
       const href = String(a.getAttribute("href") || "");
       const text = clean(a.textContent);
       return /\/user\/\d+/.test(href) && /\/live_programs(?:\?|$)/.test(href) && text && !/^https?:\/\//i.test(text);
     });
+    const streamLink = streamLinkAnchors[0];
+    const streamLinkHrefCandidates = streamLinkAnchors.map(
+      (a) => String(a.getAttribute("href") || "")
+    );
     const embeddedProps = (() => {
       try {
         return extractEmbeddedDataProps(document);
@@ -5895,7 +5921,7 @@
       embeddedSupplierProgramProviderId: embeddedProps?.program?.supplier?.programProviderId,
       embeddedSupplierId: embeddedProps?.program?.supplier?.id,
       embeddedSupplierPageUrl: embeddedProps?.program?.supplier?.pageUrl,
-      streamLinkHref: streamLink?.getAttribute("href") ?? ""
+      streamLinkHrefCandidates
     });
     const broadcasterPageUrl = (() => {
       const raw = String(embeddedProps?.program?.supplier?.pageUrl ?? "").trim();
@@ -6652,16 +6678,29 @@
       return broadcasterUidCache;
     }
     const clean = (v) => String(v || "").replace(/\s+/g, " ").trim();
-    const streamLink = Array.from(
+    const streamLinkAnchors = Array.from(
       document.querySelectorAll('a[href*="/user/"]')
-    ).find((a) => {
-      const href2 = String(a.getAttribute("href") || "");
+    ).filter((a) => {
+      const href = String(a.getAttribute("href") || "");
       const text = clean(a.textContent);
-      return /\/user\/\d+/.test(href2) && /\/live_programs(?:\?|$)/.test(href2) && text && !/^https?:\/\//i.test(text);
+      return /\/user\/\d+/.test(href) && /\/live_programs(?:\?|$)/.test(href) && text && !/^https?:\/\//i.test(text);
     });
-    const href = String(streamLink?.getAttribute("href") || "");
-    const m = href.match(/\/user\/(\d+)/);
-    broadcasterUidCache = m ? m[1] : "";
+    const streamLinkHrefCandidates = streamLinkAnchors.map(
+      (a) => String(a.getAttribute("href") || "")
+    );
+    let embeddedSupplier = null;
+    try {
+      const props = extractEmbeddedDataProps(document);
+      embeddedSupplier = props?.program?.supplier ?? null;
+    } catch {
+      embeddedSupplier = null;
+    }
+    broadcasterUidCache = extractBroadcasterUserId({
+      embeddedSupplierProgramProviderId: embeddedSupplier?.programProviderId,
+      embeddedSupplierId: embeddedSupplier?.id,
+      embeddedSupplierPageUrl: embeddedSupplier?.pageUrl,
+      streamLinkHrefCandidates
+    });
     broadcasterUidCacheAt = now;
     return broadcasterUidCache;
   }

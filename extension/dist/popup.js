@@ -700,6 +700,14 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.39",
+      date: "2026-04-30",
+      summary: "\u5185\u90E8\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u5206\u5272\u306E\u7D9A\u304D",
+      items: Object.freeze([
+        "\u30A2\u30D0\u30BF\u30FC URL \u6BD4\u8F03\u30D8\u30EB\u30D1\uFF08avatarCompareKey / isSameAvatarUrl\uFF09\u3092 src/lib/avatarUrlCompare.js \u306B\u5207\u308A\u51FA\u3057\uFF08\u7D14\u7C8B\u95A2\u6570 + 14 \u30B1\u30FC\u30B9 TDD\uFF09\u3002query/hash \u9055\u3044\u3092\u300C\u540C\u3058\u30A2\u30D0\u30BF\u30FC\u300D\u3068\u3057\u3066\u6271\u3046\u30ED\u30B8\u30C3\u30AF\u306E\u5358\u4F53\u691C\u8A3C\u3092\u5F37\u5316"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.38",
       date: "2026-04-30",
       summary: "\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u306E\u30EA\u30F3\u30AF\u5148\u3092\u4FEE\u6B63",
@@ -8628,6 +8636,25 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 \u203B\u3046\u307E\u304F\u3044\u304B\u306A\u3044\u3068\u304D: ${hintLines.join("\n")}` : s;
   }
 
+  // src/lib/avatarUrlCompare.js
+  function avatarCompareKey(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    try {
+      const u = new URL(s);
+      u.search = "";
+      u.hash = "";
+      return u.href;
+    } catch {
+      return s;
+    }
+  }
+  function isSameAvatarUrl(a, b) {
+    const ka = avatarCompareKey(a);
+    const kb = avatarCompareKey(b);
+    return Boolean(ka && kb && ka === kb);
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -9974,23 +10001,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     }
     return "";
-  }
-  function avatarCompareKey(raw) {
-    const s = String(raw || "").trim();
-    if (!s) return "";
-    try {
-      const u = new URL(s);
-      u.search = "";
-      u.hash = "";
-      return u.href;
-    } catch {
-      return s;
-    }
-  }
-  function isSameAvatarUrl(a, b) {
-    const ka = avatarCompareKey(a);
-    const kb = avatarCompareKey(b);
-    return Boolean(ka && kb && ka === kb);
   }
   function countEntriesWithUserId(entries) {
     let n = 0;
@@ -15069,7 +15079,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1909" ? String("0430-1909") : "dev";
+      const buildId = "0430-1924" ? String("0430-1924") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

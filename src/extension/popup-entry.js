@@ -254,6 +254,7 @@ import { formatDateTime } from '../lib/formatDateTime.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
+import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 
 /**
  * @typedef {{
@@ -2140,27 +2141,6 @@ function rememberedAvatarUrlForUserId(userId) {
     }
   }
   return '';
-}
-
-/** @param {string} raw */
-function avatarCompareKey(raw) {
-  const s = String(raw || '').trim();
-  if (!s) return '';
-  try {
-    const u = new URL(s);
-    u.search = '';
-    u.hash = '';
-    return u.href;
-  } catch {
-    return s;
-  }
-}
-
-/** @param {string} a @param {string} b */
-function isSameAvatarUrl(a, b) {
-  const ka = avatarCompareKey(a);
-  const kb = avatarCompareKey(b);
-  return Boolean(ka && kb && ka === kb);
 }
 
 /** @param {PopupCommentEntry[]} entries */

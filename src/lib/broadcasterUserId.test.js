@@ -109,6 +109,102 @@ describe('extractBroadcasterUserId - チャンネル放送', () => {
   });
 });
 
+describe('extractBroadcasterUserId - DOM 候補配列の ?ref=watch_user_information 優先（lv350421699 RIO ケース）', () => {
+  it('embedded 全滅 + 5 件候補 → ?ref=watch_user_information 付きを採用', () => {
+    // 実例: 関連配信サイドバーが先頭に並び、本配信者リンクは末尾。
+    // ?ref=watch_user_information 付き anchor が本配信者の目印。
+    const uid = extractBroadcasterUserId({
+      embeddedSupplierProgramProviderId: null,
+      embeddedSupplierId: null,
+      embeddedSupplierPageUrl: '',
+      streamLinkHrefCandidates: [
+        'https://www.nicovideo.jp/user/43068016/live_programs',
+        'https://www.nicovideo.jp/user/94392112/live_programs',
+        'https://www.nicovideo.jp/user/23600899/live_programs',
+        'https://www.nicovideo.jp/user/131913660/live_programs',
+        'https://www.nicovideo.jp/user/143899079/live_programs?ref=watch_user_information'
+      ]
+    });
+    expect(uid).toBe('143899079');
+  });
+
+  it('?ref=watch_user_information 付きが最初に来ても採用', () => {
+    const uid = extractBroadcasterUserId({
+      streamLinkHrefCandidates: [
+        'https://www.nicovideo.jp/user/143899079/live_programs?ref=watch_user_information',
+        'https://www.nicovideo.jp/user/43068016/live_programs'
+      ]
+    });
+    expect(uid).toBe('143899079');
+  });
+
+  it('?ref=watch_user_information が無い場合は先頭候補（既存挙動維持）', () => {
+    const uid = extractBroadcasterUserId({
+      streamLinkHrefCandidates: [
+        'https://www.nicovideo.jp/user/45300945/live_programs',
+        'https://www.nicovideo.jp/user/115713314/live_programs'
+      ]
+    });
+    expect(uid).toBe('45300945');
+  });
+
+  it('embedded-data があれば候補配列より優先される', () => {
+    const uid = extractBroadcasterUserId({
+      embeddedSupplierProgramProviderId: '143899079',
+      streamLinkHrefCandidates: [
+        'https://www.nicovideo.jp/user/43068016/live_programs',
+        'https://www.nicovideo.jp/user/45300945/live_programs?ref=watch_user_information'
+      ]
+    });
+    expect(uid).toBe('143899079');
+  });
+
+  it('候補配列が空配列でも throw しない', () => {
+    expect(extractBroadcasterUserId({
+      streamLinkHrefCandidates: []
+    })).toBe('');
+  });
+
+  it('候補配列に空文字 / null が混じっても無視', () => {
+    const uid = extractBroadcasterUserId({
+      streamLinkHrefCandidates: [
+        '',
+        null,
+        undefined,
+        'https://www.nicovideo.jp/user/143899079/live_programs?ref=watch_user_information'
+      ]
+    });
+    expect(uid).toBe('143899079');
+  });
+
+  it('streamLinkHrefCandidates が配列でない（string）→ 単一 href 互換扱い', () => {
+    const uid = extractBroadcasterUserId({
+      streamLinkHref: 'https://www.nicovideo.jp/user/143899079/live_programs?ref=watch_user_information'
+    });
+    expect(uid).toBe('143899079');
+  });
+
+  it('?ref=watch_user_information の後ろに別パラメータがあっても認識する', () => {
+    const uid = extractBroadcasterUserId({
+      streamLinkHrefCandidates: [
+        'https://www.nicovideo.jp/user/100/live_programs',
+        'https://www.nicovideo.jp/user/143899079/live_programs?ref=watch_user_information&extra=1'
+      ]
+    });
+    expect(uid).toBe('143899079');
+  });
+
+  it('?other_ref=watch_user_information は誤判定しない（先頭一致）', () => {
+    const uid = extractBroadcasterUserId({
+      streamLinkHrefCandidates: [
+        'https://www.nicovideo.jp/user/100/live_programs?other_ref=watch_user_information',
+        'https://www.nicovideo.jp/user/200/live_programs?ref=watch_user_information'
+      ]
+    });
+    expect(uid).toBe('200');
+  });
+});
+
 describe('extractBroadcasterUserId - エッジケース', () => {
   it('streamLinkHref が相対パスでも /user/{id}/ を抜ける', () => {
     const uid = extractBroadcasterUserId({

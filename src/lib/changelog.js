@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.39',
+    date: '2026-04-30',
+    summary: '配信者リンク誤検出の再発防止',
+    items: Object.freeze([
+      '配信者タイルが関連配信枠の別人を指してしまう事象（0.1.38 の追加対策）。DOM 候補から ?ref=watch_user_information マーカ付き anchor を最優先にして二重防御。同種の検出ロジックを使う別関数（detectBroadcasterUserIdFromDom）も同じ防御に統一',
+      'アバター URL 比較ヘルパ（avatarCompareKey / isSameAvatarUrl）を src/lib/avatarUrlCompare.js に切り出し（純粋関数 + 14 ケース TDD）。query/hash 違いを「同じアバター」として扱うロジックの単体検証を強化'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.38',
     date: '2026-04-30',
     summary: '配信者タイルのリンク先を修正',
