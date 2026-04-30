@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.54',
+    date: '2026-04-30',
+    summary: 'ランキング導線を常時表示に',
+    items: Object.freeze([
+      'ツールバーから popup を開いた時にランキング導線が出ない問題を修正。複数 window 環境で source 検出が想定どおり動かないケースがあったため、popup window では常に導線を表示する形に変更（watch ページ内のパネル iframe では非表示）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.53',
     date: '2026-04-30',
     summary: 'ランキング導線の表示条件を厳密化',

@@ -708,6 +708,14 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.54",
+      date: "2026-04-30",
+      summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u3092\u5E38\u6642\u8868\u793A\u306B",
+      items: Object.freeze([
+        "\u30C4\u30FC\u30EB\u30D0\u30FC\u304B\u3089 popup \u3092\u958B\u3044\u305F\u6642\u306B\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u304C\u51FA\u306A\u3044\u554F\u984C\u3092\u4FEE\u6B63\u3002\u8907\u6570 window \u74B0\u5883\u3067 source \u691C\u51FA\u304C\u60F3\u5B9A\u3069\u304A\u308A\u52D5\u304B\u306A\u3044\u30B1\u30FC\u30B9\u304C\u3042\u3063\u305F\u305F\u3081\u3001popup window \u3067\u306F\u5E38\u306B\u5C0E\u7DDA\u3092\u8868\u793A\u3059\u308B\u5F62\u306B\u5909\u66F4\uFF08watch \u30DA\u30FC\u30B8\u5185\u306E\u30D1\u30CD\u30EB iframe \u3067\u306F\u975E\u8868\u793A\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.53",
       date: "2026-04-30",
       summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u306E\u8868\u793A\u6761\u4EF6\u3092\u53B3\u5BC6\u5316",
@@ -14262,10 +14270,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         );
       }
       syncVoiceCommentButton();
-      const isLiveActiveSource = watchUrlPick.source === "activeTab" || watchUrlPick.source === "lastFocusedNormal";
       const noWatchHint = $("noWatchRankingHint");
       if (noWatchHint instanceof HTMLElement) {
-        noWatchHint.hidden = isLiveActiveSource;
+        noWatchHint.hidden = INLINE_MODE;
       }
       if (!isNicoLiveWatchUrl(url)) {
         if (!isFreshRefresh()) return;
@@ -15998,7 +16005,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2321" ? String("0430-2321") : "dev";
+      const buildId = "0430-2328" ? String("0430-2328") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

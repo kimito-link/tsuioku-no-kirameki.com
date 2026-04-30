@@ -6263,21 +6263,17 @@ async function refresh() {
   syncVoiceCommentButton();
 
   /*
-   * 0.1.53 (AI): ランキング導線の表示条件を「アクティブタブが watch」のみに限定。
-   *   0.1.52 では `!isNicoLiveWatchUrl(url)` で判定していたが、url は
-   *   pickWatchUrlFromMultipleSources の fallback で storage の last_watch_url
-   *   を返すことがあり、Google 等の非 watch タブでも url=watch URL となって
-   *   ランキング導線が出ない問題があった。ユーザー報告「何もないところを
-   *   クリックすると前ひらいた放送につながっている」への対応。
-   *   source が 'activeTab' / 'lastFocusedNormal' 以外（= 'storage' / 'none'）
-   *   なら「アクティブな watch タブは無い」と判断して導線を出す。
+   * 0.1.54 (AJ): ランキング導線を「standalone popup なら常時表示」に変更。
+   *   0.1.53 では source ベースで判定していたが、複数 window や複数モニタ等で
+   *   `chrome.windows.getLastFocused` の挙動が想定と違い、ユーザーが Google を
+   *   見ているのに source='lastFocusedNormal' で導線が出ない事象が継続していた。
+   *   standalone popup window はユーザーが明示的にツールバーアイコンから
+   *   開いた状態で、ランキング導線を出してもデメリットが少ない。INLINE_MODE
+   *   （watch ページ内 iframe）のときだけ hidden にする。
    */
-  const isLiveActiveSource =
-    watchUrlPick.source === 'activeTab' ||
-    watchUrlPick.source === 'lastFocusedNormal';
   const noWatchHint = $('noWatchRankingHint');
   if (noWatchHint instanceof HTMLElement) {
-    noWatchHint.hidden = isLiveActiveSource;
+    noWatchHint.hidden = INLINE_MODE;
   }
 
   if (!isNicoLiveWatchUrl(url)) {
