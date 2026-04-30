@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.49',
+    date: '2026-04-30',
+    summary: 'マーケ分析に動的アドバイスを追加',
+    items: Object.freeze([
+      'マーケ分析の各セクションに「データに応じて変わるキャラ別アドバイス」を追加。KPI / 同接 / 笑い / 新規 vs 常連 / 沈黙 / 感情 / リーチ / 成長 / 初コメ / 生存曲線 / キーボード型 / コメ伝染 / 直近比較 / 波形 / 言わなかった人気語 / 話芸ピーク の 16 セクション × 100+ ルールで具体的な助言を出します（既存の固定アドバイスはそのまま、その後ろに追加表示）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.48',
     date: '2026-04-30',
     summary: '大規模配信のマーケ分析を安定化',

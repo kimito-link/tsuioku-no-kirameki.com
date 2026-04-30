@@ -708,6 +708,14 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.49",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u52D5\u7684\u30A2\u30C9\u30D0\u30A4\u30B9\u3092\u8FFD\u52A0",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306E\u5404\u30BB\u30AF\u30B7\u30E7\u30F3\u306B\u300C\u30C7\u30FC\u30BF\u306B\u5FDC\u3058\u3066\u5909\u308F\u308B\u30AD\u30E3\u30E9\u5225\u30A2\u30C9\u30D0\u30A4\u30B9\u300D\u3092\u8FFD\u52A0\u3002KPI / \u540C\u63A5 / \u7B11\u3044 / \u65B0\u898F vs \u5E38\u9023 / \u6C88\u9ED9 / \u611F\u60C5 / \u30EA\u30FC\u30C1 / \u6210\u9577 / \u521D\u30B3\u30E1 / \u751F\u5B58\u66F2\u7DDA / \u30AD\u30FC\u30DC\u30FC\u30C9\u578B / \u30B3\u30E1\u4F1D\u67D3 / \u76F4\u8FD1\u6BD4\u8F03 / \u6CE2\u5F62 / \u8A00\u308F\u306A\u304B\u3063\u305F\u4EBA\u6C17\u8A9E / \u8A71\u82B8\u30D4\u30FC\u30AF \u306E 16 \u30BB\u30AF\u30B7\u30E7\u30F3 \xD7 100+ \u30EB\u30FC\u30EB\u3067\u5177\u4F53\u7684\u306A\u52A9\u8A00\u3092\u51FA\u3057\u307E\u3059\uFF08\u65E2\u5B58\u306E\u56FA\u5B9A\u30A2\u30C9\u30D0\u30A4\u30B9\u306F\u305D\u306E\u307E\u307E\u3001\u305D\u306E\u5F8C\u308D\u306B\u8FFD\u52A0\u8868\u793A\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.48",
       date: "2026-04-30",
       summary: "\u5927\u898F\u6A21\u914D\u4FE1\u306E\u30DE\u30FC\u30B1\u5206\u6790\u3092\u5B89\u5B9A\u5316",
@@ -6266,6 +6274,610 @@ ${body}`;
     return { coefficient: Math.round(c / u * 100) / 100 };
   }
 
+  // src/lib/marketingDynamicAdvice.js
+  function pickAdvicesFromRules(rules, metrics) {
+    const list = Array.isArray(rules) ? rules : [];
+    const byChar = /* @__PURE__ */ new Map();
+    for (const r of list) {
+      if (!r || typeof r !== "object") continue;
+      let pass = false;
+      try {
+        pass = !!r.test?.(metrics);
+      } catch {
+        pass = false;
+      }
+      if (!pass) continue;
+      const cur = byChar.get(r.character);
+      if (!cur || (r.priority ?? 0) > (cur.priority ?? 0)) {
+        byChar.set(r.character, r);
+      }
+    }
+    const out = [];
+    for (
+      const c of
+      /** @type {AdviceCharacter[]} */
+      ["link", "konta", "tanu"]
+    ) {
+      const r = byChar.get(c);
+      if (r) out.push({ character: r.character, lines: r.lines.slice() });
+    }
+    return out;
+  }
+  var HIGH = 100;
+  var KPI_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "kpi-link-very-active",
+        character: "link",
+        priority: HIGH,
+        test: (m) => m.r.commentsPerMinute >= 50,
+        lines: ["\u3059\u3054\u3044\u76DB\u308A\u4E0A\u304C\u308A\u3060\u3063\u305F\u306E\u3060\uFF01", "\u6B21\u56DE\u3082\u3053\u306E\u30C6\u30F3\u30DD\u3092\u7DAD\u6301\u3059\u308B\u305F\u3081\u3001\u958B\u59CB 5 \u5206\u3067\u540C\u3058\u5BC6\u5EA6\u3092\u518D\u73FE\u3059\u308B\u5F3E\u3092\u4ED5\u8FBC\u3093\u3067\u304A\u304D\u305F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-link-active",
+        character: "link",
+        priority: 80,
+        test: (m) => m.r.commentsPerMinute >= 20,
+        lines: ["\u3057\u3063\u304B\u308A\u30EA\u30A2\u30AF\u30B7\u30E7\u30F3\u304C\u56DE\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u914D\u4FE1\u5185\u5BB9\u306E\u67F1\u304C\u30B3\u30E1\u306B\u4E57\u3063\u3066\u3044\u308B\u8A3C\u62E0\u3067\u3001\u81EA\u4FE1\u6301\u3063\u3066\u6B21\u56DE\u3082\u8D70\u3063\u3066\u3044\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-link-modest",
+        character: "link",
+        priority: 60,
+        test: (m) => m.r.commentsPerMinute >= 5,
+        lines: ["\u7A0B\u3088\u304F\u30B3\u30E1\u304C\u4ED8\u3044\u305F\u67A0\u306A\u306E\u3060\u3002", "\u6FC3\u3044\u5BFE\u8A71\u578B\u306E\u914D\u4FE1\u306A\u3089\u3053\u306E\u30C6\u30F3\u30DD\u304C\u5FC3\u5730\u3044\u3044\u304B\u3089\u3001\u7121\u7406\u306B\u30C6\u30F3\u30DD\u3092\u4E0A\u3052\u308B\u5FC5\u8981\u306F\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-link-quiet",
+        character: "link",
+        priority: 40,
+        test: (m) => m.r.commentsPerMinute < 5 && m.r.totalComments > 0,
+        lines: ["\u4ECA\u65E5\u306F\u9759\u304B\u3081\u3060\u3063\u305F\u306E\u3060\u3002", "\u9577\u6587\u6D3E\u304C\u591A\u3044\u6642\u9593\u5E2F\u304B\u3001\u8074\u304F\u5074\u306E\u67A0\u3060\u3063\u305F\u53EF\u80FD\u6027\u306A\u306E\u3060\u3002\u30B3\u30E1\u5BC6\u5EA6\u3060\u3051\u304C\u914D\u4FE1\u4FA1\u5024\u3058\u3083\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-konta-many-people",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => m.r.uniqueUsers >= 100,
+        lines: ["\u3044\u3063\u3071\u3044\u306E\u4EBA\u304C\u6765\u3066\u304F\u308C\u305F\u306E\u3060\u3002", "\u30E6\u30CB\u30FC\u30AF 100 \u4EBA\u8D85\u3048\u306F\u300C\u6B21\u56DE\u307E\u305F\u6765\u305F\u3044\u300D\u3068\u601D\u3063\u3066\u3082\u3089\u3046\u5C0E\u7DDA\u304C\u52B9\u3044\u305F\u8A3C\u62E0\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-konta-some-people",
+        character: "konta",
+        priority: 60,
+        test: (m) => m.r.uniqueUsers >= 30,
+        lines: ["\u3057\u3063\u304B\u308A\u5E38\u9023\u5C64\u304C\u3064\u3044\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u540D\u524D\u304C\u898B\u3048\u308B\u4EBA\u304C\u5897\u3048\u308B\u3068\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u3068\u3057\u3066\u5B89\u5B9A\u3057\u3066\u304F\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-konta-tight-circle",
+        character: "konta",
+        priority: 40,
+        test: (m) => m.r.uniqueUsers > 0 && m.r.uniqueUsers < 30,
+        lines: ["\u5C11\u4EBA\u6570\u3060\u3051\u3069\u6DF1\u304F\u8A71\u305B\u308B\u67A0\u306A\u306E\u3060\u3002", "\u4EBA\u6570\u3088\u308A\u300C\u5E38\u9023\u304C\u4F55\u4EBA\u3044\u308B\u304B\u300D\u3092\u5927\u4E8B\u306B\u3059\u308B\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u306A\u3089\u7406\u60F3\u5F62\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-tanu-balanced",
+        character: "tanu",
+        priority: HIGH,
+        test: (m) => m.r.commentsPerMinute >= 10 && m.r.uniqueUsers >= 30,
+        lines: ["\u30B3\u30E1\u5BC6\u5EA6\u30FB\u4EBA\u6570\u306E\u30D0\u30E9\u30F3\u30B9\u304C\u53D6\u308C\u305F\u3001\u5065\u5EB7\u7684\u306A\u67A0\u306A\u306E\u3060\u3002", "\u5B89\u5B9A\u904B\u55B6\u306E\u6307\u6A19\u3068\u3057\u3066\u306F\u512A\u79C0\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-tanu-deep",
+        character: "tanu",
+        priority: 80,
+        test: (m) => m.r.medianCommentsPerUser >= 3,
+        lines: ["\u30B3\u30E1\u30F3\u30BF\u30FC 1 \u4EBA\u3042\u305F\u308A\u306E\u4E2D\u592E\u5024\u304C 3 \u4EF6\u4EE5\u4E0A\u3067\u3001\u6DF1\u304F\u5BFE\u8A71\u3057\u3066\u304F\u308C\u305F\u4EBA\u304C\u591A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u6FC3\u3044\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u304C\u3067\u304D\u3066\u3044\u308B\u5146\u3057\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-tanu-glance",
+        character: "tanu",
+        priority: 50,
+        test: (m) => m.r.uniqueUsers > 0 && m.r.medianCommentsPerUser <= 1,
+        lines: ["1 \u4EBA 1 \u30B3\u30E1\u3067\u901A\u308A\u904E\u304E\u308B\u300C\u4E00\u898B\u300D\u7387\u304C\u9AD8\u3044\u67A0\u306A\u306E\u3060\u3002", "\u96C6\u5BA2\u529B\u306F\u9AD8\u3044\u3051\u3069\u5B9A\u7740\u306E\u4F38\u3073\u3057\u308D\u304C\u3042\u308B\u30D1\u30BF\u30FC\u30F3\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var CONCURRENT_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "cc-link-strong-retention",
+        character: "link",
+        priority: HIGH,
+        test: (m) => m.peak?.endRetentionRatio != null && m.peak.endRetentionRatio >= 0.8,
+        lines: ["\u7D42\u4E86\u6642\u4FDD\u6301\u7387 80% \u8D85\u3067\u3001\u6700\u5F8C\u307E\u3067\u6B8B\u3063\u3066\u3082\u3089\u3048\u305F\u67A0\u306A\u306E\u3060\u3002", "\u30D5\u30A1\u30F3\u5C64\u304C\u3057\u3063\u304B\u308A\u3064\u3044\u3066\u308B\u8A3C\u62E0\u3067\u3001\u30EA\u30D4\u30FC\u30BF\u30FC\u6BD4\u7387\u3082\u9AD8\u304F\u306A\u308A\u3084\u3059\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-link-mid-retention",
+        character: "link",
+        priority: 70,
+        test: (m) => m.peak?.endRetentionRatio != null && m.peak.endRetentionRatio >= 0.5,
+        lines: ["\u7D42\u4E86\u6642\u4FDD\u6301\u7387 50%\uFF0B\u3067\u3001\u4E2D\u76E4\u307E\u3067\u3057\u3063\u304B\u308A\u6301\u3063\u305F\u306E\u3060\u3002", "\u534A\u6E1B\u70B9\u304C\u51FA\u3066\u3044\u308B\u5834\u5408\u306F\u305D\u306E\u77AC\u9593\u306B\u4F55\u304C\u3042\u3063\u305F\u304B\u632F\u308A\u8FD4\u308B\u3068\u6B21\u306E\u6539\u5584\u30DD\u30A4\u30F3\u30C8\u304C\u898B\u3048\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-link-weak-retention",
+        character: "link",
+        priority: 50,
+        test: (m) => m.peak?.endRetentionRatio != null && m.peak.endRetentionRatio < 0.5,
+        lines: ["\u7D42\u4E86\u6642\u4FDD\u6301\u7387\u304C 50% \u3092\u5207\u3063\u3066\u3044\u308B\u67A0\u306A\u306E\u3060\u3002", "\u4E2D\u76E4\u3067\u30C6\u30F3\u30DD\u304C\u843D\u3061\u305F\u53EF\u80FD\u6027\u3002\u30B3\u30E1\u4F1D\u67D3\u3084\u8A71\u82B8\u30D4\u30FC\u30AF\u306E\u4F4D\u7F6E\u3068\u3064\u304D\u5408\u308F\u305B\u3066\u4E2D\u3060\u308B\u307F\u3092\u6F70\u3059\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-konta-early-peak",
+        character: "konta",
+        priority: 80,
+        test: (m) => m.peak?.peakMinute != null && m.r.durationMinutes > 10 && m.peak.peakMinute < m.r.durationMinutes * 0.25,
+        lines: ["\u30D4\u30FC\u30AF\u304C\u5192\u982D\u5074\u306B\u3042\u3063\u3066\u300C\u63B4\u307F\u306F\u5F37\u3044\u300D\u67A0\u306A\u306E\u3060\u3002", "\u914D\u4FE1\u544A\u77E5\u3084\u30AA\u30FC\u30D7\u30CB\u30F3\u30B0\u6F14\u51FA\u304C\u52B9\u3044\u3066\u3044\u308B\u53EF\u80FD\u6027\u5927\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-konta-late-peak",
+        character: "konta",
+        priority: 70,
+        test: (m) => m.peak?.peakMinute != null && m.r.durationMinutes > 10 && m.peak.peakMinute > m.r.durationMinutes * 0.75,
+        lines: ["\u30D4\u30FC\u30AF\u304C\u7D42\u76E4\u306B\u6765\u3066\u308B\u3001\u5F8C\u534A\u52DD\u8CA0\u578B\u306E\u67A0\u306A\u306E\u3060\u3002", "\u6700\u5F8C\u307E\u3067\u89B3\u3066\u3082\u3089\u3048\u308B\u69CB\u6210\u306B\u306A\u3063\u3066\u3044\u308B\u304B\u3089\u3001\u30A8\u30F3\u30C7\u30A3\u30F3\u30B0\u6F14\u51FA\u3092\u5927\u5207\u306B\u3057\u305F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-konta-mid-peak",
+        character: "konta",
+        priority: 60,
+        test: (m) => m.peak?.peakMinute != null,
+        lines: ["\u30D4\u30FC\u30AF\u304C\u4E2D\u76E4\u306B\u6765\u3066\u308B\u3001\u738B\u9053\u306E\u5C71\u578B\u306A\u306E\u3060\u3002", "\u5192\u982D\u30FB\u4E2D\u76E4\u30FB\u7D42\u76E4\u306E\u30E1\u30EA\u30CF\u30EA\u304C\u7DBA\u9E97\u306B\u51FA\u3066\u3044\u308B\u914D\u4FE1\u69CB\u6210\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-tanu-no-half",
+        character: "tanu",
+        priority: 80,
+        test: (m) => m.peak?.halfDecayMinute == null && m.peak?.peakValue != null && m.peak.peakValue > 0,
+        lines: ["\u30D4\u30FC\u30AF\u5F8C\u306B\u300C\u30D4\u30FC\u30AF\u306E\u534A\u5206\u3092\u5272\u3063\u305F\u300D\u5206\u304C\u51FA\u3066\u3044\u306A\u3044\uFF1D\u305A\u3063\u3068\u76DB\u308A\u4E0A\u304C\u3063\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u8996\u8074\u7DAD\u6301\u306E\u7406\u60F3\u5F62\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-tanu-half-fast",
+        character: "tanu",
+        priority: 60,
+        test: (m) => m.peak?.peakMinute != null && m.peak?.halfDecayMinute != null && m.peak.halfDecayMinute - m.peak.peakMinute <= 5,
+        lines: ["\u30D4\u30FC\u30AF\u5F8C 5 \u5206\u3067\u534A\u6E1B\u3057\u3066\u308B\u6025\u964D\u4E0B\u30D1\u30BF\u30FC\u30F3\u306A\u306E\u3060\u3002", "\u76DB\u308A\u4E0A\u304C\u308A\u306E\u77AC\u9593\u6027\u304C\u9AD8\u3044\u53CD\u9762\u3001\u30EA\u30D4\u30FC\u30C8\u8996\u8074\u306E\u52D5\u6A5F\u3092\u4F5C\u308B\u5DE5\u592B\u304C\u3042\u308B\u3068\u3055\u3089\u306B\u826F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-tanu-no-data",
+        character: "tanu",
+        priority: 30,
+        test: (m) => m.peak == null || m.peak.peakValue === 0,
+        lines: ["\u540C\u63A5\u30B5\u30F3\u30D7\u30EB\u304C\u53D6\u308C\u3066\u3044\u306A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u8996\u8074\u30DA\u30FC\u30B8\u3067\u62E1\u5F35\u304C\u52D5\u3044\u3066\u3044\u305F\u6642\u9593\u304C\u77ED\u304B\u3063\u305F\u53EF\u80FD\u6027\u3002\u6B21\u56DE\u306F\u6700\u521D\u304B\u3089\u958B\u3044\u3066\u304A\u304F\u3068\u8A18\u9332\u304C\u6B8B\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var LAUGHTER_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "la-konta-very-funny",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => (m.laughter?.overallRatio ?? 0) >= 0.3,
+        lines: ["\u7B11\u3044\u30B3\u30E1\u304C\u5168\u4F53\u306E 30% \u8D85\u3048\u3067\u3001\u62B1\u8179\u7D76\u5012\u7CFB\u306E\u67A0\u306A\u306E\u3060\u3002", "\u5207\u308A\u629C\u304D\u6620\u3048\u3059\u308B\u77AC\u9593\u304C\u591A\u3044\u304B\u3089\u3001\u30CF\u30A4\u30E9\u30A4\u30C8\u30AF\u30EA\u30C3\u30D7\u3092\u4F5C\u308B\u30D9\u30FC\u30B9\u7D20\u6750\u3068\u3057\u3066\u6700\u5F37\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-konta-funny",
+        character: "konta",
+        priority: 70,
+        test: (m) => (m.laughter?.overallRatio ?? 0) >= 0.15,
+        lines: ["\u7B11\u3044\u306E\u77AC\u9593\u304C\u5B9A\u671F\u7684\u306B\u51FA\u3066\u3044\u308B\u67A0\u306A\u306E\u3060\u3002", "\u30D4\u30FC\u30AF\u306E\u524D\u5F8C 30 \u79D2\u306B\u6CE8\u76EE\u3059\u308B\u3068\u3001\u30A6\u30B1\u305F\u8A00\u8449\u3084\u30DC\u30B1\u306E\u30D1\u30BF\u30FC\u30F3\u304C\u898B\u3048\u3066\u304F\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-konta-low",
+        character: "konta",
+        priority: 40,
+        test: (m) => (m.laughter?.overallRatio ?? 0) < 0.05 && m.r.totalComments > 0,
+        lines: ["\u7B11\u3044\u30B3\u30E1\u304C 5% \u672A\u6E80\u306E\u771F\u9762\u76EE\u3081\u306E\u67A0\u306A\u306E\u3060\u3002", "\u611F\u60C5\u66F2\u7DDA\u3067\u300C\u9A5A\u304D\u300D\u300C\u30DD\u30B8\u300D\u306E\u6BD4\u7387\u304C\u9AD8\u3051\u308C\u3070\u3001\u7B11\u3044\u4EE5\u5916\u306E\u611F\u52D5\u8EF8\u3067\u30D5\u30A1\u30F3\u304C\u96C6\u307E\u3063\u3066\u3044\u308B\u3068\u3044\u3046\u3053\u3068\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-link-funny-bias",
+        character: "link",
+        priority: 70,
+        test: (m) => (m.laughter?.overallRatio ?? 0) >= 0.2,
+        lines: ["\u7B11\u3044\u53CD\u5FDC\u306E\u77AC\u767A\u529B\u304C\u3042\u308B\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u306A\u306E\u3060\u3002", "\u6B21\u56DE\u3082\u3053\u306E\u7A7A\u6C17\u611F\u3092\u7DAD\u6301\u3067\u304D\u308B\u3088\u3046\u300C\u7B11\u3044\u8D77\u70B9\u300D\u306E\u30C8\u30D4\u30C3\u30AF\u3092 1 \u301C 2 \u500B\u7528\u610F\u3057\u3066\u304A\u304F\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-link-serious",
+        character: "link",
+        priority: 50,
+        test: (m) => (m.laughter?.overallRatio ?? 0) < 0.05 && (m.sentimentTotals?.positive ?? 0) > 0,
+        lines: ["\u7B11\u3044\u3088\u308A\u5171\u611F\u30FB\u611F\u5FC3\u30D9\u30FC\u30B9\u3067\u52D5\u3044\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u300C\u30DB\u30ED\u30C3\u3068\u3057\u305F\u300D\u300C\u3059\u3054\u3044\u300D\u307F\u305F\u3044\u306A\u611F\u60C5\u30B3\u30E1\u3092\u5927\u5207\u306B\u3059\u308B\u65B9\u5411\u6027\u304C\u5408\u3063\u3066\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-tanu-clipping",
+        character: "tanu",
+        priority: 60,
+        test: (m) => m.laughter?.peakBucket != null && (m.laughter?.peakValue ?? 0) >= 5,
+        lines: ["\u7B11\u3044\u30D4\u30FC\u30AF\u306E 30 \u79D2\u30D0\u30B1\u30C3\u30C8\u304C\u30CF\u30C3\u30AD\u30EA\u7ACB\u3063\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u5207\u308A\u629C\u304D\u30AF\u30EA\u30A8\u30A4\u30BF\u30FC\u5411\u3051\u306E\u7D20\u6750\u3068\u3057\u3066\u30D4\u30FC\u30AF\u6642\u523B\u3092\u30E1\u30E2\u3057\u3066\u304A\u304F\u3068\u6D3B\u7528\u3067\u304D\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var NEW_VS_REPEAT_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "nr-link-new-rush",
+        character: "link",
+        priority: HIGH,
+        test: (m) => (m.newVsRepeat?.newRatio ?? 0) >= 0.7,
+        lines: ["\u65B0\u898F\u7387 70% \u8D85\u3067\u3001\u65B0\u3057\u3044\u4EBA\u304C\u305F\u304F\u3055\u3093\u6765\u305F\u56DE\u306A\u306E\u3060\u3002", "\u30BF\u30A4\u30C8\u30EB\u30FB\u30B5\u30E0\u30CD\u30FB\u544A\u77E5\u304C\u52B9\u3044\u305F\u67A0\u306A\u306E\u3067\u3001\u305D\u306E\u8981\u7D20\u3092\u6B21\u56DE\u306B\u3082\u5F15\u304D\u7D99\u3050\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-link-balanced",
+        character: "link",
+        priority: 70,
+        test: (m) => (m.newVsRepeat?.newRatio ?? 0) >= 0.3 && (m.newVsRepeat?.repeatRatio ?? 0) >= 0.3,
+        lines: ["\u65B0\u898F\u30FB\u5E38\u9023\u304C\u4E21\u65B9\u3044\u308B\u30D0\u30E9\u30F3\u30B9\u578B\u306A\u306E\u3060\u3002", "\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u3068\u3057\u3066\u5065\u5EB7\u306A\u72B6\u614B\u3067\u3001\u9577\u304F\u7D9A\u304F\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-link-mostly-repeat",
+        character: "link",
+        priority: 60,
+        test: (m) => (m.newVsRepeat?.repeatRatio ?? 0) >= 0.7,
+        lines: ["\u5E38\u9023\u5C64\u306B\u652F\u3048\u3089\u308C\u305F\u56DE\u306A\u306E\u3060\u3002", "\u5B89\u5FC3\u611F\u306F\u3042\u308B\u3051\u3069\u3001\u65B0\u898F\u6D41\u5165\u3092\u5897\u3084\u3059\u306B\u306F TikTok \u5207\u308A\u629C\u304D\u3084 SNS \u544A\u77E5\u306E\u898B\u76F4\u3057\u304C\u52B9\u304F\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-konta-heavy-fans",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => (m.newVsRepeat?.heavyRatio ?? 0) >= 0.3,
+        lines: ["\u30D8\u30D3\u30FC\u5E38\u9023\uFF08\u904E\u53BB 5+ \u30B3\u30E1\u5B9F\u7E3E\uFF09\u304C 30% \u8D85\u3048\u3001\u30B3\u30A2\u30D5\u30A1\u30F3\u304C\u539A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u3053\u3046\u3044\u3046\u67A0\u306F\u914D\u4FE1\u8005\u3068\u3057\u3066\u3082\u7CBE\u795E\u7684\u306B\u697D\u306A\u306F\u305A\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-konta-discovery",
+        character: "konta",
+        priority: 60,
+        test: (m) => (m.newVsRepeat?.newRatio ?? 0) >= 0.5,
+        lines: ["\u534A\u6570\u4EE5\u4E0A\u304C\u65B0\u898F\u3067\u3001\u65B0\u3057\u3044\u51FA\u4F1A\u3044\u304C\u3044\u3063\u3071\u3044\u3042\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u6B21\u56DE\u307E\u305F\u6765\u3066\u3082\u3089\u3046\u305F\u3081\u306B\u914D\u4FE1\u5192\u982D\u3067\u8EFD\u3044\u81EA\u5DF1\u7D39\u4ECB\u3092\u5165\u308C\u308B\u306E\u3082\u6709\u52B9\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-tanu-tracking",
+        character: "tanu",
+        priority: 80,
+        test: (m) => (m.newVsRepeat?.totalCurrent ?? 0) >= 30,
+        lines: ["\u904E\u53BB\u914D\u4FE1\u3068\u306E\u7A81\u304D\u5408\u308F\u305B\u304C\u3067\u304D\u308B\u898F\u6A21\u611F\u306A\u306E\u3060\u3002", "\u5E38\u9023\u30AB\u30EC\u30F3\u30C0\u30FC\u3068\u4F75\u305B\u3066\u300C\u3044\u3064\u3082\u3044\u308B\u4EBA\u300D\u3092\u610F\u8B58\u3059\u308B\u3068\u3001\u6B21\u56DE\u306E\u6328\u62F6\u3084\u53CD\u5FDC\u306B\u539A\u307F\u304C\u51FA\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-tanu-small-sample",
+        character: "tanu",
+        priority: 30,
+        test: (m) => (m.newVsRepeat?.totalCurrent ?? 0) < 10,
+        lines: ["\u30B5\u30F3\u30D7\u30EB\u6570\u304C\u5C11\u306A\u3081\u306A\u306E\u3067\u3001\u65B0\u898F\u7387 / \u5E38\u9023\u7387\u306E\u6570\u5B57\u306F\u63FA\u308C\u3084\u3059\u3044\u306E\u3060\u3002", "\u4F55\u56DE\u304B\u307E\u3068\u3081\u3066\u898B\u308B\u306E\u304C\u3044\u3044\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var SILENCE_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "sl-link-engaged",
+        character: "link",
+        priority: HIGH,
+        test: (m) => m.silenceQualityCounts.engaged >= 3,
+        lines: ["\u6C88\u9ED9\u660E\u3051\u306B\u53CD\u5FDC\u304C\u7206\u767A\u3059\u308B\u300C\u30AC\u30F3\u898B\u7CFB\u300D\u304C\u8907\u6570\u56DE\u3042\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u914D\u4FE1\u8005\u306E\u8A71\u82B8 / \u6F14\u51FA\u304C\u52B9\u3044\u305F\u77AC\u9593\u306A\u306E\u3067\u3001\u305D\u306E\u6642\u306E\u8A71\u984C\u306F\u518D\u5229\u7528\u3067\u304D\u308B\u5F37\u3044\u5F3E\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "sl-link-departed",
+        character: "link",
+        priority: 70,
+        test: (m) => m.silenceQualityCounts.departed >= 3,
+        lines: ["\u6C88\u9ED9\u660E\u3051\u306B\u53CD\u5FDC\u304C\u51FA\u306A\u3044\u300C\u96E2\u8131\u7CFB\u300D\u304C\u8907\u6570\u3042\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u4E2D\u76E4\u3067\u8996\u8074\u8005\u304C\u53BB\u3063\u3066\u308B\u77AC\u9593\u3002\u8A71\u984C\u306E\u5207\u308A\u66FF\u3048\u30BF\u30A4\u30DF\u30F3\u30B0\u3092\u898B\u76F4\u3057\u305F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "sl-konta-rare",
+        character: "konta",
+        priority: 60,
+        test: (m) => m.silenceCount === 0,
+        lines: ["60 \u79D2\u4EE5\u4E0A\u306E\u6C88\u9ED9\u304C\u4E00\u5EA6\u3082\u306A\u3044\u3001\u305A\u3063\u3068\u8CD1\u3084\u304B\u3060\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u8996\u8074\u8005\u304C\u5E38\u306B\u4F55\u304B\u306B\u53CD\u5FDC\u3057\u3066\u305F\u8A3C\u62E0\u3067\u3001\u96D1\u8AC7\u529B\u304C\u9AD8\u3044\u914D\u4FE1\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "sl-konta-many",
+        character: "konta",
+        priority: 50,
+        test: (m) => m.silenceCount >= 10,
+        lines: ["\u6C88\u9ED9\u30BE\u30FC\u30F3\u304C 10 \u500B\u4EE5\u4E0A\u3042\u3063\u305F\u3001\u30E1\u30EA\u30CF\u30EA\u306E\u5F37\u3044\u67A0\u306A\u306E\u3060\u3002", "\u8003\u3048\u8FBC\u307E\u305B\u308B\u5834\u9762 \u2192 \u3069\u3063\u3068\u53CD\u5FDC\u3001\u306E\u30EA\u30BA\u30E0\u304C\u3042\u308C\u3070\u300C\u30AC\u30F3\u898B\u7CFB\u300D\u304C\u591A\u3044\u306F\u305A\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "sl-tanu-explainer",
+        character: "tanu",
+        priority: 40,
+        test: (m) => m.silenceCount > 0,
+        lines: ["\u6C88\u9ED9\u30BE\u30FC\u30F3\u306E\u300C\u8CEA\u300D\u3092\u898B\u308B\u3068\u3001\u305D\u306E\u914D\u4FE1\u306E\u76DB\u308A\u4E0A\u304C\u308A\u65B9\u306E\u7279\u5FB4\u304C\u63B4\u3081\u308B\u306E\u3060\u3002", "\u30AC\u30F3\u898B\u7CFB\u304C\u591A\u3044\uFF1D\u9759\u3068\u52D5\u306E\u30E1\u30EA\u30CF\u30EA\u3001\u96E2\u8131\u7CFB\u304C\u591A\u3044\uFF1D\u6539\u5584\u4F59\u5730\u3042\u308A\u3001\u306E\u76EE\u5B89\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var SENTIMENT_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "st-konta-positive",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => (m.sentimentTotals?.positive ?? 0) > (m.sentimentTotals?.negative ?? 0) * 3 && (m.sentimentTotals?.positive ?? 0) >= 10,
+        lines: ["\u30DD\u30B8\u30C6\u30A3\u30D6\u7CFB\u306E\u8A00\u8449\u304C\u5727\u5012\u7684\u306B\u591A\u3044\u3001\u6E29\u304B\u3044\u67A0\u306A\u306E\u3060\u3002", "\u300C\u697D\u3057\u3044\u300D\u300C\u3059\u3054\u3044\u300D\u300C\u3042\u308A\u304C\u3068\u3046\u300D\u304C\u56DE\u3063\u3066\u308B\u914D\u4FE1\u306F\u5FC3\u7406\u7684\u306B\u5B89\u5168\u306A\u7A7A\u9593\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "st-konta-surprise",
+        character: "konta",
+        priority: 80,
+        test: (m) => (m.sentimentTotals?.surprise ?? 0) >= 10,
+        lines: ["\u300C\u30DE\u30B8\u300D\u300C\u3048\u3063\u300D\u300C\u3046\u305D\u300D\u307F\u305F\u3044\u306A\u9A5A\u304D\u7CFB\u304C\u591A\u3081\u306E\u67A0\u306A\u306E\u3060\u3002", "\u30B5\u30D7\u30E9\u30A4\u30BA\u5C55\u958B\u30FB\u4E88\u60F3\u5916\u306E\u30AA\u30C1\u304C\u52B9\u3044\u3066\u3044\u308B\u8A3C\u62E0\u3067\u3001\u30A8\u30F3\u30BF\u30E1\u6027\u306E\u9AD8\u3044\u914D\u4FE1\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "st-konta-negative",
+        character: "konta",
+        priority: 60,
+        test: (m) => (m.sentimentTotals?.negative ?? 0) > (m.sentimentTotals?.positive ?? 0) && (m.sentimentTotals?.negative ?? 0) >= 5,
+        lines: ["\u30CD\u30AC\u7CFB\u30B3\u30E1\u304C\u76EE\u7ACB\u3064\u67A0\u306A\u306E\u3060\u3002", "\u8F9E\u66F8\u30D9\u30FC\u30B9\u3067\u76AE\u8089\u3084\u5197\u8AC7\u3092\u8AAD\u3081\u306A\u3044\u306E\u3067\u3001\u6587\u8108\u6B21\u7B2C\u3067\u306F\u300C\u30E4\u30D0\u3044\u300D\u304C\u30DD\u30B8\u3067\u3082\u62FE\u308F\u308C\u308B\u306E\u3060\u3002\u9D5C\u5451\u307F\u306B\u305B\u305A\u6570\u5024\u306E\u50BE\u5411\u3060\u3051\u898B\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "st-link-confused",
+        character: "link",
+        priority: 50,
+        test: (m) => (m.sentimentTotals?.confusion ?? 0) >= 5,
+        lines: ["\u300C\u3046\u30FC\u3093\u300D\u300C\u8B0E\u300D\u307F\u305F\u3044\u306A\u56F0\u60D1\u7CFB\u304C\u51FA\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u30B2\u30FC\u30E0\u5B9F\u6CC1\u3084\u60C5\u5831\u914D\u4FE1\u306A\u3089\u300C\u8003\u3048\u3055\u305B\u308B\u5834\u9762\u300D\u306E\u8A3C\u62E0\u3067\u3001\u5FC5\u305A\u3057\u3082\u60AA\u304F\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "st-tanu-balanced-tone",
+        character: "tanu",
+        priority: 40,
+        test: (m) => (m.sentimentTotals?.positive ?? 0) > 0 && (m.sentimentTotals?.surprise ?? 0) > 0,
+        lines: ["\u30DD\u30B8\u30FB\u9A5A\u304D\u304C\u4E21\u65B9\u4E57\u3063\u3066\u308B\u3001\u611F\u60C5\u306E\u8D77\u4F0F\u304C\u3042\u308B\u67A0\u306A\u306E\u3060\u3002", "\u4E00\u672C\u8ABF\u5B50\u3058\u3083\u306A\u3044\u69CB\u6210\u306F\u98FD\u304D\u306B\u304F\u304F\u3066\u3001\u30EA\u30D4\u30FC\u30C8\u8996\u8074\u306B\u52B9\u304F\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var REACH_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "rc-konta-silent-many",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => (m.reach?.coefficient ?? 0) >= 10,
+        lines: ["\u30EA\u30FC\u30C1\u4FC2\u6570 10+ \u3067\u3001\u30B3\u30E1\u30F3\u30BF\u30FC 1 \u4EBA\u306B\u3064\u304D 10 \u4EBA\u4EE5\u4E0A\u304C\u89B3\u3066\u308B\u30B5\u30A4\u30EC\u30F3\u30C8\u89B3\u6226\u5C64\u304C\u539A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u30B3\u30E1\u5C11\u306A\u3081\u3067\u3082\u89B3\u3066\u308B\u4EBA\u306F\u591A\u3044\u304B\u3089\u3001\u81EA\u4FE1\u3092\u6301\u3063\u3066\u3044\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "rc-konta-balanced",
+        character: "konta",
+        priority: 70,
+        test: (m) => (m.reach?.coefficient ?? 0) >= 3 && (m.reach?.coefficient ?? 0) < 10,
+        lines: ["\u30EA\u30FC\u30C1\u4FC2\u6570 3\u301C10 \u306E\u30D0\u30E9\u30F3\u30B9\u578B\u306A\u306E\u3060\u3002", "\u30B3\u30E1\u3059\u308B\u5074\u3068\u89B3\u308B\u5074\u306E\u6BD4\u7387\u304C\u5065\u5EB7\u7684\u3067\u3001\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306E\u898F\u6A21\u611F\u304C\u307B\u3069\u3088\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "rc-konta-active",
+        character: "konta",
+        priority: 50,
+        test: (m) => (m.reach?.coefficient ?? 0) > 0 && (m.reach?.coefficient ?? 0) < 3,
+        lines: ["\u30EA\u30FC\u30C1\u4FC2\u6570 1\u301C3 \u3067\u3001\u89B3\u3066\u308B\u4EBA\u307B\u307C\u5168\u54E1\u304C\u30B3\u30E1\u3059\u308B\u80FD\u52D5\u7684\u306A\u67A0\u306A\u306E\u3060\u3002", "\u5C11\u4EBA\u6570\u3067\u3082\u6FC3\u3044\u6642\u9593\u304C\u6D41\u308C\u3066\u3044\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "rc-link-grow-silent",
+        character: "link",
+        priority: 60,
+        test: (m) => (m.reach?.coefficient ?? 0) >= 8,
+        lines: ["\u30B5\u30A4\u30EC\u30F3\u30C8\u89B3\u6226\u5C64\u304C\u539A\u3044\u5834\u5408\u3001ROM \u5C02\u3092\u5F15\u304D\u51FA\u3059\u300C\u30B3\u30E1\u3057\u3084\u3059\u3044\u96D1\u8AC7\u30B3\u30FC\u30CA\u30FC\u300D\u3068\u304B\u3092\u4F5C\u308B\u3068\u4F53\u611F\u76DB\u308A\u4E0A\u304C\u308A\u304C\u4E0A\u304C\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var GROWTH_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "gr-link-booming",
+        character: "link",
+        priority: HIGH,
+        test: (m) => (m.growth?.zScore ?? -99) >= 1.5,
+        lines: ["\u904E\u53BB\u914D\u4FE1\u306E\u5E73\u5747\u304B\u3089 +1.5\u03C3 \u4EE5\u4E0A\u3067\u3001\u7D76\u597D\u8ABF\u306E\u56DE\u306A\u306E\u3060\uFF01", "\u4F55\u304C\u52B9\u3044\u305F\u304B\u30E1\u30E2\u3057\u3066\u304A\u304F\u3068\u6B21\u56DE\u518D\u73FE\u3057\u3084\u3059\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "gr-link-up",
+        character: "link",
+        priority: 70,
+        test: (m) => (m.growth?.deltaPct ?? -1) >= 0.2,
+        lines: ["\u904E\u53BB\u5E73\u5747\u3088\u308A +20% \u4EE5\u4E0A\u306E\u30D7\u30E9\u30B9\u306A\u306E\u3060\u3002", "\u3044\u3044\u6D41\u308C\u306B\u4E57\u3063\u3066\u3044\u308B\u304B\u3089\u3001\u914D\u4FE1\u30D5\u30A9\u30FC\u30DE\u30C3\u30C8\u3092\u5909\u3048\u305A\u306B\u3053\u306E\u307E\u307E\u7D9A\u3051\u305F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "gr-link-flat",
+        character: "link",
+        priority: 50,
+        test: (m) => Math.abs(m.growth?.deltaPct ?? 0) < 0.1 && (m.growth?.deltaPct ?? null) !== null,
+        lines: ["\u904E\u53BB\u5E73\u5747\u3068\xB110% \u4EE5\u5185\u306E\u5B89\u5B9A\u67A0\u306A\u306E\u3060\u3002", "\u826F\u304F\u3082\u60AA\u304F\u3082\u63FA\u308C\u304C\u306A\u3044\u3001\u56FA\u5B9A\u5BA2\u5411\u3051\u306E\u5B89\u5FC3\u611F\u304C\u3042\u308B\u56DE\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "gr-link-down",
+        character: "link",
+        priority: 60,
+        test: (m) => (m.growth?.deltaPct ?? 99) <= -0.2,
+        lines: ["\u904E\u53BB\u5E73\u5747\u3088\u308A -20% \u4EE5\u4E0B\u306A\u306E\u3060\u3002", "\u30B8\u30E3\u30F3\u30EB\u9055\u3044\u30FB\u77ED\u6642\u9593\u67A0\u30FB\u914D\u4FE1\u6642\u9593\u304C\u5909\u5247\u7684\u3060\u3063\u305F\u53EF\u80FD\u6027\u3002\u4E0B\u304C\u3063\u305F\u3060\u3051\u3067\u914D\u4FE1\u306E\u4FA1\u5024\u304C\u4E0B\u304C\u308B\u308F\u3051\u3058\u3083\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "gr-tanu-sample",
+        character: "tanu",
+        priority: 30,
+        test: (m) => m.growth?.average == null,
+        lines: ["\u904E\u53BB\u914D\u4FE1\u306E\u30B5\u30F3\u30D7\u30EB\u304C\u307E\u3060\u5C11\u306A\u3044\u306E\u3067\u3001\u6210\u9577\u30E1\u30FC\u30BF\u30FC\u304C\u8868\u793A\u3067\u304D\u306A\u3044\u67A0\u306A\u306E\u3060\u3002", "5 \u914D\u4FE1\u3050\u3089\u3044\u8A18\u9332\u304C\u8CAF\u307E\u308B\u3068\u76F8\u5BFE\u6BD4\u8F03\u304C\u3067\u304D\u308B\u3088\u3046\u306B\u306A\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var FIRST_SECOND_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "fs-konta-eager",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => m.firstSecondTotal >= 10,
+        lines: ["10 \u4EBA\u4EE5\u4E0A\u304C\u300C\u521D\u30B3\u30E1 \u2192 \u7D9A\u3051\u3066\u30B3\u30E1\u300D\u3092\u6253\u3063\u3066\u308B\u3001\u4E57\u3063\u3066\u304D\u305F\u6D3E\u304C\u591A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u521D\u30B3\u30E1\u3067\u7D42\u308F\u3089\u305A\u4F1A\u8A71\u306B\u5165\u308B\u4EBA\u304C\u591A\u3044\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306F\u5065\u5EB7\u7684\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "fs-konta-watcher",
+        character: "konta",
+        priority: 50,
+        test: (m) => m.firstSecondTotal > 0 && m.firstSecondTotal < 5,
+        lines: ["\u591A\u304F\u306E\u4EBA\u304C 1 \u30B3\u30E1\u3067\u69D8\u5B50\u898B\u3001\u3082\u3057\u304F\u306F\u7D99\u7D9A\u30B3\u30E1\u307E\u3067\u306F\u6D41\u308C\u306A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u30B3\u30E1\u6B53\u8FCE\u306E\u58F0\u3092\u304B\u3051\u305F\u308A\u3001\u30C6\u30FC\u30DE\u30C8\u30FC\u30AF\u3067\u5DFB\u304D\u8FBC\u3080\u3068 2 \u30B3\u30E1\u76EE\u3092\u5F15\u304D\u51FA\u305B\u308B\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var SURVIVAL_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "sv-link-strong",
+        character: "link",
+        priority: HIGH,
+        test: (m) => (m.survivalEndPct ?? -1) >= 50,
+        lines: ["\u6700\u521D\u306E\u533A\u9593\u306B\u30B3\u30E1\u304F\u308C\u305F\u4EBA\u306E\u534A\u5206\u4EE5\u4E0A\u304C\u3001\u7D42\u76E4\u307E\u3067\u30B3\u30E1\u3057\u7D9A\u3051\u3066\u305F\u67A0\u306A\u306E\u3060\u3002", "\u8996\u8074\u7DAD\u6301\uFF0B\u30B3\u30E1\u53C2\u52A0\u306E\u4E8C\u91CD\u3067\u5F37\u3044\u3001\u7406\u60F3\u578B\u306E\u914D\u4FE1\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "sv-link-fade",
+        character: "link",
+        priority: 60,
+        test: (m) => (m.survivalEndPct ?? -1) >= 0 && (m.survivalEndPct ?? -1) < 25,
+        lines: ["\u521D\u671F\u30B3\u30E1\u53C2\u52A0\u8005\u306E 25% \u4EE5\u4E0B\u3057\u304B\u7D42\u76E4\u306B\u6B8B\u3063\u3066\u306A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u534A\u6E1B\u70B9\u3068\u7A81\u304D\u5408\u308F\u305B\u3066\u3001\u3069\u306E\u77AC\u9593\u306B\u96E2\u8131\u304C\u59CB\u307E\u3063\u305F\u304B\u8ABF\u3079\u308B\u306E\u304C\u6B21\u306E\u6539\u5584\u30DD\u30A4\u30F3\u30C8\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var KEYBOARD_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "kb-tanu-emoji-heavy",
+        character: "tanu",
+        priority: 80,
+        test: (m) => (m.keyboardCounts?.emoji ?? 0) > 0 && (m.keyboardCounts?.emoji ?? 0) >= (m.keyboardCounts?.short ?? 0) + (m.keyboardCounts?.long ?? 0) + (m.keyboardCounts?.balanced ?? 0),
+        lines: ["\u7D75\u6587\u5B57\u6D3E\u304C\u4ED6\u306E\u578B\u3068\u6BD4\u3079\u3066\u591A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u8996\u899A\u7684\u306A\u30C6\u30F3\u30B7\u30E7\u30F3\u304C\u9AD8\u3044\u6587\u5316\u306E\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u3067\u3001\u914D\u4FE1\u8005\u5074\u3082\u7D75\u6587\u5B57\u3084\u9854\u6587\u5B57\u3092\u8FD4\u3059\u3068\u99B4\u67D3\u307F\u3084\u3059\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kb-tanu-short-dominant",
+        character: "tanu",
+        priority: 70,
+        test: (m) => (m.keyboardCounts?.short ?? 0) > 0 && (m.keyboardCounts?.short ?? 0) >= (m.keyboardCounts?.long ?? 0) + (m.keyboardCounts?.balanced ?? 0),
+        lines: ["\u77ED\u6587\u6D3E\u304C\u591A\u3044\u53CD\u5FDC\u901F\u5EA6\u578B\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306A\u306E\u3060\u3002", "\u4F1A\u8A71\u306E\u30C6\u30F3\u30DD\u304C\u901F\u3044\u304B\u3089\u914D\u4FE1\u8005\u5074\u3082\u30C6\u30F3\u30DD\u306B\u5408\u308F\u305B\u308B\u3068\u76DB\u308A\u4E0A\u304C\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "kb-tanu-long-dominant",
+        character: "tanu",
+        priority: 70,
+        test: (m) => (m.keyboardCounts?.long ?? 0) > 0 && (m.keyboardCounts?.long ?? 0) >= (m.keyboardCounts?.short ?? 0) + (m.keyboardCounts?.balanced ?? 0),
+        lines: ["\u30ED\u30F3\u30B0\u6D3E\u304C\u591A\u3044\u719F\u8AAD\u578B\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306A\u306E\u3060\u3002", "\u4E01\u5BE7\u306B\u7B54\u3048\u308B\u3068\u6E80\u8DB3\u5EA6\u304C\u4E0A\u304C\u308B\u5C64\u306A\u306E\u3067\u3001\u914D\u4FE1\u8005\u5074\u306E\u30EC\u30B9\u3082\u3058\u3063\u304F\u308A\u3081\u304C\u5408\u3046\u306E\u3060\u3002"]
+      },
+      {
+        id: "kb-tanu-quiet",
+        character: "tanu",
+        priority: 50,
+        test: (m) => (m.keyboardCounts?.quiet ?? 0) >= 5,
+        lines: ["\u7121\u53E3\u89B3\u6226\u6D3E\uFF081 \u30B3\u30E1\u4EE5\u4E0B\uFF09\u304C 5 \u4EBA\u4EE5\u4E0A\u3044\u308B\u67A0\u306A\u306E\u3060\u3002", "\u898B\u3066\u308B\u3060\u3051\u306E\u30D5\u30A1\u30F3\u3082\u5927\u4E8B\u306A\u5BA2\u5C64\u3067\u3001\u30B3\u30E1\u6B53\u8FCE\u306E\u58F0\u304B\u3051\u3067\u53C2\u52A0\u306B\u8A98\u3048\u308B\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var ECHO_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "ec-konta-many",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => m.echoBurstCount >= 5,
+        lines: ["\u30B3\u30E1\u4F1D\u67D3\uFF0F\u88AB\u308A\u77AC\u9593\u304C 5 \u4EF6\u4EE5\u4E0A\u3042\u3063\u305F\u3001\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306E\u4E00\u4F53\u611F\u304C\u9AD8\u3044\u67A0\u306A\u306E\u3060\u3002", '\u540C\u3058\u8A9E\u304C\u77AC\u9593\u7684\u306B\u8907\u6570\u4EBA\u304B\u3089\u51FA\u308B\u73FE\u8C61\u306F\u3001\u305D\u306E\u914D\u4FE1\u306E "\u8C61\u5FB4\u30EF\u30FC\u30C9" \u306B\u306A\u308A\u3084\u3059\u3044\u306E\u3060\u3002']
+      },
+      {
+        id: "ec-konta-few",
+        character: "konta",
+        priority: 60,
+        test: (m) => m.echoBurstCount > 0 && m.echoBurstCount < 3,
+        lines: ["\u30B3\u30E1\u4F1D\u67D3\u304C 1\u301C2 \u4EF6\u3068\u63A7\u3048\u3081\u3060\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u500B\u5225\u53CD\u5FDC\u304C\u4E2D\u5FC3\u306E\u843D\u3061\u7740\u3044\u305F\u7A7A\u6C17\u3067\u3001\u3053\u308C\u3082\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u306E\u4E00\u3064\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var RECENT_CMP_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "rc-link-trend",
+        character: "link",
+        priority: 70,
+        test: (m) => m.recentCmpCount >= 5,
+        lines: ["\u76F4\u8FD1 5 \u914D\u4FE1\u306E\u6BD4\u8F03\u30D0\u30FC\u304C\u63C3\u3063\u3066\u8868\u793A\u3067\u304D\u308B\u898F\u6A21\u611F\u306A\u306E\u3060\u3002", "\u4E0A\u6607\u30C8\u30EC\u30F3\u30C9\u306A\u3089\u81EA\u4FE1\u306B\u3001\u5E73\u3089\u306A\u3089\u5B89\u5B9A\u904B\u55B6\u306E\u6307\u6A19\u3068\u3057\u3066\u6D3B\u7528\u3059\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var WAVEFORM_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "wf-tanu-similar",
+        character: "tanu",
+        priority: 60,
+        test: (m) => m.waveformSimilarCount >= 3,
+        lines: ["\u904E\u53BB\u914D\u4FE1\u3068\u5F62\u304C\u4F3C\u3066\u3044\u308B\u56DE\u304C\u8907\u6570\u898B\u3064\u304B\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", '"\u3042\u306E\u795E\u56DE\u307D\u3044\u6D41\u308C" \u3092\u767A\u898B\u3067\u304D\u308B\u6A5F\u80FD\u3067\u3001\u914D\u4FE1\u30EB\u30FC\u30C1\u30F3\u306E\u518D\u73FE\u6027\u304C\u898B\u3048\u308B\u306E\u3060\u3002']
+      }
+    ]
+  );
+  var UNIQUE_WORDS_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "uw-konta-many",
+        character: "konta",
+        priority: 70,
+        test: (m) => m.uniqueWordsCount >= 5,
+        lines: ["\u81EA\u5206\u304C\u4F7F\u3063\u3066\u306A\u3044\u4EBA\u6C17\u8A9E\u304C 5 \u3064\u4EE5\u4E0A\u3042\u308B\u67A0\u306A\u306E\u3060\u3002", '\u6B21\u56DE\u305D\u3063\u3068\u81EA\u5206\u306E\u30B3\u30E1\u306B\u6DF7\u305C\u308B\u3068 "\u30D5\u30A1\u30F3\u6587\u5316\u306B\u4E57\u3063\u304B\u308C\u305F\u611F" \u304C\u51FA\u308B\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002']
+      }
+    ]
+  );
+  var TALENT_PEAK_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "tp-link-many",
+        character: "link",
+        priority: HIGH,
+        test: (m) => m.talentPeakCount >= 5,
+        lines: ['\u6C88\u9ED9\u2192\u5373\u53CD\u5FDC\u306E "\u8A71\u82B8\u30D4\u30FC\u30AF" \u304C 5 \u56DE\u4EE5\u4E0A\u691C\u51FA\u3055\u308C\u305F\u306E\u3060\u3002', "\u30C8\u30FC\u30AF\u529B\u304C\u7206\u767A\u3057\u305F\u56DE\u3067\u3001\u305D\u306E\u77AC\u9593\u306E\u8A71\u984C\u306F\u30E1\u30E2\u3057\u3066\u6B21\u56DE\u518D\u73FE\u3057\u305F\u3044\u5F3E\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "tp-link-few",
+        character: "link",
+        priority: 50,
+        test: (m) => m.talentPeakCount >= 1 && m.talentPeakCount < 3,
+        lines: ["\u8A71\u82B8\u30D4\u30FC\u30AF\u304C 1\u301C2 \u56DE\u691C\u51FA\u3055\u308C\u305F\u306E\u3060\u3002", "\u5C11\u306A\u3081\u3060\u3051\u3069\u78BA\u5B9F\u306B\u300C\u52B9\u3044\u305F\u77AC\u9593\u300D\u304C\u3042\u3063\u305F\u8A3C\u62E0\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var RULES = Object.freeze({
+    kpi: KPI_RULES,
+    concurrent: CONCURRENT_RULES,
+    laughter: LAUGHTER_RULES,
+    newVsRepeat: NEW_VS_REPEAT_RULES,
+    silence: SILENCE_RULES,
+    sentiment: SENTIMENT_RULES,
+    reach: REACH_RULES,
+    growth: GROWTH_RULES,
+    firstSecond: FIRST_SECOND_RULES,
+    survival: SURVIVAL_RULES,
+    keyboard: KEYBOARD_RULES,
+    echo: ECHO_RULES,
+    recentCmp: RECENT_CMP_RULES,
+    waveform: WAVEFORM_RULES,
+    uniqueWords: UNIQUE_WORDS_RULES,
+    talentPeak: TALENT_PEAK_RULES
+  });
+  function pickAdvicesFor(section, metrics) {
+    const rules = RULES[
+      /** @type {keyof typeof RULES} */
+      section
+    ];
+    if (!rules) return [];
+    return pickAdvicesFromRules(rules, metrics);
+  }
+  var MARKETING_DYNAMIC_ADVICE_TOTAL_RULES = (() => {
+    let n = 0;
+    for (const k of Object.keys(RULES)) n += RULES[k].length;
+    return n;
+  })();
+
   // src/lib/marketingChartsHtml.js
   function adviceCard(role, displayName, lines) {
     const ps = lines.filter((s) => s && String(s).trim()).map((line) => `<p class="mkt-advice__p">${escapeHtml(line)}</p>`).join("");
@@ -6586,6 +7198,82 @@ ${yLabelsL}${yLabelsR}${xLabels}
   }
   function adviceWrap(html) {
     return html ? `<div class="mkt-advice-after">${html}</div>` : "";
+  }
+  function dynamicAdviceCardsHtml(section, metrics) {
+    let advices = [];
+    try {
+      advices = pickAdvicesFor(section, metrics);
+    } catch {
+      return "";
+    }
+    if (!advices.length) return "";
+    const cards = advices.map((a) => {
+      const displayName = a.character === "link" ? "\u308A\u3093\u304F" : a.character === "konta" ? "\u3053\u3093\u592A" : "\u305F\u306C\u59C9";
+      return adviceCard(a.character, displayName, a.lines);
+    }).join("");
+    return adviceWrap(cards);
+  }
+  function buildDynamicAdviceMetrics(opts) {
+    return {
+      r: opts.r,
+      peak: opts.concurrentPeak,
+      laughter: opts.laughterDensity,
+      silenceCount: Array.isArray(opts.silenceZones) ? opts.silenceZones.length : 0,
+      silenceQualityCounts: (() => {
+        const counts = { engaged: 0, departed: 0, neutral: 0, unknown: 0 };
+        const list = Array.isArray(opts.silenceZones) ? opts.silenceZones : [];
+        for (const z of list) {
+          const q = String(z?.quality || "unknown");
+          if (q === "engaged") counts.engaged += 1;
+          else if (q === "departed") counts.departed += 1;
+          else if (q === "neutral") counts.neutral += 1;
+          else counts.unknown += 1;
+        }
+        return counts;
+      })(),
+      newVsRepeat: opts.newVsRepeat ? {
+        newRatio: Number(opts.newVsRepeat.newRatio) || 0,
+        repeatRatio: Number(opts.newVsRepeat.repeatRatio) || 0,
+        heavyRatio: Number(opts.newVsRepeat.heavyRatio) || 0,
+        totalCurrent: Number(opts.newVsRepeat.totalCurrent) || 0
+      } : null,
+      sentimentTotals: opts.sentimentCurve?.totals ? {
+        positive: Number(opts.sentimentCurve.totals.positive) || 0,
+        negative: Number(opts.sentimentCurve.totals.negative) || 0,
+        surprise: Number(opts.sentimentCurve.totals.surprise) || 0,
+        confusion: Number(opts.sentimentCurve.totals.confusion) || 0
+      } : null,
+      reach: opts.reach ? { coefficient: Number(opts.reach.coefficient) || null } : null,
+      growth: opts.growth ? {
+        deltaPct: Number.isFinite(opts.growth.deltaPct) ? opts.growth.deltaPct : null,
+        zScore: Number.isFinite(opts.growth.zScore) ? opts.growth.zScore : null,
+        average: Number.isFinite(opts.growth.average) ? opts.growth.average : null
+      } : null,
+      firstSecondTotal: Number(opts.firstSecondLatency?.users?.length) || 0,
+      survivalEndPct: (() => {
+        const segs = opts.survivalCurve?.segments;
+        if (!Array.isArray(segs) || segs.length === 0) return null;
+        const last = segs[segs.length - 1];
+        const v = Number(last?.survivalPct);
+        return Number.isFinite(v) ? v : null;
+      })(),
+      talentPeakCount: Array.isArray(opts.talentPeaks) ? opts.talentPeaks.length : 0,
+      echoBurstCount: (() => {
+        const a = Array.isArray(opts.echoPropagation?.bursts) ? opts.echoPropagation.bursts.length : 0;
+        const b = Array.isArray(opts.echoSync?.bursts) ? opts.echoSync.bursts.length : 0;
+        return a + b;
+      })(),
+      recentCmpCount: Array.isArray(opts.recentComparison?.bars) ? opts.recentComparison.bars.length : 0,
+      uniqueWordsCount: Array.isArray(opts.uniqueWords?.suggestions) ? opts.uniqueWords.suggestions.length : 0,
+      waveformSimilarCount: Array.isArray(opts.similarBroadcasts) ? opts.similarBroadcasts.length : 0,
+      keyboardCounts: opts.keyboardTypes?.counts ? {
+        emoji: Number(opts.keyboardTypes.counts.emoji) || 0,
+        short: Number(opts.keyboardTypes.counts.short) || 0,
+        long: Number(opts.keyboardTypes.counts.long) || 0,
+        quiet: Number(opts.keyboardTypes.counts.quiet) || 0,
+        balanced: Number(opts.keyboardTypes.counts.balanced) || 0
+      } : null
+    };
   }
   function adviceAfterCommentVelocity() {
     return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
@@ -7425,6 +8113,25 @@ ${lineFor("confusion", "#94a3b8")}
       currentConcurrent: lastPoint ? lastPoint.value : NaN,
       uniqueCommentersInWindow: recentActiveCommenters
     });
+    const dynMetrics = buildDynamicAdviceMetrics({
+      r,
+      concurrentPeak,
+      laughterDensity,
+      silenceZones,
+      newVsRepeat,
+      sentimentCurve,
+      reach,
+      growth,
+      firstSecondLatency,
+      survivalCurve,
+      talentPeaks,
+      echoPropagation,
+      echoSync,
+      recentComparison,
+      uniqueWords,
+      similarBroadcasts,
+      keyboardTypes
+    });
     const allTocItems = [
       { id: "mkt-kpi", label: "KPI \u30B5\u30DE\u30EA" },
       { id: "mkt-content", label: "\u30B3\u30E1\u30F3\u30C8\u672C\u6587\u30FB\u5C5E\u6027\u306E\u50BE\u5411" },
@@ -7463,6 +8170,7 @@ __NL_TOC_PLACEHOLDER__
 ${sectionAdviceIntro()}
 ${idWrap("mkt-kpi", sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
+${dynamicAdviceCardsHtml("kpi", dynMetrics)}
 ${idWrap("mkt-content", sectionContentShape(r))}
 ${sectionAdviceAfterContentShape(r)}
 ${idWrap("mkt-quarter", sectionQuarterEngagement(r))}
@@ -7473,42 +8181,57 @@ ${sectionCommentVelocityCurve(velocityTimeline)}
 ${adviceAfterCommentVelocity()}
 ${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
 ${adviceAfterConcurrent()}
+${dynamicAdviceCardsHtml("concurrent", dynMetrics)}
 ${sectionSilenceZones(silenceZones)}
 ${silenceZones.length ? adviceAfterSilence() : ""}
+${silenceZones.length ? dynamicAdviceCardsHtml("silence", dynMetrics) : ""}
 ${sectionLaughterDensity(laughterDensity)}
 ${laughterDensity.buckets.length >= 2 ? adviceAfterLaughter() : ""}
+${laughterDensity.buckets.length >= 2 ? dynamicAdviceCardsHtml("laughter", dynMetrics) : ""}
 ${sectionNewVsRepeat(newVsRepeat)}
 ${newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat() : ""}
+${newVsRepeat.totalCurrent > 0 ? dynamicAdviceCardsHtml("newVsRepeat", dynMetrics) : ""}
 ${sectionSurvivalCurve(survivalCurve)}
 ${survivalCurve.segments.length >= 2 ? adviceAfterSurvival() : ""}
+${survivalCurve.segments.length >= 2 ? dynamicAdviceCardsHtml("survival", dynMetrics) : ""}
 ${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver)}
 ${!maskShare && departedHeavy.length > 0 ? adviceAfterDeparted() : ""}
 ${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver)}
 ${!maskShare && attendanceMatrix.users.length > 0 && attendanceMatrix.broadcasts.length >= 2 ? adviceAfterAttendance() : ""}
 ${sectionKeyboardTypes(keyboardTypes)}
 ${keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced > 0 ? adviceAfterKeyboard() : ""}
+${keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced > 0 ? dynamicAdviceCardsHtml("keyboard", dynMetrics) : ""}
 ${sectionRecentComparison(recentComparison)}
 ${recentComparison.bars.length >= 2 ? adviceAfterRecentCmp() : ""}
+${recentComparison.bars.length >= 2 ? dynamicAdviceCardsHtml("recentCmp", dynMetrics) : ""}
 ${sectionWeekdayHourHeatmap(weekdayHourHeat)}
 ${weekdayHourHeat.maxValue > 0 ? adviceAfterWeekdayHeat() : ""}
 ${sectionGrowthMeter(growth, "\u4ECA\u56DE\u306E\u7DCF\u30B3\u30E1\u6570")}
 ${growth.average != null ? adviceAfterGrowthMeter() : ""}
+${growth.average != null ? dynamicAdviceCardsHtml("growth", dynMetrics) : ""}
 ${sectionOpeningFivePrediction(openingFivePts)}
 ${openingFivePts.points.length >= 2 ? adviceAfterOpeningFive() : ""}
 ${sectionWaveformSimilarity(similarBroadcasts)}
 ${similarBroadcasts.length > 0 ? adviceAfterWaveform() : ""}
+${similarBroadcasts.length > 0 ? dynamicAdviceCardsHtml("waveform", dynMetrics) : ""}
 ${sectionEchoBursts(echoPropagation, echoSync)}
 ${echoPropagation.length > 0 || echoSync.length > 0 ? adviceAfterEcho() : ""}
+${echoPropagation.length > 0 || echoSync.length > 0 ? dynamicAdviceCardsHtml("echo", dynMetrics) : ""}
 ${sectionFirstSecondLatency(firstSecondLatency)}
 ${firstSecondLatency.totalUsers > 0 ? adviceAfterFirstSecond() : ""}
+${firstSecondLatency.totalUsers > 0 ? dynamicAdviceCardsHtml("firstSecond", dynMetrics) : ""}
 ${sectionTalentPeak(talentPeaks)}
 ${talentPeaks.length > 0 ? adviceAfterTalentPeak() : ""}
+${talentPeaks.length > 0 ? dynamicAdviceCardsHtml("talentPeak", dynMetrics) : ""}
 ${sectionSentimentCurve(sentimentCurve)}
 ${sentimentCurve.buckets.length >= 2 ? adviceAfterSentiment() : ""}
+${sentimentCurve.buckets.length >= 2 ? dynamicAdviceCardsHtml("sentiment", dynMetrics) : ""}
 ${sectionUniqueWordSuggestions(uniqueWords)}
 ${uniqueWords.length > 0 ? adviceAfterUniqueWords() : ""}
+${uniqueWords.length > 0 ? dynamicAdviceCardsHtml("uniqueWords", dynMetrics) : ""}
 ${sectionReachCoefficient(reach)}
 ${reach.coefficient != null ? adviceAfterReach() : ""}
+${reach.coefficient != null ? dynamicAdviceCardsHtml("reach", dynMetrics) : ""}
 ${idWrap("mkt-derived", sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap("mkt-segment", sectionSegment(r))}
@@ -15238,7 +15961,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2227" ? String("0430-2227") : "dev";
+      const buildId = "0430-2242" ? String("0430-2242") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

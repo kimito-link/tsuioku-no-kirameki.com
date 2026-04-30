@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.48（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.49（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,29 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.49 バンプで入った修正（marketingDynamicAdvice 配線 AE）**:
+
+ユーザー要望「もっとマーケ増やせますか？」に応えて、`marketingDynamicAdvice.js`
+（0.1.33 で作成、329 行・100+ ルール）を完全に未配線（dead code）から
+本番配線へ。マーケ分析の各セクションに「データに応じて変わるキャラ別
+アドバイス」が動的に出るようになった。
+
+- **配線方針**:
+  - 既存の固定アドバイス（`adviceAfter*` 関数群）はそのまま残す（後方互換）
+  - その直後に `dynamicAdviceCardsHtml(section, dynMetrics)` を挿入
+  - rule が何もマッチしない場合は空文字を返すので、固定アドバイスのみ表示
+
+- **対象 16 セクション**:
+  kpi / concurrent / laughter / newVsRepeat / survival / silence / keyboard /
+  recentCmp / growth / waveform / echo / firstSecond / talentPeak / sentiment /
+  uniqueWords / reach
+
+- **AdviceMetrics 組み立て**: 集約済みデータ（MarketingReport, ConcurrentPeakAnalysis,
+  LaughterDensityTimeline, silenceZones, newVsRepeat, sentimentCurve, reach,
+  growth, firstSecondLatency, survivalCurve, talentPeaks, echoPropagation,
+  echoSync, recentComparison, uniqueWords, similarBroadcasts, keyboardTypes）
+  から `buildDynamicAdviceMetrics(opts)` で AdviceMetrics 型に正規化。
 
 **0.1.48 バンプで入った修正（大規模配信のマーケ分析安定化 AD）**:
 

@@ -46,6 +46,7 @@ import {
   suggestUniqueWords,
   computeReachCoefficient
 } from './commenterCulturalAnalytics.js';
+import { pickAdvicesFor } from './marketingDynamicAdvice.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -441,6 +442,134 @@ function sectionAdviceAfterRank(r) {
 /** @param {string} html */
 function adviceWrap(html) {
   return html ? `<div class="mkt-advice-after">${html}</div>` : '';
+}
+
+/**
+ * 0.1.49 (AE): marketingDynamicAdvice.js の rule registry に対し metrics を
+ *   渡して「内容に応じて変わる」アドバイスを動的に描画する。固定アドバイス
+ *   （adviceAfter*）の後ろに追加して、より具体的な助言を出す。
+ *
+ *   ルールが何もマッチしない場合は空文字を返すので、固定アドバイスだけが
+ *   表示される（後方互換）。
+ *
+ * @param {string} section
+ * @param {import('./marketingDynamicAdvice.js').AdviceMetrics} metrics
+ * @returns {string}
+ */
+function dynamicAdviceCardsHtml(section, metrics) {
+  /** @type {{character: 'link'|'konta'|'tanu', lines: string[]}[]} */
+  let advices = [];
+  try {
+    advices = pickAdvicesFor(section, metrics);
+  } catch {
+    return '';
+  }
+  if (!advices.length) return '';
+  const cards = advices
+    .map((a) => {
+      const displayName =
+        a.character === 'link' ? 'りんく' : a.character === 'konta' ? 'こん太' : 'たぬ姉';
+      return adviceCard(a.character, displayName, a.lines);
+    })
+    .join('');
+  return adviceWrap(cards);
+}
+
+/**
+ * 動的アドバイス用 metrics を集約データから組み立てる。
+ * @param {{
+ *   r: import('./marketingAggregate.js').MarketingReport,
+ *   concurrentPeak: any,
+ *   laughterDensity: any,
+ *   silenceZones: any[],
+ *   newVsRepeat: any,
+ *   sentimentCurve: any,
+ *   reach: any,
+ *   growth: any,
+ *   firstSecondLatency: any,
+ *   survivalCurve: any,
+ *   talentPeaks: any[],
+ *   echoPropagation: any,
+ *   echoSync: any,
+ *   recentComparison: any,
+ *   uniqueWords: any,
+ *   similarBroadcasts: any[],
+ *   keyboardTypes: any
+ * }} opts
+ * @returns {import('./marketingDynamicAdvice.js').AdviceMetrics}
+ */
+function buildDynamicAdviceMetrics(opts) {
+  return {
+    r: opts.r,
+    peak: opts.concurrentPeak,
+    laughter: opts.laughterDensity,
+    silenceCount: Array.isArray(opts.silenceZones) ? opts.silenceZones.length : 0,
+    silenceQualityCounts: (() => {
+      /** @type {{engaged:number,departed:number,neutral:number,unknown:number}} */
+      const counts = { engaged: 0, departed: 0, neutral: 0, unknown: 0 };
+      const list = Array.isArray(opts.silenceZones) ? opts.silenceZones : [];
+      for (const z of list) {
+        const q = String(z?.quality || 'unknown');
+        if (q === 'engaged') counts.engaged += 1;
+        else if (q === 'departed') counts.departed += 1;
+        else if (q === 'neutral') counts.neutral += 1;
+        else counts.unknown += 1;
+      }
+      return counts;
+    })(),
+    newVsRepeat: opts.newVsRepeat
+      ? {
+          newRatio: Number(opts.newVsRepeat.newRatio) || 0,
+          repeatRatio: Number(opts.newVsRepeat.repeatRatio) || 0,
+          heavyRatio: Number(opts.newVsRepeat.heavyRatio) || 0,
+          totalCurrent: Number(opts.newVsRepeat.totalCurrent) || 0
+        }
+      : null,
+    sentimentTotals: opts.sentimentCurve?.totals
+      ? {
+          positive: Number(opts.sentimentCurve.totals.positive) || 0,
+          negative: Number(opts.sentimentCurve.totals.negative) || 0,
+          surprise: Number(opts.sentimentCurve.totals.surprise) || 0,
+          confusion: Number(opts.sentimentCurve.totals.confusion) || 0
+        }
+      : null,
+    reach: opts.reach
+      ? { coefficient: Number(opts.reach.coefficient) || null }
+      : null,
+    growth: opts.growth
+      ? {
+          deltaPct: Number.isFinite(opts.growth.deltaPct) ? opts.growth.deltaPct : null,
+          zScore: Number.isFinite(opts.growth.zScore) ? opts.growth.zScore : null,
+          average: Number.isFinite(opts.growth.average) ? opts.growth.average : null
+        }
+      : null,
+    firstSecondTotal: Number(opts.firstSecondLatency?.users?.length) || 0,
+    survivalEndPct: (() => {
+      const segs = opts.survivalCurve?.segments;
+      if (!Array.isArray(segs) || segs.length === 0) return null;
+      const last = segs[segs.length - 1];
+      const v = Number(last?.survivalPct);
+      return Number.isFinite(v) ? v : null;
+    })(),
+    talentPeakCount: Array.isArray(opts.talentPeaks) ? opts.talentPeaks.length : 0,
+    echoBurstCount: (() => {
+      const a = Array.isArray(opts.echoPropagation?.bursts) ? opts.echoPropagation.bursts.length : 0;
+      const b = Array.isArray(opts.echoSync?.bursts) ? opts.echoSync.bursts.length : 0;
+      return a + b;
+    })(),
+    recentCmpCount: Array.isArray(opts.recentComparison?.bars) ? opts.recentComparison.bars.length : 0,
+    uniqueWordsCount: Array.isArray(opts.uniqueWords?.suggestions) ? opts.uniqueWords.suggestions.length : 0,
+    waveformSimilarCount: Array.isArray(opts.similarBroadcasts) ? opts.similarBroadcasts.length : 0,
+    keyboardCounts: opts.keyboardTypes?.counts
+      ? {
+          emoji: Number(opts.keyboardTypes.counts.emoji) || 0,
+          short: Number(opts.keyboardTypes.counts.short) || 0,
+          long: Number(opts.keyboardTypes.counts.long) || 0,
+          quiet: Number(opts.keyboardTypes.counts.quiet) || 0,
+          balanced: Number(opts.keyboardTypes.counts.balanced) || 0
+        }
+      : null
+  };
 }
 
 function adviceAfterCommentVelocity() {
@@ -1592,6 +1721,32 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     uniqueCommentersInWindow: recentActiveCommenters
   });
 
+  /*
+   * 0.1.49 (AE): marketingDynamicAdvice.js の rule registry に渡す metrics を
+   *   集約データから組み立てる。各セクションの advice 配置位置で
+   *   `dynamicAdviceCardsHtml(section, dynMetrics)` を呼ぶと、データに応じた
+   *   キャラ別アドバイス（最大 3 件）が静的アドバイスの後ろに出力される。
+   */
+  const dynMetrics = buildDynamicAdviceMetrics({
+    r,
+    concurrentPeak,
+    laughterDensity,
+    silenceZones,
+    newVsRepeat,
+    sentimentCurve,
+    reach,
+    growth,
+    firstSecondLatency,
+    survivalCurve,
+    talentPeaks,
+    echoPropagation,
+    echoSync,
+    recentComparison,
+    uniqueWords,
+    similarBroadcasts,
+    keyboardTypes
+  });
+
   // 0.1.26 (AA): TOC は「実際に描画されたセクション」だけ表示する。
   // 沈黙ゾーンやコメ伝染など、データ不足で空文字を返すセクションをクリックしても
   // 何も起こらない／謎のスクロール挙動になる問題を解消する。
@@ -1634,6 +1789,7 @@ __NL_TOC_PLACEHOLDER__
 ${sectionAdviceIntro()}
 ${idWrap('mkt-kpi', sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
+${dynamicAdviceCardsHtml('kpi', dynMetrics)}
 ${idWrap('mkt-content', sectionContentShape(r))}
 ${sectionAdviceAfterContentShape(r)}
 ${idWrap('mkt-quarter', sectionQuarterEngagement(r))}
@@ -1644,42 +1800,57 @@ ${sectionCommentVelocityCurve(velocityTimeline)}
 ${adviceAfterCommentVelocity()}
 ${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
 ${adviceAfterConcurrent()}
+${dynamicAdviceCardsHtml('concurrent', dynMetrics)}
 ${sectionSilenceZones(silenceZones)}
 ${silenceZones.length ? adviceAfterSilence() : ''}
+${silenceZones.length ? dynamicAdviceCardsHtml('silence', dynMetrics) : ''}
 ${sectionLaughterDensity(laughterDensity)}
 ${laughterDensity.buckets.length >= 2 ? adviceAfterLaughter() : ''}
+${laughterDensity.buckets.length >= 2 ? dynamicAdviceCardsHtml('laughter', dynMetrics) : ''}
 ${sectionNewVsRepeat(newVsRepeat)}
 ${newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat() : ''}
+${newVsRepeat.totalCurrent > 0 ? dynamicAdviceCardsHtml('newVsRepeat', dynMetrics) : ''}
 ${sectionSurvivalCurve(survivalCurve)}
 ${survivalCurve.segments.length >= 2 ? adviceAfterSurvival() : ''}
+${survivalCurve.segments.length >= 2 ? dynamicAdviceCardsHtml('survival', dynMetrics) : ''}
 ${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver)}
 ${(!maskShare && departedHeavy.length > 0) ? adviceAfterDeparted() : ''}
 ${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver)}
 ${(!maskShare && attendanceMatrix.users.length > 0 && attendanceMatrix.broadcasts.length >= 2) ? adviceAfterAttendance() : ''}
 ${sectionKeyboardTypes(keyboardTypes)}
 ${(keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced) > 0 ? adviceAfterKeyboard() : ''}
+${(keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced) > 0 ? dynamicAdviceCardsHtml('keyboard', dynMetrics) : ''}
 ${sectionRecentComparison(recentComparison)}
 ${recentComparison.bars.length >= 2 ? adviceAfterRecentCmp() : ''}
+${recentComparison.bars.length >= 2 ? dynamicAdviceCardsHtml('recentCmp', dynMetrics) : ''}
 ${sectionWeekdayHourHeatmap(weekdayHourHeat)}
 ${weekdayHourHeat.maxValue > 0 ? adviceAfterWeekdayHeat() : ''}
 ${sectionGrowthMeter(growth, '今回の総コメ数')}
 ${growth.average != null ? adviceAfterGrowthMeter() : ''}
+${growth.average != null ? dynamicAdviceCardsHtml('growth', dynMetrics) : ''}
 ${sectionOpeningFivePrediction(openingFivePts)}
 ${openingFivePts.points.length >= 2 ? adviceAfterOpeningFive() : ''}
 ${sectionWaveformSimilarity(similarBroadcasts)}
 ${similarBroadcasts.length > 0 ? adviceAfterWaveform() : ''}
+${similarBroadcasts.length > 0 ? dynamicAdviceCardsHtml('waveform', dynMetrics) : ''}
 ${sectionEchoBursts(echoPropagation, echoSync)}
 ${(echoPropagation.length > 0 || echoSync.length > 0) ? adviceAfterEcho() : ''}
+${(echoPropagation.length > 0 || echoSync.length > 0) ? dynamicAdviceCardsHtml('echo', dynMetrics) : ''}
 ${sectionFirstSecondLatency(firstSecondLatency)}
 ${firstSecondLatency.totalUsers > 0 ? adviceAfterFirstSecond() : ''}
+${firstSecondLatency.totalUsers > 0 ? dynamicAdviceCardsHtml('firstSecond', dynMetrics) : ''}
 ${sectionTalentPeak(talentPeaks)}
 ${talentPeaks.length > 0 ? adviceAfterTalentPeak() : ''}
+${talentPeaks.length > 0 ? dynamicAdviceCardsHtml('talentPeak', dynMetrics) : ''}
 ${sectionSentimentCurve(sentimentCurve)}
 ${sentimentCurve.buckets.length >= 2 ? adviceAfterSentiment() : ''}
+${sentimentCurve.buckets.length >= 2 ? dynamicAdviceCardsHtml('sentiment', dynMetrics) : ''}
 ${sectionUniqueWordSuggestions(uniqueWords)}
 ${uniqueWords.length > 0 ? adviceAfterUniqueWords() : ''}
+${uniqueWords.length > 0 ? dynamicAdviceCardsHtml('uniqueWords', dynMetrics) : ''}
 ${sectionReachCoefficient(reach)}
 ${reach.coefficient != null ? adviceAfterReach() : ''}
+${reach.coefficient != null ? dynamicAdviceCardsHtml('reach', dynMetrics) : ''}
 ${idWrap('mkt-derived', sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap('mkt-segment', sectionSegment(r))}
