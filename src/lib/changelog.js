@@ -26,6 +26,18 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.21',
+    date: '2026-04-30',
+    summary: 'HTML レポートに分析項目を追加',
+    items: Object.freeze([
+      'HTML レポートに「最初／最後の記録コメント・配信時間・1分あたりのコメント数（CPM）・配信者レベル・本文の平均/中央値/最大字数」を追加',
+      'ユーザー別表に「累計字数（平均字数併記）」列を追加',
+      '内訳統計（数値ID／184匿名／自コメ／その他の件数と比率）を新セクションで表示',
+      '自分のコメントだけ抜粋する専用テーブルを追加',
+      '保存コメント一覧の上に「CSV をダウンロード」ボタンを追加（UTF-8 BOM 付き、Excel/Google Sheets 対応）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.20',
     date: '2026-04-30',
     summary: '公式チャンネル放送でも配信者タイル表示',

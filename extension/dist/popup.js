@@ -700,6 +700,18 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.21",
+      date: "2026-04-30",
+      summary: "HTML \u30EC\u30DD\u30FC\u30C8\u306B\u5206\u6790\u9805\u76EE\u3092\u8FFD\u52A0",
+      items: Object.freeze([
+        "HTML \u30EC\u30DD\u30FC\u30C8\u306B\u300C\u6700\u521D\uFF0F\u6700\u5F8C\u306E\u8A18\u9332\u30B3\u30E1\u30F3\u30C8\u30FB\u914D\u4FE1\u6642\u9593\u30FB1\u5206\u3042\u305F\u308A\u306E\u30B3\u30E1\u30F3\u30C8\u6570\uFF08CPM\uFF09\u30FB\u914D\u4FE1\u8005\u30EC\u30D9\u30EB\u30FB\u672C\u6587\u306E\u5E73\u5747/\u4E2D\u592E\u5024/\u6700\u5927\u5B57\u6570\u300D\u3092\u8FFD\u52A0",
+        "\u30E6\u30FC\u30B6\u30FC\u5225\u8868\u306B\u300C\u7D2F\u8A08\u5B57\u6570\uFF08\u5E73\u5747\u5B57\u6570\u4F75\u8A18\uFF09\u300D\u5217\u3092\u8FFD\u52A0",
+        "\u5185\u8A33\u7D71\u8A08\uFF08\u6570\u5024ID\uFF0F184\u533F\u540D\uFF0F\u81EA\u30B3\u30E1\uFF0F\u305D\u306E\u4ED6\u306E\u4EF6\u6570\u3068\u6BD4\u7387\uFF09\u3092\u65B0\u30BB\u30AF\u30B7\u30E7\u30F3\u3067\u8868\u793A",
+        "\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8\u3060\u3051\u629C\u7C8B\u3059\u308B\u5C02\u7528\u30C6\u30FC\u30D6\u30EB\u3092\u8FFD\u52A0",
+        "\u4FDD\u5B58\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7\u306E\u4E0A\u306B\u300CCSV \u3092\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u300D\u30DC\u30BF\u30F3\u3092\u8FFD\u52A0\uFF08UTF-8 BOM \u4ED8\u304D\u3001Excel/Google Sheets \u5BFE\u5FDC\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.20",
       date: "2026-04-30",
       summary: "\u516C\u5F0F\u30C1\u30E3\u30F3\u30CD\u30EB\u653E\u9001\u3067\u3082\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u8868\u793A",
@@ -2930,6 +2942,145 @@
       }
     }
     return { numericIdUsers, anonymousUsers, skippedCount };
+  }
+
+  // src/lib/broadcastReportSummary.js
+  function toFiniteNumberOrNull(v) {
+    if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+    if (typeof v === "string" && v.trim()) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  }
+  function summarizeBroadcastTiming(input) {
+    const snapshot = input?.snapshot ?? null;
+    const comments = Array.isArray(input?.comments) ? input.comments : [];
+    const lvRaw = snapshot && typeof snapshot === "object" ? snapshot.broadcasterLevel : null;
+    const broadcasterLevel = typeof lvRaw === "number" && Number.isFinite(lvRaw) && lvRaw > 0 ? lvRaw : null;
+    let first = null;
+    let last = null;
+    let validCount = 0;
+    for (const c of comments) {
+      const at = toFiniteNumberOrNull(c?.capturedAt);
+      if (at == null) continue;
+      validCount += 1;
+      if (first == null || at < first) first = at;
+      if (last == null || at > last) last = at;
+    }
+    const durationMs = first != null && last != null ? last - first : 0;
+    const durationMinutes = durationMs / 6e4;
+    const commentsPerMinute = durationMinutes > 0 && validCount > 1 ? Math.round(validCount / durationMinutes * 100) / 100 : 0;
+    return {
+      broadcasterLevel,
+      firstCapturedAt: first,
+      lastCapturedAt: last,
+      durationMs,
+      durationMinutes,
+      commentsPerMinute
+    };
+  }
+  function summarizeCommentBodyStats(comments) {
+    const list = Array.isArray(comments) ? comments : [];
+    if (!list.length) {
+      return { totalCount: 0, totalChars: 0, averageChars: 0, medianChars: 0, maxChars: 0 };
+    }
+    const lengths = [];
+    let total = 0;
+    let max = 0;
+    for (const c of list) {
+      const len = String(c?.text == null ? "" : c.text).length;
+      lengths.push(len);
+      total += len;
+      if (len > max) max = len;
+    }
+    lengths.sort((a, b) => a - b);
+    const mid = Math.floor(lengths.length / 2);
+    const median = lengths.length % 2 === 0 ? (lengths[mid - 1] + lengths[mid]) / 2 : lengths[mid];
+    const average = Math.round(total / lengths.length * 100) / 100;
+    return {
+      totalCount: lengths.length,
+      totalChars: total,
+      averageChars: average,
+      medianChars: median,
+      maxChars: max
+    };
+  }
+  function summarizeIdentifierStats(comments) {
+    const list = Array.isArray(comments) ? comments : [];
+    let numeric = 0;
+    let anon = 0;
+    let self = 0;
+    let other = 0;
+    for (const c of list) {
+      const uid = c?.userId == null ? "" : String(c.userId).trim();
+      if (c?.selfPosted) self += 1;
+      if (/^\d+$/.test(uid)) {
+        numeric += 1;
+      } else if (uid.startsWith("a:")) {
+        anon += 1;
+      } else {
+        other += 1;
+      }
+    }
+    const total = list.length;
+    return {
+      totalCount: total,
+      numericIdCount: numeric,
+      anonymous184Count: anon,
+      selfPostedCount: self,
+      otherCount: other,
+      numericIdRatio: total > 0 ? Math.round(numeric / total * 1e3) / 1e3 : 0,
+      anonymous184Ratio: total > 0 ? Math.round(anon / total * 1e3) / 1e3 : 0
+    };
+  }
+
+  // src/lib/reportCommentsCsv.js
+  var HEADER_COLUMNS = Object.freeze([
+    "#",
+    "commentNo",
+    "userId",
+    "nickname",
+    "text",
+    "vpos",
+    "is184",
+    "selfPosted",
+    "capturedAtIso"
+  ]);
+  function csvEscapeField(value) {
+    if (value == null) return "";
+    let s = String(value);
+    const startsWithFormula = /^[=+\-@\t]/.test(s);
+    if (startsWithFormula) s = `'${s}`;
+    const needsQuotes = startsWithFormula || /[",\r\n]/.test(s);
+    if (!needsQuotes) return s;
+    const inner = s.replace(/"/g, '""');
+    return `"${inner}"`;
+  }
+  function buildReportCommentsCsv(comments) {
+    const list = Array.isArray(comments) ? comments : [];
+    const rows = [HEADER_COLUMNS.join(",")];
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i] || {};
+      const uid = c.userId == null ? "" : String(c.userId);
+      const is184 = uid.startsWith("a:");
+      const selfPosted = Boolean(c.selfPosted);
+      const at = typeof c.capturedAt === "number" && Number.isFinite(c.capturedAt) && c.capturedAt > 0 ? new Date(c.capturedAt).toISOString() : "";
+      const vposStr = typeof c.vpos === "number" && Number.isFinite(c.vpos) ? String(c.vpos) : "";
+      const cells = [
+        String(i + 1),
+        csvEscapeField(c.commentNo),
+        csvEscapeField(uid),
+        csvEscapeField(c.nickname),
+        csvEscapeField(c.text),
+        vposStr,
+        is184 ? "true" : "false",
+        selfPosted ? "true" : "false",
+        csvEscapeField(at)
+      ];
+      rows.push(cells.join(","));
+    }
+    return rows.join("\r\n") + "\r\n";
   }
 
   // src/lib/supportGrowthAvatarLoad.js
@@ -11621,11 +11772,21 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const aggregatedRooms = reportBroadcasterUserId ? aggregatedRoomsAll.filter(
       (room) => String(room.userKey || "").trim() !== reportBroadcasterUserId
     ) : aggregatedRoomsAll;
+    const userKeyToTotalChars = /* @__PURE__ */ new Map();
+    for (const c of comments) {
+      const uid = c?.userId ? String(c.userId).trim() : "";
+      if (reportBroadcasterUserId && uid === reportBroadcasterUserId) continue;
+      const userKey = uid || UNKNOWN_USER_KEY;
+      const len = String(c?.text == null ? "" : c.text).length;
+      userKeyToTotalChars.set(userKey, (userKeyToTotalChars.get(userKey) || 0) + len);
+    }
     const roomRows = aggregatedRooms.map((room) => {
       const label = displayUserLabel(room.userKey, room.nickname);
       const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
+      const totalChars = userKeyToTotalChars.get(room.userKey) || 0;
+      const avgChars = room.count > 0 ? Math.round(totalChars / room.count * 10) / 10 : 0;
       const search = escapeAttr(
-        `${label} ${room.nickname || ""} ${room.userKey} ${room.lastText || ""} ${room.count}`.toLowerCase()
+        `${label} ${room.nickname || ""} ${room.userKey} ${room.lastText || ""} ${room.count} ${totalChars}`.toLowerCase()
       );
       const avatarSrc = resolveReportUserThumbSrc({
         userId: room.userKey,
@@ -11638,6 +11799,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         <td>${avatarCell}</td>
         <td>${labelHtml}</td>
         <td>${room.count}</td>
+        <td>${totalChars}\uFF08\u5E73\u5747 ${avgChars}\uFF09</td>
         <td>${escapeHtml(room.lastText || "")}</td>
       </tr>
     `;
@@ -11759,6 +11921,37 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         </tr>
       `;
     });
+    const reportTiming = summarizeBroadcastTiming({ snapshot, comments: commentsForReport });
+    const reportBody = summarizeCommentBodyStats(commentsForReport);
+    const reportId = summarizeIdentifierStats(commentsForReport);
+    const formatTimingDate = (ms) => typeof ms === "number" && Number.isFinite(ms) && ms > 0 ? formatDateTime(ms) : "-";
+    const formatPct = (ratio) => typeof ratio === "number" && Number.isFinite(ratio) ? `${Math.round(ratio * 1e3) / 10}%` : "-";
+    const durationLabel = (() => {
+      const min = reportTiming.durationMinutes;
+      if (!min || min <= 0) return "-";
+      const totalSeconds = Math.round(reportTiming.durationMs / 1e3);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor(totalSeconds % 3600 / 60);
+      const s = totalSeconds % 60;
+      if (h > 0) return `${h}\u6642\u9593${m}\u5206${s}\u79D2`;
+      if (m > 0) return `${m}\u5206${s}\u79D2`;
+      return `${s}\u79D2`;
+    })();
+    const selfPostedComments = commentsForReport.filter((c) => Boolean(c?.selfPosted));
+    const selfPostedRows = selfPostedComments.map((c, idx) => {
+      const text = String(c.text || "").trim();
+      const search = escapeAttr(`${idx + 1} ${text} ${c.commentNo || ""}`.toLowerCase());
+      return `
+      <tr class="search-item" data-search="${search}">
+        <td>${idx + 1}</td>
+        <td>${escapeHtml(String(c.commentNo || "-"))}</td>
+        <td>${escapeHtml(text || "-")}</td>
+        <td>${escapeHtml(formatDateTime(c.capturedAt || 0))}</td>
+      </tr>
+    `;
+    });
+    const reportCommentsCsv = buildReportCommentsCsv(commentsForReport);
+    const reportCsvFilename = `tsuioku-comments-${liveId || "unknown"}.csv`;
     const headLinkRows = snapshot ? linkRows(snapshot.links) : [];
     const { friendly: friendlyMetas, technical: technicalMetas } = partitionMetasForHtmlReport(snapshot?.metas);
     const friendlyMetaRowsHtml = friendlyMetas.map((v) => {
@@ -11908,6 +12101,27 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         color: var(--muted);
         font-size: 11px;
       }
+      .nl-report-csv-btn {
+        display: inline-block;
+        background: #1d4ed8;
+        color: #fff;
+        border: 1px solid #1e3a8a;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .nl-report-csv-btn:hover { background: #1e40af; }
+      .nl-report-csv-btn:focus-visible {
+        outline: 2px solid #38bdf8;
+        outline-offset: 2px;
+      }
+      .nl-report-csv-hint {
+        color: var(--muted);
+        font-size: 11px;
+        margin-left: 8px;
+      }
+      #nlReportCsvData { display: none; }
       .guide-lead {
         margin: 0 0 12px;
         color: var(--muted);
@@ -12311,11 +12525,19 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
               <tr class="search-item" data-search="${escapeAttr(liveId.toLowerCase())}"><th>liveId</th><td class="mono">${safeLiveId}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcastTitle || "").toLowerCase())}"><th>\u653E\u9001\u30BF\u30A4\u30C8\u30EB</th><td>${safeBroadcastTitle}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcasterName || "").toLowerCase())}"><th>\u914D\u4FE1\u8005\u540D</th><td>${safeBroadcasterName}</td></tr>
-              <tr class="search-item" data-search="${escapeAttr(String(snapshot?.startAtText || "").toLowerCase())}"><th>\u958B\u59CB\u6642\u523B</th><td>${safeStartAtText}</td></tr>
+              <tr class="search-item" data-search="${escapeAttr(String(snapshot?.startAtText || "").toLowerCase())}"><th>\u958B\u59CB\u6642\u523B\uFF08\u516C\u5F0F\u8868\u8A18\uFF09</th><td>${safeStartAtText}</td></tr>
+              <tr><th>\u6700\u521D\u306E\u8A18\u9332\u30B3\u30E1\u30F3\u30C8</th><td>${escapeHtml(formatTimingDate(reportTiming.firstCapturedAt))}</td></tr>
+              <tr><th>\u6700\u5F8C\u306E\u8A18\u9332\u30B3\u30E1\u30F3\u30C8</th><td>${escapeHtml(formatTimingDate(reportTiming.lastCapturedAt))}</td></tr>
+              <tr><th>\u8A18\u9332\u3067\u304D\u305F\u533A\u9593\u306E\u9577\u3055</th><td>${escapeHtml(durationLabel)}</td></tr>
+              <tr><th>1\u5206\u3042\u305F\u308A\u306E\u30B3\u30E1\u30F3\u30C8\uFF08CPM\uFF09</th><td>${reportTiming.commentsPerMinute || "-"}</td></tr>
+              <tr><th>\u914D\u4FE1\u8005\u30EC\u30D9\u30EB</th><td>${reportTiming.broadcasterLevel != null ? `LV${reportTiming.broadcasterLevel}` : "-"}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.url || watchUrl || "").toLowerCase())}"><th>URL</th><td class="mono">${safeWatchUrl}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.title || "").toLowerCase())}"><th>Title\u30BF\u30B0</th><td>${safeTitle}</td></tr>
               <tr><th>\u4FDD\u5B58\u30B3\u30E1\u30F3\u30C8\u6570</th><td>${comments.length}</td></tr>
               <tr><th>\u30E6\u30FC\u30B6\u30FC\u5225\u4EF6\u6570</th><td>${aggregateCommentsByUser(comments).length}</td></tr>
+              <tr><th>\u672C\u6587\u306E\u5E73\u5747\u5B57\u6570</th><td>${reportBody.averageChars}</td></tr>
+              <tr><th>\u672C\u6587\u306E\u4E2D\u592E\u5024\u5B57\u6570</th><td>${reportBody.medianChars}</td></tr>
+              <tr><th>\u672C\u6587\u306E\u6700\u5927\u5B57\u6570</th><td>${reportBody.maxChars}</td></tr>
             </tbody>
           </table>
           <h2 style="margin-top:12px;">\u30B5\u30E0\u30CD\u30A4\u30EB</h2>
@@ -12332,8 +12554,22 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         <section class="card">
           <h2>\u30E6\u30FC\u30B6\u30FC\u5225\uFF08\u3057\u304A\u308A\u96C6\u8A08\uFF09</h2>
           <table>
-            <thead><tr><th>\u30B5\u30E0\u30CD</th><th>\u30E6\u30FC\u30B6\u30FC</th><th>\u4EF6\u6570</th><th>\u6700\u65B0\u30B3\u30E1\u30F3\u30C8</th></tr></thead>
-            <tbody>${roomRows.join("") || '<tr><td colspan="4">\u30C7\u30FC\u30BF\u306A\u3057</td></tr>'}</tbody>
+            <thead><tr><th>\u30B5\u30E0\u30CD</th><th>\u30E6\u30FC\u30B6\u30FC</th><th>\u4EF6\u6570</th><th>\u7D2F\u8A08\u5B57\u6570</th><th>\u6700\u65B0\u30B3\u30E1\u30F3\u30C8</th></tr></thead>
+            <tbody>${roomRows.join("") || '<tr><td colspan="5">\u30C7\u30FC\u30BF\u306A\u3057</td></tr>'}</tbody>
+          </table>
+        </section>
+        <section class="card">
+          <h2>\u5185\u8A33\u7D71\u8A08\uFF08\u7121\u6599\uFF09</h2>
+          <p class="guide-lead">\u8A18\u9332\u3057\u305F\u30B3\u30E1\u30F3\u30C8\u306E\u5185\u8A33\u3092\u3001\u767B\u5834\u3057\u305F\u8B58\u5225\u5B50\u306E\u7A2E\u985E\u5225\u306B\u307E\u3068\u3081\u305F\u306E\u3060\u3002\u533F\u540D\uFF08184\uFF09\u3068\u6570\u5024ID\u3001\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8\u306E\u6BD4\u7387\u304C\u308F\u304B\u308B\u306E\u3060\u3002</p>
+          <table>
+            <thead><tr><th>\u7A2E\u5225</th><th>\u4EF6\u6570</th><th>\u6BD4\u7387</th></tr></thead>
+            <tbody>
+              <tr><th>\u6570\u5024 ID\uFF08\u30ED\u30B0\u30A4\u30F3\u30E6\u30FC\u30B6\u30FC\uFF09</th><td>${reportId.numericIdCount}</td><td>${formatPct(reportId.numericIdRatio)}</td></tr>
+              <tr><th>\u533F\u540D\uFF08184 / a:\u30D7\u30EC\u30D5\u30A3\u30C3\u30AF\u30B9\uFF09</th><td>${reportId.anonymous184Count}</td><td>${formatPct(reportId.anonymous184Ratio)}</td></tr>
+              <tr><th>\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8</th><td>${reportId.selfPostedCount}</td><td>${formatPct(reportId.totalCount > 0 ? reportId.selfPostedCount / reportId.totalCount : 0)}</td></tr>
+              <tr><th>\u305D\u306E\u4ED6\uFF08ID \u672A\u53D6\u5F97\uFF09</th><td>${reportId.otherCount}</td><td>${formatPct(reportId.totalCount > 0 ? reportId.otherCount / reportId.totalCount : 0)}</td></tr>
+              <tr><th>\u7DCF\u30B3\u30E1\u30F3\u30C8\u6570</th><td colspan="2">${reportId.totalCount}</td></tr>
+            </tbody>
           </table>
         </section>
         ${thumbedUsersSectionHtml}
@@ -12378,7 +12614,21 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       </details>
 
       <section class="card" style="margin-top:12px;">
+        <h2>\u81EA\u5206\u306E\u30B3\u30E1\u30F3\u30C8\u629C\u7C8B\uFF08${selfPostedComments.length}\u4EF6\uFF09</h2>
+        <p class="guide-lead">\u81EA\u5206\u304C\u9001\u3063\u305F\u30B3\u30E1\u30F3\u30C8\u3060\u3051\u3092\u629C\u304D\u51FA\u3057\u305F\u306E\u3060\u3002\u5F8C\u304B\u3089\u81EA\u5206\u306E\u5FDC\u63F4\u3092\u632F\u308A\u8FD4\u308B\u3068\u304D\u7528\u306A\u306E\u3060\u3002</p>
+        <table>
+          <thead><tr><th>#</th><th>commentNo</th><th>\u672C\u6587</th><th>capturedAt</th></tr></thead>
+          <tbody>${selfPostedRows.join("") || '<tr><td colspan="4">\u81EA\u30B3\u30E1\u306F\u8A18\u9332\u3055\u308C\u3066\u3044\u306A\u3044\u306E\u3060</td></tr>'}</tbody>
+        </table>
+      </section>
+
+      <section class="card" style="margin-top:12px;">
         <h2>\u4FDD\u5B58\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7</h2>
+        <p class="guide-lead">
+          <button type="button" id="nlReportCsvDownloadBtn" class="nl-report-csv-btn">CSV \u3092\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9</button>
+          <span class="nl-report-csv-hint">Excel / Google Sheets \u3067\u958B\u3051\u308B\u306E\u3060\uFF08UTF-8 BOM \u4ED8\u304D\uFF09\u3002</span>
+        </p>
+        <pre id="nlReportCsvData" hidden>${escapeHtml(reportCommentsCsv)}</pre>
         <table>
           <thead><tr><th>#</th><th>commentNo</th><th>user</th><th>text</th><th>capturedAt</th></tr></thead>
           <tbody>${commentRows.join("") || '<tr><td colspan="5">\u30B3\u30E1\u30F3\u30C8\u306A\u3057</td></tr>'}</tbody>
@@ -12412,6 +12662,27 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         };
         q.addEventListener('input', update);
         update();
+
+        // 0.1.21 (V): CSV \u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3002pre \u8981\u7D20\u306E textContent \u304B\u3089\u751F CSV \u3092\u53D6\u308A\u3001
+        // UTF-8 BOM \u3092\u5148\u982D\u306B\u4ED8\u3051\u305F Blob \u3092\u751F\u6210\u3057\u3066 a.click() \u3067\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3002
+        const csvBtn = document.getElementById('nlReportCsvDownloadBtn');
+        const csvData = document.getElementById('nlReportCsvData');
+        if (csvBtn && csvData) {
+          csvBtn.addEventListener('click', () => {
+            try {
+              const csv = csvData.textContent || '';
+              const blob = new Blob(['\\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = ${JSON.stringify(reportCsvFilename)};
+              a.click();
+              setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (e) {
+              console.warn('csv download failed', e);
+            }
+          });
+        }
       })();
     <\/script>
   </body>
@@ -12473,7 +12744,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1256" ? String("0430-1256") : "dev";
+      const buildId = "0430-1316" ? String("0430-1316") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

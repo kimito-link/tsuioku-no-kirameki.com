@@ -166,6 +166,12 @@ import {
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
+import {
+  summarizeBroadcastTiming,
+  summarizeCommentBodyStats,
+  summarizeIdentifierStats
+} from '../lib/broadcastReportSummary.js';
+import { buildReportCommentsCsv } from '../lib/reportCommentsCsv.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
@@ -7284,13 +7290,26 @@ async function buildHtmlReportDocument(
         (room) => String(room.userKey || '').trim() !== reportBroadcasterUserId
       )
     : aggregatedRoomsAll;
+  // 0.1.21 (V): ユーザー別の累計字数（合計コメ字数）を集計テーブルに併記する。
+  // 配信者本人の除外は aggregatedRooms と同じ条件で。
+  /** @type {Map<string, number>} */
+  const userKeyToTotalChars = new Map();
+  for (const c of comments) {
+    const uid = c?.userId ? String(c.userId).trim() : '';
+    if (reportBroadcasterUserId && uid === reportBroadcasterUserId) continue;
+    const userKey = uid || UNKNOWN_USER_KEY;
+    const len = String(c?.text == null ? '' : c.text).length;
+    userKeyToTotalChars.set(userKey, (userKeyToTotalChars.get(userKey) || 0) + len);
+  }
   const roomRows = aggregatedRooms.map((room) => {
     const label = displayUserLabel(room.userKey, room.nickname);
     // 数値 ID のときだけ niconico ユーザーページへのリンクで包む
     // （匿名・ハッシュ・未取得は escapeHtml されたテキストのみ）。
     const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
+    const totalChars = userKeyToTotalChars.get(room.userKey) || 0;
+    const avgChars = room.count > 0 ? Math.round((totalChars / room.count) * 10) / 10 : 0;
     const search = escapeAttr(
-      `${label} ${room.nickname || ''} ${room.userKey} ${room.lastText || ''} ${room.count}`.toLowerCase()
+      `${label} ${room.nickname || ''} ${room.userKey} ${room.lastText || ''} ${room.count} ${totalChars}`.toLowerCase()
     );
     // 0.1.12 (F): 「最低サムネ」を必ず出す。avatarUrl が空でも数値 ID なら
     // ニコ既定 CDN URL、匿名 a:... なら identicon SVG data URL を使う。
@@ -7307,6 +7326,7 @@ async function buildHtmlReportDocument(
         <td>${avatarCell}</td>
         <td>${labelHtml}</td>
         <td>${room.count}</td>
+        <td>${totalChars}（平均 ${avgChars}）</td>
         <td>${escapeHtml(room.lastText || '')}</td>
       </tr>
     `;
@@ -7486,6 +7506,55 @@ async function buildHtmlReportDocument(
       `;
     });
 
+  /*
+   * 0.1.21 (V): HTML レポート無料拡張で追加する集計群。
+   *  - timing: 配信時間 / 開始～終了時刻 / CPM / 配信者LV
+   *  - body  : 字数の平均 / 中央値 / 最大
+   *  - id    : 184 / 数値ID / 自コメ / その他 件数 + 比率
+   * いずれも pure helper（broadcastReportSummary.js / vitest 全件カバー）。
+   * commentsForReport（配信者本人を除外したリスト）に対して計算する。
+   */
+  const reportTiming = summarizeBroadcastTiming({ snapshot, comments: commentsForReport });
+  const reportBody = summarizeCommentBodyStats(commentsForReport);
+  const reportId = summarizeIdentifierStats(commentsForReport);
+  const formatTimingDate = (ms) =>
+    typeof ms === 'number' && Number.isFinite(ms) && ms > 0 ? formatDateTime(ms) : '-';
+  const formatPct = (ratio) =>
+    typeof ratio === 'number' && Number.isFinite(ratio)
+      ? `${Math.round(ratio * 1000) / 10}%`
+      : '-';
+  const durationLabel = (() => {
+    const min = reportTiming.durationMinutes;
+    if (!min || min <= 0) return '-';
+    const totalSeconds = Math.round(reportTiming.durationMs / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    if (h > 0) return `${h}時間${m}分${s}秒`;
+    if (m > 0) return `${m}分${s}秒`;
+    return `${s}秒`;
+  })();
+
+  // 0.1.21 (V): 自分のコメント抜粋（自コメだけのテーブル）。
+  const selfPostedComments = commentsForReport.filter((c) => Boolean(c?.selfPosted));
+  const selfPostedRows = selfPostedComments.map((c, idx) => {
+    const text = String(c.text || '').trim();
+    const search = escapeAttr(`${idx + 1} ${text} ${c.commentNo || ''}`.toLowerCase());
+    return `
+      <tr class="search-item" data-search="${search}">
+        <td>${idx + 1}</td>
+        <td>${escapeHtml(String(c.commentNo || '-'))}</td>
+        <td>${escapeHtml(text || '-')}</td>
+        <td>${escapeHtml(formatDateTime(c.capturedAt || 0))}</td>
+      </tr>
+    `;
+  });
+
+  // 0.1.21 (V): CSV ダウンロード用の生 CSV を埋め込む。<pre hidden> の textContent
+  // から JS が読み取り Blob 化してダウンロードする（再エスケープ不要）。
+  const reportCommentsCsv = buildReportCommentsCsv(commentsForReport);
+  const reportCsvFilename = `tsuioku-comments-${liveId || 'unknown'}.csv`;
+
   const headLinkRows = snapshot ? linkRows(snapshot.links) : [];
   const { friendly: friendlyMetas, technical: technicalMetas } =
     partitionMetasForHtmlReport(snapshot?.metas);
@@ -7637,6 +7706,27 @@ async function buildHtmlReportDocument(
         color: var(--muted);
         font-size: 11px;
       }
+      .nl-report-csv-btn {
+        display: inline-block;
+        background: #1d4ed8;
+        color: #fff;
+        border: 1px solid #1e3a8a;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .nl-report-csv-btn:hover { background: #1e40af; }
+      .nl-report-csv-btn:focus-visible {
+        outline: 2px solid #38bdf8;
+        outline-offset: 2px;
+      }
+      .nl-report-csv-hint {
+        color: var(--muted);
+        font-size: 11px;
+        margin-left: 8px;
+      }
+      #nlReportCsvData { display: none; }
       .guide-lead {
         margin: 0 0 12px;
         color: var(--muted);
@@ -8040,11 +8130,19 @@ async function buildHtmlReportDocument(
               <tr class="search-item" data-search="${escapeAttr(liveId.toLowerCase())}"><th>liveId</th><td class="mono">${safeLiveId}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcastTitle || '').toLowerCase())}"><th>放送タイトル</th><td>${safeBroadcastTitle}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcasterName || '').toLowerCase())}"><th>配信者名</th><td>${safeBroadcasterName}</td></tr>
-              <tr class="search-item" data-search="${escapeAttr(String(snapshot?.startAtText || '').toLowerCase())}"><th>開始時刻</th><td>${safeStartAtText}</td></tr>
+              <tr class="search-item" data-search="${escapeAttr(String(snapshot?.startAtText || '').toLowerCase())}"><th>開始時刻（公式表記）</th><td>${safeStartAtText}</td></tr>
+              <tr><th>最初の記録コメント</th><td>${escapeHtml(formatTimingDate(reportTiming.firstCapturedAt))}</td></tr>
+              <tr><th>最後の記録コメント</th><td>${escapeHtml(formatTimingDate(reportTiming.lastCapturedAt))}</td></tr>
+              <tr><th>記録できた区間の長さ</th><td>${escapeHtml(durationLabel)}</td></tr>
+              <tr><th>1分あたりのコメント（CPM）</th><td>${reportTiming.commentsPerMinute || '-'}</td></tr>
+              <tr><th>配信者レベル</th><td>${reportTiming.broadcasterLevel != null ? `LV${reportTiming.broadcasterLevel}` : '-'}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.url || watchUrl || '').toLowerCase())}"><th>URL</th><td class="mono">${safeWatchUrl}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.title || '').toLowerCase())}"><th>Titleタグ</th><td>${safeTitle}</td></tr>
               <tr><th>保存コメント数</th><td>${comments.length}</td></tr>
               <tr><th>ユーザー別件数</th><td>${aggregateCommentsByUser(comments).length}</td></tr>
+              <tr><th>本文の平均字数</th><td>${reportBody.averageChars}</td></tr>
+              <tr><th>本文の中央値字数</th><td>${reportBody.medianChars}</td></tr>
+              <tr><th>本文の最大字数</th><td>${reportBody.maxChars}</td></tr>
             </tbody>
           </table>
           <h2 style="margin-top:12px;">サムネイル</h2>
@@ -8076,8 +8174,22 @@ async function buildHtmlReportDocument(
         <section class="card">
           <h2>ユーザー別（しおり集計）</h2>
           <table>
-            <thead><tr><th>サムネ</th><th>ユーザー</th><th>件数</th><th>最新コメント</th></tr></thead>
-            <tbody>${roomRows.join('') || '<tr><td colspan="4">データなし</td></tr>'}</tbody>
+            <thead><tr><th>サムネ</th><th>ユーザー</th><th>件数</th><th>累計字数</th><th>最新コメント</th></tr></thead>
+            <tbody>${roomRows.join('') || '<tr><td colspan="5">データなし</td></tr>'}</tbody>
+          </table>
+        </section>
+        <section class="card">
+          <h2>内訳統計（無料）</h2>
+          <p class="guide-lead">記録したコメントの内訳を、登場した識別子の種類別にまとめたのだ。匿名（184）と数値ID、自分のコメントの比率がわかるのだ。</p>
+          <table>
+            <thead><tr><th>種別</th><th>件数</th><th>比率</th></tr></thead>
+            <tbody>
+              <tr><th>数値 ID（ログインユーザー）</th><td>${reportId.numericIdCount}</td><td>${formatPct(reportId.numericIdRatio)}</td></tr>
+              <tr><th>匿名（184 / a:プレフィックス）</th><td>${reportId.anonymous184Count}</td><td>${formatPct(reportId.anonymous184Ratio)}</td></tr>
+              <tr><th>自分のコメント</th><td>${reportId.selfPostedCount}</td><td>${formatPct(reportId.totalCount > 0 ? reportId.selfPostedCount / reportId.totalCount : 0)}</td></tr>
+              <tr><th>その他（ID 未取得）</th><td>${reportId.otherCount}</td><td>${formatPct(reportId.totalCount > 0 ? reportId.otherCount / reportId.totalCount : 0)}</td></tr>
+              <tr><th>総コメント数</th><td colspan="2">${reportId.totalCount}</td></tr>
+            </tbody>
           </table>
         </section>
         ${thumbedUsersSectionHtml}
@@ -8125,7 +8237,24 @@ async function buildHtmlReportDocument(
       </details>
 
       <section class="card" style="margin-top:12px;">
+        <h2>自分のコメント抜粋（${selfPostedComments.length}件）</h2>
+        <p class="guide-lead">自分が送ったコメントだけを抜き出したのだ。後から自分の応援を振り返るとき用なのだ。</p>
+        <table>
+          <thead><tr><th>#</th><th>commentNo</th><th>本文</th><th>capturedAt</th></tr></thead>
+          <tbody>${
+            selfPostedRows.join('') ||
+            '<tr><td colspan="4">自コメは記録されていないのだ</td></tr>'
+          }</tbody>
+        </table>
+      </section>
+
+      <section class="card" style="margin-top:12px;">
         <h2>保存コメント一覧</h2>
+        <p class="guide-lead">
+          <button type="button" id="nlReportCsvDownloadBtn" class="nl-report-csv-btn">CSV をダウンロード</button>
+          <span class="nl-report-csv-hint">Excel / Google Sheets で開けるのだ（UTF-8 BOM 付き）。</span>
+        </p>
+        <pre id="nlReportCsvData" hidden>${escapeHtml(reportCommentsCsv)}</pre>
         <table>
           <thead><tr><th>#</th><th>commentNo</th><th>user</th><th>text</th><th>capturedAt</th></tr></thead>
           <tbody>${commentRows.join('') || '<tr><td colspan="5">コメントなし</td></tr>'}</tbody>
@@ -8159,6 +8288,27 @@ async function buildHtmlReportDocument(
         };
         q.addEventListener('input', update);
         update();
+
+        // 0.1.21 (V): CSV ダウンロード。pre 要素の textContent から生 CSV を取り、
+        // UTF-8 BOM を先頭に付けた Blob を生成して a.click() でダウンロード。
+        const csvBtn = document.getElementById('nlReportCsvDownloadBtn');
+        const csvData = document.getElementById('nlReportCsvData');
+        if (csvBtn && csvData) {
+          csvBtn.addEventListener('click', () => {
+            try {
+              const csv = csvData.textContent || '';
+              const blob = new Blob(['\\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = ${JSON.stringify(reportCsvFilename)};
+              a.click();
+              setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (e) {
+              console.warn('csv download failed', e);
+            }
+          });
+        }
       })();
     </script>
   </body>
