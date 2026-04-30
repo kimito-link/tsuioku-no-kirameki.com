@@ -475,14 +475,12 @@ async function openOrFocusPopupWindow() {
     // no-op
   }
   /*
-   * 0.1.60 (AP) → 0.1.61 (AQ): 複数モニタ環境で「同じモニタ」に出すのは OK
-   *   になったが、中央配置だと Chrome ウィンドウの中身に被さって不自然
-   *   （ユーザー報告: 高さがずれている、ボックスの中にあるかんじ）。
-   *   Chrome の右側に隣接させる形に変更。
-   *     - left = Chrome window の右端 - popup の幅 - 余白
-   *     - top  = Chrome window の上端 + tab/toolbar 分の小さなオフセット
-   *   これで Chrome のメイン content に被さらず、右上付近に popup が出る。
-   *   画面端からはみ出る場合は workArea に合わせて clamp。
+   * 0.1.61 (AQ) → 0.1.62 (AR): popup を Chrome の右端に「密着」させる。
+   *   ユーザー報告「くっついてない時点でおかしい」への対応。
+   *     - left = Chrome の右端そのもの（popup は Chrome の外側に隣接）
+   *     - top  = Chrome の上端と揃える
+   *   Chrome window の右隣に popup が並ぶ形になる。Chrome の content に
+   *   被らず、視覚的にも一体感が出る。画面右端からはみ出る場合は clamp。
    */
   /** @type {{ left?: number, top?: number }} */
   const positionHint = {};
@@ -494,15 +492,12 @@ async function openOrFocusPopupWindow() {
       lastNormal &&
       typeof lastNormal.left === 'number' &&
       typeof lastNormal.top === 'number' &&
-      typeof lastNormal.width === 'number' &&
-      typeof lastNormal.height === 'number'
+      typeof lastNormal.width === 'number'
     ) {
-      const POPUP_RIGHT_MARGIN = 16;
-      const POPUP_TOP_OFFSET = 80;
-      // Chrome の右上アイコン付近に popup を配置。Chrome の content に被らない。
-      const left = lastNormal.left + lastNormal.width - POPUP_WINDOW_WIDTH - POPUP_RIGHT_MARGIN;
-      const top = lastNormal.top + POPUP_TOP_OFFSET;
-      // モニタの最低限の境界（負値防止）
+      // Chrome の右端ぴったりに popup の左端を合わせる
+      const left = lastNormal.left + lastNormal.width;
+      // Chrome の上端と揃える（タイトルバーが少しずれるのは Chrome 仕様）
+      const top = lastNormal.top;
       positionHint.left = Math.max(0, Math.round(left));
       positionHint.top = Math.max(0, Math.round(top));
     }

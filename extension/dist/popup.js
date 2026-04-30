@@ -708,6 +708,14 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.62",
+      date: "2026-05-01",
+      summary: "popup \u3092 Chrome \u53F3\u7AEF\u306B\u5BC6\u7740",
+      items: Object.freeze([
+        "popup \u3068 Chrome \u30A6\u30A3\u30F3\u30C9\u30A6\u306E\u9593\u306B\u9699\u9593\u304C\u3042\u3063\u305F\u554F\u984C\u3092\u4FEE\u6B63\u3002Chrome \u306E\u53F3\u7AEF\u3074\u3063\u305F\u308A\u306B popup \u306E\u5DE6\u7AEF\u3092\u5408\u308F\u305B\u3001\u4E0A\u7AEF\u3082\u63C3\u3048\u3066\u96A3\u63A5\u914D\u7F6E\uFF08\u9699\u9593\u30BC\u30ED\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.61",
       date: "2026-05-01",
       summary: "popup \u3092 Chrome \u306E\u53F3\u5074\u306B\u96A3\u63A5\u914D\u7F6E",
@@ -16068,7 +16076,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-0350" ? String("0501-0350") : "dev";
+      const buildId = "0501-0401" ? String("0501-0401") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

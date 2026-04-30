@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.62',
+    date: '2026-05-01',
+    summary: 'popup を Chrome 右端に密着',
+    items: Object.freeze([
+      'popup と Chrome ウィンドウの間に隙間があった問題を修正。Chrome の右端ぴったりに popup の左端を合わせ、上端も揃えて隣接配置（隙間ゼロ）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.61',
     date: '2026-05-01',
     summary: 'popup を Chrome の右側に隣接配置',
