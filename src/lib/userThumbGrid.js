@@ -65,7 +65,8 @@ function isAnonymousLikeUserId(userId) {
  * @param {{
  *   identiconResolver?: (uid: string) => string,
  *   maxNumeric?: number,
- *   maxAnonymous?: number
+ *   maxAnonymous?: number,
+ *   broadcasterUserId?: string
  * }} [opts]
  * @returns {{
  *   numericIdUsers: ResolvedThumbGridUser[],
@@ -85,6 +86,12 @@ export function categorizeUsersForThumbGrid(users, opts = {}) {
   const maxAnonymous = Number.isFinite(opts.maxAnonymous)
     ? Number(opts.maxAnonymous)
     : Number.POSITIVE_INFINITY;
+  // 0.1.17 (R): 配信者本人 userId を除外。型違いは握りつぶす（呼び出し側は
+  // snapshot.broadcasterUserId をそのまま渡すので空文字や undefined もありうる）。
+  const broadcasterUid =
+    typeof opts.broadcasterUserId === 'string'
+      ? String(opts.broadcasterUserId).trim()
+      : '';
 
   if (!Array.isArray(users)) {
     return { numericIdUsers, anonymousUsers, skippedCount: 0 };
@@ -93,6 +100,11 @@ export function categorizeUsersForThumbGrid(users, opts = {}) {
   for (const u of users) {
     const userId = String(u?.userId || '').trim();
     if (!userId || userId === '__unknown__') {
+      skippedCount += 1;
+      continue;
+    }
+    if (broadcasterUid && userId === broadcasterUid) {
+      // 配信者本人は応援される側 — 一覧から除外する
       skippedCount += 1;
       continue;
     }

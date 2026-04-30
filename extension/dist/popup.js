@@ -700,6 +700,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.17",
+      date: "2026-04-30",
+      summary: "\u914D\u4FE1\u8005\u672C\u4EBA\u3092\u5FDC\u63F4\u8005\u30EA\u30B9\u30C8\u304B\u3089\u9664\u5916",
+      items: Object.freeze([
+        "HTML \u30EC\u30DD\u30FC\u30C8 / \u30DE\u30FC\u30B1\u5206\u6790 / \u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7\u304B\u3089\u3001\u914D\u4FE1\u8005\u672C\u4EBA\u306E\u30B3\u30E1\u30F3\u30C8\u3092\u9664\u5916\uFF08\u5FDC\u63F4\u3059\u308B\u5074\u3067\u306F\u306A\u3044\u305F\u3081\uFF09",
+        "\u5168\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7\u30C6\u30FC\u30D6\u30EB\u30FB\u30E6\u30FC\u30B6\u30FC\u5225\u96C6\u8A08\u30C6\u30FC\u30D6\u30EB\u30FB\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC\u30FB\u30B5\u30E0\u30CD\u4ED8\u304D\u30B0\u30EA\u30C3\u30C9\u306E\u5404\u7B87\u6240\u3067\u9069\u7528",
+        "\u914D\u4FE1\u8005\u672C\u4EBA\u306E\u30BF\u30A4\u30EB\u306F\u5F93\u6765\u3069\u304A\u308A\u300C\u914D\u4FE1\u8005\u60C5\u5831\u300D\u67A0\u3067\u5225\u51FA\u3057\uFF08\u5909\u66F4\u306A\u3057\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.16",
       date: "2026-04-30",
       summary: "\u30D1\u30CD\u30EB\u540C\u6642\u51FA\u73FE\u306E\u771F\u56E0\u4FEE\u6B63",
@@ -2714,12 +2724,17 @@
     let skippedCount = 0;
     const maxNumeric = Number.isFinite(opts.maxNumeric) ? Number(opts.maxNumeric) : Number.POSITIVE_INFINITY;
     const maxAnonymous = Number.isFinite(opts.maxAnonymous) ? Number(opts.maxAnonymous) : Number.POSITIVE_INFINITY;
+    const broadcasterUid = typeof opts.broadcasterUserId === "string" ? String(opts.broadcasterUserId).trim() : "";
     if (!Array.isArray(users)) {
       return { numericIdUsers, anonymousUsers, skippedCount: 0 };
     }
     for (const u of users) {
       const userId = String(u?.userId || "").trim();
       if (!userId || userId === "__unknown__") {
+        skippedCount += 1;
+        continue;
+      }
+      if (broadcasterUid && userId === broadcasterUid) {
         skippedCount += 1;
         continue;
       }
@@ -4892,6 +4907,7 @@ ${yLabelsL}${yLabelsR}${xLabels}
   function buildMarketingDashboardHtml(r, opts = {}) {
     const maskShare = opts.maskShareLabels === true;
     const identiconResolver = typeof opts.anonymousIdenticonResolver === "function" ? opts.anonymousIdenticonResolver : void 0;
+    const broadcasterUserId = typeof opts.broadcasterUserId === "string" ? opts.broadcasterUserId : "";
     const exportedAtIso = (/* @__PURE__ */ new Date()).toISOString();
     const embedJson = buildMarketingEmbedScriptInnerText(r, {
       maskShareLabels: maskShare,
@@ -4926,9 +4942,9 @@ ${sectionDerivedTimeline(r)}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${sectionSegment(r)}
 ${sectionAdviceAfterSegment(r)}
-${sectionTopUsers(r, maskShare, identiconResolver)}
+${sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId)}
 ${sectionAdviceAfterRank(r)}
-${sectionUsersWithThumbnails(r, maskShare, identiconResolver)}
+${sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId)}
 ${sectionVposThirds(r)}
 ${sectionHourHeatmap(r)}
 </main>
@@ -4936,7 +4952,7 @@ ${sectionHourHeatmap(r)}
 ${sectionMachineReadableJson(embedJson, maskShare)}
 </body></html>`;
   }
-  function sectionUsersWithThumbnails(r, maskShare, identiconResolver) {
+  function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId) {
     if (maskShare) return "";
     if (!Array.isArray(r.topUsers) || r.topUsers.length === 0) return "";
     const { numericIdUsers, anonymousUsers } = categorizeUsersForThumbGrid(
@@ -4944,7 +4960,8 @@ ${sectionMachineReadableJson(embedJson, maskShare)}
       {
         identiconResolver,
         maxNumeric: 60,
-        maxAnonymous: 60
+        maxAnonymous: 60,
+        broadcasterUserId
       }
     );
     if (numericIdUsers.length === 0 && anonymousUsers.length === 0) return "";
@@ -5071,10 +5088,13 @@ ${yLabelsC}${xLabels}${bars}
 <div class="mkt-seg-legend">${legend}</div>
 </div></section>`;
   }
-  function sectionTopUsers(r, maskShare = false, identiconResolver = void 0) {
+  function sectionTopUsers(r, maskShare = false, identiconResolver = void 0, broadcasterUserId = "") {
     if (r.topUsers.length === 0) return "";
-    const maxCount = r.topUsers[0].count;
-    const rows = r.topUsers.slice(0, 20).map((u, i) => {
+    const broadcasterUid = String(broadcasterUserId || "").trim();
+    const filteredTopUsers = broadcasterUid ? r.topUsers.filter((u) => String(u.userId || "").trim() !== broadcasterUid) : r.topUsers;
+    if (filteredTopUsers.length === 0) return "";
+    const maxCount = filteredTopUsers[0].count;
+    const rows = filteredTopUsers.slice(0, 20).map((u, i) => {
       const pct = u.count / Math.max(1, maxCount) * 100;
       const resolvedAvatar = maskShare ? "" : resolveReportUserThumbSrc({
         userId: u.userId || "",
@@ -11414,7 +11434,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     };
     const htmlReportConceptGuideCardHtml = buildHtmlReportConceptGuideCardHtml(yukkuriAvatars);
     const htmlReportSaveGuideCardHtml = buildHtmlReportSaveGuideCardHtml(yukkuriAvatars);
-    const aggregatedRooms = aggregateCommentsByUser(comments);
+    const reportBroadcasterUserId = String(
+      snapshot?.broadcasterUserId || ""
+    ).trim();
+    const aggregatedRoomsAll = aggregateCommentsByUser(comments);
+    const aggregatedRooms = reportBroadcasterUserId ? aggregatedRoomsAll.filter(
+      (room) => String(room.userKey || "").trim() !== reportBroadcasterUserId
+    ) : aggregatedRoomsAll;
     const roomRows = aggregatedRooms.map((room) => {
       const label = displayUserLabel(room.userKey, room.nickname);
       const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
@@ -11481,7 +11507,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       });
       userKeyToResolvedThumb.set(room.userKey, src);
     }
-    const commentRows = comments.map((c, idx) => {
+    const commentsForReport = reportBroadcasterUserId ? comments.filter(
+      (c) => String(c?.userId || "").trim() !== reportBroadcasterUserId
+    ) : comments;
+    const commentRows = commentsForReport.map((c, idx) => {
       const commentNo = String(c.commentNo || "").trim();
       const text = String(c.text || "").trim();
       const userId = c.userId ? String(c.userId) : "";
@@ -12264,7 +12293,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1151" ? String("0430-1151") : "dev";
+      const buildId = "0430-1207" ? String("0430-1207") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -12706,7 +12735,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         const maskShare = Boolean(maskEl?.checked);
         const html = buildMarketingDashboardHtml(report, {
           maskShareLabels: maskShare,
-          anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl
+          anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
+          broadcasterUserId: String(
+            watchMetaCache.snapshot?.broadcasterUserId || ""
+          ).trim()
         });
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
@@ -12743,7 +12775,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
               const maskShare = Boolean(maskEl?.checked);
               const html = buildMarketingDashboardHtml(report, {
                 maskShareLabels: maskShare,
-                anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl
+                anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
+                broadcasterUserId: String(
+                  watchMetaCache.snapshot?.broadcasterUserId || ""
+                ).trim()
               });
               const blob = new Blob([html], { type: "text/html;charset=utf-8" });
               const url = URL.createObjectURL(blob);

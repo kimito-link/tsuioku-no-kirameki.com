@@ -405,7 +405,8 @@ function sectionAdviceAfterRank(r) {
  * @param {MarketingReport} r
  * @param {{
  *   maskShareLabels?: boolean,
- *   anonymousIdenticonResolver?: (uid: string) => string
+ *   anonymousIdenticonResolver?: (uid: string) => string,
+ *   broadcasterUserId?: string
  * }} [opts]
  * @returns {string}
  */
@@ -417,6 +418,10 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     typeof opts.anonymousIdenticonResolver === 'function'
       ? opts.anonymousIdenticonResolver
       : undefined;
+  // 0.1.17 (R): 配信者本人の userId を thread。サムネ付きユーザー一覧 / トップコメンター
+  // から除外する（配信者は応援される側で、応援する側ではない）。
+  const broadcasterUserId =
+    typeof opts.broadcasterUserId === 'string' ? opts.broadcasterUserId : '';
   const exportedAtIso = new Date().toISOString();
   const embedJson = buildMarketingEmbedScriptInnerText(r, {
     maskShareLabels: maskShare,
@@ -451,9 +456,9 @@ ${sectionDerivedTimeline(r)}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${sectionSegment(r)}
 ${sectionAdviceAfterSegment(r)}
-${sectionTopUsers(r, maskShare, identiconResolver)}
+${sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId)}
 ${sectionAdviceAfterRank(r)}
-${sectionUsersWithThumbnails(r, maskShare, identiconResolver)}
+${sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId)}
 ${sectionVposThirds(r)}
 ${sectionHourHeatmap(r)}
 </main>
@@ -470,11 +475,14 @@ ${sectionMachineReadableJson(embedJson, maskShare)}
  * 共有向け伏せ字（maskShare=true）はアイコン残存で識別される懸念があるため、
  * セクションごと出力しない（従来挙動を維持）。
  *
+ * 0.1.17 (R): broadcasterUserId を受け取り、配信者本人を一覧から除外する。
+ *
  * @param {MarketingReport} r
  * @param {boolean} maskShare
  * @param {((uid: string) => string) | undefined} identiconResolver
+ * @param {string} [broadcasterUserId]
  */
-function sectionUsersWithThumbnails(r, maskShare, identiconResolver) {
+function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId) {
   if (maskShare) return '';
   if (!Array.isArray(r.topUsers) || r.topUsers.length === 0) return '';
 
@@ -483,7 +491,8 @@ function sectionUsersWithThumbnails(r, maskShare, identiconResolver) {
     {
       identiconResolver,
       maxNumeric: 60,
-      maxAnonymous: 60
+      maxAnonymous: 60,
+      broadcasterUserId
     }
   );
 
@@ -668,11 +677,18 @@ function sectionSegment(r) {
  * @param {((uid: string) => string) | undefined} [identiconResolver]
  *   匿名 a:... ユーザー向けの identicon SVG data URL を返す関数（呼び出し側で
  *   事前計算したマップを引いてもらう）。null/undefined のときは匿名は空。
+ * @param {string} [broadcasterUserId] 配信者本人の userId。一致したら topUsers から除外。
  */
-function sectionTopUsers(r, maskShare = false, identiconResolver = undefined) {
+function sectionTopUsers(r, maskShare = false, identiconResolver = undefined, broadcasterUserId = '') {
   if (r.topUsers.length === 0) return '';
-  const maxCount = r.topUsers[0].count;
-  const rows = r.topUsers.slice(0, 20)
+  // 0.1.17 (R): 配信者本人をトップコメンターから除外する。
+  const broadcasterUid = String(broadcasterUserId || '').trim();
+  const filteredTopUsers = broadcasterUid
+    ? r.topUsers.filter((u) => String(u.userId || '').trim() !== broadcasterUid)
+    : r.topUsers;
+  if (filteredTopUsers.length === 0) return '';
+  const maxCount = filteredTopUsers[0].count;
+  const rows = filteredTopUsers.slice(0, 20)
     .map((u, i) => {
       const pct = (u.count / Math.max(1, maxCount)) * 100;
       // 0.1.12 (F1): 「最低サムネ」を必ず出す方針へ。

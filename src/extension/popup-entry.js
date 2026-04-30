@@ -7206,7 +7206,18 @@ async function buildHtmlReportDocument(
   const htmlReportSaveGuideCardHtml =
     buildHtmlReportSaveGuideCardHtml(yukkuriAvatars);
 
-  const aggregatedRooms = aggregateCommentsByUser(comments);
+  // 0.1.17 (R): 配信者本人 userId をスナップショットから取得し、応援コメント集計
+  // から除外。HTML レポートのユーザー別テーブル / サムネ付き一覧 / 全コメント一覧
+  // 全てに反映（配信者は応援される側で、応援する側ではない）。
+  const reportBroadcasterUserId = String(
+    snapshot?.broadcasterUserId || ''
+  ).trim();
+  const aggregatedRoomsAll = aggregateCommentsByUser(comments);
+  const aggregatedRooms = reportBroadcasterUserId
+    ? aggregatedRoomsAll.filter(
+        (room) => String(room.userKey || '').trim() !== reportBroadcasterUserId
+      )
+    : aggregatedRoomsAll;
   const roomRows = aggregatedRooms.map((room) => {
     const label = displayUserLabel(room.userKey, room.nickname);
     // 数値 ID のときだけ niconico ユーザーページへのリンクで包む
@@ -7315,7 +7326,13 @@ async function buildHtmlReportDocument(
     });
     userKeyToResolvedThumb.set(room.userKey, src);
   }
-  const commentRows = comments.map((c, idx) => {
+  // 0.1.17 (R): 配信者本人のコメントは「応援コメント一覧」から除外（応援者ではない）。
+  const commentsForReport = reportBroadcasterUserId
+    ? comments.filter(
+        (c) => String(c?.userId || '').trim() !== reportBroadcasterUserId
+      )
+    : comments;
+  const commentRows = commentsForReport.map((c, idx) => {
     const commentNo = String(c.commentNo || '').trim();
     const text = String(c.text || '').trim();
     const userId = c.userId ? String(c.userId) : '';
@@ -8594,9 +8611,14 @@ function initPopup() {
       // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
       // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
       // ユーザーの opt-out が尊重される）。
+      // 0.1.17 (R): 配信者本人を topUsers / サムネ付き一覧から除外するため
+      // snapshot.broadcasterUserId を thread。空文字なら影響なし（互換）。
       const html = buildMarketingDashboardHtml(report, {
         maskShareLabels: maskShare,
-        anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl
+        anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
+        broadcasterUserId: String(
+          watchMetaCache.snapshot?.broadcasterUserId || ''
+        ).trim()
       });
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -8634,7 +8656,10 @@ function initPopup() {
             const maskShare = Boolean(maskEl?.checked);
             const html = buildMarketingDashboardHtml(report, {
               maskShareLabels: maskShare,
-              anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl
+              anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
+              broadcasterUserId: String(
+                watchMetaCache.snapshot?.broadcasterUserId || ''
+              ).trim()
             });
             const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
             const url = URL.createObjectURL(blob);

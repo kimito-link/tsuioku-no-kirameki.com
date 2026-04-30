@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.16（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.17（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,24 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.17 バンプで追加した修正（配信者除外 R）**:
+
+- ユーザー報告: 「配信者本人が応援者リストに入っている問題も解決したい」。
+- 既に popup の 3 レーン（りんく/こん太/たぬ姉）には storyUserLaneContaminationGuard
+ で配信者除外があるが、HTML レポート / マーケ分析 / サムネ付きユーザー一覧 /
+ 全コメント一覧 / トップコメンター 等には除外責任が無く混入していた。
+- 修正:
+  - `src/lib/userThumbGrid.js#categorizeUsersForThumbGrid` に `broadcasterUserId`
+   opt を追加し、一致する uid は skipped に集計（TDD: 18 ケース、+3）。
+  - `src/lib/marketingChartsHtml.js#buildMarketingDashboardHtml` に opt を追加し、
+   `sectionTopUsers` / `sectionUsersWithThumbnails` 両方で除外。
+  - `src/extension/popup-entry.js#buildHtmlReportDocument` で aggregatedRooms と
+   commentsForReport を broadcaster で filter してから集計テーブル / サムネ付き
+   一覧 / 全コメント一覧の各列に渡す。
+  - 2 箇所の `buildMarketingDashboardHtml` 呼び出しに `broadcasterUserId` を thread。
+- 配信者本人のタイル（topSupportRankStripCasterTileHtml）は応援される側として
+ 「配信者情報」枠で別出ししているのでそのまま。
 
 **0.1.16 バンプで追加した修正（パネル同時出現の真因 P）**:
 

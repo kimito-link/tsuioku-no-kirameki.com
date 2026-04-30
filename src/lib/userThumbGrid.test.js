@@ -215,4 +215,53 @@ describe('categorizeUsersForThumbGrid', () => {
     expect(r.numericIdUsers).toHaveLength(1);
     expect(r.numericIdUsers[0].nickname).toBe('');
   });
+
+  /*
+   * 0.1.17 (R): 配信者本人の userId を受け取って、応援コメント一覧から除外する。
+   *   配信者は応援される側であって応援する側ではないので、彼ら自身のコメントは
+   *   サムネ付きユーザー一覧 / マーケ分析の topUsers / HTML レポートのテーブルに
+   *   は出すべきではない（既に popup の 3 レーンには contamination guard がある
+   *   が、HTML レポート / マーケ側にも同じ責任を持たせる）。
+   */
+  it('broadcasterUserId 指定で配信者本人を skipped に集計', () => {
+    const users = [
+      { userId: '4046119', count: 10, avatarUrl: '', nickname: '' },
+      { userId: '141071773', count: 5, avatarUrl: '', nickname: '' },
+      { userId: 'a:abcdef', count: 3, avatarUrl: '', nickname: '' }
+    ];
+    const r = categorizeUsersForThumbGrid(users, {
+      broadcasterUserId: '141071773',
+      identiconResolver: () => 'data:identicon'
+    });
+    expect(r.numericIdUsers.map((u) => u.userId)).toEqual(['4046119']);
+    expect(r.anonymousUsers.map((u) => u.userId)).toEqual(['a:abcdef']);
+    expect(r.skippedCount).toBe(1); // 141071773
+  });
+
+  it('broadcasterUserId 空文字 / null / 数値 → 除外しない（互換）', () => {
+    const users = [
+      { userId: '4046119', count: 10, avatarUrl: '', nickname: '' }
+    ];
+    expect(
+      categorizeUsersForThumbGrid(users, { broadcasterUserId: '' }).numericIdUsers
+    ).toHaveLength(1);
+    expect(
+      // @ts-expect-error: null
+      categorizeUsersForThumbGrid(users, { broadcasterUserId: null }).numericIdUsers
+    ).toHaveLength(1);
+    expect(
+      // @ts-expect-error: number
+      categorizeUsersForThumbGrid(users, { broadcasterUserId: 4046119 }).numericIdUsers
+    ).toHaveLength(1);
+  });
+
+  it('broadcaster と一致しても trim 後の比較を行う（スペース混入防御）', () => {
+    const users = [
+      { userId: '141071773', count: 1, avatarUrl: '', nickname: '' }
+    ];
+    expect(
+      categorizeUsersForThumbGrid(users, { broadcasterUserId: '  141071773  ' })
+        .numericIdUsers
+    ).toHaveLength(0);
+  });
 });

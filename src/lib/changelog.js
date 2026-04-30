@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.17',
+    date: '2026-04-30',
+    summary: '配信者本人を応援者リストから除外',
+    items: Object.freeze([
+      'HTML レポート / マーケ分析 / サムネ付きユーザー一覧から、配信者本人のコメントを除外（応援する側ではないため）',
+      '全コメント一覧テーブル・ユーザー別集計テーブル・トップコメンター・サムネ付きグリッドの各箇所で適用',
+      '配信者本人のタイルは従来どおり「配信者情報」枠で別出し（変更なし）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.16',
     date: '2026-04-30',
     summary: 'パネル同時出現の真因修正',
