@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.59',
+    date: '2026-05-01',
+    summary: 'popup を毎回作り直して横長を確実に解消',
+    items: Object.freeze([
+      'popup window が横長で開いて空白だらけになる問題を確実に修正。0.1.58 では update でサイズ変更を試みたが Chrome が無視するケースがあったため、既存 popup を一度閉じて 420×780 で新規作成する形に変更（state:normal も明示）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.58',
     date: '2026-05-01',
     summary: 'popup window サイズを毎回 420×780 にリセット',

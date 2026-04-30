@@ -444,16 +444,19 @@ async function getToolbarActionPolicy() {
 /**
  * 既存の popup 窓があれば前面化、なければ作成（default_popup 廃止後の代替）。
  *
- * 0.1.58 (AN): popup window のサイズを毎回 420×780 に強制リセット。
- *   ユーザーが popup を resize した状態を Chrome が記憶し、次回開いた時に
- *   横長で開いて右側が空白の cream 領域になる「レイアウトガタガタ」現象が
- *   発生していた。focused だけでなく width/height も update で揃える。
+ * 0.1.58 (AN) → 0.1.59 (AO): popup window のサイズを毎回 420×780 に
+ *   リセットするだけでなく、Chrome が以前の resize を強く保持する
+ *   ケースに対処するため、既存 popup を **閉じてから** 新規作成する形に
+ *   変更。フォーカス継続は失われるが、サイズが必ず 420×780 になる。
+ *   さらに `state: 'normal'` を明示して maximized 等の異常状態を解除し、
+ *   `top`/`left` を画面中央寄せに。
  */
 const POPUP_WINDOW_WIDTH = 420;
 const POPUP_WINDOW_HEIGHT = 780;
 async function openOrFocusPopupWindow() {
   const url = chrome.runtime.getURL('popup.html');
   const urlBase = url.replace(/[?#].*$/, '');
+  // 既存 popup を見つけたら一度閉じる（サイズリセットの確実性のため）
   try {
     const all = await chrome.windows.getAll({ populate: true });
     for (const w of all) {
@@ -461,12 +464,11 @@ async function openOrFocusPopupWindow() {
       const t = w.tabs && w.tabs[0];
       const u = String(t?.url || '');
       if (u && (u === url || u.startsWith(urlBase))) {
-        await chrome.windows.update(w.id, {
-          focused: true,
-          width: POPUP_WINDOW_WIDTH,
-          height: POPUP_WINDOW_HEIGHT
-        });
-        return;
+        try {
+          await chrome.windows.remove(w.id);
+        } catch {
+          // already closed
+        }
       }
     }
   } catch {
@@ -478,7 +480,8 @@ async function openOrFocusPopupWindow() {
       type: 'popup',
       width: POPUP_WINDOW_WIDTH,
       height: POPUP_WINDOW_HEIGHT,
-      focused: true
+      focused: true,
+      state: 'normal'
     });
   } catch {
     // no-op
