@@ -10,6 +10,7 @@ import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
 import { resolveReportUserThumbSrc } from './reportUserThumb.js';
+import { categorizeUsersForThumbGrid } from './userThumbGrid.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -462,10 +463,12 @@ ${sectionMachineReadableJson(embedJson, maskShare)}
 }
 
 /**
- * 0.1.12 (F3): サムネ付きユーザー一覧。topUsers のうち「サムネが解決できた人」だけを
- * グリッドで並べ、視覚的に「どんな人たちが応援してくれたか」を一目で見られるようにする。
- * 順序は topUsers と同じ（コメ件数の多い順）。最大 60 件。共有向け伏せ字時は丸ごと出さない
- * （アイコン残存で識別される懸念があるため）。
+ * 0.1.15 (L): サムネ付きユーザー一覧。「数値 ID（個人サムネ or ニコ既定）」と
+ * 「匿名（identicon）」を別の <ol> に分けてカテゴリ感を出す。0.1.12 では同じ grid に
+ * 混在していて視覚的にうるさかったというユーザー報告に対応。
+ *
+ * 共有向け伏せ字（maskShare=true）はアイコン残存で識別される懸念があるため、
+ * セクションごと出力しない（従来挙動を維持）。
  *
  * @param {MarketingReport} r
  * @param {boolean} maskShare
@@ -474,33 +477,51 @@ ${sectionMachineReadableJson(embedJson, maskShare)}
 function sectionUsersWithThumbnails(r, maskShare, identiconResolver) {
   if (maskShare) return '';
   if (!Array.isArray(r.topUsers) || r.topUsers.length === 0) return '';
-  const items = r.topUsers
-    .slice(0, 60)
-    .map((u) => {
-      const src = resolveReportUserThumbSrc({
-        userId: u.userId || '',
-        avatarUrl: u.avatarUrl || '',
-        identiconResolver
-      });
-      if (!src) return null;
-      const uidForLabel = u.userId || UNKNOWN_USER_KEY;
-      const rawLabel = u.userId
-        ? displayUserLabel(u.userId, u.nickname || '')
-        : u.nickname || '—';
-      const labelHtml = buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
-      const countText = `${u.count}件`;
-      return `<li class="mkt-thumb-grid__cell">
-<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+
+  const { numericIdUsers, anonymousUsers } = categorizeUsersForThumbGrid(
+    r.topUsers,
+    {
+      identiconResolver,
+      maxNumeric: 60,
+      maxAnonymous: 60
+    }
+  );
+
+  if (numericIdUsers.length === 0 && anonymousUsers.length === 0) return '';
+
+  /**
+   * @param {import('./userThumbGrid.js').ResolvedThumbGridUser} u
+   * @returns {string}
+   */
+  const cellHtml = (u) => {
+    const uidForLabel = u.userId || UNKNOWN_USER_KEY;
+    const rawLabel = displayUserLabel(u.userId, u.nickname || '');
+    const labelHtml = buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
+    const countText = `${u.count}件`;
+    return `<li class="mkt-thumb-grid__cell">
+<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
 <span class="mkt-thumb-grid__label">${labelHtml}</span>
 <span class="mkt-thumb-grid__count">${escapeHtml(countText)}</span>
 </li>`;
-    })
-    .filter((s) => s !== null);
-  if (items.length === 0) return '';
+  };
+
+  const numericBlock =
+    numericIdUsers.length > 0
+      ? `<h3 class="mkt-thumb-grid__heading">数値 ID（個人サムネ・ニコ既定アイコン）<span class="mkt-thumb-grid__heading-count">${numericIdUsers.length}名</span></h3>
+<ol class="mkt-thumb-grid">${numericIdUsers.map(cellHtml).join('')}</ol>`
+      : '';
+
+  const anonymousBlock =
+    anonymousUsers.length > 0
+      ? `<h3 class="mkt-thumb-grid__heading">匿名（識別子から生成した identicon）<span class="mkt-thumb-grid__heading-count">${anonymousUsers.length}名</span></h3>
+<ol class="mkt-thumb-grid">${anonymousUsers.map(cellHtml).join('')}</ol>`
+      : '';
+
   return `<section class="mkt-section mkt-section--thumb-grid" aria-label="サムネ付きユーザー一覧">
 <h2>サムネ付きユーザー一覧</h2>
-<p class="mkt-note">アイコンが解決できた応援ユーザーをコメ件数の多い順に並べました（最大 60 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順で選びます。</p>
-<ol class="mkt-thumb-grid">${items.join('')}</ol>
+<p class="mkt-note">アイコンが解決できた応援ユーザーをコメ件数の多い順、種別ごとに並べました（各カテゴリ最大 60 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順で選びます。</p>
+${numericBlock}
+${anonymousBlock}
 </section>`;
 }
 
@@ -760,6 +781,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 /* 0.1.12 (F3): サムネ付きユーザー一覧グリッド。トップコメンター表とは別軸で、
    どんな顔ぶれが応援してくれたかを視覚的に振り返るための面。 */
 .mkt-section--thumb-grid h2{border-left-color:#fb923c}
+.mkt-thumb-grid__heading{margin:1rem 0 .5rem;padding:0 0 .35rem;border-bottom:1px solid #334155;font-size:.92rem;font-weight:700;color:#cbd5e1;display:flex;align-items:baseline;gap:.5rem}
+.mkt-thumb-grid__heading:first-of-type{margin-top:.4rem}
+.mkt-thumb-grid__heading-count{font-size:.74rem;color:#94a3b8;font-weight:600}
 .mkt-thumb-grid{list-style:none;margin:.6rem 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
 .mkt-thumb-grid__cell{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 6px;background:#1e293b;border:1px solid #334155;border-radius:10px;min-width:0;text-align:center}
 .mkt-thumb-grid__avatar-wrap{width:48px;height:48px;border-radius:50%;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;flex-shrink:0}

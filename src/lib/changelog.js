@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.15',
+    date: '2026-04-30',
+    summary: 'サムネ一覧の分類とパネル動作改善',
+    items: Object.freeze([
+      'サムネ付きユーザー一覧を「数値 ID」と「匿名」のカテゴリに分けて並べました（HTML レポート / マーケ分析）',
+      'kon-ta（ツールバー）押下時にインラインパネルとポップアップ窓が同時に出る不具合を修正',
+      '×でパネルを閉じた後にもう一度 kon-ta を押すと、パネルがすぐ出ずポップアップ窓だけ開いていた不具合を修正'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.14',
     date: '2026-04-30',
     summary: 'ゲスト判定とサムネ一覧の視認性改善',

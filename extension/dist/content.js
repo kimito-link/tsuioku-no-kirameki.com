@@ -427,9 +427,14 @@
     const n = String(nickname ?? "").trim();
     return /^user\s+[A-Za-z0-9]+$/i.test(n);
   }
+  function isNiconicoGuestPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return n === "\u30B2\u30B9\u30C8";
+  }
   function anonymousNicknameFallback(userId, nickname) {
     const nick = String(nickname ?? "").trim();
-    if (nick) return nick;
+    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
+    if (nick && !isPlaceholder) return nick;
     return isNiconicoAnonymousUserId(userId) ? "\u533F\u540D" : "";
   }
 
@@ -2403,6 +2408,10 @@
     const r = deps.getBoundingClientRect(host);
     const min = typeof deps.minSize === "number" ? deps.minSize : 120;
     return r.width >= min && r.height >= min;
+  }
+  function shouldRespondFocusedNowFromToolbar(host) {
+    if (!host) return false;
+    return host.isConnected === true;
   }
 
   // src/lib/embeddedDataExtract.js
@@ -4989,41 +4998,49 @@
   async function focusInlinePanelHostFromToolbar() {
     if (!isWatchInlinePanelTopFrame()) return false;
     if (!isNicoLiveWatchUrl(window.location.href)) return false;
-    const host = await pollUntil(
-      () => {
-        const h = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
-        if (!(h instanceof HTMLElement)) return null;
-        const ready = isInlinePanelHostReadyForFocus(h, {
-          getComputedStyle: (el) => window.getComputedStyle(
-            /** @type {Element} */
-            el
-          ),
-          getBoundingClientRect: (el) => (
-            /** @type {Element} */
-            el.getBoundingClientRect()
-          )
-        });
-        return ready ? h : null;
-      },
-      { timeoutMs: 500, intervalMs: 30 }
-    );
-    if (!host) return false;
-    try {
-      suppressOwnScrollCountingFor(1e3);
-      host.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    } catch {
+    const host = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+    if (!(host instanceof HTMLElement)) return false;
+    if (!shouldRespondFocusedNowFromToolbar(host)) return false;
+    void (async () => {
       try {
-        host.scrollIntoView();
+        const ready = await pollUntil(
+          () => {
+            const h = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+            if (!(h instanceof HTMLElement)) return null;
+            const isReady = isInlinePanelHostReadyForFocus(h, {
+              getComputedStyle: (el) => window.getComputedStyle(
+                /** @type {Element} */
+                el
+              ),
+              getBoundingClientRect: (el) => (
+                /** @type {Element} */
+                el.getBoundingClientRect()
+              )
+            });
+            return isReady ? h : null;
+          },
+          { timeoutMs: 500, intervalMs: 30 }
+        );
+        if (!ready) return;
+        try {
+          suppressOwnScrollCountingFor(1e3);
+          ready.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        } catch {
+          try {
+            ready.scrollIntoView();
+          } catch {
+          }
+        }
+        const iframe = ready.querySelector(`#${INLINE_POPUP_IFRAME_ID}`);
+        if (iframe instanceof HTMLIFrameElement) {
+          try {
+            iframe.focus();
+          } catch {
+          }
+        }
       } catch {
       }
-    }
-    const iframe = host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`);
-    if (iframe instanceof HTMLIFrameElement) {
-      try {
-        iframe.focus();
-      } catch {
-      }
-    }
+    })();
     return true;
   }
   function buildAiShareFastDiagnosticsPayload() {

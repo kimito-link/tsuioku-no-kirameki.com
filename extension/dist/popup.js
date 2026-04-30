@@ -700,6 +700,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.15",
+      date: "2026-04-30",
+      summary: "\u30B5\u30E0\u30CD\u4E00\u89A7\u306E\u5206\u985E\u3068\u30D1\u30CD\u30EB\u52D5\u4F5C\u6539\u5584",
+      items: Object.freeze([
+        "\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7\u3092\u300C\u6570\u5024 ID\u300D\u3068\u300C\u533F\u540D\u300D\u306E\u30AB\u30C6\u30B4\u30EA\u306B\u5206\u3051\u3066\u4E26\u3079\u307E\u3057\u305F\uFF08HTML \u30EC\u30DD\u30FC\u30C8 / \u30DE\u30FC\u30B1\u5206\u6790\uFF09",
+        "kon-ta\uFF08\u30C4\u30FC\u30EB\u30D0\u30FC\uFF09\u62BC\u4E0B\u6642\u306B\u30A4\u30F3\u30E9\u30A4\u30F3\u30D1\u30CD\u30EB\u3068\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u7A93\u304C\u540C\u6642\u306B\u51FA\u308B\u4E0D\u5177\u5408\u3092\u4FEE\u6B63",
+        "\xD7\u3067\u30D1\u30CD\u30EB\u3092\u9589\u3058\u305F\u5F8C\u306B\u3082\u3046\u4E00\u5EA6 kon-ta \u3092\u62BC\u3059\u3068\u3001\u30D1\u30CD\u30EB\u304C\u3059\u3050\u51FA\u305A\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u7A93\u3060\u3051\u958B\u3044\u3066\u3044\u305F\u4E0D\u5177\u5408\u3092\u4FEE\u6B63"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.14",
       date: "2026-04-30",
       summary: "\u30B2\u30B9\u30C8\u5224\u5B9A\u3068\u30B5\u30E0\u30CD\u4E00\u89A7\u306E\u8996\u8A8D\u6027\u6539\u5584",
@@ -2673,6 +2683,72 @@
       if (typeof r === "string" && r.length > 0) return r;
     }
     return "";
+  }
+
+  // src/lib/userThumbGrid.js
+  var THUMB_USER_KIND_NUMERIC = "numeric";
+  var THUMB_USER_KIND_ANONYMOUS = "anonymous";
+  function isNumericNicoUserId(userId) {
+    return /^\d{5,14}$/.test(String(userId || "").trim());
+  }
+  function isAnonymousLikeUserId(userId) {
+    const s = String(userId || "").trim();
+    if (!s) return false;
+    if (/^a:/i.test(s)) return true;
+    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return true;
+    return false;
+  }
+  function categorizeUsersForThumbGrid(users, opts = {}) {
+    const numericIdUsers = [];
+    const anonymousUsers = [];
+    let skippedCount = 0;
+    const maxNumeric = Number.isFinite(opts.maxNumeric) ? Number(opts.maxNumeric) : Number.POSITIVE_INFINITY;
+    const maxAnonymous = Number.isFinite(opts.maxAnonymous) ? Number(opts.maxAnonymous) : Number.POSITIVE_INFINITY;
+    if (!Array.isArray(users)) {
+      return { numericIdUsers, anonymousUsers, skippedCount: 0 };
+    }
+    for (const u of users) {
+      const userId = String(u?.userId || "").trim();
+      if (!userId || userId === "__unknown__") {
+        skippedCount += 1;
+        continue;
+      }
+      const thumbSrc = resolveReportUserThumbSrc({
+        userId,
+        avatarUrl: u?.avatarUrl || "",
+        identiconResolver: opts.identiconResolver
+      });
+      if (!thumbSrc) {
+        skippedCount += 1;
+        continue;
+      }
+      const nickname = String(u?.nickname || "");
+      const count = Number(u?.count || 0);
+      if (isNumericNicoUserId(userId)) {
+        if (numericIdUsers.length < maxNumeric) {
+          numericIdUsers.push({
+            userId,
+            nickname,
+            count,
+            thumbSrc,
+            kind: THUMB_USER_KIND_NUMERIC
+          });
+        }
+      } else if (isAnonymousLikeUserId(userId)) {
+        if (anonymousUsers.length < maxAnonymous) {
+          anonymousUsers.push({
+            userId,
+            nickname,
+            count,
+            thumbSrc,
+            kind: THUMB_USER_KIND_ANONYMOUS
+          });
+        }
+      } else {
+        skippedCount += 1;
+      }
+    }
+    return { numericIdUsers, anonymousUsers, skippedCount };
   }
 
   // src/lib/supportGrowthAvatarLoad.js
@@ -4853,28 +4929,35 @@ ${sectionMachineReadableJson(embedJson, maskShare)}
   function sectionUsersWithThumbnails(r, maskShare, identiconResolver) {
     if (maskShare) return "";
     if (!Array.isArray(r.topUsers) || r.topUsers.length === 0) return "";
-    const items = r.topUsers.slice(0, 60).map((u) => {
-      const src = resolveReportUserThumbSrc({
-        userId: u.userId || "",
-        avatarUrl: u.avatarUrl || "",
-        identiconResolver
-      });
-      if (!src) return null;
+    const { numericIdUsers, anonymousUsers } = categorizeUsersForThumbGrid(
+      r.topUsers,
+      {
+        identiconResolver,
+        maxNumeric: 60,
+        maxAnonymous: 60
+      }
+    );
+    if (numericIdUsers.length === 0 && anonymousUsers.length === 0) return "";
+    const cellHtml = (u) => {
       const uidForLabel = u.userId || UNKNOWN_USER_KEY;
-      const rawLabel = u.userId ? displayUserLabel(u.userId, u.nickname || "") : u.nickname || "\u2014";
+      const rawLabel = displayUserLabel(u.userId, u.nickname || "");
       const labelHtml = buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
       const countText = `${u.count}\u4EF6`;
       return `<li class="mkt-thumb-grid__cell">
-<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
 <span class="mkt-thumb-grid__label">${labelHtml}</span>
 <span class="mkt-thumb-grid__count">${escapeHtml(countText)}</span>
 </li>`;
-    }).filter((s) => s !== null);
-    if (items.length === 0) return "";
+    };
+    const numericBlock = numericIdUsers.length > 0 ? `<h3 class="mkt-thumb-grid__heading">\u6570\u5024 ID\uFF08\u500B\u4EBA\u30B5\u30E0\u30CD\u30FB\u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3\uFF09<span class="mkt-thumb-grid__heading-count">${numericIdUsers.length}\u540D</span></h3>
+<ol class="mkt-thumb-grid">${numericIdUsers.map(cellHtml).join("")}</ol>` : "";
+    const anonymousBlock = anonymousUsers.length > 0 ? `<h3 class="mkt-thumb-grid__heading">\u533F\u540D\uFF08\u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon\uFF09<span class="mkt-thumb-grid__heading-count">${anonymousUsers.length}\u540D</span></h3>
+<ol class="mkt-thumb-grid">${anonymousUsers.map(cellHtml).join("")}</ol>` : "";
     return `<section class="mkt-section mkt-section--thumb-grid" aria-label="\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7">
 <h2>\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</h2>
-<p class="mkt-note">\u30A2\u30A4\u30B3\u30F3\u304C\u89E3\u6C7A\u3067\u304D\u305F\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u3092\u30B3\u30E1\u4EF6\u6570\u306E\u591A\u3044\u9806\u306B\u4E26\u3079\u307E\u3057\u305F\uFF08\u6700\u5927 60 \u540D\uFF09\u3002\u30A2\u30A4\u30B3\u30F3\u306F \u2460 \u500B\u4EBA\u30B5\u30E0\u30CD \u2461 \u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 \u2462 \u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon \u306E\u512A\u5148\u9806\u3067\u9078\u3073\u307E\u3059\u3002</p>
-<ol class="mkt-thumb-grid">${items.join("")}</ol>
+<p class="mkt-note">\u30A2\u30A4\u30B3\u30F3\u304C\u89E3\u6C7A\u3067\u304D\u305F\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u3092\u30B3\u30E1\u4EF6\u6570\u306E\u591A\u3044\u9806\u3001\u7A2E\u5225\u3054\u3068\u306B\u4E26\u3079\u307E\u3057\u305F\uFF08\u5404\u30AB\u30C6\u30B4\u30EA\u6700\u5927 60 \u540D\uFF09\u3002\u30A2\u30A4\u30B3\u30F3\u306F \u2460 \u500B\u4EBA\u30B5\u30E0\u30CD \u2461 \u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 \u2462 \u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon \u306E\u512A\u5148\u9806\u3067\u9078\u3073\u307E\u3059\u3002</p>
+${numericBlock}
+${anonymousBlock}
 </section>`;
   }
   function sectionMachineReadableJson(embedJson, maskShare) {
@@ -5061,6 +5144,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 /* 0.1.12 (F3): \u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7\u30B0\u30EA\u30C3\u30C9\u3002\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC\u8868\u3068\u306F\u5225\u8EF8\u3067\u3001
    \u3069\u3093\u306A\u9854\u3076\u308C\u304C\u5FDC\u63F4\u3057\u3066\u304F\u308C\u305F\u304B\u3092\u8996\u899A\u7684\u306B\u632F\u308A\u8FD4\u308B\u305F\u3081\u306E\u9762\u3002 */
 .mkt-section--thumb-grid h2{border-left-color:#fb923c}
+.mkt-thumb-grid__heading{margin:1rem 0 .5rem;padding:0 0 .35rem;border-bottom:1px solid #334155;font-size:.92rem;font-weight:700;color:#cbd5e1;display:flex;align-items:baseline;gap:.5rem}
+.mkt-thumb-grid__heading:first-of-type{margin-top:.4rem}
+.mkt-thumb-grid__heading-count{font-size:.74rem;color:#94a3b8;font-weight:600}
 .mkt-thumb-grid{list-style:none;margin:.6rem 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
 .mkt-thumb-grid__cell{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 6px;background:#1e293b;border:1px solid #334155;border-radius:10px;min-width:0;text-align:center}
 .mkt-thumb-grid__avatar-wrap{width:48px;height:48px;border-radius:50%;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -11338,26 +11424,40 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       </tr>
     `;
     });
-    const thumbedRoomCells = [...aggregatedRooms].sort((a, b) => b.count - a.count).slice(0, 80).map((room) => {
-      const src = resolveReportUserThumbSrc({
-        userId: room.userKey,
-        avatarUrl: room.avatarUrl || "",
-        identiconResolver: getCachedAnonymousIdenticonDataUrl
-      });
-      if (!src) return "";
-      const label = displayUserLabel(room.userKey, room.nickname);
-      const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
+    const sortedRoomsForThumbGrid = [...aggregatedRooms].sort((a, b) => b.count - a.count).map((room) => ({
+      userId: room.userKey,
+      nickname: room.nickname,
+      avatarUrl: room.avatarUrl || "",
+      count: room.count
+    }));
+    const { numericIdUsers: thumbNumericUsers, anonymousUsers: thumbAnonymousUsers } = categorizeUsersForThumbGrid(sortedRoomsForThumbGrid, {
+      identiconResolver: getCachedAnonymousIdenticonDataUrl,
+      maxNumeric: 80,
+      maxAnonymous: 80
+    });
+    const reportThumbCellHtml = (u) => {
+      const label = displayUserLabel(u.userId, u.nickname || "");
+      const labelHtml = buildUserProfileLinkedLabelHtml(u.userId, label);
       return `<li class="report-thumb-grid__cell">
-        <span class="report-thumb-grid__avatar-wrap"><img class="report-thumb-grid__avatar" src="${escapeAttr(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+        <span class="report-thumb-grid__avatar-wrap"><img class="report-thumb-grid__avatar" src="${escapeAttr(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
         <span class="report-thumb-grid__label">${labelHtml}</span>
-        <span class="report-thumb-grid__count">${room.count}\u4EF6</span>
+        <span class="report-thumb-grid__count">${u.count}\u4EF6</span>
       </li>`;
-    }).filter((s) => s !== "");
-    const thumbedUsersSectionHtml = thumbedRoomCells.length > 0 ? `
+    };
+    const thumbNumericBlockHtml = thumbNumericUsers.length > 0 ? `
+          <h3 class="report-thumb-grid__heading">\u6570\u5024 ID\uFF08\u500B\u4EBA\u30B5\u30E0\u30CD\u30FB\u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3\uFF09<span class="report-thumb-grid__heading-count">${thumbNumericUsers.length}\u540D</span></h3>
+          <ol class="report-thumb-grid">${thumbNumericUsers.map(reportThumbCellHtml).join("")}</ol>
+        ` : "";
+    const thumbAnonymousBlockHtml = thumbAnonymousUsers.length > 0 ? `
+          <h3 class="report-thumb-grid__heading">\u533F\u540D\uFF08\u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon\uFF09<span class="report-thumb-grid__heading-count">${thumbAnonymousUsers.length}\u540D</span></h3>
+          <ol class="report-thumb-grid">${thumbAnonymousUsers.map(reportThumbCellHtml).join("")}</ol>
+        ` : "";
+    const thumbedUsersSectionHtml = thumbNumericUsers.length > 0 || thumbAnonymousUsers.length > 0 ? `
         <section class="card">
           <h2>\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</h2>
-          <p class="guide-lead">\u30A2\u30A4\u30B3\u30F3\u304C\u89E3\u6C7A\u3067\u304D\u305F\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u3092\u4EF6\u6570\u306E\u591A\u3044\u9806\u306B\u4E26\u3079\u305F\u306E\u3060\uFF08\u6700\u5927 80 \u540D\uFF09\u3002\u30A2\u30A4\u30B3\u30F3\u306F \u2460 \u500B\u4EBA\u30B5\u30E0\u30CD \u2461 \u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 \u2462 \u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon \u306E\u512A\u5148\u9806\u306A\u306E\u3060\u3002</p>
-          <ol class="report-thumb-grid">${thumbedRoomCells.join("")}</ol>
+          <p class="guide-lead">\u30A2\u30A4\u30B3\u30F3\u304C\u89E3\u6C7A\u3067\u304D\u305F\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u3092\u4EF6\u6570\u306E\u591A\u3044\u9806\u3001\u7A2E\u5225\u3054\u3068\u306B\u4E26\u3079\u305F\u306E\u3060\uFF08\u5404\u30AB\u30C6\u30B4\u30EA\u6700\u5927 80 \u540D\uFF09\u3002\u30A2\u30A4\u30B3\u30F3\u306F \u2460 \u500B\u4EBA\u30B5\u30E0\u30CD \u2461 \u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 \u2462 \u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon \u306E\u512A\u5148\u9806\u306A\u306E\u3060\u3002</p>
+          ${thumbNumericBlockHtml}
+          ${thumbAnonymousBlockHtml}
         </section>
       ` : "";
     const userKeyToResolvedThumb = /* @__PURE__ */ new Map();
@@ -11888,6 +11988,26 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
          --panel-bg \u306F report \u5074\u3067\u672A\u5B9A\u7FA9 \u2192 \u767D fallback \u304C\u5F53\u305F\u308A\u3001\u3057\u304B\u3082 text \u8272\u306F
          --text (light gray) \u3092\u7D99\u627F\u3057\u3066\u3044\u305F\u305F\u3081\u300C\u767D\xD7\u30E9\u30A4\u30C8\u30B0\u30EC\u30FC\u300D\u3067\u8AAD\u3081\u306A\u3044\u72B6\u614B
          \u3060\u3063\u305F\uFF08\u30E6\u30FC\u30B6\u30FC\u5831\u544A\u306E\u8996\u8A8D\u6027\u554F\u984C\uFF09\u3002 */
+      /* 0.1.15 (L): subsection heading\uFF08\u6570\u5024 ID / \u533F\u540D\uFF09\u3002card \u5185\u306E\u5C0F\u898B\u51FA\u3057\u3002 */
+      .report-thumb-grid__heading {
+        margin: 14px 0 8px;
+        padding: 0 0 6px;
+        border-bottom: 1px solid #2a3a5e;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #cbd5e1;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .report-thumb-grid__heading:first-of-type {
+        margin-top: 4px;
+      }
+      .report-thumb-grid__heading-count {
+        font-size: 0.74rem;
+        color: #94a3b8;
+        font-weight: 600;
+      }
       .report-thumb-grid {
         list-style: none;
         margin: 0;
@@ -12132,7 +12252,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1108" ? String("0430-1108") : "dev";
+      const buildId = "0430-1129" ? String("0430-1129") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

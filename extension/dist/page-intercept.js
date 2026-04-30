@@ -311,9 +311,18 @@
     const rest = s.slice(2).trim();
     return rest.length >= 2;
   }
+  function isNiconicoAutoUserPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return /^user\s+[A-Za-z0-9]+$/i.test(n);
+  }
+  function isNiconicoGuestPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return n === "\u30B2\u30B9\u30C8";
+  }
   function anonymousNicknameFallback(userId, nickname) {
     const nick = String(nickname ?? "").trim();
-    if (nick) return nick;
+    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
+    if (nick && !isPlaceholder) return nick;
     return isNiconicoAnonymousUserId(userId) ? "\u533F\u540D" : "";
   }
 

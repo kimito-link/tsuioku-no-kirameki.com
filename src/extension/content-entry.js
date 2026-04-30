@@ -95,7 +95,10 @@ import {
 } from '../lib/voiceComment.js';
 import { audioConstraintsForDevice } from '../lib/voiceInputDevices.js';
 import { pollUntil } from '../lib/pollUntil.js';
-import { isInlinePanelHostReadyForFocus } from '../lib/inlinePanelFocusGate.js';
+import {
+  isInlinePanelHostReadyForFocus,
+  shouldRespondFocusedNowFromToolbar
+} from '../lib/inlinePanelFocusGate.js';
 import {
   extractEmbeddedDataProps,
   pickViewerCountFromEmbeddedData,
@@ -2402,52 +2405,75 @@ function inlineHostLooksVisible() {
 /**
  * ツールバーから：ページ内インラインパネルを前面化（スクロール＋ iframe フォーカス）。
  *
- * 0.1.11 (B1 race fix): 旧実装は同期で即時判定しており、msg=NLS_FOCUS_INLINE_PANEL
- *   受信 → renderPageFrameOverlay() で host 挿入直後の layout 未確定（rect=0）
- *   タイミングで `r.width < 120` で false を返すケースがあった（toolbar popup
- *   だけ出てインラインに前面化されない症状）。pollUntil で最大 500ms（rAF 約 16
- *   フレーム相当）rect 確定を待ってから scrollIntoView + iframe.focus する。
+ * 0.1.11 (B1): pollUntil で rect ≥ 120×120 を 500ms wait してから scroll/focus。
+ * 0.1.15 (M/N): host が DOM に居れば即座に true を返すように変更。理由:
+ *   - 旧版は rect が 120×120 になるまで pollUntil で 500ms 待ってから true 返却。
+ *     その間 background は応答待ちで blocked。pollUntil が timeout で false 返却
+ *     すると background が popup 窓を openOrFocusPopupWindow で開いてしまい、
+ *     インラインパネルと popup 窓が「同時に出る」現象になっていた（user 報告 Bug1）。
+ *   - close ボタン押下後に display:none された host は rect=0 のまま → pollUntil
+ *     timeout → false → popup 窓だけ開いてインラインが「すぐ出ない」体験になる
+ *     （user 報告 Bug2）。
+ *   - 修正: host が DOM 上に居る（renderPageFrameOverlay で挿入済み or 既存）
+ *     なら即座に focused=true 応答。scrollIntoView + iframe.focus は別タスクで
+ *     fire-and-forget（pollUntil 内蔵）。応答自体は rect も layout も待たない。
  *
- * @returns {Promise<boolean>} ホストが見つかれば true
+ * @returns {Promise<boolean>} host が DOM 上にあれば即座に true
  */
 async function focusInlinePanelHostFromToolbar() {
   if (!isWatchInlinePanelTopFrame()) return false;
   if (!isNicoLiveWatchUrl(window.location.href)) return false;
-  const host = await pollUntil(
-    () => {
-      const h =
-        nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
-      if (!(h instanceof HTMLElement)) return null;
-      const ready = isInlinePanelHostReadyForFocus(h, {
-        getComputedStyle: (el) => window.getComputedStyle(/** @type {Element} */ (el)),
-        getBoundingClientRect: (el) =>
-          /** @type {Element} */ (el).getBoundingClientRect()
-      });
-      return ready ? h : null;
-    },
-    { timeoutMs: 500, intervalMs: 30 }
-  );
-  if (!host) return false;
-  try {
-    // ツールバーからの前面化は意図的な大きなスクロール変化になり得るので、
-    // 発生する scroll イベントを user-scroll として誤カウントしないよう抑止窓を張る。
-    suppressOwnScrollCountingFor(1000);
-    host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  } catch {
+  const host =
+    nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+  if (!(host instanceof HTMLElement)) return false;
+  if (!shouldRespondFocusedNowFromToolbar(host)) return false;
+
+  // fire-and-forget: rect 確定を待ってから scroll + iframe focus を試行。
+  // 結果は応答に反映しない（応答は既に true で返している）。
+  void (async () => {
     try {
-      host.scrollIntoView();
+      const ready = await pollUntil(
+        () => {
+          const h =
+            nlsInlinePopupHostSingleton ||
+            document.getElementById(INLINE_POPUP_HOST_ID);
+          if (!(h instanceof HTMLElement)) return null;
+          const isReady = isInlinePanelHostReadyForFocus(h, {
+            getComputedStyle: (el) =>
+              window.getComputedStyle(/** @type {Element} */ (el)),
+            getBoundingClientRect: (el) =>
+              /** @type {Element} */ (el).getBoundingClientRect()
+          });
+          return isReady ? h : null;
+        },
+        { timeoutMs: 500, intervalMs: 30 }
+      );
+      if (!ready) return;
+      try {
+        // ツールバーからの前面化は意図的な大きなスクロール変化になり得るので、
+        // 発生する scroll イベントを user-scroll として誤カウントしないよう抑止窓を張る。
+        suppressOwnScrollCountingFor(1000);
+        ready.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } catch {
+        try {
+          ready.scrollIntoView();
+        } catch {
+          // no-op
+        }
+      }
+      const iframe = ready.querySelector(`#${INLINE_POPUP_IFRAME_ID}`);
+      if (iframe instanceof HTMLIFrameElement) {
+        try {
+          iframe.focus();
+        } catch {
+          // no-op
+        }
+      }
     } catch {
-      // no-op
+      // no-op: scroll/focus 失敗は致命的でない
     }
-  }
-  const iframe = host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`);
-  if (iframe instanceof HTMLIFrameElement) {
-    try {
-      iframe.focus();
-    } catch {
-      // no-op
-    }
-  }
+  })();
+
   return true;
 }
 

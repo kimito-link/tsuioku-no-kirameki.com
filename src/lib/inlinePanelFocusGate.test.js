@@ -9,7 +9,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isInlinePanelHostReadyForFocus } from './inlinePanelFocusGate.js';
+import {
+  isInlinePanelHostReadyForFocus,
+  shouldRespondFocusedNowFromToolbar
+} from './inlinePanelFocusGate.js';
 
 /**
  * @param {{ width?: number, height?: number, display?: string, visibility?: string, isConnected?: boolean }} [opts]
@@ -91,5 +94,44 @@ describe('isInlinePanelHostReadyForFocus', () => {
       const { host, deps } = makeHostStub({ display });
       expect(isInlinePanelHostReadyForFocus(host, deps)).toBe(true);
     }
+  });
+});
+
+/*
+ * 0.1.15 (M/N): host が DOM に居れば即座に focused=true を返す軽量判定。
+ *   isInlinePanelHostReadyForFocus の重い rect 判定を待っていると background が
+ *   popup 窓を開く race を起こすので、応答用の判定を分けた。
+ */
+describe('shouldRespondFocusedNowFromToolbar', () => {
+  it('null/undefined → false', () => {
+    expect(shouldRespondFocusedNowFromToolbar(null)).toBe(false);
+    expect(shouldRespondFocusedNowFromToolbar(undefined)).toBe(false);
+  });
+
+  it('isConnected=false（DOM から外された）→ false', () => {
+    expect(shouldRespondFocusedNowFromToolbar({ isConnected: false })).toBe(false);
+  });
+
+  it('isConnected=true → true（display:none でも rect=0 でも true）', () => {
+    expect(shouldRespondFocusedNowFromToolbar({ isConnected: true })).toBe(true);
+  });
+
+  it('isConnected が真偽値以外 → false（防御）', () => {
+    // @ts-expect-error: invalid input
+    expect(shouldRespondFocusedNowFromToolbar({ isConnected: 'yes' })).toBe(false);
+    // @ts-expect-error
+    expect(shouldRespondFocusedNowFromToolbar({ isConnected: 1 })).toBe(false);
+  });
+
+  it('isInlinePanelHostReadyForFocus が false でも、shouldRespond は true になりうる（責務が違う）', () => {
+    // host は DOM 上にあるが display:none → focus はまだできない（ready=false）
+    // でも応答は即 true（panel 自体は exists、popup は不要）
+    const host = { isConnected: true };
+    const readyDeps = {
+      getComputedStyle: () => ({ display: 'none', visibility: 'visible' }),
+      getBoundingClientRect: () => ({ width: 0, height: 0 })
+    };
+    expect(isInlinePanelHostReadyForFocus(host, readyDeps)).toBe(false);
+    expect(shouldRespondFocusedNowFromToolbar(host)).toBe(true);
   });
 });

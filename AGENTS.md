@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.14（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.15（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,25 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.15 バンプで追加した修正（カテゴリ分類 L / popup 同時出現 M / kon-ta 即時 N）**:
+
+- `feat(report)`: 「サムネ付きユーザー一覧」を「数値 ID（個人サムネ・ニコ既定）」と
+ 「匿名（identicon）」の 2 カテゴリに分けて表示。0.1.12 では同じ grid に混在していて
+ 件数順が匿名で埋まると数値 ID の応援ユーザーが下に追いやられる UX 報告に対応。
+ 純粋関数 `categorizeUsersForThumbGrid`（src/lib/userThumbGrid.js）として共通化し、
+ HTML レポート / マーケ分析の両方で使う。
+- `fix(content)`: `focusInlinePanelHostFromToolbar` を「host が DOM に居れば即座に
+ focused=true 応答 / scroll & iframe.focus は fire-and-forget」へ変更。旧実装は
+ pollUntil で rect ≥120×120 を 500ms wait してから応答を返していたため、その間に
+ background.js の `chrome.tabs.sendMessage` が応答待ちでブロックされ、timeout で
+ false 返却された場合に popup 窓を開く path が走り「panel と popup 窓が同時に出る」
+ 現象を起こしていた（M：Bug1）。close ボタンで display:none された host は rect=0
+ のまま pollUntil timeout → focused=false → popup 窓だけ開く現象（N：Bug2）も
+ 同じ修正で解消。判定は `shouldRespondFocusedNowFromToolbar`（`isConnected===true`
+ のみ確認、display/rect は問わない）を新設し、unit test で固定。
+- `lib(new)`: `src/lib/userThumbGrid.js` (15 ケース新設) ・
+ `src/lib/inlinePanelFocusGate.js#shouldRespondFocusedNowFromToolbar` (5 ケース追加)。
 
 **0.1.14 バンプで追加した修正（ゲスト判定 I / 視認性 J）**:
 

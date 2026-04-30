@@ -163,6 +163,7 @@ import {
 } from './story/renderStoryUserLaneDom.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
+import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
@@ -7245,32 +7246,60 @@ async function buildHtmlReportDocument(
    * グリッドカード（最大 80 名）。マーケ分析側と同じ責務だが、HTML レポートは
    * 全行を出すのが目的なのでこちらは件数の多い順に絞る。
    */
-  const thumbedRoomCells = [...aggregatedRooms]
+  /*
+   * 0.1.15 (L): 数値 ID（個人サムネ・ニコ既定）と 匿名（identicon）を別 <ol> に
+   *   分けて並べる。0.1.12 ではすべて 1 つの grid に混在していて、件数順が
+   *   匿名で埋まると数値 ID の応援ユーザーが下に追いやられて見えにくかった
+   *   という UX 報告に対応。categorize は src/lib/userThumbGrid.js の純粋関数。
+   */
+  const sortedRoomsForThumbGrid = [...aggregatedRooms]
     .sort((a, b) => b.count - a.count)
-    .slice(0, 80)
-    .map((room) => {
-      const src = resolveReportUserThumbSrc({
-        userId: room.userKey,
-        avatarUrl: room.avatarUrl || '',
-        identiconResolver: getCachedAnonymousIdenticonDataUrl
-      });
-      if (!src) return '';
-      const label = displayUserLabel(room.userKey, room.nickname);
-      const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
-      return `<li class="report-thumb-grid__cell">
-        <span class="report-thumb-grid__avatar-wrap"><img class="report-thumb-grid__avatar" src="${escapeAttr(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+    .map((room) => ({
+      userId: room.userKey,
+      nickname: room.nickname,
+      avatarUrl: room.avatarUrl || '',
+      count: room.count
+    }));
+  const { numericIdUsers: thumbNumericUsers, anonymousUsers: thumbAnonymousUsers } =
+    categorizeUsersForThumbGrid(sortedRoomsForThumbGrid, {
+      identiconResolver: getCachedAnonymousIdenticonDataUrl,
+      maxNumeric: 80,
+      maxAnonymous: 80
+    });
+  /**
+   * @param {import('../lib/userThumbGrid.js').ResolvedThumbGridUser} u
+   */
+  const reportThumbCellHtml = (u) => {
+    const label = displayUserLabel(u.userId, u.nickname || '');
+    const labelHtml = buildUserProfileLinkedLabelHtml(u.userId, label);
+    return `<li class="report-thumb-grid__cell">
+        <span class="report-thumb-grid__avatar-wrap"><img class="report-thumb-grid__avatar" src="${escapeAttr(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
         <span class="report-thumb-grid__label">${labelHtml}</span>
-        <span class="report-thumb-grid__count">${room.count}件</span>
+        <span class="report-thumb-grid__count">${u.count}件</span>
       </li>`;
-    })
-    .filter((s) => s !== '');
+  };
+  const thumbNumericBlockHtml =
+    thumbNumericUsers.length > 0
+      ? `
+          <h3 class="report-thumb-grid__heading">数値 ID（個人サムネ・ニコ既定アイコン）<span class="report-thumb-grid__heading-count">${thumbNumericUsers.length}名</span></h3>
+          <ol class="report-thumb-grid">${thumbNumericUsers.map(reportThumbCellHtml).join('')}</ol>
+        `
+      : '';
+  const thumbAnonymousBlockHtml =
+    thumbAnonymousUsers.length > 0
+      ? `
+          <h3 class="report-thumb-grid__heading">匿名（識別子から生成した identicon）<span class="report-thumb-grid__heading-count">${thumbAnonymousUsers.length}名</span></h3>
+          <ol class="report-thumb-grid">${thumbAnonymousUsers.map(reportThumbCellHtml).join('')}</ol>
+        `
+      : '';
   const thumbedUsersSectionHtml =
-    thumbedRoomCells.length > 0
+    thumbNumericUsers.length > 0 || thumbAnonymousUsers.length > 0
       ? `
         <section class="card">
           <h2>サムネ付きユーザー一覧</h2>
-          <p class="guide-lead">アイコンが解決できた応援ユーザーを件数の多い順に並べたのだ（最大 80 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順なのだ。</p>
-          <ol class="report-thumb-grid">${thumbedRoomCells.join('')}</ol>
+          <p class="guide-lead">アイコンが解決できた応援ユーザーを件数の多い順、種別ごとに並べたのだ（各カテゴリ最大 80 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順なのだ。</p>
+          ${thumbNumericBlockHtml}
+          ${thumbAnonymousBlockHtml}
         </section>
       `
       : '';
@@ -7831,6 +7860,26 @@ async function buildHtmlReportDocument(
          --panel-bg は report 側で未定義 → 白 fallback が当たり、しかも text 色は
          --text (light gray) を継承していたため「白×ライトグレー」で読めない状態
          だった（ユーザー報告の視認性問題）。 */
+      /* 0.1.15 (L): subsection heading（数値 ID / 匿名）。card 内の小見出し。 */
+      .report-thumb-grid__heading {
+        margin: 14px 0 8px;
+        padding: 0 0 6px;
+        border-bottom: 1px solid #2a3a5e;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #cbd5e1;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .report-thumb-grid__heading:first-of-type {
+        margin-top: 4px;
+      }
+      .report-thumb-grid__heading-count {
+        font-size: 0.74rem;
+        color: #94a3b8;
+        font-weight: 600;
+      }
       .report-thumb-grid {
         list-style: none;
         margin: 0;

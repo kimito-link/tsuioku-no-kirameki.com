@@ -29,3 +29,27 @@ export function isInlinePanelHostReadyForFocus(host, deps) {
   const min = typeof deps.minSize === 'number' ? deps.minSize : 120;
   return r.width >= min && r.height >= min;
 }
+
+/**
+ * 0.1.15 (M/N): toolbar からの NLS_FOCUS_INLINE_PANEL 受信時に、background.js
+ * へ「インライン側で扱った（focused=true）」を即座に応答するべきかの判定。
+ *
+ * 旧 isInlinePanelHostReadyForFocus は rect 120×120 を待っていたため、
+ *   - rect が確定しない transient タイミングで pollUntil(500ms) 待ち
+ *   - 待った末に false を返すと background が popup 窓を開く
+ *   - 一度 close ボタンで display:none された host も rect=0 → false
+ * となり「kon-ta 押下で popup 窓も同時に開く」「kon-ta 再押下で panel が
+ * 出ずに popup だけ出る」という user-visible bug を起こしていた。
+ *
+ * 新方針: host が DOM に居る（renderPageFrameOverlay で挿入済み or 既存）
+ *   なら即座に true を返し、scroll/focus は呼び出し側で fire-and-forget。
+ *   応答自体には rect も layout 完了も要らない（panel 表示自体は
+ *   renderPageFrameOverlay 側で同期的に処理されるため）。
+ *
+ * @param {{ isConnected: boolean } | null | undefined} host
+ * @returns {boolean}
+ */
+export function shouldRespondFocusedNowFromToolbar(host) {
+  if (!host) return false;
+  return host.isConnected === true;
+}
