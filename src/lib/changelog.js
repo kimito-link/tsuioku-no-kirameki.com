@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.13',
+    date: '2026-04-30',
+    summary: 'HTML レポートのサムネ強化と CSP 修正',
+    items: Object.freeze([
+      'HTML レポート / マーケ分析の各ユーザーに「最低サムネ」を必ず表示（個人サムネが無くてもニコ既定アイコン or identicon を充当）',
+      '「サムネ付きユーザー一覧」セクションを HTML レポート / マーケ分析の両方に追加（カードグリッド形式）',
+      '全コメント一覧の各行のユーザー欄にも 20px のインラインサムネを表示',
+      'chrome://extensions のエラータブに毎回出ていた CSP 違反（onerror 属性）を解消'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.12',
     date: '2026-04-30',
     summary: '盛り上げワード ワンクリック挿入',
