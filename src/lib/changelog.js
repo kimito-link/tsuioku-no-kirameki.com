@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.27',
+    date: '2026-04-30',
+    summary: 'マーケ分析の表示改善＋パネル安定化',
+    items: Object.freeze([
+      '離反コメンター TOP・常連出席カレンダーにサムネイル列とユーザー ID 列を追加',
+      'マーケ分析の各 PRO セクション直後に「りんく・こん太・たぬ姉」のキャラ解説を追加（このデータで何がわかるか）',
+      'インラインパネルが複数表示される race を抑止（singleton と DOM の対応関係を追従）',
+      'iframe ロード中にパネルが消えたり再生成されたりするフリッカーを抑止'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.26',
     date: '2026-04-30',
     summary: '表現修正・目次の自動絞り込み・マーケDLボタン追加',

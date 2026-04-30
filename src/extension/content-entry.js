@@ -1579,7 +1579,18 @@ function pickPrimaryInlinePopupHostFromDom() {
   const hosts = Array.from(
     document.querySelectorAll(`#${INLINE_POPUP_HOST_ID}`)
   ).filter((n) => n instanceof HTMLDivElement);
-  if (!hosts.length) return null;
+  if (!hosts.length) {
+    // 0.1.27 (AB): singleton が disconnected のまま残っていると
+    // ensureInlinePopupHost の早期 return で「DOM には居ないが singleton 経由で
+    // 古い host を返す」 race が起きる。DOM に 1 件も無いなら singleton も破棄。
+    if (
+      nlsInlinePopupHostSingleton &&
+      !nlsInlinePopupHostSingleton.isConnected
+    ) {
+      nlsInlinePopupHostSingleton = null;
+    }
+    return null;
+  }
   const connected = hosts.filter((h) => h.isConnected);
   const primary = connected[0] || hosts[0];
   for (const h of hosts) {
@@ -1590,6 +1601,11 @@ function pickPrimaryInlinePopupHostFromDom() {
       // no-op
     }
   }
+  // 0.1.27 (AB): 確定した primary を singleton に追従させる。これを怠ると
+  // 旧 singleton（既に DOM から消えた host）が ensureInlinePopupHost の
+  // fallback 経路で返り、DOM にも primary が居るのに別 host が iframe を
+  // 抱えるので「画面に 2 つの host が出る」race の元になる。
+  nlsInlinePopupHostSingleton = primary;
   return primary;
 }
 
@@ -2398,6 +2414,15 @@ function inlineHostLooksVisible() {
   if (!host.isConnected) return false;
   const cs = window.getComputedStyle(host);
   if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+  // 0.1.27 (AB): iframe 初回ロード中（visibility:hidden で 2s）に
+  // host の getBoundingClientRect が一時的に小さく見えるケースで、
+  // dock_bottom フォールバックが走って host を再構成してしまう「フリッカー」
+  // を抑止。iframe が src を持って居る間は「これからレイアウトされる」と
+  // 見なし、サイズだけで不可視判定しない。
+  const iframe = /** @type {HTMLIFrameElement|null} */ (
+    host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+  );
+  if (iframe && iframe.getAttribute('src')) return true;
   const r = host.getBoundingClientRect();
   return r.width >= 120 && r.height >= 120;
 }

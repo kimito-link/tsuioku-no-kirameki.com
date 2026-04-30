@@ -436,6 +436,153 @@ function sectionAdviceAfterRank(r) {
   ])}</div>`;
 }
 
+/* ═══ 0.1.27 (AB): PRO 各セクションのキャラ解説（このデータで何がわかるか） ═══ */
+
+/** @param {string} html */
+function adviceWrap(html) {
+  return html ? `<div class="mkt-advice-after">${html}</div>` : '';
+}
+
+function adviceAfterCommentVelocity() {
+  return adviceWrap(adviceCard('link', 'りんく', [
+    'コメ速度カーブは「1分ごとに何コメ来たか」と「直近5分の平均」を重ねて見るカーブなのだ。',
+    'ピークが出た分の前後を見直すと、「何のトピックで盛り上がったか」が手繰れるのだ。',
+  ]));
+}
+
+function adviceAfterConcurrent() {
+  return adviceWrap(adviceCard('link', 'りんく', [
+    '同接推移カーブは、視聴維持の代わりになる指標なのだ。ピーク到達分・半減点・終了時保持率の 3 つを見るのだ。',
+    '終了時保持率が高い枠は「最後まで残ってもらえた」枠で、半減点が早い枠は「序盤で抜けられた」可能性なのだ。',
+  ]));
+}
+
+function adviceAfterSilence() {
+  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
+    '沈黙＝悪ではないのだ。沈黙の質が "ガン見系" なら集中、"離脱系" なら盛り下がりの可能性なのだ。',
+    '長い沈黙の前後コメを見直すと、配信の「曲がり角」が分かるのだ。',
+  ]));
+}
+
+function adviceAfterLaughter() {
+  return adviceWrap(adviceCard('konta', 'こん太', [
+    '「笑い密度」は w / 草 / 8888 / 笑 等の出現を 30 秒粒度で見たやつなのだ。',
+    '笑いが集中した瞬間がそのまま「ハイライト候補」になるから、配信の切り抜きヒントに使えるのだ。',
+  ]));
+}
+
+function adviceAfterNewVsRepeat() {
+  return adviceWrap(adviceCard('link', 'りんく', [
+    '新規が多い枠＝集客がうまく回った枠、リピーターが多い枠＝コミュニティが厚い枠、なのだ。',
+    '両方ある枠が理想だけど、どちらかに偏っても配信スタイルとして全然 OK なのだ。',
+  ]));
+}
+
+function adviceAfterSurvival() {
+  return adviceWrap(adviceCard('link', 'りんく', [
+    'コメ参加維持率は「最初の区間にコメくれた人が、後半もコメしていたか」の割合なのだ。',
+    '50% を切ったタイミングで何があったか、コメタイムラインと突き合わせると気づきがあるのだ。',
+  ]));
+}
+
+function adviceAfterDeparted() {
+  return adviceWrap(adviceCard('konta', 'こん太', [
+    'ヘビーだった人が今回いない＝「離反」とは限らないのだ。タイミングが合わなかっただけかもしれないのだ。',
+    '同じ人が 2 〜 3 回連続で出てきたら、X とかで一言挨拶してもいいタイミングなのだ。',
+  ]));
+}
+
+function adviceAfterAttendance() {
+  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
+    '出席カレンダーは「常連層が枠を選んでいるか／毎回いるか」が見えるのだ。',
+    '横一列で●が並ぶ常連は、コミュニティの背骨なのだ。大事にしてほしいのだ。',
+  ]));
+}
+
+function adviceAfterKeyboard() {
+  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
+    'キーボード型は「ファン層の語り方」のざっくり傾向なのだ。短文派が多い枠は反応速度型、ロング派が多い枠は熟読型なのだ。',
+    '無口観戦派は配信を見てるけどコメは控えめな層で、これも貴重なファンなのだ。',
+  ]));
+}
+
+function adviceAfterRecentCmp() {
+  return adviceWrap(adviceCard('link', 'りんく', [
+    '直近 5 配信の比較バーは、自分の "調子のグラデーション" を一目で見るやつなのだ。',
+    '高い／低いに一喜一憂しなくていいのだ。配信ジャンル・曜日・時間で振れるのが普通なのだ。',
+  ]));
+}
+
+function adviceAfterWeekdayHeat() {
+  return adviceWrap(adviceCard('konta', 'こん太', [
+    '曜日 × 時間帯ヒートは「ファン層の活動時間」を浮き彫りにするのだ。濃い時間帯に配信を寄せると拾われやすいのだ。',
+    '逆に「自分の生活リズムに合う時間」を優先するのも全然アリなのだ。',
+  ]));
+}
+
+function adviceAfterGrowthMeter() {
+  return adviceWrap(adviceCard('link', 'りんく', [
+    '成長メーターは「過去平均との偏差」なのだ。±10% くらいは普通の揺らぎ、+50% 超えなら何かが効いた枠なのだ。',
+    '低い回も、悪いわけじゃないのだ。ジャンル違い・短時間枠なら下がるのが自然なのだ。',
+  ]));
+}
+
+function adviceAfterOpeningFive() {
+  return adviceWrap(adviceCard('link', 'りんく', [
+    '冒頭 5 分の CPM が「全体ピーク」と相関するなら、開始の掴みが効いている証拠なのだ。',
+    '相関が弱い枠は「中盤・終盤の伸びる仕掛け」が機能している、というポジティブな解釈もあるのだ。',
+  ]));
+}
+
+function adviceAfterWaveform() {
+  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
+    '"似てる配信" は CPM カーブの形だけで類似度を測るのだ。コメ件数の多い少ないは関係ないのだ。',
+    '形が同じ過去枠を見れば、「あの神回ぽい流れ」「あの落ち着いた回ぽい流れ」が言語化できるのだ。',
+  ]));
+}
+
+function adviceAfterEcho() {
+  return adviceWrap(adviceCard('konta', 'こん太', [
+    'コメ伝染と被り瞬間は、ファン同士の "歓声同期" を見るやつなのだ。ニコ生独特のコメ文化の数値化なのだ。',
+    'リスト上位の語が、その配信を象徴するキャッチフレーズになりやすいのだ。',
+  ]));
+}
+
+function adviceAfterFirstSecond() {
+  return adviceWrap(adviceCard('konta', 'こん太', [
+    '初コメ→2コメ目までが速い人は「乗ってきた派」、長い人は「様子見派」、というファンの肌感の数値化なのだ。',
+    '配信スタイルによって理想分布は変わるから、絶対的な良い悪いはないのだ。',
+  ]));
+}
+
+function adviceAfterTalentPeak() {
+  return adviceWrap(adviceCard('link', 'りんく', [
+    '話芸ピーク＝沈黙が続いた直後にどっと反応が来た瞬間、なのだ。配信者のリアクションやトークが効いた可能性大なのだ。',
+    'その瞬間のトーク内容を後で見返すと、自分の「効く弾」が見つかるのだ。',
+  ]));
+}
+
+function adviceAfterSentiment() {
+  return adviceWrap(adviceCard('konta', 'こん太', [
+    '感情曲線は語彙辞書ベースの「ざっくり感情」なのだ。皮肉や文脈は読まないので、傾向だけ参考に見るのだ。',
+    'ポジ・ネガが入れ替わった瞬間が、配信の起伏ポイントなのだ。',
+  ]));
+}
+
+function adviceAfterUniqueWords() {
+  return adviceWrap(adviceCard('tanu', 'たぬ姉', [
+    '「自分が言わなかった語」は、視聴者が頻繁に使ってるけど自分は乗ってない語なのだ。',
+    '次回そっと自分のコメに混ぜると "ファン文化に乗っかれた感" が出るかもしれないのだ。',
+  ]));
+}
+
+function adviceAfterReach() {
+  return adviceWrap(adviceCard('konta', 'こん太', [
+    'リーチ係数は "1 コメンターあたり何人が観てるか" の目安なのだ。係数が大きいほどサイレント観戦層が厚い枠なのだ。',
+    'コメ少なめでも、係数が高いなら「観てる人は多い」枠だから自信を持っていいのだ。',
+  ]));
+}
+
 /**
  * 0.1.22 (W): TOC（目次）。各セクションの id に飛ぶアンカーリンク。
  * @param {Array<{ id: string, label: string }>} items
@@ -750,11 +897,12 @@ ${dots}
 }
 
 /**
- * 0.1.23 (X): 離反コメンター TOP（L8）。
+ * 0.1.23 (X): 離反コメンター TOP（L8）。0.1.27 (AB) でサムネ列とユーザー ID 列を追加。
  * @param {ReturnType<typeof findDepartedHeavyCommenters>} departed
  * @param {boolean} maskShare
+ * @param {((uid: string) => string) | undefined} identiconResolver
  */
-function sectionDepartedHeavy(departed, maskShare) {
+function sectionDepartedHeavy(departed, maskShare, identiconResolver) {
   if (!Array.isArray(departed) || departed.length === 0) return '';
   if (maskShare) return ''; // 個人特定リストなので共有モードでは出さない
   const rows = departed
@@ -763,9 +911,22 @@ function sectionDepartedHeavy(departed, maskShare) {
         d.userId,
         displayUserLabel(d.userId, '')
       );
+      // 0.1.27 (AB): 数値 ID なら CDN usericon、a:プレフィックスなら identicon
+      // を出す。avatarUrl は離反者なので過去配信のものが来る保証がないため、
+      // identicon / CDN URL のみで解決する。
+      const thumbSrc = resolveReportUserThumbSrc({
+        userId: d.userId,
+        avatarUrl: '',
+        identiconResolver
+      });
+      const thumbCell = thumbSrc
+        ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+        : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>';
       return `<tr>
 <td>${i + 1}</td>
+<td>${thumbCell}</td>
 <td>${labelHtml}</td>
+<td class="mkt-mono">${escapeHtml(d.userId)}</td>
 <td>${d.totalComments}</td>
 <td>${d.broadcastCount}</td>
 </tr>`;
@@ -775,18 +936,19 @@ function sectionDepartedHeavy(departed, maskShare) {
 <h2>離反コメンター TOP <span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">過去の配信で 5+ コメだったが、今回は記録に居ないユーザー（ラテラル分析 L8）。引き留め / 復帰アプローチの候補。</p>
 <table class="mkt-rank">
-<thead><tr><th>#</th><th>ユーザー</th><th>過去累計コメ</th><th>過去参加放送数</th></tr></thead>
+<thead><tr><th>#</th><th>サムネ</th><th>ユーザー</th><th>ID</th><th>過去累計コメ</th><th>過去参加放送数</th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
 </section>`;
 }
 
 /**
- * 0.1.23 (X): 常連出席カレンダー（L9）。
+ * 0.1.23 (X): 常連出席カレンダー（L9）。0.1.27 (AB) でサムネ列を追加。
  * @param {ReturnType<typeof buildCommenterAttendanceMatrix>} matrix
  * @param {boolean} maskShare
+ * @param {((uid: string) => string) | undefined} identiconResolver
  */
-function sectionAttendanceMatrix(matrix, maskShare) {
+function sectionAttendanceMatrix(matrix, maskShare, identiconResolver) {
   if (!matrix || matrix.users.length === 0 || matrix.broadcasts.length < 2) return '';
   if (maskShare) return '';
   const headCols = matrix.broadcasts
@@ -798,6 +960,14 @@ function sectionAttendanceMatrix(matrix, maskShare) {
         u.userId,
         displayUserLabel(u.userId, '')
       );
+      const thumbSrc = resolveReportUserThumbSrc({
+        userId: u.userId,
+        avatarUrl: '',
+        identiconResolver
+      });
+      const thumbCell = thumbSrc
+        ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+        : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>';
       const cells = u.attendance
         .map(
           (v) =>
@@ -807,6 +977,7 @@ function sectionAttendanceMatrix(matrix, maskShare) {
         )
         .join('');
       return `<tr>
+<td>${thumbCell}</td>
 <td>${labelHtml}</td>
 ${cells}
 <td>${u.totalComments}</td>
@@ -818,7 +989,7 @@ ${cells}
 <p class="mkt-note">直近 ${matrix.broadcasts.length} 配信 × TOP ${matrix.users.length} コメンター（ラテラル分析 L9）。● = 出席 / · = 不参加。各列の横軸は左→右が古→新。</p>
 <div class="mkt-chart-wrap">
 <table class="mkt-rank mkt-attendance">
-<thead><tr><th>ユーザー</th>${headCols}<th>累計</th></tr></thead>
+<thead><tr><th>サムネ</th><th>ユーザー</th>${headCols}<th>累計</th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
 </div></section>`;
@@ -1460,25 +1631,45 @@ ${sectionAdviceAfterQuarterEngagement(r)}
 ${idWrap('mkt-timeline', sectionTimeline(r))}
 ${sectionAdviceAfterTimeline(r)}
 ${sectionCommentVelocityCurve(velocityTimeline)}
+${adviceAfterCommentVelocity()}
 ${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
+${adviceAfterConcurrent()}
 ${sectionSilenceZones(silenceZones)}
+${silenceZones.length ? adviceAfterSilence() : ''}
 ${sectionLaughterDensity(laughterDensity)}
+${laughterDensity.buckets.length >= 2 ? adviceAfterLaughter() : ''}
 ${sectionNewVsRepeat(newVsRepeat)}
+${newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat() : ''}
 ${sectionSurvivalCurve(survivalCurve)}
-${sectionDepartedHeavy(departedHeavy, maskShare)}
-${sectionAttendanceMatrix(attendanceMatrix, maskShare)}
+${survivalCurve.segments.length >= 2 ? adviceAfterSurvival() : ''}
+${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver)}
+${(!maskShare && departedHeavy.length > 0) ? adviceAfterDeparted() : ''}
+${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver)}
+${(!maskShare && attendanceMatrix.users.length > 0 && attendanceMatrix.broadcasts.length >= 2) ? adviceAfterAttendance() : ''}
 ${sectionKeyboardTypes(keyboardTypes)}
+${(keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced) > 0 ? adviceAfterKeyboard() : ''}
 ${sectionRecentComparison(recentComparison)}
+${recentComparison.bars.length >= 2 ? adviceAfterRecentCmp() : ''}
 ${sectionWeekdayHourHeatmap(weekdayHourHeat)}
+${weekdayHourHeat.maxValue > 0 ? adviceAfterWeekdayHeat() : ''}
 ${sectionGrowthMeter(growth, '今回の総コメ数')}
+${growth.average != null ? adviceAfterGrowthMeter() : ''}
 ${sectionOpeningFivePrediction(openingFivePts)}
+${openingFivePts.points.length >= 2 ? adviceAfterOpeningFive() : ''}
 ${sectionWaveformSimilarity(similarBroadcasts)}
+${similarBroadcasts.length > 0 ? adviceAfterWaveform() : ''}
 ${sectionEchoBursts(echoPropagation, echoSync)}
+${(echoPropagation.length > 0 || echoSync.length > 0) ? adviceAfterEcho() : ''}
 ${sectionFirstSecondLatency(firstSecondLatency)}
+${firstSecondLatency.totalUsers > 0 ? adviceAfterFirstSecond() : ''}
 ${sectionTalentPeak(talentPeaks)}
+${talentPeaks.length > 0 ? adviceAfterTalentPeak() : ''}
 ${sectionSentimentCurve(sentimentCurve)}
+${sentimentCurve.buckets.length >= 2 ? adviceAfterSentiment() : ''}
 ${sectionUniqueWordSuggestions(uniqueWords)}
+${uniqueWords.length > 0 ? adviceAfterUniqueWords() : ''}
 ${sectionReachCoefficient(reach)}
+${reach.coefficient != null ? adviceAfterReach() : ''}
 ${idWrap('mkt-derived', sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap('mkt-segment', sectionSegment(r))}
@@ -1841,6 +2032,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-heat-cell{color:#f8fafc;font-weight:700}
 .mkt-bar{background:#1e3a5a;border-radius:4px;height:14px;width:100%;overflow:hidden}
 .mkt-bar__fill{display:block;height:100%}
+.mkt-departed-thumb{width:24px;height:24px;border-radius:6px;object-fit:cover;display:inline-block;background:#0f172a}
+.mkt-departed-thumb--empty{border:1px dashed #334155}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}

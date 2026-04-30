@@ -4376,7 +4376,12 @@
     const hosts = Array.from(
       document.querySelectorAll(`#${INLINE_POPUP_HOST_ID}`)
     ).filter((n) => n instanceof HTMLDivElement);
-    if (!hosts.length) return null;
+    if (!hosts.length) {
+      if (nlsInlinePopupHostSingleton && !nlsInlinePopupHostSingleton.isConnected) {
+        nlsInlinePopupHostSingleton = null;
+      }
+      return null;
+    }
     const connected = hosts.filter((h) => h.isConnected);
     const primary = connected[0] || hosts[0];
     for (const h of hosts) {
@@ -4386,6 +4391,7 @@
       } catch {
       }
     }
+    nlsInlinePopupHostSingleton = primary;
     return primary;
   }
   function ensureInlinePopupIframe(host) {
@@ -4992,6 +4998,11 @@
     if (!host.isConnected) return false;
     const cs = window.getComputedStyle(host);
     if (cs.display === "none" || cs.visibility === "hidden") return false;
+    const iframe = (
+      /** @type {HTMLIFrameElement|null} */
+      host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+    );
+    if (iframe && iframe.getAttribute("src")) return true;
     const r = host.getBoundingClientRect();
     return r.width >= 120 && r.height >= 120;
   }

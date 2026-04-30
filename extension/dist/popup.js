@@ -700,6 +700,17 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.27",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306E\u8868\u793A\u6539\u5584\uFF0B\u30D1\u30CD\u30EB\u5B89\u5B9A\u5316",
+      items: Object.freeze([
+        "\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP\u30FB\u5E38\u9023\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC\u306B\u30B5\u30E0\u30CD\u30A4\u30EB\u5217\u3068\u30E6\u30FC\u30B6\u30FC ID \u5217\u3092\u8FFD\u52A0",
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306E\u5404 PRO \u30BB\u30AF\u30B7\u30E7\u30F3\u76F4\u5F8C\u306B\u300C\u308A\u3093\u304F\u30FB\u3053\u3093\u592A\u30FB\u305F\u306C\u59C9\u300D\u306E\u30AD\u30E3\u30E9\u89E3\u8AAC\u3092\u8FFD\u52A0\uFF08\u3053\u306E\u30C7\u30FC\u30BF\u3067\u4F55\u304C\u308F\u304B\u308B\u304B\uFF09",
+        "\u30A4\u30F3\u30E9\u30A4\u30F3\u30D1\u30CD\u30EB\u304C\u8907\u6570\u8868\u793A\u3055\u308C\u308B race \u3092\u6291\u6B62\uFF08singleton \u3068 DOM \u306E\u5BFE\u5FDC\u95A2\u4FC2\u3092\u8FFD\u5F93\uFF09",
+        "iframe \u30ED\u30FC\u30C9\u4E2D\u306B\u30D1\u30CD\u30EB\u304C\u6D88\u3048\u305F\u308A\u518D\u751F\u6210\u3055\u308C\u305F\u308A\u3059\u308B\u30D5\u30EA\u30C3\u30AB\u30FC\u3092\u6291\u6B62"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.26",
       date: "2026-04-30",
       summary: "\u8868\u73FE\u4FEE\u6B63\u30FB\u76EE\u6B21\u306E\u81EA\u52D5\u7D5E\u308A\u8FBC\u307F\u30FB\u30DE\u30FC\u30B1DL\u30DC\u30BF\u30F3\u8FFD\u52A0",
@@ -6341,6 +6352,129 @@ ${yLabelsL}${yLabelsR}${xLabels}
       "\u30E9\u30F3\u30AD\u30F3\u30B0\u306F\u8868\u793A\u9806\u306E\u305F\u3081\u3067\u3001\u4E0B\u306E\u4EBA\u307B\u3069\u4FA1\u5024\u304C\u4F4E\u3044\u3068\u3044\u3046\u8A71\u306B\u306F\u306A\u3089\u306A\u3044\u306E\u3060\u3002\u62FE\u3048\u305F\u8A18\u9332\u306E\u7BC4\u56F2\u3067\u306E\u4E26\u3073\u306A\u306E\u3060\u3002"
     ])}</div>`;
   }
+  function adviceWrap(html) {
+    return html ? `<div class="mkt-advice-after">${html}</div>` : "";
+  }
+  function adviceAfterCommentVelocity() {
+    return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
+      "\u30B3\u30E1\u901F\u5EA6\u30AB\u30FC\u30D6\u306F\u300C1\u5206\u3054\u3068\u306B\u4F55\u30B3\u30E1\u6765\u305F\u304B\u300D\u3068\u300C\u76F4\u8FD15\u5206\u306E\u5E73\u5747\u300D\u3092\u91CD\u306D\u3066\u898B\u308B\u30AB\u30FC\u30D6\u306A\u306E\u3060\u3002",
+      "\u30D4\u30FC\u30AF\u304C\u51FA\u305F\u5206\u306E\u524D\u5F8C\u3092\u898B\u76F4\u3059\u3068\u3001\u300C\u4F55\u306E\u30C8\u30D4\u30C3\u30AF\u3067\u76DB\u308A\u4E0A\u304C\u3063\u305F\u304B\u300D\u304C\u624B\u7E70\u308C\u308B\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterConcurrent() {
+    return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
+      "\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\u306F\u3001\u8996\u8074\u7DAD\u6301\u306E\u4EE3\u308F\u308A\u306B\u306A\u308B\u6307\u6A19\u306A\u306E\u3060\u3002\u30D4\u30FC\u30AF\u5230\u9054\u5206\u30FB\u534A\u6E1B\u70B9\u30FB\u7D42\u4E86\u6642\u4FDD\u6301\u7387\u306E 3 \u3064\u3092\u898B\u308B\u306E\u3060\u3002",
+      "\u7D42\u4E86\u6642\u4FDD\u6301\u7387\u304C\u9AD8\u3044\u67A0\u306F\u300C\u6700\u5F8C\u307E\u3067\u6B8B\u3063\u3066\u3082\u3089\u3048\u305F\u300D\u67A0\u3067\u3001\u534A\u6E1B\u70B9\u304C\u65E9\u3044\u67A0\u306F\u300C\u5E8F\u76E4\u3067\u629C\u3051\u3089\u308C\u305F\u300D\u53EF\u80FD\u6027\u306A\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterSilence() {
+    return adviceWrap(adviceCard("tanu", "\u305F\u306C\u59C9", [
+      '\u6C88\u9ED9\uFF1D\u60AA\u3067\u306F\u306A\u3044\u306E\u3060\u3002\u6C88\u9ED9\u306E\u8CEA\u304C "\u30AC\u30F3\u898B\u7CFB" \u306A\u3089\u96C6\u4E2D\u3001"\u96E2\u8131\u7CFB" \u306A\u3089\u76DB\u308A\u4E0B\u304C\u308A\u306E\u53EF\u80FD\u6027\u306A\u306E\u3060\u3002',
+      "\u9577\u3044\u6C88\u9ED9\u306E\u524D\u5F8C\u30B3\u30E1\u3092\u898B\u76F4\u3059\u3068\u3001\u914D\u4FE1\u306E\u300C\u66F2\u304C\u308A\u89D2\u300D\u304C\u5206\u304B\u308B\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterLaughter() {
+    return adviceWrap(adviceCard("konta", "\u3053\u3093\u592A", [
+      "\u300C\u7B11\u3044\u5BC6\u5EA6\u300D\u306F w / \u8349 / 8888 / \u7B11 \u7B49\u306E\u51FA\u73FE\u3092 30 \u79D2\u7C92\u5EA6\u3067\u898B\u305F\u3084\u3064\u306A\u306E\u3060\u3002",
+      "\u7B11\u3044\u304C\u96C6\u4E2D\u3057\u305F\u77AC\u9593\u304C\u305D\u306E\u307E\u307E\u300C\u30CF\u30A4\u30E9\u30A4\u30C8\u5019\u88DC\u300D\u306B\u306A\u308B\u304B\u3089\u3001\u914D\u4FE1\u306E\u5207\u308A\u629C\u304D\u30D2\u30F3\u30C8\u306B\u4F7F\u3048\u308B\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterNewVsRepeat() {
+    return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
+      "\u65B0\u898F\u304C\u591A\u3044\u67A0\uFF1D\u96C6\u5BA2\u304C\u3046\u307E\u304F\u56DE\u3063\u305F\u67A0\u3001\u30EA\u30D4\u30FC\u30BF\u30FC\u304C\u591A\u3044\u67A0\uFF1D\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u304C\u539A\u3044\u67A0\u3001\u306A\u306E\u3060\u3002",
+      "\u4E21\u65B9\u3042\u308B\u67A0\u304C\u7406\u60F3\u3060\u3051\u3069\u3001\u3069\u3061\u3089\u304B\u306B\u504F\u3063\u3066\u3082\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u3068\u3057\u3066\u5168\u7136 OK \u306A\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterSurvival() {
+    return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
+      "\u30B3\u30E1\u53C2\u52A0\u7DAD\u6301\u7387\u306F\u300C\u6700\u521D\u306E\u533A\u9593\u306B\u30B3\u30E1\u304F\u308C\u305F\u4EBA\u304C\u3001\u5F8C\u534A\u3082\u30B3\u30E1\u3057\u3066\u3044\u305F\u304B\u300D\u306E\u5272\u5408\u306A\u306E\u3060\u3002",
+      "50% \u3092\u5207\u3063\u305F\u30BF\u30A4\u30DF\u30F3\u30B0\u3067\u4F55\u304C\u3042\u3063\u305F\u304B\u3001\u30B3\u30E1\u30BF\u30A4\u30E0\u30E9\u30A4\u30F3\u3068\u7A81\u304D\u5408\u308F\u305B\u308B\u3068\u6C17\u3065\u304D\u304C\u3042\u308B\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterDeparted() {
+    return adviceWrap(adviceCard("konta", "\u3053\u3093\u592A", [
+      "\u30D8\u30D3\u30FC\u3060\u3063\u305F\u4EBA\u304C\u4ECA\u56DE\u3044\u306A\u3044\uFF1D\u300C\u96E2\u53CD\u300D\u3068\u306F\u9650\u3089\u306A\u3044\u306E\u3060\u3002\u30BF\u30A4\u30DF\u30F3\u30B0\u304C\u5408\u308F\u306A\u304B\u3063\u305F\u3060\u3051\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002",
+      "\u540C\u3058\u4EBA\u304C 2 \u301C 3 \u56DE\u9023\u7D9A\u3067\u51FA\u3066\u304D\u305F\u3089\u3001X \u3068\u304B\u3067\u4E00\u8A00\u6328\u62F6\u3057\u3066\u3082\u3044\u3044\u30BF\u30A4\u30DF\u30F3\u30B0\u306A\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterAttendance() {
+    return adviceWrap(adviceCard("tanu", "\u305F\u306C\u59C9", [
+      "\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC\u306F\u300C\u5E38\u9023\u5C64\u304C\u67A0\u3092\u9078\u3093\u3067\u3044\u308B\u304B\uFF0F\u6BCE\u56DE\u3044\u308B\u304B\u300D\u304C\u898B\u3048\u308B\u306E\u3060\u3002",
+      "\u6A2A\u4E00\u5217\u3067\u25CF\u304C\u4E26\u3076\u5E38\u9023\u306F\u3001\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306E\u80CC\u9AA8\u306A\u306E\u3060\u3002\u5927\u4E8B\u306B\u3057\u3066\u307B\u3057\u3044\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterKeyboard() {
+    return adviceWrap(adviceCard("tanu", "\u305F\u306C\u59C9", [
+      "\u30AD\u30FC\u30DC\u30FC\u30C9\u578B\u306F\u300C\u30D5\u30A1\u30F3\u5C64\u306E\u8A9E\u308A\u65B9\u300D\u306E\u3056\u3063\u304F\u308A\u50BE\u5411\u306A\u306E\u3060\u3002\u77ED\u6587\u6D3E\u304C\u591A\u3044\u67A0\u306F\u53CD\u5FDC\u901F\u5EA6\u578B\u3001\u30ED\u30F3\u30B0\u6D3E\u304C\u591A\u3044\u67A0\u306F\u719F\u8AAD\u578B\u306A\u306E\u3060\u3002",
+      "\u7121\u53E3\u89B3\u6226\u6D3E\u306F\u914D\u4FE1\u3092\u898B\u3066\u308B\u3051\u3069\u30B3\u30E1\u306F\u63A7\u3048\u3081\u306A\u5C64\u3067\u3001\u3053\u308C\u3082\u8CB4\u91CD\u306A\u30D5\u30A1\u30F3\u306A\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterRecentCmp() {
+    return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
+      '\u76F4\u8FD1 5 \u914D\u4FE1\u306E\u6BD4\u8F03\u30D0\u30FC\u306F\u3001\u81EA\u5206\u306E "\u8ABF\u5B50\u306E\u30B0\u30E9\u30C7\u30FC\u30B7\u30E7\u30F3" \u3092\u4E00\u76EE\u3067\u898B\u308B\u3084\u3064\u306A\u306E\u3060\u3002',
+      "\u9AD8\u3044\uFF0F\u4F4E\u3044\u306B\u4E00\u559C\u4E00\u6182\u3057\u306A\u304F\u3066\u3044\u3044\u306E\u3060\u3002\u914D\u4FE1\u30B8\u30E3\u30F3\u30EB\u30FB\u66DC\u65E5\u30FB\u6642\u9593\u3067\u632F\u308C\u308B\u306E\u304C\u666E\u901A\u306A\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterWeekdayHeat() {
+    return adviceWrap(adviceCard("konta", "\u3053\u3093\u592A", [
+      "\u66DC\u65E5 \xD7 \u6642\u9593\u5E2F\u30D2\u30FC\u30C8\u306F\u300C\u30D5\u30A1\u30F3\u5C64\u306E\u6D3B\u52D5\u6642\u9593\u300D\u3092\u6D6E\u304D\u5F6B\u308A\u306B\u3059\u308B\u306E\u3060\u3002\u6FC3\u3044\u6642\u9593\u5E2F\u306B\u914D\u4FE1\u3092\u5BC4\u305B\u308B\u3068\u62FE\u308F\u308C\u3084\u3059\u3044\u306E\u3060\u3002",
+      "\u9006\u306B\u300C\u81EA\u5206\u306E\u751F\u6D3B\u30EA\u30BA\u30E0\u306B\u5408\u3046\u6642\u9593\u300D\u3092\u512A\u5148\u3059\u308B\u306E\u3082\u5168\u7136\u30A2\u30EA\u306A\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterGrowthMeter() {
+    return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
+      "\u6210\u9577\u30E1\u30FC\u30BF\u30FC\u306F\u300C\u904E\u53BB\u5E73\u5747\u3068\u306E\u504F\u5DEE\u300D\u306A\u306E\u3060\u3002\xB110% \u304F\u3089\u3044\u306F\u666E\u901A\u306E\u63FA\u3089\u304E\u3001+50% \u8D85\u3048\u306A\u3089\u4F55\u304B\u304C\u52B9\u3044\u305F\u67A0\u306A\u306E\u3060\u3002",
+      "\u4F4E\u3044\u56DE\u3082\u3001\u60AA\u3044\u308F\u3051\u3058\u3083\u306A\u3044\u306E\u3060\u3002\u30B8\u30E3\u30F3\u30EB\u9055\u3044\u30FB\u77ED\u6642\u9593\u67A0\u306A\u3089\u4E0B\u304C\u308B\u306E\u304C\u81EA\u7136\u306A\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterOpeningFive() {
+    return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
+      "\u5192\u982D 5 \u5206\u306E CPM \u304C\u300C\u5168\u4F53\u30D4\u30FC\u30AF\u300D\u3068\u76F8\u95A2\u3059\u308B\u306A\u3089\u3001\u958B\u59CB\u306E\u63B4\u307F\u304C\u52B9\u3044\u3066\u3044\u308B\u8A3C\u62E0\u306A\u306E\u3060\u3002",
+      "\u76F8\u95A2\u304C\u5F31\u3044\u67A0\u306F\u300C\u4E2D\u76E4\u30FB\u7D42\u76E4\u306E\u4F38\u3073\u308B\u4ED5\u639B\u3051\u300D\u304C\u6A5F\u80FD\u3057\u3066\u3044\u308B\u3001\u3068\u3044\u3046\u30DD\u30B8\u30C6\u30A3\u30D6\u306A\u89E3\u91C8\u3082\u3042\u308B\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterWaveform() {
+    return adviceWrap(adviceCard("tanu", "\u305F\u306C\u59C9", [
+      '"\u4F3C\u3066\u308B\u914D\u4FE1" \u306F CPM \u30AB\u30FC\u30D6\u306E\u5F62\u3060\u3051\u3067\u985E\u4F3C\u5EA6\u3092\u6E2C\u308B\u306E\u3060\u3002\u30B3\u30E1\u4EF6\u6570\u306E\u591A\u3044\u5C11\u306A\u3044\u306F\u95A2\u4FC2\u306A\u3044\u306E\u3060\u3002',
+      "\u5F62\u304C\u540C\u3058\u904E\u53BB\u67A0\u3092\u898B\u308C\u3070\u3001\u300C\u3042\u306E\u795E\u56DE\u307D\u3044\u6D41\u308C\u300D\u300C\u3042\u306E\u843D\u3061\u7740\u3044\u305F\u56DE\u307D\u3044\u6D41\u308C\u300D\u304C\u8A00\u8A9E\u5316\u3067\u304D\u308B\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterEcho() {
+    return adviceWrap(adviceCard("konta", "\u3053\u3093\u592A", [
+      '\u30B3\u30E1\u4F1D\u67D3\u3068\u88AB\u308A\u77AC\u9593\u306F\u3001\u30D5\u30A1\u30F3\u540C\u58EB\u306E "\u6B53\u58F0\u540C\u671F" \u3092\u898B\u308B\u3084\u3064\u306A\u306E\u3060\u3002\u30CB\u30B3\u751F\u72EC\u7279\u306E\u30B3\u30E1\u6587\u5316\u306E\u6570\u5024\u5316\u306A\u306E\u3060\u3002',
+      "\u30EA\u30B9\u30C8\u4E0A\u4F4D\u306E\u8A9E\u304C\u3001\u305D\u306E\u914D\u4FE1\u3092\u8C61\u5FB4\u3059\u308B\u30AD\u30E3\u30C3\u30C1\u30D5\u30EC\u30FC\u30BA\u306B\u306A\u308A\u3084\u3059\u3044\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterFirstSecond() {
+    return adviceWrap(adviceCard("konta", "\u3053\u3093\u592A", [
+      "\u521D\u30B3\u30E1\u21922\u30B3\u30E1\u76EE\u307E\u3067\u304C\u901F\u3044\u4EBA\u306F\u300C\u4E57\u3063\u3066\u304D\u305F\u6D3E\u300D\u3001\u9577\u3044\u4EBA\u306F\u300C\u69D8\u5B50\u898B\u6D3E\u300D\u3001\u3068\u3044\u3046\u30D5\u30A1\u30F3\u306E\u808C\u611F\u306E\u6570\u5024\u5316\u306A\u306E\u3060\u3002",
+      "\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u306B\u3088\u3063\u3066\u7406\u60F3\u5206\u5E03\u306F\u5909\u308F\u308B\u304B\u3089\u3001\u7D76\u5BFE\u7684\u306A\u826F\u3044\u60AA\u3044\u306F\u306A\u3044\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterTalentPeak() {
+    return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
+      "\u8A71\u82B8\u30D4\u30FC\u30AF\uFF1D\u6C88\u9ED9\u304C\u7D9A\u3044\u305F\u76F4\u5F8C\u306B\u3069\u3063\u3068\u53CD\u5FDC\u304C\u6765\u305F\u77AC\u9593\u3001\u306A\u306E\u3060\u3002\u914D\u4FE1\u8005\u306E\u30EA\u30A2\u30AF\u30B7\u30E7\u30F3\u3084\u30C8\u30FC\u30AF\u304C\u52B9\u3044\u305F\u53EF\u80FD\u6027\u5927\u306A\u306E\u3060\u3002",
+      "\u305D\u306E\u77AC\u9593\u306E\u30C8\u30FC\u30AF\u5185\u5BB9\u3092\u5F8C\u3067\u898B\u8FD4\u3059\u3068\u3001\u81EA\u5206\u306E\u300C\u52B9\u304F\u5F3E\u300D\u304C\u898B\u3064\u304B\u308B\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterSentiment() {
+    return adviceWrap(adviceCard("konta", "\u3053\u3093\u592A", [
+      "\u611F\u60C5\u66F2\u7DDA\u306F\u8A9E\u5F59\u8F9E\u66F8\u30D9\u30FC\u30B9\u306E\u300C\u3056\u3063\u304F\u308A\u611F\u60C5\u300D\u306A\u306E\u3060\u3002\u76AE\u8089\u3084\u6587\u8108\u306F\u8AAD\u307E\u306A\u3044\u306E\u3067\u3001\u50BE\u5411\u3060\u3051\u53C2\u8003\u306B\u898B\u308B\u306E\u3060\u3002",
+      "\u30DD\u30B8\u30FB\u30CD\u30AC\u304C\u5165\u308C\u66FF\u308F\u3063\u305F\u77AC\u9593\u304C\u3001\u914D\u4FE1\u306E\u8D77\u4F0F\u30DD\u30A4\u30F3\u30C8\u306A\u306E\u3060\u3002"
+    ]));
+  }
+  function adviceAfterUniqueWords() {
+    return adviceWrap(adviceCard("tanu", "\u305F\u306C\u59C9", [
+      "\u300C\u81EA\u5206\u304C\u8A00\u308F\u306A\u304B\u3063\u305F\u8A9E\u300D\u306F\u3001\u8996\u8074\u8005\u304C\u983B\u7E41\u306B\u4F7F\u3063\u3066\u308B\u3051\u3069\u81EA\u5206\u306F\u4E57\u3063\u3066\u306A\u3044\u8A9E\u306A\u306E\u3060\u3002",
+      '\u6B21\u56DE\u305D\u3063\u3068\u81EA\u5206\u306E\u30B3\u30E1\u306B\u6DF7\u305C\u308B\u3068 "\u30D5\u30A1\u30F3\u6587\u5316\u306B\u4E57\u3063\u304B\u308C\u305F\u611F" \u304C\u51FA\u308B\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002'
+    ]));
+  }
+  function adviceAfterReach() {
+    return adviceWrap(adviceCard("konta", "\u3053\u3093\u592A", [
+      '\u30EA\u30FC\u30C1\u4FC2\u6570\u306F "1 \u30B3\u30E1\u30F3\u30BF\u30FC\u3042\u305F\u308A\u4F55\u4EBA\u304C\u89B3\u3066\u308B\u304B" \u306E\u76EE\u5B89\u306A\u306E\u3060\u3002\u4FC2\u6570\u304C\u5927\u304D\u3044\u307B\u3069\u30B5\u30A4\u30EC\u30F3\u30C8\u89B3\u6226\u5C64\u304C\u539A\u3044\u67A0\u306A\u306E\u3060\u3002',
+      "\u30B3\u30E1\u5C11\u306A\u3081\u3067\u3082\u3001\u4FC2\u6570\u304C\u9AD8\u3044\u306A\u3089\u300C\u89B3\u3066\u308B\u4EBA\u306F\u591A\u3044\u300D\u67A0\u3060\u304B\u3089\u81EA\u4FE1\u3092\u6301\u3063\u3066\u3044\u3044\u306E\u3060\u3002"
+    ]));
+  }
   function sectionToc(items) {
     if (!items || !items.length) return "";
     const lis = items.map(
@@ -6556,7 +6690,7 @@ ${dots}
 </svg>
 </div></section>`;
   }
-  function sectionDepartedHeavy(departed, maskShare) {
+  function sectionDepartedHeavy(departed, maskShare, identiconResolver) {
     if (!Array.isArray(departed) || departed.length === 0) return "";
     if (maskShare) return "";
     const rows = departed.map((d, i) => {
@@ -6564,9 +6698,17 @@ ${dots}
         d.userId,
         displayUserLabel(d.userId, "")
       );
+      const thumbSrc = resolveReportUserThumbSrc({
+        userId: d.userId,
+        avatarUrl: "",
+        identiconResolver
+      });
+      const thumbCell = thumbSrc ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>';
       return `<tr>
 <td>${i + 1}</td>
+<td>${thumbCell}</td>
 <td>${labelHtml}</td>
+<td class="mkt-mono">${escapeHtml(d.userId)}</td>
 <td>${d.totalComments}</td>
 <td>${d.broadcastCount}</td>
 </tr>`;
@@ -6575,12 +6717,12 @@ ${dots}
 <h2>\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP <span class="mkt-pro-tag">PRO</span></h2>
 <p class="mkt-note">\u904E\u53BB\u306E\u914D\u4FE1\u3067 5+ \u30B3\u30E1\u3060\u3063\u305F\u304C\u3001\u4ECA\u56DE\u306F\u8A18\u9332\u306B\u5C45\u306A\u3044\u30E6\u30FC\u30B6\u30FC\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L8\uFF09\u3002\u5F15\u304D\u7559\u3081 / \u5FA9\u5E30\u30A2\u30D7\u30ED\u30FC\u30C1\u306E\u5019\u88DC\u3002</p>
 <table class="mkt-rank">
-<thead><tr><th>#</th><th>\u30E6\u30FC\u30B6\u30FC</th><th>\u904E\u53BB\u7D2F\u8A08\u30B3\u30E1</th><th>\u904E\u53BB\u53C2\u52A0\u653E\u9001\u6570</th></tr></thead>
+<thead><tr><th>#</th><th>\u30B5\u30E0\u30CD</th><th>\u30E6\u30FC\u30B6\u30FC</th><th>ID</th><th>\u904E\u53BB\u7D2F\u8A08\u30B3\u30E1</th><th>\u904E\u53BB\u53C2\u52A0\u653E\u9001\u6570</th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
 </section>`;
   }
-  function sectionAttendanceMatrix(matrix, maskShare) {
+  function sectionAttendanceMatrix(matrix, maskShare, identiconResolver) {
     if (!matrix || matrix.users.length === 0 || matrix.broadcasts.length < 2) return "";
     if (maskShare) return "";
     const headCols = matrix.broadcasts.map((b, i) => `<th title="${escapeHtml(b.liveId)}">\u914D\u4FE1${i + 1}</th>`).join("");
@@ -6589,10 +6731,17 @@ ${dots}
         u.userId,
         displayUserLabel(u.userId, "")
       );
+      const thumbSrc = resolveReportUserThumbSrc({
+        userId: u.userId,
+        avatarUrl: "",
+        identiconResolver
+      });
+      const thumbCell = thumbSrc ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>';
       const cells = u.attendance.map(
         (v) => v ? '<td class="mkt-att-cell mkt-att-cell--on" aria-label="\u51FA\u5E2D">\u25CF</td>' : '<td class="mkt-att-cell mkt-att-cell--off" aria-label="\u4E0D\u53C2\u52A0">\xB7</td>'
       ).join("");
       return `<tr>
+<td>${thumbCell}</td>
 <td>${labelHtml}</td>
 ${cells}
 <td>${u.totalComments}</td>
@@ -6603,7 +6752,7 @@ ${cells}
 <p class="mkt-note">\u76F4\u8FD1 ${matrix.broadcasts.length} \u914D\u4FE1 \xD7 TOP ${matrix.users.length} \u30B3\u30E1\u30F3\u30BF\u30FC\uFF08\u30E9\u30C6\u30E9\u30EB\u5206\u6790 L9\uFF09\u3002\u25CF = \u51FA\u5E2D / \xB7 = \u4E0D\u53C2\u52A0\u3002\u5404\u5217\u306E\u6A2A\u8EF8\u306F\u5DE6\u2192\u53F3\u304C\u53E4\u2192\u65B0\u3002</p>
 <div class="mkt-chart-wrap">
 <table class="mkt-rank mkt-attendance">
-<thead><tr><th>\u30E6\u30FC\u30B6\u30FC</th>${headCols}<th>\u7D2F\u8A08</th></tr></thead>
+<thead><tr><th>\u30B5\u30E0\u30CD</th><th>\u30E6\u30FC\u30B6\u30FC</th>${headCols}<th>\u7D2F\u8A08</th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
 </div></section>`;
@@ -7087,25 +7236,45 @@ ${sectionAdviceAfterQuarterEngagement(r)}
 ${idWrap("mkt-timeline", sectionTimeline(r))}
 ${sectionAdviceAfterTimeline(r)}
 ${sectionCommentVelocityCurve(velocityTimeline)}
+${adviceAfterCommentVelocity()}
 ${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
+${adviceAfterConcurrent()}
 ${sectionSilenceZones(silenceZones)}
+${silenceZones.length ? adviceAfterSilence() : ""}
 ${sectionLaughterDensity(laughterDensity)}
+${laughterDensity.buckets.length >= 2 ? adviceAfterLaughter() : ""}
 ${sectionNewVsRepeat(newVsRepeat)}
+${newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat() : ""}
 ${sectionSurvivalCurve(survivalCurve)}
-${sectionDepartedHeavy(departedHeavy, maskShare)}
-${sectionAttendanceMatrix(attendanceMatrix, maskShare)}
+${survivalCurve.segments.length >= 2 ? adviceAfterSurvival() : ""}
+${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver)}
+${!maskShare && departedHeavy.length > 0 ? adviceAfterDeparted() : ""}
+${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver)}
+${!maskShare && attendanceMatrix.users.length > 0 && attendanceMatrix.broadcasts.length >= 2 ? adviceAfterAttendance() : ""}
 ${sectionKeyboardTypes(keyboardTypes)}
+${keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced > 0 ? adviceAfterKeyboard() : ""}
 ${sectionRecentComparison(recentComparison)}
+${recentComparison.bars.length >= 2 ? adviceAfterRecentCmp() : ""}
 ${sectionWeekdayHourHeatmap(weekdayHourHeat)}
+${weekdayHourHeat.maxValue > 0 ? adviceAfterWeekdayHeat() : ""}
 ${sectionGrowthMeter(growth, "\u4ECA\u56DE\u306E\u7DCF\u30B3\u30E1\u6570")}
+${growth.average != null ? adviceAfterGrowthMeter() : ""}
 ${sectionOpeningFivePrediction(openingFivePts)}
+${openingFivePts.points.length >= 2 ? adviceAfterOpeningFive() : ""}
 ${sectionWaveformSimilarity(similarBroadcasts)}
+${similarBroadcasts.length > 0 ? adviceAfterWaveform() : ""}
 ${sectionEchoBursts(echoPropagation, echoSync)}
+${echoPropagation.length > 0 || echoSync.length > 0 ? adviceAfterEcho() : ""}
 ${sectionFirstSecondLatency(firstSecondLatency)}
+${firstSecondLatency.totalUsers > 0 ? adviceAfterFirstSecond() : ""}
 ${sectionTalentPeak(talentPeaks)}
+${talentPeaks.length > 0 ? adviceAfterTalentPeak() : ""}
 ${sectionSentimentCurve(sentimentCurve)}
+${sentimentCurve.buckets.length >= 2 ? adviceAfterSentiment() : ""}
 ${sectionUniqueWordSuggestions(uniqueWords)}
+${uniqueWords.length > 0 ? adviceAfterUniqueWords() : ""}
 ${sectionReachCoefficient(reach)}
+${reach.coefficient != null ? adviceAfterReach() : ""}
 ${idWrap("mkt-derived", sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap("mkt-segment", sectionSegment(r))}
@@ -7350,6 +7519,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-heat-cell{color:#f8fafc;font-weight:700}
 .mkt-bar{background:#1e3a5a;border-radius:4px;height:14px;width:100%;overflow:hidden}
 .mkt-bar__fill{display:block;height:100%}
+.mkt-departed-thumb{width:24px;height:24px;border-radius:6px;object-fit:cover;display:inline-block;background:#0f172a}
+.mkt-departed-thumb--empty{border:1px dashed #334155}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}
@@ -14693,7 +14864,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1450" ? String("0430-1450") : "dev";
+      const buildId = "0430-1510" ? String("0430-1510") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
