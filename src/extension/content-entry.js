@@ -140,6 +140,7 @@ import {
   shouldRunEndedBulkHarvest
 } from '../lib/watchProgramEndState.js';
 import { hydrateInterceptAvatarMapFromProfile } from '../lib/interceptAvatarHydration.js';
+import { extractBroadcasterUserId } from '../lib/broadcasterUserId.js';
 import {
   KEY_COMMENT_PANEL_AUTO_RESTORE,
   LATEST_COMMENT_BUTTON_SELECTOR,
@@ -3635,21 +3636,19 @@ function collectWatchPageSnapshot() {
     broadcasterNameFromMeta ||
     broadcasterNameFromDomFallback;
 
-  const broadcasterUserId = (() => {
-    // 1. streamLink href から
-    const href = String(streamLink?.getAttribute('href') || '');
-    const m = href.match(/\/user\/(\d+)/);
-    if (m) return m[1];
-    // 2. embedded-data の supplier.programProviderId / pageUrl から
-    const supplierId = String(
-      embeddedProps?.program?.supplier?.programProviderId ??
-      embeddedProps?.program?.supplier?.id ?? ''
-    ).trim();
-    if (/^\d+$/.test(supplierId)) return supplierId;
-    const pageUrl = String(embeddedProps?.program?.supplier?.pageUrl ?? '');
-    const m2 = pageUrl.match(/\/user\/(\d+)/);
-    return m2 ? m2[1] : '';
-  })();
+  /*
+   * 0.1.38 (T): lv350420992 で発生した broadcasterUserId 取り違え
+   *   （streamLink が Nasu 45300945 を拾い、本配信者 刑事桃 115713314 が
+   *    レーン除外フィルタを素通りして こん太レーン に混入）への対策。
+   *   embedded-data は配信者本人を指す authoritative なソースなので、
+   *   DOM の streamLink より先に参照する。詳細は lib/broadcasterUserId.js。
+   */
+  const broadcasterUserId = extractBroadcasterUserId({
+    embeddedSupplierProgramProviderId: embeddedProps?.program?.supplier?.programProviderId,
+    embeddedSupplierId: embeddedProps?.program?.supplier?.id,
+    embeddedSupplierPageUrl: embeddedProps?.program?.supplier?.pageUrl,
+    streamLinkHref: streamLink?.getAttribute('href') ?? ''
+  });
 
   /*
    * 0.1.20 (U): 公式チャンネル / 業者放送のフォロー導線。

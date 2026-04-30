@@ -700,6 +700,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.38",
+      date: "2026-04-30",
+      summary: "\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u306E\u30EA\u30F3\u30AF\u5148\u3092\u4FEE\u6B63",
+      items: Object.freeze([
+        "\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u304B\u3089\u30AF\u30EA\u30C3\u30AF\u3057\u305F\u6642\u306B\u5225\u4EBA\u306E\u30DA\u30FC\u30B8\u306B\u98DB\u3076\u4E8B\u8C61\u3092\u4FEE\u6B63\uFF08embedded-data \u306E supplier.programProviderId \u3092\u6700\u512A\u5148\u306B\uFF09\u3002\u672C\u914D\u4FE1\u8005\u304C\u30EC\u30FC\u30F3\u306B\u6DF7\u5165\u3059\u308B\u539F\u56E0\u306B\u3082\u306A\u3063\u3066\u3044\u305F\u7B87\u6240",
+        "\u30B3\u30E1\u9001\u4FE1\u30A8\u30E9\u30FC\u6642\u306E\u518D\u8AAD\u307F\u8FBC\u307F\u6848\u5185\u30ED\u30B8\u30C3\u30AF\u3092 src/lib/commentSendTroubleshootHint.js \u306B\u5207\u308A\u51FA\u3057\uFF08\u7D14\u7C8B\u95A2\u6570 + 7 \u30B1\u30FC\u30B9 TDD\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.37",
       date: "2026-04-30",
       summary: "\u5185\u90E8\u306E\u91CD\u8907\u5B9A\u7FA9\u3092\u6574\u7406",
@@ -8601,6 +8610,24 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return r.includes("yukkuri-charactore-english") || d.includes("yukkuri-charactore-english");
   }
 
+  // src/lib/commentSendTroubleshootHint.js
+  var EXTENSION_RELOAD_USER_GUIDE_JA = "\u6539\u5584\u3057\u306A\u3051\u308C\u3070 chrome://extensions \u3092\u958B\u304D\u3001\u300C\u541B\u6597\u308A\u3093\u304F\u306E\u8FFD\u61B6\u306E\u304D\u3089\u3081\u304D\u300D\u306E\u300C\u66F4\u65B0\u300D\u3067\u62E1\u5F35\u3092\u518D\u8AAD\u307F\u8FBC\u307F\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
+  function withCommentSendTroubleshootHint(message) {
+    const s = String(message == null ? "" : message).trim();
+    if (!s) return "";
+    const hintLines = [];
+    if (!/再読み込み|F5|別タブ|前面/.test(s)) {
+      hintLines.push(
+        "watch\u30DA\u30FC\u30B8\u3092\u518D\u8AAD\u307F\u8FBC\u307F\uFF08F5\uFF09\u3057\u3001\u5225\u30BF\u30D6\u3067\u958B\u3044\u3066\u3044\u308B\u653E\u9001\u30DA\u30FC\u30B8\u3092\u524D\u9762\u306B\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+      );
+    }
+    if (!/chrome:\/\/extensions|「更新」/.test(s)) {
+      hintLines.push(EXTENSION_RELOAD_USER_GUIDE_JA);
+    }
+    return hintLines.length ? `${s}
+\u203B\u3046\u307E\u304F\u3044\u304B\u306A\u3044\u3068\u304D: ${hintLines.join("\n")}` : s;
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -9102,23 +9129,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     setPostStatus(statusMessage, statusKind);
     syncVoiceCommentButton();
   }
-  var EXTENSION_RELOAD_USER_GUIDE_JA = "\u6539\u5584\u3057\u306A\u3051\u308C\u3070 chrome://extensions \u3092\u958B\u304D\u3001\u300C\u541B\u6597\u308A\u3093\u304F\u306E\u8FFD\u61B6\u306E\u304D\u3089\u3081\u304D\u300D\u306E\u300C\u66F4\u65B0\u300D\u3067\u62E1\u5F35\u3092\u518D\u8AAD\u307F\u8FBC\u307F\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
   var KEY_AI_SHARE_FAST_DIAG = "nls_ai_share_fast_diag_v1";
-  function withCommentSendTroubleshootHint(message) {
-    const s = String(message || "").trim();
-    if (!s) return "";
-    const hintLines = [];
-    if (!/再読み込み|F5|別タブ|前面/.test(s)) {
-      hintLines.push(
-        "watch\u30DA\u30FC\u30B8\u3092\u518D\u8AAD\u307F\u8FBC\u307F\uFF08F5\uFF09\u3057\u3001\u5225\u30BF\u30D6\u3067\u958B\u3044\u3066\u3044\u308B\u653E\u9001\u30DA\u30FC\u30B8\u3092\u524D\u9762\u306B\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
-      );
-    }
-    if (!/chrome:\/\/extensions|「更新」/.test(s)) {
-      hintLines.push(EXTENSION_RELOAD_USER_GUIDE_JA);
-    }
-    return hintLines.length ? `${s}
-\u203B\u3046\u307E\u304F\u3044\u304B\u306A\u3044\u3068\u304D: ${hintLines.join("\n")}` : s;
-  }
   function hasExtensionContext() {
     try {
       return Boolean(
@@ -15058,7 +15069,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1858" ? String("0430-1858") : "dev";
+      const buildId = "0430-1909" ? String("0430-1909") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

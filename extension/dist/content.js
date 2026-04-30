@@ -3183,6 +3183,34 @@
     return added;
   }
 
+  // src/lib/broadcasterUserId.js
+  function asTrimmedString(v) {
+    if (v == null) return "";
+    return String(v).trim();
+  }
+  function isAllDigits(s) {
+    return s.length > 0 && /^\d+$/.test(s);
+  }
+  function pickUserIdFromUrl(url) {
+    if (!url) return "";
+    const m = url.match(/\/user\/(\d+)/);
+    return m ? m[1] : "";
+  }
+  function extractBroadcasterUserId(input) {
+    if (!input || typeof input !== "object") return "";
+    const ppid = asTrimmedString(input.embeddedSupplierProgramProviderId);
+    if (isAllDigits(ppid)) return ppid;
+    const sid = asTrimmedString(input.embeddedSupplierId);
+    if (isAllDigits(sid)) return sid;
+    const pageUrl = asTrimmedString(input.embeddedSupplierPageUrl);
+    const fromPageUrl = pickUserIdFromUrl(pageUrl);
+    if (fromPageUrl) return fromPageUrl;
+    const streamHref = asTrimmedString(input.streamLinkHref);
+    const fromStream = pickUserIdFromUrl(streamHref);
+    if (fromStream) return fromStream;
+    return "";
+  }
+
   // src/lib/commentPanelHealthProbe.js
   var LATEST_COMMENT_BUTTON_SELECTOR = 'button.indicator[aria-label="\u6700\u65B0\u30B3\u30E1\u30F3\u30C8\u306B\u623B\u308B"]';
   var COMMENT_PANEL_RESTORE_COOLDOWN_MS = 10 * 1e3;
@@ -5863,18 +5891,12 @@
       document.querySelector('[class*="userName"], [class*="streamerName"]')?.textContent || ""
     );
     const broadcasterName = broadcasterNameFromEmbedded || broadcasterNameFromStreamLink || broadcasterNameFromMeta || broadcasterNameFromDomFallback;
-    const broadcasterUserId = (() => {
-      const href = String(streamLink?.getAttribute("href") || "");
-      const m = href.match(/\/user\/(\d+)/);
-      if (m) return m[1];
-      const supplierId = String(
-        embeddedProps?.program?.supplier?.programProviderId ?? embeddedProps?.program?.supplier?.id ?? ""
-      ).trim();
-      if (/^\d+$/.test(supplierId)) return supplierId;
-      const pageUrl = String(embeddedProps?.program?.supplier?.pageUrl ?? "");
-      const m2 = pageUrl.match(/\/user\/(\d+)/);
-      return m2 ? m2[1] : "";
-    })();
+    const broadcasterUserId = extractBroadcasterUserId({
+      embeddedSupplierProgramProviderId: embeddedProps?.program?.supplier?.programProviderId,
+      embeddedSupplierId: embeddedProps?.program?.supplier?.id,
+      embeddedSupplierPageUrl: embeddedProps?.program?.supplier?.pageUrl,
+      streamLinkHref: streamLink?.getAttribute("href") ?? ""
+    });
     const broadcasterPageUrl = (() => {
       const raw = String(embeddedProps?.program?.supplier?.pageUrl ?? "").trim();
       if (/^https?:\/\//i.test(raw)) return raw;

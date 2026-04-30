@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.37（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.38（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,34 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.38 バンプで入った修正（配信者 UID 取り違え修正 + 切り出し AM）**:
+
+- ユーザー報告: lv350420992（配信者 = 刑事桃 / userId 115713314）の watch
+ ページで、配信者タイルからクリックすると別人 Nasu（45300945）のページに飛ぶ。
+ さらに本配信者 115713314 が こん太レーン に混入していた（ Nasu は本来の
+ 配信者ではなく、コメ投稿もしていない別ユーザ）。
+- 原因: `collectWatchPageSnapshot` の `streamLink` ピッカが
+ `document.querySelectorAll('a[href*="/user/"]')` で先頭 hit の
+ `/user/{id}/live_programs` 形式 anchor から uid を取り出していた。
+ watch ページにはコメ欄言及や履歴ウィジェット等で `/user/{id}/live_programs`
+ 形式 anchor が複数含まれることがあり、本配信者ではない uid を取ることが
+ あった。さらに優先順位が「streamLink → embedded」で DOM 優先だったため、
+ authoritative な embedded-data があっても DOM が勝っていた。
+- 修正:
+  - 新規 lib: `src/lib/broadcasterUserId.js`（`extractBroadcasterUserId`、
+   13 ケースの TDD）。優先順位を embedded-data 最優先に：
+     1. `embedded-data.program.supplier.programProviderId`（authoritative）
+     2. `embedded-data.program.supplier.id`
+     3. `embedded-data.program.supplier.pageUrl` の `/user/(\d+)/`
+     4. DOM streamLink href の `/user/(\d+)/`（最後の手段）
+  - `content-entry.js#collectWatchPageSnapshot` を新 lib にスイッチ。
+- 効果: lv350420992 ケースでは embedded supplier.programProviderId =
+ 115713314 が即取れて、本配信者がレーンから除外される。配信者タイルからの
+ リンクも正しく刑事桃のページに飛ぶ。
+- 同梱: コメ送信エラー時の再読み込み案内ロジック (`withCommentSendTroubleshootHint`
+ + `EXTENSION_RELOAD_USER_GUIDE_JA`) を `src/lib/commentSendTroubleshootHint.js`
+ に切り出し（純粋関数 + 7 ケース TDD）。
 
 **0.1.37 バンプで入った修正（重複定義整理 + 切り出し AL）**:
 

@@ -253,6 +253,7 @@ import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
+import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
 
 /**
  * @typedef {{
@@ -969,26 +970,9 @@ function paintCommentComposeUi() {
   syncVoiceCommentButton();
 }
 
-/** 拡張コンテキスト無効化・更新手順の共通文案（UI とヒントで揃える） */
-const EXTENSION_RELOAD_USER_GUIDE_JA =
-  '改善しなければ chrome://extensions を開き、「君斗りんくの追憶のきらめき」の「更新」で拡張を再読み込みしてください。';
+// 0.1.38 (AM): EXTENSION_RELOAD_USER_GUIDE_JA / withCommentSendTroubleshootHint
+// を src/lib/commentSendTroubleshootHint.js に切り出し済み（純粋関数 + 7 ケース TDD）。
 const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
-
-/** コメント送信まわりのエラーに、再読み込み案内を1回だけ足す */
-function withCommentSendTroubleshootHint(message) {
-  const s = String(message || '').trim();
-  if (!s) return '';
-  const hintLines = [];
-  if (!/再読み込み|F5|別タブ|前面/.test(s)) {
-    hintLines.push(
-      'watchページを再読み込み（F5）し、別タブで開いている放送ページを前面にしてください。'
-    );
-  }
-  if (!/chrome:\/\/extensions|「更新」/.test(s)) {
-    hintLines.push(EXTENSION_RELOAD_USER_GUIDE_JA);
-  }
-  return hintLines.length ? `${s}\n※うまくいかないとき: ${hintLines.join('\n')}` : s;
-}
 
 // 0.1.16 (Q): isExtensionContextInvalidatedError の重複定義を撤去し
 // `../lib/reportSilentError.js#isContextInvalidatedError` に一本化（同名 alias 経由で

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.38',
+    date: '2026-04-30',
+    summary: '配信者タイルのリンク先を修正',
+    items: Object.freeze([
+      '配信者タイルからクリックした時に別人のページに飛ぶ事象を修正（embedded-data の supplier.programProviderId を最優先に）。本配信者がレーンに混入する原因にもなっていた箇所',
+      'コメ送信エラー時の再読み込み案内ロジックを src/lib/commentSendTroubleshootHint.js に切り出し（純粋関数 + 7 ケース TDD）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.37',
     date: '2026-04-30',
     summary: '内部の重複定義を整理',
