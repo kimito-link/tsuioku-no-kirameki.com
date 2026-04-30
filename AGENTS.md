@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.46（2026-04-30 ローカル準備）
+- **次回提出バージョン**: 0.1.47（2026-04-30 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,29 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.47 バンプで入った修正（同接カーブ hybrid + 連打事故防止 AC）**:
+
+- **M10 (AC): 同接タイムラインの source 二者択一による sample 落ち**
+  - 原因: `buildConcurrentTimelineSeries` は「official が 1 件以上あれば
+    全 official、無ければ全 estimated」の二者択一だったため、official が
+    途中 1 件だけ入った放送で残り 90% の estimated 行が捨てられ、
+    `sectionConcurrentTimeline` が `series.points.length < 2` で空表示に
+    なっていた。「同接サンプルが取れていません」アドバイスが出るが実は
+    estimated は十分取れているという食い違い。
+  - 修正: per-row で official 優先 → 無ければ estimated に fallback する
+    hybrid 方式へ変更。集約 source は all-official / all-estimated /
+    `mixed`（混在）を返す。`marketingChartsHtml.js` の sourceLabel も
+    mixed 対応（"公式来場者数 + 同接推定値（取れた方を採用）"）。
+
+- **P1/P2 (AC): 連打防止漏れ（exportBtn / captureBtn）**
+  - 原因: `exportBtn` / `captureBtn` のクリックハンドラ内でボタンを一度も
+    `disabled = true` にしていなかった。`downloadCommentsHtml` は数万
+    コメント環境では数秒かかるため、ユーザーが連打すると並行で走り、
+    Blob URL が複数生成されて連番ファイルが大量ダウンロードされる。
+    キャプチャは ms 単位 timestamp なので連打時に同名扱いで `uniquify`
+    が連番化、`safeRefresh` も毎回 trigger されて UI が荒れる。
+  - 修正: 開始時に `btn.disabled = true`、`finally` で `false` に戻す。
 
 **0.1.46 バンプで入った修正（マーケ分析の精度向上 AB）**:
 

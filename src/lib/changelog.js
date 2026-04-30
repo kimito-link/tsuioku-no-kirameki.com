@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.47',
+    date: '2026-04-30',
+    summary: '同接カーブと連打事故防止',
+    items: Object.freeze([
+      '同接推移カーブが「公式があれば公式・なければ推定」の二者択一で稀に取れる公式値があると推定値 90% を捨ててグラフがほぼ空になっていた問題を修正。各サンプル単位で公式優先 → 無ければ推定にフォールバックする hybrid に変更',
+      'HTML レポートボタン / スクショボタンの連打で重複ダウンロードが起きていた問題を修正（処理中はボタンを disable）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.46',
     date: '2026-04-30',
     summary: 'マーケ分析の精度向上',

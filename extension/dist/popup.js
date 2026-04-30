@@ -708,6 +708,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.47",
+      date: "2026-04-30",
+      summary: "\u540C\u63A5\u30AB\u30FC\u30D6\u3068\u9023\u6253\u4E8B\u6545\u9632\u6B62",
+      items: Object.freeze([
+        "\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\u304C\u300C\u516C\u5F0F\u304C\u3042\u308C\u3070\u516C\u5F0F\u30FB\u306A\u3051\u308C\u3070\u63A8\u5B9A\u300D\u306E\u4E8C\u8005\u629E\u4E00\u3067\u7A00\u306B\u53D6\u308C\u308B\u516C\u5F0F\u5024\u304C\u3042\u308B\u3068\u63A8\u5B9A\u5024 90% \u3092\u6368\u3066\u3066\u30B0\u30E9\u30D5\u304C\u307B\u307C\u7A7A\u306B\u306A\u3063\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\u3002\u5404\u30B5\u30F3\u30D7\u30EB\u5358\u4F4D\u3067\u516C\u5F0F\u512A\u5148 \u2192 \u7121\u3051\u308C\u3070\u63A8\u5B9A\u306B\u30D5\u30A9\u30FC\u30EB\u30D0\u30C3\u30AF\u3059\u308B hybrid \u306B\u5909\u66F4",
+        "HTML \u30EC\u30DD\u30FC\u30C8\u30DC\u30BF\u30F3 / \u30B9\u30AF\u30B7\u30E7\u30DC\u30BF\u30F3\u306E\u9023\u6253\u3067\u91CD\u8907\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u304C\u8D77\u304D\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\uFF08\u51E6\u7406\u4E2D\u306F\u30DC\u30BF\u30F3\u3092 disable\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.46",
       date: "2026-04-30",
       summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306E\u7CBE\u5EA6\u5411\u4E0A",
@@ -5155,30 +5164,39 @@ ${body}`;
     if (!list.length) {
       return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: "none" };
     }
-    let hasOfficial = false;
-    let hasEstimated = false;
-    for (const r of list) {
-      if (!r || typeof r !== "object") continue;
-      if (typeof r.capturedAt !== "number" || !Number.isFinite(r.capturedAt)) continue;
-      if (isFiniteNonNegative(r.officialViewerCount)) hasOfficial = true;
-      if (isFiniteNonNegative(r.peakConcurrentEstimate)) hasEstimated = true;
-    }
-    const source = hasOfficial ? "official" : hasEstimated ? "estimated" : "none";
-    if (source === "none") {
-      return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: "none" };
-    }
+    let officialCount = 0;
+    let estimatedCount = 0;
     const collected = [];
     for (const r of list) {
       if (!r || typeof r !== "object") continue;
       if (typeof r.capturedAt !== "number" || !Number.isFinite(r.capturedAt)) continue;
-      const v = source === "official" ? r.officialViewerCount : r.peakConcurrentEstimate;
-      if (!isFiniteNonNegative(v)) continue;
-      collected.push({ at: r.capturedAt, value: v });
+      if (isFiniteNonNegative(r.officialViewerCount)) {
+        collected.push({
+          at: r.capturedAt,
+          value: (
+            /** @type {number} */
+            r.officialViewerCount
+          ),
+          kind: "official"
+        });
+        officialCount += 1;
+      } else if (isFiniteNonNegative(r.peakConcurrentEstimate)) {
+        collected.push({
+          at: r.capturedAt,
+          value: (
+            /** @type {number} */
+            r.peakConcurrentEstimate
+          ),
+          kind: "estimated"
+        });
+        estimatedCount += 1;
+      }
+    }
+    if (!collected.length) {
+      return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: "none" };
     }
     collected.sort((a, b) => a.at - b.at);
-    if (!collected.length) {
-      return { points: [], maxValue: 0, firstAt: null, lastAt: null, source };
-    }
+    const source = officialCount > 0 && estimatedCount > 0 ? "mixed" : officialCount > 0 ? "official" : "estimated";
     const firstAt = collected[0].at;
     const lastAt = collected[collected.length - 1].at;
     let maxValue = 0;
@@ -6727,7 +6745,7 @@ ${yLabelsL}${yLabelsR}${xLabels}
       const y = yOf(series.points[idx].value);
       return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="none" stroke="#f87171" stroke-width="2"><title>\u534A\u6E1B\u70B9: ${peak.halfDecayMinute}\u5206\u76EE\uFF08\u30D4\u30FC\u30AF\u306E 50% \u3092\u5272\u3063\u305F\uFF09</title></circle>`;
     })() : "";
-    const sourceLabel = series.source === "official" ? "\u516C\u5F0F\u6765\u5834\u8005\u6570" : "\u540C\u63A5\u63A8\u5B9A\u5024";
+    const sourceLabel = series.source === "official" ? "\u516C\u5F0F\u6765\u5834\u8005\u6570" : series.source === "mixed" ? "\u516C\u5F0F\u6765\u5834\u8005\u6570 + \u540C\u63A5\u63A8\u5B9A\u5024\uFF08\u53D6\u308C\u305F\u65B9\u3092\u63A1\u7528\uFF09" : "\u540C\u63A5\u63A8\u5B9A\u5024";
     const peakSummary = peak && peak.peakMinute != null ? `<ul class="mkt-mini-stats">
 <li><strong>\u30D4\u30FC\u30AF\u5230\u9054:</strong> ${peak.peakMinute}\u5206\u76EE / ${peak.peakValue.toLocaleString("ja-JP")}\u4EBA</li>
 <li><strong>\u958B\u59CB\u6642:</strong> ${peak.startValue.toLocaleString("ja-JP")}\u4EBA</li>
@@ -15200,7 +15218,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-2215" ? String("0430-2215") : "dev";
+      const buildId = "0430-2222" ? String("0430-2222") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -16051,6 +16069,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         setCaptureStatus(captureStatus, "watch\u30DA\u30FC\u30B8\u3092\u958B\u3044\u3066\u304F\u3060\u3055\u3044\u3002", "error");
         return;
       }
+      if (captureBtn.disabled) return;
+      captureBtn.disabled = true;
       setCaptureStatus(captureStatus, "\u30AD\u30E3\u30D7\u30C1\u30E3\u4E2D\u2026", "idle");
       try {
         const res = (
@@ -16087,6 +16107,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         safeRefresh();
       } catch (err) {
         setCaptureStatus(captureStatus, `\u30AD\u30E3\u30D7\u30C1\u30E3\u306B\u5931\u6557: ${err instanceof Error ? err.message : String(err)}`, "error");
+      } finally {
+        captureBtn.disabled = false;
       }
     });
     thumbIntervalSel?.addEventListener("change", async () => {
@@ -16111,9 +16133,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const key = exportBtn.dataset.storageKey;
       const watchUrl = exportBtn.dataset.watchUrl || "";
       if (!lv || !key || exportBtn.disabled) return;
+      exportBtn.disabled = true;
       try {
         await downloadCommentsHtml(lv, key, watchUrl);
       } catch {
+      } finally {
+        exportBtn.disabled = false;
       }
     });
     $("exportSessionSummaryJsonBtn")?.addEventListener("click", async () => {

@@ -9306,6 +9306,13 @@ function initPopup() {
       setCaptureStatus(captureStatus, 'watchページを開いてください。', 'error');
       return;
     }
+    if (captureBtn.disabled) return;
+    /*
+     * 0.1.47 (AC): 連打防止。連打すると同名（ms 単位）の重複 download が
+     *   uniquify で連番ファイル化、`safeRefresh` も毎回トリガーされて UI
+     *   が荒れる。
+     */
+    captureBtn.disabled = true;
     setCaptureStatus(captureStatus, 'キャプチャ中…', 'idle');
     try {
       const res = /** @type {{ ok?: boolean, errorCode?: string, dataUrl?: string, liveId?: string }|null} */ (
@@ -9340,6 +9347,9 @@ function initPopup() {
       safeRefresh();
     } catch (err) {
       setCaptureStatus(captureStatus, `キャプチャに失敗: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    } finally {
+      // 0.1.47 (AC): 連打防止の disable を必ず解除
+      captureBtn.disabled = false;
     }
   });
 
@@ -9367,10 +9377,18 @@ function initPopup() {
     const key = exportBtn.dataset.storageKey;
     const watchUrl = exportBtn.dataset.watchUrl || '';
     if (!lv || !key || exportBtn.disabled) return;
+    /*
+     * 0.1.47 (AC): 連打防止。downloadCommentsHtml は数万コメ環境では数秒
+     *   かかるので、終わるまでボタンを disable する。これがないと連打で
+     *   並行ダウンロード + Blob URL リーク + 同名ファイル連番が発生する。
+     */
+    exportBtn.disabled = true;
     try {
       await downloadCommentsHtml(lv, key, watchUrl);
     } catch {
       // no-op
+    } finally {
+      exportBtn.disabled = false;
     }
   });
 

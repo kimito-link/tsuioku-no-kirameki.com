@@ -673,7 +673,13 @@ function sectionConcurrentTimeline(series, peak) {
           return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="none" stroke="#f87171" stroke-width="2"><title>半減点: ${peak.halfDecayMinute}分目（ピークの 50% を割った）</title></circle>`;
         })()
       : '';
-  const sourceLabel = series.source === 'official' ? '公式来場者数' : '同接推定値';
+  // 0.1.47 (AC): hybrid モード（official+estimated 混在）でも適切に表示
+  const sourceLabel =
+    series.source === 'official'
+      ? '公式来場者数'
+      : series.source === 'mixed'
+        ? '公式来場者数 + 同接推定値（取れた方を採用）'
+        : '同接推定値';
   const peakSummary = peak && peak.peakMinute != null
     ? `<ul class="mkt-mini-stats">
 <li><strong>ピーク到達:</strong> ${peak.peakMinute}分目 / ${peak.peakValue.toLocaleString('ja-JP')}人</li>
