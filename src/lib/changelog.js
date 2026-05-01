@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.78',
+    date: '2026-05-01',
+    summary: 'コメ記録の汚染 avatar を表示時に補正',
+    items: Object.freeze([
+      '0.1.76 / 0.1.77 で intercept キャッシュと表示信号にガードを追加しましたが、過去のバージョンで chrome.storage に既に焼き込まれた nls_comments_* の avatarUrl は補正されませんでした。aggregateCommentsByUser が「最新コメ時刻の avatar」を採用する仕様のため、汚染レコードが残っている限り broadcaster icon が出続けていました',
+      '修正内容: src/lib/sanitizeRoomAvatarsForBroadcaster.js を新設（純粋関数 + 13 ケース TDD）。aggregateCommentsByUser の出力に対し、broadcaster icon と一致する viewer の avatarUrl を空に倒す後処理を popup 表示と HTML レポート 2 箇所に適用',
+      'これで chrome.storage 上の汚染データを削除しなくても、表示時に正しい canonical アイコンに戻ります（過去レコードに対する完全な後方互換補正）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.77',
     date: '2026-05-01',
     summary: 'avatar 取り違え修正の表示時ガード追加',

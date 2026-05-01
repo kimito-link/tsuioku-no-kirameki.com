@@ -7,6 +7,7 @@ import {
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
+import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import {
   anonymousNicknameFallback,
   compactNicoLaneUserId
@@ -4740,7 +4741,13 @@ function renderUserRooms(entries, liveId = '') {
           : '増加は少なめ';
   renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText);
 
-  const rooms = aggregateCommentsByUser(list);
+  // 0.1.78: コメ記録に焼き込まれた汚染 avatar の表示時補正
+  //   過去のバージョンで保存された nls_comments_<liveId> に broadcaster icon が
+  //   viewer の avatarUrl として残っているケースを popup 表示前に除去する。
+  const rooms = sanitizeRoomAvatarsForBroadcaster(aggregateCommentsByUser(list), {
+    broadcasterUid: String(watchMetaCache.snapshot?.broadcasterUserId || '').trim(),
+    broadcasterIconUrl: String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim()
+  });
   ul.innerHTML = '';
 
   if (!rooms.length) {
@@ -7637,7 +7644,14 @@ async function buildHtmlReportDocument(
   const reportBroadcasterUserId = String(
     snapshot?.broadcasterUserId || ''
   ).trim();
-  const aggregatedRoomsAll = aggregateCommentsByUser(comments);
+  // 0.1.78: HTML レポート側でも broadcaster icon の取り違えを補正
+  const aggregatedRoomsAll = sanitizeRoomAvatarsForBroadcaster(
+    aggregateCommentsByUser(comments),
+    {
+      broadcasterUid: reportBroadcasterUserId,
+      broadcasterIconUrl: String(snapshot?.broadcasterIconUrl || '').trim()
+    }
+  );
   const aggregatedRooms = reportBroadcasterUserId
     ? aggregatedRoomsAll.filter(
         (room) => String(room.userKey || '').trim() !== reportBroadcasterUserId

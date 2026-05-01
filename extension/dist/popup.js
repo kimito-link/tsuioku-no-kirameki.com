@@ -198,6 +198,43 @@
     };
   }
 
+  // src/lib/avatarUrlCompare.js
+  function avatarCompareKey(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    try {
+      const u = new URL(s);
+      u.search = "";
+      u.hash = "";
+      return u.href;
+    } catch {
+      return s;
+    }
+  }
+  function isSameAvatarUrl(a, b) {
+    const ka = avatarCompareKey(a);
+    const kb = avatarCompareKey(b);
+    return Boolean(ka && kb && ka === kb);
+  }
+
+  // src/lib/sanitizeRoomAvatarsForBroadcaster.js
+  function sanitizeRoomAvatarForBroadcaster(room, ctx) {
+    if (!room || typeof room !== "object") return room;
+    const av = String(room.avatarUrl ?? "").trim();
+    if (!av) return room;
+    const broadcasterUid = String(ctx?.broadcasterUid ?? "").trim();
+    const broadcasterIconUrl = String(ctx?.broadcasterIconUrl ?? "").trim();
+    if (!broadcasterUid || !broadcasterIconUrl) return room;
+    const userKey = String(room.userKey ?? "").trim();
+    if (userKey === broadcasterUid) return room;
+    if (!isSameAvatarUrl(av, broadcasterIconUrl)) return room;
+    return { ...room, avatarUrl: "" };
+  }
+  function sanitizeRoomAvatarsForBroadcaster(rooms, ctx) {
+    if (!Array.isArray(rooms)) return [];
+    return rooms.map((r) => sanitizeRoomAvatarForBroadcaster(r, ctx));
+  }
+
   // src/lib/nicoAnonymousDisplay.js
   function isNiconicoAnonymousUserId(userId) {
     const s = String(userId ?? "").trim();
@@ -707,6 +744,16 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.78",
+      date: "2026-05-01",
+      summary: "\u30B3\u30E1\u8A18\u9332\u306E\u6C5A\u67D3 avatar \u3092\u8868\u793A\u6642\u306B\u88DC\u6B63",
+      items: Object.freeze([
+        "0.1.76 / 0.1.77 \u3067 intercept \u30AD\u30E3\u30C3\u30B7\u30E5\u3068\u8868\u793A\u4FE1\u53F7\u306B\u30AC\u30FC\u30C9\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F\u304C\u3001\u904E\u53BB\u306E\u30D0\u30FC\u30B8\u30E7\u30F3\u3067 chrome.storage \u306B\u65E2\u306B\u713C\u304D\u8FBC\u307E\u308C\u305F nls_comments_* \u306E avatarUrl \u306F\u88DC\u6B63\u3055\u308C\u307E\u305B\u3093\u3067\u3057\u305F\u3002aggregateCommentsByUser \u304C\u300C\u6700\u65B0\u30B3\u30E1\u6642\u523B\u306E avatar\u300D\u3092\u63A1\u7528\u3059\u308B\u4ED5\u69D8\u306E\u305F\u3081\u3001\u6C5A\u67D3\u30EC\u30B3\u30FC\u30C9\u304C\u6B8B\u3063\u3066\u3044\u308B\u9650\u308A broadcaster icon \u304C\u51FA\u7D9A\u3051\u3066\u3044\u307E\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: src/lib/sanitizeRoomAvatarsForBroadcaster.js \u3092\u65B0\u8A2D\uFF08\u7D14\u7C8B\u95A2\u6570 + 13 \u30B1\u30FC\u30B9 TDD\uFF09\u3002aggregateCommentsByUser \u306E\u51FA\u529B\u306B\u5BFE\u3057\u3001broadcaster icon \u3068\u4E00\u81F4\u3059\u308B viewer \u306E avatarUrl \u3092\u7A7A\u306B\u5012\u3059\u5F8C\u51E6\u7406\u3092 popup \u8868\u793A\u3068 HTML \u30EC\u30DD\u30FC\u30C8 2 \u7B87\u6240\u306B\u9069\u7528",
+        "\u3053\u308C\u3067 chrome.storage \u4E0A\u306E\u6C5A\u67D3\u30C7\u30FC\u30BF\u3092\u524A\u9664\u3057\u306A\u304F\u3066\u3082\u3001\u8868\u793A\u6642\u306B\u6B63\u3057\u3044 canonical \u30A2\u30A4\u30B3\u30F3\u306B\u623B\u308A\u307E\u3059\uFF08\u904E\u53BB\u30EC\u30B3\u30FC\u30C9\u306B\u5BFE\u3059\u308B\u5B8C\u5168\u306A\u5F8C\u65B9\u4E92\u63DB\u88DC\u6B63\uFF09"
+      ])
+    }),
     Object.freeze({
       version: "0.1.77",
       date: "2026-05-01",
@@ -9797,25 +9844,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 \u203B\u3046\u307E\u304F\u3044\u304B\u306A\u3044\u3068\u304D: ${hintLines.join("\n")}` : s;
   }
 
-  // src/lib/avatarUrlCompare.js
-  function avatarCompareKey(raw) {
-    const s = String(raw == null ? "" : raw).trim();
-    if (!s) return "";
-    try {
-      const u = new URL(s);
-      u.search = "";
-      u.hash = "";
-      return u.href;
-    } catch {
-      return s;
-    }
-  }
-  function isSameAvatarUrl(a, b) {
-    const ka = avatarCompareKey(a);
-    const kb = avatarCompareKey(b);
-    return Boolean(ka && kb && ka === kb);
-  }
-
   // src/lib/watchSnapshotPartialMerge.js
   var PROTECTED_STRING_FIELDS = (
     /** @type {const} */
@@ -13304,7 +13332,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const heatPercent = totalRecent > 0 ? Math.min(100, Math.log10(totalRecent + 1) * 38) : 0;
     const heatText = totalRecent >= 50 ? "\u5897\u52A0\u304C\u3068\u3066\u3082\u5927\u304D\u3044" : totalRecent >= 20 ? "\u5897\u52A0\u304C\u5927\u304D\u3044" : totalRecent >= 5 ? "\u5897\u52A0\u3042\u308A" : "\u5897\u52A0\u306F\u5C11\u306A\u3081";
     renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText);
-    const rooms = aggregateCommentsByUser(list);
+    const rooms = sanitizeRoomAvatarsForBroadcaster(aggregateCommentsByUser(list), {
+      broadcasterUid: String(watchMetaCache.snapshot?.broadcasterUserId || "").trim(),
+      broadcasterIconUrl: String(watchMetaCache.snapshot?.broadcasterIconUrl || "").trim()
+    });
     ul.innerHTML = "";
     if (!rooms.length) {
       _lastTopSupportRankStripStableKey = null;
@@ -15501,7 +15532,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const reportBroadcasterUserId = String(
       snapshot?.broadcasterUserId || ""
     ).trim();
-    const aggregatedRoomsAll = aggregateCommentsByUser(comments);
+    const aggregatedRoomsAll = sanitizeRoomAvatarsForBroadcaster(
+      aggregateCommentsByUser(comments),
+      {
+        broadcasterUid: reportBroadcasterUserId,
+        broadcasterIconUrl: String(snapshot?.broadcasterIconUrl || "").trim()
+      }
+    );
     const aggregatedRooms = reportBroadcasterUserId ? aggregatedRoomsAll.filter(
       (room) => String(room.userKey || "").trim() !== reportBroadcasterUserId
     ) : aggregatedRoomsAll;
@@ -16519,7 +16556,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1456" ? String("0501-1456") : "dev";
+      const buildId = "0501-1516" ? String("0501-1516") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
