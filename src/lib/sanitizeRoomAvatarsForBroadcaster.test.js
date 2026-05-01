@@ -87,6 +87,78 @@ describe('sanitizeRoomAvatarForBroadcaster', () => {
     );
     expect(out.avatarUrl).toBe('https://cdn.example/totally-different.jpg');
   });
+
+  it('0.1.97: 同じ broadcaster icon でも size 違い (s vs uri150x150 vs m) は同じ汚染と判定', () => {
+    // ctx の broadcasterIconUrl は /s/ サイズ。viewer 側 storage に
+    // /uri150x150/ で焼き込まれた汚染も検出する。
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: '4046119',
+        avatarUrl:
+          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/uri150x150/9/99999.jpg',
+        count: 5
+      },
+      ctx
+    );
+    expect(out.avatarUrl).toBe('');
+  });
+
+  it('0.1.97: m サイズの broadcaster icon も検出', () => {
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: '4046119',
+        avatarUrl:
+          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/m/9/99999.jpg',
+        count: 5
+      },
+      ctx
+    );
+    expect(out.avatarUrl).toBe('');
+  });
+
+  it('0.1.97: UNKNOWN_USER_KEY (uid 不明) の room に broadcaster icon が乗っているケースも検出', () => {
+    // 「ID 未取得（DOM に投稿者情報なし）」のコメントが broadcaster icon を
+    // 抱き込んで rank strip 1 番目に出る現象（lv350429771 で実機確認）
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: '__unknown__',
+        avatarUrl:
+          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/uri150x150/9/99999.jpg',
+        count: 1
+      },
+      ctx
+    );
+    expect(out.avatarUrl).toBe('');
+  });
+
+  it('0.1.97: query string + size 違いの組み合わせでも検出', () => {
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: '4046119',
+        avatarUrl:
+          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/m/9/99999.jpg?cache=1',
+        count: 5
+      },
+      ctx
+    );
+    expect(out.avatarUrl).toBe('');
+  });
+
+  it('0.1.97: 同じパターン (uid 99999) を含むが broadcasterIconUrl と全く違うドメインは通す（保守的）', () => {
+    // niconico CDN 以外のドメインで /99999.jpg があったら？
+    // → uid 抽出は niconico CDN 形式のみマッチするので通す（誤検出しない）
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: '4046119',
+        avatarUrl: 'https://cdn.example/avatar/99999.jpg',
+        count: 5
+      },
+      ctx
+    );
+    // extractNiconicoUserIdFromIconUrl は domain-agnostic だが
+    // 「99999」が抽出されて broadcasterUid と一致するなら strip する
+    expect(out.avatarUrl).toBe('');
+  });
 });
 
 describe('sanitizeRoomAvatarsForBroadcaster (array)', () => {

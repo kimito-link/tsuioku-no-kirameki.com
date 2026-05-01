@@ -16,9 +16,19 @@
  *
  *   他の場所のガードと違って、これは「観測された汚染データの撤去」が目的なので、
  *   broadcaster 情報未取得時もガードを掛けない（false positive 回避）原則は同じ。
+ *
+ * 0.1.97: uid 抽出ベースに強化
+ *   旧 0.1.78 ロジックは `isSameAvatarUrl` で URL 文字列一致を見ていたが、
+ *   broadcaster icon が `/s/` / `/uri150x150/` / `/m/` などサイズ違いで
+ *   storage に焼き込まれていると一致せず、stripped されない問題があった
+ *   (lv350429771 で実機確認: ID 未取得の room に broadcaster icon が乗ったまま
+ *    rank strip 1 番目に表示)。
+ *   URL から niconico uid を抽出し、broadcasterUid と一致するかで判定すれば
+ *   サイズ違い・query 違いに関係なく検出できる。URL 文字列一致は fallback として残す。
  */
 
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
+import { extractNiconicoUserIdFromIconUrl } from '../shared/avatar/avatarUrlGuard.js';
 
 /**
  * @typedef {Object} SanitizeRoomAvatarsContext
@@ -48,9 +58,17 @@ export function sanitizeRoomAvatarForBroadcaster(room, ctx) {
   const userKey = String(room.userKey ?? '').trim();
   // broadcaster 本人 room はそのまま通す
   if (userKey === broadcasterUid) return room;
-  // av が broadcaster icon と一致しない → 通す
+
+  // 0.1.97: uid 抽出ベースの contamination 検出（サイズ違い対応）
+  //   av の URL から niconico uid を抽出し broadcasterUid と一致するなら
+  //   汚染とみなす。`/s/` / `/uri150x150/` / `/m/` などサイズ違いも検出可。
+  const avUid = extractNiconicoUserIdFromIconUrl(av);
+  if (avUid && avUid === broadcasterUid) {
+    return { ...room, avatarUrl: '' };
+  }
+
+  // fallback: 0.1.78 の URL 文字列一致（uid を含まない非標準 URL の保険）
   if (!isSameAvatarUrl(av, broadcasterIconUrl)) return room;
-  // 汚染確定 → avatarUrl を空にして canonical fallback に倒す
   return { ...room, avatarUrl: '' };
 }
 

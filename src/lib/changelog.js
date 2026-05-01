@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.97',
+    date: '2026-05-01',
+    summary: '配信者 icon の取り違えをサイズ違いでも検出',
+    items: Object.freeze([
+      'rank strip の 1 番目（uid 不明の room）に配信者の顔アイコンが乗ってしまう症状を修正しました。原因は broadcaster icon が `/s/`・`/uri150x150/`・`/m/` などサイズ違いで storage に焼き込まれていた場合、URL 文字列一致で contamination 判定していたために stripped されていなかったことです',
+      '修正内容: avatar URL から niconico uid を抽出し broadcasterUid と一致するかで判定するように強化（サイズ違い・query 違いを問わず検出）。URL 文字列一致は uid を含まない非標準 URL の fallback として残しています',
+      'これで「ID 未取得（DOM に投稿者情報なし）」のコメントが配信者アイコンを抱き込んで rank strip 1 番目に出る現象が消えます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.96',
     date: '2026-05-01',
     summary: '診断バンドルに snapshot 情報を追加',
