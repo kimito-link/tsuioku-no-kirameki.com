@@ -26,9 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.85',
+    date: '2026-05-01',
+    summary: 'storyGrowthAvatarSrcCandidate を resolver 化',
+    items: Object.freeze([
+      'popup-entry.js の storyGrowthAvatarSrcCandidate（アイコン列の avatar URL 決定）を、avatarResolver 経由に書き換えました。45 行の手書きガードロジックが 25 行のシンプルな observation 配列構築に置き換えられ、保守性が向上しています',
+      '入力ソース 2 種（entry.avatarUrl, profile cache）を AvatarObservation に正規化して resolver に渡す形式に統一。ガード（uid mismatch / broadcaster impersonation / viewer impersonation）はすべて resolver 内で処理されます',
+      '挙動は 0.1.84 と同等（既存 7 層ガードと resolver の判定結果が一致）。次の Phase E で旧コード削除予定'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.84',
     date: '2026-05-01',
-    summary: 'Hoshino-Romi 流リファクタ Phase A+B（avatarResolver 基盤）',
+    summary: 'avatar 解決の単一 component 化（基盤）',
     items: Object.freeze([
       'avatar 解決ロジックを単一の純粋関数 src/domain/user/avatarResolver.js に集約する基盤を実装しました（surechigai-lite の単一 store パターンを参考）。22 ケースの TDD 完備（合計 2153 件 PASS）',
       'shared レイヤに src/shared/avatar/avatarUrlGuard.js を新設し、URL helper（isSameAvatarUrl / extractNiconicoUserIdFromIconUrl / isAvatarUrlForUserId）を集約。レイヤ依存ルール（domain → shared）を遵守',
