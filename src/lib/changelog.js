@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.76',
+    date: '2026-05-01',
+    summary: 'ギフト演出 DOM での avatar 取り違え修正',
+    items: Object.freeze([
+      'ニコ生でアイテム（ギフト）を投げた直後に、応援者リスト（アイコン列）に表示される自分のサムネイルが配信者のアイコンに化けてしまう不具合を修正しました',
+      'ギフト演出 DOM では送信者の情報行に配信者アイコンも並んで描画される構造になっており、本拡張の avatar 観測が誤って「viewer の uid に broadcaster icon を紐付け」してしまうのが原因でした',
+      '修正内容: avatar を uid に紐付ける直前に「その avatar が現在の broadcaster icon と一致するなら、その uid が broadcaster 本人でない限り紐付けを skip する」純粋関数ガード（src/lib/avatarBroadcasterGuard.js, 12 ケース TDD）を追加。content-entry.js の 4 箇所すべてに適用',
+      '既に化けてしまっているキャッシュは、popup の「キャッシュクリア」ボタンで一度クリアすると、次回コメ受信時から正しく表示されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.67',
     date: '2026-05-01',
     summary: '関係ないタブで開く時のパネルを Chrome 統合に',

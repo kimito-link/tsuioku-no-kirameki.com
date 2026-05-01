@@ -1861,6 +1861,39 @@
     return { viewerAvatarUrl, viewerNickname, viewerUserId };
   }
 
+  // src/lib/avatarUrlCompare.js
+  function avatarCompareKey(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    try {
+      const u = new URL(s);
+      u.search = "";
+      u.hash = "";
+      return u.href;
+    } catch {
+      return s;
+    }
+  }
+  function isSameAvatarUrl(a, b) {
+    const ka = avatarCompareKey(a);
+    const kb = avatarCompareKey(b);
+    return Boolean(ka && kb && ka === kb);
+  }
+
+  // src/lib/avatarBroadcasterGuard.js
+  function shouldAssociateAvatarWithUser(input) {
+    const uid = String(input?.uid ?? "").trim();
+    const av = String(input?.av ?? "").trim();
+    if (!uid || !av) return true;
+    const broadcasterUid = String(input?.broadcasterUid ?? "").trim();
+    const broadcasterIconUrl = String(input?.broadcasterIconUrl ?? "").trim();
+    if (!broadcasterUid || !broadcasterIconUrl) return true;
+    if (isSameAvatarUrl(av, broadcasterIconUrl)) {
+      return uid === broadcasterUid;
+    }
+    return true;
+  }
+
   // src/lib/liveAudienceDom.js
   var MAX_REASONABLE_VIEWERS = 12e6;
   function normalizeDigitsForViewerScan(text) {
@@ -4182,7 +4215,7 @@
       const iconRaw = String(v.iconUrl || "").trim();
       const icon = isHttpAvatarUrl(iconRaw) ? iconRaw : "";
       if (nick) interceptedNicknames.set(uid, nick);
-      if (icon) interceptedAvatars.set(uid, icon);
+      if (icon && isAvatarSafeToAssociate(uid, icon)) interceptedAvatars.set(uid, icon);
       activeUserTimestamps.set(uid, seenNow);
     }
     if (activeUserTimestamps.size > ACTIVE_USER_MAP_MAX) {
@@ -4226,8 +4259,17 @@
   }
   var broadcasterUidCache = "";
   var broadcasterUidCacheAt = 0;
+  var broadcasterIconUrlCache = "";
   function isHttpAvatarUrl(v) {
     return /^https?:\/\//i.test(String(v || "").trim());
+  }
+  function isAvatarSafeToAssociate(uid, av) {
+    return shouldAssociateAvatarWithUser({
+      uid,
+      av,
+      broadcasterUid: broadcasterUidCache,
+      broadcasterIconUrl: broadcasterIconUrlCache
+    });
   }
   function resetOfficialStatsState() {
     officialViewerCount = null;
@@ -4424,7 +4466,7 @@
         const sAv = isHttpAvatarUrl(av) ? String(av).trim() : "";
         if (!sUid) continue;
         if (sName) interceptedNicknames.set(sUid, sName);
-        if (sAv) interceptedAvatars.set(sUid, sAv);
+        if (sAv && isAvatarSafeToAssociate(sUid, sAv)) interceptedAvatars.set(sUid, sAv);
         activeUserTimestamps.set(sUid, seenNow);
         reconcileUsers.push({ uid: sUid, name: sName, av: sAv });
       }
@@ -4450,7 +4492,7 @@
           ...nextAv ? { av: nextAv } : {}
         });
         if (sName && sUid) interceptedNicknames.set(sUid, sName);
-        if (sAv && sUid) interceptedAvatars.set(sUid, sAv);
+        if (sAv && sUid && isAvatarSafeToAssociate(sUid, sAv)) interceptedAvatars.set(sUid, sAv);
         if (sUid) activeUserTimestamps.set(sUid, seenNow);
         reconcileEntries.push({ no: sNo, uid: sUid, name: sName, av: sAv });
       }
@@ -6420,6 +6462,7 @@
       }
       return "";
     })();
+    broadcasterIconUrlCache = broadcasterIconUrl;
     const thumbnailUrl = toAbsoluteUrl(
       clean(metaGet(metaMap, ["og:image", "twitter:image"]))
     );
@@ -7033,7 +7076,7 @@
                   ...name ? { name } : {},
                   ...av || prevAv ? { av: av || prevAv } : {}
                 });
-                if (uid && av) interceptedAvatars.set(uid, av);
+                if (uid && av && isAvatarSafeToAssociate(uid, av)) interceptedAvatars.set(uid, av);
               }
             }
             sendResponse({ ok: true, items: buildInterceptCacheExportItems() });
@@ -7557,6 +7600,7 @@
         activeUserTimestamps.clear();
         broadcasterUidCache = "";
         broadcasterUidCacheAt = 0;
+        broadcasterIconUrlCache = "";
         wsViewerCount = null;
         wsCommentCount = null;
         wsViewerCountUpdatedAt = 0;
@@ -7605,6 +7649,7 @@
         activeUserTimestamps.clear();
         broadcasterUidCache = "";
         broadcasterUidCacheAt = 0;
+        broadcasterIconUrlCache = "";
         wsViewerCount = null;
         wsCommentCount = null;
         wsViewerCountUpdatedAt = 0;

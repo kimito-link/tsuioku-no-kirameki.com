@@ -67,6 +67,7 @@ import {
 } from '../lib/commentSubmitConfirm.js';
 import { findCommentSubmitButton } from '../lib/commentPostDom.js';
 import { collectLoggedInViewerProfile } from '../lib/watchPageViewerProfile.js';
+import { shouldAssociateAvatarWithUser } from '../lib/avatarBroadcasterGuard.js';
 import {
   closestHarvestableNicoCommentRow,
   extractCommentsFromNode,
@@ -946,7 +947,7 @@ async function flushInterceptViewerJoin(viewers) {
     const iconRaw = String(v.iconUrl || '').trim();
     const icon = isHttpAvatarUrl(iconRaw) ? iconRaw : '';
     if (nick) interceptedNicknames.set(uid, nick);
-    if (icon) interceptedAvatars.set(uid, icon);
+    if (icon && isAvatarSafeToAssociate(uid, icon)) interceptedAvatars.set(uid, icon);
     activeUserTimestamps.set(uid, seenNow);
   }
   if (activeUserTimestamps.size > ACTIVE_USER_MAP_MAX) {
@@ -997,8 +998,30 @@ async function flushInterceptViewerJoin(viewers) {
 let broadcasterUidCache = '';
 let broadcasterUidCacheAt = 0;
 
+// 0.1.76: ギフト演出 DOM での avatar 取り違え対策。snapshot 構築時に更新され、
+// interceptedAvatars.set に紐付ける uid に対するガード判定で参照される。
+let broadcasterIconUrlCache = '';
+
 function isHttpAvatarUrl(v) {
   return /^https?:\/\//i.test(String(v || '').trim());
+}
+
+/**
+ * interceptedAvatars に「uid -> av」を紐付ける前に、av が現在の配信者
+ * アイコンに化けていないかを判定するガード。配信者本人 uid 以外への
+ * broadcasterIconUrl 紐付けを抑止する（0.1.76: ギフト演出 DOM 対策）。
+ *
+ * @param {string} uid
+ * @param {string} av
+ * @returns {boolean} true なら紐付けて良い
+ */
+function isAvatarSafeToAssociate(uid, av) {
+  return shouldAssociateAvatarWithUser({
+    uid,
+    av,
+    broadcasterUid: broadcasterUidCache,
+    broadcasterIconUrl: broadcasterIconUrlCache
+  });
 }
 
 function resetOfficialStatsState() {
@@ -1265,7 +1288,7 @@ window.addEventListener('message', (e) => {
       const sAv = isHttpAvatarUrl(av) ? String(av).trim() : '';
       if (!sUid) continue;
       if (sName) interceptedNicknames.set(sUid, sName);
-      if (sAv) interceptedAvatars.set(sUid, sAv);
+      if (sAv && isAvatarSafeToAssociate(sUid, sAv)) interceptedAvatars.set(sUid, sAv);
       activeUserTimestamps.set(sUid, seenNow);
       reconcileUsers.push({ uid: sUid, name: sName, av: sAv });
     }
@@ -1291,7 +1314,7 @@ window.addEventListener('message', (e) => {
         ...(nextAv ? { av: nextAv } : {})
       });
       if (sName && sUid) interceptedNicknames.set(sUid, sName);
-      if (sAv && sUid) interceptedAvatars.set(sUid, sAv);
+      if (sAv && sUid && isAvatarSafeToAssociate(sUid, sAv)) interceptedAvatars.set(sUid, sAv);
       if (sUid) activeUserTimestamps.set(sUid, seenNow);
       reconcileEntries.push({ no: sNo, uid: sUid, name: sName, av: sAv });
     }
@@ -3973,6 +3996,10 @@ function collectWatchPageSnapshot() {
     return '';
   })();
 
+  // 0.1.76: ギフト演出 DOM での avatar 取り違え対策。snapshot 構築のたびに
+  // module-level cache を更新して、後続の interceptedAvatars.set ガードで参照する。
+  broadcasterIconUrlCache = broadcasterIconUrl;
+
   const thumbnailUrl = toAbsoluteUrl(
     clean(metaGet(metaMap, ['og:image', 'twitter:image']))
   );
@@ -4706,7 +4733,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
               ...(name ? { name } : {}),
               ...(av || prevAv ? { av: av || prevAv } : {})
             });
-            if (uid && av) interceptedAvatars.set(uid, av);
+            if (uid && av && isAvatarSafeToAssociate(uid, av)) interceptedAvatars.set(uid, av);
           }
         }
         sendResponse({ ok: true, items: buildInterceptCacheExportItems() });
@@ -5382,6 +5409,7 @@ function syncLiveIdFromLocation() {
       activeUserTimestamps.clear();
       broadcasterUidCache = '';
       broadcasterUidCacheAt = 0;
+      broadcasterIconUrlCache = '';
       wsViewerCount = null;
       wsCommentCount = null;
       wsViewerCountUpdatedAt = 0;
@@ -5431,6 +5459,7 @@ function syncLiveIdFromLocation() {
       activeUserTimestamps.clear();
       broadcasterUidCache = '';
       broadcasterUidCacheAt = 0;
+      broadcasterIconUrlCache = '';
       wsViewerCount = null;
       wsCommentCount = null;
       wsViewerCountUpdatedAt = 0;
