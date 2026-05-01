@@ -3,6 +3,7 @@
  * 匿名 a: は tier 3（りんく段）以外では捕獲 HTTP を出さず Identicon 等へ寄せる（りんく段では http をそのまま使う）。
  */
 
+import { isAvatarUrlForUserId } from '../shared/avatar/avatarUrlGuard.js';
 import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
 import { supportGridPersonalThumbPreferredUrl } from './supportGridDisplayTier.js';
 import {
@@ -13,6 +14,12 @@ import {
 /**
  * ユーザーレーン img 用: tier が見る stored と同順で個人 URL を選び、
  * storyGrowthAvatarSrcCandidate が合成 canonical だけ返すときも記録上の個人 URL を渡す。
+ *
+ * 0.1.101: broadcaster icon 取り違え対策。supportGridPersonalThumbPreferredUrl は
+ *   score>=2 の URL を guard 無しで返すため、entry.userId と URL 埋め込み uid が違っても
+ *   storedRaw を採用してしまう。ここで universal rule (isAvatarUrlForUserId) を適用し、
+ *   uid 不一致の URL は弾く。これで grid タイルに他人の icon (broadcaster icon) が
+ *   出る最後のバイパス経路を塞ぐ。
  *
  * @param {unknown} userId
  * @param {unknown} primaryHttp storyGrowthAvatarSrcCandidate
@@ -25,9 +32,10 @@ export function userLaneHttpForTilePick(userId, primaryHttp, storedRaw) {
     String(primaryHttp ?? ''),
     String(storedRaw ?? '')
   );
-  if (preferred) return preferred;
+  if (preferred && isAvatarUrlForUserId(preferred, userId)) return preferred;
   const h = String(primaryHttp ?? '').trim();
   if (!isHttpOrHttpsUrl(h)) return '';
+  if (!isAvatarUrlForUserId(h, userId)) return '';
   return h;
 }
 

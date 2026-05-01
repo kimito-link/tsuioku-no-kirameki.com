@@ -812,6 +812,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.101",
+      date: "2026-05-01",
+      summary: "avatar \u53D6\u308A\u9055\u3048\u6700\u5F8C\u306E\u30D0\u30A4\u30D1\u30B9\u7D4C\u8DEF\u3092\u585E\u3044\u3060",
+      items: Object.freeze([
+        "0.1.100 \u6295\u5165\u5F8C\u3082\u300Cstory growth grid \u306B\u914D\u4FE1\u8005\u306E\u9854\u30BF\u30A4\u30EB\u304C\u6B8B\u308B\u300D\u5831\u544A\u304C\u3042\u3063\u305F\u4EF6\u3092\u3001TDD \u3067\u771F\u56E0\u3092\u7279\u5B9A\u3057\u3066\u4FEE\u6B63\u3057\u307E\u3057\u305F\u3002userLaneHttpForTilePick \u304C supportGridPersonalThumbPreferredUrl \u7D4C\u7531\u3067\u751F\u306E entry.avatarUrl \u3092 guard \u7121\u3057\u3067\u8FD4\u3057\u3066\u3044\u305F\u30D0\u30A4\u30D1\u30B9\u7D4C\u8DEF\u3067\u3059",
+        "\u4FEE\u6B63\u5185\u5BB9: userLaneHttpForTilePick \u306B universal rule (isAvatarUrlForUserId) \u3092\u8FFD\u52A0\u3002preferred URL \u3082 primary URL \u3082\u300Centry.userId \u3068 URL \u57CB\u3081\u8FBC\u307F uid \u304C\u4E00\u81F4\u3057\u306A\u3044\u5834\u5408\u300D\u306F\u63A1\u7528\u3057\u307E\u305B\u3093\u30020.1.99 \u3067 storyGrowthAvatarSrcCandidate \u306B\u306F\u9069\u7528\u6E08\u307F\u3067\u3057\u305F\u304C\u3001\u3053\u3061\u3089\u306F bypass \u306E\u9699\u9593\u304C\u6B8B\u3063\u3066\u3044\u307E\u3057\u305F",
+        "\u5F71\u97FF\u7BC4\u56F2: story growth grid \u30BF\u30A4\u30EB, \u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30EC\u30FC\u30F3\u306E\u500B\u4EBA\u30B5\u30E0\u30CD\u63A1\u7528\u3002\u666E\u904D\u30EB\u30FC\u30EB\u304C grid \u3068 lane \u306E\u4E21\u65B9\u3067\u5B8C\u5168\u306B\u52B9\u304F\u3088\u3046\u306B\u306A\u308A\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.100",
       date: "2026-05-01",
       summary: "\u914D\u4FE1\u8005\u672C\u4EBA\u306E\u81EA\u30B3\u30E1\u306F story grid \u304B\u3089\u9664\u5916",
@@ -3335,9 +3345,10 @@
       String(primaryHttp ?? ""),
       String(storedRaw ?? "")
     );
-    if (preferred) return preferred;
+    if (preferred && isAvatarUrlForUserId(preferred, userId)) return preferred;
     const h = String(primaryHttp ?? "").trim();
     if (!isHttpOrHttpsUrl(h)) return "";
+    if (!isAvatarUrlForUserId(h, userId)) return "";
     return h;
   }
   function pickStoryUserLaneCellDisplaySrc(p) {
@@ -16929,7 +16940,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-2211" ? String("0501-2211") : "dev";
+      const buildId = "0501-2232" ? String("0501-2232") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

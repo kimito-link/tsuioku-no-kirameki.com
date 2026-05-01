@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.101',
+    date: '2026-05-01',
+    summary: 'avatar 取り違え最後のバイパス経路を塞いだ',
+    items: Object.freeze([
+      '0.1.100 投入後も「story growth grid に配信者の顔タイルが残る」報告があった件を、TDD で真因を特定して修正しました。userLaneHttpForTilePick が supportGridPersonalThumbPreferredUrl 経由で生の entry.avatarUrl を guard 無しで返していたバイパス経路です',
+      '修正内容: userLaneHttpForTilePick に universal rule (isAvatarUrlForUserId) を追加。preferred URL も primary URL も「entry.userId と URL 埋め込み uid が一致しない場合」は採用しません。0.1.99 で storyGrowthAvatarSrcCandidate には適用済みでしたが、こちらは bypass の隙間が残っていました',
+      '影響範囲: story growth grid タイル, 応援ユーザーレーンの個人サムネ採用。普遍ルールが grid と lane の両方で完全に効くようになります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.100',
     date: '2026-05-01',
     summary: '配信者本人の自コメは story grid から除外',
