@@ -198,7 +198,7 @@
     };
   }
 
-  // src/lib/avatarUrlCompare.js
+  // src/shared/avatar/avatarUrlGuard.js
   function avatarCompareKey(raw) {
     const s = String(raw == null ? "" : raw).trim();
     if (!s) return "";
@@ -215,6 +215,21 @@
     const ka = avatarCompareKey(a);
     const kb = avatarCompareKey(b);
     return Boolean(ka && kb && ka === kb);
+  }
+  function extractNiconicoUserIdFromIconUrl(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    const m = s.match(/\/(\d{2,15})\.(?:jpg|jpeg|png|gif|webp)(?:[?#]|$)/i);
+    if (m && m[1]) return m[1];
+    return "";
+  }
+  function isAvatarUrlForUserId(url, expectedUserId) {
+    const expected = String(expectedUserId ?? "").trim();
+    if (!expected) return true;
+    if (!/^\d{2,15}$/.test(expected)) return true;
+    const urlUid = extractNiconicoUserIdFromIconUrl(url);
+    if (!urlUid) return true;
+    return urlUid === expected;
   }
 
   // src/lib/sanitizeRoomAvatarsForBroadcaster.js
@@ -236,21 +251,7 @@
   }
 
   // src/lib/avatarBroadcasterGuard.js
-  function extractNiconicoUserIdFromIconUrl(raw) {
-    const s = String(raw == null ? "" : raw).trim();
-    if (!s) return "";
-    const m = s.match(/\/(\d{2,15})\.(?:jpg|jpeg|png|gif|webp)(?:[?#]|$)/i);
-    if (m && m[1]) return m[1];
-    return "";
-  }
-  function isAvatarUrlForUserId(url, expectedUserId) {
-    const expected = String(expectedUserId ?? "").trim();
-    if (!expected) return true;
-    if (!/^\d{2,15}$/.test(expected)) return true;
-    const urlUid = extractNiconicoUserIdFromIconUrl(url);
-    if (!urlUid) return true;
-    return urlUid === expected;
-  }
+  var isAvatarUrlForUserId2 = isAvatarUrlForUserId;
   function shouldAssociateAvatarWithUser(input) {
     const uid = String(input?.uid ?? "").trim();
     const av = String(input?.av ?? "").trim();
@@ -777,6 +778,17 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.84",
+      date: "2026-05-01",
+      summary: "Hoshino-Romi \u6D41\u30EA\u30D5\u30A1\u30AF\u30BF Phase A+B\uFF08avatarResolver \u57FA\u76E4\uFF09",
+      items: Object.freeze([
+        "avatar \u89E3\u6C7A\u30ED\u30B8\u30C3\u30AF\u3092\u5358\u4E00\u306E\u7D14\u7C8B\u95A2\u6570 src/domain/user/avatarResolver.js \u306B\u96C6\u7D04\u3059\u308B\u57FA\u76E4\u3092\u5B9F\u88C5\u3057\u307E\u3057\u305F\uFF08surechigai-lite \u306E\u5358\u4E00 store \u30D1\u30BF\u30FC\u30F3\u3092\u53C2\u8003\uFF09\u300222 \u30B1\u30FC\u30B9\u306E TDD \u5B8C\u5099\uFF08\u5408\u8A08 2153 \u4EF6 PASS\uFF09",
+        "shared \u30EC\u30A4\u30E4\u306B src/shared/avatar/avatarUrlGuard.js \u3092\u65B0\u8A2D\u3057\u3001URL helper\uFF08isSameAvatarUrl / extractNiconicoUserIdFromIconUrl / isAvatarUrlForUserId\uFF09\u3092\u96C6\u7D04\u3002\u30EC\u30A4\u30E4\u4F9D\u5B58\u30EB\u30FC\u30EB\uFF08domain \u2192 shared\uFF09\u3092\u9075\u5B88",
+        "lib/avatarUrlCompare.js \u3068 lib/avatarBroadcasterGuard.js \u306F shared \u3078\u306E re-export shim \u306B\u7E2E\u5C0F\uFF08\u5F8C\u65B9\u4E92\u63DB\uFF09\u3002shouldAssociateAvatarWithUser \u306F @deprecated \u3068\u3057\u3001Phase E \u3067\u524A\u9664\u4E88\u5B9A",
+        "\u4ECA\u56DE phase B \u5358\u4F53\u3067\u306F\u30E6\u30FC\u30B6\u30FC\u4F53\u9A13\u306F\u5909\u5316\u3057\u307E\u305B\u3093\u3002Phase C/D \u3067\u66F8\u304D\u8FBC\u307F\u30FB\u8868\u793A\u7D4C\u8DEF\u3092\u6BB5\u968E\u7684\u306B resolver \u7D4C\u7531\u306B\u7D71\u5408\u3057\u3066\u3044\u304D\u307E\u3059"
+      ])
+    }),
     Object.freeze({
       version: "0.1.83",
       date: "2026-05-01",
@@ -2929,7 +2941,7 @@
   }
   function guardAvatarForBroadcaster(uid, av, broadcasterContext) {
     if (!av) return av;
-    if (!isAvatarUrlForUserId(av, uid)) return "";
+    if (!isAvatarUrlForUserId2(av, uid)) return "";
     if (!broadcasterContext) return av;
     const safe = shouldAssociateAvatarWithUser({
       uid,
@@ -3002,14 +3014,14 @@
         }
       }
       if (candAv && isHttpOrHttpsUrl(candAv) && !isWeakNiconicoUserIconHttpUrl(candAv) && // 0.1.83: 普遍ガード — URL 埋め込み uid とエントリ uid の一致を要求
-      isAvatarUrlForUserId(candAv, uid)) {
+      isAvatarUrlForUserId2(candAv, uid)) {
         const curStrong = curAv && isHttpOrHttpsUrl(curAv) && !isWeakNiconicoUserIconHttpUrl(curAv);
         if (!curStrong) {
           out = { ...out, avatarUrl: candAv };
           changed = true;
         }
       }
-      if (curAv && isHttpOrHttpsUrl(curAv) && !isAvatarUrlForUserId(curAv, uid)) {
+      if (curAv && isHttpOrHttpsUrl(curAv) && !isAvatarUrlForUserId2(curAv, uid)) {
         out = { ...out, avatarUrl: "" };
         changed = true;
       }
@@ -4155,7 +4167,7 @@ ${body}`;
           g.avatarUrl ?? ""
         ).trim();
         if (!u) continue;
-        if (!isAvatarUrlForUserId(u, userId)) continue;
+        if (!isAvatarUrlForUserId2(u, userId)) continue;
         if (broadcasterGuardEnabled && !isBroadcasterHere && isSameAvatarUrl(u, broadcasterIconUrl)) {
           continue;
         }
@@ -11519,7 +11531,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const mistakenBroadcaster = !own && Boolean(bc && entUid && bc === entUid);
     const guardAv = (av) => {
       if (!av) return "";
-      if (!isAvatarUrlForUserId(av, entUid)) return "";
+      if (!isAvatarUrlForUserId2(av, entUid)) return "";
       return shouldAssociateAvatarWithUser({
         uid: entUid,
         av,
@@ -16689,7 +16701,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1631" ? String("0501-1631") : "dev";
+      const buildId = "0501-1653" ? String("0501-1653") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

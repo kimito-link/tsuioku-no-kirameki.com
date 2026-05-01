@@ -688,7 +688,7 @@
     return true;
   }
 
-  // src/lib/avatarUrlCompare.js
+  // src/shared/avatar/avatarUrlGuard.js
   function avatarCompareKey(raw) {
     const s = String(raw == null ? "" : raw).trim();
     if (!s) return "";
@@ -706,8 +706,6 @@
     const kb = avatarCompareKey(b);
     return Boolean(ka && kb && ka === kb);
   }
-
-  // src/lib/avatarBroadcasterGuard.js
   function extractNiconicoUserIdFromIconUrl(raw) {
     const s = String(raw == null ? "" : raw).trim();
     if (!s) return "";
@@ -723,6 +721,9 @@
     if (!urlUid) return true;
     return urlUid === expected;
   }
+
+  // src/lib/avatarBroadcasterGuard.js
+  var isAvatarUrlForUserId2 = isAvatarUrlForUserId;
   function shouldAssociateAvatarWithUser(input) {
     const uid = String(input?.uid ?? "").trim();
     const av = String(input?.av ?? "").trim();
@@ -814,7 +815,7 @@
   }
   function guardAvatarForBroadcaster(uid, av, broadcasterContext) {
     if (!av) return av;
-    if (!isAvatarUrlForUserId(av, uid)) return "";
+    if (!isAvatarUrlForUserId2(av, uid)) return "";
     if (!broadcasterContext) return av;
     const safe = shouldAssociateAvatarWithUser({
       uid,
@@ -887,14 +888,14 @@
         }
       }
       if (candAv && isHttpOrHttpsUrl(candAv) && !isWeakNiconicoUserIconHttpUrl(candAv) && // 0.1.83: 普遍ガード — URL 埋め込み uid とエントリ uid の一致を要求
-      isAvatarUrlForUserId(candAv, uid)) {
+      isAvatarUrlForUserId2(candAv, uid)) {
         const curStrong = curAv && isHttpOrHttpsUrl(curAv) && !isWeakNiconicoUserIconHttpUrl(curAv);
         if (!curStrong) {
           out = { ...out, avatarUrl: candAv };
           changed = true;
         }
       }
-      if (curAv && isHttpOrHttpsUrl(curAv) && !isAvatarUrlForUserId(curAv, uid)) {
+      if (curAv && isHttpOrHttpsUrl(curAv) && !isAvatarUrlForUserId2(curAv, uid)) {
         out = { ...out, avatarUrl: "" };
         changed = true;
       }
@@ -3459,7 +3460,7 @@
       const av = String(rec?.avatarUrl || "").trim();
       if (!isHttpOrHttpsUrl(av)) continue;
       if (isWeakNiconicoUserIconHttpUrl(av)) continue;
-      if (!isAvatarUrlForUserId(av, uid)) continue;
+      if (!isAvatarUrlForUserId2(av, uid)) continue;
       if (broadcasterUid && !shouldAssociateAvatarWithUser({
         uid,
         av,

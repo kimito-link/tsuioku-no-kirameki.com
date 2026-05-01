@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.84',
+    date: '2026-05-01',
+    summary: 'Hoshino-Romi 流リファクタ Phase A+B（avatarResolver 基盤）',
+    items: Object.freeze([
+      'avatar 解決ロジックを単一の純粋関数 src/domain/user/avatarResolver.js に集約する基盤を実装しました（surechigai-lite の単一 store パターンを参考）。22 ケースの TDD 完備（合計 2153 件 PASS）',
+      'shared レイヤに src/shared/avatar/avatarUrlGuard.js を新設し、URL helper（isSameAvatarUrl / extractNiconicoUserIdFromIconUrl / isAvatarUrlForUserId）を集約。レイヤ依存ルール（domain → shared）を遵守',
+      'lib/avatarUrlCompare.js と lib/avatarBroadcasterGuard.js は shared への re-export shim に縮小（後方互換）。shouldAssociateAvatarWithUser は @deprecated とし、Phase E で削除予定',
+      '今回 phase B 単体ではユーザー体験は変化しません。Phase C/D で書き込み・表示経路を段階的に resolver 経由に統合していきます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.83',
     date: '2026-05-01',
     summary: '普遍ルール「URL の uid とエントリの uid 一致」で根治',
