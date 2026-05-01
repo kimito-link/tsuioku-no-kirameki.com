@@ -883,9 +883,19 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.86",
+      date: "2026-05-01",
+      summary: "\u30B9\u30AF\u30ED\u30FC\u30EB\u30D0\u30FC 2 \u91CD\u306E\u4FEE\u6B63",
+      items: Object.freeze([
+        "popup window \u304C\u7E26\u306B\u5C0F\u3055\u3044\u6642\u3001html height (580px \u7B49) \u304C viewport \u3092\u8D85\u3048\u308B\u3068\u3001popup window \u81EA\u4F53\u306B scrollbar \u304C\u51FA\u3066\u3001\u5185\u5074\u306E .nl-main \u306E scrollbar \u3068\u4E8C\u91CD\u306B\u306A\u3063\u3066\u3044\u307E\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: extension/popup.html \u306E html:not(.nl-inline) \u3068 body \u306E height/max-height \u3092 min(--nl-pop-height, 580px, 100vh) \u3067\u30AF\u30E9\u30F3\u30D7\u3002viewport \u3092\u8D85\u3048\u306A\u3044\u306E\u3067 popup window \u5074\u306B scrollbar \u304C\u51FA\u306A\u304F\u306A\u308A\u3001\u5185\u90E8 .nl-main \u306E 1 \u672C\u306E\u307F\u306B\u306A\u308A\u307E\u3059",
+        "\u5927\u753B\u9762\u3067\u306F\u305D\u3082\u305D\u3082 2 \u91CD\u306B\u306A\u3089\u306A\u304B\u3063\u305F\uFF08viewport \u304C\u5927\u304D\u3044\u306E\u3067 window scrollbar \u4E0D\u8981\uFF09\u305F\u3081\u3001\u672C\u4FEE\u6B63\u306F\u5C0F\u301C\u4E2D\u753B\u9762\u3067\u52B9\u679C\u3042\u308A"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.85",
       date: "2026-05-01",
-      summary: "storyGrowthAvatarSrcCandidate \u3092 resolver \u5316",
+      summary: "avatar \u5019\u88DC\u89E3\u6C7A\u3092 resolver \u7D4C\u7531\u306B\u66F8\u63DB",
       items: Object.freeze([
         "popup-entry.js \u306E storyGrowthAvatarSrcCandidate\uFF08\u30A2\u30A4\u30B3\u30F3\u5217\u306E avatar URL \u6C7A\u5B9A\uFF09\u3092\u3001avatarResolver \u7D4C\u7531\u306B\u66F8\u304D\u63DB\u3048\u307E\u3057\u305F\u300245 \u884C\u306E\u624B\u66F8\u304D\u30AC\u30FC\u30C9\u30ED\u30B8\u30C3\u30AF\u304C 25 \u884C\u306E\u30B7\u30F3\u30D7\u30EB\u306A observation \u914D\u5217\u69CB\u7BC9\u306B\u7F6E\u304D\u63DB\u3048\u3089\u308C\u3001\u4FDD\u5B88\u6027\u304C\u5411\u4E0A\u3057\u3066\u3044\u307E\u3059",
         "\u5165\u529B\u30BD\u30FC\u30B9 2 \u7A2E\uFF08entry.avatarUrl, profile cache\uFF09\u3092 AvatarObservation \u306B\u6B63\u898F\u5316\u3057\u3066 resolver \u306B\u6E21\u3059\u5F62\u5F0F\u306B\u7D71\u4E00\u3002\u30AC\u30FC\u30C9\uFF08uid mismatch / broadcaster impersonation / viewer impersonation\uFF09\u306F\u3059\u3079\u3066 resolver \u5185\u3067\u51E6\u7406\u3055\u308C\u307E\u3059",
@@ -16810,7 +16820,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1659" ? String("0501-1659") : "dev";
+      const buildId = "0501-1704" ? String("0501-1704") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

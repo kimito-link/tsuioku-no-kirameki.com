@@ -26,9 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.86',
+    date: '2026-05-01',
+    summary: 'スクロールバー 2 重の修正',
+    items: Object.freeze([
+      'popup window が縦に小さい時、html height (580px 等) が viewport を超えると、popup window 自体に scrollbar が出て、内側の .nl-main の scrollbar と二重になっていました',
+      '修正内容: extension/popup.html の html:not(.nl-inline) と body の height/max-height を min(--nl-pop-height, 580px, 100vh) でクランプ。viewport を超えないので popup window 側に scrollbar が出なくなり、内部 .nl-main の 1 本のみになります',
+      '大画面ではそもそも 2 重にならなかった（viewport が大きいので window scrollbar 不要）ため、本修正は小〜中画面で効果あり'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.85',
     date: '2026-05-01',
-    summary: 'storyGrowthAvatarSrcCandidate を resolver 化',
+    summary: 'avatar 候補解決を resolver 経由に書換',
     items: Object.freeze([
       'popup-entry.js の storyGrowthAvatarSrcCandidate（アイコン列の avatar URL 決定）を、avatarResolver 経由に書き換えました。45 行の手書きガードロジックが 25 行のシンプルな observation 配列構築に置き換えられ、保守性が向上しています',
       '入力ソース 2 種（entry.avatarUrl, profile cache）を AvatarObservation に正規化して resolver に渡す形式に統一。ガード（uid mismatch / broadcaster impersonation / viewer impersonation）はすべて resolver 内で処理されます',
