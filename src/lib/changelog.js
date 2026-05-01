@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.96',
+    date: '2026-05-01',
+    summary: '診断バンドルに snapshot 情報を追加',
+    items: Object.freeze([
+      '配信者がりんく lane に出続ける件の原因切り分けのため、AI 共有用診断バンドルに watchMetaCache.snapshot の broadcasterUserId / broadcasterName / viewerUserId を含めるようにしました（個人特定可能情報は既に他経路で扱っているもののみ）',
+      'これで「snapshot の broadcasterUserId が空でフィルタが no-op になっている」のか「broadcasterUid は取れているが別経路で混入している」のかが診断バンドル 1 つで判別できるようになります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.95',
     date: '2026-05-01',
     summary: '配信者が rank strip と専用カードに二重表示される件を修正',

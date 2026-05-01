@@ -9053,6 +9053,24 @@ function initPopup() {
           } catch {
             return true;
           }
+        })(),
+        // 0.1.96: lane / rank strip のフィルタが正しく効いているかを判定するため、
+        //   snapshot の broadcaster / viewer 識別子を診断バンドルに含める。
+        //   uid 一致比較でしか除外できないので、これが空 / 不一致 だとフィルタは
+        //   no-op になる。診断時の根拠として読めるようにする。
+        watchSnapshotMeta: (() => {
+          const snap = watchMetaCache?.snapshot;
+          if (!snap || typeof snap !== 'object') return null;
+          return {
+            liveId: String(snap.liveId || ''),
+            broadcasterUserId: String(snap.broadcasterUserId || ''),
+            broadcasterName: String(snap.broadcasterName || '').slice(0, 80),
+            broadcasterPageUrl: String(snap.broadcasterPageUrl || '').slice(0, 200),
+            viewerUserId: String(snap.viewerUserId || ''),
+            hasBroadcasterIconUrl: Boolean(
+              String(snap.broadcasterIconUrl || '').trim()
+            )
+          };
         })()
       },
       content: null,

@@ -790,6 +790,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.96",
+      date: "2026-05-01",
+      summary: "\u8A3A\u65AD\u30D0\u30F3\u30C9\u30EB\u306B snapshot \u60C5\u5831\u3092\u8FFD\u52A0",
+      items: Object.freeze([
+        "\u914D\u4FE1\u8005\u304C\u308A\u3093\u304F lane \u306B\u51FA\u7D9A\u3051\u308B\u4EF6\u306E\u539F\u56E0\u5207\u308A\u5206\u3051\u306E\u305F\u3081\u3001AI \u5171\u6709\u7528\u8A3A\u65AD\u30D0\u30F3\u30C9\u30EB\u306B watchMetaCache.snapshot \u306E broadcasterUserId / broadcasterName / viewerUserId \u3092\u542B\u3081\u308B\u3088\u3046\u306B\u3057\u307E\u3057\u305F\uFF08\u500B\u4EBA\u7279\u5B9A\u53EF\u80FD\u60C5\u5831\u306F\u65E2\u306B\u4ED6\u7D4C\u8DEF\u3067\u6271\u3063\u3066\u3044\u308B\u3082\u306E\u306E\u307F\uFF09",
+        "\u3053\u308C\u3067\u300Csnapshot \u306E broadcasterUserId \u304C\u7A7A\u3067\u30D5\u30A3\u30EB\u30BF\u304C no-op \u306B\u306A\u3063\u3066\u3044\u308B\u300D\u306E\u304B\u300CbroadcasterUid \u306F\u53D6\u308C\u3066\u3044\u308B\u304C\u5225\u7D4C\u8DEF\u3067\u6DF7\u5165\u3057\u3066\u3044\u308B\u300D\u306E\u304B\u304C\u8A3A\u65AD\u30D0\u30F3\u30C9\u30EB 1 \u3064\u3067\u5224\u5225\u3067\u304D\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.95",
       date: "2026-05-01",
       summary: "\u914D\u4FE1\u8005\u304C rank strip \u3068\u5C02\u7528\u30AB\u30FC\u30C9\u306B\u4E8C\u91CD\u8868\u793A\u3055\u308C\u308B\u4EF6\u3092\u4FEE\u6B63",
@@ -16854,7 +16863,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-2110" ? String("0501-2110") : "dev";
+      const buildId = "0501-2124" ? String("0501-2124") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -17044,6 +17053,24 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
             } catch {
               return true;
             }
+          })(),
+          // 0.1.96: lane / rank strip のフィルタが正しく効いているかを判定するため、
+          //   snapshot の broadcaster / viewer 識別子を診断バンドルに含める。
+          //   uid 一致比較でしか除外できないので、これが空 / 不一致 だとフィルタは
+          //   no-op になる。診断時の根拠として読めるようにする。
+          watchSnapshotMeta: (() => {
+            const snap = watchMetaCache?.snapshot;
+            if (!snap || typeof snap !== "object") return null;
+            return {
+              liveId: String(snap.liveId || ""),
+              broadcasterUserId: String(snap.broadcasterUserId || ""),
+              broadcasterName: String(snap.broadcasterName || "").slice(0, 80),
+              broadcasterPageUrl: String(snap.broadcasterPageUrl || "").slice(0, 200),
+              viewerUserId: String(snap.viewerUserId || ""),
+              hasBroadcasterIconUrl: Boolean(
+                String(snap.broadcasterIconUrl || "").trim()
+              )
+            };
           })()
         },
         content: null,
