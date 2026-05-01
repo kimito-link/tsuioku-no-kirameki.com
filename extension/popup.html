@@ -6120,22 +6120,41 @@
        * 「履歴あり empty」では cards に前回データが入るので hide しない。
        * → JS が html に nl-empty-no-history を付けたとき限定で hide する。
        */
-      html.nl-empty-no-history body .nl-live-stat-cards,
-      html.nl-empty-no-history body .nl-stats,
-      html.nl-empty-no-history body .nl-vdh-divider,
-      html.nl-empty-no-history body .nl-comment-compose,
-      html.nl-empty-no-history body .nl-session-summary-panel,
-      html.nl-empty-no-history body .nl-gift-quick-panel,
-      html.nl-empty-no-history body .nl-record-nav-hint,
-      html.nl-empty-no-history body .nl-dev-monitor-details {
+      /*
+       * 0.1.70 (AZ): empty state は **2 段階** で hide する。
+       *
+       *   nl-empty-state:        履歴あり/なしどちらでも常に hide すべき要素
+       *                          (active な watch 用の UI 群)
+       *   nl-empty-no-history:   履歴ゼロのときに「前回の配信」cards も hide
+       *
+       * 0.1.69 (AY) では `nl-empty-no-history` だけで列挙していたが、履歴あり
+       * empty で **下半分（応援 hero / コメ送信欄 / 5分の応援増加 / 記録 0 件 /
+       * アイコン列・グリッド・診断 / 書き出しの詳細）が全部出たまま** で混乱した。
+       * 共通分を `nl-empty-state` に切り出し、cards 系だけを no-history で追加 hide する。
+       */
+
+      /* 共通: 履歴あり/なしどちらでも hide する active watch 用 UI */
+      html.nl-empty-state body .nl-stats,
+      html.nl-empty-state body .nl-comment-compose,
+      html.nl-empty-state body .nl-vdh-divider,
+      html.nl-empty-state body .nl-session-summary-panel,
+      html.nl-empty-state body .nl-gift-quick-panel,
+      html.nl-empty-state body .nl-record-nav-hint,
+      html.nl-empty-state body .nl-dev-monitor-details {
         display: none !important;
       }
 
-      /* userRoomList とその周辺の「応援可視化」セクションも一括 hide */
-      html.nl-empty-no-history body h2[data-nl-toolbar-only],
-      html.nl-empty-no-history body #userRoomList,
-      html.nl-empty-no-history body .nl-anonymous-identicon-opt,
-      html.nl-empty-no-history body .nl-anonymous-identicon-hint {
+      html.nl-empty-state body h2[data-nl-toolbar-only],
+      html.nl-empty-state body #userRoomList,
+      html.nl-empty-state body .nl-anonymous-identicon-opt,
+      html.nl-empty-state body .nl-anonymous-identicon-hint {
+        display: none !important;
+      }
+
+      /* 履歴ゼロ追加: 「前回の配信」cards / indicator / actions も hide */
+      html.nl-empty-no-history body .nl-live-stat-cards,
+      html.nl-empty-no-history body .nl-last-broadcast-indicator,
+      html.nl-empty-no-history body .nl-last-broadcast-actions {
         display: none !important;
       }
 

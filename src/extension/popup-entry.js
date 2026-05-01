@@ -6131,6 +6131,11 @@ async function applyLastBroadcastReviewToEmptyState() {
   const concurrentSub = $('watchConcurrentSub');
   const officialEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsOfficial'));
 
+  // 0.1.70 (AZ): empty state は履歴あり/なしどちらでも nl-empty-state を必ず付け、
+  //   active watch 用の UI（応援 hero / コメ送信欄 / heat / userRoomList / 各種 details）を
+  //   一括 hide する。履歴ゼロのときは追加で nl-empty-no-history で cards も hide。
+  root.classList.add('nl-empty-state');
+
   const hideReview = () => {
     if (indicator) indicator.hidden = true;
     if (actionsEl) actionsEl.hidden = true;
@@ -6256,10 +6261,15 @@ async function applyLastBroadcastReviewToEmptyState() {
 
 /**
  * 0.1.69 (AY): empty state を抜けて active な watch に戻る瞬間に呼ぶ。
- * indicator / button を hide にし、`nl-empty-no-history` を確実に外す。
+ * indicator / button を hide にし、empty state 用クラスを確実に外す。
+ *
+ * 0.1.70 (AZ): nl-empty-state（共通）と nl-empty-no-history（追加）の両方を
+ *   外す。これがないと active watch でも応援 hero / コメ送信欄 / 各 details が
+ *   消えたままになる。
  */
 function clearLastBroadcastReviewArtifacts() {
   const root = document.documentElement;
+  root.classList.remove('nl-empty-state');
   root.classList.remove('nl-empty-no-history');
   const indicator = $('lastBroadcastIndicator');
   if (indicator) indicator.hidden = true;

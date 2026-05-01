@@ -14297,6 +14297,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       /** @type {HTMLElement|null} */
       $("liveStatCommentsOfficial")
     );
+    root.classList.add("nl-empty-state");
     const hideReview = () => {
       if (indicator) indicator.hidden = true;
       if (actionsEl) actionsEl.hidden = true;
@@ -14394,6 +14395,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   }
   function clearLastBroadcastReviewArtifacts() {
     const root = document.documentElement;
+    root.classList.remove("nl-empty-state");
     root.classList.remove("nl-empty-no-history");
     const indicator = $("lastBroadcastIndicator");
     if (indicator) indicator.hidden = true;
@@ -16413,7 +16415,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1053" ? String("0501-1053") : "dev";
+      const buildId = "0501-1101" ? String("0501-1101") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.69（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.70（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,35 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.70 バンプで入った修正（empty state の hide 範囲を「履歴あり」にも拡大 AZ）**:
+
+- ユーザー報告（0.1.69 リリース後、スクショ）: 「ひどいです もうなおらないのですかね」。
+  popup の下半分で **応援 hero（「（この配信は未取得）」）/ コメ送信欄 / 5分の応援増加
+  / 記録 0 件です / アイコン列・グリッド・診断 / 書き出しの詳細 / 詳しい状況** が
+  全部出たままで、「前回の配信」cards との文脈ちぐはぐが大きかった。
+- 原因: 0.1.69 (AY) は **履歴ゼロ** のときだけ `nl-empty-no-history` クラスで
+  hide 列挙していた。**履歴あり** empty では何も hide していなかったため、
+  active watch 用 UI（応援 hero / コメ送信欄 等）が全部表示されたまま。
+- 修正: empty state の hide を **2 段階** に分割。
+  - `nl-empty-state` (共通): 履歴あり/なしどちらでも常に hide する active watch 用 UI
+    （`.nl-stats` / `.nl-comment-compose` / `.nl-vdh-divider` /
+    `.nl-session-summary-panel` / `.nl-gift-quick-panel` / `.nl-record-nav-hint` /
+    `.nl-dev-monitor-details` / `#userRoomList` / `h2[data-nl-toolbar-only]` /
+    `.nl-anonymous-identicon-opt` / `.nl-anonymous-identicon-hint`）
+  - `nl-empty-no-history` (追加): 履歴ゼロのときに `.nl-live-stat-cards` /
+    `.nl-last-broadcast-indicator` / `.nl-last-broadcast-actions` も hide
+- popup-entry.js:
+  - `applyLastBroadcastReviewToEmptyState()` の冒頭で `nl-empty-state` を常に付ける
+  - `clearLastBroadcastReviewArtifacts()` で active watch に戻ったとき、
+    `nl-empty-state` も `nl-empty-no-history` も両方外す
+- 検証:
+  - lint / typecheck / build すべて green
+  - プレビュー 380px **履歴あり**: noWatchRankingHint + 「前回（08:37〜）」+
+    「もう一度開く」+ 3 cards (14/37/121) + 詳細設定 + 更新履歴 + 拡張について +
+    配色プリセット のみ。下半分の余分な UI は完全に消えた。
+  - プレビュー 380px **履歴ゼロ**: noWatchRankingHint + 詳細設定 + 更新履歴 +
+    拡張について + 配色プリセット のみ。0.1.69 と同じくらい綺麗。
 
 **0.1.69 バンプで入った修正（配信なし empty state を「前回の配信」cards で再現 + side panel ランキング導線復活 AY）**:
 
