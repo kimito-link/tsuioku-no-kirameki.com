@@ -6152,32 +6152,19 @@ async function resizePopupWindowForState(input) {
     // popup window 限定。通常の Chrome ウィンドウや side panel は無視。
     if (win.type !== 'popup') return;
 
-    // 0.1.71 (BA): empty state のときだけ実測ベースで高さを決める。
-    // active watch（emptyState=false）は既存の 780px を維持して見た目を変えない。
-    // empty state の hide ルール反映後の DOM レイアウト確定を待つため
-    // requestAnimationFrame を 1 段挟む。
-    /** @type {{ contentHeightPx: number, chromeOverheadPx: number }|undefined} */
-    let viewportHint = undefined;
-    if (emptyState) {
-      try {
-        await new Promise((r) => requestAnimationFrame(() => r(undefined)));
-        const bodyEl = document.body;
-        const bodyScroll = bodyEl ? bodyEl.scrollHeight : 0;
-        if (Number.isFinite(bodyScroll) && bodyScroll > 0) {
-          viewportHint = {
-            contentHeightPx: bodyScroll,
-            chromeOverheadPx: 40
-          };
-        }
-      } catch {
-        // 測定失敗時はプリセットにフォールバック
-      }
-    }
-
+    // 0.1.72 (BB): 0.1.71 の body.scrollHeight 実測は changelog / concept /
+    //   frame-switch / powered-by など empty state でも可視のセクション全部を
+    //   含んだ「content 全体高さ」を返してしまい、popup が逆に拡大することが
+    //   判明（780→960 級のケースあり）。
+    //   CSS 側で `html:not(.nl-inline) { height: min(...,580px); }` の cap が
+    //   既に効いており、popup outer = 580 + 40 = 620 にすれば body cap が
+    //   inner viewport にぴったり収まる。それ以下の content は body 内で
+    //   .nl-main の overflow:auto で scroll される。
+    //
+    //   よって fixed preset のみを使う（測定値 hint は渡さない）。
     const height = computePopupWindowTargetHeight({
       emptyState,
-      hasHistory,
-      viewportHint
+      hasHistory
     });
     if (typeof win.height === 'number' && win.height === height) return;
     await chrome.windows.update(win.id, {

@@ -27,12 +27,17 @@ export const POPUP_WINDOW_WIDTH = 420;
 export const POPUP_WINDOW_HEIGHT_ACTIVE_WATCH = 780;
 
 /** empty state + 履歴ありの popup window 高さ
- *  プレビュー実測: inner content ~620px → outer 660px で OS chrome 40px 込みでぴったり */
-export const POPUP_WINDOW_HEIGHT_EMPTY_WITH_HISTORY = 660;
+ *  CSS の `html:not(.nl-inline) { height: min(..., 580px) }` で body 高さは 580px に
+ *  cap される。outer = 580 + 40（OS chrome 余裕）= 620 にすれば body cap が
+ *  inner viewport にぴったり収まり、白い空き帯がゼロになる。
+ *  content がそれを超える分は body 内 .nl-main の overflow:auto で scroll。 */
+export const POPUP_WINDOW_HEIGHT_EMPTY_WITH_HISTORY = 620;
 
 /** empty state + 履歴ゼロ（first-time）の popup window 高さ
- *  プレビュー実測: 4 ボタン + 4 details + Konjite で inner ~510px → outer 550px */
-export const POPUP_WINDOW_HEIGHT_EMPTY_NO_HISTORY = 550;
+ *  ranking 4 ボタン + 詳細設定 + 更新履歴 + 拡張について + 配色 + powered-by で
+ *  実測 ~550px。outer 600 = inner 560、body cap 580 が inner で抑えられて 560、
+ *  content 550 ≦ 560 でほぼスクロールなし、白い空きもごく僅か。 */
+export const POPUP_WINDOW_HEIGHT_EMPTY_NO_HISTORY = 600;
 
 /** クランプ用の MIN（OS / Chrome の最小窓サイズを下回らないように） */
 export const POPUP_WINDOW_MIN_HEIGHT = 360;

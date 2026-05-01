@@ -9637,8 +9637,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   // src/lib/popupWindowEmptyHeight.js
   var POPUP_WINDOW_WIDTH = 420;
   var POPUP_WINDOW_HEIGHT_ACTIVE_WATCH = 780;
-  var POPUP_WINDOW_HEIGHT_EMPTY_WITH_HISTORY = 660;
-  var POPUP_WINDOW_HEIGHT_EMPTY_NO_HISTORY = 550;
+  var POPUP_WINDOW_HEIGHT_EMPTY_WITH_HISTORY = 620;
+  var POPUP_WINDOW_HEIGHT_EMPTY_NO_HISTORY = 600;
   var POPUP_WINDOW_MIN_HEIGHT = 360;
   var POPUP_WINDOW_MAX_HEIGHT = 1100;
   function computePopupWindowTargetHeight(input) {
@@ -14326,25 +14326,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const win = await chrome.windows.getCurrent();
       if (!win || win.id == null) return;
       if (win.type !== "popup") return;
-      let viewportHint = void 0;
-      if (emptyState) {
-        try {
-          await new Promise((r) => requestAnimationFrame(() => r(void 0)));
-          const bodyEl = document.body;
-          const bodyScroll = bodyEl ? bodyEl.scrollHeight : 0;
-          if (Number.isFinite(bodyScroll) && bodyScroll > 0) {
-            viewportHint = {
-              contentHeightPx: bodyScroll,
-              chromeOverheadPx: 40
-            };
-          }
-        } catch {
-        }
-      }
       const height = computePopupWindowTargetHeight({
         emptyState,
-        hasHistory,
-        viewportHint
+        hasHistory
       });
       if (typeof win.height === "number" && win.height === height) return;
       await chrome.windows.update(win.id, {
@@ -16498,7 +16482,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1117" ? String("0501-1117") : "dev";
+      const buildId = "0501-1133" ? String("0501-1133") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

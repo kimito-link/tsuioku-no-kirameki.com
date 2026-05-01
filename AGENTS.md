@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.71（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.72（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,30 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.72 バンプで入った修正（popup window 実測 resize の不具合修正 + Playwright 検証 BB）**:
+
+- ユーザー報告（0.1.71 リリース後、スクショ 2 枚）: 「なんかよいかんじではないです
+  プレイライトつかいながら最適化がいいかも」
+  - スクショ 1（小型 PC）: popup 高さ ~600 で 詳細設定 直下が空
+  - スクショ 2（大型 PC）: popup 高さ ~960 で 更新履歴 / 拡張について まで見える
+    が popup 自体が縦に長すぎる
+- 原因: 0.1.71 の `body.scrollHeight` 実測は **changelog / concept / frame /
+  powered-by など empty state でも可視のセクション全部を含む全コンテンツ高さ
+  （~820px）** を返していた。これに OS chrome 余裕 40px 足して `chrome.windows.update`
+  を呼ぶと popup outer = 860+ になり、画面によっては 960+ まで膨張する事故が発生。
+- 修正: 実測パスを撤去し、fixed preset のみを使う。
+  - empty + history: 660 → **620**（CSS body cap 580 + chrome 40 でぴったり）
+  - empty + no-history: 550 → **600**（content ~530 がほぼスクロールなしで収まる）
+  - active watch: 780（不変）
+- Playwright 検証 (`tests/e2e/popup-empty-state-window-height.spec.js`):
+  - SW 経由で `chrome.windows.create({type:'popup', height:780})` で popup 起動
+  - 利用条件 gate / refresh / resize 完了を待ったあと
+    `chrome.windows.getAll` で popup の現在サイズを取得
+  - 実機実測: **width=420, height=600, type='popup'** を確認（fresh profile = no-history）
+  - 「780 のまま resize されない退行」を弾く assertion 付き
+- 残課題: Playwright で history-あり ケースのテストはまだ追加していない
+  （IDB に事前データを挿入する fixture が必要）。0.1.73 以降の候補。
 
 **0.1.71 バンプで入った修正（empty state では popup window 高さを実測ベースで縮める BA）**:
 
