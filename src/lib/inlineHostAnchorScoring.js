@@ -51,7 +51,12 @@ export const DEFAULT_INLINE_HOST_ANCHOR_LIMITS = Object.freeze({
   maxAspect: 2.6,
   minWidthRatioToVideo: 0.95,
   maxWidthRatioToVideo: 1.6,
-  maxHeightRatioToVideo: 3.5,
+  // 0.1.88: maxHeightRatioToVideo を 3.5 → 2.0 に絞る。
+  //   3.5 だと video + タグ + 配信者情報 + 関連作品 + アドバナーまで含む
+  //   巨大な wrapper まで eligible になり、その直後（page 末尾）に panel が
+  //   挿入される事故が発生していた（ニコ生 SEKIRO 系の縦積みレイアウト）。
+  //   2.0 = video の真下に「公式コメント列 + UI 1〜2 段」程度までに収める。
+  maxHeightRatioToVideo: 2.0,
   maxTopOffsetFromVideo: 120
 });
 

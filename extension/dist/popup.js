@@ -883,6 +883,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.88",
+      date: "2026-05-01",
+      summary: "\u30D1\u30CD\u30EB\u304C page \u672B\u5C3E\u306B\u51FA\u308B\u30D0\u30B0\u306E\u4FEE\u6B63",
+      items: Object.freeze([
+        "\u30CB\u30B3\u751F SEKIRO \u7CFB\u306E\u7E26\u7A4D\u307F\u30EC\u30A4\u30A2\u30A6\u30C8\u3067\u3001\u914D\u4FE1\u30D1\u30CD\u30EB\u304C\u30DA\u30FC\u30B8\u306E\u6700\u4E0B\u90E8\uFF08\u30BF\u30B0\u30FB\u95A2\u9023\u4F5C\u54C1\u30FB\u30A2\u30C9\u30D0\u30CA\u30FC\u306E\u4E0B\uFF09\u306B\u633F\u5165\u3055\u308C\u3066\u3057\u307E\u3046\u4E0D\u5177\u5408\u3092\u4FEE\u6B63\u3057\u307E\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: src/lib/inlineHostAnchorScoring.js \u306E maxHeightRatioToVideo \u3092 3.5 \u2192 2.0 \u306B\u7D5E\u308A\u307E\u3057\u305F\u30023.5 \u3060\u3068\u300Cvideo + \u30BF\u30B0 + \u914D\u4FE1\u8005\u60C5\u5831 + \u95A2\u9023\u4F5C\u54C1 + \u30A2\u30C9\u30D0\u30CA\u30FC\u300D\u307E\u3067\u3092\u542B\u3080\u5DE8\u5927\u306A\u30E9\u30C3\u30D1\u30FC\u307E\u3067 eligible \u5224\u5B9A\u3055\u308C\u3066\u3057\u307E\u3044\u3001\u305D\u306E\u76F4\u5F8C\u306B\u30D1\u30CD\u30EB\u304C\u633F\u5165\u3055\u308C\u3066\u3044\u307E\u3057\u305F",
+        "2.0 \u3067\u306F\u300Cvideo + \u516C\u5F0F\u30B3\u30E1\u30F3\u30C8\u5217 + UI 1\u301C2 \u6BB5\u300D\u7A0B\u5EA6\u307E\u3067\u3057\u304B eligible \u306B\u306A\u3089\u305A\u3001player \u306E\u771F\u4E0B\u306B\u6B63\u3057\u304F\u914D\u7F6E\u3055\u308C\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.87",
       date: "2026-05-01",
       summary: "\u30B0\u30EA\u30C3\u30C9\u304C\u65B0\u30B3\u30E1\u7121\u3057\u3067\u52D5\u304F\u306E\u3092\u4FEE\u6B63",
@@ -16830,7 +16840,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1710" ? String("0501-1710") : "dev";
+      const buildId = "0501-1713" ? String("0501-1713") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

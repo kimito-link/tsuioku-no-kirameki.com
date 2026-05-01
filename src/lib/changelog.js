@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.88',
+    date: '2026-05-01',
+    summary: 'パネルが page 末尾に出るバグの修正',
+    items: Object.freeze([
+      'ニコ生 SEKIRO 系の縦積みレイアウトで、配信パネルがページの最下部（タグ・関連作品・アドバナーの下）に挿入されてしまう不具合を修正しました',
+      '修正内容: src/lib/inlineHostAnchorScoring.js の maxHeightRatioToVideo を 3.5 → 2.0 に絞りました。3.5 だと「video + タグ + 配信者情報 + 関連作品 + アドバナー」までを含む巨大なラッパーまで eligible 判定されてしまい、その直後にパネルが挿入されていました',
+      '2.0 では「video + 公式コメント列 + UI 1〜2 段」程度までしか eligible にならず、player の真下に正しく配置されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.87',
     date: '2026-05-01',
     summary: 'グリッドが新コメ無しで動くのを修正',
