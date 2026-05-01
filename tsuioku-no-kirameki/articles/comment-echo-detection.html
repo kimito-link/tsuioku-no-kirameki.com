@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>ライブチャットの「コメ伝染／コメ被り」を sliding window で定量化する ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../images/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../images/apple-touch-icon.png">
+
+    <meta name="description" content="ライブチャットで起きる『コメ伝染』（30 秒以内に同じ語が複数ユーザーから飛ぶ連鎖）と『コメ被り瞬間』（5 秒以内の同期歓声）を、sliding window と正規化文字列マッチで軽量に検出するアルゴリズムの解説。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/comment-echo-detection.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/comment-echo-detection.html">
+    <meta property="og:title" content="ライブチャットの「コメ伝染／コメ被り」を sliding window で定量化する">
+    <meta property="og:description" content="ライブチャットの同期現象（コメ伝染・コメ被り）を sliding window で軽量に検出する手法。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-05-01T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "ライブチャットの「コメ伝染／コメ被り」を sliding window で定量化する",
+        "datePublished": "2026-05-01",
+        "dateModified": "2026-05-01",
+        "author": {"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},
+        "publisher": {"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},
+        "url": "https://tsuioku-no-kirameki.com/articles/comment-echo-detection.html",
+        "inLanguage": "ja-JP",
+        "license": "https://opensource.org/licenses/MIT"
+      }
+    </script>
+
+    <style>
+      :root{
+        --bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;
+        --line:rgba(88,62,28,.12);--gold:#c98e2b;--sky:#3d708d;--mint:#0f5e4f;--blue:#255d9b;
+        --violet:#5645ad;--brown:#8a3d19;--slate:#56534e;--red:#952b2a;
+        --text-primary:#2c2117;--text-secondary:#4f4338;
+        --shadow:0 18px 44px rgba(70,49,20,.12);--r1:34px;--r2:24px;--r3:18px;--maxw:880px;
+        --space-xs:8px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;
+        --shell-pad:16px;
+        --lh-tight:1.35;--lh-ui:1.58;--lh-body:1.82;--lh-heading:1.22;
+        --anchor-offset:56px;
+        --code-bg:rgba(45,33,23,.05);
+      }
+      @media (min-width:480px){ :root{--shell-pad:clamp(16px,3.2vw,28px)} }
+      *{box-sizing:border-box}
+      html{scroll-behavior:smooth;overflow-x:hidden}
+      body{
+        margin:0;color:var(--text-primary);
+        font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;
+        line-height:var(--lh-body);
+        background:
+          radial-gradient(ellipse 70% 48% at 98% 4%, rgba(255,210,228,.35), transparent 46%),
+          radial-gradient(circle at top right, rgba(132,184,207,.4), transparent 28%),
+          linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));
+        min-height:100vh;
+      }
+      a{color:var(--blue);text-underline-offset:3px}
+      a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);color:#1a1208;letter-spacing:.005em;}
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md);line-height:var(--lh-body)}
+      header.page .meta{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+      header.page .meta strong{color:var(--ink)}
+
+      main{padding-bottom:var(--space-2xl)}
+      section.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset);}
+      section.box h2{font-size:1.2rem;line-height:var(--lh-heading);margin:0 0 var(--space-md);color:#1a1208;letter-spacing:.01em;}
+      section.box h2 .num{display:inline-block;min-width:1.8em;color:var(--gold);font-variant-numeric:tabular-nums;font-weight:800;margin-right:.2em;}
+      section.box h3{font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700;}
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul, section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}
+      section.box li::marker{color:var(--gold)}
+
+      nav.toc{background:rgba(255,251,245,.72);border:1px solid var(--line);border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg);}
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);letter-spacing:.04em;font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}
+      nav.toc a:hover{color:var(--brown);text-decoration:underline}
+
+      .digest{padding:18px 22px;border-radius:var(--r3);background:linear-gradient(160deg, rgba(243,170,37,.1), rgba(15,94,79,.06));border:1px solid var(--line);margin:0 0 var(--space-lg);}
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}
+      .digest li{margin-bottom:4px;font-size:.94rem}
+
+      .note{font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;margin:var(--space-sm) 0;}
+      .note b{color:var(--brown);font-weight:700}
+
+      code, kbd{font-family:"Menlo","Consolas","SFMono-Regular",monospace;font-size:.92em;background:var(--code-bg);padding:1px 6px;border-radius:4px;}
+      pre.code{margin:var(--space-sm) 0;padding:14px 18px;background:#1f1d1a;color:#e8e0d2;border-radius:var(--r3);overflow-x:auto;font-family:"Menlo","Consolas","SFMono-Regular",monospace;font-size:.84rem;line-height:1.6;border:1px solid rgba(0,0,0,.3);}
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      pre.code .kw{color:#ff9d6c}
+      pre.code .fn{color:#a8d8ff}
+      pre.code .str{color:#b6e0a0}
+      pre.code .num{color:#d6b8ff}
+      pre.code .cm{color:#7d8694;font-style:italic}
+
+      .formula{margin:var(--space-sm) 0;padding:14px 18px;background:rgba(255,253,248,.7);border:1px solid var(--line);border-radius:var(--r3);font-family:"Menlo","Consolas",monospace;font-size:.95em;text-align:center;overflow-x:auto;}
+
+      .dl-meta{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:var(--space-sm) 0;font-size:.92rem;}
+      .dl-meta dt{color:var(--muted);font-weight:600}
+      .dl-meta dd{margin:0;color:var(--ink)}
+
+      footer.page{margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);}
+      footer.page a{color:var(--muted)}
+      footer.page a:hover{color:var(--brown)}
+
+      @media(max-width:520px){
+        section.box{padding:var(--space-md)}
+        pre.code{padding:12px 14px;font-size:.78rem}
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../" aria-label="君斗りんくの追憶のきらめき（トップへ戻る）">
+          <img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project">
+        </a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ コメ伝染・コメ被り検出</p>
+        <h1>ライブチャットの「コメ伝染／コメ被り」を<br>sliding window で定量化する</h1>
+        <p class="lead">ライブチャット上で起こる「同じ語が短時間に複数ユーザーから飛ぶ連鎖」（コメ伝染）と「ほぼ同時に同じ歓声が上がる瞬間」（コメ被り瞬間）を、sliding window と正規化文字列マッチで軽量に検出する手法。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-05-01</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>実装: <strong><a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/commentEchoDetector.js" target="_blank" rel="noopener">GitHub</a></strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+
+        <aside class="digest" aria-label="この記事の要点">
+          <h3>3 行要約</h3>
+          <ul>
+            <li>コメント本文を <strong>視覚的に同じものを同じキー</strong>に変換する正規化（全角→半角・case 統一・記号除去）を施す。</li>
+            <li>正規化キー単位で <strong>sliding window</strong> を維持し、window 内に <strong>異なる N ユーザー以上</strong> から同じキーが出たらバーストとして検出する。</li>
+            <li>パラメータ（window 幅・必要ユーザー数）を変えるだけで「30 秒の伝染」「5 秒の同期歓声」など複数の現象を同じアルゴリズムで切り分けられる。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc" aria-label="目次">
+          <h2>目次</h2>
+          <ol>
+            <li><a href="#s1">解決したい課題</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">アルゴリズム詳細</a></li>
+            <li><a href="#s4">参考実装（JavaScript）</a></li>
+            <li><a href="#s5">なぜこの設計なのか</a></li>
+            <li><a href="#s6">計算量と運用コスト</a></li>
+            <li><a href="#s7">既知の限界と拡張可能性</a></li>
+            <li><a href="#s8">関連する既知技術（先行技術）</a></li>
+            <li><a href="#s9">本記事の位置づけ・ライセンス</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>解決したい課題</h2>
+          <p>ライブ配信のコメント欄を眺めていると、しばしば次のような<strong>同期現象</strong>が観察される:</p>
+          <ul>
+            <li>配信終了直後、<strong>30 秒以内に「おつー」「おつかれ」「乙」が次々と</strong>飛ぶ → 文化的伝染。</li>
+            <li>配信中に何かが起きた直後、<strong>5 秒以内に「うおお」「すげー」が複数ユーザーから</strong>同時に上がる → 歓声同期。</li>
+            <li>誰かのコメントに反応して、<strong>同じ語が「リプライ的に」</strong>連鎖する → 文脈伝染。</li>
+          </ul>
+          <p>こうした現象は配信のハイライトを判定する強い手掛かりだが、検出するには「<strong>同じキーが</strong>」「<strong>短時間内に</strong>」「<strong>異なる複数ユーザーから</strong>」という 3 条件を組み合わせて判定する必要がある。さらに「ｗ／w／笑」「！／!」のような表記揺れを吸収しないと、本来同じ語が別キーとして扱われてしまう。</p>
+          <p>本手法は、これらを軽量な sliding window 1 パスで処理するためのアルゴリズムである。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>処理は以下の 3 段階で構成される:</p>
+          <ol>
+            <li><strong>正規化（Normalization）</strong>: コメント本文を「視覚的に同じものを同じキー」に変換する。</li>
+            <li><strong>キー別 sliding window 管理</strong>: 正規化キーごとに、現在進行中のバースト窓（firstAt, lastAt, users, count）を保持する。新しいコメントが来るたび、そのキーの窓が「閉じる」べきか「延長」されるべきかを判定する。</li>
+            <li><strong>バースト判定</strong>: 窓が閉じる際に、含まれる<strong>ユニークユーザー数</strong>がしきい値以上ならバーストとして出力する。</li>
+          </ol>
+          <p>パラメータは <code>windowMs</code>（窓幅、ms）と <code>minDistinctUsers</code>（必要ユニークユーザー数）の 2 つ。これを <code>(30000, 3)</code> にすれば「コメ伝染」、<code>(5000, 3)</code> にすれば「コメ被り瞬間」の検出に切り替わる。</p>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>アルゴリズム詳細</h2>
+
+          <h3>3-1. 正規化規則</h3>
+          <p>本手法における文字列正規化は、<strong>視覚的同等性</strong>を基準に以下を順に適用する:</p>
+          <ol>
+            <li>全角 W／ｗ → 半角 w（日本語ライブの「笑い」表現の表記揺れ対策）</li>
+            <li>全文字を <strong>小文字</strong>に統一</li>
+            <li>句読点・記号（<code>!?！？。、,．</code>＋空白）を除去</li>
+            <li>長さ 0 ならばノイズとして除外</li>
+            <li>ASCII 1 文字（"a" "1" など）はノイズとして除外（漢字・ひらがな・カタカナ・絵文字 1 字は通す）</li>
+          </ol>
+          <p>これにより、「ｗｗｗ」「www」「WWW」「W W W」「w!w!」が全て <code>www</code> という単一キーに帰着する。</p>
+
+          <h3>3-2. 入力データ</h3>
+          <pre class="code"><code><span class="cm">// 1 件あたりの最低限のフィールド</span>
+{
+  capturedAt: <span class="num">1714532400000</span>,  <span class="cm">// Unix エポックミリ秒</span>
+  userId: <span class="str">"user-12345"</span>,        <span class="cm">// 文字列の安定 ID（数値・匿名 184 ハッシュも可）</span>
+  text: <span class="str">"おつー"</span>                  <span class="cm">// 正規化対象の本文</span>
+}</code></pre>
+
+          <h3>3-3. sliding window 管理</h3>
+          <p>各正規化キー <code>k</code> に対して、現在進行中の窓を以下の構造で保持する:</p>
+          <pre class="code"><code>{
+  firstAt: <span class="num">1714532400000</span>,  <span class="cm">// 窓の最初のコメント時刻</span>
+  lastAt:  <span class="num">1714532411000</span>,  <span class="cm">// 窓の最後のコメント時刻</span>
+  users:   Set { <span class="str">"u1"</span>, <span class="str">"u2"</span>, <span class="str">"u3"</span> },
+  commentCount: <span class="num">5</span>
+}</code></pre>
+          <p>新しいコメント <code>(at, uid, key)</code> が到着すると、キー <code>key</code> の窓を引き、次のいずれかの処理を行う:</p>
+          <ul>
+            <li><strong>窓が存在しない</strong> → 新しい窓を開く（firstAt = lastAt = at, users = {uid}, count = 1）。</li>
+            <li><strong>窓が存在し、at − firstAt ≤ windowMs</strong> → 窓を延長（lastAt = at, users.add(uid), count++）。</li>
+            <li><strong>窓が存在するが、at − firstAt &gt; windowMs</strong> → 既存窓を「閉じて」判定し、新しい窓に置き換える。</li>
+          </ul>
+
+          <h3>3-4. バースト判定</h3>
+          <p>窓が「閉じる」タイミングで、<code>users.size ≥ minDistinctUsers</code> ならバーストとして出力する:</p>
+          <pre class="code"><code>{
+  text: <span class="str">"おつー"</span>,
+  firstAt: <span class="num">1714532400000</span>,
+  lastAt:  <span class="num">1714532411000</span>,
+  userCount: <span class="num">5</span>,    <span class="cm">// ユニークユーザー数（重要指標）</span>
+  commentCount: <span class="num">7</span>  <span class="cm">// 全コメント数（同一ユーザーの連投も含む）</span>
+}</code></pre>
+          <p>処理ループ終了時に未閉鎖の窓があれば、最後にまとめて判定する（flush）。</p>
+          <p>出力は <code>userCount</code> 降順、同点ならば <code>commentCount</code> 降順でソートする。</p>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>参考実装（JavaScript / 純粋関数）</h2>
+          <p>以下は本拡張機能で実際に使用している実装の抜粋である（<a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/commentEchoDetector.js" target="_blank" rel="noopener">src/lib/commentEchoDetector.js</a>）。</p>
+
+<pre class="code"><code><span class="cm">/** 視覚的同等性に基づく正規化 */</span>
+<span class="kw">export function</span> <span class="fn">normalizeForEcho</span>(text) {
+  <span class="kw">let</span> s = String(text == <span class="kw">null</span> ? <span class="str">''</span> : text);
+  s = s.<span class="fn">replace</span>(<span class="str">/[Ｗｗ]/g</span>, <span class="str">'w'</span>);
+  s = s.<span class="fn">toLowerCase</span>();
+  s = s.<span class="fn">replace</span>(<span class="str">/[!?！？。、,．\s]/g</span>, <span class="str">''</span>);
+  s = s.<span class="fn">trim</span>();
+  <span class="kw">if</span> (s.length === <span class="num">0</span>) <span class="kw">return</span> <span class="str">''</span>;
+  <span class="kw">if</span> (s.length === <span class="num">1</span> &amp;&amp; s.<span class="fn">charCodeAt</span>(<span class="num">0</span>) &lt; <span class="num">128</span>) <span class="kw">return</span> <span class="str">''</span>;
+  <span class="kw">return</span> s;
+}
+
+<span class="cm">/** sliding window によるバースト検出（共通実装） */</span>
+<span class="kw">function</span> <span class="fn">detectClusters</span>(comments, cfg) {
+  <span class="kw">const</span> items = <span class="fn">collectKeys</span>(comments);
+  <span class="kw">if</span> (items.length === <span class="num">0</span>) <span class="kw">return</span> [];
+  <span class="kw">const</span> open = <span class="kw">new</span> Map();
+  <span class="kw">const</span> bursts = [];
+
+  <span class="kw">for</span> (<span class="kw">const</span> it <span class="kw">of</span> items) {
+    <span class="kw">const</span> cur = open.<span class="fn">get</span>(it.key);
+    <span class="kw">if</span> (cur &amp;&amp; it.at - cur.firstAt &lt;= cfg.windowMs) {
+      <span class="cm">// 窓を延長</span>
+      cur.lastAt = it.at;
+      cur.users.<span class="fn">add</span>(it.uid);
+      cur.commentCount += <span class="num">1</span>;
+    } <span class="kw">else</span> {
+      <span class="cm">// 窓を閉じてバースト判定</span>
+      <span class="kw">if</span> (cur &amp;&amp; cur.users.size &gt;= cfg.minDistinctUsers) {
+        bursts.<span class="fn">push</span>({
+          text: it.key,
+          firstAt: cur.firstAt,
+          lastAt: cur.lastAt,
+          userCount: cur.users.size,
+          commentCount: cur.commentCount
+        });
+      }
+      <span class="cm">// 新しい窓を開始</span>
+      open.<span class="fn">set</span>(it.key, {
+        firstAt: it.at, lastAt: it.at,
+        users: <span class="kw">new</span> Set([it.uid]),
+        commentCount: <span class="num">1</span>
+      });
+    }
+  }
+  <span class="cm">// 残りの窓を flush</span>
+  <span class="kw">for</span> (<span class="kw">const</span> [, cur] <span class="kw">of</span> open) {
+    <span class="kw">if</span> (cur.users.size &gt;= cfg.minDistinctUsers) {
+      bursts.<span class="fn">push</span>({
+        text: cur.key,
+        firstAt: cur.firstAt, lastAt: cur.lastAt,
+        userCount: cur.users.size,
+        commentCount: cur.commentCount
+      });
+    }
+  }
+  bursts.<span class="fn">sort</span>((a, b) =&gt;
+    b.userCount - a.userCount || b.commentCount - a.commentCount
+  );
+  <span class="kw">return</span> bursts;
+}
+
+<span class="cm">/** L1 コメ伝染（30 秒窓 / 3 ユーザー以上） */</span>
+<span class="kw">export function</span> <span class="fn">detectCommentPropagation</span>(comments, opts = {}) {
+  <span class="kw">return</span> <span class="fn">detectClusters</span>(comments, {
+    windowMs: opts.windowMs ?? <span class="num">30_000</span>,
+    minDistinctUsers: opts.minDistinctUsers ?? <span class="num">3</span>
+  });
+}
+
+<span class="cm">/** L5 コメ被り瞬間（5 秒窓 / 3 ユーザー以上） */</span>
+<span class="kw">export function</span> <span class="fn">detectCommentSyncBursts</span>(comments, opts = {}) {
+  <span class="kw">return</span> <span class="fn">detectClusters</span>(comments, {
+    windowMs: opts.windowMs ?? <span class="num">5_000</span>,
+    minDistinctUsers: opts.minDistinctUsers ?? <span class="num">3</span>
+  });
+}</code></pre>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>なぜこの設計なのか</h2>
+
+          <h3>5-1. なぜキー別の sliding window なのか</h3>
+          <p>「30 秒以内に同じ語が複数ユーザーから出た」を判定するナイーブな実装は <strong>O(n²)</strong> になる（各コメントから過去 30 秒のコメントを全部見る）。本手法は<strong>キー別に状態を保持</strong>することで、各コメントの処理を <strong>O(1)</strong> 償却に抑えている。</p>
+
+          <h3>5-2. なぜ「窓を閉じてから判定」なのか</h3>
+          <p>窓に新しいコメントが追加されるたびに判定してしまうと、同じバーストが何度もカウントされる。窓を閉じる瞬間に 1 度だけ判定することで、<strong>各バーストが正確に 1 回だけ出力される</strong>ことが保証される。</p>
+
+          <h3>5-3. なぜ ASCII 1 文字を弾くのか</h3>
+          <p>"a", "1", "?" のような 1 文字 ASCII は、誤打や記号として偶然多発しやすく、伝染現象として見ると noise が支配的になる。しかし、漢字 1 字（例: 「神」「乙」）は意味のある反応として頻出するため、<strong>ASCII 1 文字のみを除外し CJK 1 文字は残す</strong>運用にしている。</p>
+
+          <h3>5-4. なぜユニークユーザー数で評価するのか</h3>
+          <p>同じユーザーが連投した場合のコメント数をいくら増やしても「伝染」「同期」の証拠にはならない。<strong>異なるユーザーが何人</strong>同じ反応をしたかが本質的な指標である。</p>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>計算量と運用コスト</h2>
+          <dl class="dl-meta">
+            <dt>時間計算量</dt><dd>O(n) ［n = コメント数。Map 操作は O(1) 償却］</dd>
+            <dt>空間計算量</dt><dd>O(k) ［k = ユニーク正規化キー数。Set にユニークユーザーを保持するため最悪 O(n)］</dd>
+            <dt>1 配信あたり</dt><dd>数千件のコメントを 数 ms で処理可能。リアルタイム解析に十分。</dd>
+          </dl>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>既知の限界と拡張可能性</h2>
+
+          <h3>7-1. 限界</h3>
+          <ul>
+            <li><strong>表記揺れの吸収範囲は正規化規則で固定</strong>: より高度な表記揺れ（「おつー／おつかれ／お疲れ様」など意味は同じだが文字列が違う）は捉えられない。意味マッチを入れるなら追加で形態素解析や word embedding が必要。</li>
+            <li><strong>窓の境界依存</strong>: 30 秒窓の場合、ちょうど 30 秒の境界をまたぐ伝染は 2 つに分割される可能性がある。実用上はしきい値の設定で吸収する想定。</li>
+          </ul>
+
+          <h3>7-2. 拡張可能性</h3>
+          <ul>
+            <li><strong>multiscale 検出</strong>: 同じ実装を <code>(5s, 3)</code> <code>(30s, 3)</code> <code>(120s, 5)</code> で並列に走らせ、複数粒度のバーストを同時取得する。</li>
+            <li><strong>意味マッチへの拡張</strong>: 正規化キーを文字列ではなく word embedding のクラスタ ID にする。</li>
+            <li><strong>配信者反応との相関</strong>: バーストの 5 ～ 10 秒前に配信者がどんな発言・動作をしたかを抽出し、伝染の<strong>引き金イベント</strong>を推定する。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>関連する既知技術（先行技術）</h2>
+
+          <h3>8-1. Burst Detection in Streams</h3>
+          <p>Kleinberg の "Bursty and Hierarchical Structure in Streams" (KDD 2002) など、時系列イベント流からのバースト検出は古くからある。本手法はそれを<strong>キーごとに分離して sliding window で軽量化した特殊形</strong>。</p>
+
+          <h3>8-2. Trending Topics Algorithms</h3>
+          <p>Twitter のトレンド検出に使われるような頻度ベース集計手法。本手法はリアルタイム性とユニークユーザー数による厳格な閾値判定を組み合わせた点が異なる。</p>
+
+          <h3>8-3. Spam Detection (Echo Spam)</h3>
+          <p>同一文字列の連投をスパムとして検出する手法は古くから存在するが、それらは<strong>同一ユーザーの繰り返し</strong>を狙うのが主流。本手法は逆に「<strong>異なるユーザーが同じ文字列を出す</strong>」現象を検出する点が決定的に異なる。</p>
+
+          <h3>8-4. ライブチャット可視化ツール</h3>
+          <p>Twitch や YouTube Live のサードパーティ拡張・ボット（Chatty, Nightbot 等）には、頻出語のフィルタリング機能はあるが、「短時間内の異なるユーザーからの同期発火」を抽出してバーストイベント化する公知の実装例は、本記事執筆時点で著者は確認していない。</p>
+        </section>
+
+        <section class="box" id="s9">
+          <h2><span class="num">9.</span>本記事の位置づけ・ライセンス</h2>
+          <p>本記事は、Chrome 拡張機能『君斗りんくの追憶のきらめき』内で 2026 年 4 月 30 日（バージョン 0.1.25）に投入された <code>commentEchoDetector.js</code> モジュールの設計思想と実装を、<strong>2026 年 5 月 1 日</strong>付で公開するものである。</p>
+          <p>公開目的:</p>
+          <ul>
+            <li>ライブチャット解析を行う他の開発者・研究者が同じ手法を自由に応用できるようにする</li>
+            <li>本手法に関する<strong>先行技術 (prior art)</strong> として、本記事の公開日時を公的記録に残す（防御的公開／defensive publication）</li>
+          </ul>
+          <p>参考実装は <strong>MIT ライセンス</strong>、本記事文章は <strong>CC BY 4.0</strong> のもとで自由に複製・引用可。</p>
+          <div class="note">
+            <b>引用例:</b> 君斗りんく「ライブチャットの『コメ伝染／コメ被り』を sliding window で定量化する」<i>君斗りんくの追憶のきらめき</i>、2026 年 5 月 1 日公開、<code>https://tsuioku-no-kirameki.com/articles/comment-echo-detection.html</code>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell">
+        <p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p>
+      </div>
+    </footer>
+  </body>
+</html>

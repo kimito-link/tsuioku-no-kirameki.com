@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>技術記事 ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../images/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../images/apple-touch-icon.png">
+
+    <meta name="description" content="Chrome 拡張『君斗りんくの追憶のきらめき』の中で実装している技術手法の解説記事一覧。ライブ配信のコメント解析・可視化に関する手法を、再利用可能な形で公開しています。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/">
+    <meta property="og:title" content="技術記事 ― 君斗りんくの追憶のきらめき">
+    <meta property="og:description" content="ライブ配信のコメント解析・可視化に関する手法の解説記事。実装と一緒に公開しています。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+
+    <style>
+      :root{
+        --bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;
+        --line:rgba(88,62,28,.12);--gold:#c98e2b;--sky:#3d708d;--mint:#0f5e4f;--blue:#255d9b;
+        --violet:#5645ad;--brown:#8a3d19;--slate:#56534e;--red:#952b2a;
+        --text-primary:#2c2117;--text-secondary:#4f4338;
+        --shadow:0 18px 44px rgba(70,49,20,.12);--r1:34px;--r2:24px;--r3:18px;--maxw:880px;
+        --space-xs:8px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;
+        --shell-pad:16px;
+        --lh-tight:1.35;--lh-ui:1.58;--lh-body:1.82;--lh-heading:1.22;
+      }
+      @media (min-width:480px){ :root{--shell-pad:clamp(16px,3.2vw,28px)} }
+      *{box-sizing:border-box}
+      html{scroll-behavior:smooth;overflow-x:hidden}
+      body{
+        margin:0;color:var(--text-primary);
+        font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;
+        line-height:var(--lh-body);
+        background:
+          radial-gradient(ellipse 70% 48% at 98% 4%, rgba(255,210,228,.35), transparent 46%),
+          radial-gradient(circle at top right, rgba(132,184,207,.4), transparent 28%),
+          linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));
+        min-height:100vh;
+      }
+      a{color:var(--blue);text-underline-offset:3px}
+      a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+      .visually-hidden{
+        position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+        clip:rect(0,0,0,0);white-space:nowrap;border:0
+      }
+
+      .topbar{
+        position:sticky;top:0;z-index:50;
+        background:rgba(250,244,235,.88);
+        backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+        border-bottom:1px solid rgba(88,62,28,.07);
+      }
+      .topbar-inner{
+        display:flex;justify-content:space-between;align-items:center;gap:12px;
+        min-height:44px;padding:8px 0
+      }
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{
+        display:inline-flex;align-items:center;gap:6px;
+        padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;
+        text-decoration:none;color:var(--ink);
+        background:rgba(255,252,247,.94);border:1px solid var(--line);
+        transition:background .2s ease,border-color .2s ease
+      }
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page h1{
+        font-size:clamp(1.7rem,4.4vw,2.4rem);line-height:var(--lh-heading);
+        margin:0 0 var(--space-sm);color:#1a1208;
+      }
+      header.page .sub{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md)}
+      header.page .meta{
+        font-size:.86rem;color:var(--muted);
+        display:flex;flex-wrap:wrap;gap:14px;
+      }
+      header.page .meta strong{color:var(--ink)}
+
+      main{padding-bottom:var(--space-2xl)}
+      section.box{
+        background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);
+        padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);
+      }
+      section.box h2{
+        font-size:1.2rem;line-height:var(--lh-heading);margin:0 0 var(--space-md);
+        color:#1a1208;letter-spacing:.01em;
+      }
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}
+
+      .article-list{display:grid;grid-template-columns:1fr;gap:var(--space-md);margin:0;padding:0;list-style:none}
+      .article-card{
+        display:block;padding:var(--space-md) var(--space-lg);
+        background:rgba(255,253,248,.85);border:1px solid var(--line);border-radius:var(--r3);
+        text-decoration:none;color:var(--ink);
+        transition:background .2s ease,border-color .2s ease,transform .15s ease;
+      }
+      .article-card:hover{
+        background:#fff;border-color:rgba(201,142,43,.4);
+        transform:translateY(-1px);color:var(--ink);
+      }
+      .article-card__date{font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+      .article-card__title{
+        font-size:1.08rem;font-weight:700;margin:6px 0 8px;line-height:var(--lh-heading);
+        color:#1a1208;
+      }
+      .article-card:hover .article-card__title{color:var(--brown)}
+      .article-card__sub{font-size:.92rem;color:var(--muted);line-height:var(--lh-ui);margin:0}
+      .article-card__tags{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+      .article-card__tag{
+        display:inline-block;font-size:.7rem;letter-spacing:.04em;
+        padding:2px 8px;border-radius:999px;
+        background:rgba(15,94,79,.1);color:var(--mint);border:1px solid rgba(15,94,79,.18);
+      }
+
+      .digest{
+        padding:18px 20px;border-radius:var(--r3);
+        background:linear-gradient(160deg, rgba(243,170,37,.1), rgba(15,94,79,.06));
+        border:1px solid var(--line);margin:0 0 var(--space-lg);
+        font-size:.95rem;
+      }
+      .digest h3{margin:0 0 6px;font-size:1.02rem;color:var(--ink)}
+      .digest p{margin:0 0 8px}
+      .digest ul{margin:0;padding-left:1.4em}
+
+      footer.page{
+        margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);
+        text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);
+      }
+      footer.page a{color:var(--muted)}
+      footer.page a:hover{color:var(--brown)}
+
+      @media(max-width:520px){
+        section.box{padding:var(--space-md)}
+        .article-card{padding:var(--space-md)}
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../" aria-label="君斗りんくの追憶のきらめき（トップへ戻る）">
+          <img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project">
+        </a>
+        <a class="topbar__back" href="../">← トップへ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <h1>技術記事</h1>
+        <p class="sub">Chrome 拡張『君斗りんくの追憶のきらめき』の中で実装している技術手法を、再利用可能な形で解説していくページです。</p>
+        <div class="meta">
+          <span>発行者: <strong>Kimito-Link Project</strong></span>
+          <span>運営: <strong>君斗りんく</strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+
+        <aside class="digest" aria-label="このページの位置づけ">
+          <h3>このページについて</h3>
+          <p>本拡張機能の中で実装している技術的な手法・アルゴリズムを、論文や特許のように体系的にまとめて公開していくページです。実装は <a href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">GitHub</a> で MIT ライセンスのもと公開していますが、コードを読まなくても手法の本質が理解できるように、ここでは日本語で丁寧に解説します。</p>
+          <p>各記事に明記された<strong>公開日</strong>は、その手法が世の中に対して<strong>公知</strong>になった日付として位置づけています（防御的公開／defensive publication の趣旨）。同様の手法を別の主体が後から特許出願しても、これらの記事の公開日が先行技術として参照可能になることを意図しています。</p>
+        </aside>
+
+        <section class="box">
+          <h2>記事一覧</h2>
+          <ul class="article-list">
+            <li>
+              <a class="article-card" href="comment-waveform-fingerprint.html">
+                <div class="article-card__date">2026-05-01 公開</div>
+                <div class="article-card__title">ライブ配信のコメント波形指紋によるリアルタイム類似配信検出</div>
+                <p class="article-card__sub">配信中に流れるコメントの密度カーブを 16 次元の正規化ベクトルにし、過去配信の指紋とコサイン類似度で比較することで「形が似てる過去配信」を見つけ出す手法。配信時間や総コメ数が違っても比較できる軽量な fingerprinting アルゴリズム。</p>
+                <div class="article-card__tags">
+                  <span class="article-card__tag">live streaming</span>
+                  <span class="article-card__tag">comment analysis</span>
+                  <span class="article-card__tag">fingerprinting</span>
+                  <span class="article-card__tag">cosine similarity</span>
+                </div>
+              </a>
+            </li>
+            <li>
+              <a class="article-card" href="comment-echo-detection.html">
+                <div class="article-card__date">2026-05-01 公開</div>
+                <div class="article-card__title">ライブチャットの「コメ伝染／コメ被り」を sliding window で定量化する</div>
+                <p class="article-card__sub">ライブチャットで起きる「コメ伝染」（30 秒以内に同じ語が複数ユーザーから飛ぶ連鎖）と「コメ被り瞬間」（5 秒以内の同期歓声）を、sliding window と正規化文字列マッチで軽量に検出するアルゴリズム。</p>
+                <div class="article-card__tags">
+                  <span class="article-card__tag">live streaming</span>
+                  <span class="article-card__tag">echo detection</span>
+                  <span class="article-card__tag">sliding window</span>
+                  <span class="article-card__tag">text normalization</span>
+                </div>
+              </a>
+            </li>
+            <li>
+              <a class="article-card" href="comment-silence-zones.html">
+                <div class="article-card__date">2026-05-01 公開</div>
+                <div class="article-card__title">ライブ配信の沈黙ゾーン検出と「沈黙の質」三段階分類</div>
+                <p class="article-card__sub">コメント無し連続区間（沈黙ゾーン）を検出し、その直後の反応コメ数で「engaged（ガン見系）／departed（離脱系）／neutral（ふつう）」の 3 段階に質判定するアルゴリズム。沈黙を一律にネガティブ評価せず、配信者の話芸が効いた瞬間を検出できる。</p>
+                <div class="article-card__tags">
+                  <span class="article-card__tag">live streaming</span>
+                  <span class="article-card__tag">silence detection</span>
+                  <span class="article-card__tag">engagement</span>
+                </div>
+              </a>
+            </li>
+            <li>
+              <a class="article-card" href="commenter-survival-curve.html">
+                <div class="article-card__date">2026-05-01 公開</div>
+                <div class="article-card__title">ライブ配信のコメンター生存曲線によるコメント参加維持率の計測</div>
+                <p class="article-card__sub">個別視聴者の入退場ログが取れないライブ配信環境でも「初期にコメントしていたユーザーが配信終了時点でも何 % コメントしていたか」をセグメント別に計測する Kaplan-Meier 風の生存曲線手法。視聴維持率の代替指標として実装可能。</p>
+                <div class="article-card__tags">
+                  <span class="article-card__tag">live streaming</span>
+                  <span class="article-card__tag">retention</span>
+                  <span class="article-card__tag">Kaplan-Meier</span>
+                  <span class="article-card__tag">survival analysis</span>
+                </div>
+              </a>
+            </li>
+            <li>
+              <a class="article-card" href="inline-host-anchor-scoring.html">
+                <div class="article-card__date">2026-05-01 公開</div>
+                <div class="article-card__title">Chrome 拡張で SPA 内に inline panel を adaptive に挿入するアンカー rect スコアリング</div>
+                <p class="article-card__sub">Chrome 拡張機能から SPA の DOM ツリー内に inline panel を挿入する際、video 要素から祖先を辿って「視聴行（player + 公式コメ列）相当の矩形」を見つける rect スコアリング手法。eligibility（足切り）→ score（残った中の最良）の二段判定で、SPA の動的な DOM 変化に追従する。</p>
+                <div class="article-card__tags">
+                  <span class="article-card__tag">chrome extension</span>
+                  <span class="article-card__tag">SPA</span>
+                  <span class="article-card__tag">DOM scoring</span>
+                  <span class="article-card__tag">adaptive layout</span>
+                </div>
+              </a>
+            </li>
+            <li>
+              <a class="article-card" href="prewarm-coordinator-lease.html">
+                <div class="article-card__date">2026-05-01 公開</div>
+                <div class="article-card__title">複数タブ間で chrome.storage.local を leased channel として使う prewarm coordinator</div>
+                <p class="article-card__sub">Chrome 拡張機能で複数タブが同時に prewarm（事前ロード）を走らせて CPU を取り合う問題を、<code>chrome.storage.local</code> を leased channel として使う first-write-wins 方式で解決する手法。TTL fallback で停止タブの lease を横取りできる純粋関数設計。</p>
+                <div class="article-card__tags">
+                  <span class="article-card__tag">chrome extension</span>
+                  <span class="article-card__tag">multi-tab</span>
+                  <span class="article-card__tag">distributed coordination</span>
+                  <span class="article-card__tag">leased channel</span>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </section>
+
+        <section class="box">
+          <h2>今後公開予定</h2>
+          <ul>
+            <li>ライブ配信向けの 28 種類のマーケ分析手法と各計算式</li>
+          </ul>
+          <p>順次公開していきます。</p>
+        </section>
+
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell">
+        <p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p>
+      </div>
+    </footer>
+  </body>
+</html>

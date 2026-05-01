@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>複数タブ間で chrome.storage.local を leased channel として使う prewarm coordinator ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../images/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../images/apple-touch-icon.png">
+
+    <meta name="description" content="Chrome 拡張機能で複数タブが同時に prewarm（事前ロード）を走らせて CPU を取り合う問題を、chrome.storage.local を leased channel として使う first-write-wins 方式で解決する手法。TTL fallback で停止タブの lease を横取りできる純粋関数設計。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/prewarm-coordinator-lease.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/prewarm-coordinator-lease.html">
+    <meta property="og:title" content="複数タブ間で chrome.storage.local を leased channel として使う prewarm coordinator">
+    <meta property="og:description" content="複数タブの prewarm 競合を chrome.storage.local lease で 1 タブに絞る純粋関数設計の解説。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-05-01T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {
+        "@context":"https://schema.org","@type":"TechArticle",
+        "headline":"複数タブ間で chrome.storage.local を leased channel として使う prewarm coordinator",
+        "datePublished":"2026-05-01","dateModified":"2026-05-01",
+        "author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},
+        "publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},
+        "url":"https://tsuioku-no-kirameki.com/articles/prewarm-coordinator-lease.html",
+        "inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"
+      }
+    </script>
+
+    <style>
+      :root{
+        --bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;
+        --line:rgba(88,62,28,.12);--gold:#c98e2b;--sky:#3d708d;--mint:#0f5e4f;--blue:#255d9b;
+        --violet:#5645ad;--brown:#8a3d19;--slate:#56534e;--red:#952b2a;
+        --text-primary:#2c2117;--text-secondary:#4f4338;
+        --shadow:0 18px 44px rgba(70,49,20,.12);--r1:34px;--r2:24px;--r3:18px;--maxw:880px;
+        --space-xs:8px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;
+        --shell-pad:16px;
+        --lh-tight:1.35;--lh-ui:1.58;--lh-body:1.82;--lh-heading:1.22;
+        --anchor-offset:56px;
+        --code-bg:rgba(45,33,23,.05);
+      }
+      @media (min-width:480px){ :root{--shell-pad:clamp(16px,3.2vw,28px)} }
+      *{box-sizing:border-box}
+      html{scroll-behavior:smooth;overflow-x:hidden}
+      body{
+        margin:0;color:var(--text-primary);
+        font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;
+        line-height:var(--lh-body);
+        background:
+          radial-gradient(ellipse 70% 48% at 98% 4%, rgba(255,210,228,.35), transparent 46%),
+          radial-gradient(circle at top right, rgba(132,184,207,.4), transparent 28%),
+          linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));
+        min-height:100vh;
+      }
+      a{color:var(--blue);text-underline-offset:3px}
+      a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);color:#1a1208;letter-spacing:.005em;}
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md);line-height:var(--lh-body)}
+      header.page .meta{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+      header.page .meta strong{color:var(--ink)}
+
+      main{padding-bottom:var(--space-2xl)}
+      section.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset);}
+      section.box h2{font-size:1.2rem;line-height:var(--lh-heading);margin:0 0 var(--space-md);color:#1a1208;letter-spacing:.01em;}
+      section.box h2 .num{display:inline-block;min-width:1.8em;color:var(--gold);font-variant-numeric:tabular-nums;font-weight:800;margin-right:.2em;}
+      section.box h3{font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700;}
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul, section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}
+      section.box li::marker{color:var(--gold)}
+
+      nav.toc{background:rgba(255,251,245,.72);border:1px solid var(--line);border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg);}
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);letter-spacing:.04em;font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}
+      nav.toc a:hover{color:var(--brown);text-decoration:underline}
+
+      .digest{padding:18px 22px;border-radius:var(--r3);background:linear-gradient(160deg, rgba(243,170,37,.1), rgba(15,94,79,.06));border:1px solid var(--line);margin:0 0 var(--space-lg);}
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}
+      .digest li{margin-bottom:4px;font-size:.94rem}
+
+      .note{font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;margin:var(--space-sm) 0;}
+      .note b{color:var(--brown);font-weight:700}
+
+      code, kbd{font-family:"Menlo","Consolas","SFMono-Regular",monospace;font-size:.92em;background:var(--code-bg);padding:1px 6px;border-radius:4px;}
+      pre.code{margin:var(--space-sm) 0;padding:14px 18px;background:#1f1d1a;color:#e8e0d2;border-radius:var(--r3);overflow-x:auto;font-family:"Menlo","Consolas","SFMono-Regular",monospace;font-size:.84rem;line-height:1.6;border:1px solid rgba(0,0,0,.3);}
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      pre.code .kw{color:#ff9d6c}
+      pre.code .fn{color:#a8d8ff}
+      pre.code .str{color:#b6e0a0}
+      pre.code .num{color:#d6b8ff}
+      pre.code .cm{color:#7d8694;font-style:italic}
+
+      table.params{width:100%;border-collapse:collapse;margin:var(--space-sm) 0;font-size:.9rem;}
+      table.params th, table.params td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;}
+      table.params th{color:var(--muted);font-weight:600;background:rgba(255,253,248,.5)}
+      table.params td code{font-size:.88em}
+
+      .dl-meta{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:var(--space-sm) 0;font-size:.92rem;}
+      .dl-meta dt{color:var(--muted);font-weight:600}
+      .dl-meta dd{margin:0;color:var(--ink)}
+
+      footer.page{margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);}
+      footer.page a{color:var(--muted)}
+      footer.page a:hover{color:var(--brown)}
+
+      @media(max-width:520px){
+        section.box{padding:var(--space-md)}
+        pre.code{padding:12px 14px;font-size:.78rem}
+        table.params{font-size:.82rem}
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../" aria-label="君斗りんくの追憶のきらめき（トップへ戻る）">
+          <img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project">
+        </a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ prewarm coordinator</p>
+        <h1>複数タブ間で chrome.storage.local を<br>leased channel として使う prewarm coordinator</h1>
+        <p class="lead">複数タブが同時に大規模な事前ロード処理（prewarm）を走らせて CPU を取り合う問題を、chrome.storage.local を leased channel として使う first-write-wins 方式と TTL fallback で解決する純粋関数設計。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-05-01</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>実装: <strong><a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/prewarmCoordinator.js" target="_blank" rel="noopener">GitHub</a></strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+
+        <aside class="digest" aria-label="この記事の要点">
+          <h3>3 行要約</h3>
+          <ul>
+            <li>各タブが独自の <code>instanceId</code> を持ち、prewarm 開始前に <code>chrome.storage.local</code> 上の lease 状態を読む。</li>
+            <li>lease が空なら <strong>claim</strong>（自分の名前で書き込んで実行）、自分が保持中なら <strong>proceed</strong>、他者が保持中なら <strong>defer</strong> を返す純粋関数。</li>
+            <li>タブが落ちて lease が解放されないケースは <strong>TTL（既定 10s）後に他タブが横取り</strong>できる設計。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc" aria-label="目次">
+          <h2>目次</h2>
+          <ol>
+            <li><a href="#s1">解決したい課題</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">3 つのアクションと判定ロジック</a></li>
+            <li><a href="#s4">参考実装（JavaScript / 純粋関数）</a></li>
+            <li><a href="#s5">呼び出し側の使い方</a></li>
+            <li><a href="#s6">なぜこの設計なのか</a></li>
+            <li><a href="#s7">既知の限界と拡張可能性</a></li>
+            <li><a href="#s8">関連する既知技術（先行技術）</a></li>
+            <li><a href="#s9">本記事の位置づけ・ライセンス</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>解決したい課題</h2>
+          <p>Chrome 拡張機能では、ユーザー操作前に重い初期化（HTML テンプレートのロード、画像のキャッシュ、iframe の先行レンダリング等）を済ませておく <strong>prewarm</strong> パターンがしばしば必要になる。これにより、ボタンが押された瞬間に UI が即座に開く UX が実現される。</p>
+          <p>しかし、ユーザーが同時に複数タブを開いている場合、各タブの content script が独立に prewarm を実行すると、以下の問題が発生する:</p>
+          <ul>
+            <li><strong>CPU 取り合い</strong>: 5 タブが同時に同じ重い処理を始めると、各タブの prewarm が遅延して、結局 1 つも prewarm が完了しない。</li>
+            <li><strong>メモリ重複</strong>: 同じリソースを各タブが個別にキャッシュすると、メモリが N 倍消費される。</li>
+            <li><strong>I/O 競合</strong>: <code>chrome.storage.local</code> や IndexedDB に同じキーを並行書き込みすると race condition の温床になる。</li>
+          </ul>
+          <p>必要なのは、<strong>「複数タブのうち 1 つだけが prewarm を実行し、他は待機する」</strong>を保証する軽量な調停機構である。タブはサーバープロセスではなく、いつでも閉じられる可能性があるため、<strong>停止したタブの権利を他タブが安全に引き継ぐ</strong>仕組みも必要になる。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>本手法では、Chrome 拡張機能が標準で提供する <code>chrome.storage.local</code> を<strong>leased channel</strong>（リース付き共有変数）として使う。各タブは prewarm を開始する直前に、storage 上の lease 状態を読み、純粋関数 <code>decidePrewarmLeaseAction</code> を呼ぶことで次のいずれかのアクションを得る:</p>
+          <ul>
+            <li><code>'claim'</code> ― lease を自分の名前で書き込んで prewarm を実行</li>
+            <li><code>'proceed'</code> ― 既に自分が lease を保持している、そのまま prewarm 続行</li>
+            <li><code>'defer'</code> ― 他タブが prewarm 中、一定時間後に再試行</li>
+          </ul>
+          <p>各タブには起動時に乱数で生成した <code>instanceId</code>（UUID 等）を持たせる。lease の保持者比較はこの ID で行う。</p>
+          <p>タブが prewarm 完了 / エラー時に明示的に lease を解放（空文字に書き戻し）する。タブが落ちて release されないケースに備え、lease には書き込み時刻も記録し、<strong>TTL（既定 10 秒）を経過した古い lease は他タブが claim で横取り</strong>できる設計にしている。</p>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>3 つのアクションと判定ロジック</h2>
+          <p>純粋関数 <code>decidePrewarmLeaseAction</code> は以下の入力を取る:</p>
+          <table class="params">
+            <thead><tr><th>引数</th><th>型</th><th>意味</th></tr></thead>
+            <tbody>
+              <tr><td><code>currentLeaseHolder</code></td><td>unknown</td><td>storage から読んだ現在の lease 保持者 ID（空文字 / undefined / null も許容）</td></tr>
+              <tr><td><code>currentLeaseAt</code></td><td>unknown</td><td>storage から読んだ lease 書き込み時刻（ms。壊れた値も許容）</td></tr>
+              <tr><td><code>selfId</code></td><td>string</td><td>呼び出し元タブの instanceId</td></tr>
+              <tr><td><code>now</code></td><td>number</td><td>現在時刻（ms。テスト時に固定値を渡せる設計）</td></tr>
+              <tr><td><code>leaseTimeoutMs</code></td><td>number?</td><td>TTL（省略時 10000）</td></tr>
+            </tbody>
+          </table>
+
+          <p>判定ロジックは以下の優先順位で行われる:</p>
+          <ol>
+            <li><code>selfId</code> が空 → <code>'defer'</code>（呼び出し元異常）</li>
+            <li>lease が空（誰も保持していない）→ <code>'claim'</code></li>
+            <li>lease が自分のもの → <code>'proceed'</code></li>
+            <li>lease の時刻が壊れている → <code>'defer'</code>（保守的）</li>
+            <li>lease の時刻が未来（時計ズレ）→ <code>'defer'</code></li>
+            <li>lease の経過時間が TTL を超える → <code>'claim'</code>（横取り）</li>
+            <li>それ以外（他者が正常保持中）→ <code>'defer'</code></li>
+          </ol>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>参考実装（JavaScript / 純粋関数）</h2>
+          <p>以下は本拡張機能で実際に使用している実装の抜粋である（<a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/prewarmCoordinator.js" target="_blank" rel="noopener">src/lib/prewarmCoordinator.js</a>）。</p>
+
+<pre class="code"><code><span class="cm">/**
+ * @param {{
+ *   currentLeaseHolder: unknown,
+ *   currentLeaseAt: unknown,
+ *   selfId: string,
+ *   now: number,
+ *   leaseTimeoutMs?: number
+ * }} input
+ * @returns {'claim' | 'proceed' | 'defer'}
+ */</span>
+<span class="kw">export function</span> <span class="fn">decidePrewarmLeaseAction</span>(input) {
+  <span class="kw">const</span> selfId = String(input.selfId || <span class="str">''</span>).<span class="fn">trim</span>();
+  <span class="kw">if</span> (!selfId) <span class="kw">return</span> <span class="str">'defer'</span>;
+
+  <span class="kw">const</span> now = Number(input.now);
+  <span class="kw">const</span> leaseTimeoutMs = Number(input.leaseTimeoutMs ?? <span class="num">10_000</span>);
+
+  <span class="kw">const</span> holder = String(input.currentLeaseHolder ?? <span class="str">''</span>).<span class="fn">trim</span>();
+  <span class="kw">const</span> heldAt = Number(input.currentLeaseAt ?? <span class="num">0</span>);
+
+  <span class="cm">// lease が空 / 無効 → claim</span>
+  <span class="kw">if</span> (!holder) <span class="kw">return</span> <span class="str">'claim'</span>;
+
+  <span class="cm">// 自分が保持中 → そのまま続行</span>
+  <span class="kw">if</span> (holder === selfId) <span class="kw">return</span> <span class="str">'proceed'</span>;
+
+  <span class="cm">// 他者が保持中 — TTL 判定</span>
+  <span class="kw">if</span> (!Number.<span class="fn">isFinite</span>(heldAt) || heldAt &lt;= <span class="num">0</span>) {
+    <span class="cm">// タイムスタンプが壊れている → 保守的に defer</span>
+    <span class="kw">return</span> <span class="str">'defer'</span>;
+  }
+
+  <span class="cm">// 未来の timestamp（時計ズレ・別 PC の clock skew）→ defer</span>
+  <span class="kw">if</span> (heldAt &gt; now) <span class="kw">return</span> <span class="str">'defer'</span>;
+
+  <span class="kw">const</span> elapsed = now - heldAt;
+  <span class="kw">if</span> (elapsed &gt; leaseTimeoutMs) {
+    <span class="cm">// 古い lease → 横取り</span>
+    <span class="kw">return</span> <span class="str">'claim'</span>;
+  }
+
+  <span class="kw">return</span> <span class="str">'defer'</span>;
+}</code></pre>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>呼び出し側の使い方</h2>
+          <p>呼び出し側（content script や popup）は次のパターンで使う:</p>
+
+<pre class="code"><code><span class="cm">// タブ起動時に instanceId を生成（タブの寿命中は固定）</span>
+<span class="kw">const</span> selfId = crypto.<span class="fn">randomUUID</span>();
+
+<span class="kw">async function</span> <span class="fn">tryPrewarm</span>() {
+  <span class="kw">const</span> { lease } = <span class="kw">await</span> chrome.storage.local.<span class="fn">get</span>(<span class="str">'prewarm_lease'</span>);
+  <span class="kw">const</span> action = <span class="fn">decidePrewarmLeaseAction</span>({
+    currentLeaseHolder: lease?.holder,
+    currentLeaseAt: lease?.at,
+    selfId,
+    now: Date.<span class="fn">now</span>()
+  });
+
+  <span class="kw">if</span> (action === <span class="str">'claim'</span>) {
+    <span class="kw">await</span> chrome.storage.local.<span class="fn">set</span>({
+      prewarm_lease: { holder: selfId, at: Date.<span class="fn">now</span>() }
+    });
+    <span class="kw">try</span> {
+      <span class="kw">await</span> <span class="fn">runPrewarm</span>();   <span class="cm">// 重い処理</span>
+    } <span class="kw">finally</span> {
+      <span class="cm">// 完了 / エラーに関わらず lease を解放</span>
+      <span class="kw">await</span> chrome.storage.local.<span class="fn">set</span>({
+        prewarm_lease: { holder: <span class="str">''</span>, at: <span class="num">0</span> }
+      });
+    }
+  } <span class="kw">else if</span> (action === <span class="str">'proceed'</span>) {
+    <span class="cm">// 自分が既に持っている。続行 or 結果を待つ</span>
+    <span class="kw">await</span> <span class="fn">runPrewarm</span>();
+  } <span class="kw">else</span> {
+    <span class="cm">// defer: 一定時間後に再試行</span>
+    <span class="fn">setTimeout</span>(tryPrewarm, <span class="num">2_000</span>);
+  }
+}</code></pre>
+          <p>注意点として、<strong>read → check → write の間にレースが起こり得る</strong>（複数タブが同時に空 lease を観測して同時に claim する可能性）。これは典型的な "TOCTOU"（time-of-check-to-time-of-use）問題で、本実装では <code>chrome.storage.local.set</code> の last-write-wins 性質に依存している。1 タブだけが最終的な lease 保持者となり、他タブは次回の <code>tryPrewarm</code> サイクルで <code>'proceed'</code> または <code>'defer'</code> に正しく転落する。</p>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>なぜこの設計なのか</h2>
+
+          <h3>6-1. なぜ chrome.storage.local なのか</h3>
+          <p>Chrome 拡張機能で複数タブ間の通信手段は <code>chrome.runtime.sendMessage</code> / <code>chrome.storage</code> / SharedWorker 等がある。<code>chrome.storage.local</code> を選ぶ理由:</p>
+          <ul>
+            <li>同期しないので<strong>外部に漏れない</strong>（<code>chrome.storage.sync</code> と違い、複数 PC 間に同期されない）</li>
+            <li>簡潔な API でアトミックな読み書きが可能</li>
+            <li>background service worker が一時停止していても各タブから直接アクセスできる（runtime メッセージは worker 経由が必要で stop 状態だと届かない）</li>
+          </ul>
+
+          <h3>6-2. なぜ純粋関数なのか</h3>
+          <p>調停ロジックを純粋関数 <code>decidePrewarmLeaseAction</code> として切り出すことで、以下が達成できる:</p>
+          <ul>
+            <li><strong>全エッジケース</strong>（空 lease、自分保持、他者保持、TTL 切れ、時計ズレ、壊れたタイムスタンプ）の単体テストが書ける</li>
+            <li>調停ロジックを変更しても呼び出し側は影響を受けない</li>
+            <li>本実装には 9 ケースの単体テストがあり、全て純粋関数として実行可能</li>
+          </ul>
+
+          <h3>6-3. なぜ TTL fallback が必要か</h3>
+          <p>タブはユーザーが任意のタイミングで閉じる可能性がある。lease を持ったまま閉じられた場合、release が走らないので lease が永久に残る。これを防ぐため、書き込み時刻を記録し、TTL 経過後に他タブが claim で横取りできる仕組みを入れている。</p>
+          <p>TTL は「prewarm の最大想定実行時間」よりわずかに長く設定する。短すぎると正常タブの lease を誤って横取りしてしまい、長すぎると停止タブの lease 解放が遅れる。本実装では 10 秒を既定値としている。</p>
+
+          <h3>6-4. なぜ未来時刻を defer 扱いするのか</h3>
+          <p>マルチユーザー Chrome やサイトをまたいだ Chrome プロファイル間で <code>Date.now()</code> がズレる可能性がある（普通は無視できるが、保守的設計）。lease の <code>at</code> が <code>now</code> より未来になっているケースは異常状態として、慎重に <code>'defer'</code> を返す。</p>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>既知の限界と拡張可能性</h2>
+
+          <h3>7-1. 限界</h3>
+          <ul>
+            <li><strong>厳密な相互排他は保証されない</strong>: TOCTOU レースで瞬間的に複数タブが claim する可能性がある。本用途（prewarm）では「2 タブ同時実行」が許容範囲内で済む。クリティカル相互排他が必要なら別の機構（chrome.locks 等）を併用すべき。</li>
+            <li><strong>TTL の調整が必要</strong>: 環境によって prewarm 時間が大きく変わる場合、TTL を動的調整する必要がある。</li>
+            <li><strong>storage API のレイテンシ</strong>: <code>chrome.storage.local.get/set</code> は数ミリ秒のレイテンシがあるため、超高頻度の呼び出しには向かない。</li>
+          </ul>
+
+          <h3>7-2. 拡張可能性</h3>
+          <ul>
+            <li><strong>multi-resource lease</strong>: 1 つの lease ではなく複数 resource ごとに lease を分け、並列実行できる resource は並列に動かす。</li>
+            <li><strong>priority-based claim</strong>: タブの可視性（visible / hidden）や残バッテリー量で claim 優先度を変える。</li>
+            <li><strong>storage onChanged 連動</strong>: lease 変化を polling せず <code>chrome.storage.onChanged</code> で受け取り、defer 中タブが即座に reactive に動く。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>関連する既知技術（先行技術）</h2>
+
+          <h3>8-1. Distributed Lease (Gray, 1989)</h3>
+          <p>Cary Gray と David Cheriton の "Leases: An Efficient Fault-Tolerant Mechanism for Distributed File Cache Consistency" (SOSP 1989) で提唱された分散 lease 概念は、本手法の理論的基盤。本手法はそれを Chrome 拡張機能のタブ間という超軽量な分散環境に適用した特殊形である。</p>
+
+          <h3>8-2. Leader Election Algorithms</h3>
+          <p>Bully Algorithm / Ring Algorithm 等の古典的な分散リーダー選出アルゴリズム。本手法は厳密なリーダー選出ではなく「first-write-wins + TTL」という単純化した変種である。タブの寿命が短く、リーダーが頻繁に変わってよい用途に最適化されている。</p>
+
+          <h3>8-3. Web Locks API</h3>
+          <p>ブラウザ標準の <code>navigator.locks</code> API は、本手法より厳密な相互排他を提供する。ただし Chrome 拡張機能の content script では使えない場合がある（context により）、また API がやや重いため、軽量な用途では本手法のような simple lease の方が扱いやすい。</p>
+
+          <h3>8-4. SharedWorker による調停</h3>
+          <p>同一 origin の複数タブから 1 つの SharedWorker を共有して調停する手法。Chrome 拡張機能の content script の場合、ホストページの origin が違うと SharedWorker を共有できない問題がある。本手法はその制約を回避する。</p>
+        </section>
+
+        <section class="box" id="s9">
+          <h2><span class="num">9.</span>本記事の位置づけ・ライセンス</h2>
+          <p>本記事は、Chrome 拡張機能『君斗りんくの追憶のきらめき』内で 2026 年 4 月 30 日（バージョン 0.1.42）に投入された <code>prewarmCoordinator.js</code> モジュールの設計思想と実装を、<strong>2026 年 5 月 1 日</strong>付で公開するものである。</p>
+          <p>公開目的:</p>
+          <ul>
+            <li>Chrome 拡張機能を開発する他の開発者が同じ手法を自由に応用できるようにする</li>
+            <li>本手法に関する<strong>先行技術 (prior art)</strong> として、本記事の公開日時を公的記録に残す（防御的公開／defensive publication）</li>
+          </ul>
+          <p>参考実装は <strong>MIT ライセンス</strong>、本記事文章は <strong>CC BY 4.0</strong> のもとで自由に複製・引用可。</p>
+          <div class="note">
+            <b>引用例:</b> 君斗りんく「複数タブ間で chrome.storage.local を leased channel として使う prewarm coordinator」<i>君斗りんくの追憶のきらめき</i>、2026 年 5 月 1 日公開、<code>https://tsuioku-no-kirameki.com/articles/prewarm-coordinator-lease.html</code>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell">
+        <p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p>
+      </div>
+    </footer>
+  </body>
+</html>

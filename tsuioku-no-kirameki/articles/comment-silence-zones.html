@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>ライブ配信の沈黙ゾーン検出と「沈黙の質」三段階分類 ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+
+    <meta name="description" content="ライブ配信のコメント無し連続区間（沈黙ゾーン）を検出し、その直後の反応コメ数で『engaged（ガン見系）／departed（離脱系）／neutral（ふつう）』の 3 段階に質判定するアルゴリズム。沈黙を一律にネガティブ評価せず、配信者の話芸が効いた瞬間を検出できる。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/comment-silence-zones.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/comment-silence-zones.html">
+    <meta property="og:title" content="ライブ配信の沈黙ゾーン検出と「沈黙の質」三段階分類">
+    <meta property="og:description" content="沈黙後の反応コメ数で engaged/departed/neutral を判定する手法。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-05-01T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"TechArticle","headline":"ライブ配信の沈黙ゾーン検出と「沈黙の質」三段階分類","datePublished":"2026-05-01","dateModified":"2026-05-01","author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"url":"https://tsuioku-no-kirameki.com/articles/comment-silence-zones.html","inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"}
+    </script>
+
+    <style>
+      :root{--bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;--line:rgba(88,62,28,.12);--gold:#c98e2b;--blue:#255d9b;--brown:#8a3d19;--mint:#0f5e4f;--red:#952b2a;--shadow:0 18px 44px rgba(70,49,20,.12);--r2:24px;--r3:18px;--maxw:880px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;--shell-pad:16px;--lh-body:1.82;--lh-heading:1.22;--anchor-offset:56px;--code-bg:rgba(45,33,23,.05);}
+      @media (min-width:480px){:root{--shell-pad:clamp(16px,3.2vw,28px)}}
+      *{box-sizing:border-box}html{scroll-behavior:smooth;overflow-x:hidden}
+      body{margin:0;color:var(--ink);font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;line-height:var(--lh-body);background:radial-gradient(ellipse 70% 48% at 98% 4%,rgba(255,210,228,.35),transparent 46%),radial-gradient(circle at top right,rgba(132,184,207,.4),transparent 28%),linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));min-height:100vh}
+      a{color:var(--blue);text-underline-offset:3px}a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo img{height:34px;width:auto}.topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);color:#1a1208}
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md)}
+      header.page .meta{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+      header.page .meta strong{color:var(--ink)}
+      main{padding-bottom:var(--space-2xl)}
+      section.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset);}
+      section.box h2{font-size:1.2rem;margin:0 0 var(--space-md);color:#1a1208}
+      section.box h2 .num{display:inline-block;min-width:1.8em;color:var(--gold);font-weight:800;margin-right:.2em}
+      section.box h3{font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700}
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul,section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}section.box li::marker{color:var(--gold)}
+      nav.toc{background:rgba(255,251,245,.72);border:1px solid var(--line);border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg)}
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}nav.toc a:hover{color:var(--brown);text-decoration:underline}
+      .digest{padding:18px 22px;border-radius:var(--r3);background:linear-gradient(160deg,rgba(243,170,37,.1),rgba(15,94,79,.06));border:1px solid var(--line);margin:0 0 var(--space-lg)}
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}.digest li{margin-bottom:4px;font-size:.94rem}
+      .note{font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;margin:var(--space-sm) 0}
+      .note b{color:var(--brown);font-weight:700}
+      code,kbd{font-family:"Menlo","Consolas",monospace;font-size:.92em;background:var(--code-bg);padding:1px 6px;border-radius:4px}
+      pre.code{margin:var(--space-sm) 0;padding:14px 18px;background:#1f1d1a;color:#e8e0d2;border-radius:var(--r3);overflow-x:auto;font-family:"Menlo","Consolas",monospace;font-size:.84rem;line-height:1.6;border:1px solid rgba(0,0,0,.3)}
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      pre.code .kw{color:#ff9d6c}.fn{color:#a8d8ff}.str{color:#b6e0a0}.num{color:#d6b8ff}.cm{color:#7d8694;font-style:italic}
+      table.params{width:100%;border-collapse:collapse;margin:var(--space-sm) 0;font-size:.9rem}
+      table.params th,table.params td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+      table.params th{color:var(--muted);font-weight:600;background:rgba(255,253,248,.5)}
+      .quality-tags{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 var(--space-sm)}
+      .qt{display:inline-block;font-size:.78rem;padding:4px 10px;border-radius:999px;font-weight:700}
+      .qt-engaged{background:rgba(15,94,79,.12);color:var(--mint);border:1px solid rgba(15,94,79,.3)}
+      .qt-departed{background:rgba(149,43,42,.1);color:var(--red);border:1px solid rgba(149,43,42,.25)}
+      .qt-neutral{background:rgba(45,33,23,.07);color:var(--muted);border:1px solid var(--line)}
+      footer.page{margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line)}
+      footer.page a{color:var(--muted)}footer.page a:hover{color:var(--brown)}
+      @media(max-width:520px){section.box{padding:var(--space-md)}pre.code{padding:12px 14px;font-size:.78rem}}
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../"><img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project"></a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ 沈黙ゾーン検出</p>
+        <h1>ライブ配信の沈黙ゾーン検出と<br>「沈黙の質」三段階分類</h1>
+        <p class="lead">ライブ配信のコメント無し連続区間（沈黙ゾーン）を検出し、その直後の反応コメ数で <code>engaged</code>（ガン見系）／<code>departed</code>（離脱系）／<code>neutral</code>（ふつう）の 3 段階に質判定するアルゴリズム。沈黙を一律にネガティブ評価せず、配信者の話芸が効いた瞬間を検出できる。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-05-01</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>実装: <strong><a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/commentSilenceZones.js" target="_blank" rel="noopener">GitHub</a></strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+
+        <aside class="digest">
+          <h3>3 行要約</h3>
+          <ul>
+            <li>連続するコメントのうち、間隔が <code>thresholdMs</code>（既定 60 秒）以上空いた区間を「沈黙ゾーン」として検出する。</li>
+            <li>沈黙終了後 <code>windowMs</code> 内のコメ数で「沈黙の質」を判定: <span class="qt qt-engaged">engaged</span>（5 コメ以上）／<span class="qt qt-neutral">neutral</span>（2-4）／<span class="qt qt-departed">departed</span>（0-1）。</li>
+            <li>沈黙を一律ネガティブ扱いせず、配信者の話芸・タメが効いた "ガン見ゾーン" を可視化できる。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc"><h2>目次</h2>
+          <ol>
+            <li><a href="#s1">解決したい課題</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">アルゴリズム詳細</a></li>
+            <li><a href="#s4">参考実装（JavaScript）</a></li>
+            <li><a href="#s5">なぜこの設計なのか</a></li>
+            <li><a href="#s6">既知の限界と拡張可能性</a></li>
+            <li><a href="#s7">関連する既知技術（先行技術）</a></li>
+            <li><a href="#s8">本記事の位置づけ・ライセンス</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>解決したい課題</h2>
+          <p>ライブ配信を分析する際、「沈黙の長さ」だけを指標にすると<strong>配信の本質を取り違える</strong>場合がある。沈黙には大きく 2 種類ある:</p>
+          <ul>
+            <li><strong>ガン見系の沈黙</strong>: 配信者の話・展開に視聴者が集中して見入っており、コメントを書く余裕がない。直後に大きな反応が爆発する。</li>
+            <li><strong>離脱系の沈黙</strong>: 視聴者が興味を失って配信から離れている。沈黙後も反応がない。</li>
+          </ul>
+          <p>両者は「コメ無し」という見た目は同じだが、配信者にとって意味が真逆である。前者は配信者の腕を示すハイライト、後者は改善すべきポイント。<strong>沈黙そのものではなく、沈黙の「質」を判定する</strong>必要がある。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>処理は 2 段階:</p>
+          <ol>
+            <li><strong>沈黙ゾーン検出</strong>: 連続するコメントの間隔（gap）を計算し、<code>thresholdMs</code>（既定 60 秒）以上ならゾーンとして記録。</li>
+            <li><strong>質判定</strong>: 沈黙終了時刻から <code>windowMs</code>（例: 30 秒）以内のコメ数を数え、<span class="qt qt-engaged">engaged</span>（5 以上）／<span class="qt qt-neutral">neutral</span>（2-4）／<span class="qt qt-departed">departed</span>（0-1）を割り当てる。</li>
+          </ol>
+          <p>質判定は opt-in。<code>opts.quality</code> を渡さなければ <code>'unknown'</code> 固定で純粋な沈黙検出のみ動作する。</p>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>アルゴリズム詳細</h2>
+          <h3>3-1. パラメータ</h3>
+          <table class="params">
+            <thead><tr><th>パラメータ</th><th>既定</th><th>意味</th></tr></thead>
+            <tbody>
+              <tr><td><code>thresholdMs</code></td><td>60_000</td><td>沈黙と見做す最小間隔</td></tr>
+              <tr><td><code>quality.windowMs</code></td><td>0（質判定オフ）</td><td>沈黙終了後の反応観測時間</td></tr>
+            </tbody>
+          </table>
+
+          <h3>3-2. ステップ</h3>
+          <ol>
+            <li><code>capturedAt</code> が有効なコメントのみ抽出し昇順ソート（破壊しない）</li>
+            <li>i = 1 から末尾まで隣接ペア (prev, cur) の gap を計算</li>
+            <li>gap &lt; threshold なら次へ。gap ≥ threshold なら以下のゾーン情報を記録:
+              <ul>
+                <li><code>startAt</code> = prev.capturedAt</li>
+                <li><code>endAt</code> = cur.capturedAt</li>
+                <li><code>durationMs</code> = gap</li>
+                <li><code>quality</code> = 質判定の結果</li>
+                <li><code>afterCount</code> = 沈黙終了から windowMs 内のコメ数</li>
+              </ul>
+            </li>
+            <li>質判定: windowMs &gt; 0 なら、cur の時刻から windowMs 以内に含まれるコメ数を数えて分類</li>
+          </ol>
+
+          <h3>3-3. 質判定の閾値</h3>
+          <ul>
+            <li><strong>afterCount ≥ 5</strong> → <span class="qt qt-engaged">engaged</span>（沈黙明けに反応が爆発 = 話芸が効いた）</li>
+            <li><strong>afterCount = 2 ～ 4</strong> → <span class="qt qt-neutral">neutral</span>（普通の沈黙明け）</li>
+            <li><strong>afterCount ≤ 1</strong> → <span class="qt qt-departed">departed</span>（沈黙明けも反応なし）</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>参考実装（JavaScript / 純粋関数）</h2>
+<pre class="code"><code><span class="kw">export function</span> <span class="fn">detectCommentSilenceZones</span>(comments, opts = {}) {
+  <span class="kw">const</span> threshold = opts.thresholdMs &gt; <span class="num">0</span> ? opts.thresholdMs : <span class="num">60_000</span>;
+  <span class="kw">const</span> qualityWindowMs = opts.quality?.windowMs &gt; <span class="num">0</span>
+    ? opts.quality.windowMs : <span class="num">0</span>;
+
+  <span class="kw">const</span> valid = (comments || []).<span class="fn">filter</span>(c =&gt;
+    c?.capturedAt &gt; <span class="num">0</span> &amp;&amp; Number.<span class="fn">isFinite</span>(c.capturedAt)
+  ).<span class="fn">slice</span>().<span class="fn">sort</span>((a, b) =&gt; a.capturedAt - b.capturedAt);
+  <span class="kw">if</span> (valid.length &lt; <span class="num">2</span>) <span class="kw">return</span> [];
+
+  <span class="kw">const</span> zones = [];
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">1</span>; i &lt; valid.length; i++) {
+    <span class="kw">const</span> prev = valid[i - <span class="num">1</span>];
+    <span class="kw">const</span> cur = valid[i];
+    <span class="kw">const</span> gap = cur.capturedAt - prev.capturedAt;
+    <span class="kw">if</span> (gap &lt; threshold) <span class="kw">continue</span>;
+
+    <span class="kw">let</span> quality = <span class="str">'unknown'</span>;
+    <span class="kw">let</span> afterCount = <span class="num">0</span>;
+    <span class="kw">if</span> (qualityWindowMs &gt; <span class="num">0</span>) {
+      <span class="kw">const</span> windowEnd = cur.capturedAt + qualityWindowMs;
+      <span class="kw">for</span> (<span class="kw">let</span> j = i; j &lt; valid.length; j++) {
+        <span class="kw">if</span> (valid[j].capturedAt &gt; windowEnd) <span class="kw">break</span>;
+        afterCount += <span class="num">1</span>;
+      }
+      <span class="kw">if</span> (afterCount &gt;= <span class="num">5</span>) quality = <span class="str">'engaged'</span>;
+      <span class="kw">else if</span> (afterCount &lt;= <span class="num">1</span>) quality = <span class="str">'departed'</span>;
+      <span class="kw">else</span> quality = <span class="str">'neutral'</span>;
+    }
+
+    zones.<span class="fn">push</span>({
+      startAt: prev.capturedAt,
+      endAt: cur.capturedAt,
+      durationMs: gap,
+      quality, afterCount
+    });
+  }
+  <span class="kw">return</span> zones;
+}</code></pre>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>なぜこの設計なのか</h2>
+          <h3>5-1. なぜ「沈黙明けの反応コメ数」で判定するのか</h3>
+          <p>沈黙そのものを観測しても "なぜ沈黙したか" は分からない。しかし<strong>沈黙の直後の反応</strong>には情報が宿る:</p>
+          <ul>
+            <li>「うわぁ」「すごい」「やばい」が短時間に多発 → 視聴者は沈黙中ガン見していた</li>
+            <li>誰も何も書かない → 視聴者は離れていた</li>
+          </ul>
+          <p>この事後情報を使うことで、沈黙の意味を遡って判定できる。</p>
+
+          <h3>5-2. なぜ閾値が「5 コメ以上 / 0-1 コメ」なのか</h3>
+          <p>20-30 秒の窓で 5 コメ以上は通常の倍以上のコメ速度であり、明らかに「反応爆発」と言える。0-1 コメは「事実上 0」で、ノイズコメ 1 件混じってもまだ離脱と見做せる。中間の 2-4 は判定保留（neutral）として誤分類リスクを避ける。これは経験則だが、複数配信での検証で誤分類が最小になる範囲。</p>
+
+          <h3>5-3. なぜ既定 thresholdMs = 60 秒か</h3>
+          <p>ニコ生・Twitch・YouTube Live 等の典型的な配信では、コメ速度は 20 ～ 200 CPM。60 秒以上のコメ無しは「明らかに何かが起きた」レベル。30 秒等にすると、通常の小さな間でも検出されてノイズが増える。</p>
+
+          <h3>5-4. なぜ質判定を opt-in にするのか</h3>
+          <p>用途によっては「沈黙ゾーンの場所」だけ知りたく、質判定は別ロジックでやりたいケースがある。<code>opts.quality</code> を渡したときだけ働く設計にすることで、シンプルな用途と高度な用途の両方に対応できる。</p>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>既知の限界と拡張可能性</h2>
+          <ul>
+            <li><strong>沈黙明けの反応が遅延する場合</strong>: 視聴者の入力に時間が掛かる場合、windowMs を短くしすぎると engaged を取り逃す。</li>
+            <li><strong>配信全体のコメ速度に依存しない閾値</strong>: 元々コメ速度の遅い配信では「5 コメ以上」が出にくく、engaged を過小検出する。改善: <strong>配信全体の平均 CPM に対する相対閾値</strong>。</li>
+            <li>拡張: 沈黙ゾーンの<strong>長さ別の質統計</strong>（短い沈黙ほど engaged 率が高い等）を可視化。</li>
+            <li>拡張: 沈黙の<strong>5 ～ 10 秒前のコメ内容</strong>を保持し、「何が引き金で沈黙が起きたか」を遡って分析。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>関連する既知技術（先行技術）</h2>
+          <h3>7-1. Audio Silence Detection</h3>
+          <p>音声処理における無音区間検出（VAD: Voice Activity Detection）。本手法はテキスト時系列での類似処理。</p>
+          <h3>7-2. Engagement Metrics in Streaming</h3>
+          <p>YouTube / Twitch のエンゲージメント指標は「コメント数」「いいね数」等の単純カウントが中心で、「沈黙の質」を区別する指標は稀である。</p>
+          <h3>7-3. Sentiment Analysis</h3>
+          <p>個別コメントの感情分析は広く研究されているが、本手法は<strong>沈黙という "コメントが無い状態" を分析対象とする</strong>点が独特。</p>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>本記事の位置づけ・ライセンス</h2>
+          <p>本記事は、Chrome 拡張機能『君斗りんくの追憶のきらめき』内で 2026 年 4 月 30 日（バージョン 0.1.22）に投入された <code>commentSilenceZones.js</code> モジュールの設計思想と実装を、<strong>2026 年 5 月 1 日</strong>付で公開するものである。</p>
+          <p>参考実装は <strong>MIT</strong>、本記事文章は <strong>CC BY 4.0</strong>。</p>
+          <div class="note"><b>引用例:</b> 君斗りんく「ライブ配信の沈黙ゾーン検出と『沈黙の質』三段階分類」<i>君斗りんくの追憶のきらめき</i>、2026 年 5 月 1 日公開、<code>https://tsuioku-no-kirameki.com/articles/comment-silence-zones.html</code></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell"><p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p></div>
+    </footer>
+  </body>
+</html>

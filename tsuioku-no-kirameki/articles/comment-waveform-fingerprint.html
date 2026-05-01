@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>ライブ配信のコメント波形指紋によるリアルタイム類似配信検出 ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../images/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../images/apple-touch-icon.png">
+
+    <meta name="description" content="ライブ配信中に流れるコメントの密度カーブを 16 次元の正規化ベクトルにし、過去配信の指紋とコサイン類似度で比較することで、配信時間や総コメ数が異なっても『形が似てる過去配信』を見つける軽量 fingerprinting アルゴリズムの解説。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/comment-waveform-fingerprint.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/comment-waveform-fingerprint.html">
+    <meta property="og:title" content="ライブ配信のコメント波形指紋によるリアルタイム類似配信検出">
+    <meta property="og:description" content="コメント密度カーブを 16 次元正規化ベクトルにしてコサイン類似度で過去配信と比較する fingerprinting 手法の解説。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-05-01T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "ライブ配信のコメント波形指紋によるリアルタイム類似配信検出",
+        "datePublished": "2026-05-01",
+        "dateModified": "2026-05-01",
+        "author": {
+          "@type": "Organization",
+          "name": "Kimito-Link Project",
+          "url": "https://kimito-link.com/"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Kimito-Link Project",
+          "url": "https://kimito-link.com/"
+        },
+        "url": "https://tsuioku-no-kirameki.com/articles/comment-waveform-fingerprint.html",
+        "inLanguage": "ja-JP",
+        "license": "https://opensource.org/licenses/MIT"
+      }
+    </script>
+
+    <style>
+      :root{
+        --bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;
+        --line:rgba(88,62,28,.12);--gold:#c98e2b;--sky:#3d708d;--mint:#0f5e4f;--blue:#255d9b;
+        --violet:#5645ad;--brown:#8a3d19;--slate:#56534e;--red:#952b2a;
+        --text-primary:#2c2117;--text-secondary:#4f4338;
+        --shadow:0 18px 44px rgba(70,49,20,.12);--r1:34px;--r2:24px;--r3:18px;--maxw:880px;
+        --space-xs:8px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;
+        --shell-pad:16px;
+        --lh-tight:1.35;--lh-ui:1.58;--lh-body:1.82;--lh-heading:1.22;
+        --anchor-offset:56px;
+        --code-bg:rgba(45,33,23,.05);
+      }
+      @media (min-width:480px){ :root{--shell-pad:clamp(16px,3.2vw,28px)} }
+      *{box-sizing:border-box}
+      html{scroll-behavior:smooth;overflow-x:hidden}
+      body{
+        margin:0;color:var(--text-primary);
+        font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;
+        line-height:var(--lh-body);
+        background:
+          radial-gradient(ellipse 70% 48% at 98% 4%, rgba(255,210,228,.35), transparent 46%),
+          radial-gradient(circle at top right, rgba(132,184,207,.4), transparent 28%),
+          linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));
+        min-height:100vh;
+      }
+      a{color:var(--blue);text-underline-offset:3px}
+      a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+      .visually-hidden{
+        position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+        clip:rect(0,0,0,0);white-space:nowrap;border:0
+      }
+
+      .topbar{
+        position:sticky;top:0;z-index:50;
+        background:rgba(250,244,235,.88);
+        backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+        border-bottom:1px solid rgba(88,62,28,.07);
+      }
+      .topbar-inner{
+        display:flex;justify-content:space-between;align-items:center;gap:12px;
+        min-height:44px;padding:8px 0
+      }
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{
+        display:inline-flex;align-items:center;gap:6px;
+        padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;
+        text-decoration:none;color:var(--ink);
+        background:rgba(255,252,247,.94);border:1px solid var(--line);
+        transition:background .2s ease,border-color .2s ease
+      }
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{
+        font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);
+        margin:0 0 var(--space-sm);color:#1a1208;letter-spacing:.005em;
+      }
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md);line-height:var(--lh-body)}
+      header.page .meta{
+        font-size:.84rem;color:var(--muted);
+        display:flex;flex-wrap:wrap;gap:14px;
+        padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+      }
+      header.page .meta strong{color:var(--ink)}
+
+      main{padding-bottom:var(--space-2xl)}
+      section.box{
+        background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);
+        padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);
+        scroll-margin-top:var(--anchor-offset);
+      }
+      section.box h2{
+        font-size:1.2rem;line-height:var(--lh-heading);margin:0 0 var(--space-md);
+        color:#1a1208;letter-spacing:.01em;
+      }
+      section.box h2 .num{
+        display:inline-block;min-width:1.8em;color:var(--gold);font-variant-numeric:tabular-nums;
+        font-weight:800;margin-right:.2em;
+      }
+      section.box h3{
+        font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700;
+      }
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul, section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}
+      section.box li::marker{color:var(--gold)}
+
+      nav.toc{
+        background:rgba(255,251,245,.72);border:1px solid var(--line);
+        border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg);
+      }
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);letter-spacing:.04em;font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}
+      nav.toc a:hover{color:var(--brown);text-decoration:underline}
+
+      .digest{
+        padding:18px 22px;border-radius:var(--r3);
+        background:linear-gradient(160deg, rgba(243,170,37,.1), rgba(15,94,79,.06));
+        border:1px solid var(--line);margin:0 0 var(--space-lg);
+      }
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}
+      .digest li{margin-bottom:4px;font-size:.94rem}
+
+      .note{
+        font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);
+        border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;
+        margin:var(--space-sm) 0;
+      }
+      .note b{color:var(--brown);font-weight:700}
+
+      code, kbd{
+        font-family:"Menlo","Consolas","SFMono-Regular",monospace;font-size:.92em;
+        background:var(--code-bg);padding:1px 6px;border-radius:4px;
+      }
+      pre.code{
+        margin:var(--space-sm) 0;padding:14px 18px;
+        background:#1f1d1a;color:#e8e0d2;
+        border-radius:var(--r3);overflow-x:auto;
+        font-family:"Menlo","Consolas","SFMono-Regular",monospace;
+        font-size:.84rem;line-height:1.6;
+        border:1px solid rgba(0,0,0,.3);
+      }
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      pre.code .kw{color:#ff9d6c}
+      pre.code .fn{color:#a8d8ff}
+      pre.code .str{color:#b6e0a0}
+      pre.code .num{color:#d6b8ff;font-weight:normal;min-width:0}
+      pre.code .cm{color:#7d8694;font-style:italic}
+
+      .formula{
+        margin:var(--space-sm) 0;padding:14px 18px;
+        background:rgba(255,253,248,.7);border:1px solid var(--line);border-radius:var(--r3);
+        font-family:"Menlo","Consolas",monospace;font-size:.95em;
+        text-align:center;overflow-x:auto;
+      }
+
+      figure.diagram{
+        margin:var(--space-md) 0;padding:var(--space-md);
+        background:#fff;border:1px solid var(--line);border-radius:var(--r3);
+      }
+      figure.diagram svg{display:block;width:100%;height:auto;max-height:320px}
+      figure.diagram figcaption{
+        font-size:.83rem;color:var(--muted);text-align:center;margin-top:8px;
+      }
+
+      .dl-meta{
+        display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;
+        margin:var(--space-sm) 0;font-size:.92rem;
+      }
+      .dl-meta dt{color:var(--muted);font-weight:600}
+      .dl-meta dd{margin:0;color:var(--ink)}
+
+      footer.page{
+        margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);
+        text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);
+      }
+      footer.page a{color:var(--muted)}
+      footer.page a:hover{color:var(--brown)}
+
+      @media(max-width:520px){
+        section.box{padding:var(--space-md)}
+        pre.code{padding:12px 14px;font-size:.78rem}
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../" aria-label="君斗りんくの追憶のきらめき（トップへ戻る）">
+          <img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project">
+        </a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ コメント波形指紋</p>
+        <h1>ライブ配信のコメント波形指紋による<br>リアルタイム類似配信検出</h1>
+        <p class="lead">配信中に流れるコメントの密度カーブを 16 次元の正規化ベクトルに変換し、過去配信の指紋とコサイン類似度で比較することで、配信時間や総コメ数が異なっても「形が似てる過去配信」を見つけ出す軽量 fingerprinting 手法。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-05-01</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>実装: <strong><a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/broadcastWaveformFingerprint.js" target="_blank" rel="noopener">GitHub</a></strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+
+        <aside class="digest" aria-label="この記事の要点">
+          <h3>3 行要約</h3>
+          <ul>
+            <li>ライブ配信のコメント発生時刻列を、配信時間軸 [0,1] に正規化した上で <strong>N 等分のヒストグラム</strong>にする。</li>
+            <li>そのヒストグラムを <strong>peak normalization</strong>（最大ビンで割る）で [0,1] のベクトルに揃え、これを「波形指紋」とする。</li>
+            <li>2 配信間の類似度は <strong>コサイン類似度</strong>で計算する。配信時間も総コメ数も異なる配信どうしを正しく比較できる。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc" aria-label="目次">
+          <h2>目次</h2>
+          <ol>
+            <li><a href="#s1">解決したい課題</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">アルゴリズム詳細</a></li>
+            <li><a href="#s4">参考実装（JavaScript）</a></li>
+            <li><a href="#s5">なぜこの設計なのか</a></li>
+            <li><a href="#s6">計算量と運用コスト</a></li>
+            <li><a href="#s7">既知の限界と拡張可能性</a></li>
+            <li><a href="#s8">関連する既知技術（先行技術）</a></li>
+            <li><a href="#s9">本記事の位置づけ・ライセンス</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>解決したい課題</h2>
+          <p>ライブ配信を追っているとき、視聴者には次のような瞬間がある:</p>
+          <ul>
+            <li>「あ、これあの神回みたいな盛り上がり方してる」</li>
+            <li>「いつもの中だるみゾーンに入ったかも」</li>
+            <li>「立ち上がりは過去の○○配信に似てるけど、後半どうなるんだろう」</li>
+          </ul>
+          <p>こうした<strong>「過去配信との形の類似」</strong>は、視聴者・配信者・分析者にとって価値のあるシグナルだが、これを<strong>定量的にリアルタイムで判定する手段</strong>は意外と整備されていない。同接数の絶対値で並べてもダメ（神回と凡庸回で同接が同じだと混ざる）、コメ数の絶対値でもダメ（長時間配信と短時間配信が比較できない）。</p>
+          <p>必要なのは「<strong>配信時間も総コメ数も違う配信どうしを、波形（盛り上がりの形）として比較できる</strong>」軽量な指標である。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>本手法では、ライブ配信を <strong>1 本のコメント発生時刻列</strong> として捉え、それを以下の手順で<strong>固定次元の指紋ベクトル</strong>に変換する:</p>
+          <ol>
+            <li><strong>時刻の正規化</strong>: 配信内のすべてのコメント timestamp を、最初のコメント時刻 = 0 / 最後のコメント時刻 = 1 となるよう線形変換する。</li>
+            <li><strong>等分ヒストグラム化</strong>: [0, 1] を N 等分（既定 N = 16）し、各ビンに含まれるコメント数を数える。</li>
+            <li><strong>peak normalization</strong>: 全ビンの中の最大カウントで各ビンを割り、[0, 1] のベクトルに揃える。</li>
+          </ol>
+          <p>このベクトルが<strong>配信のコメント波形指紋</strong>（fingerprint）となる。配信どうしを比較するには、それぞれの指紋ベクトル間の<strong>コサイン類似度</strong>を計算する。</p>
+          <p>類似度は -1 ～ 1 の値（実用上は 0 ～ 1）で出力され、1 に近いほど「形が似ている」配信と判断される。</p>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>アルゴリズム詳細</h2>
+
+          <h3>3-1. 入力データ</h3>
+          <p>各コメントについて、最低限必要なフィールドは<strong>発生時刻</strong>のみ:</p>
+          <pre class="code"><code><span class="cm">// コメント 1 件あたりに必要な最低限のフィールド</span>
+{
+  capturedAt: <span class="num">1714532400000</span>  <span class="cm">// Unix エポックミリ秒（任意の単調増加 timestamp で可）</span>
+}</code></pre>
+          <p>テキスト本文・ユーザー ID・スタンプ等は本手法では一切使用しない。これにより、コメント本文を保存しないログ形式や、テキスト解析が困難な多言語配信にも適用できる。</p>
+
+          <h3>3-2. ステップ A: 時刻の正規化</h3>
+          <p>コメント時刻列 <code>t<sub>1</sub>, t<sub>2</sub>, ..., t<sub>n</sub></code>（昇順）に対し、配信全体のスパンを以下で定める:</p>
+          <div class="formula">first = min(t<sub>i</sub>),&nbsp;&nbsp;last = max(t<sub>i</sub>),&nbsp;&nbsp;span = max(1, last − first)</div>
+          <p>各 timestamp は次のように [0, 1] の正規化時刻に変換される:</p>
+          <div class="formula">τ<sub>i</sub> = (t<sub>i</sub> − first) / span</div>
+          <p><code>span = max(1, last − first)</code> としているのは、配信時間が 0 や負の異常入力でも 0 除算しない安全策である。</p>
+
+          <h3>3-3. ステップ B: 等分ヒストグラム化</h3>
+          <p>正規化時刻 τ<sub>i</sub> を N 等分のビンに割り当てる:</p>
+          <div class="formula">bin(τ<sub>i</sub>) = clamp(⌊τ<sub>i</sub> × N⌋, 0, N − 1)</div>
+          <p><code>clamp</code> は τ<sub>i</sub> = 1 のとき bin = N となるのを N − 1 に丸める処理。各ビンに何件のコメントがあるかを集計し、長さ N の整数配列 <code>counts</code> を得る。</p>
+          <p>既定 N = 16 だが、用途に応じて 8 / 32 / 64 等に調整可能。次元数が多いほど時間方向の解像度が上がるが、配信長が短い・コメ密度が低い場合は<strong>ノイズに敏感</strong>になる。経験則として 16 が「配信時間 30 分 ～ 10 時間」の範囲で最も安定して動作する。</p>
+
+          <h3>3-4. ステップ C: peak normalization</h3>
+          <p><code>counts</code> 配列の最大値 <code>peak</code> で全要素を割る:</p>
+          <div class="formula">vector<sub>i</sub> = round(counts<sub>i</sub> / peak × 1000) / 1000</div>
+          <p>これにより、ベクトルの最大値が常に 1.0 となり、ベクトルのスケール（総コメ数）が消去される。例えば「総コメ 100 件で peak 30 のヒストグラム」と「総コメ 10,000 件で peak 3,000 のヒストグラム」は、形が同じならば指紋として等価になる。</p>
+          <p><code>round(... × 1000) / 1000</code> は表示・保存時の桁数制御で、本質的な意味は持たない（精度を 3 桁に丸める）。</p>
+
+          <h3>3-5. ステップ D: 比較（コサイン類似度）</h3>
+          <p>2 つの指紋ベクトル <code>a</code>, <code>b</code>（共に長さ N）の類似度は次式で計算される:</p>
+          <div class="formula">similarity(a, b) = (a · b) / (‖a‖ × ‖b‖)</div>
+          <p>ここで <code>a · b</code> は内積、<code>‖a‖</code> は a のノルムである。両ベクトルの形が完全に同じならば 1.0、直交ならば 0.0、対称的に逆向きならば -1.0 となる。実用上、コメント波形指紋は非負値のみなので、出力範囲は [0, 1] となる。</p>
+          <p>過去配信の指紋集合に対して順次計算し、similarity 降順でソートして上位 N 件を取り出すことで「現在の配信に最も似た過去配信」を取得できる。</p>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>参考実装（JavaScript / 純粋関数）</h2>
+          <p>以下は本拡張機能で実際に使用している実装の抜粋である（<a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/broadcastWaveformFingerprint.js" target="_blank" rel="noopener">src/lib/broadcastWaveformFingerprint.js</a>）。Chrome / Node.js / browser 上で動作する純粋関数で、外部依存はゼロである。</p>
+
+<pre class="code"><code><span class="cm">/**
+ * コメント時刻列から波形指紋ベクトルを生成する。
+ * @param {Array&lt;{capturedAt:number}&gt;} comments
+ * @param {{dimensions?:number}=} opts
+ * @returns {{vector:number[], totalCount:number}|null}
+ */</span>
+<span class="kw">export function</span> <span class="fn">buildBroadcastWaveformFingerprint</span>(comments, opts = {}) {
+  <span class="kw">const</span> dim = (<span class="kw">typeof</span> opts?.dimensions === <span class="str">'number'</span> &amp;&amp; opts.dimensions &gt; <span class="num">0</span>)
+    ? Math.<span class="fn">floor</span>(opts.dimensions)
+    : <span class="num">16</span>;
+  <span class="kw">const</span> list = Array.<span class="fn">isArray</span>(comments) ? comments : [];
+  <span class="kw">const</span> ats = [];
+  <span class="kw">for</span> (<span class="kw">const</span> c <span class="kw">of</span> list) {
+    <span class="kw">if</span> (!c || <span class="kw">typeof</span> c !== <span class="str">'object'</span>) <span class="kw">continue</span>;
+    <span class="kw">const</span> at = c.capturedAt;
+    <span class="kw">if</span> (<span class="kw">typeof</span> at !== <span class="str">'number'</span> || !Number.<span class="fn">isFinite</span>(at) || at &lt;= <span class="num">0</span>) <span class="kw">continue</span>;
+    ats.<span class="fn">push</span>(at);
+  }
+  <span class="kw">if</span> (!ats.length) <span class="kw">return null</span>;
+  ats.<span class="fn">sort</span>((a, b) =&gt; a - b);
+
+  <span class="cm">// ステップ A: 時刻の正規化</span>
+  <span class="kw">const</span> first = ats[<span class="num">0</span>];
+  <span class="kw">const</span> last = ats[ats.length - <span class="num">1</span>];
+  <span class="kw">const</span> span = Math.<span class="fn">max</span>(<span class="num">1</span>, last - first);
+
+  <span class="cm">// ステップ B: 等分ヒストグラム化</span>
+  <span class="kw">const</span> counts = <span class="kw">new</span> Array(dim).<span class="fn">fill</span>(<span class="num">0</span>);
+  <span class="kw">for</span> (<span class="kw">const</span> at <span class="kw">of</span> ats) {
+    <span class="kw">let</span> idx = Math.<span class="fn">floor</span>(((at - first) / span) * dim);
+    <span class="kw">if</span> (idx &gt;= dim) idx = dim - <span class="num">1</span>;
+    <span class="kw">if</span> (idx &lt; <span class="num">0</span>) idx = <span class="num">0</span>;
+    counts[idx] += <span class="num">1</span>;
+  }
+
+  <span class="cm">// ステップ C: peak normalization</span>
+  <span class="kw">const</span> peak = counts.<span class="fn">reduce</span>((a, b) =&gt; Math.<span class="fn">max</span>(a, b), <span class="num">0</span>);
+  <span class="kw">const</span> vector = counts.<span class="fn">map</span>((v) =&gt;
+    peak &gt; <span class="num">0</span> ? Math.<span class="fn">round</span>((v / peak) * <span class="num">1000</span>) / <span class="num">1000</span> : <span class="num">0</span>
+  );
+
+  <span class="kw">return</span> { vector, totalCount: ats.length };
+}
+
+<span class="cm">/**
+ * 2 つの指紋ベクトル間のコサイン類似度。
+ * @returns {number|null}
+ */</span>
+<span class="kw">export function</span> <span class="fn">cosineSimilarity</span>(a, b) {
+  <span class="kw">if</span> (!Array.<span class="fn">isArray</span>(a) || !Array.<span class="fn">isArray</span>(b)) <span class="kw">return null</span>;
+  <span class="kw">if</span> (a.length !== b.length || a.length === <span class="num">0</span>) <span class="kw">return null</span>;
+  <span class="kw">let</span> dot = <span class="num">0</span>, na = <span class="num">0</span>, nb = <span class="num">0</span>;
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; a.length; i++) {
+    <span class="kw">const</span> av = Number(a[i]) || <span class="num">0</span>;
+    <span class="kw">const</span> bv = Number(b[i]) || <span class="num">0</span>;
+    dot += av * bv;
+    na += av * av;
+    nb += bv * bv;
+  }
+  <span class="kw">if</span> (na === <span class="num">0</span> || nb === <span class="num">0</span>) <span class="kw">return null</span>;
+  <span class="kw">return</span> Math.<span class="fn">round</span>((dot / Math.<span class="fn">sqrt</span>(na * nb)) * <span class="num">1000</span>) / <span class="num">1000</span>;
+}</code></pre>
+
+          <p>この実装は <a href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">本拡張機能のリポジトリ</a> 内で <strong>MIT ライセンス</strong>のもと公開されており、自由に複製・改変・再配布できる。</p>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>なぜこの設計なのか</h2>
+
+          <h3>5-1. なぜ時刻の正規化が必要か</h3>
+          <p>配信時間は配信ごとに違う（30 分の短い配信もあれば、10 時間の長い配信もある）。生の Unix timestamp で比較すると、絶対時刻軸上で完全に重ならないため、形の比較ができない。配信時間 [0, 1] に正規化することで、<strong>配信長に依らない波形比較</strong>が可能になる。</p>
+
+          <h3>5-2. なぜ peak normalization なのか</h3>
+          <p>同接 100 人の小規模配信と、同接 10,000 人の大型配信では、コメ数の絶対値が 100 倍違う。それぞれのヒストグラムの最大ビンで割ることで、スケールを揃えた上で形だけを比較できるようになる。</p>
+          <p>類似の手段として <strong>L2 正規化</strong>（ベクトル全体のノルムで割る）もあるが、コサイン類似度の計算過程で実質的に L2 正規化と等価な処理が入るため、peak normalization の方が「最も盛り上がった瞬間が必ず 1.0 になる」という直感的に分かりやすい指紋になる。</p>
+
+          <h3>5-3. なぜ N = 16 が既定なのか</h3>
+          <p>ライブ配信の典型的な「盛り上がり方の波」は、以下のような時間粒度の特徴を持つ:</p>
+          <ul>
+            <li>序盤の挨拶ラッシュ（0 ～ 5 分）</li>
+            <li>本編の盛り上がりピーク（中盤）</li>
+            <li>終盤のラストスパート（直前 5 分）</li>
+            <li>挨拶・お別れ（最後 1 ～ 2 分）</li>
+          </ul>
+          <p>30 分 ～ 数時間の配信を 16 等分すると、1 ビンあたり 2 ～ 30 分となり、上記の特徴をちょうど 1 ～ 2 ビンで捉えられる。次元数を増やしても本質的な情報量はあまり増えず、配信長が短い場合に統計ノイズが増える。</p>
+          <p>用途によっては <code>dimensions: 32</code>（より細かい盛り上がりピーク検出）や <code>dimensions: 8</code>（大局的な波の形のみで比較）も有用。</p>
+
+          <h3>5-4. なぜコサイン類似度なのか</h3>
+          <p>コサイン類似度は<strong>ベクトルの「向き」だけ</strong>を比較するため、peak normalization と組み合わせると<strong>形の類似度</strong>を綺麗に取り出せる。ユークリッド距離は絶対値の差に敏感すぎるため、配信規模の違いに耐えられない。</p>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>計算量と運用コスト</h2>
+          <dl class="dl-meta">
+            <dt>指紋生成</dt><dd>O(n)（n = コメント数）。1 配信あたり数百 ～ 数万件でも数ミリ秒。</dd>
+            <dt>指紋サイズ</dt><dd>16 次元 × Float（実装上は 0.001 刻みで 4 桁）。1 配信あたり 100 バイト未満。</dd>
+            <dt>指紋比較</dt><dd>O(N) = O(16)。1 比較あたりマイクロ秒オーダー。</dd>
+            <dt>過去 1,000 配信との比較</dt><dd>16,000 浮動小数点演算。ブラウザ上で数ミリ秒。</dd>
+          </dl>
+          <p>クライアント側（ブラウザ）でリアルタイムに動作させても全く負荷にならない軽量さである。これは Chrome 拡張のような、限られた CPU リソース下で動かす UX において重要な性質である。</p>
+          <p>過去の指紋データはあらかじめ <code>chrome.storage.local</code> や IndexedDB に「liveId → fingerprint vector」の形で保存しておけば、新しい配信を視聴中に随時比較が可能。</p>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>既知の限界と拡張可能性</h2>
+
+          <h3>7-1. 限界</h3>
+          <ul>
+            <li><strong>コメ数が極端に少ない配信</strong>（数十件以下）では統計ノイズが支配的になり、波形が安定しない。</li>
+            <li><strong>異常に長い無コメ区間</strong>がある配信は、その区間の前後でビン境界が偶然一致するか否かで指紋が大きく変わる場合がある。</li>
+            <li>本手法は<strong>形のみ</strong>を比較するため、内容（誰が・何を喋ったか）の類似は捉えられない。</li>
+          </ul>
+
+          <h3>7-2. 拡張可能性</h3>
+          <ul>
+            <li><strong>多重指紋</strong>: 同じ配信を「全体波形（N=16）」「序盤波形（N=8、最初の 30%）」「終盤波形（N=8、最後の 30%）」の 3 指紋に分解し、用途に応じて使い分ける。</li>
+            <li><strong>同接波形との合成</strong>: コメ波形と同接数の時系列波形を別ベクトルとして持ち、加重平均で類似度を統合する。</li>
+            <li><strong>サブイベント抽出</strong>: 指紋ベクトルの中で他配信より突出して高いビン位置を「この配信の独自盛り上がり」として抽出する。</li>
+            <li><strong>クラスタリング</strong>: 大量の指紋を k-means 等でクラスタ化し、配信スタイルの類型を発見する。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>関連する既知技術（先行技術）</h2>
+          <p>本手法は以下のような既知技術の延長線上にある。それぞれ独立に存在する技術であるが、「ライブ配信のコメント時刻列に適用する」組み合わせとしての本手法は、本記事公開時点で公開された具体的な記述としてここに位置づける。</p>
+
+          <h3>8-1. Audio Fingerprinting</h3>
+          <p>音声信号からスペクトログラムのピーク位置を抽出してハッシュ化し、楽曲を識別する技術。Shazam の "An Industrial-Strength Audio Search Algorithm" (2003) が代表例。本手法とは「時系列信号を固定次元の指紋に変換する」という発想を共有するが、対象が音声波形ではなくコメント密度カーブである点が異なる。</p>
+
+          <h3>8-2. Perceptual Hashing</h3>
+          <p>画像やビデオの内容を低次元のハッシュに変換して類似比較する技術（pHash, dHash 等）。本手法は時系列に対する perceptual hash と見なせる。</p>
+
+          <h3>8-3. ヒストグラム比較によるドキュメント類似度</h3>
+          <p>テキスト文書の単語頻度ヒストグラムを TF-IDF ベクトル化してコサイン類似度で比較する手法は、情報検索の基本技法として広く知られている。本手法は単語の代わりに「時間ビン内のコメント発生頻度」を要素とする点が異なる。</p>
+
+          <h3>8-4. Time-Series Subsequence Matching</h3>
+          <p>時系列データ間の類似度を Dynamic Time Warping (DTW) や Symbolic Aggregate approXimation (SAX) で計算する手法。本手法は SAX に近いが、シンボル化を行わず実数ベクトルとして保持する点、配信時間軸を [0, 1] に強制正規化する点が異なる。</p>
+
+          <h3>8-5. Twitch / YouTube Live のチャット解析ツール</h3>
+          <p>Twitch / YouTube Live 上のチャットメッセージ流を可視化するサードパーティツール（Chatty, Streamlabs Chatbox 等）は数多く存在するが、それらは主に「現在のチャット流をリアルタイム表示する」「個別メッセージにフィルタを掛ける」という用途が中心であり、配信全体のコメント波形を固定次元ベクトルにして過去配信と比較する手法を実装した公知例は、本記事執筆時点で著者は確認していない。</p>
+        </section>
+
+        <section class="box" id="s9">
+          <h2><span class="num">9.</span>本記事の位置づけ・ライセンス</h2>
+          <p>本記事は、Chrome 拡張機能『君斗りんくの追憶のきらめき』内で 2026 年 4 月 30 日（バージョン 0.1.24）に投入された <code>broadcastWaveformFingerprint.js</code> モジュールの設計思想と実装を、<strong>2026 年 5 月 1 日</strong>付で公開するものである。</p>
+          <p>本記事と参考実装は、以下の目的で公開される:</p>
+          <ul>
+            <li>ライブ配信解析を行う他の開発者・研究者が同じ手法を自由に応用できるようにする</li>
+            <li>本手法に関する<strong>先行技術 (prior art)</strong> として、本記事の公開日時を公的記録に残す（防御的公開／defensive publication）</li>
+            <li>既存の関連技術領域における具体的応用例として、技術コミュニティに知見を還元する</li>
+          </ul>
+          <p>参考実装のソースコードは <strong>MIT ライセンス</strong>（<a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">opensource.org/licenses/MIT</a>）のもとで提供される。本記事の文章部分は <strong>CC BY 4.0</strong>（<a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">creativecommons.org/licenses/by/4.0/deed.ja</a>）のもとで自由に複製・引用してよい（出典として本ページの URL を併記してください）。</p>
+
+          <div class="note">
+            <b>引用例:</b> 君斗りんく「ライブ配信のコメント波形指紋によるリアルタイム類似配信検出」<i>君斗りんくの追憶のきらめき</i>、2026 年 5 月 1 日公開、<code>https://tsuioku-no-kirameki.com/articles/comment-waveform-fingerprint.html</code>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell">
+        <p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p>
+      </div>
+    </footer>
+  </body>
+</html>

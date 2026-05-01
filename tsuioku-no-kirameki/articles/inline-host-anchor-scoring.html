@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Chrome 拡張で SPA 内に inline panel を adaptive に挿入するアンカー rect スコアリング ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../images/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../images/apple-touch-icon.png">
+
+    <meta name="description" content="Chrome 拡張機能から SPA（Single Page Application）の DOM ツリー内に inline panel を挿入する際、video 要素から祖先を辿って『視聴行（player + 公式コメ列）相当の矩形』を見つける rect スコアリング手法の解説。eligibility（足切り）→ score（残った中の最良）の二段判定で、SPA の動的な DOM 変化に追従する。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/inline-host-anchor-scoring.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/inline-host-anchor-scoring.html">
+    <meta property="og:title" content="Chrome 拡張で SPA 内に inline panel を adaptive に挿入するアンカー rect スコアリング">
+    <meta property="og:description" content="video 要素から祖先 DOM を辿って最適な panel 挿入位置を rect スコアリングで決定する手法。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-05-01T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {
+        "@context":"https://schema.org","@type":"TechArticle",
+        "headline":"Chrome 拡張で SPA 内に inline panel を adaptive に挿入するアンカー rect スコアリング",
+        "datePublished":"2026-05-01","dateModified":"2026-05-01",
+        "author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},
+        "publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},
+        "url":"https://tsuioku-no-kirameki.com/articles/inline-host-anchor-scoring.html",
+        "inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"
+      }
+    </script>
+
+    <style>
+      :root{
+        --bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;
+        --line:rgba(88,62,28,.12);--gold:#c98e2b;--sky:#3d708d;--mint:#0f5e4f;--blue:#255d9b;
+        --violet:#5645ad;--brown:#8a3d19;--slate:#56534e;--red:#952b2a;
+        --text-primary:#2c2117;--text-secondary:#4f4338;
+        --shadow:0 18px 44px rgba(70,49,20,.12);--r1:34px;--r2:24px;--r3:18px;--maxw:880px;
+        --space-xs:8px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;
+        --shell-pad:16px;
+        --lh-tight:1.35;--lh-ui:1.58;--lh-body:1.82;--lh-heading:1.22;
+        --anchor-offset:56px;
+        --code-bg:rgba(45,33,23,.05);
+      }
+      @media (min-width:480px){ :root{--shell-pad:clamp(16px,3.2vw,28px)} }
+      *{box-sizing:border-box}
+      html{scroll-behavior:smooth;overflow-x:hidden}
+      body{
+        margin:0;color:var(--text-primary);
+        font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;
+        line-height:var(--lh-body);
+        background:
+          radial-gradient(ellipse 70% 48% at 98% 4%, rgba(255,210,228,.35), transparent 46%),
+          radial-gradient(circle at top right, rgba(132,184,207,.4), transparent 28%),
+          linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));
+        min-height:100vh;
+      }
+      a{color:var(--blue);text-underline-offset:3px}
+      a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);color:#1a1208;letter-spacing:.005em;}
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md);line-height:var(--lh-body)}
+      header.page .meta{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+      header.page .meta strong{color:var(--ink)}
+
+      main{padding-bottom:var(--space-2xl)}
+      section.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset);}
+      section.box h2{font-size:1.2rem;line-height:var(--lh-heading);margin:0 0 var(--space-md);color:#1a1208;letter-spacing:.01em;}
+      section.box h2 .num{display:inline-block;min-width:1.8em;color:var(--gold);font-variant-numeric:tabular-nums;font-weight:800;margin-right:.2em;}
+      section.box h3{font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700;}
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul, section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}
+      section.box li::marker{color:var(--gold)}
+
+      nav.toc{background:rgba(255,251,245,.72);border:1px solid var(--line);border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg);}
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);letter-spacing:.04em;font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}
+      nav.toc a:hover{color:var(--brown);text-decoration:underline}
+
+      .digest{padding:18px 22px;border-radius:var(--r3);background:linear-gradient(160deg, rgba(243,170,37,.1), rgba(15,94,79,.06));border:1px solid var(--line);margin:0 0 var(--space-lg);}
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}
+      .digest li{margin-bottom:4px;font-size:.94rem}
+
+      .note{font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;margin:var(--space-sm) 0;}
+      .note b{color:var(--brown);font-weight:700}
+
+      code, kbd{font-family:"Menlo","Consolas","SFMono-Regular",monospace;font-size:.92em;background:var(--code-bg);padding:1px 6px;border-radius:4px;}
+      pre.code{margin:var(--space-sm) 0;padding:14px 18px;background:#1f1d1a;color:#e8e0d2;border-radius:var(--r3);overflow-x:auto;font-family:"Menlo","Consolas","SFMono-Regular",monospace;font-size:.84rem;line-height:1.6;border:1px solid rgba(0,0,0,.3);}
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      pre.code .kw{color:#ff9d6c}
+      pre.code .fn{color:#a8d8ff}
+      pre.code .str{color:#b6e0a0}
+      pre.code .num{color:#d6b8ff}
+      pre.code .cm{color:#7d8694;font-style:italic}
+
+      .formula{margin:var(--space-sm) 0;padding:14px 18px;background:rgba(255,253,248,.7);border:1px solid var(--line);border-radius:var(--r3);font-family:"Menlo","Consolas",monospace;font-size:.95em;text-align:center;overflow-x:auto;}
+
+      table.params{width:100%;border-collapse:collapse;margin:var(--space-sm) 0;font-size:.9rem;}
+      table.params th, table.params td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;}
+      table.params th{color:var(--muted);font-weight:600;background:rgba(255,253,248,.5)}
+      table.params td code{font-size:.88em}
+
+      .dl-meta{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:var(--space-sm) 0;font-size:.92rem;}
+      .dl-meta dt{color:var(--muted);font-weight:600}
+      .dl-meta dd{margin:0;color:var(--ink)}
+
+      footer.page{margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);}
+      footer.page a{color:var(--muted)}
+      footer.page a:hover{color:var(--brown)}
+
+      @media(max-width:520px){
+        section.box{padding:var(--space-md)}
+        pre.code{padding:12px 14px;font-size:.78rem}
+        table.params{font-size:.82rem}
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../" aria-label="君斗りんくの追憶のきらめき（トップへ戻る）">
+          <img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project">
+        </a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ inline panel anchor scoring</p>
+        <h1>Chrome 拡張で SPA 内に inline panel を<br>adaptive に挿入するアンカー rect スコアリング</h1>
+        <p class="lead">video 要素から祖先 DOM を辿って「視聴行（player + 公式コメ列）相当の矩形」を見つけ、その直後に拡張機能の inline panel を挿入する手法。eligibility（足切り）と score（最良選択）の二段判定で、SPA の動的 DOM 変化に追従する。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-05-01</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>実装: <strong><a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/inlineHostAnchorScoring.js" target="_blank" rel="noopener">GitHub</a></strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+
+        <aside class="digest" aria-label="この記事の要点">
+          <h3>3 行要約</h3>
+          <ul>
+            <li>video 要素から祖先 DOM を順に辿り、各祖先の <code>getBoundingClientRect()</code> を「アンカー候補矩形」として収集する。</li>
+            <li>各候補に対して <strong>eligibility</strong>（最小幅・最大面積・aspect 比・video との寸法整合）の足切りを掛け、残った候補に <strong>score = 面積 × (1 − aspect penalty − width ratio penalty)</strong> を計算して最良を選ぶ。</li>
+            <li>純粋関数として実装することで、jsdom 不要の単体テストで設計をデバッグでき、SPA の DOM 変化があっても挙動が予測可能になる。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc" aria-label="目次">
+          <h2>目次</h2>
+          <ol>
+            <li><a href="#s1">解決したい課題</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">eligibility 判定の閾値</a></li>
+            <li><a href="#s4">score の計算式</a></li>
+            <li><a href="#s5">参考実装（JavaScript）</a></li>
+            <li><a href="#s6">なぜこの設計なのか</a></li>
+            <li><a href="#s7">既知の限界と拡張可能性</a></li>
+            <li><a href="#s8">関連する既知技術（先行技術）</a></li>
+            <li><a href="#s9">本記事の位置づけ・ライセンス</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>解決したい課題</h2>
+          <p>Chrome 拡張機能で SPA（Single Page Application）の DOM 内に独自の UI panel を inline で挿入したい場合、典型的に次の問題に直面する:</p>
+          <ul>
+            <li>SPA は <strong>クラス名・属性が毎リリースで変わる</strong>ため、CSS セレクタによる固定アンカーは壊れやすい。</li>
+            <li>ページのレイアウトが <strong>ウィンドウ幅・ログイン状態・コンテンツ種別で動的に変化</strong>するため、同じセレクタでも違う場所にヒットすることがある。</li>
+            <li>一見適切な祖先要素が「視聴行 + コメント欄 + バナー一式」を含む<strong>巨大なラッパー</strong>になっていて、その直後にパネルを挿入すると関連動画やフッターのさらに後ろに追いやられる。</li>
+          </ul>
+          <p>必要なのは、<strong>クラス名や ID に依存せず</strong>、<strong>レイアウトの幾何学的特徴</strong>から「ここに挿入すべき」場所を特定するアルゴリズムである。本手法は、video 要素を起点に祖先 DOM を辿り、矩形のサイズ・形状・video との寸法整合をスコアリングして最適な挿入位置を選ぶ。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>処理は以下の流れで構成される:</p>
+          <ol>
+            <li><strong>video 要素を起点に祖先を辿る</strong>: <code>video.parentElement</code> を 1 つずつ遡って、各祖先の <code>getBoundingClientRect()</code> を「アンカー候補矩形」として収集する。</li>
+            <li><strong>各候補に eligibility 判定を適用</strong>: 最小幅・最大面積比・aspect 比・video との寸法整合などの閾値で<strong>足切り</strong>する。</li>
+            <li><strong>残った候補に score を計算</strong>: 面積を主指標とし、aspect 比と video との幅比のペナルティを掛けて減点する。</li>
+            <li><strong>最高スコアの候補を選択</strong>し、その直後に panel を挿入する。</li>
+          </ol>
+          <p>本手法のキーアイデアは、判定ロジックを<strong>純粋関数</strong>として実装することにある。入力は「候補 rect・viewport サイズ・videoRect」の 3 つだけで、DOM への副作用も依存もない。これにより、jsdom 不要の単体テストで全エッジケースを検証でき、SPA の DOM 構造が変わっても本体ロジックの正しさは保たれる。</p>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>eligibility 判定の閾値</h2>
+          <p>以下のいずれかに該当する候補は<strong>失格</strong>として除外される:</p>
+          <table class="params">
+            <thead><tr><th>パラメータ</th><th>既定値</th><th>意味</th></tr></thead>
+            <tbody>
+              <tr><td><code>minWidth</code></td><td>260 px</td><td>panel が見える最小幅</td></tr>
+              <tr><td><code>minHeight</code></td><td>140 px</td><td>panel が見える最小高さ</td></tr>
+              <tr><td><code>maxAreaRatio</code></td><td>0.6</td><td>候補面積 / viewport 面積の上限（巨大ラッパーを除外）</td></tr>
+              <tr><td><code>minAspect</code></td><td>1</td><td>aspect 下限（縦長の細い柱を除外）</td></tr>
+              <tr><td><code>maxAspect</code></td><td>2.6</td><td>aspect 上限（横長すぎる行全体を除外）</td></tr>
+              <tr><td><code>minWidthRatioToVideo</code></td><td>0.95</td><td>候補幅 / video 幅 の下限（video より細い祖先を除外）</td></tr>
+              <tr><td><code>maxWidthRatioToVideo</code></td><td>1.6</td><td>候補幅 / video 幅 の上限（video より遥かに広い祖先を除外）</td></tr>
+              <tr><td><code>maxHeightRatioToVideo</code></td><td>3.5</td><td>候補高さ / video 高さ の上限</td></tr>
+              <tr><td><code>maxTopOffsetFromVideo</code></td><td>120 px</td><td>候補 top と video top の差の上限（video から離れすぎを除外）</td></tr>
+            </tbody>
+          </table>
+          <p>これらは絶対的なルールではなく、対象 SPA の特性に応じて <code>overrides</code> 引数で個別に上書き可能。本拡張機能では、ニコ生視聴ページの実測値に基づいて上記既定値を選んでいる。</p>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>score の計算式</h2>
+          <p>eligibility を通過した候補に対しては、以下のスコアを計算する:</p>
+          <div class="formula">aspectPenalty = min(|aspect − 16/9|, 1.1) × 0.18</div>
+          <div class="formula">widthPenalty = min(|widthRatio − 1.15|, 0.6) × 0.15</div>
+          <div class="formula">score = area × (1 − aspectPenalty − widthPenalty)</div>
+          <p>各係数の意味:</p>
+          <ul>
+            <li><strong>area（基本点）</strong>: 大きい矩形ほど panel が広く取れて望ましい（ただし maxAreaRatio で上限あり）。</li>
+            <li><strong>aspect penalty</strong>: 候補の aspect 比が 16:9 から離れるほど減点。video の自然な aspect に近い候補を優先する。</li>
+            <li><strong>width penalty</strong>: 候補幅 / video 幅が 1.15 から離れるほど減点。video よりわずかに広い「視聴行」相当の候補を優先する。</li>
+            <li><strong>min によるクランプ</strong>: ペナルティ係数が暴走しないように上限を設けている。</li>
+          </ul>
+          <p>結果として、score は <strong>「video とほぼ同じ aspect で、video よりわずかに広い、できるだけ大きい矩形」</strong>を最高評価する設計になっている。</p>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>参考実装（JavaScript / 純粋関数）</h2>
+          <p>以下は本拡張機能で実際に使用している実装の抜粋である（<a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/inlineHostAnchorScoring.js" target="_blank" rel="noopener">src/lib/inlineHostAnchorScoring.js</a>）。</p>
+
+<pre class="code"><code><span class="kw">export const</span> DEFAULT_INLINE_HOST_ANCHOR_LIMITS = Object.<span class="fn">freeze</span>({
+  minWidth: <span class="num">260</span>,
+  minHeight: <span class="num">140</span>,
+  maxAreaRatio: <span class="num">0.6</span>,
+  minAspect: <span class="num">1</span>,
+  maxAspect: <span class="num">2.6</span>,
+  minWidthRatioToVideo: <span class="num">0.95</span>,
+  maxWidthRatioToVideo: <span class="num">1.6</span>,
+  maxHeightRatioToVideo: <span class="num">3.5</span>,
+  maxTopOffsetFromVideo: <span class="num">120</span>
+});
+
+<span class="kw">const</span> ASPECT_IDEAL = <span class="num">16</span> / <span class="num">9</span>;
+<span class="kw">const</span> IDEAL_WIDTH_RATIO = <span class="num">1.15</span>;
+
+<span class="cm">/**
+ * 候補矩形をスコアリングする純粋関数。DOM 依存なし。
+ * @param {{rect, viewport, videoRect}} input
+ * @param {Partial&lt;Limits&gt;} overrides
+ * @returns {{eligible:boolean, score:number, reason:string}}
+ */</span>
+<span class="kw">export function</span> <span class="fn">scoreInlineHostAnchorCandidate</span>(input, overrides = {}) {
+  <span class="kw">const</span> limits = { ...DEFAULT_INLINE_HOST_ANCHOR_LIMITS, ...overrides };
+  <span class="kw">const</span> { rect, viewport, videoRect } = input;
+  <span class="kw">const</span> viewportArea = Math.<span class="fn">max</span>(<span class="num">1</span>, viewport.width * viewport.height);
+  <span class="kw">const</span> area = Math.<span class="fn">max</span>(<span class="num">0</span>, rect.width * rect.height);
+  <span class="kw">const</span> aspect = rect.width / Math.<span class="fn">max</span>(rect.height, <span class="num">1</span>);
+
+  <span class="cm">// eligibility 判定（足切り）</span>
+  <span class="kw">if</span> (rect.width &lt; limits.minWidth)
+    <span class="kw">return</span> { eligible: <span class="kw">false</span>, score: <span class="num">0</span>, reason: <span class="str">'width&lt;min'</span> };
+  <span class="kw">if</span> (rect.height &lt; limits.minHeight)
+    <span class="kw">return</span> { eligible: <span class="kw">false</span>, score: <span class="num">0</span>, reason: <span class="str">'height&lt;min'</span> };
+  <span class="kw">if</span> (area &gt; viewportArea * limits.maxAreaRatio)
+    <span class="kw">return</span> { eligible: <span class="kw">false</span>, score: <span class="num">0</span>, reason: <span class="str">'area&gt;max'</span> };
+  <span class="kw">if</span> (aspect &lt; limits.minAspect)
+    <span class="kw">return</span> { eligible: <span class="kw">false</span>, score: <span class="num">0</span>, reason: <span class="str">'aspect&lt;min'</span> };
+  <span class="kw">if</span> (aspect &gt; limits.maxAspect)
+    <span class="kw">return</span> { eligible: <span class="kw">false</span>, score: <span class="num">0</span>, reason: <span class="str">'aspect&gt;max'</span> };
+
+  <span class="kw">const</span> videoWidth = Math.<span class="fn">max</span>(<span class="num">1</span>, videoRect.width);
+  <span class="kw">const</span> videoHeight = Math.<span class="fn">max</span>(<span class="num">1</span>, videoRect.height);
+  <span class="kw">const</span> widthRatio = rect.width / videoWidth;
+  <span class="kw">const</span> heightRatio = rect.height / videoHeight;
+  <span class="kw">const</span> topOffset = Math.<span class="fn">abs</span>(rect.top - videoRect.top);
+
+  <span class="kw">if</span> (widthRatio &lt; limits.minWidthRatioToVideo)
+    <span class="kw">return</span> { eligible: <span class="kw">false</span>, score: <span class="num">0</span>, reason: <span class="str">'width&lt;videoMin'</span> };
+  <span class="kw">if</span> (widthRatio &gt; limits.maxWidthRatioToVideo)
+    <span class="kw">return</span> { eligible: <span class="kw">false</span>, score: <span class="num">0</span>, reason: <span class="str">'width&gt;videoMax'</span> };
+  <span class="kw">if</span> (heightRatio &gt; limits.maxHeightRatioToVideo)
+    <span class="kw">return</span> { eligible: <span class="kw">false</span>, score: <span class="num">0</span>, reason: <span class="str">'height&gt;videoMax'</span> };
+  <span class="kw">if</span> (topOffset &gt; limits.maxTopOffsetFromVideo)
+    <span class="kw">return</span> { eligible: <span class="kw">false</span>, score: <span class="num">0</span>, reason: <span class="str">'topOffset&gt;max'</span> };
+
+  <span class="cm">// score 計算</span>
+  <span class="kw">const</span> aspectPenalty = Math.<span class="fn">min</span>(Math.<span class="fn">abs</span>(aspect - ASPECT_IDEAL), <span class="num">1.1</span>) * <span class="num">0.18</span>;
+  <span class="kw">const</span> widthPenalty = Math.<span class="fn">min</span>(Math.<span class="fn">abs</span>(widthRatio - IDEAL_WIDTH_RATIO), <span class="num">0.6</span>) * <span class="num">0.15</span>;
+  <span class="kw">const</span> score = area * (<span class="num">1</span> - aspectPenalty - widthPenalty);
+  <span class="kw">return</span> { eligible: <span class="kw">true</span>, score, reason: <span class="str">'ok'</span> };
+}</code></pre>
+
+          <p>呼び出し側（content script）は、video から祖先を辿って各 <code>parentElement</code> の rect をこの関数に渡し、<code>{eligible:true}</code> の中で最大 score の候補を選ぶ。</p>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>なぜこの設計なのか</h2>
+
+          <h3>6-1. なぜ純粋関数か</h3>
+          <p>SPA の DOM 構造は変化が頻繁で、本物のページに依存したテストは壊れやすい。判定ロジックを「rect 入力 → score 出力」の純粋関数に閉じ込めることで、<strong>本物の DOM なしで全エッジケースをテスト</strong>できる。本拡張機能では、この関数だけで 12 ケースの単体テストを持つ。</p>
+
+          <h3>6-2. なぜ eligibility と score の二段か</h3>
+          <p>「全候補にスコアを付けて最高値を取る」だけでは、不適切な候補（巨大ラッパー等）にも何らかのスコアが付き、たまたま最高値を取ってしまう事故が起きる。<strong>絶対 NG な候補は scoring の前に除外</strong>することで、最終出力の安定性が大きく上がる。</p>
+
+          <h3>6-3. なぜ video との寸法整合を見るのか</h3>
+          <p>video 単体の rect は信頼できる「視聴領域の中心」だが、その rect 自体に panel を挿入すると video の上に被さる。理想は「<strong>video を含む横並びレイアウトの『行全体』</strong>」を見つけること。video よりわずかに広く、aspect が近く、top も近い候補は、その「行」である可能性が高い。</p>
+
+          <h3>6-4. なぜ ASPECT_IDEAL = 16/9 なのか</h3>
+          <p>動画の標準 aspect 比 16:9 を持つ候補は、構造的に「video のためにレイアウトされた領域」である可能性が高い。完全一致は要求せず、ペナルティとして緩く評価する。</p>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>既知の限界と拡張可能性</h2>
+
+          <h3>7-1. 限界</h3>
+          <ul>
+            <li>video 要素が存在しないページ（音声配信のみ等）には適用できない。</li>
+            <li>多重 iframe 構造（特に cross-origin）の中の video は本手法だけでは扱えない。content script を全 frame に注入するなど別の対応が必要。</li>
+            <li>SPA がレイアウトを大幅に変更（例: video が portrait 縦長専用に変わる）した場合は、閾値の再調整が必要になる。</li>
+          </ul>
+
+          <h3>7-2. 拡張可能性</h3>
+          <ul>
+            <li><strong>ResizeObserver で再アンカー</strong>: player サイズが変わったら再スコアリングして panel を移動する。</li>
+            <li><strong>祖先 transform 検出</strong>: <code>position:fixed</code> 内に挿入してしまうと panel が画面に固定されてしまう。祖先の <code>transform</code> / <code>position</code> を検出して避ける拡張が可能。</li>
+            <li><strong>履歴ベースの学習</strong>: 同一サイトでの過去の選択結果を <code>chrome.storage.local</code> に記録し、次回起動時に直接同じ候補を選ぶショートカット。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>関連する既知技術（先行技術）</h2>
+
+          <h3>8-1. Computer Vision の Region Proposal</h3>
+          <p>R-CNN / Selective Search 系の object detection で、画像内に矩形候補を生成し、各候補にスコアを付けて非極大値抑制で絞る手法。本手法は対象が画像ピクセルではなく DOM 矩形である点を除いて、同じ枠組み（候補生成 → eligibility → scoring → 選択）を辿っている。</p>
+
+          <h3>8-2. Web Reader Mode の Article Extraction</h3>
+          <p>Mozilla Readability や Safari Reader Mode は、ページ内の本文領域を DOM ノードのスコアリングで特定する。本手法は対象が「本文」ではなく「video 周辺の挿入アンカー」である点が異なる。</p>
+
+          <h3>8-3. Chrome 拡張の DOM 注入手法</h3>
+          <p>多くの広告ブロッカーや改造拡張機能は、CSS セレクタや XPath による固定アンカーで DOM を改変する。本手法は<strong>セレクタを使わず幾何学的特徴で挿入位置を決める</strong>点が独特である。これに最も近い公知の実装は Wappalyzer 等のサイト解析系拡張があるが、それらは「検出」が目的で「挿入位置の adaptive 決定」とは目的が異なる。</p>
+        </section>
+
+        <section class="box" id="s9">
+          <h2><span class="num">9.</span>本記事の位置づけ・ライセンス</h2>
+          <p>本記事は、Chrome 拡張機能『君斗りんくの追憶のきらめき』内で 2026 年 5 月 1 日（バージョン 0.1.64）に投入された <code>inlineHostAnchorScoring.js</code> モジュールの設計思想と実装を、<strong>2026 年 5 月 1 日</strong>付で公開するものである。</p>
+          <p>公開目的:</p>
+          <ul>
+            <li>Chrome 拡張機能を開発する他の開発者が同じ手法を自由に応用できるようにする</li>
+            <li>本手法に関する<strong>先行技術 (prior art)</strong> として、本記事の公開日時を公的記録に残す（防御的公開／defensive publication）</li>
+          </ul>
+          <p>参考実装は <strong>MIT ライセンス</strong>、本記事文章は <strong>CC BY 4.0</strong> のもとで自由に複製・引用可。</p>
+          <div class="note">
+            <b>引用例:</b> 君斗りんく「Chrome 拡張で SPA 内に inline panel を adaptive に挿入するアンカー rect スコアリング」<i>君斗りんくの追憶のきらめき</i>、2026 年 5 月 1 日公開、<code>https://tsuioku-no-kirameki.com/articles/inline-host-anchor-scoring.html</code>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell">
+        <p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p>
+      </div>
+    </footer>
+  </body>
+</html>
