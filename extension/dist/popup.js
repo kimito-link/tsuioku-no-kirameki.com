@@ -779,6 +779,17 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.94",
+      date: "2026-05-01",
+      summary: "INLINE \u30E2\u30FC\u30C9\u3067\u300C\u63A5\u7D9A\u4E2D\u2026\u300D\u56FA\u5B9A\u306E race \u3092\u6839\u6CBB",
+      items: Object.freeze([
+        "INLINE \u30E2\u30FC\u30C9\uFF08\u62E1\u5F35\u3092\u30CB\u30B3\u751F watch \u30DA\u30FC\u30B8\u306B\u57CB\u3081\u8FBC\u3093\u3060\u72B6\u614B\uFF09\u3067 \u63A8\u5B9A\u540C\u63A5 / \u6765\u5834\u8005\u6570\u304C\u300C\uFF08\u63A5\u7D9A\u4E2D\u2026\uFF09\u300D\u306E\u307E\u307E\u56FA\u5B9A\u3055\u308C\u308B race condition \u3092\u6839\u6CBB\u3057\u307E\u3057\u305F\u30020.1.91-0.1.93 \u306E 3 \u9023\u7D9A\u4FEE\u6B63\u3067\u3082\u6B8B\u3063\u3066\u3044\u305F\u75C7\u72B6\u306E\u771F\u56E0\u3067\u3059",
+        "\u771F\u56E0: popup-entry.js#refresh() \u304C\u4E16\u4EE3\u756A\u53F7\u3067\u5B88\u3089\u308C\u3066\u3044\u308B\u8A2D\u8A08\u3060\u304C\u3001watch snapshot \u306E merge \u3082\u4E16\u4EE3\u306E bail-out \u306E\u5F8C\u308D\u306B\u3042\u3063\u305F\u305F\u3081\u3001INLINE polling=10 \u79D2 \xD7 slow fetch=\u6700\u5927 11 \u79D2\u306E\u7D44\u307F\u5408\u308F\u305B\u3067 1 \u56DE\u76EE\u306E\u53D6\u5F97\u7D50\u679C\u304C\u5E38\u306B\u7834\u68C4\u3055\u308C\u3066\u3044\u307E\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: snapshot \u306F\u4E16\u4EE3\u3092\u8D85\u3048\u308B\u6C38\u7D9A\u30AD\u30E3\u30C3\u30B7\u30E5\u3068\u3057\u3066 isFreshRefresh() \u306E bail-out \u3088\u308A\u5148\u306B merge \u3059\u308B\u3088\u3046\u3001\u7D14\u95A2\u6570 popupWatchSnapshotPersist.js \u3092\u65B0\u8A2D\u3057\u3066\u8CAC\u52D9\u3092\u5206\u96E2\u3002paint \u3084 derived UI \u66F4\u65B0\u306F\u5F15\u304D\u7D9A\u304D\u4E16\u4EE3\u3067\u5B88\u308B",
+        "\u526F\u4F5C\u7528\u4FEE\u6B63: INLINE \u30E2\u30FC\u30C9\u306E visibilitychange \u6642\u306B\u3082 snapshot=null \u30AF\u30EA\u30A2\u304C\u6B8B\u3063\u3066\u3044\u305F\u6F0F\u308C\u3092\u64A4\u53BB\uFF08\u30BF\u30D6\u5207\u66FF\u3067\u623B\u3063\u305F\u77AC\u9593\u306B\u300C\u63A5\u7D9A\u4E2D\u2026\u300D\u304C\u518D\u70B9\u706F\u3059\u308B\u75C7\u72B6\u306E\u9632\u6B62\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.93",
       date: "2026-05-01",
       summary: "lv \u5207\u66FF\u6642\u306F stale \u3092\u6368\u3066\u308B\u4FEE\u6B63",
@@ -10096,6 +10107,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return merged;
   }
 
+  // src/lib/popupWatchSnapshotPersist.js
+  function persistFreshlyFetchedSnapshot({ currentSnapshot, fetchedSnapshot, merge }) {
+    if (fetchedSnapshot == null) return currentSnapshot;
+    return merge(currentSnapshot, fetchedSnapshot);
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -15272,11 +15289,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           watchMetaCache.fetchInflight = false;
         }
         watchMetaCache.fetchError = String(snapResult.error || "");
+        watchMetaCache.snapshot = persistFreshlyFetchedSnapshot({
+          currentSnapshot: watchMetaCache.snapshot,
+          fetchedSnapshot: snapResult.snapshot,
+          merge: mergeWatchSnapshotPreservingBroadcaster
+        });
         if (!isFreshRefresh()) return;
-        watchMetaCache.snapshot = mergeWatchSnapshotPreservingBroadcaster(
-          watchMetaCache.snapshot,
-          snapResult.snapshot
-        );
         watchSnapshot = watchMetaCache.snapshot;
         const strippedAfterSnap = stripViewerAvatarContamination(
           arr,
@@ -16811,7 +16829,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1928" ? String("0501-1928") : "dev";
+      const buildId = "0501-2032" ? String("0501-2032") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -18419,7 +18437,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         if (now - lastVisibilityRefresh < POLL_INTERVAL_MS) return;
         lastVisibilityRefresh = now;
         watchMetaCache.key = "";
-        watchMetaCache.snapshot = null;
         safeRefresh();
       });
     }
