@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.73（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.74（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,51 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.74 バンプで入った修正（empty state で popup window が広い時の右側余白 + 中央寄せ BD）**:
+
+- ユーザー報告（0.1.73 リリース後、empty state スクショ 3 枚）:
+  「右に余計な空白がいつもあるし、もっと中央にきてもいい」
+  - スクショ 1（Google homepage を背景にした popup window）: popup window が
+    手動リサイズで ~600px に広がっており、内部 body の右側に大きな余白が見える。
+  - スクショ 2/3（chrome://extensions を背景にした popup window）: popup window
+    が ~420px のとき余白なし（症状は出ていない）。
+- 原因:
+  - `html { width: var(--nl-pop-width); max-width: 540px; }` により html は
+    420〜540px に固定されているが、popup window 自体はユーザーが手動で広げると
+    その値を超えるサイズになる。
+  - 結果 html が popup window より狭くなり、popup window 左端から html / body
+    が始まる構造のため、html の右側に空白だけが残る（左寄せで余白が右だけに出る）。
+  - body 側で `--nl-pop-width` を `window.innerWidth` に追従させていない
+    （[popup-entry.js:411-415] で `sw * 0.265` 由来 → screen size から決定）ので、
+    手動リサイズには反応しない。
+- 修正（CSS のみ・JS 不要）:
+  - `extension/popup.html` の `html:not(.nl-inline)` ルールに以下を追加:
+    ```css
+    html:not(.nl-inline) {
+      width: max(var(--nl-pop-width, 420px), 100vw);
+      max-width: 100vw;
+      /* 既存の height ルールはそのまま */
+    }
+    html:not(.nl-inline) body {
+      margin-left: auto;
+      margin-right: auto;
+      /* 既存の height ルールはそのまま */
+    }
+    ```
+  - html を viewport 幅まで広げ、body は基底ルールの `--nl-pop-width` を維持して
+    `margin-inline:auto` で水平中央に寄せる。これにより手動リサイズで生じた
+    余白が左右に均等に分散する（中央寄せ）。
+- action popup（Chrome が body 幅にリサイズ）の場合: viewport == body 幅なので
+  `100vw == --nl-pop-width` で `max(--nl-pop-width, 100vw) == --nl-pop-width`、
+  margin auto は左右 0 になり実質変化なし。既存の見た目は完全に維持される。
+- 副作用想定:
+  - active watch（empty state 以外）でも同条件なら中央寄せが効くが、active watch
+    はユーザーが手動リサイズしないユースケースが大半なので影響軽微。万一気になる
+    場合は `:not(.nl-empty-state)` で empty state 専用に絞るオプションあり。
+- 残課題: 手動リサイズの場合のみで発動する性質上、Playwright での自動検証は
+  `chrome.windows.update` で width を意図的に広げてからのスクショ比較が必要。
+  0.1.75 以降の候補。
 
 **0.1.73 バンプで入った修正（empty state では body cap 解除 + primary.scrollHeight 実測 BC）**:
 
