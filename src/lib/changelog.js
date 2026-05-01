@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.87',
+    date: '2026-05-01',
+    summary: 'グリッドが新コメ無しで動くのを修正',
+    items: Object.freeze([
+      'コメント追加が無いのにアイコングリッドの最後尾が pulse（光る演出）するのを修正しました。avatar URL がキャッシュ補完などで後から埋まる度に「新コメ追加」と同じ演出が走っていました',
+      '修正内容: popup-entry.js の syncStoryGrowth 内で、signature の変化（avatar URL 補完等）による再同期では pulseLast: false に変更。新規コメ追加（renderedCount < targetCount）の経路のみ pulseLast: true で光らせる',
+      '既存の「新コメが来たら最後尾が一瞬光る」演出は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.86',
     date: '2026-05-01',
     summary: 'スクロールバー 2 重の修正',

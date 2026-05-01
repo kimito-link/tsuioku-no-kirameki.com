@@ -883,6 +883,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.87",
+      date: "2026-05-01",
+      summary: "\u30B0\u30EA\u30C3\u30C9\u304C\u65B0\u30B3\u30E1\u7121\u3057\u3067\u52D5\u304F\u306E\u3092\u4FEE\u6B63",
+      items: Object.freeze([
+        "\u30B3\u30E1\u30F3\u30C8\u8FFD\u52A0\u304C\u7121\u3044\u306E\u306B\u30A2\u30A4\u30B3\u30F3\u30B0\u30EA\u30C3\u30C9\u306E\u6700\u5F8C\u5C3E\u304C pulse\uFF08\u5149\u308B\u6F14\u51FA\uFF09\u3059\u308B\u306E\u3092\u4FEE\u6B63\u3057\u307E\u3057\u305F\u3002avatar URL \u304C\u30AD\u30E3\u30C3\u30B7\u30E5\u88DC\u5B8C\u306A\u3069\u3067\u5F8C\u304B\u3089\u57CB\u307E\u308B\u5EA6\u306B\u300C\u65B0\u30B3\u30E1\u8FFD\u52A0\u300D\u3068\u540C\u3058\u6F14\u51FA\u304C\u8D70\u3063\u3066\u3044\u307E\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: popup-entry.js \u306E syncStoryGrowth \u5185\u3067\u3001signature \u306E\u5909\u5316\uFF08avatar URL \u88DC\u5B8C\u7B49\uFF09\u306B\u3088\u308B\u518D\u540C\u671F\u3067\u306F pulseLast: false \u306B\u5909\u66F4\u3002\u65B0\u898F\u30B3\u30E1\u8FFD\u52A0\uFF08renderedCount < targetCount\uFF09\u306E\u7D4C\u8DEF\u306E\u307F pulseLast: true \u3067\u5149\u3089\u305B\u308B",
+        "\u65E2\u5B58\u306E\u300C\u65B0\u30B3\u30E1\u304C\u6765\u305F\u3089\u6700\u5F8C\u5C3E\u304C\u4E00\u77AC\u5149\u308B\u300D\u6F14\u51FA\u306F\u5909\u308F\u308A\u307E\u305B\u3093"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.86",
       date: "2026-05-01",
       summary: "\u30B9\u30AF\u30ED\u30FC\u30EB\u30D0\u30FC 2 \u91CD\u306E\u4FEE\u6B63",
@@ -13035,7 +13045,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const needSourceSync = STORY_GROWTH_STATE.renderedCount > 0 && STORY_GROWTH_STATE.renderedCount === STORY_GROWTH_STATE.targetCount && nextSig !== STORY_GROWTH_STATE.sourceSig;
     STORY_GROWTH_STATE.sourceSig = nextSig;
     if (needSourceSync) {
-      patchStoryGrowthIconsFromSource(root, { pulseLast: true });
+      patchStoryGrowthIconsFromSource(root, { pulseLast: false });
     }
     if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
       root.innerHTML = "";
@@ -16820,7 +16830,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1704" ? String("0501-1704") : "dev";
+      const buildId = "0501-1710" ? String("0501-1710") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

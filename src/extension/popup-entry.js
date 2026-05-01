@@ -4029,7 +4029,10 @@ function syncStoryGrowth(liveId, count, root) {
     nextSig !== STORY_GROWTH_STATE.sourceSig;
   STORY_GROWTH_STATE.sourceSig = nextSig;
   if (needSourceSync) {
-    patchStoryGrowthIconsFromSource(root, { pulseLast: true });
+    // 0.1.87: avatar URL の遅延補完（cache hydration 等）で signature が変わるだけの
+    //   再同期では pulse しない。pulseLast=true は新コメ追加（rnd < tgt）の経路のみ
+    //   に限定し、グリッドが「コメ無くても動いて見える」のを防ぐ。
+    patchStoryGrowthIconsFromSource(root, { pulseLast: false });
   }
 
   if (STORY_GROWTH_STATE.renderedCount === 0 && root.childElementCount > 0) {
