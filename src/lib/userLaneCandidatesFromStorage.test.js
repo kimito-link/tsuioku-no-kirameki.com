@@ -434,13 +434,13 @@ maybe('0.1.79: ギフト演出 DOM での broadcaster icon 取り違えガード
     expect(me?.avatarUrl).toBe(viewerPersonalIcon);
   });
 
-  it('opts 未指定なら従来通り（後方互換 — false positive 回避）', () => {
+  it('0.1.83 普遍ルール: opts 未指定でも URL の uid 不一致は弾く（最強ガード）', () => {
     const out = userLaneCandidatesFromStorage(
       [
         {
           userId: viewerUid,
           nickname: '君斗りんく',
-          avatarUrl: broadcasterIconUrl,
+          avatarUrl: broadcasterIconUrl, // 別人の uid を含む URL
           capturedAt: 1,
           liveId: lvId
         }
@@ -448,11 +448,11 @@ maybe('0.1.79: ギフト演出 DOM での broadcaster icon 取り違えガード
       lvId
     );
     const me = out.find((c) => c.userId === viewerUid);
-    // ガード未指定なので通る
-    expect(me?.avatarUrl).toBe(broadcasterIconUrl);
+    // 普遍ルールが効いて broadcaster icon は URL uid 不一致で弾かれる
+    expect(me?.avatarUrl).not.toBe(broadcasterIconUrl);
   });
 
-  it('broadcasterIconUrl のみ未指定（broadcasterUid のみ） → 後方互換でガード掛けず', () => {
+  it('0.1.83 普遍ルール: broadcasterIconUrl 未指定でも URL の uid 不一致で弾く', () => {
     const out = userLaneCandidatesFromStorage(
       [
         {
@@ -466,6 +466,6 @@ maybe('0.1.79: ギフト演出 DOM での broadcaster icon 取り違えガード
       { broadcasterUid, broadcasterIconUrl: '' }
     );
     const me = out.find((c) => c.userId === viewerUid);
-    expect(me?.avatarUrl).toBe(broadcasterIconUrl);
+    expect(me?.avatarUrl).not.toBe(broadcasterIconUrl);
   });
 });

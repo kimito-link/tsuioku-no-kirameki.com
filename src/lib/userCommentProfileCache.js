@@ -10,7 +10,7 @@ import {
 import { isNiconicoAutoUserPlaceholderNickname } from './nicoAnonymousDisplay.js';
 import { supportGridStrongNickname } from './supportGridDisplayTier.js';
 import { clampAvatarUrl } from '../shared/avatar/clampAvatarUrl.js';
-import { shouldAssociateAvatarWithUser } from './avatarBroadcasterGuard.js';
+import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from './avatarBroadcasterGuard.js';
 
 /** 保持するエントリ数の上限（chrome.storage.local 容量対策） */
 export const USER_COMMENT_PROFILE_CACHE_MAX = 5000;
@@ -129,11 +129,10 @@ function mergeIntoMap(map, uid, p) {
 
 /**
  * 0.1.82: broadcaster icon の取り違え防止ガード（永続汚染源を断つ）
- *
- * KEY_USER_COMMENT_PROFILE_CACHE は 30 日永続のため、ここに broadcaster icon が
- * viewer uid で書き込まれると、次セッションで hydrateInterceptAvatarMapFromProfile
- * 経由で in-memory cache に戻ってしまう（永続汚染ループ）。書き込み前に
- * shouldAssociateAvatarWithUser でガードする。
+ * 0.1.83: 上に加えて、URL の埋め込み uid とエントリ uid の不一致チェック
+ *   （broadcaster 情報に依存しない普遍ルール）も適用。これにより
+ *   過去の broadcaster だった人のアイコンや、無関係な他人のアイコンが
+ *   viewer uid に紐付いていても reject される。
  *
  * @param {string} uid 紐付け対象の userId
  * @param {string} av 紐付けようとしている avatarUrl
@@ -141,7 +140,11 @@ function mergeIntoMap(map, uid, p) {
  * @returns {string} ガード OK なら入力 av、NG なら空文字
  */
 function guardAvatarForBroadcaster(uid, av, broadcasterContext) {
-  if (!av || !broadcasterContext) return av;
+  if (!av) return av;
+  // 0.1.83: 普遍ルール — URL の埋め込み uid とエントリ uid の一致を要求
+  if (!isAvatarUrlForUserId(av, uid)) return '';
+  if (!broadcasterContext) return av;
+  // 既存の broadcaster ガード（補助）
   const safe = shouldAssociateAvatarWithUser({
     uid,
     av,
@@ -245,7 +248,9 @@ export function applyUserCommentProfileMapToEntries(entries, map) {
     if (
       candAv &&
       isHttpOrHttpsUrl(candAv) &&
-      !isWeakNiconicoUserIconHttpUrl(candAv)
+      !isWeakNiconicoUserIconHttpUrl(candAv) &&
+      // 0.1.83: 普遍ガード — URL 埋め込み uid とエントリ uid の一致を要求
+      isAvatarUrlForUserId(candAv, uid)
     ) {
       const curStrong =
         curAv &&
@@ -255,6 +260,15 @@ export function applyUserCommentProfileMapToEntries(entries, map) {
         out = { ...out, avatarUrl: candAv };
         changed = true;
       }
+    }
+    // 0.1.83: 既存 entry の avatarUrl が uid と一致しない場合は掃除（過去汚染データの除去）
+    if (
+      curAv &&
+      isHttpOrHttpsUrl(curAv) &&
+      !isAvatarUrlForUserId(curAv, uid)
+    ) {
+      out = { ...out, avatarUrl: '' };
+      changed = true;
     }
     if (changed) patched += 1;
     return out;

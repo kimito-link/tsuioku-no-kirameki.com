@@ -48,6 +48,35 @@ export function extractNiconicoUserIdFromIconUrl(raw) {
 }
 
 /**
+ * 0.1.83: avatar URL の埋め込み uid とエントリ uid の一致を検証する純粋関数。
+ *
+ * niconico user icon URL は `usericon/.../<uid>.jpg` 形式で uid を含む。
+ * エントリの userId と URL の埋め込み uid が一致しなければ、それは
+ * 「他人のアバターが間違って紐付けられた」状態であり、必ず reject する。
+ *
+ * broadcaster 情報に依存しない汎用ルール。ギフト演出だけでなく、あらゆる
+ * 取り違え（誤観測・キャッシュ汚染・横流し）に対応する。
+ *
+ * 対象: 数値 niconico uid（2〜15 桁）のみ。匿名 (a:xxxx) や test stub (u1 等)
+ *      は対象外（URL に uid が埋まらないため判定不能）。
+ *
+ * @param {unknown} url
+ * @param {unknown} expectedUserId
+ * @returns {boolean}
+ *   - true: URL に uid が埋まっていない（合成不可）または uid が一致 → 紐付け OK
+ *   - false: URL の uid が expectedUserId と異なる → 取り違え確定
+ */
+export function isAvatarUrlForUserId(url, expectedUserId) {
+  const expected = String(expectedUserId ?? '').trim();
+  if (!expected) return true; // expected uid 不明 → 判定不可、通す
+  // 0.1.83: 数値 niconico uid 以外は判定対象外（test stub, anonymous a:xxxx）
+  if (!/^\d{2,15}$/.test(expected)) return true;
+  const urlUid = extractNiconicoUserIdFromIconUrl(url);
+  if (!urlUid) return true; // URL に uid 埋め込み無し → 判定不可、通す
+  return urlUid === expected;
+}
+
+/**
  * @typedef {Object} AvatarBroadcasterGuardInput
  * @property {unknown} uid                     紐付け対象のユーザー ID
  * @property {unknown} av                      紐付けようとしているアバター URL

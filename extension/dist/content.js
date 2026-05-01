@@ -715,6 +715,14 @@
     if (m && m[1]) return m[1];
     return "";
   }
+  function isAvatarUrlForUserId(url, expectedUserId) {
+    const expected = String(expectedUserId ?? "").trim();
+    if (!expected) return true;
+    if (!/^\d{2,15}$/.test(expected)) return true;
+    const urlUid = extractNiconicoUserIdFromIconUrl(url);
+    if (!urlUid) return true;
+    return urlUid === expected;
+  }
   function shouldAssociateAvatarWithUser(input) {
     const uid = String(input?.uid ?? "").trim();
     const av = String(input?.av ?? "").trim();
@@ -805,7 +813,9 @@
     return true;
   }
   function guardAvatarForBroadcaster(uid, av, broadcasterContext) {
-    if (!av || !broadcasterContext) return av;
+    if (!av) return av;
+    if (!isAvatarUrlForUserId(av, uid)) return "";
+    if (!broadcasterContext) return av;
     const safe = shouldAssociateAvatarWithUser({
       uid,
       av,
@@ -876,12 +886,17 @@
           changed = true;
         }
       }
-      if (candAv && isHttpOrHttpsUrl(candAv) && !isWeakNiconicoUserIconHttpUrl(candAv)) {
+      if (candAv && isHttpOrHttpsUrl(candAv) && !isWeakNiconicoUserIconHttpUrl(candAv) && // 0.1.83: 普遍ガード — URL 埋め込み uid とエントリ uid の一致を要求
+      isAvatarUrlForUserId(candAv, uid)) {
         const curStrong = curAv && isHttpOrHttpsUrl(curAv) && !isWeakNiconicoUserIconHttpUrl(curAv);
         if (!curStrong) {
           out = { ...out, avatarUrl: candAv };
           changed = true;
         }
+      }
+      if (curAv && isHttpOrHttpsUrl(curAv) && !isAvatarUrlForUserId(curAv, uid)) {
+        out = { ...out, avatarUrl: "" };
+        changed = true;
       }
       if (changed) patched += 1;
       return out;
@@ -3444,6 +3459,7 @@
       const av = String(rec?.avatarUrl || "").trim();
       if (!isHttpOrHttpsUrl(av)) continue;
       if (isWeakNiconicoUserIconHttpUrl(av)) continue;
+      if (!isAvatarUrlForUserId(av, uid)) continue;
       if (broadcasterUid && !shouldAssociateAvatarWithUser({
         uid,
         av,

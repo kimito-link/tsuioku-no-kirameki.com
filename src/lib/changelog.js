@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.83',
+    date: '2026-05-01',
+    summary: '普遍ルール「URL の uid とエントリの uid 一致」で根治',
+    items: Object.freeze([
+      '0.1.76〜0.1.82 で broadcaster 情報に依存した個別ガードを 7 層積み上げてきましたが、永続キャッシュに焼き込まれた過去の汚染（過去 broadcast の broadcaster icon が viewer uid に紐付いている等）はガードがすり抜けて表示されていました',
+      '修正内容: broadcaster 情報に依存しない普遍ルール「avatar URL に埋め込まれた uid とエントリの uid が一致しなければ取り違え」を実装（src/lib/avatarBroadcasterGuard.js#isAvatarUrlForUserId）。これを userCommentProfileCache.js の upsert / apply、interceptAvatarHydration.js、popup-entry.js の表示時 guard すべてに適用',
+      '効果: 過去の汚染データ（どんな broadcaster の icon でも、どんな経路でも）も自動掃除。8 ケース TDD 追加（合計 32）',
+      'これは Hoshino-Romi 流 clean design への第一歩。次フェーズで avatarResolver 単一 component に集約予定（docs/plan-avatar-resolver-refactor.md 参照）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.82',
     date: '2026-05-01',
     summary: '永続キャッシュへの汚染書き込みを完全停止',

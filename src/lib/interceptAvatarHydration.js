@@ -1,5 +1,5 @@
 import { isHttpOrHttpsUrl, isWeakNiconicoUserIconHttpUrl } from './supportGrowthTileSrc.js';
-import { shouldAssociateAvatarWithUser } from './avatarBroadcasterGuard.js';
+import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from './avatarBroadcasterGuard.js';
 
 /**
  * profile cache の強い avatar を intercept avatar map へ補完する。
@@ -33,7 +33,10 @@ export function hydrateInterceptAvatarMapFromProfile(
     const av = String(rec?.avatarUrl || '').trim();
     if (!isHttpOrHttpsUrl(av)) continue;
     if (isWeakNiconicoUserIconHttpUrl(av)) continue;
-    // 0.1.82: 過去に焼き込まれた broadcaster icon の汚染データを hydrate しない
+    // 0.1.83: 普遍ルール — URL 埋め込み uid とエントリ uid の一致を要求
+    //   broadcaster 情報に依存しない最強のガード。過去のどんな汚染も拾わない。
+    if (!isAvatarUrlForUserId(av, uid)) continue;
+    // 0.1.82: broadcaster icon ガード（補助。普遍ルールが先に効くので大半はここに来ない）
     if (
       broadcasterUid &&
       !shouldAssociateAvatarWithUser({

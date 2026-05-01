@@ -9,6 +9,7 @@ import { normalizeLv as normalizeLvCanonical } from '../shared/niconico/liveId.j
 import { pickStrongestAvatarUrlForUser } from './supportGrowthTileSrc.js';
 import { supportGridStrongNickname } from './supportGridDisplayTier.js';
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
+import { isAvatarUrlForUserId } from './avatarBroadcasterGuard.js';
 
 /**
  * @typedef {{
@@ -130,6 +131,9 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
       }
       const u = String(/** @type {{ avatarUrl?: unknown }} */ (g).avatarUrl ?? '').trim();
       if (!u) continue;
+      // 0.1.83: 普遍ルール — URL の埋め込み uid とエントリ uid の不一致は弾く
+      //   broadcaster 情報が無くても効く最強のガード（過去の汚染データも全て掃除）
+      if (!isAvatarUrlForUserId(u, userId)) continue;
       if (
         broadcasterGuardEnabled &&
         !isBroadcasterHere &&

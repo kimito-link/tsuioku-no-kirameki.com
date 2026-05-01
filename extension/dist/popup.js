@@ -243,6 +243,14 @@
     if (m && m[1]) return m[1];
     return "";
   }
+  function isAvatarUrlForUserId(url, expectedUserId) {
+    const expected = String(expectedUserId ?? "").trim();
+    if (!expected) return true;
+    if (!/^\d{2,15}$/.test(expected)) return true;
+    const urlUid = extractNiconicoUserIdFromIconUrl(url);
+    if (!urlUid) return true;
+    return urlUid === expected;
+  }
   function shouldAssociateAvatarWithUser(input) {
     const uid = String(input?.uid ?? "").trim();
     const av = String(input?.av ?? "").trim();
@@ -769,6 +777,17 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.83",
+      date: "2026-05-01",
+      summary: "\u666E\u904D\u30EB\u30FC\u30EB\u300CURL \u306E uid \u3068\u30A8\u30F3\u30C8\u30EA\u306E uid \u4E00\u81F4\u300D\u3067\u6839\u6CBB",
+      items: Object.freeze([
+        "0.1.76\u301C0.1.82 \u3067 broadcaster \u60C5\u5831\u306B\u4F9D\u5B58\u3057\u305F\u500B\u5225\u30AC\u30FC\u30C9\u3092 7 \u5C64\u7A4D\u307F\u4E0A\u3052\u3066\u304D\u307E\u3057\u305F\u304C\u3001\u6C38\u7D9A\u30AD\u30E3\u30C3\u30B7\u30E5\u306B\u713C\u304D\u8FBC\u307E\u308C\u305F\u904E\u53BB\u306E\u6C5A\u67D3\uFF08\u904E\u53BB broadcast \u306E broadcaster icon \u304C viewer uid \u306B\u7D10\u4ED8\u3044\u3066\u3044\u308B\u7B49\uFF09\u306F\u30AC\u30FC\u30C9\u304C\u3059\u308A\u629C\u3051\u3066\u8868\u793A\u3055\u308C\u3066\u3044\u307E\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: broadcaster \u60C5\u5831\u306B\u4F9D\u5B58\u3057\u306A\u3044\u666E\u904D\u30EB\u30FC\u30EB\u300Cavatar URL \u306B\u57CB\u3081\u8FBC\u307E\u308C\u305F uid \u3068\u30A8\u30F3\u30C8\u30EA\u306E uid \u304C\u4E00\u81F4\u3057\u306A\u3051\u308C\u3070\u53D6\u308A\u9055\u3048\u300D\u3092\u5B9F\u88C5\uFF08src/lib/avatarBroadcasterGuard.js#isAvatarUrlForUserId\uFF09\u3002\u3053\u308C\u3092 userCommentProfileCache.js \u306E upsert / apply\u3001interceptAvatarHydration.js\u3001popup-entry.js \u306E\u8868\u793A\u6642 guard \u3059\u3079\u3066\u306B\u9069\u7528",
+        "\u52B9\u679C: \u904E\u53BB\u306E\u6C5A\u67D3\u30C7\u30FC\u30BF\uFF08\u3069\u3093\u306A broadcaster \u306E icon \u3067\u3082\u3001\u3069\u3093\u306A\u7D4C\u8DEF\u3067\u3082\uFF09\u3082\u81EA\u52D5\u6383\u9664\u30028 \u30B1\u30FC\u30B9 TDD \u8FFD\u52A0\uFF08\u5408\u8A08 32\uFF09",
+        "\u3053\u308C\u306F Hoshino-Romi \u6D41 clean design \u3078\u306E\u7B2C\u4E00\u6B69\u3002\u6B21\u30D5\u30A7\u30FC\u30BA\u3067 avatarResolver \u5358\u4E00 component \u306B\u96C6\u7D04\u4E88\u5B9A\uFF08docs/plan-avatar-resolver-refactor.md \u53C2\u7167\uFF09"
+      ])
+    }),
     Object.freeze({
       version: "0.1.82",
       date: "2026-05-01",
@@ -2909,7 +2928,9 @@
     return true;
   }
   function guardAvatarForBroadcaster(uid, av, broadcasterContext) {
-    if (!av || !broadcasterContext) return av;
+    if (!av) return av;
+    if (!isAvatarUrlForUserId(av, uid)) return "";
+    if (!broadcasterContext) return av;
     const safe = shouldAssociateAvatarWithUser({
       uid,
       av,
@@ -2980,12 +3001,17 @@
           changed = true;
         }
       }
-      if (candAv && isHttpOrHttpsUrl(candAv) && !isWeakNiconicoUserIconHttpUrl(candAv)) {
+      if (candAv && isHttpOrHttpsUrl(candAv) && !isWeakNiconicoUserIconHttpUrl(candAv) && // 0.1.83: 普遍ガード — URL 埋め込み uid とエントリ uid の一致を要求
+      isAvatarUrlForUserId(candAv, uid)) {
         const curStrong = curAv && isHttpOrHttpsUrl(curAv) && !isWeakNiconicoUserIconHttpUrl(curAv);
         if (!curStrong) {
           out = { ...out, avatarUrl: candAv };
           changed = true;
         }
+      }
+      if (curAv && isHttpOrHttpsUrl(curAv) && !isAvatarUrlForUserId(curAv, uid)) {
+        out = { ...out, avatarUrl: "" };
+        changed = true;
       }
       if (changed) patched += 1;
       return out;
@@ -4129,6 +4155,7 @@ ${body}`;
           g.avatarUrl ?? ""
         ).trim();
         if (!u) continue;
+        if (!isAvatarUrlForUserId(u, userId)) continue;
         if (broadcasterGuardEnabled && !isBroadcasterHere && isSameAvatarUrl(u, broadcasterIconUrl)) {
           continue;
         }
@@ -11490,12 +11517,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const avatarUrl = String(entry?.avatarUrl || "").trim();
     const viewerAvatarUrl = String(snap?.viewerAvatarUrl || "").trim();
     const mistakenBroadcaster = !own && Boolean(bc && entUid && bc === entUid);
-    const guardAv = (av) => shouldAssociateAvatarWithUser({
-      uid: entUid,
-      av,
-      broadcasterUid: bc,
-      broadcasterIconUrl
-    }) ? av : "";
+    const guardAv = (av) => {
+      if (!av) return "";
+      if (!isAvatarUrlForUserId(av, entUid)) return "";
+      return shouldAssociateAvatarWithUser({
+        uid: entUid,
+        av,
+        broadcasterUid: bc,
+        broadcasterIconUrl
+      }) ? av : "";
+    };
     const guardedRememberedAvatar = guardAv(rememberedAvatarUrlForUserId(entUid));
     const guardedAvatarUrl = guardAv(avatarUrl);
     const fallbackAvatar = mistakenBroadcaster || viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own ? "" : guardedRememberedAvatar;
@@ -16658,7 +16689,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1611" ? String("0501-1611") : "dev";
+      const buildId = "0501-1631" ? String("0501-1631") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

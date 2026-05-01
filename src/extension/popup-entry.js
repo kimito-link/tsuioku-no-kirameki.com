@@ -8,7 +8,7 @@ import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMult
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
-import { shouldAssociateAvatarWithUser } from '../lib/avatarBroadcasterGuard.js';
+import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
   compactNicoLaneUserId
@@ -2434,11 +2434,13 @@ function storyGrowthAvatarSrcCandidate(entry, liveId, entries = STORY_SOURCE_STA
   const mistakenBroadcaster =
     !own && Boolean(bc && entUid && bc === entUid);
 
-  // 0.1.81: 6 層目のガード。entry.avatarUrl と rememberedAvatarUrlForUserId の
-  //   両方に対して、broadcaster icon と一致する URL は無効化する。
-  //   KEY_USER_COMMENT_PROFILE_CACHE 経由の汚染データもここで除去できる。
-  const guardAv = (av) =>
-    shouldAssociateAvatarWithUser({
+  // 0.1.81/0.1.83: avatar 取り違えガード
+  //   - 0.1.83 普遍ルール: URL 埋め込み uid とエントリ uid の不一致は必ず弾く
+  //   - 0.1.81 broadcaster ガード: 上記で uid 抽出不能だった場合の補助
+  const guardAv = (av) => {
+    if (!av) return '';
+    if (!isAvatarUrlForUserId(av, entUid)) return ''; // 普遍ルール
+    return shouldAssociateAvatarWithUser({
       uid: entUid,
       av,
       broadcasterUid: bc,
@@ -2446,6 +2448,7 @@ function storyGrowthAvatarSrcCandidate(entry, liveId, entries = STORY_SOURCE_STA
     })
       ? av
       : '';
+  };
   const guardedRememberedAvatar = guardAv(rememberedAvatarUrlForUserId(entUid));
   const guardedAvatarUrl = guardAv(avatarUrl);
 

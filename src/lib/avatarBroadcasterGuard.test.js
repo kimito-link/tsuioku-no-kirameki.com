@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   shouldAssociateAvatarWithUser,
-  extractNiconicoUserIdFromIconUrl
+  extractNiconicoUserIdFromIconUrl,
+  isAvatarUrlForUserId
 } from './avatarBroadcasterGuard.js';
 
 describe('shouldAssociateAvatarWithUser', () => {
@@ -257,6 +258,79 @@ describe('shouldAssociateAvatarWithUser - 0.1.80: サイズバリアント対応
         broadcasterUid: 'ch12345',
         broadcasterIconUrl: channelIcon
       })
+    ).toBe(false);
+  });
+});
+
+describe('isAvatarUrlForUserId - 0.1.83 普遍ルール（broadcaster 情報不要）', () => {
+  it('URL の埋め込み uid とエントリ uid が一致 → true', () => {
+    expect(
+      isAvatarUrlForUserId(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/4/4046119.jpg',
+        '4046119'
+      )
+    ).toBe(true);
+  });
+
+  it('URL の埋め込み uid とエントリ uid が不一致 → false', () => {
+    expect(
+      isAvatarUrlForUserId(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14367/143675916.jpg',
+        '4046119'
+      )
+    ).toBe(false);
+  });
+
+  it('サイズバリアント (uri150x150) でも uid 抽出して照合', () => {
+    expect(
+      isAvatarUrlForUserId(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/uri150x150/14367/143675916.jpg',
+        '143675916'
+      )
+    ).toBe(true);
+  });
+
+  it('URL に uid 埋め込み無し（channel icon 等）→ true（判定不可だから通す）', () => {
+    expect(
+      isAvatarUrlForUserId(
+        'https://example.com/some/non-niconico-avatar.png',
+        '4046119'
+      )
+    ).toBe(true);
+  });
+
+  it('expectedUserId が空 → true（判定不可だから通す）', () => {
+    expect(
+      isAvatarUrlForUserId(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/4/4046119.jpg',
+        ''
+      )
+    ).toBe(true);
+  });
+
+  it('null / undefined 入力でクラッシュしない', () => {
+    expect(isAvatarUrlForUserId(null, '4046119')).toBe(true);
+    expect(isAvatarUrlForUserId('', '4046119')).toBe(true);
+    expect(isAvatarUrlForUserId('https://...', null)).toBe(true);
+  });
+
+  it('クエリ string 付き URL でも uid 抽出', () => {
+    expect(
+      isAvatarUrlForUserId(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/4/4046119.jpg?cache_buster=1',
+        '4046119'
+      )
+    ).toBe(true);
+  });
+
+  it('別の broadcaster の icon が後の broadcast で残ってる → false（過去汚染検出）', () => {
+    // ユーザーが broadcast A を見たあと broadcast B を見る。A の broadcaster icon が
+    // 自分の uid に紐付いて永続化されたケースを、broadcaster 情報なしに検出できる。
+    expect(
+      isAvatarUrlForUserId(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14367/143675916.jpg', // 過去 broadcaster
+        '4046119' // viewer 本人
+      )
     ).toBe(false);
   });
 });
