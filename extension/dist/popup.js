@@ -9355,6 +9355,36 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     );
     return TRANSIENT_IDB_ERROR_NAMES.has(name);
   }
+  function extractReviewFieldsFromSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") return {};
+    const out = {};
+    const pickStr = (key) => {
+      const v = (
+        /** @type {Record<string, unknown>} */
+        snapshot[key]
+      );
+      if (typeof v !== "string") return;
+      const t = v.trim();
+      if (!t) return;
+      out[key] = t;
+    };
+    pickStr("broadcastTitle");
+    pickStr("broadcasterName");
+    pickStr("broadcasterUserId");
+    pickStr("broadcasterIconUrl");
+    pickStr("broadcasterPageUrl");
+    pickStr("thumbnailUrl");
+    const vc = (
+      /** @type {Record<string, unknown>} */
+      snapshot.viewerCountFromDom
+    );
+    if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) {
+      out.viewerCountFromDom = vc;
+    } else if (vc === null) {
+      out.viewerCountFromDom = null;
+    }
+    return out;
+  }
   function peakConcurrentEstimateFromSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== "object") return null;
     const vcRaw = snapshot.viewerCountFromDom;
@@ -9424,6 +9454,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const r = Number(snap.officialCaptureRatio);
       if (Number.isFinite(r)) officialCaptureRatio = r;
     }
+    const reviewFields = extractReviewFieldsFromSnapshot(snap);
     const row = {
       liveId: lid,
       capturedAt: now,
@@ -9435,7 +9466,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       peakConcurrentEstimate: peakConcurrentEstimateFromSnapshot(snap),
       officialCommentCount: oc,
       officialViewerCount: ov,
-      officialCaptureRatio
+      officialCaptureRatio,
+      ...reviewFields
     };
     let db;
     try {
@@ -9507,6 +9539,99 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         cur.continue();
       };
     });
+  }
+
+  // src/lib/loadLastBroadcastSummary.js
+  var DEFAULT_LAST_BROADCAST_FRESHNESS_MS = 30 * 24 * 60 * 60 * 1e3;
+  async function loadLastBroadcastSummary(db, opts = {}) {
+    if (!db) return null;
+    const nowMs = typeof opts.nowMs === "number" && Number.isFinite(opts.nowMs) ? opts.nowMs : Date.now();
+    const freshnessMs = typeof opts.freshnessMs === "number" && Number.isFinite(opts.freshnessMs) && opts.freshnessMs > 0 ? opts.freshnessMs : DEFAULT_LAST_BROADCAST_FRESHNESS_MS;
+    return new Promise((resolve, reject) => {
+      let tx;
+      try {
+        tx = db.transaction(BROADCAST_SUMMARY_STORE, "readonly");
+      } catch (e) {
+        reject(e);
+        return;
+      }
+      const store = tx.objectStore(BROADCAST_SUMMARY_STORE);
+      const idx = store.index("byCapturedAt");
+      const req = idx.openCursor(null, "prev");
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const cur = req.result;
+        if (!cur) {
+          resolve(null);
+          return;
+        }
+        const row = (
+          /** @type {Row} */
+          cur.value
+        );
+        const capturedAt = typeof row?.capturedAt === "number" && Number.isFinite(row.capturedAt) ? row.capturedAt : 0;
+        if (capturedAt <= 0 || nowMs - capturedAt > freshnessMs) {
+          resolve(null);
+          return;
+        }
+        const lid = String(row?.liveId || "").trim();
+        if (!lid) {
+          resolve(null);
+          return;
+        }
+        resolve(row);
+      };
+    });
+  }
+  function buildLastBroadcastReviewView(row) {
+    if (!row || typeof row !== "object") return null;
+    const liveId = String(row.liveId || "").trim();
+    if (!liveId) return null;
+    const capturedAt = typeof row.capturedAt === "number" && Number.isFinite(row.capturedAt) ? row.capturedAt : 0;
+    if (capturedAt <= 0) return null;
+    const finiteOrNull = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
+    const trimOrUndef = (v) => {
+      if (typeof v !== "string") return void 0;
+      const t = v.trim();
+      return t || void 0;
+    };
+    const vc = typeof row.viewerCountFromDom === "number" && Number.isFinite(row.viewerCountFromDom) && row.viewerCountFromDom >= 0 ? row.viewerCountFromDom : null;
+    return {
+      liveId,
+      capturedAt,
+      watchUrl: String(row.watchUrl || "").trim(),
+      commentStorageCount: typeof row.commentStorageCount === "number" && Number.isFinite(row.commentStorageCount) ? row.commentStorageCount : 0,
+      peakConcurrentEstimate: finiteOrNull(row.peakConcurrentEstimate),
+      officialCommentCount: finiteOrNull(row.officialCommentCount),
+      officialViewerCount: finiteOrNull(row.officialViewerCount),
+      viewerCount: vc,
+      broadcastTitle: trimOrUndef(row.broadcastTitle),
+      broadcasterName: trimOrUndef(row.broadcasterName),
+      broadcasterUserId: trimOrUndef(row.broadcasterUserId),
+      broadcasterIconUrl: trimOrUndef(row.broadcasterIconUrl),
+      broadcasterPageUrl: trimOrUndef(row.broadcasterPageUrl),
+      thumbnailUrl: trimOrUndef(row.thumbnailUrl)
+    };
+  }
+  function formatLastBroadcastIndicator(capturedAt, nowMs) {
+    if (typeof capturedAt !== "number" || !Number.isFinite(capturedAt) || capturedAt <= 0) {
+      return "\u524D\u56DE\u306E\u914D\u4FE1";
+    }
+    const now = typeof nowMs === "number" && Number.isFinite(nowMs) ? nowMs : Date.now();
+    const d = new Date(capturedAt);
+    const nd = new Date(now);
+    const sameDay = d.getFullYear() === nd.getFullYear() && d.getMonth() === nd.getMonth() && d.getDate() === nd.getDate();
+    const ageMs = Math.max(0, now - capturedAt);
+    const sevenDays = 7 * 24 * 60 * 60 * 1e3;
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    if (sameDay) {
+      return `\u524D\u56DE\uFF08${hh}:${mm} \u301C\uFF09`;
+    }
+    if (ageMs < sevenDays) {
+      return `\u524D\u56DE\uFF08${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm} \u301C\uFF09`;
+    }
+    return `\u524D\u56DE\uFF08${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} \u301C\uFF09`;
   }
 
   // src/lib/objectUrlRevokeQueue.js
@@ -14154,6 +14279,135 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     }
   }
+  async function applyLastBroadcastReviewToEmptyState() {
+    const root = document.documentElement;
+    const indicator = $("lastBroadcastIndicator");
+    const indicatorTitleEl = $("lastBroadcastIndicatorTitle");
+    const indicatorLeadEl = $("lastBroadcastIndicatorLead");
+    const actionsEl = $("lastBroadcastActions");
+    const reopenBtn = (
+      /** @type {HTMLButtonElement|null} */
+      $("lastBroadcastReopenBtn")
+    );
+    const liveStatComments = $("liveStatComments");
+    const concurrentEst = $("watchConcurrentEst");
+    const viewerDom = $("watchViewerDom");
+    const concurrentSub = $("watchConcurrentSub");
+    const officialEl = (
+      /** @type {HTMLElement|null} */
+      $("liveStatCommentsOfficial")
+    );
+    const hideReview = () => {
+      if (indicator) indicator.hidden = true;
+      if (actionsEl) actionsEl.hidden = true;
+      if (reopenBtn) {
+        reopenBtn.disabled = true;
+        reopenBtn.dataset.watchUrl = "";
+      }
+    };
+    if (typeof indexedDB === "undefined") {
+      hideReview();
+      root.classList.add("nl-empty-no-history");
+      return;
+    }
+    let db;
+    try {
+      db = await openBroadcastSessionSummaryDb();
+      const row = await loadLastBroadcastSummary(db);
+      const view = buildLastBroadcastReviewView(row);
+      if (!view) {
+        hideReview();
+        root.classList.add("nl-empty-no-history");
+        return;
+      }
+      root.classList.remove("nl-empty-no-history");
+      if (indicator) indicator.hidden = false;
+      if (indicatorLeadEl) {
+        indicatorLeadEl.textContent = formatLastBroadcastIndicator(view.capturedAt);
+      }
+      if (indicatorTitleEl) {
+        const titleText = view.broadcastTitle || `${view.liveId}\uFF08\u30BF\u30A4\u30C8\u30EB\u672A\u53D6\u5F97\uFF09`;
+        indicatorTitleEl.textContent = titleText;
+      }
+      if (actionsEl) actionsEl.hidden = false;
+      if (reopenBtn) {
+        const watchUrl = view.watchUrl;
+        if (watchUrl) {
+          reopenBtn.disabled = false;
+          reopenBtn.dataset.watchUrl = watchUrl;
+        } else {
+          reopenBtn.disabled = true;
+          reopenBtn.dataset.watchUrl = "";
+        }
+      }
+      if (liveStatComments) {
+        liveStatComments.textContent = view.commentStorageCount.toLocaleString("ja-JP");
+        liveStatComments.classList.remove("is-placeholder");
+      }
+      if (officialEl) {
+        const oc = view.officialCommentCount;
+        if (typeof oc === "number" && Number.isFinite(oc) && oc >= 0) {
+          const recorded = view.commentStorageCount;
+          let line = `\u516C\u5F0F ${oc.toLocaleString("ja-JP")} \u4EF6`;
+          if (oc > 0 && recorded >= 0 && recorded <= oc) {
+            line += ` \xB7 \u8A18\u9332\u306F\u516C\u5F0F\u306E\u7D04${Math.round(recorded / oc * 100)}%`;
+          }
+          officialEl.textContent = line;
+          officialEl.hidden = false;
+        } else {
+          officialEl.textContent = "";
+          officialEl.hidden = true;
+        }
+      }
+      if (concurrentEst) {
+        if (typeof view.peakConcurrentEstimate === "number" && Number.isFinite(view.peakConcurrentEstimate)) {
+          concurrentEst.textContent = view.peakConcurrentEstimate.toLocaleString("ja-JP");
+          concurrentEst.classList.remove("is-placeholder");
+        } else {
+          concurrentEst.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
+          concurrentEst.classList.add("is-placeholder");
+        }
+        concurrentEst.removeAttribute("title");
+      }
+      if (concurrentSub) concurrentSub.textContent = "\u4EBA";
+      if (viewerDom) {
+        if (typeof view.viewerCount === "number" && Number.isFinite(view.viewerCount)) {
+          viewerDom.textContent = view.viewerCount.toLocaleString("ja-JP");
+          viewerDom.classList.remove("is-placeholder");
+        } else {
+          viewerDom.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
+          viewerDom.classList.add("is-placeholder");
+        }
+      }
+    } catch (err) {
+      if (typeof console !== "undefined" && console?.warn) {
+        console.warn("[applyLastBroadcastReview] failed:", err);
+      }
+      hideReview();
+      root.classList.add("nl-empty-no-history");
+    } finally {
+      try {
+        db?.close();
+      } catch {
+      }
+    }
+  }
+  function clearLastBroadcastReviewArtifacts() {
+    const root = document.documentElement;
+    root.classList.remove("nl-empty-no-history");
+    const indicator = $("lastBroadcastIndicator");
+    if (indicator) indicator.hidden = true;
+    const actionsEl = $("lastBroadcastActions");
+    if (actionsEl) actionsEl.hidden = true;
+    const reopenBtn = (
+      /** @type {HTMLButtonElement|null} */
+      $("lastBroadcastReopenBtn")
+    );
+    if (reopenBtn) {
+      reopenBtn.disabled = true;
+      reopenBtn.dataset.watchUrl = "";
+    }
+  }
   async function refresh() {
     if (!hasExtensionContext()) {
       renderExtensionContextBanner(true);
@@ -14408,7 +14662,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       syncVoiceCommentButton();
       const noWatchHint = $("noWatchRankingHint");
       if (noWatchHint instanceof HTMLElement) {
-        if (INLINE_MODE) {
+        if (INLINE_EMBED_WATCH) {
           noWatchHint.setAttribute("hidden", "");
           noWatchHint.style.display = "none";
         } else {
@@ -14462,6 +14716,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         void renderSessionSummaryComparePanel("");
         void renderGiftQuickStatsPanel("");
         await populateStorySourceEntriesFromStorageFallback();
+        if (!INLINE_MODE) {
+          await applyLastBroadcastReviewToEmptyState();
+        } else {
+          clearLastBroadcastReviewArtifacts();
+        }
         markPopupRefreshContentPainted();
         revealPopupPrimaryOnce();
         return;
@@ -14514,10 +14773,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         void renderSessionSummaryComparePanel("");
         void renderGiftQuickStatsPanel("");
         await populateStorySourceEntriesFromStorageFallback();
+        if (!INLINE_MODE) {
+          await applyLastBroadcastReviewToEmptyState();
+        } else {
+          clearLastBroadcastReviewArtifacts();
+        }
         markPopupRefreshContentPainted();
         revealPopupPrimaryOnce();
         return;
       }
+      clearLastBroadcastReviewArtifacts();
       const snapshotKey = `${lv}|${url}|s17`;
       const key = commentsStorageKey(lv);
       const snapshotCacheHit = watchMetaCache.key === snapshotKey && watchMetaCache.snapshot != null;
@@ -16148,7 +16413,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-0911" ? String("0501-0911") : "dev";
+      const buildId = "0501-1053" ? String("0501-1053") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -17478,6 +17743,22 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     });
     $("reloadWatchTabPanelBtn")?.addEventListener("click", () => {
       void triggerReloadWatchTabFromPopup();
+    });
+    $("lastBroadcastReopenBtn")?.addEventListener("click", () => {
+      const btn = (
+        /** @type {HTMLButtonElement|null} */
+        $("lastBroadcastReopenBtn")
+      );
+      if (!btn || btn.disabled) return;
+      const url = String(btn.dataset.watchUrl || "").trim();
+      if (!url) return;
+      try {
+        void chrome.tabs.create({ url });
+      } catch (err) {
+        if (typeof console !== "undefined" && console?.warn) {
+          console.warn("[lastBroadcastReopen] tabs.create failed:", err);
+        }
+      }
     });
     postBtn?.addEventListener("click", () => {
       if (postBtn.disabled) return;

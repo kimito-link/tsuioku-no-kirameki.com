@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.68（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.69（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,61 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.69 バンプで入った修正（配信なし empty state を「前回の配信」cards で再現 + side panel ランキング導線復活 AY）**:
+
+- ユーザー報告（0.1.68 リリース後）: 「配信のときと同じ感じがいいと思うのですが
+  むずかしいのでしょうか？」スクショで、watch 中は cards に
+  記録 14 / 推定 ~37 / 来場者 121 が並ぶ live state と、配信なしで「（取得不可）」
+  プレースホルダが並ぶ empty state を比較。「**カードの形は同じで、中身を前回の
+  配信の数字にしてくれれば自然**」というニュアンスを `docs/plan-empty-state-no-broadcast.md`
+  の **案 B 直撃**として実装。
+- 設計（plan §5 案 B）:
+  - `broadcastSessionSummary_v1` IDB スキーマに `broadcastTitle` /
+    `broadcasterName` / `broadcasterUserId` / `broadcasterIconUrl` /
+    `broadcasterPageUrl` / `thumbnailUrl` / `viewerCountFromDom` の 7 フィールドを
+    追加（**全部 undefined 許容**で IDB version bump 不要、古い行は自動的に
+    「未取得」フォールバックで描く）。
+  - 新 lib `src/lib/loadLastBroadcastSummary.js` に純粋関数 3 つ:
+    - `loadLastBroadcastSummary(db, opts)`: `byCapturedAt` index を `prev` で
+      なめて最新 1 行を返す。30 日より古い行は null（fallback で隠す）
+    - `buildLastBroadcastReviewView(row)`: row → cards に流せる平らな view
+      （文字列は trim、数値は finite チェック）
+    - `formatLastBroadcastIndicator(capturedAt)`: 「前回（HH:mm 〜）」/
+      「前回（M/D HH:mm 〜）」/「前回（YYYY/M/D 〜）」を相対表示
+    - 単体テスト 14 ケース付き
+  - `broadcastSessionSummaryFlush.js` に `extractReviewFieldsFromSnapshot()`
+    純粋関数を追加。snapshot から新フィールドを抜いて行に同梱（単体テスト 8 ケース）。
+- popup-entry.js の empty state ブランチ:
+  - `applyLastBroadcastReviewToEmptyState()` を新設し、IDB から最新行を取って
+    cards に流し込む。**履歴あり**: indicator「前回（HH:mm〜）アサイチ プレミアムトーク」
+    + 「もう一度この配信を開く」ボタン + 3 cards に過去の数字。**履歴ゼロ**:
+    `html.nl-empty-no-history` クラスを付け、CSS で 3 cards / nl-stats /
+    userRoomList / dev-monitor / Identicon 設定 / session-summary / gift-quick を
+    一括 hide（plan §5 案 A 動作にフォールバック）。残るのは noWatchRankingHint
+    （4 ボタンのランキング導線）+ 詳細設定 + 更新履歴 + 拡張について + 配色プリセット のみ。
+  - `clearLastBroadcastReviewArtifacts()` を active な watch 経路に挿入し、
+    indicator/buttons を確実に消す。
+  - INLINE_MODE（watch ページ内 iframe）では呼ばない（**inline panel locked-in
+    baseline は触らない**、`feedback_inline_panel_beside_size_ok.md` の制約遵守）。
+- 「もう一度この配信を開く」ボタンのクリックハンドラ:
+  - `chrome.tabs.create({ url: dataset.watchUrl })` で前回の watch URL を新タブで開く。
+  - `tabs` permission は manifest.json に既存。新規 permission 追加なし
+    （CWS 審査負担ゼロ）。
+- side panel ランキング導線復活（同梱バグ修正）:
+  - 0.1.55 から `INLINE_MODE` で noWatchRankingHint を hide していたが、0.1.67 で
+    side panel が「watch じゃないタブ」の主役になった結果、side panel でも
+    導線が出ない退行があった。判定を `INLINE_EMBED_WATCH` に絞り、
+    side panel は standalone popup と同様に導線表示。
+- マーケDLボタンは 0.1.69 では見送り（plan §5 で 0.1.70 候補と記載）。
+  empty state の「前回の配信」cards の存在自体は、この時点で
+  ユーザー要望「配信のときと同じ感じ」をほぼ満たしている。
+- 検証:
+  - 単体テスト 2061 → 2089 へ拡大（追加 26 ケース、すべて pass）
+  - lint / typecheck / build すべて green
+  - プレビューで 370px の **履歴あり**: 「前回（08:37〜）」+「もう一度開く」+
+    3 cards に 14/37/121。**履歴ゼロ**: noWatchRankingHint + 詳細設定 + 更新履歴
+    + 拡張について + 配色プリセット のみ、cards 系は全部 hide。両方 OK。
 
 **0.1.68 バンプで入った修正（配信なし時の stat カード「（取得不可）」表示を読めるサイズに AX）**:
 

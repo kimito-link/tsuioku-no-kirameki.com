@@ -249,6 +249,11 @@ import {
   openBroadcastSessionSummaryDb
 } from '../lib/broadcastSessionSummaryDb.js';
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
+import {
+  buildLastBroadcastReviewView,
+  formatLastBroadcastIndicator,
+  loadLastBroadcastSummary
+} from '../lib/loadLastBroadcastSummary.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
@@ -6098,6 +6103,175 @@ async function populateStorySourceEntriesFromStorageFallback() {
   }
 }
 
+/**
+ * 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」を cards に流し込む。
+ *
+ * `nls_broadcast_summary_v1` IDB から直近の sample を取り出して:
+ *   - 履歴あり: indicator + 3 cards + 配信者 banner + 「もう一度開く」 button を表示
+ *   - 履歴ゼロ / 古すぎ: html に `nl-empty-no-history` class を付け、cards
+ *     / count+ticker / lane / panel を CSS で hide（案 A 動作にフォールバック）
+ *
+ * INLINE_MODE（watch ページ内 iframe）では呼ばない想定。standalone popup と
+ * side panel のみで使う（呼出元 refresh() で gate する）。
+ *
+ * 失敗しても empty state 自体は壊さない（catch で console.warn のみ）。
+ *
+ * @returns {Promise<void>}
+ */
+async function applyLastBroadcastReviewToEmptyState() {
+  const root = document.documentElement;
+  const indicator = $('lastBroadcastIndicator');
+  const indicatorTitleEl = $('lastBroadcastIndicatorTitle');
+  const indicatorLeadEl = $('lastBroadcastIndicatorLead');
+  const actionsEl = $('lastBroadcastActions');
+  const reopenBtn = /** @type {HTMLButtonElement|null} */ ($('lastBroadcastReopenBtn'));
+  const liveStatComments = $('liveStatComments');
+  const concurrentEst = $('watchConcurrentEst');
+  const viewerDom = $('watchViewerDom');
+  const concurrentSub = $('watchConcurrentSub');
+  const officialEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsOfficial'));
+
+  const hideReview = () => {
+    if (indicator) indicator.hidden = true;
+    if (actionsEl) actionsEl.hidden = true;
+    if (reopenBtn) {
+      reopenBtn.disabled = true;
+      reopenBtn.dataset.watchUrl = '';
+    }
+  };
+
+  if (typeof indexedDB === 'undefined') {
+    hideReview();
+    root.classList.add('nl-empty-no-history');
+    return;
+  }
+
+  /** @type {IDBDatabase|undefined} */
+  let db;
+  try {
+    db = await openBroadcastSessionSummaryDb();
+    const row = await loadLastBroadcastSummary(db);
+    const view = buildLastBroadcastReviewView(row);
+    if (!view) {
+      hideReview();
+      root.classList.add('nl-empty-no-history');
+      return;
+    }
+
+    // 履歴あり: cards に流し込む。
+    root.classList.remove('nl-empty-no-history');
+
+    // indicator
+    if (indicator) indicator.hidden = false;
+    if (indicatorLeadEl) {
+      indicatorLeadEl.textContent = formatLastBroadcastIndicator(view.capturedAt);
+    }
+    if (indicatorTitleEl) {
+      const titleText = view.broadcastTitle || `${view.liveId}（タイトル未取得）`;
+      indicatorTitleEl.textContent = titleText;
+    }
+
+    // 「もう一度開く」 button
+    if (actionsEl) actionsEl.hidden = false;
+    if (reopenBtn) {
+      const watchUrl = view.watchUrl;
+      if (watchUrl) {
+        reopenBtn.disabled = false;
+        reopenBtn.dataset.watchUrl = watchUrl;
+      } else {
+        reopenBtn.disabled = true;
+        reopenBtn.dataset.watchUrl = '';
+      }
+    }
+
+    // 記録カード（応援コメント数）。0.1.68 の is-placeholder トグルを意識して、
+    // 数字のときだけ class を外す。
+    if (liveStatComments) {
+      liveStatComments.textContent = view.commentStorageCount.toLocaleString('ja-JP');
+      liveStatComments.classList.remove('is-placeholder');
+    }
+    // 公式件数の補足行
+    if (officialEl) {
+      const oc = view.officialCommentCount;
+      if (typeof oc === 'number' && Number.isFinite(oc) && oc >= 0) {
+        const recorded = view.commentStorageCount;
+        let line = `公式 ${oc.toLocaleString('ja-JP')} 件`;
+        if (oc > 0 && recorded >= 0 && recorded <= oc) {
+          line += ` · 記録は公式の約${Math.round((recorded / oc) * 100)}%`;
+        }
+        officialEl.textContent = line;
+        officialEl.hidden = false;
+      } else {
+        officialEl.textContent = '';
+        officialEl.hidden = true;
+      }
+    }
+
+    // 推定同時接続: peak を表示。null なら fallback（取得不可）に倒す。
+    if (concurrentEst) {
+      if (
+        typeof view.peakConcurrentEstimate === 'number' &&
+        Number.isFinite(view.peakConcurrentEstimate)
+      ) {
+        concurrentEst.textContent = view.peakConcurrentEstimate.toLocaleString('ja-JP');
+        concurrentEst.classList.remove('is-placeholder');
+      } else {
+        concurrentEst.textContent = '（取得不可）';
+        concurrentEst.classList.add('is-placeholder');
+      }
+      concurrentEst.removeAttribute('title');
+    }
+    if (concurrentSub) concurrentSub.textContent = '人';
+
+    // 来場者数: 最後に取れていた数字。null は「（取得不可）」。
+    if (viewerDom) {
+      if (
+        typeof view.viewerCount === 'number' &&
+        Number.isFinite(view.viewerCount)
+      ) {
+        viewerDom.textContent = view.viewerCount.toLocaleString('ja-JP');
+        viewerDom.classList.remove('is-placeholder');
+      } else {
+        viewerDom.textContent = '（取得不可）';
+        viewerDom.classList.add('is-placeholder');
+      }
+    }
+
+    // 配信者 banner（既存 #casterBanner は display:none で固定なので、
+    // ここでは動かさない。タイトルは indicator に出してユーザーに伝わる）
+  } catch (err) {
+    if (typeof console !== 'undefined' && console?.warn) {
+      console.warn('[applyLastBroadcastReview] failed:', err);
+    }
+    hideReview();
+    root.classList.add('nl-empty-no-history');
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      // no-op
+    }
+  }
+}
+
+/**
+ * 0.1.69 (AY): empty state を抜けて active な watch に戻る瞬間に呼ぶ。
+ * indicator / button を hide にし、`nl-empty-no-history` を確実に外す。
+ */
+function clearLastBroadcastReviewArtifacts() {
+  const root = document.documentElement;
+  root.classList.remove('nl-empty-no-history');
+  const indicator = $('lastBroadcastIndicator');
+  if (indicator) indicator.hidden = true;
+  const actionsEl = $('lastBroadcastActions');
+  if (actionsEl) actionsEl.hidden = true;
+  const reopenBtn = /** @type {HTMLButtonElement|null} */ ($('lastBroadcastReopenBtn'));
+  if (reopenBtn) {
+    reopenBtn.disabled = true;
+    reopenBtn.dataset.watchUrl = '';
+  }
+}
+
 async function refresh() {
   if (!hasExtensionContext()) {
     renderExtensionContextBanner(true);
@@ -6300,13 +6474,18 @@ async function refresh() {
   /*
    * 0.1.55 (AK): ランキング導線が popup で出ない件を確実に直す。
    *   popup.html 側で hidden 属性を撤去したため、本来は何もしなくても
-   *   表示されるはず。INLINE_MODE（watch ページ内 iframe）のときだけ
+   *   表示されるはず。INLINE_EMBED_WATCH（watch ページ内 iframe）のときだけ
    *   removeAttribute / setAttribute で明示的に切り替え、念のため inline style
    *   も設定して CSS の影響を遮断する。
+   *
+   * 0.1.69 (AY): 0.1.67 で side panel が「watch じゃないタブ」の主役になったが、
+   *   旧コードは `INLINE_MODE` (= side panel も含む) で hide していたため、
+   *   side panel で導線が出ない退行があった。`INLINE_EMBED_WATCH` に絞り、
+   *   side panel では standalone popup と同様に導線を表示する。
    */
   const noWatchHint = $('noWatchRankingHint');
   if (noWatchHint instanceof HTMLElement) {
-    if (INLINE_MODE) {
+    if (INLINE_EMBED_WATCH) {
       noWatchHint.setAttribute('hidden', '');
       noWatchHint.style.display = 'none';
     } else {
@@ -6374,6 +6553,15 @@ async function refresh() {
     // 応援レーンは「直近放送の保存」から暫定復元する。reset の後に呼ぶことで、
     // 生 URL で popup を開いたときに lane が真っ白にならない（E2E lane-visibility）。
     await populateStorySourceEntriesFromStorageFallback();
+    // 0.1.69 (AY): standalone popup / side panel では「前回の配信」を cards に
+    // 復元する。INLINE_MODE（watch ページ内 iframe）は empty state 自体が
+    // 発生しない想定なのでスキップ。clearWatchMetaCard() の直後に呼ぶことで
+    // is-placeholder を上書きできる順序を保証する。
+    if (!INLINE_MODE) {
+      await applyLastBroadcastReviewToEmptyState();
+    } else {
+      clearLastBroadcastReviewArtifacts();
+    }
     markPopupRefreshContentPainted();
     revealPopupPrimaryOnce();
     return;
@@ -6429,10 +6617,21 @@ async function refresh() {
     void renderGiftQuickStatsPanel('');
     // lv が取り出せなかった場合も、同じ保存ベース fallback を試みる。
     await populateStorySourceEntriesFromStorageFallback();
+    // 0.1.69 (AY): 同じ「watch URL があるけど lv 抜けない」レアケースでも
+    // empty state なので、前回の配信を復元する。
+    if (!INLINE_MODE) {
+      await applyLastBroadcastReviewToEmptyState();
+    } else {
+      clearLastBroadcastReviewArtifacts();
+    }
     markPopupRefreshContentPainted();
     revealPopupPrimaryOnce();
     return;
   }
+
+  // 0.1.69 (AY): active な watch に戻った瞬間に「前回の配信」UI を片付ける。
+  // 以降のコードは通常の paintWatchPopupUi 経路で cards に live data を流す。
+  clearLastBroadcastReviewArtifacts();
 
   const snapshotKey = `${lv}|${url}|s17`;
   const key = commentsStorageKey(lv);
@@ -9912,6 +10111,24 @@ function initPopup() {
   });
   $('reloadWatchTabPanelBtn')?.addEventListener('click', () => {
     void triggerReloadWatchTabFromPopup();
+  });
+
+  // 0.1.69 (AY): empty state「前回の配信」cards から、その配信を新タブで開く。
+  // dataset.watchUrl は applyLastBroadcastReviewToEmptyState() で設定される。
+  // hasExtensionContext() が偽ならボタン自体が disabled なので、ここでは
+  // 単純に new tab を開くだけ。
+  $('lastBroadcastReopenBtn')?.addEventListener('click', () => {
+    const btn = /** @type {HTMLButtonElement|null} */ ($('lastBroadcastReopenBtn'));
+    if (!btn || btn.disabled) return;
+    const url = String(btn.dataset.watchUrl || '').trim();
+    if (!url) return;
+    try {
+      void chrome.tabs.create({ url });
+    } catch (err) {
+      if (typeof console !== 'undefined' && console?.warn) {
+        console.warn('[lastBroadcastReopen] tabs.create failed:', err);
+      }
+    }
   });
 
   postBtn?.addEventListener('click', () => {

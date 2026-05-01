@@ -6027,6 +6027,118 @@
         outline: none;
       }
 
+      /*
+       * 0.1.69 (AY): empty state（配信なし）で「前回の配信」を再現するための
+       * indicator バナーとアクションボタン。stat cards の上に小さく出して
+       * 「これは過去の配信を表示しています」と明示する。
+       *
+       * - .nl-last-broadcast-indicator: 「前回（HH:mm 〜）」+ タイトル
+       * - .nl-last-broadcast-actions: 「もう一度開く」ボタン
+       *
+       * INLINE_MODE（watch ページ内 iframe）では empty state 自体が発生しない
+       * のでこれらは hidden。standalone popup と side panel のみで表示。
+       */
+      .nl-last-broadcast-indicator {
+        margin: 8px 12px 4px;
+        padding: 6px 10px;
+        background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-surface));
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 32%, var(--nl-border));
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .nl-last-broadcast-indicator[hidden] {
+        display: none !important;
+      }
+
+      .nl-last-broadcast-indicator__lead {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--nl-muted);
+        line-height: 1.2;
+        letter-spacing: 0.02em;
+      }
+
+      .nl-last-broadcast-indicator__title {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--nl-text);
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+      }
+
+      .nl-last-broadcast-actions {
+        margin: 6px 12px 4px;
+        display: flex;
+        gap: 6px;
+      }
+
+      .nl-last-broadcast-actions[hidden] {
+        display: none !important;
+      }
+
+      .nl-last-broadcast-actions__reopen {
+        flex: 1 1 auto;
+        appearance: none;
+        -webkit-appearance: none;
+        font: inherit;
+        padding: 7px 10px;
+        background: var(--nl-accent);
+        color: #fff;
+        border: 1px solid var(--nl-accent);
+        border-radius: 8px;
+        font-size: 12.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 120ms ease, border-color 120ms ease;
+      }
+
+      .nl-last-broadcast-actions__reopen:hover,
+      .nl-last-broadcast-actions__reopen:focus-visible {
+        background: var(--nl-accent-hover, #0b73ad);
+        border-color: var(--nl-accent-hover, #0b73ad);
+        outline: none;
+      }
+
+      .nl-last-broadcast-actions__reopen:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      /*
+       * 0.1.69 (AY): empty state「履歴ゼロ」フォールバック用。
+       * 拡張インストール直後・本当に何もない場合は、stat cards / count+ticker /
+       * lane / session-summary / gift-quick を全部 hide してすっきりさせる。
+       * 残るのは: nlVersionBadge / noWatchRankingHint（4 ボタン導線）/
+       * character scene（語り）/ 詳細設定 / 配色プリセット のみ。
+       *
+       * 「履歴あり empty」では cards に前回データが入るので hide しない。
+       * → JS が html に nl-empty-no-history を付けたとき限定で hide する。
+       */
+      html.nl-empty-no-history body .nl-live-stat-cards,
+      html.nl-empty-no-history body .nl-stats,
+      html.nl-empty-no-history body .nl-vdh-divider,
+      html.nl-empty-no-history body .nl-comment-compose,
+      html.nl-empty-no-history body .nl-session-summary-panel,
+      html.nl-empty-no-history body .nl-gift-quick-panel,
+      html.nl-empty-no-history body .nl-record-nav-hint,
+      html.nl-empty-no-history body .nl-dev-monitor-details {
+        display: none !important;
+      }
+
+      /* userRoomList とその周辺の「応援可視化」セクションも一括 hide */
+      html.nl-empty-no-history body h2[data-nl-toolbar-only],
+      html.nl-empty-no-history body #userRoomList,
+      html.nl-empty-no-history body .nl-anonymous-identicon-opt,
+      html.nl-empty-no-history body .nl-anonymous-identicon-hint {
+        display: none !important;
+      }
+
       html.nl-skin-panel-dark {
         color-scheme: dark;
         --nl-bg: #0a0e14;
@@ -6368,6 +6480,42 @@
           </li>
         </ul>
       </section>
+      <!--
+        0.1.69 (AY): empty state で「前回の配信」を再現する indicator バナー。
+        stat cards の上に「前回（HH:mm〜）」とタイトルを小さく見せて、
+        ユーザーが「現在の配信」と誤認しないようにする。
+        履歴があるときだけ JS が hidden を外す。標準は hidden。
+      -->
+      <div
+        id="lastBroadcastIndicator"
+        class="nl-last-broadcast-indicator"
+        role="note"
+        aria-label="前回の配信"
+        hidden
+      >
+        <span id="lastBroadcastIndicatorLead" class="nl-last-broadcast-indicator__lead">前回の配信</span>
+        <span id="lastBroadcastIndicatorTitle" class="nl-last-broadcast-indicator__title"></span>
+      </div>
+      <!--
+        0.1.69 (AY): 「もう一度開く」ボタン。前回の watchUrl を新タブで開く。
+        履歴があるときだけ JS が hidden を外す。watchUrl が空なら disabled。
+      -->
+      <div
+        id="lastBroadcastActions"
+        class="nl-last-broadcast-actions"
+        role="group"
+        aria-label="前回の配信のアクション"
+        hidden
+      >
+        <button
+          type="button"
+          id="lastBroadcastReopenBtn"
+          class="nl-last-broadcast-actions__reopen"
+          title="前回の watch ページを新しいタブで開きます"
+        >
+          🔄 もう一度この配信を開く
+        </button>
+      </div>
       <div
         id="offlineBanner"
         class="nl-extension-context-banner nl-offline-banner"
