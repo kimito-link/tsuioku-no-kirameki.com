@@ -715,9 +715,10 @@
   }
   function isAvatarUrlForUserId(url, expectedUserId) {
     const expected = String(expectedUserId ?? "").trim();
-    if (!expected) return true;
-    if (!/^\d{2,15}$/.test(expected)) return true;
     const urlUid = extractNiconicoUserIdFromIconUrl(url);
+    if (!expected) return !urlUid;
+    if (/^a:/.test(expected)) return !urlUid;
+    if (!/^\d{2,15}$/.test(expected)) return true;
     if (!urlUid) return true;
     return urlUid === expected;
   }
