@@ -9830,6 +9830,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     _prevViewerCount = null;
     _prevConcurrentEstimated = null;
   }
+  function isStatValuePlaceholderText(text) {
+    const t = String(text ?? "").trim();
+    if (!t) return true;
+    return !/^~?[\d,，]+$/.test(t);
+  }
   function setCountDisplay(value, watchSnapshot = null) {
     let recordedNum = null;
     let text = "";
@@ -9854,7 +9859,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       );
     }
     const liveStatEl = $("liveStatComments");
-    if (liveStatEl) liveStatEl.textContent = text;
+    if (liveStatEl) {
+      liveStatEl.textContent = text;
+      liveStatEl.classList.toggle(
+        "is-placeholder",
+        isStatValuePlaceholderText(text)
+      );
+    }
     const officialEl = (
       /** @type {HTMLElement|null} */
       $("liveStatCommentsOfficial")
@@ -12676,9 +12687,19 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       snapshotFetchInflight: inflight,
       snapshotFetchError: error
     });
-    if (viewerDomEl) viewerDomEl.textContent = gate.viewerLabel;
+    if (viewerDomEl) {
+      viewerDomEl.textContent = gate.viewerLabel;
+      viewerDomEl.classList.toggle(
+        "is-placeholder",
+        isStatValuePlaceholderText(gate.viewerLabel)
+      );
+    }
     if (concurrentEstEl) {
       concurrentEstEl.textContent = gate.concurrentLabel;
+      concurrentEstEl.classList.toggle(
+        "is-placeholder",
+        isStatValuePlaceholderText(gate.concurrentLabel)
+      );
       concurrentEstEl.removeAttribute("title");
     }
     if (concurrentSubEl) concurrentSubEl.textContent = "\u4EBA";
@@ -12799,8 +12820,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (viewerDomEl) {
       if (stateGate.shouldUseSnapshotForViewer && typeof vc === "number") {
         viewerDomEl.textContent = vc.toLocaleString("ja-JP");
+        viewerDomEl.classList.remove("is-placeholder");
       } else {
         viewerDomEl.textContent = stateGate.viewerLabel;
+        viewerDomEl.classList.add("is-placeholder");
       }
     }
     if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) {
@@ -12837,6 +12860,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         const directLike = resolved.method === "official";
         const estStr = resolved.estimated.toLocaleString("ja-JP");
         concurrentEstEl.textContent = `${directLike ? "" : "~"}${estStr}`;
+        concurrentEstEl.classList.remove("is-placeholder");
         if (_prevConcurrentEstimated != null && resolved.estimated !== _prevConcurrentEstimated && concurrentCard) {
           const icon = concurrentCard.querySelector(":scope > img.nl-live-stat-icon");
           triggerCharaReaction(icon, {
@@ -12885,6 +12909,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         if (concurrentReadyEl) concurrentReadyEl.hidden = true;
         if (concurrentCard) concurrentCard.setAttribute("aria-busy", "true");
         concurrentEstEl.textContent = "\u8A08\u6E2C\u4E2D\u2026";
+        concurrentEstEl.classList.add("is-placeholder");
         concurrentEstEl.removeAttribute("title");
         if (concurrentSubEl) concurrentSubEl.textContent = "\u4EBA";
       }
@@ -16123,7 +16148,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-0847" ? String("0501-0847") : "dev";
+      const buildId = "0501-0911" ? String("0501-0911") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

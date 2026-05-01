@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.67（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.68（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,32 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.68 バンプで入った修正（配信なし時の stat カード「（取得不可）」表示を読めるサイズに AX）**:
+
+- ユーザー報告（0.1.67 リリース後）: 「いろんな画面サイズで配信がないところで
+  ボタンおすとみずらいです」。スクショ4枚で popup width 340〜540px のいずれでも
+  「watch ページが見つかりません」empty state の下にある stat カード3枚
+  （記録 / 推定同時接続 / 来場者数）の値枠が「（取得不可）」「（この配信は未取得）」を
+  受けて、極太22px + tabular-nums のままカード幅 ~100px に流し込まれ、1〜3 字ずつ
+  縦書き状に折り返されて読めなくなっていた。
+- 旧実装: `.nl-live-stat-value` は `font-size: clamp(16px, 4.5vw, 22px)` ・
+  `font-weight: 900` ・ `font-variant-numeric: tabular-nums` で完全に「数字専用」
+  スタイル。日本語のフォールバック文言を流すと CJK は任意の文字境界で折り返せる
+  ので、6 字の「（取得不可）」がカード幅に対して大きすぎて段組み状に潰れていた。
+- 修正: 値が「数字（カンマ区切り含む / 先頭 ~ も許容）」以外のときだけ
+  `is-placeholder` クラスを付け、CSS 側で `clamp(10.5px, 2.6vw, 13px)` ・
+  `font-weight: 700` ・ `color: var(--nl-muted)` ・ `word-break: keep-all` ・
+  `overflow-wrap: anywhere` の控え目スタイルに切り替える。inline 埋め込み時は
+  `clamp(12px, 3vw, 16px)` で少し大きめに揃える。数字に戻ったら自動でクラスが
+  外れて従来の極太に戻る。
+- 切替地点 3 箇所:
+  - `setCountDisplay` (`liveStatComments` の値)
+  - `clearWatchMetaCard` (`watchViewerDom` / `watchConcurrentEst` を gate.viewerLabel /
+    concurrentLabel で塗るとき)
+  - `renderWatchMetaCard` の viewer 経路 + concurrent 経路（`計測中…` の else 分岐含む）
+- 純粋判定 helper: `isStatValuePlaceholderText(text)` を popup-entry.js に追加
+  （`/^~?[\d,，]+$/` でない文字列を placeholder と判定）。
 
 **0.1.67 バンプで入った修正（関係ないタブを side panel に統合 AW）**:
 

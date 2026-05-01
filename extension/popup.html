@@ -2175,6 +2175,21 @@
         margin: 1px 0;
       }
 
+      /* 配信なし / 取得失敗時の「（取得不可）」「（この配信は未取得）」など、
+         数字以外のフォールバック文言が値枠に流れ込んだ場合の表示。
+         極太22px + tabular-nums のままだと幅 ~100px のカードで 1〜2 字ずつ
+         縦書き状に折り返されて読めなくなる（0.1.68 修正）。 */
+      .nl-live-stat-value.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 13px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        font-variant-numeric: normal;
+        line-height: 1.25;
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+
       .nl-live-stat-unit {
         font-size: clamp(8px, 2vw, 10px);
         font-weight: 600;
@@ -2533,6 +2548,12 @@
 
       html.nl-inline body .nl-live-stat-value {
         font-size: clamp(18px, 5vw, 28px);
+      }
+
+      /* inline panel は base より値が大きい（28px 上限）ので、placeholder 側も
+         少し大きめに揃える。それでも数字用の極太よりは確実に小さい。 */
+      html.nl-inline body .nl-live-stat-value.is-placeholder {
+        font-size: clamp(12px, 3vw, 16px);
       }
 
       /* 統計直下の案内 / 詳細設定内の記録ブロック（旧 first-view と同系） */

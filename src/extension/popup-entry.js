@@ -533,6 +533,21 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
 }
 
 /**
+ * `.nl-live-stat-value` に流す文言が「数字以外（フォールバック）」かを判定する。
+ * 数字 (`'1,234'`) と「~」プレフィックス推定値 (`'~250'`) は数値扱い。
+ * 「（取得不可）」「計測中…」「—」「-」などはフォールバック扱いで、CSS 側で
+ * 小さめサイズに切り替える（極太22px のままだと幅100px のカードで縦書き状に
+ * 折り返されて読めなくなる、0.1.68 修正）。
+ * @param {string} text
+ * @returns {boolean}
+ */
+function isStatValuePlaceholderText(text) {
+  const t = String(text ?? '').trim();
+  if (!t) return true;
+  return !/^~?[\d,，]+$/.test(t);
+}
+
+/**
  * @param {string|number} value 数値は toLocaleString('ja-JP') で表示。未取得時は明示文言。
  * @param {WatchPageSnapshot|null} [watchSnapshot] 公式コメント数の併記用
  */
@@ -562,7 +577,13 @@ function setCountDisplay(value, watchSnapshot = null) {
     );
   }
   const liveStatEl = $('liveStatComments');
-  if (liveStatEl) liveStatEl.textContent = text;
+  if (liveStatEl) {
+    liveStatEl.textContent = text;
+    liveStatEl.classList.toggle(
+      'is-placeholder',
+      isStatValuePlaceholderText(text)
+    );
+  }
 
   const officialEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsOfficial'));
   if (officialEl) {
@@ -4122,9 +4143,19 @@ function clearWatchMetaCard(opts = {}) {
     snapshotFetchInflight: inflight,
     snapshotFetchError: error
   });
-  if (viewerDomEl) viewerDomEl.textContent = gate.viewerLabel;
+  if (viewerDomEl) {
+    viewerDomEl.textContent = gate.viewerLabel;
+    viewerDomEl.classList.toggle(
+      'is-placeholder',
+      isStatValuePlaceholderText(gate.viewerLabel)
+    );
+  }
   if (concurrentEstEl) {
     concurrentEstEl.textContent = gate.concurrentLabel;
+    concurrentEstEl.classList.toggle(
+      'is-placeholder',
+      isStatValuePlaceholderText(gate.concurrentLabel)
+    );
     concurrentEstEl.removeAttribute('title');
   }
   if (concurrentSubEl) concurrentSubEl.textContent = '人';
@@ -4247,8 +4278,10 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   if (viewerDomEl) {
     if (stateGate.shouldUseSnapshotForViewer && typeof vc === 'number') {
       viewerDomEl.textContent = vc.toLocaleString('ja-JP');
+      viewerDomEl.classList.remove('is-placeholder');
     } else {
       viewerDomEl.textContent = stateGate.viewerLabel;
+      viewerDomEl.classList.add('is-placeholder');
     }
   }
   if (typeof vc === 'number' && Number.isFinite(vc) && vc >= 0) {
@@ -4315,6 +4348,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
       const directLike = resolved.method === 'official';
       const estStr = resolved.estimated.toLocaleString('ja-JP');
       concurrentEstEl.textContent = `${directLike ? '' : '~'}${estStr}`;
+      concurrentEstEl.classList.remove('is-placeholder');
 
       if (
         _prevConcurrentEstimated != null &&
@@ -4385,6 +4419,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
       if (concurrentReadyEl) concurrentReadyEl.hidden = true;
       if (concurrentCard) concurrentCard.setAttribute('aria-busy', 'true');
       concurrentEstEl.textContent = '計測中…';
+      concurrentEstEl.classList.add('is-placeholder');
       concurrentEstEl.removeAttribute('title');
       if (concurrentSubEl) concurrentSubEl.textContent = '人';
     }
