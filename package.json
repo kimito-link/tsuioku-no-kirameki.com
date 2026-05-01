@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "verify": "npm test && npm run lint && npm run typecheck && npm run build",
+    "verify:bump": "node scripts/verify-bump.mjs",
     "build": "node scripts/build.mjs",
     "build:watch": "node scripts/build-watch.mjs",
     "test:e2e": "npm run build && node scripts/run-e2e.mjs",
