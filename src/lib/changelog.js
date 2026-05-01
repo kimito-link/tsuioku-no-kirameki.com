@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.92',
+    date: '2026-05-01',
+    summary: '数字ちらちら + 接続中固定の根治',
+    items: Object.freeze([
+      '推定同接 / 来場者数が「（接続中…）」のまま、または ちらちら点滅する症状を根治しました。原因は polling 時に snapshot を null クリアして loading 状態を再表示する設計でした',
+      '修正内容: stale-while-revalidate パターンに変更。古い snapshot を fetch 中も保持し続けて表示する。新しい fetch が成功したら ATOMIC に置き換える。fetch 失敗時も古い表示が残る（「接続中…」点滅なし）',
+      '具体的には popup-entry.js の polling と refresh で watchMetaCache.snapshot = null を撤去し、古いデータを loading 中も表示用に維持。loading ラベルは初回 fetch のみで表示し、stale snapshot がある場合はスキップ'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.91',
     date: '2026-05-01',
     summary: 'fetch hang を防ぐ + ちくらん URL 修正',

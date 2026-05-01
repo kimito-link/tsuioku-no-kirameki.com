@@ -779,6 +779,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.92",
+      date: "2026-05-01",
+      summary: "stale-while-revalidate \u3067 flicker \u3068 loading \u6C38\u4E45\u5316\u3092\u89E3\u6D88",
+      items: Object.freeze([
+        "\u63A8\u5B9A\u540C\u63A5 / \u6765\u5834\u8005\u6570\u304C\u300C\uFF08\u63A5\u7D9A\u4E2D\u2026\uFF09\u300D\u306E\u307E\u307E\u3001\u307E\u305F\u306F \u3061\u3089\u3061\u3089\u70B9\u6EC5\u3059\u308B\u75C7\u72B6\u3092\u6839\u6CBB\u3057\u307E\u3057\u305F\u3002\u539F\u56E0\u306F polling \u6642\u306B snapshot \u3092 null \u30AF\u30EA\u30A2\u3057\u3066 loading \u72B6\u614B\u3092\u518D\u8868\u793A\u3059\u308B\u8A2D\u8A08\u3067\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: stale-while-revalidate \u30D1\u30BF\u30FC\u30F3\u306B\u5909\u66F4\u3002\u53E4\u3044 snapshot \u3092 fetch \u4E2D\u3082\u4FDD\u6301\u3057\u7D9A\u3051\u3066\u8868\u793A\u3059\u308B\u3002\u65B0\u3057\u3044 fetch \u304C\u6210\u529F\u3057\u305F\u3089 ATOMIC \u306B\u7F6E\u304D\u63DB\u3048\u308B\u3002fetch \u5931\u6557\u6642\u3082\u53E4\u3044\u8868\u793A\u304C\u6B8B\u308B\uFF08\u300C\u63A5\u7D9A\u4E2D\u2026\u300D\u70B9\u6EC5\u306A\u3057\uFF09",
+        "\u5177\u4F53\u7684\u306B\u306F popup-entry.js \u306E polling \u3068 refresh \u3067 watchMetaCache.snapshot = null \u3092\u64A4\u53BB\u3057\u3001\u53E4\u3044\u30C7\u30FC\u30BF\u3092 loading \u4E2D\u3082\u8868\u793A\u7528\u306B\u7DAD\u6301\u3002loading \u30E9\u30D9\u30EB\u306F\u521D\u56DE fetch \u306E\u307F\u3067\u8868\u793A\u3057\u3001stale snapshot \u304C\u3042\u308B\u5834\u5408\u306F\u30B9\u30AD\u30C3\u30D7"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.91",
       date: "2026-05-01",
       summary: "fetch hang \u3092\u9632\u3050 + \u3061\u304F\u3089\u3093 URL \u4FEE\u6B63",
@@ -15139,10 +15149,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const snapshotKey = `${lv}|${url}|s17`;
       const key = commentsStorageKey(lv);
       const snapshotCacheHit = watchMetaCache.key === snapshotKey && watchMetaCache.snapshot != null;
-      let watchSnapshot = snapshotCacheHit ? watchMetaCache.snapshot : null;
+      let watchSnapshot = watchMetaCache.snapshot;
       if (!snapshotCacheHit) {
         watchMetaCache.key = snapshotKey;
-        watchMetaCache.snapshot = null;
       }
       const data = await readStorageBagWithRetry(
         () => chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
@@ -15223,7 +15232,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const shouldDeep = !INTERCEPT_BACKFILL_STATE.deepTried && arr.length >= 30 && missingIdCount >= Math.ceil(arr.length * 0.4);
       resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
       if (!snapshotCacheHit) {
-        watchMetaCache.fetchInflight = true;
+        const hasStaleSnapshot = watchMetaCache.snapshot != null;
+        watchMetaCache.fetchInflight = !hasStaleSnapshot;
         watchMetaCache.fetchError = "";
         if (isFreshRefresh()) {
           paintWatchPopupUi();
@@ -16784,7 +16794,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1904" ? String("0501-1904") : "dev";
+      const buildId = "0501-1920" ? String("0501-1920") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -18381,7 +18391,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
       if (typeof document !== "undefined" && document.hidden) return;
       watchMetaCache.key = "";
-      watchMetaCache.snapshot = null;
       safeRefresh();
     }, POLL_INTERVAL_MS);
     if (INLINE_MODE || INLINE_SIDE_PANEL) {

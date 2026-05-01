@@ -6793,11 +6793,12 @@ async function refresh() {
   const key = commentsStorageKey(lv);
   const snapshotCacheHit =
     watchMetaCache.key === snapshotKey && watchMetaCache.snapshot != null;
-  let watchSnapshot = snapshotCacheHit ? watchMetaCache.snapshot : null;
+  // 0.1.92 stale-while-revalidate: cache miss でも 古い snapshot を表示用に保持
+  let watchSnapshot = watchMetaCache.snapshot;
 
   if (!snapshotCacheHit) {
     watchMetaCache.key = snapshotKey;
-    watchMetaCache.snapshot = null;
+    // 0.1.92: snapshot は null にせず、新 fetch 完了まで stale を表示
   }
 
   /** @type {Record<string, unknown>} */
@@ -6972,7 +6973,10 @@ async function refresh() {
     // clearWatchMetaCard が `watchMetaCache.fetchInflight` を読んで「（接続中…）」
     // を出してくれるので、ユーザーは取得失敗（取得不可）と取得中（接続中）を
     // 視覚的に区別できるようになる。
-    watchMetaCache.fetchInflight = true;
+    // 0.1.92: ただし、古い snapshot がある場合は loading 表示せず stale を維持
+    //   （flicker 防止 + ユーザーが「常に接続中」と誤解する症状の根治）
+    const hasStaleSnapshot = watchMetaCache.snapshot != null;
+    watchMetaCache.fetchInflight = !hasStaleSnapshot;
     watchMetaCache.fetchError = '';
     if (isFreshRefresh()) {
       paintWatchPopupUi();
@@ -10610,8 +10614,11 @@ function initPopup() {
           return;
         }
         if (typeof document !== 'undefined' && document.hidden) return;
+        // 0.1.92: stale-while-revalidate パターン。
+        //   key だけ無効化して fetch を促し、snapshot 自体は保持して
+        //   fetch 中も古い数値を表示し続ける（loading 状態の点滅を防ぐ）。
         watchMetaCache.key = '';
-        watchMetaCache.snapshot = null;
+        // watchMetaCache.snapshot = null; ← 0.1.92: 削除（古い snapshot を表示維持）
         safeRefresh();
       }, POLL_INTERVAL_MS)
     )
