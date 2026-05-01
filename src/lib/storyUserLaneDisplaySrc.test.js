@@ -131,36 +131,4 @@ describe('userLaneHttpForTilePick', () => {
     const uid = '21552210';
     expect(userLaneHttpForTilePick(uid, '', '')).toBe('');
   });
-
-  // 0.1.101: broadcaster icon 取り違えバイパス修正
-  // supportGridPersonalThumbPreferredUrl は score >= 2 の URL を guard 無しで返すため、
-  // entry.userId と URL 埋め込み uid が違っても storedRaw を採用してしまう。
-  // 例: viewer (uid 12345) が broadcaster (uid 29006464) の icon URL を avatarUrl に
-  // 持っていると、grid タイルに broadcaster の顔が出る。
-  describe('0.1.101 broadcaster contamination guard', () => {
-    const otherUserNiconicoIcon =
-      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/2900/29006464.jpg';
-
-    it('storedRaw に他人の niconico user icon が来ても採用しない', () => {
-      // entry.userId = 12345, stored avatar URL has uid 29006464 → 取り違え
-      expect(userLaneHttpForTilePick('12345', '', otherUserNiconicoIcon)).toBe('');
-    });
-
-    it('primary に他人の niconico user icon が来ても採用しない', () => {
-      // primary も guard が必要（contamination 経路は両方ありうる）
-      expect(userLaneHttpForTilePick('12345', otherUserNiconicoIcon, '')).toBe('');
-    });
-
-    it('uid 一致すれば storedRaw もそのまま採用する（happy path 維持）', () => {
-      const ownIcon =
-        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1234/12345.jpg';
-      expect(userLaneHttpForTilePick('12345', '', ownIcon)).toBe(ownIcon);
-    });
-
-    it('CDN 個人サムネ（uid 抽出不能）は uid に関係なく通す（既存挙動）', () => {
-      // niconico CDN 形式じゃない URL は uid を抽出できないので isAvatarUrlForUserId は通す
-      const personal = 'https://cdn.example/avatar.png';
-      expect(userLaneHttpForTilePick('12345', '', personal)).toBe(personal);
-    });
-  });
 });

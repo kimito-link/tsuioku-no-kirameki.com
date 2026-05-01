@@ -26,13 +26,13 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.101',
+    version: '0.1.102',
     date: '2026-05-01',
-    summary: 'avatar 取り違え最後のバイパス経路を塞いだ',
+    summary: '0.1.101 が popup 起動を阻害した件を緊急 revert',
     items: Object.freeze([
-      '0.1.100 投入後も「story growth grid に配信者の顔タイルが残る」報告があった件を、TDD で真因を特定して修正しました。userLaneHttpForTilePick が supportGridPersonalThumbPreferredUrl 経由で生の entry.avatarUrl を guard 無しで返していたバイパス経路です',
-      '修正内容: userLaneHttpForTilePick に universal rule (isAvatarUrlForUserId) を追加。preferred URL も primary URL も「entry.userId と URL 埋め込み uid が一致しない場合」は採用しません。0.1.99 で storyGrowthAvatarSrcCandidate には適用済みでしたが、こちらは bypass の隙間が残っていました',
-      '影響範囲: story growth grid タイル, 応援ユーザーレーンの個人サムネ採用。普遍ルールが grid と lane の両方で完全に効くようになります'
+      '0.1.101 で投入した「userLaneHttpForTilePick の universal rule guard 強化」が、何らかの経路で popup 起動を阻害してしまう不具合を引き起こしました。実機検証で popup が出てこない症状が確認できたので緊急に revert します',
+      '機能としての挙動は 0.1.100 と同じに戻ります。grid に broadcaster の顔タイルが残る件は引き続き残課題ですが、popup が動かないほうが優先度高なのでこの判断にしました',
+      '原因の特定と安全な再投入は別 commit で。観測層 Phase 1+Phase 2（StatObservation/observationStore）は runtime に触れないので残します'
     ])
   }),
   Object.freeze({
