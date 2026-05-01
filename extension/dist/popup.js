@@ -745,6 +745,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.80",
+      date: "2026-05-01",
+      summary: "avatar \u53D6\u308A\u9055\u3048\u4FEE\u6B63\u306E\u771F\u56E0\uFF08URL \u30B5\u30A4\u30BA\u9055\u3044\uFF09\u306B\u5BFE\u5FDC",
+      items: Object.freeze([
+        "0.1.76\u301C0.1.79 \u3067\u8A08 4 \u5C64\u306E\u30AC\u30FC\u30C9\u3092\u5165\u308C\u307E\u3057\u305F\u304C\u3001\u3059\u3079\u3066 URL \u5B8C\u5168\u4E00\u81F4\uFF08isSameAvatarUrl\uFF09\u3067 broadcaster icon \u3092\u5224\u5B9A\u3057\u3066\u3044\u305F\u305F\u3081\u3001snapshot \u306F 150x150 \u3092\u8FD4\u3057\u3001\u30B3\u30E1 harvester \u306F s/ \u5C0F\u30B5\u30A4\u30BA\u3092\u62FE\u3046\u30B5\u30A4\u30BA\u9055\u3044\u3067\u4E00\u81F4\u305B\u305A\u30014 \u5C64\u5168\u90E8\u304C\u7A7A\u632F\u308A\u3057\u3066\u3044\u307E\u3057\u305F\uFF08\u5B9F\u969B\u306E\u6C5A\u67D3 URL: usericon/s/14367/143675916.jpg\u3001snapshot: usericon/uri150x150/...\uFF09",
+        "\u4FEE\u6B63\u5185\u5BB9: avatarBroadcasterGuard.js \u306B extractNiconicoUserIdFromIconUrl \u3092\u8FFD\u52A0\u3057\u3001URL \u672B\u5C3E\u306E uid \u3092\u62BD\u51FA\u3057\u3066 broadcasterUid \u3068\u76F4\u63A5\u7167\u5408\u3059\u308B\u30ED\u30B8\u30C3\u30AF\u3092\u512A\u5148\u3002\u30B5\u30A4\u30BA\u30D0\u30EA\u30A2\u30F3\u30C8\uFF08s/m/l/uri150x150\uFF09\u306B\u4F9D\u5B58\u3057\u306A\u3044\u5224\u5B9A\u304C\u3067\u304D\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3057\u305F",
+        "\u3053\u308C\u3067 0.1.76\u301C0.1.79 \u306E 4 \u5C64\u30AC\u30FC\u30C9\u304C\u521D\u3081\u3066\u6B63\u3057\u304F\u6A5F\u80FD\u3057\u3001\u30AE\u30D5\u30C8\u6F14\u51FA\u7531\u6765\u306E\u53D6\u308A\u9055\u3048\u304C\u5B8C\u5168\u306B\u89E3\u6D88\u3055\u308C\u307E\u3059\u3002\u65B0\u898F 12 \u30B1\u30FC\u30B9\u306E TDD \u8FFD\u52A0\uFF08\u5408\u8A08 36\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.79",
       date: "2026-05-01",
       summary: "\u30A2\u30A4\u30B3\u30F3\u5217\u306E\u6C5A\u67D3 avatar \u3082\u8868\u793A\u6642\u306B\u88DC\u6B63",
@@ -16581,7 +16591,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1527" ? String("0501-1527") : "dev";
+      const buildId = "0501-1545" ? String("0501-1545") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

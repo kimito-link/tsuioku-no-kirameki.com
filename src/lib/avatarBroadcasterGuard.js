@@ -15,9 +15,37 @@
  *
  *   broadcaster 情報が未取得（snapshot 未確定 / channel 配信で URL 不明等）の
  *   ときはガードを掛けない（false negative より false positive を避ける）。
+ *
+ * 0.1.80: URL のサイズバリアント（s/m/l/uri150x150 等）をすり抜けるバグ修正:
+ *   ニコ生 user icon URL は `nicoaccount/usericon/<size>/<bucket>/<uid>.jpg`
+ *   形式で、同じ配信者でも snapshot は uri150x150 を返し、コメ harvester は
+ *   /s/ 小サイズを拾う。完全 URL 一致では不十分なため、URL パスから uid を
+ *   抽出して broadcasterUid と一致したら「同じ配信者アイコン」として扱う。
  */
 
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
+
+/**
+ * niconico user icon URL からユーザー ID を抽出する（純粋関数）。
+ *
+ * 対象パターン例:
+ *   - https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14367/143675916.jpg
+ *   - https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/uri150x150/14367/143675916.jpg
+ *   - https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/m/14367/143675916.jpg?cache_buster=1
+ *
+ * 末尾の `<数字>.<拡張子>` を取り出す。
+ *
+ * @param {unknown} raw
+ * @returns {string} userId（見つからなければ空文字）
+ */
+export function extractNiconicoUserIdFromIconUrl(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  // /<digits>.<ext>?... もしくは /<digits>.<ext>$
+  const m = s.match(/\/(\d{2,15})\.(?:jpg|jpeg|png|gif|webp)(?:[?#]|$)/i);
+  if (m && m[1]) return m[1];
+  return '';
+}
 
 /**
  * @typedef {Object} AvatarBroadcasterGuardInput
@@ -44,11 +72,19 @@ export function shouldAssociateAvatarWithUser(input) {
   const broadcasterUid = String(input?.broadcasterUid ?? '').trim();
   const broadcasterIconUrl = String(input?.broadcasterIconUrl ?? '').trim();
 
-  // broadcaster 情報が未取得 → ガード掛けず通す
-  if (!broadcasterUid || !broadcasterIconUrl) return true;
+  // broadcaster uid が未取得 → ガード掛けず通す
+  // （uid 不明では「broadcaster 本人かどうか」の最終判定ができないため）
+  if (!broadcasterUid) return true;
 
-  // av が broadcaster icon と一致するなら、uid が broadcaster 本人の場合のみ許可
-  if (isSameAvatarUrl(av, broadcasterIconUrl)) {
+  // 0.1.80: URL から uid を抽出し、broadcasterUid と一致したら「同じ配信者の
+  //         icon」と判定する（s/m/l/uri150x150 等のサイズバリアントを吸収）。
+  const avUidFromUrl = extractNiconicoUserIdFromIconUrl(av);
+  if (avUidFromUrl && avUidFromUrl === broadcasterUid) {
+    return uid === broadcasterUid;
+  }
+
+  // 既存ガード: broadcasterIconUrl 完全一致（チャンネル配信や非標準 URL 用）
+  if (broadcasterIconUrl && isSameAvatarUrl(av, broadcasterIconUrl)) {
     return uid === broadcasterUid;
   }
 

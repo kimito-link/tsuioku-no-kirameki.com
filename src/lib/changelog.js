@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.80',
+    date: '2026-05-01',
+    summary: 'avatar 取り違え修正の真因（URL サイズ違い）に対応',
+    items: Object.freeze([
+      '0.1.76〜0.1.79 で計 4 層のガードを入れましたが、すべて URL 完全一致（isSameAvatarUrl）で broadcaster icon を判定していたため、snapshot は 150x150 を返し、コメ harvester は s/ 小サイズを拾うサイズ違いで一致せず、4 層全部が空振りしていました（実際の汚染 URL: usericon/s/14367/143675916.jpg、snapshot: usericon/uri150x150/...）',
+      '修正内容: avatarBroadcasterGuard.js に extractNiconicoUserIdFromIconUrl を追加し、URL 末尾の uid を抽出して broadcasterUid と直接照合するロジックを優先。サイズバリアント（s/m/l/uri150x150）に依存しない判定ができるようになりました',
+      'これで 0.1.76〜0.1.79 の 4 層ガードが初めて正しく機能し、ギフト演出由来の取り違えが完全に解消されます。新規 12 ケースの TDD 追加（合計 36）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.79',
     date: '2026-05-01',
     summary: 'アイコン列の汚染 avatar も表示時に補正',

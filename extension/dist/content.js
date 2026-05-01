@@ -1881,14 +1881,25 @@
   }
 
   // src/lib/avatarBroadcasterGuard.js
+  function extractNiconicoUserIdFromIconUrl(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    const m = s.match(/\/(\d{2,15})\.(?:jpg|jpeg|png|gif|webp)(?:[?#]|$)/i);
+    if (m && m[1]) return m[1];
+    return "";
+  }
   function shouldAssociateAvatarWithUser(input) {
     const uid = String(input?.uid ?? "").trim();
     const av = String(input?.av ?? "").trim();
     if (!uid || !av) return true;
     const broadcasterUid = String(input?.broadcasterUid ?? "").trim();
     const broadcasterIconUrl = String(input?.broadcasterIconUrl ?? "").trim();
-    if (!broadcasterUid || !broadcasterIconUrl) return true;
-    if (isSameAvatarUrl(av, broadcasterIconUrl)) {
+    if (!broadcasterUid) return true;
+    const avUidFromUrl = extractNiconicoUserIdFromIconUrl(av);
+    if (avUidFromUrl && avUidFromUrl === broadcasterUid) {
+      return uid === broadcasterUid;
+    }
+    if (broadcasterIconUrl && isSameAvatarUrl(av, broadcasterIconUrl)) {
       return uid === broadcasterUid;
     }
     return true;
