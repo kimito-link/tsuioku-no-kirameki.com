@@ -9,6 +9,7 @@ import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoale
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
+import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -6923,7 +6924,17 @@ async function refresh() {
     STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
     STORY_AVATAR_DIAG_STATE.selfPending = countPendingSelfPostedRecentsForLive(lv);
     STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
-    const displayEntries = buildDisplayCommentEntries(arr, lv);
+    // 0.1.100: 配信者本人 user の自コメは「応援コメ」ではないので popup display
+    //   経路から除外（story growth grid / 集計件数 / lane / ticker 全部に効く）。
+    //   配信者カードは watchMetaCache.snapshot.broadcaster* から別経路で描画されるため
+    //   表示情報は失われない。HTML レポート側 (popup-entry.js:7745 周辺) では
+    //   既に同等の inline filter が個別コメに適用されている。
+    const broadcasterUidForCommentExclude =
+      String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+    const displayEntries = excludeBroadcasterFromCommentEntries(
+      buildDisplayCommentEntries(arr, lv),
+      broadcasterUidForCommentExclude
+    );
     STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
     setCountDisplay(displayEntries.length, watchSnapshot);
     void updateIngestHeartbeatDisplay(lv);

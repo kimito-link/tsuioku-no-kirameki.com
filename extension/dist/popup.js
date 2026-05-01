@@ -272,6 +272,17 @@
     });
   }
 
+  // src/lib/excludeBroadcasterFromCommentEntries.js
+  function excludeBroadcasterFromCommentEntries(entries, broadcasterUid) {
+    if (!Array.isArray(entries)) return [];
+    const uid = String(broadcasterUid ?? "").trim();
+    if (!uid) return entries.slice();
+    return entries.filter((entry) => {
+      const entryUid = String(entry?.userId ?? "").trim();
+      return entryUid !== uid;
+    });
+  }
+
   // src/lib/avatarBroadcasterGuard.js
   var isAvatarUrlForUserId2 = isAvatarUrlForUserId;
   function shouldAssociateAvatarWithUser(input) {
@@ -800,6 +811,16 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.100",
+      date: "2026-05-01",
+      summary: "\u914D\u4FE1\u8005\u672C\u4EBA\u306E\u81EA\u30B3\u30E1\u306F story grid \u304B\u3089\u9664\u5916",
+      items: Object.freeze([
+        "\u914D\u4FE1\u8005\u304C\u81EA\u5206\u306E\u653E\u9001\u3067 post \u3057\u305F\u30B3\u30E1\u304C story growth grid (\u30BF\u30A4\u30EB\u7CFB) \u3084\u96C6\u8A08\u4EF6\u6570\u306B\u542B\u307E\u308C\u3066\u3044\u305F\u4EF6\u3092\u4FEE\u6B63\u3057\u307E\u3057\u305F\u3002\u914D\u4FE1\u8005\u306F\u5FDC\u63F4\u3055\u308C\u308B\u5074\u3067\u5FDC\u63F4\u3059\u308B\u5074\u3067\u306F\u306A\u3044\u305F\u3081\u3001popup \u306E\u8868\u793A\u7D4C\u8DEF\uFF08grid / \u4EF6\u6570 / lane / ticker\uFF09\u304B\u3089\u9664\u5916\u3057\u307E\u3059",
+        "\u4FEE\u6B63\u5185\u5BB9: \u7D14\u95A2\u6570 excludeBroadcasterFromCommentEntries \u3092\u8FFD\u52A0\u3057\u3001refresh \u306E displayEntries \u69CB\u7BC9\u76F4\u5F8C\u306B\u9069\u7528\u3002HTML \u30EC\u30DD\u30FC\u30C8\u5074\u3067\u306F\u65E2\u306B\u540C\u7B49\u306E inline filter \u304C\u52D5\u3044\u3066\u3044\u305F\u306E\u3067\u3001popup display \u7D4C\u8DEF\u3092\u7D71\u4E00\u3057\u307E\u3057\u305F",
+        "\u914D\u4FE1\u8005\u672C\u4EBA\u30AB\u30FC\u30C9\u306F watchMetaCache.snapshot.broadcaster* \u304B\u3089\u5225\u7D4C\u8DEF\u3067\u63CF\u753B\u3055\u308C\u308B\u305F\u3081\u3001\u914D\u4FE1\u8005\u306E\u8868\u793A\u60C5\u5831\u81EA\u4F53\u306F\u5931\u308F\u308C\u307E\u305B\u3093\u3002\u914D\u4FE1\u8005\u306F dedicated card \u306E\u307F\u306B\u96C6\u7D04\u3055\u308C\u307E\u3059"
+      ])
+    }),
     Object.freeze({
       version: "0.1.99",
       date: "2026-05-01",
@@ -14912,7 +14933,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
         STORY_AVATAR_DIAG_STATE.selfPending = countPendingSelfPostedRecentsForLive(lv);
         STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
-        const displayEntries = buildDisplayCommentEntries(arr, lv);
+        const broadcasterUidForCommentExclude = String(watchMetaCache.snapshot?.broadcasterUserId || "").trim();
+        const displayEntries = excludeBroadcasterFromCommentEntries(
+          buildDisplayCommentEntries(arr, lv),
+          broadcasterUidForCommentExclude
+        );
         STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
         setCountDisplay(displayEntries.length, watchSnapshot);
         void updateIngestHeartbeatDisplay(lv);
@@ -16904,7 +16929,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-2153" ? String("0501-2153") : "dev";
+      const buildId = "0501-2203" ? String("0501-2203") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

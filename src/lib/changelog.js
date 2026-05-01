@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.100',
+    date: '2026-05-01',
+    summary: '配信者本人の自コメは story grid から除外',
+    items: Object.freeze([
+      '配信者が自分の放送で post したコメが story growth grid (タイル系) や集計件数に含まれていた件を修正しました。配信者は応援される側で応援する側ではないため、popup の表示経路（grid / 件数 / lane / ticker）から除外します',
+      '修正内容: 純関数 excludeBroadcasterFromCommentEntries を追加し、refresh の displayEntries 構築直後に適用。HTML レポート側では既に同等の inline filter が動いていたので、popup display 経路を統一しました',
+      '配信者本人カードは watchMetaCache.snapshot.broadcaster* から別経路で描画されるため、配信者の表示情報自体は失われません。配信者は dedicated card のみに集約されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.99',
     date: '2026-05-01',
     summary: 'コメント単位 rendering でも avatar 取り違えを検出',
