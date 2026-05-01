@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>ライブチャットの定型反応を 4 カテゴリ（笑・命中・評価・状態宣言）に分類する辞書とトークナイザ ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../images/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../images/apple-touch-icon.png">
+
+    <meta name="description" content="ライブチャットで頻出する定型反応コメント（草・www・正解・あ・監視中・ひっど など）を、笑反応・命中反応・評価反応・状態宣言の 4 カテゴリに辞書ベースで分類する手法。形態素解析を使わず、視覚的同等性に基づく正規化と短語彙テーブルで配信中のリアルタイム集計を可能にする。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/reaction-template-classifier.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/reaction-template-classifier.html">
+    <meta property="og:title" content="ライブチャットの定型反応を 4 カテゴリに分類する辞書とトークナイザ">
+    <meta property="og:description" content="草・正解・監視中・ひっど などの定型反応を 4 カテゴリに分類する軽量手法。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-05-01T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "ライブチャットの定型反応を 4 カテゴリ（笑・命中・評価・状態宣言）に分類する辞書とトークナイザ",
+        "datePublished": "2026-05-01",
+        "dateModified": "2026-05-01",
+        "author": {"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},
+        "publisher": {"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},
+        "url": "https://tsuioku-no-kirameki.com/articles/reaction-template-classifier.html",
+        "inLanguage": "ja-JP",
+        "license": "https://opensource.org/licenses/MIT"
+      }
+    </script>
+
+    <style>
+      :root{
+        --bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;
+        --line:rgba(88,62,28,.12);--gold:#c98e2b;--sky:#3d708d;--mint:#0f5e4f;--blue:#255d9b;
+        --violet:#5645ad;--brown:#8a3d19;--slate:#56534e;--red:#952b2a;
+        --text-primary:#2c2117;--text-secondary:#4f4338;
+        --shadow:0 18px 44px rgba(70,49,20,.12);--r1:34px;--r2:24px;--r3:18px;--maxw:880px;
+        --space-xs:8px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;
+        --shell-pad:16px;
+        --lh-tight:1.35;--lh-ui:1.58;--lh-body:1.82;--lh-heading:1.22;
+        --anchor-offset:56px;
+        --code-bg:rgba(45,33,23,.05);
+      }
+      @media (min-width:480px){ :root{--shell-pad:clamp(16px,3.2vw,28px)} }
+      *{box-sizing:border-box}
+      html{scroll-behavior:smooth;overflow-x:hidden}
+      body{
+        margin:0;color:var(--text-primary);
+        font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;
+        line-height:var(--lh-body);
+        background:
+          radial-gradient(ellipse 70% 48% at 98% 4%, rgba(255,210,228,.35), transparent 46%),
+          radial-gradient(circle at top right, rgba(132,184,207,.4), transparent 28%),
+          linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));
+        min-height:100vh;
+      }
+      a{color:var(--blue);text-underline-offset:3px}
+      a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page h1{font-size:clamp(1.7rem,4vw,2.4rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);letter-spacing:.01em}
+      header.page .meta{display:flex;flex-wrap:wrap;gap:var(--space-md);font-size:.88rem;color:var(--muted);margin:var(--space-sm) 0 0}
+      header.page .meta span{display:inline-flex;align-items:center;gap:6px}
+      header.page .meta strong{color:var(--ink);font-weight:600}
+
+      main{padding-bottom:var(--space-2xl)}
+
+      .digest{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-md) var(--space-lg);margin:var(--space-lg) 0;box-shadow:var(--shadow)}
+      .digest h3{margin:0 0 var(--space-sm);color:var(--brown);font-size:1rem}
+      .digest p{margin:0 0 var(--space-xs)}
+      .digest p:last-child{margin-bottom:0}
+
+      .toc{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-md) var(--space-lg);margin:var(--space-lg) 0;box-shadow:var(--shadow)}
+      .toc h2{margin:0 0 var(--space-sm);font-size:1rem;color:var(--brown)}
+      .toc ol{margin:0;padding-left:1.4em}
+      .toc li{margin:.18em 0}
+      .toc a{color:var(--ink);text-decoration:none}
+      .toc a:hover{color:var(--brown);text-decoration:underline}
+
+      .box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:var(--space-lg) 0;box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset)}
+      .box h2{margin:0 0 var(--space-md);font-size:1.4rem;line-height:var(--lh-heading);color:var(--ink);display:flex;align-items:baseline;gap:.5em}
+      .box h2 .num{font-size:.78em;color:var(--gold);font-weight:700}
+      .box h3{margin:var(--space-md) 0 var(--space-sm);font-size:1.08rem;color:var(--brown)}
+      .box p{margin:.5em 0}
+      .box ul,.box ol{margin:.5em 0;padding-left:1.6em}
+      .box li{margin:.25em 0}
+      .box code{background:var(--code-bg);padding:.06em .35em;border-radius:5px;font-size:.92em;font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+
+      pre.code{background:#2a2218;color:#f4ecde;border-radius:var(--r3);padding:var(--space-md);overflow-x:auto;font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:.85rem;line-height:1.62;margin:var(--space-md) 0}
+      pre.code code{background:transparent;padding:0;font-size:inherit}
+      pre.code .kw{color:#ffb86c}
+      pre.code .fn{color:#8be9fd}
+      pre.code .str{color:#a5e8a7}
+      pre.code .num{color:#f8c5d2}
+      pre.code .cm{color:#9087a7;font-style:italic}
+
+      .table-wrap{overflow-x:auto;margin:var(--space-md) 0}
+      table{width:100%;border-collapse:collapse;background:rgba(255,252,247,.5);border-radius:var(--r3);overflow:hidden}
+      th,td{padding:.55em .8em;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:.92rem}
+      th{background:rgba(88,62,28,.06);font-weight:600;color:var(--brown)}
+      tr:last-child td{border-bottom:none}
+
+      footer.page{padding:var(--space-xl) 0;border-top:1px solid var(--line);margin-top:var(--space-2xl);color:var(--muted);font-size:.86rem}
+      footer.page p{margin:.3em 0}
+    </style>
+  </head>
+  <body>
+    <header class="topbar" role="banner">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../" aria-label="君斗りんくの追憶のきらめき（トップへ戻る）">
+          <img src="../images/apple-touch-icon.png" alt="君斗りんく">
+        </a>
+        <a class="topbar__back" href="./">← 技術記事 一覧</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ 定型反応 4 カテゴリ分類</p>
+        <h1>ライブチャットの定型反応を 4 カテゴリ（笑・命中・評価・状態宣言）に分類する辞書とトークナイザ</h1>
+        <div class="meta">
+          <span>公開日: <strong>2026-05-01</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+
+        <aside class="digest" aria-label="ざっくり要約">
+          <h3>ざっくり要約</h3>
+          <p>ライブ配信のチャットには「<strong>草</strong>」「<strong>www</strong>」「<strong>正解</strong>」「<strong>あ</strong>」「<strong>監視中</strong>」「<strong>ひっど</strong>」のような<strong>定型反応</strong>が頻出する。これらを「笑反応・命中反応・評価反応・状態宣言」の 4 カテゴリに辞書ベースで分類する軽量手法を解説する。</p>
+          <p>形態素解析や ML モデルを使わず、<strong>視覚的同等性に基づく正規化</strong>と<strong>短語彙テーブル</strong>で配信中のリアルタイム集計を可能にする。配信単位の感情プロファイル（4 カテゴリの比率）を生成でき、過去配信との比較・配信者の話芸傾向の可視化に応用できる。</p>
+        </aside>
+
+        <nav class="toc" aria-label="目次">
+          <h2>目次</h2>
+          <ol>
+            <li><a href="#s1">背景と動機</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">4 カテゴリの定義と語彙</a></li>
+            <li><a href="#s4">分類アルゴリズム</a></li>
+            <li><a href="#s5">参考実装（JavaScript / 純粋関数）</a></li>
+            <li><a href="#s6">なぜこの設計なのか</a></li>
+            <li><a href="#s7">応用例と限界</a></li>
+            <li><a href="#s8">公知化と実装公開</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>背景と動機</h2>
+          <p>ニコニコ生放送・YouTube Live・Twitch などのライブ配信のチャットには、自由文よりもむしろ <strong>「定型句的な短い反応」</strong> が圧倒的多数を占める。日本語ライブ文化では特に顕著で、配信者の発言や場面に対して視聴者が即座にぶつける反応として、語彙が事実上テンプレ化している。</p>
+          <p>たとえばニコ生における代表的な定型反応:</p>
+          <ul>
+            <li><strong>笑反応</strong>: 草、www、ｗｗｗ、ワロタ、ｺﾚﾀﾞｦ、ｗ</li>
+            <li><strong>命中反応</strong>: 正解、それ、それな、あ、なるほど、ですよね</li>
+            <li><strong>評価反応</strong>: ひっど、神、神回、わかる、まじか、つよい、きもい</li>
+            <li><strong>状態宣言</strong>: 監視中、待機、ROM、初見、おつ、おつー、おやすみ</li>
+          </ul>
+          <p>これらは個別には情報量が少ないが、配信単位で集計すると<strong>その配信の空気感</strong>を表す指紋になる。「笑反応が圧倒的に多い配信」と「評価反応・命中反応が多い配信」では、同じ視聴者数でも<strong>体験している感情のプロファイル</strong>が違う。</p>
+          <p>本手法は、これら定型反応を<strong>形態素解析や機械学習を使わず</strong>、辞書ベースで 4 カテゴリに分類する軽量な実装である。Chrome 拡張機能のように<strong>クライアントサイドで配信中にリアルタイム動作する必要がある</strong>環境で、軽量さが本質的に重要になる。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>処理は以下の 4 段階で構成される:</p>
+          <ol>
+            <li><strong>正規化（Normalization）</strong>: コメント本文を視覚的同等性に基づき短いキーに変換する（例: 「ｗｗｗｗ」「ｗｗｗ」「www!」→ <code>www</code>）。</li>
+            <li><strong>長さ判定</strong>: 正規化後の文字数で「定型句候補」かを足切りする（基本は 8 文字以下）。</li>
+            <li><strong>カテゴリ辞書照合</strong>: 4 カテゴリそれぞれが持つ短語彙テーブルと完全一致／前方一致／部分一致のいずれかで照合する。</li>
+            <li><strong>カテゴリ集計</strong>: マッチしたコメントは該当カテゴリにカウントされる。マッチしないコメントは <code>narrative</code>（自由文）として別枠に集計する。</li>
+          </ol>
+          <p>1 コメントあたりの処理は <strong>O(辞書サイズ)</strong> で、辞書が数百語規模ならば実質 O(1)。配信中のリアルタイム集計に余裕で間に合う。</p>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>4 カテゴリの定義と語彙</h2>
+
+          <h3>3-1. 笑反応（laugh）</h3>
+          <p>「面白い」と感じた瞬間の即時反応。ライブ配信のチャットで最も多いカテゴリ。</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>正規化キー</th><th>例（生コメ）</th><th>マッチ規則</th></tr></thead>
+            <tbody>
+              <tr><td><code>www</code></td><td>w / ｗ / ww / ｗｗ / www / ｗｗｗ / wwww...</td><td>正規化後 <code>w+</code> の連続</td></tr>
+              <tr><td><code>草</code></td><td>草 / 草草 / 大草原 / w 草 w</td><td>「草」「大草原」を含む</td></tr>
+              <tr><td><code>warota</code></td><td>ワロタ / ﾜﾛﾀ / ワロチ / ワロエナイ</td><td>前方一致 <code>ワロ</code></td></tr>
+              <tr><td><code>laugh</code></td><td>笑 / 爆笑 / wktk</td><td>完全一致</td></tr>
+            </tbody>
+          </table></div>
+
+          <h3>3-2. 命中反応（hit）</h3>
+          <p>配信者の発言・展開に視聴者が「腑に落ちた」「予想が当たった」「気づいた」瞬間の反応。</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>正規化キー</th><th>例</th><th>マッチ規則</th></tr></thead>
+            <tbody>
+              <tr><td><code>正解</code></td><td>正解 / 正解！ / せいかい</td><td>完全一致</td></tr>
+              <tr><td><code>あ</code></td><td>あ / あっ / あ、 / ああ</td><td>正規化後 1〜2 文字 + 「あ」始まり</td></tr>
+              <tr><td><code>それ</code></td><td>それ / それな / それそれ / それだ</td><td>前方一致 <code>それ</code></td></tr>
+              <tr><td><code>narurodo</code></td><td>なるほど / なるほどな / ﾅﾙﾎﾄﾞ</td><td>前方一致 <code>なるほど</code> または カナ正規化</td></tr>
+              <tr><td><code>desuyone</code></td><td>ですよね / そうですよね</td><td>完全一致 / 部分一致</td></tr>
+            </tbody>
+          </table></div>
+          <p><strong>注意</strong>: 「あ」は単独文字なので false positive が起きやすい（自由文の冒頭にも頻出する）。本手法では「正規化後の文字列が <code>あ</code> または <code>あっ</code> で完結している」ことを条件にする（句読点・記号を除いた後）。</p>
+
+          <h3>3-3. 評価反応（eval）</h3>
+          <p>配信内容に対する視聴者の評価・感情ラベル。ポジティブ／ネガティブ両方を含む。</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>正規化キー</th><th>例</th><th>極性</th></tr></thead>
+            <tbody>
+              <tr><td><code>ひっど</code></td><td>ひっど / ひどい / ヒドイ</td><td>negative</td></tr>
+              <tr><td><code>神</code></td><td>神 / 神回 / 神配信</td><td>positive</td></tr>
+              <tr><td><code>つよい</code></td><td>つよい / 強い / 強すぎ</td><td>positive</td></tr>
+              <tr><td><code>きもい</code></td><td>きもい / キモい / きしょい</td><td>negative</td></tr>
+              <tr><td><code>わかる</code></td><td>わかる / わかります / わかりみ</td><td>共感</td></tr>
+              <tr><td><code>majika</code></td><td>まじか / マジか / まじかよ</td><td>驚き</td></tr>
+            </tbody>
+          </table></div>
+          <p>評価反応は<strong>極性（positive/negative/共感/驚き）</strong>のメタを辞書側に持たせると、後段の集計でポジ・ネガ比率も出せる。</p>
+
+          <h3>3-4. 状態宣言（status）</h3>
+          <p>視聴者が「自分の今の状態」をチャットに宣言するコメント。content より meta な情報。</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>正規化キー</th><th>例</th><th>意味</th></tr></thead>
+            <tbody>
+              <tr><td><code>監視中</code></td><td>監視中 / 監視 / 観察中</td><td>サイレント観戦の宣言</td></tr>
+              <tr><td><code>待機</code></td><td>待機 / 待機中 / 待ってます</td><td>配信開始待ち</td></tr>
+              <tr><td><code>rom</code></td><td>ROM / ろむ / ROM 中</td><td>Read Only Member</td></tr>
+              <tr><td><code>初見</code></td><td>初見 / 初見です / 初見失礼</td><td>初訪問</td></tr>
+              <tr><td><code>otsu</code></td><td>おつ / おつー / おつかれ / 乙</td><td>挨拶（終了時）</td></tr>
+              <tr><td><code>oyasumi</code></td><td>おやすみ / おやすー / 寝落ち</td><td>離脱宣言</td></tr>
+            </tbody>
+          </table></div>
+          <p>状態宣言は<strong>視聴者の入退場やエンゲージメント変化の代替シグナル</strong>として使える。「監視中」「待機」が多い時間帯は配信の盛り上がりとは別軸の指標になる。</p>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>分類アルゴリズム</h2>
+
+          <h3>4-1. 正規化規則</h3>
+          <p>本手法の正規化は、<a href="comment-echo-detection.html">コメ伝染検出</a>と共通の関数を使う:</p>
+          <ol>
+            <li>全角 W／ｗ → 半角 w</li>
+            <li>全文字を小文字に統一</li>
+            <li>句読点・記号（<code>!?！？。、,．</code>＋空白）を除去</li>
+            <li>長さ 0 ならばノイズとして除外</li>
+            <li>ASCII 1 文字（"a" "1" 等）はノイズとして除外（漢字・ひらがな・カタカナ・絵文字 1 字は通す）</li>
+          </ol>
+
+          <h3>4-2. カテゴリ判定の優先順位</h3>
+          <p>1 コメントが複数カテゴリにマッチする可能性がある（例: 「神草」は <code>神</code>(eval) と <code>草</code>(laugh) 両方にヒット）。本手法では以下の優先順位で 1 つに割り当てる:</p>
+          <ol>
+            <li><strong>笑反応</strong>（最優先）: 「草」「www」が含まれていれば、たとえ他にも当てはまっても laugh にする。理由: 笑反応は<strong>感情の即時性</strong>が強く、複合語でも笑いが主要因。</li>
+            <li><strong>命中反応</strong></li>
+            <li><strong>評価反応</strong></li>
+            <li><strong>状態宣言</strong></li>
+          </ol>
+          <p>どれにもマッチしない場合は <code>narrative</code>（自由文）に分類する。</p>
+
+          <h3>4-3. マッチ規則の 3 種類</h3>
+          <p>各語彙エントリは以下のいずれかの規則を持つ:</p>
+          <ul>
+            <li><code>exact</code>: 正規化後の文字列が完全一致。誤検出が少ないが、表記揺れに弱い。</li>
+            <li><code>prefix</code>: 正規化後の文字列が指定キーで始まる。「ワロタ」「ワロチ」「ワロエナイ」を <code>ワロ</code> でカバー。</li>
+            <li><code>contains</code>: 正規化後の文字列に指定キーを含む。「神回」「神配信」を <code>神</code> でカバー。ただし誤検出（「神は死んだ」のような自由文）も拾うので、長さ制約を併用する。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>参考実装（JavaScript / 純粋関数）</h2>
+          <p>以下は本拡張機能で実装している方針の擬似コードである。実装本体は将来 <code>src/lib/reactionTemplateClassifier.js</code> として公開予定。</p>
+
+<pre class="code"><code><span class="cm">/** 4 カテゴリ辞書（部分抜粋） */</span>
+<span class="kw">const</span> CATEGORIES = {
+  laugh: [
+    { rule: <span class="str">'regex'</span>, pattern: <span class="str">/^w+$/</span> },
+    { rule: <span class="str">'contains'</span>, key: <span class="str">'草'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'ワロ'</span> },
+    { rule: <span class="str">'exact'</span>, key: <span class="str">'笑'</span> },
+    { rule: <span class="str">'exact'</span>, key: <span class="str">'wktk'</span> }
+  ],
+  hit: [
+    { rule: <span class="str">'exact'</span>, key: <span class="str">'正解'</span> },
+    { rule: <span class="str">'regex'</span>, pattern: <span class="str">/^あ+っ?$/</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'それ'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'なるほど'</span> },
+    { rule: <span class="str">'exact'</span>, key: <span class="str">'ですよね'</span> }
+  ],
+  eval: [
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'ひっど'</span>, polarity: <span class="str">'neg'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'ひどい'</span>, polarity: <span class="str">'neg'</span> },
+    { rule: <span class="str">'contains'</span>, key: <span class="str">'神'</span>, polarity: <span class="str">'pos'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'つよ'</span>, polarity: <span class="str">'pos'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'きも'</span>, polarity: <span class="str">'neg'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'わかる'</span>, polarity: <span class="str">'empathy'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'まじか'</span>, polarity: <span class="str">'surprise'</span> }
+  ],
+  status: [
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'監視'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'待機'</span> },
+    { rule: <span class="str">'exact'</span>, key: <span class="str">'rom'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'初見'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'おつ'</span> },
+    { rule: <span class="str">'prefix'</span>, key: <span class="str">'おやす'</span> }
+  ]
+};
+
+<span class="kw">const</span> CATEGORY_PRIORITY = [<span class="str">'laugh'</span>, <span class="str">'hit'</span>, <span class="str">'eval'</span>, <span class="str">'status'</span>];
+<span class="kw">const</span> MAX_TEMPLATE_LEN = <span class="num">12</span>;  <span class="cm">// 12 文字超は自由文扱い</span>
+
+<span class="cm">/** 単一コメントを 1 カテゴリに分類 */</span>
+<span class="kw">export function</span> <span class="fn">classifyReaction</span>(text) {
+  <span class="kw">const</span> norm = <span class="fn">normalizeForEcho</span>(text);
+  <span class="kw">if</span> (!norm || norm.length &gt; MAX_TEMPLATE_LEN) {
+    <span class="kw">return</span> { category: <span class="str">'narrative'</span>, polarity: <span class="kw">null</span>, key: <span class="str">''</span> };
+  }
+  <span class="kw">for</span> (<span class="kw">const</span> cat <span class="kw">of</span> CATEGORY_PRIORITY) {
+    <span class="kw">for</span> (<span class="kw">const</span> entry <span class="kw">of</span> CATEGORIES[cat]) {
+      <span class="kw">if</span> (<span class="fn">matchEntry</span>(norm, entry)) {
+        <span class="kw">return</span> {
+          category: cat,
+          polarity: entry.polarity ?? <span class="kw">null</span>,
+          key: entry.key ?? entry.pattern.source
+        };
+      }
+    }
+  }
+  <span class="kw">return</span> { category: <span class="str">'narrative'</span>, polarity: <span class="kw">null</span>, key: <span class="str">''</span> };
+}
+
+<span class="kw">function</span> <span class="fn">matchEntry</span>(norm, entry) {
+  <span class="kw">if</span> (entry.rule === <span class="str">'exact'</span>)    <span class="kw">return</span> norm === entry.key;
+  <span class="kw">if</span> (entry.rule === <span class="str">'prefix'</span>)   <span class="kw">return</span> norm.<span class="fn">startsWith</span>(entry.key);
+  <span class="kw">if</span> (entry.rule === <span class="str">'contains'</span>) <span class="kw">return</span> norm.<span class="fn">includes</span>(entry.key);
+  <span class="kw">if</span> (entry.rule === <span class="str">'regex'</span>)    <span class="kw">return</span> entry.pattern.<span class="fn">test</span>(norm);
+  <span class="kw">return</span> <span class="kw">false</span>;
+}
+
+<span class="cm">/** コメント配列から配信単位の 4 カテゴリ profile を作る */</span>
+<span class="kw">export function</span> <span class="fn">aggregateReactionProfile</span>(comments) {
+  <span class="kw">const</span> profile = {
+    laugh: <span class="num">0</span>, hit: <span class="num">0</span>, eval: <span class="num">0</span>, status: <span class="num">0</span>, narrative: <span class="num">0</span>,
+    evalPolarity: { pos: <span class="num">0</span>, neg: <span class="num">0</span>, empathy: <span class="num">0</span>, surprise: <span class="num">0</span> },
+    total: <span class="num">0</span>
+  };
+  <span class="kw">for</span> (<span class="kw">const</span> c <span class="kw">of</span> comments) {
+    <span class="kw">const</span> r = <span class="fn">classifyReaction</span>(c.text);
+    profile[r.category] += <span class="num">1</span>;
+    <span class="kw">if</span> (r.category === <span class="str">'eval'</span> &amp;&amp; r.polarity) {
+      profile.evalPolarity[r.polarity] = (profile.evalPolarity[r.polarity] || <span class="num">0</span>) + <span class="num">1</span>;
+    }
+    profile.total += <span class="num">1</span>;
+  }
+  <span class="kw">return</span> profile;
+}</code></pre>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>なぜこの設計なのか</h2>
+
+          <h3>6-1. なぜ形態素解析を使わないのか</h3>
+          <p>形態素解析（kuromoji 等）はライブ配信のチャットには<strong>過剰な精度を要求しない代わりに過剰なコストを払う</strong>選択になる。チャットコメントは平均 5〜10 文字程度の短文で、辞書ベースの完全一致／前方一致／部分一致で 9 割以上の定型反応をカバーできる。形態素解析を持ち込むと辞書サイズ（数 MB〜十数 MB）と起動時間（数百 ms）が拡張機能のロード遅延に直結する。</p>
+
+          <h3>6-2. なぜ ML モデルを使わないのか</h3>
+          <p>分類モデル（BERT 系の感情分類など）は精度は高いが、(1) 推論時間（1 コメ数十〜百数十 ms）、(2) モデルサイズ（数十 MB〜）、(3) クライアントサイドでの推論実装の複雑さ、の 3 点でライブ配信のリアルタイム集計には不向き。本手法は <strong>1 コメあたり数 µs</strong> で処理できる。</p>
+
+          <h3>6-3. なぜ「優先順位による単一カテゴリ割当」なのか</h3>
+          <p>マルチラベル分類（1 コメに複数カテゴリ）にすると、後段の集計が「1 コメで複数カテゴリのカウントを上げる」設計になり、合計コメ数と各カテゴリの和が合わなくなる。本手法は<strong>各コメは 1 カテゴリに帰属</strong>させることで、集計の整合性を保ち、UI 表示で「全コメ中 35% が笑反応」のような単純な比率を即座に出せるようにしている。</p>
+
+          <h3>6-4. なぜ <code>narrative</code> カテゴリを別枠にするのか</h3>
+          <p>定型反応にマッチしない自由文を「該当無し」として捨てるのではなく、<strong>narrative として明示的に集計する</strong>。これにより、配信単位で「定型反応が多い／少ない」自体が指標になる。話芸寄りの配信は narrative 比率が高く、リアクション寄りの配信は laugh + eval 比率が高い、という傾向が出る。</p>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>応用例と限界</h2>
+
+          <h3>7-1. 応用例</h3>
+          <ul>
+            <li><strong>配信単位の感情プロファイル可視化</strong>: 4 カテゴリ + narrative の比率を円グラフ／積み上げ棒グラフで表示。</li>
+            <li><strong>配信間の比較</strong>: 同じ配信者の過去 10 配信の laugh 比率を時系列でプロットして話芸傾向を観察。</li>
+            <li><strong>盛り上がり区間の同定</strong>: 30 秒バケットごとに laugh 比率を集計し、ピーク区間を切り出す。<a href="comment-echo-detection.html">コメ伝染検出</a>と組み合わせると更に精度が上がる。</li>
+            <li><strong>視聴者層の推定</strong>: status カテゴリの「監視中」「ROM」が多い配信は<strong>サイレント観戦比率が高い</strong>と推定できる（自己宣言した人だけだが、傾向は出る）。</li>
+            <li><strong>ネガティブ比率モニタリング</strong>: eval カテゴリの polarity が neg に偏っている時間帯を検出して、配信者にフィードバックする。</li>
+          </ul>
+
+          <h3>7-2. 限界</h3>
+          <ul>
+            <li><strong>新語・スラングへの追従</strong>: 辞書ベースなので、新語が出るたびに辞書を更新する必要がある。半自動で頻出 narrative を抽出して人間が振り分ける運用が現実的。</li>
+            <li><strong>文脈依存の分類</strong>: 「神」が皮肉で使われる場合（「神かよ（笑）」）など、文脈依存の極性反転は検出できない。これを精緻にやるには ML が必要。</li>
+            <li><strong>言語固定</strong>: 本手法は日本語ライブの語彙に最適化されている。他言語ライブでは語彙テーブルを差し替える必要がある（規則の枠組み自体は流用可能）。</li>
+            <li><strong>誤検出の許容</strong>: 自由文の中にたまたま「草」が含まれる（例: 「雑草」）と laugh と誤分類される。本手法は「短さ」（MAX_TEMPLATE_LEN 制約）でこれを抑制するが、完全には避けられない。集計ベースで使う限りは許容範囲。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>公知化と実装公開</h2>
+          <p>本記事および本記事で参照する将来公開予定のソースコード（<code>src/lib/reactionTemplateClassifier.js</code> および関連辞書ファイル）は MIT ライセンスのもと <a href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">GitHub</a> で公開する予定である。本記事の<strong>公開日 2026-05-01</strong> をもって、本手法は世の中に対して公知になったものとして位置づける。同様の手法を別の主体が後から特許出願した場合、本記事および本記事で参照するコミット履歴が先行技術として参照可能になることを意図している（防御的公開／defensive publication）。</p>
+          <p>本手法は<a href="comment-echo-detection.html">コメ伝染検出</a>・<a href="comment-silence-zones.html">沈黙ゾーン検出</a>と組み合わせることで、配信単位の<strong>感情・反応・沈黙</strong>の三次元プロファイルを構成できる。</p>
+        </section>
+
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell">
+        <p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事 一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p>
+      </div>
+    </footer>
+  </body>
+</html>
