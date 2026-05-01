@@ -49,20 +49,39 @@ describe('sanitizeRoomAvatarForBroadcaster', () => {
     expect(out.avatarUrl).toBe('');
   });
 
-  it('broadcasterUid 未取得 → no-op', () => {
+  it('broadcasterUid 未取得でも universal rule (uid 不一致) は生きる', () => {
+    // 0.1.98: 旧 0.1.78 では「broadcaster 情報なし → 全体 no-op」だったが、
+    // 0.1.83 普遍ルール（URL の uid と entry uid 一致）は broadcaster 文脈と独立。
+    // entry uid 4046119 vs URL uid 99999 → 取り違え確定で strip。
     const out = sanitizeRoomAvatarForBroadcaster(
       { userKey: '4046119', avatarUrl: broadcasterIconUrl, count: 5 },
       { broadcasterUid: '', broadcasterIconUrl }
     );
-    expect(out.avatarUrl).toBe(broadcasterIconUrl);
+    expect(out.avatarUrl).toBe('');
   });
 
-  it('broadcasterIconUrl 未取得 → no-op', () => {
+  it('broadcasterUid 未取得 + custom URL (niconico icon でない) → no-op', () => {
+    // niconico icon パターンに該当しない URL は universal rule の対象外。
+    // broadcaster 情報も無いので strip しない。
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: '4046119',
+        avatarUrl: 'https://custom-cdn.example/photo.jpg',
+        count: 5
+      },
+      { broadcasterUid: '', broadcasterIconUrl: 'https://custom-cdn.example/photo.jpg' }
+    );
+    expect(out.avatarUrl).toBe('https://custom-cdn.example/photo.jpg');
+  });
+
+  it('broadcasterIconUrl 未取得でも universal rule は生きる', () => {
+    // broadcasterIconUrl が空でも、URL から uid を抽出して
+    // entry uid と一致しなければ strip する。
     const out = sanitizeRoomAvatarForBroadcaster(
       { userKey: '4046119', avatarUrl: broadcasterIconUrl, count: 5 },
       { broadcasterUid, broadcasterIconUrl: '' }
     );
-    expect(out.avatarUrl).toBe(broadcasterIconUrl);
+    expect(out.avatarUrl).toBe('');
   });
 
   it('avatarUrl が空 room はそのまま通す', () => {
@@ -158,6 +177,77 @@ describe('sanitizeRoomAvatarForBroadcaster', () => {
     // extractNiconicoUserIdFromIconUrl は domain-agnostic だが
     // 「99999」が抽出されて broadcasterUid と一致するなら strip する
     expect(out.avatarUrl).toBe('');
+  });
+
+  it('0.1.98: a:xxx 匿名 entry に niconico user icon (broadcaster でない別人 uid) が乗ってたら strip', () => {
+    // 匿名ユーザーに niconico user icon は本来あり得ない（identicon が出る設計）。
+    // 別 lv の broadcaster (例: 別配信のだるまくん 55141222) が混入していても
+    // strip。filter を「current broadcaster 一人」だけに依存させない。
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: 'a:Xu-Sy7ai1e_kgbq3',
+        avatarUrl:
+          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/uri150x150/5/55141222.jpg',
+        count: 3
+      },
+      ctx
+    );
+    expect(out.avatarUrl).toBe('');
+  });
+
+  it('0.1.98: UNKNOWN_USER_KEY entry に niconico user icon (broadcaster でない別人 uid) が乗ってたら strip', () => {
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: '__unknown__',
+        avatarUrl:
+          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/55/55141222.jpg',
+        count: 1
+      },
+      ctx
+    );
+    expect(out.avatarUrl).toBe('');
+  });
+
+  it('0.1.98: 数値 uid entry の avatar URL が別 uid の niconico icon なら strip (普遍ルール)', () => {
+    // 0.1.83 の普遍ルール (URL の uid とエントリ uid 一致) を sanitize にも適用。
+    // entry uid 4046119 vs URL uid 55141222 → 取り違え確定
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: '4046119',
+        avatarUrl:
+          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/55/55141222.jpg',
+        count: 5
+      },
+      ctx
+    );
+    expect(out.avatarUrl).toBe('');
+  });
+
+  it('0.1.98: 数値 uid entry の avatar URL が同じ uid の niconico icon なら通す（正常）', () => {
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: '4046119',
+        avatarUrl:
+          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/40/4046119.jpg',
+        count: 5
+      },
+      ctx
+    );
+    expect(out.avatarUrl).toBe(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/40/4046119.jpg'
+    );
+  });
+
+  it('0.1.98: 匿名 entry でも niconico user icon ではない URL（identicon, custom CDN）は通す', () => {
+    const out = sanitizeRoomAvatarForBroadcaster(
+      {
+        userKey: 'a:abcd1234',
+        avatarUrl: 'data:image/svg+xml;base64,iVBORw0K...',
+        count: 2
+      },
+      ctx
+    );
+    expect(out.avatarUrl).toBe('data:image/svg+xml;base64,iVBORw0K...');
   });
 });
 

@@ -239,13 +239,19 @@
     if (!av) return room;
     const broadcasterUid = String(ctx?.broadcasterUid ?? "").trim();
     const broadcasterIconUrl = String(ctx?.broadcasterIconUrl ?? "").trim();
-    if (!broadcasterUid || !broadcasterIconUrl) return room;
     const userKey = String(room.userKey ?? "").trim();
-    if (userKey === broadcasterUid) return room;
     const avUid = extractNiconicoUserIdFromIconUrl(av);
-    if (avUid && avUid === broadcasterUid) {
-      return { ...room, avatarUrl: "" };
+    if (avUid) {
+      const isAnonymousLike = !userKey || userKey === "__unknown__" || /^a:/.test(userKey);
+      if (isAnonymousLike) {
+        return { ...room, avatarUrl: "" };
+      }
+      if (/^\d+$/.test(userKey) && userKey !== avUid) {
+        return { ...room, avatarUrl: "" };
+      }
     }
+    if (!broadcasterUid || !broadcasterIconUrl) return room;
+    if (userKey === broadcasterUid) return room;
     if (!isSameAvatarUrl(av, broadcasterIconUrl)) return room;
     return { ...room, avatarUrl: "" };
   }
@@ -793,6 +799,16 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.98",
+      date: "2026-05-01",
+      summary: "\u4ED6\u4EBA\u306E avatar \u53D6\u308A\u9055\u3048\u3082 broader \u306B\u691C\u51FA",
+      items: Object.freeze([
+        "0.1.97 \u307E\u3067\u306F\u300C\u73FE\u914D\u4FE1\u8005\u306E icon\u300D\u3060\u3051\u3092 strip \u5BFE\u8C61\u306B\u3057\u3066\u3044\u307E\u3057\u305F\u304C\u3001\u8907\u6570 lv \u3092\u884C\u304D\u6765\u3057\u305F\u6642\u306B snapshot \u306E broadcaster uid \u304C\u524D\u306E lv \u306E\u307E\u307E\u306B\u306A\u308B\u30B1\u30FC\u30B9\u304C\u3042\u308A\u3001\u5225 lv \u306E broadcaster \u3084\u4ED6\u306E viewer \u306E icon \u304C\u53D6\u308A\u9055\u3048\u3067\u6B8B\u3063\u305F\u307E\u307E\u3060\u3063\u305F\u4EF6\u3092\u4FEE\u6B63",
+        "\u4FEE\u6B63: filter \u3092\u300C\u73FE\u914D\u4FE1\u8005 1 \u4EBA\u300D\u306B\u4F9D\u5B58\u3055\u305B\u305A\u3001avatar URL \u304B\u3089 niconico uid \u3092\u62BD\u51FA\u3057\u3066 entry uid \u3068\u4E00\u81F4\u3059\u308B\u304B\u3092\u7D14\u7C8B\u306B\u30C1\u30A7\u30C3\u30AF\u3059\u308B\u30ED\u30B8\u30C3\u30AF\u306B\u5909\u66F4\u3002\u533F\u540D (a:xxx) / UNKNOWN entry \u306B niconico user icon \u304C\u4E57\u3063\u3066\u3044\u305F\u3089\u554F\u7B54\u7121\u7528\u3067 strip \u3057\u3001\u6570\u5024 uid entry \u306E URL uid \u304C entry uid \u3068\u7570\u306A\u308C\u3070\u53D6\u308A\u9055\u3048\u3068\u3057\u3066 strip",
+        "\u3053\u308C\u3067\u300C\u4ED6\u306E\u4EBA\u306E icon \u304C\u5225\u306E\u4EBA\u306B\u305A\u308C\u3066\u51FA\u308B\u300D\u73FE\u8C61\u3082\u540C\u3058\u4ED5\u7D44\u307F\u3067\u88DC\u6B63\u3055\u308C\u307E\u3059\u3002\u533F\u540D\u306F identicon \u306B\u3001UNKNOWN \u306F\u4F55\u3082\u8868\u793A\u3057\u306A\u3044 fallback \u306B\u5012\u308C\u307E\u3059"
+      ])
+    }),
     Object.freeze({
       version: "0.1.97",
       date: "2026-05-01",
@@ -16877,7 +16893,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-2133" ? String("0501-2133") : "dev";
+      const buildId = "0501-2145" ? String("0501-2145") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

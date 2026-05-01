@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.98',
+    date: '2026-05-01',
+    summary: '他人の avatar 取り違えも broader に検出',
+    items: Object.freeze([
+      '0.1.97 までは「現配信者の icon」だけを strip 対象にしていましたが、複数 lv を行き来した時に snapshot の broadcaster uid が前の lv のままになるケースがあり、別 lv の broadcaster や他の viewer の icon が取り違えで残ったままだった件を修正',
+      '修正: filter を「現配信者 1 人」に依存させず、avatar URL から niconico uid を抽出して entry uid と一致するかを純粋にチェックするロジックに変更。匿名 (a:xxx) / UNKNOWN entry に niconico user icon が乗っていたら問答無用で strip し、数値 uid entry の URL uid が entry uid と異なれば取り違えとして strip',
+      'これで「他の人の icon が別の人にずれて出る」現象も同じ仕組みで補正されます。匿名は identicon に、UNKNOWN は何も表示しない fallback に倒れます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.97',
     date: '2026-05-01',
     summary: '配信者 icon の取り違えをサイズ違いでも検出',

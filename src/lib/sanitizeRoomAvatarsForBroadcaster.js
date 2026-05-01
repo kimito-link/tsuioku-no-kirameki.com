@@ -54,19 +54,34 @@ export function sanitizeRoomAvatarForBroadcaster(room, ctx) {
   if (!av) return room;
   const broadcasterUid = String(ctx?.broadcasterUid ?? '').trim();
   const broadcasterIconUrl = String(ctx?.broadcasterIconUrl ?? '').trim();
-  if (!broadcasterUid || !broadcasterIconUrl) return room;
   const userKey = String(room.userKey ?? '').trim();
-  // broadcaster 本人 room はそのまま通す
-  if (userKey === broadcasterUid) return room;
 
-  // 0.1.97: uid 抽出ベースの contamination 検出（サイズ違い対応）
-  //   av の URL から niconico uid を抽出し broadcasterUid と一致するなら
-  //   汚染とみなす。`/s/` / `/uri150x150/` / `/m/` などサイズ違いも検出可。
+  // 0.1.97/0.1.98: avatar URL から niconico uid を抽出（サイズ違い対応）
   const avUid = extractNiconicoUserIdFromIconUrl(av);
-  if (avUid && avUid === broadcasterUid) {
-    return { ...room, avatarUrl: '' };
+
+  // 0.1.98 broader contamination 検出: avatar URL が niconico user icon の場合、
+  //   entry uid との整合性を必須にする（filter を 1 人の broadcaster に依存させない）。
+  //   別 lv の broadcaster icon が storage に残っているケースや、
+  //   viewer 同士の icon 取り違えも同じ仕組みでカバーできる。
+  if (avUid) {
+    // 匿名 (a:xxx) や UNKNOWN entry に niconico user icon は不適切（identicon が正）
+    const isAnonymousLike =
+      !userKey || userKey === '__unknown__' || /^a:/.test(userKey);
+    if (isAnonymousLike) {
+      return { ...room, avatarUrl: '' };
+    }
+    // 数値 uid entry の icon URL は entry uid と一致しなければならない（普遍ルール）
+    if (/^\d+$/.test(userKey) && userKey !== avUid) {
+      return { ...room, avatarUrl: '' };
+    }
   }
 
+  // 以降は broadcaster 情報が揃っているときだけの URL 文字列一致 fallback
+  if (!broadcasterUid || !broadcasterIconUrl) return room;
+  // broadcaster 本人 room はそのまま通す
+  if (userKey === broadcasterUid) return room;
+  // 0.1.97: avUid === broadcasterUid は上の broader 経路で既に処理済み。
+  //   到達するのは「avUid なし or 別の niconico uid だが broadcaster とは違う」ケース。
   // fallback: 0.1.78 の URL 文字列一致（uid を含まない非標準 URL の保険）
   if (!isSameAvatarUrl(av, broadcasterIconUrl)) return room;
   return { ...room, avatarUrl: '' };
