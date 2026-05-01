@@ -86,6 +86,12 @@
        * body を `margin-inline:auto` で水平中央に寄せる。action popup（Chrome が body
        * 幅にリサイズ）では viewport == body 幅なので 100vw == --nl-pop-width で実質
        * 変化なし。手動でウィンドウを広げた場合だけ余白が左右に均等に分散する。
+       *
+       * 0.1.75 (BE): body 側にも `max-width: 100vw` を追加。--nl-pop-width が
+       * screen 幅由来（1920 → 508）で計算されるのに対し popup window は force 420px
+       * のままで、body が viewport より広くなると右側が clip されるケース（特に
+       * 大画面で来場者数 card が見切れる）を修正。viewport を超えないようクランプ
+       * する。
        */
       html:not(.nl-inline) {
         width: max(var(--nl-pop-width, 420px), 100vw);
@@ -95,6 +101,7 @@
       }
 
       html:not(.nl-inline) body {
+        max-width: 100vw;
         margin-left: auto;
         margin-right: auto;
         height: min(var(--nl-pop-height), 580px);

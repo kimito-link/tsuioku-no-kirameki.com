@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.74（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.75（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,34 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.75 バンプで入った修正（body の viewport クランプで大画面の右側 clip 修正 BE）**:
+
+- ユーザー報告（0.1.74 リリース後、3 画面サイズスクショ）: 「バージョンかわったけど
+  よくなったけど全部の画面サイズに最適化がまだかも」
+  - 中・小画面（~1000px 級ディスプレイ）: 0.1.74 で OK。3 cards が水平に揃う。
+  - 大画面（1920+ 級ディスプレイ）の左寄せ popup: stat cards の右端（来場者数 card）が
+    clip 気味。0.1.74 の `margin-inline:auto` だけでは body が viewport より広い
+    ケースを救えていなかった。
+- 原因:
+  - `--nl-pop-width` は `popup-entry.js` で `screen.availWidth * 0.265` から計算され、
+    1920 ディスプレイでは 508px、2560+ では 520px に達する（[popup-entry.js:411-415]）。
+  - 一方 popup window は `chrome.windows.update` で `POPUP_WINDOW_WIDTH = 420` 固定
+    ([popupWindowEmptyHeight.js:23])。結果 body の宣言値 (508) > popup window inner
+    width (420) となり、body が右にはみ出して `overflow: hidden` で clip。
+  - 0.1.74 で html 側は `max-width: 100vw` を追加していたが、body 側にも同じ
+    クランプが必要だった（盲点）。
+- 修正（CSS のみ・1 行追加）:
+  - `extension/popup.html` の `html:not(.nl-inline) body` ルールに `max-width: 100vw`
+    を追加。body の宣言値が viewport を超えても 100vw でキャップされる。
+- 期待結果:
+  - 大画面 popup（forced 420px）でも body 全幅が 420px に収まり、3 stat cards
+    全部見える状態。
+  - 小画面（~1366）と中画面（~1600）では従来通り（body 幅 = nl-pop-width < viewport）。
+  - ユーザー手動リサイズで window が広がるケースは 0.1.74 の中央寄せが引き続き効く。
+- 残課題: そもそも `--nl-pop-width` を `window.innerWidth` に追従させる JS 側の改修も
+  検討余地あり（screen 由来 → window 由来）。今回は CSS only の最小修正に留めた。
+  0.1.76 以降の候補。
 
 **0.1.74 バンプで入った修正（empty state で popup window が広い時の右側余白 + 中央寄せ BD）**:
 
