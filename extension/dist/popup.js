@@ -225,9 +225,10 @@
   }
   function isAvatarUrlForUserId(url, expectedUserId) {
     const expected = String(expectedUserId ?? "").trim();
-    if (!expected) return true;
-    if (!/^\d{2,15}$/.test(expected)) return true;
     const urlUid = extractNiconicoUserIdFromIconUrl(url);
+    if (!expected) return !urlUid;
+    if (/^a:/.test(expected)) return !urlUid;
+    if (!/^\d{2,15}$/.test(expected)) return true;
     if (!urlUid) return true;
     return urlUid === expected;
   }
@@ -799,6 +800,16 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.99",
+      date: "2026-05-01",
+      summary: "\u30B3\u30E1\u30F3\u30C8\u5358\u4F4D rendering \u3067\u3082 avatar \u53D6\u308A\u9055\u3048\u3092\u691C\u51FA",
+      items: Object.freeze([
+        "rank strip \u306E\u5DE6\u7AEF\u30BF\u30A4\u30EB (155 \u30BF\u30A4\u30EB\u7CFB) \u306B\u300CID \u672A\u53D6\u5F97\uFF08DOM \u306B\u6295\u7A3F\u8005\u60C5\u5831\u306A\u3057\uFF09\u300D\u306E\u30B3\u30E1\u3068\u4E00\u7DD2\u306B\u914D\u4FE1\u8005\u306E\u9854\u30A2\u30A4\u30B3\u30F3\u304C\u4E57\u308B\u73FE\u8C61\u3092\u4FEE\u6B63\u3057\u307E\u3057\u305F\u30020.1.98 \u307E\u3067\u306F\u96C6\u7D04 room \u5358\u4F4D\u306E sanitize \u3067\u3057\u304B filter \u3057\u3066\u3044\u306A\u304B\u3063\u305F\u305F\u3081\u3001\u30B3\u30E1\u30F3\u30C8\u5358\u4F4D rendering \u3092\u7D4C\u7531\u3059\u308B\u3053\u306E\u7D4C\u8DEF\u306B\u306F\u5C4A\u3044\u3066\u3044\u307E\u305B\u3093\u3067\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: 0.1.83 \u666E\u904D\u30EB\u30FC\u30EB (isAvatarUrlForUserId) \u3092\u53B3\u683C\u5316\u3002entry uid \u304C\u7A7A / niconico \u533F\u540D (a:xxx) \u306E entry \u306B niconico user icon \u304C\u7D10\u4ED8\u3044\u3066\u3044\u305F\u3089\u5FC5\u305A reject \u3059\u308B\u3002avatar \u53D6\u308A\u9055\u3048\u30AC\u30FC\u30C9\u304C\u30B3\u30E1\u30FBroom \u4E21\u65B9\u306E\u8868\u793A\u7D4C\u8DEF\u306B\u52B9\u304F\u3088\u3046\u306B\u306A\u308A\u307E\u3059",
+        "\u5F71\u97FF\u7BC4\u56F2: storyGrowthAvatarSrcCandidate, intercept hydration, profile cache \u306E avatar \u63A1\u7528\u5224\u5B9A\u3002test stub \u306E\u3088\u3046\u306A\u6570\u5024\u3067\u3082 a:xxx \u3067\u3082\u306A\u3044 uid \u306F\u5F93\u6765\u3069\u304A\u308A\u5224\u5B9A\u4E0D\u53EF\u3067\u901A\u3059\u306E\u3067\u4E92\u63DB\u6027\u306F\u7DAD\u6301"
+      ])
+    }),
     Object.freeze({
       version: "0.1.98",
       date: "2026-05-01",
@@ -16893,7 +16904,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-2145" ? String("0501-2145") : "dev";
+      const buildId = "0501-2153" ? String("0501-2153") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

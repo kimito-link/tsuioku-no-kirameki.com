@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.99',
+    date: '2026-05-01',
+    summary: 'コメント単位 rendering でも avatar 取り違えを検出',
+    items: Object.freeze([
+      'rank strip の左端タイル (155 タイル系) に「ID 未取得（DOM に投稿者情報なし）」のコメと一緒に配信者の顔アイコンが乗る現象を修正しました。0.1.98 までは集約 room 単位の sanitize でしか filter していなかったため、コメント単位 rendering を経由するこの経路には届いていませんでした',
+      '修正内容: 0.1.83 普遍ルール (isAvatarUrlForUserId) を厳格化。entry uid が空 / niconico 匿名 (a:xxx) の entry に niconico user icon が紐付いていたら必ず reject する。avatar 取り違えガードがコメ・room 両方の表示経路に効くようになります',
+      '影響範囲: storyGrowthAvatarSrcCandidate, intercept hydration, profile cache の avatar 採用判定。test stub のような数値でも a:xxx でもない uid は従来どおり判定不可で通すので互換性は維持'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.98',
     date: '2026-05-01',
     summary: '他人の avatar 取り違えも broader に検出',

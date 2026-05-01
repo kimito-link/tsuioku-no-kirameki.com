@@ -58,27 +58,37 @@ export function extractNiconicoUserIdFromIconUrl(raw) {
 }
 
 /**
- * 普遍ルール（0.1.83）:
+ * 普遍ルール（0.1.83 → 0.1.99 で厳格化）:
  * avatar URL の埋め込み uid とエントリ uid の一致を検証する純粋関数。
  *
  * niconico user icon URL は `usericon/.../<uid>.jpg` 形式で uid を含む。
  * エントリの userId と URL の埋め込み uid が一致しなければ、それは
  * 「他人のアバターが間違って紐付けられた」状態であり、必ず reject する。
  *
- * 対象: 数値 niconico uid（2〜15 桁）のみ。匿名 (a:xxxx) や test stub (u1 等)
- *      は対象外（URL に uid が埋まらないため判定不能）。
+ * 0.1.99 厳格化:
+ *   旧 0.1.83 は「entry uid 空 / 匿名 (a:xxx) → 判定不可で通す」設計だったが、
+ *   ユーザー実機 (lv350429804 シミケン) で「ID 未取得（DOM に投稿者情報なし）」
+ *   のコメントに broadcaster icon が焼き込まれて rank strip 1 番目に
+ *   出続ける不具合が確認されたため、以下を追加:
+ *   - entry uid 空 + URL に niconico uid 埋め込みあり → reject
+ *   - 匿名 (a:xxx) entry + URL に niconico uid 埋め込みあり → reject
+ *   どちらも「他人の niconico user icon を借りる事故」を防ぐ。
  *
  * @param {unknown} url
  * @param {unknown} expectedUserId
  * @returns {boolean}
- *   - true: URL に uid が埋まっていない or uid が一致 → 紐付け OK
- *   - false: URL の uid が expectedUserId と異なる → 取り違え確定
+ *   - true:  紐付け OK
+ *   - false: 取り違え or 不適切な紐付け
  */
 export function isAvatarUrlForUserId(url, expectedUserId) {
   const expected = String(expectedUserId ?? '').trim();
-  if (!expected) return true;
-  if (!/^\d{2,15}$/.test(expected)) return true;
   const urlUid = extractNiconicoUserIdFromIconUrl(url);
+  // 0.1.99: entry uid 空 → niconico user icon は紐付けない（他人 icon 借りる事故防止）
+  if (!expected) return !urlUid;
+  // 0.1.99: niconico 匿名 (a:xxx) → niconico user icon は紐付けない（identicon が正）
+  if (/^a:/.test(expected)) return !urlUid;
+  // 数値 niconico uid 以外（test stub 'u1'/'a' 等）は判定不能で通す
+  if (!/^\d{2,15}$/.test(expected)) return true;
   if (!urlUid) return true;
   return urlUid === expected;
 }

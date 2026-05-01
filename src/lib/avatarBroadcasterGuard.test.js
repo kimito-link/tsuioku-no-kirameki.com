@@ -299,18 +299,43 @@ describe('isAvatarUrlForUserId - 0.1.83 普遍ルール（broadcaster 情報不�
     ).toBe(true);
   });
 
-  it('expectedUserId が空 → true（判定不可だから通す）', () => {
+  it('0.1.99: expectedUserId が空 + URL に niconico uid 埋め込みあり → false（取り違え検出）', () => {
+    // 旧 0.1.83 では「expectedUserId 空 → true (判定不可だから通す)」だった。
+    // しかし「ID 未取得（DOM に投稿者情報なし）」コメに broadcaster icon が
+    // 焼き込まれて rank strip 1 番目に出る不具合があり、空 uid + niconico
+    // icon の組み合わせは「他人の icon を借りた」とみなして reject するように
+    // 変更（ユーザー実機 lv350429804 シミケンで確認）。
     expect(
       isAvatarUrlForUserId(
         'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/4/4046119.jpg',
         ''
       )
+    ).toBe(false);
+  });
+
+  it('0.1.99: expectedUserId が空 + URL に niconico uid 埋め込み無し → true（判定不可だから通す）', () => {
+    // niconico icon URL でない (channel icon / 外部 CDN 等) なら uid を持たない
+    // ので判定不可 → 従来どおり通す。
+    expect(
+      isAvatarUrlForUserId('https://example.com/some/non-niconico-avatar.png', '')
     ).toBe(true);
+  });
+
+  it('0.1.99: 匿名 (a:xxx) entry + niconico user icon → false', () => {
+    // a:xxx は niconico の匿名コメで、本来 identicon が出る設計。
+    // 万一 niconico user icon が紐付いていたら他人 icon の取り違えなので reject。
+    expect(
+      isAvatarUrlForUserId(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/4/4046119.jpg',
+        'a:Xu-Sy7ai1e_kgbq3'
+      )
+    ).toBe(false);
   });
 
   it('null / undefined 入力でクラッシュしない', () => {
     expect(isAvatarUrlForUserId(null, '4046119')).toBe(true);
     expect(isAvatarUrlForUserId('', '4046119')).toBe(true);
+    // 'https://...' は niconico icon パターンではない URL（uid 抽出不能）
     expect(isAvatarUrlForUserId('https://...', null)).toBe(true);
   });
 
