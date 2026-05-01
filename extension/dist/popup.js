@@ -770,6 +770,17 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.82",
+      date: "2026-05-01",
+      summary: "\u6C38\u7D9A\u30AD\u30E3\u30C3\u30B7\u30E5\u3078\u306E\u6C5A\u67D3\u66F8\u304D\u8FBC\u307F\u3092\u5B8C\u5168\u505C\u6B62",
+      items: Object.freeze([
+        "0.1.76\u301C0.1.81 \u3067\u8A08 6 \u5C64\u306E\u8868\u793A\u6642\u30AC\u30FC\u30C9\u3092\u8FFD\u52A0\u3057\u3066\u304D\u307E\u3057\u305F\u304C\u3001\u6839\u672C\u7684\u306B\u300C\u6C38\u7D9A\u30AD\u30E3\u30C3\u30B7\u30E5\uFF0830 \u65E5\u4FDD\u5B58\u3055\u308C\u308B KEY_USER_COMMENT_PROFILE_CACHE\uFF09\u3078\u306E\u66F8\u304D\u8FBC\u307F\u6642\u306B\u30AC\u30FC\u30C9\u304C\u7121\u304F\u3001\u66F8\u304D\u8FBC\u307E\u308C\u305F\u6C5A\u67D3\u30C7\u30FC\u30BF\u304C\u6B21\u30BB\u30C3\u30B7\u30E7\u30F3\u3067 in-memory cache \u306B\u623B\u3063\u3066\u304F\u308B\u6C38\u7D9A\u30EB\u30FC\u30D7\u300D\u304C\u539F\u56E0\u3067\u76F4\u3063\u3066\u3044\u307E\u305B\u3093\u3067\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: src/lib/userCommentProfileCache.js \u306E upsertUserCommentProfileFromEntry / upsertUserCommentProfileFromIntercept \u306B broadcasterContext \u5F15\u6570\u3092\u8FFD\u52A0\u3002\u66F8\u304D\u8FBC\u307F\u524D\u306B shouldAssociateAvatarWithUser \u3067\u30AC\u30FC\u30C9\u9069\u7528\u3002content-entry.js \u306E 3 \u7B87\u6240\u306E\u547C\u3073\u51FA\u3057\u5168\u3066\u306B broadcasterUid + broadcasterIconUrl \u3092\u6E21\u3059",
+        "\u3055\u3089\u306B src/lib/interceptAvatarHydration.js \u306E hydrateInterceptAvatarMapFromProfile\uFF08profile cache \u2192 intercept map \u3078\u306E\u88DC\u5B8C\u7D4C\u8DEF\uFF09\u306B\u3082\u540C\u3058\u30AC\u30FC\u30C9\u3092\u8FFD\u52A0\u3002\u3053\u308C\u3067 \u6C38\u7D9A\u30AD\u30E3\u30C3\u30B7\u30E5\u306B\u6B8B\u3063\u305F\u904E\u53BB\u306E\u6C5A\u67D3\u30C7\u30FC\u30BF\u3082 hydrate \u3055\u308C\u306A\u304F\u306A\u308A\u3001\u6C38\u7D9A\u30EB\u30FC\u30D7\u304C\u65AD\u305F\u308C\u307E\u3059",
+        "\u6B63\u672C\u8A2D\u8A08\u66F8: docs/plan-avatar-resolver-refactor.md\uFF08avatar pipeline \u7D71\u5408 component \u306E\u6BB5\u968E\u7684 refactor \u8A08\u753B\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.81",
       date: "2026-05-01",
       summary: "\u30D7\u30ED\u30D5\u30A1\u30A4\u30EB\u30AD\u30E3\u30C3\u30B7\u30E5\u7D4C\u7531\u306E\u6C5A\u67D3\u306B\u3082\u5BFE\u5FDC",
@@ -2897,21 +2908,34 @@
     map[uid] = entry;
     return true;
   }
-  function upsertUserCommentProfileFromEntry(map, entry) {
+  function guardAvatarForBroadcaster(uid, av, broadcasterContext) {
+    if (!av || !broadcasterContext) return av;
+    const safe = shouldAssociateAvatarWithUser({
+      uid,
+      av,
+      broadcasterUid: broadcasterContext.broadcasterUid,
+      broadcasterIconUrl: broadcasterContext.broadcasterIconUrl
+    });
+    return safe ? av : "";
+  }
+  function upsertUserCommentProfileFromEntry(map, entry, broadcasterContext) {
     const uid = String(entry?.userId || "").trim();
     if (!uid) return false;
+    const rawAv = String(entry?.avatarUrl || "").trim();
+    const guardedAv = guardAvatarForBroadcaster(uid, rawAv, broadcasterContext);
     return mergeIntoMap(map, uid, {
       nickname: String(entry?.nickname || "").trim(),
-      avatarUrl: String(entry?.avatarUrl || "").trim()
+      avatarUrl: guardedAv
     });
   }
-  function upsertUserCommentProfileFromIntercept(map, it) {
+  function upsertUserCommentProfileFromIntercept(map, it, broadcasterContext) {
     const uid = String(it?.uid || "").trim();
     if (!uid) return false;
-    const av = String(it?.av || "").trim();
+    const rawAv = String(it?.av || "").trim();
+    const guardedAv = guardAvatarForBroadcaster(uid, rawAv, broadcasterContext);
     return mergeIntoMap(map, uid, {
       nickname: String(it?.name || "").trim(),
-      avatarUrl: av
+      avatarUrl: guardedAv
     });
   }
   function isWeakMergedDisplayNickname(nick) {
@@ -16634,7 +16658,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1552" ? String("0501-1552") : "dev";
+      const buildId = "0501-1611" ? String("0501-1611") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

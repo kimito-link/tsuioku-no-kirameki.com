@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.82',
+    date: '2026-05-01',
+    summary: '永続キャッシュへの汚染書き込みを完全停止',
+    items: Object.freeze([
+      '0.1.76〜0.1.81 で計 6 層の表示時ガードを追加してきましたが、根本的に「永続キャッシュ（30 日保存される KEY_USER_COMMENT_PROFILE_CACHE）への書き込み時にガードが無く、書き込まれた汚染データが次セッションで in-memory cache に戻ってくる永続ループ」が原因で直っていませんでした',
+      '修正内容: src/lib/userCommentProfileCache.js の upsertUserCommentProfileFromEntry / upsertUserCommentProfileFromIntercept に broadcasterContext 引数を追加。書き込み前に shouldAssociateAvatarWithUser でガード適用。content-entry.js の 3 箇所の呼び出し全てに broadcasterUid + broadcasterIconUrl を渡す',
+      'さらに src/lib/interceptAvatarHydration.js の hydrateInterceptAvatarMapFromProfile（profile cache → intercept map への補完経路）にも同じガードを追加。これで 永続キャッシュに残った過去の汚染データも hydrate されなくなり、永続ループが断たれます',
+      '正本設計書: docs/plan-avatar-resolver-refactor.md（avatar pipeline 統合 component の段階的 refactor 計画）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.81',
     date: '2026-05-01',
     summary: 'プロファイルキャッシュ経由の汚染にも対応',

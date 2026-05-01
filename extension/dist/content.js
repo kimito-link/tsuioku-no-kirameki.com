@@ -688,6 +688,50 @@
     return true;
   }
 
+  // src/lib/avatarUrlCompare.js
+  function avatarCompareKey(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    try {
+      const u = new URL(s);
+      u.search = "";
+      u.hash = "";
+      return u.href;
+    } catch {
+      return s;
+    }
+  }
+  function isSameAvatarUrl(a, b) {
+    const ka = avatarCompareKey(a);
+    const kb = avatarCompareKey(b);
+    return Boolean(ka && kb && ka === kb);
+  }
+
+  // src/lib/avatarBroadcasterGuard.js
+  function extractNiconicoUserIdFromIconUrl(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    const m = s.match(/\/(\d{2,15})\.(?:jpg|jpeg|png|gif|webp)(?:[?#]|$)/i);
+    if (m && m[1]) return m[1];
+    return "";
+  }
+  function shouldAssociateAvatarWithUser(input) {
+    const uid = String(input?.uid ?? "").trim();
+    const av = String(input?.av ?? "").trim();
+    if (!uid || !av) return true;
+    const broadcasterUid = String(input?.broadcasterUid ?? "").trim();
+    const broadcasterIconUrl = String(input?.broadcasterIconUrl ?? "").trim();
+    if (!broadcasterUid) return true;
+    const avUidFromUrl = extractNiconicoUserIdFromIconUrl(av);
+    if (avUidFromUrl && avUidFromUrl === broadcasterUid) {
+      return uid === broadcasterUid;
+    }
+    if (broadcasterIconUrl && isSameAvatarUrl(av, broadcasterIconUrl)) {
+      return uid === broadcasterUid;
+    }
+    return true;
+  }
+
   // src/lib/userCommentProfileCache.js
   var USER_COMMENT_PROFILE_CACHE_MAX = 5e3;
   var USER_COMMENT_PROFILE_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
@@ -760,21 +804,34 @@
     map[uid] = entry;
     return true;
   }
-  function upsertUserCommentProfileFromEntry(map, entry) {
+  function guardAvatarForBroadcaster(uid, av, broadcasterContext) {
+    if (!av || !broadcasterContext) return av;
+    const safe = shouldAssociateAvatarWithUser({
+      uid,
+      av,
+      broadcasterUid: broadcasterContext.broadcasterUid,
+      broadcasterIconUrl: broadcasterContext.broadcasterIconUrl
+    });
+    return safe ? av : "";
+  }
+  function upsertUserCommentProfileFromEntry(map, entry, broadcasterContext) {
     const uid = String(entry?.userId || "").trim();
     if (!uid) return false;
+    const rawAv = String(entry?.avatarUrl || "").trim();
+    const guardedAv = guardAvatarForBroadcaster(uid, rawAv, broadcasterContext);
     return mergeIntoMap(map, uid, {
       nickname: String(entry?.nickname || "").trim(),
-      avatarUrl: String(entry?.avatarUrl || "").trim()
+      avatarUrl: guardedAv
     });
   }
-  function upsertUserCommentProfileFromIntercept(map, it) {
+  function upsertUserCommentProfileFromIntercept(map, it, broadcasterContext) {
     const uid = String(it?.uid || "").trim();
     if (!uid) return false;
-    const av = String(it?.av || "").trim();
+    const rawAv = String(it?.av || "").trim();
+    const guardedAv = guardAvatarForBroadcaster(uid, rawAv, broadcasterContext);
     return mergeIntoMap(map, uid, {
       nickname: String(it?.name || "").trim(),
-      avatarUrl: av
+      avatarUrl: guardedAv
     });
   }
   function isWeakMergedDisplayNickname(nick) {
@@ -1859,50 +1916,6 @@
     }
     const viewerUserId = pickViewerUserIdFromRoots(uniqueRoots);
     return { viewerAvatarUrl, viewerNickname, viewerUserId };
-  }
-
-  // src/lib/avatarUrlCompare.js
-  function avatarCompareKey(raw) {
-    const s = String(raw == null ? "" : raw).trim();
-    if (!s) return "";
-    try {
-      const u = new URL(s);
-      u.search = "";
-      u.hash = "";
-      return u.href;
-    } catch {
-      return s;
-    }
-  }
-  function isSameAvatarUrl(a, b) {
-    const ka = avatarCompareKey(a);
-    const kb = avatarCompareKey(b);
-    return Boolean(ka && kb && ka === kb);
-  }
-
-  // src/lib/avatarBroadcasterGuard.js
-  function extractNiconicoUserIdFromIconUrl(raw) {
-    const s = String(raw == null ? "" : raw).trim();
-    if (!s) return "";
-    const m = s.match(/\/(\d{2,15})\.(?:jpg|jpeg|png|gif|webp)(?:[?#]|$)/i);
-    if (m && m[1]) return m[1];
-    return "";
-  }
-  function shouldAssociateAvatarWithUser(input) {
-    const uid = String(input?.uid ?? "").trim();
-    const av = String(input?.av ?? "").trim();
-    if (!uid || !av) return true;
-    const broadcasterUid = String(input?.broadcasterUid ?? "").trim();
-    const broadcasterIconUrl = String(input?.broadcasterIconUrl ?? "").trim();
-    if (!broadcasterUid) return true;
-    const avUidFromUrl = extractNiconicoUserIdFromIconUrl(av);
-    if (avUidFromUrl && avUidFromUrl === broadcasterUid) {
-      return uid === broadcasterUid;
-    }
-    if (broadcasterIconUrl && isSameAvatarUrl(av, broadcasterIconUrl)) {
-      return uid === broadcasterUid;
-    }
-    return true;
   }
 
   // src/lib/liveAudienceDom.js
@@ -3416,11 +3429,13 @@
   }
 
   // src/lib/interceptAvatarHydration.js
-  function hydrateInterceptAvatarMapFromProfile(avatarMap, profileMap, allowedUserIds) {
+  function hydrateInterceptAvatarMapFromProfile(avatarMap, profileMap, allowedUserIds, broadcasterContext) {
     if (!(avatarMap instanceof Map) || !profileMap || typeof profileMap !== "object") {
       return 0;
     }
     const hasAllowSet = allowedUserIds instanceof Set && allowedUserIds.size > 0;
+    const broadcasterUid = String(broadcasterContext?.broadcasterUid ?? "").trim();
+    const broadcasterIconUrl = String(broadcasterContext?.broadcasterIconUrl ?? "").trim();
     let added = 0;
     for (const [uidRaw, rec] of Object.entries(profileMap)) {
       const uid = String(uidRaw || "").trim();
@@ -3429,6 +3444,14 @@
       const av = String(rec?.avatarUrl || "").trim();
       if (!isHttpOrHttpsUrl(av)) continue;
       if (isWeakNiconicoUserIconHttpUrl(av)) continue;
+      if (broadcasterUid && !shouldAssociateAvatarWithUser({
+        uid,
+        av,
+        broadcasterUid,
+        broadcasterIconUrl
+      })) {
+        continue;
+      }
       avatarMap.set(uid, av);
       added += 1;
     }
@@ -4086,13 +4109,17 @@
       }
       let profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
       let cacheTouched = false;
+      const broadcasterCtx = {
+        broadcasterUid: broadcasterUidCache,
+        broadcasterIconUrl: broadcasterIconUrlCache
+      };
       for (const it of mergedItems) {
-        if (upsertUserCommentProfileFromIntercept(profileMap, { uid: it.uid, name: it.name, av: it.av })) {
+        if (upsertUserCommentProfileFromIntercept(profileMap, { uid: it.uid, name: it.name, av: it.av }, broadcasterCtx)) {
           cacheTouched = true;
         }
       }
       for (const u of mergedUsers) {
-        if (upsertUserCommentProfileFromIntercept(profileMap, u)) {
+        if (upsertUserCommentProfileFromIntercept(profileMap, u, broadcasterCtx)) {
           cacheTouched = true;
         }
       }
@@ -4261,6 +4288,9 @@
           userId: uid,
           nickname: nick,
           avatarUrl: iconUrl
+        }, {
+          broadcasterUid: broadcasterUidCache,
+          broadcasterIconUrl: broadcasterIconUrlCache
         })) {
           cacheTouched = true;
         }
@@ -7466,11 +7496,15 @@
         bag[KEY_USER_COMMENT_PROFILE_CACHE]
       );
       let cacheTouched = false;
+      const broadcasterCtx2 = {
+        broadcasterUid: broadcasterUidCache,
+        broadcasterIconUrl: broadcasterIconUrlCache
+      };
       for (const r of enriched) {
-        if (upsertUserCommentProfileFromEntry(profileMap, r)) cacheTouched = true;
+        if (upsertUserCommentProfileFromEntry(profileMap, r, broadcasterCtx2)) cacheTouched = true;
       }
       for (const e of next) {
-        if (upsertUserCommentProfileFromEntry(profileMap, e)) cacheTouched = true;
+        if (upsertUserCommentProfileFromEntry(profileMap, e, broadcasterCtx2)) cacheTouched = true;
       }
       const profileApplied = applyUserCommentProfileMapToEntries(next, profileMap);
       if (profileApplied.patched > 0) {
@@ -7493,7 +7527,13 @@
       hydrateInterceptAvatarMapFromProfile(
         interceptedAvatars,
         profileMap,
-        liveObservedUserIds
+        liveObservedUserIds,
+        // 0.1.82: 過去の汚染データ（broadcaster icon が viewer uid に焼き込まれている）
+        //   が hydrate ループで in-memory cache に戻るのを防ぐ
+        {
+          broadcasterUid: broadcasterUidCache,
+          broadcasterIconUrl: broadcasterIconUrlCache
+        }
       );
       if (!storageTouched && !pendingTouched && !cacheTouched) {
         console.debug(formatPipelinePhase("skip", { reason: "no changes" }));

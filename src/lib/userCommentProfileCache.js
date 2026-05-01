@@ -10,6 +10,7 @@ import {
 import { isNiconicoAutoUserPlaceholderNickname } from './nicoAnonymousDisplay.js';
 import { supportGridStrongNickname } from './supportGridDisplayTier.js';
 import { clampAvatarUrl } from '../shared/avatar/clampAvatarUrl.js';
+import { shouldAssociateAvatarWithUser } from './avatarBroadcasterGuard.js';
 
 /** 保持するエントリ数の上限（chrome.storage.local 容量対策） */
 export const USER_COMMENT_PROFILE_CACHE_MAX = 5000;
@@ -127,31 +128,63 @@ function mergeIntoMap(map, uid, p) {
 }
 
 /**
+ * 0.1.82: broadcaster icon の取り違え防止ガード（永続汚染源を断つ）
+ *
+ * KEY_USER_COMMENT_PROFILE_CACHE は 30 日永続のため、ここに broadcaster icon が
+ * viewer uid で書き込まれると、次セッションで hydrateInterceptAvatarMapFromProfile
+ * 経由で in-memory cache に戻ってしまう（永続汚染ループ）。書き込み前に
+ * shouldAssociateAvatarWithUser でガードする。
+ *
+ * @param {string} uid 紐付け対象の userId
+ * @param {string} av 紐付けようとしている avatarUrl
+ * @param {{ broadcasterUid?: string, broadcasterIconUrl?: string }} [broadcasterContext]
+ * @returns {string} ガード OK なら入力 av、NG なら空文字
+ */
+function guardAvatarForBroadcaster(uid, av, broadcasterContext) {
+  if (!av || !broadcasterContext) return av;
+  const safe = shouldAssociateAvatarWithUser({
+    uid,
+    av,
+    broadcasterUid: broadcasterContext.broadcasterUid,
+    broadcasterIconUrl: broadcasterContext.broadcasterIconUrl
+  });
+  return safe ? av : '';
+}
+
+/**
  * @param {Record<string, UserCommentProfileCacheEntry>} map
  * @param {{ userId?: string|null, nickname?: string, avatarUrl?: string|null }} entry
+ * @param {{ broadcasterUid?: string, broadcasterIconUrl?: string }} [broadcasterContext]
+ *   0.1.82: 未指定時はガード掛けず（後方互換）。指定時は broadcaster icon で
+ *   汚染された avatarUrl を空に倒してから merge する（永続汚染防止）。
  * @returns {boolean}
  */
-export function upsertUserCommentProfileFromEntry(map, entry) {
+export function upsertUserCommentProfileFromEntry(map, entry, broadcasterContext) {
   const uid = String(entry?.userId || '').trim();
   if (!uid) return false;
+  const rawAv = String(entry?.avatarUrl || '').trim();
+  const guardedAv = guardAvatarForBroadcaster(uid, rawAv, broadcasterContext);
   return mergeIntoMap(map, uid, {
     nickname: String(entry?.nickname || '').trim(),
-    avatarUrl: String(entry?.avatarUrl || '').trim()
+    avatarUrl: guardedAv
   });
 }
 
 /**
  * @param {Record<string, UserCommentProfileCacheEntry>} map
  * @param {{ uid?: string, name?: string, av?: string }} it intercept 行
+ * @param {{ broadcasterUid?: string, broadcasterIconUrl?: string }} [broadcasterContext]
+ *   0.1.82: 同上。
  * @returns {boolean}
  */
-export function upsertUserCommentProfileFromIntercept(map, it) {
+export function upsertUserCommentProfileFromIntercept(map, it, broadcasterContext) {
   const uid = String(it?.uid || '').trim();
   if (!uid) return false;
-  const av = String(it?.av || '').trim();
+  const rawAv = String(it?.av || '').trim();
+  const guardedAv = guardAvatarForBroadcaster(uid, rawAv, broadcasterContext);
   return mergeIntoMap(map, uid, {
     nickname: String(it?.name || '').trim(),
-    avatarUrl: av
+    avatarUrl: guardedAv
   });
 }
 

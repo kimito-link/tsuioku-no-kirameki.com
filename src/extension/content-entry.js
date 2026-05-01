@@ -781,13 +781,18 @@ async function runInterceptReconcile(entries, users) {
 
     let profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
     let cacheTouched = false;
+    // 0.1.82: 永続キャッシュ書き込み時に broadcaster icon の取り違えを防ぐ
+    const broadcasterCtx = {
+      broadcasterUid: broadcasterUidCache,
+      broadcasterIconUrl: broadcasterIconUrlCache
+    };
     for (const it of mergedItems) {
-      if (upsertUserCommentProfileFromIntercept(profileMap, { uid: it.uid, name: it.name, av: it.av })) {
+      if (upsertUserCommentProfileFromIntercept(profileMap, { uid: it.uid, name: it.name, av: it.av }, broadcasterCtx)) {
         cacheTouched = true;
       }
     }
     for (const u of mergedUsers) {
-      if (upsertUserCommentProfileFromIntercept(profileMap, u)) {
+      if (upsertUserCommentProfileFromIntercept(profileMap, u, broadcasterCtx)) {
         cacheTouched = true;
       }
     }
@@ -974,6 +979,9 @@ async function flushInterceptViewerJoin(viewers) {
           userId: uid,
           nickname: nick,
           avatarUrl: iconUrl
+        }, {
+          broadcasterUid: broadcasterUidCache,
+          broadcasterIconUrl: broadcasterIconUrlCache
         })
       ) {
         cacheTouched = true;
@@ -5219,11 +5227,16 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       bag[KEY_USER_COMMENT_PROFILE_CACHE]
     );
     let cacheTouched = false;
+    // 0.1.82: 永続キャッシュ書き込み時の broadcaster icon 取り違え防止
+    const broadcasterCtx2 = {
+      broadcasterUid: broadcasterUidCache,
+      broadcasterIconUrl: broadcasterIconUrlCache
+    };
     for (const r of enriched) {
-      if (upsertUserCommentProfileFromEntry(profileMap, r)) cacheTouched = true;
+      if (upsertUserCommentProfileFromEntry(profileMap, r, broadcasterCtx2)) cacheTouched = true;
     }
     for (const e of next) {
-      if (upsertUserCommentProfileFromEntry(profileMap, e)) cacheTouched = true;
+      if (upsertUserCommentProfileFromEntry(profileMap, e, broadcasterCtx2)) cacheTouched = true;
     }
     const profileApplied = applyUserCommentProfileMapToEntries(next, profileMap);
     if (profileApplied.patched > 0) {
@@ -5248,7 +5261,13 @@ async function persistCommentRowsImpl(rows, opts = {}) {
     hydrateInterceptAvatarMapFromProfile(
       interceptedAvatars,
       profileMap,
-      liveObservedUserIds
+      liveObservedUserIds,
+      // 0.1.82: 過去の汚染データ（broadcaster icon が viewer uid に焼き込まれている）
+      //   が hydrate ループで in-memory cache に戻るのを防ぐ
+      {
+        broadcasterUid: broadcasterUidCache,
+        broadcasterIconUrl: broadcasterIconUrlCache
+      }
     );
 
     if (!storageTouched && !pendingTouched && !cacheTouched) {
