@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.70（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.71（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,42 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.71 バンプで入った修正（empty state では popup window 高さを実測ベースで縮める BA）**:
+
+- ユーザー報告（0.1.70 リリース後）: 「下半分が真っ白で empty な空間になってる」
+  「画面の位置」を改善してほしい。0.1.70 で content は綺麗になったが、
+  popup window が **780px 固定**（0.1.58 で強制リセット）のため、empty state では
+  下に ~200px の白い空きスペースが残っていた。
+- 設計:
+  - 新 lib `src/lib/popupWindowEmptyHeight.js` に純粋関数 `computePopupWindowTargetHeight`
+    を実装。state（active / empty+history / empty+no-history）と viewportHint
+    （実測した content height）から target outer height を返す。
+    - active watch: 780px（既存）
+    - empty + history: 660px（preset、実測あれば content + 40px）
+    - empty + no-history: 550px（preset、実測あれば content + 40px）
+    - クランプ範囲 360〜1100px
+    - 単体テスト 12 ケース
+  - popup-entry.js に `resizePopupWindowForState({ emptyState, hasHistory })`
+    を追加。`chrome.windows.getCurrent` → `chrome.windows.update(id, { height })`。
+    - empty state のみ実測（`document.body.scrollHeight`）。
+      requestAnimationFrame を 1 段挟んでレイアウト確定後に測る。
+    - active watch は preset 直接（既存 780px の見た目維持）。
+    - 同じ state での連続呼出しは内部 state guard で no-op。
+    - INLINE_MODE / side panel / popup type≠'popup' は早期 return。
+  - 呼出し箇所:
+    - `applyLastBroadcastReviewToEmptyState` 各分岐（履歴あり / 履歴ゼロ / IDB なし / catch）
+    - `clearLastBroadcastReviewArtifacts`（active watch 復帰時に 780 へ戻す）
+- リスク・整合性:
+  - 0.1.58 で popup を毎回 close→create で 420×780 にリセットする運用は維持。
+    その後で 0.1.71 が state に応じて update 1 回かける形。チラつきは
+    requestAnimationFrame 1 段ぶんの ~16ms のみ。
+  - 0.1.66（feedback_inline_panel_beside_size_ok）の inline panel locked-in
+    baseline は INLINE_MODE 早期 return で確実に守る。
+  - permission 追加なし（chrome.windows は標準で popup から自身を update 可能）。
+- 検証: lint / typecheck / build green。tests 2113（追加 12 ケース）すべて pass。
+  プレビュー 420×620（empty+history 想定 inner）で content が viewport にぴったり、
+  下の白い空きスペースが消えることを確認。
 
 **0.1.70 バンプで入った修正（empty state の hide 範囲を「履歴あり」にも拡大 AZ）**:
 

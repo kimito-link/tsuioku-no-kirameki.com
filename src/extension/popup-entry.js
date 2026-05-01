@@ -254,6 +254,10 @@ import {
   formatLastBroadcastIndicator,
   loadLastBroadcastSummary
 } from '../lib/loadLastBroadcastSummary.js';
+import {
+  computePopupWindowTargetHeight,
+  POPUP_WINDOW_WIDTH
+} from '../lib/popupWindowEmptyHeight.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
@@ -6104,6 +6108,90 @@ async function populateStorySourceEntriesFromStorageFallback() {
 }
 
 /**
+ * 0.1.71 (BA): popup window のリサイズを state ごとに 1 回だけ走らせる。
+ *
+ * 既存の 0.1.58 (AN) は popup を毎回 420×780 に強制リセットしていたが、
+ * 0.1.69-0.1.70 で empty state の中身を整理した結果、empty 時の content は
+ * 580〜620px しかないので 780px の window では下に白い空きスペースが残る。
+ *
+ * この helper は `chrome.windows.update` で window の高さを state（active /
+ * empty+history / empty+no-history）に応じて切り替える。
+ *
+ * 同じ state で何度も refresh が走っても update 呼び出しが flush しないよう、
+ * `_lastPopupStateForResize` で前回値を覚えておく。
+ *
+ * INLINE_MODE（watch ページ内 iframe / side panel）は popup window じゃないので
+ * 早期 return する。standalone popup window のみが対象。
+ *
+ * @param {{ emptyState: boolean, hasHistory: boolean }} input
+ * @returns {Promise<void>}
+ */
+let _lastPopupStateForResize = /** @type {string|null} */ (null);
+async function resizePopupWindowForState(input) {
+  if (INLINE_MODE) return;
+  const emptyState = input?.emptyState === true;
+  const hasHistory = input?.hasHistory === true;
+  const stateKey = emptyState
+    ? hasHistory
+      ? 'empty-history'
+      : 'empty-no-history'
+    : 'active';
+  if (_lastPopupStateForResize === stateKey) return;
+  _lastPopupStateForResize = stateKey;
+  if (
+    typeof chrome === 'undefined' ||
+    !chrome.windows ||
+    typeof chrome.windows.update !== 'function' ||
+    typeof chrome.windows.getCurrent !== 'function'
+  ) {
+    return;
+  }
+  try {
+    const win = await chrome.windows.getCurrent();
+    if (!win || win.id == null) return;
+    // popup window 限定。通常の Chrome ウィンドウや side panel は無視。
+    if (win.type !== 'popup') return;
+
+    // 0.1.71 (BA): empty state のときだけ実測ベースで高さを決める。
+    // active watch（emptyState=false）は既存の 780px を維持して見た目を変えない。
+    // empty state の hide ルール反映後の DOM レイアウト確定を待つため
+    // requestAnimationFrame を 1 段挟む。
+    /** @type {{ contentHeightPx: number, chromeOverheadPx: number }|undefined} */
+    let viewportHint = undefined;
+    if (emptyState) {
+      try {
+        await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+        const bodyEl = document.body;
+        const bodyScroll = bodyEl ? bodyEl.scrollHeight : 0;
+        if (Number.isFinite(bodyScroll) && bodyScroll > 0) {
+          viewportHint = {
+            contentHeightPx: bodyScroll,
+            chromeOverheadPx: 40
+          };
+        }
+      } catch {
+        // 測定失敗時はプリセットにフォールバック
+      }
+    }
+
+    const height = computePopupWindowTargetHeight({
+      emptyState,
+      hasHistory,
+      viewportHint
+    });
+    if (typeof win.height === 'number' && win.height === height) return;
+    await chrome.windows.update(win.id, {
+      height,
+      width: POPUP_WINDOW_WIDTH
+    });
+  } catch (err) {
+    if (typeof console !== 'undefined' && console?.warn) {
+      console.warn('[resizePopupWindow] failed:', err);
+    }
+  }
+}
+
+/**
  * 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」を cards に流し込む。
  *
  * `nls_broadcast_summary_v1` IDB から直近の sample を取り出して:
@@ -6148,6 +6236,7 @@ async function applyLastBroadcastReviewToEmptyState() {
   if (typeof indexedDB === 'undefined') {
     hideReview();
     root.classList.add('nl-empty-no-history');
+    void resizePopupWindowForState({ emptyState: true, hasHistory: false });
     return;
   }
 
@@ -6160,11 +6249,13 @@ async function applyLastBroadcastReviewToEmptyState() {
     if (!view) {
       hideReview();
       root.classList.add('nl-empty-no-history');
+      void resizePopupWindowForState({ emptyState: true, hasHistory: false });
       return;
     }
 
     // 履歴あり: cards に流し込む。
     root.classList.remove('nl-empty-no-history');
+    void resizePopupWindowForState({ emptyState: true, hasHistory: true });
 
     // indicator
     if (indicator) indicator.hidden = false;
@@ -6250,6 +6341,7 @@ async function applyLastBroadcastReviewToEmptyState() {
     }
     hideReview();
     root.classList.add('nl-empty-no-history');
+    void resizePopupWindowForState({ emptyState: true, hasHistory: false });
   } finally {
     try {
       db?.close();
@@ -6280,6 +6372,9 @@ function clearLastBroadcastReviewArtifacts() {
     reopenBtn.disabled = true;
     reopenBtn.dataset.watchUrl = '';
   }
+  // 0.1.71 (BA): active watch に戻ったら window 高さを 780px に戻す
+  // （連続呼出しは内部 state guard で no-op になるので毎回呼んで OK）。
+  void resizePopupWindowForState({ emptyState: false, hasHistory: true });
 }
 
 async function refresh() {

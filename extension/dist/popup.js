@@ -2227,10 +2227,10 @@
   }
   function darkenHexColor(hex, ratio) {
     const source = normalizeHexColor(hex, "#0f8fd8").slice(1);
-    const clamp2 = (v) => Math.max(0, Math.min(255, Math.round(v)));
-    const r = clamp2(parseInt(source.slice(0, 2), 16) * (1 - ratio));
-    const g = clamp2(parseInt(source.slice(2, 4), 16) * (1 - ratio));
-    const b = clamp2(parseInt(source.slice(4, 6), 16) * (1 - ratio));
+    const clamp3 = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    const r = clamp3(parseInt(source.slice(0, 2), 16) * (1 - ratio));
+    const g = clamp3(parseInt(source.slice(2, 4), 16) * (1 - ratio));
+    const b = clamp3(parseInt(source.slice(4, 6), 16) * (1 - ratio));
     return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   }
   function sanitizeCustomFrame(raw) {
@@ -9634,6 +9634,35 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return `\u524D\u56DE\uFF08${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} \u301C\uFF09`;
   }
 
+  // src/lib/popupWindowEmptyHeight.js
+  var POPUP_WINDOW_WIDTH = 420;
+  var POPUP_WINDOW_HEIGHT_ACTIVE_WATCH = 780;
+  var POPUP_WINDOW_HEIGHT_EMPTY_WITH_HISTORY = 660;
+  var POPUP_WINDOW_HEIGHT_EMPTY_NO_HISTORY = 550;
+  var POPUP_WINDOW_MIN_HEIGHT = 360;
+  var POPUP_WINDOW_MAX_HEIGHT = 1100;
+  function computePopupWindowTargetHeight(input) {
+    const params = input && typeof input === "object" ? input : {};
+    const emptyState = params.emptyState === true;
+    const hasHistory = params.hasHistory === true;
+    const hint = params.viewportHint;
+    if (hint && typeof hint === "object") {
+      const c = Number(hint.contentHeightPx);
+      const ov = Number(hint.chromeOverheadPx);
+      if (Number.isFinite(c) && c > 0 && Number.isFinite(ov) && ov >= 0) {
+        const raw = Math.round(c + ov);
+        return clamp2(raw, POPUP_WINDOW_MIN_HEIGHT, POPUP_WINDOW_MAX_HEIGHT);
+      }
+    }
+    if (!emptyState) return POPUP_WINDOW_HEIGHT_ACTIVE_WATCH;
+    return hasHistory ? POPUP_WINDOW_HEIGHT_EMPTY_WITH_HISTORY : POPUP_WINDOW_HEIGHT_EMPTY_NO_HISTORY;
+  }
+  function clamp2(v, lo, hi) {
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+  }
+
   // src/lib/objectUrlRevokeQueue.js
   var DEFAULT_TIMEOUT_MS = 15e3;
   var DEFAULT_MAX_CONCURRENT = 3;
@@ -14279,6 +14308,55 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     }
   }
+  var _lastPopupStateForResize = (
+    /** @type {string|null} */
+    null
+  );
+  async function resizePopupWindowForState(input) {
+    if (INLINE_MODE) return;
+    const emptyState = input?.emptyState === true;
+    const hasHistory = input?.hasHistory === true;
+    const stateKey = emptyState ? hasHistory ? "empty-history" : "empty-no-history" : "active";
+    if (_lastPopupStateForResize === stateKey) return;
+    _lastPopupStateForResize = stateKey;
+    if (typeof chrome === "undefined" || !chrome.windows || typeof chrome.windows.update !== "function" || typeof chrome.windows.getCurrent !== "function") {
+      return;
+    }
+    try {
+      const win = await chrome.windows.getCurrent();
+      if (!win || win.id == null) return;
+      if (win.type !== "popup") return;
+      let viewportHint = void 0;
+      if (emptyState) {
+        try {
+          await new Promise((r) => requestAnimationFrame(() => r(void 0)));
+          const bodyEl = document.body;
+          const bodyScroll = bodyEl ? bodyEl.scrollHeight : 0;
+          if (Number.isFinite(bodyScroll) && bodyScroll > 0) {
+            viewportHint = {
+              contentHeightPx: bodyScroll,
+              chromeOverheadPx: 40
+            };
+          }
+        } catch {
+        }
+      }
+      const height = computePopupWindowTargetHeight({
+        emptyState,
+        hasHistory,
+        viewportHint
+      });
+      if (typeof win.height === "number" && win.height === height) return;
+      await chrome.windows.update(win.id, {
+        height,
+        width: POPUP_WINDOW_WIDTH
+      });
+    } catch (err) {
+      if (typeof console !== "undefined" && console?.warn) {
+        console.warn("[resizePopupWindow] failed:", err);
+      }
+    }
+  }
   async function applyLastBroadcastReviewToEmptyState() {
     const root = document.documentElement;
     const indicator = $("lastBroadcastIndicator");
@@ -14309,6 +14387,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (typeof indexedDB === "undefined") {
       hideReview();
       root.classList.add("nl-empty-no-history");
+      void resizePopupWindowForState({ emptyState: true, hasHistory: false });
       return;
     }
     let db;
@@ -14319,9 +14398,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       if (!view) {
         hideReview();
         root.classList.add("nl-empty-no-history");
+        void resizePopupWindowForState({ emptyState: true, hasHistory: false });
         return;
       }
       root.classList.remove("nl-empty-no-history");
+      void resizePopupWindowForState({ emptyState: true, hasHistory: true });
       if (indicator) indicator.hidden = false;
       if (indicatorLeadEl) {
         indicatorLeadEl.textContent = formatLastBroadcastIndicator(view.capturedAt);
@@ -14386,6 +14467,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
       hideReview();
       root.classList.add("nl-empty-no-history");
+      void resizePopupWindowForState({ emptyState: true, hasHistory: false });
     } finally {
       try {
         db?.close();
@@ -14409,6 +14491,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       reopenBtn.disabled = true;
       reopenBtn.dataset.watchUrl = "";
     }
+    void resizePopupWindowForState({ emptyState: false, hasHistory: true });
   }
   async function refresh() {
     if (!hasExtensionContext()) {
@@ -16415,7 +16498,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1101" ? String("0501-1101") : "dev";
+      const buildId = "0501-1117" ? String("0501-1117") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
