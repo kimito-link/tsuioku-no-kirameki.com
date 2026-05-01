@@ -4948,11 +4948,15 @@ function enrichRowsWithInterceptedUserIds(rows) {
         : '';
     // 表示用 URL と tier 判定用の観測信号を userEntryAvatarResolve に一任する。
     // ここで 2 本を混ぜない設計が「視認性／混入の再発」を止めるための要。
+    // 0.1.77: ギフト演出 DOM での broadcaster icon 取り違え対策で、
+    //         broadcasterUid + broadcasterIconUrl も渡してガード判定させる。
     const { displayAvatarUrl, avatarObserved } = resolveUserEntryAvatarSignals({
       userId,
       rowAv,
       interceptEntryAv,
-      interceptMapAv
+      interceptMapAv,
+      broadcasterUid: broadcasterUidCache,
+      broadcasterIconUrl: broadcasterIconUrlCache
     });
     return {
       ...r,

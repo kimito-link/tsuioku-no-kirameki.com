@@ -708,6 +708,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.77",
+      date: "2026-05-01",
+      summary: "avatar \u53D6\u308A\u9055\u3048\u4FEE\u6B63\u306E\u8868\u793A\u6642\u30AC\u30FC\u30C9\u8FFD\u52A0",
+      items: Object.freeze([
+        "0.1.76 \u3067 intercept \u30AD\u30E3\u30C3\u30B7\u30E5\u3078\u306E broadcaster icon \u7D10\u4ED8\u3051\u3092\u6B62\u3081\u307E\u3057\u305F\u304C\u3001\u30B3\u30E1\u8A18\u9332\u306B\u65E2\u306B\u713C\u304D\u8FBC\u307E\u308C\u305F avatarUrl \u307E\u3067\u306F\u623B\u305B\u307E\u305B\u3093\u3067\u3057\u305F\u30020.1.77 \u3067\u8868\u793A\u6642\u306B\u3082\u540C\u3058\u30AC\u30FC\u30C9\u3092\u639B\u3051\u308B\u3053\u3068\u3067\u3001\u904E\u53BB\u306E\u6C5A\u67D3\u30C7\u30FC\u30BF\u3082\u81EA\u52D5\u3067\u6B63\u3057\u3044 canonical \u30A2\u30A4\u30B3\u30F3\u306B\u7F6E\u304D\u63DB\u308F\u308B\u3088\u3046\u306B\u3057\u307E\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: src/lib/userEntryAvatarResolve.js\uFF08resolveUserEntryAvatarSignals\uFF09\u306E\u5165\u529B 3 \u30BD\u30FC\u30B9\uFF08rowAv / interceptEntryAv / interceptMapAv\uFF09\u3059\u3079\u3066\u306B\u5BFE\u3057\u3001broadcaster icon \u3068\u4E00\u81F4\u3059\u308B URL \u306F viewer \u672C\u4EBA\u3067\u306A\u3044\u9650\u308A\u7121\u52B9\u5316\uFF08canonical fallback \u306B\u5012\u3059\uFF09\u300216 \u30B1\u30FC\u30B9 TDD\uFF08\u65E2\u5B58 9 + \u65B0\u898F 7\uFF09",
+        "\u3053\u308C\u3067\u300C\u30AD\u30E3\u30C3\u30B7\u30E5\u30AF\u30EA\u30A2\u3057\u306A\u3044\u3068\u76F4\u3089\u306A\u3044\u300D\u72B6\u614B\u304C\u89E3\u6D88\u3055\u308C\u3001\u62E1\u5F35\u66F4\u65B0\u5F8C\u306E\u6700\u521D\u306E\u30B3\u30E1\u53D7\u4FE1\u304B\u3089\u6B63\u3057\u3044\u8868\u793A\u306B\u623B\u308A\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.76",
       date: "2026-05-01",
       summary: "\u30AE\u30D5\u30C8\u6F14\u51FA DOM \u3067\u306E avatar \u53D6\u308A\u9055\u3048\u4FEE\u6B63",
@@ -16509,7 +16519,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1450" ? String("0501-1450") : "dev";
+      const buildId = "0501-1456" ? String("0501-1456") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

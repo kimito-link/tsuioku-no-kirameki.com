@@ -116,4 +116,103 @@ describe('resolveUserEntryAvatarSignals', () => {
     expect(out.avatarObserved).toBe(false);
     expect(out.displayAvatarUrl).toBe(niconicoDefaultUserIconUrl('88210441'));
   });
+
+  describe('0.1.77: ギフト演出 DOM 取り違えガード', () => {
+    const broadcasterUid = '99999';
+    const broadcasterIconUrl =
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/9/99999.jpg';
+    const viewerUid = '4046119';
+
+    it('rowAv が broadcaster icon の場合、viewer の displayAvatarUrl は canonical fallback に', () => {
+      const out = resolveUserEntryAvatarSignals({
+        userId: viewerUid,
+        rowAv: broadcasterIconUrl,
+        interceptEntryAv: '',
+        interceptMapAv: '',
+        broadcasterUid,
+        broadcasterIconUrl
+      });
+      // observed は false（broadcaster icon なので無効化）
+      expect(out.avatarObserved).toBe(false);
+      // displayAvatarUrl は viewer 自身の canonical
+      expect(out.displayAvatarUrl).toBe(niconicoDefaultUserIconUrl(viewerUid));
+    });
+
+    it('interceptEntryAv が broadcaster icon の場合も同様に viewer 用 canonical に倒す', () => {
+      const out = resolveUserEntryAvatarSignals({
+        userId: viewerUid,
+        rowAv: '',
+        interceptEntryAv: broadcasterIconUrl,
+        interceptMapAv: '',
+        broadcasterUid,
+        broadcasterIconUrl
+      });
+      expect(out.avatarObserved).toBe(false);
+      expect(out.displayAvatarUrl).toBe(niconicoDefaultUserIconUrl(viewerUid));
+    });
+
+    it('interceptMapAv が broadcaster icon の場合も同様', () => {
+      const out = resolveUserEntryAvatarSignals({
+        userId: viewerUid,
+        rowAv: '',
+        interceptEntryAv: '',
+        interceptMapAv: broadcasterIconUrl,
+        broadcasterUid,
+        broadcasterIconUrl
+      });
+      expect(out.avatarObserved).toBe(false);
+      expect(out.displayAvatarUrl).toBe(niconicoDefaultUserIconUrl(viewerUid));
+    });
+
+    it('全ソースが broadcaster icon でも、broadcaster 本人 uid なら通す', () => {
+      const out = resolveUserEntryAvatarSignals({
+        userId: broadcasterUid,
+        rowAv: broadcasterIconUrl,
+        interceptEntryAv: broadcasterIconUrl,
+        interceptMapAv: broadcasterIconUrl,
+        broadcasterUid,
+        broadcasterIconUrl
+      });
+      expect(out.avatarObserved).toBe(true);
+      expect(out.displayAvatarUrl).toBe(broadcasterIconUrl);
+    });
+
+    it('viewer 自身の正しい個人サムネは通す', () => {
+      const personal = 'https://cdn.example/viewer-personal.jpg';
+      const out = resolveUserEntryAvatarSignals({
+        userId: viewerUid,
+        rowAv: personal,
+        interceptEntryAv: '',
+        interceptMapAv: '',
+        broadcasterUid,
+        broadcasterIconUrl
+      });
+      expect(out.avatarObserved).toBe(true);
+      expect(out.displayAvatarUrl).toBe(personal);
+    });
+
+    it('broadcaster 情報未指定なら従来通り（ガード掛けず）', () => {
+      const out = resolveUserEntryAvatarSignals({
+        userId: viewerUid,
+        rowAv: broadcasterIconUrl,
+        interceptEntryAv: '',
+        interceptMapAv: ''
+      });
+      expect(out.avatarObserved).toBe(true);
+      expect(out.displayAvatarUrl).toBe(broadcasterIconUrl);
+    });
+
+    it('broadcaster icon と異なる URL は普通に通す', () => {
+      const out = resolveUserEntryAvatarSignals({
+        userId: viewerUid,
+        rowAv: 'https://cdn.example/totally-different.jpg',
+        interceptEntryAv: '',
+        interceptMapAv: '',
+        broadcasterUid,
+        broadcasterIconUrl
+      });
+      expect(out.avatarObserved).toBe(true);
+      expect(out.displayAvatarUrl).toBe('https://cdn.example/totally-different.jpg');
+    });
+  });
 });

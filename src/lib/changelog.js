@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.77',
+    date: '2026-05-01',
+    summary: 'avatar 取り違え修正の表示時ガード追加',
+    items: Object.freeze([
+      '0.1.76 で intercept キャッシュへの broadcaster icon 紐付けを止めましたが、コメ記録に既に焼き込まれた avatarUrl までは戻せませんでした。0.1.77 で表示時にも同じガードを掛けることで、過去の汚染データも自動で正しい canonical アイコンに置き換わるようにしました',
+      '修正内容: src/lib/userEntryAvatarResolve.js（resolveUserEntryAvatarSignals）の入力 3 ソース（rowAv / interceptEntryAv / interceptMapAv）すべてに対し、broadcaster icon と一致する URL は viewer 本人でない限り無効化（canonical fallback に倒す）。16 ケース TDD（既存 9 + 新規 7）',
+      'これで「キャッシュクリアしないと直らない」状態が解消され、拡張更新後の最初のコメ受信から正しい表示に戻ります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.76',
     date: '2026-05-01',
     summary: 'ギフト演出 DOM での avatar 取り違え修正',

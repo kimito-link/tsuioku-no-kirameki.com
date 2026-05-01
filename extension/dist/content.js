@@ -2983,9 +2983,20 @@
   // src/lib/userEntryAvatarResolve.js
   function resolveUserEntryAvatarSignals(input) {
     const userId = String(input?.userId || "").trim();
-    const rowAv = String(input?.rowAv || "").trim();
-    const interceptEntryAv = String(input?.interceptEntryAv || "").trim();
-    const interceptMapAv = String(input?.interceptMapAv || "").trim();
+    const rowAvRaw = String(input?.rowAv || "").trim();
+    const interceptEntryAvRaw = String(input?.interceptEntryAv || "").trim();
+    const interceptMapAvRaw = String(input?.interceptMapAv || "").trim();
+    const broadcasterUid = String(input?.broadcasterUid || "").trim();
+    const broadcasterIconUrl = String(input?.broadcasterIconUrl || "").trim();
+    const guard = (av) => shouldAssociateAvatarWithUser({
+      uid: userId,
+      av,
+      broadcasterUid,
+      broadcasterIconUrl
+    }) ? av : "";
+    const rowAv = guard(rowAvRaw);
+    const interceptEntryAv = guard(interceptEntryAvRaw);
+    const interceptMapAv = guard(interceptMapAvRaw);
     const avatarObserved = Boolean(rowAv || interceptEntryAv || interceptMapAv);
     const canonicalFallback = enrichmentAvatarWithCanonicalFallback(
       userId,
@@ -7244,7 +7255,9 @@
         userId,
         rowAv,
         interceptEntryAv,
-        interceptMapAv
+        interceptMapAv,
+        broadcasterUid: broadcasterUidCache,
+        broadcasterIconUrl: broadcasterIconUrlCache
       });
       return {
         ...r,

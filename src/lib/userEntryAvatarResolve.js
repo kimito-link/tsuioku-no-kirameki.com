@@ -26,6 +26,7 @@
 
 import { pickStrongestAvatarUrlForUser } from './supportGrowthTileSrc.js';
 import { enrichmentAvatarWithCanonicalFallback } from './enrichmentAvatarFallback.js';
+import { shouldAssociateAvatarWithUser } from './avatarBroadcasterGuard.js';
 
 /**
  * @typedef {Object} UserEntryAvatarInput
@@ -33,6 +34,8 @@ import { enrichmentAvatarWithCanonicalFallback } from './enrichmentAvatarFallbac
  * @property {string} rowAv             DOM 抽出の素の avatarUrl（isHttpAvatarUrl で弾き済みを推奨）
  * @property {string} interceptEntryAv  intercept 行エントリーの avatarUrl（同）
  * @property {string} interceptMapAv    userId→avatar マップの avatarUrl（同）
+ * @property {string} [broadcasterUid]      0.1.77: ガード用、現在の配信者 uid（任意）
+ * @property {string} [broadcasterIconUrl]  0.1.77: ガード用、現在の配信者アイコン URL（任意）
  */
 
 /**
@@ -47,9 +50,29 @@ import { enrichmentAvatarWithCanonicalFallback } from './enrichmentAvatarFallbac
  */
 export function resolveUserEntryAvatarSignals(input) {
   const userId = String(input?.userId || '').trim();
-  const rowAv = String(input?.rowAv || '').trim();
-  const interceptEntryAv = String(input?.interceptEntryAv || '').trim();
-  const interceptMapAv = String(input?.interceptMapAv || '').trim();
+  const rowAvRaw = String(input?.rowAv || '').trim();
+  const interceptEntryAvRaw = String(input?.interceptEntryAv || '').trim();
+  const interceptMapAvRaw = String(input?.interceptMapAv || '').trim();
+  const broadcasterUid = String(input?.broadcasterUid || '').trim();
+  const broadcasterIconUrl = String(input?.broadcasterIconUrl || '').trim();
+
+  // 0.1.77: ギフト演出 DOM での avatar 取り違え対策。
+  //   3 ソース（rowAv / interceptEntryAv / interceptMapAv）すべてに対し、
+  //   broadcaster icon と一致する URL は uid が broadcaster 本人でない限り
+  //   無効化する。これにより comment record に焼き込み済みの誤データや
+  //   intercept キャッシュの汚染も表示時点で除外できる（defense in depth）。
+  const guard = (av) =>
+    shouldAssociateAvatarWithUser({
+      uid: userId,
+      av,
+      broadcasterUid,
+      broadcasterIconUrl
+    })
+      ? av
+      : '';
+  const rowAv = guard(rowAvRaw);
+  const interceptEntryAv = guard(interceptEntryAvRaw);
+  const interceptMapAv = guard(interceptMapAvRaw);
 
   // 観測信号（tier 判定用）:
   //   DOM or intercept のいずれかで「実 URL」を掴めているかだけを見る。
