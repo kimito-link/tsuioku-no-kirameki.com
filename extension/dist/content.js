@@ -4947,7 +4947,7 @@
     host.style.width = `${panelW}px`;
     host.style.maxWidth = `${panelW}px`;
     host.style.maxHeight = `${maxH}px`;
-    host.style.overflow = "auto";
+    host.style.overflow = "hidden";
     host.style.overflowX = "hidden";
     host.style.marginLeft = "0";
     host.style.boxSizing = "border-box";
@@ -5053,7 +5053,7 @@
     host.style.maxWidth = "100%";
     host.style.maxHeight = `${hostMaxH}px`;
     host.style.marginLeft = "0";
-    host.style.overflow = "auto";
+    host.style.overflow = "hidden";
     host.style.overflowX = "hidden";
     host.style.boxSizing = "border-box";
     host.style.zIndex = "2147483646";

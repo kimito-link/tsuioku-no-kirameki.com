@@ -883,6 +883,17 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.89",
+      date: "2026-05-01",
+      summary: "\u30B9\u30AF\u30ED\u30FC\u30EB\u30D0\u30FC 2 \u91CD\u4FEE\u6B63\uFF08host \u5074 overflow \u64A4\u53BB\uFF09",
+      items: Object.freeze([
+        "0.1.86 \u3067 popup window mode \u306F\u5BFE\u51E6\u3057\u307E\u3057\u305F\u304C\u3001\u8907\u6570\u30BF\u30D6\u540C\u6642\u8996\u8074\u6642\u306B inline panel mode\uFF08dock_bottom / floating\uFF09\u3067\u3082 2 \u91CD scrollbar \u304C\u51FA\u3066\u3044\u307E\u3057\u305F",
+        "\u539F\u56E0: src/extension/content-entry.js \u306E renderInlinePanelDockBottomHost / renderInlinePanelFloatingHost \u3067 host (iframe wrapper) \u306B overflow:auto \u3092\u8A2D\u5B9A\u3057\u3066\u3044\u305F\u305F\u3081\u3001iframe \u5185\u90E8\u306E .nl-main scrollbar \u3068\u4E8C\u91CD\u306B\u306A\u3063\u3066\u3044\u307E\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: \u4E21\u95A2\u6570\u306E host.style.overflow \u3092 auto \u2192 hidden \u306B\u5909\u66F4\u3002host \u306F iframe \u3088\u308A 16px \u5927\u304D\u3044\u3060\u3051\u3067\u5185\u5074\u306B\u4F59\u88D5\u304C\u3042\u308A\u3001\u5916\u5074 scrollbar \u306F\u4E0D\u8981\u3067\u3059\u3002iframe \u5185\u90E8\u306E\u6B63\u898F scrollbar \u306F\u7DAD\u6301\u3055\u308C\u307E\u3059",
+        "\u3053\u308C\u3067\u8907\u6570\u30BF\u30D6\u8996\u8074\u6642\u3082 inline panel \u306B scrollbar 1 \u672C\u3060\u3051\u306B\u306A\u308A\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.88",
       date: "2026-05-01",
       summary: "\u30D1\u30CD\u30EB\u304C page \u672B\u5C3E\u306B\u51FA\u308B\u30D0\u30B0\u306E\u4FEE\u6B63",
@@ -16840,7 +16851,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1713" ? String("0501-1713") : "dev";
+      const buildId = "0501-1837" ? String("0501-1837") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

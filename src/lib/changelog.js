@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.89',
+    date: '2026-05-01',
+    summary: 'スクロールバー 2 重修正（host 側 overflow 撤去）',
+    items: Object.freeze([
+      '0.1.86 で popup window mode は対処しましたが、複数タブ同時視聴時に inline panel mode（dock_bottom / floating）でも 2 重 scrollbar が出ていました',
+      '原因: src/extension/content-entry.js の renderInlinePanelDockBottomHost / renderInlinePanelFloatingHost で host (iframe wrapper) に overflow:auto を設定していたため、iframe 内部の .nl-main scrollbar と二重になっていました',
+      '修正内容: 両関数の host.style.overflow を auto → hidden に変更。host は iframe より 16px 大きいだけで内側に余裕があり、外側 scrollbar は不要です。iframe 内部の正規 scrollbar は維持されます',
+      'これで複数タブ視聴時も inline panel に scrollbar 1 本だけになります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.88',
     date: '2026-05-01',
     summary: 'パネルが page 末尾に出るバグの修正',

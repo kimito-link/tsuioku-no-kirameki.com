@@ -1796,7 +1796,8 @@ function renderInlinePanelFloatingHost() {
   host.style.width = `${panelW}px`;
   host.style.maxWidth = `${panelW}px`;
   host.style.maxHeight = `${maxH}px`;
-  host.style.overflow = 'auto';
+  // 0.1.89: floating でも host overflow:auto は iframe 内部 scroll と二重になる
+  host.style.overflow = 'hidden';
   host.style.overflowX = 'hidden';
   host.style.marginLeft = '0';
   host.style.boxSizing = 'border-box';
@@ -1938,7 +1939,10 @@ function renderInlinePanelDockBottomHost() {
   host.style.maxWidth = '100%';
   host.style.maxHeight = `${hostMaxH}px`;
   host.style.marginLeft = '0';
-  host.style.overflow = 'auto';
+  // 0.1.89: host は iframe wrapper のみ（hostMaxH = iframeInnerH + 16 で
+  //   iframe より 16px 大きいだけ）。overflow:auto だと iframe 内の .nl-main
+  //   の scrollbar と二重になる症状（複数タブ時に顕在化）の根治のため hidden に。
+  host.style.overflow = 'hidden';
   host.style.overflowX = 'hidden';
   host.style.boxSizing = 'border-box';
   host.style.zIndex = '2147483646';
