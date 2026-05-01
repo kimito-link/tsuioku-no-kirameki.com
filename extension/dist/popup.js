@@ -269,110 +269,6 @@
     return true;
   }
 
-  // src/domain/user/identity.js
-  function isAnonymousStyleNicoUserId(userId) {
-    const s = String(userId || "").trim();
-    if (!s) return true;
-    if (/^\d{5,14}$/.test(s)) return false;
-    if (/^a:/i.test(s)) return true;
-    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return true;
-    return true;
-  }
-
-  // src/domain/user/avatarResolver.js
-  var CANONICAL_USERICON_HTTPS_PREFIX = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/";
-  var KIND_PRIORITY = Object.freeze([
-    "dom",
-    "ndgr-entry",
-    "ndgr-map",
-    "live-api",
-    "stored",
-    "profile-cache"
-  ]);
-  function synthesizeCanonicalUsericon(userId) {
-    const s = String(userId || "").trim();
-    if (!/^\d{5,14}$/.test(s)) return "";
-    const n = Number(s);
-    if (!Number.isFinite(n) || n < 1) return "";
-    const bucket = Math.max(1, Math.floor(n / 1e4));
-    return `${CANONICAL_USERICON_HTTPS_PREFIX}s/${bucket}/${s}.jpg`;
-  }
-  function isHttpUrl(url) {
-    return /^https?:\/\//i.test(String(url || "").trim());
-  }
-  function isObservationSafe(userId, observation, broadcaster, viewer) {
-    const url = String(observation?.url || "").trim();
-    if (!isHttpUrl(url)) return { safe: false, reason: "invalid-url" };
-    const uid = String(userId || "").trim();
-    if (!isAvatarUrlForUserId(url, uid)) {
-      return { safe: false, reason: "uid-mismatch" };
-    }
-    const bUid = String(broadcaster?.broadcasterUid || "").trim();
-    const bIcon = String(broadcaster?.broadcasterIconUrl || "").trim();
-    if (bUid) {
-      if (bIcon && isSameAvatarUrl(url, bIcon) && uid !== bUid) {
-        return { safe: false, reason: "broadcaster-impersonation" };
-      }
-      const urlUid = extractNiconicoUserIdFromIconUrl(url);
-      if (urlUid && urlUid === bUid && uid !== bUid) {
-        return { safe: false, reason: "broadcaster-impersonation" };
-      }
-    }
-    const vUid = String(viewer?.viewerUid || "").trim();
-    const vAvatar = String(viewer?.viewerAvatarUrl || "").trim();
-    if (vUid && vAvatar && isSameAvatarUrl(url, vAvatar) && uid !== vUid) {
-      return { safe: false, reason: "viewer-impersonation" };
-    }
-    return { safe: true };
-  }
-  function pickDisplayUrlFromAccepted(accepted) {
-    for (const kind of KIND_PRIORITY) {
-      const sameKind = accepted.filter((o) => o.kind === kind);
-      if (sameKind.length === 0) continue;
-      sameKind.sort((a, b) => (b.observedAt || 0) - (a.observedAt || 0));
-      return sameKind[0].url;
-    }
-    return "";
-  }
-  function resolveAvatar(input) {
-    const userId = String(input?.userId || "").trim();
-    const observations = Array.isArray(input?.observations) ? input.observations : [];
-    const broadcaster = input?.broadcaster;
-    const viewer = input?.viewer;
-    const accepted = [];
-    const rejected = [];
-    for (const obs of observations) {
-      if (!obs || typeof obs !== "object") continue;
-      const verdict = isObservationSafe(userId, obs, broadcaster, viewer);
-      if (verdict.safe) {
-        accepted.push(obs);
-      } else {
-        rejected.push({
-          kind: obs.kind,
-          reason: verdict.reason,
-          url: String(obs.url || "")
-        });
-      }
-    }
-    let displayUrl = pickDisplayUrlFromAccepted(accepted);
-    if (!displayUrl && userId && !isAnonymousStyleNicoUserId(userId)) {
-      displayUrl = synthesizeCanonicalUsericon(userId);
-    }
-    const observedKinds = new Set(accepted.map((o) => o.kind));
-    const hasNonCanonicalPersonalUrl = accepted.some(
-      (o) => !o.url.startsWith(CANONICAL_USERICON_HTTPS_PREFIX)
-    );
-    return Object.freeze({
-      displayUrl,
-      observedKinds: (
-        /** @type {ReadonlySet<AvatarObservationKind>} */
-        observedKinds
-      ),
-      rejected: Object.freeze(rejected),
-      hasNonCanonicalPersonalUrl
-    });
-  }
-
   // src/lib/nicoAnonymousDisplay.js
   function isNiconicoAnonymousUserId(userId) {
     const s = String(userId ?? "").trim();
@@ -535,7 +431,7 @@
     const expected = niconicoDefaultUserIconUrl(uid);
     return Boolean(expected && url === expected);
   }
-  function isAnonymousStyleNicoUserId2(userId) {
+  function isAnonymousStyleNicoUserId(userId) {
     const s = String(userId || "").trim();
     if (!s) return true;
     if (/^\d{5,14}$/.test(s)) return false;
@@ -549,7 +445,7 @@
     }
     const y = String(yukkuriSrc || "").trim();
     const t = String(tvSrc || "").trim();
-    if (isAnonymousStyleNicoUserId2(userId)) {
+    if (isAnonymousStyleNicoUserId(userId)) {
       return t || y;
     }
     const syn = niconicoDefaultUserIconUrl(userId);
@@ -561,7 +457,7 @@
       return String(httpCandidate).trim();
     }
     const uid = String(userId || "").trim();
-    if (identiconOpts?.anonymousIdenticonEnabled !== false && uid && isAnonymousStyleNicoUserId2(uid)) {
+    if (identiconOpts?.anonymousIdenticonEnabled !== false && uid && isAnonymousStyleNicoUserId(uid)) {
       const data = String(identiconOpts.anonymousIdenticonDataUrl || "").trim();
       if (data) return data;
     }
@@ -686,7 +582,7 @@
     const key = String(userKey || "").trim();
     if (!key) return true;
     if (key === UNKNOWN_USER_KEY) return false;
-    return isAnonymousStyleNicoUserId2(key);
+    return isAnonymousStyleNicoUserId(key);
   }
   function partitionRankedRoomsForStrip(ranked, opts) {
     const list = Array.isArray(ranked) ? ranked : [];
@@ -882,6 +778,16 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.90",
+      date: "2026-05-01",
+      summary: "avatar refactor \u306E\u5F71\u97FF\u5207\u308A\u5206\u3051 revert",
+      items: Object.freeze([
+        "0.1.89 \u5F8C\u306B\u30E6\u30FC\u30B6\u30FC\u304B\u3089\u300C\u63A8\u5B9A\u540C\u6642\u63A5\u7D9A\u30FB\u6765\u5834\u8005\u6570\u304C\uFF08\u63A5\u7D9A\u4E2D\u2026\uFF09\u306E\u307E\u307E\u3001\u8A18\u9332\u30AB\u30A6\u30F3\u30C8\u3082\u5B89\u5B9A\u3057\u3066\u51FA\u306A\u3044\u300D\u5831\u544A\u304C\u3042\u308A\u30010.1.85 \u306E avatar refactor (storyGrowthAvatarSrcCandidate \u3092 avatarResolver \u5316) \u3092\u5FF5\u306E\u305F\u3081 revert \u3057\u307E\u3057\u305F",
+        "avatar \u53D6\u308A\u9055\u3048\u4FEE\u6B63\uFF080.1.83 \u306E\u666E\u904D\u30EB\u30FC\u30EB\uFF09\u306F\u7DAD\u6301\u30020.1.84 \u306E avatarResolver \u57FA\u76E4\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u3082\u6B8B\u7F6E\uFF08\u4ED6\u30B3\u30FC\u30C9\u304B\u3089\u306F\u672A\u4F7F\u7528\uFF09\u3002CSS \u7CFB\u306E\u4FEE\u6B63\uFF080.1.86/0.1.89 \u30B9\u30AF\u30ED\u30FC\u30EB\u30D0\u30FC\u30010.1.88 \u30D1\u30CD\u30EB\u4F4D\u7F6E\uFF09\u3082\u7DAD\u6301",
+        "\u56DE\u5E30\u306E\u771F\u56E0\u306F\u307E\u3060\u4E0D\u660E\u30020.1.90 \u3067\u75C7\u72B6\u304C\u5909\u308F\u308B\u304B\u3001\u7121\u95A2\u4FC2\uFF08\u74B0\u5883\u8981\u56E0\uFF09\u304B\u5207\u308A\u5206\u3051\u308B\u305F\u3081\u306E\u9000\u907F\u30D0\u30FC\u30B8\u30E7\u30F3"
+      ])
+    }),
     Object.freeze({
       version: "0.1.89",
       date: "2026-05-01",
@@ -2299,7 +2205,7 @@
   function canLinkCommentTickerName(userId) {
     const s = String(userId || "").trim();
     if (!s) return false;
-    return !isAnonymousStyleNicoUserId2(s);
+    return !isAnonymousStyleNicoUserId(s);
   }
   function buildCommentTickerNameHref(userId) {
     if (!canLinkCommentTickerName(userId)) return "";
@@ -4035,7 +3941,7 @@
       let thumbSrc = "";
       if (isHttpOrHttpsUrl(rawAv)) {
         thumbSrc = String(rawAv).trim();
-      } else if (idnResolver && uidForThumb && isAnonymousStyleNicoUserId2(uidForThumb)) {
+      } else if (idnResolver && uidForThumb && isAnonymousStyleNicoUserId(uidForThumb)) {
         const idn = String(idnResolver(uidForThumb) || "").trim();
         thumbSrc = idn ? idn : pickSupportGrowthFallbackTileSrc(
           uidForThumb,
@@ -4125,6 +4031,16 @@ ${body}`;
     return [...b.link, ...b.konta, ...b.tanu];
   }
 
+  // src/domain/user/identity.js
+  function isAnonymousStyleNicoUserId2(userId) {
+    const s = String(userId || "").trim();
+    if (!s) return true;
+    if (/^\d{5,14}$/.test(s)) return false;
+    if (/^a:/i.test(s)) return true;
+    if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return true;
+    return true;
+  }
+
   // src/domain/user/nickname.js
   function isNiconicoAutoUserPlaceholderNickname2(nick) {
     const n = String(nick ?? "").trim();
@@ -4138,7 +4054,7 @@ ${body}`;
     if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)") return false;
     if (n === "\u533F\u540D") return false;
     if (n === "\u30B2\u30B9\u30C8" || /^guest$/i.test(n)) return false;
-    if (isAnonymousStyleNicoUserId(userId) && n.length <= 1) return false;
+    if (isAnonymousStyleNicoUserId2(userId) && n.length <= 1) return false;
     return true;
   }
 
@@ -4146,7 +4062,7 @@ ${body}`;
   function matchesLinkPolicy(entry) {
     const uid = String(entry?.userId || "").trim();
     if (!uid) return false;
-    if (isAnonymousStyleNicoUserId(uid)) return false;
+    if (isAnonymousStyleNicoUserId2(uid)) return false;
     const kinds = entry?.avatarObservationKinds;
     const observedAny = kinds instanceof Set && kinds.size > 0 || Array.isArray(kinds) && kinds.length > 0 || Boolean(entry?.avatarObserved);
     if (observedAny) return true;
@@ -4159,7 +4075,7 @@ ${body}`;
   function matchesKontaPolicy(entry) {
     const uid = String(entry?.userId || "").trim();
     if (!uid) return false;
-    if (isAnonymousStyleNicoUserId(uid)) return false;
+    if (isAnonymousStyleNicoUserId2(uid)) return false;
     if (matchesLinkPolicy(entry)) return false;
     return true;
   }
@@ -4168,7 +4084,7 @@ ${body}`;
   function matchesTanuPolicy(entry) {
     const uid = String(entry?.userId || "").trim();
     if (!uid) return false;
-    return isAnonymousStyleNicoUserId(uid);
+    return isAnonymousStyleNicoUserId2(uid);
   }
 
   // src/domain/lane/tier.js
@@ -4540,14 +4456,14 @@ ${body}`;
   }
 
   // src/data/sources/laneFromStoredComments.js
-  var CANONICAL_USERICON_HTTPS_PREFIX2 = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/";
-  function isHttpUrl2(url) {
+  var CANONICAL_USERICON_HTTPS_PREFIX = "https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/";
+  function isHttpUrl(url) {
     return /^https?:\/\//i.test(String(url || "").trim());
   }
   function isCanonicalUsericonUrl(url) {
     const s = String(url || "").trim();
-    if (!isHttpUrl2(s)) return false;
-    return s.startsWith(CANONICAL_USERICON_HTTPS_PREFIX2);
+    if (!isHttpUrl(s)) return false;
+    return s.startsWith(CANONICAL_USERICON_HTTPS_PREFIX);
   }
   function rowMatchesLiveFilter2(row, targetNorm) {
     if (!targetNorm) return true;
@@ -5077,7 +4993,7 @@ ${body}`;
         else numericUidWithoutHttpAvatar += 1;
         if (hasNick) numericWithNickname += 1;
         else numericWithoutNickname += 1;
-      } else if (isAnonymousStyleNicoUserId2(uid)) {
+      } else if (isAnonymousStyleNicoUserId(uid)) {
         if (http) anonStyleUidWithHttpAvatar += 1;
         else anonStyleUidWithoutHttpAvatar += 1;
         if (hasNick) anonWithNickname += 1;
@@ -11251,7 +11167,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   function getCachedAnonymousIdenticonDataUrl(userId) {
     if (!anonymousIdenticonRuntimeEnabled) return "";
     const u = String(userId || "").trim();
-    if (!u || !isAnonymousStyleNicoUserId2(u)) return "";
+    if (!u || !isAnonymousStyleNicoUserId(u)) return "";
     const hit = anonymousIdenticonDataUrlCache.get(u);
     if (hit) return hit;
     const gen = anonymousIdenticonDataUrl(u);
@@ -11669,32 +11585,27 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const snap = watchMetaCache.snapshot;
     const own = isOwnPostedSupportComment(entry, String(liveId || ""), entries);
     const bc = String(snap?.broadcasterUserId || "").trim();
+    const broadcasterIconUrl = String(snap?.broadcasterIconUrl || "").trim();
     const entUid = String(entry?.userId || "").trim();
+    const avatarUrl = String(entry?.avatarUrl || "").trim();
+    const viewerAvatarUrl = String(snap?.viewerAvatarUrl || "").trim();
     const mistakenBroadcaster = !own && Boolean(bc && entUid && bc === entUid);
-    const observations = [];
-    const entryAv = String(entry?.avatarUrl || "").trim();
-    if (entryAv) {
-      observations.push({ kind: "stored", url: entryAv, observedAt: 1 });
-    }
-    const remembered = rememberedAvatarUrlForUserId(entUid);
-    if (remembered) {
-      observations.push({ kind: "profile-cache", url: remembered, observedAt: 0 });
-    }
-    const resolved = resolveAvatar({
-      userId: entUid,
-      observations,
-      broadcaster: {
+    const guardAv = (av) => {
+      if (!av) return "";
+      if (!isAvatarUrlForUserId2(av, entUid)) return "";
+      return shouldAssociateAvatarWithUser({
+        uid: entUid,
+        av,
         broadcasterUid: bc,
-        broadcasterIconUrl: String(snap?.broadcasterIconUrl || "").trim()
-      },
-      // 自コメ時は viewer なりすまし判定をかけない（自コメは viewer 自身の avatar が出るのが正常）
-      viewer: own ? void 0 : {
-        viewerUid: String(snap?.viewerUserId || "").trim(),
-        viewerAvatarUrl: String(snap?.viewerAvatarUrl || "").trim()
-      }
-    });
+        broadcasterIconUrl
+      }) ? av : "";
+    };
+    const guardedRememberedAvatar = guardAv(rememberedAvatarUrlForUserId(entUid));
+    const guardedAvatarUrl = guardAv(avatarUrl);
+    const fallbackAvatar = mistakenBroadcaster || viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own ? "" : guardedRememberedAvatar;
+    const effectiveAvatar = viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own ? "" : guardedAvatarUrl;
     const src = resolveSupportGrowthTileSrc({
-      entryAvatarUrl: resolved.displayUrl,
+      entryAvatarUrl: effectiveAvatar || fallbackAvatar,
       userId: mistakenBroadcaster ? null : entry?.userId ?? null,
       isOwnPosted: own,
       viewerAvatarUrl: snap?.viewerAvatarUrl,
@@ -11730,7 +11641,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
       return { idLine: "\u2014", nameLine: "ID\u672A\u53D6\u5F97" };
     }
-    if (isAnonymousStyleNicoUserId2(uid)) {
+    if (isAnonymousStyleNicoUserId(uid)) {
       const idLine2 = compactNicoLaneUserId(uid);
       const nameLine = anonymousNicknameFallback(uid, nick);
       return {
@@ -13577,7 +13488,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         lineClass += " nl-top-support-rank__line--has-accent";
         lineStyle = ` style="--nl-rank-accent:${escapeAttr(m.accentColorCss)}"`;
       }
-      const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId2(m.userKey);
+      const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
       const linkHref = isLinkable ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}` : "";
       const innerHtml = `${placeHtml}
         <span class="nl-top-support-rank__count">${m.count}\u4EF6</span>
@@ -16851,7 +16762,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1837" ? String("0501-1837") : "dev";
+      const buildId = "0501-1854" ? String("0501-1854") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

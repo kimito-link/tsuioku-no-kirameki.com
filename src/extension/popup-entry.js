@@ -9,7 +9,6 @@ import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoale
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
-import { resolveAvatar } from '../domain/user/avatarResolver.js';
 import {
   anonymousNicknameFallback,
   compactNicoLaneUserId
@@ -2428,42 +2427,43 @@ function storyGrowthAvatarSrcCandidate(entry, liveId, entries = STORY_SOURCE_STA
   const snap = watchMetaCache.snapshot;
   const own = isOwnPostedSupportComment(entry, String(liveId || ''), entries);
   const bc = String(snap?.broadcasterUserId || '').trim();
+  const broadcasterIconUrl = String(snap?.broadcasterIconUrl || '').trim();
   const entUid = String(entry?.userId || '').trim();
+  const avatarUrl = String(entry?.avatarUrl || '').trim();
+  const viewerAvatarUrl = String(snap?.viewerAvatarUrl || '').trim();
   const mistakenBroadcaster =
     !own && Boolean(bc && entUid && bc === entUid);
 
-  // 0.1.84 (Phase D): avatar 解決を avatarResolver に委譲
-  //   入力 2 ソース（entry.avatarUrl, profile cache 経由）を AvatarObservation
-  //   配列に正規化して resolver に渡す。ガード（uid mismatch / broadcaster /
-  //   viewer impersonation）はすべて resolver 内で処理される。
-  /** @type {{ kind: import('../domain/user/avatarResolver.js').AvatarObservationKind, url: string, observedAt: number }[]} */
-  const observations = [];
-  const entryAv = String(entry?.avatarUrl || '').trim();
-  if (entryAv) {
-    observations.push({ kind: 'stored', url: entryAv, observedAt: 1 });
-  }
-  const remembered = rememberedAvatarUrlForUserId(entUid);
-  if (remembered) {
-    observations.push({ kind: 'profile-cache', url: remembered, observedAt: 0 });
-  }
-  const resolved = resolveAvatar({
-    userId: entUid,
-    observations,
-    broadcaster: {
+  // 0.1.81/0.1.83: avatar 取り違えガード
+  //   - 0.1.83 普遍ルール: URL 埋め込み uid とエントリ uid の不一致は必ず弾く
+  //   - 0.1.81 broadcaster ガード: 上記で uid 抽出不能だった場合の補助
+  // (0.1.85 で resolver 化したが 0.1.90 で revert: 切り分け)
+  const guardAv = (av) => {
+    if (!av) return '';
+    if (!isAvatarUrlForUserId(av, entUid)) return '';
+    return shouldAssociateAvatarWithUser({
+      uid: entUid,
+      av,
       broadcasterUid: bc,
-      broadcasterIconUrl: String(snap?.broadcasterIconUrl || '').trim()
-    },
-    // 自コメ時は viewer なりすまし判定をかけない（自コメは viewer 自身の avatar が出るのが正常）
-    viewer: own
-      ? undefined
-      : {
-          viewerUid: String(snap?.viewerUserId || '').trim(),
-          viewerAvatarUrl: String(snap?.viewerAvatarUrl || '').trim()
-        }
-  });
+      broadcasterIconUrl
+    })
+      ? av
+      : '';
+  };
+  const guardedRememberedAvatar = guardAv(rememberedAvatarUrlForUserId(entUid));
+  const guardedAvatarUrl = guardAv(avatarUrl);
 
+  const fallbackAvatar =
+    mistakenBroadcaster ||
+    (viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own)
+      ? ''
+      : guardedRememberedAvatar;
+  const effectiveAvatar =
+    viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own
+      ? ''
+      : guardedAvatarUrl;
   const src = resolveSupportGrowthTileSrc({
-    entryAvatarUrl: resolved.displayUrl,
+    entryAvatarUrl: effectiveAvatar || fallbackAvatar,
     userId: mistakenBroadcaster ? null : entry?.userId ?? null,
     isOwnPosted: own,
     viewerAvatarUrl: snap?.viewerAvatarUrl,

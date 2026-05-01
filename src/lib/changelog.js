@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.90',
+    date: '2026-05-01',
+    summary: 'avatar refactor の影響切り分け revert',
+    items: Object.freeze([
+      '0.1.89 後にユーザーから「推定同時接続・来場者数が（接続中…）のまま、記録カウントも安定して出ない」報告があり、0.1.85 の avatar refactor (storyGrowthAvatarSrcCandidate を avatarResolver 化) を念のため revert しました',
+      'avatar 取り違え修正（0.1.83 の普遍ルール）は維持。0.1.84 の avatarResolver 基盤コンポーネントも残置（他コードからは未使用）。CSS 系の修正（0.1.86/0.1.89 スクロールバー、0.1.88 パネル位置）も維持',
+      '回帰の真因はまだ不明。0.1.90 で症状が変わるか、無関係（環境要因）か切り分けるための退避バージョン'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.89',
     date: '2026-05-01',
     summary: 'スクロールバー 2 重修正（host 側 overflow 撤去）',
