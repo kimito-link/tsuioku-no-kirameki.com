@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.93',
+    date: '2026-05-01',
+    summary: 'lv 切替時は stale を捨てる修正',
+    items: Object.freeze([
+      '0.1.92 の stale-while-revalidate で、別配信に切り替わった時も古い snapshot を表示し続けるバグを修正。同じ lv の polling 再 fetch では stale を維持し、別 lv に切り替わった時のみ snapshot をクリアします',
+      '効果: 多タブ運用で配信を切り替えても、別放送の数値が表示され続けることがなくなります。同じ放送内の polling では引き続き flicker しません',
+      '判定: snapshot.liveId === 現在の lv で「同じ放送」と判定'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.92',
     date: '2026-05-01',
     summary: '数字ちらちら + 接続中固定の根治',

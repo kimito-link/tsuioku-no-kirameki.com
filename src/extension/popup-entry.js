@@ -6793,12 +6793,25 @@ async function refresh() {
   const key = commentsStorageKey(lv);
   const snapshotCacheHit =
     watchMetaCache.key === snapshotKey && watchMetaCache.snapshot != null;
-  // 0.1.92 stale-while-revalidate: cache miss でも 古い snapshot を表示用に保持
-  let watchSnapshot = watchMetaCache.snapshot;
+
+  // 0.1.93: 同じ lv の polling 再 fetch では stale を保持、別 lv に切り替わった
+  //   ら snapshot をクリアする。lv 比較で「同じ放送かどうか」を判定。
+  const previousSnapshotLiveId = String(
+    watchMetaCache.snapshot?.liveId || ''
+  ).trim();
+  const isSameBroadcast = previousSnapshotLiveId && previousSnapshotLiveId === lv;
+  let watchSnapshot = snapshotCacheHit
+    ? watchMetaCache.snapshot
+    : isSameBroadcast
+    ? watchMetaCache.snapshot
+    : null;
 
   if (!snapshotCacheHit) {
     watchMetaCache.key = snapshotKey;
-    // 0.1.92: snapshot は null にせず、新 fetch 完了まで stale を表示
+    // 別 lv に切り替わった場合のみ snapshot をクリア（stale を捨てる）
+    if (!isSameBroadcast) {
+      watchMetaCache.snapshot = null;
+    }
   }
 
   /** @type {Record<string, unknown>} */
@@ -6973,10 +6986,12 @@ async function refresh() {
     // clearWatchMetaCard が `watchMetaCache.fetchInflight` を読んで「（接続中…）」
     // を出してくれるので、ユーザーは取得失敗（取得不可）と取得中（接続中）を
     // 視覚的に区別できるようになる。
-    // 0.1.92: ただし、古い snapshot がある場合は loading 表示せず stale を維持
-    //   （flicker 防止 + ユーザーが「常に接続中」と誤解する症状の根治）
-    const hasStaleSnapshot = watchMetaCache.snapshot != null;
-    watchMetaCache.fetchInflight = !hasStaleSnapshot;
+    // 0.1.92/0.1.93: 古い snapshot があり、かつ同じ放送（lv 一致）の場合のみ
+    //   loading 表示せず stale を維持。別 lv 切替時は loading 表示で OK。
+    const hasUsableStaleSnapshot =
+      watchMetaCache.snapshot != null &&
+      String(watchMetaCache.snapshot?.liveId || '').trim() === lv;
+    watchMetaCache.fetchInflight = !hasUsableStaleSnapshot;
     watchMetaCache.fetchError = '';
     if (isFreshRefresh()) {
       paintWatchPopupUi();

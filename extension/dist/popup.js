@@ -779,9 +779,19 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.93",
+      date: "2026-05-01",
+      summary: "lv \u5207\u66FF\u6642\u306F stale \u3092\u6368\u3066\u308B\u4FEE\u6B63",
+      items: Object.freeze([
+        "0.1.92 \u306E stale-while-revalidate \u3067\u3001\u5225\u914D\u4FE1\u306B\u5207\u308A\u66FF\u308F\u3063\u305F\u6642\u3082\u53E4\u3044 snapshot \u3092\u8868\u793A\u3057\u7D9A\u3051\u308B\u30D0\u30B0\u3092\u4FEE\u6B63\u3002\u540C\u3058 lv \u306E polling \u518D fetch \u3067\u306F stale \u3092\u7DAD\u6301\u3057\u3001\u5225 lv \u306B\u5207\u308A\u66FF\u308F\u3063\u305F\u6642\u306E\u307F snapshot \u3092\u30AF\u30EA\u30A2\u3057\u307E\u3059",
+        "\u52B9\u679C: \u591A\u30BF\u30D6\u904B\u7528\u3067\u914D\u4FE1\u3092\u5207\u308A\u66FF\u3048\u3066\u3082\u3001\u5225\u653E\u9001\u306E\u6570\u5024\u304C\u8868\u793A\u3055\u308C\u7D9A\u3051\u308B\u3053\u3068\u304C\u306A\u304F\u306A\u308A\u307E\u3059\u3002\u540C\u3058\u653E\u9001\u5185\u306E polling \u3067\u306F\u5F15\u304D\u7D9A\u304D flicker \u3057\u307E\u305B\u3093",
+        "\u5224\u5B9A: snapshot.liveId === \u73FE\u5728\u306E lv \u3067\u300C\u540C\u3058\u653E\u9001\u300D\u3068\u5224\u5B9A"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.92",
       date: "2026-05-01",
-      summary: "stale-while-revalidate \u3067 flicker \u3068 loading \u6C38\u4E45\u5316\u3092\u89E3\u6D88",
+      summary: "\u6570\u5B57\u3061\u3089\u3061\u3089 + \u63A5\u7D9A\u4E2D\u56FA\u5B9A\u306E\u6839\u6CBB",
       items: Object.freeze([
         "\u63A8\u5B9A\u540C\u63A5 / \u6765\u5834\u8005\u6570\u304C\u300C\uFF08\u63A5\u7D9A\u4E2D\u2026\uFF09\u300D\u306E\u307E\u307E\u3001\u307E\u305F\u306F \u3061\u3089\u3061\u3089\u70B9\u6EC5\u3059\u308B\u75C7\u72B6\u3092\u6839\u6CBB\u3057\u307E\u3057\u305F\u3002\u539F\u56E0\u306F polling \u6642\u306B snapshot \u3092 null \u30AF\u30EA\u30A2\u3057\u3066 loading \u72B6\u614B\u3092\u518D\u8868\u793A\u3059\u308B\u8A2D\u8A08\u3067\u3057\u305F",
         "\u4FEE\u6B63\u5185\u5BB9: stale-while-revalidate \u30D1\u30BF\u30FC\u30F3\u306B\u5909\u66F4\u3002\u53E4\u3044 snapshot \u3092 fetch \u4E2D\u3082\u4FDD\u6301\u3057\u7D9A\u3051\u3066\u8868\u793A\u3059\u308B\u3002\u65B0\u3057\u3044 fetch \u304C\u6210\u529F\u3057\u305F\u3089 ATOMIC \u306B\u7F6E\u304D\u63DB\u3048\u308B\u3002fetch \u5931\u6557\u6642\u3082\u53E4\u3044\u8868\u793A\u304C\u6B8B\u308B\uFF08\u300C\u63A5\u7D9A\u4E2D\u2026\u300D\u70B9\u6EC5\u306A\u3057\uFF09",
@@ -15149,9 +15159,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const snapshotKey = `${lv}|${url}|s17`;
       const key = commentsStorageKey(lv);
       const snapshotCacheHit = watchMetaCache.key === snapshotKey && watchMetaCache.snapshot != null;
-      let watchSnapshot = watchMetaCache.snapshot;
+      const previousSnapshotLiveId = String(
+        watchMetaCache.snapshot?.liveId || ""
+      ).trim();
+      const isSameBroadcast = previousSnapshotLiveId && previousSnapshotLiveId === lv;
+      let watchSnapshot = snapshotCacheHit ? watchMetaCache.snapshot : isSameBroadcast ? watchMetaCache.snapshot : null;
       if (!snapshotCacheHit) {
         watchMetaCache.key = snapshotKey;
+        if (!isSameBroadcast) {
+          watchMetaCache.snapshot = null;
+        }
       }
       const data = await readStorageBagWithRetry(
         () => chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
@@ -15232,8 +15249,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const shouldDeep = !INTERCEPT_BACKFILL_STATE.deepTried && arr.length >= 30 && missingIdCount >= Math.ceil(arr.length * 0.4);
       resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
       if (!snapshotCacheHit) {
-        const hasStaleSnapshot = watchMetaCache.snapshot != null;
-        watchMetaCache.fetchInflight = !hasStaleSnapshot;
+        const hasUsableStaleSnapshot = watchMetaCache.snapshot != null && String(watchMetaCache.snapshot?.liveId || "").trim() === lv;
+        watchMetaCache.fetchInflight = !hasUsableStaleSnapshot;
         watchMetaCache.fetchError = "";
         if (isFreshRefresh()) {
           paintWatchPopupUi();
@@ -16794,7 +16811,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1920" ? String("0501-1920") : "dev";
+      const buildId = "0501-1928" ? String("0501-1928") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
