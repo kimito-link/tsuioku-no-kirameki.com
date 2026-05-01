@@ -8,6 +8,7 @@ import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMult
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
+import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -4780,10 +4781,16 @@ function renderUserRooms(entries, liveId = '') {
   // 0.1.78: コメ記録に焼き込まれた汚染 avatar の表示時補正
   //   過去のバージョンで保存された nls_comments_<liveId> に broadcaster icon が
   //   viewer の avatarUrl として残っているケースを popup 表示前に除去する。
-  const rooms = sanitizeRoomAvatarsForBroadcaster(aggregateCommentsByUser(list), {
-    broadcasterUid: String(watchMetaCache.snapshot?.broadcasterUserId || '').trim(),
-    broadcasterIconUrl: String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim()
+  // 0.1.95: 配信者専用カードと rank slot の二重表示を防ぐため、配信者本人 room を
+  //   rank strip 入力から除外。配信者カードは watchMetaCache.snapshot の
+  //   broadcaster* フィールドから別経路で描画される。
+  const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+  const broadcasterIconUrl = String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim();
+  const sanitizedRooms = sanitizeRoomAvatarsForBroadcaster(aggregateCommentsByUser(list), {
+    broadcasterUid,
+    broadcasterIconUrl
   });
+  const rooms = excludeBroadcasterFromRankedRooms(sanitizedRooms, broadcasterUid);
   ul.innerHTML = '';
 
   if (!rooms.length) {
@@ -7726,11 +7733,13 @@ async function buildHtmlReportDocument(
       broadcasterIconUrl: String(snapshot?.broadcasterIconUrl || '').trim()
     }
   );
-  const aggregatedRooms = reportBroadcasterUserId
-    ? aggregatedRoomsAll.filter(
-        (room) => String(room.userKey || '').trim() !== reportBroadcasterUserId
-      )
-    : aggregatedRoomsAll;
+  // 0.1.95: rank strip と同じ純関数で broadcaster room を除外。
+  //   旧コードは inline filter で同じことをしていたが、責務を helper に統一して
+  //   将来「集計除外ルール」が変わった時に 1 箇所で済むようにする。
+  const aggregatedRooms = excludeBroadcasterFromRankedRooms(
+    aggregatedRoomsAll,
+    reportBroadcasterUserId
+  );
   // 0.1.21 (V): ユーザー別の累計字数（合計コメ字数）を集計テーブルに併記する。
   // 配信者本人の除外は aggregatedRooms と同じ条件で。
   /** @type {Map<string, number>} */

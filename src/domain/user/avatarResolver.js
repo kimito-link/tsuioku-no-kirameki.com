@@ -3,6 +3,17 @@
  *
  * レイヤ: domain/ (pure)
  *
+ * 現状（0.1.95 時点）: 未配線（dead code 状態）
+ *   0.1.84 で実装、0.1.85 で `storyGrowthAvatarSrcCandidate` に部分配線したが、
+ *   0.1.89 後の watchMeta 回帰の切り分けのため 0.1.90 で revert。その後の
+ *   調査で回帰の真因は別経路（0.1.94 で解決した polling 周期と取得時間の
+ *   race condition）と判明したため、配線 revert 自体は不要だったことが
+ *   判明している。
+ *
+ *   このファイル本体と 22 ケースのテストは設計の正本として残置。
+ *   再配線する際は `docs/plan-avatar-resolver-refactor.md` の 5 phase に沿って
+ *   `storyGrowthAvatarSrcCandidate` から再開する。
+ *
  * 設計（docs/plan-avatar-resolver-refactor.md / 0.1.84 Phase B）:
  *
  *   0.1.76〜0.1.83 で broadcaster icon 取り違えガードを 7 ファイルに分散

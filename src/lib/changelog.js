@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.95',
+    date: '2026-05-01',
+    summary: '配信者が rank strip と専用カードに二重表示される件を修正',
+    items: Object.freeze([
+      '配信者が自分の放送でコメントを多めにすると、応援ランクストリップの 1〜10 にも入って「専用カード（末尾）」と二重表示されていた件を修正しました。配信者は応援される側で応援する側ではないため、rank strip 集計から明示的に除外します',
+      'HTML レポート側で同じ意味の inline filter が既にあったので、新ヘルパー excludeBroadcasterFromRankedRooms に統一（DRY）。将来「集計除外ルール」が変わった時に 1 箇所で済む',
+      'avatarResolver.js (0.1.84 で実装、0.1.90 で revert 後 dead code) のヘッダに「現状未配線」明記。再配線時は docs/plan-avatar-resolver-refactor.md の 5 phase に沿う旨を残置'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.94',
     date: '2026-05-01',
     summary: 'INLINE モードで「接続中…」固定の race を根治',

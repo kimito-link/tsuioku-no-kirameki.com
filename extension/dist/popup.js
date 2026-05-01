@@ -250,6 +250,17 @@
     return rooms.map((r) => sanitizeRoomAvatarForBroadcaster(r, ctx));
   }
 
+  // src/lib/excludeBroadcasterFromRankedRooms.js
+  function excludeBroadcasterFromRankedRooms(rooms, broadcasterUid) {
+    if (!Array.isArray(rooms)) return [];
+    const uid = String(broadcasterUid ?? "").trim();
+    if (!uid) return rooms.slice();
+    return rooms.filter((room) => {
+      const userKey = String(room?.userKey ?? "").trim();
+      return userKey !== uid;
+    });
+  }
+
   // src/lib/avatarBroadcasterGuard.js
   var isAvatarUrlForUserId2 = isAvatarUrlForUserId;
   function shouldAssociateAvatarWithUser(input) {
@@ -778,6 +789,16 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.95",
+      date: "2026-05-01",
+      summary: "\u914D\u4FE1\u8005\u304C rank strip \u3068\u5C02\u7528\u30AB\u30FC\u30C9\u306B\u4E8C\u91CD\u8868\u793A\u3055\u308C\u308B\u4EF6\u3092\u4FEE\u6B63",
+      items: Object.freeze([
+        "\u914D\u4FE1\u8005\u304C\u81EA\u5206\u306E\u653E\u9001\u3067\u30B3\u30E1\u30F3\u30C8\u3092\u591A\u3081\u306B\u3059\u308B\u3068\u3001\u5FDC\u63F4\u30E9\u30F3\u30AF\u30B9\u30C8\u30EA\u30C3\u30D7\u306E 1\u301C10 \u306B\u3082\u5165\u3063\u3066\u300C\u5C02\u7528\u30AB\u30FC\u30C9\uFF08\u672B\u5C3E\uFF09\u300D\u3068\u4E8C\u91CD\u8868\u793A\u3055\u308C\u3066\u3044\u305F\u4EF6\u3092\u4FEE\u6B63\u3057\u307E\u3057\u305F\u3002\u914D\u4FE1\u8005\u306F\u5FDC\u63F4\u3055\u308C\u308B\u5074\u3067\u5FDC\u63F4\u3059\u308B\u5074\u3067\u306F\u306A\u3044\u305F\u3081\u3001rank strip \u96C6\u8A08\u304B\u3089\u660E\u793A\u7684\u306B\u9664\u5916\u3057\u307E\u3059",
+        "HTML \u30EC\u30DD\u30FC\u30C8\u5074\u3067\u540C\u3058\u610F\u5473\u306E inline filter \u304C\u65E2\u306B\u3042\u3063\u305F\u306E\u3067\u3001\u65B0\u30D8\u30EB\u30D1\u30FC excludeBroadcasterFromRankedRooms \u306B\u7D71\u4E00\uFF08DRY\uFF09\u3002\u5C06\u6765\u300C\u96C6\u8A08\u9664\u5916\u30EB\u30FC\u30EB\u300D\u304C\u5909\u308F\u3063\u305F\u6642\u306B 1 \u7B87\u6240\u3067\u6E08\u3080",
+        "avatarResolver.js (0.1.84 \u3067\u5B9F\u88C5\u30010.1.90 \u3067 revert \u5F8C dead code) \u306E\u30D8\u30C3\u30C0\u306B\u300C\u73FE\u72B6\u672A\u914D\u7DDA\u300D\u660E\u8A18\u3002\u518D\u914D\u7DDA\u6642\u306F docs/plan-avatar-resolver-refactor.md \u306E 5 phase \u306B\u6CBF\u3046\u65E8\u3092\u6B8B\u7F6E"
+      ])
+    }),
     Object.freeze({
       version: "0.1.94",
       date: "2026-05-01",
@@ -13585,10 +13606,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const heatPercent = totalRecent > 0 ? Math.min(100, Math.log10(totalRecent + 1) * 38) : 0;
     const heatText = totalRecent >= 50 ? "\u5897\u52A0\u304C\u3068\u3066\u3082\u5927\u304D\u3044" : totalRecent >= 20 ? "\u5897\u52A0\u304C\u5927\u304D\u3044" : totalRecent >= 5 ? "\u5897\u52A0\u3042\u308A" : "\u5897\u52A0\u306F\u5C11\u306A\u3081";
     renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText);
-    const rooms = sanitizeRoomAvatarsForBroadcaster(aggregateCommentsByUser(list), {
-      broadcasterUid: String(watchMetaCache.snapshot?.broadcasterUserId || "").trim(),
-      broadcasterIconUrl: String(watchMetaCache.snapshot?.broadcasterIconUrl || "").trim()
+    const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || "").trim();
+    const broadcasterIconUrl = String(watchMetaCache.snapshot?.broadcasterIconUrl || "").trim();
+    const sanitizedRooms = sanitizeRoomAvatarsForBroadcaster(aggregateCommentsByUser(list), {
+      broadcasterUid,
+      broadcasterIconUrl
     });
+    const rooms = excludeBroadcasterFromRankedRooms(sanitizedRooms, broadcasterUid);
     ul.innerHTML = "";
     if (!rooms.length) {
       _lastTopSupportRankStripStableKey = null;
@@ -15812,9 +15836,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         broadcasterIconUrl: String(snapshot?.broadcasterIconUrl || "").trim()
       }
     );
-    const aggregatedRooms = reportBroadcasterUserId ? aggregatedRoomsAll.filter(
-      (room) => String(room.userKey || "").trim() !== reportBroadcasterUserId
-    ) : aggregatedRoomsAll;
+    const aggregatedRooms = excludeBroadcasterFromRankedRooms(
+      aggregatedRoomsAll,
+      reportBroadcasterUserId
+    );
     const userKeyToTotalChars = /* @__PURE__ */ new Map();
     for (const c of comments) {
       const uid = c?.userId ? String(c.userId).trim() : "";
@@ -16829,7 +16854,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-2032" ? String("0501-2032") : "dev";
+      const buildId = "0501-2110" ? String("0501-2110") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

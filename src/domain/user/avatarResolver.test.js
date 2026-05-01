@@ -3,7 +3,6 @@ import { resolveAvatar, isObservationSafe } from './avatarResolver.js';
 
 const VIEWER_UID = '4046119';
 const BROADCASTER_UID = '99999';
-const PAST_BROADCASTER_UID = '143675916';
 
 const VIEWER_PERSONAL_ICON =
   'https://cdn.example/viewer-photo.jpg';
