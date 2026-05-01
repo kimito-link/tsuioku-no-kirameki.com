@@ -6982,8 +6982,23 @@ async function refresh() {
     // 視聴タブのリロード直後は content script が readiness 揃わず、単発の
     // NLS_EXPORT_WATCH_SNAPSHOT が snapshot=null で返る瞬間がある。
     // その状態で polling 周期（10〜30秒）まで待たされないように、内部で短いバックオフで再試行する。
-    const snapResult = await requestWatchPageSnapshotFromOpenTab(url);
-    watchMetaCache.fetchInflight = false;
+    // 0.1.91: try/finally で fetchInflight リセット保証。例外で fetch hang ＝
+    //   永久に「(接続中…)」表示の症状を防ぐ。
+    /** @type {{ snapshot?: any, error?: string }} */
+    let snapResult = { snapshot: null, error: '' };
+    try {
+      snapResult = await requestWatchPageSnapshotFromOpenTab(url);
+    } catch (err) {
+      snapResult = {
+        snapshot: null,
+        error:
+          err && typeof err === 'object' && 'message' in err
+            ? String(/** @type {{ message?: unknown }} */ (err).message || 'snapshot_request_failed')
+            : 'snapshot_request_failed'
+      };
+    } finally {
+      watchMetaCache.fetchInflight = false;
+    }
     watchMetaCache.fetchError = String(snapResult.error || '');
     if (!isFreshRefresh()) return;
     /*

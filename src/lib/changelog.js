@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.91',
+    date: '2026-05-01',
+    summary: 'fetch hang を防ぐ + ちくらん URL 修正',
+    items: Object.freeze([
+      '推定同時接続/来場者数が「（接続中…）」のまま停滞する症状の対策。requestWatchPageSnapshotFromOpenTab の await が例外を投げると後続の watchMetaCache.fetchInflight = false が実行されず、永久に「（接続中…）」が表示される設計上の脆さを修正',
+      '修正内容: popup-entry.js の snapshot fetch を try/catch/finally で囲み、例外時も必ず fetchInflight=false に戻す。snapshot は null、fetchError にメッセージを格納して fetch_failed 経路に倒す',
+      'これで snapshot 取得失敗時も「（取得不可）」表示に進めるようになり、永久 loading 状態は発生しなくなります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.90',
     date: '2026-05-01',
     summary: 'avatar refactor の影響切り分け revert',

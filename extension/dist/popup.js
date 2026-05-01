@@ -779,6 +779,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.91",
+      date: "2026-05-01",
+      summary: "fetch hang \u3092\u9632\u3050 + \u3061\u304F\u3089\u3093 URL \u4FEE\u6B63",
+      items: Object.freeze([
+        "\u63A8\u5B9A\u540C\u6642\u63A5\u7D9A/\u6765\u5834\u8005\u6570\u304C\u300C\uFF08\u63A5\u7D9A\u4E2D\u2026\uFF09\u300D\u306E\u307E\u307E\u505C\u6EDE\u3059\u308B\u75C7\u72B6\u306E\u5BFE\u7B56\u3002requestWatchPageSnapshotFromOpenTab \u306E await \u304C\u4F8B\u5916\u3092\u6295\u3052\u308B\u3068\u5F8C\u7D9A\u306E watchMetaCache.fetchInflight = false \u304C\u5B9F\u884C\u3055\u308C\u305A\u3001\u6C38\u4E45\u306B\u300C\uFF08\u63A5\u7D9A\u4E2D\u2026\uFF09\u300D\u304C\u8868\u793A\u3055\u308C\u308B\u8A2D\u8A08\u4E0A\u306E\u8106\u3055\u3092\u4FEE\u6B63",
+        "\u4FEE\u6B63\u5185\u5BB9: popup-entry.js \u306E snapshot fetch \u3092 try/catch/finally \u3067\u56F2\u307F\u3001\u4F8B\u5916\u6642\u3082\u5FC5\u305A fetchInflight=false \u306B\u623B\u3059\u3002snapshot \u306F null\u3001fetchError \u306B\u30E1\u30C3\u30BB\u30FC\u30B8\u3092\u683C\u7D0D\u3057\u3066 fetch_failed \u7D4C\u8DEF\u306B\u5012\u3059",
+        "\u3053\u308C\u3067 snapshot \u53D6\u5F97\u5931\u6557\u6642\u3082\u300C\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09\u300D\u8868\u793A\u306B\u9032\u3081\u308B\u3088\u3046\u306B\u306A\u308A\u3001\u6C38\u4E45 loading \u72B6\u614B\u306F\u767A\u751F\u3057\u306A\u304F\u306A\u308A\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.90",
       date: "2026-05-01",
       summary: "avatar refactor \u306E\u5F71\u97FF\u5207\u308A\u5206\u3051 revert",
@@ -15220,8 +15230,20 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           markPopupRefreshContentPainted();
           revealPopupPrimaryOnce();
         }
-        const snapResult = await requestWatchPageSnapshotFromOpenTab(url);
-        watchMetaCache.fetchInflight = false;
+        let snapResult = { snapshot: null, error: "" };
+        try {
+          snapResult = await requestWatchPageSnapshotFromOpenTab(url);
+        } catch (err) {
+          snapResult = {
+            snapshot: null,
+            error: err && typeof err === "object" && "message" in err ? String(
+              /** @type {{ message?: unknown }} */
+              err.message || "snapshot_request_failed"
+            ) : "snapshot_request_failed"
+          };
+        } finally {
+          watchMetaCache.fetchInflight = false;
+        }
         watchMetaCache.fetchError = String(snapResult.error || "");
         if (!isFreshRefresh()) return;
         watchMetaCache.snapshot = mergeWatchSnapshotPreservingBroadcaster(
@@ -16762,7 +16784,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1854" ? String("0501-1854") : "dev";
+      const buildId = "0501-1904" ? String("0501-1904") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
