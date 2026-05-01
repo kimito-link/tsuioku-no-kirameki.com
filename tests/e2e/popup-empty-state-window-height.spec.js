@@ -72,7 +72,59 @@ test.describe('popup window height for empty state', () => {
       return { width: popup?.width, height: popup?.height, type: popup?.type };
     }, popupUrl);
 
-    console.log(`[popup-empty-state-window-height] measured dims:`, dims);
+    // popup 内部の content 高さを測定（preset 調整用）
+    const contentDims = await popupPage.evaluate(() => {
+      const el = (id) => document.getElementById(id);
+      const body = document.body;
+      const primary = document.getElementById('nlPopupPrimary');
+      const lastVisibleSection = (selectors) => {
+        for (const s of selectors) {
+          const e = document.querySelector(s);
+          if (e && e.offsetHeight > 0) {
+            return { sel: s, bottom: e.getBoundingClientRect().bottom };
+          }
+        }
+        return null;
+      };
+      return {
+        bodyScrollHeight: body?.scrollHeight,
+        bodyClientHeight: body?.clientHeight,
+        primaryScrollHeight: primary?.scrollHeight,
+        primaryOffsetHeight: primary?.offsetHeight,
+        primaryRectBottom: primary?.getBoundingClientRect().bottom,
+        viewportHeight: window.innerHeight,
+        bottomOfDetailedSettings:
+          el('nlPopupSettings')?.getBoundingClientRect().bottom,
+        bottomOfStatCards:
+          el('liveStatCards')?.getBoundingClientRect().bottom,
+        bottomOfPoweredBy: lastVisibleSection(['.nl-powered-by'])?.bottom,
+        rootClasses: document.documentElement.className
+      };
+    });
+
+    console.log(`[popup-empty-state-window-height] window dims:`, dims);
+    console.log(`[popup-empty-state-window-height] content dims:`, contentDims);
+
+    // empty state では popup outer ≒ primary.scrollHeight + 40 になっているはず
+    if (
+      contentDims.primaryScrollHeight &&
+      Number.isFinite(contentDims.primaryScrollHeight)
+    ) {
+      const expectedOuter = contentDims.primaryScrollHeight + 40;
+      expect(
+        Math.abs(dims.height - expectedOuter),
+        `popup outer (${dims.height}) should be near content + chrome (${expectedOuter})`
+      ).toBeLessThanOrEqual(HEIGHT_TOLERANCE);
+    }
+
+    // bodyScrollHeight も content にあわせて伸びている（cap 解除確認）
+    expect(contentDims.bodyScrollHeight).toBeGreaterThanOrEqual(580);
+
+    // popup スクショ（diagnostic）
+    await popupPage.screenshot({
+      path: 'test-results/popup-empty-state-no-history.png',
+      fullPage: false
+    });
 
     expect(dims.width).toBe(POPUP_WIDTH);
     expect(dims.type).toBe('popup');

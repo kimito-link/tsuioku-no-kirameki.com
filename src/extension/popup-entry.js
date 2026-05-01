@@ -6152,19 +6152,41 @@ async function resizePopupWindowForState(input) {
     // popup window 限定。通常の Chrome ウィンドウや side panel は無視。
     if (win.type !== 'popup') return;
 
-    // 0.1.72 (BB): 0.1.71 の body.scrollHeight 実測は changelog / concept /
-    //   frame-switch / powered-by など empty state でも可視のセクション全部を
-    //   含んだ「content 全体高さ」を返してしまい、popup が逆に拡大することが
-    //   判明（780→960 級のケースあり）。
-    //   CSS 側で `html:not(.nl-inline) { height: min(...,580px); }` の cap が
-    //   既に効いており、popup outer = 580 + 40 = 620 にすれば body cap が
-    //   inner viewport にぴったり収まる。それ以下の content は body 内で
-    //   .nl-main の overflow:auto で scroll される。
+    // 0.1.73 (BC): empty state は CSS で body cap を解除し、content の高さに
+    //   合わせて body を伸ばすようにした。よって `nlPopupPrimary.scrollHeight`
+    //   が「実際に見せるべき content の高さ」になる。これに OS chrome 余裕 40px
+    //   を足して outer height とする。
+    //   primary を使う理由: body.scrollHeight は body cap 580 で止まるが（後方互換
+    //   のため CSS cap は default 残す）、primary は cap がかかっていないので
+    //   生の content 高さが取れる。
     //
-    //   よって fixed preset のみを使う（測定値 hint は渡さない）。
+    //   active watch (emptyState=false) は preset 780 のまま。
+    /** @type {{ contentHeightPx: number, chromeOverheadPx: number }|undefined} */
+    let viewportHint = undefined;
+    if (emptyState) {
+      try {
+        // 1 frame 待って CSS の hide / cap 解除が反映されたあとに測る
+        await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+        const primary = document.getElementById('nlPopupPrimary');
+        const measured =
+          (primary && Number.isFinite(primary.scrollHeight)
+            ? primary.scrollHeight
+            : 0) || 0;
+        if (measured > 0) {
+          viewportHint = {
+            contentHeightPx: measured,
+            chromeOverheadPx: 40
+          };
+        }
+      } catch {
+        // 測定失敗時はプリセットにフォールバック
+      }
+    }
+
     const height = computePopupWindowTargetHeight({
       emptyState,
-      hasHistory
+      hasHistory,
+      viewportHint
     });
     if (typeof win.height === 'number' && win.height === height) return;
     await chrome.windows.update(win.id, {

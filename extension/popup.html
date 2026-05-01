@@ -6158,6 +6158,28 @@
         display: none !important;
       }
 
+      /*
+       * 0.1.73 (BC): empty state では body の 580px cap を解除し、content の高さに
+       * 合わせて body / .nl-main を伸ばす。standard popup mode では「watch 中は
+       * 1000px+ になり得るので body=580 で .nl-main を内部スクロール」設計だが、
+       * empty state は content が ~620px に収まるので、cap を外して全部見える方が
+       * 自然。下流で popup window 自体の outer height を primary.scrollHeight + 40
+       * に合わせるので、popup window 外側にも内部にも scrollbar が出ない。
+       */
+      html.nl-empty-state:not(.nl-inline) {
+        height: auto !important;
+        max-height: none !important;
+      }
+      html.nl-empty-state:not(.nl-inline) body {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      html.nl-empty-state:not(.nl-inline) body .nl-main {
+        flex: 0 0 auto;
+        overflow-y: visible;
+      }
+
       html.nl-skin-panel-dark {
         color-scheme: dark;
         --nl-bg: #0a0e14;

@@ -14326,9 +14326,25 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const win = await chrome.windows.getCurrent();
       if (!win || win.id == null) return;
       if (win.type !== "popup") return;
+      let viewportHint = void 0;
+      if (emptyState) {
+        try {
+          await new Promise((r) => requestAnimationFrame(() => r(void 0)));
+          const primary = document.getElementById("nlPopupPrimary");
+          const measured = (primary && Number.isFinite(primary.scrollHeight) ? primary.scrollHeight : 0) || 0;
+          if (measured > 0) {
+            viewportHint = {
+              contentHeightPx: measured,
+              chromeOverheadPx: 40
+            };
+          }
+        } catch {
+        }
+      }
       const height = computePopupWindowTargetHeight({
         emptyState,
-        hasHistory
+        hasHistory,
+        viewportHint
       });
       if (typeof win.height === "number" && win.height === height) return;
       await chrome.windows.update(win.id, {
@@ -16482,7 +16498,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1133" ? String("0501-1133") : "dev";
+      const buildId = "0501-1145" ? String("0501-1145") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

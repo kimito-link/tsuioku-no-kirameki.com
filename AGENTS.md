@@ -20,7 +20,7 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **次回提出バージョン**: 0.1.72（2026-05-01 ローカル準備）
+- **次回提出バージョン**: 0.1.73（2026-05-01 ローカル準備）
 - **直前提出バージョン**: 0.1.10（2026-04-29 提出済 / 審査中）
 - **直近通過バージョン**: 0.1.7（2026-04-23 提出 / 審査通過済・公開中）
 - **前回提出**: 0.1.6（2026-04-19 / 審査通過済）
@@ -175,6 +175,40 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 ---
 
 ## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.73 バンプで入った修正（empty state では body cap 解除 + primary.scrollHeight 実測 BC）**:
+
+- ユーザー報告（0.1.72 リリース後、5 枚スクショで複数画面サイズ検証）:
+  「ファーストビューに全部おさまっていない 枠から飛び出している」
+- 原因（Playwright で実測して特定）:
+  - `html:not(.nl-inline) { height: min(...,580px); max-height: ... }` の **body cap 580px**
+    が popup mode で常時かかっており、body 内に content が 622px ある場合、
+    最後の 42px が `.nl-main` の `overflow-y: auto` で内部 scroll になっていた。
+  - 0.1.72 で popup outer = 600 にしたが、popup window inner ≈ 560 < html cap 580 となり、
+    今度は popup window 自身に外側の scrollbar が出るパターンも発生。
+  - `body.scrollHeight` を測ると body cap で 580 までしか返らないため、measurement 駆動
+    したい場合は **`nlPopupPrimary.scrollHeight` (= 617)** を使う必要があった。
+- 修正（2 段階）:
+  - **CSS** (`extension/popup.html`): empty state のときだけ html / body の height cap を
+    解除し、`.nl-main` の overflow も visible に切り替え:
+    ```css
+    html.nl-empty-state:not(.nl-inline) { height: auto !important; max-height: none !important; }
+    html.nl-empty-state:not(.nl-inline) body { height: auto !important; max-height: none !important; overflow: visible !important; }
+    html.nl-empty-state:not(.nl-inline) body .nl-main { flex: 0 0 auto; overflow-y: visible; }
+    ```
+    これにより body / .nl-main は content に沿って伸び、内部 scrollbar が消える。
+  - **JS** (`src/extension/popup-entry.js`): measurement を `body.scrollHeight` から
+    `nlPopupPrimary.scrollHeight` に切替。`primary.scrollHeight + 40` を viewportHint で渡す。
+- 効果（Playwright で実測）:
+  - empty + no-history: popup outer = **657** (= primary 617 + chrome 40)
+  - bodyScrollHeight = 632 (cap 解除されて content に合う)
+  - 内部スクロールバーなし、外側スクロールバーなし
+  - スクショ（`test-results/popup-empty-state-no-history.png`）で
+    全 content が一画面に収まることを確認
+- Playwright spec 強化: 「popup outer ≒ primary.scrollHeight + 40 に収まる」assertion 追加。
+  「body.scrollHeight ≥ 580」で cap 解除が効いていることも assertion。
+- 残課題: history-あり ケースの Playwright テストはまだ未追加（IDB 事前データ挿入が必要）。
+  0.1.74 以降の候補。
 
 **0.1.72 バンプで入った修正（popup window 実測 resize の不具合修正 + Playwright 検証 BB）**:
 
