@@ -267,6 +267,7 @@ import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
+import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
 
 /**
  * @typedef {{
@@ -7019,19 +7020,23 @@ async function refresh() {
       watchMetaCache.fetchInflight = false;
     }
     watchMetaCache.fetchError = String(snapResult.error || '');
-    if (!isFreshRefresh()) return;
     /*
-     * 0.1.41 (W): 配信者タイル「出たと思ったら消える」の対策。
-     *   30 秒ごとの polling で snapshot を無条件上書きしていたため、
-     *   niconico SPA が #embedded-data を一瞬書き換えるタイミングに当たると
-     *   broadcaster 系（name/pageUrl/iconUrl/userId/level）が空の snapshot で
-     *   旧値を消してしまっていた。partial-merge で broadcaster identity 系
-     *   フィールドだけは「新値が空なら旧値を保つ」にする。
+     * 0.1.94 race fix: snapshot は generation を超える永続キャッシュなので、
+     *   `isFreshRefresh()` の bail-out より先に merge する。INLINE モード
+     *   （polling=10s）× slow fetch（frame iteration × retry で最大 ~11s）で
+     *   旧コードでは 1st fetch の結果が常に bail-out で破棄され、
+     *   `watchMetaCache.snapshot` が永久に null → 「（接続中…）」固定になる
+     *   race が発生していた（ユーザー実機 v0.1.92 で確認）。
+     *
+     * 0.1.41 (W): 配信者タイル「出たと思ったら消える」対策として
+     *   broadcaster identity フィールドは partial-merge を続ける。
      */
-    watchMetaCache.snapshot = mergeWatchSnapshotPreservingBroadcaster(
-      watchMetaCache.snapshot,
-      snapResult.snapshot
-    );
+    watchMetaCache.snapshot = persistFreshlyFetchedSnapshot({
+      currentSnapshot: watchMetaCache.snapshot,
+      fetchedSnapshot: snapResult.snapshot,
+      merge: mergeWatchSnapshotPreservingBroadcaster
+    });
+    if (!isFreshRefresh()) return;
     watchSnapshot = watchMetaCache.snapshot;
     const strippedAfterSnap = stripViewerAvatarContamination(
       arr,
@@ -10647,8 +10652,10 @@ function initPopup() {
       const now = Date.now();
       if (now - lastVisibilityRefresh < POLL_INTERVAL_MS) return;
       lastVisibilityRefresh = now;
+      // 0.1.94: 0.1.92 polling 側で snapshot=null を撤去したのに合わせて
+      //   visibilitychange でも snapshot を残す（stale-while-revalidate）。
+      //   タブ切替で戻った瞬間に「接続中…」が再点灯する症状を防ぐ。
       watchMetaCache.key = '';
-      watchMetaCache.snapshot = null;
       safeRefresh();
     });
   }

@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.94',
+    date: '2026-05-01',
+    summary: 'INLINE モードで「接続中…」固定の race を根治',
+    items: Object.freeze([
+      'INLINE モード（拡張をニコ生 watch ページに埋め込んだ状態）で 推定同接 / 来場者数が「（接続中…）」のまま固定される race condition を根治しました。0.1.91-0.1.93 の 3 連続修正でも残っていた症状の真因です',
+      '真因: popup-entry.js#refresh() が世代番号で守られている設計だが、watch snapshot の merge も世代の bail-out の後ろにあったため、INLINE polling=10 秒 × slow fetch=最大 11 秒の組み合わせで 1 回目の取得結果が常に破棄されていました',
+      '修正内容: snapshot は世代を超える永続キャッシュとして isFreshRefresh() の bail-out より先に merge するよう、純関数 popupWatchSnapshotPersist.js を新設して責務を分離。paint や derived UI 更新は引き続き世代で守る',
+      '副作用修正: INLINE モードの visibilitychange 時にも snapshot=null クリアが残っていた漏れを撤去（タブ切替で戻った瞬間に「接続中…」が再点灯する症状の防止）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.93',
     date: '2026-05-01',
     summary: 'lv 切替時は stale を捨てる修正',
