@@ -312,6 +312,31 @@ async function migrateFloatingPanelToDockProfileOnce() {
 }
 
 /**
+ * 0.1.63 (AS): below → dock_bottom のワンショット移行（SW 側コピー）。
+ * 内容は src/lib/migrateInlinePanelBelowToDock.js と同一。
+ */
+async function migrateBelowPanelToDockProfileOnce() {
+  const K_PLACEMENT = 'nls_inline_panel_placement';
+  const K_DONE = 'nls_inline_panel_below_to_dock_migrated';
+  try {
+    const bag = await chrome.storage.local.get([K_PLACEMENT, K_DONE]);
+    if (bag[K_DONE] === true) return;
+    const p = String(bag[K_PLACEMENT] || '').trim().toLowerCase();
+    if (p !== 'below') {
+      // 既に dock_bottom 等なら値は変えず flag だけ立てる
+      await chrome.storage.local.set({ [K_DONE]: true });
+      return;
+    }
+    await chrome.storage.local.set({
+      [K_PLACEMENT]: 'dock_bottom',
+      [K_DONE]: true
+    });
+  } catch {
+    // no-op
+  }
+}
+
+/**
  * 0.1.7 / 0.1.8 / 0.1.9 で焼き込まれた古い `selfPosted: true` を全 `nls_comments_*` から
  * 剥がす後方互換 migration（D-4）。SW は ESM バンドル外のため、純関数を import せず
  * 同等ロジックを SW 内にハードコピー（`migrateInlinePanelFloatToDockProfileOnce` と同パターン）。
@@ -396,6 +421,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   void ensureAutoBackupAlarm();
   void (async () => {
     await migrateFloatingPanelToDockProfileOnce();
+    await migrateBelowPanelToDockProfileOnce();
     // D-4: 0.1.10 未満からの自動更新で「他人コメントへの誤焼き込み selfPosted」を剥がす。
     // 'install'（fresh）では走らないよう previousVersion を渡す。
     if (details?.reason === 'update') {
@@ -413,6 +439,7 @@ chrome.runtime.onStartup.addListener(() => {
   ensureToolbarOpensPopupNotSidePanel();
   void ensureAutoBackupAlarm();
   void migrateFloatingPanelToDockProfileOnce();
+  void migrateBelowPanelToDockProfileOnce();
   void injectIntoExistingTabs();
 });
 
@@ -443,10 +470,20 @@ async function getToolbarActionPolicy() {
 
 /**
  * 既存の popup 窓があれば前面化、なければ作成（default_popup 廃止後の代替）。
+ *
+ * 0.1.58 (AN) → 0.1.59 (AO): popup window のサイズを毎回 420×780 に
+ *   リセットするだけでなく、Chrome が以前の resize を強く保持する
+ *   ケースに対処するため、既存 popup を **閉じてから** 新規作成する形に
+ *   変更。フォーカス継続は失われるが、サイズが必ず 420×780 になる。
+ *   さらに `state: 'normal'` を明示して maximized 等の異常状態を解除し、
+ *   `top`/`left` を画面中央寄せに。
  */
+const POPUP_WINDOW_WIDTH = 420;
+const POPUP_WINDOW_HEIGHT = 780;
 async function openOrFocusPopupWindow() {
   const url = chrome.runtime.getURL('popup.html');
   const urlBase = url.replace(/[?#].*$/, '');
+  // 既存 popup を見つけたら一度閉じる（サイズリセットの確実性のため）
   try {
     const all = await chrome.windows.getAll({ populate: true });
     for (const w of all) {
@@ -454,20 +491,65 @@ async function openOrFocusPopupWindow() {
       const t = w.tabs && w.tabs[0];
       const u = String(t?.url || '');
       if (u && (u === url || u.startsWith(urlBase))) {
-        await chrome.windows.update(w.id, { focused: true });
-        return;
+        try {
+          await chrome.windows.remove(w.id);
+        } catch {
+          // already closed
+        }
       }
     }
   } catch {
     // no-op
   }
+  /*
+   * 0.1.61 (AQ) → 0.1.62 (AR) → 0.1.64 (AT3): popup を Chrome window の
+   *   「右内側」に配置する。
+   *
+   *   経緯:
+   *     0.1.62 では Chrome の右**外**側 (left = lastNormal.left + width) に
+   *     置いていた。Chrome がモニタ A の右寄りにいると、外側＝モニタ B
+   *     （隣のモニタ）になる。多モニタ環境（5 モニタ等）では popup が別の
+   *     モニタに飛んでしまう報告。
+   *   修正:
+   *     popup の left を「Chrome の右端 - POPUP_WIDTH」にし、Chrome window の
+   *     **内側**右上に出す。Chrome content の右側と少し被るが、必ず Chrome の
+   *     いるモニタに popup が出るので「別モニタに飛ぶ」事故を完全に防げる。
+   *     ユーザー要望「Chrome から離れて出るのはおかしい」（=右側に並べたい）の
+   *     趣旨も保つ。
+   *     Chrome window が POPUP_WIDTH より狭い極端ケースでは window 全体に
+   *     被るが、その場合は元々が異常状態なので無視（左端を超えない clamp で
+   *     十分）。
+   */
+  /** @type {{ left?: number, top?: number }} */
+  const positionHint = {};
+  try {
+    const lastNormal = await chrome.windows.getLastFocused({
+      windowTypes: ['normal']
+    });
+    if (
+      lastNormal &&
+      typeof lastNormal.left === 'number' &&
+      typeof lastNormal.top === 'number' &&
+      typeof lastNormal.width === 'number'
+    ) {
+      // Chrome window の右**内側**に popup の右端を合わせる（content の右側と被るが必ず同モニタ）
+      const left = lastNormal.left + lastNormal.width - POPUP_WINDOW_WIDTH;
+      const top = lastNormal.top;
+      positionHint.left = Math.max(lastNormal.left, Math.round(left));
+      positionHint.top = Math.max(0, Math.round(top));
+    }
+  } catch {
+    // no-op: getLastFocused が取れなければ Chrome のデフォルト位置にする
+  }
   try {
     await chrome.windows.create({
       url,
       type: 'popup',
-      width: 420,
-      height: 780,
-      focused: true
+      width: POPUP_WINDOW_WIDTH,
+      height: POPUP_WINDOW_HEIGHT,
+      focused: true,
+      state: 'normal',
+      ...positionHint
     });
   } catch {
     // no-op
@@ -475,39 +557,68 @@ async function openOrFocusPopupWindow() {
 }
 
 /**
+ * 0.1.67 (AW): 関係ないタブ（watch じゃない）でツールバーアイコンを押した時、
+ *   旧来の standalone popup window ではなく Chrome 統合の **side panel** を
+ *   開くよう変更。ユーザー報告「(配信中の inline panel と違って) 関係ない
+ *   タブで開いた popup が Chrome から離れて見える」への対応で、視覚的に
+ *   Chrome window と一体化させる。
+ *
+ *   - watch ページ: 従来通り inline panel に focus（NLS_FOCUS_INLINE_PANEL）
+ *   - watch じゃないタブ: chrome.sidePanel.open({windowId}) で side panel
+ *   - 旧 popup window は API 不在・エラー時の fallback として残す
+ *   - getToolbarActionPolicy() === 'always_open_popup' は旧挙動を保つ（互換）
+ *
+ *   sidepanel.html は popup.html?inline=1&dock=sidepanel を iframe で読み込む
+ *   既存実装。popup-entry.js の sidepanel 用 UI 切り替えロジック (search param
+ *   `dock=sidepanel`) がそのまま機能する。
+ *
  * @param {import('chrome').tabs.Tab|undefined} tab
  */
 async function handleBrowserActionClick(tab) {
   const policy = await getToolbarActionPolicy();
   if (policy === 'always_open_popup') {
+    // 旧設定の人は popup window を維持（互換）
     await openOrFocusPopupWindow();
     return;
   }
   const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
-  if (tid === chrome.tabs.TAB_ID_NONE) {
-    await openOrFocusPopupWindow();
-    return;
+  if (tid !== chrome.tabs.TAB_ID_NONE) {
+    try {
+      /*
+       * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
+       * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
+       * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
+       * フレームに broadcast され、iframe の listener が
+       *   if (!isWatchInlinePanelTopFrame()) return false;
+       * で同期 false を返して port を閉じてしまう。top frame の async listener が
+       * sendResponse({focused:true}) する前に port closed エラーになり、
+       * background が popup 窓を fallback として開いてしまう（user 報告：
+       * インラインパネル + popup 窓が同時に出る）。
+       */
+      const res = await chrome.tabs.sendMessage(
+        tid,
+        { type: 'NLS_FOCUS_INLINE_PANEL' },
+        { frameId: 0 }
+      );
+      if (res && res.focused) return;
+    } catch {
+      // コンテンツ未注入・対象外 URL
+    }
   }
+  // 0.1.67 (AW): watch じゃないタブ → Chrome 統合の side panel を試みる
   try {
-    /*
-     * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
-     * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
-     * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
-     * フレームに broadcast され、iframe の listener が
-     *   if (!isWatchInlinePanelTopFrame()) return false;
-     * で同期 false を返して port を閉じてしまう。top frame の async listener が
-     * sendResponse({focused:true}) する前に port closed エラーになり、
-     * background が popup 窓を fallback として開いてしまう（user 報告：
-     * インラインパネル + popup 窓が同時に出る）。
-     */
-    const res = await chrome.tabs.sendMessage(
-      tid,
-      { type: 'NLS_FOCUS_INLINE_PANEL' },
-      { frameId: 0 }
-    );
-    if (res && res.focused) return;
+    if (
+      tab &&
+      typeof tab.windowId === 'number' &&
+      typeof chrome !== 'undefined' &&
+      chrome.sidePanel &&
+      typeof chrome.sidePanel.open === 'function'
+    ) {
+      await chrome.sidePanel.open({ windowId: tab.windowId });
+      return;
+    }
   } catch {
-    // コンテンツ未注入・対象外 URL
+    // sidePanel.open が使えない / user gesture が失われた / 環境制約 → popup window へ fallback
   }
   await openOrFocusPopupWindow();
 }

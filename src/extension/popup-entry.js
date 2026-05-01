@@ -4,7 +4,7 @@ import {
   isNicoLiveWatchUrl,
   watchPageUrlsMatchForSnapshot
 } from '../lib/broadcastUrl.js';
-import { resolveWatchUrlFromTabAndStash } from '../lib/popupWatchUrlResolve.js';
+import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import {
@@ -249,10 +249,22 @@ import {
   openBroadcastSessionSummaryDb
 } from '../lib/broadcastSessionSummaryDb.js';
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
+import {
+  buildLastBroadcastReviewView,
+  formatLastBroadcastIndicator,
+  loadLastBroadcastSummary
+} from '../lib/loadLastBroadcastSummary.js';
+import {
+  computePopupWindowTargetHeight,
+  POPUP_WINDOW_WIDTH
+} from '../lib/popupWindowEmptyHeight.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
+import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
+import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
+import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 
 /**
  * @typedef {{
@@ -368,8 +380,16 @@ function applyResponsivePopupLayout() {
   body.classList.toggle('nl-inline', INLINE_MODE);
   root.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
   body.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
-  /* ダークカード系は html のみ（CSS セレクタも html 起点。body に二重で付けない） */
-  root.classList.toggle('nl-skin-panel-dark', !INLINE_MODE || INLINE_SIDE_PANEL);
+  /*
+   * 0.1.51 (AG): popup window で dark テーマが消えない件の追跡修正。
+   *   0.1.50 で `prefers-color-scheme: dark` 検出に切り替えたが、
+   *   Chrome のテーマ設定 / Windows のシステム配色が dark 寄りだと
+   *   matchMedia が true を返してしまい、ユーザー視点の「OS は light」と
+   *   食い違って dark のままだった。完全に light 強制（dark クラスを
+   *   一切付けない）に変更する。dark を望むユーザー向けには将来 設定
+   *   トグルを追加する。
+   */
+  root.classList.remove('nl-skin-panel-dark');
   body.classList.remove('nl-skin-panel-dark');
 
   if (INLINE_MODE) {
@@ -522,6 +542,21 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
 }
 
 /**
+ * `.nl-live-stat-value` に流す文言が「数字以外（フォールバック）」かを判定する。
+ * 数字 (`'1,234'`) と「~」プレフィックス推定値 (`'~250'`) は数値扱い。
+ * 「（取得不可）」「計測中…」「—」「-」などはフォールバック扱いで、CSS 側で
+ * 小さめサイズに切り替える（極太22px のままだと幅100px のカードで縦書き状に
+ * 折り返されて読めなくなる、0.1.68 修正）。
+ * @param {string} text
+ * @returns {boolean}
+ */
+function isStatValuePlaceholderText(text) {
+  const t = String(text ?? '').trim();
+  if (!t) return true;
+  return !/^~?[\d,，]+$/.test(t);
+}
+
+/**
  * @param {string|number} value 数値は toLocaleString('ja-JP') で表示。未取得時は明示文言。
  * @param {WatchPageSnapshot|null} [watchSnapshot] 公式コメント数の併記用
  */
@@ -551,7 +586,13 @@ function setCountDisplay(value, watchSnapshot = null) {
     );
   }
   const liveStatEl = $('liveStatComments');
-  if (liveStatEl) liveStatEl.textContent = text;
+  if (liveStatEl) {
+    liveStatEl.textContent = text;
+    liveStatEl.classList.toggle(
+      'is-placeholder',
+      isStatValuePlaceholderText(text)
+    );
+  }
 
   const officialEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsOfficial'));
   if (officialEl) {
@@ -969,26 +1010,9 @@ function paintCommentComposeUi() {
   syncVoiceCommentButton();
 }
 
-/** 拡張コンテキスト無効化・更新手順の共通文案（UI とヒントで揃える） */
-const EXTENSION_RELOAD_USER_GUIDE_JA =
-  '改善しなければ chrome://extensions を開き、「君斗りんくの追憶のきらめき」の「更新」で拡張を再読み込みしてください。';
+// 0.1.38 (AM): EXTENSION_RELOAD_USER_GUIDE_JA / withCommentSendTroubleshootHint
+// を src/lib/commentSendTroubleshootHint.js に切り出し済み（純粋関数 + 7 ケース TDD）。
 const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
-
-/** コメント送信まわりのエラーに、再読み込み案内を1回だけ足す */
-function withCommentSendTroubleshootHint(message) {
-  const s = String(message || '').trim();
-  if (!s) return '';
-  const hintLines = [];
-  if (!/再読み込み|F5|別タブ|前面/.test(s)) {
-    hintLines.push(
-      'watchページを再読み込み（F5）し、別タブで開いている放送ページを前面にしてください。'
-    );
-  }
-  if (!/chrome:\/\/extensions|「更新」/.test(s)) {
-    hintLines.push(EXTENSION_RELOAD_USER_GUIDE_JA);
-  }
-  return hintLines.length ? `${s}\n※うまくいかないとき: ${hintLines.join('\n')}` : s;
-}
 
 // 0.1.16 (Q): isExtensionContextInvalidatedError の重複定義を撤去し
 // `../lib/reportSilentError.js#isContextInvalidatedError` に一本化（同名 alias 経由で
@@ -2156,27 +2180,6 @@ function rememberedAvatarUrlForUserId(userId) {
     }
   }
   return '';
-}
-
-/** @param {string} raw */
-function avatarCompareKey(raw) {
-  const s = String(raw || '').trim();
-  if (!s) return '';
-  try {
-    const u = new URL(s);
-    u.search = '';
-    u.hash = '';
-    return u.href;
-  } catch {
-    return s;
-  }
-}
-
-/** @param {string} a @param {string} b */
-function isSameAvatarUrl(a, b) {
-  const ka = avatarCompareKey(a);
-  const kb = avatarCompareKey(b);
-  return Boolean(ka && kb && ka === kb);
 }
 
 /** @param {PopupCommentEntry[]} entries */
@@ -4149,9 +4152,19 @@ function clearWatchMetaCard(opts = {}) {
     snapshotFetchInflight: inflight,
     snapshotFetchError: error
   });
-  if (viewerDomEl) viewerDomEl.textContent = gate.viewerLabel;
+  if (viewerDomEl) {
+    viewerDomEl.textContent = gate.viewerLabel;
+    viewerDomEl.classList.toggle(
+      'is-placeholder',
+      isStatValuePlaceholderText(gate.viewerLabel)
+    );
+  }
   if (concurrentEstEl) {
     concurrentEstEl.textContent = gate.concurrentLabel;
+    concurrentEstEl.classList.toggle(
+      'is-placeholder',
+      isStatValuePlaceholderText(gate.concurrentLabel)
+    );
     concurrentEstEl.removeAttribute('title');
   }
   if (concurrentSubEl) concurrentSubEl.textContent = '人';
@@ -4274,8 +4287,10 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   if (viewerDomEl) {
     if (stateGate.shouldUseSnapshotForViewer && typeof vc === 'number') {
       viewerDomEl.textContent = vc.toLocaleString('ja-JP');
+      viewerDomEl.classList.remove('is-placeholder');
     } else {
       viewerDomEl.textContent = stateGate.viewerLabel;
+      viewerDomEl.classList.add('is-placeholder');
     }
   }
   if (typeof vc === 'number' && Number.isFinite(vc) && vc >= 0) {
@@ -4342,6 +4357,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
       const directLike = resolved.method === 'official';
       const estStr = resolved.estimated.toLocaleString('ja-JP');
       concurrentEstEl.textContent = `${directLike ? '' : '~'}${estStr}`;
+      concurrentEstEl.classList.remove('is-placeholder');
 
       if (
         _prevConcurrentEstimated != null &&
@@ -4412,6 +4428,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
       if (concurrentReadyEl) concurrentReadyEl.hidden = true;
       if (concurrentCard) concurrentCard.setAttribute('aria-busy', 'true');
       concurrentEstEl.textContent = '計測中…';
+      concurrentEstEl.classList.add('is-placeholder');
       concurrentEstEl.removeAttribute('title');
       if (concurrentSubEl) concurrentSubEl.textContent = '人';
     }
@@ -6090,6 +6107,285 @@ async function populateStorySourceEntriesFromStorageFallback() {
   }
 }
 
+/**
+ * 0.1.71 (BA): popup window のリサイズを state ごとに 1 回だけ走らせる。
+ *
+ * 既存の 0.1.58 (AN) は popup を毎回 420×780 に強制リセットしていたが、
+ * 0.1.69-0.1.70 で empty state の中身を整理した結果、empty 時の content は
+ * 580〜620px しかないので 780px の window では下に白い空きスペースが残る。
+ *
+ * この helper は `chrome.windows.update` で window の高さを state（active /
+ * empty+history / empty+no-history）に応じて切り替える。
+ *
+ * 同じ state で何度も refresh が走っても update 呼び出しが flush しないよう、
+ * `_lastPopupStateForResize` で前回値を覚えておく。
+ *
+ * INLINE_MODE（watch ページ内 iframe / side panel）は popup window じゃないので
+ * 早期 return する。standalone popup window のみが対象。
+ *
+ * @param {{ emptyState: boolean, hasHistory: boolean }} input
+ * @returns {Promise<void>}
+ */
+let _lastPopupStateForResize = /** @type {string|null} */ (null);
+async function resizePopupWindowForState(input) {
+  if (INLINE_MODE) return;
+  const emptyState = input?.emptyState === true;
+  const hasHistory = input?.hasHistory === true;
+  const stateKey = emptyState
+    ? hasHistory
+      ? 'empty-history'
+      : 'empty-no-history'
+    : 'active';
+  if (_lastPopupStateForResize === stateKey) return;
+  _lastPopupStateForResize = stateKey;
+  if (
+    typeof chrome === 'undefined' ||
+    !chrome.windows ||
+    typeof chrome.windows.update !== 'function' ||
+    typeof chrome.windows.getCurrent !== 'function'
+  ) {
+    return;
+  }
+  try {
+    const win = await chrome.windows.getCurrent();
+    if (!win || win.id == null) return;
+    // popup window 限定。通常の Chrome ウィンドウや side panel は無視。
+    if (win.type !== 'popup') return;
+
+    // 0.1.73 (BC): empty state は CSS で body cap を解除し、content の高さに
+    //   合わせて body を伸ばすようにした。よって `nlPopupPrimary.scrollHeight`
+    //   が「実際に見せるべき content の高さ」になる。これに OS chrome 余裕 40px
+    //   を足して outer height とする。
+    //   primary を使う理由: body.scrollHeight は body cap 580 で止まるが（後方互換
+    //   のため CSS cap は default 残す）、primary は cap がかかっていないので
+    //   生の content 高さが取れる。
+    //
+    //   active watch (emptyState=false) は preset 780 のまま。
+    /** @type {{ contentHeightPx: number, chromeOverheadPx: number }|undefined} */
+    let viewportHint = undefined;
+    if (emptyState) {
+      try {
+        // 1 frame 待って CSS の hide / cap 解除が反映されたあとに測る
+        await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+        const primary = document.getElementById('nlPopupPrimary');
+        const measured =
+          (primary && Number.isFinite(primary.scrollHeight)
+            ? primary.scrollHeight
+            : 0) || 0;
+        if (measured > 0) {
+          viewportHint = {
+            contentHeightPx: measured,
+            chromeOverheadPx: 40
+          };
+        }
+      } catch {
+        // 測定失敗時はプリセットにフォールバック
+      }
+    }
+
+    const height = computePopupWindowTargetHeight({
+      emptyState,
+      hasHistory,
+      viewportHint
+    });
+    if (typeof win.height === 'number' && win.height === height) return;
+    await chrome.windows.update(win.id, {
+      height,
+      width: POPUP_WINDOW_WIDTH
+    });
+  } catch (err) {
+    if (typeof console !== 'undefined' && console?.warn) {
+      console.warn('[resizePopupWindow] failed:', err);
+    }
+  }
+}
+
+/**
+ * 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」を cards に流し込む。
+ *
+ * `nls_broadcast_summary_v1` IDB から直近の sample を取り出して:
+ *   - 履歴あり: indicator + 3 cards + 配信者 banner + 「もう一度開く」 button を表示
+ *   - 履歴ゼロ / 古すぎ: html に `nl-empty-no-history` class を付け、cards
+ *     / count+ticker / lane / panel を CSS で hide（案 A 動作にフォールバック）
+ *
+ * INLINE_MODE（watch ページ内 iframe）では呼ばない想定。standalone popup と
+ * side panel のみで使う（呼出元 refresh() で gate する）。
+ *
+ * 失敗しても empty state 自体は壊さない（catch で console.warn のみ）。
+ *
+ * @returns {Promise<void>}
+ */
+async function applyLastBroadcastReviewToEmptyState() {
+  const root = document.documentElement;
+  const indicator = $('lastBroadcastIndicator');
+  const indicatorTitleEl = $('lastBroadcastIndicatorTitle');
+  const indicatorLeadEl = $('lastBroadcastIndicatorLead');
+  const actionsEl = $('lastBroadcastActions');
+  const reopenBtn = /** @type {HTMLButtonElement|null} */ ($('lastBroadcastReopenBtn'));
+  const liveStatComments = $('liveStatComments');
+  const concurrentEst = $('watchConcurrentEst');
+  const viewerDom = $('watchViewerDom');
+  const concurrentSub = $('watchConcurrentSub');
+  const officialEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsOfficial'));
+
+  // 0.1.70 (AZ): empty state は履歴あり/なしどちらでも nl-empty-state を必ず付け、
+  //   active watch 用の UI（応援 hero / コメ送信欄 / heat / userRoomList / 各種 details）を
+  //   一括 hide する。履歴ゼロのときは追加で nl-empty-no-history で cards も hide。
+  root.classList.add('nl-empty-state');
+
+  const hideReview = () => {
+    if (indicator) indicator.hidden = true;
+    if (actionsEl) actionsEl.hidden = true;
+    if (reopenBtn) {
+      reopenBtn.disabled = true;
+      reopenBtn.dataset.watchUrl = '';
+    }
+  };
+
+  if (typeof indexedDB === 'undefined') {
+    hideReview();
+    root.classList.add('nl-empty-no-history');
+    void resizePopupWindowForState({ emptyState: true, hasHistory: false });
+    return;
+  }
+
+  /** @type {IDBDatabase|undefined} */
+  let db;
+  try {
+    db = await openBroadcastSessionSummaryDb();
+    const row = await loadLastBroadcastSummary(db);
+    const view = buildLastBroadcastReviewView(row);
+    if (!view) {
+      hideReview();
+      root.classList.add('nl-empty-no-history');
+      void resizePopupWindowForState({ emptyState: true, hasHistory: false });
+      return;
+    }
+
+    // 履歴あり: cards に流し込む。
+    root.classList.remove('nl-empty-no-history');
+    void resizePopupWindowForState({ emptyState: true, hasHistory: true });
+
+    // indicator
+    if (indicator) indicator.hidden = false;
+    if (indicatorLeadEl) {
+      indicatorLeadEl.textContent = formatLastBroadcastIndicator(view.capturedAt);
+    }
+    if (indicatorTitleEl) {
+      const titleText = view.broadcastTitle || `${view.liveId}（タイトル未取得）`;
+      indicatorTitleEl.textContent = titleText;
+    }
+
+    // 「もう一度開く」 button
+    if (actionsEl) actionsEl.hidden = false;
+    if (reopenBtn) {
+      const watchUrl = view.watchUrl;
+      if (watchUrl) {
+        reopenBtn.disabled = false;
+        reopenBtn.dataset.watchUrl = watchUrl;
+      } else {
+        reopenBtn.disabled = true;
+        reopenBtn.dataset.watchUrl = '';
+      }
+    }
+
+    // 記録カード（応援コメント数）。0.1.68 の is-placeholder トグルを意識して、
+    // 数字のときだけ class を外す。
+    if (liveStatComments) {
+      liveStatComments.textContent = view.commentStorageCount.toLocaleString('ja-JP');
+      liveStatComments.classList.remove('is-placeholder');
+    }
+    // 公式件数の補足行
+    if (officialEl) {
+      const oc = view.officialCommentCount;
+      if (typeof oc === 'number' && Number.isFinite(oc) && oc >= 0) {
+        const recorded = view.commentStorageCount;
+        let line = `公式 ${oc.toLocaleString('ja-JP')} 件`;
+        if (oc > 0 && recorded >= 0 && recorded <= oc) {
+          line += ` · 記録は公式の約${Math.round((recorded / oc) * 100)}%`;
+        }
+        officialEl.textContent = line;
+        officialEl.hidden = false;
+      } else {
+        officialEl.textContent = '';
+        officialEl.hidden = true;
+      }
+    }
+
+    // 推定同時接続: peak を表示。null なら fallback（取得不可）に倒す。
+    if (concurrentEst) {
+      if (
+        typeof view.peakConcurrentEstimate === 'number' &&
+        Number.isFinite(view.peakConcurrentEstimate)
+      ) {
+        concurrentEst.textContent = view.peakConcurrentEstimate.toLocaleString('ja-JP');
+        concurrentEst.classList.remove('is-placeholder');
+      } else {
+        concurrentEst.textContent = '（取得不可）';
+        concurrentEst.classList.add('is-placeholder');
+      }
+      concurrentEst.removeAttribute('title');
+    }
+    if (concurrentSub) concurrentSub.textContent = '人';
+
+    // 来場者数: 最後に取れていた数字。null は「（取得不可）」。
+    if (viewerDom) {
+      if (
+        typeof view.viewerCount === 'number' &&
+        Number.isFinite(view.viewerCount)
+      ) {
+        viewerDom.textContent = view.viewerCount.toLocaleString('ja-JP');
+        viewerDom.classList.remove('is-placeholder');
+      } else {
+        viewerDom.textContent = '（取得不可）';
+        viewerDom.classList.add('is-placeholder');
+      }
+    }
+
+    // 配信者 banner（既存 #casterBanner は display:none で固定なので、
+    // ここでは動かさない。タイトルは indicator に出してユーザーに伝わる）
+  } catch (err) {
+    if (typeof console !== 'undefined' && console?.warn) {
+      console.warn('[applyLastBroadcastReview] failed:', err);
+    }
+    hideReview();
+    root.classList.add('nl-empty-no-history');
+    void resizePopupWindowForState({ emptyState: true, hasHistory: false });
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      // no-op
+    }
+  }
+}
+
+/**
+ * 0.1.69 (AY): empty state を抜けて active な watch に戻る瞬間に呼ぶ。
+ * indicator / button を hide にし、empty state 用クラスを確実に外す。
+ *
+ * 0.1.70 (AZ): nl-empty-state（共通）と nl-empty-no-history（追加）の両方を
+ *   外す。これがないと active watch でも応援 hero / コメ送信欄 / 各 details が
+ *   消えたままになる。
+ */
+function clearLastBroadcastReviewArtifacts() {
+  const root = document.documentElement;
+  root.classList.remove('nl-empty-state');
+  root.classList.remove('nl-empty-no-history');
+  const indicator = $('lastBroadcastIndicator');
+  if (indicator) indicator.hidden = true;
+  const actionsEl = $('lastBroadcastActions');
+  if (actionsEl) actionsEl.hidden = true;
+  const reopenBtn = /** @type {HTMLButtonElement|null} */ ($('lastBroadcastReopenBtn'));
+  if (reopenBtn) {
+    reopenBtn.disabled = true;
+    reopenBtn.dataset.watchUrl = '';
+  }
+  // 0.1.71 (BA): active watch に戻ったら window 高さを 780px に戻す
+  // （連続呼出しは内部 state guard で no-op になるので毎回呼んで OK）。
+  void resizePopupWindowForState({ emptyState: false, hasHistory: true });
+}
+
 async function refresh() {
   if (!hasExtensionContext()) {
     renderExtensionContextBanner(true);
@@ -6118,8 +6414,19 @@ async function refresh() {
   try {
   ensurePopupPrimaryCloakedBeforeFirstReveal();
   document.documentElement.removeAttribute('data-nl-popup-content-painted');
-  const [tabs, openBag] = await Promise.all([
+  /*
+   * 0.1.41 (W): standalone popup window 時の multi-tab 混信修正。
+   *   popup window から見ると `chrome.tabs.query({active:true, currentWindow:true})`
+   *   は popup 自身の URL を返してしまう。directly opened した場合の
+   *   「直前の通常 window のアクティブタブ」も並行取得して、
+   *   pickWatchUrlFromMultipleSources で優先順を判定する。
+   *   INLINE_MODE（popup が watch ページ iframe）では従来どおり
+   *   activeTab が watch URL に直接マッチする。
+   */
+  const [tabs, lastFocusedNormal, openBag] = await Promise.all([
     chrome.tabs.query({ active: true, currentWindow: true }),
+    chrome.windows.getLastFocused({ populate: true, windowTypes: ['normal'] })
+      .catch(() => /** @type {chrome.windows.Window|null} */ (null)),
     chrome.storage.local.get([
       KEY_SELF_POSTED_RECENTS,
       KEY_LAST_WATCH_URL,
@@ -6137,6 +6444,8 @@ async function refresh() {
       KEY_FOLD_ANONYMOUS_IN_RANK_STRIP
     ])
   ]);
+  const lastFocusedNormalActiveTab =
+    lastFocusedNormal?.tabs?.find((t) => t?.active) ?? null;
   applySelfPostedRecentsFromBag(openBag);
   const calmOn = normalizeCalmPanelMotion(openBag[KEY_CALM_PANEL_MOTION], {
     inlineDefault: INLINE_MODE
@@ -6154,10 +6463,19 @@ async function refresh() {
   // （checkbox.checked + runtime 変数 + キャッシュクリア / 再描画キー破棄などの
   //  副作用をコントローラが内包）
   popupBooleanSettingsRegistry.applyFromBag(openBag);
-  const { url, fromActiveTab } = resolveWatchUrlFromTabAndStash(
-    tabs[0],
-    openBag[KEY_LAST_WATCH_URL]
-  );
+  /*
+   * 0.1.41 (W): pickWatchUrlFromMultipleSources で 3 ソース統合判定。
+   *   従来の resolveWatchUrlFromTabAndStash は activeTab → storage の 2 段だが、
+   *   standalone popup ではこの間に「直前の通常 window のアクティブタブ」を
+   *   挟むと complex multi-tab で正しい URL が拾える。
+   */
+  const watchUrlPick = pickWatchUrlFromMultipleSources({
+    activeTab: tabs[0],
+    lastFocusedNormalActiveTab,
+    lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL]
+  });
+  const url = watchUrlPick.url;
+  const fromActiveTab = watchUrlPick.source === 'activeTab';
   const resolvedLv = extractLiveIdFromUrl(url);
   const viewerLvForError =
     isNicoLiveWatchUrl(url) && resolvedLv ? resolvedLv : '';
@@ -6267,7 +6585,42 @@ async function refresh() {
   }
   syncVoiceCommentButton();
 
-  if (!isNicoLiveWatchUrl(url)) {
+  /*
+   * 0.1.55 (AK): ランキング導線が popup で出ない件を確実に直す。
+   *   popup.html 側で hidden 属性を撤去したため、本来は何もしなくても
+   *   表示されるはず。INLINE_EMBED_WATCH（watch ページ内 iframe）のときだけ
+   *   removeAttribute / setAttribute で明示的に切り替え、念のため inline style
+   *   も設定して CSS の影響を遮断する。
+   *
+   * 0.1.69 (AY): 0.1.67 で side panel が「watch じゃないタブ」の主役になったが、
+   *   旧コードは `INLINE_MODE` (= side panel も含む) で hide していたため、
+   *   side panel で導線が出ない退行があった。`INLINE_EMBED_WATCH` に絞り、
+   *   side panel では standalone popup と同様に導線を表示する。
+   */
+  const noWatchHint = $('noWatchRankingHint');
+  if (noWatchHint instanceof HTMLElement) {
+    if (INLINE_EMBED_WATCH) {
+      noWatchHint.setAttribute('hidden', '');
+      noWatchHint.style.display = 'none';
+    } else {
+      noWatchHint.removeAttribute('hidden');
+      noWatchHint.style.display = 'block';
+    }
+  }
+
+  /*
+   * 0.1.57 (AM): source='storage'/'none' のときは stale な watch URL を持ち出して
+   *   前の放送のデータを表示してしまっていたのを止め、「watch を開いてください」
+   *   状態の placeholder を出す。これで標準 popup を非 watch ページで開いた時、
+   *   ランキング導線（オレンジカード）と空状態の placeholder だけのスッキリ表示
+   *   になる。INLINE_MODE / activeTab / lastFocusedNormal なら従来どおりデータ表示。
+   */
+  const treatAsNoActiveWatch =
+    !isNicoLiveWatchUrl(url) ||
+    watchUrlPick.source === 'storage' ||
+    watchUrlPick.source === 'none';
+
+  if (treatAsNoActiveWatch) {
     if (!isFreshRefresh()) return;
     resetPerBroadcastPopupCachesIfLiveIdChanged('');
     if (liveEl) liveEl.textContent = '（ニコ生watchを開いてください）';
@@ -6314,6 +6667,15 @@ async function refresh() {
     // 応援レーンは「直近放送の保存」から暫定復元する。reset の後に呼ぶことで、
     // 生 URL で popup を開いたときに lane が真っ白にならない（E2E lane-visibility）。
     await populateStorySourceEntriesFromStorageFallback();
+    // 0.1.69 (AY): standalone popup / side panel では「前回の配信」を cards に
+    // 復元する。INLINE_MODE（watch ページ内 iframe）は empty state 自体が
+    // 発生しない想定なのでスキップ。clearWatchMetaCard() の直後に呼ぶことで
+    // is-placeholder を上書きできる順序を保証する。
+    if (!INLINE_MODE) {
+      await applyLastBroadcastReviewToEmptyState();
+    } else {
+      clearLastBroadcastReviewArtifacts();
+    }
     markPopupRefreshContentPainted();
     revealPopupPrimaryOnce();
     return;
@@ -6369,10 +6731,21 @@ async function refresh() {
     void renderGiftQuickStatsPanel('');
     // lv が取り出せなかった場合も、同じ保存ベース fallback を試みる。
     await populateStorySourceEntriesFromStorageFallback();
+    // 0.1.69 (AY): 同じ「watch URL があるけど lv 抜けない」レアケースでも
+    // empty state なので、前回の配信を復元する。
+    if (!INLINE_MODE) {
+      await applyLastBroadcastReviewToEmptyState();
+    } else {
+      clearLastBroadcastReviewArtifacts();
+    }
     markPopupRefreshContentPainted();
     revealPopupPrimaryOnce();
     return;
   }
+
+  // 0.1.69 (AY): active な watch に戻った瞬間に「前回の配信」UI を片付ける。
+  // 以降のコードは通常の paintWatchPopupUi 経路で cards に live data を流す。
+  clearLastBroadcastReviewArtifacts();
 
   const snapshotKey = `${lv}|${url}|s17`;
   const key = commentsStorageKey(lv);
@@ -6571,7 +6944,18 @@ async function refresh() {
     watchMetaCache.fetchInflight = false;
     watchMetaCache.fetchError = String(snapResult.error || '');
     if (!isFreshRefresh()) return;
-    watchMetaCache.snapshot = snapResult.snapshot;
+    /*
+     * 0.1.41 (W): 配信者タイル「出たと思ったら消える」の対策。
+     *   30 秒ごとの polling で snapshot を無条件上書きしていたため、
+     *   niconico SPA が #embedded-data を一瞬書き換えるタイミングに当たると
+     *   broadcaster 系（name/pageUrl/iconUrl/userId/level）が空の snapshot で
+     *   旧値を消してしまっていた。partial-merge で broadcaster identity 系
+     *   フィールドだけは「新値が空なら旧値を保つ」にする。
+     */
+    watchMetaCache.snapshot = mergeWatchSnapshotPreservingBroadcaster(
+      watchMetaCache.snapshot,
+      snapResult.snapshot
+    );
     watchSnapshot = watchMetaCache.snapshot;
     const strippedAfterSnap = stripViewerAvatarContamination(
       arr,
@@ -8840,7 +9224,13 @@ function initPopup() {
         if (btn) btn.disabled = false;
         return;
       }
-      const report = aggregateMarketingReport(comments, lid);
+      // 0.1.46 (AB): 配信者本人のコメ（合いの手等）を KPI 集計から除外
+      const reportBroadcasterUid = String(
+        watchMetaCache.snapshot?.broadcasterUserId || ''
+      ).trim();
+      const report = aggregateMarketingReport(comments, lid, {
+        broadcasterUserId: reportBroadcasterUid
+      });
       const maskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
       const maskShare = Boolean(maskEl?.checked);
       // 0.1.22 (W): 同接推移カーブ用のサンプル行を IDB から取得。失敗しても本体出力は継続。
@@ -8913,11 +9303,16 @@ function initPopup() {
           : [];
         if (fallbackComments.length > 0) {
           try {
+            // 0.1.46 (AB): fallback 経路でも配信者本人を集計除外する
+            const fallbackBroadcasterUid = String(
+              watchMetaCache.snapshot?.broadcasterUserId || ''
+            ).trim();
             const report = aggregateMarketingReport(
               /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
                 fallbackComments
               ),
-              lid || String(STORY_SOURCE_STATE.liveId || '').trim()
+              lid || String(STORY_SOURCE_STATE.liveId || '').trim(),
+              { broadcasterUserId: fallbackBroadcasterUid }
             );
             const maskEl = /** @type {HTMLInputElement|null} */ (
               $('devMonitorExportMarketingMaskLabels')
@@ -9297,6 +9692,13 @@ function initPopup() {
       setCaptureStatus(captureStatus, 'watchページを開いてください。', 'error');
       return;
     }
+    if (captureBtn.disabled) return;
+    /*
+     * 0.1.47 (AC): 連打防止。連打すると同名（ms 単位）の重複 download が
+     *   uniquify で連番ファイル化、`safeRefresh` も毎回トリガーされて UI
+     *   が荒れる。
+     */
+    captureBtn.disabled = true;
     setCaptureStatus(captureStatus, 'キャプチャ中…', 'idle');
     try {
       const res = /** @type {{ ok?: boolean, errorCode?: string, dataUrl?: string, liveId?: string }|null} */ (
@@ -9331,6 +9733,9 @@ function initPopup() {
       safeRefresh();
     } catch (err) {
       setCaptureStatus(captureStatus, `キャプチャに失敗: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    } finally {
+      // 0.1.47 (AC): 連打防止の disable を必ず解除
+      captureBtn.disabled = false;
     }
   });
 
@@ -9358,10 +9763,18 @@ function initPopup() {
     const key = exportBtn.dataset.storageKey;
     const watchUrl = exportBtn.dataset.watchUrl || '';
     if (!lv || !key || exportBtn.disabled) return;
+    /*
+     * 0.1.47 (AC): 連打防止。downloadCommentsHtml は数万コメ環境では数秒
+     *   かかるので、終わるまでボタンを disable する。これがないと連打で
+     *   並行ダウンロード + Blob URL リーク + 同名ファイル連番が発生する。
+     */
+    exportBtn.disabled = true;
     try {
       await downloadCommentsHtml(lv, key, watchUrl);
     } catch {
       // no-op
+    } finally {
+      exportBtn.disabled = false;
     }
   });
 
@@ -9812,6 +10225,24 @@ function initPopup() {
   });
   $('reloadWatchTabPanelBtn')?.addEventListener('click', () => {
     void triggerReloadWatchTabFromPopup();
+  });
+
+  // 0.1.69 (AY): empty state「前回の配信」cards から、その配信を新タブで開く。
+  // dataset.watchUrl は applyLastBroadcastReviewToEmptyState() で設定される。
+  // hasExtensionContext() が偽ならボタン自体が disabled なので、ここでは
+  // 単純に new tab を開くだけ。
+  $('lastBroadcastReopenBtn')?.addEventListener('click', () => {
+    const btn = /** @type {HTMLButtonElement|null} */ ($('lastBroadcastReopenBtn'));
+    if (!btn || btn.disabled) return;
+    const url = String(btn.dataset.watchUrl || '').trim();
+    if (!url) return;
+    try {
+      void chrome.tabs.create({ url });
+    } catch (err) {
+      if (typeof console !== 'undefined' && console?.warn) {
+        console.warn('[lastBroadcastReopen] tabs.create failed:', err);
+      }
+    }
   });
 
   postBtn?.addEventListener('click', () => {

@@ -63,7 +63,14 @@ export function normalizeCommentText(value) {
 
 /**
  * @param {string} liveId
- * @param {{ commentNo?: string, text?: string, capturedAt?: number }} rec
+ * @param {{ commentNo?: string, text?: string, capturedAt?: number, userId?: string|null }} rec
+ *
+ * 0.1.46 (AB): commentNo 欠落時の dedupe key に userId を含める。
+ *   旧コードは `${liveId}||${text}|${sec}` で、複数ユーザーが同じ 1 秒内に
+ *   同じ短文（"8888" / "草" 等）を打つと最初の 1 件だけ採用され残りは patch
+ *   扱いになり、コメ被り検出（L1 / L5）が「N 人の被り」を N=1 と記録してしまい
+ *   `detectCommentSyncBursts` の minDistinctUsers=3 を満たさなくなる問題があった。
+ *   userId を key に含めることで同秒・同テキスト・別ユーザーが別行として扱われる。
  */
 export function buildDedupeKey(liveId, rec) {
   const text = normalizeCommentText(rec.text);
@@ -72,7 +79,8 @@ export function buildDedupeKey(liveId, rec) {
     return `${liveId}|${no}|${text}`;
   }
   const sec = Math.floor(Number(rec.capturedAt || 0) / 1000);
-  return `${liveId}||${text}|${sec}`;
+  const uid = String(rec.userId ?? '').trim();
+  return `${liveId}||${text}|${sec}|${uid}`;
 }
 
 function randomId() {

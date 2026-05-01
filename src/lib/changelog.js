@@ -26,6 +26,262 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.67',
+    date: '2026-05-01',
+    summary: '関係ないタブで開く時のパネルを Chrome 統合に',
+    items: Object.freeze([
+      'watch じゃないタブで拡張アイコンを押した時、これまでは独立した popup window が Chrome から離れて表示されることがありました。これを Chrome 標準のサイドパネル（画面右側に統合）に変更しました。Chrome のウィンドウから離れて表示される問題が根本解決し、配信視聴中の inline panel と同じような一体感のある UX になります',
+      '従来の popup window は、サイドパネルが使えない環境では fallback として残ります。設定で「常に popup window を開く」を選んでいた人は従来通りの挙動です'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.66',
+    date: '2026-05-01',
+    summary: '横付きパネルの幅・高さをどの画面サイズでも最適化',
+    items: Object.freeze([
+      '「横付き」モードで広い画面（1920px 級）でパネルが画面右にはみ出して「来場者数」が見切れる問題を修正。利用可能な右側余白を厳密に測り、足りなければ自動で「プレイヤー行の下」に切り替えるようになりました',
+      '「横付き」モードで超広画面（2000px 級）でパネルが縦に間延びして下半分が空白になる問題を修正。動画+公式コメ列の高さに揃えて、空白なくぴったり収まるようになりました',
+      'ウィンドウのリサイズ・全画面切替・モニタ移動時に、横付きパネルもリアルタイムで追従するようになりました（debounce 150ms）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.65',
+    date: '2026-05-01',
+    summary: '画面下パネルの高さをどの画面サイズでも最適化',
+    items: Object.freeze([
+      '「画面下いっぱい」モードのパネル高さが viewport の 50% で固定だったため、大画面では下半分占有・小画面では動画圧迫の両極端になっていた問題を根本修正。動画+公式コメ列が画面で実際に占めている縦範囲を測定し、その残りスペースに自動でパネルを収めるよう変更。720p ノートから 4K 縦置きまで、どの画面サイズでも自動最適化されます',
+      'ウィンドウサイズ変更（リサイズ・全画面切替・モニタ移動など）にもリアルタイム追従するようになりました（debounce 150ms）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.64',
+    date: '2026-05-01',
+    summary: 'パネル位置の根治＋popup 表示まわりの不具合修正',
+    items: Object.freeze([
+      'watch ページのパネルが「ページ最下部（amazon・関連配信の後ろ）」に出る現象の根本原因（祖先候補の選定が緩く、視聴行+コメ欄+バナー一式の巨大ラッパーまで拾っていた）を修正。判定を純粋関数に切り出し、video の rect とのジオメトリ整合（幅比 0.95–1.6・top オフセット 120px・aspect 上限 2.6・面積上限 viewport 60%）まで含めて厳格化しました（0.1.63 の応急 migration と組み合わせて二重で改善）',
+      'ツールバーから popup を開いた時、popup window の中に冗長な「君斗りんくの追憶のきらめき」ロゴ帯が出ていて Chrome 自身のタイトルバーと「枠が 2 つ」に見えていた問題を修正。standalone window では内部ヘッダーを非表示にしました',
+      '5 モニタなどの多モニタ環境で、popup window が Chrome window の隣のモニタに飛んでしまう問題を修正。popup を Chrome window の右内側に配置するよう変更し、必ず Chrome のいるモニタに popup が出るようになりました（Chrome の content 右側と少し被るのは許容）',
+      '画面幅が約1200px未満で「横付き」を選んでも自動で「プレイヤー行の下」と同じ動作になる仕様について、見落とされやすかったヒント文を警告調（黄色背景 + 太字）に強調しました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.63',
+    date: '2026-05-01',
+    summary: '配信時のパネル位置を player の近くに戻す',
+    items: Object.freeze([
+      'watch ページのパネルが「ページ最下部（amazon・関連配信の後ろ）」に出るようになっていた問題を修正。「プレイヤー行の下」設定の人を「画面下いっぱい（既定）」に一度だけ自動移行し、player と panel が常に viewport 上でセットで見える状態に戻します（意図して「下」を選んでいた場合は設定画面から再度切り替え可能）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.62',
+    date: '2026-05-01',
+    summary: 'popup を Chrome 右端に密着',
+    items: Object.freeze([
+      'popup と Chrome ウィンドウの間に隙間があった問題を修正。Chrome の右端ぴったりに popup の左端を合わせ、上端も揃えて隣接配置（隙間ゼロ）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.61',
+    date: '2026-05-01',
+    summary: 'popup を Chrome の右側に隣接配置',
+    items: Object.freeze([
+      'popup が Chrome ウィンドウの中央に被さって「ボックスの中にあるかんじ」になる問題を修正。Chrome ウィンドウの右側に隣接する位置に popup を配置するよう変更（Chrome の content に重ならない）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.60',
+    date: '2026-05-01',
+    summary: '複数モニタ時に popup を同じ画面に出す',
+    items: Object.freeze([
+      'モニタが複数あるとき popup が別モニタに開く問題を修正。直前に使っていた Chrome ウィンドウの中央に popup を配置するよう変更（同じモニタに出る）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.59',
+    date: '2026-05-01',
+    summary: 'popup を毎回作り直して横長を確実に解消',
+    items: Object.freeze([
+      'popup window が横長で開いて空白だらけになる問題を確実に修正。0.1.58 では update でサイズ変更を試みたが Chrome が無視するケースがあったため、既存 popup を一度閉じて 420×780 で新規作成する形に変更（state:normal も明示）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.58',
+    date: '2026-05-01',
+    summary: 'popup window サイズを毎回 420×780 にリセット',
+    items: Object.freeze([
+      'popup window が横に間延びして右側が空白だらけになる「レイアウトガタガタ」現象を修正。Chrome が以前のサイズを記憶していた問題で、popup を開くたびに 420×780 に強制リセットするよう変更'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.57',
+    date: '2026-05-01',
+    summary: '何もない時は前放送データを出さない',
+    items: Object.freeze([
+      'watch ページ以外で popup を開いた時に、storage 由来の前放送データ（記録 N 件・(取得不可) など）が表示されてレイアウトがガタガタになる問題を修正。アクティブな watch タブが無いときは「（ニコ生 watch を開いてください）」placeholder + ランキング導線のみのスッキリ表示に統一'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.56',
+    date: '2026-05-01',
+    summary: 'ランキング導線を最上部に固定表示',
+    items: Object.freeze([
+      'popup でランキング導線が出ない問題を確定的に修正。section 配置を version badge の直下（最上部）に移動し、display:block !important + 目立つオレンジ色枠線で必ず見える形にしました（INLINE_MODE のときだけ display:none）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.55',
+    date: '2026-05-01',
+    summary: 'ランキング導線を確実に表示',
+    items: Object.freeze([
+      'popup を開いてもランキング導線が出ない問題を確実に修正。HTML の hidden 属性デフォルトを撤去し、popup window では最初から表示状態に変更（watch ページ内のパネル iframe では JS で hidden を付ける）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.54',
+    date: '2026-04-30',
+    summary: 'ランキング導線を常時表示に',
+    items: Object.freeze([
+      'ツールバーから popup を開いた時にランキング導線が出ない問題を修正。複数 window 環境で source 検出が想定どおり動かないケースがあったため、popup window では常に導線を表示する形に変更（watch ページ内のパネル iframe では非表示）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.53',
+    date: '2026-04-30',
+    summary: 'ランキング導線の表示条件を厳密化',
+    items: Object.freeze([
+      'watch 以外のページで popup を開いてもランキング導線が出ず、前に見た放送のデータが表示される問題を修正。アクティブタブが watch ページじゃない時は必ずランキング導線を出すように変更（storage fallback の影響を受けないよう判定強化）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.52',
+    date: '2026-04-30',
+    summary: '何もない時はニコ生ランキング導線',
+    items: Object.freeze([
+      'watch ページ以外で popup を開いた時に、ニコ生トップ・生放送ランキング・ちくらん・直近開始の放送 へのリンクを表示。気になる放送をすぐ探せるようにしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.51',
+    date: '2026-04-30',
+    summary: 'popup の dark を完全に撤去',
+    items: Object.freeze([
+      'popup を開いたときに dark テーマで真っ黒になる問題を完全修正。0.1.50 で OS の dark 設定検出に切り替えたが、Chrome のテーマや Windows のシステム配色で誤って dark と判定されるケースが残ったので、light 配色（クリーム色背景）固定に変更'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.50',
+    date: '2026-04-30',
+    summary: 'popup の黒テーマ強制を撤去（部分）',
+    items: Object.freeze([
+      'ツールバーから popup を開いた時に常に真っ黒だった件の対策（OS の dark 設定検出に切替、後の 0.1.51 でさらに完全 light 化）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.49',
+    date: '2026-04-30',
+    summary: 'マーケ分析に動的アドバイスを追加',
+    items: Object.freeze([
+      'マーケ分析の各セクションに「データに応じて変わるキャラ別アドバイス」を追加。KPI / 同接 / 笑い / 新規 vs 常連 / 沈黙 / 感情 / リーチ / 成長 / 初コメ / 生存曲線 / キーボード型 / コメ伝染 / 直近比較 / 波形 / 言わなかった人気語 / 話芸ピーク の 16 セクション × 100+ ルールで具体的な助言を出します（既存の固定アドバイスはそのまま、その後ろに追加表示）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.48',
+    date: '2026-04-30',
+    summary: '大規模配信のマーケ分析を安定化',
+    items: Object.freeze([
+      '人気配信者の 8 万コメ超放送でマーケ分析がスタックオーバーフローで無症状失敗していた問題を修正（Math.min/max の spread を for ループ化）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.47',
+    date: '2026-04-30',
+    summary: '同接カーブと連打事故防止',
+    items: Object.freeze([
+      '同接推移カーブが「公式があれば公式・なければ推定」の二者択一で稀に取れる公式値があると推定値 90% を捨ててグラフがほぼ空になっていた問題を修正。各サンプル単位で公式優先 → 無ければ推定にフォールバックする hybrid に変更',
+      'HTML レポートボタン / スクショボタンの連打で重複ダウンロードが起きていた問題を修正（処理中はボタンを disable）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.46',
+    date: '2026-04-30',
+    summary: 'マーケ分析の精度向上',
+    items: Object.freeze([
+      'マーケ分析の KPI 集計から配信者本人のコメント（合いの手等）を除外（CPM・ユニーク・タイムラインが歪んでいた問題）',
+      'コメ被り検出（伝染・被り瞬間）が複数人の同時バーストを 1 件として扱っていた問題を修正（同秒・同テキスト・別ユーザーを別行扱いに）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.45',
+    date: '2026-04-30',
+    summary: '裏側のクリーンアップとプライバシー',
+    items: Object.freeze([
+      '拡張リロード後に長時間放置すると裏でタイマーが回り続けて CPU を消費していた問題を修正（pageFrameLoopTimer も停止対象に追加）',
+      'AI 診断（共有テキスト）に保存する watch URL から query / fragment を削除（万一個人情報を含む token が乗っていた場合の漏洩を抑止）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.44',
+    date: '2026-04-30',
+    summary: '裏側のメモリ効率と整合性',
+    items: Object.freeze([
+      'サムネイル保存時に過去の全サムネを毎回メモリ展開していた処理を cursor + count() ベースに変更。長時間視聴のメモリスパイクを抑止',
+      '自動バックアップの状態管理で content と background SW の同時書き込みによる重複バックアップを抑止（write 直前に fresh re-read で merge）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.43',
+    date: '2026-04-30',
+    summary: 'パネルが開かない事象の修正',
+    items: Object.freeze([
+      'kon-ta クリックしてもパネルが開かない事象を修正。focus 判定を強化し、host が DOM 上でも display:none / visibility:hidden の場合は popup window へフォールバックするよう変更（純粋関数 + テスト 7 ケース追加）',
+      '内部: content script の onMessage listener を idempotent に変更（SPA 再注入時の二重応答 → port closed エラー対策）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.42',
+    date: '2026-04-30',
+    summary: 'パネル準備の競合解消',
+    items: Object.freeze([
+      '複数 watch タブ並行時に kon-ta クリック→パネル表示までが遅くなる問題を修正。chrome.storage.local の lease を使って同時にパネル準備（prewarm）を走らせるタブを 1 つに絞り、CPU 取り合いを抑止（純粋関数 + 10 ケース TDD）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.41',
+    date: '2026-04-30',
+    summary: '深層監査の結果を反映',
+    items: Object.freeze([
+      '配信者タイルが「出たと思ったら消える」事象を修正（30 秒ごとの再取得で broadcaster 系が空のとき旧値を保つ partial-merge を導入、純粋関数 + 11 ケース TDD）',
+      '複数タブで kon-ta パネルの記録件数 / ランクストリップが混信する事象を修正（standalone popup window から「直前の通常 window のアクティブタブ」を拾うよう判定追加、純粋関数 + 8 ケース TDD）',
+      'コメ取り込み率が 17% 程度に低下していた事象を修正（NDGR が active な間 deep harvest を全 skip していたが、5 分以上 deep が走っていなければ強制実行する recovery を runDeepHarvest 内部にも結線）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.40',
+    date: '2026-04-30',
+    summary: '公式チャンネル放送の配信者タイル復活',
+    items: Object.freeze([
+      '公式チャンネル放送（運営・業者）で配信者タイルが出ていなかった事象を修正。embedded-data の supplier.name は提供会社名（例「株式会社ドワンゴ」）でチャンネル名ではないため、socialGroup.name / socialGroup.socialGroupPageUrl を優先するように変更。アイコンも socialGroup.thumbnailImageUrl 等を読むように追加（純粋関数 + 19 ケース TDD）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.39',
+    date: '2026-04-30',
+    summary: '配信者リンク誤検出の再発防止',
+    items: Object.freeze([
+      '配信者タイルが関連配信枠の別人を指してしまう事象（0.1.38 の追加対策）。DOM 候補から ?ref=watch_user_information マーカ付き anchor を最優先にして二重防御。同種の検出ロジックを使う別関数（detectBroadcasterUserIdFromDom）も同じ防御に統一',
+      'アバター URL 比較ヘルパ（avatarCompareKey / isSameAvatarUrl）を src/lib/avatarUrlCompare.js に切り出し（純粋関数 + 14 ケース TDD）。query/hash 違いを「同じアバター」として扱うロジックの単体検証を強化'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.38',
+    date: '2026-04-30',
+    summary: '配信者タイルのリンク先を修正',
+    items: Object.freeze([
+      '配信者タイルからクリックした時に別人のページに飛ぶ事象を修正（embedded-data の supplier.programProviderId を最優先に）。本配信者がレーンに混入する原因にもなっていた箇所',
+      'コメ送信エラー時の再読み込み案内ロジックを src/lib/commentSendTroubleshootHint.js に切り出し（純粋関数 + 7 ケース TDD）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.37',
     date: '2026-04-30',
     summary: '内部の重複定義を整理',

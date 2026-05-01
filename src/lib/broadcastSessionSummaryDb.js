@@ -24,8 +24,22 @@ export const BROADCAST_SUMMARY_MAX_PER_LIVE = 200;
  *   peakConcurrentEstimate: number|null,
  *   officialCommentCount: number|null,
  *   officialViewerCount: number|null,
- *   officialCaptureRatio: number|null
+ *   officialCaptureRatio: number|null,
+ *   broadcastTitle?: string,
+ *   broadcasterName?: string,
+ *   broadcasterUserId?: string,
+ *   broadcasterIconUrl?: string,
+ *   broadcasterPageUrl?: string,
+ *   thumbnailUrl?: string,
+ *   viewerCountFromDom?: number|null
  * }} BroadcastSessionSummaryRow
+ *
+ * 追加フィールド（0.1.69 配信なし empty state 改善 AY）:
+ * - broadcastTitle / broadcasterName / broadcasterUserId / broadcasterIconUrl /
+ *   broadcasterPageUrl / thumbnailUrl / viewerCountFromDom はすべて undefined 許容。
+ * - 既存ユーザーの IDB は version bump なしで読み書き可能（古い行は新フィールドが
+ *   undefined のまま残り、empty state 側は「未取得」フォールバックで描く）。
+ * - 新行は broadcastSessionSummaryFlush.js で snapshot から自動的に埋まる。
  */
 
 /** @returns {Promise<IDBDatabase>} */

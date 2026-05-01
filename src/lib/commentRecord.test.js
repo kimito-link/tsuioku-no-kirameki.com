@@ -42,19 +42,52 @@ describe('buildDedupeKey', () => {
     ).toBe('lv1|1011|hello');
   });
 
-  it('番号なしは capturedAt を秒単位で含める', () => {
+  it('番号なしは capturedAt を秒単位 + userId を含める', () => {
+    expect(
+      buildDedupeKey('lv1', {
+        commentNo: '',
+        text: 'hello',
+        capturedAt: 1_700_000_000_123,
+        userId: 'u123'
+      })
+    ).toBe('lv1||hello|1700000000|u123');
+  });
+
+  it('番号なし・userId 無しの場合も末尾に空文字 segment が入る（後方互換）', () => {
     expect(
       buildDedupeKey('lv1', {
         commentNo: '',
         text: 'hello',
         capturedAt: 1_700_000_000_123
       })
-    ).toBe('lv1||hello|1700000000');
+    ).toBe('lv1||hello|1700000000|');
   });
 
-  it('同一秒・同一本文・番号なしは同じキー', () => {
-    const row = { commentNo: '', text: 'x', capturedAt: 5_000 };
+  it('同一秒・同一本文・番号なし・同一 userId は同じキー', () => {
+    const row = { commentNo: '', text: 'x', capturedAt: 5_000, userId: 'u1' };
     expect(buildDedupeKey('lv1', row)).toBe(buildDedupeKey('lv1', row));
+  });
+
+  /*
+   * 0.1.46 (AB): 同秒・同本文・別 userId のとき key が違うことを確認。
+   *   これがないとコメ被り検出 (L1/L5) が機能せず、複数人の同時バーストが
+   *   1 件にマージされてしまう。
+   */
+  it('同一秒・同一本文・別 userId は別キー（コメ被り検出に必要）', () => {
+    const a = buildDedupeKey('lv1', { commentNo: '', text: '8888', capturedAt: 5_000, userId: 'u1' });
+    const b = buildDedupeKey('lv1', { commentNo: '', text: '8888', capturedAt: 5_000, userId: 'u2' });
+    expect(a).not.toBe(b);
+  });
+
+  it('番号ありの場合は userId は key に含めない（commentNo 自体が一意）', () => {
+    expect(
+      buildDedupeKey('lv1', {
+        commentNo: '1011',
+        text: 'hello',
+        capturedAt: 1_700_000_000_000,
+        userId: 'u999'
+      })
+    ).toBe('lv1|1011|hello');
   });
 });
 

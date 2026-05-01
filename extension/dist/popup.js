@@ -49,16 +49,24 @@
     }
   }
 
-  // src/lib/popupWatchUrlResolve.js
-  function resolveWatchUrlFromTabAndStash(tab, lastWatchUrlRaw) {
-    const tabUrl = tab?.url || "";
-    if (isNicoLiveWatchUrl(tabUrl)) {
-      return { url: tabUrl, fromActiveTab: true };
+  // src/lib/popupWatchUrlResolveMultiTab.js
+  function pickWatchUrlFromMultipleSources(input) {
+    if (!input || typeof input !== "object") {
+      return { url: "", source: "none" };
     }
-    if (typeof lastWatchUrlRaw === "string" && isNicoLiveWatchUrl(lastWatchUrlRaw)) {
-      return { url: lastWatchUrlRaw, fromActiveTab: false };
+    const activeUrl = String(input.activeTab?.url ?? "").trim();
+    if (isNicoLiveWatchUrl(activeUrl)) {
+      return { url: activeUrl, source: "activeTab" };
     }
-    return { url: "", fromActiveTab: true };
+    const lastFocusedUrl = String(input.lastFocusedNormalActiveTab?.url ?? "").trim();
+    if (isNicoLiveWatchUrl(lastFocusedUrl)) {
+      return { url: lastFocusedUrl, source: "lastFocusedNormal" };
+    }
+    const stashed = typeof input.lastWatchUrlRaw === "string" ? input.lastWatchUrlRaw.trim() : "";
+    if (isNicoLiveWatchUrl(stashed)) {
+      return { url: stashed, source: "storage" };
+    }
+    return { url: "", source: "none" };
   }
 
   // src/lib/popupStorageRefreshCoalesce.js
@@ -700,6 +708,262 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.67",
+      date: "2026-05-01",
+      summary: "\u95A2\u4FC2\u306A\u3044\u30BF\u30D6\u3067\u958B\u304F\u6642\u306E\u30D1\u30CD\u30EB\u3092 Chrome \u7D71\u5408\u306B",
+      items: Object.freeze([
+        "watch \u3058\u3083\u306A\u3044\u30BF\u30D6\u3067\u62E1\u5F35\u30A2\u30A4\u30B3\u30F3\u3092\u62BC\u3057\u305F\u6642\u3001\u3053\u308C\u307E\u3067\u306F\u72EC\u7ACB\u3057\u305F popup window \u304C Chrome \u304B\u3089\u96E2\u308C\u3066\u8868\u793A\u3055\u308C\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3057\u305F\u3002\u3053\u308C\u3092 Chrome \u6A19\u6E96\u306E\u30B5\u30A4\u30C9\u30D1\u30CD\u30EB\uFF08\u753B\u9762\u53F3\u5074\u306B\u7D71\u5408\uFF09\u306B\u5909\u66F4\u3057\u307E\u3057\u305F\u3002Chrome \u306E\u30A6\u30A3\u30F3\u30C9\u30A6\u304B\u3089\u96E2\u308C\u3066\u8868\u793A\u3055\u308C\u308B\u554F\u984C\u304C\u6839\u672C\u89E3\u6C7A\u3057\u3001\u914D\u4FE1\u8996\u8074\u4E2D\u306E inline panel \u3068\u540C\u3058\u3088\u3046\u306A\u4E00\u4F53\u611F\u306E\u3042\u308B UX \u306B\u306A\u308A\u307E\u3059",
+        "\u5F93\u6765\u306E popup window \u306F\u3001\u30B5\u30A4\u30C9\u30D1\u30CD\u30EB\u304C\u4F7F\u3048\u306A\u3044\u74B0\u5883\u3067\u306F fallback \u3068\u3057\u3066\u6B8B\u308A\u307E\u3059\u3002\u8A2D\u5B9A\u3067\u300C\u5E38\u306B popup window \u3092\u958B\u304F\u300D\u3092\u9078\u3093\u3067\u3044\u305F\u4EBA\u306F\u5F93\u6765\u901A\u308A\u306E\u6319\u52D5\u3067\u3059"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.66",
+      date: "2026-05-01",
+      summary: "\u6A2A\u4ED8\u304D\u30D1\u30CD\u30EB\u306E\u5E45\u30FB\u9AD8\u3055\u3092\u3069\u306E\u753B\u9762\u30B5\u30A4\u30BA\u3067\u3082\u6700\u9069\u5316",
+      items: Object.freeze([
+        "\u300C\u6A2A\u4ED8\u304D\u300D\u30E2\u30FC\u30C9\u3067\u5E83\u3044\u753B\u9762\uFF081920px \u7D1A\uFF09\u3067\u30D1\u30CD\u30EB\u304C\u753B\u9762\u53F3\u306B\u306F\u307F\u51FA\u3057\u3066\u300C\u6765\u5834\u8005\u6570\u300D\u304C\u898B\u5207\u308C\u308B\u554F\u984C\u3092\u4FEE\u6B63\u3002\u5229\u7528\u53EF\u80FD\u306A\u53F3\u5074\u4F59\u767D\u3092\u53B3\u5BC6\u306B\u6E2C\u308A\u3001\u8DB3\u308A\u306A\u3051\u308C\u3070\u81EA\u52D5\u3067\u300C\u30D7\u30EC\u30A4\u30E4\u30FC\u884C\u306E\u4E0B\u300D\u306B\u5207\u308A\u66FF\u3048\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3057\u305F",
+        "\u300C\u6A2A\u4ED8\u304D\u300D\u30E2\u30FC\u30C9\u3067\u8D85\u5E83\u753B\u9762\uFF082000px \u7D1A\uFF09\u3067\u30D1\u30CD\u30EB\u304C\u7E26\u306B\u9593\u5EF6\u3073\u3057\u3066\u4E0B\u534A\u5206\u304C\u7A7A\u767D\u306B\u306A\u308B\u554F\u984C\u3092\u4FEE\u6B63\u3002\u52D5\u753B+\u516C\u5F0F\u30B3\u30E1\u5217\u306E\u9AD8\u3055\u306B\u63C3\u3048\u3066\u3001\u7A7A\u767D\u306A\u304F\u3074\u3063\u305F\u308A\u53CE\u307E\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3057\u305F",
+        "\u30A6\u30A3\u30F3\u30C9\u30A6\u306E\u30EA\u30B5\u30A4\u30BA\u30FB\u5168\u753B\u9762\u5207\u66FF\u30FB\u30E2\u30CB\u30BF\u79FB\u52D5\u6642\u306B\u3001\u6A2A\u4ED8\u304D\u30D1\u30CD\u30EB\u3082\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u3067\u8FFD\u5F93\u3059\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3057\u305F\uFF08debounce 150ms\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.65",
+      date: "2026-05-01",
+      summary: "\u753B\u9762\u4E0B\u30D1\u30CD\u30EB\u306E\u9AD8\u3055\u3092\u3069\u306E\u753B\u9762\u30B5\u30A4\u30BA\u3067\u3082\u6700\u9069\u5316",
+      items: Object.freeze([
+        "\u300C\u753B\u9762\u4E0B\u3044\u3063\u3071\u3044\u300D\u30E2\u30FC\u30C9\u306E\u30D1\u30CD\u30EB\u9AD8\u3055\u304C viewport \u306E 50% \u3067\u56FA\u5B9A\u3060\u3063\u305F\u305F\u3081\u3001\u5927\u753B\u9762\u3067\u306F\u4E0B\u534A\u5206\u5360\u6709\u30FB\u5C0F\u753B\u9762\u3067\u306F\u52D5\u753B\u5727\u8FEB\u306E\u4E21\u6975\u7AEF\u306B\u306A\u3063\u3066\u3044\u305F\u554F\u984C\u3092\u6839\u672C\u4FEE\u6B63\u3002\u52D5\u753B+\u516C\u5F0F\u30B3\u30E1\u5217\u304C\u753B\u9762\u3067\u5B9F\u969B\u306B\u5360\u3081\u3066\u3044\u308B\u7E26\u7BC4\u56F2\u3092\u6E2C\u5B9A\u3057\u3001\u305D\u306E\u6B8B\u308A\u30B9\u30DA\u30FC\u30B9\u306B\u81EA\u52D5\u3067\u30D1\u30CD\u30EB\u3092\u53CE\u3081\u308B\u3088\u3046\u5909\u66F4\u3002720p \u30CE\u30FC\u30C8\u304B\u3089 4K \u7E26\u7F6E\u304D\u307E\u3067\u3001\u3069\u306E\u753B\u9762\u30B5\u30A4\u30BA\u3067\u3082\u81EA\u52D5\u6700\u9069\u5316\u3055\u308C\u307E\u3059",
+        "\u30A6\u30A3\u30F3\u30C9\u30A6\u30B5\u30A4\u30BA\u5909\u66F4\uFF08\u30EA\u30B5\u30A4\u30BA\u30FB\u5168\u753B\u9762\u5207\u66FF\u30FB\u30E2\u30CB\u30BF\u79FB\u52D5\u306A\u3069\uFF09\u306B\u3082\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u8FFD\u5F93\u3059\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3057\u305F\uFF08debounce 150ms\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.64",
+      date: "2026-05-01",
+      summary: "\u30D1\u30CD\u30EB\u4F4D\u7F6E\u306E\u6839\u6CBB\uFF0Bpopup \u8868\u793A\u307E\u308F\u308A\u306E\u4E0D\u5177\u5408\u4FEE\u6B63",
+      items: Object.freeze([
+        "watch \u30DA\u30FC\u30B8\u306E\u30D1\u30CD\u30EB\u304C\u300C\u30DA\u30FC\u30B8\u6700\u4E0B\u90E8\uFF08amazon\u30FB\u95A2\u9023\u914D\u4FE1\u306E\u5F8C\u308D\uFF09\u300D\u306B\u51FA\u308B\u73FE\u8C61\u306E\u6839\u672C\u539F\u56E0\uFF08\u7956\u5148\u5019\u88DC\u306E\u9078\u5B9A\u304C\u7DE9\u304F\u3001\u8996\u8074\u884C+\u30B3\u30E1\u6B04+\u30D0\u30CA\u30FC\u4E00\u5F0F\u306E\u5DE8\u5927\u30E9\u30C3\u30D1\u30FC\u307E\u3067\u62FE\u3063\u3066\u3044\u305F\uFF09\u3092\u4FEE\u6B63\u3002\u5224\u5B9A\u3092\u7D14\u7C8B\u95A2\u6570\u306B\u5207\u308A\u51FA\u3057\u3001video \u306E rect \u3068\u306E\u30B8\u30AA\u30E1\u30C8\u30EA\u6574\u5408\uFF08\u5E45\u6BD4 0.95\u20131.6\u30FBtop \u30AA\u30D5\u30BB\u30C3\u30C8 120px\u30FBaspect \u4E0A\u9650 2.6\u30FB\u9762\u7A4D\u4E0A\u9650 viewport 60%\uFF09\u307E\u3067\u542B\u3081\u3066\u53B3\u683C\u5316\u3057\u307E\u3057\u305F\uFF080.1.63 \u306E\u5FDC\u6025 migration \u3068\u7D44\u307F\u5408\u308F\u305B\u3066\u4E8C\u91CD\u3067\u6539\u5584\uFF09",
+        "\u30C4\u30FC\u30EB\u30D0\u30FC\u304B\u3089 popup \u3092\u958B\u3044\u305F\u6642\u3001popup window \u306E\u4E2D\u306B\u5197\u9577\u306A\u300C\u541B\u6597\u308A\u3093\u304F\u306E\u8FFD\u61B6\u306E\u304D\u3089\u3081\u304D\u300D\u30ED\u30B4\u5E2F\u304C\u51FA\u3066\u3044\u3066 Chrome \u81EA\u8EAB\u306E\u30BF\u30A4\u30C8\u30EB\u30D0\u30FC\u3068\u300C\u67A0\u304C 2 \u3064\u300D\u306B\u898B\u3048\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\u3002standalone window \u3067\u306F\u5185\u90E8\u30D8\u30C3\u30C0\u30FC\u3092\u975E\u8868\u793A\u306B\u3057\u307E\u3057\u305F",
+        "5 \u30E2\u30CB\u30BF\u306A\u3069\u306E\u591A\u30E2\u30CB\u30BF\u74B0\u5883\u3067\u3001popup window \u304C Chrome window \u306E\u96A3\u306E\u30E2\u30CB\u30BF\u306B\u98DB\u3093\u3067\u3057\u307E\u3046\u554F\u984C\u3092\u4FEE\u6B63\u3002popup \u3092 Chrome window \u306E\u53F3\u5185\u5074\u306B\u914D\u7F6E\u3059\u308B\u3088\u3046\u5909\u66F4\u3057\u3001\u5FC5\u305A Chrome \u306E\u3044\u308B\u30E2\u30CB\u30BF\u306B popup \u304C\u51FA\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3057\u305F\uFF08Chrome \u306E content \u53F3\u5074\u3068\u5C11\u3057\u88AB\u308B\u306E\u306F\u8A31\u5BB9\uFF09",
+        "\u753B\u9762\u5E45\u304C\u7D041200px\u672A\u6E80\u3067\u300C\u6A2A\u4ED8\u304D\u300D\u3092\u9078\u3093\u3067\u3082\u81EA\u52D5\u3067\u300C\u30D7\u30EC\u30A4\u30E4\u30FC\u884C\u306E\u4E0B\u300D\u3068\u540C\u3058\u52D5\u4F5C\u306B\u306A\u308B\u4ED5\u69D8\u306B\u3064\u3044\u3066\u3001\u898B\u843D\u3068\u3055\u308C\u3084\u3059\u304B\u3063\u305F\u30D2\u30F3\u30C8\u6587\u3092\u8B66\u544A\u8ABF\uFF08\u9EC4\u8272\u80CC\u666F + \u592A\u5B57\uFF09\u306B\u5F37\u8ABF\u3057\u307E\u3057\u305F"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.63",
+      date: "2026-05-01",
+      summary: "\u914D\u4FE1\u6642\u306E\u30D1\u30CD\u30EB\u4F4D\u7F6E\u3092 player \u306E\u8FD1\u304F\u306B\u623B\u3059",
+      items: Object.freeze([
+        "watch \u30DA\u30FC\u30B8\u306E\u30D1\u30CD\u30EB\u304C\u300C\u30DA\u30FC\u30B8\u6700\u4E0B\u90E8\uFF08amazon\u30FB\u95A2\u9023\u914D\u4FE1\u306E\u5F8C\u308D\uFF09\u300D\u306B\u51FA\u308B\u3088\u3046\u306B\u306A\u3063\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\u3002\u300C\u30D7\u30EC\u30A4\u30E4\u30FC\u884C\u306E\u4E0B\u300D\u8A2D\u5B9A\u306E\u4EBA\u3092\u300C\u753B\u9762\u4E0B\u3044\u3063\u3071\u3044\uFF08\u65E2\u5B9A\uFF09\u300D\u306B\u4E00\u5EA6\u3060\u3051\u81EA\u52D5\u79FB\u884C\u3057\u3001player \u3068 panel \u304C\u5E38\u306B viewport \u4E0A\u3067\u30BB\u30C3\u30C8\u3067\u898B\u3048\u308B\u72B6\u614B\u306B\u623B\u3057\u307E\u3059\uFF08\u610F\u56F3\u3057\u3066\u300C\u4E0B\u300D\u3092\u9078\u3093\u3067\u3044\u305F\u5834\u5408\u306F\u8A2D\u5B9A\u753B\u9762\u304B\u3089\u518D\u5EA6\u5207\u308A\u66FF\u3048\u53EF\u80FD\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.62",
+      date: "2026-05-01",
+      summary: "popup \u3092 Chrome \u53F3\u7AEF\u306B\u5BC6\u7740",
+      items: Object.freeze([
+        "popup \u3068 Chrome \u30A6\u30A3\u30F3\u30C9\u30A6\u306E\u9593\u306B\u9699\u9593\u304C\u3042\u3063\u305F\u554F\u984C\u3092\u4FEE\u6B63\u3002Chrome \u306E\u53F3\u7AEF\u3074\u3063\u305F\u308A\u306B popup \u306E\u5DE6\u7AEF\u3092\u5408\u308F\u305B\u3001\u4E0A\u7AEF\u3082\u63C3\u3048\u3066\u96A3\u63A5\u914D\u7F6E\uFF08\u9699\u9593\u30BC\u30ED\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.61",
+      date: "2026-05-01",
+      summary: "popup \u3092 Chrome \u306E\u53F3\u5074\u306B\u96A3\u63A5\u914D\u7F6E",
+      items: Object.freeze([
+        "popup \u304C Chrome \u30A6\u30A3\u30F3\u30C9\u30A6\u306E\u4E2D\u592E\u306B\u88AB\u3055\u3063\u3066\u300C\u30DC\u30C3\u30AF\u30B9\u306E\u4E2D\u306B\u3042\u308B\u304B\u3093\u3058\u300D\u306B\u306A\u308B\u554F\u984C\u3092\u4FEE\u6B63\u3002Chrome \u30A6\u30A3\u30F3\u30C9\u30A6\u306E\u53F3\u5074\u306B\u96A3\u63A5\u3059\u308B\u4F4D\u7F6E\u306B popup \u3092\u914D\u7F6E\u3059\u308B\u3088\u3046\u5909\u66F4\uFF08Chrome \u306E content \u306B\u91CD\u306A\u3089\u306A\u3044\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.60",
+      date: "2026-05-01",
+      summary: "\u8907\u6570\u30E2\u30CB\u30BF\u6642\u306B popup \u3092\u540C\u3058\u753B\u9762\u306B\u51FA\u3059",
+      items: Object.freeze([
+        "\u30E2\u30CB\u30BF\u304C\u8907\u6570\u3042\u308B\u3068\u304D popup \u304C\u5225\u30E2\u30CB\u30BF\u306B\u958B\u304F\u554F\u984C\u3092\u4FEE\u6B63\u3002\u76F4\u524D\u306B\u4F7F\u3063\u3066\u3044\u305F Chrome \u30A6\u30A3\u30F3\u30C9\u30A6\u306E\u4E2D\u592E\u306B popup \u3092\u914D\u7F6E\u3059\u308B\u3088\u3046\u5909\u66F4\uFF08\u540C\u3058\u30E2\u30CB\u30BF\u306B\u51FA\u308B\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.59",
+      date: "2026-05-01",
+      summary: "popup \u3092\u6BCE\u56DE\u4F5C\u308A\u76F4\u3057\u3066\u6A2A\u9577\u3092\u78BA\u5B9F\u306B\u89E3\u6D88",
+      items: Object.freeze([
+        "popup window \u304C\u6A2A\u9577\u3067\u958B\u3044\u3066\u7A7A\u767D\u3060\u3089\u3051\u306B\u306A\u308B\u554F\u984C\u3092\u78BA\u5B9F\u306B\u4FEE\u6B63\u30020.1.58 \u3067\u306F update \u3067\u30B5\u30A4\u30BA\u5909\u66F4\u3092\u8A66\u307F\u305F\u304C Chrome \u304C\u7121\u8996\u3059\u308B\u30B1\u30FC\u30B9\u304C\u3042\u3063\u305F\u305F\u3081\u3001\u65E2\u5B58 popup \u3092\u4E00\u5EA6\u9589\u3058\u3066 420\xD7780 \u3067\u65B0\u898F\u4F5C\u6210\u3059\u308B\u5F62\u306B\u5909\u66F4\uFF08state:normal \u3082\u660E\u793A\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.58",
+      date: "2026-05-01",
+      summary: "popup window \u30B5\u30A4\u30BA\u3092\u6BCE\u56DE 420\xD7780 \u306B\u30EA\u30BB\u30C3\u30C8",
+      items: Object.freeze([
+        "popup window \u304C\u6A2A\u306B\u9593\u5EF6\u3073\u3057\u3066\u53F3\u5074\u304C\u7A7A\u767D\u3060\u3089\u3051\u306B\u306A\u308B\u300C\u30EC\u30A4\u30A2\u30A6\u30C8\u30AC\u30BF\u30AC\u30BF\u300D\u73FE\u8C61\u3092\u4FEE\u6B63\u3002Chrome \u304C\u4EE5\u524D\u306E\u30B5\u30A4\u30BA\u3092\u8A18\u61B6\u3057\u3066\u3044\u305F\u554F\u984C\u3067\u3001popup \u3092\u958B\u304F\u305F\u3073\u306B 420\xD7780 \u306B\u5F37\u5236\u30EA\u30BB\u30C3\u30C8\u3059\u308B\u3088\u3046\u5909\u66F4"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.57",
+      date: "2026-05-01",
+      summary: "\u4F55\u3082\u306A\u3044\u6642\u306F\u524D\u653E\u9001\u30C7\u30FC\u30BF\u3092\u51FA\u3055\u306A\u3044",
+      items: Object.freeze([
+        "watch \u30DA\u30FC\u30B8\u4EE5\u5916\u3067 popup \u3092\u958B\u3044\u305F\u6642\u306B\u3001storage \u7531\u6765\u306E\u524D\u653E\u9001\u30C7\u30FC\u30BF\uFF08\u8A18\u9332 N \u4EF6\u30FB(\u53D6\u5F97\u4E0D\u53EF) \u306A\u3069\uFF09\u304C\u8868\u793A\u3055\u308C\u3066\u30EC\u30A4\u30A2\u30A6\u30C8\u304C\u30AC\u30BF\u30AC\u30BF\u306B\u306A\u308B\u554F\u984C\u3092\u4FEE\u6B63\u3002\u30A2\u30AF\u30C6\u30A3\u30D6\u306A watch \u30BF\u30D6\u304C\u7121\u3044\u3068\u304D\u306F\u300C\uFF08\u30CB\u30B3\u751F watch \u3092\u958B\u3044\u3066\u304F\u3060\u3055\u3044\uFF09\u300Dplaceholder + \u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u306E\u307F\u306E\u30B9\u30C3\u30AD\u30EA\u8868\u793A\u306B\u7D71\u4E00"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.56",
+      date: "2026-05-01",
+      summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u3092\u6700\u4E0A\u90E8\u306B\u56FA\u5B9A\u8868\u793A",
+      items: Object.freeze([
+        "popup \u3067\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u304C\u51FA\u306A\u3044\u554F\u984C\u3092\u78BA\u5B9A\u7684\u306B\u4FEE\u6B63\u3002section \u914D\u7F6E\u3092 version badge \u306E\u76F4\u4E0B\uFF08\u6700\u4E0A\u90E8\uFF09\u306B\u79FB\u52D5\u3057\u3001display:block !important + \u76EE\u7ACB\u3064\u30AA\u30EC\u30F3\u30B8\u8272\u67A0\u7DDA\u3067\u5FC5\u305A\u898B\u3048\u308B\u5F62\u306B\u3057\u307E\u3057\u305F\uFF08INLINE_MODE \u306E\u3068\u304D\u3060\u3051 display:none\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.55",
+      date: "2026-05-01",
+      summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u3092\u78BA\u5B9F\u306B\u8868\u793A",
+      items: Object.freeze([
+        "popup \u3092\u958B\u3044\u3066\u3082\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u304C\u51FA\u306A\u3044\u554F\u984C\u3092\u78BA\u5B9F\u306B\u4FEE\u6B63\u3002HTML \u306E hidden \u5C5E\u6027\u30C7\u30D5\u30A9\u30EB\u30C8\u3092\u64A4\u53BB\u3057\u3001popup window \u3067\u306F\u6700\u521D\u304B\u3089\u8868\u793A\u72B6\u614B\u306B\u5909\u66F4\uFF08watch \u30DA\u30FC\u30B8\u5185\u306E\u30D1\u30CD\u30EB iframe \u3067\u306F JS \u3067 hidden \u3092\u4ED8\u3051\u308B\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.54",
+      date: "2026-04-30",
+      summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u3092\u5E38\u6642\u8868\u793A\u306B",
+      items: Object.freeze([
+        "\u30C4\u30FC\u30EB\u30D0\u30FC\u304B\u3089 popup \u3092\u958B\u3044\u305F\u6642\u306B\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u304C\u51FA\u306A\u3044\u554F\u984C\u3092\u4FEE\u6B63\u3002\u8907\u6570 window \u74B0\u5883\u3067 source \u691C\u51FA\u304C\u60F3\u5B9A\u3069\u304A\u308A\u52D5\u304B\u306A\u3044\u30B1\u30FC\u30B9\u304C\u3042\u3063\u305F\u305F\u3081\u3001popup window \u3067\u306F\u5E38\u306B\u5C0E\u7DDA\u3092\u8868\u793A\u3059\u308B\u5F62\u306B\u5909\u66F4\uFF08watch \u30DA\u30FC\u30B8\u5185\u306E\u30D1\u30CD\u30EB iframe \u3067\u306F\u975E\u8868\u793A\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.53",
+      date: "2026-04-30",
+      summary: "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u306E\u8868\u793A\u6761\u4EF6\u3092\u53B3\u5BC6\u5316",
+      items: Object.freeze([
+        "watch \u4EE5\u5916\u306E\u30DA\u30FC\u30B8\u3067 popup \u3092\u958B\u3044\u3066\u3082\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u304C\u51FA\u305A\u3001\u524D\u306B\u898B\u305F\u653E\u9001\u306E\u30C7\u30FC\u30BF\u304C\u8868\u793A\u3055\u308C\u308B\u554F\u984C\u3092\u4FEE\u6B63\u3002\u30A2\u30AF\u30C6\u30A3\u30D6\u30BF\u30D6\u304C watch \u30DA\u30FC\u30B8\u3058\u3083\u306A\u3044\u6642\u306F\u5FC5\u305A\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u3092\u51FA\u3059\u3088\u3046\u306B\u5909\u66F4\uFF08storage fallback \u306E\u5F71\u97FF\u3092\u53D7\u3051\u306A\u3044\u3088\u3046\u5224\u5B9A\u5F37\u5316\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.52",
+      date: "2026-04-30",
+      summary: "\u4F55\u3082\u306A\u3044\u6642\u306F\u30CB\u30B3\u751F\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA",
+      items: Object.freeze([
+        "watch \u30DA\u30FC\u30B8\u4EE5\u5916\u3067 popup \u3092\u958B\u3044\u305F\u6642\u306B\u3001\u30CB\u30B3\u751F\u30C8\u30C3\u30D7\u30FB\u751F\u653E\u9001\u30E9\u30F3\u30AD\u30F3\u30B0\u30FB\u3061\u304F\u3089\u3093\u30FB\u76F4\u8FD1\u958B\u59CB\u306E\u653E\u9001 \u3078\u306E\u30EA\u30F3\u30AF\u3092\u8868\u793A\u3002\u6C17\u306B\u306A\u308B\u653E\u9001\u3092\u3059\u3050\u63A2\u305B\u308B\u3088\u3046\u306B\u3057\u307E\u3057\u305F"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.51",
+      date: "2026-04-30",
+      summary: "popup \u306E dark \u3092\u5B8C\u5168\u306B\u64A4\u53BB",
+      items: Object.freeze([
+        "popup \u3092\u958B\u3044\u305F\u3068\u304D\u306B dark \u30C6\u30FC\u30DE\u3067\u771F\u3063\u9ED2\u306B\u306A\u308B\u554F\u984C\u3092\u5B8C\u5168\u4FEE\u6B63\u30020.1.50 \u3067 OS \u306E dark \u8A2D\u5B9A\u691C\u51FA\u306B\u5207\u308A\u66FF\u3048\u305F\u304C\u3001Chrome \u306E\u30C6\u30FC\u30DE\u3084 Windows \u306E\u30B7\u30B9\u30C6\u30E0\u914D\u8272\u3067\u8AA4\u3063\u3066 dark \u3068\u5224\u5B9A\u3055\u308C\u308B\u30B1\u30FC\u30B9\u304C\u6B8B\u3063\u305F\u306E\u3067\u3001light \u914D\u8272\uFF08\u30AF\u30EA\u30FC\u30E0\u8272\u80CC\u666F\uFF09\u56FA\u5B9A\u306B\u5909\u66F4"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.50",
+      date: "2026-04-30",
+      summary: "popup \u306E\u9ED2\u30C6\u30FC\u30DE\u5F37\u5236\u3092\u64A4\u53BB\uFF08\u90E8\u5206\uFF09",
+      items: Object.freeze([
+        "\u30C4\u30FC\u30EB\u30D0\u30FC\u304B\u3089 popup \u3092\u958B\u3044\u305F\u6642\u306B\u5E38\u306B\u771F\u3063\u9ED2\u3060\u3063\u305F\u4EF6\u306E\u5BFE\u7B56\uFF08OS \u306E dark \u8A2D\u5B9A\u691C\u51FA\u306B\u5207\u66FF\u3001\u5F8C\u306E 0.1.51 \u3067\u3055\u3089\u306B\u5B8C\u5168 light \u5316\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.49",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306B\u52D5\u7684\u30A2\u30C9\u30D0\u30A4\u30B9\u3092\u8FFD\u52A0",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306E\u5404\u30BB\u30AF\u30B7\u30E7\u30F3\u306B\u300C\u30C7\u30FC\u30BF\u306B\u5FDC\u3058\u3066\u5909\u308F\u308B\u30AD\u30E3\u30E9\u5225\u30A2\u30C9\u30D0\u30A4\u30B9\u300D\u3092\u8FFD\u52A0\u3002KPI / \u540C\u63A5 / \u7B11\u3044 / \u65B0\u898F vs \u5E38\u9023 / \u6C88\u9ED9 / \u611F\u60C5 / \u30EA\u30FC\u30C1 / \u6210\u9577 / \u521D\u30B3\u30E1 / \u751F\u5B58\u66F2\u7DDA / \u30AD\u30FC\u30DC\u30FC\u30C9\u578B / \u30B3\u30E1\u4F1D\u67D3 / \u76F4\u8FD1\u6BD4\u8F03 / \u6CE2\u5F62 / \u8A00\u308F\u306A\u304B\u3063\u305F\u4EBA\u6C17\u8A9E / \u8A71\u82B8\u30D4\u30FC\u30AF \u306E 16 \u30BB\u30AF\u30B7\u30E7\u30F3 \xD7 100+ \u30EB\u30FC\u30EB\u3067\u5177\u4F53\u7684\u306A\u52A9\u8A00\u3092\u51FA\u3057\u307E\u3059\uFF08\u65E2\u5B58\u306E\u56FA\u5B9A\u30A2\u30C9\u30D0\u30A4\u30B9\u306F\u305D\u306E\u307E\u307E\u3001\u305D\u306E\u5F8C\u308D\u306B\u8FFD\u52A0\u8868\u793A\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.48",
+      date: "2026-04-30",
+      summary: "\u5927\u898F\u6A21\u914D\u4FE1\u306E\u30DE\u30FC\u30B1\u5206\u6790\u3092\u5B89\u5B9A\u5316",
+      items: Object.freeze([
+        "\u4EBA\u6C17\u914D\u4FE1\u8005\u306E 8 \u4E07\u30B3\u30E1\u8D85\u653E\u9001\u3067\u30DE\u30FC\u30B1\u5206\u6790\u304C\u30B9\u30BF\u30C3\u30AF\u30AA\u30FC\u30D0\u30FC\u30D5\u30ED\u30FC\u3067\u7121\u75C7\u72B6\u5931\u6557\u3057\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\uFF08Math.min/max \u306E spread \u3092 for \u30EB\u30FC\u30D7\u5316\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.47",
+      date: "2026-04-30",
+      summary: "\u540C\u63A5\u30AB\u30FC\u30D6\u3068\u9023\u6253\u4E8B\u6545\u9632\u6B62",
+      items: Object.freeze([
+        "\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\u304C\u300C\u516C\u5F0F\u304C\u3042\u308C\u3070\u516C\u5F0F\u30FB\u306A\u3051\u308C\u3070\u63A8\u5B9A\u300D\u306E\u4E8C\u8005\u629E\u4E00\u3067\u7A00\u306B\u53D6\u308C\u308B\u516C\u5F0F\u5024\u304C\u3042\u308B\u3068\u63A8\u5B9A\u5024 90% \u3092\u6368\u3066\u3066\u30B0\u30E9\u30D5\u304C\u307B\u307C\u7A7A\u306B\u306A\u3063\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\u3002\u5404\u30B5\u30F3\u30D7\u30EB\u5358\u4F4D\u3067\u516C\u5F0F\u512A\u5148 \u2192 \u7121\u3051\u308C\u3070\u63A8\u5B9A\u306B\u30D5\u30A9\u30FC\u30EB\u30D0\u30C3\u30AF\u3059\u308B hybrid \u306B\u5909\u66F4",
+        "HTML \u30EC\u30DD\u30FC\u30C8\u30DC\u30BF\u30F3 / \u30B9\u30AF\u30B7\u30E7\u30DC\u30BF\u30F3\u306E\u9023\u6253\u3067\u91CD\u8907\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u304C\u8D77\u304D\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\uFF08\u51E6\u7406\u4E2D\u306F\u30DC\u30BF\u30F3\u3092 disable\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.46",
+      date: "2026-04-30",
+      summary: "\u30DE\u30FC\u30B1\u5206\u6790\u306E\u7CBE\u5EA6\u5411\u4E0A",
+      items: Object.freeze([
+        "\u30DE\u30FC\u30B1\u5206\u6790\u306E KPI \u96C6\u8A08\u304B\u3089\u914D\u4FE1\u8005\u672C\u4EBA\u306E\u30B3\u30E1\u30F3\u30C8\uFF08\u5408\u3044\u306E\u624B\u7B49\uFF09\u3092\u9664\u5916\uFF08CPM\u30FB\u30E6\u30CB\u30FC\u30AF\u30FB\u30BF\u30A4\u30E0\u30E9\u30A4\u30F3\u304C\u6B6A\u3093\u3067\u3044\u305F\u554F\u984C\uFF09",
+        "\u30B3\u30E1\u88AB\u308A\u691C\u51FA\uFF08\u4F1D\u67D3\u30FB\u88AB\u308A\u77AC\u9593\uFF09\u304C\u8907\u6570\u4EBA\u306E\u540C\u6642\u30D0\u30FC\u30B9\u30C8\u3092 1 \u4EF6\u3068\u3057\u3066\u6271\u3063\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\uFF08\u540C\u79D2\u30FB\u540C\u30C6\u30AD\u30B9\u30C8\u30FB\u5225\u30E6\u30FC\u30B6\u30FC\u3092\u5225\u884C\u6271\u3044\u306B\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.45",
+      date: "2026-04-30",
+      summary: "\u88CF\u5074\u306E\u30AF\u30EA\u30FC\u30F3\u30A2\u30C3\u30D7\u3068\u30D7\u30E9\u30A4\u30D0\u30B7\u30FC",
+      items: Object.freeze([
+        "\u62E1\u5F35\u30EA\u30ED\u30FC\u30C9\u5F8C\u306B\u9577\u6642\u9593\u653E\u7F6E\u3059\u308B\u3068\u88CF\u3067\u30BF\u30A4\u30DE\u30FC\u304C\u56DE\u308A\u7D9A\u3051\u3066 CPU \u3092\u6D88\u8CBB\u3057\u3066\u3044\u305F\u554F\u984C\u3092\u4FEE\u6B63\uFF08pageFrameLoopTimer \u3082\u505C\u6B62\u5BFE\u8C61\u306B\u8FFD\u52A0\uFF09",
+        "AI \u8A3A\u65AD\uFF08\u5171\u6709\u30C6\u30AD\u30B9\u30C8\uFF09\u306B\u4FDD\u5B58\u3059\u308B watch URL \u304B\u3089 query / fragment \u3092\u524A\u9664\uFF08\u4E07\u4E00\u500B\u4EBA\u60C5\u5831\u3092\u542B\u3080 token \u304C\u4E57\u3063\u3066\u3044\u305F\u5834\u5408\u306E\u6F0F\u6D29\u3092\u6291\u6B62\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.44",
+      date: "2026-04-30",
+      summary: "\u88CF\u5074\u306E\u30E1\u30E2\u30EA\u52B9\u7387\u3068\u6574\u5408\u6027",
+      items: Object.freeze([
+        "\u30B5\u30E0\u30CD\u30A4\u30EB\u4FDD\u5B58\u6642\u306B\u904E\u53BB\u306E\u5168\u30B5\u30E0\u30CD\u3092\u6BCE\u56DE\u30E1\u30E2\u30EA\u5C55\u958B\u3057\u3066\u3044\u305F\u51E6\u7406\u3092 cursor + count() \u30D9\u30FC\u30B9\u306B\u5909\u66F4\u3002\u9577\u6642\u9593\u8996\u8074\u306E\u30E1\u30E2\u30EA\u30B9\u30D1\u30A4\u30AF\u3092\u6291\u6B62",
+        "\u81EA\u52D5\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u306E\u72B6\u614B\u7BA1\u7406\u3067 content \u3068 background SW \u306E\u540C\u6642\u66F8\u304D\u8FBC\u307F\u306B\u3088\u308B\u91CD\u8907\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u3092\u6291\u6B62\uFF08write \u76F4\u524D\u306B fresh re-read \u3067 merge\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.43",
+      date: "2026-04-30",
+      summary: "\u30D1\u30CD\u30EB\u304C\u958B\u304B\u306A\u3044\u4E8B\u8C61\u306E\u4FEE\u6B63",
+      items: Object.freeze([
+        "kon-ta \u30AF\u30EA\u30C3\u30AF\u3057\u3066\u3082\u30D1\u30CD\u30EB\u304C\u958B\u304B\u306A\u3044\u4E8B\u8C61\u3092\u4FEE\u6B63\u3002focus \u5224\u5B9A\u3092\u5F37\u5316\u3057\u3001host \u304C DOM \u4E0A\u3067\u3082 display:none / visibility:hidden \u306E\u5834\u5408\u306F popup window \u3078\u30D5\u30A9\u30FC\u30EB\u30D0\u30C3\u30AF\u3059\u308B\u3088\u3046\u5909\u66F4\uFF08\u7D14\u7C8B\u95A2\u6570 + \u30C6\u30B9\u30C8 7 \u30B1\u30FC\u30B9\u8FFD\u52A0\uFF09",
+        "\u5185\u90E8: content script \u306E onMessage listener \u3092 idempotent \u306B\u5909\u66F4\uFF08SPA \u518D\u6CE8\u5165\u6642\u306E\u4E8C\u91CD\u5FDC\u7B54 \u2192 port closed \u30A8\u30E9\u30FC\u5BFE\u7B56\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.42",
+      date: "2026-04-30",
+      summary: "\u30D1\u30CD\u30EB\u6E96\u5099\u306E\u7AF6\u5408\u89E3\u6D88",
+      items: Object.freeze([
+        "\u8907\u6570 watch \u30BF\u30D6\u4E26\u884C\u6642\u306B kon-ta \u30AF\u30EA\u30C3\u30AF\u2192\u30D1\u30CD\u30EB\u8868\u793A\u307E\u3067\u304C\u9045\u304F\u306A\u308B\u554F\u984C\u3092\u4FEE\u6B63\u3002chrome.storage.local \u306E lease \u3092\u4F7F\u3063\u3066\u540C\u6642\u306B\u30D1\u30CD\u30EB\u6E96\u5099\uFF08prewarm\uFF09\u3092\u8D70\u3089\u305B\u308B\u30BF\u30D6\u3092 1 \u3064\u306B\u7D5E\u308A\u3001CPU \u53D6\u308A\u5408\u3044\u3092\u6291\u6B62\uFF08\u7D14\u7C8B\u95A2\u6570 + 10 \u30B1\u30FC\u30B9 TDD\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.41",
+      date: "2026-04-30",
+      summary: "\u6DF1\u5C64\u76E3\u67FB\u306E\u7D50\u679C\u3092\u53CD\u6620",
+      items: Object.freeze([
+        "\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u304C\u300C\u51FA\u305F\u3068\u601D\u3063\u305F\u3089\u6D88\u3048\u308B\u300D\u4E8B\u8C61\u3092\u4FEE\u6B63\uFF0830 \u79D2\u3054\u3068\u306E\u518D\u53D6\u5F97\u3067 broadcaster \u7CFB\u304C\u7A7A\u306E\u3068\u304D\u65E7\u5024\u3092\u4FDD\u3064 partial-merge \u3092\u5C0E\u5165\u3001\u7D14\u7C8B\u95A2\u6570 + 11 \u30B1\u30FC\u30B9 TDD\uFF09",
+        "\u8907\u6570\u30BF\u30D6\u3067 kon-ta \u30D1\u30CD\u30EB\u306E\u8A18\u9332\u4EF6\u6570 / \u30E9\u30F3\u30AF\u30B9\u30C8\u30EA\u30C3\u30D7\u304C\u6DF7\u4FE1\u3059\u308B\u4E8B\u8C61\u3092\u4FEE\u6B63\uFF08standalone popup window \u304B\u3089\u300C\u76F4\u524D\u306E\u901A\u5E38 window \u306E\u30A2\u30AF\u30C6\u30A3\u30D6\u30BF\u30D6\u300D\u3092\u62FE\u3046\u3088\u3046\u5224\u5B9A\u8FFD\u52A0\u3001\u7D14\u7C8B\u95A2\u6570 + 8 \u30B1\u30FC\u30B9 TDD\uFF09",
+        "\u30B3\u30E1\u53D6\u308A\u8FBC\u307F\u7387\u304C 17% \u7A0B\u5EA6\u306B\u4F4E\u4E0B\u3057\u3066\u3044\u305F\u4E8B\u8C61\u3092\u4FEE\u6B63\uFF08NDGR \u304C active \u306A\u9593 deep harvest \u3092\u5168 skip \u3057\u3066\u3044\u305F\u304C\u30015 \u5206\u4EE5\u4E0A deep \u304C\u8D70\u3063\u3066\u3044\u306A\u3051\u308C\u3070\u5F37\u5236\u5B9F\u884C\u3059\u308B recovery \u3092 runDeepHarvest \u5185\u90E8\u306B\u3082\u7D50\u7DDA\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.40",
+      date: "2026-04-30",
+      summary: "\u516C\u5F0F\u30C1\u30E3\u30F3\u30CD\u30EB\u653E\u9001\u306E\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u5FA9\u6D3B",
+      items: Object.freeze([
+        "\u516C\u5F0F\u30C1\u30E3\u30F3\u30CD\u30EB\u653E\u9001\uFF08\u904B\u55B6\u30FB\u696D\u8005\uFF09\u3067\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u304C\u51FA\u3066\u3044\u306A\u304B\u3063\u305F\u4E8B\u8C61\u3092\u4FEE\u6B63\u3002embedded-data \u306E supplier.name \u306F\u63D0\u4F9B\u4F1A\u793E\u540D\uFF08\u4F8B\u300C\u682A\u5F0F\u4F1A\u793E\u30C9\u30EF\u30F3\u30B4\u300D\uFF09\u3067\u30C1\u30E3\u30F3\u30CD\u30EB\u540D\u3067\u306F\u306A\u3044\u305F\u3081\u3001socialGroup.name / socialGroup.socialGroupPageUrl \u3092\u512A\u5148\u3059\u308B\u3088\u3046\u306B\u5909\u66F4\u3002\u30A2\u30A4\u30B3\u30F3\u3082 socialGroup.thumbnailImageUrl \u7B49\u3092\u8AAD\u3080\u3088\u3046\u306B\u8FFD\u52A0\uFF08\u7D14\u7C8B\u95A2\u6570 + 19 \u30B1\u30FC\u30B9 TDD\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.39",
+      date: "2026-04-30",
+      summary: "\u914D\u4FE1\u8005\u30EA\u30F3\u30AF\u8AA4\u691C\u51FA\u306E\u518D\u767A\u9632\u6B62",
+      items: Object.freeze([
+        "\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u304C\u95A2\u9023\u914D\u4FE1\u67A0\u306E\u5225\u4EBA\u3092\u6307\u3057\u3066\u3057\u307E\u3046\u4E8B\u8C61\uFF080.1.38 \u306E\u8FFD\u52A0\u5BFE\u7B56\uFF09\u3002DOM \u5019\u88DC\u304B\u3089 ?ref=watch_user_information \u30DE\u30FC\u30AB\u4ED8\u304D anchor \u3092\u6700\u512A\u5148\u306B\u3057\u3066\u4E8C\u91CD\u9632\u5FA1\u3002\u540C\u7A2E\u306E\u691C\u51FA\u30ED\u30B8\u30C3\u30AF\u3092\u4F7F\u3046\u5225\u95A2\u6570\uFF08detectBroadcasterUserIdFromDom\uFF09\u3082\u540C\u3058\u9632\u5FA1\u306B\u7D71\u4E00",
+        "\u30A2\u30D0\u30BF\u30FC URL \u6BD4\u8F03\u30D8\u30EB\u30D1\uFF08avatarCompareKey / isSameAvatarUrl\uFF09\u3092 src/lib/avatarUrlCompare.js \u306B\u5207\u308A\u51FA\u3057\uFF08\u7D14\u7C8B\u95A2\u6570 + 14 \u30B1\u30FC\u30B9 TDD\uFF09\u3002query/hash \u9055\u3044\u3092\u300C\u540C\u3058\u30A2\u30D0\u30BF\u30FC\u300D\u3068\u3057\u3066\u6271\u3046\u30ED\u30B8\u30C3\u30AF\u306E\u5358\u4F53\u691C\u8A3C\u3092\u5F37\u5316"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.38",
+      date: "2026-04-30",
+      summary: "\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u306E\u30EA\u30F3\u30AF\u5148\u3092\u4FEE\u6B63",
+      items: Object.freeze([
+        "\u914D\u4FE1\u8005\u30BF\u30A4\u30EB\u304B\u3089\u30AF\u30EA\u30C3\u30AF\u3057\u305F\u6642\u306B\u5225\u4EBA\u306E\u30DA\u30FC\u30B8\u306B\u98DB\u3076\u4E8B\u8C61\u3092\u4FEE\u6B63\uFF08embedded-data \u306E supplier.programProviderId \u3092\u6700\u512A\u5148\u306B\uFF09\u3002\u672C\u914D\u4FE1\u8005\u304C\u30EC\u30FC\u30F3\u306B\u6DF7\u5165\u3059\u308B\u539F\u56E0\u306B\u3082\u306A\u3063\u3066\u3044\u305F\u7B87\u6240",
+        "\u30B3\u30E1\u9001\u4FE1\u30A8\u30E9\u30FC\u6642\u306E\u518D\u8AAD\u307F\u8FBC\u307F\u6848\u5185\u30ED\u30B8\u30C3\u30AF\u3092 src/lib/commentSendTroubleshootHint.js \u306B\u5207\u308A\u51FA\u3057\uFF08\u7D14\u7C8B\u95A2\u6570 + 7 \u30B1\u30FC\u30B9 TDD\uFF09"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.37",
       date: "2026-04-30",
       summary: "\u5185\u90E8\u306E\u91CD\u8907\u5B9A\u7FA9\u3092\u6574\u7406",
@@ -1064,7 +1328,8 @@
       return `${liveId}|${no}|${text}`;
     }
     const sec = Math.floor(Number(rec.capturedAt || 0) / 1e3);
-    return `${liveId}||${text}|${sec}`;
+    const uid = String(rec.userId ?? "").trim();
+    return `${liveId}||${text}|${sec}|${uid}`;
   }
 
   // src/lib/commentKindnessNudge.js
@@ -1962,10 +2227,10 @@
   }
   function darkenHexColor(hex, ratio) {
     const source = normalizeHexColor(hex, "#0f8fd8").slice(1);
-    const clamp2 = (v) => Math.max(0, Math.min(255, Math.round(v)));
-    const r = clamp2(parseInt(source.slice(0, 2), 16) * (1 - ratio));
-    const g = clamp2(parseInt(source.slice(2, 4), 16) * (1 - ratio));
-    const b = clamp2(parseInt(source.slice(4, 6), 16) * (1 - ratio));
+    const clamp3 = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    const r = clamp3(parseInt(source.slice(0, 2), 16) * (1 - ratio));
+    const g = clamp3(parseInt(source.slice(2, 4), 16) * (1 - ratio));
+    const b = clamp3(parseInt(source.slice(4, 6), 16) * (1 - ratio));
     return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   }
   function sanitizeCustomFrame(raw) {
@@ -4772,9 +5037,11 @@ ${body}`;
   }
 
   // src/lib/marketingAggregate.js
-  function aggregateMarketingReport(comments, liveId) {
+  function aggregateMarketingReport(comments, liveId, opts = {}) {
+    const broadcasterUid = String(opts?.broadcasterUserId || "").trim();
     const filtered = comments.filter(
-      (c) => c.liveId === liveId && c.text && c.text.trim()
+      (c) => c.liveId === liveId && c.text && c.text.trim() && // 配信者本人のコメを除外（broadcasterUid が指定されたとき）
+      !(broadcasterUid && String(c.userId || "").trim() === broadcasterUid)
     );
     const userMap = /* @__PURE__ */ new Map();
     const timestamps = [];
@@ -4804,8 +5071,17 @@ ${body}`;
     users.sort((a, b) => b.count - a.count);
     const counts = users.map((u) => u.count).sort((a, b) => a - b);
     const median = counts.length === 0 ? 0 : counts.length % 2 === 1 ? counts[Math.floor(counts.length / 2)] : (counts[counts.length / 2 - 1] + counts[counts.length / 2]) / 2;
-    const minT = timestamps.length ? Math.min(...timestamps) : 0;
-    const maxT = timestamps.length ? Math.max(...timestamps) : 0;
+    let minT = 0;
+    let maxT = 0;
+    if (timestamps.length) {
+      minT = timestamps[0];
+      maxT = timestamps[0];
+      for (let i = 1; i < timestamps.length; i++) {
+        const t = timestamps[i];
+        if (t < minT) minT = t;
+        if (t > maxT) maxT = t;
+      }
+    }
     const durationMs = maxT - minT;
     const durationMinutes = Math.max(1, Math.round(durationMs / 6e4));
     const bucketMap = /* @__PURE__ */ new Map();
@@ -4992,7 +5268,10 @@ ${body}`;
   function computeVposThirds(filtered) {
     const vps = filtered.map((c) => c.vpos).filter((v) => typeof v === "number" && Number.isFinite(v) && v >= 0);
     if (vps.length < 5) return null;
-    const maxV = Math.max(...vps);
+    let maxV = vps[0];
+    for (let i = 1; i < vps.length; i++) {
+      if (vps[i] > maxV) maxV = vps[i];
+    }
     let early = 0;
     let mid = 0;
     let late = 0;
@@ -5064,30 +5343,39 @@ ${body}`;
     if (!list.length) {
       return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: "none" };
     }
-    let hasOfficial = false;
-    let hasEstimated = false;
-    for (const r of list) {
-      if (!r || typeof r !== "object") continue;
-      if (typeof r.capturedAt !== "number" || !Number.isFinite(r.capturedAt)) continue;
-      if (isFiniteNonNegative(r.officialViewerCount)) hasOfficial = true;
-      if (isFiniteNonNegative(r.peakConcurrentEstimate)) hasEstimated = true;
-    }
-    const source = hasOfficial ? "official" : hasEstimated ? "estimated" : "none";
-    if (source === "none") {
-      return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: "none" };
-    }
+    let officialCount = 0;
+    let estimatedCount = 0;
     const collected = [];
     for (const r of list) {
       if (!r || typeof r !== "object") continue;
       if (typeof r.capturedAt !== "number" || !Number.isFinite(r.capturedAt)) continue;
-      const v = source === "official" ? r.officialViewerCount : r.peakConcurrentEstimate;
-      if (!isFiniteNonNegative(v)) continue;
-      collected.push({ at: r.capturedAt, value: v });
+      if (isFiniteNonNegative(r.officialViewerCount)) {
+        collected.push({
+          at: r.capturedAt,
+          value: (
+            /** @type {number} */
+            r.officialViewerCount
+          ),
+          kind: "official"
+        });
+        officialCount += 1;
+      } else if (isFiniteNonNegative(r.peakConcurrentEstimate)) {
+        collected.push({
+          at: r.capturedAt,
+          value: (
+            /** @type {number} */
+            r.peakConcurrentEstimate
+          ),
+          kind: "estimated"
+        });
+        estimatedCount += 1;
+      }
+    }
+    if (!collected.length) {
+      return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: "none" };
     }
     collected.sort((a, b) => a.at - b.at);
-    if (!collected.length) {
-      return { points: [], maxValue: 0, firstAt: null, lastAt: null, source };
-    }
+    const source = officialCount > 0 && estimatedCount > 0 ? "mixed" : officialCount > 0 ? "official" : "estimated";
     const firstAt = collected[0].at;
     const lastAt = collected[collected.length - 1].at;
     let maxValue = 0;
@@ -6137,6 +6425,610 @@ ${body}`;
     return { coefficient: Math.round(c / u * 100) / 100 };
   }
 
+  // src/lib/marketingDynamicAdvice.js
+  function pickAdvicesFromRules(rules, metrics) {
+    const list = Array.isArray(rules) ? rules : [];
+    const byChar = /* @__PURE__ */ new Map();
+    for (const r of list) {
+      if (!r || typeof r !== "object") continue;
+      let pass = false;
+      try {
+        pass = !!r.test?.(metrics);
+      } catch {
+        pass = false;
+      }
+      if (!pass) continue;
+      const cur = byChar.get(r.character);
+      if (!cur || (r.priority ?? 0) > (cur.priority ?? 0)) {
+        byChar.set(r.character, r);
+      }
+    }
+    const out = [];
+    for (
+      const c of
+      /** @type {AdviceCharacter[]} */
+      ["link", "konta", "tanu"]
+    ) {
+      const r = byChar.get(c);
+      if (r) out.push({ character: r.character, lines: r.lines.slice() });
+    }
+    return out;
+  }
+  var HIGH = 100;
+  var KPI_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "kpi-link-very-active",
+        character: "link",
+        priority: HIGH,
+        test: (m) => m.r.commentsPerMinute >= 50,
+        lines: ["\u3059\u3054\u3044\u76DB\u308A\u4E0A\u304C\u308A\u3060\u3063\u305F\u306E\u3060\uFF01", "\u6B21\u56DE\u3082\u3053\u306E\u30C6\u30F3\u30DD\u3092\u7DAD\u6301\u3059\u308B\u305F\u3081\u3001\u958B\u59CB 5 \u5206\u3067\u540C\u3058\u5BC6\u5EA6\u3092\u518D\u73FE\u3059\u308B\u5F3E\u3092\u4ED5\u8FBC\u3093\u3067\u304A\u304D\u305F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-link-active",
+        character: "link",
+        priority: 80,
+        test: (m) => m.r.commentsPerMinute >= 20,
+        lines: ["\u3057\u3063\u304B\u308A\u30EA\u30A2\u30AF\u30B7\u30E7\u30F3\u304C\u56DE\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u914D\u4FE1\u5185\u5BB9\u306E\u67F1\u304C\u30B3\u30E1\u306B\u4E57\u3063\u3066\u3044\u308B\u8A3C\u62E0\u3067\u3001\u81EA\u4FE1\u6301\u3063\u3066\u6B21\u56DE\u3082\u8D70\u3063\u3066\u3044\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-link-modest",
+        character: "link",
+        priority: 60,
+        test: (m) => m.r.commentsPerMinute >= 5,
+        lines: ["\u7A0B\u3088\u304F\u30B3\u30E1\u304C\u4ED8\u3044\u305F\u67A0\u306A\u306E\u3060\u3002", "\u6FC3\u3044\u5BFE\u8A71\u578B\u306E\u914D\u4FE1\u306A\u3089\u3053\u306E\u30C6\u30F3\u30DD\u304C\u5FC3\u5730\u3044\u3044\u304B\u3089\u3001\u7121\u7406\u306B\u30C6\u30F3\u30DD\u3092\u4E0A\u3052\u308B\u5FC5\u8981\u306F\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-link-quiet",
+        character: "link",
+        priority: 40,
+        test: (m) => m.r.commentsPerMinute < 5 && m.r.totalComments > 0,
+        lines: ["\u4ECA\u65E5\u306F\u9759\u304B\u3081\u3060\u3063\u305F\u306E\u3060\u3002", "\u9577\u6587\u6D3E\u304C\u591A\u3044\u6642\u9593\u5E2F\u304B\u3001\u8074\u304F\u5074\u306E\u67A0\u3060\u3063\u305F\u53EF\u80FD\u6027\u306A\u306E\u3060\u3002\u30B3\u30E1\u5BC6\u5EA6\u3060\u3051\u304C\u914D\u4FE1\u4FA1\u5024\u3058\u3083\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-konta-many-people",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => m.r.uniqueUsers >= 100,
+        lines: ["\u3044\u3063\u3071\u3044\u306E\u4EBA\u304C\u6765\u3066\u304F\u308C\u305F\u306E\u3060\u3002", "\u30E6\u30CB\u30FC\u30AF 100 \u4EBA\u8D85\u3048\u306F\u300C\u6B21\u56DE\u307E\u305F\u6765\u305F\u3044\u300D\u3068\u601D\u3063\u3066\u3082\u3089\u3046\u5C0E\u7DDA\u304C\u52B9\u3044\u305F\u8A3C\u62E0\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-konta-some-people",
+        character: "konta",
+        priority: 60,
+        test: (m) => m.r.uniqueUsers >= 30,
+        lines: ["\u3057\u3063\u304B\u308A\u5E38\u9023\u5C64\u304C\u3064\u3044\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u540D\u524D\u304C\u898B\u3048\u308B\u4EBA\u304C\u5897\u3048\u308B\u3068\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u3068\u3057\u3066\u5B89\u5B9A\u3057\u3066\u304F\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-konta-tight-circle",
+        character: "konta",
+        priority: 40,
+        test: (m) => m.r.uniqueUsers > 0 && m.r.uniqueUsers < 30,
+        lines: ["\u5C11\u4EBA\u6570\u3060\u3051\u3069\u6DF1\u304F\u8A71\u305B\u308B\u67A0\u306A\u306E\u3060\u3002", "\u4EBA\u6570\u3088\u308A\u300C\u5E38\u9023\u304C\u4F55\u4EBA\u3044\u308B\u304B\u300D\u3092\u5927\u4E8B\u306B\u3059\u308B\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u306A\u3089\u7406\u60F3\u5F62\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-tanu-balanced",
+        character: "tanu",
+        priority: HIGH,
+        test: (m) => m.r.commentsPerMinute >= 10 && m.r.uniqueUsers >= 30,
+        lines: ["\u30B3\u30E1\u5BC6\u5EA6\u30FB\u4EBA\u6570\u306E\u30D0\u30E9\u30F3\u30B9\u304C\u53D6\u308C\u305F\u3001\u5065\u5EB7\u7684\u306A\u67A0\u306A\u306E\u3060\u3002", "\u5B89\u5B9A\u904B\u55B6\u306E\u6307\u6A19\u3068\u3057\u3066\u306F\u512A\u79C0\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-tanu-deep",
+        character: "tanu",
+        priority: 80,
+        test: (m) => m.r.medianCommentsPerUser >= 3,
+        lines: ["\u30B3\u30E1\u30F3\u30BF\u30FC 1 \u4EBA\u3042\u305F\u308A\u306E\u4E2D\u592E\u5024\u304C 3 \u4EF6\u4EE5\u4E0A\u3067\u3001\u6DF1\u304F\u5BFE\u8A71\u3057\u3066\u304F\u308C\u305F\u4EBA\u304C\u591A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u6FC3\u3044\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u304C\u3067\u304D\u3066\u3044\u308B\u5146\u3057\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "kpi-tanu-glance",
+        character: "tanu",
+        priority: 50,
+        test: (m) => m.r.uniqueUsers > 0 && m.r.medianCommentsPerUser <= 1,
+        lines: ["1 \u4EBA 1 \u30B3\u30E1\u3067\u901A\u308A\u904E\u304E\u308B\u300C\u4E00\u898B\u300D\u7387\u304C\u9AD8\u3044\u67A0\u306A\u306E\u3060\u3002", "\u96C6\u5BA2\u529B\u306F\u9AD8\u3044\u3051\u3069\u5B9A\u7740\u306E\u4F38\u3073\u3057\u308D\u304C\u3042\u308B\u30D1\u30BF\u30FC\u30F3\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var CONCURRENT_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "cc-link-strong-retention",
+        character: "link",
+        priority: HIGH,
+        test: (m) => m.peak?.endRetentionRatio != null && m.peak.endRetentionRatio >= 0.8,
+        lines: ["\u7D42\u4E86\u6642\u4FDD\u6301\u7387 80% \u8D85\u3067\u3001\u6700\u5F8C\u307E\u3067\u6B8B\u3063\u3066\u3082\u3089\u3048\u305F\u67A0\u306A\u306E\u3060\u3002", "\u30D5\u30A1\u30F3\u5C64\u304C\u3057\u3063\u304B\u308A\u3064\u3044\u3066\u308B\u8A3C\u62E0\u3067\u3001\u30EA\u30D4\u30FC\u30BF\u30FC\u6BD4\u7387\u3082\u9AD8\u304F\u306A\u308A\u3084\u3059\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-link-mid-retention",
+        character: "link",
+        priority: 70,
+        test: (m) => m.peak?.endRetentionRatio != null && m.peak.endRetentionRatio >= 0.5,
+        lines: ["\u7D42\u4E86\u6642\u4FDD\u6301\u7387 50%\uFF0B\u3067\u3001\u4E2D\u76E4\u307E\u3067\u3057\u3063\u304B\u308A\u6301\u3063\u305F\u306E\u3060\u3002", "\u534A\u6E1B\u70B9\u304C\u51FA\u3066\u3044\u308B\u5834\u5408\u306F\u305D\u306E\u77AC\u9593\u306B\u4F55\u304C\u3042\u3063\u305F\u304B\u632F\u308A\u8FD4\u308B\u3068\u6B21\u306E\u6539\u5584\u30DD\u30A4\u30F3\u30C8\u304C\u898B\u3048\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-link-weak-retention",
+        character: "link",
+        priority: 50,
+        test: (m) => m.peak?.endRetentionRatio != null && m.peak.endRetentionRatio < 0.5,
+        lines: ["\u7D42\u4E86\u6642\u4FDD\u6301\u7387\u304C 50% \u3092\u5207\u3063\u3066\u3044\u308B\u67A0\u306A\u306E\u3060\u3002", "\u4E2D\u76E4\u3067\u30C6\u30F3\u30DD\u304C\u843D\u3061\u305F\u53EF\u80FD\u6027\u3002\u30B3\u30E1\u4F1D\u67D3\u3084\u8A71\u82B8\u30D4\u30FC\u30AF\u306E\u4F4D\u7F6E\u3068\u3064\u304D\u5408\u308F\u305B\u3066\u4E2D\u3060\u308B\u307F\u3092\u6F70\u3059\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-konta-early-peak",
+        character: "konta",
+        priority: 80,
+        test: (m) => m.peak?.peakMinute != null && m.r.durationMinutes > 10 && m.peak.peakMinute < m.r.durationMinutes * 0.25,
+        lines: ["\u30D4\u30FC\u30AF\u304C\u5192\u982D\u5074\u306B\u3042\u3063\u3066\u300C\u63B4\u307F\u306F\u5F37\u3044\u300D\u67A0\u306A\u306E\u3060\u3002", "\u914D\u4FE1\u544A\u77E5\u3084\u30AA\u30FC\u30D7\u30CB\u30F3\u30B0\u6F14\u51FA\u304C\u52B9\u3044\u3066\u3044\u308B\u53EF\u80FD\u6027\u5927\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-konta-late-peak",
+        character: "konta",
+        priority: 70,
+        test: (m) => m.peak?.peakMinute != null && m.r.durationMinutes > 10 && m.peak.peakMinute > m.r.durationMinutes * 0.75,
+        lines: ["\u30D4\u30FC\u30AF\u304C\u7D42\u76E4\u306B\u6765\u3066\u308B\u3001\u5F8C\u534A\u52DD\u8CA0\u578B\u306E\u67A0\u306A\u306E\u3060\u3002", "\u6700\u5F8C\u307E\u3067\u89B3\u3066\u3082\u3089\u3048\u308B\u69CB\u6210\u306B\u306A\u3063\u3066\u3044\u308B\u304B\u3089\u3001\u30A8\u30F3\u30C7\u30A3\u30F3\u30B0\u6F14\u51FA\u3092\u5927\u5207\u306B\u3057\u305F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-konta-mid-peak",
+        character: "konta",
+        priority: 60,
+        test: (m) => m.peak?.peakMinute != null,
+        lines: ["\u30D4\u30FC\u30AF\u304C\u4E2D\u76E4\u306B\u6765\u3066\u308B\u3001\u738B\u9053\u306E\u5C71\u578B\u306A\u306E\u3060\u3002", "\u5192\u982D\u30FB\u4E2D\u76E4\u30FB\u7D42\u76E4\u306E\u30E1\u30EA\u30CF\u30EA\u304C\u7DBA\u9E97\u306B\u51FA\u3066\u3044\u308B\u914D\u4FE1\u69CB\u6210\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-tanu-no-half",
+        character: "tanu",
+        priority: 80,
+        test: (m) => m.peak?.halfDecayMinute == null && m.peak?.peakValue != null && m.peak.peakValue > 0,
+        lines: ["\u30D4\u30FC\u30AF\u5F8C\u306B\u300C\u30D4\u30FC\u30AF\u306E\u534A\u5206\u3092\u5272\u3063\u305F\u300D\u5206\u304C\u51FA\u3066\u3044\u306A\u3044\uFF1D\u305A\u3063\u3068\u76DB\u308A\u4E0A\u304C\u3063\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u8996\u8074\u7DAD\u6301\u306E\u7406\u60F3\u5F62\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-tanu-half-fast",
+        character: "tanu",
+        priority: 60,
+        test: (m) => m.peak?.peakMinute != null && m.peak?.halfDecayMinute != null && m.peak.halfDecayMinute - m.peak.peakMinute <= 5,
+        lines: ["\u30D4\u30FC\u30AF\u5F8C 5 \u5206\u3067\u534A\u6E1B\u3057\u3066\u308B\u6025\u964D\u4E0B\u30D1\u30BF\u30FC\u30F3\u306A\u306E\u3060\u3002", "\u76DB\u308A\u4E0A\u304C\u308A\u306E\u77AC\u9593\u6027\u304C\u9AD8\u3044\u53CD\u9762\u3001\u30EA\u30D4\u30FC\u30C8\u8996\u8074\u306E\u52D5\u6A5F\u3092\u4F5C\u308B\u5DE5\u592B\u304C\u3042\u308B\u3068\u3055\u3089\u306B\u826F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "cc-tanu-no-data",
+        character: "tanu",
+        priority: 30,
+        test: (m) => m.peak == null || m.peak.peakValue === 0,
+        lines: ["\u540C\u63A5\u30B5\u30F3\u30D7\u30EB\u304C\u53D6\u308C\u3066\u3044\u306A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u8996\u8074\u30DA\u30FC\u30B8\u3067\u62E1\u5F35\u304C\u52D5\u3044\u3066\u3044\u305F\u6642\u9593\u304C\u77ED\u304B\u3063\u305F\u53EF\u80FD\u6027\u3002\u6B21\u56DE\u306F\u6700\u521D\u304B\u3089\u958B\u3044\u3066\u304A\u304F\u3068\u8A18\u9332\u304C\u6B8B\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var LAUGHTER_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "la-konta-very-funny",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => (m.laughter?.overallRatio ?? 0) >= 0.3,
+        lines: ["\u7B11\u3044\u30B3\u30E1\u304C\u5168\u4F53\u306E 30% \u8D85\u3048\u3067\u3001\u62B1\u8179\u7D76\u5012\u7CFB\u306E\u67A0\u306A\u306E\u3060\u3002", "\u5207\u308A\u629C\u304D\u6620\u3048\u3059\u308B\u77AC\u9593\u304C\u591A\u3044\u304B\u3089\u3001\u30CF\u30A4\u30E9\u30A4\u30C8\u30AF\u30EA\u30C3\u30D7\u3092\u4F5C\u308B\u30D9\u30FC\u30B9\u7D20\u6750\u3068\u3057\u3066\u6700\u5F37\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-konta-funny",
+        character: "konta",
+        priority: 70,
+        test: (m) => (m.laughter?.overallRatio ?? 0) >= 0.15,
+        lines: ["\u7B11\u3044\u306E\u77AC\u9593\u304C\u5B9A\u671F\u7684\u306B\u51FA\u3066\u3044\u308B\u67A0\u306A\u306E\u3060\u3002", "\u30D4\u30FC\u30AF\u306E\u524D\u5F8C 30 \u79D2\u306B\u6CE8\u76EE\u3059\u308B\u3068\u3001\u30A6\u30B1\u305F\u8A00\u8449\u3084\u30DC\u30B1\u306E\u30D1\u30BF\u30FC\u30F3\u304C\u898B\u3048\u3066\u304F\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-konta-low",
+        character: "konta",
+        priority: 40,
+        test: (m) => (m.laughter?.overallRatio ?? 0) < 0.05 && m.r.totalComments > 0,
+        lines: ["\u7B11\u3044\u30B3\u30E1\u304C 5% \u672A\u6E80\u306E\u771F\u9762\u76EE\u3081\u306E\u67A0\u306A\u306E\u3060\u3002", "\u611F\u60C5\u66F2\u7DDA\u3067\u300C\u9A5A\u304D\u300D\u300C\u30DD\u30B8\u300D\u306E\u6BD4\u7387\u304C\u9AD8\u3051\u308C\u3070\u3001\u7B11\u3044\u4EE5\u5916\u306E\u611F\u52D5\u8EF8\u3067\u30D5\u30A1\u30F3\u304C\u96C6\u307E\u3063\u3066\u3044\u308B\u3068\u3044\u3046\u3053\u3068\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-link-funny-bias",
+        character: "link",
+        priority: 70,
+        test: (m) => (m.laughter?.overallRatio ?? 0) >= 0.2,
+        lines: ["\u7B11\u3044\u53CD\u5FDC\u306E\u77AC\u767A\u529B\u304C\u3042\u308B\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u306A\u306E\u3060\u3002", "\u6B21\u56DE\u3082\u3053\u306E\u7A7A\u6C17\u611F\u3092\u7DAD\u6301\u3067\u304D\u308B\u3088\u3046\u300C\u7B11\u3044\u8D77\u70B9\u300D\u306E\u30C8\u30D4\u30C3\u30AF\u3092 1 \u301C 2 \u500B\u7528\u610F\u3057\u3066\u304A\u304F\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-link-serious",
+        character: "link",
+        priority: 50,
+        test: (m) => (m.laughter?.overallRatio ?? 0) < 0.05 && (m.sentimentTotals?.positive ?? 0) > 0,
+        lines: ["\u7B11\u3044\u3088\u308A\u5171\u611F\u30FB\u611F\u5FC3\u30D9\u30FC\u30B9\u3067\u52D5\u3044\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u300C\u30DB\u30ED\u30C3\u3068\u3057\u305F\u300D\u300C\u3059\u3054\u3044\u300D\u307F\u305F\u3044\u306A\u611F\u60C5\u30B3\u30E1\u3092\u5927\u5207\u306B\u3059\u308B\u65B9\u5411\u6027\u304C\u5408\u3063\u3066\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "la-tanu-clipping",
+        character: "tanu",
+        priority: 60,
+        test: (m) => m.laughter?.peakBucket != null && (m.laughter?.peakValue ?? 0) >= 5,
+        lines: ["\u7B11\u3044\u30D4\u30FC\u30AF\u306E 30 \u79D2\u30D0\u30B1\u30C3\u30C8\u304C\u30CF\u30C3\u30AD\u30EA\u7ACB\u3063\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u5207\u308A\u629C\u304D\u30AF\u30EA\u30A8\u30A4\u30BF\u30FC\u5411\u3051\u306E\u7D20\u6750\u3068\u3057\u3066\u30D4\u30FC\u30AF\u6642\u523B\u3092\u30E1\u30E2\u3057\u3066\u304A\u304F\u3068\u6D3B\u7528\u3067\u304D\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var NEW_VS_REPEAT_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "nr-link-new-rush",
+        character: "link",
+        priority: HIGH,
+        test: (m) => (m.newVsRepeat?.newRatio ?? 0) >= 0.7,
+        lines: ["\u65B0\u898F\u7387 70% \u8D85\u3067\u3001\u65B0\u3057\u3044\u4EBA\u304C\u305F\u304F\u3055\u3093\u6765\u305F\u56DE\u306A\u306E\u3060\u3002", "\u30BF\u30A4\u30C8\u30EB\u30FB\u30B5\u30E0\u30CD\u30FB\u544A\u77E5\u304C\u52B9\u3044\u305F\u67A0\u306A\u306E\u3067\u3001\u305D\u306E\u8981\u7D20\u3092\u6B21\u56DE\u306B\u3082\u5F15\u304D\u7D99\u3050\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-link-balanced",
+        character: "link",
+        priority: 70,
+        test: (m) => (m.newVsRepeat?.newRatio ?? 0) >= 0.3 && (m.newVsRepeat?.repeatRatio ?? 0) >= 0.3,
+        lines: ["\u65B0\u898F\u30FB\u5E38\u9023\u304C\u4E21\u65B9\u3044\u308B\u30D0\u30E9\u30F3\u30B9\u578B\u306A\u306E\u3060\u3002", "\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u3068\u3057\u3066\u5065\u5EB7\u306A\u72B6\u614B\u3067\u3001\u9577\u304F\u7D9A\u304F\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-link-mostly-repeat",
+        character: "link",
+        priority: 60,
+        test: (m) => (m.newVsRepeat?.repeatRatio ?? 0) >= 0.7,
+        lines: ["\u5E38\u9023\u5C64\u306B\u652F\u3048\u3089\u308C\u305F\u56DE\u306A\u306E\u3060\u3002", "\u5B89\u5FC3\u611F\u306F\u3042\u308B\u3051\u3069\u3001\u65B0\u898F\u6D41\u5165\u3092\u5897\u3084\u3059\u306B\u306F TikTok \u5207\u308A\u629C\u304D\u3084 SNS \u544A\u77E5\u306E\u898B\u76F4\u3057\u304C\u52B9\u304F\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-konta-heavy-fans",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => (m.newVsRepeat?.heavyRatio ?? 0) >= 0.3,
+        lines: ["\u30D8\u30D3\u30FC\u5E38\u9023\uFF08\u904E\u53BB 5+ \u30B3\u30E1\u5B9F\u7E3E\uFF09\u304C 30% \u8D85\u3048\u3001\u30B3\u30A2\u30D5\u30A1\u30F3\u304C\u539A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u3053\u3046\u3044\u3046\u67A0\u306F\u914D\u4FE1\u8005\u3068\u3057\u3066\u3082\u7CBE\u795E\u7684\u306B\u697D\u306A\u306F\u305A\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-konta-discovery",
+        character: "konta",
+        priority: 60,
+        test: (m) => (m.newVsRepeat?.newRatio ?? 0) >= 0.5,
+        lines: ["\u534A\u6570\u4EE5\u4E0A\u304C\u65B0\u898F\u3067\u3001\u65B0\u3057\u3044\u51FA\u4F1A\u3044\u304C\u3044\u3063\u3071\u3044\u3042\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u6B21\u56DE\u307E\u305F\u6765\u3066\u3082\u3089\u3046\u305F\u3081\u306B\u914D\u4FE1\u5192\u982D\u3067\u8EFD\u3044\u81EA\u5DF1\u7D39\u4ECB\u3092\u5165\u308C\u308B\u306E\u3082\u6709\u52B9\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-tanu-tracking",
+        character: "tanu",
+        priority: 80,
+        test: (m) => (m.newVsRepeat?.totalCurrent ?? 0) >= 30,
+        lines: ["\u904E\u53BB\u914D\u4FE1\u3068\u306E\u7A81\u304D\u5408\u308F\u305B\u304C\u3067\u304D\u308B\u898F\u6A21\u611F\u306A\u306E\u3060\u3002", "\u5E38\u9023\u30AB\u30EC\u30F3\u30C0\u30FC\u3068\u4F75\u305B\u3066\u300C\u3044\u3064\u3082\u3044\u308B\u4EBA\u300D\u3092\u610F\u8B58\u3059\u308B\u3068\u3001\u6B21\u56DE\u306E\u6328\u62F6\u3084\u53CD\u5FDC\u306B\u539A\u307F\u304C\u51FA\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "nr-tanu-small-sample",
+        character: "tanu",
+        priority: 30,
+        test: (m) => (m.newVsRepeat?.totalCurrent ?? 0) < 10,
+        lines: ["\u30B5\u30F3\u30D7\u30EB\u6570\u304C\u5C11\u306A\u3081\u306A\u306E\u3067\u3001\u65B0\u898F\u7387 / \u5E38\u9023\u7387\u306E\u6570\u5B57\u306F\u63FA\u308C\u3084\u3059\u3044\u306E\u3060\u3002", "\u4F55\u56DE\u304B\u307E\u3068\u3081\u3066\u898B\u308B\u306E\u304C\u3044\u3044\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var SILENCE_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "sl-link-engaged",
+        character: "link",
+        priority: HIGH,
+        test: (m) => m.silenceQualityCounts.engaged >= 3,
+        lines: ["\u6C88\u9ED9\u660E\u3051\u306B\u53CD\u5FDC\u304C\u7206\u767A\u3059\u308B\u300C\u30AC\u30F3\u898B\u7CFB\u300D\u304C\u8907\u6570\u56DE\u3042\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u914D\u4FE1\u8005\u306E\u8A71\u82B8 / \u6F14\u51FA\u304C\u52B9\u3044\u305F\u77AC\u9593\u306A\u306E\u3067\u3001\u305D\u306E\u6642\u306E\u8A71\u984C\u306F\u518D\u5229\u7528\u3067\u304D\u308B\u5F37\u3044\u5F3E\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "sl-link-departed",
+        character: "link",
+        priority: 70,
+        test: (m) => m.silenceQualityCounts.departed >= 3,
+        lines: ["\u6C88\u9ED9\u660E\u3051\u306B\u53CD\u5FDC\u304C\u51FA\u306A\u3044\u300C\u96E2\u8131\u7CFB\u300D\u304C\u8907\u6570\u3042\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u4E2D\u76E4\u3067\u8996\u8074\u8005\u304C\u53BB\u3063\u3066\u308B\u77AC\u9593\u3002\u8A71\u984C\u306E\u5207\u308A\u66FF\u3048\u30BF\u30A4\u30DF\u30F3\u30B0\u3092\u898B\u76F4\u3057\u305F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "sl-konta-rare",
+        character: "konta",
+        priority: 60,
+        test: (m) => m.silenceCount === 0,
+        lines: ["60 \u79D2\u4EE5\u4E0A\u306E\u6C88\u9ED9\u304C\u4E00\u5EA6\u3082\u306A\u3044\u3001\u305A\u3063\u3068\u8CD1\u3084\u304B\u3060\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u8996\u8074\u8005\u304C\u5E38\u306B\u4F55\u304B\u306B\u53CD\u5FDC\u3057\u3066\u305F\u8A3C\u62E0\u3067\u3001\u96D1\u8AC7\u529B\u304C\u9AD8\u3044\u914D\u4FE1\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "sl-konta-many",
+        character: "konta",
+        priority: 50,
+        test: (m) => m.silenceCount >= 10,
+        lines: ["\u6C88\u9ED9\u30BE\u30FC\u30F3\u304C 10 \u500B\u4EE5\u4E0A\u3042\u3063\u305F\u3001\u30E1\u30EA\u30CF\u30EA\u306E\u5F37\u3044\u67A0\u306A\u306E\u3060\u3002", "\u8003\u3048\u8FBC\u307E\u305B\u308B\u5834\u9762 \u2192 \u3069\u3063\u3068\u53CD\u5FDC\u3001\u306E\u30EA\u30BA\u30E0\u304C\u3042\u308C\u3070\u300C\u30AC\u30F3\u898B\u7CFB\u300D\u304C\u591A\u3044\u306F\u305A\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "sl-tanu-explainer",
+        character: "tanu",
+        priority: 40,
+        test: (m) => m.silenceCount > 0,
+        lines: ["\u6C88\u9ED9\u30BE\u30FC\u30F3\u306E\u300C\u8CEA\u300D\u3092\u898B\u308B\u3068\u3001\u305D\u306E\u914D\u4FE1\u306E\u76DB\u308A\u4E0A\u304C\u308A\u65B9\u306E\u7279\u5FB4\u304C\u63B4\u3081\u308B\u306E\u3060\u3002", "\u30AC\u30F3\u898B\u7CFB\u304C\u591A\u3044\uFF1D\u9759\u3068\u52D5\u306E\u30E1\u30EA\u30CF\u30EA\u3001\u96E2\u8131\u7CFB\u304C\u591A\u3044\uFF1D\u6539\u5584\u4F59\u5730\u3042\u308A\u3001\u306E\u76EE\u5B89\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var SENTIMENT_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "st-konta-positive",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => (m.sentimentTotals?.positive ?? 0) > (m.sentimentTotals?.negative ?? 0) * 3 && (m.sentimentTotals?.positive ?? 0) >= 10,
+        lines: ["\u30DD\u30B8\u30C6\u30A3\u30D6\u7CFB\u306E\u8A00\u8449\u304C\u5727\u5012\u7684\u306B\u591A\u3044\u3001\u6E29\u304B\u3044\u67A0\u306A\u306E\u3060\u3002", "\u300C\u697D\u3057\u3044\u300D\u300C\u3059\u3054\u3044\u300D\u300C\u3042\u308A\u304C\u3068\u3046\u300D\u304C\u56DE\u3063\u3066\u308B\u914D\u4FE1\u306F\u5FC3\u7406\u7684\u306B\u5B89\u5168\u306A\u7A7A\u9593\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "st-konta-surprise",
+        character: "konta",
+        priority: 80,
+        test: (m) => (m.sentimentTotals?.surprise ?? 0) >= 10,
+        lines: ["\u300C\u30DE\u30B8\u300D\u300C\u3048\u3063\u300D\u300C\u3046\u305D\u300D\u307F\u305F\u3044\u306A\u9A5A\u304D\u7CFB\u304C\u591A\u3081\u306E\u67A0\u306A\u306E\u3060\u3002", "\u30B5\u30D7\u30E9\u30A4\u30BA\u5C55\u958B\u30FB\u4E88\u60F3\u5916\u306E\u30AA\u30C1\u304C\u52B9\u3044\u3066\u3044\u308B\u8A3C\u62E0\u3067\u3001\u30A8\u30F3\u30BF\u30E1\u6027\u306E\u9AD8\u3044\u914D\u4FE1\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "st-konta-negative",
+        character: "konta",
+        priority: 60,
+        test: (m) => (m.sentimentTotals?.negative ?? 0) > (m.sentimentTotals?.positive ?? 0) && (m.sentimentTotals?.negative ?? 0) >= 5,
+        lines: ["\u30CD\u30AC\u7CFB\u30B3\u30E1\u304C\u76EE\u7ACB\u3064\u67A0\u306A\u306E\u3060\u3002", "\u8F9E\u66F8\u30D9\u30FC\u30B9\u3067\u76AE\u8089\u3084\u5197\u8AC7\u3092\u8AAD\u3081\u306A\u3044\u306E\u3067\u3001\u6587\u8108\u6B21\u7B2C\u3067\u306F\u300C\u30E4\u30D0\u3044\u300D\u304C\u30DD\u30B8\u3067\u3082\u62FE\u308F\u308C\u308B\u306E\u3060\u3002\u9D5C\u5451\u307F\u306B\u305B\u305A\u6570\u5024\u306E\u50BE\u5411\u3060\u3051\u898B\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "st-link-confused",
+        character: "link",
+        priority: 50,
+        test: (m) => (m.sentimentTotals?.confusion ?? 0) >= 5,
+        lines: ["\u300C\u3046\u30FC\u3093\u300D\u300C\u8B0E\u300D\u307F\u305F\u3044\u306A\u56F0\u60D1\u7CFB\u304C\u51FA\u3066\u308B\u67A0\u306A\u306E\u3060\u3002", "\u30B2\u30FC\u30E0\u5B9F\u6CC1\u3084\u60C5\u5831\u914D\u4FE1\u306A\u3089\u300C\u8003\u3048\u3055\u305B\u308B\u5834\u9762\u300D\u306E\u8A3C\u62E0\u3067\u3001\u5FC5\u305A\u3057\u3082\u60AA\u304F\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "st-tanu-balanced-tone",
+        character: "tanu",
+        priority: 40,
+        test: (m) => (m.sentimentTotals?.positive ?? 0) > 0 && (m.sentimentTotals?.surprise ?? 0) > 0,
+        lines: ["\u30DD\u30B8\u30FB\u9A5A\u304D\u304C\u4E21\u65B9\u4E57\u3063\u3066\u308B\u3001\u611F\u60C5\u306E\u8D77\u4F0F\u304C\u3042\u308B\u67A0\u306A\u306E\u3060\u3002", "\u4E00\u672C\u8ABF\u5B50\u3058\u3083\u306A\u3044\u69CB\u6210\u306F\u98FD\u304D\u306B\u304F\u304F\u3066\u3001\u30EA\u30D4\u30FC\u30C8\u8996\u8074\u306B\u52B9\u304F\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var REACH_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "rc-konta-silent-many",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => (m.reach?.coefficient ?? 0) >= 10,
+        lines: ["\u30EA\u30FC\u30C1\u4FC2\u6570 10+ \u3067\u3001\u30B3\u30E1\u30F3\u30BF\u30FC 1 \u4EBA\u306B\u3064\u304D 10 \u4EBA\u4EE5\u4E0A\u304C\u89B3\u3066\u308B\u30B5\u30A4\u30EC\u30F3\u30C8\u89B3\u6226\u5C64\u304C\u539A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u30B3\u30E1\u5C11\u306A\u3081\u3067\u3082\u89B3\u3066\u308B\u4EBA\u306F\u591A\u3044\u304B\u3089\u3001\u81EA\u4FE1\u3092\u6301\u3063\u3066\u3044\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "rc-konta-balanced",
+        character: "konta",
+        priority: 70,
+        test: (m) => (m.reach?.coefficient ?? 0) >= 3 && (m.reach?.coefficient ?? 0) < 10,
+        lines: ["\u30EA\u30FC\u30C1\u4FC2\u6570 3\u301C10 \u306E\u30D0\u30E9\u30F3\u30B9\u578B\u306A\u306E\u3060\u3002", "\u30B3\u30E1\u3059\u308B\u5074\u3068\u89B3\u308B\u5074\u306E\u6BD4\u7387\u304C\u5065\u5EB7\u7684\u3067\u3001\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306E\u898F\u6A21\u611F\u304C\u307B\u3069\u3088\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "rc-konta-active",
+        character: "konta",
+        priority: 50,
+        test: (m) => (m.reach?.coefficient ?? 0) > 0 && (m.reach?.coefficient ?? 0) < 3,
+        lines: ["\u30EA\u30FC\u30C1\u4FC2\u6570 1\u301C3 \u3067\u3001\u89B3\u3066\u308B\u4EBA\u307B\u307C\u5168\u54E1\u304C\u30B3\u30E1\u3059\u308B\u80FD\u52D5\u7684\u306A\u67A0\u306A\u306E\u3060\u3002", "\u5C11\u4EBA\u6570\u3067\u3082\u6FC3\u3044\u6642\u9593\u304C\u6D41\u308C\u3066\u3044\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "rc-link-grow-silent",
+        character: "link",
+        priority: 60,
+        test: (m) => (m.reach?.coefficient ?? 0) >= 8,
+        lines: ["\u30B5\u30A4\u30EC\u30F3\u30C8\u89B3\u6226\u5C64\u304C\u539A\u3044\u5834\u5408\u3001ROM \u5C02\u3092\u5F15\u304D\u51FA\u3059\u300C\u30B3\u30E1\u3057\u3084\u3059\u3044\u96D1\u8AC7\u30B3\u30FC\u30CA\u30FC\u300D\u3068\u304B\u3092\u4F5C\u308B\u3068\u4F53\u611F\u76DB\u308A\u4E0A\u304C\u308A\u304C\u4E0A\u304C\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var GROWTH_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "gr-link-booming",
+        character: "link",
+        priority: HIGH,
+        test: (m) => (m.growth?.zScore ?? -99) >= 1.5,
+        lines: ["\u904E\u53BB\u914D\u4FE1\u306E\u5E73\u5747\u304B\u3089 +1.5\u03C3 \u4EE5\u4E0A\u3067\u3001\u7D76\u597D\u8ABF\u306E\u56DE\u306A\u306E\u3060\uFF01", "\u4F55\u304C\u52B9\u3044\u305F\u304B\u30E1\u30E2\u3057\u3066\u304A\u304F\u3068\u6B21\u56DE\u518D\u73FE\u3057\u3084\u3059\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "gr-link-up",
+        character: "link",
+        priority: 70,
+        test: (m) => (m.growth?.deltaPct ?? -1) >= 0.2,
+        lines: ["\u904E\u53BB\u5E73\u5747\u3088\u308A +20% \u4EE5\u4E0A\u306E\u30D7\u30E9\u30B9\u306A\u306E\u3060\u3002", "\u3044\u3044\u6D41\u308C\u306B\u4E57\u3063\u3066\u3044\u308B\u304B\u3089\u3001\u914D\u4FE1\u30D5\u30A9\u30FC\u30DE\u30C3\u30C8\u3092\u5909\u3048\u305A\u306B\u3053\u306E\u307E\u307E\u7D9A\u3051\u305F\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "gr-link-flat",
+        character: "link",
+        priority: 50,
+        test: (m) => Math.abs(m.growth?.deltaPct ?? 0) < 0.1 && (m.growth?.deltaPct ?? null) !== null,
+        lines: ["\u904E\u53BB\u5E73\u5747\u3068\xB110% \u4EE5\u5185\u306E\u5B89\u5B9A\u67A0\u306A\u306E\u3060\u3002", "\u826F\u304F\u3082\u60AA\u304F\u3082\u63FA\u308C\u304C\u306A\u3044\u3001\u56FA\u5B9A\u5BA2\u5411\u3051\u306E\u5B89\u5FC3\u611F\u304C\u3042\u308B\u56DE\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "gr-link-down",
+        character: "link",
+        priority: 60,
+        test: (m) => (m.growth?.deltaPct ?? 99) <= -0.2,
+        lines: ["\u904E\u53BB\u5E73\u5747\u3088\u308A -20% \u4EE5\u4E0B\u306A\u306E\u3060\u3002", "\u30B8\u30E3\u30F3\u30EB\u9055\u3044\u30FB\u77ED\u6642\u9593\u67A0\u30FB\u914D\u4FE1\u6642\u9593\u304C\u5909\u5247\u7684\u3060\u3063\u305F\u53EF\u80FD\u6027\u3002\u4E0B\u304C\u3063\u305F\u3060\u3051\u3067\u914D\u4FE1\u306E\u4FA1\u5024\u304C\u4E0B\u304C\u308B\u308F\u3051\u3058\u3083\u306A\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "gr-tanu-sample",
+        character: "tanu",
+        priority: 30,
+        test: (m) => m.growth?.average == null,
+        lines: ["\u904E\u53BB\u914D\u4FE1\u306E\u30B5\u30F3\u30D7\u30EB\u304C\u307E\u3060\u5C11\u306A\u3044\u306E\u3067\u3001\u6210\u9577\u30E1\u30FC\u30BF\u30FC\u304C\u8868\u793A\u3067\u304D\u306A\u3044\u67A0\u306A\u306E\u3060\u3002", "5 \u914D\u4FE1\u3050\u3089\u3044\u8A18\u9332\u304C\u8CAF\u307E\u308B\u3068\u76F8\u5BFE\u6BD4\u8F03\u304C\u3067\u304D\u308B\u3088\u3046\u306B\u306A\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var FIRST_SECOND_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "fs-konta-eager",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => m.firstSecondTotal >= 10,
+        lines: ["10 \u4EBA\u4EE5\u4E0A\u304C\u300C\u521D\u30B3\u30E1 \u2192 \u7D9A\u3051\u3066\u30B3\u30E1\u300D\u3092\u6253\u3063\u3066\u308B\u3001\u4E57\u3063\u3066\u304D\u305F\u6D3E\u304C\u591A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u521D\u30B3\u30E1\u3067\u7D42\u308F\u3089\u305A\u4F1A\u8A71\u306B\u5165\u308B\u4EBA\u304C\u591A\u3044\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306F\u5065\u5EB7\u7684\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "fs-konta-watcher",
+        character: "konta",
+        priority: 50,
+        test: (m) => m.firstSecondTotal > 0 && m.firstSecondTotal < 5,
+        lines: ["\u591A\u304F\u306E\u4EBA\u304C 1 \u30B3\u30E1\u3067\u69D8\u5B50\u898B\u3001\u3082\u3057\u304F\u306F\u7D99\u7D9A\u30B3\u30E1\u307E\u3067\u306F\u6D41\u308C\u306A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u30B3\u30E1\u6B53\u8FCE\u306E\u58F0\u3092\u304B\u3051\u305F\u308A\u3001\u30C6\u30FC\u30DE\u30C8\u30FC\u30AF\u3067\u5DFB\u304D\u8FBC\u3080\u3068 2 \u30B3\u30E1\u76EE\u3092\u5F15\u304D\u51FA\u305B\u308B\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var SURVIVAL_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "sv-link-strong",
+        character: "link",
+        priority: HIGH,
+        test: (m) => (m.survivalEndPct ?? -1) >= 50,
+        lines: ["\u6700\u521D\u306E\u533A\u9593\u306B\u30B3\u30E1\u304F\u308C\u305F\u4EBA\u306E\u534A\u5206\u4EE5\u4E0A\u304C\u3001\u7D42\u76E4\u307E\u3067\u30B3\u30E1\u3057\u7D9A\u3051\u3066\u305F\u67A0\u306A\u306E\u3060\u3002", "\u8996\u8074\u7DAD\u6301\uFF0B\u30B3\u30E1\u53C2\u52A0\u306E\u4E8C\u91CD\u3067\u5F37\u3044\u3001\u7406\u60F3\u578B\u306E\u914D\u4FE1\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "sv-link-fade",
+        character: "link",
+        priority: 60,
+        test: (m) => (m.survivalEndPct ?? -1) >= 0 && (m.survivalEndPct ?? -1) < 25,
+        lines: ["\u521D\u671F\u30B3\u30E1\u53C2\u52A0\u8005\u306E 25% \u4EE5\u4E0B\u3057\u304B\u7D42\u76E4\u306B\u6B8B\u3063\u3066\u306A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u534A\u6E1B\u70B9\u3068\u7A81\u304D\u5408\u308F\u305B\u3066\u3001\u3069\u306E\u77AC\u9593\u306B\u96E2\u8131\u304C\u59CB\u307E\u3063\u305F\u304B\u8ABF\u3079\u308B\u306E\u304C\u6B21\u306E\u6539\u5584\u30DD\u30A4\u30F3\u30C8\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var KEYBOARD_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "kb-tanu-emoji-heavy",
+        character: "tanu",
+        priority: 80,
+        test: (m) => (m.keyboardCounts?.emoji ?? 0) > 0 && (m.keyboardCounts?.emoji ?? 0) >= (m.keyboardCounts?.short ?? 0) + (m.keyboardCounts?.long ?? 0) + (m.keyboardCounts?.balanced ?? 0),
+        lines: ["\u7D75\u6587\u5B57\u6D3E\u304C\u4ED6\u306E\u578B\u3068\u6BD4\u3079\u3066\u591A\u3044\u67A0\u306A\u306E\u3060\u3002", "\u8996\u899A\u7684\u306A\u30C6\u30F3\u30B7\u30E7\u30F3\u304C\u9AD8\u3044\u6587\u5316\u306E\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u3067\u3001\u914D\u4FE1\u8005\u5074\u3082\u7D75\u6587\u5B57\u3084\u9854\u6587\u5B57\u3092\u8FD4\u3059\u3068\u99B4\u67D3\u307F\u3084\u3059\u3044\u306E\u3060\u3002"]
+      },
+      {
+        id: "kb-tanu-short-dominant",
+        character: "tanu",
+        priority: 70,
+        test: (m) => (m.keyboardCounts?.short ?? 0) > 0 && (m.keyboardCounts?.short ?? 0) >= (m.keyboardCounts?.long ?? 0) + (m.keyboardCounts?.balanced ?? 0),
+        lines: ["\u77ED\u6587\u6D3E\u304C\u591A\u3044\u53CD\u5FDC\u901F\u5EA6\u578B\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306A\u306E\u3060\u3002", "\u4F1A\u8A71\u306E\u30C6\u30F3\u30DD\u304C\u901F\u3044\u304B\u3089\u914D\u4FE1\u8005\u5074\u3082\u30C6\u30F3\u30DD\u306B\u5408\u308F\u305B\u308B\u3068\u76DB\u308A\u4E0A\u304C\u308B\u306E\u3060\u3002"]
+      },
+      {
+        id: "kb-tanu-long-dominant",
+        character: "tanu",
+        priority: 70,
+        test: (m) => (m.keyboardCounts?.long ?? 0) > 0 && (m.keyboardCounts?.long ?? 0) >= (m.keyboardCounts?.short ?? 0) + (m.keyboardCounts?.balanced ?? 0),
+        lines: ["\u30ED\u30F3\u30B0\u6D3E\u304C\u591A\u3044\u719F\u8AAD\u578B\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306A\u306E\u3060\u3002", "\u4E01\u5BE7\u306B\u7B54\u3048\u308B\u3068\u6E80\u8DB3\u5EA6\u304C\u4E0A\u304C\u308B\u5C64\u306A\u306E\u3067\u3001\u914D\u4FE1\u8005\u5074\u306E\u30EC\u30B9\u3082\u3058\u3063\u304F\u308A\u3081\u304C\u5408\u3046\u306E\u3060\u3002"]
+      },
+      {
+        id: "kb-tanu-quiet",
+        character: "tanu",
+        priority: 50,
+        test: (m) => (m.keyboardCounts?.quiet ?? 0) >= 5,
+        lines: ["\u7121\u53E3\u89B3\u6226\u6D3E\uFF081 \u30B3\u30E1\u4EE5\u4E0B\uFF09\u304C 5 \u4EBA\u4EE5\u4E0A\u3044\u308B\u67A0\u306A\u306E\u3060\u3002", "\u898B\u3066\u308B\u3060\u3051\u306E\u30D5\u30A1\u30F3\u3082\u5927\u4E8B\u306A\u5BA2\u5C64\u3067\u3001\u30B3\u30E1\u6B53\u8FCE\u306E\u58F0\u304B\u3051\u3067\u53C2\u52A0\u306B\u8A98\u3048\u308B\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var ECHO_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "ec-konta-many",
+        character: "konta",
+        priority: HIGH,
+        test: (m) => m.echoBurstCount >= 5,
+        lines: ["\u30B3\u30E1\u4F1D\u67D3\uFF0F\u88AB\u308A\u77AC\u9593\u304C 5 \u4EF6\u4EE5\u4E0A\u3042\u3063\u305F\u3001\u30B3\u30DF\u30E5\u30CB\u30C6\u30A3\u306E\u4E00\u4F53\u611F\u304C\u9AD8\u3044\u67A0\u306A\u306E\u3060\u3002", '\u540C\u3058\u8A9E\u304C\u77AC\u9593\u7684\u306B\u8907\u6570\u4EBA\u304B\u3089\u51FA\u308B\u73FE\u8C61\u306F\u3001\u305D\u306E\u914D\u4FE1\u306E "\u8C61\u5FB4\u30EF\u30FC\u30C9" \u306B\u306A\u308A\u3084\u3059\u3044\u306E\u3060\u3002']
+      },
+      {
+        id: "ec-konta-few",
+        character: "konta",
+        priority: 60,
+        test: (m) => m.echoBurstCount > 0 && m.echoBurstCount < 3,
+        lines: ["\u30B3\u30E1\u4F1D\u67D3\u304C 1\u301C2 \u4EF6\u3068\u63A7\u3048\u3081\u3060\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", "\u500B\u5225\u53CD\u5FDC\u304C\u4E2D\u5FC3\u306E\u843D\u3061\u7740\u3044\u305F\u7A7A\u6C17\u3067\u3001\u3053\u308C\u3082\u914D\u4FE1\u30B9\u30BF\u30A4\u30EB\u306E\u4E00\u3064\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var RECENT_CMP_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "rc-link-trend",
+        character: "link",
+        priority: 70,
+        test: (m) => m.recentCmpCount >= 5,
+        lines: ["\u76F4\u8FD1 5 \u914D\u4FE1\u306E\u6BD4\u8F03\u30D0\u30FC\u304C\u63C3\u3063\u3066\u8868\u793A\u3067\u304D\u308B\u898F\u6A21\u611F\u306A\u306E\u3060\u3002", "\u4E0A\u6607\u30C8\u30EC\u30F3\u30C9\u306A\u3089\u81EA\u4FE1\u306B\u3001\u5E73\u3089\u306A\u3089\u5B89\u5B9A\u904B\u55B6\u306E\u6307\u6A19\u3068\u3057\u3066\u6D3B\u7528\u3059\u308B\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var WAVEFORM_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "wf-tanu-similar",
+        character: "tanu",
+        priority: 60,
+        test: (m) => m.waveformSimilarCount >= 3,
+        lines: ["\u904E\u53BB\u914D\u4FE1\u3068\u5F62\u304C\u4F3C\u3066\u3044\u308B\u56DE\u304C\u8907\u6570\u898B\u3064\u304B\u3063\u305F\u67A0\u306A\u306E\u3060\u3002", '"\u3042\u306E\u795E\u56DE\u307D\u3044\u6D41\u308C" \u3092\u767A\u898B\u3067\u304D\u308B\u6A5F\u80FD\u3067\u3001\u914D\u4FE1\u30EB\u30FC\u30C1\u30F3\u306E\u518D\u73FE\u6027\u304C\u898B\u3048\u308B\u306E\u3060\u3002']
+      }
+    ]
+  );
+  var UNIQUE_WORDS_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "uw-konta-many",
+        character: "konta",
+        priority: 70,
+        test: (m) => m.uniqueWordsCount >= 5,
+        lines: ["\u81EA\u5206\u304C\u4F7F\u3063\u3066\u306A\u3044\u4EBA\u6C17\u8A9E\u304C 5 \u3064\u4EE5\u4E0A\u3042\u308B\u67A0\u306A\u306E\u3060\u3002", '\u6B21\u56DE\u305D\u3063\u3068\u81EA\u5206\u306E\u30B3\u30E1\u306B\u6DF7\u305C\u308B\u3068 "\u30D5\u30A1\u30F3\u6587\u5316\u306B\u4E57\u3063\u304B\u308C\u305F\u611F" \u304C\u51FA\u308B\u304B\u3082\u3057\u308C\u306A\u3044\u306E\u3060\u3002']
+      }
+    ]
+  );
+  var TALENT_PEAK_RULES = (
+    /** @type {AdviceRule[]} */
+    [
+      {
+        id: "tp-link-many",
+        character: "link",
+        priority: HIGH,
+        test: (m) => m.talentPeakCount >= 5,
+        lines: ['\u6C88\u9ED9\u2192\u5373\u53CD\u5FDC\u306E "\u8A71\u82B8\u30D4\u30FC\u30AF" \u304C 5 \u56DE\u4EE5\u4E0A\u691C\u51FA\u3055\u308C\u305F\u306E\u3060\u3002', "\u30C8\u30FC\u30AF\u529B\u304C\u7206\u767A\u3057\u305F\u56DE\u3067\u3001\u305D\u306E\u77AC\u9593\u306E\u8A71\u984C\u306F\u30E1\u30E2\u3057\u3066\u6B21\u56DE\u518D\u73FE\u3057\u305F\u3044\u5F3E\u306A\u306E\u3060\u3002"]
+      },
+      {
+        id: "tp-link-few",
+        character: "link",
+        priority: 50,
+        test: (m) => m.talentPeakCount >= 1 && m.talentPeakCount < 3,
+        lines: ["\u8A71\u82B8\u30D4\u30FC\u30AF\u304C 1\u301C2 \u56DE\u691C\u51FA\u3055\u308C\u305F\u306E\u3060\u3002", "\u5C11\u306A\u3081\u3060\u3051\u3069\u78BA\u5B9F\u306B\u300C\u52B9\u3044\u305F\u77AC\u9593\u300D\u304C\u3042\u3063\u305F\u8A3C\u62E0\u306A\u306E\u3060\u3002"]
+      }
+    ]
+  );
+  var RULES = Object.freeze({
+    kpi: KPI_RULES,
+    concurrent: CONCURRENT_RULES,
+    laughter: LAUGHTER_RULES,
+    newVsRepeat: NEW_VS_REPEAT_RULES,
+    silence: SILENCE_RULES,
+    sentiment: SENTIMENT_RULES,
+    reach: REACH_RULES,
+    growth: GROWTH_RULES,
+    firstSecond: FIRST_SECOND_RULES,
+    survival: SURVIVAL_RULES,
+    keyboard: KEYBOARD_RULES,
+    echo: ECHO_RULES,
+    recentCmp: RECENT_CMP_RULES,
+    waveform: WAVEFORM_RULES,
+    uniqueWords: UNIQUE_WORDS_RULES,
+    talentPeak: TALENT_PEAK_RULES
+  });
+  function pickAdvicesFor(section, metrics) {
+    const rules = RULES[
+      /** @type {keyof typeof RULES} */
+      section
+    ];
+    if (!rules) return [];
+    return pickAdvicesFromRules(rules, metrics);
+  }
+  var MARKETING_DYNAMIC_ADVICE_TOTAL_RULES = (() => {
+    let n = 0;
+    for (const k of Object.keys(RULES)) n += RULES[k].length;
+    return n;
+  })();
+
   // src/lib/marketingChartsHtml.js
   function adviceCard(role, displayName, lines) {
     const ps = lines.filter((s) => s && String(s).trim()).map((line) => `<p class="mkt-advice__p">${escapeHtml(line)}</p>`).join("");
@@ -6458,6 +7350,82 @@ ${yLabelsL}${yLabelsR}${xLabels}
   function adviceWrap(html) {
     return html ? `<div class="mkt-advice-after">${html}</div>` : "";
   }
+  function dynamicAdviceCardsHtml(section, metrics) {
+    let advices = [];
+    try {
+      advices = pickAdvicesFor(section, metrics);
+    } catch {
+      return "";
+    }
+    if (!advices.length) return "";
+    const cards = advices.map((a) => {
+      const displayName = a.character === "link" ? "\u308A\u3093\u304F" : a.character === "konta" ? "\u3053\u3093\u592A" : "\u305F\u306C\u59C9";
+      return adviceCard(a.character, displayName, a.lines);
+    }).join("");
+    return adviceWrap(cards);
+  }
+  function buildDynamicAdviceMetrics(opts) {
+    return {
+      r: opts.r,
+      peak: opts.concurrentPeak,
+      laughter: opts.laughterDensity,
+      silenceCount: Array.isArray(opts.silenceZones) ? opts.silenceZones.length : 0,
+      silenceQualityCounts: (() => {
+        const counts = { engaged: 0, departed: 0, neutral: 0, unknown: 0 };
+        const list = Array.isArray(opts.silenceZones) ? opts.silenceZones : [];
+        for (const z of list) {
+          const q = String(z?.quality || "unknown");
+          if (q === "engaged") counts.engaged += 1;
+          else if (q === "departed") counts.departed += 1;
+          else if (q === "neutral") counts.neutral += 1;
+          else counts.unknown += 1;
+        }
+        return counts;
+      })(),
+      newVsRepeat: opts.newVsRepeat ? {
+        newRatio: Number(opts.newVsRepeat.newRatio) || 0,
+        repeatRatio: Number(opts.newVsRepeat.repeatRatio) || 0,
+        heavyRatio: Number(opts.newVsRepeat.heavyRatio) || 0,
+        totalCurrent: Number(opts.newVsRepeat.totalCurrent) || 0
+      } : null,
+      sentimentTotals: opts.sentimentCurve?.totals ? {
+        positive: Number(opts.sentimentCurve.totals.positive) || 0,
+        negative: Number(opts.sentimentCurve.totals.negative) || 0,
+        surprise: Number(opts.sentimentCurve.totals.surprise) || 0,
+        confusion: Number(opts.sentimentCurve.totals.confusion) || 0
+      } : null,
+      reach: opts.reach ? { coefficient: Number(opts.reach.coefficient) || null } : null,
+      growth: opts.growth ? {
+        deltaPct: Number.isFinite(opts.growth.deltaPct) ? opts.growth.deltaPct : null,
+        zScore: Number.isFinite(opts.growth.zScore) ? opts.growth.zScore : null,
+        average: Number.isFinite(opts.growth.average) ? opts.growth.average : null
+      } : null,
+      firstSecondTotal: Number(opts.firstSecondLatency?.users?.length) || 0,
+      survivalEndPct: (() => {
+        const segs = opts.survivalCurve?.segments;
+        if (!Array.isArray(segs) || segs.length === 0) return null;
+        const last = segs[segs.length - 1];
+        const v = Number(last?.survivalPct);
+        return Number.isFinite(v) ? v : null;
+      })(),
+      talentPeakCount: Array.isArray(opts.talentPeaks) ? opts.talentPeaks.length : 0,
+      echoBurstCount: (() => {
+        const a = Array.isArray(opts.echoPropagation?.bursts) ? opts.echoPropagation.bursts.length : 0;
+        const b = Array.isArray(opts.echoSync?.bursts) ? opts.echoSync.bursts.length : 0;
+        return a + b;
+      })(),
+      recentCmpCount: Array.isArray(opts.recentComparison?.bars) ? opts.recentComparison.bars.length : 0,
+      uniqueWordsCount: Array.isArray(opts.uniqueWords?.suggestions) ? opts.uniqueWords.suggestions.length : 0,
+      waveformSimilarCount: Array.isArray(opts.similarBroadcasts) ? opts.similarBroadcasts.length : 0,
+      keyboardCounts: opts.keyboardTypes?.counts ? {
+        emoji: Number(opts.keyboardTypes.counts.emoji) || 0,
+        short: Number(opts.keyboardTypes.counts.short) || 0,
+        long: Number(opts.keyboardTypes.counts.long) || 0,
+        quiet: Number(opts.keyboardTypes.counts.quiet) || 0,
+        balanced: Number(opts.keyboardTypes.counts.balanced) || 0
+      } : null
+    };
+  }
   function adviceAfterCommentVelocity() {
     return adviceWrap(adviceCard("link", "\u308A\u3093\u304F", [
       "\u30B3\u30E1\u901F\u5EA6\u30AB\u30FC\u30D6\u306F\u300C1\u5206\u3054\u3068\u306B\u4F55\u30B3\u30E1\u6765\u305F\u304B\u300D\u3068\u300C\u76F4\u8FD15\u5206\u306E\u5E73\u5747\u300D\u3092\u91CD\u306D\u3066\u898B\u308B\u30AB\u30FC\u30D6\u306A\u306E\u3060\u3002",
@@ -6636,7 +7604,7 @@ ${yLabelsL}${yLabelsR}${xLabels}
       const y = yOf(series.points[idx].value);
       return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="none" stroke="#f87171" stroke-width="2"><title>\u534A\u6E1B\u70B9: ${peak.halfDecayMinute}\u5206\u76EE\uFF08\u30D4\u30FC\u30AF\u306E 50% \u3092\u5272\u3063\u305F\uFF09</title></circle>`;
     })() : "";
-    const sourceLabel = series.source === "official" ? "\u516C\u5F0F\u6765\u5834\u8005\u6570" : "\u540C\u63A5\u63A8\u5B9A\u5024";
+    const sourceLabel = series.source === "official" ? "\u516C\u5F0F\u6765\u5834\u8005\u6570" : series.source === "mixed" ? "\u516C\u5F0F\u6765\u5834\u8005\u6570 + \u540C\u63A5\u63A8\u5B9A\u5024\uFF08\u53D6\u308C\u305F\u65B9\u3092\u63A1\u7528\uFF09" : "\u540C\u63A5\u63A8\u5B9A\u5024";
     const peakSummary = peak && peak.peakMinute != null ? `<ul class="mkt-mini-stats">
 <li><strong>\u30D4\u30FC\u30AF\u5230\u9054:</strong> ${peak.peakMinute}\u5206\u76EE / ${peak.peakValue.toLocaleString("ja-JP")}\u4EBA</li>
 <li><strong>\u958B\u59CB\u6642:</strong> ${peak.startValue.toLocaleString("ja-JP")}\u4EBA</li>
@@ -7296,6 +8264,25 @@ ${lineFor("confusion", "#94a3b8")}
       currentConcurrent: lastPoint ? lastPoint.value : NaN,
       uniqueCommentersInWindow: recentActiveCommenters
     });
+    const dynMetrics = buildDynamicAdviceMetrics({
+      r,
+      concurrentPeak,
+      laughterDensity,
+      silenceZones,
+      newVsRepeat,
+      sentimentCurve,
+      reach,
+      growth,
+      firstSecondLatency,
+      survivalCurve,
+      talentPeaks,
+      echoPropagation,
+      echoSync,
+      recentComparison,
+      uniqueWords,
+      similarBroadcasts,
+      keyboardTypes
+    });
     const allTocItems = [
       { id: "mkt-kpi", label: "KPI \u30B5\u30DE\u30EA" },
       { id: "mkt-content", label: "\u30B3\u30E1\u30F3\u30C8\u672C\u6587\u30FB\u5C5E\u6027\u306E\u50BE\u5411" },
@@ -7334,6 +8321,7 @@ __NL_TOC_PLACEHOLDER__
 ${sectionAdviceIntro()}
 ${idWrap("mkt-kpi", sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
+${dynamicAdviceCardsHtml("kpi", dynMetrics)}
 ${idWrap("mkt-content", sectionContentShape(r))}
 ${sectionAdviceAfterContentShape(r)}
 ${idWrap("mkt-quarter", sectionQuarterEngagement(r))}
@@ -7344,42 +8332,57 @@ ${sectionCommentVelocityCurve(velocityTimeline)}
 ${adviceAfterCommentVelocity()}
 ${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
 ${adviceAfterConcurrent()}
+${dynamicAdviceCardsHtml("concurrent", dynMetrics)}
 ${sectionSilenceZones(silenceZones)}
 ${silenceZones.length ? adviceAfterSilence() : ""}
+${silenceZones.length ? dynamicAdviceCardsHtml("silence", dynMetrics) : ""}
 ${sectionLaughterDensity(laughterDensity)}
 ${laughterDensity.buckets.length >= 2 ? adviceAfterLaughter() : ""}
+${laughterDensity.buckets.length >= 2 ? dynamicAdviceCardsHtml("laughter", dynMetrics) : ""}
 ${sectionNewVsRepeat(newVsRepeat)}
 ${newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat() : ""}
+${newVsRepeat.totalCurrent > 0 ? dynamicAdviceCardsHtml("newVsRepeat", dynMetrics) : ""}
 ${sectionSurvivalCurve(survivalCurve)}
 ${survivalCurve.segments.length >= 2 ? adviceAfterSurvival() : ""}
+${survivalCurve.segments.length >= 2 ? dynamicAdviceCardsHtml("survival", dynMetrics) : ""}
 ${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver)}
 ${!maskShare && departedHeavy.length > 0 ? adviceAfterDeparted() : ""}
 ${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver)}
 ${!maskShare && attendanceMatrix.users.length > 0 && attendanceMatrix.broadcasts.length >= 2 ? adviceAfterAttendance() : ""}
 ${sectionKeyboardTypes(keyboardTypes)}
 ${keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced > 0 ? adviceAfterKeyboard() : ""}
+${keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced > 0 ? dynamicAdviceCardsHtml("keyboard", dynMetrics) : ""}
 ${sectionRecentComparison(recentComparison)}
 ${recentComparison.bars.length >= 2 ? adviceAfterRecentCmp() : ""}
+${recentComparison.bars.length >= 2 ? dynamicAdviceCardsHtml("recentCmp", dynMetrics) : ""}
 ${sectionWeekdayHourHeatmap(weekdayHourHeat)}
 ${weekdayHourHeat.maxValue > 0 ? adviceAfterWeekdayHeat() : ""}
 ${sectionGrowthMeter(growth, "\u4ECA\u56DE\u306E\u7DCF\u30B3\u30E1\u6570")}
 ${growth.average != null ? adviceAfterGrowthMeter() : ""}
+${growth.average != null ? dynamicAdviceCardsHtml("growth", dynMetrics) : ""}
 ${sectionOpeningFivePrediction(openingFivePts)}
 ${openingFivePts.points.length >= 2 ? adviceAfterOpeningFive() : ""}
 ${sectionWaveformSimilarity(similarBroadcasts)}
 ${similarBroadcasts.length > 0 ? adviceAfterWaveform() : ""}
+${similarBroadcasts.length > 0 ? dynamicAdviceCardsHtml("waveform", dynMetrics) : ""}
 ${sectionEchoBursts(echoPropagation, echoSync)}
 ${echoPropagation.length > 0 || echoSync.length > 0 ? adviceAfterEcho() : ""}
+${echoPropagation.length > 0 || echoSync.length > 0 ? dynamicAdviceCardsHtml("echo", dynMetrics) : ""}
 ${sectionFirstSecondLatency(firstSecondLatency)}
 ${firstSecondLatency.totalUsers > 0 ? adviceAfterFirstSecond() : ""}
+${firstSecondLatency.totalUsers > 0 ? dynamicAdviceCardsHtml("firstSecond", dynMetrics) : ""}
 ${sectionTalentPeak(talentPeaks)}
 ${talentPeaks.length > 0 ? adviceAfterTalentPeak() : ""}
+${talentPeaks.length > 0 ? dynamicAdviceCardsHtml("talentPeak", dynMetrics) : ""}
 ${sectionSentimentCurve(sentimentCurve)}
 ${sentimentCurve.buckets.length >= 2 ? adviceAfterSentiment() : ""}
+${sentimentCurve.buckets.length >= 2 ? dynamicAdviceCardsHtml("sentiment", dynMetrics) : ""}
 ${sectionUniqueWordSuggestions(uniqueWords)}
 ${uniqueWords.length > 0 ? adviceAfterUniqueWords() : ""}
+${uniqueWords.length > 0 ? dynamicAdviceCardsHtml("uniqueWords", dynMetrics) : ""}
 ${sectionReachCoefficient(reach)}
 ${reach.coefficient != null ? adviceAfterReach() : ""}
+${reach.coefficient != null ? dynamicAdviceCardsHtml("reach", dynMetrics) : ""}
 ${idWrap("mkt-derived", sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap("mkt-segment", sectionSegment(r))}
@@ -8352,6 +9355,36 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     );
     return TRANSIENT_IDB_ERROR_NAMES.has(name);
   }
+  function extractReviewFieldsFromSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") return {};
+    const out = {};
+    const pickStr = (key) => {
+      const v = (
+        /** @type {Record<string, unknown>} */
+        snapshot[key]
+      );
+      if (typeof v !== "string") return;
+      const t = v.trim();
+      if (!t) return;
+      out[key] = t;
+    };
+    pickStr("broadcastTitle");
+    pickStr("broadcasterName");
+    pickStr("broadcasterUserId");
+    pickStr("broadcasterIconUrl");
+    pickStr("broadcasterPageUrl");
+    pickStr("thumbnailUrl");
+    const vc = (
+      /** @type {Record<string, unknown>} */
+      snapshot.viewerCountFromDom
+    );
+    if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) {
+      out.viewerCountFromDom = vc;
+    } else if (vc === null) {
+      out.viewerCountFromDom = null;
+    }
+    return out;
+  }
   function peakConcurrentEstimateFromSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== "object") return null;
     const vcRaw = snapshot.viewerCountFromDom;
@@ -8421,6 +9454,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const r = Number(snap.officialCaptureRatio);
       if (Number.isFinite(r)) officialCaptureRatio = r;
     }
+    const reviewFields = extractReviewFieldsFromSnapshot(snap);
     const row = {
       liveId: lid,
       capturedAt: now,
@@ -8432,7 +9466,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       peakConcurrentEstimate: peakConcurrentEstimateFromSnapshot(snap),
       officialCommentCount: oc,
       officialViewerCount: ov,
-      officialCaptureRatio
+      officialCaptureRatio,
+      ...reviewFields
     };
     let db;
     try {
@@ -8504,6 +9539,128 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         cur.continue();
       };
     });
+  }
+
+  // src/lib/loadLastBroadcastSummary.js
+  var DEFAULT_LAST_BROADCAST_FRESHNESS_MS = 30 * 24 * 60 * 60 * 1e3;
+  async function loadLastBroadcastSummary(db, opts = {}) {
+    if (!db) return null;
+    const nowMs = typeof opts.nowMs === "number" && Number.isFinite(opts.nowMs) ? opts.nowMs : Date.now();
+    const freshnessMs = typeof opts.freshnessMs === "number" && Number.isFinite(opts.freshnessMs) && opts.freshnessMs > 0 ? opts.freshnessMs : DEFAULT_LAST_BROADCAST_FRESHNESS_MS;
+    return new Promise((resolve, reject) => {
+      let tx;
+      try {
+        tx = db.transaction(BROADCAST_SUMMARY_STORE, "readonly");
+      } catch (e) {
+        reject(e);
+        return;
+      }
+      const store = tx.objectStore(BROADCAST_SUMMARY_STORE);
+      const idx = store.index("byCapturedAt");
+      const req = idx.openCursor(null, "prev");
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const cur = req.result;
+        if (!cur) {
+          resolve(null);
+          return;
+        }
+        const row = (
+          /** @type {Row} */
+          cur.value
+        );
+        const capturedAt = typeof row?.capturedAt === "number" && Number.isFinite(row.capturedAt) ? row.capturedAt : 0;
+        if (capturedAt <= 0 || nowMs - capturedAt > freshnessMs) {
+          resolve(null);
+          return;
+        }
+        const lid = String(row?.liveId || "").trim();
+        if (!lid) {
+          resolve(null);
+          return;
+        }
+        resolve(row);
+      };
+    });
+  }
+  function buildLastBroadcastReviewView(row) {
+    if (!row || typeof row !== "object") return null;
+    const liveId = String(row.liveId || "").trim();
+    if (!liveId) return null;
+    const capturedAt = typeof row.capturedAt === "number" && Number.isFinite(row.capturedAt) ? row.capturedAt : 0;
+    if (capturedAt <= 0) return null;
+    const finiteOrNull = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
+    const trimOrUndef = (v) => {
+      if (typeof v !== "string") return void 0;
+      const t = v.trim();
+      return t || void 0;
+    };
+    const vc = typeof row.viewerCountFromDom === "number" && Number.isFinite(row.viewerCountFromDom) && row.viewerCountFromDom >= 0 ? row.viewerCountFromDom : null;
+    return {
+      liveId,
+      capturedAt,
+      watchUrl: String(row.watchUrl || "").trim(),
+      commentStorageCount: typeof row.commentStorageCount === "number" && Number.isFinite(row.commentStorageCount) ? row.commentStorageCount : 0,
+      peakConcurrentEstimate: finiteOrNull(row.peakConcurrentEstimate),
+      officialCommentCount: finiteOrNull(row.officialCommentCount),
+      officialViewerCount: finiteOrNull(row.officialViewerCount),
+      viewerCount: vc,
+      broadcastTitle: trimOrUndef(row.broadcastTitle),
+      broadcasterName: trimOrUndef(row.broadcasterName),
+      broadcasterUserId: trimOrUndef(row.broadcasterUserId),
+      broadcasterIconUrl: trimOrUndef(row.broadcasterIconUrl),
+      broadcasterPageUrl: trimOrUndef(row.broadcasterPageUrl),
+      thumbnailUrl: trimOrUndef(row.thumbnailUrl)
+    };
+  }
+  function formatLastBroadcastIndicator(capturedAt, nowMs) {
+    if (typeof capturedAt !== "number" || !Number.isFinite(capturedAt) || capturedAt <= 0) {
+      return "\u524D\u56DE\u306E\u914D\u4FE1";
+    }
+    const now = typeof nowMs === "number" && Number.isFinite(nowMs) ? nowMs : Date.now();
+    const d = new Date(capturedAt);
+    const nd = new Date(now);
+    const sameDay = d.getFullYear() === nd.getFullYear() && d.getMonth() === nd.getMonth() && d.getDate() === nd.getDate();
+    const ageMs = Math.max(0, now - capturedAt);
+    const sevenDays = 7 * 24 * 60 * 60 * 1e3;
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    if (sameDay) {
+      return `\u524D\u56DE\uFF08${hh}:${mm} \u301C\uFF09`;
+    }
+    if (ageMs < sevenDays) {
+      return `\u524D\u56DE\uFF08${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm} \u301C\uFF09`;
+    }
+    return `\u524D\u56DE\uFF08${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} \u301C\uFF09`;
+  }
+
+  // src/lib/popupWindowEmptyHeight.js
+  var POPUP_WINDOW_WIDTH = 420;
+  var POPUP_WINDOW_HEIGHT_ACTIVE_WATCH = 780;
+  var POPUP_WINDOW_HEIGHT_EMPTY_WITH_HISTORY = 620;
+  var POPUP_WINDOW_HEIGHT_EMPTY_NO_HISTORY = 600;
+  var POPUP_WINDOW_MIN_HEIGHT = 360;
+  var POPUP_WINDOW_MAX_HEIGHT = 1100;
+  function computePopupWindowTargetHeight(input) {
+    const params = input && typeof input === "object" ? input : {};
+    const emptyState = params.emptyState === true;
+    const hasHistory = params.hasHistory === true;
+    const hint = params.viewportHint;
+    if (hint && typeof hint === "object") {
+      const c = Number(hint.contentHeightPx);
+      const ov = Number(hint.chromeOverheadPx);
+      if (Number.isFinite(c) && c > 0 && Number.isFinite(ov) && ov >= 0) {
+        const raw = Math.round(c + ov);
+        return clamp2(raw, POPUP_WINDOW_MIN_HEIGHT, POPUP_WINDOW_MAX_HEIGHT);
+      }
+    }
+    if (!emptyState) return POPUP_WINDOW_HEIGHT_ACTIVE_WATCH;
+    return hasHistory ? POPUP_WINDOW_HEIGHT_EMPTY_WITH_HISTORY : POPUP_WINDOW_HEIGHT_EMPTY_NO_HISTORY;
+  }
+  function clamp2(v, lo, hi) {
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
   }
 
   // src/lib/objectUrlRevokeQueue.js
@@ -8601,6 +9758,79 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     return r.includes("yukkuri-charactore-english") || d.includes("yukkuri-charactore-english");
   }
 
+  // src/lib/commentSendTroubleshootHint.js
+  var EXTENSION_RELOAD_USER_GUIDE_JA = "\u6539\u5584\u3057\u306A\u3051\u308C\u3070 chrome://extensions \u3092\u958B\u304D\u3001\u300C\u541B\u6597\u308A\u3093\u304F\u306E\u8FFD\u61B6\u306E\u304D\u3089\u3081\u304D\u300D\u306E\u300C\u66F4\u65B0\u300D\u3067\u62E1\u5F35\u3092\u518D\u8AAD\u307F\u8FBC\u307F\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
+  function withCommentSendTroubleshootHint(message) {
+    const s = String(message == null ? "" : message).trim();
+    if (!s) return "";
+    const hintLines = [];
+    if (!/再読み込み|F5|別タブ|前面/.test(s)) {
+      hintLines.push(
+        "watch\u30DA\u30FC\u30B8\u3092\u518D\u8AAD\u307F\u8FBC\u307F\uFF08F5\uFF09\u3057\u3001\u5225\u30BF\u30D6\u3067\u958B\u3044\u3066\u3044\u308B\u653E\u9001\u30DA\u30FC\u30B8\u3092\u524D\u9762\u306B\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+      );
+    }
+    if (!/chrome:\/\/extensions|「更新」/.test(s)) {
+      hintLines.push(EXTENSION_RELOAD_USER_GUIDE_JA);
+    }
+    return hintLines.length ? `${s}
+\u203B\u3046\u307E\u304F\u3044\u304B\u306A\u3044\u3068\u304D: ${hintLines.join("\n")}` : s;
+  }
+
+  // src/lib/avatarUrlCompare.js
+  function avatarCompareKey(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    try {
+      const u = new URL(s);
+      u.search = "";
+      u.hash = "";
+      return u.href;
+    } catch {
+      return s;
+    }
+  }
+  function isSameAvatarUrl(a, b) {
+    const ka = avatarCompareKey(a);
+    const kb = avatarCompareKey(b);
+    return Boolean(ka && kb && ka === kb);
+  }
+
+  // src/lib/watchSnapshotPartialMerge.js
+  var PROTECTED_STRING_FIELDS = (
+    /** @type {const} */
+    [
+      "broadcasterName",
+      "broadcasterPageUrl",
+      "broadcasterIconUrl",
+      "broadcasterUserId"
+    ]
+  );
+  function asTrimmedString(v) {
+    if (v == null) return "";
+    return String(v).trim();
+  }
+  function mergeWatchSnapshotPreservingBroadcaster(prev, next) {
+    if (next == null) return null;
+    if (prev == null) return next;
+    const merged = { ...next };
+    for (const key of PROTECTED_STRING_FIELDS) {
+      const nextStr = asTrimmedString(next[key]);
+      if (!nextStr) {
+        const prevStr = asTrimmedString(prev[key]);
+        if (prevStr) {
+          merged[key] = prev[key];
+        }
+      }
+    }
+    const nextLv = next.broadcasterLevel;
+    if (nextLv == null) {
+      if (prev.broadcasterLevel != null) {
+        merged.broadcasterLevel = prev.broadcasterLevel;
+      }
+    }
+    return merged;
+  }
+
   // src/extension/popup-entry.js
   function $(id) {
     return document.getElementById(id);
@@ -8655,7 +9885,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     body.classList.toggle("nl-inline", INLINE_MODE);
     root.classList.toggle("nl-inline-embed-watch", INLINE_EMBED_WATCH);
     body.classList.toggle("nl-inline-embed-watch", INLINE_EMBED_WATCH);
-    root.classList.toggle("nl-skin-panel-dark", !INLINE_MODE || INLINE_SIDE_PANEL);
+    root.classList.remove("nl-skin-panel-dark");
     body.classList.remove("nl-skin-panel-dark");
     if (INLINE_MODE) {
       const iw = Math.round(window.innerWidth || 360);
@@ -8754,6 +9984,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     _prevViewerCount = null;
     _prevConcurrentEstimated = null;
   }
+  function isStatValuePlaceholderText(text) {
+    const t = String(text ?? "").trim();
+    if (!t) return true;
+    return !/^~?[\d,，]+$/.test(t);
+  }
   function setCountDisplay(value, watchSnapshot = null) {
     let recordedNum = null;
     let text = "";
@@ -8778,7 +10013,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       );
     }
     const liveStatEl = $("liveStatComments");
-    if (liveStatEl) liveStatEl.textContent = text;
+    if (liveStatEl) {
+      liveStatEl.textContent = text;
+      liveStatEl.classList.toggle(
+        "is-placeholder",
+        isStatValuePlaceholderText(text)
+      );
+    }
     const officialEl = (
       /** @type {HTMLElement|null} */
       $("liveStatCommentsOfficial")
@@ -9102,23 +10343,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     setPostStatus(statusMessage, statusKind);
     syncVoiceCommentButton();
   }
-  var EXTENSION_RELOAD_USER_GUIDE_JA = "\u6539\u5584\u3057\u306A\u3051\u308C\u3070 chrome://extensions \u3092\u958B\u304D\u3001\u300C\u541B\u6597\u308A\u3093\u304F\u306E\u8FFD\u61B6\u306E\u304D\u3089\u3081\u304D\u300D\u306E\u300C\u66F4\u65B0\u300D\u3067\u62E1\u5F35\u3092\u518D\u8AAD\u307F\u8FBC\u307F\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
   var KEY_AI_SHARE_FAST_DIAG = "nls_ai_share_fast_diag_v1";
-  function withCommentSendTroubleshootHint(message) {
-    const s = String(message || "").trim();
-    if (!s) return "";
-    const hintLines = [];
-    if (!/再読み込み|F5|別タブ|前面/.test(s)) {
-      hintLines.push(
-        "watch\u30DA\u30FC\u30B8\u3092\u518D\u8AAD\u307F\u8FBC\u307F\uFF08F5\uFF09\u3057\u3001\u5225\u30BF\u30D6\u3067\u958B\u3044\u3066\u3044\u308B\u653E\u9001\u30DA\u30FC\u30B8\u3092\u524D\u9762\u306B\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
-      );
-    }
-    if (!/chrome:\/\/extensions|「更新」/.test(s)) {
-      hintLines.push(EXTENSION_RELOAD_USER_GUIDE_JA);
-    }
-    return hintLines.length ? `${s}
-\u203B\u3046\u307E\u304F\u3044\u304B\u306A\u3044\u3068\u304D: ${hintLines.join("\n")}` : s;
-  }
   function hasExtensionContext() {
     try {
       return Boolean(
@@ -9963,23 +11188,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     }
     return "";
-  }
-  function avatarCompareKey(raw) {
-    const s = String(raw || "").trim();
-    if (!s) return "";
-    try {
-      const u = new URL(s);
-      u.search = "";
-      u.hash = "";
-      return u.href;
-    } catch {
-      return s;
-    }
-  }
-  function isSameAvatarUrl(a, b) {
-    const ka = avatarCompareKey(a);
-    const kb = avatarCompareKey(b);
-    return Boolean(ka && kb && ka === kb);
   }
   function countEntriesWithUserId(entries) {
     let n = 0;
@@ -11633,9 +12841,19 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       snapshotFetchInflight: inflight,
       snapshotFetchError: error
     });
-    if (viewerDomEl) viewerDomEl.textContent = gate.viewerLabel;
+    if (viewerDomEl) {
+      viewerDomEl.textContent = gate.viewerLabel;
+      viewerDomEl.classList.toggle(
+        "is-placeholder",
+        isStatValuePlaceholderText(gate.viewerLabel)
+      );
+    }
     if (concurrentEstEl) {
       concurrentEstEl.textContent = gate.concurrentLabel;
+      concurrentEstEl.classList.toggle(
+        "is-placeholder",
+        isStatValuePlaceholderText(gate.concurrentLabel)
+      );
       concurrentEstEl.removeAttribute("title");
     }
     if (concurrentSubEl) concurrentSubEl.textContent = "\u4EBA";
@@ -11756,8 +12974,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (viewerDomEl) {
       if (stateGate.shouldUseSnapshotForViewer && typeof vc === "number") {
         viewerDomEl.textContent = vc.toLocaleString("ja-JP");
+        viewerDomEl.classList.remove("is-placeholder");
       } else {
         viewerDomEl.textContent = stateGate.viewerLabel;
+        viewerDomEl.classList.add("is-placeholder");
       }
     }
     if (typeof vc === "number" && Number.isFinite(vc) && vc >= 0) {
@@ -11794,6 +13014,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         const directLike = resolved.method === "official";
         const estStr = resolved.estimated.toLocaleString("ja-JP");
         concurrentEstEl.textContent = `${directLike ? "" : "~"}${estStr}`;
+        concurrentEstEl.classList.remove("is-placeholder");
         if (_prevConcurrentEstimated != null && resolved.estimated !== _prevConcurrentEstimated && concurrentCard) {
           const icon = concurrentCard.querySelector(":scope > img.nl-live-stat-icon");
           triggerCharaReaction(icon, {
@@ -11842,6 +13063,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         if (concurrentReadyEl) concurrentReadyEl.hidden = true;
         if (concurrentCard) concurrentCard.setAttribute("aria-busy", "true");
         concurrentEstEl.textContent = "\u8A08\u6E2C\u4E2D\u2026";
+        concurrentEstEl.classList.add("is-placeholder");
         concurrentEstEl.removeAttribute("title");
         if (concurrentSubEl) concurrentSubEl.textContent = "\u4EBA";
       }
@@ -13086,6 +14308,191 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     }
   }
+  var _lastPopupStateForResize = (
+    /** @type {string|null} */
+    null
+  );
+  async function resizePopupWindowForState(input) {
+    if (INLINE_MODE) return;
+    const emptyState = input?.emptyState === true;
+    const hasHistory = input?.hasHistory === true;
+    const stateKey = emptyState ? hasHistory ? "empty-history" : "empty-no-history" : "active";
+    if (_lastPopupStateForResize === stateKey) return;
+    _lastPopupStateForResize = stateKey;
+    if (typeof chrome === "undefined" || !chrome.windows || typeof chrome.windows.update !== "function" || typeof chrome.windows.getCurrent !== "function") {
+      return;
+    }
+    try {
+      const win = await chrome.windows.getCurrent();
+      if (!win || win.id == null) return;
+      if (win.type !== "popup") return;
+      let viewportHint = void 0;
+      if (emptyState) {
+        try {
+          await new Promise((r) => requestAnimationFrame(() => r(void 0)));
+          const primary = document.getElementById("nlPopupPrimary");
+          const measured = (primary && Number.isFinite(primary.scrollHeight) ? primary.scrollHeight : 0) || 0;
+          if (measured > 0) {
+            viewportHint = {
+              contentHeightPx: measured,
+              chromeOverheadPx: 40
+            };
+          }
+        } catch {
+        }
+      }
+      const height = computePopupWindowTargetHeight({
+        emptyState,
+        hasHistory,
+        viewportHint
+      });
+      if (typeof win.height === "number" && win.height === height) return;
+      await chrome.windows.update(win.id, {
+        height,
+        width: POPUP_WINDOW_WIDTH
+      });
+    } catch (err) {
+      if (typeof console !== "undefined" && console?.warn) {
+        console.warn("[resizePopupWindow] failed:", err);
+      }
+    }
+  }
+  async function applyLastBroadcastReviewToEmptyState() {
+    const root = document.documentElement;
+    const indicator = $("lastBroadcastIndicator");
+    const indicatorTitleEl = $("lastBroadcastIndicatorTitle");
+    const indicatorLeadEl = $("lastBroadcastIndicatorLead");
+    const actionsEl = $("lastBroadcastActions");
+    const reopenBtn = (
+      /** @type {HTMLButtonElement|null} */
+      $("lastBroadcastReopenBtn")
+    );
+    const liveStatComments = $("liveStatComments");
+    const concurrentEst = $("watchConcurrentEst");
+    const viewerDom = $("watchViewerDom");
+    const concurrentSub = $("watchConcurrentSub");
+    const officialEl = (
+      /** @type {HTMLElement|null} */
+      $("liveStatCommentsOfficial")
+    );
+    root.classList.add("nl-empty-state");
+    const hideReview = () => {
+      if (indicator) indicator.hidden = true;
+      if (actionsEl) actionsEl.hidden = true;
+      if (reopenBtn) {
+        reopenBtn.disabled = true;
+        reopenBtn.dataset.watchUrl = "";
+      }
+    };
+    if (typeof indexedDB === "undefined") {
+      hideReview();
+      root.classList.add("nl-empty-no-history");
+      void resizePopupWindowForState({ emptyState: true, hasHistory: false });
+      return;
+    }
+    let db;
+    try {
+      db = await openBroadcastSessionSummaryDb();
+      const row = await loadLastBroadcastSummary(db);
+      const view = buildLastBroadcastReviewView(row);
+      if (!view) {
+        hideReview();
+        root.classList.add("nl-empty-no-history");
+        void resizePopupWindowForState({ emptyState: true, hasHistory: false });
+        return;
+      }
+      root.classList.remove("nl-empty-no-history");
+      void resizePopupWindowForState({ emptyState: true, hasHistory: true });
+      if (indicator) indicator.hidden = false;
+      if (indicatorLeadEl) {
+        indicatorLeadEl.textContent = formatLastBroadcastIndicator(view.capturedAt);
+      }
+      if (indicatorTitleEl) {
+        const titleText = view.broadcastTitle || `${view.liveId}\uFF08\u30BF\u30A4\u30C8\u30EB\u672A\u53D6\u5F97\uFF09`;
+        indicatorTitleEl.textContent = titleText;
+      }
+      if (actionsEl) actionsEl.hidden = false;
+      if (reopenBtn) {
+        const watchUrl = view.watchUrl;
+        if (watchUrl) {
+          reopenBtn.disabled = false;
+          reopenBtn.dataset.watchUrl = watchUrl;
+        } else {
+          reopenBtn.disabled = true;
+          reopenBtn.dataset.watchUrl = "";
+        }
+      }
+      if (liveStatComments) {
+        liveStatComments.textContent = view.commentStorageCount.toLocaleString("ja-JP");
+        liveStatComments.classList.remove("is-placeholder");
+      }
+      if (officialEl) {
+        const oc = view.officialCommentCount;
+        if (typeof oc === "number" && Number.isFinite(oc) && oc >= 0) {
+          const recorded = view.commentStorageCount;
+          let line = `\u516C\u5F0F ${oc.toLocaleString("ja-JP")} \u4EF6`;
+          if (oc > 0 && recorded >= 0 && recorded <= oc) {
+            line += ` \xB7 \u8A18\u9332\u306F\u516C\u5F0F\u306E\u7D04${Math.round(recorded / oc * 100)}%`;
+          }
+          officialEl.textContent = line;
+          officialEl.hidden = false;
+        } else {
+          officialEl.textContent = "";
+          officialEl.hidden = true;
+        }
+      }
+      if (concurrentEst) {
+        if (typeof view.peakConcurrentEstimate === "number" && Number.isFinite(view.peakConcurrentEstimate)) {
+          concurrentEst.textContent = view.peakConcurrentEstimate.toLocaleString("ja-JP");
+          concurrentEst.classList.remove("is-placeholder");
+        } else {
+          concurrentEst.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
+          concurrentEst.classList.add("is-placeholder");
+        }
+        concurrentEst.removeAttribute("title");
+      }
+      if (concurrentSub) concurrentSub.textContent = "\u4EBA";
+      if (viewerDom) {
+        if (typeof view.viewerCount === "number" && Number.isFinite(view.viewerCount)) {
+          viewerDom.textContent = view.viewerCount.toLocaleString("ja-JP");
+          viewerDom.classList.remove("is-placeholder");
+        } else {
+          viewerDom.textContent = "\uFF08\u53D6\u5F97\u4E0D\u53EF\uFF09";
+          viewerDom.classList.add("is-placeholder");
+        }
+      }
+    } catch (err) {
+      if (typeof console !== "undefined" && console?.warn) {
+        console.warn("[applyLastBroadcastReview] failed:", err);
+      }
+      hideReview();
+      root.classList.add("nl-empty-no-history");
+      void resizePopupWindowForState({ emptyState: true, hasHistory: false });
+    } finally {
+      try {
+        db?.close();
+      } catch {
+      }
+    }
+  }
+  function clearLastBroadcastReviewArtifacts() {
+    const root = document.documentElement;
+    root.classList.remove("nl-empty-state");
+    root.classList.remove("nl-empty-no-history");
+    const indicator = $("lastBroadcastIndicator");
+    if (indicator) indicator.hidden = true;
+    const actionsEl = $("lastBroadcastActions");
+    if (actionsEl) actionsEl.hidden = true;
+    const reopenBtn = (
+      /** @type {HTMLButtonElement|null} */
+      $("lastBroadcastReopenBtn")
+    );
+    if (reopenBtn) {
+      reopenBtn.disabled = true;
+      reopenBtn.dataset.watchUrl = "";
+    }
+    void resizePopupWindowForState({ emptyState: false, hasHistory: true });
+  }
   async function refresh() {
     if (!hasExtensionContext()) {
       renderExtensionContextBanner(true);
@@ -13185,8 +14592,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       };
       ensurePopupPrimaryCloakedBeforeFirstReveal();
       document.documentElement.removeAttribute("data-nl-popup-content-painted");
-      const [tabs, openBag] = await Promise.all([
+      const [tabs, lastFocusedNormal, openBag] = await Promise.all([
         chrome.tabs.query({ active: true, currentWindow: true }),
+        chrome.windows.getLastFocused({ populate: true, windowTypes: ["normal"] }).catch(() => (
+          /** @type {chrome.windows.Window|null} */
+          null
+        )),
         chrome.storage.local.get([
           KEY_SELF_POSTED_RECENTS,
           KEY_LAST_WATCH_URL,
@@ -13204,6 +14615,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           KEY_FOLD_ANONYMOUS_IN_RANK_STRIP
         ])
       ]);
+      const lastFocusedNormalActiveTab = lastFocusedNormal?.tabs?.find((t) => t?.active) ?? null;
       applySelfPostedRecentsFromBag(openBag);
       const calmOn = normalizeCalmPanelMotion(openBag[KEY_CALM_PANEL_MOTION], {
         inlineDefault: INLINE_MODE
@@ -13224,10 +14636,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         );
       }
       popupBooleanSettingsRegistry.applyFromBag(openBag);
-      const { url, fromActiveTab } = resolveWatchUrlFromTabAndStash(
-        tabs[0],
-        openBag[KEY_LAST_WATCH_URL]
-      );
+      const watchUrlPick = pickWatchUrlFromMultipleSources({
+        activeTab: tabs[0],
+        lastFocusedNormalActiveTab,
+        lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL]
+      });
+      const url = watchUrlPick.url;
+      const fromActiveTab = watchUrlPick.source === "activeTab";
       const resolvedLv = extractLiveIdFromUrl(url);
       const viewerLvForError = isNicoLiveWatchUrl(url) && resolvedLv ? resolvedLv : "";
       const commentPanelPayload = parseCommentPanelStatusPayload(
@@ -13330,7 +14745,18 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         );
       }
       syncVoiceCommentButton();
-      if (!isNicoLiveWatchUrl(url)) {
+      const noWatchHint = $("noWatchRankingHint");
+      if (noWatchHint instanceof HTMLElement) {
+        if (INLINE_EMBED_WATCH) {
+          noWatchHint.setAttribute("hidden", "");
+          noWatchHint.style.display = "none";
+        } else {
+          noWatchHint.removeAttribute("hidden");
+          noWatchHint.style.display = "block";
+        }
+      }
+      const treatAsNoActiveWatch = !isNicoLiveWatchUrl(url) || watchUrlPick.source === "storage" || watchUrlPick.source === "none";
+      if (treatAsNoActiveWatch) {
         if (!isFreshRefresh()) return;
         resetPerBroadcastPopupCachesIfLiveIdChanged("");
         if (liveEl) liveEl.textContent = "\uFF08\u30CB\u30B3\u751Fwatch\u3092\u958B\u3044\u3066\u304F\u3060\u3055\u3044\uFF09";
@@ -13375,6 +14801,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         void renderSessionSummaryComparePanel("");
         void renderGiftQuickStatsPanel("");
         await populateStorySourceEntriesFromStorageFallback();
+        if (!INLINE_MODE) {
+          await applyLastBroadcastReviewToEmptyState();
+        } else {
+          clearLastBroadcastReviewArtifacts();
+        }
         markPopupRefreshContentPainted();
         revealPopupPrimaryOnce();
         return;
@@ -13427,10 +14858,16 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         void renderSessionSummaryComparePanel("");
         void renderGiftQuickStatsPanel("");
         await populateStorySourceEntriesFromStorageFallback();
+        if (!INLINE_MODE) {
+          await applyLastBroadcastReviewToEmptyState();
+        } else {
+          clearLastBroadcastReviewArtifacts();
+        }
         markPopupRefreshContentPainted();
         revealPopupPrimaryOnce();
         return;
       }
+      clearLastBroadcastReviewArtifacts();
       const snapshotKey = `${lv}|${url}|s17`;
       const key = commentsStorageKey(lv);
       const snapshotCacheHit = watchMetaCache.key === snapshotKey && watchMetaCache.snapshot != null;
@@ -13529,7 +14966,10 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         watchMetaCache.fetchInflight = false;
         watchMetaCache.fetchError = String(snapResult.error || "");
         if (!isFreshRefresh()) return;
-        watchMetaCache.snapshot = snapResult.snapshot;
+        watchMetaCache.snapshot = mergeWatchSnapshotPreservingBroadcaster(
+          watchMetaCache.snapshot,
+          snapResult.snapshot
+        );
         watchSnapshot = watchMetaCache.snapshot;
         const strippedAfterSnap = stripViewerAvatarContamination(
           arr,
@@ -15058,7 +16498,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0430-1858" ? String("0430-1858") : "dev";
+      const buildId = "0501-1227" ? String("0501-1227") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -15499,7 +16939,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           if (btn) btn.disabled = false;
           return;
         }
-        const report = aggregateMarketingReport(comments, lid);
+        const reportBroadcasterUid = String(
+          watchMetaCache.snapshot?.broadcasterUserId || ""
+        ).trim();
+        const report = aggregateMarketingReport(comments, lid, {
+          broadcasterUserId: reportBroadcasterUid
+        });
         const maskEl = (
           /** @type {HTMLInputElement|null} */
           $("devMonitorExportMarketingMaskLabels")
@@ -15562,10 +17007,14 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           const fallbackComments = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
           if (fallbackComments.length > 0) {
             try {
+              const fallbackBroadcasterUid = String(
+                watchMetaCache.snapshot?.broadcasterUserId || ""
+              ).trim();
               const report = aggregateMarketingReport(
                 /** @type {import('../lib/commentRecord.js').StoredComment[]} */
                 fallbackComments,
-                lid || String(STORY_SOURCE_STATE.liveId || "").trim()
+                lid || String(STORY_SOURCE_STATE.liveId || "").trim(),
+                { broadcasterUserId: fallbackBroadcasterUid }
               );
               const maskEl = (
                 /** @type {HTMLInputElement|null} */
@@ -15900,6 +17349,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         setCaptureStatus(captureStatus, "watch\u30DA\u30FC\u30B8\u3092\u958B\u3044\u3066\u304F\u3060\u3055\u3044\u3002", "error");
         return;
       }
+      if (captureBtn.disabled) return;
+      captureBtn.disabled = true;
       setCaptureStatus(captureStatus, "\u30AD\u30E3\u30D7\u30C1\u30E3\u4E2D\u2026", "idle");
       try {
         const res = (
@@ -15936,6 +17387,8 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         safeRefresh();
       } catch (err) {
         setCaptureStatus(captureStatus, `\u30AD\u30E3\u30D7\u30C1\u30E3\u306B\u5931\u6557: ${err instanceof Error ? err.message : String(err)}`, "error");
+      } finally {
+        captureBtn.disabled = false;
       }
     });
     thumbIntervalSel?.addEventListener("change", async () => {
@@ -15960,9 +17413,12 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       const key = exportBtn.dataset.storageKey;
       const watchUrl = exportBtn.dataset.watchUrl || "";
       if (!lv || !key || exportBtn.disabled) return;
+      exportBtn.disabled = true;
       try {
         await downloadCommentsHtml(lv, key, watchUrl);
       } catch {
+      } finally {
+        exportBtn.disabled = false;
       }
     });
     $("exportSessionSummaryJsonBtn")?.addEventListener("click", async () => {
@@ -16372,6 +17828,22 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     });
     $("reloadWatchTabPanelBtn")?.addEventListener("click", () => {
       void triggerReloadWatchTabFromPopup();
+    });
+    $("lastBroadcastReopenBtn")?.addEventListener("click", () => {
+      const btn = (
+        /** @type {HTMLButtonElement|null} */
+        $("lastBroadcastReopenBtn")
+      );
+      if (!btn || btn.disabled) return;
+      const url = String(btn.dataset.watchUrl || "").trim();
+      if (!url) return;
+      try {
+        void chrome.tabs.create({ url });
+      } catch (err) {
+        if (typeof console !== "undefined" && console?.warn) {
+          console.warn("[lastBroadcastReopen] tabs.create failed:", err);
+        }
+      }
     });
     postBtn?.addEventListener("click", () => {
       if (postBtn.disabled) return;

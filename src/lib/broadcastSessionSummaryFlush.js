@@ -63,6 +63,52 @@ export function isTransientIdbError(err) {
 }
 
 /**
+ * 0.1.69 (AY): empty state で「前回の配信」cards を復元するために必要な
+ * メタ情報（配信者・タイトル・サムネ・来場者数）を snapshot から取り出す純粋関数。
+ *
+ * すべて undefined 許容で、snapshot が無い / フィールドが欠けているケースは
+ * その項目を出力に含めない（後段で undefined になるだけ）。trim 済の文字列か
+ * Number.isFinite な数値以外は弾く。
+ *
+ * @param {Record<string, unknown>|null|undefined} snapshot
+ * @returns {{
+ *   broadcastTitle?: string,
+ *   broadcasterName?: string,
+ *   broadcasterUserId?: string,
+ *   broadcasterIconUrl?: string,
+ *   broadcasterPageUrl?: string,
+ *   thumbnailUrl?: string,
+ *   viewerCountFromDom?: number|null
+ * }}
+ */
+export function extractReviewFieldsFromSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return {};
+  /** @type {Record<string, unknown>} */
+  const out = {};
+  /** @param {string} key */
+  const pickStr = (key) => {
+    const v = /** @type {Record<string, unknown>} */ (snapshot)[key];
+    if (typeof v !== 'string') return;
+    const t = v.trim();
+    if (!t) return;
+    out[key] = t;
+  };
+  pickStr('broadcastTitle');
+  pickStr('broadcasterName');
+  pickStr('broadcasterUserId');
+  pickStr('broadcasterIconUrl');
+  pickStr('broadcasterPageUrl');
+  pickStr('thumbnailUrl');
+  const vc = /** @type {Record<string, unknown>} */ (snapshot).viewerCountFromDom;
+  if (typeof vc === 'number' && Number.isFinite(vc) && vc >= 0) {
+    out.viewerCountFromDom = vc;
+  } else if (vc === null) {
+    out.viewerCountFromDom = null;
+  }
+  return out;
+}
+
+/**
  * @param {Record<string, unknown>|null|undefined} snapshot
  * @returns {number|null}
  */
@@ -201,6 +247,12 @@ export async function maybeFlushBroadcastSessionSummarySample(input) {
     if (Number.isFinite(r)) officialCaptureRatio = r;
   }
 
+  // 0.1.69 (AY): empty state で「前回の配信」を再現するため、snapshot から
+  // 配信者・タイトル・サムネ・現在の来場者数を抜いて行に同梱する。
+  // どれも undefined 許容なので、古い IDB 行や snapshot 不在のケースは
+  // 自動的に「未取得」フォールバックで扱われる。
+  const reviewFields = extractReviewFieldsFromSnapshot(snap);
+
   const row = {
     liveId: lid,
     capturedAt: now,
@@ -212,7 +264,8 @@ export async function maybeFlushBroadcastSessionSummarySample(input) {
     peakConcurrentEstimate: peakConcurrentEstimateFromSnapshot(snap),
     officialCommentCount: oc,
     officialViewerCount: ov,
-    officialCaptureRatio
+    officialCaptureRatio,
+    ...reviewFields
   };
 
   let db;

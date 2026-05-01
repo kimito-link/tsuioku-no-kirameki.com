@@ -12,6 +12,7 @@ import {
   KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
   normalizeInlinePanelAutoshowEnabled,
   INLINE_PANEL_PLACEMENT_BESIDE,
+  INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_FLOATING,
   INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
   KEY_INLINE_FLOATING_ANCHOR,
@@ -88,6 +89,9 @@ import {
   effectiveInlinePanelPlacement,
   selectBestPlayerRectIndex
 } from '../lib/inlinePanelLayout.js';
+import { scoreInlineHostAnchorCandidate } from '../lib/inlineHostAnchorScoring.js';
+import { calculateDockBottomPanelHeight } from '../lib/inlineHostDockSizing.js';
+import { calculateBesidePanelLayout } from '../lib/inlineHostBesideSizing.js';
 import {
   applyRecognitionResult,
   isVoiceCommentSupported,
@@ -113,6 +117,7 @@ import {
   maybeAppendCommentIngestLog
 } from '../lib/commentIngestLog.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
+import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
 import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
@@ -140,6 +145,9 @@ import {
   shouldRunEndedBulkHarvest
 } from '../lib/watchProgramEndState.js';
 import { hydrateInterceptAvatarMapFromProfile } from '../lib/interceptAvatarHydration.js';
+import { extractBroadcasterUserId } from '../lib/broadcasterUserId.js';
+import { resolveChannelBroadcasterMeta } from '../lib/channelBroadcasterMeta.js';
+import { decidePrewarmLeaseAction } from '../lib/prewarmCoordinator.js';
 import {
   KEY_COMMENT_PANEL_AUTO_RESTORE,
   LATEST_COMMENT_BUTTON_SELECTOR,
@@ -1838,6 +1846,12 @@ function ensureInlinePanelCloseButton(host) {
 /**
  * 視聴ページ下部にビューポート固定で広げる（ポップアップ風より視認しやすい既定用）。
  * プレイヤー DOM 非依存のため、ターゲット video の遅延があっても先に出せる。
+ *
+ * 0.1.65 (AU): panel 高さの計算を `calculateDockBottomPanelHeight` (純粋関数)
+ *   に切り出し。video + コメ列の bottom が取れれば残りスペースに合わせ、取れ
+ *   なければ viewport*0.4 のフォールバック。viewport / player 変化は
+
+ *   `ensureInlineHostReflowListener` の resize listener で再呼び出しして追従する。
  */
 function renderInlinePanelDockBottomHost() {
   const host = ensureInlinePopupHost();
@@ -1847,11 +1861,39 @@ function renderInlinePanelDockBottomHost() {
   const viewport = nlsViewportSize();
   let vh = Number(viewport.innerHeight) || 0;
   if (vh < 280) vh = 720;
-  const maxDockH = watchDockPanelMaxHeightPx();
-  const iframeInnerH = Math.max(
-    200,
-    Math.min(maxDockH - 16, Math.round(vh * 0.5))
-  );
+
+  // video + コメ列の bottom を取得（取れなければ null=フォールバック）
+  let playerRowBottom = null;
+  try {
+    const video = document.querySelector('video');
+    if (
+      video instanceof HTMLVideoElement &&
+      video.getBoundingClientRect().height >= 100
+    ) {
+      const insertAfter = findFrameInsertAnchorFromVideo(video);
+      if (insertAfter instanceof HTMLElement) {
+        const playerRect = resolvePlayerRowRect(video, insertAfter);
+        if (
+          playerRect &&
+          Number.isFinite(playerRect.top) &&
+          Number.isFinite(playerRect.height) &&
+          playerRect.height > 0
+        ) {
+          playerRowBottom = playerRect.top + playerRect.height;
+        }
+      }
+    }
+  } catch {
+    // no-op: 取れなければ fallback ratio が効く
+  }
+
+  const sizing = calculateDockBottomPanelHeight({
+    viewportHeight: vh,
+    playerRowBottom,
+    contentNaturalHeight: null
+  });
+  const iframeInnerH = sizing.height;
+  const hostMaxH = iframeInnerH + 16; // 上下の余白
 
   if (host.parentNode !== document.body) {
     document.body.appendChild(host);
@@ -1863,7 +1905,7 @@ function renderInlinePanelDockBottomHost() {
   host.style.top = '';
   host.style.width = '100%';
   host.style.maxWidth = '100%';
-  host.style.maxHeight = `${maxDockH}px`;
+  host.style.maxHeight = `${hostMaxH}px`;
   host.style.marginLeft = '0';
   host.style.overflow = 'auto';
   host.style.overflowX = 'hidden';
@@ -1882,6 +1924,7 @@ function renderInlinePanelDockBottomHost() {
     iframe.style.height = `${iframeInnerH}px`;
     iframe.style.maxHeight = `${iframeInnerH}px`;
   }
+  ensureInlineHostReflowListener();
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
@@ -1893,14 +1936,77 @@ function renderInlinePanelDockBottomHost() {
 }
 
 /**
+ * inline panel host が viewport / player rect 変化に追従するための共通 resize
+ * listener。0.1.65 (AU) で dock_bottom 用に導入、0.1.66 (AV) で beside / below
+ * にも対応。一度だけ登録し、以降 resize で 150ms debounce 後に再描画する。
+ * 対象 placement に該当しない時は何もしない（renderInline* の中で placement
+ * を再判定するので無駄な再描画にはならない）。
+ */
+let __inlineHostReflowListenerRegistered = false;
+function ensureInlineHostReflowListener() {
+  if (__inlineHostReflowListenerRegistered) return;
+  __inlineHostReflowListenerRegistered = true;
+  /** @type {ReturnType<typeof setTimeout>|null} */
+  let timer = null;
+  const reflow = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      try {
+        const placement = getEffectiveInlinePanelPlacement();
+        if (placement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
+          renderInlinePanelDockBottomHost();
+        } else if (
+          placement === INLINE_PANEL_PLACEMENT_BESIDE ||
+          placement === INLINE_PANEL_PLACEMENT_BELOW
+        ) {
+          // beside / below は video 必須。video が取れる時だけ再描画
+          const v = document.querySelector('video');
+          if (
+            v instanceof HTMLVideoElement &&
+            v.getBoundingClientRect().height >= 100
+          ) {
+            renderInlineHostAnchoredToVideo(v);
+          }
+        }
+      } catch {
+        // no-op
+      }
+    }, 150);
+  };
+  try {
+    window.addEventListener('resize', reflow, { passive: true });
+  } catch {
+    // no-op: addEventListener が使えない環境（test 等）はスキップ
+  }
+}
+
+/**
  * video から親を辿り、プレイヤー列（映像＋公式コメント欄を含むブロック）相当の要素を選ぶ。
  * その要素の「直後」にホストを置くと、コメント入力バーの下〜列の下に自然に付く（video 直後だけだとバーの上に挟まることがある）。
  * body / documentElement は候補にしない（誤って最外に出さない）。
+ *
+ * 0.1.64 (AT): 旧スコアリング (aspect <= 3.4 / area <= viewport*0.92) は緩く、
+ *   ニコ生 SPA で「視聴行 + コメント欄 + バナー一式」を含む巨大ラッパーがヒット
+ *   して、その直後（description / Amazon / 関連配信の直前）にパネルが挿入される
+ *   事象が頻発していた。`scoreInlineHostAnchorCandidate` (純粋関数) に切り出し、
+ *   video rect とのジオメトリ整合（幅比 0.95–1.6 / 高さ比上限 / top オフセット
+ *   上限）まで含めて厳格化した。0.1.63 で below → dock_bottom の応急 migration
+ *   を入れているが、本関数の改善で `below` モードを再度推奨できる品質に戻す
+ *   下地ができた。詳細は src/lib/inlineHostAnchorScoring.js のヘッダコメント参照。
  * @param {HTMLElement} base
  */
 function findFrameInsertAnchorFromVideo(base) {
   if (!(base instanceof HTMLElement)) return base;
-  const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const videoEl =
+    base instanceof HTMLVideoElement ? base : base.querySelector?.('video');
+  const vr = (videoEl ?? base).getBoundingClientRect();
+  const videoRect = {
+    left: vr.left,
+    top: vr.top,
+    width: vr.width,
+    height: vr.height
+  };
   /** @type {{ el: HTMLElement, score: number }|null} */
   let best = null;
   let cur = base;
@@ -1910,18 +2016,14 @@ function findFrameInsertAnchorFromVideo(base) {
       cur = cur.parentElement;
       continue;
     }
-    const rect = cur.getBoundingClientRect();
-    const area = rect.width * rect.height;
-    const aspect = rect.width / Math.max(rect.height, 1);
-    if (
-      rect.width >= 260 &&
-      rect.height >= 140 &&
-      area <= viewportArea * 0.92 &&
-      aspect >= 1 &&
-      aspect <= 3.4
-    ) {
-      const score = area * (1.25 - Math.min(Math.abs(aspect - 1.78), 1.1) * 0.2);
-      if (!best || score > best.score) best = { el: cur, score };
+    const r = cur.getBoundingClientRect();
+    const result = scoreInlineHostAnchorCandidate({
+      rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+      viewport,
+      videoRect
+    });
+    if (result.eligible && (!best || result.score > best.score)) {
+      best = { el: cur, score: result.score };
     }
     cur = cur.parentElement;
   }
@@ -2186,13 +2288,58 @@ function renderInlineHostAnchoredToVideo(video) {
   let hostParent;
   /** flex 行の子として「動画列の次」に置けた（ニコ生の内側ラッパー脱出） */
   let besideFlexRowColumn = false;
+  /**
+   * 0.1.66 (AV): beside 用の純粋関数で計算した panel 幅・高さ。null の時は
+   * 利用可能幅不足で below フォールバック中（既存の computeInlinePanelLayout
+   * を使う）。
+   * @type {{ panelWidth: number, panelHeight: number, source: string } | null}
+   */
+  let besideLayout = null;
 
   if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
     const col = findBesideFlexRowColumnInsertion(video);
     if (col?.hostParent && col.insertAfter) {
-      insertAfter = col.insertAfter;
-      hostParent = col.hostParent;
-      besideFlexRowColumn = true;
+      // beside 用の幅・高さを純粋関数で再計算
+      const vrCheck = video.getBoundingClientRect();
+      const playerRect =
+        col.insertAfter instanceof HTMLElement
+          ? resolvePlayerRowRect(video, col.insertAfter)
+          : null;
+      const layoutCheck = calculateBesidePanelLayout({
+        videoRect: {
+          left: vrCheck.left,
+          top: vrCheck.top,
+          width: vrCheck.width,
+          height: vrCheck.height
+        },
+        playerRowRect: playerRect
+          ? {
+              left: playerRect.left,
+              top: playerRect.top,
+              width: playerRect.width,
+              height: playerRect.height
+            }
+          : null,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        },
+        contentNaturalHeight: null
+      });
+      if (layoutCheck) {
+        insertAfter = col.insertAfter;
+        hostParent = col.hostParent;
+        besideFlexRowColumn = true;
+        besideLayout = layoutCheck;
+      } else {
+        // 利用可能幅不足 → below フォールバック（player の真下に DOM 内挿入）
+        const r = resolveInlinePanelInsertAnchor(
+          domAnchor,
+          INLINE_PANEL_PLACEMENT_BELOW
+        );
+        insertAfter = /** @type {HTMLElement} */ (r.insertAfter);
+        hostParent = r.hostParent;
+      }
     } else {
       const r = resolveInlinePanelInsertAnchor(
         insertResolveAnchor,
@@ -2260,20 +2407,32 @@ function renderInlineHostAnchoredToVideo(video) {
   host.style.marginLeft =
     hostAttachFallbackBody || besideFlexRowColumn ? '0' : `${marginLeftPx}px`;
   host.style.maxWidth = '100%';
+  // 0.1.66 (AV): beside で純粋関数結果が取れていればそれを優先（幅・高さ）
+  const finalPanelWidthPx = besideLayout?.panelWidth ?? panelWidthPx;
   host.style.width = hostAttachFallbackBody
     ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px`
-    : `${panelWidthPx}px`;
+    : `${finalPanelWidthPx}px`;
   const iframe = /** @type {HTMLIFrameElement|null} */ (
     host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
   );
   if (iframe)
     iframe.style.width = hostAttachFallbackBody
       ? host.style.width
-      : `${panelWidthPx}px`;
+      : `${finalPanelWidthPx}px`;
+  // beside の高さを動画行の自然高さに揃える（縦間延びの解消）
+  if (besideLayout) {
+    host.style.maxHeight = `${besideLayout.panelHeight}px`;
+    if (iframe) {
+      iframe.style.height = `${besideLayout.panelHeight}px`;
+      iframe.style.maxHeight = `${besideLayout.panelHeight}px`;
+    }
+  }
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
   host.style.opacity = '1';
+  // 0.1.66 (AV): viewport / video rect 変化に追従
+  ensureInlineHostReflowListener();
 }
 
 /** @param {HTMLElement} target */
@@ -2451,7 +2610,16 @@ async function focusInlinePanelHostFromToolbar() {
   const host =
     nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
   if (!(host instanceof HTMLElement)) return false;
-  if (!shouldRespondFocusedNowFromToolbar(host)) return false;
+  /*
+   * 0.1.43 (Y): prewarm された host が DOM 上にあっても display:none で残った
+   *   ケースで、background に focused=true を返すと popup window fallback が
+   *   起動せず「kon-ta 押しても何も出ない」現象になる。computedStyle で
+   *   実際の可視状態を確認し、不可視なら false を返して background fallback
+   *   に任せる。
+   */
+  if (!shouldRespondFocusedNowFromToolbar(host, {
+    getComputedStyle: (el) => window.getComputedStyle(/** @type {Element} */ (el))
+  })) return false;
 
   // fire-and-forget: rect 確定を待ってから scroll + iframe focus を試行。
   // 結果は応答に反映しない（応答は既に true で返している）。
@@ -2547,7 +2715,8 @@ function buildAiShareFastDiagnosticsPayload() {
     exportedAt: new Date().toISOString(),
     frame: {
       isTop,
-      href: href.slice(0, 500),
+      // 0.1.45 (AA): query/fragment は strip して個人情報漏れを防ぐ
+      href: sanitizeWatchUrlForDiag(href),
       userAgent: String(navigator.userAgent || '').slice(0, 280)
     },
     contentScript: {
@@ -2600,6 +2769,24 @@ function buildAiShareFastDiagnosticsPayload() {
   };
 }
 
+/**
+ * 0.1.45 (AA): AI 診断に保存する watch URL から query/fragment を strip。
+ *   旧コードは `location.href.slice(0, 500)` をそのまま保存していたため、
+ *   ニコ生の querystring に session token / referrer / user 識別子等が
+ *   乗っていた場合、診断 dump を AI に貼ったり開発者に送ったりする際に
+ *   個人情報が漏れる懸念があった。liveId と path だけ残す。
+ */
+function sanitizeWatchUrlForDiag(rawHref) {
+  const s = String(rawHref || '');
+  if (!s) return '';
+  try {
+    const u = new URL(s);
+    return `${u.origin}${u.pathname}`.slice(0, 500);
+  } catch {
+    return s.split('?')[0].split('#')[0].slice(0, 500);
+  }
+}
+
 function persistAiShareFastDiagnostics() {
   if (!hasExtensionContext()) return;
   const now = Date.now();
@@ -2611,7 +2798,7 @@ function persistAiShareFastDiagnostics() {
       content: buildAiShareFastDiagnosticsPayload(),
       note:
         'Chrome コンソールの ERR_BLOCKED_BY_CLIENT / 広告スクリプト失敗はブロッカー由来で多く、本拡張とは無関係なことがあります。',
-      resolvedTabUrl: String(window.location.href || '').slice(0, 500),
+      resolvedTabUrl: sanitizeWatchUrlForDiag(window.location.href),
       persistedAt: new Date().toISOString()
     };
     void chrome.storage.local.set({ [KEY_AI_SHARE_FAST_DIAG]: payload });
@@ -2649,18 +2836,6 @@ let stableFrameTarget = null;
 
 function nlsViewportSize() {
   return { innerWidth: window.innerWidth, innerHeight: window.innerHeight };
-}
-
-/** ドックパネルと同じ上限高さ（padding-bottom 予約と共有） */
-function watchDockPanelMaxHeightPx() {
-  let ih = Number(nlsViewportSize().innerHeight) || 0;
-  /*
-   * バックグラウンドタブ・描画直前など innerHeight が 0 に近いと maxDockH=0 になり
-   * パネルが完全に潰れることがある。
-   */
-  if (ih < 280) ih = 720;
-  const capped = Math.min(Math.round(ih * 0.58), 720);
-  return Math.max(260, capped);
 }
 
 /**
@@ -2976,31 +3151,106 @@ function schedulePrewarmInlinePopupIframe() {
   }, 800);
 }
 
+/*
+ * 0.1.42 (X): prewarm lease を chrome.storage.local で取り合う。
+ *   複数 watch タブが visible 並行状態のとき、全タブが popup.html を並列
+ *   ロードして CPU を取り合うため、kon-ta 押下時のパネル表示が遅くなる
+ *   問題への対策。一度に prewarm するタブを 1 つに絞り、完了後に他タブが
+ *   順次 prewarm する。
+ */
+const PREWARM_LEASE_KEY = 'nls_prewarm_lease_v1';
+const PREWARM_LEASE_TIMEOUT_MS = 10_000;
+const PREWARM_LEASE_RETRY_MS = 1_500;
+const prewarmInstanceId = (() => {
+  try {
+    return `nlpw-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  } catch {
+    return `nlpw-fallback-${Date.now().toString(36)}`;
+  }
+})();
+
+async function tryAcquirePrewarmLease() {
+  try {
+    const bag = await chrome.storage.local.get(PREWARM_LEASE_KEY);
+    const cur = /** @type {{holder?: string, at?: number}|null} */ (bag[PREWARM_LEASE_KEY] ?? null);
+    const action = decidePrewarmLeaseAction({
+      currentLeaseHolder: cur?.holder,
+      currentLeaseAt: cur?.at,
+      selfId: prewarmInstanceId,
+      now: Date.now(),
+      leaseTimeoutMs: PREWARM_LEASE_TIMEOUT_MS
+    });
+    if (action === 'proceed') return true;
+    if (action === 'defer') return false;
+    // 'claim' → 自分の名前で書き込む
+    await chrome.storage.local.set({
+      [PREWARM_LEASE_KEY]: { holder: prewarmInstanceId, at: Date.now() }
+    });
+    return true;
+  } catch {
+    // storage 失敗時は coordination 諦めて prewarm 実行（fail-open）
+    return true;
+  }
+}
+
+async function releasePrewarmLeaseIfMine() {
+  try {
+    const bag = await chrome.storage.local.get(PREWARM_LEASE_KEY);
+    const cur = /** @type {{holder?: string}|null} */ (bag[PREWARM_LEASE_KEY] ?? null);
+    if (cur?.holder === prewarmInstanceId) {
+      await chrome.storage.local.set({
+        [PREWARM_LEASE_KEY]: { holder: '', at: 0 }
+      });
+    }
+  } catch {
+    // no-op
+  }
+}
+
 function prewarmInlinePopupIframe() {
   if (prewarmInlinePopupDone) return;
   if (!hasExtensionContext()) return;
   if (!isWatchInlinePanelTopFrame()) return;
   if (!isNicoLiveWatchUrl(window.location.href)) return;
-  try {
-    const host = ensureInlinePopupHost();
-    if (!(host instanceof HTMLElement)) return;
-    if (host.parentNode !== document.body) {
-      // 画面に出さないままで body に挿入。iframe は display:none でも load する。
-      host.style.display = 'none';
-      host.setAttribute('aria-hidden', 'true');
-      // レイアウトに影響しないよう offscreen に固定。
-      host.style.position = 'fixed';
-      host.style.top = '-99999px';
-      host.style.left = '-99999px';
-      host.style.width = '420px';
-      host.style.height = '600px';
-      host.style.pointerEvents = 'none';
-      document.body.appendChild(host);
+  void (async () => {
+    const acquired = await tryAcquirePrewarmLease();
+    if (!acquired) {
+      // 他タブが prewarm 中。一定時間後に再試行。
+      if (!prewarmInlinePopupDone && !prewarmInlinePopupTimer) {
+        prewarmInlinePopupTimer = setTimeout(() => {
+          prewarmInlinePopupTimer = null;
+          prewarmInlinePopupIframe();
+        }, PREWARM_LEASE_RETRY_MS);
+      }
+      return;
     }
-    prewarmInlinePopupDone = true;
-  } catch {
-    // 失敗しても致命的ではない（kon-ta 押下時に通常パスで host が作られる）
-  }
+    try {
+      const host = ensureInlinePopupHost();
+      if (!(host instanceof HTMLElement)) {
+        await releasePrewarmLeaseIfMine();
+        return;
+      }
+      if (host.parentNode !== document.body) {
+        // 画面に出さないままで body に挿入。iframe は display:none でも load する。
+        host.style.display = 'none';
+        host.setAttribute('aria-hidden', 'true');
+        // レイアウトに影響しないよう offscreen に固定。
+        host.style.position = 'fixed';
+        host.style.top = '-99999px';
+        host.style.left = '-99999px';
+        host.style.width = '420px';
+        host.style.height = '600px';
+        host.style.pointerEvents = 'none';
+        document.body.appendChild(host);
+      }
+      prewarmInlinePopupDone = true;
+    } catch {
+      // 失敗しても致命的ではない（kon-ta 押下時に通常パスで host が作られる）
+    } finally {
+      // lease は次のタブが直ぐ prewarm 始められるよう速やかに release
+      await releasePrewarmLeaseIfMine();
+    }
+  })();
 }
 
 function hasExtensionContext() {
@@ -3592,9 +3842,17 @@ function collectWatchPageSnapshot() {
   const h1Text = clean(document.querySelector('h1')?.textContent || '');
   const broadcastTitle = titleFromMeta || h1Text || titleFromDocument;
 
-  const streamLink = Array.from(
+  /*
+   * 0.1.39 (U): /user/{id}/live_programs 形式 anchor を全件収集して
+   *   `extractBroadcasterUserId` の defense-in-depth に渡す。
+   *   関連配信サイドバーに他配信者リンクが先に並ぶケース（lv350421699 RIO）
+   *   でも、本配信者リンクの `?ref=watch_user_information` を見つけられる。
+   *   `streamLink` (配信者名取り出し用) 自体は従来どおり「先頭 hit」を採るが、
+   *   broadcasterUserId の方は配列を渡して ref マーカ付きを優先する。
+   */
+  const streamLinkAnchors = Array.from(
     document.querySelectorAll('a[href*="/user/"]')
-  ).find((a) => {
+  ).filter((a) => {
     const href = String(a.getAttribute('href') || '');
     const text = clean(a.textContent);
     return (
@@ -3604,6 +3862,10 @@ function collectWatchPageSnapshot() {
       !/^https?:\/\//i.test(text)
     );
   });
+  const streamLink = streamLinkAnchors[0];
+  const streamLinkHrefCandidates = streamLinkAnchors.map((a) =>
+    String(a.getAttribute('href') || '')
+  );
   /*
    * 配信者名の優先順位:
    *   1. embedded-data の program.supplier.name  — ニコ生が表示する「配信表示名」そのもの
@@ -3618,8 +3880,18 @@ function collectWatchPageSnapshot() {
   const embeddedProps = (() => {
     try { return extractEmbeddedDataProps(document); } catch { return null; }
   })();
+  /*
+   * 0.1.40 (V): 公式チャンネル放送（運営・業者）の broadcaster メタを抽出。
+   *   一般ユーザー放送と embedded-data の構造が違い、`supplier.name` は提供
+   *   会社名（"株式会社ドワンゴ" 等）で、画面で見える本来のチャンネル名は
+   *   `socialGroup.name`、URL は `socialGroup.socialGroupPageUrl`。
+   *   詳細は lib/channelBroadcasterMeta.js。
+   */
+  const channelMeta = resolveChannelBroadcasterMeta(embeddedProps);
   const broadcasterNameFromEmbedded = clean(
-    embeddedProps?.program?.supplier?.name ?? ''
+    channelMeta.kind === 'channel'
+      ? channelMeta.name
+      : (embeddedProps?.program?.supplier?.name ?? '')
   );
   const broadcasterNameFromMeta = clean(
     metaGet(metaMap, ['author', 'twitter:creator', 'profile:username'])
@@ -3635,21 +3907,19 @@ function collectWatchPageSnapshot() {
     broadcasterNameFromMeta ||
     broadcasterNameFromDomFallback;
 
-  const broadcasterUserId = (() => {
-    // 1. streamLink href から
-    const href = String(streamLink?.getAttribute('href') || '');
-    const m = href.match(/\/user\/(\d+)/);
-    if (m) return m[1];
-    // 2. embedded-data の supplier.programProviderId / pageUrl から
-    const supplierId = String(
-      embeddedProps?.program?.supplier?.programProviderId ??
-      embeddedProps?.program?.supplier?.id ?? ''
-    ).trim();
-    if (/^\d+$/.test(supplierId)) return supplierId;
-    const pageUrl = String(embeddedProps?.program?.supplier?.pageUrl ?? '');
-    const m2 = pageUrl.match(/\/user\/(\d+)/);
-    return m2 ? m2[1] : '';
-  })();
+  /*
+   * 0.1.38 (T): lv350420992 で発生した broadcasterUserId 取り違え
+   *   （streamLink が Nasu 45300945 を拾い、本配信者 刑事桃 115713314 が
+   *    レーン除外フィルタを素通りして こん太レーン に混入）への対策。
+   *   embedded-data は配信者本人を指す authoritative なソースなので、
+   *   DOM の streamLink より先に参照する。詳細は lib/broadcasterUserId.js。
+   */
+  const broadcasterUserId = extractBroadcasterUserId({
+    embeddedSupplierProgramProviderId: embeddedProps?.program?.supplier?.programProviderId,
+    embeddedSupplierId: embeddedProps?.program?.supplier?.id,
+    embeddedSupplierPageUrl: embeddedProps?.program?.supplier?.pageUrl,
+    streamLinkHrefCandidates
+  });
 
   /*
    * 0.1.20 (U): 公式チャンネル / 業者放送のフォロー導線。
@@ -3658,11 +3928,19 @@ function collectWatchPageSnapshot() {
    * なる。生 URL を snapshot に持ち出して popup 側で channel タイルに切替える。
    */
   const broadcasterPageUrl = (() => {
+    // 0.1.40 (V): チャンネル放送は socialGroup 側に URL があるので最優先
+    if (channelMeta.kind === 'channel' && channelMeta.pageUrl) {
+      return channelMeta.pageUrl;
+    }
     const raw = String(embeddedProps?.program?.supplier?.pageUrl ?? '').trim();
     if (/^https?:\/\//i.test(raw)) return raw;
     return '';
   })();
   const broadcasterIconUrl = (() => {
+    // 0.1.40 (V): チャンネル放送は socialGroup.thumbnailImageUrl を最優先
+    if (channelMeta.kind === 'channel' && channelMeta.iconUrl) {
+      return channelMeta.iconUrl;
+    }
     const supplier = embeddedProps?.program?.supplier;
     /** @type {string[]} */
     const candidates = [];
@@ -3678,7 +3956,13 @@ function collectWatchPageSnapshot() {
     }
     const sg = embeddedProps?.socialGroup;
     if (sg && typeof sg === 'object') {
-      for (const key of ['thumbnailUrl', 'thumbnailSmallUrl']) {
+      // 新フィールド名（thumbnailImageUrl）+ 旧フィールド名 両方を後方互換で見る
+      for (const key of [
+        'thumbnailImageUrl',
+        'thumbnailSmallImageUrl',
+        'thumbnailUrl',
+        'thumbnailSmallUrl'
+      ]) {
         const v = /** @type {Record<string, unknown>} */ (sg)[key];
         if (typeof v === 'string') candidates.push(v);
       }
@@ -4148,7 +4432,8 @@ function buildAiSharePageDiagnostics() {
     exportedAt: new Date().toISOString(),
     frame: {
       isTop,
-      href: href.slice(0, 500),
+      // 0.1.45 (AA): query/fragment は strip して個人情報漏れを防ぐ
+      href: sanitizeWatchUrlForDiag(href),
       userAgent: String(navigator.userAgent || '').slice(0, 280)
     },
     contentScript: {
@@ -4206,6 +4491,24 @@ function buildAiSharePageDiagnostics() {
   };
 }
 
+/*
+ * 0.1.43 (Y): content.js は manifest.json の all_frames:true で iframe を含む
+ *   全フレームに注入される。さらに SPA navigation で再注入されると、トップ
+ *   レベルで `chrome.runtime.onMessage.addListener` を呼ぶたびに listener が
+ *   累積し、NLS_FOCUS_INLINE_PANEL に複数フレームから応答 → sendResponse の
+ *   port が複数解釈されて Chrome が「The message port closed before a response
+ *   was received」を投げ、background.js 側が popup window fallback を誤発火
+ *   する原因になる。globalThis に bound flag を立てて idempotent にする。
+ */
+const __NLS_MSG_LISTENER_BOUND_KEY__ = '__NLS_CONTENT_MSG_LISTENER_BOUND__';
+const nlsContentMsgListenerHost =
+  typeof globalThis !== 'undefined' ? globalThis : window;
+if (!(/** @type {Record<string, unknown>} */ (nlsContentMsgListenerHost))[__NLS_MSG_LISTENER_BOUND_KEY__]) {
+  /** @type {Record<string, unknown>} */ (nlsContentMsgListenerHost)[__NLS_MSG_LISTENER_BOUND_KEY__] = true;
+  bindContentScriptMessageListener();
+}
+
+function bindContentScriptMessageListener() {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!hasExtensionContext()) return;
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
@@ -4444,6 +4747,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 });
+}
 
 function rememberWatchPageUrl() {
   if (!hasExtensionContext()) return;
@@ -4531,9 +4835,15 @@ function detectBroadcasterUserIdFromDom() {
     return broadcasterUidCache;
   }
   const clean = (v) => String(v || '').replace(/\s+/g, ' ').trim();
-  const streamLink = Array.from(
+  /*
+   * 0.1.39 (U): collectWatchPageSnapshot と同じ defense-in-depth ロジックを
+   *   ここでも使う。embedded-data も読めるなら supplier.programProviderId を
+   *   最優先にし、DOM フォールバック時も `?ref=watch_user_information` 付き
+   *   anchor を優先する。3 秒キャッシュは引き続き有効。
+   */
+  const streamLinkAnchors = Array.from(
     document.querySelectorAll('a[href*="/user/"]')
-  ).find((a) => {
+  ).filter((a) => {
     const href = String(a.getAttribute('href') || '');
     const text = clean(a.textContent);
     return (
@@ -4543,9 +4853,22 @@ function detectBroadcasterUserIdFromDom() {
       !/^https?:\/\//i.test(text)
     );
   });
-  const href = String(streamLink?.getAttribute('href') || '');
-  const m = href.match(/\/user\/(\d+)/);
-  broadcasterUidCache = m ? m[1] : '';
+  const streamLinkHrefCandidates = streamLinkAnchors.map((a) =>
+    String(a.getAttribute('href') || '')
+  );
+  let embeddedSupplier = null;
+  try {
+    const props = extractEmbeddedDataProps(document);
+    embeddedSupplier = props?.program?.supplier ?? null;
+  } catch {
+    embeddedSupplier = null;
+  }
+  broadcasterUidCache = extractBroadcasterUserId({
+    embeddedSupplierProgramProviderId: embeddedSupplier?.programProviderId,
+    embeddedSupplierId: embeddedSupplier?.id,
+    embeddedSupplierPageUrl: embeddedSupplier?.pageUrl,
+    streamLinkHrefCandidates
+  });
   broadcasterUidCacheAt = now;
   return broadcasterUidCache;
 }
@@ -4928,21 +5251,35 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       : extractLiveIdFromUrl(rememberedWatchUrl) === liveId
         ? rememberedWatchUrl
         : `https://live.nicovideo.jp/watch/${liveId}`;
-    const autoBackupState = normalizeAutoBackupState(bag[KEY_AUTO_BACKUP_STATE]);
-    const prevBackupMeta = autoBackupState.lives[String(liveId || '').trim().toLowerCase()] || {
+    /*
+     * 0.1.44 (Z): KEY_AUTO_BACKUP_STATE は content（commentCount/updatedAt
+     *   /lastCommentAt/watchUrl 担当）と background SW（lastBackupAt/
+     *   lastBackedUpdatedAt/lastBackupCount 担当）の両方が更新する。
+     *   旧コードは bag を冒頭で 1 回読んだだけで write したため、その間に
+     *   background が更新した backup 系フィールドを stale 値で上書きする
+     *   race があった（重複バックアップが IDB に溜まる原因）。
+     *   write 直前に再 read → background 担当フィールドは fresh 値、content
+     *   担当フィールドは新規値で merge し、他の live のエントリは fresh state
+     *   をそのまま使う。
+     */
+    const lidLowerForBackup = String(liveId || '').trim().toLowerCase();
+    const freshBackupBag = await chrome.storage.local.get(KEY_AUTO_BACKUP_STATE);
+    const autoBackupState = normalizeAutoBackupState(freshBackupBag[KEY_AUTO_BACKUP_STATE]);
+    const freshLiveMeta = autoBackupState.lives[lidLowerForBackup] || {
       lastBackupAt: 0,
       lastBackedUpdatedAt: 0,
       lastBackupCount: 0
     };
-    autoBackupState.lives[String(liveId || '').trim().toLowerCase()] = {
-      liveId: String(liveId || '').trim().toLowerCase(),
+    autoBackupState.lives[lidLowerForBackup] = {
+      liveId: lidLowerForBackup,
       commentCount: next.length,
       updatedAt,
       lastCommentAt,
       watchUrl: backupWatchUrl,
-      lastBackupAt: Math.max(0, Number(prevBackupMeta.lastBackupAt) || 0),
-      lastBackedUpdatedAt: Math.max(0, Number(prevBackupMeta.lastBackedUpdatedAt) || 0),
-      lastBackupCount: Math.max(0, Number(prevBackupMeta.lastBackupCount) || 0)
+      // background SW 所有: fresh 値をそのまま使う（content では更新しない）
+      lastBackupAt: Math.max(0, Number(freshLiveMeta.lastBackupAt) || 0),
+      lastBackedUpdatedAt: Math.max(0, Number(freshLiveMeta.lastBackedUpdatedAt) || 0),
+      lastBackupCount: Math.max(0, Number(freshLiveMeta.lastBackupCount) || 0)
     };
     pruneAutoBackupLives(autoBackupState);
     if (storageTouched || pendingTouched) {
@@ -5383,15 +5720,31 @@ async function runDeepHarvest(opts = {}) {
   ) {
     return;
   }
-  if (
-    !opts.force &&
-    shouldSkipDeepHarvest({
+  /*
+   * 0.1.41 (W): NDGR が active な間 deep harvest を全 skip すると、配信途中
+   *   参加時の backlog（既に積まれていた数百件のコメント）が永遠に取れない
+   *   現象が発生していた（ユーザー報告: 公式 324 件・記録 55 件 = 17%）。
+   *   `tryPeriodicQuietDeepHarvest` / `onTabVisibleForCommentHarvest` は
+   *   recovery を計算して force=true を渡しているが、`scheduleDeepHarvest`
+   *   経路（liveIdChange / recordingOn / tabVisible reason）は force=false
+   *   のため NDGR active で skip されていた。runDeepHarvest 自体に
+   *   recovery 判定を OR で入れる defense-in-depth。
+   */
+  if (!opts.force) {
+    const nowMs = Date.now();
+    const ndgrSkip = shouldSkipDeepHarvest({
       ndgrLastReceivedAt,
-      now: Date.now(),
+      now: nowMs,
       thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
-    })
-  ) {
-    return;
+    });
+    const needsRecovery = shouldForceDeepHarvestRecovery({
+      lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
+      now: nowMs,
+      recoveryMs: HARVEST_TIMING.deepRecoveryMs
+    });
+    if (ndgrSkip && !needsRecovery) {
+      return;
+    }
   }
   harvestRunning = true;
   try {
@@ -5842,6 +6195,16 @@ async function start() {
       get: (keys) => chrome.storage.local.get(keys),
       set: (obj) => chrome.storage.local.set(obj)
     }).catch(() => ({ changed: false }));
+    /*
+     * 0.1.63 (AS): below → dock_bottom のワンショット migration。
+     *   ニコ生 SPA の親要素レイアウト変更により、`below` モードでパネルが
+     *   ページ最下部に出てしまう問題（ユーザー報告「前はちゃんと出ていたが
+     *   いつからかおかしくなった」）の暫定対策。
+     */
+    await migrateBelowInlinePanelToDockOnce({
+      get: (keys) => chrome.storage.local.get(keys),
+      set: (obj) => chrome.storage.local.set(obj)
+    }).catch(() => ({ changed: false }));
     await loadPageFrameSettings().catch(() => {});
     if (isNicoLiveWatchUrl(window.location.href)) {
       startPageFrameLoop();
@@ -6055,6 +6418,17 @@ async function start() {
         // no-op
       }
       thumbTimerId = null;
+    }
+    // 0.1.45 (AA): pageFrameLoopTimer も止める。旧コードはこの timer を
+    // 止めずに tick の冒頭で early return するだけだったため、setInterval
+    // slot と CPU が tab 寿命まで消費され続ける問題があった。
+    if (pageFrameLoopTimer != null) {
+      try {
+        clearInterval(pageFrameLoopTimer);
+      } catch {
+        // no-op
+      }
+      pageFrameLoopTimer = null;
     }
     return true;
   };

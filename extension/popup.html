@@ -80,13 +80,30 @@
       /*
        * ツールバーポップアップ: --nl-pop-height がビューポートより大きいと外側スクロールが付きやすい。
        * JS でも上限するが、CSS でも二重に抑える（nl-inline は html.nl-inline で上書き）。
+       *
+       * 0.1.74 (BD): popup window がユーザーリサイズで body より広い場合に、右側だけ
+       * 余白が見える（body が左寄せになる）症状を修正。html を viewport 幅まで広げて
+       * body を `margin-inline:auto` で水平中央に寄せる。action popup（Chrome が body
+       * 幅にリサイズ）では viewport == body 幅なので 100vw == --nl-pop-width で実質
+       * 変化なし。手動でウィンドウを広げた場合だけ余白が左右に均等に分散する。
+       *
+       * 0.1.75 (BE): body 側にも `max-width: 100vw` を追加。--nl-pop-width が
+       * screen 幅由来（1920 → 508）で計算されるのに対し popup window は force 420px
+       * のままで、body が viewport より広くなると右側が clip されるケース（特に
+       * 大画面で来場者数 card が見切れる）を修正。viewport を超えないようクランプ
+       * する。
        */
       html:not(.nl-inline) {
+        width: max(var(--nl-pop-width, 420px), 100vw);
+        max-width: 100vw;
         height: min(var(--nl-pop-height), 580px);
         max-height: min(var(--nl-pop-height), 580px);
       }
 
       html:not(.nl-inline) body {
+        max-width: 100vw;
+        margin-left: auto;
+        margin-right: auto;
         height: min(var(--nl-pop-height), 580px);
         max-height: min(var(--nl-pop-height), 580px);
       }
@@ -153,6 +170,17 @@
 
       /* watch 埋め込み時は上部のブランド帯を非表示（視聴導線を優先） */
       html.nl-inline body .nl-header {
+        display: none;
+      }
+
+      /* 0.1.64 (AT2): standalone popup window でも Chrome 自身のタイトルバー
+         （拡張アイコン + 拡張名）が出ているため、内部の nl-header（ロゴ帯）は
+         冗長で「枠が 2 つ」に見える。INLINE_MODE 時はクラス nl-inline で既に
+         hidden だが、それ以外（standalone window / ツールバー popup）でも
+         non-watch でランキング導線を出すケースで二重表示が目立つので非表示に
+         揃える。watch ページ埋め込み (nl-inline) は元から hidden、ここで
+         standalone も hidden に拡張するだけなので、表示が出るパスは無い。 */
+      body .nl-header {
         display: none;
       }
 
@@ -2164,6 +2192,21 @@
         margin: 1px 0;
       }
 
+      /* 配信なし / 取得失敗時の「（取得不可）」「（この配信は未取得）」など、
+         数字以外のフォールバック文言が値枠に流れ込んだ場合の表示。
+         極太22px + tabular-nums のままだと幅 ~100px のカードで 1〜2 字ずつ
+         縦書き状に折り返されて読めなくなる（0.1.68 修正）。 */
+      .nl-live-stat-value.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 13px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        font-variant-numeric: normal;
+        line-height: 1.25;
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+
       .nl-live-stat-unit {
         font-size: clamp(8px, 2vw, 10px);
         font-weight: 600;
@@ -2522,6 +2565,12 @@
 
       html.nl-inline body .nl-live-stat-value {
         font-size: clamp(18px, 5vw, 28px);
+      }
+
+      /* inline panel は base より値が大きい（28px 上限）ので、placeholder 側も
+         少し大きめに揃える。それでも数字用の極太よりは確実に小さい。 */
+      html.nl-inline body .nl-live-stat-value.is-placeholder {
+        font-size: clamp(12px, 3vw, 16px);
       }
 
       /* 統計直下の案内 / 詳細設定内の記録ブロック（旧 first-view と同系） */
@@ -4041,6 +4090,19 @@
         font-weight: 500;
         color: var(--nl-muted);
         line-height: 1.35;
+      }
+
+      /* 0.1.64 (AT4): 「横付き」を選んでも 1200px 未満だと『プレイヤー行の下』
+         と同じ動作になり、ユーザーから「切り替えても何も変わらない」報告が
+         あった。ヒント文を warning 調に強調して見落とされないようにする。 */
+      .nl-panel-placement-hint--warning {
+        background: #fff7e0;
+        border: 1px solid #f6c869;
+        border-radius: 6px;
+        padding: 4px 8px;
+        margin-top: 4px;
+        color: #7a4f00;
+        font-weight: 700;
       }
 
       .nl-floating-anchor-wrap {
@@ -5924,6 +5986,217 @@
         display: none;
       }
 
+      /* 0.1.52 (AH) → 0.1.56 (AL): watch ページ未検出時の導線。
+         確実に表示されるよう display:block を明示し、margin・padding を
+         はっきり付け、目立つ配色にする。 */
+      .nl-no-watch-hint {
+        display: block !important;
+        margin: 10px 12px 6px;
+        padding: 12px 14px 14px;
+        background: linear-gradient(160deg, #fff5d9, #ffe8b3);
+        border: 2px solid #f59e0b;
+        border-radius: 12px;
+        box-shadow: 0 3px 10px rgb(245 158 11 / 25%);
+      }
+
+      .nl-no-watch-hint[hidden] {
+        display: none !important;
+      }
+
+      .nl-no-watch-hint__lead {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #1f2937;
+        line-height: 1.4;
+      }
+
+      .nl-no-watch-hint__links {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .nl-no-watch-hint__links li {
+        margin: 0;
+      }
+
+      .nl-no-watch-hint__links a {
+        display: block;
+        padding: 8px 10px;
+        background: #ffffff;
+        border: 1px solid #d5e3f5;
+        border-radius: 8px;
+        color: #0b73ad;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background 120ms ease, border-color 120ms ease;
+      }
+
+      .nl-no-watch-hint__links a:hover,
+      .nl-no-watch-hint__links a:focus-visible {
+        background: #e0f2fe;
+        border-color: #0f8fd8;
+        outline: none;
+      }
+
+      /*
+       * 0.1.69 (AY): empty state（配信なし）で「前回の配信」を再現するための
+       * indicator バナーとアクションボタン。stat cards の上に小さく出して
+       * 「これは過去の配信を表示しています」と明示する。
+       *
+       * - .nl-last-broadcast-indicator: 「前回（HH:mm 〜）」+ タイトル
+       * - .nl-last-broadcast-actions: 「もう一度開く」ボタン
+       *
+       * INLINE_MODE（watch ページ内 iframe）では empty state 自体が発生しない
+       * のでこれらは hidden。standalone popup と side panel のみで表示。
+       */
+      .nl-last-broadcast-indicator {
+        margin: 8px 12px 4px;
+        padding: 6px 10px;
+        background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-surface));
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 32%, var(--nl-border));
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .nl-last-broadcast-indicator[hidden] {
+        display: none !important;
+      }
+
+      .nl-last-broadcast-indicator__lead {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--nl-muted);
+        line-height: 1.2;
+        letter-spacing: 0.02em;
+      }
+
+      .nl-last-broadcast-indicator__title {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--nl-text);
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+      }
+
+      .nl-last-broadcast-actions {
+        margin: 6px 12px 4px;
+        display: flex;
+        gap: 6px;
+      }
+
+      .nl-last-broadcast-actions[hidden] {
+        display: none !important;
+      }
+
+      .nl-last-broadcast-actions__reopen {
+        flex: 1 1 auto;
+        appearance: none;
+        -webkit-appearance: none;
+        font: inherit;
+        padding: 7px 10px;
+        background: var(--nl-accent);
+        color: #fff;
+        border: 1px solid var(--nl-accent);
+        border-radius: 8px;
+        font-size: 12.5px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 120ms ease, border-color 120ms ease;
+      }
+
+      .nl-last-broadcast-actions__reopen:hover,
+      .nl-last-broadcast-actions__reopen:focus-visible {
+        background: var(--nl-accent-hover, #0b73ad);
+        border-color: var(--nl-accent-hover, #0b73ad);
+        outline: none;
+      }
+
+      .nl-last-broadcast-actions__reopen:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      /*
+       * 0.1.69 (AY): empty state「履歴ゼロ」フォールバック用。
+       * 拡張インストール直後・本当に何もない場合は、stat cards / count+ticker /
+       * lane / session-summary / gift-quick を全部 hide してすっきりさせる。
+       * 残るのは: nlVersionBadge / noWatchRankingHint（4 ボタン導線）/
+       * character scene（語り）/ 詳細設定 / 配色プリセット のみ。
+       *
+       * 「履歴あり empty」では cards に前回データが入るので hide しない。
+       * → JS が html に nl-empty-no-history を付けたとき限定で hide する。
+       */
+      /*
+       * 0.1.70 (AZ): empty state は **2 段階** で hide する。
+       *
+       *   nl-empty-state:        履歴あり/なしどちらでも常に hide すべき要素
+       *                          (active な watch 用の UI 群)
+       *   nl-empty-no-history:   履歴ゼロのときに「前回の配信」cards も hide
+       *
+       * 0.1.69 (AY) では `nl-empty-no-history` だけで列挙していたが、履歴あり
+       * empty で **下半分（応援 hero / コメ送信欄 / 5分の応援増加 / 記録 0 件 /
+       * アイコン列・グリッド・診断 / 書き出しの詳細）が全部出たまま** で混乱した。
+       * 共通分を `nl-empty-state` に切り出し、cards 系だけを no-history で追加 hide する。
+       */
+
+      /* 共通: 履歴あり/なしどちらでも hide する active watch 用 UI */
+      html.nl-empty-state body .nl-stats,
+      html.nl-empty-state body .nl-comment-compose,
+      html.nl-empty-state body .nl-vdh-divider,
+      html.nl-empty-state body .nl-session-summary-panel,
+      html.nl-empty-state body .nl-gift-quick-panel,
+      html.nl-empty-state body .nl-record-nav-hint,
+      html.nl-empty-state body .nl-dev-monitor-details {
+        display: none !important;
+      }
+
+      html.nl-empty-state body h2[data-nl-toolbar-only],
+      html.nl-empty-state body #userRoomList,
+      html.nl-empty-state body .nl-anonymous-identicon-opt,
+      html.nl-empty-state body .nl-anonymous-identicon-hint {
+        display: none !important;
+      }
+
+      /* 履歴ゼロ追加: 「前回の配信」cards / indicator / actions も hide */
+      html.nl-empty-no-history body .nl-live-stat-cards,
+      html.nl-empty-no-history body .nl-last-broadcast-indicator,
+      html.nl-empty-no-history body .nl-last-broadcast-actions {
+        display: none !important;
+      }
+
+      /*
+       * 0.1.73 (BC): empty state では body の 580px cap を解除し、content の高さに
+       * 合わせて body / .nl-main を伸ばす。standard popup mode では「watch 中は
+       * 1000px+ になり得るので body=580 で .nl-main を内部スクロール」設計だが、
+       * empty state は content が ~620px に収まるので、cap を外して全部見える方が
+       * 自然。下流で popup window 自体の outer height を primary.scrollHeight + 40
+       * に合わせるので、popup window 外側にも内部にも scrollbar が出ない。
+       */
+      html.nl-empty-state:not(.nl-inline) {
+        height: auto !important;
+        max-height: none !important;
+      }
+      html.nl-empty-state:not(.nl-inline) body {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      html.nl-empty-state:not(.nl-inline) body .nl-main {
+        flex: 0 0 auto;
+        overflow-y: visible;
+      }
+
       html.nl-skin-panel-dark {
         color-scheme: dark;
         --nl-bg: #0a0e14;
@@ -6233,6 +6506,74 @@
         <span class="nl-version-badge__label">ビルド</span>
         <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
       </div>
+      <!--
+        0.1.55 (AK) → 0.1.56 (AL): version badge 直下に配置することで、確実に
+        最初に表示される位置に固定する。INLINE_MODE のときだけ JS が hidden
+        を付ける。
+      -->
+      <section id="noWatchRankingHint" class="nl-no-watch-hint" aria-label="ニコ生 ランキング">
+        <p class="nl-no-watch-hint__lead">
+          🔎 watch ページが見つかりません。気になる放送を探してみますか？
+        </p>
+        <ul class="nl-no-watch-hint__links">
+          <li>
+            <a href="https://live.nicovideo.jp/" target="_blank" rel="noopener noreferrer">
+              🏠 ニコニコ生放送 トップ
+            </a>
+          </li>
+          <li>
+            <a href="https://live.nicovideo.jp/ranking" target="_blank" rel="noopener noreferrer">
+              📊 生放送ランキング
+            </a>
+          </li>
+          <li>
+            <a href="https://com.nicovideo.jp/ranking/live" target="_blank" rel="noopener noreferrer">
+              🎯 ちくらん（コミュニティ生放送ランキング）
+            </a>
+          </li>
+          <li>
+            <a href="https://live.nicovideo.jp/recent" target="_blank" rel="noopener noreferrer">
+              🆕 開始したばかりの放送（recent）
+            </a>
+          </li>
+        </ul>
+      </section>
+      <!--
+        0.1.69 (AY): empty state で「前回の配信」を再現する indicator バナー。
+        stat cards の上に「前回（HH:mm〜）」とタイトルを小さく見せて、
+        ユーザーが「現在の配信」と誤認しないようにする。
+        履歴があるときだけ JS が hidden を外す。標準は hidden。
+      -->
+      <div
+        id="lastBroadcastIndicator"
+        class="nl-last-broadcast-indicator"
+        role="note"
+        aria-label="前回の配信"
+        hidden
+      >
+        <span id="lastBroadcastIndicatorLead" class="nl-last-broadcast-indicator__lead">前回の配信</span>
+        <span id="lastBroadcastIndicatorTitle" class="nl-last-broadcast-indicator__title"></span>
+      </div>
+      <!--
+        0.1.69 (AY): 「もう一度開く」ボタン。前回の watchUrl を新タブで開く。
+        履歴があるときだけ JS が hidden を外す。watchUrl が空なら disabled。
+      -->
+      <div
+        id="lastBroadcastActions"
+        class="nl-last-broadcast-actions"
+        role="group"
+        aria-label="前回の配信のアクション"
+        hidden
+      >
+        <button
+          type="button"
+          id="lastBroadcastReopenBtn"
+          class="nl-last-broadcast-actions__reopen"
+          title="前回の watch ページを新しいタブで開きます"
+        >
+          🔄 もう一度この配信を開く
+        </button>
+      </div>
       <div
         id="offlineBanner"
         class="nl-extension-context-banner nl-offline-banner"
@@ -6483,8 +6824,8 @@
                   id="inlinePanelPlacementBeside"
                 />
                 横付き（親のレイアウトに合わせる・従来に近い）
-                <span class="nl-panel-placement-hint"
-                  >画面幅が約1200px未満では、公式UIとの競合を避けるため自動で下に表示します。</span>
+                <span class="nl-panel-placement-hint nl-panel-placement-hint--warning"
+                  >⚠️ 画面幅が約1200px未満では、選んでも『プレイヤー行の下』と同じ動作になります（公式UIとの競合回避のため自動で下に表示）。広いウィンドウで使ってください。</span>
               </label>
               <label>
                 <input

@@ -87,13 +87,27 @@
 
 /**
  * StoredComment の配列からマーケティング分析用の集計を行う。
+ *
+ * 0.1.46 (AB): 配信者本人を KPI / CPM / uniqueUsers / timeline / segment /
+ *   coreReturning 等の集計から除外する `broadcasterUserId` パラメータを追加。
+ *   0.1.17 で `sectionTopUsers` と `sectionUsersWithThumbnails` の表示時
+ *   フィルタは入っていたが、aggregate 層は配信者を含めたままで KPI が
+ *   歪んでいた（合いの手 50 コメで CPM が +1〜2、selfPosted% も歪む）。
+ *
  * @param {StoredComment[]} comments
  * @param {string} liveId
+ * @param {{ broadcasterUserId?: string }} [opts]
  * @returns {MarketingReport}
  */
-export function aggregateMarketingReport(comments, liveId) {
+export function aggregateMarketingReport(comments, liveId, opts = {}) {
+  const broadcasterUid = String(opts?.broadcasterUserId || '').trim();
   const filtered = comments.filter(
-    (c) => c.liveId === liveId && c.text && c.text.trim()
+    (c) =>
+      c.liveId === liveId &&
+      c.text &&
+      c.text.trim() &&
+      // 配信者本人のコメを除外（broadcasterUid が指定されたとき）
+      !(broadcasterUid && String(c.userId || '').trim() === broadcasterUid)
   );
 
   /** @type {Map<string, UserCommentProfile>} */
@@ -134,8 +148,23 @@ export function aggregateMarketingReport(comments, liveId) {
         ? counts[Math.floor(counts.length / 2)]
         : (counts[counts.length / 2 - 1] + counts[counts.length / 2]) / 2;
 
-  const minT = timestamps.length ? Math.min(...timestamps) : 0;
-  const maxT = timestamps.length ? Math.max(...timestamps) : 0;
+  /*
+   * 0.1.48 (AD): Math.min(...arr) / Math.max(...arr) は spread が引数上限
+   *   （V8 で 65535 程度）を超えると "Maximum call stack size exceeded" になる。
+   *   8 万コメント超の人気配信者 zone でマーケ分析が無症状失敗する。
+   *   reduce 化で大規模配列でも安全に min/max を取る。
+   */
+  let minT = 0;
+  let maxT = 0;
+  if (timestamps.length) {
+    minT = timestamps[0];
+    maxT = timestamps[0];
+    for (let i = 1; i < timestamps.length; i++) {
+      const t = timestamps[i];
+      if (t < minT) minT = t;
+      if (t > maxT) maxT = t;
+    }
+  }
   const durationMs = maxT - minT;
   const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
 
@@ -364,7 +393,11 @@ function computeVposThirds(filtered) {
     .map((c) => c.vpos)
     .filter((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0);
   if (vps.length < 5) return null;
-  const maxV = Math.max(...vps);
+  // 0.1.48 (AD): スタックオーバーフロー対策（reduce 化）
+  let maxV = vps[0];
+  for (let i = 1; i < vps.length; i++) {
+    if (vps[i] > maxV) maxV = vps[i];
+  }
   let early = 0;
   let mid = 0;
   let late = 0;

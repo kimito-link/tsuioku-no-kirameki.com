@@ -83,6 +83,7 @@
   var KEY_INLINE_PANEL_WIDTH_MODE = "nls_inline_panel_width_mode";
   var KEY_INLINE_PANEL_PLACEMENT = "nls_inline_panel_placement";
   var KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED = "nls_inline_panel_float_to_dock_migrated";
+  var KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED = "nls_inline_panel_below_to_dock_migrated";
   var KEY_INLINE_PANEL_AUTOSHOW_ENABLED = "nls_inline_panel_autoshow_enabled";
   function normalizeInlinePanelAutoshowEnabled(raw) {
     return raw === true;
@@ -254,21 +255,32 @@
         });
         addReq.onerror = () => reject(addReq.error);
         addReq.onsuccess = () => {
-          const getReq = idx.getAll(lid);
-          getReq.onerror = () => reject(getReq.error);
-          getReq.onsuccess = () => {
-            const all = (
-              /** @type {{ id: number, capturedAt: number }[]} */
-              getReq.result || []
-            );
-            all.sort((a, b) => a.capturedAt - b.capturedAt);
-            const toDrop = thumbIdsToDropForFifo(
-              all.map((r) => ({ id: r.id, capturedAt: r.capturedAt })),
-              MAX_THUMBS_PER_LIVE
-            );
-            for (const id of toDrop) {
-              store.delete(id);
+          const summaries = [];
+          const curReq = idx.openCursor(IDBKeyRange.only(lid));
+          curReq.onerror = () => reject(curReq.error);
+          curReq.onsuccess = () => {
+            const cursor = curReq.result;
+            if (!cursor) {
+              summaries.sort((a, b) => a.capturedAt - b.capturedAt);
+              const toDrop = thumbIdsToDropForFifo(
+                summaries,
+                MAX_THUMBS_PER_LIVE
+              );
+              for (const id2 of toDrop) {
+                store.delete(id2);
+              }
+              return;
             }
+            const v = (
+              /** @type {{ capturedAt?: number }} */
+              cursor.value || {}
+            );
+            const id = typeof cursor.primaryKey === "number" ? cursor.primaryKey : Number(cursor.primaryKey);
+            const capturedAt = typeof v.capturedAt === "number" ? v.capturedAt : 0;
+            if (Number.isFinite(id) && id > 0 && capturedAt > 0) {
+              summaries.push({ id, capturedAt });
+            }
+            cursor.continue();
           };
         };
         tx.oncomplete = () => resolve(void 0);
@@ -288,8 +300,11 @@
       return await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE, "readonly");
         const idx = tx.objectStore(STORE).index("byLive");
-        const r = idx.getAll(lid);
-        r.onsuccess = () => resolve((r.result || []).length);
+        const r = idx.count(IDBKeyRange.only(lid));
+        r.onsuccess = () => {
+          const n = Number(r.result);
+          resolve(Number.isFinite(n) && n >= 0 ? n : 0);
+        };
         r.onerror = () => reject(r.error);
       });
     } finally {
@@ -470,7 +485,8 @@
       return `${liveId2}|${no}|${text}`;
     }
     const sec = Math.floor(Number(rec.capturedAt || 0) / 1e3);
-    return `${liveId2}||${text}|${sec}`;
+    const uid = String(rec.userId ?? "").trim();
+    return `${liveId2}||${text}|${sec}|${uid}`;
   }
   function randomId() {
     return `c_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -2352,6 +2368,154 @@
     return s;
   }
 
+  // src/lib/inlineHostAnchorScoring.js
+  var DEFAULT_INLINE_HOST_ANCHOR_LIMITS = Object.freeze({
+    minWidth: 260,
+    minHeight: 140,
+    maxAreaRatio: 0.6,
+    minAspect: 1,
+    maxAspect: 2.6,
+    minWidthRatioToVideo: 0.95,
+    maxWidthRatioToVideo: 1.6,
+    maxHeightRatioToVideo: 3.5,
+    maxTopOffsetFromVideo: 120
+  });
+  var ASPECT_IDEAL = 16 / 9;
+  var IDEAL_WIDTH_RATIO = 1.15;
+  function scoreInlineHostAnchorCandidate(input, overrides = {}) {
+    const limits = { ...DEFAULT_INLINE_HOST_ANCHOR_LIMITS, ...overrides };
+    const { rect, viewport, videoRect } = input;
+    const viewportArea = Math.max(1, viewport.width * viewport.height);
+    const area = Math.max(0, rect.width * rect.height);
+    const aspect = rect.width / Math.max(rect.height, 1);
+    if (rect.width < limits.minWidth) {
+      return { eligible: false, score: 0, reason: "width<min" };
+    }
+    if (rect.height < limits.minHeight) {
+      return { eligible: false, score: 0, reason: "height<min" };
+    }
+    if (area > viewportArea * limits.maxAreaRatio) {
+      return { eligible: false, score: 0, reason: "area>max" };
+    }
+    if (aspect < limits.minAspect) {
+      return { eligible: false, score: 0, reason: "aspect<min" };
+    }
+    if (aspect > limits.maxAspect) {
+      return { eligible: false, score: 0, reason: "aspect>max" };
+    }
+    const videoWidth = Math.max(1, videoRect.width);
+    const videoHeight = Math.max(1, videoRect.height);
+    const widthRatio = rect.width / videoWidth;
+    const heightRatio = rect.height / videoHeight;
+    const topOffset = Math.abs(rect.top - videoRect.top);
+    if (widthRatio < limits.minWidthRatioToVideo) {
+      return { eligible: false, score: 0, reason: "width<videoMin" };
+    }
+    if (widthRatio > limits.maxWidthRatioToVideo) {
+      return { eligible: false, score: 0, reason: "width>videoMax" };
+    }
+    if (heightRatio > limits.maxHeightRatioToVideo) {
+      return { eligible: false, score: 0, reason: "height>videoMax" };
+    }
+    if (topOffset > limits.maxTopOffsetFromVideo) {
+      return { eligible: false, score: 0, reason: "topOffset>max" };
+    }
+    const aspectPenalty = Math.min(Math.abs(aspect - ASPECT_IDEAL), 1.1) * 0.18;
+    const widthPenalty = Math.min(Math.abs(widthRatio - IDEAL_WIDTH_RATIO), 0.6) * 0.15;
+    const score = area * (1 - aspectPenalty - widthPenalty);
+    return { eligible: true, score, reason: "ok" };
+  }
+
+  // src/lib/inlineHostDockSizing.js
+  var DEFAULT_DOCK_PANEL_LIMITS = Object.freeze({
+    minHeight: 220,
+    maxRatio: 0.55,
+    bottomPadding: 8,
+    fallbackRatio: 0.4
+  });
+  function calculateDockBottomPanelHeight(input, overrides = {}) {
+    const limits = { ...DEFAULT_DOCK_PANEL_LIMITS, ...overrides };
+    const vh = Math.max(280, Number(input.viewportHeight) || 0);
+    const safetyMax = Math.max(
+      limits.minHeight,
+      Math.round(vh * limits.maxRatio)
+    );
+    const clamp2 = (h, source) => ({
+      height: Math.max(limits.minHeight, Math.min(safetyMax, Math.round(h))),
+      source
+    });
+    const pb = input.playerRowBottom;
+    if (pb != null && Number.isFinite(pb) && pb > 0) {
+      const available = vh - pb - limits.bottomPadding;
+      if (available >= limits.minHeight) {
+        const cn = input.contentNaturalHeight;
+        if (cn != null && Number.isFinite(cn)) {
+          const cnClamped = Math.max(limits.minHeight, cn);
+          if (cnClamped < available) {
+            return clamp2(cnClamped, "content-fit");
+          }
+        }
+        return clamp2(available, "player-rect");
+      }
+      return { height: limits.minHeight, source: "min" };
+    }
+    const fallback = Math.round(vh * limits.fallbackRatio);
+    return clamp2(fallback, "fallback");
+  }
+
+  // src/lib/inlineHostBesideSizing.js
+  var DEFAULT_BESIDE_PANEL_LIMITS = Object.freeze({
+    minWidth: 280,
+    minHeight: 240,
+    maxHeightRatio: 0.72,
+    safeRight: 12
+  });
+  function calculateBesidePanelLayout(input, overrides = {}) {
+    const limits = { ...DEFAULT_BESIDE_PANEL_LIMITS, ...overrides };
+    const { videoRect, playerRowRect, viewport, contentNaturalHeight } = input;
+    const vw = Math.max(0, Number(viewport.width) || 0);
+    const vh = Math.max(0, Number(viewport.height) || 0);
+    const vRight = Math.max(0, videoRect.left + videoRect.width);
+    const videoWidth = Math.max(0, videoRect.width);
+    const videoHeight = Math.max(0, videoRect.height);
+    const availableRight = vw - vRight - limits.safeRight;
+    if (availableRight < limits.minWidth) {
+      return null;
+    }
+    let panelWidth = Math.min(videoWidth, availableRight);
+    if (panelWidth < limits.minWidth) {
+      panelWidth = Math.min(limits.minWidth, availableRight);
+      if (panelWidth < limits.minWidth) {
+        return null;
+      }
+    }
+    let baseSource = "video-fallback";
+    let baseHeight = videoHeight;
+    if (playerRowRect && Number.isFinite(playerRowRect.height) && playerRowRect.height >= limits.minHeight) {
+      baseHeight = playerRowRect.height;
+      baseSource = "player-rect";
+    }
+    const safetyMax = Math.max(
+      limits.minHeight,
+      Math.round(vh * limits.maxHeightRatio)
+    );
+    let panelHeight = Math.min(baseHeight, safetyMax);
+    let source = baseSource;
+    if (contentNaturalHeight != null && Number.isFinite(contentNaturalHeight)) {
+      const cnClamped = Math.max(limits.minHeight, contentNaturalHeight);
+      if (cnClamped < panelHeight) {
+        panelHeight = cnClamped;
+        source = "content-fit";
+      }
+    }
+    panelHeight = Math.max(limits.minHeight, Math.round(panelHeight));
+    return {
+      panelWidth: Math.round(panelWidth),
+      panelHeight,
+      source
+    };
+  }
+
   // src/lib/voiceComment.js
   var VOICE_COMMENT_MAX_CHARS = 250;
   function isVoiceCommentSupported() {
@@ -2409,9 +2573,19 @@
     const min = typeof deps.minSize === "number" ? deps.minSize : 120;
     return r.width >= min && r.height >= min;
   }
-  function shouldRespondFocusedNowFromToolbar(host) {
+  function shouldRespondFocusedNowFromToolbar(host, deps) {
     if (!host) return false;
-    return host.isConnected === true;
+    if (host.isConnected !== true) return false;
+    if (!deps || typeof deps.getComputedStyle !== "function") return true;
+    try {
+      const cs = deps.getComputedStyle(host);
+      if (!cs || typeof cs !== "object") return true;
+      if (cs.display === "none") return false;
+      if (cs.visibility === "hidden") return false;
+      return true;
+    } catch {
+      return true;
+    }
   }
 
   // src/lib/embeddedDataExtract.js
@@ -2704,6 +2878,29 @@
     await storage.set({
       [KEY_INLINE_PANEL_PLACEMENT]: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
       [KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED]: true
+    });
+    return { changed: true };
+  }
+
+  // src/lib/migrateInlinePanelBelowToDock.js
+  async function migrateBelowInlinePanelToDockOnce(storage) {
+    const bag = await storage.get([
+      KEY_INLINE_PANEL_PLACEMENT,
+      KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED
+    ]);
+    if (bag[KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED] === true) {
+      return { changed: false };
+    }
+    const p = String(bag[KEY_INLINE_PANEL_PLACEMENT] ?? "").trim().toLowerCase();
+    if (p !== INLINE_PANEL_PLACEMENT_BELOW) {
+      await storage.set({
+        [KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED]: true
+      });
+      return { changed: false };
+    }
+    await storage.set({
+      [KEY_INLINE_PANEL_PLACEMENT]: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
+      [KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED]: true
     });
     return { changed: true };
   }
@@ -3181,6 +3378,136 @@
       added += 1;
     }
     return added;
+  }
+
+  // src/lib/broadcasterUserId.js
+  var WATCH_USER_INFO_REF_RE = /[?&]ref=watch_user_information(?:&|$)/;
+  function asTrimmedString(v) {
+    if (v == null) return "";
+    return String(v).trim();
+  }
+  function isAllDigits(s) {
+    return s.length > 0 && /^\d+$/.test(s);
+  }
+  function pickUserIdFromUrl(url) {
+    if (!url) return "";
+    const m = url.match(/\/user\/(\d+)/);
+    return m ? m[1] : "";
+  }
+  function pickBestStreamLinkHref(candidates) {
+    const cleaned = [];
+    for (const c of candidates) {
+      const s = asTrimmedString(c);
+      if (s) cleaned.push(s);
+    }
+    if (cleaned.length === 0) return "";
+    for (const c of cleaned) {
+      if (WATCH_USER_INFO_REF_RE.test(c)) return c;
+    }
+    return cleaned[0];
+  }
+  function extractBroadcasterUserId(input) {
+    if (!input || typeof input !== "object") return "";
+    const ppid = asTrimmedString(input.embeddedSupplierProgramProviderId);
+    if (isAllDigits(ppid)) return ppid;
+    const sid = asTrimmedString(input.embeddedSupplierId);
+    if (isAllDigits(sid)) return sid;
+    const pageUrl = asTrimmedString(input.embeddedSupplierPageUrl);
+    const fromPageUrl = pickUserIdFromUrl(pageUrl);
+    if (fromPageUrl) return fromPageUrl;
+    let candidateList = (
+      /** @type {unknown[]} */
+      []
+    );
+    if (Array.isArray(input.streamLinkHrefCandidates)) {
+      candidateList = input.streamLinkHrefCandidates;
+    } else if (input.streamLinkHref != null) {
+      candidateList = [input.streamLinkHref];
+    }
+    const bestHref = pickBestStreamLinkHref(candidateList);
+    const fromStream = pickUserIdFromUrl(bestHref);
+    if (fromStream) return fromStream;
+    return "";
+  }
+
+  // src/lib/channelBroadcasterMeta.js
+  var NONE_RESULT = Object.freeze({
+    kind: (
+      /** @type {const} */
+      "none"
+    ),
+    name: "",
+    pageUrl: "",
+    iconUrl: ""
+  });
+  function asTrimmedString2(v) {
+    if (v == null) return "";
+    return String(v).trim();
+  }
+  function isHttpUrl(url) {
+    return /^https?:\/\//i.test(url);
+  }
+  function resolveChannelBroadcasterMeta(embeddedProps) {
+    if (!embeddedProps || typeof embeddedProps !== "object") {
+      return { ...NONE_RESULT };
+    }
+    const program = embeddedProps.program ?? null;
+    const supplier = program?.supplier ?? null;
+    const socialGroup = embeddedProps.socialGroup ?? null;
+    const supplierType = asTrimmedString2(supplier?.supplierType);
+    const providerType = asTrimmedString2(program?.providerType);
+    const sgType = asTrimmedString2(socialGroup?.type);
+    const isChannel = supplierType === "channel" || providerType === "channel" || sgType === "channel";
+    if (!isChannel) return { ...NONE_RESULT };
+    if (!socialGroup || typeof socialGroup !== "object") {
+      return { ...NONE_RESULT };
+    }
+    const name = asTrimmedString2(socialGroup.name);
+    if (!name) return { ...NONE_RESULT };
+    let pageUrl = asTrimmedString2(socialGroup.socialGroupPageUrl);
+    if (!isHttpUrl(pageUrl)) {
+      const sgId = asTrimmedString2(socialGroup.id);
+      if (/^ch\d+$/.test(sgId)) {
+        pageUrl = `https://ch.nicovideo.jp/channel/${sgId}`;
+      } else {
+        pageUrl = "";
+      }
+    }
+    let iconUrl = "";
+    for (const key of [
+      "thumbnailImageUrl",
+      "thumbnailSmallImageUrl",
+      "thumbnailUrl",
+      "thumbnailSmallUrl"
+    ]) {
+      const v = asTrimmedString2(socialGroup[key]);
+      if (isHttpUrl(v)) {
+        iconUrl = v;
+        break;
+      }
+    }
+    return { kind: "channel", name, pageUrl, iconUrl };
+  }
+
+  // src/lib/prewarmCoordinator.js
+  function decidePrewarmLeaseAction(input) {
+    const selfId = String(input.selfId || "").trim();
+    if (!selfId) return "defer";
+    const now = Number(input.now);
+    const leaseTimeoutMs = Number(input.leaseTimeoutMs ?? 1e4);
+    const holder = String(input.currentLeaseHolder ?? "").trim();
+    const heldAt = Number(input.currentLeaseAt ?? 0);
+    if (!holder) return "claim";
+    if (holder === selfId) return "proceed";
+    if (!Number.isFinite(heldAt) || heldAt <= 0) {
+      return "defer";
+    }
+    if (heldAt > now) return "defer";
+    const elapsed = now - heldAt;
+    if (elapsed > leaseTimeoutMs) {
+      return "claim";
+    }
+    return "defer";
   }
 
   // src/lib/commentPanelHealthProbe.js
@@ -4577,11 +4904,27 @@
     const viewport = nlsViewportSize();
     let vh = Number(viewport.innerHeight) || 0;
     if (vh < 280) vh = 720;
-    const maxDockH = watchDockPanelMaxHeightPx();
-    const iframeInnerH = Math.max(
-      200,
-      Math.min(maxDockH - 16, Math.round(vh * 0.5))
-    );
+    let playerRowBottom = null;
+    try {
+      const video = document.querySelector("video");
+      if (video instanceof HTMLVideoElement && video.getBoundingClientRect().height >= 100) {
+        const insertAfter = findFrameInsertAnchorFromVideo(video);
+        if (insertAfter instanceof HTMLElement) {
+          const playerRect = resolvePlayerRowRect(video, insertAfter);
+          if (playerRect && Number.isFinite(playerRect.top) && Number.isFinite(playerRect.height) && playerRect.height > 0) {
+            playerRowBottom = playerRect.top + playerRect.height;
+          }
+        }
+      }
+    } catch {
+    }
+    const sizing = calculateDockBottomPanelHeight({
+      viewportHeight: vh,
+      playerRowBottom,
+      contentNaturalHeight: null
+    });
+    const iframeInnerH = sizing.height;
+    const hostMaxH = iframeInnerH + 16;
     if (host.parentNode !== document.body) {
       document.body.appendChild(host);
     }
@@ -4592,7 +4935,7 @@
     host.style.top = "";
     host.style.width = "100%";
     host.style.maxWidth = "100%";
-    host.style.maxHeight = `${maxDockH}px`;
+    host.style.maxHeight = `${hostMaxH}px`;
     host.style.marginLeft = "0";
     host.style.overflow = "auto";
     host.style.overflowX = "hidden";
@@ -4610,15 +4953,51 @@
       iframe.style.height = `${iframeInnerH}px`;
       iframe.style.maxHeight = `${iframeInnerH}px`;
     }
+    ensureInlineHostReflowListener();
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
     host.style.opacity = "1";
     ensureInlinePanelCloseButton(host);
   }
+  var __inlineHostReflowListenerRegistered = false;
+  function ensureInlineHostReflowListener() {
+    if (__inlineHostReflowListenerRegistered) return;
+    __inlineHostReflowListenerRegistered = true;
+    let timer = null;
+    const reflow = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          const placement = getEffectiveInlinePanelPlacement();
+          if (placement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
+            renderInlinePanelDockBottomHost();
+          } else if (placement === INLINE_PANEL_PLACEMENT_BESIDE || placement === INLINE_PANEL_PLACEMENT_BELOW) {
+            const v = document.querySelector("video");
+            if (v instanceof HTMLVideoElement && v.getBoundingClientRect().height >= 100) {
+              renderInlineHostAnchoredToVideo(v);
+            }
+          }
+        } catch {
+        }
+      }, 150);
+    };
+    try {
+      window.addEventListener("resize", reflow, { passive: true });
+    } catch {
+    }
+  }
   function findFrameInsertAnchorFromVideo(base) {
     if (!(base instanceof HTMLElement)) return base;
-    const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const videoEl = base instanceof HTMLVideoElement ? base : base.querySelector?.("video");
+    const vr = (videoEl ?? base).getBoundingClientRect();
+    const videoRect = {
+      left: vr.left,
+      top: vr.top,
+      width: vr.width,
+      height: vr.height
+    };
     let best = null;
     let cur = base;
     for (let i = 0; i < 8 && cur; i++) {
@@ -4627,12 +5006,14 @@
         cur = cur.parentElement;
         continue;
       }
-      const rect = cur.getBoundingClientRect();
-      const area = rect.width * rect.height;
-      const aspect = rect.width / Math.max(rect.height, 1);
-      if (rect.width >= 260 && rect.height >= 140 && area <= viewportArea * 0.92 && aspect >= 1 && aspect <= 3.4) {
-        const score = area * (1.25 - Math.min(Math.abs(aspect - 1.78), 1.1) * 0.2);
-        if (!best || score > best.score) best = { el: cur, score };
+      const r = cur.getBoundingClientRect();
+      const result = scoreInlineHostAnchorCandidate({
+        rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+        viewport,
+        videoRect
+      });
+      if (result.eligible && (!best || result.score > best.score)) {
+        best = { el: cur, score: result.score };
       }
       cur = cur.parentElement;
     }
@@ -4811,12 +5192,45 @@
     let insertAfter;
     let hostParent;
     let besideFlexRowColumn = false;
+    let besideLayout = null;
     if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
       const col = findBesideFlexRowColumnInsertion(video);
       if (col?.hostParent && col.insertAfter) {
-        insertAfter = col.insertAfter;
-        hostParent = col.hostParent;
-        besideFlexRowColumn = true;
+        const vrCheck = video.getBoundingClientRect();
+        const playerRect = col.insertAfter instanceof HTMLElement ? resolvePlayerRowRect(video, col.insertAfter) : null;
+        const layoutCheck = calculateBesidePanelLayout({
+          videoRect: {
+            left: vrCheck.left,
+            top: vrCheck.top,
+            width: vrCheck.width,
+            height: vrCheck.height
+          },
+          playerRowRect: playerRect ? {
+            left: playerRect.left,
+            top: playerRect.top,
+            width: playerRect.width,
+            height: playerRect.height
+          } : null,
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
+          },
+          contentNaturalHeight: null
+        });
+        if (layoutCheck) {
+          insertAfter = col.insertAfter;
+          hostParent = col.hostParent;
+          besideFlexRowColumn = true;
+          besideLayout = layoutCheck;
+        } else {
+          const r = resolveInlinePanelInsertAnchor(
+            domAnchor,
+            INLINE_PANEL_PLACEMENT_BELOW
+          );
+          insertAfter = /** @type {HTMLElement} */
+          r.insertAfter;
+          hostParent = r.hostParent;
+        }
       } else {
         const r = resolveInlinePanelInsertAnchor(
           insertResolveAnchor,
@@ -4874,17 +5288,26 @@
     host.style.boxSizing = "border-box";
     host.style.marginLeft = hostAttachFallbackBody || besideFlexRowColumn ? "0" : `${marginLeftPx}px`;
     host.style.maxWidth = "100%";
-    host.style.width = hostAttachFallbackBody ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px` : `${panelWidthPx}px`;
+    const finalPanelWidthPx = besideLayout?.panelWidth ?? panelWidthPx;
+    host.style.width = hostAttachFallbackBody ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px` : `${finalPanelWidthPx}px`;
     const iframe = (
       /** @type {HTMLIFrameElement|null} */
       host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
     );
     if (iframe)
-      iframe.style.width = hostAttachFallbackBody ? host.style.width : `${panelWidthPx}px`;
+      iframe.style.width = hostAttachFallbackBody ? host.style.width : `${finalPanelWidthPx}px`;
+    if (besideLayout) {
+      host.style.maxHeight = `${besideLayout.panelHeight}px`;
+      if (iframe) {
+        iframe.style.height = `${besideLayout.panelHeight}px`;
+        iframe.style.maxHeight = `${besideLayout.panelHeight}px`;
+      }
+    }
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
     host.style.opacity = "1";
+    ensureInlineHostReflowListener();
   }
   function renderInlinePopupHost(target) {
     if (!(target instanceof HTMLElement)) return;
@@ -5011,7 +5434,12 @@
     if (!isNicoLiveWatchUrl(window.location.href)) return false;
     const host = nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
     if (!(host instanceof HTMLElement)) return false;
-    if (!shouldRespondFocusedNowFromToolbar(host)) return false;
+    if (!shouldRespondFocusedNowFromToolbar(host, {
+      getComputedStyle: (el) => window.getComputedStyle(
+        /** @type {Element} */
+        el
+      )
+    })) return false;
     void (async () => {
       try {
         const ready = await pollUntil(
@@ -5096,7 +5524,8 @@
       exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
       frame: {
         isTop,
-        href: href.slice(0, 500),
+        // 0.1.45 (AA): query/fragment は strip して個人情報漏れを防ぐ
+        href: sanitizeWatchUrlForDiag(href),
         userAgent: String(navigator.userAgent || "").slice(0, 280)
       },
       contentScript: {
@@ -5142,6 +5571,16 @@
       }
     };
   }
+  function sanitizeWatchUrlForDiag(rawHref) {
+    const s = String(rawHref || "");
+    if (!s) return "";
+    try {
+      const u = new URL(s);
+      return `${u.origin}${u.pathname}`.slice(0, 500);
+    } catch {
+      return s.split("?")[0].split("#")[0].slice(0, 500);
+    }
+  }
   function persistAiShareFastDiagnostics() {
     if (!hasExtensionContext()) return;
     const now = Date.now();
@@ -5152,7 +5591,7 @@
         popup: null,
         content: buildAiShareFastDiagnosticsPayload(),
         note: "Chrome \u30B3\u30F3\u30BD\u30FC\u30EB\u306E ERR_BLOCKED_BY_CLIENT / \u5E83\u544A\u30B9\u30AF\u30EA\u30D7\u30C8\u5931\u6557\u306F\u30D6\u30ED\u30C3\u30AB\u30FC\u7531\u6765\u3067\u591A\u304F\u3001\u672C\u62E1\u5F35\u3068\u306F\u7121\u95A2\u4FC2\u306A\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002",
-        resolvedTabUrl: String(window.location.href || "").slice(0, 500),
+        resolvedTabUrl: sanitizeWatchUrlForDiag(window.location.href),
         persistedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
       void chrome.storage.local.set({ [KEY_AI_SHARE_FAST_DIAG]: payload });
@@ -5181,12 +5620,6 @@
   var stableFrameTarget = null;
   function nlsViewportSize() {
     return { innerWidth: window.innerWidth, innerHeight: window.innerHeight };
-  }
-  function watchDockPanelMaxHeightPx() {
-    let ih = Number(nlsViewportSize().innerHeight) || 0;
-    if (ih < 280) ih = 720;
-    const capped = Math.min(Math.round(ih * 0.58), 720);
-    return Math.max(260, capped);
   }
   function syncWatchPageDockBodyReserve() {
     if (!isWatchInlinePanelTopFrame()) return;
@@ -5401,28 +5834,94 @@
       prewarmInlinePopupIframe();
     }, 800);
   }
+  var PREWARM_LEASE_KEY = "nls_prewarm_lease_v1";
+  var PREWARM_LEASE_TIMEOUT_MS = 1e4;
+  var PREWARM_LEASE_RETRY_MS = 1500;
+  var prewarmInstanceId = (() => {
+    try {
+      return `nlpw-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    } catch {
+      return `nlpw-fallback-${Date.now().toString(36)}`;
+    }
+  })();
+  async function tryAcquirePrewarmLease() {
+    try {
+      const bag = await chrome.storage.local.get(PREWARM_LEASE_KEY);
+      const cur = (
+        /** @type {{holder?: string, at?: number}|null} */
+        bag[PREWARM_LEASE_KEY] ?? null
+      );
+      const action = decidePrewarmLeaseAction({
+        currentLeaseHolder: cur?.holder,
+        currentLeaseAt: cur?.at,
+        selfId: prewarmInstanceId,
+        now: Date.now(),
+        leaseTimeoutMs: PREWARM_LEASE_TIMEOUT_MS
+      });
+      if (action === "proceed") return true;
+      if (action === "defer") return false;
+      await chrome.storage.local.set({
+        [PREWARM_LEASE_KEY]: { holder: prewarmInstanceId, at: Date.now() }
+      });
+      return true;
+    } catch {
+      return true;
+    }
+  }
+  async function releasePrewarmLeaseIfMine() {
+    try {
+      const bag = await chrome.storage.local.get(PREWARM_LEASE_KEY);
+      const cur = (
+        /** @type {{holder?: string}|null} */
+        bag[PREWARM_LEASE_KEY] ?? null
+      );
+      if (cur?.holder === prewarmInstanceId) {
+        await chrome.storage.local.set({
+          [PREWARM_LEASE_KEY]: { holder: "", at: 0 }
+        });
+      }
+    } catch {
+    }
+  }
   function prewarmInlinePopupIframe() {
     if (prewarmInlinePopupDone) return;
     if (!hasExtensionContext()) return;
     if (!isWatchInlinePanelTopFrame()) return;
     if (!isNicoLiveWatchUrl(window.location.href)) return;
-    try {
-      const host = ensureInlinePopupHost();
-      if (!(host instanceof HTMLElement)) return;
-      if (host.parentNode !== document.body) {
-        host.style.display = "none";
-        host.setAttribute("aria-hidden", "true");
-        host.style.position = "fixed";
-        host.style.top = "-99999px";
-        host.style.left = "-99999px";
-        host.style.width = "420px";
-        host.style.height = "600px";
-        host.style.pointerEvents = "none";
-        document.body.appendChild(host);
+    void (async () => {
+      const acquired = await tryAcquirePrewarmLease();
+      if (!acquired) {
+        if (!prewarmInlinePopupDone && !prewarmInlinePopupTimer) {
+          prewarmInlinePopupTimer = setTimeout(() => {
+            prewarmInlinePopupTimer = null;
+            prewarmInlinePopupIframe();
+          }, PREWARM_LEASE_RETRY_MS);
+        }
+        return;
       }
-      prewarmInlinePopupDone = true;
-    } catch {
-    }
+      try {
+        const host = ensureInlinePopupHost();
+        if (!(host instanceof HTMLElement)) {
+          await releasePrewarmLeaseIfMine();
+          return;
+        }
+        if (host.parentNode !== document.body) {
+          host.style.display = "none";
+          host.setAttribute("aria-hidden", "true");
+          host.style.position = "fixed";
+          host.style.top = "-99999px";
+          host.style.left = "-99999px";
+          host.style.width = "420px";
+          host.style.height = "600px";
+          host.style.pointerEvents = "none";
+          document.body.appendChild(host);
+        }
+        prewarmInlinePopupDone = true;
+      } catch {
+      } finally {
+        await releasePrewarmLeaseIfMine();
+      }
+    })();
   }
   function hasExtensionContext() {
     try {
@@ -5838,13 +6337,17 @@
     );
     const h1Text = clean(document.querySelector("h1")?.textContent || "");
     const broadcastTitle = titleFromMeta || h1Text || titleFromDocument;
-    const streamLink = Array.from(
+    const streamLinkAnchors = Array.from(
       document.querySelectorAll('a[href*="/user/"]')
-    ).find((a) => {
+    ).filter((a) => {
       const href = String(a.getAttribute("href") || "");
       const text = clean(a.textContent);
       return /\/user\/\d+/.test(href) && /\/live_programs(?:\?|$)/.test(href) && text && !/^https?:\/\//i.test(text);
     });
+    const streamLink = streamLinkAnchors[0];
+    const streamLinkHrefCandidates = streamLinkAnchors.map(
+      (a) => String(a.getAttribute("href") || "")
+    );
     const embeddedProps = (() => {
       try {
         return extractEmbeddedDataProps(document);
@@ -5852,8 +6355,9 @@
         return null;
       }
     })();
+    const channelMeta = resolveChannelBroadcasterMeta(embeddedProps);
     const broadcasterNameFromEmbedded = clean(
-      embeddedProps?.program?.supplier?.name ?? ""
+      channelMeta.kind === "channel" ? channelMeta.name : embeddedProps?.program?.supplier?.name ?? ""
     );
     const broadcasterNameFromMeta = clean(
       metaGet(metaMap, ["author", "twitter:creator", "profile:username"])
@@ -5863,24 +6367,24 @@
       document.querySelector('[class*="userName"], [class*="streamerName"]')?.textContent || ""
     );
     const broadcasterName = broadcasterNameFromEmbedded || broadcasterNameFromStreamLink || broadcasterNameFromMeta || broadcasterNameFromDomFallback;
-    const broadcasterUserId = (() => {
-      const href = String(streamLink?.getAttribute("href") || "");
-      const m = href.match(/\/user\/(\d+)/);
-      if (m) return m[1];
-      const supplierId = String(
-        embeddedProps?.program?.supplier?.programProviderId ?? embeddedProps?.program?.supplier?.id ?? ""
-      ).trim();
-      if (/^\d+$/.test(supplierId)) return supplierId;
-      const pageUrl = String(embeddedProps?.program?.supplier?.pageUrl ?? "");
-      const m2 = pageUrl.match(/\/user\/(\d+)/);
-      return m2 ? m2[1] : "";
-    })();
+    const broadcasterUserId = extractBroadcasterUserId({
+      embeddedSupplierProgramProviderId: embeddedProps?.program?.supplier?.programProviderId,
+      embeddedSupplierId: embeddedProps?.program?.supplier?.id,
+      embeddedSupplierPageUrl: embeddedProps?.program?.supplier?.pageUrl,
+      streamLinkHrefCandidates
+    });
     const broadcasterPageUrl = (() => {
+      if (channelMeta.kind === "channel" && channelMeta.pageUrl) {
+        return channelMeta.pageUrl;
+      }
       const raw = String(embeddedProps?.program?.supplier?.pageUrl ?? "").trim();
       if (/^https?:\/\//i.test(raw)) return raw;
       return "";
     })();
     const broadcasterIconUrl = (() => {
+      if (channelMeta.kind === "channel" && channelMeta.iconUrl) {
+        return channelMeta.iconUrl;
+      }
       const supplier = embeddedProps?.program?.supplier;
       const candidates = [];
       if (supplier && typeof supplier === "object") {
@@ -5898,7 +6402,12 @@
       }
       const sg = embeddedProps?.socialGroup;
       if (sg && typeof sg === "object") {
-        for (const key of ["thumbnailUrl", "thumbnailSmallUrl"]) {
+        for (const key of [
+          "thumbnailImageUrl",
+          "thumbnailSmallImageUrl",
+          "thumbnailUrl",
+          "thumbnailSmallUrl"
+        ]) {
           const v = (
             /** @type {Record<string, unknown>} */
             sg[key]
@@ -6302,7 +6811,8 @@
       exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
       frame: {
         isTop,
-        href: href.slice(0, 500),
+        // 0.1.45 (AA): query/fragment は strip して個人情報漏れを防ぐ
+        href: sanitizeWatchUrlForDiag(href),
         userAgent: String(navigator.userAgent || "").slice(0, 280)
       },
       contentScript: {
@@ -6350,209 +6860,218 @@
       }
     };
   }
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (!hasExtensionContext()) return;
-    if (!msg || typeof msg !== "object" || !("type" in msg)) return;
-    if (msg.type === "NLS_FOCUS_INLINE_PANEL") {
-      if (!isWatchInlinePanelTopFrame()) {
-        return false;
-      }
-      toolbarInitiatedShowThisSession = true;
-      try {
-        renderPageFrameOverlay();
-      } catch {
-      }
-      try {
-        if (deepHarvestTimer != null && deepHarvestQuietUi) {
-          ensureDeepHarvestLoadingUi();
+  var __NLS_MSG_LISTENER_BOUND_KEY__ = "__NLS_CONTENT_MSG_LISTENER_BOUND__";
+  var nlsContentMsgListenerHost = typeof globalThis !== "undefined" ? globalThis : window;
+  if (!/** @type {Record<string, unknown>} */
+  nlsContentMsgListenerHost[__NLS_MSG_LISTENER_BOUND_KEY__]) {
+    nlsContentMsgListenerHost[__NLS_MSG_LISTENER_BOUND_KEY__] = true;
+    bindContentScriptMessageListener();
+  }
+  function bindContentScriptMessageListener() {
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (!hasExtensionContext()) return;
+      if (!msg || typeof msg !== "object" || !("type" in msg)) return;
+      if (msg.type === "NLS_FOCUS_INLINE_PANEL") {
+        if (!isWatchInlinePanelTopFrame()) {
+          return false;
         }
-      } catch {
-      }
-      void (async () => {
-        let focused = false;
+        toolbarInitiatedShowThisSession = true;
         try {
-          focused = await focusInlinePanelHostFromToolbar();
+          renderPageFrameOverlay();
         } catch {
         }
         try {
-          sendResponse({ ok: true, focused });
+          if (deepHarvestTimer != null && deepHarvestQuietUi) {
+            ensureDeepHarvestLoadingUi();
+          }
         } catch {
         }
-      })();
-      return true;
-    }
-    if (msg.type === "NLS_CAPTURE_SCREENSHOT") {
-      if (!isWatchPageMainFrameForMessages()) return;
-      void (async () => {
-        try {
-          if (!isNicoLiveWatchUrl(window.location.href)) {
-            sendResponse({ ok: false, errorCode: "not_watch" });
-            return;
+        void (async () => {
+          let focused = false;
+          try {
+            focused = await focusInlinePanelHostFromToolbar();
+          } catch {
           }
-          const video = pickLargestVisibleVideo(document);
-          if (!video) {
-            sendResponse({ ok: false, errorCode: "no_video" });
-            return;
+          try {
+            sendResponse({ ok: true, focused });
+          } catch {
           }
-          const cap = await captureVideoToPngDataUrl(video);
-          if (cap.ok === false) {
-            sendResponse({ ok: false, errorCode: cap.errorCode });
-            return;
-          }
-          sendResponse({
-            ok: true,
-            mime: cap.mime,
-            dataUrl: cap.dataUrl,
-            liveId: liveId || ""
-          });
-        } catch {
-          sendResponse({ ok: false, errorCode: "capture_failed" });
-        }
-      })();
-      return true;
-    }
-    if (msg.type === "NLS_THUMB_STATS") {
-      if (!isWatchPageMainFrameForMessages()) return;
-      void (async () => {
-        try {
-          if (!liveId) {
-            sendResponse({ ok: true, count: 0 });
-            return;
-          }
-          const count = await countThumbsForLive(liveId);
-          sendResponse({ ok: true, count });
-        } catch {
-          sendResponse({ ok: false, count: 0 });
-        }
-      })();
-      return true;
-    }
-    if (msg.type === "NLS_POST_COMMENT") {
-      if (!canPostCommentInThisFrame()) {
-        sendResponse({
-          ok: false,
-          error: "\u3053\u306E\u30D5\u30EC\u30FC\u30E0\u306B\u306F\u30B3\u30E1\u30F3\u30C8\u6B04\u304C\u3042\u308A\u307E\u305B\u3093\u3002"
-        });
+        })();
         return true;
       }
-      const text = "text" in msg ? String(
-        /** @type {{ text?: unknown }} */
-        msg.text || ""
-      ) : "";
-      void postCommentFromContentAsync(text).then((result) => sendResponse(result)).catch(
-        (err) => sendResponse({
-          ok: false,
-          error: err && typeof err === "object" && "message" in err ? String(
-            /** @type {{ message?: unknown }} */
-            err.message || "post_failed"
-          ) : "post_failed"
-        })
-      );
-      return true;
-    }
-    if (msg.type === "NLS_EXPORT_WATCH_SNAPSHOT") {
-      if (!canExportWatchSnapshotFromThisFrame()) {
-        sendResponse({
-          ok: false,
-          error: "watch\u30DA\u30FC\u30B8\u4EE5\u5916\u3067\u306F\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093"
-        });
-        return;
-      }
-      syncLiveIdFromLocation();
-      try {
-        sendResponse({
-          ok: true,
-          snapshot: collectWatchPageSnapshot()
-        });
-      } catch (err) {
-        sendResponse({
-          ok: false,
-          error: err && typeof err === "object" && "message" in err ? String(
-            /** @type {{ message?: unknown }} */
-            err.message || "snapshot_error"
-          ) : "snapshot_error"
-        });
-      }
-    }
-    if (msg.type === "NLS_EXPORT_INTERCEPT_CACHE") {
-      if (!canExportWatchSnapshotFromThisFrame()) {
-        sendResponse({
-          ok: false,
-          error: "watch\u30DA\u30FC\u30B8\u4EE5\u5916\u3067\u306F\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093"
-        });
-        return;
-      }
-      void (async () => {
-        try {
-          const deep = !!(msg && typeof msg === "object" && "deep" in msg && /** @type {{ deep?: unknown }} */
-          msg.deep);
-          const deepPlan = planDeepExportSweep({
-            deep,
-            ndgrLastReceivedAt,
-            now: Date.now(),
-            thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
-          });
-          if (deepPlan.shouldRunSweep && locationAllowsCommentRecording()) {
-            const rows = await harvestVirtualCommentList({
-              document,
-              extractCommentsFromNode,
-              waitMs: 42,
-              respectTyping: false,
-              quietScroll: deepPlan.quietScroll
-            });
-            for (const r of rows) {
-              const no = String(r?.commentNo || "").trim();
-              const uid = String(r?.userId || "").trim();
-              if (!no) continue;
-              const av = isHttpAvatarUrl(r?.avatarUrl) ? String(r.avatarUrl).trim() : "";
-              if (!uid && !av) continue;
-              const prev = interceptedUsers.get(no);
-              const name = String(prev?.name || "").trim();
-              const prevUid = String(prev?.uid || "").trim();
-              const prevAv = isHttpAvatarUrl(prev?.av) ? String(prev?.av || "").trim() : "";
-              interceptedUsers.set(no, {
-                ...uid || prevUid ? { uid: uid || prevUid } : {},
-                ...name ? { name } : {},
-                ...av || prevAv ? { av: av || prevAv } : {}
-              });
-              if (uid && av) interceptedAvatars.set(uid, av);
+      if (msg.type === "NLS_CAPTURE_SCREENSHOT") {
+        if (!isWatchPageMainFrameForMessages()) return;
+        void (async () => {
+          try {
+            if (!isNicoLiveWatchUrl(window.location.href)) {
+              sendResponse({ ok: false, errorCode: "not_watch" });
+              return;
             }
+            const video = pickLargestVisibleVideo(document);
+            if (!video) {
+              sendResponse({ ok: false, errorCode: "no_video" });
+              return;
+            }
+            const cap = await captureVideoToPngDataUrl(video);
+            if (cap.ok === false) {
+              sendResponse({ ok: false, errorCode: cap.errorCode });
+              return;
+            }
+            sendResponse({
+              ok: true,
+              mime: cap.mime,
+              dataUrl: cap.dataUrl,
+              liveId: liveId || ""
+            });
+          } catch {
+            sendResponse({ ok: false, errorCode: "capture_failed" });
           }
-          sendResponse({ ok: true, items: buildInterceptCacheExportItems() });
-        } catch (err) {
-          const msg2 = err && typeof err === "object" && "message" in err ? String(
-            /** @type {{ message?: unknown }} */
-            err.message || "intercept_export_error"
-          ) : "intercept_export_error";
+        })();
+        return true;
+      }
+      if (msg.type === "NLS_THUMB_STATS") {
+        if (!isWatchPageMainFrameForMessages()) return;
+        void (async () => {
+          try {
+            if (!liveId) {
+              sendResponse({ ok: true, count: 0 });
+              return;
+            }
+            const count = await countThumbsForLive(liveId);
+            sendResponse({ ok: true, count });
+          } catch {
+            sendResponse({ ok: false, count: 0 });
+          }
+        })();
+        return true;
+      }
+      if (msg.type === "NLS_POST_COMMENT") {
+        if (!canPostCommentInThisFrame()) {
           sendResponse({
             ok: false,
-            error: msg2.length > 220 ? `${msg2.slice(0, 220)}\u2026` : msg2
+            error: "\u3053\u306E\u30D5\u30EC\u30FC\u30E0\u306B\u306F\u30B3\u30E1\u30F3\u30C8\u6B04\u304C\u3042\u308A\u307E\u305B\u3093\u3002"
+          });
+          return true;
+        }
+        const text = "text" in msg ? String(
+          /** @type {{ text?: unknown }} */
+          msg.text || ""
+        ) : "";
+        void postCommentFromContentAsync(text).then((result) => sendResponse(result)).catch(
+          (err) => sendResponse({
+            ok: false,
+            error: err && typeof err === "object" && "message" in err ? String(
+              /** @type {{ message?: unknown }} */
+              err.message || "post_failed"
+            ) : "post_failed"
+          })
+        );
+        return true;
+      }
+      if (msg.type === "NLS_EXPORT_WATCH_SNAPSHOT") {
+        if (!canExportWatchSnapshotFromThisFrame()) {
+          sendResponse({
+            ok: false,
+            error: "watch\u30DA\u30FC\u30B8\u4EE5\u5916\u3067\u306F\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093"
+          });
+          return;
+        }
+        syncLiveIdFromLocation();
+        try {
+          sendResponse({
+            ok: true,
+            snapshot: collectWatchPageSnapshot()
+          });
+        } catch (err) {
+          sendResponse({
+            ok: false,
+            error: err && typeof err === "object" && "message" in err ? String(
+              /** @type {{ message?: unknown }} */
+              err.message || "snapshot_error"
+            ) : "snapshot_error"
           });
         }
-      })();
-      return true;
-    }
-    if (msg.type === "NLS_AI_SHARE_PAGE_DIAGNOSTICS") {
-      try {
-        persistAiShareFastDiagnostics();
-        sendResponse({
-          ok: true,
-          diagnostics: buildAiSharePageDiagnostics()
-        });
-      } catch (err) {
-        sendResponse({
-          ok: false,
-          error: String(
-            err && typeof err === "object" && "message" in err ? (
-              /** @type {{ message?: unknown }} */
-              err.message
-            ) : err || "diag_failed"
-          )
-        });
       }
-      return true;
-    }
-  });
+      if (msg.type === "NLS_EXPORT_INTERCEPT_CACHE") {
+        if (!canExportWatchSnapshotFromThisFrame()) {
+          sendResponse({
+            ok: false,
+            error: "watch\u30DA\u30FC\u30B8\u4EE5\u5916\u3067\u306F\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093"
+          });
+          return;
+        }
+        void (async () => {
+          try {
+            const deep = !!(msg && typeof msg === "object" && "deep" in msg && /** @type {{ deep?: unknown }} */
+            msg.deep);
+            const deepPlan = planDeepExportSweep({
+              deep,
+              ndgrLastReceivedAt,
+              now: Date.now(),
+              thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
+            });
+            if (deepPlan.shouldRunSweep && locationAllowsCommentRecording()) {
+              const rows = await harvestVirtualCommentList({
+                document,
+                extractCommentsFromNode,
+                waitMs: 42,
+                respectTyping: false,
+                quietScroll: deepPlan.quietScroll
+              });
+              for (const r of rows) {
+                const no = String(r?.commentNo || "").trim();
+                const uid = String(r?.userId || "").trim();
+                if (!no) continue;
+                const av = isHttpAvatarUrl(r?.avatarUrl) ? String(r.avatarUrl).trim() : "";
+                if (!uid && !av) continue;
+                const prev = interceptedUsers.get(no);
+                const name = String(prev?.name || "").trim();
+                const prevUid = String(prev?.uid || "").trim();
+                const prevAv = isHttpAvatarUrl(prev?.av) ? String(prev?.av || "").trim() : "";
+                interceptedUsers.set(no, {
+                  ...uid || prevUid ? { uid: uid || prevUid } : {},
+                  ...name ? { name } : {},
+                  ...av || prevAv ? { av: av || prevAv } : {}
+                });
+                if (uid && av) interceptedAvatars.set(uid, av);
+              }
+            }
+            sendResponse({ ok: true, items: buildInterceptCacheExportItems() });
+          } catch (err) {
+            const msg2 = err && typeof err === "object" && "message" in err ? String(
+              /** @type {{ message?: unknown }} */
+              err.message || "intercept_export_error"
+            ) : "intercept_export_error";
+            sendResponse({
+              ok: false,
+              error: msg2.length > 220 ? `${msg2.slice(0, 220)}\u2026` : msg2
+            });
+          }
+        })();
+        return true;
+      }
+      if (msg.type === "NLS_AI_SHARE_PAGE_DIAGNOSTICS") {
+        try {
+          persistAiShareFastDiagnostics();
+          sendResponse({
+            ok: true,
+            diagnostics: buildAiSharePageDiagnostics()
+          });
+        } catch (err) {
+          sendResponse({
+            ok: false,
+            error: String(
+              err && typeof err === "object" && "message" in err ? (
+                /** @type {{ message?: unknown }} */
+                err.message
+              ) : err || "diag_failed"
+            )
+          });
+        }
+        return true;
+      }
+    });
+  }
   function rememberWatchPageUrl() {
     if (!hasExtensionContext()) return;
     if (!isNicoLiveWatchUrl(window.location.href)) return;
@@ -6630,16 +7149,29 @@
       return broadcasterUidCache;
     }
     const clean = (v) => String(v || "").replace(/\s+/g, " ").trim();
-    const streamLink = Array.from(
+    const streamLinkAnchors = Array.from(
       document.querySelectorAll('a[href*="/user/"]')
-    ).find((a) => {
-      const href2 = String(a.getAttribute("href") || "");
+    ).filter((a) => {
+      const href = String(a.getAttribute("href") || "");
       const text = clean(a.textContent);
-      return /\/user\/\d+/.test(href2) && /\/live_programs(?:\?|$)/.test(href2) && text && !/^https?:\/\//i.test(text);
+      return /\/user\/\d+/.test(href) && /\/live_programs(?:\?|$)/.test(href) && text && !/^https?:\/\//i.test(text);
     });
-    const href = String(streamLink?.getAttribute("href") || "");
-    const m = href.match(/\/user\/(\d+)/);
-    broadcasterUidCache = m ? m[1] : "";
+    const streamLinkHrefCandidates = streamLinkAnchors.map(
+      (a) => String(a.getAttribute("href") || "")
+    );
+    let embeddedSupplier = null;
+    try {
+      const props = extractEmbeddedDataProps(document);
+      embeddedSupplier = props?.program?.supplier ?? null;
+    } catch {
+      embeddedSupplier = null;
+    }
+    broadcasterUidCache = extractBroadcasterUserId({
+      embeddedSupplierProgramProviderId: embeddedSupplier?.programProviderId,
+      embeddedSupplierId: embeddedSupplier?.id,
+      embeddedSupplierPageUrl: embeddedSupplier?.pageUrl,
+      streamLinkHrefCandidates
+    });
     broadcasterUidCacheAt = now;
     return broadcasterUidCache;
   }
@@ -6917,21 +7449,24 @@
       const lastCommentAt = Math.max(0, Number(next[next.length - 1]?.capturedAt || 0));
       const rememberedWatchUrl = String(bag[KEY_LAST_WATCH_URL] || "").trim();
       const backupWatchUrl = isNicoLiveWatchUrl(window.location.href) ? String(window.location.href || "") : extractLiveIdFromUrl(rememberedWatchUrl) === liveId ? rememberedWatchUrl : `https://live.nicovideo.jp/watch/${liveId}`;
-      const autoBackupState = normalizeAutoBackupState(bag[KEY_AUTO_BACKUP_STATE]);
-      const prevBackupMeta = autoBackupState.lives[String(liveId || "").trim().toLowerCase()] || {
+      const lidLowerForBackup = String(liveId || "").trim().toLowerCase();
+      const freshBackupBag = await chrome.storage.local.get(KEY_AUTO_BACKUP_STATE);
+      const autoBackupState = normalizeAutoBackupState(freshBackupBag[KEY_AUTO_BACKUP_STATE]);
+      const freshLiveMeta = autoBackupState.lives[lidLowerForBackup] || {
         lastBackupAt: 0,
         lastBackedUpdatedAt: 0,
         lastBackupCount: 0
       };
-      autoBackupState.lives[String(liveId || "").trim().toLowerCase()] = {
-        liveId: String(liveId || "").trim().toLowerCase(),
+      autoBackupState.lives[lidLowerForBackup] = {
+        liveId: lidLowerForBackup,
         commentCount: next.length,
         updatedAt,
         lastCommentAt,
         watchUrl: backupWatchUrl,
-        lastBackupAt: Math.max(0, Number(prevBackupMeta.lastBackupAt) || 0),
-        lastBackedUpdatedAt: Math.max(0, Number(prevBackupMeta.lastBackedUpdatedAt) || 0),
-        lastBackupCount: Math.max(0, Number(prevBackupMeta.lastBackupCount) || 0)
+        // background SW 所有: fresh 値をそのまま使う（content では更新しない）
+        lastBackupAt: Math.max(0, Number(freshLiveMeta.lastBackupAt) || 0),
+        lastBackedUpdatedAt: Math.max(0, Number(freshLiveMeta.lastBackedUpdatedAt) || 0),
+        lastBackupCount: Math.max(0, Number(freshLiveMeta.lastBackupCount) || 0)
       };
       pruneAutoBackupLives(autoBackupState);
       if (storageTouched || pendingTouched) {
@@ -7301,12 +7836,21 @@
     if (harvestRunning || !recording || !liveId || !locationAllowsCommentRecording()) {
       return;
     }
-    if (!opts.force && shouldSkipDeepHarvest({
-      ndgrLastReceivedAt,
-      now: Date.now(),
-      thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
-    })) {
-      return;
+    if (!opts.force) {
+      const nowMs = Date.now();
+      const ndgrSkip = shouldSkipDeepHarvest({
+        ndgrLastReceivedAt,
+        now: nowMs,
+        thresholdMs: HARVEST_TIMING.ndgrActiveThresholdMs
+      });
+      const needsRecovery = shouldForceDeepHarvestRecovery({
+        lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
+        now: nowMs,
+        recoveryMs: HARVEST_TIMING.deepRecoveryMs
+      });
+      if (ndgrSkip && !needsRecovery) {
+        return;
+      }
     }
     harvestRunning = true;
     try {
@@ -7640,6 +8184,10 @@
         get: (keys) => chrome.storage.local.get(keys),
         set: (obj) => chrome.storage.local.set(obj)
       }).catch(() => ({ changed: false }));
+      await migrateBelowInlinePanelToDockOnce({
+        get: (keys) => chrome.storage.local.get(keys),
+        set: (obj) => chrome.storage.local.set(obj)
+      }).catch(() => ({ changed: false }));
       await loadPageFrameSettings().catch(() => {
       });
       if (isNicoLiveWatchUrl(window.location.href)) {
@@ -7818,6 +8366,13 @@
         } catch {
         }
         thumbTimerId = null;
+      }
+      if (pageFrameLoopTimer != null) {
+        try {
+          clearInterval(pageFrameLoopTimer);
+        } catch {
+        }
+        pageFrameLoopTimer = null;
       }
       return true;
     };

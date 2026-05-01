@@ -41,18 +41,25 @@ describe('buildConcurrentTimelineSeries', () => {
     expect(r.source).toBe('estimated');
   });
 
-  it('混在: official が部分的にだけある場合は official のあるサンプルだけ使う（estimated は混ぜない）', () => {
+  /*
+   * 0.1.47 (AC): hybrid モードに変更。
+   *   旧仕様は「official が 1 件以上あれば全 official、無ければ全 estimated」
+   *   の二者択一だったが、official が稀にしか取れない放送で 90% の estimated
+   *   行が捨てられてグラフがほぼ空になる問題があった。新仕様は per-row で
+   *   official 優先 → 無ければ estimated に fallback、source=`mixed`。
+   */
+  it('混在: official が部分的にだけある場合は per-row で official 優先 → 無ければ estimated にフォールバック（hybrid）', () => {
     const rows = [
       row(0, { official: 100 }),
       row(1, { official: null, estimated: 40 }),
       row(2, { official: 220 })
     ];
     const r = buildConcurrentTimelineSeries(rows);
-    // official が 1 件以上あるので source=official、estimated 行は捨てる
-    expect(r.source).toBe('official');
-    expect(r.points.length).toBe(2);
-    expect(r.points[0].value).toBe(100);
-    expect(r.points[1].value).toBe(220);
+    expect(r.source).toBe('mixed');
+    expect(r.points.length).toBe(3);
+    expect(r.points[0].value).toBe(100);  // official
+    expect(r.points[1].value).toBe(40);   // estimated fallback
+    expect(r.points[2].value).toBe(220);  // official
   });
 
   it('時系列ソート: 順不同入力でも capturedAt 昇順で並ぶ', () => {

@@ -35,7 +35,7 @@
  *   maxValue: number,
  *   firstAt: number|null,
  *   lastAt: number|null,
- *   source: 'official' | 'estimated' | 'none'
+ *   source: 'official' | 'estimated' | 'mixed' | 'none'
  * }} ConcurrentTimelineSeries
  */
 
@@ -57,37 +57,50 @@ export function buildConcurrentTimelineSeries(rows) {
     return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: 'none' };
   }
 
-  // どちらの source を使うか決める：official が 1 件以上 あれば official、
-  // 全部 null なら estimated にフォールバック。
-  let hasOfficial = false;
-  let hasEstimated = false;
-  for (const r of list) {
-    if (!r || typeof r !== 'object') continue;
-    if (typeof r.capturedAt !== 'number' || !Number.isFinite(r.capturedAt)) continue;
-    if (isFiniteNonNegative(r.officialViewerCount)) hasOfficial = true;
-    if (isFiniteNonNegative(r.peakConcurrentEstimate)) hasEstimated = true;
-  }
-  /** @type {'official' | 'estimated' | 'none'} */
-  const source = hasOfficial ? 'official' : hasEstimated ? 'estimated' : 'none';
-  if (source === 'none') {
-    return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: 'none' };
-  }
-
-  // 該当 source の値だけを集め、capturedAt 昇順にする（破壊しないようコピー）。
+  /*
+   * 0.1.47 (AC): hybrid モードに変更。
+   *   旧コードは「official が 1 件以上あれば全 official、無ければ全 estimated」の
+   *   二者択一だった。ところが配信中に official が 1 件でも入った瞬間 source は
+   *   official になり、official が無い 90% の estimated 行がすべて捨てられる。
+   *   結果「2 サンプルしかない」グラフになり sectionConcurrentTimeline が
+   *   `series.points.length < 2` で空表示になっていた。
+   *   新方針: 各行で official 優先 → 無ければ estimated に fallback。
+   *   集約 source は all-official / all-estimated / 混在で `mixed` を返す。
+   */
+  let officialCount = 0;
+  let estimatedCount = 0;
+  /** @type {{ at: number, value: number, kind: 'official'|'estimated' }[]} */
   const collected = [];
   for (const r of list) {
     if (!r || typeof r !== 'object') continue;
     if (typeof r.capturedAt !== 'number' || !Number.isFinite(r.capturedAt)) continue;
-    const v =
-      source === 'official' ? r.officialViewerCount : r.peakConcurrentEstimate;
-    if (!isFiniteNonNegative(v)) continue;
-    collected.push({ at: r.capturedAt, value: v });
+    if (isFiniteNonNegative(r.officialViewerCount)) {
+      collected.push({
+        at: r.capturedAt,
+        value: /** @type {number} */ (r.officialViewerCount),
+        kind: 'official'
+      });
+      officialCount += 1;
+    } else if (isFiniteNonNegative(r.peakConcurrentEstimate)) {
+      collected.push({
+        at: r.capturedAt,
+        value: /** @type {number} */ (r.peakConcurrentEstimate),
+        kind: 'estimated'
+      });
+      estimatedCount += 1;
+    }
+  }
+  if (!collected.length) {
+    return { points: [], maxValue: 0, firstAt: null, lastAt: null, source: 'none' };
   }
   collected.sort((a, b) => a.at - b.at);
-
-  if (!collected.length) {
-    return { points: [], maxValue: 0, firstAt: null, lastAt: null, source };
-  }
+  /** @type {'official' | 'estimated' | 'mixed' | 'none'} */
+  const source =
+    officialCount > 0 && estimatedCount > 0
+      ? 'mixed'
+      : officialCount > 0
+        ? 'official'
+        : 'estimated';
 
   const firstAt = collected[0].at;
   const lastAt = collected[collected.length - 1].at;

@@ -197,7 +197,803 @@ build/                 ← **.gitignore 対象**。CWS 提出用 ZIP + 生成ア
 
 ---
 
-## 5-旧. 直近セッションで入った変更（2026-04-30）
+## 5. 直近セッションで入った変更（2026-04-30）
+
+**0.1.75 バンプで入った修正（body の viewport クランプで大画面の右側 clip 修正 BE）**:
+
+- ユーザー報告（0.1.74 リリース後、3 画面サイズスクショ）: 「バージョンかわったけど
+  よくなったけど全部の画面サイズに最適化がまだかも」
+  - 中・小画面（~1000px 級ディスプレイ）: 0.1.74 で OK。3 cards が水平に揃う。
+  - 大画面（1920+ 級ディスプレイ）の左寄せ popup: stat cards の右端（来場者数 card）が
+    clip 気味。0.1.74 の `margin-inline:auto` だけでは body が viewport より広い
+    ケースを救えていなかった。
+- 原因:
+  - `--nl-pop-width` は `popup-entry.js` で `screen.availWidth * 0.265` から計算され、
+    1920 ディスプレイでは 508px、2560+ では 520px に達する（[popup-entry.js:411-415]）。
+  - 一方 popup window は `chrome.windows.update` で `POPUP_WINDOW_WIDTH = 420` 固定
+    ([popupWindowEmptyHeight.js:23])。結果 body の宣言値 (508) > popup window inner
+    width (420) となり、body が右にはみ出して `overflow: hidden` で clip。
+  - 0.1.74 で html 側は `max-width: 100vw` を追加していたが、body 側にも同じ
+    クランプが必要だった（盲点）。
+- 修正（CSS のみ・1 行追加）:
+  - `extension/popup.html` の `html:not(.nl-inline) body` ルールに `max-width: 100vw`
+    を追加。body の宣言値が viewport を超えても 100vw でキャップされる。
+- 期待結果:
+  - 大画面 popup（forced 420px）でも body 全幅が 420px に収まり、3 stat cards
+    全部見える状態。
+  - 小画面（~1366）と中画面（~1600）では従来通り（body 幅 = nl-pop-width < viewport）。
+  - ユーザー手動リサイズで window が広がるケースは 0.1.74 の中央寄せが引き続き効く。
+- 残課題: そもそも `--nl-pop-width` を `window.innerWidth` に追従させる JS 側の改修も
+  検討余地あり（screen 由来 → window 由来）。今回は CSS only の最小修正に留めた。
+  0.1.76 以降の候補。
+
+**0.1.74 バンプで入った修正（empty state で popup window が広い時の右側余白 + 中央寄せ BD）**:
+
+- ユーザー報告（0.1.73 リリース後、empty state スクショ 3 枚）:
+  「右に余計な空白がいつもあるし、もっと中央にきてもいい」
+  - スクショ 1（Google homepage を背景にした popup window）: popup window が
+    手動リサイズで ~600px に広がっており、内部 body の右側に大きな余白が見える。
+  - スクショ 2/3（chrome://extensions を背景にした popup window）: popup window
+    が ~420px のとき余白なし（症状は出ていない）。
+- 原因:
+  - `html { width: var(--nl-pop-width); max-width: 540px; }` により html は
+    420〜540px に固定されているが、popup window 自体はユーザーが手動で広げると
+    その値を超えるサイズになる。
+  - 結果 html が popup window より狭くなり、popup window 左端から html / body
+    が始まる構造のため、html の右側に空白だけが残る（左寄せで余白が右だけに出る）。
+  - body 側で `--nl-pop-width` を `window.innerWidth` に追従させていない
+    （[popup-entry.js:411-415] で `sw * 0.265` 由来 → screen size から決定）ので、
+    手動リサイズには反応しない。
+- 修正（CSS のみ・JS 不要）:
+  - `extension/popup.html` の `html:not(.nl-inline)` ルールに以下を追加:
+    ```css
+    html:not(.nl-inline) {
+      width: max(var(--nl-pop-width, 420px), 100vw);
+      max-width: 100vw;
+      /* 既存の height ルールはそのまま */
+    }
+    html:not(.nl-inline) body {
+      margin-left: auto;
+      margin-right: auto;
+      /* 既存の height ルールはそのまま */
+    }
+    ```
+  - html を viewport 幅まで広げ、body は基底ルールの `--nl-pop-width` を維持して
+    `margin-inline:auto` で水平中央に寄せる。これにより手動リサイズで生じた
+    余白が左右に均等に分散する（中央寄せ）。
+- action popup（Chrome が body 幅にリサイズ）の場合: viewport == body 幅なので
+  `100vw == --nl-pop-width` で `max(--nl-pop-width, 100vw) == --nl-pop-width`、
+  margin auto は左右 0 になり実質変化なし。既存の見た目は完全に維持される。
+- 副作用想定:
+  - active watch（empty state 以外）でも同条件なら中央寄せが効くが、active watch
+    はユーザーが手動リサイズしないユースケースが大半なので影響軽微。万一気になる
+    場合は `:not(.nl-empty-state)` で empty state 専用に絞るオプションあり。
+- 残課題: 手動リサイズの場合のみで発動する性質上、Playwright での自動検証は
+  `chrome.windows.update` で width を意図的に広げてからのスクショ比較が必要。
+  0.1.75 以降の候補。
+
+**0.1.73 バンプで入った修正（empty state では body cap 解除 + primary.scrollHeight 実測 BC）**:
+
+- ユーザー報告（0.1.72 リリース後、5 枚スクショで複数画面サイズ検証）:
+  「ファーストビューに全部おさまっていない 枠から飛び出している」
+- 原因（Playwright で実測して特定）:
+  - `html:not(.nl-inline) { height: min(...,580px); max-height: ... }` の **body cap 580px**
+    が popup mode で常時かかっており、body 内に content が 622px ある場合、
+    最後の 42px が `.nl-main` の `overflow-y: auto` で内部 scroll になっていた。
+  - 0.1.72 で popup outer = 600 にしたが、popup window inner ≈ 560 < html cap 580 となり、
+    今度は popup window 自身に外側の scrollbar が出るパターンも発生。
+  - `body.scrollHeight` を測ると body cap で 580 までしか返らないため、measurement 駆動
+    したい場合は **`nlPopupPrimary.scrollHeight` (= 617)** を使う必要があった。
+- 修正（2 段階）:
+  - **CSS** (`extension/popup.html`): empty state のときだけ html / body の height cap を
+    解除し、`.nl-main` の overflow も visible に切り替え:
+    ```css
+    html.nl-empty-state:not(.nl-inline) { height: auto !important; max-height: none !important; }
+    html.nl-empty-state:not(.nl-inline) body { height: auto !important; max-height: none !important; overflow: visible !important; }
+    html.nl-empty-state:not(.nl-inline) body .nl-main { flex: 0 0 auto; overflow-y: visible; }
+    ```
+    これにより body / .nl-main は content に沿って伸び、内部 scrollbar が消える。
+  - **JS** (`src/extension/popup-entry.js`): measurement を `body.scrollHeight` から
+    `nlPopupPrimary.scrollHeight` に切替。`primary.scrollHeight + 40` を viewportHint で渡す。
+- 効果（Playwright で実測）:
+  - empty + no-history: popup outer = **657** (= primary 617 + chrome 40)
+  - bodyScrollHeight = 632 (cap 解除されて content に合う)
+  - 内部スクロールバーなし、外側スクロールバーなし
+  - スクショ（`test-results/popup-empty-state-no-history.png`）で
+    全 content が一画面に収まることを確認
+- Playwright spec 強化: 「popup outer ≒ primary.scrollHeight + 40 に収まる」assertion 追加。
+  「body.scrollHeight ≥ 580」で cap 解除が効いていることも assertion。
+- 残課題: history-あり ケースの Playwright テストはまだ未追加（IDB 事前データ挿入が必要）。
+  0.1.74 以降の候補。
+
+**0.1.72 バンプで入った修正（popup window 実測 resize の不具合修正 + Playwright 検証 BB）**:
+
+- ユーザー報告（0.1.71 リリース後、スクショ 2 枚）: 「なんかよいかんじではないです
+  プレイライトつかいながら最適化がいいかも」
+  - スクショ 1（小型 PC）: popup 高さ ~600 で 詳細設定 直下が空
+  - スクショ 2（大型 PC）: popup 高さ ~960 で 更新履歴 / 拡張について まで見える
+    が popup 自体が縦に長すぎる
+- 原因: 0.1.71 の `body.scrollHeight` 実測は **changelog / concept / frame /
+  powered-by など empty state でも可視のセクション全部を含む全コンテンツ高さ
+  （~820px）** を返していた。これに OS chrome 余裕 40px 足して `chrome.windows.update`
+  を呼ぶと popup outer = 860+ になり、画面によっては 960+ まで膨張する事故が発生。
+- 修正: 実測パスを撤去し、fixed preset のみを使う。
+  - empty + history: 660 → **620**（CSS body cap 580 + chrome 40 でぴったり）
+  - empty + no-history: 550 → **600**（content ~530 がほぼスクロールなしで収まる）
+  - active watch: 780（不変）
+- Playwright 検証 (`tests/e2e/popup-empty-state-window-height.spec.js`):
+  - SW 経由で `chrome.windows.create({type:'popup', height:780})` で popup 起動
+  - 利用条件 gate / refresh / resize 完了を待ったあと
+    `chrome.windows.getAll` で popup の現在サイズを取得
+  - 実機実測: **width=420, height=600, type='popup'** を確認（fresh profile = no-history）
+  - 「780 のまま resize されない退行」を弾く assertion 付き
+- 残課題: Playwright で history-あり ケースのテストはまだ追加していない
+  （IDB に事前データを挿入する fixture が必要）。0.1.73 以降の候補。
+
+**0.1.71 バンプで入った修正（empty state では popup window 高さを実測ベースで縮める BA）**:
+
+- ユーザー報告（0.1.70 リリース後）: 「下半分が真っ白で empty な空間になってる」
+  「画面の位置」を改善してほしい。0.1.70 で content は綺麗になったが、
+  popup window が **780px 固定**（0.1.58 で強制リセット）のため、empty state では
+  下に ~200px の白い空きスペースが残っていた。
+- 設計:
+  - 新 lib `src/lib/popupWindowEmptyHeight.js` に純粋関数 `computePopupWindowTargetHeight`
+    を実装。state（active / empty+history / empty+no-history）と viewportHint
+    （実測した content height）から target outer height を返す。
+    - active watch: 780px（既存）
+    - empty + history: 660px（preset、実測あれば content + 40px）
+    - empty + no-history: 550px（preset、実測あれば content + 40px）
+    - クランプ範囲 360〜1100px
+    - 単体テスト 12 ケース
+  - popup-entry.js に `resizePopupWindowForState({ emptyState, hasHistory })`
+    を追加。`chrome.windows.getCurrent` → `chrome.windows.update(id, { height })`。
+    - empty state のみ実測（`document.body.scrollHeight`）。
+      requestAnimationFrame を 1 段挟んでレイアウト確定後に測る。
+    - active watch は preset 直接（既存 780px の見た目維持）。
+    - 同じ state での連続呼出しは内部 state guard で no-op。
+    - INLINE_MODE / side panel / popup type≠'popup' は早期 return。
+  - 呼出し箇所:
+    - `applyLastBroadcastReviewToEmptyState` 各分岐（履歴あり / 履歴ゼロ / IDB なし / catch）
+    - `clearLastBroadcastReviewArtifacts`（active watch 復帰時に 780 へ戻す）
+- リスク・整合性:
+  - 0.1.58 で popup を毎回 close→create で 420×780 にリセットする運用は維持。
+    その後で 0.1.71 が state に応じて update 1 回かける形。チラつきは
+    requestAnimationFrame 1 段ぶんの ~16ms のみ。
+  - 0.1.66（feedback_inline_panel_beside_size_ok）の inline panel locked-in
+    baseline は INLINE_MODE 早期 return で確実に守る。
+  - permission 追加なし（chrome.windows は標準で popup から自身を update 可能）。
+- 検証: lint / typecheck / build green。tests 2113（追加 12 ケース）すべて pass。
+  プレビュー 420×620（empty+history 想定 inner）で content が viewport にぴったり、
+  下の白い空きスペースが消えることを確認。
+
+**0.1.70 バンプで入った修正（empty state の hide 範囲を「履歴あり」にも拡大 AZ）**:
+
+- ユーザー報告（0.1.69 リリース後、スクショ）: 「ひどいです もうなおらないのですかね」。
+  popup の下半分で **応援 hero（「（この配信は未取得）」）/ コメ送信欄 / 5分の応援増加
+  / 記録 0 件です / アイコン列・グリッド・診断 / 書き出しの詳細 / 詳しい状況** が
+  全部出たままで、「前回の配信」cards との文脈ちぐはぐが大きかった。
+- 原因: 0.1.69 (AY) は **履歴ゼロ** のときだけ `nl-empty-no-history` クラスで
+  hide 列挙していた。**履歴あり** empty では何も hide していなかったため、
+  active watch 用 UI（応援 hero / コメ送信欄 等）が全部表示されたまま。
+- 修正: empty state の hide を **2 段階** に分割。
+  - `nl-empty-state` (共通): 履歴あり/なしどちらでも常に hide する active watch 用 UI
+    （`.nl-stats` / `.nl-comment-compose` / `.nl-vdh-divider` /
+    `.nl-session-summary-panel` / `.nl-gift-quick-panel` / `.nl-record-nav-hint` /
+    `.nl-dev-monitor-details` / `#userRoomList` / `h2[data-nl-toolbar-only]` /
+    `.nl-anonymous-identicon-opt` / `.nl-anonymous-identicon-hint`）
+  - `nl-empty-no-history` (追加): 履歴ゼロのときに `.nl-live-stat-cards` /
+    `.nl-last-broadcast-indicator` / `.nl-last-broadcast-actions` も hide
+- popup-entry.js:
+  - `applyLastBroadcastReviewToEmptyState()` の冒頭で `nl-empty-state` を常に付ける
+  - `clearLastBroadcastReviewArtifacts()` で active watch に戻ったとき、
+    `nl-empty-state` も `nl-empty-no-history` も両方外す
+- 検証:
+  - lint / typecheck / build すべて green
+  - プレビュー 380px **履歴あり**: noWatchRankingHint + 「前回（08:37〜）」+
+    「もう一度開く」+ 3 cards (14/37/121) + 詳細設定 + 更新履歴 + 拡張について +
+    配色プリセット のみ。下半分の余分な UI は完全に消えた。
+  - プレビュー 380px **履歴ゼロ**: noWatchRankingHint + 詳細設定 + 更新履歴 +
+    拡張について + 配色プリセット のみ。0.1.69 と同じくらい綺麗。
+
+**0.1.69 バンプで入った修正（配信なし empty state を「前回の配信」cards で再現 + side panel ランキング導線復活 AY）**:
+
+- ユーザー報告（0.1.68 リリース後）: 「配信のときと同じ感じがいいと思うのですが
+  むずかしいのでしょうか？」スクショで、watch 中は cards に
+  記録 14 / 推定 ~37 / 来場者 121 が並ぶ live state と、配信なしで「（取得不可）」
+  プレースホルダが並ぶ empty state を比較。「**カードの形は同じで、中身を前回の
+  配信の数字にしてくれれば自然**」というニュアンスを `docs/plan-empty-state-no-broadcast.md`
+  の **案 B 直撃**として実装。
+- 設計（plan §5 案 B）:
+  - `broadcastSessionSummary_v1` IDB スキーマに `broadcastTitle` /
+    `broadcasterName` / `broadcasterUserId` / `broadcasterIconUrl` /
+    `broadcasterPageUrl` / `thumbnailUrl` / `viewerCountFromDom` の 7 フィールドを
+    追加（**全部 undefined 許容**で IDB version bump 不要、古い行は自動的に
+    「未取得」フォールバックで描く）。
+  - 新 lib `src/lib/loadLastBroadcastSummary.js` に純粋関数 3 つ:
+    - `loadLastBroadcastSummary(db, opts)`: `byCapturedAt` index を `prev` で
+      なめて最新 1 行を返す。30 日より古い行は null（fallback で隠す）
+    - `buildLastBroadcastReviewView(row)`: row → cards に流せる平らな view
+      （文字列は trim、数値は finite チェック）
+    - `formatLastBroadcastIndicator(capturedAt)`: 「前回（HH:mm 〜）」/
+      「前回（M/D HH:mm 〜）」/「前回（YYYY/M/D 〜）」を相対表示
+    - 単体テスト 14 ケース付き
+  - `broadcastSessionSummaryFlush.js` に `extractReviewFieldsFromSnapshot()`
+    純粋関数を追加。snapshot から新フィールドを抜いて行に同梱（単体テスト 8 ケース）。
+- popup-entry.js の empty state ブランチ:
+  - `applyLastBroadcastReviewToEmptyState()` を新設し、IDB から最新行を取って
+    cards に流し込む。**履歴あり**: indicator「前回（HH:mm〜）アサイチ プレミアムトーク」
+    + 「もう一度この配信を開く」ボタン + 3 cards に過去の数字。**履歴ゼロ**:
+    `html.nl-empty-no-history` クラスを付け、CSS で 3 cards / nl-stats /
+    userRoomList / dev-monitor / Identicon 設定 / session-summary / gift-quick を
+    一括 hide（plan §5 案 A 動作にフォールバック）。残るのは noWatchRankingHint
+    （4 ボタンのランキング導線）+ 詳細設定 + 更新履歴 + 拡張について + 配色プリセット のみ。
+  - `clearLastBroadcastReviewArtifacts()` を active な watch 経路に挿入し、
+    indicator/buttons を確実に消す。
+  - INLINE_MODE（watch ページ内 iframe）では呼ばない（**inline panel locked-in
+    baseline は触らない**、`feedback_inline_panel_beside_size_ok.md` の制約遵守）。
+- 「もう一度この配信を開く」ボタンのクリックハンドラ:
+  - `chrome.tabs.create({ url: dataset.watchUrl })` で前回の watch URL を新タブで開く。
+  - `tabs` permission は manifest.json に既存。新規 permission 追加なし
+    （CWS 審査負担ゼロ）。
+- side panel ランキング導線復活（同梱バグ修正）:
+  - 0.1.55 から `INLINE_MODE` で noWatchRankingHint を hide していたが、0.1.67 で
+    side panel が「watch じゃないタブ」の主役になった結果、side panel でも
+    導線が出ない退行があった。判定を `INLINE_EMBED_WATCH` に絞り、
+    side panel は standalone popup と同様に導線表示。
+- マーケDLボタンは 0.1.69 では見送り（plan §5 で 0.1.70 候補と記載）。
+  empty state の「前回の配信」cards の存在自体は、この時点で
+  ユーザー要望「配信のときと同じ感じ」をほぼ満たしている。
+- 検証:
+  - 単体テスト 2061 → 2089 へ拡大（追加 26 ケース、すべて pass）
+  - lint / typecheck / build すべて green
+  - プレビューで 370px の **履歴あり**: 「前回（08:37〜）」+「もう一度開く」+
+    3 cards に 14/37/121。**履歴ゼロ**: noWatchRankingHint + 詳細設定 + 更新履歴
+    + 拡張について + 配色プリセット のみ、cards 系は全部 hide。両方 OK。
+
+**0.1.68 バンプで入った修正（配信なし時の stat カード「（取得不可）」表示を読めるサイズに AX）**:
+
+- ユーザー報告（0.1.67 リリース後）: 「いろんな画面サイズで配信がないところで
+  ボタンおすとみずらいです」。スクショ4枚で popup width 340〜540px のいずれでも
+  「watch ページが見つかりません」empty state の下にある stat カード3枚
+  （記録 / 推定同時接続 / 来場者数）の値枠が「（取得不可）」「（この配信は未取得）」を
+  受けて、極太22px + tabular-nums のままカード幅 ~100px に流し込まれ、1〜3 字ずつ
+  縦書き状に折り返されて読めなくなっていた。
+- 旧実装: `.nl-live-stat-value` は `font-size: clamp(16px, 4.5vw, 22px)` ・
+  `font-weight: 900` ・ `font-variant-numeric: tabular-nums` で完全に「数字専用」
+  スタイル。日本語のフォールバック文言を流すと CJK は任意の文字境界で折り返せる
+  ので、6 字の「（取得不可）」がカード幅に対して大きすぎて段組み状に潰れていた。
+- 修正: 値が「数字（カンマ区切り含む / 先頭 ~ も許容）」以外のときだけ
+  `is-placeholder` クラスを付け、CSS 側で `clamp(10.5px, 2.6vw, 13px)` ・
+  `font-weight: 700` ・ `color: var(--nl-muted)` ・ `word-break: keep-all` ・
+  `overflow-wrap: anywhere` の控え目スタイルに切り替える。inline 埋め込み時は
+  `clamp(12px, 3vw, 16px)` で少し大きめに揃える。数字に戻ったら自動でクラスが
+  外れて従来の極太に戻る。
+- 切替地点 3 箇所:
+  - `setCountDisplay` (`liveStatComments` の値)
+  - `clearWatchMetaCard` (`watchViewerDom` / `watchConcurrentEst` を gate.viewerLabel /
+    concurrentLabel で塗るとき)
+  - `renderWatchMetaCard` の viewer 経路 + concurrent 経路（`計測中…` の else 分岐含む）
+- 純粋判定 helper: `isStatValuePlaceholderText(text)` を popup-entry.js に追加
+  （`/^~?[\d,，]+$/` でない文字列を placeholder と判定）。
+
+**0.1.67 バンプで入った修正（関係ないタブを side panel に統合 AW）**:
+
+- ユーザー報告（0.1.66 リリース後）: 「関係ないところでひらくと POP が
+  離れています」「配信の時の POP と同じでいい気がします」。watch じゃない
+  タブで拡張アイコンを押すと standalone popup window が独立した OS window
+  として開き、Chrome から「離れて」見える違和感（0.1.62-0.1.64 で popup の
+  位置調整を重ねたが、OS 上は別 window なので根本的に「枠 2 つ感」が残る
+  問題があった）。
+- 修正方針（B 案 / 推奨）:
+  Chrome 標準の **side panel API** に切り替え。watch じゃないタブで拡張
+  アイコンを押すと chrome.sidePanel.open({windowId}) で Chrome window 内に
+  統合された side panel が右側に開く。視覚的に Chrome と完全に一体化、
+  「枠 2 つ感」が完全に消える。
+- 実装:
+  - background.js の `handleBrowserActionClick` を変更。
+    - watch ページ: 従来通り inline panel に focus（NLS_FOCUS_INLINE_PANEL）
+    - watch じゃないタブ: chrome.sidePanel.open() で side panel を開く（user
+      gesture context で chrome.action.onClicked から呼ぶので user gesture は
+      満たされる）
+    - sidePanel.open が使えない / 失敗時: 旧 openOrFocusPopupWindow() に fallback
+    - getToolbarActionPolicy() === 'always_open_popup' の旧設定は popup window
+      を維持（互換）
+  - sidepanel.html / popup.html?inline=1&dock=sidepanel の既存実装はそのまま
+    使う（変更なし）。popup-entry.js の sidepanel 用 UI 切り替えロジック
+    （search param `dock=sidepanel`）が機能する。
+  - manifest.json の sidePanel permission / side_panel.default_path: 'sidepanel.html'
+    は既に存在（permissions 追加なし、CWS 審査負担を最小化）。
+  - 0.1.62-0.1.64 で実装した popup window の位置調整（右内側 / 多モニタ対応）
+    は **fallback 経路として残す**。
+
+**0.1.66 バンプで入った修正（beside panel 幅・高さ最適化 AV）**:
+
+- ユーザー報告（0.1.65 リリース後の段階的フィードバック）:
+  - ~1700px: OK（動画+コメ列+panel の三段構成、バランス良）
+  - ~1920px: panel が viewport 右端からはみ出し「来場者数」見切れ
+  - ~2000px: panel が縦に間延びして下半分 cream 空白
+- 旧実装（仮説 + deep research 結果）:
+  - 幅: `inlinePanelLayout.js` の `min(videoRect.width, viewport.width - vLeft - 12)`
+    で clamp 済みだが、SPA の構造で video の右側 right edge との関係が
+    厳密に取れていないケースで panel が viewport を超える。
+  - 高さ: JS 設定なし、CSS で `min(560px, 58vh)` 固定 → playerRow の自然
+    高さに連動せず、大画面で下半分空白。
+- 修正:
+  - 純粋関数 `calculateBesidePanelLayout` (`src/lib/inlineHostBesideSizing.js`、
+    TDD 21 ケース) を新設。
+  - 幅: `min(videoRect.width, viewport.width - videoRect.right - 12)` を厳密に
+    計算し、利用可能幅が `minWidth` (280px) を下回ったら **null を返す → 呼出元
+    `renderInlineHostAnchoredToVideo` で自動的に below フォールバック**。1920px
+    の見切れケースは「beside で破綻するなら自動で下に逃がす」設計で根治。
+  - 高さ: `resolvePlayerRowRect` の戻り値（player+コメ列の自然高さ）を採用、
+    `contentNaturalHeight` が分かれば短い方、最終的に `viewport*0.72` で
+    safety clamp、最低 240px 保証。CSS 固定値依存をやめた。
+  - iframe.height を JS で明示設定するロジックを追加。
+- 0.1.65 で導入した `ensureDockBottomReflowListener` を `ensureInlineHostReflowListener`
+  にリネーム拡張、beside と below もカバー。viewport / video rect 変化に
+  追従して再描画（debounce 150ms）。
+
+**0.1.65 バンプで入った修正（dock_bottom panel 高さ最適化 AU）**:
+
+- ユーザー報告（0.1.64 リリース後）: 「画面下いっぱい」モードでパネルが画面の
+  下半分を占有してバランスがおかしい。一時的な数値調整ではなく、どの画面サイズ
+  でも最適化される根本対処の要望。
+- 旧実装: panel 高さ = `viewport * 0.5` 固定（最大 720px）。1080p で 540px の
+  panel になり「下半分占有」、720p では動画 + 上部 content + panel で足りなく
+  なる懸念があった。
+- 修正: 純粋関数 `calculateDockBottomPanelHeight`
+  (`src/lib/inlineHostDockSizing.js`、TDD 16 ケース) を新設し、`resolvePlayerRowRect`
+  で得られる「動画 + 公式コメ列」の bottom を起点に、その下の残りスペースを
+  panel に割り当てる設計に変更。
+  - playerRowBottom が取れる: `viewport - playerRowBottom - 8px` を使える空間
+  - contentNaturalHeight が分かれば（将来拡張）それでさらに縮める
+  - playerRowBottom が取れない: viewport * 0.4 のフォールバック
+  - 全結果は最終的に `viewport * 0.55` で safety clamp、最低 220px 保証
+- ResizeObserver の代わりに `window.addEventListener('resize')` で 150ms
+  debounce 後に再描画する `ensureDockBottomReflowListener` を追加。
+  全画面切替・モニタ移動・SPA 再描画に追従。dock_bottom 以外のモードに
+  切り替わっている時は再描画をスキップ（無駄走行ゼロ）。
+- 旧 `watchDockPanelMaxHeightPx` は使われなくなったため削除。
+
+**0.1.64 バンプで入った修正（findFrame 根治 + popup 系まとめ AT/AT2/AT3/AT4）**:
+
+- **AT2 (popup 内部ヘッダー非表示)**: standalone popup window でも内部の
+  `<header class="nl-header">` ロゴ帯が表示され、Chrome 自身のタイトルバーと
+  「枠が 2 つ」に見える問題。`body .nl-header { display: none; }` を追加して
+  全モードで内部ヘッダーを非表示に揃えた（INLINE_MODE は元から hidden）。
+- **AT3 (popup 多モニタ対応)**: 0.1.62 (AR) で popup を Chrome の右**外**側に
+  配置していたが、5 モニタ環境では Chrome のいるモニタの境界を越えて popup が
+  別モニタに飛んでしまうユーザー報告。popup の left を `lastNormal.left +
+  width - POPUP_WIDTH` に変更し、Chrome window の**内側**右上に出すよう修正。
+  Chrome content の右側と少し被るが、必ず Chrome のいるモニタに popup が出る。
+  `chrome.system.display` permission は追加せず、CWS 審査を増やさない設計。
+- **AT4 (横付きヒント強調)**: 1200px 未満で「横付き」を選んでも自動 fallback で
+  「プレイヤー行の下」と同じ動作になる仕様について、ユーザー報告「切り替えても
+  何も変わらない」。ヒント文を `nl-panel-placement-hint--warning` クラスで黄色
+  背景 + 太字に強調して見落とされないようにした。
+
+**0.1.64 バンプで入った修正（findFrame 根治 AT）**:
+
+- 経緯: 0.1.63 (AS) で `below` → `dock_bottom` の応急 migration を入れたが、
+  ユーザー要望「応急処置でなく将来を見据えての設計に」に応えるための本格修正。
+  watch ページのパネルが「ページ最下部（amazon・関連配信の後ろ）」に出る根本
+  原因は `findFrameInsertAnchorFromVideo` (content-entry.js:1905) のスコアリング
+  が緩いこと（`aspect <= 3.4 && area <= viewport*0.92` のみ）で、ニコ生 SPA の
+  「視聴行 + コメ欄 + バナー一式」の巨大ラッパーがヒットしていた。
+- 修正: スコアリング部分を純粋関数 `scoreInlineHostAnchorCandidate`
+  (`src/lib/inlineHostAnchorScoring.js` 新設、TDD 16 ケース) に切り出し、以下の
+  ジオメトリ制約を追加:
+  - aspect 上限: 3.4 → **2.6**（横並び layout に余裕を持たせつつ巨大ラッパー除外）
+  - 面積上限: viewport の 92% → **60%**
+  - **video 幅比**: 候補幅 / video 幅 ∈ [0.95, 1.6]（コメ列を含む程度に絞る）
+  - **video 高さ比**: 候補高 / video 高 ≤ 3.5
+  - **top オフセット**: |候補 top − video top| ≤ 120px（視聴行から離れた要素を除外）
+- DOM 走査ループ部分（祖先 8 段辿り）は content-entry.js に残し、純粋関数を
+  呼ぶように書き換え。`scoreInlineHostAnchorCandidate` は jsdom 不要でテスト可能。
+- これで `below` モードを再度推奨できる品質に近づいたが、0.1.63 の migration
+  flag は維持しつつ、設定 UI で意図的に `below` を再選択したユーザーには新しい
+  スコアリングが適用される。
+
+**0.1.54 バンプで入った変更（ランキング導線を常時表示 AJ）**:
+
+- ユーザー報告（再再）: 0.1.53 で source ベース判定にしても popup 側で
+  導線が出ない（前ひらいた放送のデータが表示されたまま）。
+- 原因（推定）: 複数 window / 複数モニタ環境で
+  `chrome.windows.getLastFocused({windowTypes:['normal']})` が想定と違う
+  window を返し、source='lastFocusedNormal' で hint を hidden 判定して
+  しまうケースがある。確証取れず、デバッグログでの追跡が必要だが、それ
+  より早期にユーザー要望を満たす方が優先。
+- 修正: 判定を簡素化して、**`INLINE_MODE` 以外（standalone popup window）
+  では常時 hint を表示**する形に変更。INLINE_MODE は watch ページ内 iframe
+  なのでユーザーは既に watch を見ており hint 不要。
+- 副作用: ユーザーが standalone popup window で watch 状態のときも hint が
+  表示される（ランキング導線として併設）。データは引き続き表示されるので
+  情報量が増えるだけで害は少ない。
+
+**0.1.53 バンプで入った変更（ランキング導線の表示条件強化 AI）**:
+
+- ユーザー報告: 0.1.52 でランキング導線を追加したが「何もないところを
+  クリックすると前ひらいた放送につながっている」状態が継続。
+- 原因: 0.1.52 は `!isNicoLiveWatchUrl(url)` で導線表示を判定していた。
+  しかし `pickWatchUrlFromMultipleSources` は storage の `nls_last_watch_url`
+  を fallback で使うため、Google 等の非 watch タブでも url が watch URL と
+  なって導線が hidden のままだった。
+- 修正: `watchUrlPick.source` を見て、`'activeTab'` / `'lastFocusedNormal'`
+  以外（= `'storage'` / `'none'`）のとき導線を表示する。アクティブな watch
+  タブが無いケースを正しく検出。
+- 副作用: アクティブタブが watch じゃないと前回データの表示が（取得不可）
+  表示と並走することはあるが、ランキング導線も同時に出るので「何もない
+  ページでも次の放送を探せる」UX 確保。
+
+**0.1.52 バンプで入った変更（ニコ生ランキング導線 AH）**:
+
+- ユーザー要望: 「何もないところの場合、ニコニコの生放送ランキングに飛ぶ
+  のはどうでしょうか？ ちくらんとか？」
+- 内容: watch ページ以外で popup を開いた時、これまでは「（ニコ生 watch を
+  開いてください）」のテキストだけだったのを、ニコ生のランキング系ページ
+  への導線リンクを **light 配色のカード** で出すよう変更:
+   - 🏠 ニコニコ生放送 トップ (live.nicovideo.jp/)
+   - 📊 生放送ランキング (live.nicovideo.jp/ranking)
+   - 🎯 ちくらん（コミュニティ生放送ランキング）(com.nicovideo.jp/ranking/live)
+   - 🆕 開始したばかりの放送 (live.nicovideo.jp/recent)
+- 実装: popup.html に `<section id="noWatchRankingHint">` を hidden で配置、
+  popup-entry.js の refresh で `!isNicoLiveWatchUrl(url)` のとき hidden を
+  外す。すべての URL は target="_blank" rel="noopener noreferrer"。
+
+**0.1.51 バンプで入った修正（popup の dark を完全撤去 AG）**:
+
+- ユーザー報告（再）: 0.1.50 で `prefers-color-scheme: dark` 検出に切り
+  替えても、なにも放送がないページで popup を開くと依然 dark になる。
+- 原因: Chrome のテーマ設定 / Windows のシステム配色（アクセント色等）が
+  dark 寄りだと `window.matchMedia('(prefers-color-scheme: dark)').matches`
+  が `true` を返してしまい、ユーザーの「OS は light」という体感と食い違う。
+  matchMedia は環境依存で信頼性に欠けることが判明。
+- 修正: `nl-skin-panel-dark` クラスの動的 toggle を撤去し、popup は常に
+  light 配色（:root の cream-ish #fffaf2 背景）固定に変更。dark を望む
+  ユーザー向けには将来 設定トグルを追加する余地は残す。
+- 副作用: 従来 dark で慣れていたユーザーは突然 light に変わるが、視認性
+  低下のクレームの方が深刻だったため light 固定で出荷。
+
+**0.1.50 バンプで入った修正（popup 黒テーマ強制を撤去 AF）**:
+
+- ユーザー報告: 「OS は dark に切り替えていないのに popup が真っ黒で視認性悪い」
+  が継続。watch ページ以外（ブラウザのトップページ・他サイト等）でツールバー
+  から popup を開くと standalone popup window が常に dark テーマで開いていた。
+- 原因: `applyResponsivePopupLayout` (popup-entry.js:374-375) が
+  `!INLINE_MODE || INLINE_SIDE_PANEL` で常に `nl-skin-panel-dark` クラスを
+  当てる固定挙動だった。INLINE_MODE は親ページに同化するので影響なしだが、
+  standalone popup window と side panel は OS 設定に関わらず dark に
+  なってしまう。
+- 修正: `window.matchMedia('(prefers-color-scheme: dark)')` を見て、
+  OS が dark のときだけ `nl-skin-panel-dark` を当てるよう変更。OS が light
+  なら popup も :root の light 配色（cream-ish #fffaf2 背景）になる。
+- 副作用: dark を使っていたユーザーは OS 設定で切り替えれば従来どおり。
+
+**0.1.49 バンプで入った修正（marketingDynamicAdvice 配線 AE）**:
+
+ユーザー要望「もっとマーケ増やせますか？」に応えて、`marketingDynamicAdvice.js`
+（0.1.33 で作成、329 行・100+ ルール）を完全に未配線（dead code）から
+本番配線へ。マーケ分析の各セクションに「データに応じて変わるキャラ別
+アドバイス」が動的に出るようになった。
+
+- **配線方針**:
+  - 既存の固定アドバイス（`adviceAfter*` 関数群）はそのまま残す（後方互換）
+  - その直後に `dynamicAdviceCardsHtml(section, dynMetrics)` を挿入
+  - rule が何もマッチしない場合は空文字を返すので、固定アドバイスのみ表示
+
+- **対象 16 セクション**:
+  kpi / concurrent / laughter / newVsRepeat / survival / silence / keyboard /
+  recentCmp / growth / waveform / echo / firstSecond / talentPeak / sentiment /
+  uniqueWords / reach
+
+- **AdviceMetrics 組み立て**: 集約済みデータ（MarketingReport, ConcurrentPeakAnalysis,
+  LaughterDensityTimeline, silenceZones, newVsRepeat, sentimentCurve, reach,
+  growth, firstSecondLatency, survivalCurve, talentPeaks, echoPropagation,
+  echoSync, recentComparison, uniqueWords, similarBroadcasts, keyboardTypes）
+  から `buildDynamicAdviceMetrics(opts)` で AdviceMetrics 型に正規化。
+
+**0.1.48 バンプで入った修正（大規模配信のマーケ分析安定化 AD）**:
+
+- **M4 (AD): `Math.min(...arr)` / `Math.max(...arr)` のスタックオーバーフロー**
+  - 原因: `marketingAggregate.js` の `Math.min(...timestamps)` /
+    `Math.max(...vps)` は spread が引数上限（V8 で 65535 程度）を超えると
+    "Maximum call stack size exceeded" を投げる。8 万コメ超の人気配信者
+    放送でマーケ分析ボタンが「分析がタイムアウトしました」になる経路と
+    区別がつかない無症状失敗を起こしていた。
+  - 修正: `Math.min/max(...arr)` を for ループ reduce に置換。引数上限の
+    制限を受けないため数十万件まで安全。
+
+**0.1.47 バンプで入った修正（同接カーブ hybrid + 連打事故防止 AC）**:
+
+- **M10 (AC): 同接タイムラインの source 二者択一による sample 落ち**
+  - 原因: `buildConcurrentTimelineSeries` は「official が 1 件以上あれば
+    全 official、無ければ全 estimated」の二者択一だったため、official が
+    途中 1 件だけ入った放送で残り 90% の estimated 行が捨てられ、
+    `sectionConcurrentTimeline` が `series.points.length < 2` で空表示に
+    なっていた。「同接サンプルが取れていません」アドバイスが出るが実は
+    estimated は十分取れているという食い違い。
+  - 修正: per-row で official 優先 → 無ければ estimated に fallback する
+    hybrid 方式へ変更。集約 source は all-official / all-estimated /
+    `mixed`（混在）を返す。`marketingChartsHtml.js` の sourceLabel も
+    mixed 対応（"公式来場者数 + 同接推定値（取れた方を採用）"）。
+
+- **P1/P2 (AC): 連打防止漏れ（exportBtn / captureBtn）**
+  - 原因: `exportBtn` / `captureBtn` のクリックハンドラ内でボタンを一度も
+    `disabled = true` にしていなかった。`downloadCommentsHtml` は数万
+    コメント環境では数秒かかるため、ユーザーが連打すると並行で走り、
+    Blob URL が複数生成されて連番ファイルが大量ダウンロードされる。
+    キャプチャは ms 単位 timestamp なので連打時に同名扱いで `uniquify`
+    が連番化、`safeRefresh` も毎回 trigger されて UI が荒れる。
+  - 修正: 開始時に `btn.disabled = true`、`finally` で `false` に戻す。
+
+**0.1.46 バンプで入った修正（マーケ分析の精度向上 AB）**:
+
+並列で 3 件の deep audit エージェントを走らせ（popup-entry / 性能 / マーケ分析）、
+合計 43 件の発見のうち高優先度・低リスクの 2 件を修正。
+
+- **M1 (AB): aggregateMarketingReport の配信者除外漏れ**
+  - 原因: 0.1.17 で `sectionTopUsers` と `sectionUsersWithThumbnails` の
+    表示時フィルタは入っていたが、`aggregateMarketingReport` の集計層は
+    `broadcasterUserId` を引数で受け取らず、配信者本人のコメ（合いの手等）
+    が KPI / CPM / uniqueUsers / timeline / segment / coreReturning に
+    そのまま入っていた。配信者が合いの手 50 コメ打つと CPM が +1〜2、
+    selfPosted% も歪む。
+  - 修正: `aggregateMarketingReport(comments, liveId, { broadcasterUserId })`
+    に optional 引数を追加し、`filtered` 段階で配信者 uid のコメを除外。
+    popup-entry.js の 2 ヶ所（dev export ボタン経路 + STORY_SOURCE_STATE
+    fallback 経路）から `watchMetaCache.snapshot.broadcasterUserId` を
+    渡す形に更新。テスト 5 ケース追加。
+
+- **M5 (AB): commentNo 欠落時の dedupe key に userId が無い**
+  - 原因: `buildDedupeKey` は `commentNo` ありなら `${liveId}|${no}|${text}`、
+    無しなら `${liveId}||${text}|${sec}` だった。NDGR 経由ではない DOM
+    intercept fallback や、commentNo が拾えない局面で複数ユーザーが同じ
+    1 秒内に同じ短文（"8888" / "草" 等）を打つと、最初の 1 件だけ採用
+    され残りは patch 扱いになる。マーケ分析の **L1 コメ伝染** / **L5
+    コメ被り瞬間** の `detectCommentSyncBursts` は minDistinctUsers=3 を
+    要求するが、複数ユーザーが 1 件にマージされて条件を満たさなくなり
+    検出不能だった。
+  - 修正: commentNo 欠落時のフォールバック key に userId を含める
+    （`${liveId}||${text}|${sec}|${uid}`）。同秒・同テキスト・別ユーザー
+    が別行として扱われるようになる。テスト 3 ケース追加（後方互換 +
+    別ユーザーの key 区別）。
+
+**0.1.45 バンプで入った修正（裏側クリーンアップ + プライバシー AT）**:
+
+deep audit 発見の中優先度バグ 2 件:
+
+- **B5: `pageFrameLoopTimer` 停止漏れ**
+  - 原因: `chrome://extensions` で拡張をリロードすると `hasExtensionContext()`
+    が false に転じるが、`pageFrameLoopTimer`（360ms 周期で
+    renderPageFrameOverlay/maybeRunEndedBulkHarvest を回す）は
+    `stopContentIntervalsIfContextInvalidated` の停止対象に入っておらず、
+    tick の冒頭で early return するだけ。setInterval slot と CPU が
+    タブ寿命まで消費され続ける（特に多数の watch タブを長時間開いた後の
+    ヘビーリロード時に蓄積）。
+  - 修正: `stopContentIntervalsIfContextInvalidated` で `pageFrameLoopTimer`
+    も `clearInterval` する。
+
+- **B14: AI 診断 URL に query/fragment が残る**
+  - 原因: `persistAiShareFastDiagnostics` と `buildAiShareFastDiagnosticsPayload`
+    が `window.location.href.slice(0, 500)` をそのまま保存していた。ニコ生
+    の querystring に session token / referrer / user 識別子が乗っていた
+    場合、診断 dump を AI に貼ったり開発者に送ったりする際に個人情報が漏れる
+    懸念。
+  - 修正: 新規 helper `sanitizeWatchUrlForDiag` で `URL.origin + pathname`
+    のみ残し query/fragment を strip。`buildAiShareFastDiagnosticsPayload`
+    の 2 箇所と `persistAiShareFastDiagnostics` の 1 箇所、計 3 ヶ所を
+    更新。
+
+**0.1.44 バンプで入った修正（裏側のメモリ効率と整合性 AS）**:
+
+deep audit エージェントが発見した中優先度のバグ 2 件を修正。
+
+- **B8 (Z): thumbDb のメモリスパイク**
+  - 原因: `addThumbBlob` が 30 秒ごとのサムネ保存で `idx.getAll(lid)` を
+    呼び、過去の全 thumbnail（最大 500 枚 × 数百KB の Blob）を一括で
+    deserialize → メモリ展開していた。長時間視聴で各回 100MB 級の
+    瞬時アロケーションが発生し、低スペック端末で UI hitch を引き起こす。
+    `countThumbsForLive` も `idx.getAll(lid).length` で同じ無駄をしていた。
+  - 修正:
+    - `addThumbBlob`: `idx.getAll` → `idx.openCursor` で 1 件ずつ
+      iterate、id と capturedAt だけ抽出した summary 配列を作る形に変更。
+      Blob 参照を都度作っては捨てるので peak メモリが大幅減。
+    - `countThumbsForLive`: `idx.getAll(lid).length` → `idx.count(IDBKeyRange.only(lid))`
+      で値を読まず件数だけ返す（高速・省メモリ）。
+
+- **B2 (Z): KEY_AUTO_BACKUP_STATE の last-write-wins race**
+  - 原因: `KEY_AUTO_BACKUP_STATE` は **content（commentCount/updatedAt
+    /lastCommentAt/watchUrl 担当）** と **background SW（lastBackupAt/
+    lastBackedUpdatedAt/lastBackupCount 担当）** の両方が更新する。
+    旧 content コードは `bag` を冒頭で 1 回読んだだけで write したため、
+    その間に background が更新した backup 系フィールドを stale 値で
+    上書きする race があり、結果として **次サイクルで同じスナップショット
+    を再保存し IDB に重複バックアップが溜まる**（24件枠の中身が全部同じ
+    になる）現象を引き起こしていた。
+  - 修正: content の persist 直前で `KEY_AUTO_BACKUP_STATE` を再 read。
+    background 担当フィールドは fresh 値、content 担当フィールドは新規値
+    で merge する。他の live のエントリは fresh state をそのまま使う。
+    background 側は既に 0.1.x で fresh re-read パターンになっていた
+    （対称化）。
+
+**0.1.43 バンプで入った修正（パネルが開かない事象 + listener 二重登録 AR）**:
+
+ユーザー報告と並行で deep audit エージェントを 2 件走らせ、未解決 2 件 +
+新規発見 17 件のうち最も user-impacting な 2 件を修正。
+
+- **症状 B (Y): kon-ta クリックしてもパネルが開かない**
+  - 原因: 0.1.18 以降の prewarm 機構で、host が DOM 上にあっても
+    `display:none` / offscreen のまま「見えない」状態が増えた。
+    `shouldRespondFocusedNowFromToolbar` は `host.isConnected` だけで
+    判定していたため、prewarmed host が renderPageFrameOverlay で
+    可視化されないケース（プレイヤー未検出・タブ非アクティブ等）でも
+    `focused=true` を返し、background.js は popup window fallback を
+    起動せず → ユーザーから「kon-ta 押しても何も起きない」現象になっていた。
+  - 修正: `shouldRespondFocusedNowFromToolbar` に optional の
+    `getComputedStyle` deps を追加し、computedStyle が取れる環境では
+    `display !== 'none'` && `visibility !== 'hidden'` を確認する。
+    不可視なら false → background が popup window fallback を起動し、
+    ユーザーに何かしら表示される。テスト 7 ケース追加。
+
+- **B11: content script の onMessage listener が二重登録**
+  - 原因: `chrome.runtime.onMessage.addListener` を content-entry.js の
+    トップレベルで呼んでいたため、SPA navigation で再注入されると
+    listener が累積。複数フレームから NLS_FOCUS_INLINE_PANEL に応答し
+    sendResponse の port が複数解釈されて Chrome が "The message port
+    closed before a response was received" エラーを投げ、background.js
+    側が popup window fallback を誤発火する原因になっていた。
+  - 修正: `globalThis.__NLS_CONTENT_MSG_LISTENER_BOUND__` フラグで
+    listener 登録を idempotent にし、再注入時は二重登録しない。
+
+**0.1.42 バンプで入った修正（複数タブ並行時の prewarm 競合解消 AQ）**:
+
+- ユーザー報告: 複数 watch タブを同時に開いていると、kon-ta クリック→
+ パネル表示までの体感が遅くなる。0.1.41 までのデータ混信は解消したが、
+ 表示速度の問題は残っていた。
+- 原因: 各 watch タブが独立に `prewarmInlinePopupIframe` で popup.html を
+ 裏ロードしていた。複数タブが visible 並行状態のとき全タブで popup.html
+ （10000+ 行 JS）が並列パース・実行 → CPU 取り合いで個々の prewarm が
+ 遅延 → kon-ta クリック時に iframe 未ロードでパネル表示が遅い。
+ 0.1.32 で「バックグラウンドタブはスキップ」にしたが、複数 window を
+ 並べて全 visible にされた場合は依然全タブ並列。
+- 修正: 新規 lib `src/lib/prewarmCoordinator.js`
+ （`decidePrewarmLeaseAction`、純粋関数 + 10 ケース TDD）。
+ `chrome.storage.local` の `nls_prewarm_lease_v1` キーで lease 機構を
+ 実装し、prewarm 前に **同時に走らせるタブを 1 つに絞る**。
+   - claim: lease が空 / 自分 / 古い（10s 経過） → 自分の名前で書き込む
+   - proceed: 既に自分が保持中
+   - defer: 他タブが保持中 → 1.5s 後に再試行
+ prewarm 完了 / エラー時に lease を release。タブが落ちて release されない
+ ケースは TTL（10s）で他タブが claim 横取り。
+- 効果: 複数タブで連鎖的に prewarm が走るため、各タブの popup.html ロードが
+ 順序立てて 1 つずつ完了。クリック時には iframe がロード済みになっている
+ 確率が上がる。
+
+**0.1.41 バンプで入った修正（深層監査結果の反映 AP）**:
+
+ユーザー報告の「配信者タイル消える / multi-tab 混信 / 取り込み率 17%」を
+deep audit エージェントで原因特定し、3 件まとめて修正。
+
+- **W1: 配信者タイル「出たと思ったら消える」**
+  - 原因: popup-entry.js が 10〜30 秒の polling で `watchMetaCache.snapshot`
+    を無条件上書きしていた。content-entry.js の collectWatchPageSnapshot は
+    `embedded-data` から broadcaster 系を引くが、niconico SPA は時間経過で
+    `#embedded-data` を一瞬書き換えるため、運悪く polling がそのタイミング
+    に当たると broadcaster フィールドが空文字の snapshot で旧値を消して
+    しまっていた。
+  - 修正: 新規 lib `src/lib/watchSnapshotPartialMerge.js`
+    （`mergeWatchSnapshotPreservingBroadcaster`、純粋関数 + 11 ケース TDD）。
+    broadcaster identity 5 フィールド（name / pageUrl / iconUrl / userId /
+    level）は新値が空なら旧値を保つ partial-merge にする。
+
+- **W2: 複数タブで kon-ta パネルが混信**
+  - 原因: standalone popup window では `chrome.tabs.query({active:true,
+    currentWindow:true})` が popup window 自身を currentWindow とみなし、
+    popup.html の URL を返す。これは niconico URL ではないので storage
+    `nls_last_watch_url` へ fallback していたが、この値は全 watch タブの
+    content script が last-write-wins で書き換えるため、複数タブで popup
+    を順に開くと **すべて同じ「直近 1 つの watch タブ URL」を見る** 状態に
+    なり、データが混信する。
+  - 修正: 新規 lib `src/lib/popupWatchUrlResolveMultiTab.js`
+    （`pickWatchUrlFromMultipleSources`、純粋関数 + 8 ケース TDD）。
+    `chrome.windows.getLastFocused({windowTypes:['normal']})` で「直前の
+    通常 window のアクティブタブ」を取得し、storage より優先する 3 段
+    判定（activeTab → lastFocusedNormal → storage）に変更。
+
+- **W3: コメ取り込み率 17%**
+  - 原因: `runDeepHarvest` が `!opts.force && shouldSkipDeepHarvest()` で
+    NDGR active 中は早期 return していた。`tryPeriodicQuietDeepHarvest` /
+    `onTabVisibleForCommentHarvest` 経路は recovery を計算して force=true
+    を渡していたが、`scheduleDeepHarvest` 経路（liveIdChange / recordingOn /
+    tabVisible reason）は `shouldForceDeepHarvestForReason` が startup
+    のみ true を返すため、ライブ参加直後の backlog（既に積まれていた数百
+    件のコメント）が NDGR active のせいで永遠に取れなかった。
+  - 修正: `runDeepHarvest` 内に `shouldForceDeepHarvestRecovery`（既に
+    lib 化済みだったが結線されていなかった）を OR 条件で追加。
+    NDGR active でも前回 deep から 5 分以上経っていれば force 実行する
+    defense-in-depth。
+
+**0.1.40 バンプで入った修正（公式チャンネル放送の配信者タイル復活 AO）**:
+
+- ユーザー報告: lv350162154（にじさんじオフィシャル ニコニコチャンネル）の
+ watch ページで、配信者タイルが popup に出ない。一般ユーザー放送（kyoncy
+ さん枠）では正しく出るので、公式チャンネル特有の事象。
+- 原因: 公式チャンネル放送では embedded-data の構造が違う。
+   - `program.supplier.name` = "株式会社ドワンゴ"（提供会社名で、画面で
+    見える本来のチャンネル名ではない）
+   - `program.supplier.pageUrl` は無い
+   - 真のチャンネル名は `socialGroup.name`（"にじさんじオフィシャル
+    ニコニコチャンネル"）、URL は `socialGroup.socialGroupPageUrl`
+    (`https://ch.nicovideo.jp/channel/ch{id}`)、アイコンは
+    `socialGroup.thumbnailImageUrl`
+   - 既存 `collectWatchPageSnapshot` は supplier 側だけ見ていたため
+    `broadcasterPageUrl` が空になり、popup の `resolveBroadcasterFollowTarget`
+    が kind=none を返してタイルが消えていた。さらに既存のアイコン fallback
+    は旧フィールド名 `thumbnailUrl` のみ参照していて、新フィールド
+    `thumbnailImageUrl` を読まなかった。
+- 修正: 新規 lib `src/lib/channelBroadcasterMeta.js`（純粋関数 + 19 ケース
+ TDD）。3 経路（supplier.supplierType / program.providerType /
+ socialGroup.type のいずれかが `"channel"`）でチャンネル放送を判定し、
+ socialGroup から name / pageUrl / iconUrl を抽出する。
+- `collectWatchPageSnapshot` で kind=channel のときは socialGroup 由来の
+ 値を broadcasterName / broadcasterPageUrl / broadcasterIconUrl に入れる。
+ アイコンは `thumbnailImageUrl` / `thumbnailSmallImageUrl` を旧フィールド
+ より優先。
+- 効果: にじさんじオフィシャルでも配信者タイルが出て、フォロー先が
+ 正しい channel ページに飛ぶ。
+
+**0.1.39 バンプで入った修正（配信者リンク誤検出の再発防止 + 切り出し AN）**:
+
+- ユーザー報告: lv350421699（配信者 = ᖇIO / userId 143899079）の watch
+ ページで、0.1.38 修正適用前は配信者タイルからクリックすると関連配信枠
+ の覇成 赤（43068016, 1 度もコメしていない別人）に飛んでいた。
+- 原因（追加調査）: watch ページの DOM には `/user/{id}/live_programs`
+ 形式 anchor が **5 件** 含まれていた:
+   1. 関連配信サイドバー → 覇成 赤 (43068016)
+   2. 関連配信サイドバー → アライ (94392112)
+   3. 関連配信サイドバー → シルメリア (23600899)
+   4. 関連配信サイドバー → ヒナたん (131913660)
+   5. 配信者ペイン → ᖇIO (143899079) ← `?ref=watch_user_information` 付き
+ 0.1.38 で `embedded-data.program.supplier.programProviderId` 最優先にしたが、
+ 万一 embedded-data が読めない場合に DOM フォールバックが先頭 hit を採るため
+ 別人を返してしまう。
+- 修正: `extractBroadcasterUserId` の API を拡張して
+ `streamLinkHrefCandidates: string[]` を受け取るようにし、DOM 候補配列から
+ `?ref=watch_user_information` 付き anchor を最優先（無ければ先頭）で 1 つに
+ 絞ってから uid を抽出する。embedded-data があれば従来どおり最優先。
+- 同じパターンを使う `detectBroadcasterUserIdFromDom`（こん太レーン汚染検出
+ 等で使用）も同じ defense-in-depth に統一。
+- TDD: 13 → 22 ケースに拡張（lv350421699 case を含む 9 ケース追加）。
+- 同梱: アバター URL 比較ヘルパ（`avatarCompareKey` / `isSameAvatarUrl`）を
+ `src/lib/avatarUrlCompare.js` に切り出し（純粋関数 + 14 ケース TDD）。
+
+**0.1.38 バンプで入った修正（配信者 UID 取り違え修正 + 切り出し AM）**:
+
+- ユーザー報告: lv350420992（配信者 = 刑事桃 / userId 115713314）の watch
+ ページで、配信者タイルからクリックすると別人 Nasu（45300945）のページに飛ぶ。
+ さらに本配信者 115713314 が こん太レーン に混入していた（ Nasu は本来の
+ 配信者ではなく、コメ投稿もしていない別ユーザ）。
+- 原因: `collectWatchPageSnapshot` の `streamLink` ピッカが
+ `document.querySelectorAll('a[href*="/user/"]')` で先頭 hit の
+ `/user/{id}/live_programs` 形式 anchor から uid を取り出していた。
+ watch ページにはコメ欄言及や履歴ウィジェット等で `/user/{id}/live_programs`
+ 形式 anchor が複数含まれることがあり、本配信者ではない uid を取ることが
+ あった。さらに優先順位が「streamLink → embedded」で DOM 優先だったため、
+ authoritative な embedded-data があっても DOM が勝っていた。
+- 修正:
+  - 新規 lib: `src/lib/broadcasterUserId.js`（`extractBroadcasterUserId`、
+   13 ケースの TDD）。優先順位を embedded-data 最優先に：
+     1. `embedded-data.program.supplier.programProviderId`（authoritative）
+     2. `embedded-data.program.supplier.id`
+     3. `embedded-data.program.supplier.pageUrl` の `/user/(\d+)/`
+     4. DOM streamLink href の `/user/(\d+)/`（最後の手段）
+  - `content-entry.js#collectWatchPageSnapshot` を新 lib にスイッチ。
+- 効果: lv350420992 ケースでは embedded supplier.programProviderId =
+ 115713314 が即取れて、本配信者がレーンから除外される。配信者タイルからの
+ リンクも正しく刑事桃のページに飛ぶ。
+- 同梱: コメ送信エラー時の再読み込み案内ロジック (`withCommentSendTroubleshootHint`
+ + `EXTENSION_RELOAD_USER_GUIDE_JA`) を `src/lib/commentSendTroubleshootHint.js`
+ に切り出し（純粋関数 + 7 ケース TDD）。
 
 **0.1.37 バンプで入った修正（重複定義整理 + 切り出し AL）**:
 

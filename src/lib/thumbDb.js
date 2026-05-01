@@ -34,6 +34,12 @@ export function openThumbDb() {
  * @param {string} liveId
  * @param {Blob} blob
  * @returns {Promise<void>}
+ *
+ * 0.1.44 (Z): 旧実装は `idx.getAll(lid)` で記録済み全 thumbnail を一度に
+ *   メモリに展開していた（500 枚 × 数百KB の Blob 配列 ≈ 100MB レベルの
+ *   peak メモリ + UI hitch）。FIFO 判定には id と capturedAt しか必要ない
+ *   ので、cursor で 1 件ずつ走査して summary 配列だけ作る形に変更。
+ *   Blob 参照を都度作っては捨てるので peak メモリが大幅に下がる。
  */
 export async function addThumbBlob(liveId, blob) {
   if (!isIndexedDbAvailable()) return;
@@ -54,20 +60,34 @@ export async function addThumbBlob(liveId, blob) {
       });
       addReq.onerror = () => reject(addReq.error);
       addReq.onsuccess = () => {
-        const getReq = idx.getAll(lid);
-        getReq.onerror = () => reject(getReq.error);
-        getReq.onsuccess = () => {
-          const all = /** @type {{ id: number, capturedAt: number }[]} */ (
-            getReq.result || []
-          );
-          all.sort((a, b) => a.capturedAt - b.capturedAt);
-          const toDrop = thumbIdsToDropForFifo(
-            all.map((r) => ({ id: r.id, capturedAt: r.capturedAt })),
-            MAX_THUMBS_PER_LIVE
-          );
-          for (const id of toDrop) {
-            store.delete(id);
+        /** @type {{ id: number, capturedAt: number }[]} */
+        const summaries = [];
+        const curReq = idx.openCursor(IDBKeyRange.only(lid));
+        curReq.onerror = () => reject(curReq.error);
+        curReq.onsuccess = () => {
+          const cursor = curReq.result;
+          if (!cursor) {
+            summaries.sort((a, b) => a.capturedAt - b.capturedAt);
+            const toDrop = thumbIdsToDropForFifo(
+              summaries,
+              MAX_THUMBS_PER_LIVE
+            );
+            for (const id of toDrop) {
+              store.delete(id);
+            }
+            return;
           }
+          const v = /** @type {{ capturedAt?: number }} */ (cursor.value || {});
+          const id = typeof cursor.primaryKey === 'number'
+            ? cursor.primaryKey
+            : Number(cursor.primaryKey);
+          const capturedAt = typeof v.capturedAt === 'number'
+            ? v.capturedAt
+            : 0;
+          if (Number.isFinite(id) && id > 0 && capturedAt > 0) {
+            summaries.push({ id, capturedAt });
+          }
+          cursor.continue();
         };
       };
 
@@ -83,6 +103,10 @@ export async function addThumbBlob(liveId, blob) {
 /**
  * @param {string} liveId
  * @returns {Promise<number>}
+ *
+ * 0.1.44 (Z): 旧実装は `idx.getAll(lid)` で全 Blob を deserialize して
+ *   `.length` だけ取っていた（メモリ無駄遣い）。`idx.count()` は値を読まず
+ *   件数だけ返すので大幅に高速・省メモリ。
  */
 export async function countThumbsForLive(liveId) {
   if (!isIndexedDbAvailable()) return 0;
@@ -93,8 +117,11 @@ export async function countThumbsForLive(liveId) {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, 'readonly');
       const idx = tx.objectStore(STORE).index('byLive');
-      const r = idx.getAll(lid);
-      r.onsuccess = () => resolve((r.result || []).length);
+      const r = idx.count(IDBKeyRange.only(lid));
+      r.onsuccess = () => {
+        const n = Number(r.result);
+        resolve(Number.isFinite(n) && n >= 0 ? n : 0);
+      };
       r.onerror = () => reject(r.error);
     });
   } finally {

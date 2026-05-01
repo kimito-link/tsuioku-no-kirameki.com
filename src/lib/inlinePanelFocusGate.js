@@ -41,15 +41,34 @@ export function isInlinePanelHostReadyForFocus(host, deps) {
  * となり「kon-ta 押下で popup 窓も同時に開く」「kon-ta 再押下で panel が
  * 出ずに popup だけ出る」という user-visible bug を起こしていた。
  *
- * 新方針: host が DOM に居る（renderPageFrameOverlay で挿入済み or 既存）
- *   なら即座に true を返し、scroll/focus は呼び出し側で fire-and-forget。
- *   応答自体には rect も layout 完了も要らない（panel 表示自体は
- *   renderPageFrameOverlay 側で同期的に処理されるため）。
+ * 0.1.43 (Y): 0.1.18 以降の prewarm 機構で、host が DOM 上にあっても
+ *   display:none / offscreen のまま「見えない」状態が増えた。renderPageFrameOverlay
+ *   が何らかの理由（プレイヤー未検出・タブ非アクティブ等）で host を可視化
+ *   できなかった場合、isConnected=true だけで focused=true を返すと
+ *   background が popup window fallback を起動せず、ユーザーから「kon-ta
+ *   押しても何も出ない」現象になる。computedStyle が利用可能なら
+ *   display !== 'none' && visibility !== 'hidden' も確認し、不可視ならば
+ *   false を返して background に popup window fallback を任せる。
  *
  * @param {{ isConnected: boolean } | null | undefined} host
+ * @param {{
+ *   getComputedStyle?: (el: object) => { display: string, visibility: string }
+ * }} [deps] computedStyle が取れる環境（DOM）では渡す。省略時は isConnected のみ判定。
  * @returns {boolean}
  */
-export function shouldRespondFocusedNowFromToolbar(host) {
+export function shouldRespondFocusedNowFromToolbar(host, deps) {
   if (!host) return false;
-  return host.isConnected === true;
+  if (host.isConnected !== true) return false;
+  // deps 未指定（旧呼び出し互換）→ isConnected のみで判断
+  if (!deps || typeof deps.getComputedStyle !== 'function') return true;
+  try {
+    const cs = deps.getComputedStyle(host);
+    if (!cs || typeof cs !== 'object') return true;
+    if (cs.display === 'none') return false;
+    if (cs.visibility === 'hidden') return false;
+    return true;
+  } catch {
+    // computedStyle 取得失敗（detached 等）→ 保守的に true（popup window race を避ける）
+    return true;
+  }
 }
