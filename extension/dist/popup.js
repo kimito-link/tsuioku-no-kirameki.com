@@ -235,6 +235,31 @@
     return rooms.map((r) => sanitizeRoomAvatarForBroadcaster(r, ctx));
   }
 
+  // src/lib/avatarBroadcasterGuard.js
+  function extractNiconicoUserIdFromIconUrl(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    if (!s) return "";
+    const m = s.match(/\/(\d{2,15})\.(?:jpg|jpeg|png|gif|webp)(?:[?#]|$)/i);
+    if (m && m[1]) return m[1];
+    return "";
+  }
+  function shouldAssociateAvatarWithUser(input) {
+    const uid = String(input?.uid ?? "").trim();
+    const av = String(input?.av ?? "").trim();
+    if (!uid || !av) return true;
+    const broadcasterUid = String(input?.broadcasterUid ?? "").trim();
+    const broadcasterIconUrl = String(input?.broadcasterIconUrl ?? "").trim();
+    if (!broadcasterUid) return true;
+    const avUidFromUrl = extractNiconicoUserIdFromIconUrl(av);
+    if (avUidFromUrl && avUidFromUrl === broadcasterUid) {
+      return uid === broadcasterUid;
+    }
+    if (broadcasterIconUrl && isSameAvatarUrl(av, broadcasterIconUrl)) {
+      return uid === broadcasterUid;
+    }
+    return true;
+  }
+
   // src/lib/nicoAnonymousDisplay.js
   function isNiconicoAnonymousUserId(userId) {
     const s = String(userId ?? "").trim();
@@ -744,6 +769,15 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.81",
+      date: "2026-05-01",
+      summary: "\u30D7\u30ED\u30D5\u30A1\u30A4\u30EB\u30AD\u30E3\u30C3\u30B7\u30E5\u7D4C\u7531\u306E\u6C5A\u67D3\u306B\u3082\u5BFE\u5FDC",
+      items: Object.freeze([
+        "0.1.80 \u3067 URL \u30B5\u30A4\u30BA\u9055\u3044\u306B\u5BFE\u5FDC\u3057\u307E\u3057\u305F\u304C\u3001storyGrowthAvatarSrcCandidate \u3068\u3044\u3046\u5225\u7D4C\u8DEF\u3067\u6C38\u7D9A\u30AD\u30E3\u30C3\u30B7\u30E5\uFF08KEY_USER_COMMENT_PROFILE_CACHE\uFF09\u304B\u3089\u6C5A\u67D3\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u51FA\u3057\u3066\u30D5\u30A9\u30FC\u30EB\u30D0\u30C3\u30AF\u306B\u4F7F\u3046\u51E6\u7406\u304C\u6B8B\u3063\u3066\u3044\u305F\u305F\u3081\u3001\u30A2\u30A4\u30B3\u30F3\u5217\u306E\u30B5\u30E0\u30CD\u304C\u76F4\u3063\u3066\u3044\u307E\u305B\u3093\u3067\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: storyGrowthAvatarSrcCandidate \u5185\u306E avatarUrl \u3068 rememberedAvatarUrlForUserId\uFF08\u30D7\u30ED\u30D5\u30A1\u30A4\u30EB\u30AD\u30E3\u30C3\u30B7\u30E5\u7D4C\u7531\uFF09\u4E21\u65B9\u306B shouldAssociateAvatarWithUser \u30AC\u30FC\u30C9\u3092\u9069\u7528\u30020.1.80 \u306E URL \u62BD\u51FA\u30ED\u30B8\u30C3\u30AF\u304C\u3053\u3053\u3067\u3082\u6A5F\u80FD\u3059\u308B\u305F\u3081\u3001\u6C38\u7D9A\u30AD\u30E3\u30C3\u30B7\u30E5\u306B\u713C\u304D\u8FBC\u307E\u308C\u305F broadcaster icon \u3082\u8868\u793A\u6642\u306B\u9664\u53BB\u3055\u308C\u307E\u3059"
+      ])
+    }),
     Object.freeze({
       version: "0.1.80",
       date: "2026-05-01",
@@ -11427,12 +11461,21 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const snap = watchMetaCache.snapshot;
     const own = isOwnPostedSupportComment(entry, String(liveId || ""), entries);
     const bc = String(snap?.broadcasterUserId || "").trim();
+    const broadcasterIconUrl = String(snap?.broadcasterIconUrl || "").trim();
     const entUid = String(entry?.userId || "").trim();
     const avatarUrl = String(entry?.avatarUrl || "").trim();
     const viewerAvatarUrl = String(snap?.viewerAvatarUrl || "").trim();
     const mistakenBroadcaster = !own && Boolean(bc && entUid && bc === entUid);
-    const fallbackAvatar = mistakenBroadcaster || viewerAvatarUrl && isSameAvatarUrl(avatarUrl, viewerAvatarUrl) && !own ? "" : rememberedAvatarUrlForUserId(entUid);
-    const effectiveAvatar = viewerAvatarUrl && isSameAvatarUrl(avatarUrl, viewerAvatarUrl) && !own ? "" : avatarUrl;
+    const guardAv = (av) => shouldAssociateAvatarWithUser({
+      uid: entUid,
+      av,
+      broadcasterUid: bc,
+      broadcasterIconUrl
+    }) ? av : "";
+    const guardedRememberedAvatar = guardAv(rememberedAvatarUrlForUserId(entUid));
+    const guardedAvatarUrl = guardAv(avatarUrl);
+    const fallbackAvatar = mistakenBroadcaster || viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own ? "" : guardedRememberedAvatar;
+    const effectiveAvatar = viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own ? "" : guardedAvatarUrl;
     const src = resolveSupportGrowthTileSrc({
       entryAvatarUrl: effectiveAvatar || fallbackAvatar,
       userId: mistakenBroadcaster ? null : entry?.userId ?? null,
@@ -16591,7 +16634,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1545" ? String("0501-1545") : "dev";
+      const buildId = "0501-1552" ? String("0501-1552") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

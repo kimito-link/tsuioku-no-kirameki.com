@@ -8,6 +8,7 @@ import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMult
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
+import { shouldAssociateAvatarWithUser } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
   compactNicoLaneUserId
@@ -2426,19 +2427,37 @@ function storyGrowthAvatarSrcCandidate(entry, liveId, entries = STORY_SOURCE_STA
   const snap = watchMetaCache.snapshot;
   const own = isOwnPostedSupportComment(entry, String(liveId || ''), entries);
   const bc = String(snap?.broadcasterUserId || '').trim();
+  const broadcasterIconUrl = String(snap?.broadcasterIconUrl || '').trim();
   const entUid = String(entry?.userId || '').trim();
   const avatarUrl = String(entry?.avatarUrl || '').trim();
   const viewerAvatarUrl = String(snap?.viewerAvatarUrl || '').trim();
   const mistakenBroadcaster =
     !own && Boolean(bc && entUid && bc === entUid);
+
+  // 0.1.81: 6 層目のガード。entry.avatarUrl と rememberedAvatarUrlForUserId の
+  //   両方に対して、broadcaster icon と一致する URL は無効化する。
+  //   KEY_USER_COMMENT_PROFILE_CACHE 経由の汚染データもここで除去できる。
+  const guardAv = (av) =>
+    shouldAssociateAvatarWithUser({
+      uid: entUid,
+      av,
+      broadcasterUid: bc,
+      broadcasterIconUrl
+    })
+      ? av
+      : '';
+  const guardedRememberedAvatar = guardAv(rememberedAvatarUrlForUserId(entUid));
+  const guardedAvatarUrl = guardAv(avatarUrl);
+
   const fallbackAvatar =
-    mistakenBroadcaster || (viewerAvatarUrl && isSameAvatarUrl(avatarUrl, viewerAvatarUrl) && !own)
+    mistakenBroadcaster ||
+    (viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own)
       ? ''
-      : rememberedAvatarUrlForUserId(entUid);
+      : guardedRememberedAvatar;
   const effectiveAvatar =
-    viewerAvatarUrl && isSameAvatarUrl(avatarUrl, viewerAvatarUrl) && !own
+    viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own
       ? ''
-      : avatarUrl;
+      : guardedAvatarUrl;
   const src = resolveSupportGrowthTileSrc({
     entryAvatarUrl: effectiveAvatar || fallbackAvatar,
     userId: mistakenBroadcaster ? null : entry?.userId ?? null,

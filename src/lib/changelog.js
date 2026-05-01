@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.81',
+    date: '2026-05-01',
+    summary: 'プロファイルキャッシュ経由の汚染にも対応',
+    items: Object.freeze([
+      '0.1.80 で URL サイズ違いに対応しましたが、storyGrowthAvatarSrcCandidate という別経路で永続キャッシュ（KEY_USER_COMMENT_PROFILE_CACHE）から汚染データを読み出してフォールバックに使う処理が残っていたため、アイコン列のサムネが直っていませんでした',
+      '修正内容: storyGrowthAvatarSrcCandidate 内の avatarUrl と rememberedAvatarUrlForUserId（プロファイルキャッシュ経由）両方に shouldAssociateAvatarWithUser ガードを適用。0.1.80 の URL 抽出ロジックがここでも機能するため、永続キャッシュに焼き込まれた broadcaster icon も表示時に除去されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.80',
     date: '2026-05-01',
     summary: 'avatar 取り違え修正の真因（URL サイズ違い）に対応',
