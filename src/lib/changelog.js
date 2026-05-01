@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.79',
+    date: '2026-05-01',
+    summary: 'アイコン列の汚染 avatar も表示時に補正',
+    items: Object.freeze([
+      '0.1.78 で aggregateCommentsByUser 経由（HTML レポート・上位ランク）はガードしましたが、応援ユーザーレーンのアイコン列は別経路（userLaneCandidatesFromStorage）を使っており、broadcaster icon の取り違えがそのまま表示され続けていました',
+      '修正内容: src/lib/userLaneCandidatesFromStorage.js に broadcasterUid + broadcasterIconUrl の optional 引数を追加。viewer のコメ記録に焼き込まれた broadcaster icon と一致する URL を集約前に除外。popup-entry.js の syncStorySourceEntries から snapshot 経由でガード情報を渡す。6 ケース TDD 追加（合計 27）',
+      'これで「アイコン列・グリッド・診断」セクションでも自分のサムネが正しい個人アイコンに戻ります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.78',
     date: '2026-05-01',
     summary: 'コメ記録の汚染 avatar を表示時に補正',

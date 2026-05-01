@@ -745,6 +745,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.79",
+      date: "2026-05-01",
+      summary: "\u30A2\u30A4\u30B3\u30F3\u5217\u306E\u6C5A\u67D3 avatar \u3082\u8868\u793A\u6642\u306B\u88DC\u6B63",
+      items: Object.freeze([
+        "0.1.78 \u3067 aggregateCommentsByUser \u7D4C\u7531\uFF08HTML \u30EC\u30DD\u30FC\u30C8\u30FB\u4E0A\u4F4D\u30E9\u30F3\u30AF\uFF09\u306F\u30AC\u30FC\u30C9\u3057\u307E\u3057\u305F\u304C\u3001\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30EC\u30FC\u30F3\u306E\u30A2\u30A4\u30B3\u30F3\u5217\u306F\u5225\u7D4C\u8DEF\uFF08userLaneCandidatesFromStorage\uFF09\u3092\u4F7F\u3063\u3066\u304A\u308A\u3001broadcaster icon \u306E\u53D6\u308A\u9055\u3048\u304C\u305D\u306E\u307E\u307E\u8868\u793A\u3055\u308C\u7D9A\u3051\u3066\u3044\u307E\u3057\u305F",
+        "\u4FEE\u6B63\u5185\u5BB9: src/lib/userLaneCandidatesFromStorage.js \u306B broadcasterUid + broadcasterIconUrl \u306E optional \u5F15\u6570\u3092\u8FFD\u52A0\u3002viewer \u306E\u30B3\u30E1\u8A18\u9332\u306B\u713C\u304D\u8FBC\u307E\u308C\u305F broadcaster icon \u3068\u4E00\u81F4\u3059\u308B URL \u3092\u96C6\u7D04\u524D\u306B\u9664\u5916\u3002popup-entry.js \u306E syncStorySourceEntries \u304B\u3089 snapshot \u7D4C\u7531\u3067\u30AC\u30FC\u30C9\u60C5\u5831\u3092\u6E21\u3059\u30026 \u30B1\u30FC\u30B9 TDD \u8FFD\u52A0\uFF08\u5408\u8A08 27\uFF09",
+        "\u3053\u308C\u3067\u300C\u30A2\u30A4\u30B3\u30F3\u5217\u30FB\u30B0\u30EA\u30C3\u30C9\u30FB\u8A3A\u65AD\u300D\u30BB\u30AF\u30B7\u30E7\u30F3\u3067\u3082\u81EA\u5206\u306E\u30B5\u30E0\u30CD\u304C\u6B63\u3057\u3044\u500B\u4EBA\u30A2\u30A4\u30B3\u30F3\u306B\u623B\u308A\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.78",
       date: "2026-05-01",
       summary: "\u30B3\u30E1\u8A18\u9332\u306E\u6C5A\u67D3 avatar \u3092\u8868\u793A\u6642\u306B\u88DC\u6B63",
@@ -4005,10 +4015,13 @@ ${body}`;
     );
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
-  function userLaneCandidatesFromStorage(storedComments, liveId) {
+  function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
     const filterByLive = arguments.length >= 2 && liveId != null && String(liveId).trim() !== "";
     const lidNorm = filterByLive ? String(liveId).trim() : "";
     const targetNorm = filterByLive ? normalizeLv2(lidNorm) : "";
+    const broadcasterUid = String(opts?.broadcasterUid ?? "").trim();
+    const broadcasterIconUrl = String(opts?.broadcasterIconUrl ?? "").trim();
+    const broadcasterGuardEnabled = Boolean(broadcasterUid && broadcasterIconUrl);
     const allRows = Array.isArray(storedComments) ? storedComments : [];
     let rows = filterByLive ? allRows.filter((e) => rowMatchesLiveFilter(e, targetNorm)) : allRows;
     let useLidForOutput = filterByLive;
@@ -4035,6 +4048,7 @@ ${body}`;
       );
       let observed = false;
       const urls = [];
+      const isBroadcasterHere = broadcasterGuardEnabled && userId === broadcasterUid;
       for (const g of chronological) {
         if (
           /** @type {{ avatarObserved?: boolean }} */
@@ -4046,7 +4060,11 @@ ${body}`;
           /** @type {{ avatarUrl?: unknown }} */
           g.avatarUrl ?? ""
         ).trim();
-        if (u) urls.push(u);
+        if (!u) continue;
+        if (broadcasterGuardEnabled && !isBroadcasterHere && isSameAvatarUrl(u, broadcasterIconUrl)) {
+          continue;
+        }
+        urls.push(u);
       }
       const avatarUrl = pickStrongestAvatarUrlForUser(userId, urls);
       const newestFirst = [...chronological].sort(
@@ -12178,7 +12196,14 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     STORY_SOURCE_STATE.entries = list;
     STORY_SOURCE_STATE.storageRowsForCurrentLive = Array.isArray(storageRowsForLane) ? storageRowsForLane : [];
-    STORY_SOURCE_STATE.laneAggregates = nextLiveId ? userLaneCandidatesFromStorage(STORY_SOURCE_STATE.storageRowsForCurrentLive, nextLiveId) : Object.freeze([]);
+    STORY_SOURCE_STATE.laneAggregates = nextLiveId ? userLaneCandidatesFromStorage(
+      STORY_SOURCE_STATE.storageRowsForCurrentLive,
+      nextLiveId,
+      {
+        broadcasterUid: String(watchMetaCache.snapshot?.broadcasterUserId || "").trim(),
+        broadcasterIconUrl: String(watchMetaCache.snapshot?.broadcasterIconUrl || "").trim()
+      }
+    ) : Object.freeze([]);
     const pin = STORY_GROWTH_STATE.pinnedCommentId;
     if (pin && !list.some((e) => commentStableId(e) === pin)) {
       STORY_GROWTH_STATE.pinnedCommentId = null;
@@ -16556,7 +16581,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0501-1516" ? String("0501-1516") : "dev";
+      const buildId = "0501-1527" ? String("0501-1527") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

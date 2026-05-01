@@ -8,6 +8,7 @@
 import { normalizeLv as normalizeLvCanonical } from '../shared/niconico/liveId.js';
 import { pickStrongestAvatarUrlForUser } from './supportGrowthTileSrc.js';
 import { supportGridStrongNickname } from './supportGridDisplayTier.js';
+import { isSameAvatarUrl } from './avatarUrlCompare.js';
 
 /**
  * @typedef {{
@@ -66,13 +67,21 @@ function rowCapturedAt(row) {
 /**
  * @param {readonly unknown[]|null|undefined} storedComments
  * @param {string|null|undefined} [liveId] 省略時は全 live を対象。非空のときは当該放送のみ。
+ * @param {{ broadcasterUid?: string, broadcasterIconUrl?: string }} [opts]
+ *   0.1.79: ギフト演出 DOM での avatar 取り違え対策。
+ *     コメ記録に焼き込まれた avatarUrl のうち、broadcaster icon と一致する URL は
+ *     viewer (uid !== broadcasterUid) には紐付けず破棄する。
+ *     未指定時はガード掛けず（false positive 回避）。
  * @returns {readonly Readonly<UserLaneCandidateFromStorage>[]}
  */
-export function userLaneCandidatesFromStorage(storedComments, liveId) {
+export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
   const filterByLive =
     arguments.length >= 2 && liveId != null && String(liveId).trim() !== '';
   const lidNorm = filterByLive ? String(liveId).trim() : '';
   const targetNorm = filterByLive ? normalizeLv(lidNorm) : '';
+  const broadcasterUid = String(opts?.broadcasterUid ?? '').trim();
+  const broadcasterIconUrl = String(opts?.broadcasterIconUrl ?? '').trim();
+  const broadcasterGuardEnabled = Boolean(broadcasterUid && broadcasterIconUrl);
 
   const allRows = Array.isArray(storedComments) ? storedComments : [];
   let rows = filterByLive
@@ -111,12 +120,24 @@ export function userLaneCandidatesFromStorage(storedComments, liveId) {
     let observed = false;
     /** @type {string[]} */
     const urls = [];
+    // 0.1.79: viewer uid が broadcaster 本人でない場合、broadcaster icon と
+    // 一致する URL は除外する（ギフト演出 DOM 観測の取り違え後方互換補正）。
+    const isBroadcasterHere =
+      broadcasterGuardEnabled && userId === broadcasterUid;
     for (const g of chronological) {
       if (/** @type {{ avatarObserved?: boolean }} */ (g).avatarObserved === true) {
         observed = true;
       }
       const u = String(/** @type {{ avatarUrl?: unknown }} */ (g).avatarUrl ?? '').trim();
-      if (u) urls.push(u);
+      if (!u) continue;
+      if (
+        broadcasterGuardEnabled &&
+        !isBroadcasterHere &&
+        isSameAvatarUrl(u, broadcasterIconUrl)
+      ) {
+        continue;
+      }
+      urls.push(u);
     }
     const avatarUrl = pickStrongestAvatarUrlForUser(userId, urls);
 

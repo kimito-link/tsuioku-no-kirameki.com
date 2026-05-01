@@ -3260,8 +3260,17 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
   STORY_SOURCE_STATE.storageRowsForCurrentLive = Array.isArray(storageRowsForLane)
     ? storageRowsForLane
     : [];
+  // 0.1.79: 4 層目のガード — 応援ユーザーレーン（アイコン列）の集約時にも
+  //   broadcaster icon の取り違えを除外する。
   STORY_SOURCE_STATE.laneAggregates = nextLiveId
-    ? userLaneCandidatesFromStorage(STORY_SOURCE_STATE.storageRowsForCurrentLive, nextLiveId)
+    ? userLaneCandidatesFromStorage(
+        STORY_SOURCE_STATE.storageRowsForCurrentLive,
+        nextLiveId,
+        {
+          broadcasterUid: String(watchMetaCache.snapshot?.broadcasterUserId || '').trim(),
+          broadcasterIconUrl: String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim()
+        }
+      )
     : Object.freeze([]);
 
   const pin = STORY_GROWTH_STATE.pinnedCommentId;

@@ -333,3 +333,139 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
     expect(acceptedNicknames).toContain(candidate?.nickname);
   });
 });
+
+maybe('0.1.79: ギフト演出 DOM での broadcaster icon 取り違えガード', () => {
+  const broadcasterUid = '99999';
+  const broadcasterIconUrl =
+    'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/9/99999.jpg';
+  const viewerUid = '4046119';
+  const viewerPersonalIcon = 'https://cdn.example/viewer-personal.jpg';
+  const lvId = 'lv350427171';
+
+  it('viewer のコメ記録に broadcaster icon が混入していても avatarUrl は別 URL になる', () => {
+    const out = userLaneCandidatesFromStorage(
+      [
+        // 1 件目: 正しい個人サムネ
+        {
+          userId: viewerUid,
+          nickname: '君斗りんく',
+          avatarUrl: viewerPersonalIcon,
+          capturedAt: 1,
+          liveId: lvId
+        },
+        // 2 件目: ギフト演出 DOM 観測の汚染データ（broadcaster icon）
+        {
+          userId: viewerUid,
+          nickname: '君斗りんく',
+          avatarUrl: broadcasterIconUrl,
+          capturedAt: 2,
+          liveId: lvId
+        }
+      ],
+      lvId,
+      { broadcasterUid, broadcasterIconUrl }
+    );
+    const me = out.find((c) => c.userId === viewerUid);
+    expect(me).toBeTruthy();
+    expect(me?.avatarUrl).toBe(viewerPersonalIcon);
+  });
+
+  it('broadcaster 本人のコメ記録の broadcaster icon は通す', () => {
+    const out = userLaneCandidatesFromStorage(
+      [
+        {
+          userId: broadcasterUid,
+          nickname: '配信者',
+          avatarUrl: broadcasterIconUrl,
+          capturedAt: 1,
+          liveId: lvId
+        }
+      ],
+      lvId,
+      { broadcasterUid, broadcasterIconUrl }
+    );
+    const broadcaster = out.find((c) => c.userId === broadcasterUid);
+    expect(broadcaster).toBeTruthy();
+    expect(broadcaster?.avatarUrl).toBe(broadcasterIconUrl);
+  });
+
+  it('全コメが汚染データのみの viewer は avatarUrl 空（pickStrongestAvatarUrlForUser フォールバック）', () => {
+    const out = userLaneCandidatesFromStorage(
+      [
+        {
+          userId: viewerUid,
+          nickname: '君斗りんく',
+          avatarUrl: broadcasterIconUrl,
+          capturedAt: 1,
+          liveId: lvId
+        }
+      ],
+      lvId,
+      { broadcasterUid, broadcasterIconUrl }
+    );
+    const me = out.find((c) => c.userId === viewerUid);
+    expect(me).toBeTruthy();
+    // urls が全部除外されたら canonical fallback or '' のいずれか
+    expect(me?.avatarUrl).not.toBe(broadcasterIconUrl);
+  });
+
+  it('query string が違うだけの broadcaster icon もブロック', () => {
+    const out = userLaneCandidatesFromStorage(
+      [
+        {
+          userId: viewerUid,
+          nickname: '君斗りんく',
+          avatarUrl: viewerPersonalIcon,
+          capturedAt: 1,
+          liveId: lvId
+        },
+        {
+          userId: viewerUid,
+          nickname: '君斗りんく',
+          avatarUrl: `${broadcasterIconUrl}?cache_buster=42`,
+          capturedAt: 2,
+          liveId: lvId
+        }
+      ],
+      lvId,
+      { broadcasterUid, broadcasterIconUrl }
+    );
+    const me = out.find((c) => c.userId === viewerUid);
+    expect(me?.avatarUrl).toBe(viewerPersonalIcon);
+  });
+
+  it('opts 未指定なら従来通り（後方互換 — false positive 回避）', () => {
+    const out = userLaneCandidatesFromStorage(
+      [
+        {
+          userId: viewerUid,
+          nickname: '君斗りんく',
+          avatarUrl: broadcasterIconUrl,
+          capturedAt: 1,
+          liveId: lvId
+        }
+      ],
+      lvId
+    );
+    const me = out.find((c) => c.userId === viewerUid);
+    // ガード未指定なので通る
+    expect(me?.avatarUrl).toBe(broadcasterIconUrl);
+  });
+
+  it('broadcasterIconUrl のみ未指定（broadcasterUid のみ） → 後方互換でガード掛けず', () => {
+    const out = userLaneCandidatesFromStorage(
+      [
+        {
+          userId: viewerUid,
+          avatarUrl: broadcasterIconUrl,
+          capturedAt: 1,
+          liveId: lvId
+        }
+      ],
+      lvId,
+      { broadcasterUid, broadcasterIconUrl: '' }
+    );
+    const me = out.find((c) => c.userId === viewerUid);
+    expect(me?.avatarUrl).toBe(broadcasterIconUrl);
+  });
+});
