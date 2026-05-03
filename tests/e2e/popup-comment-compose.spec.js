@@ -1,4 +1,9 @@
-import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
+import {
+  test,
+  expect,
+  dismissExtensionUsageTermsGate,
+  focusMockWatchThenReloadPopup
+} from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
@@ -67,6 +72,7 @@ test.describe('popup comment compose', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await dismissExtensionUsageTermsGate(popup);
 
     const postBtn = popup.locator('#postCommentBtn');
@@ -120,6 +126,7 @@ test.describe('popup comment compose', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await dismissExtensionUsageTermsGate(popup);
 
     const postBtn = popup.locator('#postCommentBtn');

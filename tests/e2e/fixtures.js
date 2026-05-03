@@ -67,6 +67,19 @@ export async function dismissExtensionUsageTermsGate(popup) {
 }
 
 /**
+ * standalone で `popup.html` を開くと、そのタブがアクティブになり
+ * `pickWatchUrlFromMultipleSources` が拡張 URL 扱い → `nl-empty-state` が付き
+ * `.nl-comment-compose` が CSS で隠れる。mock watch タブを前面にしてから
+ * popup を reload し、watch を解決したペイントに合わせる（E2E 安定化）。
+ * @param {import('@playwright/test').Page} watch
+ * @param {import('@playwright/test').Page} popup
+ */
+export async function focusMockWatchThenReloadPopup(watch, popup) {
+  await watch.bringToFront();
+  await popup.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+}
+
+/**
  * 記録 ON/OFF などが `#nlPopupSettings` 内にある場合に、折りたたみを開く。
  * @param {import('@playwright/test').Page | import('@playwright/test').FrameLocator} pageOrFrame
  */

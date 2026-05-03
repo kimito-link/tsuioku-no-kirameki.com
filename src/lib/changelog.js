@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.105',
+    date: '2026-05-03',
+    summary: '自動テストのポップアップ検証を安定化',
+    items: Object.freeze([
+      'GitHub Actions のブラウザ自動テスト（E2E）で、モックの視聴ページとは別タブでポップアップだけを開いたあと、アクティブタブが拡張側と判定され「配信なし」と同じ見た目の CSS がコメント欄を隠してしまい、見えない扱いになることがありました',
+      'テスト側で「視聴タブを一度前面にしたうえでポップアップを再読み込みする」共通手順を追加し、視聴中と同じ前提で検証できるようにしました。通常の視聴・ポップアップの動作そのものは変えていません',
+      'Chrome の拡張機能一覧とポップアップのバージョン表示が 0.1.105 になります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.104',
     date: '2026-05-03',
     summary: 'deep gap recovery をさらに強化',
