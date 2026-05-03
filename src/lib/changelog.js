@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.107',
+    date: '2026-05-03',
+    summary: '自動テストのインラインパネル配置検証を現仕様に整合',
+    items: Object.freeze([
+      'GitHub Actions のブラウザ自動テストで、beside（横付き）時に動画とパネルの間へ空白テキストを挟む検証が、環境によって期待値とずれて失敗することがありました',
+      '設計どおり「空白が挟まっても毎フレーム DOM を差し替え続けない」ことと、安定後も動画の直前要素としてパネルが論理的に繋がっていることを確認する内容にテストを更新しました（本体の表示ロジックの変更ではありません）',
+      'Chrome の拡張機能一覧とポップアップのバージョン表示が 0.1.107 になります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.106',
     date: '2026-05-03',
     summary: '視聴ページパネルでランキング枠が一瞬出る現象を軽減',

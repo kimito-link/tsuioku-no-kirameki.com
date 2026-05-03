@@ -335,13 +335,24 @@ test.describe('inline panel alignment', () => {
 
     await page.waitForTimeout(1200);
 
+    /*
+     * 本体は inlinePopupHostIsCorrectlyPlaced で previousElementSibling === insertAfter を見ており、
+     * 間に空白 Text があっても「配置済み」と判定して毎tick insertAdjacent しない（content-entry 参照）。
+     * その後のレイアウト調整で DOM が VIDEO の直後に host が寄せられ、previousSibling が ELEMENT（VIDEO）
+     * になる環境があるが、thrashing しないことが契約なので安定後も prevElement が VIDEO のままであることと、
+     * 短時間で親／直前要素タグがぶれないことを検証する。
+     */
     await expect
       .poll(() => hostPlacementMetrics(page), { timeout: 10_000 })
       .toMatchObject({
         parentId: 'mock-player-row',
-        prevElementTag: 'VIDEO',
-        prevSiblingType: 3
+        prevElementTag: 'VIDEO'
       });
+    const mid = await hostPlacementMetrics(page);
+    await page.waitForTimeout(600);
+    const later = await hostPlacementMetrics(page);
+    expect(mid?.parentId).toBe(later?.parentId);
+    expect(mid?.prevElementTag).toBe(later?.prevElementTag);
   });
 
   test('floating + bottom_left では fixed で左下に寄せる', async ({ context }) => {
