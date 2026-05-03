@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { INGEST_TIMING, SUBMIT_TIMING, MAP_LIMITS, HARVEST_TIMING } from './timingConstants.js';
+import {
+  INGEST_TIMING,
+  SUBMIT_TIMING,
+  MAP_LIMITS,
+  HARVEST_TIMING,
+  OFFICIAL_GAP_DEEP_TIMING
+} from './timingConstants.js';
 
 describe('INGEST_TIMING', () => {
   it('必須キーを全て持つ', () => {
@@ -67,6 +73,22 @@ describe('HARVEST_TIMING', () => {
       expect(HARVEST_TIMING).toHaveProperty(key);
       expect(typeof HARVEST_TIMING[key]).toBe('number');
       expect(HARVEST_TIMING[key]).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('OFFICIAL_GAP_DEEP_TIMING', () => {
+  it('必須キーを全て持つ', () => {
+    const required = [
+      'cooldownMs',
+      'minOfficialComments',
+      'minGapAbsolute',
+      'gapRatioOfOfficial'
+    ];
+    for (const key of required) {
+      expect(OFFICIAL_GAP_DEEP_TIMING).toHaveProperty(key);
+      expect(typeof OFFICIAL_GAP_DEEP_TIMING[key]).toBe('number');
+      expect(OFFICIAL_GAP_DEEP_TIMING[key]).toBeGreaterThan(0);
     }
   });
 });

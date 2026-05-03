@@ -44,3 +44,14 @@ export const HARVEST_TIMING = /** @type {const} */ ({
   ndgrActiveThresholdMs: 60_000,
   deepRecoveryMs: 300_000
 });
+
+/**
+ * ライブ中: 公式 statistics のコメント累計と記録件数の差が大きいときの追い quiet deep。
+ * 配信終了後の DOM 検知 bulk（watchProgramEndState）と併用する。
+ */
+export const OFFICIAL_GAP_DEEP_TIMING = /** @type {const} */ ({
+  cooldownMs: 55_000,
+  minOfficialComments: 120,
+  minGapAbsolute: 220,
+  gapRatioOfOfficial: 0.075
+});

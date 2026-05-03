@@ -225,14 +225,14 @@ export function resolveAvatar(input) {
   for (const obs of observations) {
     if (!obs || typeof obs !== 'object') continue;
     const verdict = isObservationSafe(userId, obs, broadcaster, viewer);
-    if (verdict.safe) {
-      accepted.push(obs);
-    } else {
+    if (verdict.safe === false) {
       rejected.push({
         kind: obs.kind,
         reason: verdict.reason,
         url: String(obs.url || '')
       });
+    } else {
+      accepted.push(obs);
     }
   }
 

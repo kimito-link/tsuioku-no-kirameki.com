@@ -125,7 +125,14 @@ import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated 
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
 import { trimMapToMax } from '../lib/trimMap.js';
 import { diagnosePersistGate } from '../lib/commentSubmitSteps.js';
-import { INGEST_TIMING, SUBMIT_TIMING, MAP_LIMITS, HARVEST_TIMING } from '../lib/timingConstants.js';
+import {
+  INGEST_TIMING,
+  SUBMIT_TIMING,
+  MAP_LIMITS,
+  HARVEST_TIMING,
+  OFFICIAL_GAP_DEEP_TIMING
+} from '../lib/timingConstants.js';
+import { shouldTriggerOfficialGapDeepHarvest } from '../lib/shouldTriggerOfficialGapDeepHarvest.js';
 import {
   shouldForceDeepHarvestForReason,
   shouldForceDeepHarvestRecovery,
@@ -657,6 +664,8 @@ let interceptReconcileTimer = null;
 let endedBulkHarvestTriggeredLiveId = '';
 /** 配信終了判定の最終チェック時刻 */
 let endedBulkHarvestLastCheckedAt = 0;
+/** ライブ中「公式−記録」ギャップ追い deep の最終発火時刻 */
+let lastOfficialGapDeepHarvestAt = 0;
 
 function clearNdgrChatRowsPending() {
   ndgrChatRowsPending.length = 0;
@@ -717,6 +726,42 @@ function maybeRunEndedBulkHarvest() {
   endedBulkHarvestTriggeredLiveId = String(liveId || '').trim();
   void runDeepHarvest({ force: true }).catch((err) =>
     reportSilentErrorToStorage('endedBulkHarvest', err)
+  );
+}
+
+/**
+ * ライブ中: statistics の公式コメ累計と記録件数の差が大きいとき、quiet deep を追いで掛ける。
+ * 終了検知後の maybeRunEndedBulkHarvest と併用（終了後はそちらが本体）。
+ */
+function maybeOfficialGapQuietDeepHarvest() {
+  if (
+    !shouldTriggerOfficialGapDeepHarvest({
+      recording,
+      liveId,
+      locationAllows: locationAllowsCommentRecording(),
+      documentHidden:
+        typeof document !== 'undefined' &&
+        document.visibilityState !== 'visible',
+      harvestRunning,
+      now: Date.now(),
+      lastTriggeredAt: lastOfficialGapDeepHarvestAt,
+      cooldownMs: OFFICIAL_GAP_DEEP_TIMING.cooldownMs,
+      officialCommentCount,
+      recordedCommentCount: observedRecordedCommentCount,
+      minOfficial: OFFICIAL_GAP_DEEP_TIMING.minOfficialComments,
+      minGapAbsolute: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
+      gapRatio: OFFICIAL_GAP_DEEP_TIMING.gapRatioOfOfficial
+    })
+  ) {
+    return;
+  }
+  lastOfficialGapDeepHarvestAt = Date.now();
+  void runDeepHarvest({
+    stabilityFollowUp: false,
+    force: true,
+    armStabilityFollowUp: false
+  }).catch((err) =>
+    reportSilentErrorToStorage('officialGapDeepHarvest', err)
   );
 }
 
@@ -3149,6 +3194,7 @@ function startPageFrameLoop() {
     if (!hasExtensionContext()) return;
     renderPageFrameOverlay();
     maybeRunEndedBulkHarvest();
+    maybeOfficialGapQuietDeepHarvest();
     persistAiShareFastDiagnostics();
     // 0.1.32 (AG): バックグラウンドで prewarm を skip した分、tick で再 schedule
     // を試みる。visibilitychange は tick を呼ぶので、可視化された瞬間に prewarm
@@ -5439,6 +5485,7 @@ function syncLiveIdFromLocation() {
       clearInterceptReconcilePending();
       endedBulkHarvestTriggeredLiveId = '';
       endedBulkHarvestLastCheckedAt = 0;
+      lastOfficialGapDeepHarvestAt = 0;
       resetDeepHarvestStabilityFollowUp();
       /*
        * 別 lv に切り替えた直後も lastCompletedAt が直前放送のままだと recovery が false になり、
@@ -5495,6 +5542,7 @@ function syncLiveIdFromLocation() {
       clearInterceptReconcilePending();
       endedBulkHarvestTriggeredLiveId = '';
       endedBulkHarvestLastCheckedAt = 0;
+      lastOfficialGapDeepHarvestAt = 0;
       resetDeepHarvestStabilityFollowUp();
       /*
        * 別 lv に切り替えた直後も lastCompletedAt が直前放送のままだと recovery が false になり、
@@ -5542,6 +5590,7 @@ function syncLiveIdFromLocation() {
   clearInterceptReconcilePending();
   endedBulkHarvestTriggeredLiveId = '';
   endedBulkHarvestLastCheckedAt = 0;
+  lastOfficialGapDeepHarvestAt = 0;
   clearThumbTimer();
   reconnectMutationObserver();
   hidePageFrameOverlay();

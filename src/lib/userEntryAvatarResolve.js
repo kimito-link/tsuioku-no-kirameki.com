@@ -61,6 +61,7 @@ export function resolveUserEntryAvatarSignals(input) {
   //   broadcaster icon と一致する URL は uid が broadcaster 本人でない限り
   //   無効化する。これにより comment record に焼き込み済みの誤データや
   //   intercept キャッシュの汚染も表示時点で除外できる（defense in depth）。
+  /** @param {string} av */
   const guard = (av) =>
     shouldAssociateAvatarWithUser({
       uid: userId,

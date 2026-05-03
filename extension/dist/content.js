@@ -3206,6 +3206,41 @@
       deepRecoveryMs: 3e5
     }
   );
+  var OFFICIAL_GAP_DEEP_TIMING = (
+    /** @type {const} */
+    {
+      cooldownMs: 55e3,
+      minOfficialComments: 120,
+      minGapAbsolute: 220,
+      gapRatioOfOfficial: 0.075
+    }
+  );
+
+  // src/lib/shouldTriggerOfficialGapDeepHarvest.js
+  function shouldTriggerOfficialGapDeepHarvest(p) {
+    if (!p?.recording) return false;
+    if (!p?.locationAllows) return false;
+    const liveId2 = String(p?.liveId || "").trim();
+    if (!liveId2) return false;
+    if (p?.documentHidden) return false;
+    if (p?.harvestRunning) return false;
+    const now = Math.max(0, Number(p.now) || 0);
+    const last = Math.max(0, Number(p.lastTriggeredAt) || 0);
+    const cooldown = Math.max(5e3, Number(p.cooldownMs) || 55e3);
+    if (last > 0 && now - last < cooldown) return false;
+    const officialRaw = p.officialCommentCount;
+    if (officialRaw == null || !Number.isFinite(officialRaw)) return false;
+    const official = Math.max(0, Math.floor(Number(officialRaw)));
+    const minOfficial = Math.max(0, Number(p.minOfficial) || 0);
+    if (official < minOfficial) return false;
+    const recRaw = p.recordedCommentCount;
+    const rec = recRaw != null && Number.isFinite(recRaw) ? Math.max(0, Math.floor(Number(recRaw))) : 0;
+    const gap = official - rec;
+    const minAbs = Math.max(0, Number(p.minGapAbsolute) || 0);
+    const ratio = Math.max(0, Number(p.gapRatio) || 0);
+    const threshold = Math.max(minAbs, Math.floor(official * ratio));
+    return gap >= threshold;
+  }
 
   // src/lib/deepHarvestReason.js
   var DEEP_HARVEST_REASONS = (
@@ -4025,6 +4060,7 @@
   var interceptReconcileTimer = null;
   var endedBulkHarvestTriggeredLiveId = "";
   var endedBulkHarvestLastCheckedAt = 0;
+  var lastOfficialGapDeepHarvestAt = 0;
   function clearNdgrChatRowsPending() {
     ndgrChatRowsPending.length = 0;
     if (ndgrChatRowsFlushTimer != null) {
@@ -4074,6 +4110,33 @@
     endedBulkHarvestTriggeredLiveId = String(liveId || "").trim();
     void runDeepHarvest({ force: true }).catch(
       (err) => reportSilentErrorToStorage("endedBulkHarvest", err)
+    );
+  }
+  function maybeOfficialGapQuietDeepHarvest() {
+    if (!shouldTriggerOfficialGapDeepHarvest({
+      recording,
+      liveId,
+      locationAllows: locationAllowsCommentRecording(),
+      documentHidden: typeof document !== "undefined" && document.visibilityState !== "visible",
+      harvestRunning,
+      now: Date.now(),
+      lastTriggeredAt: lastOfficialGapDeepHarvestAt,
+      cooldownMs: OFFICIAL_GAP_DEEP_TIMING.cooldownMs,
+      officialCommentCount,
+      recordedCommentCount: observedRecordedCommentCount,
+      minOfficial: OFFICIAL_GAP_DEEP_TIMING.minOfficialComments,
+      minGapAbsolute: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
+      gapRatio: OFFICIAL_GAP_DEEP_TIMING.gapRatioOfOfficial
+    })) {
+      return;
+    }
+    lastOfficialGapDeepHarvestAt = Date.now();
+    void runDeepHarvest({
+      stabilityFollowUp: false,
+      force: true,
+      armStabilityFollowUp: false
+    }).catch(
+      (err) => reportSilentErrorToStorage("officialGapDeepHarvest", err)
     );
   }
   function queueInterceptReconcile(entries, users) {
@@ -5927,6 +5990,7 @@
       if (!hasExtensionContext()) return;
       renderPageFrameOverlay();
       maybeRunEndedBulkHarvest();
+      maybeOfficialGapQuietDeepHarvest();
       persistAiShareFastDiagnostics();
       schedulePrewarmInlinePopupIframe();
     };
@@ -7684,6 +7748,7 @@
         clearInterceptReconcilePending();
         endedBulkHarvestTriggeredLiveId = "";
         endedBulkHarvestLastCheckedAt = 0;
+        lastOfficialGapDeepHarvestAt = 0;
         resetDeepHarvestStabilityFollowUp();
         deepHarvestPipelineStats.lastCompletedAt = 0;
         armDeepHarvestZeroRowRetryForNewLiveSession();
@@ -7735,6 +7800,7 @@
         clearInterceptReconcilePending();
         endedBulkHarvestTriggeredLiveId = "";
         endedBulkHarvestLastCheckedAt = 0;
+        lastOfficialGapDeepHarvestAt = 0;
         resetDeepHarvestStabilityFollowUp();
         deepHarvestPipelineStats.lastCompletedAt = 0;
         armDeepHarvestZeroRowRetryForNewLiveSession();
@@ -7777,6 +7843,7 @@
     clearInterceptReconcilePending();
     endedBulkHarvestTriggeredLiveId = "";
     endedBulkHarvestLastCheckedAt = 0;
+    lastOfficialGapDeepHarvestAt = 0;
     clearThumbTimer();
     reconnectMutationObserver();
     hidePageFrameOverlay();
