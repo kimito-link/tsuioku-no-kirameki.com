@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.103',
+    date: '2026-05-03',
+    summary: 'deep harvest 最適化（下端・ギャップ追い）',
+    items: Object.freeze([
+      '公式コメント欄の仮想リスト走査で、スクロール下端を先にマージしてから上→下へスイープするオプションを deep / 深掘りエクスポートに有効化しました。途中参加でも新しめの帯を早く拾いやすくなります',
+      'ライブ中に公式のコメント累計とローカル記録件数の差が大きいときの追加 quiet deep について、クールダウンとギャップ閾値をわずかに緩め、追い取りが少し早く反応するようにしました（終了後の bulk 取得との併用は従来どおり）',
+      'Chrome の拡張機能一覧と popup のバージョン表示が 0.1.103 になるよう更新しています。「更新」後に watch ページを再読み込みすると確実です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.102',
     date: '2026-05-01',
     summary: '0.1.101 が popup 起動を阻害した件を緊急 revert',
