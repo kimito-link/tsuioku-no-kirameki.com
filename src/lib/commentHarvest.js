@@ -171,6 +171,7 @@ export function pageUserLikelyTypingIn(doc) {
  *   twoPassGapMs?: number,
  *   scrollStepClientHeightRatio?: number,
  *   quietScroll?: boolean,
+ *   preferRecentScrollEndFirst?: boolean,
  *   onBetweenVirtualPasses?: () => void
  * }} opts
  */
@@ -179,6 +180,7 @@ export async function harvestVirtualCommentList(opts) {
   const extract = opts.extractCommentsFromNode;
   const waitMs = opts.waitMs ?? 50;
   const respectTyping = opts.respectTyping !== false;
+  const preferRecentScrollEndFirst = Boolean(opts.preferRecentScrollEndFirst);
   const twoPass = Boolean(opts.twoPass);
   const twoPassGapMs = opts.twoPassGapMs ?? 140;
   const scrollStepRatio =
@@ -241,6 +243,13 @@ export async function harvestVirtualCommentList(opts) {
       const saved = host.scrollTop;
       const max = Math.max(0, host.scrollHeight - host.clientHeight);
       const step = Math.max(64, Math.floor(host.clientHeight * scrollStepRatio));
+
+      if (preferRecentScrollEndFirst && max > 0) {
+        host.scrollTop = max;
+        await raf(doc);
+        await delay(waitMs);
+        mergeInto(map, extract(scanRoot));
+      }
 
       host.scrollTop = 0;
       await raf(doc);

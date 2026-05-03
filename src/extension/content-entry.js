@@ -4784,7 +4784,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             extractCommentsFromNode,
             waitMs: 42,
             respectTyping: false,
-            quietScroll: deepPlan.quietScroll
+            quietScroll: deepPlan.quietScroll,
+            preferRecentScrollEndFirst: true
           });
           for (const r of rows) {
             const no = String(r?.commentNo || '').trim();
@@ -5920,7 +5921,8 @@ async function runDeepHarvest(opts = {}) {
       twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS,
       scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO,
       quietScroll: true,
-      respectTyping: false
+      respectTyping: false,
+      preferRecentScrollEndFirst: true
     });
     await persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.DEEP });
     deepHarvestPipelineStats.lastCompletedAt = Date.now();

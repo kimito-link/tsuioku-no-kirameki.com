@@ -172,6 +172,51 @@ describe('harvestVirtualCommentList', () => {
     expect(nos.size).toBeGreaterThan(1);
   });
 
+  it('preferRecentScrollEndFirst で下端へ先にスクロールしてから先頭へ戻す', async () => {
+    document.body.innerHTML = `
+      <div class="ga-ns-comment-panel">
+        <div class="body" role="rowgroup" style="height:50px;overflow:auto;width:200px">
+          <div id="slot"></div>
+        </div>
+      </div>`;
+    const body = /** @type {HTMLElement} */ (document.querySelector('.body'));
+    Object.defineProperty(body, 'clientHeight', { value: 50, configurable: true });
+    Object.defineProperty(body, 'scrollHeight', { value: 500, configurable: true });
+    let scrollTop = 0;
+    /** @type {number[]} */
+    const assignments = [];
+    Object.defineProperty(body, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (v) => {
+        scrollTop = v;
+        assignments.push(v);
+      }
+    });
+    const slot = document.getElementById('slot');
+    const extract = () => {
+      const idx = Math.min(9, Math.max(0, Math.floor(scrollTop / 60)));
+      slot.innerHTML = `
+        <div class="table-row" data-comment-type="normal">
+          <span class="comment-number">${idx + 1}</span>
+          <span class="comment-text">x</span>
+        </div>
+        <div style="height:800px"></div>`;
+      return extractCommentsFromNode(document.querySelector('.ga-ns-comment-panel'));
+    };
+
+    await harvestVirtualCommentList({
+      document,
+      extractCommentsFromNode: extract,
+      waitMs: 0,
+      preferRecentScrollEndFirst: true,
+      respectTyping: false
+    });
+    const max = Math.max(0, 500 - 50);
+    expect(assignments[0]).toBe(max);
+    expect(assignments).toContain(0);
+  });
+
   it('同一キーは薄い後続パスで userId を失わない', async () => {
     document.body.innerHTML = `
       <div class="ga-ns-comment-panel">

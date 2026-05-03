@@ -50,8 +50,9 @@ export const HARVEST_TIMING = /** @type {const} */ ({
  * 配信終了後の DOM 検知 bulk（watchProgramEndState）と併用する。
  */
 export const OFFICIAL_GAP_DEEP_TIMING = /** @type {const} */ ({
-  cooldownMs: 55_000,
+  // ライブ中追い deep: CPU との折り合いで 40s 前後に寄せる（従来 55s）
+  cooldownMs: 42_000,
   minOfficialComments: 120,
-  minGapAbsolute: 220,
-  gapRatioOfOfficial: 0.075
+  minGapAbsolute: 190,
+  gapRatioOfOfficial: 0.065
 });

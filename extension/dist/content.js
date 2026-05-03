@@ -2207,6 +2207,7 @@
     const extract = opts.extractCommentsFromNode;
     const waitMs = opts.waitMs ?? 50;
     const respectTyping = opts.respectTyping !== false;
+    const preferRecentScrollEndFirst = Boolean(opts.preferRecentScrollEndFirst);
     const twoPass = Boolean(opts.twoPass);
     const twoPassGapMs = opts.twoPassGapMs ?? 140;
     const scrollStepRatio = typeof opts.scrollStepClientHeightRatio === "number" ? opts.scrollStepClientHeightRatio : HARVEST_SCROLL_STEP_CLIENT_HEIGHT_RATIO;
@@ -2255,6 +2256,12 @@
         const saved = host.scrollTop;
         const max = Math.max(0, host.scrollHeight - host.clientHeight);
         const step = Math.max(64, Math.floor(host.clientHeight * scrollStepRatio));
+        if (preferRecentScrollEndFirst && max > 0) {
+          host.scrollTop = max;
+          await raf(doc);
+          await delay(waitMs);
+          mergeInto(map, extract(scanRoot));
+        }
         host.scrollTop = 0;
         await raf(doc);
         await delay(waitMs);
@@ -3209,10 +3216,11 @@
   var OFFICIAL_GAP_DEEP_TIMING = (
     /** @type {const} */
     {
-      cooldownMs: 55e3,
+      // ライブ中追い deep: CPU との折り合いで 40s 前後に寄せる（従来 55s）
+      cooldownMs: 42e3,
       minOfficialComments: 120,
-      minGapAbsolute: 220,
-      gapRatioOfOfficial: 0.075
+      minGapAbsolute: 190,
+      gapRatioOfOfficial: 0.065
     }
   );
 
@@ -7202,7 +7210,8 @@
                 extractCommentsFromNode,
                 waitMs: 42,
                 respectTyping: false,
-                quietScroll: deepPlan.quietScroll
+                quietScroll: deepPlan.quietScroll,
+                preferRecentScrollEndFirst: true
               });
               for (const r of rows) {
                 const no = String(r?.commentNo || "").trim();
@@ -8097,7 +8106,8 @@
         twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS,
         scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO,
         quietScroll: true,
-        respectTyping: false
+        respectTyping: false,
+        preferRecentScrollEndFirst: true
       });
       await persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.DEEP });
       deepHarvestPipelineStats.lastCompletedAt = Date.now();
