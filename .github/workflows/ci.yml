@@ -28,7 +28,8 @@ jobs:
   e2e:
     needs: test-and-build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # workers=1 + CI retries=1 で spec 数分は 20 分に届きやすい。ギリギリの打ち切りを避ける。
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
