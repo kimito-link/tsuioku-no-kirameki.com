@@ -6637,39 +6637,29 @@ async function refresh() {
   syncVoiceCommentButton();
 
   /*
-   * 0.1.55 (AK): ランキング導線が popup で出ない件を確実に直す。
-   *   popup.html 側で hidden 属性を撤去したため、本来は何もしなくても
-   *   表示されるはず。INLINE_EMBED_WATCH（watch ページ内 iframe）のときだけ
-   *   removeAttribute / setAttribute で明示的に切り替え、念のため inline style
-   *   も設定して CSS の影響を遮断する。
-   *
-   * 0.1.69 (AY): 0.1.67 で side panel が「watch じゃないタブ」の主役になったが、
-   *   旧コードは `INLINE_MODE` (= side panel も含む) で hide していたため、
-   *   side panel で導線が出ない退行があった。`INLINE_EMBED_WATCH` に絞り、
-   *   side panel では standalone popup と同様に導線を表示する。
-   */
-  const noWatchHint = $('noWatchRankingHint');
-  if (noWatchHint instanceof HTMLElement) {
-    if (INLINE_EMBED_WATCH) {
-      noWatchHint.setAttribute('hidden', '');
-      noWatchHint.style.display = 'none';
-    } else {
-      noWatchHint.removeAttribute('hidden');
-      noWatchHint.style.display = 'block';
-    }
-  }
-
-  /*
-   * 0.1.57 (AM): source='storage'/'none' のときは stale な watch URL を持ち出して
-   *   前の放送のデータを表示してしまっていたのを止め、「watch を開いてください」
-   *   状態の placeholder を出す。これで標準 popup を非 watch ページで開いた時、
-   *   ランキング導線（オレンジカード）と空状態の placeholder だけのスッキリ表示
-   *   になる。INLINE_MODE / activeTab / lastFocusedNormal なら従来どおりデータ表示。
+   * ランキング導線（noWatchRankingHint）:
+   *   popup.html では既定 hidden（モジュール遅延時の FOUC 防止）。
+   *   INLINE_EMBED_WATCH（watch 埋め込み iframe）は視聴中でも誤って block にしない。
+   *   standalone / side panel は「実質アクティブ watch が無い」ときだけ表示し、
+   *   activeTab / lastFocused で watch が取れたときは非表示（0.1.106）。
    */
   const treatAsNoActiveWatch =
     !isNicoLiveWatchUrl(url) ||
     watchUrlPick.source === 'storage' ||
     watchUrlPick.source === 'none';
+
+  const noWatchHint = $('noWatchRankingHint');
+  if (noWatchHint instanceof HTMLElement) {
+    const showNoWatchRankingHint =
+      !INLINE_EMBED_WATCH && treatAsNoActiveWatch;
+    if (showNoWatchRankingHint) {
+      noWatchHint.removeAttribute('hidden');
+      noWatchHint.style.display = 'block';
+    } else {
+      noWatchHint.setAttribute('hidden', '');
+      noWatchHint.style.display = 'none';
+    }
+  }
 
   if (treatAsNoActiveWatch) {
     if (!isFreshRefresh()) return;

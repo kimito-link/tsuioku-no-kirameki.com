@@ -6509,11 +6509,11 @@
         <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
       </div>
       <!--
-        0.1.55 (AK) → 0.1.56 (AL): version badge 直下に配置することで、確実に
-        最初に表示される位置に固定する。INLINE_MODE のときだけ JS が hidden
-        を付ける。
+        0.1.55 (AK) → 0.1.106: 既定は hidden。refresh が「非 watch」のときだけ外す。
+        FOUC（ランキングだけ先に見える）防止。
       -->
-      <section id="noWatchRankingHint" class="nl-no-watch-hint" aria-label="ニコ生 ランキング">
+      <!-- 既定 hidden: JS が走る・またはモジュール読込が遅い間にランキング枠だけが先に見える FOUC を防ぐ -->
+      <section id="noWatchRankingHint" class="nl-no-watch-hint" aria-label="ニコ生 ランキング" hidden>
         <p class="nl-no-watch-hint__lead">
           🔎 watch ページが見つかりません。気になる放送を探してみますか？
         </p>

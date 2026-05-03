@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.106',
+    date: '2026-05-03',
+    summary: '視聴ページパネルでランキング枠が一瞬出る現象を軽減',
+    items: Object.freeze([
+      'watch ページに埋め込んだパネル（インライン）で、読み込み直後に「ランキングへ」のオレンジ枠だけが先に見え、そのあと通常の表示に切り替わることがあったので抑えました',
+      'ランキング導線は HTML では既定で非表示にし、ツールバーのポップアップなど「実質どこにもニコ生 watch が繋がっていない」ときだけ表示します。視聴タブとして watch が取れたときは出しません',
+      'Chrome の拡張機能一覧とポップアップのバージョン表示が 0.1.106 になります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.105',
     date: '2026-05-03',
     summary: '自動テストのポップアップ検証を安定化',

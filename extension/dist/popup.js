@@ -812,6 +812,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.106",
+      date: "2026-05-03",
+      summary: "\u8996\u8074\u30DA\u30FC\u30B8\u30D1\u30CD\u30EB\u3067\u30E9\u30F3\u30AD\u30F3\u30B0\u67A0\u304C\u4E00\u77AC\u51FA\u308B\u73FE\u8C61\u3092\u8EFD\u6E1B",
+      items: Object.freeze([
+        "watch \u30DA\u30FC\u30B8\u306B\u57CB\u3081\u8FBC\u3093\u3060\u30D1\u30CD\u30EB\uFF08\u30A4\u30F3\u30E9\u30A4\u30F3\uFF09\u3067\u3001\u8AAD\u307F\u8FBC\u307F\u76F4\u5F8C\u306B\u300C\u30E9\u30F3\u30AD\u30F3\u30B0\u3078\u300D\u306E\u30AA\u30EC\u30F3\u30B8\u67A0\u3060\u3051\u304C\u5148\u306B\u898B\u3048\u3001\u305D\u306E\u3042\u3068\u901A\u5E38\u306E\u8868\u793A\u306B\u5207\u308A\u66FF\u308F\u308B\u3053\u3068\u304C\u3042\u3063\u305F\u306E\u3067\u6291\u3048\u307E\u3057\u305F",
+        "\u30E9\u30F3\u30AD\u30F3\u30B0\u5C0E\u7DDA\u306F HTML \u3067\u306F\u65E2\u5B9A\u3067\u975E\u8868\u793A\u306B\u3057\u3001\u30C4\u30FC\u30EB\u30D0\u30FC\u306E\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u306A\u3069\u300C\u5B9F\u8CEA\u3069\u3053\u306B\u3082\u30CB\u30B3\u751F watch \u304C\u7E4B\u304C\u3063\u3066\u3044\u306A\u3044\u300D\u3068\u304D\u3060\u3051\u8868\u793A\u3057\u307E\u3059\u3002\u8996\u8074\u30BF\u30D6\u3068\u3057\u3066 watch \u304C\u53D6\u308C\u305F\u3068\u304D\u306F\u51FA\u3057\u307E\u305B\u3093",
+        "Chrome \u306E\u62E1\u5F35\u6A5F\u80FD\u4E00\u89A7\u3068\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u306E\u30D0\u30FC\u30B8\u30E7\u30F3\u8868\u793A\u304C 0.1.106 \u306B\u306A\u308A\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.105",
       date: "2026-05-03",
       summary: "\u81EA\u52D5\u30C6\u30B9\u30C8\u306E\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u691C\u8A3C\u3092\u5B89\u5B9A\u5316",
@@ -15189,17 +15199,18 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         );
       }
       syncVoiceCommentButton();
+      const treatAsNoActiveWatch = !isNicoLiveWatchUrl(url) || watchUrlPick.source === "storage" || watchUrlPick.source === "none";
       const noWatchHint = $("noWatchRankingHint");
       if (noWatchHint instanceof HTMLElement) {
-        if (INLINE_EMBED_WATCH) {
-          noWatchHint.setAttribute("hidden", "");
-          noWatchHint.style.display = "none";
-        } else {
+        const showNoWatchRankingHint = !INLINE_EMBED_WATCH && treatAsNoActiveWatch;
+        if (showNoWatchRankingHint) {
           noWatchHint.removeAttribute("hidden");
           noWatchHint.style.display = "block";
+        } else {
+          noWatchHint.setAttribute("hidden", "");
+          noWatchHint.style.display = "none";
         }
       }
-      const treatAsNoActiveWatch = !isNicoLiveWatchUrl(url) || watchUrlPick.source === "storage" || watchUrlPick.source === "none";
       if (treatAsNoActiveWatch) {
         if (!isFreshRefresh()) return;
         resetPerBroadcastPopupCachesIfLiveIdChanged("");
@@ -16969,7 +16980,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0503-1225" ? String("0503-1225") : "dev";
+      const buildId = "0503-1234" ? String("0503-1234") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
