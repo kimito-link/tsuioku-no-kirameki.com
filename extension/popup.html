@@ -4228,7 +4228,8 @@
         gap: 8px;
         font-size: clamp(11px, calc(var(--nl-base-font) * 0.86), 14px);
         font-weight: 700;
-        color: var(--nl-accent);
+        /* 単色 var(--nl-accent) は半透明白パネル上で WCAG AA に届かないことがある */
+        color: color-mix(in srgb, var(--nl-accent) 52%, var(--nl-text) 48%);
         line-height: 1.25;
       }
 
@@ -6192,7 +6193,6 @@
       html.nl-empty-state:not(.nl-inline) body {
         height: auto !important;
         max-height: none !important;
-        overflow: visible !important;
       }
       html.nl-empty-state:not(.nl-inline) body .nl-main {
         flex: 0 0 auto;

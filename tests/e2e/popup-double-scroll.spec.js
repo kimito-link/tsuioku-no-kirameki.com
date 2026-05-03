@@ -137,15 +137,30 @@ test('standalone popup: nl-popup-settings のコントラストが AA 以上', a
     const sum = globalThis.document.querySelector('.nl-popup-settings__summary');
     if (!sum) return null;
     const st = globalThis.getComputedStyle(sum);
-    // 親 .nl-popup-settings の背景も取得（summary 側が transparent の場合に備えて fallback）
     const box = sum.closest('.nl-popup-settings');
     const boxBg = box ? globalThis.getComputedStyle(box).backgroundColor : null;
+    const root = globalThis.document.documentElement;
+    const isDarkSkin = root.classList.contains('nl-skin-panel-dark');
+    /** @param {string} css */
+    function cssColorToRgb(css) {
+      const canvas = globalThis.document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.fillStyle = css;
+      ctx.fillRect(0, 0, 1, 1);
+      const d = ctx.getImageData(0, 0, 1, 1).data;
+      return { r: d[0], g: d[1], b: d[2], a: d[3] / 255 };
+    }
     return {
       color: st.color,
+      textRgb: cssColorToRgb(st.color),
       summaryBg: st.backgroundColor,
       containerBg: boxBg,
       fontSize: st.fontSize,
-      fontWeight: st.fontWeight
+      fontWeight: st.fontWeight,
+      isDarkSkin
     };
   });
   expect(metrics, 'summary が見える').not.toBeNull();
@@ -179,11 +194,22 @@ test('standalone popup: nl-popup-settings のコントラストが AA 以上', a
       b: over.b * a + under.b * (1 - a)
     };
   };
-  const text = parseRgb(metrics.color);
+  const text =
+    metrics.textRgb ||
+    (() => {
+      const m = String(metrics.color).match(/rgba?\(([^)]+)\)/);
+      if (!m) return null;
+      const [r, g, b, a = '1'] = m[1].split(',').map((x) => Number(x.trim()));
+      return { r, g, b, a: Number(a) };
+    })();
+  expect(text, `テキスト色を取得できない: ${metrics.color}`).not.toBeNull();
   const sumBg = parseRgb(metrics.summaryBg);
   const boxBg = parseRgb(metrics.containerBg);
-  // ダークスキン body bg の主要 stop を仮定（#0a0e14）
-  const bodyBase = { r: 10, g: 14, b: 20, a: 1 };
+  /* standalone は 0.1.51 以降ライト固定のため nl-skin-panel-dark が無い。
+     ブレンド下地をテーマに合わせないと輝度計算が破綻する（ratio≈1.3）。 */
+  const bodyBase = metrics.isDarkSkin
+    ? { r: 10, g: 14, b: 20, a: 1 }
+    : { r: 255, g: 250, b: 242, a: 1 };
   const resolvedBg = blend(
     sumBg && sumBg.a > 0 ? sumBg : { r: 0, g: 0, b: 0, a: 0 },
     blend(boxBg || { r: 0, g: 0, b: 0, a: 0 }, bodyBase)
