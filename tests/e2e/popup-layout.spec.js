@@ -1,4 +1,9 @@
-import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
+import {
+  test,
+  expect,
+  dismissExtensionUsageTermsGate,
+  focusMockWatchThenReloadPopup
+} from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const KEY_RECORDING = 'nls_recording_enabled';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
@@ -95,6 +100,7 @@ test.describe('popup layout', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await waitForPopupInteractive(popup);
 
     const metrics = await popup.evaluate(() => {
@@ -164,11 +170,31 @@ test.describe('popup layout', () => {
     }
     const extensionId = new URL(sw.url()).hostname;
 
+    await sw.evaluate(
+      async ({ recordingKey, lastWatchKey, commentsKey, watchUrl }) => {
+        await chrome.storage.local.set({
+          [recordingKey]: true,
+          [lastWatchKey]: watchUrl,
+          [commentsKey]: []
+        });
+      },
+      {
+        recordingKey: KEY_RECORDING,
+        lastWatchKey: KEY_LAST_WATCH_URL,
+        commentsKey: STORAGE_COMMENTS,
+        watchUrl: MOCK_WATCH
+      }
+    );
+
+    const watch = await context.newPage();
+    await watch.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+
     const popup = await context.newPage();
     await popup.goto(`chrome-extension://${extensionId}/popup.html`, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await waitForPopupInteractive(popup);
 
     const themeDetails = popup.locator('#frameThemeDetails');
@@ -202,11 +228,31 @@ test.describe('popup layout', () => {
     }
     const extensionId = new URL(sw.url()).hostname;
 
+    await sw.evaluate(
+      async ({ recordingKey, lastWatchKey, commentsKey, watchUrl }) => {
+        await chrome.storage.local.set({
+          [recordingKey]: true,
+          [lastWatchKey]: watchUrl,
+          [commentsKey]: []
+        });
+      },
+      {
+        recordingKey: KEY_RECORDING,
+        lastWatchKey: KEY_LAST_WATCH_URL,
+        commentsKey: STORAGE_COMMENTS,
+        watchUrl: MOCK_WATCH
+      }
+    );
+
+    const watch = await context.newPage();
+    await watch.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+
     const popup = await context.newPage();
     await popup.goto(`chrome-extension://${extensionId}/popup.html`, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await waitForPopupInteractive(popup);
 
     const voiceDetails = popup.locator('#voiceOsGuideDetails');
@@ -279,6 +325,7 @@ test.describe('popup layout', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await waitForPopupInteractive(popup);
 
     await expectDetailsOpen(popup, false, 'initially details closed');
@@ -339,6 +386,7 @@ test.describe('popup layout', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await waitForPopupInteractive(popup);
     await expectDetailsOpen(popup, false, 'keyboard test: start closed');
 
@@ -391,6 +439,7 @@ test.describe('popup layout', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await waitForPopupInteractive(popup);
 
     await expectDetailsOpen(popup, false, 'scroll test: start with details closed');
@@ -443,6 +492,7 @@ test.describe('popup layout', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await waitForPopupInteractive(popup);
 
     /* 先頭ブロックが増えたとき summary が .nl-main 外に出ると elementFromPoint が外れる */

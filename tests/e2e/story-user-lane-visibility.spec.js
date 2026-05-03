@@ -15,8 +15,10 @@ import {
   test,
   expect,
   dismissExtensionUsageTermsGate,
+  focusMockWatchThenReloadPopup,
   openNlPopupSettings
 } from './fixtures.js';
+import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 
 async function extensionServiceWorker(context) {
   const pickExt = () =>
@@ -40,8 +42,9 @@ async function extensionIdFromContext(context) {
  * 実際のライブ経由で入れるのは E2E では不安定なので、chrome.storage に
  * 合成コメントをいくつか入れた上で popup を開き、レーンが描画されるかを見る。
  */
-async function seedLaneFixture(context, liveId = 'lv999999999') {
+async function seedLaneFixture(context, liveId = 'lv888888888') {
   const sw = await extensionServiceWorker(context);
+  const commentsKey = `nls_comments_${liveId}`;
   const seeds = [
     {
       id: `${liveId}:1`,
@@ -77,17 +80,26 @@ async function seedLaneFixture(context, liveId = 'lv999999999') {
       avatarObserved: false // 匿名は必ず tanu 段
     }
   ];
-  await sw.evaluate(async (rows) => {
-    const prev = await chrome.storage.local.get('nls_comments');
-    const merged = [...(prev.nls_comments || []), ...rows];
-    await chrome.storage.local.set({ nls_comments: merged });
-  }, seeds);
+  await sw.evaluate(
+    async ({ rows, commentsKey: ck, watchUrl }) => {
+      await chrome.storage.local.set({
+        [ck]: rows,
+        nls_recording_enabled: true,
+        nls_last_watch_url: watchUrl
+      });
+    },
+    { rows: seeds, commentsKey, watchUrl: MOCK_WATCH }
+  );
 }
 
 async function clearLaneFixture(context) {
   const sw = await extensionServiceWorker(context);
   await sw.evaluate(async () => {
-    await chrome.storage.local.remove(['nls_comments']);
+    const bag = await chrome.storage.local.get(null);
+    const rm = Object.keys(bag).filter(
+      (k) => k === 'nls_comments' || k.startsWith('nls_comments_')
+    );
+    if (rm.length) await chrome.storage.local.remove(rm);
   });
 }
 
@@ -100,11 +112,15 @@ test.describe('応援レーン可視性の契約（Phase 0 baseline）', () => {
     const extensionId = await extensionIdFromContext(context);
     await seedLaneFixture(context);
 
+    const watch = await context.newPage();
+    await watch.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+
     const popup = await context.newPage();
     await popup.goto(`chrome-extension://${extensionId}/popup.html`, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await dismissExtensionUsageTermsGate(popup);
     await openNlPopupSettings(popup);
 
@@ -113,7 +129,7 @@ test.describe('応援レーン可視性の契約（Phase 0 baseline）', () => {
     // 契約にするため、UI の折り畳み解除はテスト側の責務として扱う。
     const supportVisualDetails = popup.locator('#supportVisualDetails');
     if (!(await supportVisualDetails.evaluate((el) => el.open))) {
-      await supportVisualDetails.locator('summary').click();
+      await popup.locator('#supportVisualDetailsSummary').click();
     }
     await expect(supportVisualDetails).toHaveJSProperty('open', true);
 

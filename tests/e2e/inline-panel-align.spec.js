@@ -502,6 +502,23 @@ test.describe('inline panel alignment', () => {
       .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
       .toMatchObject({ display: 'block', position: 'fixed' });
 
+    await expect
+      .poll(
+        async () =>
+          page.evaluate((hostId) => {
+            const host = globalThis.document.getElementById(hostId);
+            return Boolean(
+              host?.classList.contains('nls-inline-host--floating') &&
+                !host?.classList.contains('nls-inline-host--dock-bottom')
+            );
+          }, INLINE_HOST_ID),
+        {
+          timeout: 25_000,
+          message: 'floating クラスが付き dock_bottom が外れるまで待つ'
+        }
+      )
+      .toBe(true);
+
     const inline = await page.evaluate((hostId) => {
       const host = globalThis.document.getElementById(hostId);
       if (!host) return null;

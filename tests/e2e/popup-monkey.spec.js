@@ -2,6 +2,7 @@ import {
   test,
   expect,
   dismissExtensionUsageTermsGate,
+  focusMockWatchThenReloadPopup,
   openNlPopupSettings
 } from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
@@ -71,6 +72,7 @@ test.describe('popup monkey', () => {
       waitUntil: 'domcontentloaded',
       timeout: 60_000
     });
+    await focusMockWatchThenReloadPopup(watch, popup);
     await dismissExtensionUsageTermsGate(popup);
     await popup.waitForTimeout(600);
     await openNlPopupSettings(popup);
