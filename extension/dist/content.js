@@ -3683,6 +3683,8 @@
   var DEEP_HARVEST_PERIODIC_MS = HARVEST_TIMING.periodicMs;
   var DEEP_HARVEST_STABILITY_FOLLOWUP_MS = HARVEST_TIMING.stabilityFollowUpMs;
   var DEEP_HARVEST_RECOVERY_MS = HARVEST_TIMING.deepRecoveryMs;
+  var DEEP_HARVEST_ZERO_ROW_RETRY_MAX = 2;
+  var DEEP_HARVEST_ZERO_ROW_RETRY_DELAY_MS = 1600;
   var DEEP_HARVEST_LOADING_HOST_ID = "nl-deep-harvest-loading";
   var DEEP_HARVEST_LOADING_IMG_PATH = "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png";
   var BOOTSTRAP_DELAYS_MS = [400, 2e3, 4500];
@@ -3731,6 +3733,8 @@
     runCount: 0,
     lastError: false
   };
+  var deepHarvestZeroRowRetryBudget = 0;
+  var deepHarvestZeroRowRetryTimer = null;
   var lastPersistCommentBatchSize = 0;
   var lastPersistGateFailures = [];
   var scrollHooked = /* @__PURE__ */ new WeakMap();
@@ -7681,6 +7685,8 @@
         endedBulkHarvestTriggeredLiveId = "";
         endedBulkHarvestLastCheckedAt = 0;
         resetDeepHarvestStabilityFollowUp();
+        deepHarvestPipelineStats.lastCompletedAt = 0;
+        armDeepHarvestZeroRowRetryForNewLiveSession();
         interceptedUsers.clear();
         interceptedNicknames.clear();
         interceptedAvatars.clear();
@@ -7730,6 +7736,8 @@
         endedBulkHarvestTriggeredLiveId = "";
         endedBulkHarvestLastCheckedAt = 0;
         resetDeepHarvestStabilityFollowUp();
+        deepHarvestPipelineStats.lastCompletedAt = 0;
+        armDeepHarvestZeroRowRetryForNewLiveSession();
         interceptedUsers.clear();
         interceptedNicknames.clear();
         interceptedAvatars.clear();
@@ -7889,11 +7897,39 @@
     } catch {
     }
   }
+  function clearDeepHarvestZeroRowRetrySchedule() {
+    if (deepHarvestZeroRowRetryTimer != null) {
+      clearTimeout(deepHarvestZeroRowRetryTimer);
+      deepHarvestZeroRowRetryTimer = null;
+    }
+  }
+  function armDeepHarvestZeroRowRetryForNewLiveSession() {
+    clearDeepHarvestZeroRowRetrySchedule();
+    deepHarvestZeroRowRetryBudget = DEEP_HARVEST_ZERO_ROW_RETRY_MAX;
+  }
+  function maybeScheduleDeepHarvestZeroRowRetry() {
+    if (deepHarvestZeroRowRetryBudget <= 0) return;
+    if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+    if (deepHarvestZeroRowRetryTimer != null) return;
+    deepHarvestZeroRowRetryBudget -= 1;
+    deepHarvestZeroRowRetryTimer = setTimeout(() => {
+      deepHarvestZeroRowRetryTimer = null;
+      if (harvestRunning || !recording || !liveId || !locationAllowsCommentRecording()) {
+        return;
+      }
+      void runDeepHarvest({
+        stabilityFollowUp: false,
+        force: true,
+        armStabilityFollowUp: false
+      }).catch((err) => reportSilentErrorToStorage("deepHarvest", err));
+    }, DEEP_HARVEST_ZERO_ROW_RETRY_DELAY_MS);
+  }
   function cancelPendingDeepHarvest() {
     if (deepHarvestTimer) {
       clearTimeout(deepHarvestTimer);
       deepHarvestTimer = null;
     }
+    clearDeepHarvestZeroRowRetrySchedule();
     resetDeepHarvestStabilityFollowUp();
     removeDeepHarvestLoadingUi();
   }
@@ -8001,6 +8037,11 @@
       deepHarvestPipelineStats.lastRowCount = rows.length;
       deepHarvestPipelineStats.runCount += 1;
       deepHarvestPipelineStats.lastError = false;
+      if (rows.length > 0) {
+        deepHarvestZeroRowRetryBudget = DEEP_HARVEST_ZERO_ROW_RETRY_MAX;
+      } else {
+        maybeScheduleDeepHarvestZeroRowRetry();
+      }
     } catch {
       deepHarvestPipelineStats.lastError = true;
     } finally {

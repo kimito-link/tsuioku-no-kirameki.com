@@ -193,6 +193,12 @@ const DEEP_HARVEST_PERIODIC_MS = HARVEST_TIMING.periodicMs;
  */
 const DEEP_HARVEST_STABILITY_FOLLOWUP_MS = HARVEST_TIMING.stabilityFollowUpMs;
 const DEEP_HARVEST_RECOVERY_MS = HARVEST_TIMING.deepRecoveryMs;
+/**
+ * deep が 0 件で終わったとき（コメント一覧の仮想スクロール宿主が未確定など）に quiet deep を追いかける上限。
+ * `force:true` で NDGR active の skip を避ける。多重タイマーは積まない。
+ */
+const DEEP_HARVEST_ZERO_ROW_RETRY_MAX = 2;
+const DEEP_HARVEST_ZERO_ROW_RETRY_DELAY_MS = 1600;
 /** 長めの待ちのあいだ、オリジナルキャラクターりんくで「読み込み中」と示す（web_accessible と一致させる） */
 const DEEP_HARVEST_LOADING_HOST_ID = 'nl-deep-harvest-loading';
 const DEEP_HARVEST_LOADING_IMG_PATH =
@@ -270,6 +276,10 @@ const deepHarvestPipelineStats = {
   runCount: 0,
   lastError: false
 };
+/** deep が 0 件だったときの遅延リトライ予算（liveId 変更時に MAX へ） */
+let deepHarvestZeroRowRetryBudget = 0;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let deepHarvestZeroRowRetryTimer = null;
 /** 直近の persistCommentRowsImpl に渡った行数（0 = 未実行またはスキップ） */
 let lastPersistCommentBatchSize = 0;
 /** @type {string[]} */
@@ -5430,6 +5440,12 @@ function syncLiveIdFromLocation() {
       endedBulkHarvestTriggeredLiveId = '';
       endedBulkHarvestLastCheckedAt = 0;
       resetDeepHarvestStabilityFollowUp();
+      /*
+       * 別 lv に切り替えた直後も lastCompletedAt が直前放送のままだと recovery が false になり、
+       * NDGR が既に動いていると deep が skip され backlog が長時間残る（0.1.41 以降の経路）。
+       */
+      deepHarvestPipelineStats.lastCompletedAt = 0;
+      armDeepHarvestZeroRowRetryForNewLiveSession();
       interceptedUsers.clear();
       interceptedNicknames.clear();
       interceptedAvatars.clear();
@@ -5480,6 +5496,12 @@ function syncLiveIdFromLocation() {
       endedBulkHarvestTriggeredLiveId = '';
       endedBulkHarvestLastCheckedAt = 0;
       resetDeepHarvestStabilityFollowUp();
+      /*
+       * 別 lv に切り替えた直後も lastCompletedAt が直前放送のままだと recovery が false になり、
+       * NDGR が既に動いていると deep が skip され backlog が長時間残る（0.1.41 以降の経路）。
+       */
+      deepHarvestPipelineStats.lastCompletedAt = 0;
+      armDeepHarvestZeroRowRetryForNewLiveSession();
       interceptedUsers.clear();
       interceptedNicknames.clear();
       interceptedAvatars.clear();
@@ -5669,11 +5691,48 @@ function ensureDeepHarvestLoadingUi() {
   }
 }
 
+function clearDeepHarvestZeroRowRetrySchedule() {
+  if (deepHarvestZeroRowRetryTimer != null) {
+    clearTimeout(deepHarvestZeroRowRetryTimer);
+    deepHarvestZeroRowRetryTimer = null;
+  }
+}
+
+function armDeepHarvestZeroRowRetryForNewLiveSession() {
+  clearDeepHarvestZeroRowRetrySchedule();
+  deepHarvestZeroRowRetryBudget = DEEP_HARVEST_ZERO_ROW_RETRY_MAX;
+}
+
+function maybeScheduleDeepHarvestZeroRowRetry() {
+  if (deepHarvestZeroRowRetryBudget <= 0) return;
+  if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  if (deepHarvestZeroRowRetryTimer != null) return;
+
+  deepHarvestZeroRowRetryBudget -= 1;
+  deepHarvestZeroRowRetryTimer = setTimeout(() => {
+    deepHarvestZeroRowRetryTimer = null;
+    if (
+      harvestRunning ||
+      !recording ||
+      !liveId ||
+      !locationAllowsCommentRecording()
+    ) {
+      return;
+    }
+    void runDeepHarvest({
+      stabilityFollowUp: false,
+      force: true,
+      armStabilityFollowUp: false
+    }).catch((err) => reportSilentErrorToStorage('deepHarvest', err));
+  }, DEEP_HARVEST_ZERO_ROW_RETRY_DELAY_MS);
+}
+
 function cancelPendingDeepHarvest() {
   if (deepHarvestTimer) {
     clearTimeout(deepHarvestTimer);
     deepHarvestTimer = null;
   }
+  clearDeepHarvestZeroRowRetrySchedule();
   resetDeepHarvestStabilityFollowUp();
   removeDeepHarvestLoadingUi();
 }
@@ -5819,6 +5878,11 @@ async function runDeepHarvest(opts = {}) {
     deepHarvestPipelineStats.lastRowCount = rows.length;
     deepHarvestPipelineStats.runCount += 1;
     deepHarvestPipelineStats.lastError = false;
+    if (rows.length > 0) {
+      deepHarvestZeroRowRetryBudget = DEEP_HARVEST_ZERO_ROW_RETRY_MAX;
+    } else {
+      maybeScheduleDeepHarvestZeroRowRetry();
+    }
   } catch {
     deepHarvestPipelineStats.lastError = true;
   } finally {
