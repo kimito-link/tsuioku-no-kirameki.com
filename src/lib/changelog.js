@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.104',
+    date: '2026-05-03',
+    summary: 'deep gap recovery をさらに強化',
+    items: Object.freeze([
+      'ライブ中に公式コメント累計と記録件数の差が開いたときの追い quiet deep を、やや敏感にしました（クールダウン・ギャップ閾値）。また NDGR が続いても deep が空きすぎないよう、強制 deep の間隔を短めました',
+      '約 2 分ごとの定期 quiet deep は、これまで recovery が不要なときは基本 1 パスでしたが、2 回に 1 回は 2-pass で仮想リスト全域を寄せ直すようにしました（CPU との折り合い）',
+      'deep の仮想リスト走査で、スクロール間の待ち時間をわずかに短くしました。公式件数との比率がまだ離れる場合もありますが、取りこぼしを減らす方向の調整です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.103',
     date: '2026-05-03',
     summary: 'deep harvest 最適化（下端・ギャップ追い）',

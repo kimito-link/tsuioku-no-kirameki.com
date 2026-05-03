@@ -76,7 +76,7 @@ describe('shouldForceDeepHarvestForReason', () => {
 
 describe('shouldForceDeepHarvestRecovery', () => {
   const T = 10_000_000;
-  const RECOVERY = 300_000;
+  const RECOVERY = 240_000;
 
   it('lastCompletedAt が 0（未実行）なら true', () => {
     expect(
@@ -123,7 +123,7 @@ describe('shouldForceDeepHarvestRecovery', () => {
     ).toBe(true);
   });
 
-  it('recoveryMs 省略時はデフォルト 300_000 で判定', () => {
+  it('recoveryMs 省略時はデフォルト 240_000 で判定', () => {
     expect(
       shouldForceDeepHarvestRecovery({ lastCompletedAt: T - 200_000, now: T })
     ).toBe(false);

@@ -206,6 +206,9 @@ const DEEP_HARVEST_RECOVERY_MS = HARVEST_TIMING.deepRecoveryMs;
  */
 const DEEP_HARVEST_ZERO_ROW_RETRY_MAX = 2;
 const DEEP_HARVEST_ZERO_ROW_RETRY_DELAY_MS = 1600;
+/** 定期 quiet deep は既定 1-pass。この間隔ごとに 2-pass で仮想リスト取りこぼしを回収する */
+const PERIODIC_DEEP_FULL_TWO_PASS_EVERY = 2;
+let periodicDeepWeakPassTick = 0;
 /** 長めの待ちのあいだ、オリジナルキャラクターりんくで「読み込み中」と示す（web_accessible と一致させる） */
 const DEEP_HARVEST_LOADING_HOST_ID = 'nl-deep-harvest-loading';
 const DEEP_HARVEST_LOADING_IMG_PATH =
@@ -5493,6 +5496,7 @@ function syncLiveIdFromLocation() {
        * NDGR が既に動いていると deep が skip され backlog が長時間残る（0.1.41 以降の経路）。
        */
       deepHarvestPipelineStats.lastCompletedAt = 0;
+      periodicDeepWeakPassTick = 0;
       armDeepHarvestZeroRowRetryForNewLiveSession();
       interceptedUsers.clear();
       interceptedNicknames.clear();
@@ -5550,6 +5554,7 @@ function syncLiveIdFromLocation() {
        * NDGR が既に動いていると deep が skip され backlog が長時間残る（0.1.41 以降の経路）。
        */
       deepHarvestPipelineStats.lastCompletedAt = 0;
+      periodicDeepWeakPassTick = 0;
       armDeepHarvestZeroRowRetryForNewLiveSession();
       interceptedUsers.clear();
       interceptedNicknames.clear();
@@ -5821,8 +5826,8 @@ function scheduleDeepHarvest(reason) {
 }
 
 /**
- * 定期の取りこぼし拾い。quietScroll 付き単一パス deep で仮想リスト全域を走査する。
- * opacity:0 なので視覚的な「滝」は起きない。安定フォローは積まない。
+ * 定期の取りこぼし拾い。quietScroll（opacity:0）で視覚的な「滝」は起きにくい。
+ * recovery が要らない間も、PERIODIC_DEEP_FULL_TWO_PASS_EVERY 回に 1 回は 2-pass で全域を寄せる。
  */
 function tryPeriodicQuietDeepHarvest() {
   if (!hasExtensionContext()) return;
@@ -5835,8 +5840,12 @@ function tryPeriodicQuietDeepHarvest() {
     now: Date.now(),
     recoveryMs: DEEP_HARVEST_RECOVERY_MS
   });
+  periodicDeepWeakPassTick += 1;
+  const useWeakSinglePassOnly =
+    !needsRecovery &&
+    periodicDeepWeakPassTick % PERIODIC_DEEP_FULL_TWO_PASS_EVERY !== 0;
   void runDeepHarvest({
-    stabilityFollowUp: !needsRecovery,
+    stabilityFollowUp: useWeakSinglePassOnly,
     force: needsRecovery
   });
 }

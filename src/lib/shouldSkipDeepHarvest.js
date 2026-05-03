@@ -32,7 +32,7 @@ export function shouldForceDeepHarvestForReason(reason) {
  * @param {{ lastCompletedAt: number|null|undefined, now: number, recoveryMs?: number }} opts
  * @returns {boolean} true = NDGR判定をバイパスして deep を強制実行すべき
  */
-export function shouldForceDeepHarvestRecovery({ lastCompletedAt, now, recoveryMs = 300_000 }) {
+export function shouldForceDeepHarvestRecovery({ lastCompletedAt, now, recoveryMs = 240_000 }) {
   if (!lastCompletedAt || lastCompletedAt <= 0) return true;
   return now - lastCompletedAt > recoveryMs;
 }

@@ -812,6 +812,16 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.104",
+      date: "2026-05-03",
+      summary: "deep gap recovery \u3092\u3055\u3089\u306B\u5F37\u5316",
+      items: Object.freeze([
+        "\u30E9\u30A4\u30D6\u4E2D\u306B\u516C\u5F0F\u30B3\u30E1\u30F3\u30C8\u7D2F\u8A08\u3068\u8A18\u9332\u4EF6\u6570\u306E\u5DEE\u304C\u958B\u3044\u305F\u3068\u304D\u306E\u8FFD\u3044 quiet deep \u3092\u3001\u3084\u3084\u654F\u611F\u306B\u3057\u307E\u3057\u305F\uFF08\u30AF\u30FC\u30EB\u30C0\u30A6\u30F3\u30FB\u30AE\u30E3\u30C3\u30D7\u95BE\u5024\uFF09\u3002\u307E\u305F NDGR \u304C\u7D9A\u3044\u3066\u3082 deep \u304C\u7A7A\u304D\u3059\u304E\u306A\u3044\u3088\u3046\u3001\u5F37\u5236 deep \u306E\u9593\u9694\u3092\u77ED\u3081\u307E\u3057\u305F",
+        "\u7D04 2 \u5206\u3054\u3068\u306E\u5B9A\u671F quiet deep \u306F\u3001\u3053\u308C\u307E\u3067 recovery \u304C\u4E0D\u8981\u306A\u3068\u304D\u306F\u57FA\u672C 1 \u30D1\u30B9\u3067\u3057\u305F\u304C\u30012 \u56DE\u306B 1 \u56DE\u306F 2-pass \u3067\u4EEE\u60F3\u30EA\u30B9\u30C8\u5168\u57DF\u3092\u5BC4\u305B\u76F4\u3059\u3088\u3046\u306B\u3057\u307E\u3057\u305F\uFF08CPU \u3068\u306E\u6298\u308A\u5408\u3044\uFF09",
+        "deep \u306E\u4EEE\u60F3\u30EA\u30B9\u30C8\u8D70\u67FB\u3067\u3001\u30B9\u30AF\u30ED\u30FC\u30EB\u9593\u306E\u5F85\u3061\u6642\u9593\u3092\u308F\u305A\u304B\u306B\u77ED\u304F\u3057\u307E\u3057\u305F\u3002\u516C\u5F0F\u4EF6\u6570\u3068\u306E\u6BD4\u7387\u304C\u307E\u3060\u96E2\u308C\u308B\u5834\u5408\u3082\u3042\u308A\u307E\u3059\u304C\u3001\u53D6\u308A\u3053\u307C\u3057\u3092\u6E1B\u3089\u3059\u65B9\u5411\u306E\u8ABF\u6574\u3067\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.103",
       date: "2026-05-03",
       summary: "deep harvest \u6700\u9069\u5316\uFF08\u4E0B\u7AEF\u30FB\u30AE\u30E3\u30C3\u30D7\u8FFD\u3044\uFF09",
@@ -16949,7 +16959,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0503-1145" ? String("0503-1145") : "dev";
+      const buildId = "0503-1157" ? String("0503-1157") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

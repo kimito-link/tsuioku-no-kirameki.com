@@ -3204,23 +3204,24 @@
     /** @type {const} */
     {
       delayMs: 600,
-      scrollWaitMs: 48,
+      // deep 仮想走査のレイアウト安定待ち（短すぎると取りこぼし、長すぎると所要時間増）
+      scrollWaitMs: 42,
       secondPassGapMs: 180,
       quietUiMs: 800,
       periodicMs: 12e4,
       stabilityFollowUpMs: 9e4,
       ndgrActiveThresholdMs: 6e4,
-      deepRecoveryMs: 3e5
+      // NDGR 継続中でもこれより長く deep が無いと強制 2-pass（取り込み率との折り合い）
+      deepRecoveryMs: 24e4
     }
   );
   var OFFICIAL_GAP_DEEP_TIMING = (
     /** @type {const} */
     {
-      // ライブ中追い deep: CPU との折り合いで 40s 前後に寄せる（従来 55s）
-      cooldownMs: 42e3,
+      cooldownMs: 36e3,
       minOfficialComments: 120,
-      minGapAbsolute: 190,
-      gapRatioOfOfficial: 0.065
+      minGapAbsolute: 170,
+      gapRatioOfOfficial: 0.058
     }
   );
 
@@ -3270,7 +3271,7 @@
   function shouldForceDeepHarvestForReason(reason) {
     return String(reason || "").trim() === DEEP_HARVEST_REASONS.startup;
   }
-  function shouldForceDeepHarvestRecovery({ lastCompletedAt, now, recoveryMs = 3e5 }) {
+  function shouldForceDeepHarvestRecovery({ lastCompletedAt, now, recoveryMs = 24e4 }) {
     if (!lastCompletedAt || lastCompletedAt <= 0) return true;
     return now - lastCompletedAt > recoveryMs;
   }
@@ -3728,6 +3729,8 @@
   var DEEP_HARVEST_RECOVERY_MS = HARVEST_TIMING.deepRecoveryMs;
   var DEEP_HARVEST_ZERO_ROW_RETRY_MAX = 2;
   var DEEP_HARVEST_ZERO_ROW_RETRY_DELAY_MS = 1600;
+  var PERIODIC_DEEP_FULL_TWO_PASS_EVERY = 2;
+  var periodicDeepWeakPassTick = 0;
   var DEEP_HARVEST_LOADING_HOST_ID = "nl-deep-harvest-loading";
   var DEEP_HARVEST_LOADING_IMG_PATH = "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png";
   var BOOTSTRAP_DELAYS_MS = [400, 2e3, 4500];
@@ -7760,6 +7763,7 @@
         lastOfficialGapDeepHarvestAt = 0;
         resetDeepHarvestStabilityFollowUp();
         deepHarvestPipelineStats.lastCompletedAt = 0;
+        periodicDeepWeakPassTick = 0;
         armDeepHarvestZeroRowRetryForNewLiveSession();
         interceptedUsers.clear();
         interceptedNicknames.clear();
@@ -7812,6 +7816,7 @@
         lastOfficialGapDeepHarvestAt = 0;
         resetDeepHarvestStabilityFollowUp();
         deepHarvestPipelineStats.lastCompletedAt = 0;
+        periodicDeepWeakPassTick = 0;
         armDeepHarvestZeroRowRetryForNewLiveSession();
         interceptedUsers.clear();
         interceptedNicknames.clear();
@@ -8046,8 +8051,10 @@
       now: Date.now(),
       recoveryMs: DEEP_HARVEST_RECOVERY_MS
     });
+    periodicDeepWeakPassTick += 1;
+    const useWeakSinglePassOnly = !needsRecovery && periodicDeepWeakPassTick % PERIODIC_DEEP_FULL_TWO_PASS_EVERY !== 0;
     void runDeepHarvest({
-      stabilityFollowUp: !needsRecovery,
+      stabilityFollowUp: useWeakSinglePassOnly,
       force: needsRecovery
     });
   }

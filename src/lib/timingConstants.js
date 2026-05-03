@@ -36,13 +36,15 @@ export const MAP_LIMITS = /** @type {const} */ ({
 
 export const HARVEST_TIMING = /** @type {const} */ ({
   delayMs: 600,
-  scrollWaitMs: 48,
+  // deep 仮想走査のレイアウト安定待ち（短すぎると取りこぼし、長すぎると所要時間増）
+  scrollWaitMs: 42,
   secondPassGapMs: 180,
   quietUiMs: 800,
   periodicMs: 120_000,
   stabilityFollowUpMs: 90_000,
   ndgrActiveThresholdMs: 60_000,
-  deepRecoveryMs: 300_000
+  // NDGR 継続中でもこれより長く deep が無いと強制 2-pass（取り込み率との折り合い）
+  deepRecoveryMs: 240_000
 });
 
 /**
@@ -50,9 +52,8 @@ export const HARVEST_TIMING = /** @type {const} */ ({
  * 配信終了後の DOM 検知 bulk（watchProgramEndState）と併用する。
  */
 export const OFFICIAL_GAP_DEEP_TIMING = /** @type {const} */ ({
-  // ライブ中追い deep: CPU との折り合いで 40s 前後に寄せる（従来 55s）
-  cooldownMs: 42_000,
+  cooldownMs: 36_000,
   minOfficialComments: 120,
-  minGapAbsolute: 190,
-  gapRatioOfOfficial: 0.065
+  minGapAbsolute: 170,
+  gapRatioOfOfficial: 0.058
 });
