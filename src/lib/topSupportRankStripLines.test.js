@@ -231,4 +231,46 @@ describe('topSupportRankLineModels', () => {
     expect(row.fullLabelForTitle).toContain('太郎');
     expect(row.fullLabelForTitle).toContain('11111');
   });
+
+  it('placeNumberMode:dense で同回数は同順位（本家貢献度ランキングに近い並び）', () => {
+    const rooms = [
+      { userKey: '1', nickname: 'a', count: 40 },
+      { userKey: '2', nickname: 'b', count: 10 },
+      { userKey: '3', nickname: 'c', count: 10 },
+      { userKey: '4', nickname: 'd', count: 10 },
+      { userKey: '5', nickname: 'e', count: 5 },
+      { userKey: '6', nickname: 'f', count: 5 }
+    ];
+    const rows = topSupportRankLineModels(rooms, {
+      defaultThumbSrc: DEF_THUMB,
+      placeNumberMode: 'dense'
+    });
+    expect(rows.map((r) => r.placeNumber)).toEqual([1, 2, 2, 2, 3, 3]);
+  });
+
+  it('placeNumberMode:dense で先頭 unknown のあと known は 1 から', () => {
+    const rows = topSupportRankLineModels(
+      [
+        { userKey: UNKNOWN_USER_KEY, nickname: '', count: 999 },
+        { userKey: '1', nickname: 'a', count: 40 },
+        { userKey: '2', nickname: 'b', count: 10 }
+      ],
+      { defaultThumbSrc: DEF_THUMB, placeNumberMode: 'dense' }
+    );
+    expect(rows[0].placeNumber).toBeNull();
+    expect(rows[1].placeNumber).toBe(1);
+    expect(rows[2].placeNumber).toBe(2);
+  });
+
+  it('placeNumberMode:dense で先頭同率は同じ 1 位', () => {
+    const rows = topSupportRankLineModels(
+      [
+        { userKey: '1', nickname: 'a', count: 7 },
+        { userKey: '2', nickname: 'b', count: 7 }
+      ],
+      { defaultThumbSrc: DEF_THUMB, placeNumberMode: 'dense' }
+    );
+    expect(rows[0].placeNumber).toBe(1);
+    expect(rows[1].placeNumber).toBe(1);
+  });
 });

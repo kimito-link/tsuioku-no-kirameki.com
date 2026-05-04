@@ -19,6 +19,9 @@ describe('rankStripSectionLabels', () => {
   it('ギフト帯の注記にコメント帯との分離が書かれている', () => {
     expect(RANK_STRIP_GIFT_NOTE).toMatch(/応援コメント/);
     expect(RANK_STRIP_GIFT_NOTE).toMatch(/別集計/);
+    expect(RANK_STRIP_GIFT_NOTE).toMatch(/貢献度ランキング/);
+    expect(RANK_STRIP_GIFT_NOTE).toMatch(/当ストリップ内の最多回/);
+    expect(RANK_STRIP_GIFT_NOTE).toMatch(/貢ポイント/);
   });
 
   it('見出しとバッジは空でないプレーン文言', () => {

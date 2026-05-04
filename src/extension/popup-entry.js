@@ -4989,7 +4989,9 @@ function renderGiftRankStrip(stripRooms) {
     colorScheme: rankScheme,
     anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled
       ? (uid) => getCachedAnonymousIdenticonDataUrl(uid)
-      : undefined
+      : undefined,
+    // 本家の貢献度ランキングと同様、同回数は同順位表示（1,2,2,2,3…）。差分はストリップ先頭の最多回との差（回）。
+    placeNumberMode: 'dense'
   });
   const topThrow = models.length ? models[0].count : 0;
   const html = models

@@ -960,6 +960,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.137",
+      date: "2026-05-04",
+      summary: "\u30AE\u30D5\u30C8\u5E2F\u306E\u9806\u4F4D\u8868\u793A\u3092\u672C\u5BB6\u5BC4\u305B\uFF08\u540C\u7387\u540C\u9806\u4F4D\uFF09\u306B",
+      items: Object.freeze([
+        "\u30AE\u30D5\u30C8\u30FB\u6295\u3052\u30E9\u30F3\u30AD\u30F3\u30B0\u5E2F\u306E\u9806\u4F4D\u30D0\u30C3\u30B8\u3092\u300C\u884C\u756A\u53F7\u300D\u304B\u3089\u300C\u5BC6\u9806\u4F4D\u300D\u306B\u5909\u66F4\u3057\u307E\u3057\u305F\uFF08\u540C\u3058\u691C\u77E5\u56DE\u6570\u306A\u3089\u540C\u3058\u9806\u4F4D\u306E\u6B21\u306E\u6BB5\u3078\u3002\u8CA2\u732E\u5EA6\u30E9\u30F3\u30AD\u30F3\u30B0\u306E\u898B\u3048\u65B9\u306B\u8FD1\u3044\uFF09",
+        "\u5E2F\u306E\u6CE8\u8A18\u3092\u3001\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u30FB\u672C\u5BB6\u8CA2\u732E\u5EA6\uFF08\u8CA2\uFF09\u3068\u5225\u3067\u300C\u56DE\u6570\u300D\u3068\u300C\u30B9\u30C8\u30EA\u30C3\u30D7\u5185\u6700\u591A\u3068\u306E\u5DEE\u300D\u3067\u3042\u308B\u3053\u3068\u3092\u3088\u308A\u660E\u793A\u3059\u308B\u6587\u8A00\u306B\u6574\u7406\u3057\u307E\u3057\u305F"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.136",
       date: "2026-05-04",
       summary: "storage URL\u3067\u3082\u958B\u3044\u3066\u3044\u308Bwatch\u30BF\u30D6\u3092\u691C\u51FA",
@@ -4483,14 +4492,29 @@
     const defaultThumb = String(opts?.defaultThumbSrc || "").trim();
     const anonThumb = String(opts?.anonymousFallbackThumbSrc || "").trim();
     const colorScheme = opts?.colorScheme === "dark" ? "dark" : "light";
+    const placeMode = opts?.placeNumberMode === "dense" ? "dense" : "row";
     const idnResolver = typeof opts?.anonymousIdenticonResolver === "function" ? opts.anonymousIdenticonResolver : null;
     const rooms = Array.isArray(stripRooms) ? stripRooms : [];
     let knownRank = 0;
+    let denseRank = 0;
+    let denseLastCount = null;
     return rooms.map((r) => {
       const userKey = String(r?.userKey ?? "");
       const isUnknown = userKey === UNKNOWN_USER_KEY;
-      if (!isUnknown) knownRank += 1;
-      const placeNumber = isUnknown ? null : knownRank;
+      const count = Math.max(0, Number(r?.count) || 0);
+      let placeNumber;
+      if (isUnknown) {
+        placeNumber = null;
+      } else if (placeMode === "dense") {
+        if (denseLastCount === null || count < denseLastCount) {
+          denseRank += 1;
+          denseLastCount = count;
+        }
+        placeNumber = denseRank;
+      } else {
+        knownRank += 1;
+        placeNumber = knownRank;
+      }
       const rawAv = String(r?.avatarUrl || "").trim();
       const uidForThumb = isUnknown ? "" : userKey;
       let thumbSrc = "";
@@ -4529,7 +4553,7 @@
         }
       }
       return {
-        count: Math.max(0, Number(r?.count) || 0),
+        count,
         userKey,
         isUnknown,
         placeNumber,
@@ -4680,7 +4704,7 @@ ${body}`;
   var RANK_STRIP_COMMENT_EMPTY_NOTE = "\u307E\u3060\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u304C\u3042\u308A\u307E\u305B\u3093\u3002\u4E0B\u306E\u300C\u30AE\u30D5\u30C8\u30FB\u6295\u3052\u300D\u3068\u306F\u5225\u3067\u3059\u3002\u307E\u305A\u306F\u914D\u4FE1\u8005\u306E\u30D5\u30A9\u30ED\u30FC\u304B\u3089\u3002";
   var RANK_STRIP_GIFT_HEADING = "\u30AE\u30D5\u30C8\u30FB\u6295\u3052";
   var RANK_STRIP_GIFT_BADGE = "NDGR \u691C\u77E5";
-  var RANK_STRIP_GIFT_NOTE = "\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u6295\u3052\uFF0F\u30AE\u30D5\u30C8\u691C\u77E5\u56DE\u6570\u306E\u591A\u3044\u9806\u3067\u3059\u3002\u4E0A\u306E\u300C\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u300D\u3068\u306F\u5225\u96C6\u8A08\u3067\u3059\u3002\u672C\u5BB6\u306E\u300C\u8CA2\u732E\u5EA6\u30E9\u30F3\u30AD\u30F3\u30B0\u300D\u3068\u3082\u5225\u3067\u3059\u30022\u4F4D\u4EE5\u964D\u306F\u5F53\u30B9\u30C8\u30EA\u30C3\u30D7\u5185\u306E\u6700\u591A\u56DE\u3068\u306E\u5DEE\u3092\u8868\u793A\u3057\u307E\u3059\uFF08\u8CA2\u30DD\u30A4\u30F3\u30C8\u3067\u306F\u3042\u308A\u307E\u305B\u3093\uFF09\u3002";
+  var RANK_STRIP_GIFT_NOTE = "\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u6295\u3052\uFF0F\u30AE\u30D5\u30C8\u691C\u77E5\u56DE\u6570\u306E\u591A\u3044\u9806\u3067\u3059\uFF08\u8868\u793A\u306F\u56DE\u6570\u306E\u307F\u3002\u672C\u5BB6\u306E\u300C\u8CA2\u300D\u3068\u306F\u5225\u6307\u6A19\uFF09\u3002\u4E0A\u306E\u300C\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u300D\u3068\u306F\u5225\u96C6\u8A08\u3067\u3059\u3002\u672C\u5BB6\u306E\u300C\u8CA2\u732E\u5EA6\u30E9\u30F3\u30AD\u30F3\u30B0\u300D\u3068\u3082\u5225\u3067\u3059\u30022\u4F4D\u4EE5\u964D\u306F\u5F53\u30B9\u30C8\u30EA\u30C3\u30D7\u5185\u306E\u6700\u591A\u56DE\u3068\u306E\u5DEE\u3092\u8868\u793A\u3057\u307E\u3059\uFF08\u8CA2\u30DD\u30A4\u30F3\u30C8\u3067\u306F\u3042\u308A\u307E\u305B\u3093\uFF09\u3002";
   function buildRankStripPillarRowHtml(kind) {
     const isGift = kind === "gifts";
     const heading = isGift ? RANK_STRIP_GIFT_HEADING : RANK_STRIP_COMMENT_HEADING;
@@ -14483,7 +14507,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
       anonymousFallbackThumbSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
       colorScheme: rankScheme,
-      anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled ? (uid) => getCachedAnonymousIdenticonDataUrl(uid) : void 0
+      anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled ? (uid) => getCachedAnonymousIdenticonDataUrl(uid) : void 0,
+      // 本家の貢献度ランキングと同様、同回数は同順位表示（1,2,2,2,3…）。差分はストリップ先頭の最多回との差（回）。
+      placeNumberMode: "dense"
     });
     const topThrow = models.length ? models[0].count : 0;
     const html = models.map((m) => {
@@ -17991,7 +18017,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0504-1558" ? String("0504-1558") : "dev";
+      const buildId = "0504-1608" ? String("0504-1608") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";

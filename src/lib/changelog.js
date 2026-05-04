@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.137',
+    date: '2026-05-04',
+    summary: 'ギフト帯の順位表示を本家寄せ（同率同順位）に',
+    items: Object.freeze([
+      'ギフト・投げランキング帯の順位バッジを「行番号」から「密順位」に変更しました（同じ検知回数なら同じ順位の次の段へ。貢献度ランキングの見え方に近い）',
+      '帯の注記を、応援コメント・本家貢献度（貢）と別で「回数」と「ストリップ内最多との差」であることをより明示する文言に整理しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.136',
     date: '2026-05-04',
     summary: 'storage URLでも開いているwatchタブを検出',
