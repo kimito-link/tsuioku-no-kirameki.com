@@ -573,6 +573,139 @@
     return best;
   }
 
+  // src/lib/supportGridDisplayTier.js
+  var SUPPORT_GRID_TIER_LINK = "link";
+  var SUPPORT_GRID_TIER_KONTA = "konta";
+  var SUPPORT_GRID_TIER_TANU = "tanu";
+  function demoteNiconicoAnonymousFromKontaTier(userId, tier) {
+    if (tier !== SUPPORT_GRID_TIER_KONTA) return tier;
+    if (!isNiconicoAnonymousUserId(userId)) return tier;
+    return SUPPORT_GRID_TIER_TANU;
+  }
+  function supportGridPersonalThumbPreferredUrl(userId, httpAvatarCandidate, storedAvatarUrl) {
+    const u = String(userId || "").trim();
+    const http = String(httpAvatarCandidate ?? "").trim();
+    const raw = String(storedAvatarUrl ?? "").trim();
+    if (commentEnrichmentAvatarScore(u, raw) >= 2) return raw;
+    if (commentEnrichmentAvatarScore(u, http) >= 2) return http;
+    return "";
+  }
+  function supportGridTierHasPersonalThumb(userId, httpAvatarCandidate, storedAvatarUrl) {
+    return Boolean(
+      supportGridPersonalThumbPreferredUrl(userId, httpAvatarCandidate, storedAvatarUrl)
+    );
+  }
+  function supportGridStrongNickname(nick, userId) {
+    const n = String(nick ?? "").trim();
+    if (!n) return false;
+    if (isNiconicoAutoUserPlaceholderNickname(n)) return false;
+    if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)") return false;
+    if (n === "\u533F\u540D") return false;
+    if (n === "\u30B2\u30B9\u30C8" || /^guest$/i.test(n)) return false;
+    if (isNiconicoAnonymousUserId(userId) && n.length <= 1) return false;
+    return true;
+  }
+  function bestAvatarScore(uid, httpCandidate, rawAv) {
+    const a = commentEnrichmentAvatarScore(uid, rawAv);
+    const b = commentEnrichmentAvatarScore(uid, httpCandidate);
+    return (
+      /** @type {0|1|2} */
+      Math.max(a, b)
+    );
+  }
+  function explainSupportGridDisplayTier(p) {
+    const uid = String(p?.userId ?? "").trim();
+    const nick = String(p?.nickname ?? "").trim();
+    const httpCandidate = String(p.httpAvatarCandidate ?? "").trim();
+    const rawAv = String(p.storedAvatarUrl ?? "").trim();
+    const strongNick = uid ? supportGridStrongNickname(nick, uid) : false;
+    const observed = Boolean(p?.avatarObserved);
+    let hasThumb = false;
+    if (p.lpMockHasCustomAvatar === true) hasThumb = true;
+    else if (p.lpMockHasCustomAvatar === false) hasThumb = false;
+    else if (uid) {
+      hasThumb = supportGridTierHasPersonalThumb(uid, httpCandidate, rawAv);
+    }
+    const avatarScore = uid ? bestAvatarScore(uid, httpCandidate, rawAv) : 0;
+    const hasAnyAvatar = avatarScore >= 1 || observed;
+    const storedAvatarScore = uid ? commentEnrichmentAvatarScore(uid, rawAv) : 0;
+    const hasObservedAvatar = storedAvatarScore >= 1;
+    const isNumericId = /^\d{5,14}$/.test(uid);
+    const isAnonymous = isNiconicoAnonymousUserId(uid);
+    const TIER_RULES = [
+      { tier: SUPPORT_GRID_TIER_LINK, match: (f) => f.observed },
+      { tier: SUPPORT_GRID_TIER_LINK, match: (f) => f.strongNick && f.hasThumb },
+      { tier: SUPPORT_GRID_TIER_LINK, match: (f) => f.strongNick && f.isNumericId },
+      { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.strongNick || f.hasThumb },
+      { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.hasAnyAvatar && !f.isAnonymous },
+      { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.isNumericId }
+    ];
+    const flags = { observed, strongNick, hasThumb, hasAnyAvatar, hasObservedAvatar, isNumericId, isAnonymous };
+    const tierRaw = !uid ? SUPPORT_GRID_TIER_TANU : TIER_RULES.find((r) => r.match(flags))?.tier ?? SUPPORT_GRID_TIER_TANU;
+    const tier = demoteNiconicoAnonymousFromKontaTier(uid, tierRaw);
+    const demotedAnonymousKontaToTanu = tierRaw === SUPPORT_GRID_TIER_KONTA && tier === SUPPORT_GRID_TIER_TANU;
+    const demotedAnonymousLinkToKonta = false;
+    return {
+      tier,
+      strongNick,
+      hasPersonalThumb: hasThumb,
+      hasAnyAvatar,
+      avatarObserved: observed,
+      demotedAnonymousLinkToKonta,
+      demotedAnonymousKontaToTanu,
+      httpCandidateNonEmpty: Boolean(httpCandidate),
+      storedAvatarNonEmpty: Boolean(rawAv)
+    };
+  }
+
+  // src/lib/giftDisplayNickname.js
+  function isLikelyInternalNdgGiftOrCampaignLabel(s) {
+    const t = String(s || "").trim();
+    if (!t) return false;
+    if (/^nicolive_/i.test(t)) return true;
+    const hasNonAscii = [...t].some((ch) => (ch.codePointAt(0) ?? 0) > 127);
+    if (/^[a-z][a-z0-9_]{22,}$/i.test(t) && !hasNonAscii) return true;
+    return false;
+  }
+  function nicknameShouldReplaceExisting(prev, next, userId) {
+    const p = String(prev || "").trim();
+    const n = String(next || "").trim();
+    const uid = String(userId || "").trim();
+    if (!n) return false;
+    if (!p) return !isLikelyInternalNdgGiftOrCampaignLabel(n);
+    if (isLikelyInternalNdgGiftOrCampaignLabel(p) && !isLikelyInternalNdgGiftOrCampaignLabel(n)) {
+      return true;
+    }
+    if (supportGridStrongNickname(n, uid) && !supportGridStrongNickname(p, uid)) {
+      return true;
+    }
+    return false;
+  }
+  function pickGiftRankDisplayNickname(userId, storedNick, commentCachedNick, interceptNick = "") {
+    const uid = String(userId || "").trim();
+    const a = String(storedNick || "").trim();
+    const b = String(commentCachedNick || "").trim();
+    const c = String(interceptNick || "").trim();
+    if (c && nicknameShouldReplaceExisting(a, c, uid)) {
+      return c;
+    }
+    if (isLikelyInternalNdgGiftOrCampaignLabel(a) && b && !isLikelyInternalNdgGiftOrCampaignLabel(b)) {
+      return b;
+    }
+    if (supportGridStrongNickname(b, uid) && !supportGridStrongNickname(a, uid)) {
+      return b;
+    }
+    if (!a && b) return b;
+    return a || b;
+  }
+
+  // src/lib/giftRecord.js
+  function normalizeGiftThrowCount(v) {
+    const n = Math.round(Number(v));
+    if (Number.isFinite(n) && n >= 1) return n;
+    return 1;
+  }
+
   // src/lib/userRooms.js
   var UNKNOWN_USER_KEY = "__unknown__";
   function shortUserKeyDisplay(userKey) {
@@ -826,6 +959,158 @@
 
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
+    Object.freeze({
+      version: "0.1.136",
+      date: "2026-05-04",
+      summary: "storage URL\u3067\u3082\u958B\u3044\u3066\u3044\u308Bwatch\u30BF\u30D6\u3092\u691C\u51FA",
+      items: Object.freeze([
+        "pickWatchUrl \u304C storage \u306B\u5012\u308C\u3066\u3082\u3001\u540C\u4E00\u653E\u9001\u306E watch \u30BF\u30D6\u304C\u5225\u30BF\u30D6\u3067\u958B\u3044\u3066\u3044\u308C\u3070\u653E\u9001\u4E2D\u3068\u3057\u3066\u63CF\u753B\u3059\u308B\u3088\u3046\u5909\u66F4\u3057\u307E\u3057\u305F\uFF08tabs.query \u3067\u5B9F\u5728\u30BF\u30D6\u3092\u5224\u5B9A\uFF09",
+        "watch snapshot \u306E fetch \u5B8C\u4E86\u5F8C\u306B refresh \u4E16\u4EE3\u304C\u9032\u3093\u3067 isFreshRefresh \u304C false \u3060\u3068\u3001\u6B21\u306E poll\uFF0830 \u79D2\uFF09\u307E\u3067\u6765\u5834\u30AB\u30FC\u30C9\u304C\u66F4\u65B0\u3055\u308C\u306A\u3044\u9000\u884C\u3092\u3001\u30AD\u30E3\u30C3\u30B7\u30E5\u540C\u671F\u3068 renderWatchMetaCard \u306E\u5373\u6642\u547C\u3073\u51FA\u3057\u3067\u9632\u304E\u307E\u3057\u305F",
+        "E2E popup-live-stat-cards: \u8868\u793A\u691C\u8A3C\u304C\u901A\u308B\u3053\u3068\u3092\u78BA\u8A8D"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.135",
+      date: "2026-05-04",
+      summary: "\u6765\u5834\u30FB\u540C\u63A5\u30FB\u516C\u5F0F\u5E2F\u3092watch\u30E1\u30BF\u6B20\u640D\u304B\u3089\u5207\u308A\u96E2\u3057",
+      items: Object.freeze([
+        "#watchMeta \u5185\u306E\u8981\u7D20\u6B20\u640D\u3067 renderWatchMetaCard / clearWatchMetaCard \u304C\u5148\u982D return \u3057\u3066\u3044\u305F\u5834\u5408\u3001#liveStatCards \u306E\u6570\u5024\u3068\u516C\u5F0F\u7D71\u8A08\u5E2F\u304C\u66F4\u65B0\u3055\u308C\u306A\u3044\u4E0D\u5177\u5408\u3092\u4FEE\u6B63\u3057\u307E\u3057\u305F\uFF08\u30E1\u30BF\u5E2F\u306F\u6B20\u3051\u3066\u3082\u30AB\u30FC\u30C9\u884C\u306F\u5FC5\u305A\u66F4\u65B0\uFF09",
+        "E2E: \u30E2\u30C3\u30AF watch \u306B\u8996\u8074\u8005\u6587\u9762\u3092\u8FFD\u52A0\u3057\u3001popup \u306E\u6765\u5834\u30FB\u540C\u63A5\u30FB\u8A18\u9332\u30AB\u30FC\u30C9\u304C\u300C\u2014\u300D\u56FA\u5B9A\u306B\u306A\u3089\u306A\u3044\u3053\u3068\u3092 popup-live-stat-cards.spec.js \u3067\u691C\u8A3C"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.134",
+      date: "2026-05-04",
+      summary: "\u5FDC\u63F4\u53EF\u8996\u5316\u306E\u6848\u5185\u6587\u8A00\u3092\u73FE\u4ED5\u69D8\u306B\u5408\u308F\u305B\u3066\u6574\u7406",
+      items: Object.freeze([
+        "\u300C1\u30B3\u30E1\u30F3\u30C8\u3054\u3068\u306B\u308A\u3093\u304F\u304C\u5DE6\u2192\u53F3\u3078\u5897\u3048\u308B\u300D\u306A\u3069\u65E7\u8868\u73FE\u3092\u3084\u3081\u3001\u30B0\u30EA\u30C3\u30C9\uFF1D\u30B3\u30E1\u30F3\u30C8\u4EF6\u6570\u3076\u3093\u306E\u4E26\u3073\u30FB\u4E0A\u306E\u4E09\u6BB5\uFF1D\u4EBA\u6570\u30D9\u30FC\u30B9\u306E\u30EC\u30FC\u30F3\u3067\u3042\u308B\u3053\u3068\u3092\u6848\u5185\u306B\u53CD\u6620\u3057\u307E\u3057\u305F\uFF08HTML \u521D\u671F\u8868\u793A\u3082\u540C\u8DA3\u65E8\u306B\u66F4\u65B0\uFF09",
+        "\u5FDC\u63F4\u30B0\u30EA\u30C3\u30C9\u7528\u306E\u9010\u6B21\u8868\u793A\u30BF\u30A4\u30DE\u30FC\u306F\u672A\u4F7F\u7528\u3060\u3063\u305F\u305F\u3081\u72B6\u614B\u304B\u3089\u524A\u9664\u3057\u3001\u5185\u90E8\u3092\u6574\u7406\u3057\u307E\u3057\u305F"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.133",
+      date: "2026-05-04",
+      summary: "\u5FDC\u63F4\u30EC\u30FC\u30F3\u3068\u8A3A\u65AD\u306E\u4EF6\u6570\u8AAC\u660E\u3092\u6574\u7406",
+      items: Object.freeze([
+        "\u300C\u3044\u307E N \u4EF6\u300D\u3068\u8A18\u9332\u30B3\u30E1\u30F3\u30C8\u7DCF\u6570\u304C\u98DF\u3044\u9055\u3063\u3066\u898B\u3048\u308B\u4EF6\u306B\u3064\u3044\u3066\u3001\u30EC\u30FC\u30F3\u76F4\u4E0B\u306B\u8A18\u9332\u4EF6\u6570\u306E\u4E00\u6587\u3092\u8FFD\u52A0\u3057\u3001\u8A3A\u65AD\u30FB\u6848\u5185\u3067\u540C\u3058\u30E9\u30D9\u30EB\u6587\u8A00\u3092\u5171\u6709\u3059\u308B\u3088\u3046\u6574\u7406\u3057\u307E\u3057\u305F"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.132",
+      date: "2026-05-04",
+      summary: "\u30B3\u30E1\u30F3\u30C8\u5E2F\u3068\u30AE\u30D5\u30C8\u5E2F\u306E\u898B\u51FA\u3057\u5206\u96E2",
+      items: Object.freeze([
+        "\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u306E\u4E0A\u4F4D\u30E9\u30F3\u30AD\u30F3\u30B0\u3092\u300C\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u300D\u3068\u300C\u30AE\u30D5\u30C8\u30FB\u6295\u3052\u300D\u306E2\u5E2F\u306B\u5206\u3051\u3001\u898B\u51FA\u3057\u3068\u8272\u3067\u533A\u5225\u3057\u3084\u3059\u304F\u3057\u307E\u3057\u305F\u3002\u6570\u5B57\u306F\u5F93\u6765\u3069\u304A\u308A\u5225\u96C6\u8A08\u3067\u3059"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.131",
+      date: "2026-05-04",
+      summary: "\u30AE\u30D5\u30C8\u30E9\u30F3\u30AD\u30F3\u30B0\u5E2F\u3092\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u672C\u5237\u65B0\u306B\u540C\u671F",
+      items: Object.freeze([
+        "\u8996\u8074\u4E2D\u306B\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u3092\u66F4\u65B0\u3059\u308B\u305F\u3073\u3001\u5FDC\u63F4\u30E9\u30F3\u30AD\u30F3\u30B0\u3068\u540C\u3058\u30BF\u30A4\u30DF\u30F3\u30B0\u3067\u30AE\u30D5\u30C8\u9806\u4F4D\u5E2F\u3082\u8AAD\u307F\u76F4\u3059\u3088\u3046\u306B\u3057\u307E\u3057\u305F\u3002\u8A73\u7D30\u8A2D\u5B9A\u306E\u30AE\u30D5\u30C8\u4E00\u89A7\u3092\u958B\u304B\u306A\u304F\u3066\u3082\u3001\u30AB\u30FC\u30C9\u4E0B\u306E\u30AE\u30D5\u30C8\u5E2F\u306B\u8868\u793A\u3055\u308C\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.130",
+      date: "2026-05-04",
+      summary: "\u5FDC\u63F4\u30E9\u30F3\u30AD\u30F3\u30B0\u5E2F\u306B\u30821\u4F4D\u3068\u306E\u4EF6\u6570\u5DEE",
+      items: Object.freeze([
+        "\u8A18\u9332\u5185\u30FB\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u5FDC\u63F4\u4EF6\u6570\u30B9\u30C8\u30EA\u30C3\u30D7\u3067\u3082\u30012\u4F4D\u4EE5\u964D\u306B\u300C1\u4F4D\u307E\u3067\u3042\u3068N\u4EF6\u300D\u3092\u8868\u793A\u3057\u307E\u3059\uFF08\u5F53\u30B9\u30C8\u30EA\u30C3\u30D7\u306E\u6700\u591A\u4EF6\u3068\u306E\u5DEE\u3002\u672C\u5BB6\u306E\u8CA2\u732E\u5EA6\u3068\u306F\u5225\u3067\u3059\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.129",
+      date: "2026-05-04",
+      summary: "\u30AE\u30D5\u30C8\u5E2F\u306E\u8868\u793A\u540D\u3092\u672C\u5BB6\u5BC4\u305B\uFF0B1\u4F4D\u3068\u306E\u5DEE",
+      items: Object.freeze([
+        "\u8996\u8074\u30DA\u30FC\u30B8 intercept \u3067\u62FE\u3063\u305F\u30CB\u30C3\u30AF\u3092 NDGR \u30AE\u30D5\u30C8\u884C\u306B\u512A\u5148\u53CD\u6620\u3057\u3001\u5185\u90E8\u30E9\u30D9\u30EB\uFF08nicolive_* \u7B49\uFF09\u3092\u6E1B\u3089\u3057\u307E\u3057\u305F",
+        "\u30AE\u30D5\u30C8\u5E2F\u306E2\u4F4D\u4EE5\u964D\u306B\u3001\u5F53\u30B9\u30C8\u30EA\u30C3\u30D7\u5185\u306E\u6700\u591A\u56DE\uFF081\u4F4D\u76F8\u5F53\uFF09\u3068\u306E\u5DEE\u300C1\u4F4D\u307E\u3067\u3042\u3068N\u56DE\u300D\u3092\u8868\u793A\u3057\u307E\u3059\uFF08\u8CA2\u30DD\u30A4\u30F3\u30C8\u3067\u306F\u306A\u304F\u691C\u77E5\u56DE\u6570\u30D9\u30FC\u30B9\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.128",
+      date: "2026-05-04",
+      summary: "\u672C\u5BB6\u5BC4\u305B\u3092\u6298\u308A\u305F\u305F\u307F\u3067\u7701\u30B9\u30DA\u30FC\u30B9\u5316",
+      items: Object.freeze([
+        "\u8A18\u9332\u30AB\u30FC\u30C9\u4E0B\u306E\u300C\u672C\u5BB6\u5BC4\u305B\u300D\u3092\u958B\u9589\u3067\u304D\u308B\u3088\u3046\u306B\u3057\u3001\u9589\u3058\u305F\u3068\u304D\u306F\u30B5\u30DE\u30EA\u30FC\u4E00\u884C\u3060\u3051\u306B\u3057\u3066\u7E26\u306E\u5360\u6709\u3092\u6291\u3048\u307E\u3057\u305F",
+        "\u30AE\u30D5\u30C8\u5E2F\u306E\u6CE8\u8A18\u3068\u672C\u5BB6\u7D2F\u8A08\u306E\u6570\u5B57\u304C\u4E8C\u91CD\u306B\u306A\u3089\u306A\u3044\u3088\u3046\u3001\u6CE8\u8A18\u306F\u300C\u672C\u5BB6\u5BC4\u305B\u300D\u3078\u306E\u6848\u5185\u6587\u306B\u7F6E\u304D\u63DB\u3048\u307E\u3057\u305F",
+        "\u8868\u793A\u5185\u5BB9\u306E digest \u3068 stable key \u3067\u3001\u540C\u3058\u6570\u5024\u306E\u3068\u304D\u306E DOM \u66F4\u65B0\u3092\u6E1B\u3089\u3057\u307E\u3057\u305F"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.127",
+      date: "2026-05-04",
+      summary: "\u672C\u5BB6\u5BC4\u305B\u306E\u8996\u8074\u7D71\u8A085\u9805\u76EE\u3092\u8A18\u9332\u30AB\u30FC\u30C9\u4E0B\u306B\u8868\u793A",
+      items: Object.freeze([
+        "\u30CB\u30B3\u751F\u30D7\u30EC\u30A4\u30E4\u30FC\u4ED8\u8FD1\u306E\u30D0\u30FC\u306B\u8FD1\u3044\u5F62\u3067\u3001\u516C\u5F0F\u6765\u5834\u30FB\u516C\u5F0F\u30B3\u30E1\u30F3\u30C8\u7D2F\u8A08\u30FB\u653E\u9001\u7D4C\u904E\u30FB\u5E83\u544Apt\u30FB\u30AE\u30D5\u30C8pt\u3092\u300C\u672C\u5BB6\u5BC4\u305B\uFF08WS / NDGR\uFF09\u300D\u3068\u3057\u3066\u307E\u3068\u3081\u3066\u8868\u793A\u3057\u307E\u3059",
+        "\u6570\u5024\u306F\u8996\u8074\u30DA\u30FC\u30B8\u306E WebSocket / NDGR statistics \u7531\u6765\u3067\u3059\u3002\u30D7\u30EC\u30A4\u30E4\u30FC\u8868\u793A\u3084\u8CA2\u732E\u5EA6\u30E9\u30F3\u30AD\u30F3\u30B0\u3068\u5B8C\u5168\u4E00\u81F4\u3057\u306A\u3044\u3053\u3068\u304C\u3042\u308A\u307E\u3059\uFF08\u30C4\u30FC\u30EB\u30C1\u30C3\u30D7\u306B\u8AAC\u660E\u3092\u5165\u308C\u3066\u3044\u307E\u3059\uFF09",
+        "\u30AE\u30D5\u30C8\u691C\u77E5\u3067\u8AA4\u3063\u3066\u8868\u793A\u540D\u306B\u5165\u308A\u3084\u3059\u3044\u5185\u90E8\u7528\u30E9\u30D9\u30EB\uFF08nicolive_ \u3067\u59CB\u307E\u308B\u540D\u524D\u306A\u3069\uFF09\u3092\u5F3E\u304D\u3001\u30B3\u30E1\u30F3\u30C8\u5074\u3067\u53D6\u308C\u305F\u8868\u793A\u540D\u3092\u5FDC\u63F4\uFF0F\u30AE\u30D5\u30C8\u306E\u4E26\u3073\u306B\u512A\u5148\u3057\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.126",
+      date: "2026-05-04",
+      summary: "\u30AE\u30D5\u30C8\u30E9\u30F3\u30AD\u30F3\u30B0\u3092\u8A18\u9332\u30AB\u30FC\u30C9\u4E0B\u306B\u3082\u8868\u793A",
+      items: Object.freeze([
+        "\u5FDC\u63F4\u30E9\u30F3\u30AF\u30B9\u30C8\u30EA\u30C3\u30D7\u76F4\u4E0B\u306E\u300C\u8A18\u9332\u30AB\u30FC\u30C9\u5217\u300D\u30D6\u30ED\u30C3\u30AF\u5185\u306B\u3001\u30AE\u30D5\u30C8\u8CA2\u732E\u30B9\u30C8\u30EA\u30C3\u30D7\uFF08NDGR \u6295\u3052\uFF0F\u30AE\u30D5\u30C8\u56DE\u6570\u9806\uFF09\u3092\u5FA9\u5E30\u3055\u305B\u307E\u3057\u305F",
+        "\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30EC\u30FC\u30F3\u306E\u76F4\u4E0B\u306B\u3082\u540C\u3058\u5185\u5BB9\u306E\u30AE\u30D5\u30C8\u5E2F\u3092\u6B8B\u3057\u3066\u3044\u308B\u305F\u3081\u3001\u30D5\u30A1\u30FC\u30B9\u30C8\u30D3\u30E5\u30FC\u3067\u3082\u30B9\u30C8\u30FC\u30EA\u30FC\u4ED8\u8FD1\u3067\u3082\u8FFD\u3048\u307E\u3059"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.125",
+      date: "2026-05-04",
+      summary: "\u30AE\u30D5\u30C8\u8CA2\u732E\u30EC\u30FC\u30F3\u3092\u5FDC\u63F4\u30EC\u30FC\u30F3\u76F4\u4E0B\u3078",
+      items: Object.freeze([
+        "NDGR \u30AE\u30D5\u30C8\u306E\u6A2A\u4E26\u3073\u30B9\u30C8\u30EA\u30C3\u30D7\u3092\u3001\u8A18\u9332\u30AB\u30FC\u30C9\u5217\u306E\u4E0B\u304B\u3089\u300C\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30EC\u30FC\u30F3\u300D\u30D6\u30ED\u30C3\u30AF\uFF08\u30A2\u30A4\u30B3\u30F3\u5217\u30FB\u8A73\u7D30\u306E\u76F4\u4E0B\uFF09\u3078\u79FB\u3057\u307E\u3057\u305F\u3002\u30B3\u30E1\u30F3\u30C8\u7CFB\u306E\u53EF\u8996\u5316\u306E\u3059\u3050\u4E0B\u3067\u30AE\u30D5\u30C8\u9806\u4F4D\u3092\u8FFD\u3044\u3084\u3059\u304F\u306A\u308A\u307E\u3059",
+        "\u898B\u305F\u76EE\u306F\u5F93\u6765\u3069\u304A\u308A\u30AA\u30EC\u30F3\u30B8\u7CFB\u306E\u30AE\u30D5\u30C8\u5E2F\u3067\u3059\u3002\u62E1\u5F35\u3092\u66F4\u65B0\u3057\u305F\u3042\u3068 watch \u3092\u518D\u8AAD\u307F\u8FBC\u307F\u3059\u308B\u3068\u53CD\u6620\u304C\u78BA\u5B9F\u3067\u3059"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.124",
+      date: "2026-05-04",
+      summary: "\u6295\u3052\u30DC\u30BF\u30F3\u3067\u672C\u5BB6\u30AE\u30D5\u30C8\u6B04\u304C\u958B\u304F\u3088\u3046\u4FEE\u6B63",
+      items: Object.freeze([
+        "watch \u306E\u30B3\u30E1\u30F3\u30C8\u5165\u529B\u304C\u5165\u3063\u305F form \u306E\u5916\u306B\u300C\u6295\u3052\uFF0F\u30AE\u30D5\u30C8\u300D\u30DC\u30BF\u30F3\u304C\u3042\u308B\u69CB\u6210\u3067\u3001\u691C\u7D22\u7BC4\u56F2\u304C form \u3060\u3051\u3060\u3068\u30DC\u30BF\u30F3\u3092\u898B\u3064\u3051\u3089\u308C\u305A\u672C\u5BB6\u306E\u753B\u9762\u304C\u958B\u3051\u306A\u3044\u3053\u3068\u304C\u3042\u308A\u307E\u3057\u305F\u3002\u30B3\u30E1\u30F3\u30C8\u30D1\u30CD\u30EB\u5168\u4F53\u3092\u5148\u306B\u30B9\u30B3\u30FC\u30D7\u3059\u308B\u3088\u3046\u5909\u66F4\u3057\u307E\u3057\u305F",
+        "\u3046\u307E\u304F\u3044\u304B\u306A\u3044\u3068\u304D\u306F watch \u3092\u524D\u9762\u306B\u3057\u3001\u30B3\u30E1\u30F3\u30C8\u6B04\u304C\u8868\u793A\u3055\u308C\u3066\u3044\u308B\u72B6\u614B\u3067\u30D1\u30CD\u30EB\u306E\u300C\u6295\u3052\u300D\u304B\u8A73\u7D30\u306E\u300Cwatch\u30BF\u30D6\u3067\u30AE\u30D5\u30C8\u30FB\u30A2\u30A4\u30C6\u30E0\u3092\u958B\u304F\u300D\u3092\u518D\u5EA6\u304A\u8A66\u3057\u304F\u3060\u3055\u3044"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.123",
+      date: "2026-05-04",
+      summary: "NDGR\u30AE\u30D5\u30C8\u306E\u9001\u308A\u4E3B\u3092\u518D\u5E30\u30CD\u30B9\u30C8\u304B\u3089\u53D6\u5F97",
+      items: Object.freeze([
+        "\u30AE\u30D5\u30C8 protobuf \u306F\u9001\u308A\u4E3B\u306E raw_user_id \u304C\u4E00\u6BB5\u4EE5\u4E0A\u6DF1\u3044 LEN \u306E\u4E2D\u306B\u3060\u3051\u3042\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002\u5168 LEN \u3092\u6DF1\u3055\u5236\u9650\u4ED8\u304D\u3067\u518D\u5E30\u3057\u3001field 5\uFF08varint \u307E\u305F\u306F\u6570\u5B57\u3060\u3051\u306E\u6587\u5B57\u5217\uFF09\u3092\u63A2\u3057\u307E\u3059\u3002\u8907\u6570\u30D2\u30C3\u30C8\u6642\u306F\u3088\u308A\u6DF1\u3044\u30D6\u30ED\u30C3\u30AF\u3092\u512A\u5148\u3057\u307E\u3059",
+        "\u8A3A\u65AD\u306E ndgrLastReceivedAgo \u306F\u300C\u6700\u5F8C\u306B NDGR \u3092\u53D7\u4FE1\u3057\u3066\u304B\u3089\u306E\u7D4C\u904E\u30DF\u30EA\u79D2\u300D\u3067\u3059\u30021\u4E07\u524D\u5F8C\u306A\u3089\u7D0410\u79D2\u3067\u3001NDGR \u505C\u6B62\u3068\u306F\u9650\u308A\u307E\u305B\u3093\u3002\u53CD\u6620\u5F8C\u3082\u9806\u4F4D\u304C\u304A\u304B\u3057\u3044\u5834\u5408\u306F\u8A18\u9332\u30AF\u30EA\u30A2\u3092\u8A66\u3057\u3066\u304F\u3060\u3055\u3044"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.122",
+      date: "2026-05-04",
+      summary: "NDGR\u30AE\u30D5\u30C8\u306E\u9001\u308A\u4E3B\u3092\u30CD\u30B9\u30C8\u5185\u306EUID\u304B\u3089\u53D6\u5F97",
+      items: Object.freeze([
+        "\u30AE\u30D5\u30C8 payload \u306E\u5916\u5074\u3060\u3051\u3092\u898B\u308B\u3068\u3001\u5546\u54C1 ID \u306A\u3069\u3068\u30CB\u30C3\u30AF\u304C\u8AA4\u7D50\u5408\u3059\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3057\u305F\u3002\u9577\u3055\u306E\u3042\u308B LEN \u30D5\u30A3\u30FC\u30EB\u30C9\u5185\u306B Chat \u4E92\u63DB\u306E raw_user_id\uFF08field 5\uFF09\u304C\u3042\u308B\u5834\u5408\u306F\u305D\u3053\u3092\u6700\u512A\u5148\u3057\u3001\u8868\u793A\u540D\u3082\u540C\u3058\u30CD\u30B9\u30C8\u304B\u3089\u53D6\u308C\u308B\u3068\u304D\u306F\u305D\u3061\u3089\u3092\u4F7F\u3044\u307E\u3059",
+        "\u53CD\u6620\u306B\u306F\u62E1\u5F35\u306E\u518D\u8AAD\u307F\u8FBC\u307F\u304C\u5FC5\u8981\u3067\u3059\u3002\u53E4\u3044\u8AA4\u30AB\u30A6\u30F3\u30C8\u306F `chrome.storage.local` \u306E `nls_gift_users_<\u653E\u9001ID>` \u306B\u6B8B\u308B\u305F\u3081\u3001\u6C17\u306B\u306A\u308B\u5834\u5408\u306F\u8A18\u9332\u30AF\u30EA\u30A2\u3067\u4E00\u5EA6\u30EA\u30BB\u30C3\u30C8\u3057\u3066\u304F\u3060\u3055\u3044"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.121",
+      date: "2026-05-04",
+      summary: "NDGR\u30AE\u30D5\u30C8\u306E\u9001\u308A\u4E3BID\u8AA4\u691C\u51FA\u3092\u4FEE\u6B63",
+      items: Object.freeze([
+        "\u30AE\u30D5\u30C8 protobuf \u5185\u306E\u8907\u6570\u306E\u6570\u5024\u304B\u3089\u5148\u982D\u3060\u3051\u3092\u9001\u308A\u4E3B ID \u3068\u3057\u3066\u3044\u305F\u305F\u3081\u3001\u5225\u30D5\u30A3\u30FC\u30EB\u30C9\u306E ID \u3068\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0\u304C\u7D50\u3073\u4ED8\u304F\u3053\u3068\u304C\u3042\u308A\u307E\u3057\u305F\u3002\u30C1\u30E3\u30C3\u30C8\u3068\u540C\u69D8\u306B field 5 \u3092\u6700\u512A\u5148\u3057\u3001\u7D9A\u3051\u3066 3\u30FB1 \u306E\u9806\u3067\u9078\u3076\u3088\u3046\u306B\u3057\u307E\u3057\u305F",
+        "\u65E2\u306B\u30B9\u30C8\u30EC\u30FC\u30B8\u306B\u6E9C\u307E\u3063\u305F\u8AA4\u3063\u305F\u884C\u306F\u3001\u4ECA\u5F8C\u306E\u691C\u77E5\u5206\u304B\u3089\u6B63\u3057\u3044 UID \u306B\u5206\u304B\u308C\u3066\u84C4\u7A4D\u3055\u308C\u307E\u3059\uFF08\u5FC5\u8981\u306A\u3089\u8A73\u7D30\u8A2D\u5B9A\u304B\u3089\u8A18\u9332\u30AF\u30EA\u30A2\u3067\u521D\u671F\u5316\u3067\u304D\u307E\u3059\uFF09"
+      ])
+    }),
+    Object.freeze({
+      version: "0.1.120",
+      date: "2026-05-04",
+      summary: "\u30AE\u30D5\u30C8\u8CA2\u732E\u30E9\u30F3\u30AD\u30F3\u30B0\u3092\u5FDC\u63F4\u30B9\u30C8\u30EA\u30C3\u30D7\u76F4\u4E0B\u306B\u8FFD\u52A0",
+      items: Object.freeze([
+        "NDGR \u3067\u691C\u77E5\u3057\u305F\u6295\u3052\uFF0F\u30AE\u30D5\u30C8\u56DE\u6570\u304C\u30B9\u30C8\u30EC\u30FC\u30B8\u306B\u8F09\u308B\u3068\u3001\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u306E\u30E9\u30F3\u30AD\u30F3\u30B0\u30B9\u30C8\u30EA\u30C3\u30D7\u306E\u76F4\u4E0B\u306B\u6696\u8272\u67A0\u306E\u30EC\u30FC\u30F3\u304C\u73FE\u308C\u307E\u3059\uFF08\u521D\u56DE\u691C\u77E5\u307E\u3067\u306F\u975E\u8868\u793A\uFF09",
+        "\u8868\u793A\u306F\u300C\u56DE\u300D\u5358\u4F4D\u3067\u3001\u914D\u4FE1\u8005\u672C\u4EBA\u306F\u30B3\u30E1\u30F3\u30C8\u5FDC\u63F4\u30B9\u30C8\u30EA\u30C3\u30D7\u3068\u540C\u69D8\u306B\u9664\u5916\u3057\u307E\u3059"
+      ])
+    }),
     Object.freeze({
       version: "0.1.119",
       date: "2026-05-04",
@@ -3012,6 +3297,23 @@
     return "\u30B3\u30E1\u30F3\u30C8/\u6765\u5834\u8005\u30D9\u30FC\u30B9\u306E\u63A8\u5B9A";
   }
 
+  // src/lib/supportVisualStoryCopy.js
+  var SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL = "\u8A73\u3057\u3044\u72B6\u6CC1\uFF08\u958B\u767A\u30FB\u5207\u308A\u5206\u3051\u7528\uFF09";
+  function buildStoryUserLaneStackAriaLabel(laneDisplayedSlots) {
+    const n = Math.max(0, Math.floor(Number(laneDisplayedSlots) || 0));
+    return `\u6700\u8FD1\u306E\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30B5\u30E0\u30CD\u30A4\u30EB\uFF08\u308A\u3093\u304F\u30FB\u3053\u3093\u592A\u30FB\u305F\u306C\u59C9\u306E\u4E09\u6BB5\uFF09\u5408\u8A08${n}\u4EF6`;
+  }
+  var STORY_SUPPORT_GROWTH_GAUGE_HELP = "\u8A18\u9332\u3057\u305F\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u306E\u4EF6\u6570\u306B\u5FDC\u3058\u3066\u3001\u4E0B\u306B\u30A2\u30A4\u30B3\u30F3\u304C\u4E26\u3073\u307E\u3059\uFF08\u30DB\u30D0\u30FC\u3067\u30D7\u30EC\u30D3\u30E5\u30FC\u30FB\u30AF\u30EA\u30C3\u30AF\u3067\u8A73\u7D30\uFF09\u3002";
+  function buildStoryGaugeMeterLabelText(recordedCommentCount) {
+    const n = Math.max(0, Math.floor(Number(recordedCommentCount) || 0));
+    const help = STORY_SUPPORT_GROWTH_GAUGE_HELP;
+    const escHint = "Esc\u30FB\u5916\u5074\u30AF\u30EA\u30C3\u30AF\u3067\u8A73\u7D30\u3092\u9589\u3058\u3089\u308C\u307E\u3059\u3002";
+    if (n <= 0) {
+      return `\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u306E\u8A18\u9332\u304C\u307E\u3060\u3042\u308A\u307E\u305B\u3093\u3002${help}`;
+    }
+    return `\u3044\u307E ${n.toLocaleString("ja-JP")} \u4EF6\u8A18\u9332\u3057\u3066\u3044\u307E\u3059\u3002${help}${escHint}`;
+  }
+
   // src/lib/liveAudienceDom.js
   var MAX_REASONABLE_VIEWERS = 12e6;
   function normalizeDigitsForViewerScan(text) {
@@ -3165,91 +3467,6 @@
       if (supportUserKeyFromEntry(e) === userKey) n += 1;
     }
     return n;
-  }
-
-  // src/lib/supportGridDisplayTier.js
-  var SUPPORT_GRID_TIER_LINK = "link";
-  var SUPPORT_GRID_TIER_KONTA = "konta";
-  var SUPPORT_GRID_TIER_TANU = "tanu";
-  function demoteNiconicoAnonymousFromKontaTier(userId, tier) {
-    if (tier !== SUPPORT_GRID_TIER_KONTA) return tier;
-    if (!isNiconicoAnonymousUserId(userId)) return tier;
-    return SUPPORT_GRID_TIER_TANU;
-  }
-  function supportGridPersonalThumbPreferredUrl(userId, httpAvatarCandidate, storedAvatarUrl) {
-    const u = String(userId || "").trim();
-    const http = String(httpAvatarCandidate ?? "").trim();
-    const raw = String(storedAvatarUrl ?? "").trim();
-    if (commentEnrichmentAvatarScore(u, raw) >= 2) return raw;
-    if (commentEnrichmentAvatarScore(u, http) >= 2) return http;
-    return "";
-  }
-  function supportGridTierHasPersonalThumb(userId, httpAvatarCandidate, storedAvatarUrl) {
-    return Boolean(
-      supportGridPersonalThumbPreferredUrl(userId, httpAvatarCandidate, storedAvatarUrl)
-    );
-  }
-  function supportGridStrongNickname(nick, userId) {
-    const n = String(nick ?? "").trim();
-    if (!n) return false;
-    if (isNiconicoAutoUserPlaceholderNickname(n)) return false;
-    if (n === "\uFF08\u672A\u53D6\u5F97\uFF09" || n === "(\u672A\u53D6\u5F97)") return false;
-    if (n === "\u533F\u540D") return false;
-    if (n === "\u30B2\u30B9\u30C8" || /^guest$/i.test(n)) return false;
-    if (isNiconicoAnonymousUserId(userId) && n.length <= 1) return false;
-    return true;
-  }
-  function bestAvatarScore(uid, httpCandidate, rawAv) {
-    const a = commentEnrichmentAvatarScore(uid, rawAv);
-    const b = commentEnrichmentAvatarScore(uid, httpCandidate);
-    return (
-      /** @type {0|1|2} */
-      Math.max(a, b)
-    );
-  }
-  function explainSupportGridDisplayTier(p) {
-    const uid = String(p?.userId ?? "").trim();
-    const nick = String(p?.nickname ?? "").trim();
-    const httpCandidate = String(p.httpAvatarCandidate ?? "").trim();
-    const rawAv = String(p.storedAvatarUrl ?? "").trim();
-    const strongNick = uid ? supportGridStrongNickname(nick, uid) : false;
-    const observed = Boolean(p?.avatarObserved);
-    let hasThumb = false;
-    if (p.lpMockHasCustomAvatar === true) hasThumb = true;
-    else if (p.lpMockHasCustomAvatar === false) hasThumb = false;
-    else if (uid) {
-      hasThumb = supportGridTierHasPersonalThumb(uid, httpCandidate, rawAv);
-    }
-    const avatarScore = uid ? bestAvatarScore(uid, httpCandidate, rawAv) : 0;
-    const hasAnyAvatar = avatarScore >= 1 || observed;
-    const storedAvatarScore = uid ? commentEnrichmentAvatarScore(uid, rawAv) : 0;
-    const hasObservedAvatar = storedAvatarScore >= 1;
-    const isNumericId = /^\d{5,14}$/.test(uid);
-    const isAnonymous = isNiconicoAnonymousUserId(uid);
-    const TIER_RULES = [
-      { tier: SUPPORT_GRID_TIER_LINK, match: (f) => f.observed },
-      { tier: SUPPORT_GRID_TIER_LINK, match: (f) => f.strongNick && f.hasThumb },
-      { tier: SUPPORT_GRID_TIER_LINK, match: (f) => f.strongNick && f.isNumericId },
-      { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.strongNick || f.hasThumb },
-      { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.hasAnyAvatar && !f.isAnonymous },
-      { tier: SUPPORT_GRID_TIER_KONTA, match: (f) => f.isNumericId }
-    ];
-    const flags = { observed, strongNick, hasThumb, hasAnyAvatar, hasObservedAvatar, isNumericId, isAnonymous };
-    const tierRaw = !uid ? SUPPORT_GRID_TIER_TANU : TIER_RULES.find((r) => r.match(flags))?.tier ?? SUPPORT_GRID_TIER_TANU;
-    const tier = demoteNiconicoAnonymousFromKontaTier(uid, tierRaw);
-    const demotedAnonymousKontaToTanu = tierRaw === SUPPORT_GRID_TIER_KONTA && tier === SUPPORT_GRID_TIER_TANU;
-    const demotedAnonymousLinkToKonta = false;
-    return {
-      tier,
-      strongNick,
-      hasPersonalThumb: hasThumb,
-      hasAnyAvatar,
-      avatarObserved: observed,
-      demotedAnonymousLinkToKonta,
-      demotedAnonymousKontaToTanu,
-      httpCandidateNonEmpty: Boolean(httpCandidate),
-      storedAvatarNonEmpty: Boolean(rawAv)
-    };
   }
 
   // src/lib/userCommentProfileCache.js
@@ -3570,13 +3787,24 @@
     return storyUserLaneGuideLine(
       faceTanu,
       escapeHtml(
-        "\u305F\u306C\u59C9: \u533F\u540D\uFF08a:\uFF09\u306E\u5FDC\u63F4\u3001\u8868\u793A\u540D\u3084\u30B5\u30E0\u30CD\u304C\u63C3\u308F\u306A\u3044\u5FDC\u63F4\u3001ID \u4E0D\u660E\u306F\u305C\u3093\u3076\u3053\u306E\u6BB5\u306B\u96C6\u3081\u308B\u3088\u3002\u4E0B\u306E\u300C\u72B6\u6CC1\u306E\u8A73\u7D30\u300D\u3067\u3069\u3053\u306E\u60C5\u5831\u304C\u6B20\u3051\u3066\u3044\u308B\u304B\u78BA\u8A8D\u3057\u3066\u306D\u3002"
+        `\u305F\u306C\u59C9: \u533F\u540D\uFF08a:\uFF09\u306E\u5FDC\u63F4\u3001\u8868\u793A\u540D\u3084\u30B5\u30E0\u30CD\u304C\u63C3\u308F\u306A\u3044\u5FDC\u63F4\u3001ID \u4E0D\u660E\u306F\u305C\u3093\u3076\u3053\u306E\u6BB5\u306B\u96C6\u3081\u308B\u3088\u3002\u4E0B\u306E\u300C${SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL}\u300D\u3092\u958B\u304F\u3068\u3001\u3069\u3053\u306E\u60C5\u5831\u304C\u6B20\u3051\u3066\u3044\u308B\u304B\u78BA\u8A8D\u3057\u3066\u306D\u3002`
       )
     );
   }
   function buildStoryUserLaneGuideFootHtml(displayCount) {
     const n = Math.max(0, Math.floor(Number(displayCount) || 0));
     return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(`\u3044\u307E ${n} \u4EF6\u3092\u8868\u793A\u4E2D`)}</p>`;
+  }
+  function buildStoryUserLaneGuideFootAndRecordedHtml(laneDisplayedSlots, recordedCommentRowsTotal) {
+    const foot = buildStoryUserLaneGuideFootHtml(laneDisplayedSlots);
+    if (recordedCommentRowsTotal == null || !Number.isFinite(Number(recordedCommentRowsTotal))) {
+      return foot;
+    }
+    const total = Math.max(0, Math.floor(Number(recordedCommentRowsTotal)));
+    if (total <= 0) {
+      return foot;
+    }
+    return foot + `<p class="nl-story-userlane-guide__recorded" aria-live="polite">\u3053\u306E\u653E\u9001\u3067\u8A18\u9332\u3057\u3066\u3044\u308B\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u306F <strong>${total}</strong> \u4EF6\u3067\u3059\u3002\u4E0A\u306E\u4EF6\u6570\u306F\u30EC\u30FC\u30F3\u306B\u4E26\u3079\u305F\u4EBA\u6570\u306E\u5408\u8A08\u3067\u3042\u308A\u3001\u30B3\u30E1\u30F3\u30C8\u4EF6\u6570\u3068\u306F\u6570\u3048\u65B9\u304C\u7570\u306A\u308A\u307E\u3059\u3002</p>`;
   }
   function storyUserLaneEmptyNoteTwoLines(line1, line2) {
     return `<p class="nl-story-userlane__empty-note-p">${escapeHtml(line1)}</p><p class="nl-story-userlane__empty-note-p">${escapeHtml(line2)}</p>`;
@@ -3707,7 +3935,7 @@
     }
     el.appendChild(frag);
   }
-  function paintStoryUserLaneDomFilled(els, faces, buckets, pickedLength, io) {
+  function paintStoryUserLaneDomFilled(els, faces, buckets, pickedLength, io, opts) {
     const {
       stack,
       laneLink,
@@ -3750,10 +3978,7 @@
       const showLinkWrap = !laneLink.hidden || hintLink && !hintLink.hidden;
       linkWrap.hidden = !showLinkWrap;
     }
-    stack.setAttribute(
-      "aria-label",
-      `\u6700\u8FD1\u306E\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u30B5\u30E0\u30CD\u30A4\u30EB\uFF08\u308A\u3093\u304F\u30FB\u3053\u3093\u592A\u30FB\u305F\u306C\u59C9\u306E\u4E09\u6BB5\uFF09\u5408\u8A08${pickedLength}\u4EF6`
-    );
+    stack.setAttribute("aria-label", buildStoryUserLaneStackAriaLabel(pickedLength));
     stack.hidden = false;
     if (guideLinesTop) {
       guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceLink);
@@ -3772,11 +3997,14 @@
     }
     if (guideMidTanu) guideMidTanu.hidden = false;
     if (guideLinesBottom) {
-      guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(pickedLength);
+      guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootAndRecordedHtml(
+        pickedLength,
+        opts && typeof opts.recordedCommentRowsTotal === "number" ? opts.recordedCommentRowsTotal : void 0
+      );
     }
     if (guideBottom) guideBottom.hidden = false;
   }
-  function paintStoryUserLaneDomEmptyGuides(els, faces) {
+  function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
     const {
       stack,
       laneLink,
@@ -3820,7 +4048,10 @@
     }
     if (guideMidTanu) guideMidTanu.hidden = false;
     if (guideLinesBottom) {
-      guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(0);
+      guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootAndRecordedHtml(
+        0,
+        opts && typeof opts.recordedCommentRowsTotal === "number" ? opts.recordedCommentRowsTotal : void 0
+      );
     }
     if (guideBottom) guideBottom.hidden = false;
   }
@@ -4335,6 +4566,127 @@ ${n}
     return `${lid}
 ${n}
 ${body}`;
+  }
+
+  // src/lib/giftRankStripConfig.js
+  var GIFT_RANK_STRIP_MAX = 11;
+
+  // src/lib/giftRankStripPrep.js
+  function normalizeGiftRow(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const o = (
+      /** @type {Record<string, unknown>} */
+      raw
+    );
+    const userId = String(o.userId ?? "").trim();
+    if (!userId) return null;
+    const nickname = String(o.nickname ?? "").trim();
+    const throwCount = normalizeGiftThrowCount(o.throwCount);
+    const capturedAt = Math.max(0, Math.floor(Number(o.capturedAt) || 0));
+    return { userId, nickname, throwCount, capturedAt };
+  }
+  function mergeAndSortGiftUserRows(raw, opts = {}) {
+    const broadcasterUid = String(opts?.broadcasterUid || "").trim();
+    const list = Array.isArray(raw) ? raw : [];
+    const byId = /* @__PURE__ */ new Map();
+    for (const item of list) {
+      const row = normalizeGiftRow(item);
+      if (!row) continue;
+      if (broadcasterUid && row.userId === broadcasterUid) continue;
+      const ex = byId.get(row.userId);
+      if (!ex) {
+        byId.set(row.userId, { ...row });
+      } else {
+        ex.throwCount = Math.max(ex.throwCount, row.throwCount);
+        ex.capturedAt = Math.max(ex.capturedAt, row.capturedAt);
+        if (row.nickname && !ex.nickname) ex.nickname = row.nickname;
+      }
+    }
+    return [...byId.values()].sort((a, b) => {
+      if (b.throwCount !== a.throwCount) return b.throwCount - a.throwCount;
+      if (b.capturedAt !== a.capturedAt) return b.capturedAt - a.capturedAt;
+      return a.userId.localeCompare(b.userId);
+    });
+  }
+  function prepareGiftRankStrip(raw, opts = {}) {
+    const max = Math.max(
+      1,
+      Math.min(
+        GIFT_RANK_STRIP_MAX,
+        Number.isFinite(Number(opts?.max)) && Number(opts.max) > 0 ? Math.floor(Number(opts.max)) : GIFT_RANK_STRIP_MAX
+      )
+    );
+    const merged = mergeAndSortGiftUserRows(raw, opts);
+    const slice = merged.slice(0, max);
+    return {
+      stripRooms: slice.map((r) => ({
+        userKey: r.userId,
+        nickname: r.nickname,
+        count: r.throwCount
+      })),
+      stableKeyRows: slice.map((r) => ({
+        userKey: r.userId,
+        throwCount: r.throwCount,
+        capturedAt: r.capturedAt,
+        nickname: r.nickname || ""
+      }))
+    };
+  }
+  function formatLeaderGapLabel(placeNumber1Based, rowCount, stripTopCount, counterUnit) {
+    const unit = counterUnit === "\u4EF6" ? "\u4EF6" : "\u56DE";
+    const p = Math.max(0, Math.floor(Number(placeNumber1Based) || 0));
+    const c = Math.max(0, Math.floor(Number(rowCount) || 0));
+    const t = Math.max(0, Math.floor(Number(stripTopCount) || 0));
+    if (p <= 1) return "";
+    const gap = Math.max(0, t - c);
+    if (gap <= 0) return "\u6700\u591A\u30BF\u30A4";
+    return `1\u4F4D\u307E\u3067\u3042\u3068${gap}${unit}`;
+  }
+  function formatGiftThrowGapLabel(placeNumber1Based, throwCount, stripTopThrowCount) {
+    return formatLeaderGapLabel(placeNumber1Based, throwCount, stripTopThrowCount, "\u56DE");
+  }
+
+  // src/lib/giftRankStripPopupSync.js
+  function syncGiftRankStripAfterUserRoomsRender(liveId, refreshGiftRankStripForLive2) {
+    const lid = String(liveId ?? "").trim().toLowerCase();
+    void refreshGiftRankStripForLive2(lid);
+  }
+
+  // src/lib/giftRankStripStableKey.js
+  function giftRankStripStableKey(liveId, rows) {
+    const lid = String(liveId || "").trim().toLowerCase();
+    const arr = Array.isArray(rows) ? rows : [];
+    if (!arr.length) {
+      return `${lid}
+0
+`;
+    }
+    const body = arr.map((r) => {
+      const k = String(r?.userKey ?? "");
+      const c = Math.max(0, Math.floor(Number(r?.throwCount) || 0));
+      const t = Math.max(0, Math.floor(Number(r?.capturedAt) || 0));
+      const nick = String(r?.nickname ?? "").trim();
+      return `${k}:${c}:${t}:${nick}`;
+    }).join("\n");
+    return `${lid}
+${arr.length}
+${body}`;
+  }
+
+  // src/lib/rankStripSectionLabels.js
+  var RANK_STRIP_COMMENT_HEADING = "\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8";
+  var RANK_STRIP_COMMENT_BADGE = "\u3053\u306EPC\u306E\u8A18\u9332";
+  var RANK_STRIP_COMMENT_NOTE = "\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u5FDC\u63F4\u4EF6\u6570\u304C\u591A\u3044\u9806\u3067\u3059\u3002\u4E0B\u306E\u300C\u30AE\u30D5\u30C8\u30FB\u6295\u3052\u300D\u3068\u306F\u5225\u96C6\u8A08\u3067\u3059\u30022\u4F4D\u4EE5\u964D\u306F\u5F53\u30B9\u30C8\u30EA\u30C3\u30D7\u306E1\u4F4D\uFF08\u6700\u591A\u4EF6\uFF09\u3068\u306E\u5DEE\u3092\u8868\u793A\u3057\u307E\u3059\uFF08\u672C\u5BB6\u306E\u8CA2\u732E\u5EA6\u30E9\u30F3\u30AD\u30F3\u30B0\u3068\u306F\u5225\u3067\u3059\uFF09\u3002";
+  var RANK_STRIP_COMMENT_EMPTY_NOTE = "\u307E\u3060\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u304C\u3042\u308A\u307E\u305B\u3093\u3002\u4E0B\u306E\u300C\u30AE\u30D5\u30C8\u30FB\u6295\u3052\u300D\u3068\u306F\u5225\u3067\u3059\u3002\u307E\u305A\u306F\u914D\u4FE1\u8005\u306E\u30D5\u30A9\u30ED\u30FC\u304B\u3089\u3002";
+  var RANK_STRIP_GIFT_HEADING = "\u30AE\u30D5\u30C8\u30FB\u6295\u3052";
+  var RANK_STRIP_GIFT_BADGE = "NDGR \u691C\u77E5";
+  var RANK_STRIP_GIFT_NOTE = "\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u6295\u3052\uFF0F\u30AE\u30D5\u30C8\u691C\u77E5\u56DE\u6570\u306E\u591A\u3044\u9806\u3067\u3059\u3002\u4E0A\u306E\u300C\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u300D\u3068\u306F\u5225\u96C6\u8A08\u3067\u3059\u3002\u672C\u5BB6\u306E\u300C\u8CA2\u732E\u5EA6\u30E9\u30F3\u30AD\u30F3\u30B0\u300D\u3068\u3082\u5225\u3067\u3059\u30022\u4F4D\u4EE5\u964D\u306F\u5F53\u30B9\u30C8\u30EA\u30C3\u30D7\u5185\u306E\u6700\u591A\u56DE\u3068\u306E\u5DEE\u3092\u8868\u793A\u3057\u307E\u3059\uFF08\u8CA2\u30DD\u30A4\u30F3\u30C8\u3067\u306F\u3042\u308A\u307E\u305B\u3093\uFF09\u3002";
+  function buildRankStripPillarRowHtml(kind) {
+    const isGift = kind === "gifts";
+    const heading = isGift ? RANK_STRIP_GIFT_HEADING : RANK_STRIP_COMMENT_HEADING;
+    const badge = isGift ? RANK_STRIP_GIFT_BADGE : RANK_STRIP_COMMENT_BADGE;
+    const mod = isGift ? "gifts" : "comments";
+    return `<div class="nl-rank-strip-pillar nl-rank-strip-pillar--${mod}" role="group" aria-label="${heading}\uFF08${badge}\uFF09"><span class="nl-rank-strip-pillar__heading">${heading}</span><span class="nl-rank-strip-pillar__badge">${badge}</span></div>`;
   }
 
   // src/lib/storyUserLaneBuckets.js
@@ -8729,6 +9081,7 @@ ${lineFor("confusion", "#94a3b8")}
       bucketMs: 3e4
     });
     const pastBroadcasts = Array.isArray(opts.pastBroadcasts) ? opts.pastBroadcasts : [];
+    const giftNdgrRows = Array.isArray(opts.giftNdgrRows) ? opts.giftNdgrRows : [];
     const filterBroadcaster = broadcasterUserId ? (cs) => Array.isArray(cs) ? cs.filter((c) => String(c?.userId || "").trim() !== broadcasterUserId) : [] : (cs) => Array.isArray(cs) ? cs : [];
     const currentCommentsForLayer = filterBroadcaster(commentsForAnalytics);
     const pastBroadcastsForLayer = pastBroadcasts.map((b) => ({
@@ -8890,6 +9243,7 @@ ${lineFor("confusion", "#94a3b8")}
       { id: "mkt-segment", label: "\u30E6\u30FC\u30B6\u30FC\u30BB\u30B0\u30E1\u30F3\u30C8" },
       { id: "mkt-top-users", label: "\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC TOP 20" },
       { id: "mkt-thumb-grid", label: "\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7" },
+      { id: "mkt-gifts", label: "\u30AE\u30D5\u30C8\u30FB\u6295\u3052\uFF08NDGR \u691C\u77E5\uFF09" },
       { id: "mkt-vpos", label: "vpos \u4E09\u5206\u5272\uFF08\u518D\u751F\u4F4D\u7F6E\uFF09" },
       { id: "mkt-hour", label: "\u6642\u9593\u5E2F\u30D2\u30FC\u30C8\u30DE\u30C3\u30D7" },
       { id: "mkt-json", label: "\u8868\u8A08\u7B97\u30FB\u30C4\u30FC\u30EB\u5411\u3051 JSON" }
@@ -8968,6 +9322,7 @@ ${sectionAdviceAfterSegment(r)}
 ${idWrap("mkt-top-users", sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId))}
 ${sectionAdviceAfterRank(r)}
 ${idWrap("mkt-thumb-grid", sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
+${idWrap("mkt-gifts", sectionGiftNdgrContributors(giftNdgrRows, maskShare, identiconResolver))}
 ${idWrap("mkt-vpos", sectionVposThirds(r))}
 ${idWrap("mkt-hour", sectionHourHeatmap(r))}`;
     const tocItems = allTocItems.filter((t) => bodyHtml.includes(`id="${t.id}"`));
@@ -9132,6 +9487,48 @@ ${yLabelsC}${xLabels}${bars}
 <svg viewBox="0 0 200 200" class="mkt-pie">${paths}</svg>
 <div class="mkt-seg-legend">${legend}</div>
 </div></section>`;
+  }
+  function sectionGiftNdgrContributors(rows, maskShare = false, identiconResolver = void 0) {
+    const list = Array.isArray(rows) ? rows.filter((x) => x && String(
+      /** @type {{ userId?: unknown }} */
+      x.userId || ""
+    ).trim()) : [];
+    if (!list.length) return "";
+    const MKT_GIFT_TABLE_MAX = 200;
+    const truncated = list.length > MKT_GIFT_TABLE_MAX;
+    const display = truncated ? list.slice(0, MKT_GIFT_TABLE_MAX) : list;
+    const totalPeople = list.length;
+    const totalThrows = list.reduce((s, r) => s + (Number(r.throwCount) > 0 ? Number(r.throwCount) : 0), 0);
+    const maxThrow = list.reduce((m, r) => Math.max(m, Number(r.throwCount) || 0), 0);
+    const noteTrunc = truncated ? `<p class="mkt-note">\u8868\u306F\u6700\u5927 ${MKT_GIFT_TABLE_MAX} \u884C\u3067\u3059\uFF08\u5168 ${totalPeople} \u30E6\u30FC\u30B6\u30FC\u30FB\u6295\u3052\u5408\u8A08 ${totalThrows} \u56DE\uFF09\u3002\u5168\u4EF6\u306F HTML \u30EC\u30DD\u30FC\u30C8\u306E\u540C\u30BB\u30AF\u30B7\u30E7\u30F3\u3092\u53C2\u7167\u3057\u3066\u304F\u3060\u3055\u3044\u3002</p>` : "";
+    const rowsHtml = display.map((r, i) => {
+      const uidForLabel = r.userId || UNKNOWN_USER_KEY;
+      const rawLabel = displayUserLabel(r.userId, r.nickname || "");
+      const nameCellHtml = maskShare ? escapeHtml(maskLabelForShare(rawLabel)) : buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
+      const resolvedAvatar = maskShare ? "" : resolveReportUserThumbSrc({
+        userId: r.userId || "",
+        avatarUrl: "",
+        identiconResolver
+      });
+      const avImg = !resolvedAvatar ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>' : `<img src="${escapeHtml(resolvedAvatar)}" class="mkt-rank-av" alt="" loading="lazy" referrerpolicy="no-referrer">`;
+      const pct = maxThrow > 0 ? (Number(r.throwCount) || 0) / maxThrow * 100 : 0;
+      const when = typeof r.capturedAt === "number" && r.capturedAt > 0 ? escapeHtml(new Date(r.capturedAt).toLocaleString("ja-JP")) : "\u2014";
+      return `<tr>
+<td class="mkt-rank-n">${i + 1}</td>
+<td>${avImg}</td>
+<td class="mkt-rank-name">${nameCellHtml}</td>
+<td class="mkt-rank-bar"><div class="mkt-rank-bar__fill" style="width:${pct.toFixed(1)}%"></div><span class="mkt-rank-bar__label">${escapeHtml(String(r.throwCount))}</span></td>
+<td class="mono">${when}</td>
+</tr>`;
+    }).join("");
+    const noteMask = maskShare ? '<p class="mkt-note">\u5171\u6709\u5411\u3051: \u8868\u793A\u540D\u3092\u4F0F\u305B\u3066\u3044\u307E\u3059\u3002</p>' : "";
+    return `<section class="mkt-section" id="mkt-gifts">
+<h2>\u30AE\u30D5\u30C8\u30FB\u6295\u3052\uFF08NDGR \u691C\u77E5\uFF09</h2>
+<p class="mkt-note">popup \u306E\u30AE\u30D5\u30C8\u8CA2\u732E\u30B9\u30C8\u30EA\u30C3\u30D7\u3068\u540C\u3058\u4E26\u3073\uFF08\u6295\u3052\u56DE\u6570\u306E\u591A\u3044\u9806\uFF09\u3002\u914D\u4FE1\u8005\u672C\u4EBA\u306F\u9664\u5916\u6E08\u307F\u3002\u753B\u9762\u4E0A\u306E\u30B9\u30C8\u30EA\u30C3\u30D7\u306F\u4E0A\u4F4D ${GIFT_RANK_STRIP_MAX} \u4EF6\u306E\u307F\u8868\u793A\u3057\u307E\u3059\u3002</p>
+<p class="mkt-note">\u30E6\u30FC\u30B6\u30FC <strong>${totalPeople}</strong> \u540D\u30FB\u6295\u3052\u5408\u8A08 <strong>${totalThrows}</strong> \u56DE\u3002</p>
+${noteTrunc}${noteMask}
+<table class="mkt-rank-table"><thead><tr><th>#</th><th></th><th>\u30E6\u30FC\u30B6\u30FC</th><th>\u6295\u3052\u56DE\u6570</th><th>\u6700\u7D42\u691C\u77E5</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+</section>`;
   }
   function sectionTopUsers(r, maskShare = false, identiconResolver = void 0, broadcasterUserId = "") {
     if (r.topUsers.length === 0) return "";
@@ -9738,7 +10135,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     const technical = formatStoryAvatarDiagLine(s);
     const glossary = '<ul class="nl-story-diag__list"><li><strong>\u4FDD\u5B58\u30A2\u30A4\u30B3\u30F3</strong>\uFF1A\u3053\u306EPC\u306E\u8A18\u9332\u306B\u3001\u30A2\u30A4\u30B3\u30F3\u306EURL\u3068\u3057\u3066\u6B8B\u3063\u3066\u3044\u308B\u4EF6\u6570\u3067\u3059\u3002</li><li><strong>\u8868\u793A\u30A2\u30A4\u30B3\u30F3</strong>\uFF1A\u30B0\u30EA\u30C3\u30C9\u306A\u3069\u3067\u5B9F\u969B\u306B\u753B\u50CF\u3068\u3057\u3066\u4F7F\u3048\u3066\u3044\u308B\u4EF6\u6570\u3067\u3059\u3002</li><li><strong>\u30DA\u30FC\u30B8\u304B\u3089\u62FE\u3063\u305F\u88DC\u52A9</strong>\uFF1A\u30CB\u30B3\u751F\u306E\u30DA\u30FC\u30B8\u304C\u8AAD\u307F\u53D6\u308B\u901A\u4FE1\u304B\u3089\u3001\u62E1\u5F35\u304C\u5229\u7528\u8005\u8868\u793A\u3092\u88DC\u3046\u305F\u3081\u306B\u4F7F\u3046\u60C5\u5831\u3067\u3059\uFF08\u672C\u6587\u306F\u4FDD\u5B58\u3057\u307E\u305B\u3093\uFF09\u3002</li><li><strong>\u4E00\u6642\u5BFE\u5FDC\u8868</strong>\uFF1A\u958B\u3044\u3066\u3044\u308B watch \u30BF\u30D6\u306E\u30E1\u30E2\u30EA\u4E0A\u3060\u3051\u306B\u3042\u308B\u5BFE\u5FDC\u8868\u3067\u3001\u30AD\u30E3\u30C3\u30B7\u30E5\u3068\u306F\u5225\u3067\u3059\u3002</li><li><strong>\u30E6\u30FC\u30B6\u30FC\u30EC\u30FC\u30F3\u306E\u6BB5</strong>\uFF1A\u8A18\u9332\u30B3\u30E1\u30F3\u30C8\u306E\u8868\u793A\u540D\u30FB\u30B5\u30E0\u30CDURL\u30FB\u6210\u9577\u30BF\u30A4\u30EB\u7528\u306E\u89E3\u6C7A\u7D50\u679C\u304B\u3089\u300C\u5F37\u3044\u540D\u524D\u300D\u300C\u500B\u4EBA\u30B5\u30E0\u30CD\u300D\u3092\u5224\u5B9A\u3057\u3066\u3044\u307E\u3059\u3002\u516C\u5F0F\u306E\u4EEE\u540D\u306E\u307E\u307E\u3060\u3068\u3053\u3093\u592A\u30FB\u305F\u306C\u59C9\u306B\u5BC4\u308A\u3084\u3059\u3044\u3067\u3059\u3002</li></ul>';
-    const compactLead = `\u8A18\u9332\u3057\u3066\u3044\u308B\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8 <strong>${totalNum}</strong> \u4EF6\u3067\u3059\u3002\u4EF6\u6570\u306E\u5185\u8A33\uFF08\u30A2\u30A4\u30B3\u30F3\u30FB\u30E6\u30FC\u30B6\u30FCID\u30FB\u30EC\u30FC\u30F3\u30FB\u53D6\u308A\u8FBC\u307F\u306A\u3069\uFF09\u306F\u3001\u4E0B\u306E\u300C\u8A73\u3057\u3044\u72B6\u6CC1\uFF08\u958B\u767A\u30FB\u5207\u308A\u5206\u3051\u7528\uFF09\u300D\u3092\u958B\u304F\u3068\u8AAD\u3081\u307E\u3059\u3002`;
+    const compactLead = `\u8A18\u9332\u3057\u3066\u3044\u308B\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8 <strong>${totalNum}</strong> \u4EF6\u3067\u3059\u3002\u4EF6\u6570\u306E\u5185\u8A33\uFF08\u30A2\u30A4\u30B3\u30F3\u30FB\u30E6\u30FC\u30B6\u30FCID\u30FB\u30EC\u30FC\u30F3\u30FB\u53D6\u308A\u8FBC\u307F\u306A\u3069\uFF09\u306F\u3001\u4E0B\u306E\u300C${SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL}\u300D\u3092\u958B\u304F\u3068\u8AAD\u3081\u307E\u3059\u3002`;
     return `<div class="nl-story-diag nl-story-diag--compact"><p class="nl-story-diag__lead">${compactLead}</p><details class="nl-story-diag__more"><summary class="nl-story-diag__summary">\u5185\u8A33\u30FB\u7528\u8A9E\uFF08\u8A73\u3057\u304F\u898B\u308B\uFF09</summary><div class="nl-story-diag__body">` + glossary + (technical ? `<p class="nl-story-diag__technical">${escapeHtml(technical)}</p>` : "") + `</div></details></div>`;
   }
 
@@ -10305,6 +10702,74 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
   }
 
+  // src/lib/formatOfficialStreamAgeMinutes.js
+  function formatOfficialStreamAgeMinutes(streamAgeMin) {
+    if (streamAgeMin == null || streamAgeMin === "") return "";
+    const m = Number(streamAgeMin);
+    if (!Number.isFinite(m) || m < 0) return "";
+    const rounded = Math.round(m);
+    if (rounded < 60) return `${rounded}\u5206`;
+    const h = Math.floor(rounded / 60);
+    const r = rounded % 60;
+    if (r === 0) return `${h}\u6642\u9593`;
+    return `${h}\u6642\u9593${r}\u5206`;
+  }
+
+  // src/lib/officialNicoStatsStripDigest.js
+  function chipNumber(v) {
+    if (typeof v === "number" && Number.isFinite(v) && v >= 0) {
+      return { text: v.toLocaleString("ja-JP"), isPlaceholder: false };
+    }
+    return { text: "\u2014", isPlaceholder: true };
+  }
+  function chipStreamAge(streamAgeMin) {
+    const t = formatOfficialStreamAgeMinutes(streamAgeMin);
+    if (t) return { text: t, isPlaceholder: false };
+    return { text: "\u2014", isPlaceholder: true };
+  }
+  function buildOfficialNicoStatsStripDigest(snap) {
+    const lid = String(snap?.liveId || "").trim().toLowerCase();
+    if (!lid) return null;
+    const viewers = chipNumber(snap?.officialViewerCount);
+    const comments = chipNumber(snap?.officialCommentCount);
+    const streamAge = chipStreamAge(snap?.streamAgeMin);
+    const adPts = chipNumber(snap?.officialAdPoints);
+    const giftPts = chipNumber(snap?.officialGiftPoints);
+    const stableKey = [
+      lid,
+      viewers.text,
+      comments.text,
+      streamAge.text,
+      adPts.text,
+      giftPts.text
+    ].join("|");
+    const parts = [];
+    if (!viewers.isPlaceholder) parts.push({ short: `\u6765${viewers.text}`, full: `\u6765\u5834 ${viewers.text}` });
+    if (!comments.isPlaceholder) parts.push({ short: `\u30B3${comments.text}`, full: `\u30B3\u30E1 ${comments.text}` });
+    if (!streamAge.isPlaceholder) parts.push({ short: `\u7D4C${streamAge.text}`, full: `\u7D4C\u904E ${streamAge.text}` });
+    if (!adPts.isPlaceholder) parts.push({ short: `\u5E83${adPts.text}`, full: `\u5E83\u544A ${adPts.text}` });
+    if (!giftPts.isPlaceholder) parts.push({ short: `\u30AE${giftPts.text}`, full: `\u30AE\u30D5\u30C8 ${giftPts.text}` });
+    let summaryText = "\u672C\u5BB6\u5BC4\u305B\uFF08WS / NDGR\uFF09";
+    if (parts.length) {
+      const shortJoined = parts.map((p) => p.short).join(" \xB7 ");
+      summaryText = `\u672C\u5BB6\u5BC4\u305B: ${shortJoined}`;
+      if (summaryText.length > 52) {
+        summaryText = `${summaryText.slice(0, 49)}\u2026`;
+      }
+    } else {
+      summaryText = "\u672C\u5BB6\u5BC4\u305B\uFF08WS / NDGR\uFF09\xB7 \u30BF\u30C3\u30D7\u3067\u5404\u9805\u76EE";
+    }
+    return {
+      stableKey,
+      summaryText,
+      viewers,
+      comments,
+      streamAge,
+      adPts,
+      giftPts
+    };
+  }
+
   // src/lib/watchTabPrioritize.js
   function prioritizeWatchTabCandidates(candidates, watchUrl) {
     const arr = Array.isArray(candidates) ? candidates : [];
@@ -10540,11 +11005,14 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     null
   );
   var _lastTopSupportRankStripStableKey = null;
+  var _lastGiftRankStripStableKey = null;
   function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
     const norm = String(nextLiveId || "").trim().toLowerCase();
     if (norm === watchPopupLastPaintedLiveId) return;
     watchPopupLastPaintedLiveId = norm;
     _lastTopSupportRankStripStableKey = null;
+    _lastGiftRankStripStableKey = null;
+    _lastOfficialNicoStatsStripKey = null;
     _prevSupportCount = null;
     _prevViewerCount = null;
     _prevConcurrentEstimated = null;
@@ -10744,6 +11212,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     panelStatusCode: "",
     notice: null
   };
+  var COMMENT_ASSET_PICKER_UI_STATE = {
+    opening: false
+  };
   var COMMENT_KINDNESS_FACE_SRC = {
     mild: "images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png",
     strong: "images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png"
@@ -10855,6 +11326,20 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   function clearCommentPostNotice() {
     COMMENT_POST_UI_STATE.notice = null;
   }
+  function paintCommentAssetPickerButtons() {
+    const can = Boolean(
+      String(COMMENT_POST_UI_STATE.watchUrl || "").trim() && String(COMMENT_POST_UI_STATE.liveId || "").trim()
+    ) && !COMMENT_POST_UI_STATE.submitting && !COMMENT_ASSET_PICKER_UI_STATE.opening;
+    for (const id of ["openNicoCommentAssetPickerBtn", "openNicoCommentAssetPickerGiftPanelBtn"]) {
+      const b = (
+        /** @type {HTMLButtonElement|null} */
+        $(id)
+      );
+      if (!b) continue;
+      b.disabled = !can;
+      b.setAttribute("aria-busy", COMMENT_ASSET_PICKER_UI_STATE.opening ? "true" : "false");
+    }
+  }
   function paintCommentComposeUi() {
     const commentInput = (
       /** @type {HTMLTextAreaElement|null} */
@@ -10897,6 +11382,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         kindnessView.warning ? "commentKindnessBody commentKindnessConfirm postStatus" : "postStatus"
       );
     }
+    paintCommentAssetPickerButtons();
     let statusMessage = baseState.statusMessage;
     let statusKind = baseState.statusKind;
     const notice = COMMENT_POST_UI_STATE.notice;
@@ -10907,6 +11393,45 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     setPostStatus(statusMessage, statusKind);
     syncVoiceCommentButton();
+  }
+  function handleOpenNicoCommentAssetPickerFromPopup() {
+    const exportBtnEl = (
+      /** @type {HTMLButtonElement|null} */
+      $("exportJson")
+    );
+    const watchUrl = String(
+      exportBtnEl?.dataset.watchUrl || COMMENT_POST_UI_STATE.watchUrl || ""
+    ).trim();
+    if (!watchUrl) {
+      setPostStatus("watch\u30DA\u30FC\u30B8\u3092\u958B\u3044\u3066\u304B\u3089\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002", "error");
+      paintCommentComposeUi();
+      return;
+    }
+    void (async () => {
+      COMMENT_ASSET_PICKER_UI_STATE.opening = true;
+      paintCommentComposeUi();
+      setPostStatus("watch\u30BF\u30D6\u3067\u30AE\u30D5\u30C8\u30FB\u30A2\u30A4\u30C6\u30E0\u6B04\u3092\u958B\u3044\u3066\u3044\u307E\u3059\u2026", "idle");
+      try {
+        const r = await requestOpenCommentAssetPickerOnWatchTab(watchUrl);
+        if (r.ok) {
+          setPostStatus(
+            "watch\u30BF\u30D6\u5074\u3067\u516C\u5F0F\u306E\u30AE\u30D5\u30C8\u30FB\u30A2\u30A4\u30C6\u30E0\u6B04\u3092\u958B\u304D\u307E\u3057\u305F\u3002\u7D9A\u304D\uFF08\u9078\u629E\u30FB\u6C7A\u6E08\uFF09\u306F\u30CB\u30B3\u751F\u306E\u753B\u9762\u3067\u64CD\u4F5C\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+            "success"
+          );
+        } else {
+          setPostStatus(r.error || "\u958B\u3051\u307E\u305B\u3093\u3067\u3057\u305F\u3002", "error");
+        }
+      } catch (err) {
+        const msg = err && typeof err === "object" && "message" in err ? String(
+          /** @type {{ message?: unknown }} */
+          err.message || ""
+        ) : String(err || "");
+        setPostStatus(msg ? `\u958B\u3051\u307E\u305B\u3093\u3067\u3057\u305F\u3002\uFF08${msg}\uFF09` : "\u958B\u3051\u307E\u305B\u3093\u3067\u3057\u305F\u3002", "error");
+      } finally {
+        COMMENT_ASSET_PICKER_UI_STATE.opening = false;
+        paintCommentComposeUi();
+      }
+    })();
   }
   var KEY_AI_SHARE_FAST_DIAG = "nls_ai_share_fast_diag_v1";
   function hasExtensionContext() {
@@ -11109,6 +11634,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const lid = String(liveId || "").trim().toLowerCase();
     if (!lid) {
       mount.innerHTML = "";
+      void refreshGiftRankStripForLive("");
       return;
     }
     try {
@@ -11120,17 +11646,27 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         mount.innerHTML = '<p class="nl-sub">\u307E\u3060\u30AE\u30D5\u30C8\u30FB\u5E83\u544A\u30E6\u30FC\u30B6\u30FC\u304C\u8A18\u9332\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002</p>';
         return;
       }
-      const sorted = [...users].sort(
-        (a, b) => (b.capturedAt || 0) - (a.capturedAt || 0)
-      );
+      const normalized = users.map((u) => ({
+        ...u,
+        throwCount: normalizeGiftThrowCount(u?.throwCount)
+      }));
+      const sorted = [...normalized].sort((a, b) => {
+        const d = (b.throwCount || 0) - (a.throwCount || 0);
+        if (d !== 0) return d;
+        return (b.capturedAt || 0) - (a.capturedAt || 0);
+      });
       const top = sorted.slice(0, 15);
-      mount.innerHTML = `<p class="nl-sub">${users.length} \u540D\u3092\u8A18\u9332\u4E2D\uFF08\u76F4\u8FD1\u9806\u306B\u6700\u592715\u4EF6\uFF09</p><ul class="nl-gift-quick-list">` + top.map((u) => {
+      const totalThrows = normalized.reduce((s, u) => s + (u.throwCount || 0), 0);
+      mount.innerHTML = `<p class="nl-sub">${users.length} \u540D\u30FB\u8A08 ${totalThrows} \u56DE\uFF08NDGR \u3067\u691C\u77E5\u3057\u305F\u6295\u3052\uFF0F\u30AE\u30D5\u30C8\u30A4\u30D9\u30F3\u30C8\u6570\u3002\u56DE\u6570\u306E\u591A\u3044\u9806\u306B\u6700\u592715\u4EF6\uFF09</p><ul class="nl-gift-quick-list">` + top.map((u) => {
         const nick = escapeHtml(String(u.nickname || "").trim() || "(noname)");
         const uid = escapeHtml(String(u.userId || "").trim());
-        return `<li><span class="nl-gift-nick">${nick}</span> <code class="nl-gift-uid">${uid}</code></li>`;
+        const tc = Math.max(1, Math.round(Number(u.throwCount)) || 1);
+        return `<li><span class="nl-gift-nick">${nick}</span> <span class="nl-gift-throws" aria-label="\u691C\u77E5\u56DE\u6570">\xD7${tc}</span> <code class="nl-gift-uid">${uid}</code></li>`;
       }).join("") + "</ul>";
     } catch {
       mount.textContent = "\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002";
+    } finally {
+      void refreshGiftRankStripForLive(lid);
     }
   }
   async function downloadSessionSummaryJson(liveId) {
@@ -11754,6 +12290,21 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     return "";
   }
+  function rememberedNicknameForUserId(userId) {
+    const uid = String(userId || "").trim();
+    if (!uid) return "";
+    const fromCache = String(popupUserCommentProfileMap?.[uid]?.nickname || "").trim();
+    if (fromCache) return fromCache;
+    const list = STORY_SOURCE_STATE?.entries;
+    if (!Array.isArray(list) || list.length === 0) return "";
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const e = list[i];
+      if (String(e?.userId || "").trim() !== uid) continue;
+      const n = String(e?.nickname || "").trim();
+      if (n) return n;
+    }
+    return "";
+  }
   function countEntriesWithUserId(entries) {
     let n = 0;
     for (const e of entries) {
@@ -12064,7 +12615,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       );
     }
     if (gaugeLabel) {
-      gaugeLabel.textContent = count <= 0 ? "\u5FDC\u63F4 0 \u30B3\u30E1\u30F3\u30C8" : `\u5FDC\u63F4 ${count.toLocaleString("ja-JP")} \u30B3\u30E1\u30F3\u30C8 / \u30DB\u30D0\u30FC\u3067\u30D7\u30EC\u30D3\u30E5\u30FC\u30FB\u30AF\u30EA\u30C3\u30AF\u3067\u8A73\u7D30\u56FA\u5B9A\uFF08Esc\u30FB\u5916\u5074\u30AF\u30EA\u30C3\u30AF\u3067\u9589\u3058\u308B\uFF09`;
+      gaugeLabel.textContent = buildStoryGaugeMeterLabelText(count);
     }
     if (!story) return;
     const reaction = String(opts.reaction || "idle");
@@ -12107,10 +12658,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     targetCount: 0,
     root: (
       /** @type {HTMLElement|null} */
-      null
-    ),
-    timer: (
-      /** @type {ReturnType<typeof setTimeout>|null} */
       null
     ),
     /** クリックで固定したコメントの安定 ID（`comment.id` ベース、レガシーは dedupe キー） */
@@ -12375,12 +12922,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       renderStoryCommentDetailPanel();
     });
   }
-  function storyUserLaneRenderSignature(liveId, colorScheme, picked, sourceEntryCount) {
+  function storyUserLaneRenderSignature(liveId, colorScheme, picked, sourceEntryCount, recordedCommentRowsTotal) {
     const lid = String(liveId || "").trim().toLowerCase();
     const scheme = String(colorScheme || "light");
+    const rec = Math.max(0, Math.floor(Number(recordedCommentRowsTotal) || 0));
     if (!picked.length) {
       const n = Math.max(0, Math.floor(Number(sourceEntryCount) || 0));
-      return `${lid}|${scheme}|0|src:${n}`;
+      return `${lid}|${scheme}|0|src:${n}|rec:${rec}`;
     }
     const parts = picked.map((p) => {
       const sid = commentStableId(p.entry);
@@ -12392,7 +12940,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         String(p.profileTier)
       ].join("");
     });
-    return `${lid}|${scheme}|${picked.length}${parts.join("")}`;
+    return `${lid}|${scheme}|${picked.length}${parts.join("")}|rec:${rec}`;
   }
   function renderStoryUserLane() {
     const stack = (
@@ -12608,17 +13156,22 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       liveId,
       laneScheme,
       picked,
-      aggList.length
+      aggList.length,
+      STORY_AVATAR_DIAG_STATE.total
     );
     if (laneSig === storyUserLaneLastRenderSig) {
       return;
     }
     storyUserLaneLastRenderSig = laneSig;
     if (!picked.length) {
-      paintStoryUserLaneDomEmptyGuides(els, faces);
+      paintStoryUserLaneDomEmptyGuides(els, faces, {
+        recordedCommentRowsTotal: STORY_AVATAR_DIAG_STATE.total
+      });
       return;
     }
-    paintStoryUserLaneDomFilled(els, faces, buckets, picked.length, laneDomIo);
+    paintStoryUserLaneDomFilled(els, faces, buckets, picked.length, laneDomIo, {
+      recordedCommentRowsTotal: STORY_AVATAR_DIAG_STATE.total
+    });
     setTimeout(() => {
       if (typeof window !== "undefined" && window.__NLS_LANE_DIAG__) {
         window.__NLS_LANE_DIAG__();
@@ -13093,11 +13646,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       scheduleStoryHoverClear();
     });
   }
-  function clearStoryGrowthTimer() {
-    if (!STORY_GROWTH_STATE.timer) return;
-    clearTimeout(STORY_GROWTH_STATE.timer);
-    STORY_GROWTH_STATE.timer = null;
-  }
   function resolveStoryIconSize(count) {
     const total = Math.max(0, Math.floor(Number(count) || 0));
     const compact = document.body?.classList.contains("nl-compact") || document.body?.classList.contains("nl-tight");
@@ -13267,7 +13815,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const changedLive = STORY_GROWTH_STATE.liveId !== nextLiveId;
     const changedRoot = STORY_GROWTH_STATE.root !== root;
     if (changedLive || changedRoot) {
-      clearStoryGrowthTimer();
       if (changedLive) {
         storyAvatarLoadGuard.clearFailedUrls();
       }
@@ -13297,7 +13844,6 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const tgt = STORY_GROWTH_STATE.targetCount;
     const rnd = STORY_GROWTH_STATE.renderedCount;
     if (rnd < tgt && tgt > 0) {
-      clearStoryGrowthTimer();
       rebuildStoryGrowth(root, tgt);
       STORY_GROWTH_STATE.renderedCount = tgt;
       patchStoryGrowthIconsFromSource(root, { pulseLast: true });
@@ -13337,14 +13883,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   }
   function renderCharacterScene(state) {
     const { hasWatch, recording, commentCount, liveId, snapshot } = state;
-    const roleCopy = "1\u30B3\u30E1\u30F3\u30C8\u3054\u3068\u306B\u3001\u308A\u3093\u304F\u304C1\u4F53\u305A\u3064\u5897\u3048\u308B\u3088\u3002";
     if (!hasWatch) {
       STORY_REACTION_STATE.liveId = "";
       STORY_REACTION_STATE.lastCount = 0;
       syncStorySourceEntries("", []);
       setSceneStory(
         "\u308A\u3093\u304F\u304C\u307F\u3093\u306A\u306E\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u3092\u96C6\u3081\u308B\u6E96\u5099\u4E2D\u3060\u3088\u3002",
-        recording ? `\u8A18\u9332\u306FON\u3002watch\u30DA\u30FC\u30B8\u304C\u958B\u3044\u305F\u3089\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u306E\u53EF\u8996\u5316\u3092\u59CB\u3081\u308B\u3088\u3002${roleCopy}` : `watch\u30DA\u30FC\u30B8\u3092\u958B\u3044\u305F\u3089\u3001\u308A\u3093\u304F\u304C\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u306E\u53EF\u8996\u5316\u3092\u59CB\u3081\u308B\u3088\u3002${roleCopy}`,
+        recording ? "\u8A18\u9332\u306FON\u3002watch\u30DA\u30FC\u30B8\u304C\u958B\u3044\u305F\u3089\u3001\u4E0B\u306E\u30B0\u30EA\u30C3\u30C9\u3068\u4E0A\u306E\u4E09\u6BB5\u30EC\u30FC\u30F3\u3067\u5FDC\u63F4\u3092\u53EF\u8996\u5316\u3059\u308B\u3088\u3002" : "watch\u30DA\u30FC\u30B8\u3092\u958B\u3044\u305F\u3089\u3001\u4E0B\u306E\u30B0\u30EA\u30C3\u30C9\u3068\u4E0A\u306E\u4E09\u6BB5\u30EC\u30FC\u30F3\u3067\u5FDC\u63F4\u3092\u53EF\u8996\u5316\u3059\u308B\u3088\u3002",
         {
           liveId: "",
           delta: 0,
@@ -13361,7 +13906,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (recording && commentCount <= 0) {
       setSceneStory(
         "\u308A\u3093\u304F\u304C\u307F\u3093\u306A\u306E\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u3092\u96C6\u3081\u3066\u3044\u307E\u3059",
-        `\u300C${title || liveId || "\u653E\u9001"}\u300D\u3092\u958B\u3044\u305F\u307E\u307E\u306B\u3057\u3066\u306D\u3002\u6570\u5B57\u304C\u3059\u3050\u5897\u3048\u306A\u3044\u3068\u304D\u306F\u3001\u53F3\u306E\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7\u304C\u4EEE\u60F3\u30B9\u30AF\u30ED\u30FC\u30EB\u306E\u305F\u3081\u5C11\u3057\u5F85\u3064\u304B\u3001\u4E00\u89A7\u3092\u5C11\u3057\u30B9\u30AF\u30ED\u30FC\u30EB\u3059\u308B\u3068\u53D6\u308A\u8FBC\u307F\u3084\u3059\u3044\u3088\u3002${roleCopy}`,
+        `\u300C${title || liveId || "\u653E\u9001"}\u300D\u3092\u958B\u3044\u305F\u307E\u307E\u306B\u3057\u3066\u306D\u3002\u6570\u5B57\u304C\u3059\u3050\u5897\u3048\u306A\u3044\u3068\u304D\u306F\u3001\u53F3\u306E\u30B3\u30E1\u30F3\u30C8\u4E00\u89A7\u304C\u4EEE\u60F3\u30B9\u30AF\u30ED\u30FC\u30EB\u306E\u305F\u3081\u5C11\u3057\u5F85\u3064\u304B\u3001\u4E00\u89A7\u3092\u5C11\u3057\u30B9\u30AF\u30ED\u30FC\u30EB\u3059\u308B\u3068\u53D6\u308A\u8FBC\u307F\u3084\u3059\u3044\u3088\u3002`,
         {
           liveId,
           delta: 0,
@@ -13375,7 +13920,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const countLabel = reaction.count.toLocaleString("ja-JP");
     setSceneStory(
       "\u308A\u3093\u304F\u304C\u307F\u3093\u306A\u306E\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u3092\u96C6\u3081\u3066\u3044\u308B\u3088\uFF01",
-      recording ? `\u3044\u307E ${countLabel} \u30B3\u30E1\u30F3\u30C8\u3002${reaction.delta > 0 ? `\u5FDC\u63F4\u304C +${reaction.delta} \u30B3\u30E1\u30F3\u30C8\u5897\u3048\u305F\u3088\u3002` : `\u300C${title || liveId || "\u653E\u9001"}\u300D\u3092\u898B\u5B88\u3063\u3066\u3044\u308B\u3088\u3002`} ${roleCopy}` : `\u8A18\u9332OFF\u3002ON\u306B\u3059\u308B\u3068\u300C${title || liveId || "\u653E\u9001"}\u300D\u306E\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u3092\u53EF\u8996\u5316\u3067\u304D\u308B\u3088\u3002${caster ? ` \u914D\u4FE1\u8005: ${caster}\u3002` : ""}${tags.length ? ` \u30BF\u30B0: ${tags.join(" / ")}\u3002` : ""}${roleCopy}`,
+      recording ? `\u3044\u307E ${countLabel} \u30B3\u30E1\u30F3\u30C8\u3002${reaction.delta > 0 ? `\u5FDC\u63F4\u304C +${reaction.delta} \u30B3\u30E1\u30F3\u30C8\u5897\u3048\u305F\u3088\u3002` : `\u300C${title || liveId || "\u653E\u9001"}\u300D\u3092\u898B\u5B88\u3063\u3066\u3044\u308B\u3088\u3002`} \u4E0B\u306F\u30B3\u30E1\u30F3\u30C8\u9806\u306E\u30B0\u30EA\u30C3\u30C9\u3001\u4E0A\u306E\u4E09\u6BB5\u306F\u4EBA\u6570\u30D9\u30FC\u30B9\u306E\u30EC\u30FC\u30F3\u3060\u3088\u3002` : `\u8A18\u9332OFF\u3002ON\u306B\u3059\u308B\u3068\u300C${title || liveId || "\u653E\u9001"}\u300D\u306E\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u3092\u53EF\u8996\u5316\u3067\u304D\u308B\u3088\u3002${caster ? ` \u914D\u4FE1\u8005: ${caster}\u3002` : ""}${tags.length ? ` \u30BF\u30B0: ${tags.join(" / ")}\u3002` : ""}`,
       {
         liveId,
         delta: reaction.delta,
@@ -13406,19 +13951,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const uniqueEl = $("watchUniqueUsers");
     const noIdEl = $("watchCommentsNoId");
     const noteEl = $("watchAudienceNote");
-    if (!wrap || !title || !broadcaster || !thumb || !tags) return;
     if (concurrentLoadingEl) concurrentLoadingEl.hidden = true;
     if (concurrentReadyEl) concurrentReadyEl.hidden = false;
     if (concurrentCard) concurrentCard.removeAttribute("aria-busy");
     const casterBanner = $("casterBanner");
     if (casterBanner) casterBanner.hidden = true;
-    wrap.hidden = true;
-    title.textContent = "-";
-    broadcaster.textContent = "-";
-    thumb.hidden = true;
-    thumb.removeAttribute("src");
-    tags.innerHTML = "";
-    if (audience) audience.hidden = true;
     const inflight = typeof opts.inflight === "boolean" ? opts.inflight : Boolean(watchMetaCache.fetchInflight);
     const error = typeof opts.error === "string" ? opts.error : String(watchMetaCache.fetchError || "");
     const gate = resolveWatchMetaCardState({
@@ -13451,6 +13988,67 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       noteEl.textContent = "";
       noteEl.removeAttribute("title");
     }
+    updateOfficialNicoStatsStrip(null);
+    if (!wrap || !title || !broadcaster || !thumb || !tags) return;
+    wrap.hidden = true;
+    title.textContent = "-";
+    broadcaster.textContent = "-";
+    thumb.hidden = true;
+    thumb.removeAttribute("src");
+    tags.innerHTML = "";
+    if (audience) audience.hidden = true;
+  }
+  var _lastOfficialNicoStatsStripKey = (
+    /** @type {string|null} */
+    null
+  );
+  var OFFICIAL_NICO_STATS_STRIP_TOOLTIP = "\u8996\u8074\u30DA\u30FC\u30B8\u306E WebSocket / NDGR statistics \u3067\u5C4A\u3044\u305F\u5024\u3067\u3059\u3002\u30CB\u30B3\u751F\u306E\u30D7\u30EC\u30A4\u30E4\u30FC\u6A2A\u306E\u6570\u5B57\u3068\u30BF\u30A4\u30DF\u30F3\u30B0\u304C\u305A\u308C\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002";
+  function updateOfficialNicoStatsStrip(snapshot) {
+    const root = (
+      /** @type {HTMLElement|null} */
+      $("officialNicoStatsStrip")
+    );
+    if (!root) return;
+    if (!snapshot || !String(snapshot.liveId || "").trim().toLowerCase()) {
+      _lastOfficialNicoStatsStripKey = null;
+      root.hidden = true;
+      root.setAttribute("aria-hidden", "true");
+      root.removeAttribute("title");
+      if (root instanceof HTMLDetailsElement) root.open = false;
+      return;
+    }
+    const digest = buildOfficialNicoStatsStripDigest(snapshot);
+    if (!digest) {
+      _lastOfficialNicoStatsStripKey = null;
+      root.hidden = true;
+      root.setAttribute("aria-hidden", "true");
+      root.removeAttribute("title");
+      if (root instanceof HTMLDetailsElement) root.open = false;
+      return;
+    }
+    if (digest.stableKey === _lastOfficialNicoStatsStripKey) return;
+    _lastOfficialNicoStatsStripKey = digest.stableKey;
+    const sumEl = $("officialNicoStatsSummary");
+    if (sumEl && sumEl.textContent !== digest.summaryText) {
+      sumEl.textContent = digest.summaryText;
+    }
+    const applyChip = (id, chip) => {
+      const el = (
+        /** @type {HTMLElement|null} */
+        $(id)
+      );
+      if (!el) return;
+      if (el.textContent !== chip.text) el.textContent = chip.text;
+      el.classList.toggle("is-placeholder", chip.isPlaceholder);
+    };
+    applyChip("officialStatNicoViewers", digest.viewers);
+    applyChip("officialStatNicoComments", digest.comments);
+    applyChip("officialStatNicoStreamAge", digest.streamAge);
+    applyChip("officialStatNicoAdPts", digest.adPts);
+    applyChip("officialStatNicoGiftPts", digest.giftPts);
+    root.hidden = false;
+    root.removeAttribute("aria-hidden");
+    root.title = OFFICIAL_NICO_STATS_STRIP_TOOLTIP;
   }
   var _prevConcurrentEstimated = (
     /** @type {number|null} */
@@ -13482,30 +14080,32 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const uniqueEl = $("watchUniqueUsers");
     const noIdEl = $("watchCommentsNoId");
     const noteEl = $("watchAudienceNote");
-    if (!wrap || !title || !broadcaster || !thumb || !tags) return;
     if (!snapshot) {
       clearWatchMetaCard();
       return;
     }
+    const metaChromeOk = Boolean(wrap && title && broadcaster && thumb && tags);
     const titleText = String(snapshot.broadcastTitle || snapshot.title || "-").trim() || "-";
     const broadcasterText = String(snapshot.broadcasterName || "-").trim() || "-";
     const tagList = Array.isArray(snapshot.tags) ? snapshot.tags.filter((v) => String(v || "").trim()).slice(0, 10) : [];
-    title.textContent = titleText;
-    broadcaster.textContent = broadcasterText;
-    tags.innerHTML = "";
-    for (const tag of tagList) {
-      const chip = document.createElement("span");
-      chip.className = "chip";
-      chip.textContent = tag;
-      tags.appendChild(chip);
-    }
-    const thumbnail = String(snapshot.thumbnailUrl || "").trim();
-    if (thumbnail) {
-      thumb.src = thumbnail;
-      thumb.hidden = false;
-    } else {
-      thumb.hidden = true;
-      thumb.removeAttribute("src");
+    if (metaChromeOk) {
+      title.textContent = titleText;
+      broadcaster.textContent = broadcasterText;
+      tags.innerHTML = "";
+      for (const tag of tagList) {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = tag;
+        tags.appendChild(chip);
+      }
+      const thumbnail = String(snapshot.thumbnailUrl || "").trim();
+      if (thumbnail) {
+        thumb.src = thumbnail;
+        thumb.hidden = false;
+      } else {
+        thumb.hidden = true;
+        thumb.removeAttribute("src");
+      }
     }
     const casterBanner = $("casterBanner");
     const casterIcon = (
@@ -13677,8 +14277,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       noteEl.textContent = body;
       noteEl.title = title2;
     }
-    if (audience) audience.hidden = false;
-    wrap.hidden = false;
+    updateOfficialNicoStatsStrip(snapshot);
+    if (metaChromeOk) {
+      if (audience) audience.hidden = false;
+      wrap.hidden = false;
+    }
   }
   function applyStorageErrorBannerFromBag(bag, viewerLiveId = "") {
     const banner = $("storageErrorBanner");
@@ -13787,7 +14390,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       strip.hidden = false;
       strip.removeAttribute("aria-hidden");
       strip.setAttribute("aria-label", "\u914D\u4FE1\u8005\u60C5\u5831");
-      strip.innerHTML = `<p class="nl-top-support-rank__note">\u307E\u3060\u5FDC\u63F4\u30B3\u30E1\u30F3\u30C8\u304C\u3042\u308A\u307E\u305B\u3093\u3002\u307E\u305A\u306F\u914D\u4FE1\u8005\u306E\u30D5\u30A9\u30ED\u30FC\u304B\u3089\u3002</p><div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
+      strip.innerHTML = buildRankStripPillarRowHtml("comments") + `<p class="nl-top-support-rank__note">${escapeHtml(RANK_STRIP_COMMENT_EMPTY_NOTE)}</p><div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
       bindOnErrorHideHandlersWithin(strip);
       return;
     }
@@ -13804,6 +14407,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       colorScheme: rankScheme,
       anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled ? (uid) => getCachedAnonymousIdenticonDataUrl(uid) : void 0
     });
+    const topSupportCount = models.length ? models[0].count : 0;
     const html = models.map((m) => {
       const placeHtml = m.placeNumber != null ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>` : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
       const full = escapeAttr(m.fullLabelForTitle);
@@ -13820,8 +14424,13 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
       const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
       const linkHref = isLinkable ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}` : "";
+      const ord = m.placeNumber != null ? m.placeNumber : 0;
+      const gapRaw = formatLeaderGapLabel(ord, m.count, topSupportCount, "\u4EF6");
+      const gapHtml = gapRaw ? `<span class="nl-top-support-rank__gap">${escapeHtml(gapRaw)}</span>` : "";
       const innerHtml = `${placeHtml}
-        <span class="nl-top-support-rank__count">${m.count}\u4EF6</span>
+        <span class="nl-top-support-rank__count-col">
+          <span class="nl-top-support-rank__count">${m.count}\u4EF6</span>${gapHtml}
+        </span>
         <span class="nl-top-support-rank__thumb-wrap">
           <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
         </span>
@@ -13830,7 +14439,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       return isLinkable ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${innerHtml}</a>` : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${innerHtml}</div>`;
     }).join("");
     const listInner = `${html}${casterTileHtml}`;
-    strip.innerHTML = `<p class="nl-top-support-rank__note">\u8A18\u9332\u5185\u30FB\u30E6\u30FC\u30B6\u30FC\u5225\u306E\u5FDC\u63F4\u4EF6\u6570\u304C\u591A\u3044\u9806\u3067\u3059\u3002</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
+    strip.innerHTML = buildRankStripPillarRowHtml("comments") + `<p class="nl-top-support-rank__note">${escapeHtml(RANK_STRIP_COMMENT_NOTE)}</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
     bindOnErrorHideHandlersWithin(strip);
     const thumbs = strip.querySelectorAll("img.nl-top-support-rank__thumb");
     models.forEach((m, i) => {
@@ -13840,6 +14449,148 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
       }
     });
+  }
+  function giftRankStripRootElements() {
+    return (
+      /** @type {HTMLElement[]} */
+      ["topGiftRankStrip", "storyGiftRankStrip"].map((id) => (
+        /** @type {HTMLElement|null} */
+        $(id)
+      )).filter((el) => el instanceof HTMLElement)
+    );
+  }
+  function buildOfficialGiftAdStatsNoteHtml() {
+    const snap = watchMetaCache.snapshot;
+    const gp = snap && typeof snap.officialGiftPoints === "number" && Number.isFinite(snap.officialGiftPoints) && snap.officialGiftPoints >= 0 ? snap.officialGiftPoints : null;
+    const ap = snap && typeof snap.officialAdPoints === "number" && Number.isFinite(snap.officialAdPoints) && snap.officialAdPoints >= 0 ? snap.officialAdPoints : null;
+    if (gp == null && ap == null) return "";
+    return `<p class="nl-top-support-rank__note nl-top-support-rank__note--official-giftstat">\u30AE\u30D5\u30C8\uFF0F\u5E83\u544A\u306E\u672C\u5BB6\u7D2F\u8A08\u306F\u3001\u8A18\u9332\u30AB\u30FC\u30C9\u76F4\u4E0B\u306E\u300C\u672C\u5BB6\u5BC4\u305B\u300D\u3092\u958B\u304F\u3068\u6570\u5B57\u3067\u78BA\u8A8D\u3067\u304D\u307E\u3059\u3002\u8CA2\u732E\u5EA6\uFF08\u8CA2\uFF09\u3068\u306F\u5225\u96C6\u8A08\u3067\u3059\u3002</p>`;
+  }
+  function renderGiftRankStrip(stripRooms) {
+    const strips = giftRankStripRootElements();
+    if (!strips.length) return;
+    const rooms = Array.isArray(stripRooms) ? stripRooms : [];
+    if (!rooms.length) {
+      for (const strip of strips) {
+        strip.hidden = true;
+        strip.innerHTML = "";
+        strip.setAttribute("aria-hidden", "true");
+      }
+      return;
+    }
+    const rankScheme = getStoryColorScheme();
+    const models = topSupportRankLineModels(rooms, {
+      defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
+      anonymousFallbackThumbSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
+      colorScheme: rankScheme,
+      anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled ? (uid) => getCachedAnonymousIdenticonDataUrl(uid) : void 0
+    });
+    const topThrow = models.length ? models[0].count : 0;
+    const html = models.map((m) => {
+      const placeHtml = m.placeNumber != null ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>` : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
+      const full = escapeAttr(m.fullLabelForTitle);
+      const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(m.thumbSrc);
+      const thumbRp = isHttpOrHttpsUrl(displayThumb) ? ' referrerpolicy="no-referrer"' : "";
+      const idText = escapeHtml(m.idShort);
+      const nameText = escapeHtml(m.nameLine);
+      const idTitle = m.isUnknown ? "" : escapeAttr(m.idTitle);
+      let lineClass = `nl-top-support-rank__line${m.isUnknown ? " nl-top-support-rank__line--unknown" : ""}`;
+      let lineStyle = "";
+      if (m.hasAccent && m.accentColorCss) {
+        lineClass += " nl-top-support-rank__line--has-accent";
+        lineStyle = ` style="--nl-rank-accent:${escapeAttr(m.accentColorCss)}"`;
+      }
+      const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
+      const linkHref = isLinkable ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}` : "";
+      const ord = m.placeNumber != null ? m.placeNumber : 0;
+      const gapRaw = formatGiftThrowGapLabel(ord, m.count, topThrow);
+      const gapHtml = gapRaw ? `<span class="nl-top-support-rank__gap">${escapeHtml(gapRaw)}</span>` : "";
+      const innerHtml = `${placeHtml}
+        <span class="nl-top-support-rank__count-col">
+          <span class="nl-top-support-rank__count">${m.count}\u56DE</span>${gapHtml}
+        </span>
+        <span class="nl-top-support-rank__thumb-wrap">
+          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
+        </span>
+        <span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>
+        <span class="nl-top-support-rank__name">${nameText}</span>`;
+      return isLinkable ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${innerHtml}</a>` : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${innerHtml}</div>`;
+    }).join("");
+    const officialNote = buildOfficialGiftAdStatsNoteHtml();
+    const bodyHtml = buildRankStripPillarRowHtml("gifts") + `<p class="nl-top-support-rank__note">${escapeHtml(RANK_STRIP_GIFT_NOTE)}</p>` + officialNote + `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
+    for (const strip of strips) {
+      strip.hidden = false;
+      strip.removeAttribute("aria-hidden");
+      strip.setAttribute(
+        "aria-label",
+        "NDGR \u3067\u691C\u77E5\u3057\u305F\u6295\u3052\uFF0F\u30AE\u30D5\u30C8\u56DE\u6570\u306E\u591A\u3044\u9806"
+      );
+      strip.innerHTML = bodyHtml;
+      bindOnErrorHideHandlersWithin(strip);
+      const thumbs = strip.querySelectorAll("img.nl-top-support-rank__thumb");
+      models.forEach((m, i) => {
+        const img = thumbs[i];
+        if (!(img instanceof HTMLImageElement)) return;
+        if (isHttpOrHttpsUrl(m.thumbSrc)) {
+          storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
+        }
+      });
+    }
+  }
+  async function refreshGiftRankStripForLive(liveId) {
+    const strips = giftRankStripRootElements();
+    if (!strips.length) return;
+    const hideAllGiftRankStrips = () => {
+      for (const strip of strips) {
+        strip.hidden = true;
+        strip.innerHTML = "";
+        strip.setAttribute("aria-hidden", "true");
+      }
+    };
+    const lid = String(liveId || "").trim().toLowerCase();
+    if (!lid) {
+      _lastGiftRankStripStableKey = null;
+      hideAllGiftRankStrips();
+      return;
+    }
+    try {
+      const gk = giftUsersStorageKey(lid);
+      const bag = await chrome.storage.local.get(gk);
+      const raw = bag[gk];
+      const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || "").trim();
+      const { stripRooms: baseRooms, stableKeyRows } = prepareGiftRankStrip(
+        Array.isArray(raw) ? raw : [],
+        { broadcasterUid }
+      );
+      if (!baseRooms.length) {
+        _lastGiftRankStripStableKey = null;
+        hideAllGiftRankStrips();
+        return;
+      }
+      const stripKey = giftRankStripStableKey(lid, stableKeyRows);
+      const enriched = baseRooms.map((room) => {
+        const ownAvatar = String(room.avatarUrl || "").trim();
+        const enrichedAvatar = ownAvatar || (room.userKey && room.userKey !== UNKNOWN_USER_KEY ? rememberedAvatarUrlForUserId(room.userKey) : "");
+        const storedNick = String(room.nickname || "").trim();
+        const cachedNick = room.userKey && room.userKey !== UNKNOWN_USER_KEY ? rememberedNicknameForUserId(room.userKey) : "";
+        const nickname = pickGiftRankDisplayNickname(
+          room.userKey,
+          storedNick,
+          cachedNick
+        );
+        return {
+          ...room,
+          avatarUrl: enrichedAvatar,
+          nickname
+        };
+      });
+      if (stripKey === _lastGiftRankStripStableKey) return;
+      _lastGiftRankStripStableKey = stripKey;
+      renderGiftRankStrip(enriched);
+    } catch {
+      _lastGiftRankStripStableKey = null;
+      hideAllGiftRankStrips();
+    }
   }
   function renderUserRooms(entries, liveId = "") {
     const ul = (
@@ -13879,6 +14630,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     if (!rooms.length) {
       _lastTopSupportRankStripStableKey = null;
       renderTopSupportRankStrip([]);
+      syncGiftRankStripAfterUserRoomsRender(liveId, (lid) => {
+        void refreshGiftRankStripForLive(lid);
+      });
       const li = document.createElement("li");
       li.className = "empty-hint";
       li.textContent = "\u307E\u3060\u30B3\u30E1\u30F3\u30C8\u304C\u3042\u308A\u307E\u305B\u3093";
@@ -13888,9 +14642,17 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const rankedRooms = rooms.map((room) => {
       const ownAvatar = String(room.avatarUrl || "").trim();
       const enrichedAvatar = ownAvatar || (room.userKey && room.userKey !== UNKNOWN_USER_KEY ? rememberedAvatarUrlForUserId(room.userKey) : "");
+      const storedNick = String(room.nickname || "").trim();
+      const cachedNick = room.userKey && room.userKey !== UNKNOWN_USER_KEY ? rememberedNicknameForUserId(room.userKey) : "";
+      const nickname = pickGiftRankDisplayNickname(
+        room.userKey,
+        storedNick,
+        cachedNick
+      );
       return {
         ...room,
         avatarUrl: enrichedAvatar,
+        nickname,
         recentCount: recentMap.get(room.userKey) || 0
       };
     }).sort((a, b) => {
@@ -13981,6 +14743,9 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       li.textContent = `\u307B\u304B ${rest} \u30E6\u30FC\u30B6\u30FC\uFF08\u4E0A\u4F4D\u306E\u307F\u8868\u793A\uFF09`;
       ul.appendChild(li);
     }
+    syncGiftRankStripAfterUserRoomsRender(liveId, (lid) => {
+      void refreshGiftRankStripForLive(lid);
+    });
   }
   async function sendMessageToWatchTabs(watchUrl, message) {
     const candidates = await collectWatchTabCandidates(watchUrl);
@@ -15110,6 +15875,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     const thumbCountEl = $("thumbCount");
     try {
       let paintWatchPopupUi = function() {
+        watchSnapshot = watchMetaCache.snapshot ?? watchSnapshot;
         syncInterceptMapDiagFromSnapshot(watchSnapshot);
         STORY_AVATAR_DIAG_STATE.total = arr.length;
         STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
@@ -15362,7 +16128,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         );
       }
       syncVoiceCommentButton();
-      const treatAsNoActiveWatch = !isNicoLiveWatchUrl(url) || watchUrlPick.source === "storage" || watchUrlPick.source === "none";
+      let hasOpenMatchingWatchTab = false;
+      if (url && isNicoLiveWatchUrl(url)) {
+        hasOpenMatchingWatchTab = await hasAnyOpenTabMatchingWatchPageUrl(url);
+      }
+      const treatAsNoActiveWatch = !isNicoLiveWatchUrl(url) || watchUrlPick.source === "none" || !hasOpenMatchingWatchTab;
       const noWatchHint = $("noWatchRankingHint");
       if (noWatchHint instanceof HTMLElement) {
         const showNoWatchRankingHint = !INLINE_EMBED_WATCH && treatAsNoActiveWatch;
@@ -15607,8 +16377,15 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
           fetchedSnapshot: snapResult.snapshot,
           merge: mergeWatchSnapshotPreservingBroadcaster
         });
-        if (!isFreshRefresh()) return;
         watchSnapshot = watchMetaCache.snapshot;
+        if (!isFreshRefresh()) {
+          const snap = watchMetaCache.snapshot;
+          if (snap) {
+            renderWatchMetaCard(snap, arr);
+            updateOfficialNicoStatsStrip(snap);
+          }
+          return;
+        }
         const strippedAfterSnap = stripViewerAvatarContamination(
           arr,
           lv,
@@ -15769,6 +16546,23 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       }
     }
     return prioritizeWatchTabCandidates(out, w);
+  }
+  async function hasAnyOpenTabMatchingWatchPageUrl(watchUrl) {
+    const w = String(watchUrl || "").trim();
+    if (!w || !isNicoLiveWatchUrl(w)) return false;
+    try {
+      const tabs = await chrome.tabs.query({});
+      for (const t of tabs) {
+        const u = t?.url;
+        if (typeof u !== "string") continue;
+        if (!isNicoLiveWatchUrl(u)) continue;
+        if (!watchPageUrlsMatchForSnapshot(u, w)) continue;
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }
   async function reloadWatchTabForUrl(watchUrl) {
     const w = String(watchUrl || "").trim();
@@ -16019,6 +16813,60 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
       error: lastDetail ? `\u30B3\u30E1\u30F3\u30C8\u9001\u4FE1\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\uFF08${lastDetail}\uFF09` : "\u30B3\u30E1\u30F3\u30C8\u9001\u4FE1\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u653E\u9001\u30BF\u30D6\u3092\u518D\u8AAD\u307F\u8FBC\u307F\u3057\u3066\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
     };
   }
+  async function requestOpenCommentAssetPickerOnWatchTab(watchUrl) {
+    const url = String(watchUrl || "").trim();
+    if (!url) {
+      return { ok: false, error: "watch URL \u304C\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002" };
+    }
+    const candidates = await collectWatchTabCandidates(url);
+    if (!candidates.length) {
+      return {
+        ok: false,
+        error: "watch\u30BF\u30D6\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002\u653E\u9001\u30BF\u30D6\u3092\u958B\u3044\u3066\u304B\u3089\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002"
+      };
+    }
+    let lastDetail = "";
+    for (const candidate of candidates) {
+      try {
+        const ranked = await listWatchFramesWithInnerText(candidate.id);
+        const tried = /* @__PURE__ */ new Set();
+        const tryOrder = [...ranked.map((r) => r.frameId), 0];
+        for (const fid of tryOrder) {
+          if (tried.has(fid)) continue;
+          tried.add(fid);
+          try {
+            const res = await tabsSendMessageWithRetry(
+              candidate.id,
+              { type: "NLS_OPEN_COMMENT_ASSET_PICKER" },
+              { frameId: fid, maxAttempts: 5, delayMs: 120 }
+            );
+            if (res?.ok) {
+              return { ok: true, error: "" };
+            }
+            if (res && typeof res === "object" && "error" in res && res.error) {
+              lastDetail = String(res.error);
+            }
+          } catch (e) {
+            const msg = e && typeof e === "object" && "message" in e ? String(
+              /** @type {{ message?: unknown }} */
+              e.message || ""
+            ) : String(e || "");
+            if (msg) lastDetail = msg;
+          }
+        }
+      } catch (e) {
+        const msg = e && typeof e === "object" && "message" in e ? String(
+          /** @type {{ message?: unknown }} */
+          e.message || ""
+        ) : String(e || "");
+        if (msg) lastDetail = msg;
+      }
+    }
+    return {
+      ok: false,
+      error: lastDetail ? `\u958B\u3051\u307E\u305B\u3093\u3067\u3057\u305F\u3002\uFF08${lastDetail}\uFF09` : "\u958B\u3051\u307E\u305B\u3093\u3067\u3057\u305F\u3002watch\u3092\u518D\u8AAD\u307F\u8FBC\u307F\u3057\u3066\u304B\u3089\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+    };
+  }
   function isFriendlyHtmlReportMetaKey(key) {
     const k = String(key || "").toLowerCase().trim();
     if (k === "description" || k === "keywords" || k === "og:title" || k === "og:description" || k === "og:image" || k === "og:url" || k === "og:site_name" || k === "og:type" || k === "twitter:title" || k === "twitter:description" || k.startsWith("twitter:image")) {
@@ -16085,7 +16933,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     }
     return `<div class="yukkuri-avatar ${fallbackClass}" aria-hidden="true">${escapeHtml(fallbackChar)}</div>`;
   }
-  async function buildHtmlReportDocument(comments, snapshot, snapshotError, liveId, watchUrl) {
+  async function buildHtmlReportDocument(comments, snapshot, snapshotError, liveId, watchUrl, _giftUsersRaw) {
     const exportedAtIso = (/* @__PURE__ */ new Date()).toISOString();
     const exportedAtJst = formatDateTime(Date.now());
     const safeLiveId = escapeHtml(liveId);
@@ -17143,7 +17991,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0504-1212" ? String("0504-1212") : "dev";
+      const buildId = "0504-1558" ? String("0504-1558") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
@@ -18545,6 +19393,22 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
         setCommentPostNotice(withCommentSendTroubleshootHint("\u9001\u4FE1\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002"), "error");
         paintCommentComposeUi();
       });
+    });
+    $("openNicoCommentAssetPickerBtn")?.addEventListener("click", () => {
+      const b = (
+        /** @type {HTMLButtonElement|null} */
+        $("openNicoCommentAssetPickerBtn")
+      );
+      if (!b || b.disabled) return;
+      handleOpenNicoCommentAssetPickerFromPopup();
+    });
+    $("openNicoCommentAssetPickerGiftPanelBtn")?.addEventListener("click", () => {
+      const b = (
+        /** @type {HTMLButtonElement|null} */
+        $("openNicoCommentAssetPickerGiftPanelBtn")
+      );
+      if (!b || b.disabled) return;
+      handleOpenNicoCommentAssetPickerFromPopup();
     });
     commentInput?.addEventListener("keydown", (e) => {
       const action = commentComposeKeyAction({

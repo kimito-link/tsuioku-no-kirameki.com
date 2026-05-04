@@ -11,6 +11,7 @@ import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
 import { resolveReportUserThumbSrc } from './reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from './userThumbGrid.js';
+import { GIFT_RANK_STRIP_MAX } from './giftRankStripConfig.js';
 import { buildConcurrentTimelineSeries } from './concurrentTimelineSeries.js';
 import { analyzeConcurrentPeak } from './concurrentPeakAnalysis.js';
 import { detectCommentSilenceZones } from './commentSilenceZones.js';
@@ -1536,7 +1537,8 @@ function sectionReachCoefficient(reach) {
  *   broadcasterUserId?: string,
  *   sessionSummaryRows?: import('./concurrentTimelineSeries.js').ConcurrentTimelineRow[],
  *   commentsForAnalytics?: import('./commentVelocityTimeline.js').VelocityCommentInput[],
- *   pastBroadcasts?: import('./commenterHistoricalAnalytics.js').BroadcastBundle[]
+ *   pastBroadcasts?: import('./commenterHistoricalAnalytics.js').BroadcastBundle[],
+ *   giftNdgrRows?: { userId: string, nickname: string, throwCount: number, capturedAt: number }[]
  * }} [opts]
  * @returns {string}
  */
@@ -1587,6 +1589,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   // 0.1.23 (X): 過去 N 配信を突き合わせるユーザー層分析。pastBroadcasts 未渡しなら
   // 空集計が返る（純粋関数側で吸収）。配信者本人は除外する。
   const pastBroadcasts = Array.isArray(opts.pastBroadcasts) ? opts.pastBroadcasts : [];
+  /** popup 側で mergeAndSortGiftUserRows 済みの行（ストレージ正本と同じマージ・順序） */
+  const giftNdgrRows = Array.isArray(opts.giftNdgrRows) ? opts.giftNdgrRows : [];
   /** @type {(cs: any) => any[]} */
   const filterBroadcaster = broadcasterUserId
     ? (cs) =>
@@ -1779,6 +1783,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-segment', label: 'ユーザーセグメント' },
     { id: 'mkt-top-users', label: 'トップコメンター TOP 20' },
     { id: 'mkt-thumb-grid', label: 'サムネ付きユーザー一覧' },
+    { id: 'mkt-gifts', label: 'ギフト・投げ（NDGR 検知）' },
     { id: 'mkt-vpos', label: 'vpos 三分割（再生位置）' },
     { id: 'mkt-hour', label: '時間帯ヒートマップ' },
     { id: 'mkt-json', label: '表計算・ツール向け JSON' }
@@ -1858,6 +1863,7 @@ ${sectionAdviceAfterSegment(r)}
 ${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId))}
 ${sectionAdviceAfterRank(r)}
 ${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
+${idWrap('mkt-gifts', sectionGiftNdgrContributors(giftNdgrRows, maskShare, identiconResolver))}
 ${idWrap('mkt-vpos', sectionVposThirds(r))}
 ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
   const tocItems = allTocItems.filter((t) => bodyHtml.includes(`id="${t.id}"`));
@@ -2099,6 +2105,72 @@ function sectionSegment(r) {
 <svg viewBox="0 0 200 200" class="mkt-pie">${paths}</svg>
 <div class="mkt-seg-legend">${legend}</div>
 </div></section>`;
+}
+
+/**
+ * NDGR 由来のギフト／投げ（`nls_gift_users_*` と同型）。行は popup 側で
+ * mergeAndSortGiftUserRows 済み（ストリップと同じマージ・並べ替え）。
+ *
+ * @param {{ userId: string, nickname: string, throwCount: number, capturedAt: number }[]} rows
+ * @param {boolean} maskShare
+ * @param {((uid: string) => string) | undefined} identiconResolver
+ */
+function sectionGiftNdgrContributors(rows, maskShare = false, identiconResolver = undefined) {
+  const list = Array.isArray(rows)
+    ? rows.filter((x) => x && String(/** @type {{ userId?: unknown }} */ (x).userId || '').trim())
+    : [];
+  if (!list.length) return '';
+  const MKT_GIFT_TABLE_MAX = 200;
+  const truncated = list.length > MKT_GIFT_TABLE_MAX;
+  const display = truncated ? list.slice(0, MKT_GIFT_TABLE_MAX) : list;
+  const totalPeople = list.length;
+  const totalThrows = list.reduce((s, r) => s + (Number(r.throwCount) > 0 ? Number(r.throwCount) : 0), 0);
+  const maxThrow = list.reduce((m, r) => Math.max(m, Number(r.throwCount) || 0), 0);
+  const noteTrunc = truncated
+    ? `<p class="mkt-note">表は最大 ${MKT_GIFT_TABLE_MAX} 行です（全 ${totalPeople} ユーザー・投げ合計 ${totalThrows} 回）。全件は HTML レポートの同セクションを参照してください。</p>`
+    : '';
+  const rowsHtml = display
+    .map((r, i) => {
+      const uidForLabel = r.userId || UNKNOWN_USER_KEY;
+      const rawLabel = displayUserLabel(r.userId, r.nickname || '');
+      const nameCellHtml = maskShare
+        ? escapeHtml(maskLabelForShare(rawLabel))
+        : buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
+      const resolvedAvatar = maskShare
+        ? ''
+        : resolveReportUserThumbSrc({
+            userId: r.userId || '',
+            avatarUrl: '',
+            identiconResolver
+          });
+      const avImg =
+        !resolvedAvatar
+          ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>'
+          : `<img src="${escapeHtml(resolvedAvatar)}" class="mkt-rank-av" alt="" loading="lazy" referrerpolicy="no-referrer">`;
+      const pct = maxThrow > 0 ? ((Number(r.throwCount) || 0) / maxThrow) * 100 : 0;
+      const when =
+        typeof r.capturedAt === 'number' && r.capturedAt > 0
+          ? escapeHtml(new Date(r.capturedAt).toLocaleString('ja-JP'))
+          : '—';
+      return `<tr>
+<td class="mkt-rank-n">${i + 1}</td>
+<td>${avImg}</td>
+<td class="mkt-rank-name">${nameCellHtml}</td>
+<td class="mkt-rank-bar"><div class="mkt-rank-bar__fill" style="width:${pct.toFixed(1)}%"></div><span class="mkt-rank-bar__label">${escapeHtml(String(r.throwCount))}</span></td>
+<td class="mono">${when}</td>
+</tr>`;
+    })
+    .join('');
+  const noteMask = maskShare
+    ? '<p class="mkt-note">共有向け: 表示名を伏せています。</p>'
+    : '';
+  return `<section class="mkt-section" id="mkt-gifts">
+<h2>ギフト・投げ（NDGR 検知）</h2>
+<p class="mkt-note">popup のギフト貢献ストリップと同じ並び（投げ回数の多い順）。配信者本人は除外済み。画面上のストリップは上位 ${GIFT_RANK_STRIP_MAX} 件のみ表示します。</p>
+<p class="mkt-note">ユーザー <strong>${totalPeople}</strong> 名・投げ合計 <strong>${totalThrows}</strong> 回。</p>
+${noteTrunc}${noteMask}
+<table class="mkt-rank-table"><thead><tr><th>#</th><th></th><th>ユーザー</th><th>投げ回数</th><th>最終検知</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+</section>`;
 }
 
 /**

@@ -20,6 +20,7 @@ import {
   normalizeViewerJoin,
   walkJsonForViewerJoinUsers
 } from '../lib/interceptViewerJoinSignals.js';
+import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js';
 
 (() => {
   'use strict';
@@ -69,6 +70,24 @@ import {
   /** 視聴者入室・オーディエンス更新（DOM より優先して content で即時処理） */
   const MSG_VIEWER_JOIN = 'NLS_INTERCEPT_VIEWER_JOIN';
 
+  /**
+   * MAIN の postMessage は同一 window の content に届くが、NDGR が iframe 側で
+   * デコードされるとトップの isolated content は e.source が子フレームになり
+   * `e.source === window` ガードで全イベントが落ちる。子からは top へ送る。
+   * @param {unknown} payload
+   */
+  function postInterceptBridge(payload) {
+    try {
+      if (window.top && window.self !== window.top) {
+        window.top.postMessage(payload, '*');
+        return;
+      }
+    } catch {
+      /* cross-origin top — 自 window のみ */
+    }
+    window.postMessage(payload, '*');
+  }
+
   /** @type {{ commentNo: string, text: string, userId: string, nickname?: string }[]} */
   let ndgrChatRowsBatch = [];
   /** @type {ReturnType<typeof setTimeout>|null} */
@@ -94,7 +113,7 @@ import {
       if (i >= all.length) return;
       const payload = all.slice(i, i + NDGR_CHAT_ROWS_POST_CHUNK);
       i += payload.length;
-      window.postMessage({ type: MSG_CHAT_ROWS, rows: payload }, '*');
+      postInterceptBridge({ type: MSG_CHAT_ROWS, rows: payload });
       if (i < all.length) schedule(pump);
     };
     pump();
@@ -192,10 +211,7 @@ import {
         out.push(row);
       }
       if (out.length) {
-        window.postMessage(
-          { type: MSG_VIEWER_JOIN, viewers: out, priority: 'fast' },
-          '*'
-        );
+        postInterceptBridge({ type: MSG_VIEWER_JOIN, viewers: out, priority: 'fast' });
       }
     } catch {
       /* never break page */
@@ -236,7 +252,7 @@ import {
     if (!entries.length && !users.length) return;
     diag.posted += entries.length;
     publishDiag();
-    window.postMessage({ type: MSG_TYPE, entries, users }, '*');
+    postInterceptBridge({ type: MSG_TYPE, entries, users });
   }
 
   function normalizeAvatarUrl(url) {
@@ -350,9 +366,22 @@ import {
 
   function handleNdgrResult(result) {
     if (!result) return;
-    if (result.stats && result.stats.viewers != null) {
-      _ndgr.stats++;
-      window.postMessage({ type: MSG_STATISTICS, viewers: result.stats.viewers, comments: result.stats.comments }, '*');
+    const st = result.stats;
+    if (st) {
+      const payload = { type: MSG_STATISTICS };
+      if (st.viewers != null) payload.viewers = st.viewers;
+      if (st.comments != null) payload.comments = st.comments;
+      if (st.giftPoints != null) payload.giftPoints = st.giftPoints;
+      if (st.adPoints != null) payload.adPoints = st.adPoints;
+      if (
+        'viewers' in payload ||
+        'comments' in payload ||
+        'giftPoints' in payload ||
+        'adPoints' in payload
+      ) {
+        _ndgr.stats++;
+        postInterceptBridge(payload);
+      }
     }
     for (const chat of result.chats) {
       const uid = chat.rawUserId ? String(chat.rawUserId) : chat.hashedUserId;
@@ -379,7 +408,7 @@ import {
       }
     }
     if (giftUsers.length) {
-      window.postMessage({ type: MSG_GIFT_USERS, users: giftUsers }, '*');
+      postInterceptBridge({ type: MSG_GIFT_USERS, users: giftUsers });
     }
     scheduleNdgrChatRowsPost(ndgrChatsToMergeRows(result.chats));
   }
@@ -442,43 +471,30 @@ import {
     }
   }
 
-  const VIEWER_KEYS = ['viewers', 'watchCount', 'watching', 'watchingCount', 'viewerCount', 'viewCount'];
-  const COMMENT_KEYS = ['comments', 'commentCount'];
-  function pickNum(obj, keys, max) {
-    for (const k of keys) {
-      const r = obj[k];
-      if (r == null) continue;
-      const n = typeof r === 'number' ? r : parseInt(String(r), 10);
-      if (Number.isFinite(n) && n >= 0 && (!max || n <= max)) return n;
-    }
-    return null;
-  }
-
   /**
-   * パース済み JSON からビューア数・コメント数を検出して転送。
+   * パース済み JSON から statistics（視聴・コメ・ギフト累計 pt 等）を検出して転送。
    * type:"statistics" だけでなく、既知キーがあれば広く拾う。
    * @param {unknown} obj
+   * @returns {boolean} いずれかを拾って転送したら true
    */
-  /** @returns {boolean} viewers を拾って転送したら true */
   function tryForwardStatistics(obj) {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
-    const o = /** @type {Record<string, unknown>} */ (obj);
-    const d = o.data;
-    const target =
-      d && typeof d === 'object' && !Array.isArray(d)
-        ? /** @type {Record<string, unknown>} */ (d)
-        : o;
-    let viewers = pickNum(target, VIEWER_KEYS, 50_000_000);
-    let comments = pickNum(target, COMMENT_KEYS);
-    if (viewers == null && target !== o) {
-      viewers = pickNum(o, VIEWER_KEYS, 50_000_000);
-      comments = comments ?? pickNum(o, COMMENT_KEYS);
+    const ext = extractStatisticsFromParsedObject(obj);
+    if (!ext) return false;
+    /** @type {Record<string, unknown>} */
+    const payload = { type: MSG_STATISTICS };
+    if (typeof ext.viewers === 'number') payload.viewers = ext.viewers;
+    if (typeof ext.comments === 'number') payload.comments = ext.comments;
+    if (typeof ext.giftPoints === 'number') payload.giftPoints = ext.giftPoints;
+    if (typeof ext.adPoints === 'number') payload.adPoints = ext.adPoints;
+    if (
+      !('viewers' in payload) &&
+      !('comments' in payload) &&
+      !('giftPoints' in payload) &&
+      !('adPoints' in payload)
+    ) {
+      return false;
     }
-    if (viewers == null) return false;
-    window.postMessage(
-      { type: MSG_STATISTICS, viewers, comments },
-      '*'
-    );
+    postInterceptBridge(payload);
     return true;
   }
 
@@ -503,7 +519,7 @@ import {
     const begin = dd.begin || dd.beginAt || dd.openTime;
     if (typeof begin === 'string' && begin.length >= 10) {
       _scheduleSent = true;
-      window.postMessage({ type: MSG_SCHEDULE, begin }, '*');
+      postInterceptBridge({ type: MSG_SCHEDULE, begin });
     }
   }
 
@@ -594,11 +610,11 @@ import {
           if (method === 'POST' && /api\/(v\d+\/)?comment/.test(url) && res.ok) {
             try {
               const cj = await res.clone().json();
-              window.postMessage({
+              postInterceptBridge({
                 type: 'NLS_INTERCEPT_COMMENT_POST',
                 status: res.status,
                 body: cj
-              }, '*');
+              });
             } catch { /* JSON parse failure — ignore */ }
           }
           diag.fetchHits += 1;
@@ -1028,7 +1044,7 @@ import {
         wc != null && Number.isFinite(Number(wc)) && Number(wc) >= 0
           ? Number(wc)
           : null;
-      window.postMessage({ type: MSG_EMBEDDED_DATA, viewers }, '*');
+      postInterceptBridge({ type: MSG_EMBEDDED_DATA, viewers });
     } catch { /* no-op */ }
   }
 
@@ -1057,7 +1073,7 @@ import {
           if (wc?.[1]) {
             const n = parseInt(wc[1], 10);
             if (Number.isFinite(n) && n >= 0) {
-              window.postMessage({ type: MSG_STATISTICS, viewers: n }, '*');
+              postInterceptBridge({ type: MSG_STATISTICS, viewers: n });
             }
           }
           const cc =
@@ -1066,7 +1082,7 @@ import {
           if (cc?.[1]) {
             const cn = parseInt(cc[1], 10);
             if (Number.isFinite(cn) && cn >= 0) {
-              window.postMessage({ type: MSG_STATISTICS, viewers: null, comments: cn }, '*');
+              postInterceptBridge({ type: MSG_STATISTICS, viewers: null, comments: cn });
             }
           }
         })
@@ -1145,7 +1161,7 @@ import {
       const cur = String(window.location.href || '');
       if (cur === prev) return;
       lastNotifiedHref = cur;
-      window.postMessage({ type: 'NLS_SPA_NAVIGATION', url: cur, prevUrl: prev }, '*');
+      postInterceptBridge({ type: 'NLS_SPA_NAVIGATION', url: cur, prevUrl: prev });
     };
     const origPushState = history.pushState;
     const origReplaceState = history.replaceState;

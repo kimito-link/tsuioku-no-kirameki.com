@@ -983,32 +983,123 @@
     return {};
   }
 
+  // src/lib/giftDisplayNickname.js
+  function isLikelyInternalNdgGiftOrCampaignLabel(s) {
+    const t = String(s || "").trim();
+    if (!t) return false;
+    if (/^nicolive_/i.test(t)) return true;
+    const hasNonAscii = [...t].some((ch) => (ch.codePointAt(0) ?? 0) > 127);
+    if (/^[a-z][a-z0-9_]{22,}$/i.test(t) && !hasNonAscii) return true;
+    return false;
+  }
+  function nicknameShouldReplaceExisting(prev, next, userId) {
+    const p = String(prev || "").trim();
+    const n = String(next || "").trim();
+    const uid = String(userId || "").trim();
+    if (!n) return false;
+    if (!p) return !isLikelyInternalNdgGiftOrCampaignLabel(n);
+    if (isLikelyInternalNdgGiftOrCampaignLabel(p) && !isLikelyInternalNdgGiftOrCampaignLabel(n)) {
+      return true;
+    }
+    if (supportGridStrongNickname(n, uid) && !supportGridStrongNickname(p, uid)) {
+      return true;
+    }
+    return false;
+  }
+  function enrichIncomingGiftThrowUsersWithInterceptNicknames(incoming, getInterceptNick) {
+    if (!Array.isArray(incoming) || !incoming.length) return incoming;
+    const get = typeof getInterceptNick === "function" ? getInterceptNick : () => "";
+    return incoming.map((u) => {
+      const uid = String(u?.userId ?? "").trim();
+      if (!uid) return u;
+      const ndgr = String(u?.nickname ?? "").trim();
+      const intercept = String(get(uid) || "").trim();
+      if (intercept && nicknameShouldReplaceExisting(ndgr, intercept, uid)) {
+        return { ...u, nickname: intercept };
+      }
+      return u;
+    });
+  }
+  function upgradeGiftUserRowsWithInterceptNicknames(rows, getInterceptNick) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return { next: Array.isArray(rows) ? rows : [], storageTouched: false };
+    }
+    const get = typeof getInterceptNick === "function" ? getInterceptNick : () => "";
+    let storageTouched = false;
+    const next = rows.map((row) => {
+      const uid = String(row?.userId ?? "").trim();
+      if (!uid) return row;
+      const nick = String(row?.nickname ?? "").trim();
+      const intercept = String(get(uid) || "").trim();
+      if (intercept && nicknameShouldReplaceExisting(nick, intercept, uid)) {
+        storageTouched = true;
+        return { ...row, nickname: intercept };
+      }
+      return row;
+    });
+    return { next, storageTouched };
+  }
+
   // src/lib/giftRecord.js
-  function mergeGiftUsers(existing, incoming) {
+  function normalizeGiftThrowCount(v) {
+    const n = Math.round(Number(v));
+    if (Number.isFinite(n) && n >= 1) return n;
+    return 1;
+  }
+  function mergeGiftUserThrowEvents(existing, incoming) {
+    if (!incoming?.length) {
+      const next2 = [];
+      for (const e of existing) {
+        const uid = String(e?.userId || "").trim();
+        if (!uid) continue;
+        next2.push({
+          userId: uid,
+          nickname: String(e?.nickname || "").trim(),
+          capturedAt: Number(e?.capturedAt) || 0,
+          throwCount: normalizeGiftThrowCount(e?.throwCount)
+        });
+      }
+      return { next: next2, added: [], storageTouched: false };
+    }
     const byId = /* @__PURE__ */ new Map();
     for (const e of existing) {
-      byId.set(e.userId, e);
+      const uid = String(e?.userId || "").trim();
+      if (!uid) continue;
+      byId.set(uid, {
+        userId: uid,
+        nickname: String(e?.nickname || "").trim(),
+        capturedAt: Number(e?.capturedAt) || 0,
+        throwCount: normalizeGiftThrowCount(e?.throwCount)
+      });
     }
     const added = [];
     let storageTouched = false;
     const now = Date.now();
     for (const inc of incoming) {
-      const uid = String(inc.userId || "").trim();
+      const uid = String(inc?.userId || "").trim();
       if (!uid) continue;
-      const nick = String(inc.nickname || "").trim();
+      const nick = String(inc?.nickname || "").trim();
       const ex = byId.get(uid);
       if (ex) {
-        if (nick && !ex.nickname) {
-          byId.set(uid, { ...ex, nickname: nick });
-          storageTouched = true;
+        ex.throwCount += 1;
+        ex.capturedAt = now;
+        if (nicknameShouldReplaceExisting(ex.nickname, nick, uid)) {
+          ex.nickname = nick;
         }
-        continue;
+        storageTouched = true;
+      } else {
+        const safeNick = nick && isLikelyInternalNdgGiftOrCampaignLabel(nick) ? "" : nick;
+        const entry = {
+          userId: uid,
+          nickname: safeNick,
+          capturedAt: now,
+          throwCount: 1
+        };
+        byId.set(uid, entry);
+        added.push({ ...entry });
+        storageTouched = true;
       }
-      const entry = { userId: uid, nickname: nick, capturedAt: now };
-      byId.set(uid, entry);
-      added.push(entry);
     }
-    if (added.length) storageTouched = true;
     const next = [...byId.values()];
     return { next, added, storageTouched };
   }
@@ -1137,6 +1228,99 @@
     }
     const minimumScore = editor != null ? 80 : root instanceof HTMLFormElement ? 60 : 120;
     return bestScore >= minimumScore ? best : null;
+  }
+
+  // src/lib/nicoCommentPanelAssetLauncher.js
+  var ASSET_LAUNCHER_HINT_RE = /(アイテム|ギフト|スタンプ|絵文字|gift|item|stamp|emoji|ワンコイン|投げ|盛り上げ)/i;
+  var ASSET_LAUNCHER_GIFT_VERB_RE = /(贈る|送る)/i;
+  var ASSET_LAUNCHER_GIFT_NOUN_RE = /(ギフト|アイテム|スタンプ|gift|item|stamp)/i;
+  var ASSET_LAUNCHER_NEGATIVE_LABEL_RE = /(コメント.{0,8}(送信|投稿)|^送信$|^投稿$|submit|send|post|書き込|書込|再読み込み|reload|閉じ|close|cancel|設定|settings)/i;
+  var ASSET_LAUNCHER_NEGATIVE_TOKEN_RE = /(comment-post|commentPost|send-comment|submit-comment|reload|close)/i;
+  function isHtmlElement2(el) {
+    return el instanceof HTMLElement;
+  }
+  function isVisibleAssetLauncherCandidate(el) {
+    if (!isHtmlElement2(el) || !el.isConnected || el.hidden) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+    if (typeof el.getClientRects === "function" && el.getClientRects().length === 0) {
+      return false;
+    }
+    return true;
+  }
+  function isDisabledAssetLauncher(el) {
+    if (el.matches('[disabled],[aria-disabled="true"]')) return true;
+    if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) {
+      return el.disabled;
+    }
+    return false;
+  }
+  function readPrimaryLabel(el) {
+    const parts = [];
+    for (const key of ["aria-label", "title"]) {
+      const v = String(el.getAttribute(key) || "").trim();
+      if (v) parts.push(v);
+    }
+    if (el instanceof HTMLInputElement) {
+      const v = String(el.value || "").trim();
+      if (v) parts.push(v);
+    }
+    const text = String(el.textContent || "").trim();
+    if (text && text.length <= 80) parts.push(text);
+    return parts.join(" ").trim();
+  }
+  function readTokenBlob(el) {
+    const parts = [];
+    for (const key of ["id", "name", "class", "data-testid", "data-test-id"]) {
+      const v = String(el.getAttribute(key) || "").trim();
+      if (v) parts.push(v);
+    }
+    return parts.join(" ").trim();
+  }
+  function scoreCommentPanelAssetLauncher(el, editor) {
+    let score = 0;
+    const label = readPrimaryLabel(el);
+    const tokens = readTokenBlob(el);
+    if (ASSET_LAUNCHER_NEGATIVE_LABEL_RE.test(label)) score -= 280;
+    if (ASSET_LAUNCHER_NEGATIVE_TOKEN_RE.test(tokens)) score -= 220;
+    if (ASSET_LAUNCHER_HINT_RE.test(label)) score += 120;
+    if (ASSET_LAUNCHER_HINT_RE.test(tokens)) score += 90;
+    const blob = `${label} ${tokens}`;
+    if (ASSET_LAUNCHER_GIFT_VERB_RE.test(blob) && ASSET_LAUNCHER_GIFT_NOUN_RE.test(blob)) {
+      score += 95;
+    }
+    const editorForm = editor?.closest("form") || null;
+    const buttonForm = el.closest("form");
+    if (editorForm && buttonForm === editorForm) score += 70;
+    else if (editor && el.closest(".ga-ns-comment-panel, .comment-panel") === editor.closest(".ga-ns-comment-panel, .comment-panel")) {
+      score += 45;
+    }
+    if (editor?.parentElement && el.parentElement === editor.parentElement) {
+      score += 25;
+    }
+    return score;
+  }
+  var CANDIDATE_SELECTOR = 'button, [role="button"], a[href]';
+  function resolveCommentPanelAssetSearchScope(editor) {
+    if (!(editor instanceof HTMLElement)) return document;
+    return editor.closest('.ga-ns-comment-panel, .comment-panel, [class*="comment-panel" i]') || editor.closest("form") || document;
+  }
+  function findCommentPanelAssetLauncherButton(root, editor = null) {
+    if (!root || typeof root.querySelectorAll !== "function") return null;
+    let best = null;
+    let bestScore = -Infinity;
+    const list = root.querySelectorAll(CANDIDATE_SELECTOR);
+    for (const node of list) {
+      if (!(node instanceof HTMLElement)) continue;
+      if (!isVisibleAssetLauncherCandidate(node)) continue;
+      if (isDisabledAssetLauncher(node)) continue;
+      const s = scoreCommentPanelAssetLauncher(node, editor);
+      if (s > bestScore) {
+        bestScore = s;
+        best = node;
+      }
+    }
+    return bestScore >= 80 ? best : null;
   }
 
   // src/lib/nicoliveDom.js
@@ -3055,9 +3239,13 @@
       officialStatsUpdatedAt: officialStatsUpdatedAt2,
       officialCommentStatsUpdatedAt: ocStatsAtRaw,
       officialViewerIntervalMs: officialViewerIntervalMs2,
-      officialCommentSummary
+      officialCommentSummary,
+      officialGiftPoints: giftRaw,
+      officialAdPoints: adRaw,
+      officialGiftAdStatsUpdatedAt: giftAdAtRaw
     } = p;
     const officialCommentStatsUpdatedAt2 = typeof ocStatsAtRaw === "number" && Number.isFinite(ocStatsAtRaw) && ocStatsAtRaw > 0 ? ocStatsAtRaw : 0;
+    const officialGiftAdStatsUpdatedAt2 = typeof giftAdAtRaw === "number" && Number.isFinite(giftAdAtRaw) && giftAdAtRaw > 0 ? giftAdAtRaw : 0;
     return {
       officialViewerCount: typeof officialViewerCount2 === "number" && Number.isFinite(officialViewerCount2) && officialViewerCount2 >= 0 ? officialViewerCount2 : null,
       officialCommentCount: typeof officialCommentCount2 === "number" && Number.isFinite(officialCommentCount2) && officialCommentCount2 >= 0 ? officialCommentCount2 : null,
@@ -3069,7 +3257,11 @@
       officialStatisticsCommentsDelta: officialCommentSummary?.statisticsCommentsDelta ?? null,
       officialReceivedCommentsDelta: officialCommentSummary?.receivedCommentsDelta ?? null,
       officialCommentSampleWindowMs: officialCommentSummary?.sampleWindowMs ?? null,
-      officialCaptureRatio: typeof officialCommentSummary?.captureRatio === "number" ? officialCommentSummary.captureRatio : null
+      officialCaptureRatio: typeof officialCommentSummary?.captureRatio === "number" ? officialCommentSummary.captureRatio : null,
+      officialGiftPoints: typeof giftRaw === "number" && Number.isFinite(giftRaw) && giftRaw >= 0 ? giftRaw : null,
+      officialAdPoints: typeof adRaw === "number" && Number.isFinite(adRaw) && adRaw >= 0 ? adRaw : null,
+      officialGiftAdStatsUpdatedAt: officialGiftAdStatsUpdatedAt2 > 0 ? officialGiftAdStatsUpdatedAt2 : null,
+      officialGiftAdStatsFreshnessMs: officialGiftAdStatsUpdatedAt2 > 0 ? Math.max(0, nowMs - officialGiftAdStatsUpdatedAt2) : null
     };
   }
 
@@ -4039,6 +4231,9 @@
   var wsViewerCountUpdatedAt = 0;
   var officialViewerCount = null;
   var officialCommentCount = null;
+  var officialGiftPoints = null;
+  var officialAdPoints = null;
+  var officialGiftAdStatsUpdatedAt = 0;
   var officialCommentStatsUpdatedAt = 0;
   var officialStatsUpdatedAt = 0;
   var officialViewerIntervalMs = null;
@@ -4346,6 +4541,34 @@
   var NDGR_PENDING_FLUSH_THRESHOLD = INGEST_TIMING.ndgrPendingThreshold;
   var NDGR_PENDING_MAX = INGEST_TIMING.ndgrPendingMax;
   var INTERCEPT_RECONCILE_MS = INGEST_TIMING.interceptReconcileMs;
+  var giftNickFromInterceptTimer = null;
+  var GIFT_NICK_FROM_INTERCEPT_DEBOUNCE_MS = 280;
+  function scheduleGiftNickUpgradeFromInterceptDebounced() {
+    if (!hasExtensionContext()) return;
+    if (giftNickFromInterceptTimer != null) clearTimeout(giftNickFromInterceptTimer);
+    giftNickFromInterceptTimer = setTimeout(() => {
+      giftNickFromInterceptTimer = null;
+      const lid = String(liveId || "").trim().toLowerCase();
+      if (!lid) return;
+      void maybeUpgradeGiftUserNicknamesFromInterceptMap(lid);
+    }, GIFT_NICK_FROM_INTERCEPT_DEBOUNCE_MS);
+  }
+  async function maybeUpgradeGiftUserNicknamesFromInterceptMap(lidNorm) {
+    if (!lidNorm || !hasExtensionContext()) return;
+    try {
+      const key = giftUsersStorageKey(lidNorm);
+      const bag = await chrome.storage.local.get(key);
+      const existing = Array.isArray(bag[key]) ? bag[key] : [];
+      const { next, storageTouched } = upgradeGiftUserRowsWithInterceptNicknames(
+        existing,
+        (uid) => String(interceptedNicknames.get(String(uid || "").trim()) || "").trim()
+      );
+      if (!storageTouched) return;
+      await chrome.storage.local.set({ [key]: next });
+    } catch (err) {
+      reportSilentErrorToStorage("giftNickInterceptUpgrade", err);
+    }
+  }
   var ENDED_HARVEST_CHECK_MS = INGEST_TIMING.endedHarvestCheckMs;
   var interceptReconcilePendingEntries = [];
   var interceptReconcilePendingUsers = [];
@@ -4475,51 +4698,55 @@
     if (!mergedItems.length && !mergedUsers.length) return;
     const key = commentsStorageKey(lidAtQueue);
     const job = persistCommentRowsChain.then(async () => {
-      const bag = await readStorageBagWithRetry(
-        () => chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
-        { attempts: 4, delaysMs: [0, 50, 120, 280] }
-      );
-      const existing = Array.isArray(bag[key]) ? bag[key] : [];
-      let next = existing;
-      let commentsTouched = false;
-      if (mergedItems.length) {
-        const merged = mergeStoredCommentsWithIntercept(existing, mergedItems);
-        if (merged.patched > 0) {
-          next = merged.next;
+      try {
+        const bag = await readStorageBagWithRetry(
+          () => chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
+          { attempts: 4, delaysMs: [0, 50, 120, 280] }
+        );
+        const existing = Array.isArray(bag[key]) ? bag[key] : [];
+        let next = existing;
+        let commentsTouched = false;
+        if (mergedItems.length) {
+          const merged = mergeStoredCommentsWithIntercept(existing, mergedItems);
+          if (merged.patched > 0) {
+            next = merged.next;
+            commentsTouched = true;
+          }
+        }
+        let profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
+        let cacheTouched = false;
+        const broadcasterCtx = {
+          broadcasterUid: broadcasterUidCache,
+          broadcasterIconUrl: broadcasterIconUrlCache
+        };
+        for (const it of mergedItems) {
+          if (upsertUserCommentProfileFromIntercept(profileMap, { uid: it.uid, name: it.name, av: it.av }, broadcasterCtx)) {
+            cacheTouched = true;
+          }
+        }
+        for (const u of mergedUsers) {
+          if (upsertUserCommentProfileFromIntercept(profileMap, u, broadcasterCtx)) {
+            cacheTouched = true;
+          }
+        }
+        const applied = applyUserCommentProfileMapToEntries(next, profileMap);
+        if (applied.patched > 0) {
+          next = applied.next;
           commentsTouched = true;
         }
-      }
-      let profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
-      let cacheTouched = false;
-      const broadcasterCtx = {
-        broadcasterUid: broadcasterUidCache,
-        broadcasterIconUrl: broadcasterIconUrlCache
-      };
-      for (const it of mergedItems) {
-        if (upsertUserCommentProfileFromIntercept(profileMap, { uid: it.uid, name: it.name, av: it.av }, broadcasterCtx)) {
+        const pruned = pruneUserCommentProfileMap(profileMap);
+        if (Object.keys(pruned).length !== Object.keys(profileMap).length) {
+          profileMap = pruned;
           cacheTouched = true;
         }
+        if (!commentsTouched && !cacheTouched) return;
+        const saveBag = {};
+        if (commentsTouched) saveBag[key] = next;
+        if (cacheTouched) saveBag[KEY_USER_COMMENT_PROFILE_CACHE] = profileMap;
+        await chrome.storage.local.set(saveBag);
+      } finally {
+        scheduleGiftNickUpgradeFromInterceptDebounced();
       }
-      for (const u of mergedUsers) {
-        if (upsertUserCommentProfileFromIntercept(profileMap, u, broadcasterCtx)) {
-          cacheTouched = true;
-        }
-      }
-      const applied = applyUserCommentProfileMapToEntries(next, profileMap);
-      if (applied.patched > 0) {
-        next = applied.next;
-        commentsTouched = true;
-      }
-      const pruned = pruneUserCommentProfileMap(profileMap);
-      if (Object.keys(pruned).length !== Object.keys(profileMap).length) {
-        profileMap = pruned;
-        cacheTouched = true;
-      }
-      if (!commentsTouched && !cacheTouched) return;
-      const saveBag = {};
-      if (commentsTouched) saveBag[key] = next;
-      if (cacheTouched) saveBag[KEY_USER_COMMENT_PROFILE_CACHE] = profileMap;
-      await chrome.storage.local.set(saveBag);
     });
     persistCommentRowsChain = job.catch((err) => reportSilentErrorToStorage("interceptReconcile", err));
     await job;
@@ -4586,6 +4813,7 @@
       if (u && n) interceptedNicknames.set(u, n);
     }
     await persistCommentRows(merged, { source: COMMENT_INGEST_SOURCE.NDGR });
+    scheduleGiftNickUpgradeFromInterceptDebounced();
   }
   function schedulePersistNdgrChatRows(rows) {
     if (!Array.isArray(rows) || !rows.length) return;
@@ -4639,25 +4867,25 @@
       );
     }
     if (!applied.length) return;
-    for (const v of applied) {
-      const uid = String(v.userId || "").trim();
-      if (!uid) continue;
-      const nick = String(v.nickname || "").trim();
-      const iconRaw = String(v.iconUrl || "").trim();
-      const icon = isHttpAvatarUrl(iconRaw) ? iconRaw : "";
-      if (nick) interceptedNicknames.set(uid, nick);
-      if (icon && isAvatarSafeToAssociate(uid, icon)) interceptedAvatars.set(uid, icon);
-      activeUserTimestamps.set(uid, seenNow);
-    }
-    if (activeUserTimestamps.size > ACTIVE_USER_MAP_MAX) {
-      const excess = activeUserTimestamps.size - ACTIVE_USER_MAP_MAX;
-      const iter = activeUserTimestamps.keys();
-      for (let i = 0; i < excess; i++) {
-        const key = iter.next().value;
-        if (key != null) activeUserTimestamps.delete(key);
-      }
-    }
     try {
+      for (const v of applied) {
+        const uid = String(v.userId || "").trim();
+        if (!uid) continue;
+        const nick = String(v.nickname || "").trim();
+        const iconRaw = String(v.iconUrl || "").trim();
+        const icon = isHttpAvatarUrl(iconRaw) ? iconRaw : "";
+        if (nick) interceptedNicknames.set(uid, nick);
+        if (icon && isAvatarSafeToAssociate(uid, icon)) interceptedAvatars.set(uid, icon);
+        activeUserTimestamps.set(uid, seenNow);
+      }
+      if (activeUserTimestamps.size > ACTIVE_USER_MAP_MAX) {
+        const excess = activeUserTimestamps.size - ACTIVE_USER_MAP_MAX;
+        const iter = activeUserTimestamps.keys();
+        for (let i = 0; i < excess; i++) {
+          const key = iter.next().value;
+          if (key != null) activeUserTimestamps.delete(key);
+        }
+      }
       const bag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
       const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
       let cacheTouched = false;
@@ -4689,6 +4917,8 @@
         });
       } catch {
       }
+    } finally {
+      scheduleGiftNickUpgradeFromInterceptDebounced();
     }
   }
   var broadcasterUidCache = "";
@@ -4708,6 +4938,9 @@
   function resetOfficialStatsState() {
     officialViewerCount = null;
     officialCommentCount = null;
+    officialGiftPoints = null;
+    officialAdPoints = null;
+    officialGiftAdStatsUpdatedAt = 0;
     officialCommentStatsUpdatedAt = 0;
     officialStatsUpdatedAt = 0;
     officialViewerIntervalMs = null;
@@ -4776,10 +5009,29 @@
       officialCommentStatsUpdatedAt = at;
       touched = true;
     }
+    if (typeof stats?.giftPoints === "number" && Number.isFinite(stats.giftPoints) && stats.giftPoints >= 0) {
+      officialGiftPoints = stats.giftPoints;
+      officialGiftAdStatsUpdatedAt = at;
+      touched = true;
+    }
+    if (typeof stats?.adPoints === "number" && Number.isFinite(stats.adPoints) && stats.adPoints >= 0) {
+      officialAdPoints = stats.adPoints;
+      officialGiftAdStatsUpdatedAt = at;
+      touched = true;
+    }
     if (touched) noteOfficialCommentSample(at);
   }
+  function isTrustedPageInterceptMessageEvent(e) {
+    if (e.source === window) return true;
+    if (!e.data || typeof e.data.type !== "string") return false;
+    if (typeof e.origin !== "string" || e.origin !== window.location.origin) return false;
+    const t = e.data.type;
+    if (t.startsWith("NLS_INTERCEPT_")) return true;
+    if (t === "NLS_SPA_NAVIGATION") return true;
+    return false;
+  }
   window.addEventListener("message", (e) => {
-    if (e.source !== window) return;
+    if (!isTrustedPageInterceptMessageEvent(e)) return;
     if (!e.data || typeof e.data.type !== "string") return;
     if (e.data.type === "NLS_INTERCEPT_SCHEDULE") {
       const b = e.data.begin;
@@ -4800,9 +5052,13 @@
       if (typeof c === "number" && Number.isFinite(c) && c >= 0) {
         wsCommentCount = c;
       }
+      const gp = e.data.giftPoints;
+      const ap = e.data.adPoints;
       updateOfficialStatistics({
         ...typeof v === "number" && Number.isFinite(v) && v >= 0 ? { viewers: v } : {},
         ...typeof c === "number" && Number.isFinite(c) && c >= 0 ? { comments: c } : {},
+        ...typeof gp === "number" && Number.isFinite(gp) && gp >= 0 ? { giftPoints: gp } : {},
+        ...typeof ap === "number" && Number.isFinite(ap) && ap >= 0 ? { adPoints: ap } : {},
         observedAt: now
       });
       return;
@@ -4840,7 +5096,11 @@
         const key = giftUsersStorageKey(liveId);
         chrome.storage.local.get(key).then((bag) => {
           const existing = Array.isArray(bag[key]) ? bag[key] : [];
-          const { next, storageTouched } = mergeGiftUsers(existing, raw);
+          const enriched = enrichIncomingGiftThrowUsersWithInterceptNicknames(
+            raw,
+            (uid) => String(interceptedNicknames.get(String(uid || "").trim()) || "").trim()
+          );
+          const { next, storageTouched } = mergeGiftUserThrowEvents(existing, enriched);
           if (storageTouched) {
             chrome.storage.local.set({ [key]: next }).catch((err) => {
               if (!isContextInvalidatedError2(err) && hasExtensionContext()) {
@@ -6931,6 +7191,48 @@
       return { ok: false, error: message };
     }
   }
+  async function openCommentPanelAssetPickerFromContentAsync() {
+    if (!canPostCommentInThisFrame()) {
+      return { ok: false, error: "\u30B3\u30E1\u30F3\u30C8\u6B04\u306E\u3042\u308Bwatch\u30D5\u30EC\u30FC\u30E0\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002" };
+    }
+    const editor = await pollUntil(findCommentEditorElement, {
+      timeoutMs: SUBMIT_TIMING.editorPollTimeoutMs,
+      intervalMs: SUBMIT_TIMING.editorPollIntervalMs
+    });
+    if (!editor) {
+      return {
+        ok: false,
+        error: "\u30B3\u30E1\u30F3\u30C8\u5165\u529B\u6B04\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002\u30DA\u30FC\u30B8\u306E\u518D\u8AAD\u307F\u8FBC\u307F\u76F4\u5F8C\u306F\u6570\u79D2\u5F85\u3063\u3066\u304B\u3089\u518D\u5EA6\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002"
+      };
+    }
+    const scope = resolveCommentPanelAssetSearchScope(
+      editor instanceof HTMLElement ? editor : null
+    );
+    const launcher = findCommentPanelAssetLauncherButton(
+      scope,
+      editor instanceof HTMLElement ? editor : null
+    );
+    if (!launcher) {
+      return {
+        ok: false,
+        error: "\u30AE\u30D5\u30C8\u30FB\u30A2\u30A4\u30C6\u30E0\u3092\u958B\u304F\u30DC\u30BF\u30F3\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3067\u3057\u305F\u3002watch\u3092\u524D\u9762\u306B\u51FA\u3057\u3001\u30B3\u30E1\u30F3\u30C8\u6B04\u304C\u8868\u793A\u3055\u308C\u3066\u3044\u308B\u304B\u78BA\u8A8D\u306E\u3046\u3048\u518D\u8AAD\u307F\u8FBC\u307F\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+      };
+    }
+    try {
+      if (launcher instanceof HTMLElement) {
+        launcher.focus({ preventScroll: true });
+      }
+      launcher.click();
+      await new Promise((r) => setTimeout(r, SUBMIT_TIMING.reactSettleMs));
+      return { ok: true };
+    } catch (err) {
+      const message = err && typeof err === "object" && "message" in err ? String(
+        /** @type {{ message?: unknown }} */
+        err.message || "click_failed"
+      ) : "click_failed";
+      return { ok: false, error: message };
+    }
+  }
   function resolveCommentEditorFromTarget(node) {
     if (!(node instanceof Element)) return null;
     const direct = node.closest(
@@ -7406,7 +7708,10 @@
         officialStatsUpdatedAt,
         officialCommentStatsUpdatedAt,
         officialViewerIntervalMs,
-        officialCommentSummary
+        officialCommentSummary,
+        officialGiftPoints,
+        officialAdPoints,
+        officialGiftAdStatsUpdatedAt
       }),
       totalComments: wsCommentCount,
       streamAgeMin: (() => {
@@ -7734,6 +8039,25 @@
               /** @type {{ message?: unknown }} */
               err.message || "post_failed"
             ) : "post_failed"
+          })
+        );
+        return true;
+      }
+      if (msg.type === "NLS_OPEN_COMMENT_ASSET_PICKER") {
+        if (!canPostCommentInThisFrame()) {
+          sendResponse({
+            ok: false,
+            error: "\u3053\u306E\u30D5\u30EC\u30FC\u30E0\u306B\u306F\u30B3\u30E1\u30F3\u30C8\u6B04\u304C\u3042\u308A\u307E\u305B\u3093\u3002"
+          });
+          return true;
+        }
+        void openCommentPanelAssetPickerFromContentAsync().then((result) => sendResponse(result)).catch(
+          (err) => sendResponse({
+            ok: false,
+            error: err && typeof err === "object" && "message" in err ? String(
+              /** @type {{ message?: unknown }} */
+              err.message || "asset_picker_failed"
+            ) : "asset_picker_failed"
           })
         );
         return true;

@@ -78,15 +78,38 @@ describe('extractStatisticsFromParsedObject', () => {
     ).toBeNull();
   });
 
+  it('viewers が無くても gift_points / ad_points があれば抽出', () => {
+    expect(
+      extractStatisticsFromParsedObject({
+        type: 'statistics',
+        data: { gift_points: 2045, ad_points: 19900 }
+      })
+    ).toEqual({ giftPoints: 2045, adPoints: 19900 });
+  });
+
+  it('viewers と gift_points を同時に返す', () => {
+    const obj = {
+      type: 'statistics',
+      data: { watchCount: 100, giftPoints: 50, ad_points: 10 }
+    };
+    expect(extractStatisticsFromParsedObject(obj)).toEqual({
+      viewers: 100,
+      comments: null,
+      giftPoints: 50,
+      adPoints: 10
+    });
+  });
+
   it('viewers が文字列数値でも parseInt して取得', () => {
     const obj = { type: 'statistics', data: { viewers: '1234', comments: '56' } };
     const r = extractStatisticsFromParsedObject(obj);
     expect(r).toEqual({ viewers: 1234, comments: 56 });
   });
 
-  it('viewers が負数は null', () => {
-    const obj = { type: 'statistics', data: { viewers: -1, comments: 0 } };
-    expect(extractStatisticsFromParsedObject(obj)).toBeNull();
+  it('viewers が負数のときは無効（他フィールドも無ければ null）', () => {
+    expect(
+      extractStatisticsFromParsedObject({ type: 'statistics', data: { viewers: -1 } })
+    ).toBeNull();
   });
 
   it('非オブジェクト入力は null', () => {

@@ -46,7 +46,11 @@ describe('buildWatchSnapshotOfficialFields', () => {
       officialStatisticsCommentsDelta: null,
       officialReceivedCommentsDelta: null,
       officialCommentSampleWindowMs: null,
-      officialCaptureRatio: null
+      officialCaptureRatio: null,
+      officialGiftPoints: null,
+      officialAdPoints: null,
+      officialGiftAdStatsUpdatedAt: null,
+      officialGiftAdStatsFreshnessMs: null
     });
   });
 

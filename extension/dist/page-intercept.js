@@ -125,6 +125,48 @@
     return out;
   }
 
+  // src/lib/nicoAnonymousDisplay.js
+  function isNiconicoAnonymousUserId(userId) {
+    const s = String(userId ?? "").trim();
+    if (!s.startsWith("a:")) return false;
+    const rest = s.slice(2).trim();
+    return rest.length >= 2;
+  }
+  function isNiconicoAutoUserPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return /^user\s+[A-Za-z0-9]+$/i.test(n);
+  }
+  function isNiconicoGuestPlaceholderNickname(nickname) {
+    const n = String(nickname ?? "").trim();
+    return n === "\u30B2\u30B9\u30C8";
+  }
+  function anonymousNicknameFallback(userId, nickname) {
+    const nick = String(nickname ?? "").trim();
+    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
+    if (nick && !isPlaceholder) return nick;
+    return isNiconicoAnonymousUserId(userId) ? "\u533F\u540D" : "";
+  }
+
+  // src/lib/supportGrowthTileSrc.js
+  function niconicoDefaultUserIconUrl(userId) {
+    const s = String(userId || "").trim();
+    if (!/^\d{5,14}$/.test(s)) return "";
+    const n = Number(s);
+    if (!Number.isFinite(n) || n < 1) return "";
+    const bucket = Math.max(1, Math.floor(n / 1e4));
+    return `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${bucket}/${s}.jpg`;
+  }
+
+  // src/lib/giftDisplayNickname.js
+  function isLikelyInternalNdgGiftOrCampaignLabel(s) {
+    const t = String(s || "").trim();
+    if (!t) return false;
+    if (/^nicolive_/i.test(t)) return true;
+    const hasNonAscii = [...t].some((ch) => (ch.codePointAt(0) ?? 0) > 127);
+    if (/^[a-z][a-z0-9_]{22,}$/i.test(t) && !hasNonAscii) return true;
+    return false;
+  }
+
   // src/lib/ndgrDecode.js
   function pbVarint(buf, off) {
     let v = 0, s = 0;
@@ -222,29 +264,111 @@
     });
     return { no, rawUserId, hashedUserId, name, content, vpos, accountStatus, is184 };
   }
+  var NDGR_GIFT_NEST_MAX = 6;
+  var NDGR_GIFT_LEN_SCAN_MAX = 12e3;
+  function peekGiftField5UserId(buf, start, end) {
+    let uidVar = null;
+    let uidStr = "";
+    pbForEach(buf, start, end, (fn, wt, val, s, e) => {
+      if (fn !== 5) return;
+      if (wt === 0 && val != null) uidVar = val;
+      if (wt === 2) {
+        const t = decodeStr(buf, s, e).trim();
+        if (/^\d{5,14}$/.test(t)) uidStr = t;
+      }
+    });
+    if (uidVar != null) {
+      const n = Number(uidVar);
+      if (Number.isFinite(n) && n >= 1e4) return Math.trunc(n);
+    }
+    if (uidStr) {
+      const n = Number(uidStr);
+      if (Number.isFinite(n) && n >= 1e4) return Math.trunc(n);
+    }
+    return null;
+  }
+  function collectNestedGiftSenders(buf, start, end, depth, out) {
+    if (depth > NDGR_GIFT_NEST_MAX) return;
+    const span = end - start;
+    if (span < 8 || span > NDGR_GIFT_LEN_SCAN_MAX) return;
+    const rid = peekGiftField5UserId(buf, start, end);
+    if (rid != null) {
+      const ch = decodeChat(buf, start, end);
+      const nestedName = String(ch.name || "").trim();
+      out.push({
+        fieldNum: 400 + depth,
+        val: String(rid),
+        kind: "nestedChatRaw",
+        _nestDepth: depth,
+        ...nestedName ? { _nestedName: nestedName } : {}
+      });
+    }
+    pbForEach(buf, start, end, (fn, wt, val, s, e) => {
+      if (wt !== 2) return;
+      collectNestedGiftSenders(buf, s, e, depth + 1, out);
+    });
+  }
+  function selectGiftUidWinner(candidates) {
+    const list = Array.isArray(candidates) ? candidates : [];
+    const good = list.filter((c) => c && /^\d{5,14}$/.test(String(c.val || "").trim()));
+    if (!good.length) return null;
+    const rank = (c) => {
+      if (c.kind === "nestedChatRaw") return -1;
+      const fn = Math.max(0, Math.floor(Number(c.fieldNum) || 0));
+      const isVar = c.kind === "varint";
+      if (fn === 5 && isVar) return 0;
+      if (fn === 3 && isVar) return 1;
+      if (fn === 1 && isVar) return 2;
+      if (fn === 1 && c.kind === "str") return 3;
+      return 100 + fn * 2 + (isVar ? 0 : 1);
+    };
+    good.sort((a, b) => {
+      let d = rank(a) - rank(b);
+      if (d !== 0) return d;
+      if (a.kind === "nestedChatRaw" && b.kind === "nestedChatRaw") {
+        d = (Number(b._nestDepth) || 0) - (Number(a._nestDepth) || 0);
+        if (d !== 0) return d;
+      }
+      return a.fieldNum - b.fieldNum;
+    });
+    return good[0] || null;
+  }
   function decodeGift(buf, start, end) {
-    let advertiserUserId = "";
     let advertiserName = "";
     const strs = [];
+    const uidCandidates = [];
     pbForEach(buf, start, end, (fn, wt, val, s, e) => {
       if (wt === 2) {
         const str = decodeStr(buf, s, e);
         if (str) strs.push(str);
-        if (fn === 2 && str) advertiserName = advertiserName || str;
+        if (fn === 2 && str && !isLikelyInternalNdgGiftOrCampaignLabel(str)) {
+          advertiserName = advertiserName || str;
+        }
         if (fn === 1 && str && /^\d{5,14}$/.test(str)) {
-          advertiserUserId = advertiserUserId || str;
+          uidCandidates.push({ fieldNum: 1, val: str.trim(), kind: "str" });
         }
       } else if (wt === 0 && val != null) {
         const vs = String(val);
-        if (/^\d{5,14}$/.test(vs)) advertiserUserId = advertiserUserId || vs;
+        if (/^\d{5,14}$/.test(vs)) {
+          uidCandidates.push({ fieldNum: fn, val: vs, kind: "varint" });
+        }
       }
     });
     for (const str of strs) {
-      if (!advertiserUserId && /^\d{5,14}$/.test(str)) advertiserUserId = str;
+      if (!/^\d{5,14}$/.test(str)) continue;
+      const t = str.trim();
+      if (uidCandidates.some((c) => c.val === t)) continue;
+      uidCandidates.push({ fieldNum: 0, val: t, kind: "str" });
+    }
+    collectNestedGiftSenders(buf, start, end, 0, uidCandidates);
+    const winner = selectGiftUidWinner(uidCandidates);
+    const advertiserUserId = winner ? String(winner.val).trim() : "";
+    if (winner?.kind === "nestedChatRaw" && winner._nestedName && !isLikelyInternalNdgGiftOrCampaignLabel(winner._nestedName)) {
+      advertiserName = winner._nestedName;
     }
     if (!advertiserName) {
       for (const str of strs) {
-        if (str !== advertiserUserId && str.length > 0 && str.length <= 128 && !/^https?:\/\//i.test(str)) {
+        if (str !== advertiserUserId && !isLikelyInternalNdgGiftOrCampaignLabel(str) && str.length > 0 && str.length <= 128 && !/^https?:\/\//i.test(str)) {
           advertiserName = str;
           break;
         }
@@ -292,38 +416,6 @@
       }
     });
     return results;
-  }
-
-  // src/lib/supportGrowthTileSrc.js
-  function niconicoDefaultUserIconUrl(userId) {
-    const s = String(userId || "").trim();
-    if (!/^\d{5,14}$/.test(s)) return "";
-    const n = Number(s);
-    if (!Number.isFinite(n) || n < 1) return "";
-    const bucket = Math.max(1, Math.floor(n / 1e4));
-    return `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${bucket}/${s}.jpg`;
-  }
-
-  // src/lib/nicoAnonymousDisplay.js
-  function isNiconicoAnonymousUserId(userId) {
-    const s = String(userId ?? "").trim();
-    if (!s.startsWith("a:")) return false;
-    const rest = s.slice(2).trim();
-    return rest.length >= 2;
-  }
-  function isNiconicoAutoUserPlaceholderNickname(nickname) {
-    const n = String(nickname ?? "").trim();
-    return /^user\s+[A-Za-z0-9]+$/i.test(n);
-  }
-  function isNiconicoGuestPlaceholderNickname(nickname) {
-    const n = String(nickname ?? "").trim();
-    return n === "\u30B2\u30B9\u30C8";
-  }
-  function anonymousNicknameFallback(userId, nickname) {
-    const nick = String(nickname ?? "").trim();
-    const isPlaceholder = isNiconicoGuestPlaceholderNickname(nick) || isNiconicoAutoUserPlaceholderNickname(nick);
-    if (nick && !isPlaceholder) return nick;
-    return isNiconicoAnonymousUserId(userId) ? "\u533F\u540D" : "";
   }
 
   // src/lib/commentRecord.js
@@ -771,6 +863,73 @@
     return [...m.values()];
   }
 
+  // src/lib/wsStatisticsExtract.js
+  var MAX_VIEWERS = 5e7;
+  var MAX_GIFT_AD_POINTS = 2e9;
+  var VIEWER_KEYS = ["viewers", "watchCount", "watching", "watchingCount", "viewerCount", "viewCount"];
+  var COMMENT_KEYS = ["comments", "commentCount"];
+  var GIFT_POINT_KEYS = [
+    "giftPoints",
+    "gift_points",
+    "programGiftPoints",
+    "totalGiftPoints",
+    "giftPointTotal"
+  ];
+  var AD_POINT_KEYS = ["adPoints", "ad_points", "henPoints", "supportPoints", "koukokuPoints"];
+  function pickViewerValue(d) {
+    for (const k of VIEWER_KEYS) {
+      const raw = d[k];
+      if (raw == null) continue;
+      const n = typeof raw === "number" ? raw : parseInt(String(raw), 10);
+      if (Number.isFinite(n) && n >= 0 && n <= MAX_VIEWERS) return n;
+    }
+    return null;
+  }
+  function pickCommentValue(d) {
+    for (const k of COMMENT_KEYS) {
+      const raw = d[k];
+      if (raw == null) continue;
+      const n = typeof raw === "number" ? raw : parseInt(String(raw), 10);
+      if (Number.isFinite(n) && n >= 0) return n;
+    }
+    return null;
+  }
+  function pickNonNegativeIntFromKeys(d, keys) {
+    for (const k of keys) {
+      const raw = d[k];
+      if (raw == null) continue;
+      const n = typeof raw === "number" ? raw : parseInt(String(raw), 10);
+      if (Number.isFinite(n) && n >= 0 && n <= MAX_GIFT_AD_POINTS) return n;
+    }
+    return null;
+  }
+  function extractStatisticsFromParsedObject(obj) {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+    const o = (
+      /** @type {Record<string, unknown>} */
+      obj
+    );
+    const data = o.data;
+    const target = data && typeof data === "object" && !Array.isArray(data) ? (
+      /** @type {Record<string, unknown>} */
+      data
+    ) : o;
+    const viewers = pickViewerValue(target) ?? (target !== o ? pickViewerValue(o) : null);
+    const comments = pickCommentValue(target) ?? (target !== o ? pickCommentValue(o) : null);
+    const giftPoints = pickNonNegativeIntFromKeys(target, GIFT_POINT_KEYS) ?? (target !== o ? pickNonNegativeIntFromKeys(o, GIFT_POINT_KEYS) : null);
+    const adPoints = pickNonNegativeIntFromKeys(target, AD_POINT_KEYS) ?? (target !== o ? pickNonNegativeIntFromKeys(o, AD_POINT_KEYS) : null);
+    if (viewers == null && comments == null && giftPoints == null && adPoints == null) {
+      return null;
+    }
+    const out = {};
+    if (viewers != null) out.viewers = viewers;
+    if (comments != null) out.comments = comments;
+    else if (viewers != null) out.comments = null;
+    if (giftPoints != null) out.giftPoints = giftPoints;
+    if (adPoints != null) out.adPoints = adPoints;
+    return out;
+  }
+
   // src/extension/page-intercept-entry.js
   (() => {
     "use strict";
@@ -805,6 +964,16 @@
     const MSG_CHAT_ROWS = "NLS_INTERCEPT_CHAT_ROWS";
     const MSG_GIFT_USERS = "NLS_INTERCEPT_GIFT_USERS";
     const MSG_VIEWER_JOIN = "NLS_INTERCEPT_VIEWER_JOIN";
+    function postInterceptBridge(payload) {
+      try {
+        if (window.top && window.self !== window.top) {
+          window.top.postMessage(payload, "*");
+          return;
+        }
+      } catch {
+      }
+      window.postMessage(payload, "*");
+    }
     let ndgrChatRowsBatch = [];
     let ndgrChatRowsTimer = null;
     const NDGR_CHAT_ROWS_BATCH_MS = 80;
@@ -818,7 +987,7 @@
         if (i >= all.length) return;
         const payload = all.slice(i, i + NDGR_CHAT_ROWS_POST_CHUNK);
         i += payload.length;
-        window.postMessage({ type: MSG_CHAT_ROWS, rows: payload }, "*");
+        postInterceptBridge({ type: MSG_CHAT_ROWS, rows: payload });
         if (i < all.length) schedule(pump);
       };
       pump();
@@ -896,10 +1065,7 @@
           out.push(row);
         }
         if (out.length) {
-          window.postMessage(
-            { type: MSG_VIEWER_JOIN, viewers: out, priority: "fast" },
-            "*"
-          );
+          postInterceptBridge({ type: MSG_VIEWER_JOIN, viewers: out, priority: "fast" });
         }
       } catch {
       }
@@ -934,7 +1100,7 @@
       if (!entries.length && !users.length) return;
       diag.posted += entries.length;
       publishDiag();
-      window.postMessage({ type: MSG_TYPE, entries, users }, "*");
+      postInterceptBridge({ type: MSG_TYPE, entries, users });
     }
     function normalizeAvatarUrl(url) {
       const s = String(url ?? "").trim();
@@ -1033,9 +1199,17 @@
     }
     function handleNdgrResult(result) {
       if (!result) return;
-      if (result.stats && result.stats.viewers != null) {
-        _ndgr.stats++;
-        window.postMessage({ type: MSG_STATISTICS, viewers: result.stats.viewers, comments: result.stats.comments }, "*");
+      const st = result.stats;
+      if (st) {
+        const payload = { type: MSG_STATISTICS };
+        if (st.viewers != null) payload.viewers = st.viewers;
+        if (st.comments != null) payload.comments = st.comments;
+        if (st.giftPoints != null) payload.giftPoints = st.giftPoints;
+        if (st.adPoints != null) payload.adPoints = st.adPoints;
+        if ("viewers" in payload || "comments" in payload || "giftPoints" in payload || "adPoints" in payload) {
+          _ndgr.stats++;
+          postInterceptBridge(payload);
+        }
       }
       for (const chat of result.chats) {
         const uid = chat.rawUserId ? String(chat.rawUserId) : chat.hashedUserId;
@@ -1061,7 +1235,7 @@
         }
       }
       if (giftUsers.length) {
-        window.postMessage({ type: MSG_GIFT_USERS, users: giftUsers }, "*");
+        postInterceptBridge({ type: MSG_GIFT_USERS, users: giftUsers });
       }
       scheduleNdgrChatRowsPost(ndgrChatsToMergeRows(result.chats));
     }
@@ -1117,39 +1291,18 @@
         );
       }
     }
-    const VIEWER_KEYS = ["viewers", "watchCount", "watching", "watchingCount", "viewerCount", "viewCount"];
-    const COMMENT_KEYS = ["comments", "commentCount"];
-    function pickNum(obj, keys, max) {
-      for (const k of keys) {
-        const r = obj[k];
-        if (r == null) continue;
-        const n = typeof r === "number" ? r : parseInt(String(r), 10);
-        if (Number.isFinite(n) && n >= 0 && (!max || n <= max)) return n;
-      }
-      return null;
-    }
     function tryForwardStatistics(obj) {
-      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false;
-      const o = (
-        /** @type {Record<string, unknown>} */
-        obj
-      );
-      const d = o.data;
-      const target = d && typeof d === "object" && !Array.isArray(d) ? (
-        /** @type {Record<string, unknown>} */
-        d
-      ) : o;
-      let viewers = pickNum(target, VIEWER_KEYS, 5e7);
-      let comments = pickNum(target, COMMENT_KEYS);
-      if (viewers == null && target !== o) {
-        viewers = pickNum(o, VIEWER_KEYS, 5e7);
-        comments = comments ?? pickNum(o, COMMENT_KEYS);
+      const ext = extractStatisticsFromParsedObject(obj);
+      if (!ext) return false;
+      const payload = { type: MSG_STATISTICS };
+      if (typeof ext.viewers === "number") payload.viewers = ext.viewers;
+      if (typeof ext.comments === "number") payload.comments = ext.comments;
+      if (typeof ext.giftPoints === "number") payload.giftPoints = ext.giftPoints;
+      if (typeof ext.adPoints === "number") payload.adPoints = ext.adPoints;
+      if (!("viewers" in payload) && !("comments" in payload) && !("giftPoints" in payload) && !("adPoints" in payload)) {
+        return false;
       }
-      if (viewers == null) return false;
-      window.postMessage(
-        { type: MSG_STATISTICS, viewers, comments },
-        "*"
-      );
+      postInterceptBridge(payload);
       return true;
     }
     function maybeRecordInterceptVisitorProbe(parsed) {
@@ -1176,7 +1329,7 @@
       const begin = dd.begin || dd.beginAt || dd.openTime;
       if (typeof begin === "string" && begin.length >= 10) {
         _scheduleSent = true;
-        window.postMessage({ type: MSG_SCHEDULE, begin }, "*");
+        postInterceptBridge({ type: MSG_SCHEDULE, begin });
       }
     }
     function tryProcess(raw) {
@@ -1250,11 +1403,11 @@
             if (method === "POST" && /api\/(v\d+\/)?comment/.test(url) && res.ok) {
               try {
                 const cj = await res.clone().json();
-                window.postMessage({
+                postInterceptBridge({
                   type: "NLS_INTERCEPT_COMMENT_POST",
                   status: res.status,
                   body: cj
-                }, "*");
+                });
               } catch {
               }
             }
@@ -1668,7 +1821,7 @@
         if (!obj || typeof obj !== "object") return;
         const wc = obj?.program?.statistics?.watchCount;
         const viewers = wc != null && Number.isFinite(Number(wc)) && Number(wc) >= 0 ? Number(wc) : null;
-        window.postMessage({ type: MSG_EMBEDDED_DATA, viewers }, "*");
+        postInterceptBridge({ type: MSG_EMBEDDED_DATA, viewers });
       } catch {
       }
     }
@@ -1693,14 +1846,14 @@
           if (wc?.[1]) {
             const n = parseInt(wc[1], 10);
             if (Number.isFinite(n) && n >= 0) {
-              window.postMessage({ type: MSG_STATISTICS, viewers: n }, "*");
+              postInterceptBridge({ type: MSG_STATISTICS, viewers: n });
             }
           }
           const cc = html.match(/"commentCount"\s*:\s*(\d+)/) || html.match(/"comments"\s*:\s*(\d+)/);
           if (cc?.[1]) {
             const cn = parseInt(cc[1], 10);
             if (Number.isFinite(cn) && cn >= 0) {
-              window.postMessage({ type: MSG_STATISTICS, viewers: null, comments: cn }, "*");
+              postInterceptBridge({ type: MSG_STATISTICS, viewers: null, comments: cn });
             }
           }
         }).catch(() => {
@@ -1782,7 +1935,7 @@
         const cur = String(window.location.href || "");
         if (cur === prev) return;
         lastNotifiedHref = cur;
-        window.postMessage({ type: "NLS_SPA_NAVIGATION", url: cur, prevUrl: prev }, "*");
+        postInterceptBridge({ type: "NLS_SPA_NAVIGATION", url: cur, prevUrl: prev });
       };
       const origPushState = history.pushState;
       const origReplaceState = history.replaceState;

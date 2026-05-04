@@ -5,6 +5,7 @@ import {
   decodeStatistics,
   decodeChat,
   decodeGift,
+  pickNdgrGiftAdvertiserUserId,
   decodeChunkedMessage,
   decodePackedSegment
 } from './ndgrDecode.js';
@@ -223,6 +224,44 @@ describe('decodeChat', () => {
   });
 });
 
+describe('pickNdgrGiftAdvertiserUserId', () => {
+  it('field 5 varint を field 1 より優先', () => {
+    expect(
+      pickNdgrGiftAdvertiserUserId([
+        { fieldNum: 1, val: '4046119', kind: 'varint' },
+        { fieldNum: 5, val: '87654321', kind: 'varint' }
+      ])
+    ).toBe('87654321');
+  });
+
+  it('field 3 varint を field 1 より優先', () => {
+    expect(
+      pickNdgrGiftAdvertiserUserId([
+        { fieldNum: 1, val: '4046119', kind: 'varint' },
+        { fieldNum: 3, val: '87654321', kind: 'varint' }
+      ])
+    ).toBe('87654321');
+  });
+
+  it('nestedChatRaw は field 5 より優先', () => {
+    expect(
+      pickNdgrGiftAdvertiserUserId([
+        { fieldNum: 5, val: '11111111', kind: 'varint' },
+        { fieldNum: 7, val: '87654321', kind: 'nestedChatRaw' }
+      ])
+    ).toBe('87654321');
+  });
+
+  it('nestedChatRaw 同士は深い _nestDepth を優先', () => {
+    expect(
+      pickNdgrGiftAdvertiserUserId([
+        { fieldNum: 1, val: '11111111', kind: 'nestedChatRaw', _nestDepth: 0 },
+        { fieldNum: 2, val: '87654321', kind: 'nestedChatRaw', _nestDepth: 2 }
+      ])
+    ).toBe('87654321');
+  });
+});
+
 describe('decodeGift', () => {
   it('pulls advertiser id and name from len/varint fields', () => {
     const buf = new Uint8Array([
@@ -232,6 +271,80 @@ describe('decodeGift', () => {
     const g = decodeGift(buf, 0, buf.length);
     expect(g.advertiserUserId).toBe('87654321');
     expect(g.advertiserName).toBe('senderNick');
+  });
+
+  it('field 1 の誤検出 ID より field 3 の送り主 ID を採用（誤結合回帰）', () => {
+    const buf = new Uint8Array([
+      ...varintField(1, 4046119),
+      ...strField(2, 'kusa'),
+      ...varintField(3, 87654321)
+    ]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.advertiserUserId).toBe('87654321');
+    expect(g.advertiserName).toBe('kusa');
+  });
+
+  it('field 5 があれば field 3 より優先（Chat raw_user_id と整合）', () => {
+    const buf = new Uint8Array([
+      ...strField(2, 'ギフト送り'),
+      ...varintField(3, 11111111),
+      ...varintField(5, 87654321)
+    ]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.advertiserUserId).toBe('87654321');
+    expect(g.advertiserName).toBe('ギフト送り');
+  });
+
+  it('LEN ネスト内の field5 raw_user_id を最優先し、表示名もネストから取る', () => {
+    const nested = new Uint8Array([
+      ...varintField(5, 87654321),
+      ...strField(2, '本物の送り主')
+    ]);
+    const buf = new Uint8Array([
+      ...varintField(1, 4046119),
+      ...strField(2, '表層ラベル'),
+      ...lenDelimited(7, [...nested])
+    ]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.advertiserUserId).toBe('87654321');
+    expect(g.advertiserName).toBe('本物の送り主');
+  });
+
+  it('二段 LEN の奥の field5 も拾う', () => {
+    const core = new Uint8Array([
+      ...varintField(5, 87654321),
+      ...strField(2, '奥の送り主')
+    ]);
+    const mid = new Uint8Array(lenDelimited(11, [...core]));
+    const buf = new Uint8Array([
+      ...varintField(1, 4046119),
+      ...lenDelimited(10, [...mid])
+    ]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.advertiserUserId).toBe('87654321');
+    expect(g.advertiserName).toBe('奥の送り主');
+  });
+
+  it('field5 が数字のみの LEN 文字列でも送り主として採用', () => {
+    const nested = new Uint8Array([
+      ...strField(5, '87654321'),
+      ...strField(2, 'str5nick')
+    ]);
+    const buf = new Uint8Array([...lenDelimited(9, [...nested])]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.advertiserUserId).toBe('87654321');
+    expect(g.advertiserName).toBe('str5nick');
+  });
+
+  it('field 2 が nicolive_ 内部ラベルのときは表示名にせず別の LEN を採用', () => {
+    const buf = new Uint8Array([
+      ...strField(2, 'nicolive_audition_lightgreen'),
+      ...strField(2, 'AIコメントジェネレータテトス'),
+      ...varintField(3, 10170134)
+    ]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.advertiserUserId).toBe('10170134');
+    expect(g.advertiserName).toBe('AIコメントジェネレータテトス');
   });
 });
 
