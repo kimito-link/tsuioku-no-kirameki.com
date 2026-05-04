@@ -10,8 +10,11 @@
  *   しないため大画面では下半分が cream の空白になる現象（~2000px）も。
  *
  *   本関数は dock_bottom の `inlineHostDockSizing` と同じ方向性で、
- *   - 幅: video の **右隣の余白**を厳密に測って収める。足りなければ null を
- *     返して呼出元で below フォールバックさせる。
+ *   - 幅: video の **右隣の余白**を測る。flex で動画カラムと公式コメ列の **あいだ**
+ *     に挟むときは `computeBesideInsertionGapPx` で実ギャップを渡す（viewport 右まで
+ *     しか見ないと幅が過大になり flex 折り返しで動画と重なる）。
+ *     ギャップが minWidth を下回れば null を返して below フォールバック。
+ *     `flexInsertionGapPx` 省略時は従来どおり viewport − video.right（単体テスト互換）。
  *   - 高さ: player + コメ列の bottom（playerRowRect.height）に合わせ、content
  *     の自然高さが分かれば短い方を採用、最終的に viewport*0.72 で safety clamp。
  *
@@ -43,6 +46,7 @@
  * @property {number} minHeight       panel の最小高さ (px)
  * @property {number} maxHeightRatio  viewport.height に対する高さ上限比
  * @property {number} safeRight       viewport 右端と panel 右端の最小余白 (px)
+ * @property {number} besideInnerGap  flex 埋め込み時に次兄弟との間に確保するインナー余白 (px)
  */
 
 /** @type {Readonly<BesidePanelLimits>} */
@@ -50,22 +54,60 @@ export const DEFAULT_BESIDE_PANEL_LIMITS = Object.freeze({
   minWidth: 280,
   minHeight: 240,
   maxHeightRatio: 0.72,
-  safeRight: 12
+  safeRight: 12,
+  /** 動画カラムと次兄弟（公式コメ列など）の間にパネルを挟むときの最低インナー余白 */
+  besideInnerGap: 8
 });
+
+/**
+ * DOM 上で動画カラムの **右端** と、すぐ右の兄弟要素の **左端**（無ければ viewport 右）
+ * までに実際に確保されている横幅を返す。ここを無視すると「viewport にはまだ余白がある」
+ * とみなしてパネル幅が肥大し、flex が折り返して動画と重なる。
+ *
+ * @param {number} insertColumnRight   動画カラム要素の getBoundingClientRect().right
+ * @param {number} viewportInnerWidth
+ * @param {number|null|undefined} nextSiblingLeft  次兄弟の getBoundingClientRect().left（無ければ null）
+ * @param {Partial<BesidePanelLimits>} [overrides]
+ * @returns {number} ギャップ px（負や極小になりうる）
+ */
+export function computeBesideInsertionGapPx(
+  insertColumnRight,
+  viewportInnerWidth,
+  nextSiblingLeft,
+  overrides = {}
+) {
+  const limits = { ...DEFAULT_BESIDE_PANEL_LIMITS, ...overrides };
+  const vw = Math.max(0, Number(viewportInnerWidth) || 0);
+  const colRight = Number(insertColumnRight) || 0;
+  const gapInner = Number(limits.besideInnerGap) || 8;
+
+  let slotRight = vw - limits.safeRight;
+  if (nextSiblingLeft != null && Number.isFinite(Number(nextSiblingLeft))) {
+    slotRight = Math.min(slotRight, Number(nextSiblingLeft) - gapInner);
+  }
+  return slotRight - colRight;
+}
 
 /**
  * @param {{
  *   videoRect: RectLike,
  *   playerRowRect: RectLike | null,
  *   viewport: ViewportLike,
- *   contentNaturalHeight: number | null
+ *   contentNaturalHeight: number | null,
+ *   flexInsertionGapPx?: number | null
  * }} input
  * @param {Partial<BesidePanelLimits>} [overrides]
  * @returns {{ panelWidth: number, panelHeight: number, source: 'player-rect' | 'video-fallback' | 'content-fit' } | null}
  */
 export function calculateBesidePanelLayout(input, overrides = {}) {
   const limits = { ...DEFAULT_BESIDE_PANEL_LIMITS, ...overrides };
-  const { videoRect, playerRowRect, viewport, contentNaturalHeight } = input;
+  const {
+    videoRect,
+    playerRowRect,
+    viewport,
+    contentNaturalHeight,
+    flexInsertionGapPx
+  } = input;
 
   const vw = Math.max(0, Number(viewport.width) || 0);
   const vh = Math.max(0, Number(viewport.height) || 0);
@@ -73,8 +115,21 @@ export function calculateBesidePanelLayout(input, overrides = {}) {
   const videoWidth = Math.max(0, videoRect.width);
   const videoHeight = Math.max(0, videoRect.height);
 
-  // 幅: video の右隣に panel を置く想定で、利用可能幅を計算
-  const availableRight = vw - vRight - limits.safeRight;
+  /*
+   * 幅:
+   *   - flex で「動画カラムの直後」に挟むときは flexInsertionGapPx（実ギャップ）を優先。
+   *   - 無ければ従来どおり viewport 右まで（後方互換・単体テスト）
+   */
+  let availableRight;
+  if (
+    flexInsertionGapPx != null &&
+    Number.isFinite(Number(flexInsertionGapPx))
+  ) {
+    availableRight = Number(flexInsertionGapPx);
+  } else {
+    availableRight = vw - vRight - limits.safeRight;
+  }
+
   if (availableRight < limits.minWidth) {
     // 利用可能幅不足 → 呼出元で below フォールバックさせる
     return null;

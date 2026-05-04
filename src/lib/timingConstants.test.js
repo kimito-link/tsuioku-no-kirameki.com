@@ -21,7 +21,11 @@ describe('INGEST_TIMING', () => {
       'endedHarvestCheckMs',
       'coalescerMinMs',
       'visibleScanDelayMs',
-      'pageFrameLoopMs'
+      'pageFrameLoopMs',
+      'pageFrameLayoutScrollDebounceMs',
+      'hiddenLivePanelScanStride',
+      'aiShareFastDiagHiddenMinIntervalMs',
+      'aiShareFastDiagVisibleMinIntervalMs'
     ];
     for (const key of required) {
       expect(INGEST_TIMING).toHaveProperty(key);

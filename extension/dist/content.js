@@ -84,7 +84,26 @@
   var KEY_INLINE_PANEL_PLACEMENT = "nls_inline_panel_placement";
   var KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED = "nls_inline_panel_float_to_dock_migrated";
   var KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED = "nls_inline_panel_below_to_dock_migrated";
+  var KEY_INSTALL_PANEL_PLACEMENT_PENDING = "nls_install_panel_placement_pending_v1";
   var KEY_INLINE_PANEL_AUTOSHOW_ENABLED = "nls_inline_panel_autoshow_enabled";
+  var KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY = "nls_inline_panel_viewport_wide_v1";
+  var KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE = "nls_inline_panel_viewport_wide_once_done_v1";
+  var INLINE_PANEL_VIEWPORT_WIDE_OFF = "off";
+  var INLINE_PANEL_VIEWPORT_WIDE_ALWAYS = "always";
+  var INLINE_PANEL_VIEWPORT_WIDE_ONCE = "once";
+  function normalizeInlinePanelViewportWidePolicy(raw) {
+    if (raw === void 0 || raw === null) {
+      return INLINE_PANEL_VIEWPORT_WIDE_ONCE;
+    }
+    const s = String(raw).trim().toLowerCase();
+    if (s === "") return INLINE_PANEL_VIEWPORT_WIDE_ONCE;
+    if (s === INLINE_PANEL_VIEWPORT_WIDE_ALWAYS) return INLINE_PANEL_VIEWPORT_WIDE_ALWAYS;
+    if (s === INLINE_PANEL_VIEWPORT_WIDE_ONCE) return INLINE_PANEL_VIEWPORT_WIDE_ONCE;
+    return INLINE_PANEL_VIEWPORT_WIDE_OFF;
+  }
+  function normalizeInlinePanelViewportWideOnceDone(raw) {
+    return raw === true;
+  }
   function normalizeInlinePanelAutoshowEnabled(raw) {
     return raw === true;
   }
@@ -2449,6 +2468,39 @@
     return s;
   }
 
+  // src/lib/inlinePanelViewportWide.js
+  var VIEWPORT_WIDE_POLICY_MAX_PX = 1920;
+  function resolveViewportWidePolicyTargetWidthPx(innerWidth) {
+    const vw = Math.round(Number(innerWidth) || 0);
+    const w = Math.max(320, vw - 24);
+    return Math.min(w, VIEWPORT_WIDE_POLICY_MAX_PX);
+  }
+  function resolveWidenedInlinePanelWidthPx(opts) {
+    const {
+      baselineWidthPx,
+      viewportInnerWidth,
+      placement,
+      policy,
+      onceDone
+    } = opts;
+    const base = Math.max(1, Math.round(Number(baselineWidthPx) || 0));
+    if (placement === INLINE_PANEL_PLACEMENT_FLOATING || placement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
+      return base;
+    }
+    if (policy === INLINE_PANEL_VIEWPORT_WIDE_OFF) return base;
+    if (policy === INLINE_PANEL_VIEWPORT_WIDE_ONCE && onceDone) return base;
+    const relaxed = resolveViewportWidePolicyTargetWidthPx(viewportInnerWidth);
+    return Math.max(base, relaxed);
+  }
+  function shouldConsumeViewportWideOnce(opts) {
+    if (opts.policy !== INLINE_PANEL_VIEWPORT_WIDE_ONCE) return false;
+    if (opts.onceDone) return false;
+    const vis = String(opts.documentVisibilityState || "visible");
+    if (vis !== "visible") return false;
+    const p = String(opts.placement || "");
+    return p === INLINE_PANEL_PLACEMENT_BELOW || p === INLINE_PANEL_PLACEMENT_BESIDE;
+  }
+
   // src/lib/inlineHostAnchorScoring.js
   var DEFAULT_INLINE_HOST_ANCHOR_LIMITS = Object.freeze({
     minWidth: 260,
@@ -2468,6 +2520,41 @@
   });
   var ASPECT_IDEAL = 16 / 9;
   var IDEAL_WIDTH_RATIO = 1.15;
+  function stackedLayoutAnchorOverrides(viewport, videoRect) {
+    const vw = Number(viewport?.width) || 0;
+    const vh = Number(viewport?.height) || 0;
+    const vidW = Number(videoRect?.width) || 0;
+    if (vw < 280 || vh < 280 || vidW < 200) return {};
+    const widthCoverage = vidW / Math.max(vw, 1);
+    const narrowViewport = vw <= 1100;
+    const videoSpansMostWidth = widthCoverage >= 0.72;
+    const veryNarrow = vw <= 560;
+    if ((!narrowViewport || !videoSpansMostWidth) && !veryNarrow) return {};
+    return {
+      maxAreaRatio: 0.84,
+      maxHeightRatioToVideo: 3.25,
+      maxTopOffsetFromVideo: 168,
+      // 縦積みではラッパーが「viewport 幅 ×（動画＋公式コメント列）」で縦長になりやすい。
+      // minAspect=1 のままだと該当ラッパーがすべて不合格になり、アンカーが video に落ちる。
+      minAspect: 0.42
+    };
+  }
+  function pickTightestEligibleAnchorRowIdx(rows, videoRect) {
+    const vw = Math.max(1, Number(videoRect.width) || 0);
+    const vh = Math.max(1, Number(videoRect.height) || 0);
+    if (!rows.length) return -1;
+    const expanded = rows.filter(
+      (r) => Number(r.width) >= vw * 1.06 || Number(r.height) >= vh * 1.08
+    );
+    const pool = expanded.length ? expanded : rows;
+    const sorted = [...pool].sort((a, b) => {
+      const da = Number(a.area) || 0;
+      const db = Number(b.area) || 0;
+      if (da !== db) return da - db;
+      return (Number(b.score) || 0) - (Number(a.score) || 0);
+    });
+    return sorted[0].idx;
+  }
   function scoreInlineHostAnchorCandidate(input, overrides = {}) {
     const limits = { ...DEFAULT_INLINE_HOST_ANCHOR_LIMITS, ...overrides };
     const { rect, viewport, videoRect } = input;
@@ -2554,17 +2641,41 @@
     minWidth: 280,
     minHeight: 240,
     maxHeightRatio: 0.72,
-    safeRight: 12
+    safeRight: 12,
+    /** 動画カラムと次兄弟（公式コメ列など）の間にパネルを挟むときの最低インナー余白 */
+    besideInnerGap: 8
   });
+  function computeBesideInsertionGapPx(insertColumnRight, viewportInnerWidth, nextSiblingLeft, overrides = {}) {
+    const limits = { ...DEFAULT_BESIDE_PANEL_LIMITS, ...overrides };
+    const vw = Math.max(0, Number(viewportInnerWidth) || 0);
+    const colRight = Number(insertColumnRight) || 0;
+    const gapInner = Number(limits.besideInnerGap) || 8;
+    let slotRight = vw - limits.safeRight;
+    if (nextSiblingLeft != null && Number.isFinite(Number(nextSiblingLeft))) {
+      slotRight = Math.min(slotRight, Number(nextSiblingLeft) - gapInner);
+    }
+    return slotRight - colRight;
+  }
   function calculateBesidePanelLayout(input, overrides = {}) {
     const limits = { ...DEFAULT_BESIDE_PANEL_LIMITS, ...overrides };
-    const { videoRect, playerRowRect, viewport, contentNaturalHeight } = input;
+    const {
+      videoRect,
+      playerRowRect,
+      viewport,
+      contentNaturalHeight,
+      flexInsertionGapPx
+    } = input;
     const vw = Math.max(0, Number(viewport.width) || 0);
     const vh = Math.max(0, Number(viewport.height) || 0);
     const vRight = Math.max(0, videoRect.left + videoRect.width);
     const videoWidth = Math.max(0, videoRect.width);
     const videoHeight = Math.max(0, videoRect.height);
-    const availableRight = vw - vRight - limits.safeRight;
+    let availableRight;
+    if (flexInsertionGapPx != null && Number.isFinite(Number(flexInsertionGapPx))) {
+      availableRight = Number(flexInsertionGapPx);
+    } else {
+      availableRight = vw - vRight - limits.safeRight;
+    }
     if (availableRight < limits.minWidth) {
       return null;
     }
@@ -2600,6 +2711,137 @@
       panelHeight,
       source
     };
+  }
+
+  // src/lib/inlineBelowWideRowInsert.js
+  function normalizeRect(r) {
+    const left = Number(r?.left) || 0;
+    const top = Number(r?.top) || 0;
+    const width = Math.max(0, Number(r?.width) || 0);
+    const height = Math.max(0, Number(r?.height) || 0);
+    return {
+      left,
+      top,
+      width,
+      height,
+      right: left + width,
+      bottom: top + height
+    };
+  }
+  function computeBelowWideRowThresholdPx(viewportInnerWidth, videoRect, commentRect) {
+    const vw = Math.max(0, Math.round(Number(viewportInnerWidth) || 0));
+    if (vw < 400) return vw;
+    const vr = normalizeRect(videoRect);
+    const hasComment = commentRect != null && (Number(commentRect.width) || 0) > 8;
+    let unionW = 0;
+    if (hasComment) {
+      const cr = normalizeRect(commentRect);
+      const unionL = Math.min(vr.left, cr.left);
+      const unionR = Math.max(vr.right, cr.right);
+      unionW = Math.max(0, unionR - unionL);
+    }
+    const threshold = hasComment ? Math.min(
+      vw - 32,
+      Math.max(
+        unionW > 64 ? Math.round(unionW * 0.94 + 48) : 0,
+        Math.round(vr.width + 200),
+        520
+      )
+    ) : Math.min(vw - 32, Math.max(Math.round(vr.width + 240), Math.round(vw * 0.46), 560));
+    return Math.max(320, Math.min(threshold, vw - 24));
+  }
+  function belowWideRowMaxParentHeightPx(viewportInnerHeight) {
+    const vh = Math.max(0, Math.round(Number(viewportInnerHeight) || 0));
+    return Math.max(480, Math.min(vh * 0.82, 900));
+  }
+  function findBelowWideRowInsertAfterElement(args) {
+    const {
+      domAnchor,
+      videoEl,
+      commentPanel,
+      viewportInnerWidth,
+      viewportInnerHeight
+    } = args;
+    if (!(domAnchor instanceof HTMLElement) || !(videoEl instanceof HTMLElement)) {
+      return null;
+    }
+    const vw = Math.round(Number(viewportInnerWidth) || 0);
+    const vh = Math.round(Number(viewportInnerHeight) || 0);
+    if (vw < 520) return null;
+    let vr;
+    try {
+      vr = videoEl.getBoundingClientRect();
+    } catch {
+      return null;
+    }
+    const videoPlain = {
+      left: vr.left,
+      top: vr.top,
+      width: vr.width,
+      height: vr.height
+    };
+    let crPlain = null;
+    if (commentPanel instanceof HTMLElement) {
+      try {
+        const cr = commentPanel.getBoundingClientRect();
+        crPlain = {
+          left: cr.left,
+          top: cr.top,
+          width: cr.width,
+          height: cr.height
+        };
+      } catch {
+        crPlain = null;
+      }
+    }
+    const threshold = computeBelowWideRowThresholdPx(
+      vw,
+      videoPlain,
+      crPlain
+    );
+    const maxParentH = belowWideRowMaxParentHeightPx(vh);
+    let p = domAnchor.parentElement;
+    for (let depth = 0; depth < 20 && p; depth++) {
+      if (p === document.body || p === document.documentElement) break;
+      if (!(p instanceof HTMLElement)) break;
+      let pr;
+      try {
+        pr = p.getBoundingClientRect();
+      } catch {
+        p = p.parentElement;
+        continue;
+      }
+      if (pr.height > maxParentH) {
+        p = p.parentElement;
+        continue;
+      }
+      if (pr.width + 6 < threshold) {
+        p = p.parentElement;
+        continue;
+      }
+      try {
+        if (!p.contains(videoEl)) {
+          p = p.parentElement;
+          continue;
+        }
+      } catch {
+        p = p.parentElement;
+        continue;
+      }
+      if (commentPanel instanceof HTMLElement) {
+        try {
+          if (!p.contains(commentPanel)) {
+            p = p.parentElement;
+            continue;
+          }
+        } catch {
+          p = p.parentElement;
+          continue;
+        }
+      }
+      return p;
+    }
+    return null;
   }
 
   // src/lib/voiceComment.js
@@ -2991,6 +3233,37 @@
     return { changed: true };
   }
 
+  // src/lib/suggestInitialInlinePanelPlacement.js
+  function suggestInitialInlinePanelPlacement(layoutInnerWidth) {
+    const w = Number(layoutInnerWidth) || 0;
+    if (w >= 1240) return INLINE_PANEL_PLACEMENT_BESIDE;
+    if (w >= 960) return INLINE_PANEL_PLACEMENT_BELOW;
+    return INLINE_PANEL_PLACEMENT_DOCK_BOTTOM;
+  }
+
+  // src/lib/migrateSuggestInitialInlinePanelPlacement.js
+  async function migrateSuggestInitialInlinePanelPlacementOnce(deps) {
+    const { get, set, layoutInnerWidth } = deps;
+    const bag = await get([
+      KEY_INSTALL_PANEL_PLACEMENT_PENDING,
+      KEY_INLINE_PANEL_PLACEMENT
+    ]);
+    if (bag[KEY_INSTALL_PANEL_PLACEMENT_PENDING] !== true) {
+      return { changed: false };
+    }
+    const raw = bag[KEY_INLINE_PANEL_PLACEMENT];
+    if (raw !== void 0 && raw !== null) {
+      await set({ [KEY_INSTALL_PANEL_PLACEMENT_PENDING]: false });
+      return { changed: false };
+    }
+    const suggested = suggestInitialInlinePanelPlacement(layoutInnerWidth);
+    await set({
+      [KEY_INLINE_PANEL_PLACEMENT]: suggested,
+      [KEY_INSTALL_PANEL_PLACEMENT_PENDING]: false
+    });
+    return { changed: true, suggested };
+  }
+
   // src/lib/persistThrottle.js
   function createPersistCoalescer(flushFn, minIntervalMs = 300, burstThreshold = 0) {
     let buffer = [];
@@ -3180,7 +3453,15 @@
       // NDGR_CHAT_ROWS_POST_CHUNK=220 より少し上に置き、1チャンク=即flushを避ける。
       coalescerBurstThreshold: 260,
       visibleScanDelayMs: 380,
-      pageFrameLoopMs: 360
+      pageFrameLoopMs: 360,
+      /** scroll/resize からのインライン再レイアウトのみ（メンテ処理は走らせない） */
+      pageFrameLayoutScrollDebounceMs: 150,
+      /** 非可視タブで livePanelScan を N 回に 1 回だけ（可視復帰で onTabVisible が補償） */
+      hiddenLivePanelScanStride: 3,
+      /** 非可視時の AI 診断ストレージ書き込み最小間隔 */
+      aiShareFastDiagHiddenMinIntervalMs: 6e3,
+      /** 可視時の AI 診断ストレージ書き込み最小間隔（従来 1500ms と同等） */
+      aiShareFastDiagVisibleMinIntervalMs: 1500
     }
   );
   var SUBMIT_TIMING = (
@@ -4687,6 +4968,10 @@
     }
   }
   var PAGE_FRAME_LOOP_MS = INGEST_TIMING.pageFrameLoopMs;
+  var PAGE_FRAME_LAYOUT_SCROLL_DEBOUNCE_MS = INGEST_TIMING.pageFrameLayoutScrollDebounceMs;
+  var HIDDEN_LIVE_PANEL_SCAN_STRIDE = INGEST_TIMING.hiddenLivePanelScanStride;
+  var AI_SHARE_FAST_DIAG_HIDDEN_MIN_MS = INGEST_TIMING.aiShareFastDiagHiddenMinIntervalMs;
+  var AI_SHARE_FAST_DIAG_VISIBLE_MIN_MS = INGEST_TIMING.aiShareFastDiagVisibleMinIntervalMs;
   var DEFAULT_PAGE_FRAME = "light";
   var LEGACY_PAGE_FRAME_ALIAS = {
     trio: "light",
@@ -4725,7 +5010,11 @@
     frameId: DEFAULT_PAGE_FRAME,
     custom: { ...DEFAULT_PAGE_FRAME_CUSTOM }
   };
+  var pageFrameOverlayRenderDeferred = false;
   var pageFrameLoopTimer = null;
+  var pageFrameLayoutDebounceTimer = null;
+  var pageFrameLayoutScrollRafId = null;
+  var hiddenLivePanelScanPhase = 0;
   var aiShareFastDiagLastPersistAt = 0;
   function hasPageFramePreset(id) {
     return Object.prototype.hasOwnProperty.call(PAGE_FRAME_PRESETS, id);
@@ -5048,6 +5337,7 @@
     host.style.display = "block";
     host.style.opacity = "1";
     ensureInlinePanelCloseButton(host);
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
   }
   function ensureInlinePanelCloseButton(host) {
     if (!host) return;
@@ -5154,6 +5444,7 @@
     host.style.display = "block";
     host.style.opacity = "1";
     ensureInlinePanelCloseButton(host);
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
   }
   var __inlineHostReflowListenerRegistered = false;
   function ensureInlineHostReflowListener() {
@@ -5167,10 +5458,14 @@
           const placement = getEffectiveInlinePanelPlacement();
           if (placement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
             renderInlinePanelDockBottomHost();
+          } else if (placement === INLINE_PANEL_PLACEMENT_FLOATING) {
+            renderInlinePanelFloatingHost();
           } else if (placement === INLINE_PANEL_PLACEMENT_BESIDE || placement === INLINE_PANEL_PLACEMENT_BELOW) {
             const v = document.querySelector("video");
             if (v instanceof HTMLVideoElement && v.getBoundingClientRect().height >= 100) {
               renderInlineHostAnchoredToVideo(v);
+            } else {
+              maybeReconnectCommentMutationObserverAfterInlineLayout();
             }
           }
         } catch {
@@ -5179,12 +5474,21 @@
     };
     try {
       window.addEventListener("resize", reflow, { passive: true });
+      const vv = window.visualViewport;
+      if (vv && typeof vv.addEventListener === "function") {
+        vv.addEventListener("resize", reflow, { passive: true });
+        vv.addEventListener("scroll", reflow, { passive: true });
+      }
     } catch {
     }
   }
   function findFrameInsertAnchorFromVideo(base) {
     if (!(base instanceof HTMLElement)) return base;
-    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const viewportSize = nlsViewportSize();
+    const viewport = {
+      width: viewportSize.innerWidth,
+      height: viewportSize.innerHeight
+    };
     const videoEl = base instanceof HTMLVideoElement ? base : base.querySelector?.("video");
     const vr = (videoEl ?? base).getBoundingClientRect();
     const videoRect = {
@@ -5193,7 +5497,8 @@
       width: vr.width,
       height: vr.height
     };
-    let best = null;
+    const anchorOverrides = stackedLayoutAnchorOverrides(viewport, videoRect);
+    const eligibleRows = [];
     let cur = base;
     for (let i = 0; i < 8 && cur; i++) {
       if (cur === document.body || cur === document.documentElement) break;
@@ -5202,17 +5507,39 @@
         continue;
       }
       const r = cur.getBoundingClientRect();
-      const result = scoreInlineHostAnchorCandidate({
-        rect: { left: r.left, top: r.top, width: r.width, height: r.height },
-        viewport,
-        videoRect
-      });
-      if (result.eligible && (!best || result.score > best.score)) {
-        best = { el: cur, score: result.score };
+      const result = scoreInlineHostAnchorCandidate(
+        {
+          rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+          viewport,
+          videoRect
+        },
+        anchorOverrides
+      );
+      if (result.eligible) {
+        eligibleRows.push({
+          idx: eligibleRows.length,
+          el: cur,
+          area: Math.max(0, r.width * r.height),
+          score: result.score,
+          width: r.width,
+          height: r.height
+        });
       }
       cur = cur.parentElement;
     }
-    return best?.el || base;
+    if (!eligibleRows.length) return base;
+    const pickedIdx = pickTightestEligibleAnchorRowIdx(
+      eligibleRows.map(({ idx, area, score, width, height }) => ({
+        idx,
+        area,
+        score,
+        width,
+        height
+      })),
+      videoRect
+    );
+    if (pickedIdx < 0 || pickedIdx >= eligibleRows.length) return base;
+    return eligibleRows[pickedIdx].el;
   }
   function unionViewRects(a, b) {
     const right = Math.max(a.left + a.width, b.left + b.width);
@@ -5261,6 +5588,8 @@
   var inlinePanelPlacementMode = normalizeInlinePanelPlacement(void 0);
   var inlineFloatingAnchor = normalizeInlineFloatingAnchor(void 0);
   var inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(void 0);
+  var inlinePanelViewportWidePolicy = normalizeInlinePanelViewportWidePolicy(void 0);
+  var inlinePanelViewportWideOnceDone = normalizeInlinePanelViewportWideOnceDone(void 0);
   var toolbarInitiatedShowThisSession = false;
   function insertionParentForElement(el) {
     if (!(el instanceof HTMLElement)) return null;
@@ -5350,7 +5679,7 @@
   }
   function findBesideFlexRowColumnInsertion(video) {
     if (!(video instanceof HTMLElement)) return null;
-    const vw = window.innerWidth;
+    const vw = nlsLayoutViewportSize().innerWidth;
     const minRowW = Math.min(720, Math.max(400, vw * 0.46));
     let node = video;
     for (let depth = 0; depth < 24 && node && node !== document.body; depth++) {
@@ -5358,6 +5687,11 @@
       if (!parent) break;
       try {
         const cs = window.getComputedStyle(parent);
+        const flexWrapRaw = cs.flexWrap || "nowrap";
+        if (flexWrapRaw !== "nowrap") {
+          node = parent;
+          continue;
+        }
         const isRowFlex = cs.display === "flex" && (cs.flexDirection === "row" || cs.flexDirection === "row-reverse");
         if (isRowFlex && node.parentElement === parent && parent.children.length >= 2) {
           const rr = parent.getBoundingClientRect();
@@ -5370,6 +5704,108 @@
       node = parent;
     }
     return null;
+  }
+  function maybePersistViewportWideOnceConsumed() {
+    const eff = getEffectiveInlinePanelPlacement();
+    if (!shouldConsumeViewportWideOnce({
+      policy: inlinePanelViewportWidePolicy,
+      onceDone: inlinePanelViewportWideOnceDone,
+      placement: eff,
+      documentVisibilityState: typeof document !== "undefined" ? document.visibilityState : "visible"
+    })) {
+      return;
+    }
+    inlinePanelViewportWideOnceDone = true;
+    try {
+      void chrome.storage.local.set({
+        [KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]: true
+      });
+    } catch {
+    }
+  }
+  function applyViewportWideBleedToHostEdges(host, iframe, widenedPx, viewport, baseRounded) {
+    const vw = Math.round(Number(viewport.innerWidth) || 0);
+    if (!(host instanceof HTMLElement) || vw < 400) return;
+    const edge = 12;
+    try {
+      void host.offsetWidth;
+    } catch {
+      return;
+    }
+    let ml = 0;
+    const mlStr = host.style.marginLeft;
+    if (mlStr && typeof mlStr === "string" && mlStr.endsWith("px")) {
+      ml = parseFloat(mlStr) || 0;
+    } else {
+      try {
+        ml = parseFloat(window.getComputedStyle(host).marginLeft) || 0;
+      } catch {
+        ml = 0;
+      }
+    }
+    let rect = host.getBoundingClientRect();
+    const left0 = Number(rect.left) || 0;
+    if (left0 > edge + 0.5) {
+      ml = Math.round(ml - (left0 - edge));
+      host.style.marginLeft = `${ml}px`;
+    }
+    try {
+      void host.offsetWidth;
+    } catch {
+    }
+    rect = host.getBoundingClientRect();
+    const left1 = Number(rect.left) || 0;
+    const spanCap = Math.floor(vw - edge - left1);
+    if (spanCap <= baseRounded) return;
+    const finalW = Math.min(Math.round(widenedPx), spanCap);
+    if (finalW <= baseRounded) return;
+    host.style.width = `${finalW}px`;
+    host.style.maxWidth = `${finalW}px`;
+    if (iframe) {
+      iframe.style.width = `${finalW}px`;
+      iframe.style.maxWidth = `${finalW}px`;
+    }
+  }
+  function applyInlineHostPanelWidthWithViewportWide(host, iframe, opts) {
+    const { baselineWidthPx, hostAttachFallbackBody } = opts;
+    const viewport = nlsViewportSize();
+    const baseRounded = Math.max(1, Math.round(Number(baselineWidthPx) || 0));
+    if (hostAttachFallbackBody) {
+      const w = Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)));
+      host.style.width = `${w}px`;
+      host.style.maxWidth = `${w}px`;
+      if (iframe) {
+        iframe.style.width = `${w}px`;
+        iframe.style.maxWidth = `${w}px`;
+      }
+      return;
+    }
+    const eff = getEffectiveInlinePanelPlacement();
+    const widened = resolveWidenedInlinePanelWidthPx({
+      baselineWidthPx,
+      viewportInnerWidth: viewport.innerWidth,
+      placement: eff,
+      policy: inlinePanelViewportWidePolicy,
+      onceDone: inlinePanelViewportWideOnceDone
+    });
+    host.style.width = `${widened}px`;
+    if (widened > baseRounded) {
+      host.style.maxWidth = `${widened}px`;
+    } else {
+      host.style.maxWidth = "100%";
+    }
+    if (iframe) {
+      iframe.style.width = `${widened}px`;
+      if (widened > baseRounded) {
+        iframe.style.maxWidth = `${widened}px`;
+      } else {
+        iframe.style.removeProperty("max-width");
+      }
+    }
+    if (widened > baseRounded) {
+      applyViewportWideBleedToHostEdges(host, iframe, widened, viewport, baseRounded);
+    }
+    maybePersistViewportWideOnceConsumed();
   }
   function renderInlineHostAnchoredToVideo(video) {
     clearInlineHostFloatingLayout(ensureInlinePopupHost());
@@ -5391,8 +5827,15 @@
     if (placement === INLINE_PANEL_PLACEMENT_BESIDE) {
       const col = findBesideFlexRowColumnInsertion(video);
       if (col?.hostParent && col.insertAfter) {
+        const layoutVp = nlsLayoutViewportSize();
         const vrCheck = video.getBoundingClientRect();
-        const playerRect = col.insertAfter instanceof HTMLElement ? resolvePlayerRowRect(video, col.insertAfter) : null;
+        const insertCol = col.insertAfter;
+        const columnRect = insertCol instanceof HTMLElement ? insertCol.getBoundingClientRect() : null;
+        const ns = insertCol instanceof HTMLElement ? insertCol.nextElementSibling : null;
+        const nextLeft = ns instanceof HTMLElement ? ns.getBoundingClientRect().left : null;
+        const vwPx = layoutVp.innerWidth;
+        const flexGapPx = columnRect && Number.isFinite(columnRect.right) ? computeBesideInsertionGapPx(columnRect.right, vwPx, nextLeft) : null;
+        const playerRect = insertCol instanceof HTMLElement ? resolvePlayerRowRect(video, insertCol) : null;
         const layoutCheck = calculateBesidePanelLayout({
           videoRect: {
             left: vrCheck.left,
@@ -5407,10 +5850,11 @@
             height: playerRect.height
           } : null,
           viewport: {
-            width: window.innerWidth,
-            height: window.innerHeight
+            width: layoutVp.innerWidth,
+            height: layoutVp.innerHeight
           },
-          contentNaturalHeight: null
+          contentNaturalHeight: null,
+          flexInsertionGapPx: flexGapPx
         });
         if (layoutCheck) {
           insertAfter = col.insertAfter;
@@ -5418,13 +5862,25 @@
           besideFlexRowColumn = true;
           besideLayout = layoutCheck;
         } else {
-          const r = resolveInlinePanelInsertAnchor(
-            domAnchor,
-            INLINE_PANEL_PLACEMENT_BELOW
-          );
-          insertAfter = /** @type {HTMLElement} */
-          r.insertAfter;
-          hostParent = r.hostParent;
+          const layoutVpWide = nlsLayoutViewportSize();
+          const vrw = video.getBoundingClientRect();
+          const safeR = Number(DEFAULT_BESIDE_PANEL_LIMITS.safeRight) || 12;
+          const minW = Number(DEFAULT_BESIDE_PANEL_LIMITS.minWidth) || 280;
+          const viewportRightGap = layoutVpWide.innerWidth - (vrw && Number.isFinite(vrw.right) ? vrw.right : 0) - safeR;
+          if (viewportRightGap >= minW) {
+            insertAfter = col.insertAfter;
+            hostParent = col.hostParent;
+            besideFlexRowColumn = true;
+            besideLayout = null;
+          } else {
+            const r = resolveInlinePanelInsertAnchor(
+              domAnchor,
+              INLINE_PANEL_PLACEMENT_BELOW
+            );
+            insertAfter = /** @type {HTMLElement} */
+            r.insertAfter;
+            hostParent = r.hostParent;
+          }
         }
       } else {
         const r = resolveInlinePanelInsertAnchor(
@@ -5441,6 +5897,23 @@
       r.insertAfter;
       hostParent = r.hostParent;
     }
+    if (placement === INLINE_PANEL_PLACEMENT_BELOW && !besideFlexRowColumn && video instanceof HTMLElement) {
+      const layoutVpWideRow = nlsLayoutViewportSize();
+      const wideAfter = findBelowWideRowInsertAfterElement({
+        domAnchor,
+        videoEl: video,
+        commentPanel: findNicoCommentPanel(document),
+        viewportInnerWidth: layoutVpWideRow.innerWidth,
+        viewportInnerHeight: layoutVpWideRow.innerHeight
+      });
+      if (wideAfter instanceof HTMLElement) {
+        const wideHostParent = insertionParentForElement(wideAfter);
+        if (wideHostParent) {
+          insertAfter = wideAfter;
+          hostParent = wideHostParent;
+        }
+      }
+    }
     let hostAttachFallbackBody = false;
     if (!hostParent) {
       hostParent = document.body;
@@ -5451,12 +5924,14 @@
     if (vr.width < 260 || vr.height < 140) {
       host.style.display = "none";
       host.setAttribute("aria-hidden", "true");
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
       return;
     }
     const viewport = nlsViewportSize();
     const pr = getInsertionContainerRect(hostParent, viewport);
     const mode = besideFlexRowColumn || inlinePanelWidthMode === "video" ? "video" : "player_row";
-    const rowRect = mode === "player_row" ? resolvePlayerRowRect(video, domAnchor) : null;
+    const rowRectCapEl = insertAfter instanceof HTMLElement ? insertAfter : domAnchor;
+    const rowRect = mode === "player_row" ? resolvePlayerRowRect(video, rowRectCapEl) : null;
     const { panelWidthPx, marginLeftPx } = computeInlinePanelLayout(mode, {
       videoRect: {
         width: vr.width,
@@ -5482,15 +5957,15 @@
     }
     host.style.boxSizing = "border-box";
     host.style.marginLeft = hostAttachFallbackBody || besideFlexRowColumn ? "0" : `${marginLeftPx}px`;
-    host.style.maxWidth = "100%";
     const finalPanelWidthPx = besideLayout?.panelWidth ?? panelWidthPx;
-    host.style.width = hostAttachFallbackBody ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px` : `${finalPanelWidthPx}px`;
     const iframe = (
       /** @type {HTMLIFrameElement|null} */
       host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
     );
-    if (iframe)
-      iframe.style.width = hostAttachFallbackBody ? host.style.width : `${finalPanelWidthPx}px`;
+    applyInlineHostPanelWidthWithViewportWide(host, iframe, {
+      baselineWidthPx: finalPanelWidthPx,
+      hostAttachFallbackBody
+    });
     if (besideLayout) {
       host.style.maxHeight = `${besideLayout.panelHeight}px`;
       if (iframe) {
@@ -5503,6 +5978,7 @@
     host.style.display = "block";
     host.style.opacity = "1";
     ensureInlineHostReflowListener();
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
   }
   function renderInlinePopupHost(target) {
     if (!(target instanceof HTMLElement)) return;
@@ -5537,6 +6013,7 @@
     if (currentRect.width < 260 || currentRect.height < 140) {
       hostEarly.style.display = "none";
       hostEarly.setAttribute("aria-hidden", "true");
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
       return;
     }
     const placement = getEffectiveInlinePanelPlacement();
@@ -5582,18 +6059,19 @@
     }
     host.style.boxSizing = "border-box";
     host.style.marginLeft = hostAttachFallbackBody ? "0" : `${marginLeftPx}px`;
-    host.style.maxWidth = "100%";
-    host.style.width = hostAttachFallbackBody ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px` : `${panelWidthPx}px`;
     const iframe = (
       /** @type {HTMLIFrameElement|null} */
       host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
     );
-    if (iframe)
-      iframe.style.width = hostAttachFallbackBody ? host.style.width : `${panelWidthPx}px`;
+    applyInlineHostPanelWidthWithViewportWide(host, iframe, {
+      baselineWidthPx: panelWidthPx,
+      hostAttachFallbackBody
+    });
     host.style.pointerEvents = "auto";
     host.setAttribute("aria-hidden", "false");
     host.style.display = "block";
     host.style.opacity = "1";
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
   }
   function hidePageFrameOverlay() {
     const overlay = document.getElementById(PAGE_FRAME_OVERLAY_ID);
@@ -5779,7 +6257,9 @@
   function persistAiShareFastDiagnostics() {
     if (!hasExtensionContext()) return;
     const now = Date.now();
-    if (now - aiShareFastDiagLastPersistAt < 1500) return;
+    const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+    const minGap = hidden ? AI_SHARE_FAST_DIAG_HIDDEN_MIN_MS : AI_SHARE_FAST_DIAG_VISIBLE_MIN_MS;
+    if (now - aiShareFastDiagLastPersistAt < minGap) return;
     aiShareFastDiagLastPersistAt = now;
     try {
       const payload = {
@@ -5813,7 +6293,28 @@
     return true;
   }
   var stableFrameTarget = null;
+  function nlsLayoutViewportSize() {
+    try {
+      const w = Number(window.innerWidth) || 0;
+      const h = Number(window.innerHeight) || 0;
+      return { innerWidth: Math.round(w), innerHeight: Math.round(h) };
+    } catch {
+      return { innerWidth: 0, innerHeight: 0 };
+    }
+  }
   function nlsViewportSize() {
+    try {
+      const vv = window.visualViewport;
+      const vw = Number(vv?.width);
+      const vh = Number(vv?.height);
+      if (vv && Number.isFinite(vw) && Number.isFinite(vh) && vw >= 200 && vh >= 200) {
+        return {
+          innerWidth: Math.round(vw),
+          innerHeight: Math.round(vh)
+        };
+      }
+    } catch {
+    }
     return { innerWidth: window.innerWidth, innerHeight: window.innerHeight };
   }
   function syncWatchPageDockBodyReserve() {
@@ -5824,10 +6325,8 @@
     }
   }
   function getEffectiveInlinePanelPlacement() {
-    return effectiveInlinePanelPlacement(
-      inlinePanelPlacementMode,
-      nlsViewportSize().innerWidth
-    );
+    const vp = nlsLayoutViewportSize();
+    return effectiveInlinePanelPlacement(inlinePanelPlacementMode, vp.innerWidth);
   }
   function pickBestInlinePanelVideo() {
     const viewport = nlsViewportSize();
@@ -5916,17 +6415,23 @@
     }
   }
   function renderPageFrameOverlay() {
-    if (renderingPageFrame) return;
+    if (renderingPageFrame) {
+      pageFrameOverlayRenderDeferred = true;
+      return;
+    }
     if (!isWatchInlinePanelTopFrame()) {
       hidePageFrameOverlay();
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
       return;
     }
     if (!isNicoLiveWatchUrl(window.location.href)) {
       hidePageFrameOverlay();
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
       return;
     }
     if (!inlinePanelAutoshowEnabled && !toolbarInitiatedShowThisSession) {
       hidePageFrameOverlay();
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
       return;
     }
     renderingPageFrame = true;
@@ -5964,6 +6469,13 @@
     } finally {
       renderingPageFrame = false;
       syncWatchPageDockBodyReserve();
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
+      let overlayDrain = 0;
+      while (pageFrameOverlayRenderDeferred && overlayDrain < 16) {
+        pageFrameOverlayRenderDeferred = false;
+        overlayDrain += 1;
+        renderPageFrameOverlay();
+      }
     }
     startPageFrameLoop();
   }
@@ -5975,7 +6487,9 @@
       KEY_INLINE_PANEL_WIDTH_MODE,
       KEY_INLINE_PANEL_PLACEMENT,
       KEY_INLINE_FLOATING_ANCHOR,
-      KEY_INLINE_PANEL_AUTOSHOW_ENABLED
+      KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
+      KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
+      KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE
     ]);
     inlinePanelWidthMode = normalizeInlinePanelWidthMode(
       bag[KEY_INLINE_PANEL_WIDTH_MODE]
@@ -5989,6 +6503,12 @@
     inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(
       bag[KEY_INLINE_PANEL_AUTOSHOW_ENABLED]
     );
+    inlinePanelViewportWidePolicy = normalizeInlinePanelViewportWidePolicy(
+      bag[KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY]
+    );
+    inlinePanelViewportWideOnceDone = normalizeInlinePanelViewportWideOnceDone(
+      bag[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]
+    );
     const rawFrame = normalizePageFrameId(bag[KEY_POPUP_FRAME]);
     pageFrameState.frameId = rawFrame === "custom" || hasPageFramePreset(rawFrame) ? rawFrame : DEFAULT_PAGE_FRAME;
     pageFrameState.custom = sanitizePageFrameCustom(bag[KEY_POPUP_FRAME_CUSTOM]);
@@ -5997,19 +6517,72 @@
   }
   function startPageFrameLoop() {
     if (pageFrameLoopTimer) return;
-    const tick = () => {
+    function tickPageFrameLayoutFromInterval() {
+      if (!hasExtensionContext()) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden" && isWatchInlinePanelTopFrame() && isNicoLiveWatchUrl(window.location.href)) {
+        maybeReconnectCommentMutationObserverAfterInlineLayout();
+      } else {
+        renderPageFrameOverlay();
+      }
+    }
+    function tickPageFrameLayoutFromScrollResize() {
       if (!hasExtensionContext()) return;
       renderPageFrameOverlay();
+    }
+    function tickPageFrameMaintenance() {
+      if (!hasExtensionContext()) return;
       maybeRunEndedBulkHarvest();
       maybeOfficialGapQuietDeepHarvest();
       persistAiShareFastDiagnostics();
       schedulePrewarmInlinePopupIframe();
-    };
-    pageFrameLoopTimer = setInterval(tick, PAGE_FRAME_LOOP_MS);
-    window.addEventListener("scroll", tick, { passive: true });
-    window.addEventListener("resize", tick);
-    document.addEventListener("visibilitychange", tick);
-    tick();
+    }
+    function tickFromInterval() {
+      tickPageFrameLayoutFromInterval();
+      tickPageFrameMaintenance();
+    }
+    function scheduleScrollThrottledPageFrameLayout() {
+      if (pageFrameLayoutScrollRafId != null) return;
+      pageFrameLayoutScrollRafId = requestAnimationFrame(() => {
+        pageFrameLayoutScrollRafId = null;
+        tickPageFrameLayoutFromScrollResize();
+      });
+    }
+    function scheduleResizeDebouncedPageFrameLayout() {
+      if (pageFrameLayoutDebounceTimer != null) {
+        clearTimeout(pageFrameLayoutDebounceTimer);
+      }
+      pageFrameLayoutDebounceTimer = setTimeout(() => {
+        pageFrameLayoutDebounceTimer = null;
+        tickPageFrameLayoutFromScrollResize();
+      }, PAGE_FRAME_LAYOUT_SCROLL_DEBOUNCE_MS);
+    }
+    function onPageFrameVisibilityChange() {
+      if (pageFrameLayoutScrollRafId != null) {
+        try {
+          cancelAnimationFrame(pageFrameLayoutScrollRafId);
+        } catch {
+        }
+        pageFrameLayoutScrollRafId = null;
+      }
+      if (pageFrameLayoutDebounceTimer != null) {
+        clearTimeout(pageFrameLayoutDebounceTimer);
+        pageFrameLayoutDebounceTimer = null;
+      }
+      if (document.visibilityState === "visible") {
+        hiddenLivePanelScanPhase = 0;
+        tickPageFrameLayoutFromInterval();
+        tickPageFrameMaintenance();
+      } else {
+        tickPageFrameLayoutFromInterval();
+      }
+    }
+    pageFrameLoopTimer = setInterval(tickFromInterval, PAGE_FRAME_LOOP_MS);
+    window.addEventListener("scroll", scheduleScrollThrottledPageFrameLayout, {
+      passive: true
+    });
+    window.addEventListener("resize", scheduleResizeDebouncedPageFrameLayout);
+    document.addEventListener("visibilitychange", onPageFrameVisibilityChange);
+    tickFromInterval();
     schedulePrewarmInlinePopupIframe();
   }
   var prewarmInlinePopupTimer = (
@@ -7326,11 +7899,16 @@
     } catch {
     }
   }
-  function reconnectMutationObserver() {
-    if (!mutationObserver) return;
-    const nextRoot = pickCommentMutationObserverRoot(document);
-    if (observedMutationRoot === nextRoot) return;
-    mutationObserver.disconnect();
+  function reconnectMutationObserverToRoot(nextRoot) {
+    if (!mutationObserver || !nextRoot) return;
+    const prev = observedMutationRoot;
+    const prevDetached = prev && prev instanceof Node && /** @type {Node} */
+    prev.isConnected === false;
+    if (!prevDetached && prev === nextRoot) return;
+    try {
+      mutationObserver.disconnect();
+    } catch {
+    }
     observedMutationRoot = nextRoot;
     mutationObserver.observe(observedMutationRoot, {
       childList: true,
@@ -7340,6 +7918,24 @@
       attributeFilter: [...NICO_USER_ICON_IMG_LAZY_ATTRS, "srcset"]
     });
     bindCommentPanelUserIconLoads(observedMutationRoot);
+  }
+  function reconnectMutationObserver() {
+    if (!mutationObserver) return;
+    reconnectMutationObserverToRoot(pickCommentMutationObserverRoot(document));
+  }
+  function maybeReconnectCommentMutationObserverAfterInlineLayout() {
+    if (!recording || !liveId || !locationAllowsCommentRecording() || !mutationObserver) {
+      return;
+    }
+    try {
+      const nextRoot = pickCommentMutationObserverRoot(document);
+      const prev = observedMutationRoot;
+      const prevDetached = prev && prev instanceof Node && /** @type {Node} */
+      prev.isConnected === false;
+      if (!prevDetached && prev === nextRoot) return;
+      reconnectMutationObserverToRoot(nextRoot);
+    } catch {
+    }
   }
   function detectBroadcasterUserIdFromDom() {
     const now = Date.now();
@@ -8445,6 +9041,15 @@
         get: (keys) => chrome.storage.local.get(keys),
         set: (obj) => chrome.storage.local.set(obj)
       }).catch(() => ({ changed: false }));
+      try {
+        const layoutW = Number(window.innerWidth) || 0;
+        await migrateSuggestInitialInlinePanelPlacementOnce({
+          get: (keys) => chrome.storage.local.get(keys),
+          set: (obj) => chrome.storage.local.set(obj),
+          layoutInnerWidth: layoutW
+        });
+      } catch {
+      }
       await loadPageFrameSettings().catch(() => {
       });
       if (isNicoLiveWatchUrl(window.location.href)) {
@@ -8518,6 +9123,21 @@
           inlinePanelPlacementMode = normalizeInlinePanelPlacement(
             changes[KEY_INLINE_PANEL_PLACEMENT].newValue
           );
+          renderPageFrameOverlay();
+        }
+      }
+      if (changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY] || changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]) {
+        if (isWatchInlinePanelTopFrame()) {
+          if (changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY]) {
+            inlinePanelViewportWidePolicy = normalizeInlinePanelViewportWidePolicy(
+              changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY].newValue
+            );
+          }
+          if (changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]) {
+            inlinePanelViewportWideOnceDone = normalizeInlinePanelViewportWideOnceDone(
+              changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE].newValue
+            );
+          }
           renderPageFrameOverlay();
         }
       }
@@ -8624,6 +9244,20 @@
         }
         thumbTimerId = null;
       }
+      if (pageFrameLayoutScrollRafId != null) {
+        try {
+          cancelAnimationFrame(pageFrameLayoutScrollRafId);
+        } catch {
+        }
+        pageFrameLayoutScrollRafId = null;
+      }
+      if (pageFrameLayoutDebounceTimer != null) {
+        try {
+          clearTimeout(pageFrameLayoutDebounceTimer);
+        } catch {
+        }
+        pageFrameLayoutDebounceTimer = null;
+      }
       if (pageFrameLoopTimer != null) {
         try {
           clearInterval(pageFrameLoopTimer);
@@ -8646,6 +9280,12 @@
       if (!recording || !liveId || !locationAllowsCommentRecording()) {
         return;
       }
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        hiddenLivePanelScanPhase = (hiddenLivePanelScanPhase + 1) % HIDDEN_LIVE_PANEL_SCAN_STRIDE;
+        if (hiddenLivePanelScanPhase !== 0) return;
+      } else {
+        hiddenLivePanelScanPhase = 0;
+      }
       scanVisibleCommentsNow();
       void probeAndRestoreCommentPanelHealth();
     }, LIVE_PANEL_SCAN_MS);
@@ -8661,6 +9301,9 @@
     /** @type {unknown} */
     setInterval(() => {
       if (stopContentIntervalsIfContextInvalidated()) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       pollStatsFromPage();
     }, STATS_POLL_MS);
   }

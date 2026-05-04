@@ -32,6 +32,12 @@ import {
   normalizeInlinePanelPlacement,
   KEY_INLINE_PANEL_PLACEMENT,
   KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED,
+  KEY_INSTALL_PANEL_PLACEMENT_PENDING,
+  KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
+  KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
+  INLINE_PANEL_VIEWPORT_WIDE_OFF,
+  INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+  INLINE_PANEL_VIEWPORT_WIDE_ALWAYS,
   KEY_INLINE_FLOATING_ANCHOR,
   INLINE_FLOATING_ANCHOR_TOP_RIGHT,
   INLINE_FLOATING_ANCHOR_BOTTOM_LEFT,
@@ -39,7 +45,9 @@ import {
   normalizeEntitlementTier,
   normalizeCalmPanelMotion,
   normalizeMarketingExportMaskLabels,
-  normalizeAnonymousIdenticonEnabled
+  normalizeAnonymousIdenticonEnabled,
+  normalizeInlinePanelViewportWidePolicy,
+  normalizeInlinePanelViewportWideOnceDone
 } from './storageKeys.js';
 
 describe('storage key constants', () => {
@@ -67,6 +75,9 @@ describe('storage key constants', () => {
     expect(KEY_USAGE_TERMS_ACK).toMatch(/^nls_/);
     expect(KEY_NL_ENTITLEMENT_TIER).toMatch(/^nls_/);
     expect(KEY_INLINE_PANEL_PLACEMENT).toMatch(/^nls_/);
+    expect(KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY).toMatch(/^nls_/);
+    expect(KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE).toMatch(/^nls_/);
+    expect(KEY_INSTALL_PANEL_PLACEMENT_PENDING).toMatch(/^nls_/);
     expect(KEY_INLINE_FLOATING_ANCHOR).toMatch(/^nls_/);
   });
 
@@ -127,6 +138,37 @@ describe('storage key constants', () => {
     expect(normalizeAnonymousIdenticonEnabled(false)).toBe(false);
     expect(normalizeAnonymousIdenticonEnabled(undefined)).toBe(true);
     expect(normalizeAnonymousIdenticonEnabled(null)).toBe(true);
+  });
+
+  it('normalizeInlinePanelViewportWideOnceDone は true のみ', () => {
+    expect(normalizeInlinePanelViewportWideOnceDone(undefined)).toBe(false);
+    expect(normalizeInlinePanelViewportWideOnceDone(true)).toBe(true);
+    expect(normalizeInlinePanelViewportWideOnceDone('true')).toBe(false);
+  });
+
+  it('normalizeInlinePanelViewportWidePolicy: 未設定・空は once、明示 off', () => {
+    expect(normalizeInlinePanelViewportWidePolicy(undefined)).toBe(
+      INLINE_PANEL_VIEWPORT_WIDE_ONCE
+    );
+    expect(normalizeInlinePanelViewportWidePolicy(null)).toBe(
+      INLINE_PANEL_VIEWPORT_WIDE_ONCE
+    );
+    expect(normalizeInlinePanelViewportWidePolicy('')).toBe(
+      INLINE_PANEL_VIEWPORT_WIDE_ONCE
+    );
+    expect(normalizeInlinePanelViewportWidePolicy('  ')).toBe(
+      INLINE_PANEL_VIEWPORT_WIDE_ONCE
+    );
+    expect(normalizeInlinePanelViewportWidePolicy('off')).toBe(
+      INLINE_PANEL_VIEWPORT_WIDE_OFF
+    );
+    expect(normalizeInlinePanelViewportWidePolicy('ALWAYS')).toBe(
+      INLINE_PANEL_VIEWPORT_WIDE_ALWAYS
+    );
+    expect(normalizeInlinePanelViewportWidePolicy('once')).toBe('once');
+    expect(normalizeInlinePanelViewportWidePolicy('garbage')).toBe(
+      INLINE_PANEL_VIEWPORT_WIDE_OFF
+    );
   });
 
   it('normalizeInlinePanelWidthMode は video 以外は player_row', () => {

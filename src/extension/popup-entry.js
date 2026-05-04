@@ -34,6 +34,8 @@ import {
   KEY_RECORDING,
   KEY_DEEP_HARVEST_QUIET_UI,
   KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
+  KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
+  KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
   KEY_SELF_POSTED_RECENTS,
   KEY_USER_COMMENT_PROFILE_CACHE,
   KEY_COMMENT_PANEL_STATUS,
@@ -53,12 +55,16 @@ import {
   KEY_DEV_MONITOR_TREND_PREFIX,
   INLINE_PANEL_WIDTH_PLAYER_ROW,
   INLINE_PANEL_WIDTH_VIDEO,
+  INLINE_PANEL_VIEWPORT_WIDE_OFF,
+  INLINE_PANEL_VIEWPORT_WIDE_ALWAYS,
+  INLINE_PANEL_VIEWPORT_WIDE_ONCE,
   commentsStorageKey,
   giftUsersStorageKey,
   isCommentEnterSendEnabled,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelAutoshowEnabled,
+  normalizeInlinePanelViewportWidePolicy,
   normalizeInlinePanelWidthMode,
   normalizeInlinePanelPlacement,
   normalizeInlineFloatingAnchor,
@@ -6486,6 +6492,8 @@ async function refresh() {
       KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
       KEY_INLINE_PANEL_WIDTH_MODE,
       KEY_INLINE_PANEL_PLACEMENT,
+      KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
+      KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
       KEY_INLINE_FLOATING_ANCHOR,
       KEY_CALM_PANEL_MOTION,
       KEY_STORAGE_WRITE_ERROR,
@@ -6579,6 +6587,26 @@ async function refresh() {
   if (radioPlayerRow && radioVideoOnly) {
     radioPlayerRow.checked = panelMode === INLINE_PANEL_WIDTH_PLAYER_ROW;
     radioVideoOnly.checked = panelMode === INLINE_PANEL_WIDTH_VIDEO;
+  }
+  const viewportWidePolicy = normalizeInlinePanelViewportWidePolicy(
+    openBag[KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY]
+  );
+  const radioViewportWideOff = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelViewportWideOff')
+  );
+  const radioViewportWideAlways = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelViewportWideAlways')
+  );
+  const radioViewportWideOnce = /** @type {HTMLInputElement|null} */ (
+    $('inlinePanelViewportWideOnce')
+  );
+  if (radioViewportWideOff && radioViewportWideAlways && radioViewportWideOnce) {
+    radioViewportWideOff.checked =
+      viewportWidePolicy === INLINE_PANEL_VIEWPORT_WIDE_OFF;
+    radioViewportWideAlways.checked =
+      viewportWidePolicy === INLINE_PANEL_VIEWPORT_WIDE_ALWAYS;
+    radioViewportWideOnce.checked =
+      viewportWidePolicy === INLINE_PANEL_VIEWPORT_WIDE_ONCE;
   }
   const placementMode = normalizeInlinePanelPlacement(
     openBag[KEY_INLINE_PANEL_PLACEMENT]
@@ -9603,6 +9631,22 @@ function initPopup() {
     safeRefresh();
   };
 
+  const saveInlinePanelViewportWidePolicy = async (value) => {
+    const v =
+      value === INLINE_PANEL_VIEWPORT_WIDE_ALWAYS
+        ? INLINE_PANEL_VIEWPORT_WIDE_ALWAYS
+        : value === INLINE_PANEL_VIEWPORT_WIDE_ONCE
+          ? INLINE_PANEL_VIEWPORT_WIDE_ONCE
+          : INLINE_PANEL_VIEWPORT_WIDE_OFF;
+    const patch = {
+      [KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY]: v,
+      [KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]: false
+    };
+    const ok = await storageSetSafe(patch);
+    if (!ok) return;
+    safeRefresh();
+  };
+
   const saveInlinePanelPlacement = async (value) => {
     const v =
       value === INLINE_PANEL_PLACEMENT_BESIDE
@@ -9641,6 +9685,31 @@ function initPopup() {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       void saveInlinePanelWidthMode(INLINE_PANEL_WIDTH_VIDEO);
+    }
+  });
+
+  /** @type {HTMLInputElement|null} */
+  const radioViewportWideOffEl = $('inlinePanelViewportWideOff');
+  /** @type {HTMLInputElement|null} */
+  const radioViewportWideAlwaysEl = $('inlinePanelViewportWideAlways');
+  /** @type {HTMLInputElement|null} */
+  const radioViewportWideOnceEl = $('inlinePanelViewportWideOnce');
+  radioViewportWideOffEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlinePanelViewportWidePolicy(INLINE_PANEL_VIEWPORT_WIDE_OFF);
+    }
+  });
+  radioViewportWideAlwaysEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlinePanelViewportWidePolicy(INLINE_PANEL_VIEWPORT_WIDE_ALWAYS);
+    }
+  });
+  radioViewportWideOnceEl?.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.checked) {
+      void saveInlinePanelViewportWidePolicy(INLINE_PANEL_VIEWPORT_WIDE_ONCE);
     }
   });
 

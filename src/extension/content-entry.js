@@ -10,7 +10,11 @@ import {
   KEY_INLINE_PANEL_WIDTH_MODE,
   KEY_INLINE_PANEL_PLACEMENT,
   KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
+  KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
+  KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
   normalizeInlinePanelAutoshowEnabled,
+  normalizeInlinePanelViewportWidePolicy,
+  normalizeInlinePanelViewportWideOnceDone,
   INLINE_PANEL_PLACEMENT_BESIDE,
   INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_FLOATING,
@@ -90,9 +94,22 @@ import {
   effectiveInlinePanelPlacement,
   selectBestPlayerRectIndex
 } from '../lib/inlinePanelLayout.js';
-import { scoreInlineHostAnchorCandidate } from '../lib/inlineHostAnchorScoring.js';
+import {
+  resolveWidenedInlinePanelWidthPx,
+  shouldConsumeViewportWideOnce
+} from '../lib/inlinePanelViewportWide.js';
+import {
+  scoreInlineHostAnchorCandidate,
+  stackedLayoutAnchorOverrides,
+  pickTightestEligibleAnchorRowIdx
+} from '../lib/inlineHostAnchorScoring.js';
 import { calculateDockBottomPanelHeight } from '../lib/inlineHostDockSizing.js';
-import { calculateBesidePanelLayout } from '../lib/inlineHostBesideSizing.js';
+import {
+  calculateBesidePanelLayout,
+  computeBesideInsertionGapPx,
+  DEFAULT_BESIDE_PANEL_LIMITS
+} from '../lib/inlineHostBesideSizing.js';
+import { findBelowWideRowInsertAfterElement } from '../lib/inlineBelowWideRowInsert.js';
 import {
   applyRecognitionResult,
   isVoiceCommentSupported,
@@ -119,6 +136,7 @@ import {
 } from '../lib/commentIngestLog.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
+import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
 import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
@@ -268,7 +286,12 @@ let observedRecordedCommentCount = 0;
 /** WebSocket schedule メッセージから取得した配信開始時刻 (epoch ms) */
 /** @type {number|null} */
 let programBeginAtMs = null;
-/** @type {Set<Element|Node>} */
+/**
+ * Mutation から flush までの差分ノード集合（`Set<Element|Node>`）。
+ * 上限は持たないが、極端バースト時はメモリ一時増の可能性がある。
+ * 将来案: 閾値超で body に畳む + 即 flush（重複行とトレードオフのため実装前に実測・persist 側 dedupe を要確認）。
+ * @type {Set<Element|Node>}
+ */
 const pendingRoots = new Set();
 /** @type {number|null} */
 let flushTimer = null;
@@ -1439,6 +1462,13 @@ function noteInlinePanelRenderError(where, err) {
   }
 }
 const PAGE_FRAME_LOOP_MS = INGEST_TIMING.pageFrameLoopMs;
+const PAGE_FRAME_LAYOUT_SCROLL_DEBOUNCE_MS =
+  INGEST_TIMING.pageFrameLayoutScrollDebounceMs;
+const HIDDEN_LIVE_PANEL_SCAN_STRIDE = INGEST_TIMING.hiddenLivePanelScanStride;
+const AI_SHARE_FAST_DIAG_HIDDEN_MIN_MS =
+  INGEST_TIMING.aiShareFastDiagHiddenMinIntervalMs;
+const AI_SHARE_FAST_DIAG_VISIBLE_MIN_MS =
+  INGEST_TIMING.aiShareFastDiagVisibleMinIntervalMs;
 const DEFAULT_PAGE_FRAME = 'light';
 const LEGACY_PAGE_FRAME_ALIAS = {
   trio: 'light',
@@ -1481,8 +1511,18 @@ const pageFrameState = {
   custom: { ...DEFAULT_PAGE_FRAME_CUSTOM }
 };
 
+/** renderPageFrameOverlay 再入でスキップされたとき、finally 後に 1 回だけ追い描画 */
+let pageFrameOverlayRenderDeferred = false;
 /** @type {number|null} */
 let pageFrameLoopTimer = null;
+/** scroll レイアウト用 rAF スロットル / resize 用デバウンス（invalidate 時に cancel） */
+/** @type {ReturnType<typeof setTimeout>|null} */
+let pageFrameLayoutDebounceTimer = null;
+/** scroll レイアウトを 1 フレーム 1 回に抑える（連続 scroll でデバウンスが延び続けるのを防ぐ） */
+/** @type {number|null} */
+let pageFrameLayoutScrollRafId = null;
+/** 非可視時 livePanelScan の間引き位相（0..stride-1 で 0 のときだけ実行） */
+let hiddenLivePanelScanPhase = 0;
 let aiShareFastDiagLastPersistAt = 0;
 
 /** @param {string} id */
@@ -1881,6 +1921,7 @@ function renderInlinePanelFloatingHost() {
   // にも追加（dock_bottom も同様に panel を非表示にする手段が無く、設定画面で
   // placement を変えないと消せなかった）。一度だけ生成して再利用する。
   ensureInlinePanelCloseButton(host);
+  maybeReconnectCommentMutationObserverAfterInlineLayout();
 }
 
 /**
@@ -2026,14 +2067,18 @@ function renderInlinePanelDockBottomHost() {
   // 元は floating だけで「× 閉じる」を出していたが、dock_bottom も同じ理由で
   // ユーザーが明示的に閉じる手段が必要だった（設定画面に行かないと消せない）。
   ensureInlinePanelCloseButton(host);
+  maybeReconnectCommentMutationObserverAfterInlineLayout();
 }
 
 /**
  * inline panel host が viewport / player rect 変化に追従するための共通 resize
  * listener。0.1.65 (AU) で dock_bottom 用に導入、0.1.66 (AV) で beside / below
  * にも対応。一度だけ登録し、以降 resize で 150ms debounce 後に再描画する。
- * 対象 placement に該当しない時は何もしない（renderInline* の中で placement
- * を再判定するので無駄な再描画にはならない）。
+ * Visual Viewport の変化（ズーム・モバイル UI chrome）にも追従する。
+ * floating は dock / beside / below と同様に resize で再描画し、ウィンドウサイズ
+ * 変化後もパネル寸法と MutationObserver 取り直しが取りこぼされないようにする。
+ * beside/below で video が一時的に取れないときはレイアウトのみ skip し、
+ * `maybeReconnectCommentMutationObserverAfterInlineLayout` で監視だけ更新する。
  */
 let __inlineHostReflowListenerRegistered = false;
 function ensureInlineHostReflowListener() {
@@ -2048,6 +2093,8 @@ function ensureInlineHostReflowListener() {
         const placement = getEffectiveInlinePanelPlacement();
         if (placement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
           renderInlinePanelDockBottomHost();
+        } else if (placement === INLINE_PANEL_PLACEMENT_FLOATING) {
+          renderInlinePanelFloatingHost();
         } else if (
           placement === INLINE_PANEL_PLACEMENT_BESIDE ||
           placement === INLINE_PANEL_PLACEMENT_BELOW
@@ -2059,6 +2106,8 @@ function ensureInlineHostReflowListener() {
             v.getBoundingClientRect().height >= 100
           ) {
             renderInlineHostAnchoredToVideo(v);
+          } else {
+            maybeReconnectCommentMutationObserverAfterInlineLayout();
           }
         }
       } catch {
@@ -2068,6 +2117,11 @@ function ensureInlineHostReflowListener() {
   };
   try {
     window.addEventListener('resize', reflow, { passive: true });
+    const vv = window.visualViewport;
+    if (vv && typeof vv.addEventListener === 'function') {
+      vv.addEventListener('resize', reflow, { passive: true });
+      vv.addEventListener('scroll', reflow, { passive: true });
+    }
   } catch {
     // no-op: addEventListener が使えない環境（test 等）はスキップ
   }
@@ -2086,11 +2140,19 @@ function ensureInlineHostReflowListener() {
  *   上限）まで含めて厳格化した。0.1.63 で below → dock_bottom の応急 migration
  *   を入れているが、本関数の改善で `below` モードを再度推奨できる品質に戻す
  *   下地ができた。詳細は src/lib/inlineHostAnchorScoring.js のヘッダコメント参照。
+ *
+ *   0.1.109: eligible が複数あるとき **スコア最大**では浅い巨大ラッパーが選ばれ、
+ *   関連放送などより下にパネルが付くことがあった。**面積最小**（プレイヤー行に密なブロック）
+ *   を優先して選ぶ（pickTightestEligibleAnchorRowIdx）。
  * @param {HTMLElement} base
  */
 function findFrameInsertAnchorFromVideo(base) {
   if (!(base instanceof HTMLElement)) return base;
-  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const viewportSize = nlsViewportSize();
+  const viewport = {
+    width: viewportSize.innerWidth,
+    height: viewportSize.innerHeight
+  };
   const videoEl =
     base instanceof HTMLVideoElement ? base : base.querySelector?.('video');
   const vr = (videoEl ?? base).getBoundingClientRect();
@@ -2100,8 +2162,9 @@ function findFrameInsertAnchorFromVideo(base) {
     width: vr.width,
     height: vr.height
   };
-  /** @type {{ el: HTMLElement, score: number }|null} */
-  let best = null;
+  const anchorOverrides = stackedLayoutAnchorOverrides(viewport, videoRect);
+  /** @type {{ el: HTMLElement, idx: number, area: number, score: number, width: number, height: number }[]} */
+  const eligibleRows = [];
   let cur = base;
   for (let i = 0; i < 8 && cur; i++) {
     if (cur === document.body || cur === document.documentElement) break;
@@ -2110,17 +2173,40 @@ function findFrameInsertAnchorFromVideo(base) {
       continue;
     }
     const r = cur.getBoundingClientRect();
-    const result = scoreInlineHostAnchorCandidate({
-      rect: { left: r.left, top: r.top, width: r.width, height: r.height },
-      viewport,
-      videoRect
-    });
-    if (result.eligible && (!best || result.score > best.score)) {
-      best = { el: cur, score: result.score };
+    const result = scoreInlineHostAnchorCandidate(
+      {
+        rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+        viewport,
+        videoRect
+      },
+      anchorOverrides
+    );
+    if (result.eligible) {
+      eligibleRows.push({
+        idx: eligibleRows.length,
+        el: cur,
+        area: Math.max(0, r.width * r.height),
+        score: result.score,
+        width: r.width,
+        height: r.height
+      });
     }
     cur = cur.parentElement;
   }
-  return best?.el || base;
+  if (!eligibleRows.length) return base;
+
+  const pickedIdx = pickTightestEligibleAnchorRowIdx(
+    eligibleRows.map(({ idx, area, score, width, height }) => ({
+      idx,
+      area,
+      score,
+      width,
+      height
+    })),
+    videoRect
+  );
+  if (pickedIdx < 0 || pickedIdx >= eligibleRows.length) return base;
+  return eligibleRows[pickedIdx].el;
 }
 
 /** @param {{ left: number, top: number, width: number, height: number }} a @param {{ left: number, top: number, width: number, height: number }} b */
@@ -2203,6 +2289,14 @@ let inlineFloatingAnchor = normalizeInlineFloatingAnchor(undefined);
  * 既定 OFF の狙いは「こん太を押す前から勝手に出る」UX 不一致の回避。
  */
 let inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(undefined);
+
+/** プレイヤー行の下／横付きでタブ幅に近いまで広げる方針（storage から更新） */
+let inlinePanelViewportWidePolicy =
+  normalizeInlinePanelViewportWidePolicy(undefined);
+
+/** `once` 方針を適用済みか（storage から更新） */
+let inlinePanelViewportWideOnceDone =
+  normalizeInlinePanelViewportWideOnceDone(undefined);
 
 /**
  * このタブで一度でもツールバーアイコンを押したか（セッション局所フラグ、storage には持たない）。
@@ -2328,7 +2422,7 @@ function resolveInlinePanelInsertAnchor(domAnchor, placement) {
  */
 function findBesideFlexRowColumnInsertion(video) {
   if (!(video instanceof HTMLElement)) return null;
-  const vw = window.innerWidth;
+  const vw = nlsLayoutViewportSize().innerWidth;
   const minRowW = Math.min(720, Math.max(400, vw * 0.46));
   let node = video;
   for (let depth = 0; depth < 24 && node && node !== document.body; depth++) {
@@ -2336,6 +2430,11 @@ function findBesideFlexRowColumnInsertion(video) {
     if (!parent) break;
     try {
       const cs = window.getComputedStyle(parent);
+      const flexWrapRaw = cs.flexWrap || 'nowrap';
+      if (flexWrapRaw !== 'nowrap') {
+        node = parent;
+        continue;
+      }
       const isRowFlex =
         cs.display === 'flex' &&
         (cs.flexDirection === 'row' || cs.flexDirection === 'row-reverse');
@@ -2355,6 +2454,150 @@ function findBesideFlexRowColumnInsertion(video) {
     node = parent;
   }
   return null;
+}
+
+/**
+ * `once` 方針のとき、可視タブで below/beside を初めて描画したら消費フラグを保存する。
+ */
+function maybePersistViewportWideOnceConsumed() {
+  const eff = getEffectiveInlinePanelPlacement();
+  if (
+    !shouldConsumeViewportWideOnce({
+      policy: inlinePanelViewportWidePolicy,
+      onceDone: inlinePanelViewportWideOnceDone,
+      placement: eff,
+      documentVisibilityState:
+        typeof document !== 'undefined' ? document.visibilityState : 'visible'
+    })
+  ) {
+    return;
+  }
+  inlinePanelViewportWideOnceDone = true;
+  try {
+    void chrome.storage.local.set({
+      [KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]: true
+    });
+  } catch {
+    // no-op
+  }
+}
+
+/**
+ * タブ幅広げ時に、狭い列の中でもビューポート右端まで届くよう margin / 幅を補正する。
+ * （親が overflow:hidden のときはこれでも切れるが、多くの watch レイアウトでは右へ伸びる）
+ * @param {HTMLElement} host
+ * @param {HTMLIFrameElement|null} iframe
+ * @param {number} widenedPx
+ * @param {{ innerWidth: number }} viewport
+ * @param {number} baseRounded
+ */
+function applyViewportWideBleedToHostEdges(
+  host,
+  iframe,
+  widenedPx,
+  viewport,
+  baseRounded
+) {
+  const vw = Math.round(Number(viewport.innerWidth) || 0);
+  if (!(host instanceof HTMLElement) || vw < 400) return;
+  const edge = 12;
+  try {
+    void host.offsetWidth;
+  } catch {
+    return;
+  }
+  let ml = 0;
+  const mlStr = host.style.marginLeft;
+  if (mlStr && typeof mlStr === 'string' && mlStr.endsWith('px')) {
+    ml = parseFloat(mlStr) || 0;
+  } else {
+    try {
+      ml = parseFloat(window.getComputedStyle(host).marginLeft) || 0;
+    } catch {
+      ml = 0;
+    }
+  }
+  let rect = host.getBoundingClientRect();
+  const left0 = Number(rect.left) || 0;
+  if (left0 > edge + 0.5) {
+    ml = Math.round(ml - (left0 - edge));
+    host.style.marginLeft = `${ml}px`;
+  }
+  try {
+    void host.offsetWidth;
+  } catch {
+    // no-op
+  }
+  rect = host.getBoundingClientRect();
+  const left1 = Number(rect.left) || 0;
+  const spanCap = Math.floor(vw - edge - left1);
+  if (spanCap <= baseRounded) return;
+  const finalW = Math.min(Math.round(widenedPx), spanCap);
+  if (finalW <= baseRounded) return;
+  host.style.width = `${finalW}px`;
+  host.style.maxWidth = `${finalW}px`;
+  if (iframe) {
+    iframe.style.width = `${finalW}px`;
+    iframe.style.maxWidth = `${finalW}px`;
+  }
+}
+
+/**
+ * @param {HTMLElement} host
+ * @param {HTMLIFrameElement|null} iframe
+ * @param {{ baselineWidthPx: number, hostAttachFallbackBody: boolean }} opts
+ */
+function applyInlineHostPanelWidthWithViewportWide(host, iframe, opts) {
+  const { baselineWidthPx, hostAttachFallbackBody } = opts;
+  const viewport = nlsViewportSize();
+  const baseRounded = Math.max(1, Math.round(Number(baselineWidthPx) || 0));
+
+  if (hostAttachFallbackBody) {
+    const w = Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)));
+    host.style.width = `${w}px`;
+    /*
+     * max-width:100% だと親が狭いときに width を上書きしてしまう。
+     * body 直下でも明示幅と揃えて確実に適用する。
+     */
+    host.style.maxWidth = `${w}px`;
+    if (iframe) {
+      iframe.style.width = `${w}px`;
+      iframe.style.maxWidth = `${w}px`;
+    }
+    return;
+  }
+
+  const eff = getEffectiveInlinePanelPlacement();
+  const widened = resolveWidenedInlinePanelWidthPx({
+    baselineWidthPx,
+    viewportInnerWidth: viewport.innerWidth,
+    placement: eff,
+    policy: inlinePanelViewportWidePolicy,
+    onceDone: inlinePanelViewportWideOnceDone
+  });
+  host.style.width = `${widened}px`;
+  /*
+   * 視聴行の子 flex 内では max-width:100% が「親列の幅」になり、
+   * width をタブ幅まで広げても見た目が動画列幅のまま残る（ユーザ報告）。
+   * 実際に広げたときだけ max-width を明示 px にしてキャップを外す。
+   */
+  if (widened > baseRounded) {
+    host.style.maxWidth = `${widened}px`;
+  } else {
+    host.style.maxWidth = '100%';
+  }
+  if (iframe) {
+    iframe.style.width = `${widened}px`;
+    if (widened > baseRounded) {
+      iframe.style.maxWidth = `${widened}px`;
+    } else {
+      iframe.style.removeProperty('max-width');
+    }
+  }
+  if (widened > baseRounded) {
+    applyViewportWideBleedToHostEdges(host, iframe, widened, viewport, baseRounded);
+  }
+  maybePersistViewportWideOnceConsumed();
 }
 
 /**
@@ -2393,10 +2636,27 @@ function renderInlineHostAnchoredToVideo(video) {
     const col = findBesideFlexRowColumnInsertion(video);
     if (col?.hostParent && col.insertAfter) {
       // beside 用の幅・高さを純粋関数で再計算
+      const layoutVp = nlsLayoutViewportSize();
       const vrCheck = video.getBoundingClientRect();
+      const insertCol = col.insertAfter;
+      const columnRect =
+        insertCol instanceof HTMLElement
+          ? insertCol.getBoundingClientRect()
+          : null;
+      const ns =
+        insertCol instanceof HTMLElement
+          ? insertCol.nextElementSibling
+          : null;
+      const nextLeft =
+        ns instanceof HTMLElement ? ns.getBoundingClientRect().left : null;
+      const vwPx = layoutVp.innerWidth;
+      const flexGapPx =
+        columnRect && Number.isFinite(columnRect.right)
+          ? computeBesideInsertionGapPx(columnRect.right, vwPx, nextLeft)
+          : null;
       const playerRect =
-        col.insertAfter instanceof HTMLElement
-          ? resolvePlayerRowRect(video, col.insertAfter)
+        insertCol instanceof HTMLElement
+          ? resolvePlayerRowRect(video, insertCol)
           : null;
       const layoutCheck = calculateBesidePanelLayout({
         videoRect: {
@@ -2414,10 +2674,11 @@ function renderInlineHostAnchoredToVideo(video) {
             }
           : null,
         viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight
+          width: layoutVp.innerWidth,
+          height: layoutVp.innerHeight
         },
-        contentNaturalHeight: null
+        contentNaturalHeight: null,
+        flexInsertionGapPx: flexGapPx
       });
       if (layoutCheck) {
         insertAfter = col.insertAfter;
@@ -2425,13 +2686,33 @@ function renderInlineHostAnchoredToVideo(video) {
         besideFlexRowColumn = true;
         besideLayout = layoutCheck;
       } else {
-        // 利用可能幅不足 → below フォールバック（player の真下に DOM 内挿入）
-        const r = resolveInlinePanelInsertAnchor(
-          domAnchor,
-          INLINE_PANEL_PLACEMENT_BELOW
-        );
-        insertAfter = /** @type {HTMLElement} */ (r.insertAfter);
-        hostParent = r.hostParent;
+        /*
+         * flex ギャップ実測だけだと minWidth 未満（公式コメ列が隣接）でも、
+         * viewport 右に十分な余白があれば「行内・動画列の次」に留める。
+         * 実ギャップ優先で null になったときだけ body 直下 below へ落とすと
+         * E2E mock や「コメ列は狭いがページ右は空いている」レイアウトで破綻する。
+         */
+        const layoutVpWide = nlsLayoutViewportSize();
+        const vrw = video.getBoundingClientRect();
+        const safeR = Number(DEFAULT_BESIDE_PANEL_LIMITS.safeRight) || 12;
+        const minW = Number(DEFAULT_BESIDE_PANEL_LIMITS.minWidth) || 280;
+        const viewportRightGap =
+          layoutVpWide.innerWidth -
+          (vrw && Number.isFinite(vrw.right) ? vrw.right : 0) -
+          safeR;
+        if (viewportRightGap >= minW) {
+          insertAfter = col.insertAfter;
+          hostParent = col.hostParent;
+          besideFlexRowColumn = true;
+          besideLayout = null;
+        } else {
+          const r = resolveInlinePanelInsertAnchor(
+            domAnchor,
+            INLINE_PANEL_PLACEMENT_BELOW
+          );
+          insertAfter = /** @type {HTMLElement} */ (r.insertAfter);
+          hostParent = r.hostParent;
+        }
       }
     } else {
       const r = resolveInlinePanelInsertAnchor(
@@ -2447,6 +2728,33 @@ function renderInlineHostAnchoredToVideo(video) {
     hostParent = r.hostParent;
   }
 
+  /*
+   * ディープ修正: Grid / 入れ子レイアウトで domAnchor が動画列の内側に留まると、
+   * ホストが overflow でクリップされタブ幅に届かない。動画＋公式コメを両方含む
+   * 十分な幅のうち domAnchor から見て内側で最初に当たる祖先の直後へ出す（0.1.118 の margin 補正と併用）。
+   */
+  if (
+    placement === INLINE_PANEL_PLACEMENT_BELOW &&
+    !besideFlexRowColumn &&
+    video instanceof HTMLElement
+  ) {
+    const layoutVpWideRow = nlsLayoutViewportSize();
+    const wideAfter = findBelowWideRowInsertAfterElement({
+      domAnchor,
+      videoEl: video,
+      commentPanel: findNicoCommentPanel(document),
+      viewportInnerWidth: layoutVpWideRow.innerWidth,
+      viewportInnerHeight: layoutVpWideRow.innerHeight
+    });
+    if (wideAfter instanceof HTMLElement) {
+      const wideHostParent = insertionParentForElement(wideAfter);
+      if (wideHostParent) {
+        insertAfter = wideAfter;
+        hostParent = wideHostParent;
+      }
+    }
+  }
+
   /** 挿入解決が完全に失敗したときでもパネルゼロを避ける（body 末尾・簡易幅） */
   let hostAttachFallbackBody = false;
   if (!hostParent) {
@@ -2458,6 +2766,7 @@ function renderInlineHostAnchoredToVideo(video) {
   if (vr.width < 260 || vr.height < 140) {
     host.style.display = 'none';
     host.setAttribute('aria-hidden', 'true');
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
   }
   const viewport = nlsViewportSize();
@@ -2469,8 +2778,12 @@ function renderInlineHostAnchoredToVideo(video) {
     besideFlexRowColumn || inlinePanelWidthMode === 'video'
       ? 'video'
       : 'player_row';
+  const rowRectCapEl =
+    insertAfter instanceof HTMLElement ? insertAfter : domAnchor;
   const rowRect =
-    mode === 'player_row' ? resolvePlayerRowRect(video, domAnchor) : null;
+    mode === 'player_row'
+      ? resolvePlayerRowRect(video, rowRectCapEl)
+      : null;
   const { panelWidthPx, marginLeftPx } = computeInlinePanelLayout(mode, {
     videoRect: {
       width: vr.width,
@@ -2499,19 +2812,16 @@ function renderInlineHostAnchoredToVideo(video) {
   host.style.boxSizing = 'border-box';
   host.style.marginLeft =
     hostAttachFallbackBody || besideFlexRowColumn ? '0' : `${marginLeftPx}px`;
-  host.style.maxWidth = '100%';
+  // max-width は applyInlineHostPanelWidthWithViewportWide が最終決定（100% だと親列で潰れる）
   // 0.1.66 (AV): beside で純粋関数結果が取れていればそれを優先（幅・高さ）
   const finalPanelWidthPx = besideLayout?.panelWidth ?? panelWidthPx;
-  host.style.width = hostAttachFallbackBody
-    ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px`
-    : `${finalPanelWidthPx}px`;
   const iframe = /** @type {HTMLIFrameElement|null} */ (
     host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
   );
-  if (iframe)
-    iframe.style.width = hostAttachFallbackBody
-      ? host.style.width
-      : `${finalPanelWidthPx}px`;
+  applyInlineHostPanelWidthWithViewportWide(host, iframe, {
+    baselineWidthPx: finalPanelWidthPx,
+    hostAttachFallbackBody
+  });
   // beside の高さを動画行の自然高さに揃える（縦間延びの解消）
   if (besideLayout) {
     host.style.maxHeight = `${besideLayout.panelHeight}px`;
@@ -2526,6 +2836,7 @@ function renderInlineHostAnchoredToVideo(video) {
   host.style.opacity = '1';
   // 0.1.66 (AV): viewport / video rect 変化に追従
   ensureInlineHostReflowListener();
+  maybeReconnectCommentMutationObserverAfterInlineLayout();
 }
 
 /** @param {HTMLElement} target */
@@ -2569,6 +2880,7 @@ function renderInlinePopupHost(target) {
   if (currentRect.width < 260 || currentRect.height < 140) {
     hostEarly.style.display = 'none';
     hostEarly.setAttribute('aria-hidden', 'true');
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
   }
 
@@ -2624,21 +2936,19 @@ function renderInlinePopupHost(target) {
   }
   host.style.boxSizing = 'border-box';
   host.style.marginLeft = hostAttachFallbackBody ? '0' : `${marginLeftPx}px`;
-  host.style.maxWidth = '100%';
-  host.style.width = hostAttachFallbackBody
-    ? `${Math.min(720, Math.max(320, Math.round(viewport.innerWidth - 24)))}px`
-    : `${panelWidthPx}px`;
+  // max-width は applyInlineHostPanelWidthWithViewportWide が最終決定
   const iframe = /** @type {HTMLIFrameElement|null} */ (
     host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
   );
-  if (iframe)
-    iframe.style.width = hostAttachFallbackBody
-      ? host.style.width
-      : `${panelWidthPx}px`;
+  applyInlineHostPanelWidthWithViewportWide(host, iframe, {
+    baselineWidthPx: panelWidthPx,
+    hostAttachFallbackBody
+  });
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
   host.style.opacity = '1';
+  maybeReconnectCommentMutationObserverAfterInlineLayout();
 }
 
 function hidePageFrameOverlay() {
@@ -2883,7 +3193,13 @@ function sanitizeWatchUrlForDiag(rawHref) {
 function persistAiShareFastDiagnostics() {
   if (!hasExtensionContext()) return;
   const now = Date.now();
-  if (now - aiShareFastDiagLastPersistAt < 1500) return;
+  const hidden =
+    typeof document !== 'undefined' &&
+    document.visibilityState === 'hidden';
+  const minGap = hidden
+    ? AI_SHARE_FAST_DIAG_HIDDEN_MIN_MS
+    : AI_SHARE_FAST_DIAG_VISIBLE_MIN_MS;
+  if (now - aiShareFastDiagLastPersistAt < minGap) return;
   aiShareFastDiagLastPersistAt = now;
   try {
     const payload = {
@@ -2927,7 +3243,41 @@ function isValidFrameTargetElement(el) {
 /** @type {HTMLElement|null} */
 let stableFrameTarget = null;
 
+/**
+ * レイアウトビューポート（CSS ピクセル）。横付き可否・ギャップ計算の幅上限に使う。
+ * `nlsViewportSize` の visualViewport 優先は拡大表示で狭くなりやすく、実タブが広いのに
+ * 常に「プレイヤー行の下」に落ちる原因になるため分離する。
+ */
+function nlsLayoutViewportSize() {
+  try {
+    const w = Number(window.innerWidth) || 0;
+    const h = Number(window.innerHeight) || 0;
+    return { innerWidth: Math.round(w), innerHeight: Math.round(h) };
+  } catch {
+    return { innerWidth: 0, innerHeight: 0 };
+  }
+}
+
 function nlsViewportSize() {
+  try {
+    const vv = window.visualViewport;
+    const vw = Number(vv?.width);
+    const vh = Number(vv?.height);
+    if (
+      vv &&
+      Number.isFinite(vw) &&
+      Number.isFinite(vh) &&
+      vw >= 200 &&
+      vh >= 200
+    ) {
+      return {
+        innerWidth: Math.round(vw),
+        innerHeight: Math.round(vh)
+      };
+    }
+  } catch {
+    // no-op
+  }
   return { innerWidth: window.innerWidth, innerHeight: window.innerHeight };
 }
 
@@ -2945,12 +3295,10 @@ function syncWatchPageDockBodyReserve() {
   }
 }
 
-/** ストレージの配置に対し、狭いビューポートでは beside を下へ逃がす（保存値はそのまま） */
+/** ストレージの配置に対し、狭いタブ幅では beside を下へ逃がす（保存値はそのまま） */
 function getEffectiveInlinePanelPlacement() {
-  return effectiveInlinePanelPlacement(
-    inlinePanelPlacementMode,
-    nlsViewportSize().innerWidth
-  );
+  const vp = nlsLayoutViewportSize();
+  return effectiveInlinePanelPlacement(inlinePanelPlacementMode, vp.innerWidth);
 }
 
 /** メインの配信 video（表示矩形が最大・かつプレイヤーとして妥当）を選ぶ */
@@ -3077,13 +3425,18 @@ function isWatchInlinePanelTopFrame() {
 
 /** 視聴ページの動画周り装飾枠（#nls-watch-prikura-frame）は表示しない。インライン用ホストの配置のみ行う。 */
 function renderPageFrameOverlay() {
-  if (renderingPageFrame) return;
+  if (renderingPageFrame) {
+    pageFrameOverlayRenderDeferred = true;
+    return;
+  }
   if (!isWatchInlinePanelTopFrame()) {
     hidePageFrameOverlay();
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
   }
   if (!isNicoLiveWatchUrl(window.location.href)) {
     hidePageFrameOverlay();
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
   }
   /*
@@ -3093,6 +3446,11 @@ function renderPageFrameOverlay() {
    */
   if (!inlinePanelAutoshowEnabled && !toolbarInitiatedShowThisSession) {
     hidePageFrameOverlay();
+    /*
+     * try/finally に入らないため、ここでも監視ルートを取り直す。
+     * パネル非表示中も公式コメ欄 DOM は差し替わり得る（tick 経路での取りこぼし防止）。
+     */
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
   }
 
@@ -3151,6 +3509,23 @@ function renderPageFrameOverlay() {
   } finally {
     renderingPageFrame = false;
     syncWatchPageDockBodyReserve();
+    /*
+     * 配置を何度も切り替えると公式コメ欄が差し替わり、MutationObserver が古い
+     * ノードを見続けて記録が止まることがある。再レイアウトのたびに監視ルートを取り直す。
+     * scroll は rAF・resize はデバウンス経由でも `renderPageFrameOverlay` を通す。
+     */
+    maybeReconnectCommentMutationObserverAfterInlineLayout();
+    /*
+     * 再入スキップ分は microtask ではなく同一スタックで追い描画する。
+     * microtask だと直後の interval tick が先に走り、まだ floating 未適用の
+     * below レイアウトで上書きされる race が出る（E2E below→floating）。
+     */
+    let overlayDrain = 0;
+    while (pageFrameOverlayRenderDeferred && overlayDrain < 16) {
+      pageFrameOverlayRenderDeferred = false;
+      overlayDrain += 1;
+      renderPageFrameOverlay();
+    }
   }
   /*
    * プレイヤー遅延で初回だけ target が無いとき、ここでループを積まないと再描画が永遠に走らない。
@@ -3167,7 +3542,9 @@ async function loadPageFrameSettings() {
     KEY_INLINE_PANEL_WIDTH_MODE,
     KEY_INLINE_PANEL_PLACEMENT,
     KEY_INLINE_FLOATING_ANCHOR,
-    KEY_INLINE_PANEL_AUTOSHOW_ENABLED
+    KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
+    KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
+    KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE
   ]);
   inlinePanelWidthMode = normalizeInlinePanelWidthMode(
     bag[KEY_INLINE_PANEL_WIDTH_MODE]
@@ -3181,6 +3558,12 @@ async function loadPageFrameSettings() {
   inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(
     bag[KEY_INLINE_PANEL_AUTOSHOW_ENABLED]
   );
+  inlinePanelViewportWidePolicy = normalizeInlinePanelViewportWidePolicy(
+    bag[KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY]
+  );
+  inlinePanelViewportWideOnceDone = normalizeInlinePanelViewportWideOnceDone(
+    bag[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]
+  );
   const rawFrame = normalizePageFrameId(bag[KEY_POPUP_FRAME]);
   pageFrameState.frameId =
     rawFrame === 'custom' || hasPageFramePreset(rawFrame)
@@ -3193,9 +3576,36 @@ async function loadPageFrameSettings() {
 
 function startPageFrameLoop() {
   if (pageFrameLoopTimer) return;
-  const tick = () => {
+
+  function tickPageFrameLayoutFromInterval() {
+    if (!hasExtensionContext()) return;
+    /*
+     * バックグラウンド（非可視）タブではインライン host のレイアウトは不要なのに
+     * 毎 tick で renderPageFrameOverlay（動画探索・ターゲット走査）が走り、
+     * watch タブを多数開いたとき CPU がタブ数にほぼ比例して増える。
+     * 可視でないときはパネル描画を skip し、公式コメ欄の監視ルート取り直しだけ残す
+     *（DOM 差し替え時の記録途切れ対策は維持）。
+     */
+    if (
+      typeof document !== 'undefined' &&
+      document.visibilityState === 'hidden' &&
+      isWatchInlinePanelTopFrame() &&
+      isNicoLiveWatchUrl(window.location.href)
+    ) {
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
+    } else {
+      renderPageFrameOverlay();
+    }
+  }
+
+  /** scroll/resize 由来。Playwright/headless で visibility が hidden の間も DOM 反映が必要なため常にフル描画 */
+  function tickPageFrameLayoutFromScrollResize() {
     if (!hasExtensionContext()) return;
     renderPageFrameOverlay();
+  }
+
+  function tickPageFrameMaintenance() {
+    if (!hasExtensionContext()) return;
     maybeRunEndedBulkHarvest();
     maybeOfficialGapQuietDeepHarvest();
     persistAiShareFastDiagnostics();
@@ -3203,13 +3613,60 @@ function startPageFrameLoop() {
     // を試みる。visibilitychange は tick を呼ぶので、可視化された瞬間に prewarm
     // が再開する（schedulePrewarmInlinePopupIframe は done flag で idempotent）。
     schedulePrewarmInlinePopupIframe();
-  };
+  }
 
-  pageFrameLoopTimer = setInterval(tick, PAGE_FRAME_LOOP_MS);
-  window.addEventListener('scroll', tick, { passive: true });
-  window.addEventListener('resize', tick);
-  document.addEventListener('visibilitychange', tick);
-  tick();
+  function tickFromInterval() {
+    tickPageFrameLayoutFromInterval();
+    tickPageFrameMaintenance();
+  }
+
+  function scheduleScrollThrottledPageFrameLayout() {
+    if (pageFrameLayoutScrollRafId != null) return;
+    pageFrameLayoutScrollRafId = requestAnimationFrame(() => {
+      pageFrameLayoutScrollRafId = null;
+      tickPageFrameLayoutFromScrollResize();
+    });
+  }
+
+  function scheduleResizeDebouncedPageFrameLayout() {
+    if (pageFrameLayoutDebounceTimer != null) {
+      clearTimeout(pageFrameLayoutDebounceTimer);
+    }
+    pageFrameLayoutDebounceTimer = setTimeout(() => {
+      pageFrameLayoutDebounceTimer = null;
+      tickPageFrameLayoutFromScrollResize();
+    }, PAGE_FRAME_LAYOUT_SCROLL_DEBOUNCE_MS);
+  }
+
+  function onPageFrameVisibilityChange() {
+    if (pageFrameLayoutScrollRafId != null) {
+      try {
+        cancelAnimationFrame(pageFrameLayoutScrollRafId);
+      } catch {
+        // no-op
+      }
+      pageFrameLayoutScrollRafId = null;
+    }
+    if (pageFrameLayoutDebounceTimer != null) {
+      clearTimeout(pageFrameLayoutDebounceTimer);
+      pageFrameLayoutDebounceTimer = null;
+    }
+    if (document.visibilityState === 'visible') {
+      hiddenLivePanelScanPhase = 0;
+      tickPageFrameLayoutFromInterval();
+      tickPageFrameMaintenance();
+    } else {
+      tickPageFrameLayoutFromInterval();
+    }
+  }
+
+  pageFrameLoopTimer = setInterval(tickFromInterval, PAGE_FRAME_LOOP_MS);
+  window.addEventListener('scroll', scheduleScrollThrottledPageFrameLayout, {
+    passive: true
+  });
+  window.addEventListener('resize', scheduleResizeDebouncedPageFrameLayout);
+  document.addEventListener('visibilitychange', onPageFrameVisibilityChange);
+  tickFromInterval();
   // 0.1.17 (S): kon-ta 押下時の体感遅延を縮めるため、watch ページ表示から
   // ~2 秒経ったら裏で popup.html iframe を boot しておく。host は display:none
   // のまま append するので画面には出ないが、iframe は読み込みを進めてくれる。
@@ -4912,11 +5369,23 @@ function bindCommentPanelUserIconLoads(root) {
   }
 }
 
-function reconnectMutationObserver() {
-  if (!mutationObserver) return;
-  const nextRoot = pickCommentMutationObserverRoot(document);
-  if (observedMutationRoot === nextRoot) return;
-  mutationObserver.disconnect();
+/**
+ * 既に `pickCommentMutationObserverRoot` で得たルートへ接続（二重 pick 回避用）。
+ * @param {Element} nextRoot
+ */
+function reconnectMutationObserverToRoot(nextRoot) {
+  if (!mutationObserver || !nextRoot) return;
+  const prev = observedMutationRoot;
+  const prevDetached =
+    prev &&
+    prev instanceof Node &&
+    /** @type {Node} */ (prev).isConnected === false;
+  if (!prevDetached && prev === nextRoot) return;
+  try {
+    mutationObserver.disconnect();
+  } catch {
+    // no-op
+  }
   observedMutationRoot = nextRoot;
   mutationObserver.observe(observedMutationRoot, {
     childList: true,
@@ -4926,6 +5395,38 @@ function reconnectMutationObserver() {
     attributeFilter: [...NICO_USER_ICON_IMG_LAZY_ATTRS, 'srcset']
   });
   bindCommentPanelUserIconLoads(observedMutationRoot);
+}
+
+function reconnectMutationObserver() {
+  if (!mutationObserver) return;
+  reconnectMutationObserverToRoot(pickCommentMutationObserverRoot(document));
+}
+
+/**
+ * インライン host の移動・再レイアウト後に公式コメ欄の監視を取り直す。
+ * `renderPageFrameOverlay` 以外（resize debounce の `renderInlineHostAnchoredToVideo` 等）でも呼ぶ。
+ */
+function maybeReconnectCommentMutationObserverAfterInlineLayout() {
+  if (
+    !recording ||
+    !liveId ||
+    !locationAllowsCommentRecording() ||
+    !mutationObserver
+  ) {
+    return;
+  }
+  try {
+    const nextRoot = pickCommentMutationObserverRoot(document);
+    const prev = observedMutationRoot;
+    const prevDetached =
+      prev &&
+      prev instanceof Node &&
+      /** @type {Node} */ (prev).isConnected === false;
+    if (!prevDetached && prev === nextRoot) return;
+    reconnectMutationObserverToRoot(nextRoot);
+  } catch {
+    // no-op
+  }
 }
 
 function detectBroadcasterUserIdFromDom() {
@@ -6385,6 +6886,16 @@ async function start() {
       get: (keys) => chrome.storage.local.get(keys),
       set: (obj) => chrome.storage.local.set(obj)
     }).catch(() => ({ changed: false }));
+    try {
+      const layoutW = Number(window.innerWidth) || 0;
+      await migrateSuggestInitialInlinePanelPlacementOnce({
+        get: (keys) => chrome.storage.local.get(keys),
+        set: (obj) => chrome.storage.local.set(obj),
+        layoutInnerWidth: layoutW
+      });
+    } catch {
+      // no-op
+    }
     await loadPageFrameSettings().catch(() => {});
     if (isNicoLiveWatchUrl(window.location.href)) {
       startPageFrameLoop();
@@ -6460,6 +6971,27 @@ async function start() {
         inlinePanelPlacementMode = normalizeInlinePanelPlacement(
           changes[KEY_INLINE_PANEL_PLACEMENT].newValue
         );
+        renderPageFrameOverlay();
+      }
+    }
+
+    if (
+      changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY] ||
+      changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]
+    ) {
+      if (isWatchInlinePanelTopFrame()) {
+        if (changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY]) {
+          inlinePanelViewportWidePolicy =
+            normalizeInlinePanelViewportWidePolicy(
+              changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY].newValue
+            );
+        }
+        if (changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]) {
+          inlinePanelViewportWideOnceDone =
+            normalizeInlinePanelViewportWideOnceDone(
+              changes[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE].newValue
+            );
+        }
         renderPageFrameOverlay();
       }
     }
@@ -6599,6 +7131,22 @@ async function start() {
       }
       thumbTimerId = null;
     }
+    if (pageFrameLayoutScrollRafId != null) {
+      try {
+        cancelAnimationFrame(pageFrameLayoutScrollRafId);
+      } catch {
+        // no-op
+      }
+      pageFrameLayoutScrollRafId = null;
+    }
+    if (pageFrameLayoutDebounceTimer != null) {
+      try {
+        clearTimeout(pageFrameLayoutDebounceTimer);
+      } catch {
+        // no-op
+      }
+      pageFrameLayoutDebounceTimer = null;
+    }
     // 0.1.45 (AA): pageFrameLoopTimer も止める。旧コードはこの timer を
     // 止めずに tick の冒頭で early return するだけだったため、setInterval
     // slot と CPU が tab 寿命まで消費され続ける問題があった。
@@ -6633,6 +7181,16 @@ async function start() {
         ) {
           return;
         }
+        if (
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'hidden'
+        ) {
+          hiddenLivePanelScanPhase =
+            (hiddenLivePanelScanPhase + 1) % HIDDEN_LIVE_PANEL_SCAN_STRIDE;
+          if (hiddenLivePanelScanPhase !== 0) return;
+        } else {
+          hiddenLivePanelScanPhase = 0;
+        }
         scanVisibleCommentsNow();
         void probeAndRestoreCommentPanelHealth();
       }, LIVE_PANEL_SCAN_MS)
@@ -6655,6 +7213,12 @@ async function start() {
     /** @type {unknown} */ (
       setInterval(() => {
         if (stopContentIntervalsIfContextInvalidated()) return;
+        if (
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'hidden'
+        ) {
+          return;
+        }
         pollStatsFromPage();
       }, STATS_POLL_MS)
     )

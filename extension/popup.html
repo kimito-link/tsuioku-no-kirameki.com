@@ -4094,9 +4094,7 @@
         line-height: 1.35;
       }
 
-      /* 0.1.64 (AT4): 「横付き」を選んでも 1200px 未満だと『プレイヤー行の下』
-         と同じ動作になり、ユーザーから「切り替えても何も変わらない」報告が
-         あった。ヒント文を warning 調に強調して見落とされないようにする。 */
+      /* 横付き: 実効は視聴タブの幅で決まる。パネル iframe 内は狭いので注意文で誤解しないよう明記 */
       .nl-panel-placement-hint--warning {
         background: #fff7e0;
         border: 1px solid #f6c869;
@@ -6832,7 +6830,7 @@
                 />
                 横付き（親のレイアウトに合わせる・従来に近い）
                 <span class="nl-panel-placement-hint nl-panel-placement-hint--warning"
-                  >⚠️ 画面幅が約1200px未満では、選んでも『プレイヤー行の下』と同じ動作になります（公式UIとの競合回避のため自動で下に表示）。広いウィンドウで使ってください。</span>
+                  >⚠️ 実際の位置は<strong>視聴中のブラウザタブの幅</strong>（このパネル内の幅ではありません）で決まります。タブ幅が約1200px未満のときは公式UIとの競合回避のため、自動で「プレイヤー行の下」になります。列の横に十分な隙間が無いときも同様です。</span>
               </label>
               <label>
                 <input
@@ -6899,6 +6897,43 @@
                 />
                 動画の幅だけ
               </label>
+            </div>
+            <div
+              class="nl-panel-width-radios nl-panel-width-radios--viewport-wide"
+              role="group"
+              aria-labelledby="inlinePanelViewportWideLegend"
+            >
+              <div id="inlinePanelViewportWideLegend" class="nl-panel-width-sublegend">
+                下／横付きのときの幅の広げ方
+              </div>
+              <label>
+                <input
+                  type="radio"
+                  name="inlinePanelViewportWide"
+                  value="off"
+                  id="inlinePanelViewportWideOff"
+                />
+                広げない（従来どおり）
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="inlinePanelViewportWide"
+                  value="always"
+                  id="inlinePanelViewportWideAlways"
+                />
+                タブ幅いっぱいまで常に広げる（超ワイドは上限あり）
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="inlinePanelViewportWide"
+                  value="once"
+                  id="inlinePanelViewportWideOnce"
+                />
+                初めての1回だけ広げて試す
+              </label>
+              <span class="nl-muted nl-panel-width-hint">画面下固定・浮遊では無効です。「1回だけ」は既定で、watch を<strong>手前のタブ</strong>で開いてパネルが描画されたタイミングで消費され、その後は動画列基準の幅に戻ります（いつでも詳細設定から変更できます）。</span>
             </div>
             <div class="nl-panel-calm-motion">
               <label for="calmPanelMotion">

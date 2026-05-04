@@ -153,13 +153,11 @@ export const INLINE_VIEWPORT_BESIDE_MIN_WIDTH = 1200;
 
 /**
  * @param {string} storedPlacement `below` | `beside` | `floating` | `dock_bottom`
- * @param {number} viewportInnerWidth
+ * @param {number} viewportInnerWidth 呼出元は **レイアウトビューポート**（通常 `window.innerWidth`）を渡すこと。
+ *   `visualViewport` だけだとページ拡大時など実タブより狭く見積もり、横付きが常に下になることがある。
  * @returns {string}
  */
-export function effectiveInlinePanelPlacement(
-  storedPlacement,
-  viewportInnerWidth
-) {
+export function effectiveInlinePanelPlacement(storedPlacement, viewportInnerWidth) {
   let s = String(storedPlacement || '').trim();
   if (!s) s = 'dock_bottom';
   const w = Number(viewportInnerWidth) || 0;

@@ -134,6 +134,13 @@ export const KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED =
   'nls_inline_panel_below_to_dock_migrated';
 
 /**
+ * 新規インストール時に一度だけ true。content が初期配置を書き込んだら false。
+ * @see migrateSuggestInitialInlinePanelPlacement.js / extension/background.js install
+ */
+export const KEY_INSTALL_PANEL_PLACEMENT_PENDING =
+  'nls_install_panel_placement_pending_v1';
+
+/**
  * 視聴ページで extension のインラインパネルを自動表示するかどうか。
  * 既定 false（opt-in）。true を明示保存したときだけ自動で出る。
  *
@@ -144,6 +151,43 @@ export const KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED =
  */
 export const KEY_INLINE_PANEL_AUTOSHOW_ENABLED =
   'nls_inline_panel_autoshow_enabled';
+
+/**
+ * プレイヤー行の下／横付きのとき、パネル幅をタブ幅に近づける方針。
+ * `off`＝従来どおり（compute の基準幅のみ）。`always`＝常に max(基準, タブ幅ベース)。
+ * `once`＝可視タブで below/beside を初めて描画した1回だけ同様に広げ、その後は off 相当（未保存の既定は once）。
+ * `once` 適用後は KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE。
+ */
+export const KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY =
+  'nls_inline_panel_viewport_wide_v1';
+
+/** `once` 方針を適用済みなら true（以降は基準幅のみ） */
+export const KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE =
+  'nls_inline_panel_viewport_wide_once_done_v1';
+
+/** @type {'off'} */
+export const INLINE_PANEL_VIEWPORT_WIDE_OFF = 'off';
+/** @type {'always'} */
+export const INLINE_PANEL_VIEWPORT_WIDE_ALWAYS = 'always';
+/** @type {'once'} */
+export const INLINE_PANEL_VIEWPORT_WIDE_ONCE = 'once';
+
+/** @param {unknown} raw */
+export function normalizeInlinePanelViewportWidePolicy(raw) {
+  if (raw === undefined || raw === null) {
+    return INLINE_PANEL_VIEWPORT_WIDE_ONCE;
+  }
+  const s = String(raw).trim().toLowerCase();
+  if (s === '') return INLINE_PANEL_VIEWPORT_WIDE_ONCE;
+  if (s === INLINE_PANEL_VIEWPORT_WIDE_ALWAYS) return INLINE_PANEL_VIEWPORT_WIDE_ALWAYS;
+  if (s === INLINE_PANEL_VIEWPORT_WIDE_ONCE) return INLINE_PANEL_VIEWPORT_WIDE_ONCE;
+  return INLINE_PANEL_VIEWPORT_WIDE_OFF;
+}
+
+/** @param {unknown} raw */
+export function normalizeInlinePanelViewportWideOnceDone(raw) {
+  return raw === true;
+}
 
 /**
  * @param {unknown} raw

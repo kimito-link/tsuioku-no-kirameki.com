@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   scoreInlineHostAnchorCandidate,
+  stackedLayoutAnchorOverrides,
+  pickTightestEligibleAnchorRowIdx,
   DEFAULT_INLINE_HOST_ANCHOR_LIMITS
 } from './inlineHostAnchorScoring.js';
 
@@ -16,6 +18,76 @@ const rect = (r) => ({
 });
 
 const VIDEO_RECT = rect({ left: 320, top: 80, width: 640, height: 360 });
+
+describe('pickTightestEligibleAnchorRowIdx', () => {
+  const videoRect = { width: 640, height: 360 };
+
+  it('video より広い候補だけをプールし、その中で面積最小の idx を選ぶ', () => {
+    const rows = [
+      { idx: 0, area: 520_000, score: 120, width: 1300, height: 520 },
+      { idx: 1, area: 310_000, score: 95, width: 780, height: 430 }
+    ];
+    expect(pickTightestEligibleAnchorRowIdx(rows, videoRect)).toBe(1);
+  });
+
+  it('どちらも expanded に入らないときは全体から面積最小', () => {
+    const rows = [
+      { idx: 0, area: 230_400, score: 80, width: 640, height: 360 },
+      { idx: 1, area: 244_200, score: 82, width: 660, height: 370 }
+    ];
+    expect(pickTightestEligibleAnchorRowIdx(rows, videoRect)).toBe(0);
+  });
+
+  it('面積が同じときは score が大きい方を優先', () => {
+    const rows = [
+      { idx: 0, area: 300_000, score: 70, width: 750, height: 400 },
+      { idx: 1, area: 300_000, score: 95, width: 625, height: 480 }
+    ];
+    expect(pickTightestEligibleAnchorRowIdx(rows, videoRect)).toBe(1);
+  });
+
+  it('rows が空なら -1', () => {
+    expect(pickTightestEligibleAnchorRowIdx([], videoRect)).toBe(-1);
+  });
+});
+
+describe('stackedLayoutAnchorOverrides', () => {
+  it('デスクトップ横並び（動画がビューポート幅の半分程度）は緩めない', () => {
+    expect(
+      stackedLayoutAnchorOverrides(
+        { width: 1440, height: 900 },
+        { left: 80, top: 80, width: 720, height: 405 }
+      )
+    ).toEqual({});
+  });
+
+  it('狭いビューポートかつ動画が幅の大半を占めるときだけ maxHeight を緩める', () => {
+    expect(
+      stackedLayoutAnchorOverrides(
+        { width: 820, height: 920 },
+        { left: 12, top: 72, width: 796, height: 448 }
+      )
+    ).toMatchObject({
+      maxAreaRatio: 0.84,
+      maxHeightRatioToVideo: 3.25,
+      maxTopOffsetFromVideo: 168,
+      minAspect: 0.42
+    });
+  });
+
+  it('幅が極端に狭いときは動画カバレッジに関係なく緩める', () => {
+    expect(
+      stackedLayoutAnchorOverrides(
+        { width: 520, height: 780 },
+        { left: 10, top: 60, width: 280, height: 158 }
+      )
+    ).toMatchObject({
+      maxAreaRatio: 0.84,
+      maxHeightRatioToVideo: 3.25,
+      minAspect: 0.42
+    });
+  });
+});
 
 describe('scoreInlineHostAnchorCandidate', () => {
   it('video 単体相当（rect == videoRect）は eligible', () => {
@@ -265,5 +337,33 @@ describe('scoreInlineHostAnchorCandidate', () => {
   it('DEFAULT_INLINE_HOST_ANCHOR_LIMITS は旧 3.4/0.92 より厳しい', () => {
     expect(DEFAULT_INLINE_HOST_ANCHOR_LIMITS.maxAspect).toBeLessThan(3.4);
     expect(DEFAULT_INLINE_HOST_ANCHOR_LIMITS.maxAreaRatio).toBeLessThan(0.92);
+  });
+
+  it('縦積み overrides で縦長かつ面積がやや大きいプレイヤー行ラッパーが eligible になりうる', () => {
+    const viewport = { width: 820, height: 880 };
+    const videoRect = rect({ left: 12, top: 72, width: 620, height: 448 });
+    const stackedWrapper = rect({
+      left: 12,
+      top: 72,
+      width: 620,
+      height: 880 // aspect < 1 かつ area ratio が既定 maxAreaRatio をわずかに超える典型
+    });
+    const strict = scoreInlineHostAnchorCandidate({
+      rect: stackedWrapper,
+      viewport,
+      videoRect
+    });
+    expect(strict.eligible).toBe(false);
+
+    const ov = stackedLayoutAnchorOverrides(viewport, videoRect);
+    const relaxed = scoreInlineHostAnchorCandidate(
+      {
+        rect: stackedWrapper,
+        viewport,
+        videoRect
+      },
+      ov
+    );
+    expect(relaxed.eligible).toBe(true);
   });
 });

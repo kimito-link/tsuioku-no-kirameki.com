@@ -1,11 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateBesidePanelLayout,
+  computeBesideInsertionGapPx,
   DEFAULT_BESIDE_PANEL_LIMITS
 } from './inlineHostBesideSizing.js';
 
 /** @param {Partial<{left:number,top:number,width:number,height:number}>} r */
 const rect = (r) => ({ left: 0, top: 0, width: 0, height: 0, ...r });
+
+describe('computeBesideInsertionGapPx', () => {
+  it('次兄弟が無いときは viewport 右端（safeRight）までをギャップに含める', () => {
+    expect(computeBesideInsertionGapPx(880, 1700, null)).toBe(1700 - 12 - 880);
+  });
+
+  it('次兄弟の左端が狭ければその手前まで（実コメ列との間のみ）', () => {
+    expect(computeBesideInsertionGapPx(800, 1700, 820)).toBe(820 - 8 - 800);
+  });
+
+  it('besideInnerGap を上書きできる', () => {
+    expect(
+      computeBesideInsertionGapPx(800, 1700, 830, { besideInnerGap: 18 })
+    ).toBe(830 - 18 - 800);
+  });
+});
 
 describe('calculateBesidePanelLayout', () => {
   describe('幅計算 — viewport 右端をはみ出さない', () => {
@@ -68,6 +85,29 @@ describe('calculateBesidePanelLayout', () => {
       );
       // 利用可能幅 = 1500 - 850 - 60 = 590
       expect(r?.panelWidth).toBe(590);
+    });
+
+    it('flexInsertionGapPx が狭いときは null（実ギャップ優先・折り返し防止）', () => {
+      const r = calculateBesidePanelLayout({
+        videoRect: rect({ left: 40, top: 80, width: 560, height: 315 }),
+        playerRowRect: null,
+        viewport: { width: 1400, height: 900 },
+        contentNaturalHeight: null,
+        flexInsertionGapPx: 40
+      });
+      expect(r).toBeNull();
+    });
+
+    it('flexInsertionGapPx が十分あればその幅でクランプ（コメ列と競合しない）', () => {
+      const r = calculateBesidePanelLayout({
+        videoRect: rect({ left: 40, top: 80, width: 560, height: 315 }),
+        playerRowRect: null,
+        viewport: { width: 1400, height: 900 },
+        contentNaturalHeight: null,
+        flexInsertionGapPx: 320
+      });
+      expect(r).not.toBeNull();
+      expect(r?.panelWidth).toBe(320);
     });
   });
 
@@ -210,9 +250,10 @@ describe('calculateBesidePanelLayout', () => {
       expect(Object.isFrozen(DEFAULT_BESIDE_PANEL_LIMITS)).toBe(true);
     });
 
-    it('minWidth は 280、safeRight は 12（既存コードと整合）', () => {
+    it('minWidth は 280、safeRight は 12、besideInnerGap は 8（既存コードと整合）', () => {
       expect(DEFAULT_BESIDE_PANEL_LIMITS.minWidth).toBe(280);
       expect(DEFAULT_BESIDE_PANEL_LIMITS.safeRight).toBe(12);
+      expect(DEFAULT_BESIDE_PANEL_LIMITS.besideInnerGap).toBe(8);
     });
 
     it('maxHeightRatio は 0.72 以下（dock_bottom 0.55 より緩いが viewport 全占有はしない）', () => {

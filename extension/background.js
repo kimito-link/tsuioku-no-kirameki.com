@@ -14,6 +14,8 @@ const MATCH_PATTERNS = [
 ];
 const KEY_AUTO_BACKUP_STATE = 'nls_auto_backup_state';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
+/** 新規インストール時のみ true → content が初回タブ幅で nls_inline_panel_placement を一度だけ書く */
+const KEY_INSTALL_PANEL_PLACEMENT_PENDING = 'nls_install_panel_placement_pending_v1';
 const AUTO_BACKUP_ALARM = 'nls_auto_backup_every_5m';
 const AUTO_BACKUP_PERIOD_MINUTES = 5;
 const AUTO_BACKUP_DB_NAME = 'nls_auto_backup_v1';
@@ -422,6 +424,15 @@ chrome.runtime.onInstalled.addListener((details) => {
   void (async () => {
     await migrateFloatingPanelToDockProfileOnce();
     await migrateBelowPanelToDockProfileOnce();
+    if (details?.reason === 'install') {
+      try {
+        await chrome.storage.local.set({
+          [KEY_INSTALL_PANEL_PLACEMENT_PENDING]: true
+        });
+      } catch {
+        // no-op
+      }
+    }
     // D-4: 0.1.10 未満からの自動更新で「他人コメントへの誤焼き込み selfPosted」を剥がす。
     // 'install'（fresh）では走らないよう previousVersion を渡す。
     if (details?.reason === 'update') {

@@ -18,7 +18,15 @@ export const INGEST_TIMING = /** @type {const} */ ({
   // NDGR_CHAT_ROWS_POST_CHUNK=220 より少し上に置き、1チャンク=即flushを避ける。
   coalescerBurstThreshold: 260,
   visibleScanDelayMs: 380,
-  pageFrameLoopMs: 360
+  pageFrameLoopMs: 360,
+  /** scroll/resize からのインライン再レイアウトのみ（メンテ処理は走らせない） */
+  pageFrameLayoutScrollDebounceMs: 150,
+  /** 非可視タブで livePanelScan を N 回に 1 回だけ（可視復帰で onTabVisible が補償） */
+  hiddenLivePanelScanStride: 3,
+  /** 非可視時の AI 診断ストレージ書き込み最小間隔 */
+  aiShareFastDiagHiddenMinIntervalMs: 6000,
+  /** 可視時の AI 診断ストレージ書き込み最小間隔（従来 1500ms と同等） */
+  aiShareFastDiagVisibleMinIntervalMs: 1500
 });
 
 export const SUBMIT_TIMING = /** @type {const} */ ({
