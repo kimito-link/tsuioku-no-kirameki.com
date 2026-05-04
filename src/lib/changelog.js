@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.138',
+    date: '2026-05-04',
+    summary: '非視聴タブでもツールバーで従来のPOPを開く',
+    items: Object.freeze([
+      'ツールバー押下でインライン前面化に失敗したとき、サイドパネルではなく従来どおりの別窓ポップアップを開くように戻しました（新しいタブやニコ生以外などで「POP が出ない」症状の回避）',
+      '視聴ページでインラインが前面化できた場合の挙動は従来どおりです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.137',
     date: '2026-05-04',
     summary: 'ギフト帯の順位表示を本家寄せ（同率同順位）に',

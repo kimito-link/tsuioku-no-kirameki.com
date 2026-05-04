@@ -960,6 +960,15 @@
   // src/lib/changelog.js
   var EXTENSION_CHANGELOG = Object.freeze([
     Object.freeze({
+      version: "0.1.138",
+      date: "2026-05-04",
+      summary: "\u975E\u8996\u8074\u30BF\u30D6\u3067\u3082\u30C4\u30FC\u30EB\u30D0\u30FC\u3067\u5F93\u6765\u306EPOP\u3092\u958B\u304F",
+      items: Object.freeze([
+        "\u30C4\u30FC\u30EB\u30D0\u30FC\u62BC\u4E0B\u3067\u30A4\u30F3\u30E9\u30A4\u30F3\u524D\u9762\u5316\u306B\u5931\u6557\u3057\u305F\u3068\u304D\u3001\u30B5\u30A4\u30C9\u30D1\u30CD\u30EB\u3067\u306F\u306A\u304F\u5F93\u6765\u3069\u304A\u308A\u306E\u5225\u7A93\u30DD\u30C3\u30D7\u30A2\u30C3\u30D7\u3092\u958B\u304F\u3088\u3046\u306B\u623B\u3057\u307E\u3057\u305F\uFF08\u65B0\u3057\u3044\u30BF\u30D6\u3084\u30CB\u30B3\u751F\u4EE5\u5916\u306A\u3069\u3067\u300CPOP \u304C\u51FA\u306A\u3044\u300D\u75C7\u72B6\u306E\u56DE\u907F\uFF09",
+        "\u8996\u8074\u30DA\u30FC\u30B8\u3067\u30A4\u30F3\u30E9\u30A4\u30F3\u304C\u524D\u9762\u5316\u3067\u304D\u305F\u5834\u5408\u306E\u6319\u52D5\u306F\u5F93\u6765\u3069\u304A\u308A\u3067\u3059"
+      ])
+    }),
+    Object.freeze({
       version: "0.1.137",
       date: "2026-05-04",
       summary: "\u30AE\u30D5\u30C8\u5E2F\u306E\u9806\u4F4D\u8868\u793A\u3092\u672C\u5BB6\u5BC4\u305B\uFF08\u540C\u7387\u540C\u9806\u4F4D\uFF09\u306B",
@@ -18017,7 +18026,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
     try {
       const manifest = chrome.runtime.getManifest();
       const version = String(manifest?.version || "").trim() || "?";
-      const buildId = "0504-1608" ? String("0504-1608") : "dev";
+      const buildId = "0504-1615" ? String("0504-1615") : "dev";
       valueEl.textContent = `v${version}\u30FBb${buildId}`;
     } catch {
       valueEl.textContent = "\u2014";
