@@ -5311,10 +5311,17 @@ function renderUserRooms(entries, liveId = '') {
   //   broadcaster* フィールドから別経路で描画される。
   const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
   const broadcasterIconUrl = String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim();
-  const sanitizedRooms = sanitizeRoomAvatarsForBroadcaster(aggregateCommentsByUser(list), {
-    broadcasterUid,
-    broadcasterIconUrl
-  });
+  // 0.1.172: text が空の entry（ギフト送信のみ・システムイベント等）は
+  //   「ユーザー別の応援件数」セクションの趣旨と合わないため、`requireText: true`
+  //   で集計対象から外す。これでコメントしていないギフト sender が混入する事象
+  //   （ポンコツびぃちゃん 123514112 / lv350459157 で確認）を防ぐ。
+  const sanitizedRooms = sanitizeRoomAvatarsForBroadcaster(
+    aggregateCommentsByUser(list, { requireText: true }),
+    {
+      broadcasterUid,
+      broadcasterIconUrl
+    }
+  );
   const rooms = excludeBroadcasterFromRankedRooms(sanitizedRooms, broadcasterUid);
   ul.innerHTML = '';
 
@@ -8348,8 +8355,9 @@ async function buildHtmlReportDocument(
     snapshot?.broadcasterUserId || ''
   ).trim();
   // 0.1.78: HTML レポート側でも broadcaster icon の取り違えを補正
+  // 0.1.172: text 空（ギフト送信のみ等）のユーザーを「ユーザー別件数」から除外
   const aggregatedRoomsAll = sanitizeRoomAvatarsForBroadcaster(
-    aggregateCommentsByUser(comments),
+    aggregateCommentsByUser(comments, { requireText: true }),
     {
       broadcasterUid: reportBroadcasterUserId,
       broadcasterIconUrl: String(snapshot?.broadcasterIconUrl || '').trim()
@@ -9357,7 +9365,7 @@ async function buildHtmlReportDocument(
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.url || watchUrl || '').toLowerCase())}"><th>URL</th><td class="mono">${safeWatchUrl}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.title || '').toLowerCase())}"><th>Titleタグ</th><td>${safeTitle}</td></tr>
               <tr><th>保存コメント数</th><td>${comments.length}</td></tr>
-              <tr><th>ユーザー別件数</th><td>${aggregateCommentsByUser(comments).length}</td></tr>
+              <tr><th>ユーザー別件数</th><td>${aggregateCommentsByUser(comments, { requireText: true }).length}</td></tr>
               <tr><th>本文の平均字数</th><td>${reportBody.averageChars}</td></tr>
               <tr><th>本文の中央値字数</th><td>${reportBody.medianChars}</td></tr>
               <tr><th>本文の最大字数</th><td>${reportBody.maxChars}</td></tr>

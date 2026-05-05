@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.172',
+    date: '2026-05-06',
+    summary: '非コメユーザーの混入を集計から除外',
+    items: Object.freeze([
+      'コメントを 1 度もしていないユーザーがギフト送信などで「ユーザー別の応援件数」に混入していた事象を直しました（lv350459157 でポンコツびぃちゃんさんが非コメで混入する事例で確認）',
+      'HTML レポートのユーザー別件数も同様にコメントを投げた人だけに絞られるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.171',
     date: '2026-05-05',
     summary: 'ニコニ広告ページを開いた時に取り込み',

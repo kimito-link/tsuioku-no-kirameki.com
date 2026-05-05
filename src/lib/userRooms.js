@@ -34,10 +34,15 @@ export function displayUserLabel(userKey, nickname) {
 
 /**
  * @param {{ userId?: string|null, nickname?: string, text?: string, capturedAt?: number, avatarUrl?: string|null }[]} entries
+ * @param {{ requireText?: boolean }} [options]
+ *   - `requireText: true` のとき、`text` が空の entry は集計から除外する。
+ *     ギフト送信のみ（コメント無し）のユーザーが「ユーザー別の応援件数」に
+ *     混入する事象（ポンコツびぃちゃん lv350459157 で確認）を防ぐための filter。
  * @returns {{ userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string }[]}
  */
-export function aggregateCommentsByUser(entries) {
+export function aggregateCommentsByUser(entries, options) {
   const list = Array.isArray(entries) ? entries : [];
+  const requireText = !!options?.requireText;
   /** @type {Map<string, { userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string }>} */
   const map = new Map();
 
@@ -46,6 +51,7 @@ export function aggregateCommentsByUser(entries) {
     const userKey = uid || UNKNOWN_USER_KEY;
     const capturedAt = Number(e?.capturedAt || 0);
     const text = String(e?.text || '').trim();
+    if (requireText && !text) continue;
     const nickname = String(e?.nickname || '').trim();
     const rawAv = String(e?.avatarUrl || '').trim();
     const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : '';
