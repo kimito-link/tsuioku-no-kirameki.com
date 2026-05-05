@@ -72,6 +72,7 @@ import {
   fetchOfficialEventBannerFromAuditionEmbed,
   fetchNicoadContributionRankingFromPublishPage
 } from '../lib/officialEventDomBundle.js';
+import { scrapeContributionRankingFromDom } from '../lib/officialEventBannerDom.js';
 import {
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
@@ -7920,6 +7921,34 @@ async function persistOfficialEventDomBundleNow() {
       } catch { /* no-op */ }
     }
   }
+  // 0.1.171: ニコニ広告ページが SPA で fetch だと SSR empty なため、
+  // ユーザーが別タブで nicoad ページを開いたときに content script が scrape して
+  // chrome.storage.local の `nls_nicoad_ranking_<lv>` に保存する設計（content-entry.js
+  // 末尾の tryHarvestNicoadContributionRankingOnce）。ここでは watch タブが
+  // そのストレージを読み出して bundle に取り込む。
+  const haveAdRankingAfterFetch =
+    Array.isArray(fresh?.adContributionRanking) ||
+    Array.isArray(lastOfficialEventDomBundle?.adContributionRanking);
+  if (!haveAdRankingAfterFetch) {
+    try {
+      const key = `nls_nicoad_ranking_${lid}`;
+      const got = await chrome.storage.local.get([key]);
+      const data = got?.[key];
+      if (data && Array.isArray(data.ranking) && data.ranking.length > 0) {
+        fresh = fresh
+          ? { ...fresh, adContributionRanking: data.ranking }
+          : {
+              capturedAt: Date.now(),
+              eventBanner: null,
+              eventBalloon: null,
+              contributionRanking: null,
+              adContributionRanking: data.ranking,
+              programStats: null,
+              giftHistory: null
+            };
+      }
+    } catch { /* no-op */ }
+  }
   // 何も取れない時は古い値を消さない（モーダル閉時に消えるのを防ぐ）
   if (!fresh && !lastOfficialEventDomBundle) return;
   const merged = mergeOfficialEventDomBundle(lastOfficialEventDomBundle, fresh);
@@ -8183,6 +8212,49 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
   }
 }
 
+/**
+ * 0.1.171: ニコニ広告ページ (https://nicoad.nicovideo.jp/live/publish/<lv>?frontend_id=9)
+ * に注入されたとき、レンダリング完了を待って貢献度ランキングを scrape し、
+ * chrome.storage.local の `nls_nicoad_ranking_<lv>` に保存する。
+ *
+ * 同じ拡張の watch タブの content script が persistOfficialEventDomBundleNow で
+ * このストレージを読み出し、bundle.adContributionRanking にマージする
+ * （別タブ経由のデータブリッジ）。SPA は SSR で空 HTML を返すため fetch 経由は
+ * 取れない（v0.1.169-170 で empty 確認済み）が、ユーザーが nicoad ページを
+ * 開けば本物の DOM がレンダリングされるのでこの経路で取れる。
+ */
+function tryHarvestNicoadContributionRankingOnce() {
+  let url = '';
+  try { url = String(window.location.href || ''); } catch { return; }
+  const m = url.match(/^https:\/\/nicoad\.nicovideo\.jp\/live\/publish\/(lv\d+)/i);
+  if (!m) return;
+  const lid = m[1].toLowerCase();
+  /** @returns {boolean} */
+  const tryScrape = () => {
+    try {
+      const ranking = scrapeContributionRankingFromDom(document);
+      if (Array.isArray(ranking) && ranking.length > 0) {
+        try {
+          chrome.storage.local.set({
+            [`nls_nicoad_ranking_${lid}`]: {
+              capturedAt: Date.now(),
+              ranking,
+              sourceUrl: url
+            }
+          });
+        } catch { /* no-op */ }
+        return true;
+      }
+    } catch { /* no-op */ }
+    return false;
+  };
+  if (tryScrape()) return;
+  setTimeout(() => {
+    if (tryScrape()) return;
+    setTimeout(tryScrape, 5000);
+  }, 1500);
+}
+
 /*
  * document の data-nls-active だけだと、拡張の再読み込み後に isolated world が新しくなっても
  * 属性が残り start() が二度と走らず、記録・パネルがすべて死ぬ。実行ごとの global フラグで開始する。
@@ -8195,5 +8267,8 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   } catch {
     // no-op
   }
+  // ニコニ広告ページに注入された場合のハーベストは start() とは独立して走らせる
+  // （start は watch ページ専用で early return するため）
+  try { tryHarvestNicoadContributionRankingOnce(); } catch { /* no-op */ }
   start().catch((err) => reportSilentErrorToStorage('start', err));
 }

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.171',
+    date: '2026-05-05',
+    summary: 'ニコニ広告ページを開いた時に取り込み',
+    items: Object.freeze([
+      'ニコニ広告ページ（その番組をニコニ広告するボタンの先のページ）を別タブで開くと、貢献度ランキングが自動で記録に取り込まれるようになりました',
+      'これまでは取得できなかった広告ポイント順のランキングが、ニコニ広告ページを 1 度開けばそのまま反映されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.170',
     date: '2026-05-05',
     summary: '広告貢献度の取得状態を診断に出す',
