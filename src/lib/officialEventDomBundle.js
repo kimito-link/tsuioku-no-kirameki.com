@@ -44,11 +44,42 @@ export async function fetchOfficialEventBannerFromAuditionEmbed(liveId) {
 }
 
 /**
+ * ニコニ広告ページ（https://nicoad.nicovideo.jp/live/publish/<liveId>?frontend_id=9）
+ * を直接 fetch し、その HTML 内の「貢献度ランキング」（広告 pt 順）を scrape する。
+ * 同じ `scrapeContributionRankingFromDom` を流用（実 DOM が `.content-supporter-section`
+ * 構造で一致するため）。0.1.169 で追加。
+ *
+ * @param {string} liveId 例 'lv350459157'
+ * @returns {Promise<ReturnType<typeof scrapeContributionRankingFromDom>>}
+ */
+export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
+  const lid = String(liveId || '').trim();
+  if (!lid) return null;
+  const url =
+    'https://nicoad.nicovideo.jp/live/publish/' +
+    encodeURIComponent(lid) +
+    '?frontend_id=9';
+  try {
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return null;
+    const html = await res.text();
+    if (!html) return null;
+    if (typeof DOMParser === 'undefined') return null;
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    if (!doc) return null;
+    return scrapeContributionRankingFromDom(doc);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @typedef {{
  *   capturedAt: number,
  *   eventBanner: ReturnType<typeof scrapeOfficialEventBannerFromDom>,
  *   eventBalloon: ReturnType<typeof scrapeOfficialEventBalloonFromDom>,
  *   contributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
+ *   adContributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
  *   programStats: ReturnType<typeof scrapeProgramStatisticsMenuFromDom>,
  *   giftHistory: ReturnType<typeof scrapeGiftHistoryFromDom>
  * }} OfficialEventDomBundle
@@ -86,6 +117,7 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
     eventBanner,
     eventBalloon,
     contributionRanking,
+    adContributionRanking: null,
     programStats,
     giftHistory
   };
@@ -108,6 +140,8 @@ export function mergeOfficialEventDomBundle(prev, next) {
     eventBanner: next.eventBanner || prev.eventBanner,
     eventBalloon: next.eventBalloon || prev.eventBalloon,
     contributionRanking: next.contributionRanking || prev.contributionRanking,
+    adContributionRanking:
+      next.adContributionRanking || prev.adContributionRanking || null,
     programStats: next.programStats || prev.programStats,
     giftHistory: next.giftHistory || prev.giftHistory
   };

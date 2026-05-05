@@ -69,7 +69,8 @@ import { mergeGiftUsers } from '../lib/giftRecord.js';
 import {
   collectOfficialEventDomBundle,
   mergeOfficialEventDomBundle,
-  fetchOfficialEventBannerFromAuditionEmbed
+  fetchOfficialEventBannerFromAuditionEmbed,
+  fetchNicoadContributionRankingFromPublishPage
 } from '../lib/officialEventDomBundle.js';
 import {
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
@@ -1159,6 +1160,8 @@ function resetOfficialStatsState() {
   _autoOpenGiftSidebarTriedLiveId = '';
   // audition embed の fetch も新 liveId で再実行を許す
   _auditionBannerFetchedForLid = '';
+  // ニコニ広告 fetch も新 liveId で再実行を許す
+  _nicoadContribFetchedForLid = '';
   resetOfficialCommentSamplingState();
 }
 
@@ -3313,6 +3316,17 @@ function buildGiftDiagnosticsBundle() {
                   : null,
               top1Contribution: b.contributionRanking[0]?.contribution ?? null,
               anonymousCount: b.contributionRanking.filter((r) => r?.isAnonymous).length
+            }
+          : null,
+        adContributionRanking: Array.isArray(b.adContributionRanking)
+          ? {
+              count: b.adContributionRanking.length,
+              top1Name:
+                b.adContributionRanking[0] && !b.adContributionRanking[0].isAnonymous
+                  ? b.adContributionRanking[0].name
+                  : null,
+              top1Contribution: b.adContributionRanking[0]?.contribution ?? null,
+              anonymousCount: b.adContributionRanking.filter((r) => r?.isAnonymous).length
             }
           : null,
         giftHistory: Array.isArray(b.giftHistory)
@@ -7734,6 +7748,13 @@ let _autoOpenGiftSidebarTriedLiveId = '';
 let _auditionBannerFetchedForLid = '';
 
 /**
+ * ニコニ広告ページの「貢献度ランキング（広告 pt 順）」を fetch 済の liveId。
+ * 0.1.169 で追加。同じ liveId につき 1 度きり。
+ * @type {string}
+ */
+let _nicoadContribFetchedForLid = '';
+
+/**
  * 「ギフトサイドバーが開いた瞬間／ユーザーがランキングタブに切り替えた瞬間」を
  * MutationObserver で検知して即スクレイプする。タブクリックの自動化はサイト側の
  * 実装変化に弱いので、こちらの DOM 観測に頼るのが堅実。
@@ -7832,7 +7853,9 @@ async function persistOfficialEventDomBundleNow() {
               eventBanner: fetched,
               eventBalloon: null,
               contributionRanking: null,
-              programStats: null
+              adContributionRanking: null,
+              programStats: null,
+              giftHistory: null
             };
         try {
           document.documentElement?.setAttribute(
@@ -7851,6 +7874,47 @@ async function persistOfficialEventDomBundleNow() {
     } catch {
       try {
         document.documentElement?.setAttribute('data-nls-audition-fetch', 'error');
+      } catch { /* no-op */ }
+    }
+  }
+  // 0.1.169: ニコニ広告ページから貢献度ランキング（広告 pt 順）を fetch。
+  // モチベーション源として popup に表示する。同じ liveId につき 1 度きり。
+  const haveAdRankingAlready =
+    Array.isArray(fresh?.adContributionRanking) ||
+    Array.isArray(lastOfficialEventDomBundle?.adContributionRanking);
+  if (!haveAdRankingAlready && _nicoadContribFetchedForLid !== lid) {
+    _nicoadContribFetchedForLid = lid;
+    try {
+      const fetched = await fetchNicoadContributionRankingFromPublishPage(lid);
+      if (Array.isArray(fetched) && fetched.length > 0) {
+        fresh = fresh
+          ? { ...fresh, adContributionRanking: fetched }
+          : {
+              capturedAt: Date.now(),
+              eventBanner: null,
+              eventBalloon: null,
+              contributionRanking: null,
+              adContributionRanking: fetched,
+              programStats: null,
+              giftHistory: null
+            };
+        try {
+          document.documentElement?.setAttribute(
+            'data-nls-nicoad-fetch',
+            'ok'
+          );
+        } catch { /* no-op */ }
+      } else {
+        try {
+          document.documentElement?.setAttribute(
+            'data-nls-nicoad-fetch',
+            'empty'
+          );
+        } catch { /* no-op */ }
+      }
+    } catch {
+      try {
+        document.documentElement?.setAttribute('data-nls-nicoad-fetch', 'error');
       } catch { /* no-op */ }
     }
   }

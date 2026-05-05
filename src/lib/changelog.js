@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.169',
+    date: '2026-05-05',
+    summary: '広告貢献度ランキングを別経路で取得',
+    items: Object.freeze([
+      'ニコニ広告ページから「広告ポイントの貢献度ランキング」を直接取得するようにしました（モチベーション源として、配信中でも一覧で見えるように）',
+      '取得したランキングは記録の保存に使われ、診断情報からも確認できるようになりました（popup 上での見せ方は次のバージョンで仕上げます）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.168',
     date: '2026-05-05',
     summary: '貢献度ランキングを popup で読めるように',
