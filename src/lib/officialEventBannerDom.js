@@ -54,10 +54,16 @@ export function scrapeOfficialEventBannerFromDom(root) {
   /** @type {HTMLElement|null} */
   let wrapper = null;
   try {
-    const owners = /** @type {NodeListOf<HTMLElement>} */ (
+    /** @type {NodeListOf<HTMLElement>|Element[]} */
+    let owners =
       /** @type {any} */ (base).querySelectorAll?.('.owner-name') ||
-        doc.querySelectorAll('.owner-name')
-    );
+      doc.querySelectorAll('.owner-name');
+    if (!owners || owners.length === 0) {
+      // CSS Modules ハッシュ化対応
+      owners =
+        /** @type {any} */ (base).querySelectorAll?.('[class*="owner-name"]') ||
+        doc.querySelectorAll('[class*="owner-name"]');
+    }
     for (const el of owners) {
       if (!(el instanceof HTMLElement)) continue;
       const t = String(el.textContent || '');
@@ -74,19 +80,43 @@ export function scrapeOfficialEventBannerFromDom(root) {
   }
   if (!wrapper) return null;
 
-  /** @param {string} sel */
-  const q = (sel) => {
+  /**
+   * simple class selector を試し、空なら CSS Modules ハッシュ化用の partial match に
+   * フォールバックする querySelector ヘルパ。
+   * @param {string} simpleSel
+   * @param {string} fragment
+   * @param {string} [excludeFragment]
+   */
+  const q2 = (simpleSel, fragment, excludeFragment) => {
     try {
-      return wrapper.querySelector(sel);
+      const r = wrapper.querySelector(simpleSel);
+      if (r) return r;
+    } catch { /* no-op */ }
+    if (!fragment) return null;
+    try {
+      const sel = excludeFragment
+        ? `[class*="${fragment}"]:not([class*="${excludeFragment}"])`
+        : `[class*="${fragment}"]`;
+      return wrapper.querySelector(sel) || null;
     } catch {
       return null;
     }
   };
-  const rankEl = q('.rank-num');
-  const scoreEl = q('.score');
-  const nameEl = q('.name');
-  const thumbEl = q('.thumbnail');
-  const ownerEl = q('.owner-name');
+  const rankEl = q2('.rank-num', 'rank-num');
+  const scoreEl = q2('.score', 'score', 'score-icon');
+  // `.name` は紛らわしい（owner-name / ranker-name / advertiser-name 等）ので
+  //   ① name-wrapper or marquee-target 配下に絞った simple
+  //   ② 同パターンの partial match（CSS Modules ハッシュ化対応）
+  //   ③ どちらも無ければ wrapper 配下の素朴な .name（旧 test 互換、owner-name は除外）
+  const nameEl =
+    wrapper.querySelector('.name-wrapper .name') ||
+    wrapper.querySelector('.marquee-target .name') ||
+    wrapper.querySelector('[class*="name-wrapper"] [class*="name"]:not([class*="name-wrapper"])') ||
+    wrapper.querySelector('[class*="marquee-target"] [class*="name"]') ||
+    wrapper.querySelector('.name:not(.owner-name)') ||
+    wrapper.querySelector('[class*="name"]:not([class*="owner-name"]):not([class*="ranker-name"]):not([class*="advertiser-name"])');
+  const thumbEl = q2('.thumbnail', 'thumbnail');
+  const ownerEl = q2('.owner-name', 'owner-name');
 
   const rankText = String(rankEl?.textContent || '').trim();
   const rank = /^\d+$/.test(rankText) ? parseInt(rankText, 10) : null;
@@ -230,10 +260,28 @@ export function scrapeContributionRankingFromDom(root) {
   /** @type {NodeListOf<Element>|Element[]} */
   let lis;
   try {
+    // 実 DOM 構造（2026-05-05 ユーザー提供サンプルで確認）：
+    //   .content-supporter-section .wrapper > ul.wrapper > li.item
+    //   各 li.item は i.rank, div.info > button.ranker / p.contribution を持つ
+    //   button.ranker[disabled] は「視聴者ページに飛べない（匿名/退会等）」相当
     lis =
       /** @type {any} */ (root).querySelectorAll?.(
-        '.contribution-ranking-list .ranker'
+        '.content-supporter-section ul.wrapper > li.item'
       ) || [];
+    // 旧構造（古いビルド or test 用）
+    if (!lis || lis.length === 0) {
+      lis =
+        /** @type {any} */ (root).querySelectorAll?.(
+          '.contribution-ranking-list .ranker'
+        ) || [];
+    }
+    // CSS Modules ハッシュ化対応（保険）
+    if (!lis || lis.length === 0) {
+      lis =
+        /** @type {any} */ (root).querySelectorAll?.(
+          '[class*="content-supporter"] ul > li[class*="item"]:not([class*="items"])'
+        ) || [];
+    }
   } catch {
     return null;
   }
@@ -243,30 +291,71 @@ export function scrapeContributionRankingFromDom(root) {
   const rows = [];
   let i = 0;
   for (const li of /** @type {Iterable<Element>} */ (lis)) {
-    const rankEl = li.querySelector?.('.rank');
-    const nameEl = li.querySelector?.('.ranker-name-value');
-    const contribEl = li.querySelector?.('.contribution');
-    const thumbEl = li.querySelector?.('.thumbnail');
     const idx = i++;
+    if (!(li instanceof HTMLElement)) continue;
+    // rank: i.rank の textContent（4 位以降は数字、1〜3 位は SVG で空）
+    const rankEl =
+      li.querySelector('i.rank') ||
+      li.querySelector(':scope > [class*="rank"]:not([class*="ranker"])') ||
+      li.querySelector('.rank');
+    // ranker（button）: ユーザー名と匿名判定の起点
+    const rankerEl =
+      li.querySelector('.ranker') ||
+      li.querySelector('button.ranker') ||
+      li.querySelector('[class*="ranker"]:not([class*="ranker-name"])');
+    // name: .ranker > .name（実 DOM）または .ranker-name-value（旧 DOM）
+    const nameEl =
+      (rankerEl instanceof HTMLElement &&
+        (rankerEl.querySelector(':scope > .name') ||
+          rankerEl.querySelector('.name'))) ||
+      li.querySelector('.ranker-name-value') ||
+      li.querySelector('[class*="ranker-name-value"]') ||
+      null;
+    // contribution
+    const contribEl =
+      li.querySelector('.contribution') ||
+      li.querySelector('[class*="contribution"]:not([class*="contribution-ranking"]):not([class*="contribution-unit"])');
+    // thumbnail: .ranker 内の .thumbnail（背景画像）
+    const thumbEl =
+      (rankerEl instanceof HTMLElement && rankerEl.querySelector('.thumbnail')) ||
+      li.querySelector('.thumbnail') ||
+      li.querySelector('[class*="thumbnail"]');
+
     if (!(nameEl instanceof HTMLElement) || !(contribEl instanceof HTMLElement)) {
       continue;
     }
     /** @type {number|null} */
     let rank = null;
     if (rankEl instanceof HTMLElement) {
-      const span = rankEl.querySelector('span');
-      const txt = String(span?.textContent || '').trim();
-      if (/^\d+$/.test(txt)) rank = parseInt(txt, 10);
+      // 直接の textContent から数字を抽出（4位以降は "4", "5" 等）
+      const directTxt = String(rankEl.textContent || '').replace(/[^\d]/g, '');
+      if (/^\d+$/.test(directTxt)) rank = parseInt(directTxt, 10);
+      // 旧 DOM 互換: span 直下にテキストがあるパターン
+      if (rank == null) {
+        const span = rankEl.querySelector('span');
+        const sTxt = String(span?.textContent || '').replace(/[^\d]/g, '');
+        if (/^\d+$/.test(sTxt)) rank = parseInt(sTxt, 10);
+      }
     }
     if (rank == null && idx < 3) {
       rank = idx + 1;
     }
     if (rank == null) continue;
 
-    const name = String(nameEl.textContent || '').trim();
+    // name 抽出時に honorific（「さん」）が含まれていたら除く
+    const nameClone = nameEl.cloneNode(true);
+    if (nameClone instanceof HTMLElement) {
+      const honorific = nameClone.querySelector('.honorific, [class*="honorific"]');
+      if (honorific) honorific.remove();
+    }
+    const name = String(
+      nameClone instanceof HTMLElement ? nameClone.textContent : nameEl.textContent || ''
+    ).trim();
     if (!name) continue;
     const isAnonymous =
-      nameEl.getAttribute('data-button-disabled') === 'true' || name === '名無し';
+      (rankerEl instanceof HTMLElement && rankerEl.hasAttribute('disabled')) ||
+      nameEl.getAttribute('data-button-disabled') === 'true' ||
+      name === '名無し';
 
     const contribDigits = String(contribEl.textContent || '').replace(/[^\d]/g, '');
     if (!/^\d+$/.test(contribDigits)) continue;
@@ -444,6 +533,13 @@ export function scrapeGiftHistoryFromDom(root) {
     items =
       /** @type {any} */ (root).querySelectorAll?.('.gift-history-list .item') ||
       [];
+    // CSS Modules ハッシュ化対応：simple selector が空なら partial match を試す
+    if (!items || items.length === 0) {
+      items =
+        /** @type {any} */ (root).querySelectorAll?.(
+          '[class*="gift-history-list"] [class*="item"]:not([class*="items"])'
+        ) || [];
+    }
   } catch {
     return null;
   }
@@ -452,17 +548,27 @@ export function scrapeGiftHistoryFromDom(root) {
   const out = [];
   for (const li of /** @type {Iterable<Element>} */ (items)) {
     if (!(li instanceof HTMLElement)) continue;
-    const thumb = li.querySelector('.thumbnail');
-    const timeEl = li.querySelector('.time');
-    const nameEl = li.querySelector('.advertiser-name');
-    const pointEl = li.querySelector('.point');
+    const thumb =
+      li.querySelector('.thumbnail') ||
+      li.querySelector('[class*="thumbnail"]');
+    const timeEl =
+      li.querySelector('.time') ||
+      li.querySelector('[class*="time"]');
+    const nameEl =
+      li.querySelector('.advertiser-name') ||
+      li.querySelector('[class*="advertiser-name"]');
+    const pointEl =
+      li.querySelector('.point') ||
+      li.querySelector('[class*="point"]:not([class*="point-unit"])');
     if (!(nameEl instanceof HTMLElement) || !(pointEl instanceof HTMLElement)) {
       continue;
     }
     // 名前から honorific（「さん」）を除いたテキストだけ取る
     const nameClone = nameEl.cloneNode(true);
     if (nameClone instanceof HTMLElement) {
-      const honorific = nameClone.querySelector('.honorific');
+      const honorific =
+        nameClone.querySelector('.honorific') ||
+        nameClone.querySelector('[class*="honorific"]');
       if (honorific) honorific.remove();
     }
     const name = String(
@@ -473,7 +579,9 @@ export function scrapeGiftHistoryFromDom(root) {
     // ポイントから unit（「pt」）を除いた数字だけ取る
     const pointClone = pointEl.cloneNode(true);
     if (pointClone instanceof HTMLElement) {
-      const unit = pointClone.querySelector('.point-unit');
+      const unit =
+        pointClone.querySelector('.point-unit') ||
+        pointClone.querySelector('[class*="point-unit"]');
       if (unit) unit.remove();
     }
     const pointText = String(

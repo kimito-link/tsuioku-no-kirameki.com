@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.168',
+    date: '2026-05-05',
+    summary: '貢献度ランキングを popup で読めるように',
+    items: Object.freeze([
+      'ニコニコの「貢献度ランキング」が popup に表示されない不具合を直しました（取得対象の DOM 構造が実物と違っていたのが原因）',
+      'ランキングは popup の上部に「1位 むんたさん 15,200貢」のように並びます。応援者の名前と貢献ポイントがそのまま見えます',
+      '広告ポイントランキングは次のバージョンで追加します（モチベーション源として）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.167',
     date: '2026-05-05',
     summary: 'ツールバー押しても何も出ない事故を修正',

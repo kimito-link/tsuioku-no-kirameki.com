@@ -113,7 +113,91 @@ describe('scrapeOfficialEventBalloonFromDom', () => {
 });
 
 describe('scrapeContributionRankingFromDom', () => {
-  it('実 niconico DOM (貢献度ランキング) から rank/name/contribution/thumb を取り出す', () => {
+  it('2026-05 実 niconico DOM（content-supporter-section / ul.wrapper > li.item / button.ranker > .name）から rank/name/contribution を取る', () => {
+    document.body.innerHTML = `
+      <div class="secondary-content-info">
+        <div class="content-supporter-section">
+          <div class="wrapper">
+            <nav class="tabs">
+              <button class="tab" aria-selected="true">貢献度ランキング</button>
+              <button class="tab" aria-selected="false">広告履歴</button>
+            </nav>
+            <div class="panel-container">
+              <div>
+                <ul class="wrapper">
+                  <li class="item">
+                    <i class="rank"><svg class="rank-icon"></svg></i>
+                    <div class="info">
+                      <button class="ranker">
+                        <span class="name">むんた</span>
+                        <span class="honorific"> さん </span>
+                        <span class="reward">
+                          <i class="body">
+                            <span class="thumbnail" style="background-image: url('https://asset2.dlive.nicovideo.jp/abc/screenshot.jpg');"></span>
+                          </i>
+                        </span>
+                      </button>
+                      <p class="contribution">15,200 <svg class="contribution-unit"></svg></p>
+                    </div>
+                  </li>
+                  <li class="item">
+                    <i class="rank"><svg class="rank-icon"></svg></i>
+                    <div class="info">
+                      <button class="ranker">
+                        <span class="name">ムッシュ村村</span>
+                        <span class="honorific"> さん </span>
+                      </button>
+                      <p class="contribution">9,609 <svg></svg></p>
+                    </div>
+                  </li>
+                  <li class="item">
+                    <i class="rank"><svg class="rank-icon"></svg></i>
+                    <div class="info">
+                      <button class="ranker" disabled>
+                        <span class="name">高市早苗</span>
+                        <span class="honorific"> さん </span>
+                      </button>
+                      <p class="contribution">7,061 <svg></svg></p>
+                    </div>
+                  </li>
+                  <li class="item">
+                    <i class="rank">4</i>
+                    <div class="info">
+                      <button class="ranker">
+                        <span class="name">な、言うたやろ</span>
+                        <span class="honorific"> さん </span>
+                      </button>
+                      <p class="contribution">5,328 <svg></svg></p>
+                    </div>
+                  </li>
+                  <li class="item">
+                    <i class="rank">5</i>
+                    <div class="info">
+                      <button class="ranker" disabled>
+                        <span class="name">あ</span>
+                        <span class="honorific"> さん </span>
+                      </button>
+                      <p class="contribution">3,644 <svg></svg></p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    const rows = scrapeContributionRankingFromDom(document);
+    expect(rows).not.toBeNull();
+    expect(rows.length).toBe(5);
+    expect(rows[0]).toMatchObject({ rank: 1, name: 'むんた', contribution: 15200, isAnonymous: false });
+    expect(rows[0].thumbnailUrl).toContain('screenshot.jpg');
+    expect(rows[1]).toMatchObject({ rank: 2, name: 'ムッシュ村村', contribution: 9609, isAnonymous: false });
+    expect(rows[2]).toMatchObject({ rank: 3, name: '高市早苗', contribution: 7061, isAnonymous: true });
+    expect(rows[3]).toMatchObject({ rank: 4, name: 'な、言うたやろ', contribution: 5328, isAnonymous: false });
+    expect(rows[4]).toMatchObject({ rank: 5, name: 'あ', contribution: 3644, isAnonymous: true });
+  });
+
+  it('実 niconico DOM (貢献度ランキング・旧構造) から rank/name/contribution/thumb を取り出す', () => {
     document.body.innerHTML = `
       <div class="wrapper">
         <h2 class="title">貢献度ランキング</h2>
