@@ -3,9 +3,10 @@ import {
   pbVarint,
   pbForEach,
   decodeStatistics,
+  ndgrStatisticsHasWireSignal,
+  mergeNdgrStatistics,
   decodeChat,
   decodeGift,
-  pickNdgrGiftAdvertiserUserId,
   decodeChunkedMessage,
   decodePackedSegment
 } from './ndgrDecode.js';
@@ -88,6 +89,9 @@ describe('decodeStatistics', () => {
     expect(stats.comments).toBe(1200);
     expect(stats.adPoints).toBe(5000);
     expect(stats.giftPoints).toBe(8000);
+    expect(stats.eventGiftScore).toBeNull();
+    expect(stats.eventRank).toBeNull();
+    expect(stats.eventTitle).toBeNull();
   });
 
   it('handles partial statistics', () => {
@@ -95,6 +99,53 @@ describe('decodeStatistics', () => {
     const stats = decodeStatistics(buf, 0, buf.length);
     expect(stats.viewers).toBe(100);
     expect(stats.comments).toBeNull();
+  });
+
+  it('decodes event fields (5/6 varint, 7 string)', () => {
+    const buf = new Uint8Array([
+      ...varintField(4, 999),
+      ...varintField(5, 111),
+      ...varintField(6, 7),
+      ...strField(7, '春のギフト')
+    ]);
+    const stats = decodeStatistics(buf, 0, buf.length);
+    expect(stats.giftPoints).toBe(999);
+    expect(stats.eventGiftScore).toBe(111);
+    expect(stats.eventRank).toBe(7);
+    expect(stats.eventTitle).toBe('春のギフト');
+  });
+
+  it('ndgrStatisticsHasWireSignal: giftPoints のみでも true', () => {
+    expect(
+      ndgrStatisticsHasWireSignal({
+        viewers: null,
+        comments: null,
+        adPoints: null,
+        giftPoints: 1,
+        eventGiftScore: null,
+        eventRank: null,
+        eventTitle: null
+      })
+    ).toBe(true);
+    expect(ndgrStatisticsHasWireSignal(null)).toBe(false);
+  });
+});
+
+describe('mergeNdgrStatistics', () => {
+  it('後勝ちで数値列を埋め、タイトルは長い方を優先', () => {
+    const aBuf = new Uint8Array([...varintField(1, 1), ...varintField(4, 1000)]);
+    const a = decodeStatistics(aBuf, 0, aBuf.length);
+    const bBuf = new Uint8Array([
+      ...varintField(5, 200),
+      ...varintField(6, 3),
+      ...strField(7, '春の箱')
+    ]);
+    const b = decodeStatistics(bBuf, 0, bBuf.length);
+    const m = mergeNdgrStatistics(a, b);
+    expect(m?.giftPoints).toBe(1000);
+    expect(m?.eventGiftScore).toBe(200);
+    expect(m?.eventRank).toBe(3);
+    expect(m?.eventTitle).toBe('春の箱');
   });
 });
 
@@ -224,44 +275,6 @@ describe('decodeChat', () => {
   });
 });
 
-describe('pickNdgrGiftAdvertiserUserId', () => {
-  it('field 5 varint を field 1 より優先', () => {
-    expect(
-      pickNdgrGiftAdvertiserUserId([
-        { fieldNum: 1, val: '4046119', kind: 'varint' },
-        { fieldNum: 5, val: '87654321', kind: 'varint' }
-      ])
-    ).toBe('87654321');
-  });
-
-  it('field 3 varint を field 1 より優先', () => {
-    expect(
-      pickNdgrGiftAdvertiserUserId([
-        { fieldNum: 1, val: '4046119', kind: 'varint' },
-        { fieldNum: 3, val: '87654321', kind: 'varint' }
-      ])
-    ).toBe('87654321');
-  });
-
-  it('nestedChatRaw は field 5 より優先', () => {
-    expect(
-      pickNdgrGiftAdvertiserUserId([
-        { fieldNum: 5, val: '11111111', kind: 'varint' },
-        { fieldNum: 7, val: '87654321', kind: 'nestedChatRaw' }
-      ])
-    ).toBe('87654321');
-  });
-
-  it('nestedChatRaw 同士は深い _nestDepth を優先', () => {
-    expect(
-      pickNdgrGiftAdvertiserUserId([
-        { fieldNum: 1, val: '11111111', kind: 'nestedChatRaw', _nestDepth: 0 },
-        { fieldNum: 2, val: '87654321', kind: 'nestedChatRaw', _nestDepth: 2 }
-      ])
-    ).toBe('87654321');
-  });
-});
-
 describe('decodeGift', () => {
   it('pulls advertiser id and name from len/varint fields', () => {
     const buf = new Uint8Array([
@@ -271,80 +284,6 @@ describe('decodeGift', () => {
     const g = decodeGift(buf, 0, buf.length);
     expect(g.advertiserUserId).toBe('87654321');
     expect(g.advertiserName).toBe('senderNick');
-  });
-
-  it('field 1 の誤検出 ID より field 3 の送り主 ID を採用（誤結合回帰）', () => {
-    const buf = new Uint8Array([
-      ...varintField(1, 4046119),
-      ...strField(2, 'kusa'),
-      ...varintField(3, 87654321)
-    ]);
-    const g = decodeGift(buf, 0, buf.length);
-    expect(g.advertiserUserId).toBe('87654321');
-    expect(g.advertiserName).toBe('kusa');
-  });
-
-  it('field 5 があれば field 3 より優先（Chat raw_user_id と整合）', () => {
-    const buf = new Uint8Array([
-      ...strField(2, 'ギフト送り'),
-      ...varintField(3, 11111111),
-      ...varintField(5, 87654321)
-    ]);
-    const g = decodeGift(buf, 0, buf.length);
-    expect(g.advertiserUserId).toBe('87654321');
-    expect(g.advertiserName).toBe('ギフト送り');
-  });
-
-  it('LEN ネスト内の field5 raw_user_id を最優先し、表示名もネストから取る', () => {
-    const nested = new Uint8Array([
-      ...varintField(5, 87654321),
-      ...strField(2, '本物の送り主')
-    ]);
-    const buf = new Uint8Array([
-      ...varintField(1, 4046119),
-      ...strField(2, '表層ラベル'),
-      ...lenDelimited(7, [...nested])
-    ]);
-    const g = decodeGift(buf, 0, buf.length);
-    expect(g.advertiserUserId).toBe('87654321');
-    expect(g.advertiserName).toBe('本物の送り主');
-  });
-
-  it('二段 LEN の奥の field5 も拾う', () => {
-    const core = new Uint8Array([
-      ...varintField(5, 87654321),
-      ...strField(2, '奥の送り主')
-    ]);
-    const mid = new Uint8Array(lenDelimited(11, [...core]));
-    const buf = new Uint8Array([
-      ...varintField(1, 4046119),
-      ...lenDelimited(10, [...mid])
-    ]);
-    const g = decodeGift(buf, 0, buf.length);
-    expect(g.advertiserUserId).toBe('87654321');
-    expect(g.advertiserName).toBe('奥の送り主');
-  });
-
-  it('field5 が数字のみの LEN 文字列でも送り主として採用', () => {
-    const nested = new Uint8Array([
-      ...strField(5, '87654321'),
-      ...strField(2, 'str5nick')
-    ]);
-    const buf = new Uint8Array([...lenDelimited(9, [...nested])]);
-    const g = decodeGift(buf, 0, buf.length);
-    expect(g.advertiserUserId).toBe('87654321');
-    expect(g.advertiserName).toBe('str5nick');
-  });
-
-  it('field 2 が nicolive_ 内部ラベルのときは表示名にせず別の LEN を採用', () => {
-    const buf = new Uint8Array([
-      ...strField(2, 'nicolive_audition_lightgreen'),
-      ...strField(2, 'AIコメントジェネレータテトス'),
-      ...varintField(3, 10170134)
-    ]);
-    const g = decodeGift(buf, 0, buf.length);
-    expect(g.advertiserUserId).toBe('10170134');
-    expect(g.advertiserName).toBe('AIコメントジェネレータテトス');
   });
 });
 
@@ -363,6 +302,44 @@ describe('decodeChunkedMessage', () => {
     expect(result.stats.comments).toBe(1200);
     expect(result.chats.length).toBe(0);
     expect(result.gifts.length).toBe(0);
+  });
+
+  it('field4 内の複数 LEN statistics をマージする', () => {
+    const statsA = new Uint8Array([
+      ...varintField(1, 10),
+      ...varintField(4, 1000)
+    ]);
+    const statsB = new Uint8Array([
+      ...varintField(5, 200),
+      ...varintField(6, 7),
+      ...strField(7, '合同')
+    ]);
+    const state4 = new Uint8Array([
+      ...lenDelimited(1, [...statsA]),
+      ...lenDelimited(2, [...statsB])
+    ]);
+    const chunk = new Uint8Array([...lenDelimited(4, [...state4])]);
+    const r = decodeChunkedMessage(chunk, 0, chunk.length);
+    expect(r.stats?.viewers).toBe(10);
+    expect(r.stats?.giftPoints).toBe(1000);
+    expect(r.stats?.eventGiftScore).toBe(200);
+    expect(r.stats?.eventRank).toBe(7);
+    expect(r.stats?.eventTitle).toBe('合同');
+  });
+
+  it('トップレベル field5 LEN も statistics としてマージする', () => {
+    const st = new Uint8Array([
+      ...varintField(3, 1),
+      ...varintField(4, 99),
+      ...varintField(5, 50),
+      ...strField(7, 'f5')
+    ]);
+    const chunk = new Uint8Array([...lenDelimited(5, [...st])]);
+    const r = decodeChunkedMessage(chunk, 0, chunk.length);
+    expect(r.stats?.adPoints).toBe(1);
+    expect(r.stats?.giftPoints).toBe(99);
+    expect(r.stats?.eventGiftScore).toBe(50);
+    expect(r.stats?.eventTitle).toBe('f5');
   });
 
   it('decodes chat from message field', () => {
@@ -436,6 +413,65 @@ describe('decodeChunkedMessage', () => {
     expect(result.chats.length).toBe(1);
     expect(result.chats[0].no).toBe(3);
     expect(result.gifts.length).toBe(0);
+  });
+
+  it('tagHistogram に top/msg の field tag を集計する', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'a'),
+      ...varintField(5, 1),
+      ...varintField(8, 9)
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...chat]));
+    const stats = new Uint8Array([...varintField(1, 5)]);
+    const state = new Uint8Array(lenDelimited(1, [...stats]));
+    // 既存解釈に乗らない top:11 と msg:5（ギフト/順位 候補）も同梱して観測対象にする
+    const unknownTop = new Uint8Array([0x11, 0x42]);
+    const unknownMsg = new Uint8Array([
+      0x2a,
+      0x02,
+      0x10,
+      0x07
+    ]);
+    const chunked = new Uint8Array([
+      ...lenDelimited(4, [...state]),
+      ...lenDelimited(2, [...msg]),
+      ...lenDelimited(2, [...unknownMsg])
+    ]);
+    void unknownTop;
+    const r = decodeChunkedMessage(chunked);
+    expect(r.tagHistogram.top['4']).toBe(1);
+    expect(r.tagHistogram.top['2']).toBe(2);
+    expect(r.tagHistogram.msg['1']).toBe(1);
+    // unknownMsg の inner: field tag 5 (= msg key '5')
+    expect(r.tagHistogram.msg['5']).toBe(1);
+  });
+
+  it('tagHistogram は空でも 0 件オブジェクトを返す', () => {
+    const r = decodeChunkedMessage(new Uint8Array([]));
+    expect(r.tagHistogram).toEqual({ top: {}, msg: {} });
+  });
+
+  it('top.1 (現プロトコル経路) からも chat / gift を取り出す', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'top1 chat'),
+      ...varintField(5, 999),
+      ...varintField(8, 42)
+    ]);
+    const gift = new Uint8Array([
+      ...strField(1, '12345678'),
+      ...strField(2, 'ギフト送り主')
+    ]);
+    const chunked = new Uint8Array([
+      ...lenDelimited(1, [...lenDelimited(1, [...chat])]),
+      ...lenDelimited(1, [...lenDelimited(8, [...gift])])
+    ]);
+    const r = decodeChunkedMessage(chunked);
+    expect(r.chats.length).toBe(1);
+    expect(r.chats[0].content).toBe('top1 chat');
+    expect(r.gifts.length).toBe(1);
+    expect(r.gifts[0].advertiserUserId).toBe('12345678');
+    expect(r.gifts[0].advertiserName).toBe('ギフト送り主');
+    expect(r.tagHistogram.top['1']).toBe(2);
   });
 });
 

@@ -13,10 +13,27 @@ export function isLikelyInternalNdgGiftOrCampaignLabel(s) {
   const t = String(s || '').trim();
   if (!t) return false;
   if (/^nicolive_/i.test(t)) return true;
+  // ニコ生クライアントがコメント／ギフト行に載せる内部系プレフィックス（本家プロフィール名ではない）
+  if (/^stamp_[a-z0-9_]{2,}$/i.test(t)) return true;
   // 長い ASCII のみ snake_case（人間のニックに稀なパターン）
   const hasNonAscii = [...t].some((ch) => (ch.codePointAt(0) ?? 0) > 127);
   if (/^[a-z][a-z0-9_]{22,}$/i.test(t) && !hasNonAscii) return true;
   return false;
+}
+
+/**
+ * 応援グリッド用途で「本家 UI に近い表示名」として信頼できるか
+ * （{@link supportGridStrongNickname} かつ内部ラベルではない）
+ * @param {string} nick
+ * @param {string} userId
+ * @returns {boolean}
+ */
+export function isTrustworthySupportGridDisplayNickname(nick, userId) {
+  const uid = String(userId || '').trim();
+  const n = String(nick || '').trim();
+  if (!n) return false;
+  if (isLikelyInternalNdgGiftOrCampaignLabel(n)) return false;
+  return supportGridStrongNickname(n, uid);
 }
 
 /**
@@ -30,14 +47,126 @@ export function nicknameShouldReplaceExisting(prev, next, userId) {
   const n = String(next || '').trim();
   const uid = String(userId || '').trim();
   if (!n) return false;
-  if (!p) return !isLikelyInternalNdgGiftOrCampaignLabel(n);
+  if (!p) return !isLikelyInternalNdgGiftOrCampaignLabel(n) || isTrustworthySupportGridDisplayNickname(n, uid);
   if (isLikelyInternalNdgGiftOrCampaignLabel(p) && !isLikelyInternalNdgGiftOrCampaignLabel(n)) {
     return true;
   }
-  if (supportGridStrongNickname(n, uid) && !supportGridStrongNickname(p, uid)) {
+  if (
+    isTrustworthySupportGridDisplayNickname(n, uid) &&
+    !isTrustworthySupportGridDisplayNickname(p, uid)
+  ) {
     return true;
   }
   return false;
+}
+
+/**
+ * ニコ公式プロフィール風の表示（和文・全角＠等）か。
+ * 英字のみの長いハンドルより優先したいときに使う。
+ * @param {string} s
+ */
+function containsJapaneseScriptOrFullwidthDisplayChars(s) {
+  return /[\u3040-\u30FF\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF]/.test(String(s || ''));
+}
+
+/**
+ * コメント欄・ギフト由来の英字ハンドルっぽい文字列（正式プロフィール名より短く紛れやすい）
+ * @param {string} s
+ */
+function isLikelyPlainAsciiHandleNickname(s) {
+  const t = String(s || '').trim();
+  if (t.length < 8) return false;
+  return /^[a-z0-9_]+$/i.test(t);
+}
+
+/**
+ * アンダースコア付きの長い ASCII（ギフト等で紛れやすい内部ハンドル）
+ * @param {string} s
+ */
+function isLikelySnakeCaseAsciiHandleNickname(s) {
+  const t = String(s || '').trim();
+  if (t.length < 8) return false;
+  if (!t.includes('_')) return false;
+  return /^[a-z0-9_]+$/i.test(t);
+}
+
+/**
+ * 短い英字のみのコメント表示（プロフィールの短い固有名など）
+ * @param {string} s
+ */
+function isShortLatinLettersOnlyNickname(s) {
+  const t = String(s || '').trim();
+  if (t.length < 2 || t.length > 20) return false;
+  return /^[A-Za-z]+$/.test(t);
+}
+
+/**
+ * content script の `interceptedNicknames` 等で、同一 userId に複数ソースから
+ * 名前が届くときのマージ（盲 `Map.set` による短い／古い表示への退行を防ぐ）。
+ * {@link mergeIntoMap}（プロフィールキャッシュ）と同優先度。
+ *
+ * @param {string} userId
+ * @param {string} prevNick 既存（空可）
+ * @param {string} incomingNick 新規
+ * @returns {string}
+ */
+export function pickBetterInterceptNickname(userId, prevNick, incomingNick) {
+  const uid = String(userId || '').trim();
+  const prev = String(prevNick || '').trim();
+  const next = String(incomingNick || '').trim();
+  if (!next) return prev;
+  if (!prev) return next;
+
+  const prevInternal = isLikelyInternalNdgGiftOrCampaignLabel(prev);
+  const nextInternal = isLikelyInternalNdgGiftOrCampaignLabel(next);
+  const prevTrust = isTrustworthySupportGridDisplayNickname(prev, uid);
+  const nextTrust = isTrustworthySupportGridDisplayNickname(next, uid);
+
+  /** @type {boolean} */
+  let preferNext = false;
+  if (prevInternal && !nextInternal) preferNext = true;
+  else if (!prevInternal && nextInternal) preferNext = false;
+  else if (prevTrust && !nextTrust) preferNext = false;
+  else if (!prevTrust && nextTrust) preferNext = true;
+  else if (
+    !prevInternal &&
+    !nextInternal &&
+    prevTrust &&
+    nextTrust &&
+    containsJapaneseScriptOrFullwidthDisplayChars(next) &&
+    isLikelyPlainAsciiHandleNickname(prev)
+  ) {
+    preferNext = true;
+  } else if (
+    !prevInternal &&
+    !nextInternal &&
+    prevTrust &&
+    nextTrust &&
+    containsJapaneseScriptOrFullwidthDisplayChars(prev) &&
+    isLikelyPlainAsciiHandleNickname(next)
+  ) {
+    preferNext = false;
+  } else if (
+    !prevInternal &&
+    !nextInternal &&
+    prevTrust &&
+    nextTrust &&
+    isShortLatinLettersOnlyNickname(next) &&
+    isLikelySnakeCaseAsciiHandleNickname(prev)
+  ) {
+    preferNext = true;
+  } else if (
+    !prevInternal &&
+    !nextInternal &&
+    prevTrust &&
+    nextTrust &&
+    isShortLatinLettersOnlyNickname(prev) &&
+    isLikelySnakeCaseAsciiHandleNickname(next)
+  ) {
+    preferNext = false;
+  } else if (next.length > prev.length) preferNext = true;
+
+  return preferNext ? next : prev;
 }
 
 /**
@@ -55,20 +184,42 @@ export function pickGiftRankDisplayNickname(
   interceptNick = ''
 ) {
   const uid = String(userId || '').trim();
-  const a = String(storedNick || '').trim();
+  let n = String(storedNick || '').trim();
   const b = String(commentCachedNick || '').trim();
   const c = String(interceptNick || '').trim();
-  if (c && nicknameShouldReplaceExisting(a, c, uid)) {
-    return c;
-  }
-  if (isLikelyInternalNdgGiftOrCampaignLabel(a) && b && !isLikelyInternalNdgGiftOrCampaignLabel(b)) {
-    return b;
-  }
-  if (supportGridStrongNickname(b, uid) && !supportGridStrongNickname(a, uid)) {
-    return b;
-  }
-  if (!a && b) return b;
-  return a || b;
+  n = pickBetterInterceptNickname(uid, n, b);
+  n = pickBetterInterceptNickname(uid, n, c);
+  return n;
+}
+
+/**
+ * ギフト系 UI 用の表示名解決ラッパ。
+ * popup 側のクイック一覧・ストリップ・レポートで同じコール形に寄せる。
+ *
+ * @param {unknown} userId
+ * @param {unknown} storedNick
+ * @param {{
+ *   rememberedNicknameForUserId?: (uid: string) => unknown,
+ *   interceptNicknameForUserId?: (uid: string) => unknown
+ * }} [opts]
+ * @returns {string}
+ */
+export function resolveGiftRankDisplayNickname(userId, storedNick, opts = {}) {
+  const uid = String(userId || '').trim();
+  const remembered =
+    uid && typeof opts?.rememberedNicknameForUserId === 'function'
+      ? opts.rememberedNicknameForUserId(uid)
+      : '';
+  const intercept =
+    uid && typeof opts?.interceptNicknameForUserId === 'function'
+      ? opts.interceptNicknameForUserId(uid)
+      : '';
+  return pickGiftRankDisplayNickname(
+    uid,
+    String(storedNick ?? ''),
+    String(remembered ?? ''),
+    String(intercept ?? '')
+  );
 }
 
 /**
@@ -85,9 +236,9 @@ export function enrichIncomingGiftThrowUsersWithInterceptNicknames(incoming, get
     if (!uid) return u;
     const ndgr = String(u?.nickname ?? '').trim();
     const intercept = String(get(uid) || '').trim();
-    if (intercept && nicknameShouldReplaceExisting(ndgr, intercept, uid)) {
-      return { ...u, nickname: intercept };
-    }
+    if (!intercept) return u;
+    const merged = pickBetterInterceptNickname(uid, ndgr, intercept);
+    if (merged !== ndgr) return { ...u, nickname: merged };
     return u;
   });
 }
@@ -109,9 +260,12 @@ export function upgradeGiftUserRowsWithInterceptNicknames(rows, getInterceptNick
     if (!uid) return row;
     const nick = String(row?.nickname ?? '').trim();
     const intercept = String(get(uid) || '').trim();
-    if (intercept && nicknameShouldReplaceExisting(nick, intercept, uid)) {
-      storageTouched = true;
-      return { ...row, nickname: intercept };
+    if (intercept) {
+      const merged = pickBetterInterceptNickname(uid, nick, intercept);
+      if (merged !== nick) {
+        storageTouched = true;
+        return { ...row, nickname: merged };
+      }
     }
     return row;
   });

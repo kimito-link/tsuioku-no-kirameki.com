@@ -8,6 +8,7 @@ import {
   COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED,
   COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS,
   maybeAppendCommentIngestLog,
+  mergeIngestLogSources,
   parseCommentIngestLog
 } from './commentIngestLog.js';
 
@@ -193,12 +194,26 @@ describe('commentIngestLog', () => {
     expect(cur.items[0].source).toBe(COMMENT_INGEST_SOURCE.UNKNOWN);
   });
 
-  it('COMMENT_INGEST_SOURCE は少なくとも NDGR/VISIBLE/MUTATION/DEEP/UNKNOWN を含む', () => {
+  it('COMMENT_INGEST_SOURCE は少なくとも NDGR/VISIBLE/MUTATION/DEEP/INTERCEPT_POST/UNKNOWN を含む', () => {
     expect(COMMENT_INGEST_SOURCE.NDGR).toBe('ndgr');
     expect(COMMENT_INGEST_SOURCE.VISIBLE).toBe('visible');
     expect(COMMENT_INGEST_SOURCE.MUTATION).toBe('mutation');
     expect(COMMENT_INGEST_SOURCE.DEEP).toBe('deep');
+    expect(COMMENT_INGEST_SOURCE.INTERCEPT_POST).toBe('intercept_post');
     expect(COMMENT_INGEST_SOURCE.UNKNOWN).toBe('unknown');
+  });
+
+  it('mergeIngestLogSources は優先度の高い経路を採用する', () => {
+    expect(mergeIngestLogSources([])).toBe(COMMENT_INGEST_SOURCE.UNKNOWN);
+    expect(mergeIngestLogSources(['mutation', 'ndgr'])).toBe(COMMENT_INGEST_SOURCE.NDGR);
+    expect(mergeIngestLogSources(['ndgr', 'mutation'])).toBe(COMMENT_INGEST_SOURCE.NDGR);
+    expect(mergeIngestLogSources(['visible', 'intercept_post'])).toBe(
+      COMMENT_INGEST_SOURCE.INTERCEPT_POST
+    );
+    expect(mergeIngestLogSources(['intercept_post', 'visible'])).toBe(
+      COMMENT_INGEST_SOURCE.INTERCEPT_POST
+    );
+    expect(mergeIngestLogSources(['deep', 'visible'])).toBe(COMMENT_INGEST_SOURCE.DEEP);
   });
 
   it('deep source はクールダウンなしで常に追記する', () => {

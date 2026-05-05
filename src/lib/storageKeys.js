@@ -16,6 +16,9 @@ export const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 /** 直近の chrome.storage.local 書き込み失敗（クォータ等）。成功時にコンテンツ側で削除する */
 export const KEY_STORAGE_WRITE_ERROR = 'nls_storage_write_error';
 
+/** AI共有・不具合調査用のエラーリング（最大80件・本文はマスク済み・local only） */
+export const KEY_DIAGNOSTICS_ERROR_RING_V1 = 'nls_diagnostics_error_ring_v1';
+
 /** 記録ON時にコメントパネル DOM が見つからない状態の警告（サイト改修の検知用・PII なし） */
 export const KEY_COMMENT_PANEL_STATUS = 'nls_comment_panel_status';
 
@@ -330,4 +333,20 @@ export function commentsStorageKey(liveId) {
 export function giftUsersStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();
   return `nls_gift_users_${id}`;
+}
+
+/**
+ * niconico の watch ページ DOM から掬った
+ *   - 配信者参加イベントバナー
+ *   - イベント累計／番組累計バルーン
+ *   - 視聴者貢献度ランキング
+ *   - リアルタイム5値（来場・コメ・予約・広告・ギフト）
+ * を 1 オブジェクトでまとめて保存するキー。ライブ中は popup 表示の正本、
+ * 終了後は HTML レポート / マーケ分析の文脈ブロックとして読まれる。
+ *
+ * @param {string} liveId lv123
+ */
+export function eventDomStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_event_dom_${id}`;
 }

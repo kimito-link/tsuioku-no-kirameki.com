@@ -107,7 +107,7 @@ export function prepareGiftUsersForRankStrip(raw, opts = {}) {
 
 /**
  * ストリップ先頭行の数値を「当ストリップ内の最多」とみなし、2 位以降にその差分ラベルを返す。
- * ギフト帯では {@link prepareGiftRankStrip} の先頭行の throwCount が基準（本家の貢献度・貢ポイントとは無関係）。
+ * ギフト帯では {@link prepareGiftRankStrip} の先頭行の throwCount が基準（本家ギフト履歴の番組累計ポイントやランキングタブの貢献度とは無関係）。
  * （応援帯では記録内応援件数が同じルールで並んでいる想定。）
  *
  * @param {number} placeNumber1Based topSupportRankLineModels の順位（1 始まり。0 以下は先頭扱いで空）

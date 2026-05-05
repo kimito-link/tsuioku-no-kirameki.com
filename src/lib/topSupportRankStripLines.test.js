@@ -232,7 +232,7 @@ describe('topSupportRankLineModels', () => {
     expect(row.fullLabelForTitle).toContain('11111');
   });
 
-  it('placeNumberMode:dense で同回数は同順位（本家貢献度ランキングに近い並び）', () => {
+  it('placeNumberMode:dense で同回数は同順位（本家ランキングタブの貢献度に近い並び方）', () => {
     const rooms = [
       { userKey: '1', nickname: 'a', count: 40 },
       { userKey: '2', nickname: 'b', count: 10 },

@@ -7,7 +7,7 @@ import {
   splitLengthDelimitedMessagesWithTail
 } from '../lib/lengthDelimitedStream.js';
 import { extractPairsFromBinaryUtf8 } from '../lib/interceptBinaryTextExtract.js';
-import { decodeChunkedMessage, decodePackedSegment } from '../lib/ndgrDecode.js';
+import { decodeChunkedMessage, decodePackedSegment, ndgrStatisticsHasWireSignal } from '../lib/ndgrDecode.js';
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { anonymousNicknameFallback } from '../lib/nicoAnonymousDisplay.js';
 import {
@@ -20,7 +20,6 @@ import {
   normalizeViewerJoin,
   walkJsonForViewerJoinUsers
 } from '../lib/interceptViewerJoinSignals.js';
-import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js';
 
 (() => {
   'use strict';
@@ -70,24 +69,6 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
   /** 視聴者入室・オーディエンス更新（DOM より優先して content で即時処理） */
   const MSG_VIEWER_JOIN = 'NLS_INTERCEPT_VIEWER_JOIN';
 
-  /**
-   * MAIN の postMessage は同一 window の content に届くが、NDGR が iframe 側で
-   * デコードされるとトップの isolated content は e.source が子フレームになり
-   * `e.source === window` ガードで全イベントが落ちる。子からは top へ送る。
-   * @param {unknown} payload
-   */
-  function postInterceptBridge(payload) {
-    try {
-      if (window.top && window.self !== window.top) {
-        window.top.postMessage(payload, '*');
-        return;
-      }
-    } catch {
-      /* cross-origin top — 自 window のみ */
-    }
-    window.postMessage(payload, '*');
-  }
-
   /** @type {{ commentNo: string, text: string, userId: string, nickname?: string }[]} */
   let ndgrChatRowsBatch = [];
   /** @type {ReturnType<typeof setTimeout>|null} */
@@ -113,7 +94,7 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
       if (i >= all.length) return;
       const payload = all.slice(i, i + NDGR_CHAT_ROWS_POST_CHUNK);
       i += payload.length;
-      postInterceptBridge({ type: MSG_CHAT_ROWS, rows: payload });
+      window.postMessage({ type: MSG_CHAT_ROWS, rows: payload }, '*');
       if (i < all.length) schedule(pump);
     };
     pump();
@@ -211,7 +192,10 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
         out.push(row);
       }
       if (out.length) {
-        postInterceptBridge({ type: MSG_VIEWER_JOIN, viewers: out, priority: 'fast' });
+        window.postMessage(
+          { type: MSG_VIEWER_JOIN, viewers: out, priority: 'fast' },
+          '*'
+        );
       }
     } catch {
       /* never break page */
@@ -252,7 +236,7 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
     if (!entries.length && !users.length) return;
     diag.posted += entries.length;
     publishDiag();
-    postInterceptBridge({ type: MSG_TYPE, entries, users });
+    window.postMessage({ type: MSG_TYPE, entries, users }, '*');
   }
 
   function normalizeAvatarUrl(url) {
@@ -352,6 +336,30 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
   }
 
   const _ndgr = { stats: 0, chats: 0, gifts: 0, decoded: 0 };
+  /**
+   * NDGR で観測した protobuf field tag のヒストグラム。
+   * top: ChunkedMessage 直下の field tag、msg: 内側 NicoliveMessage one-of の field tag。
+   * niconico がプロトコルを差し替えた時、どの tag に新ペイロードが乗ったかを
+   * 「既存の chats/gifts カウンタが伸びない vs 新 tag が伸びている」という形で観測する。
+   */
+  const _ndgrTagHistogram = { top: /** @type {Record<string, number>} */ ({}), msg: /** @type {Record<string, number>} */ ({}) };
+  /** @param {{ top: Record<string, number>, msg: Record<string, number> } | undefined} h */
+  function mergeNdgrTagHistogram(h) {
+    if (!h) return;
+    for (const k of Object.keys(h.top || {})) {
+      _ndgrTagHistogram.top[k] = (_ndgrTagHistogram.top[k] || 0) + (h.top[k] || 0);
+    }
+    for (const k of Object.keys(h.msg || {})) {
+      _ndgrTagHistogram.msg[k] = (_ndgrTagHistogram.msg[k] || 0) + (h.msg[k] || 0);
+    }
+  }
+  function publishNdgrTagHistogram() {
+    const root = document.documentElement;
+    if (!root) return;
+    try {
+      root.setAttribute('data-nls-ndgr-tags', JSON.stringify(_ndgrTagHistogram));
+    } catch { /* no-op */ }
+  }
   /** @type {{ pendingBytes: number, droppedBytes: number, totalFrames: number }|null} */
   let _ldStreamStats = null;
 
@@ -366,22 +374,23 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
 
   function handleNdgrResult(result) {
     if (!result) return;
-    const st = result.stats;
-    if (st) {
-      const payload = { type: MSG_STATISTICS };
-      if (st.viewers != null) payload.viewers = st.viewers;
-      if (st.comments != null) payload.comments = st.comments;
-      if (st.giftPoints != null) payload.giftPoints = st.giftPoints;
-      if (st.adPoints != null) payload.adPoints = st.adPoints;
-      if (
-        'viewers' in payload ||
-        'comments' in payload ||
-        'giftPoints' in payload ||
-        'adPoints' in payload
-      ) {
-        _ndgr.stats++;
-        postInterceptBridge(payload);
-      }
+    mergeNdgrTagHistogram(result.tagHistogram);
+    if (result.stats && ndgrStatisticsHasWireSignal(result.stats)) {
+      _ndgr.stats++;
+      const st = result.stats;
+      window.postMessage(
+        {
+          type: MSG_STATISTICS,
+          ...(st.viewers != null ? { viewers: st.viewers } : {}),
+          ...(st.comments != null ? { comments: st.comments } : {}),
+          ...(st.adPoints != null ? { adPoints: st.adPoints } : {}),
+          ...(st.giftPoints != null ? { giftPoints: st.giftPoints } : {}),
+          ...(st.eventGiftScore != null ? { eventGiftScore: st.eventGiftScore } : {}),
+          ...(st.eventRank != null ? { eventRank: st.eventRank } : {}),
+          ...(st.eventTitle ? { eventTitle: String(st.eventTitle) } : {})
+        },
+        '*'
+      );
     }
     for (const chat of result.chats) {
       const uid = chat.rawUserId ? String(chat.rawUserId) : chat.hashedUserId;
@@ -408,7 +417,7 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
       }
     }
     if (giftUsers.length) {
-      postInterceptBridge({ type: MSG_GIFT_USERS, users: giftUsers });
+      window.postMessage({ type: MSG_GIFT_USERS, users: giftUsers }, '*');
     }
     scheduleNdgrChatRowsPost(ndgrChatsToMergeRows(result.chats));
   }
@@ -469,32 +478,65 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
         `s=${_ndgr.stats} c=${_ndgr.chats} g=${_ndgr.gifts} d=${_ndgr.decoded}`
       );
     }
+    publishNdgrTagHistogram();
+  }
+
+  const VIEWER_KEYS = ['viewers', 'watchCount', 'watching', 'watchingCount', 'viewerCount', 'viewCount'];
+  const COMMENT_KEYS = ['comments', 'commentCount'];
+  const AD_KEYS = ['adPoints', 'ad_points', 'adPoint', 'accumulatedAdPoints'];
+  const GIFT_KEYS = [
+    'giftPoints',
+    'gift_points',
+    'giftPoint',
+    'accumulatedGiftPoints',
+    'programGiftPoints',
+    'program_gift_points'
+  ];
+  function pickNum(obj, keys, max) {
+    for (const k of keys) {
+      const r = obj[k];
+      if (r == null) continue;
+      const n = typeof r === 'number' ? r : parseInt(String(r), 10);
+      if (Number.isFinite(n) && n >= 0 && (!max || n <= max)) return n;
+    }
+    return null;
   }
 
   /**
-   * パース済み JSON から statistics（視聴・コメ・ギフト累計 pt 等）を検出して転送。
+   * パース済み JSON からビューア数・コメント数を検出して転送。
    * type:"statistics" だけでなく、既知キーがあれば広く拾う。
    * @param {unknown} obj
-   * @returns {boolean} いずれかを拾って転送したら true
    */
+  /** @returns {boolean} statistics 相当を転送したら true */
   function tryForwardStatistics(obj) {
-    const ext = extractStatisticsFromParsedObject(obj);
-    if (!ext) return false;
-    /** @type {Record<string, unknown>} */
-    const payload = { type: MSG_STATISTICS };
-    if (typeof ext.viewers === 'number') payload.viewers = ext.viewers;
-    if (typeof ext.comments === 'number') payload.comments = ext.comments;
-    if (typeof ext.giftPoints === 'number') payload.giftPoints = ext.giftPoints;
-    if (typeof ext.adPoints === 'number') payload.adPoints = ext.adPoints;
-    if (
-      !('viewers' in payload) &&
-      !('comments' in payload) &&
-      !('giftPoints' in payload) &&
-      !('adPoints' in payload)
-    ) {
-      return false;
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+    const o = /** @type {Record<string, unknown>} */ (obj);
+    const d = o.data;
+    const target =
+      d && typeof d === 'object' && !Array.isArray(d)
+        ? /** @type {Record<string, unknown>} */ (d)
+        : o;
+    let viewers = pickNum(target, VIEWER_KEYS, 50_000_000);
+    let comments = pickNum(target, COMMENT_KEYS);
+    let adPoints = pickNum(target, AD_KEYS);
+    let giftPoints = pickNum(target, GIFT_KEYS);
+    if (viewers == null && target !== o) {
+      viewers = pickNum(o, VIEWER_KEYS, 50_000_000);
+      comments = comments ?? pickNum(o, COMMENT_KEYS);
+      adPoints = adPoints ?? pickNum(o, AD_KEYS);
+      giftPoints = giftPoints ?? pickNum(o, GIFT_KEYS);
     }
-    postInterceptBridge(payload);
+    if (viewers == null && adPoints == null && giftPoints == null) return false;
+    window.postMessage(
+      {
+        type: MSG_STATISTICS,
+        ...(viewers != null ? { viewers } : {}),
+        ...(comments != null ? { comments } : {}),
+        ...(adPoints != null ? { adPoints } : {}),
+        ...(giftPoints != null ? { giftPoints } : {})
+      },
+      '*'
+    );
     return true;
   }
 
@@ -519,7 +561,7 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
     const begin = dd.begin || dd.beginAt || dd.openTime;
     if (typeof begin === 'string' && begin.length >= 10) {
       _scheduleSent = true;
-      postInterceptBridge({ type: MSG_SCHEDULE, begin });
+      window.postMessage({ type: MSG_SCHEDULE, begin }, '*');
     }
   }
 
@@ -610,11 +652,11 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
           if (method === 'POST' && /api\/(v\d+\/)?comment/.test(url) && res.ok) {
             try {
               const cj = await res.clone().json();
-              postInterceptBridge({
+              window.postMessage({
                 type: 'NLS_INTERCEPT_COMMENT_POST',
                 status: res.status,
                 body: cj
-              });
+              }, '*');
             } catch { /* JSON parse failure — ignore */ }
           }
           diag.fetchHits += 1;
@@ -1044,7 +1086,7 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
         wc != null && Number.isFinite(Number(wc)) && Number(wc) >= 0
           ? Number(wc)
           : null;
-      postInterceptBridge({ type: MSG_EMBEDDED_DATA, viewers });
+      window.postMessage({ type: MSG_EMBEDDED_DATA, viewers }, '*');
     } catch { /* no-op */ }
   }
 
@@ -1073,7 +1115,7 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
           if (wc?.[1]) {
             const n = parseInt(wc[1], 10);
             if (Number.isFinite(n) && n >= 0) {
-              postInterceptBridge({ type: MSG_STATISTICS, viewers: n });
+              window.postMessage({ type: MSG_STATISTICS, viewers: n }, '*');
             }
           }
           const cc =
@@ -1082,7 +1124,7 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
           if (cc?.[1]) {
             const cn = parseInt(cc[1], 10);
             if (Number.isFinite(cn) && cn >= 0) {
-              postInterceptBridge({ type: MSG_STATISTICS, viewers: null, comments: cn });
+              window.postMessage({ type: MSG_STATISTICS, viewers: null, comments: cn }, '*');
             }
           }
         })
@@ -1161,7 +1203,7 @@ import { extractStatisticsFromParsedObject } from '../lib/wsStatisticsExtract.js
       const cur = String(window.location.href || '');
       if (cur === prev) return;
       lastNotifiedHref = cur;
-      postInterceptBridge({ type: 'NLS_SPA_NAVIGATION', url: cur, prevUrl: prev });
+      window.postMessage({ type: 'NLS_SPA_NAVIGATION', url: cur, prevUrl: prev }, '*');
     };
     const origPushState = history.pushState;
     const origReplaceState = history.replaceState;

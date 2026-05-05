@@ -19,6 +19,16 @@ const GIFT_POINT_KEYS = [
   'totalGiftPoints',
   'giftPointTotal'
 ];
+/** イベント累計スコア系（statistics JSON で観測される変形キー） */
+const EVENT_GIFT_SCORE_KEYS = [
+  'eventGiftScore',
+  'event_gift_score',
+  'eventGiftPoints',
+  'event_gift_points',
+  'eventScore',
+  'campaignGiftPoints',
+  'campaign_gift_points'
+];
 /** 広告・応援（変形キーはサイト改修で増える可能性あり） */
 const AD_POINT_KEYS = ['adPoints', 'ad_points', 'henPoints', 'supportPoints', 'koukokuPoints'];
 
@@ -73,7 +83,8 @@ function pickNonNegativeIntFromKeys(d, keys) {
  *   viewers?: number,
  *   comments?: number | null,
  *   giftPoints?: number,
- *   adPoints?: number
+ *   adPoints?: number,
+ *   eventGiftScore?: number
  * } | null}
  */
 export function extractStatisticsFromParsedObject(obj) {
@@ -93,6 +104,9 @@ export function extractStatisticsFromParsedObject(obj) {
   const giftPoints =
     pickNonNegativeIntFromKeys(target, GIFT_POINT_KEYS) ??
     (target !== o ? pickNonNegativeIntFromKeys(o, GIFT_POINT_KEYS) : null);
+  const eventGiftScore =
+    pickNonNegativeIntFromKeys(target, EVENT_GIFT_SCORE_KEYS) ??
+    (target !== o ? pickNonNegativeIntFromKeys(o, EVENT_GIFT_SCORE_KEYS) : null);
   const adPoints =
     pickNonNegativeIntFromKeys(target, AD_POINT_KEYS) ??
     (target !== o ? pickNonNegativeIntFromKeys(o, AD_POINT_KEYS) : null);
@@ -101,18 +115,20 @@ export function extractStatisticsFromParsedObject(obj) {
     viewers == null &&
     comments == null &&
     giftPoints == null &&
-    adPoints == null
+    adPoints == null &&
+    eventGiftScore == null
   ) {
     return null;
   }
 
-  /** @type {{ viewers?: number, comments?: number | null, giftPoints?: number, adPoints?: number }} */
+  /** @type {{ viewers?: number, comments?: number | null, giftPoints?: number, adPoints?: number, eventGiftScore?: number }} */
   const out = {};
   if (viewers != null) out.viewers = viewers;
   if (comments != null) out.comments = comments;
   else if (viewers != null) out.comments = null;
   if (giftPoints != null) out.giftPoints = giftPoints;
   if (adPoints != null) out.adPoints = adPoints;
+  if (eventGiftScore != null) out.eventGiftScore = eventGiftScore;
   return out;
 }
 

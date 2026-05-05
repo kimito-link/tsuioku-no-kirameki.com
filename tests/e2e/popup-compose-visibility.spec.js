@@ -137,4 +137,36 @@ test.describe('popup compose / toolbar-only visibility', () => {
     expect(sideVisibility.inputDisplay).not.toBe('none');
     expect(sideVisibility.postDisplay).not.toBe('none');
   });
+
+  test('inline=1 では本家公式統計チップ行が grid で並びチップが DOM に残る', async ({
+    context
+  }) => {
+    const extensionId = await extensionIdFromContext(context);
+    const page = await context.newPage();
+    await page.goto(
+      `chrome-extension://${extensionId}/popup.html?inline=1`,
+      {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000
+      }
+    );
+    await dismissExtensionUsageTermsGate(page);
+    await expect(page.locator('html.nl-inline')).toBeAttached({
+      timeout: 10_000
+    });
+
+    const row = page.locator('.nl-official-nico-stats__row');
+    await expect(row).toBeAttached();
+    const display = await row.evaluate((el) =>
+      globalThis.getComputedStyle(el).display
+    );
+    expect(display).toBe('grid');
+
+    const chipCount = await page
+      .locator('.nl-official-nico-stats__row .nl-official-nico-stats__chip')
+      .count();
+    expect(chipCount).toBeGreaterThan(0);
+
+    await expect(page.locator('.nl-main')).toBeVisible();
+  });
 });

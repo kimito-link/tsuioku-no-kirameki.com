@@ -27,6 +27,25 @@ describe('findNicoCommentPanel', () => {
     document.body.innerHTML = '<div class="other-panel"></div>';
     expect(findNicoCommentPanel(document)).toBeNull();
   });
+
+  it('CSS Modules ハッシュ命名（___comment-panel___HASH）でも拾う', () => {
+    document.body.innerHTML =
+      '<div class="___comment-panel___aB12 some-other" id="hashed"></div>';
+    expect(findNicoCommentPanel(document)?.id).toBe('hashed');
+  });
+
+  it('camelCase キーの commentPanel ハッシュも拾う', () => {
+    document.body.innerHTML =
+      '<div class="root_commentPanel_xy9z" id="camel"></div>';
+    expect(findNicoCommentPanel(document)?.id).toBe('camel');
+  });
+
+  it('静的 class があればハッシュ命名より優先', () => {
+    document.body.innerHTML =
+      '<div class="___comment-panel___HASH" id="hash"></div>' +
+      '<div class="ga-ns-comment-panel" id="static"></div>';
+    expect(findNicoCommentPanel(document)?.id).toBe('static');
+  });
 });
 
 describe('findCommentListScrollHost', () => {

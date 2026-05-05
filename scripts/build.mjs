@@ -19,7 +19,13 @@ const BUILD_ID = buildIdJst();
 const common = {
   bundle: true,
   format: 'iife',
-  platform: 'browser'
+  platform: 'browser',
+  // 識別子は残す（bundleFixesPresent 等が dist 内の関数名を grep するため）。
+  // 空白・不要な構文の削減だけでパース負荷とファイルサイズを多少下げる。
+  minifyWhitespace: true,
+  minifySyntax: true,
+  minifyIdentifiers: false,
+  legalComments: 'none'
 };
 
 const popupDefine = { NL_BUILD_ID: JSON.stringify(BUILD_ID) };

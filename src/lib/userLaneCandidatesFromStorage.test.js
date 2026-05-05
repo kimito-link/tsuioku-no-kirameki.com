@@ -24,12 +24,18 @@ import {
 } from './supportGrowthTileSrc.js';
 
 let userLaneCandidatesFromStorage;
+let enrichUserLaneAggregatesWithProfileAndDisplay;
 try {
-  ({ userLaneCandidatesFromStorage } = await import('./userLaneCandidatesFromStorage.js'));
+  ({
+    userLaneCandidatesFromStorage,
+    enrichUserLaneAggregatesWithProfileAndDisplay
+  } = await import('./userLaneCandidatesFromStorage.js'));
 } catch {
   // 未実装時は describe.skip で契約だけ先に置く
 }
 const maybe = typeof userLaneCandidatesFromStorage === 'function' ? describe : describe.skip;
+const maybeEnrich =
+  typeof enrichUserLaneAggregatesWithProfileAndDisplay === 'function' ? describe : describe.skip;
 
 const SYNTHETIC_CANONICAL_URL =
   'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14196/141965615.jpg';
@@ -110,6 +116,7 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
   it.each([
     {
       name: 'I3: 弱ニック（匿名）より強ニックを優先',
+      userId: '88210441',
       storedComments: [
         { userId: '88210441', nickname: '匿名' },
         { userId: '88210441', nickname: 'nora' }
@@ -118,6 +125,7 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
     },
     {
       name: 'I3: 弱ニック（（未取得））より強ニックを優先',
+      userId: '88210441',
       storedComments: [
         { userId: '88210441', nickname: '（未取得）' },
         { userId: '88210441', nickname: 'レコ' }
@@ -126,14 +134,28 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
     },
     {
       name: 'I3: 弱ニック（ゲスト）より強ニックを優先',
+      userId: '88210441',
       storedComments: [
         { userId: '88210441', nickname: 'ゲスト' },
         { userId: '88210441', nickname: 'ソウルブラザー' }
       ],
       expectedNickname: 'ソウルブラザー'
+    },
+    {
+      name: 'I3 拡張: 新しいコメントが英字でも古い行の和文を維持',
+      userId: '4046119',
+      storedComments: [
+        {
+          userId: '4046119',
+          nickname: '君斗りんく＠クリエイター応援',
+          capturedAt: 1000
+        },
+        { userId: '4046119', nickname: 'perfectbattingball', capturedAt: 2000 }
+      ],
+      expectedNickname: '君斗りんく＠クリエイター応援'
     }
-  ])('$name', ({ storedComments, expectedNickname }) => {
-    const candidate = pickCandidateByUserId(storedComments, '88210441');
+  ])('$name', ({ storedComments, expectedNickname, userId }) => {
+    const candidate = pickCandidateByUserId(storedComments, userId);
     expect(candidate).toBeTruthy();
     expect(candidate?.nickname).toBe(expectedNickname);
   });
@@ -332,6 +354,29 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
     expect(candidate).toBeTruthy();
     expect(acceptedNicknames).toContain(candidate?.nickname);
   });
+
+  it('同一 userId で stamp 行より実名行を集約ニックに優先', () => {
+    const storedComments = [
+      {
+        userId: '6292820',
+        nickname: 'stamp_applause',
+        avatarUrl: 'https://example.com/a.png',
+        capturedAt: 2,
+        liveId: 'lv888'
+      },
+      {
+        userId: '6292820',
+        nickname: 'Chiharu',
+        avatarUrl: 'https://example.com/b.png',
+        capturedAt: 1,
+        liveId: 'lv888',
+        avatarObserved: true
+      }
+    ];
+    const out = userLaneCandidatesFromStorage(storedComments, 'lv888');
+    const row = out.find((r) => r.userId === '6292820');
+    expect(row?.nickname).toBe('Chiharu');
+  });
 });
 
 maybe('0.1.79: ギフト演出 DOM での broadcaster icon 取り違えガード', () => {
@@ -467,5 +512,84 @@ maybe('0.1.79: ギフト演出 DOM での broadcaster icon 取り違えガード
     );
     const me = out.find((c) => c.userId === viewerUid);
     expect(me?.avatarUrl).not.toBe(broadcasterIconUrl);
+  });
+});
+
+maybeEnrich('enrichUserLaneAggregatesWithProfileAndDisplay', () => {
+  it('プロファイルキャッシュの表示名でストレージの弱ニックを置き換える', () => {
+    const agg = Object.freeze([
+      Object.freeze({
+        userId: '4046119',
+        nickname: '匿名',
+        avatarUrl: '',
+        avatarObserved: false,
+        liveId: 'lv1'
+      })
+    ]);
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(agg, [], {
+      '4046119': { nickname: 'perfectbattingball' }
+    });
+    expect(out[0].nickname).toBe('perfectbattingball');
+  });
+
+  it('displayEntries の強ニックでストレージ空を補完する', () => {
+    const agg = Object.freeze([
+      Object.freeze({
+        userId: '4046119',
+        nickname: '',
+        avatarUrl: '',
+        avatarObserved: false,
+        liveId: 'lv1'
+      })
+    ]);
+    const display = [{ userId: '4046119', nickname: 'fromDisplay', capturedAt: 100 }];
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(agg, display, {});
+    expect(out[0].nickname).toBe('fromDisplay');
+  });
+
+  it('内部ラベルは intercept（プロファイル）で置換される', () => {
+    const agg = Object.freeze([
+      Object.freeze({
+        userId: '10170134',
+        nickname: 'nicolive_audition_lightgreen',
+        avatarUrl: '',
+        avatarObserved: false,
+        liveId: 'lv1'
+      })
+    ]);
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(agg, [], {
+      '10170134': { nickname: '本家表示名' }
+    });
+    expect(out[0].nickname).toBe('本家表示名');
+  });
+
+  it('変更なしなら同一参照の配列を返す', () => {
+    const row = Object.freeze({
+      userId: '4046119',
+      nickname: 'stable',
+      avatarUrl: '',
+      avatarObserved: false,
+      liveId: 'lv1'
+    });
+    const agg = Object.freeze([row]);
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(agg, [], {});
+    expect(out).toBe(agg);
+    expect(out[0]).toBe(row);
+  });
+
+  it('集約が stamp のみでもプロファイルで Chiharu に補強される', () => {
+    const agg = Object.freeze([
+      Object.freeze({
+        userId: '6292820',
+        nickname: 'stamp_applause',
+        avatarUrl: 'https://example.com/t.png',
+        avatarObserved: true,
+        liveId: 'lv1'
+      })
+    ]);
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(agg, [], {
+      '6292820': { nickname: 'Chiharu' }
+    });
+    expect(out[0].nickname).toBe('Chiharu');
   });
 });

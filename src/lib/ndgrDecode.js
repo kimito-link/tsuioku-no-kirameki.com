@@ -9,11 +9,11 @@
  *   ChunkedMessage.message(field 2) → NicoliveMessage.chat     (field 1) → Chat
  *
  * Statistics fields: viewers(1), comments(2), ad_points(3), gift_points(4)
+ * 拡張（実バイナル確認中）: field 5/6 を varint、field 7 を UTF-8 文字列として
+ * イベント系（累計スコア・順位・タイトル候補）をベストエフォートで拾う。
  * Chat fields: content(1), name(2), vpos(3), account_status(4),
  *              raw_user_id(5), hashed_user_id(6), modifier(7), no(8)
  */
-
-import { isLikelyInternalNdgGiftOrCampaignLabel } from './giftDisplayNickname.js';
 
 /**
  * @param {Uint8Array} buf
@@ -80,8 +80,69 @@ export function pbForEach(buf, start, end, cb) {
 }
 
 /**
- * @typedef {{ viewers: number|null, comments: number|null, adPoints: number|null, giftPoints: number|null }} NdgrStatistics
+ * @typedef {{
+ *   viewers: number|null,
+ *   comments: number|null,
+ *   adPoints: number|null,
+ *   giftPoints: number|null,
+ *   eventGiftScore: number|null,
+ *   eventRank: number|null,
+ *   eventTitle: string|null
+ * }} NdgrStatistics
  */
+
+/**
+ * NDGR Statistics に「何かしらのワイヤシグナル」があるか（page-intercept の
+ * `_ndgr.stats` カウント用）。viewers が無くても ad/gift/イベントのみの更新を拾う。
+ * @param {NdgrStatistics|null|undefined} s
+ * @returns {boolean}
+ */
+export function ndgrStatisticsHasWireSignal(s) {
+  if (!s || typeof s !== 'object') return false;
+  const nums = [
+    s.viewers,
+    s.comments,
+    s.adPoints,
+    s.giftPoints,
+    s.eventGiftScore,
+    s.eventRank
+  ];
+  for (const n of nums) {
+    if (typeof n === 'number' && Number.isFinite(n) && n >= 0) return true;
+  }
+  const t = String(s.eventTitle || '').trim();
+  return t.length > 0;
+}
+
+/**
+ * 同一 ChunkedMessage 内の複数 Statistics LEN をマージする。
+ * `b` の非 null フィールドが優先（同一フレーム内の後続サブメッセージがイベント列のみ等）。
+ *
+ * @param {NdgrStatistics|null|undefined} a
+ * @param {NdgrStatistics|null|undefined} b
+ * @returns {NdgrStatistics|null}
+ */
+export function mergeNdgrStatistics(a, b) {
+  if (!b) return a ?? null;
+  if (!a) return b;
+  /** @param {number|null|undefined} x @param {number|null|undefined} y */
+  const pickNum = (x, y) =>
+    typeof y === 'number' && Number.isFinite(y) && y >= 0 ? y : x ?? null;
+  const ta = String(a.eventTitle || '').trim();
+  const tb = String(b.eventTitle || '').trim();
+  let titleOut = null;
+  if (tb && (!ta || tb.length >= ta.length)) titleOut = tb;
+  else if (ta) titleOut = ta;
+  return {
+    viewers: pickNum(a.viewers, b.viewers),
+    comments: pickNum(a.comments, b.comments),
+    adPoints: pickNum(a.adPoints, b.adPoints),
+    giftPoints: pickNum(a.giftPoints, b.giftPoints),
+    eventGiftScore: pickNum(a.eventGiftScore, b.eventGiftScore),
+    eventRank: pickNum(a.eventRank, b.eventRank),
+    eventTitle: titleOut
+  };
+}
 
 /**
  * @param {Uint8Array} buf
@@ -90,15 +151,42 @@ export function pbForEach(buf, start, end, cb) {
  * @returns {NdgrStatistics}
  */
 export function decodeStatistics(buf, start, end) {
-  let viewers = null, comments = null, adPoints = null, giftPoints = null;
-  pbForEach(buf, start, end, (fn, wt, val) => {
-    if (wt !== 0) return;
-    if (fn === 1) viewers = val;
-    if (fn === 2) comments = val;
-    if (fn === 3) adPoints = val;
-    if (fn === 4) giftPoints = val;
+  let viewers = null,
+    comments = null,
+    adPoints = null,
+    giftPoints = null;
+  let eventGiftScore = null;
+  let eventRank = null;
+  /** @type {string[]} */
+  const titleCandidates = [];
+  pbForEach(buf, start, end, (fn, wt, val, s, e) => {
+    if (wt === 0) {
+      if (fn === 1) viewers = val;
+      else if (fn === 2) comments = val;
+      else if (fn === 3) adPoints = val;
+      else if (fn === 4) giftPoints = val;
+      else if (fn === 5) eventGiftScore = val;
+      else if (fn === 6) eventRank = val;
+    } else if (wt === 2) {
+      const str = decodeStr(buf, s, e).trim();
+      if (fn === 7 && str) titleCandidates.push(str);
+      else if ((fn === 8 || fn === 9) && str) titleCandidates.push(str);
+    }
   });
-  return { viewers, comments, adPoints, giftPoints };
+  let eventTitle = null;
+  for (const cand of titleCandidates) {
+    if (!cand || cand.length > 400 || /^https?:\/\//i.test(cand)) continue;
+    if (!eventTitle || cand.length > eventTitle.length) eventTitle = cand;
+  }
+  return {
+    viewers,
+    comments,
+    adPoints,
+    giftPoints,
+    eventGiftScore,
+    eventRank,
+    eventTitle
+  };
 }
 
 /**
@@ -146,123 +234,6 @@ export function decodeChat(buf, start, end) {
   return { no, rawUserId, hashedUserId, name, content, vpos, accountStatus, is184 };
 }
 
-/** ギフト payload 内の LEN を再帰走査するときの深さ上限 */
-const NDGR_GIFT_NEST_MAX = 6;
-/** 1 ノードあたり走査する protobuf サイズ上限（異常フレームの暴走防止） */
-const NDGR_GIFT_LEN_SCAN_MAX = 12000;
-
-/**
- * バッファが Chat 互換で field 5 にユーザー ID を持つかだけを見る。
- * varint のほか、proto 差分で field 5 が UTF-8 数字列だけの LEN になる場合も拾う。
- * decodeChat の 9〜15 ヒューリスティックは使わない。
- *
- * @param {Uint8Array} buf
- * @param {number} start
- * @param {number} end
- * @returns {number|null}
- */
-function peekGiftField5UserId(buf, start, end) {
-  /** @type {number|null} */
-  let uidVar = null;
-  let uidStr = '';
-  pbForEach(buf, start, end, (fn, wt, val, s, e) => {
-    if (fn !== 5) return;
-    if (wt === 0 && val != null) uidVar = val;
-    if (wt === 2) {
-      const t = decodeStr(buf, s, e).trim();
-      if (/^\d{5,14}$/.test(t)) uidStr = t;
-    }
-  });
-  if (uidVar != null) {
-    const n = Number(uidVar);
-    if (Number.isFinite(n) && n >= 10000) return Math.trunc(n);
-  }
-  if (uidStr) {
-    const n = Number(uidStr);
-    if (Number.isFinite(n) && n >= 10000) return Math.trunc(n);
-  }
-  return null;
-}
-
-/**
- * ギフト（およびその LEN 子）のどこかに field5 ユーザーがいれば候補に積む。深いほど優先。
- *
- * @param {Uint8Array} buf
- * @param {number} start
- * @param {number} end
- * @param {number} depth
- * @param {{ fieldNum: number, val: string, kind: 'varint'|'str'|'nestedChatRaw', _nestDepth?: number, _nestedName?: string }[]} out
- */
-function collectNestedGiftSenders(buf, start, end, depth, out) {
-  if (depth > NDGR_GIFT_NEST_MAX) return;
-  const span = end - start;
-  if (span < 8 || span > NDGR_GIFT_LEN_SCAN_MAX) return;
-  const rid = peekGiftField5UserId(buf, start, end);
-  if (rid != null) {
-    const ch = decodeChat(buf, start, end);
-    const nestedName = String(ch.name || '').trim();
-    out.push({
-      fieldNum: 400 + depth,
-      val: String(rid),
-      kind: 'nestedChatRaw',
-      _nestDepth: depth,
-      ...(nestedName ? { _nestedName: nestedName } : {})
-    });
-  }
-  pbForEach(buf, start, end, (fn, wt, val, s, e) => {
-    if (wt !== 2) return;
-    collectNestedGiftSenders(buf, s, e, depth + 1, out);
-  });
-}
-
-/**
- * ギフト payload 内の「数値だけっぽい ID」候補から送り主 UID を1つ選ぶ。
- * 先勝ちだと商品 ID・内部カウンタ等が先に出たケースで他人 ID に誤結合するため、
- * LEN 内を decodeChat した raw_user_id（ネスト）を最優先し、続けて Chat と同様の
- * field 5 varint → field 3 → field 1 の順を優先する。
- *
- * @param {{ fieldNum: number, val: string, kind: 'varint'|'str'|'nestedChatRaw', _nestDepth?: number, _nestedName?: string }[]} candidates
- * @returns {string}
- */
-export function pickNdgrGiftAdvertiserUserId(candidates) {
-  const w = selectGiftUidWinner(candidates);
-  return w ? String(w.val).trim() : '';
-}
-
-/**
- * @param {{ fieldNum: number, val: string, kind: 'varint'|'str'|'nestedChatRaw', _nestDepth?: number, _nestedName?: string }[]} candidates
- * @returns {{ fieldNum: number, val: string, kind: string, _nestDepth?: number, _nestedName?: string }|null}
- */
-function selectGiftUidWinner(candidates) {
-  const list = Array.isArray(candidates) ? candidates : [];
-  const good = list.filter((c) => c && /^\d{5,14}$/.test(String(c.val || '').trim()));
-  if (!good.length) return null;
-
-  /**
-   * @param {{ fieldNum: number, val: string, kind: string, _nestDepth?: number, _nestedName?: string }} c
-   */
-  const rank = (c) => {
-    if (c.kind === 'nestedChatRaw') return -1;
-    const fn = Math.max(0, Math.floor(Number(c.fieldNum) || 0));
-    const isVar = c.kind === 'varint';
-    if (fn === 5 && isVar) return 0;
-    if (fn === 3 && isVar) return 1;
-    if (fn === 1 && isVar) return 2;
-    if (fn === 1 && c.kind === 'str') return 3;
-    return 100 + fn * 2 + (isVar ? 0 : 1);
-  };
-  good.sort((a, b) => {
-    let d = rank(a) - rank(b);
-    if (d !== 0) return d;
-    if (a.kind === 'nestedChatRaw' && b.kind === 'nestedChatRaw') {
-      d = (Number(b._nestDepth) || 0) - (Number(a._nestDepth) || 0);
-      if (d !== 0) return d;
-    }
-    return a.fieldNum - b.fieldNum;
-  });
-  return good[0] || null;
-}
-
 /**
  * NicoliveMessage oneof の Gift（field 8 想定）を軽量デコード。proto 差異に耐えるため LEN 文字列を走査する。
  *
@@ -272,50 +243,30 @@ function selectGiftUidWinner(candidates) {
  * @returns {NdgrGift}
  */
 export function decodeGift(buf, start, end) {
+  let advertiserUserId = '';
   let advertiserName = '';
   /** @type {string[]} */
   const strs = [];
-  /** @type {{ fieldNum: number, val: string, kind: 'varint'|'str'|'nestedChatRaw', _nestDepth?: number, _nestedName?: string }[]} */
-  const uidCandidates = [];
   pbForEach(buf, start, end, (fn, wt, val, s, e) => {
     if (wt === 2) {
       const str = decodeStr(buf, s, e);
       if (str) strs.push(str);
-      if (fn === 2 && str && !isLikelyInternalNdgGiftOrCampaignLabel(str)) {
-        advertiserName = advertiserName || str;
-      }
+      if (fn === 2 && str) advertiserName = advertiserName || str;
       if (fn === 1 && str && /^\d{5,14}$/.test(str)) {
-        uidCandidates.push({ fieldNum: 1, val: str.trim(), kind: 'str' });
+        advertiserUserId = advertiserUserId || str;
       }
     } else if (wt === 0 && val != null) {
       const vs = String(val);
-      if (/^\d{5,14}$/.test(vs)) {
-        uidCandidates.push({ fieldNum: fn, val: vs, kind: 'varint' });
-      }
+      if (/^\d{5,14}$/.test(vs)) advertiserUserId = advertiserUserId || vs;
     }
   });
   for (const str of strs) {
-    if (!/^\d{5,14}$/.test(str)) continue;
-    const t = str.trim();
-    if (uidCandidates.some((c) => c.val === t)) continue;
-    uidCandidates.push({ fieldNum: 0, val: t, kind: 'str' });
-  }
-  collectNestedGiftSenders(buf, start, end, 0, uidCandidates);
-
-  const winner = selectGiftUidWinner(uidCandidates);
-  const advertiserUserId = winner ? String(winner.val).trim() : '';
-  if (
-    winner?.kind === 'nestedChatRaw' &&
-    winner._nestedName &&
-    !isLikelyInternalNdgGiftOrCampaignLabel(winner._nestedName)
-  ) {
-    advertiserName = winner._nestedName;
+    if (!advertiserUserId && /^\d{5,14}$/.test(str)) advertiserUserId = str;
   }
   if (!advertiserName) {
     for (const str of strs) {
       if (
         str !== advertiserUserId &&
-        !isLikelyInternalNdgGiftOrCampaignLabel(str) &&
         str.length > 0 &&
         str.length <= 128 &&
         !/^https?:\/\//i.test(str)
@@ -329,7 +280,20 @@ export function decodeGift(buf, start, end) {
 }
 
 /**
- * @typedef {{ stats: NdgrStatistics|null, chats: NdgrChat[], gifts: NdgrGift[] }} NdgrDecodeResult
+ * @typedef {{
+ *   top: Record<string, number>,
+ *   msg: Record<string, number>
+ * }} NdgrTagHistogram
+ *
+ * - `top`: ChunkedMessage 直下で観測した field tag → 件数
+ * - `msg`: 内側の NicoliveMessage（top.fn=2）one-of の field tag → 件数
+ *
+ * niconico 側がプロトコルを差し替えた時に「どの tag が新規に増えたか」を
+ * 0 件のまま居る既存 tag と並べて見るための診断用カウンタ。
+ */
+
+/**
+ * @typedef {{ stats: NdgrStatistics|null, chats: NdgrChat[], gifts: NdgrGift[], tagHistogram: NdgrTagHistogram }} NdgrDecodeResult
  */
 
 /**
@@ -348,21 +312,43 @@ export function decodeChunkedMessage(buf, start, end) {
   const chats = [];
   /** @type {NdgrGift[]} */
   const gifts = [];
+  /** @type {NdgrTagHistogram} */
+  const tagHistogram = { top: {}, msg: {} };
 
   pbForEach(buf, s0, e0, (fn, wt, _v, s, e) => {
     if (wt !== 2) return;
+    const topKey = String(fn);
+    tagHistogram.top[topKey] = (tagHistogram.top[topKey] || 0) + 1;
 
     if (fn === 4) {
-      pbForEach(buf, s, e, (sfn, swt, _sv, ss, se) => {
-        if (sfn === 1 && swt === 2) {
-          stats = decodeStatistics(buf, ss, se);
+      pbForEach(buf, s, e, (_sfn, swt, _sv, ss, se) => {
+        if (swt === 2) {
+          const sub = decodeStatistics(buf, ss, se);
+          if (!ndgrStatisticsHasWireSignal(sub)) return;
+          stats = mergeNdgrStatistics(stats, sub);
         }
       });
     }
 
-    if (fn === 2) {
+    if (fn === 5) {
+      const sub = decodeStatistics(buf, s, e);
+      if (ndgrStatisticsHasWireSignal(sub)) {
+        stats = mergeNdgrStatistics(stats, sub);
+      }
+    }
+
+    // top.1 / top.2 とも NicoliveMessage の oneof ラッパとして同じロジックで掘る。
+    // niconico の現プロトコルでは大半のメッセージ（chat / gift / system event）が
+    // top.1 に乗っており、top.2 は古い経路（残っているが少数）。両方処理しないと
+    // ギフトイベントが永遠に 0 件のままになる。
+    // chat/gift デコーダ側で構造的に validate 済み（`chat.no != null` /
+    // `advertiserUserId || advertiserName`）なので、見当違いの payload を踏んでも
+    // 偽陽性は出ない。
+    if (fn === 1 || fn === 2) {
       pbForEach(buf, s, e, (mfn, mwt, _mv, ms, me) => {
         if (mwt !== 2) return;
+        const msgKey = String(mfn);
+        tagHistogram.msg[msgKey] = (tagHistogram.msg[msgKey] || 0) + 1;
         if (mfn === 1 || mfn === 20) {
           const chat = decodeChat(buf, ms, me);
           if (chat.no != null) chats.push(chat);
@@ -374,7 +360,7 @@ export function decodeChunkedMessage(buf, start, end) {
     }
   });
 
-  return { stats, chats, gifts };
+  return { stats, chats, gifts, tagHistogram };
 }
 
 /**

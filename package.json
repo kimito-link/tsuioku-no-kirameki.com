@@ -1,13 +1,13 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.138",
+  "version": "0.1.162",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint .",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint",
     "typecheck": "tsc --noEmit",
     "verify": "npm test && npm run lint && npm run typecheck && npm run build",
     "verify:bump": "node scripts/verify-bump.mjs",

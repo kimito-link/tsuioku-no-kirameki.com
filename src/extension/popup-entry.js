@@ -10,6 +10,8 @@ import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
+import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
+import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -60,6 +62,7 @@ import {
   INLINE_PANEL_VIEWPORT_WIDE_ONCE,
   commentsStorageKey,
   giftUsersStorageKey,
+  eventDomStorageKey,
   isCommentEnterSendEnabled,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
@@ -73,7 +76,6 @@ import {
   normalizeAnonymousIdenticonEnabled,
   normalizeFoldAnonymousInRankStrip
 } from '../lib/storageKeys.js';
-import { normalizeGiftThrowCount } from '../lib/giftRecord.js';
 import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold.js';
 import { normalizeSupportVisualExpanded } from '../lib/supportVisualExpanded.js';
 import { computeScrollDeltaToRevealInParent } from '../lib/nlMainScrollReveal.js';
@@ -135,7 +137,6 @@ import {
   concurrentResolutionMethodTitlePart,
   SPARSE_CONCURRENT_ESTIMATE_NOTE
 } from '../lib/watchConcurrentEstimateUiCopy.js';
-import { buildStoryGaugeMeterLabelText } from '../lib/supportVisualStoryCopy.js';
 import { parseViewerCountFromLooseText } from '../lib/liveAudienceDom.js';
 import { pickLatestCommentEntry } from '../lib/pickLatestComment.js';
 import {
@@ -196,19 +197,6 @@ import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 import { TOP_SUPPORT_RANK_STRIP_MAX } from '../lib/topSupportRankStripConfig.js';
 import { topSupportRankStripStableKey } from '../lib/topSupportRankStripStableKey.js';
 import {
-  prepareGiftRankStrip,
-  formatGiftThrowGapLabel,
-  formatLeaderGapLabel
-} from '../lib/giftRankStripPrep.js';
-import { syncGiftRankStripAfterUserRoomsRender } from '../lib/giftRankStripPopupSync.js';
-import { giftRankStripStableKey } from '../lib/giftRankStripStableKey.js';
-import {
-  buildRankStripPillarRowHtml,
-  RANK_STRIP_COMMENT_EMPTY_NOTE,
-  RANK_STRIP_COMMENT_NOTE,
-  RANK_STRIP_GIFT_NOTE
-} from '../lib/rankStripSectionLabels.js';
-import {
   bucketStoryUserLanePicks,
   flattenStoryUserLaneBuckets
 } from '../lib/storyUserLaneBuckets.js';
@@ -243,7 +231,14 @@ import {
   trendToSparklineArrays
 } from '../lib/devMonitorTrendSession.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
+import { buildReportMemoPayload } from '../lib/supportGrowthInsights.js';
 import { buildMarketingDashboardHtml } from '../lib/marketingChartsHtml.js';
+import {
+  buildYukkuriBroadcastSummary,
+  renderYukkuriBroadcastSummaryHtml,
+  yukkuriBroadcastSummaryEmbeddedCss,
+  listYukkuriCharacterImagePaths
+} from '../lib/yukkuriBroadcastSummary.js';
 import {
   buildDevMonitorDlChartsHtml,
   commentTypeDistribution,
@@ -285,14 +280,14 @@ import {
 } from '../lib/popupWindowEmptyHeight.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
-import { pickGiftRankDisplayNickname } from '../lib/giftDisplayNickname.js';
-import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
+import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
+import { snapshotLooksAlignedWithWatchUrl } from '../lib/watchSnapshotAlignment.js';
 
 /**
  * @typedef {{
@@ -342,10 +337,6 @@ import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.
  *   officialReceivedCommentsDelta?: number|null,
  *   officialCommentSampleWindowMs?: number|null,
  *   officialCaptureRatio?: number|null,
- *   officialGiftPoints?: number|null,
- *   officialAdPoints?: number|null,
- *   officialGiftAdStatsUpdatedAt?: number|null,
- *   officialGiftAdStatsFreshnessMs?: number|null,
  *   totalComments?: number|null,
  *   streamAgeMin?: number|null,
  *   recentActiveUsers?: number,
@@ -547,9 +538,6 @@ let _prevSupportCount = /** @type {number|null} */ (null);
 /** @type {string|null} */
 let _lastTopSupportRankStripStableKey = null;
 
-/** @type {string|null} */
-let _lastGiftRankStripStableKey = null;
-
 /**
  * 放送切替（liveId 変化）を検知して、直前放送の UI キャッシュ（rank strip キー・差分リアクション用の
  * 直近値）を全て強制リセットする。複数 refresh が並走したときに古い描画が新しい描画を上書きしても
@@ -563,7 +551,6 @@ let _lastGiftRankStripStableKey = null;
  *   - `_prevViewerCount`          ..... DOM 視聴者数 delta
  *   - `_prevConcurrentEstimated`  ..... 推定同時接続 delta
  * `_lastTopSupportRankStripStableKey` は上位ランクストリップの描画冪等キー。
- * `_lastGiftRankStripStableKey` はギフト貢献ストリップの描画冪等キー。
  *
  * @param {string} nextLiveId
  */
@@ -572,8 +559,6 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
   if (norm === watchPopupLastPaintedLiveId) return;
   watchPopupLastPaintedLiveId = norm;
   _lastTopSupportRankStripStableKey = null;
-  _lastGiftRankStripStableKey = null;
-  _lastOfficialNicoStatsStripKey = null;
   _prevSupportCount = null;
   _prevViewerCount = null;
   _prevConcurrentEstimated = null;
@@ -842,10 +827,6 @@ const COMMENT_POST_UI_STATE = {
   notice: null
 };
 
-const COMMENT_ASSET_PICKER_UI_STATE = {
-  opening: false
-};
-
 const COMMENT_KINDNESS_FACE_SRC = {
   mild: 'images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png',
   strong: 'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png'
@@ -996,22 +977,6 @@ function clearCommentPostNotice() {
   COMMENT_POST_UI_STATE.notice = null;
 }
 
-function paintCommentAssetPickerButtons() {
-  const can =
-    Boolean(
-      String(COMMENT_POST_UI_STATE.watchUrl || '').trim() &&
-        String(COMMENT_POST_UI_STATE.liveId || '').trim()
-    ) &&
-    !COMMENT_POST_UI_STATE.submitting &&
-    !COMMENT_ASSET_PICKER_UI_STATE.opening;
-  for (const id of ['openNicoCommentAssetPickerBtn', 'openNicoCommentAssetPickerGiftPanelBtn']) {
-    const b = /** @type {HTMLButtonElement|null} */ ($(id));
-    if (!b) continue;
-    b.disabled = !can;
-    b.setAttribute('aria-busy', COMMENT_ASSET_PICKER_UI_STATE.opening ? 'true' : 'false');
-  }
-}
-
 function paintCommentComposeUi() {
   const commentInput = /** @type {HTMLTextAreaElement|null} */ ($('commentInput'));
   const postBtn = /** @type {HTMLButtonElement|null} */ ($('postCommentBtn'));
@@ -1053,8 +1018,6 @@ function paintCommentComposeUi() {
     );
   }
 
-  paintCommentAssetPickerButtons();
-
   let statusMessage = baseState.statusMessage;
   let statusKind = baseState.statusKind;
   const notice = COMMENT_POST_UI_STATE.notice;
@@ -1068,43 +1031,6 @@ function paintCommentComposeUi() {
   }
   setPostStatus(statusMessage, statusKind);
   syncVoiceCommentButton();
-}
-
-function handleOpenNicoCommentAssetPickerFromPopup() {
-  const exportBtnEl = /** @type {HTMLButtonElement|null} */ ($('exportJson'));
-  const watchUrl = String(
-    exportBtnEl?.dataset.watchUrl || COMMENT_POST_UI_STATE.watchUrl || ''
-  ).trim();
-  if (!watchUrl) {
-    setPostStatus('watchページを開いてからお試しください。', 'error');
-    paintCommentComposeUi();
-    return;
-  }
-  void (async () => {
-    COMMENT_ASSET_PICKER_UI_STATE.opening = true;
-    paintCommentComposeUi();
-    setPostStatus('watchタブでギフト・アイテム欄を開いています…', 'idle');
-    try {
-      const r = await requestOpenCommentAssetPickerOnWatchTab(watchUrl);
-      if (r.ok) {
-        setPostStatus(
-          'watchタブ側で公式のギフト・アイテム欄を開きました。続き（選択・決済）はニコ生の画面で操作してください。',
-          'success'
-        );
-      } else {
-        setPostStatus(r.error || '開けませんでした。', 'error');
-      }
-    } catch (err) {
-      const msg =
-        err && typeof err === 'object' && 'message' in err
-          ? String(/** @type {{ message?: unknown }} */ (err).message || '')
-          : String(err || '');
-      setPostStatus(msg ? `開けませんでした。（${msg}）` : '開けませんでした。', 'error');
-    } finally {
-      COMMENT_ASSET_PICKER_UI_STATE.opening = false;
-      paintCommentComposeUi();
-    }
-  })();
 }
 
 // 0.1.38 (AM): EXTENSION_RELOAD_USER_GUIDE_JA / withCommentSendTroubleshootHint
@@ -1398,7 +1324,6 @@ async function renderGiftQuickStatsPanel(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) {
     mount.innerHTML = '';
-    void refreshGiftRankStripForLive('');
     return;
   }
   try {
@@ -1411,32 +1336,22 @@ async function renderGiftQuickStatsPanel(liveId) {
         '<p class="nl-sub">まだギフト・広告ユーザーが記録されていません。</p>';
       return;
     }
-    const normalized = users.map((u) => ({
-      ...u,
-      throwCount: normalizeGiftThrowCount(u?.throwCount)
-    }));
-    const sorted = [...normalized].sort((a, b) => {
-      const d = (b.throwCount || 0) - (a.throwCount || 0);
-      if (d !== 0) return d;
-      return (b.capturedAt || 0) - (a.capturedAt || 0);
-    });
+    const sorted = [...users].sort(
+      (a, b) => (b.capturedAt || 0) - (a.capturedAt || 0)
+    );
     const top = sorted.slice(0, 15);
-    const totalThrows = normalized.reduce((s, u) => s + (u.throwCount || 0), 0);
     mount.innerHTML =
-      `<p class="nl-sub">${users.length} 名・計 ${totalThrows} 回（NDGR で検知した投げ／ギフトイベント数。回数の多い順に最大15件）</p><ul class="nl-gift-quick-list">` +
+      `<p class="nl-sub">${users.length} 名を記録中（直近順に最大15件）</p><ul class="nl-gift-quick-list">` +
       top
         .map((u) => {
           const nick = escapeHtml(String(u.nickname || '').trim() || '(noname)');
           const uid = escapeHtml(String(u.userId || '').trim());
-          const tc = Math.max(1, Math.round(Number(u.throwCount)) || 1);
-          return `<li><span class="nl-gift-nick">${nick}</span> <span class="nl-gift-throws" aria-label="検知回数">×${tc}</span> <code class="nl-gift-uid">${uid}</code></li>`;
+          return `<li><span class="nl-gift-nick">${nick}</span> <code class="nl-gift-uid">${uid}</code></li>`;
         })
         .join('') +
       '</ul>';
   } catch {
     mount.textContent = '読み込みに失敗しました。';
-  } finally {
-    void refreshGiftRankStripForLive(lid);
   }
 }
 
@@ -2290,26 +2205,6 @@ function rememberedAvatarUrlForUserId(userId) {
   return '';
 }
 
-/**
- * 同一 userId でコメント／プロファイルから取れた表示名を再利用（ギフト帯の内部ラベル補正）
- * @param {unknown} userId
- */
-function rememberedNicknameForUserId(userId) {
-  const uid = String(userId || '').trim();
-  if (!uid) return '';
-  const fromCache = String(popupUserCommentProfileMap?.[uid]?.nickname || '').trim();
-  if (fromCache) return fromCache;
-  const list = STORY_SOURCE_STATE?.entries;
-  if (!Array.isArray(list) || list.length === 0) return '';
-  for (let i = list.length - 1; i >= 0; i -= 1) {
-    const e = list[i];
-    if (String(e?.userId || '').trim() !== uid) continue;
-    const n = String(e?.nickname || '').trim();
-    if (n) return n;
-  }
-  return '';
-}
-
 /** @param {PopupCommentEntry[]} entries */
 function countEntriesWithUserId(entries) {
   let n = 0;
@@ -2736,7 +2631,10 @@ function setSceneStory(lead, sub, opts = {}) {
     );
   }
   if (gaugeLabel) {
-    gaugeLabel.textContent = buildStoryGaugeMeterLabelText(count);
+    gaugeLabel.textContent =
+      count <= 0
+        ? '応援 0 コメント'
+        : `応援 ${count.toLocaleString('ja-JP')} コメント / ホバーでプレビュー・クリックで詳細固定（Esc・外側クリックで閉じる）`;
   }
   if (!story) return;
   const reaction = String(opts.reaction || 'idle');
@@ -2780,6 +2678,7 @@ const STORY_GROWTH_STATE = {
   renderedCount: 0,
   targetCount: 0,
   root: /** @type {HTMLElement|null} */ (null),
+  timer: /** @type {ReturnType<typeof setTimeout>|null} */ (null),
   /** クリックで固定したコメントの安定 ID（`comment.id` ベース、レガシーは dedupe キー） */
   pinnedCommentId: /** @type {string|null} */ (null),
   /** ホバー一時プレビュー（固定中は無視・上書きしない） */
@@ -3065,21 +2964,18 @@ function bindStoryDetailHoverBridge() {
  * @param {'light'|'dark'} colorScheme
  * @param {Array<{ displaySrc: string, meta: { idLine: string, nameLine: string }, profileTier: number, entry: PopupCommentEntry }>} picked
  * @param {number} sourceEntryCount STORY_SOURCE_STATE.entries の長さ（picked=0 でもリスト更新で再描画するため）
- * @param {number} recordedCommentRowsTotal 診断 total と同じ記録件数（レーン直下の第2文と同期）
  */
 function storyUserLaneRenderSignature(
   liveId,
   colorScheme,
   picked,
-  sourceEntryCount,
-  recordedCommentRowsTotal
+  sourceEntryCount
 ) {
   const lid = String(liveId || '').trim().toLowerCase();
   const scheme = String(colorScheme || 'light');
-  const rec = Math.max(0, Math.floor(Number(recordedCommentRowsTotal) || 0));
   if (!picked.length) {
     const n = Math.max(0, Math.floor(Number(sourceEntryCount) || 0));
-    return `${lid}|${scheme}|0|src:${n}|rec:${rec}`;
+    return `${lid}|${scheme}|0|src:${n}`;
   }
   const parts = picked.map((p) => {
     const sid = commentStableId(p.entry);
@@ -3091,7 +2987,7 @@ function storyUserLaneRenderSignature(
       String(p.profileTier)
     ].join('\u001f');
   });
-  return `${lid}|${scheme}|${picked.length}\u001e${parts.join('\u001e')}|rec:${rec}`;
+  return `${lid}|${scheme}|${picked.length}\u001e${parts.join('\u001e')}`;
 }
 
 function renderStoryUserLane() {
@@ -3293,8 +3189,7 @@ function renderStoryUserLane() {
     liveId,
     laneScheme,
     picked,
-    aggList.length,
-    STORY_AVATAR_DIAG_STATE.total
+    aggList.length
   );
   if (laneSig === storyUserLaneLastRenderSig) {
     return;
@@ -3302,15 +3197,11 @@ function renderStoryUserLane() {
   storyUserLaneLastRenderSig = laneSig;
 
   if (!picked.length) {
-    paintStoryUserLaneDomEmptyGuides(els, faces, {
-      recordedCommentRowsTotal: STORY_AVATAR_DIAG_STATE.total
-    });
+    paintStoryUserLaneDomEmptyGuides(els, faces);
     return;
   }
 
-  paintStoryUserLaneDomFilled(els, faces, buckets, picked.length, laneDomIo, {
-    recordedCommentRowsTotal: STORY_AVATAR_DIAG_STATE.total
-  });
+  paintStoryUserLaneDomFilled(els, faces, buckets, picked.length, laneDomIo);
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
       window.__NLS_LANE_DIAG__();
@@ -3882,6 +3773,12 @@ function bindStoryGrowthInteractions(root) {
   });
 }
 
+function clearStoryGrowthTimer() {
+  if (!STORY_GROWTH_STATE.timer) return;
+  clearTimeout(STORY_GROWTH_STATE.timer);
+  STORY_GROWTH_STATE.timer = null;
+}
+
 /** @param {number} count */
 function resolveStoryIconSize(count) {
   const total = Math.max(0, Math.floor(Number(count) || 0));
@@ -4100,6 +3997,7 @@ function syncStoryGrowth(liveId, count, root) {
   const changedRoot = STORY_GROWTH_STATE.root !== root;
 
   if (changedLive || changedRoot) {
+    clearStoryGrowthTimer();
     if (changedLive) {
       storyAvatarLoadGuard.clearFailedUrls();
     }
@@ -4133,8 +4031,12 @@ function syncStoryGrowth(liveId, count, root) {
 
   const tgt = STORY_GROWTH_STATE.targetCount;
   const rnd = STORY_GROWTH_STATE.renderedCount;
-  // 件数が増えたら常に一括 rebuild（旧 setTimeout 逐次追加は廃止済み）。
+  /*
+   * 以前は setTimeout で1セルずつ追加していたが、開いた直後に「滝」のように見えるため、
+   * 件数が足りないときは常に一括で rebuild する（差分が1件だけでもタイマー列は使わない）。
+   */
   if (rnd < tgt && tgt > 0) {
+    clearStoryGrowthTimer();
     rebuildStoryGrowth(root, tgt);
     STORY_GROWTH_STATE.renderedCount = tgt;
     patchStoryGrowthIconsFromSource(root, { pulseLast: true });
@@ -4200,6 +4102,7 @@ function computeStoryReaction(liveId, commentCount) {
  */
 function renderCharacterScene(state) {
   const { hasWatch, recording, commentCount, liveId, snapshot } = state;
+  const roleCopy = '1コメントごとに、りんくが1体ずつ増えるよ。';
 
   if (!hasWatch) {
     STORY_REACTION_STATE.liveId = '';
@@ -4208,8 +4111,8 @@ function renderCharacterScene(state) {
     setSceneStory(
       'りんくがみんなの応援コメントを集める準備中だよ。',
       recording
-        ? '記録はON。watchページが開いたら、下のグリッドと上の三段レーンで応援を可視化するよ。'
-        : 'watchページを開いたら、下のグリッドと上の三段レーンで応援を可視化するよ。',
+        ? `記録はON。watchページが開いたら応援コメントの可視化を始めるよ。${roleCopy}`
+        : `watchページを開いたら、りんくが応援コメントの可視化を始めるよ。${roleCopy}`,
       {
         liveId: '',
         delta: 0,
@@ -4231,7 +4134,7 @@ function renderCharacterScene(state) {
   if (recording && commentCount <= 0) {
     setSceneStory(
       'りんくがみんなの応援コメントを集めています',
-      `「${title || liveId || '放送'}」を開いたままにしてね。数字がすぐ増えないときは、右のコメント一覧が仮想スクロールのため少し待つか、一覧を少しスクロールすると取り込みやすいよ。`,
+      `「${title || liveId || '放送'}」を開いたままにしてね。数字がすぐ増えないときは、右のコメント一覧が仮想スクロールのため少し待つか、一覧を少しスクロールすると取り込みやすいよ。${roleCopy}`,
       {
         liveId,
         delta: 0,
@@ -4247,8 +4150,8 @@ function renderCharacterScene(state) {
   setSceneStory(
     'りんくがみんなの応援コメントを集めているよ！',
     recording
-      ? `いま ${countLabel} コメント。${reaction.delta > 0 ? `応援が +${reaction.delta} コメント増えたよ。` : `「${title || liveId || '放送'}」を見守っているよ。`} 下はコメント順のグリッド、上の三段は人数ベースのレーンだよ。`
-      : `記録OFF。ONにすると「${title || liveId || '放送'}」の応援コメントを可視化できるよ。${caster ? ` 配信者: ${caster}。` : ''}${tags.length ? ` タグ: ${tags.join(' / ')}。` : ''}`,
+      ? `いま ${countLabel} コメント。${reaction.delta > 0 ? `応援が +${reaction.delta} コメント増えたよ。` : `「${title || liveId || '放送'}」を見守っているよ。`} ${roleCopy}`
+      : `記録OFF。ONにすると「${title || liveId || '放送'}」の応援コメントを可視化できるよ。${caster ? ` 配信者: ${caster}。` : ''}${tags.length ? ` タグ: ${tags.join(' / ')}。` : ''}${roleCopy}`,
     {
       liveId,
       delta: reaction.delta,
@@ -4282,11 +4185,19 @@ function clearWatchMetaCard(opts = {}) {
   const uniqueEl = $('watchUniqueUsers');
   const noIdEl = $('watchCommentsNoId');
   const noteEl = $('watchAudienceNote');
+  if (!wrap || !title || !broadcaster || !thumb || !tags) return;
   if (concurrentLoadingEl) concurrentLoadingEl.hidden = true;
   if (concurrentReadyEl) concurrentReadyEl.hidden = false;
   if (concurrentCard) concurrentCard.removeAttribute('aria-busy');
   const casterBanner = $('casterBanner');
   if (casterBanner) casterBanner.hidden = true;
+  wrap.hidden = true;
+  title.textContent = '-';
+  broadcaster.textContent = '-';
+  thumb.hidden = true;
+  thumb.removeAttribute('src');
+  tags.innerHTML = '';
+  if (audience) audience.hidden = true;
   const inflight =
     typeof opts.inflight === 'boolean'
       ? opts.inflight
@@ -4323,75 +4234,321 @@ function clearWatchMetaCard(opts = {}) {
     noteEl.textContent = '';
     noteEl.removeAttribute('title');
   }
-  updateOfficialNicoStatsStrip(null);
-
-  // #watchMeta は補助ブロック。欠損時でも #liveStatCards / 公式帯は上で必ず反映する。
-  if (!wrap || !title || !broadcaster || !thumb || !tags) return;
-  wrap.hidden = true;
-  title.textContent = '-';
-  broadcaster.textContent = '-';
-  thumb.hidden = true;
-  thumb.removeAttribute('src');
-  tags.innerHTML = '';
-  if (audience) audience.hidden = true;
+  const officialNdgrCard = $('watchOfficialNdgrCard');
+  if (officialNdgrCard instanceof HTMLElement) {
+    officialNdgrCard.hidden = true;
+  }
+  paintOfficialNicoStatsStrip(null);
+  paintOfficialEventBannerCard(null);
 }
 
-let _lastOfficialNicoStatsStripKey = /** @type {string|null} */ (null);
-
-/** 本家プレイヤー付近の統計（WS / NDGR）を1行に集約表示 */
-const OFFICIAL_NICO_STATS_STRIP_TOOLTIP =
-  '視聴ページの WebSocket / NDGR statistics で届いた値です。ニコ生のプレイヤー横の数字とタイミングがずれることがあります。';
+/**
+ * niconico DOM から掬った正本値の bundle（`nls_event_dom_<lv>` の中身）。
+ * paint* 関数群はこのキャッシュを最優先で読む。content-script が周期的に更新する。
+ * @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null}
+ */
+let _lastOfficialEventDomBundle = null;
 
 /**
- * @param {WatchPageSnapshot|null} snapshot
+ * niconico 公式バナー「○○さんが参加しています！現在 N 位 X」をネイティブに描画する。
+ * iframe で audition embed を載せると配信者ログイン状態では管理 UI（参加中のイベント
+ * ドロップダウン等）が混じってしまうため、必要な値だけを掬って自前のカードに表示する。
+ *
+ * 値の優先順：
+ *   - ownerName / iconUrl は bundle.eventBanner があればそれ、無ければ snapshot.broadcasterName
+ *   - title は bundle.eventBanner.title（gift サイドバー由来）
+ *   - rank は bundle.eventBanner.rank → snapshot.officialNicoEventRankNdgr（NDGR 由来）
+ *   - score は bundle.eventBalloon.eventTotalScore → bundle.eventBanner.score → snapshot.officialEventGiftScoreNdgr
+ *
+ * 何も拾えないとき（番組がイベント不参加 等）はカードを hidden にするだけ。
+ *
+ * @param {Record<string, unknown>|null|undefined} snapshot
  */
-function updateOfficialNicoStatsStrip(snapshot) {
-  const root = /** @type {HTMLElement|null} */ ($('officialNicoStatsStrip'));
-  if (!root) return;
-  if (!snapshot || !String(snapshot.liveId || '').trim().toLowerCase()) {
-    _lastOfficialNicoStatsStripKey = null;
-    root.hidden = true;
-    root.setAttribute('aria-hidden', 'true');
-    root.removeAttribute('title');
-    if (root instanceof HTMLDetailsElement) root.open = false;
+function paintOfficialEventBannerCard(snapshot) {
+  const card = /** @type {HTMLAnchorElement|null} */ (
+    $('watchOfficialEventBannerCard')
+  );
+  if (!(card instanceof HTMLAnchorElement)) return;
+  const ownerEl = $('watchOfficialEventBannerOwner');
+  const titleEl = $('watchOfficialEventBannerTitle');
+  const rankEl = $('watchOfficialEventBannerRank');
+  const scoreEl = $('watchOfficialEventBannerScore');
+  const thumbEl = /** @type {HTMLImageElement|null} */ (
+    $('watchOfficialEventBannerThumb')
+  );
+
+  const hide = () => {
+    card.hidden = true;
+    card.setAttribute('aria-hidden', 'true');
+    card.removeAttribute('href');
+    if (ownerEl) ownerEl.textContent = '';
+    if (titleEl) titleEl.textContent = '';
+    if (rankEl) rankEl.textContent = '';
+    if (scoreEl) scoreEl.textContent = '';
+    if (thumbEl) {
+      thumbEl.hidden = true;
+      thumbEl.removeAttribute('src');
+      thumbEl.removeAttribute('alt');
+    }
+  };
+
+  const snap = snapshot && typeof snapshot === 'object' ? snapshot : null;
+  const bundle = _lastOfficialEventDomBundle;
+  const banner = bundle?.eventBanner || null;
+  const balloon = bundle?.eventBalloon || null;
+
+  /** @param {unknown} v */
+  const asNum = (v) =>
+    typeof v === 'number' && Number.isFinite(v) ? v : null;
+  /** @param {unknown} a @param {unknown} b */
+  const pickNum = (a, b) => asNum(a) ?? asNum(b);
+  /** @param {unknown[]} xs */
+  const pickStr = (...xs) => {
+    for (const x of xs) {
+      const s = String(x ?? '').trim();
+      if (s) return s;
+    }
+    return '';
+  };
+
+  const broadcasterName = pickStr(snap?.broadcasterName);
+  const ownerText = pickStr(banner?.ownerText, broadcasterName ? `${broadcasterName}さんが参加しています！` : '');
+  const title = pickStr(banner?.title);
+  const rank = pickNum(banner?.rank, snap?.officialNicoEventRankNdgr);
+  const score = pickNum(
+    balloon?.eventTotalScore,
+    pickNum(banner?.score, snap?.officialEventGiftScoreNdgr)
+  );
+  const iconUrl = pickStr(banner?.iconUrl);
+  const href = pickStr(banner?.href);
+  const liveIdLocal = pickStr(snap?.liveId).toLowerCase();
+  const fallbackHref = liveIdLocal
+    ? 'https://audition.nicovideo.jp/embedded/richview/live?content_id=' +
+      encodeURIComponent(liveIdLocal) +
+      '&frontend_id=9&frontend_version=644.0.0'
+    : '';
+
+  // 何の手がかりも無いなら隠す（バナー無視）。rank だけは NDGR から拾えるので
+  // rank があるか、bundle.eventBanner が居るときだけ表示する。
+  const haveSomething = banner != null || rank != null || title || score != null;
+  if (!haveSomething) {
+    hide();
     return;
   }
 
-  const digest = buildOfficialNicoStatsStripDigest(snapshot);
-  if (!digest) {
-    _lastOfficialNicoStatsStripKey = null;
-    root.hidden = true;
-    root.setAttribute('aria-hidden', 'true');
-    root.removeAttribute('title');
-    if (root instanceof HTMLDetailsElement) root.open = false;
+  card.hidden = false;
+  card.removeAttribute('aria-hidden');
+  if (href || fallbackHref) card.href = href || fallbackHref;
+
+  if (ownerEl) {
+    ownerEl.textContent = ownerText || '配信者がイベントに参加中';
+  }
+  if (titleEl) {
+    titleEl.textContent = title || 'イベント名は配信終了後または公式サイドバーで取得されます';
+    titleEl.title = title || '';
+  }
+  if (rankEl) {
+    rankEl.textContent = rank != null ? `${rank} 位` : '—';
+  }
+  if (scoreEl) {
+    scoreEl.textContent = score != null ? score.toLocaleString('ja-JP') : '';
+  }
+  if (thumbEl) {
+    if (iconUrl && /^https?:\/\//.test(iconUrl)) {
+      thumbEl.src = iconUrl;
+      thumbEl.alt = title || ownerText || '';
+      thumbEl.hidden = false;
+    } else {
+      thumbEl.hidden = true;
+      thumbEl.removeAttribute('src');
+    }
+  }
+}
+
+/**
+ * ゆっくり解説用キャラ画像（24枚程度）を全部 data URL に焼く。HTML レポート /
+ * マーケ分析がダウンロードされた後でも画像が表示されるようにするため。
+ * 1 度しか呼ばれない想定だが、Promise はキャッシュして複数呼んでも軽い。
+ * @returns {Promise<Record<string, string>>}
+ */
+let _yukkuriImageDataUrlMapPromise = null;
+async function buildYukkuriImageDataUrlMap() {
+  if (_yukkuriImageDataUrlMapPromise) return _yukkuriImageDataUrlMapPromise;
+  _yukkuriImageDataUrlMapPromise = (async () => {
+    /** @type {Record<string, string>} */
+    const out = {};
+    const paths = listYukkuriCharacterImagePaths();
+    await Promise.all(
+      paths.map(async (p) => {
+        try {
+          const dataUrl = await fetchExtensionPngAsDataUrl(p);
+          if (dataUrl) out[p] = dataUrl;
+        } catch {
+          // no-op（取れない画像は path のまま fallback）
+        }
+      })
+    );
+    return out;
+  })();
+  return _yukkuriImageDataUrlMapPromise;
+}
+
+/**
+ * `nls_event_dom_<lv>` を 1 回読むだけのヘルパ。HTML レポート / マーケ分析の
+ * 出力時にもこの bundle を使ってゆっくり解説を組み立てるので外出しする。
+ * @param {string} liveId
+ * @returns {Promise<import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null>}
+ */
+async function readOfficialEventDomBundleFromStorage(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return null;
+  try {
+    const key = eventDomStorageKey(lid);
+    const bag = await chrome.storage.local.get(key);
+    const v = bag?.[key];
+    return v && typeof v === 'object' && !Array.isArray(v)
+      ? /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle} */ (v)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** @param {string} liveId */
+async function refreshOfficialEventDomBundle(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) {
+    _lastOfficialEventDomBundle = null;
     return;
   }
-
-  if (digest.stableKey === _lastOfficialNicoStatsStripKey) return;
-  _lastOfficialNicoStatsStripKey = digest.stableKey;
-
-  const sumEl = $('officialNicoStatsSummary');
-  if (sumEl && sumEl.textContent !== digest.summaryText) {
-    sumEl.textContent = digest.summaryText;
+  try {
+    const key = eventDomStorageKey(lid);
+    const bag = await chrome.storage.local.get(key);
+    const v = bag?.[key];
+    _lastOfficialEventDomBundle =
+      v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+  } catch {
+    _lastOfficialEventDomBundle = null;
   }
+}
 
+/**
+ * 上段 5 チップ（来場・本家コメ・経過・広告pt・ギフトpt）を描画する。
+ * `_lastOfficialEventDomBundle.programStats` があればそちらを優先（公式 DOM 正本）。
+ * 無ければ snapshot 経由の NDGR 値にフォールバック。
+ * snapshot が null / liveId 不明のときは「—」プレースホルダに戻す。
+ * @param {Record<string, unknown>|null|undefined} snapshot
+ */
+function paintOfficialNicoStatsStrip(snapshot) {
   /** @param {string} id @param {{ text: string, isPlaceholder: boolean }} chip */
   const applyChip = (id, chip) => {
-    const el = /** @type {HTMLElement|null} */ ($(id));
+    const el = $(id);
     if (!el) return;
     if (el.textContent !== chip.text) el.textContent = chip.text;
     el.classList.toggle('is-placeholder', chip.isPlaceholder);
   };
-
+  const PH = { text: '—', isPlaceholder: true };
+  const ids = [
+    'officialStatNicoViewers',
+    'officialStatNicoComments',
+    'officialStatNicoStreamAge',
+    'officialStatNicoAdPts',
+    'officialStatNicoGiftPts'
+  ];
+  if (!snapshot || !String(snapshot.liveId || '').trim()) {
+    for (const id of ids) applyChip(id, PH);
+    return;
+  }
+  // niconico の watch ページ DOM から取れた正本値を最優先で snapshot に焼き込む。
+  // niconico 側プレイヤーの「3,266」「1,060」等がリアルタイムで data-value に入っており
+  // NDGR field 1〜4 と戦うより読むのが速くて確実。
+  const ps = _lastOfficialEventDomBundle?.programStats || null;
+  const augmented = ps
+    ? {
+        ...snapshot,
+        ...(typeof ps.watchCount === 'number' && Number.isFinite(ps.watchCount)
+          ? { officialViewerCount: ps.watchCount }
+          : null),
+        ...(typeof ps.commentCount === 'number' && Number.isFinite(ps.commentCount)
+          ? { officialCommentCount: ps.commentCount }
+          : null),
+        ...(typeof ps.adPoints === 'number' && Number.isFinite(ps.adPoints)
+          ? { officialAdPointsNdgr: ps.adPoints }
+          : null),
+        ...(typeof ps.giftPoints === 'number' && Number.isFinite(ps.giftPoints)
+          ? { officialGiftPointsNdgr: ps.giftPoints }
+          : null)
+      }
+    : snapshot;
+  const digest = buildOfficialNicoStatsStripDigest(augmented);
+  if (!digest) {
+    for (const id of ids) applyChip(id, PH);
+    return;
+  }
   applyChip('officialStatNicoViewers', digest.viewers);
   applyChip('officialStatNicoComments', digest.comments);
   applyChip('officialStatNicoStreamAge', digest.streamAge);
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
+}
 
-  root.hidden = false;
-  root.removeAttribute('aria-hidden');
-  root.title = OFFICIAL_NICO_STATS_STRIP_TOOLTIP;
+/**
+ * 公式ギフト・イベント指標（NDGR intercept）をライブスタットに描画する。
+ * @param {Record<string, unknown>|null|undefined} snap
+ */
+function paintOfficialNdgrGiftCard(snap) {
+  const card = $('watchOfficialNdgrCard');
+  if (!(card instanceof HTMLElement)) return;
+  if (!snap || typeof snap !== 'object') {
+    card.hidden = true;
+    return;
+  }
+  // niconico DOM から取れた正本値があれば優先（NDGR field 5/6 の値と意味が違う問題を回避）
+  const bundle = _lastOfficialEventDomBundle;
+  const programStats = bundle?.programStats || null;
+  const balloon = bundle?.eventBalloon || null;
+  const banner = bundle?.eventBanner || null;
+  /** @param {unknown} a @param {unknown} b */
+  const pickNum = (a, b) =>
+    typeof a === 'number' && Number.isFinite(a)
+      ? a
+      : typeof b === 'number' && Number.isFinite(b)
+        ? b
+        : null;
+  const ap = pickNum(programStats?.adPoints, snap.officialAdPointsNdgr);
+  const gp = pickNum(
+    balloon?.programTotalPoints,
+    pickNum(programStats?.giftPoints, snap.officialGiftPointsNdgr)
+  );
+  const ev = pickNum(balloon?.eventTotalScore, snap.officialEventGiftScoreNdgr);
+  const rk = pickNum(banner?.rank, snap.officialNicoEventRankNdgr);
+  const titleFromBanner = String(banner?.title || '').trim();
+  const title = titleFromBanner || String(snap.officialNicoEventTitleNdgr || '').trim();
+  /** @param {unknown} v */
+  const fmt = (v) =>
+    typeof v === 'number' && Number.isFinite(v) && v >= 0
+      ? v.toLocaleString('ja-JP')
+      : '—';
+  const hasNum =
+    (typeof ap === 'number' && Number.isFinite(ap)) ||
+    (typeof gp === 'number' && Number.isFinite(gp)) ||
+    (typeof ev === 'number' && Number.isFinite(ev)) ||
+    (typeof rk === 'number' && Number.isFinite(rk));
+  if (!hasNum && !title) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  const elAd = $('watchOfficialAdPts');
+  const elGift = $('watchOfficialGiftPts');
+  const elEv = $('watchOfficialEventPts');
+  const elRank = $('watchOfficialRank');
+  const elTitle = $('watchOfficialEventTitle');
+  if (elAd) elAd.textContent = fmt(ap);
+  if (elGift) elGift.textContent = fmt(gp);
+  if (elEv) elEv.textContent = fmt(ev);
+  if (elRank) elRank.textContent = fmt(rk);
+  if (elTitle) elTitle.textContent = title || '—';
 }
 
 let _prevConcurrentEstimated = /** @type {number|null} */ (null);
@@ -4417,12 +4574,11 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   const uniqueEl = $('watchUniqueUsers');
   const noIdEl = $('watchCommentsNoId');
   const noteEl = $('watchAudienceNote');
+  if (!wrap || !title || !broadcaster || !thumb || !tags) return;
   if (!snapshot) {
     clearWatchMetaCard();
     return;
   }
-
-  const metaChromeOk = Boolean(wrap && title && broadcaster && thumb && tags);
 
   const titleText = String(snapshot.broadcastTitle || snapshot.title || '-').trim() || '-';
   const broadcasterText = String(snapshot.broadcasterName || '-').trim() || '-';
@@ -4430,25 +4586,23 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
     ? snapshot.tags.filter((v) => String(v || '').trim()).slice(0, 10)
     : [];
 
-  if (metaChromeOk) {
-    title.textContent = titleText;
-    broadcaster.textContent = broadcasterText;
-    tags.innerHTML = '';
-    for (const tag of tagList) {
-      const chip = document.createElement('span');
-      chip.className = 'chip';
-      chip.textContent = tag;
-      tags.appendChild(chip);
-    }
+  title.textContent = titleText;
+  broadcaster.textContent = broadcasterText;
+  tags.innerHTML = '';
+  for (const tag of tagList) {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = tag;
+    tags.appendChild(chip);
+  }
 
-    const thumbnail = String(snapshot.thumbnailUrl || '').trim();
-    if (thumbnail) {
-      thumb.src = thumbnail;
-      thumb.hidden = false;
-    } else {
-      thumb.hidden = true;
-      thumb.removeAttribute('src');
-    }
+  const thumbnail = String(snapshot.thumbnailUrl || '').trim();
+  if (thumbnail) {
+    thumb.src = thumbnail;
+    thumb.hidden = false;
+  } else {
+    thumb.hidden = true;
+    thumb.removeAttribute('src');
   }
 
   const casterBanner = $('casterBanner');
@@ -4677,13 +4831,16 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
     noteEl.textContent = body;
     noteEl.title = title;
   }
+  if (audience) audience.hidden = false;
 
-  updateOfficialNicoStatsStrip(snapshot);
+  paintOfficialNdgrGiftCard(
+    /** @type {Record<string, unknown>} */ (snapshot)
+  );
+  paintOfficialNicoStatsStrip(
+    /** @type {Record<string, unknown>} */ (snapshot)
+  );
 
-  if (metaChromeOk) {
-    if (audience) audience.hidden = false;
-    wrap.hidden = false;
-  }
+  wrap.hidden = false;
 }
 
 /** @param {string} viewerLiveId 現在表示中の lv（小文字想定）・無ければ空 */
@@ -4849,8 +5006,7 @@ function renderTopSupportRankStrip(stripRooms) {
     strip.removeAttribute('aria-hidden');
     strip.setAttribute('aria-label', '配信者情報');
     strip.innerHTML =
-      buildRankStripPillarRowHtml('comments') +
-      `<p class="nl-top-support-rank__note">${escapeHtml(RANK_STRIP_COMMENT_EMPTY_NOTE)}</p>` +
+      `<p class="nl-top-support-rank__note">まだ応援コメントがありません。まずは配信者のフォローから。</p>` +
       `<div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
     bindOnErrorHideHandlersWithin(strip);
     return;
@@ -4870,7 +5026,6 @@ function renderTopSupportRankStrip(stripRooms) {
       ? (uid) => getCachedAnonymousIdenticonDataUrl(uid)
       : undefined
   });
-  const topSupportCount = models.length ? models[0].count : 0;
   const html = models
     .map((m) => {
       const placeHtml =
@@ -4896,15 +5051,8 @@ function renderTopSupportRankStrip(stripRooms) {
       const linkHref = isLinkable
         ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}`
         : '';
-      const ord = m.placeNumber != null ? m.placeNumber : 0;
-      const gapRaw = formatLeaderGapLabel(ord, m.count, topSupportCount, '件');
-      const gapHtml = gapRaw
-        ? `<span class="nl-top-support-rank__gap">${escapeHtml(gapRaw)}</span>`
-        : '';
       const innerHtml = `${placeHtml}
-        <span class="nl-top-support-rank__count-col">
-          <span class="nl-top-support-rank__count">${m.count}件</span>${gapHtml}
-        </span>
+        <span class="nl-top-support-rank__count">${m.count}件</span>
         <span class="nl-top-support-rank__thumb-wrap">
           <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
         </span>
@@ -4921,10 +5069,7 @@ function renderTopSupportRankStrip(stripRooms) {
    * スクロール前提のタイル列なので、末尾の追加がレイアウトを壊さない。
    */
   const listInner = `${html}${casterTileHtml}`;
-  strip.innerHTML =
-    buildRankStripPillarRowHtml('comments') +
-    `<p class="nl-top-support-rank__note">${escapeHtml(RANK_STRIP_COMMENT_NOTE)}</p>` +
-    `<div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
+  strip.innerHTML = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
   bindOnErrorHideHandlersWithin(strip);
   const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
   models.forEach((m, i) => {
@@ -4936,52 +5081,79 @@ function renderTopSupportRankStrip(stripRooms) {
   });
 }
 
-/** @returns {HTMLElement[]} */
-function giftRankStripRootElements() {
-  return /** @type {HTMLElement[]} */ (
-    ['topGiftRankStrip', 'storyGiftRankStrip']
-      .map((id) => /** @type {HTMLElement|null} */ ($(id)))
-      .filter((el) => el instanceof HTMLElement)
-  );
-}
-
-/** スナップショットに載る本家寄せのギフト／広告累計 pt 行（HTML 断片） */
-function buildOfficialGiftAdStatsNoteHtml() {
-  const snap = watchMetaCache.snapshot;
-  const gp =
-    snap &&
-    typeof snap.officialGiftPoints === 'number' &&
-    Number.isFinite(snap.officialGiftPoints) &&
-    snap.officialGiftPoints >= 0
-      ? snap.officialGiftPoints
-      : null;
-  const ap =
-    snap &&
-    typeof snap.officialAdPoints === 'number' &&
-    Number.isFinite(snap.officialAdPoints) &&
-    snap.officialAdPoints >= 0
-      ? snap.officialAdPoints
-      : null;
-  if (gp == null && ap == null) return '';
-  return `<p class="nl-top-support-rank__note nl-top-support-rank__note--official-giftstat">ギフト／広告の本家累計は、記録カード直下の「本家寄せ」を開くと数字で確認できます。貢献度（貢）とは別集計です。</p>`;
-}
-
 /**
- * ギフト貢献ストリップ（NDGR 検知の投げ／ギフト回数）。データが 1 件も無い間は呼び出し元で非表示。
- * @param {{ userKey: string, nickname: string, count: number, avatarUrl?: string }[]} stripRooms
+ * 貢献度ランキング帯。niconico DOM から掬った正本値（`nls_event_dom_<lv>` の
+ * contributionRanking）を最優先、それが無いときだけ NDGR ギフト event 集計に
+ * フォールバック。応援帯と同じ CSS / モデル化（topSupportRankLineModels）を流用。
+ *
+ * @param {string} liveId
  */
-function renderGiftRankStrip(stripRooms) {
-  const strips = giftRankStripRootElements();
-  if (!strips.length) return;
-  const rooms = Array.isArray(stripRooms) ? stripRooms : [];
-  if (!rooms.length) {
-    for (const strip of strips) {
-      strip.hidden = true;
-      strip.innerHTML = '';
-      strip.setAttribute('aria-hidden', 'true');
-    }
+async function refreshGiftRankStrip(liveId) {
+  const strip = /** @type {HTMLElement|null} */ ($('topGiftRankStrip'));
+  if (!strip) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  const hide = () => {
+    strip.hidden = true;
+    strip.innerHTML = '';
+    strip.setAttribute('aria-hidden', 'true');
+  };
+  if (!lid) {
+    hide();
     return;
   }
+  // 1. 公式 DOM 由来の貢献度ランキングがあればそれを優先
+  /** @type {{userKey:string, nickname:string, count:number, avatarUrl:string}[]} */
+  let rooms = [];
+  /** @type {string} */
+  let noteText = '';
+  /** @type {string} */
+  let unitSuffix = '';
+  /** @type {string} */
+  let ariaLabel = '';
+  const bundle = _lastOfficialEventDomBundle;
+  const ranking = Array.isArray(bundle?.contributionRanking)
+    ? bundle.contributionRanking
+    : null;
+  if (ranking && ranking.length > 0) {
+    rooms = ranking.map((r, i) => ({
+      userKey: r.isAnonymous ? `__anon_contrib_${i}` : `__contrib_${i}_${String(r.name || '').slice(0, 12)}`,
+      nickname: String(r.name || ''),
+      count: Number(r.contribution) || 0,
+      avatarUrl: String(r.thumbnailUrl || '')
+    }));
+    noteText = '公式の貢献度ランキング順（niconico の表示そのまま）';
+    unitSuffix = '貢';
+    ariaLabel = '公式の貢献度ランキング';
+  } else {
+    // 2. フォールバック: NDGR で観測したギフト event の集計
+    const key = giftUsersStorageKey(lid);
+    let raw = /** @type {unknown[]} */ ([]);
+    try {
+      const bag = await chrome.storage.local.get(key);
+      raw = Array.isArray(bag[key]) ? bag[key] : [];
+    } catch {
+      hide();
+      return;
+    }
+    const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+    const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
+    if (!stripRooms.length) {
+      hide();
+      return;
+    }
+    rooms = stripRooms.map((r) => ({
+      userKey: r.userKey,
+      nickname: r.nickname,
+      count: r.count,
+      avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
+    }));
+    noteText = 'NDGR で観測したギフト/投げの回数が多い順（公式ランキングが取得できないとき）';
+    unitSuffix = '回';
+    ariaLabel = 'NDGR で観測したギフト/投げの回数が多い順';
+  }
+  strip.hidden = false;
+  strip.removeAttribute('aria-hidden');
+  strip.setAttribute('aria-label', ariaLabel);
   const rankScheme = getStoryColorScheme();
   const models = topSupportRankLineModels(rooms, {
     defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
@@ -4989,11 +5161,8 @@ function renderGiftRankStrip(stripRooms) {
     colorScheme: rankScheme,
     anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled
       ? (uid) => getCachedAnonymousIdenticonDataUrl(uid)
-      : undefined,
-    // 本家の貢献度ランキングと同様、同回数は同順位表示（1,2,2,2,3…）。差分はストリップ先頭の最多回との差（回）。
-    placeNumberMode: 'dense'
+      : undefined
   });
-  const topThrow = models.length ? models[0].count : 0;
   const html = models
     .map((m) => {
       const placeHtml =
@@ -5018,115 +5187,30 @@ function renderGiftRankStrip(stripRooms) {
       const linkHref = isLinkable
         ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}`
         : '';
-      const ord = m.placeNumber != null ? m.placeNumber : 0;
-      const gapRaw = formatGiftThrowGapLabel(ord, m.count, topThrow);
-      const gapHtml = gapRaw
-        ? `<span class="nl-top-support-rank__gap">${escapeHtml(gapRaw)}</span>`
-        : '';
-      const innerHtml = `${placeHtml}
-        <span class="nl-top-support-rank__count-col">
-          <span class="nl-top-support-rank__count">${m.count}回</span>${gapHtml}
-        </span>
+      const inner = `${placeHtml}
+        <span class="nl-top-support-rank__count">${m.count}${escapeHtml(unitSuffix)}</span>
         <span class="nl-top-support-rank__thumb-wrap">
           <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
         </span>
         <span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>
         <span class="nl-top-support-rank__name">${nameText}</span>`;
       return isLinkable
-        ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${innerHtml}</a>`
-        : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${innerHtml}</div>`;
+        ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${inner}</a>`
+        : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${inner}</div>`;
     })
     .join('');
-  const officialNote = buildOfficialGiftAdStatsNoteHtml();
-  const bodyHtml =
-    buildRankStripPillarRowHtml('gifts') +
-    `<p class="nl-top-support-rank__note">${escapeHtml(RANK_STRIP_GIFT_NOTE)}</p>` +
-    officialNote +
+  strip.innerHTML =
+    `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
     `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
-  for (const strip of strips) {
-    strip.hidden = false;
-    strip.removeAttribute('aria-hidden');
-    strip.setAttribute(
-      'aria-label',
-      'NDGR で検知した投げ／ギフト回数の多い順'
-    );
-    strip.innerHTML = bodyHtml;
-    bindOnErrorHideHandlersWithin(strip);
-    const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
-    models.forEach((m, i) => {
-      const img = thumbs[i];
-      if (!(img instanceof HTMLImageElement)) return;
-      if (isHttpOrHttpsUrl(m.thumbSrc)) {
-        storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
-      }
-    });
-  }
-}
-
-/**
- * @param {string} liveId
- */
-async function refreshGiftRankStripForLive(liveId) {
-  const strips = giftRankStripRootElements();
-  if (!strips.length) return;
-  const hideAllGiftRankStrips = () => {
-    for (const strip of strips) {
-      strip.hidden = true;
-      strip.innerHTML = '';
-      strip.setAttribute('aria-hidden', 'true');
+  bindOnErrorHideHandlersWithin(strip);
+  const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
+  models.forEach((m, i) => {
+    const img = thumbs[i];
+    if (!(img instanceof HTMLImageElement)) return;
+    if (isHttpOrHttpsUrl(m.thumbSrc)) {
+      storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
     }
-  };
-  const lid = String(liveId || '').trim().toLowerCase();
-  if (!lid) {
-    _lastGiftRankStripStableKey = null;
-    hideAllGiftRankStrips();
-    return;
-  }
-  try {
-    const gk = giftUsersStorageKey(lid);
-    const bag = await chrome.storage.local.get(gk);
-    const raw = bag[gk];
-    const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
-    const { stripRooms: baseRooms, stableKeyRows } = prepareGiftRankStrip(
-      Array.isArray(raw) ? raw : [],
-      { broadcasterUid }
-    );
-    if (!baseRooms.length) {
-      _lastGiftRankStripStableKey = null;
-      hideAllGiftRankStrips();
-      return;
-    }
-    const stripKey = giftRankStripStableKey(lid, stableKeyRows);
-    const enriched = baseRooms.map((room) => {
-      const ownAvatar = String(room.avatarUrl || '').trim();
-      const enrichedAvatar =
-        ownAvatar ||
-        (room.userKey && room.userKey !== UNKNOWN_USER_KEY
-          ? rememberedAvatarUrlForUserId(room.userKey)
-          : '');
-      const storedNick = String(room.nickname || '').trim();
-      const cachedNick =
-        room.userKey && room.userKey !== UNKNOWN_USER_KEY
-          ? rememberedNicknameForUserId(room.userKey)
-          : '';
-      const nickname = pickGiftRankDisplayNickname(
-        room.userKey,
-        storedNick,
-        cachedNick
-      );
-      return {
-        ...room,
-        avatarUrl: enrichedAvatar,
-        nickname
-      };
-    });
-    if (stripKey === _lastGiftRankStripStableKey) return;
-    _lastGiftRankStripStableKey = stripKey;
-    renderGiftRankStrip(enriched);
-  } catch {
-    _lastGiftRankStripStableKey = null;
-    hideAllGiftRankStrips();
-  }
+  });
 }
 
 /**
@@ -5136,6 +5220,25 @@ async function refreshGiftRankStripForLive(liveId) {
 function renderUserRooms(entries, liveId = '') {
   const ul = /** @type {HTMLUListElement} */ ($('userRoomList'));
   if (!ul) return;
+  // bundle 取得 → ランキング帯描画 → 5チップ/NDGRカード/参加バナーを公式値で再塗装、を直列で。
+  void (async () => {
+    await refreshOfficialEventDomBundle(liveId);
+    await refreshGiftRankStrip(liveId);
+    const snap = watchMetaCache.snapshot;
+    if (snap) {
+      paintOfficialNicoStatsStrip(
+        /** @type {Record<string, unknown>} */ (snap)
+      );
+      paintOfficialNdgrGiftCard(
+        /** @type {Record<string, unknown>} */ (snap)
+      );
+      paintOfficialEventBannerCard(
+        /** @type {Record<string, unknown>} */ (snap)
+      );
+    } else {
+      paintOfficialEventBannerCard(null);
+    }
+  })();
 
   const list = Array.isArray(entries) ? entries : [];
   const latestAt = list.reduce((max, e) => {
@@ -5185,9 +5288,6 @@ function renderUserRooms(entries, liveId = '') {
   if (!rooms.length) {
     _lastTopSupportRankStripStableKey = null;
     renderTopSupportRankStrip([]);
-    syncGiftRankStripAfterUserRoomsRender(liveId, (lid) => {
-      void refreshGiftRankStripForLive(lid);
-    });
     const li = document.createElement('li');
     li.className = 'empty-hint';
     li.textContent = 'まだコメントがありません';
@@ -5208,20 +5308,9 @@ function renderUserRooms(entries, liveId = '') {
         (room.userKey && room.userKey !== UNKNOWN_USER_KEY
           ? rememberedAvatarUrlForUserId(room.userKey)
           : '');
-      const storedNick = String(room.nickname || '').trim();
-      const cachedNick =
-        room.userKey && room.userKey !== UNKNOWN_USER_KEY
-          ? rememberedNicknameForUserId(room.userKey)
-          : '';
-      const nickname = pickGiftRankDisplayNickname(
-        room.userKey,
-        storedNick,
-        cachedNick
-      );
       return {
         ...room,
         avatarUrl: enrichedAvatar,
-        nickname,
         recentCount: recentMap.get(room.userKey) || 0
       };
     })
@@ -5340,10 +5429,6 @@ function renderUserRooms(entries, liveId = '') {
     li.textContent = `ほか ${rest} ユーザー（上位のみ表示）`;
     ul.appendChild(li);
   }
-
-  syncGiftRankStripAfterUserRoomsRender(liveId, (lid) => {
-    void refreshGiftRankStripForLive(lid);
-  });
 }
 
 /**
@@ -5441,7 +5526,8 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
 
   for (const candidate of candidates) {
     try {
-      const ranked = await listWatchFramesWithInnerText(candidate.id);
+      const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
+      const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
       const tried = new Set();
       const tryOrder = [...ranked.map((r) => r.frameId), 0];
       for (const fid of tryOrder) {
@@ -6934,6 +7020,15 @@ async function refresh() {
     lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL]
   });
   const url = watchUrlPick.url;
+  if (
+    isNicoLiveWatchUrl(url) &&
+    (watchUrlPick.source === 'activeTab' ||
+      watchUrlPick.source === 'lastFocusedNormal')
+  ) {
+    void chrome.storage.local
+      .set({ [KEY_LAST_WATCH_URL]: url })
+      .catch(() => {});
+  }
   const fromActiveTab = watchUrlPick.source === 'activeTab';
   const resolvedLv = extractLiveIdFromUrl(url);
   const viewerLvForError =
@@ -7070,18 +7165,11 @@ async function refresh() {
    *   INLINE_EMBED_WATCH（watch 埋め込み iframe）は視聴中でも誤って block にしない。
    *   standalone / side panel は「実質アクティブ watch が無い」ときだけ表示し、
    *   activeTab / lastFocused で watch が取れたときは非表示（0.1.106）。
-   *
-   * 0.1.136: pickWatchUrl が storage に倒れても、同一 lv の watch タブが別タブで
-   *   開いていれば放送中として扱う（hasAnyOpenTabMatchingWatchPageUrl）。
    */
-  let hasOpenMatchingWatchTab = false;
-  if (url && isNicoLiveWatchUrl(url)) {
-    hasOpenMatchingWatchTab = await hasAnyOpenTabMatchingWatchPageUrl(url);
-  }
   const treatAsNoActiveWatch =
     !isNicoLiveWatchUrl(url) ||
-    watchUrlPick.source === 'none' ||
-    !hasOpenMatchingWatchTab;
+    watchUrlPick.source === 'storage' ||
+    watchUrlPick.source === 'none';
 
   const noWatchHint = $('noWatchRankingHint');
   if (noWatchHint instanceof HTMLElement) {
@@ -7335,9 +7423,6 @@ async function refresh() {
     missingIdCount >= Math.ceil(arr.length * 0.4);
 
   function paintWatchPopupUi() {
-    // 0.1.136: watchMetaCache は fetch 後も世代をまたいで更新されるが、閉包の
-    //   watchSnapshot は stale bail-out で古いまま残り得る。毎 paint でキャッシュを正本に寄せる。
-    watchSnapshot = watchMetaCache.snapshot ?? watchSnapshot;
     syncInterceptMapDiagFromSnapshot(watchSnapshot);
     STORY_AVATAR_DIAG_STATE.total = arr.length;
     STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
@@ -7421,6 +7506,7 @@ async function refresh() {
     updateCommentVelocityLine(
       /** @type {PopupCommentEntry[]} */ (displayEntries)
     );
+    void renderGiftQuickStatsPanel(lv);
   }
 
   // 放送切替を検知して、直前放送に紐付くキャッシュ（rank strip の再描画抑止キー、
@@ -7466,6 +7552,11 @@ async function refresh() {
       watchMetaCache.fetchInflight = false;
     }
     watchMetaCache.fetchError = String(snapResult.error || '');
+    const cacheKeyStillTargetsThisRefresh = watchMetaCache.key === snapshotKey;
+    const fetchedSnapshotAligned =
+      snapResult.snapshot == null
+        ? true
+        : snapshotLooksAlignedWithWatchUrl(snapResult.snapshot, url, url);
     /*
      * 0.1.94 race fix: snapshot は generation を超える永続キャッシュなので、
      *   `isFreshRefresh()` の bail-out より先に merge する。INLINE モード
@@ -7477,20 +7568,22 @@ async function refresh() {
      * 0.1.41 (W): 配信者タイル「出たと思ったら消える」対策として
      *   broadcaster identity フィールドは partial-merge を続ける。
      */
-    watchMetaCache.snapshot = persistFreshlyFetchedSnapshot({
-      currentSnapshot: watchMetaCache.snapshot,
-      fetchedSnapshot: snapResult.snapshot,
-      merge: mergeWatchSnapshotPreservingBroadcaster
-    });
-    watchSnapshot = watchMetaCache.snapshot;
-    if (!isFreshRefresh()) {
-      const snap = watchMetaCache.snapshot;
-      if (snap) {
-        renderWatchMetaCard(snap, arr);
-        updateOfficialNicoStatsStrip(snap);
-      }
-      return;
+    if (cacheKeyStillTargetsThisRefresh && fetchedSnapshotAligned) {
+      watchMetaCache.snapshot = persistFreshlyFetchedSnapshot({
+        currentSnapshot: watchMetaCache.snapshot,
+        fetchedSnapshot: snapResult.snapshot,
+        merge: mergeWatchSnapshotPreservingBroadcaster
+      });
+    } else if (
+      cacheKeyStillTargetsThisRefresh &&
+      snapResult.snapshot != null &&
+      !watchMetaCache.fetchError
+    ) {
+      // 同一 refresh key なのに snapshot の live が合わない場合は採用しない。
+      watchMetaCache.fetchError = 'snapshot_live_mismatch';
     }
+    if (!isFreshRefresh()) return;
+    watchSnapshot = watchMetaCache.snapshot;
     const strippedAfterSnap = stripViewerAvatarContamination(
       arr,
       lv,
@@ -7691,34 +7784,6 @@ async function collectWatchTabCandidates(watchUrl) {
 }
 
 /**
- * `nls_last_watch_url` など storage 由来の URL と同じ放送のタブが開いているか。
- * standalone で「watch タブ + extension の popup タブ」を別タブにすると
- * activeTab / lastFocused が extension 側に寄り、pickWatchUrl が storage に
- * 倒れる。従来は source===storage 一律で treatAsNoActiveWatch となり snapshot
- * 取得前に empty 分岐へ落ちていた（E2E popup-live-stat-cards 等）。
- *
- * @param {string} watchUrl
- * @returns {Promise<boolean>}
- */
-async function hasAnyOpenTabMatchingWatchPageUrl(watchUrl) {
-  const w = String(watchUrl || '').trim();
-  if (!w || !isNicoLiveWatchUrl(w)) return false;
-  try {
-    const tabs = await chrome.tabs.query({});
-    for (const t of tabs) {
-      const u = t?.url;
-      if (typeof u !== 'string') continue;
-      if (!isNicoLiveWatchUrl(u)) continue;
-      if (!watchPageUrlsMatchForSnapshot(u, w)) continue;
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * コメント送信先の watch タブを再読み込み（tabs 権限なしで scripting + host 権限を利用）
  * @param {string} watchUrl
  * @returns {Promise<{ ok: boolean, error?: string }>}
@@ -7800,7 +7865,7 @@ async function triggerReloadWatchTabFromPopup() {
 /**
  * 全フレームをスコア付けし innerText 断片を返す（about:blank の子フレームも含む）
  * @param {number} tabId
- * @returns {Promise<{ frameId: number, score: number, text: string }[]>}
+ * @returns {Promise<{ frameId: number, score: number, text: string, href: string }[]>}
  */
 async function listWatchFramesWithInnerText(tabId) {
   try {
@@ -7826,7 +7891,7 @@ async function listWatchFramesWithInnerText(tabId) {
         return { score, text, href };
       }
     });
-    /** @type {{ frameId: number, score: number, text: string }[]} */
+    /** @type {{ frameId: number, score: number, text: string, href: string }[]} */
     const out = [];
     for (const row of results || []) {
       const res = row?.result;
@@ -7835,7 +7900,8 @@ async function listWatchFramesWithInnerText(tabId) {
       out.push({
         frameId: fid,
         score: res.score,
-        text: String(res.text || '')
+        text: String(res.text || ''),
+        href: String(res.href || '')
       });
     }
     out.sort((a, b) => b.score - a.score);
@@ -7911,7 +7977,8 @@ async function requestWatchPageSnapshotFromOpenTabOnce(watchUrl) {
 
   for (const candidate of candidates) {
     try {
-      const ranked = await listWatchFramesWithInnerText(candidate.id);
+      const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
+      const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
       const viewerProbe = probeViewerCountFromFrameTexts(ranked);
       const tried = new Set();
       const tryOrder = [
@@ -7928,6 +7995,15 @@ async function requestWatchPageSnapshotFromOpenTabOnce(watchUrl) {
             { frameId: fid, maxAttempts: 5, delayMs: 90 }
           );
           if (res?.ok && res.snapshot) {
+            if (
+              !snapshotLooksAlignedWithWatchUrl(
+                res.snapshot,
+                watchUrl,
+                candidate.url
+              )
+            ) {
+              continue;
+            }
             const merged = mergeViewerProbeIntoSnapshot(
               /** @type {WatchPageSnapshot} */ (res.snapshot),
               viewerProbe
@@ -7993,7 +8069,8 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
   let lastDetail = '';
   for (const candidate of candidates) {
     try {
-      const ranked = await listWatchFramesWithInnerText(candidate.id);
+      const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
+      const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
       const tried = new Set();
       const tryOrder = [...ranked.map((r) => r.frameId), 0];
       for (const fid of tryOrder) {
@@ -8036,73 +8113,6 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
     error: lastDetail
       ? `コメント送信に失敗しました。（${lastDetail}）`
       : 'コメント送信に失敗しました。放送タブを再読み込みして再試行してください。'
-  };
-}
-
-/**
- * watch タブでニコ生公式のギフト・アイテム起動ボタンをクリックする（本家モーダルで続行）。
- * @param {string} watchUrl
- * @returns {Promise<{ ok: boolean, error: string }>}
- */
-async function requestOpenCommentAssetPickerOnWatchTab(watchUrl) {
-  const url = String(watchUrl || '').trim();
-  if (!url) {
-    return { ok: false, error: 'watch URL が取得できませんでした。' };
-  }
-
-  const candidates = await collectWatchTabCandidates(url);
-
-  if (!candidates.length) {
-    return {
-      ok: false,
-      error: 'watchタブが見つかりません。放送タブを開いてからお試しください。'
-    };
-  }
-
-  /** @type {string} */
-  let lastDetail = '';
-  for (const candidate of candidates) {
-    try {
-      const ranked = await listWatchFramesWithInnerText(candidate.id);
-      const tried = new Set();
-      const tryOrder = [...ranked.map((r) => r.frameId), 0];
-      for (const fid of tryOrder) {
-        if (tried.has(fid)) continue;
-        tried.add(fid);
-        try {
-          const res = await tabsSendMessageWithRetry(
-            candidate.id,
-            { type: 'NLS_OPEN_COMMENT_ASSET_PICKER' },
-            { frameId: fid, maxAttempts: 5, delayMs: 120 }
-          );
-          if (res?.ok) {
-            return { ok: true, error: '' };
-          }
-          if (res && typeof res === 'object' && 'error' in res && res.error) {
-            lastDetail = String(res.error);
-          }
-        } catch (e) {
-          const msg =
-            e && typeof e === 'object' && 'message' in e
-              ? String(/** @type {{ message?: unknown }} */ (e).message || '')
-              : String(e || '');
-          if (msg) lastDetail = msg;
-        }
-      }
-    } catch (e) {
-      const msg =
-        e && typeof e === 'object' && 'message' in e
-          ? String(/** @type {{ message?: unknown }} */ (e).message || '')
-          : String(e || '');
-      if (msg) lastDetail = msg;
-    }
-  }
-
-  return {
-    ok: false,
-    error: lastDetail
-      ? `開けませんでした。（${lastDetail}）`
-      : '開けませんでした。watchを再読み込みしてから再試行してください。'
   };
 }
 
@@ -8215,16 +8225,12 @@ function yukkuriReportAvatarHtml(dataUrl, fallbackClass, fallbackChar) {
  * @param {string} watchUrl
  * @returns {Promise<string>}
  */
-/**
- * @param {unknown} [_giftUsersRaw] `nls_gift_users_<lv>` の生配列（将来 HTML レポートのギフト集計に使用予定）
- */
 async function buildHtmlReportDocument(
   comments,
   snapshot,
   snapshotError,
   liveId,
-  watchUrl,
-  _giftUsersRaw
+  watchUrl
 ) {
   const exportedAtIso = new Date().toISOString();
   const exportedAtJst = formatDateTime(Date.now());
@@ -8263,6 +8269,42 @@ async function buildHtmlReportDocument(
     buildHtmlReportConceptGuideCardHtml(yukkuriAvatars);
   const htmlReportSaveGuideCardHtml =
     buildHtmlReportSaveGuideCardHtml(yukkuriAvatars);
+
+  // ゆっくり解説風の「番組のおさらい」セクションを HTML レポートの先頭に挟む。
+  // niconico DOM から掬った正本値（`nls_event_dom_<lv>`）があれば最終5値・順位・
+  // 上位応援者を読み上げる。無い時はタイトルと締めの挨拶だけの最小構成。
+  /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */
+  let eventDomBundleForReport = null;
+  try {
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (lid) {
+      const key = eventDomStorageKey(lid);
+      const bag = await chrome.storage.local.get(key);
+      const v = bag?.[key];
+      eventDomBundleForReport =
+        v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+    }
+  } catch {
+    eventDomBundleForReport = null;
+  }
+  const yukkuriReportLines = buildYukkuriBroadcastSummary({
+    bundle: eventDomBundleForReport,
+    broadcastTitle: String(snapshot?.broadcastTitle || snapshot?.title || ''),
+    broadcasterName: String(snapshot?.broadcasterName || ''),
+    recordedCommentCount: Array.isArray(comments) ? comments.length : 0,
+    streamAgeMin:
+      typeof snapshot?.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0
+        ? snapshot.streamAgeMin
+        : undefined
+  });
+  // HTML レポートはダウンロード後にローカルで開かれるため、相対 path の <img> は
+  // 解決できない。キャラ画像を data URL に焼き込んで埋める。
+  const yukkuriReportImageMap = await buildYukkuriImageDataUrlMap();
+  const yukkuriReportHtml = renderYukkuriBroadcastSummaryHtml(
+    yukkuriReportLines,
+    { heading: '今回の放送のおさらい', imageDataUrlMap: yukkuriReportImageMap }
+  );
+  const yukkuriReportCss = yukkuriBroadcastSummaryEmbeddedCss();
 
   // 0.1.17 (R): 配信者本人 userId をスナップショットから取得し、応援コメント集計
   // から除外。HTML レポートのユーザー別テーブル / サムネ付き一覧 / 全コメント一覧
@@ -8566,6 +8608,87 @@ async function buildHtmlReportDocument(
   const headScriptRows = snapshot ? scriptRows(snapshot.scripts) : [];
   const headNoopenerRows = snapshot ? noopenerRows(snapshot.noopenerLinks) : [];
 
+  /** 次回向けの軽量メモ（マーケ分析より薄い） */
+  let nextMemoSectionHtml = '';
+  try {
+    const lidKey = String(liveId || '').trim();
+    const gk = giftUsersStorageKey(lidKey);
+    const giftBag = await chrome.storage.local.get(gk);
+    const giftUsers = Array.isArray(giftBag[gk]) ? giftBag[gk] : [];
+    const mr = aggregateMarketingReport(comments, lidKey, {
+      broadcasterUserId: reportBroadcasterUserId || undefined
+    });
+    const memo = buildReportMemoPayload({
+      report: mr,
+      comments,
+      giftUsers,
+      broadcasterUserId: reportBroadcasterUserId,
+      maskShareLabels: false
+    });
+    const memLis =
+      memo.nextMemos.length > 0
+        ? memo.nextMemos.map((m) => `<li>${escapeHtml(m)}</li>`).join('')
+        : '<li>（まだ十分なメモが出ません）</li>';
+    const hiLis =
+      memo.highlights.length > 0
+        ? memo.highlights
+            .map(
+              (h) =>
+                `<li><strong>${escapeHtml(h.atLabel)}</strong> — ${escapeHtml(h.reason)}<br><span class="memo-sample">${escapeHtml(h.sampleLine)}</span></li>`
+            )
+            .join('')
+        : '<li>（この枠では目立つ場面の抽出がまだ少ないです）</li>';
+    const thLis =
+      memo.thanksPoints.length > 0
+        ? memo.thanksPoints.map((t) => `<li>${escapeHtml(t)}</li>`).join('')
+        : '<li>（記録が増えるとここが埋まります）</li>';
+    const tplLis =
+      memo.templates.length > 0
+        ? memo.templates.map((t) => `<li>${escapeHtml(t)}</li>`).join('')
+        : '<li>（テンプレはマーケ分析の「りんく達の作戦会議」も参照）</li>';
+    const dynamicNote = 'この内容は今回の配信データから組み立てています。配信内容によって毎回変わります。';
+    const trioGuideHtml = `
+        <div class="yukkuri-guide memo-yukkuri-guide" role="note" aria-label="りんく・こん太・たぬ姉の次枠ガイド">
+          <div class="yukkuri-row">
+            ${avatarLink}
+            <div class="speech-bubble">
+              <strong>りんくより</strong>
+              <p>次の枠で試しやすい順に、まずはやってみる作戦をまとめたよ。1つだけでも十分なのだ。</p>
+            </div>
+          </div>
+          <div class="yukkuri-row">
+            ${avatarKonta}
+            <div class="speech-bubble">
+              <strong>こん太より</strong>
+              <p>リスナーが参加しやすかった流れを拾ってるよ。声かけやお礼の言葉に使うと、空気があたたまりやすいのだ。</p>
+            </div>
+          </div>
+          <div class="yukkuri-row">
+            ${avatarTanu}
+            <div class="speech-bubble">
+              <strong>たぬ姉より</strong>
+              <p>${escapeHtml(dynamicNote)}</p>
+            </div>
+          </div>
+        </div>`;
+    nextMemoSectionHtml = `
+      <section class="card yukkuri-guide-card" id="sec-next-memo" style="margin-top:12px;">
+        <h2>りんく・こん太・たぬ姉の次枠メモ</h2>
+        <p class="guide-lead">詳しい分析より先に、次の配信で試せる短い作戦をまとめたのだ。</p>
+        ${trioGuideHtml}
+        <h3>次の配信で試したいこと（最大3）</h3>
+        <ol>${memLis}</ol>
+        <h3>盛り上がった場面（最大3）</h3>
+        <ul>${hiLis}</ul>
+        <h3>ありがとうポイント</h3>
+        <ul>${thLis}</ul>
+        <h3>次の配信で使える一言テンプレ</h3>
+        <ul>${tplLis}</ul>
+      </section>`;
+  } catch {
+    nextMemoSectionHtml = '';
+  }
+
   return `<!doctype html>
 <html lang="ja">
   <head>
@@ -8756,6 +8879,12 @@ async function buildHtmlReportDocument(
         font-size: 0.88rem;
         line-height: 1.45;
       }
+      .memo-sample {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
       .yukkuri-guide-card .guide-lead {
         color: #cbd5e1;
         font-size: clamp(0.85rem, 2.2vw, 0.93rem);
@@ -8767,6 +8896,17 @@ async function buildHtmlReportDocument(
         display: flex;
         flex-direction: column;
         gap: 14px;
+      }
+      .memo-yukkuri-guide {
+        margin: 4px 0 12px;
+        padding: 10px;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        background: #0b1325;
+      }
+      .memo-yukkuri-guide .speech-bubble {
+        border-color: #3b4b68;
+        background: #111827;
       }
       .yukkuri-row {
         display: flex;
@@ -9130,6 +9270,7 @@ async function buildHtmlReportDocument(
         color: #cbd5e1;
         font-weight: 600;
       }
+      ${yukkuriReportCss}
     </style>
   </head>
   <body>
@@ -9140,6 +9281,8 @@ async function buildHtmlReportDocument(
         <p class="mono">watch URL: ${safeWatchUrl}</p>
       </header>
 
+      ${yukkuriReportHtml}
+
       <div class="search-box">
         <input id="q" type="search" placeholder="タイトル・配信者・タグ・メタ・script・コメントを横断検索（例: 珈琲 / まめ。２ / コーヒー / og:title）">
         <div id="searchResult" class="hint">検索対象: <span id="totalCount">0</span> 件</div>
@@ -9148,6 +9291,7 @@ async function buildHtmlReportDocument(
       <nav class="toc" aria-label="目次">
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
+          <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
           <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
           <li><a href="#sec-id-breakdown">内訳統計（ID 種別比率）</a></li>
@@ -9158,6 +9302,8 @@ async function buildHtmlReportDocument(
           <li><a href="#sec-tech-dump">ページの裏側データ（上級者向け）</a></li>
         </ol>
       </nav>
+
+      ${nextMemoSectionHtml}
 
       <div class="grid">
         <section class="card" id="sec-overview">
@@ -9450,6 +9596,23 @@ function paintVersionBadge() {
   }
 }
 
+/**
+ * content 側の高速診断キャッシュを採用してよいか。
+ * 別放送 liveId の stale 診断を混ぜないため、watch URL がある場合は同一放送のみ許可する。
+ *
+ * @param {unknown} fastResolvedTabUrl
+ * @param {string} watchUrl
+ * @returns {boolean}
+ */
+function canUseFastAiShareDiagnostics(fastResolvedTabUrl, watchUrl) {
+  const w = String(watchUrl || '').trim();
+  const f = String(fastResolvedTabUrl || '').trim();
+  if (!f) return true;
+  if (!w) return true;
+  if (!isNicoLiveWatchUrl(w) || !isNicoLiveWatchUrl(f)) return false;
+  return watchPageUrlsMatchForSnapshot(f, w);
+}
+
 function initPopup() {
   installExtensionContextErrorGuard();
   initOfflineBannerOnce();
@@ -9606,6 +9769,9 @@ function initPopup() {
         watchSnapshotMeta: (() => {
           const snap = watchMetaCache?.snapshot;
           if (!snap || typeof snap !== 'object') return null;
+          if (!snapshotLooksAlignedWithWatchUrl(snap, watchUrl, watchUrl)) {
+            return null;
+          }
           return {
             liveId: String(snap.liveId || ''),
             broadcasterUserId: String(snap.broadcasterUserId || ''),
@@ -9643,12 +9809,14 @@ function initPopup() {
         typeof fastCache.content === 'object'
           ? fastCache.content
           : null;
-      if (fastContent) {
+      const resolvedFastUrl = String(fastCache?.resolvedTabUrl || '').trim();
+      if (fastContent && canUseFastAiShareDiagnostics(resolvedFastUrl, watchUrl)) {
         payload.content = /** @type {Record<string, unknown>} */ (fastContent);
-        const resolvedFastUrl = String(fastCache?.resolvedTabUrl || '').trim();
         if (resolvedFastUrl) payload.resolvedTabUrl = resolvedFastUrl.slice(0, 240);
         const persistedAt = String(fastCache?.persistedAt || '').trim();
         if (persistedAt) payload.cachedAt = persistedAt;
+      } else if (fastContent && resolvedFastUrl) {
+        lastErr = `fast_diag_live_mismatch: ${resolvedFastUrl.slice(0, 140)}`;
       }
 
       const manifest = chrome.runtime.getManifest();
@@ -9871,14 +10039,16 @@ function initPopup() {
     if (stEl) stEl.textContent = '分析中…';
     try {
       const sKey = commentsStorageKey(lid);
+      const gKey = giftUsersStorageKey(lid);
       const data = await withTimeout(
-        chrome.storage.local.get(sKey),
+        chrome.storage.local.get([sKey, gKey]),
         8_000,
         'marketing_storage_timeout'
       );
       const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
         Array.isArray(data[sKey]) ? data[sKey] : []
       );
+      const giftUsersForMarketing = Array.isArray(data[gKey]) ? data[gKey] : [];
       if (comments.length === 0) {
         if (stEl) stEl.textContent = 'コメントが0件です';
         if (btn) btn.disabled = false;
@@ -9930,6 +10100,10 @@ function initPopup() {
       // ユーザーの opt-out が尊重される）。
       // 0.1.17 (R): 配信者本人を topUsers / サムネ付き一覧から除外するため
       // snapshot.broadcasterUserId を thread。空文字なら影響なし（互換）。
+      // niconico DOM から掬った正本値（番組統計5値・参加イベント・貢献度ランキング）も
+      // ゆっくり解説の素材として渡す。無ければマーケ分析側で最小構成にフォールバック。
+      const bundleForMkt = await readOfficialEventDomBundleFromStorage(lid);
+      const yukkuriImageMapForMkt = await buildYukkuriImageDataUrlMap();
       const html = buildMarketingDashboardHtml(report, {
         maskShareLabels: maskShare,
         anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
@@ -9938,7 +10112,19 @@ function initPopup() {
         ).trim(),
         sessionSummaryRows,
         commentsForAnalytics: comments,
-        pastBroadcasts
+        pastBroadcasts,
+        giftUsers: giftUsersForMarketing,
+        officialEventDomBundle: bundleForMkt,
+        broadcastTitle: String(
+          watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
+        ),
+        broadcasterName: String(watchMetaCache.snapshot?.broadcasterName || ''),
+        recordedCommentCount: Array.isArray(comments) ? comments.length : 0,
+        streamAgeMin:
+          typeof watchMetaCache.snapshot?.streamAgeMin === 'number'
+            ? watchMetaCache.snapshot.streamAgeMin
+            : undefined,
+        yukkuriImageDataUrlMap: yukkuriImageMapForMkt
       });
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -9978,6 +10164,7 @@ function initPopup() {
               $('devMonitorExportMarketingMaskLabels')
             );
             const maskShare = Boolean(maskEl?.checked);
+            const yukkuriImageMapFb = await buildYukkuriImageDataUrlMap();
             const html = buildMarketingDashboardHtml(report, {
               maskShareLabels: maskShare,
               anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
@@ -9986,7 +10173,19 @@ function initPopup() {
               ).trim(),
               // fallback 経路では IDB アクセスは諦める（拡張再読み込み中でも分析だけは出す）
               sessionSummaryRows: [],
-              commentsForAnalytics: fallbackComments
+              commentsForAnalytics: fallbackComments,
+              giftUsers: [],
+              // ゆっくり解説向けに、メモリ上の watchSnapshot からヒントを引く
+              broadcastTitle: String(
+                watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
+              ),
+              broadcasterName: String(watchMetaCache.snapshot?.broadcasterName || ''),
+              recordedCommentCount: Array.isArray(fallbackComments) ? fallbackComments.length : 0,
+              streamAgeMin:
+                typeof watchMetaCache.snapshot?.streamAgeMin === 'number'
+                  ? watchMetaCache.snapshot.streamAgeMin
+                  : undefined,
+              yukkuriImageDataUrlMap: yukkuriImageMapFb
             });
             const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
             const url = URL.createObjectURL(blob);
@@ -10952,17 +11151,6 @@ function initPopup() {
       setCommentPostNotice(withCommentSendTroubleshootHint('送信に失敗しました。'), 'error');
       paintCommentComposeUi();
     });
-  });
-
-  $('openNicoCommentAssetPickerBtn')?.addEventListener('click', () => {
-    const b = /** @type {HTMLButtonElement|null} */ ($('openNicoCommentAssetPickerBtn'));
-    if (!b || b.disabled) return;
-    handleOpenNicoCommentAssetPickerFromPopup();
-  });
-  $('openNicoCommentAssetPickerGiftPanelBtn')?.addEventListener('click', () => {
-    const b = /** @type {HTMLButtonElement|null} */ ($('openNicoCommentAssetPickerGiftPanelBtn'));
-    if (!b || b.disabled) return;
-    handleOpenNicoCommentAssetPickerFromPopup();
   });
 
   commentInput?.addEventListener('keydown', (e) => {

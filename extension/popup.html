@@ -842,15 +842,6 @@
         line-height: 1.35;
       }
 
-      .nl-story-userlane-guide__recorded {
-        margin: 4px 0 0;
-        padding: 0 2px;
-        font-size: 10px;
-        font-weight: 600;
-        color: var(--nl-text-sub);
-        line-height: 1.38;
-      }
-
       .nl-story-userlane__empty-note {
         margin: 4px 0 2px;
         padding: 8px 10px;
@@ -1934,84 +1925,39 @@
         gap: 6px;
       }
 
-      /* 本家プレイヤー横に近い 5 指標（折りたたみでファーストビューの縦を節約） */
-      .nl-official-nico-stats {
-        grid-column: 1 / -1;
-        margin-top: 4px;
-        border-radius: 12px;
-        border: 1px solid var(--nl-stat-card-border, var(--nl-border));
-        background: linear-gradient(
-          155deg,
-          color-mix(in srgb, var(--nl-stat-card-bg-start, var(--nl-surface)) 92%, var(--nl-border) 8%),
-          color-mix(in srgb, var(--nl-stat-card-bg-end, var(--nl-bg-soft)) 94%, var(--nl-border) 6%)
-        );
-        box-shadow: var(--nl-stat-card-shadow, 0 2px 6px rgb(2 17 31 / 8%));
-      }
-
-      .nl-official-nico-stats > summary {
-        list-style: none;
-        margin: 0;
-        padding: 6px 8px;
-        cursor: pointer;
-        font-size: clamp(10px, 2.5vw, 11px);
-        font-weight: 700;
-        color: var(--nl-text);
-        text-align: center;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        border-radius: 12px;
-      }
-
-      .nl-official-nico-stats > summary::-webkit-details-marker {
-        display: none;
-      }
-
-      .nl-official-nico-stats > summary:focus-visible {
-        outline: 2px solid var(--nl-accent, #3b82f6);
-        outline-offset: 1px;
-      }
-
-      .nl-official-nico-stats__panel {
-        padding: 2px 6px 7px;
-      }
-
       .nl-official-nico-stats__row {
-        display: flex;
-        flex-wrap: wrap;
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 5px;
-        justify-content: space-between;
-        align-items: stretch;
       }
 
       .nl-official-nico-stats__chip {
-        flex: 1 1 56px;
         min-width: 0;
+        padding: 4px 3px 5px;
+        border-radius: 9px;
+        border: 1px solid var(--nl-border);
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-border) 12%);
         display: flex;
         flex-direction: column;
         align-items: center;
         text-align: center;
-        padding: 4px 3px 5px;
-        border-radius: 9px;
-        background: color-mix(in srgb, var(--nl-surface, #fffaf2) 88%, var(--nl-border) 12%);
       }
 
       .nl-official-nico-stats__label {
         font-size: clamp(9px, 2.2vw, 10px);
-        line-height: 1.2;
         color: var(--nl-muted);
         font-weight: 600;
+        line-height: 1.2;
       }
 
       .nl-official-nico-stats__val {
         margin-top: 2px;
         font-size: clamp(11px, 2.9vw, 14px);
         font-weight: 800;
+        color: var(--nl-text);
         font-variant-numeric: tabular-nums;
         line-height: 1.15;
-        color: var(--nl-text);
-        word-break: keep-all;
-        overflow-wrap: anywhere;
       }
 
       .nl-official-nico-stats__val.is-placeholder {
@@ -2257,6 +2203,134 @@
         border-color: var(--nl-border);
       }
 
+      .nl-live-stat-card--official-ndgr {
+        border-color: rgb(34 197 94 / 35%);
+        grid-column: 1 / -1;
+      }
+
+      .nl-official-event-banner-card {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 14px;
+        border-radius: 14px;
+        background: linear-gradient(180deg, #effaf0, #e3f4e7);
+        border: 1px solid rgb(34 197 94 / 28%);
+        box-shadow: 0 1px 0 rgb(34 197 94 / 8%);
+        text-decoration: none;
+        color: inherit;
+      }
+      .nl-official-event-banner-card[hidden] {
+        display: none;
+      }
+      .nl-official-event-banner-card__owner {
+        font-size: 12px;
+        font-weight: 700;
+        color: #1e7c44;
+        background: #c8eed3;
+        border-radius: 6px;
+        padding: 3px 8px;
+        align-self: flex-start;
+      }
+      .nl-official-event-banner-card__body {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .nl-official-event-banner-card__thumb {
+        width: 56px;
+        height: 56px;
+        border-radius: 8px;
+        object-fit: cover;
+        flex-shrink: 0;
+      }
+      .nl-official-event-banner-card__thumb[hidden] {
+        display: none;
+      }
+      .nl-official-event-banner-card__text {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .nl-official-event-banner-card__title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1f2937;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .nl-official-event-banner-card__status {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        font-size: 13px;
+      }
+      .nl-official-event-banner-card__rank {
+        color: #1e7c44;
+        font-weight: 700;
+      }
+      .nl-official-event-banner-card__rank::before {
+        content: '現在 ';
+        color: #6b7280;
+        font-weight: 500;
+        font-size: 11px;
+      }
+      .nl-official-event-banner-card__score {
+        color: #1f2937;
+        font-weight: 700;
+      }
+      .nl-official-event-banner-card__score::before {
+        content: '⬥ ';
+        color: #1e7c44;
+        font-weight: 600;
+      }
+
+      .nl-official-ndgr-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: clamp(9px, 2.3vw, 11px);
+        line-height: 1.25;
+      }
+
+      .nl-official-ndgr-list li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px 10px;
+      }
+
+      .nl-official-ndgr-k {
+        color: var(--nl-muted);
+        font-weight: 600;
+        flex: 1 1 46%;
+        min-width: 0;
+      }
+
+      .nl-official-ndgr-v {
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        max-width: 52%;
+        word-break: break-word;
+      }
+
+      .nl-official-ndgr-v--title {
+        font-weight: 700;
+        font-size: clamp(9px, 2.2vw, 10.5px);
+        text-align: left;
+        max-width: 100%;
+      }
+
       .nl-live-stat-icon {
         width: clamp(32px, 9vw, 44px);
         height: clamp(32px, 9vw, 44px);
@@ -2455,30 +2529,6 @@
         --nl-rank-count: #5eead4;
       }
 
-      .nl-top-support-rank__count-col {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1px;
-        min-width: 0;
-      }
-
-      .nl-top-support-rank__gap {
-        font-size: 0.58rem;
-        font-weight: 700;
-        color: var(--nl-text-sub);
-        line-height: 1.08;
-        text-align: center;
-        max-width: 6.2em;
-        word-break: keep-all;
-        overflow-wrap: anywhere;
-      }
-
-      html.nl-skin-panel-dark .nl-top-support-rank__gap {
-        color: var(--nl-muted);
-      }
-
       .nl-top-support-rank__thumb-wrap {
         width: 24px;
         height: 24px;
@@ -2574,129 +2624,11 @@
         font-size: clamp(7px, 1.75vw, 9px);
       }
 
-      .nl-top-support-rank--below-cards .nl-top-support-rank__gap {
-        font-size: clamp(5px, 1.35vw, 7px);
-        max-width: 100%;
-      }
-
       .nl-top-support-rank--below-cards .nl-top-support-rank__id,
       .nl-top-support-rank--below-cards .nl-top-support-rank__name {
         font-size: clamp(6px, 1.65vw, 8px);
         max-width: 100%;
         text-align: center;
-      }
-
-      /* 応援コメントランキング帯（ギフト帯と配色で区別） */
-      .nl-comment-rank-strip {
-        border: 1px solid color-mix(in srgb, #0d9488 30%, var(--nl-border) 70%);
-        background: color-mix(in srgb, #ccfbf1 22%, var(--nl-surface) 78%);
-      }
-
-      html.nl-skin-panel-dark .nl-comment-rank-strip {
-        border-color: color-mix(in srgb, #2dd4bf 36%, var(--nl-border) 64%);
-        background: color-mix(in srgb, #134e4a 24%, var(--nl-surface) 76%);
-      }
-
-      .nl-comment-rank-strip.nl-top-support-rank--below-cards .nl-top-support-rank__list {
-        border-top-color: color-mix(in srgb, #0d9488 22%, var(--nl-border) 78%);
-      }
-
-      #topGiftRankStrip.nl-gift-rank-strip {
-        margin-top: 10px;
-      }
-
-      .nl-rank-strip-pillar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px 8px;
-        margin: 0 0 6px;
-        padding: 0 0 4px;
-        border-bottom: 1px solid color-mix(in srgb, var(--nl-border) 55%, transparent);
-      }
-
-      .nl-rank-strip-pillar__heading {
-        font-size: clamp(8px, 2.1vw, 11px);
-        font-weight: 800;
-        letter-spacing: 0.03em;
-        color: var(--nl-text);
-        line-height: 1.2;
-      }
-
-      .nl-rank-strip-pillar__badge {
-        display: inline-block;
-        padding: 1px 6px 2px;
-        border-radius: 999px;
-        font-size: clamp(6px, 1.55vw, 8px);
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        line-height: 1.2;
-        border: 1px solid color-mix(in srgb, var(--nl-border) 60%, transparent);
-      }
-
-      .nl-rank-strip-pillar--comments .nl-rank-strip-pillar__badge {
-        color: #0f766e;
-        background: color-mix(in srgb, #ccfbf1 70%, var(--nl-surface) 30%);
-        border-color: color-mix(in srgb, #0d9488 35%, var(--nl-border) 65%);
-      }
-
-      html.nl-skin-panel-dark .nl-rank-strip-pillar--comments .nl-rank-strip-pillar__badge {
-        color: #5eead4;
-        background: color-mix(in srgb, #134e4a 55%, var(--nl-surface) 45%);
-        border-color: color-mix(in srgb, #2dd4bf 40%, var(--nl-border) 60%);
-      }
-
-      .nl-rank-strip-pillar--gifts .nl-rank-strip-pillar__badge {
-        color: #9a3412;
-        background: color-mix(in srgb, #ffedd5 75%, var(--nl-surface) 25%);
-        border-color: color-mix(in srgb, #ea580c 38%, var(--nl-border) 62%);
-      }
-
-      html.nl-skin-panel-dark .nl-rank-strip-pillar--gifts .nl-rank-strip-pillar__badge {
-        color: #fdba74;
-        background: color-mix(in srgb, #431407 45%, var(--nl-surface) 55%);
-        border-color: color-mix(in srgb, #fb923c 42%, var(--nl-border) 58%);
-      }
-
-      /* ギフト貢献レーン（応援コメントストリップと色面で区別） */
-      .nl-gift-rank-strip {
-        width: 100%;
-        min-width: 0;
-        box-sizing: border-box;
-        border-radius: 10px;
-        padding: 2px 4px 4px;
-        border: 1px solid color-mix(in srgb, #ea580c 32%, var(--nl-border) 68%);
-        background: color-mix(in srgb, #fff7ed 55%, var(--nl-surface) 45%);
-      }
-
-      html.nl-skin-panel-dark .nl-gift-rank-strip {
-        border-color: color-mix(in srgb, #fb923c 40%, var(--nl-border) 60%);
-        background: color-mix(in srgb, #431407 22%, var(--nl-surface) 78%);
-      }
-
-      .nl-gift-rank-strip.nl-top-support-rank--below-cards .nl-top-support-rank__list {
-        border-top-color: color-mix(in srgb, #ea580c 25%, var(--nl-border) 75%);
-      }
-
-      .nl-gift-rank-strip .nl-top-support-rank__note {
-        font-weight: 600;
-        color: color-mix(in srgb, #9a3412 50%, var(--nl-text) 50%);
-      }
-
-      html.nl-skin-panel-dark .nl-gift-rank-strip .nl-top-support-rank__note {
-        color: color-mix(in srgb, #fdba74 55%, var(--nl-text) 45%);
-      }
-
-      /* 応援ユーザーレーン（details）の直下に置くギフト貢献レーン */
-      .nl-story-gift-lane {
-        width: 100%;
-        min-width: 0;
-        box-sizing: border-box;
-        margin-top: 10px;
-      }
-
-      html.nl-inline body .nl-story-gift-lane {
-        margin-top: 8px;
       }
 
       /*
@@ -2810,18 +2742,6 @@
          少し大きめに揃える。それでも数字用の極太よりは確実に小さい。 */
       html.nl-inline body .nl-live-stat-value.is-placeholder {
         font-size: clamp(12px, 3vw, 16px);
-      }
-
-      html.nl-inline body .nl-official-nico-stats__val {
-        font-size: clamp(12px, 3.2vw, 16px);
-      }
-
-      html.nl-inline body .nl-official-nico-stats__val.is-placeholder {
-        font-size: clamp(11px, 2.8vw, 14px);
-      }
-
-      html.nl-inline body .nl-official-nico-stats > summary {
-        font-size: clamp(9px, 2.3vw, 11px);
       }
 
       /* 統計直下の案内 / 詳細設定内の記録ブロック（旧 first-view と同系） */
@@ -5969,35 +5889,6 @@
         font-size: 10px;
       }
 
-      .nl-gift-throws {
-        font-size: 11px;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
-        color: var(--nl-accent, #0ea5e9);
-        margin-inline: 4px;
-      }
-
-      .nl-gift-quick-actions {
-        margin: 8px 0 4px;
-      }
-
-      .nl-gift-quick-actions button {
-        max-width: 100%;
-        box-sizing: border-box;
-        font-size: 12px;
-        padding: 8px 12px;
-        border-radius: 8px;
-        border: 1px solid var(--nl-border);
-        background: var(--nl-surface);
-        color: var(--nl-text, #1e293b);
-        cursor: pointer;
-      }
-
-      .nl-gift-quick-actions button:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-
       .room-bar-row {
         margin-top: 3px;
         display: flex;
@@ -6985,58 +6876,59 @@
           <div class="nl-live-stat-value" id="watchViewerDom">—</div>
           <div class="nl-live-stat-unit">人</div>
         </div>
-        <details
-          id="officialNicoStatsStrip"
-          class="nl-official-nico-stats"
+        <div class="nl-official-nico-stats__row" role="group" aria-label="公式視聴統計の一覧">
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">来場</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoViewers">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">本家コメ</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoComments">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">経過</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoStreamAge">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">広告pt</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoAdPts">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">ギフトpt</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoGiftPts">—</span>
+          </div>
+        </div>
+        <a
+          id="watchOfficialEventBannerCard"
+          class="nl-official-event-banner-card"
+          target="_blank"
+          rel="noopener"
           hidden
           aria-hidden="true"
         >
-          <summary class="nl-official-nico-stats__summary" id="officialNicoStatsSummary">
-            本家寄せ（WS / NDGR）
-          </summary>
-          <div class="nl-official-nico-stats__panel">
-            <div class="nl-official-nico-stats__row" role="group" aria-label="公式視聴統計の一覧">
-              <div
-                class="nl-official-nico-stats__chip"
-                title="statistics の来場者系（viewers 等）。DOM の来場者数とは別経路です。"
-              >
-                <span class="nl-official-nico-stats__label">来場</span>
-                <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoViewers">—</span>
-              </div>
-              <div
-                class="nl-official-nico-stats__chip"
-                title="statistics の累計コメント件数。プレイヤー横の数字と一致しないことがあります。"
-              >
-                <span class="nl-official-nico-stats__label">本家コメ</span>
-                <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoComments">—</span>
-              </div>
-              <div
-                class="nl-official-nico-stats__chip"
-                title="配信開始からの経過（分換算）。番組表・WS・プレイヤー表示から推定します。"
-              >
-                <span class="nl-official-nico-stats__label">経過</span>
-                <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoStreamAge">—</span>
-              </div>
-              <div
-                class="nl-official-nico-stats__chip"
-                title="statistics の広告・応援ポイント累計（ad_points 系）。貢献度（貢）とは別集計です。"
-              >
-                <span class="nl-official-nico-stats__label">広告pt</span>
-                <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoAdPts">—</span>
-              </div>
-              <div
-                class="nl-official-nico-stats__chip"
-                title="statistics のギフトポイント累計（gift_points 系）。ギフト画面のランキングとは別です。"
-              >
-                <span class="nl-official-nico-stats__label">ギフトpt</span>
-                <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoGiftPts">—</span>
+          <div class="nl-official-event-banner-card__owner" id="watchOfficialEventBannerOwner"></div>
+          <div class="nl-official-event-banner-card__body">
+            <img
+              class="nl-official-event-banner-card__thumb"
+              id="watchOfficialEventBannerThumb"
+              alt=""
+              decoding="async"
+              referrerpolicy="no-referrer"
+              loading="lazy"
+              hidden
+            />
+            <div class="nl-official-event-banner-card__text">
+              <div class="nl-official-event-banner-card__title" id="watchOfficialEventBannerTitle"></div>
+              <div class="nl-official-event-banner-card__status">
+                <span class="nl-official-event-banner-card__rank" id="watchOfficialEventBannerRank"></span>
+                <span class="nl-official-event-banner-card__score" id="watchOfficialEventBannerScore"></span>
               </div>
             </div>
           </div>
-        </details>
+        </a>
         <div
           id="topSupportRankStrip"
-          class="nl-top-support-rank nl-comment-rank-strip nl-top-support-rank--below-cards nl-top-support-rank--span-cards"
+          class="nl-top-support-rank nl-top-support-rank--below-cards nl-top-support-rank--span-cards"
           hidden
           aria-hidden="true"
         ></div>
@@ -7383,7 +7275,7 @@
             <div
               class="nl-compose-quick-toolbar"
               role="toolbar"
-              aria-label="書き出し・ギフト・watch の再読み込み"
+              aria-label="書き出しと watch の再読み込み"
               aria-describedby="exportToolbarHint"
             >
               <button
@@ -7408,18 +7300,6 @@
                 <span class="nl-compose-qbtn__row">
                   <span class="nl-compose-qbtn__emoji" aria-hidden="true">📊</span>
                   <span class="nl-compose-qbtn__word">マーケ</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                id="openNicoCommentAssetPickerBtn"
-                disabled
-                title="watchタブでニコ生のギフト・アイテム画面を開く"
-                aria-label="watchタブでニコ生のギフト・アイテム画面を開く。選択と決済はニコ生の公式画面で行います。"
-              >
-                <span class="nl-compose-qbtn__row">
-                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">🎁</span>
-                  <span class="nl-compose-qbtn__word">投げ</span>
                 </span>
               </button>
               <button
@@ -7659,18 +7539,12 @@
                         <div id="sceneStoryGrowth" class="nl-story-growth" aria-live="polite"></div>
                       </div>
                       <div id="sceneStoryGaugeLabel" class="nl-story-meter-label">
-                        記録した応援コメントの件数に応じて、下にアイコンが並びます（ホバーでプレビュー・クリックで詳細）。
+                        1コメントごとに、りんくが左→右へ増えるよ
                       </div>
                     </div>
                   </div>
                 </div>
               </details>
-              <div
-                id="storyGiftRankStrip"
-                class="nl-top-support-rank nl-gift-rank-strip nl-top-support-rank--below-cards nl-story-gift-lane"
-                hidden
-                aria-hidden="true"
-              ></div>
               <div id="sceneStoryDetail" class="nl-story-detail" hidden>
                 <div class="nl-story-detail-head">
                   <img
@@ -8168,15 +8042,7 @@
       </details>
 
       <details class="nl-gift-quick-panel" data-nl-toolbar-only>
-        <summary>ギフト・アイテム・広告（投げ回数 / 簡易）</summary>
-        <p class="nl-sub">
-          パネルの「投げ」または下のボタンで、watchタブ側のニコ生公式のギフト・アイテム入口を開きます（選択・決済はニコ生の画面で行います）。
-        </p>
-        <div class="nl-gift-quick-actions">
-          <button type="button" id="openNicoCommentAssetPickerGiftPanelBtn" disabled>
-            watchタブでギフト・アイテムを開く
-          </button>
-        </div>
+        <summary>ギフト・広告ユーザー（簡易）</summary>
         <div id="giftQuickStatsMount" class="nl-gift-quick-mount"></div>
       </details>
 
