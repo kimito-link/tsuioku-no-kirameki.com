@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.167',
+    date: '2026-05-05',
+    summary: 'ツールバー押しても何も出ない事故を修正',
+    items: Object.freeze([
+      'インラインパネルが画面の上下に隠れて見えない状態のまま「見えている」と誤判定して、ツールバーを押しても popup 窓も出ない事故を直しました（画面に見える形で出ない時は普通の popup 窓を開くようフォールバック）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.166',
     date: '2026-05-05',
     summary: 'イベント不参加時の順位表示を撤去',

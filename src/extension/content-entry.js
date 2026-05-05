@@ -3117,7 +3117,34 @@ async function focusInlinePanelHostFromToolbar() {
     getComputedStyle: (el) => window.getComputedStyle(/** @type {Element} */ (el))
   })) return false;
 
-  // fire-and-forget: rect 確定を待ってから scroll + iframe focus を試行。
+  // 0.1.167: panel host が CSS 上は display:block / visibility:visible でも、
+  // rect が画面外（rectTop が大きく負 / bottom が viewport 下端より下）に
+  // 居ると、ユーザーから見ると「何も見えない」。即時 scrollIntoView で
+  // viewport に引き込み、それでも見える領域が極小なら focused=false を返して
+  // background に popup window fallback を起動させる。
+  // これがないと「panel が画面外のままで focused=true → popup も開かない →
+  // ツールバー押しても何も起きない」という user-visible 障害になる。
+  try {
+    suppressOwnScrollCountingFor(1000);
+    host.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+  } catch {
+    // no-op: scrollIntoView 失敗は致命的でない（次の判定で吸収）
+  }
+  try {
+    const rect = host.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement?.clientHeight || 0;
+    if (vh > 0) {
+      // 完全に画面外
+      if (rect.bottom <= 0 || rect.top >= vh) return false;
+      // 部分的に見えていても、可視領域が 40px 未満なら「見えない」とみなす
+      const visibleH = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0));
+      if (visibleH < 40) return false;
+    }
+  } catch {
+    // no-op: rect 取得失敗時は保守的に true 寄りに倒す
+  }
+
+  // fire-and-forget: rect 確定を待ってから smooth scroll + iframe focus を試行。
   // 結果は応答に反映しない（応答は既に true で返している）。
   void (async () => {
     try {
