@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.175',
+    date: '2026-05-06',
+    summary: 'コメント文字列からギフト送信者・アイテム・ptを抽出',
+    items: Object.freeze([
+      'コメント欄に流れる「○○さんがギフト「XXX（Npt）」を贈りました」のテキストから、送信者名・アイテム名・ポイントを自動で抽出するようになりました',
+      'これによりギフトサイドバーが開かない番組でも、コメント DOM 経由でギフト送信者の集計が取れます',
+      '診断 JSON に giftCommentDiag ブロック（送信者別合計・アイテム別件数・top10）と「ギフトサマリ」の「コメントDOM由来ギフト観測数」「pt合計」を追加しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.174',
     date: '2026-05-06',
     summary: 'ランキングタブ自動オープンの強化と日本語サマリ追加',

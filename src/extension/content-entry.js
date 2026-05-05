@@ -153,6 +153,10 @@ import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
+import {
+  parseGiftCommentText,
+  summarizeGiftComments
+} from '../lib/parseGiftComment.js';
 import { trimMapToMax } from '../lib/trimMap.js';
 import { diagnosePersistGate } from '../lib/commentSubmitSteps.js';
 import {
@@ -691,6 +695,10 @@ const interceptedNicknames = new Map();
  * 0.1.173: ランキング表示の lifetime 観測。診断シートで「いつ何が取れたか」を
  * 1 か所で読めるようにする。globalThis に保持（ホットリロード対応 / SPA でも累積）。
  *
+ * 0.1.175: コメント DOM 経由で観測したギフトコメント（sender/item/point）を
+ * `giftCommentObservations` に蓄積。NDGR ギフト event を取り逃した番組でも
+ * ここから sender 集計が取れる。
+ *
  * @returns {{
  *   collectAttempts: number,
  *   contributionRankingFoundAt: number,
@@ -706,7 +714,10 @@ const interceptedNicknames = new Map();
  *   autoOpenAttemptCount: number,
  *   autoOpenLastAttemptAt: number,
  *   autoOpenLastStatus: string,
- *   giftSenders: Map<string, { count: number, lastAt: number }>
+ *   giftSenders: Map<string, { count: number, lastAt: number }>,
+ *   giftCommentObservations: Map<string, { sender: string, item: string, point: number, firstObservedAt: number }>,
+ *   giftCommentHarvestRunCount: number,
+ *   giftCommentHarvestLastAt: number
  * }}
  */
 function getRankingLifetimeDiag() {
@@ -728,7 +739,11 @@ function getRankingLifetimeDiag() {
       autoOpenLastAttemptAt: 0,
       autoOpenLastStatus: '',
       /** @type {Map<string, { count: number, lastAt: number }>} */
-      giftSenders: new Map()
+      giftSenders: new Map(),
+      /** @type {Map<string, { sender: string, item: string, point: number, firstObservedAt: number }>} */
+      giftCommentObservations: new Map(),
+      giftCommentHarvestRunCount: 0,
+      giftCommentHarvestLastAt: 0
     };
   }
   return g.__nls_ranking_lifetime_diag__;
@@ -755,6 +770,61 @@ function recordGiftSenderObservation(userId) {
     if (oldest) diag.giftSenders.delete(oldest[0]);
   }
 }
+
+/**
+ * 0.1.175: コメントテーブル DOM から `data-comment-type="gift"` の row を抽出して
+ * 「sender さんがギフト「item（Npt）」を贈りました」のテキストをパースし、
+ * lifetime に蓄積する。NDGR ギフト event を取り逃した番組（拡張が後から接続）でも、
+ * コメント文字列から sender / item / point が確実に取れる迂回ルート。
+ *
+ * テスラ式：autoOpen が動かない真因（Vue がサイドバーをマウントしない）を
+ * 試行錯誤で潰すより、niconico 側が最初から流してくれている文字列を素直に拾う。
+ *
+ * 重複判定：rawText を key にする。同一文字列のギフト row は既に観測済みとして無視。
+ *   → 同じユーザーが同じアイテムを同じポイントで複数回贈った場合の取りこぼしは
+ *     許容する（DOM virtualization で同じ row が再表示されるケースが多い）。
+ */
+function harvestGiftCommentsFromCommentTableDom() {
+  /** @type {{ raw: string, parsed: { sender: string, item: string, point: number } }[]} */
+  const rows = [];
+  try {
+    const els = document.querySelectorAll('div.table-row[data-comment-type="gift"]');
+    for (const el of els) {
+      if (!(el instanceof HTMLElement)) continue;
+      const textEl = el.querySelector('.comment-text');
+      const text = textEl?.textContent || '';
+      const trimmed = text.trim();
+      if (!trimmed) continue;
+      const p = parseGiftCommentText(trimmed);
+      if (p) rows.push({ raw: trimmed, parsed: p });
+    }
+  } catch { /* no-op */ }
+  const _d = getRankingLifetimeDiag();
+  _d.giftCommentHarvestRunCount += 1;
+  _d.giftCommentHarvestLastAt = Date.now();
+  if (rows.length === 0) return;
+  const now = Date.now();
+  for (const r of rows) {
+    if (_d.giftCommentObservations.has(r.raw)) continue;
+    _d.giftCommentObservations.set(r.raw, {
+      sender: r.parsed.sender,
+      item: r.parsed.item,
+      point: r.parsed.point,
+      firstObservedAt: now
+    });
+  }
+  // 上限：500 ギフトコメントまで（メモリ保護、古い順に削る）
+  if (_d.giftCommentObservations.size > 500) {
+    const entries = [..._d.giftCommentObservations.entries()].sort(
+      (a, b) => a[1].firstObservedAt - b[1].firstObservedAt
+    );
+    const drop = entries.length - 500;
+    for (let i = 0; i < drop; i++) {
+      _d.giftCommentObservations.delete(entries[i][0]);
+    }
+  }
+}
+
 /** userId→avatarUrl の補助マップ */
 /** @type {Map<string, string>} */
 const interceptedAvatars = new Map();
@@ -3600,6 +3670,7 @@ function buildGiftDiagnosticsBundle() {
     },
     // 0.1.174: 「ギフト」「ランキング」の日本語キーで、診断 JSON をパッと見ても
     // 状況が分かるサマリブロック。値は数値・bool・文字列のみ（人が読みやすい形）。
+    // 0.1.175: コメント DOM 経由のギフト観測（commentGift系）を追加。
     'ギフトサマリ': (() => {
       const b = lastOfficialEventDomBundle;
       const _d = getRankingLifetimeDiag();
@@ -3614,14 +3685,41 @@ function buildGiftDiagnosticsBundle() {
       const sendersResolved = [..._d.giftSenders.keys()].filter((uid) =>
         interceptedNicknames.has(uid)
       ).length;
+      const commentGiftCount = _d.giftCommentObservations.size;
+      const commentGiftPoints = [..._d.giftCommentObservations.values()].reduce(
+        (s, v) => s + (Number(v.point) || 0),
+        0
+      );
       return {
         'ギフトポイント観測': programGiftPoints,
         'NDGRギフトevent数': ndgrGifts,
         'DOM由来ギフト履歴件数': domGiftHistoryItems,
         'ギフト送信者観測数': sendersObserved,
         'ニックネーム解決済': sendersResolved,
+        'コメントDOM由来ギフト観測数': commentGiftCount,
+        'コメントDOM由来ギフトpt合計': commentGiftPoints,
         '取り逃し疑い':
-          programGiftPoints > 0 && ndgrGifts === 0 && domGiftHistoryItems === 0
+          programGiftPoints > 0 &&
+          ndgrGifts === 0 &&
+          domGiftHistoryItems === 0 &&
+          commentGiftCount === 0
+      };
+    })(),
+    // 0.1.175: コメント DOM 経由のギフト観測の集計（autoOpen 迂回ルートの結果）
+    giftCommentDiag: (() => {
+      const _d = getRankingLifetimeDiag();
+      const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
+      const rows = [..._d.giftCommentObservations.values()].map((v) => ({
+        sender: v.sender,
+        item: v.item,
+        point: v.point
+      }));
+      const summary = summarizeGiftComments(rows);
+      return {
+        harvestRunCount: _d.giftCommentHarvestRunCount,
+        harvestLastAgoMs: ago(_d.giftCommentHarvestLastAt),
+        observationsTotal: _d.giftCommentObservations.size,
+        ...summary
       };
     })(),
     'ランキングサマリ': (() => {
@@ -8050,6 +8148,8 @@ async function persistOfficialEventDomBundleNow() {
   // 0.1.173: lifetime 観測カウンタ（診断シート用）
   const _rd = getRankingLifetimeDiag();
   _rd.collectAttempts += 1;
+  // 0.1.175: コメント DOM 経由のギフト送信者観測（autoOpen 迂回ルート）
+  try { harvestGiftCommentsFromCommentTableDom(); } catch { /* no-op */ }
   let fresh = collectOfficialEventDomBundle(document, { nowMs: Date.now() });
   if (fresh) {
     const _now = Date.now();
