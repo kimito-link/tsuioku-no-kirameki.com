@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.174',
+    date: '2026-05-06',
+    summary: 'ランキングタブ自動オープンの強化と日本語サマリ追加',
+    items: Object.freeze([
+      '貢献度ランキングのタブ自動切替を強化しました（部分一致と selector 拡張で「ランキング」「Ranking」「貢献」を含むタブを広く検出）',
+      'ランキングタブ click 時にステルス CSS の pointer-events を一時解除し、Vue 側で click event が遮断される問題に対処しました',
+      '自動オープンが空回りした時に、ギフトサイドバー内のクリック可能要素のテキスト・class 名を診断 JSON に dump するようにしました（次回診断で原因特定を確実にする観測）',
+      '診断 JSON に「ギフトサマリ」「ランキングサマリ」の日本語キーを追加し、状況がパッと見て分かるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.173',
     date: '2026-05-06',
     summary: '診断シートにランキング・タブ・ギフト送信者の観測情報を集約',

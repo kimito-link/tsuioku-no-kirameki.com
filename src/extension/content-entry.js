@@ -3542,7 +3542,17 @@ function buildGiftDiagnosticsBundle() {
         autoOpen: {
           attemptCount: _d.autoOpenAttemptCount,
           lastAttemptAgoMs: ago(_d.autoOpenLastAttemptAt),
-          lastStatus: _d.autoOpenLastStatus || ''
+          lastStatus: _d.autoOpenLastStatus || '',
+          // 0.1.174: 失敗時に sidebar 内 clickable を dump（テスラ式観測）
+          lastSidebarHints: (() => {
+            const snap = /** @type {any} */ (globalThis).__nls_auto_open_sidebar_hints__;
+            if (!snap) return null;
+            return {
+              capturedAgoMs: ago(snap.capturedAt),
+              hintCount: Array.isArray(snap.hints) ? snap.hints.length : 0,
+              hints: Array.isArray(snap.hints) ? snap.hints : []
+            };
+          })()
         }
       };
     })(),
@@ -3588,6 +3598,55 @@ function buildGiftDiagnosticsBundle() {
       interceptNicknameSize: interceptedNicknames.size,
       interceptAvatarSize: interceptedAvatars.size
     },
+    // 0.1.174: 「ギフト」「ランキング」の日本語キーで、診断 JSON をパッと見ても
+    // 状況が分かるサマリブロック。値は数値・bool・文字列のみ（人が読みやすい形）。
+    'ギフトサマリ': (() => {
+      const b = lastOfficialEventDomBundle;
+      const _d = getRankingLifetimeDiag();
+      const programGiftPoints = (() => {
+        try { return Number(b?.programStats?.giftPoints) || 0; } catch { return 0; }
+      })();
+      const ndgrGifts = pickNum('g');
+      const domGiftHistoryItems = (() => {
+        try { return Array.isArray(b?.giftHistory) ? b.giftHistory.length : 0; } catch { return 0; }
+      })();
+      const sendersObserved = _d.giftSenders.size;
+      const sendersResolved = [..._d.giftSenders.keys()].filter((uid) =>
+        interceptedNicknames.has(uid)
+      ).length;
+      return {
+        'ギフトポイント観測': programGiftPoints,
+        'NDGRギフトevent数': ndgrGifts,
+        'DOM由来ギフト履歴件数': domGiftHistoryItems,
+        'ギフト送信者観測数': sendersObserved,
+        'ニックネーム解決済': sendersResolved,
+        '取り逃し疑い':
+          programGiftPoints > 0 && ndgrGifts === 0 && domGiftHistoryItems === 0
+      };
+    })(),
+    'ランキングサマリ': (() => {
+      const _d = getRankingLifetimeDiag();
+      const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
+      const b = lastOfficialEventDomBundle;
+      const contributionRows = (() => {
+        try { return Array.isArray(b?.contributionRanking) ? b.contributionRanking.length : 0; } catch { return 0; }
+      })();
+      const adRows = (() => {
+        try { return Array.isArray(b?.adContributionRanking) ? b.adContributionRanking.length : 0; } catch { return 0; }
+      })();
+      return {
+        '貢献度ランキング件数': contributionRows,
+        '広告ランキング件数': adRows,
+        '貢献度ランキング取得回数': _d.contributionRankingFoundCount,
+        'ギフト履歴取得回数': _d.giftHistoryFoundCount,
+        'イベントバナー取得回数': _d.eventBannerFoundCount,
+        'イベントバルーン取得回数': _d.eventBalloonFoundCount,
+        '広告ランキング取得回数': _d.adContributionRankingFoundCount,
+        '自動オープン試行回数': _d.autoOpenAttemptCount,
+        '自動オープン最終ステータス': _d.autoOpenLastStatus || '',
+        '自動オープン最終試行ago_ms': ago(_d.autoOpenLastAttemptAt)
+      };
+    })(),
     urlLiveId: urlLv || ''
   };
 }
@@ -8176,6 +8235,59 @@ function setAutoOpenStatus(v) {
   } catch {
     // no-op
   }
+  // 0.1.174: lifetime counter に接続（rankingDiag.autoOpen を駆動）。
+  // 'start' で attempt をカウント、それ以外は last 系のみ更新。
+  try {
+    const _d = getRankingLifetimeDiag();
+    if (v === 'start') _d.autoOpenAttemptCount += 1;
+    _d.autoOpenLastAttemptAt = Date.now();
+    _d.autoOpenLastStatus = String(v || '').slice(0, 80);
+  } catch { /* no-op */ }
+}
+
+/**
+ * 0.1.174: 自動オープン後にサイドバー内のクリック可能要素を観測して、
+ * 「ランキング」タブが見つからない真因を診断 JSON に残す（テスラ式観測）。
+ * 1 回の dump で次の修正方針が確定する：
+ *   - hint に「ランキング」を含む要素が居る → タブは存在、selector か click 経路の問題
+ *   - 居ない → サイドバー自体が開いていない or タブが Shadow DOM
+ *   - 候補数 0 → サイドバー DOM がそもそも生成されていない（gift-button click 不発）
+ */
+function snapshotAutoOpenSidebarHints() {
+  /** @type {{ tag: string, role: string, text: string, cls: string }[]} */
+  const hints = [];
+  try {
+    const sidebarRoot =
+      document.querySelector('[class*="gift-sidebar"]') ||
+      document.querySelector('[class*="gift-modal"]') ||
+      document.querySelector('[class*="gift-popup"]') ||
+      document.querySelector('[class*="rich-view"]') ||
+      document.body;
+    if (!(sidebarRoot instanceof HTMLElement)) return;
+    const candidates = sidebarRoot.querySelectorAll(
+      '[role="tab"], button, a, li, div[class*="tab"], span[class*="tab"], [class*="ranking"], [class*="contribution"]'
+    );
+    let i = 0;
+    for (const el of candidates) {
+      if (i >= 30) break;
+      if (!(el instanceof HTMLElement)) continue;
+      const text = String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      if (!text) continue;
+      hints.push({
+        tag: String(el.tagName || '').toLowerCase(),
+        role: String(el.getAttribute('role') || ''),
+        text,
+        cls: String(el.className || '').slice(0, 80)
+      });
+      i += 1;
+    }
+  } catch { /* no-op */ }
+  try {
+    /** @type {any} */ (globalThis).__nls_auto_open_sidebar_hints__ = {
+      capturedAt: Date.now(),
+      hints
+    };
+  } catch { /* no-op */ }
 }
 
 /**
@@ -8326,24 +8438,51 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     //    niconico のギフトサイドバーは「番組ギフト / マイギフト / 履歴 / ランキング」の
     //    4 タブで、ランキングタブを開かないと .contribution-ranking-list が DOM に
     //    出てこない。バナーがマウント済みであろうこのタイミングで切り替える。
+    //
+    //    0.1.174: 検出を 3 段階に強化。
+    //     (a) 部分一致 + selector 拡張：「ランキング」「Ranking」「貢献」のいずれかを
+    //         含む短いテキスト（30 字以下）の clickable 要素を広く拾う。
+    //     (b) class 名による検出：ranking-tab / contribution-tab 等の命名にもヒット。
+    //     (c) 失敗時は sidebar 内 clickable を 30 件 dump（snapshotAutoOpenSidebarHints）、
+    //         診断 JSON に残して次回の真因切り分けに使う。
     /** @type {HTMLElement|null} */
     let rankTabBtn = null;
+    let rankTabFinder = '';
     try {
-      // role="tab" や button のなかから「ランキング」テキストを持つ要素を探す
+      const RANK_TEXT_RE = /ランキング|Ranking|貢献/;
       const candidates = document.querySelectorAll(
-        '[role="tab"], button, a[role="button"]'
+        '[role="tab"], button, a, li, div[class*="tab"], span[class*="tab"]'
       );
       for (const el of candidates) {
         if (!(el instanceof HTMLElement)) continue;
-        const t = String(el.textContent || '').trim();
-        if (t === 'ランキング' || t === '貢献度ランキング') {
+        const t = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!t || t.length > 30) continue;
+        if (RANK_TEXT_RE.test(t)) {
           rankTabBtn = el;
+          rankTabFinder = `text:${el.tagName.toLowerCase()}`;
           break;
         }
       }
+      if (!rankTabBtn) {
+        const byCls = document.querySelector(
+          '[class*="ranking-tab"], [class*="contribution-tab"], [class*="ranker-tab"]'
+        );
+        if (byCls instanceof HTMLElement) {
+          rankTabBtn = byCls;
+          rankTabFinder = 'class';
+        }
+      }
     } catch { /* no-op */ }
+    if (!rankTabBtn) {
+      // 失敗時の根本観測：次回診断で「ランキング」と書かれた要素の class 名・親が見える
+      try { snapshotAutoOpenSidebarHints(); } catch { /* no-op */ }
+    }
     let scrapedRanking = false;
     if (rankTabBtn) {
+      // 0.1.174: ステルス CSS の pointer-events:none で click event が遮断される
+      // 可能性に対処。tab 要素だけ inline style で一時的に pointer-events を auto に。
+      const prevPe = rankTabBtn.style.pointerEvents;
+      try { rankTabBtn.style.pointerEvents = 'auto'; } catch { /* no-op */ }
       dispatchSyntheticActivation(rankTabBtn);
       // ランキングは XHR で取得→Vue マウントなので、バナーより少し時間がかかる。
       // 最大 3 秒、500ms ごとに polling。
@@ -8359,19 +8498,31 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
           scrapedRanking = true;
           setAutoOpenStatus(
             scrapedBanner
-              ? `scraped-banner-and-ranking-tick-${i + 1}`
-              : `scraped-ranking-only-tick-${i + 1}`
+              ? `scraped-banner-and-ranking-tick-${i + 1}:${rankTabFinder}`
+              : `scraped-ranking-only-tick-${i + 1}:${rankTabFinder}`
           );
           break;
         }
       }
+      try { rankTabBtn.style.pointerEvents = prevPe; } catch { /* no-op */ }
     }
     if (!scrapedBanner && !scrapedRanking) {
       // どちらも現れなかった → programStats 等だけでも取って終わる
       await persistOfficialEventDomBundleNow();
-      setAutoOpenStatus(rankTabBtn ? 'opened-no-banner-no-ranking' : 'opened-but-no-banner');
+      // tab 見つかったが ranker 出ない場合は dump も取る（仮説 3：click が効いてない）
+      if (rankTabBtn) {
+        try { snapshotAutoOpenSidebarHints(); } catch { /* no-op */ }
+      }
+      setAutoOpenStatus(
+        rankTabBtn ? `opened-no-banner-no-ranking:${rankTabFinder}` : 'opened-but-no-banner'
+      );
     } else if (scrapedBanner && !scrapedRanking) {
-      setAutoOpenStatus(rankTabBtn ? 'banner-only-no-ranking' : 'banner-only-no-rank-tab');
+      if (rankTabBtn) {
+        try { snapshotAutoOpenSidebarHints(); } catch { /* no-op */ }
+      }
+      setAutoOpenStatus(
+        rankTabBtn ? `banner-only-no-ranking:${rankTabFinder}` : 'banner-only-no-rank-tab'
+      );
     }
     // 6. 閉じる：close ボタンが居れば優先、無ければギフトボタンを再クリックでトグル
     /** @type {HTMLElement|null} */
