@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.173',
+    date: '2026-05-06',
+    summary: '診断シートにランキング・タブ・ギフト送信者の観測情報を集約',
+    items: Object.freeze([
+      'AI 診断 JSON に rankingDiag / multiTabDiag / giftSenderDiag / nicknameDiag を追加し、ランキング表示が出ない原因を 1 か所で読めるようにしました',
+      'NDGR 経由のギフト送信者（user_id）を lifetime で観測し、ニックネーム解決状況とあわせて診断に表示します',
+      'ランキング各種（貢献度・ギフト履歴・イベントバナー・広告）の取得回数と最終取得時刻を診断に出します',
+      '他配信タブの保存状況（イベント DOM / ニコニ広告）も診断に表示し、複数タブ干渉の切り分けに使えるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.172',
     date: '2026-05-06',
     summary: '非コメユーザーの混入を集計から除外',

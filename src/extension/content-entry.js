@@ -686,6 +686,75 @@ const VIEWER_JOIN_FLUSH_SUPPRESS_MS = 2500;
 /** userId→nickname の補助マップ */
 /** @type {Map<string, string>} */
 const interceptedNicknames = new Map();
+
+/**
+ * 0.1.173: ランキング表示の lifetime 観測。診断シートで「いつ何が取れたか」を
+ * 1 か所で読めるようにする。globalThis に保持（ホットリロード対応 / SPA でも累積）。
+ *
+ * @returns {{
+ *   collectAttempts: number,
+ *   contributionRankingFoundAt: number,
+ *   contributionRankingFoundCount: number,
+ *   giftHistoryFoundAt: number,
+ *   giftHistoryFoundCount: number,
+ *   eventBannerFoundAt: number,
+ *   eventBannerFoundCount: number,
+ *   eventBalloonFoundAt: number,
+ *   eventBalloonFoundCount: number,
+ *   adContributionRankingFoundAt: number,
+ *   adContributionRankingFoundCount: number,
+ *   autoOpenAttemptCount: number,
+ *   autoOpenLastAttemptAt: number,
+ *   autoOpenLastStatus: string,
+ *   giftSenders: Map<string, { count: number, lastAt: number }>
+ * }}
+ */
+function getRankingLifetimeDiag() {
+  const g = /** @type {any} */ (globalThis);
+  if (!g.__nls_ranking_lifetime_diag__) {
+    g.__nls_ranking_lifetime_diag__ = {
+      collectAttempts: 0,
+      contributionRankingFoundAt: 0,
+      contributionRankingFoundCount: 0,
+      giftHistoryFoundAt: 0,
+      giftHistoryFoundCount: 0,
+      eventBannerFoundAt: 0,
+      eventBannerFoundCount: 0,
+      eventBalloonFoundAt: 0,
+      eventBalloonFoundCount: 0,
+      adContributionRankingFoundAt: 0,
+      adContributionRankingFoundCount: 0,
+      autoOpenAttemptCount: 0,
+      autoOpenLastAttemptAt: 0,
+      autoOpenLastStatus: '',
+      /** @type {Map<string, { count: number, lastAt: number }>} */
+      giftSenders: new Map()
+    };
+  }
+  return g.__nls_ranking_lifetime_diag__;
+}
+
+/**
+ * NDGR で観測したギフト event の sender user_id を記録する。
+ * 診断シートで「ギフトを送ったが nickname が解決できていない user」を見える化する。
+ * @param {string} userId
+ */
+function recordGiftSenderObservation(userId) {
+  const uid = String(userId || '').trim();
+  if (!uid) return;
+  const diag = getRankingLifetimeDiag();
+  const cur = diag.giftSenders.get(uid) || { count: 0, lastAt: 0 };
+  cur.count += 1;
+  cur.lastAt = Date.now();
+  diag.giftSenders.set(uid, cur);
+  // 上限：100 user まで（古い順に削る）
+  if (diag.giftSenders.size > 100) {
+    const oldest = [...diag.giftSenders.entries()].sort(
+      (a, b) => a[1].lastAt - b[1].lastAt
+    )[0];
+    if (oldest) diag.giftSenders.delete(oldest[0]);
+  }
+}
 /** userId→avatarUrl の補助マップ */
 /** @type {Map<string, string>} */
 const interceptedAvatars = new Map();
@@ -1405,6 +1474,13 @@ window.addEventListener('message', (e) => {
 
   if (e.data.type === 'NLS_INTERCEPT_GIFT_USERS') {
     const raw = e.data.users;
+    if (Array.isArray(raw) && raw.length) {
+      // 0.1.173: lifetime 観測（診断シート用）。liveId 不在でも record する。
+      for (const u of raw) {
+        const uid = String(u?.userId || '').trim();
+        if (uid) recordGiftSenderObservation(uid);
+      }
+    }
     if (Array.isArray(raw) && raw.length && liveId && hasExtensionContext()) {
       const key = giftUsersStorageKey(liveId);
       chrome.storage.local.get(key).then((bag) => {
@@ -3437,6 +3513,80 @@ function buildGiftDiagnosticsBundle() {
       officialNicoEventTitleNdgrPreview: officialNicoEventTitleNdgr
         ? officialNicoEventTitleNdgr.slice(0, 80)
         : ''
+    },
+    rankingDiag: (() => {
+      const _d = getRankingLifetimeDiag();
+      const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
+      return {
+        collectAttempts: _d.collectAttempts,
+        contributionRanking: {
+          foundCount: _d.contributionRankingFoundCount,
+          lastFoundAgoMs: ago(_d.contributionRankingFoundAt)
+        },
+        giftHistory: {
+          foundCount: _d.giftHistoryFoundCount,
+          lastFoundAgoMs: ago(_d.giftHistoryFoundAt)
+        },
+        eventBanner: {
+          foundCount: _d.eventBannerFoundCount,
+          lastFoundAgoMs: ago(_d.eventBannerFoundAt)
+        },
+        eventBalloon: {
+          foundCount: _d.eventBalloonFoundCount,
+          lastFoundAgoMs: ago(_d.eventBalloonFoundAt)
+        },
+        adContributionRanking: {
+          foundCount: _d.adContributionRankingFoundCount,
+          lastFoundAgoMs: ago(_d.adContributionRankingFoundAt)
+        },
+        autoOpen: {
+          attemptCount: _d.autoOpenAttemptCount,
+          lastAttemptAgoMs: ago(_d.autoOpenLastAttemptAt),
+          lastStatus: _d.autoOpenLastStatus || ''
+        }
+      };
+    })(),
+    multiTabDiag: (() => {
+      const snap = /** @type {any} */ (globalThis).__nls_multitab_snapshot__;
+      if (!snap) return { hasSnapshot: false };
+      const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
+      const eventDomLvs = Array.isArray(snap.eventDomLvs) ? snap.eventDomLvs : [];
+      const nicoadLvs = Array.isArray(snap.nicoadLvs) ? snap.nicoadLvs : [];
+      return {
+        hasSnapshot: true,
+        capturedAgoMs: ago(snap.capturedAt),
+        eventDomLvCount: eventDomLvs.length,
+        eventDomLvs: eventDomLvs.slice(0, 10),
+        nicoadLvCount: nicoadLvs.length,
+        nicoadLvs: nicoadLvs.slice(0, 10),
+        currentLiveIdInEventDom: lid ? eventDomLvs.includes(lid) : null,
+        currentLiveIdInNicoad: lid ? nicoadLvs.includes(lid) : null
+      };
+    })(),
+    giftSenderDiag: (() => {
+      const _d = getRankingLifetimeDiag();
+      /** @type {[string, { count: number, lastAt: number }][]} */
+      const arr = [..._d.giftSenders.entries()];
+      arr.sort((a, b) => b[1].count - a[1].count);
+      const top = arr.slice(0, 10).map(([uid, v]) => {
+        const nickname = interceptedNicknames.get(uid) || '';
+        return {
+          userId: uid,
+          observedCount: v.count,
+          lastAgoMs: v.lastAt > 0 ? Math.max(0, Date.now() - v.lastAt) : null,
+          nicknameResolved: !!nickname,
+          nicknamePreview: nickname ? nickname.slice(0, 30) : ''
+        };
+      });
+      return {
+        uniqueSenderCount: arr.length,
+        nicknameResolvedCount: top.filter((t) => t.nicknameResolved).length,
+        topSenders: top
+      };
+    })(),
+    nicknameDiag: {
+      interceptNicknameSize: interceptedNicknames.size,
+      interceptAvatarSize: interceptedAvatars.size
     },
     urlLiveId: urlLv || ''
   };
@@ -7838,7 +7988,51 @@ async function persistOfficialEventDomBundleNow() {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) return;
   ensureOfficialEventDomObserver();
+  // 0.1.173: lifetime 観測カウンタ（診断シート用）
+  const _rd = getRankingLifetimeDiag();
+  _rd.collectAttempts += 1;
   let fresh = collectOfficialEventDomBundle(document, { nowMs: Date.now() });
+  if (fresh) {
+    const _now = Date.now();
+    if (fresh.eventBanner) {
+      _rd.eventBannerFoundCount += 1;
+      _rd.eventBannerFoundAt = _now;
+    }
+    if (fresh.eventBalloon) {
+      _rd.eventBalloonFoundCount += 1;
+      _rd.eventBalloonFoundAt = _now;
+    }
+    if (Array.isArray(fresh.contributionRanking) && fresh.contributionRanking.length > 0) {
+      _rd.contributionRankingFoundCount += 1;
+      _rd.contributionRankingFoundAt = _now;
+    }
+    if (Array.isArray(fresh.giftHistory) && fresh.giftHistory.length > 0) {
+      _rd.giftHistoryFoundCount += 1;
+      _rd.giftHistoryFoundAt = _now;
+    }
+    if (Array.isArray(fresh.adContributionRanking) && fresh.adContributionRanking.length > 0) {
+      _rd.adContributionRankingFoundCount += 1;
+      _rd.adContributionRankingFoundAt = _now;
+    }
+  }
+  // 0.1.173: multi-tab snapshot を非同期で取得して globalThis にキャッシュ
+  // （buildGiftDiagnosticsBundle が同期なのでここで先取りする）
+  try {
+    const all = await chrome.storage.local.get(null);
+    if (all && typeof all === 'object') {
+      const eventDomLvs = Object.keys(all)
+        .filter((k) => k.startsWith('nls_event_dom_'))
+        .map((k) => k.slice('nls_event_dom_'.length));
+      const nicoadLvs = Object.keys(all)
+        .filter((k) => k.startsWith('nls_nicoad_ranking_'))
+        .map((k) => k.slice('nls_nicoad_ranking_'.length));
+      /** @type {any} */ (globalThis).__nls_multitab_snapshot__ = {
+        capturedAt: Date.now(),
+        eventDomLvs,
+        nicoadLvs
+      };
+    }
+  } catch { /* no-op */ }
   // バナーが DOM に居ないとき（ギフトサイドバー閉時の通常状態）は audition embed
   // を直接 fetch してみる。同じ liveId につき 1 度だけ。
   const haveBannerAlready =
