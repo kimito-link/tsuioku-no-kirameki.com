@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.170',
+    date: '2026-05-05',
+    summary: '広告貢献度の取得状態を診断に出す',
+    items: Object.freeze([
+      'ニコニ広告ページからの取得が成功しているか失敗しているかを診断情報で確認できるようにしました（fetch ステータスを popup の診断JSONに露出）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.169',
     date: '2026-05-05',
     summary: '広告貢献度ランキングを別経路で取得',

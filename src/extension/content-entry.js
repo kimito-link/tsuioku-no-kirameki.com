@@ -3280,6 +3280,8 @@ function buildGiftDiagnosticsBundle() {
       document.documentElement?.getAttribute('data-nls-auto-open') || 'never',
     auditionFetchStatus:
       document.documentElement?.getAttribute('data-nls-audition-fetch') || 'never',
+    nicoadFetchStatus:
+      document.documentElement?.getAttribute('data-nls-nicoad-fetch') || 'never',
     eventDomBundleSummary: (() => {
       const b = lastOfficialEventDomBundle;
       if (!b) return { hasBundle: false };
