@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.166',
+    date: '2026-05-05',
+    summary: 'イベント不参加時の順位表示を撤去',
+    items: Object.freeze([
+      'イベントに参加していない配信なのに「ニコ生現在 50 位」のような順位が popup に表示される誤情報を直しました（公式バナーが取れた時だけ表示するように変更）',
+      '「履歴」「ランキング」タブの DOM が公式と一致しているかを確認するための診断情報を追加しました（次の修正に必要なデータを集めるため）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.165',
     date: '2026-05-05',
     summary: '「読み込み中」が消えない事故を防ぐ',

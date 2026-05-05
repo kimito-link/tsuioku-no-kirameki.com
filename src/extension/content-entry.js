@@ -3288,6 +3288,82 @@ function buildGiftDiagnosticsBundle() {
               anonymousCount: b.contributionRanking.filter((r) => r?.isAnonymous).length
             }
           : null,
+        giftHistory: Array.isArray(b.giftHistory)
+          ? (() => {
+              const totalPoints = b.giftHistory.reduce(
+                (s, h) => s + (Number(h?.point) || 0),
+                0
+              );
+              const anonymousCount = b.giftHistory.filter((h) => h?.isAnonymous).length;
+              const aggMap = new Map();
+              for (const h of b.giftHistory) {
+                const name = String(h?.advertiserName || '').trim();
+                if (!name) continue;
+                const pt = Number(h?.point) || 0;
+                const cur = aggMap.get(name) || { name, total: 0, count: 0, isAnon: !!h?.isAnonymous };
+                cur.total += pt;
+                cur.count += 1;
+                aggMap.set(name, cur);
+              }
+              const sorted = [...aggMap.values()].sort((a, b) => b.total - a.total);
+              const top = sorted[0] || null;
+              return {
+                count: b.giftHistory.length,
+                totalPoints,
+                anonymousCount,
+                uniqueUserCount: aggMap.size,
+                top1Name: top && !top.isAnon ? top.name : null,
+                top1TotalPoints: top?.total ?? null,
+                top1GiftCount: top?.count ?? null
+              };
+            })()
+          : null,
+        giftHistoryDomItemsNow: (() => {
+          try {
+            return document.querySelectorAll('.gift-history-list .item').length;
+          } catch {
+            return null;
+          }
+        })(),
+        contributionRankingDomItemsNow: (() => {
+          try {
+            return document.querySelectorAll('.contribution-ranking-list .ranker').length;
+          } catch {
+            return null;
+          }
+        })(),
+        giftSidebarDomProbe: (() => {
+          try {
+            const partialCount = (frag) => {
+              try {
+                return document.querySelectorAll(`[class*="${frag}"]`).length;
+              } catch {
+                return 0;
+              }
+            };
+            const sampleClass = (frag) => {
+              try {
+                const el = document.querySelector(`[class*="${frag}"]`);
+                return el ? String(el.className || '').slice(0, 120) : null;
+              } catch {
+                return null;
+              }
+            };
+            return {
+              giftHistoryListPartial: partialCount('gift-history-list'),
+              contributionRankingListPartial: partialCount('contribution-ranking-list'),
+              advertiserNamePartial: partialCount('advertiser-name'),
+              rankerPartial: partialCount('ranker'),
+              ownerNamePartial: partialCount('owner-name'),
+              giftHistoryListSample: sampleClass('gift-history-list'),
+              contributionRankingListSample: sampleClass('contribution-ranking-list'),
+              advertiserNameSample: sampleClass('advertiser-name'),
+              rankerSample: sampleClass('ranker')
+            };
+          } catch {
+            return null;
+          }
+        })(),
         programStats: b.programStats
           ? {
               watchCount: b.programStats.watchCount ?? null,

@@ -4313,27 +4313,24 @@ function paintOfficialEventBannerCard(snapshot) {
     return '';
   };
 
-  // 順位の出し分け：
-  //   公式 DOM 由来の banner (bundle.eventBanner) があれば → イベント順位として表示
-  //   無くても NDGR field 6 が来ていれば → 「ニコ生順位」として表示（ラベルで明示）
-  //   両方無ければカード自体を隠す
+  // 表示は「公式 DOM 由来の banner (bundle.eventBanner) が居る時だけ」。
+  // NDGR field 6 単独は、イベントに参加していない配信にも値が返ることが
+  // 確認されているため誤情報の温床。沈黙を選ぶ（誤情報より沈黙）。
   const broadcasterName = pickStr(snap?.broadcasterName);
-  const ndgrRank = asNum(snap?.officialNicoEventRankNdgr);
   const isEventBanner = banner != null && asNum(banner.rank) != null;
-  const rank = isEventBanner ? asNum(banner?.rank) : ndgrRank;
-  const score = isEventBanner
-    ? (asNum(balloon?.eventTotalScore) ?? asNum(banner?.score))
-    : null;
-  const title = isEventBanner ? pickStr(banner?.title) : '';
-  const iconUrl = isEventBanner ? pickStr(banner?.iconUrl) : '';
-  const href = isEventBanner ? pickStr(banner?.href) : '';
-  const ownerText = isEventBanner
-    ? pickStr(
-        banner?.ownerText,
-        broadcasterName ? `${broadcasterName}さんが参加しています！` : ''
-      )
-    : (broadcasterName ? `${broadcasterName}さんの現在順位` : '');
-  const rankLabel = isEventBanner ? 'イベント現在' : 'ニコ生現在';
+  if (!isEventBanner) {
+    hide();
+    return;
+  }
+  const rank = asNum(banner?.rank);
+  const score = asNum(balloon?.eventTotalScore) ?? asNum(banner?.score);
+  const title = pickStr(banner?.title);
+  const iconUrl = pickStr(banner?.iconUrl);
+  const href = pickStr(banner?.href);
+  const ownerText = pickStr(
+    banner?.ownerText,
+    broadcasterName ? `${broadcasterName}さんが参加しています！` : ''
+  );
 
   if (rank == null && score == null && !title) {
     hide();
@@ -4355,11 +4352,10 @@ function paintOfficialEventBannerCard(snapshot) {
   }
   if (rankEl) {
     if (rank != null) {
-      rankEl.textContent = `${rankLabel} ${rank} 位`;
+      rankEl.textContent = `イベント現在 ${rank} 位`;
       rankEl.hidden = false;
-      // 「イベント」と「ニコ生」でラベル色味を分けるため class を切替
-      rankEl.classList.toggle('nl-official-event-banner-card__rank--event', isEventBanner);
-      rankEl.classList.toggle('nl-official-event-banner-card__rank--niconama', !isEventBanner);
+      rankEl.classList.add('nl-official-event-banner-card__rank--event');
+      rankEl.classList.remove('nl-official-event-banner-card__rank--niconama');
     } else {
       rankEl.textContent = '';
       rankEl.hidden = true;
