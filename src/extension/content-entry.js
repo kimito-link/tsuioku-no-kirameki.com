@@ -3250,6 +3250,54 @@ function buildGiftDiagnosticsBundle() {
       document.documentElement?.getAttribute('data-nls-auto-open') || 'never',
     auditionFetchStatus:
       document.documentElement?.getAttribute('data-nls-audition-fetch') || 'never',
+    eventDomBundleSummary: (() => {
+      const b = lastOfficialEventDomBundle;
+      if (!b) return { hasBundle: false };
+      return {
+        hasBundle: true,
+        capturedAgoMs:
+          typeof b.capturedAt === 'number' && b.capturedAt > 0
+            ? Math.max(0, Date.now() - b.capturedAt)
+            : null,
+        eventBanner: b.eventBanner
+          ? {
+              hasRank: typeof b.eventBanner.rank === 'number',
+              rank: b.eventBanner.rank ?? null,
+              hasScore: typeof b.eventBanner.score === 'number',
+              score: b.eventBanner.score ?? null,
+              titleLen: String(b.eventBanner.title || '').length,
+              hasIcon: Boolean(b.eventBanner.iconUrl)
+            }
+          : null,
+        eventBalloon: b.eventBalloon
+          ? {
+              hasEventTotalScore: typeof b.eventBalloon.eventTotalScore === 'number',
+              eventTotalScore: b.eventBalloon.eventTotalScore ?? null,
+              hasProgramTotalPoints: typeof b.eventBalloon.programTotalPoints === 'number',
+              programTotalPoints: b.eventBalloon.programTotalPoints ?? null
+            }
+          : null,
+        contributionRanking: Array.isArray(b.contributionRanking)
+          ? {
+              count: b.contributionRanking.length,
+              top1Name:
+                b.contributionRanking[0] && !b.contributionRanking[0].isAnonymous
+                  ? b.contributionRanking[0].name
+                  : null,
+              top1Contribution: b.contributionRanking[0]?.contribution ?? null,
+              anonymousCount: b.contributionRanking.filter((r) => r?.isAnonymous).length
+            }
+          : null,
+        programStats: b.programStats
+          ? {
+              watchCount: b.programStats.watchCount ?? null,
+              commentCount: b.programStats.commentCount ?? null,
+              adPoints: b.programStats.adPoints ?? null,
+              giftPoints: b.programStats.giftPoints ?? null
+            }
+          : null
+      };
+    })(),
     officialGiftStats: {
       eventGiftScoreDom: null,
       eventGiftScoreNdgr: officialEventGiftScoreNdgr,
@@ -7369,13 +7417,29 @@ async function start() {
     }
     // niconico のギフトサイドバーをユーザに気づかれないよう一瞬だけ開閉して、
     // 「○○さんが参加しています」「貢献度ランキング」等の正本値を永続化する。
-    // niconico Vue のマウント完了を待つため 6 秒後に実行（visibility:hidden 経由で
-    // ステルス、ユーザーは画面変化を見ない）。同一 liveId につき 1 度きり。
+    // 速度優先：niconico Vue のマウント完了を待つ最低限の 2 秒後に発火。
+    // ステルス CSS（opacity:0 + pointer-events:none）でユーザーは画面変化を見ない。
+    // 同一 liveId につき 1 度きり。
     setTimeout(() => {
       if (recording && liveId && locationAllowsCommentRecording()) {
         void tryAutoOpenGiftSidebarOnceForScrape();
       }
-    }, 6000);
+    }, 2000);
+    // セーフティ・リトライ：30 秒後に bundle.contributionRanking がまだ取れて
+    // いなければ、_autoOpenGiftSidebarTriedLiveId をリセットしてもう 1 度だけ
+    // 自動オープンを試す。初回の Vue マウント遅延／タブクリック取りこぼし／
+    // niconico 側の XHR 失敗 などを救済するための一発リトライ。
+    setTimeout(() => {
+      if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+      const lid = String(liveId || '').trim().toLowerCase();
+      if (!lid) return;
+      const haveRanking = Array.isArray(lastOfficialEventDomBundle?.contributionRanking) &&
+        lastOfficialEventDomBundle.contributionRanking.length > 0;
+      if (haveRanking) return;
+      // 1 度だけリトライを許す
+      _autoOpenGiftSidebarTriedLiveId = '';
+      void tryAutoOpenGiftSidebarOnceForScrape();
+    }, 30_000);
   }
 
   // 拡張 context invalidated（chrome://extensions の再読み込み等）後は、
@@ -7566,10 +7630,87 @@ let _autoOpenGiftSidebarTriedLiveId = '';
  */
 let _auditionBannerFetchedForLid = '';
 
+/**
+ * 「ギフトサイドバーが開いた瞬間／ユーザーがランキングタブに切り替えた瞬間」を
+ * MutationObserver で検知して即スクレイプする。タブクリックの自動化はサイト側の
+ * 実装変化に弱いので、こちらの DOM 観測に頼るのが堅実。
+ *
+ * 監視対象セレクタ：
+ *   - .owner-name（参加バナー）
+ *   - .contribution-ranking-list（貢献度ランキング）
+ *   - .point-field（バルーン累計テーブル）
+ *
+ * これらのいずれかが追加 / テキスト変更された瞬間、200ms スロットリングしてから
+ * persistOfficialEventDomBundleNow を呼ぶ。
+ *
+ * @type {MutationObserver|null}
+ */
+let _officialEventDomObserver = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let _officialEventDomObserverTimer = null;
+let _officialEventDomObserverInstalledForLid = '';
+function ensureOfficialEventDomObserver() {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  if (_officialEventDomObserverInstalledForLid === lid && _officialEventDomObserver) return;
+  if (_officialEventDomObserver) {
+    try { _officialEventDomObserver.disconnect(); } catch { /* no-op */ }
+    _officialEventDomObserver = null;
+  }
+  _officialEventDomObserverInstalledForLid = lid;
+  if (typeof MutationObserver !== 'function') return;
+  if (!document.body) return;
+  const RELEVANT = '.owner-name, .contribution-ranking-list, .point-field, .ranker, .rank-num, .gift-history-list, .gift-history-list .item';
+  const trigger = () => {
+    if (_officialEventDomObserverTimer) clearTimeout(_officialEventDomObserverTimer);
+    _officialEventDomObserverTimer = setTimeout(() => {
+      void persistOfficialEventDomBundleNow();
+    }, 200);
+  };
+  _officialEventDomObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      // 追加ノードに関連要素があれば即発火
+      for (const node of m.addedNodes) {
+        if (!(node instanceof HTMLElement)) continue;
+        try {
+          if (node.matches && node.matches(RELEVANT)) {
+            trigger();
+            return;
+          }
+          if (node.querySelector && node.querySelector(RELEVANT)) {
+            trigger();
+            return;
+          }
+        } catch { /* no-op */ }
+      }
+      // テキスト変化も拾う（rank-num の数値更新など）
+      if (
+        m.type === 'characterData' &&
+        m.target?.parentElement instanceof HTMLElement
+      ) {
+        try {
+          if (m.target.parentElement.closest(RELEVANT)) {
+            trigger();
+            return;
+          }
+        } catch { /* no-op */ }
+      }
+    }
+  });
+  try {
+    _officialEventDomObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  } catch { /* no-op */ }
+}
+
 async function persistOfficialEventDomBundleNow() {
   if (!hasExtensionContext()) return;
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) return;
+  ensureOfficialEventDomObserver();
   let fresh = collectOfficialEventDomBundle(document, { nowMs: Date.now() });
   // バナーが DOM に居ないとき（ギフトサイドバー閉時の通常状態）は audition embed
   // を直接 fetch してみる。同じ liveId につき 1 度だけ。
@@ -7737,8 +7878,10 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     return;
   }
 
-  // 3. ステルス CSS：サイドバーを画面外（left:-200vw）に逃がして表示せず、ただし
-  //    Vue がマウントを skip しないよう visibility は visible のまま保つ。
+  // 3. ステルス CSS：opacity + pointer-events で見えなくする。
+  //    画面外に飛ばすと Vue の IntersectionObserver が「見えてない」と判定して
+  //    バナーをマウントしないため、bounding box は通常位置のまま透明にする。
+  //    transform / position は触らないので Vue が viewport 内と認識→マウント実行。
   const styleEl = document.createElement('style');
   styleEl.id = 'nls-stealth-gift-sidebar';
   styleEl.textContent = `
@@ -7752,10 +7895,9 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     [class*="program-gift-richview"],
     [class*="balloon"][data-has-reload-button],
     .balloon[data-has-reload-button] {
-      position: fixed !important;
-      left: -200vw !important;
-      top: 0 !important;
+      opacity: 0 !important;
       pointer-events: none !important;
+      user-select: none !important;
     }
   `;
   try {
@@ -7770,7 +7912,7 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     setAutoOpenStatus('opening');
     dispatchSyntheticActivation(giftBtn);
     // 5. Vue のマウント＋XHR 完了を待つ（最大 2 秒、500ms ごとに DOM ヒットを確認）
-    let scraped = false;
+    let scrapedBanner = false;
     for (let i = 0; i < 4; i++) {
       await new Promise((r) => setTimeout(r, 500));
       const banner = (() => {
@@ -7781,22 +7923,63 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
         } catch { /* no-op */ }
         return false;
       })();
-      const ranking = (() => {
-        try {
-          return !!document.querySelector('.contribution-ranking-list .ranker');
-        } catch { return false; }
-      })();
-      if (banner || ranking) {
+      if (banner) {
         await persistOfficialEventDomBundleNow();
-        scraped = true;
-        setAutoOpenStatus(`scraped-tick-${i + 1}`);
+        scrapedBanner = true;
+        setAutoOpenStatus(`scraped-banner-tick-${i + 1}`);
         break;
       }
     }
-    if (!scraped) {
-      // バナー / ランキングが現れなかった → 一応 programStats 等は取れるかもしれないので scrape
+    // 6. ランキングタブを探してクリック（貢献度ランキングのマウントを誘発）。
+    //    niconico のギフトサイドバーは「番組ギフト / マイギフト / 履歴 / ランキング」の
+    //    4 タブで、ランキングタブを開かないと .contribution-ranking-list が DOM に
+    //    出てこない。バナーがマウント済みであろうこのタイミングで切り替える。
+    /** @type {HTMLElement|null} */
+    let rankTabBtn = null;
+    try {
+      // role="tab" や button のなかから「ランキング」テキストを持つ要素を探す
+      const candidates = document.querySelectorAll(
+        '[role="tab"], button, a[role="button"]'
+      );
+      for (const el of candidates) {
+        if (!(el instanceof HTMLElement)) continue;
+        const t = String(el.textContent || '').trim();
+        if (t === 'ランキング' || t === '貢献度ランキング') {
+          rankTabBtn = el;
+          break;
+        }
+      }
+    } catch { /* no-op */ }
+    let scrapedRanking = false;
+    if (rankTabBtn) {
+      dispatchSyntheticActivation(rankTabBtn);
+      // ランキングは XHR で取得→Vue マウントなので、バナーより少し時間がかかる。
+      // 最大 3 秒、500ms ごとに polling。
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const hasRank = (() => {
+          try {
+            return !!document.querySelector('.contribution-ranking-list .ranker');
+          } catch { return false; }
+        })();
+        if (hasRank) {
+          await persistOfficialEventDomBundleNow();
+          scrapedRanking = true;
+          setAutoOpenStatus(
+            scrapedBanner
+              ? `scraped-banner-and-ranking-tick-${i + 1}`
+              : `scraped-ranking-only-tick-${i + 1}`
+          );
+          break;
+        }
+      }
+    }
+    if (!scrapedBanner && !scrapedRanking) {
+      // どちらも現れなかった → programStats 等だけでも取って終わる
       await persistOfficialEventDomBundleNow();
-      setAutoOpenStatus('opened-but-no-banner');
+      setAutoOpenStatus(rankTabBtn ? 'opened-no-banner-no-ranking' : 'opened-but-no-banner');
+    } else if (scrapedBanner && !scrapedRanking) {
+      setAutoOpenStatus(rankTabBtn ? 'banner-only-no-ranking' : 'banner-only-no-rank-tab');
     }
     // 6. 閉じる：close ボタンが居れば優先、無ければギフトボタンを再クリックでトグル
     /** @type {HTMLElement|null} */

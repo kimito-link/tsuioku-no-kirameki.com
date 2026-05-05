@@ -4,7 +4,9 @@ import {
   scrapeOfficialEventBannerFromDom,
   scrapeOfficialEventBalloonFromDom,
   scrapeContributionRankingFromDom,
-  scrapeProgramStatisticsMenuFromDom
+  scrapeProgramStatisticsMenuFromDom,
+  scrapeGiftHistoryFromDom,
+  aggregateGiftHistoryByUser
 } from './officialEventBannerDom.js';
 
 describe('scrapeOfficialEventBannerFromDom', () => {
@@ -288,5 +290,128 @@ describe('scrapeProgramStatisticsMenuFromDom', () => {
   it('該当 ul が無ければ null', () => {
     document.body.innerHTML = '<div></div>';
     expect(scrapeProgramStatisticsMenuFromDom(document)).toBeNull();
+  });
+});
+
+describe('scrapeGiftHistoryFromDom', () => {
+  it('実 niconico DOM (履歴タブ) から個別ギフト履歴を取り出す', () => {
+    document.body.innerHTML = `
+      <ul class="gift-history-list">
+        <li class="item">
+          <img class="thumbnail" src="https://x.cdn/stamp.png" alt="８８８８">
+          <p class="time">19:58</p>
+          <p class="text">
+            <span class="advertiser-name">くろかな <small class="honorific">さん</small></span>
+          </p>
+          <p class="point">30 <small class="point-unit">pt</small></p>
+        </li>
+        <li class="item">
+          <img class="thumbnail" src="https://x.cdn/wakotsu.png" alt="わこつ茶">
+          <p class="time">11:13</p>
+          <p class="text">
+            <span class="advertiser-name">名無し <small class="honorific">さん</small></span>
+          </p>
+          <p class="point">300 <small class="point-unit">pt</small></p>
+        </li>
+        <li class="item">
+          <img class="thumbnail" src="https://x.cdn/wakotsu.png" alt="わこつ茶">
+          <p class="time">07:39</p>
+          <p class="text">
+            <span class="advertiser-name">ケロ彦 <small class="honorific">さん</small></span>
+          </p>
+          <p class="point">50 <small class="point-unit">pt</small></p>
+        </li>
+      </ul>`;
+    const r = scrapeGiftHistoryFromDom(document);
+    expect(r).not.toBeNull();
+    expect(r.length).toBe(3);
+    expect(r[0]).toMatchObject({
+      time: '19:58',
+      advertiserName: 'くろかな',
+      isAnonymous: false,
+      point: 30,
+      giftName: '８８８８'
+    });
+    expect(r[1]).toMatchObject({
+      advertiserName: '名無し',
+      isAnonymous: true,
+      point: 300
+    });
+    expect(r[2].advertiserName).toBe('ケロ彦');
+  });
+
+  it('「さん」honorific を除いた名前だけ取り出す', () => {
+    document.body.innerHTML = `
+      <ul class="gift-history-list">
+        <li class="item">
+          <p class="text">
+            <span class="advertiser-name">つるちゃ͜ん <small class="honorific">さん</small></span>
+          </p>
+          <p class="point">100 <small class="point-unit">pt</small></p>
+        </li>
+      </ul>`;
+    const r = scrapeGiftHistoryFromDom(document);
+    expect(r[0].advertiserName).toBe('つるちゃ͜ん');
+    expect(r[0].advertiserName).not.toContain('さん');
+  });
+
+  it('ul が無ければ null', () => {
+    document.body.innerHTML = '<div></div>';
+    expect(scrapeGiftHistoryFromDom(document)).toBeNull();
+  });
+
+  it('数値が無いエントリはスキップ', () => {
+    document.body.innerHTML = `
+      <ul class="gift-history-list">
+        <li class="item">
+          <p class="text"><span class="advertiser-name">x <small class="honorific">さん</small></span></p>
+          <p class="point">--</p>
+        </li>
+        <li class="item">
+          <p class="text"><span class="advertiser-name">y <small class="honorific">さん</small></span></p>
+          <p class="point">42 pt</p>
+        </li>
+      </ul>`;
+    const r = scrapeGiftHistoryFromDom(document);
+    expect(r.length).toBe(1);
+    expect(r[0].advertiserName).toBe('y');
+    expect(r[0].point).toBe(42);
+  });
+});
+
+describe('aggregateGiftHistoryByUser', () => {
+  it('同一ユーザーの複数ギフトを totalPoints で合算', () => {
+    const result = aggregateGiftHistoryByUser([
+      { time: '00:09', advertiserName: 'つるちゃ͜ん', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
+      { time: '00:12', advertiserName: 'つるちゃ͜ん', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
+      { time: '00:15', advertiserName: 'つるちゃ͜ん', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
+      { time: '11:13', advertiserName: '名無し', isAnonymous: true, point: 300, thumbnailUrl: '', giftName: '' },
+      { time: '02:57', advertiserName: '名無し', isAnonymous: true, point: 50, thumbnailUrl: '', giftName: '' }
+    ]);
+    expect(result.length).toBe(2);
+    expect(result[0]).toMatchObject({ name: '名無し', totalPoints: 350, giftCount: 2 });
+    expect(result[1]).toMatchObject({ name: 'つるちゃ͜ん', totalPoints: 300, giftCount: 3 });
+  });
+
+  it('totalPoints 降順で並ぶ', () => {
+    const result = aggregateGiftHistoryByUser([
+      { time: '01:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
+      { time: '02:00', advertiserName: 'B', isAnonymous: false, point: 500, thumbnailUrl: '', giftName: '' },
+      { time: '03:00', advertiserName: 'C', isAnonymous: false, point: 300, thumbnailUrl: '', giftName: '' }
+    ]);
+    expect(result.map((r) => r.name)).toEqual(['B', 'C', 'A']);
+  });
+
+  it('lastTime は最新（数値比較できる範囲で）', () => {
+    const result = aggregateGiftHistoryByUser([
+      { time: '01:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
+      { time: '05:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
+      { time: '03:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' }
+    ]);
+    expect(result[0].lastTime).toBe('05:00');
+  });
+
+  it('空配列なら空', () => {
+    expect(aggregateGiftHistoryByUser([])).toEqual([]);
   });
 });

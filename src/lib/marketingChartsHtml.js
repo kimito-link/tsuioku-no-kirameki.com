@@ -6,11 +6,12 @@
 import { escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { MKT_ADVISOR_AVATAR_DATA_URI } from './marketingHtmlAdvisorAvatars.js';
+import { yukkuriBroadcastSummaryEmbeddedCss } from './yukkuriBroadcastSummary.js';
 import {
-  buildYukkuriBroadcastSummary,
-  renderYukkuriBroadcastSummaryHtml,
-  yukkuriBroadcastSummaryEmbeddedCss
-} from './yukkuriBroadcastSummary.js';
+  buildMangaBroadcastPanels,
+  renderMangaBroadcastPanelsHtml,
+  mangaBroadcastSummaryEmbeddedCss
+} from './mangaBroadcastSummary.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
@@ -2052,8 +2053,9 @@ ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
   const tocItems = allTocItems.filter((t) => bodyHtml.includes(`id="${t.id}"`));
   const finalBody = bodyHtml.replace('__NL_TOC_PLACEHOLDER__', sectionToc(tocItems));
 
-  // ゆっくり解説風の「番組のおさらい」セクション。bundle が無い場合は最低限の挨拶だけ出す。
-  const yukkuriLines = buildYukkuriBroadcastSummary({
+  // 漫画コマ風の「番組のおさらい」セクション。bundle が無い場合も opening / closing
+  // の最低 2 コマは出る設計。レスポンシブ：clamp + container query で全幅に追従。
+  const mangaPanels = buildMangaBroadcastPanels({
     bundle: opts?.officialEventDomBundle ?? null,
     broadcastTitle: typeof opts?.broadcastTitle === 'string' ? opts.broadcastTitle : '',
     broadcasterName: typeof opts?.broadcasterName === 'string' ? opts.broadcasterName : '',
@@ -2061,8 +2063,8 @@ ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
       typeof opts?.recordedCommentCount === 'number' ? opts.recordedCommentCount : undefined,
     streamAgeMin: typeof opts?.streamAgeMin === 'number' ? opts.streamAgeMin : undefined
   });
-  const yukkuriHtml = renderYukkuriBroadcastSummaryHtml(yukkuriLines, {
-    heading: '今回の放送のおさらい',
+  const yukkuriHtml = renderMangaBroadcastPanelsHtml(mangaPanels, {
+    heading: '今回の放送のおさらい・漫画版',
     imageDataUrlMap:
       opts?.yukkuriImageDataUrlMap && typeof opts.yukkuriImageDataUrlMap === 'object'
         ? opts.yukkuriImageDataUrlMap
@@ -2075,7 +2077,7 @@ ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>配信マーケ分析 — ${escapeHtml(r.liveId)}</title>
-<style>${CSS_BODY}${yukkuriBroadcastSummaryEmbeddedCss()}</style>
+<style>${CSS_BODY}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
 </head>
 <body>
 <header class="mkt-header">

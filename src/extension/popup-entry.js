@@ -12,6 +12,7 @@ import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFrom
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
 import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
 import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
+import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -234,11 +235,14 @@ import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { buildReportMemoPayload } from '../lib/supportGrowthInsights.js';
 import { buildMarketingDashboardHtml } from '../lib/marketingChartsHtml.js';
 import {
-  buildYukkuriBroadcastSummary,
-  renderYukkuriBroadcastSummaryHtml,
   yukkuriBroadcastSummaryEmbeddedCss,
   listYukkuriCharacterImagePaths
 } from '../lib/yukkuriBroadcastSummary.js';
+import {
+  buildMangaBroadcastPanels,
+  renderMangaBroadcastPanelsHtml,
+  mangaBroadcastSummaryEmbeddedCss
+} from '../lib/mangaBroadcastSummary.js';
 import {
   buildDevMonitorDlChartsHtml,
   commentTypeDistribution,
@@ -4300,8 +4304,6 @@ function paintOfficialEventBannerCard(snapshot) {
   /** @param {unknown} v */
   const asNum = (v) =>
     typeof v === 'number' && Number.isFinite(v) ? v : null;
-  /** @param {unknown} a @param {unknown} b */
-  const pickNum = (a, b) => asNum(a) ?? asNum(b);
   /** @param {unknown[]} xs */
   const pickStr = (...xs) => {
     for (const x of xs) {
@@ -4311,47 +4313,66 @@ function paintOfficialEventBannerCard(snapshot) {
     return '';
   };
 
+  // 順位の出し分け：
+  //   公式 DOM 由来の banner (bundle.eventBanner) があれば → イベント順位として表示
+  //   無くても NDGR field 6 が来ていれば → 「ニコ生順位」として表示（ラベルで明示）
+  //   両方無ければカード自体を隠す
   const broadcasterName = pickStr(snap?.broadcasterName);
-  const ownerText = pickStr(banner?.ownerText, broadcasterName ? `${broadcasterName}さんが参加しています！` : '');
-  const title = pickStr(banner?.title);
-  const rank = pickNum(banner?.rank, snap?.officialNicoEventRankNdgr);
-  const score = pickNum(
-    balloon?.eventTotalScore,
-    pickNum(banner?.score, snap?.officialEventGiftScoreNdgr)
-  );
-  const iconUrl = pickStr(banner?.iconUrl);
-  const href = pickStr(banner?.href);
-  const liveIdLocal = pickStr(snap?.liveId).toLowerCase();
-  const fallbackHref = liveIdLocal
-    ? 'https://audition.nicovideo.jp/embedded/richview/live?content_id=' +
-      encodeURIComponent(liveIdLocal) +
-      '&frontend_id=9&frontend_version=644.0.0'
-    : '';
+  const ndgrRank = asNum(snap?.officialNicoEventRankNdgr);
+  const isEventBanner = banner != null && asNum(banner.rank) != null;
+  const rank = isEventBanner ? asNum(banner?.rank) : ndgrRank;
+  const score = isEventBanner
+    ? (asNum(balloon?.eventTotalScore) ?? asNum(banner?.score))
+    : null;
+  const title = isEventBanner ? pickStr(banner?.title) : '';
+  const iconUrl = isEventBanner ? pickStr(banner?.iconUrl) : '';
+  const href = isEventBanner ? pickStr(banner?.href) : '';
+  const ownerText = isEventBanner
+    ? pickStr(
+        banner?.ownerText,
+        broadcasterName ? `${broadcasterName}さんが参加しています！` : ''
+      )
+    : (broadcasterName ? `${broadcasterName}さんの現在順位` : '');
+  const rankLabel = isEventBanner ? 'イベント現在' : 'ニコ生現在';
 
-  // 何の手がかりも無いなら隠す（バナー無視）。rank だけは NDGR から拾えるので
-  // rank があるか、bundle.eventBanner が居るときだけ表示する。
-  const haveSomething = banner != null || rank != null || title || score != null;
-  if (!haveSomething) {
+  if (rank == null && score == null && !title) {
     hide();
     return;
   }
 
   card.hidden = false;
   card.removeAttribute('aria-hidden');
-  if (href || fallbackHref) card.href = href || fallbackHref;
+  if (href) card.href = href;
+  else card.removeAttribute('href');
 
   if (ownerEl) {
-    ownerEl.textContent = ownerText || '配信者がイベントに参加中';
+    ownerEl.textContent = ownerText;
   }
   if (titleEl) {
-    titleEl.textContent = title || 'イベント名は配信終了後または公式サイドバーで取得されます';
-    titleEl.title = title || '';
+    titleEl.textContent = title;
+    titleEl.title = title;
+    titleEl.hidden = !title;
   }
   if (rankEl) {
-    rankEl.textContent = rank != null ? `${rank} 位` : '—';
+    if (rank != null) {
+      rankEl.textContent = `${rankLabel} ${rank} 位`;
+      rankEl.hidden = false;
+      // 「イベント」と「ニコ生」でラベル色味を分けるため class を切替
+      rankEl.classList.toggle('nl-official-event-banner-card__rank--event', isEventBanner);
+      rankEl.classList.toggle('nl-official-event-banner-card__rank--niconama', !isEventBanner);
+    } else {
+      rankEl.textContent = '';
+      rankEl.hidden = true;
+    }
   }
   if (scoreEl) {
-    scoreEl.textContent = score != null ? score.toLocaleString('ja-JP') : '';
+    if (score != null) {
+      scoreEl.textContent = score.toLocaleString('ja-JP');
+      scoreEl.hidden = false;
+    } else {
+      scoreEl.textContent = '';
+      scoreEl.hidden = true;
+    }
   }
   if (thumbEl) {
     if (iconUrl && /^https?:\/\//.test(iconUrl)) {
@@ -5114,6 +5135,9 @@ async function refreshGiftRankStrip(liveId) {
   const ranking = Array.isArray(bundle?.contributionRanking)
     ? bundle.contributionRanking
     : null;
+  const giftHistory = Array.isArray(bundle?.giftHistory)
+    ? bundle.giftHistory
+    : null;
   if (ranking && ranking.length > 0) {
     rooms = ranking.map((r, i) => ({
       userKey: r.isAnonymous ? `__anon_contrib_${i}` : `__contrib_${i}_${String(r.name || '').slice(0, 12)}`,
@@ -5124,6 +5148,19 @@ async function refreshGiftRankStrip(liveId) {
     noteText = '公式の貢献度ランキング順（niconico の表示そのまま）';
     unitSuffix = '貢';
     ariaLabel = '公式の貢献度ランキング';
+  } else if (giftHistory && giftHistory.length > 0) {
+    // 2. ランキングタブを開いていないが履歴タブを開いている → 個別ギフトを
+    //    ユーザー単位でアグリゲートして「貢献度ランキング相当」を作る。
+    const aggregated = aggregateGiftHistoryByUser(giftHistory);
+    rooms = aggregated.map((a, i) => ({
+      userKey: a.isAnonymous ? `__anon_gift_${i}` : `__gift_${i}_${String(a.name || '').slice(0, 12)}`,
+      nickname: String(a.name || ''),
+      count: Number(a.totalPoints) || 0,
+      avatarUrl: ''
+    }));
+    noteText = 'ギフト履歴をユーザー別に集計（pt 順）';
+    unitSuffix = 'pt';
+    ariaLabel = 'ギフト履歴のユーザー別集計';
   } else {
     // 2. フォールバック: NDGR で観測したギフト event の集計
     const key = giftUsersStorageKey(lid);
@@ -8287,7 +8324,8 @@ async function buildHtmlReportDocument(
   } catch {
     eventDomBundleForReport = null;
   }
-  const yukkuriReportLines = buildYukkuriBroadcastSummary({
+  // 漫画コマ風の「番組のおさらい」セクション。レスポンシブ（clamp + container query）。
+  const mangaReportPanels = buildMangaBroadcastPanels({
     bundle: eventDomBundleForReport,
     broadcastTitle: String(snapshot?.broadcastTitle || snapshot?.title || ''),
     broadcasterName: String(snapshot?.broadcasterName || ''),
@@ -8300,11 +8338,12 @@ async function buildHtmlReportDocument(
   // HTML レポートはダウンロード後にローカルで開かれるため、相対 path の <img> は
   // 解決できない。キャラ画像を data URL に焼き込んで埋める。
   const yukkuriReportImageMap = await buildYukkuriImageDataUrlMap();
-  const yukkuriReportHtml = renderYukkuriBroadcastSummaryHtml(
-    yukkuriReportLines,
-    { heading: '今回の放送のおさらい', imageDataUrlMap: yukkuriReportImageMap }
-  );
-  const yukkuriReportCss = yukkuriBroadcastSummaryEmbeddedCss();
+  const yukkuriReportHtml = renderMangaBroadcastPanelsHtml(mangaReportPanels, {
+    heading: '今回の放送のおさらい・漫画版',
+    imageDataUrlMap: yukkuriReportImageMap
+  });
+  const yukkuriReportCss =
+    yukkuriBroadcastSummaryEmbeddedCss() + mangaBroadcastSummaryEmbeddedCss();
 
   // 0.1.17 (R): 配信者本人 userId をスナップショットから取得し、応援コメント集計
   // から除外。HTML レポートのユーザー別テーブル / サムネ付き一覧 / 全コメント一覧
@@ -9550,6 +9589,47 @@ const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
 /** 初回 refresh が完了するまではコアレスをバイパスし即時反映する */
 let initialRefreshDone = false;
 
+/**
+ * popup を開いた瞬間の白／空／ガタガタを隠していたロードシェードを撤去する。
+ * 初回 refresh の `.finally()` 直後に 1 度だけ呼ばれる。冪等。
+ *
+ * 最低 800ms はシェードを見せる：popup 起動が高速だと一瞬で消えてしまい
+ * 「こん太が居たのが分からない」になるため、minimum-visible タイマで保証。
+ */
+const NL_INIT_SHADE_MIN_VISIBLE_MS = 800;
+const NL_INIT_SHADE_BORN_AT = (() => {
+  try {
+    return typeof performance !== 'undefined' && performance.now
+      ? performance.now()
+      : Date.now();
+  } catch {
+    return Date.now();
+  }
+})();
+function dismissInitialLoadShade() {
+  const shade = document.getElementById('nlInitialLoadShade');
+  if (!(shade instanceof HTMLElement)) return;
+  if (shade.classList.contains('nl-init-shade--done')) return;
+  const now =
+    typeof performance !== 'undefined' && performance.now
+      ? performance.now()
+      : Date.now();
+  const elapsed = now - NL_INIT_SHADE_BORN_AT;
+  const wait = Math.max(0, NL_INIT_SHADE_MIN_VISIBLE_MS - elapsed);
+  setTimeout(() => {
+    if (shade.classList.contains('nl-init-shade--done')) return;
+    shade.classList.add('nl-init-shade--done');
+    // CSS transition (220ms) 後に DOM から外す
+    setTimeout(() => {
+      try {
+        shade.remove();
+      } catch {
+        // no-op
+      }
+    }, 260);
+  }, wait);
+}
+
 /** @param {string} key */
 function isHighFrequencyCommentRelatedStorageKey(key) {
   const k = String(key || '');
@@ -9692,6 +9772,11 @@ function initPopup() {
       .finally(() => {
         const wasInitialRefresh = !initialRefreshDone;
         initialRefreshDone = true;
+        // 初回 refresh が終わった瞬間、ロードシェードをフェードアウト。
+        // 「白→空→ガタガタ」の見え方を「シェード→単一フェード」に圧縮する。
+        if (wasInitialRefresh) {
+          requestAnimationFrame(() => dismissInitialLoadShade());
+        }
         requestAnimationFrame(() => {
           applyResponsivePopupLayout();
           if (INLINE_MODE) {
@@ -11478,6 +11563,12 @@ if (document.readyState === 'loading') {
 } else {
   initPopup();
 }
+
+// 安全網：万が一 initPopup が throw して initialRefreshDone が立たなくても、
+// 最大 5 秒でロードシェードを撤去する（ユーザーが永遠に「読み込み中…」を見続けるのを防ぐ）。
+setTimeout(() => {
+  dismissInitialLoadShade();
+}, 5000);
 
 // 最終安全網: initPopup や refresh が throw / 中断しても、window load 後に
 // 800ms（CSS の auto-reveal 後）で必ず cloak を外す。JS state に依らない

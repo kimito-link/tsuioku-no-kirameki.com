@@ -37,6 +37,56 @@
         box-sizing: border-box;
       }
 
+      /* 初回ロードシェード：popup を開いた瞬間の hidden 要素チラ見え／要素ガタガタ
+         を全部隠す。JS の初回 render が終わったら .nl-init-shade--done を付けて
+         200ms フェードアウト→display:none 化。
+         JS が完全に止まっても 15s で CSS だけで fade out する二重防衛。 */
+      .nl-init-shade {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+        background: linear-gradient(180deg, #f6fff8, #eef9f3);
+        transition: opacity 220ms ease-out;
+        animation: nl-init-shade-css-failsafe 15s ease-out forwards;
+      }
+      .nl-init-shade__face {
+        width: clamp(56px, 14vw, 72px);
+        height: clamp(56px, 14vw, 72px);
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #1f2937;
+        box-shadow: 2px 2px 0 #1f2937;
+        animation: nl-init-shade-bob 1.2s ease-in-out infinite;
+      }
+      .nl-init-shade__msg {
+        font-size: clamp(12px, 3vw, 14px);
+        font-weight: 700;
+        color: #2a6f4d;
+        letter-spacing: 0.06em;
+      }
+      .nl-init-shade--done {
+        opacity: 0;
+        pointer-events: none;
+        animation: none;
+      }
+      @keyframes nl-init-shade-bob {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-6px); }
+      }
+      @keyframes nl-init-shade-css-failsafe {
+        0%, 93% { opacity: 1; visibility: visible; pointer-events: auto; }
+        100% { opacity: 0; visibility: hidden; pointer-events: none; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-init-shade__face { animation: none; }
+        .nl-init-shade { transition: none; }
+      }
+
       /* 0.1.11 (A1 親バグ根治): すべての input / textarea で placeholder の色を
          フレーム由来の `--nl-placeholder` に統一。個別ルールで上書きしている箇所
          （.nl-comment-compose textarea / .nl-frame-share textarea）は明示優先。
@@ -2270,14 +2320,13 @@
         font-size: 13px;
       }
       .nl-official-event-banner-card__rank {
-        color: #1e7c44;
         font-weight: 700;
       }
-      .nl-official-event-banner-card__rank::before {
-        content: '現在 ';
-        color: #6b7280;
-        font-weight: 500;
-        font-size: 11px;
+      .nl-official-event-banner-card__rank--event {
+        color: #1e7c44;
+      }
+      .nl-official-event-banner-card__rank--niconama {
+        color: #1e3a8a;
       }
       .nl-official-event-banner-card__score {
         color: #1f2937;
@@ -6580,6 +6629,21 @@
     </style>
   </head>
   <body>
+    <!--
+      初回ロード中のシェード。Chrome が popup.html を開いた瞬間に、
+      hidden 要素の混じった raw な popup がチラ見えしないよう全画面を覆う。
+      JS の初回 render 完了時に nlInitialLoadShade.removeAttribute('hidden')
+      を反転して fade-out。詳細 popup-entry.js: dismissInitialLoadShade()。
+    -->
+    <div id="nlInitialLoadShade" class="nl-init-shade" aria-hidden="true">
+      <img
+        class="nl-init-shade__face"
+        src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-blink-mouth-open.png"
+        alt=""
+        decoding="async"
+      />
+      <div class="nl-init-shade__msg">読み込み中…</div>
+    </div>
     <header class="nl-header">
       <div class="nl-header-brand">
         <img

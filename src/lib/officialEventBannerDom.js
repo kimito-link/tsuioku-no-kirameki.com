@@ -402,6 +402,153 @@ export function scrapeProgramStatisticsMenuFromDom(root) {
 }
 
 /**
+ * niconico ギフトサイドバーの「履歴」タブから個別ギフト履歴を掬う。
+ * 貢献度ランキング（.contribution-ranking-list）はランキングタブを開かないと
+ * DOM に出ないが、履歴タブは多くの場合デフォルト or ユーザーがすぐ開く位置にあるので、
+ * ここから集約することで「貢献度ランキング相当」のデータが取れる。
+ *
+ * 実 DOM 構造（2026-05 時点で確認）:
+ *
+ *   <ul class="gift-history-list">
+ *     <li class="item">
+ *       <img class="thumbnail" src="..." alt="ギフト名">
+ *       <p class="time">19:58</p>
+ *       <p class="text">
+ *         <span class="advertiser-name">くろかな <small class="honorific">さん</small></span>
+ *       </p>
+ *       <p class="point">30 <small class="point-unit">pt</small></p>
+ *     </li>
+ *   </ul>
+ *
+ * 「名無し」は匿名（不特定多数を区別不能）なので isAnonymous フラグで識別。
+ *
+ * @typedef {{
+ *   time: string,
+ *   advertiserName: string,
+ *   isAnonymous: boolean,
+ *   point: number,
+ *   thumbnailUrl: string,
+ *   giftName: string
+ * }} GiftHistoryEntry
+ */
+
+/**
+ * @param {Document|Element} root
+ * @returns {GiftHistoryEntry[]|null}
+ */
+export function scrapeGiftHistoryFromDom(root) {
+  if (!root) return null;
+  /** @type {NodeListOf<Element>|Element[]} */
+  let items;
+  try {
+    items =
+      /** @type {any} */ (root).querySelectorAll?.('.gift-history-list .item') ||
+      [];
+  } catch {
+    return null;
+  }
+  if (!items || items.length === 0) return null;
+  /** @type {GiftHistoryEntry[]} */
+  const out = [];
+  for (const li of /** @type {Iterable<Element>} */ (items)) {
+    if (!(li instanceof HTMLElement)) continue;
+    const thumb = li.querySelector('.thumbnail');
+    const timeEl = li.querySelector('.time');
+    const nameEl = li.querySelector('.advertiser-name');
+    const pointEl = li.querySelector('.point');
+    if (!(nameEl instanceof HTMLElement) || !(pointEl instanceof HTMLElement)) {
+      continue;
+    }
+    // 名前から honorific（「さん」）を除いたテキストだけ取る
+    const nameClone = nameEl.cloneNode(true);
+    if (nameClone instanceof HTMLElement) {
+      const honorific = nameClone.querySelector('.honorific');
+      if (honorific) honorific.remove();
+    }
+    const name = String(
+      nameClone instanceof HTMLElement ? nameClone.textContent : ''
+    )
+      .trim();
+    if (!name) continue;
+    // ポイントから unit（「pt」）を除いた数字だけ取る
+    const pointClone = pointEl.cloneNode(true);
+    if (pointClone instanceof HTMLElement) {
+      const unit = pointClone.querySelector('.point-unit');
+      if (unit) unit.remove();
+    }
+    const pointText = String(
+      pointClone instanceof HTMLElement ? pointClone.textContent : ''
+    ).replace(/[^\d]/g, '');
+    if (!/^\d+$/.test(pointText)) continue;
+    const point = parseInt(pointText, 10);
+    const time = String(timeEl?.textContent || '').trim();
+    const thumbnailUrl =
+      thumb instanceof HTMLImageElement ? String(thumb.src || '') : '';
+    const giftName =
+      thumb instanceof HTMLImageElement ? String(thumb.alt || '').trim() : '';
+    const isAnonymous = name === '名無し';
+    out.push({
+      time,
+      advertiserName: name,
+      isAnonymous,
+      point,
+      thumbnailUrl,
+      giftName
+    });
+  }
+  if (out.length === 0) return null;
+  return out;
+}
+
+/**
+ * gift-history を「ユーザー名でアグリゲート」して貢献度ランキング相当に整形する。
+ * 名無しは個々を区別できないので 1 つのバケットに統合する（順位上は妥当な扱い）。
+ *
+ * @typedef {{
+ *   name: string,
+ *   isAnonymous: boolean,
+ *   totalPoints: number,
+ *   giftCount: number,
+ *   lastTime: string
+ * }} GiftContributorAggregated
+ *
+ * @param {GiftHistoryEntry[]} history
+ * @returns {GiftContributorAggregated[]} totalPoints 降順
+ */
+export function aggregateGiftHistoryByUser(history) {
+  if (!Array.isArray(history) || history.length === 0) return [];
+  /** @type {Map<string, GiftContributorAggregated>} */
+  const map = new Map();
+  for (const h of history) {
+    if (!h || typeof h !== 'object') continue;
+    const name = String(h.advertiserName || '').trim();
+    if (!name) continue;
+    const point = Number(h.point);
+    if (!Number.isFinite(point) || point < 0) continue;
+    const time = String(h.time || '').trim();
+    let agg = map.get(name);
+    if (!agg) {
+      agg = {
+        name,
+        isAnonymous: !!h.isAnonymous || name === '名無し',
+        totalPoints: 0,
+        giftCount: 0,
+        lastTime: ''
+      };
+      map.set(name, agg);
+    }
+    agg.totalPoints += point;
+    agg.giftCount += 1;
+    if (time && (!agg.lastTime || time > agg.lastTime)) agg.lastTime = time;
+  }
+  return [...map.values()].sort((a, b) => {
+    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    if (b.giftCount !== a.giftCount) return b.giftCount - a.giftCount;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/**
  * 【メモ・未実装】ギフト購入ボタン (.payment-text を含む `<button>`)
  *
  * 例:

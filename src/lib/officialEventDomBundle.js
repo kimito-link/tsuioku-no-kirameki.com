@@ -9,7 +9,8 @@ import {
   scrapeOfficialEventBannerFromDom,
   scrapeOfficialEventBalloonFromDom,
   scrapeContributionRankingFromDom,
-  scrapeProgramStatisticsMenuFromDom
+  scrapeProgramStatisticsMenuFromDom,
+  scrapeGiftHistoryFromDom
 } from './officialEventBannerDom.js';
 
 /**
@@ -48,7 +49,8 @@ export async function fetchOfficialEventBannerFromAuditionEmbed(liveId) {
  *   eventBanner: ReturnType<typeof scrapeOfficialEventBannerFromDom>,
  *   eventBalloon: ReturnType<typeof scrapeOfficialEventBalloonFromDom>,
  *   contributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
- *   programStats: ReturnType<typeof scrapeProgramStatisticsMenuFromDom>
+ *   programStats: ReturnType<typeof scrapeProgramStatisticsMenuFromDom>,
+ *   giftHistory: ReturnType<typeof scrapeGiftHistoryFromDom>
  * }} OfficialEventDomBundle
  */
 
@@ -69,7 +71,14 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
   const eventBalloon = scrapeOfficialEventBalloonFromDom(root);
   const contributionRanking = scrapeContributionRankingFromDom(root);
   const programStats = scrapeProgramStatisticsMenuFromDom(root);
-  if (!eventBanner && !eventBalloon && !contributionRanking && !programStats) {
+  const giftHistory = scrapeGiftHistoryFromDom(root);
+  if (
+    !eventBanner &&
+    !eventBalloon &&
+    !contributionRanking &&
+    !programStats &&
+    !giftHistory
+  ) {
     return null;
   }
   return {
@@ -77,7 +86,8 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
     eventBanner,
     eventBalloon,
     contributionRanking,
-    programStats
+    programStats,
+    giftHistory
   };
 }
 
@@ -98,6 +108,7 @@ export function mergeOfficialEventDomBundle(prev, next) {
     eventBanner: next.eventBanner || prev.eventBanner,
     eventBalloon: next.eventBalloon || prev.eventBalloon,
     contributionRanking: next.contributionRanking || prev.contributionRanking,
-    programStats: next.programStats || prev.programStats
+    programStats: next.programStats || prev.programStats,
+    giftHistory: next.giftHistory || prev.giftHistory
   };
 }
