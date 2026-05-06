@@ -8519,6 +8519,22 @@
         </div>
       </section>
 
+      <section class="section" id="snapshot-multi-tab-safety" aria-labelledby="snapshot-multi-tab-safety-heading" data-lp-feature="snapshot-multi-tab-safety">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="snapshot-multi-tab-safety-heading">複数タブで開いてもランキングが消えない（v0.1.195 で改善）</h2>
+            <p>
+              同じ配信を<strong>複数タブで同時に開く</strong>と、片方のタブで取れたランキングがもう片方のタブの観測で<strong>上書き消去される</strong>ことがありました。v0.1.195 で、保存前に他タブが書いた値を読みなおして<strong>3-way merge</strong>する仕組みに変更し、消えにくくしました。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>これまで（v0.1.194 以前）</strong> — 別タブの値を見ずに上書きする実装で、まれにランキング枠が空・「読み込み中」のままなどの症状が出ました。</p>
+            <p><strong>今いまできていること</strong> — 別タブが直前に書いた値も保持して、新しい観測値とまとめて保存します（ランキングが残る・並行運用が安定）。</p>
+            <p><strong>これから</strong> — タブごとの観測カウンタを並べて見られる「複数タブ状況スナップショット」を計画中です。</p>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="marketing-features" aria-labelledby="marketing-features-heading">
         <div class="shell">
           <div class="section-head fade">
