@@ -9,7 +9,10 @@ import { normalizeLv as normalizeLvCanonical } from '../shared/niconico/liveId.j
 import { pickStrongestAvatarUrlForUser } from './supportGrowthTileSrc.js';
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
 import { isAvatarUrlForUserId } from './avatarBroadcasterGuard.js';
-import { pickBetterInterceptNickname, pickGiftRankDisplayNickname } from './giftDisplayNickname.js';
+import {
+  pickBetterInterceptNickname,
+  pickGiftRankDisplayNicknameWithUidFallback
+} from './giftDisplayNickname.js';
 
 /**
  * @typedef {{
@@ -247,7 +250,15 @@ export function enrichUserLaneAggregatesWithProfileAndDisplay(
       /** @type {{ nickname?: unknown }} */ (map[uid])?.nickname ?? ''
     ).trim();
     const fromDisplay = bestNicknameFromEntries(uid);
-    const merged = pickGiftRankDisplayNickname(uid, stored, fromDisplay, intercept);
+    // 0.1.182: nickname が解決できないケース（avatarNicknameMatchDiag.avNoNick）で
+    // 匿名表示にせず、`u/<uid>` フォールバック表示を使う（v0.1.181 で追加した
+    // formatNicknameWithUidFallback 経由）。
+    const merged = pickGiftRankDisplayNicknameWithUidFallback(
+      uid,
+      stored,
+      fromDisplay,
+      intercept
+    );
     if (merged === stored) return agg;
     anyChange = true;
     return Object.freeze({

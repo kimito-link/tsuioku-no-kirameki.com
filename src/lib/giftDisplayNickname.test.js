@@ -39,6 +39,35 @@ describe('formatNicknameWithUidFallback', () => {
   });
 });
 
+// 0.1.182: pickGiftRankDisplayNickname の戻り値に対して uid fallback を適用
+import { pickGiftRankDisplayNicknameWithUidFallback } from './giftDisplayNickname.js';
+
+describe('pickGiftRankDisplayNicknameWithUidFallback', () => {
+  it('nickname が解決できればそのまま返す', () => {
+    expect(
+      pickGiftRankDisplayNicknameWithUidFallback('4814023', 'のえる', '', '')
+    ).toBe('のえる');
+  });
+
+  it('nickname がどのソースからも空なら u/<uid> 形式', () => {
+    expect(pickGiftRankDisplayNicknameWithUidFallback('4814023', '', '', '')).toBe(
+      'u/4814023'
+    );
+  });
+
+  it('intercept から nickname が来れば実 nickname を優先', () => {
+    expect(
+      pickGiftRankDisplayNicknameWithUidFallback('4814023', '', '', 'のえる')
+    ).toBe('のえる');
+  });
+
+  it('a:xxx 匿名形式の uid は空文字（既存の匿名表示を壊さない）', () => {
+    expect(
+      pickGiftRankDisplayNicknameWithUidFallback('a:9unQabc', '', '', '')
+    ).toBe('');
+  });
+});
+
 describe('isLikelyInternalNdgGiftOrCampaignLabel', () => {
   it('nicolive_ 接頭辞は内部ラベル', () => {
     expect(isLikelyInternalNdgGiftOrCampaignLabel('nicolive_audition_lightgreen')).toBe(

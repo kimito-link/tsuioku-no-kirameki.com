@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.182',
+    date: '2026-05-06',
+    summary: 'ユーザーレーン表示でuidフォールバックを適用',
+    items: Object.freeze([
+      'ユーザー一覧（応援レーン）で、ニックネームが解決できないユーザーが「u/4814023」のような ID 表示で出るようになりました（これまでは「匿名」表示でアイコンだけ見えていた事象を解消）',
+      'pickGiftRankDisplayNicknameWithUidFallback 関数を追加し、ユーザー候補の集約処理で順次切り替えました。ギフトクイック・ランクストリップなど他の表示は次バージョン以降で順次対応します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.181',
     date: '2026-05-06',
     summary: 'サムネあり匿名にuidフォールバック表示を導入',

@@ -193,6 +193,35 @@ export function pickGiftRankDisplayNickname(
 }
 
 /**
+ * 0.1.182: pickGiftRankDisplayNickname の戻り値で nickname が空のときに
+ * `formatNicknameWithUidFallback` を適用するラッパ。「サムネあり匿名」事象の
+ * 表示側対処。各 UI 表示箇所で順次切り替えていく予定。
+ *
+ * 既存の pickGiftRankDisplayNickname は変えない（戻り値が「空文字 = 匿名」を
+ * 期待する呼び出し側を壊さないため）。fallback が要る箇所だけこの関数を使う。
+ *
+ * @param {string} userId
+ * @param {string} storedNick
+ * @param {string} commentCachedNick
+ * @param {string} [interceptNick]
+ * @returns {string}
+ */
+export function pickGiftRankDisplayNicknameWithUidFallback(
+  userId,
+  storedNick,
+  commentCachedNick,
+  interceptNick = ''
+) {
+  const resolved = pickGiftRankDisplayNickname(
+    userId,
+    storedNick,
+    commentCachedNick,
+    interceptNick
+  );
+  return formatNicknameWithUidFallback(userId, resolved);
+}
+
+/**
  * ギフト系 UI 用の表示名解決ラッパ。
  * popup 側のクイック一覧・ストリップ・レポートで同じコール形に寄せる。
  *
