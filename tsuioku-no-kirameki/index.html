@@ -8471,6 +8471,102 @@
         </div>
       </section>
 
+      <section class="section" id="unified-snapshot-overview" aria-labelledby="unified-snapshot-overview-heading" data-lp-feature="unified-snapshot-overview">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="unified-snapshot-overview-heading">状況把握をひとつのスナップショットにまとめる（計画）</h2>
+            <p>
+              これまでバラバラに記録していた「ギフト」「ランキング」「取得状況」「複数タブの状態」「拡張パネルの位置」「時系列グラフ」を、<strong>ひとつのスナップショット</strong>にまとめる計画です。判断しやすくなり、後から「なぜそうなったか」を追えるようになります。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>今いまできていること</strong> — ギフト・公式値・liveId 整合性の記録（v0.1.192 で完成した MCP Bridge Phase 1a が土台）。</p>
+            <p><strong>これから（計画中）</strong> — 応援ランキング・観測経路の健全性・複数タブ状態・パネル位置・時系列グラフをひとつにまとめます（現在は別々に動いています）。</p>
+            <p><strong>将来の予定</strong> — 他の人の配信との比較情報も AI が出せるように、控えめに広げていきます。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="snapshot-gift-detail" aria-labelledby="snapshot-gift-detail-heading" data-lp-feature="snapshot-gift-detail">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="snapshot-gift-detail-heading">同じギフトをダブって数えない仕組み（計画）</h2>
+            <p>
+              ギフトは「演出」「コメント行」「公式の集計」と複数の経路で観測できます。それぞれを別々に数えると<strong>同じ 1 件のギフトが二重・三重に重複</strong>することがあるため、<strong>送信者と時刻を手がかりに 1 件として数えなおす</strong>仕組みを計画しています。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>判断材料</strong> — 誰が（送り手・送信者）・いつ（時刻）・何を（アイテム）を組にして照合します。</p>
+            <p><strong>今は</strong> — それぞれの経路で別々の集計が並ぶ場面があります（重複が同じ 1 件のダブりとして見える場合があります）。</p>
+            <p><strong>これから</strong> — 同じギフトとみなせる行をひとつにまとめ、重複を取り除いた件数で表示する予定です。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="snapshot-ranking" aria-labelledby="snapshot-ranking-heading" data-lp-feature="snapshot-ranking">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="snapshot-ranking-heading">3 種類のランキングをひとつのスナップショットに（計画）</h2>
+            <p>
+              ニコ生のランキングは <strong>応援ランキング</strong>（コメント件数ベース）・<strong>貢献度ランキング</strong>（公式イベント・ギフトポイント順）・<strong>広告（ニコニ広告）ランキング</strong> の 3 系統があり、画面の場所や更新タイミングが別々です。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>今いまできていること</strong> — 応援ランキング（拡張独自集計）と貢献度ランキング（公式 DOM スクレイプ）が別々に表示されます。</p>
+            <p><strong>これから</strong> — 3 つを<strong>同じ時刻のスナップショット</strong>として並べて、入れ違いや欠損が分かるように整える予定です。</p>
+            <p><strong>注意</strong> — 公式ランキングが取得できない時間帯はその枠だけ「未取得」になります（拡張のミスではなく観測タイミングの差です）。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="snapshot-multi-tab-safety" aria-labelledby="snapshot-multi-tab-safety-heading" data-lp-feature="snapshot-multi-tab-safety">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="snapshot-multi-tab-safety-heading">複数タブで開いてもランキングが消えない（v0.1.195 で改善）</h2>
+            <p>
+              同じ配信を<strong>複数タブで同時に開く</strong>と、片方のタブで取れたランキングがもう片方のタブの観測で<strong>上書き消去される</strong>ことがありました。v0.1.195 で、保存前に他タブが書いた値を読みなおして<strong>3-way merge</strong>する仕組みに変更し、消えにくくしました。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>これまで（v0.1.194 以前）</strong> — 別タブの値を見ずに上書きする実装で、まれにランキング枠が空・「読み込み中」のままなどの症状が出ました。</p>
+            <p><strong>今いまできていること</strong> — 別タブが直前に書いた値も保持して、新しい観測値とまとめて保存します（ランキングが残る・並行運用が安定）。</p>
+            <p><strong>これから</strong> — タブごとの観測カウンタを並べて見られる「複数タブ状況スナップショット」を計画中です。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="snapshot-observability" aria-labelledby="snapshot-observability-heading" data-lp-feature="snapshot-observability">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="snapshot-observability-heading">「なぜ取れていないか」がわかる仕組み（計画）</h2>
+            <p>
+              観測が失敗したとき、<strong>原因を分類して残す</strong>と判断がしやすくなります。理由が「観測経路の停止」なのか「公式側の未提供」なのか「タブが閉じている」なのかを <strong>reason code</strong> として記録する仕組みを計画しています。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>例</strong> — <code>FRONTEND_HOOK_BROKEN</code>（拡張のフック失敗）・<code>OFFICIAL_NOT_PROVIDED</code>（公式値が未提供）・<code>TAB_NOT_OPEN</code>（観測タブが閉じている）など。</p>
+            <p><strong>今いまできていること</strong> — 部分的に source / capturedAt の記録は始まっています（v0.1.190 系で導入）。</p>
+            <p><strong>これから</strong> — 上記分類をユーザーが popup の診断画面で確認できるようにし、「なぜ取れない」が一目でわかるようにする予定です。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="snapshot-future-comparison" aria-labelledby="snapshot-future-comparison-heading" data-lp-feature="snapshot-future-comparison">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="snapshot-future-comparison-heading">他の人の配信と比較する機能（将来の予定）</h2>
+            <p>
+              将来的に、自分の配信と<strong>他の似たジャンルの配信</strong>を比較できる機能を計画しています。<strong>まだ未対応</strong>で、いまは使えません。プライバシーは最優先で、視聴者の<strong>個人情報は出さず</strong>、<strong>匿名化（hash）</strong>した集計値だけを扱う設計を検討中です。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>現時点</strong> — 比較機能はまだありません。今は自分の配信単独のスナップショットだけを扱います。</p>
+            <p><strong>これから</strong> — 同ジャンル・近い時間帯の配信を「比較対象」として AI が要約できるようにする予定です。</p>
+            <p><strong>プライバシー方針</strong> — 視聴者の個人を特定する情報は扱わず、匿名化（hash 化）した集計値のみ参照します。詳細はリリース時に明記します。</p>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="marketing-features" aria-labelledby="marketing-features-heading">
         <div class="shell">
           <div class="section-head fade">

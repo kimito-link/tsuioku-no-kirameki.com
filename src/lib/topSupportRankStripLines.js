@@ -13,6 +13,7 @@ import {
   displayUserLabel
 } from './userRooms.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
+import { formatNicknameWithUidFallback } from './giftDisplayNickname.js';
 
 /**
  * @typedef {{ userKey: string, nickname: string, count: number, avatarUrl?: string }} TopSupportRankRoom
@@ -120,7 +121,10 @@ export function topSupportRankLineModels(stripRooms, opts) {
     const nickRaw = String(r?.nickname || '').trim();
     const nameLine = isUnknown
       ? '—'
-      : anonymousNicknameFallback(userKey, nickRaw) || '（未取得）';
+      : formatNicknameWithUidFallback(
+          userKey,
+          anonymousNicknameFallback(userKey, nickRaw)
+        ) || '（未取得）';
 
     const fullLabelForTitle = displayUserLabel(userKey, r?.nickname);
 

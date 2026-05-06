@@ -1793,10 +1793,11 @@ const anonymousIdenticonDataUrlCache = new Map();
 
 /**
  * 応援ランクストリップで匿名ユーザーを後送り（折り畳み）するか。
- * 既定 true。false にすると件数順で並べる従来挙動。
+ * 既定 false（v0.1.195〜）。「ランキング = 件数降順」というユーザーの直感に合わせる。
+ * 明示 true で storage 保存しているユーザーには opt-in 機能として残る。
  * @type {boolean}
  */
-let foldAnonymousInRankStripRuntimeEnabled = true;
+let foldAnonymousInRankStripRuntimeEnabled = false;
 
 /**
  * popup のブール設定をまとめて管理するレジストリ。
@@ -9974,34 +9975,57 @@ function initPopup() {
         } else {
           for (const c of candidates) {
             try {
-              const res = /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string, liveId?: string, frameHref?: string }} */ (
-                await withTimeout(
-                  tabsSendMessageWithRetry(
-                    c.id,
-                    { type: 'NLS_AI_SHARE_PAGE_DIAGNOSTICS' },
-                    { frameId: 0, maxAttempts: 8, delayMs: 80 }
-                  ),
-                  6_500,
-                  'diag_send_timeout'
-                )
-              );
-              if (res?.ok && res.diagnostics) {
-                // 0.1.178: liveId 整合ガード — 別 live のタブから返ってきたら破棄
-                if (!responseAlignedWithWatchUrl(res, watchUrl)) {
-                  lastErr = `live_mismatch (resp=${String(res.liveId || '')})`;
-                  continue;
+              // v0.1.195 (P0-2): frameId=0 固定 → watch 一致フレーム優先
+              // NLS_EXPORT_INTERCEPT_CACHE と同じ tryOrder パターン
+              const rankedRaw = await listWatchFramesWithInnerText(c.id);
+              const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
+              const tried = new Set();
+              const tryOrder = [...ranked.map((r) => r.frameId), 0];
+
+              let accepted = false;
+              for (const fid of tryOrder) {
+                if (tried.has(fid)) continue;
+                tried.add(fid);
+                try {
+                  const res = /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string, liveId?: string, frameHref?: string }} */ (
+                    await withTimeout(
+                      tabsSendMessageWithRetry(
+                        c.id,
+                        { type: 'NLS_AI_SHARE_PAGE_DIAGNOSTICS' },
+                        { frameId: fid, maxAttempts: 8, delayMs: 80 }
+                      ),
+                      6_500,
+                      'diag_send_timeout'
+                    )
+                  );
+                  if (res?.ok && res.diagnostics) {
+                    // 0.1.178: liveId 整合ガード — 別 live のタブから返ってきたら破棄
+                    if (!responseAlignedWithWatchUrl(res, watchUrl)) {
+                      lastErr = `live_mismatch (resp=${String(res.liveId || '')}, frameId=${fid})`;
+                      continue;
+                    }
+                    payload.content = /** @type {Record<string, unknown>} */ (res.diagnostics);
+                    payload.resolvedTabUrl = String(c.url || '').slice(0, 240);
+                    lastErr = '';
+                    accepted = true;
+                    break;
+                  }
+                  if (res) lastErr = String(res.error || `frameId=${fid} で ok を返しませんでした`);
+                } catch (innerErr) {
+                  // フレーム単位の失敗は次フレームで補える可能性があるので継続
+                  lastErr = String(
+                    innerErr && typeof innerErr === 'object' && 'message' in innerErr
+                      ? /** @type {{ message?: unknown }} */ (innerErr).message
+                      : innerErr || 'send_failed'
+                  );
                 }
-                payload.content = /** @type {Record<string, unknown>} */ (res.diagnostics);
-                payload.resolvedTabUrl = String(c.url || '').slice(0, 240);
-                lastErr = '';
-                break;
               }
-              lastErr = String(res?.error || 'content が ok を返しませんでした');
+              if (accepted) break;
             } catch (e) {
               lastErr = String(
                 e && typeof e === 'object' && 'message' in e
                   ? /** @type {{ message?: unknown }} */ (e).message
-                  : e || 'send_failed'
+                  : e || 'frame_enumeration_failed'
               );
             }
           }

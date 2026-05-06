@@ -207,12 +207,12 @@ describe('topSupportRankLineModels', () => {
     expect(light.accentColorCss).not.toBe(dark.accentColorCss);
   });
 
-  it('ニックなしの known は名前行が（未取得）', () => {
+  it('ニックなしの known は名前行が u/<uid>（v0.1.181-183 互換、ペチパー fix）', () => {
     const [row] = topSupportRankLineModels(
       [{ userKey: '99999999', nickname: '', count: 7 }],
       { defaultThumbSrc: DEF_THUMB }
     );
-    expect(row.nameLine).toBe('（未取得）');
+    expect(row.nameLine).toBe('u/99999999');
   });
 
   it('匿名IDでニック空は名前行が匿名', () => {
@@ -221,6 +221,30 @@ describe('topSupportRankLineModels', () => {
       { defaultThumbSrc: DEF_THUMB }
     );
     expect(row.nameLine).toBe('匿名');
+  });
+
+  it('数値 uid + ニック空は u/<uid> 形式（ペチパー 507563 ケース）', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '507563', nickname: '', count: 1 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('u/507563');
+  });
+
+  it('数値 uid + nickname がゲスト placeholder のときも u/<uid> 形式', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '507563', nickname: 'ゲスト', count: 1 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('u/507563');
+  });
+
+  it('数値 uid + nickname が user XXXX placeholder のときも u/<uid> 形式', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '507563', nickname: 'user 0539Z74OJ13', count: 1 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('u/507563');
   });
 
   it('fullLabelForTitle は displayUserLabel 相当', () => {

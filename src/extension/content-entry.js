@@ -8735,9 +8735,28 @@ async function persistOfficialEventDomBundleNow() {
       }
     } catch { /* no-op */ }
   }
+  // v0.1.195: 複数 watch タブ race で他タブが書いた値を上書き消去しないよう、
+  // storage の現値を読んで 3-way merge する。
+  // 旧実装は「自タブメモリ + fresh」だけ merge していたため、他タブが直前に書いた
+  // contributionRanking 等が silent 消去される race があった
+  // （memory todo_multi_tab_ranking_disappear.md 参照）。
+  /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle | null} */
+  let storageCurrent = null;
+  try {
+    const key = eventDomStorageKey(lid);
+    const bag = await chrome.storage.local.get(key);
+    const v = bag?.[key];
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      storageCurrent = /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle} */ (v);
+    }
+  } catch { /* no-op */ }
   // 何も取れない時は古い値を消さない（モーダル閉時に消えるのを防ぐ）
-  if (!fresh && !lastOfficialEventDomBundle) return;
-  const merged = mergeOfficialEventDomBundle(lastOfficialEventDomBundle, fresh);
+  if (!fresh && !lastOfficialEventDomBundle && !storageCurrent) return;
+  // 3-way merge: storage 現値 → 自メモリ → fresh の順で重ねる。
+  // mergeOfficialEventDomBundle(prev, next) は next を優先するので
+  // 最後に重ねた fresh（観測値）が最優先、次に自メモリ、最後に他タブ書き込み。
+  const stage1 = mergeOfficialEventDomBundle(storageCurrent, lastOfficialEventDomBundle);
+  const merged = mergeOfficialEventDomBundle(stage1, fresh);
   if (!merged) return;
   lastOfficialEventDomBundle = merged;
   try {

@@ -18,6 +18,11 @@ export function isLikelyInternalNdgGiftOrCampaignLabel(s) {
   // 長い ASCII のみ snake_case（人間のニックに稀なパターン）
   const hasNonAscii = [...t].some((ch) => (ch.codePointAt(0) ?? 0) > 127);
   if (/^[a-z][a-z0-9_]{22,}$/i.test(t) && !hasNonAscii) return true;
+  // 「unei_niconico」を含む = niconico 運営内部ラベル確定（めがくろ誤表示 fix）
+  if (/unei_niconico/i.test(t)) return true;
+  // 数字プレフィックス + snake_case ASCII（YYYYMMDD_xxx_NN 風）
+  // 例: 202408unei_niconico_27 / 20240801_test_label
+  if (/^\d{4,}[_a-z][a-z0-9_]{8,}$/i.test(t) && !hasNonAscii) return true;
   return false;
 }
 
