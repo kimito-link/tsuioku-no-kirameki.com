@@ -106,6 +106,7 @@ import { probeRecommendedLiveSection } from '../lib/probeRecommendedLiveSection.
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
+import { buildNetworkErrorProbe } from '../lib/networkErrorProbe.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -4279,6 +4280,40 @@ function buildAiShareFastDiagnosticsPayload() {
           probeError: String(e?.message || e || 'unknown')
         };
       }
+    })(),
+    // v0.1.201: network 層異常を 1 ブロックに集約。
+    // 既存の data-nls-nicoad-fetch 属性 + ndgrLastReceivedAt から導出する。
+    networkErrorProbe: (() => {
+      try {
+        const nicoadFetchStatus =
+          document.documentElement?.getAttribute('data-nls-nicoad-fetch') ||
+          'never';
+        const ndgrAgoMs =
+          ndgrLastReceivedAt > 0
+            ? Math.max(0, Date.now() - ndgrLastReceivedAt)
+            : null;
+        // chrome.runtime が無効化されていれば service worker は inactive 扱い。
+        // hasExtensionContext は extension の生存判定として既に他経路で使われている。
+        const swInactive = !hasExtensionContext();
+        return buildNetworkErrorProbe({
+          nicoadFetchStatus,
+          nicoadFetchErrors: [],
+          ndgrLastReceivedAgoMs: ndgrAgoMs,
+          ndgrReconnectCount: 0,
+          ndgrLastError: null,
+          serviceWorkerInactive: swInactive
+        });
+      } catch (e) {
+        return {
+          nicoadFetchStatus: 'never',
+          nicoadFetchErrorMessages: [],
+          ndgrConnectStatus: 'unknown',
+          ndgrLastError: null,
+          ndgrReconnectCount: 0,
+          serviceWorkerInactive: false,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
     })()
   };
 }
@@ -6292,6 +6327,40 @@ function buildAiSharePageDiagnostics() {
           recentErrors: [],
           totalCount: 0,
           ignoredCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: network 層異常を 1 ブロックに集約。
+    // 既存の data-nls-nicoad-fetch 属性 + ndgrLastReceivedAt から導出する。
+    networkErrorProbe: (() => {
+      try {
+        const nicoadFetchStatus =
+          document.documentElement?.getAttribute('data-nls-nicoad-fetch') ||
+          'never';
+        const ndgrAgoMs =
+          ndgrLastReceivedAt > 0
+            ? Math.max(0, Date.now() - ndgrLastReceivedAt)
+            : null;
+        // chrome.runtime が無効化されていれば service worker は inactive 扱い。
+        // hasExtensionContext は extension の生存判定として既に他経路で使われている。
+        const swInactive = !hasExtensionContext();
+        return buildNetworkErrorProbe({
+          nicoadFetchStatus,
+          nicoadFetchErrors: [],
+          ndgrLastReceivedAgoMs: ndgrAgoMs,
+          ndgrReconnectCount: 0,
+          ndgrLastError: null,
+          serviceWorkerInactive: swInactive
+        });
+      } catch (e) {
+        return {
+          nicoadFetchStatus: 'never',
+          nicoadFetchErrorMessages: [],
+          ndgrConnectStatus: 'unknown',
+          ndgrLastError: null,
+          ndgrReconnectCount: 0,
+          serviceWorkerInactive: false,
           probeError: String(e?.message || e || 'unknown')
         };
       }
