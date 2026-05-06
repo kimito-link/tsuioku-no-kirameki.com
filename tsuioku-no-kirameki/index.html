@@ -8535,6 +8535,22 @@
         </div>
       </section>
 
+      <section class="section" id="snapshot-observability" aria-labelledby="snapshot-observability-heading" data-lp-feature="snapshot-observability">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="snapshot-observability-heading">「なぜ取れていないか」がわかる仕組み（計画）</h2>
+            <p>
+              観測が失敗したとき、<strong>原因を分類して残す</strong>と判断がしやすくなります。理由が「観測経路の停止」なのか「公式側の未提供」なのか「タブが閉じている」なのかを <strong>reason code</strong> として記録する仕組みを計画しています。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>例</strong> — <code>FRONTEND_HOOK_BROKEN</code>（拡張のフック失敗）・<code>OFFICIAL_NOT_PROVIDED</code>（公式値が未提供）・<code>TAB_NOT_OPEN</code>（観測タブが閉じている）など。</p>
+            <p><strong>今いまできていること</strong> — 部分的に source / capturedAt の記録は始まっています（v0.1.190 系で導入）。</p>
+            <p><strong>これから</strong> — 上記分類をユーザーが popup の診断画面で確認できるようにし、「なぜ取れない」が一目でわかるようにする予定です。</p>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="marketing-features" aria-labelledby="marketing-features-heading">
         <div class="shell">
           <div class="section-head fade">
