@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.191',
+    date: '2026-05-06',
+    summary: 'AI連携用JSONを手動でDLできるボタンを追加',
+    items: Object.freeze([
+      'popup の「記録サマリの推移」セクションに「MCP用JSONを保存」ボタンを追加しました。AI 連携の手動エクスポートとして使えます',
+      '保存先は Downloads フォルダ内の nicolivelog-mcp フォルダです。同じ配信なら上書き保存されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.190',
     date: '2026-05-06',
     summary: 'プレイヤーオーバーレイのギフト演出を即パース',

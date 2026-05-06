@@ -1364,6 +1364,40 @@ async function renderGiftQuickStatsPanel(liveId) {
 }
 
 /**
+ * 0.1.191: MCP Bridge Phase1a (PoC) の手動エクスポート。
+ * chrome.storage.local の `nls_mcp_live_latest_v1` を JSON として
+ * Downloads/nicolivelog-mcp/<liveId>.json に保存する。
+ *
+ * Node MCP server がこのフォルダを polling して MCP ツールの返却値に使う想定。
+ * 権限は既存の `downloads` で間に合うため新規追加なし。
+ */
+async function downloadMcpSnapshotJson() {
+  /** @type {{ liveId?: string, snapshot?: unknown, updatedAt?: number }|null} */
+  let bag = null;
+  try {
+    const got = await chrome.storage.local.get('nls_mcp_live_latest_v1');
+    bag = /** @type {any} */ (got?.nls_mcp_live_latest_v1) || null;
+  } catch {
+    return;
+  }
+  if (!bag || !bag.snapshot) return;
+  const lid = String(bag.liveId || 'unknown').toLowerCase().replace(/[^a-z0-9_-]/gi, '');
+  const json = JSON.stringify(bag.snapshot, null, 2);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  try {
+    await chrome.downloads.download({
+      url,
+      filename: `nicolivelog-mcp/${lid || 'unknown'}.json`,
+      saveAs: false,
+      conflictAction: 'overwrite'
+    });
+  } finally {
+    objectUrlRevokeQueue.enqueue(url);
+  }
+}
+
+/**
  * @param {string} liveId
  */
 async function downloadSessionSummaryJson(liveId) {
@@ -10797,6 +10831,15 @@ function initPopup() {
     if (!lv || exportBtn.disabled) return;
     try {
       await downloadSessionSummaryJson(lv);
+    } catch {
+      // no-op
+    }
+  });
+
+  // 0.1.191: MCP Phase1a 手動 export
+  $('exportMcpSnapshotJsonBtn')?.addEventListener('click', async () => {
+    try {
+      await downloadMcpSnapshotJson();
     } catch {
       // no-op
     }
