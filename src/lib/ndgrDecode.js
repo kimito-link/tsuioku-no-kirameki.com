@@ -191,7 +191,25 @@ export function decodeStatistics(buf, start, end) {
 
 /**
  * @typedef {{ no: number|null, rawUserId: number|null, hashedUserId: string, name: string, content: string, vpos: number|null, accountStatus: number|null, is184: boolean }} NdgrChat
- * @typedef {{ advertiserUserId: string, advertiserName: string }} NdgrGift
+ *
+ * @typedef {{
+ *   itemId: string,
+ *   advertiserUserId: string,
+ *   advertiserName: string,
+ *   point: number|null,
+ *   message: string,
+ *   itemName: string,
+ *   contributionRank: number|null
+ * }} NdgrGift
+ *
+ * proto schema (n-air-app/nicolive-comment-protobuf, atoms.proto):
+ *   1: item_id (string)             — "stamp_xxx" / "ball_basketball" 等
+ *   2: advertiser_user_id (optional int64) — 文字列化して保持。anonymous gift では空
+ *   3: advertiser_name (string)
+ *   4: point (int64)
+ *   5: message (string)
+ *   6: item_name (string)            — 表示名（"バスケットボール" 等）
+ *   7: contribution_rank (optional int32) — 貢献ランキング順位
  */
 
 const _dec = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: false }) : null;
@@ -235,7 +253,13 @@ export function decodeChat(buf, start, end) {
 }
 
 /**
- * NicoliveMessage oneof の Gift（field 8 想定）を軽量デコード。proto 差異に耐えるため LEN 文字列を走査する。
+ * NicoliveMessage oneof の Gift（field 8）を proto 原本準拠でデコードする。
+ *
+ * proto schema は NdgrGift 型定義の docstring を参照。
+ * codex の web 調査（2026-05-07、n-air-app/nicolive-comment-protobuf
+ * atoms.proto blob 3edaa1b 確認）で、過去の経験的 decoder（fn=1 を string
+ * userId と仮定し fn=2 を name と仮定する設計）が proto 仕様と齟齬していた
+ * ことが判明したため、本書き直しで proto 原本に整合させた。
  *
  * @param {Uint8Array} buf
  * @param {number} start
@@ -243,40 +267,34 @@ export function decodeChat(buf, start, end) {
  * @returns {NdgrGift}
  */
 export function decodeGift(buf, start, end) {
+  let itemId = '';
   let advertiserUserId = '';
   let advertiserName = '';
-  /** @type {string[]} */
-  const strs = [];
+  /** @type {number|null} */
+  let point = null;
+  let message = '';
+  let itemName = '';
+  /** @type {number|null} */
+  let contributionRank = null;
   pbForEach(buf, start, end, (fn, wt, val, s, e) => {
-    if (wt === 2) {
-      const str = decodeStr(buf, s, e);
-      if (str) strs.push(str);
-      if (fn === 2 && str) advertiserName = advertiserName || str;
-      if (fn === 1 && str && /^\d{5,14}$/.test(str)) {
-        advertiserUserId = advertiserUserId || str;
-      }
-    } else if (wt === 0 && val != null) {
-      const vs = String(val);
-      if (/^\d{5,14}$/.test(vs)) advertiserUserId = advertiserUserId || vs;
+    if (fn === 1 && wt === 2) {
+      if (!itemId) itemId = decodeStr(buf, s, e);
+    } else if (fn === 2 && wt === 0 && val != null) {
+      // proto: optional int64. JS の number 安全範囲を超えうるので文字列化して保持。
+      if (!advertiserUserId) advertiserUserId = String(val);
+    } else if (fn === 3 && wt === 2) {
+      if (!advertiserName) advertiserName = decodeStr(buf, s, e);
+    } else if (fn === 4 && wt === 0 && val != null) {
+      if (point == null) point = val;
+    } else if (fn === 5 && wt === 2) {
+      if (!message) message = decodeStr(buf, s, e);
+    } else if (fn === 6 && wt === 2) {
+      if (!itemName) itemName = decodeStr(buf, s, e);
+    } else if (fn === 7 && wt === 0 && val != null) {
+      if (contributionRank == null) contributionRank = val;
     }
   });
-  for (const str of strs) {
-    if (!advertiserUserId && /^\d{5,14}$/.test(str)) advertiserUserId = str;
-  }
-  if (!advertiserName) {
-    for (const str of strs) {
-      if (
-        str !== advertiserUserId &&
-        str.length > 0 &&
-        str.length <= 128 &&
-        !/^https?:\/\//i.test(str)
-      ) {
-        advertiserName = str;
-        break;
-      }
-    }
-  }
-  return { advertiserUserId, advertiserName };
+  return { itemId, advertiserUserId, advertiserName, point, message, itemName, contributionRank };
 }
 
 /**
@@ -341,9 +359,8 @@ export function decodeChunkedMessage(buf, start, end) {
     // niconico の現プロトコルでは大半のメッセージ（chat / gift / system event）が
     // top.1 に乗っており、top.2 は古い経路（残っているが少数）。両方処理しないと
     // ギフトイベントが永遠に 0 件のままになる。
-    // chat/gift デコーダ側で構造的に validate 済み（`chat.no != null` /
-    // `advertiserUserId || advertiserName`）なので、見当違いの payload を踏んでも
-    // 偽陽性は出ない。
+    // chat/gift デコーダ側で構造的に validate 済みなので、見当違いの payload を
+    // 踏んでも偽陽性は出ない。
     if (fn === 1 || fn === 2) {
       pbForEach(buf, s, e, (mfn, mwt, _mv, ms, me) => {
         if (mwt !== 2) return;
@@ -354,7 +371,18 @@ export function decodeChunkedMessage(buf, start, end) {
           if (chat.no != null) chats.push(chat);
         } else if (mfn === 8) {
           const g = decodeGift(buf, ms, me);
-          if (g.advertiserUserId || g.advertiserName) gifts.push(g);
+          // anonymous gift（advertiser_user_id 欠落）でも item_id / advertiser_name
+          // / point / item_name / contribution_rank のいずれかが取れていれば valid。
+          if (
+            g.itemId ||
+            g.advertiserUserId ||
+            g.advertiserName ||
+            g.itemName ||
+            g.point != null ||
+            g.contributionRank != null
+          ) {
+            gifts.push(g);
+          }
         }
       });
     }
