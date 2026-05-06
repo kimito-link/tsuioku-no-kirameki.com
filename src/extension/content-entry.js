@@ -107,6 +107,10 @@ import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
 import { buildNetworkErrorProbe } from '../lib/networkErrorProbe.js';
+import {
+  deriveAutoOpenFailureReason,
+  deriveStaleDomBundleSuspected
+} from '../lib/diagWarnings.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -3774,30 +3778,37 @@ function buildGiftDiagnosticsBundle() {
           foundCount: _d.adContributionRankingFoundCount,
           lastFoundAgoMs: ago(_d.adContributionRankingFoundAt)
         },
-        autoOpen: {
-          attemptCount: _d.autoOpenAttemptCount,
-          lastAttemptAgoMs: ago(_d.autoOpenLastAttemptAt),
-          lastStatus: _d.autoOpenLastStatus || '',
-          // 0.1.174: 失敗時に sidebar 内 clickable を dump（テスラ式観測）
-          lastSidebarHints: (() => {
-            const snap = /** @type {any} */ (globalThis).__nls_auto_open_sidebar_hints__;
-            if (!snap) return null;
-            return {
-              capturedAgoMs: ago(snap.capturedAt),
-              hintCount: Array.isArray(snap.hints) ? snap.hints.length : 0,
-              hints: Array.isArray(snap.hints) ? snap.hints : []
-            };
-          })()
-        }
+        autoOpen: (() => {
+          const snap = /** @type {any} */ (globalThis).__nls_auto_open_sidebar_hints__;
+          const lastSidebarHints = snap
+            ? {
+                capturedAgoMs: ago(snap.capturedAt),
+                hintCount: Array.isArray(snap.hints) ? snap.hints.length : 0,
+                hints: Array.isArray(snap.hints) ? snap.hints : []
+              }
+            : null;
+          const base = {
+            attemptCount: _d.autoOpenAttemptCount,
+            lastAttemptAgoMs: ago(_d.autoOpenLastAttemptAt),
+            lastStatus: _d.autoOpenLastStatus || '',
+            // 0.1.174: 失敗時に sidebar 内 clickable を dump（テスラ式観測）
+            lastSidebarHints
+          };
+          // v0.1.201: 現在値から失敗理由を 1 トークンで導出（診断見せれば説明不要）
+          return {
+            ...base,
+            lastFailureReason: deriveAutoOpenFailureReason(base)
+          };
+        })()
       };
     })(),
     multiTabDiag: (() => {
       const snap = /** @type {any} */ (globalThis).__nls_multitab_snapshot__;
-      if (!snap) return { hasSnapshot: false };
+      if (!snap) return { hasSnapshot: false, staleDomBundleSuspected: false };
       const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
       const eventDomLvs = Array.isArray(snap.eventDomLvs) ? snap.eventDomLvs : [];
       const nicoadLvs = Array.isArray(snap.nicoadLvs) ? snap.nicoadLvs : [];
-      return {
+      const base = {
         hasSnapshot: true,
         capturedAgoMs: ago(snap.capturedAt),
         eventDomLvCount: eventDomLvs.length,
@@ -3806,6 +3817,11 @@ function buildGiftDiagnosticsBundle() {
         nicoadLvs: nicoadLvs.slice(0, 10),
         currentLiveIdInEventDom: lid ? eventDomLvs.includes(lid) : null,
         currentLiveIdInNicoad: lid ? nicoadLvs.includes(lid) : null
+      };
+      // v0.1.201: 過去 lv の DOM 残骸 / current lv 不一致を warning で要約
+      return {
+        ...base,
+        staleDomBundleSuspected: deriveStaleDomBundleSuspected(base)
       };
     })(),
     giftSenderDiag: (() => {

@@ -8,7 +8,7 @@
  * 「そもそも DOM が見えていない」のかを切り分け可能にする。
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { probeWatchPageDomStructure } from './probeWatchPageDomStructure.js';
 
 /** @param {string} html @returns {Document} */

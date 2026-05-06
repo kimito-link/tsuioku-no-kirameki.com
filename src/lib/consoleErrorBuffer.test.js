@@ -5,7 +5,7 @@
  * 副作用は (1) 自身の内部 buffer 更新、(2) install/uninstall で window listener 操作のみ。
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   createConsoleErrorBuffer,
   isIgnoredErrorMessage
