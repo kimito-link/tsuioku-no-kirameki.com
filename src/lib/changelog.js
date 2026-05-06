@@ -26,6 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.201',
+    date: '2026-05-06',
+    summary: '診断 JSON 統合強化（説明不要レベルへ）',
+    items: Object.freeze([
+      '不具合報告時に AI 共有診断 JSON を貼るだけで原因が特定できるよう、6 ブロック（giftSubAppDiag / domStructureProbe / consoleErrorProbe / networkErrorProbe / lastFailureReason / staleDomBundleSuspected）を 1 つの診断にまとめました',
+      'ギフトサイドバー履歴の集計（送り主・上位アイテム・iframe 数など）が popup 表示と診断 JSON で完全に一致するようになりました',
+      'ranking 自動オープンが「banner 出ず」で停止する原因（sidebar が空 / button 未検出 等）を 1 トークンで表示します（rankingDiag.autoOpen.lastFailureReason）',
+      '複数 watch タブ起因の DOM 残骸（過去 lv が大量に混入 / 現在の lv が見つからない等）を staleDomBundleSuspected 警告フラグで明示します',
+      'nicoad 取得・NDGR 接続・Service Worker 状態を 1 ブロック networkErrorProbe にまとめ、network 層の異常を一括観測できます',
+      'JS の捕捉エラー（広告ブロッカー由来は無視リストで除外）を ring buffer で集約し、直近 50 件まで診断に含めます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.200',
     date: '2026-05-06',
     summary: 'おすすめ生放送のコメント汚染を修正',
