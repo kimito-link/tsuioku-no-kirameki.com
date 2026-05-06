@@ -86,6 +86,22 @@ describe('isLikelyInternalNdgGiftOrCampaignLabel', () => {
     expect(isLikelyInternalNdgGiftOrCampaignLabel('stamp_applause')).toBe(true);
     expect(isLikelyInternalNdgGiftOrCampaignLabel('stamp_ganbare')).toBe(true);
   });
+  // めがくろ誤表示の修正（YYYYMMDD_xxx_NN 風の niconico 運営内部ラベル対策）
+  it('202408unei_niconico_27 を内部ラベルと判定（めがくろ誤表示 fix）', () => {
+    expect(isLikelyInternalNdgGiftOrCampaignLabel('202408unei_niconico_27')).toBe(true);
+  });
+  it('20240801_test_label を内部ラベルと判定', () => {
+    expect(isLikelyInternalNdgGiftOrCampaignLabel('20240801_test_label')).toBe(true);
+  });
+  it('数字始まりでも短いものは内部ラベルとみなさない', () => {
+    expect(isLikelyInternalNdgGiftOrCampaignLabel('123abc')).toBe(false);
+  });
+  it('「めがくろ」（日本語）は内部ラベルでない', () => {
+    expect(isLikelyInternalNdgGiftOrCampaignLabel('めがくろ')).toBe(false);
+  });
+  it('「unei_niconico」を含めば内部ラベル', () => {
+    expect(isLikelyInternalNdgGiftOrCampaignLabel('foo_unei_niconico_bar')).toBe(true);
+  });
 });
 
 describe('isTrustworthySupportGridDisplayNickname', () => {
