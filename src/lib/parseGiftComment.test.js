@@ -79,6 +79,56 @@ describe('parseGiftCommentText', () => {
       parseGiftCommentText('Aさんがギフト「item（abc pt）」を贈りました')
     ).toBe(null);
   });
+
+  // 0.1.177: niconico 実機で観測された順位プレフィックスへの対応
+  it('【ギフト貢献N位】プレフィックスを sender から除外し rank に切り出す', () => {
+    expect(
+      parseGiftCommentText(
+        '【ギフト貢献4位】エマさんがギフト「応援メガホン 水色（10pt）」を贈りました'
+      )
+    ).toEqual({
+      sender: 'エマ',
+      item: '応援メガホン 水色',
+      point: 10,
+      rank: 4
+    });
+  });
+
+  it('【ギフト貢献1位】も正しく rank=1', () => {
+    expect(
+      parseGiftCommentText(
+        '【ギフト貢献1位】豪華さんがギフト「金一封（10000pt）」を贈りました'
+      )
+    ).toEqual({
+      sender: '豪華',
+      item: '金一封',
+      point: 10000,
+      rank: 1
+    });
+  });
+
+  it('複数のプレフィックスがあっても sender だけ取れる', () => {
+    expect(
+      parseGiftCommentText(
+        '【新規】【ギフト貢献2位】Bさんがギフト「item（5pt）」を贈りました'
+      )
+    ).toEqual({
+      sender: 'B',
+      item: 'item',
+      point: 5,
+      rank: 2
+    });
+  });
+
+  it('ギフト貢献以外のプレフィックスは rank を付けない', () => {
+    expect(
+      parseGiftCommentText('【新規】Cさんがギフト「item（3pt）」を贈りました')
+    ).toEqual({
+      sender: 'C',
+      item: 'item',
+      point: 3
+    });
+  });
 });
 
 describe('summarizeGiftComments', () => {

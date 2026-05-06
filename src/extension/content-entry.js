@@ -775,7 +775,9 @@ function recordGiftSenderObservation(userId) {
  * 0.1.176: パース済ギフトコメントを lifetime に蓄積する共通関数。
  * DOM 経路と NDGR 経路の両方から呼ばれる。rawText を key に重複排除。
  *
- * @param {{ sender: string, item: string, point: number }} parsed
+ * 0.1.177: rank（順位プレフィックス由来）も保存して診断 JSON で使う。
+ *
+ * @param {{ sender: string, item: string, point: number, rank?: number }} parsed
  * @param {string} rawText
  */
 function recordGiftCommentObservation(parsed, rawText) {
@@ -783,12 +785,17 @@ function recordGiftCommentObservation(parsed, rawText) {
   const key = String(rawText || '').trim();
   if (!key) return;
   if (_d.giftCommentObservations.has(key)) return;
-  _d.giftCommentObservations.set(key, {
+  /** @type {{ sender: string, item: string, point: number, rank?: number, firstObservedAt: number }} */
+  const entry = {
     sender: parsed.sender,
     item: parsed.item,
     point: parsed.point,
     firstObservedAt: Date.now()
-  });
+  };
+  if (typeof parsed.rank === 'number' && Number.isFinite(parsed.rank)) {
+    entry.rank = parsed.rank;
+  }
+  _d.giftCommentObservations.set(key, entry);
   if (_d.giftCommentObservations.size > 500) {
     const entries = [..._d.giftCommentObservations.entries()].sort(
       (a, b) => a[1].firstObservedAt - b[1].firstObservedAt

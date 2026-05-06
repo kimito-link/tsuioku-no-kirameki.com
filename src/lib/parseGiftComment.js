@@ -16,7 +16,7 @@
  */
 
 /**
- * @typedef {{ sender: string, item: string, point: number }} ParsedGiftComment
+ * @typedef {{ sender: string, item: string, point: number, rank?: number }} ParsedGiftComment
  */
 
 /**
@@ -27,15 +27,25 @@ export function parseGiftCommentText(text) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim();
   if (!trimmed) return null;
-  // 「sender さんがギフト「item（Npt）」を贈りました」
+  // 0.1.177: niconico は順位プレフィックス付きで送ってくる：
+  //   「【ギフト貢献4位】エマさんがギフト「応援メガホン 水色（10pt）」を贈りました」
+  // 0〜複数の 【...】 を許容して sender だけを取る。順位は別フィールドに切り出す。
   // 括弧は 「」『』、ポイント括弧は （ ） / ( )
-  const re = /^(.+?)さんがギフト[「『](.+?)[（(](\d+)\s*pt[)）][」』]を贈りました/;
+  const re = /^(?:【[^】]*】\s*)*(.+?)さんがギフト[「『](.+?)[（(](\d+)\s*pt[)）][」』]を贈りました/;
   const m = trimmed.match(re);
   if (!m) return null;
   const sender = m[1].trim();
   const item = m[2].trim();
   const point = parseInt(m[3], 10);
   if (!sender || !item || !Number.isFinite(point) || point < 0) return null;
+  // 順位プレフィックスがあれば rank を抽出（「ギフト貢献N位」のみ。他の括弧形式は無視）
+  const rankMatch = trimmed.match(/【ギフト貢献(\d+)位】/);
+  if (rankMatch) {
+    const rank = parseInt(rankMatch[1], 10);
+    if (Number.isFinite(rank) && rank > 0) {
+      return { sender, item, point, rank };
+    }
+  }
   return { sender, item, point };
 }
 
@@ -46,12 +56,12 @@ export function parseGiftCommentText(text) {
  *   totalPoints: number,
  *   uniqueSenderCount: number,
  *   uniqueItemCount: number,
- *   topSenders: { sender: string, totalPoints: number, count: number }[],
+ *   topSenders: { sender: string, totalPoints: number, count: number, latestRank?: number }[],
  *   topItems: { item: string, count: number, totalPoints: number }[]
  * }}
  */
 export function summarizeGiftComments(parsedRows) {
-  /** @type {Map<string, { totalPoints: number, count: number }>} */
+  /** @type {Map<string, { totalPoints: number, count: number, latestRank: number | null }>} */
   const senderAgg = new Map();
   /** @type {Map<string, { count: number, totalPoints: number }>} */
   const itemAgg = new Map();
@@ -63,9 +73,13 @@ export function summarizeGiftComments(parsedRows) {
     const item = String(o.item || '').trim();
     const point = Number(o.point) || 0;
     if (!sender || !item) continue;
-    const sCur = senderAgg.get(sender) || { totalPoints: 0, count: 0 };
+    const sCur = senderAgg.get(sender) || { totalPoints: 0, count: 0, latestRank: null };
     sCur.totalPoints += point;
     sCur.count += 1;
+    // 0.1.177: 順位プレフィックスがあれば最新値を保持
+    if (typeof o.rank === 'number' && Number.isFinite(o.rank)) {
+      sCur.latestRank = o.rank;
+    }
     senderAgg.set(sender, sCur);
     const iCur = itemAgg.get(item) || { count: 0, totalPoints: 0 };
     iCur.count += 1;
@@ -77,11 +91,12 @@ export function summarizeGiftComments(parsedRows) {
   const topSenders = [...senderAgg.entries()]
     .sort((a, b) => b[1].totalPoints - a[1].totalPoints)
     .slice(0, 10)
-    .map(([sender, v]) => ({
-      sender,
-      totalPoints: v.totalPoints,
-      count: v.count
-    }));
+    .map(([sender, v]) => {
+      /** @type {{ sender: string, totalPoints: number, count: number, latestRank?: number }} */
+      const out = { sender, totalPoints: v.totalPoints, count: v.count };
+      if (v.latestRank !== null) out.latestRank = v.latestRank;
+      return out;
+    });
   const topItems = [...itemAgg.entries()]
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 10)

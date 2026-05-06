@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.177',
+    date: '2026-05-06',
+    summary: 'ギフト送信者に順位プレフィックスが混入する事象を修正',
+    items: Object.freeze([
+      'コメント欄のギフト文字列が「【ギフト貢献4位】エマさんがギフト〜」のように順位プレフィックス付きで来るケースで、送信者名に「【ギフト貢献4位】」が混入していた事象を直しました',
+      '順位は別フィールド（rank）として切り出し、診断 JSON の topSenders に latestRank として表示するようになりました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.176',
     date: '2026-05-06',
     summary: 'NDGR経由のギフトもパース＋DOMスキャン観測強化',
