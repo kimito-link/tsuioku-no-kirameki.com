@@ -1793,10 +1793,11 @@ const anonymousIdenticonDataUrlCache = new Map();
 
 /**
  * 応援ランクストリップで匿名ユーザーを後送り（折り畳み）するか。
- * 既定 true。false にすると件数順で並べる従来挙動。
+ * 既定 false（v0.1.195〜）。「ランキング = 件数降順」というユーザーの直感に合わせる。
+ * 明示 true で storage 保存しているユーザーには opt-in 機能として残る。
  * @type {boolean}
  */
-let foldAnonymousInRankStripRuntimeEnabled = true;
+let foldAnonymousInRankStripRuntimeEnabled = false;
 
 /**
  * popup のブール設定をまとめて管理するレジストリ。

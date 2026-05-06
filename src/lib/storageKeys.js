@@ -289,7 +289,9 @@ export function normalizeAnonymousIdenticonEnabled(raw) {
 
 /** @param {unknown} raw */
 export function normalizeFoldAnonymousInRankStrip(raw) {
-  return raw !== false;
+  // v0.1.195: デフォルト OFF。「ランキング = 件数降順」というユーザーの直感に合わせる。
+  // 既存ユーザーが明示 true で保存していれば opt-in として尊重する。
+  return raw === true;
 }
 
 /** @param {unknown} raw */
