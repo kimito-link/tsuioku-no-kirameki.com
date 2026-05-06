@@ -157,6 +157,8 @@ import {
   parseGiftCommentText,
   summarizeGiftComments
 } from '../lib/parseGiftComment.js';
+import { buildLiveMcpSnapshot } from '../lib/mcpBridge/buildLiveMcpSnapshot.js';
+import { validateLiveMcpSnapshot } from '../lib/mcpBridge/validateLiveMcpSnapshot.js';
 import { trimMapToMax } from '../lib/trimMap.js';
 import { diagnosePersistGate } from '../lib/commentSubmitSteps.js';
 import {
@@ -8444,6 +8446,63 @@ function ensureOfficialEventDomObserver() {
   } catch { /* no-op */ }
 }
 
+/**
+ * 0.1.189: L1 Canonical Snapshot を chrome.storage.local に書き出す Producer 経路。
+ * MCP Bridge Phase1a の準備として、観測値を `nls_mcp_live_snapshot_v1_<liveId>` に
+ * 5s に 1 回まで coalesce して保存する。
+ *
+ * 既存の buildGiftDiagnosticsBundle の戻り値（officialValuesV2）を入力にして
+ * buildLiveMcpSnapshot で L1 形式に変換、validateLiveMcpSnapshot で構造 check 後
+ * storage に保存する。
+ *
+ * 書き込み失敗は silent（既存の表示・記録には影響しない）。
+ */
+let _mcpSnapshotSeq = 0;
+let _mcpLastWriteAt = 0;
+const MCP_WRITE_COALESCE_MS = 5000;
+
+async function buildAndPersistMcpSnapshot() {
+  if (!hasExtensionContext()) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const now = Date.now();
+  if (now - _mcpLastWriteAt < MCP_WRITE_COALESCE_MS) return;
+  let extensionVersion = '';
+  try {
+    extensionVersion = String(chrome.runtime.getManifest().version || '');
+  } catch { /* no-op */ }
+  /** @type {Record<string, unknown>} */
+  let giftDiag;
+  try {
+    giftDiag = /** @type {Record<string, unknown>} */ (buildGiftDiagnosticsBundle());
+  } catch {
+    return;
+  }
+  const v2 = /** @type {any} */ (giftDiag).officialValuesV2;
+  if (!v2 || typeof v2 !== 'object') return;
+  _mcpSnapshotSeq += 1;
+  const snapshot = buildLiveMcpSnapshot({
+    extensionVersion,
+    buildId: '',
+    seq: _mcpSnapshotSeq,
+    liveId,
+    watchUrl: String(window.location.href || ''),
+    aligned: !!(/** @type {any} */ (giftDiag).liveIdAlignedWithUrl),
+    exportedAt: now,
+    officialValuesV2: /** @type {any} */ (v2),
+    mismatchReasons: []
+  });
+  const validation = validateLiveMcpSnapshot(snapshot);
+  if (!validation.valid) return;
+  _mcpLastWriteAt = now;
+  try {
+    await chrome.storage.local.set({
+      [`nls_mcp_live_snapshot_v1_${lid}`]: snapshot,
+      nls_mcp_live_latest_v1: { liveId: lid, snapshot, updatedAt: now }
+    });
+  } catch { /* no-op */ }
+}
+
 async function persistOfficialEventDomBundleNow() {
   if (!hasExtensionContext()) return;
   const lid = String(liveId || '').trim().toLowerCase();
@@ -8618,6 +8677,8 @@ async function persistOfficialEventDomBundleNow() {
       // no-op
     }
   }
+  // 0.1.189: L1 Canonical Snapshot を MCP Bridge 用に書き出す（5s coalesce 内蔵）
+  try { void buildAndPersistMcpSnapshot(); } catch { /* no-op */ }
 }
 
 /**

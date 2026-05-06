@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.189',
+    date: '2026-05-06',
+    summary: 'AI連携用データを5秒ごとに保存しはじめます',
+    items: Object.freeze([
+      'AI 連携の足場として、ギフト・広告・ランキングの観測値を 5 秒ごとに正準形（Canonical Snapshot）にまとめて、拡張のローカルストレージに保存しはじめました。表示や記録の動作には影響しません',
+      'まずは記録のみ。手動エクスポート機能と Node MCP server (PoC) は次バージョン以降で順次実装します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.188',
     date: '2026-05-06',
     summary: 'MCP連携データの検証と統合libを追加',
