@@ -103,6 +103,7 @@ import {
 } from '../lib/commentHarvest.js';
 import { pickCommentMutationObserverRoot } from '../lib/observerTarget.js';
 import { probeRecommendedLiveSection } from '../lib/probeRecommendedLiveSection.js';
+import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -4210,6 +4211,34 @@ function buildAiShareFastDiagnosticsPayload() {
           probeError: String(e?.message || e || 'unknown')
         };
       }
+    })(),
+    // v0.1.201: ギフト sub-app 履歴の summary（v0.1.198 で実装した
+    // _giftSubAppHistoryCache の現在値を診断 JSON 用に集約）。
+    // popup と同じ raw データから summary を作るので、popup 表示と
+    // 診断 JSON が必ず一致する（ユーザー要望「診断内容一致させてないなら
+    // させるべきです」への直接対応）。
+    giftSubAppDiag: (() => {
+      try {
+        return summarizeGiftSubAppHistoryDiag({
+          history: _giftSubAppHistoryCache.history,
+          totalCounts: _giftSubAppHistoryCache.totalCounts,
+          scannedFrames: _giftSubAppHistoryCache.scannedFrames,
+          observedFrames: _giftSubAppHistoryCache.observedFrames
+        });
+      } catch (e) {
+        return {
+          historyCount: 0,
+          itemTypeCount: 0,
+          resolvedSenderCount: 0,
+          unresolvedSenderCount: 0,
+          topSenders: [],
+          topItems: [],
+          totalPoints: 0,
+          iframeCount: 0,
+          scrapableFrameCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
     })()
   };
 }
@@ -6157,6 +6186,34 @@ function buildAiSharePageDiagnostics() {
           commentCountElementCount: 0,
           excludedFromScrapeCount: 0,
           classSamples: [],
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: ギフト sub-app 履歴の summary（v0.1.198 で実装した
+    // _giftSubAppHistoryCache の現在値を診断 JSON 用に集約）。
+    // popup と同じ raw データから summary を作るので、popup 表示と
+    // 診断 JSON が必ず一致する（ユーザー要望「診断内容一致させてないなら
+    // させるべきです」への直接対応）。
+    giftSubAppDiag: (() => {
+      try {
+        return summarizeGiftSubAppHistoryDiag({
+          history: _giftSubAppHistoryCache.history,
+          totalCounts: _giftSubAppHistoryCache.totalCounts,
+          scannedFrames: _giftSubAppHistoryCache.scannedFrames,
+          observedFrames: _giftSubAppHistoryCache.observedFrames
+        });
+      } catch (e) {
+        return {
+          historyCount: 0,
+          itemTypeCount: 0,
+          resolvedSenderCount: 0,
+          unresolvedSenderCount: 0,
+          topSenders: [],
+          topItems: [],
+          totalPoints: 0,
+          iframeCount: 0,
+          scrapableFrameCount: 0,
           probeError: String(e?.message || e || 'unknown')
         };
       }
