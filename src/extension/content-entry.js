@@ -36,6 +36,7 @@ import {
   commentsStorageKey,
   giftUsersStorageKey,
   eventDomStorageKey,
+  giftSubAppHistoryStorageKey,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
@@ -73,6 +74,8 @@ import {
   fetchNicoadContributionRankingFromPublishPage
 } from '../lib/officialEventDomBundle.js';
 import { scrapeContributionRankingFromDom } from '../lib/officialEventBannerDom.js';
+import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
+import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
 import {
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
@@ -1377,6 +1380,14 @@ function resetOfficialStatsState() {
   _auditionBannerFetchedForLid = '';
   // ニコニ広告 fetch も新 liveId で再実行を許す
   _nicoadContribFetchedForLid = '';
+  // v0.1.198: gift sub-app DOM スキャン結果も新 liveId で初期化
+  _giftSubAppHistoryCache = {
+    history: [],
+    totalCounts: [],
+    lastObservedAt: 0,
+    scannedFrames: 0,
+    observedFrames: 0
+  };
   resetOfficialCommentSamplingState();
 }
 
@@ -8409,6 +8420,20 @@ let _autoOpenGiftSidebarTriedLiveId = '';
 let _auditionBannerFetchedForLid = '';
 
 /**
+ * v0.1.198: ニコ生ギフトサブアプリ DOM（gift-history-list / total-dold-count-list）を
+ * iframe を含む全フレームでスキャンした結果のキャッシュ。
+ * 観測されたら直近の値を保持し、観測が一時的に途切れても古い値を消さない。
+ * @type {{ history: any[], totalCounts: any[], lastObservedAt: number, scannedFrames: number, observedFrames: number }}
+ */
+let _giftSubAppHistoryCache = {
+  history: [],
+  totalCounts: [],
+  lastObservedAt: 0,
+  scannedFrames: 0,
+  observedFrames: 0
+};
+
+/**
  * ニコニ広告ページの「貢献度ランキング（広告 pt 順）」を fetch 済の liveId。
  * 0.1.169 で追加。同じ liveId につき 1 度きり。
  * @type {string}
@@ -8573,6 +8598,124 @@ async function buildAndPersistMcpSnapshot() {
   } catch { /* no-op */ }
 }
 
+/**
+ * v0.1.198: ニコ生ギフトサブアプリ DOM（gift-history-list と total-dold-count-list）を
+ * top document + 同一 origin な iframe contentDocument 全部に対してスキャンする。
+ *
+ * 観測された最新の history / totalCounts は `_giftSubAppHistoryCache` に保持し、
+ * 一時的に消えても古い値を温存する（モーダル閉時の表示維持）。
+ *
+ * @returns {{
+ *   history: any[],
+ *   totalCounts: any[],
+ *   scannedFrames: number,
+ *   observedFrames: number
+ * }} 今回の観測結果（フレッシュ）。空のときは history/totalCounts が空配列。
+ */
+function scanGiftSubAppDomAcrossFrames() {
+  /** @type {Array<Document>} */
+  const allDocs = [];
+  try { allDocs.push(document); } catch { /* no-op */ }
+  // 同一 origin な iframe の contentDocument を集める。クロス origin は throw or null になるので skip
+  let iframes;
+  try {
+    iframes = document.querySelectorAll('iframe');
+  } catch {
+    iframes = /** @type {any} */ ([]);
+  }
+  for (const ifr of iframes) {
+    try {
+      const doc = /** @type {any} */ (ifr).contentDocument;
+      if (doc && doc !== document) allDocs.push(doc);
+    } catch {
+      // cross-origin iframe は無視
+    }
+  }
+
+  /** @type {any[]} */
+  let history = [];
+  /** @type {any[]} */
+  let totalCounts = [];
+  let observedFrames = 0;
+  for (const doc of allDocs) {
+    let observedThis = false;
+    try {
+      const r = scrapeGiftHistoryList(doc);
+      if (r && Array.isArray(r.items) && r.items.length > 0) {
+        // どれか 1 frame で取れたものを採用（複数 frame で重複することは稀、最大長を採用）
+        if (r.items.length > history.length) history = r.items;
+        observedThis = true;
+      }
+    } catch { /* no-op */ }
+    try {
+      const r2 = scrapeTotalGiftCountList(doc);
+      if (r2 && Array.isArray(r2.items) && r2.items.length > 0) {
+        if (r2.items.length > totalCounts.length) totalCounts = r2.items;
+        observedThis = true;
+      }
+    } catch { /* no-op */ }
+    if (observedThis) observedFrames += 1;
+  }
+
+  return {
+    history,
+    totalCounts,
+    scannedFrames: allDocs.length,
+    observedFrames
+  };
+}
+
+/**
+ * v0.1.198: スキャン結果と既存キャッシュをマージして persist する。
+ * 「観測がある期間は更新、観測ゼロの期間は古い値を保持」のポリシー。
+ */
+async function persistGiftSubAppHistoryNow() {
+  if (!hasExtensionContext()) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  let fresh;
+  try {
+    fresh = scanGiftSubAppDomAcrossFrames();
+  } catch {
+    return;
+  }
+  const cache = _giftSubAppHistoryCache;
+  const haveFreshHistory = Array.isArray(fresh.history) && fresh.history.length > 0;
+  const haveFreshTotalCounts = Array.isArray(fresh.totalCounts) && fresh.totalCounts.length > 0;
+  // フレッシュに値があるフィールドだけ更新。空でも古い値は消さない
+  if (haveFreshHistory) {
+    cache.history = fresh.history;
+    cache.lastObservedAt = Date.now();
+  }
+  if (haveFreshTotalCounts) {
+    cache.totalCounts = fresh.totalCounts;
+    cache.lastObservedAt = Date.now();
+  }
+  cache.scannedFrames = fresh.scannedFrames;
+  cache.observedFrames = fresh.observedFrames;
+
+  // 何も観測していないし、キャッシュも空なら storage write を skip
+  if (cache.history.length === 0 && cache.totalCounts.length === 0) return;
+
+  const payload = {
+    liveId: lid,
+    capturedAt: cache.lastObservedAt || Date.now(),
+    history: cache.history,
+    totalCounts: cache.totalCounts,
+    scannedFrames: cache.scannedFrames,
+    observedFrames: cache.observedFrames
+  };
+  try {
+    await chrome.storage.local.set({
+      [giftSubAppHistoryStorageKey(lid)]: payload
+    });
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      // no-op
+    }
+  }
+}
+
 async function persistOfficialEventDomBundleNow() {
   if (!hasExtensionContext()) return;
   const lid = String(liveId || '').trim().toLowerCase();
@@ -8583,6 +8726,8 @@ async function persistOfficialEventDomBundleNow() {
   _rd.collectAttempts += 1;
   // 0.1.175: コメント DOM 経由のギフト送信者観測（autoOpen 迂回ルート）
   try { harvestGiftCommentsFromCommentTableDom(); } catch { /* no-op */ }
+  // v0.1.198: ギフトサブアプリ DOM（iframe 内含む全 frame）を走査して popup へ
+  try { void persistGiftSubAppHistoryNow(); } catch { /* no-op */ }
   let fresh = collectOfficialEventDomBundle(document, { nowMs: Date.now() });
   if (fresh) {
     const _now = Date.now();

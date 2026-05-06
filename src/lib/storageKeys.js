@@ -352,3 +352,21 @@ export function eventDomStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();
   return `nls_event_dom_${id}`;
 }
+
+/**
+ * v0.1.198: niconico ギフト sub-app 由来の「個別ギフト履歴 + 種類別集計」を保存。
+ * iframe 内の Vue サブアプリ DOM をスキャンした結果（gift-history-list / total-dold-count-list）
+ * を popup へ受け渡すための専用キー。
+ *
+ *   {
+ *     liveId, capturedAt,
+ *     history: GiftHistoryItem[],   // 60+ 件の個別ギフト
+ *     totalCounts: TotalGiftCountItem[]  // 33 種類の集計
+ *   }
+ *
+ * @param {string} liveId lv123
+ */
+export function giftSubAppHistoryStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_gift_subapp_history_${id}`;
+}

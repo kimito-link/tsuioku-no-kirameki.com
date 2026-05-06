@@ -24,6 +24,7 @@ import {
   commentsStorageKey,
   devMonitorTrendStorageKey,
   giftUsersStorageKey,
+  giftSubAppHistoryStorageKey,
   isCommentEnterSendEnabled,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
@@ -113,6 +114,16 @@ describe('storage key constants', () => {
     expect(giftUsersStorageKey('LV123')).toBe('nls_gift_users_lv123');
     expect(giftUsersStorageKey('  LV99  ')).toBe('nls_gift_users_lv99');
     expect(giftUsersStorageKey('')).toBe('nls_gift_users_');
+  });
+
+  it('giftSubAppHistoryStorageKey は trim + 小文字', () => {
+    expect(giftSubAppHistoryStorageKey('LV350468795')).toBe(
+      'nls_gift_subapp_history_lv350468795'
+    );
+    expect(giftSubAppHistoryStorageKey('  LV99  ')).toBe(
+      'nls_gift_subapp_history_lv99'
+    );
+    expect(giftSubAppHistoryStorageKey('')).toBe('nls_gift_subapp_history_');
   });
 
   it('normalizeCalmPanelMotion: 明示 true/false と inline 既定', () => {
