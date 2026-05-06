@@ -26,6 +26,20 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.195',
+    date: '2026-05-06',
+    summary: '複数タブでランキング消失を修正、表示名解決を強化',
+    items: Object.freeze([
+      '複数の watch タブで同じ配信を開いていたとき、片方の観測値で応援ランキングが消えることがある問題を修正（content-entry.js の保存処理を 3-way merge に変更）',
+      '応援ランクストリップで数値 uid + ニックネーム空のとき「（未取得）」が出る問題を修正し、「u/数字」形式で表示するようにしました（ペチパーライス問題）',
+      'NDGR の内部ラベル「YYYYMMDD_unei_niconico_NN」が nickname として誤採用される問題を修正（めがくろさんの「202408unei_niconico_27」誤表示）',
+      'NDGR ギフトシステムメッセージを通常コメントとして記録しないようにしました（コメントしていないユーザーが「ユーザー別応援件数」に混入する問題を真因 fix）',
+      '応援ランクストリップの「匿名後送り」trigger をデフォルト OFF に変更し、件数降順を尊重するようにしました（明示有効化はオプションとして残します）',
+      'AI 共有診断（NLS_AI_SHARE_PAGE_DIAGNOSTICS）の取得を frameId=0 固定から watch 一致フレーム優先に変更（codex P0-2）',
+      'LP（tsuioku-no-kirameki/index.html）に「統合状況スナップショット」紹介セクションを追加（6 コンポーネント、TDD 実装、誇張防止の文言）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.192',
     date: '2026-05-06',
     summary: 'AI連携サーバ（ローカル）を追加',
