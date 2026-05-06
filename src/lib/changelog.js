@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.183',
+    date: '2026-05-06',
+    summary: '「（未取得）」表示をu/IDフォールバックに置換',
+    items: Object.freeze([
+      'ユーザーレーンの ストーリー表示で「（未取得）」になっていた箇所を、ID から「u/1127518」のような表示に置き換えました（0.1.182 で追加した formatNicknameWithUidFallback を popup の story 表示にも適用）',
+      '匿名形式の uid（a:xxx）はこれまで通りの表示（既存挙動を壊さない）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.182',
     date: '2026-05-06',
     summary: 'ユーザーレーン表示でuidフォールバックを適用',

@@ -5,6 +5,7 @@ import {
   watchPageUrlsMatchForSnapshot
 } from '../lib/broadcastUrl.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
+import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
@@ -2557,12 +2558,14 @@ function storyUserLaneMetaLines(entry, httpCandidate, userLaneDedupeKey = '') {
     return { idLine, nameLine: nick };
   }
   if (numeric && !nick) {
-    return { idLine, nameLine: '（未取得）' };
+    // 0.1.183: ニックネーム未取得の数値 ID は「（未取得）」より「u/<uid>」表示で
+    // ID として扱える形にする（avatar あり / nickname 空 のケース）
+    return { idLine, nameLine: formatNicknameWithUidFallback(uid, '') || '（未取得）' };
   }
   if (nick) {
     return { idLine, nameLine: nick };
   }
-  return { idLine, nameLine: '（未取得）' };
+  return { idLine, nameLine: formatNicknameWithUidFallback(uid, '') || '（未取得）' };
 }
 
 const STORY_HOP_STATE = {
