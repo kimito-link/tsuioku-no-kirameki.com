@@ -8,6 +8,7 @@ import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMult
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import { backfillRemoveRecommendedLivePollution } from '../lib/backfillRemoveRecommendedLivePollution.js';
+import { summarizeDevMonitorGiftRanking } from '../lib/summarizeDevMonitorGiftRanking.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
@@ -6561,6 +6562,8 @@ function renderDevMonitorPanel(p) {
   if (dlChartsEl) {
     dlChartsEl.innerHTML = buildDevMonitorDlChartsHtml(p);
   }
+  // v0.1.202 A-0: AI 共有診断と同じ raw data から取得状況サマリを extras に出す
+  void renderDevMonitorGiftRankingExtras();
   if (!statsEl || !jsonEl) return;
 
   const win = typeof globalThis !== 'undefined' ? globalThis : window;
@@ -6766,6 +6769,43 @@ function renderDevMonitorPanel(p) {
     outJson.profileGaps = gaps;
   }
   jsonEl.textContent = JSON.stringify(outJson, null, 2);
+}
+
+/**
+ * v0.1.202 A-0: 「詳しい状況」セクションに AI 共有診断 fastCache から
+ * 取得状況サマリ（gift / ranking / multi-tab / network / avatar / viewer）を出す。
+ *
+ * data の出所を AI 共有 JSON と一致させるため、`KEY_AI_SHARE_FAST_DIAG` storage
+ * （content-entry.js が定期的に書き出す高速キャッシュ）を読み、純関数
+ * `summarizeDevMonitorGiftRanking` で popup 行表示用の rows を生成する。
+ *
+ * 副作用：`#devMonitorGiftRankingExtras` の innerHTML を上書き。
+ */
+async function renderDevMonitorGiftRankingExtras() {
+  const extrasEl = $('devMonitorGiftRankingExtras');
+  if (!extrasEl) return;
+  try {
+    const bag = await chrome.storage.local.get(KEY_AI_SHARE_FAST_DIAG);
+    const fastCache = bag?.[KEY_AI_SHARE_FAST_DIAG] || null;
+    const rows = summarizeDevMonitorGiftRanking(fastCache);
+    if (!rows.length) {
+      extrasEl.innerHTML = '';
+      return;
+    }
+    const headerHtml =
+      '<div class="nl-dev-monitor__row" style="opacity:0.7;font-size:0.85em;margin-top:6px;">' +
+      '<dt>── 取得状況サマリ（AI 共有診断と同じ raw data） ──</dt><dd></dd></div>';
+    extrasEl.innerHTML =
+      headerHtml +
+      rows
+        .map(
+          ([dt, dd]) =>
+            `<div class="nl-dev-monitor__row"><dt>${escapeHtml(dt)}</dt><dd>${escapeHtml(dd)}</dd></div>`
+        )
+        .join('');
+  } catch {
+    extrasEl.innerHTML = '';
+  }
 }
 
 /** 収録・スクショ向け: `html.nl-calm-motion` でループアニメ等を止める */
