@@ -291,7 +291,10 @@ import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootH
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
-import { snapshotLooksAlignedWithWatchUrl } from '../lib/watchSnapshotAlignment.js';
+import {
+  snapshotLooksAlignedWithWatchUrl,
+  responseAlignedWithWatchUrl
+} from '../lib/watchSnapshotAlignment.js';
 
 /**
  * @typedef {{
@@ -5574,7 +5577,7 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
         if (tried.has(fid)) continue;
         tried.add(fid);
         try {
-          const res = /** @type {{ ok?: boolean, items?: unknown, error?: unknown }|null} */ (
+          const res = /** @type {{ ok?: boolean, items?: unknown, error?: unknown, liveId?: string, frameHref?: string }|null} */ (
             await tabsSendMessageWithRetry(
               candidate.id,
               {
@@ -5586,6 +5589,11 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
           );
           if (!res) continue;
           if (res.ok === true) {
+            // 0.1.178: liveId 整合ガード — 別 live の export を merge しない
+            if (!responseAlignedWithWatchUrl(res, watchUrl)) {
+              lastRejectError = `live_mismatch (resp=${String(res.liveId || '')})`;
+              continue;
+            }
             sawOkTrue = true;
             const chunk = normalizeInterceptCacheItems(res.items);
             merged.push(...chunk);
@@ -5606,9 +5614,18 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
   }
 
   const items = mergeInterceptCacheItems(merged);
+  // 0.1.178: live_mismatch を独立 diag.code として表示する
+  const liveMismatchSeen =
+    typeof lastRejectError === 'string' && lastRejectError.startsWith('live_mismatch');
   if (items.length > 0) {
     diag.code = 'ok';
-    diag.detail = '';
+    diag.detail = liveMismatchSeen
+      ? `一部の応答は別 live のため破棄しました（${lastRejectError}）`.slice(0, 200)
+      : '';
+  } else if (liveMismatchSeen) {
+    diag.code = 'live_mismatch';
+    diag.detail =
+      `別 live の応答のみが返ってきたため反映を拒否しました（${lastRejectError}）`.slice(0, 200);
   } else if (sawOkTrue) {
     diag.code = 'ok_empty';
     diag.detail =
@@ -9920,7 +9937,7 @@ function initPopup() {
         } else {
           for (const c of candidates) {
             try {
-              const res = /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string }} */ (
+              const res = /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string, liveId?: string, frameHref?: string }} */ (
                 await withTimeout(
                   tabsSendMessageWithRetry(
                     c.id,
@@ -9932,6 +9949,11 @@ function initPopup() {
                 )
               );
               if (res?.ok && res.diagnostics) {
+                // 0.1.178: liveId 整合ガード — 別 live のタブから返ってきたら破棄
+                if (!responseAlignedWithWatchUrl(res, watchUrl)) {
+                  lastErr = `live_mismatch (resp=${String(res.liveId || '')})`;
+                  continue;
+                }
                 payload.content = /** @type {Record<string, unknown>} */ (res.diagnostics);
                 payload.resolvedTabUrl = String(c.url || '').slice(0, 240);
                 lastErr = '';

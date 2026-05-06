@@ -6129,7 +6129,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             if (uid && av && isAvatarSafeToAssociate(uid, av)) interceptedAvatars.set(uid, av);
           }
         }
-        sendResponse({ ok: true, items: buildInterceptCacheExportItems() });
+        // 0.1.178: 応答に liveId / frameHref を含める。popup 側で
+        // responseAlignedWithWatchUrl により別 live の混入を破棄できるようにする。
+        sendResponse({
+          ok: true,
+          items: buildInterceptCacheExportItems(),
+          liveId: String(liveId || ''),
+          frameHref: String(window.location.href || '')
+        });
       } catch (err) {
         const msg =
           err && typeof err === 'object' && 'message' in err
@@ -6140,7 +6147,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             : 'intercept_export_error';
         sendResponse({
           ok: false,
-          error: msg.length > 220 ? `${msg.slice(0, 220)}…` : msg
+          error: msg.length > 220 ? `${msg.slice(0, 220)}…` : msg,
+          liveId: String(liveId || ''),
+          frameHref: String(window.location.href || '')
         });
       }
     })();
@@ -6150,13 +6159,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'NLS_AI_SHARE_PAGE_DIAGNOSTICS') {
     try {
       persistAiShareFastDiagnostics();
+      // 0.1.178: 応答に liveId / frameHref を含める（混線防止）
       sendResponse({
         ok: true,
-        diagnostics: buildAiSharePageDiagnostics()
+        diagnostics: buildAiSharePageDiagnostics(),
+        liveId: String(liveId || ''),
+        frameHref: String(window.location.href || '')
       });
     } catch (err) {
       sendResponse({
         ok: false,
+        liveId: String(liveId || ''),
+        frameHref: String(window.location.href || ''),
         error: String(
           err && typeof err === 'object' && 'message' in err
             ? /** @type {{ message?: unknown }} */ (err).message

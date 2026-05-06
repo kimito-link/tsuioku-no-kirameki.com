@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.178',
+    date: '2026-05-06',
+    summary: '別配信のデータが混入しないようlive整合ガードを強化',
+    items: Object.freeze([
+      'NLS_EXPORT_INTERCEPT_CACHE と NLS_AI_SHARE_PAGE_DIAGNOSTICS の応答に liveId と frameHref を含めるようにしました',
+      'popup 側で受け取った応答の liveId が現在の watch URL と一致しない場合は反映を拒否するようにしました（複数 watch タブ間の混線を防止）',
+      '反映拒否時は AI 共有診断の取り込みコードに live_mismatch を出すようにしました（原因切り分けがしやすくなります）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.177',
     date: '2026-05-06',
     summary: 'ギフト送信者に順位プレフィックスが混入する事象を修正',
