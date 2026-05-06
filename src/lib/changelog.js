@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.180',
+    date: '2026-05-06',
+    summary: 'サムネあり匿名の真因観測ブロックを正しい設計で再構築',
+    items: Object.freeze([
+      'avatarNicknameMatchDiag を追加し、interceptedAvatars と interceptedNicknames の集合関係（avAndNick / avNoNick / nickNoAv）と avNoNick のサンプル 5 件を診断 JSON に出すようにしました（0.1.179 の avatarUidDiag は interceptedUsers 経路の観測で実態と合っていなかった）',
+      'pinCommentProbe で hit があった selector の DOM サンプル（tag / class / text / innerHTML 抜粋）を 3 件まで dump するようにしました（ピン留めコメントの DOM 構造を特定するため）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.179',
     date: '2026-05-06',
     summary: 'サムネありで匿名扱いになる原因を診断に観測',

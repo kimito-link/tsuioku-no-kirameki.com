@@ -3791,6 +3791,7 @@ function buildGiftDiagnosticsBundle() {
     })(),
     // 0.1.179: ピン留めコメント観測。「No.75 が匿名扱いで pin 表示」事象に対し、
     // pin/固定/operator/anchor 系 class が DOM にどれだけあるか hit 数で確認する。
+    // 0.1.180: hit があった selector の DOM 内容を sample で dump（innerHTML 一部）。
     pinCommentProbe: (() => {
       const selectors = [
         '[class*="pin"]',
@@ -3802,13 +3803,64 @@ function buildGiftDiagnosticsBundle() {
       ];
       /** @type {string[]} */
       const hits = [];
+      /** @type {{ sel: string, tag: string, cls: string, text: string, innerHtmlSample: string }[]} */
+      const samples = [];
       for (const sel of selectors) {
         try {
-          const n = document.querySelectorAll(sel).length;
-          if (n > 0) hits.push(`${sel}:${n}`);
+          const els = document.querySelectorAll(sel);
+          if (els.length > 0) {
+            hits.push(`${sel}:${els.length}`);
+            for (const el of els) {
+              if (samples.length >= 3) break;
+              if (!(el instanceof HTMLElement)) continue;
+              samples.push({
+                sel,
+                tag: el.tagName.toLowerCase(),
+                cls: String(el.className || '').slice(0, 120),
+                text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+                innerHtmlSample: String(el.innerHTML || '').replace(/\s+/g, ' ').slice(0, 280)
+              });
+            }
+          }
         } catch { /* no-op */ }
       }
-      return { selectorHits: hits };
+      return { selectorHits: hits, samples };
+    })(),
+    // 0.1.180: 「サムネあり匿名」の正しい観測。
+    // interceptedAvatars (uid→av) と interceptedNicknames (uid→nick) の集合関係を見る。
+    // - avatar あり + nickname あり: 普通のユーザー
+    // - avatar あり + nickname なし: ★ popup で「サムネあり匿名」表示の原因
+    // - avatar なし + nickname あり: 一般的（avatar が取れない構造）
+    avatarNicknameMatchDiag: (() => {
+      let avAndNick = 0;
+      let avNoNick = 0;
+      let nickNoAv = 0;
+      /** @type {{ uid: string, av: string }[]} */
+      const avNoNickSamples = [];
+      for (const [uid, av] of interceptedAvatars.entries()) {
+        if (interceptedNicknames.has(uid)) {
+          avAndNick += 1;
+        } else {
+          avNoNick += 1;
+          if (avNoNickSamples.length < 5) {
+            avNoNickSamples.push({
+              uid: String(uid).slice(0, 30),
+              av: String(av).slice(0, 80)
+            });
+          }
+        }
+      }
+      for (const uid of interceptedNicknames.keys()) {
+        if (!interceptedAvatars.has(uid)) nickNoAv += 1;
+      }
+      return {
+        avatarMapSize: interceptedAvatars.size,
+        nicknameMapSize: interceptedNicknames.size,
+        avAndNick,
+        avNoNick,
+        nickNoAv,
+        avNoNickSamples
+      };
     })(),
     // 0.1.174: 「ギフト」「ランキング」の日本語キーで、診断 JSON をパッと見ても
     // 状況が分かるサマリブロック。値は数値・bool・文字列のみ（人が読みやすい形）。
