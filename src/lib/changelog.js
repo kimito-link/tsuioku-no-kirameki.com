@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.202',
+    date: '2026-05-06',
+    summary: '詳しい状況に取得状況サマリを表示',
+    items: Object.freeze([
+      'popup「詳しい状況（開発・切り分け用・折りたたみ）」セクションに、AI 共有診断 JSON と同じ情報源から生成した取得状況サマリ（ギフト観測 / ギフトサイドバー履歴 / 応援ランキング自動オープン / 貢献度ランキング / multi-tab race 警告 / avatar 取得率 / viewer ログイン状態 / network 接続）を表で表示するようになりました。AI に診断を貼らなくても popup を見るだけで状況がわかります',
+      '応援ランキング自動オープンが「banner 出ず」で止まる原因（v0.1.201 で診断 JSON に追加した lastFailureReason）が popup の表上でも 1 トークン + hint テキストで見えます',
+      '複数 watch タブによる DOM 残骸（過去 lv 大量 / nicoad 不一致）の警告（v0.1.201 staleDomBundleSuspected）が popup の表上でも ⚠️ で見えます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.201',
     date: '2026-05-06',
     summary: '診断 JSON 統合強化（説明不要レベルへ）',
