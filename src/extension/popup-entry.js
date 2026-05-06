@@ -66,6 +66,7 @@ import {
   commentsStorageKey,
   giftUsersStorageKey,
   eventDomStorageKey,
+  giftSubAppHistoryStorageKey,
   isCommentEnterSendEnabled,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
@@ -80,6 +81,10 @@ import {
   normalizeFoldAnonymousInRankStrip
 } from '../lib/storageKeys.js';
 import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold.js';
+import {
+  summarizeGiftSubAppHistory,
+  formatGiftSubAppHistorySummaryLabel
+} from '../lib/formatGiftSubAppHistory.js';
 import { normalizeSupportVisualExpanded } from '../lib/supportVisualExpanded.js';
 import { computeScrollDeltaToRevealInParent } from '../lib/nlMainScrollReveal.js';
 import { commentComposeKeyAction } from '../lib/commentComposeShortcuts.js';
@@ -1362,6 +1367,100 @@ async function renderGiftQuickStatsPanel(liveId) {
   } catch {
     mount.textContent = '読み込みに失敗しました。';
   }
+}
+
+/**
+ * v0.1.198: ギフトサブアプリ DOM 由来の「個別ギフト履歴 + 種類別集計」を描画する。
+ * `nls_gift_subapp_history_<liveId>` に content-script が書き込んだ payload を読む。
+ *
+ * 既存の renderGiftQuickStatsPanel（NDGR 由来 / nickname のみ）と並列して、
+ * 「ギフトサイドバーの履歴タブで見える 60+ 件のギフト + 33 種類の集計」をそのまま反映。
+ *
+ * @param {string} liveId
+ */
+async function renderGiftSubAppHistoryPanel(liveId) {
+  const summaryEl = /** @type {HTMLElement|null} */ ($('giftSubAppHistorySummary'));
+  const mount = /** @type {HTMLElement|null} */ ($('giftSubAppHistoryMount'));
+  if (!mount) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) {
+    mount.innerHTML = '';
+    if (summaryEl) summaryEl.textContent = 'ギフトサイドバー履歴（未取得）';
+    return;
+  }
+  /** @type {{ history?: any[], totalCounts?: any[] }|null} */
+  let payload = null;
+  try {
+    const key = giftSubAppHistoryStorageKey(lid);
+    const bag = await chrome.storage.local.get(key);
+    const v = bag?.[key];
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      payload = /** @type {any} */ (v);
+    }
+  } catch {
+    mount.textContent = '読み込みに失敗しました。';
+    return;
+  }
+  const summary = summarizeGiftSubAppHistory(payload);
+  if (summaryEl) {
+    summaryEl.textContent =
+      'ギフトサイドバー履歴（' + formatGiftSubAppHistorySummaryLabel(summary) + '）';
+  }
+  if (!summary.hasData) {
+    mount.innerHTML =
+      '<p class="nl-sub">ギフトサイドバーがまだ開かれていないため、履歴は未取得です。サイドバーの「履歴」タブを開くと、最新 60+ 件と種類別集計を popup に取り込みます。</p>';
+    return;
+  }
+  const history = Array.isArray(payload?.history) ? /** @type {any[]} */ (payload.history) : [];
+  const totalCounts = Array.isArray(payload?.totalCounts)
+    ? /** @type {any[]} */ (payload.totalCounts)
+    : [];
+  /** @type {string[]} */
+  const blocks = [];
+  // 種類別集計（カウント降順）
+  if (totalCounts.length > 0) {
+    const sortedCounts = [...totalCounts].sort(
+      (a, b) => (Number(b?.count) || 0) - (Number(a?.count) || 0)
+    );
+    const countsHtml = sortedCounts
+      .slice(0, 50)
+      .map((c) => {
+        const name = escapeHtml(String(c?.itemName || '').trim() || '(unknown)');
+        const cnt = escapeHtml(String(Number(c?.count) || 0));
+        return `<li><span class="nl-gift-nick">${name}</span> <code class="nl-gift-uid">×${cnt}</code></li>`;
+      })
+      .join('');
+    blocks.push(
+      `<p class="nl-sub">アイテム種類別の合計（${sortedCounts.length} 種類）</p>` +
+        `<ul class="nl-gift-quick-list">${countsHtml}</ul>`
+    );
+  }
+  // 個別ギフト履歴（最新順、最大 60 件）
+  if (history.length > 0) {
+    const top = history.slice(0, 60);
+    const histHtml = top
+      .map((it) => {
+        const item = escapeHtml(String(it?.itemName || '').trim() || '(unknown)');
+        const sender = escapeHtml(String(it?.senderName || '').trim() || '(noname)');
+        const time = escapeHtml(String(it?.time || '').trim());
+        const pointsRaw = String(it?.pointsRaw || '').trim();
+        const pointsNum = Number(it?.points) || 0;
+        const ptsLabel = pointsRaw || String(pointsNum);
+        return (
+          `<li><span class="nl-gift-nick">${sender}</span> ` +
+          `<code class="nl-gift-uid">${item}</code> ` +
+          `<code class="nl-gift-uid">${escapeHtml(ptsLabel)} pt</code>` +
+          (time ? ` <small>${time}</small>` : '') +
+          `</li>`
+        );
+      })
+      .join('');
+    blocks.push(
+      `<p class="nl-sub">個別ギフト履歴（${history.length} 件中、最新 ${top.length} 件）</p>` +
+        `<ul class="nl-gift-quick-list">${histHtml}</ul>`
+    );
+  }
+  mount.innerHTML = blocks.join('');
 }
 
 /**
@@ -7324,6 +7423,7 @@ async function refresh() {
     void updateIngestHeartbeatDisplay('');
     void renderSessionSummaryComparePanel('');
     void renderGiftQuickStatsPanel('');
+    void renderGiftSubAppHistoryPanel('');
     // 応援レーンは「直近放送の保存」から暫定復元する。reset の後に呼ぶことで、
     // 生 URL で popup を開いたときに lane が真っ白にならない（E2E lane-visibility）。
     await populateStorySourceEntriesFromStorageFallback();
@@ -7389,6 +7489,7 @@ async function refresh() {
     void updateIngestHeartbeatDisplay('');
     void renderSessionSummaryComparePanel('');
     void renderGiftQuickStatsPanel('');
+    void renderGiftSubAppHistoryPanel('');
     // lv が取り出せなかった場合も、同じ保存ベース fallback を試みる。
     await populateStorySourceEntriesFromStorageFallback();
     // 0.1.69 (AY): 同じ「watch URL があるけど lv 抜けない」レアケースでも
@@ -7603,6 +7704,7 @@ async function refresh() {
       /** @type {PopupCommentEntry[]} */ (displayEntries)
     );
     void renderGiftQuickStatsPanel(lv);
+    void renderGiftSubAppHistoryPanel(lv);
   }
 
   // 放送切替を検知して、直前放送に紐付くキャッシュ（rank strip の再描画抑止キー、
@@ -7717,6 +7819,7 @@ async function refresh() {
   });
   void renderSessionSummaryComparePanel(lv);
   void renderGiftQuickStatsPanel(lv);
+  void renderGiftSubAppHistoryPanel(lv);
 
   void (async () => {
     try {
