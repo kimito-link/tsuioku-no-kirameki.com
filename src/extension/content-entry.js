@@ -103,6 +103,7 @@ import {
 } from '../lib/commentHarvest.js';
 import { pickCommentMutationObserverRoot } from '../lib/observerTarget.js';
 import { probeRecommendedLiveSection } from '../lib/probeRecommendedLiveSection.js';
+import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
@@ -4239,6 +4240,30 @@ function buildAiShareFastDiagnosticsPayload() {
           probeError: String(e?.message || e || 'unknown')
         };
       }
+    })(),
+    // v0.1.201: watch ページ主要 DOM の存在観測。
+    // recommendedLiveSectionDiag（v0.1.200）と組み合わせて、
+    // 「DOM が見えているのに集計が空」なのか「そもそも DOM 自体が
+    // 見えていない」のかを診断 JSON で切り分け可能にする。
+    domStructureProbe: (() => {
+      try {
+        return probeWatchPageDomStructure(document);
+      } catch (e) {
+        return {
+          giftSidebar: {
+            iframeFound: false,
+            giftHistoryListPresent: false,
+            totalDoldCountListPresent: false,
+            advertiserNameCount: 0
+          },
+          watchTab: {
+            commentTablePresent: false,
+            commentTableRowCount: 0,
+            videoElementPresent: false
+          },
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
     })()
   };
 }
@@ -6214,6 +6239,30 @@ function buildAiSharePageDiagnostics() {
           totalPoints: 0,
           iframeCount: 0,
           scrapableFrameCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: watch ページ主要 DOM の存在観測。
+    // recommendedLiveSectionDiag（v0.1.200）と組み合わせて、
+    // 「DOM が見えているのに集計が空」なのか「そもそも DOM 自体が
+    // 見えていない」のかを診断 JSON で切り分け可能にする。
+    domStructureProbe: (() => {
+      try {
+        return probeWatchPageDomStructure(document);
+      } catch (e) {
+        return {
+          giftSidebar: {
+            iframeFound: false,
+            giftHistoryListPresent: false,
+            totalDoldCountListPresent: false,
+            advertiserNameCount: 0
+          },
+          watchTab: {
+            commentTablePresent: false,
+            commentTableRowCount: 0,
+            videoElementPresent: false
+          },
           probeError: String(e?.message || e || 'unknown')
         };
       }
