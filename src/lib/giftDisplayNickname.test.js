@@ -7,8 +7,37 @@ import {
   pickGiftRankDisplayNickname,
   resolveGiftRankDisplayNickname,
   enrichIncomingGiftThrowUsersWithInterceptNicknames,
-  upgradeGiftUserRowsWithInterceptNicknames
+  upgradeGiftUserRowsWithInterceptNicknames,
+  formatNicknameWithUidFallback
 } from './giftDisplayNickname.js';
+
+// 0.1.181: 「サムネあり匿名」事象の修正
+describe('formatNicknameWithUidFallback', () => {
+  it('nickname があればそれをそのまま返す', () => {
+    expect(formatNicknameWithUidFallback('4814023', 'のえる')).toBe('のえる');
+  });
+
+  it('nickname が空で uid が数値なら u/<uid> 形式', () => {
+    expect(formatNicknameWithUidFallback('4814023', '')).toBe('u/4814023');
+    expect(formatNicknameWithUidFallback('141998114', '   ')).toBe('u/141998114');
+  });
+
+  it('nickname も uid も空なら空文字', () => {
+    expect(formatNicknameWithUidFallback('', '')).toBe('');
+    expect(formatNicknameWithUidFallback(null, undefined)).toBe('');
+  });
+
+  it('a:xxx 匿名形式の uid は空文字（既存の匿名表示を壊さない）', () => {
+    expect(formatNicknameWithUidFallback('a:9unQabc', '')).toBe('');
+    expect(formatNicknameWithUidFallback('A:XYZ', '')).toBe('');
+  });
+
+  it('予期しない形式の uid は u/<sliced> 形式', () => {
+    expect(formatNicknameWithUidFallback('abc-xyz', '')).toBe('u/abc-xyz');
+    // 長すぎる uid は 20 文字まで
+    expect(formatNicknameWithUidFallback('x'.repeat(50), '')).toBe(`u/${'x'.repeat(20)}`);
+  });
+});
 
 describe('isLikelyInternalNdgGiftOrCampaignLabel', () => {
   it('nicolive_ 接頭辞は内部ラベル', () => {

@@ -223,6 +223,37 @@ export function resolveGiftRankDisplayNickname(userId, storedNick, opts = {}) {
 }
 
 /**
+ * 0.1.181: nickname が空の uid に対して、匿名表示ではなく **uid フォールバック表示**を返す。
+ *
+ * 真因（v0.1.180 診断 JSON で確定）：
+ * - niconico の NDGR chat row は「uid あり / nickname 空」で来るケースが多い
+ *   （ユーザーが nickname を設定していない、184 でない通常コメントの一部 等）
+ * - avatar URL は `nicoaccount/usericon/s/<head4>/<uid>.jpg` 形式で uid から
+ *   自動合成可能なため avatar map には保存される
+ * - 結果：「サムネあり / nickname 空 / popup で『匿名』表示」になっていた
+ *
+ * 解決：nickname が空でも、uid そのものを `u/<uid>` 形式で表示することで「匿名」表示を回避。
+ * 外部 fetch なしで完結する。元の nickname 解決が成功する経路があれば、それが優先される
+ * （`pickGiftRankDisplayNickname` の戻り値が空のときだけこのフォールバックを使う）。
+ *
+ * @param {string} userId
+ * @param {string} resolvedNickname pickGiftRankDisplayNickname / resolveGiftRankDisplayNickname の戻り値
+ * @returns {string} resolved があればそのまま、なければ `u/<uid>` 形式
+ */
+export function formatNicknameWithUidFallback(userId, resolvedNickname) {
+  const nick = String(resolvedNickname || '').trim();
+  if (nick) return nick;
+  const uid = String(userId || '').trim();
+  if (!uid) return '';
+  // 匿名形式（a:xxx）はそのまま返す（既存の匿名表示ロジックを壊さない）
+  if (/^a:/i.test(uid)) return '';
+  // 数値 uid なら `u/4814023` 形式（ニコ生の URL 形式に合わせる）
+  if (/^\d+$/.test(uid)) return `u/${uid}`;
+  // それ以外（予期しない形式）は uid をそのまま slice
+  return `u/${uid.slice(0, 20)}`;
+}
+
+/**
  * NDGR ギフト着信行の nickname を、intercept マップで上書きできるなら上書きする（merge 直前）。
  * @param {{ userId?: unknown, nickname?: unknown }[]} incoming
  * @param {(uid: string) => string} getInterceptNick

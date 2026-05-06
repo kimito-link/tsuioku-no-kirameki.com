@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.181',
+    date: '2026-05-06',
+    summary: 'サムネあり匿名にuidフォールバック表示を導入',
+    items: Object.freeze([
+      'コメント送信者のニックネームが空でも、ID（数値）が分かれば「u/4814023」のような ID 表示にフォールバックする関数を追加しました（formatNicknameWithUidFallback）',
+      '0.1.180 の診断で「avAndNick=0、avNoNick=3」が確定し、avatar URL は ID から自動合成される一方でニックネームが空のケースが多いと判明したため対処。表示は v0.1.182 以降で順次切り替えます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.180',
     date: '2026-05-06',
     summary: 'サムネあり匿名の真因観測ブロックを正しい設計で再構築',
