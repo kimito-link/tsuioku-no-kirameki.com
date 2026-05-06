@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.185',
+    date: '2026-05-06',
+    summary: 'ギフト欄の出現をハッシュclass対応で即検知',
+    items: Object.freeze([
+      'ニコ生側のクラス名が `___contribution-ranking-list___xxx` のような CSS Modules 形式になっていても、ギフト履歴やランキング枠の出現を即座に検知して取り込むようになりました（部分一致 selector を併設）',
+      'コメント欄に「○○さんがギフト〜を贈りました」が流れた瞬間も自動取り込みの対象になり、これまで virtualization で消えていたギフト送信者の取り逃しが減ります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.184',
     date: '2026-05-06',
     summary: '診断JSONに値とソースと未取得理由を一緒に出す',

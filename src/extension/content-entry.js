@@ -8385,7 +8385,20 @@ function ensureOfficialEventDomObserver() {
   _officialEventDomObserverInstalledForLid = lid;
   if (typeof MutationObserver !== 'function') return;
   if (!document.body) return;
-  const RELEVANT = '.owner-name, .contribution-ranking-list, .point-field, .ranker, .rank-num, .gift-history-list, .gift-history-list .item';
+  // 0.1.185: niconico の CSS Modules（`___xxx-yyy___HASH`）形式に追随するため
+  // 各 selector の `[class*="..."]` 版を併設。さらにコメント欄の gift row 出現も
+  // 即発火するよう `[data-comment-type="gift"]` を追加（kimi 提案 #3 の MutationObserver
+  // を既存ロジックの拡張で実現）。
+  const RELEVANT = [
+    '.owner-name', '[class*="owner-name"]',
+    '.contribution-ranking-list', '[class*="contribution-ranking-list"]',
+    '.point-field', '[class*="point-field"]',
+    '.ranker', '[class*="ranker"]',
+    '.rank-num', '[class*="rank-num"]',
+    '.gift-history-list', '[class*="gift-history-list"]',
+    '.gift-history-list .item', '[class*="gift-history-list"] [class*="item"]',
+    '[data-comment-type="gift"]'
+  ].join(', ');
   const trigger = () => {
     if (_officialEventDomObserverTimer) clearTimeout(_officialEventDomObserverTimer);
     _officialEventDomObserverTimer = setTimeout(() => {
