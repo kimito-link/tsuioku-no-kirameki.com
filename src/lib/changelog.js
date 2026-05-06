@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.200',
+    date: '2026-05-06',
+    summary: 'おすすめ生放送のコメント汚染を修正',
+    items: Object.freeze([
+      'watch ページ右側「おすすめ生放送」セクションが拡張のコメント記録に混入し、配信タイトル（「LIVE」「N分経過」等）や他配信者の配信ID（lvXXXXXXX）がコメントとして保存されていた真因を修正しました（複数件コメントしているのに 1 件しか反映されない問題の真因）',
+      'CSS Modules ハッシュ命名（___program-card-list___HASH 等）に追随する部分一致 selector でおすすめ列の DOM を識別し、comment scraper の経路から物理的に除外（isInsideRecommendedLiveSection ガード）',
+      '過去に汚染した記録を popup 起動時に 1 回だけ自動除去する migration を同梱（flag nls_backfill_remove_recommended_live_pollution_v1）',
+      '診断 JSON に recommendedLiveSectionDiag ブロックを追加し、おすすめ列の存在 / カード件数 / 汚染源候補数を可視化（再発検知）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.198',
     date: '2026-05-06',
     summary: 'ギフトサイドバー履歴を popup に取込',

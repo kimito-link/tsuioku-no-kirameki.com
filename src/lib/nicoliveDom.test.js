@@ -570,6 +570,80 @@ describe('extractCommentsFromNode', () => {
     expect(texts.has('通常')).toBe(true);
     expect(texts.has('カード')).toBe(false);
   });
+
+  it('v0.1.200: CSS Modules ハッシュ命名のおすすめ生放送カードも無視（真因 fix）', () => {
+    // ユーザー提供 HTML から抜粋（lv350469899 のカード）。
+    // 旧 collectNicoLiveTableRows + generic ROW_QUERY 経路では
+    // [class*="comment" i] が「___comment-count___HASH」にマッチして
+    // 配信タイトルや「LIVE」「N分経過」が誤抽出されていた。
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">1</span><span class="comment-text">本編コメント</span>
+      </div>
+      <form class="___loading-form___BCU8r loading-form">
+        <div class="___loading-target___ez0Kl loading-target">
+          <ul class="___program-card-list___LlRTy program-card-list">
+            <li class="___item___fDZA1 item">
+              <article id="lv350469899" class="___program-card___BaFpe program-card">
+                <span class="___duration___oGO6d label duration">1時間52分経過</span>
+                <ul class="___program-statistics-list___QyIpS program-statistics-list">
+                  <li class="___comment-count___ylyGl comment-count" title="コメント数">
+                    <span data-value="4847">4,847</span>
+                  </li>
+                </ul>
+              </article>
+            </li>
+          </ul>
+        </div>
+      </form>`;
+    const list = extractCommentsFromNode(root);
+    const texts = list.map((r) => r.text);
+    expect(texts).toContain('本編コメント');
+    // 「1時間52分経過」「4,847」「LIVE」等の汚染が含まれない
+    for (const t of texts) {
+      expect(t).not.toMatch(/分経過/);
+      expect(t).not.toMatch(/^LIVE$/);
+    }
+  });
+
+  it('v0.1.200: おすすめ列の comment-count li 単独 root も無視（root 自身がおすすめ内）', () => {
+    // MutationObserver で「おすすめ列の li.comment-count」が直接 root として
+    // 渡された場合、根本ガードがないと parseCommentElement が「コメント数 4847」
+    // 風の偽コメントを生成してしまう
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <ul class="___program-card-list___X program-card-list">
+        <li class="item">
+          <article class="___program-card___Y program-card">
+            <ul class="program-statistics-list">
+              <li class="___comment-count___Z comment-count">
+                <span data-value="4847">4,847</span>
+              </li>
+            </ul>
+          </article>
+        </li>
+      </ul>`;
+    const liCommentCount = wrap.querySelector('li.comment-count');
+    expect(liCommentCount).not.toBeNull();
+    const list = extractCommentsFromNode(/** @type {Element} */ (liCommentCount));
+    expect(list).toEqual([]);
+  });
+
+  it('v0.1.200: おすすめ列の article.program-card 単独 root も無視', () => {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <article class="___program-card___X program-card">
+        <a class="___program-title___Y program-title">【歌枠イベ】ゴールデンウィーク</a>
+        <ul class="program-statistics-list">
+          <li class="comment-count"><span data-value="100">100</span></li>
+        </ul>
+      </article>`;
+    const article = wrap.querySelector('article');
+    expect(article).not.toBeNull();
+    const list = extractCommentsFromNode(/** @type {Element} */ (article));
+    expect(list).toEqual([]);
+  });
 });
 
 describe('resolveUserIdForNicoLiveCommentRow', () => {
