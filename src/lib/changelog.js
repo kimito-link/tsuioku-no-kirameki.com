@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.186',
+    date: '2026-05-06',
+    summary: 'MCP連携の正準データ型を新設（schema lib）',
+    items: Object.freeze([
+      'AI 連携の足場として、ギフト・広告・ランキングの値を「値・取得元・経過時間・未取得理由・信頼度」の組で表す Canonical Snapshot 型を追加しました（src/lib/mcpBridge/schema.js）。',
+      'まずは型定義のみで実装は次バージョン以降。表示や記録の動作には影響しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.185',
     date: '2026-05-06',
     summary: 'ギフト欄の出現をハッシュclass対応で即検知',
