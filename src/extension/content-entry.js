@@ -102,6 +102,7 @@ import {
   harvestVirtualCommentList
 } from '../lib/commentHarvest.js';
 import { pickCommentMutationObserverRoot } from '../lib/observerTarget.js';
+import { probeRecommendedLiveSection } from '../lib/probeRecommendedLiveSection.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -4193,7 +4194,23 @@ function buildAiShareFastDiagnosticsPayload() {
           ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
           : null
     },
-    giftDiagnostics: buildGiftDiagnosticsBundle()
+    giftDiagnostics: buildGiftDiagnosticsBundle(),
+    // v0.1.200: おすすめ生放送セクションの観測値（汚染源候補数）。
+    // 真因 fix が効いている確認 + 再発検知のため diag に出す。
+    recommendedLiveSectionDiag: (() => {
+      try {
+        return probeRecommendedLiveSection(document);
+      } catch (e) {
+        return {
+          detectedInWatchPage: false,
+          cardCount: 0,
+          commentCountElementCount: 0,
+          excludedFromScrapeCount: 0,
+          classSamples: [],
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })()
   };
 }
 
@@ -6127,7 +6144,23 @@ function buildAiSharePageDiagnostics() {
           ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
           : null
     },
-    giftDiagnostics: buildGiftDiagnosticsBundle()
+    giftDiagnostics: buildGiftDiagnosticsBundle(),
+    // v0.1.200: おすすめ生放送セクションの観測値（汚染源候補数）。
+    // 真因 fix が効いている確認 + 再発検知のため diag に出す。
+    recommendedLiveSectionDiag: (() => {
+      try {
+        return probeRecommendedLiveSection(document);
+      } catch (e) {
+        return {
+          detectedInWatchPage: false,
+          cardCount: 0,
+          commentCountElementCount: 0,
+          excludedFromScrapeCount: 0,
+          classSamples: [],
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })()
   };
 }
 
