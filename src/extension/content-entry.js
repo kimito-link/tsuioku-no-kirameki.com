@@ -103,6 +103,14 @@ import {
 } from '../lib/commentHarvest.js';
 import { pickCommentMutationObserverRoot } from '../lib/observerTarget.js';
 import { probeRecommendedLiveSection } from '../lib/probeRecommendedLiveSection.js';
+import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
+import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
+import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
+import { buildNetworkErrorProbe } from '../lib/networkErrorProbe.js';
+import {
+  deriveAutoOpenFailureReason,
+  deriveStaleDomBundleSuspected
+} from '../lib/diagWarnings.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -3770,30 +3778,37 @@ function buildGiftDiagnosticsBundle() {
           foundCount: _d.adContributionRankingFoundCount,
           lastFoundAgoMs: ago(_d.adContributionRankingFoundAt)
         },
-        autoOpen: {
-          attemptCount: _d.autoOpenAttemptCount,
-          lastAttemptAgoMs: ago(_d.autoOpenLastAttemptAt),
-          lastStatus: _d.autoOpenLastStatus || '',
-          // 0.1.174: 失敗時に sidebar 内 clickable を dump（テスラ式観測）
-          lastSidebarHints: (() => {
-            const snap = /** @type {any} */ (globalThis).__nls_auto_open_sidebar_hints__;
-            if (!snap) return null;
-            return {
-              capturedAgoMs: ago(snap.capturedAt),
-              hintCount: Array.isArray(snap.hints) ? snap.hints.length : 0,
-              hints: Array.isArray(snap.hints) ? snap.hints : []
-            };
-          })()
-        }
+        autoOpen: (() => {
+          const snap = /** @type {any} */ (globalThis).__nls_auto_open_sidebar_hints__;
+          const lastSidebarHints = snap
+            ? {
+                capturedAgoMs: ago(snap.capturedAt),
+                hintCount: Array.isArray(snap.hints) ? snap.hints.length : 0,
+                hints: Array.isArray(snap.hints) ? snap.hints : []
+              }
+            : null;
+          const base = {
+            attemptCount: _d.autoOpenAttemptCount,
+            lastAttemptAgoMs: ago(_d.autoOpenLastAttemptAt),
+            lastStatus: _d.autoOpenLastStatus || '',
+            // 0.1.174: 失敗時に sidebar 内 clickable を dump（テスラ式観測）
+            lastSidebarHints
+          };
+          // v0.1.201: 現在値から失敗理由を 1 トークンで導出（診断見せれば説明不要）
+          return {
+            ...base,
+            lastFailureReason: deriveAutoOpenFailureReason(base)
+          };
+        })()
       };
     })(),
     multiTabDiag: (() => {
       const snap = /** @type {any} */ (globalThis).__nls_multitab_snapshot__;
-      if (!snap) return { hasSnapshot: false };
+      if (!snap) return { hasSnapshot: false, staleDomBundleSuspected: false };
       const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
       const eventDomLvs = Array.isArray(snap.eventDomLvs) ? snap.eventDomLvs : [];
       const nicoadLvs = Array.isArray(snap.nicoadLvs) ? snap.nicoadLvs : [];
-      return {
+      const base = {
         hasSnapshot: true,
         capturedAgoMs: ago(snap.capturedAt),
         eventDomLvCount: eventDomLvs.length,
@@ -3802,6 +3817,11 @@ function buildGiftDiagnosticsBundle() {
         nicoadLvs: nicoadLvs.slice(0, 10),
         currentLiveIdInEventDom: lid ? eventDomLvs.includes(lid) : null,
         currentLiveIdInNicoad: lid ? nicoadLvs.includes(lid) : null
+      };
+      // v0.1.201: 過去 lv の DOM 残骸 / current lv 不一致を warning で要約
+      return {
+        ...base,
+        staleDomBundleSuspected: deriveStaleDomBundleSuspected(base)
       };
     })(),
     giftSenderDiag: (() => {
@@ -4207,6 +4227,106 @@ function buildAiShareFastDiagnosticsPayload() {
           commentCountElementCount: 0,
           excludedFromScrapeCount: 0,
           classSamples: [],
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: ギフト sub-app 履歴の summary（v0.1.198 で実装した
+    // _giftSubAppHistoryCache の現在値を診断 JSON 用に集約）。
+    // popup と同じ raw データから summary を作るので、popup 表示と
+    // 診断 JSON が必ず一致する（ユーザー要望「診断内容一致させてないなら
+    // させるべきです」への直接対応）。
+    giftSubAppDiag: (() => {
+      try {
+        return summarizeGiftSubAppHistoryDiag({
+          history: _giftSubAppHistoryCache.history,
+          totalCounts: _giftSubAppHistoryCache.totalCounts,
+          scannedFrames: _giftSubAppHistoryCache.scannedFrames,
+          observedFrames: _giftSubAppHistoryCache.observedFrames
+        });
+      } catch (e) {
+        return {
+          historyCount: 0,
+          itemTypeCount: 0,
+          resolvedSenderCount: 0,
+          unresolvedSenderCount: 0,
+          topSenders: [],
+          topItems: [],
+          totalPoints: 0,
+          iframeCount: 0,
+          scrapableFrameCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: watch ページ主要 DOM の存在観測。
+    // recommendedLiveSectionDiag（v0.1.200）と組み合わせて、
+    // 「DOM が見えているのに集計が空」なのか「そもそも DOM 自体が
+    // 見えていない」のかを診断 JSON で切り分け可能にする。
+    domStructureProbe: (() => {
+      try {
+        return probeWatchPageDomStructure(document);
+      } catch (e) {
+        return {
+          giftSidebar: {
+            iframeFound: false,
+            giftHistoryListPresent: false,
+            totalDoldCountListPresent: false,
+            advertiserNameCount: 0
+          },
+          watchTab: {
+            commentTablePresent: false,
+            commentTableRowCount: 0,
+            videoElementPresent: false
+          },
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: window.error / unhandledrejection 観測 ring buffer の snapshot。
+    // boot 時に install 済みで、最新 20 件 + ignoredCount を診断 JSON に出す。
+    consoleErrorProbe: (() => {
+      try {
+        return _consoleErrorBuffer.snapshot();
+      } catch (e) {
+        return {
+          recentErrors: [],
+          totalCount: 0,
+          ignoredCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: network 層異常を 1 ブロックに集約。
+    // 既存の data-nls-nicoad-fetch 属性 + ndgrLastReceivedAt から導出する。
+    networkErrorProbe: (() => {
+      try {
+        const nicoadFetchStatus =
+          document.documentElement?.getAttribute('data-nls-nicoad-fetch') ||
+          'never';
+        const ndgrAgoMs =
+          ndgrLastReceivedAt > 0
+            ? Math.max(0, Date.now() - ndgrLastReceivedAt)
+            : null;
+        // chrome.runtime が無効化されていれば service worker は inactive 扱い。
+        // hasExtensionContext は extension の生存判定として既に他経路で使われている。
+        const swInactive = !hasExtensionContext();
+        return buildNetworkErrorProbe({
+          nicoadFetchStatus,
+          nicoadFetchErrors: [],
+          ndgrLastReceivedAgoMs: ndgrAgoMs,
+          ndgrReconnectCount: 0,
+          ndgrLastError: null,
+          serviceWorkerInactive: swInactive
+        });
+      } catch (e) {
+        return {
+          nicoadFetchStatus: 'never',
+          nicoadFetchErrorMessages: [],
+          ndgrConnectStatus: 'unknown',
+          ndgrLastError: null,
+          ndgrReconnectCount: 0,
+          serviceWorkerInactive: false,
           probeError: String(e?.message || e || 'unknown')
         };
       }
@@ -6157,6 +6277,106 @@ function buildAiSharePageDiagnostics() {
           commentCountElementCount: 0,
           excludedFromScrapeCount: 0,
           classSamples: [],
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: ギフト sub-app 履歴の summary（v0.1.198 で実装した
+    // _giftSubAppHistoryCache の現在値を診断 JSON 用に集約）。
+    // popup と同じ raw データから summary を作るので、popup 表示と
+    // 診断 JSON が必ず一致する（ユーザー要望「診断内容一致させてないなら
+    // させるべきです」への直接対応）。
+    giftSubAppDiag: (() => {
+      try {
+        return summarizeGiftSubAppHistoryDiag({
+          history: _giftSubAppHistoryCache.history,
+          totalCounts: _giftSubAppHistoryCache.totalCounts,
+          scannedFrames: _giftSubAppHistoryCache.scannedFrames,
+          observedFrames: _giftSubAppHistoryCache.observedFrames
+        });
+      } catch (e) {
+        return {
+          historyCount: 0,
+          itemTypeCount: 0,
+          resolvedSenderCount: 0,
+          unresolvedSenderCount: 0,
+          topSenders: [],
+          topItems: [],
+          totalPoints: 0,
+          iframeCount: 0,
+          scrapableFrameCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: watch ページ主要 DOM の存在観測。
+    // recommendedLiveSectionDiag（v0.1.200）と組み合わせて、
+    // 「DOM が見えているのに集計が空」なのか「そもそも DOM 自体が
+    // 見えていない」のかを診断 JSON で切り分け可能にする。
+    domStructureProbe: (() => {
+      try {
+        return probeWatchPageDomStructure(document);
+      } catch (e) {
+        return {
+          giftSidebar: {
+            iframeFound: false,
+            giftHistoryListPresent: false,
+            totalDoldCountListPresent: false,
+            advertiserNameCount: 0
+          },
+          watchTab: {
+            commentTablePresent: false,
+            commentTableRowCount: 0,
+            videoElementPresent: false
+          },
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: window.error / unhandledrejection 観測 ring buffer の snapshot。
+    // boot 時に install 済みで、最新 20 件 + ignoredCount を診断 JSON に出す。
+    consoleErrorProbe: (() => {
+      try {
+        return _consoleErrorBuffer.snapshot();
+      } catch (e) {
+        return {
+          recentErrors: [],
+          totalCount: 0,
+          ignoredCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: network 層異常を 1 ブロックに集約。
+    // 既存の data-nls-nicoad-fetch 属性 + ndgrLastReceivedAt から導出する。
+    networkErrorProbe: (() => {
+      try {
+        const nicoadFetchStatus =
+          document.documentElement?.getAttribute('data-nls-nicoad-fetch') ||
+          'never';
+        const ndgrAgoMs =
+          ndgrLastReceivedAt > 0
+            ? Math.max(0, Date.now() - ndgrLastReceivedAt)
+            : null;
+        // chrome.runtime が無効化されていれば service worker は inactive 扱い。
+        // hasExtensionContext は extension の生存判定として既に他経路で使われている。
+        const swInactive = !hasExtensionContext();
+        return buildNetworkErrorProbe({
+          nicoadFetchStatus,
+          nicoadFetchErrors: [],
+          ndgrLastReceivedAgoMs: ndgrAgoMs,
+          ndgrReconnectCount: 0,
+          ndgrLastError: null,
+          serviceWorkerInactive: swInactive
+        });
+      } catch (e) {
+        return {
+          nicoadFetchStatus: 'never',
+          nicoadFetchErrorMessages: [],
+          ndgrConnectStatus: 'unknown',
+          ndgrLastError: null,
+          ndgrReconnectCount: 0,
+          serviceWorkerInactive: false,
           probeError: String(e?.message || e || 'unknown')
         };
       }
@@ -8467,6 +8687,13 @@ let _giftSubAppHistoryCache = {
 };
 
 /**
+ * v0.1.201: window.error / unhandledrejection を診断 JSON に集約するための ring buffer。
+ * boot 時に install して、診断 payload 生成時に snapshot を読む。
+ * `__NLS_CONSOLE_ERROR_BUFFER__` global flag で重複 install を抑止（idempotent）。
+ */
+const _consoleErrorBuffer = createConsoleErrorBuffer({ capacity: 20 });
+
+/**
  * ニコニ広告ページの「貢献度ランキング（広告 pt 順）」を fetch 済の liveId。
  * 0.1.169 で追加。同じ liveId につき 1 度きり。
  * @type {string}
@@ -9344,6 +9571,11 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   } catch {
     // no-op
   }
+  // v0.1.201: window.error / unhandledrejection を診断 JSON 用 ring buffer に
+  // 取り込み開始（idempotent、初回 boot のみ install）。
+  try {
+    if (typeof window !== 'undefined') _consoleErrorBuffer.install(window);
+  } catch { /* no-op */ }
   // ニコニ広告ページに注入された場合のハーベストは start() とは独立して走らせる
   // （start は watch ページ専用で early return するため）
   try { tryHarvestNicoadContributionRankingOnce(); } catch { /* no-op */ }
