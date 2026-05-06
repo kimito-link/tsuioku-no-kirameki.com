@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.187',
+    date: '2026-05-06',
+    summary: 'MCP連携の正準データを組み立てるlibを追加',
+    items: Object.freeze([
+      'AI 連携のために、拡張の観測値（NDGR / DOM 由来）を 1 つの正準データに組み立てる純粋関数を追加しました（src/lib/mcpBridge/buildLiveMcpSnapshot.js）。',
+      'まずは関数のみで実装は次バージョン以降。表示や記録の動作には影響しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.186',
     date: '2026-05-06',
     summary: 'MCP連携の正準データ型を新設（schema lib）',
