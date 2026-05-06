@@ -1,3 +1,5 @@
+import { parseGiftCommentText } from './parseGiftComment.js';
+
 /**
  * NDGR チャット行の正規化純関数。
  * content-entry.js L935-957 から抽出。
@@ -5,8 +7,6 @@
  * @param {unknown[]} raw
  * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]}
  */
-import { parseGiftCommentText } from './parseGiftComment.js';
-
 export function cleanNdgrChatRows(raw) {
   /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]} */
   const cleaned = [];
