@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.184',
+    date: '2026-05-06',
+    summary: '診断JSONに値とソースと未取得理由を一緒に出す',
+    items: Object.freeze([
+      '診断 JSON に officialValuesV2 ブロックを追加し、ギフト点数・広告pt・イベント順位・タイトルなどを「値・取得元（source）・取得経過時間（ageMs）・未取得理由（reason）」の組で出すようにしました',
+      '未取得理由は no_field（取得元に値がない）/ stale（60秒以上古い）/ null（最新）のいずれかで判別できます。次バージョン以降の正規化レイヤー設計の入口になります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.183',
     date: '2026-05-06',
     summary: '「（未取得）」表示をu/IDフォールバックに置換',

@@ -3667,6 +3667,70 @@ function buildGiftDiagnosticsBundle() {
         ? officialNicoEventTitleNdgr.slice(0, 80)
         : ''
     },
+    // 0.1.184: codex 提案 P0-3 + データ品質設計 L1 Canonical の前段。
+    // 「値 + source + ageMs + reason」の構造で各値の **採用ソースと未取得理由** を明示。
+    // 既存 officialGiftStats / officialHudPageState は維持（互換性）。
+    //
+    // reason の意味:
+    //   - null         : 値が取れていて新鮮（採用 OK）
+    //   - 'no_field'   : そもそもデータソースが値を持っていない
+    //   - 'stale'      : 値はあるが古い（>60s）。L2 Read Model で confidence 低下に使う
+    //   - 'live_mismatch': v0.1.178 で導入済の整合ガード由来（responseAlignedWithWatchUrl）
+    officialValuesV2: (() => {
+      const b = lastOfficialEventDomBundle;
+      const ageMs = officialNdgrStatsUpdatedAt > 0
+        ? Math.max(0, Date.now() - officialNdgrStatsUpdatedAt)
+        : null;
+      const STALE_MS = 60_000;
+      /**
+       * @param {unknown} value
+       * @param {string} source
+       * @returns {{ value: unknown, source: string, ageMs: number | null, reason: string | null }}
+       */
+      const wrap = (value, source) => {
+        const hasValue = value !== null && value !== undefined && value !== '';
+        let reason = null;
+        if (!hasValue) {
+          reason = 'no_field';
+        } else if (typeof ageMs === 'number' && ageMs > STALE_MS) {
+          reason = 'stale';
+        }
+        return {
+          value: hasValue ? value : null,
+          source,
+          ageMs,
+          reason
+        };
+      };
+      return {
+        eventGiftScore: {
+          ndgr: wrap(officialEventGiftScoreNdgr, 'ndgr_stats'),
+          domBanner: wrap(b?.eventBanner?.score, 'dom_event_banner')
+        },
+        giftPoints: {
+          ndgr: wrap(officialGiftPointsNdgr, 'ndgr_stats'),
+          domStats: wrap(b?.programStats?.giftPoints, 'dom_program_stats')
+        },
+        adPoints: {
+          ndgr: wrap(officialAdPointsNdgr, 'ndgr_stats'),
+          domStats: wrap(b?.programStats?.adPoints, 'dom_program_stats')
+        },
+        nicoEventRank: {
+          ndgr: wrap(officialNicoEventRankNdgr, 'ndgr_stats'),
+          domBanner: wrap(b?.eventBanner?.rank, 'dom_event_banner')
+        },
+        nicoEventTitle: {
+          ndgr: wrap(officialNicoEventTitleNdgr, 'ndgr_stats'),
+          domBanner: wrap(b?.eventBanner?.title, 'dom_event_banner')
+        },
+        commentCount: {
+          domStats: wrap(b?.programStats?.commentCount, 'dom_program_stats')
+        },
+        watchCount: {
+          domStats: wrap(b?.programStats?.watchCount, 'dom_program_stats')
+        }
+      };
+    })(),
     rankingDiag: (() => {
       const _d = getRankingLifetimeDiag();
       const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
