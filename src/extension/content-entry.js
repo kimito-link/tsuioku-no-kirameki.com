@@ -111,6 +111,10 @@ import {
   deriveAutoOpenFailureReason,
   deriveStaleDomBundleSuspected
 } from '../lib/diagWarnings.js';
+import {
+  pruneStaleEventDomLvs,
+  buildEventDomEntriesFromStorageBag
+} from '../lib/pruneStaleEventDomLvs.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -9014,18 +9018,28 @@ async function persistOfficialEventDomBundleNow() {
   }
   // 0.1.173: multi-tab snapshot を非同期で取得して globalThis にキャッシュ
   // （buildGiftDiagnosticsBundle が同期なのでここで先取りする）
+  // v0.1.204 Patch E: snapshot 構築前に 24h 超過の nls_event_dom_<lv> 残骸を
+  // storage から削除する。v0.1.203 で eventDomLvCount=49 まで膨れて multi-tab
+  // race 警告が常時出ていた問題への対応（純関数 pruneStaleEventDomLvs は v0.1.203
+  // Patch 4 で先に作成済み）。
   try {
     const all = await chrome.storage.local.get(null);
     if (all && typeof all === 'object') {
-      const eventDomLvs = Object.keys(all)
-        .filter((k) => k.startsWith('nls_event_dom_'))
-        .map((k) => k.slice('nls_event_dom_'.length));
+      const entries = buildEventDomEntriesFromStorageBag(all);
+      const { keep, prune } = pruneStaleEventDomLvs(entries, lid, Date.now());
+      if (prune.length) {
+        try {
+          await chrome.storage.local.remove(
+            prune.map((lv) => `nls_event_dom_${lv}`)
+          );
+        } catch { /* best-effort */ }
+      }
       const nicoadLvs = Object.keys(all)
         .filter((k) => k.startsWith('nls_nicoad_ranking_'))
         .map((k) => k.slice('nls_nicoad_ranking_'.length));
       /** @type {any} */ (globalThis).__nls_multitab_snapshot__ = {
         capturedAt: Date.now(),
-        eventDomLvs,
+        eventDomLvs: keep,
         nicoadLvs
       };
     }
