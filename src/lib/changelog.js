@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.188',
+    date: '2026-05-06',
+    summary: 'MCP連携データの検証と統合libを追加',
+    items: Object.freeze([
+      'AI 連携データの構造チェック関数（validateLiveMcpSnapshot）を追加し、不正な値があれば理由付きで弾けるようにしました',
+      '複数の観測データを 1 つに統合する関数（mergeLiveMcpSnapshot）を追加しました。古い世代で新しい値を上書きしない、別配信のデータは混ぜない、入力順に依存しない、を担保しています',
+      'まずは関数のみで実装は次バージョン以降。表示や記録の動作には影響しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.187',
     date: '2026-05-06',
     summary: 'MCP連携の正準データを組み立てるlibを追加',
