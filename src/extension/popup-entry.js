@@ -6,6 +6,7 @@ import {
 } from '../lib/broadcastUrl.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
+import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
@@ -9752,7 +9753,63 @@ function canUseFastAiShareDiagnostics(fastResolvedTabUrl, watchUrl) {
   return watchPageUrlsMatchForSnapshot(f, w);
 }
 
+/**
+ * v0.1.196: v0.1.172 〜 v0.1.194 までの間に NDGR ギフトシステムメッセージが
+ * `nls_comments_<lv>` に通常コメントとして persist されていた汚染を、
+ * popup 起動時に 1 回だけ除去する migration。
+ *
+ * v0.1.195 で `cleanNdgrChatRows` / `ndgrChatRows` 側に gift パターン skip を
+ * 入れたが、それ以前の汚染データは storage に残るため、本 migration で除去する。
+ *
+ * - flag `nls_backfill_remove_gift_system_msgs_v1` で 1 回だけ実行
+ * - 失敗してもユーザー操作を妨げない（try/catch で握り潰し）
+ * - chrome.storage.local 権限がない環境（テスト等）では noop
+ */
+const KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE = 'nls_backfill_remove_gift_system_msgs_v1';
+async function runOneTimeBackfillRemoveGiftSystemMessages() {
+  const local = globalThis.chrome?.storage?.local;
+  if (!local) return;
+  try {
+    const flagBag = await local.get(KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE);
+    if (flagBag?.[KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE]) return;
+
+    const all = await local.get(null);
+    let totalRemoved = 0;
+    /** @type {Record<string, unknown>} */
+    const updates = {};
+    for (const [key, value] of Object.entries(all)) {
+      if (!key.startsWith('nls_comments_lv')) continue;
+      const r = backfillRemoveGiftSystemMessages(value);
+      if (r.removedCount > 0) {
+        updates[key] = r.cleaned;
+        totalRemoved += r.removedCount;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await local.set(updates);
+    }
+    await local.set({
+      [KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE]: {
+        at: new Date().toISOString(),
+        removedCount: totalRemoved,
+        version: '0.1.196'
+      }
+    });
+    if (totalRemoved > 0) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[nls-migration] removed ${totalRemoved} gift system message(s) from comment records`
+      );
+    }
+  } catch (e) {
+    // migration 失敗は致命でない（次回 boot で再試行）
+    // eslint-disable-next-line no-console
+    console.warn('[nls-migration] backfill skipped:', e);
+  }
+}
+
 function initPopup() {
+  void runOneTimeBackfillRemoveGiftSystemMessages();
   installExtensionContextErrorGuard();
   initOfflineBannerOnce();
   paintVersionBadge();

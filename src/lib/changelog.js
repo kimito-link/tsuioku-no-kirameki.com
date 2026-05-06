@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.196',
+    date: '2026-05-06',
+    summary: '過去のギフト誤記録を起動時に自動除去',
+    items: Object.freeze([
+      'v0.1.172 〜 v0.1.194 までの間に「○○さんがギフト「XXX（Npt）」を贈りました」というニコ生ギフトシステム文言が通常コメントとして保存されていた汚染を、popup 起動時に 1 回だけ自動除去します（v0.1.195 の根本 fix の後始末）',
+      'migration は flag `nls_backfill_remove_gift_system_msgs_v1` で 1 回だけ実行、失敗してもユーザー操作を妨げません（次回 boot で再試行）',
+      '影響：「ユーザー別応援件数」「サムネ付き応援グリッド」などからコメントしていない人が消え、表示が真に「コメント数」に整合します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.195',
     date: '2026-05-06',
     summary: '複数タブでランキング消失を修正、表示名解決を強化',
