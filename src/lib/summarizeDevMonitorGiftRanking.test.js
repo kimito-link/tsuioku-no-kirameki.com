@@ -102,10 +102,35 @@ describe('summarizeDevMonitorGiftRanking', () => {
     expect(v).toBe('NDGR: 1 件 / 1920pt、DOM由来: 1 件 / 300pt');
   });
 
-  it('ギフトサイドバー履歴: 0 件は ❌ で iframe 数も含む', () => {
+  it('ギフトサイドバー履歴: 0 件は ❌ で iframe 数も含む（failureReason なし fixture）', () => {
     const rows = summarizeDevMonitorGiftRanking(buildRealisticFastCache());
     const v = rows.find((r) => r[0] === 'ギフトサイドバー履歴')?.[1];
     expect(v).toBe('❌ 0 件 / iframe 2 / scrape 可能 0');
+  });
+
+  it('v0.1.203: failureReason=cross_origin_iframe_only 時は「仕様」注記つき', () => {
+    const c = buildRealisticFastCache();
+    c.content.giftSubAppDiag.failureReason = 'cross_origin_iframe_only';
+    const rows = summarizeDevMonitorGiftRanking(c);
+    const v = rows.find((r) => r[0] === 'ギフトサイドバー履歴')?.[1];
+    expect(v).toBe(
+      '❌ 0 件 / iframe 2 / scrape 可能 0 — cross_origin_iframe_only（仕様、NDGR 経路で代替予定）'
+    );
+  });
+
+  it('v0.1.203: failureReason=no_iframe_found のときは reason をそのまま表示', () => {
+    const c = buildRealisticFastCache();
+    c.content.giftSubAppDiag = {
+      historyCount: 0,
+      iframeCount: 0,
+      scrapableFrameCount: 0,
+      failureReason: 'no_iframe_found'
+    };
+    const rows = summarizeDevMonitorGiftRanking(c);
+    const v = rows.find((r) => r[0] === 'ギフトサイドバー履歴')?.[1];
+    expect(v).toBe(
+      '❌ 0 件 / iframe 0 / scrape 可能 0 — no_iframe_found'
+    );
   });
 
   it('応援ランキング自動オープン: lastFailureReason + hint テキスト', () => {

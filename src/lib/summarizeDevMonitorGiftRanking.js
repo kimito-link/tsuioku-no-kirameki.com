@@ -51,17 +51,27 @@ export function summarizeDevMonitorGiftRanking(fastCache) {
     ]);
   }
 
-  // ギフトサイドバー履歴
+  // ギフトサイドバー履歴（v0.1.203: failureReason 反映）
   const subApp = c.giftSubAppDiag;
   if (subApp && typeof subApp === 'object') {
     const hc = numOr(subApp.historyCount, 0);
     const ifc = numOr(subApp.iframeCount, 0);
     const sfc = numOr(subApp.scrapableFrameCount, 0);
+    const reason =
+      typeof subApp.failureReason === 'string' && subApp.failureReason
+        ? subApp.failureReason
+        : '';
     const ok = hc > 0;
-    rows.push([
-      'ギフトサイドバー履歴',
-      `${ok ? '✅' : '❌'} ${hc} 件 / iframe ${ifc} / scrape 可能 ${sfc}`
-    ]);
+    let msg = `${ok ? '✅' : '❌'} ${hc} 件 / iframe ${ifc} / scrape 可能 ${sfc}`;
+    if (!ok && reason) {
+      // cross_origin_iframe_only は仕様（NDGR 経路に頼るのが正解）であることを明示
+      const note =
+        reason === 'cross_origin_iframe_only'
+          ? `${reason}（仕様、NDGR 経路で代替予定）`
+          : reason;
+      msg += ` — ${note}`;
+    }
+    rows.push(['ギフトサイドバー履歴', msg]);
   }
 
   // 応援ランキング自動オープン（v0.1.201 lastFailureReason 統合）
