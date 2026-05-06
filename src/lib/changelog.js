@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.198',
+    date: '2026-05-06',
+    summary: 'ギフトサイドバー履歴を popup に取込',
+    items: Object.freeze([
+      'ニコ生ギフトサイドバーの「履歴」タブに表示される 60+ 件の個別ギフトと、種類別集計（33 種類）を popup へ取り込めるようになりました',
+      'ギフトサブアプリは iframe 内に描画されるため、これまで popup には 1 件しか反映されていなかった真因を解消（同一 origin の全フレームをスキャン）',
+      'popup 下部の「ギフトサイドバー履歴」セクションを開くと、送り主・アイテム・pt・時刻が一覧で見えます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.196',
     date: '2026-05-06',
     summary: '過去のギフト誤記録を起動時に自動除去',
