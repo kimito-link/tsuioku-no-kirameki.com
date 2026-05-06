@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.179',
+    date: '2026-05-06',
+    summary: 'サムネありで匿名扱いになる原因を診断に観測',
+    items: Object.freeze([
+      'コメント記録のうち「アバター画像は取れているのに userId が空（匿名扱い）」のケース数とサンプルを診断 JSON に出すようにしました（avatarUidDiag）',
+      'ピン留めコメント関連の class（pin / operator / anchor-comment / fixed-comment / data-pinned / data-pin）の DOM 出現数を診断 JSON に出すようにしました（pinCommentProbe）',
+      '次回診断を取れば、サムネあり匿名扱いの真因（intercept の uid 解決経路 / ピン留め DOM 構造）が確定します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.178',
     date: '2026-05-06',
     summary: '別配信のデータが混入しないようlive整合ガードを強化',

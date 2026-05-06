@@ -3751,6 +3751,65 @@ function buildGiftDiagnosticsBundle() {
       interceptNicknameSize: interceptedNicknames.size,
       interceptAvatarSize: interceptedAvatars.size
     },
+    // 0.1.179: 「サムネあり・ID 空（匿名扱い）」事象の真因切り分け。
+    // intercepted comment entry を 4 象限で集計し、avatar あり+uid 空 のサンプルを 5 件 dump。
+    avatarUidDiag: (() => {
+      let total = 0;
+      let avAndUid = 0;
+      let avNoUid = 0;
+      let uidNoAv = 0;
+      let bothEmpty = 0;
+      /** @type {{ commentNo: string, avPreview: string, name: string }[]} */
+      const avNoUidSamples = [];
+      for (const [no, entry] of interceptedUsers.entries()) {
+        total += 1;
+        const av = String(entry?.av || '');
+        const uid = String(entry?.uid || '').trim();
+        const hasAv = !!av && /^https?:/i.test(av);
+        const hasUid = !!uid;
+        if (hasAv && hasUid) avAndUid += 1;
+        else if (hasAv && !hasUid) {
+          avNoUid += 1;
+          if (avNoUidSamples.length < 5) {
+            avNoUidSamples.push({
+              commentNo: String(no || '').slice(0, 40),
+              avPreview: av.slice(0, 80),
+              name: String(entry?.name || '').slice(0, 30)
+            });
+          }
+        } else if (!hasAv && hasUid) uidNoAv += 1;
+        else bothEmpty += 1;
+      }
+      return {
+        interceptedUsersTotal: total,
+        avAndUid,
+        avNoUid,
+        uidNoAv,
+        bothEmpty,
+        avNoUidSamples
+      };
+    })(),
+    // 0.1.179: ピン留めコメント観測。「No.75 が匿名扱いで pin 表示」事象に対し、
+    // pin/固定/operator/anchor 系 class が DOM にどれだけあるか hit 数で確認する。
+    pinCommentProbe: (() => {
+      const selectors = [
+        '[class*="pin"]',
+        '[class*="operator"]',
+        '[class*="anchor-comment"]',
+        '[class*="fixed-comment"]',
+        '[data-pinned]',
+        '[data-pin]'
+      ];
+      /** @type {string[]} */
+      const hits = [];
+      for (const sel of selectors) {
+        try {
+          const n = document.querySelectorAll(sel).length;
+          if (n > 0) hits.push(`${sel}:${n}`);
+        } catch { /* no-op */ }
+      }
+      return { selectorHits: hits };
+    })(),
     // 0.1.174: 「ギフト」「ランキング」の日本語キーで、診断 JSON をパッと見ても
     // 状況が分かるサマリブロック。値は数値・bool・文字列のみ（人が読みやすい形）。
     // 0.1.175: コメント DOM 経由のギフト観測（commentGift系）を追加。
