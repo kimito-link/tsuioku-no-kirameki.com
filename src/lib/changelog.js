@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.192',
+    date: '2026-05-06',
+    summary: 'AI連携サーバ（ローカル）を追加',
+    items: Object.freeze([
+      'AI から拡張のデータを参照できるローカル MCP サーバ（Node 製）を tools/mcp-nicolive/ に追加しました。外部送信はせず、ダウンロードフォルダの JSON だけを読みます',
+      '使い方は tools/mcp-nicolive/README.md を参照してください'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.191',
     date: '2026-05-06',
     summary: 'AI連携用JSONを手動でDLできるボタンを追加',
