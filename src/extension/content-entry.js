@@ -105,6 +105,7 @@ import { pickCommentMutationObserverRoot } from '../lib/observerTarget.js';
 import { probeRecommendedLiveSection } from '../lib/probeRecommendedLiveSection.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
+import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -4264,6 +4265,20 @@ function buildAiShareFastDiagnosticsPayload() {
           probeError: String(e?.message || e || 'unknown')
         };
       }
+    })(),
+    // v0.1.201: window.error / unhandledrejection 観測 ring buffer の snapshot。
+    // boot 時に install 済みで、最新 20 件 + ignoredCount を診断 JSON に出す。
+    consoleErrorProbe: (() => {
+      try {
+        return _consoleErrorBuffer.snapshot();
+      } catch (e) {
+        return {
+          recentErrors: [],
+          totalCount: 0,
+          ignoredCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
     })()
   };
 }
@@ -6263,6 +6278,20 @@ function buildAiSharePageDiagnostics() {
             commentTableRowCount: 0,
             videoElementPresent: false
           },
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: window.error / unhandledrejection 観測 ring buffer の snapshot。
+    // boot 時に install 済みで、最新 20 件 + ignoredCount を診断 JSON に出す。
+    consoleErrorProbe: (() => {
+      try {
+        return _consoleErrorBuffer.snapshot();
+      } catch (e) {
+        return {
+          recentErrors: [],
+          totalCount: 0,
+          ignoredCount: 0,
           probeError: String(e?.message || e || 'unknown')
         };
       }
@@ -8573,6 +8602,13 @@ let _giftSubAppHistoryCache = {
 };
 
 /**
+ * v0.1.201: window.error / unhandledrejection を診断 JSON に集約するための ring buffer。
+ * boot 時に install して、診断 payload 生成時に snapshot を読む。
+ * `__NLS_CONSOLE_ERROR_BUFFER__` global flag で重複 install を抑止（idempotent）。
+ */
+const _consoleErrorBuffer = createConsoleErrorBuffer({ capacity: 20 });
+
+/**
  * ニコニ広告ページの「貢献度ランキング（広告 pt 順）」を fetch 済の liveId。
  * 0.1.169 で追加。同じ liveId につき 1 度きり。
  * @type {string}
@@ -9450,6 +9486,11 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   } catch {
     // no-op
   }
+  // v0.1.201: window.error / unhandledrejection を診断 JSON 用 ring buffer に
+  // 取り込み開始（idempotent、初回 boot のみ install）。
+  try {
+    if (typeof window !== 'undefined') _consoleErrorBuffer.install(window);
+  } catch { /* no-op */ }
   // ニコニ広告ページに注入された場合のハーベストは start() とは独立して走らせる
   // （start は watch ページ専用で early return するため）
   try { tryHarvestNicoadContributionRankingOnce(); } catch { /* no-op */ }
