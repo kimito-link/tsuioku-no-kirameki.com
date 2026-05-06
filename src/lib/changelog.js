@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.190',
+    date: '2026-05-06',
+    summary: 'プレイヤーオーバーレイのギフト演出を即パース',
+    items: Object.freeze([
+      'プレイヤー画面に流れる「○○さんがギフト〜を贈りました」の演出から、送信者名を即座に取り込むようになりました（コメント欄が画面外でも捕捉できるルートです）',
+      'ギフト関連の DOM 構造を診断 JSON に詳細出力するようにしました（giftSidebarVerboseProbe）。ニコ生側のクラス名が変わっても、どの命名で描画されているかが次回診断で判別できます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.189',
     date: '2026-05-06',
     summary: 'AI連携用データを5秒ごとに保存しはじめます',

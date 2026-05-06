@@ -3855,6 +3855,64 @@ function buildGiftDiagnosticsBundle() {
         avNoUidSamples
       };
     })(),
+    // 0.1.190: ギフト UI を表す可能性のある class 名候補を**全部スキャン**。
+    // niconico がクラス名を変更した時に、どの命名で描画されているかを次回診断で確定する。
+    // top frame だけでなく iframe 内（同 origin の場合）も観測する（CORS で読めなければ skip）。
+    giftSidebarVerboseProbe: (() => {
+      /** @type {{ pattern: string, count: number, sampleClasses: string[] }[]} */
+      const findings = [];
+      const patterns = [
+        'gift', 'history', 'ranking', 'ranker', 'contribution',
+        'rich-view', 'event-banner', 'event-balloon', 'point-field',
+        'donation', 'support', 'sponsor', 'advertiser', 'tribute',
+        'modal', 'dialog', 'sidebar', 'panel', 'drawer'
+      ];
+      const seenClass = new Set();
+      /** @param {Document} doc @param {string} originLabel */
+      const scanDoc = (doc, originLabel) => {
+        for (const pattern of patterns) {
+          try {
+            const els = doc.querySelectorAll(`[class*="${pattern}"]`);
+            if (els.length === 0) continue;
+            /** @type {string[]} */
+            const samples = [];
+            for (const el of els) {
+              if (samples.length >= 3) break;
+              if (!(el instanceof HTMLElement)) continue;
+              const cls = String(el.className || '').slice(0, 120);
+              if (seenClass.has(cls)) continue;
+              seenClass.add(cls);
+              samples.push(cls);
+            }
+            if (samples.length > 0 || els.length > 0) {
+              findings.push({
+                pattern: `${originLabel}:${pattern}`,
+                count: els.length,
+                sampleClasses: samples
+              });
+            }
+          } catch { /* no-op */ }
+        }
+      };
+      try {
+        scanDoc(document, 'top');
+      } catch { /* no-op */ }
+      // iframe 内（同 origin の場合のみ contentDocument にアクセスできる）
+      try {
+        const iframes = document.querySelectorAll('iframe');
+        let i = 0;
+        for (const iframe of iframes) {
+          if (i >= 3) break;
+          if (!(iframe instanceof HTMLIFrameElement)) continue;
+          try {
+            const idoc = iframe.contentDocument;
+            if (idoc) scanDoc(idoc, `iframe[${i}]`);
+          } catch { /* CORS で読めない（cross-origin） */ }
+          i += 1;
+        }
+      } catch { /* no-op */ }
+      return findings.slice(0, 50);
+    })(),
     // 0.1.179: ピン留めコメント観測。「No.75 が匿名扱いで pin 表示」事象に対し、
     // pin/固定/operator/anchor 系 class が DOM にどれだけあるか hit 数で確認する。
     // 0.1.180: hit があった selector の DOM 内容を sample で dump（innerHTML 一部）。
@@ -8420,6 +8478,18 @@ function ensureOfficialEventDomObserver() {
           if (node.querySelector && node.querySelector(RELEVANT)) {
             trigger();
             return;
+          }
+          // 0.1.190: プレイヤーオーバーレイなどに「【ギフト貢献N位】〇〇さんがギフト
+          // 「アイテム（Npt）」を贈りました」が表示された瞬間にパース。
+          // virtualization の影響を受けない経路（実際に画面に出た瞬間にキャッチ）。
+          const text = String(node.textContent || '');
+          if (
+            text.length < 200 &&
+            text.includes('さんがギフト') &&
+            text.includes('を贈りました')
+          ) {
+            const parsed = parseGiftCommentText(text);
+            if (parsed) recordGiftCommentObservation(parsed, text);
           }
         } catch { /* no-op */ }
       }
