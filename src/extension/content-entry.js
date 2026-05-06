@@ -772,48 +772,23 @@ function recordGiftSenderObservation(userId) {
 }
 
 /**
- * 0.1.175: コメントテーブル DOM から `data-comment-type="gift"` の row を抽出して
- * 「sender さんがギフト「item（Npt）」を贈りました」のテキストをパースし、
- * lifetime に蓄積する。NDGR ギフト event を取り逃した番組（拡張が後から接続）でも、
- * コメント文字列から sender / item / point が確実に取れる迂回ルート。
+ * 0.1.176: パース済ギフトコメントを lifetime に蓄積する共通関数。
+ * DOM 経路と NDGR 経路の両方から呼ばれる。rawText を key に重複排除。
  *
- * テスラ式：autoOpen が動かない真因（Vue がサイドバーをマウントしない）を
- * 試行錯誤で潰すより、niconico 側が最初から流してくれている文字列を素直に拾う。
- *
- * 重複判定：rawText を key にする。同一文字列のギフト row は既に観測済みとして無視。
- *   → 同じユーザーが同じアイテムを同じポイントで複数回贈った場合の取りこぼしは
- *     許容する（DOM virtualization で同じ row が再表示されるケースが多い）。
+ * @param {{ sender: string, item: string, point: number }} parsed
+ * @param {string} rawText
  */
-function harvestGiftCommentsFromCommentTableDom() {
-  /** @type {{ raw: string, parsed: { sender: string, item: string, point: number } }[]} */
-  const rows = [];
-  try {
-    const els = document.querySelectorAll('div.table-row[data-comment-type="gift"]');
-    for (const el of els) {
-      if (!(el instanceof HTMLElement)) continue;
-      const textEl = el.querySelector('.comment-text');
-      const text = textEl?.textContent || '';
-      const trimmed = text.trim();
-      if (!trimmed) continue;
-      const p = parseGiftCommentText(trimmed);
-      if (p) rows.push({ raw: trimmed, parsed: p });
-    }
-  } catch { /* no-op */ }
+function recordGiftCommentObservation(parsed, rawText) {
   const _d = getRankingLifetimeDiag();
-  _d.giftCommentHarvestRunCount += 1;
-  _d.giftCommentHarvestLastAt = Date.now();
-  if (rows.length === 0) return;
-  const now = Date.now();
-  for (const r of rows) {
-    if (_d.giftCommentObservations.has(r.raw)) continue;
-    _d.giftCommentObservations.set(r.raw, {
-      sender: r.parsed.sender,
-      item: r.parsed.item,
-      point: r.parsed.point,
-      firstObservedAt: now
-    });
-  }
-  // 上限：500 ギフトコメントまで（メモリ保護、古い順に削る）
+  const key = String(rawText || '').trim();
+  if (!key) return;
+  if (_d.giftCommentObservations.has(key)) return;
+  _d.giftCommentObservations.set(key, {
+    sender: parsed.sender,
+    item: parsed.item,
+    point: parsed.point,
+    firstObservedAt: Date.now()
+  });
   if (_d.giftCommentObservations.size > 500) {
     const entries = [..._d.giftCommentObservations.entries()].sort(
       (a, b) => a[1].firstObservedAt - b[1].firstObservedAt
@@ -823,6 +798,97 @@ function harvestGiftCommentsFromCommentTableDom() {
       _d.giftCommentObservations.delete(entries[i][0]);
     }
   }
+}
+
+/**
+ * 0.1.175: コメントテーブル DOM から `data-comment-type="gift"` の row を抽出して
+ * 「sender さんがギフト「item（Npt）」を贈りました」のテキストをパースし、
+ * lifetime に蓄積する。NDGR ギフト event を取り逃した番組（拡張が後から接続）でも、
+ * コメント文字列から sender / item / point が確実に取れる迂回ルート。
+ *
+ * 0.1.176: scan 各段階の observation を globalThis にキャッシュ → 診断 JSON へ。
+ * harvestRunCount は走るが observationsTotal=0 だった v0.1.175 の真因切り分けのため、
+ * tableRowCount / commentTypeRowCount / giftRowCount / sampleClasses / giftRowSamples /
+ * iframeCount を出して「DOM のどこまで届いていないか」を確定させる。
+ */
+function harvestGiftCommentsFromCommentTableDom() {
+  const _d = getRankingLifetimeDiag();
+  _d.giftCommentHarvestRunCount += 1;
+  _d.giftCommentHarvestLastAt = Date.now();
+
+  /** @type {{
+   *   tableRowCount: number,
+   *   commentTypeRowCount: number,
+   *   giftRowCount: number,
+   *   parsedCount: number,
+   *   iframeCount: number,
+   *   sampleClasses: string[],
+   *   commentTypeValues: string[],
+   *   giftRowSamples: string[]
+   * }} */
+  const probe = {
+    tableRowCount: 0,
+    commentTypeRowCount: 0,
+    giftRowCount: 0,
+    parsedCount: 0,
+    iframeCount: 0,
+    sampleClasses: [],
+    commentTypeValues: [],
+    giftRowSamples: []
+  };
+
+  try {
+    probe.iframeCount = document.querySelectorAll('iframe').length;
+
+    // table-row 全部（class 命名のばらつきにも追随）
+    const allTableRows = document.querySelectorAll('div.table-row, [class*="table-row"]');
+    probe.tableRowCount = allTableRows.length;
+    for (let i = 0; i < Math.min(3, allTableRows.length); i++) {
+      const el = allTableRows[i];
+      if (el instanceof HTMLElement) {
+        probe.sampleClasses.push(String(el.className || '').slice(0, 120));
+      }
+    }
+
+    // data-comment-type 付きの row 全部
+    const typedRows = document.querySelectorAll('[data-comment-type]');
+    probe.commentTypeRowCount = typedRows.length;
+    /** @type {Map<string, number>} */
+    const typeHist = new Map();
+    for (const el of typedRows) {
+      if (!(el instanceof HTMLElement)) continue;
+      const t = el.getAttribute('data-comment-type') || '';
+      typeHist.set(t, (typeHist.get(t) || 0) + 1);
+    }
+    probe.commentTypeValues = [...typeHist.entries()]
+      .map(([k, v]) => `${k}:${v}`)
+      .slice(0, 10);
+
+    // gift type の row → パース
+    const giftRows = document.querySelectorAll('[data-comment-type="gift"]');
+    probe.giftRowCount = giftRows.length;
+    let sampled = 0;
+    for (const row of giftRows) {
+      if (!(row instanceof HTMLElement)) continue;
+      const textEl = row.querySelector('.comment-text');
+      const trimmed = (textEl?.textContent || '').trim();
+      if (sampled < 3 && trimmed) {
+        probe.giftRowSamples.push(trimmed.slice(0, 100));
+        sampled += 1;
+      }
+      if (!trimmed) continue;
+      const p = parseGiftCommentText(trimmed);
+      if (p) {
+        probe.parsedCount += 1;
+        recordGiftCommentObservation(p, trimmed);
+      }
+    }
+  } catch { /* no-op */ }
+
+  /** @type {any} */ (globalThis).__nls_gift_comment_scan_probe__ = {
+    capturedAt: Date.now(),
+    ...probe
+  };
 }
 
 /** userId→avatarUrl の補助マップ */
@@ -1536,6 +1602,16 @@ window.addEventListener('message', (e) => {
   if (e.data.type === 'NLS_INTERCEPT_CHAT_ROWS') {
     const raw = e.data.rows;
     if (Array.isArray(raw) && raw.length) {
+      // 0.1.176: NDGR chat 経路でもギフト文字列をパース（DOM 非依存ルート）。
+      // virtualization で DOM から消えた古い gift row も、NDGR backward で来た
+      // chat に「○○さんがギフト〜を贈りました」が入っていれば拾える。
+      for (const x of raw) {
+        if (!x || typeof x !== 'object') continue;
+        const text = String(/** @type {any} */ (x).text ?? '').trim();
+        if (!text) continue;
+        const p = parseGiftCommentText(text);
+        if (p) recordGiftCommentObservation(p, text);
+      }
       const cleaned = cleanNdgrChatRows(raw);
       if (cleaned.length) schedulePersistNdgrChatRows(cleaned);
     }
@@ -3706,6 +3782,9 @@ function buildGiftDiagnosticsBundle() {
       };
     })(),
     // 0.1.175: コメント DOM 経由のギフト観測の集計（autoOpen 迂回ルートの結果）
+    // 0.1.176: scanProbe を追加 — observationsTotal=0 だった時に DOM のどこまで
+    // 届いていないか（iframeCount / tableRowCount / commentTypeRowCount /
+    // giftRowCount / sampleClasses / giftRowSamples）が一目で分かる。
     giftCommentDiag: (() => {
       const _d = getRankingLifetimeDiag();
       const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
@@ -3715,10 +3794,26 @@ function buildGiftDiagnosticsBundle() {
         point: v.point
       }));
       const summary = summarizeGiftComments(rows);
+      const scanProbe = (() => {
+        const snap = /** @type {any} */ (globalThis).__nls_gift_comment_scan_probe__;
+        if (!snap) return null;
+        return {
+          capturedAgoMs: ago(snap.capturedAt),
+          iframeCount: snap.iframeCount,
+          tableRowCount: snap.tableRowCount,
+          commentTypeRowCount: snap.commentTypeRowCount,
+          giftRowCount: snap.giftRowCount,
+          parsedCount: snap.parsedCount,
+          sampleClasses: snap.sampleClasses,
+          commentTypeValues: snap.commentTypeValues,
+          giftRowSamples: snap.giftRowSamples
+        };
+      })();
       return {
         harvestRunCount: _d.giftCommentHarvestRunCount,
         harvestLastAgoMs: ago(_d.giftCommentHarvestLastAt),
         observationsTotal: _d.giftCommentObservations.size,
+        scanProbe,
         ...summary
       };
     })(),

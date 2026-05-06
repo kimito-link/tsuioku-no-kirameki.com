@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.176',
+    date: '2026-05-06',
+    summary: 'NDGR経由のギフトもパース＋DOMスキャン観測強化',
+    items: Object.freeze([
+      'NDGR チャットの経路でもギフト文字列をパースするようになり、ギフトサイドバーが開けない番組や DOM virtualization で表示外のギフトでも、NDGR から流れてくる文字列だけで送信者を取得できます',
+      '0.1.175 でコメント DOM 経由のギフト取得が 0 件だった原因を特定するための観測（scanProbe）を診断 JSON に追加しました（iframe数・table-row数・data-comment-type 内訳・サンプル class 名・サンプル文字列）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.175',
     date: '2026-05-06',
     summary: 'コメント文字列からギフト送信者・アイテム・ptを抽出',
