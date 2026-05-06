@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.203',
+    date: '2026-05-06',
+    summary: 'viewer ID と avatar 経路を抜本改善',
+    items: Object.freeze([
+      'viewer ID（ログイン中ユーザー識別子）を `<script id="embedded-data">` から取得する経路を first-class fallback として追加しました（streamlink / yt-dlp が使う安定経路、SSR で必ず埋まる）。これまで header の DOM スコアリングだけに頼って空になっていた状態を解消',
+      'ニックネームと avatar URL も embedded-data から取れる場合は優先採用し、avatar URL が取れない場合は UID から確定パターン（secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/<UID/10000>/<UID>.jpg）で生成して補完します。「サムネあり匿名」事象の構造的解消',
+      'ギフトサイドバー履歴の取得失敗理由（cross_origin_iframe_only / no_iframe_found / iframe_present_but_no_history）を診断 JSON と popup「詳しい状況」に明示。「scrape 失敗 = 異常」ではなく「クロスオリジン iframe は仕様、NDGR 経路で代替予定」と説明される構造に',
+      '過去の watch lv 残骸（multi-tab race 警告の真因）を 24h TTL で cleanup する純関数を追加。content-entry.js への組み込みは v0.1.204 以降で段階導入'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.202',
     date: '2026-05-06',
     summary: '詳しい状況に取得状況サマリを表示',
