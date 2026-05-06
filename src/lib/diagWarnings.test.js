@@ -8,7 +8,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   deriveAutoOpenFailureReason,
-  deriveStaleDomBundleSuspected
+  deriveStaleDomBundleSuspected,
+  deriveGiftSubAppFailureReason
 } from './diagWarnings.js';
 
 describe('deriveAutoOpenFailureReason', () => {
@@ -192,5 +193,62 @@ describe('deriveStaleDomBundleSuspected', () => {
         currentLiveIdInNicoad: false
       })
     ).toBe(true);
+  });
+});
+
+describe('deriveGiftSubAppFailureReason', () => {
+  it('null/undefined → null（判定対象なし）', () => {
+    expect(deriveGiftSubAppFailureReason(null)).toBeNull();
+    expect(deriveGiftSubAppFailureReason(undefined)).toBeNull();
+  });
+
+  it('historyCount > 0 → null（取れている）', () => {
+    expect(
+      deriveGiftSubAppFailureReason({
+        historyCount: 5,
+        iframeCount: 2,
+        scrapableFrameCount: 1
+      })
+    ).toBeNull();
+  });
+
+  it('iframeCount=0 → no_iframe_found', () => {
+    expect(
+      deriveGiftSubAppFailureReason({
+        historyCount: 0,
+        iframeCount: 0,
+        scrapableFrameCount: 0
+      })
+    ).toBe('no_iframe_found');
+  });
+
+  it('実機 lv350471922: iframe 2 / scrape 0 / history 0 → cross_origin_iframe_only', () => {
+    expect(
+      deriveGiftSubAppFailureReason({
+        historyCount: 0,
+        iframeCount: 2,
+        scrapableFrameCount: 0
+      })
+    ).toBe('cross_origin_iframe_only');
+  });
+
+  it('iframe 検出 + scrape 可能だが history 0 → iframe_present_but_no_history', () => {
+    expect(
+      deriveGiftSubAppFailureReason({
+        historyCount: 0,
+        iframeCount: 2,
+        scrapableFrameCount: 1
+      })
+    ).toBe('iframe_present_but_no_history');
+  });
+
+  it('壊れた値（数値以外）でも crash しない', () => {
+    expect(
+      deriveGiftSubAppFailureReason(/** @type {any} */ ({
+        historyCount: 'abc',
+        iframeCount: null,
+        scrapableFrameCount: undefined
+      }))
+    ).toBe('no_iframe_found');
   });
 });

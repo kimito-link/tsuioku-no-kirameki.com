@@ -11,6 +11,7 @@ import { summarizeGiftSubAppHistoryDiag } from './summarizeGiftSubAppHistoryDiag
 
 describe('summarizeGiftSubAppHistoryDiag', () => {
   it('null/undefined では空 summary を返す（診断 JSON が壊れない）', () => {
+    // v0.1.203: failureReason を含む（iframe なしの状態 = 'no_iframe_found'）
     const empty = {
       historyCount: 0,
       itemTypeCount: 0,
@@ -20,11 +21,36 @@ describe('summarizeGiftSubAppHistoryDiag', () => {
       topItems: [],
       totalPoints: 0,
       iframeCount: 0,
-      scrapableFrameCount: 0
+      scrapableFrameCount: 0,
+      failureReason: 'no_iframe_found'
     };
     expect(summarizeGiftSubAppHistoryDiag(null)).toEqual(empty);
     expect(summarizeGiftSubAppHistoryDiag(undefined)).toEqual(empty);
     expect(summarizeGiftSubAppHistoryDiag({})).toEqual(empty);
+  });
+
+  it('v0.1.203: 実機 lv350471922 のシナリオ（iframe 2 / scrape 0 / history 0）→ cross_origin_iframe_only', () => {
+    const r = summarizeGiftSubAppHistoryDiag({
+      history: [],
+      totalCounts: [],
+      scannedFrames: 2,
+      observedFrames: 0
+    });
+    expect(r.failureReason).toBe('cross_origin_iframe_only');
+    expect(r.historyCount).toBe(0);
+    expect(r.iframeCount).toBe(2);
+    expect(r.scrapableFrameCount).toBe(0);
+  });
+
+  it('v0.1.203: 履歴が取れているとき（success）→ failureReason は null', () => {
+    const r = summarizeGiftSubAppHistoryDiag({
+      history: [{ senderName: 'alice', points: 100, itemName: 'item1' }],
+      totalCounts: [],
+      scannedFrames: 2,
+      observedFrames: 1
+    });
+    expect(r.failureReason).toBeNull();
+    expect(r.historyCount).toBe(1);
   });
 
   it('history と totalCounts の件数を正確に数える', () => {

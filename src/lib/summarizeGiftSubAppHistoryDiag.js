@@ -13,6 +13,8 @@
  * `persistGiftSubAppHistoryNow` が書き込んだ形）。または同等構造の object。
  */
 
+import { deriveGiftSubAppFailureReason } from './diagWarnings.js';
+
 /**
  * sender 名のうち unresolved 扱いするパターン。
  * - 空文字 / null / undefined
@@ -36,7 +38,8 @@ const UNRESOLVED_SENDER_NAMES = new Set(['名無し', 'ゲスト']);
  *   topItems: TopItemEntry[],
  *   totalPoints: number,
  *   iframeCount: number,
- *   scrapableFrameCount: number
+ *   scrapableFrameCount: number,
+ *   failureReason: string|null
  * }} GiftSubAppDiagSummary
  */
 
@@ -63,7 +66,9 @@ export function summarizeGiftSubAppHistoryDiag(payload) {
     topItems: [],
     totalPoints: 0,
     iframeCount: 0,
-    scrapableFrameCount: 0
+    scrapableFrameCount: 0,
+    // v0.1.203: empty 状態は iframe が観測できなかった = 'no_iframe_found'
+    failureReason: 'no_iframe_found'
   };
   if (!payload || typeof payload !== 'object') return empty;
 
@@ -137,7 +142,7 @@ export function summarizeGiftSubAppHistoryDiag(payload) {
       ? Math.max(0, payload.observedFrames | 0)
       : 0;
 
-  return {
+  const result = {
     historyCount: history.length,
     itemTypeCount: itemCountMap.size,
     resolvedSenderCount: resolvedCount,
@@ -147,5 +152,11 @@ export function summarizeGiftSubAppHistoryDiag(payload) {
     totalPoints,
     iframeCount: scannedFrames,
     scrapableFrameCount: observedFrames
+  };
+  // v0.1.203: 取得失敗の理由を 1 トークンで diag に含める
+  // （Agent A deep research: cross-origin iframe は仕様、NDGR 経路に頼る必要）
+  return {
+    ...result,
+    failureReason: deriveGiftSubAppFailureReason(result)
   };
 }

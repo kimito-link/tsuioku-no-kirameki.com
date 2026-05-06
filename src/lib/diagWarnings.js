@@ -65,6 +65,38 @@ export function deriveAutoOpenFailureReason(autoOpen) {
 }
 
 /**
+ * v0.1.203: gift sub-app の取得失敗理由を 1 トークンで返す。
+ *
+ * 戻り値:
+ *   - null                            … 取得できている（historyCount > 0）
+ *   - 'no_iframe_found'               … iframe 自体が無い（page 構造変更の疑い）
+ *   - 'cross_origin_iframe_only'      … iframe あるが全部 cross-origin（仕様、NDGR 経路に頼る）
+ *   - 'iframe_present_but_no_history' … iframe scrape できるが履歴 0（タイミング or DOM 変更）
+ *
+ * Agent A の deep research で判明：niconico のギフトサイドバーは cross-origin iframe で
+ * 隔離されており、Chrome 拡張の content_script では中身を読めない。これを「異常」ではなく
+ * 「仕様」として reason 化することで、ユーザーが「DOM scrape 失敗 = バグ」と誤解しないよう
+ * にする。代替路は NDGR Protobuf gift event の `advertiserUserId/Name/contributionRank/point`。
+ *
+ * @param {{ historyCount?: number, iframeCount?: number, scrapableFrameCount?: number }|null|undefined} subApp
+ * @returns {string|null}
+ */
+export function deriveGiftSubAppFailureReason(subApp) {
+  if (!subApp || typeof subApp !== 'object') return null;
+  const hc = typeof subApp.historyCount === 'number' ? subApp.historyCount | 0 : 0;
+  const ifc = typeof subApp.iframeCount === 'number' ? subApp.iframeCount | 0 : 0;
+  const sfc =
+    typeof subApp.scrapableFrameCount === 'number'
+      ? subApp.scrapableFrameCount | 0
+      : 0;
+
+  if (hc > 0) return null;
+  if (ifc === 0) return 'no_iframe_found';
+  if (sfc === 0) return 'cross_origin_iframe_only';
+  return 'iframe_present_but_no_history';
+}
+
+/**
  * multi-tab race による DOM bundle の汚染が疑わしいかを bool で返す。
  *
  * 判定（いずれか one でも当てはまれば true）:
