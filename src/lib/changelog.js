@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.213',
+    date: '2026-05-07',
+    summary: 'AI 診断ボタンの挙動を逐次表示に',
+    items: Object.freeze([
+      'AI 診断ボタンを押しても表示が変わらないという報告があったため、各処理ステップを逐次表示に変更しました。クリック検知 → Built-in AI 検出 → prompt 構築 → AI 実行 までの 4 ステップで進捗が見えます',
+      'Built-in AI が利用できない環境では、その state（unavailable / downloadable / downloading）と理由（reason）を表示し、Chrome 138+ + WebGPU + chrome://flags / chrome://components 有効化の手順を案内します',
+      'コンソール（DevTools の console）にも各ステップのログを出力するようになりました。デバッグ時に実際にどこで止まっているかが追跡可能です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.212',
     date: '2026-05-07',
     summary: 'popup に AI 診断ボタン（Gemini Nano）',

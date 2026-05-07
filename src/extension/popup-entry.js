@@ -300,6 +300,11 @@ import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootH
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 import { pickAvatarUrlForUid } from '../lib/deriveAvatarUrlFromUid.js';
 import { runPopupAiDiagnosis } from '../lib/popupAiDiagOrchestrator.js';
+import {
+  probeBuiltinAiAvailability,
+  runBuiltinAiPrompt
+} from '../lib/geminiNanoBridge.js';
+import { buildErrorDiagnosisPrompt } from '../lib/errorAutoDiagnosis.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
 import {
@@ -6823,17 +6828,56 @@ async function renderDevMonitorGiftRankingExtras() {
 }
 
 /**
- * v0.1.212: popup「AI 診断（Gemini Nano）」ボタンの handler を attach する。
+ * v0.1.213: popup「AI 診断（Gemini Nano）」ボタンの handler。
+ * 各ステップで result.textContent を逐次更新し、どこで止まるか可視化する
+ * （v0.1.212 で「クリックしても変わらない」報告があったため、step 別に
+ * 状態を出して silent fail を防ぐ）。
+ *
  * @param {any} fastCache  KEY_AI_SHARE_FAST_DIAG の中身
  */
 function attachAiDiagButtonHandler(fastCache) {
   const btn = $('aiDiagBtn');
   const result = $('aiDiagResult');
-  if (!btn || !result) return;
+  if (!btn || !result) {
+    try {
+      console.warn(
+        '[nls AI診断] ボタン or 結果表示エリアが見つかりません',
+        '#aiDiagBtn=',
+        !!btn,
+        '#aiDiagResult=',
+        !!result
+      );
+    } catch { /* no-op */ }
+    return;
+  }
+  try {
+    console.log('[nls AI診断] handler attached to #aiDiagBtn');
+  } catch { /* no-op */ }
   btn.addEventListener('click', async () => {
-    result.textContent = '⏳ Built-in AI（Gemini Nano）に診断を依頼中…';
+    try {
+      console.log('[nls AI診断] click 検知');
+    } catch { /* no-op */ }
+    result.textContent = '⏳ ステップ 1/4: クリック検知、Built-in AI 検出中…';
     btn.setAttribute('disabled', 'disabled');
     try {
+      const av = await probeBuiltinAiAvailability();
+      result.textContent = `⏳ ステップ 2/4: 検出結果 state=${av.state}${av.reason ? ` (${av.reason})` : ''}`;
+      try {
+        console.log('[nls AI診断] availability', av);
+      } catch { /* no-op */ }
+      if (av.state !== 'available') {
+        result.textContent =
+          `❌ Built-in AI 利用不可\n` +
+          `state: ${av.state}\n` +
+          `reason: ${av.reason || '(なし)'}\n\n` +
+          `Chrome 138+ + WebGPU 対応 + Built-in AI モデル DL が必要です。\n` +
+          `chrome://flags/#optimization-guide-on-device-model を有効化、\n` +
+          `chrome://components で「Optimization Guide On Device Model」を最新化してください。`;
+        btn.removeAttribute('disabled');
+        return;
+      }
+
+      // step 3: prompt 構築
       const cache = fastCache && typeof fastCache === 'object' ? fastCache : {};
       const content = cache?.content || {};
       const consoleErrors = Array.isArray(
@@ -6872,24 +6916,37 @@ function attachAiDiagButtonHandler(fastCache) {
       const ndgrGifts = giftSummary?.['NDGRギフトevent数'] ?? 0;
       const giftPoints = giftSummary?.['ギフトポイント観測'] ?? 0;
       const contextNote = `現在の配信状況: ギフト event 観測 ${ndgrGifts} 件, ギフトポイント ${giftPoints}, 視聴者 ${content?.romiDebug?.interceptMapSize ?? 0} 名`;
-      const res = await runPopupAiDiagnosis({
+
+      result.textContent = '⏳ ステップ 3/4: prompt 構築中…';
+      const prompt = buildErrorDiagnosisPrompt({
         consoleErrors,
         networkErrors,
         diagWarnings,
         contextNote
       });
-      if (res.ok) {
-        result.textContent = res.text || '(AI 応答が空でした)';
-      } else {
-        result.textContent = '❌ ' + (res.reason || 'AI 診断に失敗しました');
-      }
+
+      result.textContent =
+        '⏳ ステップ 4/4: Built-in AI に問い合わせ中… (5〜10 秒かかります)';
+      try {
+        console.log('[nls AI診断] runBuiltinAiPrompt 開始');
+      } catch { /* no-op */ }
+      const text = await runBuiltinAiPrompt(prompt);
+      try {
+        console.log('[nls AI診断] runBuiltinAiPrompt 応答', text?.length, '文字');
+      } catch { /* no-op */ }
+      result.textContent = text || '(AI 応答が空でした)';
     } catch (e) {
+      try {
+        console.error('[nls AI診断] エラー', e);
+      } catch { /* no-op */ }
       result.textContent =
         '❌ エラー: ' + String(/** @type {any} */ (e)?.message || e);
     } finally {
       btn.removeAttribute('disabled');
     }
   });
+  // 参照されない警告抑制（runPopupAiDiagnosis は v0.1.212 互換のため残置）
+  void runPopupAiDiagnosis;
 }
 
 /** 収録・スクショ向け: `html.nl-calm-motion` でループアニメ等を止める */
