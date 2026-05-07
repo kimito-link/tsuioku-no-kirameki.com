@@ -3651,6 +3651,15 @@ function buildGiftDiagnosticsBundle() {
       decoded: pickNum('d'),
       gifts: pickNum('g'),
       stats: pickNum('s'),
+      // v0.1.221: gifts の内訳。decode で uid/name/item/point/rank が取れた件数。
+      // gifts に対し各値が小さい → ndgrDecode 側の proto field 認識ズレ疑い。
+      // gifts に対し各値が高いが popup の sender 観測 0 → 受信側 (mergeGiftUsers
+      // / appendGiftEvents) の保存ゲートで skip されている疑い。
+      giftsWithUid: pickNum('gu'),
+      giftsWithName: pickNum('gn'),
+      giftsWithItem: pickNum('gi'),
+      giftsWithPoint: pickNum('gp'),
+      giftsWithRank: pickNum('gr'),
       parseOk: true
     },
     ndgrTagHistogram,

@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.221',
+    date: '2026-05-07',
+    summary: 'ギフト送信者観測 0 の原因切り分け診断を追加',
+    items: Object.freeze([
+      'NDGR ギフトイベントは届いている（gifts カウンタが進む）のに popup の「ギフト送信者観測数」が 0 件のままになる症状について、原因が「proto デコードで送信者情報が取り出せていない」のか「受信側で保存条件を満たさず skip されている」のかを切り分けるための診断値を追加しました',
+      'AI 共有診断 JSON の `ndgrWireCounters` に `giftsWithUid` / `giftsWithName` / `giftsWithItem` / `giftsWithPoint` / `giftsWithRank` の 5 件を追加しました。`gifts` 総数に対しこれらの値が小さい場合は decode 側、十分大きいのに popup の送信者数が 0 のままなら受信側の保存ゲートが原因、と判断できます',
+      '本バージョンは観測値の追加のみでロジック変更はありません。次バージョン以降の実装方針を、実機の診断値を見てから決めるための準備です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.220',
     date: '2026-05-07',
     summary: 'AI 診断ボタンが反応しない問題を修正',
