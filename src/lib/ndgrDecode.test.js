@@ -276,14 +276,69 @@ describe('decodeChat', () => {
 });
 
 describe('decodeGift', () => {
-  it('pulls advertiser id and name from len/varint fields', () => {
+  it('decodes proto-schema gift fields (fn 1〜7)', () => {
+    // proto schema (n-air-app/nicolive-comment-protobuf, atoms.proto):
+    //   1: item_id (string)
+    //   2: advertiser_user_id (optional int64)
+    //   3: advertiser_name (string)
+    //   4: point (int64)
+    //   5: message (string)
+    //   6: item_name (string)
+    //   7: contribution_rank (optional int32)
     const buf = new Uint8Array([
-      ...strField(2, 'senderNick'),
-      ...varintField(3, 87654321)
+      ...strField(1, 'stamp_basketball'),
+      ...varintField(2, 86255751),
+      ...strField(3, 'よしださん'),
+      ...varintField(4, 11000),
+      ...strField(5, 'ありがとう'),
+      ...strField(6, 'バスケットボール'),
+      ...varintField(7, 3)
     ]);
     const g = decodeGift(buf, 0, buf.length);
-    expect(g.advertiserUserId).toBe('87654321');
-    expect(g.advertiserName).toBe('senderNick');
+    expect(g.itemId).toBe('stamp_basketball');
+    expect(g.advertiserUserId).toBe('86255751');
+    expect(g.advertiserName).toBe('よしださん');
+    expect(g.point).toBe(11000);
+    expect(g.message).toBe('ありがとう');
+    expect(g.itemName).toBe('バスケットボール');
+    expect(g.contributionRank).toBe(3);
+  });
+
+  it('handles anonymous gift (advertiser_user_id absent)', () => {
+    const buf = new Uint8Array([
+      ...strField(1, 'stamp_anon'),
+      ...strField(3, '名無し'),
+      ...varintField(4, 100)
+    ]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.itemId).toBe('stamp_anon');
+    expect(g.advertiserUserId).toBe('');
+    expect(g.advertiserName).toBe('名無し');
+    expect(g.point).toBe(100);
+    expect(g.contributionRank).toBeNull();
+  });
+
+  it('returns default fields for empty payload', () => {
+    const g = decodeGift(new Uint8Array(), 0, 0);
+    expect(g.itemId).toBe('');
+    expect(g.advertiserUserId).toBe('');
+    expect(g.advertiserName).toBe('');
+    expect(g.point).toBeNull();
+    expect(g.message).toBe('');
+    expect(g.itemName).toBe('');
+    expect(g.contributionRank).toBeNull();
+  });
+
+  it('first occurrence wins for repeated fields', () => {
+    const buf = new Uint8Array([
+      ...strField(1, 'first_item'),
+      ...strField(1, 'second_item'),
+      ...varintField(2, 111),
+      ...varintField(2, 222)
+    ]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.itemId).toBe('first_item');
+    expect(g.advertiserUserId).toBe('111');
   });
 });
 
@@ -376,10 +431,13 @@ describe('decodeChunkedMessage', () => {
     expect(result.gifts.length).toBe(0);
   });
 
-  it('decodes gift from NicoliveMessage field 8', () => {
+  it('decodes gift from NicoliveMessage field 8 (proto schema)', () => {
     const gift = new Uint8Array([
-      ...strField(2, 'ギフト送り'),
-      ...varintField(3, 87654321)
+      ...strField(1, 'stamp_xxx'),
+      ...varintField(2, 87654321),
+      ...strField(3, 'ギフト送り'),
+      ...varintField(4, 5000),
+      ...strField(6, 'バスケットボール')
     ]);
     const nicoliveMessage = new Uint8Array(lenDelimited(8, [...gift]));
     const chunkedMessage = new Uint8Array(lenDelimited(2, [...nicoliveMessage]));
@@ -387,8 +445,27 @@ describe('decodeChunkedMessage', () => {
     const result = decodeChunkedMessage(chunkedMessage);
     expect(result.chats.length).toBe(0);
     expect(result.gifts.length).toBe(1);
+    expect(result.gifts[0].itemId).toBe('stamp_xxx');
     expect(result.gifts[0].advertiserUserId).toBe('87654321');
     expect(result.gifts[0].advertiserName).toBe('ギフト送り');
+    expect(result.gifts[0].point).toBe(5000);
+    expect(result.gifts[0].itemName).toBe('バスケットボール');
+  });
+
+  it('pushes anonymous gift even when advertiser_user_id is empty', () => {
+    const gift = new Uint8Array([
+      ...strField(1, 'stamp_anon'),
+      ...strField(3, '名無し'),
+      ...varintField(4, 50)
+    ]);
+    const nicoliveMessage = new Uint8Array(lenDelimited(8, [...gift]));
+    const chunkedMessage = new Uint8Array(lenDelimited(2, [...nicoliveMessage]));
+    const result = decodeChunkedMessage(chunkedMessage);
+    expect(result.gifts.length).toBe(1);
+    expect(result.gifts[0].itemId).toBe('stamp_anon');
+    expect(result.gifts[0].advertiserUserId).toBe('');
+    expect(result.gifts[0].advertiserName).toBe('名無し');
+    expect(result.gifts[0].point).toBe(50);
   });
 
   it('handles message with both stats and chat', () => {
@@ -458,8 +535,10 @@ describe('decodeChunkedMessage', () => {
       ...varintField(8, 42)
     ]);
     const gift = new Uint8Array([
-      ...strField(1, '12345678'),
-      ...strField(2, 'ギフト送り主')
+      ...strField(1, 'stamp_basketball'),
+      ...varintField(2, 12345678),
+      ...strField(3, 'ギフト送り主'),
+      ...varintField(7, 1)
     ]);
     const chunked = new Uint8Array([
       ...lenDelimited(1, [...lenDelimited(1, [...chat])]),
@@ -469,8 +548,10 @@ describe('decodeChunkedMessage', () => {
     expect(r.chats.length).toBe(1);
     expect(r.chats[0].content).toBe('top1 chat');
     expect(r.gifts.length).toBe(1);
+    expect(r.gifts[0].itemId).toBe('stamp_basketball');
     expect(r.gifts[0].advertiserUserId).toBe('12345678');
     expect(r.gifts[0].advertiserName).toBe('ギフト送り主');
+    expect(r.gifts[0].contributionRank).toBe(1);
     expect(r.tagHistogram.top['1']).toBe(2);
   });
 });

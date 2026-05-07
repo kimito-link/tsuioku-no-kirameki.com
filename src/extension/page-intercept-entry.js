@@ -405,16 +405,33 @@ import {
       }
     }
     const giftList = result.gifts || [];
-    /** @type {{ userId: string, nickname: string }[]} */
+    /** @type {Array<{
+     *   userId: string, nickname: string,
+     *   itemId?: string, itemName?: string, point?: number,
+     *   message?: string, contributionRank?: number
+     * }>} */
     const giftUsers = [];
     for (const g of giftList) {
       const uid = String(g.advertiserUserId || '').trim();
       const name = String(g.advertiserName || '').trim();
-      if (uid) {
-        _ndgr.gifts++;
-        learnUser(uid, name, '');
-        giftUsers.push({ userId: uid, nickname: name });
-      }
+      // v0.1.204 Patch C-1: anonymous gift（uid 欠落）も _ndgr.gifts でカウントする。
+      // 過去は uid を必須にしていたため、過去の経験的 decoder の field 番号誤認と
+      // 合わせて gifts カウンタが永遠に 0 のままだった（v0.1.203 真因）。proto 準拠
+      // decoder（v0.1.204 Patch B）に合わせ、payload で何かしら取れている event は
+      // すべてカウント対象にする。
+      _ndgr.gifts++;
+      if (uid) learnUser(uid, name, '');
+      giftUsers.push({
+        userId: uid,
+        nickname: name,
+        ...(g.itemId ? { itemId: g.itemId } : {}),
+        ...(g.itemName ? { itemName: g.itemName } : {}),
+        ...(typeof g.point === 'number' ? { point: g.point } : {}),
+        ...(g.message ? { message: g.message } : {}),
+        ...(typeof g.contributionRank === 'number'
+          ? { contributionRank: g.contributionRank }
+          : {})
+      });
     }
     if (giftUsers.length) {
       window.postMessage({ type: MSG_GIFT_USERS, users: giftUsers }, '*');
