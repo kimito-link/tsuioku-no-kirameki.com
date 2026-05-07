@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.210',
+    date: '2026-05-07',
+    summary: 'ギフトイベントの取得経路を msg.1 fallback に拡張',
+    items: Object.freeze([
+      'NDGR ギフトイベントが従来の決め打ち経路（msg.8）に来ず、コメントと同じ msg.1 で来ていた可能性が v0.1.209 の観測強化で判明したので、コメントとして解析できなかった msg.1 を「ギフトイベント候補」として再解析するようになりました。アイテム名（stamp_xxx 等の固定形式の文字列）が取れた場合のみギフトとして記録するため、誤検出は強く抑えられています',
+      'msg.2 / msg.3 / その他の未知 field でもアイテム名が含まれていればギフトとして記録するようになりました。これによりニコニコ側プロトコルの差し替えに対して柔軟に追従できる構造に',
+      '本版でギフト取得率が改善した場合、ギフト送信者のニックネーム解決も同時に復活する見込みです（同じ event payload に advertiserName が含まれているため）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.209',
     date: '2026-05-07',
     summary: '未知 NDGR field の中身を診断に出す（緊急）',
