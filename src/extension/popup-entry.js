@@ -298,6 +298,7 @@ import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
+import { pickAvatarUrlForUid } from '../lib/deriveAvatarUrlFromUid.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
 import {
@@ -2334,7 +2335,11 @@ function rememberedAvatarUrlForUserId(userId) {
     return fromCache;
   }
   const list = STORY_SOURCE_STATE?.entries;
-  if (!Array.isArray(list) || list.length === 0) return '';
+  // v0.1.208 Phase B: STORY_SOURCE が空でも、uid から生成 URL を返して
+  // avatar 取得率を上げる（v0.1.203 Patch 1 で確立した deriveAvatarUrlFromUid 経由）。
+  if (!Array.isArray(list) || list.length === 0) {
+    return pickAvatarUrlForUid(uid, null);
+  }
   for (let i = list.length - 1; i >= 0; i -= 1) {
     const e = list[i];
     if (String(e?.userId || '').trim() !== uid) continue;
@@ -2347,7 +2352,8 @@ function rememberedAvatarUrlForUserId(userId) {
       return av;
     }
   }
-  return '';
+  // v0.1.208 Phase B: STORY_SOURCE 走査でも見つからなければ uid から生成。
+  return pickAvatarUrlForUid(uid, null);
 }
 
 /** @param {PopupCommentEntry[]} entries */
