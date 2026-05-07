@@ -253,6 +253,76 @@ export function decodeChat(buf, start, end) {
 }
 
 /**
+ * v0.1.211: msg.24 の "nx:gift:show" event を decode する純関数。
+ *
+ * 実機 lv350472558 で観測された構造:
+ *   fn=1 LEN: eventType ("nx:gift:show" 等)
+ *   fn=5 LEN: payload (map 形式)
+ *     fn=1 LEN repeated: { fn=1=key (string), fn=2=value (double LEN9 or string LEN) }
+ *
+ * 主要 props:
+ *   - advertiserName: "名無し" 等の送り主名
+ *   - adPoint: 5 (double, ギフトポイント)
+ *   - totalAdPoint: 累計
+ *   - itemId / itemName: 場合により含まれる
+ *
+ * @param {Uint8Array} buf
+ * @param {number} start
+ * @param {number} end
+ * @returns {{ eventType: string, props: Record<string, string|number> }}
+ */
+export function decodeNxGiftEvent(buf, start, end) {
+  let eventType = '';
+  /** @type {Record<string, string|number>} */
+  const props = {};
+  pbForEach(buf, start, end, (fn, wt, _v, s, e) => {
+    if (fn === 1 && wt === 2) {
+      if (!eventType) eventType = decodeStr(buf, s, e);
+    } else if (fn === 5 && wt === 2) {
+      pbForEach(buf, s, e, (mfn, mwt, _mv, ms, me) => {
+        if (mfn !== 1 || mwt !== 2) return;
+        let key = '';
+        /** @type {number|null} */
+        let numVal = null;
+        let strVal = '';
+        pbForEach(buf, ms, me, (ifn, iwt, _iv, is, ie) => {
+          if (ifn === 1 && iwt === 2) {
+            if (!key) key = decodeStr(buf, is, ie);
+          } else if (ifn === 2 && iwt === 2) {
+            const len = ie - is;
+            // double LEN9: 0x11 (tag fn=2 wt=1) + 8 byte float64
+            if (len === 9 && buf[is] === 0x11) {
+              try {
+                const view = new DataView(
+                  buf.buffer,
+                  buf.byteOffset + is + 1,
+                  8
+                );
+                const v = view.getFloat64(0, true);
+                if (Number.isFinite(v)) numVal = v;
+              } catch { /* no-op */ }
+            } else {
+              // value は wrapper struct { fn=3 LEN: string } の構造（実機観測）
+              pbForEach(buf, is, ie, (vfn, vwt, _vv, vs, ve) => {
+                if (vfn === 3 && vwt === 2) {
+                  const inner = decodeStr(buf, vs, ve);
+                  if (inner && !strVal) strVal = inner;
+                }
+              });
+            }
+          }
+        });
+        if (key) {
+          if (numVal != null) props[key] = numVal;
+          else if (strVal) props[key] = strVal;
+        }
+      });
+    }
+  });
+  return { eventType, props };
+}
+
+/**
  * NicoliveMessage oneof の Gift（field 8）を proto 原本準拠でデコードする。
  *
  * proto schema は NdgrGift 型定義の docstring を参照。
@@ -347,11 +417,26 @@ export function decodeGift(buf, start, end) {
  */
 
 const NDGR_KNOWN_TOP_FN = new Set([1, 2, 4, 5]);
-// v0.1.210: msg.1 の chat 失敗 31 件が gift の可能性が浮上したため、known set を
-// 縮小して msg.1/2/3/... 全部を sample 保存対象にする（観測の幅を広げる）。
-// 真の gift 経路が確定したら known set を更新する。
-const NDGR_KNOWN_MSG_FN = new Set([20]);
+// v0.1.211: 真因確定後に known set を更新。1=Chat、8=Gift（proto 原本）、
+// 20=Chat (legacy)、24=NxGiftEvent (msg.24 nx:gift:show)。残り (2, 3, 23 等)
+// は引き続き unknownSamples で観測継続。
+const NDGR_KNOWN_MSG_FN = new Set([1, 8, 20, 24]);
 const NDGR_MAX_UNKNOWN_SAMPLES_PER_KEY = 3;
+
+/**
+ * v0.1.211: false positive を生む item_id を判定（"nx:" / "system:" prefix）。
+ * msg.24 の "nx:gift:show" 等の event type 文字列が item_id に紛れ込むのを防ぐ。
+ * @param {string} itemId
+ * @returns {boolean}
+ */
+function isFalsePositiveItemId(itemId) {
+  if (!itemId) return false;
+  const s = String(itemId).trim();
+  if (s.startsWith('nx:')) return true;
+  if (s.startsWith('system:')) return true;
+  if (s.startsWith('event:')) return true;
+  return false;
+}
 
 /**
  * Uint8Array の指定範囲を hex 文字列に変換
@@ -493,12 +578,11 @@ export function decodeChunkedMessage(buf, start, end) {
             chats.push(chat);
           } else {
             // v0.1.210: chat 失敗時は gift として fallback 試行。
-            // 実機 lv350474211 で msg.1=36 / chats=5 / msg.8=0 が観測され、
-            // msg.1 のうち chat 失敗 31 件が gift event の可能性が浮上したため。
-            // false positive を厳しく抑えるため item_id 必須（"stamp_xxx" 等
-            // の固定形式 string がある時のみ gift として記録）。
+            // v0.1.211: false positive 抑制のため "nx:" / "system:" prefix を除外。
             const g = decodeGift(buf, ms, me);
-            if (g.itemId) gifts.push(g);
+            if (g.itemId && !isFalsePositiveItemId(g.itemId)) {
+              gifts.push(g);
+            }
           }
         } else if (mfn === 8) {
           const g = decodeGift(buf, ms, me);
@@ -514,10 +598,42 @@ export function decodeChunkedMessage(buf, start, end) {
           ) {
             gifts.push(g);
           }
+        } else if (mfn === 24) {
+          // v0.1.211: msg.24 の "nx:gift:show" 系を専用 decoder で処理。
+          // 実機で 99 件来ていたが、これは map 形式の event payload で、
+          // proto 原本の Gift 構造とは異なる。
+          const ev = decodeNxGiftEvent(buf, ms, me);
+          if (ev.eventType === 'nx:gift:show') {
+            const advName = String(ev.props.advertiserName || '').trim();
+            const advUid = String(
+              ev.props.advertiserUserId || ev.props.userId || ''
+            ).trim();
+            const itemNameStr = String(ev.props.itemName || '').trim();
+            const point =
+              typeof ev.props.adPoint === 'number'
+                ? ev.props.adPoint
+                : typeof ev.props.point === 'number'
+                  ? ev.props.point
+                  : null;
+            if (advName || advUid || itemNameStr || point != null) {
+              gifts.push({
+                itemId: String(ev.props.itemId || ''),
+                advertiserUserId: advUid,
+                advertiserName: advName,
+                point,
+                message: '',
+                itemName: itemNameStr,
+                contributionRank: null
+              });
+            }
+          }
         } else {
-          // v0.1.210: msg.2/3/その他 でも gift として試す（itemId 必須で false positive 抑制）
+          // v0.1.210: msg.2/3/その他 でも gift として試す
+          // v0.1.211: false positive 抑制のため "nx:" / "system:" prefix を除外
           const g = decodeGift(buf, ms, me);
-          if (g.itemId) gifts.push(g);
+          if (g.itemId && !isFalsePositiveItemId(g.itemId)) {
+            gifts.push(g);
+          }
         }
       });
     }

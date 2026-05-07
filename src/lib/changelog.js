@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.211',
+    date: '2026-05-07',
+    summary: 'ギフト誤計上を解消 + AI 診断基盤',
+    items: Object.freeze([
+      'v0.1.210 で導入したギフトイベント取得経路（msg.1 fallback）が、ニコニコ側のシステムイベント（nx:gift:show 等）も誤ってギフトとして計上していたため、prefix が「nx:」「system:」「event:」のアイテム ID を除外するようになりました。これで「ギフト 100 件取得」という誤った観測値が、実際の件数に近づきます',
+      'msg.24 で配信される「nx:gift:show」イベント（ギフト表示通知）を専用デコーダで解析するようになりました。送り主名（advertiserName）とポイント（adPoint）を取り出し、本物のギフト経路として popup に反映する基盤になります',
+      'AI 診断ボタン用の純関数 popupAiDiagOrchestrator を追加（未公開、popup UI への組み込みは次バージョン以降）。Built-in AI（Gemini Nano）の利用可否判定、エラーログから AI プロンプト構築、AI 実行、結果整形までを 1 関数にまとめました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.210',
     date: '2026-05-07',
     summary: 'ギフトイベントの取得経路を msg.1 fallback に拡張',
