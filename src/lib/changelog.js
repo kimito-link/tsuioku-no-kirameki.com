@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.222',
+    date: '2026-05-08',
+    summary: 'ギフト送信者観測 0 を decode 側修正で解消',
+    items: Object.freeze([
+      'v0.1.221 の診断（giftsWithItem は 100% 取れているのに giftsWithUid / giftsWithName / giftsWithPoint / giftsWithRank がすべて 0）から確定した「decode 側の問題」を修正しました。具体的には msg.24 nx:gift:show の parameters decode で、google.protobuf.Value を先に protobuf field として parse するよう順序を整理し、snake_case の key（advertiser_name / advertiser_user_id / item_name / item_id / ad_point / contribution_rank）も拾えるようにしました（既存 camelCase キーとの並列対応）',
+      '6 UTF-8 bytes の string_value wrapper が tag + len + payload で全体 8 bytes になり、raw double と誤認される境界バグも併せて修正しました',
+      'Gift proto (msg.8) の field mapping は OSS（n-air-app/nicolive-comment-protobuf）と一致しているためそのまま維持しています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.221',
     date: '2026-05-07',
     summary: 'ギフト送信者観測 0 の原因切り分け診断を追加',
