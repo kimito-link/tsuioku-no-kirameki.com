@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.204',
+    date: '2026-05-07',
+    summary: 'NDGR ギフトイベントの取得経路を proto 原本準拠に修正',
+    items: Object.freeze([
+      'NDGR Protobuf streaming のギフトイベント decoder を、proto 原本（n-air-app/nicolive-comment-protobuf の atoms.proto）準拠に書き直しました。過去の経験的な field 番号（fn=1 を userId、fn=2 を name と仮定）が proto 仕様と齟齬していたため、v0.1.203 までギフトイベントカウンタが 0 のまま動かなかった真因を解消しました。item_id / point / item_name / contribution_rank / message も decode 対象に追加',
+      'anonymous gift（advertiser_user_id 欠落のイベント）も _ndgr.gifts カウンタに含めるようにしました。表示・履歴側への活用（ranking 構築 / avatar 補完 / 履歴一覧）は v0.1.205 以降で段階的に追加予定です',
+      '24h を超えた過去配信の event-dom 残骸（v0.1.203 で eventDomLvCount=49 まで膨れていた multi-tab race 警告の主因）を、popup 起動時の snapshot 構築直前に storage から自動削除するようにしました（v0.1.203 で先行実装していた純関数 pruneStaleEventDomLvs の本体統合）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.203',
     date: '2026-05-06',
     summary: 'viewer ID と avatar 経路を抜本改善',
