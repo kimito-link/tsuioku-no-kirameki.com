@@ -26,6 +26,26 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.212',
+    date: '2026-05-07',
+    summary: 'popup に AI 診断ボタン（Gemini Nano）',
+    items: Object.freeze([
+      'popup の「ユーザー別の応援件数が多い順」セクションに「AI 診断（Gemini Nano）」ボタンを追加しました。クリックすると、Chrome の Built-in AI（Gemini Nano）が拡張のエラーログ・ネットワーク異常・診断警告を 3 行（主因 / 対処 / 備考）でまとめて表示します。完全オンデバイス実行で外部送信なし、ユーザーコストもゼロです',
+      'Built-in AI が利用できない環境（Chrome 137 以前 / WebGPU 非対応 / モデル未ダウンロード）では、その理由を分かりやすく表示します。Chrome 138+ で WebGPU 対応の PC なら、初回クリックでモデルが自動的に有効化される想定です',
+      '入力データは AI 共有診断 fastCache から自動取得します。コンソールエラー / ニコニ広告 fetch エラー / multi-tab race 警告 / 自動オープン失敗 / ギフト event 観測数などを集約して prompt にまとめ、AI に主因推定を依頼する流れです'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.211',
+    date: '2026-05-07',
+    summary: 'ギフト誤計上を解消 + AI 診断基盤',
+    items: Object.freeze([
+      'v0.1.210 で導入したギフトイベント取得経路（msg.1 fallback）が、ニコニコ側のシステムイベント（nx:gift:show 等）も誤ってギフトとして計上していたため、prefix が「nx:」「system:」「event:」のアイテム ID を除外するようになりました。これで「ギフト 100 件取得」という誤った観測値が、実際の件数に近づきます',
+      'msg.24 で配信される「nx:gift:show」イベント（ギフト表示通知）を専用デコーダで解析するようになりました。送り主名（advertiserName）とポイント（adPoint）を取り出し、本物のギフト経路として popup に反映する基盤になります',
+      'AI 診断ボタン用の純関数 popupAiDiagOrchestrator を追加（未公開、popup UI への組み込みは次バージョン以降）。Built-in AI（Gemini Nano）の利用可否判定、エラーログから AI プロンプト構築、AI 実行、結果整形までを 1 関数にまとめました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.210',
     date: '2026-05-07',
     summary: 'ギフトイベントの取得経路を msg.1 fallback に拡張',

@@ -299,6 +299,7 @@ import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 import { pickAvatarUrlForUid } from '../lib/deriveAvatarUrlFromUid.js';
+import { runPopupAiDiagnosis } from '../lib/popupAiDiagOrchestrator.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
 import {
@@ -6801,6 +6802,11 @@ async function renderDevMonitorGiftRankingExtras() {
     const headerHtml =
       '<div class="nl-dev-monitor__row" style="opacity:0.7;font-size:0.85em;margin-top:6px;">' +
       '<dt>── 取得状況サマリ（AI 共有診断と同じ raw data） ──</dt><dd></dd></div>';
+    // v0.1.212: popup「AI 診断（Gemini Nano）」ボタン
+    const aiDiagHtml =
+      '<div class="nl-dev-monitor__row" id="aiDiagSection" style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">' +
+      '<dt><button id="aiDiagBtn" type="button" style="padding:6px 12px;font-size:0.9em;cursor:pointer;background:#2563eb;color:#fff;border:none;border-radius:4px;">🤖 AI 診断（Gemini Nano）</button></dt>' +
+      '<dd id="aiDiagResult" style="white-space:pre-wrap;font-size:0.85em;line-height:1.5;color:#94a3b8;margin-top:4px;">クリックでオンデバイス AI に「主因 / 対処 / 備考」を 3 行で診断してもらいます（外部送信なし、Chrome 138+ 必要）</dd></div>';
     extrasEl.innerHTML =
       headerHtml +
       rows
@@ -6808,10 +6814,82 @@ async function renderDevMonitorGiftRankingExtras() {
           ([dt, dd]) =>
             `<div class="nl-dev-monitor__row"><dt>${escapeHtml(dt)}</dt><dd>${escapeHtml(dd)}</dd></div>`
         )
-        .join('');
+        .join('') +
+      aiDiagHtml;
+    attachAiDiagButtonHandler(fastCache);
   } catch {
     extrasEl.innerHTML = '';
   }
+}
+
+/**
+ * v0.1.212: popup「AI 診断（Gemini Nano）」ボタンの handler を attach する。
+ * @param {any} fastCache  KEY_AI_SHARE_FAST_DIAG の中身
+ */
+function attachAiDiagButtonHandler(fastCache) {
+  const btn = $('aiDiagBtn');
+  const result = $('aiDiagResult');
+  if (!btn || !result) return;
+  btn.addEventListener('click', async () => {
+    result.textContent = '⏳ Built-in AI（Gemini Nano）に診断を依頼中…';
+    btn.setAttribute('disabled', 'disabled');
+    try {
+      const cache = fastCache && typeof fastCache === 'object' ? fastCache : {};
+      const content = cache?.content || {};
+      const consoleErrors = Array.isArray(
+        content?.consoleErrorProbe?.recentErrors
+      )
+        ? content.consoleErrorProbe.recentErrors
+        : [];
+      const networkErrorMessages = Array.isArray(
+        content?.networkErrorProbe?.nicoadFetchErrorMessages
+      )
+        ? content.networkErrorProbe.nicoadFetchErrorMessages
+        : [];
+      const networkErrors = networkErrorMessages.map((msg, i) => ({
+        url: '(nicoad fetch)',
+        ts: i,
+        reason: String(msg || '')
+      }));
+      const giftDiag = content?.giftDiagnostics || {};
+      const diagWarnings = [];
+      if (giftDiag?.multiTabDiag?.staleDomBundleSuspected) {
+        diagWarnings.push({
+          severity: 'medium',
+          code: 'STALE_DOM_BUNDLE',
+          message:
+            'multi-tab race の疑い（過去配信の DOM 残骸が混入している可能性）'
+        });
+      }
+      if (giftDiag?.rankingDiag?.autoOpen?.lastFailureReason) {
+        diagWarnings.push({
+          severity: 'medium',
+          code: 'AUTO_OPEN_FAILED',
+          message: `応援ランキング自動オープン失敗: ${giftDiag.rankingDiag.autoOpen.lastFailureReason}`
+        });
+      }
+      const giftSummary = giftDiag?.['ギフトサマリ'] || {};
+      const ndgrGifts = giftSummary?.['NDGRギフトevent数'] ?? 0;
+      const giftPoints = giftSummary?.['ギフトポイント観測'] ?? 0;
+      const contextNote = `現在の配信状況: ギフト event 観測 ${ndgrGifts} 件, ギフトポイント ${giftPoints}, 視聴者 ${content?.romiDebug?.interceptMapSize ?? 0} 名`;
+      const res = await runPopupAiDiagnosis({
+        consoleErrors,
+        networkErrors,
+        diagWarnings,
+        contextNote
+      });
+      if (res.ok) {
+        result.textContent = res.text || '(AI 応答が空でした)';
+      } else {
+        result.textContent = '❌ ' + (res.reason || 'AI 診断に失敗しました');
+      }
+    } catch (e) {
+      result.textContent =
+        '❌ エラー: ' + String(/** @type {any} */ (e)?.message || e);
+    } finally {
+      btn.removeAttribute('disabled');
+    }
+  });
 }
 
 /** 収録・スクショ向け: `html.nl-calm-motion` でループアニメ等を止める */
