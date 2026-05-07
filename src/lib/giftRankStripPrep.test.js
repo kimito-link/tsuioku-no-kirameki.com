@@ -6,6 +6,7 @@ import {
   formatGiftThrowGapLabel,
   formatLeaderGapLabel
 } from './giftRankStripPrep.js';
+import { mergeGiftUsers } from './giftRecord.js';
 
 describe('prepareGiftRankStrip', () => {
   it('空配列は stripRooms / stableKeyRows とも空', () => {
@@ -107,5 +108,44 @@ describe('prepareGiftUsersForRankStrip', () => {
         { userId: '1', nickname: 'n', throwCount: 2, capturedAt: 1 }
       ])
     ).toEqual([{ userKey: '1', nickname: 'n', count: 2 }]);
+  });
+});
+
+// v0.1.215: anonymous gift（uid 空 + nickname あり）が popup「ユーザー別の
+//   応援件数」 fallback で表示されることを保証する integration test。
+//   mergeGiftUsers が __anon_<nickname> を userId field に保存し、
+//   prepareGiftRankStrip がそれを stripRooms に流す経路を end-to-end で確認。
+describe('mergeGiftUsers → prepareGiftRankStrip integration（anonymous）', () => {
+  it('anonymous gift の userKey が __anon_<nickname> として stripRooms に出る', () => {
+    const merged = mergeGiftUsers([], [
+      { userId: '12345', nickname: '通常ユーザ' },
+      { userId: '', nickname: 'ペチパー' }
+    ]).next;
+    // throwCount は merge 側で持たないので prepareGiftRankStrip の正規化で 1 になる
+    const { stripRooms } = prepareGiftRankStrip(merged);
+    const userKeys = stripRooms.map((r) => r.userKey).sort();
+    expect(userKeys).toContain('12345');
+    expect(userKeys).toContain('__anon_ペチパー');
+  });
+
+  it('同名 anonymous は 1 つの stripRooms 行に集約', () => {
+    const merged = mergeGiftUsers([], [
+      { userId: '', nickname: '同名' },
+      { userId: '', nickname: '同名' },
+      { userId: '', nickname: '別名' }
+    ]).next;
+    const { stripRooms } = prepareGiftRankStrip(merged);
+    expect(stripRooms).toHaveLength(2);
+    const keys = stripRooms.map((r) => r.userKey).sort();
+    expect(keys).toEqual(['__anon_別名', '__anon_同名']);
+  });
+
+  it('anonymous gift の nickname も stripRooms に反映', () => {
+    const merged = mergeGiftUsers([], [
+      { userId: '', nickname: 'リン' }
+    ]).next;
+    const { stripRooms } = prepareGiftRankStrip(merged);
+    expect(stripRooms[0].userKey).toBe('__anon_リン');
+    expect(stripRooms[0].nickname).toBe('リン');
   });
 });
