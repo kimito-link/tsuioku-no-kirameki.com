@@ -601,7 +601,20 @@ describe('unknown field samples (v0.1.209 緊急投入)', () => {
     expect(r.unknownSamples['msg:3']).toHaveLength(3);
   });
 
-  it('does not record sample for known fields', () => {
+  it('does not record sample for known msg.20 (legacy chat)', () => {
+    // v0.1.210 で KNOWN_MSG_FN を {20} に縮小したため、msg.20 のみが unknown 除外。
+    // msg.1 は msg.1 のサンプル保存対象（chat と gift の両方を試す経路に変更）。
+    const chat = new Uint8Array([
+      ...strField(1, 'hi'),
+      ...varintField(8, 1)
+    ]);
+    const msg = new Uint8Array(lenDelimited(20, [...chat]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.unknownSamples['msg:20']).toBeUndefined();
+  });
+
+  it('records sample for msg.1 too (v0.1.210: gift route candidate)', () => {
     const chat = new Uint8Array([
       ...strField(1, 'hi'),
       ...varintField(8, 1)
@@ -609,7 +622,8 @@ describe('unknown field samples (v0.1.209 緊急投入)', () => {
     const msg = new Uint8Array(lenDelimited(1, [...chat]));
     const chunked = new Uint8Array(lenDelimited(1, [...msg]));
     const r = decodeChunkedMessage(chunked);
-    expect(Object.keys(r.unknownSamples)).toHaveLength(0);
+    expect(r.unknownSamples['msg:1']).toBeDefined();
+    expect(r.unknownSamples['msg:1']).toHaveLength(1);
   });
 
   it('hexPreview is short (max 96 bytes = 192 hex chars)', () => {
@@ -620,6 +634,65 @@ describe('unknown field samples (v0.1.209 緊急投入)', () => {
       192
     );
     expect(r.unknownSamples['top:11'][0].byteSize).toBe(200);
+  });
+});
+
+describe('v0.1.210 gift fallback (msg.1 chat 失敗時 + msg.其他 で itemId があれば gift 認定)', () => {
+  it('msg.1 で chat.no が null かつ item_id があれば gift として記録される', () => {
+    // proto schema の Gift: fn=1 item_id (string)
+    const giftPayload = new Uint8Array([
+      ...strField(1, 'stamp_basketball'),
+      ...varintField(2, 86255751),
+      ...strField(3, 'よしださん'),
+      ...varintField(4, 11000),
+      ...strField(6, 'バスケットボール')
+    ]);
+    // msg.1 に gift payload を入れる（chat じゃない構造）
+    const msg = new Uint8Array(lenDelimited(1, [...giftPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].itemId).toBe('stamp_basketball');
+    expect(r.gifts[0].advertiserName).toBe('よしださん');
+    expect(r.gifts[0].point).toBe(11000);
+    expect(r.chats).toHaveLength(0);
+  });
+
+  it('msg.1 で chat 成功時は gift fallback しない（chat 優先）', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'こんにちは'),
+      ...varintField(5, 12345),
+      ...varintField(8, 42)
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...chat]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.chats).toHaveLength(1);
+    expect(r.gifts).toHaveLength(0);
+  });
+
+  it('msg.3 などの未対応 field でも item_id があれば gift として記録', () => {
+    const giftPayload = new Uint8Array([
+      ...strField(1, 'stamp_anon'),
+      ...strField(3, '名無し'),
+      ...varintField(4, 100)
+    ]);
+    const msg = new Uint8Array(lenDelimited(3, [...giftPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].itemId).toBe('stamp_anon');
+  });
+
+  it('item_id が無い payload は gift として記録しない（false positive 抑制）', () => {
+    // varint のみで string がない（実機の msg.3 = liveId ping パターン）
+    const noisePayload = new Uint8Array([
+      ...varintField(1, 350474211)
+    ]);
+    const msg = new Uint8Array(lenDelimited(3, [...noisePayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
   });
 });
 

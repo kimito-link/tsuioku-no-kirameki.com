@@ -347,7 +347,10 @@ export function decodeGift(buf, start, end) {
  */
 
 const NDGR_KNOWN_TOP_FN = new Set([1, 2, 4, 5]);
-const NDGR_KNOWN_MSG_FN = new Set([1, 8, 20]);
+// v0.1.210: msg.1 の chat 失敗 31 件が gift の可能性が浮上したため、known set を
+// 縮小して msg.1/2/3/... 全部を sample 保存対象にする（観測の幅を広げる）。
+// 真の gift 経路が確定したら known set を更新する。
+const NDGR_KNOWN_MSG_FN = new Set([20]);
 const NDGR_MAX_UNKNOWN_SAMPLES_PER_KEY = 3;
 
 /**
@@ -486,7 +489,17 @@ export function decodeChunkedMessage(buf, start, end) {
 
         if (mfn === 1 || mfn === 20) {
           const chat = decodeChat(buf, ms, me);
-          if (chat.no != null) chats.push(chat);
+          if (chat.no != null) {
+            chats.push(chat);
+          } else {
+            // v0.1.210: chat 失敗時は gift として fallback 試行。
+            // 実機 lv350474211 で msg.1=36 / chats=5 / msg.8=0 が観測され、
+            // msg.1 のうち chat 失敗 31 件が gift event の可能性が浮上したため。
+            // false positive を厳しく抑えるため item_id 必須（"stamp_xxx" 等
+            // の固定形式 string がある時のみ gift として記録）。
+            const g = decodeGift(buf, ms, me);
+            if (g.itemId) gifts.push(g);
+          }
         } else if (mfn === 8) {
           const g = decodeGift(buf, ms, me);
           // anonymous gift（advertiser_user_id 欠落）でも item_id / advertiser_name
@@ -501,6 +514,10 @@ export function decodeChunkedMessage(buf, start, end) {
           ) {
             gifts.push(g);
           }
+        } else {
+          // v0.1.210: msg.2/3/その他 でも gift として試す（itemId 必須で false positive 抑制）
+          const g = decodeGift(buf, ms, me);
+          if (g.itemId) gifts.push(g);
         }
       });
     }

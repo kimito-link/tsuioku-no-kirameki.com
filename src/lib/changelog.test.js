@@ -54,8 +54,8 @@ describe('EXTENSION_CHANGELOG', () => {
     expect(new Set(versions).size).toBe(versions.length);
   });
 
-  it('現在の manifest.json バージョン（0.1.209）が先頭にある', () => {
-    expect(EXTENSION_CHANGELOG[0].version).toBe('0.1.209');
+  it('現在の manifest.json バージョン（0.1.210）が先頭にある', () => {
+    expect(EXTENSION_CHANGELOG[0].version).toBe('0.1.210');
   });
 
   it('summary は短い（35 字以内、popup の summary 行で省略しないため）', () => {
