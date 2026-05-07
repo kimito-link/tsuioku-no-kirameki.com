@@ -4,18 +4,18 @@
  *
  * 入力: scrapeGiftHistoryList の出力（時系列の個別 throw event）
  *   `[{ senderName, points, itemName, time, thumbnailUrl }, ...]`
- * 出力: throwCount + totalPoints 付き StoredGiftUser（mergeGiftUsers の拡張形）
+ * 出力: throwCount + totalPoints 付き集計済みエントリ
  *   `[{ userId: '__anon_<senderName>', nickname, throwCount, totalPoints, capturedAt }, ...]`
  *
+ * 設計（重要）:
+ * - **冪等な「全置換」設計**。incoming 配列のみで集計し、existing は無視する。
+ *   公式 DOM 履歴は時系列 event log で、iframe content script の re-mount や
+ *   Chrome reload のたびに同じ全履歴が再送信される。`existing + incoming` で
+ *   throwCount を加算する設計だと、reload するたびに throwCount / totalPoints
+ *   が倍々になる重大バグ（v0.1.216 初版で発見、即修正）。
  * - 同名 senderName は 1 entry に集約（throwCount + totalPoints 加算）
  * - senderName 空白のみは skip
  * - userId は `__anon_<senderName>` 固定（公式 DOM には数値 uid が出ないため）
- * - capturedAt は最新 scrape 時刻
- *
- * 注意: 公式 DOM 履歴は時系列 event log なので、同じ scrape 結果を繰り返し
- *   受け取ると throwCount が重複加算される。呼出側で diff 取るか、scrape
- *   interval を長めにして運用する前提。本関数の責務は「incoming = N event →
- *   throwCount を N 加算」。
  *
  * 副作用なし。
  */
@@ -40,36 +40,24 @@
  * @typedef {{
  *   next: StoredGiftUserWithThrows[],
  *   storageTouched: boolean
- * }} MergeGiftHistoryThrowsResult
+ * }} AggregateGiftHistoryThrowsResult
  */
 
 /**
- * @param {StoredGiftUserWithThrows[]|null|undefined} existing
+ * 公式サイドバー履歴の現在状態を集計して storage 用の形式に変換する。
+ * incoming のみで集計（existing は無視 → 冪等）。
+ *
  * @param {GiftHistoryItemInput[]|null|undefined} incoming
  * @param {number} now
- * @returns {MergeGiftHistoryThrowsResult}
+ * @returns {AggregateGiftHistoryThrowsResult}
  */
-export function mergeGiftHistoryThrows(existing, incoming, now) {
-  const base = Array.isArray(existing) ? existing : [];
+export function aggregateGiftHistoryThrows(incoming, now) {
   const inc = Array.isArray(incoming) ? incoming : [];
   if (inc.length === 0) {
-    return { next: base, storageTouched: false };
+    return { next: [], storageTouched: false };
   }
   /** @type {Map<string, StoredGiftUserWithThrows>} */
   const byKey = new Map();
-  for (const e of base) {
-    if (!e || typeof e !== 'object') continue;
-    const uid = String(e.userId || '').trim();
-    if (!uid) continue;
-    byKey.set(uid, {
-      userId: uid,
-      nickname: String(e.nickname || '').trim(),
-      throwCount: positiveIntOr(e.throwCount, 0),
-      totalPoints: nonNegativeIntOr(e.totalPoints, 0),
-      capturedAt: positiveIntOr(e.capturedAt, 0)
-    });
-  }
-  let touched = false;
   for (const item of inc) {
     if (!item || typeof item !== 'object') continue;
     const senderName = String(item.senderName || '').trim();
@@ -80,8 +68,6 @@ export function mergeGiftHistoryThrows(existing, incoming, now) {
     if (ex) {
       ex.throwCount += 1;
       ex.totalPoints += points;
-      ex.capturedAt = now;
-      ex.nickname = senderName;
     } else {
       byKey.set(key, {
         userId: key,
@@ -91,23 +77,11 @@ export function mergeGiftHistoryThrows(existing, incoming, now) {
         capturedAt: now
       });
     }
-    touched = true;
   }
-  if (!touched) {
-    return { next: base, storageTouched: false };
+  if (byKey.size === 0) {
+    return { next: [], storageTouched: false };
   }
   return { next: [...byKey.values()], storageTouched: true };
-}
-
-/**
- * @param {unknown} v
- * @param {number} fallback
- * @returns {number}
- */
-function positiveIntOr(v, fallback) {
-  const n = Number(v);
-  if (Number.isFinite(n) && n > 0) return Math.floor(n);
-  return fallback;
 }
 
 /**

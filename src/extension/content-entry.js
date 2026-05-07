@@ -76,7 +76,7 @@ import {
 import { scrapeContributionRankingFromDom } from '../lib/officialEventBannerDom.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
 import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
-import { mergeGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
+import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
 import {
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
@@ -1817,10 +1817,10 @@ window.addEventListener('message', (e) => {
 // v0.1.216: iframe（gift sub-app, koken.nicovideo.jp 等）からの gift 履歴を
 //   受信する経路。既存 listener は `e.source !== window` で iframe からの
 //   message を弾くため、別 listener として追加する。
-//   ここで受け取った history items は mergeGiftHistoryThrows で throwCount +
-//   totalPoints 付き形式に集約し、`nls_gift_history_throws_<liveId>` に保存。
-//   popup の refreshGiftRankStrip fallback で読み込んで「ぱぴよん 3 回」のような
-//   ユーザー別ランキングとして表示される。
+//   設計: aggregateGiftHistoryThrows は incoming のみで集計する「全置換」
+//   設計（冪等）。iframe re-mount や Chrome reload で同じ全履歴が再送信されても、
+//   storage は同じ data で上書きされるだけで throwCount / totalPoints は倍々
+//   にならない。popup の refreshGiftRankStrip fallback がこれを読み込む。
 window.addEventListener('message', (e) => {
   if (!e?.data || typeof e.data.type !== 'string') return;
   if (e.data.type !== 'NLS_GIFT_HISTORY_FROM_IFRAME') return;
@@ -1828,23 +1828,15 @@ window.addEventListener('message', (e) => {
   if (items.length === 0) return;
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid || !hasExtensionContext()) return;
-  const key = `nls_gift_history_throws_${lid}`;
+  const r = aggregateGiftHistoryThrows(items, Date.now());
+  if (!r.storageTouched) return;
   chrome.storage.local
-    .get(key)
-    .then((bag) => {
-      const existing = Array.isArray(bag[key]) ? bag[key] : [];
-      const r = mergeGiftHistoryThrows(existing, items, Date.now());
-      if (r.storageTouched) {
-        chrome.storage.local
-          .set({ [key]: r.next })
-          .catch((err) => {
-            if (!isContextInvalidatedError(err)) {
-              /* best-effort */
-            }
-          });
+    .set({ [`nls_gift_history_throws_${lid}`]: r.next })
+    .catch((err) => {
+      if (!isContextInvalidatedError(err)) {
+        /* best-effort */
       }
-    })
-    .catch((err) => reportSilentErrorToStorage('gift-history-iframe', err));
+    });
 });
 /** @type {number|null} */
 let lastWatchUrlTimer = null;
@@ -8992,8 +8984,13 @@ function maybeStartGiftSubAppIframeRelay() {
       const payload = JSON.stringify({ items: r.items, totalCounts });
       if (payload === lastSent) return;
       lastSent = payload;
+      // v0.1.216 修正: window.parent ではなく window.top に送る。
+      // ネスト iframe (live → embed → koken) の場合、parent は中間 iframe で
+      // liveId を持たない。top frame (live.nicovideo.jp/watch/...) に直接届けば
+      // 確実に receive される。target = '*' で cross-origin 制約なし。
       try {
-        window.parent.postMessage(
+        const target = window.top || window.parent;
+        target.postMessage(
           {
             type: 'NLS_GIFT_HISTORY_FROM_IFRAME',
             items: r.items,

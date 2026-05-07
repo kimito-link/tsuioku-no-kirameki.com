@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { mergeGiftHistoryThrows } from './mergeGiftHistoryThrows.js';
+import { aggregateGiftHistoryThrows } from './mergeGiftHistoryThrows.js';
 
 const NOW = 1_700_000_000_000;
 
-describe('mergeGiftHistoryThrows', () => {
-  it('空 existing + 1 履歴 → 1 entry, throwCount=1', () => {
-    const r = mergeGiftHistoryThrows(
-      [],
+describe('aggregateGiftHistoryThrows', () => {
+  it('1 履歴 → 1 entry, throwCount=1, totalPoints=points', () => {
+    const r = aggregateGiftHistoryThrows(
       [{ senderName: 'ぱぴよん', points: 800, itemName: 'スプーン', time: '05:53', thumbnailUrl: '' }],
       NOW
     );
@@ -20,8 +19,7 @@ describe('mergeGiftHistoryThrows', () => {
   });
 
   it('同名 senderName が複数回 → 1 entry に集約、throwCount + totalPoints 加算', () => {
-    const r = mergeGiftHistoryThrows(
-      [],
+    const r = aggregateGiftHistoryThrows(
       [
         { senderName: 'ぱぴよん', points: 800, itemName: '錬金窯', time: '05:53', thumbnailUrl: '' },
         { senderName: 'ぱぴよん', points: 100, itemName: 'スプーン', time: '05:51', thumbnailUrl: '' },
@@ -37,30 +35,28 @@ describe('mergeGiftHistoryThrows', () => {
     expect(byKey.get('__anon_うっぺ')?.totalPoints).toBe(500);
   });
 
-  it('既存 entry に追加 → throwCount + totalPoints 累積、capturedAt 更新', () => {
-    const existing = [
-      {
-        userId: '__anon_ぱぴよん',
-        nickname: 'ぱぴよん',
-        throwCount: 2,
-        totalPoints: 900,
-        capturedAt: NOW - 60_000
-      }
+  it('「同じ scrape 結果が再送信されても結果は同じ（冪等）」 — 重複加算しない', () => {
+    // iframe re-mount や Chrome reload で同じ全履歴 payload が再送される
+    // ことが頻発するため、毎回「全置換」で集計する設計。これにより throwCount /
+    // totalPoints が倍々になる事故を防ぐ（v0.1.216 の重大欠陥対応）。
+    const items = [
+      { senderName: 'a', points: 100, itemName: '', time: '', thumbnailUrl: '' },
+      { senderName: 'a', points: 200, itemName: '', time: '', thumbnailUrl: '' },
+      { senderName: 'b', points: 50, itemName: '', time: '', thumbnailUrl: '' }
     ];
-    const r = mergeGiftHistoryThrows(
-      existing,
-      [{ senderName: 'ぱぴよん', points: 200, itemName: 'スプーン', time: '06:00', thumbnailUrl: '' }],
-      NOW
-    );
-    expect(r.next).toHaveLength(1);
-    expect(r.next[0].throwCount).toBe(3);
-    expect(r.next[0].totalPoints).toBe(1100);
-    expect(r.next[0].capturedAt).toBe(NOW);
+    const r1 = aggregateGiftHistoryThrows(items, NOW);
+    const r2 = aggregateGiftHistoryThrows(items, NOW + 1000);
+    const byKey1 = new Map(r1.next.map((u) => [u.userId, u]));
+    const byKey2 = new Map(r2.next.map((u) => [u.userId, u]));
+    expect(byKey1.get('__anon_a')?.throwCount).toBe(2);
+    expect(byKey2.get('__anon_a')?.throwCount).toBe(2); // 倍々にならない
+    expect(byKey1.get('__anon_a')?.totalPoints).toBe(300);
+    expect(byKey2.get('__anon_a')?.totalPoints).toBe(300);
+    expect(byKey2.get('__anon_b')?.throwCount).toBe(1);
   });
 
-  it('senderName 空 / 「名無し さん」 のような既知の anonymous label は __anon_<name> で集約', () => {
-    const r = mergeGiftHistoryThrows(
-      [],
+  it('「名無し」「ゲスト」のような既知 anonymous label も __anon_<name> で集約', () => {
+    const r = aggregateGiftHistoryThrows(
       [
         { senderName: '名無し', points: 5, itemName: 'スプーン', time: '03:58', thumbnailUrl: '' },
         { senderName: '名無し', points: 10, itemName: 'フラスコ', time: '02:49', thumbnailUrl: '' },
@@ -76,8 +72,7 @@ describe('mergeGiftHistoryThrows', () => {
   });
 
   it('senderName 空白のみは skip', () => {
-    const r = mergeGiftHistoryThrows(
-      [],
+    const r = aggregateGiftHistoryThrows(
       [
         { senderName: '', points: 5, itemName: '', time: '', thumbnailUrl: '' },
         { senderName: '   ', points: 10, itemName: '', time: '', thumbnailUrl: '' },
@@ -90,8 +85,7 @@ describe('mergeGiftHistoryThrows', () => {
   });
 
   it('points が無効（負 / NaN / 文字列）は totalPoints=0 として扱う', () => {
-    const r = mergeGiftHistoryThrows(
-      [],
+    const r = aggregateGiftHistoryThrows(
       [
         { senderName: 'a', points: -1, itemName: '', time: '', thumbnailUrl: '' },
         { senderName: 'b', points: NaN, itemName: '', time: '', thumbnailUrl: '' },
@@ -106,49 +100,33 @@ describe('mergeGiftHistoryThrows', () => {
     }
   });
 
-  it('incoming が空 → next は existing と同一、storageTouched=false', () => {
-    const existing = [
-      {
-        userId: '__anon_x',
-        nickname: 'x',
-        throwCount: 1,
-        totalPoints: 5,
-        capturedAt: NOW - 1000
-      }
-    ];
-    const r = mergeGiftHistoryThrows(existing, [], NOW);
-    expect(r.next).toBe(existing);
+  it('incoming が空 → next 空、storageTouched=false', () => {
+    const r = aggregateGiftHistoryThrows([], NOW);
+    expect(r.next).toEqual([]);
     expect(r.storageTouched).toBe(false);
   });
 
-  it('既存に同じ throw が来ても throwCount は incoming 件数分のみ加算（履歴は冪等ではないので毎回加算）', () => {
-    // 注意: 履歴は時系列の event log なので、同じ scrape 結果を繰り返し受け取ると
-    //       throwCount が重複加算される。呼出側で diff 取るか、scrape interval を
-    //       長めにする運用前提。本関数の責務は「incoming = N event → N 加算」。
-    const existing = [
-      {
-        userId: '__anon_a',
-        nickname: 'a',
-        throwCount: 1,
-        totalPoints: 100,
-        capturedAt: NOW - 1000
-      }
-    ];
-    const r = mergeGiftHistoryThrows(
-      existing,
-      [{ senderName: 'a', points: 100, itemName: '', time: '', thumbnailUrl: '' }],
-      NOW
-    );
-    expect(r.next[0].throwCount).toBe(2);
-    expect(r.next[0].totalPoints).toBe(200);
-  });
-
   it('null/undefined 入力は安全', () => {
-    const r1 = mergeGiftHistoryThrows(null, null, NOW);
+    const r1 = aggregateGiftHistoryThrows(null, NOW);
     expect(r1.next).toEqual([]);
     expect(r1.storageTouched).toBe(false);
-    const r2 = mergeGiftHistoryThrows(undefined, undefined, NOW);
+    const r2 = aggregateGiftHistoryThrows(undefined, NOW);
     expect(r2.next).toEqual([]);
     expect(r2.storageTouched).toBe(false);
+  });
+
+  it('実機 lv350474211 に近い 3 名のシナリオで合計 pt 順にソート可能', () => {
+    const r = aggregateGiftHistoryThrows(
+      [
+        { senderName: 'ぱぴよん', points: 800, itemName: 'スプーン', time: '5:44:50', thumbnailUrl: '' },
+        { senderName: 'うっぺ', points: 500, itemName: 'スプーン', time: '3:08:35', thumbnailUrl: '' },
+        { senderName: 'ばんぺいゆ', points: 100, itemName: 'スプーン', time: '5:05:09', thumbnailUrl: '' }
+      ],
+      NOW
+    );
+    expect(r.next).toHaveLength(3);
+    const sorted = [...r.next].sort((a, b) => b.totalPoints - a.totalPoints);
+    expect(sorted.map((u) => u.nickname)).toEqual(['ぱぴよん', 'うっぺ', 'ばんぺいゆ']);
+    expect(sorted.map((u) => u.totalPoints)).toEqual([800, 500, 100]);
   });
 });
