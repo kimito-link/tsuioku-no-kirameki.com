@@ -27,7 +27,8 @@
     "vendor:visual-explainer": "node scripts/vendor-visual-explainer.mjs",
     "gen:marketing-avatars": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/resize-marketing-html-avatars.ps1 && node scripts/encode-marketing-html-avatars.mjs",
     "sync:lp-twitter-icon": "node scripts/sync-lp-twitter-icon.mjs",
-    "lp:serve": "python -m http.server 3780 --bind 127.0.0.1"
+    "lp:serve": "python -m http.server 3780 --bind 127.0.0.1",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -37,6 +38,7 @@
     "eslint": "^9.39.4",
     "globals": "^15.15.0",
     "happy-dom": "^20.8.9",
+    "husky": "^9.1.7",
     "serve": "^14.2.4",
     "typescript": "^6.0.2",
     "vitest": "^3.0.0"
