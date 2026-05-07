@@ -311,8 +311,97 @@ export function decodeGift(buf, start, end) {
  */
 
 /**
- * @typedef {{ stats: NdgrStatistics|null, chats: NdgrChat[], gifts: NdgrGift[], tagHistogram: NdgrTagHistogram }} NdgrDecodeResult
+ * @typedef {{
+ *   key: string,
+ *   topFn: number,
+ *   msgFn: number|null,
+ *   byteSize: number,
+ *   hexPreview: string,
+ *   innerHistogram: Record<string, number>,
+ *   stringSamples: string[]
+ * }} NdgrUnknownSample
+ *
+ * v0.1.209 緊急投入: msg.8 (gift) が来ない一方で msg.3 / top.11 が来る配信が確認された
+ * （実機 lv350473936、giftPoints=3130 だが ndgrWireCounters.gifts=0）。proto 仕様か
+ * ニコニコ側プロトコル差し替えで gift event の field 番号が変わっている可能性が
+ * 強いため、未知 field の中身を最大 3 件サンプル保存して、診断バンドル経由で
+ * 構造を解析する用途。
+ *
+ * - `key`: "top:11" or "msg:3" 等の識別子
+ * - `topFn`: ChunkedMessage 直下の field number
+ * - `msgFn`: NicoliveMessage 内の field number（top レベルのみなら null）
+ * - `byteSize`: payload バイト長
+ * - `hexPreview`: 先頭 96 bytes の hex 文字列（中身解析の手がかり）
+ * - `innerHistogram`: 中の field tag → 件数（gift の itemId/userId/point 等の構造識別用）
+ * - `stringSamples`: 中の string 型 field の最初 3 件（advertiserName 等の判別用）
  */
+
+/**
+ * @typedef {{
+ *   stats: NdgrStatistics|null,
+ *   chats: NdgrChat[],
+ *   gifts: NdgrGift[],
+ *   tagHistogram: NdgrTagHistogram,
+ *   unknownSamples: Record<string, NdgrUnknownSample[]>
+ * }} NdgrDecodeResult
+ */
+
+const NDGR_KNOWN_TOP_FN = new Set([1, 2, 4, 5]);
+const NDGR_KNOWN_MSG_FN = new Set([1, 8, 20]);
+const NDGR_MAX_UNKNOWN_SAMPLES_PER_KEY = 3;
+
+/**
+ * Uint8Array の指定範囲を hex 文字列に変換
+ * @param {Uint8Array} buf
+ * @param {number} start
+ * @param {number} end
+ */
+function bufToHex(buf, start, end) {
+  let out = '';
+  const cap = Math.min(end, buf.length);
+  for (let i = start; i < cap; i++) {
+    out += buf[i].toString(16).padStart(2, '0');
+  }
+  return out;
+}
+
+/**
+ * 未知 field の中身を sample 保存する内部ヘルパー（最大 3 件 / key）
+ * @param {Record<string, NdgrUnknownSample[]>} samples
+ * @param {string} key
+ * @param {number} topFn
+ * @param {number|null} msgFn
+ * @param {Uint8Array} buf
+ * @param {number} s
+ * @param {number} e
+ */
+function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e) {
+  if (!samples[key]) samples[key] = [];
+  if (samples[key].length >= NDGR_MAX_UNKNOWN_SAMPLES_PER_KEY) return;
+  /** @type {Record<string, number>} */
+  const innerHistogram = {};
+  /** @type {string[]} */
+  const stringSamples = [];
+  pbForEach(buf, s, e, (ifn, iwt, _iv, is, ie) => {
+    const ikey = String(ifn);
+    innerHistogram[ikey] = (innerHistogram[ikey] || 0) + 1;
+    if (iwt === 2 && stringSamples.length < 3) {
+      const str = decodeStr(buf, is, ie);
+      if (str && str.length > 0 && str.length <= 80) {
+        stringSamples.push(str);
+      }
+    }
+  });
+  samples[key].push({
+    key,
+    topFn,
+    msgFn,
+    byteSize: e - s,
+    hexPreview: bufToHex(buf, s, Math.min(e, s + 96)),
+    innerHistogram,
+    stringSamples
+  });
+}
 
 /**
  * 1件の ChunkedMessage をデコードして統計情報とチャットを返す
@@ -332,11 +421,26 @@ export function decodeChunkedMessage(buf, start, end) {
   const gifts = [];
   /** @type {NdgrTagHistogram} */
   const tagHistogram = { top: {}, msg: {} };
+  /** @type {Record<string, NdgrUnknownSample[]>} */
+  const unknownSamples = {};
 
   pbForEach(buf, s0, e0, (fn, wt, _v, s, e) => {
     if (wt !== 2) return;
     const topKey = String(fn);
     tagHistogram.top[topKey] = (tagHistogram.top[topKey] || 0) + 1;
+
+    // v0.1.209: top レベルで未知 field が来た場合に中身を sample 保存
+    if (!NDGR_KNOWN_TOP_FN.has(fn)) {
+      recordNdgrUnknownSample(
+        unknownSamples,
+        `top:${fn}`,
+        fn,
+        null,
+        buf,
+        s,
+        e
+      );
+    }
 
     if (fn === 4) {
       pbForEach(buf, s, e, (_sfn, swt, _sv, ss, se) => {
@@ -366,6 +470,20 @@ export function decodeChunkedMessage(buf, start, end) {
         if (mwt !== 2) return;
         const msgKey = String(mfn);
         tagHistogram.msg[msgKey] = (tagHistogram.msg[msgKey] || 0) + 1;
+
+        // v0.1.209: msg レベルで未知 field が来た場合に中身を sample 保存
+        if (!NDGR_KNOWN_MSG_FN.has(mfn)) {
+          recordNdgrUnknownSample(
+            unknownSamples,
+            `msg:${mfn}`,
+            fn,
+            mfn,
+            buf,
+            ms,
+            me
+          );
+        }
+
         if (mfn === 1 || mfn === 20) {
           const chat = decodeChat(buf, ms, me);
           if (chat.no != null) chats.push(chat);
@@ -388,7 +506,7 @@ export function decodeChunkedMessage(buf, start, end) {
     }
   });
 
-  return { stats, chats, gifts, tagHistogram };
+  return { stats, chats, gifts, tagHistogram, unknownSamples };
 }
 
 /**

@@ -3545,6 +3545,23 @@ function buildGiftDiagnosticsBundle() {
     } catch { /* no-op */ }
   }
 
+  // v0.1.209 緊急投入: 未知 NDGR field の sample（msg.3 / top.11 等）を診断 JSON に
+  // 露出する。msg.8 (gift) が来ない一方で他 field が来る配信があるため、
+  // 中身を解析して真の gift 経路を特定する用途。
+  const ndgrUnknownSamplesAttr =
+    document.documentElement?.getAttribute('data-nls-ndgr-unknown-samples') ||
+    '';
+  /** @type {Record<string, Array<unknown>>} */
+  let ndgrUnknownSamples = {};
+  if (ndgrUnknownSamplesAttr) {
+    try {
+      const parsed = JSON.parse(ndgrUnknownSamplesAttr);
+      if (parsed && typeof parsed === 'object') {
+        ndgrUnknownSamples = parsed;
+      }
+    } catch { /* no-op */ }
+  }
+
   const hud = collectNlsGiftHudDomSlice();
   const statsAgeMs =
     officialNdgrStatsUpdatedAt > 0
@@ -3563,6 +3580,7 @@ function buildGiftDiagnosticsBundle() {
       parseOk: true
     },
     ndgrTagHistogram,
+    ndgrUnknownSamples,
     autoOpenStatus:
       document.documentElement?.getAttribute('data-nls-auto-open') || 'never',
     auditionFetchStatus:
