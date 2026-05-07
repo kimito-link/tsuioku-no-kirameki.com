@@ -335,7 +335,25 @@ import {
     }
   }
 
-  const _ndgr = { stats: 0, chats: 0, gifts: 0, decoded: 0 };
+  // gifts カウンタの内訳（v0.1.221 追加）：
+  //   giftsUid: advertiserUserId が空でなかった件数
+  //   giftsName: advertiserName が空でなかった件数
+  //   giftsItem: itemId か itemName のどちらかが取れた件数
+  //   giftsPoint: point が number で取れた件数
+  //   giftsRank: contributionRank が number で取れた件数
+  // gifts 総数に対し各内訳が小さい場合、decode (proto field) で取れていない段が原因。
+  // 各内訳が高いのに popup の sender 観測 0 なら受信側 (content-entry の保存) で skip されている段。
+  const _ndgr = {
+    stats: 0,
+    chats: 0,
+    gifts: 0,
+    decoded: 0,
+    giftsUid: 0,
+    giftsName: 0,
+    giftsItem: 0,
+    giftsPoint: 0,
+    giftsRank: 0
+  };
   /**
    * NDGR で観測した protobuf field tag のヒストグラム。
    * top: ChunkedMessage 直下の field tag、msg: 内側 NicoliveMessage one-of の field tag。
@@ -455,6 +473,14 @@ import {
       // decoder（v0.1.204 Patch B）に合わせ、payload で何かしら取れている event は
       // すべてカウント対象にする。
       _ndgr.gifts++;
+      // v0.1.221: decode 結果の field 充足度を内訳カウンタに反映。popup の
+      // ギフト送信者観測 0 が「decode で空」か「受信側で skip」のどちらの段かを
+      // 切り分けるための診断値。
+      if (uid) _ndgr.giftsUid++;
+      if (name) _ndgr.giftsName++;
+      if (g.itemId || g.itemName) _ndgr.giftsItem++;
+      if (typeof g.point === 'number') _ndgr.giftsPoint++;
+      if (typeof g.contributionRank === 'number') _ndgr.giftsRank++;
       if (uid) learnUser(uid, name, '');
       giftUsers.push({
         userId: uid,
@@ -527,7 +553,9 @@ import {
     if (root && (_ndgr.stats > 0 || _ndgr.chats > 0 || _ndgr.gifts > 0)) {
       root.setAttribute(
         'data-nls-ndgr',
-        `s=${_ndgr.stats} c=${_ndgr.chats} g=${_ndgr.gifts} d=${_ndgr.decoded}`
+        `s=${_ndgr.stats} c=${_ndgr.chats} g=${_ndgr.gifts} d=${_ndgr.decoded}` +
+          ` gu=${_ndgr.giftsUid} gn=${_ndgr.giftsName} gi=${_ndgr.giftsItem}` +
+          ` gp=${_ndgr.giftsPoint} gr=${_ndgr.giftsRank}`
       );
     }
     publishNdgrTagHistogram();
