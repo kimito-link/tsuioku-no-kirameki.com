@@ -116,6 +116,7 @@ import {
   buildEventDomEntriesFromStorageBag
 } from '../lib/pruneStaleEventDomLvs.js';
 import { appendGiftEvents } from '../lib/giftEventStore.js';
+import { resolveGiftSenderBucketKey } from '../lib/giftSenderObservation.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -769,18 +770,25 @@ function getRankingLifetimeDiag() {
 }
 
 /**
- * NDGR で観測したギフト event の sender user_id を記録する。
- * 診断シートで「ギフトを送ったが nickname が解決できていない user」を見える化する。
- * @param {string} userId
+ * NDGR で観測したギフト event の sender を記録する。
+ * 診断シートで「ギフト送信者観測数」を集計するための bucket。
+ *
+ * v0.1.214: anonymous gift（userId 空）も nickname があれば
+ * `__anon_<nickname>` で bucket 化して記録対象に含める。これまでは
+ * uid 空 = 完全 skip だったため、anonymous gift だけ来た配信では
+ * 「ギフト送信者観測数」が 0 のまま表示されていた。
+ *
+ * @param {string|null|undefined} userId
+ * @param {string|null|undefined} [nickname]
  */
-function recordGiftSenderObservation(userId) {
-  const uid = String(userId || '').trim();
-  if (!uid) return;
+function recordGiftSenderObservation(userId, nickname) {
+  const key = resolveGiftSenderBucketKey({ userId, nickname });
+  if (!key) return;
   const diag = getRankingLifetimeDiag();
-  const cur = diag.giftSenders.get(uid) || { count: 0, lastAt: 0 };
+  const cur = diag.giftSenders.get(key) || { count: 0, lastAt: 0 };
   cur.count += 1;
   cur.lastAt = Date.now();
-  diag.giftSenders.set(uid, cur);
+  diag.giftSenders.set(key, cur);
   // 上限：100 user まで（古い順に削る）
   if (diag.giftSenders.size > 100) {
     const oldest = [...diag.giftSenders.entries()].sort(
@@ -1656,9 +1664,11 @@ window.addEventListener('message', (e) => {
     const raw = e.data.users;
     if (Array.isArray(raw) && raw.length) {
       // 0.1.173: lifetime 観測（診断シート用）。liveId 不在でも record する。
+      // v0.1.214: anonymous gift（uid 空）も nickname があれば記録するため
+      //   guard を撤去し、recordGiftSenderObservation 内で bucket key を
+      //   解決する形に統一。
       for (const u of raw) {
-        const uid = String(u?.userId || '').trim();
-        if (uid) recordGiftSenderObservation(uid);
+        recordGiftSenderObservation(u?.userId, u?.nickname);
       }
     }
     if (Array.isArray(raw) && raw.length && liveId && hasExtensionContext()) {
