@@ -5283,12 +5283,35 @@ async function refreshGiftRankStrip(liveId) {
   /** @type {string} */
   let ariaLabel = '';
   const bundle = _lastOfficialEventDomBundle;
-  const ranking = Array.isArray(bundle?.contributionRanking)
+  /** @type {any[]|null} */
+  let ranking = Array.isArray(bundle?.contributionRanking)
     ? bundle.contributionRanking
     : null;
   const giftHistory = Array.isArray(bundle?.giftHistory)
     ? bundle.giftHistory
     : null;
+  // v0.1.217: bundle.contributionRanking が空（親 frame の DOM scrape では
+  //   audition.nicovideo.jp 等の cross-origin iframe にアクセスできない）の
+  //   ときは、iframe 経由で取得・保存された contributionRanking を fallback で
+  //   読み込む。content-entry.js の NLS_GIFT_HISTORY_FROM_IFRAME receive で
+  //   `nls_iframe_official_dom_<lid>` に保存される。
+  if (!ranking || ranking.length === 0) {
+    try {
+      const iframeBag = await chrome.storage.local.get(
+        `nls_iframe_official_dom_${lid}`
+      );
+      const iframeData = iframeBag[`nls_iframe_official_dom_${lid}`];
+      if (
+        iframeData &&
+        Array.isArray(iframeData.contributionRanking) &&
+        iframeData.contributionRanking.length > 0
+      ) {
+        ranking = iframeData.contributionRanking;
+      }
+    } catch {
+      /* no-op */
+    }
+  }
   if (ranking && ranking.length > 0) {
     rooms = ranking.map((r, i) => ({
       userKey: r.isAnonymous ? `__anon_contrib_${i}` : `__contrib_${i}_${String(r.name || '').slice(0, 12)}`,
