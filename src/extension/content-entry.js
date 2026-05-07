@@ -115,6 +115,7 @@ import {
   pruneStaleEventDomLvs,
   buildEventDomEntriesFromStorageBag
 } from '../lib/pruneStaleEventDomLvs.js';
+import { appendGiftEvents } from '../lib/giftEventStore.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -1661,6 +1662,7 @@ window.addEventListener('message', (e) => {
       }
     }
     if (Array.isArray(raw) && raw.length && liveId && hasExtensionContext()) {
+      // 既存: throwCount 集約版（nls_gift_users_<liveId>）
       const key = giftUsersStorageKey(liveId);
       chrome.storage.local.get(key).then((bag) => {
         const existing = Array.isArray(bag[key]) ? bag[key] : [];
@@ -1677,6 +1679,35 @@ window.addEventListener('message', (e) => {
           });
         }
       }).catch((err) => reportSilentErrorToStorage('gift', err));
+
+      // v0.1.207 Phase A: 個別 event の時系列ストア（nls_gift_events_<liveId>）
+      // proto 準拠 decoder（v0.1.204 Patch B）+ payload 拡張（v0.1.205 prep
+      // Patch C-1）で取れる itemId / itemName / point / message /
+      // contributionRank を保存。popup の ranking / 履歴 / avatar 補完で
+      // 使う（DOM 統合は v0.1.208 以降の別 PR）。
+      const eventsKey = `nls_gift_events_${liveId}`;
+      chrome.storage.local.get(eventsKey).then((bag2) => {
+        const existing = Array.isArray(bag2[eventsKey]) ? bag2[eventsKey] : [];
+        const { next, storageTouched } = appendGiftEvents(
+          existing,
+          raw,
+          Date.now()
+        );
+        if (storageTouched) {
+          chrome.storage.local.set({ [eventsKey]: next }).catch((err) => {
+            if (!isContextInvalidatedError(err) && hasExtensionContext()) {
+              try {
+                chrome.storage.local.set({
+                  [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(
+                    liveId,
+                    err
+                  )
+                });
+              } catch { /* best-effort */ }
+            }
+          });
+        }
+      }).catch((err) => reportSilentErrorToStorage('gift-events', err));
     }
     return;
   }
