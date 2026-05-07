@@ -601,29 +601,28 @@ describe('unknown field samples (v0.1.209 緊急投入)', () => {
     expect(r.unknownSamples['msg:3']).toHaveLength(3);
   });
 
-  it('does not record sample for known msg.20 (legacy chat)', () => {
-    // v0.1.210 で KNOWN_MSG_FN を {20} に縮小したため、msg.20 のみが unknown 除外。
-    // msg.1 は msg.1 のサンプル保存対象（chat と gift の両方を試す経路に変更）。
+  it('does not record sample for known msg fields (1, 8, 20, 24) v0.1.211', () => {
     const chat = new Uint8Array([
       ...strField(1, 'hi'),
       ...varintField(8, 1)
     ]);
-    const msg = new Uint8Array(lenDelimited(20, [...chat]));
-    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
-    const r = decodeChunkedMessage(chunked);
-    expect(r.unknownSamples['msg:20']).toBeUndefined();
+    for (const fn of [1, 8, 20, 24]) {
+      const msg = new Uint8Array(lenDelimited(fn, [...chat]));
+      const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+      const r = decodeChunkedMessage(chunked);
+      expect(r.unknownSamples[`msg:${fn}`]).toBeUndefined();
+    }
   });
 
-  it('records sample for msg.1 too (v0.1.210: gift route candidate)', () => {
-    const chat = new Uint8Array([
-      ...strField(1, 'hi'),
-      ...varintField(8, 1)
-    ]);
-    const msg = new Uint8Array(lenDelimited(1, [...chat]));
-    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
-    const r = decodeChunkedMessage(chunked);
-    expect(r.unknownSamples['msg:1']).toBeDefined();
-    expect(r.unknownSamples['msg:1']).toHaveLength(1);
+  it('still records sample for msg.2 / msg.3 / msg.23 (unknown observation continues)', () => {
+    const inner = new Uint8Array([...varintField(1, 100)]);
+    for (const fn of [2, 3, 23]) {
+      const msg = new Uint8Array(lenDelimited(fn, [...inner]));
+      const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+      const r = decodeChunkedMessage(chunked);
+      expect(r.unknownSamples[`msg:${fn}`]).toBeDefined();
+      expect(r.unknownSamples[`msg:${fn}`].length).toBeGreaterThan(0);
+    }
   });
 
   it('hexPreview is short (max 96 bytes = 192 hex chars)', () => {
@@ -634,6 +633,68 @@ describe('unknown field samples (v0.1.209 緊急投入)', () => {
       192
     );
     expect(r.unknownSamples['top:11'][0].byteSize).toBe(200);
+  });
+});
+
+describe('v0.1.211 false positive 抑制 + msg.24 nx:gift:show 専用 decode', () => {
+  it('msg.1 で item_id が "nx:" prefix なら gift として記録しない（false positive 抑制）', () => {
+    const giftPayload = new Uint8Array([
+      ...strField(1, 'nx:gift:show')
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...giftPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+  });
+
+  it('msg.3 で item_id が "system:" prefix なら gift として記録しない', () => {
+    const payload = new Uint8Array([
+      ...strField(1, 'system:announce')
+    ]);
+    const msg = new Uint8Array(lenDelimited(3, [...payload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+  });
+
+  it('msg.24 nx:gift:show を専用 decoder で gift として記録', () => {
+    // 実機 lv350472558 で観測された構造の最小再現:
+    //   fn=1 LEN: "nx:gift:show"
+    //   fn=5 LEN: payload (map)
+    //     fn=1 LEN: { fn=1=key (string), fn=2=value (string LEN with 0x1a prefix) }
+    function strValueField(s) {
+      // value が string の場合の wire (fn=2 LEN): 0x12 + len + 0x1a + str_len + str
+      // 実機 hex: "12 0b 1a 09 e5 90 8d ..." = fn=2 LEN(11) → 0x1a (LEN) + str
+      const enc = new TextEncoder();
+      const bytes = enc.encode(s);
+      const innerLen = bytes.length;
+      const inner = [0x1a, innerLen, ...bytes]; // 0x1a = (3 << 3) | 2 = wire of fn=3 LEN
+      return [0x12, inner.length, ...inner]; // fn=2 LEN
+    }
+    const advNameKv = new Uint8Array([
+      ...strField(1, 'advertiserName'),
+      ...strValueField('やまださん')
+    ]);
+    const adPointKv = new Uint8Array([
+      ...strField(1, 'adPoint'),
+      // double LEN9: 0x12 0x09 0x11 + 8byte float64 = 100.0
+      0x12, 0x09, 0x11,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x40 // 100.0 (little endian)
+    ]);
+    const mapPayload = new Uint8Array([
+      ...lenDelimited(1, [...advNameKv]),
+      ...lenDelimited(1, [...adPointKv])
+    ]);
+    const ev = new Uint8Array([
+      ...strField(1, 'nx:gift:show'),
+      ...lenDelimited(5, [...mapPayload])
+    ]);
+    const msg = new Uint8Array(lenDelimited(24, [...ev]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].advertiserName).toBe('やまださん');
+    expect(r.gifts[0].point).toBe(100);
   });
 });
 
