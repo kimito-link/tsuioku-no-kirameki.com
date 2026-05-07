@@ -290,8 +290,37 @@ export function decodeNxGiftEvent(buf, start, end) {
             if (!key) key = decodeStr(buf, is, ie);
           } else if (ifn === 2 && iwt === 2) {
             const len = ie - is;
-            // double LEN9: 0x11 (tag fn=2 wt=1) + 8 byte float64
-            if (len === 9 && buf[is] === 0x11) {
+            let parsedValueWrapper = false;
+            // google.protobuf.Value: number_value = field 2 (wire 1 double), string_value = field 3.
+            // 先に protobuf field として読む。string_value が 6 UTF-8 bytes の場合、
+            // tag + len + payload で全体 8 bytes になり raw double heuristic と衝突する。
+            pbForEach(buf, is, ie, (vfn, vwt, vv, vs, ve) => {
+              if (vfn === 2 && vwt === 1 && ve - vs === 8) {
+                try {
+                  const view = new DataView(
+                    buf.buffer,
+                    buf.byteOffset + vs,
+                    8
+                  );
+                  const v = view.getFloat64(0, true);
+                  if (Number.isFinite(v)) {
+                    numVal = v;
+                    parsedValueWrapper = true;
+                  }
+                } catch { /* no-op */ }
+              } else if (vfn === 3 && vwt === 2) {
+                const inner = decodeStr(buf, vs, ve);
+                if (inner && !strVal) {
+                  strVal = inner;
+                  parsedValueWrapper = true;
+                }
+              } else if (vfn === 4 && vwt === 0 && vv != null) {
+                strVal = vv ? 'true' : 'false';
+                parsedValueWrapper = true;
+              }
+            });
+            if (!parsedValueWrapper && len === 9 && buf[is] === 0x11) {
+              // 旧観測: wrapper struct { fn=2 LEN: 0x11 + 8 byte float64 }
               try {
                 const view = new DataView(
                   buf.buffer,
@@ -301,14 +330,6 @@ export function decodeNxGiftEvent(buf, start, end) {
                 const v = view.getFloat64(0, true);
                 if (Number.isFinite(v)) numVal = v;
               } catch { /* no-op */ }
-            } else {
-              // value は wrapper struct { fn=3 LEN: string } の構造（実機観測）
-              pbForEach(buf, is, ie, (vfn, vwt, _vv, vs, ve) => {
-                if (vfn === 3 && vwt === 2) {
-                  const inner = decodeStr(buf, vs, ve);
-                  if (inner && !strVal) strVal = inner;
-                }
-              });
             }
           }
         });
@@ -436,6 +457,39 @@ function isFalsePositiveItemId(itemId) {
   if (s.startsWith('system:')) return true;
   if (s.startsWith('event:')) return true;
   return false;
+}
+
+/**
+ * @param {Record<string, string|number>} props
+ * @param {string[]} keys
+ * @returns {string}
+ */
+function pickNxGiftString(props, keys) {
+  for (const key of keys) {
+    const value = props[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return '';
+}
+
+/**
+ * @param {Record<string, string|number>} props
+ * @param {string[]} keys
+ * @returns {number|null}
+ */
+function pickNxGiftNumber(props, keys) {
+  for (const key of keys) {
+    const value = props[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const normalized = value.replace(/,/g, '').trim();
+      if (!normalized) continue;
+      const n = Number(normalized);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
 }
 
 /**
@@ -604,26 +658,62 @@ export function decodeChunkedMessage(buf, start, end) {
           // proto 原本の Gift 構造とは異なる。
           const ev = decodeNxGiftEvent(buf, ms, me);
           if (ev.eventType === 'nx:gift:show') {
-            const advName = String(ev.props.advertiserName || '').trim();
-            const advUid = String(
-              ev.props.advertiserUserId || ev.props.userId || ''
-            ).trim();
-            const itemNameStr = String(ev.props.itemName || '').trim();
-            const point =
-              typeof ev.props.adPoint === 'number'
-                ? ev.props.adPoint
-                : typeof ev.props.point === 'number'
-                  ? ev.props.point
-                  : null;
-            if (advName || advUid || itemNameStr || point != null) {
+            const advName = pickNxGiftString(ev.props, [
+              'advertiserName',
+              'advertiser_name',
+              'senderName',
+              'sender_name',
+              'userName',
+              'user_name',
+              'nickname',
+              'name'
+            ]);
+            const advUid = pickNxGiftString(ev.props, [
+              'advertiserUserId',
+              'advertiser_user_id',
+              'senderUserId',
+              'sender_user_id',
+              'rawUserId',
+              'raw_user_id',
+              'userId',
+              'user_id'
+            ]);
+            const itemIdStr = pickNxGiftString(ev.props, [
+              'itemId',
+              'item_id',
+              'giftItemId',
+              'gift_item_id'
+            ]);
+            const itemNameStr = pickNxGiftString(ev.props, [
+              'itemName',
+              'item_name',
+              'giftName',
+              'gift_name'
+            ]);
+            const point = pickNxGiftNumber(ev.props, [
+              'adPoint',
+              'ad_point',
+              'point',
+              'points',
+              'giftPoint',
+              'gift_point',
+              'itemPoint',
+              'item_point'
+            ]);
+            const contributionRank = pickNxGiftNumber(ev.props, [
+              'contributionRank',
+              'contribution_rank',
+              'rank'
+            ]);
+            if (advName || advUid || itemIdStr || itemNameStr || point != null || contributionRank != null) {
               gifts.push({
-                itemId: String(ev.props.itemId || ''),
+                itemId: itemIdStr,
                 advertiserUserId: advUid,
                 advertiserName: advName,
                 point,
                 message: '',
                 itemName: itemNameStr,
-                contributionRank: null
+                contributionRank
               });
             }
           }

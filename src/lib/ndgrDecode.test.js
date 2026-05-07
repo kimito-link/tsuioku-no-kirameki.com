@@ -657,33 +657,32 @@ describe('v0.1.211 false positive 抑制 + msg.24 nx:gift:show 専用 decode', (
     expect(r.gifts).toHaveLength(0);
   });
 
-  it('msg.24 nx:gift:show を専用 decoder で gift として記録', () => {
-    // 実機 lv350472558 で観測された構造の最小再現:
-    //   fn=1 LEN: "nx:gift:show"
-    //   fn=5 LEN: payload (map)
-    //     fn=1 LEN: { fn=1=key (string), fn=2=value (string LEN with 0x1a prefix) }
-    function strValueField(s) {
-      // value が string の場合の wire (fn=2 LEN): 0x12 + len + 0x1a + str_len + str
-      // 実機 hex: "12 0b 1a 09 e5 90 8d ..." = fn=2 LEN(11) → 0x1a (LEN) + str
+  it('msg.24 nx:gift:show の snake_case keys と google.protobuf.Value number_value を decode', () => {
+    function structStringValue(s) {
       const enc = new TextEncoder();
       const bytes = enc.encode(s);
-      const innerLen = bytes.length;
-      const inner = [0x1a, innerLen, ...bytes]; // 0x1a = (3 << 3) | 2 = wire of fn=3 LEN
-      return [0x12, inner.length, ...inner]; // fn=2 LEN
+      return lenDelimited(3, [...bytes]);
     }
-    const advNameKv = new Uint8Array([
-      ...strField(1, 'advertiserName'),
-      ...strValueField('やまださん')
-    ]);
-    const adPointKv = new Uint8Array([
-      ...strField(1, 'adPoint'),
-      // double LEN9: 0x12 0x09 0x11 + 8byte float64 = 100.0
-      0x12, 0x09, 0x11,
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x40 // 100.0 (little endian)
-    ]);
+    function structNumberValue(n) {
+      const buf = new ArrayBuffer(8);
+      new DataView(buf).setFloat64(0, n, true);
+      return [...tag(2, 1), ...new Uint8Array(buf)];
+    }
+    function kv(key, valuePayload) {
+      return lenDelimited(1, [
+        ...strField(1, key),
+        ...lenDelimited(2, valuePayload)
+      ]);
+    }
+    const sixByteNameValue = structStringValue('名無');
+    expect(sixByteNameValue).toHaveLength(8);
     const mapPayload = new Uint8Array([
-      ...lenDelimited(1, [...advNameKv]),
-      ...lenDelimited(1, [...adPointKv])
+      ...kv('advertiser_name', sixByteNameValue),
+      ...kv('advertiser_user_id', structStringValue('12345678')),
+      ...kv('item_name', structStringValue('バスケットボール')),
+      ...kv('item_id', structStringValue('stamp_basketball')),
+      ...kv('ad_point', structNumberValue(300)),
+      ...kv('contribution_rank', structNumberValue(4))
     ]);
     const ev = new Uint8Array([
       ...strField(1, 'nx:gift:show'),
@@ -693,10 +692,15 @@ describe('v0.1.211 false positive 抑制 + msg.24 nx:gift:show 専用 decode', (
     const chunked = new Uint8Array(lenDelimited(1, [...msg]));
     const r = decodeChunkedMessage(chunked);
     expect(r.gifts).toHaveLength(1);
-    expect(r.gifts[0].advertiserName).toBe('やまださん');
-    expect(r.gifts[0].point).toBe(100);
+    expect(r.gifts[0].advertiserUserId).toBe('12345678');
+    expect(r.gifts[0].advertiserName).toBe('名無');
+    expect(r.gifts[0].itemId).toBe('stamp_basketball');
+    expect(r.gifts[0].itemName).toBe('バスケットボール');
+    expect(r.gifts[0].point).toBe(300);
+    expect(r.gifts[0].contributionRank).toBe(4);
   });
 });
+
 
 describe('v0.1.210 gift fallback (msg.1 chat 失敗時 + msg.其他 で itemId があれば gift 認定)', () => {
   it('msg.1 で chat.no が null かつ item_id があれば gift として記録される', () => {
