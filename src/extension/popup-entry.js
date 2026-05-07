@@ -6879,10 +6879,16 @@ async function renderDevMonitorGiftRankingExtras() {
 }
 
 /**
- * v0.1.213: popup「AI 診断（Gemini Nano）」ボタンの handler。
+ * popup「AI 診断（Gemini Nano）」ボタンの handler。
  * 各ステップで result.textContent を逐次更新し、どこで止まるか可視化する
- * （v0.1.212 で「クリックしても変わらない」報告があったため、step 別に
- * 状態を出して silent fail を防ぐ）。
+ * （silent fail 防止）。
+ *
+ * 利用可否の分岐:
+ *   - `'unavailable'` のみ早期終了（Chrome 138 未満や WebGPU 未対応など）
+ *   - `'downloadable'` / `'downloading'` はそのまま進み、runBuiltinAiPrompt
+ *     の onDownloadProgress でモデル DL 進捗を %% 表示しつつ DL 完了後に
+ *     自動で診断を実行する（1 クリック完結）
+ *   - `'available'` はすぐ問い合わせて応答を表示
  *
  * @param {any} fastCache  KEY_AI_SHARE_FAST_DIAG の中身
  */
@@ -6916,12 +6922,12 @@ function attachAiDiagButtonHandler(fastCache) {
       try {
         console.log('[nls AI診断] availability', av);
       } catch { /* no-op */ }
-      if (av.state !== 'available') {
+      if (av.state === 'unavailable') {
         result.textContent =
           `❌ Built-in AI 利用不可\n` +
           `state: ${av.state}\n` +
           `reason: ${av.reason || '(なし)'}\n\n` +
-          `Chrome 138+ + WebGPU 対応 + Built-in AI モデル DL が必要です。\n` +
+          `Chrome 138+ + WebGPU 対応 + Built-in AI 機能の有効化が必要です。\n` +
           `chrome://flags/#optimization-guide-on-device-model を有効化、\n` +
           `chrome://components で「Optimization Guide On Device Model」を最新化してください。`;
         btn.removeAttribute('disabled');
@@ -6976,12 +6982,23 @@ function attachAiDiagButtonHandler(fastCache) {
         contextNote
       });
 
-      result.textContent =
-        '⏳ ステップ 4/4: Built-in AI に問い合わせ中… (5〜10 秒かかります)';
+      const needsDownload =
+        av.state === 'downloadable' || av.state === 'downloading';
+      result.textContent = needsDownload
+        ? '⏳ ステップ 4/4: Built-in AI モデル DL 中…\n' +
+          '（初回のみ、約 2GB の DL が走ります。Wi-Fi 推奨、数分〜数十分）'
+        : '⏳ ステップ 4/4: Built-in AI に問い合わせ中… (5〜10 秒かかります)';
       try {
-        console.log('[nls AI診断] runBuiltinAiPrompt 開始');
+        console.log('[nls AI診断] runBuiltinAiPrompt 開始', { needsDownload });
       } catch { /* no-op */ }
-      const text = await runBuiltinAiPrompt(prompt);
+      const text = await runBuiltinAiPrompt(prompt, {
+        onDownloadProgress: (loaded) => {
+          const pct = Math.max(0, Math.min(100, Number(loaded) * 100));
+          result.textContent =
+            `⬇️ Built-in AI モデル DL 中: ${pct.toFixed(1)}%\n` +
+            `（初回のみ、約 2GB。完了後そのまま AI 診断を実行します）`;
+        }
+      });
       try {
         console.log('[nls AI診断] runBuiltinAiPrompt 応答', text?.length, '文字');
       } catch { /* no-op */ }
