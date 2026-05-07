@@ -118,13 +118,22 @@ export function mergeGiftUsers(existing, incoming) {
 
   for (const inc of incoming) {
     const uid = String(inc.userId || '').trim();
-    if (!uid) continue;
     const nick = String(inc.nickname || '').trim();
+    // v0.1.215: anonymous gift（uid 空 + nickname あり）も bucket key を
+    //   __anon_<nickname> にして storage に格納する。これで popup「ユーザー
+    //   別の応援件数」 fallback (refreshGiftRankStrip) で anonymous gift も
+    //   表示される。同名 anonymous は 1 つの bucket に集約する仕様。
+    //   uid 空 + nickname が内部ラベルのみ（運営割り当て）の場合は表示価値が
+    //   ないので従来通り skip。
+    if (!uid && (!nick || isLikelyInternalNdgGiftOrCampaignLabel(nick))) {
+      continue;
+    }
+    const key = uid || `__anon_${nick}`;
 
-    const ex = byId.get(uid);
+    const ex = byId.get(key);
     if (ex) {
-      if (nicknameShouldReplaceExisting(ex.nickname, nick, uid)) {
-        byId.set(uid, { ...ex, nickname: nick });
+      if (nicknameShouldReplaceExisting(ex.nickname, nick, key)) {
+        byId.set(key, { ...ex, nickname: nick });
         storageTouched = true;
       }
       continue;
@@ -132,8 +141,8 @@ export function mergeGiftUsers(existing, incoming) {
     const entryNickname =
       nick && isLikelyInternalNdgGiftOrCampaignLabel(nick) ? '' : nick;
     /** @type {StoredGiftUser} */
-    const entry = { userId: uid, nickname: entryNickname, capturedAt: now };
-    byId.set(uid, entry);
+    const entry = { userId: key, nickname: entryNickname, capturedAt: now };
+    byId.set(key, entry);
     added.push(entry);
   }
 
