@@ -9081,6 +9081,115 @@ function maybeStartGiftSubAppIframeRelay() {
   setInterval(scanAndPost, 5000);
 }
 
+/** @type {string} */
+let _hiddenOfficialIframesInjectedForLid = '';
+
+/**
+ * v0.1.218: 公式 iframe (audition / koken / nicoad) を裏で inject して Vue を
+ *   完全 render させる。kimito さんが「ギフト」モーダル → 「履歴」タブを開く
+ *   操作なしで、過去 gift history + 貢献度ランキング + イベント参加バナーを
+ *   取得する。
+ *
+ * 既存 fetchOfficialEventBannerFromAuditionEmbed (v0.1.169) は SPA で SSR が
+ * empty なため `fetch + DOMParser` では Vue が走らず空のまま (実機 v0.1.215〜
+ * 217 で `auditionFetchStatus: "empty"` 確認）。本関数は実 browser frame として
+ * iframe を load させるので Vue が完全 render される。
+ *
+ * iframe の中では manifest `all_frames: true` で content script (page-intercept
+ * + content-entry) が注入され、v0.1.216/217 で実装済の relay
+ * (`maybeStartGiftSubAppIframeRelay`) が起動 → 5 秒間隔で scrape →
+ * `window.top.postMessage(NLS_GIFT_HISTORY_FROM_IFRAME)` で親 frame に送信 →
+ * 既存 receive listener が storage 保存 → popup 反映。
+ *
+ * 副作用:
+ *   - 親 frame body に 3 個の hidden iframe を append
+ *   - 60 秒後 destroy (memory cleanup)
+ *   - 同じ liveId に対して 1 回だけ inject (重複防止)
+ *   - SPA 遷移で liveId が変わったら再 inject 可能
+ *
+ * @param {string} liveId 例 'lv350474211'
+ */
+function maybeInjectHiddenOfficialIframes(liveId) {
+  const lid = String(liveId || '').trim();
+  if (!lid) return;
+  if (_hiddenOfficialIframesInjectedForLid === lid) return;
+  _hiddenOfficialIframesInjectedForLid = lid;
+  let isTop = true;
+  try {
+    isTop = window.self === window.top;
+  } catch {
+    isTop = true;
+  }
+  if (!isTop) return; // 親 frame だけ
+  if (!document?.body) return;
+
+  /** @type {{ id: string, url: string }[]} */
+  const targets = [
+    {
+      id: 'nls-hidden-audition-iframe',
+      url:
+        'https://audition.nicovideo.jp/embedded/richview/live?content_id=' +
+        encodeURIComponent(lid) +
+        '&frontend_id=9&frontend_version=644.0.0'
+    },
+    {
+      id: 'nls-hidden-koken-iframe',
+      url:
+        'https://koken.nicovideo.jp/supporter/contents/live/' +
+        encodeURIComponent(lid) +
+        '/gift'
+    },
+    {
+      id: 'nls-hidden-nicoad-iframe',
+      url:
+        'https://nicoad.nicovideo.jp/live/publish/' +
+        encodeURIComponent(lid) +
+        '?frontend_id=9'
+    }
+  ];
+
+  /** @type {HTMLIFrameElement[]} */
+  const created = [];
+  for (const { id, url } of targets) {
+    if (document.getElementById(id)) continue;
+    try {
+      const ifr = document.createElement('iframe');
+      ifr.id = id;
+      ifr.src = url;
+      // ユーザーに見えない位置 + 1px サイズで Vue 描画は走るが画面占有しない
+      ifr.style.cssText =
+        'display:block !important;' +
+        'position:fixed !important;' +
+        'top:-9999px !important;' +
+        'left:-9999px !important;' +
+        'width:1px !important;' +
+        'height:1px !important;' +
+        'border:0 !important;' +
+        'pointer-events:none !important;' +
+        'opacity:0 !important;' +
+        'z-index:-1 !important;';
+      ifr.setAttribute('aria-hidden', 'true');
+      ifr.setAttribute('tabindex', '-1');
+      ifr.setAttribute('data-nls-hidden-injected', '1');
+      document.body.appendChild(ifr);
+      created.push(ifr);
+    } catch {
+      /* no-op */
+    }
+  }
+
+  // 60 秒後 destroy (memory cleanup)。十分な scrape 機会を与えてから片付ける。
+  setTimeout(() => {
+    for (const ifr of created) {
+      try {
+        ifr.remove();
+      } catch {
+        /* no-op */
+      }
+    }
+  }, 60_000);
+}
+
 /**
  * v0.1.198: ニコ生ギフトサブアプリ DOM（gift-history-list と total-dold-count-list）を
  * top document + 同一 origin な iframe contentDocument 全部に対してスキャンする。
@@ -9207,6 +9316,12 @@ async function persistOfficialEventDomBundleNow() {
   // 0.1.173: lifetime 観測カウンタ（診断シート用）
   const _rd = getRankingLifetimeDiag();
   _rd.collectAttempts += 1;
+  // v0.1.218: 公式 iframe (audition / koken / nicoad) を裏で inject して Vue を
+  //   render させる。同じ liveId に対して 1 回だけ実行。実 browser frame として
+  //   load されるため、SPA でも Vue が完全 render → iframe content script の
+  //   relay 経路 (v0.1.216/217) で過去 gift history / 貢献度ランキング /
+  //   イベント参加バナーがすべて popup に反映される。kimito さん操作 0 回。
+  try { maybeInjectHiddenOfficialIframes(lid); } catch { /* no-op */ }
   // 0.1.175: コメント DOM 経由のギフト送信者観測（autoOpen 迂回ルート）
   try { harvestGiftCommentsFromCommentTableDom(); } catch { /* no-op */ }
   // v0.1.198: ギフトサブアプリ DOM（iframe 内含む全 frame）を走査して popup へ
