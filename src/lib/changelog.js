@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.209',
+    date: '2026-05-07',
+    summary: '未知 NDGR field の中身を診断に出す（緊急）',
+    items: Object.freeze([
+      'NDGR ギフトイベントが想定 field（v0.1.204 で proto 原本準拠に直した経路）に来ず、別 field（実機観測で msg.3 と top.11）に化けている可能性が浮上したため、未知 field の中身を最大 3 件サンプル保存して AI 共有診断 JSON に出すようにしました。次回の診断バンドルで真のギフト経路を特定する手がかりになります',
+      '具体的には ndgrUnknownSamples フィールドが診断に追加されます。各サンプルには byteSize / 先頭 96 byte の hex プレビュー / 中の field 番号ヒストグラム / 文字列フィールドの先頭 3 件が含まれ、ギフトの送り主・アイテム名・ポイントが見えるはずです',
+      '本版自体ではギフト取得率は変わりません（次版以降でデコード経路を真の field に合わせる予定）。ユーザー名が「u スラッシュ ID」のような fallback 表示になる事象も同根です（NDGR ギフト経由でニックネーム解決する設計が機能していなかったため）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.208',
     date: '2026-05-07',
     summary: 'popup の応援アイコン取得率を改善',

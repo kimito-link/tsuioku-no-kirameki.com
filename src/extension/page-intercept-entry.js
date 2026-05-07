@@ -360,6 +360,40 @@ import {
       root.setAttribute('data-nls-ndgr-tags', JSON.stringify(_ndgrTagHistogram));
     } catch { /* no-op */ }
   }
+
+  /**
+   * v0.1.209 緊急投入: 未知 NDGR field の sample を蓄積（lifetime、最大 3 件 / key）。
+   * msg.8 (gift) が来ない一方で msg.3 / top.11 が来る配信が確認されたため、
+   * 中身（hex preview + 内側 field histogram + string sample）を診断 JSON に
+   * 露出して真の gift 経路を特定する。
+   */
+  /** @type {Record<string, Array<any>>} */
+  const _ndgrUnknownSamples = {};
+  const NDGR_UNKNOWN_SAMPLES_MAX_PER_KEY = 3;
+  /** @param {Record<string, Array<any>> | undefined} u */
+  function mergeNdgrUnknownSamples(u) {
+    if (!u || typeof u !== 'object') return;
+    for (const key of Object.keys(u)) {
+      if (!_ndgrUnknownSamples[key]) _ndgrUnknownSamples[key] = [];
+      const slot = _ndgrUnknownSamples[key];
+      if (slot.length >= NDGR_UNKNOWN_SAMPLES_MAX_PER_KEY) continue;
+      const incoming = Array.isArray(u[key]) ? u[key] : [];
+      for (const sample of incoming) {
+        if (slot.length >= NDGR_UNKNOWN_SAMPLES_MAX_PER_KEY) break;
+        slot.push(sample);
+      }
+    }
+  }
+  function publishNdgrUnknownSamples() {
+    const root = document.documentElement;
+    if (!root) return;
+    try {
+      root.setAttribute(
+        'data-nls-ndgr-unknown-samples',
+        JSON.stringify(_ndgrUnknownSamples)
+      );
+    } catch { /* no-op */ }
+  }
   /** @type {{ pendingBytes: number, droppedBytes: number, totalFrames: number }|null} */
   let _ldStreamStats = null;
 
@@ -375,6 +409,7 @@ import {
   function handleNdgrResult(result) {
     if (!result) return;
     mergeNdgrTagHistogram(result.tagHistogram);
+    mergeNdgrUnknownSamples(result.unknownSamples);
     if (result.stats && ndgrStatisticsHasWireSignal(result.stats)) {
       _ndgr.stats++;
       const st = result.stats;
@@ -496,6 +531,7 @@ import {
       );
     }
     publishNdgrTagHistogram();
+    publishNdgrUnknownSamples();
   }
 
   const VIEWER_KEYS = ['viewers', 'watchCount', 'watching', 'watchingCount', 'viewerCount', 'viewCount'];

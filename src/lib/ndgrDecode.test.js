@@ -556,6 +556,73 @@ describe('decodeChunkedMessage', () => {
   });
 });
 
+describe('unknown field samples (v0.1.209 緊急投入)', () => {
+  it('records sample for unknown msg field (msg:3)', () => {
+    // top:1 → msg:3 (unknown) を含む
+    const innerPayload = new Uint8Array([
+      ...strField(1, 'sender_name'),
+      ...varintField(2, 12345)
+    ]);
+    const nicoliveMessage = new Uint8Array(lenDelimited(3, [...innerPayload]));
+    const chunkedMessage = new Uint8Array(lenDelimited(1, [...nicoliveMessage]));
+
+    const r = decodeChunkedMessage(chunkedMessage);
+    expect(r.unknownSamples['msg:3']).toBeDefined();
+    expect(r.unknownSamples['msg:3']).toHaveLength(1);
+    expect(r.unknownSamples['msg:3'][0].topFn).toBe(1);
+    expect(r.unknownSamples['msg:3'][0].msgFn).toBe(3);
+    expect(r.unknownSamples['msg:3'][0].byteSize).toBe(innerPayload.length);
+    expect(r.unknownSamples['msg:3'][0].innerHistogram['1']).toBe(1);
+    expect(r.unknownSamples['msg:3'][0].innerHistogram['2']).toBe(1);
+    expect(r.unknownSamples['msg:3'][0].stringSamples).toContain(
+      'sender_name'
+    );
+  });
+
+  it('records sample for unknown top field (top:11)', () => {
+    const innerPayload = new Uint8Array([...varintField(1, 100)]);
+    const chunked = new Uint8Array(lenDelimited(11, [...innerPayload]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.unknownSamples['top:11']).toBeDefined();
+    expect(r.unknownSamples['top:11'][0].topFn).toBe(11);
+    expect(r.unknownSamples['top:11'][0].msgFn).toBeNull();
+    expect(r.unknownSamples['top:11'][0].innerHistogram['1']).toBe(1);
+  });
+
+  it('caps at 3 samples per key', () => {
+    const inner = new Uint8Array([...varintField(1, 100)]);
+    /** @type {number[]} */
+    const all = [];
+    for (let i = 0; i < 5; i++) {
+      all.push(...lenDelimited(1, [...lenDelimited(3, [...inner])]));
+    }
+    const chunked = new Uint8Array(all);
+    const r = decodeChunkedMessage(chunked);
+    expect(r.unknownSamples['msg:3']).toHaveLength(3);
+  });
+
+  it('does not record sample for known fields', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'hi'),
+      ...varintField(8, 1)
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...chat]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(Object.keys(r.unknownSamples)).toHaveLength(0);
+  });
+
+  it('hexPreview is short (max 96 bytes = 192 hex chars)', () => {
+    const big = new Array(200).fill(0x42);
+    const chunked = new Uint8Array(lenDelimited(11, big));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.unknownSamples['top:11'][0].hexPreview.length).toBeLessThanOrEqual(
+      192
+    );
+    expect(r.unknownSamples['top:11'][0].byteSize).toBe(200);
+  });
+});
+
 describe('decodePackedSegment', () => {
   it('decodes repeated ChunkedMessages', () => {
     const chat1 = new Uint8Array([
