@@ -45,10 +45,15 @@ export async function probeBuiltinAiAvailability() {
 /**
  * Built-in AI で 1 ターンの prompt → completion を取る。
  *
+ * `options.onDownloadProgress` を渡すと、availability が `'downloadable'` /
+ * `'downloading'` の場合に Chrome がモデルを DL する進捗（0..1）を受け取れる。
+ * `'available'` 状態（DL 済）では監視は呼ばれずそのまま prompt まで進む。
+ *
  * @param {{ system?: string, user: string, temperature?: number }} input
+ * @param {{ onDownloadProgress?: (loaded: number) => void }} [options]
  * @returns {Promise<string>}
  */
-export async function runBuiltinAiPrompt(input) {
+export async function runBuiltinAiPrompt(input, options) {
   const sys = String(input?.system ?? '').trim();
   const usr = String(input?.user ?? '').trim();
   if (!usr) throw new Error('runBuiltinAiPrompt: user prompt is required');
@@ -60,6 +65,18 @@ export async function runBuiltinAiPrompt(input) {
   const opts = {};
   if (sys) opts.initialPrompts = [{ role: 'system', content: sys }];
   if (typeof input?.temperature === 'number') opts.temperature = input.temperature;
+  const onDownloadProgress = options?.onDownloadProgress;
+  if (typeof onDownloadProgress === 'function') {
+    opts.monitor = (/** @type {any} */ m) => {
+      try {
+        m.addEventListener('downloadprogress', (/** @type {any} */ e) => {
+          try {
+            onDownloadProgress(Number(e?.loaded ?? 0));
+          } catch { /* no-op */ }
+        });
+      } catch { /* no-op */ }
+    };
+  }
   const session = await lm.create(opts);
   try {
     const out = await session.prompt(usr);

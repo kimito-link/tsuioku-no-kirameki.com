@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.219',
+    date: '2026-05-07',
+    summary: 'AI 診断ボタン 1 クリックでモデル DL → 診断まで自動実行',
+    items: Object.freeze([
+      'popup「詳しい状況」セクションの「🤖 AI 診断（Gemini Nano）」ボタンを押したとき、これまではオンデバイス AI モデル未 DL の場合「ダウンロードしてください」というメッセージで止まっていました。本バージョンからボタン押下のみで自動的にモデル DL を開始し、DL 進捗（%）を表示しながら完了後そのまま AI 診断を実行するようにしました（1 クリック完結）',
+      '初回は約 2GB のオンデバイスモデルの DL が走ります（外部に送信されることはありません、Chrome 内蔵の AI モデルです）。2 回目以降は DL 不要なので押すと即座に診断結果が出ます。Wi-Fi 環境を推奨します',
+      'DL の途中で popup を閉じても Chrome 側の DL は継続するので、後で再度開いたときに進捗が引き継がれます。WebGPU 非対応環境や Chrome 138 未満では従来通り「利用不可」メッセージで終了します（こちらは設定変更が必要なため自動化できません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.218',
     date: '2026-05-07',
     summary: '公式 iframe を裏で読み込んで全 gift 自動取得',

@@ -151,6 +151,88 @@ describe('runBuiltinAiPrompt', () => {
     const out = await runBuiltinAiPrompt({ user: 'hi' });
     expect(out).toBe('ok');
   });
+
+  it('omits monitor when onDownloadProgress is not provided', async () => {
+    let createOpts = null;
+    globalThis.LanguageModel = {
+      create: async (opts) => {
+        createOpts = opts;
+        return { prompt: async () => 'ok', destroy: () => {} };
+      }
+    };
+    await runBuiltinAiPrompt({ user: 'hi' });
+    expect(createOpts.monitor).toBeUndefined();
+  });
+
+  it('forwards downloadprogress events to onDownloadProgress callback', async () => {
+    const progress = [];
+    let monitorFn = null;
+    globalThis.LanguageModel = {
+      create: async (opts) => {
+        monitorFn = opts.monitor;
+        const listeners = [];
+        const m = {
+          addEventListener: (name, fn) => listeners.push({ name, fn })
+        };
+        monitorFn(m);
+        listeners
+          .filter((l) => l.name === 'downloadprogress')
+          .forEach((l) => {
+            l.fn({ loaded: 0.25 });
+            l.fn({ loaded: 0.5 });
+            l.fn({ loaded: 1 });
+          });
+        return { prompt: async () => 'ok', destroy: () => {} };
+      }
+    };
+    await runBuiltinAiPrompt(
+      { user: 'hi' },
+      { onDownloadProgress: (loaded) => progress.push(loaded) }
+    );
+    expect(progress).toEqual([0.25, 0.5, 1]);
+  });
+
+  it('survives addEventListener throwing inside monitor', async () => {
+    globalThis.LanguageModel = {
+      create: async (opts) => {
+        opts.monitor({
+          addEventListener: () => {
+            throw new Error('listener boom');
+          }
+        });
+        return { prompt: async () => 'ok', destroy: () => {} };
+      }
+    };
+    const out = await runBuiltinAiPrompt(
+      { user: 'hi' },
+      { onDownloadProgress: () => {} }
+    );
+    expect(out).toBe('ok');
+  });
+
+  it('survives onDownloadProgress callback throwing', async () => {
+    globalThis.LanguageModel = {
+      create: async (opts) => {
+        const listeners = [];
+        opts.monitor({
+          addEventListener: (name, fn) => listeners.push({ name, fn })
+        });
+        listeners
+          .filter((l) => l.name === 'downloadprogress')
+          .forEach((l) => l.fn({ loaded: 0.5 }));
+        return { prompt: async () => 'ok', destroy: () => {} };
+      }
+    };
+    const out = await runBuiltinAiPrompt(
+      { user: 'hi' },
+      {
+        onDownloadProgress: () => {
+          throw new Error('cb boom');
+        }
+      }
+    );
+    expect(out).toBe('ok');
+  });
 });
 
 describe('runBuiltinAiSummarize', () => {
