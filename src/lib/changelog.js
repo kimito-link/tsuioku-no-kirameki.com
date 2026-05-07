@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.223',
+    date: '2026-05-08',
+    summary: 'ギフト誤検知を抑え送信者取得を強化',
+    items: Object.freeze([
+      'NDGR の msg.1 / msg.2 / msg.3 fallback で、field 1 の文字列だけをギフト itemId と誤認していた経路を抑制しました。正式な msg.8 Gift 以外では、itemId に加えて送信者名・ポイント・順位などギフト固有の情報が取れた場合だけギフトとして記録します',
+      'msg.24 nx:gift:show の parameters で、google.protobuf.Value だけでなく Int64Value / StringValue 相当の wrapper や raw string map 値も読めるようにし、sender_id / uid / nico_user_id など UID alias の候補も増やしました',
+      'AI 共有診断 JSON に NDGR ギフトの decode 経路別カウンタ（msg:8 / msg:24 / fallback など）を追加し、gifts 総数がどの msg 経路から増えているか確認しやすくしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.222',
     date: '2026-05-08',
     summary: 'ギフト送信者観測 0 を decode 側修正で解消',

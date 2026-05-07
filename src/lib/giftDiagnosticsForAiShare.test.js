@@ -9,18 +9,26 @@ import {
 
 describe('parseDataNlsNdgrAttr', () => {
   it('s/c/g/d を数値化', () => {
-    const p = parseDataNlsNdgrAttr('s=1 c=200 g=5 d=12');
+    const p = parseDataNlsNdgrAttr(
+      's=1 c=200 g=5 d=12 gu=2 gn=3 gi=4 gp=5 gr=1'
+    );
     expect(p.parseOk).toBe(true);
     expect(p.stats).toBe(1);
     expect(p.chats).toBe(200);
     expect(p.gifts).toBe(5);
     expect(p.decoded).toBe(12);
+    expect(p.giftsWithUid).toBe(2);
+    expect(p.giftsWithName).toBe(3);
+    expect(p.giftsWithItem).toBe(4);
+    expect(p.giftsWithPoint).toBe(5);
+    expect(p.giftsWithRank).toBe(1);
   });
 
   it('空は parseOk false', () => {
     const p = parseDataNlsNdgrAttr('');
     expect(p.parseOk).toBe(false);
     expect(p.gifts).toBeNull();
+    expect(p.giftsWithUid).toBeNull();
   });
 });
 

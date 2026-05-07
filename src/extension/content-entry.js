@@ -3619,6 +3619,24 @@ function buildGiftDiagnosticsBundle() {
     } catch { /* no-op */ }
   }
 
+  const ndgrGiftPathsAttr =
+    document.documentElement?.getAttribute('data-nls-ndgr-gift-paths') || '';
+  /** @type {Record<string, number>} */
+  let ndgrGiftPathCounters = {};
+  if (ndgrGiftPathsAttr) {
+    try {
+      const parsed = JSON.parse(ndgrGiftPathsAttr);
+      if (parsed && typeof parsed === 'object') {
+        const out = /** @type {Record<string, number>} */ ({});
+        for (const key of Object.keys(parsed)) {
+          const n = Number(parsed[key]);
+          if (Number.isFinite(n) && n >= 0) out[key] = Math.floor(n);
+        }
+        ndgrGiftPathCounters = out;
+      }
+    } catch { /* no-op */ }
+  }
+
   // v0.1.209 緊急投入: 未知 NDGR field の sample（msg.3 / top.11 等）を診断 JSON に
   // 露出する。msg.8 (gift) が来ない一方で他 field が来る配信があるため、
   // 中身を解析して真の gift 経路を特定する用途。
@@ -3660,9 +3678,11 @@ function buildGiftDiagnosticsBundle() {
       giftsWithItem: pickNum('gi'),
       giftsWithPoint: pickNum('gp'),
       giftsWithRank: pickNum('gr'),
+      giftPaths: ndgrGiftPathCounters,
       parseOk: true
     },
     ndgrTagHistogram,
+    ndgrGiftPathCounters,
     ndgrUnknownSamples,
     autoOpenStatus:
       document.documentElement?.getAttribute('data-nls-auto-open') || 'never',

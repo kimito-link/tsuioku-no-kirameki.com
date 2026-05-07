@@ -450,6 +450,7 @@ describe('decodeChunkedMessage', () => {
     expect(result.gifts[0].advertiserName).toBe('ギフト送り');
     expect(result.gifts[0].point).toBe(5000);
     expect(result.gifts[0].itemName).toBe('バスケットボール');
+    expect(result.giftPathCounters['msg:8']).toBe(1);
   });
 
   it('pushes anonymous gift even when advertiser_user_id is empty', () => {
@@ -552,6 +553,7 @@ describe('decodeChunkedMessage', () => {
     expect(r.gifts[0].advertiserUserId).toBe('12345678');
     expect(r.gifts[0].advertiserName).toBe('ギフト送り主');
     expect(r.gifts[0].contributionRank).toBe(1);
+    expect(r.giftPathCounters['msg:8']).toBe(1);
     expect(r.tagHistogram.top['1']).toBe(2);
   });
 });
@@ -698,6 +700,48 @@ describe('v0.1.211 false positive 抑制 + msg.24 nx:gift:show 専用 decode', (
     expect(r.gifts[0].itemName).toBe('バスケットボール');
     expect(r.gifts[0].point).toBe(300);
     expect(r.gifts[0].contributionRank).toBe(4);
+    expect(r.giftPathCounters['msg:24']).toBe(1);
+  });
+
+  it('msg.24 nx:gift:show は Int64Value / raw string map の uid alias も decode', () => {
+    function wrapperInt64Value(n) {
+      return varintField(1, n);
+    }
+    function rawStringValue(s) {
+      const enc = new TextEncoder();
+      return [...enc.encode(s)];
+    }
+    function structNumberValue(n) {
+      const buf = new ArrayBuffer(8);
+      new DataView(buf).setFloat64(0, n, true);
+      return [...tag(2, 1), ...new Uint8Array(buf)];
+    }
+    function kv(key, valuePayload) {
+      return lenDelimited(1, [
+        ...strField(1, key),
+        ...lenDelimited(2, valuePayload)
+      ]);
+    }
+    const mapPayload = new Uint8Array([
+      ...kv('sender_id', wrapperInt64Value(987654321)),
+      ...kv('nickname', rawStringValue('送り主')),
+      ...kv('gift_item_id', rawStringValue('stamp_star')),
+      ...kv('gift_name', rawStringValue('スター')),
+      ...kv('gift_point', structNumberValue(90))
+    ]);
+    const ev = new Uint8Array([
+      ...strField(1, 'nx:gift:show'),
+      ...lenDelimited(5, [...mapPayload])
+    ]);
+    const msg = new Uint8Array(lenDelimited(24, [...ev]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].advertiserUserId).toBe('987654321');
+    expect(r.gifts[0].advertiserName).toBe('送り主');
+    expect(r.gifts[0].itemId).toBe('stamp_star');
+    expect(r.gifts[0].itemName).toBe('スター');
+    expect(r.gifts[0].point).toBe(90);
   });
 });
 
@@ -736,7 +780,7 @@ describe('v0.1.210 gift fallback (msg.1 chat 失敗時 + msg.其他 で itemId �
     expect(r.gifts).toHaveLength(0);
   });
 
-  it('msg.3 などの未対応 field でも item_id があれば gift として記録', () => {
+  it('msg.3 などの未対応 field でも item_id + gift 固有 field があれば記録', () => {
     const giftPayload = new Uint8Array([
       ...strField(1, 'stamp_anon'),
       ...strField(3, '名無し'),
@@ -747,6 +791,29 @@ describe('v0.1.210 gift fallback (msg.1 chat 失敗時 + msg.其他 で itemId �
     const r = decodeChunkedMessage(chunked);
     expect(r.gifts).toHaveLength(1);
     expect(r.gifts[0].itemId).toBe('stamp_anon');
+    expect(r.giftPathCounters['msg:3:fallback']).toBe(1);
+  });
+
+  it('msg.1 fallback は field 1 文字列だけでは gift として記録しない', () => {
+    const textOnlyPayload = new Uint8Array([
+      ...strField(1, 'いらっしゃいませ')
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...textOnlyPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+    expect(r.giftPathCounters).toEqual({});
+  });
+
+  it('未知 msg fallback は item_id だけでは gift として記録しない', () => {
+    const itemOnlyPayload = new Uint8Array([
+      ...strField(1, 'stamp_only')
+    ]);
+    const msg = new Uint8Array(lenDelimited(2, [...itemOnlyPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+    expect(r.unknownSamples['msg:2']).toBeDefined();
   });
 
   it('item_id が無い payload は gift として記録しない（false positive 抑制）', () => {

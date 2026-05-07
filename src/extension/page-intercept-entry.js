@@ -352,7 +352,8 @@ import {
     giftsName: 0,
     giftsItem: 0,
     giftsPoint: 0,
-    giftsRank: 0
+    giftsRank: 0,
+    giftPaths: /** @type {Record<string, number>} */ ({})
   };
   /**
    * NDGR で観測した protobuf field tag のヒストグラム。
@@ -412,6 +413,26 @@ import {
       );
     } catch { /* no-op */ }
   }
+  /** @param {Record<string, number> | undefined} counters */
+  function mergeNdgrGiftPathCounters(counters) {
+    if (!counters || typeof counters !== 'object') return;
+    for (const k of Object.keys(counters)) {
+      const key = String(k || '').trim().slice(0, 60);
+      const n = Number(counters[k]);
+      if (!key || !Number.isFinite(n) || n <= 0) continue;
+      _ndgr.giftPaths[key] = (_ndgr.giftPaths[key] || 0) + Math.floor(n);
+    }
+  }
+  function publishNdgrGiftPathCounters() {
+    const root = document.documentElement;
+    if (!root) return;
+    try {
+      root.setAttribute(
+        'data-nls-ndgr-gift-paths',
+        JSON.stringify(_ndgr.giftPaths)
+      );
+    } catch { /* no-op */ }
+  }
   /** @type {{ pendingBytes: number, droppedBytes: number, totalFrames: number }|null} */
   let _ldStreamStats = null;
 
@@ -428,6 +449,7 @@ import {
     if (!result) return;
     mergeNdgrTagHistogram(result.tagHistogram);
     mergeNdgrUnknownSamples(result.unknownSamples);
+    mergeNdgrGiftPathCounters(result.giftPathCounters);
     if (result.stats && ndgrStatisticsHasWireSignal(result.stats)) {
       _ndgr.stats++;
       const st = result.stats;
@@ -560,6 +582,7 @@ import {
     }
     publishNdgrTagHistogram();
     publishNdgrUnknownSamples();
+    publishNdgrGiftPathCounters();
   }
 
   const VIEWER_KEYS = ['viewers', 'watchCount', 'watching', 'watchingCount', 'viewerCount', 'viewCount'];

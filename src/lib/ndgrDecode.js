@@ -199,7 +199,8 @@ export function decodeStatistics(buf, start, end) {
  *   point: number|null,
  *   message: string,
  *   itemName: string,
- *   contributionRank: number|null
+ *   contributionRank: number|null,
+ *   sourcePath?: string
  * }} NdgrGift
  *
  * proto schema (n-air-app/nicolive-comment-protobuf, atoms.proto):
@@ -217,6 +218,20 @@ const _dec = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fat
 function decodeStr(buf, s, e) {
   if (!_dec) return '';
   try { return _dec.decode(buf.subarray(s, e)); } catch { return ''; }
+}
+
+/**
+ * @param {string} s
+ * @returns {boolean}
+ */
+function looksLikePrintableUtf8Value(s) {
+  const v = String(s || '').trim();
+  if (!v || v.length > 500) return false;
+  for (let i = 0; i < v.length; i += 1) {
+    const code = v.charCodeAt(i);
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) return false;
+  }
+  return true;
 }
 
 /**
@@ -288,14 +303,21 @@ export function decodeNxGiftEvent(buf, start, end) {
         pbForEach(buf, ms, me, (ifn, iwt, _iv, is, ie) => {
           if (ifn === 1 && iwt === 2) {
             if (!key) key = decodeStr(buf, is, ie);
+          } else if (ifn === 2 && iwt === 0 && _iv != null) {
+            numVal = _iv;
           } else if (ifn === 2 && iwt === 2) {
             const len = ie - is;
             let parsedValueWrapper = false;
             // google.protobuf.Value: number_value = field 2 (wire 1 double), string_value = field 3.
+            // google.protobuf.*Value wrappers: value = field 1. UID 系だけ Int64Value
+            // (field 1 varint) で来る実装差にも対応する。
             // 先に protobuf field として読む。string_value が 6 UTF-8 bytes の場合、
             // tag + len + payload で全体 8 bytes になり raw double heuristic と衝突する。
             pbForEach(buf, is, ie, (vfn, vwt, vv, vs, ve) => {
-              if (vfn === 2 && vwt === 1 && ve - vs === 8) {
+              if (vfn === 1 && vwt === 0 && vv != null) {
+                numVal = vv;
+                parsedValueWrapper = true;
+              } else if ((vfn === 1 || vfn === 2) && vwt === 1 && ve - vs === 8) {
                 try {
                   const view = new DataView(
                     buf.buffer,
@@ -308,7 +330,7 @@ export function decodeNxGiftEvent(buf, start, end) {
                     parsedValueWrapper = true;
                   }
                 } catch { /* no-op */ }
-              } else if (vfn === 3 && vwt === 2) {
+              } else if ((vfn === 1 || vfn === 3) && vwt === 2) {
                 const inner = decodeStr(buf, vs, ve);
                 if (inner && !strVal) {
                   strVal = inner;
@@ -330,6 +352,10 @@ export function decodeNxGiftEvent(buf, start, end) {
                 const v = view.getFloat64(0, true);
                 if (Number.isFinite(v)) numVal = v;
               } catch { /* no-op */ }
+            }
+            if (!parsedValueWrapper && !strVal) {
+              const raw = decodeStr(buf, is, ie);
+              if (looksLikePrintableUtf8Value(raw)) strVal = raw.trim();
             }
           }
         });
@@ -432,6 +458,7 @@ export function decodeGift(buf, start, end) {
  *   stats: NdgrStatistics|null,
  *   chats: NdgrChat[],
  *   gifts: NdgrGift[],
+ *   giftPathCounters: Record<string, number>,
  *   tagHistogram: NdgrTagHistogram,
  *   unknownSamples: Record<string, NdgrUnknownSample[]>
  * }} NdgrDecodeResult
@@ -457,6 +484,42 @@ function isFalsePositiveItemId(itemId) {
   if (s.startsWith('system:')) return true;
   if (s.startsWith('event:')) return true;
   return false;
+}
+
+/**
+ * msg.8 のような正式 Gift oneof では item_id 単独でも gift として扱う。
+ * @param {NdgrGift} g
+ * @returns {boolean}
+ */
+function hasAnyGiftField(g) {
+  return Boolean(
+    g.itemId ||
+      g.advertiserUserId ||
+      g.advertiserName ||
+      g.itemName ||
+      g.message ||
+      g.point != null ||
+      g.contributionRank != null
+  );
+}
+
+/**
+ * msg.1/chat fallback や未知 msg fallback は field 1 の任意文字列を item_id と
+ * 誤認しやすい。正式 Gift 以外では、item_id に加えて送信者・pt・順位など
+ * gift 固有の追加 field が少なくとも 1 つ取れた場合だけ採用する。
+ * @param {NdgrGift} g
+ * @returns {boolean}
+ */
+function hasFallbackGiftEvidence(g) {
+  if (!g.itemId || isFalsePositiveItemId(g.itemId)) return false;
+  return Boolean(
+    g.advertiserUserId ||
+      g.advertiserName ||
+      g.itemName ||
+      g.message ||
+      g.point != null ||
+      g.contributionRank != null
+  );
 }
 
 /**
@@ -561,10 +624,22 @@ export function decodeChunkedMessage(buf, start, end) {
   const chats = [];
   /** @type {NdgrGift[]} */
   const gifts = [];
+  /** @type {Record<string, number>} */
+  const giftPathCounters = {};
   /** @type {NdgrTagHistogram} */
   const tagHistogram = { top: {}, msg: {} };
   /** @type {Record<string, NdgrUnknownSample[]>} */
   const unknownSamples = {};
+
+  /**
+   * @param {NdgrGift} g
+   * @param {string} sourcePath
+   */
+  function pushGift(g, sourcePath) {
+    const path = String(sourcePath || 'unknown').trim() || 'unknown';
+    giftPathCounters[path] = (giftPathCounters[path] || 0) + 1;
+    gifts.push({ ...g, sourcePath: path });
+  }
 
   pbForEach(buf, s0, e0, (fn, wt, _v, s, e) => {
     if (wt !== 2) return;
@@ -634,23 +709,16 @@ export function decodeChunkedMessage(buf, start, end) {
             // v0.1.210: chat 失敗時は gift として fallback 試行。
             // v0.1.211: false positive 抑制のため "nx:" / "system:" prefix を除外。
             const g = decodeGift(buf, ms, me);
-            if (g.itemId && !isFalsePositiveItemId(g.itemId)) {
-              gifts.push(g);
+            if (hasFallbackGiftEvidence(g)) {
+              pushGift(g, `msg:${mfn}:fallback`);
             }
           }
         } else if (mfn === 8) {
           const g = decodeGift(buf, ms, me);
           // anonymous gift（advertiser_user_id 欠落）でも item_id / advertiser_name
           // / point / item_name / contribution_rank のいずれかが取れていれば valid。
-          if (
-            g.itemId ||
-            g.advertiserUserId ||
-            g.advertiserName ||
-            g.itemName ||
-            g.point != null ||
-            g.contributionRank != null
-          ) {
-            gifts.push(g);
+          if (hasAnyGiftField(g)) {
+            pushGift(g, 'msg:8');
           }
         } else if (mfn === 24) {
           // v0.1.211: msg.24 の "nx:gift:show" 系を専用 decoder で処理。
@@ -671,12 +739,33 @@ export function decodeChunkedMessage(buf, start, end) {
             const advUid = pickNxGiftString(ev.props, [
               'advertiserUserId',
               'advertiser_user_id',
+              'advertiserUserID',
+              'advertiser_userID',
+              'advertiserId',
+              'advertiser_id',
               'senderUserId',
               'sender_user_id',
+              'senderUid',
+              'sender_uid',
+              'senderId',
+              'sender_id',
               'rawUserId',
               'raw_user_id',
+              'niconicoUserId',
+              'niconico_user_id',
+              'nicoUserId',
+              'nico_user_id',
+              'memberId',
+              'member_id',
+              'accountId',
+              'account_id',
+              'profileUserId',
+              'profile_user_id',
               'userId',
-              'user_id'
+              'user_id',
+              'userIdStr',
+              'user_id_str',
+              'uid'
             ]);
             const itemIdStr = pickNxGiftString(ev.props, [
               'itemId',
@@ -706,7 +795,7 @@ export function decodeChunkedMessage(buf, start, end) {
               'rank'
             ]);
             if (advName || advUid || itemIdStr || itemNameStr || point != null || contributionRank != null) {
-              gifts.push({
+              pushGift({
                 itemId: itemIdStr,
                 advertiserUserId: advUid,
                 advertiserName: advName,
@@ -714,22 +803,22 @@ export function decodeChunkedMessage(buf, start, end) {
                 message: '',
                 itemName: itemNameStr,
                 contributionRank
-              });
+              }, 'msg:24');
             }
           }
         } else {
           // v0.1.210: msg.2/3/その他 でも gift として試す
           // v0.1.211: false positive 抑制のため "nx:" / "system:" prefix を除外
           const g = decodeGift(buf, ms, me);
-          if (g.itemId && !isFalsePositiveItemId(g.itemId)) {
-            gifts.push(g);
+          if (hasFallbackGiftEvidence(g)) {
+            pushGift(g, `msg:${mfn}:fallback`);
           }
         }
       });
     }
   });
 
-  return { stats, chats, gifts, tagHistogram, unknownSamples };
+  return { stats, chats, gifts, giftPathCounters, tagHistogram, unknownSamples };
 }
 
 /**

@@ -18,7 +18,18 @@ export const GIFT_PIPELINE_AI_HINTS_JA = [
 /**
  * page-intercept が html に載せる `data-nls-ndgr`（例: `s=1 c=100 g=5 d=10`）を解析する。
  * @param {string|null|undefined} raw
- * @returns {{ stats: number|null, chats: number|null, gifts: number|null, decoded: number|null, parseOk: boolean }}
+ * @returns {{
+ *   stats: number|null,
+ *   chats: number|null,
+ *   gifts: number|null,
+ *   decoded: number|null,
+ *   giftsWithUid: number|null,
+ *   giftsWithName: number|null,
+ *   giftsWithItem: number|null,
+ *   giftsWithPoint: number|null,
+ *   giftsWithRank: number|null,
+ *   parseOk: boolean
+ * }}
  */
 export function parseDataNlsNdgrAttr(raw) {
   const s = String(raw || '').trim();
@@ -27,6 +38,11 @@ export function parseDataNlsNdgrAttr(raw) {
     chats: /** @type {number|null} */ (null),
     gifts: /** @type {number|null} */ (null),
     decoded: /** @type {number|null} */ (null),
+    giftsWithUid: /** @type {number|null} */ (null),
+    giftsWithName: /** @type {number|null} */ (null),
+    giftsWithItem: /** @type {number|null} */ (null),
+    giftsWithPoint: /** @type {number|null} */ (null),
+    giftsWithRank: /** @type {number|null} */ (null),
     parseOk: false
   };
   if (!s) return out;
@@ -40,11 +56,21 @@ export function parseDataNlsNdgrAttr(raw) {
   out.chats = pick('c');
   out.gifts = pick('g');
   out.decoded = pick('d');
+  out.giftsWithUid = pick('gu');
+  out.giftsWithName = pick('gn');
+  out.giftsWithItem = pick('gi');
+  out.giftsWithPoint = pick('gp');
+  out.giftsWithRank = pick('gr');
   out.parseOk =
     out.stats != null ||
     out.chats != null ||
     out.gifts != null ||
-    out.decoded != null;
+    out.decoded != null ||
+    out.giftsWithUid != null ||
+    out.giftsWithName != null ||
+    out.giftsWithItem != null ||
+    out.giftsWithPoint != null ||
+    out.giftsWithRank != null;
   return out;
 }
 
