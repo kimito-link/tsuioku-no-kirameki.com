@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.208',
+    date: '2026-05-07',
+    summary: 'popup の応援アイコン取得率を改善',
+    items: Object.freeze([
+      'popup の応援グリッド／コメント一覧／応援ストーリーで、配信者ページから直接取れなかったユーザーのアイコン（avatar）を、ユーザー ID から自動生成して表示するようになりました。これまで「サムネあり匿名」で空のままだった視聴者のアイコンが、ニコニコ公式の確定パターン（secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/...）から復元されます',
+      '内部的には rememberedAvatarUrlForUserId 関数の最終 fallback を「空文字を返す」から「ユーザー ID から生成 URL を返す」に変更しました。strong cache や STORY_SOURCE 由来の URL がある場合はこれまで通りそちらを優先します（v0.1.206 prep の純関数 pickAvatarUrlForUid を活用）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.207',
     date: '2026-05-07',
     summary: 'ギフトイベントを時系列で保存（ranking 表示の基盤）',
