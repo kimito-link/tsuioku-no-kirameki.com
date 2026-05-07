@@ -73,7 +73,10 @@ import {
   fetchOfficialEventBannerFromAuditionEmbed,
   fetchNicoadContributionRankingFromPublishPage
 } from '../lib/officialEventDomBundle.js';
-import { scrapeContributionRankingFromDom } from '../lib/officialEventBannerDom.js';
+import {
+  scrapeContributionRankingFromDom,
+  scrapeOfficialEventBannerFromDom
+} from '../lib/officialEventBannerDom.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
 import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
 import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
@@ -1824,19 +1827,54 @@ window.addEventListener('message', (e) => {
 window.addEventListener('message', (e) => {
   if (!e?.data || typeof e.data.type !== 'string') return;
   if (e.data.type !== 'NLS_GIFT_HISTORY_FROM_IFRAME') return;
-  const items = Array.isArray(e.data.items) ? e.data.items : [];
-  if (items.length === 0) return;
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid || !hasExtensionContext()) return;
-  const r = aggregateGiftHistoryThrows(items, Date.now());
-  if (!r.storageTouched) return;
-  chrome.storage.local
-    .set({ [`nls_gift_history_throws_${lid}`]: r.next })
-    .catch((err) => {
-      if (!isContextInvalidatedError(err)) {
-        /* best-effort */
-      }
-    });
+
+  // 1. gift 履歴 (v0.1.216): items を全置換で集計
+  const items = Array.isArray(e.data.items) ? e.data.items : [];
+  if (items.length > 0) {
+    const r = aggregateGiftHistoryThrows(items, Date.now());
+    if (r.storageTouched) {
+      chrome.storage.local
+        .set({ [`nls_gift_history_throws_${lid}`]: r.next })
+        .catch((err) => {
+          if (!isContextInvalidatedError(err)) {
+            /* best-effort */
+          }
+        });
+    }
+  }
+
+  // 2. v0.1.217: 公式サイドバー DOM の貢献度ランキング + イベント参加バナーを
+  //    `nls_iframe_official_dom_<liveId>` storage に保存。popup の
+  //    refreshGiftRankStrip が _lastOfficialEventDomBundle.contributionRanking
+  //    が空のときの fallback として読み込む。
+  const contributionRanking = Array.isArray(e.data.contributionRanking)
+    ? e.data.contributionRanking
+    : null;
+  const eventBanner =
+    e.data.eventBanner && typeof e.data.eventBanner === 'object'
+      ? e.data.eventBanner
+      : null;
+  if (
+    (contributionRanking && contributionRanking.length > 0) ||
+    eventBanner
+  ) {
+    chrome.storage.local
+      .set({
+        [`nls_iframe_official_dom_${lid}`]: {
+          contributionRanking: contributionRanking || [],
+          eventBanner: eventBanner || null,
+          capturedAt: Date.now(),
+          frameUrl: String(e.data.frameUrl || '').slice(0, 200)
+        }
+      })
+      .catch((err) => {
+        if (!isContextInvalidatedError(err)) {
+          /* best-effort */
+        }
+      });
+  }
 });
 /** @type {number|null} */
 let lastWatchUrlTimer = null;
@@ -8977,24 +9015,54 @@ function maybeStartGiftSubAppIframeRelay() {
   const scanAndPost = () => {
     try {
       const r = scrapeGiftHistoryList(document);
-      if (!r || !Array.isArray(r.items) || r.items.length === 0) return;
+      const items = r && Array.isArray(r.items) ? r.items : [];
       const r2 = scrapeTotalGiftCountList(document);
       const totalCounts =
         r2 && Array.isArray(r2.items) ? r2.items : [];
-      const payload = JSON.stringify({ items: r.items, totalCounts });
+      // v0.1.217: 公式サイドバー iframe には gift 履歴だけでなく、
+      //   - イベント参加バナー（owner-name, rank, score, eventName）
+      //   - 貢献度ランキング（.contribution-ranking-list の各 ranker）
+      //   が同居していることが kimito さん提供 DOM (audition.nicovideo.jp) で
+      //   確認された。既存 lib の selector は本構造に対応済み（旧構造 fallback で
+      //   `.contribution-ranking-list .ranker` を拾う、`.owner-name` を起点に
+      //   バナーを掬う）。同じ scan tick で 3 種類すべて scrape して親に送る。
+      let contributionRanking = null;
+      try {
+        contributionRanking = scrapeContributionRankingFromDom(document) || [];
+      } catch { contributionRanking = []; }
+      let eventBanner = null;
+      try {
+        eventBanner = scrapeOfficialEventBannerFromDom(document) || null;
+      } catch { eventBanner = null; }
+      // 何も取れていなければ送信不要
+      if (
+        items.length === 0 &&
+        (!contributionRanking || contributionRanking.length === 0) &&
+        !eventBanner
+      ) {
+        return;
+      }
+      const payload = JSON.stringify({
+        items,
+        totalCounts,
+        contributionRanking,
+        eventBanner
+      });
       if (payload === lastSent) return;
       lastSent = payload;
       // v0.1.216 修正: window.parent ではなく window.top に送る。
-      // ネスト iframe (live → embed → koken) の場合、parent は中間 iframe で
-      // liveId を持たない。top frame (live.nicovideo.jp/watch/...) に直接届けば
-      // 確実に receive される。target = '*' で cross-origin 制約なし。
+      // ネスト iframe (live → embed → koken/audition) の場合、parent は中間
+      // iframe で liveId を持たない。top frame (live.nicovideo.jp/watch/...) に
+      // 直接届けば確実に receive される。target = '*' で cross-origin 制約なし。
       try {
         const target = window.top || window.parent;
         target.postMessage(
           {
             type: 'NLS_GIFT_HISTORY_FROM_IFRAME',
-            items: r.items,
+            items,
             totalCounts,
+            contributionRanking,
+            eventBanner,
             scannedAt: Date.now(),
             frameUrl: href
           },
