@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.220',
+    date: '2026-05-07',
+    summary: 'AI 診断ボタンが反応しない問題を修正',
+    items: Object.freeze([
+      'v0.1.219 で「🤖 AI 診断（Gemini Nano）」ボタンを押しても反応しない問題を修正しました。popup の「詳しい状況」セクションが取得状況の更新で定期的に再描画されるたびにボタンの DOM 要素が入れ替わり、ボタン本体に登録した click イベントが無効化されていたのが原因です',
+      '親コンテナにイベント委譲（event delegation）でクリックを受ける形に変更しました。これでセクションが再描画されてもボタン押下を毎回検知でき、診断ステップ表示や DL 進捗 % 表示も最後まで消えずに進みます',
+      '診断中に表示されるテキストも親要素から都度取得するようになり、AI 応答中に裏で再描画が起きても結果が消えにくくなりました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.219',
     date: '2026-05-07',
     summary: 'AI 診断ボタン 1 クリックでモデル DL → 診断まで自動実行',

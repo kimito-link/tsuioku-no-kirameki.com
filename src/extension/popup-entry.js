@@ -6878,44 +6878,57 @@ async function renderDevMonitorGiftRankingExtras() {
   }
 }
 
+/** @type {any} 直近の fastCache を click 時に参照するため保持 */
+let _latestAiDiagFastCache = null;
+/** @type {boolean} extrasEl への delegated click listener が attach 済みか */
+let _aiDiagDelegatedAttached = false;
+
 /**
  * popup「AI 診断（Gemini Nano）」ボタンの handler。
- * 各ステップで result.textContent を逐次更新し、どこで止まるか可視化する
- * （silent fail 防止）。
  *
+ * 親 `#devMonitorGiftRankingExtras` に **delegated click listener を 1 度だけ**貼る。
+ * 親の innerHTML は popup 再描画のたびに入れ替わるため、ボタン要素に直接
+ * `addEventListener` すると click より先に DOM が消えて反応しなくなる。
+ * delegation なら親が生きている限り click を拾える。
+ *
+ * 各ステップで result.textContent を逐次更新し silent fail を防ぐ。
  * 利用可否の分岐:
  *   - `'unavailable'` のみ早期終了（Chrome 138 未満や WebGPU 未対応など）
- *   - `'downloadable'` / `'downloading'` はそのまま進み、runBuiltinAiPrompt
- *     の onDownloadProgress でモデル DL 進捗を %% 表示しつつ DL 完了後に
+ *   - `'downloadable'` / `'downloading'` はそのまま進み、`runBuiltinAiPrompt`
+ *     の `onDownloadProgress` でモデル DL 進捗を % 表示しつつ DL 完了後に
  *     自動で診断を実行する（1 クリック完結）
  *   - `'available'` はすぐ問い合わせて応答を表示
  *
  * @param {any} fastCache  KEY_AI_SHARE_FAST_DIAG の中身
  */
 function attachAiDiagButtonHandler(fastCache) {
-  const btn = $('aiDiagBtn');
-  const result = $('aiDiagResult');
-  if (!btn || !result) {
-    try {
-      console.warn(
-        '[nls AI診断] ボタン or 結果表示エリアが見つかりません',
-        '#aiDiagBtn=',
-        !!btn,
-        '#aiDiagResult=',
-        !!result
-      );
-    } catch { /* no-op */ }
-    return;
-  }
+  _latestAiDiagFastCache = fastCache;
+  if (_aiDiagDelegatedAttached) return;
+  const extrasEl = $('devMonitorGiftRankingExtras');
+  if (!extrasEl) return;
+  _aiDiagDelegatedAttached = true;
   try {
-    console.log('[nls AI診断] handler attached to #aiDiagBtn');
+    console.log(
+      '[nls AI診断] delegated listener attached to #devMonitorGiftRankingExtras'
+    );
   } catch { /* no-op */ }
-  btn.addEventListener('click', async () => {
+  extrasEl.addEventListener('click', async (e) => {
+    const target = /** @type {HTMLElement|null} */ (e.target);
+    const btn = /** @type {HTMLButtonElement|null} */ (
+      target?.closest?.('#aiDiagBtn') || null
+    );
+    if (!btn) return;
+    const result = /** @type {HTMLElement|null} */ (
+      extrasEl.querySelector('#aiDiagResult')
+    );
+    if (!result) return;
+    if (btn.hasAttribute('disabled')) return;
     try {
-      console.log('[nls AI診断] click 検知');
+      console.log('[nls AI診断] click 検知（delegated）');
     } catch { /* no-op */ }
     result.textContent = '⏳ ステップ 1/4: クリック検知、Built-in AI 検出中…';
     btn.setAttribute('disabled', 'disabled');
+    const fastCache = _latestAiDiagFastCache;
     try {
       const av = await probeBuiltinAiAvailability();
       result.textContent = `⏳ ステップ 2/4: 検出結果 state=${av.state}${av.reason ? ` (${av.reason})` : ''}`;
