@@ -76,6 +76,7 @@ import {
 import { scrapeContributionRankingFromDom } from '../lib/officialEventBannerDom.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
 import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
+import { mergeGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
 import {
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
@@ -1811,6 +1812,39 @@ window.addEventListener('message', (e) => {
   trimMapToMax(interceptedNicknames, INTERCEPT_MAP_MAX);
   trimMapToMax(interceptedAvatars, INTERCEPT_MAP_MAX);
   queueInterceptReconcile(reconcileEntries, reconcileUsers);
+});
+
+// v0.1.216: iframe（gift sub-app, koken.nicovideo.jp 等）からの gift 履歴を
+//   受信する経路。既存 listener は `e.source !== window` で iframe からの
+//   message を弾くため、別 listener として追加する。
+//   ここで受け取った history items は mergeGiftHistoryThrows で throwCount +
+//   totalPoints 付き形式に集約し、`nls_gift_history_throws_<liveId>` に保存。
+//   popup の refreshGiftRankStrip fallback で読み込んで「ぱぴよん 3 回」のような
+//   ユーザー別ランキングとして表示される。
+window.addEventListener('message', (e) => {
+  if (!e?.data || typeof e.data.type !== 'string') return;
+  if (e.data.type !== 'NLS_GIFT_HISTORY_FROM_IFRAME') return;
+  const items = Array.isArray(e.data.items) ? e.data.items : [];
+  if (items.length === 0) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !hasExtensionContext()) return;
+  const key = `nls_gift_history_throws_${lid}`;
+  chrome.storage.local
+    .get(key)
+    .then((bag) => {
+      const existing = Array.isArray(bag[key]) ? bag[key] : [];
+      const r = mergeGiftHistoryThrows(existing, items, Date.now());
+      if (r.storageTouched) {
+        chrome.storage.local
+          .set({ [key]: r.next })
+          .catch((err) => {
+            if (!isContextInvalidatedError(err)) {
+              /* best-effort */
+            }
+          });
+      }
+    })
+    .catch((err) => reportSilentErrorToStorage('gift-history-iframe', err));
 });
 /** @type {number|null} */
 let lastWatchUrlTimer = null;
@@ -8922,6 +8956,67 @@ async function buildAndPersistMcpSnapshot() {
 }
 
 /**
+ * v0.1.216: iframe 内（gift sub-app, koken.nicovideo.jp 等）から親 frame に
+ *   gift 履歴を送る経路。親は cross-origin iframe.contentDocument に
+ *   アクセスできない（Same-Origin Policy）が、iframe 内には all_frames=true
+ *   で content script が注入されている。iframe 内で scrape して
+ *   window.parent.postMessage で送る経路を確立する。
+ *
+ * 起動条件:
+ *   - 自分が iframe 内である（window.self !== window.top）
+ *   - host が *.nicovideo.jp 配下（koken.nicovideo.jp / embed.nicovideo.jp 等）
+ *   - DOM に scrapeGiftHistoryList で取れる結果がある
+ *
+ * 親側の receive handler は別途 window.addEventListener('message', ...) で実装。
+ */
+function maybeStartGiftSubAppIframeRelay() {
+  let isTop = true;
+  try {
+    isTop = window.self === window.top;
+  } catch {
+    isTop = true;
+  }
+  if (isTop) return; // 親 frame では起動しない（既存 scanGiftSubAppDomAcrossFrames が同一 origin 経路を担当）
+  const href = String(window.location.href || '');
+  if (!isNicoVideoJpHost(href)) return;
+
+  /** @type {string} */
+  let lastSent = '';
+  const scanAndPost = () => {
+    try {
+      const r = scrapeGiftHistoryList(document);
+      if (!r || !Array.isArray(r.items) || r.items.length === 0) return;
+      const r2 = scrapeTotalGiftCountList(document);
+      const totalCounts =
+        r2 && Array.isArray(r2.items) ? r2.items : [];
+      const payload = JSON.stringify({ items: r.items, totalCounts });
+      if (payload === lastSent) return;
+      lastSent = payload;
+      try {
+        window.parent.postMessage(
+          {
+            type: 'NLS_GIFT_HISTORY_FROM_IFRAME',
+            items: r.items,
+            totalCounts,
+            scannedAt: Date.now(),
+            frameUrl: href
+          },
+          '*'
+        );
+      } catch {
+        /* no-op */
+      }
+    } catch {
+      /* no-op */
+    }
+  };
+
+  // 初回 1 秒遅延（DOM 描画待ち）+ 以後 5 秒間隔
+  setTimeout(scanAndPost, 1000);
+  setInterval(scanAndPost, 5000);
+}
+
+/**
  * v0.1.198: ニコ生ギフトサブアプリ DOM（gift-history-list と total-dold-count-list）を
  * top document + 同一 origin な iframe contentDocument 全部に対してスキャンする。
  *
@@ -9652,5 +9747,9 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   // ニコニ広告ページに注入された場合のハーベストは start() とは独立して走らせる
   // （start は watch ページ専用で early return するため）
   try { tryHarvestNicoadContributionRankingOnce(); } catch { /* no-op */ }
+  // v0.1.216: gift sub-app iframe（koken.nicovideo.jp 等）から親 frame への
+  //   履歴 relay 経路を起動。iframe 内では shouldRunWatchContentInThisFrame() が
+  //   false で start() が早期 return するため、独立して起動する。
+  try { maybeStartGiftSubAppIframeRelay(); } catch { /* no-op */ }
   start().catch((err) => reportSilentErrorToStorage('start', err));
 }

@@ -5313,31 +5313,59 @@ async function refreshGiftRankStrip(liveId) {
     unitSuffix = 'pt';
     ariaLabel = 'ギフト履歴のユーザー別集計';
   } else {
-    // 2. フォールバック: NDGR で観測したギフト event の集計
-    const key = giftUsersStorageKey(lid);
-    let raw = /** @type {unknown[]} */ ([]);
+    // v0.1.216: 公式サイドバー履歴（gift sub-app iframe を経由して scrape 済み）
+    //   から「だれが何 pt 投げたか」を集計したものを優先表示する。
+    //   storage key: nls_gift_history_throws_<liveId>
+    //   書込元: content-entry.js の NLS_GIFT_HISTORY_FROM_IFRAME receive
+    /** @type {{ userId?: string, nickname?: string, throwCount?: number, totalPoints?: number }[]} */
+    let throwsRows = [];
     try {
-      const bag = await chrome.storage.local.get(key);
-      raw = Array.isArray(bag[key]) ? bag[key] : [];
+      const throwsBag = await chrome.storage.local.get(`nls_gift_history_throws_${lid}`);
+      const v = throwsBag[`nls_gift_history_throws_${lid}`];
+      if (Array.isArray(v)) throwsRows = /** @type {any} */ (v);
     } catch {
-      hide();
-      return;
+      /* no-op */
     }
-    const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
-    const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
-    if (!stripRooms.length) {
-      hide();
-      return;
+    if (throwsRows.length > 0) {
+      const sorted = [...throwsRows].sort(
+        (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
+      );
+      rooms = sorted.slice(0, 12).map((r) => ({
+        userKey: String(r?.userId || ''),
+        nickname: String(r?.nickname || ''),
+        count: Number(r?.totalPoints) || 0,
+        avatarUrl: ''
+      }));
+      noteText = '公式サイドバー履歴のユーザー別集計（合計 pt 順）';
+      unitSuffix = 'pt';
+      ariaLabel = '公式サイドバー履歴のユーザー別集計';
+    } else {
+      // 3. フォールバック: NDGR で観測したギフト event の集計
+      const key = giftUsersStorageKey(lid);
+      let raw = /** @type {unknown[]} */ ([]);
+      try {
+        const bag = await chrome.storage.local.get(key);
+        raw = Array.isArray(bag[key]) ? bag[key] : [];
+      } catch {
+        hide();
+        return;
+      }
+      const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+      const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
+      if (!stripRooms.length) {
+        hide();
+        return;
+      }
+      rooms = stripRooms.map((r) => ({
+        userKey: r.userKey,
+        nickname: r.nickname,
+        count: r.count,
+        avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
+      }));
+      noteText = 'NDGR で観測したギフト/投げの回数が多い順（公式ランキングが取得できないとき）';
+      unitSuffix = '回';
+      ariaLabel = 'NDGR で観測したギフト/投げの回数が多い順';
     }
-    rooms = stripRooms.map((r) => ({
-      userKey: r.userKey,
-      nickname: r.nickname,
-      count: r.count,
-      avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
-    }));
-    noteText = 'NDGR で観測したギフト/投げの回数が多い順（公式ランキングが取得できないとき）';
-    unitSuffix = '回';
-    ariaLabel = 'NDGR で観測したギフト/投げの回数が多い順';
   }
   strip.hidden = false;
   strip.removeAttribute('aria-hidden');

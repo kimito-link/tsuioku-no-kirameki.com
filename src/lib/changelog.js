@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.216',
+    date: '2026-05-07',
+    summary: '公式サイドバー履歴を popup ランキングに反映',
+    items: Object.freeze([
+      'ニコ生公式の「ギフト」サイドバー（番組へのギフト履歴）から、だれが何 pt 投げたかを集計して popup「ユーザー別の応援件数」帯に合計 pt 順で表示するようにしました。これまで公式サイドバーは別ドメインの iframe にあり拡張から内容を取得できなかったため、popup 側に情報が届かず空のままでした',
+      '解決方法: 公式サイドバー iframe に注入された content script が定期的に履歴 DOM を解析し、親 frame（watch ページ）に postMessage で履歴を送る経路を新設しました。親 frame 側で受け取った履歴を、ユーザー名ごとに throwCount + 合計 pt の形に集計してローカル保存しています',
+      '同名のユーザーは 1 行に集約します（公式サイドバーには数値 ID が出ないため、表示名で集計する仕様です）。公式ランキングタブが取れる配信ではそちら優先、取れない場合のフォールバックとして本機能が効きます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.215',
     date: '2026-05-07',
     summary: '匿名ギフトも「ユーザー別の応援件数」に表示',
