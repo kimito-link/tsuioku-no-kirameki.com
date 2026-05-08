@@ -198,3 +198,32 @@ describe('aggregateMarketingReport - broadcaster 除外', () => {
     expect(r.topUsers.find((u) => u.userId.startsWith('anon:'))).toBeDefined();
   });
 });
+
+describe('aggregateMarketingReport - liveId 表記 / avatar 補正', () => {
+  it('lvId のみの行も集計に含める（正規化一致）', () => {
+    const row = {
+      ...c(1, 'u1', 'text', 0),
+      liveId: undefined,
+      lvId: '1'
+    };
+    const r = aggregateMarketingReport([row], 'lv1');
+    expect(r.totalComments).toBe(1);
+  });
+
+  it('viewer に配信者アイコン URL が焼き込まれている場合は topUsers で avatar を空にする', () => {
+    const bIcon =
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/1/12.jpg';
+    const comments = [
+      {
+        ...c(1, '99999', 'viewer', 0),
+        avatarUrl: bIcon
+      }
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1', {
+      broadcasterUserId: '123',
+      broadcasterIconUrl: bIcon
+    });
+    const top = r.topUsers.find((u) => u.userId === '99999');
+    expect(top?.avatarUrl).toBe('');
+  });
+});

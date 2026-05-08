@@ -9,6 +9,8 @@
  *   ChunkedMessage.message(field 2) → NicoliveMessage.chat     (field 1) → Chat
  *
  * Statistics fields: viewers(1), comments(2), ad_points(3), gift_points(4)
+ * 拡張（実バイナル確認中）: field 5/6 を varint、field 7 を UTF-8 文字列として
+ * イベント系（累計スコア・順位・タイトル候補）をベストエフォートで拾う。
  * Chat fields: content(1), name(2), vpos(3), account_status(4),
  *              raw_user_id(5), hashed_user_id(6), modifier(7), no(8)
  */
@@ -78,8 +80,69 @@ export function pbForEach(buf, start, end, cb) {
 }
 
 /**
- * @typedef {{ viewers: number|null, comments: number|null, adPoints: number|null, giftPoints: number|null }} NdgrStatistics
+ * @typedef {{
+ *   viewers: number|null,
+ *   comments: number|null,
+ *   adPoints: number|null,
+ *   giftPoints: number|null,
+ *   eventGiftScore: number|null,
+ *   eventRank: number|null,
+ *   eventTitle: string|null
+ * }} NdgrStatistics
  */
+
+/**
+ * NDGR Statistics に「何かしらのワイヤシグナル」があるか（page-intercept の
+ * `_ndgr.stats` カウント用）。viewers が無くても ad/gift/イベントのみの更新を拾う。
+ * @param {NdgrStatistics|null|undefined} s
+ * @returns {boolean}
+ */
+export function ndgrStatisticsHasWireSignal(s) {
+  if (!s || typeof s !== 'object') return false;
+  const nums = [
+    s.viewers,
+    s.comments,
+    s.adPoints,
+    s.giftPoints,
+    s.eventGiftScore,
+    s.eventRank
+  ];
+  for (const n of nums) {
+    if (typeof n === 'number' && Number.isFinite(n) && n >= 0) return true;
+  }
+  const t = String(s.eventTitle || '').trim();
+  return t.length > 0;
+}
+
+/**
+ * 同一 ChunkedMessage 内の複数 Statistics LEN をマージする。
+ * `b` の非 null フィールドが優先（同一フレーム内の後続サブメッセージがイベント列のみ等）。
+ *
+ * @param {NdgrStatistics|null|undefined} a
+ * @param {NdgrStatistics|null|undefined} b
+ * @returns {NdgrStatistics|null}
+ */
+export function mergeNdgrStatistics(a, b) {
+  if (!b) return a ?? null;
+  if (!a) return b;
+  /** @param {number|null|undefined} x @param {number|null|undefined} y */
+  const pickNum = (x, y) =>
+    typeof y === 'number' && Number.isFinite(y) && y >= 0 ? y : x ?? null;
+  const ta = String(a.eventTitle || '').trim();
+  const tb = String(b.eventTitle || '').trim();
+  let titleOut = null;
+  if (tb && (!ta || tb.length >= ta.length)) titleOut = tb;
+  else if (ta) titleOut = ta;
+  return {
+    viewers: pickNum(a.viewers, b.viewers),
+    comments: pickNum(a.comments, b.comments),
+    adPoints: pickNum(a.adPoints, b.adPoints),
+    giftPoints: pickNum(a.giftPoints, b.giftPoints),
+    eventGiftScore: pickNum(a.eventGiftScore, b.eventGiftScore),
+    eventRank: pickNum(a.eventRank, b.eventRank),
+    eventTitle: titleOut
+  };
+}
 
 /**
  * @param {Uint8Array} buf
@@ -88,20 +151,65 @@ export function pbForEach(buf, start, end, cb) {
  * @returns {NdgrStatistics}
  */
 export function decodeStatistics(buf, start, end) {
-  let viewers = null, comments = null, adPoints = null, giftPoints = null;
-  pbForEach(buf, start, end, (fn, wt, val) => {
-    if (wt !== 0) return;
-    if (fn === 1) viewers = val;
-    if (fn === 2) comments = val;
-    if (fn === 3) adPoints = val;
-    if (fn === 4) giftPoints = val;
+  let viewers = null,
+    comments = null,
+    adPoints = null,
+    giftPoints = null;
+  let eventGiftScore = null;
+  let eventRank = null;
+  /** @type {string[]} */
+  const titleCandidates = [];
+  pbForEach(buf, start, end, (fn, wt, val, s, e) => {
+    if (wt === 0) {
+      if (fn === 1) viewers = val;
+      else if (fn === 2) comments = val;
+      else if (fn === 3) adPoints = val;
+      else if (fn === 4) giftPoints = val;
+      else if (fn === 5) eventGiftScore = val;
+      else if (fn === 6) eventRank = val;
+    } else if (wt === 2) {
+      const str = decodeStr(buf, s, e).trim();
+      if (fn === 7 && str) titleCandidates.push(str);
+      else if ((fn === 8 || fn === 9) && str) titleCandidates.push(str);
+    }
   });
-  return { viewers, comments, adPoints, giftPoints };
+  let eventTitle = null;
+  for (const cand of titleCandidates) {
+    if (!cand || cand.length > 400 || /^https?:\/\//i.test(cand)) continue;
+    if (!eventTitle || cand.length > eventTitle.length) eventTitle = cand;
+  }
+  return {
+    viewers,
+    comments,
+    adPoints,
+    giftPoints,
+    eventGiftScore,
+    eventRank,
+    eventTitle
+  };
 }
 
 /**
  * @typedef {{ no: number|null, rawUserId: number|null, hashedUserId: string, name: string, content: string, vpos: number|null, accountStatus: number|null, is184: boolean }} NdgrChat
- * @typedef {{ advertiserUserId: string, advertiserName: string }} NdgrGift
+ *
+ * @typedef {{
+ *   itemId: string,
+ *   advertiserUserId: string,
+ *   advertiserName: string,
+ *   point: number|null,
+ *   message: string,
+ *   itemName: string,
+ *   contributionRank: number|null
+ * }} NdgrGift
+ *
+ * proto schema (n-air-app/nicolive-comment-protobuf, atoms.proto):
+ *   1: item_id (string)             — "stamp_xxx" / "ball_basketball" 等
+ *   2: advertiser_user_id (optional int64) — 文字列化して保持。anonymous gift では空
+ *   3: advertiser_name (string)
+ *   4: point (int64)
+ *   5: message (string)
+ *   6: item_name (string)            — 表示名（"バスケットボール" 等）
+ *   7: contribution_rank (optional int32) — 貢献ランキング順位
  */
 
 const _dec = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: false }) : null;
@@ -145,7 +253,104 @@ export function decodeChat(buf, start, end) {
 }
 
 /**
- * NicoliveMessage oneof の Gift（field 8 想定）を軽量デコード。proto 差異に耐えるため LEN 文字列を走査する。
+ * v0.1.211: msg.24 の "nx:gift:show" event を decode する純関数。
+ *
+ * 実機 lv350472558 で観測された構造:
+ *   fn=1 LEN: eventType ("nx:gift:show" 等)
+ *   fn=5 LEN: payload (map 形式)
+ *     fn=1 LEN repeated: { fn=1=key (string), fn=2=value (double LEN9 or string LEN) }
+ *
+ * 主要 props:
+ *   - advertiserName: "名無し" 等の送り主名
+ *   - adPoint: 5 (double, ギフトポイント)
+ *   - totalAdPoint: 累計
+ *   - itemId / itemName: 場合により含まれる
+ *
+ * @param {Uint8Array} buf
+ * @param {number} start
+ * @param {number} end
+ * @returns {{ eventType: string, props: Record<string, string|number> }}
+ */
+export function decodeNxGiftEvent(buf, start, end) {
+  let eventType = '';
+  /** @type {Record<string, string|number>} */
+  const props = {};
+  pbForEach(buf, start, end, (fn, wt, _v, s, e) => {
+    if (fn === 1 && wt === 2) {
+      if (!eventType) eventType = decodeStr(buf, s, e);
+    } else if (fn === 5 && wt === 2) {
+      pbForEach(buf, s, e, (mfn, mwt, _mv, ms, me) => {
+        if (mfn !== 1 || mwt !== 2) return;
+        let key = '';
+        /** @type {number|null} */
+        let numVal = null;
+        let strVal = '';
+        pbForEach(buf, ms, me, (ifn, iwt, _iv, is, ie) => {
+          if (ifn === 1 && iwt === 2) {
+            if (!key) key = decodeStr(buf, is, ie);
+          } else if (ifn === 2 && iwt === 2) {
+            const len = ie - is;
+            let parsedValueWrapper = false;
+            // google.protobuf.Value: number_value = field 2 (wire 1 double), string_value = field 3.
+            // 先に protobuf field として読む。string_value が 6 UTF-8 bytes の場合、
+            // tag + len + payload で全体 8 bytes になり raw double heuristic と衝突する。
+            pbForEach(buf, is, ie, (vfn, vwt, vv, vs, ve) => {
+              if (vfn === 2 && vwt === 1 && ve - vs === 8) {
+                try {
+                  const view = new DataView(
+                    buf.buffer,
+                    buf.byteOffset + vs,
+                    8
+                  );
+                  const v = view.getFloat64(0, true);
+                  if (Number.isFinite(v)) {
+                    numVal = v;
+                    parsedValueWrapper = true;
+                  }
+                } catch { /* no-op */ }
+              } else if (vfn === 3 && vwt === 2) {
+                const inner = decodeStr(buf, vs, ve);
+                if (inner && !strVal) {
+                  strVal = inner;
+                  parsedValueWrapper = true;
+                }
+              } else if (vfn === 4 && vwt === 0 && vv != null) {
+                strVal = vv ? 'true' : 'false';
+                parsedValueWrapper = true;
+              }
+            });
+            if (!parsedValueWrapper && len === 9 && buf[is] === 0x11) {
+              // 旧観測: wrapper struct { fn=2 LEN: 0x11 + 8 byte float64 }
+              try {
+                const view = new DataView(
+                  buf.buffer,
+                  buf.byteOffset + is + 1,
+                  8
+                );
+                const v = view.getFloat64(0, true);
+                if (Number.isFinite(v)) numVal = v;
+              } catch { /* no-op */ }
+            }
+          }
+        });
+        if (key) {
+          if (numVal != null) props[key] = numVal;
+          else if (strVal) props[key] = strVal;
+        }
+      });
+    }
+  });
+  return { eventType, props };
+}
+
+/**
+ * NicoliveMessage oneof の Gift（field 8）を proto 原本準拠でデコードする。
+ *
+ * proto schema は NdgrGift 型定義の docstring を参照。
+ * codex の web 調査（2026-05-07、n-air-app/nicolive-comment-protobuf
+ * atoms.proto blob 3edaa1b 確認）で、過去の経験的 decoder（fn=1 を string
+ * userId と仮定し fn=2 を name と仮定する設計）が proto 仕様と齟齬していた
+ * ことが判明したため、本書き直しで proto 原本に整合させた。
  *
  * @param {Uint8Array} buf
  * @param {number} start
@@ -153,45 +358,192 @@ export function decodeChat(buf, start, end) {
  * @returns {NdgrGift}
  */
 export function decodeGift(buf, start, end) {
+  let itemId = '';
   let advertiserUserId = '';
   let advertiserName = '';
-  /** @type {string[]} */
-  const strs = [];
+  /** @type {number|null} */
+  let point = null;
+  let message = '';
+  let itemName = '';
+  /** @type {number|null} */
+  let contributionRank = null;
   pbForEach(buf, start, end, (fn, wt, val, s, e) => {
-    if (wt === 2) {
-      const str = decodeStr(buf, s, e);
-      if (str) strs.push(str);
-      if (fn === 2 && str) advertiserName = advertiserName || str;
-      if (fn === 1 && str && /^\d{5,14}$/.test(str)) {
-        advertiserUserId = advertiserUserId || str;
-      }
-    } else if (wt === 0 && val != null) {
-      const vs = String(val);
-      if (/^\d{5,14}$/.test(vs)) advertiserUserId = advertiserUserId || vs;
+    if (fn === 1 && wt === 2) {
+      if (!itemId) itemId = decodeStr(buf, s, e);
+    } else if (fn === 2 && wt === 0 && val != null) {
+      // proto: optional int64. JS の number 安全範囲を超えうるので文字列化して保持。
+      if (!advertiserUserId) advertiserUserId = String(val);
+    } else if (fn === 3 && wt === 2) {
+      if (!advertiserName) advertiserName = decodeStr(buf, s, e);
+    } else if (fn === 4 && wt === 0 && val != null) {
+      if (point == null) point = val;
+    } else if (fn === 5 && wt === 2) {
+      if (!message) message = decodeStr(buf, s, e);
+    } else if (fn === 6 && wt === 2) {
+      if (!itemName) itemName = decodeStr(buf, s, e);
+    } else if (fn === 7 && wt === 0 && val != null) {
+      if (contributionRank == null) contributionRank = val;
     }
   });
-  for (const str of strs) {
-    if (!advertiserUserId && /^\d{5,14}$/.test(str)) advertiserUserId = str;
-  }
-  if (!advertiserName) {
-    for (const str of strs) {
-      if (
-        str !== advertiserUserId &&
-        str.length > 0 &&
-        str.length <= 128 &&
-        !/^https?:\/\//i.test(str)
-      ) {
-        advertiserName = str;
-        break;
-      }
-    }
-  }
-  return { advertiserUserId, advertiserName };
+  return { itemId, advertiserUserId, advertiserName, point, message, itemName, contributionRank };
 }
 
 /**
- * @typedef {{ stats: NdgrStatistics|null, chats: NdgrChat[], gifts: NdgrGift[] }} NdgrDecodeResult
+ * @typedef {{
+ *   top: Record<string, number>,
+ *   msg: Record<string, number>
+ * }} NdgrTagHistogram
+ *
+ * - `top`: ChunkedMessage 直下で観測した field tag → 件数
+ * - `msg`: 内側の NicoliveMessage（top.fn=2）one-of の field tag → 件数
+ *
+ * niconico 側がプロトコルを差し替えた時に「どの tag が新規に増えたか」を
+ * 0 件のまま居る既存 tag と並べて見るための診断用カウンタ。
  */
+
+/**
+ * @typedef {{
+ *   key: string,
+ *   topFn: number,
+ *   msgFn: number|null,
+ *   byteSize: number,
+ *   hexPreview: string,
+ *   innerHistogram: Record<string, number>,
+ *   stringSamples: string[]
+ * }} NdgrUnknownSample
+ *
+ * v0.1.209 緊急投入: msg.8 (gift) が来ない一方で msg.3 / top.11 が来る配信が確認された
+ * （実機 lv350473936、giftPoints=3130 だが ndgrWireCounters.gifts=0）。proto 仕様か
+ * ニコニコ側プロトコル差し替えで gift event の field 番号が変わっている可能性が
+ * 強いため、未知 field の中身を最大 3 件サンプル保存して、診断バンドル経由で
+ * 構造を解析する用途。
+ *
+ * - `key`: "top:11" or "msg:3" 等の識別子
+ * - `topFn`: ChunkedMessage 直下の field number
+ * - `msgFn`: NicoliveMessage 内の field number（top レベルのみなら null）
+ * - `byteSize`: payload バイト長
+ * - `hexPreview`: 先頭 96 bytes の hex 文字列（中身解析の手がかり）
+ * - `innerHistogram`: 中の field tag → 件数（gift の itemId/userId/point 等の構造識別用）
+ * - `stringSamples`: 中の string 型 field の最初 3 件（advertiserName 等の判別用）
+ */
+
+/**
+ * @typedef {{
+ *   stats: NdgrStatistics|null,
+ *   chats: NdgrChat[],
+ *   gifts: NdgrGift[],
+ *   tagHistogram: NdgrTagHistogram,
+ *   unknownSamples: Record<string, NdgrUnknownSample[]>
+ * }} NdgrDecodeResult
+ */
+
+const NDGR_KNOWN_TOP_FN = new Set([1, 2, 4, 5]);
+// v0.1.211: 真因確定後に known set を更新。1=Chat、8=Gift（proto 原本）、
+// 20=Chat (legacy)、24=NxGiftEvent (msg.24 nx:gift:show)。残り (2, 3, 23 等)
+// は引き続き unknownSamples で観測継続。
+const NDGR_KNOWN_MSG_FN = new Set([1, 8, 20, 24]);
+const NDGR_MAX_UNKNOWN_SAMPLES_PER_KEY = 3;
+
+/**
+ * v0.1.211: false positive を生む item_id を判定（"nx:" / "system:" prefix）。
+ * msg.24 の "nx:gift:show" 等の event type 文字列が item_id に紛れ込むのを防ぐ。
+ * @param {string} itemId
+ * @returns {boolean}
+ */
+function isFalsePositiveItemId(itemId) {
+  if (!itemId) return false;
+  const s = String(itemId).trim();
+  if (s.startsWith('nx:')) return true;
+  if (s.startsWith('system:')) return true;
+  if (s.startsWith('event:')) return true;
+  return false;
+}
+
+/**
+ * @param {Record<string, string|number>} props
+ * @param {string[]} keys
+ * @returns {string}
+ */
+function pickNxGiftString(props, keys) {
+  for (const key of keys) {
+    const value = props[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return '';
+}
+
+/**
+ * @param {Record<string, string|number>} props
+ * @param {string[]} keys
+ * @returns {number|null}
+ */
+function pickNxGiftNumber(props, keys) {
+  for (const key of keys) {
+    const value = props[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const normalized = value.replace(/,/g, '').trim();
+      if (!normalized) continue;
+      const n = Number(normalized);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+/**
+ * Uint8Array の指定範囲を hex 文字列に変換
+ * @param {Uint8Array} buf
+ * @param {number} start
+ * @param {number} end
+ */
+function bufToHex(buf, start, end) {
+  let out = '';
+  const cap = Math.min(end, buf.length);
+  for (let i = start; i < cap; i++) {
+    out += buf[i].toString(16).padStart(2, '0');
+  }
+  return out;
+}
+
+/**
+ * 未知 field の中身を sample 保存する内部ヘルパー（最大 3 件 / key）
+ * @param {Record<string, NdgrUnknownSample[]>} samples
+ * @param {string} key
+ * @param {number} topFn
+ * @param {number|null} msgFn
+ * @param {Uint8Array} buf
+ * @param {number} s
+ * @param {number} e
+ */
+function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e) {
+  if (!samples[key]) samples[key] = [];
+  if (samples[key].length >= NDGR_MAX_UNKNOWN_SAMPLES_PER_KEY) return;
+  /** @type {Record<string, number>} */
+  const innerHistogram = {};
+  /** @type {string[]} */
+  const stringSamples = [];
+  pbForEach(buf, s, e, (ifn, iwt, _iv, is, ie) => {
+    const ikey = String(ifn);
+    innerHistogram[ikey] = (innerHistogram[ikey] || 0) + 1;
+    if (iwt === 2 && stringSamples.length < 3) {
+      const str = decodeStr(buf, is, ie);
+      if (str && str.length > 0 && str.length <= 80) {
+        stringSamples.push(str);
+      }
+    }
+  });
+  samples[key].push({
+    key,
+    topFn,
+    msgFn,
+    byteSize: e - s,
+    hexPreview: bufToHex(buf, s, Math.min(e, s + 96)),
+    innerHistogram,
+    stringSamples
+  });
+}
 
 /**
  * 1件の ChunkedMessage をデコードして統計情報とチャットを返す
@@ -209,33 +561,175 @@ export function decodeChunkedMessage(buf, start, end) {
   const chats = [];
   /** @type {NdgrGift[]} */
   const gifts = [];
+  /** @type {NdgrTagHistogram} */
+  const tagHistogram = { top: {}, msg: {} };
+  /** @type {Record<string, NdgrUnknownSample[]>} */
+  const unknownSamples = {};
 
   pbForEach(buf, s0, e0, (fn, wt, _v, s, e) => {
     if (wt !== 2) return;
+    const topKey = String(fn);
+    tagHistogram.top[topKey] = (tagHistogram.top[topKey] || 0) + 1;
+
+    // v0.1.209: top レベルで未知 field が来た場合に中身を sample 保存
+    if (!NDGR_KNOWN_TOP_FN.has(fn)) {
+      recordNdgrUnknownSample(
+        unknownSamples,
+        `top:${fn}`,
+        fn,
+        null,
+        buf,
+        s,
+        e
+      );
+    }
 
     if (fn === 4) {
-      pbForEach(buf, s, e, (sfn, swt, _sv, ss, se) => {
-        if (sfn === 1 && swt === 2) {
-          stats = decodeStatistics(buf, ss, se);
+      pbForEach(buf, s, e, (_sfn, swt, _sv, ss, se) => {
+        if (swt === 2) {
+          const sub = decodeStatistics(buf, ss, se);
+          if (!ndgrStatisticsHasWireSignal(sub)) return;
+          stats = mergeNdgrStatistics(stats, sub);
         }
       });
     }
 
-    if (fn === 2) {
+    if (fn === 5) {
+      const sub = decodeStatistics(buf, s, e);
+      if (ndgrStatisticsHasWireSignal(sub)) {
+        stats = mergeNdgrStatistics(stats, sub);
+      }
+    }
+
+    // top.1 / top.2 とも NicoliveMessage の oneof ラッパとして同じロジックで掘る。
+    // niconico の現プロトコルでは大半のメッセージ（chat / gift / system event）が
+    // top.1 に乗っており、top.2 は古い経路（残っているが少数）。両方処理しないと
+    // ギフトイベントが永遠に 0 件のままになる。
+    // chat/gift デコーダ側で構造的に validate 済みなので、見当違いの payload を
+    // 踏んでも偽陽性は出ない。
+    if (fn === 1 || fn === 2) {
       pbForEach(buf, s, e, (mfn, mwt, _mv, ms, me) => {
         if (mwt !== 2) return;
+        const msgKey = String(mfn);
+        tagHistogram.msg[msgKey] = (tagHistogram.msg[msgKey] || 0) + 1;
+
+        // v0.1.209: msg レベルで未知 field が来た場合に中身を sample 保存
+        if (!NDGR_KNOWN_MSG_FN.has(mfn)) {
+          recordNdgrUnknownSample(
+            unknownSamples,
+            `msg:${mfn}`,
+            fn,
+            mfn,
+            buf,
+            ms,
+            me
+          );
+        }
+
         if (mfn === 1 || mfn === 20) {
           const chat = decodeChat(buf, ms, me);
-          if (chat.no != null) chats.push(chat);
+          if (chat.no != null) {
+            chats.push(chat);
+          } else {
+            // v0.1.210: chat 失敗時は gift として fallback 試行。
+            // v0.1.211: false positive 抑制のため "nx:" / "system:" prefix を除外。
+            const g = decodeGift(buf, ms, me);
+            if (g.itemId && !isFalsePositiveItemId(g.itemId)) {
+              gifts.push(g);
+            }
+          }
         } else if (mfn === 8) {
           const g = decodeGift(buf, ms, me);
-          if (g.advertiserUserId || g.advertiserName) gifts.push(g);
+          // anonymous gift（advertiser_user_id 欠落）でも item_id / advertiser_name
+          // / point / item_name / contribution_rank のいずれかが取れていれば valid。
+          if (
+            g.itemId ||
+            g.advertiserUserId ||
+            g.advertiserName ||
+            g.itemName ||
+            g.point != null ||
+            g.contributionRank != null
+          ) {
+            gifts.push(g);
+          }
+        } else if (mfn === 24) {
+          // v0.1.211: msg.24 の "nx:gift:show" 系を専用 decoder で処理。
+          // 実機で 99 件来ていたが、これは map 形式の event payload で、
+          // proto 原本の Gift 構造とは異なる。
+          const ev = decodeNxGiftEvent(buf, ms, me);
+          if (ev.eventType === 'nx:gift:show') {
+            const advName = pickNxGiftString(ev.props, [
+              'advertiserName',
+              'advertiser_name',
+              'senderName',
+              'sender_name',
+              'userName',
+              'user_name',
+              'nickname',
+              'name'
+            ]);
+            const advUid = pickNxGiftString(ev.props, [
+              'advertiserUserId',
+              'advertiser_user_id',
+              'senderUserId',
+              'sender_user_id',
+              'rawUserId',
+              'raw_user_id',
+              'userId',
+              'user_id'
+            ]);
+            const itemIdStr = pickNxGiftString(ev.props, [
+              'itemId',
+              'item_id',
+              'giftItemId',
+              'gift_item_id'
+            ]);
+            const itemNameStr = pickNxGiftString(ev.props, [
+              'itemName',
+              'item_name',
+              'giftName',
+              'gift_name'
+            ]);
+            const point = pickNxGiftNumber(ev.props, [
+              'adPoint',
+              'ad_point',
+              'point',
+              'points',
+              'giftPoint',
+              'gift_point',
+              'itemPoint',
+              'item_point'
+            ]);
+            const contributionRank = pickNxGiftNumber(ev.props, [
+              'contributionRank',
+              'contribution_rank',
+              'rank'
+            ]);
+            if (advName || advUid || itemIdStr || itemNameStr || point != null || contributionRank != null) {
+              gifts.push({
+                itemId: itemIdStr,
+                advertiserUserId: advUid,
+                advertiserName: advName,
+                point,
+                message: '',
+                itemName: itemNameStr,
+                contributionRank
+              });
+            }
+          }
+        } else {
+          // v0.1.210: msg.2/3/その他 でも gift として試す
+          // v0.1.211: false positive 抑制のため "nx:" / "system:" prefix を除外
+          const g = decodeGift(buf, ms, me);
+          if (g.itemId && !isFalsePositiveItemId(g.itemId)) {
+            gifts.push(g);
+          }
         }
       });
     }
   });
 
-  return { stats, chats, gifts };
+  return { stats, chats, gifts, tagHistogram, unknownSamples };
 }
 
 /**

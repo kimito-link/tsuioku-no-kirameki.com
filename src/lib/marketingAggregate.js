@@ -2,6 +2,10 @@
  * @typedef {import('./commentRecord.js').StoredComment} StoredComment
  */
 
+import { normalizeLv } from '../shared/niconico/liveId.js';
+import { extractNiconicoUserIdFromIconUrl } from '../shared/avatar/avatarUrlGuard.js';
+import { isSameAvatarUrl } from './avatarUrlCompare.js';
+
 /**
  * @typedef {{
  *   userId: string,
@@ -86,6 +90,31 @@
  */
 
 /**
+ * マーケ topUsers の avatarUrl から、記録汚染由来の配信者アイコンや uid 不一致を除去。
+ *
+ * @param {UserCommentProfile[]} users
+ * @param {{ broadcasterUserId?: string, broadcasterIconUrl?: string }} ctx
+ * @returns {UserCommentProfile[]}
+ */
+function scrubMarketingTopUserAvatars(users, ctx) {
+  const bUid = String(ctx?.broadcasterUserId || '').trim();
+  const bIcon = String(ctx?.broadcasterIconUrl || '').trim();
+  return users.map((u) => {
+    const av = String(u.avatarUrl || '').trim();
+    if (!av) return u;
+    const uid = String(u.userId || '').trim();
+    if (bUid && bIcon && uid && uid !== bUid && isSameAvatarUrl(av, bIcon)) {
+      return { ...u, avatarUrl: '' };
+    }
+    const avUid = extractNiconicoUserIdFromIconUrl(av);
+    if (avUid && /^\d+$/.test(uid) && avUid !== uid) {
+      return { ...u, avatarUrl: '' };
+    }
+    return u;
+  });
+}
+
+/**
  * StoredComment の配列からマーケティング分析用の集計を行う。
  *
  * 0.1.46 (AB): 配信者本人を KPI / CPM / uniqueUsers / timeline / segment /
@@ -96,19 +125,22 @@
  *
  * @param {StoredComment[]} comments
  * @param {string} liveId
- * @param {{ broadcasterUserId?: string }} [opts]
+ * @param {{ broadcasterUserId?: string, broadcasterIconUrl?: string }} [opts]
  * @returns {MarketingReport}
  */
 export function aggregateMarketingReport(comments, liveId, opts = {}) {
   const broadcasterUid = String(opts?.broadcasterUserId || '').trim();
-  const filtered = comments.filter(
-    (c) =>
-      c.liveId === liveId &&
+  const targetLv = normalizeLv(liveId);
+  const filtered = comments.filter((c) => {
+    const row = /** @type {import('./commentRecord.js').StoredComment & { lvId?: string }} */ (c);
+    const rowLv = normalizeLv(row.liveId ?? row.lvId ?? '');
+    return (
+      rowLv === targetLv &&
       c.text &&
-      c.text.trim() &&
-      // 配信者本人のコメを除外（broadcasterUid が指定されたとき）
+      String(c.text).trim() &&
       !(broadcasterUid && String(c.userId || '').trim() === broadcasterUid)
-  );
+    );
+  });
 
   /** @type {Map<string, UserCommentProfile>} */
   const userMap = new Map();
@@ -138,8 +170,12 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
     }
   }
 
-  const users = [...userMap.values()];
+  let users = [...userMap.values()];
   users.sort((a, b) => b.count - a.count);
+  users = scrubMarketingTopUserAvatars(users, {
+    broadcasterUserId: broadcasterUid,
+    broadcasterIconUrl: String(opts?.broadcasterIconUrl || '').trim()
+  });
   const counts = users.map((u) => u.count).sort((a, b) => a - b);
   const median =
     counts.length === 0

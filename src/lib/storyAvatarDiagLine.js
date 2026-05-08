@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml } from './htmlEscape.js';
+import { SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL } from './supportVisualStoryCopy.js';
 
 /**
  * @typedef {{
@@ -224,7 +225,7 @@ export function buildStoryAvatarDiagHtml(s) {
 
   const compactLead =
     `記録している応援コメント <strong>${totalNum}</strong> 件です。` +
-    `件数の内訳（アイコン・ユーザーID・レーン・取り込みなど）は、下の「詳しい状況（開発・切り分け用）」を開くと読めます。`;
+    `件数の内訳（アイコン・ユーザーID・レーン・取り込みなど）は、下の「${SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL}」を開くと読めます。`;
 
   return (
     `<div class="nl-story-diag nl-story-diag--compact">` +

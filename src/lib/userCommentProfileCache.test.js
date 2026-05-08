@@ -94,6 +94,43 @@ describe('upsertUserCommentProfileFromEntry', () => {
     expect(map.a?.nickname).toBe('abc');
   });
 
+  it('stamp_ は単体ではキャッシュに入れず、本名で初めて入る', () => {
+    const map = {};
+    expect(
+      upsertUserCommentProfileFromEntry(map, {
+        userId: '6292820',
+        nickname: 'stamp_applause',
+        avatarUrl: ''
+      })
+    ).toBe(false);
+    expect(map['6292820']).toBeUndefined();
+    expect(
+      upsertUserCommentProfileFromEntry(map, {
+        userId: '6292820',
+        nickname: 'Chiharu',
+        avatarUrl: ''
+      })
+    ).toBe(true);
+    expect(map['6292820']?.nickname).toBe('Chiharu');
+  });
+
+  it('本名のあと stamp_ は上書きしない', () => {
+    const map = {};
+    upsertUserCommentProfileFromEntry(map, {
+      userId: '6292820',
+      nickname: 'Chiharu',
+      avatarUrl: ''
+    });
+    expect(
+      upsertUserCommentProfileFromEntry(map, {
+        userId: '6292820',
+        nickname: 'stamp_applause',
+        avatarUrl: ''
+      })
+    ).toBe(false);
+    expect(map['6292820']?.nickname).toBe('Chiharu');
+  });
+
   it('個人サムネを補完', () => {
     const map = {};
     upsertUserCommentProfileFromEntry(map, {
@@ -175,6 +212,18 @@ describe('applyUserCommentProfileMapToEntries', () => {
     const { next, patched } = applyUserCommentProfileMapToEntries(entries, map);
     expect(patched).toBe(1);
     expect(next[0].nickname).toBe('花子');
+  });
+
+  it('実名コメント行を stamp_ のみのキャッシュで潰さない', () => {
+    const map = normalizeUserCommentProfileMap({
+      u1: { nickname: 'stamp_applause', avatarUrl: '', updatedAt: 1 }
+    });
+    const entries = [
+      { userId: 'u1', nickname: 'Chiharu', avatarUrl: '', commentNo: '1' }
+    ];
+    const { next, patched } = applyUserCommentProfileMapToEntries(entries, map);
+    expect(patched).toBe(0);
+    expect(next[0].nickname).toBe('Chiharu');
   });
 });
 

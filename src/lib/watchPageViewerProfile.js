@@ -1,8 +1,15 @@
 /**
- * watch ページのサイトヘッダー付近からログイン中ユーザーのアイコン・表示名を推定
+ * watch ページのサイトヘッダー付近からログイン中ユーザーのアイコン・表示名を推定。
+ *
+ * v0.1.203: niconico フロントエンド構造変更により header DOM scoring が空を返すこと
+ * が増加。streamlink/yt-dlp が使う `<script id="embedded-data" data-props='{...}'>`
+ * 経路を **first-class fallback** として組み込み、avatar URL も UID から自動生成して
+ * 取得率を構造的に上げる。
  */
 
 import { absoluteNicoUserIconFromImg } from './nicoliveDom.js';
+import { parseEmbeddedDataViewerInfo } from './parseEmbeddedDataViewerInfo.js';
+import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 
 /** ヘッダー帯より下はコメント欄アイコンと誤認しやすいので上限 */
 const HEADER_BAND_MAX_TOP = 220;
@@ -141,7 +148,21 @@ export function collectLoggedInViewerProfile(doc, baseHref) {
     if (viewerNickname) break;
   }
 
-  const viewerUserId = pickViewerUserIdFromRoots(uniqueRoots);
+  // v0.1.203: embedded-data を first-class 経路に。streamlink/yt-dlp と同パターン。
+  // niconico SSR で必ず埋まる安定経路、フロントエンド構造変更で壊れにくい。
+  const fromEmbedded = parseEmbeddedDataViewerInfo(doc);
+  const viewerUserId =
+    fromEmbedded.userId || pickViewerUserIdFromRoots(uniqueRoots);
+
+  // v0.1.203: nickname も embedded-data から優先取得
+  if (!viewerNickname && fromEmbedded.nickname) {
+    viewerNickname = clean(fromEmbedded.nickname);
+  }
+
+  // v0.1.203: avatar URL が DOM から取れなくても UID から確定パターンで生成
+  if (!viewerAvatarUrl && viewerUserId) {
+    viewerAvatarUrl = deriveAvatarUrlFromUid(viewerUserId);
+  }
 
   return { viewerAvatarUrl, viewerNickname, viewerUserId };
 }

@@ -207,12 +207,12 @@ describe('topSupportRankLineModels', () => {
     expect(light.accentColorCss).not.toBe(dark.accentColorCss);
   });
 
-  it('ニックなしの known は名前行が（未取得）', () => {
+  it('ニックなしの known は名前行が u/<uid>（v0.1.181-183 互換、ペチパー fix）', () => {
     const [row] = topSupportRankLineModels(
       [{ userKey: '99999999', nickname: '', count: 7 }],
       { defaultThumbSrc: DEF_THUMB }
     );
-    expect(row.nameLine).toBe('（未取得）');
+    expect(row.nameLine).toBe('u/99999999');
   });
 
   it('匿名IDでニック空は名前行が匿名', () => {
@@ -223,6 +223,30 @@ describe('topSupportRankLineModels', () => {
     expect(row.nameLine).toBe('匿名');
   });
 
+  it('数値 uid + ニック空は u/<uid> 形式（ペチパー 507563 ケース）', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '507563', nickname: '', count: 1 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('u/507563');
+  });
+
+  it('数値 uid + nickname がゲスト placeholder のときも u/<uid> 形式', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '507563', nickname: 'ゲスト', count: 1 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('u/507563');
+  });
+
+  it('数値 uid + nickname が user XXXX placeholder のときも u/<uid> 形式', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '507563', nickname: 'user 0539Z74OJ13', count: 1 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('u/507563');
+  });
+
   it('fullLabelForTitle は displayUserLabel 相当', () => {
     const [row] = topSupportRankLineModels(
       [{ userKey: '11111', nickname: '太郎', count: 1 }],
@@ -230,5 +254,47 @@ describe('topSupportRankLineModels', () => {
     );
     expect(row.fullLabelForTitle).toContain('太郎');
     expect(row.fullLabelForTitle).toContain('11111');
+  });
+
+  it('placeNumberMode:dense で同回数は同順位（本家ランキングタブの貢献度に近い並び方）', () => {
+    const rooms = [
+      { userKey: '1', nickname: 'a', count: 40 },
+      { userKey: '2', nickname: 'b', count: 10 },
+      { userKey: '3', nickname: 'c', count: 10 },
+      { userKey: '4', nickname: 'd', count: 10 },
+      { userKey: '5', nickname: 'e', count: 5 },
+      { userKey: '6', nickname: 'f', count: 5 }
+    ];
+    const rows = topSupportRankLineModels(rooms, {
+      defaultThumbSrc: DEF_THUMB,
+      placeNumberMode: 'dense'
+    });
+    expect(rows.map((r) => r.placeNumber)).toEqual([1, 2, 2, 2, 3, 3]);
+  });
+
+  it('placeNumberMode:dense で先頭 unknown のあと known は 1 から', () => {
+    const rows = topSupportRankLineModels(
+      [
+        { userKey: UNKNOWN_USER_KEY, nickname: '', count: 999 },
+        { userKey: '1', nickname: 'a', count: 40 },
+        { userKey: '2', nickname: 'b', count: 10 }
+      ],
+      { defaultThumbSrc: DEF_THUMB, placeNumberMode: 'dense' }
+    );
+    expect(rows[0].placeNumber).toBeNull();
+    expect(rows[1].placeNumber).toBe(1);
+    expect(rows[2].placeNumber).toBe(2);
+  });
+
+  it('placeNumberMode:dense で先頭同率は同じ 1 位', () => {
+    const rows = topSupportRankLineModels(
+      [
+        { userKey: '1', nickname: 'a', count: 7 },
+        { userKey: '2', nickname: 'b', count: 7 }
+      ],
+      { defaultThumbSrc: DEF_THUMB, placeNumberMode: 'dense' }
+    );
+    expect(rows[0].placeNumber).toBe(1);
+    expect(rows[1].placeNumber).toBe(1);
   });
 });

@@ -44,25 +44,36 @@ export function mergeVirtualHarvestRows(prev, next) {
 }
 
 /**
+ * niconico 側が CSS Modules（`___xxx-yyy___HASH` 形式）に移行した場合に備えて、
+ * 静的 class → サブストリング → 構造的特徴 の 3 段で探す。
+ * 静的 class が残っているうちはそこで即決まるので速度コストはほぼ無し。
+ *
  * @param {Document|Element} root
  * @returns {Element|null}
  */
 export function findNicoCommentPanel(root = document) {
-  if (!root || root.nodeType !== 9 && root.nodeType !== 1) return null;
+  if (!root || (root.nodeType !== 9 && root.nodeType !== 1)) return null;
   /** @type {Document} */
   const doc = root.nodeType === 9 ? /** @type {Document} */ (root) : root.ownerDocument || document;
   const base = root.nodeType === 9 ? doc.documentElement : /** @type {Element} */ (root);
-  try {
-    return (
-      doc.querySelector('.ga-ns-comment-panel') ||
-      doc.querySelector('.comment-panel') ||
-      base.querySelector?.('.ga-ns-comment-panel') ||
-      base.querySelector?.('.comment-panel') ||
-      null
-    );
-  } catch {
-    return null;
-  }
+  /** @param {string} sel */
+  const tryFind = (sel) => {
+    try {
+      return doc.querySelector(sel) || base.querySelector?.(sel) || null;
+    } catch {
+      return null;
+    }
+  };
+  // 1. 静的 class（旧 niconico）
+  const staticHit = tryFind('.ga-ns-comment-panel') || tryFind('.comment-panel');
+  if (staticHit) return staticHit;
+  // 2. CSS Modules ハッシュ命名（`___comment-panel___HASH` を含む class 全般）
+  const moduleHit =
+    tryFind('[class*="comment-panel"]') ||
+    tryFind('[class*="ns-comment"]') ||
+    tryFind('[class*="commentPanel"]');
+  if (moduleHit) return moduleHit;
+  return null;
 }
 
 /**

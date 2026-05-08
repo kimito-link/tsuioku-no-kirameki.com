@@ -6,6 +6,12 @@
 import { escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { MKT_ADVISOR_AVATAR_DATA_URI } from './marketingHtmlAdvisorAvatars.js';
+import { yukkuriBroadcastSummaryEmbeddedCss } from './yukkuriBroadcastSummary.js';
+import {
+  buildMangaBroadcastPanels,
+  renderMangaBroadcastPanelsHtml,
+  mangaBroadcastSummaryEmbeddedCss
+} from './mangaBroadcastSummary.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
@@ -47,6 +53,10 @@ import {
   computeReachCoefficient
 } from './commenterCulturalAnalytics.js';
 import { pickAdvicesFor } from './marketingDynamicAdvice.js';
+import {
+  buildSupportGrowthInsights,
+  supportGrowthMetricsForAdvice
+} from './supportGrowthInsights.js';
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -543,7 +553,10 @@ function buildDynamicAdviceMetrics(opts) {
           average: Number.isFinite(opts.growth.average) ? opts.growth.average : null
         }
       : null,
-    firstSecondTotal: Number(opts.firstSecondLatency?.users?.length) || 0,
+    firstSecondTotal:
+      Number(opts.firstSecondLatency?.totalUsers) ||
+      Number(opts.firstSecondLatency?.users?.length) ||
+      0,
     survivalEndPct: (() => {
       const segs = opts.survivalCurve?.segments;
       if (!Array.isArray(segs) || segs.length === 0) return null;
@@ -553,8 +566,10 @@ function buildDynamicAdviceMetrics(opts) {
     })(),
     talentPeakCount: Array.isArray(opts.talentPeaks) ? opts.talentPeaks.length : 0,
     echoBurstCount: (() => {
-      const a = Array.isArray(opts.echoPropagation?.bursts) ? opts.echoPropagation.bursts.length : 0;
-      const b = Array.isArray(opts.echoSync?.bursts) ? opts.echoSync.bursts.length : 0;
+      const ep = opts.echoPropagation;
+      const es = opts.echoSync;
+      const a = Array.isArray(ep) ? ep.length : Array.isArray(ep?.bursts) ? ep.bursts.length : 0;
+      const b = Array.isArray(es) ? es.length : Array.isArray(es?.bursts) ? es.bursts.length : 0;
       return a + b;
     })(),
     recentCmpCount: Array.isArray(opts.recentComparison?.bars) ? opts.recentComparison.bars.length : 0,
@@ -1529,6 +1544,150 @@ function sectionReachCoefficient(reach) {
 }
 
 /**
+ * 次回行動メモ・応援チャンス等（KPI より前に出すブロック）
+ * @param {ReturnType<typeof buildSupportGrowthInsights>} insights
+ * @param {import('./marketingDynamicAdvice.js').AdviceMetrics} metricsFull
+ */
+function renderSupportGrowthSections(insights, metricsFull) {
+  if (!insights) return '';
+  const parts = [];
+  const noteMeta = insights.meta?.giftNote
+    ? `<p class="mkt-note">${escapeHtml(String(insights.meta.giftNote))}</p>`
+    : '';
+
+  if (insights.nextActions?.length) {
+    const lis = insights.nextActions
+      .map(
+        (a) => `<li class="mkt-sg-next-item">
+<span class="mkt-sg-phase">${escapeHtml(a.phase)}</span>
+<p class="mkt-sg-line">${escapeHtml(a.line)}</p>
+<p class="mkt-sg-meta">根拠: ${escapeHtml(a.because)}</p>
+<p class="mkt-sg-meta">期待: ${escapeHtml(a.effect)}</p>
+</li>`
+      )
+      .join('');
+    const liveNote = 'この内容は今回の配信データから自動で組み立てています。配信内容によって毎回変わります。';
+    const trioCards =
+      `<div class="mkt-advice-stack mkt-advice-stack--next">` +
+      adviceCard('link', 'りんく', [
+        '次の配信で試しやすい順に並べたよ。気になる1つだけでも、まずはやってみよう。'
+      ]) +
+      adviceCard('konta', 'こん太', [
+        'リスナー目線で「言いやすい・参加しやすい」流れを拾ってるよ。楽しい空気づくりに使ってね。'
+      ]) +
+      adviceCard('tanu', 'たぬ姉', [
+        '数字は正解ではなく目安です。毎回の配信内容で変わるので、その回の色として読んでください。'
+      ]) +
+      `</div>`;
+    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-next-actions">
+<h2>りんく・こん太・たぬ姉の作戦会議（最大5つ）</h2>
+<p class="mkt-lead">まずは楽しく試せるアクションから。次の枠で使えるメモを先に置いたのだ。</p>
+<p class="mkt-sg-live-note">${escapeHtml(liveNote)}</p>
+${trioCards}
+${noteMeta}
+<ol class="mkt-sg-next-list">${lis}</ol>
+${dynamicAdviceCardsHtml('nextActions', metricsFull)}
+</section>`);
+  }
+
+  if (insights.supportWindows?.length) {
+    const rows = insights.supportWindows
+      .map(
+        (w) =>
+          `<li><strong>${escapeHtml(w.label)}</strong> <span class="mkt-sg-time">（${escapeHtml(w.timeHint)}）</span><br><span class="mkt-sg-meta">${escapeHtml(w.because)}</span></li>`
+      )
+      .join('');
+    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-support-chance">
+<h2>応援が増えそうな時間</h2>
+<ul class="mkt-sg-simple-list">${rows}</ul>
+${dynamicAdviceCardsHtml('supportGrowth', metricsFull)}
+</section>`);
+  }
+
+  if (insights.giftFlow?.length) {
+    const blocks = insights.giftFlow
+      .map(
+        (g) => `<article class="mkt-sg-gift-block"><h3>${escapeHtml(g.headline)}</h3>
+<p>${escapeHtml(g.beforeHint)}</p>
+<p>${escapeHtml(g.afterHint)}</p>
+<p class="mkt-sg-meta">${escapeHtml(g.thankTimingHint)}</p></article>`
+      )
+      .join('');
+    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-gift-flow">
+<p class="mkt-sg-note">番組・イベントの<strong>ギフト累計</strong>は、ニコ生公式のギフト指標です（広告ptやコメント数とは別枠です）。</p>
+<h2>ギフト・アイテムが飛びやすかった流れ</h2>
+${blocks}
+${dynamicAdviceCardsHtml('giftFlow', metricsFull)}
+</section>`);
+  }
+
+  const sumLine = String(insights.onboarding?.summaryLine || '').trim();
+  const voiceEx = Array.isArray(insights.onboarding?.voiceExamples)
+    ? insights.onboarding.voiceExamples
+    : [];
+  if (sumLine || voiceEx.length) {
+    const ex = voiceEx.map((v) => `<li>${escapeHtml(v)}</li>`).join('');
+    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-onboarding">
+<h2>初見さんを迎え入れる手がかり</h2>
+${sumLine ? `<p>${escapeHtml(sumLine)}</p>` : ''}
+<p class="mkt-lead">そのまま使える声かけ例</p>
+<ul class="mkt-sg-simple-list">${ex}</ul>
+${dynamicAdviceCardsHtml('listenerOnboarding', metricsFull)}
+</section>`);
+  }
+
+  if (insights.clippingMoments?.length) {
+    const cm = insights.clippingMoments
+      .map(
+        (c) =>
+          `<article class="mkt-sg-clip"><p class="mkt-sg-time">${escapeHtml(c.atLabel)} — ${escapeHtml(c.reason)}</p>
+<p class="mkt-sg-sample">代表: ${escapeHtml(c.sampleLine)}</p>
+<p class="mkt-sg-meta">${escapeHtml(c.promoHint)}</p></article>`
+      )
+      .join('');
+    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-clip-promo">
+<h2>切り抜き・告知に使えそうな場面</h2>
+${cm}
+</section>`);
+  }
+
+  if (insights.listenerRewards?.length) {
+    const lr = insights.listenerRewards.map((x) => `<li>${escapeHtml(x.line)}</li>`).join('');
+    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-listener-care">
+<h2>リスナーが喜ぶお返し</h2>
+<ul class="mkt-sg-simple-list">${lr}</ul>
+${dynamicAdviceCardsHtml('listenerCare', metricsFull)}
+</section>`);
+  }
+
+  const g = insights.askTiming?.good || [];
+  const b = insights.askTiming?.bad || [];
+  if (g.length || b.length) {
+    const gHtml = g.length
+      ? `<h3>お願いしても空気が軽くなりやすいとき</h3><ul class="mkt-sg-simple-list">${g.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
+      : '';
+    const bHtml = b.length
+      ? `<h3>お願いは控えめがよさそうなとき</h3><ul class="mkt-sg-simple-list">${b.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
+      : '';
+    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-ask-timing">
+<h2>お願いの出しどころ（やさしめの目安）</h2>
+${gHtml}${bHtml}
+${dynamicAdviceCardsHtml('askTiming', metricsFull)}
+</section>`);
+  }
+
+  if (insights.caution?.length) {
+    parts.push(`<section class="mkt-section mkt-section--sg" id="mkt-sg-caution">
+<h2>読み取りの注意</h2>
+<ul class="mkt-sg-simple-list">${insights.caution.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+</section>`);
+  }
+
+  if (!parts.length) return '';
+  return `<div class="mkt-sg-pack">${parts.join('\n')}</div>`;
+}
+
+/**
  * @param {MarketingReport} r
  * @param {{
  *   maskShareLabels?: boolean,
@@ -1536,7 +1695,14 @@ function sectionReachCoefficient(reach) {
  *   broadcasterUserId?: string,
  *   sessionSummaryRows?: import('./concurrentTimelineSeries.js').ConcurrentTimelineRow[],
  *   commentsForAnalytics?: import('./commentVelocityTimeline.js').VelocityCommentInput[],
- *   pastBroadcasts?: import('./commenterHistoricalAnalytics.js').BroadcastBundle[]
+ *   pastBroadcasts?: import('./commenterHistoricalAnalytics.js').BroadcastBundle[],
+ *   giftUsers?: import('./giftRecord.js').StoredGiftUser[],
+ *   officialEventDomBundle?: import('./officialEventDomBundle.js').OfficialEventDomBundle | null,
+ *   broadcastTitle?: string,
+ *   broadcasterName?: string,
+ *   recordedCommentCount?: number,
+ *   streamAgeMin?: number,
+ *   yukkuriImageDataUrlMap?: Record<string, string>
  * }} [opts]
  * @returns {string}
  */
@@ -1724,7 +1890,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   /*
    * 0.1.49 (AE): marketingDynamicAdvice.js の rule registry に渡す metrics を
    *   集約データから組み立てる。各セクションの advice 配置位置で
-   *   `dynamicAdviceCardsHtml(section, dynMetrics)` を呼ぶと、データに応じた
+   *   `dynamicAdviceCardsHtml(section, metricsForAdvice)` を呼ぶと、データに応じた
    *   キャラ別アドバイス（最大 3 件）が静的アドバイスの後ろに出力される。
    */
   const dynMetrics = buildDynamicAdviceMetrics({
@@ -1747,10 +1913,33 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     keyboardTypes
   });
 
+  const giftUsersForSg = Array.isArray(opts.giftUsers) ? opts.giftUsers : [];
+  const sgInsights = buildSupportGrowthInsights({
+    report: r,
+    comments: currentCommentsForLayer,
+    giftUsers: giftUsersForSg,
+    sessionSummaryRows,
+    pastBroadcasts: pastBroadcastsForLayer,
+    broadcasterUserId,
+    maskShareLabels: maskShare
+  });
+  const metricsForAdvice = {
+    ...dynMetrics,
+    ...supportGrowthMetricsForAdvice(sgInsights.adviceSlice)
+  };
+
   // 0.1.26 (AA): TOC は「実際に描画されたセクション」だけ表示する。
   // 沈黙ゾーンやコメ伝染など、データ不足で空文字を返すセクションをクリックしても
   // 何も起こらない／謎のスクロール挙動になる問題を解消する。
   const allTocItems = [
+    { id: 'mkt-next-actions', label: 'りんく達の作戦会議' },
+    { id: 'mkt-support-chance', label: '応援が増えそうな時間' },
+    { id: 'mkt-gift-flow', label: 'ギフトの流れ' },
+    { id: 'mkt-onboarding', label: '初見さんの手がかり' },
+    { id: 'mkt-clip-promo', label: '切り抜き・告知候補' },
+    { id: 'mkt-listener-care', label: 'リスナーお返し' },
+    { id: 'mkt-ask-timing', label: 'お願いの出しどころ' },
+    { id: 'mkt-sg-caution', label: '読み取りの注意' },
     { id: 'mkt-kpi', label: 'KPI サマリ' },
     { id: 'mkt-content', label: 'コメント本文・属性の傾向' },
     { id: 'mkt-quarter', label: '冒頭・終盤（四分位）' },
@@ -1787,9 +1976,10 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   const bodyHtml = `${sectionFeaturesOverview()}
 __NL_TOC_PLACEHOLDER__
 ${sectionAdviceIntro()}
+${renderSupportGrowthSections(sgInsights, metricsForAdvice)}
 ${idWrap('mkt-kpi', sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
-${dynamicAdviceCardsHtml('kpi', dynMetrics)}
+${dynamicAdviceCardsHtml('kpi', metricsForAdvice)}
 ${idWrap('mkt-content', sectionContentShape(r))}
 ${sectionAdviceAfterContentShape(r)}
 ${idWrap('mkt-quarter', sectionQuarterEngagement(r))}
@@ -1800,57 +1990,57 @@ ${sectionCommentVelocityCurve(velocityTimeline)}
 ${adviceAfterCommentVelocity()}
 ${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
 ${adviceAfterConcurrent()}
-${dynamicAdviceCardsHtml('concurrent', dynMetrics)}
+${dynamicAdviceCardsHtml('concurrent', metricsForAdvice)}
 ${sectionSilenceZones(silenceZones)}
 ${silenceZones.length ? adviceAfterSilence() : ''}
-${silenceZones.length ? dynamicAdviceCardsHtml('silence', dynMetrics) : ''}
+${silenceZones.length ? dynamicAdviceCardsHtml('silence', metricsForAdvice) : ''}
 ${sectionLaughterDensity(laughterDensity)}
 ${laughterDensity.buckets.length >= 2 ? adviceAfterLaughter() : ''}
-${laughterDensity.buckets.length >= 2 ? dynamicAdviceCardsHtml('laughter', dynMetrics) : ''}
+${laughterDensity.buckets.length >= 2 ? dynamicAdviceCardsHtml('laughter', metricsForAdvice) : ''}
 ${sectionNewVsRepeat(newVsRepeat)}
 ${newVsRepeat.totalCurrent > 0 ? adviceAfterNewVsRepeat() : ''}
-${newVsRepeat.totalCurrent > 0 ? dynamicAdviceCardsHtml('newVsRepeat', dynMetrics) : ''}
+${newVsRepeat.totalCurrent > 0 ? dynamicAdviceCardsHtml('newVsRepeat', metricsForAdvice) : ''}
 ${sectionSurvivalCurve(survivalCurve)}
 ${survivalCurve.segments.length >= 2 ? adviceAfterSurvival() : ''}
-${survivalCurve.segments.length >= 2 ? dynamicAdviceCardsHtml('survival', dynMetrics) : ''}
+${survivalCurve.segments.length >= 2 ? dynamicAdviceCardsHtml('survival', metricsForAdvice) : ''}
 ${sectionDepartedHeavy(departedHeavy, maskShare, identiconResolver)}
 ${(!maskShare && departedHeavy.length > 0) ? adviceAfterDeparted() : ''}
 ${sectionAttendanceMatrix(attendanceMatrix, maskShare, identiconResolver)}
 ${(!maskShare && attendanceMatrix.users.length > 0 && attendanceMatrix.broadcasts.length >= 2) ? adviceAfterAttendance() : ''}
 ${sectionKeyboardTypes(keyboardTypes)}
 ${(keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced) > 0 ? adviceAfterKeyboard() : ''}
-${(keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced) > 0 ? dynamicAdviceCardsHtml('keyboard', dynMetrics) : ''}
+${(keyboardTypes.counts.emoji + keyboardTypes.counts.short + keyboardTypes.counts.long + keyboardTypes.counts.quiet + keyboardTypes.counts.balanced) > 0 ? dynamicAdviceCardsHtml('keyboard', metricsForAdvice) : ''}
 ${sectionRecentComparison(recentComparison)}
 ${recentComparison.bars.length >= 2 ? adviceAfterRecentCmp() : ''}
-${recentComparison.bars.length >= 2 ? dynamicAdviceCardsHtml('recentCmp', dynMetrics) : ''}
+${recentComparison.bars.length >= 2 ? dynamicAdviceCardsHtml('recentCmp', metricsForAdvice) : ''}
 ${sectionWeekdayHourHeatmap(weekdayHourHeat)}
 ${weekdayHourHeat.maxValue > 0 ? adviceAfterWeekdayHeat() : ''}
 ${sectionGrowthMeter(growth, '今回の総コメ数')}
 ${growth.average != null ? adviceAfterGrowthMeter() : ''}
-${growth.average != null ? dynamicAdviceCardsHtml('growth', dynMetrics) : ''}
+${growth.average != null ? dynamicAdviceCardsHtml('growth', metricsForAdvice) : ''}
 ${sectionOpeningFivePrediction(openingFivePts)}
 ${openingFivePts.points.length >= 2 ? adviceAfterOpeningFive() : ''}
 ${sectionWaveformSimilarity(similarBroadcasts)}
 ${similarBroadcasts.length > 0 ? adviceAfterWaveform() : ''}
-${similarBroadcasts.length > 0 ? dynamicAdviceCardsHtml('waveform', dynMetrics) : ''}
+${similarBroadcasts.length > 0 ? dynamicAdviceCardsHtml('waveform', metricsForAdvice) : ''}
 ${sectionEchoBursts(echoPropagation, echoSync)}
 ${(echoPropagation.length > 0 || echoSync.length > 0) ? adviceAfterEcho() : ''}
-${(echoPropagation.length > 0 || echoSync.length > 0) ? dynamicAdviceCardsHtml('echo', dynMetrics) : ''}
+${(echoPropagation.length > 0 || echoSync.length > 0) ? dynamicAdviceCardsHtml('echo', metricsForAdvice) : ''}
 ${sectionFirstSecondLatency(firstSecondLatency)}
 ${firstSecondLatency.totalUsers > 0 ? adviceAfterFirstSecond() : ''}
-${firstSecondLatency.totalUsers > 0 ? dynamicAdviceCardsHtml('firstSecond', dynMetrics) : ''}
+${firstSecondLatency.totalUsers > 0 ? dynamicAdviceCardsHtml('firstSecond', metricsForAdvice) : ''}
 ${sectionTalentPeak(talentPeaks)}
 ${talentPeaks.length > 0 ? adviceAfterTalentPeak() : ''}
-${talentPeaks.length > 0 ? dynamicAdviceCardsHtml('talentPeak', dynMetrics) : ''}
+${talentPeaks.length > 0 ? dynamicAdviceCardsHtml('talentPeak', metricsForAdvice) : ''}
 ${sectionSentimentCurve(sentimentCurve)}
 ${sentimentCurve.buckets.length >= 2 ? adviceAfterSentiment() : ''}
-${sentimentCurve.buckets.length >= 2 ? dynamicAdviceCardsHtml('sentiment', dynMetrics) : ''}
+${sentimentCurve.buckets.length >= 2 ? dynamicAdviceCardsHtml('sentiment', metricsForAdvice) : ''}
 ${sectionUniqueWordSuggestions(uniqueWords)}
 ${uniqueWords.length > 0 ? adviceAfterUniqueWords() : ''}
-${uniqueWords.length > 0 ? dynamicAdviceCardsHtml('uniqueWords', dynMetrics) : ''}
+${uniqueWords.length > 0 ? dynamicAdviceCardsHtml('uniqueWords', metricsForAdvice) : ''}
 ${sectionReachCoefficient(reach)}
 ${reach.coefficient != null ? adviceAfterReach() : ''}
-${reach.coefficient != null ? dynamicAdviceCardsHtml('reach', dynMetrics) : ''}
+${reach.coefficient != null ? dynamicAdviceCardsHtml('reach', metricsForAdvice) : ''}
 ${idWrap('mkt-derived', sectionDerivedTimeline(r))}
 ${sectionAdviceAfterDerivedTimeline(r)}
 ${idWrap('mkt-segment', sectionSegment(r))}
@@ -1863,19 +2053,38 @@ ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
   const tocItems = allTocItems.filter((t) => bodyHtml.includes(`id="${t.id}"`));
   const finalBody = bodyHtml.replace('__NL_TOC_PLACEHOLDER__', sectionToc(tocItems));
 
+  // 漫画コマ風の「番組のおさらい」セクション。bundle が無い場合も opening / closing
+  // の最低 2 コマは出る設計。レスポンシブ：clamp + container query で全幅に追従。
+  const mangaPanels = buildMangaBroadcastPanels({
+    bundle: opts?.officialEventDomBundle ?? null,
+    broadcastTitle: typeof opts?.broadcastTitle === 'string' ? opts.broadcastTitle : '',
+    broadcasterName: typeof opts?.broadcasterName === 'string' ? opts.broadcasterName : '',
+    recordedCommentCount:
+      typeof opts?.recordedCommentCount === 'number' ? opts.recordedCommentCount : undefined,
+    streamAgeMin: typeof opts?.streamAgeMin === 'number' ? opts.streamAgeMin : undefined
+  });
+  const yukkuriHtml = renderMangaBroadcastPanelsHtml(mangaPanels, {
+    heading: '今回の放送のおさらい・漫画版',
+    imageDataUrlMap:
+      opts?.yukkuriImageDataUrlMap && typeof opts.yukkuriImageDataUrlMap === 'object'
+        ? opts.yukkuriImageDataUrlMap
+        : undefined
+  });
+
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>配信マーケ分析 — ${escapeHtml(r.liveId)}</title>
-<style>${CSS_BODY}</style>
+<style>${CSS_BODY}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
 </head>
 <body>
 <header class="mkt-header">
 <h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
 <p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
 </header>
+${yukkuriHtml}
 <main class="mkt-main">
 ${finalBody}
 </main>
@@ -2276,6 +2485,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-section--advice h2{border-left-color:#a78bfa}
 .mkt-advice-stack{display:flex;flex-direction:column;gap:clamp(.85rem,3vw,1.35rem)}
 .mkt-advice-stack--intro{gap:clamp(1rem,3.5vw,1.5rem)}
+.mkt-advice-stack--next{gap:clamp(.65rem,2.4vw,.9rem);margin:.65rem 0 .85rem}
 .mkt-advice-after{display:flex;flex-direction:column;gap:clamp(.75rem,2.5vw,1rem);margin:.85rem 0 0}
 .mkt-advice-row{display:flex;flex-direction:row;align-items:flex-start;gap:clamp(.65rem,2.5vw,.95rem);max-width:100%}
 .mkt-advice__avatar-wrap{flex-shrink:0;width:clamp(48px,12vw,56px)}
@@ -2310,6 +2520,22 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   .mkt-hour-grid{grid-template-columns:repeat(6,1fr)}
   .mkt-seg-wrap{flex-direction:column;align-items:flex-start}
 }
+.mkt-sg-pack{margin-bottom:.5rem}
+.mkt-section--sg{border-left:4px solid #22c55e}
+.mkt-sg-live-note{margin:.25rem 0 .7rem;padding:.55rem .7rem;border:1px dashed #4ade80;border-radius:10px;background:#0b2a1b;color:#dcfce7;font-size:.82rem;line-height:1.55}
+.mkt-sg-note{margin:.35rem 0 .55rem;font-size:.85rem;color:#94a3b8;line-height:1.45}
+.mkt-sg-next-list{margin:.4rem 0 0;padding-left:1.2rem}
+.mkt-sg-next-item{margin-bottom:1rem;padding:.62rem .68rem;border:1px solid #334155;border-radius:10px;background:#0f172a}
+.mkt-sg-phase{display:inline-block;font-size:.72rem;font-weight:700;color:#bbf7d0;background:#14532d;border-radius:6px;padding:2px 8px;margin-bottom:.25rem}
+.mkt-sg-line{margin:.25rem 0;font-weight:600;color:#f8fafc}
+.mkt-sg-meta{margin:.15rem 0;font-size:.82rem;color:#94a3b8}
+.mkt-sg-time{font-size:.82rem;color:#cbd5e1}
+.mkt-sg-simple-list{margin:.4rem 0;padding-left:1.2rem}
+.mkt-sg-simple-list li{margin-bottom:.45rem}
+.mkt-sg-gift-block{margin-bottom:1rem;padding:.6rem .4rem;border-top:1px solid #334155}
+.mkt-sg-gift-block h3{margin:.2rem 0 .4rem;font-size:.95rem;color:#e2e8f0}
+.mkt-sg-clip{margin-bottom:.85rem;padding-bottom:.6rem;border-bottom:1px dashed #334155}
+.mkt-sg-sample{font-size:.88rem;color:#e2e8f0}
 @media print{
   body{background:#fff;color:#0f172a}
   .mkt-header,.mkt-section{background:#f1f5f9;border-color:#cbd5e1;box-shadow:none}

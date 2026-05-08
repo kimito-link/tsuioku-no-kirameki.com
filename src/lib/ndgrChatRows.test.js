@@ -223,6 +223,36 @@ describe('ndgrChatsToMergeRows', () => {
     expect(rows[0]).not.toHaveProperty('is184');
   });
 
+  // v0.1.195: NDGR ギフトシステムメッセージを通常コメント変換から除外
+  it('ギフトシステムメッセージ chat を除外する', () => {
+    const rows = ndgrChatsToMergeRows([
+      {
+        no: 1,
+        rawUserId: 'u1',
+        hashedUserId: '',
+        name: '',
+        content: 'こんにちは'
+      },
+      {
+        no: 2,
+        rawUserId: 123514112,
+        hashedUserId: '',
+        name: 'giftevent_xxx',
+        content: 'ポンコツびぃちゃんさんがギフト「応援メガホン 黄（10pt）」を贈りました'
+      },
+      {
+        no: 3,
+        rawUserId: 'u3',
+        hashedUserId: '',
+        name: '',
+        content: 'おつ〜'
+      }
+    ]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].text).toBe('こんにちは');
+    expect(rows[1].text).toBe('おつ〜');
+  });
+
   it('vpos/accountStatus が null なら省略する', () => {
     const rows = ndgrChatsToMergeRows([
       {
