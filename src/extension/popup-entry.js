@@ -5521,13 +5521,17 @@ function renderUserRooms(entries, liveId = '') {
   //   「ユーザー別の応援件数」セクションの趣旨と合わないため、`requireText: true`
   //   で集計対象から外す。これでコメントしていないギフト sender が混入する事象
   //   （ポンコツびぃちゃん 123514112 / lv350459157 で確認）を防ぐ。
+  // v0.1.224: uid 取得失敗で `__unknown__` bucket に集約された entry が
+  // 単独タイル（順位なし）で大量カウント（実機で「150件」観測）として表示される
+  // 事象を防ぐため、ranking 表示からは UNKNOWN_USER_KEY を除外する。
+  // HTML レポート側（L8782 等）の集計はそのまま維持。
   const sanitizedRooms = sanitizeRoomAvatarsForBroadcaster(
     aggregateCommentsByUser(list, { requireText: true }),
     {
       broadcasterUid,
       broadcasterIconUrl
     }
-  );
+  ).filter((room) => room.userKey !== UNKNOWN_USER_KEY);
   const rooms = excludeBroadcasterFromRankedRooms(sanitizedRooms, broadcasterUid);
   ul.innerHTML = '';
 

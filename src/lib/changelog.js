@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.224',
+    date: '2026-05-08',
+    summary: 'ID未取得コメントの謎タイル混入を修正',
+    items: Object.freeze([
+      'popup「ユーザー別の応援件数が多い順」セクションに、ID未取得コメント（投稿者 ID が DOM から取れなかったコメント群）が単独タイルで「150 件」のように大量カウント表示される事象を修正しました。配信中に多数発生しうる ID 未取得コメントが 1 つの匿名バケツに集約され、配信者本人より目立つ位置で表示されるのが直感に反するため、ranking 表示からは除外する仕様に変更しました',
+      'HTMLレポートやマーケ集計内の「ユーザー別件数」など、別経路の集計には影響しません（ranking 表示のみの調整です）',
+      'ID未取得コメント自体の記録は維持しています（保存コメント本体には残ります）。投稿者 ID 取得経路の改善は別バージョンで対応します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.222',
     date: '2026-05-08',
     summary: 'ギフト送信者観測 0 を decode 側修正で解消',
