@@ -108,11 +108,7 @@ import {
   isGiftRankingLaneEnabledFromStorage,
   isGiftRankingLaneEnabledFromChange
 } from '../lib/giftRankingLaneOptIn.js';
-import {
-  classifyGiftSubAppFrameSource,
-  isContributionRankingTrustedSource,
-  isEventBannerTrustedSource
-} from '../lib/giftSubAppFrameSource.js';
+import { buildOfficialDomFromRelayEvent } from '../lib/iframeOfficialDomFromRelay.js';
 import {
   parseLiveViewerCountFromDocument,
   parseViewerCountFromSnapshotMetas
@@ -1901,41 +1897,14 @@ window.addEventListener('message', (e) => {
   //    refreshGiftRankStrip が _lastOfficialEventDomBundle.contributionRanking
   //    が空のときの fallback として読み込む。
   //
-  // v0.1.230 修正: relay 送信元 frame URL を分類し、信頼できる送信元のデータ
-  //   だけを保存する。具体的には nicoad iframe（広告ランキングを表示する公式
-  //   iframe）が `scrapeContributionRankingFromDom` で広告ランキング DOM を
-  //   拾って親に送ってくるため、そのままだと popup「公式の貢献度ランキング」
-  //   ラベルに広告 pt（23692貢 等）が混入する。
-  //   contributionRanking は audition/koken のみ、eventBanner は audition のみを
-  //   信頼する。それ以外は drop。
-  const frameSource = classifyGiftSubAppFrameSource(e.data.frameUrl);
-  const rawContribRanking = Array.isArray(e.data.contributionRanking)
-    ? e.data.contributionRanking
-    : null;
-  const rawEventBanner =
-    e.data.eventBanner && typeof e.data.eventBanner === 'object'
-      ? e.data.eventBanner
-      : null;
-  const contributionRanking = isContributionRankingTrustedSource(frameSource)
-    ? rawContribRanking
-    : null;
-  const eventBanner = isEventBannerTrustedSource(frameSource)
-    ? rawEventBanner
-    : null;
-  if (
-    (contributionRanking && contributionRanking.length > 0) ||
-    eventBanner
-  ) {
+  // v0.1.230 / v0.1.231: 受信ロジックは src/lib/iframeOfficialDomFromRelay.js に
+  //   純関数として切り出し、unit test で frame source 別 routing
+  //   （nicoad の広告ランキング drop / audition + koken のみ採用 等）を
+  //   検証する。本ハンドラは結果に従って storage 書き込みを行うだけ。
+  const decision = buildOfficialDomFromRelayEvent(e.data, { nowMs: Date.now() });
+  if (decision.shouldWrite && decision.payload) {
     chrome.storage.local
-      .set({
-        [`nls_iframe_official_dom_${lid}`]: {
-          contributionRanking: contributionRanking || [],
-          eventBanner: eventBanner || null,
-          capturedAt: Date.now(),
-          frameUrl: String(e.data.frameUrl || '').slice(0, 200),
-          frameSource
-        }
-      })
+      .set({ [`nls_iframe_official_dom_${lid}`]: decision.payload })
       .catch((err) => {
         if (!isContextInvalidatedError(err)) {
           /* best-effort */
@@ -10001,7 +9970,12 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     [class*="rich-view"],
     [class*="program-gift-richview"],
     [class*="balloon"][data-has-reload-button],
-    .balloon[data-has-reload-button] {
+    .balloon[data-has-reload-button],
+    /* v0.1.231: 配信者ごとに Vue が render に到達しない場合に出る
+       「お困りの方はこちら」rescue link が、autoOpen の close 失敗時に
+       一瞬ユーザーに見えてしまう問題を抑制する。 */
+    [class*="rescue-information-anchor"],
+    [class*="rescue-information"] {
       opacity: 0 !important;
       pointer-events: none !important;
       user-select: none !important;
@@ -10013,6 +9987,13 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     setAutoOpenStatus('style-failed');
     return;
   }
+
+  // v0.1.231: 「お困りの方はこちら」rescue link が描画された配信者は、
+  //   今回の autoOpen で banner / ranking が render に到達しないことが
+  //   ほぼ確定なので早期 abort して close を急ぐ（stealth CSS 越しでも
+  //   rescue link が見える窓を最小化する）。in-memory cache で同じ liveId
+  //   で 30 秒リトライ路に入っても再 trigger しないように記録する。
+  let rescueLinkSeen = false;
 
   try {
     // 4. 開く（5 段攻めで Vue / React / Vanilla すべてに反応させる）
@@ -10036,6 +10017,17 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
         setAutoOpenStatus(`scraped-banner-tick-${i + 1}`);
         break;
       }
+      // v0.1.231: rescue link 検出で早期 abort（banner が render に到達しないことが確定）
+      const rescue = (() => {
+        try {
+          return !!document.querySelector('[class*="rescue-information-anchor"]');
+        } catch { return false; }
+      })();
+      if (rescue) {
+        rescueLinkSeen = true;
+        setAutoOpenStatus(`rescue-link-detected-tick-${i + 1}`);
+        break;
+      }
     }
     // 6. ランキングタブを探してクリック（貢献度ランキングのマウントを誘発）。
     //    niconico のギフトサイドバーは「番組ギフト / マイギフト / 履歴 / ランキング」の
@@ -10051,7 +10043,9 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     /** @type {HTMLElement|null} */
     let rankTabBtn = null;
     let rankTabFinder = '';
-    try {
+    // v0.1.231: rescue link が出てしまった配信は rank tab も Vue 未 render の
+    //   ため search 自体が無駄。close を急ぐために skip。
+    if (!rescueLinkSeen) try {
       // v0.1.229 修正（critical）: rank tab 検索を gift sidebar container に scope。
       //
       // v0.1.228 までは document 全体を querySelectorAll（`a` タグ含む）していたが、
@@ -10167,16 +10161,34 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     }
     if (closeBtn) {
       dispatchSyntheticActivation(closeBtn);
+      // v0.1.231: rescue link が居る配信では close ボタンが反応しない可能性があるので
+      //   gift button を toggle する 2 段目も入れる（idempotent）
+      if (rescueLinkSeen) {
+        await new Promise((r) => setTimeout(r, 200));
+        dispatchSyntheticActivation(giftBtn);
+      }
     } else {
       dispatchSyntheticActivation(giftBtn);
     }
     // 7. 閉じアニメーション分待ってからステルス CSS を外す
-    await new Promise((r) => setTimeout(r, 400));
+    //   v0.1.231: rescue link が出ていたケースは余分に 600ms 待つ
+    //   （Vue が close 後も rescue link を残すケースがあり、stealth 解除直後に
+    //   ユーザーに見えるのを防ぐ）
+    await new Promise((r) => setTimeout(r, rescueLinkSeen ? 1000 : 400));
   } catch (err) {
     setAutoOpenStatus(`error-${String(err && /** @type {{name?:string}} */(err).name || 'unknown').slice(0, 20)}`);
   } finally {
     try {
-      styleEl.remove();
+      // v0.1.231: finally 直前で再度 rescue link 残存を確認し、まだ居れば
+      //   さらに 800ms 待ってから stealth 解除（保険）。
+      const stillRescue = (() => {
+        try { return !!document.querySelector('[class*="rescue-information-anchor"]'); } catch { return false; }
+      })();
+      if (stillRescue) {
+        setTimeout(() => { try { styleEl.remove(); } catch { /* no-op */ } }, 800);
+      } else {
+        styleEl.remove();
+      }
     } catch {
       // no-op
     }
