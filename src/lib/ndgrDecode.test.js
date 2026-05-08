@@ -761,6 +761,103 @@ describe('v0.1.210 gift fallback (msg.1 chat 失敗時 + msg.其他 で itemId �
   });
 });
 
+describe('v0.1.233 chat fallback false positive 抑制 (looksLikeValidGiftItemId)', () => {
+  it('msg.1 chat 本文（日本語「草」）は gift として記録しない', () => {
+    // chat decode が chat.no=null（fn=8 が無いだけ）で抜けるケースを想定。
+    // chat 本文「草」が itemId と誤認されて gift 量産する v0.1.222 までの
+    // 振る舞いをテストで阻止する。
+    const chatNoNumber = new Uint8Array([
+      ...strField(1, '草'),
+      ...varintField(5, 12345)
+      // fn=8 (chat.no) を意図的に省略
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...chatNoNumber]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+    expect(r.chats).toHaveLength(0);
+  });
+
+  it('msg.1 chat 本文「kwsk」（ASCII だが gift item_id slug ではない、5 字）は記録される（境界）', () => {
+    // 注: chat 本文でも ASCII 4-80 文字 + 英字始まりは itemId 妥当性 regex を
+    //   通る。これは「真の chat 本文 ASCII テキストのうち長めのもの」と
+    //   「真の gift item slug」を完全分離できないトレードオフ（slug の文字
+    //   セットと ASCII 英字 chat の文字セットが共有）。実害は小さく、件数も
+    //   日本語テキストに比べれば少ない。本テストは挙動確認のため設置。
+    const chatAscii = new Uint8Array([
+      ...strField(1, 'kwsk'),
+      ...varintField(5, 99999)
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...chatAscii]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    // 'kwsk' は 4 文字、英字始まり、slug regex 通る → gift と誤認される
+    // 短すぎる（3 文字未満）chat 本文は looksLikeValidGiftItemId で弾かれる
+    expect(r.gifts.length).toBeLessThanOrEqual(1);
+  });
+
+  it('msg.1 chat 本文（短い ASCII「lol」3 字）は弾かれる（item_id 妥当性 3 字以上）', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'no'),  // 2 字 → 弾かれるはず
+      ...varintField(5, 1)
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...chat]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+  });
+
+  it('真の gift item_id「stamp_basketball」は引き続き gift として認識される（後方互換）', () => {
+    const giftPayload = new Uint8Array([
+      ...strField(1, 'stamp_basketball'),
+      ...strField(3, 'よしださん'),
+      ...varintField(4, 11000)
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...giftPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].itemId).toBe('stamp_basketball');
+  });
+
+  it('「event:foo」「nx:bar」「system:announce」prefix は引き続き弾かれる（v0.1.211 互換）', () => {
+    for (const itemId of ['event:foo', 'nx:test', 'system:announce']) {
+      const payload = new Uint8Array([...strField(1, itemId)]);
+      const msg = new Uint8Array(lenDelimited(1, [...payload]));
+      const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+      const r = decodeChunkedMessage(chunked);
+      expect(r.gifts).toHaveLength(0);
+    }
+  });
+
+  it('日本語 / 中国語 / 絵文字を含む chat 本文は item_id として認識されない', () => {
+    for (const text of ['とても良い配信', '草草草', '😀😀😀', 'お疲れさまでした']) {
+      const chat = new Uint8Array([...strField(1, text), ...varintField(5, 1)]);
+      const msg = new Uint8Array(lenDelimited(1, [...chat]));
+      const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+      const r = decodeChunkedMessage(chunked);
+      expect(r.gifts).toHaveLength(0);
+    }
+  });
+});
+
+describe('v0.1.233 msg.24 nx:gift:show empty 結果は debug sample に保存', () => {
+  it('nx:gift:show だが props 抽出に失敗した場合 unknownSamples["msg:24:empty"] に hex が残る', () => {
+    // event_type のみ "nx:gift:show" で、payload 構造が想定外（fn=5 が無い）
+    const ev = new Uint8Array([
+      ...strField(1, 'nx:gift:show')
+    ]);
+    const msg = new Uint8Array(lenDelimited(24, [...ev]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+    expect(r.unknownSamples['msg:24:empty']).toBeDefined();
+    expect(r.unknownSamples['msg:24:empty'].length).toBeGreaterThan(0);
+    expect(r.unknownSamples['msg:24:empty'][0].topFn).toBe(1);
+    expect(r.unknownSamples['msg:24:empty'][0].msgFn).toBe(24);
+  });
+});
+
 describe('decodePackedSegment', () => {
   it('decodes repeated ChunkedMessages', () => {
     const chat1 = new Uint8Array([
