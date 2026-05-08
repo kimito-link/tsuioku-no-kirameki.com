@@ -101,6 +101,14 @@ export function mergeGiftUserThrowEvents(existing, incoming) {
 }
 
 /**
+ * v0.1.234: ストレージ肥大化 / DoS 対策の cap。1 配信あたりの unique user 上限。
+ * 通常配信では 2000 を超えることはまずないが、`NLS_INTERCEPT_GIFT_USERS` を
+ * 任意 JS が偽装して unique user を流し込めば storage が無制限に膨らむ。
+ * cap を超えたら古い `capturedAt` の entry から drop する（FIFO）。
+ */
+export const MAX_GIFT_USERS_PER_LIVE = 2000;
+
+/**
  * @param {StoredGiftUser[]} existing
  * @param {{ userId: string, nickname?: string }[]} incoming
  * @returns {{ next: StoredGiftUser[], added: StoredGiftUser[], storageTouched: boolean }}
@@ -147,6 +155,14 @@ export function mergeGiftUsers(existing, incoming) {
   }
 
   if (added.length) storageTouched = true;
-  const next = [...byId.values()];
+  let next = [...byId.values()];
+  // v0.1.234: cap を超えたら古い capturedAt の entry から drop（FIFO 風 LRU）
+  if (next.length > MAX_GIFT_USERS_PER_LIVE) {
+    next = next
+      .slice()
+      .sort((a, b) => (b.capturedAt || 0) - (a.capturedAt || 0))
+      .slice(0, MAX_GIFT_USERS_PER_LIVE);
+    storageTouched = true;
+  }
   return { next, added, storageTouched };
 }

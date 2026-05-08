@@ -20,6 +20,10 @@ import {
   normalizeViewerJoin,
   walkJsonForViewerJoinUsers
 } from '../lib/interceptViewerJoinSignals.js';
+import {
+  generateNlsAuthToken,
+  NLS_AUTH_TOKEN_ATTR
+} from '../lib/nlsInterceptAuth.js';
 
 (() => {
   'use strict';
@@ -61,6 +65,31 @@ import {
   if (!isWatchPage && !isLocalDev) return;
   window.__NLS_PAGE_INTERCEPT__ = true;
 
+  // v0.1.234: NLS_INTERCEPT_* 経路の最低限の改ざん耐性として token 認証を導入。
+  //   page-intercept (MAIN world) が起動時に生成し、`data-nls-page-token` 属性
+  //   経由で content-entry (ISOLATED world) と共有する。各 postMessage に
+  //   `_token` を同梱し、receiver は値が一致しないメッセージを drop する。
+  //
+  //   注: MAIN world の他 script は属性を読めば偽装できるため、これは「決定的な
+  //   防御」ではなく「事故的衝突 / generic な spoof」を弾くための層。完全な
+  //   isolation は MV3 + same-window 通信の制約上不可能。
+  /** @type {string} */
+  const NLS_AUTH_TOKEN = generateNlsAuthToken();
+  try {
+    document.documentElement.setAttribute(NLS_AUTH_TOKEN_ATTR, NLS_AUTH_TOKEN);
+  } catch { /* no-op: attribute set 失敗時は token 一致が失敗、receiver 側で drop */ }
+
+  /**
+   * window.postMessage を token 同梱版でラップする。token は `_token` プロパティに
+   * 入れる。target = '*' は同 window 内 broadcast。
+   * @param {Record<string, unknown>} payload
+   */
+  const postNlsIntercept = (payload) => {
+    try {
+      window.postMessage({ ...payload, _token: NLS_AUTH_TOKEN }, '*');
+    } catch { /* best-effort */ }
+  };
+
   const MSG_TYPE = 'NLS_INTERCEPT_USERID';
   const MSG_STATISTICS = 'NLS_INTERCEPT_STATISTICS';
   const MSG_SCHEDULE = 'NLS_INTERCEPT_SCHEDULE';
@@ -94,7 +123,7 @@ import {
       if (i >= all.length) return;
       const payload = all.slice(i, i + NDGR_CHAT_ROWS_POST_CHUNK);
       i += payload.length;
-      window.postMessage({ type: MSG_CHAT_ROWS, rows: payload }, '*');
+      postNlsIntercept({ type: MSG_CHAT_ROWS, rows: payload });
       if (i < all.length) schedule(pump);
     };
     pump();
@@ -192,9 +221,8 @@ import {
         out.push(row);
       }
       if (out.length) {
-        window.postMessage(
-          { type: MSG_VIEWER_JOIN, viewers: out, priority: 'fast' },
-          '*'
+        postNlsIntercept(
+          { type: MSG_VIEWER_JOIN, viewers: out, priority: 'fast' }
         );
       }
     } catch {
@@ -236,7 +264,7 @@ import {
     if (!entries.length && !users.length) return;
     diag.posted += entries.length;
     publishDiag();
-    window.postMessage({ type: MSG_TYPE, entries, users }, '*');
+    postNlsIntercept({ type: MSG_TYPE, entries, users });
   }
 
   function normalizeAvatarUrl(url) {
@@ -431,7 +459,7 @@ import {
     if (result.stats && ndgrStatisticsHasWireSignal(result.stats)) {
       _ndgr.stats++;
       const st = result.stats;
-      window.postMessage(
+      postNlsIntercept(
         {
           type: MSG_STATISTICS,
           ...(st.viewers != null ? { viewers: st.viewers } : {}),
@@ -441,8 +469,7 @@ import {
           ...(st.eventGiftScore != null ? { eventGiftScore: st.eventGiftScore } : {}),
           ...(st.eventRank != null ? { eventRank: st.eventRank } : {}),
           ...(st.eventTitle ? { eventTitle: String(st.eventTitle) } : {})
-        },
-        '*'
+        }
       );
     }
     for (const chat of result.chats) {
@@ -495,7 +522,7 @@ import {
       });
     }
     if (giftUsers.length) {
-      window.postMessage({ type: MSG_GIFT_USERS, users: giftUsers }, '*');
+      postNlsIntercept({ type: MSG_GIFT_USERS, users: giftUsers });
     }
     scheduleNdgrChatRowsPost(ndgrChatsToMergeRows(result.chats));
   }
@@ -608,16 +635,13 @@ import {
       giftPoints = giftPoints ?? pickNum(o, GIFT_KEYS);
     }
     if (viewers == null && adPoints == null && giftPoints == null) return false;
-    window.postMessage(
-      {
-        type: MSG_STATISTICS,
-        ...(viewers != null ? { viewers } : {}),
-        ...(comments != null ? { comments } : {}),
-        ...(adPoints != null ? { adPoints } : {}),
-        ...(giftPoints != null ? { giftPoints } : {})
-      },
-      '*'
-    );
+    postNlsIntercept({
+      type: MSG_STATISTICS,
+      ...(viewers != null ? { viewers } : {}),
+      ...(comments != null ? { comments } : {}),
+      ...(adPoints != null ? { adPoints } : {}),
+      ...(giftPoints != null ? { giftPoints } : {})
+    });
     return true;
   }
 
@@ -642,7 +666,7 @@ import {
     const begin = dd.begin || dd.beginAt || dd.openTime;
     if (typeof begin === 'string' && begin.length >= 10) {
       _scheduleSent = true;
-      window.postMessage({ type: MSG_SCHEDULE, begin }, '*');
+      postNlsIntercept({ type: MSG_SCHEDULE, begin });
     }
   }
 
@@ -733,11 +757,11 @@ import {
           if (method === 'POST' && /api\/(v\d+\/)?comment/.test(url) && res.ok) {
             try {
               const cj = await res.clone().json();
-              window.postMessage({
+              postNlsIntercept({
                 type: 'NLS_INTERCEPT_COMMENT_POST',
                 status: res.status,
                 body: cj
-              }, '*');
+              });
             } catch { /* JSON parse failure — ignore */ }
           }
           diag.fetchHits += 1;
@@ -1167,7 +1191,7 @@ import {
         wc != null && Number.isFinite(Number(wc)) && Number(wc) >= 0
           ? Number(wc)
           : null;
-      window.postMessage({ type: MSG_EMBEDDED_DATA, viewers }, '*');
+      postNlsIntercept({ type: MSG_EMBEDDED_DATA, viewers });
     } catch { /* no-op */ }
   }
 
@@ -1196,7 +1220,7 @@ import {
           if (wc?.[1]) {
             const n = parseInt(wc[1], 10);
             if (Number.isFinite(n) && n >= 0) {
-              window.postMessage({ type: MSG_STATISTICS, viewers: n }, '*');
+              postNlsIntercept({ type: MSG_STATISTICS, viewers: n });
             }
           }
           const cc =
@@ -1205,7 +1229,7 @@ import {
           if (cc?.[1]) {
             const cn = parseInt(cc[1], 10);
             if (Number.isFinite(cn) && cn >= 0) {
-              window.postMessage({ type: MSG_STATISTICS, viewers: null, comments: cn }, '*');
+              postNlsIntercept({ type: MSG_STATISTICS, viewers: null, comments: cn });
             }
           }
         })
@@ -1284,7 +1308,7 @@ import {
       const cur = String(window.location.href || '');
       if (cur === prev) return;
       lastNotifiedHref = cur;
-      window.postMessage({ type: 'NLS_SPA_NAVIGATION', url: cur, prevUrl: prev }, '*');
+      postNlsIntercept({ type: 'NLS_SPA_NAVIGATION', url: cur, prevUrl: prev });
     };
     const origPushState = history.pushState;
     const origReplaceState = history.replaceState;
