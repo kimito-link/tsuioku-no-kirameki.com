@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.228',
+    date: '2026-05-08',
+    summary: 'ギフトランキング取得を opt-in 化',
+    items: Object.freeze([
+      'v0.1.226 / v0.1.227 の実機観測で、配信者ごとに公式サイドバー iframe（貢献度ランキング・ギフト履歴を出す部分）の Vue が rich-view-status placeholder のまま render に到達しないケースが多いことが分かりました。ギフトランキング取得の試行（自動でサイドバーを一瞬開く処理）の副作用で「お困りの方はこちら」表示が出てしまい、UX を損ねていました',
+      '初期状態では取得経路（auto-open / hidden iframe inject）を停止し、popup の応援帯直下に「ギフトランキング取得を開始（β）」ボタンを表示するようにしました。ボタンを押すと chrome.storage の `nls_gift_ranking_lane_enabled` が true になり、content 側でギフトランキング・累計・履歴の取得を 1 秒以内に開始します（F5 不要、SPA 遷移後も維持）',
+      'コメント記録・応援ランキング・ユーザー別の応援件数など、ギフト以外の経路はこれまで通り常時動きます。本変更は「ギフトランキングレーンの取得試行のみ」を opt-in 化するものです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.227',
     date: '2026-05-08',
     summary: 'iframe relay scrape の heartbeat 観測',

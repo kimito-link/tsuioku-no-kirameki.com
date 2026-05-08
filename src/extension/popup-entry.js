@@ -80,8 +80,10 @@ import {
   normalizeCalmPanelMotion,
   normalizeMarketingExportMaskLabels,
   normalizeAnonymousIdenticonEnabled,
-  normalizeFoldAnonymousInRankStrip
+  normalizeFoldAnonymousInRankStrip,
+  KEY_GIFT_RANKING_LANE_ENABLED
 } from '../lib/storageKeys.js';
+import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
 import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold.js';
 import {
   summarizeGiftSubAppHistory,
@@ -5254,6 +5256,64 @@ function renderTopSupportRankStrip(stripRooms) {
 }
 
 /**
+ * v0.1.228: ギフトランキング取得開始ボタンの click を 1 度だけ bind。
+ * popup 起動時の initPopup から呼ぶ。複数回呼ばれても二重 bind しない。
+ */
+let _giftRankingFetchPromptBound = false;
+function bindGiftRankingFetchPromptButtonOnce() {
+  if (_giftRankingFetchPromptBound) return;
+  const btn = /** @type {HTMLButtonElement|null} */ (
+    document.getElementById('enableGiftRankingFetchBtn')
+  );
+  if (!btn) return;
+  _giftRankingFetchPromptBound = true;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      await chrome.storage.local.set({ [KEY_GIFT_RANKING_LANE_ENABLED]: true });
+      // prompt を即座に隠す（次の refresh を待たず体感を改善）。content 側は
+      // storage.onChanged で 1 秒後に autoOpen を起動する。F5 不要。
+      const prompt = document.getElementById('giftRankingFetchPrompt');
+      if (prompt) {
+        prompt.hidden = true;
+        prompt.setAttribute('aria-hidden', 'true');
+      }
+    } catch {
+      btn.disabled = false;
+    }
+  });
+}
+
+/**
+ * v0.1.228: ギフトランキング取得 opt-in prompt の表示切り替え。
+ * flag OFF（default）かつ topGiftRankStrip にデータが無いときだけ prompt 表示。
+ * flag ON、または既にランキングデータが取れているときは prompt を隠す。
+ *
+ * 配信者ごとに公式 iframe が render に到達しないケースが多いため、
+ * 取得試行を opt-in 化（v0.1.228）。
+ *
+ * @param {string} liveId
+ */
+async function refreshGiftRankingFetchPrompt(liveId) {
+  const prompt = /** @type {HTMLElement|null} */ ($('giftRankingFetchPrompt'));
+  if (!prompt) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  let enabled = false;
+  try {
+    const bag = await chrome.storage.local.get(KEY_GIFT_RANKING_LANE_ENABLED);
+    enabled = isGiftRankingLaneEnabledFromStorage(bag);
+  } catch {
+    enabled = false;
+  }
+  // ランキング帯（topGiftRankStrip）が表示状態なら prompt は不要。
+  const strip = /** @type {HTMLElement|null} */ ($('topGiftRankStrip'));
+  const stripVisible = !!(strip && strip.hidden === false);
+  const shouldShow = !!lid && !enabled && !stripVisible;
+  prompt.hidden = !shouldShow;
+  prompt.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+}
+
+/**
  * 貢献度ランキング帯。niconico DOM から掬った正本値（`nls_event_dom_<lv>` の
  * contributionRanking）を最優先、それが無いときだけ NDGR ギフト event 集計に
  * フォールバック。応援帯と同じ CSS / モデル化（topSupportRankLineModels）を流用。
@@ -5463,6 +5523,8 @@ function renderUserRooms(entries, liveId = '') {
   void (async () => {
     await refreshOfficialEventDomBundle(liveId);
     await refreshGiftRankStrip(liveId);
+    // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
+    await refreshGiftRankingFetchPrompt(liveId);
     const snap = watchMetaCache.snapshot;
     if (snap) {
       paintOfficialNicoStatsStrip(
@@ -10241,6 +10303,7 @@ function initPopup() {
   installExtensionContextErrorGuard();
   initOfflineBannerOnce();
   paintVersionBadge();
+  bindGiftRankingFetchPromptButtonOnce();
   void globalThis.chrome?.storage?.local
     ?.get(KEY_CALM_PANEL_MOTION)
     ?.then((b) => {
