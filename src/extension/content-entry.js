@@ -97,6 +97,12 @@ import {
   NICO_USER_ICON_IMG_LAZY_ATTRS
 } from '../lib/nicoliveDom.js';
 import {
+  probeCommentRowDataAttributes,
+  aggregateSavedCommentsUidStats,
+  parseInterceptFetchLog,
+  snapshotCommentIngestCounters
+} from '../lib/commentObservabilityDiag.js';
+import {
   parseLiveViewerCountFromDocument,
   parseViewerCountFromSnapshotMetas
 } from '../lib/liveAudienceDom.js';
@@ -4250,6 +4256,32 @@ function buildGiftDiagnosticsBundle() {
         '自動オープン最終試行ago_ms': ago(_d.autoOpenLastAttemptAt)
       };
     })(),
+    // v0.1.225 観測強化: コメント記録の uid 解決診断（AI 共有診断 commentObservability）
+    // niconico の最新 frontend で uid を DOM/NDGR/intercept のどこから取れているか
+    // 切り分けて、F12 不要で root cause を特定するための観測値。挙動変更なし。
+    commentObservability: (() => {
+      const decodedChats = pickNum('c');
+      const persistedNdgr = _commentIngestSourceCounters.ndgr || 0;
+      const ratio = decodedChats > 0
+        ? Math.round((persistedNdgr / decodedChats) * 1000) / 10
+        : 0;
+      return {
+        commentRowDataAttributesProbe: probeCommentRowDataAttributes(
+          document.querySelectorAll('[class*="table-row"]'),
+          { limit: 5 }
+        ),
+        interceptFetchLog: parseInterceptFetchLog(
+          document.documentElement?.getAttribute('data-nls-fetch-log')
+        ),
+        commentIngestBySource: snapshotCommentIngestCounters(_commentIngestSourceCounters),
+        savedCommentsUidStats: { ..._lastSavedCommentsUidStats },
+        ndgrChatToPersistRatio: {
+          decodedChats,
+          ndgrPersistedRows: persistedNdgr,
+          ratioPercent: ratio
+        }
+      };
+    })(),
     urlLiveId: urlLv || ''
   };
 }
@@ -7202,6 +7234,30 @@ function pruneAutoBackupLives(state) {
 /** NDGR・MutationObserver・deep harvest が同時に来ても storage の merge が壊れないよう直列化 */
 let persistCommentRowsChain = Promise.resolve();
 
+/**
+ * v0.1.225 観測強化: source 別 persist 件数の累積 counter（AI 共有診断用）
+ * @type {Record<string, number>}
+ */
+const _commentIngestSourceCounters = {
+  ndgr: 0,
+  mutation: 0,
+  deep: 0,
+  visible: 0,
+  intercept_post: 0,
+  unknown: 0
+};
+
+/**
+ * v0.1.225 観測強化: 直近の保存コメント uid 解決状況の snapshot（AI 共有診断用）
+ * @type {{ totalSaved: number, withUid: number, withoutUid: number, withUidPercent: number }}
+ */
+let _lastSavedCommentsUidStats = {
+  totalSaved: 0,
+  withUid: 0,
+  withoutUid: 0,
+  withUidPercent: 0
+};
+
 const MIN_PERSIST_INTERVAL_MS = INGEST_TIMING.coalescerMinMs;
 const PERSIST_BURST_THRESHOLD = INGEST_TIMING.coalescerBurstThreshold;
 
@@ -7215,7 +7271,7 @@ const persistCoalescer = createPersistCoalescer(async (/** @type {ParsedCommentR
  * @param {ParsedCommentRow[]|null|undefined} rows
  * @param {{ source?: string }} [opts] ndgr | mutation | deep | visible
  */
-function persistCommentRows(rows, _opts = {}) {
+function persistCommentRows(rows, opts = {}) {
   const gate = diagnosePersistGate({
     hasRows: !!rows?.length,
     recording,
@@ -7230,6 +7286,14 @@ function persistCommentRows(rows, _opts = {}) {
     return;
   }
   lastPersistGateFailures = [];
+  // v0.1.225 観測強化: source 別 persist 件数を累積（AI 共有診断 commentIngestBySource）
+  const sourceKey = String(opts?.source || 'unknown');
+  const incBy = rows?.length || 0;
+  if (Object.prototype.hasOwnProperty.call(_commentIngestSourceCounters, sourceKey)) {
+    _commentIngestSourceCounters[sourceKey] += incBy;
+  } else {
+    _commentIngestSourceCounters.unknown += incBy;
+  }
   persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (rows));
 }
 
@@ -7326,6 +7390,9 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       next = bfAv.next;
       storageTouched = true;
     }
+    // v0.1.225 観測強化: 保存される予定の next の uid 解決状況を snapshot
+    // （AI 共有診断 savedCommentsUidStats）
+    _lastSavedCommentsUidStats = aggregateSavedCommentsUidStats(next);
     const profileKeysBefore = Object.keys(profileMap).length;
     profileMap = pruneUserCommentProfileMap(profileMap);
     if (Object.keys(profileMap).length !== profileKeysBefore) cacheTouched = true;

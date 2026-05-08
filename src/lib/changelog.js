@@ -26,6 +26,26 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.225',
+    date: '2026-05-08',
+    summary: 'コメント uid 解決経路の切り分け観測を追加',
+    items: Object.freeze([
+      'v0.1.224 で目立たなくなった「150 件謎タイル」の根本原因（投稿者 ID 取得失敗）について、原因が DOM 側か NDGR 側か page-intercept 側かを F12 不要で AI 共有診断 JSON だけで切り分けられるよう、観測値を追加しました。具体的にはコメ表 row の `data-user-id` 系属性の有無、page-intercept が拾った fetch URL 履歴、コメント取り込み source 別件数、保存コメントの uid 解決率、NDGR から decode した chat に対する保存率の 5 種類です',
+      '上記は AI 共有診断 JSON の `content.giftDiagnostics.commentObservability` ブロックに追記されます。観測専用の追加で、拡張の挙動は一切変更しません',
+      '次バージョン以降で、この観測値に基づいて DOM scrape / API hook の補強（uid 取得経路の根本改善）を進めます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.224',
+    date: '2026-05-08',
+    summary: 'ID未取得コメントの謎タイル混入を修正',
+    items: Object.freeze([
+      'popup「ユーザー別の応援件数が多い順」セクションに、ID未取得コメント（投稿者 ID が DOM から取れなかったコメント群）が単独タイルで「150 件」のように大量カウント表示される事象を修正しました。配信中に多数発生しうる ID 未取得コメントが 1 つの匿名バケツに集約され、配信者本人より目立つ位置で表示されるのが直感に反するため、ranking 表示からは除外する仕様に変更しました',
+      'HTMLレポートやマーケ集計内の「ユーザー別件数」など、別経路の集計には影響しません（ranking 表示のみの調整です）',
+      'ID未取得コメント自体の記録は維持しています（保存コメント本体には残ります）。投稿者 ID 取得経路の改善は別バージョンで対応します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.222',
     date: '2026-05-08',
     summary: 'ギフト送信者観測 0 を decode 側修正で解消',
