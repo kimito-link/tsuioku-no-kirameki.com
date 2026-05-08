@@ -10014,27 +10014,50 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     let rankTabBtn = null;
     let rankTabFinder = '';
     try {
-      const RANK_TEXT_RE = /ランキング|Ranking|貢献/;
-      const candidates = document.querySelectorAll(
-        '[role="tab"], button, a, li, div[class*="tab"], span[class*="tab"]'
-      );
-      for (const el of candidates) {
-        if (!(el instanceof HTMLElement)) continue;
-        const t = String(el.textContent || '').replace(/\s+/g, ' ').trim();
-        if (!t || t.length > 30) continue;
-        if (RANK_TEXT_RE.test(t)) {
-          rankTabBtn = el;
-          rankTabFinder = `text:${el.tagName.toLowerCase()}`;
-          break;
-        }
-      }
-      if (!rankTabBtn) {
-        const byCls = document.querySelector(
-          '[class*="ranking-tab"], [class*="contribution-tab"], [class*="ranker-tab"]'
+      // v0.1.229 修正（critical）: rank tab 検索を gift sidebar container に scope。
+      //
+      // v0.1.228 までは document 全体を querySelectorAll（`a` タグ含む）していたが、
+      // ニコニコ watch ページにはおすすめ生放送カード（実機で 25 件）が居り、その中の
+      // <a> リンクが「ランキング」「貢献」を含む文言を持っていることがある。
+      // テキスト一致 + click → 別配信者ページへ navigate という重大バグを起こしていた
+      // （v0.1.228 ボタン押下で発覚: lv350481401 視聴中に別配信者ページに遷移）。
+      //
+      // gift sidebar / rich-view / gift-modal 配下に rank tab は必ず存在するため、
+      // 親 frame document 全体ではなく sidebar container 内だけを search する。
+      // sidebar container が見つからない（autoOpen 失敗・rich-view-status placeholder
+      // のまま等）の場合は rank tab 検索自体を skip（誤クリック回避を最優先）。
+      let sidebarRoot = null;
+      try {
+        sidebarRoot = document.querySelector(
+          '[class*="gift-sidebar"], [class*="rich-view"], ' +
+            '[class*="gift-modal"], [class*="gift-popup"], ' +
+            '[class*="gift-balloon"], [class*="gift-dialog"], ' +
+            '[class*="gift-overlay"], [class*="program-gift-richview"]'
         );
-        if (byCls instanceof HTMLElement) {
-          rankTabBtn = byCls;
-          rankTabFinder = 'class';
+      } catch { /* no-op */ }
+      if (sidebarRoot instanceof HTMLElement) {
+        const RANK_TEXT_RE = /ランキング|Ranking|貢献/;
+        const candidates = sidebarRoot.querySelectorAll(
+          '[role="tab"], button, a, li, div[class*="tab"], span[class*="tab"]'
+        );
+        for (const el of candidates) {
+          if (!(el instanceof HTMLElement)) continue;
+          const t = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+          if (!t || t.length > 30) continue;
+          if (RANK_TEXT_RE.test(t)) {
+            rankTabBtn = el;
+            rankTabFinder = `text:${el.tagName.toLowerCase()}`;
+            break;
+          }
+        }
+        if (!rankTabBtn) {
+          const byCls = sidebarRoot.querySelector(
+            '[class*="ranking-tab"], [class*="contribution-tab"], [class*="ranker-tab"]'
+          );
+          if (byCls instanceof HTMLElement) {
+            rankTabBtn = byCls;
+            rankTabFinder = 'class';
+          }
         }
       }
     } catch { /* no-op */ }
