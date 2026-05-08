@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.232',
+    date: '2026-05-08',
+    summary: 'ボタン トグル化 + ギフトサイドバー close 強化',
+    items: Object.freeze([
+      'popup「ギフトランキング取得を開始」ボタンを ON / OFF トグルに変更しました。一度押した後にボタンが消えてしまい元に戻せなくなる問題を解消し、いつでも停止できます。停止すると次の F5 から自動オープンが走らなくなります',
+      'ギフトサイドバーの自動オープンが「お困りの方はこちら」が出る配信者で閉じきれず、サイドバーが開いたまま残る事象を修正しました。close ボタンクリック → Escape キー → ギフトボタン トグル → close ボタン再クリックの 4 段で確実に閉じるよう強化し、待ち時間も 400ms→600ms（rescue link 検出時は 1000ms→1200ms）に延長しています',
+      '挙動: 取得値や観測値は変えていません。ユーザー体験のみ「ボタンを押し直せる / サイドバーが開きっぱなしにならない」方向の改善です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.231',
     date: '2026-05-08',
     summary: '「お困り」抑制 + relay 受信を単体テスト化',

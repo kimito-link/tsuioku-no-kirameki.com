@@ -5256,8 +5256,37 @@ function renderTopSupportRankStrip(stripRooms) {
 }
 
 /**
- * v0.1.228: ギフトランキング取得開始ボタンの click を 1 度だけ bind。
+ * v0.1.232: prompt の表示テキスト + ボタン label を enabled 状態に合わせて更新。
+ * @param {boolean} enabled
+ */
+function applyGiftRankingFetchPromptLabel(enabled) {
+  const prompt = /** @type {HTMLElement|null} */ ($('giftRankingFetchPrompt'));
+  if (!prompt) return;
+  const text = /** @type {HTMLElement|null} */ (
+    prompt.querySelector('.nl-gift-ranking-prompt__text')
+  );
+  const btn = /** @type {HTMLButtonElement|null} */ (
+    prompt.querySelector('#enableGiftRankingFetchBtn')
+  );
+  if (text) {
+    text.textContent = enabled
+      ? 'ギフトランキング取得は ON です。停止すると次の F5 から自動オープンしません（広告ランキング除外と「お困りの方はこちら」抑制も停止）。'
+      : 'ギフトランキング・累計・履歴は、配信者によっては取得に失敗してサイドバーが一瞬開く副作用が出るため、初期状態では取得しません。';
+  }
+  if (btn) {
+    btn.textContent = enabled
+      ? 'ギフトランキング取得を停止'
+      : 'ギフトランキング取得を開始（β）';
+    btn.setAttribute('data-nl-state', enabled ? 'on' : 'off');
+  }
+}
+
+/**
+ * v0.1.228 / v0.1.232: ギフトランキング取得開始ボタンの click を 1 度だけ bind。
  * popup 起動時の initPopup から呼ぶ。複数回呼ばれても二重 bind しない。
+ *
+ * v0.1.232: トグル化（ON のときに押すと OFF に戻せる）。OFF 状態は flag 削除で
+ *   表現する（未設定 = OFF default）。
  */
 let _giftRankingFetchPromptBound = false;
 function bindGiftRankingFetchPromptButtonOnce() {
@@ -5270,27 +5299,30 @@ function bindGiftRankingFetchPromptButtonOnce() {
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     try {
-      await chrome.storage.local.set({ [KEY_GIFT_RANKING_LANE_ENABLED]: true });
-      // prompt を即座に隠す（次の refresh を待たず体感を改善）。content 側は
-      // storage.onChanged で 1 秒後に autoOpen を起動する。F5 不要。
-      const prompt = document.getElementById('giftRankingFetchPrompt');
-      if (prompt) {
-        prompt.hidden = true;
-        prompt.setAttribute('aria-hidden', 'true');
+      const bag = await chrome.storage.local.get(KEY_GIFT_RANKING_LANE_ENABLED);
+      const wasEnabled = isGiftRankingLaneEnabledFromStorage(bag);
+      if (wasEnabled) {
+        // OFF へ：未設定状態に戻す（KEY を削除）
+        await chrome.storage.local.remove(KEY_GIFT_RANKING_LANE_ENABLED);
+        applyGiftRankingFetchPromptLabel(false);
+      } else {
+        await chrome.storage.local.set({ [KEY_GIFT_RANKING_LANE_ENABLED]: true });
+        applyGiftRankingFetchPromptLabel(true);
       }
     } catch {
+      /* no-op */
+    } finally {
       btn.disabled = false;
     }
   });
 }
 
 /**
- * v0.1.228: ギフトランキング取得 opt-in prompt の表示切り替え。
- * flag OFF（default）かつ topGiftRankStrip にデータが無いときだけ prompt 表示。
- * flag ON、または既にランキングデータが取れているときは prompt を隠す。
+ * v0.1.228 / v0.1.232: ギフトランキング取得 opt-in prompt の表示切り替え。
  *
- * 配信者ごとに公式 iframe が render に到達しないケースが多いため、
- * 取得試行を opt-in 化（v0.1.228）。
+ * v0.1.232 修正: 「ボタンが消えて操作不能」事象（v0.1.228 で押した後、勝手に
+ *   prompt が hide されて元に戻せなくなる）を解消するため、lid があれば
+ *   常時表示し、enabled 状態に応じて文言とボタン label を切り替える。
  *
  * @param {string} liveId
  */
@@ -5298,6 +5330,12 @@ async function refreshGiftRankingFetchPrompt(liveId) {
   const prompt = /** @type {HTMLElement|null} */ ($('giftRankingFetchPrompt'));
   if (!prompt) return;
   const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) {
+    // lid が無い（empty state）ときだけ非表示
+    prompt.hidden = true;
+    prompt.setAttribute('aria-hidden', 'true');
+    return;
+  }
   let enabled = false;
   try {
     const bag = await chrome.storage.local.get(KEY_GIFT_RANKING_LANE_ENABLED);
@@ -5305,12 +5343,10 @@ async function refreshGiftRankingFetchPrompt(liveId) {
   } catch {
     enabled = false;
   }
-  // ランキング帯（topGiftRankStrip）が表示状態なら prompt は不要。
-  const strip = /** @type {HTMLElement|null} */ ($('topGiftRankStrip'));
-  const stripVisible = !!(strip && strip.hidden === false);
-  const shouldShow = !!lid && !enabled && !stripVisible;
-  prompt.hidden = !shouldShow;
-  prompt.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+  // 常時表示（v0.1.232）: lid がある間は ON/OFF どちらの状態でも prompt を出す
+  prompt.hidden = false;
+  prompt.setAttribute('aria-hidden', 'false');
+  applyGiftRankingFetchPromptLabel(enabled);
 }
 
 /**

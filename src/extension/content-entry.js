@@ -10159,22 +10159,58 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     } catch {
       // no-op
     }
+    // v0.1.232: 「サイドバーが開いたまま」事象（実機 lv350481542 で観測）に
+    //   対応する強化 close。close ボタン → Escape key → giftBtn toggle の
+    //   3 段で確実に閉じる。各段の後にサイドバー残存を確認して既に閉じてれば
+    //   早期 return。
+    const isSidebarStillVisible = () => {
+      try {
+        // rich-view-status が見える / gift-sidebar が hidden でない / etc
+        return !!document.querySelector(
+          '[class*="rich-view-status"]:not([hidden]), ' +
+            '[class*="gift-sidebar"]:not([hidden]), ' +
+            '[class*="gift-modal"]:not([hidden]), ' +
+            '[class*="gift-popup"]:not([hidden])'
+        );
+      } catch {
+        return false;
+      }
+    };
+    // 1) close ボタンを click
     if (closeBtn) {
       dispatchSyntheticActivation(closeBtn);
-      // v0.1.231: rescue link が居る配信では close ボタンが反応しない可能性があるので
-      //   gift button を toggle する 2 段目も入れる（idempotent）
-      if (rescueLinkSeen) {
-        await new Promise((r) => setTimeout(r, 200));
-        dispatchSyntheticActivation(giftBtn);
-      }
-    } else {
-      dispatchSyntheticActivation(giftBtn);
+      await new Promise((r) => setTimeout(r, 200));
     }
-    // 7. 閉じアニメーション分待ってからステルス CSS を外す
-    //   v0.1.231: rescue link が出ていたケースは余分に 600ms 待つ
-    //   （Vue が close 後も rescue link を残すケースがあり、stealth 解除直後に
-    //   ユーザーに見えるのを防ぐ）
-    await new Promise((r) => setTimeout(r, rescueLinkSeen ? 1000 : 400));
+    // 2) Escape キー dispatch（多くの Vue モーダルが対応）
+    if (isSidebarStillVisible()) {
+      try {
+        const KEY_INIT = {
+          key: 'Escape',
+          code: 'Escape',
+          keyCode: 27,
+          which: 27,
+          bubbles: true,
+          cancelable: true
+        };
+        document.dispatchEvent(new KeyboardEvent('keydown', KEY_INIT));
+        document.dispatchEvent(new KeyboardEvent('keyup', KEY_INIT));
+      } catch { /* no-op */ }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    // 3) giftBtn toggle（最終手段）
+    if (isSidebarStillVisible()) {
+      dispatchSyntheticActivation(giftBtn);
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    // 4) close ボタン再 click（giftBtn toggle が効かなかった保険）
+    if (isSidebarStillVisible() && closeBtn) {
+      dispatchSyntheticActivation(closeBtn);
+    }
+    // 5) 閉じアニメーション + Vue 状態安定化を待つ
+    //    v0.1.231: rescue link が出ていたケースは余分に 600ms 待つ
+    //    v0.1.232: いずれの場合もデフォルトを 600ms に伸ばし、stealth 解除前に
+    //              サイドバーが閉じる時間を確保する
+    await new Promise((r) => setTimeout(r, rescueLinkSeen ? 1200 : 600));
   } catch (err) {
     setAutoOpenStatus(`error-${String(err && /** @type {{name?:string}} */(err).name || 'unknown').slice(0, 20)}`);
   } finally {
