@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.231',
+    date: '2026-05-08',
+    summary: '「お困り」抑制 + relay 受信を単体テスト化',
+    items: Object.freeze([
+      'ギフトランキング取得を開始したときに、配信者によっては「お困りの方はこちら」のリンクが一瞬画面に見えてしまう副作用を抑制しました。表示用のステルス CSS にこのリンクを含め、検出した場合は内部処理を早期終了して閉じるようにし、リンクがまだ残っているときはステルス CSS を 800ms 余分に維持してから外すようにしました',
+      '内部処理: ギフト iframe relay の受信ロジック（v0.1.230 で実装した frame URL 別の振り分け）を `src/lib/iframeOfficialDomFromRelay.js` に純関数として切り出し、単体テスト 18 件を追加しました。これで「広告 iframe の値が貢献度ランキングに混入する」回帰を、実機テスト無しで CI 上で自動検出できます',
+      '挙動変更ゼロ（観測 / 取得値）。ユーザー体験のみ「お困りの方はこちら」が見えなくなる方向の改善です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.230',
     date: '2026-05-08',
     summary: '広告ランキングが貢献度ランキング欄に混入する事象を修正',
