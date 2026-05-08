@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.227',
+    date: '2026-05-08',
+    summary: 'iframe relay scrape の heartbeat 観測',
+    items: Object.freeze([
+      'v0.1.226 で「iframe relay は技術的に動いている（nicoad から受信あり）が、貢献度ランキング・ギフト履歴を持つ audition / koken iframe からは何も来ない」状態が実機で確定しました。原因が「child content script 自体が動いてない」のか「動いているが scrape 結果が 0 件で送信を諦めている」のかを切り分けるための観測値（heartbeat）を追加しました',
+      'iframe 内の relay は scan 毎 tick で `NLS_GIFT_SUBAPP_RELAY_HEARTBEAT` を親に送信するようにしました。scrape 結果が 0 件でも送るので、親側で「frame URL × 累積回数 × 直近 scrape 件数」を観測できます。AI 共有診断 JSON の `content.giftDiagnostics.giftSubAppRelayDiag.heartbeatsByFrameUrl` と popup「詳しい状況」の「iframe relay 経路」行で読めます',
+      '観測専用の追加で、拡張の挙動は一切変更しません。次バージョン以降で、heartbeat の値に基づき scrape ロジックの修復（DOM 空のリトライ・selector 補強）または child script 起動の補強を進めます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.226',
     date: '2026-05-08',
     summary: 'ギフトサイドバー iframe relay 経路の生存観測を追加',

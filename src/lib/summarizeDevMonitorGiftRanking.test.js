@@ -133,31 +133,68 @@ describe('summarizeDevMonitorGiftRanking', () => {
     );
   });
 
-  it('v0.1.226: giftSubAppRelayDiag 受信 0 → 「iframe relay 未受信」行を出す', () => {
+  it('v0.1.226/227: giftSubAppRelayDiag 受信 0 + heartbeat 0 → 起動なし行', () => {
     const c = buildRealisticFastCache();
     c.content.giftDiagnostics.giftSubAppRelayDiag = {
       messagesReceivedTotal: 0,
       messagesByFrameUrl: {},
       lastReceivedAgoMs: null,
+      heartbeatsByFrameUrl: {},
+      heartbeatFrameCount: 0,
       crossOriginThrows: 6,
       sameOriginAccess: 1,
-      hasReceivedAny: false
+      hasReceivedAny: false,
+      hasHeartbeatAny: false
     };
     const rows = summarizeDevMonitorGiftRanking(c);
     const v = rows.find((r) => r[0] === 'iframe relay 経路')?.[1];
-    expect(v).toContain('iframe relay 未受信');
+    expect(v).toContain('起動なし');
     expect(v).toContain('6');
   });
 
-  it('v0.1.226: giftSubAppRelayDiag 受信あり → 受信件数行を出す', () => {
+  it('v0.1.227: heartbeat あり + relay 0 → 起動済 / scrape 0 件行', () => {
+    const c = buildRealisticFastCache();
+    c.content.giftDiagnostics.giftSubAppRelayDiag = {
+      messagesReceivedTotal: 0,
+      messagesByFrameUrl: {},
+      lastReceivedAgoMs: null,
+      heartbeatsByFrameUrl: {
+        'https://audition.nicovideo.jp/x': {
+          count: 5,
+          lastAgoMs: 500,
+          lastScrapeAttempts: 5,
+          lastItemsCount: 0,
+          lastContribCount: 0,
+          lastEventBannerPresent: false
+        }
+      },
+      heartbeatFrameCount: 1,
+      crossOriginThrows: 0,
+      sameOriginAccess: 0,
+      hasReceivedAny: false,
+      hasHeartbeatAny: true
+    };
+    const rows = summarizeDevMonitorGiftRanking(c);
+    const v = rows.find((r) => r[0] === 'iframe relay 経路')?.[1];
+    expect(v).toContain('iframe relay 起動 1 frame');
+    expect(v).toContain('scrape 0');
+  });
+
+  it('v0.1.226/227: giftSubAppRelayDiag 受信あり → 受信件数行を出す', () => {
     const c = buildRealisticFastCache();
     c.content.giftDiagnostics.giftSubAppRelayDiag = {
       messagesReceivedTotal: 12,
       messagesByFrameUrl: { a: 6, b: 6 },
       lastReceivedAgoMs: 3500,
+      heartbeatsByFrameUrl: {
+        a: { count: 6, lastAgoMs: 100, lastScrapeAttempts: 6, lastItemsCount: 6, lastContribCount: 0, lastEventBannerPresent: false },
+        b: { count: 6, lastAgoMs: 100, lastScrapeAttempts: 6, lastItemsCount: 6, lastContribCount: 0, lastEventBannerPresent: false }
+      },
+      heartbeatFrameCount: 2,
       crossOriginThrows: 2,
       sameOriginAccess: 0,
-      hasReceivedAny: true
+      hasReceivedAny: true,
+      hasHeartbeatAny: true
     };
     const rows = summarizeDevMonitorGiftRanking(c);
     const v = rows.find((r) => r[0] === 'iframe relay 経路')?.[1];
