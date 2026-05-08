@@ -109,6 +109,11 @@ import {
   isGiftRankingLaneEnabledFromChange
 } from '../lib/giftRankingLaneOptIn.js';
 import {
+  classifyGiftSubAppFrameSource,
+  isContributionRankingTrustedSource,
+  isEventBannerTrustedSource
+} from '../lib/giftSubAppFrameSource.js';
+import {
   parseLiveViewerCountFromDocument,
   parseViewerCountFromSnapshotMetas
 } from '../lib/liveAudienceDom.js';
@@ -1895,13 +1900,28 @@ window.addEventListener('message', (e) => {
   //    `nls_iframe_official_dom_<liveId>` storage に保存。popup の
   //    refreshGiftRankStrip が _lastOfficialEventDomBundle.contributionRanking
   //    が空のときの fallback として読み込む。
-  const contributionRanking = Array.isArray(e.data.contributionRanking)
+  //
+  // v0.1.230 修正: relay 送信元 frame URL を分類し、信頼できる送信元のデータ
+  //   だけを保存する。具体的には nicoad iframe（広告ランキングを表示する公式
+  //   iframe）が `scrapeContributionRankingFromDom` で広告ランキング DOM を
+  //   拾って親に送ってくるため、そのままだと popup「公式の貢献度ランキング」
+  //   ラベルに広告 pt（23692貢 等）が混入する。
+  //   contributionRanking は audition/koken のみ、eventBanner は audition のみを
+  //   信頼する。それ以外は drop。
+  const frameSource = classifyGiftSubAppFrameSource(e.data.frameUrl);
+  const rawContribRanking = Array.isArray(e.data.contributionRanking)
     ? e.data.contributionRanking
     : null;
-  const eventBanner =
+  const rawEventBanner =
     e.data.eventBanner && typeof e.data.eventBanner === 'object'
       ? e.data.eventBanner
       : null;
+  const contributionRanking = isContributionRankingTrustedSource(frameSource)
+    ? rawContribRanking
+    : null;
+  const eventBanner = isEventBannerTrustedSource(frameSource)
+    ? rawEventBanner
+    : null;
   if (
     (contributionRanking && contributionRanking.length > 0) ||
     eventBanner
@@ -1912,7 +1932,8 @@ window.addEventListener('message', (e) => {
           contributionRanking: contributionRanking || [],
           eventBanner: eventBanner || null,
           capturedAt: Date.now(),
-          frameUrl: String(e.data.frameUrl || '').slice(0, 200)
+          frameUrl: String(e.data.frameUrl || '').slice(0, 200),
+          frameSource
         }
       })
       .catch((err) => {
@@ -8753,6 +8774,12 @@ async function start() {
     // いなければ、_autoOpenGiftSidebarTriedLiveId をリセットしてもう 1 度だけ
     // 自動オープンを試す。初回の Vue マウント遅延／タブクリック取りこぼし／
     // niconico 側の XHR 失敗 などを救済するための一発リトライ。
+    //
+    // v0.1.230: 初回 autoOpen が `opened-but-no-banner` で終わっていた場合
+    //   （Vue が rich-view-status placeholder のまま render に到達せず
+    //   「お困りの方はこちら」rescue link が出る配信者）はリトライしない。
+    //   2 回目以降も同じ結果が確定的なので、無駄に「お困りの方はこちら」を
+    //   再度トリガするだけになる。
     setTimeout(() => {
       if (!isGiftRankingLaneEnabled()) return; // v0.1.228 opt-in gate
       if (!recording || !liveId || !locationAllowsCommentRecording()) return;
@@ -8761,6 +8788,17 @@ async function start() {
       const haveRanking = Array.isArray(lastOfficialEventDomBundle?.contributionRanking) &&
         lastOfficialEventDomBundle.contributionRanking.length > 0;
       if (haveRanking) return;
+      try {
+        const _d = getRankingLifetimeDiag();
+        const lastStatus = String(_d.autoOpenLastStatus || '');
+        if (
+          lastStatus === 'opened-but-no-banner' ||
+          lastStatus.startsWith('opened-no-banner-no-ranking')
+        ) {
+          // v0.1.230: 同じ rescue link 状態を再度誘発するだけなので skip
+          return;
+        }
+      } catch { /* no-op */ }
       // 1 度だけリトライを許す
       _autoOpenGiftSidebarTriedLiveId = '';
       void tryAutoOpenGiftSidebarOnceForScrape();
