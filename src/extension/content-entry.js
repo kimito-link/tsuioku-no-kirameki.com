@@ -33,6 +33,7 @@ import {
   KEY_STORAGE_WRITE_ERROR,
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
+  KEY_GIFT_RANKING_LANE_ENABLED,
   commentsStorageKey,
   giftUsersStorageKey,
   eventDomStorageKey,
@@ -103,6 +104,10 @@ import {
   snapshotCommentIngestCounters
 } from '../lib/commentObservabilityDiag.js';
 import { snapshotIframeRelayDiag } from '../lib/giftSubAppRelayDiag.js';
+import {
+  isGiftRankingLaneEnabledFromStorage,
+  isGiftRankingLaneEnabledFromChange
+} from '../lib/giftRankingLaneOptIn.js';
 import {
   parseLiveViewerCountFromDocument,
   parseViewerCountFromSnapshotMetas
@@ -8566,9 +8571,38 @@ async function start() {
   await readThumbSettings().catch(() => {});
   applyThumbSchedule();
 
+  // v0.1.228: ギフトランキング opt-in flag の初期読み込み（async）。
+  // 失敗しても OFF default のまま、後続の onChanged で正しい値に切り替わる。
+  try {
+    chrome.storage.local.get(KEY_GIFT_RANKING_LANE_ENABLED).then((bag) => {
+      _giftRankingLaneEnabled = isGiftRankingLaneEnabledFromStorage(bag);
+    }).catch(() => { /* OFF default を維持 */ });
+  } catch { /* no-op */ }
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (!hasExtensionContext()) return;
     if (area !== 'local') return;
+
+    // v0.1.228: ギフトランキング opt-in flag の同期。popup ボタン押下から伝播。
+    // false → true への遷移で、初回 autoOpen を 1 秒遅延で起動する（page load 後
+    // の 2s setTimeout は既に過ぎているため、ボタンを今押しても autoOpen が
+    // 走らないのを救済）。hidden iframe inject は次の 360ms tick で自動的に動く。
+    if (changes[KEY_GIFT_RANKING_LANE_ENABLED]) {
+      const wasEnabled = _giftRankingLaneEnabled;
+      _giftRankingLaneEnabled = isGiftRankingLaneEnabledFromChange(
+        changes[KEY_GIFT_RANKING_LANE_ENABLED]
+      );
+      if (!wasEnabled && _giftRankingLaneEnabled && isWatchInlinePanelTopFrame()) {
+        setTimeout(() => {
+          if (!isGiftRankingLaneEnabled()) return;
+          if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+          // 1 度だけ即時試行。失敗時のリトライは既存の 30s リトライ路に乗らない
+          // が、次の SPA 遷移 / F5 で 2s setTimeout 経由で起動する。
+          _autoOpenGiftSidebarTriedLiveId = '';
+          void tryAutoOpenGiftSidebarOnceForScrape();
+        }, 1000);
+      }
+    }
 
     if (changes[KEY_POPUP_FRAME] || changes[KEY_POPUP_FRAME_CUSTOM]) {
       if (isWatchInlinePanelTopFrame()) {
@@ -8704,7 +8738,13 @@ async function start() {
     // 速度優先：niconico Vue のマウント完了を待つ最低限の 2 秒後に発火。
     // ステルス CSS（opacity:0 + pointer-events:none）でユーザーは画面変化を見ない。
     // 同一 liveId につき 1 度きり。
+    //
+    // v0.1.228: ギフトランキング opt-in flag が立っていなければ skip。
+    //   実機観測で配信者ごとに公式 iframe が render に到達しないケース多数、
+    //   試行の副作用（rescue link 表示）が UX を損ねるため、ユーザーが
+    //   明示的にボタンを押したときだけ動かす。
     setTimeout(() => {
+      if (!isGiftRankingLaneEnabled()) return;
       if (recording && liveId && locationAllowsCommentRecording()) {
         void tryAutoOpenGiftSidebarOnceForScrape();
       }
@@ -8714,6 +8754,7 @@ async function start() {
     // 自動オープンを試す。初回の Vue マウント遅延／タブクリック取りこぼし／
     // niconico 側の XHR 失敗 などを救済するための一発リトライ。
     setTimeout(() => {
+      if (!isGiftRankingLaneEnabled()) return; // v0.1.228 opt-in gate
       if (!recording || !liveId || !locationAllowsCommentRecording()) return;
       const lid = String(liveId || '').trim().toLowerCase();
       if (!lid) return;
@@ -9234,6 +9275,28 @@ function maybeStartGiftSubAppIframeRelay() {
 let _hiddenOfficialIframesInjectedForLid = '';
 
 /**
+ * v0.1.228: ギフトランキング取得経路（autoOpen / hidden iframe inject /
+ *   cross-origin iframe scrape）の opt-in cache。
+ *
+ * default OFF。popup の「ギフトランキング取得を開始」ボタン押下で
+ * KEY_GIFT_RANKING_LANE_ENABLED に true が書かれ、storage.onChanged 経由で
+ * このキャッシュが true に切り替わる。autoOpen / hidden inject はこのキャッシュを
+ * 見て guard する（async storage.get を毎回しない）。
+ *
+ * 起動直後は false、初回 storage.local 読み込み完了後に正しい値になる。
+ * @type {boolean}
+ */
+let _giftRankingLaneEnabled = false;
+
+/**
+ * v0.1.228: opt-in cache を取得。autoOpen / hidden iframe inject の guard で使う。
+ * @returns {boolean}
+ */
+function isGiftRankingLaneEnabled() {
+  return _giftRankingLaneEnabled === true;
+}
+
+/**
  * v0.1.226 観測強化 / v0.1.227 拡張: ギフトサイドバー cross-origin iframe relay 経路の
  *   生存確認 state。
  *
@@ -9296,6 +9359,9 @@ const _giftSubAppRelayDiagState = {
  * @param {string} liveId 例 'lv350474211'
  */
 function maybeInjectHiddenOfficialIframes(liveId) {
+  // v0.1.228: opt-in gate（autoOpen と同じ理由で、ユーザーが明示的に取得開始
+  // した時のみ inject する）。OFF default。
+  if (!isGiftRankingLaneEnabled()) return;
   const lid = String(liveId || '').trim();
   if (!lid) return;
   if (_hiddenOfficialIframesInjectedForLid === lid) return;

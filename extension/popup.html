@@ -2624,6 +2624,44 @@
         grid-column: 1 / -1;
       }
 
+      /* v0.1.228: ギフトランキング取得 opt-in prompt（取得未開始のとき表示） */
+      .nl-gift-ranking-prompt {
+        grid-column: 1 / -1;
+        margin-top: 4px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px dashed rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .nl-gift-ranking-prompt[hidden] { display: none; }
+      .nl-gift-ranking-prompt__text {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--nl-text-soft, rgba(255, 255, 255, 0.78));
+      }
+      .nl-gift-ranking-prompt__btn {
+        cursor: pointer;
+        padding: 6px 14px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #fff;
+        background: linear-gradient(180deg, #4a90e2, #2f6fbe);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+      }
+      .nl-gift-ranking-prompt__btn:hover {
+        filter: brightness(1.08);
+      }
+      .nl-gift-ranking-prompt__btn:disabled {
+        opacity: 0.6;
+        cursor: progress;
+      }
+
       .nl-top-support-rank--below-cards {
         margin-top: 2px;
       }
@@ -7002,6 +7040,25 @@
           hidden
           aria-hidden="true"
         ></div>
+        <!-- v0.1.228: ギフトランキング opt-in prompt。flag OFF（default）のとき表示。
+             ボタン押下で content 側の autoOpen / hidden iframe inject が動き出す。 -->
+        <div
+          id="giftRankingFetchPrompt"
+          class="nl-gift-ranking-prompt"
+          hidden
+          aria-hidden="true"
+        >
+          <p class="nl-gift-ranking-prompt__text">
+            ギフトランキング・累計・履歴は、配信者によっては取得に失敗してサイドバーが一瞬開く副作用が出るため、初期状態では取得しません。
+          </p>
+          <button
+            type="button"
+            id="enableGiftRankingFetchBtn"
+            class="nl-gift-ranking-prompt__btn"
+          >
+            ギフトランキング取得を開始（β）
+          </button>
+        </div>
       </div>
 
       <p class="nl-record-nav-hint">
