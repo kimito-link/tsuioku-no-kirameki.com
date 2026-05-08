@@ -858,6 +858,127 @@ describe('v0.1.233 msg.24 nx:gift:show empty 結果は debug sample に保存', 
   });
 });
 
+describe('v0.1.235 msg.24 nx:gift:show partial decode サンプル + props キー名', () => {
+  // Helpers shared across cases
+  function structStringValue(s) {
+    const enc = new TextEncoder();
+    const bytes = enc.encode(s);
+    return lenDelimited(3, [...bytes]);
+  }
+  function structNumberValue(n) {
+    const buf = new ArrayBuffer(8);
+    new DataView(buf).setFloat64(0, n, true);
+    return [...tag(2, 1), ...new Uint8Array(buf)];
+  }
+  function kv(key, valuePayload) {
+    return lenDelimited(1, [
+      ...strField(1, key),
+      ...lenDelimited(2, valuePayload)
+    ]);
+  }
+
+  it('item / uid / rank が全部欠落しても name+point が取れていれば push 成功し、3 種の partial サンプルが出る', () => {
+    const mapPayload = new Uint8Array([
+      ...kv('advertiser_name', structStringValue('名無し')),
+      ...kv('ad_point', structNumberValue(5))
+    ]);
+    const ev = new Uint8Array([
+      ...strField(1, 'nx:gift:show'),
+      ...lenDelimited(5, [...mapPayload])
+    ]);
+    const msg = new Uint8Array(lenDelimited(24, [...ev]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].advertiserName).toBe('名無し');
+    expect(r.gifts[0].point).toBe(5);
+    expect(r.gifts[0].itemId).toBe('');
+    expect(r.gifts[0].advertiserUserId).toBe('');
+    expect(r.gifts[0].contributionRank).toBeNull();
+    // 全 3 種の partial サンプルが出る（push 成功なので msg:24:empty には入らない）
+    expect(r.unknownSamples['msg:24:empty']).toBeUndefined();
+    expect(r.unknownSamples['msg:24:noitem']).toBeDefined();
+    expect(r.unknownSamples['msg:24:nouid']).toBeDefined();
+    expect(r.unknownSamples['msg:24:norank']).toBeDefined();
+    // propsKeyNames に「実機 wire のキー名」が見える化されている
+    const sample = r.unknownSamples['msg:24:noitem'][0];
+    expect(sample.propsKeyNames).toEqual(
+      expect.arrayContaining(['advertiser_name', 'ad_point'])
+    );
+    expect(sample.topFn).toBe(1);
+    expect(sample.msgFn).toBe(24);
+  });
+
+  it('item と uid は取れていて rank だけ欠落の場合は msg:24:norank だけ出る', () => {
+    const mapPayload = new Uint8Array([
+      ...kv('advertiser_name', structStringValue('よしださん')),
+      ...kv('advertiser_user_id', structStringValue('86255751')),
+      ...kv('item_id', structStringValue('stamp_basketball')),
+      ...kv('item_name', structStringValue('バスケットボール')),
+      ...kv('ad_point', structNumberValue(11000))
+    ]);
+    const ev = new Uint8Array([
+      ...strField(1, 'nx:gift:show'),
+      ...lenDelimited(5, [...mapPayload])
+    ]);
+    const msg = new Uint8Array(lenDelimited(24, [...ev]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.unknownSamples['msg:24:noitem']).toBeUndefined();
+    expect(r.unknownSamples['msg:24:nouid']).toBeUndefined();
+    expect(r.unknownSamples['msg:24:norank']).toBeDefined();
+    expect(r.unknownSamples['msg:24:norank'][0].propsKeyNames).toEqual(
+      expect.arrayContaining(['item_id', 'item_name', 'advertiser_user_id'])
+    );
+  });
+
+  it('rank まで全部取れる完全な gift では partial サンプルは一切出ない', () => {
+    const mapPayload = new Uint8Array([
+      ...kv('advertiser_name', structStringValue('よしださん')),
+      ...kv('advertiser_user_id', structStringValue('86255751')),
+      ...kv('item_id', structStringValue('stamp_basketball')),
+      ...kv('item_name', structStringValue('バスケットボール')),
+      ...kv('ad_point', structNumberValue(11000)),
+      ...kv('contribution_rank', structNumberValue(3))
+    ]);
+    const ev = new Uint8Array([
+      ...strField(1, 'nx:gift:show'),
+      ...lenDelimited(5, [...mapPayload])
+    ]);
+    const msg = new Uint8Array(lenDelimited(24, [...ev]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].contributionRank).toBe(3);
+    expect(r.unknownSamples['msg:24:noitem']).toBeUndefined();
+    expect(r.unknownSamples['msg:24:nouid']).toBeUndefined();
+    expect(r.unknownSamples['msg:24:norank']).toBeUndefined();
+    expect(r.unknownSamples['msg:24:empty']).toBeUndefined();
+  });
+
+  it('partial サンプルは MAX_PER_KEY (3) で頭打ち', () => {
+    const mapPayload = new Uint8Array([
+      ...kv('advertiser_name', structStringValue('名無し')),
+      ...kv('ad_point', structNumberValue(5))
+    ]);
+    const ev = new Uint8Array([
+      ...strField(1, 'nx:gift:show'),
+      ...lenDelimited(5, [...mapPayload])
+    ]);
+    const msg = new Uint8Array(lenDelimited(24, [...ev]));
+    // 同じ ChunkedMessage に msg.24 を 5 個並べる
+    const chunked = new Uint8Array(
+      lenDelimited(1, [...msg, ...msg, ...msg, ...msg, ...msg])
+    );
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(5);
+    expect(r.unknownSamples['msg:24:noitem'].length).toBe(3);
+    expect(r.unknownSamples['msg:24:nouid'].length).toBe(3);
+    expect(r.unknownSamples['msg:24:norank'].length).toBe(3);
+  });
+});
+
 describe('decodePackedSegment', () => {
   it('decodes repeated ChunkedMessages', () => {
     const chat1 = new Uint8Array([
