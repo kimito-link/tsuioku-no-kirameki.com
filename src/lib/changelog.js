@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.235',
+    date: '2026-05-08',
+    summary: 'NDGR ギフト partial decode の真因サンプル収集',
+    items: Object.freeze([
+      'NDGR ギフト event を受信しているのに「アイテム名 / 送信者 ID / 順位」のいずれかが取れない部分欠落のケースについて、診断 JSON の `ndgrUnknownSamples` に欠落カテゴリ別（`msg:24:noitem` / `msg:24:nouid` / `msg:24:norank`）の hex サンプルと、実機 wire の生キー名一覧（`propsKeyNames`）を最大 3 件ずつ残すようにしました。次バージョン以降で `pickNxGiftString` の候補リストを実機キー名に合わせる手がかりになります',
+      '挙動変更ゼロ。ユーザー画面の表示は v0.1.234 と同一です。AI 共有診断のサイズが微増しますが、3 サンプル × 4 カテゴリ × 16 キー名上限なので実用上は数百バイト程度の増加です',
+      '実機観測（lv350482067、ニー子配信）で `gifts: 10` のうち `giftsWithItem: 5 / giftsWithUid: 4 / giftsWithRank: 0` という偏りが確認されており、v0.1.233 で仕込んだ `msg:24:empty` 経路では捕まえられない「partial 欠落」を診断に出すための仕込みです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.234',
     date: '2026-05-08',
     summary: 'postMessage 認証強化 + ギフト保存件数 cap',
