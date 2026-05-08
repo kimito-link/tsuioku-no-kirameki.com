@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.233',
+    date: '2026-05-08',
+    summary: 'NDGR ギフト decode の偽陽性削減 + 真因サンプル収集',
+    items: Object.freeze([
+      'ギフト件数（NDGRギフトevent数）に、コメント本文「草」などが誤ってギフトとして数えられる事象を修正しました。具体的には、ギフトの item_id が「英数字 + アンダースコア / ハイフンの slug 形式（stamp_xxx / ball_basketball など）で 3〜80 字」を満たすときだけギフト計上するように厳格化しています。日本語・絵文字を含むコメント本文がギフトに混入することはなくなります',
+      'ギフト送信者の数値型 user_id（Vue 経由で number_value として送られるパス）も拾えるよう、decode の safety net を追加しました（raw varint / fixed64 直送りパス）。送信者観測の精度が上がります',
+      '「ギフト event は届いたが decode 結果が空」という状況の wire 構造を AI 共有診断 JSON の `ndgrUnknownSamples["msg:24:empty"]` に hex で残すようにしました。これは次バージョン以降で「全部 0 件」を切り分けるための調査用観測値です。挙動変更ゼロ、ユーザー画面には影響しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.232',
     date: '2026-05-08',
     summary: 'ボタン トグル化 + ギフトサイドバー close 強化',
