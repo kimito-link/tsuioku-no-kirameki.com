@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.234',
+    date: '2026-05-08',
+    summary: 'postMessage 認証強化 + ギフト保存件数 cap',
+    items: Object.freeze([
+      'コメント・ギフト・統計の postMessage 経路に最低限の改ざん耐性として認証トークンを導入しました。同じ視聴ページに居る別の拡張やユーザースクリプトが偽の `NLS_INTERCEPT_*` を送って `nls_comments_（liveId）` / `nls_gift_users_（liveId）` を汚染する事故的衝突を抑止します（完全防御ではなく、generic な spoof を弾く層）',
+      'コメント・ギフトの受信内容に shape 検証を追加しました。異常な `commentNo`（非数字 / 11 桁以上）、過大な文字列（4096 字超）、配列の上限（1000 件超）、不正な `userId` 形式、負の point などは drop します。NDGR から実際に届く正規の値はそのまま通過します',
+      'cross-origin iframe 由来の `NLS_GIFT_HISTORY_FROM_IFRAME` / `NLS_GIFT_SUBAPP_RELAY_HEARTBEAT` の trust 検証を強化しました。`frameUrl` 必須化と、`origin` と `frameUrl.origin` の一致を必須化し、trusted host 内のなりすまし（別 nicovideo.jp 配下 iframe が他 iframe を名乗る）を阻止します',
+      'ギフト送信者の保存件数に上限（1 配信あたり 2000 件）を追加しました。これを超えた場合は古い `capturedAt` の entry から drop します（FIFO）。ストレージ肥大化 / DoS の緩和です。通常配信ではこの上限に達することはありません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.233',
     date: '2026-05-08',
     summary: 'NDGR ギフト decode の偽陽性削減 + 真因サンプル収集',
