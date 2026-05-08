@@ -3,6 +3,8 @@ import {
   pbVarint,
   pbForEach,
   decodeStatistics,
+  ndgrStatisticsHasWireSignal,
+  mergeNdgrStatistics,
   decodeChat,
   decodeGift,
   decodeChunkedMessage,
@@ -87,6 +89,9 @@ describe('decodeStatistics', () => {
     expect(stats.comments).toBe(1200);
     expect(stats.adPoints).toBe(5000);
     expect(stats.giftPoints).toBe(8000);
+    expect(stats.eventGiftScore).toBeNull();
+    expect(stats.eventRank).toBeNull();
+    expect(stats.eventTitle).toBeNull();
   });
 
   it('handles partial statistics', () => {
@@ -94,6 +99,53 @@ describe('decodeStatistics', () => {
     const stats = decodeStatistics(buf, 0, buf.length);
     expect(stats.viewers).toBe(100);
     expect(stats.comments).toBeNull();
+  });
+
+  it('decodes event fields (5/6 varint, 7 string)', () => {
+    const buf = new Uint8Array([
+      ...varintField(4, 999),
+      ...varintField(5, 111),
+      ...varintField(6, 7),
+      ...strField(7, '春のギフト')
+    ]);
+    const stats = decodeStatistics(buf, 0, buf.length);
+    expect(stats.giftPoints).toBe(999);
+    expect(stats.eventGiftScore).toBe(111);
+    expect(stats.eventRank).toBe(7);
+    expect(stats.eventTitle).toBe('春のギフト');
+  });
+
+  it('ndgrStatisticsHasWireSignal: giftPoints のみでも true', () => {
+    expect(
+      ndgrStatisticsHasWireSignal({
+        viewers: null,
+        comments: null,
+        adPoints: null,
+        giftPoints: 1,
+        eventGiftScore: null,
+        eventRank: null,
+        eventTitle: null
+      })
+    ).toBe(true);
+    expect(ndgrStatisticsHasWireSignal(null)).toBe(false);
+  });
+});
+
+describe('mergeNdgrStatistics', () => {
+  it('後勝ちで数値列を埋め、タイトルは長い方を優先', () => {
+    const aBuf = new Uint8Array([...varintField(1, 1), ...varintField(4, 1000)]);
+    const a = decodeStatistics(aBuf, 0, aBuf.length);
+    const bBuf = new Uint8Array([
+      ...varintField(5, 200),
+      ...varintField(6, 3),
+      ...strField(7, '春の箱')
+    ]);
+    const b = decodeStatistics(bBuf, 0, bBuf.length);
+    const m = mergeNdgrStatistics(a, b);
+    expect(m?.giftPoints).toBe(1000);
+    expect(m?.eventGiftScore).toBe(200);
+    expect(m?.eventRank).toBe(3);
+    expect(m?.eventTitle).toBe('春の箱');
   });
 });
 
@@ -224,14 +276,69 @@ describe('decodeChat', () => {
 });
 
 describe('decodeGift', () => {
-  it('pulls advertiser id and name from len/varint fields', () => {
+  it('decodes proto-schema gift fields (fn 1〜7)', () => {
+    // proto schema (n-air-app/nicolive-comment-protobuf, atoms.proto):
+    //   1: item_id (string)
+    //   2: advertiser_user_id (optional int64)
+    //   3: advertiser_name (string)
+    //   4: point (int64)
+    //   5: message (string)
+    //   6: item_name (string)
+    //   7: contribution_rank (optional int32)
     const buf = new Uint8Array([
-      ...strField(2, 'senderNick'),
-      ...varintField(3, 87654321)
+      ...strField(1, 'stamp_basketball'),
+      ...varintField(2, 86255751),
+      ...strField(3, 'よしださん'),
+      ...varintField(4, 11000),
+      ...strField(5, 'ありがとう'),
+      ...strField(6, 'バスケットボール'),
+      ...varintField(7, 3)
     ]);
     const g = decodeGift(buf, 0, buf.length);
-    expect(g.advertiserUserId).toBe('87654321');
-    expect(g.advertiserName).toBe('senderNick');
+    expect(g.itemId).toBe('stamp_basketball');
+    expect(g.advertiserUserId).toBe('86255751');
+    expect(g.advertiserName).toBe('よしださん');
+    expect(g.point).toBe(11000);
+    expect(g.message).toBe('ありがとう');
+    expect(g.itemName).toBe('バスケットボール');
+    expect(g.contributionRank).toBe(3);
+  });
+
+  it('handles anonymous gift (advertiser_user_id absent)', () => {
+    const buf = new Uint8Array([
+      ...strField(1, 'stamp_anon'),
+      ...strField(3, '名無し'),
+      ...varintField(4, 100)
+    ]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.itemId).toBe('stamp_anon');
+    expect(g.advertiserUserId).toBe('');
+    expect(g.advertiserName).toBe('名無し');
+    expect(g.point).toBe(100);
+    expect(g.contributionRank).toBeNull();
+  });
+
+  it('returns default fields for empty payload', () => {
+    const g = decodeGift(new Uint8Array(), 0, 0);
+    expect(g.itemId).toBe('');
+    expect(g.advertiserUserId).toBe('');
+    expect(g.advertiserName).toBe('');
+    expect(g.point).toBeNull();
+    expect(g.message).toBe('');
+    expect(g.itemName).toBe('');
+    expect(g.contributionRank).toBeNull();
+  });
+
+  it('first occurrence wins for repeated fields', () => {
+    const buf = new Uint8Array([
+      ...strField(1, 'first_item'),
+      ...strField(1, 'second_item'),
+      ...varintField(2, 111),
+      ...varintField(2, 222)
+    ]);
+    const g = decodeGift(buf, 0, buf.length);
+    expect(g.itemId).toBe('first_item');
+    expect(g.advertiserUserId).toBe('111');
   });
 });
 
@@ -250,6 +357,44 @@ describe('decodeChunkedMessage', () => {
     expect(result.stats.comments).toBe(1200);
     expect(result.chats.length).toBe(0);
     expect(result.gifts.length).toBe(0);
+  });
+
+  it('field4 内の複数 LEN statistics をマージする', () => {
+    const statsA = new Uint8Array([
+      ...varintField(1, 10),
+      ...varintField(4, 1000)
+    ]);
+    const statsB = new Uint8Array([
+      ...varintField(5, 200),
+      ...varintField(6, 7),
+      ...strField(7, '合同')
+    ]);
+    const state4 = new Uint8Array([
+      ...lenDelimited(1, [...statsA]),
+      ...lenDelimited(2, [...statsB])
+    ]);
+    const chunk = new Uint8Array([...lenDelimited(4, [...state4])]);
+    const r = decodeChunkedMessage(chunk, 0, chunk.length);
+    expect(r.stats?.viewers).toBe(10);
+    expect(r.stats?.giftPoints).toBe(1000);
+    expect(r.stats?.eventGiftScore).toBe(200);
+    expect(r.stats?.eventRank).toBe(7);
+    expect(r.stats?.eventTitle).toBe('合同');
+  });
+
+  it('トップレベル field5 LEN も statistics としてマージする', () => {
+    const st = new Uint8Array([
+      ...varintField(3, 1),
+      ...varintField(4, 99),
+      ...varintField(5, 50),
+      ...strField(7, 'f5')
+    ]);
+    const chunk = new Uint8Array([...lenDelimited(5, [...st])]);
+    const r = decodeChunkedMessage(chunk, 0, chunk.length);
+    expect(r.stats?.adPoints).toBe(1);
+    expect(r.stats?.giftPoints).toBe(99);
+    expect(r.stats?.eventGiftScore).toBe(50);
+    expect(r.stats?.eventTitle).toBe('f5');
   });
 
   it('decodes chat from message field', () => {
@@ -286,10 +431,13 @@ describe('decodeChunkedMessage', () => {
     expect(result.gifts.length).toBe(0);
   });
 
-  it('decodes gift from NicoliveMessage field 8', () => {
+  it('decodes gift from NicoliveMessage field 8 (proto schema)', () => {
     const gift = new Uint8Array([
-      ...strField(2, 'ギフト送り'),
-      ...varintField(3, 87654321)
+      ...strField(1, 'stamp_xxx'),
+      ...varintField(2, 87654321),
+      ...strField(3, 'ギフト送り'),
+      ...varintField(4, 5000),
+      ...strField(6, 'バスケットボール')
     ]);
     const nicoliveMessage = new Uint8Array(lenDelimited(8, [...gift]));
     const chunkedMessage = new Uint8Array(lenDelimited(2, [...nicoliveMessage]));
@@ -297,8 +445,27 @@ describe('decodeChunkedMessage', () => {
     const result = decodeChunkedMessage(chunkedMessage);
     expect(result.chats.length).toBe(0);
     expect(result.gifts.length).toBe(1);
+    expect(result.gifts[0].itemId).toBe('stamp_xxx');
     expect(result.gifts[0].advertiserUserId).toBe('87654321');
     expect(result.gifts[0].advertiserName).toBe('ギフト送り');
+    expect(result.gifts[0].point).toBe(5000);
+    expect(result.gifts[0].itemName).toBe('バスケットボール');
+  });
+
+  it('pushes anonymous gift even when advertiser_user_id is empty', () => {
+    const gift = new Uint8Array([
+      ...strField(1, 'stamp_anon'),
+      ...strField(3, '名無し'),
+      ...varintField(4, 50)
+    ]);
+    const nicoliveMessage = new Uint8Array(lenDelimited(8, [...gift]));
+    const chunkedMessage = new Uint8Array(lenDelimited(2, [...nicoliveMessage]));
+    const result = decodeChunkedMessage(chunkedMessage);
+    expect(result.gifts.length).toBe(1);
+    expect(result.gifts[0].itemId).toBe('stamp_anon');
+    expect(result.gifts[0].advertiserUserId).toBe('');
+    expect(result.gifts[0].advertiserName).toBe('名無し');
+    expect(result.gifts[0].point).toBe(50);
   });
 
   it('handles message with both stats and chat', () => {
@@ -323,6 +490,274 @@ describe('decodeChunkedMessage', () => {
     expect(result.chats.length).toBe(1);
     expect(result.chats[0].no).toBe(3);
     expect(result.gifts.length).toBe(0);
+  });
+
+  it('tagHistogram に top/msg の field tag を集計する', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'a'),
+      ...varintField(5, 1),
+      ...varintField(8, 9)
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...chat]));
+    const stats = new Uint8Array([...varintField(1, 5)]);
+    const state = new Uint8Array(lenDelimited(1, [...stats]));
+    // 既存解釈に乗らない top:11 と msg:5（ギフト/順位 候補）も同梱して観測対象にする
+    const unknownTop = new Uint8Array([0x11, 0x42]);
+    const unknownMsg = new Uint8Array([
+      0x2a,
+      0x02,
+      0x10,
+      0x07
+    ]);
+    const chunked = new Uint8Array([
+      ...lenDelimited(4, [...state]),
+      ...lenDelimited(2, [...msg]),
+      ...lenDelimited(2, [...unknownMsg])
+    ]);
+    void unknownTop;
+    const r = decodeChunkedMessage(chunked);
+    expect(r.tagHistogram.top['4']).toBe(1);
+    expect(r.tagHistogram.top['2']).toBe(2);
+    expect(r.tagHistogram.msg['1']).toBe(1);
+    // unknownMsg の inner: field tag 5 (= msg key '5')
+    expect(r.tagHistogram.msg['5']).toBe(1);
+  });
+
+  it('tagHistogram は空でも 0 件オブジェクトを返す', () => {
+    const r = decodeChunkedMessage(new Uint8Array([]));
+    expect(r.tagHistogram).toEqual({ top: {}, msg: {} });
+  });
+
+  it('top.1 (現プロトコル経路) からも chat / gift を取り出す', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'top1 chat'),
+      ...varintField(5, 999),
+      ...varintField(8, 42)
+    ]);
+    const gift = new Uint8Array([
+      ...strField(1, 'stamp_basketball'),
+      ...varintField(2, 12345678),
+      ...strField(3, 'ギフト送り主'),
+      ...varintField(7, 1)
+    ]);
+    const chunked = new Uint8Array([
+      ...lenDelimited(1, [...lenDelimited(1, [...chat])]),
+      ...lenDelimited(1, [...lenDelimited(8, [...gift])])
+    ]);
+    const r = decodeChunkedMessage(chunked);
+    expect(r.chats.length).toBe(1);
+    expect(r.chats[0].content).toBe('top1 chat');
+    expect(r.gifts.length).toBe(1);
+    expect(r.gifts[0].itemId).toBe('stamp_basketball');
+    expect(r.gifts[0].advertiserUserId).toBe('12345678');
+    expect(r.gifts[0].advertiserName).toBe('ギフト送り主');
+    expect(r.gifts[0].contributionRank).toBe(1);
+    expect(r.tagHistogram.top['1']).toBe(2);
+  });
+});
+
+describe('unknown field samples (v0.1.209 緊急投入)', () => {
+  it('records sample for unknown msg field (msg:3)', () => {
+    // top:1 → msg:3 (unknown) を含む
+    const innerPayload = new Uint8Array([
+      ...strField(1, 'sender_name'),
+      ...varintField(2, 12345)
+    ]);
+    const nicoliveMessage = new Uint8Array(lenDelimited(3, [...innerPayload]));
+    const chunkedMessage = new Uint8Array(lenDelimited(1, [...nicoliveMessage]));
+
+    const r = decodeChunkedMessage(chunkedMessage);
+    expect(r.unknownSamples['msg:3']).toBeDefined();
+    expect(r.unknownSamples['msg:3']).toHaveLength(1);
+    expect(r.unknownSamples['msg:3'][0].topFn).toBe(1);
+    expect(r.unknownSamples['msg:3'][0].msgFn).toBe(3);
+    expect(r.unknownSamples['msg:3'][0].byteSize).toBe(innerPayload.length);
+    expect(r.unknownSamples['msg:3'][0].innerHistogram['1']).toBe(1);
+    expect(r.unknownSamples['msg:3'][0].innerHistogram['2']).toBe(1);
+    expect(r.unknownSamples['msg:3'][0].stringSamples).toContain(
+      'sender_name'
+    );
+  });
+
+  it('records sample for unknown top field (top:11)', () => {
+    const innerPayload = new Uint8Array([...varintField(1, 100)]);
+    const chunked = new Uint8Array(lenDelimited(11, [...innerPayload]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.unknownSamples['top:11']).toBeDefined();
+    expect(r.unknownSamples['top:11'][0].topFn).toBe(11);
+    expect(r.unknownSamples['top:11'][0].msgFn).toBeNull();
+    expect(r.unknownSamples['top:11'][0].innerHistogram['1']).toBe(1);
+  });
+
+  it('caps at 3 samples per key', () => {
+    const inner = new Uint8Array([...varintField(1, 100)]);
+    /** @type {number[]} */
+    const all = [];
+    for (let i = 0; i < 5; i++) {
+      all.push(...lenDelimited(1, [...lenDelimited(3, [...inner])]));
+    }
+    const chunked = new Uint8Array(all);
+    const r = decodeChunkedMessage(chunked);
+    expect(r.unknownSamples['msg:3']).toHaveLength(3);
+  });
+
+  it('does not record sample for known msg fields (1, 8, 20, 24) v0.1.211', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'hi'),
+      ...varintField(8, 1)
+    ]);
+    for (const fn of [1, 8, 20, 24]) {
+      const msg = new Uint8Array(lenDelimited(fn, [...chat]));
+      const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+      const r = decodeChunkedMessage(chunked);
+      expect(r.unknownSamples[`msg:${fn}`]).toBeUndefined();
+    }
+  });
+
+  it('still records sample for msg.2 / msg.3 / msg.23 (unknown observation continues)', () => {
+    const inner = new Uint8Array([...varintField(1, 100)]);
+    for (const fn of [2, 3, 23]) {
+      const msg = new Uint8Array(lenDelimited(fn, [...inner]));
+      const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+      const r = decodeChunkedMessage(chunked);
+      expect(r.unknownSamples[`msg:${fn}`]).toBeDefined();
+      expect(r.unknownSamples[`msg:${fn}`].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('hexPreview is short (max 96 bytes = 192 hex chars)', () => {
+    const big = new Array(200).fill(0x42);
+    const chunked = new Uint8Array(lenDelimited(11, big));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.unknownSamples['top:11'][0].hexPreview.length).toBeLessThanOrEqual(
+      192
+    );
+    expect(r.unknownSamples['top:11'][0].byteSize).toBe(200);
+  });
+});
+
+describe('v0.1.211 false positive 抑制 + msg.24 nx:gift:show 専用 decode', () => {
+  it('msg.1 で item_id が "nx:" prefix なら gift として記録しない（false positive 抑制）', () => {
+    const giftPayload = new Uint8Array([
+      ...strField(1, 'nx:gift:show')
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...giftPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+  });
+
+  it('msg.3 で item_id が "system:" prefix なら gift として記録しない', () => {
+    const payload = new Uint8Array([
+      ...strField(1, 'system:announce')
+    ]);
+    const msg = new Uint8Array(lenDelimited(3, [...payload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+  });
+
+  it('msg.24 nx:gift:show の snake_case keys と google.protobuf.Value number_value を decode', () => {
+    function structStringValue(s) {
+      const enc = new TextEncoder();
+      const bytes = enc.encode(s);
+      return lenDelimited(3, [...bytes]);
+    }
+    function structNumberValue(n) {
+      const buf = new ArrayBuffer(8);
+      new DataView(buf).setFloat64(0, n, true);
+      return [...tag(2, 1), ...new Uint8Array(buf)];
+    }
+    function kv(key, valuePayload) {
+      return lenDelimited(1, [
+        ...strField(1, key),
+        ...lenDelimited(2, valuePayload)
+      ]);
+    }
+    const sixByteNameValue = structStringValue('名無');
+    expect(sixByteNameValue).toHaveLength(8);
+    const mapPayload = new Uint8Array([
+      ...kv('advertiser_name', sixByteNameValue),
+      ...kv('advertiser_user_id', structStringValue('12345678')),
+      ...kv('item_name', structStringValue('バスケットボール')),
+      ...kv('item_id', structStringValue('stamp_basketball')),
+      ...kv('ad_point', structNumberValue(300)),
+      ...kv('contribution_rank', structNumberValue(4))
+    ]);
+    const ev = new Uint8Array([
+      ...strField(1, 'nx:gift:show'),
+      ...lenDelimited(5, [...mapPayload])
+    ]);
+    const msg = new Uint8Array(lenDelimited(24, [...ev]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].advertiserUserId).toBe('12345678');
+    expect(r.gifts[0].advertiserName).toBe('名無');
+    expect(r.gifts[0].itemId).toBe('stamp_basketball');
+    expect(r.gifts[0].itemName).toBe('バスケットボール');
+    expect(r.gifts[0].point).toBe(300);
+    expect(r.gifts[0].contributionRank).toBe(4);
+  });
+});
+
+
+describe('v0.1.210 gift fallback (msg.1 chat 失敗時 + msg.其他 で itemId があれば gift 認定)', () => {
+  it('msg.1 で chat.no が null かつ item_id があれば gift として記録される', () => {
+    // proto schema の Gift: fn=1 item_id (string)
+    const giftPayload = new Uint8Array([
+      ...strField(1, 'stamp_basketball'),
+      ...varintField(2, 86255751),
+      ...strField(3, 'よしださん'),
+      ...varintField(4, 11000),
+      ...strField(6, 'バスケットボール')
+    ]);
+    // msg.1 に gift payload を入れる（chat じゃない構造）
+    const msg = new Uint8Array(lenDelimited(1, [...giftPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].itemId).toBe('stamp_basketball');
+    expect(r.gifts[0].advertiserName).toBe('よしださん');
+    expect(r.gifts[0].point).toBe(11000);
+    expect(r.chats).toHaveLength(0);
+  });
+
+  it('msg.1 で chat 成功時は gift fallback しない（chat 優先）', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'こんにちは'),
+      ...varintField(5, 12345),
+      ...varintField(8, 42)
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...chat]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.chats).toHaveLength(1);
+    expect(r.gifts).toHaveLength(0);
+  });
+
+  it('msg.3 などの未対応 field でも item_id があれば gift として記録', () => {
+    const giftPayload = new Uint8Array([
+      ...strField(1, 'stamp_anon'),
+      ...strField(3, '名無し'),
+      ...varintField(4, 100)
+    ]);
+    const msg = new Uint8Array(lenDelimited(3, [...giftPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].itemId).toBe('stamp_anon');
+  });
+
+  it('item_id が無い payload は gift として記録しない（false positive 抑制）', () => {
+    // varint のみで string がない（実機の msg.3 = liveId ping パターン）
+    const noisePayload = new Uint8Array([
+      ...varintField(1, 350474211)
+    ]);
+    const msg = new Uint8Array(lenDelimited(3, [...noisePayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
   });
 });
 

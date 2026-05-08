@@ -8,6 +8,12 @@
  *   officialStatsUpdatedAt: number,
  *   officialCommentStatsUpdatedAt?: number,
  *   officialViewerIntervalMs: unknown,
+ *   officialAdPointsNdgr?: unknown,
+ *   officialGiftPointsNdgr?: unknown,
+ *   officialEventGiftScoreNdgr?: unknown,
+ *   officialNicoEventRankNdgr?: unknown,
+ *   officialNicoEventTitleNdgr?: unknown,
+ *   officialNdgrStatsUpdatedAt?: number,
  *   officialCommentSummary: {
  *     statisticsCommentsDelta?: number|null,
  *     receivedCommentsDelta?: number|null,
@@ -26,7 +32,14 @@
  *   officialStatisticsCommentsDelta: number|null,
  *   officialReceivedCommentsDelta: number|null,
  *   officialCommentSampleWindowMs: number|null,
- *   officialCaptureRatio: number|null
+ *   officialCaptureRatio: number|null,
+ *   officialAdPointsNdgr: number|null,
+ *   officialGiftPointsNdgr: number|null,
+ *   officialEventGiftScoreNdgr: number|null,
+ *   officialNicoEventRankNdgr: number|null,
+ *   officialNicoEventTitleNdgr: string|null,
+ *   officialNdgrStatsUpdatedAt: number|null,
+ *   officialNdgrStatsFreshnessMs: number|null
  * }}
  */
 export function buildWatchSnapshotOfficialFields(p) {
@@ -37,12 +50,31 @@ export function buildWatchSnapshotOfficialFields(p) {
     officialStatsUpdatedAt,
     officialCommentStatsUpdatedAt: ocStatsAtRaw,
     officialViewerIntervalMs,
-    officialCommentSummary
+    officialCommentSummary,
+    officialAdPointsNdgr: adRaw,
+    officialGiftPointsNdgr: giftRaw,
+    officialEventGiftScoreNdgr: evGiftRaw,
+    officialNicoEventRankNdgr: rankRaw,
+    officialNicoEventTitleNdgr: titleRaw,
+    officialNdgrStatsUpdatedAt: ndgrAtRaw
   } = p;
   const officialCommentStatsUpdatedAt =
     typeof ocStatsAtRaw === 'number' && Number.isFinite(ocStatsAtRaw) && ocStatsAtRaw > 0
       ? ocStatsAtRaw
       : 0;
+
+  /** @param {unknown} v @returns {number|null} */
+  const nnInt = (v) =>
+    typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null;
+
+  const officialNdgrStatsUpdatedAt =
+    typeof ndgrAtRaw === 'number' && Number.isFinite(ndgrAtRaw) && ndgrAtRaw > 0
+      ? ndgrAtRaw
+      : 0;
+
+  const titleTrim = String(titleRaw || '').trim();
+  const officialNicoEventTitleNdgr =
+    titleTrim.length > 0 ? titleTrim.slice(0, 200) : null;
 
   return {
     officialViewerCount:
@@ -82,6 +114,17 @@ export function buildWatchSnapshotOfficialFields(p) {
     officialCaptureRatio:
       typeof officialCommentSummary?.captureRatio === 'number'
         ? officialCommentSummary.captureRatio
+        : null,
+    officialAdPointsNdgr: nnInt(adRaw),
+    officialGiftPointsNdgr: nnInt(giftRaw),
+    officialEventGiftScoreNdgr: nnInt(evGiftRaw),
+    officialNicoEventRankNdgr: nnInt(rankRaw),
+    officialNicoEventTitleNdgr,
+    officialNdgrStatsUpdatedAt:
+      officialNdgrStatsUpdatedAt > 0 ? officialNdgrStatsUpdatedAt : null,
+    officialNdgrStatsFreshnessMs:
+      officialNdgrStatsUpdatedAt > 0
+        ? Math.max(0, nowMs - officialNdgrStatsUpdatedAt)
         : null
   };
 }

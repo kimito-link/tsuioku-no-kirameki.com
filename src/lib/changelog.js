@@ -26,6 +26,630 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.226',
+    date: '2026-05-08',
+    summary: 'ギフトサイドバー iframe relay 経路の生存観測を追加',
+    items: Object.freeze([
+      '公式の貢献度ランキング・イベント累計・ギフト履歴を取得するための「cross-origin iframe → window.top.postMessage で親 frame に DOM scrape 結果を中継する」経路（v0.1.216 〜 v0.1.218 で導入）が、実機で実際に動いているのかを確認できる観測値を追加しました。受信件数の累積、frame URL 別の受信件数、最終受信時刻、cross-origin throw 回数、same-origin access 回数の 5 種類です',
+      '上記は AI 共有診断 JSON の `content.giftDiagnostics.giftSubAppRelayDiag` ブロックと、popup「詳しい状況」の「iframe relay 経路」行に追記されます。受信 0 件のときは「未受信（cross-origin で N 回弾かれ、…）」が出るため、relay 不全の原因が「hidden iframe inject 未動作」か「scrape 結果の postMessage 失敗」かを切り分けやすくなります',
+      '観測専用の追加で、拡張の挙動は一切変更しません。次バージョン以降で、この観測値に基づいて relay 不全の根本改善（hidden iframe inject の動作補強・scrape ロジック修復）を進めます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.225',
+    date: '2026-05-08',
+    summary: 'コメント uid 解決経路の切り分け観測を追加',
+    items: Object.freeze([
+      'v0.1.224 で目立たなくなった「150 件謎タイル」の根本原因（投稿者 ID 取得失敗）について、原因が DOM 側か NDGR 側か page-intercept 側かを F12 不要で AI 共有診断 JSON だけで切り分けられるよう、観測値を追加しました。具体的にはコメ表 row の `data-user-id` 系属性の有無、page-intercept が拾った fetch URL 履歴、コメント取り込み source 別件数、保存コメントの uid 解決率、NDGR から decode した chat に対する保存率の 5 種類です',
+      '上記は AI 共有診断 JSON の `content.giftDiagnostics.commentObservability` ブロックに追記されます。観測専用の追加で、拡張の挙動は一切変更しません',
+      '次バージョン以降で、この観測値に基づいて DOM scrape / API hook の補強（uid 取得経路の根本改善）を進めます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.224',
+    date: '2026-05-08',
+    summary: 'ID未取得コメントの謎タイル混入を修正',
+    items: Object.freeze([
+      'popup「ユーザー別の応援件数が多い順」セクションに、ID未取得コメント（投稿者 ID が DOM から取れなかったコメント群）が単独タイルで「150 件」のように大量カウント表示される事象を修正しました。配信中に多数発生しうる ID 未取得コメントが 1 つの匿名バケツに集約され、配信者本人より目立つ位置で表示されるのが直感に反するため、ranking 表示からは除外する仕様に変更しました',
+      'HTMLレポートやマーケ集計内の「ユーザー別件数」など、別経路の集計には影響しません（ranking 表示のみの調整です）',
+      'ID未取得コメント自体の記録は維持しています（保存コメント本体には残ります）。投稿者 ID 取得経路の改善は別バージョンで対応します'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.222',
+    date: '2026-05-08',
+    summary: 'ギフト送信者観測 0 を decode 側修正で解消',
+    items: Object.freeze([
+      'v0.1.221 の診断（giftsWithItem は 100% 取れているのに giftsWithUid / giftsWithName / giftsWithPoint / giftsWithRank がすべて 0）から確定した「decode 側の問題」を修正しました。具体的には msg.24 nx:gift:show の parameters decode で、google.protobuf.Value を先に protobuf field として parse するよう順序を整理し、snake_case の key（advertiser_name / advertiser_user_id / item_name / item_id / ad_point / contribution_rank）も拾えるようにしました（既存 camelCase キーとの並列対応）',
+      '6 UTF-8 bytes の string_value wrapper が tag + len + payload で全体 8 bytes になり、raw double と誤認される境界バグも併せて修正しました',
+      'Gift proto (msg.8) の field mapping は OSS（n-air-app/nicolive-comment-protobuf）と一致しているためそのまま維持しています'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.221',
+    date: '2026-05-07',
+    summary: 'ギフト送信者観測 0 の原因切り分け診断を追加',
+    items: Object.freeze([
+      'NDGR ギフトイベントは届いている（gifts カウンタが進む）のに popup の「ギフト送信者観測数」が 0 件のままになる症状について、原因が「proto デコードで送信者情報が取り出せていない」のか「受信側で保存条件を満たさず skip されている」のかを切り分けるための診断値を追加しました',
+      'AI 共有診断 JSON の `ndgrWireCounters` に `giftsWithUid` / `giftsWithName` / `giftsWithItem` / `giftsWithPoint` / `giftsWithRank` の 5 件を追加しました。`gifts` 総数に対しこれらの値が小さい場合は decode 側、十分大きいのに popup の送信者数が 0 のままなら受信側の保存ゲートが原因、と判断できます',
+      '本バージョンは観測値の追加のみでロジック変更はありません。次バージョン以降の実装方針を、実機の診断値を見てから決めるための準備です'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.220',
+    date: '2026-05-07',
+    summary: 'AI 診断ボタンが反応しない問題を修正',
+    items: Object.freeze([
+      'v0.1.219 で「🤖 AI 診断（Gemini Nano）」ボタンを押しても反応しない問題を修正しました。popup の「詳しい状況」セクションが取得状況の更新で定期的に再描画されるたびにボタンの DOM 要素が入れ替わり、ボタン本体に登録した click イベントが無効化されていたのが原因です',
+      '親コンテナにイベント委譲（event delegation）でクリックを受ける形に変更しました。これでセクションが再描画されてもボタン押下を毎回検知でき、診断ステップ表示や DL 進捗 % 表示も最後まで消えずに進みます',
+      '診断中に表示されるテキストも親要素から都度取得するようになり、AI 応答中に裏で再描画が起きても結果が消えにくくなりました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.219',
+    date: '2026-05-07',
+    summary: 'AI 診断ボタン 1 クリックでモデル DL → 診断まで自動実行',
+    items: Object.freeze([
+      'popup「詳しい状況」セクションの「🤖 AI 診断（Gemini Nano）」ボタンを押したとき、これまではオンデバイス AI モデル未 DL の場合「ダウンロードしてください」というメッセージで止まっていました。本バージョンからボタン押下のみで自動的にモデル DL を開始し、DL 進捗（%）を表示しながら完了後そのまま AI 診断を実行するようにしました（1 クリック完結）',
+      '初回は約 2GB のオンデバイスモデルの DL が走ります（外部に送信されることはありません、Chrome 内蔵の AI モデルです）。2 回目以降は DL 不要なので押すと即座に診断結果が出ます。Wi-Fi 環境を推奨します',
+      'DL の途中で popup を閉じても Chrome 側の DL は継続するので、後で再度開いたときに進捗が引き継がれます。WebGPU 非対応環境や Chrome 138 未満では従来通り「利用不可」メッセージで終了します（こちらは設定変更が必要なため自動化できません）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.218',
+    date: '2026-05-07',
+    summary: '公式 iframe を裏で読み込んで全 gift 自動取得',
+    items: Object.freeze([
+      'これまでギフト履歴や貢献度ランキングを取得するには、配信ページの「ギフト」モーダルや履歴タブを 1 度開く必要がありました。本バージョンから拡張が裏でこれらの画面を読み込み、配信を見るだけで自動的に取得するようにしました',
+      '裏読み込みは画面に見えない位置で実行され、配信視聴を一切妨げません。読み込みは配信 1 件につき 1 回、60 秒で自動的に片付けてメモリを開放します',
+      'これまで取得できなかった「過去のギフト履歴」「番組参加情報」「貢献度ランキング」が、配信開始から見ていない場合でも popup に表示されるようになります。仕組み上、ニコ生公式の SPA 構造を尊重した形で実現しています'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.217',
+    date: '2026-05-07',
+    summary: '公式の貢献度ランキングも popup に反映',
+    items: Object.freeze([
+      'ニコ生公式の「貢献度ランキング」（イベント参加配信のサイドバーに表示される、貢献度の高い順のユーザー一覧）も popup「ユーザー別の応援件数」帯に反映するようにしました。これまで親ページからは別ドメインの iframe 内 DOM にアクセスできず popup に届いていませんでした',
+      'v0.1.216 で確立した iframe 越しの取得経路を拡張し、貢献度ランキングと、イベント参加バナー（順位とポイント）も同時に親ページへ送るようにしました。ギフトサイドバーやイベント参加バナーを開いていれば、そのまま反映されます',
+      '公式の貢献度ランキングが取れた配信ではそちらが最優先で表示され、取れない配信では従来通り合計 pt 順や投げ回数順のフォールバックで表示します'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.216',
+    date: '2026-05-07',
+    summary: '公式サイドバー履歴を popup ランキングに反映',
+    items: Object.freeze([
+      'ニコ生公式の「ギフト」サイドバー（番組へのギフト履歴）から、だれが何 pt 投げたかを集計して popup「ユーザー別の応援件数」帯に合計 pt 順で表示するようにしました。これまで公式サイドバーは別ドメインの iframe にあり拡張から内容を取得できなかったため、popup 側に情報が届かず空のままでした',
+      '解決方法: 公式サイドバー iframe に注入された content script が定期的に履歴 DOM を解析し、親 frame（watch ページ）に postMessage で履歴を送る経路を新設しました。親 frame 側で受け取った履歴を、ユーザー名ごとに throwCount + 合計 pt の形に集計してローカル保存しています',
+      '同名のユーザーは 1 行に集約します（公式サイドバーには数値 ID が出ないため、表示名で集計する仕様です）。公式ランキングタブが取れる配信ではそちら優先、取れない場合のフォールバックとして本機能が効きます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.215',
+    date: '2026-05-07',
+    summary: '匿名ギフトも「ユーザー別の応援件数」に表示',
+    items: Object.freeze([
+      '匿名で投げられたギフトも、popup の「ユーザー別の応援件数」（公式ランキング・履歴が取れない時のフォールバック表示）に表示するようにしました。これまで匿名ギフトはユーザー識別情報がないとして storage への保存自体を skip していたため、popup に出ない状態でした',
+      '同じ表示名の匿名ギフトは 1 人の送信者としてまとめて数えます。表示名で集計する仕様のため、表示名が同じだと内部的に同じ送信者として扱います',
+      '内部ラベル（ニコ運営が割り当てる識別子）のみの匿名ギフトは表示価値がないため従来通り表示対象外とします'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.214',
+    date: '2026-05-07',
+    summary: '匿名ギフトも「ギフト送信者観測数」に集計',
+    items: Object.freeze([
+      '匿名で投げられたギフトも、表示名があれば「ギフト送信者観測数」に数えるようにしました。これまでは匿名ギフトを完全に対象外としていたため、匿名ギフトだけ来た配信では観測数が 0 のまま表示されていました',
+      '同じ表示名の匿名ギフトは 1 人の送信者としてまとめて数えます。同じ表示名で複数の方が居る可能性はありますが、表示の見え方を優先する仕様です',
+      'popup「ユーザー別の応援件数」表示への匿名ギフト反映は、次バージョン以降で対応予定です'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.213',
+    date: '2026-05-07',
+    summary: 'AI 診断ボタンの挙動を逐次表示に',
+    items: Object.freeze([
+      'AI 診断ボタンを押しても表示が変わらないという報告があったため、各処理ステップを逐次表示に変更しました。クリック検知 → Built-in AI 検出 → prompt 構築 → AI 実行 までの 4 ステップで進捗が見えます',
+      'Built-in AI が利用できない環境では、その state（unavailable / downloadable / downloading）と理由（reason）を表示し、Chrome 138+ + WebGPU + chrome://flags / chrome://components 有効化の手順を案内します',
+      'コンソール（DevTools の console）にも各ステップのログを出力するようになりました。デバッグ時に実際にどこで止まっているかが追跡可能です'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.212',
+    date: '2026-05-07',
+    summary: 'popup に AI 診断ボタン（Gemini Nano）',
+    items: Object.freeze([
+      'popup の「ユーザー別の応援件数が多い順」セクションに「AI 診断（Gemini Nano）」ボタンを追加しました。クリックすると、Chrome の Built-in AI（Gemini Nano）が拡張のエラーログ・ネットワーク異常・診断警告を 3 行（主因 / 対処 / 備考）でまとめて表示します。完全オンデバイス実行で外部送信なし、ユーザーコストもゼロです',
+      'Built-in AI が利用できない環境（Chrome 137 以前 / WebGPU 非対応 / モデル未ダウンロード）では、その理由を分かりやすく表示します。Chrome 138+ で WebGPU 対応の PC なら、初回クリックでモデルが自動的に有効化される想定です',
+      '入力データは AI 共有診断 fastCache から自動取得します。コンソールエラー / ニコニ広告 fetch エラー / multi-tab race 警告 / 自動オープン失敗 / ギフト event 観測数などを集約して prompt にまとめ、AI に主因推定を依頼する流れです'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.211',
+    date: '2026-05-07',
+    summary: 'ギフト誤計上を解消 + AI 診断基盤',
+    items: Object.freeze([
+      'v0.1.210 で導入したギフトイベント取得経路（msg.1 fallback）が、ニコニコ側のシステムイベント（nx:gift:show 等）も誤ってギフトとして計上していたため、prefix が「nx:」「system:」「event:」のアイテム ID を除外するようになりました。これで「ギフト 100 件取得」という誤った観測値が、実際の件数に近づきます',
+      'msg.24 で配信される「nx:gift:show」イベント（ギフト表示通知）を専用デコーダで解析するようになりました。送り主名（advertiserName）とポイント（adPoint）を取り出し、本物のギフト経路として popup に反映する基盤になります',
+      'AI 診断ボタン用の純関数 popupAiDiagOrchestrator を追加（未公開、popup UI への組み込みは次バージョン以降）。Built-in AI（Gemini Nano）の利用可否判定、エラーログから AI プロンプト構築、AI 実行、結果整形までを 1 関数にまとめました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.210',
+    date: '2026-05-07',
+    summary: 'ギフトイベントの取得経路を msg.1 fallback に拡張',
+    items: Object.freeze([
+      'NDGR ギフトイベントが従来の決め打ち経路（msg.8）に来ず、コメントと同じ msg.1 で来ていた可能性が v0.1.209 の観測強化で判明したので、コメントとして解析できなかった msg.1 を「ギフトイベント候補」として再解析するようになりました。アイテム名（stamp_xxx 等の固定形式の文字列）が取れた場合のみギフトとして記録するため、誤検出は強く抑えられています',
+      'msg.2 / msg.3 / その他の未知 field でもアイテム名が含まれていればギフトとして記録するようになりました。これによりニコニコ側プロトコルの差し替えに対して柔軟に追従できる構造に',
+      '本版でギフト取得率が改善した場合、ギフト送信者のニックネーム解決も同時に復活する見込みです（同じ event payload に advertiserName が含まれているため）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.209',
+    date: '2026-05-07',
+    summary: '未知 NDGR field の中身を診断に出す（緊急）',
+    items: Object.freeze([
+      'NDGR ギフトイベントが想定 field（v0.1.204 で proto 原本準拠に直した経路）に来ず、別 field（実機観測で msg.3 と top.11）に化けている可能性が浮上したため、未知 field の中身を最大 3 件サンプル保存して AI 共有診断 JSON に出すようにしました。次回の診断バンドルで真のギフト経路を特定する手がかりになります',
+      '具体的には ndgrUnknownSamples フィールドが診断に追加されます。各サンプルには byteSize / 先頭 96 byte の hex プレビュー / 中の field 番号ヒストグラム / 文字列フィールドの先頭 3 件が含まれ、ギフトの送り主・アイテム名・ポイントが見えるはずです',
+      '本版自体ではギフト取得率は変わりません（次版以降でデコード経路を真の field に合わせる予定）。ユーザー名が「u スラッシュ ID」のような fallback 表示になる事象も同根です（NDGR ギフト経由でニックネーム解決する設計が機能していなかったため）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.208',
+    date: '2026-05-07',
+    summary: 'popup の応援アイコン取得率を改善',
+    items: Object.freeze([
+      'popup の応援グリッド／コメント一覧／応援ストーリーで、配信者ページから直接取れなかったユーザーのアイコン（avatar）を、ユーザー ID から自動生成して表示するようになりました。これまで「サムネあり匿名」で空のままだった視聴者のアイコンが、ニコニコ公式の確定パターン（secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/...）から復元されます',
+      '内部的には rememberedAvatarUrlForUserId 関数の最終 fallback を「空文字を返す」から「ユーザー ID から生成 URL を返す」に変更しました。strong cache や STORY_SOURCE 由来の URL がある場合はこれまで通りそちらを優先します（v0.1.206 prep の純関数 pickAvatarUrlForUid を活用）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.207',
+    date: '2026-05-07',
+    summary: 'ギフトイベントを時系列で保存（ranking 表示の基盤）',
+    items: Object.freeze([
+      'NDGR ギフトイベントを個別の時系列ログとして保存するようになりました。v0.1.204 で proto 準拠の解析が直り、v0.1.205 で必要な新フィールドが揃ったので、ようやく実用化できる段階に到達。これにより各ギフトの送り主・アイテム名・ポイント・貢献ランキング順位が記録され、次バージョン以降で popup の応援ランキング・ギフト履歴表示に活用されます',
+      '配信ごとに別キーで最新 500 件まで FIFO で保持しています。既存の応援者リスト（同一ユーザーを件数で集約する形式）はそのまま残し、両系統を並走させています',
+      'Built-in AI（Gemini Nano）連携の基盤ライブラリと CI 失敗を未然に防ぐ pre-push チェックを v0.1.205 で先行投入済、popup の応援アイコン解決ライブラリと個別ギフトの時系列保存ライブラリを v0.1.206 で先行投入済。本版でようやく拡張本体への組み込みが始まります'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.204',
+    date: '2026-05-07',
+    summary: 'NDGR ギフトイベントの取得経路を proto 原本準拠に修正',
+    items: Object.freeze([
+      'NDGR Protobuf streaming のギフトイベント decoder を、proto 原本（n-air-app/nicolive-comment-protobuf の atoms.proto）準拠に書き直しました。過去の経験的な field 番号（fn=1 を userId、fn=2 を name と仮定）が proto 仕様と齟齬していたため、v0.1.203 までギフトイベントカウンタが 0 のまま動かなかった真因を解消しました。item_id / point / item_name / contribution_rank / message も decode 対象に追加',
+      'anonymous gift（advertiser_user_id 欠落のイベント）も _ndgr.gifts カウンタに含めるようにしました。表示・履歴側への活用（ranking 構築 / avatar 補完 / 履歴一覧）は v0.1.205 以降で段階的に追加予定です',
+      '24h を超えた過去配信の event-dom 残骸（v0.1.203 で eventDomLvCount=49 まで膨れていた multi-tab race 警告の主因）を、popup 起動時の snapshot 構築直前に storage から自動削除するようにしました（v0.1.203 で先行実装していた純関数 pruneStaleEventDomLvs の本体統合）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.203',
+    date: '2026-05-06',
+    summary: 'viewer ID と avatar 経路を抜本改善',
+    items: Object.freeze([
+      'viewer ID（ログイン中ユーザー識別子）を埋め込みデータ経路（script タグの data-props 内 JSON）から取得する fallback を追加しました（streamlink / yt-dlp が使う安定経路、SSR で必ず埋まる）。これまで header の DOM スコアリングだけに頼って空になっていた状態を解消',
+      'ニックネームと avatar URL も埋め込みデータから取れる場合は優先採用し、avatar URL が取れない場合は UID から確定パターン（secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/[UID÷10000]/[UID].jpg）で生成して補完します。「サムネあり匿名」事象の構造的解消',
+      'ギフトサイドバー履歴の取得失敗理由（cross_origin_iframe_only / no_iframe_found / iframe_present_but_no_history）を診断 JSON と popup「詳しい状況」に明示。「scrape 失敗 = 異常」ではなく「クロスオリジン iframe は仕様、NDGR 経路で代替予定」と説明される構造に',
+      '過去の watch lv 残骸（multi-tab race 警告の真因）を 24h TTL で cleanup する純関数を追加。content-entry.js への組み込みは v0.1.204 以降で段階導入'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.202',
+    date: '2026-05-06',
+    summary: '詳しい状況に取得状況サマリを表示',
+    items: Object.freeze([
+      'popup「詳しい状況（開発・切り分け用・折りたたみ）」セクションに、AI 共有診断 JSON と同じ情報源から生成した取得状況サマリ（ギフト観測 / ギフトサイドバー履歴 / 応援ランキング自動オープン / 貢献度ランキング / multi-tab race 警告 / avatar 取得率 / viewer ログイン状態 / network 接続）を表で表示するようになりました。AI に診断を貼らなくても popup を見るだけで状況がわかります',
+      '応援ランキング自動オープンが「banner 出ず」で止まる原因（v0.1.201 で診断 JSON に追加した lastFailureReason）が popup の表上でも 1 トークン + hint テキストで見えます',
+      '複数 watch タブによる DOM 残骸（過去 lv 大量 / nicoad 不一致）の警告（v0.1.201 staleDomBundleSuspected）が popup の表上でも ⚠️ で見えます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.201',
+    date: '2026-05-06',
+    summary: '診断 JSON 統合強化（説明不要レベルへ）',
+    items: Object.freeze([
+      '不具合報告時に AI 共有診断 JSON を貼るだけで原因が特定できるよう、6 ブロック（giftSubAppDiag / domStructureProbe / consoleErrorProbe / networkErrorProbe / lastFailureReason / staleDomBundleSuspected）を 1 つの診断にまとめました',
+      'ギフトサイドバー履歴の集計（送り主・上位アイテム・iframe 数など）が popup 表示と診断 JSON で完全に一致するようになりました',
+      'ranking 自動オープンが「banner 出ず」で停止する原因（sidebar が空 / button 未検出 等）を 1 トークンで表示します（rankingDiag.autoOpen.lastFailureReason）',
+      '複数 watch タブ起因の DOM 残骸（過去 lv が大量に混入 / 現在の lv が見つからない等）を staleDomBundleSuspected 警告フラグで明示します',
+      'nicoad 取得・NDGR 接続・Service Worker 状態を 1 ブロック networkErrorProbe にまとめ、network 層の異常を一括観測できます',
+      'JS の捕捉エラー（広告ブロッカー由来は無視リストで除外）を ring buffer で集約し、直近 50 件まで診断に含めます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.200',
+    date: '2026-05-06',
+    summary: 'おすすめ生放送のコメント汚染を修正',
+    items: Object.freeze([
+      'watch ページ右側「おすすめ生放送」セクションが拡張のコメント記録に混入し、配信タイトル（「LIVE」「N分経過」等）や他配信者の配信ID（lvXXXXXXX）がコメントとして保存されていた真因を修正しました（複数件コメントしているのに 1 件しか反映されない問題の真因）',
+      'CSS Modules ハッシュ命名（___program-card-list___HASH 等）に追随する部分一致 selector でおすすめ列の DOM を識別し、comment scraper の経路から物理的に除外（isInsideRecommendedLiveSection ガード）',
+      '過去に汚染した記録を popup 起動時に 1 回だけ自動除去する migration を同梱（flag nls_backfill_remove_recommended_live_pollution_v1）',
+      '診断 JSON に recommendedLiveSectionDiag ブロックを追加し、おすすめ列の存在 / カード件数 / 汚染源候補数を可視化（再発検知）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.198',
+    date: '2026-05-06',
+    summary: 'ギフトサイドバー履歴を popup に取込',
+    items: Object.freeze([
+      'ニコ生ギフトサイドバーの「履歴」タブに表示される 60+ 件の個別ギフトと、種類別集計（33 種類）を popup へ取り込めるようになりました',
+      'ギフトサブアプリは iframe 内に描画されるため、これまで popup には 1 件しか反映されていなかった真因を解消（同一 origin の全フレームをスキャン）',
+      'popup 下部の「ギフトサイドバー履歴」セクションを開くと、送り主・アイテム・pt・時刻が一覧で見えます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.196',
+    date: '2026-05-06',
+    summary: '過去のギフト誤記録を起動時に自動除去',
+    items: Object.freeze([
+      'v0.1.172 〜 v0.1.194 までの間に「○○さんがギフト「XXX（Npt）」を贈りました」というニコ生ギフトシステム文言が通常コメントとして保存されていた汚染を、popup 起動時に 1 回だけ自動除去します（v0.1.195 の根本 fix の後始末）',
+      'migration は flag `nls_backfill_remove_gift_system_msgs_v1` で 1 回だけ実行、失敗してもユーザー操作を妨げません（次回 boot で再試行）',
+      '影響：「ユーザー別応援件数」「サムネ付き応援グリッド」などからコメントしていない人が消え、表示が真に「コメント数」に整合します'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.195',
+    date: '2026-05-06',
+    summary: '複数タブでランキング消失を修正、表示名解決を強化',
+    items: Object.freeze([
+      '複数の watch タブで同じ配信を開いていたとき、片方の観測値で応援ランキングが消えることがある問題を修正（content-entry.js の保存処理を 3-way merge に変更）',
+      '応援ランクストリップで数値 uid + ニックネーム空のとき「（未取得）」が出る問題を修正し、「u/数字」形式で表示するようにしました（ペチパーライス問題）',
+      'NDGR の内部ラベル「YYYYMMDD_unei_niconico_NN」が nickname として誤採用される問題を修正（めがくろさんの「202408unei_niconico_27」誤表示）',
+      'NDGR ギフトシステムメッセージを通常コメントとして記録しないようにしました（コメントしていないユーザーが「ユーザー別応援件数」に混入する問題を真因 fix）',
+      '応援ランクストリップの「匿名後送り」trigger をデフォルト OFF に変更し、件数降順を尊重するようにしました（明示有効化はオプションとして残します）',
+      'AI 共有診断（NLS_AI_SHARE_PAGE_DIAGNOSTICS）の取得を frameId=0 固定から watch 一致フレーム優先に変更（codex P0-2）',
+      'LP（tsuioku-no-kirameki/index.html）に「統合状況スナップショット」紹介セクションを追加（6 コンポーネント、TDD 実装、誇張防止の文言）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.192',
+    date: '2026-05-06',
+    summary: 'AI連携サーバ（ローカル）を追加',
+    items: Object.freeze([
+      'AI から拡張のデータを参照できるローカル MCP サーバ（Node 製）を tools/mcp-nicolive/ に追加しました。外部送信はせず、ダウンロードフォルダの JSON だけを読みます',
+      '使い方は tools/mcp-nicolive/README.md を参照してください'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.191',
+    date: '2026-05-06',
+    summary: 'AI連携用JSONを手動でDLできるボタンを追加',
+    items: Object.freeze([
+      'popup の「記録サマリの推移」セクションに「MCP用JSONを保存」ボタンを追加しました。AI 連携の手動エクスポートとして使えます',
+      '保存先は Downloads フォルダ内の nicolivelog-mcp フォルダです。同じ配信なら上書き保存されます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.190',
+    date: '2026-05-06',
+    summary: 'プレイヤーオーバーレイのギフト演出を即パース',
+    items: Object.freeze([
+      'プレイヤー画面に流れる「○○さんがギフト〜を贈りました」の演出から、送信者名を即座に取り込むようになりました（コメント欄が画面外でも捕捉できるルートです）',
+      'ギフト関連の DOM 構造を診断 JSON に詳細出力するようにしました（giftSidebarVerboseProbe）。ニコ生側のクラス名が変わっても、どの命名で描画されているかが次回診断で判別できます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.189',
+    date: '2026-05-06',
+    summary: 'AI連携用データを5秒ごとに保存しはじめます',
+    items: Object.freeze([
+      'AI 連携の足場として、ギフト・広告・ランキングの観測値を 5 秒ごとに正準形（Canonical Snapshot）にまとめて、拡張のローカルストレージに保存しはじめました。表示や記録の動作には影響しません',
+      'まずは記録のみ。手動エクスポート機能と Node MCP server (PoC) は次バージョン以降で順次実装します'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.188',
+    date: '2026-05-06',
+    summary: 'MCP連携データの検証と統合libを追加',
+    items: Object.freeze([
+      'AI 連携データの構造チェック関数（validateLiveMcpSnapshot）を追加し、不正な値があれば理由付きで弾けるようにしました',
+      '複数の観測データを 1 つに統合する関数（mergeLiveMcpSnapshot）を追加しました。古い世代で新しい値を上書きしない、別配信のデータは混ぜない、入力順に依存しない、を担保しています',
+      'まずは関数のみで実装は次バージョン以降。表示や記録の動作には影響しません'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.187',
+    date: '2026-05-06',
+    summary: 'MCP連携の正準データを組み立てるlibを追加',
+    items: Object.freeze([
+      'AI 連携のために、拡張の観測値（NDGR / DOM 由来）を 1 つの正準データに組み立てる純粋関数を追加しました（src/lib/mcpBridge/buildLiveMcpSnapshot.js）。',
+      'まずは関数のみで実装は次バージョン以降。表示や記録の動作には影響しません'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.186',
+    date: '2026-05-06',
+    summary: 'MCP連携の正準データ型を新設（schema lib）',
+    items: Object.freeze([
+      'AI 連携の足場として、ギフト・広告・ランキングの値を「値・取得元・経過時間・未取得理由・信頼度」の組で表す Canonical Snapshot 型を追加しました（src/lib/mcpBridge/schema.js）。',
+      'まずは型定義のみで実装は次バージョン以降。表示や記録の動作には影響しません'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.185',
+    date: '2026-05-06',
+    summary: 'ギフト欄の出現をハッシュclass対応で即検知',
+    items: Object.freeze([
+      'ニコ生側のクラス名が `___contribution-ranking-list___xxx` のような CSS Modules 形式になっていても、ギフト履歴やランキング枠の出現を即座に検知して取り込むようになりました（部分一致 selector を併設）',
+      'コメント欄に「○○さんがギフト〜を贈りました」が流れた瞬間も自動取り込みの対象になり、これまで virtualization で消えていたギフト送信者の取り逃しが減ります'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.184',
+    date: '2026-05-06',
+    summary: '診断JSONに値とソースと未取得理由を一緒に出す',
+    items: Object.freeze([
+      '診断 JSON に officialValuesV2 ブロックを追加し、ギフト点数・広告pt・イベント順位・タイトルなどを「値・取得元（source）・取得経過時間（ageMs）・未取得理由（reason）」の組で出すようにしました',
+      '未取得理由は no_field（取得元に値がない）/ stale（60秒以上古い）/ null（最新）のいずれかで判別できます。次バージョン以降の正規化レイヤー設計の入口になります'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.183',
+    date: '2026-05-06',
+    summary: '「（未取得）」表示をu/IDフォールバックに置換',
+    items: Object.freeze([
+      'ユーザーレーンの ストーリー表示で「（未取得）」になっていた箇所を、ID から「u/1127518」のような表示に置き換えました（0.1.182 で追加した formatNicknameWithUidFallback を popup の story 表示にも適用）',
+      '匿名形式の uid（a:xxx）はこれまで通りの表示（既存挙動を壊さない）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.182',
+    date: '2026-05-06',
+    summary: 'ユーザーレーン表示でuidフォールバックを適用',
+    items: Object.freeze([
+      'ユーザー一覧（応援レーン）で、ニックネームが解決できないユーザーが「u/4814023」のような ID 表示で出るようになりました（これまでは「匿名」表示でアイコンだけ見えていた事象を解消）',
+      'pickGiftRankDisplayNicknameWithUidFallback 関数を追加し、ユーザー候補の集約処理で順次切り替えました。ギフトクイック・ランクストリップなど他の表示は次バージョン以降で順次対応します'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.181',
+    date: '2026-05-06',
+    summary: 'サムネあり匿名にuidフォールバック表示を導入',
+    items: Object.freeze([
+      'コメント送信者のニックネームが空でも、ID（数値）が分かれば「u/4814023」のような ID 表示にフォールバックする関数を追加しました（formatNicknameWithUidFallback）',
+      '0.1.180 の診断で「avAndNick=0、avNoNick=3」が確定し、avatar URL は ID から自動合成される一方でニックネームが空のケースが多いと判明したため対処。表示は v0.1.182 以降で順次切り替えます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.180',
+    date: '2026-05-06',
+    summary: 'サムネあり匿名の真因観測ブロックを正しい設計で再構築',
+    items: Object.freeze([
+      'avatarNicknameMatchDiag を追加し、interceptedAvatars と interceptedNicknames の集合関係（avAndNick / avNoNick / nickNoAv）と avNoNick のサンプル 5 件を診断 JSON に出すようにしました（0.1.179 の avatarUidDiag は interceptedUsers 経路の観測で実態と合っていなかった）',
+      'pinCommentProbe で hit があった selector の DOM サンプル（tag / class / text / innerHTML 抜粋）を 3 件まで dump するようにしました（ピン留めコメントの DOM 構造を特定するため）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.179',
+    date: '2026-05-06',
+    summary: 'サムネありで匿名扱いになる原因を診断に観測',
+    items: Object.freeze([
+      'コメント記録のうち「アバター画像は取れているのに userId が空（匿名扱い）」のケース数とサンプルを診断 JSON に出すようにしました（avatarUidDiag）',
+      'ピン留めコメント関連の class（pin / operator / anchor-comment / fixed-comment / data-pinned / data-pin）の DOM 出現数を診断 JSON に出すようにしました（pinCommentProbe）',
+      '次回診断を取れば、サムネあり匿名扱いの真因（intercept の uid 解決経路 / ピン留め DOM 構造）が確定します'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.178',
+    date: '2026-05-06',
+    summary: '別配信のデータが混入しないようlive整合ガードを強化',
+    items: Object.freeze([
+      'NLS_EXPORT_INTERCEPT_CACHE と NLS_AI_SHARE_PAGE_DIAGNOSTICS の応答に liveId と frameHref を含めるようにしました',
+      'popup 側で受け取った応答の liveId が現在の watch URL と一致しない場合は反映を拒否するようにしました（複数 watch タブ間の混線を防止）',
+      '反映拒否時は AI 共有診断の取り込みコードに live_mismatch を出すようにしました（原因切り分けがしやすくなります）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.177',
+    date: '2026-05-06',
+    summary: 'ギフト送信者に順位プレフィックスが混入する事象を修正',
+    items: Object.freeze([
+      'コメント欄のギフト文字列が「【ギフト貢献4位】エマさんがギフト〜」のように順位プレフィックス付きで来るケースで、送信者名に「【ギフト貢献4位】」が混入していた事象を直しました',
+      '順位は別フィールド（rank）として切り出し、診断 JSON の topSenders に latestRank として表示するようになりました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.176',
+    date: '2026-05-06',
+    summary: 'NDGR経由のギフトもパース＋DOMスキャン観測強化',
+    items: Object.freeze([
+      'NDGR チャットの経路でもギフト文字列をパースするようになり、ギフトサイドバーが開けない番組や DOM virtualization で表示外のギフトでも、NDGR から流れてくる文字列だけで送信者を取得できます',
+      '0.1.175 でコメント DOM 経由のギフト取得が 0 件だった原因を特定するための観測（scanProbe）を診断 JSON に追加しました（iframe数・table-row数・data-comment-type 内訳・サンプル class 名・サンプル文字列）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.175',
+    date: '2026-05-06',
+    summary: 'コメント文字列からギフト送信者・アイテム・ptを抽出',
+    items: Object.freeze([
+      'コメント欄に流れる「○○さんがギフト「XXX（Npt）」を贈りました」のテキストから、送信者名・アイテム名・ポイントを自動で抽出するようになりました',
+      'これによりギフトサイドバーが開かない番組でも、コメント DOM 経由でギフト送信者の集計が取れます',
+      '診断 JSON に giftCommentDiag ブロック（送信者別合計・アイテム別件数・top10）と「ギフトサマリ」の「コメントDOM由来ギフト観測数」「pt合計」を追加しました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.174',
+    date: '2026-05-06',
+    summary: 'ランキングタブ自動オープンの強化と日本語サマリ追加',
+    items: Object.freeze([
+      '貢献度ランキングのタブ自動切替を強化しました（部分一致と selector 拡張で「ランキング」「Ranking」「貢献」を含むタブを広く検出）',
+      'ランキングタブ click 時にステルス CSS の pointer-events を一時解除し、Vue 側で click event が遮断される問題に対処しました',
+      '自動オープンが空回りした時に、ギフトサイドバー内のクリック可能要素のテキスト・class 名を診断 JSON に dump するようにしました（次回診断で原因特定を確実にする観測）',
+      '診断 JSON に「ギフトサマリ」「ランキングサマリ」の日本語キーを追加し、状況がパッと見て分かるようにしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.173',
+    date: '2026-05-06',
+    summary: '診断シートにランキング・タブ・ギフト送信者の観測情報を集約',
+    items: Object.freeze([
+      'AI 診断 JSON に rankingDiag / multiTabDiag / giftSenderDiag / nicknameDiag を追加し、ランキング表示が出ない原因を 1 か所で読めるようにしました',
+      'NDGR 経由のギフト送信者（user_id）を lifetime で観測し、ニックネーム解決状況とあわせて診断に表示します',
+      'ランキング各種（貢献度・ギフト履歴・イベントバナー・広告）の取得回数と最終取得時刻を診断に出します',
+      '他配信タブの保存状況（イベント DOM / ニコニ広告）も診断に表示し、複数タブ干渉の切り分けに使えるようにしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.172',
+    date: '2026-05-06',
+    summary: '非コメユーザーの混入を集計から除外',
+    items: Object.freeze([
+      'コメントを 1 度もしていないユーザーがギフト送信などで「ユーザー別の応援件数」に混入していた事象を直しました（lv350459157 でポンコツびぃちゃんさんが非コメで混入する事例で確認）',
+      'HTML レポートのユーザー別件数も同様にコメントを投げた人だけに絞られるようにしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.171',
+    date: '2026-05-05',
+    summary: 'ニコニ広告ページを開いた時に取り込み',
+    items: Object.freeze([
+      'ニコニ広告ページ（その番組をニコニ広告するボタンの先のページ）を別タブで開くと、貢献度ランキングが自動で記録に取り込まれるようになりました',
+      'これまでは取得できなかった広告ポイント順のランキングが、ニコニ広告ページを 1 度開けばそのまま反映されます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.170',
+    date: '2026-05-05',
+    summary: '広告貢献度の取得状態を診断に出す',
+    items: Object.freeze([
+      'ニコニ広告ページからの取得が成功しているか失敗しているかを診断情報で確認できるようにしました（fetch ステータスを popup の診断JSONに露出）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.169',
+    date: '2026-05-05',
+    summary: '広告貢献度ランキングを別経路で取得',
+    items: Object.freeze([
+      'ニコニ広告ページから「広告ポイントの貢献度ランキング」を直接取得するようにしました（モチベーション源として、配信中でも一覧で見えるように）',
+      '取得したランキングは記録の保存に使われ、診断情報からも確認できるようになりました（popup 上での見せ方は次のバージョンで仕上げます）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.168',
+    date: '2026-05-05',
+    summary: '貢献度ランキングを popup で読めるように',
+    items: Object.freeze([
+      'ニコニコの「貢献度ランキング」が popup に表示されない不具合を直しました（取得対象の DOM 構造が実物と違っていたのが原因）',
+      'ランキングは popup の上部に「1位 むんたさん 15,200貢」のように並びます。応援者の名前と貢献ポイントがそのまま見えます',
+      '広告ポイントランキングは次のバージョンで追加します（モチベーション源として）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.167',
+    date: '2026-05-05',
+    summary: 'ツールバー押しても何も出ない事故を修正',
+    items: Object.freeze([
+      'インラインパネルが画面の上下に隠れて見えない状態のまま「見えている」と誤判定して、ツールバーを押しても popup 窓も出ない事故を直しました（画面に見える形で出ない時は普通の popup 窓を開くようフォールバック）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.166',
+    date: '2026-05-05',
+    summary: 'イベント不参加時の順位表示を撤去',
+    items: Object.freeze([
+      'イベントに参加していない配信なのに「ニコ生現在 50 位」のような順位が popup に表示される誤情報を直しました（公式バナーが取れた時だけ表示するように変更）',
+      '「履歴」「ランキング」タブの DOM が公式と一致しているかを確認するための診断情報を追加しました（次の修正に必要なデータを集めるため）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.165',
+    date: '2026-05-05',
+    summary: '「読み込み中」が消えない事故を防ぐ',
+    items: Object.freeze([
+      'popup を開いた直後の「読み込み中…」の絵が、なんらかの不具合で消えなくなっても、最大 15 秒後に必ず自動で消えるよう二重の安全網を入れました',
+      '拡張の更新が部分的にしか反映されなかった場合でも、永遠に読み込み画面に固まらず popup の中身を表示するようにしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.164',
+    date: '2026-05-05',
+    summary: '貢献度ランキングを履歴からも掬う',
+    items: Object.freeze([
+      'ニコ生公式の「貢献度ランキング」タブの DOM をそのまま読み、応援者の名前と貢献ポイントを popup に表示するようにしました',
+      'ランキングタブを開いていなくても、「履歴」タブの個別ギフトをユーザー単位で合算して同様に表示するフォールバックを追加しました',
+      '順位が公式値で取れた時のラベルを「イベント現在 N 位」、NDGR 経由の汎用順位を「ニコ生現在 N 位」と分けて表記し、間違いを誤情報として出さないようにしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.163',
+    date: '2026-05-05',
+    summary: 'おさらいを漫画コマ風に',
+    items: Object.freeze([
+      'HTML レポートとマーケ分析の冒頭の「今回の放送のおさらい」を、コマ割り・吹き出し・強調数字・擬音語のついた漫画コマ風レイアウトに作り変えました',
+      '画面幅に合わせて顔とフォントが拡縮するレスポンシブ設計（clamp + container query）にし、スマホでもPCでも読みやすくしました',
+      '上位応援者は3人会話、捕捉率の良し悪しでこん太の表情と背景色が変わるなど、シーンごとに見た目が動くようにしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.162',
+    date: '2026-05-05',
+    summary: '公式DOMから掬った正本値を表示',
+    items: Object.freeze([
+      'niconico プレイヤー上のリアルタイム5値（来場・コメ・経過・広告pt・ギフトpt）を data-value から直接読み、NDGR 由来の値より優先するようにしました',
+      '「○○さんが参加しています！現在 N 位 X」という公式の参加バナーを popup にネイティブで描き、ユーザー操作なしでイベント順位とスコアが見えるようにしました',
+      '貢献度ランキングが取得できる場合は、NDGRギフト集計より公式ランキングを優先して表示するようにしました',
+      'HTML レポート / マーケ分析の冒頭に「今回の放送のおさらい」というりんく・こん太・たぬ姉の三人解説を入れ、最終数値と上位応援者を読み上げる形にしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.161',
+    date: '2026-05-05',
+    summary: 'コメント表示ズレと診断混線を抑制',
+    items: Object.freeze([
+      'watch snapshot の liveId が現在の watch URL と合わない結果は採用しないようにし、別放送データが混ざる経路を塞ぎました',
+      'refresh 世代が切り替わった後に古い fetch 結果が snapshot キャッシュを書き戻す経路を止め、放送切替直後の表示ズレを減らしました',
+      'AI共有の高速診断キャッシュは現在の watch URL と同じ放送のときだけ使うようにし、診断JSONの liveId 混線を防ぎました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.160',
+    date: '2026-05-05',
+    summary: '作戦会議UIと三人ガイドを強化',
+    items: Object.freeze([
+      'マーケ分析HTMLの「次回やること」を、りんく・こん太・たぬ姉の作戦会議として見出しと導線を整理し、吹き出し案内を増やして読みやすくしました',
+      'HTMLレポートの次枠メモも三人の解説つきに刷新し、スマホ/PCのどちらでも読みやすい配置に調整しました',
+      '「この内容は配信データに応じて毎回変わる」説明を、マーケ分析とHTMLレポートの両方に明記しました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.158',
+    date: '2026-05-04',
+    summary: 'のどぐろ経由の公式ギフト指標を反映',
+    items: Object.freeze([
+      '拡張の版を 0.1.158 にしました。別環境の 0.1.157 より新しい番号で、読み込んだフォルダが正しいか判別しやすくなります',
+      'のどぐろ（NDGR）由来の広告pt・番組・イベントのギフト累計・順位・イベント名の popup 表示と、マーケHTMLギフト節の注釈はこの版に含まれます'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.122',
+    date: '2026-05-04',
+    summary: '公式ギフト指標（NDGR）をpopup表示',
+    items: Object.freeze([
+      'のどぐろ（NDGR）の statistics を来場者数が無くても拾い、広告pt・番組・イベントのギフト累計・順位・イベント名を watch popup に表示します',
+      'マーケ分析HTMLのギフト節に、番組・イベント累計がニコ生公式のギフト指標である旨の短い注釈を追加しました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.121',
+    date: '2026-05-04',
+    summary: '同一放送だけ配信者メタを引き継ぎ',
+    items: Object.freeze([
+      'watch スナップショットの partial-merge で、前枠の配信者名などが別の live に残り続けることがないよう、prev と next の liveId が両方そろい同一のときだけ配信者同一性を引き継ぐようにしました',
+      'liveId が片方だけ欠けるときは引き継ぎません（誤結合より一瞬の欠損を優先）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.120',
+    date: '2026-05-04',
+    summary: 'マーケ分析とHTMLレポートに次回向けメモ',
+    items: Object.freeze([
+      'マーケ分析HTMLの先頭に「次回やること」や応援しやすい時間のメモを追加しました。ギフト記録があるときは前後の流れも表示します',
+      'HTMLレポートに短い「次回メモ」ブロックを追加しました（保存して後から見返す用途向け）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.119',
     date: '2026-05-04',
     summary: 'インライン below の挿入点を視聴行ラッパーへ（フル幅の根）',

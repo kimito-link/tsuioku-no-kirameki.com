@@ -3,6 +3,8 @@
  * ニコ生 watch ページのコメント一覧からの抽出（セレクタは実機で要調整）
  */
 
+import { isInsideRecommendedLiveSection } from './isInsideRecommendedLiveSection.js';
+
 /** 行頭: コメント番号 + 空白 + 本文（table-row 側と桁を揃え長時間配信でも落とさない） */
 const LINE_HEAD = /^(\d{1,12})\s+([\s\S]+)$/;
 
@@ -913,6 +915,8 @@ function collectNicoLiveTableRows(el) {
   const maybeAdd = (r) => {
     if (!r.querySelector?.('.comment-number') || !r.querySelector?.('.comment-text'))
       return;
+    // v0.1.200: おすすめ生放送セクション内の DOM は除外（真因 fix）
+    if (isInsideRecommendedLiveSection(r)) return;
     set.add(r);
   };
   try {
@@ -932,6 +936,8 @@ function collectNicoLiveTableRows(el) {
 export function extractCommentsFromNode(root) {
   if (!root || root.nodeType !== 1) return [];
   const el = /** @type {Element} */ (root);
+  // v0.1.200: ルート自身が「おすすめ生放送」セクションの子孫なら全部スキップ（真因 fix）
+  if (isInsideRecommendedLiveSection(el)) return [];
   const seen = new Set();
   /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, avatarUrl?: string }[]} */
   const out = [];
@@ -966,6 +972,8 @@ export function extractCommentsFromNode(root) {
       el.querySelectorAll(genericQuery).forEach((node) => {
         if (node.closest?.('.program-recommend-panel')) return;
         if (node.closest?.('article.program-card')) return;
+        // v0.1.200: CSS Modules ハッシュ命名の「おすすめ生放送」も除外（真因 fix）
+        if (isInsideRecommendedLiveSection(node)) return;
         push(parseCommentElement(node));
       });
     } catch {
@@ -973,6 +981,8 @@ export function extractCommentsFromNode(root) {
       el.querySelectorAll('li').forEach((node) => {
         if (node.closest?.('.program-recommend-panel')) return;
         if (node.closest?.('article.program-card')) return;
+        // v0.1.200: CSS Modules ハッシュ命名の「おすすめ生放送」も除外（真因 fix）
+        if (isInsideRecommendedLiveSection(node)) return;
         push(parseCommentElement(node));
       });
     }

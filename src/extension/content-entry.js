@@ -35,6 +35,8 @@ import {
   KEY_THUMB_INTERVAL_MS,
   commentsStorageKey,
   giftUsersStorageKey,
+  eventDomStorageKey,
+  giftSubAppHistoryStorageKey,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
@@ -66,10 +68,27 @@ import {
 } from '../lib/userCommentProfileCache.js';
 import { mergeGiftUsers } from '../lib/giftRecord.js';
 import {
+  collectOfficialEventDomBundle,
+  mergeOfficialEventDomBundle,
+  fetchOfficialEventBannerFromAuditionEmbed,
+  fetchNicoadContributionRankingFromPublishPage
+} from '../lib/officialEventDomBundle.js';
+import {
+  scrapeContributionRankingFromDom,
+  scrapeOfficialEventBannerFromDom
+} from '../lib/officialEventBannerDom.js';
+import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
+import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
+import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
+import {
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
 } from '../lib/commentSubmitConfirm.js';
 import { findCommentSubmitButton } from '../lib/commentPostDom.js';
+import {
+  findCommentPanelAssetLauncherButton,
+  resolveCommentPanelAssetSearchScope
+} from '../lib/nicoCommentPanelAssetLauncher.js';
 import { collectLoggedInViewerProfile } from '../lib/watchPageViewerProfile.js';
 import { shouldAssociateAvatarWithUser } from '../lib/avatarBroadcasterGuard.js';
 import {
@@ -77,6 +96,13 @@ import {
   extractCommentsFromNode,
   NICO_USER_ICON_IMG_LAZY_ATTRS
 } from '../lib/nicoliveDom.js';
+import {
+  probeCommentRowDataAttributes,
+  aggregateSavedCommentsUidStats,
+  parseInterceptFetchLog,
+  snapshotCommentIngestCounters
+} from '../lib/commentObservabilityDiag.js';
+import { snapshotIframeRelayDiag } from '../lib/giftSubAppRelayDiag.js';
 import {
   parseLiveViewerCountFromDocument,
   parseViewerCountFromSnapshotMetas
@@ -87,6 +113,21 @@ import {
   harvestVirtualCommentList
 } from '../lib/commentHarvest.js';
 import { pickCommentMutationObserverRoot } from '../lib/observerTarget.js';
+import { probeRecommendedLiveSection } from '../lib/probeRecommendedLiveSection.js';
+import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
+import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
+import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
+import { buildNetworkErrorProbe } from '../lib/networkErrorProbe.js';
+import {
+  deriveAutoOpenFailureReason,
+  deriveStaleDomBundleSuspected
+} from '../lib/diagWarnings.js';
+import {
+  pruneStaleEventDomLvs,
+  buildEventDomEntriesFromStorageBag
+} from '../lib/pruneStaleEventDomLvs.js';
+import { appendGiftEvents } from '../lib/giftEventStore.js';
+import { resolveGiftSenderBucketKey } from '../lib/giftSenderObservation.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
@@ -141,6 +182,12 @@ import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
+import {
+  parseGiftCommentText,
+  summarizeGiftComments
+} from '../lib/parseGiftComment.js';
+import { buildLiveMcpSnapshot } from '../lib/mcpBridge/buildLiveMcpSnapshot.js';
+import { validateLiveMcpSnapshot } from '../lib/mcpBridge/validateLiveMcpSnapshot.js';
 import { trimMapToMax } from '../lib/trimMap.js';
 import { diagnosePersistGate } from '../lib/commentSubmitSteps.js';
 import {
@@ -273,6 +320,22 @@ let officialCommentCount = null;
 let officialCommentStatsUpdatedAt = 0;
 /** @type {number} */
 let officialStatsUpdatedAt = 0;
+/** NDGR / intercept statistics 由来の公式広告ポイント（番組側の累計系） */
+/** @type {number|null} */
+let officialAdPointsNdgr = null;
+/** NDGR 由来の公式ギフトポイント（番組ギフト累計とみなす） */
+/** @type {number|null} */
+let officialGiftPointsNdgr = null;
+/** NDGR field 5 ベストエフォート: イベントギフト累計 */
+/** @type {number|null} */
+let officialEventGiftScoreNdgr = null;
+/** NDGR field 6 ベストエフォート: イベント順位 */
+/** @type {number|null} */
+let officialNicoEventRankNdgr = null;
+/** NDGR field 7 文字列: イベント名候補 */
+let officialNicoEventTitleNdgr = '';
+/** 上記 NDGR 公式値の最終更新（epoch ms） */
+let officialNdgrStatsUpdatedAt = 0;
 /** @type {number|null} */
 let officialViewerIntervalMs = null;
 /** @type {number} */
@@ -658,6 +721,221 @@ const VIEWER_JOIN_FLUSH_SUPPRESS_MS = 2500;
 /** userId→nickname の補助マップ */
 /** @type {Map<string, string>} */
 const interceptedNicknames = new Map();
+
+/**
+ * 0.1.173: ランキング表示の lifetime 観測。診断シートで「いつ何が取れたか」を
+ * 1 か所で読めるようにする。globalThis に保持（ホットリロード対応 / SPA でも累積）。
+ *
+ * 0.1.175: コメント DOM 経由で観測したギフトコメント（sender/item/point）を
+ * `giftCommentObservations` に蓄積。NDGR ギフト event を取り逃した番組でも
+ * ここから sender 集計が取れる。
+ *
+ * @returns {{
+ *   collectAttempts: number,
+ *   contributionRankingFoundAt: number,
+ *   contributionRankingFoundCount: number,
+ *   giftHistoryFoundAt: number,
+ *   giftHistoryFoundCount: number,
+ *   eventBannerFoundAt: number,
+ *   eventBannerFoundCount: number,
+ *   eventBalloonFoundAt: number,
+ *   eventBalloonFoundCount: number,
+ *   adContributionRankingFoundAt: number,
+ *   adContributionRankingFoundCount: number,
+ *   autoOpenAttemptCount: number,
+ *   autoOpenLastAttemptAt: number,
+ *   autoOpenLastStatus: string,
+ *   giftSenders: Map<string, { count: number, lastAt: number }>,
+ *   giftCommentObservations: Map<string, { sender: string, item: string, point: number, firstObservedAt: number }>,
+ *   giftCommentHarvestRunCount: number,
+ *   giftCommentHarvestLastAt: number
+ * }}
+ */
+function getRankingLifetimeDiag() {
+  const g = /** @type {any} */ (globalThis);
+  if (!g.__nls_ranking_lifetime_diag__) {
+    g.__nls_ranking_lifetime_diag__ = {
+      collectAttempts: 0,
+      contributionRankingFoundAt: 0,
+      contributionRankingFoundCount: 0,
+      giftHistoryFoundAt: 0,
+      giftHistoryFoundCount: 0,
+      eventBannerFoundAt: 0,
+      eventBannerFoundCount: 0,
+      eventBalloonFoundAt: 0,
+      eventBalloonFoundCount: 0,
+      adContributionRankingFoundAt: 0,
+      adContributionRankingFoundCount: 0,
+      autoOpenAttemptCount: 0,
+      autoOpenLastAttemptAt: 0,
+      autoOpenLastStatus: '',
+      /** @type {Map<string, { count: number, lastAt: number }>} */
+      giftSenders: new Map(),
+      /** @type {Map<string, { sender: string, item: string, point: number, firstObservedAt: number }>} */
+      giftCommentObservations: new Map(),
+      giftCommentHarvestRunCount: 0,
+      giftCommentHarvestLastAt: 0
+    };
+  }
+  return g.__nls_ranking_lifetime_diag__;
+}
+
+/**
+ * NDGR で観測したギフト event の sender を記録する。
+ * 診断シートで「ギフト送信者観測数」を集計するための bucket。
+ *
+ * v0.1.214: anonymous gift（userId 空）も nickname があれば
+ * `__anon_<nickname>` で bucket 化して記録対象に含める。これまでは
+ * uid 空 = 完全 skip だったため、anonymous gift だけ来た配信では
+ * 「ギフト送信者観測数」が 0 のまま表示されていた。
+ *
+ * @param {string|null|undefined} userId
+ * @param {string|null|undefined} [nickname]
+ */
+function recordGiftSenderObservation(userId, nickname) {
+  const key = resolveGiftSenderBucketKey({ userId, nickname });
+  if (!key) return;
+  const diag = getRankingLifetimeDiag();
+  const cur = diag.giftSenders.get(key) || { count: 0, lastAt: 0 };
+  cur.count += 1;
+  cur.lastAt = Date.now();
+  diag.giftSenders.set(key, cur);
+  // 上限：100 user まで（古い順に削る）
+  if (diag.giftSenders.size > 100) {
+    const oldest = [...diag.giftSenders.entries()].sort(
+      (a, b) => a[1].lastAt - b[1].lastAt
+    )[0];
+    if (oldest) diag.giftSenders.delete(oldest[0]);
+  }
+}
+
+/**
+ * 0.1.176: パース済ギフトコメントを lifetime に蓄積する共通関数。
+ * DOM 経路と NDGR 経路の両方から呼ばれる。rawText を key に重複排除。
+ *
+ * 0.1.177: rank（順位プレフィックス由来）も保存して診断 JSON で使う。
+ *
+ * @param {{ sender: string, item: string, point: number, rank?: number }} parsed
+ * @param {string} rawText
+ */
+function recordGiftCommentObservation(parsed, rawText) {
+  const _d = getRankingLifetimeDiag();
+  const key = String(rawText || '').trim();
+  if (!key) return;
+  if (_d.giftCommentObservations.has(key)) return;
+  /** @type {{ sender: string, item: string, point: number, rank?: number, firstObservedAt: number }} */
+  const entry = {
+    sender: parsed.sender,
+    item: parsed.item,
+    point: parsed.point,
+    firstObservedAt: Date.now()
+  };
+  if (typeof parsed.rank === 'number' && Number.isFinite(parsed.rank)) {
+    entry.rank = parsed.rank;
+  }
+  _d.giftCommentObservations.set(key, entry);
+  if (_d.giftCommentObservations.size > 500) {
+    const entries = [..._d.giftCommentObservations.entries()].sort(
+      (a, b) => a[1].firstObservedAt - b[1].firstObservedAt
+    );
+    const drop = entries.length - 500;
+    for (let i = 0; i < drop; i++) {
+      _d.giftCommentObservations.delete(entries[i][0]);
+    }
+  }
+}
+
+/**
+ * 0.1.175: コメントテーブル DOM から `data-comment-type="gift"` の row を抽出して
+ * 「sender さんがギフト「item（Npt）」を贈りました」のテキストをパースし、
+ * lifetime に蓄積する。NDGR ギフト event を取り逃した番組（拡張が後から接続）でも、
+ * コメント文字列から sender / item / point が確実に取れる迂回ルート。
+ *
+ * 0.1.176: scan 各段階の observation を globalThis にキャッシュ → 診断 JSON へ。
+ * harvestRunCount は走るが observationsTotal=0 だった v0.1.175 の真因切り分けのため、
+ * tableRowCount / commentTypeRowCount / giftRowCount / sampleClasses / giftRowSamples /
+ * iframeCount を出して「DOM のどこまで届いていないか」を確定させる。
+ */
+function harvestGiftCommentsFromCommentTableDom() {
+  const _d = getRankingLifetimeDiag();
+  _d.giftCommentHarvestRunCount += 1;
+  _d.giftCommentHarvestLastAt = Date.now();
+
+  /** @type {{
+   *   tableRowCount: number,
+   *   commentTypeRowCount: number,
+   *   giftRowCount: number,
+   *   parsedCount: number,
+   *   iframeCount: number,
+   *   sampleClasses: string[],
+   *   commentTypeValues: string[],
+   *   giftRowSamples: string[]
+   * }} */
+  const probe = {
+    tableRowCount: 0,
+    commentTypeRowCount: 0,
+    giftRowCount: 0,
+    parsedCount: 0,
+    iframeCount: 0,
+    sampleClasses: [],
+    commentTypeValues: [],
+    giftRowSamples: []
+  };
+
+  try {
+    probe.iframeCount = document.querySelectorAll('iframe').length;
+
+    // table-row 全部（class 命名のばらつきにも追随）
+    const allTableRows = document.querySelectorAll('div.table-row, [class*="table-row"]');
+    probe.tableRowCount = allTableRows.length;
+    for (let i = 0; i < Math.min(3, allTableRows.length); i++) {
+      const el = allTableRows[i];
+      if (el instanceof HTMLElement) {
+        probe.sampleClasses.push(String(el.className || '').slice(0, 120));
+      }
+    }
+
+    // data-comment-type 付きの row 全部
+    const typedRows = document.querySelectorAll('[data-comment-type]');
+    probe.commentTypeRowCount = typedRows.length;
+    /** @type {Map<string, number>} */
+    const typeHist = new Map();
+    for (const el of typedRows) {
+      if (!(el instanceof HTMLElement)) continue;
+      const t = el.getAttribute('data-comment-type') || '';
+      typeHist.set(t, (typeHist.get(t) || 0) + 1);
+    }
+    probe.commentTypeValues = [...typeHist.entries()]
+      .map(([k, v]) => `${k}:${v}`)
+      .slice(0, 10);
+
+    // gift type の row → パース
+    const giftRows = document.querySelectorAll('[data-comment-type="gift"]');
+    probe.giftRowCount = giftRows.length;
+    let sampled = 0;
+    for (const row of giftRows) {
+      if (!(row instanceof HTMLElement)) continue;
+      const textEl = row.querySelector('.comment-text');
+      const trimmed = (textEl?.textContent || '').trim();
+      if (sampled < 3 && trimmed) {
+        probe.giftRowSamples.push(trimmed.slice(0, 100));
+        sampled += 1;
+      }
+      if (!trimmed) continue;
+      const p = parseGiftCommentText(trimmed);
+      if (p) {
+        probe.parsedCount += 1;
+        recordGiftCommentObservation(p, trimmed);
+      }
+    }
+  } catch { /* no-op */ }
+
+  /** @type {any} */ (globalThis).__nls_gift_comment_scan_probe__ = {
+    capturedAt: Date.now(),
+    ...probe
+  };
+}
+
 /** userId→avatarUrl の補助マップ */
 /** @type {Map<string, string>} */
 const interceptedAvatars = new Map();
@@ -1121,6 +1399,28 @@ function resetOfficialStatsState() {
   officialViewerIntervalMs = null;
   lastOfficialViewerTickAt = 0;
   officialViewerIntervals.length = 0;
+  officialAdPointsNdgr = null;
+  officialGiftPointsNdgr = null;
+  officialEventGiftScoreNdgr = null;
+  officialNicoEventRankNdgr = null;
+  officialNicoEventTitleNdgr = '';
+  officialNdgrStatsUpdatedAt = 0;
+  // liveId 切替時に旧番組の DOM bundle を新番組に持ち越さない
+  lastOfficialEventDomBundle = null;
+  // 新しい live に切り替わったらギフトサイドバー自動オープンも再トライ可能に
+  _autoOpenGiftSidebarTriedLiveId = '';
+  // audition embed の fetch も新 liveId で再実行を許す
+  _auditionBannerFetchedForLid = '';
+  // ニコニ広告 fetch も新 liveId で再実行を許す
+  _nicoadContribFetchedForLid = '';
+  // v0.1.198: gift sub-app DOM スキャン結果も新 liveId で初期化
+  _giftSubAppHistoryCache = {
+    history: [],
+    totalCounts: [],
+    lastObservedAt: 0,
+    scannedFrames: 0,
+    observedFrames: 0
+  };
   resetOfficialCommentSamplingState();
 }
 
@@ -1204,6 +1504,53 @@ function noteOfficialCommentSample(at) {
 }
 
 /**
+ * page-intercept の NDGR / JSON statistics からの広告・ギフト・イベント指標。
+ * 部分更新（gift のみ等）に対応し、フィールドが無いときは既存値を維持する。
+ *
+ * @param {{
+ *   adPoints?: unknown,
+ *   giftPoints?: unknown,
+ *   eventGiftScore?: unknown,
+ *   eventRank?: unknown,
+ *   eventTitle?: unknown,
+ *   observedAt?: number
+ * }} payload
+ */
+function applyInterceptNdgrStatisticsFields(payload) {
+  const at =
+    typeof payload?.observedAt === 'number' && Number.isFinite(payload.observedAt)
+      ? payload.observedAt
+      : Date.now();
+  let touched = false;
+  const ap = payload?.adPoints;
+  if (typeof ap === 'number' && Number.isFinite(ap) && ap >= 0) {
+    officialAdPointsNdgr = Math.floor(ap);
+    touched = true;
+  }
+  const gp = payload?.giftPoints;
+  if (typeof gp === 'number' && Number.isFinite(gp) && gp >= 0) {
+    officialGiftPointsNdgr = Math.floor(gp);
+    touched = true;
+  }
+  const eg = payload?.eventGiftScore;
+  if (typeof eg === 'number' && Number.isFinite(eg) && eg >= 0) {
+    officialEventGiftScoreNdgr = Math.floor(eg);
+    touched = true;
+  }
+  const rk = payload?.eventRank;
+  if (typeof rk === 'number' && Number.isFinite(rk) && rk >= 0) {
+    officialNicoEventRankNdgr = Math.floor(rk);
+    touched = true;
+  }
+  const et = payload?.eventTitle;
+  if (typeof et === 'string' && et.trim()) {
+    officialNicoEventTitleNdgr = et.trim().slice(0, 300);
+    touched = true;
+  }
+  if (touched) officialNdgrStatsUpdatedAt = at;
+}
+
+/**
  * statistics 着信時のタイミング・コメント数を記録する。
  *
  * statistics.viewers / watchCount は「累計来場者数」であり同時接続ではないため、
@@ -1263,6 +1610,14 @@ window.addEventListener('message', (e) => {
     if (typeof c === 'number' && Number.isFinite(c) && c >= 0) {
       wsCommentCount = c;
     }
+    applyInterceptNdgrStatisticsFields({
+      adPoints: e.data.adPoints,
+      giftPoints: e.data.giftPoints,
+      eventGiftScore: e.data.eventGiftScore,
+      eventRank: e.data.eventRank,
+      eventTitle: e.data.eventTitle,
+      observedAt: now
+    });
     updateOfficialStatistics({
       ...(typeof v === 'number' && Number.isFinite(v) && v >= 0 ? { viewers: v } : {}),
       ...(typeof c === 'number' && Number.isFinite(c) && c >= 0 ? { comments: c } : {}),
@@ -1300,6 +1655,16 @@ window.addEventListener('message', (e) => {
   if (e.data.type === 'NLS_INTERCEPT_CHAT_ROWS') {
     const raw = e.data.rows;
     if (Array.isArray(raw) && raw.length) {
+      // 0.1.176: NDGR chat 経路でもギフト文字列をパース（DOM 非依存ルート）。
+      // virtualization で DOM から消えた古い gift row も、NDGR backward で来た
+      // chat に「○○さんがギフト〜を贈りました」が入っていれば拾える。
+      for (const x of raw) {
+        if (!x || typeof x !== 'object') continue;
+        const text = String(/** @type {any} */ (x).text ?? '').trim();
+        if (!text) continue;
+        const p = parseGiftCommentText(text);
+        if (p) recordGiftCommentObservation(p, text);
+      }
       const cleaned = cleanNdgrChatRows(raw);
       if (cleaned.length) schedulePersistNdgrChatRows(cleaned);
     }
@@ -1308,7 +1673,17 @@ window.addEventListener('message', (e) => {
 
   if (e.data.type === 'NLS_INTERCEPT_GIFT_USERS') {
     const raw = e.data.users;
+    if (Array.isArray(raw) && raw.length) {
+      // 0.1.173: lifetime 観測（診断シート用）。liveId 不在でも record する。
+      // v0.1.214: anonymous gift（uid 空）も nickname があれば記録するため
+      //   guard を撤去し、recordGiftSenderObservation 内で bucket key を
+      //   解決する形に統一。
+      for (const u of raw) {
+        recordGiftSenderObservation(u?.userId, u?.nickname);
+      }
+    }
     if (Array.isArray(raw) && raw.length && liveId && hasExtensionContext()) {
+      // 既存: throwCount 集約版（nls_gift_users_<liveId>）
       const key = giftUsersStorageKey(liveId);
       chrome.storage.local.get(key).then((bag) => {
         const existing = Array.isArray(bag[key]) ? bag[key] : [];
@@ -1325,6 +1700,35 @@ window.addEventListener('message', (e) => {
           });
         }
       }).catch((err) => reportSilentErrorToStorage('gift', err));
+
+      // v0.1.207 Phase A: 個別 event の時系列ストア（nls_gift_events_<liveId>）
+      // proto 準拠 decoder（v0.1.204 Patch B）+ payload 拡張（v0.1.205 prep
+      // Patch C-1）で取れる itemId / itemName / point / message /
+      // contributionRank を保存。popup の ranking / 履歴 / avatar 補完で
+      // 使う（DOM 統合は v0.1.208 以降の別 PR）。
+      const eventsKey = `nls_gift_events_${liveId}`;
+      chrome.storage.local.get(eventsKey).then((bag2) => {
+        const existing = Array.isArray(bag2[eventsKey]) ? bag2[eventsKey] : [];
+        const { next, storageTouched } = appendGiftEvents(
+          existing,
+          raw,
+          Date.now()
+        );
+        if (storageTouched) {
+          chrome.storage.local.set({ [eventsKey]: next }).catch((err) => {
+            if (!isContextInvalidatedError(err) && hasExtensionContext()) {
+              try {
+                chrome.storage.local.set({
+                  [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(
+                    liveId,
+                    err
+                  )
+                });
+              } catch { /* best-effort */ }
+            }
+          });
+        }
+      }).catch((err) => reportSilentErrorToStorage('gift-events', err));
     }
     return;
   }
@@ -1418,6 +1822,74 @@ window.addEventListener('message', (e) => {
   trimMapToMax(interceptedNicknames, INTERCEPT_MAP_MAX);
   trimMapToMax(interceptedAvatars, INTERCEPT_MAP_MAX);
   queueInterceptReconcile(reconcileEntries, reconcileUsers);
+});
+
+// v0.1.216: iframe（gift sub-app, koken.nicovideo.jp 等）からの gift 履歴を
+//   受信する経路。既存 listener は `e.source !== window` で iframe からの
+//   message を弾くため、別 listener として追加する。
+//   設計: aggregateGiftHistoryThrows は incoming のみで集計する「全置換」
+//   設計（冪等）。iframe re-mount や Chrome reload で同じ全履歴が再送信されても、
+//   storage は同じ data で上書きされるだけで throwCount / totalPoints は倍々
+//   にならない。popup の refreshGiftRankStrip fallback がこれを読み込む。
+window.addEventListener('message', (e) => {
+  if (!e?.data || typeof e.data.type !== 'string') return;
+  if (e.data.type !== 'NLS_GIFT_HISTORY_FROM_IFRAME') return;
+  // v0.1.226 観測強化: relay 受信 counter（lid 確定前に加算して受信自体を見える化）
+  _giftSubAppRelayDiagState.iframeRelayMessagesReceivedTotal += 1;
+  _giftSubAppRelayDiagState.iframeRelayLastReceivedAt = Date.now();
+  const _diagFrameUrl = String(e.data.frameUrl || '').slice(0, 200);
+  if (_diagFrameUrl) {
+    const _cur = _giftSubAppRelayDiagState.iframeRelayMessagesByFrameUrl[_diagFrameUrl] || 0;
+    _giftSubAppRelayDiagState.iframeRelayMessagesByFrameUrl[_diagFrameUrl] = _cur + 1;
+  }
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !hasExtensionContext()) return;
+
+  // 1. gift 履歴 (v0.1.216): items を全置換で集計
+  const items = Array.isArray(e.data.items) ? e.data.items : [];
+  if (items.length > 0) {
+    const r = aggregateGiftHistoryThrows(items, Date.now());
+    if (r.storageTouched) {
+      chrome.storage.local
+        .set({ [`nls_gift_history_throws_${lid}`]: r.next })
+        .catch((err) => {
+          if (!isContextInvalidatedError(err)) {
+            /* best-effort */
+          }
+        });
+    }
+  }
+
+  // 2. v0.1.217: 公式サイドバー DOM の貢献度ランキング + イベント参加バナーを
+  //    `nls_iframe_official_dom_<liveId>` storage に保存。popup の
+  //    refreshGiftRankStrip が _lastOfficialEventDomBundle.contributionRanking
+  //    が空のときの fallback として読み込む。
+  const contributionRanking = Array.isArray(e.data.contributionRanking)
+    ? e.data.contributionRanking
+    : null;
+  const eventBanner =
+    e.data.eventBanner && typeof e.data.eventBanner === 'object'
+      ? e.data.eventBanner
+      : null;
+  if (
+    (contributionRanking && contributionRanking.length > 0) ||
+    eventBanner
+  ) {
+    chrome.storage.local
+      .set({
+        [`nls_iframe_official_dom_${lid}`]: {
+          contributionRanking: contributionRanking || [],
+          eventBanner: eventBanner || null,
+          capturedAt: Date.now(),
+          frameUrl: String(e.data.frameUrl || '').slice(0, 200)
+        }
+      })
+      .catch((err) => {
+        if (!isContextInvalidatedError(err)) {
+          /* best-effort */
+        }
+      });
+  }
 });
 /** @type {number|null} */
 let lastWatchUrlTimer = null;
@@ -3024,7 +3496,34 @@ async function focusInlinePanelHostFromToolbar() {
     getComputedStyle: (el) => window.getComputedStyle(/** @type {Element} */ (el))
   })) return false;
 
-  // fire-and-forget: rect 確定を待ってから scroll + iframe focus を試行。
+  // 0.1.167: panel host が CSS 上は display:block / visibility:visible でも、
+  // rect が画面外（rectTop が大きく負 / bottom が viewport 下端より下）に
+  // 居ると、ユーザーから見ると「何も見えない」。即時 scrollIntoView で
+  // viewport に引き込み、それでも見える領域が極小なら focused=false を返して
+  // background に popup window fallback を起動させる。
+  // これがないと「panel が画面外のままで focused=true → popup も開かない →
+  // ツールバー押しても何も起きない」という user-visible 障害になる。
+  try {
+    suppressOwnScrollCountingFor(1000);
+    host.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+  } catch {
+    // no-op: scrollIntoView 失敗は致命的でない（次の判定で吸収）
+  }
+  try {
+    const rect = host.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement?.clientHeight || 0;
+    if (vh > 0) {
+      // 完全に画面外
+      if (rect.bottom <= 0 || rect.top >= vh) return false;
+      // 部分的に見えていても、可視領域が 40px 未満なら「見えない」とみなす
+      const visibleH = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0));
+      if (visibleH < 40) return false;
+    }
+  } catch {
+    // no-op: rect 取得失敗時は保守的に true 寄りに倒す
+  }
+
+  // fire-and-forget: rect 確定を待ってから smooth scroll + iframe focus を試行。
   // 結果は応答に反映しない（応答は既に true で返している）。
   void (async () => {
     try {
@@ -3071,6 +3570,733 @@ async function focusInlinePanelHostFromToolbar() {
   })();
 
   return true;
+}
+
+/**
+ * 本家ギフト HUD のベストエフォート検出（closed shadow 内は取れないことが多い）
+ * @returns {{ giftHudLastAttr: string }}
+ */
+function collectNlsGiftHudDomSlice() {
+  const hits = [];
+  try {
+    const sels = [
+      '[class*="___gift" i]',
+      '[class*="GiftHud" i]',
+      '[class*="gift-hud" i]',
+      '[data-gift-hud]',
+      '[class*="NicoGift" i]'
+    ];
+    for (const sel of sels) {
+      const el = document.querySelector(sel);
+      if (el instanceof Element) {
+        const cls = String(el.getAttribute('class') || '').slice(0, 120);
+        if (cls) hits.push(cls);
+      }
+    }
+  } catch {
+    // no-op
+  }
+  return { giftHudLastAttr: hits.join('|').slice(0, 220) };
+}
+
+/**
+ * AI 診断・ギフト切り分け: NDGR カウンタと intercept 由来の公式値の要約
+ * @returns {Record<string, unknown>}
+ */
+function buildGiftDiagnosticsBundle() {
+  const href = String(window.location.href || '');
+  const urlLv = extractLiveIdFromUrl(href);
+  const lid = String(liveId || '').trim().toLowerCase();
+  const aligned =
+    !lid ||
+    !urlLv ||
+    lid === String(urlLv).trim().toLowerCase();
+
+  const ndgrAttr = document.documentElement?.getAttribute('data-nls-ndgr') || '';
+  const pickNum = (letter) => {
+    const m = ndgrAttr.match(new RegExp(`\\b${letter}=(\\d+)`));
+    return m ? parseInt(m[1], 10) : 0;
+  };
+
+  const ndgrTagsAttr =
+    document.documentElement?.getAttribute('data-nls-ndgr-tags') || '';
+  /** @type {{ top: Record<string, number>, msg: Record<string, number> }} */
+  let ndgrTagHistogram = { top: {}, msg: {} };
+  if (ndgrTagsAttr) {
+    try {
+      const parsed = JSON.parse(ndgrTagsAttr);
+      if (parsed && typeof parsed === 'object') {
+        ndgrTagHistogram = {
+          top: parsed.top && typeof parsed.top === 'object' ? parsed.top : {},
+          msg: parsed.msg && typeof parsed.msg === 'object' ? parsed.msg : {}
+        };
+      }
+    } catch { /* no-op */ }
+  }
+
+  // v0.1.209 緊急投入: 未知 NDGR field の sample（msg.3 / top.11 等）を診断 JSON に
+  // 露出する。msg.8 (gift) が来ない一方で他 field が来る配信があるため、
+  // 中身を解析して真の gift 経路を特定する用途。
+  const ndgrUnknownSamplesAttr =
+    document.documentElement?.getAttribute('data-nls-ndgr-unknown-samples') ||
+    '';
+  /** @type {Record<string, Array<unknown>>} */
+  let ndgrUnknownSamples = {};
+  if (ndgrUnknownSamplesAttr) {
+    try {
+      const parsed = JSON.parse(ndgrUnknownSamplesAttr);
+      if (parsed && typeof parsed === 'object') {
+        ndgrUnknownSamples = parsed;
+      }
+    } catch { /* no-op */ }
+  }
+
+  const hud = collectNlsGiftHudDomSlice();
+  const statsAgeMs =
+    officialNdgrStatsUpdatedAt > 0
+      ? Math.max(0, Date.now() - officialNdgrStatsUpdatedAt)
+      : null;
+
+  return {
+    contentLiveId: lid,
+    giftHudLastAttr: hud.giftHudLastAttr,
+    liveIdAlignedWithUrl: aligned,
+    ndgrWireCounters: {
+      chats: pickNum('c'),
+      decoded: pickNum('d'),
+      gifts: pickNum('g'),
+      stats: pickNum('s'),
+      // v0.1.221: gifts の内訳。decode で uid/name/item/point/rank が取れた件数。
+      // gifts に対し各値が小さい → ndgrDecode 側の proto field 認識ズレ疑い。
+      // gifts に対し各値が高いが popup の sender 観測 0 → 受信側 (mergeGiftUsers
+      // / appendGiftEvents) の保存ゲートで skip されている疑い。
+      giftsWithUid: pickNum('gu'),
+      giftsWithName: pickNum('gn'),
+      giftsWithItem: pickNum('gi'),
+      giftsWithPoint: pickNum('gp'),
+      giftsWithRank: pickNum('gr'),
+      parseOk: true
+    },
+    ndgrTagHistogram,
+    ndgrUnknownSamples,
+    autoOpenStatus:
+      document.documentElement?.getAttribute('data-nls-auto-open') || 'never',
+    auditionFetchStatus:
+      document.documentElement?.getAttribute('data-nls-audition-fetch') || 'never',
+    nicoadFetchStatus:
+      document.documentElement?.getAttribute('data-nls-nicoad-fetch') || 'never',
+    eventDomBundleSummary: (() => {
+      const b = lastOfficialEventDomBundle;
+      if (!b) return { hasBundle: false };
+      return {
+        hasBundle: true,
+        capturedAgoMs:
+          typeof b.capturedAt === 'number' && b.capturedAt > 0
+            ? Math.max(0, Date.now() - b.capturedAt)
+            : null,
+        eventBanner: b.eventBanner
+          ? {
+              hasRank: typeof b.eventBanner.rank === 'number',
+              rank: b.eventBanner.rank ?? null,
+              hasScore: typeof b.eventBanner.score === 'number',
+              score: b.eventBanner.score ?? null,
+              titleLen: String(b.eventBanner.title || '').length,
+              hasIcon: Boolean(b.eventBanner.iconUrl)
+            }
+          : null,
+        eventBalloon: b.eventBalloon
+          ? {
+              hasEventTotalScore: typeof b.eventBalloon.eventTotalScore === 'number',
+              eventTotalScore: b.eventBalloon.eventTotalScore ?? null,
+              hasProgramTotalPoints: typeof b.eventBalloon.programTotalPoints === 'number',
+              programTotalPoints: b.eventBalloon.programTotalPoints ?? null
+            }
+          : null,
+        contributionRanking: Array.isArray(b.contributionRanking)
+          ? {
+              count: b.contributionRanking.length,
+              top1Name:
+                b.contributionRanking[0] && !b.contributionRanking[0].isAnonymous
+                  ? b.contributionRanking[0].name
+                  : null,
+              top1Contribution: b.contributionRanking[0]?.contribution ?? null,
+              anonymousCount: b.contributionRanking.filter((r) => r?.isAnonymous).length
+            }
+          : null,
+        adContributionRanking: Array.isArray(b.adContributionRanking)
+          ? {
+              count: b.adContributionRanking.length,
+              top1Name:
+                b.adContributionRanking[0] && !b.adContributionRanking[0].isAnonymous
+                  ? b.adContributionRanking[0].name
+                  : null,
+              top1Contribution: b.adContributionRanking[0]?.contribution ?? null,
+              anonymousCount: b.adContributionRanking.filter((r) => r?.isAnonymous).length
+            }
+          : null,
+        giftHistory: Array.isArray(b.giftHistory)
+          ? (() => {
+              const totalPoints = b.giftHistory.reduce(
+                (s, h) => s + (Number(h?.point) || 0),
+                0
+              );
+              const anonymousCount = b.giftHistory.filter((h) => h?.isAnonymous).length;
+              const aggMap = new Map();
+              for (const h of b.giftHistory) {
+                const name = String(h?.advertiserName || '').trim();
+                if (!name) continue;
+                const pt = Number(h?.point) || 0;
+                const cur = aggMap.get(name) || { name, total: 0, count: 0, isAnon: !!h?.isAnonymous };
+                cur.total += pt;
+                cur.count += 1;
+                aggMap.set(name, cur);
+              }
+              const sorted = [...aggMap.values()].sort((a, b) => b.total - a.total);
+              const top = sorted[0] || null;
+              return {
+                count: b.giftHistory.length,
+                totalPoints,
+                anonymousCount,
+                uniqueUserCount: aggMap.size,
+                top1Name: top && !top.isAnon ? top.name : null,
+                top1TotalPoints: top?.total ?? null,
+                top1GiftCount: top?.count ?? null
+              };
+            })()
+          : null,
+        giftHistoryDomItemsNow: (() => {
+          try {
+            return document.querySelectorAll('.gift-history-list .item').length;
+          } catch {
+            return null;
+          }
+        })(),
+        contributionRankingDomItemsNow: (() => {
+          try {
+            return document.querySelectorAll('.contribution-ranking-list .ranker').length;
+          } catch {
+            return null;
+          }
+        })(),
+        giftSidebarDomProbe: (() => {
+          try {
+            const partialCount = (frag) => {
+              try {
+                return document.querySelectorAll(`[class*="${frag}"]`).length;
+              } catch {
+                return 0;
+              }
+            };
+            const sampleClass = (frag) => {
+              try {
+                const el = document.querySelector(`[class*="${frag}"]`);
+                return el ? String(el.className || '').slice(0, 120) : null;
+              } catch {
+                return null;
+              }
+            };
+            return {
+              giftHistoryListPartial: partialCount('gift-history-list'),
+              contributionRankingListPartial: partialCount('contribution-ranking-list'),
+              advertiserNamePartial: partialCount('advertiser-name'),
+              rankerPartial: partialCount('ranker'),
+              ownerNamePartial: partialCount('owner-name'),
+              giftHistoryListSample: sampleClass('gift-history-list'),
+              contributionRankingListSample: sampleClass('contribution-ranking-list'),
+              advertiserNameSample: sampleClass('advertiser-name'),
+              rankerSample: sampleClass('ranker')
+            };
+          } catch {
+            return null;
+          }
+        })(),
+        programStats: b.programStats
+          ? {
+              watchCount: b.programStats.watchCount ?? null,
+              commentCount: b.programStats.commentCount ?? null,
+              adPoints: b.programStats.adPoints ?? null,
+              giftPoints: b.programStats.giftPoints ?? null
+            }
+          : null
+      };
+    })(),
+    officialGiftStats: {
+      eventGiftScoreDom: null,
+      eventGiftScoreNdgr: officialEventGiftScoreNdgr,
+      giftPointsNdgr: officialGiftPointsNdgr,
+      adPointsNdgr: officialAdPointsNdgr,
+      programPointsDom: null,
+      statsAgeMs
+    },
+    officialHudPageState: {
+      officialEventGiftScoreDom: null,
+      officialGiftHudProgramPointsDom: null,
+      officialNicoEventRank: officialNicoEventRankNdgr,
+      officialNicoEventTitleDomLen: 0,
+      officialNicoEventTitleNdgrLen: officialNicoEventTitleNdgr
+        ? officialNicoEventTitleNdgr.length
+        : 0,
+      officialNicoEventTitleNdgrPreview: officialNicoEventTitleNdgr
+        ? officialNicoEventTitleNdgr.slice(0, 80)
+        : ''
+    },
+    // 0.1.184: codex 提案 P0-3 + データ品質設計 L1 Canonical の前段。
+    // 「値 + source + ageMs + reason」の構造で各値の **採用ソースと未取得理由** を明示。
+    // 既存 officialGiftStats / officialHudPageState は維持（互換性）。
+    //
+    // reason の意味:
+    //   - null         : 値が取れていて新鮮（採用 OK）
+    //   - 'no_field'   : そもそもデータソースが値を持っていない
+    //   - 'stale'      : 値はあるが古い（>60s）。L2 Read Model で confidence 低下に使う
+    //   - 'live_mismatch': v0.1.178 で導入済の整合ガード由来（responseAlignedWithWatchUrl）
+    officialValuesV2: (() => {
+      const b = lastOfficialEventDomBundle;
+      const ageMs = officialNdgrStatsUpdatedAt > 0
+        ? Math.max(0, Date.now() - officialNdgrStatsUpdatedAt)
+        : null;
+      const STALE_MS = 60_000;
+      /**
+       * @param {unknown} value
+       * @param {string} source
+       * @returns {{ value: unknown, source: string, ageMs: number | null, reason: string | null }}
+       */
+      const wrap = (value, source) => {
+        const hasValue = value !== null && value !== undefined && value !== '';
+        let reason = null;
+        if (!hasValue) {
+          reason = 'no_field';
+        } else if (typeof ageMs === 'number' && ageMs > STALE_MS) {
+          reason = 'stale';
+        }
+        return {
+          value: hasValue ? value : null,
+          source,
+          ageMs,
+          reason
+        };
+      };
+      return {
+        eventGiftScore: {
+          ndgr: wrap(officialEventGiftScoreNdgr, 'ndgr_stats'),
+          domBanner: wrap(b?.eventBanner?.score, 'dom_event_banner')
+        },
+        giftPoints: {
+          ndgr: wrap(officialGiftPointsNdgr, 'ndgr_stats'),
+          domStats: wrap(b?.programStats?.giftPoints, 'dom_program_stats')
+        },
+        adPoints: {
+          ndgr: wrap(officialAdPointsNdgr, 'ndgr_stats'),
+          domStats: wrap(b?.programStats?.adPoints, 'dom_program_stats')
+        },
+        nicoEventRank: {
+          ndgr: wrap(officialNicoEventRankNdgr, 'ndgr_stats'),
+          domBanner: wrap(b?.eventBanner?.rank, 'dom_event_banner')
+        },
+        nicoEventTitle: {
+          ndgr: wrap(officialNicoEventTitleNdgr, 'ndgr_stats'),
+          domBanner: wrap(b?.eventBanner?.title, 'dom_event_banner')
+        },
+        commentCount: {
+          domStats: wrap(b?.programStats?.commentCount, 'dom_program_stats')
+        },
+        watchCount: {
+          domStats: wrap(b?.programStats?.watchCount, 'dom_program_stats')
+        }
+      };
+    })(),
+    rankingDiag: (() => {
+      const _d = getRankingLifetimeDiag();
+      const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
+      return {
+        collectAttempts: _d.collectAttempts,
+        contributionRanking: {
+          foundCount: _d.contributionRankingFoundCount,
+          lastFoundAgoMs: ago(_d.contributionRankingFoundAt)
+        },
+        giftHistory: {
+          foundCount: _d.giftHistoryFoundCount,
+          lastFoundAgoMs: ago(_d.giftHistoryFoundAt)
+        },
+        eventBanner: {
+          foundCount: _d.eventBannerFoundCount,
+          lastFoundAgoMs: ago(_d.eventBannerFoundAt)
+        },
+        eventBalloon: {
+          foundCount: _d.eventBalloonFoundCount,
+          lastFoundAgoMs: ago(_d.eventBalloonFoundAt)
+        },
+        adContributionRanking: {
+          foundCount: _d.adContributionRankingFoundCount,
+          lastFoundAgoMs: ago(_d.adContributionRankingFoundAt)
+        },
+        autoOpen: (() => {
+          const snap = /** @type {any} */ (globalThis).__nls_auto_open_sidebar_hints__;
+          const lastSidebarHints = snap
+            ? {
+                capturedAgoMs: ago(snap.capturedAt),
+                hintCount: Array.isArray(snap.hints) ? snap.hints.length : 0,
+                hints: Array.isArray(snap.hints) ? snap.hints : []
+              }
+            : null;
+          const base = {
+            attemptCount: _d.autoOpenAttemptCount,
+            lastAttemptAgoMs: ago(_d.autoOpenLastAttemptAt),
+            lastStatus: _d.autoOpenLastStatus || '',
+            // 0.1.174: 失敗時に sidebar 内 clickable を dump（テスラ式観測）
+            lastSidebarHints
+          };
+          // v0.1.201: 現在値から失敗理由を 1 トークンで導出（診断見せれば説明不要）
+          return {
+            ...base,
+            lastFailureReason: deriveAutoOpenFailureReason(base)
+          };
+        })()
+      };
+    })(),
+    multiTabDiag: (() => {
+      const snap = /** @type {any} */ (globalThis).__nls_multitab_snapshot__;
+      if (!snap) return { hasSnapshot: false, staleDomBundleSuspected: false };
+      const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
+      const eventDomLvs = Array.isArray(snap.eventDomLvs) ? snap.eventDomLvs : [];
+      const nicoadLvs = Array.isArray(snap.nicoadLvs) ? snap.nicoadLvs : [];
+      const base = {
+        hasSnapshot: true,
+        capturedAgoMs: ago(snap.capturedAt),
+        eventDomLvCount: eventDomLvs.length,
+        eventDomLvs: eventDomLvs.slice(0, 10),
+        nicoadLvCount: nicoadLvs.length,
+        nicoadLvs: nicoadLvs.slice(0, 10),
+        currentLiveIdInEventDom: lid ? eventDomLvs.includes(lid) : null,
+        currentLiveIdInNicoad: lid ? nicoadLvs.includes(lid) : null
+      };
+      // v0.1.201: 過去 lv の DOM 残骸 / current lv 不一致を warning で要約
+      return {
+        ...base,
+        staleDomBundleSuspected: deriveStaleDomBundleSuspected(base)
+      };
+    })(),
+    giftSenderDiag: (() => {
+      const _d = getRankingLifetimeDiag();
+      /** @type {[string, { count: number, lastAt: number }][]} */
+      const arr = [..._d.giftSenders.entries()];
+      arr.sort((a, b) => b[1].count - a[1].count);
+      const top = arr.slice(0, 10).map(([uid, v]) => {
+        const nickname = interceptedNicknames.get(uid) || '';
+        return {
+          userId: uid,
+          observedCount: v.count,
+          lastAgoMs: v.lastAt > 0 ? Math.max(0, Date.now() - v.lastAt) : null,
+          nicknameResolved: !!nickname,
+          nicknamePreview: nickname ? nickname.slice(0, 30) : ''
+        };
+      });
+      return {
+        uniqueSenderCount: arr.length,
+        nicknameResolvedCount: top.filter((t) => t.nicknameResolved).length,
+        topSenders: top
+      };
+    })(),
+    nicknameDiag: {
+      interceptNicknameSize: interceptedNicknames.size,
+      interceptAvatarSize: interceptedAvatars.size
+    },
+    // 0.1.179: 「サムネあり・ID 空（匿名扱い）」事象の真因切り分け。
+    // intercepted comment entry を 4 象限で集計し、avatar あり+uid 空 のサンプルを 5 件 dump。
+    avatarUidDiag: (() => {
+      let total = 0;
+      let avAndUid = 0;
+      let avNoUid = 0;
+      let uidNoAv = 0;
+      let bothEmpty = 0;
+      /** @type {{ commentNo: string, avPreview: string, name: string }[]} */
+      const avNoUidSamples = [];
+      for (const [no, entry] of interceptedUsers.entries()) {
+        total += 1;
+        const av = String(entry?.av || '');
+        const uid = String(entry?.uid || '').trim();
+        const hasAv = !!av && /^https?:/i.test(av);
+        const hasUid = !!uid;
+        if (hasAv && hasUid) avAndUid += 1;
+        else if (hasAv && !hasUid) {
+          avNoUid += 1;
+          if (avNoUidSamples.length < 5) {
+            avNoUidSamples.push({
+              commentNo: String(no || '').slice(0, 40),
+              avPreview: av.slice(0, 80),
+              name: String(entry?.name || '').slice(0, 30)
+            });
+          }
+        } else if (!hasAv && hasUid) uidNoAv += 1;
+        else bothEmpty += 1;
+      }
+      return {
+        interceptedUsersTotal: total,
+        avAndUid,
+        avNoUid,
+        uidNoAv,
+        bothEmpty,
+        avNoUidSamples
+      };
+    })(),
+    // 0.1.190: ギフト UI を表す可能性のある class 名候補を**全部スキャン**。
+    // niconico がクラス名を変更した時に、どの命名で描画されているかを次回診断で確定する。
+    // top frame だけでなく iframe 内（同 origin の場合）も観測する（CORS で読めなければ skip）。
+    giftSidebarVerboseProbe: (() => {
+      /** @type {{ pattern: string, count: number, sampleClasses: string[] }[]} */
+      const findings = [];
+      const patterns = [
+        'gift', 'history', 'ranking', 'ranker', 'contribution',
+        'rich-view', 'event-banner', 'event-balloon', 'point-field',
+        'donation', 'support', 'sponsor', 'advertiser', 'tribute',
+        'modal', 'dialog', 'sidebar', 'panel', 'drawer'
+      ];
+      const seenClass = new Set();
+      /** @param {Document} doc @param {string} originLabel */
+      const scanDoc = (doc, originLabel) => {
+        for (const pattern of patterns) {
+          try {
+            const els = doc.querySelectorAll(`[class*="${pattern}"]`);
+            if (els.length === 0) continue;
+            /** @type {string[]} */
+            const samples = [];
+            for (const el of els) {
+              if (samples.length >= 3) break;
+              if (!(el instanceof HTMLElement)) continue;
+              const cls = String(el.className || '').slice(0, 120);
+              if (seenClass.has(cls)) continue;
+              seenClass.add(cls);
+              samples.push(cls);
+            }
+            if (samples.length > 0 || els.length > 0) {
+              findings.push({
+                pattern: `${originLabel}:${pattern}`,
+                count: els.length,
+                sampleClasses: samples
+              });
+            }
+          } catch { /* no-op */ }
+        }
+      };
+      try {
+        scanDoc(document, 'top');
+      } catch { /* no-op */ }
+      // iframe 内（同 origin の場合のみ contentDocument にアクセスできる）
+      try {
+        const iframes = document.querySelectorAll('iframe');
+        let i = 0;
+        for (const iframe of iframes) {
+          if (i >= 3) break;
+          if (!(iframe instanceof HTMLIFrameElement)) continue;
+          try {
+            const idoc = iframe.contentDocument;
+            if (idoc) scanDoc(idoc, `iframe[${i}]`);
+          } catch { /* CORS で読めない（cross-origin） */ }
+          i += 1;
+        }
+      } catch { /* no-op */ }
+      return findings.slice(0, 50);
+    })(),
+    // 0.1.179: ピン留めコメント観測。「No.75 が匿名扱いで pin 表示」事象に対し、
+    // pin/固定/operator/anchor 系 class が DOM にどれだけあるか hit 数で確認する。
+    // 0.1.180: hit があった selector の DOM 内容を sample で dump（innerHTML 一部）。
+    pinCommentProbe: (() => {
+      const selectors = [
+        '[class*="pin"]',
+        '[class*="operator"]',
+        '[class*="anchor-comment"]',
+        '[class*="fixed-comment"]',
+        '[data-pinned]',
+        '[data-pin]'
+      ];
+      /** @type {string[]} */
+      const hits = [];
+      /** @type {{ sel: string, tag: string, cls: string, text: string, innerHtmlSample: string }[]} */
+      const samples = [];
+      for (const sel of selectors) {
+        try {
+          const els = document.querySelectorAll(sel);
+          if (els.length > 0) {
+            hits.push(`${sel}:${els.length}`);
+            for (const el of els) {
+              if (samples.length >= 3) break;
+              if (!(el instanceof HTMLElement)) continue;
+              samples.push({
+                sel,
+                tag: el.tagName.toLowerCase(),
+                cls: String(el.className || '').slice(0, 120),
+                text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+                innerHtmlSample: String(el.innerHTML || '').replace(/\s+/g, ' ').slice(0, 280)
+              });
+            }
+          }
+        } catch { /* no-op */ }
+      }
+      return { selectorHits: hits, samples };
+    })(),
+    // 0.1.180: 「サムネあり匿名」の正しい観測。
+    // interceptedAvatars (uid→av) と interceptedNicknames (uid→nick) の集合関係を見る。
+    // - avatar あり + nickname あり: 普通のユーザー
+    // - avatar あり + nickname なし: ★ popup で「サムネあり匿名」表示の原因
+    // - avatar なし + nickname あり: 一般的（avatar が取れない構造）
+    avatarNicknameMatchDiag: (() => {
+      let avAndNick = 0;
+      let avNoNick = 0;
+      let nickNoAv = 0;
+      /** @type {{ uid: string, av: string }[]} */
+      const avNoNickSamples = [];
+      for (const [uid, av] of interceptedAvatars.entries()) {
+        if (interceptedNicknames.has(uid)) {
+          avAndNick += 1;
+        } else {
+          avNoNick += 1;
+          if (avNoNickSamples.length < 5) {
+            avNoNickSamples.push({
+              uid: String(uid).slice(0, 30),
+              av: String(av).slice(0, 80)
+            });
+          }
+        }
+      }
+      for (const uid of interceptedNicknames.keys()) {
+        if (!interceptedAvatars.has(uid)) nickNoAv += 1;
+      }
+      return {
+        avatarMapSize: interceptedAvatars.size,
+        nicknameMapSize: interceptedNicknames.size,
+        avAndNick,
+        avNoNick,
+        nickNoAv,
+        avNoNickSamples
+      };
+    })(),
+    // 0.1.174: 「ギフト」「ランキング」の日本語キーで、診断 JSON をパッと見ても
+    // 状況が分かるサマリブロック。値は数値・bool・文字列のみ（人が読みやすい形）。
+    // 0.1.175: コメント DOM 経由のギフト観測（commentGift系）を追加。
+    'ギフトサマリ': (() => {
+      const b = lastOfficialEventDomBundle;
+      const _d = getRankingLifetimeDiag();
+      const programGiftPoints = (() => {
+        try { return Number(b?.programStats?.giftPoints) || 0; } catch { return 0; }
+      })();
+      const ndgrGifts = pickNum('g');
+      const domGiftHistoryItems = (() => {
+        try { return Array.isArray(b?.giftHistory) ? b.giftHistory.length : 0; } catch { return 0; }
+      })();
+      const sendersObserved = _d.giftSenders.size;
+      const sendersResolved = [..._d.giftSenders.keys()].filter((uid) =>
+        interceptedNicknames.has(uid)
+      ).length;
+      const commentGiftCount = _d.giftCommentObservations.size;
+      const commentGiftPoints = [..._d.giftCommentObservations.values()].reduce(
+        (s, v) => s + (Number(v.point) || 0),
+        0
+      );
+      return {
+        'ギフトポイント観測': programGiftPoints,
+        'NDGRギフトevent数': ndgrGifts,
+        'DOM由来ギフト履歴件数': domGiftHistoryItems,
+        'ギフト送信者観測数': sendersObserved,
+        'ニックネーム解決済': sendersResolved,
+        'コメントDOM由来ギフト観測数': commentGiftCount,
+        'コメントDOM由来ギフトpt合計': commentGiftPoints,
+        '取り逃し疑い':
+          programGiftPoints > 0 &&
+          ndgrGifts === 0 &&
+          domGiftHistoryItems === 0 &&
+          commentGiftCount === 0
+      };
+    })(),
+    // 0.1.175: コメント DOM 経由のギフト観測の集計（autoOpen 迂回ルートの結果）
+    // 0.1.176: scanProbe を追加 — observationsTotal=0 だった時に DOM のどこまで
+    // 届いていないか（iframeCount / tableRowCount / commentTypeRowCount /
+    // giftRowCount / sampleClasses / giftRowSamples）が一目で分かる。
+    giftCommentDiag: (() => {
+      const _d = getRankingLifetimeDiag();
+      const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
+      const rows = [..._d.giftCommentObservations.values()].map((v) => ({
+        sender: v.sender,
+        item: v.item,
+        point: v.point
+      }));
+      const summary = summarizeGiftComments(rows);
+      const scanProbe = (() => {
+        const snap = /** @type {any} */ (globalThis).__nls_gift_comment_scan_probe__;
+        if (!snap) return null;
+        return {
+          capturedAgoMs: ago(snap.capturedAt),
+          iframeCount: snap.iframeCount,
+          tableRowCount: snap.tableRowCount,
+          commentTypeRowCount: snap.commentTypeRowCount,
+          giftRowCount: snap.giftRowCount,
+          parsedCount: snap.parsedCount,
+          sampleClasses: snap.sampleClasses,
+          commentTypeValues: snap.commentTypeValues,
+          giftRowSamples: snap.giftRowSamples
+        };
+      })();
+      return {
+        harvestRunCount: _d.giftCommentHarvestRunCount,
+        harvestLastAgoMs: ago(_d.giftCommentHarvestLastAt),
+        observationsTotal: _d.giftCommentObservations.size,
+        scanProbe,
+        ...summary
+      };
+    })(),
+    'ランキングサマリ': (() => {
+      const _d = getRankingLifetimeDiag();
+      const ago = (t) => (typeof t === 'number' && t > 0 ? Math.max(0, Date.now() - t) : null);
+      const b = lastOfficialEventDomBundle;
+      const contributionRows = (() => {
+        try { return Array.isArray(b?.contributionRanking) ? b.contributionRanking.length : 0; } catch { return 0; }
+      })();
+      const adRows = (() => {
+        try { return Array.isArray(b?.adContributionRanking) ? b.adContributionRanking.length : 0; } catch { return 0; }
+      })();
+      return {
+        '貢献度ランキング件数': contributionRows,
+        '広告ランキング件数': adRows,
+        '貢献度ランキング取得回数': _d.contributionRankingFoundCount,
+        'ギフト履歴取得回数': _d.giftHistoryFoundCount,
+        'イベントバナー取得回数': _d.eventBannerFoundCount,
+        'イベントバルーン取得回数': _d.eventBalloonFoundCount,
+        '広告ランキング取得回数': _d.adContributionRankingFoundCount,
+        '自動オープン試行回数': _d.autoOpenAttemptCount,
+        '自動オープン最終ステータス': _d.autoOpenLastStatus || '',
+        '自動オープン最終試行ago_ms': ago(_d.autoOpenLastAttemptAt)
+      };
+    })(),
+    // v0.1.225 観測強化: コメント記録の uid 解決診断（AI 共有診断 commentObservability）
+    // niconico の最新 frontend で uid を DOM/NDGR/intercept のどこから取れているか
+    // 切り分けて、F12 不要で root cause を特定するための観測値。挙動変更なし。
+    commentObservability: (() => {
+      const decodedChats = pickNum('c');
+      const persistedNdgr = _commentIngestSourceCounters.ndgr || 0;
+      const ratio = decodedChats > 0
+        ? Math.round((persistedNdgr / decodedChats) * 1000) / 10
+        : 0;
+      return {
+        commentRowDataAttributesProbe: probeCommentRowDataAttributes(
+          document.querySelectorAll('[class*="table-row"]'),
+          { limit: 5 }
+        ),
+        interceptFetchLog: parseInterceptFetchLog(
+          document.documentElement?.getAttribute('data-nls-fetch-log')
+        ),
+        commentIngestBySource: snapshotCommentIngestCounters(_commentIngestSourceCounters),
+        savedCommentsUidStats: { ..._lastSavedCommentsUidStats },
+        ndgrChatToPersistRatio: {
+          decodedChats,
+          ndgrPersistedRows: persistedNdgr,
+          ratioPercent: ratio
+        }
+      };
+    })(),
+    // v0.1.226 観測強化: ギフトサイドバー cross-origin iframe relay 経路の生存確認
+    // （AI 共有診断 giftSubAppRelayDiag）。受信件数 / frame 別 / cross-origin throw 数
+    // から「relay が来てない / 来たけど空 / scrape 失敗」のどれかを切り分ける。
+    giftSubAppRelayDiag: snapshotIframeRelayDiag(_giftSubAppRelayDiagState),
+    urlLiveId: urlLv || ''
+  };
 }
 
 function buildAiShareFastDiagnosticsPayload() {
@@ -3168,7 +4394,124 @@ function buildAiShareFastDiagnosticsPayload() {
         endedBulkHarvestLastCheckedAt > 0
           ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
           : null
-    }
+    },
+    giftDiagnostics: buildGiftDiagnosticsBundle(),
+    // v0.1.200: おすすめ生放送セクションの観測値（汚染源候補数）。
+    // 真因 fix が効いている確認 + 再発検知のため diag に出す。
+    recommendedLiveSectionDiag: (() => {
+      try {
+        return probeRecommendedLiveSection(document);
+      } catch (e) {
+        return {
+          detectedInWatchPage: false,
+          cardCount: 0,
+          commentCountElementCount: 0,
+          excludedFromScrapeCount: 0,
+          classSamples: [],
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: ギフト sub-app 履歴の summary（v0.1.198 で実装した
+    // _giftSubAppHistoryCache の現在値を診断 JSON 用に集約）。
+    // popup と同じ raw データから summary を作るので、popup 表示と
+    // 診断 JSON が必ず一致する（ユーザー要望「診断内容一致させてないなら
+    // させるべきです」への直接対応）。
+    giftSubAppDiag: (() => {
+      try {
+        return summarizeGiftSubAppHistoryDiag({
+          history: _giftSubAppHistoryCache.history,
+          totalCounts: _giftSubAppHistoryCache.totalCounts,
+          scannedFrames: _giftSubAppHistoryCache.scannedFrames,
+          observedFrames: _giftSubAppHistoryCache.observedFrames
+        });
+      } catch (e) {
+        return {
+          historyCount: 0,
+          itemTypeCount: 0,
+          resolvedSenderCount: 0,
+          unresolvedSenderCount: 0,
+          topSenders: [],
+          topItems: [],
+          totalPoints: 0,
+          iframeCount: 0,
+          scrapableFrameCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: watch ページ主要 DOM の存在観測。
+    // recommendedLiveSectionDiag（v0.1.200）と組み合わせて、
+    // 「DOM が見えているのに集計が空」なのか「そもそも DOM 自体が
+    // 見えていない」のかを診断 JSON で切り分け可能にする。
+    domStructureProbe: (() => {
+      try {
+        return probeWatchPageDomStructure(document);
+      } catch (e) {
+        return {
+          giftSidebar: {
+            iframeFound: false,
+            giftHistoryListPresent: false,
+            totalDoldCountListPresent: false,
+            advertiserNameCount: 0
+          },
+          watchTab: {
+            commentTablePresent: false,
+            commentTableRowCount: 0,
+            videoElementPresent: false
+          },
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: window.error / unhandledrejection 観測 ring buffer の snapshot。
+    // boot 時に install 済みで、最新 20 件 + ignoredCount を診断 JSON に出す。
+    consoleErrorProbe: (() => {
+      try {
+        return _consoleErrorBuffer.snapshot();
+      } catch (e) {
+        return {
+          recentErrors: [],
+          totalCount: 0,
+          ignoredCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: network 層異常を 1 ブロックに集約。
+    // 既存の data-nls-nicoad-fetch 属性 + ndgrLastReceivedAt から導出する。
+    networkErrorProbe: (() => {
+      try {
+        const nicoadFetchStatus =
+          document.documentElement?.getAttribute('data-nls-nicoad-fetch') ||
+          'never';
+        const ndgrAgoMs =
+          ndgrLastReceivedAt > 0
+            ? Math.max(0, Date.now() - ndgrLastReceivedAt)
+            : null;
+        // chrome.runtime が無効化されていれば service worker は inactive 扱い。
+        // hasExtensionContext は extension の生存判定として既に他経路で使われている。
+        const swInactive = !hasExtensionContext();
+        return buildNetworkErrorProbe({
+          nicoadFetchStatus,
+          nicoadFetchErrors: [],
+          ndgrLastReceivedAgoMs: ndgrAgoMs,
+          ndgrReconnectCount: 0,
+          ndgrLastError: null,
+          serviceWorkerInactive: swInactive
+        });
+      } catch (e) {
+        return {
+          nicoadFetchStatus: 'never',
+          nicoadFetchErrorMessages: [],
+          ndgrConnectStatus: 'unknown',
+          ndgrLastError: null,
+          ndgrReconnectCount: 0,
+          serviceWorkerInactive: false,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })()
   };
 }
 
@@ -4127,6 +5470,59 @@ async function postCommentFromContentAsync(rawText) {
   }
 }
 
+/**
+ * ニコ生公式のギフト・アイテム等の起動 UI を開く（コメント欄付近のボタンを 1 回クリック）。
+ * 課金・在庫の確定は本家のモーダルに任せる。
+ * @returns {Promise<{ ok: boolean, error?: string }>}
+ */
+async function openCommentPanelAssetPickerFromContentAsync() {
+  if (!canPostCommentInThisFrame()) {
+    return { ok: false, error: 'コメント欄のあるwatchフレームが見つかりません。' };
+  }
+
+  const editor = await pollUntil(findCommentEditorElement, {
+    timeoutMs: SUBMIT_TIMING.editorPollTimeoutMs,
+    intervalMs: SUBMIT_TIMING.editorPollIntervalMs
+  });
+  if (!editor) {
+    return {
+      ok: false,
+      error:
+        'コメント入力欄が見つかりません。ページの再読み込み直後は数秒待ってから再度お試しください。'
+    };
+  }
+
+  const scope = resolveCommentPanelAssetSearchScope(
+    editor instanceof HTMLElement ? editor : null
+  );
+  const launcher = findCommentPanelAssetLauncherButton(
+    scope,
+    editor instanceof HTMLElement ? editor : null
+  );
+  if (!launcher) {
+    return {
+      ok: false,
+      error:
+        'ギフト・アイテムを開くボタンが見つかりませんでした。watchを前面に出し、コメント欄が表示されているか確認のうえ再読み込みしてください。'
+    };
+  }
+
+  try {
+    if (launcher instanceof HTMLElement) {
+      launcher.focus({ preventScroll: true });
+    }
+    launcher.click();
+    await new Promise((r) => setTimeout(r, SUBMIT_TIMING.reactSettleMs));
+    return { ok: true };
+  } catch (err) {
+    const message =
+      err && typeof err === 'object' && 'message' in err
+        ? String(/** @type {{ message?: unknown }} */ (err).message || 'click_failed')
+        : 'click_failed';
+    return { ok: false, error: message };
+  }
+}
+
 /** @param {Element|null|undefined} node */
 function resolveCommentEditorFromTarget(node) {
   if (!(node instanceof Element)) return null;
@@ -4769,7 +6165,13 @@ function collectWatchPageSnapshot() {
       officialStatsUpdatedAt,
       officialCommentStatsUpdatedAt,
       officialViewerIntervalMs,
-      officialCommentSummary
+      officialCommentSummary,
+      officialAdPointsNdgr,
+      officialGiftPointsNdgr,
+      officialEventGiftScoreNdgr,
+      officialNicoEventRankNdgr,
+      officialNicoEventTitleNdgr,
+      officialNdgrStatsUpdatedAt
     }),
     totalComments: wsCommentCount,
     streamAgeMin: (() => {
@@ -5042,7 +6444,124 @@ function buildAiSharePageDiagnostics() {
         endedBulkHarvestLastCheckedAt > 0
           ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
           : null
-    }
+    },
+    giftDiagnostics: buildGiftDiagnosticsBundle(),
+    // v0.1.200: おすすめ生放送セクションの観測値（汚染源候補数）。
+    // 真因 fix が効いている確認 + 再発検知のため diag に出す。
+    recommendedLiveSectionDiag: (() => {
+      try {
+        return probeRecommendedLiveSection(document);
+      } catch (e) {
+        return {
+          detectedInWatchPage: false,
+          cardCount: 0,
+          commentCountElementCount: 0,
+          excludedFromScrapeCount: 0,
+          classSamples: [],
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: ギフト sub-app 履歴の summary（v0.1.198 で実装した
+    // _giftSubAppHistoryCache の現在値を診断 JSON 用に集約）。
+    // popup と同じ raw データから summary を作るので、popup 表示と
+    // 診断 JSON が必ず一致する（ユーザー要望「診断内容一致させてないなら
+    // させるべきです」への直接対応）。
+    giftSubAppDiag: (() => {
+      try {
+        return summarizeGiftSubAppHistoryDiag({
+          history: _giftSubAppHistoryCache.history,
+          totalCounts: _giftSubAppHistoryCache.totalCounts,
+          scannedFrames: _giftSubAppHistoryCache.scannedFrames,
+          observedFrames: _giftSubAppHistoryCache.observedFrames
+        });
+      } catch (e) {
+        return {
+          historyCount: 0,
+          itemTypeCount: 0,
+          resolvedSenderCount: 0,
+          unresolvedSenderCount: 0,
+          topSenders: [],
+          topItems: [],
+          totalPoints: 0,
+          iframeCount: 0,
+          scrapableFrameCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: watch ページ主要 DOM の存在観測。
+    // recommendedLiveSectionDiag（v0.1.200）と組み合わせて、
+    // 「DOM が見えているのに集計が空」なのか「そもそも DOM 自体が
+    // 見えていない」のかを診断 JSON で切り分け可能にする。
+    domStructureProbe: (() => {
+      try {
+        return probeWatchPageDomStructure(document);
+      } catch (e) {
+        return {
+          giftSidebar: {
+            iframeFound: false,
+            giftHistoryListPresent: false,
+            totalDoldCountListPresent: false,
+            advertiserNameCount: 0
+          },
+          watchTab: {
+            commentTablePresent: false,
+            commentTableRowCount: 0,
+            videoElementPresent: false
+          },
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: window.error / unhandledrejection 観測 ring buffer の snapshot。
+    // boot 時に install 済みで、最新 20 件 + ignoredCount を診断 JSON に出す。
+    consoleErrorProbe: (() => {
+      try {
+        return _consoleErrorBuffer.snapshot();
+      } catch (e) {
+        return {
+          recentErrors: [],
+          totalCount: 0,
+          ignoredCount: 0,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })(),
+    // v0.1.201: network 層異常を 1 ブロックに集約。
+    // 既存の data-nls-nicoad-fetch 属性 + ndgrLastReceivedAt から導出する。
+    networkErrorProbe: (() => {
+      try {
+        const nicoadFetchStatus =
+          document.documentElement?.getAttribute('data-nls-nicoad-fetch') ||
+          'never';
+        const ndgrAgoMs =
+          ndgrLastReceivedAt > 0
+            ? Math.max(0, Date.now() - ndgrLastReceivedAt)
+            : null;
+        // chrome.runtime が無効化されていれば service worker は inactive 扱い。
+        // hasExtensionContext は extension の生存判定として既に他経路で使われている。
+        const swInactive = !hasExtensionContext();
+        return buildNetworkErrorProbe({
+          nicoadFetchStatus,
+          nicoadFetchErrors: [],
+          ndgrLastReceivedAgoMs: ndgrAgoMs,
+          ndgrReconnectCount: 0,
+          ndgrLastError: null,
+          serviceWorkerInactive: swInactive
+        });
+      } catch (e) {
+        return {
+          nicoadFetchStatus: 'never',
+          nicoadFetchErrorMessages: [],
+          ndgrConnectStatus: 'unknown',
+          ndgrLastError: null,
+          ndgrReconnectCount: 0,
+          serviceWorkerInactive: false,
+          probeError: String(e?.message || e || 'unknown')
+        };
+      }
+    })()
   };
 }
 
@@ -5189,6 +6708,31 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'NLS_OPEN_COMMENT_ASSET_PICKER') {
+    if (!canPostCommentInThisFrame()) {
+      sendResponse({
+        ok: false,
+        error: 'このフレームにはコメント欄がありません。'
+      });
+      return true;
+    }
+    void openCommentPanelAssetPickerFromContentAsync()
+      .then((result) => sendResponse(result))
+      .catch((err) =>
+        sendResponse({
+          ok: false,
+          error:
+            err && typeof err === 'object' && 'message' in err
+              ? String(
+                  /** @type {{ message?: unknown }} */ (err).message ||
+                    'asset_picker_failed'
+                )
+              : 'asset_picker_failed'
+        })
+      );
+    return true;
+  }
+
   if (msg.type === 'NLS_EXPORT_WATCH_SNAPSHOT') {
     /** watch 本体が iframe 内だけにある構成でもスナップショットを取れるよう、サブフレームも応答する */
     if (!canExportWatchSnapshotFromThisFrame()) {
@@ -5265,7 +6809,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             if (uid && av && isAvatarSafeToAssociate(uid, av)) interceptedAvatars.set(uid, av);
           }
         }
-        sendResponse({ ok: true, items: buildInterceptCacheExportItems() });
+        // 0.1.178: 応答に liveId / frameHref を含める。popup 側で
+        // responseAlignedWithWatchUrl により別 live の混入を破棄できるようにする。
+        sendResponse({
+          ok: true,
+          items: buildInterceptCacheExportItems(),
+          liveId: String(liveId || ''),
+          frameHref: String(window.location.href || '')
+        });
       } catch (err) {
         const msg =
           err && typeof err === 'object' && 'message' in err
@@ -5276,7 +6827,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             : 'intercept_export_error';
         sendResponse({
           ok: false,
-          error: msg.length > 220 ? `${msg.slice(0, 220)}…` : msg
+          error: msg.length > 220 ? `${msg.slice(0, 220)}…` : msg,
+          liveId: String(liveId || ''),
+          frameHref: String(window.location.href || '')
         });
       }
     })();
@@ -5286,13 +6839,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'NLS_AI_SHARE_PAGE_DIAGNOSTICS') {
     try {
       persistAiShareFastDiagnostics();
+      // 0.1.178: 応答に liveId / frameHref を含める（混線防止）
       sendResponse({
         ok: true,
-        diagnostics: buildAiSharePageDiagnostics()
+        diagnostics: buildAiSharePageDiagnostics(),
+        liveId: String(liveId || ''),
+        frameHref: String(window.location.href || '')
       });
     } catch (err) {
       sendResponse({
         ok: false,
+        liveId: String(liveId || ''),
+        frameHref: String(window.location.href || ''),
         error: String(
           err && typeof err === 'object' && 'message' in err
             ? /** @type {{ message?: unknown }} */ (err).message
@@ -5689,6 +7247,30 @@ function pruneAutoBackupLives(state) {
 /** NDGR・MutationObserver・deep harvest が同時に来ても storage の merge が壊れないよう直列化 */
 let persistCommentRowsChain = Promise.resolve();
 
+/**
+ * v0.1.225 観測強化: source 別 persist 件数の累積 counter（AI 共有診断用）
+ * @type {Record<string, number>}
+ */
+const _commentIngestSourceCounters = {
+  ndgr: 0,
+  mutation: 0,
+  deep: 0,
+  visible: 0,
+  intercept_post: 0,
+  unknown: 0
+};
+
+/**
+ * v0.1.225 観測強化: 直近の保存コメント uid 解決状況の snapshot（AI 共有診断用）
+ * @type {{ totalSaved: number, withUid: number, withoutUid: number, withUidPercent: number }}
+ */
+let _lastSavedCommentsUidStats = {
+  totalSaved: 0,
+  withUid: 0,
+  withoutUid: 0,
+  withUidPercent: 0
+};
+
 const MIN_PERSIST_INTERVAL_MS = INGEST_TIMING.coalescerMinMs;
 const PERSIST_BURST_THRESHOLD = INGEST_TIMING.coalescerBurstThreshold;
 
@@ -5702,7 +7284,7 @@ const persistCoalescer = createPersistCoalescer(async (/** @type {ParsedCommentR
  * @param {ParsedCommentRow[]|null|undefined} rows
  * @param {{ source?: string }} [opts] ndgr | mutation | deep | visible
  */
-function persistCommentRows(rows, _opts = {}) {
+function persistCommentRows(rows, opts = {}) {
   const gate = diagnosePersistGate({
     hasRows: !!rows?.length,
     recording,
@@ -5717,6 +7299,14 @@ function persistCommentRows(rows, _opts = {}) {
     return;
   }
   lastPersistGateFailures = [];
+  // v0.1.225 観測強化: source 別 persist 件数を累積（AI 共有診断 commentIngestBySource）
+  const sourceKey = String(opts?.source || 'unknown');
+  const incBy = rows?.length || 0;
+  if (Object.prototype.hasOwnProperty.call(_commentIngestSourceCounters, sourceKey)) {
+    _commentIngestSourceCounters[sourceKey] += incBy;
+  } else {
+    _commentIngestSourceCounters.unknown += incBy;
+  }
   persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (rows));
 }
 
@@ -5813,6 +7403,9 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       next = bfAv.next;
       storageTouched = true;
     }
+    // v0.1.225 観測強化: 保存される予定の next の uid 解決状況を snapshot
+    // （AI 共有診断 savedCommentsUidStats）
+    _lastSavedCommentsUidStats = aggregateSavedCommentsUidStats(next);
     const profileKeysBefore = Object.keys(profileMap).length;
     profileMap = pruneUserCommentProfileMap(profileMap);
     if (Object.keys(profileMap).length !== profileKeysBefore) cacheTouched = true;
@@ -7080,6 +8673,31 @@ async function start() {
         }
       }, ms);
     }
+    // niconico のギフトサイドバーをユーザに気づかれないよう一瞬だけ開閉して、
+    // 「○○さんが参加しています」「貢献度ランキング」等の正本値を永続化する。
+    // 速度優先：niconico Vue のマウント完了を待つ最低限の 2 秒後に発火。
+    // ステルス CSS（opacity:0 + pointer-events:none）でユーザーは画面変化を見ない。
+    // 同一 liveId につき 1 度きり。
+    setTimeout(() => {
+      if (recording && liveId && locationAllowsCommentRecording()) {
+        void tryAutoOpenGiftSidebarOnceForScrape();
+      }
+    }, 2000);
+    // セーフティ・リトライ：30 秒後に bundle.contributionRanking がまだ取れて
+    // いなければ、_autoOpenGiftSidebarTriedLiveId をリセットしてもう 1 度だけ
+    // 自動オープンを試す。初回の Vue マウント遅延／タブクリック取りこぼし／
+    // niconico 側の XHR 失敗 などを救済するための一発リトライ。
+    setTimeout(() => {
+      if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+      const lid = String(liveId || '').trim().toLowerCase();
+      if (!lid) return;
+      const haveRanking = Array.isArray(lastOfficialEventDomBundle?.contributionRanking) &&
+        lastOfficialEventDomBundle.contributionRanking.length > 0;
+      if (haveRanking) return;
+      // 1 度だけリトライを許す
+      _autoOpenGiftSidebarTriedLiveId = '';
+      void tryAutoOpenGiftSidebarOnceForScrape();
+    }, 30_000);
   }
 
   // 拡張 context invalidated（chrome://extensions の再読み込み等）後は、
@@ -7111,6 +8729,10 @@ async function start() {
     if (statsPollIntervalId != null) {
       clearInterval(statsPollIntervalId);
       statsPollIntervalId = null;
+    }
+    if (officialEventDomScrapeIntervalId != null) {
+      clearInterval(officialEventDomScrapeIntervalId);
+      officialEventDomScrapeIntervalId = null;
     }
     // 0.1.29 (AD): 拡張リロード後、旧 MutationObserver が DOM 変化のたびに
     // 走り続けて CPU を消費する。callback 内の hasExtensionContext() check で
@@ -7223,6 +8845,1181 @@ async function start() {
       }, STATS_POLL_MS)
     )
   );
+
+  // niconico DOM の正本値（program-statistics-menu / グリーンバナー / バルーン /
+  // 貢献度ランキング）を 8 秒間隔で掬って `nls_event_dom_<lv>` に保存する。
+  // モーダルが閉まっていて取れないフィールドは前回値で温存（mergeOfficialEventDomBundle）。
+  // popup・HTML レポート・マーケ分析の 3 経路がここを正本として読む。
+  void persistOfficialEventDomBundleNow();
+  officialEventDomScrapeIntervalId = /** @type {number} */ (
+    /** @type {unknown} */ (
+      setInterval(() => {
+        if (stopContentIntervalsIfContextInvalidated()) return;
+        if (!recording || !liveId) return;
+        if (
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'hidden'
+        ) {
+          return;
+        }
+        void persistOfficialEventDomBundleNow();
+      }, OFFICIAL_EVENT_DOM_SCRAPE_MS)
+    )
+  );
+}
+
+const OFFICIAL_EVENT_DOM_SCRAPE_MS = 8_000;
+/** @type {number|null} */
+let officialEventDomScrapeIntervalId = null;
+/** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */
+let lastOfficialEventDomBundle = null;
+/**
+ * 同一 liveId について「ギフトサイドバーを 1 回だけ自動的に開いて閉じる」を済ませたか。
+ * niconico の Vue コンポーネントは sidebar が開かれるまで参加イベント情報を DOM に
+ * マウントしないため、bundle が空のままでは popup の下段カードが永遠に空になる。
+ * 初回だけ無視できる短時間サイドバーを開閉してスクレイプし、永続化する。
+ */
+let _autoOpenGiftSidebarTriedLiveId = '';
+
+/**
+ * audition embed (https://audition.nicovideo.jp/embedded/richview/live?content_id=...) は
+ * 番組単位で固定なので、bundle.eventBanner が未取得のときだけ 1 度 fetch する。
+ * @type {string}
+ */
+let _auditionBannerFetchedForLid = '';
+
+/**
+ * v0.1.198: ニコ生ギフトサブアプリ DOM（gift-history-list / total-dold-count-list）を
+ * iframe を含む全フレームでスキャンした結果のキャッシュ。
+ * 観測されたら直近の値を保持し、観測が一時的に途切れても古い値を消さない。
+ * @type {{ history: any[], totalCounts: any[], lastObservedAt: number, scannedFrames: number, observedFrames: number }}
+ */
+let _giftSubAppHistoryCache = {
+  history: [],
+  totalCounts: [],
+  lastObservedAt: 0,
+  scannedFrames: 0,
+  observedFrames: 0
+};
+
+/**
+ * v0.1.201: window.error / unhandledrejection を診断 JSON に集約するための ring buffer。
+ * boot 時に install して、診断 payload 生成時に snapshot を読む。
+ * `__NLS_CONSOLE_ERROR_BUFFER__` global flag で重複 install を抑止（idempotent）。
+ */
+const _consoleErrorBuffer = createConsoleErrorBuffer({ capacity: 20 });
+
+/**
+ * ニコニ広告ページの「貢献度ランキング（広告 pt 順）」を fetch 済の liveId。
+ * 0.1.169 で追加。同じ liveId につき 1 度きり。
+ * @type {string}
+ */
+let _nicoadContribFetchedForLid = '';
+
+/**
+ * 「ギフトサイドバーが開いた瞬間／ユーザーがランキングタブに切り替えた瞬間」を
+ * MutationObserver で検知して即スクレイプする。タブクリックの自動化はサイト側の
+ * 実装変化に弱いので、こちらの DOM 観測に頼るのが堅実。
+ *
+ * 監視対象セレクタ：
+ *   - .owner-name（参加バナー）
+ *   - .contribution-ranking-list（貢献度ランキング）
+ *   - .point-field（バルーン累計テーブル）
+ *
+ * これらのいずれかが追加 / テキスト変更された瞬間、200ms スロットリングしてから
+ * persistOfficialEventDomBundleNow を呼ぶ。
+ *
+ * @type {MutationObserver|null}
+ */
+let _officialEventDomObserver = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let _officialEventDomObserverTimer = null;
+let _officialEventDomObserverInstalledForLid = '';
+function ensureOfficialEventDomObserver() {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  if (_officialEventDomObserverInstalledForLid === lid && _officialEventDomObserver) return;
+  if (_officialEventDomObserver) {
+    try { _officialEventDomObserver.disconnect(); } catch { /* no-op */ }
+    _officialEventDomObserver = null;
+  }
+  _officialEventDomObserverInstalledForLid = lid;
+  if (typeof MutationObserver !== 'function') return;
+  if (!document.body) return;
+  // 0.1.185: niconico の CSS Modules（`___xxx-yyy___HASH`）形式に追随するため
+  // 各 selector の `[class*="..."]` 版を併設。さらにコメント欄の gift row 出現も
+  // 即発火するよう `[data-comment-type="gift"]` を追加（kimi 提案 #3 の MutationObserver
+  // を既存ロジックの拡張で実現）。
+  const RELEVANT = [
+    '.owner-name', '[class*="owner-name"]',
+    '.contribution-ranking-list', '[class*="contribution-ranking-list"]',
+    '.point-field', '[class*="point-field"]',
+    '.ranker', '[class*="ranker"]',
+    '.rank-num', '[class*="rank-num"]',
+    '.gift-history-list', '[class*="gift-history-list"]',
+    '.gift-history-list .item', '[class*="gift-history-list"] [class*="item"]',
+    '[data-comment-type="gift"]'
+  ].join(', ');
+  const trigger = () => {
+    if (_officialEventDomObserverTimer) clearTimeout(_officialEventDomObserverTimer);
+    _officialEventDomObserverTimer = setTimeout(() => {
+      void persistOfficialEventDomBundleNow();
+    }, 200);
+  };
+  _officialEventDomObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      // 追加ノードに関連要素があれば即発火
+      for (const node of m.addedNodes) {
+        if (!(node instanceof HTMLElement)) continue;
+        try {
+          if (node.matches && node.matches(RELEVANT)) {
+            trigger();
+            return;
+          }
+          if (node.querySelector && node.querySelector(RELEVANT)) {
+            trigger();
+            return;
+          }
+          // 0.1.190: プレイヤーオーバーレイなどに「【ギフト貢献N位】〇〇さんがギフト
+          // 「アイテム（Npt）」を贈りました」が表示された瞬間にパース。
+          // virtualization の影響を受けない経路（実際に画面に出た瞬間にキャッチ）。
+          const text = String(node.textContent || '');
+          if (
+            text.length < 200 &&
+            text.includes('さんがギフト') &&
+            text.includes('を贈りました')
+          ) {
+            const parsed = parseGiftCommentText(text);
+            if (parsed) recordGiftCommentObservation(parsed, text);
+          }
+        } catch { /* no-op */ }
+      }
+      // テキスト変化も拾う（rank-num の数値更新など）
+      if (
+        m.type === 'characterData' &&
+        m.target?.parentElement instanceof HTMLElement
+      ) {
+        try {
+          if (m.target.parentElement.closest(RELEVANT)) {
+            trigger();
+            return;
+          }
+        } catch { /* no-op */ }
+      }
+    }
+  });
+  try {
+    _officialEventDomObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  } catch { /* no-op */ }
+}
+
+/**
+ * 0.1.189: L1 Canonical Snapshot を chrome.storage.local に書き出す Producer 経路。
+ * MCP Bridge Phase1a の準備として、観測値を `nls_mcp_live_snapshot_v1_<liveId>` に
+ * 5s に 1 回まで coalesce して保存する。
+ *
+ * 既存の buildGiftDiagnosticsBundle の戻り値（officialValuesV2）を入力にして
+ * buildLiveMcpSnapshot で L1 形式に変換、validateLiveMcpSnapshot で構造 check 後
+ * storage に保存する。
+ *
+ * 書き込み失敗は silent（既存の表示・記録には影響しない）。
+ */
+let _mcpSnapshotSeq = 0;
+let _mcpLastWriteAt = 0;
+const MCP_WRITE_COALESCE_MS = 5000;
+
+async function buildAndPersistMcpSnapshot() {
+  if (!hasExtensionContext()) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const now = Date.now();
+  if (now - _mcpLastWriteAt < MCP_WRITE_COALESCE_MS) return;
+  let extensionVersion = '';
+  try {
+    extensionVersion = String(chrome.runtime.getManifest().version || '');
+  } catch { /* no-op */ }
+  /** @type {Record<string, unknown>} */
+  let giftDiag;
+  try {
+    giftDiag = /** @type {Record<string, unknown>} */ (buildGiftDiagnosticsBundle());
+  } catch {
+    return;
+  }
+  const v2 = /** @type {any} */ (giftDiag).officialValuesV2;
+  if (!v2 || typeof v2 !== 'object') return;
+  _mcpSnapshotSeq += 1;
+  const snapshot = buildLiveMcpSnapshot({
+    extensionVersion,
+    buildId: '',
+    seq: _mcpSnapshotSeq,
+    liveId,
+    watchUrl: String(window.location.href || ''),
+    aligned: !!(/** @type {any} */ (giftDiag).liveIdAlignedWithUrl),
+    exportedAt: now,
+    officialValuesV2: /** @type {any} */ (v2),
+    mismatchReasons: []
+  });
+  const validation = validateLiveMcpSnapshot(snapshot);
+  if (!validation.valid) return;
+  _mcpLastWriteAt = now;
+  try {
+    await chrome.storage.local.set({
+      [`nls_mcp_live_snapshot_v1_${lid}`]: snapshot,
+      nls_mcp_live_latest_v1: { liveId: lid, snapshot, updatedAt: now }
+    });
+  } catch { /* no-op */ }
+}
+
+/**
+ * v0.1.216: iframe 内（gift sub-app, koken.nicovideo.jp 等）から親 frame に
+ *   gift 履歴を送る経路。親は cross-origin iframe.contentDocument に
+ *   アクセスできない（Same-Origin Policy）が、iframe 内には all_frames=true
+ *   で content script が注入されている。iframe 内で scrape して
+ *   window.parent.postMessage で送る経路を確立する。
+ *
+ * 起動条件:
+ *   - 自分が iframe 内である（window.self !== window.top）
+ *   - host が *.nicovideo.jp 配下（koken.nicovideo.jp / embed.nicovideo.jp 等）
+ *   - DOM に scrapeGiftHistoryList で取れる結果がある
+ *
+ * 親側の receive handler は別途 window.addEventListener('message', ...) で実装。
+ */
+function maybeStartGiftSubAppIframeRelay() {
+  let isTop = true;
+  try {
+    isTop = window.self === window.top;
+  } catch {
+    isTop = true;
+  }
+  if (isTop) return; // 親 frame では起動しない（既存 scanGiftSubAppDomAcrossFrames が同一 origin 経路を担当）
+  const href = String(window.location.href || '');
+  if (!isNicoVideoJpHost(href)) return;
+
+  /** @type {string} */
+  let lastSent = '';
+  const scanAndPost = () => {
+    try {
+      const r = scrapeGiftHistoryList(document);
+      const items = r && Array.isArray(r.items) ? r.items : [];
+      const r2 = scrapeTotalGiftCountList(document);
+      const totalCounts =
+        r2 && Array.isArray(r2.items) ? r2.items : [];
+      // v0.1.217: 公式サイドバー iframe には gift 履歴だけでなく、
+      //   - イベント参加バナー（owner-name, rank, score, eventName）
+      //   - 貢献度ランキング（.contribution-ranking-list の各 ranker）
+      //   が同居していることが kimito さん提供 DOM (audition.nicovideo.jp) で
+      //   確認された。既存 lib の selector は本構造に対応済み（旧構造 fallback で
+      //   `.contribution-ranking-list .ranker` を拾う、`.owner-name` を起点に
+      //   バナーを掬う）。同じ scan tick で 3 種類すべて scrape して親に送る。
+      let contributionRanking = null;
+      try {
+        contributionRanking = scrapeContributionRankingFromDom(document) || [];
+      } catch { contributionRanking = []; }
+      let eventBanner = null;
+      try {
+        eventBanner = scrapeOfficialEventBannerFromDom(document) || null;
+      } catch { eventBanner = null; }
+      // 何も取れていなければ送信不要
+      if (
+        items.length === 0 &&
+        (!contributionRanking || contributionRanking.length === 0) &&
+        !eventBanner
+      ) {
+        return;
+      }
+      const payload = JSON.stringify({
+        items,
+        totalCounts,
+        contributionRanking,
+        eventBanner
+      });
+      if (payload === lastSent) return;
+      lastSent = payload;
+      // v0.1.216 修正: window.parent ではなく window.top に送る。
+      // ネスト iframe (live → embed → koken/audition) の場合、parent は中間
+      // iframe で liveId を持たない。top frame (live.nicovideo.jp/watch/...) に
+      // 直接届けば確実に receive される。target = '*' で cross-origin 制約なし。
+      try {
+        const target = window.top || window.parent;
+        target.postMessage(
+          {
+            type: 'NLS_GIFT_HISTORY_FROM_IFRAME',
+            items,
+            totalCounts,
+            contributionRanking,
+            eventBanner,
+            scannedAt: Date.now(),
+            frameUrl: href
+          },
+          '*'
+        );
+      } catch {
+        /* no-op */
+      }
+    } catch {
+      /* no-op */
+    }
+  };
+
+  // 初回 1 秒遅延（DOM 描画待ち）+ 以後 5 秒間隔
+  setTimeout(scanAndPost, 1000);
+  setInterval(scanAndPost, 5000);
+}
+
+/** @type {string} */
+let _hiddenOfficialIframesInjectedForLid = '';
+
+/**
+ * v0.1.226 観測強化: ギフトサイドバー cross-origin iframe relay 経路の生存確認 state。
+ * NLS_GIFT_HISTORY_FROM_IFRAME 受信側 + scanGiftSubAppDomAcrossFrames 内で更新される
+ * 累積 counter。AI 共有診断 JSON の `giftSubAppRelayDiag` ブロックで snapshot として出す。
+ * @type {{
+ *   iframeRelayMessagesReceivedTotal: number,
+ *   iframeRelayMessagesByFrameUrl: Record<string, number>,
+ *   iframeRelayLastReceivedAt: number,
+ *   scanCrossOriginThrows: number,
+ *   scanSameOriginAccess: number
+ * }}
+ */
+const _giftSubAppRelayDiagState = {
+  iframeRelayMessagesReceivedTotal: 0,
+  iframeRelayMessagesByFrameUrl: {},
+  iframeRelayLastReceivedAt: 0,
+  scanCrossOriginThrows: 0,
+  scanSameOriginAccess: 0
+};
+
+/**
+ * v0.1.218: 公式 iframe (audition / koken / nicoad) を裏で inject して Vue を
+ *   完全 render させる。kimito さんが「ギフト」モーダル → 「履歴」タブを開く
+ *   操作なしで、過去 gift history + 貢献度ランキング + イベント参加バナーを
+ *   取得する。
+ *
+ * 既存 fetchOfficialEventBannerFromAuditionEmbed (v0.1.169) は SPA で SSR が
+ * empty なため `fetch + DOMParser` では Vue が走らず空のまま (実機 v0.1.215〜
+ * 217 で `auditionFetchStatus: "empty"` 確認）。本関数は実 browser frame として
+ * iframe を load させるので Vue が完全 render される。
+ *
+ * iframe の中では manifest `all_frames: true` で content script (page-intercept
+ * + content-entry) が注入され、v0.1.216/217 で実装済の relay
+ * (`maybeStartGiftSubAppIframeRelay`) が起動 → 5 秒間隔で scrape →
+ * `window.top.postMessage(NLS_GIFT_HISTORY_FROM_IFRAME)` で親 frame に送信 →
+ * 既存 receive listener が storage 保存 → popup 反映。
+ *
+ * 副作用:
+ *   - 親 frame body に 3 個の hidden iframe を append
+ *   - 60 秒後 destroy (memory cleanup)
+ *   - 同じ liveId に対して 1 回だけ inject (重複防止)
+ *   - SPA 遷移で liveId が変わったら再 inject 可能
+ *
+ * @param {string} liveId 例 'lv350474211'
+ */
+function maybeInjectHiddenOfficialIframes(liveId) {
+  const lid = String(liveId || '').trim();
+  if (!lid) return;
+  if (_hiddenOfficialIframesInjectedForLid === lid) return;
+  _hiddenOfficialIframesInjectedForLid = lid;
+  let isTop = true;
+  try {
+    isTop = window.self === window.top;
+  } catch {
+    isTop = true;
+  }
+  if (!isTop) return; // 親 frame だけ
+  if (!document?.body) return;
+
+  /** @type {{ id: string, url: string }[]} */
+  const targets = [
+    {
+      id: 'nls-hidden-audition-iframe',
+      url:
+        'https://audition.nicovideo.jp/embedded/richview/live?content_id=' +
+        encodeURIComponent(lid) +
+        '&frontend_id=9&frontend_version=644.0.0'
+    },
+    {
+      id: 'nls-hidden-koken-iframe',
+      url:
+        'https://koken.nicovideo.jp/supporter/contents/live/' +
+        encodeURIComponent(lid) +
+        '/gift'
+    },
+    {
+      id: 'nls-hidden-nicoad-iframe',
+      url:
+        'https://nicoad.nicovideo.jp/live/publish/' +
+        encodeURIComponent(lid) +
+        '?frontend_id=9'
+    }
+  ];
+
+  /** @type {HTMLIFrameElement[]} */
+  const created = [];
+  for (const { id, url } of targets) {
+    if (document.getElementById(id)) continue;
+    try {
+      const ifr = document.createElement('iframe');
+      ifr.id = id;
+      ifr.src = url;
+      // ユーザーに見えない位置 + 1px サイズで Vue 描画は走るが画面占有しない
+      ifr.style.cssText =
+        'display:block !important;' +
+        'position:fixed !important;' +
+        'top:-9999px !important;' +
+        'left:-9999px !important;' +
+        'width:1px !important;' +
+        'height:1px !important;' +
+        'border:0 !important;' +
+        'pointer-events:none !important;' +
+        'opacity:0 !important;' +
+        'z-index:-1 !important;';
+      ifr.setAttribute('aria-hidden', 'true');
+      ifr.setAttribute('tabindex', '-1');
+      ifr.setAttribute('data-nls-hidden-injected', '1');
+      document.body.appendChild(ifr);
+      created.push(ifr);
+    } catch {
+      /* no-op */
+    }
+  }
+
+  // 60 秒後 destroy (memory cleanup)。十分な scrape 機会を与えてから片付ける。
+  setTimeout(() => {
+    for (const ifr of created) {
+      try {
+        ifr.remove();
+      } catch {
+        /* no-op */
+      }
+    }
+  }, 60_000);
+}
+
+/**
+ * v0.1.198: ニコ生ギフトサブアプリ DOM（gift-history-list と total-dold-count-list）を
+ * top document + 同一 origin な iframe contentDocument 全部に対してスキャンする。
+ *
+ * 観測された最新の history / totalCounts は `_giftSubAppHistoryCache` に保持し、
+ * 一時的に消えても古い値を温存する（モーダル閉時の表示維持）。
+ *
+ * @returns {{
+ *   history: any[],
+ *   totalCounts: any[],
+ *   scannedFrames: number,
+ *   observedFrames: number
+ * }} 今回の観測結果（フレッシュ）。空のときは history/totalCounts が空配列。
+ */
+function scanGiftSubAppDomAcrossFrames() {
+  /** @type {Array<Document>} */
+  const allDocs = [];
+  try { allDocs.push(document); } catch { /* no-op */ }
+  // 同一 origin な iframe の contentDocument を集める。クロス origin は throw or null になるので skip
+  let iframes;
+  try {
+    iframes = document.querySelectorAll('iframe');
+  } catch {
+    iframes = /** @type {any} */ ([]);
+  }
+  for (const ifr of iframes) {
+    try {
+      const doc = /** @type {any} */ (ifr).contentDocument;
+      if (doc && doc !== document) {
+        allDocs.push(doc);
+        // v0.1.226 観測強化: same-origin access 成功
+        _giftSubAppRelayDiagState.scanSameOriginAccess += 1;
+      }
+    } catch {
+      // cross-origin iframe は無視
+      // v0.1.226 観測強化: cross-origin throw 件数
+      _giftSubAppRelayDiagState.scanCrossOriginThrows += 1;
+    }
+  }
+
+  /** @type {any[]} */
+  let history = [];
+  /** @type {any[]} */
+  let totalCounts = [];
+  let observedFrames = 0;
+  for (const doc of allDocs) {
+    let observedThis = false;
+    try {
+      const r = scrapeGiftHistoryList(doc);
+      if (r && Array.isArray(r.items) && r.items.length > 0) {
+        // どれか 1 frame で取れたものを採用（複数 frame で重複することは稀、最大長を採用）
+        if (r.items.length > history.length) history = r.items;
+        observedThis = true;
+      }
+    } catch { /* no-op */ }
+    try {
+      const r2 = scrapeTotalGiftCountList(doc);
+      if (r2 && Array.isArray(r2.items) && r2.items.length > 0) {
+        if (r2.items.length > totalCounts.length) totalCounts = r2.items;
+        observedThis = true;
+      }
+    } catch { /* no-op */ }
+    if (observedThis) observedFrames += 1;
+  }
+
+  return {
+    history,
+    totalCounts,
+    scannedFrames: allDocs.length,
+    observedFrames
+  };
+}
+
+/**
+ * v0.1.198: スキャン結果と既存キャッシュをマージして persist する。
+ * 「観測がある期間は更新、観測ゼロの期間は古い値を保持」のポリシー。
+ */
+async function persistGiftSubAppHistoryNow() {
+  if (!hasExtensionContext()) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  let fresh;
+  try {
+    fresh = scanGiftSubAppDomAcrossFrames();
+  } catch {
+    return;
+  }
+  const cache = _giftSubAppHistoryCache;
+  const haveFreshHistory = Array.isArray(fresh.history) && fresh.history.length > 0;
+  const haveFreshTotalCounts = Array.isArray(fresh.totalCounts) && fresh.totalCounts.length > 0;
+  // フレッシュに値があるフィールドだけ更新。空でも古い値は消さない
+  if (haveFreshHistory) {
+    cache.history = fresh.history;
+    cache.lastObservedAt = Date.now();
+  }
+  if (haveFreshTotalCounts) {
+    cache.totalCounts = fresh.totalCounts;
+    cache.lastObservedAt = Date.now();
+  }
+  cache.scannedFrames = fresh.scannedFrames;
+  cache.observedFrames = fresh.observedFrames;
+
+  // 何も観測していないし、キャッシュも空なら storage write を skip
+  if (cache.history.length === 0 && cache.totalCounts.length === 0) return;
+
+  const payload = {
+    liveId: lid,
+    capturedAt: cache.lastObservedAt || Date.now(),
+    history: cache.history,
+    totalCounts: cache.totalCounts,
+    scannedFrames: cache.scannedFrames,
+    observedFrames: cache.observedFrames
+  };
+  try {
+    await chrome.storage.local.set({
+      [giftSubAppHistoryStorageKey(lid)]: payload
+    });
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      // no-op
+    }
+  }
+}
+
+async function persistOfficialEventDomBundleNow() {
+  if (!hasExtensionContext()) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  ensureOfficialEventDomObserver();
+  // 0.1.173: lifetime 観測カウンタ（診断シート用）
+  const _rd = getRankingLifetimeDiag();
+  _rd.collectAttempts += 1;
+  // v0.1.218: 公式 iframe (audition / koken / nicoad) を裏で inject して Vue を
+  //   render させる。同じ liveId に対して 1 回だけ実行。実 browser frame として
+  //   load されるため、SPA でも Vue が完全 render → iframe content script の
+  //   relay 経路 (v0.1.216/217) で過去 gift history / 貢献度ランキング /
+  //   イベント参加バナーがすべて popup に反映される。kimito さん操作 0 回。
+  try { maybeInjectHiddenOfficialIframes(lid); } catch { /* no-op */ }
+  // 0.1.175: コメント DOM 経由のギフト送信者観測（autoOpen 迂回ルート）
+  try { harvestGiftCommentsFromCommentTableDom(); } catch { /* no-op */ }
+  // v0.1.198: ギフトサブアプリ DOM（iframe 内含む全 frame）を走査して popup へ
+  try { void persistGiftSubAppHistoryNow(); } catch { /* no-op */ }
+  let fresh = collectOfficialEventDomBundle(document, { nowMs: Date.now() });
+  if (fresh) {
+    const _now = Date.now();
+    if (fresh.eventBanner) {
+      _rd.eventBannerFoundCount += 1;
+      _rd.eventBannerFoundAt = _now;
+    }
+    if (fresh.eventBalloon) {
+      _rd.eventBalloonFoundCount += 1;
+      _rd.eventBalloonFoundAt = _now;
+    }
+    if (Array.isArray(fresh.contributionRanking) && fresh.contributionRanking.length > 0) {
+      _rd.contributionRankingFoundCount += 1;
+      _rd.contributionRankingFoundAt = _now;
+    }
+    if (Array.isArray(fresh.giftHistory) && fresh.giftHistory.length > 0) {
+      _rd.giftHistoryFoundCount += 1;
+      _rd.giftHistoryFoundAt = _now;
+    }
+    if (Array.isArray(fresh.adContributionRanking) && fresh.adContributionRanking.length > 0) {
+      _rd.adContributionRankingFoundCount += 1;
+      _rd.adContributionRankingFoundAt = _now;
+    }
+  }
+  // 0.1.173: multi-tab snapshot を非同期で取得して globalThis にキャッシュ
+  // （buildGiftDiagnosticsBundle が同期なのでここで先取りする）
+  // v0.1.204 Patch E: snapshot 構築前に 24h 超過の nls_event_dom_<lv> 残骸を
+  // storage から削除する。v0.1.203 で eventDomLvCount=49 まで膨れて multi-tab
+  // race 警告が常時出ていた問題への対応（純関数 pruneStaleEventDomLvs は v0.1.203
+  // Patch 4 で先に作成済み）。
+  try {
+    const all = await chrome.storage.local.get(null);
+    if (all && typeof all === 'object') {
+      const entries = buildEventDomEntriesFromStorageBag(all);
+      const { keep, prune } = pruneStaleEventDomLvs(entries, lid, Date.now());
+      if (prune.length) {
+        try {
+          await chrome.storage.local.remove(
+            prune.map((lv) => `nls_event_dom_${lv}`)
+          );
+        } catch { /* best-effort */ }
+      }
+      const nicoadLvs = Object.keys(all)
+        .filter((k) => k.startsWith('nls_nicoad_ranking_'))
+        .map((k) => k.slice('nls_nicoad_ranking_'.length));
+      /** @type {any} */ (globalThis).__nls_multitab_snapshot__ = {
+        capturedAt: Date.now(),
+        eventDomLvs: keep,
+        nicoadLvs
+      };
+    }
+  } catch { /* no-op */ }
+  // バナーが DOM に居ないとき（ギフトサイドバー閉時の通常状態）は audition embed
+  // を直接 fetch してみる。同じ liveId につき 1 度だけ。
+  const haveBannerAlready =
+    !!fresh?.eventBanner ||
+    !!lastOfficialEventDomBundle?.eventBanner;
+  if (!haveBannerAlready && _auditionBannerFetchedForLid !== lid) {
+    _auditionBannerFetchedForLid = lid;
+    try {
+      const fetched = await fetchOfficialEventBannerFromAuditionEmbed(lid);
+      if (fetched) {
+        fresh = fresh
+          ? { ...fresh, eventBanner: fetched }
+          : {
+              capturedAt: Date.now(),
+              eventBanner: fetched,
+              eventBalloon: null,
+              contributionRanking: null,
+              adContributionRanking: null,
+              programStats: null,
+              giftHistory: null
+            };
+        try {
+          document.documentElement?.setAttribute(
+            'data-nls-audition-fetch',
+            'ok'
+          );
+        } catch { /* no-op */ }
+      } else {
+        try {
+          document.documentElement?.setAttribute(
+            'data-nls-audition-fetch',
+            'empty'
+          );
+        } catch { /* no-op */ }
+      }
+    } catch {
+      try {
+        document.documentElement?.setAttribute('data-nls-audition-fetch', 'error');
+      } catch { /* no-op */ }
+    }
+  }
+  // 0.1.169: ニコニ広告ページから貢献度ランキング（広告 pt 順）を fetch。
+  // モチベーション源として popup に表示する。同じ liveId につき 1 度きり。
+  const haveAdRankingAlready =
+    Array.isArray(fresh?.adContributionRanking) ||
+    Array.isArray(lastOfficialEventDomBundle?.adContributionRanking);
+  if (!haveAdRankingAlready && _nicoadContribFetchedForLid !== lid) {
+    _nicoadContribFetchedForLid = lid;
+    try {
+      const fetched = await fetchNicoadContributionRankingFromPublishPage(lid);
+      if (Array.isArray(fetched) && fetched.length > 0) {
+        fresh = fresh
+          ? { ...fresh, adContributionRanking: fetched }
+          : {
+              capturedAt: Date.now(),
+              eventBanner: null,
+              eventBalloon: null,
+              contributionRanking: null,
+              adContributionRanking: fetched,
+              programStats: null,
+              giftHistory: null
+            };
+        try {
+          document.documentElement?.setAttribute(
+            'data-nls-nicoad-fetch',
+            'ok'
+          );
+        } catch { /* no-op */ }
+      } else {
+        try {
+          document.documentElement?.setAttribute(
+            'data-nls-nicoad-fetch',
+            'empty'
+          );
+        } catch { /* no-op */ }
+      }
+    } catch {
+      try {
+        document.documentElement?.setAttribute('data-nls-nicoad-fetch', 'error');
+      } catch { /* no-op */ }
+    }
+  }
+  // 0.1.171: ニコニ広告ページが SPA で fetch だと SSR empty なため、
+  // ユーザーが別タブで nicoad ページを開いたときに content script が scrape して
+  // chrome.storage.local の `nls_nicoad_ranking_<lv>` に保存する設計（content-entry.js
+  // 末尾の tryHarvestNicoadContributionRankingOnce）。ここでは watch タブが
+  // そのストレージを読み出して bundle に取り込む。
+  const haveAdRankingAfterFetch =
+    Array.isArray(fresh?.adContributionRanking) ||
+    Array.isArray(lastOfficialEventDomBundle?.adContributionRanking);
+  if (!haveAdRankingAfterFetch) {
+    try {
+      const key = `nls_nicoad_ranking_${lid}`;
+      const got = await chrome.storage.local.get([key]);
+      const data = got?.[key];
+      if (data && Array.isArray(data.ranking) && data.ranking.length > 0) {
+        fresh = fresh
+          ? { ...fresh, adContributionRanking: data.ranking }
+          : {
+              capturedAt: Date.now(),
+              eventBanner: null,
+              eventBalloon: null,
+              contributionRanking: null,
+              adContributionRanking: data.ranking,
+              programStats: null,
+              giftHistory: null
+            };
+      }
+    } catch { /* no-op */ }
+  }
+  // v0.1.195: 複数 watch タブ race で他タブが書いた値を上書き消去しないよう、
+  // storage の現値を読んで 3-way merge する。
+  // 旧実装は「自タブメモリ + fresh」だけ merge していたため、他タブが直前に書いた
+  // contributionRanking 等が silent 消去される race があった
+  // （memory todo_multi_tab_ranking_disappear.md 参照）。
+  /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle | null} */
+  let storageCurrent = null;
+  try {
+    const key = eventDomStorageKey(lid);
+    const bag = await chrome.storage.local.get(key);
+    const v = bag?.[key];
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      storageCurrent = /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle} */ (v);
+    }
+  } catch { /* no-op */ }
+  // 何も取れない時は古い値を消さない（モーダル閉時に消えるのを防ぐ）
+  if (!fresh && !lastOfficialEventDomBundle && !storageCurrent) return;
+  // 3-way merge: storage 現値 → 自メモリ → fresh の順で重ねる。
+  // mergeOfficialEventDomBundle(prev, next) は next を優先するので
+  // 最後に重ねた fresh（観測値）が最優先、次に自メモリ、最後に他タブ書き込み。
+  const stage1 = mergeOfficialEventDomBundle(storageCurrent, lastOfficialEventDomBundle);
+  const merged = mergeOfficialEventDomBundle(stage1, fresh);
+  if (!merged) return;
+  lastOfficialEventDomBundle = merged;
+  try {
+    await chrome.storage.local.set({ [eventDomStorageKey(lid)]: merged });
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      // no-op
+    }
+  }
+  // 0.1.189: L1 Canonical Snapshot を MCP Bridge 用に書き出す（5s coalesce 内蔵）
+  try { void buildAndPersistMcpSnapshot(); } catch { /* no-op */ }
+}
+
+/**
+ * niconico のギフトサイドバーをユーザに気づかれないよう一時的に開閉して、
+ * 「○○さんが参加しています」「貢献度ランキング」「イベント累計スコア」を
+ * 1 度だけ DOM に出させる。出た瞬間に scrape されて
+ * `nls_event_dom_<lv>` に永続化されるので、サイドバーは閉じても表示は維持される。
+ *
+ * 安全策：
+ *   - 既にバナーが見えている（ユーザが開いている）→ スクレイプだけして自動操作はしない
+ *   - 同一 liveId で 1 回だけ実行（再呼び出しは no-op）
+ *   - サイドバーをステルス CSS で「visibility:hidden + pointer-events:none」にしてから開く
+ *   - 失敗時はサイレントに抜ける（拡張のロジックは壊れない）
+ */
+/** @param {string} v */
+function setAutoOpenStatus(v) {
+  try {
+    document.documentElement?.setAttribute('data-nls-auto-open', v);
+  } catch {
+    // no-op
+  }
+  // 0.1.174: lifetime counter に接続（rankingDiag.autoOpen を駆動）。
+  // 'start' で attempt をカウント、それ以外は last 系のみ更新。
+  try {
+    const _d = getRankingLifetimeDiag();
+    if (v === 'start') _d.autoOpenAttemptCount += 1;
+    _d.autoOpenLastAttemptAt = Date.now();
+    _d.autoOpenLastStatus = String(v || '').slice(0, 80);
+  } catch { /* no-op */ }
+}
+
+/**
+ * 0.1.174: 自動オープン後にサイドバー内のクリック可能要素を観測して、
+ * 「ランキング」タブが見つからない真因を診断 JSON に残す（テスラ式観測）。
+ * 1 回の dump で次の修正方針が確定する：
+ *   - hint に「ランキング」を含む要素が居る → タブは存在、selector か click 経路の問題
+ *   - 居ない → サイドバー自体が開いていない or タブが Shadow DOM
+ *   - 候補数 0 → サイドバー DOM がそもそも生成されていない（gift-button click 不発）
+ */
+function snapshotAutoOpenSidebarHints() {
+  /** @type {{ tag: string, role: string, text: string, cls: string }[]} */
+  const hints = [];
+  try {
+    const sidebarRoot =
+      document.querySelector('[class*="gift-sidebar"]') ||
+      document.querySelector('[class*="gift-modal"]') ||
+      document.querySelector('[class*="gift-popup"]') ||
+      document.querySelector('[class*="rich-view"]') ||
+      document.body;
+    if (!(sidebarRoot instanceof HTMLElement)) return;
+    const candidates = sidebarRoot.querySelectorAll(
+      '[role="tab"], button, a, li, div[class*="tab"], span[class*="tab"], [class*="ranking"], [class*="contribution"]'
+    );
+    let i = 0;
+    for (const el of candidates) {
+      if (i >= 30) break;
+      if (!(el instanceof HTMLElement)) continue;
+      const text = String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      if (!text) continue;
+      hints.push({
+        tag: String(el.tagName || '').toLowerCase(),
+        role: String(el.getAttribute('role') || ''),
+        text,
+        cls: String(el.className || '').slice(0, 80)
+      });
+      i += 1;
+    }
+  } catch { /* no-op */ }
+  try {
+    /** @type {any} */ (globalThis).__nls_auto_open_sidebar_hints__ = {
+      capturedAt: Date.now(),
+      hints
+    };
+  } catch { /* no-op */ }
+}
+
+/**
+ * Vue / 他のフレームワークが `.click()` だけでは反応しない場合があるので、
+ * pointerdown → pointerup → mousedown → mouseup → click の 5 段攻めで動かす。
+ * @param {HTMLElement} el
+ */
+function dispatchSyntheticActivation(el) {
+  /** @param {string} type */
+  const dispatch = (type) => {
+    try {
+      const Ev = type.startsWith('pointer') && typeof PointerEvent !== 'undefined'
+        ? PointerEvent
+        : MouseEvent;
+      const ev = new Ev(type, {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        view: window
+      });
+      el.dispatchEvent(ev);
+    } catch {
+      // no-op
+    }
+  };
+  dispatch('pointerdown');
+  dispatch('mousedown');
+  dispatch('pointerup');
+  dispatch('mouseup');
+  try {
+    el.click();
+  } catch {
+    dispatch('click');
+  }
+}
+
+async function tryAutoOpenGiftSidebarOnceForScrape() {
+  if (!hasExtensionContext()) {
+    setAutoOpenStatus('no-context');
+    return;
+  }
+  if (!recording || !liveId) {
+    setAutoOpenStatus('no-live');
+    return;
+  }
+  if (!isWatchInlinePanelTopFrame()) {
+    setAutoOpenStatus('not-top-frame');
+    return;
+  }
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) {
+    setAutoOpenStatus('no-lid');
+    return;
+  }
+  if (_autoOpenGiftSidebarTriedLiveId === lid) {
+    setAutoOpenStatus('already-tried');
+    return;
+  }
+  _autoOpenGiftSidebarTriedLiveId = lid;
+  setAutoOpenStatus('start');
+
+  // 1. 既にバナーが見える＝ユーザがサイドバーを開いている → 触らずに scrape のみ
+  const owners = (() => {
+    try {
+      return document.querySelectorAll('.owner-name');
+    } catch {
+      return [];
+    }
+  })();
+  for (const el of /** @type {Iterable<Element>} */ (owners)) {
+    if (el instanceof HTMLElement && /さんが参加しています/.test(el.textContent || '')) {
+      await persistOfficialEventDomBundleNow();
+      setAutoOpenStatus('already-open-scraped');
+      return;
+    }
+  }
+
+  // 2. ギフトボタンを探す（CSS Modules ハッシュ命名 ___gift-button___HASH に追随）
+  /** @type {HTMLElement|null} */
+  let giftBtn = null;
+  try {
+    const cand =
+      document.querySelector('[class*="gift-button"]') ||
+      document.querySelector('button[aria-label*="ギフト"]') ||
+      document.querySelector('button[title*="ギフト"]');
+    if (cand instanceof HTMLElement) giftBtn = cand;
+  } catch {
+    // no-op
+  }
+  if (!giftBtn) {
+    setAutoOpenStatus('no-button');
+    return;
+  }
+
+  // 3. ステルス CSS：opacity + pointer-events で見えなくする。
+  //    画面外に飛ばすと Vue の IntersectionObserver が「見えてない」と判定して
+  //    バナーをマウントしないため、bounding box は通常位置のまま透明にする。
+  //    transform / position は触らないので Vue が viewport 内と認識→マウント実行。
+  const styleEl = document.createElement('style');
+  styleEl.id = 'nls-stealth-gift-sidebar';
+  styleEl.textContent = `
+    [class*="gift-sidebar"],
+    [class*="gift-modal"],
+    [class*="gift-popup"],
+    [class*="gift-balloon"],
+    [class*="gift-dialog"],
+    [class*="gift-overlay"],
+    [class*="rich-view"],
+    [class*="program-gift-richview"],
+    [class*="balloon"][data-has-reload-button],
+    .balloon[data-has-reload-button] {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      user-select: none !important;
+    }
+  `;
+  try {
+    document.head.appendChild(styleEl);
+  } catch {
+    setAutoOpenStatus('style-failed');
+    return;
+  }
+
+  try {
+    // 4. 開く（5 段攻めで Vue / React / Vanilla すべてに反応させる）
+    setAutoOpenStatus('opening');
+    dispatchSyntheticActivation(giftBtn);
+    // 5. Vue のマウント＋XHR 完了を待つ（最大 2 秒、500ms ごとに DOM ヒットを確認）
+    let scrapedBanner = false;
+    for (let i = 0; i < 4; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const banner = (() => {
+        try {
+          for (const el of document.querySelectorAll('.owner-name')) {
+            if (el instanceof HTMLElement && /さんが参加しています/.test(el.textContent || '')) return true;
+          }
+        } catch { /* no-op */ }
+        return false;
+      })();
+      if (banner) {
+        await persistOfficialEventDomBundleNow();
+        scrapedBanner = true;
+        setAutoOpenStatus(`scraped-banner-tick-${i + 1}`);
+        break;
+      }
+    }
+    // 6. ランキングタブを探してクリック（貢献度ランキングのマウントを誘発）。
+    //    niconico のギフトサイドバーは「番組ギフト / マイギフト / 履歴 / ランキング」の
+    //    4 タブで、ランキングタブを開かないと .contribution-ranking-list が DOM に
+    //    出てこない。バナーがマウント済みであろうこのタイミングで切り替える。
+    //
+    //    0.1.174: 検出を 3 段階に強化。
+    //     (a) 部分一致 + selector 拡張：「ランキング」「Ranking」「貢献」のいずれかを
+    //         含む短いテキスト（30 字以下）の clickable 要素を広く拾う。
+    //     (b) class 名による検出：ranking-tab / contribution-tab 等の命名にもヒット。
+    //     (c) 失敗時は sidebar 内 clickable を 30 件 dump（snapshotAutoOpenSidebarHints）、
+    //         診断 JSON に残して次回の真因切り分けに使う。
+    /** @type {HTMLElement|null} */
+    let rankTabBtn = null;
+    let rankTabFinder = '';
+    try {
+      const RANK_TEXT_RE = /ランキング|Ranking|貢献/;
+      const candidates = document.querySelectorAll(
+        '[role="tab"], button, a, li, div[class*="tab"], span[class*="tab"]'
+      );
+      for (const el of candidates) {
+        if (!(el instanceof HTMLElement)) continue;
+        const t = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!t || t.length > 30) continue;
+        if (RANK_TEXT_RE.test(t)) {
+          rankTabBtn = el;
+          rankTabFinder = `text:${el.tagName.toLowerCase()}`;
+          break;
+        }
+      }
+      if (!rankTabBtn) {
+        const byCls = document.querySelector(
+          '[class*="ranking-tab"], [class*="contribution-tab"], [class*="ranker-tab"]'
+        );
+        if (byCls instanceof HTMLElement) {
+          rankTabBtn = byCls;
+          rankTabFinder = 'class';
+        }
+      }
+    } catch { /* no-op */ }
+    if (!rankTabBtn) {
+      // 失敗時の根本観測：次回診断で「ランキング」と書かれた要素の class 名・親が見える
+      try { snapshotAutoOpenSidebarHints(); } catch { /* no-op */ }
+    }
+    let scrapedRanking = false;
+    if (rankTabBtn) {
+      // 0.1.174: ステルス CSS の pointer-events:none で click event が遮断される
+      // 可能性に対処。tab 要素だけ inline style で一時的に pointer-events を auto に。
+      const prevPe = rankTabBtn.style.pointerEvents;
+      try { rankTabBtn.style.pointerEvents = 'auto'; } catch { /* no-op */ }
+      dispatchSyntheticActivation(rankTabBtn);
+      // ランキングは XHR で取得→Vue マウントなので、バナーより少し時間がかかる。
+      // 最大 3 秒、500ms ごとに polling。
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const hasRank = (() => {
+          try {
+            return !!document.querySelector('.contribution-ranking-list .ranker');
+          } catch { return false; }
+        })();
+        if (hasRank) {
+          await persistOfficialEventDomBundleNow();
+          scrapedRanking = true;
+          setAutoOpenStatus(
+            scrapedBanner
+              ? `scraped-banner-and-ranking-tick-${i + 1}:${rankTabFinder}`
+              : `scraped-ranking-only-tick-${i + 1}:${rankTabFinder}`
+          );
+          break;
+        }
+      }
+      try { rankTabBtn.style.pointerEvents = prevPe; } catch { /* no-op */ }
+    }
+    if (!scrapedBanner && !scrapedRanking) {
+      // どちらも現れなかった → programStats 等だけでも取って終わる
+      await persistOfficialEventDomBundleNow();
+      // tab 見つかったが ranker 出ない場合は dump も取る（仮説 3：click が効いてない）
+      if (rankTabBtn) {
+        try { snapshotAutoOpenSidebarHints(); } catch { /* no-op */ }
+      }
+      setAutoOpenStatus(
+        rankTabBtn ? `opened-no-banner-no-ranking:${rankTabFinder}` : 'opened-but-no-banner'
+      );
+    } else if (scrapedBanner && !scrapedRanking) {
+      if (rankTabBtn) {
+        try { snapshotAutoOpenSidebarHints(); } catch { /* no-op */ }
+      }
+      setAutoOpenStatus(
+        rankTabBtn ? `banner-only-no-ranking:${rankTabFinder}` : 'banner-only-no-rank-tab'
+      );
+    }
+    // 6. 閉じる：close ボタンが居れば優先、無ければギフトボタンを再クリックでトグル
+    /** @type {HTMLElement|null} */
+    let closeBtn = null;
+    try {
+      const c =
+        document.querySelector(
+          '[class*="gift-sidebar"] [class*="close"], ' +
+            '[class*="gift-modal"] [class*="close"], ' +
+            '[class*="gift-popup"] [class*="close"], ' +
+            '[class*="rich-view"] [class*="close"]'
+        );
+      if (c instanceof HTMLElement) closeBtn = c;
+    } catch {
+      // no-op
+    }
+    if (closeBtn) {
+      dispatchSyntheticActivation(closeBtn);
+    } else {
+      dispatchSyntheticActivation(giftBtn);
+    }
+    // 7. 閉じアニメーション分待ってからステルス CSS を外す
+    await new Promise((r) => setTimeout(r, 400));
+  } catch (err) {
+    setAutoOpenStatus(`error-${String(err && /** @type {{name?:string}} */(err).name || 'unknown').slice(0, 20)}`);
+  } finally {
+    try {
+      styleEl.remove();
+    } catch {
+      // no-op
+    }
+  }
+}
+
+/**
+ * 0.1.171: ニコニ広告ページ (https://nicoad.nicovideo.jp/live/publish/<lv>?frontend_id=9)
+ * に注入されたとき、レンダリング完了を待って貢献度ランキングを scrape し、
+ * chrome.storage.local の `nls_nicoad_ranking_<lv>` に保存する。
+ *
+ * 同じ拡張の watch タブの content script が persistOfficialEventDomBundleNow で
+ * このストレージを読み出し、bundle.adContributionRanking にマージする
+ * （別タブ経由のデータブリッジ）。SPA は SSR で空 HTML を返すため fetch 経由は
+ * 取れない（v0.1.169-170 で empty 確認済み）が、ユーザーが nicoad ページを
+ * 開けば本物の DOM がレンダリングされるのでこの経路で取れる。
+ */
+function tryHarvestNicoadContributionRankingOnce() {
+  let url = '';
+  try { url = String(window.location.href || ''); } catch { return; }
+  const m = url.match(/^https:\/\/nicoad\.nicovideo\.jp\/live\/publish\/(lv\d+)/i);
+  if (!m) return;
+  const lid = m[1].toLowerCase();
+  /** @returns {boolean} */
+  const tryScrape = () => {
+    try {
+      const ranking = scrapeContributionRankingFromDom(document);
+      if (Array.isArray(ranking) && ranking.length > 0) {
+        try {
+          chrome.storage.local.set({
+            [`nls_nicoad_ranking_${lid}`]: {
+              capturedAt: Date.now(),
+              ranking,
+              sourceUrl: url
+            }
+          });
+        } catch { /* no-op */ }
+        return true;
+      }
+    } catch { /* no-op */ }
+    return false;
+  };
+  if (tryScrape()) return;
+  setTimeout(() => {
+    if (tryScrape()) return;
+    setTimeout(tryScrape, 5000);
+  }, 1500);
 }
 
 /*
@@ -7237,5 +10034,17 @@ if (!__nlsBootGlobal.__NLS_CONTENT_ENTRY_STARTED__) {
   } catch {
     // no-op
   }
+  // v0.1.201: window.error / unhandledrejection を診断 JSON 用 ring buffer に
+  // 取り込み開始（idempotent、初回 boot のみ install）。
+  try {
+    if (typeof window !== 'undefined') _consoleErrorBuffer.install(window);
+  } catch { /* no-op */ }
+  // ニコニ広告ページに注入された場合のハーベストは start() とは独立して走らせる
+  // （start は watch ページ専用で early return するため）
+  try { tryHarvestNicoadContributionRankingOnce(); } catch { /* no-op */ }
+  // v0.1.216: gift sub-app iframe（koken.nicovideo.jp 等）から親 frame への
+  //   履歴 relay 経路を起動。iframe 内では shouldRunWatchContentInThisFrame() が
+  //   false で start() が早期 return するため、独立して起動する。
+  try { maybeStartGiftSubAppIframeRelay(); } catch { /* no-op */ }
   start().catch((err) => reportSilentErrorToStorage('start', err));
 }

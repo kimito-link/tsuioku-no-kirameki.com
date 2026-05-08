@@ -8,7 +8,11 @@ import {
   isWeakNiconicoUserIconHttpUrl
 } from './supportGrowthTileSrc.js';
 import { isNiconicoAutoUserPlaceholderNickname } from './nicoAnonymousDisplay.js';
-import { supportGridStrongNickname } from './supportGridDisplayTier.js';
+import {
+  isLikelyInternalNdgGiftOrCampaignLabel,
+  isTrustworthySupportGridDisplayNickname,
+  pickBetterInterceptNickname
+} from './giftDisplayNickname.js';
 import { clampAvatarUrl } from '../shared/avatar/clampAvatarUrl.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from './avatarBroadcasterGuard.js';
 
@@ -103,7 +107,17 @@ function mergeIntoMap(map, uid, p) {
   let changed = false;
 
   if (nickIn) {
-    if (!nextNick || nickIn.length > nextNick.length) {
+    const inInternal = isLikelyInternalNdgGiftOrCampaignLabel(nickIn);
+    const inTrust = isTrustworthySupportGridDisplayNickname(nickIn, uid);
+
+    let preferIn = false;
+    if (!nextNick) {
+      preferIn = !inInternal || inTrust;
+    } else {
+      preferIn = pickBetterInterceptNickname(uid, nextNick, nickIn) === nickIn;
+    }
+
+    if (preferIn && nickIn !== nextNick) {
       nextNick = nickIn;
       changed = true;
     }
@@ -235,12 +249,18 @@ export function applyUserCommentProfileMapToEntries(entries, map) {
     let changed = false;
 
     if (candNick) {
+      const candInternal = isLikelyInternalNdgGiftOrCampaignLabel(candNick);
+      const curInternal = isLikelyInternalNdgGiftOrCampaignLabel(curNick);
+      const candTrust = isTrustworthySupportGridDisplayNickname(candNick, uid);
       const preferNick =
-        !curNick ||
-        candNick.length > curNick.length ||
-        (isWeakMergedDisplayNickname(curNick) &&
-          supportGridStrongNickname(candNick, uid));
-      if (preferNick && candNick !== curNick) {
+        candNick !== curNick &&
+        ((!curNick && (!candInternal || candTrust)) ||
+          (curInternal && !candInternal) ||
+          (!curInternal &&
+            !candInternal &&
+            (!curNick || candNick.length > curNick.length)) ||
+          (isWeakMergedDisplayNickname(curNick) && candTrust && !candInternal));
+      if (preferNick) {
         out = { ...out, nickname: candNick };
         changed = true;
       }

@@ -46,7 +46,14 @@ describe('buildWatchSnapshotOfficialFields', () => {
       officialStatisticsCommentsDelta: null,
       officialReceivedCommentsDelta: null,
       officialCommentSampleWindowMs: null,
-      officialCaptureRatio: null
+      officialCaptureRatio: null,
+      officialAdPointsNdgr: null,
+      officialGiftPointsNdgr: null,
+      officialEventGiftScoreNdgr: null,
+      officialNicoEventRankNdgr: null,
+      officialNicoEventTitleNdgr: null,
+      officialNdgrStatsUpdatedAt: null,
+      officialNdgrStatsFreshnessMs: null
     });
   });
 
@@ -113,6 +120,33 @@ describe('buildWatchSnapshotOfficialFields', () => {
       officialReceivedCommentsDelta: 0,
       officialCommentSampleWindowMs: 0,
       officialCaptureRatio: 0
+    });
+  });
+
+  it('NDGR 由来の公式ギフト・イベント欄を正規化する', () => {
+    expect(
+      buildWatchSnapshotOfficialFields({
+        nowMs: 500_000,
+        officialViewerCount: null,
+        officialCommentCount: null,
+        officialStatsUpdatedAt: 0,
+        officialViewerIntervalMs: null,
+        officialCommentSummary: null,
+        officialAdPointsNdgr: 12,
+        officialGiftPointsNdgr: 63470,
+        officialEventGiftScoreNdgr: 353200,
+        officialNicoEventRankNdgr: 3,
+        officialNicoEventTitleNdgr: '  春キャン  ',
+        officialNdgrStatsUpdatedAt: 499_000
+      })
+    ).toMatchObject({
+      officialAdPointsNdgr: 12,
+      officialGiftPointsNdgr: 63470,
+      officialEventGiftScoreNdgr: 353200,
+      officialNicoEventRankNdgr: 3,
+      officialNicoEventTitleNdgr: '春キャン',
+      officialNdgrStatsUpdatedAt: 499_000,
+      officialNdgrStatsFreshnessMs: 1000
     });
   });
 });

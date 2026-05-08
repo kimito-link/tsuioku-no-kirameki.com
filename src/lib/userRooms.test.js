@@ -175,4 +175,32 @@ describe('aggregateCommentsByUser', () => {
     expect(rows[0].userKey).toBe(UNKNOWN_USER_KEY);
     expect(rows[0].avatarUrl).toBe('');
   });
+
+  it('requireText: true で text 空の entry を除外（ギフト送信のみのユーザーが消える）', () => {
+    const rows = aggregateCommentsByUser(
+      [
+        { userId: 'commenter', text: 'こんにちは', capturedAt: 100 },
+        { userId: 'commenter', text: 'ww', capturedAt: 200 },
+        { userId: 'gift_only_user', text: '', capturedAt: 300 },
+        { userId: 'mixed', text: '', capturedAt: 400 },
+        { userId: 'mixed', text: '応援！', capturedAt: 500 },
+        { userId: 'whitespace_only', text: '   ', capturedAt: 600 }
+      ],
+      { requireText: true }
+    );
+    const keys = rows.map((r) => r.userKey).sort();
+    expect(keys).toEqual(['commenter', 'mixed']);
+    const commenter = rows.find((r) => r.userKey === 'commenter');
+    expect(commenter?.count).toBe(2);
+    const mixed = rows.find((r) => r.userKey === 'mixed');
+    expect(mixed?.count).toBe(1); // 空 text の entry はカウントされない
+  });
+
+  it('requireText 未指定（旧 API）では従来どおり全 entry をカウント', () => {
+    const rowsDefault = aggregateCommentsByUser([
+      { userId: 'gift_only', text: '', capturedAt: 100 }
+    ]);
+    expect(rowsDefault.length).toBe(1);
+    expect(rowsDefault[0].userKey).toBe('gift_only');
+  });
 });

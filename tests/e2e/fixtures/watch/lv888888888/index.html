@@ -28,6 +28,13 @@
   <body>
     <h1>nicolivelog E2E mock</h1>
     <p>URL は <code>/watch/lv888888888/</code>。コメントパネル構造のみニコ生に近い。</p>
+    <!--
+      collectWatchPageSnapshot → parseLiveViewerCountFromDocument が拾う文面。
+      実ページの Shadow 外に相当する平文（body.textContent に含まれること）。
+    -->
+    <p id="e2e-mock-viewer-count-sentinel" class="nls-e2e-sentinel" aria-hidden="true">
+      現在 <strong>9,876人が視聴中</strong>
+    </p>
 
     <!-- 先頭の .ga-ns-comment-panel が findNicoCommentPanel に選ばれるため、仮想リスト（行あり）を先に置く -->
     <video
@@ -123,6 +130,18 @@
               }
             }, 1800);
           });
+          return;
+        }
+
+        if (variant === 'asset-picker') {
+          wrap.innerHTML =
+            '<form id="e2e-comment-form">' +
+            '<div class="toolbar">' +
+            '<button type="button" id="e2e-asset-launcher" aria-label="ギフトを贈る">🎁</button>' +
+            '</div>' +
+            '<textarea placeholder="コメントを入力" name="comment" rows="2"></textarea>' +
+            '<button type="submit" aria-label="コメントを送信">送信</button>' +
+            '</form>';
           return;
         }
 

@@ -568,20 +568,17 @@ async function openOrFocusPopupWindow() {
 }
 
 /**
- * 0.1.67 (AW): 関係ないタブ（watch じゃない）でツールバーアイコンを押した時、
- *   旧来の standalone popup window ではなく Chrome 統合の **side panel** を
- *   開くよう変更。ユーザー報告「(配信中の inline panel と違って) 関係ない
- *   タブで開いた popup が Chrome から離れて見える」への対応で、視覚的に
- *   Chrome window と一体化させる。
+ * ツールバーアイコン押下: watch ならインライン前面化、それ以外は **従来の standalone popup 窓**。
  *
- *   - watch ページ: 従来通り inline panel に focus（NLS_FOCUS_INLINE_PANEL）
- *   - watch じゃないタブ: chrome.sidePanel.open({windowId}) で side panel
- *   - 旧 popup window は API 不在・エラー時の fallback として残す
- *   - getToolbarActionPolicy() === 'always_open_popup' は旧挙動を保つ（互換）
+ * 0.1.67 (AW) では非 watch で `chrome.sidePanel.open` を試していたが、
+ * 環境・タブ種別によってサイドパネルが空／未表示に見え「いつもの POP が出ない」
+ * となる報告があったため、インラインにフォーカスできないときは **常に**
+ * `openOrFocusPopupWindow()` に戻す（サイドパネルは manifest の default_path の
+ * まま、Chrome UI から手動で開く利用は可能）。
  *
- *   sidepanel.html は popup.html?inline=1&dock=sidepanel を iframe で読み込む
- *   既存実装。popup-entry.js の sidepanel 用 UI 切り替えロジック (search param
- *   `dock=sidepanel`) がそのまま機能する。
+ * - watch ページ: `NLS_FOCUS_INLINE_PANEL` で前面化、`{ focused: true }` なら終了
+ * - それ以外・失敗時: `chrome.windows.create` の popup 窓（従来どおり）
+ * - `getToolbarActionPolicy() === 'always_open_popup'` は常に popup のみ（互換）
  *
  * @param {import('chrome').tabs.Tab|undefined} tab
  */
@@ -615,21 +612,6 @@ async function handleBrowserActionClick(tab) {
     } catch {
       // コンテンツ未注入・対象外 URL
     }
-  }
-  // 0.1.67 (AW): watch じゃないタブ → Chrome 統合の side panel を試みる
-  try {
-    if (
-      tab &&
-      typeof tab.windowId === 'number' &&
-      typeof chrome !== 'undefined' &&
-      chrome.sidePanel &&
-      typeof chrome.sidePanel.open === 'function'
-    ) {
-      await chrome.sidePanel.open({ windowId: tab.windowId });
-      return;
-    }
-  } catch {
-    // sidePanel.open が使えない / user gesture が失われた / 環境制約 → popup window へ fallback
   }
   await openOrFocusPopupWindow();
 }

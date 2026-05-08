@@ -7,7 +7,7 @@ import {
   splitLengthDelimitedMessagesWithTail
 } from '../lib/lengthDelimitedStream.js';
 import { extractPairsFromBinaryUtf8 } from '../lib/interceptBinaryTextExtract.js';
-import { decodeChunkedMessage, decodePackedSegment } from '../lib/ndgrDecode.js';
+import { decodeChunkedMessage, decodePackedSegment, ndgrStatisticsHasWireSignal } from '../lib/ndgrDecode.js';
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { anonymousNicknameFallback } from '../lib/nicoAnonymousDisplay.js';
 import {
@@ -335,7 +335,83 @@ import {
     }
   }
 
-  const _ndgr = { stats: 0, chats: 0, gifts: 0, decoded: 0 };
+  // gifts カウンタの内訳（v0.1.221 追加）：
+  //   giftsUid: advertiserUserId が空でなかった件数
+  //   giftsName: advertiserName が空でなかった件数
+  //   giftsItem: itemId か itemName のどちらかが取れた件数
+  //   giftsPoint: point が number で取れた件数
+  //   giftsRank: contributionRank が number で取れた件数
+  // gifts 総数に対し各内訳が小さい場合、decode (proto field) で取れていない段が原因。
+  // 各内訳が高いのに popup の sender 観測 0 なら受信側 (content-entry の保存) で skip されている段。
+  const _ndgr = {
+    stats: 0,
+    chats: 0,
+    gifts: 0,
+    decoded: 0,
+    giftsUid: 0,
+    giftsName: 0,
+    giftsItem: 0,
+    giftsPoint: 0,
+    giftsRank: 0
+  };
+  /**
+   * NDGR で観測した protobuf field tag のヒストグラム。
+   * top: ChunkedMessage 直下の field tag、msg: 内側 NicoliveMessage one-of の field tag。
+   * niconico がプロトコルを差し替えた時、どの tag に新ペイロードが乗ったかを
+   * 「既存の chats/gifts カウンタが伸びない vs 新 tag が伸びている」という形で観測する。
+   */
+  const _ndgrTagHistogram = { top: /** @type {Record<string, number>} */ ({}), msg: /** @type {Record<string, number>} */ ({}) };
+  /** @param {{ top: Record<string, number>, msg: Record<string, number> } | undefined} h */
+  function mergeNdgrTagHistogram(h) {
+    if (!h) return;
+    for (const k of Object.keys(h.top || {})) {
+      _ndgrTagHistogram.top[k] = (_ndgrTagHistogram.top[k] || 0) + (h.top[k] || 0);
+    }
+    for (const k of Object.keys(h.msg || {})) {
+      _ndgrTagHistogram.msg[k] = (_ndgrTagHistogram.msg[k] || 0) + (h.msg[k] || 0);
+    }
+  }
+  function publishNdgrTagHistogram() {
+    const root = document.documentElement;
+    if (!root) return;
+    try {
+      root.setAttribute('data-nls-ndgr-tags', JSON.stringify(_ndgrTagHistogram));
+    } catch { /* no-op */ }
+  }
+
+  /**
+   * v0.1.209 緊急投入: 未知 NDGR field の sample を蓄積（lifetime、最大 3 件 / key）。
+   * msg.8 (gift) が来ない一方で msg.3 / top.11 が来る配信が確認されたため、
+   * 中身（hex preview + 内側 field histogram + string sample）を診断 JSON に
+   * 露出して真の gift 経路を特定する。
+   */
+  /** @type {Record<string, Array<any>>} */
+  const _ndgrUnknownSamples = {};
+  const NDGR_UNKNOWN_SAMPLES_MAX_PER_KEY = 3;
+  /** @param {Record<string, Array<any>> | undefined} u */
+  function mergeNdgrUnknownSamples(u) {
+    if (!u || typeof u !== 'object') return;
+    for (const key of Object.keys(u)) {
+      if (!_ndgrUnknownSamples[key]) _ndgrUnknownSamples[key] = [];
+      const slot = _ndgrUnknownSamples[key];
+      if (slot.length >= NDGR_UNKNOWN_SAMPLES_MAX_PER_KEY) continue;
+      const incoming = Array.isArray(u[key]) ? u[key] : [];
+      for (const sample of incoming) {
+        if (slot.length >= NDGR_UNKNOWN_SAMPLES_MAX_PER_KEY) break;
+        slot.push(sample);
+      }
+    }
+  }
+  function publishNdgrUnknownSamples() {
+    const root = document.documentElement;
+    if (!root) return;
+    try {
+      root.setAttribute(
+        'data-nls-ndgr-unknown-samples',
+        JSON.stringify(_ndgrUnknownSamples)
+      );
+    } catch { /* no-op */ }
+  }
   /** @type {{ pendingBytes: number, droppedBytes: number, totalFrames: number }|null} */
   let _ldStreamStats = null;
 
@@ -350,9 +426,24 @@ import {
 
   function handleNdgrResult(result) {
     if (!result) return;
-    if (result.stats && result.stats.viewers != null) {
+    mergeNdgrTagHistogram(result.tagHistogram);
+    mergeNdgrUnknownSamples(result.unknownSamples);
+    if (result.stats && ndgrStatisticsHasWireSignal(result.stats)) {
       _ndgr.stats++;
-      window.postMessage({ type: MSG_STATISTICS, viewers: result.stats.viewers, comments: result.stats.comments }, '*');
+      const st = result.stats;
+      window.postMessage(
+        {
+          type: MSG_STATISTICS,
+          ...(st.viewers != null ? { viewers: st.viewers } : {}),
+          ...(st.comments != null ? { comments: st.comments } : {}),
+          ...(st.adPoints != null ? { adPoints: st.adPoints } : {}),
+          ...(st.giftPoints != null ? { giftPoints: st.giftPoints } : {}),
+          ...(st.eventGiftScore != null ? { eventGiftScore: st.eventGiftScore } : {}),
+          ...(st.eventRank != null ? { eventRank: st.eventRank } : {}),
+          ...(st.eventTitle ? { eventTitle: String(st.eventTitle) } : {})
+        },
+        '*'
+      );
     }
     for (const chat of result.chats) {
       const uid = chat.rawUserId ? String(chat.rawUserId) : chat.hashedUserId;
@@ -367,16 +458,41 @@ import {
       }
     }
     const giftList = result.gifts || [];
-    /** @type {{ userId: string, nickname: string }[]} */
+    /** @type {Array<{
+     *   userId: string, nickname: string,
+     *   itemId?: string, itemName?: string, point?: number,
+     *   message?: string, contributionRank?: number
+     * }>} */
     const giftUsers = [];
     for (const g of giftList) {
       const uid = String(g.advertiserUserId || '').trim();
       const name = String(g.advertiserName || '').trim();
-      if (uid) {
-        _ndgr.gifts++;
-        learnUser(uid, name, '');
-        giftUsers.push({ userId: uid, nickname: name });
-      }
+      // v0.1.204 Patch C-1: anonymous gift（uid 欠落）も _ndgr.gifts でカウントする。
+      // 過去は uid を必須にしていたため、過去の経験的 decoder の field 番号誤認と
+      // 合わせて gifts カウンタが永遠に 0 のままだった（v0.1.203 真因）。proto 準拠
+      // decoder（v0.1.204 Patch B）に合わせ、payload で何かしら取れている event は
+      // すべてカウント対象にする。
+      _ndgr.gifts++;
+      // v0.1.221: decode 結果の field 充足度を内訳カウンタに反映。popup の
+      // ギフト送信者観測 0 が「decode で空」か「受信側で skip」のどちらの段かを
+      // 切り分けるための診断値。
+      if (uid) _ndgr.giftsUid++;
+      if (name) _ndgr.giftsName++;
+      if (g.itemId || g.itemName) _ndgr.giftsItem++;
+      if (typeof g.point === 'number') _ndgr.giftsPoint++;
+      if (typeof g.contributionRank === 'number') _ndgr.giftsRank++;
+      if (uid) learnUser(uid, name, '');
+      giftUsers.push({
+        userId: uid,
+        nickname: name,
+        ...(g.itemId ? { itemId: g.itemId } : {}),
+        ...(g.itemName ? { itemName: g.itemName } : {}),
+        ...(typeof g.point === 'number' ? { point: g.point } : {}),
+        ...(g.message ? { message: g.message } : {}),
+        ...(typeof g.contributionRank === 'number'
+          ? { contributionRank: g.contributionRank }
+          : {})
+      });
     }
     if (giftUsers.length) {
       window.postMessage({ type: MSG_GIFT_USERS, users: giftUsers }, '*');
@@ -437,13 +553,26 @@ import {
     if (root && (_ndgr.stats > 0 || _ndgr.chats > 0 || _ndgr.gifts > 0)) {
       root.setAttribute(
         'data-nls-ndgr',
-        `s=${_ndgr.stats} c=${_ndgr.chats} g=${_ndgr.gifts} d=${_ndgr.decoded}`
+        `s=${_ndgr.stats} c=${_ndgr.chats} g=${_ndgr.gifts} d=${_ndgr.decoded}` +
+          ` gu=${_ndgr.giftsUid} gn=${_ndgr.giftsName} gi=${_ndgr.giftsItem}` +
+          ` gp=${_ndgr.giftsPoint} gr=${_ndgr.giftsRank}`
       );
     }
+    publishNdgrTagHistogram();
+    publishNdgrUnknownSamples();
   }
 
   const VIEWER_KEYS = ['viewers', 'watchCount', 'watching', 'watchingCount', 'viewerCount', 'viewCount'];
   const COMMENT_KEYS = ['comments', 'commentCount'];
+  const AD_KEYS = ['adPoints', 'ad_points', 'adPoint', 'accumulatedAdPoints'];
+  const GIFT_KEYS = [
+    'giftPoints',
+    'gift_points',
+    'giftPoint',
+    'accumulatedGiftPoints',
+    'programGiftPoints',
+    'program_gift_points'
+  ];
   function pickNum(obj, keys, max) {
     for (const k of keys) {
       const r = obj[k];
@@ -459,7 +588,7 @@ import {
    * type:"statistics" だけでなく、既知キーがあれば広く拾う。
    * @param {unknown} obj
    */
-  /** @returns {boolean} viewers を拾って転送したら true */
+  /** @returns {boolean} statistics 相当を転送したら true */
   function tryForwardStatistics(obj) {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
     const o = /** @type {Record<string, unknown>} */ (obj);
@@ -470,13 +599,23 @@ import {
         : o;
     let viewers = pickNum(target, VIEWER_KEYS, 50_000_000);
     let comments = pickNum(target, COMMENT_KEYS);
+    let adPoints = pickNum(target, AD_KEYS);
+    let giftPoints = pickNum(target, GIFT_KEYS);
     if (viewers == null && target !== o) {
       viewers = pickNum(o, VIEWER_KEYS, 50_000_000);
       comments = comments ?? pickNum(o, COMMENT_KEYS);
+      adPoints = adPoints ?? pickNum(o, AD_KEYS);
+      giftPoints = giftPoints ?? pickNum(o, GIFT_KEYS);
     }
-    if (viewers == null) return false;
+    if (viewers == null && adPoints == null && giftPoints == null) return false;
     window.postMessage(
-      { type: MSG_STATISTICS, viewers, comments },
+      {
+        type: MSG_STATISTICS,
+        ...(viewers != null ? { viewers } : {}),
+        ...(comments != null ? { comments } : {}),
+        ...(adPoints != null ? { adPoints } : {}),
+        ...(giftPoints != null ? { giftPoints } : {})
+      },
       '*'
     );
     return true;

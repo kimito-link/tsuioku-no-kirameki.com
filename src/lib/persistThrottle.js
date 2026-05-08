@@ -6,21 +6,28 @@
  * burstThreshold を指定すると、バッファが閾値を超えた時点で最小間隔を待たず
  * 即時 flush する（誕生日・ファンミ等の高流量で体感レイテンシを短縮）。
  *
- * @param {(batch: unknown[]) => Promise<void>} flushFn
+ * @param {(batch: unknown[], meta: { sources: string[] }) => Promise<void>} flushFn
  * @param {number} [minIntervalMs]
  * @param {number} [burstThreshold] 0 以下は無効（既定の throttle 挙動）
  */
 export function createPersistCoalescer(flushFn, minIntervalMs = 300, burstThreshold = 0) {
-  /** @type {unknown[]} */
+  /** @type {{ rows: unknown[], source?: string }[]} */
   let buffer = [];
   /** @type {ReturnType<typeof setTimeout>|null} */
   let timer = null;
   let lastFlushTime = 0;
 
-  /** @param {unknown[]} rows */
-  function enqueue(rows) {
-    buffer.push(...rows);
-    if (burstThreshold > 0 && buffer.length >= burstThreshold) {
+  /**
+   * @param {unknown[]} rows
+   * @param {string} [source] 取り込み経路（コメント ingest ログ用）
+   */
+  function enqueue(rows, source) {
+    buffer.push({
+      rows,
+      source: typeof source === 'string' && source ? source.slice(0, 32) : ''
+    });
+    const totalLen = buffer.reduce((n, c) => n + c.rows.length, 0);
+    if (burstThreshold > 0 && totalLen >= burstThreshold) {
       // バースト閾値到達: 即時 flush（既存の timer は flush() 内でクリア）
       void flush();
       return;
@@ -35,10 +42,18 @@ export function createPersistCoalescer(flushFn, minIntervalMs = 300, burstThresh
   async function flush() {
     if (timer) { clearTimeout(timer); timer = null; }
     if (!buffer.length) return;
-    const batch = buffer;
+    const chunks = buffer;
     buffer = [];
     lastFlushTime = Date.now();
-    await flushFn(batch);
+    /** @type {unknown[]} */
+    const batchRows = [];
+    /** @type {string[]} */
+    const sources = [];
+    for (const c of chunks) {
+      batchRows.push(...c.rows);
+      if (c.source) sources.push(c.source);
+    }
+    await flushFn(batchRows, { sources });
   }
 
   function clear() {
@@ -46,5 +61,5 @@ export function createPersistCoalescer(flushFn, minIntervalMs = 300, burstThresh
     if (timer) { clearTimeout(timer); timer = null; }
   }
 
-  return { enqueue, flush, clear, pending: () => buffer.length };
+  return { enqueue, flush, clear, pending: () => buffer.reduce((n, c) => n + c.rows.length, 0) };
 }

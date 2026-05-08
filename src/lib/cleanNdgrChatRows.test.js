@@ -60,4 +60,43 @@ describe('cleanNdgrChatRows', () => {
   it('空配列 → 空配列', () => {
     expect(cleanNdgrChatRows([])).toEqual([]);
   });
+
+  // v0.1.195: NDGR ギフトシステムメッセージは通常コメントとして persist しない
+  // （非コメユーザーが「ユーザー別応援件数」に混入する真因 fix）
+  it('ギフトシステムメッセージ行を除外する', () => {
+    const raw = [
+      { commentNo: '1', text: 'こんにちは', userId: 'u1' },
+      {
+        commentNo: '2',
+        text: 'ポンコツびぃちゃんさんがギフト「応援メガホン 黄（10pt）」を贈りました',
+        userId: '123514112'
+      },
+      { commentNo: '3', text: 'おつ〜', userId: 'u3' }
+    ];
+    const cleaned = cleanNdgrChatRows(raw);
+    expect(cleaned).toHaveLength(2);
+    expect(cleaned[0].text).toBe('こんにちは');
+    expect(cleaned[1].text).toBe('おつ〜');
+  });
+
+  it('「【ギフト貢献N位】XXX さんがギフト〜」も除外する', () => {
+    const raw = [
+      {
+        commentNo: '1',
+        text: '【ギフト貢献5位】kawarimiw9 さんがギフト「ヤミーアイスクリーム（100pt）」を贈りました',
+        userId: '13891348'
+      }
+    ];
+    const cleaned = cleanNdgrChatRows(raw);
+    expect(cleaned).toHaveLength(0);
+  });
+
+  it('通常コメは text 内に「ギフト」を含んでも persist する', () => {
+    const raw = [
+      { commentNo: '1', text: 'ギフトありがとう！', userId: 'u1' }
+    ];
+    const cleaned = cleanNdgrChatRows(raw);
+    expect(cleaned).toHaveLength(1);
+    expect(cleaned[0].text).toBe('ギフトありがとう！');
+  });
 });

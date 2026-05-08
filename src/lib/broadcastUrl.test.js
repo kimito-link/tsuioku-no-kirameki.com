@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  canonicalWatchUrlForDisplay,
   extractLiveIdFromUrl,
   isNicoLiveWatchUrl,
+  openWatchTabMatchesResolvedBroadcast,
   watchPageUrlsMatchForSnapshot
 } from './broadcastUrl.js';
 
@@ -123,6 +125,36 @@ describe('watchPageUrlsMatchForSnapshot', () => {
   it('別 lv は不一致', () => {
     expect(
       watchPageUrlsMatchForSnapshot(
+        'https://live.nicovideo.jp/watch/lv1',
+        'https://live.nicovideo.jp/watch/lv2'
+      )
+    ).toBe(false);
+  });
+});
+
+describe('canonicalWatchUrlForDisplay', () => {
+  it('query と hash を除去', () => {
+    expect(
+      canonicalWatchUrlForDisplay(
+        'https://live.nicovideo.jp/watch/lv1?ref=header#comment'
+      )
+    ).toBe('https://live.nicovideo.jp/watch/lv1');
+  });
+});
+
+describe('openWatchTabMatchesResolvedBroadcast', () => {
+  it('クエリだけ違う同一 lv は true', () => {
+    expect(
+      openWatchTabMatchesResolvedBroadcast(
+        'https://live.nicovideo.jp/watch/lv999?ref=header',
+        'https://live.nicovideo.jp/watch/lv999'
+      )
+    ).toBe(true);
+  });
+
+  it('lv が別なら false', () => {
+    expect(
+      openWatchTabMatchesResolvedBroadcast(
         'https://live.nicovideo.jp/watch/lv1',
         'https://live.nicovideo.jp/watch/lv2'
       )

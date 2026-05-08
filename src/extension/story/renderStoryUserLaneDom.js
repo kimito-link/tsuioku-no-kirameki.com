@@ -7,11 +7,12 @@ import {
   buildStoryUserLaneEmptyNoteKontaHtml,
   buildStoryUserLaneEmptyNoteLinkHtml,
   buildStoryUserLaneEmptyNoteTanuHtml,
-  buildStoryUserLaneGuideFootHtml,
+  buildStoryUserLaneGuideFootAndRecordedHtml,
   buildStoryUserLaneGuideKontaHtml,
   buildStoryUserLaneGuideTanuHtml,
   buildStoryUserLaneGuideTopHtml
 } from '../../lib/storyUserLaneGuideHtml.js';
+import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCopy.js';
 
 /**
  * @typedef {{
@@ -179,13 +180,15 @@ function fillLaneTier(el, items, io) {
  * @param {{ link: unknown[], konta: unknown[], tanu: unknown[] }} buckets
  * @param {number} pickedLength
  * @param {StoryUserLaneDomIo} io
+ * @param {{ recordedCommentRowsTotal?: number }} [opts] 診断の total と同じ記録件数（省略時はレーン直下の第2文なし）
  */
 export function paintStoryUserLaneDomFilled(
   els,
   faces,
   buckets,
   pickedLength,
-  io
+  io,
+  opts
 ) {
   const {
     stack,
@@ -235,10 +238,7 @@ export function paintStoryUserLaneDomFilled(
     linkWrap.hidden = !showLinkWrap;
   }
 
-  stack.setAttribute(
-    'aria-label',
-    `最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段）合計${pickedLength}件`
-  );
+  stack.setAttribute('aria-label', buildStoryUserLaneStackAriaLabel(pickedLength));
   stack.hidden = false;
 
   if (guideLinesTop) {
@@ -258,7 +258,12 @@ export function paintStoryUserLaneDomFilled(
   }
   if (guideMidTanu) guideMidTanu.hidden = false;
   if (guideLinesBottom) {
-    guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(pickedLength);
+    guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootAndRecordedHtml(
+      pickedLength,
+      opts && typeof opts.recordedCommentRowsTotal === 'number'
+        ? opts.recordedCommentRowsTotal
+        : undefined
+    );
   }
   if (guideBottom) guideBottom.hidden = false;
 }
@@ -267,8 +272,9 @@ export function paintStoryUserLaneDomFilled(
  * 候補ゼロだがエントリはあるときのガイドのみ表示。
  * @param {StoryUserLaneDomElements} els
  * @param {{ faceLink: string, faceKonta: string, faceTanu: string }} faces
+ * @param {{ recordedCommentRowsTotal?: number }} [opts]
  */
-export function paintStoryUserLaneDomEmptyGuides(els, faces) {
+export function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
   const {
     stack,
     laneLink,
@@ -312,7 +318,12 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces) {
   }
   if (guideMidTanu) guideMidTanu.hidden = false;
   if (guideLinesBottom) {
-    guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootHtml(0);
+    guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootAndRecordedHtml(
+      0,
+      opts && typeof opts.recordedCommentRowsTotal === 'number'
+        ? opts.recordedCommentRowsTotal
+        : undefined
+    );
   }
   if (guideBottom) guideBottom.hidden = false;
 }

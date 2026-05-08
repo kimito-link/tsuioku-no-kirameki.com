@@ -65,6 +65,22 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('Alice');
   });
 
+  it('giftUsers を渡すとギフトの流れセクション（mkt-gift-flow）が含まれる', () => {
+    const html = buildMarketingDashboardHtml(minimal(), {
+      giftUsers: [
+        {
+          userId: '88210441',
+          nickname: 'ギフター',
+          throwCount: 3,
+          capturedAt: Date.now() - 60_000
+        }
+      ]
+    });
+    expect(html).toContain('id="mkt-gift-flow"');
+    expect(html).toContain('ギフター');
+    expect(html).toContain('ギフト前後');
+  });
+
   it('トップコメンターの数値 ID は niconico ユーザーページへのリンクで包まれる（手元用）', () => {
     // minimal() の user u1..u10 は数値でないため、リンク化されない。
     // 数値 ID を持つレポートを作って挙動を確認する。
@@ -189,11 +205,11 @@ describe('buildMarketingDashboardHtml', () => {
 
   it('冒頭案内にりんく・こん太・たぬ姉の吹き出しが各1つずつ', () => {
     const html = buildMarketingDashboardHtml(minimal());
-    const start = html.indexOf('mkt-advice-stack--intro');
-    expect(start).toBeGreaterThan(-1);
-    const end = html.indexOf('<h2>KPI サマリ</h2>', start);
-    expect(end).toBeGreaterThan(start);
-    const introBlock = html.slice(start, end);
+    const sectionMatch = html.match(
+      /<section class="mkt-section mkt-section--advice"[\s\S]*?<\/section>/
+    );
+    expect(sectionMatch).toBeTruthy();
+    const introBlock = String(sectionMatch?.[0] || '');
     expect((introBlock.match(/mkt-advice-row mkt-advice--link/g) || []).length).toBe(1);
     expect((introBlock.match(/mkt-advice-row mkt-advice--konta/g) || []).length).toBe(1);
     expect((introBlock.match(/mkt-advice-row mkt-advice--tanu/g) || []).length).toBe(1);

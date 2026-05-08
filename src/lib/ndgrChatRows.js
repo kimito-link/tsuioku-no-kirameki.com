@@ -4,6 +4,7 @@
 
 import { normalizeCommentText } from './commentRecord.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
+import { parseGiftCommentText } from './parseGiftComment.js';
 
 /**
  * @param {import('./ndgrDecode.js').NdgrChat} chat
@@ -35,6 +36,9 @@ export function ndgrChatsToMergeRows(chats) {
     if (!chat || chat.no == null) continue;
     const text = normalizeCommentText(chat.content);
     if (!text) continue;
+    // v0.1.195: ギフトシステムメッセージは通常コメントとして記録しない
+    // （cleanNdgrChatRows と同じ guard を NDGR decode 経路にも適用）
+    if (parseGiftCommentText(text)) continue;
     const commentNo = String(chat.no).trim();
     if (!commentNo) continue;
     const uid = ndgrChatUserId(chat);

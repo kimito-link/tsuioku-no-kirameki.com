@@ -12,6 +12,8 @@ export const COMMENT_INGEST_SOURCE = {
   VISIBLE: 'visible',
   MUTATION: 'mutation',
   DEEP: 'deep',
+  /** page-intercept 経由の投稿同期（MAIN→content） */
+  INTERCEPT_POST: 'intercept_post',
   UNKNOWN: 'unknown'
 };
 
@@ -23,6 +25,36 @@ export const COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS = 4000;
 export const COMMENT_INGEST_LOG_NDGR_MIN_ADDED = 3;
 export const COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED = 5;
 const INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA = 10;
+
+/** コアレサーで複数経路が混ざったときの監査ログ source の優先（高い方を採用） */
+const SOURCE_MERGE_PRIORITY = /** @type {Readonly<Record<string, number>>} */ ({
+  [COMMENT_INGEST_SOURCE.NDGR]: 50,
+  [COMMENT_INGEST_SOURCE.DEEP]: 40,
+  [COMMENT_INGEST_SOURCE.VISIBLE]: 30,
+  [COMMENT_INGEST_SOURCE.INTERCEPT_POST]: 35,
+  [COMMENT_INGEST_SOURCE.MUTATION]: 20,
+  [COMMENT_INGEST_SOURCE.UNKNOWN]: 0
+});
+
+/**
+ * persist バッチに混在した source から 1 つに丸める（診断ログ用）。
+ * @param {unknown[]} sources
+ * @returns {string}
+ */
+export function mergeIngestLogSources(sources) {
+  const arr = Array.isArray(sources) ? sources : [];
+  let best = COMMENT_INGEST_SOURCE.UNKNOWN;
+  let bestP = -1;
+  for (const raw of arr) {
+    const s = normalizeIngestSource(raw);
+    const p = SOURCE_MERGE_PRIORITY[s] ?? 0;
+    if (p > bestP) {
+      bestP = p;
+      best = s;
+    }
+  }
+  return best;
+}
 
 const INGEST_LOG_COOLDOWN_RULES = /** @type {Readonly<Record<string, { minIntervalMs: number, minAdded: number, minTotalDelta: number }>>} */ ({
   [COMMENT_INGEST_SOURCE.NDGR]: {

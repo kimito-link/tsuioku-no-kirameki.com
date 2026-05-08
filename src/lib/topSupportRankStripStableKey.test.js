@@ -32,4 +32,12 @@ describe('topSupportRankStripStableKey', () => {
       topSupportRankStripStableKey('lv1', 50, rows)
     );
   });
+
+  it('件数不変で表示名だけ変わるとキーが変わる', () => {
+    const a = [{ userKey: 'u1', count: 10, nickname: 'stack_ice_cup' }];
+    const b = [{ userKey: 'u1', count: 10, nickname: 'Quma' }];
+    expect(topSupportRankStripStableKey('lv1', 100, a)).not.toBe(
+      topSupportRankStripStableKey('lv1', 100, b)
+    );
+  });
 });

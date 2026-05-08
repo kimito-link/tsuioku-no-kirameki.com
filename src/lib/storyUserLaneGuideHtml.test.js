@@ -3,6 +3,7 @@ import {
   buildStoryUserLaneEmptyNoteKontaHtml,
   buildStoryUserLaneEmptyNoteLinkHtml,
   buildStoryUserLaneEmptyNoteTanuHtml,
+  buildStoryUserLaneGuideFootAndRecordedHtml,
   buildStoryUserLaneGuideFootHtml,
   buildStoryUserLaneGuideKontaHtml,
   buildStoryUserLaneGuideTanuHtml,
@@ -27,6 +28,7 @@ describe('storyUserLaneGuideHtml', () => {
     expect(konta).not.toContain('りんく:');
     expect(konta).not.toContain('たぬ姉:');
     expect(tanu).toContain('たぬ姉:');
+    expect(tanu).toContain('詳しい状況（開発・切り分け用）');
     expect(tanu).not.toContain('こん太:');
     expect(top + konta + tanu).not.toMatch(/<script/i);
     expect(top).toMatch(/src="https:\/\/example\.test\/link\.png"/);
@@ -45,6 +47,27 @@ describe('storyUserLaneGuideHtml', () => {
     expect(foot).not.toContain('こん太:');
     expect(foot).not.toContain('たぬ姉:');
     expect(foot).toContain('nl-story-userlane-guide__foot');
+  });
+
+  it('フット＋記録件数は第2文でコメント総数とレーン枠の違いを説明する', () => {
+    const html = buildStoryUserLaneGuideFootAndRecordedHtml(34, 220);
+    expect(html).toContain('いま 34 件を表示中');
+    expect(html).toContain('<strong>220</strong>');
+    expect(html).toContain('nl-story-userlane-guide__recorded');
+    expect(html).toContain('数え方が異なります');
+    expect(html).not.toMatch(/<script/i);
+  });
+
+  it('記録件数が未指定・0 以下なら第2文なし', () => {
+    expect(buildStoryUserLaneGuideFootAndRecordedHtml(3, undefined)).toBe(
+      buildStoryUserLaneGuideFootHtml(3)
+    );
+    expect(buildStoryUserLaneGuideFootAndRecordedHtml(3, 0)).toBe(
+      buildStoryUserLaneGuideFootHtml(3)
+    );
+    expect(buildStoryUserLaneGuideFootAndRecordedHtml(3, -2)).toBe(
+      buildStoryUserLaneGuideFootHtml(3)
+    );
   });
 
   it('空段ノートは段ごとに別文面で、増える一文は共通', () => {

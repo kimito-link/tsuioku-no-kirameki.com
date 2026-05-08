@@ -123,3 +123,48 @@ export function watchPageUrlsMatchForSnapshot(a, b) {
     return String(a || '').trim() === String(b || '').trim();
   }
 }
+
+/**
+ * 開いているタブ URL が「解決済み watch URL」と同一放送か。
+ * lv が両方から取れるときは ID のみで一致判定し、その後に
+ * `watchPageUrlsMatchForSnapshot`（ch 形式など lv 無し）へフォールバック。
+ *
+ * @param {string | null | undefined} tabUrl
+ * @param {string | null | undefined} resolvedWatchUrl storage / pick の解決結果
+ * @returns {boolean}
+ */
+export function openWatchTabMatchesResolvedBroadcast(
+  tabUrl,
+  resolvedWatchUrl
+) {
+  const u = String(tabUrl || '').trim();
+  const w = String(resolvedWatchUrl || '').trim();
+  if (!isNicoLiveWatchUrl(u) || !isNicoLiveWatchUrl(w)) return false;
+  const lw = extractLiveIdFromUrl(w);
+  if (lw) {
+    const lu = extractLiveIdFromUrl(u);
+    if (lu && lu === lw) return true;
+  }
+  return watchPageUrlsMatchForSnapshot(u, w);
+}
+
+/**
+ * 表示・診断コピー・保存 HTML 向け: query / hash を落とした watch URL。
+ * storage の正本キーは変更しない（あくまで出力・表示のサニタイズ）。
+ *
+ * @param {string | null | undefined} raw
+ * @returns {string}
+ */
+export function canonicalWatchUrlForDisplay(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  try {
+    const u = new URL(s);
+    u.search = '';
+    u.hash = '';
+    return u.toString();
+  } catch {
+    const q = s.split('?')[0];
+    return q.split('#')[0];
+  }
+}

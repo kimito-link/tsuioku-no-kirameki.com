@@ -3,6 +3,7 @@
  */
 
 import { escapeAttr, escapeHtml } from './htmlEscape.js';
+import { SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL } from './supportVisualStoryCopy.js';
 
 /** @param {string} src @param {string} textEscaped 既に escapeHtml 済みの本文 */
 function storyUserLaneGuideLine(src, textEscaped) {
@@ -39,7 +40,7 @@ export function buildStoryUserLaneGuideTanuHtml(faceTanu) {
   return storyUserLaneGuideLine(
     faceTanu,
     escapeHtml(
-      'たぬ姉: 匿名（a:）の応援、表示名やサムネが揃わない応援、ID 不明はぜんぶこの段に集めるよ。下の「状況の詳細」でどこの情報が欠けているか確認してね。'
+      `たぬ姉: 匿名（a:）の応援、表示名やサムネが揃わない応援、ID 不明はぜんぶこの段に集めるよ。下の「${SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL}」を開くと、どこの情報が欠けているか確認してね。`
     )
   );
 }
@@ -48,6 +49,36 @@ export function buildStoryUserLaneGuideTanuHtml(faceTanu) {
 export function buildStoryUserLaneGuideFootHtml(displayCount) {
   const n = Math.max(0, Math.floor(Number(displayCount) || 0));
   return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(`いま ${n} 件を表示中`)}</p>`;
+}
+
+/**
+ * レーン直下の「表示枠」と「記録コメント総数」をつなぐ（診断ブロックの total と同じ数を渡すこと）。
+ * @param {number} laneDisplayedSlots 三段レーンに並べた合計枠数（dedupe+cap 後）
+ * @param {number|undefined|null} recordedCommentRowsTotal 当放送の記録コメント行数。未指定・非有限・0 以下なら第2文なし。
+ * @returns {string}
+ */
+export function buildStoryUserLaneGuideFootAndRecordedHtml(
+  laneDisplayedSlots,
+  recordedCommentRowsTotal
+) {
+  const foot = buildStoryUserLaneGuideFootHtml(laneDisplayedSlots);
+  if (
+    recordedCommentRowsTotal == null ||
+    !Number.isFinite(Number(recordedCommentRowsTotal))
+  ) {
+    return foot;
+  }
+  const total = Math.max(0, Math.floor(Number(recordedCommentRowsTotal)));
+  if (total <= 0) {
+    return foot;
+  }
+  return (
+    foot +
+    `<p class="nl-story-userlane-guide__recorded" aria-live="polite">` +
+    `この放送で記録している応援コメントは <strong>${total}</strong> 件です。` +
+    `上の件数はレーンに並べた人数の合計であり、コメント件数とは数え方が異なります。` +
+    `</p>`
+  );
 }
 
 /** @param {string} line1 @param {string} line2 */

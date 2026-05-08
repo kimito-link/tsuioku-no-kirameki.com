@@ -37,6 +37,56 @@
         box-sizing: border-box;
       }
 
+      /* 初回ロードシェード：popup を開いた瞬間の hidden 要素チラ見え／要素ガタガタ
+         を全部隠す。JS の初回 render が終わったら .nl-init-shade--done を付けて
+         200ms フェードアウト→display:none 化。
+         JS が完全に止まっても 15s で CSS だけで fade out する二重防衛。 */
+      .nl-init-shade {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+        background: linear-gradient(180deg, #f6fff8, #eef9f3);
+        transition: opacity 220ms ease-out;
+        animation: nl-init-shade-css-failsafe 15s ease-out forwards;
+      }
+      .nl-init-shade__face {
+        width: clamp(56px, 14vw, 72px);
+        height: clamp(56px, 14vw, 72px);
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #1f2937;
+        box-shadow: 2px 2px 0 #1f2937;
+        animation: nl-init-shade-bob 1.2s ease-in-out infinite;
+      }
+      .nl-init-shade__msg {
+        font-size: clamp(12px, 3vw, 14px);
+        font-weight: 700;
+        color: #2a6f4d;
+        letter-spacing: 0.06em;
+      }
+      .nl-init-shade--done {
+        opacity: 0;
+        pointer-events: none;
+        animation: none;
+      }
+      @keyframes nl-init-shade-bob {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-6px); }
+      }
+      @keyframes nl-init-shade-css-failsafe {
+        0%, 93% { opacity: 1; visibility: visible; pointer-events: auto; }
+        100% { opacity: 0; visibility: hidden; pointer-events: none; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-init-shade__face { animation: none; }
+        .nl-init-shade { transition: none; }
+      }
+
       /* 0.1.11 (A1 親バグ根治): すべての input / textarea で placeholder の色を
          フレーム由来の `--nl-placeholder` に統一。個別ルールで上書きしている箇所
          （.nl-comment-compose textarea / .nl-frame-share textarea）は明示優先。
@@ -1925,6 +1975,47 @@
         gap: 6px;
       }
 
+      .nl-official-nico-stats__row {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 5px;
+      }
+
+      .nl-official-nico-stats__chip {
+        min-width: 0;
+        padding: 4px 3px 5px;
+        border-radius: 9px;
+        border: 1px solid var(--nl-border);
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-border) 12%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+
+      .nl-official-nico-stats__label {
+        font-size: clamp(9px, 2.2vw, 10px);
+        color: var(--nl-muted);
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .nl-official-nico-stats__val {
+        margin-top: 2px;
+        font-size: clamp(11px, 2.9vw, 14px);
+        font-weight: 800;
+        color: var(--nl-text);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.15;
+      }
+
+      .nl-official-nico-stats__val.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 12px);
+        font-weight: 700;
+        color: var(--nl-muted);
+      }
+
       .nl-live-stat-card {
         display: flex;
         flex-direction: column;
@@ -2160,6 +2251,133 @@
 
       .nl-live-stat-card--visitors {
         border-color: var(--nl-border);
+      }
+
+      .nl-live-stat-card--official-ndgr {
+        border-color: rgb(34 197 94 / 35%);
+        grid-column: 1 / -1;
+      }
+
+      .nl-official-event-banner-card {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 14px;
+        border-radius: 14px;
+        background: linear-gradient(180deg, #effaf0, #e3f4e7);
+        border: 1px solid rgb(34 197 94 / 28%);
+        box-shadow: 0 1px 0 rgb(34 197 94 / 8%);
+        text-decoration: none;
+        color: inherit;
+      }
+      .nl-official-event-banner-card[hidden] {
+        display: none;
+      }
+      .nl-official-event-banner-card__owner {
+        font-size: 12px;
+        font-weight: 700;
+        color: #1e7c44;
+        background: #c8eed3;
+        border-radius: 6px;
+        padding: 3px 8px;
+        align-self: flex-start;
+      }
+      .nl-official-event-banner-card__body {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .nl-official-event-banner-card__thumb {
+        width: 56px;
+        height: 56px;
+        border-radius: 8px;
+        object-fit: cover;
+        flex-shrink: 0;
+      }
+      .nl-official-event-banner-card__thumb[hidden] {
+        display: none;
+      }
+      .nl-official-event-banner-card__text {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .nl-official-event-banner-card__title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1f2937;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .nl-official-event-banner-card__status {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        font-size: 13px;
+      }
+      .nl-official-event-banner-card__rank {
+        font-weight: 700;
+      }
+      .nl-official-event-banner-card__rank--event {
+        color: #1e7c44;
+      }
+      .nl-official-event-banner-card__rank--niconama {
+        color: #1e3a8a;
+      }
+      .nl-official-event-banner-card__score {
+        color: #1f2937;
+        font-weight: 700;
+      }
+      .nl-official-event-banner-card__score::before {
+        content: '⬥ ';
+        color: #1e7c44;
+        font-weight: 600;
+      }
+
+      .nl-official-ndgr-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: clamp(9px, 2.3vw, 11px);
+        line-height: 1.25;
+      }
+
+      .nl-official-ndgr-list li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px 10px;
+      }
+
+      .nl-official-ndgr-k {
+        color: var(--nl-muted);
+        font-weight: 600;
+        flex: 1 1 46%;
+        min-width: 0;
+      }
+
+      .nl-official-ndgr-v {
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        max-width: 52%;
+        word-break: break-word;
+      }
+
+      .nl-official-ndgr-v--title {
+        font-weight: 700;
+        font-size: clamp(9px, 2.2vw, 10.5px);
+        text-align: left;
+        max-width: 100%;
       }
 
       .nl-live-stat-icon {
@@ -6411,6 +6629,21 @@
     </style>
   </head>
   <body>
+    <!--
+      初回ロード中のシェード。Chrome が popup.html を開いた瞬間に、
+      hidden 要素の混じった raw な popup がチラ見えしないよう全画面を覆う。
+      JS の初回 render 完了時に nlInitialLoadShade.removeAttribute('hidden')
+      を反転して fade-out。詳細 popup-entry.js: dismissInitialLoadShade()。
+    -->
+    <div id="nlInitialLoadShade" class="nl-init-shade" aria-hidden="true">
+      <img
+        class="nl-init-shade__face"
+        src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-blink-mouth-open.png"
+        alt=""
+        decoding="async"
+      />
+      <div class="nl-init-shade__msg">読み込み中…</div>
+    </div>
     <header class="nl-header">
       <div class="nl-header-brand">
         <img
@@ -6707,9 +6940,65 @@
           <div class="nl-live-stat-value" id="watchViewerDom">—</div>
           <div class="nl-live-stat-unit">人</div>
         </div>
+        <div class="nl-official-nico-stats__row" role="group" aria-label="公式視聴統計の一覧">
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">来場</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoViewers">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">本家コメ</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoComments">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">経過</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoStreamAge">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">広告pt</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoAdPts">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">ギフトpt</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoGiftPts">—</span>
+          </div>
+        </div>
+        <a
+          id="watchOfficialEventBannerCard"
+          class="nl-official-event-banner-card"
+          target="_blank"
+          rel="noopener"
+          hidden
+          aria-hidden="true"
+        >
+          <div class="nl-official-event-banner-card__owner" id="watchOfficialEventBannerOwner"></div>
+          <div class="nl-official-event-banner-card__body">
+            <img
+              class="nl-official-event-banner-card__thumb"
+              id="watchOfficialEventBannerThumb"
+              alt=""
+              decoding="async"
+              referrerpolicy="no-referrer"
+              loading="lazy"
+              hidden
+            />
+            <div class="nl-official-event-banner-card__text">
+              <div class="nl-official-event-banner-card__title" id="watchOfficialEventBannerTitle"></div>
+              <div class="nl-official-event-banner-card__status">
+                <span class="nl-official-event-banner-card__rank" id="watchOfficialEventBannerRank"></span>
+                <span class="nl-official-event-banner-card__score" id="watchOfficialEventBannerScore"></span>
+              </div>
+            </div>
+          </div>
+        </a>
         <div
           id="topSupportRankStrip"
           class="nl-top-support-rank nl-top-support-rank--below-cards nl-top-support-rank--span-cards"
+          hidden
+          aria-hidden="true"
+        ></div>
+        <div
+          id="topGiftRankStrip"
+          class="nl-top-support-rank nl-gift-rank-strip nl-top-support-rank--below-cards nl-top-support-rank--span-cards"
           hidden
           aria-hidden="true"
         ></div>
@@ -7410,6 +7699,12 @@
             aria-live="polite"
           ></div>
           <dl class="nl-dev-monitor__stats" id="devMonitorStats"></dl>
+          <!-- v0.1.202 A-0: AI 共有診断と同じ raw data から生成する取得状況サマリ -->
+          <dl
+            class="nl-dev-monitor__stats"
+            id="devMonitorGiftRankingExtras"
+            aria-live="polite"
+          ></dl>
           <pre
             class="nl-dev-monitor__json"
             id="devMonitorJson"
@@ -7813,12 +8108,24 @@
           <button type="button" id="exportSessionSummaryJsonBtn">
             サマリをJSONで保存
           </button>
+          <button
+            type="button"
+            id="exportMcpSnapshotJsonBtn"
+            title="AI 連携用の正準スナップショットを Downloads/nicolivelog-mcp/ に保存します（MCP Phase1a）"
+          >
+            MCP用JSONを保存
+          </button>
         </div>
       </details>
 
       <details class="nl-gift-quick-panel" data-nl-toolbar-only>
         <summary>ギフト・広告ユーザー（簡易）</summary>
         <div id="giftQuickStatsMount" class="nl-gift-quick-mount"></div>
+      </details>
+
+      <details class="nl-gift-quick-panel" data-nl-toolbar-only>
+        <summary id="giftSubAppHistorySummary">ギフトサイドバー履歴（未取得）</summary>
+        <div id="giftSubAppHistoryMount" class="nl-gift-quick-mount"></div>
       </details>
 
       <footer

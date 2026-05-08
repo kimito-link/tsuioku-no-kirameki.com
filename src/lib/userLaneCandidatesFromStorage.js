@@ -7,9 +7,12 @@
 
 import { normalizeLv as normalizeLvCanonical } from '../shared/niconico/liveId.js';
 import { pickStrongestAvatarUrlForUser } from './supportGrowthTileSrc.js';
-import { supportGridStrongNickname } from './supportGridDisplayTier.js';
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
 import { isAvatarUrlForUserId } from './avatarBroadcasterGuard.js';
+import {
+  pickBetterInterceptNickname,
+  pickGiftRankDisplayNicknameWithUidFallback
+} from './giftDisplayNickname.js';
 
 /**
  * @typedef {{
@@ -149,17 +152,10 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
       (a, b) => rowCapturedAt(b) - rowCapturedAt(a)
     );
     let nickname = '';
-    for (const g of newestFirst) {
+    for (const g of chronological) {
       const n = String(/** @type {{ nickname?: unknown }} */ (g).nickname ?? '').trim();
-      if (supportGridStrongNickname(n, userId)) {
-        nickname = n;
-        break;
-      }
-    }
-    if (!nickname && newestFirst.length > 0) {
-      nickname = String(
-        /** @type {{ nickname?: unknown }} */ (newestFirst[0]).nickname ?? ''
-      ).trim();
+      if (!n) continue;
+      nickname = pickBetterInterceptNickname(userId, nickname, n);
     }
 
     const lastCapturedAt = Math.max(0, ...chronological.map(rowCapturedAt));
@@ -192,4 +188,90 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
     )
   );
   return /** @type {readonly Readonly<UserLaneCandidateFromStorage>[]} */ (frozen);
+}
+
+/**
+ * ストレージ集約の nickname を、表示リスト（プロファイル適用済みのコメント行）と
+ * `KEY_USER_COMMENT_PROFILE_CACHE`（intercept / join 由来）で補強する。
+ * ギフト帯の {@link pickGiftRankDisplayNickname} と同系の優先ルールで揃える。
+ *
+ * @param {readonly Readonly<UserLaneCandidateFromStorage>[]} aggregates
+ * @param {readonly unknown[]|null|undefined} displayEntries
+ * @param {Record<string, { nickname?: unknown }>|null|undefined} profileMap
+ * @returns {readonly Readonly<UserLaneCandidateFromStorage>[]}
+ */
+export function enrichUserLaneAggregatesWithProfileAndDisplay(
+  aggregates,
+  displayEntries,
+  profileMap
+) {
+  if (!Array.isArray(aggregates) || aggregates.length === 0) {
+    return Array.isArray(aggregates)
+      ? /** @type {readonly Readonly<UserLaneCandidateFromStorage>[]} */ (aggregates)
+      : Object.freeze([]);
+  }
+  const entries = Array.isArray(displayEntries) ? displayEntries : [];
+  const map =
+    profileMap && typeof profileMap === 'object' && !Array.isArray(profileMap)
+      ? profileMap
+      : /** @type {Record<string, { nickname?: unknown }>} */ ({});
+
+  /**
+   * @param {string} uid
+   * @returns {string}
+   */
+  function bestNicknameFromEntries(uid) {
+    const id = String(uid || '').trim();
+    if (!id || !entries.length) return '';
+    /** @type {unknown[]} */
+    const hits = [];
+    for (const e of entries) {
+      if (String(/** @type {{ userId?: unknown }} */ (e)?.userId ?? '').trim() !== id) {
+        continue;
+      }
+      hits.push(e);
+    }
+    if (!hits.length) return '';
+    hits.sort((a, b) => rowCapturedAt(a) - rowCapturedAt(b));
+    let nick = '';
+    for (const e of hits) {
+      const n = String(/** @type {{ nickname?: unknown }} */ (e)?.nickname ?? '').trim();
+      if (!n) continue;
+      nick = pickBetterInterceptNickname(id, nick, n);
+    }
+    return nick;
+  }
+
+  let anyChange = false;
+  const built = aggregates.map((agg) => {
+    const uid = String(agg.userId || '').trim();
+    const stored = String(agg.nickname || '').trim();
+    const intercept = String(
+      /** @type {{ nickname?: unknown }} */ (map[uid])?.nickname ?? ''
+    ).trim();
+    const fromDisplay = bestNicknameFromEntries(uid);
+    // 0.1.182: nickname が解決できないケース（avatarNicknameMatchDiag.avNoNick）で
+    // 匿名表示にせず、`u/<uid>` フォールバック表示を使う（v0.1.181 で追加した
+    // formatNicknameWithUidFallback 経由）。
+    const merged = pickGiftRankDisplayNicknameWithUidFallback(
+      uid,
+      stored,
+      fromDisplay,
+      intercept
+    );
+    if (merged === stored) return agg;
+    anyChange = true;
+    return Object.freeze({
+      userId: agg.userId,
+      nickname: merged,
+      avatarUrl: agg.avatarUrl,
+      avatarObserved: agg.avatarObserved,
+      liveId: agg.liveId
+    });
+  });
+
+  if (!anyChange) return aggregates;
+  return /** @type {readonly Readonly<UserLaneCandidateFromStorage>[]} */ (
+    Object.freeze(built)
+  );
 }

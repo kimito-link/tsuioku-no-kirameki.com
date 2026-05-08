@@ -12,6 +12,7 @@ describe('createPersistCoalescer', () => {
     vi.advanceTimersByTime(0);
     await vi.runAllTimersAsync();
     expect(flush).toHaveBeenCalledTimes(1);
+    expect(flush.mock.calls[0][1]).toEqual({ sources: [] });
     expect(c.pending()).toBe(0);
   });
 
@@ -36,7 +37,9 @@ describe('createPersistCoalescer', () => {
     vi.advanceTimersByTime(0);
     await vi.runAllTimersAsync();
     expect(flush).toHaveBeenCalledTimes(1);
-    expect(flush).toHaveBeenCalledWith([{ id: '1' }, { id: '2' }, { id: '3' }]);
+    expect(flush).toHaveBeenCalledWith([{ id: '1' }, { id: '2' }, { id: '3' }], {
+      sources: []
+    });
     expect(c.pending()).toBe(0);
   });
 
@@ -48,6 +51,19 @@ describe('createPersistCoalescer', () => {
     await vi.runAllTimersAsync();
     expect(flush).toHaveBeenCalledTimes(1);
     expect(flush.mock.calls[0][0]).toHaveLength(10);
+    expect(flush.mock.calls[0][1]).toEqual({ sources: [] });
+  });
+
+  it('enqueue の第2引数 source が flush の meta.sources に順に積まれる', async () => {
+    const flush = vi.fn().mockResolvedValue(undefined);
+    const c = createPersistCoalescer(flush, 300);
+    c.enqueue([{ id: 'a' }], 'ndgr');
+    c.enqueue([{ id: 'b' }], 'mutation');
+    vi.advanceTimersByTime(0);
+    await vi.runAllTimersAsync();
+    expect(flush).toHaveBeenCalledTimes(1);
+    expect(flush.mock.calls[0][0]).toEqual([{ id: 'a' }, { id: 'b' }]);
+    expect(flush.mock.calls[0][1]).toEqual({ sources: ['ndgr', 'mutation'] });
   });
 
   it('clear でバッファがリセットされる', () => {
@@ -74,6 +90,7 @@ describe('createPersistCoalescer', () => {
     await vi.runAllTimersAsync();
     expect(flush).toHaveBeenCalledTimes(2);
     expect(flush.mock.calls[1][0]).toEqual([{ id: 'second' }]);
+    expect(flush.mock.calls[1][1]).toEqual({ sources: [] });
   });
 
   it('手動 flush で即座にバッファを処理できる', async () => {
@@ -100,6 +117,7 @@ describe('createPersistCoalescer', () => {
     await vi.runAllTimersAsync();
     expect(flushFn).toHaveBeenCalledTimes(2);
     expect(flushFn.mock.calls[1][0]).toHaveLength(5);
+    expect(flushFn.mock.calls[1][1]).toEqual({ sources: [] });
     expect(c.pending()).toBe(0);
   });
 

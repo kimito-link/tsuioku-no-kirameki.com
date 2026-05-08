@@ -16,7 +16,11 @@ const common = {
   bundle: true,
   format: 'iife',
   platform: 'browser',
-  target: 'chrome100'
+  target: 'chrome100',
+  minifyWhitespace: true,
+  minifySyntax: true,
+  minifyIdentifiers: false,
+  legalComments: 'none'
 };
 
 const ctxPageIntercept = await esbuild.context({
