@@ -427,7 +427,8 @@ export function decodeGift(buf, start, end) {
  *   byteSize: number,
  *   hexPreview: string,
  *   innerHistogram: Record<string, number>,
- *   stringSamples: string[]
+ *   stringSamples: string[],
+ *   propsKeyNames?: string[]
  * }} NdgrUnknownSample
  *
  * v0.1.209 緊急投入: msg.8 (gift) が来ない一方で msg.3 / top.11 が来る配信が確認された
@@ -443,6 +444,10 @@ export function decodeGift(buf, start, end) {
  * - `hexPreview`: 先頭 96 bytes の hex 文字列（中身解析の手がかり）
  * - `innerHistogram`: 中の field tag → 件数（gift の itemId/userId/point 等の構造識別用）
  * - `stringSamples`: 中の string 型 field の最初 3 件（advertiserName 等の判別用）
+ * - `propsKeyNames`: v0.1.235 追加。msg:24 nx:gift:show の `decodeNxGiftEvent` 戻り値の
+ *   props キー名一覧（最大 16 件）。`pickNxGiftString` 候補リストと実機 wire の
+ *   キー名が乖離していないか診断するため。partial empty (`msg:24:noitem` 等) の
+ *   サンプルにのみ含まれ、未知 field 系のサンプルでは省略される。
  */
 
 /**
@@ -562,8 +567,12 @@ function bufToHex(buf, start, end) {
  * @param {Uint8Array} buf
  * @param {number} s
  * @param {number} e
+ * @param {string[]} [propsKeyNames] v0.1.235: msg:24 nx:gift:show 系で
+ *   `decodeNxGiftEvent` の戻り値の props キー名一覧。pickNxGiftString の
+ *   候補リストと実機 wire のキー名が乖離していないか診断用。最大 16 件
+ *   までサンプルに格納する。
  */
-function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e) {
+function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e, propsKeyNames) {
   if (!samples[key]) samples[key] = [];
   if (samples[key].length >= NDGR_MAX_UNKNOWN_SAMPLES_PER_KEY) return;
   /** @type {Record<string, number>} */
@@ -580,7 +589,8 @@ function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e) {
       }
     }
   });
-  samples[key].push({
+  /** @type {NdgrUnknownSample} */
+  const sample = {
     key,
     topFn,
     msgFn,
@@ -588,7 +598,11 @@ function recordNdgrUnknownSample(samples, key, topFn, msgFn, buf, s, e) {
     hexPreview: bufToHex(buf, s, Math.min(e, s + 96)),
     innerHistogram,
     stringSamples
-  });
+  };
+  if (Array.isArray(propsKeyNames) && propsKeyNames.length > 0) {
+    sample.propsKeyNames = propsKeyNames.slice(0, 16);
+  }
+  samples[key].push(sample);
 }
 
 /**
@@ -763,11 +777,56 @@ export function decodeChunkedMessage(buf, start, end) {
                 itemName: itemNameStr,
                 contributionRank
               });
+              // v0.1.235: push 成功（=name か point か何かは取れた）でも、
+              //   実機では itemId/itemName/uid/rank が部分欠落するケースが多い
+              //   （診断 lv350482067: gifts=10 だが giftsWithItem=5/giftsWithUid=4/
+              //   giftsWithRank=0）。`pickNxGiftString` の候補リストと実機 wire の
+              //   キー名が乖離している可能性を診断するため、欠落カテゴリ別に
+              //   hex + props キー名一覧をサンプル保存する。挙動変更ゼロ。
+              const propsKeyNames = Object.keys(ev.props);
+              if (!itemIdStr && !itemNameStr) {
+                recordNdgrUnknownSample(
+                  unknownSamples,
+                  'msg:24:noitem',
+                  fn,
+                  mfn,
+                  buf,
+                  ms,
+                  me,
+                  propsKeyNames
+                );
+              }
+              if (!advUid) {
+                recordNdgrUnknownSample(
+                  unknownSamples,
+                  'msg:24:nouid',
+                  fn,
+                  mfn,
+                  buf,
+                  ms,
+                  me,
+                  propsKeyNames
+                );
+              }
+              if (contributionRank == null) {
+                recordNdgrUnknownSample(
+                  unknownSamples,
+                  'msg:24:norank',
+                  fn,
+                  mfn,
+                  buf,
+                  ms,
+                  me,
+                  propsKeyNames
+                );
+              }
             } else {
               // v0.1.233: msg.24 nx:gift:show を decode したが gift fields が
               //   全部空で push できなかった = 想定外 wire 形式の可能性が高い。
               //   実機の hex sample を unknownSamples に「msg:24:empty」として
               //   保存し、診断 JSON 経由で wire 構造を解析する用途。
+              // v0.1.235: empty 時も props キー名（あれば）を残して、Vue 側が
+              //   キー名を完全に変えたケースとペイロード自体が空のケースを切り分ける。
               recordNdgrUnknownSample(
                 unknownSamples,
                 'msg:24:empty',
@@ -775,7 +834,8 @@ export function decodeChunkedMessage(buf, start, end) {
                 mfn,
                 buf,
                 ms,
-                me
+                me,
+                Object.keys(ev.props)
               );
             }
           }
