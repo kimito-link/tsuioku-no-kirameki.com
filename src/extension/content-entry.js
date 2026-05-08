@@ -109,6 +109,31 @@ import {
   isGiftRankingLaneEnabledFromChange
 } from '../lib/giftRankingLaneOptIn.js';
 import { buildOfficialDomFromRelayEvent } from '../lib/iframeOfficialDomFromRelay.js';
+import { isTrustedGiftSubAppRelayMessage } from '../lib/giftSubAppRelayTrust.js';
+import {
+  NLS_AUTH_TOKEN_ATTR,
+  isNlsInterceptTokenValid,
+  isValidChatRow,
+  isValidGiftUser,
+  isValidCommentPostBody,
+  sanitizeIncomingArray
+} from '../lib/nlsInterceptAuth.js';
+
+/**
+ * v0.1.234: page-intercept (MAIN world) と共有する auth token。startup 時に
+ *   `data-nls-page-token` 属性から読む。token が無い間に届く `NLS_INTERCEPT_*` は
+ *   reject される（page-intercept 側が data-nls-page-token を最初にセットして
+ *   から postMessage を始めるので、通常は race にならない）。
+ *   完全な防御ではなく、generic / opportunistic な spoof を弾く層。
+ * @returns {string}
+ */
+function readNlsPageToken() {
+  try {
+    return document.documentElement?.getAttribute(NLS_AUTH_TOKEN_ATTR) || '';
+  } catch {
+    return '';
+  }
+}
 import {
   parseLiveViewerCountFromDocument,
   parseViewerCountFromSnapshotMetas
@@ -1596,6 +1621,13 @@ window.addEventListener('message', (e) => {
   if (e.source !== window) return;
   if (!e.data || typeof e.data.type !== 'string') return;
 
+  // v0.1.234: NLS_INTERCEPT_* / NLS_SPA_NAVIGATION の受信は token 認証必須。
+  //   page-intercept (MAIN world) が起動時に `data-nls-page-token` 属性に
+  //   set した token と一致しないメッセージは drop。MAIN world 同居の他 script
+  //   が偽装 postMessage で local storage を汚染するのを抑止する。
+  const expectedToken = readNlsPageToken();
+  if (!isNlsInterceptTokenValid(e, expectedToken)) return;
+
   if (e.data.type === 'NLS_INTERCEPT_SCHEDULE') {
     const b = e.data.begin;
     if (typeof b === 'string' && b.length >= 10) {
@@ -1659,8 +1691,9 @@ window.addEventListener('message', (e) => {
   }
 
   if (e.data.type === 'NLS_INTERCEPT_CHAT_ROWS') {
-    const raw = e.data.rows;
-    if (Array.isArray(raw) && raw.length) {
+    // v0.1.234: shape validation — 巨大配列 / 異常 commentNo / 異常 userId は drop
+    const raw = sanitizeIncomingArray(e.data.rows, isValidChatRow);
+    if (raw && raw.length) {
       // 0.1.176: NDGR chat 経路でもギフト文字列をパース（DOM 非依存ルート）。
       // virtualization で DOM から消えた古い gift row も、NDGR backward で来た
       // chat に「○○さんがギフト〜を贈りました」が入っていれば拾える。
@@ -1678,8 +1711,9 @@ window.addEventListener('message', (e) => {
   }
 
   if (e.data.type === 'NLS_INTERCEPT_GIFT_USERS') {
-    const raw = e.data.users;
-    if (Array.isArray(raw) && raw.length) {
+    // v0.1.234: shape validation
+    const raw = sanitizeIncomingArray(e.data.users, isValidGiftUser);
+    if (raw && raw.length) {
       // 0.1.173: lifetime 観測（診断シート用）。liveId 不在でも record する。
       // v0.1.214: anonymous gift（uid 空）も nickname があれば記録するため
       //   guard を撤去し、recordGiftSenderObservation 内で bucket key を
@@ -1741,14 +1775,13 @@ window.addEventListener('message', (e) => {
 
   if (e.data.type === 'NLS_INTERCEPT_COMMENT_POST') {
     const body = e.data.body;
-    if (body && typeof body === 'object') {
-      const no = String(body.no ?? body.commentNo ?? '').trim();
-      const text = String(body.body ?? body.text ?? '').trim();
-      if (no && text) {
-        const uid = String(body.userId ?? body.user_id ?? '').trim() || null;
-        persistCommentRows([{ commentNo: no, text, userId: uid }]);
-      }
-    }
+    // v0.1.234: shape validation — 異常値 / 過大文字列 を drop
+    if (!isValidCommentPostBody(body)) return;
+    const b = /** @type {Record<string, unknown>} */ (body);
+    const no = String(b.no ?? b.commentNo ?? '').trim();
+    const text = String(b.body ?? b.text ?? '').trim();
+    const uid = String(b.userId ?? b.user_id ?? '').trim() || null;
+    persistCommentRows([{ commentNo: no, text, userId: uid }]);
     return;
   }
 
@@ -1840,9 +1873,22 @@ window.addEventListener('message', (e) => {
 // v0.1.227 観測強化: heartbeat 専用 listener。NLS_GIFT_HISTORY_FROM_IFRAME とは
 // 独立した経路で「relay 起動してるが scrape 0」を見える化する。受信のみで storage は
 // 触らない（観測専用）。
+//
+// v0.1.234 認証強化: cross-origin iframe からの postMessage は origin / frameUrl
+//   検証を必須化。trusted child（audition/koken/nicoad/gift.nicovideo.jp 配下、
+//   かつ origin と frameUrl の origin 一致）以外は drop。
 window.addEventListener('message', (e) => {
   if (!e?.data || typeof e.data.type !== 'string') return;
   if (e.data.type !== 'NLS_GIFT_SUBAPP_RELAY_HEARTBEAT') return;
+  if (
+    !isTrustedGiftSubAppRelayMessage({
+      data: e.data,
+      origin: e.origin,
+      isSelfSource: e.source === window
+    })
+  ) {
+    return;
+  }
   const url = String(e.data.frameUrl || '').slice(0, 200);
   if (!url) return;
   const map = _giftSubAppRelayDiagState.iframeRelayHeartbeatsByFrameUrl;
@@ -1866,6 +1912,16 @@ window.addEventListener('message', (e) => {
 window.addEventListener('message', (e) => {
   if (!e?.data || typeof e.data.type !== 'string') return;
   if (e.data.type !== 'NLS_GIFT_HISTORY_FROM_IFRAME') return;
+  // v0.1.234 認証強化: heartbeat と同じく cross-origin iframe trust 検証を通す
+  if (
+    !isTrustedGiftSubAppRelayMessage({
+      data: e.data,
+      origin: e.origin,
+      isSelfSource: e.source === window
+    })
+  ) {
+    return;
+  }
   // v0.1.226 観測強化: relay 受信 counter（lid 確定前に加算して受信自体を見える化）
   _giftSubAppRelayDiagState.iframeRelayMessagesReceivedTotal += 1;
   _giftSubAppRelayDiagState.iframeRelayLastReceivedAt = Date.now();
