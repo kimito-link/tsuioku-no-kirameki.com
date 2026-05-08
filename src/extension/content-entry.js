@@ -4342,6 +4342,54 @@ function buildGiftDiagnosticsBundle() {
         '自動オープン最終試行ago_ms': ago(_d.autoOpenLastAttemptAt)
       };
     })(),
+    // v0.1.236: 北極星 6 レーン常設レポート。
+    // kimito さん明示（2026-05-09）: popup に枠だけ絶対残るようにする + 診断シートにも残す。
+    // 取得状況に関わらず 6 項目すべて出力 → popup を見なくても診断 JSON で「何が抜けてるか」が分かる。
+    // value は鏡実装時に niconico DOM の outerHTML を入れる予定（現状は数値/null のみ）。
+    '北極星レーン': (() => {
+      const _d = getRankingLifetimeDiag();
+      const b = lastOfficialEventDomBundle;
+      const len = (a) => (Array.isArray(a) ? a.length : 0);
+      const num = (n) => (typeof n === 'number' && Number.isFinite(n) ? n : null);
+      const contribCount = len(b?.contributionRanking);
+      const giftHistoryCount = len(b?.giftHistory);
+      const adCount = len(b?.adContributionRanking);
+      const eventScore = num(b?.eventBanner?.score) ?? num(b?.eventBalloon?.score);
+      const programPoints = num(b?.programStats?.giftPoints);
+      const eventRank = num(b?.eventBanner?.rank);
+      return {
+        '1_貢献度ランキング': {
+          state: contribCount > 0 ? 'ok' : 'missing',
+          count: contribCount,
+          foundCountLifetime: _d.contributionRankingFoundCount
+        },
+        '2_ギフト履歴': {
+          state: giftHistoryCount > 0 ? 'ok' : 'missing',
+          count: giftHistoryCount,
+          foundCountLifetime: _d.giftHistoryFoundCount
+        },
+        '3_イベント累計スコア': {
+          state: eventScore != null ? 'ok' : 'missing',
+          value: eventScore,
+          bannerFoundCountLifetime: _d.eventBannerFoundCount,
+          balloonFoundCountLifetime: _d.eventBalloonFoundCount
+        },
+        '4_番組累計ポイント': {
+          state: programPoints != null ? 'ok' : 'missing',
+          value: programPoints
+        },
+        '5_イベント現在順位': {
+          state: eventRank != null ? 'ok' : 'missing',
+          value: eventRank,
+          bannerFoundCountLifetime: _d.eventBannerFoundCount
+        },
+        '+α_広告ランキング': {
+          state: adCount > 0 ? 'ok' : 'missing',
+          count: adCount,
+          foundCountLifetime: _d.adContributionRankingFoundCount
+        }
+      };
+    })(),
     // v0.1.225 観測強化: コメント記録の uid 解決診断（AI 共有診断 commentObservability）
     // niconico の最新 frontend で uid を DOM/NDGR/intercept のどこから取れているか
     // 切り分けて、F12 不要で root cause を特定するための観測値。挙動変更なし。
