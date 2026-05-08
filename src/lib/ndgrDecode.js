@@ -331,6 +331,24 @@ export function decodeNxGiftEvent(buf, start, end) {
                 if (Number.isFinite(v)) numVal = v;
               } catch { /* no-op */ }
             }
+          } else if (ifn === 2 && iwt === 0 && _iv != null) {
+            // v0.1.233: google.protobuf.Value wrapper を経由せず raw varint で
+            //   入って来るパスへの safety net（ニコ生 ext 側が int 型を直接
+            //   送るレガシー観測がある場合に拾う）。
+            if (numVal == null) numVal = Number(_iv);
+          } else if (ifn === 2 && iwt === 1 && ie - is === 8) {
+            // v0.1.233: 同上、raw fixed64 直送りパス
+            if (numVal == null) {
+              try {
+                const view = new DataView(
+                  buf.buffer,
+                  buf.byteOffset + is,
+                  8
+                );
+                const v = view.getFloat64(0, true);
+                if (Number.isFinite(v)) numVal = v;
+              } catch { /* no-op */ }
+            }
           }
         });
         if (key) {
@@ -457,6 +475,34 @@ function isFalsePositiveItemId(itemId) {
   if (s.startsWith('system:')) return true;
   if (s.startsWith('event:')) return true;
   return false;
+}
+
+/**
+ * v0.1.233: ニコニコの gift item_id は ASCII 英数 + `_` `-` の slug 形式
+ * （`stamp_xxx` / `ball_basketball` / `heart` 等、proto schema と OSS 観測）。
+ * 一方 chat content（「草」「kwsk」「???????????」等の任意テキスト）が
+ * decodeChat で拾えない（chat.no が null）ときに decodeGift 側で itemId と
+ * 誤認されると、popup ギフトサマリで偽陽性を量産する。
+ *
+ * 実機 lv350481542 / lv350482510 で `gifts: 91 〜 266` のうち
+ * `giftsWith{Uid,Point,Rank} = 0` という偏りが観測されており、これらは
+ * msg.1/20/その他経路で chat 本文を itemId と誤って拾っているケースが大半と
+ * 推測される（v0.1.222 の研究レポート所見と整合）。
+ *
+ * 本判定は item_id 形式の strictness を上げて、ASCII slug かつ 3-80 文字の
+ * もののみを gift item_id として採用する。実 gift item_id は確実に通過し、
+ * chat 本文や URL 断片は弾かれる。
+ *
+ * @param {string|null|undefined} itemId
+ * @returns {boolean}
+ */
+function looksLikeValidGiftItemId(itemId) {
+  if (!itemId) return false;
+  const s = String(itemId).trim();
+  if (!s) return false;
+  if (isFalsePositiveItemId(s)) return false;
+  // ASCII 英数 + `_` `-`、先頭は英字、3〜80 文字
+  return /^[a-zA-Z][a-zA-Z0-9_-]{2,79}$/.test(s);
 }
 
 /**
@@ -633,8 +679,10 @@ export function decodeChunkedMessage(buf, start, end) {
           } else {
             // v0.1.210: chat 失敗時は gift として fallback 試行。
             // v0.1.211: false positive 抑制のため "nx:" / "system:" prefix を除外。
+            // v0.1.233: 判定を looksLikeValidGiftItemId に強化。chat 本文（日本語等）が
+            //   itemId と誤認されて gift 偽陽性を量産していた問題に対応。
             const g = decodeGift(buf, ms, me);
-            if (g.itemId && !isFalsePositiveItemId(g.itemId)) {
+            if (looksLikeValidGiftItemId(g.itemId)) {
               gifts.push(g);
             }
           }
@@ -715,13 +763,28 @@ export function decodeChunkedMessage(buf, start, end) {
                 itemName: itemNameStr,
                 contributionRank
               });
+            } else {
+              // v0.1.233: msg.24 nx:gift:show を decode したが gift fields が
+              //   全部空で push できなかった = 想定外 wire 形式の可能性が高い。
+              //   実機の hex sample を unknownSamples に「msg:24:empty」として
+              //   保存し、診断 JSON 経由で wire 構造を解析する用途。
+              recordNdgrUnknownSample(
+                unknownSamples,
+                'msg:24:empty',
+                fn,
+                mfn,
+                buf,
+                ms,
+                me
+              );
             }
           }
         } else {
           // v0.1.210: msg.2/3/その他 でも gift として試す
           // v0.1.211: false positive 抑制のため "nx:" / "system:" prefix を除外
+          // v0.1.233: 判定を looksLikeValidGiftItemId に強化（chat 本文 false positive 対策）
           const g = decodeGift(buf, ms, me);
-          if (g.itemId && !isFalsePositiveItemId(g.itemId)) {
+          if (looksLikeValidGiftItemId(g.itemId)) {
             gifts.push(g);
           }
         }
