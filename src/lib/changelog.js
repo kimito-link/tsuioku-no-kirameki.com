@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.230',
+    date: '2026-05-08',
+    summary: '広告ランキングが貢献度ランキング欄に混入する事象を修正',
+    items: Object.freeze([
+      'v0.1.226 〜 v0.1.229 でギフトランキング取得経路を opt-in 化したあと、ボタンを押すと popup の「公式の貢献度ランキング順」に広告ランキングの数値（23692貢など）が混入する事象がありました。原因は、広告ランキング iframe（nicoad.nicovideo.jp）の DOM scrape が貢献度ランキング用の selector にもヒットしてしまい、親 frame で「貢献度ランキング」として保存されていたことです',
+      '本バージョンでは、relay 受信側で送信元の iframe（audition / koken / gift / nicoad）を URL から判別し、貢献度ランキング・イベント参加バナーは audition / koken からのみ採用、広告 iframe（nicoad）の値は drop するように変更しました。ギフト履歴は koken のみ、イベントバナーは audition のみが信頼源です',
+      'あわせて、初回の自動オープンが「お困りの方はこちら」表示で終わった配信では、30 秒後の自動リトライを行わないようにしました（同じ rescue 表示を再度トリガするだけになるため）。実機でユーザーが目にする副作用が更に減ります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.229',
     date: '2026-05-08',
     summary: 'ランキングタブ検索の誤 navigate を修正',

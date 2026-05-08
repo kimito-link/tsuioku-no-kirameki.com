@@ -21,6 +21,19 @@ async function waitForPopupInteractive(popup) {
   await expect(popup.locator('html[data-nl-support-wired]')).toBeAttached({
     timeout: 15_000
   });
+  /* v0.1.230: 初期ロード shade（NL_INIT_SHADE_MIN_VISIBLE_MS=800ms 表示後に
+     dismiss）が elementFromPoint テスト等を阻害しないよう、消えるまで待つ。
+     shade 要素は dismissInitialLoadShade で remove() される or
+     class に nl-init-shade--done が付く。 */
+  await popup.waitForFunction(
+    () => {
+      const shade = document.getElementById('nlInitialLoadShade');
+      if (!shade) return true;
+      return shade.classList.contains('nl-init-shade--done');
+    },
+    null,
+    { timeout: 5_000 }
+  );
 }
 
 /** #supportVisualDetails の open 状態が期待値になるまで待つ */
