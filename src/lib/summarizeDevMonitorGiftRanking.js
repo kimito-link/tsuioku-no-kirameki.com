@@ -14,6 +14,8 @@
  * 副作用なし。
  */
 
+import { formatRelayDiagOneLine } from './giftSubAppRelayDiag.js';
+
 /**
  * @typedef {[string, string]} DevMonitorRow
  */
@@ -72,6 +74,13 @@ export function summarizeDevMonitorGiftRanking(fastCache) {
       msg += ` — ${note}`;
     }
     rows.push(['ギフトサイドバー履歴', msg]);
+  }
+
+  // v0.1.226: ギフトサイドバー cross-origin iframe relay 経路の生存状態
+  // （hidden iframe inject → window.top.postMessage 経路が動いているかの切り分け）
+  const relayDiag = gd.giftSubAppRelayDiag;
+  if (relayDiag && typeof relayDiag === 'object') {
+    rows.push(['iframe relay 経路', formatRelayDiagOneLine(relayDiag)]);
   }
 
   // 応援ランキング自動オープン（v0.1.201 lastFailureReason 統合）

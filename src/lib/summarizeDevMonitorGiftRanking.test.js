@@ -133,6 +133,43 @@ describe('summarizeDevMonitorGiftRanking', () => {
     );
   });
 
+  it('v0.1.226: giftSubAppRelayDiag 受信 0 → 「iframe relay 未受信」行を出す', () => {
+    const c = buildRealisticFastCache();
+    c.content.giftDiagnostics.giftSubAppRelayDiag = {
+      messagesReceivedTotal: 0,
+      messagesByFrameUrl: {},
+      lastReceivedAgoMs: null,
+      crossOriginThrows: 6,
+      sameOriginAccess: 1,
+      hasReceivedAny: false
+    };
+    const rows = summarizeDevMonitorGiftRanking(c);
+    const v = rows.find((r) => r[0] === 'iframe relay 経路')?.[1];
+    expect(v).toContain('iframe relay 未受信');
+    expect(v).toContain('6');
+  });
+
+  it('v0.1.226: giftSubAppRelayDiag 受信あり → 受信件数行を出す', () => {
+    const c = buildRealisticFastCache();
+    c.content.giftDiagnostics.giftSubAppRelayDiag = {
+      messagesReceivedTotal: 12,
+      messagesByFrameUrl: { a: 6, b: 6 },
+      lastReceivedAgoMs: 3500,
+      crossOriginThrows: 2,
+      sameOriginAccess: 0,
+      hasReceivedAny: true
+    };
+    const rows = summarizeDevMonitorGiftRanking(c);
+    const v = rows.find((r) => r[0] === 'iframe relay 経路')?.[1];
+    expect(v).toContain('iframe relay 受信 12 件');
+  });
+
+  it('v0.1.226: giftSubAppRelayDiag が無い fixture では行を出さない（後方互換）', () => {
+    const rows = summarizeDevMonitorGiftRanking(buildRealisticFastCache());
+    const v = rows.find((r) => r[0] === 'iframe relay 経路');
+    expect(v).toBeUndefined();
+  });
+
   it('応援ランキング自動オープン: lastFailureReason + hint テキスト', () => {
     const rows = summarizeDevMonitorGiftRanking(buildRealisticFastCache());
     const v = rows.find((r) => r[0] === '応援ランキング自動オープン')?.[1];

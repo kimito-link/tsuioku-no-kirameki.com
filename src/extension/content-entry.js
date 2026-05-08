@@ -102,6 +102,7 @@ import {
   parseInterceptFetchLog,
   snapshotCommentIngestCounters
 } from '../lib/commentObservabilityDiag.js';
+import { snapshotIframeRelayDiag } from '../lib/giftSubAppRelayDiag.js';
 import {
   parseLiveViewerCountFromDocument,
   parseViewerCountFromSnapshotMetas
@@ -1833,6 +1834,14 @@ window.addEventListener('message', (e) => {
 window.addEventListener('message', (e) => {
   if (!e?.data || typeof e.data.type !== 'string') return;
   if (e.data.type !== 'NLS_GIFT_HISTORY_FROM_IFRAME') return;
+  // v0.1.226 観測強化: relay 受信 counter（lid 確定前に加算して受信自体を見える化）
+  _giftSubAppRelayDiagState.iframeRelayMessagesReceivedTotal += 1;
+  _giftSubAppRelayDiagState.iframeRelayLastReceivedAt = Date.now();
+  const _diagFrameUrl = String(e.data.frameUrl || '').slice(0, 200);
+  if (_diagFrameUrl) {
+    const _cur = _giftSubAppRelayDiagState.iframeRelayMessagesByFrameUrl[_diagFrameUrl] || 0;
+    _giftSubAppRelayDiagState.iframeRelayMessagesByFrameUrl[_diagFrameUrl] = _cur + 1;
+  }
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid || !hasExtensionContext()) return;
 
@@ -4282,6 +4291,10 @@ function buildGiftDiagnosticsBundle() {
         }
       };
     })(),
+    // v0.1.226 観測強化: ギフトサイドバー cross-origin iframe relay 経路の生存確認
+    // （AI 共有診断 giftSubAppRelayDiag）。受信件数 / frame 別 / cross-origin throw 数
+    // から「relay が来てない / 来たけど空 / scrape 失敗」のどれかを切り分ける。
+    giftSubAppRelayDiag: snapshotIframeRelayDiag(_giftSubAppRelayDiagState),
     urlLiveId: urlLv || ''
   };
 }
@@ -9161,6 +9174,26 @@ function maybeStartGiftSubAppIframeRelay() {
 let _hiddenOfficialIframesInjectedForLid = '';
 
 /**
+ * v0.1.226 観測強化: ギフトサイドバー cross-origin iframe relay 経路の生存確認 state。
+ * NLS_GIFT_HISTORY_FROM_IFRAME 受信側 + scanGiftSubAppDomAcrossFrames 内で更新される
+ * 累積 counter。AI 共有診断 JSON の `giftSubAppRelayDiag` ブロックで snapshot として出す。
+ * @type {{
+ *   iframeRelayMessagesReceivedTotal: number,
+ *   iframeRelayMessagesByFrameUrl: Record<string, number>,
+ *   iframeRelayLastReceivedAt: number,
+ *   scanCrossOriginThrows: number,
+ *   scanSameOriginAccess: number
+ * }}
+ */
+const _giftSubAppRelayDiagState = {
+  iframeRelayMessagesReceivedTotal: 0,
+  iframeRelayMessagesByFrameUrl: {},
+  iframeRelayLastReceivedAt: 0,
+  scanCrossOriginThrows: 0,
+  scanSameOriginAccess: 0
+};
+
+/**
  * v0.1.218: 公式 iframe (audition / koken / nicoad) を裏で inject して Vue を
  *   完全 render させる。kimito さんが「ギフト」モーダル → 「履歴」タブを開く
  *   操作なしで、過去 gift history + 貢献度ランキング + イベント参加バナーを
@@ -9294,9 +9327,15 @@ function scanGiftSubAppDomAcrossFrames() {
   for (const ifr of iframes) {
     try {
       const doc = /** @type {any} */ (ifr).contentDocument;
-      if (doc && doc !== document) allDocs.push(doc);
+      if (doc && doc !== document) {
+        allDocs.push(doc);
+        // v0.1.226 観測強化: same-origin access 成功
+        _giftSubAppRelayDiagState.scanSameOriginAccess += 1;
+      }
     } catch {
       // cross-origin iframe は無視
+      // v0.1.226 観測強化: cross-origin throw 件数
+      _giftSubAppRelayDiagState.scanCrossOriginThrows += 1;
     }
   }
 

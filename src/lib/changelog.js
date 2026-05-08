@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.226',
+    date: '2026-05-08',
+    summary: 'ギフトサイドバー iframe relay 経路の生存観測を追加',
+    items: Object.freeze([
+      '公式の貢献度ランキング・イベント累計・ギフト履歴を取得するための「cross-origin iframe → window.top.postMessage で親 frame に DOM scrape 結果を中継する」経路（v0.1.216 〜 v0.1.218 で導入）が、実機で実際に動いているのかを確認できる観測値を追加しました。受信件数の累積、frame URL 別の受信件数、最終受信時刻、cross-origin throw 回数、same-origin access 回数の 5 種類です',
+      '上記は AI 共有診断 JSON の `content.giftDiagnostics.giftSubAppRelayDiag` ブロックと、popup「詳しい状況」の「iframe relay 経路」行に追記されます。受信 0 件のときは「未受信（cross-origin で N 回弾かれ、…）」が出るため、relay 不全の原因が「hidden iframe inject 未動作」か「scrape 結果の postMessage 失敗」かを切り分けやすくなります',
+      '観測専用の追加で、拡張の挙動は一切変更しません。次バージョン以降で、この観測値に基づいて relay 不全の根本改善（hidden iframe inject の動作補強・scrape ロジック修復）を進めます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.225',
     date: '2026-05-08',
     summary: 'コメント uid 解決経路の切り分け観測を追加',
