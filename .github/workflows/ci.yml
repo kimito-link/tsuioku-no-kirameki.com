@@ -12,7 +12,7 @@ jobs:
   test-and-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v4
         with:
@@ -31,7 +31,7 @@ jobs:
     # workers=1 + CI retries=1 で spec 数分は 20 分に届きやすい。ギリギリの打ち切りを避ける。
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v4
         with:
