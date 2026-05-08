@@ -1831,6 +1831,32 @@ window.addEventListener('message', (e) => {
 //   設計（冪等）。iframe re-mount や Chrome reload で同じ全履歴が再送信されても、
 //   storage は同じ data で上書きされるだけで throwCount / totalPoints は倍々
 //   にならない。popup の refreshGiftRankStrip fallback がこれを読み込む。
+// v0.1.227 観測強化: heartbeat 専用 listener。NLS_GIFT_HISTORY_FROM_IFRAME とは
+// 独立した経路で「relay 起動してるが scrape 0」を見える化する。受信のみで storage は
+// 触らない（観測専用）。
+window.addEventListener('message', (e) => {
+  if (!e?.data || typeof e.data.type !== 'string') return;
+  if (e.data.type !== 'NLS_GIFT_SUBAPP_RELAY_HEARTBEAT') return;
+  const url = String(e.data.frameUrl || '').slice(0, 200);
+  if (!url) return;
+  const map = _giftSubAppRelayDiagState.iframeRelayHeartbeatsByFrameUrl;
+  const cur = map[url] || {
+    count: 0,
+    lastAt: 0,
+    lastScrapeAttempts: 0,
+    lastItemsCount: 0,
+    lastContribCount: 0,
+    lastEventBannerPresent: false
+  };
+  cur.count += 1;
+  cur.lastAt = Date.now();
+  cur.lastScrapeAttempts = Number(e.data.scrapeAttempts) || 0;
+  cur.lastItemsCount = Number(e.data.itemsCount) || 0;
+  cur.lastContribCount = Number(e.data.contribCount) || 0;
+  cur.lastEventBannerPresent = e.data.eventBannerPresent === true;
+  map[url] = cur;
+});
+
 window.addEventListener('message', (e) => {
   if (!e?.data || typeof e.data.type !== 'string') return;
   if (e.data.type !== 'NLS_GIFT_HISTORY_FROM_IFRAME') return;
@@ -9101,13 +9127,23 @@ function maybeStartGiftSubAppIframeRelay() {
 
   /** @type {string} */
   let lastSent = '';
+  /** v0.1.227: scan tick の累積回数。heartbeat に乗せて「relay は起動してるが scrape 0 件」を区別する */
+  let scrapeAttempts = 0;
   const scanAndPost = () => {
+    scrapeAttempts += 1;
+    /** @type {Array<unknown>} */
+    let items = [];
+    /** @type {Array<unknown>} */
+    let totalCounts = [];
+    /** @type {Array<unknown>|null} */
+    let contributionRanking = null;
+    /** @type {unknown} */
+    let eventBanner = null;
     try {
       const r = scrapeGiftHistoryList(document);
-      const items = r && Array.isArray(r.items) ? r.items : [];
+      items = r && Array.isArray(r.items) ? r.items : [];
       const r2 = scrapeTotalGiftCountList(document);
-      const totalCounts =
-        r2 && Array.isArray(r2.items) ? r2.items : [];
+      totalCounts = r2 && Array.isArray(r2.items) ? r2.items : [];
       // v0.1.217: 公式サイドバー iframe には gift 履歴だけでなく、
       //   - イベント参加バナー（owner-name, rank, score, eventName）
       //   - 貢献度ランキング（.contribution-ranking-list の各 ranker）
@@ -9115,15 +9151,39 @@ function maybeStartGiftSubAppIframeRelay() {
       //   確認された。既存 lib の selector は本構造に対応済み（旧構造 fallback で
       //   `.contribution-ranking-list .ranker` を拾う、`.owner-name` を起点に
       //   バナーを掬う）。同じ scan tick で 3 種類すべて scrape して親に送る。
-      let contributionRanking = null;
       try {
         contributionRanking = scrapeContributionRankingFromDom(document) || [];
       } catch { contributionRanking = []; }
-      let eventBanner = null;
       try {
         eventBanner = scrapeOfficialEventBannerFromDom(document) || null;
       } catch { eventBanner = null; }
-      // 何も取れていなければ送信不要
+    } catch {
+      /* no-op: scrape 失敗時も heartbeat は送る */
+    }
+
+    // v0.1.227 観測強化: scrape 結果が 0 件でも heartbeat を必ず送る。
+    // これで「relay は起動してるが scrape 空」と「relay 自体起動してない」を
+    // 親 frame 側で区別できる（v0.1.226 では区別できなかった盲点）。
+    try {
+      const target = window.top || window.parent;
+      target.postMessage(
+        {
+          type: 'NLS_GIFT_SUBAPP_RELAY_HEARTBEAT',
+          frameUrl: href,
+          scrapeAttempts,
+          itemsCount: items.length,
+          contribCount: Array.isArray(contributionRanking) ? contributionRanking.length : 0,
+          eventBannerPresent: !!eventBanner,
+          sentAt: Date.now()
+        },
+        '*'
+      );
+    } catch {
+      /* no-op */
+    }
+
+    try {
+      // 何も取れていなければ実 payload 送信は不要（heartbeat だけで切り分け可能）
       if (
         items.length === 0 &&
         (!contributionRanking || contributionRanking.length === 0) &&
@@ -9174,13 +9234,29 @@ function maybeStartGiftSubAppIframeRelay() {
 let _hiddenOfficialIframesInjectedForLid = '';
 
 /**
- * v0.1.226 観測強化: ギフトサイドバー cross-origin iframe relay 経路の生存確認 state。
- * NLS_GIFT_HISTORY_FROM_IFRAME 受信側 + scanGiftSubAppDomAcrossFrames 内で更新される
- * 累積 counter。AI 共有診断 JSON の `giftSubAppRelayDiag` ブロックで snapshot として出す。
+ * v0.1.226 観測強化 / v0.1.227 拡張: ギフトサイドバー cross-origin iframe relay 経路の
+ *   生存確認 state。
+ *
+ * v0.1.226: NLS_GIFT_HISTORY_FROM_IFRAME 受信 counter + scan 時の throw/hit。
+ *   ただし「iframe 内 relay は起動してるが scrape 0 件で silent return」のケースを
+ *   区別できなかった盲点があった。
+ * v0.1.227: 上記盲点を埋めるため `iframeRelayHeartbeatsByFrameUrl` を追加。iframe 側が
+ *   scrape 結果に関係なく毎 scan tick 送る heartbeat（NLS_GIFT_SUBAPP_RELAY_HEARTBEAT）を
+ *   受信し、frame 別に最新 scrape カウントを保持する。
+ *
+ * AI 共有診断 JSON の `giftSubAppRelayDiag` ブロックで snapshot として出す。
  * @type {{
  *   iframeRelayMessagesReceivedTotal: number,
  *   iframeRelayMessagesByFrameUrl: Record<string, number>,
  *   iframeRelayLastReceivedAt: number,
+ *   iframeRelayHeartbeatsByFrameUrl: Record<string, {
+ *     count: number,
+ *     lastAt: number,
+ *     lastScrapeAttempts: number,
+ *     lastItemsCount: number,
+ *     lastContribCount: number,
+ *     lastEventBannerPresent: boolean
+ *   }>,
  *   scanCrossOriginThrows: number,
  *   scanSameOriginAccess: number
  * }}
@@ -9189,6 +9265,7 @@ const _giftSubAppRelayDiagState = {
   iframeRelayMessagesReceivedTotal: 0,
   iframeRelayMessagesByFrameUrl: {},
   iframeRelayLastReceivedAt: 0,
+  iframeRelayHeartbeatsByFrameUrl: {},
   scanCrossOriginThrows: 0,
   scanSameOriginAccess: 0
 };

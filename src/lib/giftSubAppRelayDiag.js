@@ -15,12 +15,36 @@
 
 /**
  * @typedef {{
+ *   count: number,
+ *   lastAt: number,
+ *   lastScrapeAttempts: number,
+ *   lastItemsCount: number,
+ *   lastContribCount: number,
+ *   lastEventBannerPresent: boolean
+ * }} GiftSubAppRelayHeartbeatEntryRaw
+ */
+
+/**
+ * @typedef {{
  *   iframeRelayMessagesReceivedTotal: number,
  *   iframeRelayMessagesByFrameUrl: Record<string, number>,
  *   iframeRelayLastReceivedAt: number,
+ *   iframeRelayHeartbeatsByFrameUrl?: Record<string, GiftSubAppRelayHeartbeatEntryRaw>,
  *   scanCrossOriginThrows: number,
  *   scanSameOriginAccess: number
  * }} GiftSubAppRelayDiagState
+ */
+
+/**
+ * v0.1.227: heartbeat snapshot 1 件分。frame 別の生存状況を popup / 診断 JSON に出す。
+ * @typedef {{
+ *   count: number,
+ *   lastAgoMs: number|null,
+ *   lastScrapeAttempts: number,
+ *   lastItemsCount: number,
+ *   lastContribCount: number,
+ *   lastEventBannerPresent: boolean
+ * }} GiftSubAppRelayHeartbeatEntry
  */
 
 /**
@@ -28,9 +52,12 @@
  *   messagesReceivedTotal: number,
  *   messagesByFrameUrl: Record<string, number>,
  *   lastReceivedAgoMs: number|null,
+ *   heartbeatsByFrameUrl: Record<string, GiftSubAppRelayHeartbeatEntry>,
+ *   heartbeatFrameCount: number,
  *   crossOriginThrows: number,
  *   sameOriginAccess: number,
- *   hasReceivedAny: boolean
+ *   hasReceivedAny: boolean,
+ *   hasHeartbeatAny: boolean
  * }} GiftSubAppRelayDiagSnapshot
  */
 
@@ -47,9 +74,12 @@ export function snapshotIframeRelayDiag(state, nowMs) {
     messagesReceivedTotal: 0,
     messagesByFrameUrl: {},
     lastReceivedAgoMs: null,
+    heartbeatsByFrameUrl: {},
+    heartbeatFrameCount: 0,
     crossOriginThrows: 0,
     sameOriginAccess: 0,
-    hasReceivedAny: false
+    hasReceivedAny: false,
+    hasHeartbeatAny: false
   };
   if (!state || typeof state !== 'object') return empty;
 
@@ -63,21 +93,52 @@ export function snapshotIframeRelayDiag(state, nowMs) {
       if (v > 0) byFrame[String(key).slice(0, 200)] = v;
     }
   }
+
+  // v0.1.227: heartbeat 集計
+  /** @type {Record<string, GiftSubAppRelayHeartbeatEntry>} */
+  const heartbeats = {};
+  let heartbeatFrameCount = 0;
+  const hbRaw = state.iframeRelayHeartbeatsByFrameUrl;
+  if (hbRaw && typeof hbRaw === 'object') {
+    for (const key of Object.keys(hbRaw)) {
+      const e = hbRaw[key];
+      if (!e || typeof e !== 'object') continue;
+      const count = numberOrZero(e.count);
+      if (count <= 0) continue;
+      const lastAtHb = numberOrZero(e.lastAt);
+      heartbeats[String(key).slice(0, 200)] = {
+        count,
+        lastAgoMs: lastAtHb > 0 ? Math.max(0, now - lastAtHb) : null,
+        lastScrapeAttempts: numberOrZero(e.lastScrapeAttempts),
+        lastItemsCount: numberOrZero(e.lastItemsCount),
+        lastContribCount: numberOrZero(e.lastContribCount),
+        lastEventBannerPresent: e.lastEventBannerPresent === true
+      };
+      heartbeatFrameCount += 1;
+    }
+  }
+
   return {
     messagesReceivedTotal: total,
     messagesByFrameUrl: byFrame,
     lastReceivedAgoMs: lastAt > 0 ? Math.max(0, now - lastAt) : null,
+    heartbeatsByFrameUrl: heartbeats,
+    heartbeatFrameCount,
     crossOriginThrows: numberOrZero(state.scanCrossOriginThrows),
     sameOriginAccess: numberOrZero(state.scanSameOriginAccess),
-    hasReceivedAny: total > 0
+    hasReceivedAny: total > 0,
+    hasHeartbeatAny: heartbeatFrameCount > 0
   };
 }
 
 /**
  * relay snapshot から popup「詳しい状況」用の 1 行短文を生成する。
- * 例:
- *   - relay 受信 0 件 / cross-origin throw 6 → "iframe relay 未受信（cross-origin で 6 回弾かれ）"
- *   - relay 受信 12 件（audition×6 / koken×6） → "iframe relay 受信 12 件（2 frame）"
+ *
+ * v0.1.227: heartbeat counter を加味して 3 シナリオを切り分ける。
+ *   1. heartbeat 0 + relay 0 → child script 自体が動いてない（または iframe 不在）
+ *   2. heartbeat あり + relay 0 → child script は動いてるが scrape 0 件
+ *   3. relay 受信あり → relay 経路は OK、heartbeat 数も合わせて出す
+ *
  * @param {GiftSubAppRelayDiagSnapshot|null|undefined} snap
  * @returns {string}
  */
@@ -85,12 +146,17 @@ export function formatRelayDiagOneLine(snap) {
   if (!snap || typeof snap !== 'object') return 'iframe relay 状態 不明';
   const total = Number(snap.messagesReceivedTotal) || 0;
   const throws = Number(snap.crossOriginThrows) || 0;
-  const sameOrigin = Number(snap.sameOriginAccess) || 0;
+  const heartbeatFrameCount = Number(snap.heartbeatFrameCount) || 0;
   if (total === 0) {
-    if (throws > 0) {
-      return `iframe relay 未受信（cross-origin で ${throws} 回弾かれ、same-origin ${sameOrigin}）`;
+    if (heartbeatFrameCount === 0) {
+      // heartbeat も 0 → child content script 自体が起動していない
+      if (throws > 0) {
+        return `iframe relay 起動なし（cross-origin で ${throws} 回弾かれ、heartbeat 0）`;
+      }
+      return 'iframe relay 起動なし（child content script 未起動 or iframe 不在）';
     }
-    return 'iframe relay 未受信（hidden iframe inject 未動作の疑い）';
+    // heartbeat あり + relay 0 → child は動いてるが scrape 0
+    return `iframe relay 起動 ${heartbeatFrameCount} frame、scrape 0 件（DOM 空 or selector 不一致）`;
   }
   const frames = Object.keys(snap.messagesByFrameUrl || {}).length;
   const lastAgo = snap.lastReceivedAgoMs;
@@ -98,7 +164,7 @@ export function formatRelayDiagOneLine(snap) {
     typeof lastAgo === 'number' && Number.isFinite(lastAgo)
       ? `、最終 ${Math.round(lastAgo / 1000)}s 前`
       : '';
-  return `iframe relay 受信 ${total} 件（${frames} frame${ago}、cross-origin throw ${throws}）`;
+  return `iframe relay 受信 ${total} 件（${frames} frame${ago}、heartbeat ${heartbeatFrameCount} frame）`;
 }
 
 /**
