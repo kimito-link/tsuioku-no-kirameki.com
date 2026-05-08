@@ -31,6 +31,18 @@ export const KEY_COMMENT_INGEST_LOG = 'nls_comment_ingest_log_v1';
 /** 5分ごとの自動バックアップ状態（最終バックアップ時刻など） */
 export const KEY_AUTO_BACKUP_STATE = 'nls_auto_backup_state';
 
+/**
+ * v0.1.228: ギフトランキング取得経路（autoOpen / hidden iframe inject /
+ * cross-origin iframe relay scrape）をユーザーが明示的に有効化したかを示す
+ * グローバル設定。値: true なら有効、未設定または false なら opt-out（default）。
+ *
+ * 経緯: v0.1.226 / v0.1.227 の実機観測で、配信者ごとに公式 iframe の Vue が
+ * 全く render しないケース（rich-view-status placeholder のまま）が多いと判明。
+ * 取得試行（autoOpen）の副作用で「お困りの方はこちら」rescue link が広域に
+ * 表示されてユーザー体験を損なうため、初期 OFF + 明示 ON 化に切り替える。
+ */
+export const KEY_GIFT_RANKING_LANE_ENABLED = 'nls_gift_ranking_lane_enabled';
+
 /** ポップアップの着せ替えフレーム設定 */
 export const KEY_POPUP_FRAME = 'nls_popup_frame';
 
