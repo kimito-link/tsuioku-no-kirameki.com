@@ -26,6 +26,20 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.237',
+    date: '2026-05-09',
+    summary: '北極星 +α 広告ランキング鏡レンダリング',
+    items: Object.freeze([
+      'popup の「公式値レーン」セクションのうち、+α 広告ランキング枠に niconico の outerHTML をそのまま映す「鏡のように貼り付け」レンダリングを追加しました。広告ランキングが取れている配信では、popup の枠内に niconico ページの DOM（順位アイコンの SVG / 名前 / "X,XXX 貢" の表示）がそのまま再現されます',
+      '自前の最小サニタイザ `mirrorSanitize.js` を新設しました（DOMPurify 等の依存追加なし、依存ゼロ方針維持）。許可タグ・許可属性のみ通すホワイトリスト方式で、SVG namespace を保持しつつ id を nonce 付きにリネーム（複数の鏡を popup に並べた時の id 衝突を防止）、`url(#...)` / `xlink:href="#..."` の参照も同期更新します。`script` / `iframe` / `style` / `href` / `data-v-*` / `[hidden]` 属性付き要素 / `javascript:` プロトコル URL などを削除し、popup の CSP やクリック挙動と衝突しないよう守ります',
+      '`scrapeAdRankingMirrorHtml(root)` を新規追加（`src/lib/officialEventBannerDom.js`）。watch ページ secondary content section の `ul.wrapper` の outerHTML を文字列として返す純関数です。CSS Modules ハッシュ化された class へのフォールバックも含みます',
+      '`fetchNicoadContributionRankingFromPublishPage` の戻り値を拡張し、Array に非列挙の `mirrorHtml` を `Object.defineProperty` で添付するようにしました。既存の `Array.isArray` 判定や `.map()` などは影響を受けません。content-entry.js 側でこれを取り出して `bundle.adRankingMirrorHtml` 別フィールドに写し、storage 経由で popup に届けます',
+      'バンドル型 `OfficialEventDomBundle` に `adRankingMirrorHtml: string|null` を追加、`mergeOfficialEventDomBundle` も新フィールドのマージに対応。既存挙動は破壊しません',
+      'popup-entry.js に `renderNorthStarLane(laneId, mirrorHtml)` と `refreshNorthStarAdRankingLane()` を追加。bundle 更新の rerender pipeline（`refreshGiftRankStrip` の隣）で広告ランキングレーンを描画します。値が無い時は v0.1.236 で常設した `(未取得)` placeholder と `data-lane-state="missing"` を維持します',
+      '実装は会議室プロンプト（Codex 実装案 / Codex 批判 / Gemini 抜け漏れの 3 AI レビュー）で計画を磨いてから着手しました。Gemini の追加視点（`[hidden]` 削除 / CSP 衝突の予防 / Shadow DOM 監視 / popup 内クリック挙動）も組み込んでいます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.236',
     date: '2026-05-09',
     summary: '北極星 6 レーン枠を popup と診断シートに常設',
