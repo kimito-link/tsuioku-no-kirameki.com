@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.236',
+    date: '2026-05-09',
+    summary: '北極星 6 レーン枠を popup と診断シートに常設',
+    items: Object.freeze([
+      'popup の「公式値レーン」セクションを新設し、(1) 貢献度ランキング (2) この番組へのギフト履歴 (3) イベント累計スコア (4) 番組累計ポイント (5) イベント現在順位 (+α) 広告ランキング の 6 つを取得可否に関わらず常設しました。値が取れていない項目は「(未取得)」placeholder として枠だけ残ります（kimito さん明示、2026-05-09）',
+      'AI 共有診断 JSON にも `北極星レーン` キーを追加しました。各レーンは `state`（"ok" / "missing"）と件数 / 値 / 取得回数（累計）を持つ統一構造で、popup を見なくても診断 JSON だけで「何が抜けてるか」が分かります',
+      '挙動変更ゼロ。データ取得経路（cross-origin iframe scrape の修復）はこの版では手をつけず、後続版で「鏡のように貼り付け」（niconico DOM の outerHTML をそのまま popup に流し込む）方式で順次値を埋める段取りです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.235',
     date: '2026-05-08',
     summary: 'NDGR ギフト partial decode の真因サンプル収集',

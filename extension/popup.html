@@ -2662,6 +2662,63 @@
         cursor: progress;
       }
 
+      /* v0.1.236: 北極星 6 レーン常設枠。
+         「取得できる/出来ないに関わらず popup に枠を残す」原則（kimito さん 2026-05-09 明示）。
+         鏡のように貼り付け原則: 値が取れたら niconico DOM の outerHTML をそのまま流し込む。
+         未取得時は placeholder のみで枠は維持。 */
+      .nl-north-star-lanes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        margin-top: 6px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 55%, transparent);
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-bg-soft) 8%);
+      }
+      .nl-north-star-lanes__title {
+        grid-column: 1 / -1;
+        margin: 0 0 2px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--nl-text);
+      }
+      .nl-north-star-lanes__note {
+        grid-column: 1 / -1;
+        margin: 0;
+        font-size: 10px;
+        color: color-mix(in srgb, var(--nl-text) 55%, transparent);
+      }
+      .nl-north-star-lane {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px;
+        border-radius: 6px;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 45%, transparent);
+        background: var(--nl-surface);
+        min-height: 48px;
+      }
+      .nl-north-star-lane--full {
+        grid-column: 1 / -1;
+      }
+      .nl-north-star-lane__label {
+        font-size: 10px;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 75%, transparent);
+      }
+      .nl-north-star-lane__body {
+        font-size: 12px;
+        color: var(--nl-text);
+        word-break: break-word;
+      }
+      .nl-north-star-lane__body[data-lane-state="missing"],
+      .nl-north-star-lane__body[data-lane-state="no_event"],
+      .nl-north-star-lane__body[data-lane-state="no_program_gift"] {
+        color: color-mix(in srgb, var(--nl-text) 40%, transparent);
+        font-style: italic;
+      }
+
       .nl-top-support-rank--below-cards {
         margin-top: 2px;
       }
@@ -7040,6 +7097,70 @@
           hidden
           aria-hidden="true"
         ></div>
+        <!-- v0.1.236: 北極星 6 レーン常設枠。
+             kimito さん明示（2026-05-09）: 取得できる/出来ないに関わらず枠を popup に残す。
+             鏡のように貼り付け原則: 取得できたら niconico DOM の outerHTML を body に流し込む。
+             未取得時は placeholder のみで枠は維持。
+             (1) 貢献度ランキング (2) ギフト履歴 (3) イベント累計スコア
+             (4) 番組累計ポイント (5) イベント現在順位 (+α) 広告ランキング -->
+        <section
+          id="northStarLanes"
+          class="nl-north-star-lanes"
+          aria-label="公式値レーン（北極星 6 項目、常設）"
+        >
+          <h3 class="nl-north-star-lanes__title">公式値レーン（取得可否に関わらず常設）</h3>
+          <div class="nl-north-star-lane" data-lane="contributionRanking">
+            <div class="nl-north-star-lane__label">貢献度ランキング</div>
+            <div
+              id="northStarLaneBody-contributionRanking"
+              class="nl-north-star-lane__body"
+              data-lane-state="missing"
+            >(未取得)</div>
+          </div>
+          <div class="nl-north-star-lane" data-lane="giftHistory">
+            <div class="nl-north-star-lane__label">この番組へのギフト履歴</div>
+            <div
+              id="northStarLaneBody-giftHistory"
+              class="nl-north-star-lane__body"
+              data-lane-state="missing"
+            >(未取得)</div>
+          </div>
+          <div class="nl-north-star-lane" data-lane="eventScore">
+            <div class="nl-north-star-lane__label">イベント累計スコア</div>
+            <div
+              id="northStarLaneBody-eventScore"
+              class="nl-north-star-lane__body"
+              data-lane-state="missing"
+            >(未取得)</div>
+          </div>
+          <div class="nl-north-star-lane" data-lane="programPoints">
+            <div class="nl-north-star-lane__label">番組累計ポイント</div>
+            <div
+              id="northStarLaneBody-programPoints"
+              class="nl-north-star-lane__body"
+              data-lane-state="missing"
+            >(未取得)</div>
+          </div>
+          <div class="nl-north-star-lane" data-lane="eventRank">
+            <div class="nl-north-star-lane__label">イベント現在順位</div>
+            <div
+              id="northStarLaneBody-eventRank"
+              class="nl-north-star-lane__body"
+              data-lane-state="missing"
+            >(未取得)</div>
+          </div>
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="adRanking">
+            <div class="nl-north-star-lane__label">広告ランキング（参考）</div>
+            <div
+              id="northStarLaneBody-adRanking"
+              class="nl-north-star-lane__body"
+              data-lane-state="missing"
+            >(未取得)</div>
+          </div>
+          <p class="nl-north-star-lanes__note">
+            鏡のように貼り付け方式（v0.1.236+）: niconico の DOM をそのまま映す予定。値が取れていない項目は枠だけ残ります。
+          </p>
+        </section>
         <!-- v0.1.228: ギフトランキング opt-in prompt。flag OFF（default）のとき表示。
              ボタン押下で content 側の autoOpen / hidden iframe inject が動き出す。 -->
         <div
