@@ -17,6 +17,7 @@ import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterF
 import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
 import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
+import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -5350,6 +5351,55 @@ async function refreshGiftRankingFetchPrompt(liveId) {
 }
 
 /**
+ * v0.1.237: 北極星「鏡のように貼り付け」レーン body へ、niconico DOM の outerHTML を
+ * sanitize して innerHTML として流し込む。
+ *
+ * - 入力 mirrorHtml が空 / null なら placeholder ("(未取得)") を維持し、
+ *   data-lane-state="missing" に倒す（v0.1.236 で常設した枠の状態管理）。
+ * - 有効な HTML なら sanitize してから innerHTML に流し込み、state="ok" にする。
+ * - sanitize は `mirrorSanitize.sanitizeMirrorHtml` に委譲（自前ホワイトリスト方式、
+ *   SVG namespace 維持 + id rename + url(#) 同期更新 + [hidden]/onXX/style/href 削除）。
+ *
+ * @param {string} laneId 例 'adRanking'（popup.html の id="northStarLaneBody-<laneId>" に対応）
+ * @param {string|null|undefined} mirrorHtml
+ */
+function renderNorthStarLane(laneId, mirrorHtml) {
+  const body = document.getElementById('northStarLaneBody-' + String(laneId || ''));
+  if (!(body instanceof HTMLElement)) return;
+
+  const raw = typeof mirrorHtml === 'string' ? mirrorHtml.trim() : '';
+  if (!raw) {
+    body.setAttribute('data-lane-state', 'missing');
+    return;
+  }
+
+  const sanitized = sanitizeMirrorHtml(raw);
+  if (!sanitized) {
+    body.setAttribute('data-lane-state', 'missing');
+    return;
+  }
+
+  body.innerHTML = sanitized;
+  body.setAttribute('data-lane-state', 'ok');
+}
+
+/**
+ * v0.1.237: 北極星 +α 広告ランキングレーンへの流し込み。
+ * `_lastOfficialEventDomBundle.adRankingMirrorHtml` を sanitize して
+ * popup の `#northStarLaneBody-adRanking` body に innerHTML として描画。
+ *
+ * - bundle が空 / mirrorHtml が空なら placeholder ("(未取得)") を維持
+ * - 鏡のように貼り付け原則に従う：niconico DOM をそのまま映す（数値抽出なし）
+ */
+function refreshNorthStarAdRankingLane() {
+  const bundle = _lastOfficialEventDomBundle;
+  const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string'
+    ? bundle.adRankingMirrorHtml
+    : null;
+  renderNorthStarLane('adRanking', mirrorHtml);
+}
+
+/**
  * 貢献度ランキング帯。niconico DOM から掬った正本値（`nls_event_dom_<lv>` の
  * contributionRanking）を最優先、それが無いときだけ NDGR ギフト event 集計に
  * フォールバック。応援帯と同じ CSS / モデル化（topSupportRankLineModels）を流用。
@@ -5559,6 +5609,8 @@ function renderUserRooms(entries, liveId = '') {
   void (async () => {
     await refreshOfficialEventDomBundle(liveId);
     await refreshGiftRankStrip(liveId);
+    // v0.1.237: 北極星 +α 広告ランキングレーンを bundle.adRankingMirrorHtml から鏡描画
+    refreshNorthStarAdRankingLane();
     // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
     await refreshGiftRankingFetchPrompt(liveId);
     const snap = watchMetaCache.snapshot;

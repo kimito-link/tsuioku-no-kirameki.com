@@ -6,7 +6,8 @@ import {
   scrapeContributionRankingFromDom,
   scrapeProgramStatisticsMenuFromDom,
   scrapeGiftHistoryFromDom,
-  aggregateGiftHistoryByUser
+  aggregateGiftHistoryByUser,
+  scrapeAdRankingMirrorHtml
 } from './officialEventBannerDom.js';
 
 describe('scrapeOfficialEventBannerFromDom', () => {
@@ -497,5 +498,66 @@ describe('aggregateGiftHistoryByUser', () => {
 
   it('空配列なら空', () => {
     expect(aggregateGiftHistoryByUser([])).toEqual([]);
+  });
+});
+
+describe('scrapeAdRankingMirrorHtml (v0.1.237)', () => {
+  it('content-supporter-section 内の ul.wrapper を outerHTML で返す', () => {
+    document.body.innerHTML = `
+      <div class="secondary-content-info">
+        <div class="content-supporter-section">
+          <div class="wrapper">
+            <nav class="tabs">
+              <button class="tab" aria-selected="true">貢献度ランキング</button>
+              <button class="tab" aria-selected="false">広告履歴</button>
+            </nav>
+            <div class="panel-container">
+              <div>
+                <ul class="wrapper">
+                  <li class="item">
+                    <i class="rank">1</i>
+                    <div class="info">
+                      <button class="ranker"><span class="name">nyanko</span></button>
+                      <p class="contribution">45,400 <svg class="contribution-unit"><title>貢</title></svg></p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const html = scrapeAdRankingMirrorHtml(document);
+    expect(html).toBeTruthy();
+    expect(html).toContain('<ul class="wrapper">');
+    expect(html).toContain('class="ranker"');
+    expect(html).toContain('nyanko');
+    expect(html).toContain('45,400');
+    expect(html).toContain('class="contribution-unit"');
+  });
+
+  it('content-supporter-section が存在しない時は null を返す', () => {
+    document.body.innerHTML = '<div class="something-else"><ul><li>x</li></ul></div>';
+    expect(scrapeAdRankingMirrorHtml(document)).toBeNull();
+  });
+
+  it('CSS Modules ハッシュ化された class（content-supporter-xxx）でもフォールバックで取れる', () => {
+    document.body.innerHTML = `
+      <div class="content-supporter-section_AbCdE">
+        <ul class="wrapper_FgHiJ">
+          <li>x</li>
+        </ul>
+      </div>
+    `;
+    const html = scrapeAdRankingMirrorHtml(document);
+    expect(html).toBeTruthy();
+    expect(html).toMatch(/^<ul/);
+  });
+
+  it('null/undefined を渡しても落ちず null を返す', () => {
+    expect(scrapeAdRankingMirrorHtml(null)).toBeNull();
+    expect(scrapeAdRankingMirrorHtml(undefined)).toBeNull();
   });
 });
