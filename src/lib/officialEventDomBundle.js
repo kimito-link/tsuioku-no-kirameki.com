@@ -10,7 +10,8 @@ import {
   scrapeOfficialEventBalloonFromDom,
   scrapeContributionRankingFromDom,
   scrapeProgramStatisticsMenuFromDom,
-  scrapeGiftHistoryFromDom
+  scrapeGiftHistoryFromDom,
+  scrapeAdRankingMirrorHtml
 } from './officialEventBannerDom.js';
 
 /**
@@ -49,8 +50,14 @@ export async function fetchOfficialEventBannerFromAuditionEmbed(liveId) {
  * 同じ `scrapeContributionRankingFromDom` を流用（実 DOM が `.content-supporter-section`
  * 構造で一致するため）。0.1.169 で追加。
  *
+ * v0.1.237: 戻り値の Array に **非列挙の `mirrorHtml`** を `Object.defineProperty`
+ * で添付（北極星「鏡のように貼り付け」用）。既存の `Array.isArray()` 判定や
+ * `.length` / `.map()` 等は影響なく動作する。JSON.stringify では `mirrorHtml` は
+ * 落ちるので、storage 保存時には呼び出し側で別 field に明示的に写す（content-entry.js
+ * 側で `bundle.adRankingMirrorHtml` に取り出す運用）。
+ *
  * @param {string} liveId 例 'lv350459157'
- * @returns {Promise<ReturnType<typeof scrapeContributionRankingFromDom>>}
+ * @returns {Promise<NicoadContributionRankingFetchResult|null>}
  */
 export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
   const lid = String(liveId || '').trim();
@@ -67,11 +74,31 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
     if (typeof DOMParser === 'undefined') return null;
     const doc = new DOMParser().parseFromString(html, 'text/html');
     if (!doc) return null;
-    return scrapeContributionRankingFromDom(doc);
+
+    const ranking = scrapeContributionRankingFromDom(doc);
+    const mirrorHtml = scrapeAdRankingMirrorHtml(doc);
+
+    if (Array.isArray(ranking)) {
+      Object.defineProperty(ranking, 'mirrorHtml', {
+        value: mirrorHtml,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+      return /** @type {NicoadContributionRankingFetchResult} */ (ranking);
+    }
+
+    return ranking;
   } catch {
     return null;
   }
 }
+
+/**
+ * @typedef {ReturnType<typeof scrapeContributionRankingFromDom> & {
+ *   mirrorHtml?: string|null
+ * }} NicoadContributionRankingFetchResult
+ */
 
 /**
  * @typedef {{
@@ -80,6 +107,7 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
  *   eventBalloon: ReturnType<typeof scrapeOfficialEventBalloonFromDom>,
  *   contributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
  *   adContributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
+ *   adRankingMirrorHtml: string|null,
  *   programStats: ReturnType<typeof scrapeProgramStatisticsMenuFromDom>,
  *   giftHistory: ReturnType<typeof scrapeGiftHistoryFromDom>
  * }} OfficialEventDomBundle
@@ -118,6 +146,7 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
     eventBalloon,
     contributionRanking,
     adContributionRanking: null,
+    adRankingMirrorHtml: null,
     programStats,
     giftHistory
   };
@@ -142,6 +171,8 @@ export function mergeOfficialEventDomBundle(prev, next) {
     contributionRanking: next.contributionRanking || prev.contributionRanking,
     adContributionRanking:
       next.adContributionRanking || prev.adContributionRanking || null,
+    adRankingMirrorHtml:
+      next.adRankingMirrorHtml || prev.adRankingMirrorHtml || null,
     programStats: next.programStats || prev.programStats,
     giftHistory: next.giftHistory || prev.giftHistory
   };

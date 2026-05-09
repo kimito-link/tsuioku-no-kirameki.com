@@ -676,3 +676,48 @@ export function aggregateGiftHistoryByUser(history) {
  *   - ギフト種別×価格テーブル化
  * - 今ターンでは実装しない。要件が固まってから別関数として追加。
  */
+
+/**
+ * v0.1.237: 北極星「鏡のように貼り付け」用の outerHTML 取得関数。
+ *
+ * watch ページ secondary content section にあるタブ式 UI（`<nav class="tabs">`
+ * 内の「貢献度ランキング」/「広告履歴」）の active タブの中身 = 広告ランキング
+ * を outerHTML で取り出す。`scrapeContributionRankingFromDom` と同じセレクタを
+ * 使うが、戻り値を構造化せず HTML 文字列のまま返すのが本関数の責務（鏡用）。
+ *
+ * 関数名は **実体に合わせて Ad Ranking** を冠する（既存
+ * `scrapeContributionRankingFromDom` は名前と取得対象がミスマッチで、実体は
+ * 広告ランキングを取っていた）。
+ *
+ * 「貢献度ランキング」（イベント参加時のギフトサイドバー内ランカー、
+ * `ul.contribution-ranking-list`）は別 DOM・別 scraper（v0.1.240 で追加予定）。
+ *
+ * @param {Document|Element} root
+ * @returns {string|null} 取れなかった時は null
+ */
+export function scrapeAdRankingMirrorHtml(root) {
+  if (!root) return null;
+
+  /** @type {Element|null} */
+  let list = null;
+  try {
+    list =
+      /** @type {any} */ (root).querySelector?.(
+        '.content-supporter-section ul.wrapper'
+      ) || null;
+    if (!list) {
+      // CSS Modules ハッシュ化保険（A/B テスト分岐への耐性、Gemini 視点 #17）
+      list =
+        /** @type {any} */ (root).querySelector?.(
+          '[class*="content-supporter"] ul[class*="wrapper"]'
+        ) || null;
+    }
+  } catch {
+    return null;
+  }
+
+  if (!(list instanceof Element)) return null;
+
+  const html = String(list.outerHTML || '').trim();
+  return html || null;
+}

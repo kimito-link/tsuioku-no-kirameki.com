@@ -9798,14 +9798,24 @@ async function persistOfficialEventDomBundleNow() {
     try {
       const fetched = await fetchNicoadContributionRankingFromPublishPage(lid);
       if (Array.isArray(fetched) && fetched.length > 0) {
+        // v0.1.237: 北極星「鏡のように貼り付け」用の outerHTML を取り出し、bundle に添える。
+        //   `fetchNicoadContributionRankingFromPublishPage` は戻り値 Array に
+        //   非列挙の `mirrorHtml` を Object.defineProperty で添付して返す（JSON 化で
+        //   消えるので、ここで取り出して別 field 化しないと storage 経由で popup へ届かない）。
+        /** @type {any} */
+        const fetchedAny = fetched;
+        const mirrorHtml = typeof fetchedAny?.mirrorHtml === 'string'
+          ? fetchedAny.mirrorHtml
+          : null;
         fresh = fresh
-          ? { ...fresh, adContributionRanking: fetched }
+          ? { ...fresh, adContributionRanking: fetched, adRankingMirrorHtml: mirrorHtml }
           : {
               capturedAt: Date.now(),
               eventBanner: null,
               eventBalloon: null,
               contributionRanking: null,
               adContributionRanking: fetched,
+              adRankingMirrorHtml: mirrorHtml,
               programStats: null,
               giftHistory: null
             };
