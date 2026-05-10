@@ -721,3 +721,101 @@ export function scrapeAdRankingMirrorHtml(root) {
   const html = String(list.outerHTML || '').trim();
   return html || null;
 }
+
+/**
+ * v0.1.240: 北極星「鏡のように貼り付け」用、レーン 3 (イベント累計スコア) +
+ * レーン 5 (イベント現在順位) のソース DOM の outerHTML 取得関数。
+ *
+ * audition.nicovideo.jp/embedded/richview/live を fetch して得られる HTML 内、
+ * 「○○さんが参加しています！」グリーンバナーの `<a class="wrapper">` 配下、
+ * `<p class="status">` 内の `<span class="score">` と `<span class="rank-field">`
+ * の outerHTML をそれぞれ抜き出す純関数。
+ *
+ * 実 DOM 構造（2026-05 時点で確認）:
+ *
+ *   <a class="wrapper" href="...">
+ *     <p class="owner-name">○○さんが参加しています！</p>
+ *     <div class="info">
+ *       <div class="text">
+ *         <p class="status">
+ *           <span class="rank-field"> 現在 <strong class="rank-num">2</strong> 位 </span>
+ *           <span class="score"><svg class="score-icon"></svg> 207,835</span>
+ *         </p>
+ *       </div>
+ *     </div>
+ *   </a>
+ *
+ * - レーン 3 (イベント累計スコア): `<span class="score">` の outerHTML
+ * - レーン 5 (イベント現在順位): `<span class="rank-field">` の outerHTML
+ *
+ * 既存 `scrapeOfficialEventBannerFromDom` と同じ「さんが参加しています」テキストで
+ * バナーを識別する誤検出回避ガードを通す。
+ *
+ * @param {Document|Element} root
+ * @returns {{scoreHtml: string|null, rankHtml: string|null}|null}
+ *   バナー DOM が見つからない場合は null、wrapper はあるが両 span ともに取れない
+ *   場合も null（部分取得の場合は取れた方のみ outerHTML、取れない方は null）。
+ */
+export function scrapeEventInfoMirrorParts(root) {
+  if (!root) return null;
+  /** @type {Document} */
+  const doc =
+    /** @type {any} */ (root).nodeType === 9
+      ? /** @type {Document} */ (root)
+      : (/** @type {Element} */ (root).ownerDocument || document);
+  const base = /** @type {any} */ (root).nodeType === 9 ? doc : root;
+  /** @type {HTMLElement|null} */
+  let wrapper = null;
+  try {
+    /** @type {NodeListOf<HTMLElement>|Element[]} */
+    let owners =
+      /** @type {any} */ (base).querySelectorAll?.('.owner-name') ||
+      doc.querySelectorAll('.owner-name');
+    if (!owners || owners.length === 0) {
+      owners =
+        /** @type {any} */ (base).querySelectorAll?.('[class*="owner-name"]') ||
+        doc.querySelectorAll('[class*="owner-name"]');
+    }
+    for (const el of owners) {
+      if (!(el instanceof HTMLElement)) continue;
+      const t = String(el.textContent || '');
+      if (!/さんが参加しています/.test(t)) continue;
+      const a = el.closest && el.closest('a');
+      const w = (a instanceof HTMLElement ? a : el.parentElement) || null;
+      if (w instanceof HTMLElement) {
+        wrapper = w;
+        break;
+      }
+    }
+  } catch {
+    return null;
+  }
+  if (!wrapper) return null;
+
+  // `.score` は static class（直接マッチ）→ partial match の順でフォールバック。
+  // `.score-icon`（内側 SVG）と `.score-value`（balloon の td 修飾子）は別物なので除外。
+  const scoreEl =
+    wrapper.querySelector('p.status > span.score') ||
+    wrapper.querySelector('.status .score:not(.score-icon):not(.score-value)') ||
+    wrapper.querySelector('.score:not(.score-icon):not(.score-value)') ||
+    wrapper.querySelector(
+      '[class*="score"]:not([class*="score-icon"]):not([class*="score-value"])'
+    );
+
+  const rankFieldEl =
+    wrapper.querySelector('p.status > span.rank-field') ||
+    wrapper.querySelector('.rank-field') ||
+    wrapper.querySelector('[class*="rank-field"]');
+
+  const scoreHtml =
+    scoreEl instanceof Element
+      ? String(scoreEl.outerHTML || '').trim() || null
+      : null;
+  const rankHtml =
+    rankFieldEl instanceof Element
+      ? String(rankFieldEl.outerHTML || '').trim() || null
+      : null;
+
+  if (!scoreHtml && !rankHtml) return null;
+  return { scoreHtml, rankHtml };
+}

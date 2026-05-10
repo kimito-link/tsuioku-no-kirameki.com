@@ -54,6 +54,17 @@ describe('collectOfficialEventDomBundle', () => {
     expect(b.programStats?.watchCount).toBe(100);
     expect(b.eventBanner).toBeNull();
   });
+
+  it('v0.1.240: bundle に eventCumulativeScoreMirrorHtml / eventCurrentRankMirrorHtml が null で含まれる', () => {
+    document.body.innerHTML = `
+      <ul class="program-statistics-menu">
+        <li title="来場者数"><span class="count" data-value="100"></span></li>
+      </ul>`;
+    const b = collectOfficialEventDomBundle(document);
+    expect(b).not.toBeNull();
+    expect(b.eventCumulativeScoreMirrorHtml).toBeNull();
+    expect(b.eventCurrentRankMirrorHtml).toBeNull();
+  });
 });
 
 describe('mergeOfficialEventDomBundle', () => {
@@ -88,5 +99,37 @@ describe('mergeOfficialEventDomBundle', () => {
     expect(merged.contributionRanking.length).toBe(1);
     expect(merged.programStats.watchCount).toBe(200);
     expect(merged.capturedAt).toBe(2);
+  });
+
+  it('v0.1.240: eventCumulativeScoreMirrorHtml / eventCurrentRankMirrorHtml は next 優先で prev fallback', () => {
+    const prev = {
+      capturedAt: 1,
+      eventBanner: null,
+      eventBalloon: null,
+      contributionRanking: null,
+      adContributionRanking: null,
+      adRankingMirrorHtml: null,
+      eventCumulativeScoreMirrorHtml: '<span class="score">100</span>',
+      eventCurrentRankMirrorHtml: '<span class="rank-field">5</span>',
+      programStats: null,
+      giftHistory: null
+    };
+    const next = {
+      capturedAt: 2,
+      eventBanner: null,
+      eventBalloon: null,
+      contributionRanking: null,
+      adContributionRanking: null,
+      adRankingMirrorHtml: null,
+      eventCumulativeScoreMirrorHtml: '<span class="score">200</span>',
+      eventCurrentRankMirrorHtml: null,
+      programStats: null,
+      giftHistory: null
+    };
+    const merged = mergeOfficialEventDomBundle(prev, next);
+    // next が値を持っている方は next を採用
+    expect(merged.eventCumulativeScoreMirrorHtml).toBe('<span class="score">200</span>');
+    // next が null なら prev で温存
+    expect(merged.eventCurrentRankMirrorHtml).toBe('<span class="rank-field">5</span>');
   });
 });
