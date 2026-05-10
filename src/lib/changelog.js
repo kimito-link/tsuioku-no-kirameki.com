@@ -26,6 +26,18 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.238',
+    date: '2026-05-10',
+    summary: 'NDGR Message ID dedupe lib を新設',
+    items: Object.freeze([
+      'NDGR 受信メッセージの重複排除を担う純関数 lib `src/lib/ndgrMessageDedupe.js` を新設しました。配信切替時 reset、live ごと FIFO eviction（既定 4096 件 cap）、観測値の plain object snapshot を提供します',
+      '設計は 4 つの独立調査が完全一致した結論ベース：(1) Codex による NdgrClientSharp / NDGRClient / mujurin1 / nagome のソース深読み、(2) Apache Kafka / Redis Streams / MQTT QoS 2 / AWS Kinesis / gRPC の distributed semantics、(3) Bilibili 弾幕プロトコル + Slack / Discord / Telegram / X の scale 桁違い設計、(4) YouTube Live / Twitch / TikTok Live の cross-platform 横断（部分）。3 軸独立で同じ 7 原則に到達したため設計に確信あり',
+      '主キーは messageId、補助は liveId + segmentUri に役割分離。canonical key は `liveId + ":" + messageId` に正規化（NdgrClientSharp の segmentUri-only は backward fetch / relay overlap に弱いため、live レベルにキー空間を広げています）',
+      '本版では lib 単体の追加に留まり、既存 NDGR 受信パイプラインへの統合 / 挙動変更は行っていません。次バージョンで wire レベル meta.id 抽出と統合 + 観測値の `commentObservability.ndgrMessageIdDedupe` ブロック追加を予定しています。挙動変更ゼロ',
+      '12 件の vitest（同一 / 別 liveId、FIFO eviction、配信切替 reset、structured clone 安全性、case-insensitive、空キー pass-through 等）で API を網羅検証しています。詳細は `analysis_distributed_dedupe.md` / `plan_v0239_message_id_dedupe.md` 参照'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.237',
     date: '2026-05-09',
     summary: '北極星 +α 広告ランキング鏡レンダリング',
