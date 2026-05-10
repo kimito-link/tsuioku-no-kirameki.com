@@ -9,6 +9,7 @@ import {
 import { extractPairsFromBinaryUtf8 } from '../lib/interceptBinaryTextExtract.js';
 import { decodeChunkedMessage, decodePackedSegment, ndgrStatisticsHasWireSignal } from '../lib/ndgrDecode.js';
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
+import { createNdgrMessageDedupe } from '../lib/ndgrMessageDedupe.js';
 import { anonymousNicknameFallback } from '../lib/nicoAnonymousDisplay.js';
 import {
   collectInterceptSignalsFromObject,
@@ -382,6 +383,79 @@ import {
     giftsPoint: 0,
     giftsRank: 0
   };
+
+  /**
+   * v0.1.239: NDGR Message ID dedupe（4 つの独立調査が完全一致した結論ベース）。
+   * - canonical key = `liveId + ":" + messageId`（live レベルでキー空間を広げ、backward fetch / relay overlap に強くする）
+   * - synthetic messageId = `co:${commentNo}:${userId}:${content}`（commentNo + userId + content が一致 = NDGR 再送）
+   * - perLiveMax 4096 FIFO eviction（無限増殖禁止）
+   * - 配信切替時 reset
+   * 詳細: memory analysis_distributed_dedupe.md / plan_v0239_message_id_dedupe.md
+   */
+  const _ndgrDedupe = createNdgrMessageDedupe({ perLiveMax: 4096 });
+
+  /**
+   * `/watch/lvXXXXX` / `/embed/lvXXXXX` から liveId を抽出。
+   * about:blank / blob: などで unknown のときは null。
+   */
+  function extractLiveIdFromHref() {
+    const m = String(path || '').match(/^\/(?:watch|embed)\/(lv\d+|ch\d+)/i);
+    if (m && m[1]) return m[1].toLowerCase();
+    // about:blank の場合は ref（親 watch ページ）から拾う
+    if (ref && ref.pathname) {
+      const rm = String(ref.pathname).match(/^\/(?:watch|embed)\/(lv\d+|ch\d+)/i);
+      if (rm && rm[1]) return rm[1].toLowerCase();
+    }
+    return null;
+  }
+  /** @type {string|null} */
+  const _liveId = extractLiveIdFromHref();
+  if (_liveId) _ndgrDedupe.resetForLive(_liveId);
+
+  /**
+   * NDGR chat 行に dedupe を適用し、初出のみ通す。
+   * synthetic messageId は `co:${commentNo}:${userId}:${content}` で
+   * 「同じ commentNo + 同じユーザー + 同じ本文」を NDGR 再送と見做す。
+   *
+   * @param {Array<{ no?: number|null, content?: string, userId?: string, ... }>} chats
+   * @returns {Array<{ no?: number|null, content?: string, userId?: string, ... }>}
+   */
+  function applyNdgrDedupe(chats) {
+    if (!Array.isArray(chats) || !chats.length) return chats || [];
+    if (!_liveId) return chats; // liveId 不明時は pass-through
+    const out = [];
+    for (const c of chats) {
+      const no = c?.no;
+      if (no == null) {
+        // commentNo 無しは dedupe 対象外（無理に key 作ると false positive 危険）
+        out.push(c);
+        continue;
+      }
+      const messageId =
+        'co:' + String(no) + ':' + String(c?.userId || '') + ':' + String(c?.content || '');
+      const r = _ndgrDedupe.accept({ liveId: _liveId, messageId });
+      if (r.accepted) out.push(c);
+    }
+    return out;
+  }
+
+  function publishNdgrDedupeDiag() {
+    const root = document.documentElement;
+    if (!root) return;
+    try {
+      const snap = _ndgrDedupe.snapshot();
+      root.setAttribute(
+        'data-nls-ndgr-dedupe',
+        `a=${snap.accepted} d=${snap.droppedDuplicate} e=${snap.evictedIds}` +
+          ` b=${snap.currentBuckets} bc=${snap.bucketsCreated} r=${snap.resets}`
+      );
+      // 詳細 snapshot は data attribute に JSON で出す（content 側で読み取り可能）
+      root.setAttribute(
+        'data-nls-ndgr-dedupe-snapshot',
+        JSON.stringify(snap)
+      );
+    } catch { /* no-op */ }
+  }
   /**
    * NDGR で観測した protobuf field tag のヒストグラム。
    * top: ChunkedMessage 直下の field tag、msg: 内側 NicoliveMessage one-of の field tag。
@@ -524,7 +598,10 @@ import {
     if (giftUsers.length) {
       postNlsIntercept({ type: MSG_GIFT_USERS, users: giftUsers });
     }
-    scheduleNdgrChatRowsPost(ndgrChatsToMergeRows(result.chats));
+    // v0.1.239: dedupe を decode 直後に適用（post 前で drop）
+    const dedupedChats = applyNdgrDedupe(result.chats);
+    scheduleNdgrChatRowsPost(ndgrChatsToMergeRows(dedupedChats));
+    publishNdgrDedupeDiag();
   }
 
   /** @param {Uint8Array} frame */

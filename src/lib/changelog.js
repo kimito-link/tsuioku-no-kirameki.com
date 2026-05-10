@@ -26,6 +26,31 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.239',
+    date: '2026-05-10',
+    summary: 'NDGR dedupe を MAIN world 受信に統合',
+    items: Object.freeze([
+      'v0.1.238 で導入した NDGR Message ID dedupe lib を、MAIN world の page-intercept 受信パイプラインに統合しました。`processLengthDelimitedNdgrFrame()` 内、`scheduleNdgrChatRowsPost()` の直前で chat 行に dedupe を適用し、初出のみを content script へ post します。NDGR が同じコメントを複数経路で再送した場合に postMessage / structured clone のオーバーヘッドを早期に削減できます',
+      'synthetic messageId は `co:${commentNo}:${userId}:${content}` 形式（commentNo + userId + 本文 が一致 = NDGR 再送と見做す）。content-entry 既存の `commentNo + text` merge と機能的に等価以下の dedupe（より厳格に userId も見る）なので、誤って正当なメッセージを drop する false positive リスクは増えていません',
+      '配信切替（lvXXX 変化）検知は `extractLiveIdFromHref()` で起動時に 1 回だけ判定。MAIN world は 1 watch ページにつき 1 回しか初期化されないため、tab 切替・SPA 遷移時は新 tab / 新 frame で別 dedupe instance が生まれます',
+      'AI 共有診断 JSON の `commentObservability.ndgrMessageIdDedupe` ブロックに dedupe snapshot を露出（`accepted` / `droppedDuplicate` / `evictedIds` / `currentBuckets` / `bucketsCreated` / `bucketsCleared` / `resets` / `lastResetLiveId`）。実機で「再送が何件起きているか」「FIFO eviction が発火しているか」が観測可能になります',
+      'ユーザ画面の表示挙動には変更なし。drop された行は既存の content-side `commentNo + text` merge でも drop される行と同一なので、最終的に persist されるコメント / 表示は v0.1.238 までと完全に一致します（dedupe pipeline の前段化のみ）',
+      '設計詳細は memory `analysis_distributed_dedupe.md`（4 軸独立調査の 7 原則）/ `plan_v0239_message_id_dedupe.md`（実装計画）参照'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.238',
+    date: '2026-05-10',
+    summary: 'NDGR Message ID dedupe lib を新設',
+    items: Object.freeze([
+      'NDGR 受信メッセージの重複排除を担う純関数 lib `src/lib/ndgrMessageDedupe.js` を新設しました。配信切替時 reset、live ごと FIFO eviction（既定 4096 件 cap）、観測値の plain object snapshot を提供します',
+      '設計は 4 つの独立調査が完全一致した結論ベース：(1) Codex による NdgrClientSharp / NDGRClient / mujurin1 / nagome のソース深読み、(2) Apache Kafka / Redis Streams / MQTT QoS 2 / AWS Kinesis / gRPC の distributed semantics、(3) Bilibili 弾幕プロトコル + Slack / Discord / Telegram / X の scale 桁違い設計、(4) YouTube Live / Twitch / TikTok Live の cross-platform 横断（部分）。3 軸独立で同じ 7 原則に到達したため設計に確信あり',
+      '主キーは messageId、補助は liveId + segmentUri に役割分離。canonical key は `liveId + ":" + messageId` に正規化（NdgrClientSharp の segmentUri-only は backward fetch / relay overlap に弱いため、live レベルにキー空間を広げています）',
+      '本版では lib 単体の追加に留まり、既存 NDGR 受信パイプラインへの統合 / 挙動変更は行っていません。次バージョンで wire レベル meta.id 抽出と統合 + 観測値の `commentObservability.ndgrMessageIdDedupe` ブロック追加を予定しています。挙動変更ゼロ',
+      '12 件の vitest（同一 / 別 liveId、FIFO eviction、配信切替 reset、structured clone 安全性、case-insensitive、空キー pass-through 等）で API を網羅検証しています。詳細は `analysis_distributed_dedupe.md` / `plan_v0239_message_id_dedupe.md` 参照'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.237',
     date: '2026-05-09',
     summary: '北極星 +α 広告ランキング鏡レンダリング',
