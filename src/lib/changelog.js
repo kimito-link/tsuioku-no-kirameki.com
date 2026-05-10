@@ -26,6 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.239',
+    date: '2026-05-10',
+    summary: 'NDGR dedupe を MAIN world 受信に統合',
+    items: Object.freeze([
+      'v0.1.238 で導入した NDGR Message ID dedupe lib を、MAIN world の page-intercept 受信パイプラインに統合しました。`processLengthDelimitedNdgrFrame()` 内、`scheduleNdgrChatRowsPost()` の直前で chat 行に dedupe を適用し、初出のみを content script へ post します。NDGR が同じコメントを複数経路で再送した場合に postMessage / structured clone のオーバーヘッドを早期に削減できます',
+      'synthetic messageId は `co:${commentNo}:${userId}:${content}` 形式（commentNo + userId + 本文 が一致 = NDGR 再送と見做す）。content-entry 既存の `commentNo + text` merge と機能的に等価以下の dedupe（より厳格に userId も見る）なので、誤って正当なメッセージを drop する false positive リスクは増えていません',
+      '配信切替（lvXXX 変化）検知は `extractLiveIdFromHref()` で起動時に 1 回だけ判定。MAIN world は 1 watch ページにつき 1 回しか初期化されないため、tab 切替・SPA 遷移時は新 tab / 新 frame で別 dedupe instance が生まれます',
+      'AI 共有診断 JSON の `commentObservability.ndgrMessageIdDedupe` ブロックに dedupe snapshot を露出（`accepted` / `droppedDuplicate` / `evictedIds` / `currentBuckets` / `bucketsCreated` / `bucketsCleared` / `resets` / `lastResetLiveId`）。実機で「再送が何件起きているか」「FIFO eviction が発火しているか」が観測可能になります',
+      'ユーザ画面の表示挙動には変更なし。drop された行は既存の content-side `commentNo + text` merge でも drop される行と同一なので、最終的に persist されるコメント / 表示は v0.1.238 までと完全に一致します（dedupe pipeline の前段化のみ）',
+      '設計詳細は memory `analysis_distributed_dedupe.md`（4 軸独立調査の 7 原則）/ `plan_v0239_message_id_dedupe.md`（実装計画）参照'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.238',
     date: '2026-05-10',
     summary: 'NDGR Message ID dedupe lib を新設',

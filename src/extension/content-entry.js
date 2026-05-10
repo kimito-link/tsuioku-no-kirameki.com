@@ -4399,6 +4399,19 @@ function buildGiftDiagnosticsBundle() {
       const ratio = decodedChats > 0
         ? Math.round((persistedNdgr / decodedChats) * 1000) / 10
         : 0;
+      // v0.1.239: page-intercept (MAIN world) が出した dedupe snapshot を取り込む
+      let ndgrMessageIdDedupe = null;
+      try {
+        const raw = document.documentElement?.getAttribute(
+          'data-nls-ndgr-dedupe-snapshot'
+        );
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            ndgrMessageIdDedupe = parsed;
+          }
+        }
+      } catch { /* no-op: parse 失敗時は null */ }
       return {
         commentRowDataAttributesProbe: probeCommentRowDataAttributes(
           document.querySelectorAll('[class*="table-row"]'),
@@ -4413,7 +4426,8 @@ function buildGiftDiagnosticsBundle() {
           decodedChats,
           ndgrPersistedRows: persistedNdgr,
           ratioPercent: ratio
-        }
+        },
+        ndgrMessageIdDedupe
       };
     })(),
     // v0.1.226 観測強化: ギフトサイドバー cross-origin iframe relay 経路の生存確認
