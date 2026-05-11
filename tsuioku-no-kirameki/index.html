@@ -8480,7 +8480,7 @@
             </p>
           </div>
           <div class="board fade d2">
-            <p><strong>今いまできていること</strong> — ギフト・公式値・liveId 整合性の記録（v0.1.192 で完成した MCP Bridge Phase 1a が土台）。</p>
+            <p><strong>今いまできていること</strong> — ギフト・公式値・liveId 整合性の記録（v0.1.192 MCP Bridge Phase 1a が土台）に加え、v0.1.236-247 で <strong>公式値レーン（北極星）の 4 レーン鏡映し</strong>・<strong>NDGR メッセージ重複除去</strong>・<strong>コメント uid 解決率改善</strong>・<strong>nickname 衝突統一</strong>・<strong>nickname map 減少バグ修正</strong>まで段階的に進めました（詳細は以降の section）。</p>
             <p><strong>これから（計画中）</strong> — 応援ランキング・観測経路の健全性・複数タブ状態・パネル位置・時系列グラフをひとつにまとめます（現在は別々に動いています）。</p>
             <p><strong>将来の予定</strong> — 他の人の配信との比較情報も AI が出せるように、控えめに広げていきます。</p>
           </div>
@@ -8490,15 +8490,15 @@
       <section class="section" id="snapshot-gift-detail" aria-labelledby="snapshot-gift-detail-heading" data-lp-feature="snapshot-gift-detail">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="snapshot-gift-detail-heading">同じギフトをダブって数えない仕組み（計画）</h2>
+            <h2 id="snapshot-gift-detail-heading">同じギフトをダブって数えない仕組み（v0.1.238/239 で NDGR 経路を実装）</h2>
             <p>
-              ギフトは「演出」「コメント行」「公式の集計」と複数の経路で観測できます。それぞれを別々に数えると<strong>同じ 1 件のギフトが二重・三重に重複</strong>することがあるため、<strong>送信者と時刻を手がかりに 1 件として数えなおす</strong>仕組みを計画しています。
+              ギフトは「演出」「コメント行」「公式の集計」と複数の経路で観測できます。それぞれを別々に数えると<strong>同じ 1 件のギフトが二重・三重に重複</strong>することがあるため、<strong>送信者と時刻を手がかりに 1 件として数えなおす</strong>仕組みです。
             </p>
           </div>
           <div class="board fade d2">
             <p><strong>判断材料</strong> — 誰が（送り手・送信者）・いつ（時刻）・何を（アイテム）を組にして照合します。</p>
-            <p><strong>今は</strong> — それぞれの経路で別々の集計が並ぶ場面があります（重複が同じ 1 件のダブりとして見える場合があります）。</p>
-            <p><strong>これから</strong> — 同じギフトとみなせる行をひとつにまとめ、重複を取り除いた件数で表示する予定です。</p>
+            <p><strong>v0.1.238/239 で実装した経路</strong> — NDGR（ニコ生公式コメント配信）の <strong>Message ID 単位の重複除去</strong>を入れました。<strong>4 軸独立調査（分散システム / Bilibili scale / cross-platform / 既存 OSS）が完全一致した 7 原則</strong>をベースに設計し、4096 件 FIFO cap で live 切替時に reset します。</p>
+            <p><strong>これから</strong> — DOM 演出経路・ギフト履歴経路を含む<strong>全経路統合 dedupe</strong>へ拡張予定です。</p>
           </div>
         </div>
       </section>
@@ -8539,7 +8539,7 @@
       <section class="section" id="snapshot-multi-tab-safety" aria-labelledby="snapshot-multi-tab-safety-heading" data-lp-feature="snapshot-multi-tab-safety">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="snapshot-multi-tab-safety-heading">複数タブで開いてもランキングが消えない（v0.1.195 で改善）</h2>
+            <h2 id="snapshot-multi-tab-safety-heading">複数タブで開いてもランキングが消えない（v0.1.195 / v0.1.247 で連続改善）</h2>
             <p>
               同じ配信を<strong>複数タブで同時に開く</strong>と、片方のタブで取れたランキングがもう片方のタブの観測で<strong>上書き消去される</strong>ことがありました。v0.1.195 で、保存前に他タブが書いた値を読みなおして<strong>3-way merge</strong>する仕組みに変更し、消えにくくしました。
             </p>
@@ -8547,6 +8547,7 @@
           <div class="board fade d2">
             <p><strong>これまで（v0.1.194 以前）</strong> — 別タブの値を見ずに上書きする実装で、まれにランキング枠が空・「読み込み中」のままなどの症状が出ました。</p>
             <p><strong>今いまできていること</strong> — 別タブが直前に書いた値も保持して、新しい観測値とまとめて保存します（ランキングが残る・並行運用が安定）。</p>
+            <p><strong>v0.1.247 で追加修正</strong> — SPA 遷移中の <strong>liveId → null 遷移</strong>を誤検出して 4 種類の map（nickname 等）を不要に <strong>109 件 → 56 件</strong>と clear してしまうバグを修正しました。両者 non-null かつ別 lv のときだけ切替と判定する厳格判定を導入。</p>
             <p><strong>これから</strong> — タブごとの観測カウンタを並べて見られる「複数タブ状況スナップショット」を計画中です。</p>
           </div>
         </div>
@@ -8555,15 +8556,16 @@
       <section class="section" id="snapshot-observability" aria-labelledby="snapshot-observability-heading" data-lp-feature="snapshot-observability">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="snapshot-observability-heading">「なぜ取れていないか」がわかる仕組み（計画）</h2>
+            <h2 id="snapshot-observability-heading">「なぜ取れていないか」がわかる仕組み（v0.1.244 で北極星レーンに 6 種類実装）</h2>
             <p>
-              観測が失敗したとき、<strong>原因を分類して残す</strong>と判断がしやすくなります。理由が「観測経路の停止」なのか「公式側の未提供」なのか「タブが閉じている」なのかを <strong>reason code</strong> として記録する仕組みを計画しています。
+              観測が失敗したとき、<strong>原因を分類して残す</strong>と判断がしやすくなります。理由が「観測経路の停止」なのか「公式側の未提供」なのか「タブが閉じている」なのかを <strong>reason code</strong> として記録する仕組みです。
             </p>
           </div>
           <div class="board fade d2">
-            <p><strong>例</strong> — <code>FRONTEND_HOOK_BROKEN</code>（拡張のフック失敗）・<code>OFFICIAL_NOT_PROVIDED</code>（公式値が未提供）・<code>TAB_NOT_OPEN</code>（観測タブが閉じている）など。</p>
-            <p><strong>今いまできていること</strong> — 部分的に source / capturedAt の記録は始まっています（v0.1.190 系で導入）。</p>
-            <p><strong>これから</strong> — 上記分類をユーザーが popup の診断画面で確認できるようにし、「なぜ取れない」が一目でわかるようにする予定です。</p>
+            <p><strong>例（観測層全体）</strong> — <code>FRONTEND_HOOK_BROKEN</code>（拡張のフック失敗）・<code>OFFICIAL_NOT_PROVIDED</code>（公式値が未提供）・<code>TAB_NOT_OPEN</code>（観測タブが閉じている）など。</p>
+            <p><strong>v0.1.244 で実装した北極星レーン側</strong> — popup の公式値レーンに <strong>6 種類の理由</strong>（イベント不参加・ギフト 0 件・サイドバー未描画・取得エラー・取得中・未取得）を細分化して表示する仕組みを入れました（<code>:empty::after</code> による reason 別 placeholder text）。診断 JSON の state も 7 値に細分化。</p>
+            <p><strong>今いまできていること（観測層全体）</strong> — source / capturedAt の記録は v0.1.190 系で導入済み、北極星レーンは v0.1.244 で reason 細分化済み。</p>
+            <p><strong>これから</strong> — 北極星以外の全観測点でも reason code を統一する形を計画中です。</p>
           </div>
         </div>
       </section>
