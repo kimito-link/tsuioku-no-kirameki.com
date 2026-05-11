@@ -5678,7 +5678,11 @@ async function handleFetchContributionRankingClick(btn, hintEl) {
 
   // mirrorHtml が空 → 失敗理由を hint に出してボタンを再表示
   let failureHint = '(取得できませんでした)';
-  if (itemCount === 0) {
+  // v0.1.252: 「お困りの方はこちら」rescue link 配信者検出時の UX 改善
+  //   (autoOpen の setAutoOpenStatus が `rescue-link-detected-tick-N` 形式で返す)
+  if (typeof status === 'string' && status.startsWith('rescue-link-detected')) {
+    failureHint = '(取得不可：配信者側 Vue 未描画)';
+  } else if (itemCount === 0) {
     failureHint = '(イベント不参加 or サイドバー未描画)';
   } else if (status) {
     failureHint = `(取得失敗：${String(status).slice(0, 60)})`;
@@ -5856,7 +5860,11 @@ async function handleFetchGiftHistoryClick(btn, hintEl) {
   }
 
   let failureHint = '(取得できませんでした)';
-  if (itemCount === 0) {
+  // v0.1.252: 「お困りの方はこちら」rescue link 配信者は extension で fixable ではない
+  // (memory: niconico 本体 or 配信者設定の問題)。早期諦め表示で UX 改善。
+  if (status === 'rescue-link-detected') {
+    failureHint = '(取得不可：配信者側 Vue 未描画)';
+  } else if (itemCount === 0) {
     failureHint = '(ギフト 0 件 or 履歴タブ未描画)';
   } else if (status) {
     failureHint = `(取得失敗：${String(status).slice(0, 60)})`;

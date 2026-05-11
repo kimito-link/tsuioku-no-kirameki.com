@@ -10765,6 +10765,19 @@ async function tryOnDemandFetchGiftHistoryMirrorOnce() {
       }
     }
 
+    // v0.1.252: 「お困りの方はこちら」rescue link 検出で早期 abort（Phase 1 autoOpen と同様の挙動）。
+    //   2026-05-11 kimito さん自発診断 (lv350506725, あかねこ。さん) で観測:
+    //   audition / koken iframe の Vue が render に到達せず、3 秒 polling は無駄に終わる。
+    //   rescue link が出ている時点で 履歴 タブを click しても DOM 出現しないので早期 close を急ぐ。
+    try {
+      if (document.querySelector('[class*="rescue-information-anchor"]')) {
+        status = 'rescue-link-detected';
+        return { mirrorHtml: null, itemCount: 0, status };
+      }
+    } catch {
+      // no-op
+    }
+
     // 5. 「履歴」タブを find + click（gift sidebar container にスコープして誤クリック回避）
     /** @type {HTMLElement|null} */
     let historyTabBtn = null;
