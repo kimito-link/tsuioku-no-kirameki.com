@@ -11,7 +11,8 @@ import {
   scrapeContributionRankingFromDom,
   scrapeProgramStatisticsMenuFromDom,
   scrapeGiftHistoryFromDom,
-  scrapeAdRankingMirrorHtml
+  scrapeAdRankingMirrorHtml,
+  scrapeEventInfoMirrorParts
 } from './officialEventBannerDom.js';
 
 /**
@@ -20,8 +21,16 @@ import {
  * 同じスクレイパ（scrapeOfficialEventBannerFromDom）を fetch 結果の HTML に対して
  * 流用 — 1 ソース・多面利用。
  *
+ * v0.1.240: 戻り値（banner data）に **非列挙の `mirrorParts`** を `Object.defineProperty`
+ * で添付（北極星「鏡のように貼り付け」レーン 3 / 5 用）。`mirrorParts` は
+ * `{scoreHtml: string|null, rankHtml: string|null}` 形式で、それぞれバナー内の
+ * `<span class="score">` / `<span class="rank-field">` の outerHTML。
+ * JSON.stringify では落ちるので、storage 保存時は呼び出し側で別 field
+ * （`eventCumulativeScoreMirrorHtml` / `eventCurrentRankMirrorHtml`）に明示的に写す
+ * （content-entry.js 側の運用）。
+ *
  * @param {string} liveId 例 'lv350458677'
- * @returns {Promise<ReturnType<typeof scrapeOfficialEventBannerFromDom>>}
+ * @returns {Promise<OfficialEventBannerFetchResult|null>}
  */
 export async function fetchOfficialEventBannerFromAuditionEmbed(liveId) {
   const lid = String(liveId || '').trim();
@@ -38,11 +47,28 @@ export async function fetchOfficialEventBannerFromAuditionEmbed(liveId) {
     if (typeof DOMParser === 'undefined') return null;
     const doc = new DOMParser().parseFromString(html, 'text/html');
     if (!doc) return null;
-    return scrapeOfficialEventBannerFromDom(doc);
+    const banner = scrapeOfficialEventBannerFromDom(doc);
+    if (!banner) return null;
+    const mirrorParts = scrapeEventInfoMirrorParts(doc);
+    if (mirrorParts) {
+      Object.defineProperty(banner, 'mirrorParts', {
+        value: mirrorParts,
+        writable: false,
+        configurable: true,
+        enumerable: false
+      });
+    }
+    return /** @type {OfficialEventBannerFetchResult} */ (banner);
   } catch {
     return null;
   }
 }
+
+/**
+ * @typedef {ReturnType<typeof scrapeOfficialEventBannerFromDom> & {
+ *   mirrorParts?: {scoreHtml: string|null, rankHtml: string|null}
+ * }} OfficialEventBannerFetchResult
+ */
 
 /**
  * ニコニ広告ページ（https://nicoad.nicovideo.jp/live/publish/<liveId>?frontend_id=9）
@@ -108,6 +134,8 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
  *   contributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
  *   adContributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
  *   adRankingMirrorHtml: string|null,
+ *   eventCumulativeScoreMirrorHtml: string|null,
+ *   eventCurrentRankMirrorHtml: string|null,
  *   programStats: ReturnType<typeof scrapeProgramStatisticsMenuFromDom>,
  *   giftHistory: ReturnType<typeof scrapeGiftHistoryFromDom>
  * }} OfficialEventDomBundle
@@ -147,6 +175,8 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
     contributionRanking,
     adContributionRanking: null,
     adRankingMirrorHtml: null,
+    eventCumulativeScoreMirrorHtml: null,
+    eventCurrentRankMirrorHtml: null,
     programStats,
     giftHistory
   };
@@ -173,6 +203,14 @@ export function mergeOfficialEventDomBundle(prev, next) {
       next.adContributionRanking || prev.adContributionRanking || null,
     adRankingMirrorHtml:
       next.adRankingMirrorHtml || prev.adRankingMirrorHtml || null,
+    eventCumulativeScoreMirrorHtml:
+      next.eventCumulativeScoreMirrorHtml ||
+      prev.eventCumulativeScoreMirrorHtml ||
+      null,
+    eventCurrentRankMirrorHtml:
+      next.eventCurrentRankMirrorHtml ||
+      prev.eventCurrentRankMirrorHtml ||
+      null,
     programStats: next.programStats || prev.programStats,
     giftHistory: next.giftHistory || prev.giftHistory
   };

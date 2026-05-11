@@ -4351,12 +4351,18 @@ function buildGiftDiagnosticsBundle() {
       const b = lastOfficialEventDomBundle;
       const len = (a) => (Array.isArray(a) ? a.length : 0);
       const num = (n) => (typeof n === 'number' && Number.isFinite(n) ? n : null);
+      const strBytes = (s) =>
+        typeof s === 'string' && s.length > 0 ? s.length : 0;
       const contribCount = len(b?.contributionRanking);
       const giftHistoryCount = len(b?.giftHistory);
       const adCount = len(b?.adContributionRanking);
       const eventScore = num(b?.eventBanner?.score) ?? num(b?.eventBalloon?.score);
       const programPoints = num(b?.programStats?.giftPoints);
       const eventRank = num(b?.eventBanner?.rank);
+      // v0.1.240: 鏡レンダリング用 mirror html の取得状況も観測値に出す
+      const adMirrorBytes = strBytes(b?.adRankingMirrorHtml);
+      const eventScoreMirrorBytes = strBytes(b?.eventCumulativeScoreMirrorHtml);
+      const eventRankMirrorBytes = strBytes(b?.eventCurrentRankMirrorHtml);
       return {
         '1_貢献度ランキング': {
           state: contribCount > 0 ? 'ok' : 'missing',
@@ -4369,8 +4375,10 @@ function buildGiftDiagnosticsBundle() {
           foundCountLifetime: _d.giftHistoryFoundCount
         },
         '3_イベント累計スコア': {
-          state: eventScore != null ? 'ok' : 'missing',
+          state:
+            eventScore != null || eventScoreMirrorBytes > 0 ? 'ok' : 'missing',
           value: eventScore,
+          mirrorHtmlBytes: eventScoreMirrorBytes,
           bannerFoundCountLifetime: _d.eventBannerFoundCount,
           balloonFoundCountLifetime: _d.eventBalloonFoundCount
         },
@@ -4379,13 +4387,16 @@ function buildGiftDiagnosticsBundle() {
           value: programPoints
         },
         '5_イベント現在順位': {
-          state: eventRank != null ? 'ok' : 'missing',
+          state:
+            eventRank != null || eventRankMirrorBytes > 0 ? 'ok' : 'missing',
           value: eventRank,
+          mirrorHtmlBytes: eventRankMirrorBytes,
           bannerFoundCountLifetime: _d.eventBannerFoundCount
         },
         '+α_広告ランキング': {
-          state: adCount > 0 ? 'ok' : 'missing',
+          state: adCount > 0 || adMirrorBytes > 0 ? 'ok' : 'missing',
           count: adCount,
+          mirrorHtmlBytes: adMirrorBytes,
           foundCountLifetime: _d.adContributionRankingFoundCount
         }
       };
@@ -9771,14 +9782,34 @@ async function persistOfficialEventDomBundleNow() {
     try {
       const fetched = await fetchOfficialEventBannerFromAuditionEmbed(lid);
       if (fetched) {
+        // v0.1.240: 北極星「鏡のように貼り付け」レーン 3 (イベント累計スコア) +
+        // レーン 5 (イベント現在順位) 用 mirror parts を取り出して bundle に写す。
+        // fetchOfficialEventBannerFromAuditionEmbed は banner data に非列挙の
+        // `mirrorParts` を Object.defineProperty で添付しているので、JSON 化前に
+        // 別 field 化しないと storage 経由で popup へ届かない。
+        /** @type {any} */
+        const fetchedAny = fetched;
+        const mp = fetchedAny?.mirrorParts || null;
+        const scoreHtml =
+          mp && typeof mp.scoreHtml === 'string' ? mp.scoreHtml : null;
+        const rankHtml =
+          mp && typeof mp.rankHtml === 'string' ? mp.rankHtml : null;
         fresh = fresh
-          ? { ...fresh, eventBanner: fetched }
+          ? {
+              ...fresh,
+              eventBanner: fetched,
+              eventCumulativeScoreMirrorHtml: scoreHtml,
+              eventCurrentRankMirrorHtml: rankHtml
+            }
           : {
               capturedAt: Date.now(),
               eventBanner: fetched,
               eventBalloon: null,
               contributionRanking: null,
               adContributionRanking: null,
+              adRankingMirrorHtml: null,
+              eventCumulativeScoreMirrorHtml: scoreHtml,
+              eventCurrentRankMirrorHtml: rankHtml,
               programStats: null,
               giftHistory: null
             };
