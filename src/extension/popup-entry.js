@@ -24,6 +24,8 @@ import {
   buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+// v0.1.253: refreshOfficialEventDomBundle の merge ロジックを純関数化（unit test 可能化）
+import { mergeIframeRelayMirrorIntoBundle } from '../lib/mergeIframeRelayMirrorIntoBundle.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -4622,78 +4624,18 @@ async function refreshOfficialEventDomBundle(liveId) {
     return;
   }
   try {
+    // v0.1.252+253: bundle (`nls_event_dom_<lv>` = top-frame scrape) と iframe relay
+    //   storage (`nls_iframe_official_dom_<lid>` = koken/audition iframe → postMessage)
+    //   を同時取得して、`mergeIframeRelayMirrorIntoBundle` (純関数) で鏡 field をマージ。
+    //   bundle 側の鏡 field が空のときだけ iframe 側で埋める（Phase 1/2 ボタンで取った
+    //   鏡を上書きしない）。両方無ければ null、iframe 側のみあれば最小 bundle を作る。
     const key = eventDomStorageKey(lid);
-    // v0.1.252: iframe relay 経路で書かれた鏡 outerHTML を bundle にマージするため、
-    //   2 つの storage key を同時取得する。bundle (`nls_event_dom_<lv>`) は top-frame
-    //   scrape (collectOfficialEventDomBundle) の結果、iframe (`nls_iframe_official_dom_<lid>`)
-    //   は cross-origin iframe (koken / audition) の content script が postMessage 経由で
-    //   送ってきた結果（buildOfficialDomFromRelayEvent で routing 検証済）。
-    //   bundle 側の鏡 field が空のときだけ iframe 側でマージするので、Phase 1/2 のボタンで
-    //   取った鏡を上書きしない。
     const iframeKey = `nls_iframe_official_dom_${lid}`;
     const bag = await chrome.storage.local.get([key, iframeKey]);
-    const v = bag?.[key];
-    const baseBundle =
-      v && typeof v === 'object' && !Array.isArray(v) ? v : null;
-    const iframeRaw = bag?.[iframeKey];
-    const iframeBundle =
-      iframeRaw && typeof iframeRaw === 'object' && !Array.isArray(iframeRaw)
-        ? /** @type {Record<string, unknown>} */ (iframeRaw)
-        : null;
-    if (baseBundle && iframeBundle) {
-      const baseAny = /** @type {Record<string, unknown>} */ (baseBundle);
-      const merged = { ...baseAny };
-      const iframeContribMirror =
-        typeof iframeBundle.contributionRankingMirrorHtml === 'string' &&
-        iframeBundle.contributionRankingMirrorHtml.length > 0
-          ? iframeBundle.contributionRankingMirrorHtml
-          : null;
-      const iframeGiftHistoryMirror =
-        typeof iframeBundle.giftHistoryMirrorHtml === 'string' &&
-        iframeBundle.giftHistoryMirrorHtml.length > 0
-          ? iframeBundle.giftHistoryMirrorHtml
-          : null;
-      if (
-        iframeContribMirror &&
-        !(typeof baseAny.contributionRankingMirrorHtml === 'string' &&
-          baseAny.contributionRankingMirrorHtml)
-      ) {
-        merged.contributionRankingMirrorHtml = iframeContribMirror;
-      }
-      if (
-        iframeGiftHistoryMirror &&
-        !(typeof baseAny.giftHistoryMirrorHtml === 'string' &&
-          baseAny.giftHistoryMirrorHtml)
-      ) {
-        merged.giftHistoryMirrorHtml = iframeGiftHistoryMirror;
-      }
-      _lastOfficialEventDomBundle = merged;
-    } else if (baseBundle) {
-      _lastOfficialEventDomBundle = baseBundle;
-    } else if (iframeBundle) {
-      // bundle が無いが iframe relay 経由の鏡 html はあるケース
-      // （Phase 1/2 ボタン未押下 + ユーザーが自然にサイドバーを開いた）
-      const iframeContribMirror =
-        typeof iframeBundle.contributionRankingMirrorHtml === 'string' &&
-        iframeBundle.contributionRankingMirrorHtml.length > 0
-          ? iframeBundle.contributionRankingMirrorHtml
-          : null;
-      const iframeGiftHistoryMirror =
-        typeof iframeBundle.giftHistoryMirrorHtml === 'string' &&
-        iframeBundle.giftHistoryMirrorHtml.length > 0
-          ? iframeBundle.giftHistoryMirrorHtml
-          : null;
-      if (iframeContribMirror || iframeGiftHistoryMirror) {
-        _lastOfficialEventDomBundle = {
-          contributionRankingMirrorHtml: iframeContribMirror,
-          giftHistoryMirrorHtml: iframeGiftHistoryMirror
-        };
-      } else {
-        _lastOfficialEventDomBundle = null;
-      }
-    } else {
-      _lastOfficialEventDomBundle = null;
-    }
+    _lastOfficialEventDomBundle = mergeIframeRelayMirrorIntoBundle(
+      bag?.[key],
+      bag?.[iframeKey]
+    );
   } catch {
     _lastOfficialEventDomBundle = null;
   }
