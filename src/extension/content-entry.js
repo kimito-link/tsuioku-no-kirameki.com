@@ -82,6 +82,8 @@ import {
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
 // v0.1.250: 北極星レーン 1 (貢献度ランキング) on-demand 取得用 mirror scraper
 import { scrapeContributionRankingMirrorHtml } from '../lib/scrapeContributionRanking.js';
+// v0.1.251: 北極星レーン 2 (この番組へのギフト履歴) on-demand 取得用 mirror scraper
+import { scrapeGiftHistoryMirrorHtml } from '../lib/scrapeGiftHistoryMirror.js';
 import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
 import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
 import {
@@ -7156,6 +7158,47 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     })();
     return true;
   }
+
+  // v0.1.251 Phase 2: popup の北極星レーン 2「ギフト履歴を取得」ボタンから
+  //   呼ばれる on-demand 取得。Phase 1 (ランキングタブ) と並んで、ギフトサイドバー
+  //   の「履歴」タブを開いて `ul.gift-history-list` を outerHTML で抽出する。
+  //
+  // Phase 1 (NLS_FETCH_CONTRIBUTION_RANKING_MIRROR) との違い:
+  //   - クリックするタブが異なる（「履歴」テキスト match）
+  //   - スクレイプ対象が `ul.gift-history-list`（Phase 1 は `ul.contribution-ranking-list`）
+  //   - 専用関数 `tryOnDemandFetchGiftHistoryMirrorOnce()` を新設（既存 autoOpen は
+  //     ランキングタブ専用なので干渉させない）
+  if (msg.type === 'NLS_FETCH_GIFT_HISTORY_MIRROR') {
+    if (!isWatchInlinePanelTopFrame()) {
+      return false;
+    }
+    void (async () => {
+      const startedAt = Date.now();
+      try {
+        const result = await tryOnDemandFetchGiftHistoryMirrorOnce();
+        sendResponse({
+          ok: true,
+          mirrorHtml: result.mirrorHtml || null,
+          itemCount: result.itemCount,
+          status: result.status,
+          liveId: String(liveId || ''),
+          elapsedMs: Date.now() - startedAt
+        });
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          liveId: String(liveId || ''),
+          elapsedMs: Date.now() - startedAt,
+          error: String(
+            err && typeof err === 'object' && 'message' in err
+              ? /** @type {{ message?: unknown }} */ (err).message
+              : err || 'fetch_gift_history_failed'
+          )
+        });
+      }
+    })();
+    return true;
+  }
 });
 }
 
@@ -10588,6 +10631,289 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     } catch {
       // no-op
     }
+  }
+}
+
+/**
+ * v0.1.251 Phase 2: ギフト履歴 on-demand 取得。popup の北極星レーン 2「ギフト履歴を取得」
+ *   ボタン click から `NLS_FETCH_GIFT_HISTORY_MIRROR` メッセージで呼ばれる。
+ *
+ * Phase 1 (`tryAutoOpenGiftSidebarOnceForScrape`) との違い:
+ *   - クリックするタブが「履歴」（Phase 1 は「ランキング」）
+ *   - スクレイプ対象が `ul.gift-history-list`（Phase 1 は `ul.contribution-ranking-list`）
+ *   - per-liveId guard を持たない（user click で何度でも再試行可能）
+ *   - opt-in gate も bypass（ボタン押下 = 明示的同意）
+ *
+ * フロー:
+ *   1. ギフトボタンを find して click でサイドバーを開く（既開なら check のみ）
+ *   2. 「履歴」タブを find して click（Vue mount を誘発）
+ *   3. polling で `ul.gift-history-list` を待つ（500ms × 6 ticks = 最大 3 秒）
+ *   4. outerHTML を scrape
+ *   5. persistOfficialEventDomBundleNow で storage に書き込み（popup 側で再 render される）
+ *   6. close ボタン → Escape → giftBtn toggle の 3 段で確実にサイドバーを閉じる
+ *
+ * @returns {Promise<{mirrorHtml: string|null, itemCount: number, status: string}>}
+ */
+async function tryOnDemandFetchGiftHistoryMirrorOnce() {
+  if (!hasExtensionContext()) return { mirrorHtml: null, itemCount: 0, status: 'no-context' };
+  if (!liveId) return { mirrorHtml: null, itemCount: 0, status: 'no-live' };
+  if (!isWatchInlinePanelTopFrame()) return { mirrorHtml: null, itemCount: 0, status: 'not-top-frame' };
+
+  // 1. 既にサイドバーが開いていれば、まず履歴タブ click から試す（giftBtn 押下を skip）
+  const sidebarAlreadyOpen = (() => {
+    try {
+      return !!document.querySelector(
+        '[class*="gift-sidebar"]:not([hidden]), [class*="rich-view"]:not([hidden])'
+      );
+    } catch {
+      return false;
+    }
+  })();
+
+  // 2. ギフトボタンを find（既開でも close で使う）
+  /** @type {HTMLElement|null} */
+  let giftBtn = null;
+  try {
+    const cand =
+      document.querySelector('[class*="gift-button"]') ||
+      document.querySelector('button[aria-label*="ギフト"]') ||
+      document.querySelector('button[title*="ギフト"]');
+    if (cand instanceof HTMLElement) giftBtn = cand;
+  } catch {
+    // no-op
+  }
+
+  // 3. ステルス CSS（既存 autoOpen と同じ意図、サイドバーを画面に見せない）
+  const styleEl = document.createElement('style');
+  styleEl.id = 'nls-stealth-gift-sidebar-history-fetch';
+  styleEl.textContent = `
+    [class*="gift-sidebar"],
+    [class*="gift-modal"],
+    [class*="gift-popup"],
+    [class*="gift-balloon"],
+    [class*="gift-dialog"],
+    [class*="gift-overlay"],
+    [class*="rich-view"],
+    [class*="program-gift-richview"],
+    [class*="rescue-information-anchor"],
+    [class*="rescue-information"] {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      user-select: none !important;
+    }
+  `;
+  try {
+    document.head.appendChild(styleEl);
+  } catch {
+    return { mirrorHtml: null, itemCount: 0, status: 'style-failed' };
+  }
+
+  /** @type {string|null} */
+  let mirrorHtml = null;
+  let itemCount = 0;
+  let status = 'unknown';
+
+  try {
+    // 4. サイドバーを開く（既開なら skip）
+    if (!sidebarAlreadyOpen) {
+      if (!giftBtn) {
+        return { mirrorHtml: null, itemCount: 0, status: 'no-gift-button' };
+      }
+      dispatchSyntheticActivation(giftBtn);
+      // サイドバー mount 待ち（最大 2 秒）
+      let sidebarFound = false;
+      for (let i = 0; i < 4; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          if (document.querySelector('[class*="gift-sidebar"], [class*="rich-view"]')) {
+            sidebarFound = true;
+            break;
+          }
+        } catch {
+          // no-op
+        }
+      }
+      if (!sidebarFound) {
+        status = 'sidebar-not-mounted';
+        // close は finally で実行
+        return { mirrorHtml: null, itemCount: 0, status };
+      }
+    }
+
+    // 5. 「履歴」タブを find + click（gift sidebar container にスコープして誤クリック回避）
+    /** @type {HTMLElement|null} */
+    let historyTabBtn = null;
+    let historyFinder = '';
+    try {
+      const sidebarRoot = document.querySelector(
+        '[class*="gift-sidebar"], [class*="rich-view"], ' +
+          '[class*="gift-modal"], [class*="gift-popup"], ' +
+          '[class*="gift-balloon"], [class*="gift-dialog"], ' +
+          '[class*="gift-overlay"], [class*="program-gift-richview"]'
+      );
+      if (sidebarRoot instanceof HTMLElement) {
+        // 「履歴」/「History」を含む短いテキストの clickable 要素
+        // ※「履歴」だけだと「視聴履歴」「番組履歴」等と誤 match の可能性があるが、
+        //   gift sidebar 内のスコープなので安全範囲。
+        const HIST_TEXT_RE = /^(履歴|History)$|履歴タブ|gift.*history/i;
+        const candidates = sidebarRoot.querySelectorAll(
+          '[role="tab"], button, a, li, div[class*="tab"], span[class*="tab"]'
+        );
+        for (const el of candidates) {
+          if (!(el instanceof HTMLElement)) continue;
+          const t = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+          if (!t || t.length > 30) continue;
+          if (HIST_TEXT_RE.test(t)) {
+            historyTabBtn = el;
+            historyFinder = `text:${el.tagName.toLowerCase()}`;
+            break;
+          }
+        }
+        if (!historyTabBtn) {
+          const byCls = sidebarRoot.querySelector(
+            '[class*="history-tab"], [class*="gift-history-tab"]'
+          );
+          if (byCls instanceof HTMLElement) {
+            historyTabBtn = byCls;
+            historyFinder = 'class';
+          }
+        }
+      }
+    } catch {
+      // no-op
+    }
+
+    if (!historyTabBtn) {
+      // 履歴タブ find 失敗 → サイドバーが履歴 default で開いてる可能性もあるので、
+      // タブクリック skip してそのまま polling
+      status = 'no-history-tab';
+      // 直接 polling で gift-history-list を待つ
+      for (let i = 0; i < 4; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const html = scrapeGiftHistoryMirrorHtml(document);
+        if (html) {
+          mirrorHtml = html;
+          itemCount = countGiftHistoryListItems(document);
+          status = `default-tab-scraped-tick-${i + 1}`;
+          break;
+        }
+      }
+    } else {
+      // 履歴タブ click
+      const prevPe = historyTabBtn.style.pointerEvents;
+      try { historyTabBtn.style.pointerEvents = 'auto'; } catch { /* no-op */ }
+      dispatchSyntheticActivation(historyTabBtn);
+      // 「履歴」タブ click → Vue mount → `ul.gift-history-list` を待つ（最大 3 秒）
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const html = scrapeGiftHistoryMirrorHtml(document);
+        if (html) {
+          mirrorHtml = html;
+          itemCount = countGiftHistoryListItems(document);
+          status = `scraped-history-tick-${i + 1}:${historyFinder}`;
+          break;
+        }
+      }
+      try { historyTabBtn.style.pointerEvents = prevPe; } catch { /* no-op */ }
+      if (!mirrorHtml) {
+        status = `history-tab-clicked-no-list:${historyFinder}`;
+      }
+    }
+
+    // 6. persistOfficialEventDomBundleNow で storage に書き込み（popup 反映）
+    if (mirrorHtml) {
+      try {
+        await persistOfficialEventDomBundleNow();
+      } catch {
+        // no-op: 失敗しても sendResponse は mirrorHtml を返す
+      }
+    }
+  } finally {
+    // 7. close: close ボタン → Escape → giftBtn toggle の 3 段（autoOpen と同等）
+    const isSidebarStillVisible = () => {
+      try {
+        return !!document.querySelector(
+          '[class*="rich-view-status"]:not([hidden]), ' +
+            '[class*="gift-sidebar"]:not([hidden]), ' +
+            '[class*="gift-modal"]:not([hidden]), ' +
+            '[class*="gift-popup"]:not([hidden])'
+        );
+      } catch {
+        return false;
+      }
+    };
+    /** @type {HTMLElement|null} */
+    let closeBtn = null;
+    try {
+      const c = document.querySelector(
+        '[class*="gift-sidebar"] [class*="close"], ' +
+          '[class*="gift-modal"] [class*="close"], ' +
+          '[class*="gift-popup"] [class*="close"], ' +
+          '[class*="rich-view"] [class*="close"]'
+      );
+      if (c instanceof HTMLElement) closeBtn = c;
+    } catch {
+      // no-op
+    }
+    if (closeBtn) {
+      dispatchSyntheticActivation(closeBtn);
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (isSidebarStillVisible()) {
+      try {
+        const KEY_INIT = {
+          key: 'Escape',
+          code: 'Escape',
+          keyCode: 27,
+          which: 27,
+          bubbles: true,
+          cancelable: true
+        };
+        document.dispatchEvent(new KeyboardEvent('keydown', KEY_INIT));
+        document.dispatchEvent(new KeyboardEvent('keyup', KEY_INIT));
+      } catch {
+        // no-op
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (isSidebarStillVisible() && giftBtn) {
+      dispatchSyntheticActivation(giftBtn);
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (isSidebarStillVisible() && closeBtn) {
+      dispatchSyntheticActivation(closeBtn);
+    }
+    // ステルス CSS を 800ms 後に削除（close アニメーション中の漏れを防ぐ）
+    try {
+      setTimeout(() => {
+        try { styleEl.remove(); } catch { /* no-op */ }
+      }, 800);
+    } catch {
+      // no-op
+    }
+  }
+
+  return { mirrorHtml, itemCount, status };
+}
+
+/**
+ * v0.1.251: gift-history-list の item 数を数える（diagnostics 用）。
+ * scrapeGiftHistoryMirror.js の countGiftHistoryItems と同じロジックだが、
+ * content-entry.js 側からの依存を避けるためインライン。
+ *
+ * @param {Document} doc
+ * @returns {number}
+ */
+function countGiftHistoryListItems(doc) {
+  try {
+    const exact = doc.querySelectorAll('ul.gift-history-list > li.item');
+    if (exact && exact.length > 0) return exact.length;
+    const partial = doc.querySelectorAll(
+      'ul[class*="gift-history-list"] > li[class*="item"]:not([class*="items"])'
+    );
+    return partial?.length || 0;
+  } catch {
+    return 0;
   }
 }
 

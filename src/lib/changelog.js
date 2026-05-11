@@ -26,6 +26,20 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.251',
+    date: '2026-05-11',
+    summary: '北極星レーン 2 ギフト履歴 取得ボタン (Phase 2)',
+    items: Object.freeze([
+      'popup の公式値レーン 2 「この番組へのギフト履歴」に「ギフト履歴を取得」ボタンを追加しました。v0.1.250 Phase 1 (貢献度ランキング) と同じパターンの on-demand 取得経路で、kimito さん方針 (2026-05-11)「ボタンつけてユーザーフレンドリー化」「確実路線」を実装',
+      'ボタン click → content script (active watch タブ) が gift サイドバーを裏で開いて「履歴」タブをクリック → polling で Vue mount を待つ → ニコ生公式 DOM の ul.gift-history-list を outerHTML で抽出 → popup の北極星レーン 2 に鏡レンダリングします',
+      '専用 on-demand 関数 tryOnDemandFetchGiftHistoryMirrorOnce を新設 (content-entry.js)。既存 tryAutoOpenGiftSidebarOnceForScrape (Phase 1 = ランキングタブ) と並んで履歴タブ専用の独立経路として動作。per-liveId guard も opt-in gate も持たないので、ユーザー click で何度でも再試行可能',
+      '純関数 scraper を src/lib/scrapeGiftHistoryMirror.js に新設 (vitest 10 件): ul.gift-history-list を outerHTML 文字列で返す。CSS Modules ハッシュ化 class への部分一致 fallback 含む。構造化済 scrapeGiftHistoryFromDom (officialEventBannerDom.js) と同じ DOM だが鏡用に outerHTML 文字列で返す',
+      'OfficialEventDomBundle 型に giftHistoryMirrorHtml フィールドを追加。collectOfficialEventDomBundle / mergeOfficialEventDomBundle / nls_event_dom_(liveId) 経路すべてに対応。Phase 1 (contributionRankingMirrorHtml) と同じパターン',
+      '失敗時は「(ギフト 0 件 or 履歴タブ未描画)」「(取得失敗：status)」等の reason caption を出してリトライ可能。鏡が取れたらボタンが消えて公式 DOM がそのまま表示。Phase 1 と同じ UX',
+      'これで 2 レーン (1 貢献度ランキング + 2 ギフト履歴) で on-demand 取得ボタンが揃いました。Phase 3 (サポーター取得 + イベントランキング取得 = audition iframe scrape) は別 PR で順次'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.250',
     date: '2026-05-11',
     summary: '北極星レーン 1 貢献度ランキング 取得ボタン (Phase 1)',

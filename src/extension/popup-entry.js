@@ -5630,16 +5630,181 @@ async function handleFetchContributionRankingClick(btn, hintEl) {
 let _contributionRankingFetchInflight = false;
 
 /**
- * v0.1.244: 北極星 レーン 2 (この番組へのギフト履歴) への流し込み。
- * 同上、reason 判定で placeholder 細分化。giftPoints=0 配信なら「(ギフト 0 件)」
- * 表示で「取得失敗ではなく、そもそも発生していない」が伝わる。
+ * v0.1.244 / v0.1.251: 北極星 レーン 2 (この番組へのギフト履歴) への流し込み。
+ *
+ * 優先度:
+ *   1. `bundle.giftHistoryMirrorHtml` (v0.1.251 で導入、user click → on-demand 取得
+ *      → gift sidebar > 履歴タブ DOM の outerHTML) が居れば最優先で鏡 render
+ *   2. それ以外は on-demand 取得ボタン + reason caption を body に挿入
+ *      (Phase 2 = レーン 2、Phase 1 と同じパターン)
  */
 function refreshNorthStarGiftHistoryLane() {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
+
+  // 1. 鏡 mirrorHtml が居れば最優先
+  const mirrorHtml = typeof bundle?.giftHistoryMirrorHtml === 'string'
+    ? bundle.giftHistoryMirrorHtml
+    : null;
+  if (mirrorHtml) {
+    renderNorthStarLane('giftHistory', mirrorHtml);
+    return;
+  }
+
+  // 2. 取得中なら現状の loading UI を温存
+  if (_giftHistoryFetchInflight) {
+    const existing = document.getElementById('fetchGiftHistoryBtn');
+    if (existing) return;
+  }
+
+  // 3. 取得ボタン + reason caption を body に挿入
   const state = determineNorthStarLaneState('giftHistory', { bundle, snap });
-  renderNorthStarLane('giftHistory', null, state);
+  renderGiftHistoryFetchButtonInLane(state);
 }
+
+/**
+ * v0.1.251 Phase 2: 北極星レーン 2 の body に「取得ボタン + caption」を挿入する。
+ * mirrorHtml が無い時に呼ばれる。click で content script に NLS_FETCH_GIFT_HISTORY_MIRROR
+ * を投げて on-demand 取得を発火する。
+ *
+ * @param {string} state v0.1.244 reason
+ */
+function renderGiftHistoryFetchButtonInLane(state) {
+  const body = document.getElementById('northStarLaneBody-giftHistory');
+  if (!(body instanceof HTMLElement)) return;
+
+  const hintText = mapGiftHistoryReasonToHint(state);
+  const btnLabel = 'ギフト履歴を取得';
+
+  body.setAttribute(
+    'data-lane-state',
+    typeof state === 'string' && state ? state : 'missing'
+  );
+  body.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'nl-on-demand-fetch';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'fetchGiftHistoryBtn';
+  btn.className = 'nl-on-demand-fetch__btn';
+  btn.dataset.loading = 'false';
+  btn.textContent = btnLabel;
+  const hint = document.createElement('span');
+  hint.className = 'nl-on-demand-fetch__hint';
+  hint.textContent = hintText;
+  wrap.appendChild(btn);
+  wrap.appendChild(hint);
+  body.appendChild(wrap);
+
+  btn.addEventListener('click', () => {
+    void handleFetchGiftHistoryClick(btn, hint);
+  });
+}
+
+/**
+ * v0.1.251: state を「ボタン下の小さな注釈」に変換。
+ *
+ * @param {string} state
+ * @returns {string}
+ */
+function mapGiftHistoryReasonToHint(state) {
+  switch (state) {
+    case 'iframe_unrendered':
+      return '(取得待ち：サイドバー描画なし)';
+    case 'fetch_error':
+      return '(取得エラー)';
+    case 'not_yet':
+      return '(取得中…)';
+    case 'no_event':
+      return '(イベント不参加)';
+    case 'no_program_gift':
+      return '(ギフト 0 件)';
+    case 'ok':
+      return '';
+    default:
+      return '(未取得)';
+  }
+}
+
+/**
+ * v0.1.251 Phase 2: 「ギフト履歴を取得」ボタン click handler。
+ *
+ * 流れ (Phase 1 と同じパターン):
+ *   1. ボタンを disabled + 「取得中…」表示
+ *   2. content script (active watch tab) に NLS_FETCH_GIFT_HISTORY_MIRROR
+ *   3. content script: gift sidebar 開く → 履歴タブ click → polling → outerHTML 取得
+ *   4. response の mirrorHtml を `_lastOfficialEventDomBundle` に乗せて再 render
+ *   5. mirrorHtml が空なら hint に失敗理由を出してリトライ可能
+ *
+ * @param {HTMLButtonElement} btn
+ * @param {Element|null} hintEl
+ */
+async function handleFetchGiftHistoryClick(btn, hintEl) {
+  if (!btn || btn.disabled) return;
+  if (_giftHistoryFetchInflight) return;
+  _giftHistoryFetchInflight = true;
+  btn.disabled = true;
+  btn.dataset.loading = 'true';
+  const originalText = btn.textContent || 'ギフト履歴を取得';
+  btn.textContent = '取得中… (最大 7 秒)';
+  if (hintEl instanceof HTMLElement) {
+    hintEl.textContent = 'サイドバーを開いて履歴タブを開いています…';
+  }
+  /** @type {unknown} */
+  let res = null;
+  try {
+    res = await sendMessageToWatchTabs('', {
+      type: 'NLS_FETCH_GIFT_HISTORY_MIRROR'
+    });
+  } catch (err) {
+    if (hintEl instanceof HTMLElement) {
+      hintEl.textContent = '(取得エラー：watch タブが見つかりません)';
+    }
+    btn.disabled = false;
+    btn.dataset.loading = 'false';
+    btn.textContent = originalText;
+    _giftHistoryFetchInflight = false;
+    return;
+  }
+
+  const r = res && typeof res === 'object' ? /** @type {Record<string, unknown>} */ (res) : null;
+  const mirrorHtml = r && typeof r.mirrorHtml === 'string' && r.mirrorHtml ? r.mirrorHtml : '';
+  const itemCount = r && typeof r.itemCount === 'number' ? r.itemCount : null;
+  const status = r && typeof r.status === 'string' ? r.status : '';
+
+  if (mirrorHtml) {
+    if (_lastOfficialEventDomBundle && typeof _lastOfficialEventDomBundle === 'object') {
+      _lastOfficialEventDomBundle = {
+        .../** @type {object} */ (_lastOfficialEventDomBundle),
+        giftHistoryMirrorHtml: mirrorHtml
+      };
+    } else {
+      /** @type {any} */ (_lastOfficialEventDomBundle) = {
+        giftHistoryMirrorHtml: mirrorHtml
+      };
+    }
+    _giftHistoryFetchInflight = false;
+    refreshNorthStarGiftHistoryLane();
+    return;
+  }
+
+  let failureHint = '(取得できませんでした)';
+  if (itemCount === 0) {
+    failureHint = '(ギフト 0 件 or 履歴タブ未描画)';
+  } else if (status) {
+    failureHint = `(取得失敗：${String(status).slice(0, 60)})`;
+  }
+  if (hintEl instanceof HTMLElement) hintEl.textContent = failureHint;
+  btn.disabled = false;
+  btn.dataset.loading = 'false';
+  btn.textContent = originalText;
+  _giftHistoryFetchInflight = false;
+}
+
+/**
+ * v0.1.251: 取得 inflight フラグ。Phase 1 の `_contributionRankingFetchInflight` と同パターン。
+ */
+let _giftHistoryFetchInflight = false;
 
 /**
  * v0.1.240: 北極星 レーン 3 (イベント累計スコア) への流し込み。
@@ -10695,14 +10860,12 @@ async function runOneTimeBackfillRemoveGiftSystemMessages() {
       }
     });
     if (totalRemoved > 0) {
-      // eslint-disable-next-line no-console
       console.log(
         `[nls-migration] removed ${totalRemoved} gift system message(s) from comment records`
       );
     }
   } catch (e) {
     // migration 失敗は致命でない（次回 boot で再試行）
-    // eslint-disable-next-line no-console
     console.warn('[nls-migration] backfill skipped:', e);
   }
 }
@@ -10752,14 +10915,12 @@ async function runOneTimeBackfillRemoveRecommendedLivePollution() {
       }
     });
     if (totalRemoved > 0) {
-      // eslint-disable-next-line no-console
       console.log(
         `[nls-migration] removed ${totalRemoved} recommended-live pollution row(s) from comment records`
       );
     }
   } catch (e) {
     // migration 失敗は致命でない（次回 boot で再試行）
-    // eslint-disable-next-line no-console
     console.warn('[nls-migration] backfill (recommended-live) skipped:', e);
   }
 }

@@ -17,6 +17,9 @@ import {
 // v0.1.250: 北極星レーン 1 (貢献度ランキング) 用の outerHTML scraper。
 // 広告ランキング (scrapeAdRankingMirrorHtml) と取得対象が別 DOM・別 class なので別ファイル。
 import { scrapeContributionRankingMirrorHtml } from './scrapeContributionRanking.js';
+// v0.1.251: 北極星レーン 2 (この番組へのギフト履歴) 用の outerHTML scraper。
+// 構造化済 scrapeGiftHistoryFromDom と同じ DOM だが鏡用に outerHTML 文字列で返す。
+import { scrapeGiftHistoryMirrorHtml } from './scrapeGiftHistoryMirror.js';
 
 /**
  * niconico の audition embed URL を直接 fetch して、HTML 内のバナー情報を掬う。
@@ -140,6 +143,7 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
  *   eventCumulativeScoreMirrorHtml: string|null,
  *   eventCurrentRankMirrorHtml: string|null,
  *   contributionRankingMirrorHtml: string|null,
+ *   giftHistoryMirrorHtml: string|null,
  *   programStats: ReturnType<typeof scrapeProgramStatisticsMenuFromDom>,
  *   giftHistory: ReturnType<typeof scrapeGiftHistoryFromDom>
  * }} OfficialEventDomBundle
@@ -167,13 +171,20 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
   // active のときに親 frame の document へ `ul.contribution-ranking-list` が出現する
   // ので、その outerHTML を JSON 直列化可能な文字列として bundle に乗せる。
   const contributionRankingMirrorHtml = scrapeContributionRankingMirrorHtml(root);
+  // v0.1.251: 北極星レーン 2 鏡用 outerHTML。gift sidebar の「履歴」タブが active
+  // のときに DOM へ `ul.gift-history-list` が出現する。autoOpen 経路（Phase 1）は
+  // ランキングタブを開く設計のためここでは null になるが、Phase 2 の on-demand 取得
+  // (`NLS_FETCH_GIFT_HISTORY_MIRROR`) で履歴タブが開かれている瞬間に persist が走ると
+  // この経路で bundle に乗る。
+  const giftHistoryMirrorHtml = scrapeGiftHistoryMirrorHtml(root);
   if (
     !eventBanner &&
     !eventBalloon &&
     !contributionRanking &&
     !programStats &&
     !giftHistory &&
-    !contributionRankingMirrorHtml
+    !contributionRankingMirrorHtml &&
+    !giftHistoryMirrorHtml
   ) {
     return null;
   }
@@ -187,6 +198,7 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
     eventCumulativeScoreMirrorHtml: null,
     eventCurrentRankMirrorHtml: null,
     contributionRankingMirrorHtml: contributionRankingMirrorHtml || null,
+    giftHistoryMirrorHtml: giftHistoryMirrorHtml || null,
     programStats,
     giftHistory
   };
@@ -227,6 +239,9 @@ export function mergeOfficialEventDomBundle(prev, next) {
       next.contributionRankingMirrorHtml ||
       prev.contributionRankingMirrorHtml ||
       null,
+    // v0.1.251: 同上（履歴タブ）。
+    giftHistoryMirrorHtml:
+      next.giftHistoryMirrorHtml || prev.giftHistoryMirrorHtml || null,
     programStats: next.programStats || prev.programStats,
     giftHistory: next.giftHistory || prev.giftHistory
   };
