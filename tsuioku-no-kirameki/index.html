@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 
-    <meta name="description" content="記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。長時間配信でもコメント記録を貯めて育てやすく、画面が一時的に不安定でも復元しやすい運用を目指します。">
+    <meta name="description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。v0.1.247 で公式値レーンの 4 レーン鏡映し（広告 / イベント累計 / 現在順位 / 番組累計）・NDGR Message ID 重複排除・記録の質改善（uid 解決 / nickname 統一）まで進めた Chrome 拡張。">
     <meta name="theme-color" content="#0a1228">
     <link rel="manifest" href="site.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -22,13 +22,16 @@
     <link rel="preload" as="image" href="../extension/images/logo/kimito-link-color.png" fetchpriority="high">
 
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"WebSite","name":"君斗りんくの追憶のきらめき","url":"https://tsuioku-no-kirameki.com/","description":"記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。","inLanguage":"ja-JP","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"}}
+      {"@context":"https://schema.org","@type":"WebSite","name":"君斗りんくの追憶のきらめき","url":"https://tsuioku-no-kirameki.com/","description":"ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。v0.1.247 で公式値レーンの 4 レーン鏡映し・NDGR Message ID 重複排除・記録の質改善まで進めた Chrome 拡張。","inLanguage":"ja-JP","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"}}
+    </script>
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"君斗りんくの追憶のきらめき","alternateName":"追憶のきらめき","operatingSystem":"Google Chrome","applicationCategory":"BrowserApplication","softwareVersion":"0.1.247","url":"https://tsuioku-no-kirameki.com/","inLanguage":"ja-JP","description":"ニコ生の応援コメントと公式値（イベント累計 / 現在順位 / 番組累計 / 広告ランキング）を取りこぼしにくく記録する Chrome 拡張。記録安定 + 公式値レーンの鏡映し + NDGR Message ID 重複排除で、長時間配信でもコメント記録を貯めて育てやすい運用を目指す。","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"license":"https://opensource.org/licenses/MIT"}
     </script>
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://tsuioku-no-kirameki.com/">
     <meta property="og:title" content="君斗りんくの追憶のきらめき ― 取りこぼしにくく、あとから育つコメント記録へ">
-    <meta property="og:description" content="記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。コメント記録をその場だけで終わらせず、長時間配信でも積み上げやすい運用を目指します。">
+    <meta property="og:description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。記録安定 + 公式値レーンの鏡映し（広告 / イベント累計 / 現在順位 / 番組累計）+ 4 軸独立調査ベースの NDGR Message ID 重複排除で、長時間配信でも積み上げやすい運用を目指します。">
     <meta property="og:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">
@@ -39,7 +42,7 @@
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="君斗りんくの追憶のきらめき ― 取りこぼしにくく、あとから育つコメント記録へ">
-    <meta name="twitter:description" content="記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。コメント記録を貯めて育てやすい導線を、誇張せずに整理しています。">
+    <meta name="twitter:description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つ記録へ。公式値レーンの鏡映し + NDGR Message ID 重複排除で、長時間配信でも積み上げやすい記録運用へ（v0.1.247）。">
     <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
     <meta name="twitter:image:alt" content="追憶のきらめき ― 流れ星みたいに消えていくコメントを、星座みたいに、つながりが残る世界へ。">
     <style>
