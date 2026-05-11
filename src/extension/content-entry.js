@@ -4366,6 +4366,8 @@ function buildGiftDiagnosticsBundle() {
       // v0.1.241: NDGR stats 由来の fallback 値も観測値 + state 判定に含める
       const eventScoreNdgrVal = num(officialEventGiftScoreNdgr);
       const eventRankNdgrVal = num(officialNicoEventRankNdgr);
+      // v0.1.242: 番組累計ポイントも NDGR 由来の値を観測値 + state 判定に含める
+      const programPointsNdgrVal = num(officialGiftPointsNdgr);
       return {
         '1_貢献度ランキング': {
           state: contribCount > 0 ? 'ok' : 'missing',
@@ -4391,8 +4393,12 @@ function buildGiftDiagnosticsBundle() {
           balloonFoundCountLifetime: _d.eventBalloonFoundCount
         },
         '4_番組累計ポイント': {
-          state: programPoints != null ? 'ok' : 'missing',
-          value: programPoints
+          state:
+            programPoints != null || programPointsNdgrVal != null
+              ? 'ok'
+              : 'missing',
+          value: programPoints,
+          ndgrValue: programPointsNdgrVal
         },
         '5_イベント現在順位': {
           state:

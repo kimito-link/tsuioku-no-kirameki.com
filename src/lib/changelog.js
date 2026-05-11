@@ -26,6 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.242',
+    date: '2026-05-11',
+    summary: '北極星 レーン 4 番組累計ポイント表示',
+    items: Object.freeze([
+      'popup の「公式値レーン」セクションの **レーン 4 番組累計ポイント** に値表示を追加しました。watch ページ自体の programStats（プレイヤー上部のティッカー）から取れる `giftPoints` の数値、または NDGR stats 由来の `officialGiftPointsNdgr` を使い、niconico 風の「X,XXX pt」形式（`span.point-value` + `small.point-unit` の構造）の HTML を組み立てて popup に流します',
+      '優先度は **DOM programStats > NDGR stats > (未取得) placeholder**。前者は watch ページ自体に常時表示されているプレイヤー上部ティッカーから取れるので、配信開始時から値が出ます',
+      '`src/lib/northStarFallbackHtml.js` に `buildNorthStarProgramPointsFallbackHtml(value)` を追加（v0.1.241 で導入したパターン踏襲）。vitest 8 件追加（正の整数 / 0 / 負数 / null / NaN / Infinity / 小数 / カンマ区切り / 大きい数 を網羅）',
+      'popup-entry.js に `refreshNorthStarProgramPointsLane()` を追加、bundle 更新の rerender pipeline に統合（v0.1.240 / v0.1.241 のレーンの隣）',
+      'AI 共有診断 JSON の `北極星レーン.4_番組累計ポイント` に `ndgrValue` フィールド追加、state 判定も「DOM 数値 OR NDGR 値」のどちらかで ok 判定に拡張',
+      'これでレーン 3 / 4 / 5 / +α の 4 レーンに値表示が揃いました。残りはレーン 1 貢献度ランキングと レーン 2 ギフト履歴（gift sidebar cross-origin iframe scrape 修復が必要）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.241',
     date: '2026-05-11',
     summary: '北極星 レーン 3+5 NDGR fallback 表示',

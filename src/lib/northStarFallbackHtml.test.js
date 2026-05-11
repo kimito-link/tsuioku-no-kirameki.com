@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildNorthStarRankFallbackHtml,
-  buildNorthStarScoreFallbackHtml
+  buildNorthStarScoreFallbackHtml,
+  buildNorthStarProgramPointsFallbackHtml
 } from './northStarFallbackHtml.js';
 
 describe('buildNorthStarRankFallbackHtml', () => {
@@ -85,5 +86,51 @@ describe('buildNorthStarScoreFallbackHtml', () => {
 
   it('string 等の不正型は null', () => {
     expect(buildNorthStarScoreFallbackHtml(/** @type {any} */ ('100'))).toBeNull();
+  });
+});
+
+describe('buildNorthStarProgramPointsFallbackHtml', () => {
+  it('正の整数 value を「X,XXX pt」HTML に整形する', () => {
+    const html = buildNorthStarProgramPointsFallbackHtml(1350);
+    expect(html).toContain('class="point-value"');
+    expect(html).toContain('1,350');
+    expect(html).toContain('<small class="point-unit">pt</small>');
+  });
+
+  it('小さい数 (3 桁以下) はカンマなし', () => {
+    const html = buildNorthStarProgramPointsFallbackHtml(550);
+    expect(html).toContain('>550 ');
+    expect(html).not.toContain(',');
+  });
+
+  it('大きい数（百万級）もカンマ区切り', () => {
+    const html = buildNorthStarProgramPointsFallbackHtml(1234567);
+    expect(html).toContain('1,234,567');
+  });
+
+  it('value=0 は表示する（ギフト発生 0 件も意味あり）', () => {
+    const html = buildNorthStarProgramPointsFallbackHtml(0);
+    expect(html).toContain('>0 ');
+    expect(html).toContain('pt');
+  });
+
+  it('負の数は null', () => {
+    expect(buildNorthStarProgramPointsFallbackHtml(-1)).toBeNull();
+  });
+
+  it('null / undefined / NaN / Infinity は null', () => {
+    expect(buildNorthStarProgramPointsFallbackHtml(null)).toBeNull();
+    expect(buildNorthStarProgramPointsFallbackHtml(undefined)).toBeNull();
+    expect(buildNorthStarProgramPointsFallbackHtml(NaN)).toBeNull();
+    expect(buildNorthStarProgramPointsFallbackHtml(Infinity)).toBeNull();
+  });
+
+  it('小数は切り捨て', () => {
+    const html = buildNorthStarProgramPointsFallbackHtml(1500.9);
+    expect(html).toContain('>1,500 ');
+  });
+
+  it('string 等の不正型は null', () => {
+    expect(buildNorthStarProgramPointsFallbackHtml(/** @type {any} */ ('100'))).toBeNull();
   });
 });

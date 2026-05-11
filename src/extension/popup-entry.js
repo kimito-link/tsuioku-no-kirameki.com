@@ -20,7 +20,8 @@ import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
 import {
   buildNorthStarRankFallbackHtml,
-  buildNorthStarScoreFallbackHtml
+  buildNorthStarScoreFallbackHtml,
+  buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
@@ -5459,6 +5460,31 @@ function refreshNorthStarEventCurrentRankLane() {
 }
 
 /**
+ * v0.1.242: 北極星 レーン 4 (番組累計ポイント) への流し込み。
+ *
+ * 優先度: bundle.programStats.giftPoints (watch ページ自体の DOM、常時取れる)
+ *   > snap.officialGiftPointsNdgr (NDGR stats 由来) > (未取得) placeholder。
+ *
+ * gift sidebar の `table.point-field > td.point-value` を outerHTML で映す本来の
+ * 鏡レンダリングは cross-origin iframe inject 不全 (v0.1.218) のため未着手。
+ * watch ページ programStats から取れる数値で「X,XXX pt」形式の fallback HTML を
+ * 組み立てるのが本版の戦略。
+ */
+function refreshNorthStarProgramPointsLane() {
+  const bundle = _lastOfficialEventDomBundle;
+  const domValue = typeof bundle?.programStats?.giftPoints === 'number'
+    ? bundle.programStats.giftPoints
+    : null;
+  const snap = watchMetaCache.snapshot;
+  const ndgrValue = typeof snap?.officialGiftPointsNdgr === 'number'
+    ? snap.officialGiftPointsNdgr
+    : null;
+  const value = domValue != null ? domValue : ndgrValue;
+  const fallback = buildNorthStarProgramPointsFallbackHtml(value);
+  renderNorthStarLane('programPoints', fallback);
+}
+
+/**
  * 貢献度ランキング帯。niconico DOM から掬った正本値（`nls_event_dom_<lv>` の
  * contributionRanking）を最優先、それが無いときだけ NDGR ギフト event 集計に
  * フォールバック。応援帯と同じ CSS / モデル化（topSupportRankLineModels）を流用。
@@ -5674,6 +5700,8 @@ function renderUserRooms(entries, liveId = '') {
     //   bundle.eventCumulativeScoreMirrorHtml / eventCurrentRankMirrorHtml から鏡描画
     refreshNorthStarEventCumulativeScoreLane();
     refreshNorthStarEventCurrentRankLane();
+    // v0.1.242: 北極星 レーン 4 番組累計ポイントを programStats.giftPoints から描画
+    refreshNorthStarProgramPointsLane();
     // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
     await refreshGiftRankingFetchPrompt(liveId);
     const snap = watchMetaCache.snapshot;
