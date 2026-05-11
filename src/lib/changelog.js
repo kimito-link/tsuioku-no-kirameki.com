@@ -26,6 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.247',
+    date: '2026-05-11',
+    summary: 'nickname map 109→56 減少バグ修正',
+    items: Object.freeze([
+      'コメントを観測している間に `interceptedNicknames` の map サイズが「109 → 56」のように減少していたバグを修正しました。memory `todo_ndgr_username_resolution.md` で観測されていた問題で、同一放送内なのに intercept された nickname が約半数消えてしまっていました',
+      '原因: `resolveWatchPageContext()` の `liveIdChanged` 判定が SPA navigation 中の一時的な URL parse 失敗 (lv → null の遷移) でも true になり、`interceptedNicknames` を含む 4 つの map (interceptedUsers / interceptedNicknames / interceptedAvatars / activeUserTimestamps) が無駄に clear されていました',
+      '解決: `src/lib/watchContext.js` に新 flag `liveIdSwitched` を追加（既存 `liveIdChanged` は互換性のため意味不変）。「両者 non-null かつ別 lv」のときだけ true になる厳格判定。`content-entry.js` の `syncLiveIdFromLocation()` 内の clear 発火条件を `liveIdChanged` → `liveIdSwitched` に切り替えました',
+      '効果切り分け用: 観測カウンタ `_liveIdChangedNonSwitchCount` (= 旧判定では false positive 起こしていた件数) を AI 共有診断 JSON の `nicknameDiag` に追加。本版以降は false positive 発火件数だけがカウントされ、map 自体は clear されません',
+      'vitest を新規 6 件追加 (`src/lib/watchContext.test.js`): 別 lv 切替 / 一時的 URL 失敗 / 初回起動 / 視聴離脱 / 同一 lv / lv1→null→lv1 シーケンス / lv1→null→lv2 真切替 を網羅検証',
+      'memory `feedback_existing_features_first.md` の「新機能より既存機能の 100% 完成を優先」(kimito さん 2026-05-11 明示) 方針に沿った修復'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.246',
     date: '2026-05-11',
     summary: 'popup 同 user_id 別 nickname 衝突を統一解決',
