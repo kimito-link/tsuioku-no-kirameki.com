@@ -8519,6 +8519,23 @@
         </div>
       </section>
 
+      <section class="section" id="north-star-mirror-lanes" aria-labelledby="north-star-mirror-lanes-heading" data-lp-feature="north-star-mirror-lanes">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="north-star-mirror-lanes-heading">公式値レーン: 鏡のように貼り付け（v0.1.247 で 4 レーン揃いました）</h2>
+            <p>
+              ポップアップに <strong>公式値レーン（北極星）</strong> という枠を常設し、配信ページの<strong>公式 DOM をそのまま鏡のように貼り付け</strong>る仕組みです。拡張が再描画せず、ニコ生本体の見た目に合わせます（取得できないときも枠は閉じず、<strong>理由</strong>を残します）。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>今いまできていること</strong> — <strong>レーン 3 イベント累計スコア</strong>（v0.1.240）／<strong>レーン 4 番組累計ポイント</strong>（v0.1.242）／<strong>レーン 5 イベント現在順位</strong>（v0.1.240）／<strong>+α 広告ランキング</strong>（v0.1.237）の 4 レーンを popup に鏡映し。</p>
+            <p><strong>取れない時間帯も枠は閉じない</strong> — 6 種類の理由（イベント不参加・ギフト 0 件・サイドバー未描画・取得エラー・取得中・未取得）で<strong>原因が一目でわかる</strong> placeholder を出します（v0.1.244）。</p>
+            <p><strong>NDGR からの代替表示</strong> — 鏡が取れないときも、NDGR 経由で取れた現在順位・累計スコアをテキストで補います（v0.1.241）。</p>
+            <p><strong>レーン 1・2 は別経路を検討中</strong> — 貢献度ランキング・ギフト履歴は cross-origin iframe の Vue mount が不完全なため、広告レーン（+α）が常時取れる代替として機能しています。</p>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="snapshot-multi-tab-safety" aria-labelledby="snapshot-multi-tab-safety-heading" data-lp-feature="snapshot-multi-tab-safety">
         <div class="shell">
           <div class="section-head fade">
@@ -10005,7 +10022,7 @@
 
     <footer class="footer-note">
       <div class="shell">
-        <div>追憶のきらめき v0.1.0 ― Kimito-Link Project</div>
+        <div>追憶のきらめき v0.1.247 ― Kimito-Link Project</div>
         <div class="footer-note__links"><a href="articles/">技術記事</a> ／ <a href="privacy.html">プライバシーポリシー</a></div>
       </div>
     </footer>
