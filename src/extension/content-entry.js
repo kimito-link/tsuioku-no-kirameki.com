@@ -4463,7 +4463,50 @@ function buildGiftDiagnosticsBundle() {
     // v0.1.226 観測強化: ギフトサイドバー cross-origin iframe relay 経路の生存確認
     // （AI 共有診断 giftSubAppRelayDiag）。受信件数 / frame 別 / cross-origin throw 数
     // から「relay が来てない / 来たけど空 / scrape 失敗」のどれかを切り分ける。
-    giftSubAppRelayDiag: snapshotIframeRelayDiag(_giftSubAppRelayDiagState),
+    // v0.1.243 拡張: iframe warmup の効果切り分け用に派生値 iframeWarmupSummary を追加。
+    // nicoad だけ mount 成功する症状（v0.1.242 まで） vs v0.1.243 warmup で audition/koken も
+    // mount 成功するか の比較を実機診断バンドルで切り分け可能にする。
+    giftSubAppRelayDiag: (() => {
+      const base = snapshotIframeRelayDiag(_giftSubAppRelayDiagState);
+      /** @type {Record<string, unknown>} */
+      const heartbeats =
+        /** @type {any} */ (base?.heartbeatsByFrameUrl) || {};
+      /** @param {string} hostFragment */
+      const findHeartbeat = (hostFragment) => {
+        for (const [url, hb] of Object.entries(heartbeats)) {
+          if (typeof url === 'string' && url.includes(hostFragment)) {
+            return /** @type {any} */ (hb);
+          }
+        }
+        return null;
+      };
+      /** @param {any} hb */
+      const summarize = (hb) => {
+        if (!hb || typeof hb !== 'object') {
+          return { hasHeartbeat: false, mountSuccess: false };
+        }
+        const contrib = Number(hb.lastContribCount) || 0;
+        const items = Number(hb.lastItemsCount) || 0;
+        const banner = !!hb.lastEventBannerPresent;
+        return {
+          hasHeartbeat: true,
+          mountSuccess: contrib > 0 || items > 0 || banner,
+          lastContribCount: contrib,
+          lastItemsCount: items,
+          lastEventBannerPresent: banner,
+          heartbeatCount: Number(hb.count) || 0
+        };
+      };
+      return {
+        ...base,
+        iframeWarmupSummary: {
+          warmupApproach: 'v0.1.243-320x240-shrink-15s',
+          auditionMount: summarize(findHeartbeat('audition.nicovideo.jp')),
+          kokenMount: summarize(findHeartbeat('koken.nicovideo.jp')),
+          nicoadMount: summarize(findHeartbeat('nicoad.nicovideo.jp'))
+        }
+      };
+    })(),
     urlLiveId: urlLv || ''
   };
 }
@@ -9557,33 +9600,77 @@ function maybeInjectHiddenOfficialIframes(liveId) {
 
   /** @type {HTMLIFrameElement[]} */
   const created = [];
+
+  // v0.1.243: container size 依存で Vue が lazy render する仮説への対応。
+  //   初期は viewport 内に 320x240 で配置し、IntersectionObserver / ResizeObserver
+  //   等が「viewable + has size」を返すようにする。opacity:0 で完全透明、
+  //   pointer-events:none で操作不可、z-index 最小値で他 UI の背後に固定。
+  //   視覚的影響はない。15 秒後（Vue mount 猶予）に 1px off-screen へ縮退する。
+  //
+  //   v0.1.218〜v0.1.242 で 1px off-screen 一本だったが、実機 v0.1.237 lv350503428
+  //   で audition/koken の heartbeat は届くのに contribCount: 0 / eventBannerPresent:
+  //   false のまま（lastScrapeAttempts: 12 回、12 × 5 秒 = 60 秒間 mount せず）。
+  //   nicoad が同じ size でも動く事実 と矛盾するが、niconico Vue の bundle 構成が
+  //   audition/koken と nicoad で異なる可能性が高い（gemini 視点）。
+  //
+  //   案 2「最初 viewable で warmup → mount 確認後縮退」（codex 会議室）が、
+  //   既に実装済の 1px off-screen 単独で取れない症状への次手段。
+  const initialStyle =
+    'display:block !important;' +
+    'position:fixed !important;' +
+    'top:0 !important;' +
+    'left:0 !important;' +
+    'width:320px !important;' +
+    'height:240px !important;' +
+    'border:0 !important;' +
+    'pointer-events:none !important;' +
+    'opacity:0 !important;' +
+    'z-index:-2147483648 !important;';
+  const shrunkStyle =
+    'display:block !important;' +
+    'position:fixed !important;' +
+    'top:-9999px !important;' +
+    'left:-9999px !important;' +
+    'width:1px !important;' +
+    'height:1px !important;' +
+    'border:0 !important;' +
+    'pointer-events:none !important;' +
+    'opacity:0 !important;' +
+    'z-index:-2147483648 !important;';
+
   for (const { id, url } of targets) {
     if (document.getElementById(id)) continue;
     try {
       const ifr = document.createElement('iframe');
       ifr.id = id;
       ifr.src = url;
-      // ユーザーに見えない位置 + 1px サイズで Vue 描画は走るが画面占有しない
-      ifr.style.cssText =
-        'display:block !important;' +
-        'position:fixed !important;' +
-        'top:-9999px !important;' +
-        'left:-9999px !important;' +
-        'width:1px !important;' +
-        'height:1px !important;' +
-        'border:0 !important;' +
-        'pointer-events:none !important;' +
-        'opacity:0 !important;' +
-        'z-index:-1 !important;';
+      ifr.style.cssText = initialStyle;
       ifr.setAttribute('aria-hidden', 'true');
       ifr.setAttribute('tabindex', '-1');
       ifr.setAttribute('data-nls-hidden-injected', '1');
+      ifr.setAttribute('data-nls-warmup-state', 'warming');
       document.body.appendChild(ifr);
       created.push(ifr);
     } catch {
       /* no-op */
     }
   }
+
+  // v0.1.243: 15 秒後に 1px off-screen へ縮退（mount 猶予を与えてから memory
+  // 占有を最小化）。Vue が container size を初期化時のみ参照する場合、ここで
+  // size を変えても既に mount 済の DOM は維持される想定。
+  setTimeout(() => {
+    for (const ifr of created) {
+      try {
+        if (ifr.isConnected) {
+          ifr.style.cssText = shrunkStyle;
+          ifr.setAttribute('data-nls-warmup-state', 'shrunk');
+        }
+      } catch {
+        /* no-op */
+      }
+    }
+  }, 15_000);
 
   // 60 秒後 destroy (memory cleanup)。十分な scrape 機会を与えてから片付ける。
   setTimeout(() => {
