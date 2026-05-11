@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 
-    <meta name="description" content="記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。長時間配信でもコメント記録を貯めて育てやすく、画面が一時的に不安定でも復元しやすい運用を目指します。">
+    <meta name="description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。v0.1.247 で公式値レーンの 4 レーン鏡映し（広告 / イベント累計 / 現在順位 / 番組累計）・NDGR Message ID 重複排除・記録の質改善（uid 解決 / nickname 統一）まで進めた Chrome 拡張。">
     <meta name="theme-color" content="#0a1228">
     <link rel="manifest" href="site.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -22,13 +22,16 @@
     <link rel="preload" as="image" href="../extension/images/logo/kimito-link-color.png" fetchpriority="high">
 
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"WebSite","name":"君斗りんくの追憶のきらめき","url":"https://tsuioku-no-kirameki.com/","description":"記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。","inLanguage":"ja-JP","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"}}
+      {"@context":"https://schema.org","@type":"WebSite","name":"君斗りんくの追憶のきらめき","url":"https://tsuioku-no-kirameki.com/","description":"ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。v0.1.247 で公式値レーンの 4 レーン鏡映し・NDGR Message ID 重複排除・記録の質改善まで進めた Chrome 拡張。","inLanguage":"ja-JP","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"}}
+    </script>
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"君斗りんくの追憶のきらめき","alternateName":"追憶のきらめき","operatingSystem":"Google Chrome","applicationCategory":"BrowserApplication","softwareVersion":"0.1.247","url":"https://tsuioku-no-kirameki.com/","inLanguage":"ja-JP","description":"ニコ生の応援コメントと公式値（イベント累計 / 現在順位 / 番組累計 / 広告ランキング）を取りこぼしにくく記録する Chrome 拡張。記録安定 + 公式値レーンの鏡映し + NDGR Message ID 重複排除で、長時間配信でもコメント記録を貯めて育てやすい運用を目指す。","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"license":"https://opensource.org/licenses/MIT"}
     </script>
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://tsuioku-no-kirameki.com/">
     <meta property="og:title" content="君斗りんくの追憶のきらめき ― 取りこぼしにくく、あとから育つコメント記録へ">
-    <meta property="og:description" content="記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。コメント記録をその場だけで終わらせず、長時間配信でも積み上げやすい運用を目指します。">
+    <meta property="og:description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。記録安定 + 公式値レーンの鏡映し（広告 / イベント累計 / 現在順位 / 番組累計）+ 4 軸独立調査ベースの NDGR Message ID 重複排除で、長時間配信でも積み上げやすい運用を目指します。">
     <meta property="og:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">
@@ -39,7 +42,7 @@
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="君斗りんくの追憶のきらめき ― 取りこぼしにくく、あとから育つコメント記録へ">
-    <meta name="twitter:description" content="記録安定を重視した、ファイル保存も含む保存基盤の強化と、保存済みデータへの後補完、配信終了後回収まで視野に入れた Chrome 拡張。コメント記録を貯めて育てやすい導線を、誇張せずに整理しています。">
+    <meta name="twitter:description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つ記録へ。公式値レーンの鏡映し + NDGR Message ID 重複排除で、長時間配信でも積み上げやすい記録運用へ（v0.1.247）。">
     <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
     <meta name="twitter:image:alt" content="追憶のきらめき ― 流れ星みたいに消えていくコメントを、星座みたいに、つながりが残る世界へ。">
     <style>
@@ -8480,7 +8483,7 @@
             </p>
           </div>
           <div class="board fade d2">
-            <p><strong>今いまできていること</strong> — ギフト・公式値・liveId 整合性の記録（v0.1.192 で完成した MCP Bridge Phase 1a が土台）。</p>
+            <p><strong>今いまできていること</strong> — ギフト・公式値・liveId 整合性の記録（v0.1.192 MCP Bridge Phase 1a が土台）に加え、v0.1.236-247 で <strong>公式値レーン（北極星）の 4 レーン鏡映し</strong>・<strong>NDGR メッセージ重複除去</strong>・<strong>コメント uid 解決率改善</strong>・<strong>nickname 衝突統一</strong>・<strong>nickname map 減少バグ修正</strong>まで段階的に進めました（詳細は以降の section）。</p>
             <p><strong>これから（計画中）</strong> — 応援ランキング・観測経路の健全性・複数タブ状態・パネル位置・時系列グラフをひとつにまとめます（現在は別々に動いています）。</p>
             <p><strong>将来の予定</strong> — 他の人の配信との比較情報も AI が出せるように、控えめに広げていきます。</p>
           </div>
@@ -8490,15 +8493,15 @@
       <section class="section" id="snapshot-gift-detail" aria-labelledby="snapshot-gift-detail-heading" data-lp-feature="snapshot-gift-detail">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="snapshot-gift-detail-heading">同じギフトをダブって数えない仕組み（計画）</h2>
+            <h2 id="snapshot-gift-detail-heading">同じギフトをダブって数えない仕組み（v0.1.238/239 で NDGR 経路を実装）</h2>
             <p>
-              ギフトは「演出」「コメント行」「公式の集計」と複数の経路で観測できます。それぞれを別々に数えると<strong>同じ 1 件のギフトが二重・三重に重複</strong>することがあるため、<strong>送信者と時刻を手がかりに 1 件として数えなおす</strong>仕組みを計画しています。
+              ギフトは「演出」「コメント行」「公式の集計」と複数の経路で観測できます。それぞれを別々に数えると<strong>同じ 1 件のギフトが二重・三重に重複</strong>することがあるため、<strong>送信者と時刻を手がかりに 1 件として数えなおす</strong>仕組みです。
             </p>
           </div>
           <div class="board fade d2">
             <p><strong>判断材料</strong> — 誰が（送り手・送信者）・いつ（時刻）・何を（アイテム）を組にして照合します。</p>
-            <p><strong>今は</strong> — それぞれの経路で別々の集計が並ぶ場面があります（重複が同じ 1 件のダブりとして見える場合があります）。</p>
-            <p><strong>これから</strong> — 同じギフトとみなせる行をひとつにまとめ、重複を取り除いた件数で表示する予定です。</p>
+            <p><strong>v0.1.238/239 で実装した経路</strong> — NDGR（ニコ生公式コメント配信）の <strong>Message ID 単位の重複除去</strong>を入れました。<strong>4 軸独立調査（分散システム / Bilibili scale / cross-platform / 既存 OSS）が完全一致した 7 原則</strong>をベースに設計し、4096 件 FIFO cap で live 切替時に reset します。</p>
+            <p><strong>これから</strong> — DOM 演出経路・ギフト履歴経路を含む<strong>全経路統合 dedupe</strong>へ拡張予定です。</p>
           </div>
         </div>
       </section>
@@ -8519,10 +8522,27 @@
         </div>
       </section>
 
+      <section class="section" id="north-star-mirror-lanes" aria-labelledby="north-star-mirror-lanes-heading" data-lp-feature="north-star-mirror-lanes">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="north-star-mirror-lanes-heading">公式値レーン: 鏡のように貼り付け（v0.1.247 で 4 レーン揃いました）</h2>
+            <p>
+              ポップアップに <strong>公式値レーン（北極星）</strong> という枠を常設し、配信ページの<strong>公式 DOM をそのまま鏡のように貼り付け</strong>る仕組みです。拡張が再描画せず、ニコ生本体の見た目に合わせます（取得できないときも枠は閉じず、<strong>理由</strong>を残します）。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>今いまできていること</strong> — <strong>レーン 3 イベント累計スコア</strong>（v0.1.240）／<strong>レーン 4 番組累計ポイント</strong>（v0.1.242）／<strong>レーン 5 イベント現在順位</strong>（v0.1.240）／<strong>+α 広告ランキング</strong>（v0.1.237）の 4 レーンを popup に鏡映し。</p>
+            <p><strong>取れない時間帯も枠は閉じない</strong> — 6 種類の理由（イベント不参加・ギフト 0 件・サイドバー未描画・取得エラー・取得中・未取得）で<strong>原因が一目でわかる</strong> placeholder を出します（v0.1.244）。</p>
+            <p><strong>NDGR からの代替表示</strong> — 鏡が取れないときも、NDGR 経由で取れた現在順位・累計スコアをテキストで補います（v0.1.241）。</p>
+            <p><strong>レーン 1・2 は別経路を検討中</strong> — 貢献度ランキング・ギフト履歴は cross-origin iframe の Vue mount が不完全なため、広告レーン（+α）が常時取れる代替として機能しています。</p>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="snapshot-multi-tab-safety" aria-labelledby="snapshot-multi-tab-safety-heading" data-lp-feature="snapshot-multi-tab-safety">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="snapshot-multi-tab-safety-heading">複数タブで開いてもランキングが消えない（v0.1.195 で改善）</h2>
+            <h2 id="snapshot-multi-tab-safety-heading">複数タブで開いてもランキングが消えない（v0.1.195 / v0.1.247 で連続改善）</h2>
             <p>
               同じ配信を<strong>複数タブで同時に開く</strong>と、片方のタブで取れたランキングがもう片方のタブの観測で<strong>上書き消去される</strong>ことがありました。v0.1.195 で、保存前に他タブが書いた値を読みなおして<strong>3-way merge</strong>する仕組みに変更し、消えにくくしました。
             </p>
@@ -8530,6 +8550,7 @@
           <div class="board fade d2">
             <p><strong>これまで（v0.1.194 以前）</strong> — 別タブの値を見ずに上書きする実装で、まれにランキング枠が空・「読み込み中」のままなどの症状が出ました。</p>
             <p><strong>今いまできていること</strong> — 別タブが直前に書いた値も保持して、新しい観測値とまとめて保存します（ランキングが残る・並行運用が安定）。</p>
+            <p><strong>v0.1.247 で追加修正</strong> — SPA 遷移中の <strong>liveId → null 遷移</strong>を誤検出して 4 種類の map（nickname 等）を不要に <strong>109 件 → 56 件</strong>と clear してしまうバグを修正しました。両者 non-null かつ別 lv のときだけ切替と判定する厳格判定を導入。</p>
             <p><strong>これから</strong> — タブごとの観測カウンタを並べて見られる「複数タブ状況スナップショット」を計画中です。</p>
           </div>
         </div>
@@ -8538,15 +8559,33 @@
       <section class="section" id="snapshot-observability" aria-labelledby="snapshot-observability-heading" data-lp-feature="snapshot-observability">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="snapshot-observability-heading">「なぜ取れていないか」がわかる仕組み（計画）</h2>
+            <h2 id="snapshot-observability-heading">「なぜ取れていないか」がわかる仕組み（v0.1.244 で北極星レーンに 6 種類実装）</h2>
             <p>
-              観測が失敗したとき、<strong>原因を分類して残す</strong>と判断がしやすくなります。理由が「観測経路の停止」なのか「公式側の未提供」なのか「タブが閉じている」なのかを <strong>reason code</strong> として記録する仕組みを計画しています。
+              観測が失敗したとき、<strong>原因を分類して残す</strong>と判断がしやすくなります。理由が「観測経路の停止」なのか「公式側の未提供」なのか「タブが閉じている」なのかを <strong>reason code</strong> として記録する仕組みです。
             </p>
           </div>
           <div class="board fade d2">
-            <p><strong>例</strong> — <code>FRONTEND_HOOK_BROKEN</code>（拡張のフック失敗）・<code>OFFICIAL_NOT_PROVIDED</code>（公式値が未提供）・<code>TAB_NOT_OPEN</code>（観測タブが閉じている）など。</p>
-            <p><strong>今いまできていること</strong> — 部分的に source / capturedAt の記録は始まっています（v0.1.190 系で導入）。</p>
-            <p><strong>これから</strong> — 上記分類をユーザーが popup の診断画面で確認できるようにし、「なぜ取れない」が一目でわかるようにする予定です。</p>
+            <p><strong>例（観測層全体）</strong> — <code>FRONTEND_HOOK_BROKEN</code>（拡張のフック失敗）・<code>OFFICIAL_NOT_PROVIDED</code>（公式値が未提供）・<code>TAB_NOT_OPEN</code>（観測タブが閉じている）など。</p>
+            <p><strong>v0.1.244 で実装した北極星レーン側</strong> — popup の公式値レーンに <strong>6 種類の理由</strong>（イベント不参加・ギフト 0 件・サイドバー未描画・取得エラー・取得中・未取得）を細分化して表示する仕組みを入れました（<code>:empty::after</code> による reason 別 placeholder text）。診断 JSON の state も 7 値に細分化。</p>
+            <p><strong>今いまできていること（観測層全体）</strong> — source / capturedAt の記録は v0.1.190 系で導入済み、北極星レーンは v0.1.244 で reason 細分化済み。</p>
+            <p><strong>これから</strong> — 北極星以外の全観測点でも reason code を統一する形を計画中です。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="commenter-record-quality" aria-labelledby="commenter-record-quality-heading" data-lp-feature="commenter-record-quality">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="commenter-record-quality-heading">コメンター記録の質を上げる（v0.1.245-247 で 3 段改善）</h2>
+            <p>
+              応援コメントを「<strong>誰が</strong>・<strong>どんな表示名で</strong>」残すかは、後から振り返るときに大切な情報です。v0.1.245-247 で<strong>コメンター記録の質</strong>を段階的に改善しました。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>v0.1.245 ― コメント uid 解決率改善</strong> — niconico の <code>/v2/watch/member.json</code> 経路を新たに hook し、これまで取りこぼしていた uid を拾えるようにしました（<strong>15.9% → 50%+ を目標</strong>に取り組み中、実機検証段階）。</p>
+            <p><strong>v0.1.246 ― nickname 衝突統一</strong> — popup で同じ user_id に対して<strong>別 nickname が並ぶ</strong>場面（実機で観測された「とうふ」 vs 「ball_football」など）を、<strong>「ユーザー別応援件数」の aggregate 結果を正本</strong>に他 section が render 時に上書きする仕組みで統一しました。</p>
+            <p><strong>v0.1.247 ― nickname map 減少バグ修正</strong> — SPA 遷移中の <code>liveId → null</code> 誤検出により、4 種類の map が <strong>109 件 → 56 件</strong>に不要な clear をしてしまうバグを修正。「両者 non-null かつ別 lv」のときだけ切替と判定する厳格判定を導入しました。</p>
+            <p><strong>残る限界</strong> — niconico 本体側で uid を出していないコメント（古い API 経路・cookie 未送信状態など）は原理的に取れません。追加の hook 経路を継続して探しています。</p>
           </div>
         </div>
       </section>
@@ -10005,7 +10044,7 @@
 
     <footer class="footer-note">
       <div class="shell">
-        <div>追憶のきらめき v0.1.0 ― Kimito-Link Project</div>
+        <div>追憶のきらめき v0.1.247 ― Kimito-Link Project</div>
         <div class="footer-note__links"><a href="articles/">技術記事</a> ／ <a href="privacy.html">プライバシーポリシー</a></div>
       </div>
     </footer>
