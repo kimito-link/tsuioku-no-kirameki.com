@@ -23,6 +23,7 @@ import {
   buildNorthStarScoreFallbackHtml,
   buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
+import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -5359,28 +5360,42 @@ async function refreshGiftRankingFetchPrompt(liveId) {
  * v0.1.237: 北極星「鏡のように貼り付け」レーン body へ、niconico DOM の outerHTML を
  * sanitize して innerHTML として流し込む。
  *
- * - 入力 mirrorHtml が空 / null なら placeholder ("(未取得)") を維持し、
- *   data-lane-state="missing" に倒す（v0.1.236 で常設した枠の状態管理）。
+ * - 入力 mirrorHtml が空 / null なら placeholder（CSS `::after` で表示）を維持し、
+ *   data-lane-state を引数 `fallbackState` （v0.1.244 で追加） or 'missing' に倒す。
  * - 有効な HTML なら sanitize してから innerHTML に流し込み、state="ok" にする。
  * - sanitize は `mirrorSanitize.sanitizeMirrorHtml` に委譲（自前ホワイトリスト方式、
  *   SVG namespace 維持 + id rename + url(#) 同期更新 + [hidden]/onXX/style/href 削除）。
  *
+ * v0.1.244: state 細分化対応。mirror/fallback が無いときに reason を指定でき、
+ *   popup の CSS `::after` で「(イベント不参加)」「(ギフト 0 件)」等を出し分ける。
+ *
  * @param {string} laneId 例 'adRanking'（popup.html の id="northStarLaneBody-<laneId>" に対応）
  * @param {string|null|undefined} mirrorHtml
+ * @param {string} [fallbackState] mirrorHtml が無い時に使う state（v0.1.244 追加）。
+ *   省略時は 'missing'。'no_event' | 'no_program_gift' | 'iframe_unrendered' |
+ *   'fetch_error' | 'not_yet' | 'missing' のいずれか。
  */
-function renderNorthStarLane(laneId, mirrorHtml) {
+function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
   const body = document.getElementById('northStarLaneBody-' + String(laneId || ''));
   if (!(body instanceof HTMLElement)) return;
 
   const raw = typeof mirrorHtml === 'string' ? mirrorHtml.trim() : '';
   if (!raw) {
-    body.setAttribute('data-lane-state', 'missing');
+    body.innerHTML = '';
+    body.setAttribute(
+      'data-lane-state',
+      typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing'
+    );
     return;
   }
 
   const sanitized = sanitizeMirrorHtml(raw);
   if (!sanitized) {
-    body.setAttribute('data-lane-state', 'missing');
+    body.innerHTML = '';
+    body.setAttribute(
+      'data-lane-state',
+      typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing'
+    );
     return;
   }
 
@@ -5393,15 +5408,47 @@ function renderNorthStarLane(laneId, mirrorHtml) {
  * `_lastOfficialEventDomBundle.adRankingMirrorHtml` を sanitize して
  * popup の `#northStarLaneBody-adRanking` body に innerHTML として描画。
  *
- * - bundle が空 / mirrorHtml が空なら placeholder ("(未取得)") を維持
+ * - bundle が空 / mirrorHtml が空なら reason 判定（v0.1.244 で細分化）
  * - 鏡のように貼り付け原則に従う：niconico DOM をそのまま映す（数値抽出なし）
  */
 function refreshNorthStarAdRankingLane() {
   const bundle = _lastOfficialEventDomBundle;
+  const snap = watchMetaCache.snapshot;
   const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string'
     ? bundle.adRankingMirrorHtml
     : null;
-  renderNorthStarLane('adRanking', mirrorHtml);
+  if (mirrorHtml) {
+    renderNorthStarLane('adRanking', mirrorHtml);
+    return;
+  }
+  // v0.1.244: 鏡が無い → reason 判定で placeholder 細分化
+  const state = determineNorthStarLaneState('adRanking', { bundle, snap });
+  renderNorthStarLane('adRanking', null, state);
+}
+
+/**
+ * v0.1.244: 北極星 レーン 1 (貢献度ランキング) への流し込み。
+ * gift sidebar cross-origin iframe Vue mount 不全のため、現状は鏡が取れない。
+ * reason 判定で「(取得待ち: サイドバー描画なし)」等を popup に表示する。
+ */
+function refreshNorthStarContributionRankingLane() {
+  const bundle = _lastOfficialEventDomBundle;
+  const snap = watchMetaCache.snapshot;
+  const state = determineNorthStarLaneState('contributionRanking', { bundle, snap });
+  // 鏡 mirrorHtml はまだ実装していない（gift sidebar Vue mount 不全のため）
+  renderNorthStarLane('contributionRanking', null, state);
+}
+
+/**
+ * v0.1.244: 北極星 レーン 2 (この番組へのギフト履歴) への流し込み。
+ * 同上、reason 判定で placeholder 細分化。giftPoints=0 配信なら「(ギフト 0 件)」
+ * 表示で「取得失敗ではなく、そもそも発生していない」が伝わる。
+ */
+function refreshNorthStarGiftHistoryLane() {
+  const bundle = _lastOfficialEventDomBundle;
+  const snap = watchMetaCache.snapshot;
+  const state = determineNorthStarLaneState('giftHistory', { bundle, snap });
+  renderNorthStarLane('giftHistory', null, state);
 }
 
 /**
@@ -5417,6 +5464,7 @@ function refreshNorthStarAdRankingLane() {
  */
 function refreshNorthStarEventCumulativeScoreLane() {
   const bundle = _lastOfficialEventDomBundle;
+  const snap = watchMetaCache.snapshot;
   const mirrorHtml = typeof bundle?.eventCumulativeScoreMirrorHtml === 'string'
     ? bundle.eventCumulativeScoreMirrorHtml
     : null;
@@ -5424,12 +5472,17 @@ function refreshNorthStarEventCumulativeScoreLane() {
     renderNorthStarLane('eventScore', mirrorHtml);
     return;
   }
-  const snap = watchMetaCache.snapshot;
   const ndgrScore = typeof snap?.officialEventGiftScoreNdgr === 'number'
     ? snap.officialEventGiftScoreNdgr
     : null;
   const fallback = buildNorthStarScoreFallbackHtml(ndgrScore);
-  renderNorthStarLane('eventScore', fallback);
+  if (fallback) {
+    renderNorthStarLane('eventScore', fallback);
+    return;
+  }
+  // v0.1.244: 鏡も NDGR fallback も無い → reason 判定
+  const state = determineNorthStarLaneState('eventScore', { bundle, snap });
+  renderNorthStarLane('eventScore', null, state);
 }
 
 /**
@@ -5444,6 +5497,7 @@ function refreshNorthStarEventCumulativeScoreLane() {
  */
 function refreshNorthStarEventCurrentRankLane() {
   const bundle = _lastOfficialEventDomBundle;
+  const snap = watchMetaCache.snapshot;
   const mirrorHtml = typeof bundle?.eventCurrentRankMirrorHtml === 'string'
     ? bundle.eventCurrentRankMirrorHtml
     : null;
@@ -5451,12 +5505,17 @@ function refreshNorthStarEventCurrentRankLane() {
     renderNorthStarLane('eventRank', mirrorHtml);
     return;
   }
-  const snap = watchMetaCache.snapshot;
   const ndgrRank = typeof snap?.officialNicoEventRankNdgr === 'number'
     ? snap.officialNicoEventRankNdgr
     : null;
   const fallback = buildNorthStarRankFallbackHtml(ndgrRank);
-  renderNorthStarLane('eventRank', fallback);
+  if (fallback) {
+    renderNorthStarLane('eventRank', fallback);
+    return;
+  }
+  // v0.1.244: 鏡も NDGR fallback も無い → reason 判定
+  const state = determineNorthStarLaneState('eventRank', { bundle, snap });
+  renderNorthStarLane('eventRank', null, state);
 }
 
 /**
@@ -5472,16 +5531,22 @@ function refreshNorthStarEventCurrentRankLane() {
  */
 function refreshNorthStarProgramPointsLane() {
   const bundle = _lastOfficialEventDomBundle;
+  const snap = watchMetaCache.snapshot;
   const domValue = typeof bundle?.programStats?.giftPoints === 'number'
     ? bundle.programStats.giftPoints
     : null;
-  const snap = watchMetaCache.snapshot;
   const ndgrValue = typeof snap?.officialGiftPointsNdgr === 'number'
     ? snap.officialGiftPointsNdgr
     : null;
   const value = domValue != null ? domValue : ndgrValue;
   const fallback = buildNorthStarProgramPointsFallbackHtml(value);
-  renderNorthStarLane('programPoints', fallback);
+  if (fallback) {
+    renderNorthStarLane('programPoints', fallback);
+    return;
+  }
+  // v0.1.244: 値が無い → reason 判定 (no_program_gift / not_yet)
+  const state = determineNorthStarLaneState('programPoints', { bundle, snap });
+  renderNorthStarLane('programPoints', null, state);
 }
 
 /**
@@ -5702,6 +5767,10 @@ function renderUserRooms(entries, liveId = '') {
     refreshNorthStarEventCurrentRankLane();
     // v0.1.242: 北極星 レーン 4 番組累計ポイントを programStats.giftPoints から描画
     refreshNorthStarProgramPointsLane();
+    // v0.1.244: 北極星 レーン 1 貢献度ランキング / レーン 2 ギフト履歴の reason 表示
+    //   (鏡レンダリングはまだ実装していないが、reason placeholder で「何故 missing か」が伝わる)
+    refreshNorthStarContributionRankingLane();
+    refreshNorthStarGiftHistoryLane();
     // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
     await refreshGiftRankingFetchPrompt(liveId);
     const snap = watchMetaCache.snapshot;
