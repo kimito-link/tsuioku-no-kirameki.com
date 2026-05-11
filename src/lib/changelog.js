@@ -26,6 +26,20 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.248',
+    date: '2026-05-11',
+    summary: '北極星レーン 5 (イベント順位) NDGR 誤情報抑制',
+    items: Object.freeze([
+      'popup の公式値レーン 5「イベント現在順位」が、cross-origin iframe で event banner が取れないケースで NDGR field 6 (officialNicoEventRankNdgr) の値を「現在 N 位」として誤表示していたバグを修正しました',
+      '実機 lv350505652 で NDGR=1 だが、ニコ生右サイドバーの実値「現在 7 位」(ション ソロ部門 125,195pt) と乖離。memory feedback_ndgr_field6_silence.md の rule (field 6 は意味確定していないため単独で順位として表示しない) を v0.1.241 で見落としていました',
+      '修正方針: 表示優先度を「鏡 mirrorHtml > bundle.eventBanner.rank の整数 > 沈黙 (placeholder)」に厳格化。NDGR field 6 単独 fallback は完全撤去',
+      'src/extension/popup-entry.js の refreshNorthStarEventCurrentRankLane で NDGR rank fallback を bundle.eventBanner.rank ベースに置換。整数 + Number.isFinite + 0 超 のガードで誤値を防ぐ',
+      'src/lib/northStarLaneReason.js の eventRank case でも state 判定から NDGR を除外、鏡 or banner のみで ok 判定',
+      'vitest 2 件追加 (NDGR 単独 → no_event 確認 + banner.rank あり + NDGR null でも ok 確認)、既存 test 2 件を v0.1.248 仕様に更新',
+      '副次効果: 「(未取得)」placeholder が出る配信が増えますが、誤情報を出すより沈黙の原則 (memory) に従う方が信頼度高い。真値が必要なら all_frames=true で gift.nicovideo.jp iframe に content script 注入する別経路を将来検討'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.247',
     date: '2026-05-11',
     summary: 'nickname map 109→56 減少バグ修正',
