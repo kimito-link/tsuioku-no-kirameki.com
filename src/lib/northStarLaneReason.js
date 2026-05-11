@@ -74,10 +74,13 @@ export function determineNorthStarLaneState(laneId, ctx) {
       return 'no_event';
     }
     case 'eventRank': {
+      // v0.1.248: NDGR field 6 (officialNicoEventRankNdgr) は意味確定していない
+      // (memory feedback_ndgr_field6_silence.md)。実機 lv350505652 で NDGR=1 だが
+      // 真値 7 位の乖離が観測されたため state 判定からも除外。
+      // 鏡 mirrorHtml もしくは公式 DOM banner.rank が居る時だけ ok。
       const dom = numOrNull(bundle?.eventBanner?.rank);
       const mirror = strNonEmpty(bundle?.eventCurrentRankMirrorHtml);
-      const ndgr = numOrNull(snap?.officialNicoEventRankNdgr);
-      if (dom != null || mirror || ndgr != null) return 'ok';
+      if (dom != null || mirror) return 'ok';
       return 'no_event';
     }
     case 'programPoints': {

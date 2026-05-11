@@ -93,10 +93,12 @@ describe('determineNorthStarLaneState', () => {
       expect(determineNorthStarLaneState('eventRank', { bundle })).toBe('ok');
     });
 
-    it('NDGR rank で ok（実機 lv350503428 シナリオ）', () => {
+    it('v0.1.248: NDGR rank 単独では no_event（field 6 は意味確定していないため除外）', () => {
+      // 実機 lv350505652 で NDGR=1 だが真値 7 位の乖離が観測された。
+      // memory feedback_ndgr_field6_silence.md に従い NDGR field 6 単独 ok は撤去。
       const bundle = {};
       const snap = { officialNicoEventRankNdgr: 50 };
-      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('ok');
+      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('no_event');
     });
 
     it('mirror html で ok', () => {
@@ -108,6 +110,12 @@ describe('determineNorthStarLaneState', () => {
       const bundle = { eventBanner: null };
       const snap = { officialNicoEventRankNdgr: null };
       expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('no_event');
+    });
+
+    it('v0.1.248: banner.rank あり + NDGR null でも ok（真値は DOM banner）', () => {
+      const bundle = { eventBanner: { rank: 7 } };
+      const snap = { officialNicoEventRankNdgr: null };
+      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('ok');
     });
   });
 
@@ -198,8 +206,10 @@ describe('determineNorthStarLaneState', () => {
       expect(determineNorthStarLaneState('programPoints', { bundle, snap })).toBe('ok');
     });
 
-    it('レーン 5 (イベント順位) → ok (NDGR 50 位、v0.1.241 で fallback 表示)', () => {
-      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('ok');
+    it('v0.1.248: レーン 5 (イベント順位) → no_event (NDGR 単独は誤情報の可能性、撤去)', () => {
+      // v0.1.241 では NDGR fallback で ok にしていたが、v0.1.248 で memory rule に
+      // 従い NDGR field 6 単独 → no_event に変更。実機 lv350505652 で誤値が観測された。
+      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('no_event');
     });
 
     it('+α (広告ランキング) → ok (5 件取れている)', () => {
