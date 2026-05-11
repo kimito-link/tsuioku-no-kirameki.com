@@ -26,6 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.243',
+    date: '2026-05-11',
+    summary: '貢献度ランキング iframe warmup 320x240 試行',
+    items: Object.freeze([
+      'レーン 1 貢献度ランキング / レーン 2 ギフト履歴を取得するために裏で開いている `audition.nicovideo.jp` / `koken.nicovideo.jp` の hidden iframe の初期サイズを 320x240 に変更しました。透明 (opacity 0) のままなので画面表示は何も変わりません。15 秒後に従来通り 1px に縮退します',
+      '背景: v0.1.218 以来この hidden iframe を 1px サイズで配置していましたが、実機 v0.1.237 で「heartbeat は届くがランキング 0 件」の状態が続いていました。niconico の Vue がコンテナサイズ依存で lazy render する可能性が高く、最初の数秒だけ実サイズで配置することで Vue mount を促す試行です',
+      '対比として nicoad は同じ 1px でも mount に成功（広告ランキングは取れている）。何故 audition/koken だけダメか の切り分けに使う観測値 `iframeWarmupSummary` を AI 共有診断 JSON の `giftSubAppRelayDiag` 配下に新設しました。次回診断バンドルで `auditionMount.mountSuccess: true` になれば本案が効いたと判定できます',
+      '副作用: 画面左上 320x240 領域に透明 iframe が 15 秒間存在しますが、`opacity: 0` / `pointer-events: none` / 最小 z-index で視覚・操作影響ゼロ',
+      'opt-in は v0.1.228 の「ギフトランキング取得を開始」ボタン押下後の挙動のみ。OFF default の挙動は変わりません',
+      'これでもダメなら次版 v0.1.244 でレーン 1+2 を experimental 降格 + 「公式ページ依存 (取得困難)」表記改善に切り替えます (stop condition)。会議室 (codex + gemini) 経由で計画磨き済'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.242',
     date: '2026-05-11',
     summary: '北極星 レーン 4 番組累計ポイント表示',
