@@ -196,4 +196,89 @@ describe('buildOfficialDomFromRelayEvent', () => {
     });
     expect(r.shouldWrite).toBe(false);
   });
+
+  // ==== v0.1.252: 鏡 outerHTML フィールド ====
+  it('v0.1.252: koken + contributionRankingMirrorHtml + giftHistoryMirrorHtml 両方採用', () => {
+    const r = buildOfficialDomFromRelayEvent({
+      frameUrl: KOKEN_URL,
+      contributionRanking: SAMPLE_RANKING,
+      contributionRankingMirrorHtml: '<ul class="contribution-ranking-list">...</ul>',
+      giftHistoryMirrorHtml: '<ul class="gift-history-list">...</ul>'
+    });
+    expect(r.shouldWrite).toBe(true);
+    expect(r.payload?.contributionRankingMirrorHtml).toBe(
+      '<ul class="contribution-ranking-list">...</ul>'
+    );
+    expect(r.payload?.giftHistoryMirrorHtml).toBe('<ul class="gift-history-list">...</ul>');
+  });
+
+  it('v0.1.252: audition + contributionRankingMirrorHtml 採用、giftHistoryMirrorHtml は drop', () => {
+    // audition iframe には履歴タブ無いので giftHistory 鏡は信頼しない
+    const r = buildOfficialDomFromRelayEvent({
+      frameUrl: AUDITION_URL,
+      contributionRanking: SAMPLE_RANKING,
+      contributionRankingMirrorHtml: '<ul class="contribution-ranking-list">...</ul>',
+      giftHistoryMirrorHtml: '<ul class="gift-history-list">...</ul>'
+    });
+    expect(r.shouldWrite).toBe(true);
+    expect(r.payload?.contributionRankingMirrorHtml).toBe(
+      '<ul class="contribution-ranking-list">...</ul>'
+    );
+    expect(r.payload?.giftHistoryMirrorHtml).toBeNull();
+  });
+
+  it('v0.1.252: 鏡のみ（構造化 contributionRanking 空 / eventBanner 無）でも accepted', () => {
+    const r = buildOfficialDomFromRelayEvent({
+      frameUrl: KOKEN_URL,
+      contributionRankingMirrorHtml: '<ul class="contribution-ranking-list">...</ul>'
+    });
+    expect(r.shouldWrite).toBe(true);
+    expect(r.reason).toBe('accepted');
+    expect(r.payload?.contributionRanking).toEqual([]);
+    expect(r.payload?.contributionRankingMirrorHtml).toContain('contribution-ranking-list');
+  });
+
+  it('v0.1.252: nicoad で鏡 outerHTML があっても drop（広告ランキング混入と同じ理由）', () => {
+    const r = buildOfficialDomFromRelayEvent({
+      frameUrl: NICOAD_URL,
+      contributionRankingMirrorHtml: '<ul>nicoad の偽 contribution-ranking</ul>',
+      giftHistoryMirrorHtml: '<ul>nicoad の偽 gift-history</ul>'
+    });
+    expect(r.shouldWrite).toBe(false);
+    expect(r.reason).toBe('all-dropped');
+  });
+
+  it('v0.1.252: 鏡 outerHTML 空文字列は null として扱う', () => {
+    const r = buildOfficialDomFromRelayEvent({
+      frameUrl: KOKEN_URL,
+      contributionRanking: SAMPLE_RANKING,
+      contributionRankingMirrorHtml: '',
+      giftHistoryMirrorHtml: ''
+    });
+    expect(r.shouldWrite).toBe(true);
+    expect(r.payload?.contributionRankingMirrorHtml).toBeNull();
+    expect(r.payload?.giftHistoryMirrorHtml).toBeNull();
+  });
+
+  it('v0.1.252: 鏡 outerHTML が文字列でない場合は null として扱う', () => {
+    const r = buildOfficialDomFromRelayEvent({
+      frameUrl: KOKEN_URL,
+      contributionRanking: SAMPLE_RANKING,
+      contributionRankingMirrorHtml: /** @type {any} */ ({ html: '<ul></ul>' }),
+      giftHistoryMirrorHtml: /** @type {any} */ (42)
+    });
+    expect(r.shouldWrite).toBe(true);
+    expect(r.payload?.contributionRankingMirrorHtml).toBeNull();
+    expect(r.payload?.giftHistoryMirrorHtml).toBeNull();
+  });
+
+  it('v0.1.252: koken の giftHistoryMirrorHtml 単独でも accepted', () => {
+    const r = buildOfficialDomFromRelayEvent({
+      frameUrl: KOKEN_URL,
+      giftHistoryMirrorHtml: '<ul class="gift-history-list"><li class="item">a</li></ul>'
+    });
+    expect(r.shouldWrite).toBe(true);
+    expect(r.reason).toBe('accepted');
+    expect(r.payload?.giftHistoryMirrorHtml).toContain('gift-history-list');
+  });
 });

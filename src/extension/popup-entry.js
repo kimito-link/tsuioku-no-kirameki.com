@@ -4623,10 +4623,77 @@ async function refreshOfficialEventDomBundle(liveId) {
   }
   try {
     const key = eventDomStorageKey(lid);
-    const bag = await chrome.storage.local.get(key);
+    // v0.1.252: iframe relay 経路で書かれた鏡 outerHTML を bundle にマージするため、
+    //   2 つの storage key を同時取得する。bundle (`nls_event_dom_<lv>`) は top-frame
+    //   scrape (collectOfficialEventDomBundle) の結果、iframe (`nls_iframe_official_dom_<lid>`)
+    //   は cross-origin iframe (koken / audition) の content script が postMessage 経由で
+    //   送ってきた結果（buildOfficialDomFromRelayEvent で routing 検証済）。
+    //   bundle 側の鏡 field が空のときだけ iframe 側でマージするので、Phase 1/2 のボタンで
+    //   取った鏡を上書きしない。
+    const iframeKey = `nls_iframe_official_dom_${lid}`;
+    const bag = await chrome.storage.local.get([key, iframeKey]);
     const v = bag?.[key];
-    _lastOfficialEventDomBundle =
+    const baseBundle =
       v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+    const iframeRaw = bag?.[iframeKey];
+    const iframeBundle =
+      iframeRaw && typeof iframeRaw === 'object' && !Array.isArray(iframeRaw)
+        ? /** @type {Record<string, unknown>} */ (iframeRaw)
+        : null;
+    if (baseBundle && iframeBundle) {
+      const baseAny = /** @type {Record<string, unknown>} */ (baseBundle);
+      const merged = { ...baseAny };
+      const iframeContribMirror =
+        typeof iframeBundle.contributionRankingMirrorHtml === 'string' &&
+        iframeBundle.contributionRankingMirrorHtml.length > 0
+          ? iframeBundle.contributionRankingMirrorHtml
+          : null;
+      const iframeGiftHistoryMirror =
+        typeof iframeBundle.giftHistoryMirrorHtml === 'string' &&
+        iframeBundle.giftHistoryMirrorHtml.length > 0
+          ? iframeBundle.giftHistoryMirrorHtml
+          : null;
+      if (
+        iframeContribMirror &&
+        !(typeof baseAny.contributionRankingMirrorHtml === 'string' &&
+          baseAny.contributionRankingMirrorHtml)
+      ) {
+        merged.contributionRankingMirrorHtml = iframeContribMirror;
+      }
+      if (
+        iframeGiftHistoryMirror &&
+        !(typeof baseAny.giftHistoryMirrorHtml === 'string' &&
+          baseAny.giftHistoryMirrorHtml)
+      ) {
+        merged.giftHistoryMirrorHtml = iframeGiftHistoryMirror;
+      }
+      _lastOfficialEventDomBundle = merged;
+    } else if (baseBundle) {
+      _lastOfficialEventDomBundle = baseBundle;
+    } else if (iframeBundle) {
+      // bundle が無いが iframe relay 経由の鏡 html はあるケース
+      // （Phase 1/2 ボタン未押下 + ユーザーが自然にサイドバーを開いた）
+      const iframeContribMirror =
+        typeof iframeBundle.contributionRankingMirrorHtml === 'string' &&
+        iframeBundle.contributionRankingMirrorHtml.length > 0
+          ? iframeBundle.contributionRankingMirrorHtml
+          : null;
+      const iframeGiftHistoryMirror =
+        typeof iframeBundle.giftHistoryMirrorHtml === 'string' &&
+        iframeBundle.giftHistoryMirrorHtml.length > 0
+          ? iframeBundle.giftHistoryMirrorHtml
+          : null;
+      if (iframeContribMirror || iframeGiftHistoryMirror) {
+        _lastOfficialEventDomBundle = {
+          contributionRankingMirrorHtml: iframeContribMirror,
+          giftHistoryMirrorHtml: iframeGiftHistoryMirror
+        };
+      } else {
+        _lastOfficialEventDomBundle = null;
+      }
+    } else {
+      _lastOfficialEventDomBundle = null;
+    }
   } catch {
     _lastOfficialEventDomBundle = null;
   }

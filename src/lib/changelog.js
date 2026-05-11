@@ -26,6 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.252',
+    date: '2026-05-11',
+    summary: 'iframe relay 経路に鏡 outerHTML 自動取得',
+    items: Object.freeze([
+      'v0.1.250 Phase 1 (貢献度ランキング) / v0.1.251 Phase 2 (ギフト履歴) で導入したボタン取得式に加えて、ユーザーが自然にギフトサイドバーを開いた瞬間にも自動で鏡 outerHTML が popup に流れ込むようになりました。Phase 1/2 のボタンは「自動取得に失敗した時の force リトライ」位置づけに格下げされ、ユーザーの手間が更に減ります',
+      '実装: 既存 iframe relay 経路 (koken / audition iframe の content script が postMessage で親 frame に送る経路) の payload に contributionRankingMirrorHtml + giftHistoryMirrorHtml フィールドを追加。content-entry.js の maybeStartGiftSubAppIframeRelay で scrape して相乗りで送信、buildOfficialDomFromRelayEvent (iframeOfficialDomFromRelay.js) で frame source 別の routing 検証 (audition は contributionRanking 鏡のみ採用 / koken は両方 / nicoad+gift は drop)',
+      'popup 側 refreshOfficialEventDomBundle で nls_event_dom_(liveId) bundle と nls_iframe_official_dom_(liveId) iframe relay storage を同時取得して、bundle 側の鏡 field が空のときだけ iframe 側でマージ。Phase 1/2 ボタン経由で取った鏡を上書きしない設計',
+      'iframeOfficialDomFromRelay.test.js に vitest 7 件追加 (合計 25 件): koken の両 mirror 採用 / audition の giftHistory mirror drop / 鏡のみで accepted / nicoad は鏡も drop / 空文字列・非文字列の null 化 / koken giftHistory mirror 単独 accepted',
+      '挙動変更ゼロの拡張: 既存 PR #72 (Phase 1) / PR #73 (Phase 2) の動作はそのまま、自動取得経路が追加されたぶん早く鏡 outerHTML が出るケースが増えます。本 PR は Phase 2 PR #73 base に stack',
+      '次の段階: Phase 3 (サポーター取得 + イベントランキング取得 = audition iframe の別 DOM scrape) は別 PR で順次。Phase 3 は DOM サンプル取得後に着手予定'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.251',
     date: '2026-05-11',
     summary: '北極星レーン 2 ギフト履歴 取得ボタン (Phase 2)',

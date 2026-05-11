@@ -9516,6 +9516,14 @@ function maybeStartGiftSubAppIframeRelay() {
     let contributionRanking = null;
     /** @type {unknown} */
     let eventBanner = null;
+    // v0.1.252: 鏡 outerHTML を iframe 側で scrape して親に送る。これにより、
+    //   ユーザーがギフトサイドバーを自然に開いた瞬間にも、Phase 1/2 のボタン click
+    //   を経由せずに `ul.contribution-ranking-list` / `ul.gift-history-list` の
+    //   outerHTML が `nls_iframe_official_dom_<lid>` → popup へ届くようになる。
+    /** @type {string|null} */
+    let contributionRankingMirrorHtml = null;
+    /** @type {string|null} */
+    let giftHistoryMirrorHtml = null;
     try {
       const r = scrapeGiftHistoryList(document);
       items = r && Array.isArray(r.items) ? r.items : [];
@@ -9534,6 +9542,14 @@ function maybeStartGiftSubAppIframeRelay() {
       try {
         eventBanner = scrapeOfficialEventBannerFromDom(document) || null;
       } catch { eventBanner = null; }
+      // v0.1.252: 鏡 outerHTML scrape（純関数なので例外ほぼ無いが防御）
+      try {
+        contributionRankingMirrorHtml =
+          scrapeContributionRankingMirrorHtml(document) || null;
+      } catch { contributionRankingMirrorHtml = null; }
+      try {
+        giftHistoryMirrorHtml = scrapeGiftHistoryMirrorHtml(document) || null;
+      } catch { giftHistoryMirrorHtml = null; }
     } catch {
       /* no-op: scrape 失敗時も heartbeat は送る */
     }
@@ -9561,10 +9577,13 @@ function maybeStartGiftSubAppIframeRelay() {
 
     try {
       // 何も取れていなければ実 payload 送信は不要（heartbeat だけで切り分け可能）
+      // v0.1.252: 鏡 outerHTML が居れば（構造化が空でも）送信する価値あり
       if (
         items.length === 0 &&
         (!contributionRanking || contributionRanking.length === 0) &&
-        !eventBanner
+        !eventBanner &&
+        !contributionRankingMirrorHtml &&
+        !giftHistoryMirrorHtml
       ) {
         return;
       }
@@ -9572,7 +9591,9 @@ function maybeStartGiftSubAppIframeRelay() {
         items,
         totalCounts,
         contributionRanking,
-        eventBanner
+        eventBanner,
+        contributionRankingMirrorHtml,
+        giftHistoryMirrorHtml
       });
       if (payload === lastSent) return;
       lastSent = payload;
@@ -9589,6 +9610,10 @@ function maybeStartGiftSubAppIframeRelay() {
             totalCounts,
             contributionRanking,
             eventBanner,
+            // v0.1.252: 鏡 outerHTML を相乗りで送信。受信側 (buildOfficialDomFromRelayEvent)
+            // で routing 検証され、信頼源 (audition / koken) のみ採用される。
+            contributionRankingMirrorHtml,
+            giftHistoryMirrorHtml,
             scannedAt: Date.now(),
             frameUrl: href
           },
