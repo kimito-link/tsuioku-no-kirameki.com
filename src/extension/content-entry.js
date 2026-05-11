@@ -755,6 +755,15 @@ const VIEWER_JOIN_FLUSH_SUPPRESS_MS = 2500;
 const interceptedNicknames = new Map();
 
 /**
+ * v0.1.247: `ctx.liveIdChanged && !ctx.liveIdSwitched` 発火回数。
+ *   観測専用カウンタ。memory `todo_ndgr_username_resolution.md` の
+ *   「interceptNicknameSize 109 → 56 減少バグ」の根本原因切り分け用。
+ *   修正後はこの値が 0 のまま増えないはず（false positive clear が消えた証拠）。
+ * @type {number}
+ */
+let _liveIdChangedNonSwitchCount = 0;
+
+/**
  * 0.1.173: ランキング表示の lifetime 観測。診断シートで「いつ何が取れたか」を
  * 1 か所で読めるようにする。globalThis に保持（ホットリロード対応 / SPA でも累積）。
  *
@@ -4076,7 +4085,12 @@ function buildGiftDiagnosticsBundle() {
     })(),
     nicknameDiag: {
       interceptNicknameSize: interceptedNicknames.size,
-      interceptAvatarSize: interceptedAvatars.size
+      interceptAvatarSize: interceptedAvatars.size,
+      // v0.1.247: `ctx.liveIdChanged && !ctx.liveIdSwitched` の発火回数。
+      //   一時的 URL parse 失敗 / 視聴離脱 / 初回起動 等で「liveIdChanged だけ true」
+      //   だった回数を観測。これが過剰だと SPA navigation 起因で false positive
+      //   clear が走っていた可能性 (v0.1.247 修正前のバグ)。新版では 0 件のはず。
+      liveIdChangedNonSwitchCount: _liveIdChangedNonSwitchCount
     },
     // 0.1.179: 「サムネあり・ID 空（匿名扱い）」事象の真因切り分け。
     // intercepted comment entry を 4 象限で集計し、avatar あり+uid 空 のサンプルを 5 件 dump。
@@ -7788,7 +7802,18 @@ function syncLiveIdFromLocation() {
   if (isNicoLiveWatchUrl(href)) {
     rememberWatchPageUrl();
     const ctx = resolveWatchPageContext(href, liveId);
-    if (ctx.liveIdChanged) {
+    // v0.1.247: liveIdChanged ではなく liveIdSwitched で判定するように変更。
+    //   `liveIdChanged` は「prev と liveId が違う」だけの粗い判定で、SPA navigation
+    //   中の一時的 URL parse 失敗 (lv → null) でも true になっていた。これで
+    //   interceptedNicknames 等 4 map が無駄に clear され、map size 109→56 減少
+    //   バグの原因になっていた (memory todo_ndgr_username_resolution.md)。
+    //   `liveIdSwitched` は「両者 non-null かつ別 lv」の明示的切替のみ true。
+    // 観測強化: liveIdChanged だが liveIdSwitched ではない (= false positive 候補)
+    //   発火回数を別 counter で記録。次回診断バンドルで観測可能。
+    if (ctx.liveIdChanged && !ctx.liveIdSwitched) {
+      _liveIdChangedNonSwitchCount += 1;
+    }
+    if (ctx.liveIdSwitched) {
       void clearCommentHarvestPanelDiagnostic();
       pendingRoots.clear();
       clearNdgrChatRowsPending();
