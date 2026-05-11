@@ -26,6 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.246',
+    date: '2026-05-11',
+    summary: 'popup 同 user_id 別 nickname 衝突を統一解決',
+    items: Object.freeze([
+      'popup 内で同じ user_id が section ごとに別 nickname で表示される衝突を解消しました。実機 lv350462027 (v0.1.168) で観測: user_id 71684574 が「ユーザー別応援件数」セクションでは `とうふ`、「NDGR で観測したギフト」セクションでは `ball_football` と別表記になっていた問題',
+      '原因: 各 section が別 storage (`nls_comments_(liveId)` / `nls_gift_users_(liveId)`) を引き、それぞれが異なる経路で異なるタイミングに populate されているため、古い nickname や fallback nickname が残ったまま表示されていました',
+      '解決: popup-entry.js に `_nicknameResolveMap` (userKey から nickname を引く Map) global を追加。`renderUserRooms` で `aggregateCommentsByUser` 結果から populate し、「公式サイドバー履歴」「NDGR ギフト帯」など他 section は render 時に本 map を引いて nickname を上書きします。コメント保存時の nickname が最も信頼度高い source なので、それを正本として全 section に展開する設計',
+      '挙動変更は popup の nickname 表示のみ、storage / 内部データ構造は変更なし。下流の export / レポート / マーケ分析等は影響受けません',
+      'memory `feedback_existing_features_first.md` の「新機能より既存機能の 100% 完成を優先」方針に沿った修復（kimito さん 2026-05-11 明示）',
+      '残課題: `interceptedNicknames` map size が 109 → 56 に減るバグ (memory `todo_ndgr_username_resolution.md`) は別 PR で対応予定 (INTERCEPT_MAP_MAX 50000 で cap には届かないので別原因)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.245',
     date: '2026-05-11',
     summary: 'コメント uid 解決率改善 (member.json hook)',
