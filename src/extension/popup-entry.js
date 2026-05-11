@@ -24,6 +24,7 @@ import {
   buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+import { buildUserContributionRankingHtml } from '../lib/userContributionRankingFallback.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -5450,11 +5451,42 @@ function refreshNorthStarAdRankingLane() {
  * gift sidebar cross-origin iframe Vue mount 不全のため、現状は鏡が取れない。
  * reason 判定で「(取得待ち: サイドバー描画なし)」等を popup に表示する。
  */
-function refreshNorthStarContributionRankingLane() {
+async function refreshNorthStarContributionRankingLane() {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
+
+  // v0.1.249: 「本当の北極星 = ユーザー別貢献度ランキング」
+  // (memory feedback_north_star_priority_no_drift.md kimito さん 2026-05-11 強化)
+  // 公式の audition iframe Vue mount 不全で contributionRanking が取れないケースで、
+  // NDGR ベースのユーザー別集計 (prepareGiftRankStrip 経由、件数順) を popup の
+  // 北極星レーン 1 に fallback として注入する。プログラムの存在意義そのもの。
+  const liveId = String(snap?.liveId || '').trim();
+  if (liveId) {
+    try {
+      const key = giftUsersStorageKey(liveId);
+      const bag = await chrome.storage.local.get(key);
+      const raw = Array.isArray(bag[key]) ? bag[key] : [];
+      const broadcasterUid = String(snap?.broadcasterUserId || '').trim();
+      const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
+      if (stripRooms.length > 0) {
+        const enrichedRooms = stripRooms.map((r) => ({
+          userKey: r.userKey,
+          // v0.1.246: 統一 nickname map から resolve（衝突対策）
+          nickname: (r.userKey && _nicknameResolveMap.get(r.userKey)) || r.nickname,
+          count: r.count,
+          avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
+        }));
+        const html = buildUserContributionRankingHtml(enrichedRooms, { topN: 5 });
+        if (html) {
+          renderNorthStarLane('contributionRanking', html);
+          return;
+        }
+      }
+    } catch { /* fall through to reason placeholder */ }
+  }
+
+  // NDGR データも無い起動直後等 → reason 判定で placeholder
   const state = determineNorthStarLaneState('contributionRanking', { bundle, snap });
-  // 鏡 mirrorHtml はまだ実装していない（gift sidebar Vue mount 不全のため）
   renderNorthStarLane('contributionRanking', null, state);
 }
 
@@ -5806,9 +5838,9 @@ function renderUserRooms(entries, liveId = '') {
     refreshNorthStarEventCurrentRankLane();
     // v0.1.242: 北極星 レーン 4 番組累計ポイントを programStats.giftPoints から描画
     refreshNorthStarProgramPointsLane();
-    // v0.1.244: 北極星 レーン 1 貢献度ランキング / レーン 2 ギフト履歴の reason 表示
-    //   (鏡レンダリングはまだ実装していないが、reason placeholder で「何故 missing か」が伝わる)
-    refreshNorthStarContributionRankingLane();
+    // v0.1.249: 北極星 レーン 1 に NDGR ベース fallback (本当の北極星 = ユーザー別貢献度ランキング)
+    //   レーン 2 は reason placeholder のみ (ギフト履歴は別経路で扱う、v0.1.250+ 候補)
+    await refreshNorthStarContributionRankingLane();
     refreshNorthStarGiftHistoryLane();
     // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
     await refreshGiftRankingFetchPrompt(liveId);

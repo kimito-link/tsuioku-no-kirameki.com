@@ -26,6 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.249',
+    date: '2026-05-11',
+    summary: '北極星レーン 1 ユーザー別貢献度ランキング fallback',
+    items: Object.freeze([
+      'kimito さん明示「これが本当の北極星です じゃないと このプログラムの意味がないとおもいます」(2026-05-11) を受けて、北極星レーン 1 (貢献度ランキング) に NDGR ベースの拡張独自集計 fallback を実装しました。プログラムの存在意義 = 配信に来てくれた人 (コメンター / ギフト送信者) を見える化する',
+      '公式の audition iframe Vue mount 不全で contributionRanking が取れない時、popup の北極星レーン 1 に「(取得待ち: サイドバー描画なし)」placeholder を出して諦めていた挙動を改め、NDGR で観測したギフト送信者を件数順で常設するように変更',
+      '新規 `src/lib/userContributionRankingFallback.js` で純関数の HTML 生成 (アバター + 名前 + 件数、上位 5 件、ニックネーム不明時は「ニコ生ユーザー (uid)」表記)。XSS エスケープ完備、vitest 10 件で nickname/avatar/XSS/件数クランプ/topN/unitSuffix を網羅検証',
+      'popup-entry.js の `refreshNorthStarContributionRankingLane` を async 化し、`prepareGiftRankStrip` (既存) で集計した stripRooms を `buildUserContributionRankingHtml` で HTML 化、北極星レーン 1 body に innerHTML 注入',
+      'memory `feedback_north_star_priority_no_drift.md` を強化: 「本当の北極星 = ユーザー別貢献度ランキング」(プログラムの存在意義)、公式値の鏡は補助、と明示',
+      '将来 (v0.1.250+) 候補: ギフトポイント合計順 (totalPoints 順) に切り替えて「公式の貢献度ランキング」概念により近づける、UI 統一 (topSupportRankLineModels 活用)、レーン 2 (ギフト履歴) にも同様の fallback'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.248',
     date: '2026-05-11',
     summary: '北極星レーン 5 (イベント順位) NDGR 誤情報抑制',
