@@ -2712,11 +2712,34 @@
         color: var(--nl-text);
         word-break: break-word;
       }
+      /* v0.1.244: reason 別 placeholder text を CSS ::after で出す。
+         body の innerHTML が空のとき表示、innerHTML がある (state=ok) ときは出さない。 */
       .nl-north-star-lane__body[data-lane-state="missing"],
       .nl-north-star-lane__body[data-lane-state="no_event"],
-      .nl-north-star-lane__body[data-lane-state="no_program_gift"] {
+      .nl-north-star-lane__body[data-lane-state="no_program_gift"],
+      .nl-north-star-lane__body[data-lane-state="iframe_unrendered"],
+      .nl-north-star-lane__body[data-lane-state="fetch_error"],
+      .nl-north-star-lane__body[data-lane-state="not_yet"] {
         color: color-mix(in srgb, var(--nl-text) 40%, transparent);
         font-style: italic;
+      }
+      .nl-north-star-lane__body[data-lane-state="missing"]:empty::after {
+        content: "(未取得)";
+      }
+      .nl-north-star-lane__body[data-lane-state="no_event"]:empty::after {
+        content: "(イベント不参加)";
+      }
+      .nl-north-star-lane__body[data-lane-state="no_program_gift"]:empty::after {
+        content: "(ギフト 0 件)";
+      }
+      .nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
+        content: "(取得待ち：サイドバー描画なし)";
+      }
+      .nl-north-star-lane__body[data-lane-state="fetch_error"]:empty::after {
+        content: "(取得エラー)";
+      }
+      .nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after {
+        content: "(取得中…)";
       }
 
       .nl-top-support-rank--below-cards {
@@ -7114,48 +7137,48 @@
             <div
               id="northStarLaneBody-contributionRanking"
               class="nl-north-star-lane__body"
-              data-lane-state="missing"
-            >(未取得)</div>
+              data-lane-state="not_yet"
+            ></div>
           </div>
           <div class="nl-north-star-lane" data-lane="giftHistory">
             <div class="nl-north-star-lane__label">この番組へのギフト履歴</div>
             <div
               id="northStarLaneBody-giftHistory"
               class="nl-north-star-lane__body"
-              data-lane-state="missing"
-            >(未取得)</div>
+              data-lane-state="not_yet"
+            ></div>
           </div>
           <div class="nl-north-star-lane" data-lane="eventScore">
             <div class="nl-north-star-lane__label">イベント累計スコア</div>
             <div
               id="northStarLaneBody-eventScore"
               class="nl-north-star-lane__body"
-              data-lane-state="missing"
-            >(未取得)</div>
+              data-lane-state="not_yet"
+            ></div>
           </div>
           <div class="nl-north-star-lane" data-lane="programPoints">
             <div class="nl-north-star-lane__label">番組累計ポイント</div>
             <div
               id="northStarLaneBody-programPoints"
               class="nl-north-star-lane__body"
-              data-lane-state="missing"
-            >(未取得)</div>
+              data-lane-state="not_yet"
+            ></div>
           </div>
           <div class="nl-north-star-lane" data-lane="eventRank">
             <div class="nl-north-star-lane__label">イベント現在順位</div>
             <div
               id="northStarLaneBody-eventRank"
               class="nl-north-star-lane__body"
-              data-lane-state="missing"
-            >(未取得)</div>
+              data-lane-state="not_yet"
+            ></div>
           </div>
           <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="adRanking">
             <div class="nl-north-star-lane__label">広告ランキング（参考）</div>
             <div
               id="northStarLaneBody-adRanking"
               class="nl-north-star-lane__body"
-              data-lane-state="missing"
-            >(未取得)</div>
+              data-lane-state="not_yet"
+            ></div>
           </div>
           <p class="nl-north-star-lanes__note">
             鏡のように貼り付け方式（v0.1.236+）: niconico の DOM をそのまま映す予定。値が取れていない項目は枠だけ残ります。

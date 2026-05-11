@@ -26,6 +26,20 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.244',
+    date: '2026-05-11',
+    summary: '北極星レーンの未取得理由を 6 種類に細分化',
+    items: Object.freeze([
+      'popup の「公式値レーン」で「(未取得)」だった placeholder を **6 種類の reason 別表示**に細分化しました。「(イベント不参加)」「(ギフト 0 件)」「(取得待ち：サイドバー描画なし)」「(取得エラー)」「(取得中…)」「(未取得)」 の 6 通り。popup を見ただけで「何故値が出ていないのか」が分かるようになります',
+      '判定ロジックは `src/lib/northStarLaneReason.js` 新設の `determineNorthStarLaneState(laneId, ctx)` 純関数に集約。bundle (DOM 由来) と snap (NDGR 由来) を元に各レーンの state を返します。vitest 32 件で正常系・異常系・実機 lv350503428 シナリオを網羅検証',
+      'popup 側では `renderNorthStarLane(laneId, mirrorHtml, fallbackState)` のシグネチャを拡張し、鏡レンダリングが空のときに reason を `data-lane-state` 属性で popup body に乗せます。popup.html の CSS で `:empty::after` セレクタごとに各 reason の placeholder text を出すので、JS から HTML を組み立てる必要なし',
+      '北極星診断 JSON の `state` フィールドも同じ 7 値に細分化（以前は ok/missing のみ）。AI 共有診断バンドルでも reason が分かるようになり、デバッグや切り分けが楽になります',
+      'レーン 1 貢献度ランキング / レーン 2 ギフト履歴に対応する `refreshNorthStarContributionRankingLane()` / `refreshNorthStarGiftHistoryLane()` を popup-entry.js に新規追加。鏡レンダリングはまだ実装していませんが、reason placeholder で「(取得待ち：サイドバー描画なし)」や「(ギフト 0 件)」が出るようになります',
+      'popup の HTML 初期 state を missing から not_yet に変更。起動直後は「(取得中…)」表示で、bundle/snap が届いた瞬間に各レーンが正しい state に切り替わります',
+      '挙動変更は placeholder 文言の細分化のみ。鏡レンダリングが取れているレーン（v0.1.237 広告 / v0.1.240 イベント累計+順位 / v0.1.242 番組累計）の表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.243',
     date: '2026-05-11',
     summary: '貢献度ランキング iframe warmup 320x240 試行',
