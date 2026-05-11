@@ -26,6 +26,9 @@ import {
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
 // v0.1.253: refreshOfficialEventDomBundle の merge ロジックを純関数化（unit test 可能化）
 import { mergeIframeRelayMirrorIntoBundle } from '../lib/mergeIframeRelayMirrorIntoBundle.js';
+// v0.1.252+: 広告ランキング mirror html が空のときの structured fallback HTML 生成
+//   (lv350507546 kimito さん診断で確認された popup 空白回帰の修正)
+import { buildAdRankingFallbackHtml } from '../lib/buildAdRankingFallbackHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -5438,6 +5441,11 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
  *
  * - bundle が空 / mirrorHtml が空なら reason 判定（v0.1.244 で細分化）
  * - 鏡のように貼り付け原則に従う：niconico DOM をそのまま映す（数値抽出なし）
+ *
+ * v0.1.252+ (2026-05-11 kimito さん診断 lv350507546): 鏡 html が無い場合でも
+ *   structured `adContributionRanking` (iframe relay 経路で取れる 5 件) が居れば、
+ *   それを使った fallback HTML を生成して popup に表示する。鏡原則の延長：
+ *   niconico 公式値（rank / name / contribution）は無加工、ラップ HTML のみ拡張側。
  */
 function refreshNorthStarAdRankingLane() {
   const bundle = _lastOfficialEventDomBundle;
@@ -5449,7 +5457,15 @@ function refreshNorthStarAdRankingLane() {
     renderNorthStarLane('adRanking', mirrorHtml);
     return;
   }
-  // v0.1.244: 鏡が無い → reason 判定で placeholder 細分化
+  // v0.1.252+: 鏡が無くても structured items があれば fallback HTML を生成
+  const fallback = buildAdRankingFallbackHtml(
+    /** @type {any} */ (bundle?.adContributionRanking)
+  );
+  if (fallback) {
+    renderNorthStarLane('adRanking', fallback);
+    return;
+  }
+  // v0.1.244: 鏡 / structured どちらも無い → reason 判定で placeholder 細分化
   const state = determineNorthStarLaneState('adRanking', { bundle, snap });
   renderNorthStarLane('adRanking', null, state);
 }

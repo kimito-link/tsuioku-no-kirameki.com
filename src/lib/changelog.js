@@ -36,6 +36,7 @@ export const EXTENSION_CHANGELOG = Object.freeze([
       'iframeOfficialDomFromRelay.test.js に vitest 7 件追加 (合計 25 件): koken の両 mirror 採用 / audition の giftHistory mirror drop / 鏡のみで accepted / nicoad は鏡も drop / 空文字列・非文字列の null 化 / koken giftHistory mirror 単独 accepted',
       'Phase 2 (NLS_FETCH_GIFT_HISTORY_MIRROR) に「お困りの方はこちら」rescue link 早期 abort を追加: ユーザー自発診断 (lv350506725) で観測されたケース。3 秒 polling 待たず即諦め、popup には「(取得不可：配信者側 Vue 未描画)」hint で正直に表示',
       'Phase 1 (NLS_FETCH_CONTRIBUTION_RANKING_MIRROR) も autoOpen の rescue-link-detected-tick-N status を popup 側で認識して「(取得不可：配信者側 Vue 未描画)」hint に正規化。「お困り」配信者では extension で fixable ではない既知の限界 (memory: niconico 本体 or 配信者設定の問題) を正直に伝える UX',
+      '広告ランキング (+α レーン) の popup 空白回帰を修正: 鏡 HTML が無いが structured adContributionRanking が居る配信 (kimito さん診断 lv350507546 で確認) で空白だったのを、structured items から build した簡易 HTML を fallback として描画するようにしました。鏡原則の延長で、niconico 公式値 (rank / name / contribution) は無加工で表示、ラップ HTML のみ拡張側。新規 buildAdRankingFallbackHtml.js + vitest 17 件',
       '次の段階: Phase 3 (サポーター取得 + イベントランキング取得 = audition iframe の別 DOM scrape) は別 PR で順次。Phase 3 は DOM サンプル取得後に着手予定'
     ])
   }),

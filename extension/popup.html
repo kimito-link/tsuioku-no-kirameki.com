@@ -2696,6 +2696,55 @@
         line-height: 1.4;
       }
 
+      /* v0.1.252+: 北極星 +α 広告ランキング structured fallback。
+         鏡 HTML が取れていないとき、structured `adContributionRanking` から
+         build される簡易リスト。kimito さん診断 lv350507546 で
+         確認された popup 空白回帰の修正 (2026-05-11)。 */
+      .nl-ad-fallback {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .nl-ad-fallback-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        line-height: 1.4;
+      }
+      .nl-ad-fallback-row__rank {
+        flex: 0 0 auto;
+        min-width: 14px;
+        text-align: right;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 75%, transparent);
+      }
+      .nl-ad-fallback-row__name {
+        flex: 1 1 auto;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--nl-text);
+      }
+      .nl-ad-fallback-row__name--anon {
+        color: color-mix(in srgb, var(--nl-text) 55%, transparent);
+        font-style: italic;
+      }
+      .nl-ad-fallback-row__contrib {
+        flex: 0 0 auto;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 85%, transparent);
+      }
+      .nl-ad-fallback__note {
+        margin: 4px 0 0;
+        font-size: 9px;
+        color: color-mix(in srgb, var(--nl-text) 45%, transparent);
+        line-height: 1.3;
+      }
+
       /* v0.1.236: 北極星 6 レーン常設枠。
          「取得できる/出来ないに関わらず popup に枠を残す」原則（kimito さん 2026-05-09 明示）。
          鏡のように貼り付け原則: 値が取れたら niconico DOM の outerHTML をそのまま流し込む。
