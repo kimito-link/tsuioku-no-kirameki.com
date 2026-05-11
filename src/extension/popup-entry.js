@@ -5509,10 +5509,17 @@ function refreshNorthStarEventCumulativeScoreLane() {
  * `_lastOfficialEventDomBundle.eventCurrentRankMirrorHtml` を sanitize して
  * popup の `#northStarLaneBody-eventRank` body に innerHTML として描画。
  *
- * v0.1.241: 鏡 mirrorHtml が無い時、`watchMetaCache.snapshot.officialNicoEventRankNdgr`
- *  (NDGR stats 由来) があれば簡易 HTML で fallback 表示。
+ * v0.1.241: 鏡 mirrorHtml が無い時の NDGR fallback を導入していたが、
+ * v0.1.248 で memory feedback_ndgr_field6_silence.md の rule (NDGR field 6
+ * 単独で順位を表示しない) を見落としていたバグを修正。
  *
- * - bundle が空 / mirrorHtml が空 / NDGR 値も空 なら placeholder ("(未取得)") を維持
+ * v0.1.248: 表示優先度を厳格化:
+ *   鏡 mirrorHtml > bundle.eventBanner.rank の整数 > 沈黙 (placeholder)
+ * NDGR field 6 (`officialNicoEventRankNdgr`) は意味確定していない値で
+ * （イベント不参加配信でも値が返ることがあり、実機 lv350505652 で NDGR=1 だが
+ * 真値 7 位の乖離が観測された）、単独 fallback は完全に撤去。
+ *
+ * - bundle が空 / mirrorHtml が空 / banner.rank も空 なら placeholder ("(未取得)") を維持
  */
 function refreshNorthStarEventCurrentRankLane() {
   const bundle = _lastOfficialEventDomBundle;
@@ -5524,15 +5531,21 @@ function refreshNorthStarEventCurrentRankLane() {
     renderNorthStarLane('eventRank', mirrorHtml);
     return;
   }
-  const ndgrRank = typeof snap?.officialNicoEventRankNdgr === 'number'
-    ? snap.officialNicoEventRankNdgr
+  // v0.1.248: NDGR field 6 (eventRank) は意味確定していないため使わない。
+  // bundle.eventBanner.rank が居る時だけ、niconico の class 名で揃えて表示。
+  const bannerRank = typeof bundle?.eventBanner?.rank === 'number'
+    && Number.isFinite(bundle.eventBanner.rank)
+    && bundle.eventBanner.rank > 0
+    ? bundle.eventBanner.rank
     : null;
-  const fallback = buildNorthStarRankFallbackHtml(ndgrRank);
-  if (fallback) {
-    renderNorthStarLane('eventRank', fallback);
-    return;
+  if (bannerRank != null) {
+    const fallback = buildNorthStarRankFallbackHtml(bannerRank);
+    if (fallback) {
+      renderNorthStarLane('eventRank', fallback);
+      return;
+    }
   }
-  // v0.1.244: 鏡も NDGR fallback も無い → reason 判定
+  // v0.1.244: 鏡も banner も無い → reason 判定
   const state = determineNorthStarLaneState('eventRank', { bundle, snap });
   renderNorthStarLane('eventRank', null, state);
 }
