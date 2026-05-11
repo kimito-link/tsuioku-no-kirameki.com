@@ -8570,6 +8570,23 @@
         </div>
       </section>
 
+      <section class="section" id="commenter-record-quality" aria-labelledby="commenter-record-quality-heading" data-lp-feature="commenter-record-quality">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="commenter-record-quality-heading">コメンター記録の質を上げる（v0.1.245-247 で 3 段改善）</h2>
+            <p>
+              応援コメントを「<strong>誰が</strong>・<strong>どんな表示名で</strong>」残すかは、後から振り返るときに大切な情報です。v0.1.245-247 で<strong>コメンター記録の質</strong>を段階的に改善しました。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>v0.1.245 ― コメント uid 解決率改善</strong> — niconico の <code>/v2/watch/member.json</code> 経路を新たに hook し、これまで取りこぼしていた uid を拾えるようにしました（<strong>15.9% → 50%+ を目標</strong>に取り組み中、実機検証段階）。</p>
+            <p><strong>v0.1.246 ― nickname 衝突統一</strong> — popup で同じ user_id に対して<strong>別 nickname が並ぶ</strong>場面（実機で観測された「とうふ」 vs 「ball_football」など）を、<strong>「ユーザー別応援件数」の aggregate 結果を正本</strong>に他 section が render 時に上書きする仕組みで統一しました。</p>
+            <p><strong>v0.1.247 ― nickname map 減少バグ修正</strong> — SPA 遷移中の <code>liveId → null</code> 誤検出により、4 種類の map が <strong>109 件 → 56 件</strong>に不要な clear をしてしまうバグを修正。「両者 non-null かつ別 lv」のときだけ切替と判定する厳格判定を導入しました。</p>
+            <p><strong>残る限界</strong> — niconico 本体側で uid を出していないコメント（古い API 経路・cookie 未送信状態など）は原理的に取れません。追加の hook 経路を継続して探しています。</p>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="snapshot-future-comparison" aria-labelledby="snapshot-future-comparison-heading" data-lp-feature="snapshot-future-comparison">
         <div class="shell">
           <div class="section-head fade">
