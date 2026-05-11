@@ -2662,6 +2662,40 @@
         cursor: progress;
       }
 
+      /* v0.1.250 Phase 1: 北極星レーン 1 (貢献度ランキング) on-demand 取得ボタン UI。
+         mirror html が無いとき body に動的注入される。kimito さん方針 (2026-05-11):
+         「ボタンつけてユーザーフレンドリー化」。 */
+      .nl-on-demand-fetch {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 4px 0;
+      }
+      .nl-on-demand-fetch__btn {
+        cursor: pointer;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #fff;
+        background: linear-gradient(180deg, #4a90e2, #2f6fbe);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        align-self: flex-start;
+      }
+      .nl-on-demand-fetch__btn:hover {
+        filter: brightness(1.08);
+      }
+      .nl-on-demand-fetch__btn:disabled,
+      .nl-on-demand-fetch__btn[data-loading='true'] {
+        opacity: 0.7;
+        cursor: progress;
+      }
+      .nl-on-demand-fetch__hint {
+        font-size: 11px;
+        color: var(--nl-text-soft, rgba(255, 255, 255, 0.65));
+        line-height: 1.4;
+      }
+
       /* v0.1.236: 北極星 6 レーン常設枠。
          「取得できる/出来ないに関わらず popup に枠を残す」原則（kimito さん 2026-05-09 明示）。
          鏡のように貼り付け原則: 値が取れたら niconico DOM の outerHTML をそのまま流し込む。

@@ -14,6 +14,9 @@ import {
   scrapeAdRankingMirrorHtml,
   scrapeEventInfoMirrorParts
 } from './officialEventBannerDom.js';
+// v0.1.250: 北極星レーン 1 (貢献度ランキング) 用の outerHTML scraper。
+// 広告ランキング (scrapeAdRankingMirrorHtml) と取得対象が別 DOM・別 class なので別ファイル。
+import { scrapeContributionRankingMirrorHtml } from './scrapeContributionRanking.js';
 
 /**
  * niconico の audition embed URL を直接 fetch して、HTML 内のバナー情報を掬う。
@@ -136,6 +139,7 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
  *   adRankingMirrorHtml: string|null,
  *   eventCumulativeScoreMirrorHtml: string|null,
  *   eventCurrentRankMirrorHtml: string|null,
+ *   contributionRankingMirrorHtml: string|null,
  *   programStats: ReturnType<typeof scrapeProgramStatisticsMenuFromDom>,
  *   giftHistory: ReturnType<typeof scrapeGiftHistoryFromDom>
  * }} OfficialEventDomBundle
@@ -159,12 +163,17 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
   const contributionRanking = scrapeContributionRankingFromDom(root);
   const programStats = scrapeProgramStatisticsMenuFromDom(root);
   const giftHistory = scrapeGiftHistoryFromDom(root);
+  // v0.1.250: 北極星レーン 1 鏡用 outerHTML。gift sidebar が開いてランキングタブが
+  // active のときに親 frame の document へ `ul.contribution-ranking-list` が出現する
+  // ので、その outerHTML を JSON 直列化可能な文字列として bundle に乗せる。
+  const contributionRankingMirrorHtml = scrapeContributionRankingMirrorHtml(root);
   if (
     !eventBanner &&
     !eventBalloon &&
     !contributionRanking &&
     !programStats &&
-    !giftHistory
+    !giftHistory &&
+    !contributionRankingMirrorHtml
   ) {
     return null;
   }
@@ -177,6 +186,7 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
     adRankingMirrorHtml: null,
     eventCumulativeScoreMirrorHtml: null,
     eventCurrentRankMirrorHtml: null,
+    contributionRankingMirrorHtml: contributionRankingMirrorHtml || null,
     programStats,
     giftHistory
   };
@@ -210,6 +220,12 @@ export function mergeOfficialEventDomBundle(prev, next) {
     eventCurrentRankMirrorHtml:
       next.eventCurrentRankMirrorHtml ||
       prev.eventCurrentRankMirrorHtml ||
+      null,
+    // v0.1.250: 鏡 outerHTML は古い値を温存（gift sidebar を閉じると次の scan で
+    // null に戻るが、ユーザーが「取得ボタン」で 1 回取得したものを残しておきたい）。
+    contributionRankingMirrorHtml:
+      next.contributionRankingMirrorHtml ||
+      prev.contributionRankingMirrorHtml ||
       null,
     programStats: next.programStats || prev.programStats,
     giftHistory: next.giftHistory || prev.giftHistory

@@ -80,6 +80,8 @@ import {
   scrapeOfficialEventBannerFromDom
 } from '../lib/officialEventBannerDom.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
+// v0.1.250: 北極星レーン 1 (貢献度ランキング) on-demand 取得用 mirror scraper
+import { scrapeContributionRankingMirrorHtml } from '../lib/scrapeContributionRanking.js';
 import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
 import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
 import {
@@ -7084,6 +7086,74 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         )
       });
     }
+    return true;
+  }
+
+  // v0.1.250 Phase 1: popup の北極星レーン 1「貢献度ランキングを取得」ボタンから
+  //   呼ばれる on-demand 取得。kimito さん方針 (2026-05-11): 確実路線 + ボタン UI で
+  //   ユーザーフレンドリー化。
+  //
+  // 既存 `tryAutoOpenGiftSidebarOnceForScrape` を再利用する。違いは:
+  //   - per-liveId guard (`_autoOpenGiftSidebarTriedLiveId`) を毎回 reset することで
+  //     ユーザーが押した瞬間に再試行できる（既存は 1 lid につき 1 回）
+  //   - opt-in gate (`isGiftRankingLaneEnabled`) を bypass する（ボタン押下 = 明示的同意）
+  //
+  // autoOpen 完了後 `persistOfficialEventDomBundleNow` が呼ばれ、その内部の
+  // `collectOfficialEventDomBundle` が `contributionRankingMirrorHtml` (v0.1.250 で追加)
+  // を含む bundle を chrome.storage.local の `nls_event_dom_<lv>` に書き込むので、
+  // popup 側は storage 経由 + sendResponse の両経路で値を受け取れる。
+  if (msg.type === 'NLS_FETCH_CONTRIBUTION_RANKING_MIRROR') {
+    if (!isWatchInlinePanelTopFrame()) {
+      // 親 watch frame でだけ処理。サブフレームに来た場合は無視（chrome は frameId=0 で
+      // 投げるはずだが念のため）。
+      return false;
+    }
+    void (async () => {
+      const startedAt = Date.now();
+      try {
+        // per-liveId guard を reset して再試行を許可
+        _autoOpenGiftSidebarTriedLiveId = '';
+        await tryAutoOpenGiftSidebarOnceForScrape();
+        // autoOpen 内部で persistOfficialEventDomBundleNow が走っているはずだが、
+        // 念のため最新 DOM から鏡 outerHTML を直接読んで sendResponse に乗せる
+        // （popup の次回 storage 読み込みを待たず即時表示できる）。
+        const mirrorHtml = scrapeContributionRankingMirrorHtml(document) || null;
+        const itemCount = (() => {
+          try {
+            return document.querySelectorAll('ul.contribution-ranking-list > li.ranker')
+              .length || 0;
+          } catch {
+            return 0;
+          }
+        })();
+        const status = (() => {
+          try {
+            return String(getRankingLifetimeDiag()?.autoOpenLastStatus || '');
+          } catch {
+            return '';
+          }
+        })();
+        sendResponse({
+          ok: true,
+          mirrorHtml,
+          itemCount,
+          autoOpenStatus: status,
+          liveId: String(liveId || ''),
+          elapsedMs: Date.now() - startedAt
+        });
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          liveId: String(liveId || ''),
+          elapsedMs: Date.now() - startedAt,
+          error: String(
+            err && typeof err === 'object' && 'message' in err
+              ? /** @type {{ message?: unknown }} */ (err).message
+              : err || 'fetch_contribution_ranking_failed'
+          )
+        });
+      }
+    })();
     return true;
   }
 });

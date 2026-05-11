@@ -5446,17 +5446,188 @@ function refreshNorthStarAdRankingLane() {
 }
 
 /**
- * v0.1.244: 北極星 レーン 1 (貢献度ランキング) への流し込み。
- * gift sidebar cross-origin iframe Vue mount 不全のため、現状は鏡が取れない。
- * reason 判定で「(取得待ち: サイドバー描画なし)」等を popup に表示する。
+ * v0.1.244 / v0.1.250: 北極星 レーン 1 (貢献度ランキング) への流し込み。
+ *
+ * 優先度:
+ *   1. `bundle.contributionRankingMirrorHtml` (v0.1.250 で導入、user click → autoOpen
+ *      → gift sidebar > ランキングタブ DOM の outerHTML) が居れば最優先で鏡 render
+ *   2. それ以外は on-demand 取得ボタン + reason caption を body に挿入
+ *      (v0.1.250 Phase 1 で導入。kimito さん方針「ボタンつけてユーザーフレンドリー化」)
  */
 function refreshNorthStarContributionRankingLane() {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
+
+  // 1. 鏡 mirrorHtml が居れば最優先
+  const mirrorHtml = typeof bundle?.contributionRankingMirrorHtml === 'string'
+    ? bundle.contributionRankingMirrorHtml
+    : null;
+  if (mirrorHtml) {
+    renderNorthStarLane('contributionRanking', mirrorHtml);
+    return;
+  }
+
+  // 2. 取得中なら現状の loading UI を温存（毎 refresh tick で button が消えないように）
+  if (_contributionRankingFetchInflight) {
+    const existing = document.getElementById('fetchContributionRankingBtn');
+    if (existing) return;
+  }
+
+  // 3. 取得ボタン + reason caption を body に挿入
   const state = determineNorthStarLaneState('contributionRanking', { bundle, snap });
-  // 鏡 mirrorHtml はまだ実装していない（gift sidebar Vue mount 不全のため）
-  renderNorthStarLane('contributionRanking', null, state);
+  renderContributionRankingFetchButtonInLane(state);
 }
+
+/**
+ * v0.1.250 Phase 1: 北極星レーン 1 の body に「取得ボタン + caption」を挿入する。
+ * mirrorHtml が無い時に呼ばれる。click で content script に NLS_FETCH_CONTRIBUTION_RANKING_MIRROR
+ * を投げて on-demand 取得を発火する。
+ *
+ * @param {string} state v0.1.244 reason ('not_yet' | 'iframe_unrendered' | etc.)
+ */
+function renderContributionRankingFetchButtonInLane(state) {
+  const body = document.getElementById('northStarLaneBody-contributionRanking');
+  if (!(body instanceof HTMLElement)) return;
+
+  // body に children を入れると CSS `:empty::after` の placeholder は出なくなるが、
+  // hint span に同等の reason text を出すことで情報量は維持する。
+  const hintText = mapContributionRankingReasonToHint(state);
+  const btnLabel = '貢献度ランキングを取得';
+
+  body.setAttribute(
+    'data-lane-state',
+    typeof state === 'string' && state ? state : 'missing'
+  );
+  // innerHTML をクリアしてから DOM 構築（XSS 対策で textContent を使う）
+  body.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'nl-on-demand-fetch';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'fetchContributionRankingBtn';
+  btn.className = 'nl-on-demand-fetch__btn';
+  btn.dataset.loading = 'false';
+  btn.textContent = btnLabel;
+  const hint = document.createElement('span');
+  hint.className = 'nl-on-demand-fetch__hint';
+  hint.textContent = hintText;
+  wrap.appendChild(btn);
+  wrap.appendChild(hint);
+  body.appendChild(wrap);
+
+  btn.addEventListener('click', () => {
+    void handleFetchContributionRankingClick(btn, hint);
+  });
+}
+
+/**
+ * v0.1.250: state を「ボタン下の小さな注釈」に変換。CSS placeholder の文言と概ね揃える。
+ *
+ * @param {string} state
+ * @returns {string}
+ */
+function mapContributionRankingReasonToHint(state) {
+  switch (state) {
+    case 'iframe_unrendered':
+      return '(取得待ち：サイドバー描画なし)';
+    case 'fetch_error':
+      return '(取得エラー)';
+    case 'not_yet':
+      return '(取得中…)';
+    case 'no_event':
+      return '(イベント不参加)';
+    case 'no_program_gift':
+      return '(ギフト 0 件)';
+    case 'ok':
+      return '';
+    default:
+      return '(未取得)';
+  }
+}
+
+/**
+ * v0.1.250 Phase 1: 「貢献度ランキングを取得」ボタン click handler。
+ *
+ * 流れ:
+ *   1. ボタンを disabled + 「取得中…」表示にする
+ *   2. content script (active watch tab) に NLS_FETCH_CONTRIBUTION_RANKING_MIRROR
+ *   3. content script: gift sidebar 自動オープン → ランキングタブ click → polling → scrape
+ *   4. response の mirrorHtml を `_lastOfficialEventDomBundle` に乗せて再 render
+ *   5. mirrorHtml が空なら hint に失敗理由を出して、ボタンを押せる状態に戻す
+ *
+ * @param {HTMLButtonElement} btn
+ * @param {Element|null} hintEl
+ */
+async function handleFetchContributionRankingClick(btn, hintEl) {
+  if (!btn || btn.disabled) return;
+  if (_contributionRankingFetchInflight) return;
+  _contributionRankingFetchInflight = true;
+  btn.disabled = true;
+  btn.dataset.loading = 'true';
+  const originalText = btn.textContent || '貢献度ランキングを取得';
+  btn.textContent = '取得中… (最大 7 秒)';
+  if (hintEl instanceof HTMLElement) {
+    hintEl.textContent = 'サイドバーを開いてランキングタブを開いています…';
+  }
+  /** @type {unknown} */
+  let res = null;
+  try {
+    // watchUrl 空文字 → collectWatchTabCandidates が active tab だけを使う
+    res = await sendMessageToWatchTabs('', {
+      type: 'NLS_FETCH_CONTRIBUTION_RANKING_MIRROR'
+    });
+  } catch (err) {
+    if (hintEl instanceof HTMLElement) {
+      hintEl.textContent = '(取得エラー：watch タブが見つかりません)';
+    }
+    btn.disabled = false;
+    btn.dataset.loading = 'false';
+    btn.textContent = originalText;
+    _contributionRankingFetchInflight = false;
+    return;
+  }
+
+  const r = res && typeof res === 'object' ? /** @type {Record<string, unknown>} */ (res) : null;
+  const mirrorHtml = r && typeof r.mirrorHtml === 'string' && r.mirrorHtml ? r.mirrorHtml : '';
+  const itemCount = r && typeof r.itemCount === 'number' ? r.itemCount : null;
+  const status = r && typeof r.autoOpenStatus === 'string' ? r.autoOpenStatus : '';
+
+  if (mirrorHtml) {
+    // bundle に乗せて再 render（次の renderUserRooms tick まで待たずに即時反映）
+    if (_lastOfficialEventDomBundle && typeof _lastOfficialEventDomBundle === 'object') {
+      _lastOfficialEventDomBundle = {
+        .../** @type {object} */ (_lastOfficialEventDomBundle),
+        contributionRankingMirrorHtml: mirrorHtml
+      };
+    } else {
+      /** @type {any} */ (_lastOfficialEventDomBundle) = {
+        contributionRankingMirrorHtml: mirrorHtml
+      };
+    }
+    _contributionRankingFetchInflight = false;
+    refreshNorthStarContributionRankingLane();
+    return;
+  }
+
+  // mirrorHtml が空 → 失敗理由を hint に出してボタンを再表示
+  let failureHint = '(取得できませんでした)';
+  if (itemCount === 0) {
+    failureHint = '(イベント不参加 or サイドバー未描画)';
+  } else if (status) {
+    failureHint = `(取得失敗：${String(status).slice(0, 60)})`;
+  }
+  if (hintEl instanceof HTMLElement) hintEl.textContent = failureHint;
+  btn.disabled = false;
+  btn.dataset.loading = 'false';
+  btn.textContent = originalText;
+  _contributionRankingFetchInflight = false;
+}
+
+/**
+ * v0.1.250: 取得 inflight フラグ。毎 refresh tick で「取得中…」UI が消えないように
+ * `refreshNorthStarContributionRankingLane` から見えるところに置く。
+ */
+let _contributionRankingFetchInflight = false;
 
 /**
  * v0.1.244: 北極星 レーン 2 (この番組へのギフト履歴) への流し込み。

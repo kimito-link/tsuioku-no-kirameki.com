@@ -26,6 +26,20 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.250',
+    date: '2026-05-11',
+    summary: '北極星レーン 1 貢献度ランキング 取得ボタン (Phase 1)',
+    items: Object.freeze([
+      'popup の公式値レーン 1 「貢献度ランキング」に「貢献度ランキングを取得」ボタンを追加しました。kimito さん方針 (2026-05-11) 「ボタンつけてユーザーフレンドリー化」「確実路線 = 公式値の鏡のみ」の Phase 1 実装',
+      'ボタン click → content script (active watch タブ) が gift サイドバーを裏で開いて「ランキング」タブをクリック → polling で Vue mount を待つ → ニコ生公式 DOM の ul.contribution-ranking-list を outerHTML で抽出 → popup の北極星レーン 1 に鏡レンダリングします',
+      '既存の autoOpen ロジック (tryAutoOpenGiftSidebarOnceForScrape) を再利用しつつ、per-liveId guard と opt-in gate を bypass する on-demand 経路を追加 (NLS_FETCH_CONTRIBUTION_RANKING_MIRROR メッセージ)。ユーザーがボタンを押した瞬間 = 明示的同意とみなして即時実行',
+      '純関数 scraper を src/lib/scrapeContributionRanking.js に新設 (vitest 10 件): ul.contribution-ranking-list を outerHTML 文字列で返す。CSS Modules ハッシュ化 class への部分一致 fallback 含む。広告ランキング (scrapeAdRankingMirrorHtml) と取得対象が別 DOM・別 class なので独立 lib',
+      'OfficialEventDomBundle 型に contributionRankingMirrorHtml フィールドを追加。collectOfficialEventDomBundle / mergeOfficialEventDomBundle / nls_event_dom_(liveId) 経路すべてに対応。既存 mirror 実装 (v0.1.237 ad / v0.1.240 event score+rank) と同じパターン',
+      'on-demand 取得の進捗表示: ボタンが「取得中… (最大 7 秒)」に変化、失敗時は「(イベント不参加 or サイドバー未描画)」「(取得失敗：autoOpenStatus)」等の reason caption を出してリトライ可能。鏡が取れたらボタンが消えて公式 DOM がそのまま表示',
+      'v0.1.249 PR #71 (NDGR ベース件数順 fallback) は close 済み。確実路線方針と相反するため撤去し、本版で「公式 DOM 鏡 only」アーキテクチャに切り替えました。Phase 2 (ギフト履歴取得ボタン) / Phase 3 (サポーター + イベントランキング) は別 PR で順次実装予定'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.248',
     date: '2026-05-11',
     summary: '北極星レーン 5 (イベント順位) NDGR 誤情報抑制',
