@@ -16,6 +16,18 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://tsuioku-no-kirameki.com/articles/ndgr-message-id-dedupe.html</loc>
+    <lastmod>2026-05-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://tsuioku-no-kirameki.com/articles/north-star-mirror-lanes.html</loc>
+    <lastmod>2026-05-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://tsuioku-no-kirameki.com/articles/comment-waveform-fingerprint.html</loc>
     <lastmod>2026-05-01</lastmod>
     <changefreq>monthly</changefreq>

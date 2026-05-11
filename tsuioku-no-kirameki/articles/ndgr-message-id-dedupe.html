@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>ライブ配信プロトコル NDGR の Message ID 単位重複除去 ― 分散システム原則の Chrome 拡張への適用 ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+
+    <meta name="description" content="ライブ配信プロトコル NDGR（ニコ生公式コメント配信）の再送・再接続・relay overlap で発生するメッセージ重複を、分散システムの確立された原則（ordering と dedupe の役割分離・bounded window FIFO・at-least-once + idempotency）に従って排除する手法。4 軸独立調査（Codex niconico 深読み・分散システム semantics・Bilibili scale）が完全一致した 7 原則ベースの設計。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/ndgr-message-id-dedupe.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/ndgr-message-id-dedupe.html">
+    <meta property="og:title" content="ライブ配信プロトコル NDGR の Message ID 単位重複除去 ― 分散システム原則の Chrome 拡張への適用">
+    <meta property="og:description" content="ライブ配信プロトコルの再送・再接続で発生する重複を、Kafka/Kinesis/MQTT/gRPC で確立された分散システム原則に従って排除する手法。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-05-11T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"TechArticle","headline":"ライブ配信プロトコル NDGR の Message ID 単位重複除去 ― 分散システム原則の Chrome 拡張への適用","datePublished":"2026-05-11","dateModified":"2026-05-11","author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"url":"https://tsuioku-no-kirameki.com/articles/ndgr-message-id-dedupe.html","inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"}
+    </script>
+
+    <style>
+      :root{--bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;--line:rgba(88,62,28,.12);--gold:#c98e2b;--blue:#255d9b;--brown:#8a3d19;--shadow:0 18px 44px rgba(70,49,20,.12);--r2:24px;--r3:18px;--maxw:880px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;--shell-pad:16px;--lh-body:1.82;--lh-heading:1.22;--anchor-offset:56px;--code-bg:rgba(45,33,23,.05);}
+      @media (min-width:480px){:root{--shell-pad:clamp(16px,3.2vw,28px)}}
+      *{box-sizing:border-box}html{scroll-behavior:smooth;overflow-x:hidden}
+      body{margin:0;color:var(--ink);font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;line-height:var(--lh-body);background:radial-gradient(ellipse 70% 48% at 98% 4%,rgba(255,210,228,.35),transparent 46%),radial-gradient(circle at top right,rgba(132,184,207,.4),transparent 28%),linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));min-height:100vh}
+      a{color:var(--blue);text-underline-offset:3px}a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);color:#1a1208}
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md)}
+      header.page .meta{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+      header.page .meta strong{color:var(--ink)}
+      main{padding-bottom:var(--space-2xl)}
+      section.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset);}
+      section.box h2{font-size:1.2rem;margin:0 0 var(--space-md);color:#1a1208}
+      section.box h2 .num{display:inline-block;min-width:1.8em;color:var(--gold);font-weight:800;margin-right:.2em}
+      section.box h3{font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700}
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul,section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}section.box li::marker{color:var(--gold)}
+      nav.toc{background:rgba(255,251,245,.72);border:1px solid var(--line);border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg)}
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}nav.toc a:hover{color:var(--brown);text-decoration:underline}
+      .digest{padding:18px 22px;border-radius:var(--r3);background:linear-gradient(160deg,rgba(243,170,37,.1),rgba(15,94,79,.06));border:1px solid var(--line);margin:0 0 var(--space-lg)}
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}.digest li{margin-bottom:4px;font-size:.94rem}
+      .note{font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;margin:var(--space-sm) 0}
+      .note b{color:var(--brown);font-weight:700}
+      code,kbd{font-family:"Menlo","Consolas",monospace;font-size:.92em;background:var(--code-bg);padding:1px 6px;border-radius:4px}
+      pre.code{margin:var(--space-sm) 0;padding:14px 18px;background:#1f1d1a;color:#e8e0d2;border-radius:var(--r3);overflow-x:auto;font-family:"Menlo","Consolas",monospace;font-size:.84rem;line-height:1.6;border:1px solid rgba(0,0,0,.3)}
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      pre.code .kw{color:#ff9d6c}.fn{color:#a8d8ff}.str{color:#b6e0a0}.num{color:#d6b8ff}.cm{color:#7d8694;font-style:italic}
+      table.cmp{width:100%;border-collapse:collapse;margin:var(--space-sm) 0;font-size:.88rem}
+      table.cmp th,table.cmp td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+      table.cmp th{background:rgba(243,170,37,.08);font-weight:700;color:var(--ink)}
+      footer.page{margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line)}
+      footer.page a{color:var(--muted)}footer.page a:hover{color:var(--brown)}
+      @media(max-width:520px){section.box{padding:var(--space-md)}pre.code{padding:12px 14px;font-size:.78rem}table.cmp{font-size:.78rem}}
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../"><img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project"></a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ NDGR Message ID 重複除去</p>
+        <h1>ライブ配信プロトコル NDGR の Message ID 単位重複除去<br>― 分散システム原則の Chrome 拡張への適用</h1>
+        <p class="lead">ライブ配信プロトコル NDGR（ニコ生公式コメント配信）の再送・再接続・relay overlap で発生するメッセージ重複を、Kafka / Kinesis / MQTT / gRPC で確立された分散システム原則（<strong>ordering と dedupe の役割分離</strong>・<strong>bounded window FIFO</strong>・<strong>at-least-once + idempotency</strong>）に従って排除する設計。4 軸独立調査（niconico OSS 深読み・分散システム semantics・Bilibili scale・cross-platform 横断）が完全一致した <strong>7 原則</strong>ベース。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-05-11</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>実装: <strong><a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/ndgrMessageDedupe.js" target="_blank" rel="noopener">GitHub</a></strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+        <aside class="digest">
+          <h3>3 行要約</h3>
+          <ul>
+            <li><strong>canonical key = <code>liveId + ":" + messageId</code></strong> を Set に貯め、decode 直後に重複を drop（segmentUri 単独だと backward fetch / relay overlap に弱い）。</li>
+            <li><strong>bounded window = FIFO 4096 件 cap</strong>（live 切替時 reset）。Telegram MTProto の 300 秒上限と一致する慣行値で、Bloom filter 不要。</li>
+            <li><strong>at-least-once + consumer-side dedupe</strong> として明示。replay は contract（重複は drop して良い、exactly-once は MQTT QoS 2 / Kafka transaction でしか主張できない）。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc"><h2>目次</h2>
+          <ol>
+            <li><a href="#s1">解決したい課題</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">アルゴリズム詳細</a></li>
+            <li><a href="#s4">参考実装（JavaScript）</a></li>
+            <li><a href="#s5">なぜこの設計なのか（7 原則）</a></li>
+            <li><a href="#s6">既知の限界と拡張可能性</a></li>
+            <li><a href="#s7">関連する既知技術（先行技術）</a></li>
+            <li><a href="#s8">本記事の位置づけ・ライセンス</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>解決したい課題</h2>
+          <p>NDGR（niconico data graph relay）は、ニコ生の現行コメント配信プロトコル。length-delimited な Protocol Buffers フレームを HTTP long-polling 経由で配信する。Chrome 拡張がコメントを<strong>独自集計</strong>する場合、NDGR フレームを decode して順次受信するが、以下 3 つの経路で<strong>同じ message が複数回</strong>届く:</p>
+          <ul>
+            <li><strong>(a) ネットワーク再送</strong>: HTTP long-polling の TCP 層 / アプリ層リトライで同一 segment が再配信される。</li>
+            <li><strong>(b) reconnect / backward fetch</strong>: 配信中の通信断後の再接続時、サーバが直近 N 秒分を再配信する（一般的な at-least-once 設計）。</li>
+            <li><strong>(c) relay overlap</strong>: 配信切替（同一視聴者が別 live に移動）で、前 live の tail と新 live の head が一時的に同じ segment URI を踏むことがある。</li>
+          </ul>
+          <p>NdgrClientSharp（niconico 系 OSS の C# 実装）は <code>Dictionary&lt;string, HashSet&lt;string&gt;&gt;</code> 型で segment URI を主キーに重複排除しているが、これは (c) に弱い（同じ segment URI が別 live で再利用されると false dedupe）。</p>
+          <p>本手法は、<strong>分散システムで確立された原則</strong>に従って NDGR Message ID 単位の dedupe を行い、3 つの重複源を統一的に処理する。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>受信パイプラインの構造:</p>
+          <pre class="code"><code>NDGR HTTP frame
+   ↓
+length-delimited decode
+   ↓
+protobuf parse → { messageId, commentNo, chat, ... }
+   ↓
+<span class="cm">★ dedupe（本手法）: canonical key = liveId + ":" + messageId</span>
+   ↓
+post to aggregator</code></pre>
+          <p>dedupe レイヤーの内部状態:</p>
+          <ul>
+            <li><strong>currentLiveId</strong>: 現在の live ID（null 許容）</li>
+            <li><strong>buckets</strong>: <code>Map&lt;liveId, { ids: Set&lt;string&gt;, fifo: string[] }&gt;</code></li>
+            <li><strong>perLiveMax</strong>: 1 live あたりの上限件数（既定 4096）</li>
+            <li><strong>stats</strong>: <code>accepted</code> / <code>droppedDuplicate</code> / <code>evictedIds</code> / <code>resets</code> 等の運用メトリクス</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>アルゴリズム詳細</h2>
+          <h3>3-1. canonical key 構築</h3>
+          <p><code>liveId + ":" + messageId</code> を主キーとする。<code>liveId</code> を含めることで、(c) relay overlap で同じ messageId が別 live に偶然衝突するケースを安全側に倒す（別 live なら別 message として通す）。</p>
+          <h3>3-2. dedupe 判定</h3>
+          <ol>
+            <li><code>messageId</code> が空文字 / null なら <code>no-id</code> として通す（dedupe しない、上流で空 ID 設計が変わった場合の fail-soft）。</li>
+            <li><code>liveId</code> が空なら <code>invalid-key</code> として通す（バグ検知のシグナルとして通すが、観測層に記録）。</li>
+            <li>該当 live の bucket に key が存在すれば <code>duplicate</code>。<code>droppedDuplicate++</code>。</li>
+            <li>無ければ <code>first-seen</code>。bucket に追加。<code>accepted++</code>。</li>
+          </ol>
+          <h3>3-3. FIFO eviction</h3>
+          <p>bucket の <code>ids</code>（Set）と <code>fifo</code>（array）を並行管理する。新規 ID は <code>ids.add(key)</code> + <code>fifo.push(key)</code>。<code>fifo.length > perLiveMax</code> になったら <code>fifo.shift()</code> で古い ID を取り出し、<code>ids.delete(oldKey)</code> で除外する。</p>
+          <h3>3-4. live 切替時の reset</h3>
+          <p><code>setCurrentLiveId(newLiveId)</code> が呼ばれ、<code>currentLiveId !== newLiveId</code> なら全 bucket を clear（メモリ解放）。relay overlap のフェーズが終わった後の不要な保持を防ぐ。観測層に <code>resets++</code> を記録。</p>
+          <h3>3-5. メモリ予算</h3>
+          <p>1 live 平均数千〜数万 message を想定すると、Set + FIFO で <strong>1 live あたり 200-400 KB</strong> 程度（key 平均 50 byte × 4096 件）。同時保持 live 数は実質 1（切替で reset するため）なので、<strong>常時 1 MB 以下</strong>。Bloom filter（10 万件 1% FP で 117 KiB）を使う必要はない。</p>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>参考実装（JavaScript / 純粋関数ファクトリ）</h2>
+<pre class="code"><code><span class="kw">export function</span> <span class="fn">createNdgrMessageDedupe</span>(opts = {}) {
+  <span class="kw">const</span> perLiveMax = Number.<span class="fn">isFinite</span>(opts.perLiveMax) &amp;&amp; opts.perLiveMax &gt; <span class="num">0</span>
+    ? Math.<span class="fn">floor</span>(opts.perLiveMax) : <span class="num">4096</span>;
+
+  <span class="kw">let</span> currentLiveId = <span class="kw">null</span>;
+  <span class="kw">const</span> buckets = <span class="kw">new</span> Map();
+  <span class="kw">const</span> stats = {
+    accepted: <span class="num">0</span>, droppedDuplicate: <span class="num">0</span>, evictedIds: <span class="num">0</span>,
+    bucketsCreated: <span class="num">0</span>, bucketsCleared: <span class="num">0</span>,
+    resets: <span class="num">0</span>, lastResetLiveId: <span class="kw">null</span>
+  };
+
+  <span class="kw">function</span> <span class="fn">getOrCreateBucket</span>(liveId) {
+    <span class="kw">let</span> b = buckets.<span class="fn">get</span>(liveId);
+    <span class="kw">if</span> (!b) {
+      b = { ids: <span class="kw">new</span> Set(), fifo: [] };
+      buckets.<span class="fn">set</span>(liveId, b);
+      stats.bucketsCreated += <span class="num">1</span>;
+    }
+    <span class="kw">return</span> b;
+  }
+
+  <span class="kw">function</span> <span class="fn">observe</span>({ liveId, messageId }) {
+    <span class="kw">if</span> (!messageId) <span class="kw">return</span> { accepted: <span class="kw">true</span>, reason: <span class="str">'no-id'</span> };
+    <span class="kw">if</span> (!liveId)    <span class="kw">return</span> { accepted: <span class="kw">true</span>, reason: <span class="str">'invalid-key'</span> };
+
+    <span class="kw">const</span> key = <span class="str">`${liveId}:${messageId}`</span>;
+    <span class="kw">const</span> b = <span class="fn">getOrCreateBucket</span>(liveId);
+
+    <span class="kw">if</span> (b.ids.<span class="fn">has</span>(key)) {
+      stats.droppedDuplicate += <span class="num">1</span>;
+      <span class="kw">return</span> { accepted: <span class="kw">false</span>, reason: <span class="str">'duplicate'</span> };
+    }
+
+    b.ids.<span class="fn">add</span>(key);
+    b.fifo.<span class="fn">push</span>(key);
+    stats.accepted += <span class="num">1</span>;
+
+    <span class="kw">while</span> (b.fifo.length &gt; perLiveMax) {
+      <span class="kw">const</span> oldKey = b.fifo.<span class="fn">shift</span>();
+      b.ids.<span class="fn">delete</span>(oldKey);
+      stats.evictedIds += <span class="num">1</span>;
+    }
+    <span class="kw">return</span> { accepted: <span class="kw">true</span>, reason: <span class="str">'first-seen'</span> };
+  }
+
+  <span class="kw">function</span> <span class="fn">setCurrentLiveId</span>(newLiveId) {
+    <span class="kw">if</span> (currentLiveId !== <span class="kw">null</span> &amp;&amp; currentLiveId !== newLiveId) {
+      stats.bucketsCleared += buckets.size;
+      buckets.<span class="fn">clear</span>();
+      stats.resets += <span class="num">1</span>;
+      stats.lastResetLiveId = currentLiveId;
+    }
+    currentLiveId = newLiveId;
+  }
+
+  <span class="kw">function</span> <span class="fn">snapshot</span>() {
+    <span class="kw">return</span> { currentLiveId, currentBuckets: buckets.size, ...stats };
+  }
+
+  <span class="kw">return</span> { observe, setCurrentLiveId, snapshot };
+}</code></pre>
+          <p class="note"><b>完全実装:</b> <a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/ndgrMessageDedupe.js" target="_blank" rel="noopener">src/lib/ndgrMessageDedupe.js</a>（vitest 10 件で first-seen / duplicate / no-id / invalid-key / FIFO eviction / live 切替 reset を網羅検証）</p>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>なぜこの設計なのか（7 原則）</h2>
+          <p>本手法は、独立に行った 4 軸の調査（niconico 系 OSS 深読み・分散システム semantics・Bilibili scale + 中華圏 OSS・cross-platform 横断）が<strong>完全に同じ結論</strong>を出した 7 つの原則に従う:</p>
+          <ol>
+            <li><strong>ordering（順序保証）と dedupe（重複排除）の役割分離</strong> ― 順序は <code>commentNo</code>、重複判定は <code>messageId</code>。Kafka / Kinesis / MQTT / gRPC で確立された原則。</li>
+            <li><strong>dedupe は decode 直後</strong> ― 上流に渡す前に弾く。Slack の「3 秒以内に同一 event_id が来たら無視せよ」、Discord の queue migration、Bilibili の ACK fast pattern すべてが同じ位置を指定。</li>
+            <li><strong>canonical key = <code>liveId + ":" + messageId</code></strong> ― C# 実装の segmentUri 単独では backward fetch / relay overlap に弱い。liveId 含めることで安全側に倒す。</li>
+            <li><strong>bounded window</strong> ― FIFO <code>perLiveMax = 4096</code> + 配信切替時 reset。TTL は保険、主制御は size cap。</li>
+            <li><strong>replay は contract</strong> ― Kinesis 公式が「duplicate は発生する、consumer 側で dedupe せよ」、gRPC が「reconnect = 新しい購読」と明記しているとおり、replay は仕様であり例外ではない。</li>
+            <li><strong>at-least-once + idempotency と明示</strong> ― exactly-once は MQTT QoS 2 / Kafka transaction の state machine が無い限り主張できない。本手法は idempotency-by-key で実現する。</li>
+            <li><strong>dedupe を運用メトリクス subsystem として扱う</strong> ― <code>droppedDuplicate</code> / <code>evictedIds</code> / <code>resets</code> 等を必ず観測層に出す。盲信せず、運用中に dedupe が「効きすぎ」「効かなさすぎ」を即検知できるようにする。</li>
+          </ol>
+          <h3>5-1. なぜ Bloom filter ではなく Set を使うのか</h3>
+          <p>1 live あたり数千〜数万 message なら、Set ベースで <strong>perLiveMax = 4096</strong> でメモリ余裕。Bloom filter は数十万〜数百万件のスケールで意味を持つ最適化で、本ケースでは false positive のリスクのほうがコスト。</p>
+          <h3>5-2. なぜ Bilibili の fuzzy merge（類似コメント統合）を採用しないか</h3>
+          <p>blivechat の <code>mergeSimilarDanmaku</code> は UI 機能としては有効だが、「保存層 dedupe の主方式」には不向き。Issue #143「合并相似弹幕導致卡住的問題」のように、merge ロジックが原因で UI が hang する事例が報告されている。「正確性 dedupe」（messageId）と「UX merge」（類似性）は別レイヤーで分離するのが堅実。</p>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>既知の限界と拡張可能性</h2>
+          <ul>
+            <li><strong>主敵は dedupe 精度ではなく再接続境界</strong> ― 中国系 OSS の運用 Issue では「reconnect ループ」「auth drift」「platform change」が圧倒的多数。dedupe 自体より<strong>再接続境界を堅くする</strong>方が ROI 高い。本手法は dedupe を完璧化する代わりに、replay を contract として受け入れる方針で再接続境界の単純化に貢献する。</li>
+            <li><strong>messageId が無いメッセージ</strong> ― <code>no-id</code> として通す fail-soft 設計。上流の messageId 設計が変わった場合に dedupe が完全停止しないよう、観測層に signal が出る。</li>
+            <li><strong>同一 live 内で messageId が衝突する場合</strong> ― 仕様上はあり得ないが、サーバ側のバグ等で衝突した場合は正しい message も drop する。観測層の <code>droppedDuplicate</code> の異常上昇で検知可能。</li>
+            <li>拡張: <strong>TTL ベースの window</strong>（Telegram MTProto の 300 秒上限と一致）を追加して、size cap と二重防衛にする。</li>
+            <li>拡張: <strong>checkpoint 永続化</strong>（chrome.storage.local に snapshot）。タブ再起動時の重複も防げる。</li>
+            <li>拡張: <strong>類似コメ折りたたみ</strong>（blivechat の fuzzy merge 相当）を別レイヤーの popup UI 機能として実装。dedupe 主方式とは混ぜない。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>関連する既知技術（先行技術）</h2>
+          <table class="cmp">
+            <thead><tr><th>システム</th><th>主キー</th><th>ordering</th><th>window</th><th>位置</th><th>再接続</th></tr></thead>
+            <tbody>
+              <tr><td>NDGR（本手法）</td><td>messageId</td><td>commentNo</td><td>FIFO 4096</td><td>decode 直後</td><td>reset + segment prune</td></tr>
+              <tr><td>Kafka KIP-98</td><td>producer + sequence</td><td>offset</td><td>transaction</td><td>broker side</td><td>idempotent producer</td></tr>
+              <tr><td>Kinesis</td><td>partitionKey + seq</td><td>seq</td><td>consumer-side</td><td>consumer 内</td><td>checkpoint</td></tr>
+              <tr><td>MQTT 5.0</td><td>packet ID</td><td>QoS level</td><td>session</td><td>broker side</td><td>session resume</td></tr>
+              <tr><td>Telegram MTProto</td><td>msg_id</td><td>monotonic</td><td>300 秒</td><td>session 内</td><td>session 再確立</td></tr>
+              <tr><td>Bilibili blivedm</td><td>protocol ID</td><td>server_seq</td><td>TTL 10 分</td><td>ACK fast</td><td>retry + auth refresh</td></tr>
+              <tr><td>Slack Events API</td><td>event_id</td><td>―</td><td>3 秒</td><td>受信 handler</td><td>retry header</td></tr>
+            </tbody>
+          </table>
+          <h3>7-1. Kafka KIP-98（exactly-once semantics）</h3>
+          <p>producer 側 sequence number + transaction でグローバル exactly-once を実現。NDGR には producer 側仕様が無いため、本手法は consumer-side dedupe で at-least-once + idempotency に倒す。</p>
+          <h3>7-2. Amazon Kinesis（duplicates ドキュメント）</h3>
+          <p>「duplicate は発生する、consumer は dedupe を実装せよ」と明記。本手法と同じ at-least-once 仮定。</p>
+          <h3>7-3. MQTT 5.0 QoS 2</h3>
+          <p>4-way handshake で exactly-once を実現するが、broker / client 両側に state machine が必要で重い。NDGR は HTTP long-polling ベースなので採用不可。</p>
+          <h3>7-4. Telegram MTProto</h3>
+          <p><code>msg_id</code> は 64-bit session 内一意・単調増加。<strong>300 秒より古い / 30 秒より未来は reject</strong>。本手法の bounded window 値（FIFO 4096）は実装上 5-15 分相当でこの慣行と一致。</p>
+          <h3>7-5. Bilibili blivedm / blivechat</h3>
+          <p>中国最大規模のライブ配信プロトコル（同時接続 100 万人級）。protocol ID 主キー + retry 窓のみ seen-set 保持。<code>mergeSimilarDanmaku</code> による fuzzy merge は別レイヤー（UI 統合）として実装され、保存層 dedupe とは混在させない設計。</p>
+          <h3>7-6. NdgrClientSharp（niconico C# 実装）</h3>
+          <p>本プロトコルの C# 系実装で、segment URI 単独を主キーに <code>Dictionary&lt;string, HashSet&lt;string&gt;&gt;</code> で dedupe する。backward fetch / relay overlap には弱い（segment URI が live を跨ぐと false dedupe）。本手法は <code>liveId + ":" + messageId</code> 化で改善。</p>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>本記事の位置づけ・ライセンス</h2>
+          <p>本記事は、Chrome 拡張機能『君斗りんくの追憶のきらめき』内で 2026 年 5 月 10 日（バージョン 0.1.238 / 0.1.239）に投入された <code>ndgrMessageDedupe.js</code> モジュールの設計思想と実装を、<strong>2026 年 5 月 11 日</strong>付で公開するものである。</p>
+          <p>設計は 4 軸独立調査（Codex による niconico 系 OSS 深読み・分散システム semantics 全面調査・Bilibili scale + 中華圏 OSS 調査・cross-platform 横断調査）が完全一致した 7 原則ベース。先行技術として Kafka / Kinesis / MQTT / Telegram MTProto / Bilibili blivedm / Slack Events API 等を参照した。</p>
+          <p>参考実装は <strong>MIT</strong>、本記事文章は <strong>CC BY 4.0</strong> のもとで自由に複製・引用可。</p>
+          <div class="note"><b>引用例:</b> 君斗りんく「ライブ配信プロトコル NDGR の Message ID 単位重複除去 ― 分散システム原則の Chrome 拡張への適用」<i>君斗りんくの追憶のきらめき</i>、2026 年 5 月 11 日公開、<code>https://tsuioku-no-kirameki.com/articles/ndgr-message-id-dedupe.html</code></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell"><p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p></div>
+    </footer>
+  </body>
+</html>
