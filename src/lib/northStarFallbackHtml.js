@@ -48,3 +48,29 @@ export function buildNorthStarScoreFallbackHtml(score) {
   const formatted = Math.floor(score).toLocaleString('en-US');
   return '<span class="score">' + formatted + '</span>';
 }
+
+/**
+ * v0.1.242: 番組累計ポイント (DOM programStats.giftPoints / NDGR officialGiftPointsNdgr)
+ * を niconico 風の「X,XXX pt」HTML に整形する。
+ *
+ * niconico の元 DOM 構造（gift sidebar `section.content-history` 内）:
+ *   <td class="point-value">1,350 <small class="point-unit">pt</small></td>
+ *
+ * gift sidebar の `<td>` は cross-origin iframe scrape 不全のため取れないが、
+ * watch ページ自体の programStats（プレイヤー上部のティッカー）と NDGR stats から
+ * 同じ値を取れる。本関数はそれらの数値を上記 niconico 構造を模倣した HTML に整形。
+ *
+ * @param {number|null|undefined} value 番組累計ポイント（pt 単位、整数）
+ * @returns {string|null} 有効値なら HTML 文字列、それ以外は null
+ */
+export function buildNorthStarProgramPointsFallbackHtml(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  const formatted = Math.floor(value).toLocaleString('en-US');
+  return (
+    '<span class="point-value">' +
+    formatted +
+    ' <small class="point-unit">pt</small></span>'
+  );
+}
