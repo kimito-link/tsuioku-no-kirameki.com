@@ -10860,14 +10860,12 @@ async function runOneTimeBackfillRemoveGiftSystemMessages() {
       }
     });
     if (totalRemoved > 0) {
-      // eslint-disable-next-line no-console
       console.log(
         `[nls-migration] removed ${totalRemoved} gift system message(s) from comment records`
       );
     }
   } catch (e) {
     // migration 失敗は致命でない（次回 boot で再試行）
-    // eslint-disable-next-line no-console
     console.warn('[nls-migration] backfill skipped:', e);
   }
 }
@@ -10917,14 +10915,12 @@ async function runOneTimeBackfillRemoveRecommendedLivePollution() {
       }
     });
     if (totalRemoved > 0) {
-      // eslint-disable-next-line no-console
       console.log(
         `[nls-migration] removed ${totalRemoved} recommended-live pollution row(s) from comment records`
       );
     }
   } catch (e) {
     // migration 失敗は致命でない（次回 boot で再試行）
-    // eslint-disable-next-line no-console
     console.warn('[nls-migration] backfill (recommended-live) skipped:', e);
   }
 }
