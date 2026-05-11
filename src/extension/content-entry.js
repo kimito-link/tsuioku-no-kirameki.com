@@ -6312,6 +6312,8 @@ function collectWatchPageSnapshot() {
       _debug.piWs = docEl.getAttribute('data-nls-page-intercept-ws') || '';
       _debug.piFetch = docEl.getAttribute('data-nls-page-intercept-fetch') || '';
       _debug.piXhr = docEl.getAttribute('data-nls-page-intercept-xhr') || '';
+      // v0.1.245: /v2/watch/member.json hook 発火回数 (uid 解決率改善の効果切り分け用)
+      _debug.piMemberJson = docEl.getAttribute('data-nls-page-intercept-member-json') || '';
       _debug.fbScans = docEl.getAttribute('data-nls-fiber-scans') || '';
       _debug.fbFound = docEl.getAttribute('data-nls-fiber-found') || '';
       _debug.fbRows = docEl.getAttribute('data-nls-fiber-rows') || '';
