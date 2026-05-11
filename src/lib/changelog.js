@@ -26,6 +26,19 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.245',
+    date: '2026-05-11',
+    summary: 'コメント uid 解決率改善 (member.json hook)',
+    items: Object.freeze([
+      'コメント保存時の user_id 解決率を改善します。実機 v0.1.237 では 107 件中 17 件 (15.9%) しか uid が取れず、84% は nickname だけの保存でしたが、本版で `/v2/watch/member.json` の fetch hook を追加して視聴者一覧を user 情報 map に流すようにしました',
+      '原因は niconico の watch ページが視聴者リストを `/v2/watch/member.json` で取得しているのに、レスポンスの content-type が `text/plain;charset=UTF-8` のため拡張の既存 fetch intercept が JSON parse をスキップしていたことでした。memory `v0.1.225 で確定` の「member.json hook 漏れ」を本版で着手しています',
+      '実装は `src/extension/page-intercept-entry.js` の fetch intercept に最小変更（10 行程度）。member.json URL を含む text/plain レスポンスのみ強制 JSON parse し、既存の `dig()` パイプラインに流して `learnUser(uid, name, av)` で interceptedUsers map に登録します。汎用ロジックの流用なのでレスポンス構造変化への耐性も高い',
+      '効果切り分けのため、AI 共有診断 JSON に `diag.memberJsonHits` (fetch hook 発火回数) を追加。`data-nls-page-intercept-member-json` 属性にも露出します。次回診断バンドルで `memberJsonHits > 0` かつ `savedCommentsUidStats.withUidPercent` が上昇していれば改善が効いたと判定可能',
+      '目標: 15.9% → 50%+。member.json は番組によって取れる視聴者数が異なる（公開配信 / 会員限定 / 視聴者数 等）ので、配信ごとに改善幅は変わる想定。最低限「視聴者参加した nickname」は uid 解決されるはずです',
+      '挙動変更ゼロ。fetch intercept ロジックの 1 endpoint 追加のみで、既存処理経路は影響を受けません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.244',
     date: '2026-05-11',
     summary: '北極星レーンの未取得理由を 6 種類に細分化',

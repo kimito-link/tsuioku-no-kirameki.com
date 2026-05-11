@@ -153,7 +153,9 @@ import {
     posted: 0,
     wsMessages: 0,
     fetchHits: 0,
-    xhrHits: 0
+    xhrHits: 0,
+    // v0.1.245: /v2/watch/member.json hook 発火回数（text/plain で来る JSON を強制 parse した件数）
+    memberJsonHits: 0
   };
 
   function publishDiag() {
@@ -165,6 +167,7 @@ import {
     root.setAttribute('data-nls-page-intercept-ws', String(diag.wsMessages));
     root.setAttribute('data-nls-page-intercept-fetch', String(diag.fetchHits));
     root.setAttribute('data-nls-page-intercept-xhr', String(diag.xhrHits));
+    root.setAttribute('data-nls-page-intercept-member-json', String(diag.memberJsonHits));
     if (href) root.setAttribute('data-nls-page-intercept-href', href.slice(0, 240));
     if (referrer) {
       root.setAttribute('data-nls-page-intercept-referrer', referrer.slice(0, 240));
@@ -855,7 +858,25 @@ import {
           const isJson = ct.includes('json');
           const isStream = ct.includes('event-stream') || ct.includes('ndjson');
           const isNdgr = /\/(view|segment|backward|snapshot)\/v\d\//.test(url) || url.includes('ndgr');
-          if (!isBinary && !isJson && !isStream && !isNdgr) return;
+          // v0.1.245: niconico の一部 API は text/plain content-type で JSON body を返す
+          //   実機観測: /v2/watch/member.json?__retry=0 が text/plain;charset=UTF-8。
+          //   既存判定だけだと body が読まれず、user 情報 (userId + nickname + iconUrl)
+          //   が learnUser map に乗らない。これが原因で親フレーム DOM 経由のコメント
+          //   (実機 8121 件中) で uid 解決失敗 (savedCommentsUidStats.withUidPercent: 15.9%)。
+          //   memory `v0.1.225 で確定 / member.json hook 漏れ` を v0.1.245 で着手。
+          if (!isBinary && !isJson && !isStream && !isNdgr) {
+            const isMemberJson = /\/v2\/watch\/member\.json/.test(url);
+            if (isMemberJson && res.ok) {
+              try {
+                const cj = await res.clone().json();
+                diag.memberJsonHits = (Number(diag.memberJsonHits) || 0) + 1;
+                emitViewerJoinFromJsonRoot(cj);
+                dig(cj, 0);
+                publishDiag();
+              } catch { /* JSON parse failure — text/plain だが JSON ではない */ }
+            }
+            return;
+          }
           const clone = res.clone();
           if ((isBinary || isStream || isNdgr) && clone.body) {
             const reader = clone.body.getReader();
