@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Chrome 拡張で配信ページの DOM を popup に「鏡のように貼り付ける」ホワイトリスト方式 sanitizer ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+
+    <meta name="description" content="Chrome 拡張機能のポップアップに、配信プラットフォーム（ライブ配信ページ）の DOM を outerHTML 経由でそのまま再描画する『鏡のように貼り付ける』手法。ホワイトリスト方式の自前 sanitizer で SVG namespace を保ちつつ id rename / url(#) 同期 / [hidden] 削除を行い、依存ゼロで XSS 安全に動作する。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/north-star-mirror-lanes.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/north-star-mirror-lanes.html">
+    <meta property="og:title" content="Chrome 拡張で配信ページの DOM を popup に「鏡のように貼り付ける」ホワイトリスト方式 sanitizer">
+    <meta property="og:description" content="配信ページの outerHTML を popup にそのまま映す自前 sanitizer。SVG namespace 維持 + id rename + url(#) 同期で依存ゼロ実装。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-05-11T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"TechArticle","headline":"Chrome 拡張で配信ページの DOM を popup に「鏡のように貼り付ける」ホワイトリスト方式 sanitizer","datePublished":"2026-05-11","dateModified":"2026-05-11","author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"url":"https://tsuioku-no-kirameki.com/articles/north-star-mirror-lanes.html","inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"}
+    </script>
+
+    <style>
+      :root{--bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;--line:rgba(88,62,28,.12);--gold:#c98e2b;--blue:#255d9b;--brown:#8a3d19;--shadow:0 18px 44px rgba(70,49,20,.12);--r2:24px;--r3:18px;--maxw:880px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;--shell-pad:16px;--lh-body:1.82;--lh-heading:1.22;--anchor-offset:56px;--code-bg:rgba(45,33,23,.05);}
+      @media (min-width:480px){:root{--shell-pad:clamp(16px,3.2vw,28px)}}
+      *{box-sizing:border-box}html{scroll-behavior:smooth;overflow-x:hidden}
+      body{margin:0;color:var(--ink);font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;line-height:var(--lh-body);background:radial-gradient(ellipse 70% 48% at 98% 4%,rgba(255,210,228,.35),transparent 46%),radial-gradient(circle at top right,rgba(132,184,207,.4),transparent 28%),linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));min-height:100vh}
+      a{color:var(--blue);text-underline-offset:3px}a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);color:#1a1208}
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md)}
+      header.page .meta{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+      header.page .meta strong{color:var(--ink)}
+      main{padding-bottom:var(--space-2xl)}
+      section.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset);}
+      section.box h2{font-size:1.2rem;margin:0 0 var(--space-md);color:#1a1208}
+      section.box h2 .num{display:inline-block;min-width:1.8em;color:var(--gold);font-weight:800;margin-right:.2em}
+      section.box h3{font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700}
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul,section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}section.box li::marker{color:var(--gold)}
+      nav.toc{background:rgba(255,251,245,.72);border:1px solid var(--line);border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg)}
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}nav.toc a:hover{color:var(--brown);text-decoration:underline}
+      .digest{padding:18px 22px;border-radius:var(--r3);background:linear-gradient(160deg,rgba(243,170,37,.1),rgba(15,94,79,.06));border:1px solid var(--line);margin:0 0 var(--space-lg)}
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}.digest li{margin-bottom:4px;font-size:.94rem}
+      .note{font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;margin:var(--space-sm) 0}
+      .note b{color:var(--brown);font-weight:700}
+      code,kbd{font-family:"Menlo","Consolas",monospace;font-size:.92em;background:var(--code-bg);padding:1px 6px;border-radius:4px}
+      pre.code{margin:var(--space-sm) 0;padding:14px 18px;background:#1f1d1a;color:#e8e0d2;border-radius:var(--r3);overflow-x:auto;font-family:"Menlo","Consolas",monospace;font-size:.84rem;line-height:1.6;border:1px solid rgba(0,0,0,.3)}
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      pre.code .kw{color:#ff9d6c}.fn{color:#a8d8ff}.str{color:#b6e0a0}.num{color:#d6b8ff}.cm{color:#7d8694;font-style:italic}
+      footer.page{margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line)}
+      footer.page a{color:var(--muted)}footer.page a:hover{color:var(--brown)}
+      @media(max-width:520px){section.box{padding:var(--space-md)}pre.code{padding:12px 14px;font-size:.78rem}}
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../"><img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project"></a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ 公式値レーン 鏡のように貼り付け</p>
+        <h1>Chrome 拡張で配信ページの DOM を popup に<br>「鏡のように貼り付ける」ホワイトリスト方式 sanitizer</h1>
+        <p class="lead">配信プラットフォームの DOM（広告ランキング・イベント累計スコア・現在順位など）の <code>outerHTML</code> を、拡張機能の popup にそのまま「鏡のように」描画する手法。DOMPurify 等の依存を持たずに、許可タグ・許可属性のホワイトリスト + SVG namespace 維持 + defs id rename + <code>url(#id)</code> 同期で、XSS と画面遷移事故を同時に防ぐ。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-05-11</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>実装: <strong><a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/mirrorSanitize.js" target="_blank" rel="noopener">GitHub</a></strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+        <aside class="digest">
+          <h3>3 行要約</h3>
+          <ul>
+            <li>配信ページの <code>outerHTML</code> を popup に流す前に、自前ホワイトリスト sanitizer に通す。</li>
+            <li>SVG defs の <code>id</code> を nonce 付きに rename し、<code>url(#id)</code> / <code>xlink:href="#id"</code> を同期更新することで、複数 mirror の並列描画で id 衝突を防ぐ。</li>
+            <li><code>href</code> / <code>[hidden]</code> / <code>style</code> / <code>on*</code> / <code>data-v-*</code> を全削除して、画面遷移事故・隠し要素の漏洩・XSS・CSS noise を同時に防ぐ。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc"><h2>目次</h2>
+          <ol>
+            <li><a href="#s1">解決したい課題</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">アルゴリズム詳細</a></li>
+            <li><a href="#s4">参考実装（JavaScript）</a></li>
+            <li><a href="#s5">なぜこの設計なのか</a></li>
+            <li><a href="#s6">既知の限界と拡張可能性</a></li>
+            <li><a href="#s7">関連する既知技術（先行技術）</a></li>
+            <li><a href="#s8">本記事の位置づけ・ライセンス</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>解決したい課題</h2>
+          <p>Chrome 拡張機能のポップアップに、視聴中の配信ページ（タブ）が表示している<strong>公式値レーン</strong>（広告ランキング・イベント累計スコア・現在順位・番組累計ポイント等）を、配信者が popup を開いた瞬間に<strong>そのままの見た目</strong>で並べたい。</p>
+          <p>選択肢は通常 3 つある:</p>
+          <ul>
+            <li><strong>(A) JSON で値だけ取得して拡張側で再描画</strong>: プラットフォーム本体の見た目とずれる。CSS 追従が継続的にコストになる。</li>
+            <li><strong>(B) iframe で配信ページの該当区画を埋め込み</strong>: cross-origin で操作不可、scroll や Vue mount の問題で表示が壊れやすい。</li>
+            <li><strong>(C) DOM の <code>outerHTML</code> をそのまま popup に流す</strong>: 見た目は完璧に揃うが、<strong>XSS・画面遷移事故・id 衝突</strong>のリスクが新規発生する。</li>
+          </ul>
+          <p>本記事は (C) を選択した場合に必要な、<strong>自前ホワイトリスト sanitizer</strong>の設計を扱う。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>「鏡のように貼り付ける」フロー:</p>
+          <ol>
+            <li>配信ページ側の content script で対象 DOM（例: <code>&lt;span class="score"&gt;</code>）の <code>outerHTML</code> を取得</li>
+            <li>chrome.runtime.sendMessage で popup 側へ HTML 文字列を渡す</li>
+            <li>popup 側で <code>DOMParser</code> によりサンドボックスで parse</li>
+            <li><strong>ホワイトリスト方式 sanitizer</strong>で許可タグ・許可属性のみ通し、SVG defs の <code>id</code> を nonce 付きに rename</li>
+            <li>sanitize 後の DOM を popup の対応レーン枠に <code>append</code></li>
+          </ol>
+          <p>ホワイトリストの粒度:</p>
+          <ul>
+            <li><strong>許可タグ</strong>: テキスト構造（<code>div span p strong</code>）・リスト・テーブル・<code>img</code>・SVG（<code>svg path defs linearGradient stop g mask use rect circle polygon</code> 等）・<code>button</code>（default action は popup 側で抑制）</li>
+            <li><strong>許可属性</strong>: <code>class role aria-label</code>・<code>src alt width height</code>・SVG 描画属性（<code>viewBox fill d transform</code> 等）・SVG <code>id</code>（rename 対象）</li>
+            <li><strong>削除する属性</strong>: <code>href</code>・<code>[hidden]</code>・<code>style</code>・<code>on*</code>・<code>data-v-*</code></li>
+          </ul>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>アルゴリズム詳細</h2>
+          <h3>3-1. SVG namespace の維持</h3>
+          <p>素朴に <code>document.createElement('path')</code> すると HTML namespace の Unknown element になり、SVG として描画されない。<code>document.createElementNS('http://www.w3.org/2000/svg', 'path')</code> で SVG namespace を明示する必要がある。本 sanitizer は再帰的に DOM を walk しながら、SVG 系タグだけ <code>createElementNS</code> で再生成する。</p>
+          <h3>3-2. defs id の nonce 付き rename</h3>
+          <p>配信ページの SVG はしばしば <code>&lt;linearGradient id="grad-rank-1"&gt;</code> のように<strong>静的な id</strong>で gradient / mask を定義し、<code>fill="url(#grad-rank-1)"</code> や <code>&lt;use xlink:href="#icon-cup"/&gt;</code> で参照している。</p>
+          <p>popup に複数の mirror（例: イベント累計スコアと現在順位を同時表示）を並べると、<strong>同じ id を持つ defs が複数</strong>登場し、ブラウザはどれを参照するか不定になる（多くの場合最初の defs を全 use が参照する事故が起きる）。</p>
+          <p>本 sanitizer は sanitize 開始時に <code>nonce = Math.random().toString(36).slice(2, 10)</code> を生成し:</p>
+          <ol>
+            <li>defs 配下の <code>id</code> をすべて <code>{元 id}__{nonce}</code> に rename し、map に登録</li>
+            <li>同じ DOM 木の <code>url(#xxx)</code> / <code>xlink:href="#xxx"</code> を map で書き換え</li>
+          </ol>
+          <p>これにより複数 mirror が同居しても id 衝突しない。</p>
+          <h3>3-3. <code>[hidden]</code> 要素の削除</h3>
+          <p>配信ページの実 DOM には <code>hidden</code> 属性付きの「描画されていない要素」が混じることがある（lazy mount 前の placeholder、A/B test の隠し UI など）。これらは元ページでは CSS で <code>display:none</code> 相当だが、popup 側の CSS が違うと<strong>うっかり表示されてしまう</strong>。sanitize 時にツリーから完全に削除する。</p>
+          <h3>3-4. <code>href</code> の全削除</h3>
+          <p>配信ページの広告ランキング DOM には「ニコニ広告のページへ」「ユーザーページへ」のような外部リンクが埋まっていることがある。popup 内でクリックされると、popup が自動 close してリンクが新規タブ or 同タブで開く挙動になり、配信者の意図しない画面遷移を起こす。<code>href</code> 属性を全削除することで「視覚情報だけを映す」状態にする。</p>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>参考実装（JavaScript / 純粋関数の抜粋）</h2>
+<pre class="code"><code><span class="cm">// ALLOWED_TAGS / ALLOWED_ATTRS は事前定義のホワイトリスト Set</span>
+
+<span class="kw">function</span> <span class="fn">sanitizeMirrorHtml</span>(htmlString) {
+  <span class="kw">if</span> (<span class="kw">typeof</span> htmlString !== <span class="str">'string'</span> || !htmlString.trim()) <span class="kw">return</span> <span class="str">''</span>;
+  <span class="kw">if</span> (<span class="kw">typeof</span> DOMParser === <span class="str">'undefined'</span>) <span class="kw">return</span> <span class="str">''</span>;
+
+  <span class="kw">const</span> doc = <span class="kw">new</span> DOMParser().<span class="fn">parseFromString</span>(
+    <span class="str">`&lt;div&gt;${htmlString}&lt;/div&gt;`</span>, <span class="str">'text/html'</span>
+  );
+  <span class="kw">const</span> root = doc.body.firstElementChild;
+  <span class="kw">if</span> (!root) <span class="kw">return</span> <span class="str">''</span>;
+
+  <span class="kw">const</span> nonce = Math.<span class="fn">random</span>().<span class="fn">toString</span>(<span class="num">36</span>).<span class="fn">slice</span>(<span class="num">2</span>, <span class="num">10</span>);
+  <span class="kw">const</span> idMap = <span class="kw">new</span> Map();
+
+  <span class="cm">// pass 1: id を nonce 付きに rename + map に登録</span>
+  root.<span class="fn">querySelectorAll</span>(<span class="str">'[id]'</span>).<span class="fn">forEach</span>(el =&gt; {
+    <span class="kw">const</span> oldId = el.<span class="fn">getAttribute</span>(<span class="str">'id'</span>);
+    <span class="kw">const</span> newId = <span class="str">`${oldId}__${nonce}`</span>;
+    idMap.<span class="fn">set</span>(oldId, newId);
+    el.<span class="fn">setAttribute</span>(<span class="str">'id'</span>, newId);
+  });
+
+  <span class="cm">// pass 2: url(#xxx) / xlink:href="#xxx" を rewrite</span>
+  <span class="fn">rewriteIdReferences</span>(root, idMap);
+
+  <span class="cm">// pass 3: 許可タグ・許可属性のみ通すホワイトリスト walk</span>
+  <span class="kw">return</span> <span class="fn">walkSanitize</span>(root, nonce).innerHTML;
+}
+
+<span class="kw">function</span> <span class="fn">walkSanitize</span>(node, nonce) {
+  <span class="kw">const</span> ns = <span class="str">'http://www.w3.org/2000/svg'</span>;
+  <span class="kw">const</span> tag = node.tagName.<span class="fn">toLowerCase</span>();
+  <span class="kw">if</span> (!ALLOWED_TAGS.<span class="fn">has</span>(tag) || node.<span class="fn">hasAttribute</span>(<span class="str">'hidden'</span>)) {
+    <span class="kw">return</span> <span class="kw">null</span>;
+  }
+  <span class="kw">const</span> isSvg = SVG_TAGS.<span class="fn">has</span>(tag);
+  <span class="kw">const</span> clone = isSvg
+    ? document.<span class="fn">createElementNS</span>(ns, tag)
+    : document.<span class="fn">createElement</span>(tag);
+  <span class="kw">for</span> (<span class="kw">const</span> attr <span class="kw">of</span> node.attributes) {
+    <span class="kw">const</span> name = attr.name.<span class="fn">toLowerCase</span>();
+    <span class="kw">if</span> (!ALLOWED_ATTRS.<span class="fn">has</span>(name)) <span class="kw">continue</span>;
+    <span class="kw">if</span> (name === <span class="str">'href'</span>) <span class="kw">continue</span>; <span class="cm">// 明示削除</span>
+    clone.<span class="fn">setAttribute</span>(name, attr.value);
+  }
+  <span class="kw">for</span> (<span class="kw">const</span> child <span class="kw">of</span> node.childNodes) {
+    <span class="kw">if</span> (child.nodeType === <span class="num">3</span>) clone.<span class="fn">appendChild</span>(child.<span class="fn">cloneNode</span>());
+    <span class="kw">else if</span> (child.nodeType === <span class="num">1</span>) {
+      <span class="kw">const</span> sub = <span class="fn">walkSanitize</span>(child, nonce);
+      <span class="kw">if</span> (sub) clone.<span class="fn">appendChild</span>(sub);
+    }
+  }
+  <span class="kw">return</span> clone;
+}</code></pre>
+          <p class="note"><b>完全実装:</b> <a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/mirrorSanitize.js" target="_blank" rel="noopener">src/lib/mirrorSanitize.js</a>（223 行、vitest 14 件で SVG namespace / id rewrite / 削除属性を網羅検証）</p>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>なぜこの設計なのか</h2>
+          <h3>5-1. なぜ DOMPurify を採用しなかったのか</h3>
+          <p>DOMPurify は熟成された定番ライブラリで、本手法と同じ目的を達成できる。本プロジェクトでは <strong>ランタイム依存ゼロ方針</strong>（拡張本体に外部 npm package を bundle しない）を採っており、必要最小限のホワイトリストを自前で持つ方を選んだ。本手法では SVG defs の id 衝突対策・<code>[hidden]</code> 完全削除のような<strong>本プロジェクト固有の要件</strong>を直接コードに書き下せる利点もある。DOMPurify を採用する場合は <code>SAFE_FOR_TEMPLATES</code> / <code>FORBID_TAGS</code> / <code>FORBID_ATTR</code> 設定でほぼ同等の挙動を作れる。</p>
+          <h3>5-2. なぜ <code>document.createElement</code> ではなく <code>createElementNS</code> なのか</h3>
+          <p>SVG タグは HTML namespace では Unknown element として parse され、レイアウトされない。<code>createElementNS('http://www.w3.org/2000/svg', tag)</code> で SVG namespace を付与しないと描画されない。これは MDN <a href="https://developer.mozilla.org/ja/docs/Web/API/Document/createElementNS" target="_blank" rel="noopener">Document.createElementNS()</a> にも明記されている挙動。</p>
+          <h3>5-3. なぜ id rename の nonce はランダム文字列か</h3>
+          <p>連番（<code>id__1, id__2, ...</code>）にすると、popup を開き直すたびに同じ番号が振られ、別 mirror 間で衝突する。<code>Math.random()</code> ベースで生成すれば衝突確率が実質ゼロになる。secret 用途ではないので CSPRNG（<code>crypto.getRandomValues</code>）は不要。</p>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>既知の限界と拡張可能性</h2>
+          <ul>
+            <li><strong>CSS が popup 側に追従しない</strong>: 配信ページの class 名（例: <code>.score</code>）を popup 側 CSS で再現する必要がある。プラットフォーム側の CSS 変更で見た目が崩れる場合がある（mitigation: 主要 class を popup 側に複製、変更検知用の単体テストを書く）。</li>
+            <li><strong>JavaScript で描画される要素は捕捉不能</strong>: 例えば canvas / Vue mount 後に動く要素は <code>outerHTML</code> 時点のスナップショットしか取れない。動的更新が必要な場合は別経路（postMessage で差分送信）を併用する。</li>
+            <li><strong>cross-origin iframe 内の DOM は取れない</strong>: 配信ページが iframe で別 origin を埋めている場合、親 frame の content script は子 iframe にアクセスできない。拡張の <code>all_frames=true</code> + <code>matches</code> で子 iframe にも content script を inject する必要がある。</li>
+            <li>拡張: <strong>diff merge</strong>。再描画時に DOM 全体を入れ替えず、差分のみ patch することで scrollY / focus を保持できる。</li>
+            <li>拡張: <strong>shadow DOM 隔離</strong>。popup 内に shadow root を作って sanitize 済 DOM を入れれば、popup 本体の CSS と干渉しない。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>関連する既知技術（先行技術）</h2>
+          <h3>7-1. DOMPurify (Cure53)</h3>
+          <p>定番の HTML/XML/SVG sanitizer。本手法と同じく許可リスト方式で動作し、SVG namespace も正しく扱う。本手法の自前 sanitizer は DOMPurify を機能サブセットとして再実装したものに相当する。</p>
+          <h3>7-2. Sanitizer API (W3C draft)</h3>
+          <p>ブラウザネイティブの <code>Element.setHTML(htmlString, { sanitizer })</code> を提供する W3C ドラフト仕様。Chrome では origin trial を経て段階的に implemented。本手法は仕様確定前の Chrome 拡張で広く動かす必要があるため独自実装を選んだが、将来的にネイティブ API への移行は可能。</p>
+          <h3>7-3. SingleFile（Chrome 拡張による Web ページ保存）</h3>
+          <p>Web ページの DOM 全体を 1 つの HTML に保存する拡張機能。<code>outerHTML</code> の sanitize と inline 化を独自実装しており、本手法と設計思想が近い（依存最小・ホワイトリスト方式）。SVG defs の id 衝突対策は本手法の方が踏み込んでいる（SingleFile は単一ページ前提なので id 衝突を扱う必要がない）。</p>
+          <h3>7-4. Mozilla Readability</h3>
+          <p>ニュース記事を本文だけに抜き出す sanitizer。許可タグセットが本手法より広く、SVG は基本除外する設計。本手法はランキング表示のため SVG（icon / gradient）を残す必要があり、設計判断が逆。</p>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>本記事の位置づけ・ライセンス</h2>
+          <p>本記事は、Chrome 拡張機能『君斗りんくの追憶のきらめき』内で 2026 年 5 月 9 日（バージョン 0.1.237）に投入された <code>mirrorSanitize.js</code> モジュールおよび、v0.1.240 / v0.1.242 で公式値レーンの 4 レーン（広告ランキング・イベント累計スコア・現在順位・番組累計ポイント）に展開した設計思想を、<strong>2026 年 5 月 11 日</strong>付で公開するものである。</p>
+          <p>参考実装は <strong>MIT</strong>、本記事文章は <strong>CC BY 4.0</strong> のもとで自由に複製・引用可。</p>
+          <div class="note"><b>引用例:</b> 君斗りんく「Chrome 拡張で配信ページの DOM を popup に『鏡のように貼り付ける』ホワイトリスト方式 sanitizer」<i>君斗りんくの追憶のきらめき</i>、2026 年 5 月 11 日公開、<code>https://tsuioku-no-kirameki.com/articles/north-star-mirror-lanes.html</code></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell"><p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p></div>
+    </footer>
+  </body>
+</html>
