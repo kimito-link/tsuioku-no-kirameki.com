@@ -24,6 +24,11 @@ import {
   buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+// v0.1.253: refreshOfficialEventDomBundle の merge ロジックを純関数化（unit test 可能化）
+import { mergeIframeRelayMirrorIntoBundle } from '../lib/mergeIframeRelayMirrorIntoBundle.js';
+// v0.1.252+: 広告ランキング mirror html が空のときの structured fallback HTML 生成
+//   (lv350507546 kimito さん診断で確認された popup 空白回帰の修正)
+import { buildAdRankingFallbackHtml } from '../lib/buildAdRankingFallbackHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -4622,11 +4627,18 @@ async function refreshOfficialEventDomBundle(liveId) {
     return;
   }
   try {
+    // v0.1.252+253: bundle (`nls_event_dom_<lv>` = top-frame scrape) と iframe relay
+    //   storage (`nls_iframe_official_dom_<lid>` = koken/audition iframe → postMessage)
+    //   を同時取得して、`mergeIframeRelayMirrorIntoBundle` (純関数) で鏡 field をマージ。
+    //   bundle 側の鏡 field が空のときだけ iframe 側で埋める（Phase 1/2 ボタンで取った
+    //   鏡を上書きしない）。両方無ければ null、iframe 側のみあれば最小 bundle を作る。
     const key = eventDomStorageKey(lid);
-    const bag = await chrome.storage.local.get(key);
-    const v = bag?.[key];
-    _lastOfficialEventDomBundle =
-      v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+    const iframeKey = `nls_iframe_official_dom_${lid}`;
+    const bag = await chrome.storage.local.get([key, iframeKey]);
+    _lastOfficialEventDomBundle = mergeIframeRelayMirrorIntoBundle(
+      bag?.[key],
+      bag?.[iframeKey]
+    );
   } catch {
     _lastOfficialEventDomBundle = null;
   }
@@ -5429,6 +5441,11 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
  *
  * - bundle が空 / mirrorHtml が空なら reason 判定（v0.1.244 で細分化）
  * - 鏡のように貼り付け原則に従う：niconico DOM をそのまま映す（数値抽出なし）
+ *
+ * v0.1.252+ (2026-05-11 kimito さん診断 lv350507546): 鏡 html が無い場合でも
+ *   structured `adContributionRanking` (iframe relay 経路で取れる 5 件) が居れば、
+ *   それを使った fallback HTML を生成して popup に表示する。鏡原則の延長：
+ *   niconico 公式値（rank / name / contribution）は無加工、ラップ HTML のみ拡張側。
  */
 function refreshNorthStarAdRankingLane() {
   const bundle = _lastOfficialEventDomBundle;
@@ -5440,7 +5457,15 @@ function refreshNorthStarAdRankingLane() {
     renderNorthStarLane('adRanking', mirrorHtml);
     return;
   }
-  // v0.1.244: 鏡が無い → reason 判定で placeholder 細分化
+  // v0.1.252+: 鏡が無くても structured items があれば fallback HTML を生成
+  const fallback = buildAdRankingFallbackHtml(
+    /** @type {any} */ (bundle?.adContributionRanking)
+  );
+  if (fallback) {
+    renderNorthStarLane('adRanking', fallback);
+    return;
+  }
+  // v0.1.244: 鏡 / structured どちらも無い → reason 判定で placeholder 細分化
   const state = determineNorthStarLaneState('adRanking', { bundle, snap });
   renderNorthStarLane('adRanking', null, state);
 }
@@ -5611,7 +5636,11 @@ async function handleFetchContributionRankingClick(btn, hintEl) {
 
   // mirrorHtml が空 → 失敗理由を hint に出してボタンを再表示
   let failureHint = '(取得できませんでした)';
-  if (itemCount === 0) {
+  // v0.1.252: 「お困りの方はこちら」rescue link 配信者検出時の UX 改善
+  //   (autoOpen の setAutoOpenStatus が `rescue-link-detected-tick-N` 形式で返す)
+  if (typeof status === 'string' && status.startsWith('rescue-link-detected')) {
+    failureHint = '(取得不可：配信者側 Vue 未描画)';
+  } else if (itemCount === 0) {
     failureHint = '(イベント不参加 or サイドバー未描画)';
   } else if (status) {
     failureHint = `(取得失敗：${String(status).slice(0, 60)})`;
@@ -5789,7 +5818,11 @@ async function handleFetchGiftHistoryClick(btn, hintEl) {
   }
 
   let failureHint = '(取得できませんでした)';
-  if (itemCount === 0) {
+  // v0.1.252: 「お困りの方はこちら」rescue link 配信者は extension で fixable ではない
+  // (memory: niconico 本体 or 配信者設定の問題)。早期諦め表示で UX 改善。
+  if (status === 'rescue-link-detected') {
+    failureHint = '(取得不可：配信者側 Vue 未描画)';
+  } else if (itemCount === 0) {
     failureHint = '(ギフト 0 件 or 履歴タブ未描画)';
   } else if (status) {
     failureHint = `(取得失敗：${String(status).slice(0, 60)})`;

@@ -26,6 +26,21 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.252',
+    date: '2026-05-11',
+    summary: 'iframe relay 鏡自動取得 + rescue link UX',
+    items: Object.freeze([
+      'v0.1.250 Phase 1 (貢献度ランキング) / v0.1.251 Phase 2 (ギフト履歴) で導入したボタン取得式に加えて、ユーザーが自然にギフトサイドバーを開いた瞬間にも自動で鏡 outerHTML が popup に流れ込むようになりました。Phase 1/2 のボタンは「自動取得に失敗した時の force リトライ」位置づけに格下げされ、ユーザーの手間が更に減ります',
+      '実装: 既存 iframe relay 経路 (koken / audition iframe の content script が postMessage で親 frame に送る経路) の payload に contributionRankingMirrorHtml + giftHistoryMirrorHtml フィールドを追加。content-entry.js の maybeStartGiftSubAppIframeRelay で scrape して相乗りで送信、buildOfficialDomFromRelayEvent (iframeOfficialDomFromRelay.js) で frame source 別の routing 検証 (audition は contributionRanking 鏡のみ採用 / koken は両方 / nicoad+gift は drop)',
+      'popup 側 refreshOfficialEventDomBundle で nls_event_dom_(liveId) bundle と nls_iframe_official_dom_(liveId) iframe relay storage を同時取得して、bundle 側の鏡 field が空のときだけ iframe 側でマージ。Phase 1/2 ボタン経由で取った鏡を上書きしない設計',
+      'iframeOfficialDomFromRelay.test.js に vitest 7 件追加 (合計 25 件): koken の両 mirror 採用 / audition の giftHistory mirror drop / 鏡のみで accepted / nicoad は鏡も drop / 空文字列・非文字列の null 化 / koken giftHistory mirror 単独 accepted',
+      'Phase 2 (NLS_FETCH_GIFT_HISTORY_MIRROR) に「お困りの方はこちら」rescue link 早期 abort を追加: ユーザー自発診断 (lv350506725) で観測されたケース。3 秒 polling 待たず即諦め、popup には「(取得不可：配信者側 Vue 未描画)」hint で正直に表示',
+      'Phase 1 (NLS_FETCH_CONTRIBUTION_RANKING_MIRROR) も autoOpen の rescue-link-detected-tick-N status を popup 側で認識して「(取得不可：配信者側 Vue 未描画)」hint に正規化。「お困り」配信者では extension で fixable ではない既知の限界 (memory: niconico 本体 or 配信者設定の問題) を正直に伝える UX',
+      '広告ランキング (+α レーン) の popup 空白回帰を修正: 鏡 HTML が無いが structured adContributionRanking が居る配信 (kimito さん診断 lv350507546 で確認) で空白だったのを、structured items から build した簡易 HTML を fallback として描画するようにしました。鏡原則の延長で、niconico 公式値 (rank / name / contribution) は無加工で表示、ラップ HTML のみ拡張側。新規 buildAdRankingFallbackHtml.js + vitest 17 件',
+      '次の段階: Phase 3 (サポーター取得 + イベントランキング取得 = audition iframe の別 DOM scrape) は別 PR で順次。Phase 3 は DOM サンプル取得後に着手予定'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.251',
     date: '2026-05-11',
     summary: '北極星レーン 2 ギフト履歴 取得ボタン (Phase 2)',

@@ -26,7 +26,9 @@ import {
  * @typedef {{
  *   frameUrl?: string,
  *   contributionRanking?: unknown,
- *   eventBanner?: unknown
+ *   eventBanner?: unknown,
+ *   contributionRankingMirrorHtml?: unknown,
+ *   giftHistoryMirrorHtml?: unknown
  * }} IframeRelayEventData
  */
 
@@ -34,6 +36,8 @@ import {
  * @typedef {{
  *   contributionRanking: Array<unknown>,
  *   eventBanner: unknown,
+ *   contributionRankingMirrorHtml: string|null,
+ *   giftHistoryMirrorHtml: string|null,
  *   capturedAt: number,
  *   frameUrl: string,
  *   frameSource: import('./giftSubAppFrameSource.js').GiftSubAppFrameSource
@@ -76,12 +80,30 @@ export function buildOfficialDomFromRelayEvent(eventData, options = {}) {
     eventData.eventBanner && typeof eventData.eventBanner === 'object'
       ? eventData.eventBanner
       : null;
+  // v0.1.252: 鏡 outerHTML（content-entry.js の iframe relay 経路で iframe 側 content
+  //   script が `ul.contribution-ranking-list` / `ul.gift-history-list` の outerHTML を
+  //   付与して送る）。文字列のときだけ採用、それ以外は null。
+  const rawContribMirror =
+    typeof eventData.contributionRankingMirrorHtml === 'string' &&
+    eventData.contributionRankingMirrorHtml.length > 0
+      ? eventData.contributionRankingMirrorHtml
+      : null;
+  const rawGiftHistoryMirror =
+    typeof eventData.giftHistoryMirrorHtml === 'string' &&
+    eventData.giftHistoryMirrorHtml.length > 0
+      ? eventData.giftHistoryMirrorHtml
+      : null;
 
   // 入力自体が空なら no-input（nicoad で不適合 drop ではない）
-  if (!rawContrib && !rawBanner) {
+  if (!rawContrib && !rawBanner && !rawContribMirror && !rawGiftHistoryMirror) {
     return { shouldWrite: false, payload: null, frameSource, reason: 'no-data' };
   }
-  if ((rawContrib === null || rawContrib.length === 0) && !rawBanner) {
+  if (
+    (rawContrib === null || rawContrib.length === 0) &&
+    !rawBanner &&
+    !rawContribMirror &&
+    !rawGiftHistoryMirror
+  ) {
     return { shouldWrite: false, payload: null, frameSource, reason: 'no-input' };
   }
 
@@ -90,11 +112,21 @@ export function buildOfficialDomFromRelayEvent(eventData, options = {}) {
     ? rawContrib
     : null;
   const eventBanner = isEventBannerTrustedSource(frameSource) ? rawBanner : null;
+  // v0.1.252: 鏡 outerHTML の routing。contributionRanking 鏡は contributionRanking 構造化と
+  // 同じ信頼源（audition / koken）で採用。giftHistory 鏡は koken のみ（履歴タブは koken iframe
+  // にしか出ない、`giftSubAppFrameSource.js` の信頼マッピングに従う）。
+  const contributionRankingMirrorHtml = isContributionRankingTrustedSource(frameSource)
+    ? rawContribMirror
+    : null;
+  const giftHistoryMirrorHtml =
+    frameSource === 'koken' ? rawGiftHistoryMirror : null;
 
   const hasContrib = !!(contributionRanking && contributionRanking.length > 0);
   const hasBanner = !!eventBanner;
+  const hasContribMirror = !!contributionRankingMirrorHtml;
+  const hasGiftHistoryMirror = !!giftHistoryMirrorHtml;
 
-  if (!hasContrib && !hasBanner) {
+  if (!hasContrib && !hasBanner && !hasContribMirror && !hasGiftHistoryMirror) {
     return { shouldWrite: false, payload: null, frameSource, reason: 'all-dropped' };
   }
 
@@ -103,6 +135,8 @@ export function buildOfficialDomFromRelayEvent(eventData, options = {}) {
     payload: {
       contributionRanking: contributionRanking || [],
       eventBanner: eventBanner || null,
+      contributionRankingMirrorHtml: contributionRankingMirrorHtml || null,
+      giftHistoryMirrorHtml: giftHistoryMirrorHtml || null,
       capturedAt: now,
       frameUrl,
       frameSource
