@@ -74,6 +74,7 @@ import {
   fetchOfficialEventBannerFromAuditionEmbed,
   fetchNicoadContributionRankingFromPublishPage
 } from '../lib/officialEventDomBundle.js';
+import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
 import {
   scrapeContributionRankingFromDom,
   scrapeOfficialEventBannerFromDom
@@ -4368,24 +4369,29 @@ function buildGiftDiagnosticsBundle() {
       const eventRankNdgrVal = num(officialNicoEventRankNdgr);
       // v0.1.242: 番組累計ポイントも NDGR 由来の値を観測値 + state 判定に含める
       const programPointsNdgrVal = num(officialGiftPointsNdgr);
+      // v0.1.244: state を細分化 (popup の data-lane-state と同じ純関数で判定)。
+      //   'ok' | 'no_event' | 'no_program_gift' | 'iframe_unrendered' |
+      //   'fetch_error' | 'not_yet' | 'missing'
+      const snapForReason = {
+        officialNicoEventRankNdgr,
+        officialEventGiftScoreNdgr,
+        officialGiftPointsNdgr
+      };
+      const stateOf = (laneId) =>
+        determineNorthStarLaneState(laneId, { bundle: b, snap: snapForReason });
       return {
         '1_貢献度ランキング': {
-          state: contribCount > 0 ? 'ok' : 'missing',
+          state: stateOf('contributionRanking'),
           count: contribCount,
           foundCountLifetime: _d.contributionRankingFoundCount
         },
         '2_ギフト履歴': {
-          state: giftHistoryCount > 0 ? 'ok' : 'missing',
+          state: stateOf('giftHistory'),
           count: giftHistoryCount,
           foundCountLifetime: _d.giftHistoryFoundCount
         },
         '3_イベント累計スコア': {
-          state:
-            eventScore != null ||
-            eventScoreMirrorBytes > 0 ||
-            eventScoreNdgrVal != null
-              ? 'ok'
-              : 'missing',
+          state: stateOf('eventScore'),
           value: eventScore,
           ndgrValue: eventScoreNdgrVal,
           mirrorHtmlBytes: eventScoreMirrorBytes,
@@ -4393,27 +4399,19 @@ function buildGiftDiagnosticsBundle() {
           balloonFoundCountLifetime: _d.eventBalloonFoundCount
         },
         '4_番組累計ポイント': {
-          state:
-            programPoints != null || programPointsNdgrVal != null
-              ? 'ok'
-              : 'missing',
+          state: stateOf('programPoints'),
           value: programPoints,
           ndgrValue: programPointsNdgrVal
         },
         '5_イベント現在順位': {
-          state:
-            eventRank != null ||
-            eventRankMirrorBytes > 0 ||
-            eventRankNdgrVal != null
-              ? 'ok'
-              : 'missing',
+          state: stateOf('eventRank'),
           value: eventRank,
           ndgrValue: eventRankNdgrVal,
           mirrorHtmlBytes: eventRankMirrorBytes,
           bannerFoundCountLifetime: _d.eventBannerFoundCount
         },
         '+α_広告ランキング': {
-          state: adCount > 0 || adMirrorBytes > 0 ? 'ok' : 'missing',
+          state: stateOf('adRanking'),
           count: adCount,
           mirrorHtmlBytes: adMirrorBytes,
           foundCountLifetime: _d.adContributionRankingFoundCount
