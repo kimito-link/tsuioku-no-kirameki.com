@@ -26,6 +26,18 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.241',
+    date: '2026-05-11',
+    summary: '北極星 レーン 3+5 NDGR fallback 表示',
+    items: Object.freeze([
+      'v0.1.240 で実装した北極星レーン 3 (イベント累計スコア) / レーン 5 (イベント現在順位) の鏡レンダリングに、**NDGR stats 由来の値からの fallback 表示**を追加しました。audition fetch が空（DOM が取れない）でも NDGR から `officialEventGiftScoreNdgr` / `officialNicoEventRankNdgr` が取れていれば、popup レーンに「現在 N 位」「X,XXX」形式で公式値を表示します',
+      '優先度は **鏡 mirrorHtml > NDGR fallback > (未取得) placeholder**。鏡が取れる時は v0.1.240 通り outerHTML をそのまま映し、取れない時だけ NDGR 値で fallback HTML を組み立てます。両方取れない時は「(未取得)」placeholder で枠だけ維持（v0.1.236 仕様）',
+      '`src/lib/northStarFallbackHtml.js` を新設し、`buildNorthStarRankFallbackHtml` / `buildNorthStarScoreFallbackHtml` の 2 純関数を実装。niconico の class 名（`rank-field` / `rank-num` / `score`）をそのまま使い、`sanitizeMirrorHtml` がそのまま通せるシンプル構造（`span` / `strong` のみ、style/href/on* 等は使わない）。15 件の vitest で正の整数 / 0 / 負数 / null / NaN / Infinity / 小数 / 不正型 を網羅検証',
+      'AI 共有診断 JSON の `北極星レーン` に `ndgrValue` フィールドを追加（レーン 3 / 5 のみ）、state 判定も「数値 OR mirror html OR NDGR 値」のどれかが取れていれば ok に倒します。実機で「DOM 取れない / NDGR 取れている」状態を popup と診断 JSON の両方で正しく表現できるようになります',
+      '実機で観測された問題への直接対応: lv350503428（v0.1.237 実機）で `officialNicoEventRankNdgr: 50` が取れていたのに popup レーン 5 が `missing` 表示だった盲点を解消'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.240',
     date: '2026-05-11',
     summary: '北極星 レーン 3+5 (累計+順位) 鏡レンダリング',

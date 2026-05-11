@@ -4363,6 +4363,9 @@ function buildGiftDiagnosticsBundle() {
       const adMirrorBytes = strBytes(b?.adRankingMirrorHtml);
       const eventScoreMirrorBytes = strBytes(b?.eventCumulativeScoreMirrorHtml);
       const eventRankMirrorBytes = strBytes(b?.eventCurrentRankMirrorHtml);
+      // v0.1.241: NDGR stats 由来の fallback 値も観測値 + state 判定に含める
+      const eventScoreNdgrVal = num(officialEventGiftScoreNdgr);
+      const eventRankNdgrVal = num(officialNicoEventRankNdgr);
       return {
         '1_貢献度ランキング': {
           state: contribCount > 0 ? 'ok' : 'missing',
@@ -4376,8 +4379,13 @@ function buildGiftDiagnosticsBundle() {
         },
         '3_イベント累計スコア': {
           state:
-            eventScore != null || eventScoreMirrorBytes > 0 ? 'ok' : 'missing',
+            eventScore != null ||
+            eventScoreMirrorBytes > 0 ||
+            eventScoreNdgrVal != null
+              ? 'ok'
+              : 'missing',
           value: eventScore,
+          ndgrValue: eventScoreNdgrVal,
           mirrorHtmlBytes: eventScoreMirrorBytes,
           bannerFoundCountLifetime: _d.eventBannerFoundCount,
           balloonFoundCountLifetime: _d.eventBalloonFoundCount
@@ -4388,8 +4396,13 @@ function buildGiftDiagnosticsBundle() {
         },
         '5_イベント現在順位': {
           state:
-            eventRank != null || eventRankMirrorBytes > 0 ? 'ok' : 'missing',
+            eventRank != null ||
+            eventRankMirrorBytes > 0 ||
+            eventRankNdgrVal != null
+              ? 'ok'
+              : 'missing',
           value: eventRank,
+          ndgrValue: eventRankNdgrVal,
           mirrorHtmlBytes: eventRankMirrorBytes,
           bannerFoundCountLifetime: _d.eventBannerFoundCount
         },

@@ -18,6 +18,10 @@ import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStrip
 import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
+import {
+  buildNorthStarRankFallbackHtml,
+  buildNorthStarScoreFallbackHtml
+} from '../lib/northStarFallbackHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -5404,16 +5408,27 @@ function refreshNorthStarAdRankingLane() {
  * `_lastOfficialEventDomBundle.eventCumulativeScoreMirrorHtml` を sanitize して
  * popup の `#northStarLaneBody-eventScore` body に innerHTML として描画。
  *
- * - bundle が空 / mirrorHtml が空なら placeholder ("(未取得)") を維持
- * - イベント不参加時は audition embed の banner 自体が render されないので
- *   mirrorHtml も null になり、自然に "(未取得)" placeholder が維持される
+ * v0.1.241: 鏡 mirrorHtml が無い時、`watchMetaCache.snapshot.officialEventGiftScoreNdgr`
+ *  (NDGR stats 由来) があれば簡易 HTML で fallback 表示。
+ *
+ * - bundle が空 / mirrorHtml が空 / NDGR 値も空 なら placeholder ("(未取得)") を維持
+ * - イベント不参加時は banner も NDGR 値も無いので、自然に "(未取得)" placeholder が維持
  */
 function refreshNorthStarEventCumulativeScoreLane() {
   const bundle = _lastOfficialEventDomBundle;
   const mirrorHtml = typeof bundle?.eventCumulativeScoreMirrorHtml === 'string'
     ? bundle.eventCumulativeScoreMirrorHtml
     : null;
-  renderNorthStarLane('eventScore', mirrorHtml);
+  if (mirrorHtml) {
+    renderNorthStarLane('eventScore', mirrorHtml);
+    return;
+  }
+  const snap = watchMetaCache.snapshot;
+  const ndgrScore = typeof snap?.officialEventGiftScoreNdgr === 'number'
+    ? snap.officialEventGiftScoreNdgr
+    : null;
+  const fallback = buildNorthStarScoreFallbackHtml(ndgrScore);
+  renderNorthStarLane('eventScore', fallback);
 }
 
 /**
@@ -5421,14 +5436,26 @@ function refreshNorthStarEventCumulativeScoreLane() {
  * `_lastOfficialEventDomBundle.eventCurrentRankMirrorHtml` を sanitize して
  * popup の `#northStarLaneBody-eventRank` body に innerHTML として描画。
  *
- * - bundle が空 / mirrorHtml が空なら placeholder ("(未取得)") を維持
+ * v0.1.241: 鏡 mirrorHtml が無い時、`watchMetaCache.snapshot.officialNicoEventRankNdgr`
+ *  (NDGR stats 由来) があれば簡易 HTML で fallback 表示。
+ *
+ * - bundle が空 / mirrorHtml が空 / NDGR 値も空 なら placeholder ("(未取得)") を維持
  */
 function refreshNorthStarEventCurrentRankLane() {
   const bundle = _lastOfficialEventDomBundle;
   const mirrorHtml = typeof bundle?.eventCurrentRankMirrorHtml === 'string'
     ? bundle.eventCurrentRankMirrorHtml
     : null;
-  renderNorthStarLane('eventRank', mirrorHtml);
+  if (mirrorHtml) {
+    renderNorthStarLane('eventRank', mirrorHtml);
+    return;
+  }
+  const snap = watchMetaCache.snapshot;
+  const ndgrRank = typeof snap?.officialNicoEventRankNdgr === 'number'
+    ? snap.officialNicoEventRankNdgr
+    : null;
+  const fallback = buildNorthStarRankFallbackHtml(ndgrRank);
+  renderNorthStarLane('eventRank', fallback);
 }
 
 /**
