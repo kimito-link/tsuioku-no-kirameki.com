@@ -571,6 +571,25 @@ let _prevSupportCount = /** @type {number|null} */ (null);
 let _lastTopSupportRankStripStableKey = null;
 
 /**
+ * v0.1.246: popup 内で同 user_id を別 nickname で表示する衡突を防ぐ統一 map。
+ *
+ * 観測された問題（memory `todo_ndgr_username_resolution.md`、lv350462027 v0.1.168）:
+ * - popup「ユーザー別応援件数」: 71684574 → `とうふ`
+ * - popup「NDGR で観測したギフト」: 71684574 → `ball_football`
+ * 同じ user_id なのに section ごとに別 nickname。
+ *
+ * 原因: 各 section が別 storage (nls_comments_<lid> / nls_gift_users_<lid>) を引き、
+ * それぞれが異なるタイミングで異なる経路から populate されているため。
+ *
+ * 解決: `renderUserRooms` で aggregate した結果（`aggregateCommentsByUser` 経由、
+ * これが最も信頼度高い source）を本 map に流し、他 section（NDGR ギフト帯 / 公式
+ * サイドバー履歴等）は render 時に本 map を引き直して nickname を上書きする。
+ *
+ * @type {Map<string, string>}
+ */
+const _nicknameResolveMap = new Map();
+
+/**
  * 放送切替（liveId 変化）を検知して、直前放送の UI キャッシュ（rank strip キー・差分リアクション用の
  * 直近値）を全て強制リセットする。複数 refresh が並走したときに古い描画が新しい描画を上書きしても
  * 放送間のデータが混ざらないようにする防御策（2026-04 追加: 同一ポップアップで配信切替時に上位ユーザー
@@ -5649,12 +5668,18 @@ async function refreshGiftRankStrip(liveId) {
       const sorted = [...throwsRows].sort(
         (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
       );
-      rooms = sorted.slice(0, 12).map((r) => ({
-        userKey: String(r?.userId || ''),
-        nickname: String(r?.nickname || ''),
-        count: Number(r?.totalPoints) || 0,
-        avatarUrl: ''
-      }));
+      rooms = sorted.slice(0, 12).map((r) => {
+        const userKey = String(r?.userId || '');
+        const rawNickname = String(r?.nickname || '');
+        // v0.1.246: 統一 nickname map から resolve、無ければ raw を fallback
+        const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
+        return {
+          userKey,
+          nickname,
+          count: Number(r?.totalPoints) || 0,
+          avatarUrl: ''
+        };
+      });
       noteText = '公式サイドバー履歴のユーザー別集計（合計 pt 順）';
       unitSuffix = 'pt';
       ariaLabel = '公式サイドバー履歴のユーザー別集計';
@@ -5677,7 +5702,8 @@ async function refreshGiftRankStrip(liveId) {
       }
       rooms = stripRooms.map((r) => ({
         userKey: r.userKey,
-        nickname: r.nickname,
+        // v0.1.246: 統一 nickname map から resolve（同 user_id 別 nickname 衡突対策）
+        nickname: (r.userKey && _nicknameResolveMap.get(r.userKey)) || r.nickname,
         count: r.count,
         avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
       }));
@@ -5842,6 +5868,15 @@ function renderUserRooms(entries, liveId = '') {
       broadcasterIconUrl
     }
   ).filter((room) => room.userKey !== UNKNOWN_USER_KEY);
+  // v0.1.246: 統一 nickname map を populate（他 section が同 user_id の nickname を
+  // 引き直すための source）。aggregateCommentsByUser はコメント保存時の nickname を
+  // 最新優先で aggregate するので、最も信頼度の高い source として採用。
+  _nicknameResolveMap.clear();
+  for (const room of sanitizedRooms) {
+    if (room.userKey && room.nickname) {
+      _nicknameResolveMap.set(room.userKey, room.nickname);
+    }
+  }
   const rooms = excludeBroadcasterFromRankedRooms(sanitizedRooms, broadcasterUid);
   ul.innerHTML = '';
 
