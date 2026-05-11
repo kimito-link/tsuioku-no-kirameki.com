@@ -7,7 +7,8 @@ import {
   scrapeProgramStatisticsMenuFromDom,
   scrapeGiftHistoryFromDom,
   aggregateGiftHistoryByUser,
-  scrapeAdRankingMirrorHtml
+  scrapeAdRankingMirrorHtml,
+  scrapeEventInfoMirrorParts
 } from './officialEventBannerDom.js';
 
 describe('scrapeOfficialEventBannerFromDom', () => {
@@ -559,5 +560,120 @@ describe('scrapeAdRankingMirrorHtml (v0.1.237)', () => {
   it('null/undefined を渡しても落ちず null を返す', () => {
     expect(scrapeAdRankingMirrorHtml(null)).toBeNull();
     expect(scrapeAdRankingMirrorHtml(undefined)).toBeNull();
+  });
+});
+
+describe('scrapeEventInfoMirrorParts (v0.1.240)', () => {
+  it('実 niconico DOM から scoreHtml + rankHtml を outerHTML で返す', () => {
+    document.body.innerHTML = `
+      <a class="wrapper" href="https://audition.nicovideo.jp/embedded/richview/live?content_id=lv350458677">
+        <p class="owner-name">あかねこ。さんが参加しています！</p>
+        <div class="info">
+          <div class="text">
+            <p class="status">
+              <span class="rank-field"> 現在 <strong class="rank-num">2</strong> 位 </span>
+              <span class="score"><svg class="score-icon"></svg> 207,835</span>
+            </p>
+          </div>
+        </div>
+      </a>
+    `;
+
+    const parts = scrapeEventInfoMirrorParts(document);
+    expect(parts).not.toBeNull();
+    expect(parts.scoreHtml).toContain('class="score"');
+    expect(parts.scoreHtml).toContain('207,835');
+    expect(parts.scoreHtml).toContain('class="score-icon"');
+    expect(parts.rankHtml).toContain('class="rank-field"');
+    expect(parts.rankHtml).toContain('現在');
+    expect(parts.rankHtml).toContain('class="rank-num"');
+    expect(parts.rankHtml).toContain('2');
+    expect(parts.rankHtml).toContain('位');
+  });
+
+  it('該当バナーが無いときは null', () => {
+    document.body.innerHTML = '<div class="other">x</div>';
+    expect(scrapeEventInfoMirrorParts(document)).toBeNull();
+  });
+
+  it('「さんが参加しています」を含まない .owner-name は無視', () => {
+    document.body.innerHTML = `
+      <a class="wrapper">
+        <p class="owner-name">違うテキスト</p>
+        <p class="status">
+          <span class="rank-field">現在 <strong class="rank-num">1</strong> 位</span>
+          <span class="score">100</span>
+        </p>
+      </a>
+    `;
+    expect(scrapeEventInfoMirrorParts(document)).toBeNull();
+  });
+
+  it('score だけ取れて rank-field が無い場合は scoreHtml のみ', () => {
+    document.body.innerHTML = `
+      <a class="wrapper">
+        <p class="owner-name">配信者さんが参加しています！</p>
+        <p class="status">
+          <span class="score"><svg class="score-icon"></svg> 50,000</span>
+        </p>
+      </a>
+    `;
+    const parts = scrapeEventInfoMirrorParts(document);
+    expect(parts).not.toBeNull();
+    expect(parts.scoreHtml).toContain('50,000');
+    expect(parts.rankHtml).toBeNull();
+  });
+
+  it('rank-field だけ取れて score が無い場合は rankHtml のみ', () => {
+    document.body.innerHTML = `
+      <a class="wrapper">
+        <p class="owner-name">配信者さんが参加しています！</p>
+        <p class="status">
+          <span class="rank-field">現在 <strong class="rank-num">99</strong> 位</span>
+        </p>
+      </a>
+    `;
+    const parts = scrapeEventInfoMirrorParts(document);
+    expect(parts).not.toBeNull();
+    expect(parts.scoreHtml).toBeNull();
+    expect(parts.rankHtml).toContain('99');
+  });
+
+  it('wrapper はあるが両 span ともに取れない場合は null', () => {
+    document.body.innerHTML = `
+      <a class="wrapper">
+        <p class="owner-name">配信者さんが参加しています！</p>
+        <div class="info"><div class="text"></div></div>
+      </a>
+    `;
+    expect(scrapeEventInfoMirrorParts(document)).toBeNull();
+  });
+
+  it('null/undefined を渡しても落ちず null を返す', () => {
+    expect(scrapeEventInfoMirrorParts(null)).toBeNull();
+    expect(scrapeEventInfoMirrorParts(undefined)).toBeNull();
+  });
+
+  it('balloon の score-value (td) と混同しない（バナーの score 側を返す）', () => {
+    document.body.innerHTML = `
+      <a class="wrapper">
+        <p class="owner-name">配信者さんが参加しています！</p>
+        <p class="status">
+          <span class="rank-field">現在 <strong class="rank-num">3</strong> 位</span>
+          <span class="score"><svg class="score-icon"></svg> 12,345</span>
+        </p>
+      </a>
+      <table class="point-field">
+        <tr>
+          <th class="point-title">イベント累計スコア：</th>
+          <td class="point-value score-value"><svg></svg> 12,345</td>
+        </tr>
+      </table>
+    `;
+    const parts = scrapeEventInfoMirrorParts(document);
+    expect(parts).not.toBeNull();
+    // バナー内の span.score の outerHTML で td.score-value ではない
+    expect(parts.scoreHtml).toMatch(/^<span/);
+    expect(parts.scoreHtml).not.toContain('point-value');
   });
 });

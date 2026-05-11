@@ -5400,6 +5400,38 @@ function refreshNorthStarAdRankingLane() {
 }
 
 /**
+ * v0.1.240: 北極星 レーン 3 (イベント累計スコア) への流し込み。
+ * `_lastOfficialEventDomBundle.eventCumulativeScoreMirrorHtml` を sanitize して
+ * popup の `#northStarLaneBody-eventScore` body に innerHTML として描画。
+ *
+ * - bundle が空 / mirrorHtml が空なら placeholder ("(未取得)") を維持
+ * - イベント不参加時は audition embed の banner 自体が render されないので
+ *   mirrorHtml も null になり、自然に "(未取得)" placeholder が維持される
+ */
+function refreshNorthStarEventCumulativeScoreLane() {
+  const bundle = _lastOfficialEventDomBundle;
+  const mirrorHtml = typeof bundle?.eventCumulativeScoreMirrorHtml === 'string'
+    ? bundle.eventCumulativeScoreMirrorHtml
+    : null;
+  renderNorthStarLane('eventScore', mirrorHtml);
+}
+
+/**
+ * v0.1.240: 北極星 レーン 5 (イベント現在順位) への流し込み。
+ * `_lastOfficialEventDomBundle.eventCurrentRankMirrorHtml` を sanitize して
+ * popup の `#northStarLaneBody-eventRank` body に innerHTML として描画。
+ *
+ * - bundle が空 / mirrorHtml が空なら placeholder ("(未取得)") を維持
+ */
+function refreshNorthStarEventCurrentRankLane() {
+  const bundle = _lastOfficialEventDomBundle;
+  const mirrorHtml = typeof bundle?.eventCurrentRankMirrorHtml === 'string'
+    ? bundle.eventCurrentRankMirrorHtml
+    : null;
+  renderNorthStarLane('eventRank', mirrorHtml);
+}
+
+/**
  * 貢献度ランキング帯。niconico DOM から掬った正本値（`nls_event_dom_<lv>` の
  * contributionRanking）を最優先、それが無いときだけ NDGR ギフト event 集計に
  * フォールバック。応援帯と同じ CSS / モデル化（topSupportRankLineModels）を流用。
@@ -5611,6 +5643,10 @@ function renderUserRooms(entries, liveId = '') {
     await refreshGiftRankStrip(liveId);
     // v0.1.237: 北極星 +α 広告ランキングレーンを bundle.adRankingMirrorHtml から鏡描画
     refreshNorthStarAdRankingLane();
+    // v0.1.240: 北極星 レーン 3 イベント累計スコア + レーン 5 イベント現在順位を
+    //   bundle.eventCumulativeScoreMirrorHtml / eventCurrentRankMirrorHtml から鏡描画
+    refreshNorthStarEventCumulativeScoreLane();
+    refreshNorthStarEventCurrentRankLane();
     // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
     await refreshGiftRankingFetchPrompt(liveId);
     const snap = watchMetaCache.snapshot;

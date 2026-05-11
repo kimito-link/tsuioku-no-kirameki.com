@@ -26,6 +26,20 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.240',
+    date: '2026-05-11',
+    summary: '北極星 レーン 3+5 (累計+順位) 鏡レンダリング',
+    items: Object.freeze([
+      'popup の「公式値レーン」セクションの **レーン 3 イベント累計スコア** と **レーン 5 イベント現在順位** に、niconico の outerHTML をそのまま映す「鏡のように貼り付け」レンダリングを追加しました。イベント参加配信では、popup の枠内に audition embed の `span.score` / `span.rank-field`（スコアアイコン SVG / 順位の太字 / X,XXX 形式）が niconico ページの見た目のまま再現されます',
+      '`scrapeEventInfoMirrorParts(root)` を新規追加（`src/lib/officialEventBannerDom.js`）。「○○さんが参加しています！」グリーンバナーの `a.wrapper` 配下、`p.status` 内の `span.score` と `span.rank-field` の outerHTML をそれぞれ抜き出す純関数です。誤検出回避のため「さんが参加しています」テキストでバナー識別、`.score-icon` / `.score-value` の混同は CSS セレクタで除外しています',
+      '`fetchOfficialEventBannerFromAuditionEmbed` の戻り値（banner data）に v0.1.237 と同じ手法（`Object.defineProperty` で非列挙の `mirrorParts`）で `scoreHtml` / `rankHtml` を添付。content-entry.js 側で別 field（`bundle.eventCumulativeScoreMirrorHtml` / `bundle.eventCurrentRankMirrorHtml`）に写して storage 経由で popup に届けます',
+      'バンドル型 `OfficialEventDomBundle` に `eventCumulativeScoreMirrorHtml: string|null` / `eventCurrentRankMirrorHtml: string|null` を追加、`mergeOfficialEventDomBundle` も新フィールドのマージ（next 優先 / prev fallback）に対応。既存挙動は破壊しません',
+      'popup-entry.js に `refreshNorthStarEventCumulativeScoreLane()` / `refreshNorthStarEventCurrentRankLane()` を追加。bundle 更新の rerender pipeline（`refreshNorthStarAdRankingLane` の隣）で両レーンを描画します。値が無い時は v0.1.236 で常設した「(未取得)」placeholder と `data-lane-state` の missing 状態を維持します',
+      'AI 共有診断 JSON の `北極星レーン` も拡張。各レーンに `mirrorHtmlBytes` を追加し、鏡レンダリングが効いているか（bytes 数）を観測できます。state 判定も「数値 OR mirror html」のどちらかが取れていれば ok に倒します',
+      '取得経路は **audition.nicovideo.jp 直接 fetch**（cross-origin iframe inject を使わない）。v0.1.218 で機能不全だった gift sidebar iframe inject の解決を待たずに、credentials: include 付きで取れる方法をフル活用しています。イベント不参加時はバナー DOM 自体が render されないので mirrorHtml も null、placeholder が維持されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.239',
     date: '2026-05-10',
     summary: 'NDGR dedupe を MAIN world 受信に統合',
