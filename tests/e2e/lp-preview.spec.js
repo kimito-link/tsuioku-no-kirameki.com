@@ -25,27 +25,30 @@ async function allBoundingBoxes(locator) {
 }
 
 test.describe('lp-preview', () => {
-  test('SEOメタ: 記録安定・後補完・配信終了後回収が主要メタに入る', async ({ page }) => {
+  test('SEOメタ: 主要キーワード (応援コメント / 取りこぼしにくく / Chrome 拡張) が description に入る', async ({ page }) => {
     await page.goto(lpHref, { waitUntil: 'domcontentloaded' });
 
     await expect(page).toHaveTitle(/取りこぼしにくく、あとから育つコメント記録へ/);
 
+    // v0.1.248: description を v0.1.236-247 進捗反映に最新化 (Phase 5-1 PR #69)。
+    // long-lasting な核キーワード (応援コメント / 取りこぼしにくく / Chrome 拡張) を expect。
+    // 機能 keyword (公式値レーン / NDGR 等) は version 進化で変わる可能性があるので test には入れない。
     const description = await page.locator('meta[name="description"]').getAttribute('content');
-    expect(description).toContain('記録安定');
-    expect(description).toContain('後補完');
-    expect(description).toContain('配信終了後回収');
+    expect(description).toContain('応援コメント');
+    expect(description).toContain('取りこぼしにくく');
+    expect(description).toContain('Chrome 拡張');
 
     const ogDescription = await page
       .locator('meta[property="og:description"]')
       .getAttribute('content');
-    expect(ogDescription).toContain('後補完');
-    expect(ogDescription).toContain('配信終了後回収');
+    expect(ogDescription).toContain('応援コメント');
+    expect(ogDescription).toContain('取りこぼしにくく');
 
     const twitterDescription = await page
       .locator('meta[name="twitter:description"]')
       .getAttribute('content');
-    expect(twitterDescription).toContain('記録安定');
-    expect(twitterDescription).toContain('後補完');
+    expect(twitterDescription).toContain('応援コメント');
+    expect(twitterDescription).toContain('取りこぼしにくく');
   });
 
   test('hero会話: 390幅で3つの吹き出しが左右交互', async ({ page }) => {
