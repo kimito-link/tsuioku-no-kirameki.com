@@ -11,7 +11,8 @@
  * @typedef {{
  *   attemptCount?: number,
  *   lastStatus?: string,
- *   lastSidebarHints?: { hintCount?: number }|null
+ *   lastSidebarHints?: { hintCount?: number }|null,
+ *   lastDetailCode?: string
  * }} AutoOpenSnapshot
  *
  * @typedef {{
@@ -33,6 +34,8 @@
  *   - 'banner_not_rendered_sidebar_has_hints'    … 開いたが banner なし。hint はある（DOM scan miss の疑い）
  *   - 'sidebar_button_not_found'                 … sidebar を開く button 自体が見つからない
  *   - 'closed'                                   … sidebar が閉じている
+ *   - 'rank_tab_not_found'                       … `opened-but-no-banner` かつランキングタブ未検出（content-entry が lastDetailCode で渡す）
+ *   - 'ranking_dom_timeout'                      … タブは押したが所定時間内にスクレイパ可能な行が出なかった
  *   - その他文字列                                … lastStatus を素通し
  *
  * @param {AutoOpenSnapshot|null|undefined} autoOpen
@@ -50,6 +53,8 @@ export function deriveAutoOpenFailureReason(autoOpen) {
   if (status === 'opened-with-banner' || status === 'success') return null;
 
   if (status === 'opened-but-no-banner') {
+    const detail = String(autoOpen.lastDetailCode || '').trim();
+    if (detail === 'rank_tab_not_found') return 'rank_tab_not_found';
     const hints =
       autoOpen.lastSidebarHints && typeof autoOpen.lastSidebarHints === 'object'
         ? autoOpen.lastSidebarHints.hintCount | 0
@@ -57,6 +62,11 @@ export function deriveAutoOpenFailureReason(autoOpen) {
     return hints === 0
       ? 'banner_not_rendered_sidebar_empty'
       : 'banner_not_rendered_sidebar_has_hints';
+  }
+
+  if (status.startsWith('opened-no-banner-no-ranking')) {
+    const detail = String(autoOpen.lastDetailCode || '').trim();
+    if (detail === 'ranking_dom_timeout') return 'ranking_dom_timeout';
   }
 
   if (status === 'sidebar_button_not_found') return 'sidebar_button_not_found';

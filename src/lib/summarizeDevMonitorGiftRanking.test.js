@@ -207,6 +207,20 @@ describe('summarizeDevMonitorGiftRanking', () => {
     expect(v).toBeUndefined();
   });
 
+  it('応援ランキング: lastFailureReason rank_tab_not_found + hint テキスト', () => {
+    const c = buildRealisticFastCache();
+    c.content.giftDiagnostics.rankingDiag.autoOpen = {
+      attemptCount: 1,
+      lastStatus: 'opened-but-no-banner',
+      lastDetailCode: 'rank_tab_not_found',
+      lastFailureReason: 'rank_tab_not_found',
+      lastSidebarHints: { hintCount: 1, hints: [{ text: 'お困りの方はこちら' }] }
+    };
+    const rows = summarizeDevMonitorGiftRanking(c);
+    const v = rows.find((r) => r[0] === '応援ランキング自動オープン')?.[1];
+    expect(v).toBe('❌ rank_tab_not_found（hint: お困りの方はこちら）');
+  });
+
   it('応援ランキング自動オープン: lastFailureReason + hint テキスト', () => {
     const rows = summarizeDevMonitorGiftRanking(buildRealisticFastCache());
     const v = rows.find((r) => r[0] === '応援ランキング自動オープン')?.[1];

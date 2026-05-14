@@ -26,7 +26,7 @@ import {
   MCP_FOLDER_PATH
 } from './store.mjs';
 
-const SERVER_VERSION = '0.1.192';
+const SERVER_VERSION = '0.1.250';
 
 const TOOLS = [
   {
@@ -43,6 +43,21 @@ const TOOLS = [
     name: 'nicolive.get_gift_ad_rank',
     description:
       'gift / ad / event score / event rank / event title を Canonical Snapshot 形式で返す。liveId 省略時は最新 live。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        liveId: {
+          type: 'string',
+          description: '省略時は最新の live snapshot を使う'
+        }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'nicolive.get_ranking_snippet',
+    description:
+      'diag.rankingSnippet のみを返す（貢献度・広告ランキングの PII 最小断片: 順位・pt・匿名フラグ・行数・truncated）。snapshot が無ければ error。',
     inputSchema: {
       type: 'object',
       properties: {
@@ -186,6 +201,21 @@ async function dispatchTool(name, args) {
     return {
       liveId: s?.watch?.liveId || lid || '',
       gift: s?.gift || {},
+      rankingSnippet: s?.diag?.rankingSnippet ?? null,
+      mismatchReasons: Array.isArray(s?.diag?.mismatchReasons) ? s.diag.mismatchReasons : [],
+      seq: s?.meta?.seq ?? 0,
+      exportedAt: s?.meta?.exportedAt ?? 0
+    };
+  }
+  if (name === 'nicolive.get_ranking_snippet') {
+    const lid = String(args?.liveId || '').trim();
+    const snap = lid ? await readSnapshot(lid) : await readLatestSnapshot();
+    if (!snap) return { error: 'no_snapshot', requestedLiveId: lid };
+    const s = /** @type {any} */ (snap);
+    return {
+      liveId: s?.watch?.liveId || lid || '',
+      rankingSnippet: s?.diag?.rankingSnippet ?? null,
+      mismatchReasons: Array.isArray(s?.diag?.mismatchReasons) ? s.diag.mismatchReasons : [],
       seq: s?.meta?.seq ?? 0,
       exportedAt: s?.meta?.exportedAt ?? 0
     };
@@ -222,5 +252,6 @@ async function dispatchTool(name, args) {
 process.stderr.write(
   `[nicolive-mcp v${SERVER_VERSION}] watching ${MCP_FOLDER_PATH}\n` +
     '  Tools: nicolive.get_current_live_context / nicolive.get_gift_ad_rank /\n' +
-    '         nicolive.get_diagnostics / nicolive.list_live_snapshots\n'
+    '         nicolive.get_ranking_snippet / nicolive.get_diagnostics /\n' +
+    '         nicolive.list_live_snapshots\n'
 );

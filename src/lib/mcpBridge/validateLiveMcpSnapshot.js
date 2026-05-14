@@ -86,6 +86,11 @@ export function validateLiveMcpSnapshot(snapshot) {
         }
       }
     }
+    if ('rankingSnippet' in d && d.rankingSnippet != null) {
+      if (typeof d.rankingSnippet !== 'object' || Array.isArray(d.rankingSnippet)) {
+        errors.push('diag.rankingSnippet must be a non-array object when present');
+      }
+    }
   }
 
   return { valid: errors.length === 0, errors };

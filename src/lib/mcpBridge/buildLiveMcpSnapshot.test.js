@@ -134,6 +134,18 @@ describe('buildLiveMcpSnapshot', () => {
     expect(s.watch.aligned).toBe(true);
   });
 
+  it('officialEventDomBundle から diag.rankingSnippet を付与', () => {
+    const s = buildLiveMcpSnapshot({
+      officialEventDomBundle: {
+        capturedAt: 1_700_000_000_000,
+        contributionRanking: [{ rank: 1, contribution: 10, isAnonymous: false }]
+      }
+    });
+    expect(s.diag.rankingSnippet).toBeDefined();
+    expect(/** @type {any} */ (s.diag.rankingSnippet).bundleCapturedAt).toBe(1_700_000_000_000);
+    expect(isCanonicalLiveSnapshot(s)).toBe(true);
+  });
+
   it('5 種の値すべての変換', () => {
     const s = buildLiveMcpSnapshot({
       officialValuesV2: {

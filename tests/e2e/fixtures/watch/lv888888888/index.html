@@ -29,6 +29,17 @@
     <h1>nicolivelog E2E mock</h1>
     <p>URL は <code>/watch/lv888888888/</code>。コメントパネル構造のみニコ生に近い。</p>
     <!--
+      content-entry の extractBroadcasterUserId / streamLinkHrefCandidates 用。
+      無いと snapshot.broadcasterUserId が空になり、popup-entry の応援レーンが
+      数値 userId を誤配信者除外で全スキップする（story-user-lane-profile-nickname 等）。
+      実ページでは ?ref=watch_user_information 付き /user/{id}/live_programs が配信者本人。
+    -->
+    <a
+      href="https://www.nicovideo.jp/user/1000000001/live_programs?ref=watch_user_information"
+      class="nls-e2e-mock-broadcaster-anchor"
+      style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0)"
+      >E2E mock caster</a>
+    <!--
       collectWatchPageSnapshot → parseLiveViewerCountFromDocument が拾う文面。
       実ページの Shadow 外に相当する平文（body.textContent に含まれること）。
     -->

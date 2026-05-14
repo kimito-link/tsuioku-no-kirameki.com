@@ -375,6 +375,20 @@ export function scrapeContributionRankingFromDom(root) {
 }
 
 /**
+ * 貢献度ランキングが DOM 上に「`scrapeContributionRankingFromDom` が解釈可能な形」で存在するか。
+ * `tryAutoOpenGiftSidebarOnceForScrape` のポーリングとスクレイパの成功条件を一致させる
+ * （`.contribution-ranking-list .ranker` のみを見ると、`.content-supporter-section` 新構造で
+ * 常に false になり得るため）。
+ *
+ * @param {Document|Element|null|undefined} root
+ * @returns {boolean}
+ */
+export function hasContributionRankingDomSignal(root) {
+  const rows = scrapeContributionRankingFromDom(root);
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+/**
  * niconico の番組統計メニュー（プレイヤー上部のリアルタイム数値ティッカー）から
  * 来場者数・コメント数・タイムシフト予約数・広告pt・ギフトpt を掬う純関数。
  *

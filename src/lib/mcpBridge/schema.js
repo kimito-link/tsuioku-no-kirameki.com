@@ -105,7 +105,8 @@ export function isCanonicalValueWithMeta(v) {
  *     nicoEventTitle?: CanonicalValueWithMeta
  *   },
  *   diag: {
- *     mismatchReasons: string[]
+ *     mismatchReasons: string[],
+ *     rankingSnippet?: object
  *   }
  * }} CanonicalLiveSnapshot
  */
