@@ -142,6 +142,7 @@ import {
 import {
   findCommentListScrollHost,
   findNicoCommentPanel,
+  findWatchCommentHarvestFallbackRoot,
   harvestVirtualCommentList
 } from '../lib/commentHarvest.js';
 import { pickCommentMutationObserverRoot } from '../lib/observerTarget.js';
@@ -211,7 +212,10 @@ import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelF
 import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
 import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
 import { createPersistCoalescer } from '../lib/persistThrottle.js';
+import { isInsideRecommendedLiveSection } from '../lib/isInsideRecommendedLiveSection.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
+import { recordDiagnosticException } from '../lib/diagnosticRingStore.js';
+import { isRecommendedLivePollutionRow } from '../lib/backfillRemoveRecommendedLivePollution.js';
 import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
 import {
@@ -956,6 +960,7 @@ function harvestGiftCommentsFromCommentTableDom() {
     let sampled = 0;
     for (const row of giftRows) {
       if (!(row instanceof HTMLElement)) continue;
+      if (isInsideRecommendedLiveSection(row)) continue;
       const textEl = row.querySelector('.comment-text');
       const trimmed = (textEl?.textContent || '').trim();
       if (sampled < 3 && trimmed) {
@@ -5388,6 +5393,9 @@ function isContextInvalidatedError(err) {
 function reportSilentErrorToStorage(context, err) {
   const p = buildSilentErrorPayload(context, err, liveId);
   if (!p.shouldReport || !hasExtensionContext()) return;
+  void recordDiagnosticException(`content:${context}`, err, { liveId: p.liveId }).catch(
+    () => {}
+  );
   try {
     chrome.storage.local.set({ [KEY_STORAGE_WRITE_ERROR]: { at: p.at, ...(p.liveId ? { liveId: p.liveId } : {}), ...(p.message ? { message: p.message } : {}) } });
   } catch { /* best-effort */ }
@@ -7511,15 +7519,18 @@ const persistCoalescer = createPersistCoalescer(async (/** @type {ParsedCommentR
  * @param {{ source?: string }} [opts] ndgr | mutation | deep | visible
  */
 function persistCommentRows(rows, opts = {}) {
+  const filtered = Array.isArray(rows)
+    ? rows.filter((r) => !isRecommendedLivePollutionRow(r))
+    : [];
   const gate = diagnosePersistGate({
-    hasRows: !!rows?.length,
+    hasRows: !!filtered.length,
     recording,
     liveId: liveId || '',
     locationAllows: locationAllowsCommentRecording(),
     hasExtensionContext: hasExtensionContext()
   });
   if (!gate.pass) {
-    if (gate.failures.length && rows?.length) {
+    if (gate.failures.length && filtered.length) {
       lastPersistGateFailures = gate.failures;
     }
     return;
@@ -7527,13 +7538,13 @@ function persistCommentRows(rows, opts = {}) {
   lastPersistGateFailures = [];
   // v0.1.225 観測強化: source 別 persist 件数を累積（AI 共有診断 commentIngestBySource）
   const sourceKey = String(opts?.source || 'unknown');
-  const incBy = rows?.length || 0;
+  const incBy = filtered.length;
   if (Object.prototype.hasOwnProperty.call(_commentIngestSourceCounters, sourceKey)) {
     _commentIngestSourceCounters[sourceKey] += incBy;
   } else {
     _commentIngestSourceCounters.unknown += incBy;
   }
-  persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (rows));
+  persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (filtered));
 }
 
 /**
@@ -8360,7 +8371,8 @@ async function syncCommentHarvestPanelStatus() {
 function scanVisibleCommentsNow() {
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
   const panel = findNicoCommentPanel(document);
-  const root = panel || document.body;
+  const root = panel || findWatchCommentHarvestFallbackRoot(document);
+  if (!root) return;
   const rows = extractCommentsFromNode(root);
   void persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.VISIBLE });
   void syncCommentHarvestPanelStatus();

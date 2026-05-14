@@ -71,7 +71,7 @@ function rowCapturedAt(row) {
 /**
  * @param {readonly unknown[]|null|undefined} storedComments
  * @param {string|null|undefined} [liveId] 省略時は全 live を対象。非空のときは当該放送のみ。
- * @param {{ broadcasterUid?: string, broadcasterIconUrl?: string }} [opts]
+ * @param {{ broadcasterUid?: string, broadcasterIconUrl?: string, requireText?: boolean }} [opts]
  *   0.1.79: ギフト演出 DOM での avatar 取り違え対策。
  *     コメ記録に焼き込まれた avatarUrl のうち、broadcaster icon と一致する URL は
  *     viewer (uid !== broadcasterUid) には紐付けず破棄する。
@@ -86,11 +86,17 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
   const broadcasterUid = String(opts?.broadcasterUid ?? '').trim();
   const broadcasterIconUrl = String(opts?.broadcasterIconUrl ?? '').trim();
   const broadcasterGuardEnabled = Boolean(broadcasterUid && broadcasterIconUrl);
+  const requireText = opts?.requireText === true;
 
   const allRows = Array.isArray(storedComments) ? storedComments : [];
   let rows = filterByLive
     ? allRows.filter((e) => rowMatchesLiveFilter(e, targetNorm))
     : allRows;
+  if (requireText) {
+    rows = rows.filter((e) =>
+      Boolean(String(/** @type {{ text?: unknown }} */ (e)?.text ?? '').trim())
+    );
+  }
   /** 集約結果の liveId 表示に lid を使うか（フォールバック後は行ベース） */
   let useLidForOutput = filterByLive;
   if (filterByLive && rows.length === 0) {
@@ -101,7 +107,11 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
      * （以前は console.warn で黄色スタックを毎回出していた — UX 的にノイズ）
      */
     console.debug('[lane] filter matched 0, fallback all');
-    rows = allRows;
+    rows = requireText
+      ? allRows.filter((e) =>
+          Boolean(String(/** @type {{ text?: unknown }} */ (e)?.text ?? '').trim())
+        )
+      : allRows;
     useLidForOutput = false;
   }
 

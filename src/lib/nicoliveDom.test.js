@@ -77,6 +77,17 @@ describe('parseCommentElement', () => {
     expect(p?.userId).toBe('999');
     expect(p?.commentNo).toBe('88');
   });
+
+  it('おすすめ program-card 内の li は null（二重ガード）', () => {
+    document.body.innerHTML = `
+      <article class="program-card ga-ns-program-card">
+        <a href="https://live.nicovideo.jp/watch/lv350000001?ref=WatchPage-ContentsTabPanel-ProgramRecommendPanel-ProgramCard">x</a>
+        <li class="comment-count">12 本文風</li>
+      </article>`;
+    const li = document.querySelector('article li');
+    expect(li).not.toBeNull();
+    expect(parseCommentElement(/** @type {Element} */ (li))).toBeNull();
+  });
 });
 
 describe('extractUserIdFromDataAttributes', () => {
@@ -642,6 +653,26 @@ describe('extractCommentsFromNode', () => {
     const article = wrap.querySelector('article');
     expect(article).not.toBeNull();
     const list = extractCommentsFromNode(/** @type {Element} */ (article));
+    expect(list).toEqual([]);
+  });
+
+  it('ProgramRecommendPanel 相当のカード全文から extract は空（タイトル・数値をコメント化しない）', () => {
+    document.body.innerHTML = `
+      <form class="___loading-form___A loading-form">
+        <ul class="___program-card-list___B program-card-list">
+          <li class="item">
+            <article class="program-card ga-ns-program-card" id="lv350000099">
+              <a href="https://live.nicovideo.jp/watch/lv350000099?ref=WatchPage-ContentsTabPanel-ProgramRecommendPanel-ProgramCard">thumb</a>
+              <div class="content-area">
+                <a class="program-title" href="https://live.nicovideo.jp/watch/lv350000099?ref=WatchPage-ContentsTabPanel-ProgramRecommendPanel-ProgramCard">【Fixture】匿名タイトル</a>
+                <span class="___duration___D duration">2時間02分経過</span>
+                <ul><li class="___comment-count___E comment-count"><span>1,906</span></li></ul>
+              </div>
+            </article>
+          </li>
+        </ul>
+      </form>`;
+    const list = extractCommentsFromNode(document.body);
     expect(list).toEqual([]);
   });
 });

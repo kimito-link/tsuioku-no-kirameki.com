@@ -320,6 +320,8 @@ import {
   snapshotLooksAlignedWithWatchUrl,
   responseAlignedWithWatchUrl
 } from '../lib/watchSnapshotAlignment.js';
+import { extractNicoUserIdFromProfileUrl } from '../lib/nicoUserProfilePage.js';
+import { inferBroadcasterUserIdFromComments } from '../lib/inferBroadcasterUserIdFromComments.js';
 
 /**
  * @typedef {{
@@ -2580,7 +2582,9 @@ function reconcileStoredOwnPostedEntries(entries, liveId) {
  * @returns {PopupCommentEntry[]}
  */
 function buildDisplayCommentEntries(entries, liveId) {
-  const list = Array.isArray(entries) ? entries : [];
+  const list = Array.isArray(entries)
+    ? entries.filter((entry) => Boolean(String(entry?.text || '').trim()))
+    : [];
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid || !selfPostedRecentsCache.length) return list;
 
@@ -3260,7 +3264,10 @@ function renderStoryUserLane() {
   const liveId = String(STORY_SOURCE_STATE.liveId || '');
   const laneScheme = getStoryColorScheme();
   const viewerUid = String(watchMetaCache.snapshot?.viewerUserId || '').trim();
-  const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+  const broadcasterUid = inferBroadcasterUserIdFromComments(
+    storageCtx,
+    watchMetaCache.snapshot || {}
+  );
 
   /** @type {{ entryIndex: number, profileTier: number, thumbScore: number, displaySrc: string, title: string, entry: PopupCommentEntry, meta: { idLine: string, nameLine: string } }[]} */
   const candidates = [];
@@ -3276,6 +3283,12 @@ function renderStoryUserLane() {
     );
     const uidRaw = String(agg?.userId || '').trim();
     if (!uidRaw) continue;
+    /*
+     * 配信者IDが確定できない状態で numeric userId 段を出すと、配信者本人や
+     * watch 周辺ユーザーを「応援者」と誤表示する。誤表示を避けるため、
+     * この状態では匿名段だけに倒す。
+     */
+    if (!broadcasterUid && /^\d{5,14}$/.test(uidRaw)) continue;
     // 集約エントリは合成 id なので、`isOwnPostedSupportComment` の id 一致検査は
     // 必ず false になり、viewer uid と一致する自分のコメントまで contamination
     // guard で除外されてしまう（= りんくレーンに自コメが出ない）。
@@ -3498,8 +3511,12 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
         STORY_SOURCE_STATE.storageRowsForCurrentLive,
         nextLiveId,
         {
-          broadcasterUid: String(watchMetaCache.snapshot?.broadcasterUserId || '').trim(),
-          broadcasterIconUrl: String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim()
+          broadcasterUid: inferBroadcasterUserIdFromComments(
+            STORY_SOURCE_STATE.storageRowsForCurrentLive,
+            watchMetaCache.snapshot || {}
+          ),
+          broadcasterIconUrl: String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim(),
+          requireText: true
         }
       )
     : Object.freeze([]);
@@ -5865,6 +5882,9 @@ function renderUserRooms(entries, liveId = '') {
   //   rank strip 入力から除外。配信者カードは watchMetaCache.snapshot の
   //   broadcaster* フィールドから別経路で描画される。
   const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+  const inferredBroadcasterUid =
+    broadcasterUid ||
+    inferBroadcasterUserIdFromComments(list, watchMetaCache.snapshot || {});
   const broadcasterIconUrl = String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim();
   // 0.1.172: text が空の entry（ギフト送信のみ・システムイベント等）は
   //   「ユーザー別の応援件数」セクションの趣旨と合わないため、`requireText: true`
@@ -5877,7 +5897,7 @@ function renderUserRooms(entries, liveId = '') {
   const sanitizedRooms = sanitizeRoomAvatarsForBroadcaster(
     aggregateCommentsByUser(list, { requireText: true }),
     {
-      broadcasterUid,
+      broadcasterUid: inferredBroadcasterUid,
       broadcasterIconUrl
     }
   ).filter((room) => room.userKey !== UNKNOWN_USER_KEY);
@@ -5890,7 +5910,7 @@ function renderUserRooms(entries, liveId = '') {
       _nicknameResolveMap.set(room.userKey, room.nickname);
     }
   }
-  const rooms = excludeBroadcasterFromRankedRooms(sanitizedRooms, broadcasterUid);
+  const rooms = excludeBroadcasterFromRankedRooms(sanitizedRooms, inferredBroadcasterUid);
   ul.innerHTML = '';
 
   if (!rooms.length) {
@@ -7434,16 +7454,33 @@ function applyRecordHeroRecordingDataset(toggle) {
  * reset を先に済ませてから fallback で上書きする順序にすることで、renderCharacterScene
  * 内部（line 3884）の二重 reset の影響を受けない。
  *
+ * @param {{ excludeUserIds?: Iterable<string> }} [opts]
  * @returns {Promise<void>}
  */
-async function populateStorySourceEntriesFromStorageFallback() {
+async function populateStorySourceEntriesFromStorageFallback(opts = {}) {
+  /** @type {ReturnType<typeof buildLastBroadcastReviewView>|null} */
+  let lastReviewView = null;
+  /** @type {IDBDatabase|undefined} */
+  let db;
   try {
+    if (typeof indexedDB !== 'undefined') {
+      try {
+        db = await openBroadcastSessionSummaryDb();
+        lastReviewView = buildLastBroadcastReviewView(
+          await loadLastBroadcastSummary(db)
+        );
+      } catch {
+        lastReviewView = null;
+      } finally {
+        try { db?.close(); } catch { /* no-op */ }
+      }
+    }
     const bag = await storageGetSafe('nls_comments', { nls_comments: [] });
     const rows = Array.isArray(bag?.nls_comments) ? bag.nls_comments : [];
     const latestLv = findLatestLiveIdFromStoredComments(rows);
     if (!latestLv) return; // 保存が無ければ何もしない（空 lane のまま）
     const laneLvKey = normalizeLv(latestLv);
-    const storageRowsForLane = rows.filter((e) => {
+    const rawRowsForLane = rows.filter((e) => {
       const a = normalizeLv(e?.liveId);
       const b = normalizeLv(e?.lvId);
       return (
@@ -7451,12 +7488,29 @@ async function populateStorySourceEntriesFromStorageFallback() {
         (Boolean(b) && b === laneLvKey)
       );
     });
+    const lastViewLiveMatches =
+      lastReviewView && normalizeLv(lastReviewView.liveId) === laneLvKey;
+    const fallbackBroadcasterUid = lastViewLiveMatches
+      ? String(lastReviewView?.broadcasterUserId || '').trim()
+      : '';
+    const excludeIds = new Set(
+      Array.from(opts.excludeUserIds || [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+    );
+    if (fallbackBroadcasterUid) excludeIds.add(fallbackBroadcasterUid);
+    const storageRowsForLane = excludeBroadcasterFromCommentEntries(
+      rawRowsForLane,
+      fallbackBroadcasterUid
+    ).filter((entry) =>
+      !excludeIds.has(String(entry?.userId || '').trim())
+    );
     const displayEntries = buildDisplayCommentEntries(storageRowsForLane, latestLv);
     syncStorySourceEntries(latestLv, displayEntries, storageRowsForLane);
     try {
       laneStoreInstance.setCandidates(
         latestLv,
-        laneCandidatesFromStoredComments(rows, latestLv)
+        laneCandidatesFromStoredComments(storageRowsForLane, latestLv)
       );
     } catch (err) {
       if (typeof console !== 'undefined' && console?.warn) {
@@ -7850,6 +7904,19 @@ async function refresh() {
       .catch(() => {});
   }
   const fromActiveTab = watchUrlPick.source === 'activeTab';
+  const activeProfileUserIds = new Set(
+    [
+      tabs[0]?.url,
+      tabs[0]?.pendingUrl,
+      lastFocusedNormalActiveTab?.url,
+      lastFocusedNormalActiveTab?.pendingUrl,
+      typeof document !== 'undefined' ? document.referrer : '',
+      url
+    ]
+      .map((u) => extractNicoUserIdFromProfileUrl(String(u || '')))
+      .filter(Boolean)
+  );
+  const onNicoUserProfilePage = activeProfileUserIds.size > 0;
   const resolvedLv = extractLiveIdFromUrl(url);
   const viewerLvForError =
     isNicoLiveWatchUrl(url) && resolvedLv ? resolvedLv : '';
@@ -8049,9 +8116,14 @@ async function refresh() {
     void renderSessionSummaryComparePanel('');
     void renderGiftQuickStatsPanel('');
     void renderGiftSubAppHistoryPanel('');
-    // 応援レーンは「直近放送の保存」から暫定復元する。reset の後に呼ぶことで、
-    // 生 URL で popup を開いたときに lane が真っ白にならない（E2E lane-visibility）。
-    await populateStorySourceEntriesFromStorageFallback();
+    // 応援レーンは「直近放送の保存」から暫定復元する。ただし niconico の
+    // ユーザープロフィールページ上では、プロフィール本人やおすすめユーザーを
+    // 「応援者」と誤解しやすいため fallback 復元しない。
+    if (!onNicoUserProfilePage) {
+      await populateStorySourceEntriesFromStorageFallback({
+        excludeUserIds: activeProfileUserIds
+      });
+    }
     // 0.1.69 (AY): standalone popup / side panel では「前回の配信」を cards に
     // 復元する。INLINE_MODE（watch ページ内 iframe）は empty state 自体が
     // 発生しない想定なのでスキップ。clearWatchMetaCard() の直後に呼ぶことで
@@ -8116,7 +8188,12 @@ async function refresh() {
     void renderGiftQuickStatsPanel('');
     void renderGiftSubAppHistoryPanel('');
     // lv が取り出せなかった場合も、同じ保存ベース fallback を試みる。
-    await populateStorySourceEntriesFromStorageFallback();
+    // ただしユーザープロフィールページでは stale な応援者表示を出さない。
+    if (!onNicoUserProfilePage) {
+      await populateStorySourceEntriesFromStorageFallback({
+        excludeUserIds: activeProfileUserIds
+      });
+    }
     // 0.1.69 (AY): 同じ「watch URL があるけど lv 抜けない」レアケースでも
     // empty state なので、前回の配信を復元する。
     if (!INLINE_MODE) {
@@ -8264,8 +8341,10 @@ async function refresh() {
     //   配信者カードは watchMetaCache.snapshot.broadcaster* から別経路で描画されるため
     //   表示情報は失われない。HTML レポート側 (popup-entry.js:7745 周辺) では
     //   既に同等の inline filter が個別コメに適用されている。
-    const broadcasterUidForCommentExclude =
-      String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+    const broadcasterUidForCommentExclude = inferBroadcasterUserIdFromComments(
+      arr,
+      watchMetaCache.snapshot || {}
+    );
     const displayEntries = excludeBroadcasterFromCommentEntries(
       buildDisplayCommentEntries(arr, lv),
       broadcasterUidForCommentExclude
@@ -10524,14 +10603,12 @@ async function runOneTimeBackfillRemoveGiftSystemMessages() {
       }
     });
     if (totalRemoved > 0) {
-      // eslint-disable-next-line no-console
       console.log(
         `[nls-migration] removed ${totalRemoved} gift system message(s) from comment records`
       );
     }
   } catch (e) {
     // migration 失敗は致命でない（次回 boot で再試行）
-    // eslint-disable-next-line no-console
     console.warn('[nls-migration] backfill skipped:', e);
   }
 }
@@ -10581,21 +10658,65 @@ async function runOneTimeBackfillRemoveRecommendedLivePollution() {
       }
     });
     if (totalRemoved > 0) {
-      // eslint-disable-next-line no-console
       console.log(
         `[nls-migration] removed ${totalRemoved} recommended-live pollution row(s) from comment records`
       );
     }
   } catch (e) {
     // migration 失敗は致命でない（次回 boot で再試行）
-    // eslint-disable-next-line no-console
     console.warn('[nls-migration] backfill (recommended-live) skipped:', e);
+  }
+}
+
+/**
+ * v2: v1 実行後に追加したヒューリスティック（例: 開始時刻ラベル）で残った汚染を
+ * もう一度だけ走査除去する。v1 済みユーザーにも効かせるためフラグを分離。
+ */
+const KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_V2_DONE =
+  'nls_backfill_remove_recommended_live_pollution_v2';
+async function runOneTimeBackfillRemoveRecommendedLivePollutionV2() {
+  const local = globalThis.chrome?.storage?.local;
+  if (!local) return;
+  try {
+    const flagBag = await local.get(KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_V2_DONE);
+    if (flagBag?.[KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_V2_DONE]) return;
+
+    const all = await local.get(null);
+    let totalRemoved = 0;
+    /** @type {Record<string, unknown>} */
+    const updates = {};
+    for (const [key, value] of Object.entries(all)) {
+      if (!key.startsWith('nls_comments_lv')) continue;
+      const r = backfillRemoveRecommendedLivePollution(value);
+      if (r.removedCount > 0) {
+        updates[key] = r.cleaned;
+        totalRemoved += r.removedCount;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await local.set(updates);
+    }
+    await local.set({
+      [KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_V2_DONE]: {
+        at: new Date().toISOString(),
+        removedCount: totalRemoved,
+        version: 'recommend-pollution-v2'
+      }
+    });
+    if (totalRemoved > 0) {
+      console.log(
+        `[nls-migration] v2 removed ${totalRemoved} recommended-live pollution row(s) from comment records`
+      );
+    }
+  } catch (e) {
+    console.warn('[nls-migration] backfill v2 (recommended-live) skipped:', e);
   }
 }
 
 function initPopup() {
   void runOneTimeBackfillRemoveGiftSystemMessages();
   void runOneTimeBackfillRemoveRecommendedLivePollution();
+  void runOneTimeBackfillRemoveRecommendedLivePollutionV2();
   installExtensionContextErrorGuard();
   initOfflineBannerOnce();
   paintVersionBadge();

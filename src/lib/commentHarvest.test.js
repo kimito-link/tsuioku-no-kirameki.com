@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   findNicoCommentPanel,
+  findWatchCommentHarvestFallbackRoot,
   findLargestVerticalScrollHost,
   findCommentListScrollHost,
   harvestVirtualCommentList,
@@ -48,6 +49,38 @@ describe('findNicoCommentPanel', () => {
   });
 });
 
+describe('findWatchCommentHarvestFallbackRoot', () => {
+  it('comment-table があればそれを返す（body 全走査の代替）', () => {
+    document.body.innerHTML =
+      '<div class="___comment-table___AbCd comment-table" id="ct"></div>';
+    expect(findWatchCommentHarvestFallbackRoot(document)?.id).toBe('ct');
+  });
+
+  it('[data-comment-type] からコメントパネル祖先を拾う', () => {
+    document.body.innerHTML = `
+      <div class="ga-ns-comment-panel" id="pan">
+        <div class="body">
+          <div data-comment-type="normal" id="row">x</div>
+        </div>
+      </div>`;
+    expect(findWatchCommentHarvestFallbackRoot(document)?.id).toBe('pan');
+  });
+
+  it('該当が無ければ null', () => {
+    document.body.innerHTML = '<div class="unrelated">x</div>';
+    expect(findWatchCommentHarvestFallbackRoot(document)).toBeNull();
+  });
+
+  it('パネル未検出かつフォールバック無しでは harvest が空（document.body を走査しない）', async () => {
+    document.body.innerHTML = '<aside class="sidebar-only">x</aside>';
+    const rows = await harvestVirtualCommentList({
+      document,
+      extractCommentsFromNode,
+      waitMs: 0
+    });
+    expect(rows).toEqual([]);
+  });
+});
 describe('findCommentListScrollHost', () => {
   it('.body[role=rowgroup] でスクロール可能ならそれを返す', () => {
     document.body.innerHTML = `

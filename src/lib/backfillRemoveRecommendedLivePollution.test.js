@@ -7,7 +7,10 @@
  * を判定して除去する。
  */
 import { describe, it, expect } from 'vitest';
-import { backfillRemoveRecommendedLivePollution } from './backfillRemoveRecommendedLivePollution.js';
+import {
+  backfillRemoveRecommendedLivePollution,
+  isRecommendedLivePollutionRow
+} from './backfillRemoveRecommendedLivePollution.js';
 
 describe('backfillRemoveRecommendedLivePollution', () => {
   it('空配列はそのまま', () => {
@@ -126,5 +129,40 @@ describe('backfillRemoveRecommendedLivePollution', () => {
     const r = backfillRemoveRecommendedLivePollution(stored);
     expect(r.removedCount).toBe(0);
     expect(r.cleaned).toHaveLength(1);
+  });
+
+  it('開始時刻ラベル（22:28 開始）も除外', () => {
+    const stored = [
+      { commentNo: 1, text: '22:28 開始', userId: '111' },
+      { commentNo: 2, text: '本編コメント', userId: '222' }
+    ];
+    const r = backfillRemoveRecommendedLivePollution(stored);
+    expect(r.removedCount).toBe(1);
+    expect(r.cleaned).toHaveLength(1);
+    expect(r.cleaned[0].text).toBe('本編コメント');
+  });
+});
+
+describe('isRecommendedLivePollutionRow', () => {
+  it('ゼロ埋め分を含む経過表記も true（2時間02分経過）', () => {
+    expect(isRecommendedLivePollutionRow({ text: '2時間02分経過', userId: '1' })).toBe(
+      true
+    );
+  });
+
+  it('開始時刻ラベルは true（22:28 開始）', () => {
+    expect(isRecommendedLivePollutionRow({ text: '22:28 開始', userId: '' })).toBe(true);
+  });
+
+  it('通常コメントは false', () => {
+    expect(
+      isRecommendedLivePollutionRow({ text: 'こんにちは 22:28 開始の話', userId: '123' })
+    ).toBe(false);
+    expect(isRecommendedLivePollutionRow({ text: '12:34:56', userId: '1' })).toBe(false);
+  });
+
+  it('非 object は false', () => {
+    expect(isRecommendedLivePollutionRow(null)).toBe(false);
+    expect(isRecommendedLivePollutionRow('x')).toBe(false);
   });
 });
