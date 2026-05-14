@@ -4,6 +4,7 @@ import {
   scrapeOfficialEventBannerFromDom,
   scrapeOfficialEventBalloonFromDom,
   scrapeContributionRankingFromDom,
+  hasContributionRankingDomSignal,
   scrapeProgramStatisticsMenuFromDom,
   scrapeGiftHistoryFromDom,
   aggregateGiftHistoryByUser,
@@ -314,6 +315,46 @@ describe('scrapeContributionRankingFromDom', () => {
   it('該当無しは null', () => {
     document.body.innerHTML = '<div></div>';
     expect(scrapeContributionRankingFromDom(document)).toBeNull();
+  });
+});
+
+describe('hasContributionRankingDomSignal', () => {
+  it('content-supporter 新構造のみ（.contribution-ranking-list 無し）でも true', () => {
+    document.body.innerHTML = `
+      <div class="content-supporter-section">
+        <div class="wrapper">
+          <ul class="wrapper">
+            <li class="item">
+              <i class="rank"><span>1</span></i>
+              <div class="info">
+                <button class="ranker"><span class="name">a</span></button>
+                <p class="contribution">100 <svg></svg></p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>`;
+    expect(document.querySelector('.contribution-ranking-list .ranker')).toBeNull();
+    expect(hasContributionRankingDomSignal(document)).toBe(true);
+  });
+
+  it('旧 .contribution-ranking-list 構造でも true', () => {
+    document.body.innerHTML = `
+      <ul class="contribution-ranking-list">
+        <li class="ranker">
+          <button>
+            <p class="rank"><span>2</span></p>
+            <p class="text"><span class="ranker-name"><strong class="ranker-name-value" data-button-disabled="false">b</strong></span></p>
+            <p class="contribution">50 <svg></svg></p>
+          </button>
+        </li>
+      </ul>`;
+    expect(hasContributionRankingDomSignal(document)).toBe(true);
+  });
+
+  it('ランキング DOM 無しは false', () => {
+    document.body.innerHTML = '<div class="other">x</div>';
+    expect(hasContributionRankingDomSignal(document)).toBe(false);
   });
 });
 

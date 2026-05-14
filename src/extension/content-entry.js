@@ -77,6 +77,7 @@ import {
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
 import {
   scrapeContributionRankingFromDom,
+  hasContributionRankingDomSignal,
   scrapeOfficialEventBannerFromDom
 } from '../lib/officialEventBannerDom.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
@@ -223,6 +224,7 @@ import {
   summarizeGiftComments
 } from '../lib/parseGiftComment.js';
 import { buildLiveMcpSnapshot } from '../lib/mcpBridge/buildLiveMcpSnapshot.js';
+import { buildMcpMismatchReasons } from '../lib/mcpBridge/buildMcpMismatchReasons.js';
 import { validateLiveMcpSnapshot } from '../lib/mcpBridge/validateLiveMcpSnapshot.js';
 import { trimMapToMax } from '../lib/trimMap.js';
 import { diagnosePersistGate } from '../lib/commentSubmitSteps.js';
@@ -814,6 +816,8 @@ function getRankingLifetimeDiag() {
       autoOpenAttemptCount: 0,
       autoOpenLastAttemptAt: 0,
       autoOpenLastStatus: '',
+      /** @type {string} v0.1.250: deriveAutoOpenFailureReason 用（rank_tab_not_found / ranking_dom_timeout） */
+      autoOpenLastDetailCode: '',
       /** @type {Map<string, { count: number, lastAt: number }>} */
       giftSenders: new Map(),
       /** @type {Map<string, { sender: string, item: string, point: number, firstObservedAt: number }>} */
@@ -4034,6 +4038,7 @@ function buildGiftDiagnosticsBundle() {
             attemptCount: _d.autoOpenAttemptCount,
             lastAttemptAgoMs: ago(_d.autoOpenLastAttemptAt),
             lastStatus: _d.autoOpenLastStatus || '',
+            lastDetailCode: String(_d.autoOpenLastDetailCode || ''),
             // 0.1.174: 失敗時に sidebar 内 clickable を dump（テスラ式観測）
             lastSidebarHints
           };
@@ -9363,7 +9368,12 @@ async function buildAndPersistMcpSnapshot() {
     aligned: !!(/** @type {any} */ (giftDiag).liveIdAlignedWithUrl),
     exportedAt: now,
     officialValuesV2: /** @type {any} */ (v2),
-    mismatchReasons: []
+    mismatchReasons: buildMcpMismatchReasons({
+      liveIdAlignedWithUrl: !!(/** @type {any} */ (giftDiag).liveIdAlignedWithUrl),
+      officialEventDomBundle: lastOfficialEventDomBundle,
+      nowMs: now
+    }),
+    officialEventDomBundle: lastOfficialEventDomBundle
   });
   const validation = validateLiveMcpSnapshot(snapshot);
   if (!validation.valid) return;
@@ -10116,6 +10126,7 @@ function setAutoOpenStatus(v) {
     if (v === 'start') _d.autoOpenAttemptCount += 1;
     _d.autoOpenLastAttemptAt = Date.now();
     _d.autoOpenLastStatus = String(v || '').slice(0, 80);
+    if (v === 'start') _d.autoOpenLastDetailCode = '';
   } catch { /* no-op */ }
 }
 
@@ -10412,8 +10423,10 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
         await new Promise((r) => setTimeout(r, 500));
         const hasRank = (() => {
           try {
-            return !!document.querySelector('.contribution-ranking-list .ranker');
-          } catch { return false; }
+            return hasContributionRankingDomSignal(document);
+          } catch {
+            return false;
+          }
         })();
         if (hasRank) {
           await persistOfficialEventDomBundleNow();
@@ -10435,12 +10448,24 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
       if (rankTabBtn) {
         try { snapshotAutoOpenSidebarHints(); } catch { /* no-op */ }
       }
+      try {
+        const _dOpen = getRankingLifetimeDiag();
+        _dOpen.autoOpenLastDetailCode = rankTabBtn ? 'ranking_dom_timeout' : 'rank_tab_not_found';
+      } catch {
+        /* no-op */
+      }
       setAutoOpenStatus(
         rankTabBtn ? `opened-no-banner-no-ranking:${rankTabFinder}` : 'opened-but-no-banner'
       );
     } else if (scrapedBanner && !scrapedRanking) {
       if (rankTabBtn) {
         try { snapshotAutoOpenSidebarHints(); } catch { /* no-op */ }
+      }
+      try {
+        const _dOpen = getRankingLifetimeDiag();
+        _dOpen.autoOpenLastDetailCode = rankTabBtn ? 'ranking_dom_timeout' : 'rank_tab_not_found';
+      } catch {
+        /* no-op */
       }
       setAutoOpenStatus(
         rankTabBtn ? `banner-only-no-ranking:${rankTabFinder}` : 'banner-only-no-rank-tab'

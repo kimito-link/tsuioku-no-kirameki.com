@@ -7,6 +7,7 @@
  * - watch.liveId が異なれば merge せず seq の新しい方を返す（live mismatch）
  * - gift field は「base に値がなければ other で補完」（depleted-fill 戦略）
  * - diag.mismatchReasons は和集合（重複排除）
+ * - diag.rankingSnippet は base 優先、無ければ other で補完
  */
 
 /**
@@ -37,13 +38,26 @@ export function mergeLiveMcpSnapshot(a, b) {
   const base = aSeq >= bSeq ? a : b;
   const other = base === a ? b : a;
 
+  const baseDiagRec = /** @type {Record<string, unknown>} */ (base.diag || {});
+  const otherDiagRec = /** @type {Record<string, unknown>} */ (other.diag || {});
+  const baseRs = baseDiagRec.rankingSnippet;
+  const otherRs = otherDiagRec.rankingSnippet;
+
+  /** @type {Record<string, unknown>} */
+  const mergedDiag = { mismatchReasons: [] };
+  if (baseRs != null && typeof baseRs === 'object' && !Array.isArray(baseRs)) {
+    mergedDiag.rankingSnippet = structuredClone(baseRs);
+  } else if (otherRs != null && typeof otherRs === 'object' && !Array.isArray(otherRs)) {
+    mergedDiag.rankingSnippet = structuredClone(otherRs);
+  }
+
   /** @type {CanonicalLiveSnapshot} */
   const merged = {
     nlsMcpSnapshotVersion: base.nlsMcpSnapshotVersion,
     meta: { ...base.meta },
     watch: { ...base.watch },
     gift: { ...base.gift },
-    diag: { mismatchReasons: [] }
+    diag: /** @type {CanonicalLiveSnapshot['diag']} */ (mergedDiag)
   };
 
   // gift: base に値がない（または value=null）field を other で補完

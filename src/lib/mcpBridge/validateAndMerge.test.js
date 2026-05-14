@@ -79,6 +79,25 @@ describe('validateLiveMcpSnapshot', () => {
     expect(r.valid).toBe(false);
     expect(r.errors.some((e) => e.includes('mismatchReasons[0]'))).toBe(true);
   });
+
+  it('diag.rankingSnippet が配列だと invalid', () => {
+    const s = createEmptyCanonicalSnapshot();
+    /** @type {any} */ (s.diag).rankingSnippet = [];
+    const r = validateLiveMcpSnapshot(s);
+    expect(r.valid).toBe(false);
+    expect(r.errors.some((e) => e.includes('rankingSnippet'))).toBe(true);
+  });
+
+  it('diag.rankingSnippet がオブジェクトなら valid', () => {
+    const s = createEmptyCanonicalSnapshot();
+    /** @type {any} */ (s.diag).rankingSnippet = {
+      bundleCapturedAt: 1,
+      contribution: { rowCount: 1, rows: [], truncated: false },
+      ad: { rowCount: 0, rows: [], truncated: false }
+    };
+    const r = validateLiveMcpSnapshot(s);
+    expect(r.valid).toBe(true);
+  });
 });
 
 describe('mergeLiveMcpSnapshot', () => {
@@ -162,6 +181,38 @@ describe('mergeLiveMcpSnapshot', () => {
       'no_field',
       'live_mismatch'
     ]);
+  });
+
+  it('rankingSnippet は base（seq 新）優先', () => {
+    const baseSnippet = {
+      bundleCapturedAt: 10,
+      contribution: { rowCount: 1, rows: [], truncated: false },
+      ad: { rowCount: 0, rows: [], truncated: false }
+    };
+    const otherSnippet = {
+      bundleCapturedAt: 99,
+      contribution: { rowCount: 2, rows: [], truncated: false },
+      ad: { rowCount: 0, rows: [], truncated: false }
+    };
+    const a = make({ seq: 1 });
+    /** @type {any} */ (a.diag).rankingSnippet = otherSnippet;
+    const b = make({ seq: 2 });
+    /** @type {any} */ (b.diag).rankingSnippet = baseSnippet;
+    const merged = mergeLiveMcpSnapshot(a, b);
+    expect(merged?.diag.rankingSnippet).toEqual(baseSnippet);
+  });
+
+  it('base に rankingSnippet が無ければ other から補完', () => {
+    const sn = {
+      bundleCapturedAt: 5,
+      contribution: { rowCount: 1, rows: [], truncated: false },
+      ad: { rowCount: 0, rows: [], truncated: false }
+    };
+    const a = make({ seq: 2 });
+    const b = make({ seq: 1 });
+    /** @type {any} */ (b.diag).rankingSnippet = sn;
+    const merged = mergeLiveMcpSnapshot(a, b);
+    expect(merged?.diag.rankingSnippet).toEqual(sn);
   });
 
   it('Deterministic：a/b の順序を入れ替えても同結果', () => {

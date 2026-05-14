@@ -68,8 +68,9 @@ stderr に起動メッセージが出ます。stdin/stdout は MCP プロトコ�
 | Tool | 説明 |
 |---|---|
 | `nicolive.get_current_live_context` | 最新 live の context（liveId / watchUrl / seq / exportedAt） |
-| `nicolive.get_gift_ad_rank` | gift / ad / event score / event rank / event title（liveId 指定可、省略時は最新） |
-| `nicolive.get_diagnostics` | aligned 状態と mismatchReasons（取得経路の整合性） |
+| `nicolive.get_gift_ad_rank` | gift / ad / event 系の Canonical 値に加え、`rankingSnippet`（PII 最小ランキング断片）と `mismatchReasons` を同梱（liveId 省略可） |
+| `nicolive.get_ranking_snippet` | `diag.rankingSnippet` と `mismatchReasons` のみを返す（軽量参照用） |
+| `nicolive.get_diagnostics` | aligned 状態と mismatchReasons（`live_mismatch` / `dom_bundle_stale` など取得経路・鮮度） |
 | `nicolive.list_live_snapshots` | フォルダにある snapshot の liveId 一覧（mtime 降順） |
 
 返却値は Canonical Snapshot（`src/lib/mcpBridge/schema.js`）の構造に準拠。

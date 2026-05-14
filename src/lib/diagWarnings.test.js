@@ -72,6 +72,36 @@ describe('deriveAutoOpenFailureReason', () => {
     ).toBe('banner_not_rendered_sidebar_empty');
   });
 
+  it('opened-but-no-banner + lastDetailCode rank_tab_not_found → ヒントより優先', () => {
+    expect(
+      deriveAutoOpenFailureReason({
+        attemptCount: 1,
+        lastStatus: 'opened-but-no-banner',
+        lastDetailCode: 'rank_tab_not_found',
+        lastSidebarHints: { hintCount: 3 }
+      })
+    ).toBe('rank_tab_not_found');
+  });
+
+  it('opened-no-banner-no-ranking:* + lastDetailCode ranking_dom_timeout', () => {
+    expect(
+      deriveAutoOpenFailureReason({
+        attemptCount: 1,
+        lastStatus: 'opened-no-banner-no-ranking:class',
+        lastDetailCode: 'ranking_dom_timeout'
+      })
+    ).toBe('ranking_dom_timeout');
+  });
+
+  it('opened-no-banner-no-ranking:* で detail 無しは lastStatus 素通し', () => {
+    expect(
+      deriveAutoOpenFailureReason({
+        attemptCount: 1,
+        lastStatus: 'opened-no-banner-no-ranking:text:button'
+      })
+    ).toBe('opened-no-banner-no-ranking:text:button');
+  });
+
   it('lastStatus=sidebar_button_not_found → 同名トークン', () => {
     expect(
       deriveAutoOpenFailureReason({

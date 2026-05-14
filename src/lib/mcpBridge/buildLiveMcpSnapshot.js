@@ -13,6 +13,7 @@ import {
   REASON_CODES,
   makeCanonicalValue
 } from './schema.js';
+import { buildMcpRankingSnippetFromBundle } from './buildMcpRankingSnippet.js';
 
 /**
  * @typedef {import('./schema.js').CanonicalLiveSnapshot} CanonicalLiveSnapshot
@@ -82,7 +83,8 @@ function pickBestSource(sources, priorities) {
  *     nicoEventRank?: Record<string, OfficialValueV2>,
  *     nicoEventTitle?: Record<string, OfficialValueV2>
  *   },
- *   mismatchReasons?: string[]
+ *   mismatchReasons?: string[],
+ *   officialEventDomBundle?: unknown
  * }} BuildLiveMcpSnapshotInput
  */
 
@@ -136,6 +138,11 @@ export function buildLiveMcpSnapshot(input = {}) {
     if (picked) {
       snapshot.gift[outKey] = picked;
     }
+  }
+
+  const rankingSnippet = buildMcpRankingSnippetFromBundle(input.officialEventDomBundle);
+  if (rankingSnippet) {
+    /** @type {Record<string, unknown>} */ (snapshot.diag).rankingSnippet = rankingSnippet;
   }
 
   return snapshot;
