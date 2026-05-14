@@ -844,6 +844,7 @@ export function parseNicoLiveTableRow(el) {
  */
 export function parseCommentElement(el) {
   if (!el || el.nodeType !== 1) return null;
+  if (isInsideRecommendedLiveSection(el)) return null;
   const fromGrid = parseNicoLiveTableRow(el);
   if (fromGrid) return fromGrid;
 

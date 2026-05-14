@@ -15,6 +15,7 @@
  *   - CSS Modules はビルドごとにハッシュが変わるので、`[class*="..."]`
  *     部分一致で識別する（ハッシュ前後の static 部分が必ず残る）。
  *   - 一致候補は親方向の closest で辿る（要素自身も含む）。
+ *   - `a[href*="ProgramRecommendPanel"]` は ref パラメータが安定しやすい（2026-05 実 DOM）。
  *   - selector のいずれかが parse error を投げても安全に false を返す。
  *
  * @param {Element|null|undefined} element 判定対象の DOM 要素
@@ -24,19 +25,36 @@ export function isInsideRecommendedLiveSection(element) {
   if (!element || typeof (/** @type {any} */ (element).closest) !== 'function') {
     return false;
   }
+  const el = /** @type {Element} */ (element);
   const selectors = [
     '[class*="program-card-list"]',
     '[class*="program-card"]',
     '[class*="program-recommend"]',
+    '[class*="loading-form"]',
     '[class*="loading-target"]',
     '[class*="program-statistics"]'
   ];
   for (const sel of selectors) {
     try {
-      if (/** @type {Element} */ (element).closest(sel)) return true;
+      if (el.closest(sel)) return true;
     } catch {
       // セレクタが古い環境で SyntaxError 等を出しても無視して継続
     }
+  }
+  // ProgramRecommendPanel 専用 URL（コメント欄の user リンクとは衝突しにくい）
+  try {
+    if (el.closest('a[href*="ProgramRecommendPanel"]')) return true;
+  } catch {
+    // ignore
+  }
+  // カード内の comment-count は a の兄弟配下にあり、href だけでは closest できない
+  try {
+    const art = el.closest(
+      'article[class*="program-card"], article.ga-ns-program-card, article.program-card'
+    );
+    if (art && art.querySelector?.('a[href*="ProgramRecommendPanel"]')) return true;
+  } catch {
+    // ignore
   }
   return false;
 }

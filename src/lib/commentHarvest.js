@@ -77,6 +77,36 @@ export function findNicoCommentPanel(root = document) {
 }
 
 /**
+ * コメントパネル検出に失敗したとき、`document.body` 全走査を避けるためのフォールバックルート。
+ * おすすめ生放送（ProgramRecommendPanel）DOM への誤 hit を減らす。
+ *
+ * @param {Document|undefined|null} doc
+ * @returns {Element|null}
+ */
+export function findWatchCommentHarvestFallbackRoot(doc) {
+  if (!doc || doc.nodeType !== 9) return null;
+  /** @param {string} sel */
+  const tryFind = (sel) => {
+    try {
+      return doc.querySelector(sel);
+    } catch {
+      return null;
+    }
+  };
+  const table =
+    tryFind('.comment-table') || tryFind('[class*="comment-table"]');
+  if (table) return table;
+  const typed = tryFind('[data-comment-type]');
+  if (typed && typeof typed.closest === 'function') {
+    const panelish = typed.closest(
+      '.ga-ns-comment-panel, .comment-panel, [class*="comment-panel"], [class*="ns-comment"]'
+    );
+    if (panelish) return /** @type {Element} */ (panelish);
+  }
+  return typed instanceof Element ? typed : null;
+}
+
+/**
  * @param {Element} el
  * @returns {Element|null}
  */
@@ -201,8 +231,9 @@ export async function harvestVirtualCommentList(opts) {
   const quietScroll = Boolean(opts.quietScroll);
 
   const panel = findNicoCommentPanel(doc);
-  const scanRoot = panel || doc.body;
+  const scanRoot = panel || findWatchCommentHarvestFallbackRoot(doc);
   if (!extract) return [];
+  if (!scanRoot) return [];
 
   /**
    * @param {Map<string, { commentNo?: string, text: string, userId?: string|null, avatarUrl?: string }>} map

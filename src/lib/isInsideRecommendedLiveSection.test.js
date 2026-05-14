@@ -147,6 +147,43 @@ describe('isInsideRecommendedLiveSection', () => {
     expect(isInsideRecommendedLiveSection(/** @type {Element} */ (target))).toBe(false);
   });
 
+  it('ProgramRecommendPanel の a[href] 配下は true（ref 安定シグナル）', () => {
+    document.body.innerHTML = `
+      <a id="rec" href="https://live.nicovideo.jp/watch/lv350000001?ref=WatchPage-ContentsTabPanel-ProgramRecommendPanel-ProgramCard">title</a>`;
+    const a = document.getElementById('rec');
+    expect(a).not.toBeNull();
+    expect(isInsideRecommendedLiveSection(/** @type {Element} */ (a))).toBe(true);
+  });
+
+  it('2026-05 実 DOM：comment-count は article 内で a と兄弟でも ProgramRecommendPanel で true', () => {
+    document.body.innerHTML = `
+      <form class="___loading-form___X loading-form">
+        <div class="___loading-target___Y loading-target">
+          <ul class="___program-card-list___Z program-card-list">
+            <li class="item">
+              <article class="___program-card___P program-card ga-ns-program-card" id="lv350000001">
+                <a class="preview" href="https://live.nicovideo.jp/watch/lv350000001?ref=WatchPage-ContentsTabPanel-ProgramRecommendPanel-ProgramCard">x</a>
+                <div class="content-area">
+                  <div class="status-bar">
+                    <div class="___program-statistics___S program-statistics">
+                      <ul>
+                        <li class="___comment-count___C comment-count" title="コメント数">
+                          <span data-value="0">0</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </li>
+          </ul>
+        </div>
+      </form>`;
+    const li = document.querySelector('.comment-count');
+    expect(li).not.toBeNull();
+    expect(isInsideRecommendedLiveSection(/** @type {Element} */ (li))).toBe(true);
+  });
+
   it('閉じる selector のいずれかが SyntaxError を投げてもクラッシュしない', () => {
     // closest が例外を投げるケースを模擬
     const fakeElement = /** @type {any} */ ({

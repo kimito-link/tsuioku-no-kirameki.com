@@ -42,7 +42,7 @@ const SYNTHETIC_CANONICAL_URL =
 const PERSONAL_URL = 'https://example.com/custom-thumb.png';
 
 /**
- * @param {Array<{ userId?: unknown, nickname?: unknown, avatarUrl?: unknown, avatarObserved?: boolean, liveId?: unknown }>} storedComments
+ * @param {Array<{ userId?: unknown, nickname?: unknown, avatarUrl?: unknown, avatarObserved?: boolean, liveId?: unknown, text?: unknown }>} storedComments
  * @param {string} userId
  */
 function pickCandidateByUserId(storedComments, userId) {
@@ -111,6 +111,19 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
     const candidate = pickCandidateByUserId(storedComments, userId);
     expect(candidate).toBeTruthy();
     expect(candidate?.avatarObserved).toBe(false);
+  });
+
+  it('requireText: true ではコメント本文なしのユーザー候補を除外する', () => {
+    const out = userLaneCandidatesFromStorage(
+      [
+        { liveId: 'lv1', userId: '142991637', nickname: '配信者', text: '' },
+        { liveId: 'lv1', userId: '17449156', nickname: 'でんでんぽ', text: 'こんにちは' }
+      ],
+      'lv1',
+      { requireText: true }
+    );
+
+    expect(out.map((row) => row.userId)).toEqual(['17449156']);
   });
 
   it.each([

@@ -12,16 +12,34 @@
  *   v0.1.200 の root cause fix（src/lib/nicoliveDom.js のガード追加）後の
  *   後始末。それ以前に汚染した storage 行を popup 起動時に 1 回だけ除去する。
  *
- * 検出ヒューリスティック（false positive を最小化）:
- *   - text が「N分経過」「N時間N分経過」「N分前」「N時間前」（duration label）
- *   - text が「LIVE」「タイムシフト」「公開終了」（status label）
- *   - userId が「lv\d+」形式（配信 ID を user ID として誤認）
- *
  * ギフトシステム文言は v0.1.196 の `backfillRemoveGiftSystemMessages` が
  * 担当するため、ここでは触らない（責務分離）。
  *
  * 純関数（input mutate せず、新しい array を返す）。
+ */
+
+/**
+ * 1 行が「おすすめ生放送カード由来」の storage 汚染か（persist 前フィルタと共有）。
  *
+ * @param {unknown} entry mergeNewComments 行または同等の { text?, userId? }
+ * @returns {boolean}
+ */
+export function isRecommendedLivePollutionRow(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  const text = String(/** @type {{ text?: unknown }} */ (entry).text || '').trim();
+  const userId = String(/** @type {{ userId?: unknown }} */ (entry).userId || '').trim();
+
+  if (/^\d+(?:時間\d*)?分経過$/.test(text)) return true;
+  if (/^\d+\s*(?:時間|分|日)前$/.test(text)) return true;
+  if (text === 'LIVE' || text === 'タイムシフト' || text === '公開終了') return true;
+  if (/^lv\d+$/i.test(userId)) return true;
+  // おすすめカードの `<time>22:28 開始</time>` 等（実コメントと衝突しにくい狭い形）
+  if (/^\d{1,2}:\d{2}\s*開始$/.test(text)) return true;
+
+  return false;
+}
+
+/**
  * @param {unknown} stored chrome.storage.local["nls_comments_<lv>"] の値
  * @returns {{ cleaned: unknown[], removedCount: number }}
  */
@@ -31,34 +49,10 @@ export function backfillRemoveRecommendedLivePollution(stored) {
   const cleaned = [];
   let removedCount = 0;
   for (const e of stored) {
-    if (!e || typeof e !== 'object') {
-      cleaned.push(e);
-      continue;
-    }
-    const text = String(/** @type {{ text?: unknown }} */ (e).text || '').trim();
-    const userId = String(/** @type {{ userId?: unknown }} */ (e).userId || '').trim();
-
-    // 配信タイトル風 duration label（「N分経過」「N時間N分経過」など）
-    if (/^\d+(?:時間\d*)?分経過$/.test(text)) {
+    if (isRecommendedLivePollutionRow(e)) {
       removedCount += 1;
       continue;
     }
-    // 「N分前」「N時間前」などの相対時刻表記
-    if (/^\d+\s*(?:時間|分|日)前$/.test(text)) {
-      removedCount += 1;
-      continue;
-    }
-    // status label
-    if (text === 'LIVE' || text === 'タイムシフト' || text === '公開終了') {
-      removedCount += 1;
-      continue;
-    }
-    // userId が lv で始まる（配信 ID 誤認）
-    if (/^lv\d+$/i.test(userId)) {
-      removedCount += 1;
-      continue;
-    }
-
     cleaned.push(e);
   }
   return { cleaned, removedCount };
