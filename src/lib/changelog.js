@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.281',
+    date: '2026-05-16',
+    summary: 'popup と identicon の memory leak 対策',
+    items: Object.freeze([
+      'popup の storage 変更通知と音声入力メッセージの受信を、popup を閉じたときに確実に解除するようにしました',
+      '匿名ユーザー用アイコンの内部キャッシュ上限を 256 件にして、長時間視聴時のメモリ膨張を抑えるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.280',
     date: '2026-05-16',
     summary: '北極星キャラ tier 連動と popup クラッシュ抑制',
