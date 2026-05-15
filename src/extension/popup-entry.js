@@ -145,10 +145,9 @@ import {
   buildDedupeKey,
   normalizeCommentText
 } from '../lib/commentRecord.js';
+import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js';
+import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
 import { mergeStoredCommentDedupeVariants } from '../lib/storedCommentDedupeMerge.js';
-import { summarizeRecordedCommenters } from '../lib/liveCommenterStats.js';
-import { resolveConcurrentViewers } from '../lib/concurrentEstimate.js';
-import { watchMetaConcurrentGateFromSnapshot } from '../lib/popupWatchMetaConcurrentGate.js';
 import {
   resolveWatchMetaCardState,
   isLiveStatValueAwaitingData
@@ -181,10 +180,6 @@ import {
   matchesAnySelfPostedRecent,
   prepareSelfPostedMatchRecents
 } from '../lib/selfPostedMatcher.js';
-import {
-  concurrentResolutionMethodTitlePart,
-  SPARSE_CONCURRENT_ESTIMATE_NOTE
-} from '../lib/watchConcurrentEstimateUiCopy.js';
 import { parseViewerCountFromLooseText } from '../lib/liveAudienceDom.js';
 import { pickLatestCommentEntry } from '../lib/pickLatestComment.js';
 import {
@@ -263,7 +258,6 @@ import {
   buildHtmlReportConceptGuideCardHtml,
   buildHtmlReportSaveGuideCardHtml
 } from '../lib/htmlReportConceptGuide.js';
-import { buildWatchAudienceNote } from '../lib/watchAudienceCopy.js';
 import { parseCommentIngestLog } from '../lib/commentIngestLog.js';
 import { pickDevMonitorDebugSubset } from '../lib/devMonitorDebugSubset.js';
 import {
@@ -4796,32 +4790,20 @@ async function refreshOfficialEventDomBundle(liveId) {
 }
 
 /**
- * `programStats.watchCount`（公式 DOM bundle）で `viewerCountFromDom` /
- * `officialViewerCount` を補完する浅いコピー。プレイヤー周辺の来場 DOM が未取得でも
- * 5 チップと同じ値で来場カード・同接推定の待ちを解除する。
+ * `programStats.watchCount`（累計来場）で `viewerCountFromDom` のみ補完する。
+ * `officialViewerCount` には流さない（累計を同接 direct と誤認するのを防ぐ）。
+ * @see mergeProgramStatsWatchIntoWatchMetaSnapshot
  * @param {WatchPageSnapshot} snapshot
  * @returns {WatchPageSnapshot}
  */
 function watchMetaSnapshotMergedWithBundleProgramStats(snapshot) {
-  if (!snapshot || typeof snapshot !== 'object') return snapshot;
   const ps = _lastOfficialEventDomBundle?.programStats;
-  if (!ps || typeof ps !== 'object') return snapshot;
-  const wc = ps.watchCount;
-  if (typeof wc !== 'number' || !Number.isFinite(wc) || wc < 0) return snapshot;
-  let changed = false;
-  /** @type {Record<string, unknown>} */
-  const out = { ...snapshot };
-  const vcd = snapshot.viewerCountFromDom;
-  if (typeof vcd !== 'number' || !Number.isFinite(vcd) || vcd < 0) {
-    out.viewerCountFromDom = wc;
-    changed = true;
-  }
-  const ovc = snapshot.officialViewerCount;
-  if (typeof ovc !== 'number' || !Number.isFinite(ovc)) {
-    out.officialViewerCount = wc;
-    changed = true;
-  }
-  return changed ? /** @type {WatchPageSnapshot} */ (out) : snapshot;
+  return /** @type {WatchPageSnapshot} */ (
+    mergeProgramStatsWatchIntoWatchMetaSnapshot(
+      snapshot,
+      ps && typeof ps === 'object' ? ps : null
+    )
+  );
 }
 
 /**
@@ -5034,196 +5016,90 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
     casterBanner.hidden = true;
   }
 
-  const vc = snapshot.viewerCountFromDom;
-  const recentActive = typeof snapshot.recentActiveUsers === 'number'
-    ? snapshot.recentActiveUsers
-    : 0;
-  const { showConcurrent, sparseConcurrent } =
-    watchMetaConcurrentGateFromSnapshot(snapshot);
-  // 0.1.19 (T): snapshot は取れたが viewerCountFromDom だけ null なケースを
-  // 「（取得不可）」ではなく「（数字非公開）」と出す。番組によっては運営側が
-  // 来場者数を非公開にしているのが普通で、ここを「取得不可」と書くと利用者が
-  // 拡張のバグだと誤解する。状態判定は watchMetaCardStateGate.js で一元化。
-  const stateGate = resolveWatchMetaCardState({
-    snapshot,
-    snapshotFetchInflight: false,
-    snapshotFetchError: ''
-  });
+  // 来場・同接・記録者集計の表示は buildWatchMetaCardAudienceViewModel に集約（0.1.278+）。
+  // 状態文言は watchMetaCardStateGate / popupWatchMetaConcurrentGate を VM 内で参照。
+  const audienceVm = buildWatchMetaCardAudienceViewModel(
+    /** @type {Record<string, unknown>} */ (snapshot),
+    {
+      commentEntries,
+      nowMs: Date.now(),
+      prevForReactions: {
+        viewerCount: _prevViewerCount,
+        concurrentEstimated: _prevConcurrentEstimated
+      }
+    }
+  );
 
   if (viewerDomEl) {
-    if (stateGate.shouldUseSnapshotForViewer && typeof vc === 'number') {
-      viewerDomEl.textContent = vc.toLocaleString('ja-JP');
-      viewerDomEl.classList.remove('is-placeholder');
-    } else {
-      viewerDomEl.textContent = stateGate.viewerLabel;
-      viewerDomEl.classList.add('is-placeholder');
-    }
+    viewerDomEl.textContent = audienceVm.visitor.text;
+    viewerDomEl.classList.toggle('is-placeholder', audienceVm.visitor.isPlaceholder);
   }
-  if (typeof vc === 'number' && Number.isFinite(vc) && vc >= 0) {
-    if (_prevViewerCount != null && vc > _prevViewerCount) {
-      const visitorsCard = viewerDomEl?.closest('.nl-live-stat-card');
-      const icon = visitorsCard?.querySelector(':scope > img.nl-live-stat-icon');
-      triggerCharaReaction(icon ?? null, {
-        delta: vc - _prevViewerCount,
-        thresholds: [1, 10, 50],
-        images: TANUNEE_IMGS,
-      });
-    }
-    _prevViewerCount = vc;
+  if (audienceVm.visitor.charReactionDelta != null && viewerDomEl) {
+    const visitorsCard = viewerDomEl.closest('.nl-live-stat-card');
+    const icon = visitorsCard?.querySelector(':scope > img.nl-live-stat-icon');
+    triggerCharaReaction(icon ?? null, {
+      delta: audienceVm.visitor.charReactionDelta,
+      thresholds: [1, 10, 50],
+      images: TANUNEE_IMGS,
+    });
   }
   if (concurrentEstEl) {
-    const nowMs = Date.now();
-    // showConcurrent が false のときは下の else でスピナー継続（aria-busy）。
-    // 条件は popupWatchMetaConcurrentGate.js / popupConcurrentEstimateGate.js の単体テストを参照。
-    if (showConcurrent) {
-      if (concurrentLoadingEl) concurrentLoadingEl.hidden = true;
-      if (concurrentReadyEl) concurrentReadyEl.hidden = false;
-      if (concurrentCard) concurrentCard.removeAttribute('aria-busy');
-      const streamAge = typeof snapshot.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0
-        ? snapshot.streamAgeMin : undefined;
-      const resolved = resolveConcurrentViewers({
-        nowMs,
-        officialViewers:
-          typeof snapshot.officialViewerCount === 'number' &&
-          Number.isFinite(snapshot.officialViewerCount)
-            ? snapshot.officialViewerCount
-            : undefined,
-        officialUpdatedAtMs:
-          typeof snapshot.officialStatsUpdatedAt === 'number' &&
-          Number.isFinite(snapshot.officialStatsUpdatedAt)
-            ? snapshot.officialStatsUpdatedAt
-            : undefined,
-        officialViewerIntervalMs:
-          typeof snapshot.officialViewerIntervalMs === 'number' &&
-          Number.isFinite(snapshot.officialViewerIntervalMs) &&
-          snapshot.officialViewerIntervalMs > 0
-            ? snapshot.officialViewerIntervalMs
-            : undefined,
-        previousStatisticsComments:
-          typeof snapshot.officialCommentCount === 'number' &&
-          Number.isFinite(snapshot.officialCommentCount) &&
-          typeof snapshot.officialStatisticsCommentsDelta === 'number' &&
-          Number.isFinite(snapshot.officialStatisticsCommentsDelta)
-            ? Math.max(0, snapshot.officialCommentCount - snapshot.officialStatisticsCommentsDelta)
-            : undefined,
-        currentStatisticsComments:
-          typeof snapshot.officialCommentCount === 'number' &&
-          Number.isFinite(snapshot.officialCommentCount)
-            ? snapshot.officialCommentCount
-            : undefined,
-        receivedCommentsDelta:
-          typeof snapshot.officialReceivedCommentsDelta === 'number' &&
-          Number.isFinite(snapshot.officialReceivedCommentsDelta)
-            ? snapshot.officialReceivedCommentsDelta
-            : undefined,
-        recentActiveUsers: recentActive,
-        totalVisitors: typeof vc === 'number' && vc > 0 ? vc : undefined,
-        streamAgeMin: streamAge
-      });
-      const directLike = resolved.method === 'official';
-      const estStr = resolved.estimated.toLocaleString('ja-JP');
-      concurrentEstEl.textContent = `${directLike ? '' : '~'}${estStr}`;
-      concurrentEstEl.classList.remove('is-placeholder');
-
-      if (
-        _prevConcurrentEstimated != null &&
-        resolved.estimated !== _prevConcurrentEstimated &&
-        concurrentCard
-      ) {
-        const icon = concurrentCard.querySelector(':scope > img.nl-live-stat-icon');
-        triggerCharaReaction(icon, {
-          delta: Math.abs(resolved.estimated - _prevConcurrentEstimated),
-          thresholds: [1, 20, 100],
-          images: KONTA_IMGS,
-        });
-      }
-      _prevConcurrentEstimated = resolved.estimated;
-
-      /** @type {string[]} */
-      const parts = [];
-      parts.push(concurrentResolutionMethodTitlePart(resolved.method));
-      if (resolved.freshnessMs != null) {
-        parts.push(`更新 ${Math.round(resolved.freshnessMs / 1000)} 秒前`);
-      }
-      if (resolved.captureRatio != null) {
-        parts.push(`コメント捕捉率 ${Math.round(resolved.captureRatio * 100)}%`);
-      }
-      if (
-        typeof snapshot.officialCommentSampleWindowMs === 'number' &&
-        Number.isFinite(snapshot.officialCommentSampleWindowMs) &&
-        snapshot.officialCommentSampleWindowMs > 0
-      ) {
-        parts.push(`窓 ${Math.round(snapshot.officialCommentSampleWindowMs / 1000)} 秒`);
-      }
-      const base = resolved.base;
-      if (resolved.method !== 'official') {
-        const baseMethod =
-          base.method === 'combined'
-            ? '複合'
-            : base.method === 'retention_only'
-              ? '滞留'
-              : base.method === 'active_only'
-                ? 'コメ率'
-                : '欠測';
-        parts.push(`${base.activeCommenters}人×${base.multiplier}≈${base.signalA}`);
-        if (base.signalB > 0) parts.push(`滞留${base.retentionPct}%≈${base.signalB}`);
-        parts.push(`base:${baseMethod}`);
-      }
-      parts.push(`信頼度 ${Math.round(resolved.confidence * 100)}%`);
-      if (sparseConcurrent) {
-        parts.push(SPARSE_CONCURRENT_ESTIMATE_NOTE);
-      }
-      concurrentEstEl.title = parts.join(' | ');
-      if (concurrentSubEl) {
-        if (resolved.method === 'official') {
-          concurrentSubEl.textContent = '直接値';
-        } else if (resolved.method === 'nowcast') {
-          concurrentSubEl.textContent =
-            resolved.freshnessMs != null
-              ? `${Math.round(resolved.freshnessMs / 1000)}秒前から補間`
-              : '補間';
-        } else if (base.method === 'combined') {
-          concurrentSubEl.textContent =
-            `${base.activeCommenters}人×${base.multiplier} + 滞留${base.retentionPct}%`;
-        } else {
-          concurrentSubEl.textContent = `5分内 ${base.activeCommenters}人×${base.multiplier}`;
-        }
-      }
+    concurrentEstEl.textContent = audienceVm.concurrent.estText;
+    concurrentEstEl.classList.toggle(
+      'is-placeholder',
+      audienceVm.concurrent.estIsPlaceholder
+    );
+    if (audienceVm.concurrent.estTitle != null) {
+      concurrentEstEl.title = audienceVm.concurrent.estTitle;
     } else {
-      if (concurrentLoadingEl) concurrentLoadingEl.hidden = false;
-      if (concurrentReadyEl) concurrentReadyEl.hidden = true;
-      if (concurrentCard) concurrentCard.setAttribute('aria-busy', 'true');
-      concurrentEstEl.textContent = '計測中…';
-      concurrentEstEl.classList.add('is-placeholder');
       concurrentEstEl.removeAttribute('title');
-      if (concurrentSubEl) concurrentSubEl.textContent = '人';
     }
+    if (concurrentSubEl) {
+      concurrentSubEl.textContent = audienceVm.concurrent.subText;
+    }
+    if (concurrentLoadingEl) {
+      concurrentLoadingEl.hidden = audienceVm.concurrent.concurrentLoadingHidden;
+    }
+    if (concurrentReadyEl) {
+      concurrentReadyEl.hidden = audienceVm.concurrent.concurrentReadyHidden;
+    }
+    if (concurrentCard) {
+      if (audienceVm.concurrent.ariaBusy) {
+        concurrentCard.setAttribute('aria-busy', 'true');
+      } else {
+        concurrentCard.removeAttribute('aria-busy');
+      }
+    }
+    if (audienceVm.concurrent.charReactionDelta != null && concurrentCard) {
+      const icon = concurrentCard.querySelector(':scope > img.nl-live-stat-icon');
+      triggerCharaReaction(icon, {
+        delta: audienceVm.concurrent.charReactionDelta,
+        thresholds: [1, 20, 100],
+        images: KONTA_IMGS,
+      });
+    }
+    _prevConcurrentEstimated = audienceVm.nextPrevForReactions.concurrentEstimated;
   }
-  const st = summarizeRecordedCommenters(
-    Array.isArray(commentEntries) ? commentEntries : []
-  );
+  _prevViewerCount = audienceVm.nextPrevForReactions.viewerCount;
+
   if (uniqueEl) {
-    if (st.uniqueKnownUserIds > 0) {
-      uniqueEl.textContent = st.uniqueKnownUserIds.toLocaleString('ja-JP');
-      uniqueEl.title = 'userId が取れたコメントについての distinct 数';
-    } else if (st.distinctAvatarUrls > 0) {
-      uniqueEl.textContent = `≈${st.distinctAvatarUrls}`;
-      uniqueEl.title =
-        'userId 未取得のため、記録された https アイコン URL の種類数を参考表示（重複アイコンは1にまとまります）';
+    uniqueEl.textContent = audienceVm.uniqueUsers.text;
+    if (audienceVm.uniqueUsers.title != null) {
+      uniqueEl.title = audienceVm.uniqueUsers.title;
     } else {
-      uniqueEl.textContent = '0';
-      uniqueEl.title =
-        'userId も有効な avatarUrl も無いコメントのみのときは 0 のままです';
+      uniqueEl.removeAttribute('title');
     }
   }
   if (noIdEl) {
-    const n = Math.max(0, Math.floor(Number(st.commentsWithoutUserId) || 0));
-    noIdEl.textContent = n.toLocaleString('ja-JP');
+    noIdEl.textContent = audienceVm.commentsNoId.text;
   }
   if (noteEl) {
-    const { body, title } = buildWatchAudienceNote({ snapshot });
-    noteEl.textContent = body;
-    noteEl.title = title;
+    noteEl.textContent = audienceVm.audienceNote.text;
+    if (audienceVm.audienceNote.title != null) {
+      noteEl.title = audienceVm.audienceNote.title;
+    } else {
+      noteEl.removeAttribute('title');
+    }
   }
   if (audience) audience.hidden = false;
 

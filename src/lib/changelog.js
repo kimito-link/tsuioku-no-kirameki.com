@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.278',
+    date: '2026-05-15',
+    summary: '推定同接が来場者と同じ数字になる不具合を修正',
+    items: Object.freeze([
+      '公式 DOM の watchCount（累計来場）を officialViewerCount に流し込まないようにしました（同接カードが来場と同一表示になるのを防ぐ）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.277',
     date: '2026-05-15',
     summary: 'インライン配置ストレージ処理のモジュール化',
