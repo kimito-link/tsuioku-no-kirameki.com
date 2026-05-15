@@ -27,6 +27,7 @@ export function buildNorthStarAdRankingStatsHtml(opts) {
     typeof sumRaw === 'number' && Number.isFinite(sumRaw) ? Math.max(0, Math.floor(sumRaw)) : null;
   const program = isFiniteNonNeg(opts?.programAdPts) ? /** @type {number} */ (opts.programAdPts) : null;
 
+  /** @param {unknown} v */
   const fmt = (v) => (typeof v === 'number' && Number.isFinite(v) ? v.toLocaleString('ja-JP') : '—');
   const sumTxt = sum != null ? fmt(sum) : '—';
 
