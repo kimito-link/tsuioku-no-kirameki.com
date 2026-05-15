@@ -793,7 +793,7 @@ export function scrapeAdRankingMirrorHtml(root) {
         null;
     }
     // 先頭にマッチした ul がタブ用など空殻のとき、同一 section 内で li 数最大の ul を選ぶ
-    let nItems = list instanceof Element ? countRankingItems(list) : 0;
+    const nItems = list instanceof Element ? countRankingItems(list) : 0;
     if (list instanceof Element && nItems === 0) {
       const sec = resolveSupporterSection(list);
       const better = bestRankingListInSection(sec);
