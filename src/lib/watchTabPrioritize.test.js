@@ -74,4 +74,70 @@ describe('prioritizeWatchTabCandidates', () => {
     prioritizeWatchTabCandidates(tabs, 'https://live.nicovideo.jp/watch/lv123');
     expect(tabs.map((t) => t.id)).toEqual(before);
   });
+
+  it('pathname 一致が複数あるとき lastAccessed が新しいタブを先にする', () => {
+    const ref = 'https://live.nicovideo.jp/watch/lv123';
+    const tabs = [
+      {
+        id: 1,
+        url: ref,
+        lastAccessed: 1000,
+        active: false,
+        audible: false
+      },
+      {
+        id: 2,
+        url: ref,
+        lastAccessed: 5000,
+        active: false,
+        audible: false
+      }
+    ];
+    const r = prioritizeWatchTabCandidates(tabs, ref);
+    expect(r.map((t) => t.id)).toEqual([2, 1]);
+  });
+
+  it('lastAccessed が同じなら active を先にする', () => {
+    const ref = 'https://live.nicovideo.jp/watch/lv123';
+    const tabs = [
+      {
+        id: 1,
+        url: ref,
+        lastAccessed: 3000,
+        active: false,
+        audible: false
+      },
+      {
+        id: 2,
+        url: ref,
+        lastAccessed: 3000,
+        active: true,
+        audible: false
+      }
+    ];
+    const r = prioritizeWatchTabCandidates(tabs, ref);
+    expect(r[0].id).toBe(2);
+  });
+
+  it('lastAccessed と active が同じなら audible を先にする', () => {
+    const ref = 'https://live.nicovideo.jp/watch/lv123';
+    const tabs = [
+      {
+        id: 1,
+        url: ref,
+        lastAccessed: 3000,
+        active: true,
+        audible: false
+      },
+      {
+        id: 2,
+        url: ref,
+        lastAccessed: 3000,
+        active: true,
+        audible: true
+      }
+    ];
+    const r = prioritizeWatchTabCandidates(tabs, ref);
+    expect(r[0].id).toBe(2);
+  });
 });

@@ -5544,6 +5544,51 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
     }
     img.alt = '';
   }
+  if (laneId === 'giftHistory') {
+    const summary = document.getElementById('northStarLaneGadgetSummary-giftHistory');
+    if (summary instanceof HTMLElement) {
+      if (state !== 'ok') {
+        summary.hidden = true;
+        summary.setAttribute('aria-hidden', 'true');
+      }
+    }
+  }
+}
+
+/**
+ * ギフト履歴レーン右サマリー（一覧カードの数値合計）。左の取得率・下段の番組累計ptとは別。
+ *
+ * @param {HTMLElement} body
+ * @param {{ count?: number }[]} rooms
+ * @param {string} unitSuffix
+ */
+function paintNorthStarGiftHistorySummaryGadget(body, rooms, unitSuffix) {
+  if (!(body instanceof HTMLElement) || body.id !== 'northStarLaneBody-giftHistory') return;
+  const summary = document.getElementById('northStarLaneGadgetSummary-giftHistory');
+  if (!(summary instanceof HTMLElement)) return;
+  const suf = String(unitSuffix || '').trim();
+  let total = 0;
+  for (const r of Array.isArray(rooms) ? rooms : []) {
+    const c = Number(r?.count);
+    const n = Math.floor(Number.isFinite(c) ? c : 0);
+    total += Math.max(0, n);
+  }
+  const numEl = summary.querySelector('.nl-north-star-lane__summary-pt-num');
+  const unitEl = summary.querySelector('.nl-north-star-lane__summary-pt-unit');
+  if (numEl instanceof HTMLElement) numEl.textContent = String(total);
+  if (unitEl instanceof HTMLElement) unitEl.textContent = suf;
+  const img = summary.querySelector('img.nl-north-star-lane__chara');
+  if (img instanceof HTMLImageElement) {
+    const rel = northStarLaneGadgetCharaRelativePath('programPoints');
+    try {
+      img.src = chrome.runtime.getURL(rel);
+    } catch {
+      img.removeAttribute('src');
+    }
+    img.alt = '';
+  }
+  summary.hidden = false;
+  summary.removeAttribute('aria-hidden');
 }
 
 /** @type {WeakMap<HTMLElement, ReturnType<typeof setInterval>>} */
@@ -6081,6 +6126,9 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
     syncNorthStarLaneGadgetFromBodyState(el);
     // 横カードに順位が含まれるため、右列の縦レールで同データを二重表示しない
     clearNorthStarVerticalRailForBody(el);
+    if (el.id === 'northStarLaneBody-giftHistory') {
+      paintNorthStarGiftHistorySummaryGadget(el, rooms, unitSuffix);
+    }
   }
 }
 
@@ -9210,22 +9258,56 @@ async function refresh() {
  * 対象 watch と同じ lv のタブだけ集める（前面が別放送なら除外）。
  * watchUrl が空でも `chrome.tabs.query({})` でニコ生 watch を列挙する（前面タブだけでは
  * 候補ゼロになりやすい: 拡張ポップアップを開いたウィンドウの active がニコ生でない等）。
+ *
+ * 0.1.x: standalone ポップアップでは `currentWindow` の active が拡張自身になりがちなため、
+ * `getLastFocused({ windowTypes:['normal'] })` の active を先に列挙する（pickWatchUrl と同じ考え方）。
  * @param {string} watchUrl
  */
 async function collectWatchTabCandidates(watchUrl) {
-  /** @type {{ id: number, url: string }[]} */
+  /** @type {{ id: number, url: string, lastAccessed: number, active: boolean, audible: boolean }[]} */
   const out = [];
   const w = String(watchUrl || '').trim();
-  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-  const tryAdd = (/** @type {chrome.tabs.Tab|undefined} */ tab) => {
+  /** @param {chrome.tabs.Tab|undefined|null} tab */
+  const tryAdd = (tab) => {
     if (!tab?.id || typeof tab.url !== 'string') return;
     if (!isNicoLiveWatchUrl(tab.url)) return;
     if (w && !watchPageUrlsMatchForSnapshot(tab.url, w)) return;
     if (out.some((x) => x.id === tab.id)) return;
-    out.push({ id: tab.id, url: tab.url });
+    const la =
+      typeof tab.lastAccessed === 'number' && Number.isFinite(tab.lastAccessed)
+        ? tab.lastAccessed
+        : 0;
+    out.push({
+      id: tab.id,
+      url: tab.url,
+      lastAccessed: la,
+      active: Boolean(tab.active),
+      audible: Boolean(tab.audible)
+    });
   };
 
+  /** @type {chrome.tabs.Tab|undefined} */
+  let activeTab;
+  /** @type {chrome.tabs.Tab|undefined} */
+  let lastFocusedNormalActiveTab;
+  try {
+    const [activeTabs, lastFocusedWin] = await Promise.all([
+      chrome.tabs.query({ active: true, currentWindow: true }),
+      chrome.windows
+        .getLastFocused({ populate: true, windowTypes: ['normal'] })
+        .catch(() => /** @type {chrome.windows.Window|null} */ (null))
+    ]);
+    activeTab = activeTabs[0];
+    lastFocusedNormalActiveTab =
+      lastFocusedWin?.tabs?.find((t) => t?.active) ?? undefined;
+  } catch {
+    activeTab = undefined;
+    lastFocusedNormalActiveTab = undefined;
+  }
+
+  // 通常ウィンドウで直近フォーカスしていたタブを先に積む（待機タブより視聴タブを優先しやすくする）
+  tryAdd(lastFocusedNormalActiveTab);
   tryAdd(activeTab);
 
   // watchUrl が空でも全タブを見る（前面がニコ生でない・別ウィンドウで開いている等）。
