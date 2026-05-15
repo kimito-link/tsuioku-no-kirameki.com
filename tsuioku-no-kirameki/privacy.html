@@ -44,6 +44,20 @@
         position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);
         white-space:nowrap;border:0
       }
+      .skip-link{
+        position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;
+        clip:rect(0,0,0,0);white-space:nowrap;border:0;z-index:1000
+      }
+      .skip-link:focus{
+        left:max(12px, env(safe-area-inset-left, 12px));
+        top:max(12px, env(safe-area-inset-top, 12px));
+        width:auto;height:auto;overflow:visible;clip:auto;
+        padding:10px 16px;border-radius:12px;
+        background:rgba(255,251,245,.96);color:var(--ink);font-weight:700;font-size:.95rem;
+        text-decoration:none;line-height:var(--lh-tight);
+        box-shadow:0 8px 28px rgba(45,36,28,.18);
+        outline:2px solid var(--gold);outline-offset:2px
+      }
       body{
         margin:0;color:var(--text-primary);
         font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;
@@ -354,6 +368,7 @@
     </style>
   </head>
   <body>
+    <a class="skip-link" href="#privacy-content">本文へ移動</a>
     <header class="topbar" id="site-header">
       <div class="shell topbar-inner">
         <a class="topbar__logo" href="./" aria-label="君斗りんくの追憶のきらめき（トップへ戻る）">
@@ -365,13 +380,13 @@
         </button>
       </div>
     </header>
-    <p class="lp-inapp-hint" id="lp-inapp-hint" role="note">X（旧Twitter）アプリ内では、BGM やコンテンツの表示・操作に制限があることがあります。<strong>画面を一度タップ（クリック）する</strong>か、<a id="lp-inapp-open" href="https://tsuioku-no-kirameki.com/privacy.html" target="_blank" rel="noopener noreferrer">ブラウザで開く</a>とよいです。</p>
+    <p class="lp-inapp-hint" id="lp-inapp-hint" role="note">X（旧Twitter）アプリ内では、BGM やコンテンツの表示・操作に制限があることがあります。<strong>画面を一度タップ（クリック）する</strong>か、<a id="lp-inapp-open" href="https://tsuioku-no-kirameki.com/privacy.html" target="_blank" rel="noopener noreferrer" aria-label="プライバシーポリシーをブラウザで開く（新しいタブ）">ブラウザで開く</a>とよいです。</p>
 
     <div class="topbar__backdrop" id="topbar-backdrop" aria-hidden="true"></div>
     <div class="topbar__drawer" id="topbar-drawer" role="dialog" aria-modal="true" aria-labelledby="topbar-drawer-title" aria-hidden="true">
       <h2 id="topbar-drawer-title" class="visually-hidden">サイトメニュー</h2>
       <p class="topbar__drawer-hint" aria-hidden="true">このページの目次</p>
-      <nav class="topbar__nav" aria-label="このページの目次">
+      <nav class="topbar__nav" role="navigation" aria-label="このページの目次">
           <a href="#s1">1. 本拡張の目的</a>
           <a href="#s2">2. 取り扱う情報の種類</a>
           <a href="#s3">3. 保存場所と保存期間</a>
@@ -394,7 +409,7 @@
 
     <header class="page">
       <div class="shell">
-        <h1>プライバシーポリシー</h1>
+        <h1 id="privacy-heading">プライバシーポリシー</h1>
         <p class="sub">Chrome 拡張機能『君斗りんくの追憶のきらめき』（以下「本拡張」）における個人情報の取扱いについて、実装の実態に即してご説明します。</p>
         <div class="meta">
           <span>発行者: <strong>Kimito-Link Project</strong></span>
@@ -404,11 +419,11 @@
       </div>
     </header>
 
-    <main>
+    <main id="privacy-content" role="main" aria-labelledby="privacy-heading">
       <div class="shell">
 
         <!-- 3匹の案内 -->
-        <section class="box" aria-label="3匹からのご挨拶">
+        <section class="box" role="region" aria-label="3匹からのご挨拶">
           <div class="guide guide--link">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="64" height="64" alt="りんく">
@@ -439,7 +454,7 @@
         </section>
 
         <!-- ざっくり要約 -->
-        <aside class="digest" aria-label="ざっくり要約">
+        <aside class="digest" role="complementary" aria-label="ざっくり要約">
           <h3>ざっくり要約</h3>
           <ul>
             <li><b>記録は端末ローカル保存のみ</b>。本拡張の開発元サーバーには一切送信しません。</li>
@@ -451,7 +466,7 @@
         </aside>
 
         <!-- 目次 -->
-        <nav class="toc" aria-label="目次">
+        <nav class="toc" role="navigation" aria-label="目次">
           <h2>目次</h2>
           <ol>
             <li><a href="#s1">本拡張の目的</a></li>
@@ -470,8 +485,8 @@
           </ol>
         </nav>
 
-        <section class="box" id="s1">
-          <h2><span class="num">1.</span>本拡張の目的</h2>
+        <section class="box" id="s1" aria-labelledby="privacy-s1-heading">
+          <h2 id="privacy-s1-heading"><span class="num">1.</span>本拡張の目的</h2>
           <div class="guide guide--link">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" width="64" height="64" alt="">
@@ -483,8 +498,8 @@
           <p>本拡張は、ニコニコ生放送における応援コメント・参加者情報を、利用者自身の端末上で可視化・記録することを目的としたブラウザ拡張機能です。第三者への情報集約や広告配信を目的としていません。</p>
         </section>
 
-        <section class="box" id="s2">
-          <h2><span class="num">2.</span>取り扱う情報の種類</h2>
+        <section class="box" id="s2" aria-labelledby="privacy-s2-heading">
+          <h2 id="privacy-s2-heading"><span class="num">2.</span>取り扱う情報の種類</h2>
           <div class="guide guide--konta">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" width="64" height="64" alt="">
@@ -516,8 +531,8 @@
           </ul>
         </section>
 
-        <section class="box" id="s3">
-          <h2><span class="num">3.</span>保存場所と保存期間</h2>
+        <section class="box" id="s3" aria-labelledby="privacy-s3-heading">
+          <h2 id="privacy-s3-heading"><span class="num">3.</span>保存場所と保存期間</h2>
           <div class="guide guide--tanu">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.png" width="64" height="64" alt="">
@@ -538,8 +553,8 @@
           <div class="note"><b>たぬ姉メモ：</b><code>chrome.storage.local</code> も IndexedDB も <b>ブラウザのサンドボックス領域</b>で、他のウェブサイトや他の拡張機能からは読み書きできません。Chrome のプロファイルを分けて使っている場合は、プロファイルごとに別の保管場所になります。</div>
         </section>
 
-        <section class="box" id="s4">
-          <h2><span class="num">4.</span>外部への送信について</h2>
+        <section class="box" id="s4" aria-labelledby="privacy-s4-heading">
+          <h2 id="privacy-s4-heading"><span class="num">4.</span>外部への送信について</h2>
           <div class="guide guide--link">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-open.png" width="64" height="64" alt="">
@@ -561,8 +576,8 @@
           </ul>
         </section>
 
-        <section class="box" id="s5">
-          <h2><span class="num">5.</span>ニコニコから取得する情報</h2>
+        <section class="box" id="s5" aria-labelledby="privacy-s5-heading">
+          <h2 id="privacy-s5-heading"><span class="num">5.</span>ニコニコから取得する情報</h2>
           <div class="guide guide--konta">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" width="64" height="64" alt="">
@@ -580,8 +595,8 @@
           <p>これらはいずれも、利用者が自身のブラウザでニコニコ生放送を視聴する過程で既に受信している公開情報、もしくは利用者自身のブラウザセッションで正規に取得可能な情報に限られます。</p>
         </section>
 
-        <section class="box" id="s6">
-          <h2><span class="num">6.</span>AI 連携機能（将来予定・未実装）</h2>
+        <section class="box" id="s6" aria-labelledby="privacy-s6-heading">
+          <h2 id="privacy-s6-heading"><span class="num">6.</span>AI 連携機能（将来予定・未実装）</h2>
           <div class="guide guide--tanu">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" width="64" height="64" alt="">
@@ -601,8 +616,8 @@
           <p>機能の追加・有効化のタイミング、送信される情報の内訳、対応する AI モデル提供者の選定については、実装提供開始時に本ポリシーで再告知します。</p>
         </section>
 
-        <section class="box" id="s7">
-          <h2><span class="num">7.</span>Cookie・トラッキング</h2>
+        <section class="box" id="s7" aria-labelledby="privacy-s7-heading">
+          <h2 id="privacy-s7-heading"><span class="num">7.</span>Cookie・トラッキング</h2>
           <div class="guide guide--link">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="64" height="64" alt="">
@@ -614,8 +629,8 @@
           <p>本拡張および本ウェブサイト（<code>https://tsuioku-no-kirameki.com/</code>）では、広告配信・行動追跡・閲覧者分析を目的とした Cookie、ローカルストレージ、その他の追跡技術を使用していません。第三者の計測タグ（Google Analytics、各種広告 SDK 等）は組み込まれていません。</p>
         </section>
 
-        <section class="box" id="s8">
-          <h2><span class="num">8.</span>第三者提供・販売</h2>
+        <section class="box" id="s8" aria-labelledby="privacy-s8-heading">
+          <h2 id="privacy-s8-heading"><span class="num">8.</span>第三者提供・販売</h2>
           <div class="guide guide--konta">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-open.png" width="64" height="64" alt="">
@@ -627,8 +642,8 @@
           <p>当プロジェクトは、本拡張を通じて利用者が取り扱う情報を、第三者に販売・提供・共有することはありません。法令に基づく開示請求等がある場合を除き、利用者の端末に保存されているデータにアクセスする手段そのものを保持していません。</p>
         </section>
 
-        <section class="box" id="s9">
-          <h2><span class="num">9.</span>利用者の権利（削除・書き出し・開示）</h2>
+        <section class="box" id="s9" aria-labelledby="privacy-s9-heading">
+          <h2 id="privacy-s9-heading"><span class="num">9.</span>利用者の権利（削除・書き出し・開示）</h2>
           <div class="guide guide--tanu">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png" width="64" height="64" alt="">
@@ -644,24 +659,24 @@
           </ul>
         </section>
 
-        <section class="box" id="s10">
-          <h2><span class="num">10.</span>セキュリティ</h2>
+        <section class="box" id="s10" aria-labelledby="privacy-s10-heading">
+          <h2 id="privacy-s10-heading"><span class="num">10.</span>セキュリティ</h2>
           <p>本拡張は、Chrome 拡張機能のセキュリティモデル（Manifest V3、サンドボックス、<code>host_permissions</code> 宣言）に従って動作します。外部送信が発生する経路（ニコニコ生放送）はすべて HTTPS を用います。</p>
           <p>なお、利用者端末自体の管理（OS・ブラウザの更新、マルウェア対策等）については、利用者の責任となります。</p>
         </section>
 
-        <section class="box" id="s11">
-          <h2><span class="num">11.</span>未成年の利用</h2>
+        <section class="box" id="s11" aria-labelledby="privacy-s11-heading">
+          <h2 id="privacy-s11-heading"><span class="num">11.</span>未成年の利用</h2>
           <p>本拡張は、13 歳未満の児童の個人情報を意図的に収集することを目的としていません。本拡張は、ニコニコ生放送の利用規約および年齢制限に従って利用されることを前提としています。保護者の方は、お子様の本拡張の利用にあたって、ニコニコ公式の規約および本ポリシーの内容をご確認のうえ、必要に応じて利用の可否をご判断ください。</p>
         </section>
 
-        <section class="box" id="s12">
-          <h2><span class="num">12.</span>改定</h2>
+        <section class="box" id="s12" aria-labelledby="privacy-s12-heading">
+          <h2 id="privacy-s12-heading"><span class="num">12.</span>改定</h2>
           <p>本ポリシーは、関連法令の改正、本拡張の機能変更、または運用方針の見直しにより改定されることがあります。改定が行われた場合は、本ページの冒頭に「最終更新」日付を明示します。利用者に重大な影響を及ぼす変更が行われる場合は、拡張機能のアップデート通知等を通じて別途お知らせする場合があります。</p>
         </section>
 
-        <section class="box" id="s13">
-          <h2><span class="num">13.</span>お問い合わせ</h2>
+        <section class="box" id="s13" aria-labelledby="privacy-s13-heading">
+          <h2 id="privacy-s13-heading"><span class="num">13.</span>お問い合わせ</h2>
           <div class="guide guide--link">
             <div class="guide__face">
               <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" width="64" height="64" alt="">

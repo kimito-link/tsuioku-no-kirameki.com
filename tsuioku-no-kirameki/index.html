@@ -5841,13 +5841,13 @@
         </button>
       </div>
     </header>
-    <p class="lp-inapp-hint" id="lp-inapp-hint" role="note">X（旧Twitter）アプリ内では、BGM やコンテンツの表示・操作に制限があることがあります。<strong>画面を一度タップ（クリック）する</strong>か、<a id="lp-inapp-open" href="https://tsuioku-no-kirameki.com/" target="_blank" rel="noopener noreferrer">ブラウザで開く</a>とよいです。</p>
+    <p class="lp-inapp-hint" id="lp-inapp-hint" role="note">X（旧Twitter）アプリ内では、BGM やコンテンツの表示・操作に制限があることがあります。<strong>画面を一度タップ（クリック）する</strong>か、<a id="lp-inapp-open" href="https://tsuioku-no-kirameki.com/" target="_blank" rel="noopener noreferrer" aria-label="現在のページをブラウザで開く（新しいタブ）">ブラウザで開く</a>とよいです。</p>
 
     <div class="topbar__backdrop" id="topbar-backdrop" aria-hidden="true"></div>
     <div class="topbar__drawer" id="topbar-drawer" role="dialog" aria-modal="true" aria-labelledby="topbar-drawer-title" aria-hidden="true">
       <h2 id="topbar-drawer-title" class="visually-hidden">サイトメニュー</h2>
       <p class="topbar__drawer-hint" aria-hidden="true">ページ内リンク</p>
-      <nav class="topbar__nav" aria-label="主要リンク">
+      <nav class="topbar__nav" role="navigation" aria-label="主要リンク">
           <a href="#worldview">はじめに</a>
           <a href="#record-foundation">記録安定</a>
           <a href="#record-results">改善実績</a>
@@ -5877,7 +5877,7 @@
       </p>
     </div>
 
-    <main id="main-content">
+    <main id="main-content" role="main" aria-label="君斗りんくの追憶のきらめき紹介コンテンツ">
       <div class="lp-dawn-arc">
         <div class="lp-dawn-arc__milky-river" aria-hidden="true"></div>
         <div class="lp-dawn-arc__milky-river lp-dawn-arc__milky-river--soft" aria-hidden="true"></div>
@@ -6504,11 +6504,11 @@
         </div>
       </section>
 
-      <section class="hero">
+      <section class="hero" role="region" aria-labelledby="hero-heading">
         <div class="shell hero-grid">
           <article class="hero-copy fade">
             <div class="eyebrow">Comment Record, Built To Recover</div>
-            <h1>
+            <h1 id="hero-heading">
               <strong>取りこぼしにくく、</strong>
               あとから育つコメント記録へ。
             </h1>
@@ -6545,7 +6545,7 @@
             </div>
           </article>
 
-          <aside class="hero-stage fade d1" aria-label="キャラクター導入（配信者＝りんく・ファン＝こん太・案内役＝たぬ姉）">
+          <aside class="hero-stage fade d1" role="complementary" aria-label="キャラクター導入（配信者＝りんく・ファン＝こん太・案内役＝たぬ姉）">
             <div class="mini-bubbles yukkuri-thread hero-thread">
               <div class="y-row">
                 <div class="speaker">
@@ -6858,7 +6858,7 @@
               <p class="live-gift-hint">あと 1,000pt ギフトを贈ると、放送者に福引券1枚が届きます（文言はイメージ）</p>
               <div class="live-input-row">
                 <input type="text" readonly value="" placeholder="願いや応援をひとこと…（デモ・送信は見た目のみ）" aria-label="コメント用テキストボックス（デモのみ・Enter送信は未実装）">
-                <button type="button" disabled>コメント</button>
+                <button type="button" disabled aria-label="コメント送信ボタンのデモ（操作できません）">コメント</button>
               </div>
               <p class="live-input-roadmap" role="note">
                 この1行は<strong>配信画面の公式コメント欄のデモ</strong>で、このページ上では<strong>送信できません</strong>。拡張側は<strong>ポップアップの入力欄</strong>から watch ページの送信 UI へ届ける流れを別途用意しています（<a href="#lp-comment-compose-guide">コメント送信の流れ</a>・<a href="#extension-guide-comment-voice">用語⑧</a>）。
@@ -7207,7 +7207,7 @@
                 <p class="live-gift-hint">あと 1,000pt ギフトを贈ると、放送者に福引券1枚が届きます（文言はイメージ）</p>
                 <div class="live-input-row">
                   <input type="text" readonly value="" placeholder="願いや応援をひとこと…（デモ・送信は見た目のみ）" aria-label="拡張の見え方セクション内：コメント用テキストボックス（デモのみ）">
-                  <button type="button" disabled>コメント</button>
+                  <button type="button" disabled aria-label="コメント送信ボタンのデモ（操作できません）">コメント</button>
                 </div>
                 <p class="live-input-roadmap" role="note">
                   この1行は<strong>配信画面の公式コメント欄のデモ</strong>で、このページ上では<strong>送信できません</strong>。拡張側は<strong>ポップアップの入力欄</strong>から watch ページの送信 UI へ届ける流れを別途用意しています（<a href="#lp-comment-compose-guide">コメント送信の流れ</a>・<a href="#extension-guide-comment-voice">用語⑧</a>）。
@@ -7228,8 +7228,8 @@
             <div class="lp-site-look-mock" role="region" aria-label="拡張パネル全体の架空プレビュー（操作できません）">
               <p class="lp-site-look-mock__tag">見本（架空）— 数値・ID・並びはすべて作りものです</p>
               <div class="lp-site-look-mock__toolbar" aria-hidden="true">
-                <button type="button" class="lp-site-look-mock__tbtn" disabled>視聴を再読込</button>
-                <button type="button" class="lp-site-look-mock__tbtn" disabled>表示キャッシュを消す</button>
+                <button type="button" class="lp-site-look-mock__tbtn" disabled aria-label="視聴を再読込するボタンのデモ（操作できません）">視聴を再読込</button>
+                <button type="button" class="lp-site-look-mock__tbtn" disabled aria-label="表示キャッシュを消すボタンのデモ（操作できません）">表示キャッシュを消す</button>
               </div>
               <div class="lp-site-look-mock__hero">
                 <div class="lp-site-look-mock__hero-main">
@@ -7481,7 +7481,7 @@
                   <div class="lp-site-look-mock__comment-row lp-site-look-mock__comment-row--stack">
                     <textarea class="lp-site-look-mock__textarea" readonly rows="2" placeholder="応援や返事を入力（見本・ここからは送れません）" aria-label="コメント用（見本・操作不可）"></textarea>
                     <div class="lp-site-look-mock__comment-actions">
-                      <button type="button" disabled tabindex="-1">コメント送信</button>
+                      <button type="button" disabled tabindex="-1" aria-label="コメント送信ボタンのデモ（操作できません）">コメント送信</button>
                     </div>
                   </div>
                   <div class="lp-site-look-mock__kindness" data-lp-feature="kindness-nudge-mock" aria-hidden="true">
@@ -8926,10 +8926,10 @@
         </div>
       </section>
 
-      <section class="section" id="problem">
+      <section class="section" id="problem" aria-labelledby="problem-heading">
         <div class="shell">
           <div class="section-head fade">
-            <h2>ファンが投稿を消してしまうのは、弱さではなく構造です。</h2>
+            <h2 id="problem-heading">ファンが投稿を消してしまうのは、弱さではなく構造です。</h2>
             <p>
               右側では「反応あり → 耐性形成 → もっと欲しい」が回り、左側では
               「反応なし → 比較 → 認知の歪み → 削除 → 見る専化」が進みます。
@@ -8971,7 +8971,7 @@
             <h3>ファンが投稿を消してしまう心理サイクル</h3>
             <p>推し活アプリ設計で重要なのは、左側のループをどこで断ち切るかです。</p>
             <div class="two-col">
-              <section class="lane left">
+              <section class="lane left" role="region" aria-label="反応なしの負のスパイラル">
                 <div class="lane-title">反応なしの負のスパイラル</div>
                 <div class="stack">
                   <div class="node gold"><strong>期待の不発</strong><span>ドーパミンが出ず、まず不快感が残る。</span></div>
@@ -8982,7 +8982,7 @@
                 </div>
                 <div class="lane-note">この流れは、個人の弱さではなく、数字が可視化される場で起こりやすい自然な防御反応です。</div>
               </section>
-              <section class="lane right">
+              <section class="lane right" role="region" aria-label="反応ありでも終わらないループ">
                 <div class="lane-title">反応ありでも終わらないループ</div>
                 <div class="stack">
                   <div class="node green"><strong>反応が返る</strong><span>いいね・RT・リプライが承認として機能する。</span></div>
@@ -8997,10 +8997,10 @@
         </div>
       </section>
 
-      <section class="section" id="impact">
+      <section class="section" id="impact" aria-labelledby="impact-heading">
         <div class="shell">
           <div class="section-head fade">
-            <h2>反応の種類ごとに、心理インパクトは違います。</h2>
+            <h2 id="impact-heading">反応の種類ごとに、心理インパクトは違います。</h2>
             <p>
               重要なのは数の大小だけではなく、反応の「質」です。SNSと配信では<strong>同じ言葉でも刺さるポイントが違う</strong>ので、
               並べて見えるようにしました。どの承認が浅く、どの承認が深く、何が一番ダメージになるのかを見誤ると、設計もズレます。
@@ -9221,10 +9221,10 @@
         </div>
       </section>
 
-      <section class="section" id="comments">
+      <section class="section" id="comments" aria-labelledby="comments-heading">
         <div class="shell">
           <div class="section-head fade">
-            <h2>配信コメントは、さらに別の虚しさがあります。</h2>
+            <h2 id="comments-heading">配信コメントは、さらに別の虚しさがあります。</h2>
             <p>
               SNS投稿では「消すか残すか」が苦しみになりますが、配信コメントではそもそも流れて消えるため、
               <strong>削除する必要すらなく、最初から存在しなかったことになりやすい</strong>のが違いです。
@@ -9714,10 +9714,10 @@
         </div>
       </section>
 
-      <section class="section" id="algorithm">
+      <section class="section" id="algorithm" aria-labelledby="algorithm-heading">
         <div class="shell">
           <div class="section-head fade">
-            <h2>「推定同時接続」は、どうやって計算しているの？</h2>
+            <h2 id="algorithm-heading">「推定同時接続」は、どうやって計算しているの？</h2>
             <p>
               ニコ生には同時接続 API がありません。配信ページが表示する数字は累計来場者数（watchCount）です。
               君斗りんくの追憶のきらめきは、コメントと来場者の情報から独自に推定しています。
@@ -9816,7 +9816,7 @@
           <div class="board fade d2" style="margin-top:20px">
             <h3>較正データと安全弁</h3>
             <div class="two-col">
-              <section class="lane left">
+              <section class="lane left" role="region" aria-label="推定同時接続の較正ポイント">
                 <div class="lane-title">較正ポイント</div>
                 <div class="stack">
                   <div class="node gold"><strong>Dさん配信</strong><span>30 active / 2,580 来場 → 305 pts → 倍率 ≈ 10</span></div>
@@ -9832,7 +9832,7 @@
                 </div>
                 <div class="lane-note">ちくわちゃんランキングのポイント ≈ 同時接続の代理指標として、実測と照合しているのだ。</div>
               </section>
-              <section class="lane right">
+              <section class="lane right" role="region" aria-label="推定同時接続の安全弁">
                 <div class="lane-title">安全弁（キャップ）</div>
                 <div class="stack">
                   <div class="node blue"><strong>ソフトキャップ</strong><span>コメンター法のみ（配信経過不明）のとき、来場者数 × 35% を上限にするのだ。高エンゲージメント配信での過大推定を防ぐ安全弁なのだ。</span></div>
@@ -9895,10 +9895,10 @@
         </div>
       </section>
 
-      <section class="section" id="solution">
+      <section class="section" id="solution" aria-labelledby="solution-heading">
         <div class="shell">
           <div class="section-head fade">
-            <h2>君斗りんくの追憶のきらめきが断ち切りたいのは、この左側のループです。</h2>
+            <h2 id="solution-heading">君斗りんくの追憶のきらめきが断ち切りたいのは、この左側のループです。</h2>
             <p>
               競争をもっと強くするのではなく、応援の痕跡を個人の手元に戻す。その設計にすると、
               反応が少ない日の推し活も「無価値」ではなくなります。
@@ -9976,7 +9976,7 @@
         </div>
       </section>
 
-      <section class="footer-wrap">
+      <section class="footer-wrap" aria-label="ページ下部の導線">
         <div class="shell">
           <ul class="lp-partner-logos lp-partner-logos--footer" aria-label="Kimito-Link Project（キミトリンクプロジェクト）シンボルマーク">
             <li>
