@@ -89,6 +89,45 @@ describe('buildGiftTimelineHtml', () => {
     expect(title?.textContent).toContain('5');
   });
 
+  it('accepts recorded point/item gift events and highlights the busiest window', () => {
+    const html = buildGiftTimelineHtml({
+      liveId: 'lv-point',
+      durationMs: 180_000,
+      gifts: [
+        g(10_000, 'u1', 1, {
+          senderName: '送り主A',
+          nickname: '',
+          itemName: 'かわいい×100',
+          points: 100
+        }),
+        g(70_000, 'u2', 1, {
+          senderName: '送り主B',
+          nickname: '',
+          itemName: 'メガホン',
+          point: 300
+        }),
+        g(80_000, 'u3', 1, {
+          senderName: '送り主C',
+          nickname: '',
+          itemName: '拍手',
+          points: 200
+        })
+      ]
+    });
+    const svg = parseSvg(html);
+    const peak = svg?.querySelector('rect.mkt-gift-timeline__peak-window');
+    const titles = [...svg.querySelectorAll('circle.mkt-gift-timeline__point title')].map(
+      (node) => node.textContent || ''
+    );
+
+    expect(peak?.textContent).toContain('盛り上がり');
+    expect(peak?.textContent).toContain('500pt');
+    expect(titles.join('\n')).toContain('かわいい×100');
+    expect(titles.join('\n')).toContain('送り主B');
+    expect(titles.join('\n')).toContain('300pt');
+    expect(svg?.getAttribute('aria-label')).toContain('600 pt');
+  });
+
   it('escapes user supplied labels in SVG text and titles', () => {
     const html = buildGiftTimelineHtml({
       liveId: '<script>alert(1)</script>',

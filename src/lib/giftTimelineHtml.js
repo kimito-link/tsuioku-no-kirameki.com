@@ -23,16 +23,25 @@ const PALETTE = {
  * @typedef {object} GiftTimelineGift
  * @property {unknown} [userId]
  * @property {unknown} [nickname]
+ * @property {unknown} [senderName]
  * @property {unknown} [capturedAt]
+ * @property {unknown} [firstObservedAt]
+ * @property {unknown} [itemName]
  * @property {unknown} [throwCount]
+ * @property {unknown} [point]
+ * @property {unknown} [points]
+ * @property {unknown} [totalPoints]
  */
 
 /**
  * @typedef {object} NormalizedGift
  * @property {string} userId
  * @property {string} nickname
+ * @property {string} itemName
  * @property {number} capturedAt
  * @property {number} throwCount
+ * @property {number} amount
+ * @property {'pt'|'件'} amountUnit
  */
 
 /** @param {unknown} value */
@@ -59,6 +68,18 @@ function toThrowCount(value) {
 }
 
 /**
+ * @param {Record<string, unknown>} source
+ * @param {string[]} keys
+ */
+function pickPositiveInteger(source, keys) {
+  for (const key of keys) {
+    const n = toThrowCount(source[key]);
+    if (n > 0) return n;
+  }
+  return 0;
+}
+
+/**
  * @param {unknown} value
  * @param {string} fallback
  * @returns {string}
@@ -77,15 +98,23 @@ function normalizeGifts(gifts) {
   return gifts
     .map((gift) => {
       if (!gift || typeof gift !== 'object') return null;
-      const capturedAt = toFiniteTimestamp(gift.capturedAt);
+      const record = /** @type {Record<string, unknown>} */ (gift);
+      const capturedAt =
+        toFiniteTimestamp(record.capturedAt) ?? toFiniteTimestamp(record.firstObservedAt);
       if (capturedAt === null) return null;
-      const throwCount = toThrowCount(gift.throwCount);
+      const throwCount = toThrowCount(record.throwCount);
       if (throwCount <= 0) return null;
+      const points = pickPositiveInteger(record, ['point', 'points', 'totalPoints']);
+      const amount = points > 0 ? points : throwCount;
+      const amountUnit = /** @type {'pt'|'件'} */ (points > 0 ? 'pt' : '件');
       return {
-        userId: textOrFallback(gift.userId, 'unknown'),
-        nickname: textOrFallback(gift.nickname, '匿名ギフター'),
+        userId: textOrFallback(record.userId, 'unknown'),
+        nickname: textOrFallback(record.nickname, textOrFallback(record.senderName, '匿名ギフター')),
+        itemName: textOrFallback(record.itemName, 'ギフト'),
         capturedAt,
-        throwCount
+        throwCount,
+        amount,
+        amountUnit
       };
     })
     .filter(Boolean)
@@ -106,13 +135,18 @@ function fmt(n) {
   return Number(n).toFixed(1);
 }
 
+/** @param {number} n */
+function fmtInt(n) {
+  return Math.max(0, Math.round(n)).toLocaleString('ja-JP');
+}
+
 /**
  * @param {NormalizedGift} gift
- * @param {number} maxThrow
+ * @param {number} maxAmount
  */
-function pointColor(gift, maxThrow) {
-  if (gift.throwCount >= Math.max(5, maxThrow * 0.72)) return PALETTE.purple;
-  if (gift.throwCount >= Math.max(3, maxThrow * 0.42)) return PALETTE.amber;
+function pointColor(gift, maxAmount) {
+  if (gift.amount >= Math.max(5, maxAmount * 0.72)) return PALETTE.purple;
+  if (gift.amount >= Math.max(3, maxAmount * 0.42)) return PALETTE.amber;
   return PALETTE.sky;
 }
 
@@ -139,6 +173,58 @@ function buildYAxisLabels(maxValue) {
     return `<line x1="${PAD_X}" y1="${fmt(y)}" x2="${PAD_X + INNER_W}" y2="${fmt(y)}" stroke="${PALETTE.stroke}" stroke-width="0.5" opacity="0.35"/>
 <text x="${PAD_X - 10}" y="${fmt(y + 4)}" text-anchor="end" fill="${PALETTE.muted}" font-size="11">${value}</text>`;
   }).join('');
+}
+
+/**
+ * @param {{ elapsed: number, gift: NormalizedGift }[]} pointModels
+ * @param {number} spanMs
+ */
+function summarizePeakWindow(pointModels, spanMs) {
+  if (!pointModels.length) return null;
+  const bucketMs = Math.max(60_000, Math.ceil(spanMs / 12));
+  /** @type {Map<number, { bucket: number, amount: number, count: number }>} */
+  const buckets = new Map();
+  for (const model of pointModels) {
+    const bucket = Math.floor(model.elapsed / bucketMs);
+    const cur = buckets.get(bucket) || { bucket, amount: 0, count: 0 };
+    cur.amount += model.gift.amount;
+    cur.count += 1;
+    buckets.set(bucket, cur);
+  }
+  let best = null;
+  for (const bucket of buckets.values()) {
+    if (
+      best == null ||
+      bucket.amount > best.amount ||
+      (bucket.amount === best.amount && bucket.count > best.count)
+    ) {
+      best = bucket;
+    }
+  }
+  if (!best || best.amount <= 0) return null;
+  return {
+    startMs: best.bucket * bucketMs,
+    endMs: Math.min(spanMs, (best.bucket + 1) * bucketMs),
+    amount: best.amount,
+    count: best.count
+  };
+}
+
+/**
+ * @param {{ startMs: number, endMs: number, amount: number, count: number } | null} peakWindow
+ * @param {number} spanMs
+ * @param {'pt'|'件'|'pt/件'} unit
+ */
+function buildPeakWindowSvg(peakWindow, spanMs, unit) {
+  if (!peakWindow) return '';
+  const startRatio = Math.min(1, Math.max(0, peakWindow.startMs / spanMs));
+  const endRatio = Math.min(1, Math.max(startRatio, peakWindow.endMs / spanMs));
+  const x = PAD_X + INNER_W * startRatio;
+  const width = Math.max(3, INNER_W * (endRatio - startRatio));
+  const label = `盛り上がり ${formatElapsed(peakWindow.startMs)}-${formatElapsed(peakWindow.endMs)} / ${fmtInt(peakWindow.amount)}${unit} / ${peakWindow.count}件`;
+  return `<rect class="mkt-gift-timeline__peak-window" x="${fmt(x)}" y="${PAD_TOP}" width="${fmt(width)}" height="${INNER_H}" fill="${PALETTE.amber}" opacity="0.13">
+<title>${escapeHtml(label)}</title>
+</rect>`;
 }
 
 /**
@@ -180,20 +266,23 @@ export function buildGiftTimelineHtml(input = {}) {
       ? input.durationMs
       : 0;
   const spanMs = Math.max(requestedDuration, lastAt - firstAt, 60_000);
-  const totalThrow = gifts.reduce((sum, gift) => sum + gift.throwCount, 0);
-  const maxThrow = Math.max(...gifts.map((gift) => gift.throwCount));
-  const maxY = Math.max(1, totalThrow, maxThrow);
-  const aria = `${liveId} のギフトタイムライン。${gifts.length}件、累積 ${totalThrow} 件。`;
+  const totalAmount = gifts.reduce((sum, gift) => sum + gift.amount, 0);
+  const maxAmount = Math.max(...gifts.map((gift) => gift.amount));
+  const maxY = Math.max(1, totalAmount, maxAmount);
+  const unitSet = new Set(gifts.map((gift) => gift.amountUnit));
+  const amountUnit = unitSet.size === 1 ? gifts[0].amountUnit : 'pt/件';
+  const aria = `${liveId} のギフトタイムライン。${gifts.length}件、累積 ${fmtInt(totalAmount)} ${amountUnit}。`;
 
   let cumulative = 0;
   const pointModels = gifts.map((gift) => {
     const elapsed = Math.max(0, gift.capturedAt - firstAt);
     const x = PAD_X + INNER_W * Math.min(1, elapsed / spanMs);
-    cumulative += gift.throwCount;
-    const pointY = PAD_TOP + INNER_H - (gift.throwCount / maxY) * INNER_H;
+    cumulative += gift.amount;
+    const pointY = PAD_TOP + INNER_H - (gift.amount / maxY) * INNER_H;
     const lineY = PAD_TOP + INNER_H - (cumulative / maxY) * INNER_H;
     return { gift, elapsed, cumulative, x, pointY, lineY };
   });
+  const peakWindow = summarizePeakWindow(pointModels, spanMs);
 
   const polylinePoints = pointModels
     .map((model) => `${fmt(model.x)},${fmt(model.lineY)}`)
@@ -202,20 +291,21 @@ export function buildGiftTimelineHtml(input = {}) {
   const points = pointModels
     .map((model) => {
       const { gift } = model;
-      const r = Math.min(9, 4 + Math.sqrt(gift.throwCount));
-      const tooltip = `${gift.nickname} (${gift.userId}) / ${formatElapsed(model.elapsed)} / ${gift.throwCount}件 / 累積 ${model.cumulative}件`;
-      return `<circle class="mkt-gift-timeline__point" cx="${fmt(model.x)}" cy="${fmt(model.pointY)}" r="${fmt(r)}" fill="${pointColor(gift, maxThrow)}" opacity="0.86" stroke="${PALETTE.bg}" stroke-width="1.4">
+      const r = Math.min(9, 4 + Math.sqrt(gift.amount));
+      const amountText = `${fmtInt(gift.amount)}${gift.amountUnit}`;
+      const tooltip = `${gift.nickname} (${gift.userId}) / ${gift.itemName} / ${formatElapsed(model.elapsed)} / ${amountText} / 累積 ${fmtInt(model.cumulative)}${amountUnit}`;
+      return `<circle class="mkt-gift-timeline__point" cx="${fmt(model.x)}" cy="${fmt(model.pointY)}" r="${fmt(r)}" fill="${pointColor(gift, maxAmount)}" opacity="0.86" stroke="${PALETTE.bg}" stroke-width="1.4">
 <title>${escapeHtml(tooltip)}</title>
 </circle>`;
     })
     .join('');
 
   const peak = pointModels.reduce((best, model) => {
-    if (!best || model.gift.throwCount > best.gift.throwCount) return model;
+    if (!best || model.gift.amount > best.gift.amount) return model;
     return best;
   }, null);
   const peakLabel = peak
-    ? `最大 ${peak.gift.throwCount}件: ${peak.gift.nickname} (${formatElapsed(peak.elapsed)})`
+    ? `最大 ${fmtInt(peak.gift.amount)}${peak.gift.amountUnit}: ${peak.gift.nickname} (${formatElapsed(peak.elapsed)})`
     : '';
 
   return `<svg viewBox="0 0 ${W} ${H}" class="mkt-gift-timeline" role="img" aria-label="${escapeAttr(aria)}" xmlns="http://www.w3.org/2000/svg">
@@ -224,12 +314,13 @@ export function buildGiftTimelineHtml(input = {}) {
 <text x="${PAD_X}" y="25" fill="${PALETTE.text}" font-size="16" font-weight="700">ギフトタイムライン</text>
 <text x="${W - PAD_X}" y="25" text-anchor="end" fill="${PALETTE.muted}" font-size="12">${escapeHtml(liveId)}</text>
 <rect x="${PAD_X}" y="${PAD_TOP}" width="${INNER_W}" height="${INNER_H}" fill="${PALETTE.panel}" stroke="${PALETTE.stroke}" stroke-width="0.5" rx="8"/>
+${buildPeakWindowSvg(peakWindow, spanMs, amountUnit)}
 ${buildXAxisLabels(firstAt, spanMs)}
 ${buildYAxisLabels(maxY)}
 <polyline class="mkt-gift-timeline__cumulative" points="${polylinePoints}" fill="none" stroke="${PALETTE.green}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
 ${points}
 <text x="${PAD_X}" y="${H - 8}" fill="${PALETTE.muted}" font-size="11">経過時間（記録開始から）</text>
-<text x="${PAD_X}" y="${PAD_TOP - 9}" fill="${PALETTE.muted}" font-size="11">件数 / 累積</text>
+<text x="${PAD_X}" y="${PAD_TOP - 9}" fill="${PALETTE.muted}" font-size="11">${escapeHtml(amountUnit)} / 累積</text>
 <g aria-hidden="true" font-size="11" fill="${PALETTE.muted}">
 <circle cx="${W - 270}" cy="${H - 18}" r="5" fill="${PALETTE.sky}" opacity="0.86"/>
 <text x="${W - 258}" y="${H - 14}">通常</text>
