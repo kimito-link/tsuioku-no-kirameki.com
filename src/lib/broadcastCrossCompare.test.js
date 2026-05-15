@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildBroadcasterCrossComparison,
   buildRecentBroadcastComparison,
   buildWeekdayHourHeatmap,
-  computeBroadcastGrowthScore
+  computeBroadcastGrowthScore,
+  hashViewerUserId
 } from './broadcastCrossCompare.js';
 
 const D = (y, m, d, h, min) => Date.UTC(y, m - 1, d, h, min, 0);
@@ -138,5 +140,75 @@ describe('computeBroadcastGrowthScore', () => {
 
   it('null 入力 → 空', () => {
     expect(computeBroadcastGrowthScore(null).average).toBeNull();
+  });
+});
+
+describe('hashViewerUserId', () => {
+  it('視聴者 uid を短縮 SHA-256 にし、raw uid を返さない', async () => {
+    const a = await hashViewerUserId('viewer-123');
+    const b = await hashViewerUserId('viewer-123');
+    expect(a).toBe(b);
+    expect(a).toMatch(/^[0-9a-f]{16}$/);
+    expect(a).not.toBe('viewer-123');
+  });
+});
+
+describe('buildBroadcasterCrossComparison', () => {
+  it('自分 vs 理想配信者の平均・密度・ギフト差分を返す', async () => {
+    const r = await buildBroadcasterCrossComparison({
+      selfLabel: '自分',
+      idealLabel: '理想',
+      selfBroadcasts: [
+        {
+          liveId: 'self-1',
+          giftPoints: 100,
+          comments: [
+            { userId: 'viewer-a', capturedAt: D(2026, 5, 1, 10, 0) },
+            { userId: 'viewer-b', capturedAt: D(2026, 5, 1, 10, 10) },
+            { userId: 'viewer-a', capturedAt: D(2026, 5, 1, 10, 20) }
+          ]
+        },
+        {
+          liveId: 'self-2',
+          giftPoints: 200,
+          comments: [
+            { userId: 'viewer-c', capturedAt: D(2026, 5, 2, 10, 0) },
+            { userId: 'viewer-b', capturedAt: D(2026, 5, 2, 10, 10) }
+          ]
+        }
+      ],
+      idealBroadcasts: [
+        {
+          liveId: 'ideal-1',
+          snapshot: { giftPoints: 600 },
+          comments: [
+            { userId: 'viewer-b', capturedAt: D(2026, 5, 3, 10, 0) },
+            { userId: 'viewer-d', capturedAt: D(2026, 5, 3, 10, 5) },
+            { userId: 'viewer-e', capturedAt: D(2026, 5, 3, 10, 10) },
+            { userId: 'viewer-b', capturedAt: D(2026, 5, 3, 10, 15) }
+          ]
+        }
+      ]
+    });
+
+    expect(r.self.label).toBe('自分');
+    expect(r.ideal.label).toBe('理想');
+    expect(r.self.broadcastCount).toBe(2);
+    expect(r.self.averageComments).toBe(2.5);
+    expect(r.ideal.averageGiftPoints).toBe(600);
+    expect(r.deltas.averageGiftPoints).toBe(450);
+    expect(r.sharedViewerHashes).toHaveLength(1);
+    expect(r.sharedViewerHashes[0].hash).toMatch(/^[0-9a-f]{16}$/);
+    expect(r.sharedViewerHashes[0].hash).not.toBe('viewer-b');
+    expect(JSON.stringify(r)).not.toContain('viewer-b');
+    expect(r.takeaways.join('\n')).toContain('理想');
+  });
+
+  it('入力なしでも空の比較結果を返す', async () => {
+    const r = await buildBroadcasterCrossComparison(null);
+    expect(r.self.broadcastCount).toBe(0);
+    expect(r.ideal.broadcastCount).toBe(0);
+    expect(r.sharedViewerHashes).toEqual([]);
+    expect(r.takeaways.length).toBeGreaterThan(0);
   });
 });
