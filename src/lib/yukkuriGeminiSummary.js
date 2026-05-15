@@ -2,8 +2,15 @@
  * MarketingReport を Gemini Nano / Built-in AI に渡すための
  * ゆっくり解説 prompt に変換する純関数。
  *
- * AI 呼び出しは Claude 領域の geminiNanoBridge.runBuiltinAiPrompt 側で行う。
+ * AI 呼び出しは geminiNanoBridge 経由に限定し、Built-in AI 不在時は
+ * yukkuriBroadcastSummary のローカル要約に fallback する。
  */
+
+import {
+  probeBuiltinAiAvailability,
+  runBuiltinAiPrompt
+} from './geminiNanoBridge.js';
+import { buildYukkuriBroadcastSummary } from './yukkuriBroadcastSummary.js';
 
 /**
  * @typedef {{
@@ -35,11 +42,13 @@
  */
 
 const SYSTEM_PROMPT = [
-  'あなたは「霊夢と魔理沙」の対話形式で niconico 生放送の配信データを解説するアシスタントです。',
+  'あなたは「りんく・こん太・たぬ姉」の対話形式で niconico 生放送の配信データを解説するアシスタントです。',
+  'りんくは配信者視点、こん太はファン視点、たぬ姉は匿名コメントも拾うしっかり者ガイドです。',
+  'この3人は本拡張のオリジナルキャラクターです。別作品由来のキャラクター名は使わないでください。',
   '視聴者ファンが楽しめるよう、要点を 3〜5 つ取り上げて、1 件あたり 2〜3 行、合計 200〜400 字程度にまとめてください。',
-  '霊夢の語尾は「〜よ」「〜だわ」、魔理沙の語尾は「〜だぜ」「〜だな」にしてください。',
+  'りんくは配信者として次回に活かす観察、こん太は応援した人が報われる見方、たぬ姉は匿名・全体傾向の整理を担当してください。',
   '特徴的な数字（コメント数 / ピーク / ギフト pt / 上位応援者）は具体的に挙げてください。',
-  '出力は「霊夢: ...」「魔理沙: ...」の会話だけにし、外部送信や未記録データがあるような表現は避けてください。'
+  '出力は「りんく: ...」「こん太: ...」「たぬ姉: ...」の会話だけにし、外部送信や未記録データがあるような表現は避けてください。'
 ].join('\n');
 
 const USER_MIN_CHARS = 200;
@@ -150,11 +159,121 @@ export function buildYukkuriGeminiPrompt(report = {}) {
     `${peakParts.join('、')}。`,
     `配信時間は ${formatNumber(durationMinutes)} 分、ギフト pt は ${formatNumber(giftPoints)}。`,
     `${formatTopUsers(report?.topUsers || [])}。`,
-    'この数値をもとに、霊夢と魔理沙の軽い掛け合いで、ファンが読んで楽しい配信レポート解説に変換してください。'
+    'この数値をもとに、りんく・こん太・たぬ姉の軽い掛け合いで、ファンが読んで楽しい配信レポート解説に変換してください。'
   ].join('');
 
   return {
     system: SYSTEM_PROMPT,
     user: fitUserPromptLength(summary)
   };
+}
+
+const FALLBACK_LABELS = /** @type {const} */ ({
+  rinku: 'りんく',
+  konta: 'こん太',
+  tanunee: 'たぬ姉'
+});
+
+/**
+ * @param {import('./yukkuriBroadcastSummary.js').YukkuriLine[]} lines
+ */
+function renderFallbackText(lines) {
+  return lines
+    .map((line) => {
+      const label = FALLBACK_LABELS[line.character] || line.character;
+      return `${label}: ${line.line}`;
+    })
+    .join('\n');
+}
+
+/**
+ * @param {YukkuriPromptMarketingReport & {
+ *   fallbackInput?: Parameters<typeof buildYukkuriBroadcastSummary>[0],
+ *   broadcastTitle?: string,
+ *   broadcasterName?: string
+ * }} report
+ * @returns {Parameters<typeof buildYukkuriBroadcastSummary>[0]}
+ */
+function normalizeFallbackInput(report) {
+  if (report?.fallbackInput && typeof report.fallbackInput === 'object') {
+    return report.fallbackInput;
+  }
+  const recordedCommentCount = pickNumber(report, [
+    'commentCount',
+    'totalComments',
+    'recordedCommentCount'
+  ]);
+  const streamAgeMin = pickNumber(report, ['durationMinutes', 'durationMin']);
+  return {
+    bundle: null,
+    broadcastTitle: report?.broadcastTitle || report?.liveId || '',
+    broadcasterName: report?.broadcasterName || '',
+    ...(recordedCommentCount != null ? { recordedCommentCount } : {}),
+    ...(streamAgeMin != null ? { streamAgeMin } : {})
+  };
+}
+
+/**
+ * Built-in AI が使える環境では Gemini Nano に会話化を任せ、使えない環境では
+ * 既存のローカルゆっくり要約を返す。どちらも外部 API には送らない。
+ *
+ * @param {YukkuriPromptMarketingReport & {
+ *   fallbackInput?: Parameters<typeof buildYukkuriBroadcastSummary>[0]
+ * }} report
+ * @param {{ onDownloadProgress?: (loaded: number) => void }} [options]
+ * @returns {Promise<{
+ *   ok: boolean,
+ *   source: 'builtin-ai'|'fallback',
+ *   text: string,
+ *   reason: string,
+ *   availability: import('./geminiNanoBridge.js').BuiltinAiAvailabilityState
+ * }>}
+ */
+export async function runYukkuriGeminiSummary(report = {}, options = {}) {
+  const fallbackInput = normalizeFallbackInput(report);
+  const fallbackText = () => renderFallbackText(buildYukkuriBroadcastSummary(fallbackInput));
+  const av = await probeBuiltinAiAvailability();
+  if (av.state !== 'available') {
+    return {
+      ok: false,
+      source: 'fallback',
+      text: fallbackText(),
+      reason:
+        av.state === 'unavailable'
+          ? `Built-in AI unavailable: ${av.reason || 'unknown'}`
+          : `Built-in AI state: ${av.state}`,
+      availability: av.state
+    };
+  }
+  try {
+    const prompt = buildYukkuriGeminiPrompt(report);
+    const text = await runBuiltinAiPrompt(
+      { ...prompt, temperature: 0.4 },
+      { onDownloadProgress: options?.onDownloadProgress }
+    );
+    if (text) {
+      return {
+        ok: true,
+        source: 'builtin-ai',
+        text,
+        reason: '',
+        availability: av.state
+      };
+    }
+    return {
+      ok: false,
+      source: 'fallback',
+      text: fallbackText(),
+      reason: 'Built-in AI returned empty text',
+      availability: av.state
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      source: 'fallback',
+      text: fallbackText(),
+      reason: `Built-in AI error: ${String(/** @type {any} */ (e)?.message || e)}`,
+      availability: av.state
+    };
+  }
 }
