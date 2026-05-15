@@ -28,6 +28,11 @@
  * 「さんが参加しています」というテキストで対象を識別し、誤認を避ける。
  */
 
+import {
+  pickAdvertiserAvatarUrlFromGiftHistoryLi,
+  resolveGiftHistoryGiftImageEl
+} from './scrapeGiftHistoryList.js';
+
 /**
  * @typedef {{
  *   rank: number|null,
@@ -340,6 +345,12 @@ export function scrapeContributionRankingFromDom(root) {
     if (rank == null && idx < 3) {
       rank = idx + 1;
     }
+    // 先頭付近で rank 要素周りに紛れ込んだ数字を拾い、実順位より小さい順位になることがある
+    // （例: 3 人目が 2 位扱い）。既に確定した行数より進んでいない順位は、DOM 行の序数で矯正する。
+    const nextOrdinal = rows.length + 1;
+    if (rank != null && nextOrdinal <= 3 && rank <= rows.length) {
+      rank = nextOrdinal;
+    }
     if (rank == null) continue;
 
     // name 抽出時に honorific（「さん」）が含まれていたら除く
@@ -366,6 +377,19 @@ export function scrapeContributionRankingFromDom(root) {
       const bg = String(thumbEl.style?.backgroundImage || '');
       const m = bg.match(/url\(["']?([^"')]+)["']?\)/);
       if (m) thumbnailUrl = m[1];
+      if (!thumbnailUrl) {
+        const img = thumbEl.querySelector('img[src]');
+        if (img instanceof HTMLImageElement) {
+          const u = String(img.currentSrc || img.src || '').trim();
+          if (/^https?:\/\//i.test(u)) thumbnailUrl = u;
+        }
+      }
+      if (!thumbnailUrl) {
+        const lazy =
+          String(thumbEl.getAttribute('data-src') || '').trim() ||
+          String(thumbEl.querySelector('img[data-src]')?.getAttribute('data-src') || '').trim();
+        if (/^https?:\/\//i.test(lazy)) thumbnailUrl = lazy;
+      }
     }
 
     rows.push({ rank, name, contribution, isAnonymous, thumbnailUrl });
@@ -514,7 +538,8 @@ export function scrapeProgramStatisticsMenuFromDom(root) {
  *
  *   <ul class="gift-history-list">
  *     <li class="item">
- *       <img class="thumbnail" src="..." alt="ギフト名">
+ *       （任意）送り主の user icon（`nicoaccount/usericon` を含む img）と
+ *       <img class="thumbnail" src="..." alt="ギフト名">（ギフト画像）
  *       <p class="time">19:58</p>
  *       <p class="text">
  *         <span class="advertiser-name">くろかな <small class="honorific">さん</small></span>
@@ -531,7 +556,8 @@ export function scrapeProgramStatisticsMenuFromDom(root) {
  *   isAnonymous: boolean,
  *   point: number,
  *   thumbnailUrl: string,
- *   giftName: string
+ *   giftName: string,
+ *   advertiserAvatarUrl: string
  * }} GiftHistoryEntry
  */
 
@@ -562,9 +588,7 @@ export function scrapeGiftHistoryFromDom(root) {
   const out = [];
   for (const li of /** @type {Iterable<Element>} */ (items)) {
     if (!(li instanceof HTMLElement)) continue;
-    const thumb =
-      li.querySelector('.thumbnail') ||
-      li.querySelector('[class*="thumbnail"]');
+    const thumb = resolveGiftHistoryGiftImageEl(li);
     const timeEl =
       li.querySelector('.time') ||
       li.querySelector('[class*="time"]');
@@ -609,13 +633,15 @@ export function scrapeGiftHistoryFromDom(root) {
     const giftName =
       thumb instanceof HTMLImageElement ? String(thumb.alt || '').trim() : '';
     const isAnonymous = name === '名無し';
+    const advertiserAvatarUrl = pickAdvertiserAvatarUrlFromGiftHistoryLi(li);
     out.push({
       time,
       advertiserName: name,
       isAnonymous,
       point,
       thumbnailUrl,
-      giftName
+      giftName,
+      advertiserAvatarUrl
     });
   }
   if (out.length === 0) return null;
@@ -631,7 +657,8 @@ export function scrapeGiftHistoryFromDom(root) {
  *   isAnonymous: boolean,
  *   totalPoints: number,
  *   giftCount: number,
- *   lastTime: string
+ *   lastTime: string,
+ *   advertiserAvatarUrl: string
  * }} GiftContributorAggregated
  *
  * @param {GiftHistoryEntry[]} history
@@ -655,13 +682,16 @@ export function aggregateGiftHistoryByUser(history) {
         isAnonymous: !!h.isAnonymous || name === '名無し',
         totalPoints: 0,
         giftCount: 0,
-        lastTime: ''
+        lastTime: '',
+        advertiserAvatarUrl: ''
       };
       map.set(name, agg);
     }
     agg.totalPoints += point;
     agg.giftCount += 1;
     if (time && (!agg.lastTime || time > agg.lastTime)) agg.lastTime = time;
+    const av = String(h.advertiserAvatarUrl || '').trim();
+    if (av) agg.advertiserAvatarUrl = av;
   }
   return [...map.values()].sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
@@ -712,19 +742,67 @@ export function aggregateGiftHistoryByUser(history) {
 export function scrapeAdRankingMirrorHtml(root) {
   if (!root) return null;
 
+  const anyRoot = /** @type {any} */ (root);
+
+  /** @param {Element} ul */
+  const countRankingItems = (ul) => {
+    try {
+      return ul.querySelectorAll('li[class*="item"], li.item').length;
+    } catch {
+      return 0;
+    }
+  };
+
+  /** @param {Element|null|undefined} sec */
+  const bestRankingListInSection = (sec) => {
+    if (!(sec instanceof Element)) return null;
+    try {
+      const uls = sec.querySelectorAll('ul[class*="wrapper"], ul.wrapper');
+      /** @type {Element|null} */
+      let best = null;
+      let bestScore = 0;
+      for (const ul of uls) {
+        const n = countRankingItems(ul);
+        if (n > bestScore) {
+          bestScore = n;
+          best = ul;
+        }
+      }
+      return bestScore > 0 ? best : null;
+    } catch {
+      return null;
+    }
+  };
+
+  /** @param {Element|null} fromList */
+  const resolveSupporterSection = (fromList) =>
+    (fromList instanceof Element &&
+      fromList.closest?.('[class*="content-supporter"]')) ||
+    anyRoot.querySelector?.('[class*="content-supporter"]') ||
+    anyRoot.querySelector?.('.content-supporter-section') ||
+    null;
+
   /** @type {Element|null} */
   let list = null;
   try {
-    list =
-      /** @type {any} */ (root).querySelector?.(
-        '.content-supporter-section ul.wrapper'
-      ) || null;
+    list = anyRoot.querySelector?.('.content-supporter-section ul.wrapper') || null;
     if (!list) {
       // CSS Modules ハッシュ化保険（A/B テスト分岐への耐性、Gemini 視点 #17）
       list =
-        /** @type {any} */ (root).querySelector?.(
-          '[class*="content-supporter"] ul[class*="wrapper"]'
-        ) || null;
+        anyRoot.querySelector?.('[class*="content-supporter"] ul[class*="wrapper"]') ||
+        null;
+    }
+    // 先頭にマッチした ul がタブ用など空殻のとき、同一 section 内で li 数最大の ul を選ぶ
+    let nItems = list instanceof Element ? countRankingItems(list) : 0;
+    if (list instanceof Element && nItems === 0) {
+      const sec = resolveSupporterSection(list);
+      const better = bestRankingListInSection(sec);
+      if (better) {
+        list = better;
+      }
+    }
+    if (!list) {
+      list = bestRankingListInSection(resolveSupporterSection(null));
     }
   } catch {
     return null;
@@ -734,6 +812,22 @@ export function scrapeAdRankingMirrorHtml(root) {
 
   const html = String(list.outerHTML || '').trim();
   return html || null;
+}
+
+/**
+ * 広告ランキングの構造化行と北極星「鏡」HTMLを同一 doc から取得（nicoad publish fetch 等）。
+ * 呼び出し側のペア取得を固定し、将来の短絡・キャッシュをここに集約しやすくする。
+ *
+ * @param {Document|Element} root
+ * @returns {{
+ *   ranking: ReturnType<typeof scrapeContributionRankingFromDom>,
+ *   mirrorHtml: ReturnType<typeof scrapeAdRankingMirrorHtml>
+ * }}
+ */
+export function scrapeAdContributionRankingRowsAndMirrorFromDom(root) {
+  const ranking = scrapeContributionRankingFromDom(root);
+  const mirrorHtml = scrapeAdRankingMirrorHtml(root);
+  return { ranking, mirrorHtml };
 }
 
 /**

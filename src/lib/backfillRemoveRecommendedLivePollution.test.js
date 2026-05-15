@@ -9,7 +9,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   backfillRemoveRecommendedLivePollution,
-  isRecommendedLivePollutionRow
+  backfillRemoveRecommendedUserChipPollution,
+  isCommentUiScraperPollutionRow,
+  isRecommendedLivePollutionRow,
+  isRecommendedUserChipPollutionRow
 } from './backfillRemoveRecommendedLivePollution.js';
 
 describe('backfillRemoveRecommendedLivePollution', () => {
@@ -164,5 +167,86 @@ describe('isRecommendedLivePollutionRow', () => {
   it('非 object は false', () => {
     expect(isRecommendedLivePollutionRow(null)).toBe(false);
     expect(isRecommendedLivePollutionRow('x')).toBe(false);
+  });
+});
+
+describe('isRecommendedUserChipPollutionRow', () => {
+  it('数値 userId + 本文が ID のみ → true', () => {
+    expect(
+      isRecommendedUserChipPollutionRow({
+        userId: '137814833',
+        text: '137814833'
+      })
+    ).toBe(true);
+  });
+
+  it('数値 userId + 本文が u/ID のみ → true', () => {
+    expect(
+      isRecommendedUserChipPollutionRow({
+        userId: '137814833',
+        text: 'u/137814833'
+      })
+    ).toBe(true);
+  });
+
+  it('改行区切りの ID + u/ID も true', () => {
+    expect(
+      isRecommendedUserChipPollutionRow({
+        userId: '137814833',
+        text: '137814833\nu/137814833'
+      })
+    ).toBe(true);
+  });
+
+  it('プロフィール URL のみ → true', () => {
+    expect(
+      isRecommendedUserChipPollutionRow({
+        userId: '137814833',
+        text: 'https://www.nicovideo.jp/user/137814833/'
+      })
+    ).toBe(true);
+  });
+
+  it('通常コメントは false', () => {
+    expect(
+      isRecommendedUserChipPollutionRow({
+        userId: '137814833',
+        text: 'こんばんは！'
+      })
+    ).toBe(false);
+  });
+
+  it('短すぎる userId は false（5 桁未満）', () => {
+    expect(
+      isRecommendedUserChipPollutionRow({ userId: '1234', text: '1234' })
+    ).toBe(false);
+  });
+});
+
+describe('isCommentUiScraperPollutionRow', () => {
+  it('おすすめ生放送系も true', () => {
+    expect(isCommentUiScraperPollutionRow({ text: 'LIVE', userId: '1' })).toBe(
+      true
+    );
+  });
+
+  it('おすすめユーザーチップ系も true', () => {
+    expect(
+      isCommentUiScraperPollutionRow({ text: 'u/137814833', userId: '137814833' })
+    ).toBe(true);
+  });
+});
+
+describe('backfillRemoveRecommendedUserChipPollution', () => {
+  it('該当行だけ除去', () => {
+    const stored = [
+      { commentNo: '1', text: '本物', userId: '11111111' },
+      { commentNo: '2', text: '137814833', userId: '137814833' },
+      { commentNo: '3', text: 'u/137814833', userId: '137814833' }
+    ];
+    const r = backfillRemoveRecommendedUserChipPollution(stored);
+    expect(r.removedCount).toBe(2);
+    expect(r.cleaned).toHaveLength(1);
+    expect(r.cleaned[0].text).toBe('本物');
   });
 });

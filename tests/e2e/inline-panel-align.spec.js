@@ -18,6 +18,10 @@ const KEY_INLINE_FLOATING_ANCHOR = 'nls_inline_floating_anchor';
  */
 const KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED =
   'nls_inline_panel_float_to_dock_migrated';
+const KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY =
+  'nls_inline_panel_viewport_wide_v1';
+const KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE =
+  'nls_inline_panel_viewport_wide_once_done_v1';
 
 async function extensionServiceWorker(context) {
   const pickExt = () =>
@@ -61,6 +65,105 @@ function injectTwoColumnPlayerRow() {
   doc.body.prepend(row);
   win.scrollTo(0, 0);
   win.dispatchEvent(new Event('resize'));
+}
+
+/**
+ * 横付き＋「タブ幅まで広げ」の回帰用: flex gap を十分広げ、calculateBesidePanelLayout が成立する幅にする。
+ */
+function injectTwoColumnPlayerRowLargeBesideGap() {
+  const doc = globalThis.document;
+  const win = globalThis.window;
+  const oldRow = doc.getElementById('mock-player-row');
+  if (oldRow) oldRow.remove();
+  const oldVid = doc.getElementById('e2e-mock-video');
+  if (oldVid) oldVid.remove();
+  const panel = doc.querySelector('.ga-ns-comment-panel');
+  if (panel) panel.remove();
+
+  const row = doc.createElement('section');
+  row.id = 'mock-player-row';
+  row.style.cssText =
+    'display:flex;flex-direction:row;align-items:flex-start;flex-wrap:nowrap;gap:300px;width:980px;margin:12px 0;padding:8px;background:#1a1a1a;';
+
+  const v = doc.createElement('video');
+  v.setAttribute('playsinline', '');
+  v.setAttribute('width', '400');
+  v.setAttribute('height', '225');
+  v.style.cssText =
+    'display:block;width:400px;height:225px;flex-shrink:0;background:#000;';
+
+  const side = doc.createElement('div');
+  side.className = 'ga-ns-comment-panel comment-panel';
+  side.style.cssText =
+    'width:220px;min-height:280px;flex-shrink:0;background:#2a2a2a;';
+
+  row.appendChild(v);
+  row.appendChild(side);
+  doc.body.prepend(row);
+  win.scrollTo(0, 0);
+  win.dispatchEvent(new Event('resize'));
+}
+
+/**
+ * 本家 watch で多い `display:inline-flex` の視聴行（横付きアンカーが `flex` のみ判定だと見逃す）。
+ */
+function injectTwoColumnPlayerRowInlineFlex() {
+  const doc = globalThis.document;
+  const win = globalThis.window;
+  const oldRow = doc.getElementById('mock-player-row');
+  if (oldRow) oldRow.remove();
+  const oldVid = doc.getElementById('e2e-mock-video');
+  if (oldVid) oldVid.remove();
+  const panel = doc.querySelector('.ga-ns-comment-panel');
+  if (panel) panel.remove();
+
+  const row = doc.createElement('section');
+  row.id = 'mock-player-row';
+  row.style.cssText =
+    'display:inline-flex;flex-direction:row;align-items:flex-start;gap:10px;width:640px;margin:12px 0;padding:8px;background:#1a1a1a;';
+
+  const v = doc.createElement('video');
+  v.setAttribute('playsinline', '');
+  v.setAttribute('width', '400');
+  v.setAttribute('height', '225');
+  v.style.cssText =
+    'display:block;width:400px;height:225px;flex-shrink:0;background:#000;';
+
+  const side = doc.createElement('div');
+  side.className = 'ga-ns-comment-panel comment-panel';
+  side.style.cssText =
+    'width:220px;min-height:280px;flex-shrink:0;background:#2a2a2a;';
+
+  row.appendChild(v);
+  row.appendChild(side);
+  doc.body.prepend(row);
+  win.scrollTo(0, 0);
+  win.dispatchEvent(new Event('resize'));
+}
+
+/**
+ * @param {import('@playwright/test').BrowserContext} context
+ * @param {'reset' | { policy: string, onceDone: boolean }} mode
+ */
+async function setViewportWideStorage(context, mode) {
+  const sw = await extensionServiceWorker(context);
+  await sw.evaluate(
+    async ({ payload, k1, k2 }) => {
+      if (payload === 'reset') {
+        await chrome.storage.local.remove([k1, k2]);
+        return;
+      }
+      await chrome.storage.local.set({
+        [k1]: payload.policy,
+        [k2]: payload.onceDone
+      });
+    },
+    {
+      payload: mode,
+      k1: KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
+      k2: KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE
+    }
+  );
 }
 
 /**
@@ -281,6 +384,26 @@ test.describe('inline panel alignment', () => {
     expect(w).toBeGreaterThan(380);
     expect(w).toBeLessThan(430);
     expect(metrics?.marginLeft).toBe('0px');
+  });
+
+  test('beside では inline-flex の視聴行内に出る', async ({ context }) => {
+    await setInlinePanelModes(context, {
+      widthMode: null,
+      placement: 'beside'
+    });
+
+    const page = await context.newPage();
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    await page.evaluate(injectTwoColumnPlayerRowInlineFlex);
+
+    await expect
+      .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+      .toMatchObject({
+        display: 'block',
+        parentId: 'mock-player-row',
+        prevElementTag: 'VIDEO',
+        floatingClass: false
+      });
   });
 
   test('beside でも狭いビューポートでは下（行の外）へ逃がす', async ({
@@ -586,4 +709,110 @@ test.describe('inline panel alignment', () => {
     expect(metrics?.position).not.toBe('fixed');
     if (process.env.CI !== 'true') expect(metrics?.floatingClass).toBe(false);
   });
+});
+
+test.describe('inline panel viewport size matrix', () => {
+  test.beforeEach(async ({ context }) => {
+    await setViewportWideStorage(context, 'reset');
+  });
+
+  test.afterEach(async ({ context }) => {
+    await setViewportWideStorage(context, 'reset');
+  });
+
+  for (const vw of [1199, 1200]) {
+    test(`beside: ビューポート ${vw}px で実効配置が閾値（1200px）通り切り替わる`, async ({
+      context
+    }) => {
+      await setInlinePanelModes(context, {
+        widthMode: 'video',
+        placement: 'beside'
+      });
+
+      const page = await context.newPage();
+      await page.setViewportSize({ width: vw, height: 800 });
+      await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+      await page.evaluate(injectTwoColumnPlayerRow);
+
+      if (vw < 1200) {
+        await expect
+          .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+          .toMatchObject({
+            display: 'block',
+            parentTag: 'BODY',
+            prevElementId: 'mock-player-row',
+            floatingClass: false
+          });
+      } else {
+        await expect
+          .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+          .toMatchObject({
+            display: 'block',
+            parentId: 'mock-player-row',
+            prevElementTag: 'VIDEO',
+            floatingClass: false
+          });
+      }
+    });
+  }
+
+  for (const vw of [1280, 1600, 1920, 2560]) {
+    test(`below: ビューポート ${vw}px でも視聴行の外（BODY 直下）に置かれる`, async ({
+      context
+    }) => {
+      await setInlinePanelModes(context, {
+        widthMode: 'video',
+        placement: 'below'
+      });
+
+      const page = await context.newPage();
+      await page.setViewportSize({ width: vw, height: 800 });
+      await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+      await page.evaluate(injectTwoColumnPlayerRow);
+
+      await expect
+        .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+        .toMatchObject({
+          display: 'block',
+          parentTag: 'BODY',
+          prevElementId: 'mock-player-row',
+          floatingClass: false
+        });
+    });
+  }
+
+  for (const vw of [1280, 1440, 1920, 2560]) {
+    test(`beside+幅拡大(常に)+列間ギャップ大: ${vw}px で行内かつ幅がタブ幅を超えない`, async ({
+      context
+    }) => {
+      await setInlinePanelModes(context, {
+        widthMode: 'video',
+        placement: 'beside'
+      });
+      await setViewportWideStorage(context, {
+        policy: 'always',
+        onceDone: false
+      });
+
+      const page = await context.newPage();
+      await page.setViewportSize({ width: vw, height: 800 });
+      await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+      await page.evaluate(injectTwoColumnPlayerRowLargeBesideGap);
+
+      await expect
+        .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+        .toMatchObject({
+          display: 'block',
+          parentId: 'mock-player-row',
+          prevElementTag: 'VIDEO',
+          floatingClass: false
+        });
+
+      const m = await hostPlacementMetrics(page);
+      const w = Number.parseFloat(String(m?.width || '0'));
+      expect(w).toBeGreaterThan(260);
+      expect(w).toBeLessThanOrEqual(360);
+      expect(m?.marginLeft).toBe('0px');
+    });
+  }
 });

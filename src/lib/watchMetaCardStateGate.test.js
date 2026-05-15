@@ -1,10 +1,37 @@
 import { describe, it, expect } from 'vitest';
-import { resolveWatchMetaCardState } from './watchMetaCardStateGate.js';
+import {
+  resolveWatchMetaCardState,
+  isLiveStatValueAwaitingData,
+  WATCH_META_CARD_LABELS
+} from './watchMetaCardStateGate.js';
 
-const LOADING = '（接続中…）';
-const FETCH_FAILED = '（取得不可）';
-const DATA_MISSING = '（数字非公開）';
-const PRE_MEASUREMENT = '計測中…';
+const LOADING = WATCH_META_CARD_LABELS.LOADING;
+const FETCH_FAILED = WATCH_META_CARD_LABELS.FETCH_FAILED;
+const DATA_MISSING = WATCH_META_CARD_LABELS.DATA_MISSING;
+const PRE_MEASUREMENT = WATCH_META_CARD_LABELS.PRE_MEASUREMENT;
+
+describe('isLiveStatValueAwaitingData', () => {
+  it('空・—・接続中・計測中は待ち', () => {
+    expect(isLiveStatValueAwaitingData('')).toBe(true);
+    expect(isLiveStatValueAwaitingData('—')).toBe(true);
+    expect(isLiveStatValueAwaitingData(LOADING)).toBe(true);
+    expect(isLiveStatValueAwaitingData(PRE_MEASUREMENT)).toBe(true);
+  });
+  it('数値・推定のチルダ付きは確定', () => {
+    expect(isLiveStatValueAwaitingData('0')).toBe(false);
+    expect(isLiveStatValueAwaitingData('3,449')).toBe(false);
+    expect(isLiveStatValueAwaitingData('~521')).toBe(false);
+  });
+  it('全角数字・細分空白を含んでも数値確定（NFKC 正規化）', () => {
+    expect(isLiveStatValueAwaitingData('３，４４９')).toBe(false);
+    expect(isLiveStatValueAwaitingData('3\u00a0449')).toBe(false);
+    expect(isLiveStatValueAwaitingData('3\u3000449')).toBe(false);
+  });
+  it('括弧メッセージは確定（ローディング解除）', () => {
+    expect(isLiveStatValueAwaitingData(FETCH_FAILED)).toBe(false);
+    expect(isLiveStatValueAwaitingData(DATA_MISSING)).toBe(false);
+  });
+});
 
 describe('resolveWatchMetaCardState - loading 状態（snapshot 取得中）', () => {
   it('snapshot=null + inflight=true → loading', () => {

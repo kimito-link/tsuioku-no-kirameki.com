@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { INLINE_VIEWPORT_BESIDE_MIN_WIDTH } from './inlinePanelLayout.js';
 import { suggestInitialInlinePanelPlacement } from './suggestInitialInlinePanelPlacement.js';
 import {
   INLINE_PANEL_PLACEMENT_BELOW,
@@ -7,19 +8,19 @@ import {
 } from './storageKeys.js';
 
 describe('suggestInitialInlinePanelPlacement', () => {
-  it('1240px 以上は横付き候補', () => {
-    expect(suggestInitialInlinePanelPlacement(1240)).toBe(
-      INLINE_PANEL_PLACEMENT_BESIDE
-    );
+  it('INLINE_VIEWPORT_BESIDE_MIN_WIDTH 以上は横付き候補（実効配置と閾値一致）', () => {
+    expect(
+      suggestInitialInlinePanelPlacement(INLINE_VIEWPORT_BESIDE_MIN_WIDTH)
+    ).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
     expect(suggestInitialInlinePanelPlacement(1920)).toBe(
       INLINE_PANEL_PLACEMENT_BESIDE
     );
   });
 
-  it('960〜1239 はプレイヤー行の下', () => {
-    expect(suggestInitialInlinePanelPlacement(1239)).toBe(
-      INLINE_PANEL_PLACEMENT_BELOW
-    );
+  it('960〜1199 はプレイヤー行の下', () => {
+    expect(
+      suggestInitialInlinePanelPlacement(INLINE_VIEWPORT_BESIDE_MIN_WIDTH - 1)
+    ).toBe(INLINE_PANEL_PLACEMENT_BELOW);
     expect(suggestInitialInlinePanelPlacement(960)).toBe(
       INLINE_PANEL_PLACEMENT_BELOW
     );

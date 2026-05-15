@@ -266,6 +266,11 @@ export function formatAiShareDiagnosticsMarkdown(parts) {
   for (const s of buildAiShareSummaryLines(parts.payload)) {
     lines.push(`- ${s}`);
   }
+  const pl = parts.payload && typeof parts.payload === 'object' ? parts.payload : null;
+  const dsv = pl && 'diagSchemaVersion' in pl ? String(/** @type {Record<string, unknown>} */ (pl).diagSchemaVersion || '') : '';
+  lines.push(
+    `- 診断スキーマ: \`${dsv || '（未付与）'}\`（LLM への再現用バージョン）`
+  );
   if (parts.extensionName || parts.extensionVersion) {
     lines.push(
       `- 拡張名: ${parts.extensionName || ''} ${parts.extensionVersion ? `v${parts.extensionVersion}` : ''}`

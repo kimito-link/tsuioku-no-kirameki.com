@@ -121,6 +121,15 @@ describe('topSupportRankLineModels', () => {
     expect(row.thumbNeedsNoReferrer).toBe(true);
   });
 
+  it('__anon_<表示名> と表示名が同じとき id 行を出さない（二重表示防止）', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__anon_名無し', nickname: '名無し', count: 1 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.idShort).toBe('');
+    expect(row.nameLine).toBe('名無し');
+  });
+
   it('anonymousIdenticonResolver が返す data URL を匿名のサムネに使う', () => {
     const tv = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/tv.jpg';
     const idn = 'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E';
@@ -254,6 +263,27 @@ describe('topSupportRankLineModels', () => {
     );
     expect(row.fullLabelForTitle).toContain('太郎');
     expect(row.fullLabelForTitle).toContain('11111');
+  });
+
+  it('rankHint が各行にあればその順位を表示する', () => {
+    const rows = topSupportRankLineModels(
+      [
+        { userKey: '1', nickname: 'a', count: 10, rankHint: 1 },
+        { userKey: '2', nickname: 'b', count: 9, rankHint: 2 },
+        { userKey: '3', nickname: 'c', count: 8, rankHint: 3 }
+      ],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(rows.map((r) => r.placeNumber)).toEqual([1, 2, 3]);
+  });
+
+  it('公式スクレイプ由来 __ad_* では DOM の表示名を優先し id 行を省略する', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__ad_0_ゲスト', nickname: 'ゲスト', count: 1200, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('ゲスト');
+    expect(row.idShort).toBe('');
   });
 
   it('placeNumberMode:dense で同回数は同順位（本家ランキングタブの貢献度に近い並び方）', () => {

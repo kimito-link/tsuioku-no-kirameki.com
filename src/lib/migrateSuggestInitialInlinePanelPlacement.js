@@ -1,7 +1,7 @@
 /**
  * 新規インストール時のみ、インライン配置キーが未保存なら画面幅で既定を一度書き込む。
  *
- * - background が `install` で pending フラグを立てる
+ * - background が `install` で pending フラグを立てる（`update` で配置キーが空のときも立てる）
  * - content start で float/below の既存 migrate の後に本関数を呼ぶ
  * - 既に `KEY_INLINE_PANEL_PLACEMENT` が入っているプロファイルでは何もしない（pending だけ下ろす）
  */

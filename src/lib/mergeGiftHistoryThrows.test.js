@@ -18,6 +18,20 @@ describe('aggregateGiftHistoryThrows', () => {
     expect(r.storageTouched).toBe(true);
   });
 
+  it('senderAvatarUrl が付いていれば avatarUrl に入る（後続行で補完）', () => {
+    const icon = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/1.jpg';
+    const r = aggregateGiftHistoryThrows(
+      [
+        { senderName: 'a', points: 10, itemName: '', time: '', thumbnailUrl: '', senderAvatarUrl: '' },
+        { senderName: 'a', points: 20, itemName: '', time: '', thumbnailUrl: '', senderAvatarUrl: icon }
+      ],
+      NOW
+    );
+    expect(r.next).toHaveLength(1);
+    expect(r.next[0].avatarUrl).toBe(icon);
+    expect(r.next[0].totalPoints).toBe(30);
+  });
+
   it('同名 senderName が複数回 → 1 entry に集約、throwCount + totalPoints 加算', () => {
     const r = aggregateGiftHistoryThrows(
       [
@@ -98,6 +112,15 @@ describe('aggregateGiftHistoryThrows', () => {
       expect(u.throwCount).toBe(1);
       expect(u.totalPoints).toBe(0);
     }
+  });
+
+  it('itemName/count だけのオブジェクト（種類別集計っぽい形）は senderName が無いので無視（totalCounts 系が混入しても加算されない）', () => {
+    const r = aggregateGiftHistoryThrows(
+      [{ itemName: 'サッカーボール', count: 4 }],
+      NOW
+    );
+    expect(r.next).toEqual([]);
+    expect(r.storageTouched).toBe(false);
   });
 
   it('incoming が空 → next 空、storageTouched=false', () => {

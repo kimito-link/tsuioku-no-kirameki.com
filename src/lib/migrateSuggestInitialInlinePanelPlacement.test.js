@@ -3,6 +3,7 @@ import { migrateSuggestInitialInlinePanelPlacementOnce } from './migrateSuggestI
 import {
   KEY_INLINE_PANEL_PLACEMENT,
   KEY_INSTALL_PANEL_PLACEMENT_PENDING,
+  INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_BESIDE
 } from './storageKeys.js';
 
@@ -69,5 +70,22 @@ describe('migrateSuggestInitialInlinePanelPlacementOnce', () => {
     });
     expect(r.changed).toBe(false);
     expect(mem.store[KEY_INLINE_PANEL_PLACEMENT]).toBeUndefined();
+  });
+
+  it('pending で 1200px 未満なら below を書き込む', async () => {
+    const mem = createMemoryStorage({
+      [KEY_INSTALL_PANEL_PLACEMENT_PENDING]: true
+    });
+    const r = await migrateSuggestInitialInlinePanelPlacementOnce({
+      get: mem.get,
+      set: mem.set,
+      layoutInnerWidth: 1100
+    });
+    expect(r.changed).toBe(true);
+    expect(r.suggested).toBe(INLINE_PANEL_PLACEMENT_BELOW);
+    expect(mem.store[KEY_INLINE_PANEL_PLACEMENT]).toBe(
+      INLINE_PANEL_PLACEMENT_BELOW
+    );
+    expect(mem.store[KEY_INSTALL_PANEL_PLACEMENT_PENDING]).toBe(false);
   });
 });

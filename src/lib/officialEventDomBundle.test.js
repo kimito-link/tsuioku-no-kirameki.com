@@ -1,7 +1,9 @@
 /** @vitest-environment happy-dom */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   collectOfficialEventDomBundle,
+  fetchNicoadContributionRankingFromPublishPage,
+  mergeGiftHistoryDomScrapeArrays,
   mergeOfficialEventDomBundle
 } from './officialEventDomBundle.js';
 
@@ -64,6 +66,39 @@ describe('collectOfficialEventDomBundle', () => {
     expect(b).not.toBeNull();
     expect(b.eventCumulativeScoreMirrorHtml).toBeNull();
     expect(b.eventCurrentRankMirrorHtml).toBeNull();
+  });
+});
+
+/** @returns {import('./officialEventBannerDom.js').GiftHistoryEntry} */
+function gh(time, name, point, gift = 'g') {
+  return {
+    time,
+    advertiserName: name,
+    isAnonymous: name === '名無し',
+    point,
+    thumbnailUrl: '',
+    giftName: gift
+  };
+}
+
+describe('mergeGiftHistoryDomScrapeArrays', () => {
+  it('next が部分集合でも prev の行を保持（ユニオン）', () => {
+    const prev = [gh('20:01', 'A', 10), gh('20:02', 'B', 20), gh('20:03', 'C', 30)];
+    const next = [gh('20:03', 'C', 30), gh('20:02', 'B', 20)];
+    const merged = mergeGiftHistoryDomScrapeArrays(prev, next);
+    expect(merged).toHaveLength(3);
+    expect(merged?.map((e) => e.advertiserName).join(',')).toBe('C,B,A');
+  });
+
+  it('next が空相当なら prev を返す', () => {
+    const prev = [gh('20:01', 'A', 10)];
+    expect(mergeGiftHistoryDomScrapeArrays(prev, null)).toEqual(prev);
+    expect(mergeGiftHistoryDomScrapeArrays(prev, [])).toEqual(prev);
+  });
+
+  it('prev が空なら next のコピー', () => {
+    const next = [gh('20:01', 'A', 10)];
+    expect(mergeGiftHistoryDomScrapeArrays(null, next)).toEqual(next);
   });
 });
 
@@ -131,5 +166,81 @@ describe('mergeOfficialEventDomBundle', () => {
     expect(merged.eventCumulativeScoreMirrorHtml).toBe('<span class="score">200</span>');
     // next が null なら prev で温存
     expect(merged.eventCurrentRankMirrorHtml).toBe('<span class="rank-field">5</span>');
+  });
+
+  it('giftHistory: next が仮想リストの部分集合でも prev を上書き消去しない', () => {
+    const prev = {
+      capturedAt: 1,
+      eventBanner: null,
+      eventBalloon: null,
+      contributionRanking: null,
+      programStats: null,
+      giftHistory: [gh('20:01', 'A', 10), gh('20:02', 'B', 20), gh('20:03', 'C', 30)]
+    };
+    const next = {
+      capturedAt: 2,
+      eventBanner: null,
+      eventBalloon: null,
+      contributionRanking: null,
+      programStats: null,
+      giftHistory: [gh('20:03', 'C', 30)]
+    };
+    const merged = mergeOfficialEventDomBundle(prev, next);
+    expect(merged?.giftHistory).toHaveLength(3);
+    expect(merged?.giftHistory?.map((e) => e.advertiserName).join(',')).toBe('C,A,B');
+  });
+
+  it('adContributionRanking: next が空配列でも prev の行を消さない', () => {
+    const prev = {
+      capturedAt: 1,
+      eventBanner: null,
+      eventBalloon: null,
+      contributionRanking: null,
+      adContributionRanking: [
+        { rank: 1, name: 'x', contribution: 5, isAnonymous: false, thumbnailUrl: '' }
+      ],
+      adRankingMirrorHtml: '<ul>old</ul>',
+      eventCumulativeScoreMirrorHtml: null,
+      eventCurrentRankMirrorHtml: null,
+      programStats: null,
+      giftHistory: null
+    };
+    const next = {
+      capturedAt: 2,
+      eventBanner: null,
+      eventBalloon: null,
+      contributionRanking: null,
+      adContributionRanking: [],
+      adRankingMirrorHtml: '<ul>new</ul>',
+      eventCumulativeScoreMirrorHtml: null,
+      eventCurrentRankMirrorHtml: null,
+      programStats: null,
+      giftHistory: null
+    };
+    const merged = mergeOfficialEventDomBundle(prev, next);
+    expect(merged?.adContributionRanking).toHaveLength(1);
+    expect(merged?.adRankingMirrorHtml).toBe('<ul>new</ul>');
+  });
+});
+
+describe('fetchNicoadContributionRankingFromPublishPage', () => {
+  it('構造化行が 0 でも mirrorHtml が取れれば空配列 + 非列挙 mirrorHtml を返す', async () => {
+    const html = `<!DOCTYPE html><html><body>
+      <div class="content-supporter-section_abc">
+        <ul class="wrapper_decoy"><li class="oops">no ranker</li></ul>
+        <ul class="wrapper_real">
+          <li class="item"><p>incomplete</p></li>
+        </ul>
+      </div>
+    </body></html>`;
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, text: async () => html });
+    // @ts-expect-error test override
+    globalThis.fetch = fetchSpy;
+
+    const res = await fetchNicoadContributionRankingFromPublishPage('lv123');
+    expect(Array.isArray(res)).toBe(true);
+    expect(res?.length).toBe(0);
+    expect(/** @type {any} */ (res)?.mirrorHtml).toContain('wrapper_real');
+    expect(/** @type {any} */ (res)?.mirrorHtml).toContain('incomplete');
   });
 });

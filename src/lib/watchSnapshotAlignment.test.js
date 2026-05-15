@@ -54,14 +54,14 @@ describe('snapshotLooksAlignedWithWatchUrl', () => {
     ).toBe(false);
   });
 
-  it('snapshot 側 lv が無くても candidateTabUrl が一致すれば true', () => {
+  it('snapshot に lv/url 証拠が無ければ candidateTabUrl だけでは false（別 iframe 空応答の拒否）', () => {
     expect(
       snapshotLooksAlignedWithWatchUrl(
         { url: '' },
         'https://live.nicovideo.jp/watch/lv100',
         'https://live.nicovideo.jp/watch/lv100'
       )
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('snapshot 側 lv が無く candidateTabUrl が不一致なら false', () => {

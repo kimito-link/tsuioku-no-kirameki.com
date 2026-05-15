@@ -4,6 +4,7 @@
 
 import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
+import { isRecommendedUserChipPollutionRow } from './backfillRemoveRecommendedLivePollution.js';
 
 export const UNKNOWN_USER_KEY = '__unknown__';
 
@@ -52,6 +53,7 @@ export function aggregateCommentsByUser(entries, options) {
     const capturedAt = Number(e?.capturedAt || 0);
     const text = String(e?.text || '').trim();
     if (requireText && !text) continue;
+    if (requireText && isRecommendedUserChipPollutionRow(e)) continue;
     const nickname = String(e?.nickname || '').trim();
     const rawAv = String(e?.avatarUrl || '').trim();
     const avatarCandidate = isHttpOrHttpsUrl(rawAv) ? rawAv : '';

@@ -9,6 +9,7 @@ import {
   scrapeGiftHistoryFromDom,
   aggregateGiftHistoryByUser,
   scrapeAdRankingMirrorHtml,
+  scrapeAdContributionRankingRowsAndMirrorFromDom,
   scrapeEventInfoMirrorParts
 } from './officialEventBannerDom.js';
 
@@ -198,6 +199,64 @@ describe('scrapeContributionRankingFromDom', () => {
     expect(rows[2]).toMatchObject({ rank: 3, name: '高市早苗', contribution: 7061, isAnonymous: true });
     expect(rows[3]).toMatchObject({ rank: 4, name: 'な、言うたやろ', contribution: 5328, isAnonymous: false });
     expect(rows[4]).toMatchObject({ rank: 5, name: 'あ', contribution: 3644, isAnonymous: true });
+  });
+
+  it('先頭3行で rank 要素が誤って小さい数字のとき、DOM 行の序数で矯正する', () => {
+    document.body.innerHTML = `
+      <div class="content-supporter-section">
+        <div class="wrapper">
+          <ul class="wrapper">
+            <li class="item">
+              <i class="rank"><svg class="rank-icon"></svg></i>
+              <div class="info">
+                <button class="ranker"><span class="name">a</span></button>
+                <p class="contribution">100 <svg></svg></p>
+              </div>
+            </li>
+            <li class="item">
+              <i class="rank"><svg class="rank-icon"></svg></i>
+              <div class="info">
+                <button class="ranker"><span class="name">b</span></button>
+                <p class="contribution">50 <svg></svg></p>
+              </div>
+            </li>
+            <li class="item">
+              <i class="rank">2</i>
+              <div class="info">
+                <button class="ranker"><span class="name">c</span></button>
+                <p class="contribution">25 <svg></svg></p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>`;
+    const rows = scrapeContributionRankingFromDom(document);
+    expect(rows).not.toBeNull();
+    expect(rows?.[2]).toMatchObject({ rank: 3, name: 'c', contribution: 25 });
+  });
+
+  it('thumbnail は .thumbnail 内の img[src] も拾う', () => {
+    document.body.innerHTML = `
+      <div class="content-supporter-section">
+        <div class="wrapper">
+          <ul class="wrapper">
+            <li class="item">
+              <i class="rank">1</i>
+              <div class="info">
+                <button class="ranker">
+                  <span class="name">ゲスト</span>
+                  <span class="thumbnail"><img src="https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank_s.jpg" alt="" width="40" height="40" /></span>
+                </button>
+                <p class="contribution">1,200 <svg></svg></p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>`;
+    const rows = scrapeContributionRankingFromDom(document);
+    expect(rows?.[0]?.thumbnailUrl).toBe(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank_s.jpg'
+    );
   });
 
   it('実 niconico DOM (貢献度ランキング・旧構造) から rank/name/contribution/thumb を取り出す', () => {
@@ -467,6 +526,45 @@ describe('scrapeGiftHistoryFromDom', () => {
     expect(r[2].advertiserName).toBe('ケロ彦');
   });
 
+  it('送り主の user icon（nicoaccount/usericon）が別 img でも拾う', () => {
+    const icon = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/9/95239.jpg';
+    document.body.innerHTML = `
+      <ul class="gift-history-list">
+        <li class="item">
+          <img src="${icon}" alt="">
+          <img class="thumbnail" src="https://x.cdn/stamp.png" alt="８８８８">
+          <p class="time">19:58</p>
+          <p class="text">
+            <span class="advertiser-name">くろかな <small class="honorific">さん</small></span>
+          </p>
+          <p class="point">30 <small class="point-unit">pt</small></p>
+        </li>
+      </ul>`;
+    const r = scrapeGiftHistoryFromDom(document);
+    expect(r).not.toBeNull();
+    expect(r?.[0].advertiserAvatarUrl).toBe(icon);
+    expect(r?.[0].thumbnailUrl).toContain('stamp.png');
+  });
+
+  it('class に thumbnail を含まないギフト img でも履歴行を拾う', () => {
+    document.body.innerHTML = `
+      <ul class="gift-history-list">
+        <li class="item">
+          <img class="___gift-icon___ZZZ" src="https://cdn.example/stamp.png" alt="スタンプ">
+          <p class="time">20:00</p>
+          <p class="text">
+            <span class="advertiser-name">送り <small class="honorific">さん</small></span>
+          </p>
+          <p class="point">15 <small class="point-unit">pt</small></p>
+        </li>
+      </ul>`;
+    const r = scrapeGiftHistoryFromDom(document);
+    expect(r).not.toBeNull();
+    expect(r?.length).toBe(1);
+    expect(r?.[0].advertiserName).toBe('送り');
+    expect(r?.[0].point).toBe(15);
+    expect(r?.[0].giftName).toBe('スタンプ');
+  });
   it('「さん」honorific を除いた名前だけ取り出す', () => {
     document.body.innerHTML = `
       <ul class="gift-history-list">
@@ -509,11 +607,11 @@ describe('scrapeGiftHistoryFromDom', () => {
 describe('aggregateGiftHistoryByUser', () => {
   it('同一ユーザーの複数ギフトを totalPoints で合算', () => {
     const result = aggregateGiftHistoryByUser([
-      { time: '00:09', advertiserName: 'つるちゃ͜ん', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
-      { time: '00:12', advertiserName: 'つるちゃ͜ん', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
-      { time: '00:15', advertiserName: 'つるちゃ͜ん', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
-      { time: '11:13', advertiserName: '名無し', isAnonymous: true, point: 300, thumbnailUrl: '', giftName: '' },
-      { time: '02:57', advertiserName: '名無し', isAnonymous: true, point: 50, thumbnailUrl: '', giftName: '' }
+      { time: '00:09', advertiserName: 'つるちゃ͜ん', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' },
+      { time: '00:12', advertiserName: 'つるちゃ͜ん', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' },
+      { time: '00:15', advertiserName: 'つるちゃ͜ん', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' },
+      { time: '11:13', advertiserName: '名無し', isAnonymous: true, point: 300, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' },
+      { time: '02:57', advertiserName: '名無し', isAnonymous: true, point: 50, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' }
     ]);
     expect(result.length).toBe(2);
     expect(result[0]).toMatchObject({ name: '名無し', totalPoints: 350, giftCount: 2 });
@@ -522,22 +620,46 @@ describe('aggregateGiftHistoryByUser', () => {
 
   it('totalPoints 降順で並ぶ', () => {
     const result = aggregateGiftHistoryByUser([
-      { time: '01:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
-      { time: '02:00', advertiserName: 'B', isAnonymous: false, point: 500, thumbnailUrl: '', giftName: '' },
-      { time: '03:00', advertiserName: 'C', isAnonymous: false, point: 300, thumbnailUrl: '', giftName: '' }
+      { time: '01:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' },
+      { time: '02:00', advertiserName: 'B', isAnonymous: false, point: 500, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' },
+      { time: '03:00', advertiserName: 'C', isAnonymous: false, point: 300, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' }
     ]);
     expect(result.map((r) => r.name)).toEqual(['B', 'C', 'A']);
   });
 
   it('lastTime は最新（数値比較できる範囲で）', () => {
     const result = aggregateGiftHistoryByUser([
-      { time: '01:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
-      { time: '05:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' },
-      { time: '03:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '' }
+      { time: '01:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' },
+      { time: '05:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' },
+      { time: '03:00', advertiserName: 'A', isAnonymous: false, point: 100, thumbnailUrl: '', giftName: '', advertiserAvatarUrl: '' }
     ]);
     expect(result[0].lastTime).toBe('05:00');
   });
 
+  it('advertiserAvatarUrl は行に含まれる nico user icon を優先して保持', () => {
+    const icon = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/100.jpg';
+    const result = aggregateGiftHistoryByUser([
+      {
+        time: '1:0',
+        advertiserName: 'A',
+        isAnonymous: false,
+        point: 10,
+        thumbnailUrl: '',
+        giftName: '',
+        advertiserAvatarUrl: icon
+      },
+      {
+        time: '1:1',
+        advertiserName: 'A',
+        isAnonymous: false,
+        point: 20,
+        thumbnailUrl: '',
+        giftName: '',
+        advertiserAvatarUrl: ''
+      }
+    ]);
+    expect(result[0].advertiserAvatarUrl).toBe(icon);
+  });
   it('空配列なら空', () => {
     expect(aggregateGiftHistoryByUser([])).toEqual([]);
   });
@@ -598,12 +720,48 @@ describe('scrapeAdRankingMirrorHtml (v0.1.237)', () => {
     expect(html).toMatch(/^<ul/);
   });
 
+  it('先頭の ul.wrapper が空殻でも、同一 section 内で li.item が多い ul を選ぶ', () => {
+    document.body.innerHTML = `
+      <div class="content-supporter-section_X">
+        <ul class="wrapper_nav"><li class="oops">nav</li></ul>
+        <div class="panel">
+          <ul class="wrapper_list">
+            <li class="item"><i class="rank">1</i><div class="info"><button class="ranker"><span class="name">a</span></button><p class="contribution">100</p></div></li>
+          </ul>
+        </div>
+      </div>
+    `;
+    const html = scrapeAdRankingMirrorHtml(document);
+    expect(html).toBeTruthy();
+    expect(html).toContain('wrapper_list');
+    expect(html).toContain('class="ranker"');
+  });
+
   it('null/undefined を渡しても落ちず null を返す', () => {
     expect(scrapeAdRankingMirrorHtml(null)).toBeNull();
     expect(scrapeAdRankingMirrorHtml(undefined)).toBeNull();
   });
 });
 
+describe('scrapeAdContributionRankingRowsAndMirrorFromDom', () => {
+  it('ranking + mirrorHtml をまとめて返す', () => {
+    document.body.innerHTML = `
+      <div class="content-supporter-section_X">
+        <ul class="wrapper_nav"><li class="oops">nav</li></ul>
+        <div class="panel">
+          <ul class="wrapper_list">
+            <li class="item"><i class="rank">1</i><div class="info"><button class="ranker"><span class="name">a</span></button><p class="contribution">100</p></div></li>
+          </ul>
+        </div>
+      </div>
+    `;
+    const got = scrapeAdContributionRankingRowsAndMirrorFromDom(document);
+    expect(got.mirrorHtml).toContain('wrapper_list');
+    expect(Array.isArray(got.ranking)).toBe(true);
+    expect(got.ranking?.length).toBe(1);
+    expect(got.ranking?.[0]?.name).toBe('a');
+  });
+});
 describe('scrapeEventInfoMirrorParts (v0.1.240)', () => {
   it('実 niconico DOM から scoreHtml + rankHtml を outerHTML で返す', () => {
     document.body.innerHTML = `
