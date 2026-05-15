@@ -41,6 +41,9 @@ export async function waitUntilEditorReflectsSubmit(opts) {
   const expected = String(expectedNormalized || '').trim();
   if (!expected) return false;
 
+  // 送信直後に欄が既に空／別文なら待たずに成功扱い（体感遅延の削減）
+  if (isEditorReflectingSubmit(expected, readNormalized())) return true;
+
   const endpoints = [...probeEndpointsMs].sort((a, b) => a - b);
   let waited = 0;
   for (const endpoint of endpoints) {

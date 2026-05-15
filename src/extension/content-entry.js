@@ -89,6 +89,8 @@ import {
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
 } from '../lib/commentSubmitConfirm.js';
+import { createCommentSubmitProfiler } from '../lib/commentSubmitProfiling.js';
+import { shouldAcceptCommentPostInWatchFrame } from '../lib/watchFrameCommentPostGate.js';
 import { findCommentSubmitButton } from '../lib/commentPostDom.js';
 import {
   findCommentPanelAssetLauncherButton,
@@ -199,6 +201,8 @@ import {
   isInlinePanelHostReadyForFocus,
   shouldRespondFocusedNowFromToolbar
 } from '../lib/inlinePanelFocusGate.js';
+import { shouldRevealInlineIframeAfterSameSrc } from '../lib/inlinePopupIframeVisibilityPolicy.js';
+import { indexOfMaxRectArea } from '../lib/inlinePopupHostPrimaryPick.js';
 import {
   extractEmbeddedDataProps,
   pickViewerCountFromEmbeddedData,
@@ -2307,7 +2311,17 @@ function pickPrimaryInlinePopupHostFromDom() {
     return null;
   }
   const connected = hosts.filter((h) => h.isConnected);
-  const primary = connected[0] || hosts[0];
+  /** @type {HTMLDivElement} */
+  let primary;
+  if (connected.length > 1) {
+    const areas = connected.map((h) => {
+      const r = h.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    });
+    primary = connected[indexOfMaxRectArea(areas)];
+  } else {
+    primary = connected[0] || hosts[0];
+  }
   for (const h of hosts) {
     if (h === primary) continue;
     try {
@@ -2324,35 +2338,12 @@ function pickPrimaryInlinePopupHostFromDom() {
   return primary;
 }
 
-/** @param {HTMLDivElement} host */
-function ensureInlinePopupIframe(host) {
-  if (!(host instanceof HTMLDivElement)) return;
-  const expectedSrc = (() => {
-    try {
-      return chrome.runtime.getURL('popup.html') + '?inline=1';
-    } catch {
-      return '';
-    }
-  })();
-  const existing = /** @type {HTMLIFrameElement|null} */ (
-    host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
-  );
-  if (existing && String(existing.getAttribute('src') || '').trim() === expectedSrc) {
-    return;
-  }
-  let iframe = existing;
-  if (!iframe) {
-    iframe = document.createElement('iframe');
-    iframe.id = INLINE_POPUP_IFRAME_ID;
-    iframe.setAttribute('title', 'nicolivelog inline panel');
-    iframe.setAttribute('allow', 'microphone');
-    iframe.style.pointerEvents = 'auto';
-    iframe.style.visibility = 'hidden';
-    host.appendChild(iframe);
-  }
-  if (expectedSrc) {
-    iframe.setAttribute('src', expectedSrc);
-  }
+/**
+ * iframe 表示の load / 2s フェイルセーフ。`src` を変えない same-src 再入でも張り直せる。
+ * @param {HTMLDivElement} host
+ * @param {HTMLIFrameElement} iframe
+ */
+function attachInlineIframeRevealFallback(host, iframe) {
   iframe.addEventListener(
     'load',
     () => {
@@ -2373,6 +2364,76 @@ function ensureInlinePopupIframe(host) {
     iframe.style.visibility = 'visible';
     host.style.opacity = '1';
   }, 2000);
+}
+
+/** @param {HTMLDivElement} host */
+function ensureInlinePopupIframe(host) {
+  if (!(host instanceof HTMLDivElement)) return;
+  const expectedSrc = (() => {
+    try {
+      return chrome.runtime.getURL('popup.html') + '?inline=1';
+    } catch {
+      return '';
+    }
+  })();
+  const existing = /** @type {HTMLIFrameElement|null} */ (
+    host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+  );
+  const srcTrim = String(existing?.getAttribute('src') || '').trim();
+  const sameSrc =
+    Boolean(expectedSrc) && Boolean(existing) && srcTrim === expectedSrc;
+
+  if (sameSrc && existing) {
+    let docState = null;
+    try {
+      docState = existing.contentDocument?.readyState ?? null;
+    } catch {
+      docState = null;
+    }
+    if (docState == null) {
+      try {
+        docState = existing.contentWindow?.document?.readyState ?? null;
+      } catch {
+        docState = null;
+      }
+    }
+    let cs;
+    try {
+      cs = window.getComputedStyle(host);
+    } catch {
+      return;
+    }
+    const { shouldReveal } = shouldRevealInlineIframeAfterSameSrc({
+      hostDisplay: cs.display,
+      hostVisibility: cs.visibility,
+      iframeDocReadyState: docState
+    });
+    if (shouldReveal) {
+      existing.style.visibility = 'visible';
+      host.style.opacity = '1';
+      return;
+    }
+    if (cs.display === 'none' || cs.visibility === 'hidden') {
+      return;
+    }
+    attachInlineIframeRevealFallback(host, existing);
+    return;
+  }
+
+  let iframe = existing;
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = INLINE_POPUP_IFRAME_ID;
+    iframe.setAttribute('title', 'nicolivelog inline panel');
+    iframe.setAttribute('allow', 'microphone');
+    iframe.style.pointerEvents = 'auto';
+    iframe.style.visibility = 'hidden';
+    host.appendChild(iframe);
+  }
+  if (expectedSrc) {
+    iframe.setAttribute('src', expectedSrc);
+  }
+  attachInlineIframeRevealFallback(host, iframe);
 }
 
 function ensureInlinePopupHost() {
@@ -5963,12 +6024,29 @@ function trySubmitComment(editor) {
       bubbles: true
     })
   );
-  return true;
+  // クリック / requestSubmit が無いときの Enter は「送れた」とはみなさない（T5 偽ルート抑制）
+  return false;
 }
 
+/**
+ * このフレームでコメント投稿メッセージを処理してよいか。
+ * @returns {boolean}
+ */
 function canPostCommentInThisFrame() {
-  if (locationAllowsCommentRecording()) return true;
-  return Boolean(findCommentEditorElement());
+  let isTop = true;
+  try {
+    isTop = window.self === window.top;
+  } catch {
+    isTop = true;
+  }
+  const href = String(window.location.href || '');
+  return shouldAcceptCommentPostInWatchFrame({
+    hasEditor: Boolean(findCommentEditorElement()),
+    hasCommentPanel: hasWatchCommentPanel(),
+    isMainTopFrame: isTop,
+    isWatchUrl: isNicoLiveWatchUrl(href),
+    locationAllowsRecording: locationAllowsCommentRecording()
+  });
 }
 
 /**
@@ -5996,7 +6074,22 @@ async function confirmSubmittedCommentAsync(editor, rawText) {
 }
 
 /**
- * React 等が入力値を反映してから送信するまで短い待ちを入れる
+ * popup から `NLS_POST_COMMENT` で届いた本文を公式コメント欄へ送る。
+ *
+ * 失敗モードとユーザー向け文言の対応（調査用・経路の正本は実装）:
+ *
+ * | 区間 | 代表エラー | 主因の目安 |
+ * |------|--------------|------------|
+ * | 入口 `canPostCommentInThisFrame` | コメント欄のあるwatchフレームが見つかりません / このフレームには… | メイン窓に UI が無い iframe 構成（`watchFrameCommentPostGate`）・パネル遅延 |
+ * | 空本文 | コメントが空です | UI 側検証と二重 |
+ * | `pollUntil(findCommentEditorElement)` (T2) | コメント入力欄が見つかりません… | iframe・仮想リスト遅延（`SUBMIT_TIMING.editorPollTimeoutMs`） |
+ * | `submitOnce` / `trySubmitComment` (T4) | 公式の送信ボタンを見つけられませんでした… | 送信 UI の DOM 差分 |
+ * | `confirmSubmittedCommentAsync` (T5) | コメント送信を確認できませんでした… | 欄クリア遅延・未送信・二回目送信後も同一文字 |
+ * | `catch` | `err.message` をそのまま | 予期しない DOM/クリック例外 |
+ *
+ * 手元計測: `globalThis.__nlsCommentSubmitProfile = true` で DevTools から有効化。
+ * 区間マーカーは `src/lib/commentSubmitProfiling.js` の説明に準拠。
+ *
  * @param {string} rawText
  * @returns {Promise<{ ok: boolean, error?: string }>}
  */
@@ -6009,72 +6102,88 @@ async function postCommentFromContentAsync(rawText) {
     return { ok: false, error: 'コメントが空です。' };
   }
 
-  const editor = await pollUntil(findCommentEditorElement, {
-    timeoutMs: SUBMIT_TIMING.editorPollTimeoutMs,
-    intervalMs: SUBMIT_TIMING.editorPollIntervalMs
-  });
-  if (!editor) {
-    return {
-      ok: false,
-      error:
-        'コメント入力欄が見つかりません。ページの再読み込み直後は数秒待ってから再度お試しください。'
-    };
-  }
-
+  const prof = createCommentSubmitProfiler();
   try {
-    if (editor instanceof HTMLElement) {
-      editor.focus();
-    }
-    setEditorText(editor, text);
-    await new Promise((r) => {
-      requestAnimationFrame(() => requestAnimationFrame(r));
+    prof?.mark('T2-editor-poll-start');
+    const editor = await pollUntil(findCommentEditorElement, {
+      timeoutMs: SUBMIT_TIMING.editorPollTimeoutMs,
+      intervalMs: SUBMIT_TIMING.editorPollIntervalMs
     });
-    await new Promise((r) => setTimeout(r, SUBMIT_TIMING.reactSettleMs));
-
-    const submitOnce = async () => {
-      const btn = await pollUntil(() => findVisibleEnabledSubmitForEditor(editor), {
-        timeoutMs: SUBMIT_TIMING.buttonPollTimeoutMs,
-        intervalMs: SUBMIT_TIMING.buttonPollIntervalMs
-      });
-      if (btn) {
-        btn.click();
-        return true;
-      }
-      return trySubmitComment(editor);
-    };
-
-    if (!(await submitOnce())) {
+    prof?.mark('T2-editor-found');
+    if (!editor) {
       return {
         ok: false,
         error:
-          '公式の送信ボタンを見つけられませんでした。watchページを再読み込みし、コメント欄が見える状態で再試行してください。'
+          'コメント入力欄が見つかりません。ページの再読み込み直後は数秒待ってから再度お試しください。'
       };
     }
-    if (await confirmSubmittedCommentAsync(editor, text)) {
-      return { ok: true };
-    }
 
-    if (!(await submitOnce())) {
+    try {
+      if (editor instanceof HTMLElement) {
+        editor.focus();
+      }
+      setEditorText(editor, text);
+      await new Promise((r) => {
+        requestAnimationFrame(() => requestAnimationFrame(r));
+      });
+      await new Promise((r) => setTimeout(r, SUBMIT_TIMING.reactSettleMs));
+      prof?.mark('T3-after-react-settle');
+
+      const submitOnce = async () => {
+        const btn = await pollUntil(() => findVisibleEnabledSubmitForEditor(editor), {
+          timeoutMs: SUBMIT_TIMING.buttonPollTimeoutMs,
+          intervalMs: SUBMIT_TIMING.buttonPollIntervalMs
+        });
+        if (btn) {
+          btn.click();
+          return true;
+        }
+        return trySubmitComment(editor);
+      };
+
+      if (!(await submitOnce())) {
+        return {
+          ok: false,
+          error:
+            '公式の送信ボタンを見つけられませんでした。watchページを再読み込みし、コメント欄が見える状態で再試行してください。'
+        };
+      }
+      prof?.mark('T4-after-submit-click');
+
+      if (await confirmSubmittedCommentAsync(editor, text)) {
+        prof?.mark('T5-after-confirm-1');
+        return { ok: true };
+      }
+      prof?.mark('T5-confirm-1-failed');
+
+      if (!(await submitOnce())) {
+        return {
+          ok: false,
+          error:
+            'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
+        };
+      }
+      prof?.mark('T4b-after-second-submit');
+
+      if (await confirmSubmittedCommentAsync(editor, text)) {
+        prof?.mark('T5-after-confirm-2');
+        return { ok: true };
+      }
+      prof?.mark('T5-confirm-2-failed');
       return {
         ok: false,
         error:
           'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
       };
+    } catch (err) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String(/** @type {{ message?: unknown }} */ (err).message || 'post_failed')
+          : 'post_failed';
+      return { ok: false, error: message };
     }
-    if (await confirmSubmittedCommentAsync(editor, text)) {
-      return { ok: true };
-    }
-    return {
-      ok: false,
-      error:
-        'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
-    };
-  } catch (err) {
-    const message =
-      err && typeof err === 'object' && 'message' in err
-        ? String(/** @type {{ message?: unknown }} */ (err).message || 'post_failed')
-        : 'post_failed';
-    return { ok: false, error: message };
+  } finally {
+    prof?.finish('nls-cmt-content');
   }
 }
 
