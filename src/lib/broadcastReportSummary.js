@@ -15,6 +15,13 @@
  *   userId?: string|null,
  *   selfPosted?: any
  * }} ReportCommentInput
+ *
+ * @typedef {{
+ *   capturedAt?: number|string|null,
+ *   viewers?: number|string|null,
+ *   concurrent?: number|string|null,
+ *   count?: number|string|null
+ * }} ReportViewerSampleInput
  */
 
 /**
@@ -28,6 +35,44 @@ function toFiniteNumberOrNull(v) {
     if (Number.isFinite(n) && n > 0) return n;
   }
   return null;
+}
+
+/**
+ * @param {unknown} v
+ * @returns {number|null}
+ */
+function toNonNegativeNumberOrNull(v) {
+  if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
+  if (typeof v === 'string' && v.trim()) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return null;
+}
+
+/** @param {number|null} value */
+function formatNumber(value) {
+  if (value == null) return '未取得';
+  return Math.round(value).toLocaleString('ja-JP');
+}
+
+/** @param {number} ms */
+function formatElapsed(ms) {
+  const safeMs = Math.max(0, ms);
+  const totalSec = Math.floor(safeMs / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} max
+ */
+function trimText(value, max) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(0, max - 1))}…`;
 }
 
 /**
@@ -158,5 +203,185 @@ export function summarizeIdentifierStats(comments) {
     otherCount: other,
     numericIdRatio: total > 0 ? Math.round((numeric / total) * 1000) / 1000 : 0,
     anonymous184Ratio: total > 0 ? Math.round((anon / total) * 1000) / 1000 : 0
+  };
+}
+
+/**
+ * @param {ReportCommentInput[]} comments
+ * @param {number|null} firstCapturedAt
+ */
+function summarizePeakCommentWindow(comments, firstCapturedAt) {
+  if (firstCapturedAt == null) return null;
+  /** @type {Map<number, { bucket: number, count: number, samples: string[] }>} */
+  const buckets = new Map();
+  for (const c of comments) {
+    const at = toFiniteNumberOrNull(c?.capturedAt);
+    if (at == null) continue;
+    const bucket = Math.max(0, Math.floor((at - firstCapturedAt) / 60_000));
+    const cur = buckets.get(bucket) || { bucket, count: 0, samples: [] };
+    cur.count += 1;
+    const sample = trimText(c?.text, 42);
+    if (sample && cur.samples.length < 3) cur.samples.push(sample);
+    buckets.set(bucket, cur);
+  }
+  let best = null;
+  for (const row of buckets.values()) {
+    if (!best || row.count > best.count) best = row;
+  }
+  if (!best) return null;
+  return {
+    startMs: best.bucket * 60_000,
+    endMs: (best.bucket + 1) * 60_000,
+    count: best.count,
+    samples: best.samples
+  };
+}
+
+/**
+ * @param {ReportViewerSampleInput[]} samples
+ */
+function summarizeViewerMovement(samples) {
+  const list = Array.isArray(samples) ? samples : [];
+  const normalized = [];
+  for (const sample of list) {
+    const capturedAt = toFiniteNumberOrNull(sample?.capturedAt);
+    const viewers =
+      toNonNegativeNumberOrNull(sample?.viewers) ??
+      toNonNegativeNumberOrNull(sample?.concurrent) ??
+      toNonNegativeNumberOrNull(sample?.count);
+    if (capturedAt == null || viewers == null) continue;
+    normalized.push({ capturedAt, viewers });
+  }
+  normalized.sort((a, b) => a.capturedAt - b.capturedAt);
+  if (normalized.length < 2) return null;
+  const first = normalized[0];
+  const last = normalized[normalized.length - 1];
+  const peak = normalized.reduce((best, row) => (row.viewers > best.viewers ? row : best), first);
+  const low = normalized.reduce((best, row) => (row.viewers < best.viewers ? row : best), first);
+  return {
+    startViewers: first.viewers,
+    endViewers: last.viewers,
+    delta: last.viewers - first.viewers,
+    peakViewers: peak.viewers,
+    peakCapturedAt: peak.capturedAt,
+    lowViewers: low.viewers
+  };
+}
+
+/**
+ * コメント・同接サンプル・公式値から、HTML レポートや AI prompt に渡せる
+ * 放送振り返りの短いナラティブを組み立てる。
+ *
+ * @param {{
+ *   snapshot?: {
+ *     broadcasterLevel?: number|null,
+ *     watchCount?: number|string|null,
+ *     commentCount?: number|string|null,
+ *     giftPoints?: number|string|null,
+ *     peakConcurrent?: number|string|null
+ *   } | null,
+ *   comments?: ReportCommentInput[],
+ *   viewerSamples?: ReportViewerSampleInput[],
+ *   broadcastTitle?: string,
+ *   title?: string,
+ *   broadcasterName?: string
+ * }} input
+ * @returns {{
+ *   heading: string,
+ *   lines: string[],
+ *   promptContext: string,
+ *   metrics: {
+ *     timing: ReturnType<typeof summarizeBroadcastTiming>,
+ *     body: ReturnType<typeof summarizeCommentBodyStats>,
+ *     identifiers: ReturnType<typeof summarizeIdentifierStats>,
+ *     peakCommentWindow: ReturnType<typeof summarizePeakCommentWindow>,
+ *     viewerMovement: ReturnType<typeof summarizeViewerMovement>
+ *   }
+ * }}
+ */
+export function buildBroadcastReportNarrative(input = {}) {
+  const snapshot = input?.snapshot ?? null;
+  const comments = Array.isArray(input?.comments) ? input.comments : [];
+  const title = trimText(input?.broadcastTitle || input?.title || 'この放送', 60);
+  const broadcaster = trimText(input?.broadcasterName || '', 40);
+  const timing = summarizeBroadcastTiming({ snapshot, comments });
+  const body = summarizeCommentBodyStats(comments);
+  const identifiers = summarizeIdentifierStats(comments);
+  const peakCommentWindow = summarizePeakCommentWindow(comments, timing.firstCapturedAt);
+  const viewerMovement = summarizeViewerMovement(input?.viewerSamples || []);
+  const officialComments =
+    snapshot && typeof snapshot === 'object'
+      ? toNonNegativeNumberOrNull(snapshot.commentCount)
+      : null;
+  const watchCount =
+    snapshot && typeof snapshot === 'object'
+      ? toNonNegativeNumberOrNull(snapshot.watchCount)
+      : null;
+  const giftPoints =
+    snapshot && typeof snapshot === 'object'
+      ? toNonNegativeNumberOrNull(snapshot.giftPoints)
+      : null;
+  const peakConcurrent =
+    snapshot && typeof snapshot === 'object'
+      ? toNonNegativeNumberOrNull(snapshot.peakConcurrent)
+      : null;
+
+  /** @type {string[]} */
+  const lines = [];
+  const owner = broadcaster ? `${broadcaster}さんの` : '';
+  if (body.totalCount === 0) {
+    lines.push(`${owner}「${title}」は、コメント記録がまだ少ないため次回以降の比較材料をためる段階です。`);
+  } else {
+    const duration =
+      timing.durationMinutes > 0
+        ? `${Math.round(timing.durationMinutes * 10) / 10}分`
+        : '短時間';
+    lines.push(
+      `${owner}「${title}」は、記録コメント ${formatNumber(body.totalCount)} 件を ${duration} で振り返れる配信です。平均 ${timing.commentsPerMinute.toLocaleString('ja-JP')} 件/分の流れでした。`
+    );
+  }
+  if (peakCommentWindow) {
+    const samples = peakCommentWindow.samples.length
+      ? ` 代表コメント: ${peakCommentWindow.samples.join(' / ')}`
+      : '';
+    lines.push(
+      `コメントの山は ${formatElapsed(peakCommentWindow.startMs)}-${formatElapsed(peakCommentWindow.endMs)} に ${formatNumber(peakCommentWindow.count)} 件。${samples}`
+    );
+  }
+  if (watchCount != null || peakConcurrent != null || viewerMovement) {
+    const official = [];
+    if (watchCount != null) official.push(`来場 ${formatNumber(watchCount)} 人`);
+    if (peakConcurrent != null) official.push(`ピーク同接 ${formatNumber(peakConcurrent)} 人`);
+    if (viewerMovement) {
+      const sign = viewerMovement.delta >= 0 ? '+' : '';
+      official.push(`同接推移 ${formatNumber(viewerMovement.startViewers)}→${formatNumber(viewerMovement.endViewers)} 人（${sign}${formatNumber(viewerMovement.delta)}）`);
+    }
+    lines.push(`視聴者の動きは ${official.join(' / ')}。`);
+  }
+  if (body.totalCount > 0) {
+    const anonPct = Math.round(identifiers.anonymous184Ratio * 100);
+    lines.push(
+      `コメント本文は平均 ${body.averageChars.toLocaleString('ja-JP')} 字、中央値 ${body.medianChars.toLocaleString('ja-JP')} 字。184 コメント比率は ${anonPct}% です。`
+    );
+  }
+  if (giftPoints != null) {
+    lines.push(`ギフトは番組累計 ${formatNumber(giftPoints)} pt。コメントの山と重ねると、応援が動いた瞬間を確認しやすくなります。`);
+  }
+  if (officialComments != null && body.totalCount > 0) {
+    lines.push(`公式コメント数 ${formatNumber(officialComments)} 件に対し、ローカル記録は ${formatNumber(body.totalCount)} 件です。`);
+  }
+
+  const heading = broadcaster ? `${broadcaster}さんの配信振り返り` : '配信振り返り';
+  return {
+    heading,
+    lines,
+    promptContext: lines.join('\n'),
+    metrics: {
+      timing,
+      body,
+      identifiers,
+      peakCommentWindow,
+      viewerMovement
+    }
   };
 }

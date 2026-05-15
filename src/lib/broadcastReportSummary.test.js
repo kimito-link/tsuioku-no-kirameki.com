@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildBroadcastReportNarrative,
   summarizeBroadcastTiming,
   summarizeCommentBodyStats,
   summarizeIdentifierStats
@@ -177,5 +178,61 @@ describe('summarizeIdentifierStats', () => {
     ]);
     // truthy 判定で 1 (boolean) と 1 (number) 両方カウント
     expect(r.selfPostedCount).toBe(2);
+  });
+});
+
+describe('buildBroadcastReportNarrative', () => {
+  it('コメントの山・本文統計・184 比率を含むナラティブを返す', () => {
+    const comments = [
+      c({ at: t0, text: '開始待機' }),
+      c({ at: t0 + 60_000, text: 'ここ盛り上がった' }),
+      c({ at: t0 + 65_000, text: 'ギフトきた', userId: 'a:anon' }),
+      c({ at: t0 + 70_000, text: 'ないすー', userId: '123' })
+    ];
+    const r = buildBroadcastReportNarrative({
+      broadcastTitle: '朝の振り返り',
+      broadcasterName: 'りんく',
+      snapshot: { commentCount: 10, giftPoints: 500 },
+      comments
+    });
+
+    expect(r.heading).toBe('りんくさんの配信振り返り');
+    expect(r.lines.join('\n')).toContain('朝の振り返り');
+    expect(r.lines.join('\n')).toContain('コメントの山');
+    expect(r.lines.join('\n')).toContain('1:00-2:00');
+    expect(r.lines.join('\n')).toContain('代表コメント');
+    expect(r.lines.join('\n')).toContain('ギフトは番組累計 500 pt');
+    expect(r.promptContext).toContain('184 コメント比率');
+    expect(r.metrics.peakCommentWindow.count).toBe(3);
+    expect(r.metrics.identifiers.anonymous184Count).toBe(1);
+  });
+
+  it('同接サンプルがあれば増減とピークを narrative context に含める', () => {
+    const r = buildBroadcastReportNarrative({
+      comments: [c({ at: t0, text: 'a' }), c({ at: t0 + 30_000, text: 'b' })],
+      snapshot: { watchCount: 120, peakConcurrent: 54 },
+      viewerSamples: [
+        { capturedAt: t0, viewers: 30 },
+        { capturedAt: t0 + 30_000, viewers: 42 },
+        { capturedAt: t0 + 60_000, viewers: 38 }
+      ]
+    });
+
+    expect(r.promptContext).toContain('来場 120 人');
+    expect(r.promptContext).toContain('ピーク同接 54 人');
+    expect(r.promptContext).toContain('同接推移 30→38 人（+8）');
+    expect(r.metrics.viewerMovement.peakViewers).toBe(42);
+  });
+
+  it('コメント 0 件でも fallback narrative を返す', () => {
+    const r = buildBroadcastReportNarrative({
+      broadcastTitle: '最小',
+      comments: []
+    });
+
+    expect(r.lines[0]).toContain('コメント記録がまだ少ない');
+    expect(r.promptContext).not.toContain('undefined');
+    expect(r.metrics.timing.durationMs).toBe(0);
+    expect(r.metrics.body.totalCount).toBe(0);
   });
 });
