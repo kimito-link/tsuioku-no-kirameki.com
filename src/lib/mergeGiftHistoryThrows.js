@@ -3,9 +3,9 @@
  *   個別ギフト履歴を、popup「ユーザー別の応援件数」帯で表示するための集約形式に変換する純関数。
  *
  * 入力: scrapeGiftHistoryList の出力（時系列の個別 throw event）
- *   `[{ senderName, points, itemName, time, thumbnailUrl }, ...]`
+ *   `[{ senderName, points, itemName, time, thumbnailUrl, senderAvatarUrl? }, ...]`
  * 出力: throwCount + totalPoints 付き集計済みエントリ
- *   `[{ userId: '__anon_<senderName>', nickname, throwCount, totalPoints, capturedAt }, ...]`
+ *   `[{ userId: '__anon_<senderName>', nickname, throwCount, totalPoints, capturedAt, avatarUrl? }, ...]`
  *
  * 設計（重要）:
  * - **冪等な「全置換」設計**。incoming 配列のみで集計し、existing は無視する。
@@ -26,7 +26,8 @@
  *   points: number,
  *   itemName?: string,
  *   time?: string,
- *   thumbnailUrl?: string
+ *   thumbnailUrl?: string,
+ *   senderAvatarUrl?: string
  * }} GiftHistoryItemInput
  *
  * @typedef {{
@@ -34,7 +35,8 @@
  *   nickname: string,
  *   throwCount: number,
  *   totalPoints: number,
- *   capturedAt: number
+ *   capturedAt: number,
+ *   avatarUrl?: string
  * }} StoredGiftUserWithThrows
  *
  * @typedef {{
@@ -64,17 +66,20 @@ export function aggregateGiftHistoryThrows(incoming, now) {
     if (!senderName) continue;
     const key = `__anon_${senderName}`;
     const points = nonNegativeIntOr(item.points, 0);
+    const av = String(item.senderAvatarUrl || '').trim();
     const ex = byKey.get(key);
     if (ex) {
       ex.throwCount += 1;
       ex.totalPoints += points;
+      if (av) ex.avatarUrl = av;
     } else {
       byKey.set(key, {
         userId: key,
         nickname: senderName,
         throwCount: 1,
         totalPoints: points,
-        capturedAt: now
+        capturedAt: now,
+        ...(av ? { avatarUrl: av } : {})
       });
     }
   }

@@ -675,6 +675,31 @@ describe('extractCommentsFromNode', () => {
     const list = extractCommentsFromNode(document.body);
     expect(list).toEqual([]);
   });
+
+  it('おすすめユーザー枠（user-recommend）内の table-row は拾わない', () => {
+    const root = document.createElement('section');
+    root.innerHTML = `
+      <div class="___user-recommend-panel___Ab user-recommend-panel">
+        <div class="table-row" role="row">
+          <span class="comment-number">1</span>
+          <span class="comment-text">137814833 u/137814833</span>
+          <a href="https://www.nicovideo.jp/user/137814833?ref=recommend_top">profile</a>
+        </div>
+      </div>`;
+    expect(extractCommentsFromNode(root)).toEqual([]);
+  });
+
+  it('結合 innerText が「番号 u/同一ID」だけにマッチしてもチップ汚染として出さない（section ルート）', () => {
+    const root = document.createElement('section');
+    root.innerHTML = `
+      <div class="___user-recommend-panel___Z user-recommend-panel">
+        <div class="table-row" role="row" data-user-id="137814833">
+          <span class="comment-number">137814833</span>
+          <span class="comment-text">u/137814833</span>
+        </div>
+      </div>`;
+    expect(extractCommentsFromNode(root)).toEqual([]);
+  });
 });
 
 describe('resolveUserIdForNicoLiveCommentRow', () => {

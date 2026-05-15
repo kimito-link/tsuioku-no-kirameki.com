@@ -4,6 +4,8 @@
  */
 
 import { isInsideRecommendedLiveSection } from './isInsideRecommendedLiveSection.js';
+import { isInsideRecommendedUserSection } from './isInsideRecommendedUserSection.js';
+import { isRecommendedUserChipPollutionRow } from './backfillRemoveRecommendedLivePollution.js';
 
 /** 行頭: コメント番号 + 空白 + 本文（table-row 側と桁を揃え長時間配信でも落とさない） */
 const LINE_HEAD = /^(\d{1,12})\s+([\s\S]+)$/;
@@ -812,6 +814,8 @@ export function parseNicoLiveTableRow(el) {
     ? el
     : el.closest?.('div.table-row[role="row"]') || el.closest?.('.table-row');
   if (!row) return null;
+  if (isInsideRecommendedLiveSection(row)) return null;
+  if (isInsideRecommendedUserSection(row)) return null;
 
   const numEl = row.querySelector('.comment-number');
   const textEl = row.querySelector('.comment-text');
@@ -845,6 +849,7 @@ export function parseNicoLiveTableRow(el) {
 export function parseCommentElement(el) {
   if (!el || el.nodeType !== 1) return null;
   if (isInsideRecommendedLiveSection(el)) return null;
+  if (isInsideRecommendedUserSection(el)) return null;
   const fromGrid = parseNicoLiveTableRow(el);
   if (fromGrid) return fromGrid;
 
@@ -918,6 +923,7 @@ function collectNicoLiveTableRows(el) {
       return;
     // v0.1.200: おすすめ生放送セクション内の DOM は除外（真因 fix）
     if (isInsideRecommendedLiveSection(r)) return;
+    if (isInsideRecommendedUserSection(r)) return;
     set.add(r);
   };
   try {
@@ -939,6 +945,7 @@ export function extractCommentsFromNode(root) {
   const el = /** @type {Element} */ (root);
   // v0.1.200: ルート自身が「おすすめ生放送」セクションの子孫なら全部スキップ（真因 fix）
   if (isInsideRecommendedLiveSection(el)) return [];
+  if (isInsideRecommendedUserSection(el)) return [];
   const seen = new Set();
   /** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string, avatarUrl?: string }[]} */
   const out = [];
@@ -946,6 +953,9 @@ export function extractCommentsFromNode(root) {
   /** @param {{ commentNo: string, text: string, userId: string|null, nickname?: string, avatarUrl?: string } | null} parsed */
   function push(parsed) {
     if (!parsed) return;
+    // ルートが section 等で user-recommend を closest できないとき、結合 innerText の
+    // 1 行だけが parseCommentLineText にマッチする経路がある（おすすめユーザー誤抽出）。
+    if (isRecommendedUserChipPollutionRow(parsed)) return;
     const k = `${parsed.commentNo}\t${parsed.text}`;
     if (seen.has(k)) return;
     seen.add(k);
@@ -975,6 +985,7 @@ export function extractCommentsFromNode(root) {
         if (node.closest?.('article.program-card')) return;
         // v0.1.200: CSS Modules ハッシュ命名の「おすすめ生放送」も除外（真因 fix）
         if (isInsideRecommendedLiveSection(node)) return;
+        if (isInsideRecommendedUserSection(node)) return;
         push(parseCommentElement(node));
       });
     } catch {
@@ -984,6 +995,7 @@ export function extractCommentsFromNode(root) {
         if (node.closest?.('article.program-card')) return;
         // v0.1.200: CSS Modules ハッシュ命名の「おすすめ生放送」も除外（真因 fix）
         if (isInsideRecommendedLiveSection(node)) return;
+        if (isInsideRecommendedUserSection(node)) return;
         push(parseCommentElement(node));
       });
     }

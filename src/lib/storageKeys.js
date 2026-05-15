@@ -149,8 +149,9 @@ export const KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED =
   'nls_inline_panel_below_to_dock_migrated';
 
 /**
- * 新規インストール時に一度だけ true。content が初期配置を書き込んだら false。
- * @see migrateSuggestInitialInlinePanelPlacement.js / extension/background.js install
+ * インストール時、または拡張更新時に配置キーが未保存なら true。
+ * content が初回タブ幅で nls_inline_panel_placement を一度だけ書き込んだら false。
+ * @see migrateSuggestInitialInlinePanelPlacement.js / extension/background.js
  */
 export const KEY_INSTALL_PANEL_PLACEMENT_PENDING =
   'nls_install_panel_placement_pending_v1';

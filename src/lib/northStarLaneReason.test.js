@@ -93,9 +93,15 @@ describe('determineNorthStarLaneState', () => {
       expect(determineNorthStarLaneState('eventRank', { bundle })).toBe('ok');
     });
 
-    it('v0.1.248: NDGR rank 単独では no_event（field 6 は意味確定していないため除外）', () => {
-      // 実機 lv350505652 で NDGR=1 だが真値 7 位の乖離が観測された。
-      // memory feedback_ndgr_field6_silence.md に従い NDGR field 6 単独 ok は撤去。
+    it('NDGR rank のみでは ok にしない（ギフト発生ありなら iframe 待ち）', () => {
+      const bundle = { programStats: { giftPoints: 100 } };
+      const snap = { officialNicoEventRankNdgr: 50 };
+      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe(
+        'iframe_unrendered'
+      );
+    });
+
+    it('NDGR rank のみ・ギフトも無ければ no_event', () => {
       const bundle = {};
       const snap = { officialNicoEventRankNdgr: 50 };
       expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('no_event');
@@ -103,6 +109,11 @@ describe('determineNorthStarLaneState', () => {
 
     it('mirror html で ok', () => {
       const bundle = { eventCurrentRankMirrorHtml: '<span class="rank-field">現在 2 位</span>' };
+      expect(determineNorthStarLaneState('eventRank', { bundle })).toBe('ok');
+    });
+
+    it('貢献度ランキング DOM があれば ok（イベント順位レーン併記用）', () => {
+      const bundle = { contributionRanking: [{ name: 'a', contribution: 1 }] };
       expect(determineNorthStarLaneState('eventRank', { bundle })).toBe('ok');
     });
 
@@ -206,10 +217,10 @@ describe('determineNorthStarLaneState', () => {
       expect(determineNorthStarLaneState('programPoints', { bundle, snap })).toBe('ok');
     });
 
-    it('v0.1.248: レーン 5 (イベント順位) → no_event (NDGR 単独は誤情報の可能性、撤去)', () => {
-      // v0.1.241 では NDGR fallback で ok にしていたが、v0.1.248 で memory rule に
-      // 従い NDGR field 6 単独 → no_event に変更。実機 lv350505652 で誤値が観測された。
-      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('no_event');
+    it('レーン 5 (イベント順位) → iframe_unrendered（NDGR のみでは順位を出さない）', () => {
+      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe(
+        'iframe_unrendered'
+      );
     });
 
     it('+α (広告ランキング) → ok (5 件取れている)', () => {

@@ -196,6 +196,19 @@ describe('aggregateCommentsByUser', () => {
     expect(mixed?.count).toBe(1); // 空 text の entry はカウントされない
   });
 
+  it('requireText: true ではおすすめユーザー誤抽出行（ID / u/ID のみ）を除外', () => {
+    const rows = aggregateCommentsByUser(
+      [
+        { userId: '137814833', text: '137814833', capturedAt: 100 },
+        { userId: '137814833', text: 'u/137814833', capturedAt: 200 },
+        { userId: '99999999', text: '普通のコメント', capturedAt: 300 }
+      ],
+      { requireText: true }
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].userKey).toBe('99999999');
+  });
+
   it('requireText 未指定（旧 API）では従来どおり全 entry をカウント', () => {
     const rowsDefault = aggregateCommentsByUser([
       { userId: 'gift_only', text: '', capturedAt: 100 }

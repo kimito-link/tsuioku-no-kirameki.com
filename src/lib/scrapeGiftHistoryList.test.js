@@ -45,6 +45,63 @@ describe('scrapeGiftHistoryList', () => {
     expect(r.items[0].points).toBe(9000);
     expect(r.items[0].time).toBe('4:16:01');
     expect(r.items[0].thumbnailUrl).toContain('decocome_kawaii_100.png');
+    expect(r.items[0].senderAvatarUrl).toBe('');
+  });
+
+  it('送り主の user icon（nicoaccount/usericon）が別 img であれば senderAvatarUrl に入る', () => {
+    document.body.innerHTML = `
+      <ul class="gift-history-list">
+        <li class="item">
+          <img src="https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/9/95239.jpg" alt="" class="face">
+          <img class="thumbnail" src="https://example.com/gift.png" alt="ギフト名">
+          <p class="time">4:16:01</p>
+          <p class="text">
+            <span class="advertiser-name">ネギトロ <small class="honorific">さん</small></span>
+          </p>
+          <p class="point">30 <small class="point-unit">pt</small></p>
+        </li>
+      </ul>`;
+    const r = scrapeGiftHistoryList(document);
+    expect(r.totalCount).toBe(1);
+    expect(r.items[0].senderAvatarUrl).toContain('nicoaccount/usericon');
+    expect(r.items[0].senderAvatarUrl).toContain('95239');
+  });
+
+  it('.thumbnail が class 名に含まれないギフト img でも行が取れる', () => {
+    document.body.innerHTML = `
+      <ul class="gift-history-list">
+        <li class="item">
+          <img src="https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/1.jpg" alt="">
+          <img class="___gift-visual___XXX" src="https://cdn.example/gift-stamp.png" alt="わこつ茶">
+          <p class="time">1:00</p>
+          <span class="advertiser-name">仮名<small class="honorific">さん</small></span>
+          <p class="point">50 <small class="point-unit">pt</small></p>
+        </li>
+      </ul>`;
+    const r = scrapeGiftHistoryList(document);
+    expect(r.totalCount).toBe(1);
+    expect(r.items[0].points).toBe(50);
+    expect(r.items[0].thumbnailUrl).toContain('gift-stamp.png');
+    expect(r.items[0].senderAvatarUrl).toContain('usericon');
+  });
+
+  it('ギフト img が無く user icon のみでも送り主と pt は抽出', () => {
+    document.body.innerHTML = `
+      <ul class="gift-history-list">
+        <li class="item">
+          <img src="https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/1.jpg" alt="">
+          <p class="time">2:00</p>
+          <span class="advertiser-name">のみ子<small class="honorific">さん</small></span>
+          <p class="point">10 <small class="point-unit">pt</small></p>
+        </li>
+      </ul>`;
+    const r = scrapeGiftHistoryList(document);
+    expect(r.totalCount).toBe(1);
+    expect(r.items[0].senderName).toBe('のみ子');
+    expect(r.items[0].points).toBe(10);
+    expect(r.items[0].itemName).toBe('');
+    expect(r.items[0].thumbnailUrl).toBe('');
+    expect(r.items[0].senderAvatarUrl).toContain('usericon');
   });
 
   it('CSS Modules ハッシュ class（部分一致）でも抽出できる', () => {
@@ -125,7 +182,7 @@ describe('scrapeGiftHistoryList', () => {
     expect(r.items.map((it) => it.itemName)).toEqual(['かわいい×100', '100てん！', '100てん！']);
   });
 
-  it('img / sender / point いずれかが欠けた item は skip（防御）', () => {
+  it('ギフト img が無くても送り主と point があれば拾う（送り主なしのみ skip）', () => {
     document.body.innerHTML = `
       <ul class="gift-history-list">
         <li class="item">
@@ -146,8 +203,10 @@ describe('scrapeGiftHistoryList', () => {
         </li>
       </ul>`;
     const r = scrapeGiftHistoryList(document);
-    expect(r.totalCount).toBe(1);
+    expect(r.totalCount).toBe(2);
     expect(r.items[0].itemName).toBe('正常');
+    expect(r.items[1].senderName).toBe('no-img');
+    expect(r.items[1].points).toBe(200);
   });
 
   it('point に数字が無い場合は skip', () => {

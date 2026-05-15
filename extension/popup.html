@@ -2017,6 +2017,7 @@
       }
 
       .nl-live-stat-card {
+        position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -2061,6 +2062,63 @@
       }
       .nl-live-stat-icon.nl-chara-bounce-big {
         animation: nl-chara-bounce-big 0.55s cubic-bezier(.34,1.56,.64,1) 1;
+      }
+
+      /* 三カード（りんく・こん太・たぬ姉）: 数値確定前のキャラ重ねローディング */
+      .nl-live-stat-card__char-load {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        padding: 6px 4px;
+        border-radius: inherit;
+        background: color-mix(in srgb, var(--nl-surface) 93%, var(--nl-border) 7%);
+        border: 1px solid color-mix(in srgb, var(--nl-stat-card-border, var(--nl-border)) 70%, transparent);
+      }
+      /* display:flex が UA の [hidden] より強く、重ねが消えても見えたままになるのを防ぐ */
+      .nl-live-stat-card__char-load[hidden] {
+        display: none !important;
+      }
+      .nl-live-stat-card__char-load-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        max-width: 100%;
+        text-align: center;
+      }
+      .nl-live-stat-card__char-load-img {
+        width: min(46px, 26vw);
+        height: auto;
+        flex-shrink: 0;
+        object-fit: contain;
+        animation: nl-char-load-gentle 1.05s ease-in-out infinite;
+      }
+      html.nl-calm-motion .nl-live-stat-card__char-load-img {
+        animation: none;
+        opacity: 0.94;
+      }
+      .nl-live-stat-card__char-load-msg {
+        font-size: clamp(9px, 2.5vw, 11px);
+        font-weight: 700;
+        color: var(--nl-text);
+        line-height: 1.3;
+        text-wrap: balance;
+      }
+      @keyframes nl-char-load-gentle {
+        0%,
+        100% {
+          transform: translateY(0);
+          opacity: 1;
+        }
+        50% {
+          transform: translateY(-3px);
+          opacity: 0.86;
+        }
       }
 
       @keyframes nl-chara-bounce-small {
@@ -2624,6 +2682,13 @@
         grid-column: 1 / -1;
       }
 
+      /* 北極星シェル内では span-cards の全幅化を無効化（落ちた縦レールの二重表示防止） */
+      .nl-north-star-lane__shell > .nl-north-star-lane__body.nl-top-support-rank--span-cards {
+        grid-column: 2;
+        width: 100%;
+        max-width: 100%;
+      }
+
       /* v0.1.228: ギフトランキング取得 opt-in prompt（取得未開始のとき表示） */
       .nl-gift-ranking-prompt {
         grid-column: 1 / -1;
@@ -2666,10 +2731,15 @@
          「取得できる/出来ないに関わらず popup に枠を残す」原則（kimito さん 2026-05-09 明示）。
          鏡のように貼り付け原則: 値が取れたら niconico DOM の outerHTML をそのまま流し込む。
          未取得時は placeholder のみで枠は維持。 */
+      #northStarLanes.nl-north-star-lanes {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+      }
       .nl-north-star-lanes {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
         margin-top: 6px;
         padding: 8px;
         border-radius: 8px;
@@ -2677,40 +2747,479 @@
         background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-bg-soft) 8%);
       }
       .nl-north-star-lanes__title {
-        grid-column: 1 / -1;
-        margin: 0 0 2px;
+        margin: 0 0 4px;
         font-size: 12px;
-        font-weight: 600;
+        font-weight: 700;
         color: var(--nl-text);
       }
       .nl-north-star-lanes__note {
-        grid-column: 1 / -1;
         margin: 0;
         font-size: 10px;
+        line-height: 1.45;
         color: color-mix(in srgb, var(--nl-text) 55%, transparent);
+      }
+      /* ギフト履歴レーン + 番組累計ポイントを 1 かたまりとして認識しやすくする */
+      .nl-north-star-gift-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px 8px 7px;
+        border-radius: 8px;
+        border: 1px dashed color-mix(in srgb, var(--nl-border) 62%, transparent);
+        background: color-mix(in srgb, var(--nl-surface) 90%, var(--nl-bg-soft) 10%);
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .nl-north-star-gift-stack__ribbon {
+        margin: 0 0 1px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 6px 10px;
+      }
+      .nl-north-star-gift-stack__ribbon-label {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        color: var(--nl-text);
+      }
+      .nl-north-star-gift-stack__ribbon-note {
+        font-size: 10px;
+        line-height: 1.38;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 54%, transparent);
+      }
+      .nl-north-star-gift-stack .nl-north-star-lane {
+        min-height: 112px;
       }
       .nl-north-star-lane {
         display: flex;
         flex-direction: column;
-        gap: 2px;
-        padding: 6px;
-        border-radius: 6px;
+        gap: 4px;
+        padding: 8px 8px 7px;
+        border-radius: 8px;
         border: 1px solid color-mix(in srgb, var(--nl-border) 45%, transparent);
         background: var(--nl-surface);
-        min-height: 48px;
+        min-height: 124px;
+        box-sizing: border-box;
+        align-self: stretch;
+        min-width: 0;
+        width: 100%;
+        position: relative;
+        isolation: isolate;
       }
       .nl-north-star-lane--full {
-        grid-column: 1 / -1;
+        width: 100%;
+      }
+      .nl-north-star-lane__heading {
+        margin: 0 0 2px;
       }
       .nl-north-star-lane__label {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--nl-text);
+      }
+      .nl-north-star-lane__sublabel {
+        margin: 3px 0 0;
         font-size: 10px;
+        line-height: 1.38;
         font-weight: 600;
-        color: color-mix(in srgb, var(--nl-text) 75%, transparent);
+        color: color-mix(in srgb, var(--nl-text) 58%, transparent);
+      }
+      .nl-north-star-lane__shell {
+        display: grid;
+        grid-template-columns: 58px minmax(0, 1fr);
+        gap: 8px;
+        align-items: stretch;
+        min-height: 108px;
+        flex: 1 1 auto;
+        min-width: 0;
+        width: 100%;
+        overflow-x: hidden;
+      }
+      @media (min-width: 360px) {
+        .nl-north-star-lane__shell {
+          grid-template-columns: 58px minmax(0, 1fr) minmax(76px, 92px);
+        }
+        /* 順位表は狭くてよいが、待機の3キャラ案内は 92px 上限だと日本語が読めない */
+        .nl-north-star-lane__shell:has(.nl-north-star-lane__rail [data-nl-rail-wait='1']) {
+          grid-template-columns:
+            58px
+            minmax(0, 1fr)
+            minmax(168px, min(40%, 300px));
+        }
+      }
+      /* 待機ヒント: 狭い幅でも右列相当を確保（3 行を下段に跨ぐ） */
+      .nl-north-star-lane__rail:has([data-nl-rail-wait='1']) {
+        display: flex;
+        max-height: 200px;
+      }
+      @media (max-width: 359px) {
+        .nl-north-star-lane__rail:has([data-nl-rail-wait='1']) {
+          grid-column: 1 / -1;
+          max-height: 112px;
+        }
+      }
+      .nl-north-star-rail-wait {
+        width: 100%;
+        min-width: 0;
+      }
+      .nl-north-star-rail-wait__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        width: 100%;
+      }
+      .nl-north-star-rail-wait__row {
+        display: flex;
+        align-items: flex-start;
+        gap: 5px;
+        min-width: 0;
+        font-size: 10px;
+        line-height: 1.35;
+        color: var(--nl-text);
+      }
+      .nl-north-star-rail-wait__avatar {
+        flex: 0 0 auto;
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-border) 12%);
+      }
+      .nl-north-star-rail-wait__img {
+        width: 20px;
+        height: 20px;
+        object-fit: contain;
+        display: block;
+      }
+      .nl-north-star-rail-wait__text {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 92%, transparent);
+      }
+      .nl-north-star-rail-wait__name {
+        font-weight: 800;
+        color: color-mix(in srgb, var(--nl-accent, #0f8fd8) 82%, var(--nl-text) 18%);
+        margin-right: 1px;
+      }
+      .nl-north-star-rail-wait__line {
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 88%, transparent);
+      }
+      .nl-north-star-lane__gadget {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 5px;
+        min-width: 0;
+        padding: 5px 3px 6px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 42%, transparent);
+        background: color-mix(in srgb, var(--nl-surface) 90%, var(--nl-bg-soft) 10%);
+        box-sizing: border-box;
+      }
+      .nl-north-star-lane__acq-title {
+        margin: 0;
+        font-size: 8.5px;
+        font-weight: 800;
+        line-height: 1.2;
+        letter-spacing: 0.02em;
+        color: color-mix(in srgb, var(--nl-text) 72%, transparent);
+        text-align: center;
+      }
+      .nl-north-star-lane__acq {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .nl-north-star-lane__acq-track {
+        height: 8px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--nl-border) 48%, var(--nl-surface) 52%);
+      }
+      .nl-north-star-lane__acq-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: inherit;
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--nl-accent, #0f8fd8) 70%, var(--nl-surface)),
+          var(--nl-accent, #0f8fd8)
+        );
+        transition: width 0.35s ease-out;
+      }
+      .nl-north-star-lane__gadget[data-nl-acq-mode='determinate'] .nl-north-star-lane__acq-fill {
+        width: calc(var(--nl-acq-pct, 0) * 1%);
+      }
+      /* 待機中は幅を動かさない（幅が変わると「取得率が上下している」ように見えるため） */
+      .nl-north-star-lane__gadget[data-nl-acq-mode='indeterminate'] .nl-north-star-lane__acq-fill {
+        width: 34%;
+        animation: nl-north-star-acq-pending-opacity 1.85s ease-in-out infinite;
+      }
+      @keyframes nl-north-star-acq-pending-opacity {
+        0%,
+        100% {
+          opacity: 0.42;
+        }
+        50% {
+          opacity: 0.9;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-north-star-lane__gadget[data-nl-acq-mode='indeterminate'] .nl-north-star-lane__acq-fill {
+          animation: none;
+          width: 34%;
+          opacity: 0.72;
+        }
+      }
+      .nl-north-star-lane__acq-pct {
+        margin: 0;
+        font-size: 9px;
+        font-weight: 800;
+        line-height: 1.1;
+        color: color-mix(in srgb, var(--nl-text) 78%, transparent);
+        text-align: center;
+      }
+      .nl-north-star-lane__chara-wrap {
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-border) 12%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 45%, transparent);
+        box-sizing: border-box;
+        transition:
+          filter 0.25s ease,
+          transform 0.25s ease;
+      }
+      .nl-north-star-lane__chara-wrap[data-nl-acq-tier='wait'] .nl-north-star-lane__chara {
+        opacity: 0.88;
+        filter: brightness(0.96);
+      }
+      .nl-north-star-lane__chara-wrap[data-nl-acq-tier='none'] .nl-north-star-lane__chara {
+        opacity: 0.82;
+        filter: grayscale(0.45) brightness(0.94);
+        transform: scale(0.94);
+      }
+      .nl-north-star-lane__chara-wrap[data-nl-acq-tier='low'] .nl-north-star-lane__chara {
+        filter: grayscale(0.22);
+      }
+      .nl-north-star-lane__chara-wrap[data-nl-acq-tier='mid'] .nl-north-star-lane__chara {
+        filter: none;
+      }
+      .nl-north-star-lane__chara-wrap[data-nl-acq-tier='high'] .nl-north-star-lane__chara {
+        filter: saturate(1.06);
+        transform: scale(1.03);
+      }
+      .nl-north-star-lane__chara-wrap[data-nl-acq-tier='full'] .nl-north-star-lane__chara {
+        filter: saturate(1.12);
+        transform: scale(1.06);
+      }
+      .nl-north-star-lane__chara {
+        width: 38px;
+        height: 38px;
+        object-fit: contain;
+        display: block;
+        border-radius: 8px;
+      }
+      .nl-north-star-lane__rail {
+        display: none;
+        flex-direction: column;
+        min-width: 0;
+        max-height: 118px;
+        overflow: hidden auto;
+        padding: 4px 5px 5px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 40%, transparent);
+        background: color-mix(in srgb, var(--nl-surface) 94%, var(--nl-accent, #0f8fd8) 6%);
+        box-sizing: border-box;
+        scrollbar-gutter: stable;
+      }
+      @media (min-width: 360px) {
+        .nl-north-star-lane__rail:not([hidden]) {
+          display: flex;
+        }
+      }
+      .nl-north-star-rail__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        width: 100%;
+      }
+      .nl-north-star-rail__row {
+        display: grid;
+        grid-template-columns: 14px minmax(0, 1fr) auto;
+        gap: 2px 4px;
+        align-items: baseline;
+        font-size: 9px;
+        line-height: 1.25;
+        color: var(--nl-text);
+        min-width: 0;
+      }
+      .nl-north-star-rail__place {
+        font-weight: 800;
+        color: color-mix(in srgb, var(--nl-text) 55%, transparent);
+        text-align: right;
+      }
+      .nl-north-star-rail__place--top {
+        color: var(--nl-accent, #0f8fd8);
+      }
+      .nl-north-star-rail__name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+      }
+      .nl-north-star-rail__count {
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+        color: color-mix(in srgb, var(--nl-text) 72%, transparent);
+        white-space: nowrap;
       }
       .nl-north-star-lane__body {
         font-size: 12px;
         color: var(--nl-text);
         word-break: break-word;
+        overflow-wrap: anywhere;
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 100px;
+        max-height: 118px;
+        overflow: auto;
+        box-sizing: border-box;
+        contain: layout;
+      }
+      .nl-north-star-lane__body .nl-north-star-rank-bundle__head {
+        margin-bottom: 4px;
+        min-width: 0;
+        max-height: 30px;
+        overflow: auto;
+        flex-shrink: 0;
+      }
+      .nl-north-star-lane__body .nl-north-star-rank-bundle__hint {
+        margin: 6px 0 0;
+        font-size: 10.5px;
+        line-height: 1.35;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 52%, transparent);
+      }
+      .nl-north-star-ad-stats {
+        margin: 0 0 6px;
+        padding: 6px 7px;
+        border-radius: 6px;
+        background: color-mix(in srgb, var(--nl-surface) 78%, var(--nl-bg-soft) 22%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 48%, transparent);
+        font-size: 9.5px;
+        line-height: 1.38;
+        box-sizing: border-box;
+      }
+      .nl-north-star-ad-stats__row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 8px;
+        align-items: baseline;
+        padding: 3px 0;
+      }
+      .nl-north-star-ad-stats__row + .nl-north-star-ad-stats__row {
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 38%, transparent);
+      }
+      .nl-north-star-ad-stats dt {
+        margin: 0;
+        font-weight: 700;
+        color: color-mix(in srgb, var(--nl-text) 62%, transparent);
+        min-width: 0;
+      }
+      .nl-north-star-ad-stats dd {
+        margin: 0;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        color: var(--nl-text);
+        white-space: nowrap;
+      }
+      .nl-north-star-ad-stats__suffix {
+        margin-left: 3px;
+        font-weight: 700;
+        font-size: 0.92em;
+        color: color-mix(in srgb, var(--nl-text) 55%, transparent);
+      }
+      #northStarLaneBody-adRanking.nl-top-support-rank {
+        max-height: 154px;
+        min-height: 112px;
+      }
+      /* 横カード列（--below-cards）では帯側の overflow-x を優先し、縦スクロールで潰さない */
+      .nl-north-star-lane__body:not(.nl-top-support-rank--below-cards) .nl-top-support-rank__list {
+        max-height: min(40vh, 240px);
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+      .nl-north-star-lane__body.nl-top-support-rank {
+        margin-top: 0;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        min-height: 100px;
+        max-height: 118px;
+        padding: 4px 6px 5px;
+        overflow: hidden;
+      }
+      .nl-north-star-lane__body.nl-top-support-rank .nl-top-support-rank__note {
+        flex: 0 0 auto;
+        margin: 0 0 3px;
+        max-height: 2.4em;
+        overflow: hidden;
+        line-height: 1.25;
+      }
+      .nl-north-star-lane__body.nl-top-support-rank .nl-top-support-rank__list {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      /* 北極星内の横カードを帯より一段コンパクトに（高さを抑える） */
+      .nl-north-star-lane__body.nl-top-support-rank--below-cards .nl-top-support-rank__line {
+        min-width: 48px;
+        max-width: 64px;
+        padding: 4px 3px 5px;
+        gap: 2px;
+      }
+      .nl-north-star-lane__body.nl-top-support-rank--below-cards .nl-top-support-rank__thumb-wrap {
+        width: 20px;
+        height: 20px;
+      }
+      .nl-north-star-lane__body.nl-top-support-rank--below-cards .nl-top-support-rank__count {
+        font-size: clamp(6px, 1.55vw, 8px);
+      }
+      .nl-north-star-lane__body.nl-top-support-rank--below-cards .nl-top-support-rank__id,
+      .nl-north-star-lane__body.nl-top-support-rank--below-cards .nl-top-support-rank__name {
+        font-size: clamp(5px, 1.45vw, 7px);
+      }
+      /* イベント順位は見出し＋ランキングで少しだけタイルを伸ばす */
+      #northStarLaneBody-eventRank {
+        max-height: 132px;
+        min-height: 104px;
+      }
+      #northStarLaneBody-eventRank.nl-top-support-rank {
+        max-height: 132px;
+        min-height: 104px;
       }
       /* v0.1.244: reason 別 placeholder text を CSS ::after で出す。
          body の innerHTML が空のとき表示、innerHTML がある (state=ok) ときは出さない。 */
@@ -2733,13 +3242,163 @@
         content: "(ギフト 0 件)";
       }
       .nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
-        content: "(取得待ち：サイドバー描画なし)";
+        content: "(取得待ち: 公式の一覧がまだ開いていません)";
       }
       .nl-north-star-lane__body[data-lane-state="fetch_error"]:empty::after {
         content: "(取得エラー)";
       }
       .nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after {
         content: "(取得中…)";
+      }
+
+      .nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after,
+      .nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
+        animation: none;
+        opacity: 0.72;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after,
+        .nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
+          opacity: 0.88;
+        }
+      }
+
+      /* 取得待ち: innerHTML で出すローディング（not_yet / iframe_unrendered）。空でないので ::after は使わない */
+      .nl-north-star-lane__body:has(.nl-north-star-lane-wait) {
+        font-style: normal;
+        color: var(--nl-text);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        max-width: 100%;
+        justify-self: stretch;
+      }
+      .nl-north-star-lane-wait.nl-north-star-lane-wait--compact {
+        gap: 4px;
+        flex: 1 1 auto;
+        min-height: 0;
+        justify-content: center;
+      }
+      .nl-north-star-lane-wait {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+      }
+      .nl-north-star-lane-wait__short {
+        margin: 0;
+        font-size: clamp(9px, 2.1vw, 11px);
+        line-height: 1.38;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 90%, transparent);
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        /* 台詞ローテで高さが揺れないよう枠を確保 */
+        min-height: 3.6em;
+        max-height: 3.6em;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+      }
+      .nl-north-star-lane-wait__gauge {
+        height: 9px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--nl-border) 55%, var(--nl-surface) 45%);
+      }
+      /* 取得中テキスト横のバー：幅は固定（進捗率ではない） */
+      .nl-north-star-lane-wait__fill {
+        height: 100%;
+        width: 36%;
+        border-radius: inherit;
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--nl-accent, #0f8fd8) 70%, var(--nl-surface)),
+          var(--nl-accent, #0f8fd8)
+        );
+        animation: nl-north-star-wait-gauge-opacity 1.85s ease-in-out infinite;
+      }
+      @keyframes nl-north-star-wait-gauge-opacity {
+        0%,
+        100% {
+          opacity: 0.44;
+        }
+        50% {
+          opacity: 0.92;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-north-star-lane-wait__fill {
+          animation: none;
+          width: 36%;
+          opacity: 0.78;
+          filter: none;
+        }
+      }
+      .nl-north-star-lane-wait__row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        min-width: 0;
+      }
+      .nl-north-star-lane-wait__badge {
+        flex: 0 0 auto;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 1.2;
+        color: #fff;
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--nl-accent, #0f8fd8) 88%, #000),
+          var(--nl-accent, #0f8fd8)
+        );
+        border: 1px solid color-mix(in srgb, var(--nl-accent, #0f8fd8) 40%, transparent);
+        max-width: 38%;
+        text-align: center;
+        word-break: keep-all;
+      }
+      /* バッジをキャラ画像に差し替えたとき（テキスト「りんく」等は alt のみ） */
+      .nl-north-star-lane-wait__badge.nl-north-star-lane-wait__badge--img {
+        padding: 2px;
+        max-width: none;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        color: transparent;
+        font-size: 0;
+        line-height: 0;
+        background: color-mix(in srgb, var(--nl-surface, #fff) 82%, var(--nl-border, #ccc) 18%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 50%, transparent);
+      }
+      .nl-north-star-lane-wait__badge-img {
+        width: 38px;
+        height: 38px;
+        object-fit: contain;
+        display: block;
+        border-radius: 8px;
+      }
+      .nl-north-star-lane-wait__line {
+        flex: 1 1 auto;
+        margin: 0;
+        min-width: 0;
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 600;
+        color: var(--nl-text);
+      }
+      .nl-north-star-lane-wait__foot {
+        margin: 0;
+        font-size: 10px;
+        line-height: 1.4;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 52%, transparent);
       }
 
       .nl-top-support-rank--below-cards {
@@ -2909,6 +3568,10 @@
          少し大きめに揃える。それでも数字用の極太よりは確実に小さい。 */
       html.nl-inline body .nl-live-stat-value.is-placeholder {
         font-size: clamp(12px, 3vw, 16px);
+      }
+
+      html.nl-inline body .nl-live-stat-card__char-load-img {
+        width: min(52px, 22vw);
       }
 
       /* 統計直下の案内 / 詳細設定内の記録ブロック（旧 first-view と同系） */
@@ -4416,9 +5079,23 @@
       }
 
       .nl-panel-width-radios label {
+        display: block;
         flex: unset;
         font-size: clamp(12px, calc(var(--nl-base-font) * 0.88), 15px);
         font-weight: 500;
+        padding: 6px 8px;
+        margin: 0;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        box-sizing: border-box;
+        transition:
+          background-color 0.12s ease,
+          border-color 0.12s ease;
+      }
+
+      .nl-panel-width-radios label:has(input[type='radio']:checked) {
+        background: color-mix(in srgb, var(--nl-accent) 16%, var(--nl-surface));
+        border-color: color-mix(in srgb, var(--nl-accent) 42%, var(--nl-border));
       }
 
       .nl-panel-placement-hint {
@@ -5992,7 +6669,8 @@
       }
 
       .room-heat-track {
-        height: 8px;
+        min-height: 10px;
+        height: 10px;
         border-radius: 999px;
         border: 1px solid var(--nl-border);
         background: linear-gradient(90deg, var(--nl-bg-soft), var(--nl-surface));
@@ -6005,7 +6683,7 @@
         width: 0%;
         border-radius: inherit;
         background: linear-gradient(90deg, #0f8fd8, #14b8a6);
-        transition: width 220ms ease;
+        transition: width 420ms cubic-bezier(0.33, 1, 0.68, 1);
       }
 
       .room-heat-note {
@@ -6852,7 +7530,7 @@
         class="nl-version-badge"
         role="status"
         aria-label="拡張バージョン（新ビルド反映の確認用）"
-        title="ここの数字が変わっていれば、新しいビルドが読み込まれています。反映されていない場合は chrome://extensions で「更新」→ watch ページを再読み込みしてください。"
+        title="左の v… は manifest の版（bump しないと変わりません）。b… がビルド時刻です。npm run build のあと chrome://extensions で「更新」し、watch ページも再読み込みしてください。"
       >
         <span class="nl-version-badge__label">ビルド</span>
         <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
@@ -7004,6 +7682,22 @@
             hidden
             aria-live="polite"
           ></div>
+          <div
+            id="liveStatCardCommentsLoad"
+            class="nl-live-stat-card__char-load"
+            hidden
+            aria-hidden="true"
+          >
+            <div class="nl-live-stat-card__char-load-box" role="status" aria-live="polite">
+              <img
+                class="nl-live-stat-card__char-load-img"
+                src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+                alt=""
+                decoding="async"
+              />
+              <span class="nl-live-stat-card__char-load-msg">よみこんでいるよ…</span>
+            </div>
+          </div>
         </div>
         <div
           class="nl-live-stat-card nl-live-stat-card--concurrent"
@@ -7046,6 +7740,22 @@
               <div class="nl-concurrent-loading__hint">データがそろうまで待っています</div>
             </div>
           </div>
+          <div
+            id="liveStatCardConcurrentLoad"
+            class="nl-live-stat-card__char-load"
+            hidden
+            aria-hidden="true"
+          >
+            <div class="nl-live-stat-card__char-load-box" role="status" aria-live="polite">
+              <img
+                class="nl-live-stat-card__char-load-img"
+                src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+                alt=""
+                decoding="async"
+              />
+              <span class="nl-live-stat-card__char-load-msg">よみこんでいるよ…</span>
+            </div>
+          </div>
         </div>
         <div class="nl-live-stat-card nl-live-stat-card--visitors">
           <img
@@ -7057,6 +7767,22 @@
           <div class="nl-live-stat-label">来場者数</div>
           <div class="nl-live-stat-value" id="watchViewerDom">—</div>
           <div class="nl-live-stat-unit">人</div>
+          <div
+            id="liveStatCardVisitorsLoad"
+            class="nl-live-stat-card__char-load"
+            hidden
+            aria-hidden="true"
+          >
+            <div class="nl-live-stat-card__char-load-box" role="status" aria-live="polite">
+              <img
+                class="nl-live-stat-card__char-load-img"
+                src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png"
+                alt=""
+                decoding="async"
+              />
+              <span class="nl-live-stat-card__char-load-msg">よみこんでいるよ…</span>
+            </div>
+          </div>
         </div>
         <div class="nl-official-nico-stats__row" role="group" aria-label="公式視聴統計の一覧">
           <div class="nl-official-nico-stats__chip">
@@ -7133,55 +7859,245 @@
         >
           <h3 class="nl-north-star-lanes__title">公式値レーン（取得可否に関わらず常設）</h3>
           <div class="nl-north-star-lane" data-lane="contributionRanking">
-            <div class="nl-north-star-lane__label">貢献度ランキング</div>
-            <div
-              id="northStarLaneBody-contributionRanking"
-              class="nl-north-star-lane__body"
-              data-lane-state="not_yet"
-            ></div>
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">貢献度ランキング</p>
+              <p class="nl-north-star-lane__sublabel">公式の一覧が取れたら、横スクロールと右の順位表に出します。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div
+                id="northStarLaneBody-contributionRanking"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-contributionRanking"
+                class="nl-north-star-lane__rail"
+                aria-label="1位から10位"
+                hidden
+              ></aside>
+            </div>
           </div>
-          <div class="nl-north-star-lane" data-lane="giftHistory">
-            <div class="nl-north-star-lane__label">この番組へのギフト履歴</div>
-            <div
-              id="northStarLaneBody-giftHistory"
-              class="nl-north-star-lane__body"
-              data-lane-state="not_yet"
-            ></div>
+          <div class="nl-north-star-gift-stack" aria-label="ギフト指標の2レーン">
+            <div class="nl-north-star-gift-stack__ribbon" role="presentation">
+              <span class="nl-north-star-gift-stack__ribbon-label">ギフト指標（2段）</span>
+              <span class="nl-north-star-gift-stack__ribbon-note">上段＝ユーザー別、下段＝番組累計pt（別指標）</span>
+            </div>
+            <div class="nl-north-star-lane" data-lane="giftHistory">
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">この番組へのギフト履歴</p>
+              <p class="nl-north-star-lane__sublabel">
+                ユーザー別。履歴が無いときはコメント観測の「投げ回数」で代替（下段の累計ptとは別）。
+              </p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/tanu-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div
+                id="northStarLaneBody-giftHistory"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-giftHistory"
+                class="nl-north-star-lane__rail"
+                aria-label="1位から10位"
+                hidden
+              ></aside>
+            </div>
           </div>
-          <div class="nl-north-star-lane" data-lane="eventScore">
-            <div class="nl-north-star-lane__label">イベント累計スコア</div>
-            <div
-              id="northStarLaneBody-eventScore"
-              class="nl-north-star-lane__body"
-              data-lane-state="not_yet"
-            ></div>
+            <div class="nl-north-star-lane" data-lane="programPoints">
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">番組累計ポイント</p>
+              <p class="nl-north-star-lane__sublabel">
+                番組ギフト累計pt（ティッカー等）。上段のユーザー別表示の内訳ではありません。
+              </p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div
+                id="northStarLaneBody-programPoints"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-programPoints"
+                class="nl-north-star-lane__rail"
+                aria-label="（この項目は数値のみ）"
+                hidden
+              ></aside>
+            </div>
           </div>
-          <div class="nl-north-star-lane" data-lane="programPoints">
-            <div class="nl-north-star-lane__label">番組累計ポイント</div>
-            <div
-              id="northStarLaneBody-programPoints"
-              class="nl-north-star-lane__body"
-              data-lane-state="not_yet"
-            ></div>
-          </div>
-          <div class="nl-north-star-lane" data-lane="eventRank">
-            <div class="nl-north-star-lane__label">イベント現在順位</div>
-            <div
-              id="northStarLaneBody-eventRank"
-              class="nl-north-star-lane__body"
-              data-lane-state="not_yet"
-            ></div>
           </div>
           <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="adRanking">
-            <div class="nl-north-star-lane__label">広告ランキング（参考）</div>
-            <div
-              id="northStarLaneBody-adRanking"
-              class="nl-north-star-lane__body"
-              data-lane-state="not_yet"
-            ></div>
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">広告ランキング</p>
+              <p class="nl-north-star-lane__sublabel">ニコニ広告の貢献度ランキングです（ギフト貢献度とは別系統）。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/konta-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div
+                id="northStarLaneBody-adRanking"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-adRanking"
+                class="nl-north-star-lane__rail"
+                aria-label="1位から10位"
+                hidden
+              ></aside>
+            </div>
+          </div>
+          <div class="nl-north-star-lane" data-lane="eventRank">
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">イベント現在順位</p>
+              <p class="nl-north-star-lane__sublabel">現在順位と、参考として貢献度上位（最大10件）を並べます。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div
+                id="northStarLaneBody-eventRank"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-eventRank"
+                class="nl-north-star-lane__rail"
+                aria-label="1位から10位"
+                hidden
+              ></aside>
+            </div>
+          </div>
+          <div class="nl-north-star-lane" data-lane="eventScore">
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">イベント累計スコア</p>
+              <p class="nl-north-star-lane__sublabel">イベント参加中のときだけ意味を持つ累計です。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div
+                id="northStarLaneBody-eventScore"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-eventScore"
+                class="nl-north-star-lane__rail"
+                aria-label="（この項目はスコア表示のみ）"
+                hidden
+              ></aside>
+            </div>
           </div>
           <p class="nl-north-star-lanes__note">
-            鏡のように貼り付け方式（v0.1.236+）: niconico の DOM をそのまま映す予定。値が取れていない項目は枠だけ残ります。
+            公式ページで見えている値を、できる範囲でこの欄に写します。取得できない項目は空欄のままにすることがあります。
           </p>
         </section>
         <!-- v0.1.228: ギフトランキング opt-in prompt。flag OFF（default）のとき表示。
@@ -7309,7 +8225,9 @@
                   value="below"
                   id="inlinePanelPlacementBelow"
                 />
-                プレイヤー行の下（ワイド画面で横に回り込まない）
+                プレイヤー行の下
+                <span class="nl-panel-placement-hint"
+                  >選択どおりプレイヤー行の<strong>下</strong>に出します（タブ幅で自動的に横付きへ切り替わりません）。パネルが動画とコメントの<strong>あいだまで広く</strong>見えるのは、下の「幅」で視聴画面いっぱいや「タブ幅いっぱいまで広げる」を選んでいる場合などです。常に画面下端に固定したい場合は「画面下いっぱい」を選んでください。</span>
               </label>
               <label>
                 <input
@@ -7378,6 +8296,9 @@
                 />
                 視聴画面いっぱい（動画＋コメント列の下）
               </label>
+              <span class="nl-muted nl-panel-width-hint nl-panel-width-hint--beside-cap" style="display:block;margin-top:4px;line-height:1.45;font-size:12px;">
+                配置が<strong>横付き</strong>で公式の<strong>列のあいだ</strong>に入っているときは、列からはみ出して折り返さないよう幅が<strong>動画列基準</strong>に抑えられます（ここで「視聴画面いっぱい」を選んでも幅が伸びないことがあります）。
+              </span>
               <label>
                 <input
                   type="radio"
@@ -7423,7 +8344,7 @@
                 />
                 初めての1回だけ広げて試す
               </label>
-              <span class="nl-muted nl-panel-width-hint">画面下固定・浮遊では無効です。「1回だけ」は既定で、watch を<strong>手前のタブ</strong>で開いてパネルが描画されたタイミングで消費され、その後は動画列基準の幅に戻ります（いつでも詳細設定から変更できます）。</span>
+              <span class="nl-muted nl-panel-width-hint">画面下固定・浮遊では無効です。「1回だけ」は既定で、watch を<strong>手前のタブ</strong>で開いてパネルが描画されたタイミングで消費され、その後は動画列基準の幅に戻ります（いつでも詳細設定から変更できます）。位置が<strong>横付き</strong>のときは、公式の動画列とコメント列のあいだに収まる幅までに抑え、レイアウトが折り返して下に落ちないようにします。</span>
             </div>
             <div class="nl-panel-calm-motion">
               <label for="calmPanelMotion">
@@ -7919,6 +8840,14 @@
               title="ページ内の診断（パネル・プレイヤー検出・挿入先）をまとめてコピー。開発者ツールは不要です。"
             >
               AI 共有用にコピー（診断まとめ）
+            </button>
+            <button
+              type="button"
+              class="nl-dev-monitor__btn"
+              id="devMonitorDownloadAiBundleBtn"
+              title="診断 JSON だけをファイルに保存（マークダウンなし）。別名保存で共有できます。"
+            >
+              AI 診断を JSON で保存
             </button>
             <button type="button" class="nl-dev-monitor__btn" id="devMonitorRefresh">
               スナップショット再取得

@@ -16,7 +16,13 @@ import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 import { formatNicknameWithUidFallback } from './giftDisplayNickname.js';
 
 /**
- * @typedef {{ userKey: string, nickname: string, count: number, avatarUrl?: string }} TopSupportRankRoom
+ * @typedef {{
+ *   userKey: string,
+ *   nickname: string,
+ *   count: number,
+ *   avatarUrl?: string,
+ *   rankHint?: number|null
+ * }} TopSupportRankRoom
  */
 
 /**
@@ -69,10 +75,19 @@ export function topSupportRankLineModels(stripRooms, opts) {
     const userKey = String(r?.userKey ?? '');
     const isUnknown = userKey === UNKNOWN_USER_KEY;
     const count = Math.max(0, Number(r?.count) || 0);
+    const rankHintRaw = r?.rankHint;
+    const rankHint =
+      typeof rankHintRaw === 'number' &&
+      Number.isFinite(rankHintRaw) &&
+      rankHintRaw > 0
+        ? Math.floor(rankHintRaw)
+        : null;
     /** @type {number|null} */
     let placeNumber;
     if (isUnknown) {
       placeNumber = null;
+    } else if (rankHint != null) {
+      placeNumber = rankHint;
     } else if (placeMode === 'dense') {
       if (denseLastCount === null || count < denseLastCount) {
         denseRank += 1;
@@ -113,18 +128,31 @@ export function topSupportRankLineModels(stripRooms, opts) {
     }
     const thumbNeedsNoReferrer = isHttpOrHttpsUrl(thumbSrc);
 
-    const idTitle = isUnknown ? '' : String(r.userKey);
-    const idShort = isUnknown
-      ? '—'
-      : shortUserKeyDisplay(userKey) || String(userKey);
-
     const nickRaw = String(r?.nickname || '').trim();
+    const useOfficialDomNick =
+      /^__(ad|contrib)_\d+_/i.test(userKey) && Boolean(nickRaw);
+    const resolvedNickForLine = useOfficialDomNick
+      ? nickRaw
+      : anonymousNicknameFallback(userKey, nickRaw);
+
+    const idTitle = isUnknown ? '' : String(r.userKey);
+    let idShort = isUnknown
+      ? '—'
+      : useOfficialDomNick
+        ? ''
+        : shortUserKeyDisplay(userKey) || String(userKey);
+
     const nameLine = isUnknown
       ? '—'
-      : formatNicknameWithUidFallback(
-          userKey,
-          anonymousNicknameFallback(userKey, nickRaw)
-        ) || '（未取得）';
+      : formatNicknameWithUidFallback(userKey, resolvedNickForLine) || '（未取得）';
+
+    // internal key が __anon_<表示名> で name と一致するときは id 行を出さない（二重表示防止）
+    if (!isUnknown && !useOfficialDomNick && idShort) {
+      const m = /^__anon_(.+)$/i.exec(String(userKey));
+      if (m && String(nameLine).trim() === String(m[1]).trim()) {
+        idShort = '';
+      }
+    }
 
     const fullLabelForTitle = displayUserLabel(userKey, r?.nickname);
 

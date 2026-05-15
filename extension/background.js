@@ -14,7 +14,7 @@ const MATCH_PATTERNS = [
 ];
 const KEY_AUTO_BACKUP_STATE = 'nls_auto_backup_state';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
-/** 新規インストール時のみ true → content が初回タブ幅で nls_inline_panel_placement を一度だけ書く */
+/** 配置未保存プロファイル向け: install または update で true → content が一度だけ書込 */
 const KEY_INSTALL_PANEL_PLACEMENT_PENDING = 'nls_install_panel_placement_pending_v1';
 const AUTO_BACKUP_ALARM = 'nls_auto_backup_every_5m';
 const AUTO_BACKUP_PERIOD_MINUTES = 5;
@@ -433,6 +433,29 @@ chrome.runtime.onInstalled.addListener((details) => {
         // no-op
       }
     }
+    /*
+     * 拡張「更新」でも、配置キーが一度も保存されていないプロファイルには
+     * pending を立てる。初回 watch で content がタブ幅に応じた既定（横付き等）を
+     * 書けるようにする（install 以外では従来 pending が立たず横付きにならない件）。
+     */
+    if (details?.reason === 'update') {
+      try {
+        const K_PL = 'nls_inline_panel_placement';
+        const bagU = await chrome.storage.local.get([K_PL]);
+        const rawU = bagU[K_PL];
+        const unset =
+          rawU === undefined ||
+          rawU === null ||
+          (typeof rawU === 'string' && !String(rawU).trim());
+        if (unset) {
+          await chrome.storage.local.set({
+            [KEY_INSTALL_PANEL_PLACEMENT_PENDING]: true
+          });
+        }
+      } catch {
+        // no-op
+      }
+    }
     // D-4: 0.1.10 未満からの自動更新で「他人コメントへの誤焼き込み selfPosted」を剥がす。
     // 'install'（fresh）では走らないよう previousVersion を渡す。
     if (details?.reason === 'update') {
@@ -465,18 +488,71 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 const KEY_TOOLBAR_ACTION_POLICY = 'nls_toolbar_action_policy';
 
+/** メモリキャッシュ（ツールバー連打時の storage 往復を削る）。storage 変更で無効化。 */
+let __toolbarActionPolicyMem = /** @type {'prefer_focus_inline' | 'always_open_popup' | null} */ (
+  null
+);
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local' || !changes[KEY_TOOLBAR_ACTION_POLICY]) return;
+  __toolbarActionPolicyMem = null;
+});
+
 /**
  * @returns {'prefer_focus_inline' | 'always_open_popup'}
  */
 async function getToolbarActionPolicy() {
+  if (__toolbarActionPolicyMem != null) return __toolbarActionPolicyMem;
   try {
     const bag = await chrome.storage.local.get(KEY_TOOLBAR_ACTION_POLICY);
     const v = String(bag[KEY_TOOLBAR_ACTION_POLICY] || '').trim();
-    if (v === 'always_open_popup') return 'always_open_popup';
-    return 'prefer_focus_inline';
+    const out = v === 'always_open_popup' ? 'always_open_popup' : 'prefer_focus_inline';
+    __toolbarActionPolicyMem = out;
+    return out;
   } catch {
+    __toolbarActionPolicyMem = 'prefer_focus_inline';
     return 'prefer_focus_inline';
   }
+}
+
+/**
+ * この拡張のページを載せた `type: 'popup'` をすべて閉じる。
+ * 0.1.269: 空タブ等で連打したあと URL が `popup.html` と完全一致しなくても
+ *   `chrome-extension://<id>/` なら掃除対象にする（孤児 popup が残り
+ *   `windows.create` が失敗して「配信画面で押しても開かない」に繋がるのを抑止）。
+ */
+async function closeAllOurExtensionPopupWindows() {
+  const extPrefix = `chrome-extension://${chrome.runtime.id}/`;
+  try {
+    const all = await chrome.windows.getAll({ populate: true });
+    for (const w of all) {
+      if (w.type !== 'popup' || w.id == null) continue;
+      const tabs = w.tabs || [];
+      let ours = false;
+      for (const t of tabs) {
+        const u = String(t?.pendingUrl || t?.url || '');
+        if (u.startsWith(extPrefix)) {
+          ours = true;
+          break;
+        }
+      }
+      if (!ours) continue;
+      try {
+        await chrome.windows.remove(w.id);
+      } catch {
+        // already closed
+      }
+    }
+  } catch {
+    // no-op
+  }
+}
+
+/** @param {number} ms */
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 /**
@@ -488,30 +564,27 @@ async function getToolbarActionPolicy() {
  *   変更。フォーカス継続は失われるが、サイズが必ず 420×780 になる。
  *   さらに `state: 'normal'` を明示して maximized 等の異常状態を解除し、
  *   `top`/`left` を画面中央寄せに。
+ *
+ * 0.1.269: 連打・複数孤児窓で `create` が黙殺されるのを防ぐため、
+ *   当拡張の chrome-extension URL を載せる popup はすべて閉じ、
+ *   操作を直列化し、create 失敗時は掃除のうえ 1 回だけ再試行する。
  */
 const POPUP_WINDOW_WIDTH = 420;
 const POPUP_WINDOW_HEIGHT = 780;
+
+/** @type {Promise<void>} */
+let _openPopupWindowChain = Promise.resolve();
+
 async function openOrFocusPopupWindow() {
+  const job = _openPopupWindowChain.then(() => doOpenOrFocusPopupWindow());
+  _openPopupWindowChain = job.catch(() => {});
+  await job;
+}
+
+async function doOpenOrFocusPopupWindow() {
   const url = chrome.runtime.getURL('popup.html');
-  const urlBase = url.replace(/[?#].*$/, '');
-  // 既存 popup を見つけたら一度閉じる（サイズリセットの確実性のため）
-  try {
-    const all = await chrome.windows.getAll({ populate: true });
-    for (const w of all) {
-      if (w.type !== 'popup' || w.id == null) continue;
-      const t = w.tabs && w.tabs[0];
-      const u = String(t?.url || '');
-      if (u && (u === url || u.startsWith(urlBase))) {
-        try {
-          await chrome.windows.remove(w.id);
-        } catch {
-          // already closed
-        }
-      }
-    }
-  } catch {
-    // no-op
-  }
+  await closeAllOurExtensionPopupWindows();
+  await sleep(70);
   /*
    * 0.1.61 (AQ) → 0.1.62 (AR) → 0.1.64 (AT3): popup を Chrome window の
    *   「右内側」に配置する。
@@ -552,18 +625,34 @@ async function openOrFocusPopupWindow() {
   } catch {
     // no-op: getLastFocused が取れなければ Chrome のデフォルト位置にする
   }
+  const createOpts = {
+    url,
+    type: 'popup',
+    width: POPUP_WINDOW_WIDTH,
+    height: POPUP_WINDOW_HEIGHT,
+    focused: true,
+    state: 'normal',
+    ...positionHint
+  };
+  /** @type {chrome.windows.Window | undefined} */
+  let created;
   try {
-    await chrome.windows.create({
-      url,
-      type: 'popup',
-      width: POPUP_WINDOW_WIDTH,
-      height: POPUP_WINDOW_HEIGHT,
-      focused: true,
-      state: 'normal',
-      ...positionHint
-    });
+    created = await chrome.windows.create(createOpts);
   } catch {
-    // no-op
+    await closeAllOurExtensionPopupWindows();
+    await sleep(90);
+    try {
+      created = await chrome.windows.create(createOpts);
+    } catch {
+      return;
+    }
+  }
+  if (created && created.id != null) {
+    try {
+      await chrome.windows.update(created.id, { focused: true });
+    } catch {
+      // no-op
+    }
   }
 }
 

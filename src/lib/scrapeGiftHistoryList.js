@@ -29,9 +29,57 @@
  *   time: string,
  *   senderName: string,
  *   points: number,
- *   pointsRaw: string
+ *   pointsRaw: string,
+ *   senderAvatarUrl: string
  * }} GiftHistoryItem
  */
+
+/**
+ * 同一 `li.item` 内の複数 img から、ニコ生ユーザーアイコン URL と思われる src を拾う。
+ * `.thumbnail` はギフト画像のことが多いため、`nicoaccount/usericon` で識別する。
+ *
+ * @param {Element} li
+ * @returns {string}
+ */
+export function pickAdvertiserAvatarUrlFromGiftHistoryLi(li) {
+  if (!li || typeof li.querySelectorAll !== 'function') return '';
+  try {
+    for (const img of li.querySelectorAll('img')) {
+      if (!(img instanceof HTMLImageElement)) continue;
+      const src = String(img.src || img.getAttribute('src') || '').trim();
+      if (!src) continue;
+      if (/nicoaccount\/usericon/i.test(src)) return src;
+    }
+  } catch {
+    /* no-op */
+  }
+  return '';
+}
+
+/**
+ * ギフト行の「ギフト画像」img。`.thumbnail` が無い改修 DOM では、user icon 以外の
+ * 最初の img をフォールバックする（user icon のみの行は null → pt/送り主だけ拾う）。
+ *
+ * @param {Element} li
+ * @returns {HTMLImageElement|null}
+ */
+export function resolveGiftHistoryGiftImageEl(li) {
+  if (!li || typeof li.querySelector !== 'function') return null;
+  const direct =
+    li.querySelector('img.thumbnail') ||
+    li.querySelector('img[class*="thumbnail"]');
+  if (direct instanceof HTMLImageElement) return direct;
+  try {
+    for (const im of li.querySelectorAll('img')) {
+      if (!(im instanceof HTMLImageElement)) continue;
+      const src = String(im.src || im.getAttribute('src') || '').trim();
+      if (src && !/nicoaccount\/usericon/i.test(src)) return im;
+    }
+  } catch {
+    /* no-op */
+  }
+  return null;
+}
 
 /**
  * @typedef {{ items: GiftHistoryItem[], totalCount: number }} GiftHistoryListResult
@@ -91,9 +139,7 @@ export function scrapeGiftHistoryList(root) {
  */
 function extractGiftHistoryItem(li) {
   if (!li || typeof li.querySelector !== 'function') return null;
-  const img =
-    li.querySelector('img.thumbnail') ||
-    li.querySelector('img[class*="thumbnail"]');
+  const img = resolveGiftHistoryGiftImageEl(li);
   const timeEl =
     li.querySelector('p.time') ||
     li.querySelector('p[class*="time"]') ||
@@ -106,10 +152,16 @@ function extractGiftHistoryItem(li) {
     li.querySelector('p[class*="point"]:not([class*="point-unit"])') ||
     li.querySelector('[class*="point"]:not([class*="point-unit"])');
 
-  if (!img || !senderEl || !pointEl) return null;
+  if (!senderEl || !pointEl) return null;
 
-  const itemName = String(img.getAttribute('alt') || '').trim();
-  const thumbnailUrl = String(img.getAttribute('src') || '').trim();
+  const itemName =
+    img instanceof HTMLImageElement
+      ? String(img.getAttribute('alt') || '').trim()
+      : '';
+  const thumbnailUrl =
+    img instanceof HTMLImageElement
+      ? String(img.getAttribute('src') || '').trim()
+      : '';
   const time = String(timeEl?.textContent || '').trim();
 
   // sender からは <small class="honorific">さん</small> を除いてテキストを取る
@@ -142,5 +194,6 @@ function extractGiftHistoryItem(li) {
   const points = parseInt(pointsRaw.replace(/,/g, ''), 10);
   if (!Number.isFinite(points) || points <= 0) return null;
 
-  return { itemName, thumbnailUrl, time, senderName, points, pointsRaw };
+  const senderAvatarUrl = pickAdvertiserAvatarUrlFromGiftHistoryLi(li);
+  return { itemName, thumbnailUrl, time, senderName, points, pointsRaw, senderAvatarUrl };
 }

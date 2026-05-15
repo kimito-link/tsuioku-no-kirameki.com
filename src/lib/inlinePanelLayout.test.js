@@ -178,9 +178,15 @@ describe('effectiveInlinePanelPlacement', () => {
     ).toBe('beside');
   });
 
-  it('floating / below は幅に関係なくそのまま', () => {
+  it('floating は幅に関係なくそのまま', () => {
     expect(effectiveInlinePanelPlacement('floating', 400)).toBe('floating');
+  });
+
+  it('below はタブ幅に関係なく常に below（自動で横付きに切り替えない）', () => {
     expect(effectiveInlinePanelPlacement('below', 400)).toBe('below');
+    expect(effectiveInlinePanelPlacement('below', 1280)).toBe('below');
+    expect(effectiveInlinePanelPlacement('below', 1600)).toBe('below');
+    expect(effectiveInlinePanelPlacement('below', 2400)).toBe('below');
   });
 
   it('dock_bottom は幅に関係なくそのまま', () => {
@@ -192,4 +198,25 @@ describe('effectiveInlinePanelPlacement', () => {
   it('空の保存値は dock_bottom 扱い', () => {
     expect(effectiveInlinePanelPlacement('', 400)).toBe('dock_bottom');
   });
+
+  it.each([
+    ['beside', INLINE_VIEWPORT_BESIDE_MIN_WIDTH - 1, 'below'],
+    ['beside', INLINE_VIEWPORT_BESIDE_MIN_WIDTH, 'beside'],
+    ['beside', INLINE_VIEWPORT_BESIDE_MIN_WIDTH + 1, 'beside'],
+    ['beside', 1920, 'beside'],
+    ['beside', 3440, 'beside'],
+    ['below', 800, 'below'],
+    ['below', INLINE_VIEWPORT_BESIDE_MIN_WIDTH - 1, 'below'],
+    ['below', INLINE_VIEWPORT_BESIDE_MIN_WIDTH, 'below'],
+    ['below', 2560, 'below'],
+    ['dock_bottom', 400, 'dock_bottom'],
+    ['dock_bottom', 2560, 'dock_bottom'],
+    ['floating', 400, 'floating'],
+    ['floating', 2560, 'floating']
+  ])(
+    '代表ビューポート: effectiveInlinePanelPlacement(%s, %i) → %s',
+    (stored, vw, expected) => {
+      expect(effectiveInlinePanelPlacement(stored, vw)).toBe(expected);
+    }
+  );
 });

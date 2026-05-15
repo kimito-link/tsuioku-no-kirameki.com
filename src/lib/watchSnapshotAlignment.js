@@ -63,12 +63,13 @@ export function snapshotLooksAlignedWithWatchUrl(
 
     if (snapLiveId === expectedLv) return true;
     if (snapUrlLv === expectedLv) return true;
-    if (tabLv === expectedLv) return true;
 
     if (snapUrl) {
       return watchPageUrlsMatchForSnapshot(snapUrl, watch);
     }
-    return true;
+    // タブ URL だけ一致で snapshot に lv/url 証拠が無い「同タブ別 iframe」の
+    // 空応答を誤採用しない（popup が数値「—」固定になる原因になりうる）。
+    return false;
   }
 
   if (snapUrl && isNicoLiveWatchUrl(snapUrl) && isNicoLiveWatchUrl(watch)) {

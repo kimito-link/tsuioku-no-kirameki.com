@@ -1,7 +1,7 @@
 import * as esbuild from 'esbuild';
 
 /**
- * ビルド時刻（JST, MMDD-HHMM）を返す。popup の `NL_BUILD_ID` に埋め込み、
+ * ビルド時刻（JST, MMDD-HHmmss）を返す。popup の `NL_BUILD_ID` に埋め込み、
  * 「chrome://extensions の更新を押したら本当に新しい bundle が反映されたか」を
  * popup ヘッダのバッジで肉眼確認できるようにする。
  */
@@ -11,7 +11,8 @@ function buildIdJst() {
   const dd = String(now.getUTCDate()).padStart(2, '0');
   const hh = String(now.getUTCHours()).padStart(2, '0');
   const mi = String(now.getUTCMinutes()).padStart(2, '0');
-  return `${mm}${dd}-${hh}${mi}`;
+  const ss = String(now.getUTCSeconds()).padStart(2, '0');
+  return `${mm}${dd}-${hh}${mi}${ss}`;
 }
 
 const BUILD_ID = buildIdJst();

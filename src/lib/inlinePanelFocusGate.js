@@ -4,12 +4,11 @@
  * unit test 可能にしておくことで、判定条件の追加/変更で再帰実装ミスを防ぐ。
  *
  * 経緯（B1 race fix）:
- *   `focusInlinePanelHostFromToolbar` は msg=NLS_FOCUS_INLINE_PANEL 受信直後に
- *   `renderPageFrameOverlay()` を呼んで host を挿入してから rect を見ていたが、
- *   挿入直後は layout が確定しておらず r.width=0 / r.height=0 となるケースが
- *   あり、即時判定だと false で返ってしまっていた（小さい toolbar popup だけが
- *   出てインラインに前面化されない症状）。判定だけ切り出し、呼び出し側は
- *   pollUntil で最大 500ms rAF 単位ポーリングする。
+ *   content-entry 側の `focusInlinePanelHostFromToolbar` は `renderPageFrameOverlay()`
+ *   後に host の可視状態を見て boolean を返す。挿入直後は layout 未確定で rect が
+ *   小さい瞬間があるため、**応答用**の軽量判定は `shouldRespondFocusedNowFromToolbar`、
+ *   **iframe フォーカス用**の厳しめ判定は `isInlinePanelHostReadyForFocus`（必要なら
+ *   pollUntil）に分離している。
  */
 
 /**

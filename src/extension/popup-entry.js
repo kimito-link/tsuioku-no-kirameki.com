@@ -7,8 +7,13 @@ import {
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
-import { backfillRemoveRecommendedLivePollution } from '../lib/backfillRemoveRecommendedLivePollution.js';
+import {
+  backfillRemoveRecommendedLivePollution,
+  backfillRemoveRecommendedUserChipPollution
+} from '../lib/backfillRemoveRecommendedLivePollution.js';
 import { summarizeDevMonitorGiftRanking } from '../lib/summarizeDevMonitorGiftRanking.js';
+import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
+import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
@@ -24,6 +29,19 @@ import {
   buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
+import {
+  isNorthStarLaneWaitingState,
+  buildNorthStarLaneWaitingShellHtml,
+  getNorthStarWaitRotationMessages
+} from '../lib/northStarLaneWaitingUi.js';
+import {
+  acquisitionPctFromNorthStarLaneState,
+  acquisitionTierFromPct
+} from '../lib/northStarAcquisitionGauge.js';
+import { northStarLaneGadgetCharaRelativePath } from '../lib/northStarLaneGadgetChara.js';
+import { buildNorthStarWaitHintsRailHtml } from '../lib/formatNorthStarWaitHintsRailHtml.js';
+import { buildNorthStarAdRankingStatsHtml } from '../lib/buildNorthStarAdRankingStatsHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
   anonymousNicknameFallback,
@@ -90,6 +108,14 @@ import {
   normalizeFoldAnonymousInRankStrip,
   KEY_GIFT_RANKING_LANE_ENABLED
 } from '../lib/storageKeys.js';
+import {
+  buildAiShareInlinePanelStorageReadback,
+  buildInlinePanelStorageSetFailedMessage,
+  storagePatchInlineFloatingAnchor,
+  storagePatchInlinePanelPlacement,
+  storagePatchInlinePanelViewportWidePolicy,
+  storagePatchInlinePanelWidthMode
+} from '../lib/inlinePanelPlacementStorage.js';
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
 import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold.js';
 import {
@@ -123,7 +149,10 @@ import { mergeStoredCommentDedupeVariants } from '../lib/storedCommentDedupeMerg
 import { summarizeRecordedCommenters } from '../lib/liveCommenterStats.js';
 import { resolveConcurrentViewers } from '../lib/concurrentEstimate.js';
 import { watchMetaConcurrentGateFromSnapshot } from '../lib/popupWatchMetaConcurrentGate.js';
-import { resolveWatchMetaCardState } from '../lib/watchMetaCardStateGate.js';
+import {
+  resolveWatchMetaCardState,
+  isLiveStatValueAwaitingData
+} from '../lib/watchMetaCardStateGate.js';
 import { resolveBroadcasterFollowTarget } from '../lib/broadcasterFollowTarget.js';
 import { retrySnapshotRequestUntilReady } from '../lib/popupWatchSnapshotRetry.js';
 import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
@@ -632,6 +661,80 @@ function isStatValuePlaceholderText(text) {
   return !/^~?[\d,，]+$/.test(t);
 }
 
+/** 記録・同接・来場の三カードに、数値確定までキャラ重ねのローディングを同期する。 */
+function syncLiveStatThreeCardsCharLoadingOverlays() {
+  const overlayIds = [
+    'liveStatCardCommentsLoad',
+    'liveStatCardConcurrentLoad',
+    'liveStatCardVisitorsLoad'
+  ];
+  /** @param {string} id @param {boolean} show */
+  const setOne = (id, show) => {
+    const el = $(id);
+    if (!(el instanceof HTMLElement)) return;
+    const on = Boolean(show);
+    el.hidden = !on;
+    el.setAttribute('aria-hidden', on ? 'false' : 'true');
+  };
+  // empty 履歴ゼロでは CSS で stat 群ごと非表示。ローディングだけ残さない。
+  if (document.documentElement.classList.contains('nl-empty-no-history')) {
+    for (const id of overlayIds) setOne(id, false);
+    return;
+  }
+  const liveEl = $('liveStatComments');
+  const countEl = $('count');
+  const concEst = $('watchConcurrentEst');
+  const concLoad = $('watchConcurrentLoading');
+  const visitorEl = $('watchViewerDom');
+  const visitorChip = $('officialStatNicoViewers');
+  // 5 チップが先に数値確定し、来場カード本文だけ置き換えが遅れた瞬間に重ねが付き直される
+  // レースを潰す（記録は本家コメと意味が違うのでミラーしない）。
+  if (
+    visitorChip instanceof HTMLElement &&
+    visitorEl instanceof HTMLElement &&
+    !visitorChip.classList.contains('is-placeholder') &&
+    !isLiveStatValueAwaitingData(visitorChip.textContent) &&
+    isLiveStatValueAwaitingData(visitorEl.textContent)
+  ) {
+    visitorEl.textContent = visitorChip.textContent;
+    visitorEl.classList.remove('is-placeholder');
+  }
+
+  // `is-placeholder` と text の判定が一瞬ズレる・片系統だけ class が残ることがある。
+  // どちらかが「プレースホルダでない」または「数値テキスト確定」なら記録は出せている扱い。
+  /** @param {HTMLElement|null|undefined} el */
+  const recordDomLooksReady = (el) =>
+    el instanceof HTMLElement &&
+    (!el.classList.contains('is-placeholder') ||
+      !isLiveStatValueAwaitingData(el.textContent));
+  const liveStatReady = recordDomLooksReady(
+    liveEl instanceof HTMLElement ? liveEl : undefined
+  );
+  const countHeroReady = recordDomLooksReady(
+    countEl instanceof HTMLElement ? countEl : undefined
+  );
+  // 記録カードは #liveStatComments とヒーロー #count の二系統に同じ件数を流すが、
+  // refresh の順序で片方だけ先に数字が付くことがある。どちらかが数値確定なら
+  // ローカル保存件数は出ているのでキャラ重ねを外す（公式5チップ待ちで固めない）。
+  const recordAwaiting = !liveStatReady && !countHeroReady;
+
+  const concurrentLoadBusy =
+    concLoad instanceof HTMLElement && !concLoad.hidden;
+  // 計測中…のときは renderWatchMetaCard が内側スピナーを出す。キャラ重ねと二重にしない。
+  const concurrentAwaiting =
+    concEst instanceof HTMLElement &&
+    isLiveStatValueAwaitingData(concEst.textContent) &&
+    !concurrentLoadBusy;
+
+  const visitorAwaiting =
+    visitorEl instanceof HTMLElement &&
+    isLiveStatValueAwaitingData(visitorEl.textContent);
+
+  setOne('liveStatCardCommentsLoad', recordAwaiting);
+  setOne('liveStatCardConcurrentLoad', concurrentAwaiting);
+  setOne('liveStatCardVisitorsLoad', visitorAwaiting);
+}
+
 /**
  * @param {string|number} value 数値は toLocaleString('ja-JP') で表示。未取得時は明示文言。
  * @param {WatchPageSnapshot|null} [watchSnapshot] 公式コメント数の併記用
@@ -711,6 +814,7 @@ function setCountDisplay(value, watchSnapshot = null) {
     });
   }
   if (!Number.isNaN(num)) _prevSupportCount = num;
+  syncLiveStatThreeCardsCharLoadingOverlays();
 }
 
 /**
@@ -1672,12 +1776,19 @@ function setFrameShareStatus(message, kind = 'idle') {
 }
 
 /**
- * watch 内インラインフレーム（`popup.html?inline=1`）では親ページの Permissions Policy により
- * `navigator.clipboard` がブロックされることがあるため、埋め込み時は execCommand を優先する。
+ * クリップボード書き込みのフォールバック（document.execCommand）。
+ * watch 内インラインフレームでは Permissions Policy で `navigator.clipboard.writeText`
+ * が弾かれ、呼び出し自体が chrome://extensions のエラー一覧に載ることがある。
+ * 埋め込み時はこちらのみ使い、通常ポップアップでは Clipboard API 失敗後のフォールバックに使う。
  * @param {string} text
- * @returns {Promise<boolean>}
+ * @returns {boolean}
  */
 function copyTextViaExecCommand(text) {
+  try {
+    window.focus();
+  } catch {
+    // no-op
+  }
   const area = document.createElement('textarea');
   area.value = text;
   area.setAttribute('readonly', 'true');
@@ -1702,6 +1813,10 @@ async function copyTextToClipboard(text) {
     embedded = true;
   }
   if (embedded) {
+    // 親ページの Permissions Policy で Clipboard API がブロックされる環境では、
+    // writeText を試すだけで chrome://extensions のエラー一覧に載ることがある。
+    // 長い await の後はユーザージェスチャが切れて execCommand も失敗しやすいが、
+    // その場合は呼び出し側で手動コピー UI にフォールバックする。
     return copyTextViaExecCommand(text);
   }
   try {
@@ -1765,7 +1880,8 @@ function openManualCopyOverlay(text) {
     'gap:8px'
   ].join(';');
   const title = document.createElement('div');
-  title.textContent = 'コピーに失敗したため、下のテキストを手動でコピーしてください（Ctrl+C）';
+  title.textContent =
+    'コピーに失敗したため、下のテキストを手動でコピーするか「コピーを再試行」を押してください';
   title.style.cssText = 'font-size:13px;color:#0f172a;font-weight:600';
   const ta = document.createElement('textarea');
   ta.value = String(text || '');
@@ -1779,13 +1895,31 @@ function openManualCopyOverlay(text) {
     'line-height:1.45'
   ].join(';');
   const row = document.createElement('div');
-  row.style.cssText = 'display:flex;justify-content:flex-end;gap:8px';
+  row.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap';
+  const retryBtn = document.createElement('button');
+  retryBtn.type = 'button';
+  retryBtn.textContent = 'コピーを再試行';
+  retryBtn.style.cssText =
+    'padding:6px 12px;border:1px solid #2563eb;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer';
+  retryBtn.addEventListener('click', () => {
+    try {
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      title.textContent = ok
+        ? 'コピーできました（このウィンドウを閉じてください）'
+        : 'まだ失敗しています。Ctrl+C（⌘+C）でコピーしてください';
+    } catch {
+      title.textContent = 'コピー処理でエラーが出ました。Ctrl+C（⌘+C）でコピーしてください';
+    }
+  });
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.textContent = '閉じる';
   closeBtn.style.cssText =
     'padding:6px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;cursor:pointer';
   closeBtn.addEventListener('click', () => host.remove());
+  row.appendChild(retryBtn);
   row.appendChild(closeBtn);
   box.appendChild(title);
   box.appendChild(ta);
@@ -1795,8 +1929,14 @@ function openManualCopyOverlay(text) {
     if (ev.target === host) host.remove();
   });
   document.body.appendChild(host);
-  ta.focus();
-  ta.select();
+  requestAnimationFrame(() => {
+    try {
+      ta.focus();
+      ta.select();
+    } catch {
+      // no-op
+    }
+  });
 }
 
 // 0.1.37 (AL): isContextInvalidatedMessageText を撤去、`reportSilentError.js` の
@@ -1809,14 +1949,15 @@ function openManualCopyOverlay(text) {
  */
 function romiDebugDataChecklist() {
   return [
+    '`diagSchemaVersion`（診断 JSON ルート）',
+    '`content.romiDebug`（取り込み入口/保存ゲート）',
+    '`content.giftDiagnostics.rankingDiag`（自動オープン失敗の段）',
+    '`content.commentObservability`（NDGR/DOM 経路比率）',
     'watch URL（lv番号）',
-    'popup exportedAt',
-    'content exportedAt',
-    'intercept map size（_debug.intercept）',
+    'popup exportedAt / content exportedAt',
+    'intercept map size',
     'ndgr pending / ndgrLastReceivedAgo',
-    'lastPersistBatch / persistGateFailures',
-    'intercept export code/detail',
-    'first view 10件の userId/nickname/avatar有無'
+    'lastPersistBatch / persistGateFailures'
   ];
 }
 
@@ -1838,6 +1979,7 @@ function formatAiShareDiagnosticsMarkdown(parts) {
   );
   lines.push('');
   lines.push(`- 拡張: ${parts.extensionName} v${parts.extensionVersion}`);
+  lines.push(`- 診断スキーマ: \`${String(parts.payload?.diagSchemaVersion || '') || '（未付与）'}\`（LLM への再現用バージョン）`);
   lines.push(`- タブ選択: ${parts.watchUrlNote}`);
   if (parts.lastSendMessageError) {
     lines.push(`- content への送信: \`${parts.lastSendMessageError}\``);
@@ -4389,7 +4531,10 @@ function clearWatchMetaCard(opts = {}) {
   const uniqueEl = $('watchUniqueUsers');
   const noIdEl = $('watchCommentsNoId');
   const noteEl = $('watchAudienceNote');
-  if (!wrap || !title || !broadcaster || !thumb || !tags) return;
+  if (!wrap || !title || !broadcaster || !thumb || !tags) {
+    syncLiveStatThreeCardsCharLoadingOverlays();
+    return;
+  }
   if (concurrentLoadingEl) concurrentLoadingEl.hidden = true;
   if (concurrentReadyEl) concurrentReadyEl.hidden = false;
   if (concurrentCard) concurrentCard.removeAttribute('aria-busy');
@@ -4444,6 +4589,7 @@ function clearWatchMetaCard(opts = {}) {
   }
   paintOfficialNicoStatsStrip(null);
   paintOfficialEventBannerCard(null);
+  syncLiveStatThreeCardsCharLoadingOverlays();
 }
 
 /**
@@ -4461,7 +4607,7 @@ let _lastOfficialEventDomBundle = null;
  * 値の優先順：
  *   - ownerName / iconUrl は bundle.eventBanner があればそれ、無ければ snapshot.broadcasterName
  *   - title は bundle.eventBanner.title（gift サイドバー由来）
- *   - rank は bundle.eventBanner.rank → snapshot.officialNicoEventRankNdgr（NDGR 由来）
+ *   - rank / title / owner 表示は bundle.eventBanner（ギフト欄 DOM スクレイプ）が取れたときのみ
  *   - score は bundle.eventBalloon.eventTotalScore → bundle.eventBanner.score → snapshot.officialEventGiftScoreNdgr
  *
  * 何も拾えないとき（番組がイベント不参加 等）はカードを hidden にするだけ。
@@ -4650,6 +4796,35 @@ async function refreshOfficialEventDomBundle(liveId) {
 }
 
 /**
+ * `programStats.watchCount`（公式 DOM bundle）で `viewerCountFromDom` /
+ * `officialViewerCount` を補完する浅いコピー。プレイヤー周辺の来場 DOM が未取得でも
+ * 5 チップと同じ値で来場カード・同接推定の待ちを解除する。
+ * @param {WatchPageSnapshot} snapshot
+ * @returns {WatchPageSnapshot}
+ */
+function watchMetaSnapshotMergedWithBundleProgramStats(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return snapshot;
+  const ps = _lastOfficialEventDomBundle?.programStats;
+  if (!ps || typeof ps !== 'object') return snapshot;
+  const wc = ps.watchCount;
+  if (typeof wc !== 'number' || !Number.isFinite(wc) || wc < 0) return snapshot;
+  let changed = false;
+  /** @type {Record<string, unknown>} */
+  const out = { ...snapshot };
+  const vcd = snapshot.viewerCountFromDom;
+  if (typeof vcd !== 'number' || !Number.isFinite(vcd) || vcd < 0) {
+    out.viewerCountFromDom = wc;
+    changed = true;
+  }
+  const ovc = snapshot.officialViewerCount;
+  if (typeof ovc !== 'number' || !Number.isFinite(ovc)) {
+    out.officialViewerCount = wc;
+    changed = true;
+  }
+  return changed ? /** @type {WatchPageSnapshot} */ (out) : snapshot;
+}
+
+/**
  * 上段 5 チップ（来場・本家コメ・経過・広告pt・ギフトpt）を描画する。
  * `_lastOfficialEventDomBundle.programStats` があればそちらを優先（公式 DOM 正本）。
  * 無ければ snapshot 経由の NDGR 値にフォールバック。
@@ -4738,7 +4913,7 @@ function paintOfficialNdgrGiftCard(snap) {
     pickNum(programStats?.giftPoints, snap.officialGiftPointsNdgr)
   );
   const ev = pickNum(balloon?.eventTotalScore, snap.officialEventGiftScoreNdgr);
-  const rk = pickNum(banner?.rank, snap.officialNicoEventRankNdgr);
+  const rk = pickNum(banner?.rank, snap.officialNicoEventRank);
   const titleFromBanner = String(banner?.title || '').trim();
   const title = titleFromBanner || String(snap.officialNicoEventTitleNdgr || '').trim();
   /** @param {unknown} v */
@@ -4772,10 +4947,10 @@ let _prevConcurrentEstimated = /** @type {number|null} */ (null);
 let _prevViewerCount = /** @type {number|null} */ (null);
 
 /**
- * @param {WatchPageSnapshot|null} snapshot
+ * @param {WatchPageSnapshot|null} rawSnapshot watch スナップショット（`programStats` で来場を補完する前）
  * @param {PopupCommentEntry[]} [commentEntries]
  */
-function renderWatchMetaCard(snapshot, commentEntries = []) {
+function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
   const wrap = $('watchMeta');
   const title = $('watchTitle');
   const broadcaster = $('watchBroadcaster');
@@ -4792,10 +4967,12 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   const noIdEl = $('watchCommentsNoId');
   const noteEl = $('watchAudienceNote');
   if (!wrap || !title || !broadcaster || !thumb || !tags) return;
-  if (!snapshot) {
+  if (!rawSnapshot) {
     clearWatchMetaCard();
     return;
   }
+  const snapshot =
+    watchMetaSnapshotMergedWithBundleProgramStats(rawSnapshot) ?? rawSnapshot;
 
   const titleText = String(snapshot.broadcastTitle || snapshot.title || '-').trim() || '-';
   const broadcasterText = String(snapshot.broadcasterName || '-').trim() || '-';
@@ -5058,6 +5235,7 @@ function renderWatchMetaCard(snapshot, commentEntries = []) {
   );
 
   wrap.hidden = false;
+  syncLiveStatThreeCardsCharLoadingOverlays();
 }
 
 /** @param {string} viewerLiveId 現在表示中の lv（小文字想定）・無ければ空 */
@@ -5125,7 +5303,7 @@ function renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText) 
   const note = $('roomHeatNote');
   if (!summary || !meta || !fill || !note) return;
   summary.hidden = false;
-  meta.textContent = `+${totalRecent}件 / ${activeUsers}人`;
+  meta.textContent = `直近5分 +${totalRecent}件 / ${activeUsers}人`;
   fill.style.width = `${Math.max(0, Math.min(100, Number(heatPercent) || 0)).toFixed(2)}%`;
   note.textContent = `${heatText}（この5分で増えた件数）`;
 }
@@ -5393,96 +5571,732 @@ async function refreshGiftRankingFetchPrompt(liveId) {
 }
 
 /**
- * v0.1.237: 北極星「鏡のように貼り付け」レーン body へ、niconico DOM の outerHTML を
- * sanitize して innerHTML として流し込む。
+ * @param {HTMLElement} body `#northStarLaneBody-*`
+ * @returns {string}
+ */
+function northStarLaneIdFromBodyEl(body) {
+  const id = body instanceof HTMLElement ? String(body.id || '') : '';
+  const m = /^northStarLaneBody-(.+)$/.exec(id);
+  return m ? m[1] : '';
+}
+
+/**
+ * @param {HTMLElement} body
+ * @returns {HTMLElement|null}
+ */
+function resolveNorthStarLaneAsideEl(body) {
+  const laneId = northStarLaneIdFromBodyEl(body);
+  if (!laneId) return null;
+  const el = document.getElementById('northStarLaneAside-' + laneId);
+  return el instanceof HTMLElement ? el : null;
+}
+
+/**
+ * @param {HTMLElement} body
+ */
+function clearNorthStarVerticalRailForBody(body) {
+  const rail = resolveNorthStarLaneAsideEl(body);
+  if (!rail) return;
+  rail.innerHTML = '';
+  rail.hidden = true;
+  rail.setAttribute('aria-hidden', 'true');
+}
+
+/**
+ * 左ガジェット（取得率メーター＋キャラ）を `data-lane-state` に合わせて更新。
  *
- * - 入力 mirrorHtml が空 / null なら placeholder（CSS `::after` で表示）を維持し、
- *   data-lane-state を引数 `fallbackState` （v0.1.244 で追加） or 'missing' に倒す。
- * - 有効な HTML なら sanitize してから innerHTML に流し込み、state="ok" にする。
- * - sanitize は `mirrorSanitize.sanitizeMirrorHtml` に委譲（自前ホワイトリスト方式、
- *   SVG namespace 維持 + id rename + url(#) 同期更新 + [hidden]/onXX/style/href 削除）。
+ * @param {HTMLElement} body
+ */
+function syncNorthStarLaneGadgetFromBodyState(body) {
+  if (!(body instanceof HTMLElement)) return;
+  const laneId = northStarLaneIdFromBodyEl(body);
+  if (!laneId) return;
+  const laneRoot = body.closest('.nl-north-star-lane');
+  const gadget = laneRoot?.querySelector?.('.nl-north-star-lane__gadget');
+  if (!(gadget instanceof HTMLElement)) return;
+  const state = String(body.getAttribute('data-lane-state') || '').trim() || 'missing';
+  const pct = acquisitionPctFromNorthStarLaneState(state);
+  const tier = acquisitionTierFromPct(pct);
+  if (pct == null) {
+    gadget.dataset.nlAcqMode = 'indeterminate';
+    gadget.style.removeProperty('--nl-acq-pct');
+  } else {
+    gadget.dataset.nlAcqMode = 'determinate';
+    gadget.style.setProperty('--nl-acq-pct', String(Math.max(0, Math.min(100, pct))));
+  }
+  const giftRankMetric = String(body.dataset.nlGiftRankMetric || '').trim();
+  const acqTitle = gadget.querySelector('.nl-north-star-lane__acq-title');
+  if (acqTitle instanceof HTMLElement) {
+    if (laneId === 'giftHistory' && giftRankMetric === 'throws' && pct != null) {
+      acqTitle.textContent = 'コメント由来';
+    } else {
+      acqTitle.textContent = pct == null ? '公式DOM待ち' : '現在の取得率';
+    }
+  }
+  const pctNum = gadget.querySelector('.nl-north-star-lane__acq-pct-num');
+  if (pctNum instanceof HTMLElement) {
+    pctNum.textContent = pct == null ? '—' : `${Math.round(pct)}%`;
+    if (pct == null) {
+      pctNum.title =
+        'パーセントではありません。ニコ生側の一覧がDOMに出るまでの待機表示です。';
+    } else if (pct >= 100) {
+      let fullTitle =
+        'この「%」はレーンの公式DOM鏡像の成立度（成立時は設計上ここが100%）です。番組累計ポイントの増え方やギフト履歴の行数とは別の指標です。';
+      if (laneId === 'giftHistory' && giftRankMetric === 'throws') {
+        fullTitle =
+          '一覧の数字は「投げた回数」です（pt ではありません）。公式のギフト履歴合計ptや、レーン「番組累計ポイント」（ティッカーのギフトpt累計）とは別指標です。';
+      } else if (laneId === 'giftHistory' && giftRankMetric === 'points') {
+        fullTitle =
+          '公式履歴タブ由来のユーザー別「履歴上の合計pt」です。レーン「番組累計ポイント」（番組全体のギフトpt累計）とは別物です。';
+      }
+      pctNum.title = fullTitle;
+    } else {
+      pctNum.title =
+        'レーン単位の取得失敗・未取得を示します。ギフト履歴の「取り逃し率」ではありません。';
+    }
+  }
+  const wrap = gadget.querySelector('.nl-north-star-lane__chara-wrap');
+  if (wrap instanceof HTMLElement) wrap.dataset.nlAcqTier = tier;
+  const img = gadget.querySelector('img.nl-north-star-lane__chara');
+  if (img instanceof HTMLImageElement) {
+    const rel = northStarLaneGadgetCharaRelativePath(laneId);
+    try {
+      img.src = chrome.runtime.getURL(rel);
+    } catch {
+      img.removeAttribute('src');
+    }
+    img.alt = '';
+  }
+}
+
+/** @type {WeakMap<HTMLElement, ReturnType<typeof setInterval>>} */
+const northStarLaneWaitIntervalByBody = new WeakMap();
+
+/** 待機 UI 脚注の「経過秒」用タイマー（ゲージと別 interval） */
+const northStarLaneWaitFootIntervalByBody = new WeakMap();
+
+function teardownNorthStarLaneWaitingUi(body) {
+  if (!(body instanceof HTMLElement)) return;
+  const tid = northStarLaneWaitIntervalByBody.get(body);
+  if (tid != null) {
+    clearInterval(tid);
+    northStarLaneWaitIntervalByBody.delete(body);
+  }
+  const ftid = northStarLaneWaitFootIntervalByBody.get(body);
+  if (ftid != null) {
+    clearInterval(ftid);
+    northStarLaneWaitFootIntervalByBody.delete(body);
+  }
+  const bid = body.id || '';
+  if (bid.startsWith('northStarLaneBody-')) {
+    clearNorthStarVerticalRailForBody(body);
+    body.classList.remove(
+      'nl-top-support-rank',
+      'nl-top-support-rank--below-cards',
+      'nl-top-support-rank--span-cards',
+      'nl-gift-rank-strip'
+    );
+    try {
+      delete body.dataset.nlGiftRankMetric;
+    } catch {
+      // no-op
+    }
+  }
+}
+
+/**
+ * @param {HTMLElement} body
+ * @param {string} laneId
+ * @param {string} state
+ */
+/**
+ * 待機中: 右列 aside に 3 キャラの短い案内を出して余白を埋める（ランキング取得後は上書きされる）。
  *
- * v0.1.244: state 細分化対応。mirror/fallback が無いときに reason を指定でき、
- *   popup の CSS `::after` で「(イベント不参加)」「(ギフト 0 件)」等を出し分ける。
+ * @param {HTMLElement} body
+ * @param {string} laneId
+ * @param {string} state
+ */
+function fillNorthStarWaitHintsRailIfApplicable(body, laneId, state) {
+  if (!(body instanceof HTMLElement)) return;
+  if (!isNorthStarLaneWaitingState(state)) return;
+  const rail = resolveNorthStarLaneAsideEl(body);
+  if (!rail) return;
+  const msgs = getNorthStarWaitRotationMessages(laneId, state);
+  const html = buildNorthStarWaitHintsRailHtml(msgs);
+  if (!html) return;
+  rail.innerHTML = html;
+  rail.hidden = false;
+  rail.setAttribute('aria-hidden', 'false');
+}
+
+function mountNorthStarLaneWaitingUi(body, laneId, state) {
+  teardownNorthStarLaneWaitingUi(body);
+  body.setAttribute('data-lane-state', String(state || 'not_yet'));
+  body.innerHTML = buildNorthStarLaneWaitingShellHtml(laneId);
+  const shortEl = body.querySelector('.nl-north-star-lane-wait__short');
+  if (shortEl) {
+    const msgs = getNorthStarWaitRotationMessages(laneId, state);
+    const m = msgs.length ? msgs[0] : { badge: 'りんく', line: '取得状況を確認しています。' };
+    // 台詞ローテは text 差し替えで「ちかちか」しやすいので静止表示（先頭1件のみ）
+    shortEl.textContent = `${m.badge}：${m.line}`;
+  }
+  fillNorthStarWaitHintsRailIfApplicable(body, laneId, state);
+  syncNorthStarLaneGadgetFromBodyState(body);
+}
+
+/** 直前に「bundle 反映前ローディングシェル」を張った liveId（同一 lv の再描画では張り直さない） */
+let _northStarBundleLoadingShellLiveId = '';
+
+/**
+ * 「直近5分の応援増加」帯: 5 分窓が「最新コメントの capturedAt」基準で滑るため、
+ * 境界をまたぐたびに件数・人数が飛びゲージ幅が大きく揺れる。表示だけ EMA で緩める。
+ * @type {{ liveId: string, emaTotal: number|null, emaActive: number|null }}
+ */
+const ROOM_HEAT_DISPLAY_SMOOTH = {
+  liveId: '',
+  emaTotal: null,
+  emaActive: null
+};
+
+/**
+ * @param {string} liveId
+ * @param {number} totalRecent
+ * @param {number} activeUsers
+ * @returns {{ total: number, active: number }}
+ */
+function smoothRoomHeatDisplay(liveId, totalRecent, activeUsers) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const BLEND = 0.36;
+  if (ROOM_HEAT_DISPLAY_SMOOTH.liveId !== lid) {
+    ROOM_HEAT_DISPLAY_SMOOTH.liveId = lid;
+    ROOM_HEAT_DISPLAY_SMOOTH.emaTotal = null;
+    ROOM_HEAT_DISPLAY_SMOOTH.emaActive = null;
+  }
+  const tr = Math.max(0, Math.floor(Number(totalRecent) || 0));
+  const au = Math.max(0, Math.floor(Number(activeUsers) || 0));
+  const et = ROOM_HEAT_DISPLAY_SMOOTH.emaTotal;
+  const ea = ROOM_HEAT_DISPLAY_SMOOTH.emaActive;
+  const nextTotal =
+    et == null ? tr : et * (1 - BLEND) + tr * BLEND;
+  const nextActive =
+    ea == null ? au : ea * (1 - BLEND) + au * BLEND;
+  ROOM_HEAT_DISPLAY_SMOOTH.emaTotal = nextTotal;
+  ROOM_HEAT_DISPLAY_SMOOTH.emaActive = nextActive;
+  return {
+    total: Math.max(0, Math.round(nextTotal)),
+    active: Math.max(0, Math.round(nextActive))
+  };
+}
+
+/** 北極星 6 レーンの body id 接尾辞（popup.html と一致） */
+const NORTH_STAR_BUNDLE_LOADING_LANE_IDS = Object.freeze([
+  'contributionRanking',
+  'giftHistory',
+  'programPoints',
+  'adRanking',
+  'eventRank',
+  'eventScore'
+]);
+
+/**
+ * 公式イベント DOM バンドル（storage）反映前に、6 レーンすべてを同型の待機 UI にする。
+ * 番組ポイントだけ先に数字が出て「他だけ止まっている」ように見えるのを避ける。
  *
- * @param {string} laneId 例 'adRanking'（popup.html の id="northStarLaneBody-<laneId>" に対応）
+ * @param {string} liveId
+ */
+function mountAllNorthStarLanesBundleLoadingUi(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  for (const laneId of NORTH_STAR_BUNDLE_LOADING_LANE_IDS) {
+    const body = document.getElementById('northStarLaneBody-' + laneId);
+    if (!(body instanceof HTMLElement)) continue;
+    mountNorthStarLaneWaitingUi(body, laneId, 'not_yet');
+  }
+}
+
+/**
+ * v0.1.237: 北極星「鏡のように貼り付け」レーン body へ mirrorHtml を sanitize して流し込む。
+ * 取得待ち（not_yet / iframe_unrendered）はゲージ＋3 キャラのローディング UI。
+ *
+ * @param {string} laneId
  * @param {string|null|undefined} mirrorHtml
- * @param {string} [fallbackState] mirrorHtml が無い時に使う state（v0.1.244 追加）。
- *   省略時は 'missing'。'no_event' | 'no_program_gift' | 'iframe_unrendered' |
- *   'fetch_error' | 'not_yet' | 'missing' のいずれか。
+ * @param {string} [fallbackState]
  */
 function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
   const body = document.getElementById('northStarLaneBody-' + String(laneId || ''));
   if (!(body instanceof HTMLElement)) return;
 
+  teardownNorthStarLaneWaitingUi(body);
+
   const raw = typeof mirrorHtml === 'string' ? mirrorHtml.trim() : '';
   if (!raw) {
-    body.innerHTML = '';
-    body.setAttribute(
-      'data-lane-state',
-      typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing'
-    );
+    const st =
+      typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
+    body.setAttribute('data-lane-state', st);
+    if (isNorthStarLaneWaitingState(st)) {
+      mountNorthStarLaneWaitingUi(body, String(laneId || ''), st);
+    } else {
+      body.innerHTML = '';
+      clearNorthStarVerticalRailForBody(body);
+      syncNorthStarLaneGadgetFromBodyState(body);
+    }
     return;
   }
 
   const sanitized = sanitizeMirrorHtml(raw);
   if (!sanitized) {
-    body.innerHTML = '';
-    body.setAttribute(
-      'data-lane-state',
-      typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing'
-    );
+    const st =
+      typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
+    body.setAttribute('data-lane-state', st);
+    if (isNorthStarLaneWaitingState(st)) {
+      mountNorthStarLaneWaitingUi(body, String(laneId || ''), st);
+    } else {
+      body.innerHTML = '';
+      clearNorthStarVerticalRailForBody(body);
+      syncNorthStarLaneGadgetFromBodyState(body);
+    }
     return;
   }
 
   body.innerHTML = sanitized;
   body.setAttribute('data-lane-state', 'ok');
+  clearNorthStarVerticalRailForBody(body);
+  syncNorthStarLaneGadgetFromBodyState(body);
 }
 
 /**
- * v0.1.237: 北極星 +α 広告ランキングレーンへの流し込み。
- * `_lastOfficialEventDomBundle.adRankingMirrorHtml` を sanitize して
- * popup の `#northStarLaneBody-adRanking` body に innerHTML として描画。
- *
- * - bundle が空 / mirrorHtml が空なら reason 判定（v0.1.244 で細分化）
- * - 鏡のように貼り付け原則に従う：niconico DOM をそのまま映す（数値抽出なし）
+ * 公式貢献度ランキング（親 frame bundle + iframe storage）の行配列。
+ * @param {string} liveId
+ * @returns {Promise<any[]|null>}
+ */
+async function resolveOfficialContributionRankingRows(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const bundle = _lastOfficialEventDomBundle;
+  /** @type {any[]|null} */
+  let ranking = Array.isArray(bundle?.contributionRanking) ? bundle.contributionRanking : null;
+  if (!ranking || ranking.length === 0) {
+    if (!lid) return null;
+    try {
+      const iframeBag = await chrome.storage.local.get(`nls_iframe_official_dom_${lid}`);
+      const iframeData = iframeBag[`nls_iframe_official_dom_${lid}`];
+      if (
+        iframeData &&
+        Array.isArray(iframeData.contributionRanking) &&
+        iframeData.contributionRanking.length > 0
+      ) {
+        ranking = iframeData.contributionRanking;
+      }
+    } catch {
+      /* no-op */
+    }
+  }
+  return ranking && ranking.length > 0 ? ranking : null;
+}
+
+/**
+ * 貢献度帯（`#topGiftRankStrip`）用の rooms 解決。非表示のとき `{ kind: 'hide' }`。
+ * @param {string} liveId
+ * @returns {Promise<
+ *   | { kind: 'hide' }
+ *   | {
+ *       kind: 'ok';
+ *       rooms: { userKey: string; nickname: string; count: number; avatarUrl: string }[];
+ *       noteText: string;
+ *       unitSuffix: string;
+ *       ariaLabel: string;
+ *     }
+ * >}
+ */
+async function computeGiftRankStripRoomsContext(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return { kind: 'hide' };
+  const ranking = await resolveOfficialContributionRankingRows(liveId);
+  const bundle = _lastOfficialEventDomBundle;
+  const giftHistory = Array.isArray(bundle?.giftHistory) ? bundle.giftHistory : null;
+  if (ranking && ranking.length > 0) {
+    const rooms = ranking.map((r, i) => ({
+      userKey: r.isAnonymous ? `__anon_contrib_${i}` : `__contrib_${i}_${String(r.name || '').slice(0, 12)}`,
+      nickname: String(r.name || ''),
+      count: Number(r.contribution) || 0,
+      avatarUrl: String(r.thumbnailUrl || '')
+    }));
+    return {
+      kind: 'ok',
+      rooms,
+      noteText: '公式の貢献度ランキング順（niconico の表示そのまま）',
+      unitSuffix: '貢',
+      ariaLabel: '公式の貢献度ランキング'
+    };
+  }
+  if (giftHistory && giftHistory.length > 0) {
+    const aggregated = aggregateGiftHistoryByUser(giftHistory);
+    const rooms = aggregated.map((a, i) => ({
+      userKey: a.isAnonymous ? `__anon_gift_${i}` : `__gift_${i}_${String(a.name || '').slice(0, 12)}`,
+      nickname: String(a.name || ''),
+      count: Number(a.totalPoints) || 0,
+      avatarUrl: String(a.advertiserAvatarUrl || '').trim()
+    }));
+    return {
+      kind: 'ok',
+      rooms,
+      noteText:
+        '公式サイドバー「履歴」DOMから取得。ユーザー別の累計pt順（番組累計ポイントのティッカー値とは別指標です）',
+      unitSuffix: 'pt',
+      ariaLabel: 'ギフト履歴のユーザー別集計'
+    };
+  }
+  /** @type {{ userId?: string; nickname?: string; throwCount?: number; totalPoints?: number }[]} */
+  let throwsRows = [];
+  try {
+    const throwsBag = await chrome.storage.local.get(`nls_gift_history_throws_${lid}`);
+    const v = throwsBag[`nls_gift_history_throws_${lid}`];
+    if (Array.isArray(v)) throwsRows = /** @type {any} */ (v);
+  } catch {
+    /* no-op */
+  }
+  if (throwsRows.length > 0) {
+    const sorted = [...throwsRows].sort(
+      (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
+    );
+    const rooms = sorted.slice(0, 12).map((r) => {
+      const userKey = String(r?.userId || '');
+      const rawNickname = String(r?.nickname || '');
+      const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
+      return {
+        userKey,
+        nickname,
+        count: Number(r?.totalPoints) || 0,
+        avatarUrl: String(r?.avatarUrl || '').trim()
+      };
+    });
+    return {
+      kind: 'ok',
+      rooms,
+      noteText:
+        '保存済みの公式履歴タブ情報からユーザー別の累計pt順（番組累計ポイントとは別指標です）',
+      unitSuffix: 'pt',
+      ariaLabel: '公式サイドバー履歴のユーザー別集計'
+    };
+  }
+  const key = giftUsersStorageKey(lid);
+  let raw = /** @type {unknown[]} */ ([]);
+  try {
+    const bag = await chrome.storage.local.get(key);
+    raw = Array.isArray(bag[key]) ? bag[key] : [];
+  } catch {
+    return { kind: 'hide' };
+  }
+  const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+  const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
+  if (!stripRooms.length) {
+    return { kind: 'hide' };
+  }
+  const rooms = stripRooms.map((r) => ({
+    userKey: r.userKey,
+    nickname: (r.userKey && _nicknameResolveMap.get(r.userKey)) || r.nickname,
+    count: r.count,
+    avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
+  }));
+  return {
+    kind: 'ok',
+    rooms,
+    noteText:
+      '履歴タブがDOMに無いときの代替。数値は「投げ回数」（pt ではありません）。公式履歴のptや番組累計ポイントとは別です',
+    unitSuffix: '回',
+    ariaLabel: 'ライブ通信で観測したギフト/投げの回数が多い順'
+  };
+}
+
+/**
+ * 北極星「この番組へのギフト履歴」レーン用（貢献度 DOM より先に履歴系のみ解決）。
+ * @param {string} liveId
+ * @returns {Promise<{
+ *   rooms: { userKey: string; nickname: string; count: number; avatarUrl: string }[];
+ *   noteText: string;
+ *   unitSuffix: string;
+ *   ariaLabel: string;
+ * } | null>}
+ */
+async function computeGiftHistoryNorthStarRoomsContext(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return null;
+  const bundle = _lastOfficialEventDomBundle;
+  const giftHistory = Array.isArray(bundle?.giftHistory) ? bundle.giftHistory : null;
+  if (giftHistory && giftHistory.length > 0) {
+    const aggregated = aggregateGiftHistoryByUser(giftHistory);
+    const rooms = aggregated.map((a, i) => ({
+      userKey: a.isAnonymous ? `__anon_gift_${i}` : `__gift_${i}_${String(a.name || '').slice(0, 12)}`,
+      nickname: String(a.name || ''),
+      count: Number(a.totalPoints) || 0,
+      avatarUrl: String(a.advertiserAvatarUrl || '').trim()
+    }));
+    const senderN = aggregated.length;
+    const throwM = aggregated.reduce((s, a) => s + (Number(a.giftCount) || 0), 0);
+    return {
+      rooms,
+      noteText: `公式履歴DOM由来のユーザー別累計pt順。送り主${senderN}名・履歴${throwM}件（番組累計ポイントとは別指標）`,
+      unitSuffix: 'pt',
+      ariaLabel: 'この番組へのギフト履歴のユーザー別集計'
+    };
+  }
+  /** @type {{ userId?: string; nickname?: string; totalPoints?: number }[]} */
+  let throwsRows = [];
+  try {
+    const throwsBag = await chrome.storage.local.get(`nls_gift_history_throws_${lid}`);
+    const v = throwsBag[`nls_gift_history_throws_${lid}`];
+    if (Array.isArray(v)) throwsRows = /** @type {any} */ (v);
+  } catch {
+    /* no-op */
+  }
+  if (throwsRows.length > 0) {
+    const sorted = [...throwsRows].sort(
+      (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
+    );
+    const senderN = sorted.length;
+    const throwM = sorted.reduce((s, r) => s + (Number(r?.throwCount) || 0), 0);
+    const rooms = sorted.slice(0, 12).map((r) => {
+      const userKey = String(r?.userId || '');
+      const rawNickname = String(r?.nickname || '');
+      const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
+      return {
+        userKey,
+        nickname,
+        count: Number(r?.totalPoints) || 0,
+        avatarUrl: String(r?.avatarUrl || '').trim()
+      };
+    });
+    return {
+      rooms,
+      noteText: `保存済み公式履歴からユーザー別累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントとは別指標）`,
+      unitSuffix: 'pt',
+      ariaLabel: '公式サイドバー履歴のユーザー別集計'
+    };
+  }
+  const key = giftUsersStorageKey(lid);
+  let raw = /** @type {unknown[]} */ ([]);
+  try {
+    const bag = await chrome.storage.local.get(key);
+    raw = Array.isArray(bag[key]) ? bag[key] : [];
+  } catch {
+    return null;
+  }
+  const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+  const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
+  if (!stripRooms.length) return null;
+  const rooms = stripRooms.map((r) => ({
+    userKey: r.userKey,
+    nickname: (r.userKey && _nicknameResolveMap.get(r.userKey)) || r.nickname,
+    count: r.count,
+    avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
+  }));
+  return {
+    rooms,
+    noteText:
+      '履歴タブがDOMに無いときの代替。数値は「投げ回数」（pt ではありません）。公式履歴のptや番組累計ポイントとは別です',
+    unitSuffix: '回',
+    ariaLabel: 'ライブ通信で観測したギフト/投げの回数が多い順'
+  };
+}
+
+/**
+ * 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
+ * @param {HTMLElement} el
+ * @param {{ userKey: string; nickname: string; count: number; avatarUrl?: string }[]} rooms
+ * @param {{
+ *   noteText: string;
+ *   unitSuffix: string;
+ *   ariaLabel: string;
+ *   prependHtml?: string;
+ *   beforeNoteHtml?: string;
+ *   isNorthStarBody?: boolean;
+ * }} opts
+ */
+function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
+  const {
+    noteText,
+    unitSuffix,
+    ariaLabel,
+    prependHtml = '',
+    beforeNoteHtml = '',
+    isNorthStarBody = false
+  } = opts;
+  if (!(el instanceof HTMLElement)) return;
+  if (isNorthStarBody) {
+    teardownNorthStarLaneWaitingUi(el);
+    el.setAttribute('data-lane-state', 'ok');
+    // 応援／ギフト帯と同じ「横スクロールのカード列」見せ方（#topSupportRankStrip と同型クラス）
+    // 北極星は .nl-north-star-lane__shell が grid（左ガジェット | 本体 | 右レール）。
+    // span-cards は grid-column:1/-1 で本体だけ全幅化し、aside が次段へ落ちて
+    // 縦レールが「本体直下のダンプ」に見えるため付けない（--below-cards だけで横カード列）。
+    el.classList.add('nl-top-support-rank', 'nl-top-support-rank--below-cards');
+    if (el.id === 'northStarLaneBody-giftHistory') {
+      el.classList.add('nl-gift-rank-strip');
+      el.dataset.nlGiftRankMetric = unitSuffix === '回' ? 'throws' : 'points';
+    }
+  }
+  el.hidden = false;
+  el.removeAttribute('aria-hidden');
+  el.setAttribute('aria-label', ariaLabel);
+  const rankScheme = getStoryColorScheme();
+  const models = topSupportRankLineModels(rooms, {
+    defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
+    anonymousFallbackThumbSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
+    colorScheme: rankScheme,
+    anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled
+      ? (uid) => getCachedAnonymousIdenticonDataUrl(uid)
+      : undefined
+  });
+  const html = models
+    .map((m) => {
+      const placeHtml =
+        m.placeNumber != null
+          ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>`
+          : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
+      const full = escapeAttr(m.fullLabelForTitle);
+      const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(m.thumbSrc);
+      const thumbRp = isHttpOrHttpsUrl(displayThumb)
+        ? ' referrerpolicy="no-referrer"'
+        : '';
+      const idText = escapeHtml(m.idShort);
+      const nameText = escapeHtml(m.nameLine);
+      const idTitle = m.isUnknown ? '' : escapeAttr(m.idTitle);
+      let lineClass = `nl-top-support-rank__line${m.isUnknown ? ' nl-top-support-rank__line--unknown' : ''}`;
+      let lineStyle = '';
+      if (m.hasAccent && m.accentColorCss) {
+        lineClass += ' nl-top-support-rank__line--has-accent';
+        lineStyle = ` style="--nl-rank-accent:${escapeAttr(m.accentColorCss)}"`;
+      }
+      const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
+      const linkHref = isLinkable
+        ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}`
+        : '';
+      const idBlock =
+        String(m.idShort || '').trim() === ''
+          ? ''
+          : `<span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>`;
+      const inner = `${placeHtml}
+        <span class="nl-top-support-rank__count">${m.count}${escapeHtml(unitSuffix)}</span>
+        <span class="nl-top-support-rank__thumb-wrap">
+          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
+        </span>
+        ${idBlock}
+        <span class="nl-top-support-rank__name">${nameText}</span>`;
+      return isLinkable
+        ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${inner}</a>`
+        : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${inner}</div>`;
+    })
+    .join('');
+  el.innerHTML =
+    prependHtml +
+    (beforeNoteHtml || '') +
+    `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
+    `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
+  bindOnErrorHideHandlersWithin(el);
+  const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
+  models.forEach((m, i) => {
+    const img = thumbs[i];
+    if (!(img instanceof HTMLImageElement)) return;
+    if (isHttpOrHttpsUrl(m.thumbSrc)) {
+      storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
+    }
+  });
+  if (isNorthStarBody) {
+    syncNorthStarLaneGadgetFromBodyState(el);
+    // 横カードに順位が含まれるため、右列の縦レールで同データを二重表示しない
+    clearNorthStarVerticalRailForBody(el);
+  }
+}
+
+/**
+ * 北極星 +α 広告ランキング。`adContributionRanking` を応援帯と同型のランキングで表示し、
+ * 無いときは鏡 HTML → reason 判定の順。
  */
 function refreshNorthStarAdRankingLane() {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
-  const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string'
-    ? bundle.adRankingMirrorHtml
-    : null;
+  const body = document.getElementById('northStarLaneBody-adRanking');
+  const adRows = Array.isArray(bundle?.adContributionRanking) ? bundle.adContributionRanking : [];
+  if (adRows.length > 0 && body instanceof HTMLElement) {
+    const rooms = officialDomRankingRowsToStripRooms(adRows, { userKeyKind: 'ad' });
+    let rankingSum = 0;
+    for (const row of adRows) {
+      const c = Number(row?.contribution);
+      if (Number.isFinite(c) && c > 0) rankingSum += c;
+    }
+    const ps = bundle?.programStats || null;
+    const programAdPts =
+      typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
+        ? ps.adPoints
+        : typeof snap?.officialAdPointsNdgr === 'number' &&
+            Number.isFinite(snap.officialAdPointsNdgr) &&
+            snap.officialAdPointsNdgr >= 0
+          ? snap.officialAdPointsNdgr
+          : null;
+    const beforeNoteHtml = buildNorthStarAdRankingStatsHtml({
+      programAdPts,
+      rankingContributionSum: rankingSum,
+      rankingRowCount: adRows.length
+    });
+    paintTopSupportRankStyleIntoElement(body, rooms, {
+      noteText:
+        'ニコニ広告の貢献度ランキング（公式ページ相当）。画面上部の累計ptなどと、各行の「貢」は指標や期間が異なり一致しないことがあります',
+      unitSuffix: '貢',
+      ariaLabel: '広告ランキング',
+      beforeNoteHtml,
+      isNorthStarBody: true
+    });
+    return;
+  }
+  const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string' ? bundle.adRankingMirrorHtml : null;
   if (mirrorHtml) {
     renderNorthStarLane('adRanking', mirrorHtml);
     return;
   }
-  // v0.1.244: 鏡が無い → reason 判定で placeholder 細分化
   const state = determineNorthStarLaneState('adRanking', { bundle, snap });
   renderNorthStarLane('adRanking', null, state);
 }
 
 /**
- * v0.1.244: 北極星 レーン 1 (貢献度ランキング) への流し込み。
- * gift sidebar cross-origin iframe Vue mount 不全のため、現状は鏡が取れない。
- * reason 判定で「(取得待ち: サイドバー描画なし)」等を popup に表示する。
+ * 北極星 レーン 1 (貢献度ランキング)。コメントランキング帯と同じ `nl-top-support-rank` で表示。
  */
-function refreshNorthStarContributionRankingLane() {
+async function refreshNorthStarContributionRankingLaneAsync(liveId) {
+  const body = document.getElementById('northStarLaneBody-contributionRanking');
+  if (!(body instanceof HTMLElement)) return;
+  const ranking = await resolveOfficialContributionRankingRows(liveId);
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
+  if (ranking && ranking.length > 0) {
+    const rooms = officialDomRankingRowsToStripRooms(ranking, { userKeyKind: 'contrib' });
+    paintTopSupportRankStyleIntoElement(body, rooms, {
+      noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
+      unitSuffix: '貢',
+      ariaLabel: '貢献度ランキング',
+      isNorthStarBody: true
+    });
+    return;
+  }
   const state = determineNorthStarLaneState('contributionRanking', { bundle, snap });
-  // 鏡 mirrorHtml はまだ実装していない（gift sidebar Vue mount 不全のため）
   renderNorthStarLane('contributionRanking', null, state);
 }
 
 /**
- * v0.1.244: 北極星 レーン 2 (この番組へのギフト履歴) への流し込み。
- * 同上、reason 判定で placeholder 細分化。giftPoints=0 配信なら「(ギフト 0 件)」
- * 表示で「取得失敗ではなく、そもそも発生していない」が伝わる。
+ * 北極星 レーン 2 (この番組へのギフト履歴)。履歴起点の集計をランキング表示。
  */
-function refreshNorthStarGiftHistoryLane() {
+async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
+  const body = document.getElementById('northStarLaneBody-giftHistory');
+  if (!(body instanceof HTMLElement)) return;
+  const ctx = await computeGiftHistoryNorthStarRoomsContext(liveId);
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
+  if (ctx && ctx.rooms.length > 0) {
+    paintTopSupportRankStyleIntoElement(body, ctx.rooms, {
+      noteText: ctx.noteText,
+      unitSuffix: ctx.unitSuffix,
+      ariaLabel: ctx.ariaLabel,
+      isNorthStarBody: true
+    });
+    return;
+  }
   const state = determineNorthStarLaneState('giftHistory', { bundle, snap });
   renderNorthStarLane('giftHistory', null, state);
 }
@@ -5522,49 +6336,69 @@ function refreshNorthStarEventCumulativeScoreLane() {
 }
 
 /**
- * v0.1.240: 北極星 レーン 5 (イベント現在順位) への流し込み。
- * `_lastOfficialEventDomBundle.eventCurrentRankMirrorHtml` を sanitize して
- * popup の `#northStarLaneBody-eventRank` body に innerHTML として描画。
+ * 北極星 レーン 5 (イベント現在順位)。公式の順位（鏡／バナー）に加え、
+ * 貢献度ランキング DOM の上位10件を応援ランキング帯と同型で併記する。
  *
- * v0.1.241: 鏡 mirrorHtml が無い時の NDGR fallback を導入していたが、
- * v0.1.248 で memory feedback_ndgr_field6_silence.md の rule (NDGR field 6
- * 単独で順位を表示しない) を見落としていたバグを修正。
- *
- * v0.1.248: 表示優先度を厳格化:
- *   鏡 mirrorHtml > bundle.eventBanner.rank の整数 > 沈黙 (placeholder)
- * NDGR field 6 (`officialNicoEventRankNdgr`) は意味確定していない値で
- * （イベント不参加配信でも値が返ることがあり、実機 lv350505652 で NDGR=1 だが
- * 真値 7 位の乖離が観測された）、単独 fallback は完全に撤去。
- *
- * - bundle が空 / mirrorHtml が空 / banner.rank も空 なら placeholder ("(未取得)") を維持
+ * @param {string} liveId
  */
-function refreshNorthStarEventCurrentRankLane() {
+async function refreshNorthStarEventCurrentRankLaneAsync(liveId) {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
-  const mirrorHtml = typeof bundle?.eventCurrentRankMirrorHtml === 'string'
-    ? bundle.eventCurrentRankMirrorHtml
-    : null;
-  if (mirrorHtml) {
-    renderNorthStarLane('eventRank', mirrorHtml);
-    return;
-  }
-  // v0.1.248: NDGR field 6 (eventRank) は意味確定していないため使わない。
-  // bundle.eventBanner.rank が居る時だけ、niconico の class 名で揃えて表示。
-  const bannerRank = typeof bundle?.eventBanner?.rank === 'number'
-    && Number.isFinite(bundle.eventBanner.rank)
-    && bundle.eventBanner.rank > 0
-    ? bundle.eventBanner.rank
-    : null;
-  if (bannerRank != null) {
-    const fallback = buildNorthStarRankFallbackHtml(bannerRank);
-    if (fallback) {
-      renderNorthStarLane('eventRank', fallback);
-      return;
+  const body = document.getElementById('northStarLaneBody-eventRank');
+  if (!(body instanceof HTMLElement)) return;
+
+  const mirrorRaw =
+    typeof bundle?.eventCurrentRankMirrorHtml === 'string'
+      ? bundle.eventCurrentRankMirrorHtml.trim()
+      : '';
+  let prependHtml = '';
+  if (mirrorRaw) {
+    const s = sanitizeMirrorHtml(mirrorRaw);
+    if (s) {
+      prependHtml = `<div class="nl-north-star-rank-bundle__head">${s}</div>`;
     }
   }
-  // v0.1.244: 鏡も banner も無い → reason 判定
-  const state = determineNorthStarLaneState('eventRank', { bundle, snap });
-  renderNorthStarLane('eventRank', null, state);
+  if (!prependHtml) {
+    const bannerRank =
+      typeof bundle?.eventBanner?.rank === 'number' &&
+      Number.isFinite(bundle.eventBanner.rank) &&
+      bundle.eventBanner.rank > 0
+        ? bundle.eventBanner.rank
+        : null;
+    if (bannerRank != null) {
+      const fallback = buildNorthStarRankFallbackHtml(bannerRank);
+      if (fallback) {
+        prependHtml = `<div class="nl-north-star-rank-bundle__head">${fallback}</div>`;
+      }
+    }
+  }
+  const rankingRows = await resolveOfficialContributionRankingRows(liveId);
+  const slice = (rankingRows || []).slice(0, 10);
+  const rooms = officialDomRankingRowsToStripRooms(slice, { userKeyKind: 'contrib' });
+
+  if (rooms.length === 0 && !prependHtml) {
+    const state = determineNorthStarLaneState('eventRank', { bundle, snap });
+    renderNorthStarLane('eventRank', null, state);
+    return;
+  }
+  if (rooms.length === 0 && prependHtml) {
+    teardownNorthStarLaneWaitingUi(body);
+    body.innerHTML =
+      prependHtml +
+      '<p class="nl-north-star-rank-bundle__hint">貢献度ランキングのDOMが未取得のため、参考の上位10件は表示できませんでした。</p>';
+    body.setAttribute('data-lane-state', 'ok');
+    clearNorthStarVerticalRailForBody(body);
+    syncNorthStarLaneGadgetFromBodyState(body);
+    return;
+  }
+  paintTopSupportRankStyleIntoElement(body, rooms, {
+    noteText:
+      '公式の貢献度ランキング上位10件（イベント内の指標であり、画面の「現在順位」と必ず一致しない場合があります）',
+    unitSuffix: '貢',
+    ariaLabel: 'イベント順位と貢献度ランキング上位',
+    prependHtml,
+    isNorthStarBody: true
+  });
 }
 
 /**
@@ -5598,6 +6432,17 @@ function refreshNorthStarProgramPointsLane() {
   renderNorthStarLane('programPoints', null, state);
 }
 
+/** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
+async function refreshAllNorthStarMirrorLanes(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  await refreshNorthStarContributionRankingLaneAsync(lid);
+  await refreshNorthStarGiftHistoryLaneAsync(lid);
+  refreshNorthStarProgramPointsLane();
+  refreshNorthStarAdRankingLane();
+  await refreshNorthStarEventCurrentRankLaneAsync(lid);
+  refreshNorthStarEventCumulativeScoreLane();
+}
+
 /**
  * 貢献度ランキング帯。niconico DOM から掬った正本値（`nls_event_dom_<lv>` の
  * contributionRanking）を最優先、それが無いときだけ NDGR ギフト event 集計に
@@ -5618,189 +6463,16 @@ async function refreshGiftRankStrip(liveId) {
     hide();
     return;
   }
-  // 1. 公式 DOM 由来の貢献度ランキングがあればそれを優先
-  /** @type {{userKey:string, nickname:string, count:number, avatarUrl:string}[]} */
-  let rooms = [];
-  /** @type {string} */
-  let noteText = '';
-  /** @type {string} */
-  let unitSuffix = '';
-  /** @type {string} */
-  let ariaLabel = '';
-  const bundle = _lastOfficialEventDomBundle;
-  /** @type {any[]|null} */
-  let ranking = Array.isArray(bundle?.contributionRanking)
-    ? bundle.contributionRanking
-    : null;
-  const giftHistory = Array.isArray(bundle?.giftHistory)
-    ? bundle.giftHistory
-    : null;
-  // v0.1.217: bundle.contributionRanking が空（親 frame の DOM scrape では
-  //   audition.nicovideo.jp 等の cross-origin iframe にアクセスできない）の
-  //   ときは、iframe 経由で取得・保存された contributionRanking を fallback で
-  //   読み込む。content-entry.js の NLS_GIFT_HISTORY_FROM_IFRAME receive で
-  //   `nls_iframe_official_dom_<lid>` に保存される。
-  if (!ranking || ranking.length === 0) {
-    try {
-      const iframeBag = await chrome.storage.local.get(
-        `nls_iframe_official_dom_${lid}`
-      );
-      const iframeData = iframeBag[`nls_iframe_official_dom_${lid}`];
-      if (
-        iframeData &&
-        Array.isArray(iframeData.contributionRanking) &&
-        iframeData.contributionRanking.length > 0
-      ) {
-        ranking = iframeData.contributionRanking;
-      }
-    } catch {
-      /* no-op */
-    }
+  const ctx = await computeGiftRankStripRoomsContext(liveId);
+  if (ctx.kind === 'hide') {
+    hide();
+    return;
   }
-  if (ranking && ranking.length > 0) {
-    rooms = ranking.map((r, i) => ({
-      userKey: r.isAnonymous ? `__anon_contrib_${i}` : `__contrib_${i}_${String(r.name || '').slice(0, 12)}`,
-      nickname: String(r.name || ''),
-      count: Number(r.contribution) || 0,
-      avatarUrl: String(r.thumbnailUrl || '')
-    }));
-    noteText = '公式の貢献度ランキング順（niconico の表示そのまま）';
-    unitSuffix = '貢';
-    ariaLabel = '公式の貢献度ランキング';
-  } else if (giftHistory && giftHistory.length > 0) {
-    // 2. ランキングタブを開いていないが履歴タブを開いている → 個別ギフトを
-    //    ユーザー単位でアグリゲートして「貢献度ランキング相当」を作る。
-    const aggregated = aggregateGiftHistoryByUser(giftHistory);
-    rooms = aggregated.map((a, i) => ({
-      userKey: a.isAnonymous ? `__anon_gift_${i}` : `__gift_${i}_${String(a.name || '').slice(0, 12)}`,
-      nickname: String(a.name || ''),
-      count: Number(a.totalPoints) || 0,
-      avatarUrl: ''
-    }));
-    noteText = 'ギフト履歴をユーザー別に集計（pt 順）';
-    unitSuffix = 'pt';
-    ariaLabel = 'ギフト履歴のユーザー別集計';
-  } else {
-    // v0.1.216: 公式サイドバー履歴（gift sub-app iframe を経由して scrape 済み）
-    //   から「だれが何 pt 投げたか」を集計したものを優先表示する。
-    //   storage key: nls_gift_history_throws_<liveId>
-    //   書込元: content-entry.js の NLS_GIFT_HISTORY_FROM_IFRAME receive
-    /** @type {{ userId?: string, nickname?: string, throwCount?: number, totalPoints?: number }[]} */
-    let throwsRows = [];
-    try {
-      const throwsBag = await chrome.storage.local.get(`nls_gift_history_throws_${lid}`);
-      const v = throwsBag[`nls_gift_history_throws_${lid}`];
-      if (Array.isArray(v)) throwsRows = /** @type {any} */ (v);
-    } catch {
-      /* no-op */
-    }
-    if (throwsRows.length > 0) {
-      const sorted = [...throwsRows].sort(
-        (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
-      );
-      rooms = sorted.slice(0, 12).map((r) => {
-        const userKey = String(r?.userId || '');
-        const rawNickname = String(r?.nickname || '');
-        // v0.1.246: 統一 nickname map から resolve、無ければ raw を fallback
-        const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
-        return {
-          userKey,
-          nickname,
-          count: Number(r?.totalPoints) || 0,
-          avatarUrl: ''
-        };
-      });
-      noteText = '公式サイドバー履歴のユーザー別集計（合計 pt 順）';
-      unitSuffix = 'pt';
-      ariaLabel = '公式サイドバー履歴のユーザー別集計';
-    } else {
-      // 3. フォールバック: NDGR で観測したギフト event の集計
-      const key = giftUsersStorageKey(lid);
-      let raw = /** @type {unknown[]} */ ([]);
-      try {
-        const bag = await chrome.storage.local.get(key);
-        raw = Array.isArray(bag[key]) ? bag[key] : [];
-      } catch {
-        hide();
-        return;
-      }
-      const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
-      const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
-      if (!stripRooms.length) {
-        hide();
-        return;
-      }
-      rooms = stripRooms.map((r) => ({
-        userKey: r.userKey,
-        // v0.1.246: 統一 nickname map から resolve（同 user_id 別 nickname 衡突対策）
-        nickname: (r.userKey && _nicknameResolveMap.get(r.userKey)) || r.nickname,
-        count: r.count,
-        avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
-      }));
-      noteText = 'NDGR で観測したギフト/投げの回数が多い順（公式ランキングが取得できないとき）';
-      unitSuffix = '回';
-      ariaLabel = 'NDGR で観測したギフト/投げの回数が多い順';
-    }
-  }
-  strip.hidden = false;
-  strip.removeAttribute('aria-hidden');
-  strip.setAttribute('aria-label', ariaLabel);
-  const rankScheme = getStoryColorScheme();
-  const models = topSupportRankLineModels(rooms, {
-    defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
-    anonymousFallbackThumbSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
-    colorScheme: rankScheme,
-    anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled
-      ? (uid) => getCachedAnonymousIdenticonDataUrl(uid)
-      : undefined
-  });
-  const html = models
-    .map((m) => {
-      const placeHtml =
-        m.placeNumber != null
-          ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>`
-          : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
-      const full = escapeAttr(m.fullLabelForTitle);
-      const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(m.thumbSrc);
-      const thumbRp = isHttpOrHttpsUrl(displayThumb)
-        ? ' referrerpolicy="no-referrer"'
-        : '';
-      const idText = escapeHtml(m.idShort);
-      const nameText = escapeHtml(m.nameLine);
-      const idTitle = m.isUnknown ? '' : escapeAttr(m.idTitle);
-      let lineClass = `nl-top-support-rank__line${m.isUnknown ? ' nl-top-support-rank__line--unknown' : ''}`;
-      let lineStyle = '';
-      if (m.hasAccent && m.accentColorCss) {
-        lineClass += ' nl-top-support-rank__line--has-accent';
-        lineStyle = ` style="--nl-rank-accent:${escapeAttr(m.accentColorCss)}"`;
-      }
-      const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
-      const linkHref = isLinkable
-        ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}`
-        : '';
-      const inner = `${placeHtml}
-        <span class="nl-top-support-rank__count">${m.count}${escapeHtml(unitSuffix)}</span>
-        <span class="nl-top-support-rank__thumb-wrap">
-          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
-        </span>
-        <span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>
-        <span class="nl-top-support-rank__name">${nameText}</span>`;
-      return isLinkable
-        ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${inner}</a>`
-        : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${inner}</div>`;
-    })
-    .join('');
-  strip.innerHTML =
-    `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
-    `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
-  bindOnErrorHideHandlersWithin(strip);
-  const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
-  models.forEach((m, i) => {
-    const img = thumbs[i];
-    if (!(img instanceof HTMLImageElement)) return;
-    if (isHttpOrHttpsUrl(m.thumbSrc)) {
-      storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
-    }
+  paintTopSupportRankStyleIntoElement(strip, ctx.rooms, {
+    noteText: ctx.noteText,
+    unitSuffix: ctx.unitSuffix,
+    ariaLabel: ctx.ariaLabel,
+    isNorthStarBody: false
   });
 }
 
@@ -5811,38 +6483,50 @@ async function refreshGiftRankStrip(liveId) {
 function renderUserRooms(entries, liveId = '') {
   const ul = /** @type {HTMLUListElement} */ ($('userRoomList'));
   if (!ul) return;
-  // bundle 取得 → ランキング帯描画 → 5チップ/NDGRカード/参加バナーを公式値で再塗装、を直列で。
+  const lvPrimed = String(liveId || '').trim().toLowerCase();
+  // 同一 lv のコメント更新のたびに 6 レーンをローディングへ戻すと、データ⇔待機が点滅する。
+  // liveId が変わったときだけ bundle 反映前の同型シェルを張る。
+  if (lvPrimed) {
+    if (_northStarBundleLoadingShellLiveId !== lvPrimed) {
+      _northStarBundleLoadingShellLiveId = lvPrimed;
+      mountAllNorthStarLanesBundleLoadingUi(lvPrimed);
+    }
+  } else {
+    _northStarBundleLoadingShellLiveId = '';
+    void refreshAllNorthStarMirrorLanes('');
+  }
+  // bundle 取得 → 5チップ/NDGR/参加バナーを即塗装 → ランキング帯・北極星鏡（待ちが長い）→ prompt。
+  // 以前は北極星の await が先で、公式チップが数十秒〜1分「—」のままになることがあった。
   void (async () => {
     await refreshOfficialEventDomBundle(liveId);
+    {
+      const snap = watchMetaCache.snapshot;
+      if (snap) {
+        paintOfficialNicoStatsStrip(
+          /** @type {Record<string, unknown>} */ (snap)
+        );
+        paintOfficialNdgrGiftCard(
+          /** @type {Record<string, unknown>} */ (snap)
+        );
+        paintOfficialEventBannerCard(
+          /** @type {Record<string, unknown>} */ (snap)
+        );
+      } else {
+        paintOfficialEventBannerCard(null);
+      }
+    }
+    const snapMeta = watchMetaCache.snapshot;
+    if (snapMeta) {
+      renderWatchMetaCard(
+        /** @type {WatchPageSnapshot} */ (snapMeta),
+        Array.isArray(entries) ? entries : []
+      );
+    }
+    syncLiveStatThreeCardsCharLoadingOverlays();
     await refreshGiftRankStrip(liveId);
-    // v0.1.237: 北極星 +α 広告ランキングレーンを bundle.adRankingMirrorHtml から鏡描画
-    refreshNorthStarAdRankingLane();
-    // v0.1.240: 北極星 レーン 3 イベント累計スコア + レーン 5 イベント現在順位を
-    //   bundle.eventCumulativeScoreMirrorHtml / eventCurrentRankMirrorHtml から鏡描画
-    refreshNorthStarEventCumulativeScoreLane();
-    refreshNorthStarEventCurrentRankLane();
-    // v0.1.242: 北極星 レーン 4 番組累計ポイントを programStats.giftPoints から描画
-    refreshNorthStarProgramPointsLane();
-    // v0.1.244: 北極星 レーン 1 貢献度ランキング / レーン 2 ギフト履歴の reason 表示
-    //   (鏡レンダリングはまだ実装していないが、reason placeholder で「何故 missing か」が伝わる)
-    refreshNorthStarContributionRankingLane();
-    refreshNorthStarGiftHistoryLane();
+    await refreshAllNorthStarMirrorLanes(String(liveId || '').trim().toLowerCase());
     // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
     await refreshGiftRankingFetchPrompt(liveId);
-    const snap = watchMetaCache.snapshot;
-    if (snap) {
-      paintOfficialNicoStatsStrip(
-        /** @type {Record<string, unknown>} */ (snap)
-      );
-      paintOfficialNdgrGiftCard(
-        /** @type {Record<string, unknown>} */ (snap)
-      );
-      paintOfficialEventBannerCard(
-        /** @type {Record<string, unknown>} */ (snap)
-      );
-    } else {
-      paintOfficialEventBannerCard(null);
-    }
   })();
 
   const list = Array.isArray(entries) ? entries : [];
@@ -5864,16 +6548,20 @@ function renderUserRooms(entries, liveId = '') {
   const recentCounts = Array.from(recentMap.values());
   const totalRecent = recentCounts.reduce((sum, v) => sum + v, 0);
   const activeUsers = recentCounts.filter((v) => v > 0).length;
-  const heatPercent = totalRecent > 0 ? Math.min(100, Math.log10(totalRecent + 1) * 38) : 0;
+  const heatDisp = smoothRoomHeatDisplay(lvPrimed, totalRecent, activeUsers);
+  const heatPercent =
+    heatDisp.total > 0
+      ? Math.min(100, Math.log10(heatDisp.total + 1) * 38)
+      : 0;
   const heatText =
-    totalRecent >= 50
+    heatDisp.total >= 50
       ? '増加がとても大きい'
-      : totalRecent >= 20
+      : heatDisp.total >= 20
         ? '増加が大きい'
-        : totalRecent >= 5
+        : heatDisp.total >= 5
           ? '増加あり'
           : '増加は少なめ';
-  renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText);
+  renderRoomHeatSummary(heatDisp.total, heatDisp.active, heatPercent, heatText);
 
   // 0.1.78: コメ記録に焼き込まれた汚染 avatar の表示時補正
   //   過去のバージョンで保存された nls_comments_<liveId> に broadcaster icon が
@@ -7639,11 +8327,9 @@ async function applyLastBroadcastReviewToEmptyState() {
   const indicatorLeadEl = $('lastBroadcastIndicatorLead');
   const actionsEl = $('lastBroadcastActions');
   const reopenBtn = /** @type {HTMLButtonElement|null} */ ($('lastBroadcastReopenBtn'));
-  const liveStatComments = $('liveStatComments');
   const concurrentEst = $('watchConcurrentEst');
   const viewerDom = $('watchViewerDom');
   const concurrentSub = $('watchConcurrentSub');
-  const officialEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsOfficial'));
 
   // 0.1.70 (AZ): empty state は履歴あり/なしどちらでも nl-empty-state を必ず付け、
   //   active watch 用の UI（応援 hero / コメ送信欄 / heat / userRoomList / 各種 details）を
@@ -7706,28 +8392,15 @@ async function applyLastBroadcastReviewToEmptyState() {
       }
     }
 
-    // 記録カード（応援コメント数）。0.1.68 の is-placeholder トグルを意識して、
-    // 数字のときだけ class を外す。
-    if (liveStatComments) {
-      liveStatComments.textContent = view.commentStorageCount.toLocaleString('ja-JP');
-      liveStatComments.classList.remove('is-placeholder');
-    }
-    // 公式件数の補足行
-    if (officialEl) {
-      const oc = view.officialCommentCount;
-      if (typeof oc === 'number' && Number.isFinite(oc) && oc >= 0) {
-        const recorded = view.commentStorageCount;
-        let line = `公式 ${oc.toLocaleString('ja-JP')} 件`;
-        if (oc > 0 && recorded >= 0 && recorded <= oc) {
-          line += ` · 記録は公式の約${Math.round((recorded / oc) * 100)}%`;
-        }
-        officialEl.textContent = line;
-        officialEl.hidden = false;
-      } else {
-        officialEl.textContent = '';
-        officialEl.hidden = true;
-      }
-    }
+    // 記録カード + ヒーロー #count は setCountDisplay で二系統を常に同期（片方だけ更新事故防止）
+    /** @type {{ officialCommentCount: number }|null} */
+    const snapForOfficial =
+      typeof view.officialCommentCount === 'number' &&
+      Number.isFinite(view.officialCommentCount) &&
+      view.officialCommentCount >= 0
+        ? { officialCommentCount: view.officialCommentCount }
+        : null;
+    setCountDisplay(view.commentStorageCount, snapForOfficial);
 
     // 推定同時接続: peak を表示。null なら fallback（取得不可）に倒す。
     if (concurrentEst) {
@@ -7758,6 +8431,8 @@ async function applyLastBroadcastReviewToEmptyState() {
         viewerDom.classList.add('is-placeholder');
       }
     }
+
+    syncLiveStatThreeCardsCharLoadingOverlays();
 
     // 配信者 banner（既存 #casterBanner は display:none で固定なので、
     // ここでは動かさない。タイトルは indicator に出してユーザーに伝わる）
@@ -8655,7 +9330,9 @@ async function refresh() {
  */
 
 /**
- * 対象 watch と同じ lv のタブだけ集める（前面が別放送なら除外）
+ * 対象 watch と同じ lv のタブだけ集める（前面が別放送なら除外）。
+ * watchUrl が空でも `chrome.tabs.query({})` でニコ生 watch を列挙する（前面タブだけでは
+ * 候補ゼロになりやすい: 拡張ポップアップを開いたウィンドウの active がニコ生でない等）。
  * @param {string} watchUrl
  */
 async function collectWatchTabCandidates(watchUrl) {
@@ -8674,13 +9351,13 @@ async function collectWatchTabCandidates(watchUrl) {
 
   tryAdd(activeTab);
 
-  if (w) {
-    try {
-      const allTabs = await chrome.tabs.query({});
-      for (const tab of allTabs) tryAdd(tab);
-    } catch {
-      // tabs 権限なし
-    }
+  // watchUrl が空でも全タブを見る（前面がニコ生でない・別ウィンドウで開いている等）。
+  // AI 診断 JSON / スナップショット取得で「候補なし」になりやすい経路のため常にマージする。
+  try {
+    const allTabs = await chrome.tabs.query({});
+    for (const tab of allTabs) tryAdd(tab);
+  } catch {
+    // tabs 権限なし
   }
 
   return prioritizeWatchTabCandidates(out, w);
@@ -10405,17 +11082,56 @@ async function buildHtmlReportDocument(
 }
 
 /**
+ * disable / status 文言を先にペイントしてから重い処理に入る（体感ラグ軽減）。
+ * @returns {Promise<void>}
+ */
+function yieldToBrowserPaint() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve(undefined);
+      });
+    });
+  });
+}
+
+/**
+ * HTML レポート用: popup が既に持つ snapshot が watch と整合していれば
+ * タブへの NLS_EXPORT を省略（ダウンロード開始までの待ちを短縮）。
+ * @param {string} watchUrl
+ * @returns {Promise<{ snapshot: WatchPageSnapshot|null, error: string }>}
+ */
+async function resolveSnapshotForHtmlExport(watchUrl) {
+  const w = String(watchUrl || '').trim();
+  const snap = watchMetaCache.snapshot;
+  if (
+    w &&
+    snap &&
+    typeof snap === 'object' &&
+    snapshotLooksAlignedWithWatchUrl(snap, w, w)
+  ) {
+    return {
+      snapshot: /** @type {WatchPageSnapshot} */ (snap),
+      error: ''
+    };
+  }
+  return requestWatchPageSnapshotFromOpenTab(watchUrl);
+}
+
+/**
  * @param {string} liveId
  * @param {string} storageKey
  * @param {string} watchUrl
  */
 async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
-  const data = await chrome.storage.local.get(storageKey);
+  const [data, { snapshot, error }] = await Promise.all([
+    chrome.storage.local.get(storageKey),
+    resolveSnapshotForHtmlExport(watchUrl)
+  ]);
   const comments = Array.isArray(data[storageKey])
     ? /** @type {PopupCommentEntry[]} */ (data[storageKey])
     : [];
 
-  const { snapshot, error } = await requestWatchPageSnapshotFromOpenTab(watchUrl);
   const html = await buildHtmlReportDocument(
     comments,
     snapshot,
@@ -10525,8 +11241,8 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
 
 /**
  * ビルド反映確認バッジを塗る（chrome://extensions で「更新」済みかの確認用）。
- * 表示例: v0.1.5・b0415-2311
- * bMMDD-HHMM は scripts/build.mjs が esbuild --define で埋め込むビルド時刻（JST）。
+ * 表示例: v0.1.5・b0415-231145
+ * bMMDD-HHmmss は scripts/build.mjs が esbuild --define で埋め込むビルド時刻（JST）。
  * 新ビルドを当てたのに反映されていない時は「更新」を押してもここが変わらない。
  */
 function paintVersionBadge() {
@@ -10558,6 +11274,157 @@ function canUseFastAiShareDiagnostics(fastResolvedTabUrl, watchUrl) {
   if (!w) return true;
   if (!isNicoLiveWatchUrl(w) || !isNicoLiveWatchUrl(f)) return false;
   return watchPageUrlsMatchForSnapshot(f, w);
+}
+
+/**
+ * 開発者モニタ「AI 共有用」診断ペイロードを組み立てる（コピー / JSON DL 共用）。
+ * @param {string} watchUrl
+ * @returns {Promise<{ payload: Record<string, unknown>, lastErr: string, manifest: chrome.runtime.Manifest }>}
+ */
+async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
+  /** @type {Record<string, unknown>} */
+  const payload = {
+    popup: {
+      exportedAt: new Date().toISOString(),
+      embedded: (() => {
+        try {
+          return window.self !== window.top;
+        } catch {
+          return true;
+        }
+      })(),
+      watchSnapshotMeta: (() => {
+        const snap = watchMetaCache?.snapshot;
+        if (!snap || typeof snap !== 'object') return null;
+        if (!snapshotLooksAlignedWithWatchUrl(snap, watchUrl, watchUrl)) {
+          return null;
+        }
+        return {
+          liveId: String(snap.liveId || ''),
+          broadcasterUserId: String(snap.broadcasterUserId || ''),
+          broadcasterName: String(snap.broadcasterName || '').slice(0, 80),
+          broadcasterPageUrl: String(snap.broadcasterPageUrl || '').slice(0, 200),
+          viewerUserId: String(snap.viewerUserId || ''),
+          hasBroadcasterIconUrl: Boolean(
+            String(snap.broadcasterIconUrl || '').trim()
+          )
+        };
+      })()
+    },
+    content: null,
+    note:
+      'Chrome コンソールの ERR_BLOCKED_BY_CLIENT / 広告スクリプト失敗はブロッカー由来で多く、本拡張とは無関係なことがあります。'
+  };
+  const manifest = chrome.runtime.getManifest();
+  let lastErr = '';
+  let fastCache = null;
+  try {
+    const rb = await withTimeout(
+      chrome.storage.local.get([
+        KEY_INLINE_PANEL_PLACEMENT,
+        KEY_INLINE_PANEL_WIDTH_MODE
+      ]),
+      1200,
+      'ai_share_storage_readback_timeout'
+    );
+    payload.popup.storageReadback =
+      buildAiShareInlinePanelStorageReadback(rb);
+  } catch {
+    payload.popup.storageReadback = { error: 'storage_read_failed' };
+  }
+  try {
+    const fastBag = await withTimeout(
+      chrome.storage.local.get(KEY_AI_SHARE_FAST_DIAG),
+      1200,
+      'ai_share_fast_cache_timeout'
+    );
+    fastCache = fastBag?.[KEY_AI_SHARE_FAST_DIAG] || null;
+  } catch {
+    fastCache = null;
+  }
+  const fastContent =
+    fastCache &&
+    typeof fastCache === 'object' &&
+    !Array.isArray(fastCache) &&
+    fastCache.content &&
+    typeof fastCache.content === 'object'
+      ? fastCache.content
+      : null;
+  const resolvedFastUrl = String(fastCache?.resolvedTabUrl || '').trim();
+  if (fastContent && canUseFastAiShareDiagnostics(resolvedFastUrl, watchUrl)) {
+    payload.content = /** @type {Record<string, unknown>} */ (fastContent);
+    if (resolvedFastUrl) payload.resolvedTabUrl = resolvedFastUrl.slice(0, 240);
+    const persistedAt = String(fastCache?.persistedAt || '').trim();
+    if (persistedAt) payload.cachedAt = persistedAt;
+  } else if (fastContent && resolvedFastUrl) {
+    lastErr = `fast_diag_live_mismatch: ${resolvedFastUrl.slice(0, 140)}`;
+  }
+
+  if (!payload.content) {
+    const candidates = await withTimeout(
+      collectWatchTabCandidates(watchUrl),
+      8_000,
+      'collect_watch_tabs_timeout'
+    );
+    if (!candidates.length) {
+      lastErr = 'watch タブ候補なし（ニコ生 watch を開いた状態で試してください）';
+    } else {
+      for (const c of candidates) {
+        try {
+          const rankedRaw = await listWatchFramesWithInnerText(c.id);
+          const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
+          const tried = new Set();
+          const tryOrder = [...ranked.map((r) => r.frameId), 0];
+
+          let accepted = false;
+          for (const fid of tryOrder) {
+            if (tried.has(fid)) continue;
+            tried.add(fid);
+            try {
+              const res = /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string, liveId?: string, frameHref?: string }} */ (
+                await withTimeout(
+                  tabsSendMessageWithRetry(
+                    c.id,
+                    { type: 'NLS_AI_SHARE_PAGE_DIAGNOSTICS' },
+                    { frameId: fid, maxAttempts: 8, delayMs: 80 }
+                  ),
+                  6_500,
+                  'diag_send_timeout'
+                )
+              );
+              if (res?.ok && res.diagnostics) {
+                if (!responseAlignedWithWatchUrl(res, watchUrl)) {
+                  lastErr = `live_mismatch (resp=${String(res.liveId || '')}, frameId=${fid})`;
+                  continue;
+                }
+                payload.content = /** @type {Record<string, unknown>} */ (res.diagnostics);
+                payload.resolvedTabUrl = String(c.url || '').slice(0, 240);
+                lastErr = '';
+                accepted = true;
+                break;
+              }
+              if (res) lastErr = String(res.error || `frameId=${fid} で ok を返しませんでした`);
+            } catch (innerErr) {
+              lastErr = String(
+                innerErr && typeof innerErr === 'object' && 'message' in innerErr
+                  ? /** @type {{ message?: unknown }} */ (innerErr).message
+                  : innerErr || 'send_failed'
+              );
+            }
+          }
+          if (accepted) break;
+        } catch (e) {
+          lastErr = String(
+            e && typeof e === 'object' && 'message' in e
+              ? /** @type {{ message?: unknown }} */ (e).message
+              : e || 'frame_enumeration_failed'
+          );
+        }
+      }
+    }
+  }
+  payload.diagSchemaVersion = AI_SHARE_DIAG_SCHEMA_VERSION;
+  return { payload, lastErr, manifest };
 }
 
 /**
@@ -10713,10 +11580,58 @@ async function runOneTimeBackfillRemoveRecommendedLivePollutionV2() {
   }
 }
 
+/**
+ * 「おすすめユーザー」チップ由来の誤記録（本文が userId / u/userId のみ等）を
+ * 1 回だけ除去する migration。v1/v2 済みユーザー向けにフラグを分離。
+ */
+const KEY_BACKFILL_REMOVE_RECOMMENDED_USER_CHIP_POLLUTION_V1_DONE =
+  'nls_backfill_remove_recommended_user_chip_pollution_v1';
+async function runOneTimeBackfillRemoveRecommendedUserChipPollution() {
+  const local = globalThis.chrome?.storage?.local;
+  if (!local) return;
+  try {
+    const flagBag = await local.get(
+      KEY_BACKFILL_REMOVE_RECOMMENDED_USER_CHIP_POLLUTION_V1_DONE
+    );
+    if (flagBag?.[KEY_BACKFILL_REMOVE_RECOMMENDED_USER_CHIP_POLLUTION_V1_DONE]) return;
+
+    const all = await local.get(null);
+    let totalRemoved = 0;
+    /** @type {Record<string, unknown>} */
+    const updates = {};
+    for (const [key, value] of Object.entries(all)) {
+      if (!key.startsWith('nls_comments_lv')) continue;
+      const r = backfillRemoveRecommendedUserChipPollution(value);
+      if (r.removedCount > 0) {
+        updates[key] = r.cleaned;
+        totalRemoved += r.removedCount;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await local.set(updates);
+    }
+    await local.set({
+      [KEY_BACKFILL_REMOVE_RECOMMENDED_USER_CHIP_POLLUTION_V1_DONE]: {
+        at: new Date().toISOString(),
+        removedCount: totalRemoved,
+        version: 'recommended-user-chip-v1'
+      }
+    });
+    if (totalRemoved > 0) {
+      console.log(
+        `[nls-migration] removed ${totalRemoved} recommended-user-chip pollution row(s) from comment records`
+      );
+    }
+  } catch (e) {
+    console.warn('[nls-migration] backfill (recommended-user-chip) skipped:', e);
+  }
+}
+
 function initPopup() {
   void runOneTimeBackfillRemoveGiftSystemMessages();
   void runOneTimeBackfillRemoveRecommendedLivePollution();
   void runOneTimeBackfillRemoveRecommendedLivePollutionV2();
+  void runOneTimeBackfillRemoveRecommendedUserChipPollution();
   installExtensionContextErrorGuard();
   initOfflineBannerOnce();
   paintVersionBadge();
@@ -10859,143 +11774,9 @@ function initPopup() {
     }
     if (stEl) stEl.textContent = '収集中…';
     else setPostStatus('診断データを収集中…', 'idle');
-    let lastErr = '';
-    /** @type {Record<string, unknown>} */
-    const payload = {
-      popup: {
-        exportedAt: new Date().toISOString(),
-        embedded: (() => {
-          try {
-            return window.self !== window.top;
-          } catch {
-            return true;
-          }
-        })(),
-        // 0.1.96: lane / rank strip のフィルタが正しく効いているかを判定するため、
-        //   snapshot の broadcaster / viewer 識別子を診断バンドルに含める。
-        //   uid 一致比較でしか除外できないので、これが空 / 不一致 だとフィルタは
-        //   no-op になる。診断時の根拠として読めるようにする。
-        watchSnapshotMeta: (() => {
-          const snap = watchMetaCache?.snapshot;
-          if (!snap || typeof snap !== 'object') return null;
-          if (!snapshotLooksAlignedWithWatchUrl(snap, watchUrl, watchUrl)) {
-            return null;
-          }
-          return {
-            liveId: String(snap.liveId || ''),
-            broadcasterUserId: String(snap.broadcasterUserId || ''),
-            broadcasterName: String(snap.broadcasterName || '').slice(0, 80),
-            broadcasterPageUrl: String(snap.broadcasterPageUrl || '').slice(0, 200),
-            viewerUserId: String(snap.viewerUserId || ''),
-            hasBroadcasterIconUrl: Boolean(
-              String(snap.broadcasterIconUrl || '').trim()
-            )
-          };
-        })()
-      },
-      content: null,
-      note:
-        'Chrome コンソールの ERR_BLOCKED_BY_CLIENT / 広告スクリプト失敗はブロッカー由来で多く、本拡張とは無関係なことがあります。'
-    };
     try {
-      /** まず content 側の高速キャッシュを読む（タイムアウト回避） */
-      let fastCache = null;
-      try {
-        const fastBag = await withTimeout(
-          chrome.storage.local.get(KEY_AI_SHARE_FAST_DIAG),
-          1200,
-          'ai_share_fast_cache_timeout'
-        );
-        fastCache = fastBag?.[KEY_AI_SHARE_FAST_DIAG] || null;
-      } catch {
-        fastCache = null;
-      }
-      const fastContent =
-        fastCache &&
-        typeof fastCache === 'object' &&
-        !Array.isArray(fastCache) &&
-        fastCache.content &&
-        typeof fastCache.content === 'object'
-          ? fastCache.content
-          : null;
-      const resolvedFastUrl = String(fastCache?.resolvedTabUrl || '').trim();
-      if (fastContent && canUseFastAiShareDiagnostics(resolvedFastUrl, watchUrl)) {
-        payload.content = /** @type {Record<string, unknown>} */ (fastContent);
-        if (resolvedFastUrl) payload.resolvedTabUrl = resolvedFastUrl.slice(0, 240);
-        const persistedAt = String(fastCache?.persistedAt || '').trim();
-        if (persistedAt) payload.cachedAt = persistedAt;
-      } else if (fastContent && resolvedFastUrl) {
-        lastErr = `fast_diag_live_mismatch: ${resolvedFastUrl.slice(0, 140)}`;
-      }
-
-      const manifest = chrome.runtime.getManifest();
-      if (!payload.content) {
-        const candidates = await withTimeout(
-          collectWatchTabCandidates(watchUrl),
-          8_000,
-          'collect_watch_tabs_timeout'
-        );
-        if (!candidates.length) {
-          lastErr = 'watch タブ候補なし（ニコ生 watch を開いた状態で試してください）';
-        } else {
-          for (const c of candidates) {
-            try {
-              // v0.1.195 (P0-2): frameId=0 固定 → watch 一致フレーム優先
-              // NLS_EXPORT_INTERCEPT_CACHE と同じ tryOrder パターン
-              const rankedRaw = await listWatchFramesWithInnerText(c.id);
-              const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
-              const tried = new Set();
-              const tryOrder = [...ranked.map((r) => r.frameId), 0];
-
-              let accepted = false;
-              for (const fid of tryOrder) {
-                if (tried.has(fid)) continue;
-                tried.add(fid);
-                try {
-                  const res = /** @type {{ ok?: boolean, diagnostics?: unknown, error?: string, liveId?: string, frameHref?: string }} */ (
-                    await withTimeout(
-                      tabsSendMessageWithRetry(
-                        c.id,
-                        { type: 'NLS_AI_SHARE_PAGE_DIAGNOSTICS' },
-                        { frameId: fid, maxAttempts: 8, delayMs: 80 }
-                      ),
-                      6_500,
-                      'diag_send_timeout'
-                    )
-                  );
-                  if (res?.ok && res.diagnostics) {
-                    // 0.1.178: liveId 整合ガード — 別 live のタブから返ってきたら破棄
-                    if (!responseAlignedWithWatchUrl(res, watchUrl)) {
-                      lastErr = `live_mismatch (resp=${String(res.liveId || '')}, frameId=${fid})`;
-                      continue;
-                    }
-                    payload.content = /** @type {Record<string, unknown>} */ (res.diagnostics);
-                    payload.resolvedTabUrl = String(c.url || '').slice(0, 240);
-                    lastErr = '';
-                    accepted = true;
-                    break;
-                  }
-                  if (res) lastErr = String(res.error || `frameId=${fid} で ok を返しませんでした`);
-                } catch (innerErr) {
-                  // フレーム単位の失敗は次フレームで補える可能性があるので継続
-                  lastErr = String(
-                    innerErr && typeof innerErr === 'object' && 'message' in innerErr
-                      ? /** @type {{ message?: unknown }} */ (innerErr).message
-                      : innerErr || 'send_failed'
-                  );
-                }
-              }
-              if (accepted) break;
-            } catch (e) {
-              lastErr = String(
-                e && typeof e === 'object' && 'message' in e
-                  ? /** @type {{ message?: unknown }} */ (e).message
-                  : e || 'frame_enumeration_failed'
-              );
-            }
-          }
-        }
-      }
+      const { payload, lastErr, manifest } =
+        await collectAiShareDevMonitorPayloadBundle(watchUrl);
       const md = formatAiShareDiagnosticsMarkdown({
         extensionName: manifest.name,
         extensionVersion: manifest.version,
@@ -11027,6 +11808,7 @@ function initPopup() {
       );
       if (isExtensionContextInvalidatedError(msg)) {
         const fallbackPayload = {
+          diagSchemaVersion: AI_SHARE_DIAG_SCHEMA_VERSION,
           popup: {
             exportedAt: new Date().toISOString(),
             embedded: (() => {
@@ -11086,6 +11868,76 @@ function initPopup() {
       }
     } finally {
       if (aiCopyBtn) aiCopyBtn.disabled = false;
+    }
+  });
+
+  $('devMonitorDownloadAiBundleBtn')?.addEventListener('click', async () => {
+    const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
+    const dlBtn = /** @type {HTMLButtonElement|null} */ ($('devMonitorDownloadAiBundleBtn'));
+    if (dlBtn) dlBtn.disabled = true;
+    const exportBtn = /** @type {HTMLButtonElement|null} */ ($('exportJson'));
+    let watchUrl = String(exportBtn?.dataset.watchUrl || '').trim();
+    if (!watchUrl) {
+      try {
+        const bag = await chrome.storage.local.get(KEY_LAST_WATCH_URL);
+        watchUrl = String(bag[KEY_LAST_WATCH_URL] || '').trim();
+      } catch {
+        watchUrl = '';
+      }
+    }
+    if (stEl) stEl.textContent = '診断JSONを準備中…';
+    let objectUrl = '';
+    try {
+      const { payload, lastErr } =
+        await collectAiShareDevMonitorPayloadBundle(watchUrl);
+      if (lastErr && !payload.content) {
+        /** @type {Record<string, unknown>} */ (payload).diagCollectLastError =
+          lastErr;
+      }
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+      objectUrl = URL.createObjectURL(blob);
+      const meta = /** @type {any} */ (payload).popup?.watchSnapshotMeta;
+      const lvRaw = meta && typeof meta.liveId === 'string' ? meta.liveId : '';
+      const lv = String(lvRaw || 'unknown')
+        .replace(/[^\w.-]+/g, '')
+        .slice(0, 32);
+      const fname = `nicolivelog-ai-diag-${lv || 'unknown'}-${Date.now()}.json`;
+      await chrome.downloads.download({
+        url: objectUrl,
+        filename: fname,
+        saveAs: true
+      });
+      // revoke が早すぎると保存ダイアログ表示前に blob が死ぬ端末があるため遅延する
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch {
+          /* noop */
+        }
+      }, 120_000);
+      if (stEl) {
+        stEl.textContent =
+          lastErr && !payload.content
+            ? `保存ダイアログを開きました（watch 詳細は未取得。JSON 内 diagCollectLastError を参照）`
+            : '保存ダイアログを開きました（JSON）';
+      }
+    } catch (e) {
+      if (objectUrl) {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch {
+          /* noop */
+        }
+      }
+      const msg = String(
+        e && typeof e === 'object' && 'message' in e
+          ? /** @type {{ message?: unknown }} */ (e).message
+          : e || 'download_failed'
+      );
+      if (stEl) stEl.textContent = `JSON保存に失敗: ${msg}`;
+    } finally {
+      if (dlBtn) dlBtn.disabled = false;
     }
   });
 
@@ -11175,6 +12027,7 @@ function initPopup() {
     if (btn) btn.disabled = true;
     if (stEl) stEl.textContent = '分析中…';
     try {
+      await yieldToBrowserPaint();
       const sKey = commentsStorageKey(lid);
       const gKey = giftUsersStorageKey(lid);
       const data = await withTimeout(
@@ -11200,38 +12053,43 @@ function initPopup() {
       });
       const maskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
       const maskShare = Boolean(maskEl?.checked);
-      // 0.1.22 (W): 同接推移カーブ用のサンプル行を IDB から取得。失敗しても本体出力は継続。
-      let sessionSummaryRows = [];
-      try {
-        const db = await openBroadcastSessionSummaryDb();
-        sessionSummaryRows = await listBroadcastSessionSummaryForLive(db, lid, 200);
-      } catch {
-        // DB が無い / 失敗しても本体は通す
-      }
-      // 0.1.23 (X): 過去 N 配信のコメントを横断分析するため最大 10 件分を読み込む。
-      // 0.1.30 (AE): broadcastSessionSummary IDB の byCapturedAt index で
-      // 直近 unique liveId を 10 件抜き、`nls_comments_<lid>` キーだけを
-      // 明示的に get する。旧実装の `storage.local.get(null)` で全 storage を
-      // 読み込む方式は 200+ 配信あるユーザでメモリを浪費していた。
-      const pastBroadcasts = [];
-      try {
-        const sumDb = await openBroadcastSessionSummaryDb();
-        const recentLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
-          limit: 10,
-          excludeLiveId: lid
-        });
-        if (recentLiveIds.length) {
-          const keys = recentLiveIds.map((id) => `nls_comments_${id}`);
-          const bag = await chrome.storage.local.get(keys);
-          for (const id of recentLiveIds) {
-            const k = `nls_comments_${id}`;
-            const cs = Array.isArray(bag[k]) ? bag[k] : [];
-            if (cs.length) pastBroadcasts.push({ liveId: id, comments: cs });
-          }
-        }
-      } catch {
-        // IDB / storage 失敗 → 過去配信無しで続行
-      }
+      // 0.1.22〜0.1.30: 同接サンプル / 過去配信 / 公式 DOM bundle / ゆっくり画像は互いに独立なので
+      // 直列 await せず Promise.all で並列化（DL 開始までの体感ラグを短縮）。
+      const [sessionSummaryRows, pastBroadcasts, bundleForMkt, yukkuriImageMapForMkt] =
+        await Promise.all([
+          (async () => {
+            try {
+              const db = await openBroadcastSessionSummaryDb();
+              return await listBroadcastSessionSummaryForLive(db, lid, 200);
+            } catch {
+              return [];
+            }
+          })(),
+          (async () => {
+            try {
+              const sumDb = await openBroadcastSessionSummaryDb();
+              const recentLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
+                limit: 10,
+                excludeLiveId: lid
+              });
+              if (!recentLiveIds.length) return [];
+              const keys = recentLiveIds.map((id) => `nls_comments_${id}`);
+              const bag = await chrome.storage.local.get(keys);
+              /** @type {{ liveId: string, comments: import('../lib/commentRecord.js').StoredComment[] }[]} */
+              const out = [];
+              for (const id of recentLiveIds) {
+                const k = `nls_comments_${id}`;
+                const cs = Array.isArray(bag[k]) ? bag[k] : [];
+                if (cs.length) out.push({ liveId: id, comments: cs });
+              }
+              return out;
+            } catch {
+              return [];
+            }
+          })(),
+          readOfficialEventDomBundleFromStorage(lid),
+          buildYukkuriImageDataUrlMap()
+        ]);
       // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
       // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
       // ユーザーの opt-out が尊重される）。
@@ -11239,8 +12097,6 @@ function initPopup() {
       // snapshot.broadcasterUserId を thread。空文字なら影響なし（互換）。
       // niconico DOM から掬った正本値（番組統計5値・参加イベント・貢献度ランキング）も
       // ゆっくり解説の素材として渡す。無ければマーケ分析側で最小構成にフォールバック。
-      const bundleForMkt = await readOfficialEventDomBundleFromStorage(lid);
-      const yukkuriImageMapForMkt = await buildYukkuriImageDataUrlMap();
       const html = buildMarketingDashboardHtml(report, {
         maskShareLabels: maskShare,
         anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
@@ -11473,53 +12329,58 @@ function initPopup() {
     }
   });
 
+  const persistInlinePanelStorageWriteFailure = async (kind) => {
+    const lid = String(viewerLvForError || resolvedLv || '')
+      .trim()
+      .toLowerCase();
+    try {
+      await chrome.storage.local.set({
+        [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(
+          lid || null,
+          new Error(buildInlinePanelStorageSetFailedMessage(kind))
+        )
+      });
+    } catch {
+      //
+    }
+    safeRefresh();
+  };
+
   const saveInlinePanelWidthMode = async (value) => {
-    const v =
-      value === INLINE_PANEL_WIDTH_VIDEO
-        ? INLINE_PANEL_WIDTH_VIDEO
-        : INLINE_PANEL_WIDTH_PLAYER_ROW;
-    const ok = await storageSetSafe({ [KEY_INLINE_PANEL_WIDTH_MODE]: v });
-    if (!ok) return;
+    const ok = await storageSetSafe(storagePatchInlinePanelWidthMode(value));
+    if (!ok) {
+      void persistInlinePanelStorageWriteFailure('width_mode');
+      return;
+    }
     safeRefresh();
   };
 
   const saveInlinePanelViewportWidePolicy = async (value) => {
-    const v =
-      value === INLINE_PANEL_VIEWPORT_WIDE_ALWAYS
-        ? INLINE_PANEL_VIEWPORT_WIDE_ALWAYS
-        : value === INLINE_PANEL_VIEWPORT_WIDE_ONCE
-          ? INLINE_PANEL_VIEWPORT_WIDE_ONCE
-          : INLINE_PANEL_VIEWPORT_WIDE_OFF;
-    const patch = {
-      [KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY]: v,
-      [KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]: false
-    };
-    const ok = await storageSetSafe(patch);
-    if (!ok) return;
+    const ok = await storageSetSafe(
+      storagePatchInlinePanelViewportWidePolicy(value)
+    );
+    if (!ok) {
+      void persistInlinePanelStorageWriteFailure('viewport_wide_policy');
+      return;
+    }
     safeRefresh();
   };
 
   const saveInlinePanelPlacement = async (value) => {
-    const v =
-      value === INLINE_PANEL_PLACEMENT_BESIDE
-        ? INLINE_PANEL_PLACEMENT_BESIDE
-        : value === INLINE_PANEL_PLACEMENT_FLOATING
-          ? INLINE_PANEL_PLACEMENT_FLOATING
-          : value === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
-            ? INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
-            : INLINE_PANEL_PLACEMENT_BELOW;
-    const ok = await storageSetSafe({ [KEY_INLINE_PANEL_PLACEMENT]: v });
-    if (!ok) return;
+    const ok = await storageSetSafe(storagePatchInlinePanelPlacement(value));
+    if (!ok) {
+      void persistInlinePanelStorageWriteFailure('placement');
+      return;
+    }
     safeRefresh();
   };
 
   const saveInlineFloatingAnchor = async (value) => {
-    const v =
-      value === INLINE_FLOATING_ANCHOR_BOTTOM_LEFT
-        ? INLINE_FLOATING_ANCHOR_BOTTOM_LEFT
-        : INLINE_FLOATING_ANCHOR_TOP_RIGHT;
-    const ok = await storageSetSafe({ [KEY_INLINE_FLOATING_ANCHOR]: v });
-    if (!ok) return;
+    const ok = await storageSetSafe(storagePatchInlineFloatingAnchor(value));
+    if (!ok) {
+      void persistInlinePanelStorageWriteFailure('floating_anchor');
+      return;
+    }
     safeRefresh();
   };
 
@@ -11805,13 +12666,23 @@ function initPopup() {
      *   かかるので、終わるまでボタンを disable する。これがないと連打で
      *   並行ダウンロード + Blob URL リーク + 同名ファイル連番が発生する。
      */
+    const postStatus = /** @type {HTMLElement|null} */ ($('postStatus'));
+    const prevPostStatus = postStatus ? postStatus.textContent : '';
     exportBtn.disabled = true;
+    exportBtn.setAttribute('aria-busy', 'true');
+    if (postStatus) postStatus.textContent = 'HTML レポートを準備しています…';
     try {
+      await yieldToBrowserPaint();
       await downloadCommentsHtml(lv, key, watchUrl);
+      if (postStatus) postStatus.textContent = 'ダウンロードを開始しました';
     } catch {
-      // no-op
+      if (postStatus) postStatus.textContent = 'HTML の保存に失敗しました';
     } finally {
+      exportBtn.removeAttribute('aria-busy');
       exportBtn.disabled = false;
+      window.setTimeout(() => {
+        if (postStatus) postStatus.textContent = prevPostStatus;
+      }, 2800);
     }
   });
 

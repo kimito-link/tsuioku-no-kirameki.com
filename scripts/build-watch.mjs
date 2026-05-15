@@ -8,7 +8,8 @@ function buildIdJst() {
   const dd = String(now.getUTCDate()).padStart(2, '0');
   const hh = String(now.getUTCHours()).padStart(2, '0');
   const mi = String(now.getUTCMinutes()).padStart(2, '0');
-  return `${mm}${dd}-${hh}${mi}`;
+  const ss = String(now.getUTCSeconds()).padStart(2, '0');
+  return `${mm}${dd}-${hh}${mi}${ss}`;
 }
 const BUILD_ID = buildIdJst();
 

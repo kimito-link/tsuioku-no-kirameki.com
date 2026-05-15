@@ -64,7 +64,7 @@ describe('buildOfficialNicoStatsStripDigest', () => {
     expect(d.summaryText).toContain('タップ');
   });
 
-  it('snapshot が *Ndgr 命名を持つ場合（WIP 後の現行命名）でも値を拾う', () => {
+  it('snapshot が *Ndgr 命名でもイベント順位チップは NDGR 単独では埋めない', () => {
     const d = buildOfficialNicoStatsStripDigest({
       liveId: 'lv350457157',
       officialViewerCount: 1234,
@@ -77,7 +77,7 @@ describe('buildOfficialNicoStatsStripDigest', () => {
     expect(d).not.toBeNull();
     expect(d.adPts.text).toBe('2,500');
     expect(d.giftPts.text).toBe('100');
-    expect(d.eventRank.text).toBe('50位');
+    expect(d.eventRank.isPlaceholder).toBe(true);
     expect(d.eventGiftPts.isPlaceholder).toBe(true);
     expect(d.eventTitle.isPlaceholder).toBe(true);
   });

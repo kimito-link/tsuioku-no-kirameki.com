@@ -9,6 +9,7 @@ describe('formatAiShareDiagnosticsMarkdown', () => {
       watchUrlNote: 'テスト',
       lastSendMessageError: '',
       payload: {
+        diagSchemaVersion: '1.1',
         meta: {
           ok: true,
           extensionVersion: '0.1.157',
@@ -33,6 +34,7 @@ describe('formatAiShareDiagnosticsMarkdown', () => {
     });
     expect(md).toContain('## nicolivelog 診断バンドル');
     expect(md).toContain('### 要約');
+    expect(md).toContain('診断スキーマ: `1.1`');
     expect(md).toContain('### 完全 JSON');
     expect(md).toContain('```json');
     expect(md).toContain('https://live.nicovideo.jp/watch/lv123');

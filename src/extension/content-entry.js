@@ -80,9 +80,11 @@ import {
   hasContributionRankingDomSignal,
   scrapeOfficialEventBannerFromDom
 } from '../lib/officialEventBannerDom.js';
+import { findGiftSidebarRankTabElement } from '../lib/giftSidebarRankTabPick.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
 import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
 import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
+import { resolveGiftRelayStorageLiveId } from '../lib/giftRelayStorageLiveId.js';
 import {
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
@@ -167,6 +169,7 @@ import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import {
   computeInlinePanelLayout,
   effectiveInlinePanelPlacement,
+  INLINE_VIEWPORT_BESIDE_MIN_WIDTH,
   selectBestPlayerRectIndex
 } from '../lib/inlinePanelLayout.js';
 import {
@@ -216,7 +219,7 @@ import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { isInsideRecommendedLiveSection } from '../lib/isInsideRecommendedLiveSection.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { recordDiagnosticException } from '../lib/diagnosticRingStore.js';
-import { isRecommendedLivePollutionRow } from '../lib/backfillRemoveRecommendedLivePollution.js';
+import { isCommentUiScraperPollutionRow } from '../lib/backfillRemoveRecommendedLivePollution.js';
 import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
 import {
@@ -1949,7 +1952,10 @@ window.addEventListener('message', (e) => {
     const _cur = _giftSubAppRelayDiagState.iframeRelayMessagesByFrameUrl[_diagFrameUrl] || 0;
     _giftSubAppRelayDiagState.iframeRelayMessagesByFrameUrl[_diagFrameUrl] = _cur + 1;
   }
-  const lid = String(liveId || '').trim().toLowerCase();
+  // watch 文脈の liveId がまだ null のとき relay だけ先に届くと、ここで return して
+  // nls_gift_history_throws_* が一度も書けない（北極星ギフト履歴が空のまま）問題があった。
+  // frameUrl に含まれる lv をフォールバックする（giftRelayStorageLiveId.js）。
+  const lid = resolveGiftRelayStorageLiveId(liveId, e.data.frameUrl);
   if (!lid || !hasExtensionContext()) return;
 
   // 1. gift 履歴 (v0.1.216): items を全置換で集計
@@ -2091,6 +2097,10 @@ let pageFrameLayoutDebounceTimer = null;
 let pageFrameLayoutScrollRafId = null;
 /** 非可視時 livePanelScan の間引き位相（0..stride-1 で 0 のときだけ実行） */
 let hiddenLivePanelScanPhase = 0;
+/** 非可視時 pageFrame メンテ（ended 検知・診断書き込み等）の間引き位相 */
+let hiddenPageFrameMaintenancePhase = 0;
+/** 非可視時 liveId 同期の間引き位相（SPA 切替は可視復帰で補正される想定） */
+let hiddenLiveIdPollPhase = 0;
 let aiShareFastDiagLastPersistAt = 0;
 
 /** @param {string} id */
@@ -2529,11 +2539,10 @@ function ensureInlinePanelCloseButton(host) {
     ].join(';');
     btn.addEventListener('click', () => {
       try {
-        host.style.display = 'none';
-        host.style.opacity = '0';
-        host.setAttribute('aria-hidden', 'true');
-        host.style.pointerEvents = 'none';
         toolbarInitiatedShowThisSession = false;
+        // 手動 close は hidePageFrameOverlay に寄せ、stableFrameTarget 掃除と
+        // iframe visibility タイマ解除を常に揃える（閉じた直後の再オープン安定化）。
+        hidePageFrameOverlay();
       } catch {
         // no-op
       }
@@ -2848,6 +2857,30 @@ let inlinePanelWidthMode = normalizeInlinePanelWidthMode(undefined);
 /** インラインパネル配置（below＝プレイヤー行の下・beside＝親 flex 任せ） */
 let inlinePanelPlacementMode = normalizeInlinePanelPlacement(undefined);
 
+/**
+ * AI 診断用: `renderInlineHostAnchoredToVideo` 直近で確定したレイアウト実効値。
+ * ストレージの widthMode とは異なり、列間挿入時の強制 video 幅などが分かる。
+ */
+const nlsInlinePanelLayoutRenderSnapshot = {
+  besideFlexRowColumnRuntime: false,
+  belowWideRowChosen: false,
+  effectiveLayoutWidthMode: /** @type {'video'|'player_row'|null} */ (null),
+  capturedAtMs: 0
+};
+
+/**
+ * @param {boolean} bes
+ * @param {boolean} belowWide
+ * @param {'video'|'player_row'|null|undefined} effMode
+ */
+function publishInlinePanelLayoutRenderSnapshot(bes, belowWide, effMode) {
+  nlsInlinePanelLayoutRenderSnapshot.besideFlexRowColumnRuntime = Boolean(bes);
+  nlsInlinePanelLayoutRenderSnapshot.belowWideRowChosen = Boolean(belowWide);
+  nlsInlinePanelLayoutRenderSnapshot.effectiveLayoutWidthMode =
+    effMode === 'video' || effMode === 'player_row' ? effMode : null;
+  nlsInlinePanelLayoutRenderSnapshot.capturedAtMs = Date.now();
+}
+
 /** floating 時の画面角（top_right＝従来・bottom_left＝左下固定） */
 let inlineFloatingAnchor = normalizeInlineFloatingAnchor(undefined);
 
@@ -2964,10 +2997,7 @@ function resolveInlinePanelInsertAnchor(domAnchor, placement) {
   }
   try {
     const cs = window.getComputedStyle(rowLikeEl);
-    const isRowFlex =
-      cs.display === 'flex' &&
-      (cs.flexDirection === 'row' || cs.flexDirection === 'row-reverse');
-    if (isRowFlex) {
+    if (isComputedRowFlexContainer(cs)) {
       const rowHostParent = insertionParentForElement(rowLikeEl);
       if (rowHostParent) {
         return { insertAfter: rowLikeEl, hostParent: rowHostParent };
@@ -2983,6 +3013,107 @@ function resolveInlinePanelInsertAnchor(domAnchor, placement) {
 }
 
 /**
+ * 横並びの flex / inline-flex コンテナか（本家 watch は `inline-flex` の視聴行がある）。
+ * @param {CSSStyleDeclaration} cs
+ */
+function isComputedRowFlexContainer(cs) {
+  try {
+    const disp = String(cs.display || '');
+    if (
+      disp !== 'flex' &&
+      disp !== 'inline-flex' &&
+      disp !== '-webkit-flex' &&
+      disp !== '-webkit-inline-flex'
+    ) {
+      return false;
+    }
+    const fd = String(cs.flexDirection || 'row');
+    return fd === 'row' || fd === 'row-reverse';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `node.parentElement === 行` の段階で拾えない入れ子向け。動画を含む行子の後続兄弟に
+ * `findNicoCommentPanel` が含まれる flex 行だけ採用する。
+ * @param {HTMLVideoElement} video
+ * @param {number} minRowW
+ * @returns {{ insertAfter: HTMLElement, hostParent: ParentNode }|null}
+ */
+function findBesideFlexRowColumnInsertionByCommentPanel(video, minRowW) {
+  if (!(video instanceof HTMLElement)) return null;
+  let panel = null;
+  try {
+    panel = findNicoCommentPanel(document);
+  } catch {
+    return null;
+  }
+  if (!(panel instanceof HTMLElement)) return null;
+
+  let el = video.parentElement;
+  for (let depth = 0; depth < 28 && el && el !== document.body; depth++) {
+    try {
+      const cs = window.getComputedStyle(el);
+      const flexWrapRaw = cs.flexWrap || 'nowrap';
+      if (!isComputedRowFlexContainer(cs)) {
+        el = el.parentElement;
+        continue;
+      }
+      const wrapStrict =
+        flexWrapRaw === 'nowrap' ||
+        flexWrapRaw === 'wrap' ||
+        flexWrapRaw === 'wrap-reverse';
+      if (!wrapStrict) {
+        el = el.parentElement;
+        continue;
+      }
+      if (el.children.length < 2) {
+        el = el.parentElement;
+        continue;
+      }
+      const rr = el.getBoundingClientRect();
+      if (rr.width < minRowW) {
+        el = el.parentElement;
+        continue;
+      }
+      /** @type {HTMLElement|null} */
+      let videoCol = null;
+      for (let i = 0; i < el.children.length; i++) {
+        const c = el.children[i];
+        if (c instanceof HTMLElement && c.contains(video)) {
+          videoCol = c;
+          break;
+        }
+      }
+      if (!videoCol) {
+        el = el.parentElement;
+        continue;
+      }
+      if (flexWrapRaw !== 'nowrap' && !videoCol.nextElementSibling) {
+        el = el.parentElement;
+        continue;
+      }
+      if (videoCol.contains(panel)) {
+        el = el.parentElement;
+        continue;
+      }
+      let sib = videoCol.nextElementSibling;
+      while (sib) {
+        if (sib instanceof HTMLElement && sib.contains(panel)) {
+          return { insertAfter: videoCol, hostParent: el };
+        }
+        sib = sib.nextElementSibling;
+      }
+    } catch {
+      // no-op
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+
+/**
  * 横付き: `<video>` の直後だとプレイヤー内ラッパー（overflow 等）に閉じ込められ見えないことがある。
  * 視聴行の flex で「動画側カラム」（video を含む直接の子ブロック）の次へ出す。
  * @param {HTMLVideoElement} video
@@ -2991,7 +3122,12 @@ function resolveInlinePanelInsertAnchor(domAnchor, placement) {
 function findBesideFlexRowColumnInsertion(video) {
   if (!(video instanceof HTMLElement)) return null;
   const vw = nlsLayoutViewportSize().innerWidth;
-  const minRowW = Math.min(720, Math.max(400, vw * 0.46));
+  /*
+   * 極端に広いタブでは旧式 min(720, vw*0.46) が「実 DOM の視聴行幅」より厳しくなり、
+   * 横付き用 flex 行を見逃して video 直後（縦積み列内）へ落ちることがある。
+   * 下限は狭いタブでの誤検出を避けるため維持しつつ、上限と係数を緩める。
+   */
+  const minRowW = Math.min(680, Math.max(300, Math.round(vw * 0.26)));
   let node = video;
   for (let depth = 0; depth < 24 && node && node !== document.body; depth++) {
     const parent = node.parentElement;
@@ -2999,29 +3135,43 @@ function findBesideFlexRowColumnInsertion(video) {
     try {
       const cs = window.getComputedStyle(parent);
       const flexWrapRaw = cs.flexWrap || 'nowrap';
-      if (flexWrapRaw !== 'nowrap') {
+      if (!isComputedRowFlexContainer(cs)) {
         node = parent;
         continue;
       }
-      const isRowFlex =
-        cs.display === 'flex' &&
-        (cs.flexDirection === 'row' || cs.flexDirection === 'row-reverse');
+      const wrapStrict =
+        flexWrapRaw === 'nowrap' ||
+        flexWrapRaw === 'wrap' ||
+        flexWrapRaw === 'wrap-reverse';
+      if (!wrapStrict) {
+        node = parent;
+        continue;
+      }
       if (
-        isRowFlex &&
         node.parentElement === parent &&
         parent.children.length >= 2
       ) {
         const rr = parent.getBoundingClientRect();
-        if (rr.width >= minRowW) {
-          return { insertAfter: node, hostParent: parent };
+        if (rr.width < minRowW) {
+          node = parent;
+          continue;
         }
+        /*
+         * wrap 行は「動画カラムの横に別カラムがある」ケースだけ採用し、
+         * 単独セル＋折り返しの誤検出を避ける（次兄弟必須）。
+         */
+        if (flexWrapRaw !== 'nowrap' && !node.nextElementSibling) {
+          node = parent;
+          continue;
+        }
+        return { insertAfter: node, hostParent: parent };
       }
     } catch {
       // no-op
     }
     node = parent;
   }
-  return null;
+  return findBesideFlexRowColumnInsertionByCommentPanel(video, minRowW);
 }
 
 /**
@@ -3113,10 +3263,14 @@ function applyViewportWideBleedToHostEdges(
 /**
  * @param {HTMLElement} host
  * @param {HTMLIFrameElement|null} iframe
- * @param {{ baselineWidthPx: number, hostAttachFallbackBody: boolean }} opts
+ * @param {{
+ *   baselineWidthPx: number,
+ *   hostAttachFallbackBody: boolean,
+ *   maxAppliedWidthPx?: number | null
+ * }} opts
  */
 function applyInlineHostPanelWidthWithViewportWide(host, iframe, opts) {
-  const { baselineWidthPx, hostAttachFallbackBody } = opts;
+  const { baselineWidthPx, hostAttachFallbackBody, maxAppliedWidthPx } = opts;
   const viewport = nlsViewportSize();
   const baseRounded = Math.max(1, Math.round(Number(baselineWidthPx) || 0));
 
@@ -3136,13 +3290,20 @@ function applyInlineHostPanelWidthWithViewportWide(host, iframe, opts) {
   }
 
   const eff = getEffectiveInlinePanelPlacement();
-  const widened = resolveWidenedInlinePanelWidthPx({
+  let widened = resolveWidenedInlinePanelWidthPx({
     baselineWidthPx,
     viewportInnerWidth: viewport.innerWidth,
     placement: eff,
     policy: inlinePanelViewportWidePolicy,
     onceDone: inlinePanelViewportWideOnceDone
   });
+  const capW =
+    maxAppliedWidthPx != null && Number.isFinite(Number(maxAppliedWidthPx))
+      ? Math.max(320, Math.round(Number(maxAppliedWidthPx)))
+      : null;
+  if (capW != null) {
+    widened = Math.min(widened, capW);
+  }
   host.style.width = `${widened}px`;
   /*
    * 視聴行の子 flex 内では max-width:100% が「親列の幅」になり、
@@ -3162,7 +3323,12 @@ function applyInlineHostPanelWidthWithViewportWide(host, iframe, opts) {
       iframe.style.removeProperty('max-width');
     }
   }
-  if (widened > baseRounded) {
+  /*
+   * 横付きで flex 列の「あいだ」に挟むとき、タブ幅いっぱいまで広げる＋右端 bleed は
+   * 幅が列スロットを超えて flex-wrap で段落ちし、動画＋コメ列の下に落ちる原因になる。
+   * maxAppliedWidthPx 指定時は bleed を抑止する。
+   */
+  if (widened > baseRounded && capW == null) {
     applyViewportWideBleedToHostEdges(host, iframe, widened, viewport, baseRounded);
   }
   maybePersistViewportWideOnceConsumed();
@@ -3175,10 +3341,12 @@ function renderInlineHostAnchoredToVideo(video) {
   clearInlineHostFloatingLayout(ensureInlinePopupHost());
   const placement = getEffectiveInlinePanelPlacement();
   if (placement === INLINE_PANEL_PLACEMENT_FLOATING) {
+    publishInlinePanelLayoutRenderSnapshot(false, false, null);
     renderInlinePanelFloatingHost();
     return;
   }
   if (placement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
+    publishInlinePanelLayoutRenderSnapshot(false, false, null);
     renderInlinePanelDockBottomHost();
     return;
   }
@@ -3192,6 +3360,8 @@ function renderInlineHostAnchoredToVideo(video) {
   let hostParent;
   /** flex 行の子として「動画列の次」に置けた（ニコ生の内側ラッパー脱出） */
   let besideFlexRowColumn = false;
+  /** `findBelowWideRowInsertAfterElement` で視聴行ラッパー直後へ寄せた（below 専用） */
+  let belowWideRowChosen = false;
   /**
    * 0.1.66 (AV): beside 用の純粋関数で計算した panel 幅・高さ。null の時は
    * 利用可能幅不足で below フォールバック中（既存の computeInlinePanelLayout
@@ -3319,6 +3489,7 @@ function renderInlineHostAnchoredToVideo(video) {
       if (wideHostParent) {
         insertAfter = wideAfter;
         hostParent = wideHostParent;
+        belowWideRowChosen = true;
       }
     }
   }
@@ -3332,6 +3503,11 @@ function renderInlineHostAnchoredToVideo(video) {
   const host = ensureInlinePopupHost();
   const vr = video.getBoundingClientRect();
   if (vr.width < 260 || vr.height < 140) {
+    publishInlinePanelLayoutRenderSnapshot(
+      besideFlexRowColumn,
+      belowWideRowChosen,
+      null
+    );
     host.style.display = 'none';
     host.setAttribute('aria-hidden', 'true');
     maybeReconnectCommentMutationObserverAfterInlineLayout();
@@ -3386,9 +3562,44 @@ function renderInlineHostAnchoredToVideo(video) {
   const iframe = /** @type {HTMLIFrameElement|null} */ (
     host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
   );
+  /** 横付き・列間挿入時は「タブ幅まで広げ」を実ギャップで上限（flex 折り返し防止） */
+  let besideViewportWideCap = null;
+  if (
+    placement === INLINE_PANEL_PLACEMENT_BESIDE &&
+    besideFlexRowColumn &&
+    insertAfter instanceof HTMLElement
+  ) {
+    const layoutVpCap = nlsLayoutViewportSize();
+    let colRect;
+    try {
+      colRect = insertAfter.getBoundingClientRect();
+    } catch {
+      colRect = null;
+    }
+    const nsCap = insertAfter.nextElementSibling;
+    let nextLeftCap = null;
+    if (nsCap instanceof HTMLElement) {
+      try {
+        nextLeftCap = nsCap.getBoundingClientRect().left;
+      } catch {
+        nextLeftCap = null;
+      }
+    }
+    if (colRect && Number.isFinite(colRect.right)) {
+      const gPx = computeBesideInsertionGapPx(
+        colRect.right,
+        layoutVpCap.innerWidth,
+        nextLeftCap
+      );
+      if (Number.isFinite(gPx) && gPx >= 280) {
+        besideViewportWideCap = Math.floor(gPx);
+      }
+    }
+  }
   applyInlineHostPanelWidthWithViewportWide(host, iframe, {
     baselineWidthPx: finalPanelWidthPx,
-    hostAttachFallbackBody
+    hostAttachFallbackBody,
+    maxAppliedWidthPx: besideViewportWideCap
   });
   // beside の高さを動画行の自然高さに揃える（縦間延びの解消）
   if (besideLayout) {
@@ -3397,11 +3608,25 @@ function renderInlineHostAnchoredToVideo(video) {
       iframe.style.height = `${besideLayout.panelHeight}px`;
       iframe.style.maxHeight = `${besideLayout.panelHeight}px`;
     }
+  } else {
+    // beside で付けた iframe の高さが、below 等へ切り替えたあとに残ると
+    // パネル内レイアウトが崩れる（#3 系）。host は reset で max-height 済みでも
+    // 子 iframe は別要素のため明示で落とす。
+    host.style.removeProperty('max-height');
+    if (iframe) {
+      iframe.style.removeProperty('height');
+      iframe.style.removeProperty('max-height');
+    }
   }
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
   host.style.display = 'block';
   host.style.opacity = '1';
+  publishInlinePanelLayoutRenderSnapshot(
+    besideFlexRowColumn,
+    belowWideRowChosen,
+    mode
+  );
   // 0.1.66 (AV): viewport / video rect 変化に追従
   ensureInlineHostReflowListener();
   maybeReconnectCommentMutationObserverAfterInlineLayout();
@@ -3520,6 +3745,11 @@ function renderInlinePopupHost(target) {
 }
 
 function hidePageFrameOverlay() {
+  try {
+    dismissToolbarOpenInstantFeedback();
+  } catch {
+    // no-op
+  }
   const overlay = document.getElementById(PAGE_FRAME_OVERLAY_ID);
   if (overlay) overlay.style.display = 'none';
   if (inlineIframeVisibilityTimer) {
@@ -3532,6 +3762,10 @@ function hidePageFrameOverlay() {
   if (host) {
     host.style.display = 'none';
     host.setAttribute('aria-hidden', 'true');
+    // × 閉じる等で display:none のみ残すと pointerEvents/opacity が中途半端に残り、
+    // 次回ツールバー直後の前面化判定やヒット領域が不安定になることがある。
+    host.style.pointerEvents = 'none';
+    host.style.opacity = '0';
   }
   stableFrameTarget = null;
   syncWatchPageDockBodyReserve();
@@ -3557,6 +3791,114 @@ function inlineHostLooksVisible() {
   return r.width >= 120 && r.height >= 120;
 }
 
+const NLS_TOOLBAR_OPEN_TOAST_ID = 'nls-toolbar-open-toast';
+
+/** ツールバー（こん太）押下の瞬間にだけ出す軽量トースト。複数 watch タブでも「押せた」体感を補強。 */
+function dismissToolbarOpenInstantFeedback() {
+  try {
+    const el = document.getElementById(NLS_TOOLBAR_OPEN_TOAST_ID);
+    if (el) el.remove();
+  } catch {
+    // no-op
+  }
+}
+
+function showToolbarOpenInstantFeedback() {
+  if (!isWatchInlinePanelTopFrame()) return;
+  try {
+    if (document.getElementById(NLS_TOOLBAR_OPEN_TOAST_ID)) return;
+    const el = document.createElement('div');
+    el.id = NLS_TOOLBAR_OPEN_TOAST_ID;
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.textContent = 'パネルを表示しています…';
+    el.style.cssText = [
+      'position:fixed',
+      'left:50%',
+      'bottom:max(24px, env(safe-area-inset-bottom, 24px))',
+      'transform:translateX(-50%)',
+      'z-index:2147483647',
+      'max-width:min(92vw, 420px)',
+      'padding:10px 16px',
+      'border-radius:999px',
+      'font:600 13px/1.35 system-ui,Segoe UI,sans-serif',
+      'color:#0f172a',
+      'background:rgba(254,252,232,0.96)',
+      'box-shadow:0 6px 24px rgba(15,23,42,0.18)',
+      'pointer-events:none'
+    ].join(';');
+    document.body.appendChild(el);
+    const maxFrames = 24;
+    let frames = 0;
+    const finish = () => dismissToolbarOpenInstantFeedback();
+    const t = window.setTimeout(finish, 900);
+    const tick = () => {
+      frames += 1;
+      try {
+        if (inlineHostLooksVisible()) {
+          window.clearTimeout(t);
+          finish();
+          return;
+        }
+      } catch {
+        // no-op
+      }
+      if (frames >= maxFrames) return;
+      window.requestAnimationFrame(tick);
+    };
+    window.requestAnimationFrame(tick);
+  } catch {
+    // no-op
+  }
+}
+
+/**
+ * iframe レイアウト確定後の smooth scroll / focus（ツールバー応答とは非同期）。
+ */
+function scheduleInlinePanelToolbarFocusPolish() {
+  void (async () => {
+    try {
+      const ready = await pollUntil(
+        () => {
+          const h =
+            nlsInlinePopupHostSingleton ||
+            document.getElementById(INLINE_POPUP_HOST_ID);
+          if (!(h instanceof HTMLElement)) return null;
+          const isReady = isInlinePanelHostReadyForFocus(h, {
+            getComputedStyle: (el) =>
+              window.getComputedStyle(/** @type {Element} */ (el)),
+            getBoundingClientRect: (el) =>
+              /** @type {Element} */ (el).getBoundingClientRect()
+          });
+          return isReady ? h : null;
+        },
+        { timeoutMs: 500, intervalMs: 30 }
+      );
+      if (!ready) return;
+      try {
+        suppressOwnScrollCountingFor(1000);
+        ready.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } catch {
+        try {
+          ready.scrollIntoView();
+        } catch {
+          // no-op
+        }
+      }
+      const iframe = ready.querySelector(`#${INLINE_POPUP_IFRAME_ID}`);
+      if (iframe instanceof HTMLIFrameElement) {
+        try {
+          iframe.focus();
+        } catch {
+          // no-op
+        }
+      }
+    } catch {
+      // no-op: scroll/focus 失敗は致命的でない
+    }
+  })();
+}
+
 /**
  * ツールバーから：ページ内インラインパネルを前面化（スクロール＋ iframe フォーカス）。
  *
@@ -3573,9 +3915,13 @@ function inlineHostLooksVisible() {
  *     なら即座に focused=true 応答。scrollIntoView + iframe.focus は別タスクで
  *     fire-and-forget（pollUntil 内蔵）。応答自体は rect も layout も待たない。
  *
- * @returns {Promise<boolean>} host が DOM 上にあれば即座に true
+ * 0.1.274+: **同期で boolean を返す**。background の `tabs.sendMessage` が
+ *   microtask までブロックされ「こん太を押しても一瞬何も起きない」体感になるのを避ける。
+ *   smooth scroll / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
+ *
+ * @returns {boolean}
  */
-async function focusInlinePanelHostFromToolbar() {
+function focusInlinePanelHostFromToolbar() {
   if (!isWatchInlinePanelTopFrame()) return false;
   if (!isNicoLiveWatchUrl(window.location.href)) return false;
   const host =
@@ -3619,52 +3965,7 @@ async function focusInlinePanelHostFromToolbar() {
     // no-op: rect 取得失敗時は保守的に true 寄りに倒す
   }
 
-  // fire-and-forget: rect 確定を待ってから smooth scroll + iframe focus を試行。
-  // 結果は応答に反映しない（応答は既に true で返している）。
-  void (async () => {
-    try {
-      const ready = await pollUntil(
-        () => {
-          const h =
-            nlsInlinePopupHostSingleton ||
-            document.getElementById(INLINE_POPUP_HOST_ID);
-          if (!(h instanceof HTMLElement)) return null;
-          const isReady = isInlinePanelHostReadyForFocus(h, {
-            getComputedStyle: (el) =>
-              window.getComputedStyle(/** @type {Element} */ (el)),
-            getBoundingClientRect: (el) =>
-              /** @type {Element} */ (el).getBoundingClientRect()
-          });
-          return isReady ? h : null;
-        },
-        { timeoutMs: 500, intervalMs: 30 }
-      );
-      if (!ready) return;
-      try {
-        // ツールバーからの前面化は意図的な大きなスクロール変化になり得るので、
-        // 発生する scroll イベントを user-scroll として誤カウントしないよう抑止窓を張る。
-        suppressOwnScrollCountingFor(1000);
-        ready.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      } catch {
-        try {
-          ready.scrollIntoView();
-        } catch {
-          // no-op
-        }
-      }
-      const iframe = ready.querySelector(`#${INLINE_POPUP_IFRAME_ID}`);
-      if (iframe instanceof HTMLIFrameElement) {
-        try {
-          iframe.focus();
-        } catch {
-          // no-op
-        }
-      }
-    } catch {
-      // no-op: scroll/focus 失敗は致命的でない
-    }
-  })();
-
+  scheduleInlinePanelToolbarFocusPolish();
   return true;
 }
 
@@ -4574,6 +4875,8 @@ function buildAiShareFastDiagnosticsPayload() {
       parentIsShadowRoot: host.parentNode instanceof ShadowRoot
     };
   }
+  const placementEffectiveFast = getEffectiveInlinePanelPlacement();
+  const viewportInnerWidthFast = nlsViewportSize().innerWidth;
   return {
     exportedAt: new Date().toISOString(),
     frame: {
@@ -4597,9 +4900,25 @@ function buildAiShareFastDiagnosticsPayload() {
     },
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
-      placementEffective: getEffectiveInlinePanelPlacement(),
-      viewportInnerWidth: nlsViewportSize().innerWidth,
+      placementEffective: placementEffectiveFast,
+      besideNarrowViewportFallback:
+        inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE &&
+        placementEffectiveFast !== inlinePanelPlacementMode,
+      viewportInnerWidth: viewportInnerWidthFast,
+      ...inlinePanelDiagPlacementHints(
+        inlinePanelPlacementMode,
+        placementEffectiveFast,
+        viewportInnerWidthFast
+      ),
       widthMode: inlinePanelWidthMode,
+      layoutRenderSnapshot: {
+        besideFlexRowColumnRuntime:
+          nlsInlinePanelLayoutRenderSnapshot.besideFlexRowColumnRuntime,
+        belowWideRowChosen: nlsInlinePanelLayoutRenderSnapshot.belowWideRowChosen,
+        effectiveLayoutWidthMode:
+          nlsInlinePanelLayoutRenderSnapshot.effectiveLayoutWidthMode,
+        capturedAtMs: nlsInlinePanelLayoutRenderSnapshot.capturedAtMs
+      },
       floatingAnchor: inlineFloatingAnchor,
       host: hostBrief,
       recentRenderErrors: nlsInlinePanelRenderErrors.slice()
@@ -4876,6 +5195,41 @@ function syncWatchPageDockBodyReserve() {
 function getEffectiveInlinePanelPlacement() {
   const vp = nlsLayoutViewportSize();
   return effectiveInlinePanelPlacement(inlinePanelPlacementMode, vp.innerWidth);
+}
+
+/**
+ * AI 共有診断用。`below` なのにタブが広いとき等、貼り付け先 LLM が誤解しやすい点を短文で示す。
+ * @param {string} placementMode
+ * @param {string} placementEffective
+ * @param {number} viewportInnerWidth
+ */
+function inlinePanelDiagPlacementHints(
+  placementMode,
+  placementEffective,
+  viewportInnerWidth
+) {
+  const w = Number(viewportInnerWidth) || 0;
+  const min = INLINE_VIEWPORT_BESIDE_MIN_WIDTH;
+  const wideEnoughForBeside = w >= min;
+  let placementInterpretationHintJa = '';
+  if (
+    placementMode === INLINE_PANEL_PLACEMENT_BELOW &&
+    placementEffective === INLINE_PANEL_PLACEMENT_BELOW &&
+    wideEnoughForBeside
+  ) {
+    placementInterpretationHintJa =
+      '保存されている配置は「下」です。横付きにするには拡張ポップアップの「配置」で「横付き」を選んでください（画面やタブを広げただけでは自動では切り替わりません）。';
+  } else if (
+    placementMode === INLINE_PANEL_PLACEMENT_BESIDE &&
+    placementEffective === INLINE_PANEL_PLACEMENT_BELOW
+  ) {
+    placementInterpretationHintJa = `横付きを選んでいますが、タブ幅が不足しているため実効は「下」です（横付きには概ね ${min}px 以上のタブ内幅が必要です）。`;
+  }
+  return {
+    besideMinWidthPx: min,
+    viewportWideEnoughForBeside: wideEnoughForBeside,
+    placementInterpretationHintJa
+  };
 }
 
 /** メインの配信 video（表示矩形が最大・かつプレイヤーとして妥当）を選ぶ */
@@ -5183,6 +5537,16 @@ function startPageFrameLoop() {
 
   function tickPageFrameMaintenance() {
     if (!hasExtensionContext()) return;
+    if (
+      typeof document !== 'undefined' &&
+      document.visibilityState === 'hidden'
+    ) {
+      hiddenPageFrameMaintenancePhase =
+        (hiddenPageFrameMaintenancePhase + 1) % HIDDEN_LIVE_PANEL_SCAN_STRIDE;
+      if (hiddenPageFrameMaintenancePhase !== 0) return;
+    } else {
+      hiddenPageFrameMaintenancePhase = 0;
+    }
     maybeRunEndedBulkHarvest();
     maybeOfficialGapQuietDeepHarvest();
     persistAiShareFastDiagnostics();
@@ -5230,6 +5594,13 @@ function startPageFrameLoop() {
     }
     if (document.visibilityState === 'visible') {
       hiddenLivePanelScanPhase = 0;
+      hiddenPageFrameMaintenancePhase = 0;
+      hiddenLiveIdPollPhase = 0;
+      try {
+        syncLiveIdFromLocation();
+      } catch {
+        // no-op
+      }
       tickPageFrameLayoutFromInterval();
       tickPageFrameMaintenance();
     } else {
@@ -6371,7 +6742,10 @@ function collectWatchPageSnapshot() {
   return {
     title: String(document.title || ''),
     url,
-    liveId,
+    // モジュール変数 liveId は同期タイミングで一瞬 null のことがあり、
+    // popup 側 paintOfficialNicoStatsStrip が liveId 無しで「—」固定になる。
+    // 応答フレームの location から常に補完する（watch URL なら extract で取れる）。
+    liveId: extractLiveIdFromUrl(url) || liveId,
     broadcastTitle,
     broadcasterName,
     thumbnailUrl,
@@ -6508,6 +6882,7 @@ function buildAiSharePageDiagnostics() {
 
   const target = findWatchFrameTargetElement();
   const placementEffective = getEffectiveInlinePanelPlacement();
+  const viewportInnerWidthDiag = nlsViewportSize().innerWidth;
   /** @type {Record<string, unknown>|null} */
   let insertionPlan = null;
   if (placementEffective === INLINE_PANEL_PLACEMENT_FLOATING) {
@@ -6652,8 +7027,21 @@ function buildAiSharePageDiagnostics() {
       besideNarrowViewportFallback:
         inlinePanelPlacementMode === INLINE_PANEL_PLACEMENT_BESIDE &&
         placementEffective !== inlinePanelPlacementMode,
-      viewportInnerWidth: nlsViewportSize().innerWidth,
+      viewportInnerWidth: viewportInnerWidthDiag,
+      ...inlinePanelDiagPlacementHints(
+        inlinePanelPlacementMode,
+        placementEffective,
+        viewportInnerWidthDiag
+      ),
       widthMode: inlinePanelWidthMode,
+      layoutRenderSnapshot: {
+        besideFlexRowColumnRuntime:
+          nlsInlinePanelLayoutRenderSnapshot.besideFlexRowColumnRuntime,
+        belowWideRowChosen: nlsInlinePanelLayoutRenderSnapshot.belowWideRowChosen,
+        effectiveLayoutWidthMode:
+          nlsInlinePanelLayoutRenderSnapshot.effectiveLayoutWidthMode,
+        capturedAtMs: nlsInlinePanelLayoutRenderSnapshot.capturedAtMs
+      },
       floatingAnchor: inlineFloatingAnchor,
       insertionPlan,
       host: hostBrief,
@@ -6836,12 +7224,54 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
      * autoshow=true のユーザには何の影響もない（既に表示中）。
      */
     toolbarInitiatedShowThisSession = true;
+    try {
+      showToolbarOpenInstantFeedback();
+    } catch {
+      // no-op
+    }
     // gate 条件が変わるので即再描画（次の tick を待たずに panel が出る）
     try {
       renderPageFrameOverlay();
     } catch {
       // no-op: 初回描画の例外は tick loop 側で回収される
     }
+    /*
+     * 0.1.264+: × 閉じ直後などで 1 フレーム目はまだ display:none のまま残り、
+     * `focusInlinePanelHostFromToolbar` が focused=false → 窓 fallback だけ、に
+     * 見えるレースを吸収する。再入 render は idempotent 寄り。
+     */
+    const depsInlineReveal = {
+      getComputedStyle: (el) =>
+        window.getComputedStyle(/** @type {Element} */ (el))
+    };
+    const inlineHostStillHiddenAfterToolbar = () => {
+      if (!toolbarInitiatedShowThisSession) return false;
+      const host =
+        nlsInlinePopupHostSingleton ||
+        document.getElementById(INLINE_POPUP_HOST_ID);
+      return !(
+        host instanceof HTMLElement &&
+        shouldRespondFocusedNowFromToolbar(host, depsInlineReveal)
+      );
+    };
+    requestAnimationFrame(() => {
+      if (!inlineHostStillHiddenAfterToolbar()) return;
+      try {
+        renderPageFrameOverlay();
+      } catch {
+        // no-op
+      }
+    });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!inlineHostStillHiddenAfterToolbar()) return;
+        try {
+          renderPageFrameOverlay();
+        } catch {
+          // no-op
+        }
+      });
+    });
     /*
      * kon-ta 押下時点で deep harvest がまだ pending（timer 生存）かつ quiet UI 有効なら、
      * ゲートで抑止していた loading インジケータをここで出す。
@@ -6855,24 +7285,23 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       // no-op: loading UI は補助表示なので失敗しても本筋に影響しない
     }
     /*
-     * 0.1.11 (B1 race fix): focusInlinePanelHostFromToolbar が async になったので
-     * sendResponse は IIFE 末尾で呼び、listener は `return true` でチャネルを
-     * 維持する（Chrome MV3: 非同期 sendResponse の必須パターン）。
+     * 0.1.11 (B1 race fix): background の `tabs.sendMessage` が遅いと「こん太を押しても
+     *   一瞬何も起きない」体感になる。`focusInlinePanelHostFromToolbar` は同期で boolean
+     *   を返し、`sendResponse` もこのターンで完了させる（return false）。
+     *   smooth scroll / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
      */
-    void (async () => {
-      let focused = false;
-      try {
-        focused = await focusInlinePanelHostFromToolbar();
-      } catch {
-        // no-op: poll/scroll 失敗は致命的ではない
-      }
-      try {
-        sendResponse({ ok: true, focused });
-      } catch {
-        // no-op: 呼び出し元が消えていることもある
-      }
-    })();
-    return true;
+    let focused = false;
+    try {
+      focused = focusInlinePanelHostFromToolbar();
+    } catch {
+      // no-op: poll/scroll 失敗は致命的ではない
+    }
+    try {
+      sendResponse({ ok: true, focused });
+    } catch {
+      // no-op: 呼び出し元が消えていることもある
+    }
+    return false;
   }
 
   if (msg.type === 'NLS_CAPTURE_SCREENSHOT') {
@@ -7525,7 +7954,7 @@ const persistCoalescer = createPersistCoalescer(async (/** @type {ParsedCommentR
  */
 function persistCommentRows(rows, opts = {}) {
   const filtered = Array.isArray(rows)
-    ? rows.filter((r) => !isRecommendedLivePollutionRow(r))
+    ? rows.filter((r) => !isCommentUiScraperPollutionRow(r))
     : [];
   const gate = diagnosePersistGate({
     hasRows: !!filtered.length,
@@ -8734,7 +9163,7 @@ async function start() {
       set: (obj) => chrome.storage.local.set(obj)
     }).catch(() => ({ changed: false }));
     try {
-      const layoutW = Number(window.innerWidth) || 0;
+      const layoutW = nlsLayoutViewportSize().innerWidth;
       await migrateSuggestInitialInlinePanelPlacementOnce({
         get: (keys) => chrome.storage.local.get(keys),
         set: (obj) => chrome.storage.local.set(obj),
@@ -9094,6 +9523,16 @@ async function start() {
     /** @type {unknown} */ (
       setInterval(() => {
         if (stopContentIntervalsIfContextInvalidated()) return;
+        if (
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'hidden'
+        ) {
+          hiddenLiveIdPollPhase =
+            (hiddenLiveIdPollPhase + 1) % HIDDEN_LIVE_PANEL_SCAN_STRIDE;
+          if (hiddenLiveIdPollPhase !== 0) return;
+        } else {
+          hiddenLiveIdPollPhase = 0;
+        }
         syncLiveIdFromLocation();
       }, LIVE_POLL_MS)
     )
@@ -9175,7 +9614,7 @@ async function start() {
   );
 }
 
-const OFFICIAL_EVENT_DOM_SCRAPE_MS = 8_000;
+const OFFICIAL_EVENT_DOM_SCRAPE_MS = 5_000;
 /** @type {number|null} */
 let officialEventDomScrapeIntervalId = null;
 /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */
@@ -9233,8 +9672,8 @@ let _nicoadContribFetchedForLid = '';
  *   - .contribution-ranking-list（貢献度ランキング）
  *   - .point-field（バルーン累計テーブル）
  *
- * これらのいずれかが追加 / テキスト変更された瞬間、200ms スロットリングしてから
- * persistOfficialEventDomBundleNow を呼ぶ。
+ * これらのいずれかが追加 / テキスト変更された瞬間、200ms（非可視タブは 600ms）
+ * スロットリングしてから persistOfficialEventDomBundleNow を呼ぶ。
  *
  * @type {MutationObserver|null}
  */
@@ -9269,9 +9708,14 @@ function ensureOfficialEventDomObserver() {
   ].join(', ');
   const trigger = () => {
     if (_officialEventDomObserverTimer) clearTimeout(_officialEventDomObserverTimer);
+    const hidden =
+      typeof document !== 'undefined' &&
+      document.visibilityState === 'hidden';
+    // 非可視時は DOM 変化が多くても即時性より CPU を優先（bundle persist の頻度を下げる）
+    const delayMs = hidden ? 600 : 200;
     _officialEventDomObserverTimer = setTimeout(() => {
       void persistOfficialEventDomBundleNow();
-    }, 200);
+    }, delayMs);
   };
   _officialEventDomObserver = new MutationObserver((mutations) => {
     for (const m of mutations) {
@@ -9511,9 +9955,9 @@ function maybeStartGiftSubAppIframeRelay() {
     }
   };
 
-  // 初回 1 秒遅延（DOM 描画待ち）+ 以後 5 秒間隔
-  setTimeout(scanAndPost, 1000);
-  setInterval(scanAndPost, 5000);
+  // 初回 0.8 秒遅延（DOM 描画待ち）+ 以後 4 秒間隔（履歴・帯の体感遅延を抑える）
+  setTimeout(scanAndPost, 800);
+  setInterval(scanAndPost, 4000);
 }
 
 /** @type {string} */
@@ -9855,6 +10299,11 @@ async function persistGiftSubAppHistoryNow() {
   }
 }
 
+/** @param {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null|undefined} bundle */
+function bundleHasAdContributionRankingRows(bundle) {
+  return Array.isArray(bundle?.adContributionRanking) && bundle.adContributionRanking.length > 0;
+}
+
 async function persistOfficialEventDomBundleNow() {
   if (!hasExtensionContext()) return;
   const lid = String(liveId || '').trim().toLowerCase();
@@ -9989,30 +10438,37 @@ async function persistOfficialEventDomBundleNow() {
   // 0.1.169: ニコニ広告ページから貢献度ランキング（広告 pt 順）を fetch。
   // モチベーション源として popup に表示する。同じ liveId につき 1 度きり。
   const haveAdRankingAlready =
-    Array.isArray(fresh?.adContributionRanking) ||
-    Array.isArray(lastOfficialEventDomBundle?.adContributionRanking);
+    bundleHasAdContributionRankingRows(fresh) ||
+    bundleHasAdContributionRankingRows(lastOfficialEventDomBundle);
   if (!haveAdRankingAlready && _nicoadContribFetchedForLid !== lid) {
     _nicoadContribFetchedForLid = lid;
     try {
       const fetched = await fetchNicoadContributionRankingFromPublishPage(lid);
-      if (Array.isArray(fetched) && fetched.length > 0) {
-        // v0.1.237: 北極星「鏡のように貼り付け」用の outerHTML を取り出し、bundle に添える。
-        //   `fetchNicoadContributionRankingFromPublishPage` は戻り値 Array に
-        //   非列挙の `mirrorHtml` を Object.defineProperty で添付して返す（JSON 化で
-        //   消えるので、ここで取り出して別 field 化しないと storage 経由で popup へ届かない）。
-        /** @type {any} */
-        const fetchedAny = fetched;
-        const mirrorHtml = typeof fetchedAny?.mirrorHtml === 'string'
-          ? fetchedAny.mirrorHtml
+      // v0.1.237: 北極星「鏡のように貼り付け」用の outerHTML を取り出し、bundle に添える。
+      //   `fetchNicoadContributionRankingFromPublishPage` は戻り値 Array に
+      //   非列挙の `mirrorHtml` を Object.defineProperty で添付して返す（JSON 化で
+      //   消えるので、ここで取り出して別 field 化しないと storage 経由で popup へ届かない）。
+      /** @type {any} */
+      const fetchedAny = fetched;
+      const mirrorRaw = fetchedAny?.mirrorHtml;
+      const mirrorHtml =
+        typeof mirrorRaw === 'string' && mirrorRaw.trim().length > 0
+          ? mirrorRaw.trim()
           : null;
+      const hasRows = Array.isArray(fetched) && fetched.length > 0;
+      if (Array.isArray(fetched) && (hasRows || mirrorHtml)) {
         fresh = fresh
-          ? { ...fresh, adContributionRanking: fetched, adRankingMirrorHtml: mirrorHtml }
+          ? {
+              ...fresh,
+              ...(hasRows ? { adContributionRanking: fetched } : {}),
+              ...(mirrorHtml ? { adRankingMirrorHtml: mirrorHtml } : {})
+            }
           : {
               capturedAt: Date.now(),
               eventBanner: null,
               eventBalloon: null,
               contributionRanking: null,
-              adContributionRanking: fetched,
+              adContributionRanking: hasRows ? fetched : null,
               adRankingMirrorHtml: mirrorHtml,
               programStats: null,
               giftHistory: null
@@ -10043,8 +10499,8 @@ async function persistOfficialEventDomBundleNow() {
   // 末尾の tryHarvestNicoadContributionRankingOnce）。ここでは watch タブが
   // そのストレージを読み出して bundle に取り込む。
   const haveAdRankingAfterFetch =
-    Array.isArray(fresh?.adContributionRanking) ||
-    Array.isArray(lastOfficialEventDomBundle?.adContributionRanking);
+    bundleHasAdContributionRankingRows(fresh) ||
+    bundleHasAdContributionRankingRows(lastOfficialEventDomBundle);
   if (!haveAdRankingAfterFetch) {
     try {
       const key = `nls_nicoad_ranking_${lid}`;
@@ -10347,11 +10803,10 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
     //    4 タブで、ランキングタブを開かないと .contribution-ranking-list が DOM に
     //    出てこない。バナーがマウント済みであろうこのタイミングで切り替える。
     //
-    //    0.1.174: 検出を 3 段階に強化。
-    //     (a) 部分一致 + selector 拡張：「ランキング」「Ranking」「貢献」のいずれかを
-    //         含む短いテキスト（30 字以下）の clickable 要素を広く拾う。
-    //     (b) class 名による検出：ranking-tab / contribution-tab 等の命名にもヒット。
-    //     (c) 失敗時は sidebar 内 clickable を 30 件 dump（snapshotAutoOpenSidebarHints）、
+    //    0.1.174: 検出を 3 段階に強化（テキスト / aria / class）。
+    //    追補: 実装は `giftSidebarRankTabPick.findGiftSidebarRankTabElement` に
+    //    一本化（30 字制限・aria 無しの古い分岐と lib 側の 56 字・aria 対応のズレ解消）。
+    //     失敗時は sidebar 内 clickable を 30 件 dump（snapshotAutoOpenSidebarHints）、
     //         診断 JSON に残して次回の真因切り分けに使う。
     /** @type {HTMLElement|null} */
     let rankTabBtn = null;
@@ -10381,29 +10836,9 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
         );
       } catch { /* no-op */ }
       if (sidebarRoot instanceof HTMLElement) {
-        const RANK_TEXT_RE = /ランキング|Ranking|貢献/;
-        const candidates = sidebarRoot.querySelectorAll(
-          '[role="tab"], button, a, li, div[class*="tab"], span[class*="tab"]'
-        );
-        for (const el of candidates) {
-          if (!(el instanceof HTMLElement)) continue;
-          const t = String(el.textContent || '').replace(/\s+/g, ' ').trim();
-          if (!t || t.length > 30) continue;
-          if (RANK_TEXT_RE.test(t)) {
-            rankTabBtn = el;
-            rankTabFinder = `text:${el.tagName.toLowerCase()}`;
-            break;
-          }
-        }
-        if (!rankTabBtn) {
-          const byCls = sidebarRoot.querySelector(
-            '[class*="ranking-tab"], [class*="contribution-tab"], [class*="ranker-tab"]'
-          );
-          if (byCls instanceof HTMLElement) {
-            rankTabBtn = byCls;
-            rankTabFinder = 'class';
-          }
-        }
+        const picked = findGiftSidebarRankTabElement(sidebarRoot);
+        rankTabBtn = picked.element;
+        rankTabFinder = picked.finder;
       }
     } catch { /* no-op */ }
     if (!rankTabBtn) {

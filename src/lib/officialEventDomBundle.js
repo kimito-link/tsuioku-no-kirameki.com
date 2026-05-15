@@ -11,7 +11,7 @@ import {
   scrapeContributionRankingFromDom,
   scrapeProgramStatisticsMenuFromDom,
   scrapeGiftHistoryFromDom,
-  scrapeAdRankingMirrorHtml,
+  scrapeAdContributionRankingRowsAndMirrorFromDom,
   scrapeEventInfoMirrorParts
 } from './officialEventBannerDom.js';
 
@@ -83,7 +83,8 @@ export async function fetchOfficialEventBannerFromAuditionEmbed(liveId) {
  * 側で `bundle.adRankingMirrorHtml` に取り出す運用）。
  *
  * @param {string} liveId 例 'lv350459157'
- * @returns {Promise<NicoadContributionRankingFetchResult|null>}
+ * @returns {Promise<(any[] & { mirrorHtml?: string|null })|null>}
+ *   行が取れなくても `mirrorHtml` が取れれば空配列 + 非列挙 `mirrorHtml` を返す。
  */
 export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
   const lid = String(liveId || '').trim();
@@ -101,30 +102,24 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     if (!doc) return null;
 
-    const ranking = scrapeContributionRankingFromDom(doc);
-    const mirrorHtml = scrapeAdRankingMirrorHtml(doc);
-
-    if (Array.isArray(ranking)) {
-      Object.defineProperty(ranking, 'mirrorHtml', {
-        value: mirrorHtml,
-        writable: false,
-        configurable: true,
-        enumerable: false
-      });
-      return /** @type {NicoadContributionRankingFetchResult} */ (ranking);
+    const { ranking: rankingParsed, mirrorHtml } =
+      scrapeAdContributionRankingRowsAndMirrorFromDom(doc);
+    /** @type {any[]} */
+    const rows = Array.isArray(rankingParsed) ? rankingParsed : [];
+    if (rows.length === 0 && !mirrorHtml) {
+      return null;
     }
-
-    return ranking;
+    Object.defineProperty(rows, 'mirrorHtml', {
+      value: mirrorHtml,
+      writable: false,
+      configurable: true,
+      enumerable: false
+    });
+    return /** @type {any[] & { mirrorHtml?: string|null }} */ (rows);
   } catch {
     return null;
   }
 }
-
-/**
- * @typedef {ReturnType<typeof scrapeContributionRankingFromDom> & {
- *   mirrorHtml?: string|null
- * }} NicoadContributionRankingFetchResult
- */
 
 /**
  * @typedef {{
@@ -183,6 +178,35 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
 }
 
 /**
+ * `scrapeGiftHistoryFromDom` の複数回観測を束ねる。仮想リストで `next` が部分集合でも
+ * `prev` の行を落とさない（next 優先・重複キーは next を採用）。
+ *
+ * @param {readonly import('./officialEventBannerDom.js').GiftHistoryEntry[]|null|undefined} prev
+ * @param {readonly import('./officialEventBannerDom.js').GiftHistoryEntry[]|null|undefined} next
+ * @returns {import('./officialEventBannerDom.js').GiftHistoryEntry[]|null}
+ */
+export function mergeGiftHistoryDomScrapeArrays(prev, next) {
+  const p = Array.isArray(prev) && prev.length > 0 ? prev : null;
+  const n = Array.isArray(next) && next.length > 0 ? next : null;
+  if (!n) return p ? [...p] : null;
+  if (!p) return [...n];
+  /** @param {import('./officialEventBannerDom.js').GiftHistoryEntry} e */
+  const key = (e) =>
+    `${String(e.time).trim()}\t${String(e.advertiserName).trim()}\t${Number(e.point)}\t${String(e.giftName).trim()}`;
+  const seen = new Set(n.map((e) => key(e)));
+  /** @type {import('./officialEventBannerDom.js').GiftHistoryEntry[]} */
+  const merged = [...n];
+  for (const e of p) {
+    const k = key(e);
+    if (!seen.has(k)) {
+      seen.add(k);
+      merged.push(e);
+    }
+  }
+  return merged;
+}
+
+/**
  * 既存 bundle と新 bundle を比較し、新の方に値があるフィールドだけ採用してマージする。
  * （DOM が一時的に閉じられた・モーダルが閉まった等で取れなくなったフィールドを古い値で温存する）
  *
@@ -200,7 +224,11 @@ export function mergeOfficialEventDomBundle(prev, next) {
     eventBalloon: next.eventBalloon || prev.eventBalloon,
     contributionRanking: next.contributionRanking || prev.contributionRanking,
     adContributionRanking:
-      next.adContributionRanking || prev.adContributionRanking || null,
+      Array.isArray(next.adContributionRanking) && next.adContributionRanking.length > 0
+        ? next.adContributionRanking
+        : Array.isArray(prev.adContributionRanking) && prev.adContributionRanking.length > 0
+          ? prev.adContributionRanking
+          : null,
     adRankingMirrorHtml:
       next.adRankingMirrorHtml || prev.adRankingMirrorHtml || null,
     eventCumulativeScoreMirrorHtml:
@@ -212,6 +240,6 @@ export function mergeOfficialEventDomBundle(prev, next) {
       prev.eventCurrentRankMirrorHtml ||
       null,
     programStats: next.programStats || prev.programStats,
-    giftHistory: next.giftHistory || prev.giftHistory
+    giftHistory: mergeGiftHistoryDomScrapeArrays(prev.giftHistory, next.giftHistory)
   };
 }

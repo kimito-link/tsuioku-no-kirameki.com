@@ -150,3 +150,23 @@ export const WATCH_META_CARD_LABELS = Object.freeze({
   DATA_MISSING: DATA_MISSING_LABEL,
   PRE_MEASUREMENT: PRE_MEASUREMENT_LABEL
 });
+
+/**
+ * ライブ統計カード上の表示文字列が「数値として確定した」か／まだデータ待ちか。
+ * 「（取得不可）」「（数字非公開）」などは確定メッセージなので待ちではない（false）。
+ *
+ * @param {unknown} rawText
+ * @returns {boolean} true = まだ待ち（ローディング重ね表示の対象）
+ */
+export function isLiveStatValueAwaitingData(rawText) {
+  const rawTrim = String(rawText ?? '').trim();
+  if (!rawTrim || rawTrim === '—' || rawTrim === '-') return true;
+  if (rawTrim === LOADING_LABEL) return true;
+  if (rawTrim === PRE_MEASUREMENT_LABEL) return true;
+  // 全角数字・細分空白・BOM 等を含んでも数値確定とみなす（NFKC + 空白除去後に判定）
+  const compact = rawTrim
+    .normalize('NFKC')
+    .replace(/[\s\u00a0\u2009\u200b\ufeff\u3000]+/g, '');
+  if (/^~?[\d,，]+$/.test(compact)) return false;
+  return false;
+}

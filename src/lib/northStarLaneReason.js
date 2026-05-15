@@ -74,13 +74,20 @@ export function determineNorthStarLaneState(laneId, ctx) {
       return 'no_event';
     }
     case 'eventRank': {
-      // v0.1.248: NDGR field 6 (officialNicoEventRankNdgr) は意味確定していない
-      // (memory feedback_ndgr_field6_silence.md)。実機 lv350505652 で NDGR=1 だが
-      // 真値 7 位の乖離が観測されたため state 判定からも除外。
-      // 鏡 mirrorHtml もしくは公式 DOM banner.rank が居る時だけ ok。
+      // 鏡 mirrorHtml / banner.rank / 貢献度ランキング DOM のいずれかがあれば ok
+      // （貢献度上位は「イベント十位」とは別指標だが、公式レーンで併記するため）。
+      // v0.1.241: NDGR field 6 単独は「ギフト欄の現在 N 位」と一致しないことが多いため、
+      // ok 判定・ユーザー向け順位表示には使わない（診断 JSON の ndgrValue 参照用に残す）。
       const dom = numOrNull(bundle?.eventBanner?.rank);
       const mirror = strNonEmpty(bundle?.eventCurrentRankMirrorHtml);
-      if (dom != null || mirror) return 'ok';
+      const contribCount = Array.isArray(bundle?.contributionRanking)
+        ? bundle.contributionRanking.length
+        : 0;
+      if (dom != null || mirror || contribCount > 0) return 'ok';
+      const gpDom = numOrNull(bundle?.programStats?.giftPoints);
+      const gpNdgr = numOrNull(snap?.officialGiftPointsNdgr);
+      const gp = gpDom != null ? gpDom : gpNdgr;
+      if (gp != null && gp > 0) return 'iframe_unrendered';
       return 'no_event';
     }
     case 'programPoints': {

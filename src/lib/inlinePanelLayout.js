@@ -148,6 +148,8 @@ export function computeInlinePanelLayout(mode, args) {
 /**
  * 横付き（beside）は公式コメント列・入力バーと幅を奪い合い、狭いウィンドウで欠けやすい。
  * 保存された配置は変えず、実際の挿入・幅計算だけ「下（below）」に寄せる。
+ *
+ * `below` はタブ幅に関係なくそのまま維持する（ユーザーが「下」を選んだ挙動と一致させる）。
  */
 export const INLINE_VIEWPORT_BESIDE_MIN_WIDTH = 1200;
 

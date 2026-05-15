@@ -140,9 +140,8 @@ export function buildOfficialNicoStatsStripDigest(snap) {
   const eventGiftPts = chipNumber(
     pickNum(snap?.officialEventGiftScoreNdgr, snap?.officialEventGiftScore)
   );
-  const eventRank = chipEventRank(
-    pickNum(snap?.officialNicoEventRankNdgr, snap?.officialNicoEventRank)
-  );
+  // イベント「現在 N 位」はギフト欄 DOM / 鏡の正本のみ。NDGR field 6 は別指標になり得る。
+  const eventRank = chipEventRank(snap?.officialNicoEventRank);
   const eventTitle = chipEventTitle(
     pickStr(snap?.officialNicoEventTitleNdgr, snap?.officialNicoEventTitle)
   );
