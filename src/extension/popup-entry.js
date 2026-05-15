@@ -2068,6 +2068,13 @@ let anonymousIdenticonRuntimeEnabled = true;
 const anonymousIdenticonDataUrlCache = new Map();
 
 /**
+ * v0.1.281: 匿名 ID ごとの data URL を無制限に保持すると、長時間視聴の popup
+ * で renderer メモリを数 MB 〜数十 MB 圧迫する（claude crash design 指摘 #2）。
+ * FIFO eviction で上限 256 エントリに cap する。
+ */
+const ANON_IDENTICON_CACHE_MAX = 256;
+
+/**
  * 応援ランクストリップで匿名ユーザーを後送り（折り畳み）するか。
  * 既定 false（v0.1.195〜）。「ランキング = 件数降順」というユーザーの直感に合わせる。
  * 明示 true で storage 保存しているユーザーには opt-in 機能として残る。
@@ -2159,7 +2166,13 @@ function getCachedAnonymousIdenticonDataUrl(userId) {
   const hit = anonymousIdenticonDataUrlCache.get(u);
   if (hit) return hit;
   const gen = anonymousIdenticonDataUrl(u);
-  if (gen) anonymousIdenticonDataUrlCache.set(u, gen);
+  if (gen) {
+    anonymousIdenticonDataUrlCache.set(u, gen);
+    if (anonymousIdenticonDataUrlCache.size > ANON_IDENTICON_CACHE_MAX) {
+      const oldestKey = anonymousIdenticonDataUrlCache.keys().next().value;
+      if (oldestKey) anonymousIdenticonDataUrlCache.delete(oldestKey);
+    }
+  }
   return gen;
 }
 
@@ -13020,7 +13033,9 @@ function initPopup() {
   try {
     const onMsg = chrome?.runtime?.onMessage;
     if (onMsg && typeof onMsg.addListener === 'function') {
-      onMsg.addListener((msg) => {
+      // v0.1.281: popup unload で removeListener する。inline iframe 再生成や
+      // 長時間運用で voice listener が積み上がる leak を防ぐ。
+      const onRuntimeMessage = (msg) => {
         if (!msg || msg.type !== 'NLS_VOICE_TO_POPUP') return;
         if (typeof msg.level === 'number') {
           setVoiceLevelMeter(msg.level);
@@ -13062,7 +13077,19 @@ function initPopup() {
             paintCommentComposeUi();
           }
         }
-      });
+      };
+      onMsg.addListener(onRuntimeMessage);
+      window.addEventListener(
+        'pagehide',
+        () => {
+          try {
+            onMsg.removeListener(onRuntimeMessage);
+          } catch {
+            // best-effort
+          }
+        },
+        { once: true }
+      );
     }
   } catch {
     // no-op
@@ -13398,7 +13425,10 @@ function initPopup() {
   try {
     const stCh = chrome?.storage?.onChanged;
     if (stCh && typeof stCh.addListener === 'function') {
-      stCh.addListener((changes, area) => {
+      // v0.1.281: popup unload で removeListener する。inline iframe 再生成で
+      // listener が積み上がり、1 回の storage 更新で複数 safeRefresh が走って
+      // renderer を圧迫するのを防ぐ。
+      const onStorageChanged = (changes, area) => {
         if (area !== 'local') return;
         // レジストリ経由のブール設定を一括反映（未登録 key は何もしない）
         popupBooleanSettingsRegistry.dispatchStorageChanges(changes);
@@ -13426,7 +13456,19 @@ function initPopup() {
         if (!skipVisualExternalSync || !onlyVisualExpanded) {
           scheduleCoalescedStorageRefresh(changes, () => safeRefresh());
         }
-      });
+      };
+      stCh.addListener(onStorageChanged);
+      window.addEventListener(
+        'pagehide',
+        () => {
+          try {
+            stCh.removeListener(onStorageChanged);
+          } catch {
+            // best-effort
+          }
+        },
+        { once: true }
+      );
     }
   } catch {
     // no-op
