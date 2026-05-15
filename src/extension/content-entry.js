@@ -1933,6 +1933,7 @@ window.addEventListener('message', (e) => {
   cur.lastContribCount = Number(e.data.contribCount) || 0;
   cur.lastEventBannerPresent = e.data.eventBannerPresent === true;
   map[url] = cur;
+  pruneRelayDiagMap(map);
 });
 
 window.addEventListener('message', (e) => {
@@ -1955,6 +1956,7 @@ window.addEventListener('message', (e) => {
   if (_diagFrameUrl) {
     const _cur = _giftSubAppRelayDiagState.iframeRelayMessagesByFrameUrl[_diagFrameUrl] || 0;
     _giftSubAppRelayDiagState.iframeRelayMessagesByFrameUrl[_diagFrameUrl] = _cur + 1;
+    pruneRelayDiagMap(_giftSubAppRelayDiagState.iframeRelayMessagesByFrameUrl);
   }
   // watch 文脈の liveId がまだ null のとき relay だけ先に届くと、ここで return して
   // nls_gift_history_throws_* が一度も書けない（北極星ギフト履歴が空のまま）問題があった。
@@ -10065,8 +10067,16 @@ function maybeStartGiftSubAppIframeRelay() {
   };
 
   // 初回 0.8 秒遅延（DOM 描画待ち）+ 以後 4 秒間隔（履歴・帯の体感遅延を抑える）
+  // pagehide で setInterval を確実に停止して、iframe destroy / tab close 時に scanAndPost が
+  // 残らないようにする（複数 watch タブ運用での heartbeat 増殖を抑える）。
+  let relayIntervalId = null;
+  const stopRelay = () => {
+    if (relayIntervalId != null) clearInterval(relayIntervalId);
+    relayIntervalId = null;
+  };
+  window.addEventListener('pagehide', stopRelay, { once: true });
   setTimeout(scanAndPost, 800);
-  setInterval(scanAndPost, 4000);
+  relayIntervalId = setInterval(scanAndPost, 4000);
 }
 
 /** @type {string} */
@@ -10130,6 +10140,22 @@ const _giftSubAppRelayDiagState = {
   scanCrossOriginThrows: 0,
   scanSameOriginAccess: 0
 };
+
+/**
+ * v0.1.280: relay diag の frameUrl 別 Map の無制限成長を防ぐための prune。
+ * frontend_version 等 URL params 変動で entry が単調増加し popup renderer の
+ * メモリを圧迫していた。挿入順で古いキーから削る（Object.keys は ES2015+ で
+ * 挿入順保証）。
+ *
+ * @param {Record<string, unknown>} map
+ * @param {number} [max=12]
+ */
+function pruneRelayDiagMap(map, max = 12) {
+  const keys = Object.keys(map);
+  for (const k of keys.slice(0, Math.max(0, keys.length - max))) {
+    delete map[k];
+  }
+}
 
 /**
  * v0.1.218: 公式 iframe (audition / koken / nicoad) を裏で inject して Vue を

@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.280',
+    date: '2026-05-16',
+    summary: '北極星キャラ tier 連動と popup クラッシュ抑制',
+    items: Object.freeze([
+      '北極星レーン左ガジェットのキャラを、取得率の段階（待機・なし・低・中・高・満）に合わせて表情画像で切り替えるようにしました',
+      '複数 watch タブ運用で popup ウィンドウが時間経過で見えなくなる事象の緊急対策として、ギフト関連 iframe の定期スキャンを pagehide で確実に停止するようにしました',
+      'iframe 別の relay 観測 Map（heartbeats / messages）を上限 12 件で剪定し、配信間の URL 変動による無制限成長を抑えるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.279',
     date: '2026-05-15',
     summary: 'インライン iframe 表示取り残し修正とコメント送信の安定化',
