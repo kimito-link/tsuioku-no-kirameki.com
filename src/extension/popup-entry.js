@@ -40,7 +40,7 @@ import {
   acquisitionPctFromNorthStarLaneState,
   acquisitionTierFromPct
 } from '../lib/northStarAcquisitionGauge.js';
-import { northStarLaneGadgetCharaRelativePath } from '../lib/northStarLaneGadgetChara.js';
+import { northStarLaneGadgetCharaPathByTier } from '../lib/northStarLaneGadgetChara.js';
 import { buildNorthStarWaitHintsRailHtml } from '../lib/formatNorthStarWaitHintsRailHtml.js';
 import { buildNorthStarAdRankingStatsHtml } from '../lib/buildNorthStarAdRankingStatsHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
@@ -5536,7 +5536,7 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
   if (wrap instanceof HTMLElement) wrap.dataset.nlAcqTier = tier;
   const img = gadget.querySelector('img.nl-north-star-lane__chara');
   if (img instanceof HTMLImageElement) {
-    const rel = northStarLaneGadgetCharaRelativePath(laneId);
+    const rel = northStarLaneGadgetCharaPathByTier(laneId, tier);
     try {
       img.src = chrome.runtime.getURL(rel);
     } catch {
@@ -5579,7 +5579,8 @@ function paintNorthStarGiftHistorySummaryGadget(body, rooms, unitSuffix) {
   if (unitEl instanceof HTMLElement) unitEl.textContent = suf;
   const img = summary.querySelector('img.nl-north-star-lane__chara');
   if (img instanceof HTMLImageElement) {
-    const rel = northStarLaneGadgetCharaRelativePath('programPoints');
+    // サマリー表示時は値が出ている前提なので、満面の笑み相当（full）で固定
+    const rel = northStarLaneGadgetCharaPathByTier('programPoints', 'full');
     try {
       img.src = chrome.runtime.getURL(rel);
     } catch {
