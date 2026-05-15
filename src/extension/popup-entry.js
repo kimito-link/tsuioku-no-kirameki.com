@@ -12330,7 +12330,11 @@ function initPopup() {
   });
 
   const persistInlinePanelStorageWriteFailure = async (kind) => {
-    const lid = String(viewerLvForError || resolvedLv || '')
+    const watchUrlForErr = String(exportBtn?.dataset?.watchUrl || '').trim();
+    const resolvedFromBtn = extractLiveIdFromUrl(watchUrlForErr);
+    const lid = String(
+      isNicoLiveWatchUrl(watchUrlForErr) && resolvedFromBtn ? resolvedFromBtn : ''
+    )
       .trim()
       .toLowerCase();
     try {
