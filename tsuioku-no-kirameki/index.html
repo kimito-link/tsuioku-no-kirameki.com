@@ -25,10 +25,72 @@
     <link rel="preload" as="image" href="../extension/images/logo/kimito-link-color.png" fetchpriority="high">
 
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"WebSite","name":"君斗りんくの追憶のきらめき","url":"https://tsuioku-no-kirameki.com/","description":"ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。v0.1.247 で公式値レーンの 4 レーン鏡映し・NDGR Message ID 重複排除・記録の質改善まで進めた Chrome 拡張。","inLanguage":"ja-JP","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"}}
-    </script>
-    <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"君斗りんくの追憶のきらめき","alternateName":"追憶のきらめき","operatingSystem":"Google Chrome","applicationCategory":"BrowserApplication","softwareVersion":"0.1.247","url":"https://tsuioku-no-kirameki.com/","inLanguage":"ja-JP","description":"ニコ生の応援コメントと公式値（イベント累計 / 現在順位 / 番組累計 / 広告ランキング）を取りこぼしにくく記録する Chrome 拡張。記録安定 + 公式値レーンの鏡映し + NDGR Message ID 重複排除で、長時間配信でもコメント記録を貯めて育てやすい運用を目指す。","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"license":"https://opensource.org/licenses/MIT"}
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://tsuioku-no-kirameki.com/#organization",
+            "name": "Kimito-Link Project",
+            "url": "https://kimito-link.com/",
+            "logo": "https://tsuioku-no-kirameki.com/images/favicon-512.png"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://tsuioku-no-kirameki.com/#website",
+            "name": "君斗りんくの追憶のきらめき",
+            "url": "https://tsuioku-no-kirameki.com/",
+            "description": "ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。v0.1.247 で公式値レーンの 4 レーン鏡映し・NDGR Message ID 重複排除・記録の質改善まで進めた Chrome 拡張。",
+            "inLanguage": "ja-JP",
+            "publisher": {
+              "@id": "https://tsuioku-no-kirameki.com/#organization"
+            }
+          },
+          {
+            "@type": "WebPage",
+            "@id": "https://tsuioku-no-kirameki.com/#webpage",
+            "url": "https://tsuioku-no-kirameki.com/",
+            "name": "君斗りんくの追憶のきらめき ― 取りこぼしにくく、あとから育つコメント記録へ",
+            "description": "ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。記録安定 + 公式値レーンの鏡映し + NDGR Message ID 重複排除で、長時間配信でも積み上げやすい記録運用を目指します。",
+            "inLanguage": "ja-JP",
+            "isPartOf": {
+              "@id": "https://tsuioku-no-kirameki.com/#website"
+            },
+            "about": {
+              "@id": "https://tsuioku-no-kirameki.com/#software"
+            },
+            "primaryImageOfPage": {
+              "@type": "ImageObject",
+              "url": "https://tsuioku-no-kirameki.com/images/og-image.jpg",
+              "width": 1200,
+              "height": 630
+            }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://tsuioku-no-kirameki.com/#software",
+            "name": "君斗りんくの追憶のきらめき",
+            "alternateName": "追憶のきらめき",
+            "applicationCategory": "BrowserApplication",
+            "operatingSystem": "Google Chrome",
+            "browserRequirements": "Google Chrome",
+            "softwareVersion": "0.1.247",
+            "url": "https://tsuioku-no-kirameki.com/",
+            "image": "https://tsuioku-no-kirameki.com/images/og-image.jpg",
+            "inLanguage": "ja-JP",
+            "description": "ニコ生の応援コメントと公式値（イベント累計 / 現在順位 / 番組累計 / 広告ランキング）を取りこぼしにくく記録する Chrome 拡張。記録安定 + 公式値レーンの鏡映し + NDGR Message ID 重複排除で、長時間配信でもコメント記録を貯めて育てやすい運用を目指す。",
+            "publisher": {
+              "@id": "https://tsuioku-no-kirameki.com/#organization"
+            },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "JPY"
+            },
+            "license": "https://opensource.org/licenses/MIT"
+          }
+        ]
+      }
     </script>
 
     <meta property="og:type" content="website">
