@@ -26,6 +26,18 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.279',
+    date: '2026-05-15',
+    summary: 'インライン iframe 表示取り残し修正とコメント送信の安定化',
+    items: Object.freeze([
+      'popup.html?inline=1 の src が同じでも、読み込み済みなら visibility を同期し、未完了なら load と 2 秒フォールバックを張り直すようにしました',
+      '重複する nls-inline-popup-host は getBoundingClientRect の面積が最大のものを残すようにしました',
+      'コメント送信: メイン窓に入力欄・パネルが無いときは受付しないようにし、iframe 側へ早く回るようにしました（誤フレームでの長時間待ちを抑制）',
+      'コメント送信: ボタンが無いときの Enter のみを送信成功扱いにせず、確認フェーズへの偽ルートを減らしました',
+      'コメント送信: 確認の直後プローブ、任意の区間計測（globalThis.__nlsCommentSubmitProfile）を追加しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.278',
     date: '2026-05-15',
     summary: '推定同接が来場者と同じ数字になる不具合を修正',

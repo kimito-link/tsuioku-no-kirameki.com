@@ -16,6 +16,7 @@ import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
+import { createCommentSubmitProfiler } from '../lib/commentSubmitProfiling.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
@@ -9502,6 +9503,19 @@ async function requestWatchPageSnapshotFromOpenTab(watchUrl, opts = {}) {
 }
 
 /**
+ * 開いている watch タブへ `NLS_POST_COMMENT` を送る（`prioritizeWatchFramesForWatchUrl` の順で各 frameId を試行）。
+ *
+ * 失敗モードとユーザー向け文言（調査用）:
+ *
+ * | 区間 | 代表エラー | 主因の目安 |
+ * |------|------------|------------|
+ * | 空本文 | コメントが空です。 | UI 検証 |
+ * | タブ列挙 | watchタブが見つかりません… | 未オープン・URL 不一致 |
+ * | `tabsSendMessageWithRetry`（T1） | コメント送信に失敗しました。（詳細） | Receiving end / 誤 frame で 5×120ms など |
+ * | content が `{ ok:false, error }` | 括弧内に content の文言 | editor / submit / confirm 各段（content JSDoc 参照） |
+ *
+ * 手元計測: `globalThis.__nlsCommentSubmitProfile = true` で各 `frameId` ごとに `T1-f{id}-send` / `T1-f{id}-res` を記録。
+ *
  * @param {string} text
  * @param {string} watchUrl
  * @returns {Promise<{ ok: boolean, error: string }>}
@@ -9521,55 +9535,64 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
     };
   }
 
+  const prof = createCommentSubmitProfiler();
+
   /** @type {string} */
   let lastDetail = '';
-  for (const candidate of candidates) {
-    try {
-      const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
-      const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
-      const tried = new Set();
-      const tryOrder = [...ranked.map((r) => r.frameId), 0];
-      for (const fid of tryOrder) {
-        if (tried.has(fid)) continue;
-        tried.add(fid);
-        try {
-          const res = await tabsSendMessageWithRetry(
-            candidate.id,
-            {
-              type: 'NLS_POST_COMMENT',
-              text: trimmed
-            },
-            { frameId: fid, maxAttempts: 5, delayMs: 120 }
-          );
-          if (res?.ok) {
-            return { ok: true, error: '' };
+  try {
+    for (const candidate of candidates) {
+      try {
+        const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
+        const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
+        const tried = new Set();
+        const tryOrder = [...ranked.map((r) => r.frameId), 0];
+        for (const fid of tryOrder) {
+          if (tried.has(fid)) continue;
+          tried.add(fid);
+          try {
+            prof?.mark(`T1-f${fid}-send`);
+            const res = await tabsSendMessageWithRetry(
+              candidate.id,
+              {
+                type: 'NLS_POST_COMMENT',
+                text: trimmed
+              },
+              { frameId: fid, maxAttempts: 5, delayMs: 120 }
+            );
+            prof?.mark(`T1-f${fid}-res`);
+            if (res?.ok) {
+              return { ok: true, error: '' };
+            }
+            if (res && typeof res === 'object' && 'error' in res && res.error) {
+              lastDetail = String(res.error);
+            }
+          } catch (e) {
+            prof?.mark(`T1-f${fid}-err`);
+            const msg =
+              e && typeof e === 'object' && 'message' in e
+                ? String(/** @type {{ message?: unknown }} */ (e).message || '')
+                : String(e || '');
+            if (msg) lastDetail = msg;
           }
-          if (res && typeof res === 'object' && 'error' in res && res.error) {
-            lastDetail = String(res.error);
-          }
-        } catch (e) {
-          const msg =
-            e && typeof e === 'object' && 'message' in e
-              ? String(/** @type {{ message?: unknown }} */ (e).message || '')
-              : String(e || '');
-          if (msg) lastDetail = msg;
         }
+      } catch (e) {
+        const msg =
+          e && typeof e === 'object' && 'message' in e
+            ? String(/** @type {{ message?: unknown }} */ (e).message || '')
+            : String(e || '');
+        if (msg) lastDetail = msg;
       }
-    } catch (e) {
-      const msg =
-        e && typeof e === 'object' && 'message' in e
-          ? String(/** @type {{ message?: unknown }} */ (e).message || '')
-          : String(e || '');
-      if (msg) lastDetail = msg;
     }
-  }
 
-  return {
-    ok: false,
-    error: lastDetail
-      ? `コメント送信に失敗しました。（${lastDetail}）`
-      : 'コメント送信に失敗しました。放送タブを再読み込みして再試行してください。'
-  };
+    return {
+      ok: false,
+      error: lastDetail
+        ? `コメント送信に失敗しました。（${lastDetail}）`
+        : 'コメント送信に失敗しました。放送タブを再読み込みして再試行してください。'
+    };
+  } finally {
+    prof?.finish('nls-cmt-popup');
+  }
 }
 
 /** @param {string} key */

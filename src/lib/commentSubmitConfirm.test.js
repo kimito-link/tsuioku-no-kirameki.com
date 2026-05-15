@@ -46,6 +46,16 @@ describe('waitUntilEditorReflectsSubmit', () => {
     await expect(p).resolves.toBe(true);
   });
 
+  it('待ち前に欄が空なら sleep なしで true', async () => {
+    const p = waitUntilEditorReflectsSubmit({
+      expectedNormalized: 'hello',
+      readNormalized: () => '',
+      probeEndpointsMs: [100, 500],
+      sleep
+    });
+    await expect(p).resolves.toBe(true);
+  });
+
   it('遅延クリア（累計 1800ms 付近）でも最終プローブ前に true', async () => {
     let value = 'slow-clear';
     vi.setSystemTime(0);
