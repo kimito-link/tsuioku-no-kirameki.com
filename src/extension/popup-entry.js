@@ -1256,11 +1256,11 @@ let extensionContextErrorGuardInstalled = false;
 function installExtensionContextErrorGuard() {
   if (extensionContextErrorGuardInstalled) return;
   extensionContextErrorGuardInstalled = true;
-  globalThis.addEventListener('unhandledrejection', (ev) => {
+  registerPopupListener(globalThis, 'unhandledrejection', (ev) => {
     if (!isExtensionContextInvalidatedError(ev.reason)) return;
     ev.preventDefault();
   });
-  globalThis.addEventListener('error', (ev) => {
+  registerPopupListener(globalThis, 'error', (ev) => {
     if (!isExtensionContextInvalidatedError(ev.error || ev.message)) return;
     ev.preventDefault();
   });
@@ -1342,8 +1342,8 @@ function initOfflineBannerOnce() {
   update();
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     try {
-      window.addEventListener('online', update);
-      window.addEventListener('offline', update);
+      registerPopupListener(window, 'online', update);
+      registerPopupListener(window, 'offline', update);
     } catch {
       // no-op
     }
@@ -1363,7 +1363,7 @@ function renderExtensionContextBanner(visible) {
     const btn = $('extensionContextBannerReload');
     if (btn instanceof HTMLButtonElement && !btn.dataset.nlBound) {
       btn.dataset.nlBound = '1';
-      btn.addEventListener('click', () => {
+      registerPopupListener(btn, 'click', () => {
         try {
           window.location.reload();
         } catch {
@@ -1946,7 +1946,7 @@ function openManualCopyOverlay(text) {
   retryBtn.textContent = 'コピーを再試行';
   retryBtn.style.cssText =
     'padding:6px 12px;border:1px solid #2563eb;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer';
-  retryBtn.addEventListener('click', () => {
+  registerPopupListener(retryBtn, 'click', () => {
     try {
       ta.focus();
       ta.select();
@@ -1963,14 +1963,14 @@ function openManualCopyOverlay(text) {
   closeBtn.textContent = '閉じる';
   closeBtn.style.cssText =
     'padding:6px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;cursor:pointer';
-  closeBtn.addEventListener('click', () => host.remove());
+  registerPopupListener(closeBtn, 'click', () => host.remove());
   row.appendChild(retryBtn);
   row.appendChild(closeBtn);
   box.appendChild(title);
   box.appendChild(ta);
   box.appendChild(row);
   host.appendChild(box);
-  host.addEventListener('click', (ev) => {
+  registerPopupListener(host, 'click', (ev) => {
     if (ev.target === host) host.remove();
   });
   document.body.appendChild(host);
@@ -3107,9 +3107,16 @@ function ensureStoryGrowthColorSchemeListener() {
     renderStoryUserLane();
   };
   if (typeof mq.addEventListener === 'function') {
-    mq.addEventListener('change', onChange);
+    registerPopupListener(mq, 'change', onChange);
   } else {
     mq.addListener(onChange);
+    registerPopupDisposer(() => {
+      try {
+        mq.removeListener(onChange);
+      } catch (_) {
+        /* noop */
+      }
+    });
   }
 }
 
@@ -3310,13 +3317,13 @@ let storyGlobalDismissBound = false;
 function ensureStoryGlobalDismissHandlers() {
   if (storyGlobalDismissBound) return;
   storyGlobalDismissBound = true;
-  document.addEventListener('keydown', (ev) => {
+  registerPopupListener(document, 'keydown', (ev) => {
     if (ev.key !== 'Escape') return;
     if (!STORY_GROWTH_STATE.pinnedCommentId) return;
     ev.preventDefault();
     clearPinnedStoryComment();
   });
-  document.addEventListener(
+  registerPopupListener(document, 
     'pointerdown',
     (ev) => {
       if (!STORY_GROWTH_STATE.pinnedCommentId) return;
@@ -3335,10 +3342,10 @@ function bindStoryDetailHoverBridge() {
   const detail = $('sceneStoryDetail');
   if (!detail || detail.dataset.nlDetailHoverBound === '1') return;
   detail.dataset.nlDetailHoverBound = '1';
-  detail.addEventListener('pointerenter', () => {
+  registerPopupListener(detail, 'pointerenter', () => {
     cancelStoryHoverClearTimer();
   });
-  detail.addEventListener('pointerleave', (ev) => {
+  registerPopupListener(detail, 'pointerleave', (ev) => {
     if (STORY_GROWTH_STATE.pinnedCommentId) return;
     const rel = ev.relatedTarget;
     if (rel instanceof Element && rel.closest?.('#sceneStoryGrowth')) return;
@@ -4108,7 +4115,7 @@ function bindStoryGrowthInteractions(root) {
   ensureStoryGlobalDismissHandlers();
   bindStoryDetailHoverBridge();
 
-  root.addEventListener('click', (ev) => {
+  registerPopupListener(root, 'click', (ev) => {
     const t = /** @type {HTMLElement} */ (ev.target);
     const img = t.closest('img.nl-story-growth-icon');
     if (!img || !root.contains(img)) return;
@@ -4122,7 +4129,7 @@ function bindStoryGrowthInteractions(root) {
     renderStoryCommentDetailPanel();
   });
 
-  root.addEventListener('keydown', (ev) => {
+  registerPopupListener(root, 'keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
     const t = /** @type {HTMLElement} */ (ev.target);
     if (!t.matches('img.nl-story-growth-icon')) return;
@@ -4130,7 +4137,7 @@ function bindStoryGrowthInteractions(root) {
     t.click();
   });
 
-  root.addEventListener('pointerover', (ev) => {
+  registerPopupListener(root, 'pointerover', (ev) => {
     if (!storyHoverPreviewEnabled()) return;
     if (STORY_GROWTH_STATE.pinnedCommentId) return;
     updateStoryHoverPointerFromEvent(ev);
@@ -4146,7 +4153,7 @@ function bindStoryGrowthInteractions(root) {
     renderStoryCommentDetailPanel();
   });
 
-  root.addEventListener('pointermove', (ev) => {
+  registerPopupListener(root, 'pointermove', (ev) => {
     if (!storyHoverPreviewEnabled()) return;
     if (STORY_GROWTH_STATE.pinnedCommentId) return;
     updateStoryHoverPointerFromEvent(ev);
@@ -4160,7 +4167,7 @@ function bindStoryGrowthInteractions(root) {
     renderStoryCommentDetailPanel();
   });
 
-  root.addEventListener('pointerout', (ev) => {
+  registerPopupListener(root, 'pointerout', (ev) => {
     if (!storyHoverPreviewEnabled()) return;
     if (STORY_GROWTH_STATE.pinnedCommentId) return;
     updateStoryHoverPointerFromEvent(ev);
@@ -5270,7 +5277,7 @@ function bindOnErrorHideHandlersWithin(root) {
     // 二重バインド防止（再描画でも一度だけ）
     if (node.dataset.nlOnErrorHideBound === '1') return;
     node.dataset.nlOnErrorHideBound = '1';
-    node.addEventListener(
+    registerPopupListener(node, 
       'error',
       () => {
         try {
@@ -5457,7 +5464,7 @@ function bindGiftRankingFetchPromptButtonOnce() {
   );
   if (!btn) return;
   _giftRankingFetchPromptBound = true;
-  btn.addEventListener('click', async () => {
+  registerPopupListener(btn, 'click', async () => {
     btn.disabled = true;
     try {
       const bag = await chrome.storage.local.get(KEY_GIFT_RANKING_LANE_ENABLED);
@@ -7971,7 +7978,7 @@ function attachAiDiagButtonHandler(fastCache) {
       '[nls AI診断] delegated listener attached to #devMonitorGiftRankingExtras'
     );
   } catch { /* no-op */ }
-  extrasEl.addEventListener('click', async (e) => {
+  registerPopupListener(extrasEl, 'click', async (e) => {
     const target = /** @type {HTMLElement|null} */ (e.target);
     const btn = /** @type {HTMLButtonElement|null} */ (
       target?.closest?.('#aiDiagBtn') || null
@@ -11709,7 +11716,7 @@ function initPopup() {
     );
     if (frameThemeDetails) frameThemeDetails.open = true;
   }
-  window.addEventListener('resize', applyResponsivePopupLayout);
+  registerPopupListener(window, 'resize', applyResponsivePopupLayout);
 
   const toggle = /** @type {HTMLInputElement} */ ($('recordToggle'));
   const exportBtn = /** @type {HTMLButtonElement} */ ($('exportJson'));
@@ -11797,13 +11804,13 @@ function initPopup() {
       });
   };
 
-  $('devMonitorRefresh')?.addEventListener('click', () => {
+  registerPopupListener($('devMonitorRefresh'), 'click', () => {
     watchMetaCache.key = '';
     watchMetaCache.snapshot = null;
     safeRefresh();
   });
 
-  $('devMonitorCopyAiBundleBtn')?.addEventListener('click', async () => {
+  registerPopupListener($('devMonitorCopyAiBundleBtn'), 'click', async () => {
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     const aiCopyBtn = /** @type {HTMLButtonElement|null} */ ($('devMonitorCopyAiBundleBtn'));
     if (aiCopyBtn) aiCopyBtn.disabled = true;
@@ -11916,7 +11923,7 @@ function initPopup() {
     }
   });
 
-  $('devMonitorDownloadAiBundleBtn')?.addEventListener('click', async () => {
+  registerPopupListener($('devMonitorDownloadAiBundleBtn'), 'click', async () => {
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     const dlBtn = /** @type {HTMLButtonElement|null} */ ($('devMonitorDownloadAiBundleBtn'));
     if (dlBtn) dlBtn.disabled = true;
@@ -11986,7 +11993,7 @@ function initPopup() {
     }
   });
 
-  $('devMonitorExportTrendBtn')?.addEventListener('click', async () => {
+  registerPopupListener($('devMonitorExportTrendBtn'), 'click', async () => {
     const prm = lastDevMonitorPanelParams;
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     if (!prm || !String(prm.liveId || '').trim()) {
@@ -12015,7 +12022,7 @@ function initPopup() {
     }
   });
 
-  $('devMonitorExportIngestBtn')?.addEventListener('click', async () => {
+  registerPopupListener($('devMonitorExportIngestBtn'), 'click', async () => {
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     try {
       const bag = await chrome.storage.local.get(KEY_COMMENT_INGEST_LOG);
@@ -12043,7 +12050,7 @@ function initPopup() {
     }
   });
 
-  $('devMonitorClearIngestBtn')?.addEventListener('click', async () => {
+  registerPopupListener($('devMonitorClearIngestBtn'), 'click', async () => {
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     try {
       await chrome.storage.local.remove(KEY_COMMENT_INGEST_LOG);
@@ -12055,12 +12062,12 @@ function initPopup() {
 
   // 0.1.26 (AA): HTML 保存ツールバー横の「マーケ」クイックボタン → 元の DL ボタンを click する
   // ことでハンドラ重複定義を避ける（status 表記やマスク設定もそのまま使える）。
-  $('exportMarketingQuickBtn')?.addEventListener('click', () => {
+  registerPopupListener($('exportMarketingQuickBtn'), 'click', () => {
     const original = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
     if (original && !original.disabled) original.click();
   });
 
-  $('devMonitorExportMarketingBtn')?.addEventListener('click', async () => {
+  registerPopupListener($('devMonitorExportMarketingBtn'), 'click', async () => {
     const prm = lastDevMonitorPanelParams;
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     const btn = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
@@ -12279,7 +12286,7 @@ function initPopup() {
     await savePopupFrameSettings();
   };
 
-  dismissErr?.addEventListener('click', async () => {
+  registerPopupListener(dismissErr, 'click', async () => {
     try {
       const ok = await storageRemoveSafe(KEY_STORAGE_WRITE_ERROR);
       if (!ok) return;
@@ -12289,7 +12296,7 @@ function initPopup() {
     }
   });
 
-  $('dismissCommentHarvestBanner')?.addEventListener('click', async () => {
+  registerPopupListener($('dismissCommentHarvestBanner'), 'click', async () => {
     try {
       const ok = await storageRemoveSafe(KEY_COMMENT_PANEL_STATUS);
       if (!ok) return;
@@ -12299,7 +12306,7 @@ function initPopup() {
     }
   });
 
-  $('extensionCacheClearBtn')?.addEventListener('click', async () => {
+  registerPopupListener($('extensionCacheClearBtn'), 'click', async () => {
     const statusEl = $('extensionCacheClearStatus');
     if (statusEl) statusEl.textContent = '';
     const confirmMsg =
@@ -12328,7 +12335,7 @@ function initPopup() {
     }
   });
 
-  toggle.addEventListener('change', async () => {
+  registerPopupListener(toggle, 'change', async () => {
     const next = toggle.checked;
     try {
       const ok = await storageSetSafe({ [KEY_RECORDING]: next });
@@ -12341,14 +12348,14 @@ function initPopup() {
       toggle.checked = !next;
     }
   });
-  toggle.addEventListener('click', (e) => {
+  registerPopupListener(toggle, 'click', (e) => {
     e.stopPropagation();
   });
 
   const deepHarvestQuietToggle = /** @type {HTMLInputElement|null} */ (
     $('deepHarvestQuietUiToggle')
   );
-  deepHarvestQuietToggle?.addEventListener('change', async () => {
+  registerPopupListener(deepHarvestQuietToggle, 'change', async () => {
     try {
       const ok = await storageSetSafe({
         [KEY_DEEP_HARVEST_QUIET_UI]: deepHarvestQuietToggle.checked
@@ -12364,7 +12371,7 @@ function initPopup() {
   const inlinePanelAutoshowToggle = /** @type {HTMLInputElement|null} */ (
     $('inlinePanelAutoshowToggle')
   );
-  inlinePanelAutoshowToggle?.addEventListener('change', async () => {
+  registerPopupListener(inlinePanelAutoshowToggle, 'change', async () => {
     try {
       await storageSetSafe({
         [KEY_INLINE_PANEL_AUTOSHOW_ENABLED]: inlinePanelAutoshowToggle.checked
@@ -12437,13 +12444,13 @@ function initPopup() {
   const radioPlayerRowEl = $('inlinePanelWidthPlayerRow');
   /** @type {HTMLInputElement|null} */
   const radioVideoOnlyEl = $('inlinePanelWidthVideo');
-  radioPlayerRowEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioPlayerRowEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       void saveInlinePanelWidthMode(INLINE_PANEL_WIDTH_PLAYER_ROW);
     }
   });
-  radioVideoOnlyEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioVideoOnlyEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       void saveInlinePanelWidthMode(INLINE_PANEL_WIDTH_VIDEO);
@@ -12456,19 +12463,19 @@ function initPopup() {
   const radioViewportWideAlwaysEl = $('inlinePanelViewportWideAlways');
   /** @type {HTMLInputElement|null} */
   const radioViewportWideOnceEl = $('inlinePanelViewportWideOnce');
-  radioViewportWideOffEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioViewportWideOffEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       void saveInlinePanelViewportWidePolicy(INLINE_PANEL_VIEWPORT_WIDE_OFF);
     }
   });
-  radioViewportWideAlwaysEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioViewportWideAlwaysEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       void saveInlinePanelViewportWidePolicy(INLINE_PANEL_VIEWPORT_WIDE_ALWAYS);
     }
   });
-  radioViewportWideOnceEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioViewportWideOnceEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       void saveInlinePanelViewportWidePolicy(INLINE_PANEL_VIEWPORT_WIDE_ONCE);
@@ -12490,28 +12497,28 @@ function initPopup() {
     wrap.hidden = !show;
     wrap.setAttribute('aria-hidden', show ? 'false' : 'true');
   };
-  radioPlacementDockBottomEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioPlacementDockBottomEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_DOCK_BOTTOM);
     }
   });
-  radioPlacementBelowEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioPlacementBelowEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BELOW);
     }
   });
-  radioPlacementBesideEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioPlacementBesideEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BESIDE);
     }
   });
-  radioPlacementFloatingEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioPlacementFloatingEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       syncFloatingAnchorWrapFromPlacementRadios();
@@ -12523,13 +12530,13 @@ function initPopup() {
   const radioFloatingAnchorTopRightEl = $('inlineFloatingAnchorTopRight');
   /** @type {HTMLInputElement|null} */
   const radioFloatingAnchorBottomLeftEl = $('inlineFloatingAnchorBottomLeft');
-  radioFloatingAnchorTopRightEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioFloatingAnchorTopRightEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       void saveInlineFloatingAnchor(INLINE_FLOATING_ANCHOR_TOP_RIGHT);
     }
   });
-  radioFloatingAnchorBottomLeftEl?.addEventListener('change', (e) => {
+  registerPopupListener(radioFloatingAnchorBottomLeftEl, 'change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       void saveInlineFloatingAnchor(INLINE_FLOATING_ANCHOR_BOTTOM_LEFT);
@@ -12537,7 +12544,7 @@ function initPopup() {
   });
 
   const calmMotionEl = /** @type {HTMLInputElement|null} */ ($('calmPanelMotion'));
-  calmMotionEl?.addEventListener('change', async () => {
+  registerPopupListener(calmMotionEl, 'change', async () => {
     try {
       const on = Boolean(calmMotionEl.checked);
       applyCalmPanelMotionClass(on);
@@ -12548,7 +12555,7 @@ function initPopup() {
   });
 
   const mktMaskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
-  mktMaskEl?.addEventListener('change', async () => {
+  registerPopupListener(mktMaskEl, 'change', async () => {
     try {
       await storageSetSafe({
         [KEY_MARKETING_EXPORT_MASK_LABELS]: Boolean(mktMaskEl.checked)
@@ -12559,13 +12566,13 @@ function initPopup() {
   });
 
   for (const chip of frameChips) {
-    chip.addEventListener('click', () => {
+    registerPopupListener(chip, 'click', () => {
       const frameId = String(chip.getAttribute('data-frame-id') || '');
       applyAndSaveFrame(frameId).catch(() => {});
     });
   }
 
-  saveCustomFrameBtn?.addEventListener('click', () => {
+  registerPopupListener(saveCustomFrameBtn, 'click', () => {
     popupFrameState.custom = readCustomFrameInputs();
     popupFrameState.id = 'custom';
     applyPopupFrame(popupFrameState.id, popupFrameState.custom);
@@ -12573,7 +12580,7 @@ function initPopup() {
     savePopupFrameSettings().catch(() => {});
   });
 
-  resetCustomFrameBtn?.addEventListener('click', () => {
+  registerPopupListener(resetCustomFrameBtn, 'click', () => {
     popupFrameState.custom = { ...DEFAULT_CUSTOM_FRAME };
     renderCustomFrameEditor(popupFrameState.custom);
     if (popupFrameState.id === 'custom') {
@@ -12583,7 +12590,7 @@ function initPopup() {
     savePopupFrameSettings().catch(() => {});
   });
 
-  toggleFrameCodeInputBtn?.addEventListener('click', () => {
+  registerPopupListener(toggleFrameCodeInputBtn, 'click', () => {
     if (!frameShareBox) return;
     const nextHidden = !frameShareBox.hidden;
     frameShareBox.hidden = nextHidden;
@@ -12595,7 +12602,7 @@ function initPopup() {
     }
   });
 
-  copyFrameCodeBtn?.addEventListener('click', () => {
+  registerPopupListener(copyFrameCodeBtn, 'click', () => {
     const code = createFrameShareCode(popupFrameState.id, popupFrameState.custom);
     copyTextToClipboard(code)
       .then((ok) => {
@@ -12610,7 +12617,7 @@ function initPopup() {
       });
   });
 
-  applyFrameCodeBtn?.addEventListener('click', () => {
+  registerPopupListener(applyFrameCodeBtn, 'click', () => {
     const raw = String(frameShareCode?.value || '');
     try {
       const parsed = parseFrameShareCode(raw);
@@ -12628,11 +12635,11 @@ function initPopup() {
     }
   });
 
-  frameShareCode?.addEventListener('input', () => {
+  registerPopupListener(frameShareCode, 'input', () => {
     setFrameShareStatus('', 'idle');
   });
 
-  captureBtn?.addEventListener('click', async () => {
+  registerPopupListener(captureBtn, 'click', async () => {
     const watchUrl =
       exportBtn.dataset.watchUrl || captureBtn?.dataset.watchUrl || '';
     if (!watchUrl) {
@@ -12686,7 +12693,7 @@ function initPopup() {
     }
   });
 
-  thumbIntervalSel?.addEventListener('change', async () => {
+  registerPopupListener(thumbIntervalSel, 'change', async () => {
     const v = Number(thumbIntervalSel.value);
     try {
       if (v === 0) {
@@ -12705,7 +12712,7 @@ function initPopup() {
     }
   });
 
-  exportBtn.addEventListener('click', async () => {
+  registerPopupListener(exportBtn, 'click', async () => {
     const lv = exportBtn.dataset.liveId;
     const key = exportBtn.dataset.storageKey;
     const watchUrl = exportBtn.dataset.watchUrl || '';
@@ -12735,7 +12742,7 @@ function initPopup() {
     }
   });
 
-  $('exportSessionSummaryJsonBtn')?.addEventListener('click', async () => {
+  registerPopupListener($('exportSessionSummaryJsonBtn'), 'click', async () => {
     const lv = exportBtn.dataset.liveId;
     if (!lv || exportBtn.disabled) return;
     try {
@@ -12746,7 +12753,7 @@ function initPopup() {
   });
 
   // 0.1.191: MCP Phase1a 手動 export
-  $('exportMcpSnapshotJsonBtn')?.addEventListener('click', async () => {
+  registerPopupListener($('exportMcpSnapshotJsonBtn'), 'click', async () => {
     try {
       await downloadMcpSnapshotJson();
     } catch {
@@ -12840,7 +12847,7 @@ function initPopup() {
     if (!on) setVoiceLevelMeter(0);
   };
 
-  window.addEventListener('pagehide', () => {
+  registerPopupListener(window, 'pagehide', () => {
     const w = exportBtn.dataset.watchUrl || '';
     if (!w || !voiceListeningUi) return;
     findWatchTabIdForVoice(w)
@@ -12858,7 +12865,7 @@ function initPopup() {
     setVoiceListeningUi(false);
   });
 
-  voiceAutoSend?.addEventListener('change', async () => {
+  registerPopupListener(voiceAutoSend, 'change', async () => {
     try {
       await storageSetSafe({
         [KEY_VOICE_AUTOSEND]: voiceAutoSend.checked
@@ -12868,7 +12875,7 @@ function initPopup() {
     }
   });
 
-  commentEnterSend?.addEventListener('change', async () => {
+  registerPopupListener(commentEnterSend, 'change', async () => {
     try {
       await storageSetSafe({
         [KEY_COMMENT_ENTER_SEND]: commentEnterSend.checked
@@ -12878,7 +12885,7 @@ function initPopup() {
     }
   });
 
-  anonymousIdenticonEnabled?.addEventListener('change', async () => {
+  registerPopupListener(anonymousIdenticonEnabled, 'change', async () => {
     const next = !!anonymousIdenticonEnabled.checked;
     try {
       await storageSetSafe({ [KEY_ANONYMOUS_IDENTICON_ENABLED]: next });
@@ -12890,7 +12897,7 @@ function initPopup() {
     safeRefresh();
   });
 
-  foldAnonymousInRankStrip?.addEventListener('change', async () => {
+  registerPopupListener(foldAnonymousInRankStrip, 'change', async () => {
     const next = !!foldAnonymousInRankStrip.checked;
     try {
       await storageSetSafe({ [KEY_FOLD_ANONYMOUS_IN_RANK_STRIP]: next });
@@ -12903,7 +12910,7 @@ function initPopup() {
   });
 
   const storyGrowthCollapseBtn = $('storyGrowthCollapseBtn');
-  storyGrowthCollapseBtn?.addEventListener('click', () => {
+  registerPopupListener(storyGrowthCollapseBtn, 'click', () => {
     void (async () => {
       const bag = await storageGetSafe(KEY_STORY_GROWTH_COLLAPSED, {});
       const collapsed = bag[KEY_STORY_GROWTH_COLLAPSED] === true;
@@ -12973,7 +12980,7 @@ function initPopup() {
 
   };
 
-  voiceDeviceSel?.addEventListener('change', async () => {
+  registerPopupListener(voiceDeviceSel, 'change', async () => {
     try {
       await storageSetSafe({
         [KEY_VOICE_INPUT_DEVICE]: voiceDeviceSel.value
@@ -12983,11 +12990,11 @@ function initPopup() {
     }
   });
 
-  voiceDeviceRefreshBtn?.addEventListener('click', () => {
+  registerPopupListener(voiceDeviceRefreshBtn, 'click', () => {
     refreshVoiceInputDeviceList().catch(() => {});
   });
 
-  voiceMicCheckBtn?.addEventListener('click', () => {
+  registerPopupListener(voiceMicCheckBtn, 'click', () => {
     void (async () => {
       setVoiceDeviceCheckStatus(
         voiceDeviceCheckStatusEl,
@@ -13013,7 +13020,7 @@ function initPopup() {
     })();
   });
 
-  voiceSrCheckBtn?.addEventListener('click', () => {
+  registerPopupListener(voiceSrCheckBtn, 'click', () => {
     void (async () => {
       const watchUrl = exportBtn.dataset.watchUrl || '';
       if (!watchUrl) {
@@ -13129,23 +13136,19 @@ function initPopup() {
         }
       };
       onMsg.addListener(onRuntimeMessage);
-      window.addEventListener(
-        'pagehide',
-        () => {
-          try {
-            onMsg.removeListener(onRuntimeMessage);
-          } catch {
-            // best-effort
-          }
-        },
-        { once: true }
-      );
+      registerPopupDisposer(() => {
+        try {
+          onMsg.removeListener(onRuntimeMessage);
+        } catch {
+          // best-effort
+        }
+      });
     }
   } catch {
     // no-op
   }
 
-  voiceBtn?.addEventListener('click', () => {
+  registerPopupListener(voiceBtn, 'click', () => {
     void (async () => {
       if (!commentInput || !voiceBtn || voiceBtn.disabled) return;
       const watchUrl = exportBtn.dataset.watchUrl || '';
@@ -13200,10 +13203,10 @@ function initPopup() {
     })();
   });
 
-  $('reloadWatchTabBtn')?.addEventListener('click', () => {
+  registerPopupListener($('reloadWatchTabBtn'), 'click', () => {
     void triggerReloadWatchTabFromPopup();
   });
-  $('reloadWatchTabPanelBtn')?.addEventListener('click', () => {
+  registerPopupListener($('reloadWatchTabPanelBtn'), 'click', () => {
     void triggerReloadWatchTabFromPopup();
   });
 
@@ -13211,7 +13214,7 @@ function initPopup() {
   // dataset.watchUrl は applyLastBroadcastReviewToEmptyState() で設定される。
   // hasExtensionContext() が偽ならボタン自体が disabled なので、ここでは
   // 単純に new tab を開くだけ。
-  $('lastBroadcastReopenBtn')?.addEventListener('click', () => {
+  registerPopupListener($('lastBroadcastReopenBtn'), 'click', () => {
     const btn = /** @type {HTMLButtonElement|null} */ ($('lastBroadcastReopenBtn'));
     if (!btn || btn.disabled) return;
     const url = String(btn.dataset.watchUrl || '').trim();
@@ -13225,7 +13228,7 @@ function initPopup() {
     }
   });
 
-  postBtn?.addEventListener('click', () => {
+  registerPopupListener(postBtn, 'click', () => {
     if (postBtn.disabled) return;
     submitComment().catch(() => {
       setCommentPostNotice(withCommentSendTroubleshootHint('送信に失敗しました。'), 'error');
@@ -13233,7 +13236,7 @@ function initPopup() {
     });
   });
 
-  commentInput?.addEventListener('keydown', (e) => {
+  registerPopupListener(commentInput, 'keydown', (e) => {
     const action = commentComposeKeyAction({
       key: e.key,
       ctrlKey: e.ctrlKey,
@@ -13254,7 +13257,7 @@ function initPopup() {
     });
   });
 
-  commentInput?.addEventListener('input', () => {
+  registerPopupListener(commentInput, 'input', () => {
     clearCommentPostNotice();
     paintCommentComposeUi();
   });
@@ -13315,7 +13318,7 @@ function initPopup() {
       cheerToggleBtn.setAttribute('aria-expanded', 'true');
     };
 
-    cheerToggleBtn.addEventListener('click', (e) => {
+    registerPopupListener(cheerToggleBtn, 'click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       const expanded = cheerToggleBtn.getAttribute('aria-expanded') === 'true';
@@ -13326,7 +13329,7 @@ function initPopup() {
       }
     });
 
-    cheerPaletteEl.addEventListener('click', (e) => {
+    registerPopupListener(cheerPaletteEl, 'click', (e) => {
       const target = e.target instanceof Element ? e.target.closest('.nl-cheer-chip') : null;
       if (!(target instanceof HTMLButtonElement)) return;
       const key = String(target.dataset.cheerKey || '');
@@ -13365,7 +13368,7 @@ function initPopup() {
     });
 
     // 外側クリックで閉じる（toggle ボタンと palette 自体は除外）
-    document.addEventListener(
+    registerPopupListener(document, 
       'click',
       (e) => {
         if (cheerPaletteEl.hidden) return;
@@ -13378,7 +13381,7 @@ function initPopup() {
     );
 
     // Esc キーで閉じる（document-level なので popup 内のどこからでも効く）
-    document.addEventListener('keydown', (e) => {
+    registerPopupListener(document, 'keydown', (e) => {
       if (e.key !== 'Escape') return;
       if (cheerPaletteEl.hidden) return;
       e.stopPropagation();
@@ -13508,17 +13511,13 @@ function initPopup() {
         }
       };
       stCh.addListener(onStorageChanged);
-      window.addEventListener(
-        'pagehide',
-        () => {
-          try {
-            stCh.removeListener(onStorageChanged);
-          } catch {
-            // best-effort
-          }
-        },
-        { once: true }
-      );
+      registerPopupDisposer(() => {
+        try {
+          stCh.removeListener(onStorageChanged);
+        } catch {
+          // best-effort
+        }
+      });
     }
   } catch {
     // no-op
@@ -13550,10 +13549,15 @@ function initPopup() {
       }, POLL_INTERVAL_MS)
     )
   );
+  registerPopupDisposer(() => {
+    if (popupPollIntervalId == null) return;
+    clearInterval(popupPollIntervalId);
+    popupPollIntervalId = null;
+  });
 
   if (INLINE_MODE || INLINE_SIDE_PANEL) {
     let lastVisibilityRefresh = Date.now();
-    document.addEventListener('visibilitychange', () => {
+    registerPopupListener(document, 'visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
       if (!hasExtensionContext()) return;
       const now = Date.now();
@@ -13569,7 +13573,7 @@ function initPopup() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initPopup);
+  registerPopupListener(document, 'DOMContentLoaded', initPopup);
 } else {
   initPopup();
 }
@@ -13596,6 +13600,6 @@ if (typeof window !== 'undefined') {
   if (document.readyState === 'complete') {
     finalRevealFallback();
   } else {
-    window.addEventListener('load', finalRevealFallback, { once: true });
+    registerPopupListener(window, 'load', finalRevealFallback, { once: true });
   }
 }
