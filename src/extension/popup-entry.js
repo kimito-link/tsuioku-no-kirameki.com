@@ -15,6 +15,7 @@ import { summarizeDevMonitorGiftRanking } from '../lib/summarizeDevMonitorGiftRa
 import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
+import { createBoundedMap } from '../lib/createBoundedMap.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import { createCommentSubmitProfiler } from '../lib/commentSubmitProfiling.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
@@ -661,9 +662,11 @@ let _lastTopSupportRankStripStableKey = null;
  * これが最も信頼度高い source）を本 map に流し、他 section（NDGR ギフト帯 / 公式
  * サイドバー履歴等）は render 時に本 map を引き直して nickname を上書きする。
  *
- * @type {Map<string, string>}
+ * @type {Map<string, string> & {cap:number, name:string, policy:'fifo'|'lru'}}
  */
-const _nicknameResolveMap = new Map();
+const _nicknameResolveMap = createBoundedMap(1024, 'popup.nicknameResolveMap', {
+  policy: 'lru'
+});
 
 /**
  * 放送切替（liveId 変化）を検知して、直前放送の UI キャッシュ（rank strip キー・差分リアクション用の
@@ -689,6 +692,7 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
   _prevSupportCount = null;
   _prevViewerCount = null;
   _prevConcurrentEstimated = null;
+  _nicknameResolveMap.clear();
 }
 
 /**
