@@ -71,6 +71,7 @@ import {
   KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
   KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
   KEY_SELF_POSTED_RECENTS,
+  KEY_AUTO_BACKUP_STATE,
   KEY_USER_COMMENT_PROFILE_CACHE,
   KEY_COMMENT_PANEL_STATUS,
   KEY_COMMENT_INGEST_LOG,
@@ -11225,6 +11226,7 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
 const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
   throttleMs: 450
 });
+registerPopupDisposer(() => coalescedRefreshScheduler.cancel());
 /** 初回 refresh が完了するまではコアレスをバイパスし即時反映する */
 let initialRefreshDone = false;
 
@@ -11269,12 +11271,29 @@ function dismissInitialLoadShade() {
   }, wait);
 }
 
-/** @param {string} key */
-function isHighFrequencyCommentRelatedStorageKey(key) {
+/**
+ * content script が配信中に繰り返し書き込む storage キー。
+ * ここに含まれるキーだけの更新は popupStorageRefreshCoalesce 経由で 450ms に集約する。
+ *
+ * @param {string} key
+ */
+function isHighFrequencyPopupRefreshStorageKey(key) {
   const k = String(key || '');
   if (/^nls_comments_/i.test(k)) return true;
   if (/^nls_gift_users_/i.test(k)) return true;
+  if (/^nls_gift_events_/i.test(k)) return true;
+  if (/^nls_gift_subapp_history_/i.test(k)) return true;
+  if (/^nls_event_dom_/i.test(k)) return true;
+  if (/^nls_nicoad_ranking_/i.test(k)) return true;
+  if (/^nls_mcp_live_snapshot_v1_/i.test(k)) return true;
+  if (k === 'nls_mcp_live_latest_v1') return true;
   if (k === KEY_SELF_POSTED_RECENTS) return true;
+  if (k === KEY_AUTO_BACKUP_STATE) return true;
+  if (k === KEY_USER_COMMENT_PROFILE_CACHE) return true;
+  if (k === KEY_COMMENT_INGEST_LOG) return true;
+  if (k === KEY_COMMENT_PANEL_STATUS) return true;
+  if (k === KEY_STORAGE_WRITE_ERROR) return true;
+  if (k === KEY_AI_SHARE_FAST_DIAG) return true;
   if (k.startsWith(KEY_DEV_MONITOR_TREND_PREFIX)) return true;
   return false;
 }
@@ -11287,7 +11306,7 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   const keys = Object.keys(changes || {});
   if (!keys.length) return;
   const allHighFreq = keys.every((k) =>
-    isHighFrequencyCommentRelatedStorageKey(k)
+    isHighFrequencyPopupRefreshStorageKey(k)
   );
   coalescedRefreshScheduler.schedule(
     { allHighFreq, initialDone: initialRefreshDone },
