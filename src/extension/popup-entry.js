@@ -407,6 +407,56 @@ function $(id) {
   return document.getElementById(id);
 }
 
+const _disposers = [];
+let _popupLifecycleDisposed = false;
+
+function registerPopupDisposer(dispose) {
+  if (typeof dispose !== 'function') return () => {};
+  let disposed = false;
+  const wrappedDispose = () => {
+    if (disposed) return;
+    disposed = true;
+    try {
+      dispose();
+    } catch (_) {
+      /* noop */
+    }
+  };
+  if (_popupLifecycleDisposed) {
+    wrappedDispose();
+    return () => {};
+  }
+  _disposers.push(wrappedDispose);
+  return wrappedDispose;
+}
+
+function disposePopupLifecycle() {
+  if (_popupLifecycleDisposed) return;
+  _popupLifecycleDisposed = true;
+  const disposers = _disposers.splice(0);
+  for (let i = disposers.length - 1; i >= 0; i -= 1) {
+    disposers[i]();
+  }
+}
+
+function registerPopupListener(target, type, handler, opts) {
+  if (!target || typeof target.addEventListener !== 'function') return () => {};
+  try {
+    target.addEventListener(type, handler, opts);
+  } catch (_) {
+    return () => {};
+  }
+  return registerPopupDisposer(() => {
+    try {
+      target.removeEventListener(type, handler, opts);
+    } catch (_) {
+      /* noop */
+    }
+  });
+}
+
+registerPopupListener(window, 'pagehide', disposePopupLifecycle, { once: true });
+
 function syncVoiceCommentButton() {
   if (!hasExtensionContext()) return;
   const voice = /** @type {HTMLButtonElement|null} */ ($('voiceCommentBtn'));
