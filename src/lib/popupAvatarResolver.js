@@ -70,3 +70,30 @@ export function resolveAvatarUrlWithCandidates(uid, candidates, size = 's') {
   }
   return pickAvatarUrlForUid(uid, null, size);
 }
+
+/**
+ * F3(v0.1.282): 観測信号 API（加法追加・表示用 API は不変）。
+ *
+ * commentProfileMap に「intercept 由来の実 avatar URL」が観測できているかだけ
+ * を返す。`resolveAvatarUrlFromCommentProfileMap` は未観測でも uid から合成
+ * canonical URL を返すため、戻り値の有無で「観測済みか」を判定できない
+ * （退会/未設定ユーザーの 404 を "観測済み" と誤提示する原因）。
+ *
+ * `userEntryAvatarResolve.js` の `avatarObserved`（実 URL のみ true、合成
+ * canonical は含めない）と同じ思想。tier / avatar 品質判定が「avatar あり」
+ * 信号にこちらを使えば、合成 URL を観測扱いする退行を防げる。表示ロジックは
+ * 一切変えない（合成フォールバックは UX 維持のため継続）。
+ *
+ * @param {string|number|null|undefined} uid
+ * @param {Record<string, { avatarUrl?: string }>|null|undefined} commentProfileMap
+ * @returns {boolean} intercept 由来の実 URL を観測できていれば true
+ */
+export function isAvatarObservedInCommentProfileMap(uid, commentProfileMap) {
+  const key = String(uid ?? '').trim();
+  if (!key) return false;
+  const entry =
+    commentProfileMap && typeof commentProfileMap === 'object'
+      ? /** @type {any} */ (commentProfileMap)[key]
+      : null;
+  return Boolean(String(entry?.avatarUrl || '').trim());
+}

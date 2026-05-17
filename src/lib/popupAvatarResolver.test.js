@@ -2,8 +2,35 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveAvatarUrlFromCommentProfileMap,
   resolveAvatarUrlFromMap,
-  resolveAvatarUrlWithCandidates
+  resolveAvatarUrlWithCandidates,
+  isAvatarObservedInCommentProfileMap
 } from './popupAvatarResolver.js';
+
+describe('isAvatarObservedInCommentProfileMap (F3 観測信号・加法追加)', () => {
+  it('intercept 由来の実 URL があれば true', () => {
+    const map = { '143172392': { avatarUrl: 'https://example.com/a.jpg' } };
+    expect(isAvatarObservedInCommentProfileMap('143172392', map)).toBe(true);
+  });
+  it('avatarUrl 空文字は false（合成 canonical を観測扱いしない）', () => {
+    expect(
+      isAvatarObservedInCommentProfileMap('2913665', { '2913665': { avatarUrl: '' } })
+    ).toBe(false);
+  });
+  it('entry 無し / 無効 uid / null map は false', () => {
+    expect(isAvatarObservedInCommentProfileMap('143172392', {})).toBe(false);
+    expect(isAvatarObservedInCommentProfileMap('', {})).toBe(false);
+    expect(isAvatarObservedInCommentProfileMap(null, {})).toBe(false);
+    expect(isAvatarObservedInCommentProfileMap(undefined, {})).toBe(false);
+    expect(isAvatarObservedInCommentProfileMap('143172392', null)).toBe(false);
+  });
+  it('表示用 API は不変（観測 false でも合成フォールバック維持＝UX 劣化ゼロ）', () => {
+    const map = {};
+    expect(isAvatarObservedInCommentProfileMap('143172392', map)).toBe(false);
+    expect(resolveAvatarUrlFromCommentProfileMap('143172392', map)).toBe(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14317/143172392.jpg'
+    );
+  });
+});
 
 describe('resolveAvatarUrlFromCommentProfileMap', () => {
   it('returns intercepted avatarUrl when present', () => {
