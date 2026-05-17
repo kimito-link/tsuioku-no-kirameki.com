@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.282',
+    date: '2026-05-17',
+    summary: '同接の累計過大表示を修正＋avatar観測信号を整備',
+    items: Object.freeze([
+      '同時接続数が累計来場者数で過大に表示されることがあった不具合を修正しました（複数AIレビューで方針を確認）',
+      'アバター画像を実際に観測できているかを内部で正しく区別できるようにしました（表示は従来どおりで変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.281',
     date: '2026-05-16',
     summary: 'popup と identicon の memory leak 対策',
