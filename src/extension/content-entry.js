@@ -1666,10 +1666,12 @@ window.addEventListener('message', (e) => {
   if (e.data.type === 'NLS_INTERCEPT_STATISTICS') {
     const now = Date.now();
     const v = e.data.viewers;
-    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
-      wsViewerCount = v;
-      wsViewerCountUpdatedAt = now;
-    }
+    // F4(v0.1.282): statistics.viewers は「累計来場」であり同時接続ではない
+    // （下の updateOfficialStatistics JSDoc が明記する設計）。累計を
+    // wsViewerCount(同接候補) に昇格させると resolveConcurrentViewers で
+    // 同接が過大表示になるため、ここでは wsViewerCount に入れない。同接推定は
+    // estimateConcurrentViewers の fallback（コメンター法＋滞留法）に委ねる。
+    // v 自体は下の updateOfficialStatistics / comments 判定で使うため残す。
     const c = e.data.comments;
     if (typeof c === 'number' && Number.isFinite(c) && c >= 0) {
       wsCommentCount = c;
@@ -9226,8 +9228,9 @@ async function pollStatsFromPage() {
     if (wc?.[1]) {
       const n = parseInt(wc[1], 10);
       if (Number.isFinite(n) && n >= 0) {
-        wsViewerCount = n;
-        wsViewerCountUpdatedAt = Date.now();
+        // F4(v0.1.282): "watchCount"/"watching" は累計来場であり同時接続では
+        // ない（content の updateOfficialStatistics JSDoc 設計準拠）。
+        // wsViewerCount(同接候補) には入れず、観測成功カウントのみ記録する。
         _pollDiag.ok += 1;
       }
     }
