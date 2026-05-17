@@ -11,3 +11,15 @@ nicolivelog-extension-investigation.zip
 
 # Chrome Web Store 申請用ビルド成果物
 build/
+
+# API キー・シークレット（誤コミット防止 / 2026-05-17 nl-keys.txt 事故対策）
+nl-keys.txt
+keys.txt
+*-keys.txt
+*-keys.json
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+credentials.json
