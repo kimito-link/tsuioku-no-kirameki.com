@@ -30,6 +30,7 @@ import {
   buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+import { shouldShowNorthStarLane } from '../lib/northStarLaneVisibility.js';
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
 import {
   isNorthStarLaneWaitingState,
@@ -5512,6 +5513,20 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
   const laneId = northStarLaneIdFromBodyEl(body);
   if (!laneId) return;
   const laneRoot = body.closest('.nl-north-star-lane');
+  // v0.1.282: 補助レーン（番組累計pt / 広告ランキング / イベント累計スコア /
+  // イベント現在順位）は「不参加・空・取得不能」を完全非表示にしてスペースを
+  // 無駄にしない（ユーザー明示 2026-05-18）。コア2レーン（貢献度ランキング /
+  // ギフト履歴＝プログラムの存在意義）は取得可否に関わらず常設のまま堅持
+  // （durable: 北極星の核は隠さない。NDGR 拡張集計で埋める前提）。
+  // 'not_yet' は起動直後の一過性ロード中なので隠さない（pop-in jank 回避）。
+  if (laneRoot instanceof HTMLElement) {
+    const laneStateForVis =
+      String(body.getAttribute('data-lane-state') || '').trim() || 'missing';
+    const showLane = shouldShowNorthStarLane(laneId, laneStateForVis);
+    laneRoot.hidden = !showLane;
+    if (showLane) laneRoot.removeAttribute('aria-hidden');
+    else laneRoot.setAttribute('aria-hidden', 'true');
+  }
   const gadget = laneRoot?.querySelector?.('.nl-north-star-lane__gadget');
   if (!(gadget instanceof HTMLElement)) return;
   const state = String(body.getAttribute('data-lane-state') || '').trim() || 'missing';
