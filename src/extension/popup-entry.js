@@ -245,6 +245,7 @@ import {
   flattenStoryUserLaneBuckets
 } from '../lib/storyUserLaneBuckets.js';
 import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js';
+import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.js';
 import {
   normalizeLv,
   userLaneCandidatesFromStorage
@@ -3452,7 +3453,16 @@ function renderStoryUserLane() {
       userId: uidRaw,
       nickname: String(agg.nickname || ''),
       avatarUrl: String(agg.avatarUrl || ''),
-      ...(agg.avatarObserved ? { avatarObserved: true } : {}),
+      // F3(v0.1.282) 接続: 集約由来の avatarObserved に加え、コメント
+      // プロファイルキャッシュ（intercept/join 由来）に「実 avatar URL」が
+      // 観測できているユーザーも観測済み扱いにする。弱ニック＋数値IDでも
+      // 実 avatar が観測できていれば link 段（tier 3）へ正しく上がる
+      // （合成 canonical URL は isAvatarObservedInCommentProfileMap が弾くので
+      // 退会/未設定ユーザーを誤って観測扱いしない）。加法のみ＝既存 true は不変。
+      ...(agg.avatarObserved ||
+      isAvatarObservedInCommentProfileMap(uidRaw, popupUserCommentProfileMap)
+        ? { avatarObserved: true }
+        : {}),
       ...(ownPostedForUid ? { selfPosted: true } : {}),
       text: '',
       commentNo: ''

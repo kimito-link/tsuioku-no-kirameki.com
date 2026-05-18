@@ -13,6 +13,7 @@ import {
   pickBetterInterceptNickname,
   pickGiftRankDisplayNicknameWithUidFallback
 } from './giftDisplayNickname.js';
+import { isAvatarObservedInCommentProfileMap } from './popupAvatarResolver.js';
 
 /**
  * @typedef {{
@@ -205,9 +206,15 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
  * `KEY_USER_COMMENT_PROFILE_CACHE`（intercept / join 由来）で補強する。
  * ギフト帯の {@link pickGiftRankDisplayNickname} と同系の優先ルールで揃える。
  *
+ * F3(v0.1.282): nickname 補強に加え、プロファイルキャッシュに「intercept 由来の
+ * 実 avatar URL」が観測できているユーザーは `avatarObserved` も true へ昇格する
+ * （加法のみ — 既存 true は不変、合成 canonical URL は
+ * `isAvatarObservedInCommentProfileMap` が弾くので退会/未設定を誤観測しない）。
+ * これにより弱ニック＋数値IDでも実 avatar 観測があれば link 段へ正しく上がる。
+ *
  * @param {readonly Readonly<UserLaneCandidateFromStorage>[]} aggregates
  * @param {readonly unknown[]|null|undefined} displayEntries
- * @param {Record<string, { nickname?: unknown }>|null|undefined} profileMap
+ * @param {Record<string, { nickname?: unknown, avatarUrl?: unknown }>|null|undefined} profileMap
  * @returns {readonly Readonly<UserLaneCandidateFromStorage>[]}
  */
 export function enrichUserLaneAggregatesWithProfileAndDisplay(
@@ -224,7 +231,7 @@ export function enrichUserLaneAggregatesWithProfileAndDisplay(
   const map =
     profileMap && typeof profileMap === 'object' && !Array.isArray(profileMap)
       ? profileMap
-      : /** @type {Record<string, { nickname?: unknown }>} */ ({});
+      : /** @type {Record<string, { nickname?: unknown, avatarUrl?: unknown }>} */ ({});
 
   /**
    * @param {string} uid
@@ -269,13 +276,20 @@ export function enrichUserLaneAggregatesWithProfileAndDisplay(
       fromDisplay,
       intercept
     );
-    if (merged === stored) return agg;
+    // F3(v0.1.282): プロファイルキャッシュに実 avatar 観測があれば observed
+    // 昇格。加法のみ（既存 true は不変、合成 canonical は弾かれる）。
+    const observedNext =
+      Boolean(agg.avatarObserved) ||
+      isAvatarObservedInCommentProfileMap(uid, map);
+    const nickChanged = merged !== stored;
+    const observedChanged = observedNext !== Boolean(agg.avatarObserved);
+    if (!nickChanged && !observedChanged) return agg;
     anyChange = true;
     return Object.freeze({
       userId: agg.userId,
-      nickname: merged,
+      nickname: nickChanged ? merged : agg.nickname,
       avatarUrl: agg.avatarUrl,
-      avatarObserved: agg.avatarObserved,
+      avatarObserved: observedNext,
       liveId: agg.liveId
     });
   });
