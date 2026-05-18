@@ -32,6 +32,7 @@ import {
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
 import { shouldShowNorthStarLane } from '../lib/northStarLaneVisibility.js';
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
+import { buildSelfAggregatedContributionRankingFromEvents } from '../lib/giftEventStore.js';
 import {
   isNorthStarLaneWaitingState,
   buildNorthStarLaneWaitingShellHtml,
@@ -6238,6 +6239,40 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
       isNorthStarBody: true
     });
     return;
+  }
+  // v0.1.282+ 北極星ピボット（feedback_north_star_priority_no_drift 2026-05-19）:
+  // 公式（cross-origin iframe）が原理的に取れない局面で placeholder 放置せず、
+  // 拡張が観測した NDGR ギフトを送信者別 point 合計した独自ランキングを堂々と出す。
+  // ここで例外を外へ投げないこと（refreshAllNorthStarMirrorLanes は per-lane
+  // 隔離されておらず、throw すると後続レーンが全滅する＝会議室 critic #7）。
+  try {
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (lid) {
+      const key = `nls_gift_events_${lid}`;
+      const bag = await chrome.storage.local.get(key);
+      const events = Array.isArray(bag[key]) ? bag[key] : [];
+      const selfRows = buildSelfAggregatedContributionRankingFromEvents(events, {
+        maxRows: 20
+      });
+      if (selfRows.length > 0) {
+        const rooms = selfRows.map((r) => ({
+          userKey: r.userId,
+          nickname: r.nickname,
+          count: r.point,
+          avatarUrl: ''
+        }));
+        paintTopSupportRankStyleIntoElement(body, rooms, {
+          noteText:
+            '視聴中ブラウザが観測できた範囲の拡張独自集計（公式の貢献度ランキングとは一致しません）',
+          unitSuffix: '貢',
+          ariaLabel: '貢献度ランキング（拡張集計）',
+          isNorthStarBody: true
+        });
+        return;
+      }
+    }
+  } catch {
+    /* 観測集計は best-effort。失敗時は既存 placeholder へ落として続行する */
   }
   const state = determineNorthStarLaneState('contributionRanking', { bundle, snap });
   renderNorthStarLane('contributionRanking', null, state);

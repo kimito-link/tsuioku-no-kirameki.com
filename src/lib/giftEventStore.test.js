@@ -3,7 +3,9 @@ import {
   appendGiftEvents,
   buildContributionRankingFromEvents,
   buildGiftHistoryFromEvents,
-  summarizeGiftEvents
+  summarizeGiftEvents,
+  dedupExactGiftEvents,
+  buildSelfAggregatedContributionRankingFromEvents
 } from './giftEventStore.js';
 
 const NOW = 1_700_000_000_000;
@@ -240,6 +242,134 @@ describe('summarizeGiftEvents', () => {
     expect(r.totalEvents).toBe(1);
     expect(r.totalPoints).toBe(100);
     expect(r.uniqueSenders).toBe(0);
+  });
+});
+
+describe('dedupExactGiftEvents', () => {
+  it('returns empty for non-array', () => {
+    expect(dedupExactGiftEvents(null)).toEqual([]);
+    expect(dedupExactGiftEvents(undefined)).toEqual([]);
+  });
+
+  it('collapses exact-tuple duplicates (same userId|itemId|point|message|capturedAt), keeps first, preserves order', () => {
+    const a = makeEvent({ userId: 'u1', itemId: 'i', point: 100, message: 'm', capturedAt: NOW });
+    const dup = makeEvent({ userId: 'u1', itemId: 'i', point: 100, message: 'm', capturedAt: NOW });
+    const b = makeEvent({ userId: 'u2', itemId: 'j', point: 50, capturedAt: NOW });
+    const r = dedupExactGiftEvents([a, dup, b]);
+    expect(r).toHaveLength(2);
+    expect(r[0].userId).toBe('u1');
+    expect(r[1].userId).toBe('u2');
+  });
+
+  it('keeps events that differ only by capturedAt (legit repeat-gift protection)', () => {
+    const r = dedupExactGiftEvents([
+      makeEvent({ userId: 'u1', itemId: 'i', point: 100, capturedAt: NOW }),
+      makeEvent({ userId: 'u1', itemId: 'i', point: 100, capturedAt: NOW + 1 })
+    ]);
+    expect(r).toHaveLength(2);
+  });
+});
+
+describe('buildSelfAggregatedContributionRankingFromEvents', () => {
+  it('returns empty for empty / null / non-array', () => {
+    expect(buildSelfAggregatedContributionRankingFromEvents([])).toEqual([]);
+    expect(buildSelfAggregatedContributionRankingFromEvents(null)).toEqual([]);
+  });
+
+  it('sums points per user, sorts desc, assigns sequential rank, tracks count + latest non-empty nickname', () => {
+    const events = [
+      makeEvent({ userId: 'u1', nickname: 'A', point: 100, capturedAt: NOW }),
+      makeEvent({ userId: 'u2', nickname: 'B', point: 500, capturedAt: NOW }),
+      makeEvent({ userId: 'u1', nickname: 'A2', point: 50, capturedAt: NOW + 1 })
+    ];
+    const r = buildSelfAggregatedContributionRankingFromEvents(events);
+    expect(r.map((x) => x.rank)).toEqual([1, 2]);
+    expect(r[0]).toMatchObject({ userId: 'u2', point: 500, count: 1, nickname: 'B' });
+    expect(r[1]).toMatchObject({ userId: 'u1', point: 150, count: 2, nickname: 'A2' });
+  });
+
+  it('excludes anonymous (userId="") from ranking entirely', () => {
+    const events = [
+      makeEvent({ userId: '', nickname: '名無し', itemName: 'x', point: 9999, capturedAt: NOW }),
+      makeEvent({ userId: 'u1', nickname: 'A', point: 100, capturedAt: NOW })
+    ];
+    const r = buildSelfAggregatedContributionRankingFromEvents(events);
+    expect(r).toHaveLength(1);
+    expect(r[0].userId).toBe('u1');
+  });
+
+  it('produces no fake 0pt ranking: all point<=0 or all anonymous => []', () => {
+    expect(
+      buildSelfAggregatedContributionRankingFromEvents([
+        makeEvent({ userId: 'u1', point: 0, capturedAt: NOW }),
+        makeEvent({ userId: 'u2', point: 0, capturedAt: NOW })
+      ])
+    ).toEqual([]);
+    expect(
+      buildSelfAggregatedContributionRankingFromEvents([
+        makeEvent({ userId: '', itemName: 'x', point: 100, capturedAt: NOW })
+      ])
+    ).toEqual([]);
+  });
+
+  it('does not double-count exact-duplicate appends', () => {
+    const dup = { userId: 'u1', nickname: 'A', itemId: 'i', itemName: '', point: 200, message: 'm', contributionRank: null, capturedAt: NOW };
+    const r = buildSelfAggregatedContributionRankingFromEvents([{ ...dup }, { ...dup }]);
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ point: 200, count: 1 });
+  });
+
+  it('counts genuine repeat-gift (same user/item/point, different capturedAt) as separate', () => {
+    const r = buildSelfAggregatedContributionRankingFromEvents([
+      makeEvent({ userId: 'u1', nickname: 'A', itemId: 'i', point: 200, capturedAt: NOW }),
+      makeEvent({ userId: 'u1', nickname: 'A', itemId: 'i', point: 200, capturedAt: NOW + 1 })
+    ]);
+    expect(r[0]).toMatchObject({ point: 400, count: 2 });
+  });
+
+  it('deterministic tie-break on equal points: count desc -> lastCapturedAt asc -> userId asc', () => {
+    const events = [
+      // u_b: 100pt in 1 gift @ NOW+5
+      makeEvent({ userId: 'u_b', nickname: 'b', point: 100, capturedAt: NOW + 5 }),
+      // u_a: 100pt in 2 gifts (higher count -> ranks above u_b)
+      makeEvent({ userId: 'u_a', nickname: 'a', point: 60, capturedAt: NOW }),
+      makeEvent({ userId: 'u_a', nickname: 'a', point: 40, capturedAt: NOW + 1 }),
+      // u_c: 100pt in 1 gift @ NOW+2 (same count as u_b, earlier lastCapturedAt -> above u_b)
+      makeEvent({ userId: 'u_c', nickname: 'c', point: 100, capturedAt: NOW + 2 })
+    ];
+    const r = buildSelfAggregatedContributionRankingFromEvents(events);
+    expect(r.map((x) => x.userId)).toEqual(['u_a', 'u_c', 'u_b']);
+    expect(r.map((x) => x.rank)).toEqual([1, 2, 3]);
+  });
+
+  it('adopts earlier non-empty nickname when the latest event nickname is empty', () => {
+    const r = buildSelfAggregatedContributionRankingFromEvents([
+      makeEvent({ userId: 'u1', nickname: 'よしだ', point: 100, capturedAt: NOW }),
+      makeEvent({ userId: 'u1', nickname: '', point: 50, capturedAt: NOW + 1000 })
+    ]);
+    expect(r[0].nickname).toBe('よしだ');
+    expect(r[0].lastCapturedAt).toBe(NOW + 1000);
+  });
+
+  it('caps rows at maxRows and renumbers rank 1..maxRows', () => {
+    const events = [];
+    for (let i = 0; i < 30; i++) {
+      events.push(makeEvent({ userId: `u${i}`, nickname: `n${i}`, point: (i + 1) * 10, capturedAt: NOW + i }));
+    }
+    const r = buildSelfAggregatedContributionRankingFromEvents(events, { maxRows: 20 });
+    expect(r).toHaveLength(20);
+    expect(r[0].rank).toBe(1);
+    expect(r[19].rank).toBe(20);
+    expect(r[0].userId).toBe('u29'); // highest point
+  });
+
+  it('treats NaN/non-finite point as 0 and excludes a user whose only points are invalid', () => {
+    const r = buildSelfAggregatedContributionRankingFromEvents([
+      makeEvent({ userId: 'u1', nickname: 'A', point: Number.NaN, capturedAt: NOW }),
+      makeEvent({ userId: 'u2', nickname: 'B', point: 300, capturedAt: NOW })
+    ]);
+    expect(r).toHaveLength(1);
+    expect(r[0].userId).toBe('u2');
   });
 });
 
