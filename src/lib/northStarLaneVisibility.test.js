@@ -30,9 +30,17 @@ describe('shouldShowNorthStarLane', () => {
     }
   });
 
-  it('v0.1.282: event_present_unscrapable は補助レーンでも表示（参加中を隠さない）', () => {
+  it('2026-05-19 撤回: event_present_unscrapable は補助レーンで非表示（空 placeholder のスペース無駄を排除）', () => {
     for (const aux of ['eventScore', 'eventRank', 'programPoints', 'adRanking']) {
       expect(shouldShowNorthStarLane(aux, 'event_present_unscrapable')).toBe(
+        false
+      );
+    }
+  });
+
+  it('event_present_unscrapable でもコア2レーンは常設（核は隠さない）', () => {
+    for (const core of ['contributionRanking', 'giftHistory']) {
+      expect(shouldShowNorthStarLane(core, 'event_present_unscrapable')).toBe(
         true
       );
     }

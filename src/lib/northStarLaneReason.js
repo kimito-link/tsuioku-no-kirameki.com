@@ -24,9 +24,10 @@
  * 順位・スコアを scrape できないケース。「イベント参加中・公式順位は取得
  * できていません」を定性表示する。`feedback_ndgr_field6_silence` は NDGR
  * の順位"数値"表示を禁じるが、参加事実の定性推論は許容（会議室確認 2026-05-18）。
- * `no_event`/`iframe_unrendered` と違い、北極星補助レーンの可視 state として
- * 扱う（`northStarLaneVisibility` で whitelist。参加中なのにレーンごと消える
- * issue3 副作用をこの state に限り解除）。
+ * ⛔ 2026-05-19: 当初は補助レーンの可視 state として whitelist していたが、
+ * 「表示できる数値が常に無い空レーンがスペースを浪費する」とユーザー実機指摘
+ * （lv350522265）。`northStarLaneVisibility` の可視 set から除外＝**非表示**へ
+ * 撤回。本 state 自体は reason 判定/診断 JSON 用に温存（DO_NOT_REWRITE）。
  *
  * @typedef {'ok' | 'no_event' | 'no_program_gift' | 'iframe_unrendered' | 'fetch_error' | 'not_yet' | 'missing' | 'event_present_unscrapable'} NorthStarLaneState
  */
@@ -118,9 +119,10 @@ export function determineNorthStarLaneState(laneId, ctx) {
         ? bundle.contributionRanking.length
         : 0;
       if (dom != null || mirror || contribCount > 0) return 'ok';
-      // v0.1.282: NDGR 等がイベント参加を示すなら、iframe_unrendered/no_event で
-      // 隠さず「参加中・公式順位取得困難」を可視表示（issue3 副作用回避）。
-      // ※順位"数値"は出さない（field6 silence）。定性表示のみ。
+      // v0.1.282: NDGR 等がイベント参加を示す state を返す（reason/診断用）。
+      // ⛔ 2026-05-19: この state の「可視表示」は撤回（northStarLaneVisibility
+      // で非表示へ）。空 placeholder のスペース浪費をユーザーが却下したため。
+      // ※順位"数値"は元々出さない（field6 silence）。state 自体は温存。
       if (hasEventParticipationSignal(bundle, snap)) {
         return 'event_present_unscrapable';
       }

@@ -9,8 +9,9 @@
  *   `eventScore` イベント累計スコア / `eventRank` イベント現在順位）は
  *   `ok`（データ有り）か `not_yet`（起動直後の一過性ロード中＝pop-in jank
  *   回避のため隠さない）のときだけ表示。`no_event`（イベント不参加）/
- *   `missing` / `iframe_unrendered` / `fetch_error` / `no_program_gift` は
- *   「不参加・空・取得不能」として完全非表示にしスペースを無駄にしない。
+ *   `missing` / `iframe_unrendered` / `fetch_error` / `no_program_gift` /
+ *   `event_present_unscrapable`（参加検出だが公式の順位/スコアを表示できない）
+ *   は「不参加・空・取得不能」として完全非表示にしスペースを無駄にしない。
  */
 
 /** コア2レーン（取得可否に関わらず常設） */
@@ -18,16 +19,23 @@ const CORE_LANE_IDS = new Set(['contributionRanking', 'giftHistory']);
 
 /**
  * 補助レーンを表示する lane-state。
- * v0.1.282: `event_present_unscrapable`（NDGR 等でイベント参加を検出したが
- * 公式の順位/スコアを cross-origin iframe から取得できない）を可視に追加。
- * 「参加中なのにレーンごと消える」issue3 副作用をこの state に限り解除し、
- * 「イベント参加中・公式順位取得困難」を表示する（ユーザー報告 2026-05-18）。
+ *
+ * v0.1.282(2026-05-18) は `event_present_unscrapable`（NDGR 等でイベント参加を
+ * 検出したが公式の順位/スコアを cross-origin iframe から取得できない）を可視に
+ * 追加していた（「参加中なのにレーンごと消える」issue3 への対応）。
+ *
+ * ⛔ 2026-05-19 撤回: ユーザー実機 lv350522265 で「スペースの無駄遣いがなおって
+ * いない／今までの無駄だった」と強い指摘。`event_present_unscrapable` は定義上
+ * **表示できる数値が常に無い**（公式順位/スコア未取得＋ field6 silence で NDGR
+ * 順位数値も出さない）ため、このレーンは「イベント参加中（公式の順位・スコアは
+ * 取得できていません）」という空 placeholder で縦スペースだけ消費していた。
+ * これは durable `feedback_north_star_priority_no_drift`（2026-05-18 主原則
+ * 「補助レーンの空はスペース無駄遣いとして却下」）と正面衝突する。主原則と
+ * ユーザーの明示要求を優先し、可視 state から除外＝**実値がある `ok` 時のみ
+ * 補助イベントレーンを表示**する。state 自体（reason 判定/診断 JSON）は
+ * `northStarLaneReason.js` に温存（DO_NOT_REWRITE）。
  */
-const AUXILIARY_VISIBLE_STATES = new Set([
-  'ok',
-  'not_yet',
-  'event_present_unscrapable'
-]);
+const AUXILIARY_VISIBLE_STATES = new Set(['ok', 'not_yet']);
 
 /**
  * @param {unknown} laneId `northStarLaneBody-` 接尾辞（例: 'eventScore'）
