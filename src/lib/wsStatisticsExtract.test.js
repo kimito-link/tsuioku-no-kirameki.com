@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractStatisticsFromWsJson,
-  extractStatisticsFromParsedObject
+  extractStatisticsFromParsedObject,
+  projectStatisticsAudienceSignal
 } from './wsStatisticsExtract.js';
 
 describe('extractStatisticsFromParsedObject', () => {
@@ -117,6 +118,67 @@ describe('extractStatisticsFromParsedObject', () => {
     expect(extractStatisticsFromParsedObject(42)).toBeNull();
     expect(extractStatisticsFromParsedObject('hello')).toBeNull();
     expect(extractStatisticsFromParsedObject(undefined)).toBeNull();
+  });
+});
+
+describe('projectStatisticsAudienceSignal (F4 ingress 契約)', () => {
+  it('statistics/viewers は累計来場として返し、同接候補は返さない', () => {
+    expect(
+      projectStatisticsAudienceSignal({ viewers: 54321, comments: 12 })
+    ).toMatchObject({
+      cumulativeVisitors: 54321,
+      comments: 12,
+      concurrentCandidate: null
+    });
+  });
+
+  it('watchCount キーも累計来場であり concurrentCandidate は常に null', () => {
+    expect(
+      projectStatisticsAudienceSignal({ watchCount: 54321 })
+    ).toMatchObject({ cumulativeVisitors: 54321, concurrentCandidate: null });
+  });
+
+  it('type:"statistics" + data ラップでも累計来場として射影', () => {
+    expect(
+      projectStatisticsAudienceSignal({
+        type: 'statistics',
+        data: { watchCount: 1806, commentCount: 414 }
+      })
+    ).toEqual({
+      cumulativeVisitors: 1806,
+      comments: 414,
+      concurrentCandidate: null
+    });
+  });
+
+  it('F4 退行ガード: どれだけ大きな来場値でも concurrentCandidate に昇格しない', () => {
+    // 累計来場が巨大でも「同接候補」には決して載せない（過大表示の根本原因）。
+    const r = projectStatisticsAudienceSignal({ viewers: 9_999_999 });
+    expect(r.concurrentCandidate).toBeNull();
+    expect(r.cumulativeVisitors).toBe(9_999_999);
+  });
+
+  it('viewer 系キーが無ければ cumulativeVisitors は null（同接は推定 fallback に委ねる）', () => {
+    expect(
+      projectStatisticsAudienceSignal({ type: 'statistics', data: {} })
+    ).toEqual({
+      cumulativeVisitors: null,
+      comments: null,
+      concurrentCandidate: null
+    });
+    expect(
+      projectStatisticsAudienceSignal({ data: { giftPoints: 50 } })
+    ).toMatchObject({ cumulativeVisitors: null, concurrentCandidate: null });
+  });
+
+  it('非オブジェクト入力でも壊れず concurrentCandidate:null を返す', () => {
+    for (const bad of [null, undefined, 42, 'x', [1, 2]]) {
+      expect(projectStatisticsAudienceSignal(bad)).toEqual({
+        cumulativeVisitors: null,
+        comments: null,
+        concurrentCandidate: null
+      });
+    }
   });
 });
 

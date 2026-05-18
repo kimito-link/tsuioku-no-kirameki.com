@@ -133,6 +133,35 @@ export function extractStatisticsFromParsedObject(obj) {
 }
 
 /**
+ * F4(v0.1.282): statistics / watchCount を「累計来場」として射影する純関数。
+ *
+ * ニコ生の視聴セッション statistics WS および埋め込み
+ * `program.statistics.watchCount` の viewer 系値は「累計来場者数」であり
+ * 同時接続ではない（content-entry.js `updateOfficialStatistics` の JSDoc が
+ * 設計を明記。累計を同接候補へ昇格させると resolveConcurrentViewers で
+ * 同接が過大表示になる）。
+ *
+ * この関数は抽出結果を `cumulativeVisitors` / `comments` に分け、
+ * `concurrentCandidate` は常に `null` を返すことを ingress 契約として固定する。
+ * 呼び出し側（content-entry.js の NLS_INTERCEPT_STATISTICS /
+ * NLS_INTERCEPT_EMBEDDED_DATA / pollStatsFromPage 経路）が累計を同接候補
+ * （wsViewerCount）へ昇格させる退行を、この純関数の test で検出できるように
+ * するための境界。表示・抽出ロジックは一切変えない（加法追加）。
+ *
+ * @param {unknown} statsLike `extractStatisticsFromParsedObject` が受ける生
+ *   オブジェクト、または `{ viewers, comments }` 等の抽出済み相当
+ * @returns {{ cumulativeVisitors: number|null, comments: number|null, concurrentCandidate: null }}
+ */
+export function projectStatisticsAudienceSignal(statsLike) {
+  const stats = extractStatisticsFromParsedObject(statsLike);
+  const cumulativeVisitors =
+    stats && typeof stats.viewers === 'number' ? stats.viewers : null;
+  const comments =
+    stats && typeof stats.comments === 'number' ? stats.comments : null;
+  return { cumulativeVisitors, comments, concurrentCandidate: null };
+}
+
+/**
  * JSON 文字列から statistics を抽出する。
  * @param {string} json
  * @returns {ReturnType<typeof extractStatisticsFromParsedObject>}
