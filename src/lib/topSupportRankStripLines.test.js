@@ -328,3 +328,95 @@ describe('topSupportRankLineModels', () => {
     expect(rows[1].placeNumber).toBe(1);
   });
 });
+
+describe('公式DOMランキング サムネかぶり対策（v0.1.282）', () => {
+  /** @param {number} n */
+  const adRows = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      userKey: `__ad_${i}_advertiser${i}`,
+      nickname: `advertiser${i}`,
+      count: 100 - i,
+      avatarUrl: ''
+    }));
+
+  it('cond3 一意性: 空サムネ広告5行が全行ユニークな中立バッジ（Set=行数）', () => {
+    const models = topSupportRankLineModels(adRows(5), {
+      defaultThumbSrc: DEF_THUMB
+      // anonymousIdenticonResolver 無し（トグル OFF 相当）
+    });
+    const thumbs = models.map((m) => m.thumbSrc);
+    expect(new Set(thumbs).size).toBe(5);
+    for (const t of thumbs) {
+      expect(t.startsWith('data:image/svg+xml,')).toBe(true);
+      expect(t).not.toBe(DEF_THUMB);
+    }
+  });
+
+  it('cond1 トグル分離: resolver 有無で結果が同一（トグル非依存の中立バッジ）', () => {
+    const off = topSupportRankLineModels(adRows(4), {
+      defaultThumbSrc: DEF_THUMB
+    }).map((m) => m.thumbSrc);
+    const on = topSupportRankLineModels(adRows(4), {
+      defaultThumbSrc: DEF_THUMB,
+      anonymousIdenticonResolver: (uid) => `data:identicon/${uid}`
+    }).map((m) => m.thumbSrc);
+    expect(on).toEqual(off); // identicon に化けず、トグル ON/OFF で不変
+    expect(on.every((t) => t.startsWith('data:image/svg+xml,'))).toBe(true);
+  });
+
+  it('cond2a 退行ゼロ: 実 http サムネ行は最優先で不変', () => {
+    const url = 'https://example.com/real-advertiser.png';
+    const [m] = topSupportRankLineModels(
+      [{ userKey: '__ad_0_utero', nickname: 'utero', count: 999, avatarUrl: url }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(m.thumbSrc).toBe(url);
+  });
+
+  it('cond2c 退行ゼロ: __gift_ / 数値uid / UNKNOWN は中立バッジにしない', () => {
+    const [gift] = topSupportRankLineModels(
+      [{ userKey: '__gift_0_sender', nickname: 'sender', count: 5, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(gift.thumbSrc).toBe(DEF_THUMB);
+    expect(gift.thumbSrc.startsWith('data:image/svg+xml,')).toBe(false);
+
+    const [numeric] = topSupportRankLineModels(
+      [{ userKey: '12345678', nickname: 'n', count: 5, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(numeric.thumbSrc).toBe(niconicoDefaultUserIconUrl('12345678'));
+
+    const [unk] = topSupportRankLineModels(
+      [{ userKey: UNKNOWN_USER_KEY, nickname: '', count: 1 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(unk.thumbSrc.startsWith('data:image/svg+xml,')).toBe(false);
+  });
+
+  it('貢献度 __contrib_ も同様に行別中立バッジ（旧かぶり→解消）', () => {
+    const rows = Array.from({ length: 3 }, (_, i) => ({
+      userKey: `__contrib_${i}_user${i}`,
+      nickname: `user${i}`,
+      count: 50 - i,
+      avatarUrl: ''
+    }));
+    const thumbs = topSupportRankLineModels(rows, {
+      defaultThumbSrc: DEF_THUMB
+    }).map((m) => m.thumbSrc);
+    expect(new Set(thumbs).size).toBe(3);
+    expect(thumbs.every((t) => t.startsWith('data:image/svg+xml,'))).toBe(true);
+  });
+
+  it('順位番号が同値でも userKey ハッシュで byte 一意（匿名広告行）', () => {
+    const rows = [
+      { userKey: '__anon_ad_0', nickname: '', count: 10, avatarUrl: '' },
+      { userKey: '__anon_ad_1', nickname: '', count: 10, avatarUrl: '' }
+    ];
+    const thumbs = topSupportRankLineModels(rows, {
+      defaultThumbSrc: DEF_THUMB
+    }).map((m) => m.thumbSrc);
+    expect(thumbs[0]).not.toBe(thumbs[1]);
+    expect(new Set(thumbs).size).toBe(2);
+  });
+});
