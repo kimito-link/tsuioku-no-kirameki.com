@@ -420,3 +420,56 @@ describe('公式DOMランキング サムネかぶり対策（v0.1.282）', () =
     expect(new Set(thumbs).size).toBe(2);
   });
 });
+
+describe('公式DOMランキング 同一実URL重複の解消（v0.1.282 実機 1-3位かぶり）', () => {
+  const DUP = 'https://example.com/scrape-artifact.jpg';
+
+  it('上位3行が同一実URL（scrapeアーティファクト）→ 全て中立バッジ・実URL不採用', () => {
+    const rows = [
+      { userKey: '__ad_0_a', nickname: 'a', count: 21200, avatarUrl: DUP },
+      { userKey: '__ad_1_b', nickname: 'b', count: 6600, avatarUrl: DUP },
+      { userKey: '__ad_2_c', nickname: 'c', count: 5047, avatarUrl: DUP },
+      { userKey: '__ad_3_d', nickname: 'd', count: 3690, avatarUrl: '' },
+      { userKey: '__ad_4_e', nickname: 'e', count: 3200, avatarUrl: '' }
+    ];
+    const thumbs = topSupportRankLineModels(rows, {
+      defaultThumbSrc: DEF_THUMB
+    }).map((m) => m.thumbSrc);
+    // 重複実URLは1つも採用されない
+    for (const t of thumbs) expect(t).not.toBe(DUP);
+    // 全行が中立バッジ（data URL）かつ全行ユニーク（かぶり解消）
+    expect(thumbs.every((t) => t.startsWith('data:image/svg+xml,'))).toBe(true);
+    expect(new Set(thumbs).size).toBe(5);
+  });
+
+  it('一意な実URLの公式ランク行はそのまま実URLを使う（誤爆しない）', () => {
+    const rows = [
+      { userKey: '__ad_0_a', nickname: 'a', count: 100, avatarUrl: DUP },
+      { userKey: '__ad_1_b', nickname: 'b', count: 90, avatarUrl: DUP },
+      {
+        userKey: '__ad_2_c',
+        nickname: 'c',
+        count: 80,
+        avatarUrl: 'https://example.com/unique-real.jpg'
+      }
+    ];
+    const thumbs = topSupportRankLineModels(rows, {
+      defaultThumbSrc: DEF_THUMB
+    }).map((m) => m.thumbSrc);
+    expect(thumbs[0]).not.toBe(DUP); // 重複は中立バッジ
+    expect(thumbs[1]).not.toBe(DUP);
+    expect(thumbs[2]).toBe('https://example.com/unique-real.jpg'); // 一意は実URL維持
+  });
+
+  it('非公式ランク（数値uid等）の同一URLは dedup 対象外＝従来どおり実URL維持', () => {
+    const rows = [
+      { userKey: '12345678', nickname: 'x', count: 5, avatarUrl: DUP },
+      { userKey: '87654321', nickname: 'y', count: 4, avatarUrl: DUP }
+    ];
+    const thumbs = topSupportRankLineModels(rows, {
+      defaultThumbSrc: DEF_THUMB
+    }).map((m) => m.thumbSrc);
+    expect(thumbs[0]).toBe(DUP);
+    expect(thumbs[1]).toBe(DUP);
+  });
+});

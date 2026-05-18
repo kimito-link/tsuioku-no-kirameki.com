@@ -123,6 +123,20 @@ export function topSupportRankLineModels(stripRooms, opts) {
       ? opts.anonymousIdenticonResolver
       : null;
   const rooms = Array.isArray(stripRooms) ? stripRooms : [];
+  // v0.1.282: 公式DOMランキングの scrape が上位行に同一の実 thumbnailUrl を
+  // 入れる事故（実機: 広告ランキング 1-3 位が全部同じアイコン）への防御。
+  // 同一 http URL が公式DOMランク行で 2 行以上に重複していたら scrape
+  // アーティファクト（別の応援者なのに同一画像）と判断し、その URL を持つ
+  // 行は実URL不採用 → 下流で行別「中立順位バッジ」へ落とす（ユーザー選択の
+  // 方針＝かぶりは識別可能な中立表示で解消、本物アイコン誤認も避ける）。
+  /** @type {Map<string, number>} */
+  const officialRankUrlFreq = new Map();
+  for (const rr of rooms) {
+    if (!isOfficialDomRankUserKey(String(rr?.userKey ?? ''))) continue;
+    const u = String(rr?.avatarUrl || '').trim();
+    if (!u || !isHttpOrHttpsUrl(u)) continue;
+    officialRankUrlFreq.set(u, (officialRankUrlFreq.get(u) || 0) + 1);
+  }
   let knownRank = 0;
   /** 密順位（同回数は同順位、次は飛ばさず 1,2,2,2,3…）用 */
   let denseRank = 0;
@@ -159,15 +173,23 @@ export function topSupportRankLineModels(stripRooms, opts) {
 
     const rawAv = String(r?.avatarUrl || '').trim();
     const uidForThumb = isUnknown ? '' : userKey;
+    const isOfficialRank = isOfficialDomRankUserKey(userKey);
+    // 公式DOMランクで同一 http URL が複数行に重複 = scrape アーティファクト。
+    // 実URL を採用せず中立バッジへ（1-3 位かぶりの本丸）。
+    const rawAvDuplicatedOfficial =
+      isOfficialRank &&
+      isHttpOrHttpsUrl(rawAv) &&
+      (officialRankUrlFreq.get(rawAv) || 0) >= 2;
     let thumbSrc = '';
-    if (isHttpOrHttpsUrl(rawAv)) {
+    if (isHttpOrHttpsUrl(rawAv) && !rawAvDuplicatedOfficial) {
       thumbSrc = String(rawAv).trim();
-    } else if (isOfficialDomRankUserKey(userKey)) {
-      // v0.1.282: 公式DOMランキング（広告/貢献度）で実サムネが取れない行は、
-      // 匿名 identicon トグルに依存せず行ごとに必ず異なる「順位バッジ風 中立
-      // プレースホルダ」にする（旧: idnResolver=undefined 時に共有
-      // プレースホルダ1枚へ全行が潰れ「サムネかぶり」になっていた）。
-      // 実 http サムネは上の分岐で最優先のまま不変。
+    } else if (isOfficialRank) {
+      // v0.1.282: 公式DOMランキング（広告/貢献度）で実サムネが取れない or
+      // 重複アーティファクトの行は、匿名 identicon トグルに依存せず行ごとに
+      // 必ず異なる「順位バッジ風 中立プレースホルダ」にする（旧: idnResolver
+      // =undefined 時に共有プレースホルダ1枚へ全行が潰れ「サムネかぶり」、
+      // および scrape が上位行へ同一実URLを入れる「サムネかぶり」両方を解消）。
+      // 一意な実 http サムネは上の分岐で最優先のまま不変。
       thumbSrc = officialDomRankBadgeThumb(placeNumber, userKey);
     } else if (
       idnResolver &&
