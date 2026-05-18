@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { migrateBelowInlinePanelToDockOnce } from './migrateInlinePanelBelowToDock.js';
 import {
   KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED,
-  KEY_INLINE_PANEL_PLACEMENT
+  KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT
 } from './storageKeys.js';
 
 /**
@@ -92,5 +93,20 @@ describe('migrateBelowInlinePanelToDockOnce', () => {
     const r = await migrateBelowInlinePanelToDockOnce(storage);
     expect(r.changed).toBe(true);
     expect(storage.store[KEY_INLINE_PANEL_PLACEMENT]).toBe('dock_bottom');
+  });
+
+  it('明示選択フラグが true なら placement も移行 flag も一切触らない', async () => {
+    const storage = makeMockStorage({
+      [KEY_INLINE_PANEL_PLACEMENT]: 'below',
+      [KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT]: true
+    });
+    const r = await migrateBelowInlinePanelToDockOnce(storage);
+    expect(r.changed).toBe(false);
+    // ユーザー明示選択を移行が巻き戻さない（dock_bottom 化しない）
+    expect(storage.store[KEY_INLINE_PANEL_PLACEMENT]).toBe('below');
+    // 副作用ゼロ：done flag も立てない
+    expect(
+      storage.store[KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED]
+    ).toBeUndefined();
   });
 });

@@ -6,14 +6,17 @@ import {
   coerceInlinePanelPlacementForStorage,
   coerceInlinePanelViewportWidePolicyForStorage,
   coerceInlinePanelWidthModeForStorage,
+  isInlinePanelPlacementWriteVerified,
   storagePatchInlineFloatingAnchor,
   storagePatchInlinePanelPlacement,
+  storagePatchInlinePanelPlacementWithExplicit,
   storagePatchInlinePanelViewportWidePolicy,
   storagePatchInlinePanelWidthMode
 } from './inlinePanelPlacementStorage.js';
 import {
   KEY_INLINE_FLOATING_ANCHOR,
   KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
   KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
   KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -67,6 +70,47 @@ describe('inlinePanelPlacementStorage', () => {
   it('storagePatchInlinePanelPlacement', () => {
     expect(storagePatchInlinePanelPlacement(INLINE_PANEL_PLACEMENT_DOCK_BOTTOM)).toEqual(
       { [KEY_INLINE_PANEL_PLACEMENT]: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM }
+    );
+  });
+
+  it('storagePatchInlinePanelPlacementWithExplicit は配置キーと明示フラグを同時に書く', () => {
+    expect(
+      storagePatchInlinePanelPlacementWithExplicit(INLINE_PANEL_PLACEMENT_BESIDE)
+    ).toEqual({
+      [KEY_INLINE_PANEL_PLACEMENT]: INLINE_PANEL_PLACEMENT_BESIDE,
+      [KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT]: true
+    });
+    // coerce も従来どおり効く（未知値は below）
+    expect(storagePatchInlinePanelPlacementWithExplicit('garbage')).toEqual({
+      [KEY_INLINE_PANEL_PLACEMENT]: INLINE_PANEL_PLACEMENT_BELOW,
+      [KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT]: true
+    });
+  });
+
+  it('isInlinePanelPlacementWriteVerified は読み戻し一致のみ true', () => {
+    expect(
+      isInlinePanelPlacementWriteVerified(
+        { [KEY_INLINE_PANEL_PLACEMENT]: 'beside' },
+        INLINE_PANEL_PLACEMENT_BESIDE
+      )
+    ).toBe(true);
+    // 保存されず旧 below が残っている＝検証不一致（横付きにしたのに戻る事象）
+    expect(
+      isInlinePanelPlacementWriteVerified(
+        { [KEY_INLINE_PANEL_PLACEMENT]: 'below' },
+        INLINE_PANEL_PLACEMENT_BESIDE
+      )
+    ).toBe(false);
+    // 前後空白付きでも normalize で一致
+    expect(
+      isInlinePanelPlacementWriteVerified(
+        { [KEY_INLINE_PANEL_PLACEMENT]: '  BESIDE  ' },
+        INLINE_PANEL_PLACEMENT_BESIDE
+      )
+    ).toBe(true);
+    // 読み戻し不能（null / 非オブジェクト）は不一致扱い（intended=beside vs 既定 below）
+    expect(isInlinePanelPlacementWriteVerified(null, INLINE_PANEL_PLACEMENT_BESIDE)).toBe(
+      false
     );
   });
 

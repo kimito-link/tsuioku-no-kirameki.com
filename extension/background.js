@@ -320,8 +320,12 @@ async function migrateFloatingPanelToDockProfileOnce() {
 async function migrateBelowPanelToDockProfileOnce() {
   const K_PLACEMENT = 'nls_inline_panel_placement';
   const K_DONE = 'nls_inline_panel_below_to_dock_migrated';
+  // src/lib/migrateInlinePanelBelowToDock.js と同一の前段ガード（SW 二重記載）。
+  const K_EXPLICIT = 'nls_inline_panel_placement_user_explicit_v1';
   try {
-    const bag = await chrome.storage.local.get([K_PLACEMENT, K_DONE]);
+    const bag = await chrome.storage.local.get([K_PLACEMENT, K_DONE, K_EXPLICIT]);
+    // ユーザー明示選択済みなら値もフラグも触らない（明示選択の巻き戻し防止）。
+    if (bag[K_EXPLICIT] === true) return;
     if (bag[K_DONE] === true) return;
     const p = String(bag[K_PLACEMENT] || '').trim().toLowerCase();
     if (p !== 'below') {
@@ -441,13 +445,16 @@ chrome.runtime.onInstalled.addListener((details) => {
     if (details?.reason === 'update') {
       try {
         const K_PL = 'nls_inline_panel_placement';
-        const bagU = await chrome.storage.local.get([K_PL]);
+        const K_EXPLICIT = 'nls_inline_panel_placement_user_explicit_v1';
+        const bagU = await chrome.storage.local.get([K_PL, K_EXPLICIT]);
         const rawU = bagU[K_PL];
         const unset =
           rawU === undefined ||
           rawU === null ||
           (typeof rawU === 'string' && !String(rawU).trim());
-        if (unset) {
+        // 明示選択済みプロファイルでは pending を立てない
+        // （suggestInitial が幅依存の既定で明示選択を上書きする経路を断つ）。
+        if (unset && bagU[K_EXPLICIT] !== true) {
           await chrome.storage.local.set({
             [KEY_INSTALL_PANEL_PLACEMENT_PENDING]: true
           });

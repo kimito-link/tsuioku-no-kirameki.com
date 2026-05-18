@@ -113,8 +113,9 @@ import {
 import {
   buildAiShareInlinePanelStorageReadback,
   buildInlinePanelStorageSetFailedMessage,
+  isInlinePanelPlacementWriteVerified,
   storagePatchInlineFloatingAnchor,
-  storagePatchInlinePanelPlacement,
+  storagePatchInlinePanelPlacementWithExplicit,
   storagePatchInlinePanelViewportWidePolicy,
   storagePatchInlinePanelWidthMode
 } from '../lib/inlinePanelPlacementStorage.js';
@@ -12408,10 +12409,34 @@ function initPopup() {
   };
 
   const saveInlinePanelPlacement = async (value) => {
-    const ok = await storageSetSafe(storagePatchInlinePanelPlacement(value));
+    // ユーザー明示選択は「配置キー」と「明示選択フラグ」を 1 回の set で
+    // アトミック保存（フラグだけ立つ / 配置だけ巻き戻る非アトミック窓を作らない。
+    // フラグが立つと below→dock / suggestInitial 等の移行が以後上書きしない）。
+    const patch = storagePatchInlinePanelPlacementWithExplicit(value);
+    let ok = await storageSetSafe(patch);
+    // Extension context invalidated 等の一過性失敗は 1 回だけ即再試行。
+    if (!ok) ok = await storageSetSafe(patch);
     if (!ok) {
       void persistInlinePanelStorageWriteFailure('placement');
       return;
+    }
+    // 読み戻し検証（best-effort・必ず有界）。set が成功扱いでも storage に
+    // 定着していない / 別経路で上書きされた場合に「横付きにしたのに黙って
+    // 下に戻る」を検知し、失敗として可視化する。withTimeout で必ず有界化し、
+    // ハンドラも描画も絶対にハングさせない（過去の await ハング回帰の教訓）。
+    try {
+      const rb = await withTimeout(
+        storageGetSafe(KEY_INLINE_PANEL_PLACEMENT, null),
+        1500,
+        'placement_verify_timeout'
+      );
+      if (rb !== null && !isInlinePanelPlacementWriteVerified(rb, value)) {
+        void persistInlinePanelStorageWriteFailure('placement');
+        return;
+      }
+    } catch {
+      // 検証は best-effort: timeout / context 不整合は従来どおり成功扱いで
+      // 続行（検証を足したことで以前より体験を悪化させない）。
     }
     safeRefresh();
   };

@@ -6,6 +6,7 @@
 import {
   KEY_INLINE_FLOATING_ANCHOR,
   KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
   KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
   KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -80,6 +81,39 @@ export function storagePatchInlinePanelPlacement(value) {
   return {
     [KEY_INLINE_PANEL_PLACEMENT]: coerceInlinePanelPlacementForStorage(value)
   };
+}
+
+/**
+ * popup でユーザーが配置を明示選択したときの保存 patch。
+ * 配置キーと「明示選択フラグ」を **1 回の storage.set でアトミックに**書く
+ * （フラグだけ立つ / 配置だけ巻き戻る非アトミック窓を作らない）。
+ * フラグが立つと below→dock / suggestInitial 等の移行が以後上書きしない。
+ * @param {unknown} value
+ * @returns {Record<string, string | boolean>}
+ */
+export function storagePatchInlinePanelPlacementWithExplicit(value) {
+  return {
+    [KEY_INLINE_PANEL_PLACEMENT]: coerceInlinePanelPlacementForStorage(value),
+    [KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT]: true
+  };
+}
+
+/**
+ * popup 保存後の読み戻し検証（純）。storage から読み直した bag の配置値が、
+ * 保存しようとした値（coerce 後）と一致するかを判定する。
+ * 不一致＝保存が定着していない / 別経路で上書きされた、を popup 側で検知して
+ * 「横付きにしたのに黙って下に戻る」を可視化するために使う。
+ * @param {Record<string, unknown> | null | undefined} readbackBag
+ * @param {unknown} intendedValue
+ * @returns {boolean} 一致＝検証 OK なら true
+ */
+export function isInlinePanelPlacementWriteVerified(readbackBag, intendedValue) {
+  const bag =
+    readbackBag && typeof readbackBag === 'object' ? readbackBag : {};
+  return (
+    normalizeInlinePanelPlacement(bag[KEY_INLINE_PANEL_PLACEMENT]) ===
+    coerceInlinePanelPlacementForStorage(intendedValue)
+  );
 }
 
 /**
