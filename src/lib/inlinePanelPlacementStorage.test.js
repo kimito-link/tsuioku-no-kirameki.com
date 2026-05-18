@@ -39,7 +39,7 @@ describe('inlinePanelPlacementStorage', () => {
     );
   });
 
-  it('buildAiShareInlinePanelStorageReadback', () => {
+  it('buildAiShareInlinePanelStorageReadback（明示フラグ未設定なら false）', () => {
     const rb = {
       [KEY_INLINE_PANEL_PLACEMENT]: '  BESIDE  ',
       [KEY_INLINE_PANEL_WIDTH_MODE]: 'video'
@@ -47,9 +47,27 @@ describe('inlinePanelPlacementStorage', () => {
     expect(buildAiShareInlinePanelStorageReadback(rb)).toEqual({
       placementRaw: '  BESIDE  ',
       placementNormalized: INLINE_PANEL_PLACEMENT_BESIDE,
+      placementUserExplicit: false,
       widthModeRaw: 'video',
       widthModeNormalized: INLINE_PANEL_WIDTH_VIDEO
     });
+  });
+
+  it('buildAiShareInlinePanelStorageReadback（明示フラグ true を露出＝修正確証用）', () => {
+    const rb = {
+      [KEY_INLINE_PANEL_PLACEMENT]: 'beside',
+      [KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT]: true,
+      [KEY_INLINE_PANEL_WIDTH_MODE]: 'player_row'
+    };
+    const out = buildAiShareInlinePanelStorageReadback(rb);
+    expect(out.placementUserExplicit).toBe(true);
+    expect(out.placementNormalized).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
+  });
+
+  it('buildAiShareInlinePanelStorageReadback（null/非オブジェクトでも壊れない）', () => {
+    const out = buildAiShareInlinePanelStorageReadback(null);
+    expect(out.placementUserExplicit).toBe(false);
+    expect(out.placementRaw).toBe(null);
   });
 
   it('coerceInlinePanelPlacementForStorage', () => {

@@ -52,6 +52,7 @@ import {
 import {
   KEY_INLINE_PANEL_WIDTH_MODE,
   KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
   INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_BESIDE,
   INLINE_PANEL_PLACEMENT_FLOATING,
@@ -11360,6 +11361,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
     const rb = await withTimeout(
       chrome.storage.local.get([
         KEY_INLINE_PANEL_PLACEMENT,
+        KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
         KEY_INLINE_PANEL_WIDTH_MODE
       ]),
       1200,

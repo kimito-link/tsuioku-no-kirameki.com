@@ -43,19 +43,25 @@ export function buildInlinePanelStorageSetFailedMessage(kind) {
  * @returns {{
  *   placementRaw: unknown,
  *   placementNormalized: ReturnType<typeof normalizeInlinePanelPlacement>,
+ *   placementUserExplicit: boolean,
  *   widthModeRaw: unknown,
  *   widthModeNormalized: ReturnType<typeof normalizeInlinePanelWidthMode>
  * }}
  */
 export function buildAiShareInlinePanelStorageReadback(rb) {
+  const bag = rb && typeof rb === 'object' ? rb : {};
   return {
-    placementRaw: rb[KEY_INLINE_PANEL_PLACEMENT] ?? null,
+    placementRaw: bag[KEY_INLINE_PANEL_PLACEMENT] ?? null,
     placementNormalized: normalizeInlinePanelPlacement(
-      rb[KEY_INLINE_PANEL_PLACEMENT]
+      bag[KEY_INLINE_PANEL_PLACEMENT]
     ),
-    widthModeRaw: rb[KEY_INLINE_PANEL_WIDTH_MODE] ?? null,
+    // 横付き根本修正(3baa77d)の確証用: ユーザー明示選択フラグが storage に
+    // 定着しているか。次回診断で true なら「明示選択が保存・保護されている」
+    // ＝修正が効いている。false のまま横付き戻りが続くなら別機構を疑う。
+    placementUserExplicit: bag[KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT] === true,
+    widthModeRaw: bag[KEY_INLINE_PANEL_WIDTH_MODE] ?? null,
     widthModeNormalized: normalizeInlinePanelWidthMode(
-      rb[KEY_INLINE_PANEL_WIDTH_MODE]
+      bag[KEY_INLINE_PANEL_WIDTH_MODE]
     )
   };
 }
