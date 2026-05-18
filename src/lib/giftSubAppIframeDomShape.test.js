@@ -103,4 +103,48 @@ describe('captureGiftSubAppIframeDomShape', () => {
     expect(r.sel.ranker).toBe(-1);
     expect(r.classSamples).toEqual([]);
   });
+
+  it('v0.1.282: SVG 要素の className 回帰 — getAttribute(class) で生文字列', () => {
+    // SVG 要素は className が SVGAnimatedString。旧実装は String() で
+    // "[object SVGAnimatedString]" になり診断が読めなかった（実機 nicoad で観測）。
+    const svgEl = {
+      // String(className) は "[object Object]" 相当
+      className: { baseVal: 'icon-cls', toString: () => '[object SVGAnimatedString]' },
+      getAttribute(name) {
+        return name === 'class' ? 'real-svg-class foo' : null;
+      }
+    };
+    const htmlEl = { className: 'plain-html-class' }; // getAttribute 無し
+    const doc = {
+      body: { className: '', childElementCount: 3, textContent: 'x' },
+      querySelector() {
+        return null;
+      },
+      querySelectorAll(sel) {
+        return sel === '[class]' ? [svgEl, htmlEl] : [];
+      }
+    };
+    const r = captureGiftSubAppIframeDomShape(doc);
+    expect(r.classSamples[0]).toBe('real-svg-class foo'); // [object…] でない
+    expect(r.classSamples[0].includes('SVGAnimatedString')).toBe(false);
+    expect(r.classSamples[1]).toBe('plain-html-class'); // 後方互換
+  });
+
+  it('v0.1.282: 観測拡充 selector が結果に含まれる（koken 本体所在の手掛かり）', () => {
+    const doc = mockDoc({
+      bodyClass: 'b',
+      children: 5,
+      text: 'x',
+      map: {
+        '[class*="supporter"], [class*="Supporter"]': [{}],
+        '[class*="ranking"], [class*="Ranking"], [class*="rank"]': [{}, {}],
+        'li, [role="listitem"]': [{}, {}, {}]
+      }
+    });
+    const r = captureGiftSubAppIframeDomShape(doc);
+    expect(r.sel.supporter).toBe(true);
+    expect(r.sel.rankingWord).toBe(2);
+    expect(r.sel.listItems).toBe(3);
+    expect(typeof r.sel.tabish).toBe('number');
+  });
 });

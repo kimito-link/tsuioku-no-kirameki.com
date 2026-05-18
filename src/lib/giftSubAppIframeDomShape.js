@@ -49,9 +49,27 @@ export function captureGiftSubAppIframeDomShape(doc) {
     try {
       const els = doc.querySelectorAll('[class]');
       const arr = Array.prototype.slice.call(els, 0, 6);
-      classSamples = arr.map((/** @type {any} */ el) =>
-        String((el && el.className) || '').slice(0, 64)
-      );
+      classSamples = arr.map((/** @type {any} */ el) => {
+        // SVG 要素の className は SVGAnimatedString（String 化すると
+        // "[object SVGAnimatedString]" になる）。getAttribute('class') は
+        // HTML/SVG 双方で生の class 文字列を返すので一貫する。
+        let raw = '';
+        try {
+          raw =
+            (el && typeof el.getAttribute === 'function'
+              ? el.getAttribute('class')
+              : '') || '';
+        } catch {
+          raw = '';
+        }
+        if (!raw && el && el.className) {
+          raw =
+            typeof el.className === 'string'
+              ? el.className
+              : String((el.className && el.className.baseVal) || '');
+        }
+        return String(raw).slice(0, 64);
+      });
     } catch {
       classSamples = [];
     }
@@ -68,7 +86,21 @@ export function captureGiftSubAppIframeDomShape(doc) {
         thumbnail: qCount('.thumbnail, [class*="thumbnail"]'),
         richview: has('[class*="rich-view"], [class*="richview"]'),
         eventName: has('[class*="event-name"], [class*="eventName"]'),
-        appRoot: has('#app, [data-v-app], [id*="app"]')
+        appRoot: has('#app, [data-v-app], [id*="app"]'),
+        // v0.1.282 観測拡充（会議室）: koken supporter 本体 / ランキング系
+        // DOM の所在を実証するための候補。次の診断でどの selector が
+        // 立つかで「mount したか / どの構造か」を判定し、安全な追補へ繋ぐ。
+        supporter: has('[class*="supporter"], [class*="Supporter"]'),
+        rankingWord: qCount(
+          '[class*="ranking"], [class*="Ranking"], [class*="rank"]'
+        ),
+        rankingLink: has(
+          'a[href*="ranking"], a[href*="supporter"], a[href*="gift"]'
+        ),
+        tabish: qCount('nav, [role="tab"], [role="tablist"], [class*="tab"]'),
+        listItems: qCount('li, [role="listitem"]'),
+        imgCount: qCount('img'),
+        dataVApp: has('[data-v-app], [data-server-rendered]')
       },
       classSamples
     };
