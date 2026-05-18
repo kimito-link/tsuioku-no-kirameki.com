@@ -1705,16 +1705,16 @@ window.addEventListener('message', (e) => {
   }
 
   if (e.data.type === 'NLS_INTERCEPT_EMBEDDED_DATA') {
-    const v = e.data.viewers;
-    if (
-      typeof v === 'number' &&
-      Number.isFinite(v) &&
-      v >= 0 &&
-      wsViewerCount == null
-    ) {
-      wsViewerCount = v;
-      wsViewerCountUpdatedAt = Date.now();
-    }
+    // F4(v0.1.282) 残存経路の是正: e.data.viewers は page-intercept の
+    // tryReadEmbeddedData が読む `program.statistics.watchCount` であり、
+    // updateOfficialStatistics JSDoc が明記する通り「累計来場者数」で同時接続
+    // ではない。以前はここで wsViewerCount(同接候補) に昇格させており、配信
+    // 開始直後（wsViewerCount==null）に累計が同接として過大表示される原因
+    // だった（NLS_INTERCEPT_STATISTICS / pollStatsFromPage 経路は 1c403f4 で
+    // 既に遮断済だが、この埋め込み経路だけ残っていた）。埋め込み由来の同接は
+    // buildWatchSnapshot 内の pickViewerCountFromEmbeddedData(source:'embedded')
+    // が別途正しく扱い、それも無ければ estimateConcurrentViewers の fallback
+    // に委ねる。よってここでは wsViewerCount に入れない（drop）。
     return;
   }
 
