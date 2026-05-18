@@ -30,6 +30,14 @@ describe('shouldShowNorthStarLane', () => {
     }
   });
 
+  it('v0.1.282: event_present_unscrapable は補助レーンでも表示（参加中を隠さない）', () => {
+    for (const aux of ['eventScore', 'eventRank', 'programPoints', 'adRanking']) {
+      expect(shouldShowNorthStarLane(aux, 'event_present_unscrapable')).toBe(
+        true
+      );
+    }
+  });
+
   it('補助レーンは不参加/空/取得不能を完全非表示', () => {
     for (const aux of ['programPoints', 'adRanking', 'eventScore', 'eventRank']) {
       for (const s of [
