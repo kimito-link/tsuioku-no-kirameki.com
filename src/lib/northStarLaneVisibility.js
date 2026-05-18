@@ -16,8 +16,18 @@
 /** コア2レーン（取得可否に関わらず常設） */
 const CORE_LANE_IDS = new Set(['contributionRanking', 'giftHistory']);
 
-/** 補助レーンを表示する lane-state */
-const AUXILIARY_VISIBLE_STATES = new Set(['ok', 'not_yet']);
+/**
+ * 補助レーンを表示する lane-state。
+ * v0.1.282: `event_present_unscrapable`（NDGR 等でイベント参加を検出したが
+ * 公式の順位/スコアを cross-origin iframe から取得できない）を可視に追加。
+ * 「参加中なのにレーンごと消える」issue3 副作用をこの state に限り解除し、
+ * 「イベント参加中・公式順位取得困難」を表示する（ユーザー報告 2026-05-18）。
+ */
+const AUXILIARY_VISIBLE_STATES = new Set([
+  'ok',
+  'not_yet',
+  'event_present_unscrapable'
+]);
 
 /**
  * @param {unknown} laneId `northStarLaneBody-` 接尾辞（例: 'eventScore'）

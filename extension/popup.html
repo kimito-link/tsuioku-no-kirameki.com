@@ -3291,6 +3291,7 @@
       .nl-north-star-lane__body[data-lane-state="no_program_gift"],
       .nl-north-star-lane__body[data-lane-state="iframe_unrendered"],
       .nl-north-star-lane__body[data-lane-state="fetch_error"],
+      .nl-north-star-lane__body[data-lane-state="event_present_unscrapable"],
       .nl-north-star-lane__body[data-lane-state="not_yet"] {
         color: color-mix(in srgb, var(--nl-text) 40%, transparent);
         font-style: italic;
@@ -3306,6 +3307,9 @@
       }
       .nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
         content: "(取得待ち: 公式の一覧がまだ開いていません)";
+      }
+      .nl-north-star-lane__body[data-lane-state="event_present_unscrapable"]:empty::after {
+        content: "イベント参加中（公式の順位・スコアは取得できていません）";
       }
       .nl-north-star-lane__body[data-lane-state="fetch_error"]:empty::after {
         content: "(取得エラー)";

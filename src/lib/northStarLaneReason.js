@@ -19,8 +19,38 @@
  */
 
 /**
- * @typedef {'ok' | 'no_event' | 'no_program_gift' | 'iframe_unrendered' | 'fetch_error' | 'not_yet' | 'missing'} NorthStarLaneState
+ * v0.1.282: `event_present_unscrapable` を追加。NDGR がイベント存在を示す
+ * （順位/タイトル/スコアの presence）のに cross-origin iframe から公式の
+ * 順位・スコアを scrape できないケース。「イベント参加中・公式順位は取得
+ * できていません」を定性表示する。`feedback_ndgr_field6_silence` は NDGR
+ * の順位"数値"表示を禁じるが、参加事実の定性推論は許容（会議室確認 2026-05-18）。
+ * `no_event`/`iframe_unrendered` と違い、北極星補助レーンの可視 state として
+ * 扱う（`northStarLaneVisibility` で whitelist。参加中なのにレーンごと消える
+ * issue3 副作用をこの state に限り解除）。
+ *
+ * @typedef {'ok' | 'no_event' | 'no_program_gift' | 'iframe_unrendered' | 'fetch_error' | 'not_yet' | 'missing' | 'event_present_unscrapable'} NorthStarLaneState
  */
+
+/**
+ * NDGR / bundle が「このイベントに参加している」ことを示す signal を持つか
+ * （boolean presence のみ。順位"数値"は使わない＝field6 silence 遵守）。
+ * 純関数・副作用なし。bundle / snap が null でも安全。
+ *
+ * @param {any} bundle
+ * @param {any} snap
+ * @returns {boolean}
+ */
+export function hasEventParticipationSignal(bundle, snap) {
+  // NDGR field6 由来のイベント存在シグナル（presence のみ、数値非表示）
+  if (numOrNull(snap?.officialNicoEventRankNdgr) != null) return true;
+  if (numOrNull(snap?.officialEventGiftScoreNdgr) != null) return true;
+  if (strNonEmpty(snap?.officialNicoEventTitleNdgr)) return true;
+  // bundle 側のイベント痕跡（ok 未満でも「参加はしている」示唆）
+  if (bundle?.eventBanner || bundle?.eventBalloon) return true;
+  if (strNonEmpty(bundle?.eventCumulativeScoreMirrorHtml)) return true;
+  if (strNonEmpty(bundle?.eventCurrentRankMirrorHtml)) return true;
+  return false;
+}
 
 /**
  * @param {string} laneId popup.html の `data-lane="<laneId>"` に対応。
@@ -70,6 +100,10 @@ export function determineNorthStarLaneState(laneId, ctx) {
       const mirror = strNonEmpty(bundle?.eventCumulativeScoreMirrorHtml);
       const ndgr = numOrNull(snap?.officialEventGiftScoreNdgr);
       if (dom != null || balloon != null || mirror || ndgr != null) return 'ok';
+      // v0.1.282: 値は無いが NDGR 等がイベント参加を示す → 参加中・取得困難
+      if (hasEventParticipationSignal(bundle, snap)) {
+        return 'event_present_unscrapable';
+      }
       // banner も balloon も NDGR も無い → イベント不参加
       return 'no_event';
     }
@@ -84,6 +118,12 @@ export function determineNorthStarLaneState(laneId, ctx) {
         ? bundle.contributionRanking.length
         : 0;
       if (dom != null || mirror || contribCount > 0) return 'ok';
+      // v0.1.282: NDGR 等がイベント参加を示すなら、iframe_unrendered/no_event で
+      // 隠さず「参加中・公式順位取得困難」を可視表示（issue3 副作用回避）。
+      // ※順位"数値"は出さない（field6 silence）。定性表示のみ。
+      if (hasEventParticipationSignal(bundle, snap)) {
+        return 'event_present_unscrapable';
+      }
       const gpDom = numOrNull(bundle?.programStats?.giftPoints);
       const gpNdgr = numOrNull(snap?.officialGiftPointsNdgr);
       const gp = gpDom != null ? gpDom : gpNdgr;
