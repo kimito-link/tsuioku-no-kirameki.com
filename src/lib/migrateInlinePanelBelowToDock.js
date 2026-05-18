@@ -23,6 +23,7 @@
 import {
   KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED,
   KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
   INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
 } from './storageKeys.js';
@@ -37,8 +38,14 @@ import {
 export async function migrateBelowInlinePanelToDockOnce(storage) {
   const bag = await storage.get([
     KEY_INLINE_PANEL_PLACEMENT,
-    KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED
+    KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED,
+    KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT
   ]);
+  // ユーザーが明示選択済みなら、この移行は値もフラグも一切触らない
+  // （明示選択を移行が巻き戻す事故の防止。storage への副作用ゼロで早期 return）。
+  if (bag[KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT] === true) {
+    return { changed: false };
+  }
   if (bag[KEY_INLINE_PANEL_BELOW_TO_DOCK_MIGRATED] === true) {
     return { changed: false };
   }

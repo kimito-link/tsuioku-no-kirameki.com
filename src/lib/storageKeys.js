@@ -157,6 +157,17 @@ export const KEY_INSTALL_PANEL_PLACEMENT_PENDING =
   'nls_install_panel_placement_pending_v1';
 
 /**
+ * ユーザーが popup の「配置」ラジオで配置を明示選択したら true。
+ * 一度立つと、below→dock / suggestInitial 等の移行が以後この値を上書きしない
+ * （「横付きにしたのに下に戻る」= 保存が定着せず移行/既定で巻き戻る事象の防止）。
+ * popup 保存成功時に nls_inline_panel_placement と同一 set でアトミックに書く。
+ * @see inlinePanelPlacementStorage.js / migrateInlinePanelBelowToDock.js /
+ *   migrateSuggestInitialInlinePanelPlacement.js / extension/background.js
+ */
+export const KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT =
+  'nls_inline_panel_placement_user_explicit_v1';
+
+/**
  * 視聴ページで extension のインラインパネルを自動表示するかどうか。
  * 既定 false（opt-in）。true を明示保存したときだけ自動で出る。
  *

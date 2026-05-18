@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { migrateSuggestInitialInlinePanelPlacementOnce } from './migrateSuggestInitialInlinePanelPlacement.js';
 import {
   KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
   KEY_INSTALL_PANEL_PLACEMENT_PENDING,
   INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_BESIDE
@@ -87,5 +88,36 @@ describe('migrateSuggestInitialInlinePanelPlacementOnce', () => {
       INLINE_PANEL_PLACEMENT_BELOW
     );
     expect(mem.store[KEY_INSTALL_PANEL_PLACEMENT_PENDING]).toBe(false);
+  });
+
+  it('明示選択フラグ true なら提案で上書きせず pending だけ下ろす', async () => {
+    const mem = createMemoryStorage({
+      [KEY_INSTALL_PANEL_PLACEMENT_PENDING]: true,
+      [KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT]: true
+    });
+    const r = await migrateSuggestInitialInlinePanelPlacementOnce({
+      get: mem.get,
+      set: mem.set,
+      layoutInnerWidth: 1920
+    });
+    expect(r.changed).toBe(false);
+    // 幅 1920 でも suggested(beside) で明示選択を上書きしない
+    expect(mem.store[KEY_INLINE_PANEL_PLACEMENT]).toBeUndefined();
+    // 再評価ループを止めるため pending は下ろす
+    expect(mem.store[KEY_INSTALL_PANEL_PLACEMENT_PENDING]).toBe(false);
+  });
+
+  it('明示選択フラグ true かつ pending 無しなら完全に無操作', async () => {
+    const mem = createMemoryStorage({
+      [KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT]: true
+    });
+    const r = await migrateSuggestInitialInlinePanelPlacementOnce({
+      get: mem.get,
+      set: mem.set,
+      layoutInnerWidth: 1920
+    });
+    expect(r.changed).toBe(false);
+    expect(mem.store[KEY_INLINE_PANEL_PLACEMENT]).toBeUndefined();
+    expect(mem.store[KEY_INSTALL_PANEL_PLACEMENT_PENDING]).toBeUndefined();
   });
 });
