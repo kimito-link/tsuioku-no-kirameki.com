@@ -266,7 +266,6 @@ import { hydrateInterceptAvatarMapFromProfile } from '../lib/interceptAvatarHydr
 import { extractBroadcasterUserId } from '../lib/broadcasterUserId.js';
 import { resolveChannelBroadcasterMeta } from '../lib/channelBroadcasterMeta.js';
 import { decidePrewarmLeaseAction } from '../lib/prewarmCoordinator.js';
-import { shouldRefireOfficialBundleForGift } from '../lib/officialBundleGiftRefire.js';
 import {
   KEY_COMMENT_PANEL_AUTO_RESTORE,
   LATEST_COMMENT_BUTTON_SELECTOR,
@@ -867,13 +866,6 @@ function recordGiftSenderObservation(userId, nickname) {
 }
 
 /**
- * F(v0.1.282): 新規ギフト観測を契機にした公式 DOM bundle 追加 persist の
- * 直近発火時刻（スロットル用）。liveId 切替で resetOfficialStatsState が 0 へ。
- * @type {number}
- */
-let _lastGiftBundleRefireAtMs = 0;
-
-/**
  * 0.1.176: パース済ギフトコメントを lifetime に蓄積する共通関数。
  * DOM 経路と NDGR 経路の両方から呼ばれる。rawText を key に重複排除。
  *
@@ -906,24 +898,6 @@ function recordGiftCommentObservation(parsed, rawText) {
     for (let i = 0; i < drop; i++) {
       _d.giftCommentObservations.delete(entries[i][0]);
     }
-  }
-  // F(v0.1.282) リアルタイム反映: 新規ギフトを観測した瞬間に公式 DOM bundle
-  // (nls_event_dom_<lv> = 番組累計pt/ギフト履歴/広告ランキングの正本) の追加
-  // persist を 1 回挟む。固定位相 5s scrape では gift 投下後最大 5s 遅れるが、
-  // ここで即時 persist すると popup は非高頻度キーを即 coalesce で読むためほぼ
-  // リアルタイムに反映される。gift storm では OFFICIAL_EVENT_DOM_SCRAPE_MS と
-  // 整合した throttle で 1 回/5s に制限（過剰 scrape 抑止＝crash hardening 非破壊）。
-  const _giftNowMs = Date.now();
-  if (
-    liveId &&
-    shouldRefireOfficialBundleForGift(
-      _giftNowMs,
-      _lastGiftBundleRefireAtMs,
-      OFFICIAL_EVENT_DOM_SCRAPE_MS
-    )
-  ) {
-    _lastGiftBundleRefireAtMs = _giftNowMs;
-    void persistOfficialEventDomBundleNow();
   }
 }
 
@@ -1490,9 +1464,6 @@ function resetOfficialStatsState() {
   officialNdgrStatsUpdatedAt = 0;
   // liveId 切替時に旧番組の DOM bundle を新番組に持ち越さない
   lastOfficialEventDomBundle = null;
-  // F(v0.1.282): gift 追加 persist の throttle を新放送で 0 リセット
-  //   （前放送の lastAt で新放送初回の即時反映を抑制しないため）
-  _lastGiftBundleRefireAtMs = 0;
   // 新しい live に切り替わったらギフトサイドバー自動オープンも再トライ可能に
   _autoOpenGiftSidebarTriedLiveId = '';
   // audition embed の fetch も新 liveId で再実行を許す
