@@ -158,6 +158,124 @@ export function summarizeGiftEvents(events) {
 }
 
 /**
+ * v0.1.282+: 完全一致タプル dedup（純・副作用なし）。
+ *
+ * `appendGiftEvents(existing, incoming, now)` は 1 回の呼び出し内の incoming 全件に
+ * 同一 `now` を `capturedAt` として刻む。NDGR decode は同一ギフトを msg.8 経路と
+ * fallback 経路の双方で拾うことがあり、同一 tick で同一ギフトが二重 append され
+ * うる（gift は `applyNdgrDedupe` の対象外＝page-intercept で post 前 drop されない）。
+ * これを `userId|itemId|point|message|capturedAt` の完全一致のみで 1 件に畳む。
+ *
+ * capturedAt が 1ms でも違えば「別観測」とみなして残す。これにより同一ユーザーが
+ * 同一アイテムを連投した正当な応援（後続 append で必ず capturedAt が進む）を
+ * 誤って消さない（偽陽性ゼロ）。順序は保持する。
+ *
+ * @param {StoredGiftEvent[]|null|undefined} events
+ * @returns {StoredGiftEvent[]}
+ */
+export function dedupExactGiftEvents(events) {
+  if (!Array.isArray(events)) return [];
+  /** @type {Set<string>} */
+  const seen = new Set();
+  /** @type {StoredGiftEvent[]} */
+  const out = [];
+  for (const e of events) {
+    if (!e || typeof e !== 'object') continue;
+    const key =
+      String(e.userId ?? '') +
+      '|' +
+      String(e.itemId ?? '') +
+      '|' +
+      String(e.point ?? '') +
+      '|' +
+      String(e.message ?? '') +
+      '|' +
+      String(e.capturedAt ?? '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(e);
+  }
+  return out;
+}
+
+/**
+ * v0.1.282+ 北極星ピボット（feedback_north_star_priority_no_drift 2026-05-19）:
+ * 観測した NDGR ギフトを送信者別に point 合計し、拡張独自の貢献度ランキングを
+ * 構築する純関数。公式の貢献度ランキング（cross-origin iframe）が原理的に
+ * 取得できない局面で、北極星レーン1へ placeholder で放置せず堂々と出すための
+ * 主経路。集計基準はギフトポイント合計順（公式の貢献度ランキングに最も近い概念）。
+ *
+ * - 完全一致 dedup を内部適用（二重 append による point 二重計上を防止）
+ * - userId='' の匿名ギフトは「別人を 1 人に融合」する誤認を生むため rank から除外
+ *   （summarizeGiftEvents で匿名分の正直な併記は別途可能）
+ * - point は数値かつ >0 のみ加算。全 point≤0 のユーザーは行を作らない
+ *   （偽の 0pt ランキングを出さない＝data accuracy framework: fail-soft）
+ * - sort は完全決定的: point desc → count desc → lastCapturedAt asc → userId asc
+ *   （同点でも毎リフレッシュで並びがブレない）
+ * - nickname は観測中で最新 capturedAt の非空を採用（途中解決で uid 表示に化けない）
+ *
+ * @param {StoredGiftEvent[]|null|undefined} events
+ * @param {{ maxRows?: number }} [opts]
+ * @returns {Array<{ rank: number, userId: string, nickname: string, point: number, count: number, lastCapturedAt: number }>}
+ */
+export function buildSelfAggregatedContributionRankingFromEvents(events, opts = {}) {
+  if (!Array.isArray(events)) return [];
+  const maxRows = positiveIntOr(opts?.maxRows, 20);
+  const deduped = dedupExactGiftEvents(events);
+  /** @type {Map<string, { userId: string, nickname: string, point: number, count: number, lastCapturedAt: number, lastNickAt: number }>} */
+  const byUser = new Map();
+  for (const e of deduped) {
+    const userId = String(e?.userId ?? '').trim();
+    if (!userId) continue; // 匿名（uid 空）は rank 対象外
+    const point =
+      typeof e?.point === 'number' && Number.isFinite(e.point) && e.point > 0
+        ? e.point
+        : 0;
+    const capturedAt =
+      typeof e?.capturedAt === 'number' && Number.isFinite(e.capturedAt)
+        ? e.capturedAt
+        : 0;
+    const nick = String(e?.nickname ?? '').trim();
+    let agg = byUser.get(userId);
+    if (!agg) {
+      agg = {
+        userId,
+        nickname: '',
+        point: 0,
+        count: 0,
+        lastCapturedAt: 0,
+        lastNickAt: -Infinity
+      };
+      byUser.set(userId, agg);
+    }
+    agg.point += point;
+    agg.count += 1;
+    if (capturedAt > agg.lastCapturedAt) agg.lastCapturedAt = capturedAt;
+    if (nick && capturedAt >= agg.lastNickAt) {
+      agg.nickname = nick;
+      agg.lastNickAt = capturedAt;
+    }
+  }
+  const rows = [...byUser.values()].filter((a) => a.point > 0);
+  rows.sort((a, b) => {
+    if (b.point !== a.point) return b.point - a.point;
+    if (b.count !== a.count) return b.count - a.count;
+    if (a.lastCapturedAt !== b.lastCapturedAt) {
+      return a.lastCapturedAt - b.lastCapturedAt;
+    }
+    return a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0;
+  });
+  return rows.slice(0, maxRows).map((a, i) => ({
+    rank: i + 1,
+    userId: a.userId,
+    nickname: a.nickname,
+    point: a.point,
+    count: a.count,
+    lastCapturedAt: a.lastCapturedAt
+  }));
+}
+
+/**
  * @param {IncomingGiftEvent|null|undefined} raw
  * @param {number} now
  * @returns {StoredGiftEvent|null}
