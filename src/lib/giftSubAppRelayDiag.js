@@ -20,7 +20,8 @@
  *   lastScrapeAttempts: number,
  *   lastItemsCount: number,
  *   lastContribCount: number,
- *   lastEventBannerPresent: boolean
+ *   lastEventBannerPresent: boolean,
+ *   lastDomShape?: Record<string, unknown>|null
  * }} GiftSubAppRelayHeartbeatEntryRaw
  */
 
@@ -43,7 +44,8 @@
  *   lastScrapeAttempts: number,
  *   lastItemsCount: number,
  *   lastContribCount: number,
- *   lastEventBannerPresent: boolean
+ *   lastEventBannerPresent: boolean,
+ *   lastDomShape?: Record<string, unknown>|null
  * }} GiftSubAppRelayHeartbeatEntry
  */
 
@@ -112,7 +114,15 @@ export function snapshotIframeRelayDiag(state, nowMs) {
         lastScrapeAttempts: numberOrZero(e.lastScrapeAttempts),
         lastItemsCount: numberOrZero(e.lastItemsCount),
         lastContribCount: numberOrZero(e.lastContribCount),
-        lastEventBannerPresent: e.lastEventBannerPresent === true
+        lastEventBannerPresent: e.lastEventBannerPresent === true,
+        // v0.1.282: scrape 空時の iframe DOM 概形（観測専用・bounded）。
+        // Scope B（公式イベント上位ランキング鏡）安全修正の前提エビデンス。
+        lastDomShape:
+          e.lastDomShape &&
+          typeof e.lastDomShape === 'object' &&
+          !Array.isArray(e.lastDomShape)
+            ? e.lastDomShape
+            : null
       };
       heartbeatFrameCount += 1;
     }

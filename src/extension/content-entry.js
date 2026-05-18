@@ -81,6 +81,7 @@ import {
   scrapeOfficialEventBannerFromDom
 } from '../lib/officialEventBannerDom.js';
 import { findGiftSidebarRankTabElement } from '../lib/giftSidebarRankTabPick.js';
+import { captureGiftSubAppIframeDomShape } from '../lib/giftSubAppIframeDomShape.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
 import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
 import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
@@ -1934,6 +1935,15 @@ window.addEventListener('message', (e) => {
   cur.lastItemsCount = Number(e.data.itemsCount) || 0;
   cur.lastContribCount = Number(e.data.contribCount) || 0;
   cur.lastEventBannerPresent = e.data.eventBannerPresent === true;
+  // v0.1.282: scrape 空時に iframe 側が同梱する DOM 概形（観測専用・bounded・
+  // 送信側で PII 非収集済）。Scope B 安全修正の前提エビデンス。object のみ採用。
+  if (
+    e.data.domShapeProbe &&
+    typeof e.data.domShapeProbe === 'object' &&
+    !Array.isArray(e.data.domShapeProbe)
+  ) {
+    cur.lastDomShape = e.data.domShapeProbe;
+  }
   map[url] = cur;
   pruneRelayDiagMap(map);
 });
@@ -10008,6 +10018,15 @@ function maybeStartGiftSubAppIframeRelay() {
     // v0.1.227 観測強化: scrape 結果が 0 件でも heartbeat を必ず送る。
     // これで「relay は起動してるが scrape 空」と「relay 自体起動してない」を
     // 親 frame 側で区別できる（v0.1.226 では区別できなかった盲点）。
+    // v0.1.282 観測層: scrape が完全に空のときだけ、iframe DOM の概形を
+    // bounded・観測専用に同梱する（挙動不変・読み取りのみ）。次の診断バンドル
+    // で「未mount/selector不一致/対象無し」を実証可能にし、Scope B(公式
+    // イベント上位ランキング鏡)を実機サンプル無しの盲目修正でなくエビデンス
+    // ベースで安全に直せるようにする。空でない通常時は payload を増やさない。
+    const scrapeEmptyForProbe =
+      items.length === 0 &&
+      (!contributionRanking || contributionRanking.length === 0) &&
+      !eventBanner;
     try {
       const target = window.top || window.parent;
       target.postMessage(
@@ -10018,7 +10037,10 @@ function maybeStartGiftSubAppIframeRelay() {
           itemsCount: items.length,
           contribCount: Array.isArray(contributionRanking) ? contributionRanking.length : 0,
           eventBannerPresent: !!eventBanner,
-          sentAt: Date.now()
+          sentAt: Date.now(),
+          ...(scrapeEmptyForProbe
+            ? { domShapeProbe: captureGiftSubAppIframeDomShape(document) }
+            : {})
         },
         '*'
       );
