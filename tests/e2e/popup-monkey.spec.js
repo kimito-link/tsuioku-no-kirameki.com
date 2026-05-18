@@ -24,9 +24,19 @@ function mulberry32(seed) {
  * ポップアップ上で疑似ランダム操作を繰り返し、クラッシュや pageerror が出ないことを確認する。
  * 実行例: npm run test:e2e:monkey
  */
+/**
+ * 固定 1 シードを N 回反復しても同一決定列の再生で探索空間は増えない。
+ * 会議室の指摘（テスト戦略: 設計AI ✗重大 / 批判AI 重い / ギャップ 中）に従い、
+ * 反復回数ではなく seed を配列で回して入力多様性＝情報量を増やす。
+ * 先頭 0x4e4c534d ("NLSM") は従来 baseline との連続性のため温存し、
+ * 残りは 32bit に分散させた定数（黄金比/xxhash/murmur 由来）。
+ */
+const MONKEY_SEEDS = [0x4e4c534d, 0x9e3779b1, 0x85ebca6b, 0xc2b2ae35];
+
 test.describe('popup monkey', () => {
-  test('シード付きランダム操作後も UI が生存', async ({ context }) => {
-    const seed = 0x4e4c534d; // "NLSM"
+  for (const seed of MONKEY_SEEDS) {
+    const seedHex = `0x${(seed >>> 0).toString(16)}`;
+    test(`シード ${seedHex} のランダム操作後も UI が生存`, async ({ context }) => {
     const rand = mulberry32(seed);
 
     let sw = context.serviceWorkers()[0];
@@ -138,5 +148,6 @@ test.describe('popup monkey', () => {
       pageErrors,
       `pageerror が発生: ${pageErrors.join(' | ')}`
     ).toHaveLength(0);
-  });
+    });
+  }
 });
