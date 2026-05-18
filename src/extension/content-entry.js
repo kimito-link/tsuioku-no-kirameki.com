@@ -82,6 +82,7 @@ import {
 } from '../lib/officialEventBannerDom.js';
 import { findGiftSidebarRankTabElement } from '../lib/giftSidebarRankTabPick.js';
 import { captureGiftSubAppIframeDomShape } from '../lib/giftSubAppIframeDomShape.js';
+import { captureSameOriginContributionRankingDomShape } from '../lib/sameOriginContribRankingDomShape.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
 import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
 import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
@@ -4280,6 +4281,19 @@ function buildGiftDiagnosticsBundle() {
             };
           } catch {
             return null;
+          }
+        })(),
+        // v0.1.282 2026-05-19: 同一 origin（watch ページ）の貢献度ランキング
+        // コンテナ DOM 概形を export 時に 1 回だけ観測（container スコープ・
+        // bounded・読取専用・PII 非収集・hot tick で回さない＝会議室 critic
+        // 安全化反映）。共有 scraper は不変。次回バンドルでこの probe='ok' なら
+        // matchedBy/rowSamples/sel から確定トークンを得て、専用 selector ＋
+        // 広告混入回帰テスト同梱で安全に本修正へ繋ぐ（盲目 selector 変更禁止）。
+        sameOriginContribRankingDomShape: (() => {
+          try {
+            return captureSameOriginContributionRankingDomShape(document);
+          } catch {
+            return { probe: 'error' };
           }
         })(),
         programStats: b.programStats
