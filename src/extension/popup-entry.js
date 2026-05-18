@@ -11135,7 +11135,24 @@ async function resolveSnapshotForHtmlExport(watchUrl) {
       error: ''
     };
   }
-  return requestWatchPageSnapshotFromOpenTab(watchUrl);
+  // v0.1.282: スナップショット取得（開いている watch タブへの messaging）が
+  // 失敗しても HTML 保存全体を落とさない。以前は requestWatchPageSnapshot
+  // FromOpenTab の reject が downloadCommentsHtml の Promise.all を巻き込み、
+  // 「HTML の保存に失敗しました」で記録コメントごと出力できなかった。
+  // buildHtmlReportDocument は snapshot=null + error を受けて記録コメント
+  // だけでレポートを生成できる設計なので、ここで必ず {snapshot,error} に
+  // 正規化して degrade させる（防御的・既存成功時は挙動不変）。
+  try {
+    return await requestWatchPageSnapshotFromOpenTab(watchUrl);
+  } catch (e) {
+    const reason = String(e?.message || e || '').trim();
+    return {
+      snapshot: null,
+      error: reason
+        ? `配信タブのスナップショット取得に失敗（記録コメントのみで出力）: ${reason.slice(0, 120)}`
+        : '配信タブのスナップショット取得に失敗しました（記録コメントのみで出力します）'
+    };
+  }
 }
 
 /**
@@ -12699,8 +12716,19 @@ function initPopup() {
       await yieldToBrowserPaint();
       await downloadCommentsHtml(lv, key, watchUrl);
       if (postStatus) postStatus.textContent = 'ダウンロードを開始しました';
-    } catch {
-      if (postStatus) postStatus.textContent = 'HTML の保存に失敗しました';
+    } catch (e) {
+      // v0.1.282: 失敗理由を握り潰さず可視化（従来は空 catch で原因不明だった）。
+      try {
+        console.error('[nls] HTML レポート保存に失敗', e);
+      } catch {
+        /* no-op */
+      }
+      const reason = String(e?.message || e || '').trim();
+      if (postStatus) {
+        postStatus.textContent = reason
+          ? `HTML の保存に失敗しました（${reason.slice(0, 80)}）`
+          : 'HTML の保存に失敗しました';
+      }
     } finally {
       exportBtn.removeAttribute('aria-busy');
       exportBtn.disabled = false;
