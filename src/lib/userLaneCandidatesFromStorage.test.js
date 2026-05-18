@@ -22,6 +22,7 @@ import {
   niconicoDefaultUserIconUrl,
   pickStrongestAvatarUrlForUser
 } from './supportGrowthTileSrc.js';
+import { resolveLaneTier } from '../domain/lane/tier.js';
 
 let userLaneCandidatesFromStorage;
 let enrichUserLaneAggregatesWithProfileAndDisplay;
@@ -604,5 +605,69 @@ maybeEnrich('enrichUserLaneAggregatesWithProfileAndDisplay', () => {
       '6292820': { nickname: 'Chiharu' }
     });
     expect(out[0].nickname).toBe('Chiharu');
+  });
+
+  // --- F3(v0.1.282): 実 avatar 観測 → avatarObserved 昇格 → link 段 ---
+  it('F3: profileMap の実 avatar 観測で弱ニック数値IDも avatarObserved 昇格→link(3)', () => {
+    const agg = Object.freeze([
+      Object.freeze({
+        userId: '25221924',
+        nickname: 'ゲスト',
+        avatarUrl: '',
+        avatarObserved: false,
+        liveId: 'lv1'
+      })
+    ]);
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(agg, [], {
+      '25221924': { avatarUrl: 'https://example.com/personal.jpg', updatedAt: 1 }
+    });
+    expect(out[0].avatarObserved).toBe(true);
+    // ユーザー可視の結果: りんく段（tier 3）へ正しく上がる
+    expect(
+      resolveLaneTier({
+        userId: out[0].userId,
+        nickname: out[0].nickname,
+        avatarObserved: out[0].avatarObserved
+      })
+    ).toBe(3);
+  });
+
+  it('F3: profileMap に avatar が無ければ avatarObserved は false のまま（konta=2）', () => {
+    const agg = Object.freeze([
+      Object.freeze({
+        userId: '25221924',
+        nickname: 'ゲスト',
+        avatarUrl: '',
+        avatarObserved: false,
+        liveId: 'lv1'
+      })
+    ]);
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(agg, [], {
+      '25221924': { nickname: 'ゲスト' }
+    });
+    expect(out[0].avatarObserved).toBe(false);
+    expect(
+      resolveLaneTier({
+        userId: out[0].userId,
+        nickname: out[0].nickname,
+        avatarObserved: out[0].avatarObserved
+      })
+    ).toBe(2);
+  });
+
+  it('F3: 既存 avatarObserved:true は profileMap 不在でも保持（加法・退行なし）', () => {
+    const row = Object.freeze({
+      userId: '25221924',
+      nickname: 'ゲスト',
+      avatarUrl: '',
+      avatarObserved: true,
+      liveId: 'lv1'
+    });
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(
+      Object.freeze([row]),
+      [],
+      {}
+    );
+    expect(out[0].avatarObserved).toBe(true);
   });
 });

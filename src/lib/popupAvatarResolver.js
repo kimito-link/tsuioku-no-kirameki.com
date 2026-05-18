@@ -85,7 +85,7 @@ export function resolveAvatarUrlWithCandidates(uid, candidates, size = 's') {
  * 一切変えない（合成フォールバックは UX 維持のため継続）。
  *
  * @param {string|number|null|undefined} uid
- * @param {Record<string, { avatarUrl?: string }>|null|undefined} commentProfileMap
+ * @param {Record<string, { avatarUrl?: unknown }>|null|undefined} commentProfileMap
  * @returns {boolean} intercept 由来の実 URL を観測できていれば true
  */
 export function isAvatarObservedInCommentProfileMap(uid, commentProfileMap) {
