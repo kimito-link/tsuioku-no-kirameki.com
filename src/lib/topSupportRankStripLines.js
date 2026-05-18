@@ -43,6 +43,64 @@ import { formatNicknameWithUidFallback } from './giftDisplayNickname.js';
  */
 
 /**
+ * 公式DOMランキング行（広告/貢献度）の合成 userKey か。
+ * `__ad_${i}_${name}` / `__anon_ad_${i}` / `__contrib_${i}_${name}` /
+ * `__anon_contrib_${i}` を対象にする（giftHistory の `__gift_` は対象外＝不変）。
+ *
+ * @param {string} userKey
+ * @returns {boolean}
+ */
+function isOfficialDomRankUserKey(userKey) {
+  return /^__(?:anon_)?(?:ad|contrib)_\d+/.test(String(userKey || ''));
+}
+
+/**
+ * userKey から決定的な短いハッシュ（byte 一意性の保証用、djb2）。
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+function shortDeterministicHash(s) {
+  let h = 5381;
+  const str = String(s || '');
+  for (let i = 0; i < str.length; i += 1) {
+    h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/**
+ * 実アバターが取れない公式DOMランキング行の「順位バッジ風 中立プレースホルダ」。
+ *
+ * 匿名 identicon トグルに依存せず、行ごとに必ず異なる決定的 data URL を返す
+ * （旧: 全行が共有プレースホルダ1枚に潰れ「サムネかぶり」だった）。
+ * 「本物のアイコン」と誤認させないよう灰色地に順位番号＋「未取得」を出す中立
+ * デザイン。userKey ハッシュを `<title>` に埋め、順位が同値でも byte 一意になる
+ * ことを保証する。副作用なし・トグル状態に非依存。
+ *
+ * @param {number|null} placeNumber 1始まりの順位（null/0以下は '—'）
+ * @param {string} userKey
+ * @returns {string} data:image/svg+xml URL
+ */
+function officialDomRankBadgeThumb(placeNumber, userKey) {
+  const n =
+    typeof placeNumber === 'number' &&
+    Number.isFinite(placeNumber) &&
+    placeNumber > 0
+      ? String(Math.floor(placeNumber))
+      : '—';
+  const uniq = shortDeterministicHash(userKey);
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" role="img">' +
+    `<title>順位${n} 未取得 ${uniq}</title>` +
+    '<rect width="48" height="48" rx="11" fill="#e7e9ec"/>' +
+    `<text x="24" y="25" font-family="sans-serif" font-size="17" font-weight="700" fill="#8b95a1" text-anchor="middle">${n}</text>` +
+    '<text x="24" y="38" font-family="sans-serif" font-size="8" fill="#aab2bc" text-anchor="middle">未取得</text>' +
+    '</svg>';
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/**
  * 応援ランキングストリップ1行分の表示モデル（DOM・HTML エスケープなし）。
  *
  * @param {TopSupportRankRoom[]} stripRooms
@@ -104,6 +162,13 @@ export function topSupportRankLineModels(stripRooms, opts) {
     let thumbSrc = '';
     if (isHttpOrHttpsUrl(rawAv)) {
       thumbSrc = String(rawAv).trim();
+    } else if (isOfficialDomRankUserKey(userKey)) {
+      // v0.1.282: 公式DOMランキング（広告/貢献度）で実サムネが取れない行は、
+      // 匿名 identicon トグルに依存せず行ごとに必ず異なる「順位バッジ風 中立
+      // プレースホルダ」にする（旧: idnResolver=undefined 時に共有
+      // プレースホルダ1枚へ全行が潰れ「サムネかぶり」になっていた）。
+      // 実 http サムネは上の分岐で最優先のまま不変。
+      thumbSrc = officialDomRankBadgeThumb(placeNumber, userKey);
     } else if (
       idnResolver &&
       uidForThumb &&
