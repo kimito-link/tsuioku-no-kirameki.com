@@ -876,3 +876,66 @@ describe('scrapeEventInfoMirrorParts (v0.1.240)', () => {
     expect(parts.scoreHtml).not.toContain('point-value');
   });
 });
+
+describe('AD汚染回帰: 共有 scraper は ad 同型 DOM で行を出す（恒久 tripwire）', () => {
+  // ⚠️ 観測サンプル到着まで gift/ad 弁別 selector は書かない。本 block は
+  //    出荷済コード挙動の pin（characterization）のみ。共有 scraper / selector に
+  //    新規弁別ロジックを足したら BLOCK 違反（会議室 critic 2026-05-19 裁定）。
+  //    scrapeAdContributionRankingRowsAndMirrorFromDom が scrapeContributionRanking
+  //    FromDom をそのまま呼ぶ＝広告 publish と gift 貢献度は構造完全同型。
+  //
+  // FIX1: 汚染主張は grep/read 実証済の「内側構造のみ」に依拠（推定外側名から
+  //       完全隔離＝false confidence ベクタ除去）。内側 DOM は既存 :120 実
+  //       niconico サンプルと逐語同型・svg-only rank の 2 行。
+  const AD_INNER_STRUCTURE_ONLY = `
+    <div class="content-supporter-section">
+      <div class="wrapper">
+        <ul class="wrapper">
+          <li class="item">
+            <i class="rank"><svg class="rank-icon"></svg></i>
+            <div class="info">
+              <button class="ranker"><span class="name">スポンサーＡ</span><span class="honorific"> さん </span></button>
+              <p class="contribution">23,692 <svg class="contribution-unit"></svg></p>
+            </div>
+          </li>
+          <li class="item">
+            <i class="rank"><svg class="rank-icon"></svg></i>
+            <div class="info">
+              <button class="ranker"><span class="name">スポンサーＢ</span><span class="honorific"> さん </span></button>
+              <p class="contribution">18,291 <svg class="contribution-unit"></svg></p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>`;
+
+  it('内側構造のみ（推定外側名ゼロ）でも共有 scraper が ad 行を出してしまう＝汚染機序', () => {
+    document.body.innerHTML = AD_INNER_STRUCTURE_ONLY;
+    const rows = scrapeContributionRankingFromDom(document);
+    expect(rows).not.toBeNull();
+    expect(rows.length).toBe(2);
+    expect(rows[0].name).toBe('スポンサーＡ');
+    expect(rows[1].name).toBe('スポンサーＢ');
+    // FIX4: 23,692/18,291 は lv350481542 混入の逸話値を fixture に置いただけで
+    //       値そのものは load-bearing でない。行 1 は fixture 値の確定 parse 確認、
+    //       行 2 は「正の整数が出る」構造契約に緩め記憶誤り由来の誤 red を排除。
+    expect(rows[0].contribution).toBe(23692);
+    expect(Number.isInteger(rows[1].contribution)).toBe(true);
+    expect(rows[1].contribution).toBeGreaterThan(0);
+  });
+
+  it('正規 ad 経路（nicoad 祖先まとう同型 DOM）でも同じ 2 行が流れる＝正しい挙動', () => {
+    // 外側 nicoad 祖先名は実 ad サンプル未取得のため推定（happy-dom は真の
+    // cross-origin iframe 不可ゆえ ad-publish fetched document の同型モデル）。
+    // FIX1: 本 case は「ad 経路が ranking を返す」確認に限定。汚染主張は上の
+    //       structure-only case が担保し、推定外側名に一切依存させない。
+    document.body.innerHTML = `
+      <div class="nicoad-ranking-root" data-nicoad-publish="lv350481542">
+        <a class="advertiser-name" href="https://nicoad.nicovideo.jp/publish/lv350481542">広告履歴</a>
+        ${AD_INNER_STRUCTURE_ONLY}
+      </div>`;
+    const got = scrapeAdContributionRankingRowsAndMirrorFromDom(document);
+    expect(Array.isArray(got.ranking)).toBe(true);
+    expect(got.ranking?.length).toBe(2);
+  });
+});
