@@ -82,6 +82,7 @@ import {
 } from '../lib/officialEventBannerDom.js';
 import { findGiftSidebarRankTabElement } from '../lib/giftSidebarRankTabPick.js';
 import { captureGiftSubAppIframeDomShape } from '../lib/giftSubAppIframeDomShape.js';
+import { classifyGiftSubAppFrameSource } from '../lib/giftSubAppFrameSource.js';
 import { captureSameOriginContributionRankingDomShape } from '../lib/sameOriginContribRankingDomShape.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
 import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
@@ -1944,6 +1945,15 @@ window.addEventListener('message', (e) => {
     !Array.isArray(e.data.domShapeProbe)
   ) {
     cur.lastDomShape = e.data.domShapeProbe;
+  }
+  // 会議室(2026-05-19) Q1: koken 限定 one-shot の貢献度ランキング DOM 概形
+  // （観測専用・bounded・送信側で PII 非収集済）。既存 lastDomShape 経路は不変。
+  if (
+    e.data.kokenContribShapeProbe &&
+    typeof e.data.kokenContribShapeProbe === 'object' &&
+    !Array.isArray(e.data.kokenContribShapeProbe)
+  ) {
+    cur.lastKokenContribShape = e.data.kokenContribShapeProbe;
   }
   map[url] = cur;
   pruneRelayDiagMap(map);
@@ -9997,6 +10007,11 @@ function maybeStartGiftSubAppIframeRelay() {
   let lastSent = '';
   /** v0.1.227: scan tick の累積回数。heartbeat に乗せて「relay は起動してるが scrape 0 件」を区別する */
   let scrapeAttempts = 0;
+  /**
+   * 会議室(2026-05-19) Q1: koken 限定の貢献度ランキング DOM 概形を 1 回だけ
+   * 送るための one-shot ガード（mount 後の毎 tick 連投を防ぐ）。
+   */
+  let kokenContribShapeSent = false;
   const scanAndPost = () => {
     scrapeAttempts += 1;
     /** @type {Array<unknown>} */
@@ -10041,6 +10056,33 @@ function maybeStartGiftSubAppIframeRelay() {
       items.length === 0 &&
       (!contributionRanking || contributionRanking.length === 0) &&
       !eventBanner;
+    // 会議室(2026-05-19) Q1 FIX: koken 別ドメイン supporter iframe は gift 履歴
+    // (items>0) を持つため上の scrapeEmptyForProbe が false になり domShapeProbe が
+    // 出ず、ユーザーが見る💎貢献度ランキングの DOM 概形が永久に観測できない狭い穴が
+    // あった（実バンドル lv350522273 で sameOriginContribRankingDomShape=no-container
+    // と判明＝同一 origin には無く koken cross-origin 側にある）。koken **限定**
+    // （nicoad 広告ランキングは `.contribution-ranking-list .ranker` 同型で
+    // lv350481542 毒サンプル化するため必ず除外）で、貢献度ランキング様 DOM が居る
+    // 瞬間に 1 回だけ bounded shape を同梱する。観測専用・PII 非収集・既存
+    // domShapeProbe / scrapeEmptyForProbe 経路は不変（純加法）。BLOCK 厳守＝
+    // koken 専用 scraper はこの shape 標本到着後に会議室で設計（ここでは書かない）。
+    let kokenContribShapeProbe = null;
+    try {
+      if (!kokenContribShapeSent && classifyGiftSubAppFrameSource(href) === 'koken') {
+        const shape = captureGiftSubAppIframeDomShape(document);
+        const sel = shape && typeof shape === 'object' ? /** @type {any} */ (shape).sel : null;
+        const looksContrib =
+          !!sel &&
+          (/** @type {any} */ (sel).contribList === true ||
+            (Number(/** @type {any} */ (sel).ranker) || 0) > 0);
+        if (looksContrib) {
+          kokenContribShapeProbe = shape;
+          kokenContribShapeSent = true;
+        }
+      }
+    } catch {
+      kokenContribShapeProbe = null;
+    }
     try {
       const target = window.top || window.parent;
       target.postMessage(
@@ -10054,7 +10096,8 @@ function maybeStartGiftSubAppIframeRelay() {
           sentAt: Date.now(),
           ...(scrapeEmptyForProbe
             ? { domShapeProbe: captureGiftSubAppIframeDomShape(document) }
-            : {})
+            : {}),
+          ...(kokenContribShapeProbe ? { kokenContribShapeProbe } : {})
         },
         '*'
       );

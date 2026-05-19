@@ -152,6 +152,52 @@ describe('snapshotIframeRelayDiag', () => {
     expect(r.hasHeartbeatAny).toBe(false);
     expect(r.heartbeatsByFrameUrl).toEqual({});
   });
+
+  it('会議室Q1: koken の lastKokenContribShape を object のみ passthrough（lastDomShape と独立・配列は弾く）', () => {
+    const shape = {
+      bodyClass: 'x',
+      sel: { contribList: true, ranker: 4 },
+      classSamples: ['___supporter___aB3', '___ranker___kk9']
+    };
+    const r = snapshotIframeRelayDiag(
+      {
+        iframeRelayMessagesReceivedTotal: 0,
+        iframeRelayMessagesByFrameUrl: {},
+        iframeRelayLastReceivedAt: 0,
+        iframeRelayHeartbeatsByFrameUrl: {
+          'https://koken.nicovideo.jp/supporter/contents/live/lv1/gift': {
+            count: 2,
+            lastAt: 9000,
+            lastScrapeAttempts: 2,
+            lastItemsCount: 3,
+            lastContribCount: 0,
+            lastEventBannerPresent: false,
+            lastKokenContribShape: shape
+          },
+          'https://nicoad.nicovideo.jp/live/publish/lv1': {
+            count: 2,
+            lastAt: 9000,
+            lastScrapeAttempts: 2,
+            lastItemsCount: 0,
+            lastContribCount: 5,
+            lastEventBannerPresent: false,
+            // 毒サンプル防御の型ガード: 配列は採用しない
+            lastKokenContribShape: [1, 2]
+          }
+        },
+        scanCrossOriginThrows: 0,
+        scanSameOriginAccess: 0
+      },
+      10000
+    );
+    const koken =
+      r.heartbeatsByFrameUrl['https://koken.nicovideo.jp/supporter/contents/live/lv1/gift'];
+    expect(koken.lastKokenContribShape).toEqual(shape);
+    expect(koken.lastDomShape).toBeNull(); // 既存経路と独立（混ざらない）
+    const ad =
+      r.heartbeatsByFrameUrl['https://nicoad.nicovideo.jp/live/publish/lv1'];
+    expect(ad.lastKokenContribShape).toBeNull();
+  });
 });
 
 describe('formatRelayDiagOneLine', () => {
