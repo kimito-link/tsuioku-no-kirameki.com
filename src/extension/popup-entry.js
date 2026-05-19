@@ -23,6 +23,7 @@ import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterF
 import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
 import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
+import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
 import {
   buildNorthStarRankFallbackHtml,
@@ -5848,6 +5849,30 @@ async function resolveOfficialContributionRankingRows(liveId) {
         iframeData.contributionRanking.length > 0
       ) {
         ranking = iframeData.contributionRanking;
+      }
+    } catch {
+      /* no-op */
+    }
+  }
+  // 核心 tail fallback: relay 由来 bundle / iframe storage がどちらも空のとき
+  // （= koken iframe 未 mount の常用ケース）、SW が無認証公式 API から取得して
+  // 専用キーに置いた行を読む。既存経路の優先度は不変＝relay が取れていれば
+  // それを使い、ここは取れない時だけ埋める純加法。描画連鎖（refreshAll…）には
+  // I/O を足さず、この既に async な resolver 内に閉じる（続5 回帰の構造を作らない）。
+  if (!ranking || ranking.length === 0) {
+    if (!lid) return null;
+    try {
+      const k = kokenContribStorageKey(lid);
+      const bag = await chrome.storage.local.get(k);
+      const data = bag[k];
+      if (
+        data &&
+        typeof data === 'object' &&
+        String(data.liveId || '').trim().toLowerCase() === lid &&
+        Array.isArray(data.rows) &&
+        data.rows.length > 0
+      ) {
+        ranking = data.rows;
       }
     } catch {
       /* no-op */

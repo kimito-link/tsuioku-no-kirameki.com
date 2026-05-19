@@ -490,6 +490,91 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* koken 公式ギフト貢献度ランキング 無認証 API の CORS バイパス fetch proxy   */
+/* content は live.nicovideo.jp origin のため API を直 fetch しても CORS で  */
+/* 本文を読めない。SW の host_permissions 特権 fetch のみ本文を読める        */
+/* （MV3 拡張発リクエストは Web の CORS 制約外）。content は liveId だけ送り、 */
+/* URL は SW がここで固定リテラル(host/path/contributionType=gift)から自作  */
+/* するので、メッセージ由来文字列で任意 URL を作らせない（SSRF 面遮断）。     */
+/* 契約・正規化は src/lib/kokenContributionRankingApi.js（lib 側に契約 test）。*/
+/* メモリ reference_koken_contribution_ranking_api 参照。                    */
+/* ------------------------------------------------------------------ */
+
+// src/lib/kokenContributionRankingApi.js の KOKEN_CONTRIB_FETCH_MESSAGE_TYPE と
+// 文字列同期（background は ESM import 不可の手書き成果物。lib 側に契約 test）。
+const KOKEN_CONTRIB_FETCH_MESSAGE_TYPE = 'NLS_KOKEN_CONTRIB_FETCH';
+const KOKEN_LIVE_ID_RE = /^lv\d{1,15}$/;
+const KOKEN_CONTRIB_FETCH_TIMEOUT_MS = 8000;
+
+async function fetchKokenContribRankingJson(liveId) {
+  const lid = String(liveId == null ? '' : liveId)
+    .trim()
+    .toLowerCase();
+  if (!KOKEN_LIVE_ID_RE.test(lid)) return { ok: false };
+  const url =
+    'https://api.koken.nicovideo.jp/v1/userperspective/contents/gift/live/' +
+    encodeURIComponent(lid) +
+    '/ranking?rank=20';
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, KOKEN_CONTRIB_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit', // 無認証 API。cookie を不要に送らない
+      cache: 'no-store', // サーバが no-store。毎回フレッシュ
+      redirect: 'error', // 想定外リダイレクトは失敗扱い（abuse 面の保守）
+      signal: ac.signal
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // 自拡張の content からのみ受理。type 不一致は他 listener / popup を妨げ
+  // ないよう undefined を返して素通り（async 応答 channel も予約しない）。
+  if (!msg || msg.type !== KOKEN_CONTRIB_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  // 必ず一度だけ応答（応答漏れは content 側 port を開きっぱなしにする）。
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchKokenContribRankingJson(msg.liveId)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
+/* ------------------------------------------------------------------ */
 /* ツールバー: ページ内インラインがあれば前面化、なければ popup 窓（src/lib/uiUxOpenStrategy と整合） */
 /* ------------------------------------------------------------------ */
 

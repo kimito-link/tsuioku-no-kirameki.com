@@ -167,6 +167,12 @@ import {
   pruneStaleEventDomLvs,
   buildEventDomEntriesFromStorageBag
 } from '../lib/pruneStaleEventDomLvs.js';
+import {
+  normalizeKokenRankingResponse,
+  kokenContribStorageKey,
+  KOKEN_CONTRIB_STORAGE_PREFIX,
+  KOKEN_CONTRIB_FETCH_MESSAGE_TYPE
+} from '../lib/kokenContributionRankingApi.js';
 import { appendGiftEvents } from '../lib/giftEventStore.js';
 import { resolveGiftSenderBucketKey } from '../lib/giftSenderObservation.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
@@ -9618,6 +9624,10 @@ async function start() {
       clearInterval(officialEventDomScrapeIntervalId);
       officialEventDomScrapeIntervalId = null;
     }
+    if (kokenContribApiIntervalId != null) {
+      clearInterval(kokenContribApiIntervalId);
+      kokenContribApiIntervalId = null;
+    }
     // 0.1.29 (AD): 拡張リロード後、旧 MutationObserver が DOM 変化のたびに
     // 走り続けて CPU を消費する。callback 内の hasExtensionContext() check で
     // 早期 return するが、observer 自体を disconnect しておく方が確実。
@@ -9760,11 +9770,116 @@ async function start() {
       }, OFFICIAL_EVENT_DOM_SCRAPE_MS)
     )
   );
+
+  // 核心: koken 公式貢献度ランキング無認証 API の鏡（officialEventDomScrape の
+  // sibling。NDGR/gift hotpath 非干渉・SW 経由・専用キー・rows>0 のみ書込）。
+  // 初回は startup harvest 窓を外して 10s 後、以後 30s 間隔。teardown は
+  // stopContentIntervalsIfContextInvalidated（kokenContribApiIntervalId）。
+  setTimeout(() => {
+    if (stopContentIntervalsIfContextInvalidated()) return;
+    maybeFetchKokenContribRankingMirrorOnce();
+  }, 10_000);
+  kokenContribApiIntervalId = /** @type {number} */ (
+    /** @type {unknown} */ (
+      setInterval(() => {
+        if (stopContentIntervalsIfContextInvalidated()) return;
+        if (!recording || !liveId) return;
+        if (
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'hidden'
+        ) {
+          return;
+        }
+        maybeFetchKokenContribRankingMirrorOnce();
+      }, KOKEN_CONTRIB_API_FETCH_MS)
+    )
+  );
 }
 
 const OFFICIAL_EVENT_DOM_SCRAPE_MS = 5_000;
 /** @type {number|null} */
 let officialEventDomScrapeIntervalId = null;
+
+const KOKEN_CONTRIB_API_FETCH_MS = 30_000;
+const KOKEN_CONTRIB_API_MIN_GAP_MS = 25_000;
+/** @type {number|null} */
+let kokenContribApiIntervalId = null;
+/** @type {number} */
+let _kokenContribApiLastAttemptAt = 0;
+
+/**
+ * koken 公式ギフト貢献度ランキング 無認証 API を SW 経由で取得し、専用 storage
+ * キー（kokenContribStorageKey）に保存する。核心（視聴中に画面で見る「1位…
+ * 5,105」公式貢献度ランキングの popup 鏡）は、当該ランキングが watch 本体 DOM に
+ * 構造的に無く別ドメイン koken SPA 側にあり、その iframe が多くの配信で mount
+ * されないため未達だった。2026-05-19 に 3 経路で確証した無認証公式 API
+ * （reference_koken_contribution_ranking_api）でこれを構造的に解決する。
+ *
+ * 制約遵守（会議室自己 critic PASS_WITH_FIXES の R1–R5）:
+ *  - NDGR/gift hotpath には一切触れない（issue2 教訓）。officialEventDomScrape と
+ *    同じ周期ループの sibling として top-frame watch init からのみ呼ばれる。
+ *  - CORS の都合上 fetch は SW（host_permissions 特権）が行い、content は liveId を
+ *    送るだけ。応答は純関数 normalizeKokenRankingResponse で正規化。
+ *  - rows>0 のときだけ専用キーに書く（空/失敗は既存値を保全＝fail-soft）。広告
+ *    (nicoad) は SW が gift 固定 URL を叩くので構造的に混入し得ない。relay の
+ *    `nls_iframe_official_dom_<lid>` とは別キー＝relay seam 無改変・clobber 不能。
+ *  - liveId 切替で stale 書込しないよう応答時に現在 liveId と echo 一致を確認。
+ *  - 再入は時刻 min-gap で抑止。boolean in-flight は SW 死亡で永久ロックする
+ *    ため使わず、callback 喪失時も次 tick で自己回復する設計にする。
+ */
+function maybeFetchKokenContribRankingMirrorOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '')
+      .trim()
+      .toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _kokenContribApiLastAttemptAt < KOKEN_CONTRIB_API_MIN_GAP_MS) return;
+    _kokenContribApiLastAttemptAt = now;
+    chrome.runtime.sendMessage(
+      { type: KOKEN_CONTRIB_FETCH_MESSAGE_TYPE, liveId: lid },
+      (resp) => {
+        // lastError を読まないと unchecked エラーが console に出る。読むだけ。
+        const le = chrome.runtime.lastError;
+        if (le) return;
+        if (!resp || resp.ok !== true || resp.json == null) return;
+        let rows = null;
+        try {
+          rows = normalizeKokenRankingResponse(resp.json);
+        } catch {
+          rows = null;
+        }
+        if (!Array.isArray(rows) || rows.length === 0) return;
+        // 応答到着までに別 liveId へ遷移していたら stale 書込しない
+        const curLid = String(liveId || '')
+          .trim()
+          .toLowerCase();
+        if (curLid !== lid) return;
+        try {
+          chrome.storage.local
+            .set({
+              [kokenContribStorageKey(lid)]: {
+                rows,
+                capturedAt: Date.now(),
+                liveId: lid
+              }
+            })
+            .catch((err) => {
+              if (!isContextInvalidatedError(err)) {
+                /* best-effort */
+              }
+            });
+        } catch {
+          /* no-op: storage 不可・context 消失 */
+        }
+      }
+    );
+  } catch {
+    /* no-op: sendMessage 不可（context invalidated 等）。次 tick で自己回復 */
+  }
+}
 /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */
 let lastOfficialEventDomBundle = null;
 /**
@@ -10581,6 +10696,27 @@ async function persistOfficialEventDomBundleNow() {
           );
         } catch { /* best-effort */ }
       }
+      // 核心: koken API 鏡の専用キー（kokenContribStorageKey）も同規約で cleanup
+      // （現 lv は保護、別 lv で 24h 超 or capturedAt 不明は prune）。キー累積防止。
+      try {
+        const KOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const curLid = String(lid || '').trim().toLowerCase();
+        const staleKokenKeys = Object.keys(all).filter((k) => {
+          if (!k.startsWith(KOKEN_CONTRIB_STORAGE_PREFIX)) return false;
+          const klv = k.slice(KOKEN_CONTRIB_STORAGE_PREFIX.length);
+          if (klv && curLid && klv === curLid) return false;
+          const v = all[k];
+          const cap =
+            v && typeof v === 'object' && typeof v.capturedAt === 'number'
+              ? v.capturedAt
+              : 0;
+          return cap === 0 || nowMs - cap >= KOKEN_TTL_MS;
+        });
+        if (staleKokenKeys.length) {
+          await chrome.storage.local.remove(staleKokenKeys);
+        }
+      } catch { /* best-effort */ }
       const nicoadLvs = Object.keys(all)
         .filter((k) => k.startsWith('nls_nicoad_ranking_'))
         .map((k) => k.slice('nls_nicoad_ranking_'.length));
