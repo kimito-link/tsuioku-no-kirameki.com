@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.283',
+    date: '2026-05-19',
+    summary: '公式貢献度ランキングを公式APIで表示',
+    items: Object.freeze([
+      '視聴中の公式ギフト貢献度ランキング（1〜10位）を、公式の取得経路から popup に表示できるようにしました',
+      '広告ランキングと混ざらない仕組みにし、取得できないときも既存の表示は壊さないようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.282',
     date: '2026-05-17',
     summary: '同接の累計過大表示を修正＋avatar観測信号を整備',
