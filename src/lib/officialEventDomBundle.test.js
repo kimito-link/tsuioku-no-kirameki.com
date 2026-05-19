@@ -244,3 +244,59 @@ describe('fetchNicoadContributionRankingFromPublishPage', () => {
     expect(/** @type {any} */ (res)?.mirrorHtml).toContain('incomplete');
   });
 });
+
+describe('AD汚染回帰: contributionRanking sticky vs adContributionRanking 非 sticky', () => {
+  // ⚠️ 観測サンプル到着まで gift/ad 弁別 selector は書かない。本 block は出荷済
+  //    mergeOfficialEventDomBundle の挙動 pin のみ。新 selector を足したら BLOCK
+  //    違反（会議室 critic 2026-05-19 裁定）。将来 gift 専用 field を作る時、:225 の
+  //    sticky な contributionRanking に相乗りすると false-positive が恒久 pin される
+  //    ＝新 field は :226-231 の非 sticky パターン必須、を実行可能契約で先行固定。
+
+  /** @param {object} over @returns {any} */
+  const bundle = (over) => ({
+    capturedAt: 1,
+    eventBanner: null,
+    eventBalloon: null,
+    contributionRanking: null,
+    adContributionRanking: null,
+    adRankingMirrorHtml: null,
+    eventCumulativeScoreMirrorHtml: null,
+    eventCurrentRankMirrorHtml: null,
+    programStats: null,
+    giftHistory: [],
+    ...over
+  });
+  const poisoned = [
+    { rank: 1, name: 'スポンサーＡ', contribution: 23692, isAnonymous: false, thumbnailUrl: '' }
+  ];
+
+  it('contributionRanking は sticky＝prev 汚染が next=null でも恒久 pin（miss=no-op が崩壊）', () => {
+    const m1 = mergeOfficialEventDomBundle(
+      bundle({ capturedAt: 1, contributionRanking: poisoned }),
+      bundle({ capturedAt: 2, contributionRanking: null })
+    );
+    expect(m1?.contributionRanking).toBe(poisoned);
+  });
+
+  it('adContributionRanking は非 sticky＝両空で null（false-positive を pin しない）', () => {
+    const m2 = mergeOfficialEventDomBundle(
+      bundle({ capturedAt: 1, adContributionRanking: poisoned }),
+      bundle({ capturedAt: 2, adContributionRanking: [] })
+    );
+    expect(m2?.adContributionRanking).toBe(poisoned); // next 空配列 → prev 非空温存
+    const m3 = mergeOfficialEventDomBundle(
+      bundle({ capturedAt: 1, adContributionRanking: null }),
+      bundle({ capturedAt: 2, adContributionRanking: [] })
+    );
+    expect(m3?.adContributionRanking).toBe(null);
+  });
+
+  it('FIX3: 部分 bundle（giftHistory 欠落）でも merge は throw しない（null 耐性 pin）', () => {
+    expect(() =>
+      mergeOfficialEventDomBundle(
+        { capturedAt: 1, contributionRanking: poisoned },
+        { capturedAt: 2, contributionRanking: null }
+      )
+    ).not.toThrow();
+  });
+});

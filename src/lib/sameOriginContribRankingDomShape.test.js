@@ -99,3 +99,40 @@ describe('captureSameOriginContributionRankingDomShape', () => {
     expect(doc.body.innerHTML).toBe(before);
   });
 });
+
+describe('AD汚染回帰: 観測層 adIshNearby 両極性（後続本実装の負弁別シグナル先行保証）', () => {
+  // ⚠️ 観測サンプル到着まで gift/ad 弁別 selector は書かない。本 block は出荷済
+  //    観測層 (captureSameOriginContributionRankingDomShape) の既存シグナル極性の
+  //    pin のみ。新 selector を足したら BLOCK 違反（会議室 critic 2026-05-19 裁定）。
+  //
+  // 内側 row 構造は officialEventBannerDom.js JSDoc(:226-244) 実 DOM と逐語同型。
+  // 外側 nicoad 祖先 3 種: [class*="nicoad"] / [href*="nicoad"] / [class*="advertiser"]。
+  const AD_WITH_NICOAD_ANCESTORS = `
+    <div class="nicoad-ranking-root" data-nicoad-publish="lv350481542">
+      <a class="advertiser-name" href="https://nicoad.nicovideo.jp/publish/lv350481542">広告履歴</a>
+      <div class="content-supporter-section"><div class="wrapper"><ul class="wrapper">
+        <li class="item"><div class="info"><button class="ranker"><span class="name">スポンサーＡ</span></button>
+          <p class="contribution">23,692</p></div></li>
+        <li class="item"><div class="info"><button class="ranker"><span class="name">スポンサーＢ</span></button>
+          <p class="contribution">18,291</p></div></li>
+      </ul></div></div>
+    </div>`;
+
+  it('ad 同型 + nicoad 祖先あり → probe ok / adIshNearby が realistic 入力で確実に true', () => {
+    const r = captureSameOriginContributionRankingDomShape(docOf(AD_WITH_NICOAD_ANCESTORS));
+    expect(r.probe).toBe('ok');
+    expect(r.matchedBy).toBe('.content-supporter-section');
+    expect(/** @type {any} */ (r.sel).adIshNearby).toBe(true);
+  });
+
+  it('正の対照: 同 row 構造から nicoad 祖先 3 種を全除去 → adIshNearby false', () => {
+    const pure = docOf(`
+      <div class="content-supporter-section"><div class="wrapper"><ul class="wrapper">
+        <li class="item"><div class="info"><button class="ranker"><span class="name">なぎ</span></button>
+          <p class="contribution">5,000</p></div></li>
+      </ul></div></div>`);
+    const r = captureSameOriginContributionRankingDomShape(pure);
+    expect(r.probe).toBe('ok');
+    expect(/** @type {any} */ (r.sel).adIshNearby).toBe(false);
+  });
+});
