@@ -21,7 +21,8 @@
  *   lastItemsCount: number,
  *   lastContribCount: number,
  *   lastEventBannerPresent: boolean,
- *   lastDomShape?: Record<string, unknown>|null
+ *   lastDomShape?: Record<string, unknown>|null,
+ *   lastKokenContribShape?: Record<string, unknown>|null
  * }} GiftSubAppRelayHeartbeatEntryRaw
  */
 
@@ -45,7 +46,8 @@
  *   lastItemsCount: number,
  *   lastContribCount: number,
  *   lastEventBannerPresent: boolean,
- *   lastDomShape?: Record<string, unknown>|null
+ *   lastDomShape?: Record<string, unknown>|null,
+ *   lastKokenContribShape?: Record<string, unknown>|null
  * }} GiftSubAppRelayHeartbeatEntry
  */
 
@@ -122,6 +124,17 @@ export function snapshotIframeRelayDiag(state, nowMs) {
           typeof e.lastDomShape === 'object' &&
           !Array.isArray(e.lastDomShape)
             ? e.lastDomShape
+            : null,
+        // 会議室(2026-05-19) Q1: koken 別ドメイン supporter iframe が gift 履歴
+        // (items>0) を持つと送信側 scrapeEmptyForProbe が false になり domShapeProbe
+        // が出ず、貢献度ランキングの DOM 概形が永久に観測できない狭い穴を、koken
+        // 限定 one-shot で埋めた観測専用 shape（bounded・PII 非収集・既存
+        // lastDomShape 経路は不変）。将来の安全な専用 selector 設計の前提エビデンス。
+        lastKokenContribShape:
+          e.lastKokenContribShape &&
+          typeof e.lastKokenContribShape === 'object' &&
+          !Array.isArray(e.lastKokenContribShape)
+            ? e.lastKokenContribShape
             : null
       };
       heartbeatFrameCount += 1;
