@@ -2898,6 +2898,28 @@
         width: 100%;
         overflow-x: hidden;
       }
+      /* Antigravity 残務 (v0.1.289): ギフト履歴レーン専用の縦スペース節約。
+         1 行 1 ギフトのカード密度は他レーンより高いのに min-height:108px の
+         共通値が下端余白として浪費されていた。giftHistory レーン専用に絞り、
+         contributionRanking / adRanking / programPoints 等は不変＝回帰リスク
+         ゼロ。selector specificity が共通 .nl-north-star-lane__shell より
+         高い（[data-lane=...]）のでオーバーライドが安定する。 */
+      .nl-north-star-lane[data-lane='giftHistory'] > .nl-north-star-lane__shell {
+        min-height: 84px;
+      }
+      .nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank--below-cards .nl-top-support-rank__list {
+        padding: 3px 2px 5px;
+      }
+      .nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank--below-cards .nl-top-support-rank__line {
+        padding: 3px 3px 4px;
+        min-width: 50px;
+        max-width: 68px;
+      }
+      .nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank__note {
+        font-size: clamp(8px, 1.7vw, 9px);
+        line-height: 1.3;
+        margin: 1px 0 2px;
+      }
       @media (max-width: 359px) {
         .nl-north-star-lane__gadget--summary {
           display: none;

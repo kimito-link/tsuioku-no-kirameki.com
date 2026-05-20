@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.289',
+    date: '2026-05-20',
+    summary: 'ギフト履歴レーンの縦スペースを節約',
+    items: Object.freeze([
+      'ギフト履歴レーンの上下余白とカード余白を絞り、北極星パネル全体の縦の高さを抑えました（小さな画面でも見渡しやすくなります）',
+      '他のレーン（貢献度ランキング・広告ランキング・番組累計など）の表示は今までどおりで変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.288',
     date: '2026-05-20',
     summary: '北極星レーンの見出しを色分けバーで強化',
