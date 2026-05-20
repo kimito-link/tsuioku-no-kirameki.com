@@ -118,6 +118,7 @@ import {
   isGiftRankingLaneEnabledFromChange
 } from '../lib/giftRankingLaneOptIn.js';
 import { buildOfficialDomFromRelayEvent } from '../lib/iframeOfficialDomFromRelay.js';
+import { iframeOfficialDomStorageKey } from '../lib/officialContributionRankingResolver.js';
 import { isTrustedGiftSubAppRelayMessage } from '../lib/giftSubAppRelayTrust.js';
 import {
   NLS_AUTH_TOKEN_ATTR,
@@ -2019,8 +2020,11 @@ window.addEventListener('message', (e) => {
   //   検証する。本ハンドラは結果に従って storage 書き込みを行うだけ。
   const decision = buildOfficialDomFromRelayEvent(e.data, { nowMs: Date.now() });
   if (decision.shouldWrite && decision.payload) {
+    // v0.1.286: key 文字列を中央関数（officialContributionRankingResolver.js）から
+    // 取得＝popup-entry.js の読み側と命名規約を構造的に揃える（key 名変更時に
+    // grep ミスで lowercase 不整合 / typo 等が起きない）。
     chrome.storage.local
-      .set({ [`nls_iframe_official_dom_${lid}`]: decision.payload })
+      .set({ [iframeOfficialDomStorageKey(lid)]: decision.payload })
       .catch((err) => {
         if (!isContextInvalidatedError(err)) {
           /* best-effort */
