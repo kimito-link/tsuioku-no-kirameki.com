@@ -3180,6 +3180,117 @@
         display: block;
         border-radius: 8px;
       }
+
+      /* ====================================================================
+       * Antigravity §6.4 (v0.1.291): 北極星 3 キャラ trio パネル
+       * rink/konta/tanu を 3 列で並列表示。各 slot は担当レーンの tier 連動で
+       * 表情・filter が変わる（既存 lane gadget の tier 表現と統一）。
+       * slot ↔ laneId ↔ accent カラーは :root の --nl-lane-accent-* を再利用。
+       * ==================================================================== */
+      .nl-north-star-chara-trio {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin: 4px 0 8px;
+        padding: 6px 8px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 90%, var(--nl-bg-soft) 10%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 40%, transparent);
+      }
+      .nl-north-star-chara-trio__slot {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 2px;
+        min-width: 0;
+        padding: 4px 2px 6px;
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--nl-surface) 80%, transparent);
+        border-left: 2px solid transparent;
+      }
+      /* slot 別 accent border（:root の中央定義から色を引く） */
+      .nl-north-star-chara-trio__slot[data-nl-trio-slot='rink'] {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-contrib) 70%, var(--nl-border) 30%);
+      }
+      .nl-north-star-chara-trio__slot[data-nl-trio-slot='konta'] {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-ad) 70%, var(--nl-border) 30%);
+      }
+      .nl-north-star-chara-trio__slot[data-nl-trio-slot='tanu'] {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-gift) 70%, var(--nl-border) 30%);
+      }
+      .nl-north-star-chara-trio__chara {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+        display: block;
+        border-radius: 6px;
+        transition:
+          filter 0.25s ease,
+          transform 0.25s ease,
+          opacity 0.25s ease;
+      }
+      /* tier 連動表情 filter（既存 lane gadget chara-wrap の tier 表現と統一） */
+      .nl-north-star-chara-trio__slot[data-nl-acq-tier='wait'] .nl-north-star-chara-trio__chara {
+        opacity: 0.85;
+        filter: brightness(0.96);
+      }
+      .nl-north-star-chara-trio__slot[data-nl-acq-tier='none'] .nl-north-star-chara-trio__chara {
+        opacity: 0.78;
+        filter: grayscale(0.5) brightness(0.94);
+        transform: scale(0.93);
+      }
+      .nl-north-star-chara-trio__slot[data-nl-acq-tier='low'] .nl-north-star-chara-trio__chara {
+        filter: grayscale(0.22);
+      }
+      .nl-north-star-chara-trio__slot[data-nl-acq-tier='mid'] .nl-north-star-chara-trio__chara {
+        filter: none;
+      }
+      .nl-north-star-chara-trio__slot[data-nl-acq-tier='high'] .nl-north-star-chara-trio__chara {
+        filter: saturate(1.06);
+        transform: scale(1.03);
+      }
+      .nl-north-star-chara-trio__slot[data-nl-acq-tier='full'] .nl-north-star-chara-trio__chara {
+        filter: saturate(1.14);
+        transform: scale(1.06);
+      }
+      .nl-north-star-chara-trio__name {
+        margin: 0;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--nl-text);
+        text-align: center;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-north-star-chara-trio__pct {
+        margin: 0;
+        font-size: 9px;
+        font-weight: 600;
+        line-height: 1.2;
+        color: color-mix(in srgb, var(--nl-text) 65%, transparent);
+        text-align: center;
+      }
+      .nl-north-star-chara-trio__pct-num {
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+      /* very-narrow viewport では trio を 1 段下げる（ラベル省略） */
+      @media (max-width: 320px) {
+        .nl-north-star-chara-trio__name {
+          font-size: 9px;
+        }
+        .nl-north-star-chara-trio__pct {
+          font-size: 8px;
+        }
+        .nl-north-star-chara-trio__chara {
+          width: 30px;
+          height: 30px;
+        }
+      }
       .nl-north-star-lane__rail {
         display: none;
         flex-direction: column;
@@ -8134,6 +8245,69 @@
           aria-label="公式値レーン（北極星 6 項目、常設）"
         >
           <h3 class="nl-north-star-lanes__title">公式値レーン（取得可否に関わらず常設）</h3>
+          <!-- Antigravity §6.4 (v0.1.291): 北極星 3 キャラ trio パネル。
+               rink/konta/tanu の 3 体を並列表示し、それぞれ担当レーンの取得率と
+               tier 表情を反映。slot ↔ laneId 対応は
+               src/lib/northStarCharaTrioConfig.js（純関数 + test ガード済）。
+               sync は syncNorthStarCharaTrioSlotFromState() がレーン更新ごとに呼ぶ。 -->
+          <div
+            id="northStarCharaTrio"
+            class="nl-north-star-chara-trio"
+            role="status"
+            aria-label="3 キャラの取得率（りんく・こん太・たぬ姉）"
+          >
+            <div
+              class="nl-north-star-chara-trio__slot"
+              data-nl-trio-slot="rink"
+              data-nl-acq-tier="wait"
+              title="りんく（貢献度ランキング）"
+            >
+              <img
+                class="nl-north-star-chara-trio__chara"
+                src="images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.png"
+                alt=""
+                width="36"
+                height="36"
+                decoding="async"
+              />
+              <p class="nl-north-star-chara-trio__name">りんく</p>
+              <p class="nl-north-star-chara-trio__pct"><span class="nl-north-star-chara-trio__pct-num">—</span></p>
+            </div>
+            <div
+              class="nl-north-star-chara-trio__slot"
+              data-nl-trio-slot="konta"
+              data-nl-acq-tier="wait"
+              title="こん太（広告ランキング）"
+            >
+              <img
+                class="nl-north-star-chara-trio__chara"
+                src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-blink-mouth-closed.png"
+                alt=""
+                width="36"
+                height="36"
+                decoding="async"
+              />
+              <p class="nl-north-star-chara-trio__name">こん太</p>
+              <p class="nl-north-star-chara-trio__pct"><span class="nl-north-star-chara-trio__pct-num">—</span></p>
+            </div>
+            <div
+              class="nl-north-star-chara-trio__slot"
+              data-nl-trio-slot="tanu"
+              data-nl-acq-tier="wait"
+              title="たぬ姉（この番組のギフト履歴）"
+            >
+              <img
+                class="nl-north-star-chara-trio__chara"
+                src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-blink-mouth-closed.png"
+                alt=""
+                width="36"
+                height="36"
+                decoding="async"
+              />
+              <p class="nl-north-star-chara-trio__name">たぬ姉</p>
+              <p class="nl-north-star-chara-trio__pct"><span class="nl-north-star-chara-trio__pct-num">—</span></p>
+            </div>
+          </div>
           <div class="nl-north-star-lane" data-lane="contributionRanking">
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">貢献度ランキング</p>
