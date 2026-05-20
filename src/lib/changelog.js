@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.293',
+    date: '2026-05-20',
+    summary: '3 キャラパネルの読み上げと説明文を強化',
+    items: Object.freeze([
+      '3 キャラパネルの各キャラの上にカーソルを置くと「りんく（貢献度ランキング）· 取得率 78% · 取得率 高」のように、現在の状態を詳しく表示するようにしました',
+      'スクリーンリーダーで操作している方にも、取得率が変化したときに自動で読み上げが行われるように調整しました',
+      '内部の挙動・他の表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.292',
     date: '2026-05-20',
     summary: 'ダークスキン時のレーン色を見やすく最適化',
