@@ -24,6 +24,10 @@ import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStrip
 import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
+import {
+  iframeOfficialDomStorageKey,
+  resolveContributionRankingRowsFromSources
+} from '../lib/officialContributionRankingResolver.js';
 import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
 import {
   buildNorthStarRankFallbackHtml,
@@ -5835,68 +5839,37 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
  */
 async function resolveOfficialContributionRankingRows(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
-  /** @type {any[]|null} */
-  let ranking = null;
 
-  // v0.1.285: 優先度を Koken API → DOM → iframe storage に並び替え（Antigravity §6.1）。
-  // 根拠＝ニコ生本体の CSS Modules ハッシュ class 変動で DOM scrape は構造的に
-  // 不安定だが、Koken 無認証 API は SW host_permissions 経由 fetch で安定
-  // （[[reference-koken-contribution-ranking-api]] で 3 経路確証済 / v0.1.283
-  // 出荷物）。同一の rows / liveId 検証ガードは v0.1.283 tail fallback から踏襲＝
-  // 不変。await 数（storage.get 1〜2 回 + 同期 bundle 読み 1 回）も不変で、
-  // 順序入れ替えだけ＝描画連鎖（refreshAll…）には新規 I/O を足さない
-  // （続5 回帰の構造を作らない）。
+  // v0.1.286: 優先度判定・検証ガードを純関数（officialContributionRankingResolver.js）
+  // に委譲＝3 年後楽の構造ガード。I/O のみここに残し、ロジックは unit test で固定。
+  // 優先度（§6.1, v0.1.285〜）: Koken API → DOM bundle → iframe storage。
+  //
+  // I/O 最適化: 2 つの storage key を 1 回の chrome.storage.local.get に集約＝
+  // 旧実装の「Koken get → 取れなかったら iframe get」(最悪 2 ラウンドトリップ)
+  // を 1 ラウンドトリップに削減（tail latency 改善・短絡で省略していた分は
+  // ChromeAPI 内部で同 IPC ＝体感差ゼロ）。描画連鎖（refreshAll…）への新規
+  // await 追加は無し（既存 1 件のまま）＝[[feedback-north-star-priority-no-drift]]
+  // 続5 非該当。
+  /** @type {unknown} */ let kokenStorage = null;
+  /** @type {unknown} */ let iframeStorage = null;
   if (lid) {
     try {
-      const k = kokenContribStorageKey(lid);
-      const bag = await chrome.storage.local.get(k);
-      const data = bag[k];
-      if (
-        data &&
-        typeof data === 'object' &&
-        String(data.liveId || '').trim().toLowerCase() === lid &&
-        Array.isArray(data.rows) &&
-        data.rows.length > 0
-      ) {
-        ranking = data.rows;
-      }
+      const kKey = kokenContribStorageKey(lid);
+      const iKey = iframeOfficialDomStorageKey(lid);
+      const bag = await chrome.storage.local.get([kKey, iKey]);
+      kokenStorage = bag[kKey] ?? null;
+      iframeStorage = bag[iKey] ?? null;
     } catch {
       /* no-op */
     }
   }
 
-  // DOM bundle（content script が親 frame で周期スクレイプし集約したもの）。
-  // Koken API が空 / liveId mismatch のときに同期で fallback。
-  if (!ranking || ranking.length === 0) {
-    const bundle = _lastOfficialEventDomBundle;
-    const domRanking = Array.isArray(bundle?.contributionRanking)
-      ? bundle.contributionRanking
-      : null;
-    if (domRanking && domRanking.length > 0) {
-      ranking = domRanking;
-    }
-  }
-
-  // iframe storage（audition/koken iframe の content script が relay handler で
-  // 書いた直近スナップ）。Koken API も DOM bundle も無い初動で最終フォールバック。
-  if (!ranking || ranking.length === 0) {
-    if (!lid) return null;
-    try {
-      const iframeBag = await chrome.storage.local.get(`nls_iframe_official_dom_${lid}`);
-      const iframeData = iframeBag[`nls_iframe_official_dom_${lid}`];
-      if (
-        iframeData &&
-        Array.isArray(iframeData.contributionRanking) &&
-        iframeData.contributionRanking.length > 0
-      ) {
-        ranking = iframeData.contributionRanking;
-      }
-    } catch {
-      /* no-op */
-    }
-  }
-
-  return ranking && ranking.length > 0 ? ranking : null;
+  return resolveContributionRankingRowsFromSources({
+    kokenStorage,
+    domBundle: _lastOfficialEventDomBundle,
+    iframeStorage,
+    liveId: lid
+  });
 }
 
 /**
