@@ -5835,32 +5835,18 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
  */
 async function resolveOfficialContributionRankingRows(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
-  const bundle = _lastOfficialEventDomBundle;
   /** @type {any[]|null} */
-  let ranking = Array.isArray(bundle?.contributionRanking) ? bundle.contributionRanking : null;
-  if (!ranking || ranking.length === 0) {
-    if (!lid) return null;
-    try {
-      const iframeBag = await chrome.storage.local.get(`nls_iframe_official_dom_${lid}`);
-      const iframeData = iframeBag[`nls_iframe_official_dom_${lid}`];
-      if (
-        iframeData &&
-        Array.isArray(iframeData.contributionRanking) &&
-        iframeData.contributionRanking.length > 0
-      ) {
-        ranking = iframeData.contributionRanking;
-      }
-    } catch {
-      /* no-op */
-    }
-  }
-  // 核心 tail fallback: relay 由来 bundle / iframe storage がどちらも空のとき
-  // （= koken iframe 未 mount の常用ケース）、SW が無認証公式 API から取得して
-  // 専用キーに置いた行を読む。既存経路の優先度は不変＝relay が取れていれば
-  // それを使い、ここは取れない時だけ埋める純加法。描画連鎖（refreshAll…）には
-  // I/O を足さず、この既に async な resolver 内に閉じる（続5 回帰の構造を作らない）。
-  if (!ranking || ranking.length === 0) {
-    if (!lid) return null;
+  let ranking = null;
+
+  // v0.1.285: 優先度を Koken API → DOM → iframe storage に並び替え（Antigravity §6.1）。
+  // 根拠＝ニコ生本体の CSS Modules ハッシュ class 変動で DOM scrape は構造的に
+  // 不安定だが、Koken 無認証 API は SW host_permissions 経由 fetch で安定
+  // （[[reference-koken-contribution-ranking-api]] で 3 経路確証済 / v0.1.283
+  // 出荷物）。同一の rows / liveId 検証ガードは v0.1.283 tail fallback から踏襲＝
+  // 不変。await 数（storage.get 1〜2 回 + 同期 bundle 読み 1 回）も不変で、
+  // 順序入れ替えだけ＝描画連鎖（refreshAll…）には新規 I/O を足さない
+  // （続5 回帰の構造を作らない）。
+  if (lid) {
     try {
       const k = kokenContribStorageKey(lid);
       const bag = await chrome.storage.local.get(k);
@@ -5878,6 +5864,38 @@ async function resolveOfficialContributionRankingRows(liveId) {
       /* no-op */
     }
   }
+
+  // DOM bundle（content script が親 frame で周期スクレイプし集約したもの）。
+  // Koken API が空 / liveId mismatch のときに同期で fallback。
+  if (!ranking || ranking.length === 0) {
+    const bundle = _lastOfficialEventDomBundle;
+    const domRanking = Array.isArray(bundle?.contributionRanking)
+      ? bundle.contributionRanking
+      : null;
+    if (domRanking && domRanking.length > 0) {
+      ranking = domRanking;
+    }
+  }
+
+  // iframe storage（audition/koken iframe の content script が relay handler で
+  // 書いた直近スナップ）。Koken API も DOM bundle も無い初動で最終フォールバック。
+  if (!ranking || ranking.length === 0) {
+    if (!lid) return null;
+    try {
+      const iframeBag = await chrome.storage.local.get(`nls_iframe_official_dom_${lid}`);
+      const iframeData = iframeBag[`nls_iframe_official_dom_${lid}`];
+      if (
+        iframeData &&
+        Array.isArray(iframeData.contributionRanking) &&
+        iframeData.contributionRanking.length > 0
+      ) {
+        ranking = iframeData.contributionRanking;
+      }
+    } catch {
+      /* no-op */
+    }
+  }
+
   return ranking && ranking.length > 0 ? ranking : null;
 }
 
