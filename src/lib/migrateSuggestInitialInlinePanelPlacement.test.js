@@ -73,14 +73,16 @@ describe('migrateSuggestInitialInlinePanelPlacementOnce', () => {
     expect(mem.store[KEY_INLINE_PANEL_PLACEMENT]).toBeUndefined();
   });
 
-  it('pending で 1200px 未満なら below を書き込む', async () => {
+  it('pending で beside 閾値未満なら below を書き込む', async () => {
+    // v0.1.284: 閾値が 1200→1100 に下がったので、below 領域のテスト幅も
+    // 1099 へ。閾値ちょうど (1100) は beside 提案になる（既存検証あり）。
     const mem = createMemoryStorage({
       [KEY_INSTALL_PANEL_PLACEMENT_PENDING]: true
     });
     const r = await migrateSuggestInitialInlinePanelPlacementOnce({
       get: mem.get,
       set: mem.set,
-      layoutInnerWidth: 1100
+      layoutInnerWidth: 1099
     });
     expect(r.changed).toBe(true);
     expect(r.suggested).toBe(INLINE_PANEL_PLACEMENT_BELOW);

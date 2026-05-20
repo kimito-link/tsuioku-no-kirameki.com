@@ -5902,19 +5902,11 @@ async function computeGiftRankStripRoomsContext(liveId) {
   const bundle = _lastOfficialEventDomBundle;
   const giftHistory = Array.isArray(bundle?.giftHistory) ? bundle.giftHistory : null;
   if (ranking && ranking.length > 0) {
-    const rooms = ranking.map((r, i) => ({
-      userKey: r.isAnonymous ? `__anon_contrib_${i}` : `__contrib_${i}_${String(r.name || '').slice(0, 12)}`,
-      nickname: String(r.name || ''),
-      count: Number(r.contribution) || 0,
-      avatarUrl: String(r.thumbnailUrl || '')
-    }));
-    return {
-      kind: 'ok',
-      rooms,
-      noteText: '公式の貢献度ランキング順（niconico の表示そのまま）',
-      unitSuffix: '貢',
-      ariaLabel: '公式の貢献度ランキング'
-    };
+    // v0.1.284: 「公式値レーン>貢献度ランキング」レーンが正本表示を担うので、
+    // 同一データを 2 セクション重複表示しない（kind:'hide' を返してこの上部
+    // ストリップ自体を非表示）。lane が描画できない救援ケースのみ giftHistory
+    // 等のフォールバックを下で続行する。
+    return { kind: 'hide' };
   }
   if (giftHistory && giftHistory.length > 0) {
     const aggregated = aggregateGiftHistoryByUser(giftHistory);
@@ -6257,7 +6249,10 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
   if (ranking && ranking.length > 0) {
-    const rooms = officialDomRankingRowsToStripRooms(ranking, { userKeyKind: 'contrib' });
+    // v0.1.284: 10 位までで打ち切り（koken API は rank=20 で取るが UI は 1-10 位
+    // が正本＝ニコ生本体表示と並びを揃え、11位以降のノイズで縦が膨らむのを防ぐ）。
+    const top10 = ranking.slice(0, 10);
+    const rooms = officialDomRankingRowsToStripRooms(top10, { userKeyKind: 'contrib' });
     paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
       unitSuffix: '貢',
@@ -6332,24 +6327,34 @@ function refreshNorthStarEventCumulativeScoreLane() {
  *
  * @param {string} liveId
  */
-async function refreshNorthStarEventCurrentRankLaneAsync(liveId) {
+async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
+  // v0.1.284: 「参考として貢献度上位 10 件」併記は撤去したため liveId は不要に
+  // なった（lint: 未使用パラメタは _ prefix で許容。call-site 互換のため
+  // シグネチャは保持）。
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
   const body = document.getElementById('northStarLaneBody-eventRank');
   if (!(body instanceof HTMLElement)) return;
 
+  // v0.1.284:
+  //  - 公式バナーが取れる時はそれを最優先（鏡 mirrorHtml > banner.rank fallback）。
+  //  - 取れない時の NDGR 推定 (officialNicoEventRankNdgr) を「目安」付きで採用＝
+  //    feedback_ndgr_field6_silence の「単独表示禁止」をユーザー明示要求で部分解除
+  //    （ニコ生本体の「現在順位」と常一致しないため必ず「目安」明示）。
+  //  - 「参考として貢献度上位10件」のコメントユーザー併記は撤去（contributionRanking
+  //    レーンが正本で表示するので二重表示・誤認の元、ユーザー指摘で除去）。
   const mirrorRaw =
     typeof bundle?.eventCurrentRankMirrorHtml === 'string'
       ? bundle.eventCurrentRankMirrorHtml.trim()
       : '';
-  let prependHtml = '';
+  let html = '';
   if (mirrorRaw) {
     const s = sanitizeMirrorHtml(mirrorRaw);
     if (s) {
-      prependHtml = `<div class="nl-north-star-rank-bundle__head">${s}</div>`;
+      html = `<div class="nl-north-star-rank-bundle__head">${s}</div>`;
     }
   }
-  if (!prependHtml) {
+  if (!html) {
     const bannerRank =
       typeof bundle?.eventBanner?.rank === 'number' &&
       Number.isFinite(bundle.eventBanner.rank) &&
@@ -6359,37 +6364,38 @@ async function refreshNorthStarEventCurrentRankLaneAsync(liveId) {
     if (bannerRank != null) {
       const fallback = buildNorthStarRankFallbackHtml(bannerRank);
       if (fallback) {
-        prependHtml = `<div class="nl-north-star-rank-bundle__head">${fallback}</div>`;
+        html = `<div class="nl-north-star-rank-bundle__head">${fallback}</div>`;
       }
     }
   }
-  const rankingRows = await resolveOfficialContributionRankingRows(liveId);
-  const slice = (rankingRows || []).slice(0, 10);
-  const rooms = officialDomRankingRowsToStripRooms(slice, { userKeyKind: 'contrib' });
+  if (!html) {
+    const ndgrRank =
+      typeof snap?.officialNicoEventRankNdgr === 'number' &&
+      Number.isFinite(snap.officialNicoEventRankNdgr) &&
+      snap.officialNicoEventRankNdgr > 0
+        ? Math.trunc(snap.officialNicoEventRankNdgr)
+        : null;
+    if (ndgrRank != null) {
+      const fallback = buildNorthStarRankFallbackHtml(ndgrRank);
+      if (fallback) {
+        html =
+          `<div class="nl-north-star-rank-bundle__head">${fallback}` +
+          `<p class="nl-north-star-rank-bundle__hint">※ NDGR 推定値（公式画面の「現在順位」と一致しない場合があります）</p>` +
+          `</div>`;
+      }
+    }
+  }
 
-  if (rooms.length === 0 && !prependHtml) {
+  if (!html) {
     const state = determineNorthStarLaneState('eventRank', { bundle, snap });
     renderNorthStarLane('eventRank', null, state);
     return;
   }
-  if (rooms.length === 0 && prependHtml) {
-    teardownNorthStarLaneWaitingUi(body);
-    body.innerHTML =
-      prependHtml +
-      '<p class="nl-north-star-rank-bundle__hint">貢献度ランキングのDOMが未取得のため、参考の上位10件は表示できませんでした。</p>';
-    body.setAttribute('data-lane-state', 'ok');
-    clearNorthStarVerticalRailForBody(body);
-    syncNorthStarLaneGadgetFromBodyState(body);
-    return;
-  }
-  paintTopSupportRankStyleIntoElement(body, rooms, {
-    noteText:
-      '公式の貢献度ランキング上位10件（イベント内の指標であり、画面の「現在順位」と必ず一致しない場合があります）',
-    unitSuffix: '貢',
-    ariaLabel: 'イベント順位と貢献度ランキング上位',
-    prependHtml,
-    isNorthStarBody: true
-  });
+  teardownNorthStarLaneWaitingUi(body);
+  body.innerHTML = html;
+  body.setAttribute('data-lane-state', 'ok');
+  clearNorthStarVerticalRailForBody(body);
+  syncNorthStarLaneGadgetFromBodyState(body);
 }
 
 /**

@@ -17,7 +17,7 @@ describe('suggestInitialInlinePanelPlacement', () => {
     );
   });
 
-  it('960〜1199 はプレイヤー行の下', () => {
+  it('960〜(閾値-1) はプレイヤー行の下', () => {
     expect(
       suggestInitialInlinePanelPlacement(INLINE_VIEWPORT_BESIDE_MIN_WIDTH - 1)
     ).toBe(INLINE_PANEL_PLACEMENT_BELOW);
