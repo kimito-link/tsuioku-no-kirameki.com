@@ -187,6 +187,21 @@ export function tierToTrioCharaSrc(slotId, tier) {
 }
 
 /**
+ * trio slot click 時に scroll する対象 laneId を解決する純関数。
+ *
+ * 本実装では trio パネル自体は北極星パネル最上部にあり、対応 laneId のレーンは
+ * その下にある＝slot click で smooth scroll させると「気になるキャラを押せば
+ * 詳細レーンへ飛ぶ」自然な操作になる。
+ *
+ * @param {string} slotId
+ * @returns {string|null} 対応 laneId、未知 slot は null
+ */
+export function resolveCharaTrioSlotScrollTargetLaneId(slotId) {
+  const slot = findCharaTrioSlotById(slotId);
+  return slot ? slot.laneId : null;
+}
+
+/**
  * trio 全 slot を tier の Map から一括で展開して、描画モデル配列に正規化する。
  *
  * 本実装での render は「3 slot を for-each」する想定。本関数は「どの slot に
