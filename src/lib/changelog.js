@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.285',
+    date: '2026-05-20',
+    summary: '貢献度ランキングの取得経路を公式APIに最優先化',
+    items: Object.freeze([
+      '貢献度ランキングの取得経路を、公式の無認証 API を最優先に並び替えました（ニコ生本体のレイアウト変更で取得が不安定になっていた DOM 経路をフォールバックに降格）',
+      '取得できる行が変わるわけではなく、取得できない時間帯が減ることを狙った変更です（取れない場面では従来どおり待機表示）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.284',
     date: '2026-05-20',
     summary: '貢献度ランキングを10位整理＋イベント順位の目安表示',
