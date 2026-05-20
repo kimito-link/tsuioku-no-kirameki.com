@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.296',
+    date: '2026-05-20',
+    summary: '貢献度 1 位の金色をテーマ色に統一',
+    items: Object.freeze([
+      '貢献度ランキング 1 位の「金色」の出し方を、他のレーン色と同じ中央定義から引くようにしました',
+      'ダーク表示でもライト表示でも、1 位の色とレーン見出しのバー、3 キャラパネルの色が自然に揃って見えます（中央で 1 箇所変えれば全部に伝わる仕組み）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.295',
     date: '2026-05-20',
     summary: '3 キャラ全員完全取得で祝福演出を追加',

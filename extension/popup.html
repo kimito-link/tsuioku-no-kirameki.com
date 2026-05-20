@@ -3819,18 +3819,21 @@
       .nl-contrib-ranking-list__row--unknown {
         opacity: 0.7;
       }
-      /* 1 位 = 金 */
+      /* 1 位 = 金。v0.1.296: hardcode 色を :root の --nl-lane-accent-contrib に
+         統一＝dark skin の accent override（v0.1.292）で自動的に dark 用色に
+         追従する。3 年後の色変更は :root 1 箇所修正で trio パネル + lane heading
+         + 縦リスト 1 位がすべて連動する性質を確立。 */
       .nl-contrib-ranking-list__row--tier-gold {
         background: linear-gradient(
           100deg,
-          color-mix(in srgb, #ffe48a 22%, var(--nl-surface) 78%) 0%,
-          color-mix(in srgb, #ffd35c 14%, var(--nl-surface) 86%) 60%,
-          color-mix(in srgb, #f5b800 8%, var(--nl-surface) 92%) 100%
+          color-mix(in srgb, var(--nl-lane-accent-contrib) 24%, var(--nl-surface) 76%) 0%,
+          color-mix(in srgb, var(--nl-lane-accent-contrib) 14%, var(--nl-surface) 86%) 60%,
+          color-mix(in srgb, var(--nl-lane-accent-contrib) 8%, var(--nl-surface) 92%) 100%
         );
-        border-color: color-mix(in srgb, #e6b400 50%, var(--nl-border) 50%);
+        border-color: color-mix(in srgb, var(--nl-lane-accent-contrib) 55%, var(--nl-border) 45%);
       }
       .nl-contrib-ranking-list__row--tier-gold .nl-contrib-ranking-list__rank {
-        color: #b8860b;
+        color: color-mix(in srgb, var(--nl-lane-accent-contrib) 70%, var(--nl-text) 30%);
         font-weight: 800;
       }
       /* 2 位 = 銀 */
