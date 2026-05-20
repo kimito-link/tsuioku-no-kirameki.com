@@ -3208,6 +3208,23 @@
         border-radius: 8px;
         background: color-mix(in srgb, var(--nl-surface) 80%, transparent);
         border-left: 2px solid transparent;
+        /* v0.1.294: slot click で対応レーンへ smooth scroll する操作の affordance */
+        cursor: pointer;
+        outline: none;
+        user-select: none;
+        transition:
+          background 0.15s ease,
+          transform 0.15s ease;
+      }
+      .nl-north-star-chara-trio__slot:hover {
+        background: color-mix(in srgb, var(--nl-surface) 65%, var(--nl-bg-soft) 35%);
+      }
+      .nl-north-star-chara-trio__slot:active {
+        transform: translateY(1px);
+      }
+      .nl-north-star-chara-trio__slot:focus-visible {
+        outline: 2px solid var(--nl-accent);
+        outline-offset: 1px;
       }
       /* slot 別 accent border（:root の中央定義から色を引く） */
       .nl-north-star-chara-trio__slot[data-nl-trio-slot='rink'] {

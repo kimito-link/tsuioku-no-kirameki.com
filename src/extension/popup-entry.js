@@ -32,7 +32,8 @@ import { buildContributionRankingListHtml } from '../lib/contributionRankingList
 import {
   findCharaTrioSlotByLaneId,
   tierToTrioCharaSrc,
-  buildCharaTrioSlotTitle
+  buildCharaTrioSlotTitle,
+  resolveCharaTrioSlotScrollTargetLaneId
 } from '../lib/northStarCharaTrioConfig.js';
 import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
 import {
@@ -11812,7 +11813,53 @@ async function runOneTimeBackfillRemoveRecommendedUserChipPollution() {
   }
 }
 
+/**
+ * 北極星 3 キャラ trio パネルの各 slot に click / keydown handler を attach する。
+ *
+ * v0.1.294 (Antigravity §6.4 続編): trio slot を click すると対応レーンへ smooth
+ * scroll する。「気になるキャラを押す → 詳細レーンへ即移動」の自然な UX。
+ *
+ * - 二重 bind 防止: `dataset.nlClickBound === '1'` チェック
+ * - keyboard: Enter / Space で activate（role="button" + tabindex="0" で a11y 確保）
+ * - 純関数 resolveCharaTrioSlotScrollTargetLaneId() で slot → lane の解決を行う
+ *   ＝3 年後に scroll target を変えたい時は本関数を触らず純関数 1 箇所修正で済む
+ */
+function attachCharaTrioSlotClickHandlers() {
+  const slots = document.querySelectorAll('.nl-north-star-chara-trio__slot[data-nl-trio-slot]');
+  slots.forEach((slotEl) => {
+    if (!(slotEl instanceof HTMLElement)) return;
+    if (slotEl.dataset.nlClickBound === '1') return;
+    slotEl.dataset.nlClickBound = '1';
+    slotEl.setAttribute('role', 'button');
+    slotEl.tabIndex = 0;
+    const onActivate = () => {
+      const slotId = String(slotEl.dataset.nlTrioSlot || '');
+      const laneId = resolveCharaTrioSlotScrollTargetLaneId(slotId);
+      if (!laneId) return;
+      const lane = document.querySelector(
+        `.nl-north-star-lane[data-lane="${laneId}"]`
+      );
+      if (lane instanceof HTMLElement) {
+        try {
+          lane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch {
+          // 一部古い環境では options 引数未対応 → fallback
+          lane.scrollIntoView(true);
+        }
+      }
+    };
+    slotEl.addEventListener('click', onActivate);
+    slotEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onActivate();
+      }
+    });
+  });
+}
+
 function initPopup() {
+  attachCharaTrioSlotClickHandlers();
   void runOneTimeBackfillRemoveGiftSystemMessages();
   void runOneTimeBackfillRemoveRecommendedLivePollution();
   void runOneTimeBackfillRemoveRecommendedLivePollutionV2();

@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.294',
+    date: '2026-05-20',
+    summary: '3 キャラパネルを押すと対応レーンへ移動',
+    items: Object.freeze([
+      '3 キャラパネルのキャラ（りんく / こん太 / たぬ姉）を押すと、対応する詳細レーン（貢献度ランキング / 広告ランキング / ギフト履歴）まで自動でスクロールするようにしました',
+      'キーボードでも操作できます（Tab で移動 / Enter または Space で決定）',
+      'マウスを乗せたときの背景と押した瞬間の動きで、押せることが分かりやすくなりました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.293',
     date: '2026-05-20',
     summary: '3 キャラパネルの読み上げと説明文を強化',

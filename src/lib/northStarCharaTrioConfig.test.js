@@ -15,7 +15,8 @@ import {
   tierToTrioCharaSrc,
   buildCharaTrioRenderModel,
   describeCharaTrioTier,
-  buildCharaTrioSlotTitle
+  buildCharaTrioSlotTitle,
+  resolveCharaTrioSlotScrollTargetLaneId
 } from './northStarCharaTrioConfig.js';
 
 describe('NORTH_STAR_CHARA_TRIO_SLOTS 不変条件', () => {
@@ -144,6 +145,23 @@ describe('buildCharaTrioSlotTitle', () => {
     expect(buildCharaTrioSlotTitle(rinkSlot, 'low', 12.3)).toBe(
       'りんく（貢献度ランキング） · 取得率 12% · 取得率 低'
     );
+  });
+});
+
+describe('resolveCharaTrioSlotScrollTargetLaneId', () => {
+  it('3 slot を laneId に解決する', () => {
+    expect(resolveCharaTrioSlotScrollTargetLaneId('rink')).toBe('contributionRanking');
+    expect(resolveCharaTrioSlotScrollTargetLaneId('konta')).toBe('adRanking');
+    expect(resolveCharaTrioSlotScrollTargetLaneId('tanu')).toBe('giftHistory');
+  });
+
+  it('未知 / 空 / null は null', () => {
+    expect(resolveCharaTrioSlotScrollTargetLaneId('hoge')).toBe(null);
+    expect(resolveCharaTrioSlotScrollTargetLaneId('')).toBe(null);
+    // @ts-expect-error 不正入力の防御
+    expect(resolveCharaTrioSlotScrollTargetLaneId(null)).toBe(null);
+    // @ts-expect-error 不正入力の防御
+    expect(resolveCharaTrioSlotScrollTargetLaneId(undefined)).toBe(null);
   });
 });
 
