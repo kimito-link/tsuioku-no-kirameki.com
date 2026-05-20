@@ -109,20 +109,21 @@ export function determineNorthStarLaneState(laneId, ctx) {
       return 'no_event';
     }
     case 'eventRank': {
-      // 鏡 mirrorHtml / banner.rank / 貢献度ランキング DOM のいずれかがあれば ok
-      // （貢献度上位は「イベント十位」とは別指標だが、公式レーンで併記するため）。
+      // 鏡 mirrorHtml / banner.rank があれば ok。
       // v0.1.241: NDGR field 6 単独は「ギフト欄の現在 N 位」と一致しないことが多いため、
-      // ok 判定・ユーザー向け順位表示には使わない（診断 JSON の ndgrValue 参照用に残す）。
+      // 「ok」判定として無条件採用はしない（純粋数値表示は誤情報リスク）。
+      // v0.1.284 撤回部分: ユーザー明示要求（lv350553787 で 67 が観測されているのに
+      // 何も出ない＝feedback_root_cause_autonomous）に合わせ、NDGR rank があれば
+      // 「目安」明示の上で表示（refreshNorthStarEventCurrentRankLaneAsync 側で
+      // ※注記つきの fallback HTML を作る）。よって reason も ok を返す。
+      // 「参考として貢献度上位」併記は撤去済（contributionRanking レーンが正本）。
       const dom = numOrNull(bundle?.eventBanner?.rank);
       const mirror = strNonEmpty(bundle?.eventCurrentRankMirrorHtml);
-      const contribCount = Array.isArray(bundle?.contributionRanking)
-        ? bundle.contributionRanking.length
-        : 0;
-      if (dom != null || mirror || contribCount > 0) return 'ok';
+      const ndgr = numOrNull(snap?.officialNicoEventRankNdgr);
+      if (dom != null || mirror || (ndgr != null && ndgr > 0)) return 'ok';
       // v0.1.282: NDGR 等がイベント参加を示す state を返す（reason/診断用）。
       // ⛔ 2026-05-19: この state の「可視表示」は撤回（northStarLaneVisibility
       // で非表示へ）。空 placeholder のスペース浪費をユーザーが却下したため。
-      // ※順位"数値"は元々出さない（field6 silence）。state 自体は温存。
       if (hasEventParticipationSignal(bundle, snap)) {
         return 'event_present_unscrapable';
       }

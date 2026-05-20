@@ -150,8 +150,15 @@ export function computeInlinePanelLayout(mode, args) {
  * 保存された配置は変えず、実際の挿入・幅計算だけ「下（below）」に寄せる。
  *
  * `below` はタブ幅に関係なくそのまま維持する（ユーザーが「下」を選んだ挙動と一致させる）。
+ *
+ * v0.1.284 緩和 1200→1100: 「大画面で横付きにならない」（実機 viewport 1007 で
+ * default migration が 'below' に倒れたまま固定する事象）への根本対応の第一歩。
+ * 1100 は一般的なノートの狭幅でも beside が現実的に収まる現実的下限（player 行
+ * 幅 ≈ 960 + 最小パネル幅 ≈ DEFAULT_MIN_PANEL_WIDTH を確保しつつ、video 列を
+ * 過剰圧迫しない）。ニコ生レイアウトでさらに狭い場合は computeInlinePanelLayout
+ * の maxByViewport で自動的に縮められる。
  */
-export const INLINE_VIEWPORT_BESIDE_MIN_WIDTH = 1200;
+export const INLINE_VIEWPORT_BESIDE_MIN_WIDTH = 1100;
 
 /**
  * @param {string} storedPlacement `below` | `beside` | `floating` | `dock_bottom`
