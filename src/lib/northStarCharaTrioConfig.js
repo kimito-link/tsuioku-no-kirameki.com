@@ -34,7 +34,8 @@
  *   laneId: 'contributionRanking'|'adRanking'|'giftHistory',
  *   charaDir: 'link'|'konta'|'tanunee',
  *   charaPrefix: 'link'|'kitsune'|'tanuki',
- *   displayName: string
+ *   displayName: string,
+ *   laneJaName: string
  * }} NorthStarCharaTrioSlot
  */
 
@@ -45,23 +46,79 @@ export const NORTH_STAR_CHARA_TRIO_SLOTS = Object.freeze([
     laneId: 'contributionRanking',
     charaDir: 'link',
     charaPrefix: 'link',
-    displayName: 'りんく'
+    displayName: 'りんく',
+    laneJaName: '貢献度ランキング'
   }),
   Object.freeze({
     slotId: 'konta',
     laneId: 'adRanking',
     charaDir: 'konta',
     charaPrefix: 'kitsune',
-    displayName: 'こん太'
+    displayName: 'こん太',
+    laneJaName: '広告ランキング'
   }),
   Object.freeze({
     slotId: 'tanu',
     laneId: 'giftHistory',
     charaDir: 'tanunee',
     charaPrefix: 'tanuki',
-    displayName: 'たぬ姉'
+    displayName: 'たぬ姉',
+    laneJaName: 'この番組のギフト履歴'
   })
 ]);
+
+/**
+ * tier → 日本語ラベル（title / aria-label / SR 読み上げで使う）。
+ *
+ * 表情 suffix とは別軸の「ユーザーに伝える意味」を表す。3 年後に文言を変える時、
+ * 本マップ 1 箇所修正で全 trio slot に伝播する。
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+const TRIO_TIER_JA_LABEL_BY_TIER = Object.freeze({
+  wait: '取得待ち',
+  none: '未取得',
+  low: '取得率 低',
+  mid: '取得率 中',
+  high: '取得率 高',
+  full: '完全取得'
+});
+
+/**
+ * tier → 日本語ラベル。未知の tier は 'wait' と同じ '取得待ち' に倒れる。
+ *
+ * @param {string} tier
+ * @returns {string}
+ */
+export function describeCharaTrioTier(tier) {
+  const key = String(tier || '').trim();
+  return TRIO_TIER_JA_LABEL_BY_TIER[key] || TRIO_TIER_JA_LABEL_BY_TIER.wait;
+}
+
+/**
+ * trio slot の title / aria-label に使う文字列を組み立てる。
+ *
+ * 形式: `りんく（貢献度ランキング） · 取得率 78% · 取得率 中`
+ *
+ * - pct=null の時は「取得待ち」を pct 位置に出す（数値で言いたいなら数値、無いなら言葉）。
+ * - tier ラベルは末尾に補足として常に付ける（SR ユーザー向けの状態説明）。
+ * - 句読点は `·` (middle dot) で軽い区切りに。
+ *
+ * @param {{ displayName: string, laneJaName: string }} slot
+ * @param {string} tier
+ * @param {number|null} pct
+ * @returns {string}
+ */
+export function buildCharaTrioSlotTitle(slot, tier, pct) {
+  const name = String(slot?.displayName || '').trim() || 'キャラ';
+  const lane = String(slot?.laneJaName || '').trim() || 'レーン';
+  const tierLabel = describeCharaTrioTier(tier);
+  const pctText =
+    typeof pct === 'number' && Number.isFinite(pct)
+      ? `取得率 ${Math.round(pct)}%`
+      : '取得待ち';
+  return `${name}（${lane}） · ${pctText} · ${tierLabel}`;
+}
 
 /**
  * laneId から trio slot を逆引き。対応する slot が無いレーン

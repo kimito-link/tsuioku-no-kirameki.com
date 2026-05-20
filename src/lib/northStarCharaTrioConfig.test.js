@@ -13,7 +13,9 @@ import {
   findCharaTrioSlotByLaneId,
   findCharaTrioSlotById,
   tierToTrioCharaSrc,
-  buildCharaTrioRenderModel
+  buildCharaTrioRenderModel,
+  describeCharaTrioTier,
+  buildCharaTrioSlotTitle
 } from './northStarCharaTrioConfig.js';
 
 describe('NORTH_STAR_CHARA_TRIO_SLOTS 不変条件', () => {
@@ -55,6 +57,93 @@ describe('NORTH_STAR_CHARA_TRIO_SLOTS 不変条件', () => {
   it('displayName は日本語表記', () => {
     const names = NORTH_STAR_CHARA_TRIO_SLOTS.map((s) => s.displayName);
     expect(names).toEqual(['りんく', 'こん太', 'たぬ姉']);
+  });
+
+  it('laneJaName は各レーンの利用者向け正式名と一致', () => {
+    const map = Object.fromEntries(
+      NORTH_STAR_CHARA_TRIO_SLOTS.map((s) => [s.slotId, s.laneJaName])
+    );
+    expect(map.rink).toBe('貢献度ランキング');
+    expect(map.konta).toBe('広告ランキング');
+    expect(map.tanu).toBe('この番組のギフト履歴');
+  });
+});
+
+describe('describeCharaTrioTier', () => {
+  it('6 tier 全てに日本語ラベルがある', () => {
+    expect(describeCharaTrioTier('wait')).toBe('取得待ち');
+    expect(describeCharaTrioTier('none')).toBe('未取得');
+    expect(describeCharaTrioTier('low')).toBe('取得率 低');
+    expect(describeCharaTrioTier('mid')).toBe('取得率 中');
+    expect(describeCharaTrioTier('high')).toBe('取得率 高');
+    expect(describeCharaTrioTier('full')).toBe('完全取得');
+  });
+
+  it('未知 tier / 空文字 / null → "取得待ち" に倒れる（落ちない）', () => {
+    expect(describeCharaTrioTier('mystery')).toBe('取得待ち');
+    expect(describeCharaTrioTier('')).toBe('取得待ち');
+    // @ts-expect-error 不正入力の防御
+    expect(describeCharaTrioTier(null)).toBe('取得待ち');
+    // @ts-expect-error 不正入力の防御
+    expect(describeCharaTrioTier(undefined)).toBe('取得待ち');
+  });
+});
+
+describe('buildCharaTrioSlotTitle', () => {
+  const rinkSlot = NORTH_STAR_CHARA_TRIO_SLOTS[0];
+
+  it('pct 数値 + tier ラベル付きの title を組み立てる', () => {
+    expect(buildCharaTrioSlotTitle(rinkSlot, 'high', 78)).toBe(
+      'りんく（貢献度ランキング） · 取得率 78% · 取得率 高'
+    );
+  });
+
+  it('pct=null → 「取得待ち」を中央位置に出す（SR 用に明示表現）', () => {
+    expect(buildCharaTrioSlotTitle(rinkSlot, 'wait', null)).toBe(
+      'りんく（貢献度ランキング） · 取得待ち · 取得待ち'
+    );
+  });
+
+  it('full tier の表現が正しい', () => {
+    expect(buildCharaTrioSlotTitle(rinkSlot, 'full', 100)).toBe(
+      'りんく（貢献度ランキング） · 取得率 100% · 完全取得'
+    );
+  });
+
+  it('pct=0 も "取得率 0%" として明示（隠さない）', () => {
+    expect(buildCharaTrioSlotTitle(rinkSlot, 'none', 0)).toBe(
+      'りんく（貢献度ランキング） · 取得率 0% · 未取得'
+    );
+  });
+
+  it('pct=NaN / 非数値は「取得待ち」表示', () => {
+    expect(buildCharaTrioSlotTitle(rinkSlot, 'wait', NaN)).toBe(
+      'りんく（貢献度ランキング） · 取得待ち · 取得待ち'
+    );
+    // @ts-expect-error 不正入力の防御
+    expect(buildCharaTrioSlotTitle(rinkSlot, 'wait', 'bogus')).toBe(
+      'りんく（貢献度ランキング） · 取得待ち · 取得待ち'
+    );
+  });
+
+  it('slot 自体が壊れていても fallback で落ちない', () => {
+    // @ts-expect-error 不正入力の防御
+    expect(buildCharaTrioSlotTitle({}, 'mid', 50)).toBe(
+      'キャラ（レーン） · 取得率 50% · 取得率 中'
+    );
+    // @ts-expect-error 不正入力の防御
+    expect(buildCharaTrioSlotTitle(null, 'mid', 50)).toBe(
+      'キャラ（レーン） · 取得率 50% · 取得率 中'
+    );
+  });
+
+  it('小数 pct は四捨五入', () => {
+    expect(buildCharaTrioSlotTitle(rinkSlot, 'high', 77.6)).toBe(
+      'りんく（貢献度ランキング） · 取得率 78% · 取得率 高'
+    );
+    expect(buildCharaTrioSlotTitle(rinkSlot, 'low', 12.3)).toBe(
+      'りんく（貢献度ランキング） · 取得率 12% · 取得率 低'
+    );
   });
 });
 

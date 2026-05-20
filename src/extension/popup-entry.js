@@ -31,7 +31,8 @@ import {
 import { buildContributionRankingListHtml } from '../lib/contributionRankingListView.js';
 import {
   findCharaTrioSlotByLaneId,
-  tierToTrioCharaSrc
+  tierToTrioCharaSrc,
+  buildCharaTrioSlotTitle
 } from '../lib/northStarCharaTrioConfig.js';
 import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
 import {
@@ -5650,6 +5651,13 @@ function syncNorthStarCharaTrioSlotFromState(laneId, tier, pct) {
   if (pctNum instanceof HTMLElement) {
     pctNum.textContent = pct == null ? '—' : `${Math.round(pct)}%`;
   }
+  // v0.1.293: SR・hover 用の動的 title を 純関数化したラベルで埋める。
+  // tier ラベル（取得率 高 / 完全取得 等）を含むので、視覚での金/銀/銅 tier
+  // 装飾とテキストが補完し合う＝SR ユーザーにも演出意図が伝わる。
+  slotEl.title = buildCharaTrioSlotTitle(slotInfo, tier, pct);
+  // aria-label も同じテキストで上書き（HTML 初期の "りんく（貢献度ランキング）"
+  // は static、tier / pct の現状値はここで動的に反映）。
+  slotEl.setAttribute('aria-label', slotEl.title);
 }
 
 /**
