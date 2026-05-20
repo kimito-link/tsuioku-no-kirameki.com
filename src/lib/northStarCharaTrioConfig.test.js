@@ -1,0 +1,195 @@
+/**
+ * northStarCharaTrioConfig.js のテスト。
+ *
+ * 目的（v0.1.290）:
+ *   §6.4 本実装（v0.1.291 予定）の前に、3 キャラ trio の slot ↔ laneId ↔ image
+ *   src の対応を構造的に固定する。3 年後に slot 追加・並び替え・キャラ差し替え
+ *   をしても本 test が落ちて即検出できる。
+ */
+
+import { describe, it, expect } from 'vitest';
+import {
+  NORTH_STAR_CHARA_TRIO_SLOTS,
+  findCharaTrioSlotByLaneId,
+  findCharaTrioSlotById,
+  tierToTrioCharaSrc,
+  buildCharaTrioRenderModel
+} from './northStarCharaTrioConfig.js';
+
+describe('NORTH_STAR_CHARA_TRIO_SLOTS 不変条件', () => {
+  it('frozen array で 3 件持つ（rink / konta / tanu）', () => {
+    expect(Array.isArray(NORTH_STAR_CHARA_TRIO_SLOTS)).toBe(true);
+    expect(Object.isFrozen(NORTH_STAR_CHARA_TRIO_SLOTS)).toBe(true);
+    expect(NORTH_STAR_CHARA_TRIO_SLOTS).toHaveLength(3);
+    for (const s of NORTH_STAR_CHARA_TRIO_SLOTS) {
+      expect(Object.isFrozen(s)).toBe(true);
+    }
+  });
+
+  it('slotId は rink / konta / tanu の 3 種で重複しない', () => {
+    const ids = NORTH_STAR_CHARA_TRIO_SLOTS.map((s) => s.slotId);
+    expect(new Set(ids)).toEqual(new Set(['rink', 'konta', 'tanu']));
+  });
+
+  it('既存 northStarLaneGadgetChara.js の characterForLane と整合（rink←contrib / konta←ad / tanu←gift）', () => {
+    const slotByLane = Object.fromEntries(
+      NORTH_STAR_CHARA_TRIO_SLOTS.map((s) => [s.laneId, s.slotId])
+    );
+    expect(slotByLane.contributionRanking).toBe('rink');
+    expect(slotByLane.adRanking).toBe('konta');
+    expect(slotByLane.giftHistory).toBe('tanu');
+  });
+
+  it('charaDir / charaPrefix が yukkuri-charactore-english アセット規約に合う', () => {
+    const map = Object.fromEntries(
+      NORTH_STAR_CHARA_TRIO_SLOTS.map((s) => [s.slotId, s])
+    );
+    expect(map.rink.charaDir).toBe('link');
+    expect(map.rink.charaPrefix).toBe('link');
+    expect(map.konta.charaDir).toBe('konta');
+    expect(map.konta.charaPrefix).toBe('kitsune');
+    expect(map.tanu.charaDir).toBe('tanunee');
+    expect(map.tanu.charaPrefix).toBe('tanuki');
+  });
+
+  it('displayName は日本語表記', () => {
+    const names = NORTH_STAR_CHARA_TRIO_SLOTS.map((s) => s.displayName);
+    expect(names).toEqual(['りんく', 'こん太', 'たぬ姉']);
+  });
+});
+
+describe('findCharaTrioSlotByLaneId', () => {
+  it('既知の 3 レーンを slot に解決する', () => {
+    expect(findCharaTrioSlotByLaneId('contributionRanking')?.slotId).toBe('rink');
+    expect(findCharaTrioSlotByLaneId('adRanking')?.slotId).toBe('konta');
+    expect(findCharaTrioSlotByLaneId('giftHistory')?.slotId).toBe('tanu');
+  });
+
+  it('trio に含まれないレーンは null（eventRank / eventScore / programPoints / 未知）', () => {
+    expect(findCharaTrioSlotByLaneId('eventRank')).toBe(null);
+    expect(findCharaTrioSlotByLaneId('eventScore')).toBe(null);
+    expect(findCharaTrioSlotByLaneId('programPoints')).toBe(null);
+    expect(findCharaTrioSlotByLaneId('unknown')).toBe(null);
+  });
+
+  it('空 / null / 前後空白を正しく扱う', () => {
+    expect(findCharaTrioSlotByLaneId('')).toBe(null);
+    expect(findCharaTrioSlotByLaneId(/** @type {any} */ (null))).toBe(null);
+    expect(findCharaTrioSlotByLaneId(/** @type {any} */ (undefined))).toBe(null);
+    expect(findCharaTrioSlotByLaneId('  adRanking  ')?.slotId).toBe('konta');
+  });
+});
+
+describe('findCharaTrioSlotById', () => {
+  it('3 種の slotId を解決する', () => {
+    expect(findCharaTrioSlotById('rink')?.laneId).toBe('contributionRanking');
+    expect(findCharaTrioSlotById('konta')?.laneId).toBe('adRanking');
+    expect(findCharaTrioSlotById('tanu')?.laneId).toBe('giftHistory');
+  });
+
+  it('未知の slotId は null', () => {
+    expect(findCharaTrioSlotById('hoge')).toBe(null);
+    expect(findCharaTrioSlotById('')).toBe(null);
+  });
+});
+
+describe('tierToTrioCharaSrc', () => {
+  it('rink + full → smile-mouth-open', () => {
+    expect(tierToTrioCharaSrc('rink', 'full')).toBe(
+      'images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png'
+    );
+  });
+
+  it('rink + wait → blink-mouth-closed', () => {
+    expect(tierToTrioCharaSrc('rink', 'wait')).toBe(
+      'images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.png'
+    );
+  });
+
+  it('konta + normal-mouth-closed は専用 fallback（kitsune-yukkuri-mouth-closed.png）', () => {
+    expect(tierToTrioCharaSrc('konta', 'mid')).toBe(
+      'images/yukkuri-charactore-english/konta/kitsune-yukkuri-mouth-closed.png'
+    );
+  });
+
+  it('tanu + low → half-eyes-mouth-closed', () => {
+    expect(tierToTrioCharaSrc('tanu', 'low')).toBe(
+      'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png'
+    );
+  });
+
+  it('tier 未知 → wait と同じ blink-mouth-closed', () => {
+    expect(tierToTrioCharaSrc('rink', 'mystery')).toBe(
+      'images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.png'
+    );
+    expect(tierToTrioCharaSrc('rink', '')).toBe(
+      'images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.png'
+    );
+  });
+
+  it('slotId 未知は null', () => {
+    expect(tierToTrioCharaSrc('hoge', 'full')).toBe(null);
+    expect(tierToTrioCharaSrc('', 'full')).toBe(null);
+  });
+
+  it('全 tier × 全 slot で path が生成できる（NULL を返さない）', () => {
+    const tiers = ['wait', 'none', 'low', 'mid', 'high', 'full'];
+    const slots = ['rink', 'konta', 'tanu'];
+    for (const s of slots) {
+      for (const t of tiers) {
+        const path = tierToTrioCharaSrc(s, t);
+        expect(typeof path).toBe('string');
+        expect(path).toMatch(/^images\/yukkuri-charactore-english\//);
+        expect(path).toMatch(/\.png$/);
+      }
+    }
+  });
+});
+
+describe('buildCharaTrioRenderModel', () => {
+  it('全 slot に対して tier と charaSrc を埋めた配列を返す（順序は SLOTS 定義順）', () => {
+    const model = buildCharaTrioRenderModel({
+      contributionRanking: 'full',
+      adRanking: 'low',
+      giftHistory: 'mid'
+    });
+    expect(model).toHaveLength(3);
+    expect(model[0].slot.slotId).toBe('rink');
+    expect(model[0].tier).toBe('full');
+    expect(model[1].slot.slotId).toBe('konta');
+    expect(model[1].tier).toBe('low');
+    expect(model[2].slot.slotId).toBe('tanu');
+    expect(model[2].tier).toBe('mid');
+    for (const m of model) {
+      expect(m.charaSrc).toMatch(/^images\/yukkuri-charactore-english\//);
+    }
+  });
+
+  it('一部レーンの tier 欠落 → 該当 slot は wait に倒れる（描画上「未取得」演出）', () => {
+    const model = buildCharaTrioRenderModel({ contributionRanking: 'full' });
+    expect(model[0].tier).toBe('full');
+    expect(model[1].tier).toBe('wait');
+    expect(model[2].tier).toBe('wait');
+  });
+
+  it('入力 null / undefined / 非 object → 全 slot wait に倒れる（落ちない）', () => {
+    // @ts-expect-error 不正入力の防御
+    const a = buildCharaTrioRenderModel(null);
+    // @ts-expect-error 不正入力の防御
+    const b = buildCharaTrioRenderModel(undefined);
+    // @ts-expect-error 不正入力の防御
+    const c = buildCharaTrioRenderModel('bogus');
+    for (const model of [a, b, c]) {
+      expect(model).toHaveLength(3);
+      for (const m of model) {
+        expect(m.tier).toBe('wait');
+      }
+    }
+  });
+
+  it('§6.4 回帰検出: slot 順は rink → konta → tanu で固定（誰かが並び替えても落ちる）', () => {
+    const model = buildCharaTrioRenderModel({});
+    const ids = model.map((m) => m.slot.slotId);
+    expect(ids).toEqual(['rink', 'konta', 'tanu']);
+  });
+});

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.290',
+    date: '2026-05-20',
+    summary: '3 キャラ並列表示の設計を内部で整備（下準備）',
+    items: Object.freeze([
+      'りんく / こん太 / たぬ姉 の 3 キャラ並列表示に向けて、対応レーン（貢献度・広告・ギフト）とのひもづけを内部で純関数として整え、テストで構造的に固定しました',
+      '表示自体は次の更新で追加します。本更新では見た目は変わりません（保守性向上のみ）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.289',
     date: '2026-05-20',
     summary: 'ギフト履歴レーンの縦スペースを節約',
