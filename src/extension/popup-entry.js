@@ -29,6 +29,10 @@ import {
   resolveContributionRankingRowsFromSources
 } from '../lib/officialContributionRankingResolver.js';
 import { buildContributionRankingListHtml } from '../lib/contributionRankingListView.js';
+import {
+  findCharaTrioSlotByLaneId,
+  tierToTrioCharaSrc
+} from '../lib/northStarCharaTrioConfig.js';
 import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
 import {
   buildNorthStarRankFallbackHtml,
@@ -5598,6 +5602,53 @@ function syncNorthStarLaneGadgetFromBodyState(body) {
         summary.setAttribute('aria-hidden', 'true');
       }
     }
+  }
+  // v0.1.291: 北極星 3 キャラ trio パネル（rink/konta/tanu）の対応 slot を同期。
+  // §6.4 本実装。trio に slot を持つ laneId（contributionRanking/adRanking/
+  // giftHistory）のときだけ slot DOM を更新。それ以外の laneId は no-op。
+  syncNorthStarCharaTrioSlotFromState(laneId, tier, pct);
+}
+
+/**
+ * 北極星 3 キャラ trio パネル (`#northStarCharaTrio`) のうち、引数 laneId に
+ * 対応する slot を tier / pct で更新する。
+ *
+ * trio に対応 slot を持たないレーン（eventRank / eventScore / programPoints）
+ * では何もしない＝呼び出し側は無条件に呼べる（純関数 findCharaTrioSlotByLaneId
+ * が null を返した時点で短絡）。
+ *
+ * v0.1.290 の純関数 `tierToTrioCharaSrc` / `findCharaTrioSlotByLaneId` を活用＝
+ * slot ↔ laneId ↔ 画像 src の解決は本ファイル外（test ガード済）で完結。
+ * 本関数は I/O 副作用（dataset 書き換え / img.src 更新 / pct テキスト更新）に
+ * だけ責任を持つ。
+ *
+ * @param {string} laneId
+ * @param {string} tier 'wait'|'none'|'low'|'mid'|'high'|'full'
+ * @param {number|null} pct null は「未取得（—）」表示
+ */
+function syncNorthStarCharaTrioSlotFromState(laneId, tier, pct) {
+  const slotInfo = findCharaTrioSlotByLaneId(laneId);
+  if (!slotInfo) return;
+  const slotEl = document.querySelector(
+    `.nl-north-star-chara-trio__slot[data-nl-trio-slot="${slotInfo.slotId}"]`
+  );
+  if (!(slotEl instanceof HTMLElement)) return;
+  slotEl.dataset.nlAcqTier = String(tier || 'wait');
+  const img = slotEl.querySelector('img.nl-north-star-chara-trio__chara');
+  if (img instanceof HTMLImageElement) {
+    const rel = tierToTrioCharaSrc(slotInfo.slotId, tier);
+    if (rel) {
+      try {
+        img.src = chrome.runtime.getURL(rel);
+      } catch {
+        img.removeAttribute('src');
+      }
+    }
+    img.alt = '';
+  }
+  const pctNum = slotEl.querySelector('.nl-north-star-chara-trio__pct-num');
+  if (pctNum instanceof HTMLElement) {
+    pctNum.textContent = pct == null ? '—' : `${Math.round(pct)}%`;
   }
 }
 
