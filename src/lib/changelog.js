@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.288',
+    date: '2026-05-20',
+    summary: '北極星レーンの見出しを色分けバーで強化',
+    items: Object.freeze([
+      '北極星パネルの 6 レーンに、それぞれ違う色の「小見出しバー」を付けて、セクションの切れ目を見やすくしました',
+      'レーン同士の間に薄い区切り線を入れて、どこから次のレーンが始まるか分かりやすくしました',
+      '色は中央で管理しているので、将来の色味調整が 1 箇所の修正で全レーンに反映できる作りにしました（保守性向上）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.287',
     date: '2026-05-20',
     summary: '貢献度ランキングを縦リストに刷新（金銀銅）',
