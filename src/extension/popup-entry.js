@@ -5659,6 +5659,41 @@ function syncNorthStarCharaTrioSlotFromState(laneId, tier, pct) {
   // aria-label も同じテキストで上書き（HTML 初期の "りんく（貢献度ランキング）"
   // は static、tier / pct の現状値はここで動的に反映）。
   slotEl.setAttribute('aria-label', slotEl.title);
+  // v0.1.295: 3 slot 全員 full なら trio パネル全体に祝福演出 attribute を立てる。
+  // 「物語の到達感」演出＝[[reference_ai_generic_rules_master]] tkjp 哲学「想いが
+  // 強いほど届く」と整合。判定は DOM 直接読みで副作用ゼロ（純関数化は YAGNI 回避
+  // で defer。将来 all-wait / all-low 演出を加える時に純関数化する）。
+  syncCharaTrioOverallStateFromDom();
+}
+
+/**
+ * `#northStarCharaTrio` の 3 slot を走査し、全員 'full' tier なら
+ * `data-nl-trio-overall="all-full"` を立てて祝福演出を発火する。
+ *
+ * 副作用は dataset 1 属性の set/remove のみ。slot tier の更新の都度呼ばれて
+ * も結果は冪等。trio パネル DOM が無い popup インスタンス（INLINE 等）では
+ * 早期 return で no-op。
+ */
+function syncCharaTrioOverallStateFromDom() {
+  const wrap = document.getElementById('northStarCharaTrio');
+  if (!(wrap instanceof HTMLElement)) return;
+  const slots = wrap.querySelectorAll(
+    '.nl-north-star-chara-trio__slot[data-nl-trio-slot]'
+  );
+  if (slots.length === 0) return;
+  let allFull = true;
+  slots.forEach((el) => {
+    if (!(el instanceof HTMLElement)) {
+      allFull = false;
+      return;
+    }
+    if (el.dataset.nlAcqTier !== 'full') allFull = false;
+  });
+  if (allFull) {
+    wrap.dataset.nlTrioOverall = 'all-full';
+  } else if (wrap.dataset.nlTrioOverall) {
+    delete wrap.dataset.nlTrioOverall;
+  }
 }
 
 /**

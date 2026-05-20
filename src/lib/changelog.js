@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.295',
+    date: '2026-05-20',
+    summary: '3 キャラ全員完全取得で祝福演出を追加',
+    items: Object.freeze([
+      '3 キャラパネルのりんく / こん太 / たぬ姉 が全員「完全取得」になったとき、金色グローと「🎉 全レーン取得完了！」のバナーが表示されるようにしました',
+      '取得が進んでいく道のりがひと目で「達成」と分かる、ささやかなご褒美演出です',
+      '動きを減らす設定（OS のアニメーション控えめ）を有効にしているときは、フェードインを抑制します（アクセシビリティ配慮）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.294',
     date: '2026-05-20',
     summary: '3 キャラパネルを押すと対応レーンへ移動',
