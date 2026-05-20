@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.292',
+    date: '2026-05-20',
+    summary: 'ダークスキン時のレーン色を見やすく最適化',
+    items: Object.freeze([
+      'ダーク表示にしているときに、北極星レーンの小見出しバーと 3 キャラパネルの色合いを、暗い背景でも見やすい明度に調整しました',
+      '通常（ライト）表示はこれまでどおりで変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.291',
     date: '2026-05-20',
     summary: '北極星 3 キャラ並列パネルを実装（取得率連動）',

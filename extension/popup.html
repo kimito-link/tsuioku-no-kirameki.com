@@ -7619,6 +7619,16 @@
         /* 0.1.11 (A1): dark 背景上で読める明るめ placeholder。デフォルトの
            #6b7280 は #0a0e14〜#161d27 の dark 面に対しコントラスト不足。 */
         --nl-placeholder: #94a3b8;
+        /* Antigravity §6.3+§6.4 (v0.1.292): dark skin 時のレーン accent カラー。
+           light 用（:root）より彩度・明度をやや上げ、#161d27 の dark surface に
+           対するコントラストを確保。命名は light と完全一致＝3 年後楽の中央定義
+           が dark でも 1 箇所修正で全レーン + trio に伝播する性質を維持。 */
+        --nl-lane-accent-contrib: #f5d975;
+        --nl-lane-accent-gift: #ff96b3;
+        --nl-lane-accent-program: #7fceff;
+        --nl-lane-accent-ad: #8fdfaa;
+        --nl-lane-accent-event-rank: #c4afff;
+        --nl-lane-accent-event-score: #ffc77f;
       }
 
       html.nl-skin-panel-dark body {
