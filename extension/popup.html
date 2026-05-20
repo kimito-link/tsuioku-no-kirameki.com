@@ -20,6 +20,15 @@
         --nl-border: #d5e3f5;
         --nl-accent: #0f8fd8;
         --nl-accent-hover: #0b73ad;
+        /* Antigravity §6.3 (v0.1.288): 北極星レーン別 accent カラー（小見出しバー
+           左 border + 区切り）。3 年後の色変更は本ブロック 1 箇所修正で全 6 レーン
+           に伝播。light/dark テーマで共用（明度の高すぎる色は避けて両方で視認可）。 */
+        --nl-lane-accent-contrib: #ffd35c;
+        --nl-lane-accent-gift: #ff8aa7;
+        --nl-lane-accent-program: #6cc4ff;
+        --nl-lane-accent-ad: #7fd49a;
+        --nl-lane-accent-event-rank: #b69cff;
+        --nl-lane-accent-event-score: #ffb86c;
         --nl-record-on: #0f9f6f;
         --nl-header-start: #0f8fd8;
         --nl-header-end: #14b8a6;
@@ -2814,12 +2823,19 @@
       }
       .nl-north-star-lane__heading {
         margin: 0 0 2px;
+        /* Antigravity §6.3 (v0.1.288): レーン別 accent カラーの「小見出しバー」化。
+           heading 左端に 3px の縦帯を立て、視覚的な「セクション切れ目」を明示。
+           accent 色は :root の --nl-lane-accent-* 変数経由＝中央化。 */
+        padding: 4px 0 4px 8px;
+        border-left: 3px solid color-mix(in srgb, var(--nl-lane-accent-default, var(--nl-accent)) 55%, var(--nl-border) 45%);
+        border-radius: 2px 0 0 2px;
       }
       .nl-north-star-lane__label {
         margin: 0;
         font-size: 12px;
         font-weight: 700;
         color: var(--nl-text);
+        letter-spacing: 0.01em;
       }
       .nl-north-star-lane__sublabel {
         margin: 3px 0 0;
@@ -2827,6 +2843,49 @@
         line-height: 1.38;
         font-weight: 600;
         color: color-mix(in srgb, var(--nl-text) 58%, transparent);
+      }
+      /* レーン別 accent border-color（:root の中央定義から色を引く） */
+      .nl-north-star-lane[data-lane='contributionRanking'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-contrib) 75%, var(--nl-border) 25%);
+      }
+      .nl-north-star-lane[data-lane='giftHistory'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-gift) 75%, var(--nl-border) 25%);
+      }
+      .nl-north-star-lane[data-lane='programPoints'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-program) 75%, var(--nl-border) 25%);
+      }
+      .nl-north-star-lane[data-lane='adRanking'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-ad) 75%, var(--nl-border) 25%);
+      }
+      .nl-north-star-lane[data-lane='eventRank'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-event-rank) 75%, var(--nl-border) 25%);
+      }
+      .nl-north-star-lane[data-lane='eventScore'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-event-score) 75%, var(--nl-border) 25%);
+      }
+      /* レーン間の subtle horizontal separator（gradient で端を fade out して
+         うるさくしない・3 年後に色変えたければ 1 箇所修正で済む） */
+      #northStarLanes .nl-north-star-lane + .nl-north-star-lane {
+        position: relative;
+        margin-top: 8px;
+        padding-top: 8px;
+      }
+      #northStarLanes .nl-north-star-lane + .nl-north-star-lane::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 4px;
+        right: 4px;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent 0%,
+          color-mix(in srgb, var(--nl-border) 45%, transparent) 15%,
+          color-mix(in srgb, var(--nl-border) 70%, transparent) 50%,
+          color-mix(in srgb, var(--nl-border) 45%, transparent) 85%,
+          transparent 100%
+        );
+        pointer-events: none;
       }
       .nl-north-star-lane__shell {
         display: grid;
@@ -3549,7 +3608,7 @@
         padding: 0 2px;
         font-size: clamp(9px, 2vw, 10px);
         line-height: 1.35;
-        color: color-mix(in srgb, var(--nl-fg) 65%, transparent);
+        color: color-mix(in srgb, var(--nl-text) 65%, transparent);
       }
       .nl-contrib-ranking-list__rows {
         display: flex;
@@ -3614,7 +3673,7 @@
       }
       .nl-contrib-ranking-list__row--tier-normal .nl-contrib-ranking-list__rank,
       .nl-contrib-ranking-list__row--tier-empty .nl-contrib-ranking-list__rank {
-        color: color-mix(in srgb, var(--nl-fg) 75%, transparent);
+        color: color-mix(in srgb, var(--nl-text) 75%, transparent);
         font-weight: 700;
       }
       .nl-contrib-ranking-list__rank {
@@ -3647,7 +3706,7 @@
         font-variant-numeric: tabular-nums;
         font-feature-settings: 'tnum' 1;
         font-weight: 700;
-        color: color-mix(in srgb, var(--nl-fg) 85%, transparent);
+        color: color-mix(in srgb, var(--nl-text) 85%, transparent);
         text-align: right;
         white-space: nowrap;
       }
