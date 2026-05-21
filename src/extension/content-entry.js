@@ -5027,7 +5027,8 @@ function buildAiShareFastDiagnosticsPayload() {
       ...inlinePanelDiagPlacementHints(
         inlinePanelPlacementMode,
         placementEffectiveFast,
-        viewportInnerWidthFast
+        viewportInnerWidthFast,
+        nlsInlinePanelLayoutRenderSnapshot.besideFlexRowColumnRuntime
       ),
       widthMode: inlinePanelWidthMode,
       layoutRenderSnapshot: {
@@ -5321,15 +5322,24 @@ function getEffectiveInlinePanelPlacement() {
  * @param {string} placementMode
  * @param {string} placementEffective
  * @param {number} viewportInnerWidth
+ * @param {boolean} [besideFlexRowColumnRuntime] 実効 beside で、実際に動画列の隣へ
+ *   挿入できたか（false かつ幅は足りているなら、ページ構造の都合で下へ逃げている＝課題B）。
  */
 function inlinePanelDiagPlacementHints(
   placementMode,
   placementEffective,
-  viewportInnerWidth
+  viewportInnerWidth,
+  besideFlexRowColumnRuntime
 ) {
   const w = Number(viewportInnerWidth) || 0;
   const min = INLINE_VIEWPORT_BESIDE_MIN_WIDTH;
   const wideEnoughForBeside = w >= min;
+  // 横付き指定・幅は足りているのに、実 DOM で動画列の隣に挿せず下へ逃げている状態。
+  // ニコ生のページ構造（SPA・配信者設定）依存で、拡張側では直せないケースがある。
+  const besideWantedButRanAsBelow =
+    placementMode === INLINE_PANEL_PLACEMENT_BESIDE &&
+    placementEffective === INLINE_PANEL_PLACEMENT_BESIDE &&
+    besideFlexRowColumnRuntime === false;
   let placementInterpretationHintJa = '';
   if (
     placementMode === INLINE_PANEL_PLACEMENT_BELOW &&
@@ -5337,16 +5347,20 @@ function inlinePanelDiagPlacementHints(
     wideEnoughForBeside
   ) {
     placementInterpretationHintJa =
-      '保存されている配置は「下」です。横付きにするには拡張ポップアップの「配置」で「横付き」を選んでください（画面やタブを広げただけでは自動では切り替わりません）。';
+      '保存されている配置は「下」です。横付きにするには拡張ポップアップの「配置」で「横付き」を選んでください。広い画面で自動的に横付きにしたい場合は「下／横付きのときの幅の広げ方」を「広げない」以外にすると、次に手前のタブで watch を開いたとき横付きへ切り替わります（配置を自分で選んだ場合はその選択が優先されます）。';
   } else if (
     placementMode === INLINE_PANEL_PLACEMENT_BESIDE &&
     placementEffective === INLINE_PANEL_PLACEMENT_BELOW
   ) {
     placementInterpretationHintJa = `横付きを選んでいますが、タブ幅が不足しているため実効は「下」です（横付きには概ね ${min}px 以上のタブ内幅が必要です）。`;
+  } else if (besideWantedButRanAsBelow) {
+    placementInterpretationHintJa =
+      '横付きを選んでいてタブ幅も足りていますが、このページの構造では動画列の横に十分な隙間を確保できず、下に表示しています（配信者の設定やニコ生本体のレイアウト都合で、拡張側では横に出せないことがあります）。';
   }
   return {
     besideMinWidthPx: min,
     viewportWideEnoughForBeside: wideEnoughForBeside,
+    besideWantedButRanAsBelow,
     placementInterpretationHintJa
   };
 }
@@ -7249,7 +7263,8 @@ function buildAiSharePageDiagnostics() {
       ...inlinePanelDiagPlacementHints(
         inlinePanelPlacementMode,
         placementEffective,
-        viewportInnerWidthDiag
+        viewportInnerWidthDiag,
+        nlsInlinePanelLayoutRenderSnapshot.besideFlexRowColumnRuntime
       ),
       widthMode: inlinePanelWidthMode,
       layoutRenderSnapshot: {
