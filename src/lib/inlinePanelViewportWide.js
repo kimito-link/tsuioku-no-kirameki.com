@@ -107,7 +107,11 @@ export function shouldConsumeViewportWideOnce(opts) {
  * storage.onChanged の外側、同期変数経由）が担う。描画ホットパスからは呼ばない。
  */
 
-/** 昇格対象になりうる保存値か（below / 未設定のみ。dock_bottom/floating は明示性が高く対象外） */
+/**
+ * 昇格対象になりうる保存値か（below / 未設定のみ。dock_bottom/floating は明示性が高く対象外）
+ * @param {unknown} stored
+ * @returns {boolean}
+ */
 function isPlacementUpgradeCandidate(stored) {
   const s = String(stored || '').trim();
   return s === '' || s === INLINE_PANEL_PLACEMENT_BELOW;

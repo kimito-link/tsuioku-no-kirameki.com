@@ -9,6 +9,7 @@ import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
   KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
   KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
   KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
   KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
@@ -186,7 +187,9 @@ import {
 } from '../lib/inlinePanelLayout.js';
 import {
   resolveWidenedInlinePanelWidthPx,
-  shouldConsumeViewportWideOnce
+  shouldConsumeViewportWideOnce,
+  suggestPlacementUpgradeForWideViewport,
+  shouldConsumePlacementUpgradeOnce
 } from '../lib/inlinePanelViewportWide.js';
 import {
   scoreInlineHostAnchorCandidate,
@@ -2954,6 +2957,13 @@ let inlinePanelWidthMode = normalizeInlinePanelWidthMode(undefined);
 let inlinePanelPlacementMode = normalizeInlinePanelPlacement(undefined);
 
 /**
+ * ユーザーが popup で配置を**明示選択**したか（KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT）。
+ * 大画面での横付き昇格（suggestPlacementUpgradeForWideViewport）は、これが true の
+ * ときは絶対に行わない＝v0.1.282 の「意思固定」ガードを逆方向に侵害しないため。
+ */
+let inlinePanelPlacementUserExplicit = false;
+
+/**
  * AI 診断用: `renderInlineHostAnchoredToVideo` 直近で確定したレイアウト実効値。
  * ストレージの widthMode とは異なり、列間挿入時の強制 video 幅などが分かる。
  */
@@ -5581,6 +5591,7 @@ async function loadPageFrameSettings() {
     KEY_POPUP_FRAME_CUSTOM,
     KEY_INLINE_PANEL_WIDTH_MODE,
     KEY_INLINE_PANEL_PLACEMENT,
+    KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
     KEY_INLINE_FLOATING_ANCHOR,
     KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
     KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
@@ -5592,6 +5603,8 @@ async function loadPageFrameSettings() {
   inlinePanelPlacementMode = normalizeInlinePanelPlacement(
     bag[KEY_INLINE_PANEL_PLACEMENT]
   );
+  inlinePanelPlacementUserExplicit =
+    bag[KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT] === true;
   inlineFloatingAnchor = normalizeInlineFloatingAnchor(
     bag[KEY_INLINE_FLOATING_ANCHOR]
   );
@@ -5611,6 +5624,54 @@ async function loadPageFrameSettings() {
       : DEFAULT_PAGE_FRAME;
   pageFrameState.custom = sanitizePageFrameCustom(bag[KEY_POPUP_FRAME_CUSTOM]);
   applyPageFramePalette(pageFrameState.frameId, pageFrameState.custom);
+  renderPageFrameOverlay();
+  // 設定読込が終わってから、大画面なら横付きへ昇格すべきか評価する（opt-in）。
+  // ここは描画ホットパスの**外側**。判定は同期純関数、書込のみ await。
+  void maybeUpgradePlacementForWideViewport(bag[KEY_INLINE_PANEL_PLACEMENT]);
+}
+
+/**
+ * 大画面で below/未設定 を横付き(beside)へ「昇格」させる（opt-in・1 回限り or 常時）。
+ *
+ * - 判定は同期純関数 `suggestPlacementUpgradeForWideViewport`（USER_EXPLICIT=true は no-op）。
+ * - 昇格時は保存値 beside を書く。書込で onChanged → loadPageFrameSettings が再走するが、
+ *   保存値が beside（昇格対象外）になり、`once` は onceDone=true になるので **2 度目は no-op**
+ *   ＝ループしない。`effectiveInlinePanelPlacement` の純関数契約（降格のみ）は不変。
+ * - 描画後にウィンドウを広げてもこの関数は走らない（リサイズ追従はしない）。狙いは
+ *   「watch を開いた時点のタブ幅で 1 回だけ意思決定」＝beside⇆below 往復を作らない。
+ *
+ * @param {unknown} rawStoredPlacement chrome.storage の生値（未設定なら undefined）
+ */
+async function maybeUpgradePlacementForWideViewport(rawStoredPlacement) {
+  if (!hasExtensionContext()) return;
+  if (!isWatchInlinePanelTopFrame()) return;
+  const vp = nlsLayoutViewportSize();
+  const upgradedTo = suggestPlacementUpgradeForWideViewport({
+    stored: String(rawStoredPlacement || ''),
+    userExplicit: inlinePanelPlacementUserExplicit,
+    viewportInnerWidth: vp.innerWidth,
+    policy: inlinePanelViewportWidePolicy,
+    onceDone: inlinePanelViewportWideOnceDone
+  });
+  if (upgradedTo == null) return;
+  // 同期の見た目を即追従（書込の onChanged を待たない）。
+  inlinePanelPlacementMode = normalizeInlinePanelPlacement(upgradedTo);
+  /** @type {Record<string, unknown>} */
+  const patch = { [KEY_INLINE_PANEL_PLACEMENT]: upgradedTo };
+  if (
+    shouldConsumePlacementUpgradeOnce({
+      policy: inlinePanelViewportWidePolicy,
+      upgradedTo
+    })
+  ) {
+    inlinePanelViewportWideOnceDone = true;
+    patch[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE] = true;
+  }
+  try {
+    await chrome.storage.local.set(patch);
+  } catch {
+    // no-op（次回 watch 表示時に再評価される）
+  }
   renderPageFrameOverlay();
 }
 
@@ -9427,6 +9488,14 @@ async function start() {
         );
         renderPageFrameOverlay();
       }
+    }
+
+    if (changes[KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT]) {
+      // ユーザーが配置を明示選択した瞬間に in-memory フラグを追従させる。
+      // これを怠ると、後続の loadPageFrameSettings が古い false を見て、明示選択を
+      // 上書きする方向に横付き昇格してしまう（意思の逆侵害）。
+      inlinePanelPlacementUserExplicit =
+        changes[KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT].newValue === true;
     }
 
     if (changes[KEY_INLINE_PANEL_PLACEMENT]) {
