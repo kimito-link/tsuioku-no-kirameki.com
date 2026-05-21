@@ -291,6 +291,25 @@ describe('AD汚染回帰: contributionRanking sticky vs adContributionRanking �
     expect(m3?.adContributionRanking).toBe(null);
   });
 
+  it('v0.1.298: adRankingStoredAt が新しいほうが両方行ありのとき優先される', () => {
+    const olderRanking = [{ rank: 1, name: 'old', contribution: 100, isAnonymous: false, thumbnailUrl: '' }];
+    const newerRanking = [{ rank: 1, name: 'new', contribution: 200, isAnonymous: false, thumbnailUrl: '' }];
+    // next のほうが新しい（storedAt が大きい）
+    const m4 = mergeOfficialEventDomBundle(
+      bundle({ adContributionRanking: olderRanking, adRankingStoredAt: 1000 }),
+      bundle({ adContributionRanking: newerRanking, adRankingStoredAt: 2000 })
+    );
+    expect(m4?.adContributionRanking?.[0].name).toBe('new');
+    expect(m4?.adRankingStoredAt).toBe(2000);
+    // prev のほうが新しい（storedAt が大きい）
+    const m5 = mergeOfficialEventDomBundle(
+      bundle({ adContributionRanking: newerRanking, adRankingStoredAt: 9000 }),
+      bundle({ adContributionRanking: olderRanking, adRankingStoredAt: 1000 })
+    );
+    expect(m5?.adContributionRanking?.[0].name).toBe('new');
+    expect(m5?.adRankingStoredAt).toBe(9000);
+  });
+
   it('FIX3: 部分 bundle（giftHistory 欠落）でも merge は throw しない（null 耐性 pin）', () => {
     expect(() =>
       mergeOfficialEventDomBundle(
