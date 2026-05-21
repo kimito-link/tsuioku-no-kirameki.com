@@ -128,7 +128,7 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
  *   eventBalloon: ReturnType<typeof scrapeOfficialEventBalloonFromDom>,
  *   contributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
  *   adContributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
- *   adRankingStoredAt: number|undefined,
+ *   adRankingStoredAt?: number,
  *   adRankingMirrorHtml: string|null,
  *   eventCumulativeScoreMirrorHtml: string|null,
  *   eventCurrentRankMirrorHtml: string|null,
