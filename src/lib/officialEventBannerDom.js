@@ -72,7 +72,7 @@ export function scrapeOfficialEventBannerFromDom(root) {
     for (const el of owners) {
       if (!(el instanceof HTMLElement)) continue;
       const t = String(el.textContent || '');
-      if (!/さんが参加しています/.test(t)) continue;
+      if (!/(?:さんが|が)参加(?:しています|中)?/.test(t)) continue;
       const a = el.closest && el.closest('a');
       const w = (a instanceof HTMLElement ? a : el.parentElement) || null;
       if (w instanceof HTMLElement) {
@@ -887,7 +887,7 @@ export function scrapeEventInfoMirrorParts(root) {
     for (const el of owners) {
       if (!(el instanceof HTMLElement)) continue;
       const t = String(el.textContent || '');
-      if (!/さんが参加しています/.test(t)) continue;
+      if (!/(?:さんが|が)参加(?:しています|中)?/.test(t)) continue;
       const a = el.closest && el.closest('a');
       const w = (a instanceof HTMLElement ? a : el.parentElement) || null;
       if (w instanceof HTMLElement) {

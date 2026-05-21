@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.298',
+    date: '2026-05-22',
+    summary: '広告ランキングの正確取得を修正',
+    items: Object.freeze([
+      '[修正] watch タブが広告ランキングを一度取得すると以降ストレージを再読みしない問題を修正——Nicoad ページで新しい値を scrape しても watch タブに届かないバグがありました。capturedAt 比較で常に新しい方を採用するよう変更しました',
+      '[修正] Nicoad ページタブが 「貢献度ランキング」選択済みでも Vue の API fetch 完了前に scrape していた問題を修正——500ms 刻みで最大 60 秒リトライし、.contribution に数値が入った後に初めて保存するようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.296',
     date: '2026-05-20',
     summary: '貢献度 1 位の金色をテーマ色に統一',

@@ -72,6 +72,42 @@ describe('scrapeOfficialEventBannerFromDom', () => {
     expect(r.rank).toBeNull();
     expect(r.title).toBe('イベント');
   });
+
+  it('さまざまな表記揺れ（が参加しています、さんが参加中、が参加中、さんが参加、が参加）に対応する', () => {
+    const variations = [
+      'あかねこ。が参加しています！',
+      'あかねこ。さんが参加中！',
+      'あかねこ。が参加中！',
+      'あかねこ。さんが参加！',
+      'あかねこ。が参加！'
+    ];
+    for (const text of variations) {
+      document.body.innerHTML = `
+        <a class="wrapper" href="https://audition.nicovideo.jp/embedded/richview/live?content_id=lv350458677">
+          <p class="owner-name">${text}</p>
+          <div class="info">
+            <div class="image">
+              <img class="thumbnail" src="https://audition.nicovideo.jp/images/thumbnails/abc" alt="イベントタイトル">
+            </div>
+            <div class="text">
+              <div class="name-wrapper">
+                <p class="marquee-target">
+                  <span class="name">イベントタイトル</span>
+                </p>
+              </div>
+              <p class="status">
+                <span class="rank-field"> 現在 <strong class="rank-num">2</strong> 位 </span>
+                <span class="score"> 207,835</span>
+              </p>
+            </div>
+          </div>
+        </a>`;
+      const r = scrapeOfficialEventBannerFromDom(document);
+      expect(r).not.toBeNull();
+      expect(r.rank).toBe(2);
+      expect(r.title).toBe('イベントタイトル');
+    }
+  });
 });
 
 describe('scrapeOfficialEventBalloonFromDom', () => {
@@ -874,6 +910,31 @@ describe('scrapeEventInfoMirrorParts (v0.1.240)', () => {
     // バナー内の span.score の outerHTML で td.score-value ではない
     expect(parts.scoreHtml).toMatch(/^<span/);
     expect(parts.scoreHtml).not.toContain('point-value');
+  });
+
+  it('さまざまな表記揺れ（が参加しています、さんが参加中、が参加中、さんが参加、が参加）に対応する', () => {
+    const variations = [
+      'あかねこ。が参加しています！',
+      'あかねこ。さんが参加中！',
+      'あかねこ。が参加中！',
+      'あかねこ。さんが参加！',
+      'あかねこ。が参加！'
+    ];
+    for (const text of variations) {
+      document.body.innerHTML = `
+        <a class="wrapper">
+          <p class="owner-name">${text}</p>
+          <p class="status">
+            <span class="rank-field">現在 <strong class="rank-num">3</strong> 位</span>
+            <span class="score"><svg class="score-icon"></svg> 12,345</span>
+          </p>
+        </a>
+      `;
+      const parts = scrapeEventInfoMirrorParts(document);
+      expect(parts).not.toBeNull();
+      expect(parts.scoreHtml).toContain('12,345');
+      expect(parts.rankHtml).toContain('3');
+    }
   });
 });
 

@@ -10855,29 +10855,38 @@ async function persistOfficialEventDomBundleNow() {
   // chrome.storage.local の `nls_nicoad_ranking_<lv>` に保存する設計（content-entry.js
   // 末尾の tryHarvestNicoadContributionRankingOnce）。ここでは watch タブが
   // そのストレージを読み出して bundle に取り込む。
-  const haveAdRankingAfterFetch =
-    bundleHasAdContributionRankingRows(fresh) ||
-    bundleHasAdContributionRankingRows(lastOfficialEventDomBundle);
-  if (!haveAdRankingAfterFetch) {
-    try {
-      const key = `nls_nicoad_ranking_${lid}`;
-      const got = await chrome.storage.local.get([key]);
-      const data = got?.[key];
-      if (data && Array.isArray(data.ranking) && data.ranking.length > 0) {
+  // v0.1.298: 以前は haveAdRankingAfterFetch=true のときスキップしていたため、
+  // Nicoad タブが後から scrape したデータが watch タブに届かない問題があった。
+  // 毎回ストレージを読み出し capturedAt が新しければ上書きするよう変更。
+  try {
+    const key = `nls_nicoad_ranking_${lid}`;
+    const got = await chrome.storage.local.get([key]);
+    const data = got?.[key];
+    if (data && Array.isArray(data.ranking) && data.ranking.length > 0) {
+      const storedAt = typeof data.capturedAt === 'number' ? data.capturedAt : 0;
+      // 既存 bundle の adContributionRanking がなければ無条件採用。
+      // あれば capturedAt を比較して新しいほうを採用する。
+      const existingHasRows = bundleHasAdContributionRankingRows(lastOfficialEventDomBundle);
+      const existingAt =
+        typeof lastOfficialEventDomBundle?.adRankingStoredAt === 'number'
+          ? lastOfficialEventDomBundle.adRankingStoredAt
+          : 0;
+      if (!existingHasRows || storedAt > existingAt) {
         fresh = fresh
-          ? { ...fresh, adContributionRanking: data.ranking }
+          ? { ...fresh, adContributionRanking: data.ranking, adRankingStoredAt: storedAt }
           : {
               capturedAt: Date.now(),
               eventBanner: null,
               eventBalloon: null,
               contributionRanking: null,
               adContributionRanking: data.ranking,
+              adRankingStoredAt: storedAt,
               programStats: null,
               giftHistory: null
             };
       }
-    } catch { /* no-op */ }
-  }
+    }
+  } catch { /* no-op */ }
   // v0.1.195: 複数 watch タブ race で他タブが書いた値を上書き消去しないよう、
   // storage の現値を読んで 3-way merge する。
   // 旧実装は「自タブメモリ + fresh」だけ merge していたため、他タブが直前に書いた
@@ -11050,13 +11059,17 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
   // 1. 既にバナーが見える＝ユーザがサイドバーを開いている → 触らずに scrape のみ
   const owners = (() => {
     try {
-      return document.querySelectorAll('.owner-name');
+      let cand = document.querySelectorAll('.owner-name');
+      if (!cand || cand.length === 0) {
+        cand = document.querySelectorAll('[class*="owner-name"]');
+      }
+      return cand;
     } catch {
       return [];
     }
   })();
   for (const el of /** @type {Iterable<Element>} */ (owners)) {
-    if (el instanceof HTMLElement && /さんが参加しています/.test(el.textContent || '')) {
+    if (el instanceof HTMLElement && /(?:さんが|が)参加(?:しています|中)?/.test(el.textContent || '')) {
       await persistOfficialEventDomBundleNow();
       setAutoOpenStatus('already-open-scraped');
       return;
@@ -11131,8 +11144,12 @@ async function tryAutoOpenGiftSidebarOnceForScrape() {
       await new Promise((r) => setTimeout(r, 500));
       const banner = (() => {
         try {
-          for (const el of document.querySelectorAll('.owner-name')) {
-            if (el instanceof HTMLElement && /さんが参加しています/.test(el.textContent || '')) return true;
+          let cand = document.querySelectorAll('.owner-name');
+          if (!cand || cand.length === 0) {
+            cand = document.querySelectorAll('[class*="owner-name"]');
+          }
+          for (const el of cand) {
+            if (el instanceof HTMLElement && /(?:さんが|が)参加(?:しています|中)?/.test(el.textContent || '')) return true;
           }
         } catch { /* no-op */ }
         return false;
@@ -11367,6 +11384,42 @@ function tryHarvestNicoadContributionRankingOnce() {
   const m = url.match(/^https:\/\/nicoad\.nicovideo\.jp\/live\/publish\/(lv\d+)/i);
   if (!m) return;
   const lid = m[1].toLowerCase();
+
+  /**
+   * 「貢献度ランキング」タブをクリック or 既に選択中なら何もしない。
+   * 「aria-selected=true かつ .contribution に数値がある」なら true を返す。
+   * @returns {'ready'|'clicked'|'notfound'}
+   */
+  const ensureContributionTabActive = () => {
+    try {
+      const candidates = document.querySelectorAll('button, .tab, [class*="tab"]');
+      for (const el of candidates) {
+        if (!(el instanceof HTMLElement)) continue;
+        const text = (el.textContent || '').trim();
+        if (
+          text.includes('貢献度ランキング') ||
+          text.includes('貢献度') ||
+          (text.includes('ランキング') && !text.includes('広告履歴'))
+        ) {
+          if (el.getAttribute('aria-selected') === 'true') {
+            // タブは選択中。データがロード済みかを確認
+            const contribs = document.querySelectorAll(
+              '.content-supporter-section .contribution, [class*="content-supporter"] .contribution'
+            );
+            for (const c of contribs) {
+              const digits = String(c.textContent || '').replace(/[^\d]/g, '');
+              if (/^\d+$/.test(digits)) return 'ready'; // 数値あり＝ロード済み
+            }
+            return 'clicked'; // タブは選択中だがデータ未ロード
+          }
+          dispatchSyntheticActivation(el);
+          return 'clicked';
+        }
+      }
+    } catch { /* no-op */ }
+    return 'notfound';
+  };
+
   /** @returns {boolean} */
   const tryScrape = () => {
     try {
@@ -11386,11 +11439,30 @@ function tryHarvestNicoadContributionRankingOnce() {
     } catch { /* no-op */ }
     return false;
   };
-  if (tryScrape()) return;
-  setTimeout(() => {
-    if (tryScrape()) return;
-    setTimeout(tryScrape, 5000);
-  }, 1500);
+
+  // v0.1.298: ニコニ広告 SPA は「タブ選択済み」でも Vue の API fetch が終わるまで
+  // contribution 値が空になる。500ms 刻みで最大 60s リトライする。
+  const MAX_MS = 60000;
+  const INTERVAL_MS = 500;
+  let elapsed = 0;
+  let done = false;
+
+  const poll = () => {
+    if (done) return;
+    const state = ensureContributionTabActive();
+    if (state === 'ready' || state === 'clicked') {
+      if (tryScrape()) {
+        done = true;
+        return;
+      }
+    }
+    elapsed += INTERVAL_MS;
+    if (elapsed >= MAX_MS) return;
+    setTimeout(poll, INTERVAL_MS);
+  };
+
+  // 初回は少し遅らせて Vue の初期レンダリングを待つ
+  setTimeout(poll, 300);
 }
 
 /*

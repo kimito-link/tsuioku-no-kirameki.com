@@ -128,6 +128,7 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
  *   eventBalloon: ReturnType<typeof scrapeOfficialEventBalloonFromDom>,
  *   contributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
  *   adContributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
+ *   adRankingStoredAt: number|undefined,
  *   adRankingMirrorHtml: string|null,
  *   eventCumulativeScoreMirrorHtml: string|null,
  *   eventCurrentRankMirrorHtml: string|null,
@@ -218,17 +219,42 @@ export function mergeOfficialEventDomBundle(prev, next) {
   if (!prev && !next) return null;
   if (!prev) return next;
   if (!next) return prev;
+
+  // adContributionRanking は adRankingStoredAt（Nicoad ページが storage に書いた時刻）で
+  // 新しいほうを採用する。両方なければ next → prev の優先順位。
+  const nextAdAt = typeof next.adRankingStoredAt === 'number' ? next.adRankingStoredAt : -1;
+  const prevAdAt = typeof prev.adRankingStoredAt === 'number' ? prev.adRankingStoredAt : -1;
+  const nextHasAd = Array.isArray(next.adContributionRanking) && next.adContributionRanking.length > 0;
+  const prevHasAd = Array.isArray(prev.adContributionRanking) && prev.adContributionRanking.length > 0;
+  let adContributionRanking;
+  let adRankingStoredAt;
+  if (nextHasAd && prevHasAd) {
+    // 両方ある → capturedAt が新しいほうを採用
+    if (nextAdAt >= prevAdAt) {
+      adContributionRanking = next.adContributionRanking;
+      adRankingStoredAt = nextAdAt >= 0 ? nextAdAt : undefined;
+    } else {
+      adContributionRanking = prev.adContributionRanking;
+      adRankingStoredAt = prevAdAt >= 0 ? prevAdAt : undefined;
+    }
+  } else if (nextHasAd) {
+    adContributionRanking = next.adContributionRanking;
+    adRankingStoredAt = nextAdAt >= 0 ? nextAdAt : undefined;
+  } else if (prevHasAd) {
+    adContributionRanking = prev.adContributionRanking;
+    adRankingStoredAt = prevAdAt >= 0 ? prevAdAt : undefined;
+  } else {
+    adContributionRanking = null;
+    adRankingStoredAt = undefined;
+  }
+
   return {
     capturedAt: Math.max(prev.capturedAt || 0, next.capturedAt || 0),
     eventBanner: next.eventBanner || prev.eventBanner,
     eventBalloon: next.eventBalloon || prev.eventBalloon,
     contributionRanking: next.contributionRanking || prev.contributionRanking,
-    adContributionRanking:
-      Array.isArray(next.adContributionRanking) && next.adContributionRanking.length > 0
-        ? next.adContributionRanking
-        : Array.isArray(prev.adContributionRanking) && prev.adContributionRanking.length > 0
-          ? prev.adContributionRanking
-          : null,
+    adContributionRanking,
+    adRankingStoredAt,
     adRankingMirrorHtml:
       next.adRankingMirrorHtml || prev.adRankingMirrorHtml || null,
     eventCumulativeScoreMirrorHtml:
