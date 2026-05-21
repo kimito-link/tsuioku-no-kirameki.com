@@ -3,8 +3,11 @@ import {
   resolveViewportRelaxedPanelWidthPx,
   resolveViewportWidePolicyTargetWidthPx,
   resolveWidenedInlinePanelWidthPx,
-  shouldConsumeViewportWideOnce
+  shouldConsumeViewportWideOnce,
+  suggestPlacementUpgradeForWideViewport,
+  shouldConsumePlacementUpgradeOnce
 } from './inlinePanelViewportWide.js';
+import { INLINE_VIEWPORT_BESIDE_MIN_WIDTH } from './inlinePanelLayout.js';
 import {
   INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_BESIDE,
@@ -158,5 +161,173 @@ describe('shouldConsumeViewportWideOnce', () => {
         documentVisibilityState: 'visible'
       })
     ).toBe(false);
+  });
+});
+
+describe('suggestPlacementUpgradeForWideViewport', () => {
+  const WIDE = INLINE_VIEWPORT_BESIDE_MIN_WIDTH + 40;
+  const NARROW = INLINE_VIEWPORT_BESIDE_MIN_WIDTH - 1;
+  const base = {
+    stored: INLINE_PANEL_PLACEMENT_BELOW,
+    userExplicit: false,
+    viewportInnerWidth: WIDE,
+    policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+    onceDone: false
+  };
+
+  it('below + 未明示 + 広い + once 未消費 → beside に昇格', () => {
+    expect(suggestPlacementUpgradeForWideViewport(base)).toBe(
+      INLINE_PANEL_PLACEMENT_BESIDE
+    );
+  });
+
+  it('未設定（空文字）も昇格対象', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({ ...base, stored: '' })
+    ).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
+  });
+
+  it('always 方針は onceDone に関わらず毎回昇格', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({
+        ...base,
+        policy: INLINE_PANEL_VIEWPORT_WIDE_ALWAYS,
+        onceDone: true
+      })
+    ).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
+  });
+
+  it('🔥 ユーザー明示選択(USER_EXPLICIT=true)なら絶対に昇格しない', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({ ...base, userExplicit: true })
+    ).toBe(null);
+    // always でも明示選択が最優先
+    expect(
+      suggestPlacementUpgradeForWideViewport({
+        ...base,
+        userExplicit: true,
+        policy: INLINE_PANEL_VIEWPORT_WIDE_ALWAYS
+      })
+    ).toBe(null);
+  });
+
+  it('off 方針なら昇格しない', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({
+        ...base,
+        policy: INLINE_PANEL_VIEWPORT_WIDE_OFF
+      })
+    ).toBe(null);
+  });
+
+  it('once 方針 + 消費済み(onceDone=true)なら昇格しない', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({ ...base, onceDone: true })
+    ).toBe(null);
+  });
+
+  it('狭いタブ幅では昇格しない（降格と同じ閾値）', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({
+        ...base,
+        viewportInnerWidth: NARROW
+      })
+    ).toBe(null);
+  });
+
+  it('閾値ちょうどでは昇格する', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({
+        ...base,
+        viewportInnerWidth: INLINE_VIEWPORT_BESIDE_MIN_WIDTH
+      })
+    ).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
+  });
+
+  it('既に beside / floating / dock_bottom は対象外（昇格しない）', () => {
+    for (const stored of [
+      INLINE_PANEL_PLACEMENT_BESIDE,
+      INLINE_PANEL_PLACEMENT_FLOATING,
+      INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
+    ]) {
+      expect(
+        suggestPlacementUpgradeForWideViewport({ ...base, stored })
+      ).toBe(null);
+    }
+  });
+
+  it('viewportInnerWidth が 0 / NaN でも安全（昇格しない）', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({ ...base, viewportInnerWidth: 0 })
+    ).toBe(null);
+    expect(
+      suggestPlacementUpgradeForWideViewport({
+        ...base,
+        viewportInnerWidth: NaN
+      })
+    ).toBe(null);
+  });
+
+  it('opts 欠落でも throw しない', () => {
+    expect(suggestPlacementUpgradeForWideViewport(undefined)).toBe(null);
+    expect(suggestPlacementUpgradeForWideViewport({})).toBe(null);
+  });
+
+  it.each([
+    // [stored, userExplicit, vw, policy, onceDone, expected]
+    [INLINE_PANEL_PLACEMENT_BELOW, false, WIDE, 'once', false, INLINE_PANEL_PLACEMENT_BESIDE],
+    [INLINE_PANEL_PLACEMENT_BELOW, false, WIDE, 'once', true, null],
+    [INLINE_PANEL_PLACEMENT_BELOW, false, WIDE, 'always', true, INLINE_PANEL_PLACEMENT_BESIDE],
+    [INLINE_PANEL_PLACEMENT_BELOW, false, NARROW, 'always', false, null],
+    [INLINE_PANEL_PLACEMENT_BELOW, true, WIDE, 'always', false, null],
+    [INLINE_PANEL_PLACEMENT_DOCK_BOTTOM, false, WIDE, 'always', false, null],
+    ['', false, WIDE, 'once', false, INLINE_PANEL_PLACEMENT_BESIDE]
+  ])(
+    'マトリクス: (%s, explicit=%s, vw=%i, %s, onceDone=%s) → %s',
+    (stored, userExplicit, viewportInnerWidth, policy, onceDone, expected) => {
+      expect(
+        suggestPlacementUpgradeForWideViewport({
+          stored,
+          userExplicit,
+          viewportInnerWidth,
+          policy,
+          onceDone
+        })
+      ).toBe(expected);
+    }
+  );
+});
+
+describe('shouldConsumePlacementUpgradeOnce', () => {
+  it('once 方針 + 実際に beside へ昇格したときだけ true', () => {
+    expect(
+      shouldConsumePlacementUpgradeOnce({
+        policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+        upgradedTo: INLINE_PANEL_PLACEMENT_BESIDE
+      })
+    ).toBe(true);
+  });
+
+  it('always 方針は消費しない（毎回評価し続ける）', () => {
+    expect(
+      shouldConsumePlacementUpgradeOnce({
+        policy: INLINE_PANEL_VIEWPORT_WIDE_ALWAYS,
+        upgradedTo: INLINE_PANEL_PLACEMENT_BESIDE
+      })
+    ).toBe(false);
+  });
+
+  it('昇格しなかった(null)なら消費しない', () => {
+    expect(
+      shouldConsumePlacementUpgradeOnce({
+        policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+        upgradedTo: null
+      })
+    ).toBe(false);
+  });
+
+  it('opts 欠落でも false', () => {
+    expect(shouldConsumePlacementUpgradeOnce(undefined)).toBe(false);
+    expect(shouldConsumePlacementUpgradeOnce({})).toBe(false);
   });
 });
