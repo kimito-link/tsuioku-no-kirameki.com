@@ -584,6 +584,94 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* nicoad（ニコニ広告）貢献度ランキング 無認証 API の CORS バイパス fetch proxy   */
+/* koken と同型。広告ランキングは従来 HTML scrape で取得していたが DOM に uid が   */
+/* 出ず、記名広告主のアカウントリンク/アバターが付かなかった。本 API は記名行に    */
+/* userId/userPageUrl を返す（無認証・2026-05-23 実機確証）。content は liveId だけ */
+/* 送り、URL は SW がここで固定リテラル(host/path/limit)から自作する（SSRF面遮断）。*/
+/* 契約・正規化は src/lib/nicoadContributionRankingApi.js（lib 側に契約 test）。    */
+/* ------------------------------------------------------------------ */
+
+// src/lib/nicoadContributionRankingApi.js の NICOAD_CONTRIB_FETCH_MESSAGE_TYPE と
+// NICOAD_CONTRIB_DEFAULT_LIMIT に文字列/数値同期（background は ESM import 不可の
+// 手書き成果物。lib 側に契約 test）。
+const NICOAD_CONTRIB_FETCH_MESSAGE_TYPE = 'NLS_NICOAD_CONTRIB_FETCH';
+const NICOAD_LIVE_ID_RE = /^lv\d{1,15}$/;
+const NICOAD_CONTRIB_FETCH_TIMEOUT_MS = 8000;
+const NICOAD_CONTRIB_DEFAULT_LIMIT = 10;
+
+async function fetchNicoadContribRankingJson(liveId) {
+  const lid = String(liveId == null ? '' : liveId)
+    .trim()
+    .toLowerCase();
+  if (!NICOAD_LIVE_ID_RE.test(lid)) return { ok: false };
+  const url =
+    'https://api.nicoad.nicovideo.jp/v1/contents/live/' +
+    encodeURIComponent(lid) +
+    '/ranking/contribution?limit=' +
+    NICOAD_CONTRIB_DEFAULT_LIMIT;
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, NICOAD_CONTRIB_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit', // 無認証 API。cookie を不要に送らない
+      cache: 'no-store',
+      redirect: 'error',
+      // niconico ブラウザ版フロントエンド署名（koken と同じ予防的補強。無認証契約不変）。
+      headers: {
+        'x-frontend-id': '6',
+        'x-frontend-version': '0'
+      },
+      signal: ac.signal
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== NICOAD_CONTRIB_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchNicoadContribRankingJson(msg.liveId)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
+/* ------------------------------------------------------------------ */
 /* ツールバー: ページ内インラインがあれば前面化、なければ popup 窓（src/lib/uiUxOpenStrategy と整合） */
 /* ------------------------------------------------------------------ */
 
