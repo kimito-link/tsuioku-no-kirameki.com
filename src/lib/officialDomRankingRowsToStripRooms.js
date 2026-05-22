@@ -14,6 +14,18 @@
  */
 
 /**
+ * `userPageUrl`（公式 API が記名行に返す）から niconico ユーザー uid を取り出す。
+ * 公式提供値の検疫のみ＝推測しない。`https://www.nicovideo.jp/user/<digits>` のみ受理。
+ * @param {unknown} value
+ * @returns {string} 数値 uid（受理時）または ''
+ */
+function extractNicoUidFromUserPageUrl(value) {
+  const s = String(value == null ? '' : value).trim();
+  const m = s.match(/^https:\/\/www\.nicovideo\.jp\/user\/(\d{1,18})\/?$/i);
+  return m ? m[1] : '';
+}
+
+/**
  * @param {unknown[]} ranking `contributionRanking` / `adContributionRanking` の配列
  * @param {{ userKeyKind?: 'contrib' | 'ad' }} [opts]
  * @returns {OfficialStripRoom[]}
@@ -31,13 +43,18 @@ export function officialDomRankingRowsToStripRooms(ranking, opts = {}) {
       typeof rankRaw === 'number' && Number.isFinite(rankRaw) && rankRaw > 0
         ? Math.floor(rankRaw)
         : null;
+    // v0.1.316: 記名行に公式 API 由来の userPageUrl があれば、その uid を userKey に
+    // 採用する＝既存 topSupportRankLineModels の数値 uid リンク経路がそのまま発火し、
+    // 公式が出している確証ありの user ページリンク + アバターになる（推測ゼロ）。
+    // 匿名行・uid 無し行は従来どおり合成キー（リンク化されない）＝挙動不変・fail-soft。
+    const officialUid = isAnonymous ? '' : extractNicoUidFromUserPageUrl(row.userPageUrl);
     const anonKey = kind === 'ad' ? `__anon_ad_${i}` : `__anon_contrib_${i}`;
     const namedKey =
       kind === 'ad'
         ? `__ad_${i}_${String(row.name || '').slice(0, 12)}`
         : `__contrib_${i}_${String(row.name || '').slice(0, 12)}`;
     return {
-      userKey: isAnonymous ? anonKey : namedKey,
+      userKey: officialUid || (isAnonymous ? anonKey : namedKey),
       nickname: String(row.name || ''),
       count: contribution,
       avatarUrl: thumb,
