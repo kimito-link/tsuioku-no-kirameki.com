@@ -69,6 +69,15 @@ function isAnonymousOfficialDomRankUserKey(userKey) {
 }
 
 /**
+ * 公式 DOM/API ランキング（貢献度・広告）の匿名行の表示ラベル。
+ * v0.1.317: niconico 公式は匿名を「名無し」と表記する（koken API supporterName /
+ * 公式 DOM とも "名無し"）。レーンは「niconico の表示に準拠」と謳うので、内部キーは
+ * 漏らさず公式表記に合わせる（旧 "匿名" から変更）。giftHistory(`__gift_`) は
+ * 本判定の対象外＝この変更の影響を受けない（NDGR 送信者名は別出所のため）。
+ */
+const OFFICIAL_RANK_ANON_LABEL = '名無し';
+
+/**
  * userKey から決定的な短いハッシュ（byte 一意性の保証用、djb2）。
  *
  * @param {string} s
@@ -246,7 +255,7 @@ export function topSupportRankLineModels(stripRooms, opts) {
     const resolvedNickForLine = useOfficialDomNick
       ? nickRaw
       : isAnonOfficialDomRank
-        ? '匿名'
+        ? OFFICIAL_RANK_ANON_LABEL
         : anonymousNicknameFallback(userKey, nickRaw);
 
     // 公式DOMランク行（名前付き含む）の合成キーは id title にも出さない
@@ -262,7 +271,7 @@ export function topSupportRankLineModels(stripRooms, opts) {
     const nameLine = isUnknown
       ? '—'
       : isAnonOfficialDomRank
-        ? '匿名'
+        ? OFFICIAL_RANK_ANON_LABEL
         : formatNicknameWithUidFallback(userKey, resolvedNickForLine) || '（未取得）';
 
     // internal key が __anon_<表示名> で name と一致するときは id 行を出さない（二重表示防止）
@@ -273,11 +282,11 @@ export function topSupportRankLineModels(stripRooms, opts) {
       }
     }
 
-    // title（hover ラベル）も合成キーを漏らさない。匿名は「匿名」、公式DOMランクの
-    // 名前付き行は公式表示名のみ（`displayUserLabel` だと `名前（__ad_0_名前）` と
-    // 内部キーが括弧で出てしまう）。非公式行は従来どおり id 併記。
+    // title（hover ラベル）も合成キーを漏らさない。匿名は公式表記「名無し」、公式DOM
+    // ランクの名前付き行は公式表示名のみ（`displayUserLabel` だと `名前（__ad_0_名前）`
+    // と内部キーが括弧で出てしまう）。非公式行は従来どおり id 併記。
     const fullLabelForTitle = isAnonOfficialDomRank
-      ? '匿名'
+      ? OFFICIAL_RANK_ANON_LABEL
       : useOfficialDomNick
         ? nickRaw
         : displayUserLabel(userKey, r?.nickname);

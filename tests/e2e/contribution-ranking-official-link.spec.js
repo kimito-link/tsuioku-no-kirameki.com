@@ -85,12 +85,11 @@ test('貢献度ランキング: 記名行(公式userPageUrl)はリンク化・�
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   await expect(link).toContainText('貢献タロウ');
 
-  // 匿名行はリンク化されない（リンクは記名1件のみ）。匿名は「匿名」表示（v0.1.308/315）。
+  // 匿名行はリンク化されない（リンクは記名1件のみ）。匿名は公式準拠の「名無し」表示（v0.1.317）。
   const text = await body.innerText();
-  expect(text).toContain('匿名');
+  expect(text).toContain('名無し');
   expect(text).not.toContain('__anon');
   expect(text).not.toContain('__contrib_');
-  expect(text).not.toContain('名無し'); // 「名無し」生表示でなく「匿名」に倒す
 
   await popup.screenshot({
     path: 'test-results/contribution-ranking-official-link.png',
