@@ -176,6 +176,11 @@ import {
   KOKEN_CONTRIB_STORAGE_PREFIX,
   KOKEN_CONTRIB_FETCH_MESSAGE_TYPE
 } from '../lib/kokenContributionRankingApi.js';
+import {
+  normalizeNicoUserProfileResponse,
+  isResolvableNicoUid,
+  NICO_USER_PROFILE_FETCH_MESSAGE_TYPE
+} from '../lib/nicoUserProfileApi.js';
 import { appendGiftEvents } from '../lib/giftEventStore.js';
 import { resolveGiftSenderBucketKey } from '../lib/giftSenderObservation.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
@@ -10112,6 +10117,8 @@ async function start() {
           return;
         }
         maybeFetchKokenContribRankingMirrorOnce();
+        // 記名 uid のプロフィール（nickname/サムネ）を少数ずつ補完（非hotpath・SW 経由）。
+        void maybeResolveNamedUserProfilesOnce();
       }, KOKEN_CONTRIB_API_FETCH_MS)
     )
   );
@@ -10199,6 +10206,120 @@ function maybeFetchKokenContribRankingMirrorOnce() {
     );
   } catch {
     /* no-op: sendMessage 不可（context invalidated 等）。次 tick で自己回復 */
+  }
+}
+
+/** 1 tick で nvapi に問い合わせる記名 uid の最大数（nvapi への過負荷防止）。 */
+const NICO_PROFILE_RESOLVE_BATCH = 3;
+/** content 側でも「最近問い合わせた uid」を覚えて、SW LRU と二重に抑制する。 */
+const _nicoProfileResolveAttempted = new Set();
+
+/**
+ * 記名 uid（コメント等で判明している数値 uid のうち、profileMap に nickname も
+ * avatar も無いもの）を少数ずつ nvapi で解決し、既存 userCommentProfileCache に
+ * upsert する。これにより、判明済みの送り主・貢献者のサムネ/ニックネームが、
+ * 既存の applyUserCommentProfileMapToEntries 経路でギフト履歴・貢献度ランキング・
+ * コメント全体に後追い反映される（新キャッシュは作らない）。
+ *
+ * 制約（koken/nicoad trigger と同じ）:
+ *  - top-frame・recording・可視タブのときだけ（呼び出し側 interval でガード済）。
+ *  - fetch は SW（host_permissions 特権 + SW 内 LRU）。content は uid を送るだけ。
+ *  - 1 tick 最大 NICO_PROFILE_RESOLVE_BATCH 件＝叩きすぎない。
+ *  - 匿名/合成キー（u/__anon… 等）は isResolvableNicoUid で除外＝誤って身元を付けない。
+ *  - 描画ホットパスではない（30s 周期の sibling）。応答 upsert も storage 書込のみ。
+ */
+async function maybeResolveNamedUserProfilesOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+
+    const commentsKey = commentsStorageKey(lid);
+    const bag = await chrome.storage.local.get([commentsKey, KEY_USER_COMMENT_PROFILE_CACHE]);
+    const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
+    const comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+
+    // 候補 uid: コメントに出ている数値 uid のうち、profileMap に nickname も avatar も
+    // 無い（＝まだ充実していない）もの。最近問い合わせ済みは除外。
+    /** @type {string[]} */
+    const candidates = [];
+    const seen = new Set();
+    for (const c of comments) {
+      const uid = String(/** @type {any} */ (c)?.userId || '').trim();
+      if (!uid || seen.has(uid)) continue;
+      seen.add(uid);
+      if (!isResolvableNicoUid(uid)) continue;
+      if (_nicoProfileResolveAttempted.has(uid)) continue;
+      const hit = profileMap[uid];
+      const hasNick = hit && String(hit.nickname || '').trim() !== '';
+      const hasAv = hit && String(hit.avatarUrl || '').trim() !== '';
+      if (hasNick && hasAv) continue; // 既に充実
+      candidates.push(uid);
+      if (candidates.length >= NICO_PROFILE_RESOLVE_BATCH) break;
+    }
+    if (candidates.length === 0) return;
+
+    const broadcasterCtx = {
+      broadcasterUid: broadcasterUidCache,
+      broadcasterIconUrl: broadcasterIconUrlCache
+    };
+
+    /** SW に 1 uid を問い合わせて正規化プロフィールを得る（失敗は null）。 */
+    const askOne = (uid) =>
+      new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage(
+            { type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid },
+            (resp) => {
+              const le = chrome.runtime.lastError;
+              if (le) return resolve(null);
+              if (!resp || resp.ok !== true || resp.json == null) return resolve(null);
+              let p = null;
+              try {
+                p = normalizeNicoUserProfileResponse(resp.json);
+              } catch {
+                p = null;
+              }
+              resolve(p);
+            }
+          );
+        } catch {
+          resolve(null);
+        }
+      });
+
+    let touched = false;
+    for (const uid of candidates) {
+      _nicoProfileResolveAttempted.add(uid);
+      const p = await askOne(uid);
+      if (!p) continue;
+      // userCommentProfileCache の guard（broadcaster icon 取り違え / avatar-uid 一致）を通す。
+      if (
+        upsertUserCommentProfileFromEntry(
+          profileMap,
+          { userId: p.userId, nickname: p.nickname, avatarUrl: p.avatarUrl },
+          broadcasterCtx
+        )
+      ) {
+        touched = true;
+      }
+    }
+    if (!touched) return;
+
+    // 応答到着までに別 liveId に遷移していたら書かない（stale 防止）。
+    const curLid = String(liveId || '').trim().toLowerCase();
+    if (curLid !== lid) return;
+    const pruned = pruneUserCommentProfileMap(profileMap);
+    try {
+      await chrome.storage.local.set({ [KEY_USER_COMMENT_PROFILE_CACHE]: pruned });
+    } catch (err) {
+      if (!isContextInvalidatedError(err)) {
+        /* best-effort */
+      }
+    }
+  } catch {
+    /* no-op: 次 tick で自己回復 */
   }
 }
 /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */

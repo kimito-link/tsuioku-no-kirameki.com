@@ -584,6 +584,110 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* ニコニコ ユーザープロフィール 無認証 API の CORS バイパス fetch proxy        */
+/* 記名 uid（広告主/貢献者/コメント）から nickname + 個人サムネを引いて、ギフト  */
+/* 履歴・貢献度ランキング・コメント全体に反映する（userCommentProfileCache 経由）。*/
+/* レガシー api.ce は死亡し、nvapi.nicovideo.jp/v1/users/<uid> が無認証で返る     */
+/* （2026-05-23 実機確証）。content は uid だけ送り、URL は SW がリテラル自作。    */
+/* 契約・正規化は src/lib/nicoUserProfileApi.js（lib 側に契約 test）。           */
+/* SW 内に有界 LRU を持ち、同一 uid の短時間連打を抑制（nvapi への過負荷防止）。  */
+/* ------------------------------------------------------------------ */
+
+// src/lib/nicoUserProfileApi.js の NICO_USER_PROFILE_FETCH_MESSAGE_TYPE と文字列同期。
+const NICO_USER_PROFILE_FETCH_MESSAGE_TYPE = 'NLS_NICO_USER_PROFILE_FETCH';
+const NICO_USER_PROFILE_UID_RE = /^\d{1,18}$/;
+const NICO_USER_PROFILE_FETCH_TIMEOUT_MS = 8000;
+// 同一 uid を短時間に何度も叩かないための SW 内 LRU（uid -> 最終 fetch 時刻）。
+// 配信中に記名 uid が増えても、一度引いた uid は一定時間 再要求しても skip する。
+const NICO_USER_PROFILE_LRU_MAX = 512;
+const NICO_USER_PROFILE_LRU_TTL_MS = 10 * 60 * 1000; // 10 分は再 fetch しない
+/** @type {Map<string, number>} uid -> last fetch epoch ms（挿入順＝LRU） */
+const _nicoUserProfileLru = new Map();
+
+function _nicoUserProfileLruShouldSkip(uid, now) {
+  const at = _nicoUserProfileLru.get(uid);
+  if (at != null && now - at < NICO_USER_PROFILE_LRU_TTL_MS) return true;
+  return false;
+}
+function _nicoUserProfileLruNote(uid, now) {
+  // 既存キーは入れ直して最近使用扱いにする（Map は挿入順を保つ）。
+  if (_nicoUserProfileLru.has(uid)) _nicoUserProfileLru.delete(uid);
+  _nicoUserProfileLru.set(uid, now);
+  while (_nicoUserProfileLru.size > NICO_USER_PROFILE_LRU_MAX) {
+    const oldest = _nicoUserProfileLru.keys().next().value;
+    if (oldest === undefined) break;
+    _nicoUserProfileLru.delete(oldest);
+  }
+}
+
+async function fetchNicoUserProfileJson(uid) {
+  const id = String(uid == null ? '' : uid).trim();
+  if (!NICO_USER_PROFILE_UID_RE.test(id) || Number(id) <= 0) return { ok: false };
+  const now = Date.now();
+  if (_nicoUserProfileLruShouldSkip(id, now)) return { ok: false, skipped: true };
+  _nicoUserProfileLruNote(id, now);
+  const url = 'https://nvapi.nicovideo.jp/v1/users/' + encodeURIComponent(id);
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, NICO_USER_PROFILE_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit', // 無認証。cookie を送らない（公開プロフィールのみ）
+      cache: 'no-store',
+      redirect: 'error',
+      headers: {
+        'x-frontend-id': '6',
+        'x-frontend-version': '0'
+      },
+      signal: ac.signal
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== NICO_USER_PROFILE_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchNicoUserProfileJson(msg.uid)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
+/* ------------------------------------------------------------------ */
 /* ツールバー: ページ内インラインがあれば前面化、なければ popup 窓（src/lib/uiUxOpenStrategy と整合） */
 /* ------------------------------------------------------------------ */
 

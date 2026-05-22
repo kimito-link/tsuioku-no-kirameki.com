@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.323',
+    date: '2026-05-23',
+    summary: '送り主のアイコン・名前を全体に反映',
+    items: Object.freeze([
+      '[改善] お名前が判明している送り主・広告主・コメントの方について、ニコニコの公式プロフィールからアイコンとニックネームを取得し、ギフト履歴・貢献度ランキング・コメント全体に反映するようにしました。匿名の方には反映しません（取得できないときは従来どおりの表示）。同じ方を何度も問い合わせない仕組みで、ニコニコへの負担も抑えています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.320',
     date: '2026-05-23',
     summary: '貢献度ランキング取得の安定性を補強',
