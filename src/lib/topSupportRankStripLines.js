@@ -55,6 +55,20 @@ function isOfficialDomRankUserKey(userKey) {
 }
 
 /**
+ * 公式DOMランキング行の「匿名」合成 userKey か。
+ * `__anon_ad_${i}` / `__anon_contrib_${i}` を対象にする。
+ * これらは送信側で name が空（匿名行）のときに付く合成キーであり、
+ * 表示にそのまま出すと `__anon_ad_2` / `u/__anon_ad_2` のような内部キーが
+ * 画面に漏れる。公式ページ相当では「匿名」と表示すべき。
+ *
+ * @param {string} userKey
+ * @returns {boolean}
+ */
+function isAnonymousOfficialDomRankUserKey(userKey) {
+  return /^__anon_(?:ad|contrib)_\d+/.test(String(userKey || ''));
+}
+
+/**
  * userKey から決定的な短いハッシュ（byte 一意性の保証用、djb2）。
  *
  * @param {string} s
@@ -218,20 +232,27 @@ export function topSupportRankLineModels(stripRooms, opts) {
     const nickRaw = String(r?.nickname || '').trim();
     const useOfficialDomNick =
       /^__(ad|contrib)_\d+_/i.test(userKey) && Boolean(nickRaw);
+    // 公式DOMランキングの匿名合成キー（__anon_ad_N / __anon_contrib_N）は、
+    // 内部キーを表示に漏らさず「匿名」と出す（公式ページ相当）。id 行・u/ リンクも出さない。
+    const isAnonOfficialDomRank = isAnonymousOfficialDomRankUserKey(userKey);
     const resolvedNickForLine = useOfficialDomNick
       ? nickRaw
-      : anonymousNicknameFallback(userKey, nickRaw);
+      : isAnonOfficialDomRank
+        ? '匿名'
+        : anonymousNicknameFallback(userKey, nickRaw);
 
-    const idTitle = isUnknown ? '' : String(r.userKey);
+    const idTitle = isUnknown || isAnonOfficialDomRank ? '' : String(r.userKey);
     let idShort = isUnknown
       ? '—'
-      : useOfficialDomNick
+      : useOfficialDomNick || isAnonOfficialDomRank
         ? ''
         : shortUserKeyDisplay(userKey) || String(userKey);
 
     const nameLine = isUnknown
       ? '—'
-      : formatNicknameWithUidFallback(userKey, resolvedNickForLine) || '（未取得）';
+      : isAnonOfficialDomRank
+        ? '匿名'
+        : formatNicknameWithUidFallback(userKey, resolvedNickForLine) || '（未取得）';
 
     // internal key が __anon_<表示名> で name と一致するときは id 行を出さない（二重表示防止）
     if (!isUnknown && !useOfficialDomNick && idShort) {
@@ -241,7 +262,9 @@ export function topSupportRankLineModels(stripRooms, opts) {
       }
     }
 
-    const fullLabelForTitle = displayUserLabel(userKey, r?.nickname);
+    const fullLabelForTitle = isAnonOfficialDomRank
+      ? '匿名'
+      : displayUserLabel(userKey, r?.nickname);
 
     let hasAccent = false;
     let accentColorCss = null;

@@ -86,5 +86,10 @@ test('広告ランキング: nls_nicoad_ranking_ を seed すると北極星レ�
   expect(text).toContain('広告タロウ');
   expect(text).toContain('広告ジロウ');
 
+  // v0.1.308: 匿名行（rank 3, name 空）は「匿名」と表示し、内部キーを漏らさない
+  expect(text).toContain('匿名');
+  expect(text).not.toContain('__anon');
+  expect(text).not.toContain('u/__anon');
+
   await popup.screenshot({ path: 'test-results/nicoad-ad-ranking.png', fullPage: false });
 });
