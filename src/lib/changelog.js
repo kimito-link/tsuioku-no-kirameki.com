@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.305',
+    date: '2026-05-22',
+    summary: '応援ランキングを最大10に＋配信者を左へ',
+    items: Object.freeze([
+      '[修正] 応援ランキング（記録内・ユーザー別の応援件数）が11枚表示されることがあった問題を直し、最大10に揃えました（別の上限値が10になっていませんでした）',
+      '[改善] 配信者タイル（フォロー導線）を一覧の右端から左端に移しました（基準点として見やすい位置に）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.304',
     date: '2026-05-22',
     summary: 'ギフト履歴を人数で可変幅＋累計ptを見出しへ',
