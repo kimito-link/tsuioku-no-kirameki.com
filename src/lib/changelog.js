@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.314',
+    date: '2026-05-22',
+    summary: '内部整理: 取得率チャートの計算をlib化',
+    items: Object.freeze([
+      '[内部] 「データ取得率」のレーダー図・円グラフの座標や割合の計算を、テストしやすい部品（純関数）に切り出しました。見た目・動作は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.313',
     date: '2026-05-22',
     summary: '内部整理: コメント送信の状態表示をlib化',
