@@ -4,7 +4,8 @@ import {
   SUBMIT_TIMING,
   MAP_LIMITS,
   HARVEST_TIMING,
-  OFFICIAL_GAP_DEEP_TIMING
+  OFFICIAL_GAP_DEEP_TIMING,
+  INLINE_FIRST_PAINT
 } from './timingConstants.js';
 
 describe('INGEST_TIMING', () => {
@@ -94,5 +95,24 @@ describe('OFFICIAL_GAP_DEEP_TIMING', () => {
       expect(typeof OFFICIAL_GAP_DEEP_TIMING[key]).toBe('number');
       expect(OFFICIAL_GAP_DEEP_TIMING[key]).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('INLINE_FIRST_PAINT', () => {
+  it('必須キーを全て持つ', () => {
+    const required = [
+      'besideSettleDeadlineMs',
+      'geomStableFrames',
+      'geomStableTolerancePx'
+    ];
+    for (const key of required) {
+      expect(INLINE_FIRST_PAINT).toHaveProperty(key);
+      expect(typeof INLINE_FIRST_PAINT[key]).toBe('number');
+      expect(INLINE_FIRST_PAINT[key]).toBeGreaterThan(0);
+    }
+  });
+
+  it('deadline は実測 beside 確定(~533ms)より十分大きい', () => {
+    expect(INLINE_FIRST_PAINT.besideSettleDeadlineMs).toBeGreaterThanOrEqual(600);
   });
 });

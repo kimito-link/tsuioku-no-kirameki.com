@@ -252,8 +252,13 @@ import {
   SUBMIT_TIMING,
   MAP_LIMITS,
   HARVEST_TIMING,
-  OFFICIAL_GAP_DEEP_TIMING
+  OFFICIAL_GAP_DEEP_TIMING,
+  INLINE_FIRST_PAINT
 } from '../lib/timingConstants.js';
+import {
+  createFirstPaintGateState,
+  observeFirstPaintFrame
+} from '../lib/inlineFirstPaintGate.js';
 import { shouldTriggerOfficialGapDeepHarvest } from '../lib/shouldTriggerOfficialGapDeepHarvest.js';
 import {
   shouldForceDeepHarvestForReason,
@@ -2963,6 +2968,31 @@ let inlinePanelPlacementMode = normalizeInlinePanelPlacement(undefined);
 let inlinePanelPlacementUserExplicit = false;
 
 /**
+ * 初回パネル表示ゲート（横付き）の状態。watch ロードごとに 1 つ。
+ * niconico の leo-player flex 行が完成するまで beside 描画を遅らせ、初回の
+ * 「下に細い帯」フラッシュを抹消する（[[plan_v0303_initial_render_gate]]）。
+ * @type {ReturnType<typeof createFirstPaintGateState>|null}
+ */
+let inlineFirstPaintGateState = null;
+/** ゲート待ち中に予約した rAF id（確定/deadline で解放） */
+let inlineFirstPaintGateRafId = null;
+
+/**
+ * 横付き初回ゲートをリセット（liveId 切替・再初期化時）。次の beside 描画で再武装。
+ */
+function resetInlineFirstPaintGate() {
+  inlineFirstPaintGateState = null;
+  if (inlineFirstPaintGateRafId != null) {
+    try {
+      cancelAnimationFrame(inlineFirstPaintGateRafId);
+    } catch {
+      // no-op
+    }
+    inlineFirstPaintGateRafId = null;
+  }
+}
+
+/**
  * AI 診断用: `renderInlineHostAnchoredToVideo` 直近で確定したレイアウト実効値。
  * ストレージの widthMode とは異なり、列間挿入時の強制 video 幅などが分かる。
  */
@@ -3440,6 +3470,74 @@ function applyInlineHostPanelWidthWithViewportWide(host, iframe, opts) {
 }
 
 /**
+ * 横付き初回ゲート: 描画してよいか判定し、待つべきなら host を隠して rAF を予約する。
+ *
+ * - 純判定は inlineFirstPaintGate.js（DOM/timer/IO 非依存）。ここは DOM 計測と rAF 予約だけ。
+ * - 「挿入先 rect」は findBesideFlexRowColumnInsertion の解決結果の getBoundingClientRect。
+ *   解決できない間（leo-player 未完成）は null を渡し、gate は waiting を返す。
+ * - settled / deadline 到達で true（描画 OK）。それまでは host を hidden に保ち false。
+ * - rAF 内で storage/fetch を await しない（過去ハング再来防止）。確定 or deadline で rAF 解放。
+ *
+ * @param {HTMLVideoElement} video
+ * @returns {boolean} 描画してよいなら true、待つなら false（host は隠してある）
+ */
+function maybePassFirstPaintGateForBeside(video) {
+  // 既に確定済み（settled）なら以後は素通し。
+  if (inlineFirstPaintGateState && inlineFirstPaintGateState.settled) return true;
+  if (!inlineFirstPaintGateState) {
+    inlineFirstPaintGateState = createFirstPaintGateState({ startedAtMs: Date.now() });
+  }
+  // 挿入先 rect を測る（解決できなければ null）。
+  /** @type {{left:number,top:number,width:number,height:number}|null} */
+  let insertionRect = null;
+  try {
+    const col = findBesideFlexRowColumnInsertion(video);
+    const anchor = col?.insertAfter;
+    if (anchor instanceof HTMLElement) {
+      const b = anchor.getBoundingClientRect();
+      insertionRect = { left: b.left, top: b.top, width: b.width, height: b.height };
+    }
+  } catch {
+    insertionRect = null;
+  }
+  const res = observeFirstPaintFrame(inlineFirstPaintGateState, {
+    insertionRect,
+    nowMs: Date.now(),
+    deadlineMs: INLINE_FIRST_PAINT.besideSettleDeadlineMs,
+    stableFrames: INLINE_FIRST_PAINT.geomStableFrames,
+    tolerancePx: INLINE_FIRST_PAINT.geomStableTolerancePx
+  });
+  if (res.shouldPaint) {
+    if (inlineFirstPaintGateRafId != null) {
+      try {
+        cancelAnimationFrame(inlineFirstPaintGateRafId);
+      } catch {
+        // no-op
+      }
+      inlineFirstPaintGateRafId = null;
+    }
+    return true;
+  }
+  // まだ待つ: host を隠し（崩れた初回を見せない）、次フレームで再評価を予約。
+  try {
+    const host = ensureInlinePopupHost();
+    host.style.display = 'none';
+    host.setAttribute('aria-hidden', 'true');
+  } catch {
+    // no-op
+  }
+  if (inlineFirstPaintGateRafId == null && typeof requestAnimationFrame === 'function') {
+    inlineFirstPaintGateRafId = requestAnimationFrame(() => {
+      inlineFirstPaintGateRafId = null;
+      if (!hasExtensionContext()) return;
+      // 再描画を促す（renderPageFrameOverlay → renderInlineHostAnchoredToVideo → 本ゲート再評価）。
+      renderPageFrameOverlay();
+    });
+  }
+  return false;
+}
+
+/**
  * 幅はモードに応じて視聴行または video のみ。DOM 上はプレイヤー列（findFrameInsertAnchorFromVideo）の直後に置く。
  */
 function renderInlineHostAnchoredToVideo(video) {
@@ -3453,6 +3551,15 @@ function renderInlineHostAnchoredToVideo(video) {
   if (placement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
     publishInlinePanelLayoutRenderSnapshot(false, false, null);
     renderInlinePanelDockBottomHost();
+    return;
+  }
+  // 初回ゲート（横付きのみ）: leo-player flex 行が未完成のうちに描画すると below(細い帯)
+  // に一瞬落ちて横付きへジャンプする＝崩れた初回。挿入先が解決でき rect が安定するまで
+  // host を隠して rAF で待つ（deadline 超過は安全網で通す）。await IO は一切しない。
+  if (
+    placement === INLINE_PANEL_PLACEMENT_BESIDE &&
+    !maybePassFirstPaintGateForBeside(video)
+  ) {
     return;
   }
   const domAnchor = findFrameInsertAnchorFromVideo(video);
@@ -8500,6 +8607,8 @@ function syncLiveIdFromLocation() {
     }
     if (ctx.liveIdSwitched) {
       void clearCommentHarvestPanelDiagnostic();
+      // 別 lv へ切替＝leo-player も組み直されるので初回ゲートを再武装。
+      resetInlineFirstPaintGate();
       pendingRoots.clear();
       clearNdgrChatRowsPending();
       clearInterceptReconcilePending();
