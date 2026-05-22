@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.313',
+    date: '2026-05-22',
+    summary: '内部整理: コメント送信の状態表示をlib化',
+    items: Object.freeze([
+      '[内部] コメント送信欄の「状態メッセージの出し分け」と読み上げ補助（aria）の決め方を、テストしやすい部品（純関数）に切り出しました。見た目・動作は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.312',
     date: '2026-05-22',
     summary: '貢献度ランキングを見ているタブで再取得',

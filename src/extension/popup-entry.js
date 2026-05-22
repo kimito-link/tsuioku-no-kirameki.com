@@ -16,6 +16,10 @@ import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
+import {
+  resolveCommentPostStatus,
+  commentComposeAriaDescribedBy
+} from '../lib/commentPostStatusPresentation.js';
 import { createCommentSubmitProfiler } from '../lib/commentSubmitProfiling.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
@@ -1168,9 +1172,7 @@ function paintCommentComposeUi() {
     );
     commentInput.setAttribute(
       'aria-describedby',
-      kindnessView.warning
-        ? 'commentKindnessBody commentKindnessConfirm postStatus exportToolbarHint'
-        : 'postStatus exportToolbarHint'
+      commentComposeAriaDescribedBy('input', Boolean(kindnessView.warning))
     );
   }
 
@@ -1183,21 +1185,15 @@ function paintCommentComposeUi() {
     );
     postBtn.setAttribute(
       'aria-describedby',
-      kindnessView.warning ? 'commentKindnessBody commentKindnessConfirm postStatus' : 'postStatus'
+      commentComposeAriaDescribedBy('button', Boolean(kindnessView.warning))
     );
   }
 
-  let statusMessage = baseState.statusMessage;
-  let statusKind = baseState.statusKind;
-  const notice = COMMENT_POST_UI_STATE.notice;
-  const baseOverridesNotice =
-    baseState.mode === 'no_watch' ||
-    baseState.mode === 'no_live_id' ||
-    baseState.mode === 'submitting';
-  if (notice && notice.message && !baseOverridesNotice) {
-    statusMessage = notice.message;
-    statusKind = notice.kind;
-  }
+  // base の status に一時 notice をかぶせるか（DOM 非依存）は純関数に委譲。
+  const { message: statusMessage, kind: statusKind } = resolveCommentPostStatus(
+    baseState,
+    COMMENT_POST_UI_STATE.notice
+  );
   setPostStatus(statusMessage, statusKind);
   syncVoiceCommentButton();
 }
