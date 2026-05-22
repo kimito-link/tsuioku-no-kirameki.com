@@ -310,6 +310,43 @@ describe('topSupportRankLineModels', () => {
     expect(row.fullLabelForTitle).toBe('匿名');
   });
 
+  it('公式ランク行 __ad_N_（名前空サフィックス）でも内部キーを漏らさず「匿名」', () => {
+    // scrape が name を読めず isAnonymous も付かなかった行は __ad_N_（空サフィックス）
+    // になり useOfficialDomNick=false。従来は u/__ad_N_ と内部キーが漏れていた（v0.1.315 修正）。
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__ad_3_', nickname: '', count: 800, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('匿名');
+    expect(row.idShort).toBe('');
+    expect(row.idTitle).toBe('');
+    expect(row.fullLabelForTitle).toBe('匿名');
+    expect(row.nameLine).not.toContain('__ad_');
+    expect(row.fullLabelForTitle).not.toContain('__ad_');
+  });
+
+  it('貢献度 __contrib_N_（名前空）でも「匿名」で内部キー漏れなし', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__contrib_5_', nickname: '', count: 30, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('匿名');
+    expect(row.fullLabelForTitle).toBe('匿名');
+    expect(row.nameLine).not.toContain('u/');
+  });
+
+  it('名前付き __ad_N_名前 は公式名のみ（title に内部キーを括弧表示しない）', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__ad_0_ゲスト', nickname: 'ゲスト', count: 1200, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('ゲスト');
+    expect(row.idShort).toBe('');
+    // 旧 displayUserLabel だと「ゲスト（__ad_0_ゲスト）」と内部キーが括弧で出ていた
+    expect(row.fullLabelForTitle).toBe('ゲスト');
+    expect(row.fullLabelForTitle).not.toContain('__ad_');
+  });
+
   it('placeNumberMode:dense で同回数は同順位（本家ランキングタブの貢献度に近い並び方）', () => {
     const rooms = [
       { userKey: '1', nickname: 'a', count: 40 },
