@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.311',
+    date: '2026-05-22',
+    summary: 'パネルが一瞬で消える問題を緩和（消失デバウンス）',
+    items: Object.freeze([
+      '[修正] ニコ生のページ内パネルが、ページの切り替わりの一瞬などで点滅して消えてしまうことがある問題を緩和しました。約1.8秒続けて「視聴ページでない」と判定したときだけ閉じるようにし、一瞬の切り替わりでは消えないようにしました（複数タブを開いているときに特に起きやすい症状です）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.310',
     date: '2026-05-22',
     summary: '内部整理: やさしさナッジの表示判断をlib化',
