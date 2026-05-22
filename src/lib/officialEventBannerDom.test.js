@@ -108,6 +108,40 @@ describe('scrapeOfficialEventBannerFromDom', () => {
       expect(r.title).toBe('イベントタイトル');
     }
   });
+
+  // v0.1.319: audition iframe 新 CSS-modules DOM（実機 lv350584711「なち」現在17位）
+  it('新 audition DOM（現在N位）から rank / score / 配信者名を取得', () => {
+    document.body.innerHTML = `
+      <div class="css-pae4zt e1gjhmvh15"><div class="css-1fe7eha e1gjhmvh14"><div>
+        <h2 class="css-12moxus e1awe04q14"><div class="css-1h4q7ss e1awe04q13">
+          <span class="css-1kputv7 e1awe04q12">なち</span><span class="css-1oa92lc e1awe04q11">さん</span>
+        </div><span class="css-mmdt3g e1awe04q10">を応援しよう！</span></h2>
+        <div class="css-96vxbf e1awe04q4"><div class="css-ffd3sq e1awe04q3"><div class="css-1m8f490 e1awe04q2">
+          <p class="css-1xc9pbi e1awe04q1">現在<span class="css-ggzujz e1awe04q0">17</span>位</p>
+          <div class="css-1uc38g"><svg viewBox="0 0 16 16" class="css-jh4whz"></svg><p class="css-1qqb6me">10,440</p></div>
+        </div>
+        <div class="css-1sycnfb e1awe04q6"><p class="css-zz2xri e1awe04q5"><span>順位UP</span>まであと</p>
+          <div class="css-8zj0aw"><svg class="css-jh4whz"></svg><p class="css-1d9a3hd">1,180</p></div>
+        </div></div></div>
+      </div></div></div>`;
+    const r = scrapeOfficialEventBannerFromDom(document);
+    expect(r).not.toBeNull();
+    expect(r.rank).toBe(17); // 「現在17位」だけを採る（1,180/10,440 と混同しない）
+    expect(r.title).toBe('なち'); // 「を応援しよう！」「さん」除去
+    expect(r.score).toBe(10440); // 累計スコア（順位UPまで 1,180 は採らない）
+  });
+
+  it('新 DOM で「現在N位」が無ければ null（誤った rank を出さない）', () => {
+    document.body.innerHTML = `
+      <div><h2 class="e1awe04q14"><span class="e1awe04q12">なち</span>を応援しよう！</h2>
+      <div class="e1awe04q6"><p>順位UPまであと</p><p class="css-1d9a3hd">1,180</p></div></div>`;
+    const r = scrapeOfficialEventBannerFromDom(document);
+    // rank は取れない（title だけ）。誤って 1,180 を rank にしない
+    if (r) {
+      expect(r.rank).toBeNull();
+      expect(r.title).toBe('なち');
+    }
+  });
 });
 
 describe('scrapeOfficialEventBalloonFromDom', () => {
