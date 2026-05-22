@@ -5375,11 +5375,11 @@ function renderTopSupportRankStrip(stripRooms) {
     })
     .join('');
   /*
-   * ランクタイル群の末尾（10 位の右）に配信者タイルを並べる。
-   * データ未取得（`topSupportRankStripCasterTileHtml()` が空文字）のときはランクのみ。
-   * スクロール前提のタイル列なので、末尾の追加がレイアウトを壊さない。
+   * v0.1.305: 配信者タイルを**先頭（左）**に置く（ユーザー要望）。配信者は基準点なので
+   * 一番左に固定する方が視線の起点として自然。caster の img は別クラス
+   * (nl-top-support-rank__caster-thumb) なので、下の thumbs[i]↔models[i] 対応は崩れない。
    */
-  const listInner = `${html}${casterTileHtml}`;
+  const listInner = `${casterTileHtml}${html}`;
   strip.innerHTML = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
   bindOnErrorHideHandlersWithin(strip);
   const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
