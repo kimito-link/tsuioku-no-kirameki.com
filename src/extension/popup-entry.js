@@ -8424,6 +8424,30 @@ async function resizePopupWindowForState(input) {
     // popup window 限定。通常の Chrome ウィンドウや side panel は無視。
     if (win.type !== 'popup') return;
 
+    // 0.1.306: standalone popup window だけに `nl-popup-window` を付ける。
+    //   action popup（ツールバーのドロップダウン）はこの関数の body に到達しない
+    //   （getCurrent() が type:'normal' を返し上で early return する）ので、
+    //   このクラスが付くのは別ウィンドウ表示のときだけ。CSS 側はこのクラスで
+    //   body の 580px cap を 100vh に開放し、ウィンドウ高 780 と body 高 580 の
+    //   差として残っていた「下の大きな空白」を無くす。`.nl-main` がウィンドウ全
+    //   高でスクロールするようになり、空きスペースをコメント送信欄まで含めて
+    //   有効活用できる。
+    //   action popup は cap を従来どおり 580 に保つため、ここでだけ付与する。
+    try {
+      const rootEl = document.documentElement;
+      const bodyEl = document.body;
+      if (rootEl) rootEl.classList.add('nl-popup-window');
+      if (bodyEl) bodyEl.classList.add('nl-popup-window');
+      // CSS の `min(--nl-pop-height, 100vh)` が 100vh 側で効くよう、
+      // 実ウィンドウ内寸を hint として渡す（無くても 100vh で破綻しない）。
+      const innerH = Math.round(window.innerHeight || 0);
+      if (rootEl && innerH > 0) {
+        rootEl.style.setProperty('--nl-pop-height', `${innerH}px`);
+      }
+    } catch {
+      // クラス付与に失敗しても resize 本体は続行する。
+    }
+
     // 0.1.73 (BC): empty state は CSS で body cap を解除し、content の高さに
     //   合わせて body を伸ばすようにした。よって `nlPopupPrimary.scrollHeight`
     //   が「実際に見せるべき content の高さ」になる。これに OS chrome 余裕 40px
