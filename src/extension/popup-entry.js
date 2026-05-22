@@ -4804,28 +4804,52 @@ async function readOfficialEventDomBundleFromStorage(liveId) {
   if (!lid) return null;
   try {
     const key = eventDomStorageKey(lid);
-    const adKey = `nls_nicoad_ranking_${lid}`;
-    const bag = await chrome.storage.local.get([key, adKey]);
+    const adKey = `nls_nicoad_ranking_${lid}`; // scrape/relay 由来（uid 無し）
+    const adApiKey = `nls_nicoad_api_ranking_${lid}`; // nicoad API 由来（userPageUrl 付き）
+    const bag = await chrome.storage.local.get([key, adKey, adApiKey]);
     const v = bag?.[key];
     let bundle = v && typeof v === 'object' && !Array.isArray(v)
       ? /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle} */ (v)
       : null;
 
+    // 広告ランキング行: API 由来（記名に userPageUrl=uid リンク）を最優先、scrape を
+    // フォールバック。API 非空なら ranking 本体は API 全体で置換（行 by name マージは
+    // 改名で壊れるので避ける）。mirrorHtml は API に無いので scrape 由来を残す。
+    const adApiVal = bag?.[adApiKey];
+    const apiRows =
+      adApiVal &&
+      typeof adApiVal === 'object' &&
+      String(adApiVal.liveId || '').trim().toLowerCase() === lid &&
+      Array.isArray(adApiVal.rows) &&
+      adApiVal.rows.length > 0
+        ? adApiVal.rows
+        : null;
     const adVal = bag?.[adKey];
-    if (adVal && typeof adVal === 'object' && Array.isArray(adVal.ranking) && adVal.ranking.length > 0) {
+    const scrapeRows =
+      adVal && typeof adVal === 'object' && Array.isArray(adVal.ranking) && adVal.ranking.length > 0
+        ? adVal.ranking
+        : null;
+    const adRows = apiRows || scrapeRows;
+
+    if (adRows) {
       if (!bundle) {
         bundle = {
-          capturedAt: adVal.capturedAt || Date.now(),
-          adContributionRanking: adVal.ranking,
+          capturedAt: (apiRows ? adApiVal.capturedAt : adVal.capturedAt) || Date.now(),
+          adContributionRanking: adRows,
           contributionRanking: null,
           programStats: null,
           eventCumulativeScoreMirrorHtml: null,
           adRankingMirrorHtml: null
         };
-      } else if (!Array.isArray(bundle.adContributionRanking) || bundle.adContributionRanking.length === 0) {
+      } else if (
+        apiRows ||
+        !Array.isArray(bundle.adContributionRanking) ||
+        bundle.adContributionRanking.length === 0
+      ) {
+        // API 由来なら既存（scrape）より優先して置換。それ以外は空のときだけ補完。
         bundle = {
           ...bundle,
-          adContributionRanking: adVal.ranking
+          adContributionRanking: adRows
         };
       }
     }

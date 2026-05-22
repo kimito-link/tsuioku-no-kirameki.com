@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.322',
+    date: '2026-05-23',
+    summary: '広告ランキングに送り主リンクを追加',
+    items: Object.freeze([
+      '[改善] 広告ランキング（ニコニ広告の貢献度上位）で、名前を出している広告主さんに、その方のニコニコのユーザーページへのリンクとアイコンが付くようになりました。公式の広告ランキングから取得した正確なユーザー情報だけを使い、匿名の方にはリンクを付けません（取得できないときは従来どおりお名前のみ表示します）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.321',
     date: '2026-05-23',
     summary: '起動時にマイクへアクセスしないよう修正',
