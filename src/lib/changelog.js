@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.302',
+    date: '2026-05-22',
+    summary: '貢献度ランキングの見栄えとレスポンシブを改善',
+    items: Object.freeze([
+      '[改善] 貢献度ランキングの縦リストを、どのウィンドウサイズでもバランスよく見えるよう調整しました——狭い画面では順位・アイコンの幅を詰めて名前の表示領域を広げ、名前が途中で切れにくくしました',
+      '[改善] 貢献度の数値を主役にし、単位（貢）を控えめな表示にして読みやすくしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.301',
     date: '2026-05-22',
     summary: '横付き不発と来場者数の数字食い違いを修正',

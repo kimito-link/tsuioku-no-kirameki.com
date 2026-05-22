@@ -3826,10 +3826,12 @@
       }
       .nl-contrib-ranking-list__row {
         display: grid;
-        grid-template-columns: 26px 26px 1fr auto;
+        /* バランス改善: rank はタブ幅でわずかに伸縮、avatar は固定、name は最大限、
+           pt は内容ぶん。狭い幅では gap を詰めて name の取り分を増やす。 */
+        grid-template-columns: minmax(18px, auto) 24px minmax(0, 1fr) auto;
         align-items: center;
-        gap: 6px;
-        padding: 4px 8px;
+        gap: clamp(4px, 1.4vw, 7px);
+        padding: clamp(4px, 1.3vw, 6px) clamp(6px, 1.6vw, 9px);
         border-radius: 8px;
         background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-bg-soft) 8%);
         border: 1px solid color-mix(in srgb, var(--nl-border) 35%, transparent);
@@ -3892,14 +3894,18 @@
         text-align: center;
         font-variant-numeric: tabular-nums;
         font-feature-settings: 'tnum' 1;
+        font-weight: 700;
+        /* 1-2 桁で幅が変わっても中央に。最小 16px だけ確保し残りは name へ譲る。 */
+        min-width: 16px;
+        padding-right: 1px;
       }
       .nl-contrib-ranking-list__thumb-wrap {
-        width: 26px;
-        height: 26px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         overflow: hidden;
         background: color-mix(in srgb, var(--nl-border) 25%, transparent);
-        flex: 0 0 26px;
+        flex: 0 0 24px;
       }
       .nl-contrib-ranking-list__thumb {
         width: 100%;
@@ -3918,9 +3924,16 @@
         font-variant-numeric: tabular-nums;
         font-feature-settings: 'tnum' 1;
         font-weight: 700;
-        color: color-mix(in srgb, var(--nl-text) 85%, transparent);
+        color: color-mix(in srgb, var(--nl-text) 88%, transparent);
         text-align: right;
         white-space: nowrap;
+      }
+      /* 単位（貢 等）は数値より一段弱め＝数字が主役。幅も少し節約。 */
+      .nl-contrib-ranking-list__pt-unit {
+        font-size: 0.82em;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 52%, transparent);
+        margin-left: 1px;
       }
 
       /*
