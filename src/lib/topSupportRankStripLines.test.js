@@ -286,52 +286,53 @@ describe('topSupportRankLineModels', () => {
     expect(row.idShort).toBe('');
   });
 
-  it('公式ランキングの匿名行 __anon_ad_N は「匿名」と表示し内部キーを漏らさない', () => {
+  it('公式ランキングの匿名行 __anon_ad_N は「名無し」(公式準拠)と表示し内部キーを漏らさない', () => {
     const [row] = topSupportRankLineModels(
       [{ userKey: '__anon_ad_2', nickname: '', count: 1000, avatarUrl: '' }],
       { defaultThumbSrc: DEF_THUMB }
     );
-    expect(row.nameLine).toBe('匿名');
+    // v0.1.317: 公式は匿名を「名無し」と表記＝レーンも公式準拠に合わせる
+    expect(row.nameLine).toBe('名無し');
     // id 行・タイトルに __anon_ad_2 / u/__anon_ad_2 が出ない
     expect(row.idShort).toBe('');
     expect(row.idTitle).toBe('');
-    expect(row.fullLabelForTitle).toBe('匿名');
+    expect(row.fullLabelForTitle).toBe('名無し');
     expect(row.nameLine).not.toContain('__anon');
     expect(row.fullLabelForTitle).not.toContain('__anon');
   });
 
-  it('貢献度ランキングの匿名行 __anon_contrib_N も「匿名」と表示する', () => {
+  it('貢献度ランキングの匿名行 __anon_contrib_N も「名無し」(公式準拠)と表示する', () => {
     const [row] = topSupportRankLineModels(
       [{ userKey: '__anon_contrib_0', nickname: '', count: 50, avatarUrl: '' }],
       { defaultThumbSrc: DEF_THUMB }
     );
-    expect(row.nameLine).toBe('匿名');
+    expect(row.nameLine).toBe('名無し');
     expect(row.idShort).toBe('');
-    expect(row.fullLabelForTitle).toBe('匿名');
+    expect(row.fullLabelForTitle).toBe('名無し');
   });
 
-  it('公式ランク行 __ad_N_（名前空サフィックス）でも内部キーを漏らさず「匿名」', () => {
+  it('公式ランク行 __ad_N_（名前空サフィックス）でも内部キーを漏らさず「名無し」', () => {
     // scrape が name を読めず isAnonymous も付かなかった行は __ad_N_（空サフィックス）
     // になり useOfficialDomNick=false。従来は u/__ad_N_ と内部キーが漏れていた（v0.1.315 修正）。
     const [row] = topSupportRankLineModels(
       [{ userKey: '__ad_3_', nickname: '', count: 800, avatarUrl: '' }],
       { defaultThumbSrc: DEF_THUMB }
     );
-    expect(row.nameLine).toBe('匿名');
+    expect(row.nameLine).toBe('名無し');
     expect(row.idShort).toBe('');
     expect(row.idTitle).toBe('');
-    expect(row.fullLabelForTitle).toBe('匿名');
+    expect(row.fullLabelForTitle).toBe('名無し');
     expect(row.nameLine).not.toContain('__ad_');
     expect(row.fullLabelForTitle).not.toContain('__ad_');
   });
 
-  it('貢献度 __contrib_N_（名前空）でも「匿名」で内部キー漏れなし', () => {
+  it('貢献度 __contrib_N_（名前空）でも「名無し」で内部キー漏れなし', () => {
     const [row] = topSupportRankLineModels(
       [{ userKey: '__contrib_5_', nickname: '', count: 30, avatarUrl: '' }],
       { defaultThumbSrc: DEF_THUMB }
     );
-    expect(row.nameLine).toBe('匿名');
-    expect(row.fullLabelForTitle).toBe('匿名');
+    expect(row.nameLine).toBe('名無し');
+    expect(row.fullLabelForTitle).toBe('名無し');
     expect(row.nameLine).not.toContain('u/');
   });
 

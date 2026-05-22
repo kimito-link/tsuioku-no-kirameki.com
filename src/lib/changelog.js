@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.317',
+    date: '2026-05-22',
+    summary: '匿名表記を公式準拠の「名無し」に統一',
+    items: Object.freeze([
+      '[改善] 貢献度ランキング・広告ランキングで名前が公開されていない方の表記を、公式の表示に合わせて「匿名」から「名無し」に変えました（ニコニコの画面と同じ言い方に統一）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.316',
     date: '2026-05-22',
     summary: '貢献度ランキングの記名上位をリンク化',
