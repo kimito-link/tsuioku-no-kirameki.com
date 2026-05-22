@@ -921,3 +921,57 @@ test.describe('inline panel viewport size matrix', () => {
     });
   }
 });
+
+/*
+ * ⭐ 初回表示ゲート（v0.1.303）回帰ガード。
+ * niconico の視聴行(flex)が「後から」出来上がる状況を模す: 行を遅延注入し、その間
+ * パネルが below(動画の下) に一瞬も落ちないこと（崩れた初回フラッシュの抹消）を検証。
+ * 行が出来たら beside(行内・VIDEO 直後) に出る。
+ */
+test.describe('inline panel 初回表示ゲート', () => {
+  test('視聴行が遅れて出来ても、初回に below へ落ちず beside で出る', async ({
+    context
+  }) => {
+    await setInlinePanelModes(context, { widthMode: 'video', placement: 'beside' });
+
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+
+    // この時点では視聴行(mock-player-row)はまだ無い。パネルは描画を試みるが
+    // 挿入先未解決でゲートが待つ → host は hidden のはず（below に落ちない）。
+    // 最初の ~600ms を細かくサンプルし「below 位置で可視」が一度も無いことを確認。
+    const sawBelowVisible = [];
+    for (let i = 0; i < 12; i++) {
+      const s = await page.evaluate((hostId) => {
+        const host = document.getElementById(hostId);
+        if (!host) return { present: false };
+        const cs = getComputedStyle(host);
+        const visible = cs.display !== 'none' && host.offsetParent !== null;
+        const v = document.querySelector('video');
+        const hb = host.getBoundingClientRect();
+        const vb = v ? v.getBoundingClientRect() : null;
+        const below = vb ? hb.top >= vb.bottom - 8 : false;
+        return { present: true, visible, below };
+      }, INLINE_HOST_ID);
+      if (s.present && s.visible && s.below) sawBelowVisible.push(i);
+      await page.waitForTimeout(50);
+    }
+
+    // ~600ms 経過後に視聴行を注入（niconico の遅延レイアウト完成を模す）。
+    await page.evaluate(injectTwoColumnPlayerRow);
+
+    // 行が出来たら beside（行内・VIDEO 直後）に確定する。
+    await expect
+      .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+      .toMatchObject({
+        display: 'block',
+        parentId: 'mock-player-row',
+        prevElementTag: 'VIDEO',
+        floatingClass: false
+      });
+
+    // 初回に「below 位置で可視」が一度も観測されないこと＝崩れフラッシュ抹消。
+    expect(sawBelowVisible, `below 可視を観測したフレーム index: ${sawBelowVisible}`).toEqual([]);
+  });
+});
