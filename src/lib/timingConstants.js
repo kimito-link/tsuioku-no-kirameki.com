@@ -29,6 +29,22 @@ export const INGEST_TIMING = /** @type {const} */ ({
   aiShareFastDiagVisibleMinIntervalMs: 1500
 });
 
+/**
+ * 初回パネル表示ゲート（横付き）。watch を開いた直後 ~300-500ms は niconico の
+ * leo-player flex 行が未完成で beside 挿入先が見つからず below(細い帯) に一瞬落ちる。
+ * その「崩れた初回」を見せないため、挿入先が安定するまで描画を遅らせる。
+ *   besideSettleDeadlineMs: これを超えたら待たずに描画（お困り配信者で leo-player が
+ *     render に到達しないケースの安全網）。実測 beside 確定 ~533ms + CPU 競合余裕 + 分散。
+ *   geomStableFrames: 挿入先 rect が「同一(±tolerance)」で連続するフレーム数。
+ *     差し替え途中の中間 rect 誤検知（早すぎ）を防ぐため 2。
+ *   geomStableTolerancePx: 同一とみなす rect の許容差。
+ */
+export const INLINE_FIRST_PAINT = /** @type {const} */ ({
+  besideSettleDeadlineMs: 800,
+  geomStableFrames: 2,
+  geomStableTolerancePx: 2
+});
+
 export const SUBMIT_TIMING = /** @type {const} */ ({
   editorPollTimeoutMs: 8000,
   editorPollIntervalMs: 50,
