@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.315',
+    date: '2026-05-22',
+    summary: '修正: ランキング匿名行の内部表示を改善',
+    items: Object.freeze([
+      '[修正] 貢献度・広告ランキングで名前が取れなかった応援者の行に、内部用の文字列（u/__ad_3_ のような表記）が出ることがあったのを「匿名」と表示するよう直しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.314',
     date: '2026-05-22',
     summary: '内部整理: 取得率チャートの計算をlib化',

@@ -45,7 +45,10 @@ test('広告ランキング: nls_nicoad_ranking_ を seed すると北極星レ�
           ranking: [
             { rank: 1, name: '広告タロウ', contribution: 5000, isAnonymous: false, userId: '111' },
             { rank: 2, name: '広告ジロウ', contribution: 3000, isAnonymous: false, userId: '222' },
-            { rank: 3, name: '', contribution: 1000, isAnonymous: true }
+            { rank: 3, name: '', contribution: 1000, isAnonymous: true },
+            // v0.1.315: scrape が name を読めず isAnonymous も付かなかった行。
+            // __ad_N_（name 空サフィックス）になり、旧版は `u/__ad_3_` と内部キーが漏れていた。
+            { rank: 4, name: '', contribution: 500, isAnonymous: false }
           ]
         }
       });
@@ -86,10 +89,34 @@ test('広告ランキング: nls_nicoad_ranking_ を seed すると北極星レ�
   expect(text).toContain('広告タロウ');
   expect(text).toContain('広告ジロウ');
 
-  // v0.1.308: 匿名行（rank 3, name 空）は「匿名」と表示し、内部キーを漏らさない
+  // v0.1.308/315: 匿名行（rank 3 = isAnonymous、rank 4 = name 空・非匿名）は
+  // どちらも「匿名」と表示し、内部合成キーを画面に漏らさない。
   expect(text).toContain('匿名');
+  // 匿名表示は 2 行（rank 3, 4）出る
+  expect(text.split('匿名').length - 1).toBeGreaterThanOrEqual(2);
   expect(text).not.toContain('__anon');
-  expect(text).not.toContain('u/__anon');
+  expect(text).not.toContain('__ad_');
+  expect(text).not.toContain('u/__');
+
+  // 表示テキストだけでなく href（リンク先 URL）にも合成キーが漏れていないこと。
+  const hrefs = await body.locator('a[href]').evaluateAll((els) =>
+    els.map((e) => e.getAttribute('href') || '')
+  );
+  for (const href of hrefs) {
+    expect(href).not.toContain('__anon');
+    expect(href).not.toContain('__ad_');
+    expect(href).not.toContain('__contrib_');
+  }
+
+  // title 属性（hover ラベル）にも合成キーが出ないこと。
+  const titles = await body.locator('[title]').evaluateAll((els) =>
+    els.map((e) => e.getAttribute('title') || '')
+  );
+  for (const t of titles) {
+    expect(t).not.toContain('__anon');
+    expect(t).not.toContain('__ad_');
+    expect(t).not.toContain('__contrib_');
+  }
 
   await popup.screenshot({ path: 'test-results/nicoad-ad-ranking.png', fullPage: false });
 });

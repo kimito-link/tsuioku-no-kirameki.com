@@ -310,6 +310,57 @@ describe('topSupportRankLineModels', () => {
     expect(row.fullLabelForTitle).toBe('匿名');
   });
 
+  // v0.1.315: scrape が name を読めず isAnonymous も付かなかった行は
+  // `__ad_N_` / `__contrib_N_`（name 空サフィックス）になる。v0.1.308 の
+  // __anon_ 限定対策では拾えず、`u/__ad_N_` と内部キーが画面に漏れていた。
+  it('広告ランキングで name 空・isAnonymous なしの __ad_N_ も「匿名」表示（内部キー漏れ防止）', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__ad_1_', nickname: '', count: 3000, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('匿名');
+    expect(row.idShort).toBe('');
+    expect(row.idTitle).toBe('');
+    expect(row.fullLabelForTitle).toBe('匿名');
+    for (const f of [row.nameLine, row.idShort, row.idTitle, row.fullLabelForTitle]) {
+      expect(f).not.toContain('__ad_');
+      expect(f).not.toContain('u/');
+    }
+  });
+
+  it('貢献度ランキングで name 空の __contrib_N_ も「匿名」表示（内部キー漏れ防止）', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__contrib_2_', nickname: '   ', count: 500, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('匿名');
+    expect(row.idShort).toBe('');
+    expect(row.idTitle).toBe('');
+    expect(row.fullLabelForTitle).toBe('匿名');
+    for (const f of [row.nameLine, row.idShort, row.idTitle, row.fullLabelForTitle]) {
+      expect(f).not.toContain('__contrib_');
+    }
+  });
+
+  it('公式DOMランクの名前付き行は title に合成キーを括弧で漏らさない（表示名のみ）', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__ad_0_広告タロウ', nickname: '広告タロウ', count: 5000, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('広告タロウ');
+    expect(row.fullLabelForTitle).toBe('広告タロウ');
+    expect(row.idTitle).toBe('');
+    expect(row.fullLabelForTitle).not.toContain('__ad_');
+  });
+
+  it('回帰: 通常の数値 uid + ニック空は従来どおり u/<uid>（公式ランク対策の巻き込み無し）', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '4814023', nickname: '', count: 3 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('u/4814023');
+  });
+
   it('placeNumberMode:dense で同回数は同順位（本家ランキングタブの貢献度に近い並び方）', () => {
     const rooms = [
       { userKey: '1', nickname: 'a', count: 40 },
