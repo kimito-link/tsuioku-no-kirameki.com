@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.312',
+    date: '2026-05-22',
+    summary: '貢献度ランキングを見ているタブで再取得',
+    items: Object.freeze([
+      '[改善] 貢献度ランキングが「取得中…」のまま出ないことがある問題を緩和しました。裏に回っていたタブを前面に戻したとき、まだ取れていなければ自動でもう一度取得を試みます（複数タブを開いていると、見ていないタブでは公式ランキングの読み込みが完了せず取れないことがあるためです）。見ているタブだけで再試行し、取得できない配信者では無駄な再試行をしません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.311',
     date: '2026-05-22',
     summary: 'パネルが一瞬で消える問題を緩和（消失デバウンス）',
