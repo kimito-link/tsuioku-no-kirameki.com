@@ -13741,7 +13741,13 @@ function initPopup() {
         // （voiceAutosend / commentEnterSend / anonymousIdenticon / foldAnonymousInRankStrip）
         void applyRegisteredBooleanSettingsFromStorage().catch(() => {});
         void applyStoryGrowthCollapsedFromStorage().catch(() => {});
-        void refreshVoiceInputDeviceList().catch(() => {});
+        // v0.1.321: 起動時にマイクデバイス一覧を自動取得しない。
+        //   旧実装は popup を開くたび refreshVoiceInputDeviceList()→getUserMedia({audio:true})
+        //   でマイクを掴んでいた（ラベル取得目的・即 stop）。これが「拡張を起動した瞬間に
+        //   ESET 等のセキュリティソフトがマイクアクセスを警告する」「拡張アイコンにカメラ
+        //   マークが付く」原因で、音声入力を使わないユーザーには不要かつプライバシー的に
+        //   不快だった。音声入力は opt-in 機能なので、デバイス一覧はユーザーが「デバイス更新」
+        //   ボタンを押した時 / 音声入力を実際に開始する時にだけ取得する（その経路は別途存在）。
         await refreshDone;
       })();
     });
