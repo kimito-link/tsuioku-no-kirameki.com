@@ -100,3 +100,100 @@ test('広告ランキング: nls_nicoad_ranking_ を seed すると北極星レ�
 
   await popup.screenshot({ path: 'test-results/nicoad-ad-ranking.png', fullPage: false });
 });
+
+const KEY_NICOAD_API_RANKING = 'nls_nicoad_api_ranking_lv888888888';
+
+test('広告ランキング: nicoad API 由来（userPageUrl 付き）が scrape より優先され uid リンクが付く', async ({
+  context
+}) => {
+  const sw = await swOf(context);
+  const extensionId = new URL(sw.url()).hostname;
+
+  await sw.evaluate(
+    async ({ watchUrl, watchKey, recordingKey, commentsKey, adKey, adApiKey }) => {
+      await chrome.storage.local.set({
+        [watchKey]: watchUrl,
+        [recordingKey]: true,
+        [commentsKey]: [{ no: 1, content: 'やあ', userId: 'u1', date: Date.now() }],
+        // scrape 由来（uid 無し・名前だけ）。これは劣後すべき。
+        [adKey]: {
+          capturedAt: Date.now(),
+          sourceUrl: 'https://nicoad.nicovideo.jp/live/publish/lv888888888',
+          ranking: [{ rank: 1, name: 'スクレイプ広告', contribution: 9999, isAnonymous: false }]
+        },
+        // nicoad API 由来（content の maybeFetchNicoadContribRankingMirrorOnce が書く形）。
+        // userPageUrl 付き＝officialDomRankingRowsToStripRooms が uid リンク化する。
+        [adApiKey]: {
+          capturedAt: Date.now(),
+          liveId: 'lv888888888',
+          // uid は実 nicoad API と同じ現実的な桁数（短すぎる数値は匿名スタイル判定で
+          // リンク化されない仕様＝isAnonymousStyleNicoUserId）。sm9 実データ準拠。
+          rows: [
+            {
+              rank: 1,
+              name: 'API広告タロウ',
+              contribution: 5000,
+              isAnonymous: false,
+              userPageUrl: 'https://www.nicovideo.jp/user/5428353'
+            },
+            {
+              rank: 2,
+              name: 'API広告ジロウ',
+              contribution: 3000,
+              isAnonymous: false,
+              userPageUrl: 'https://www.nicovideo.jp/user/36715409'
+            }
+          ]
+        }
+      });
+    },
+    {
+      watchUrl: MOCK_WATCH,
+      watchKey: KEY_LAST_WATCH_URL,
+      recordingKey: KEY_RECORDING,
+      commentsKey: STORAGE_COMMENTS,
+      adKey: KEY_NICOAD_RANKING,
+      adApiKey: KEY_NICOAD_API_RANKING
+    }
+  );
+
+  const watch = await context.newPage();
+  await watch.goto(MOCK_WATCH, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000
+  });
+  await dismissExtensionUsageTermsGate(popup);
+  await focusMockWatchThenReloadPopup(watch, popup);
+  await popup.waitForTimeout(1500);
+
+  const body = popup.locator('#northStarLaneBody-adRanking');
+  await expect(body).toBeAttached();
+  await expect
+    .poll(async () => (await body.innerText().catch(() => '')).length, { timeout: 8000 })
+    .toBeGreaterThan(0);
+
+  const text = await body.innerText();
+  console.log('ad-ranking(API) lane text:', JSON.stringify(text));
+
+  // API 由来が優先された証拠（scrape の "スクレイプ広告" ではなく API の名前が出る）
+  expect(text).toContain('API広告タロウ');
+  expect(text).toContain('API広告ジロウ');
+  expect(text).not.toContain('スクレイプ広告');
+
+  // 記名広告主に公式 user ページリンクが付く（他ビューワーに無い uid リンク化）
+  const linkHrefs = await body.locator('a[href*="nicovideo.jp/user/"]').evaluateAll((els) =>
+    els.map((e) => e.getAttribute('href'))
+  );
+  console.log('ad-ranking(API) user links:', JSON.stringify(linkHrefs));
+  expect(linkHrefs.some((h) => h && h.includes('/user/5428353'))).toBe(true);
+  expect(linkHrefs.some((h) => h && h.includes('/user/36715409'))).toBe(true);
+
+  // 内部キーは漏れない
+  expect(text).not.toContain('__ad_');
+  expect(text).not.toContain('u/__');
+
+  await popup.screenshot({ path: 'test-results/nicoad-ad-ranking-api.png', fullPage: false });
+});

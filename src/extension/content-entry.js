@@ -176,6 +176,12 @@ import {
   KOKEN_CONTRIB_STORAGE_PREFIX,
   KOKEN_CONTRIB_FETCH_MESSAGE_TYPE
 } from '../lib/kokenContributionRankingApi.js';
+import {
+  normalizeNicoadRankingResponse,
+  nicoadContribStorageKey,
+  NICOAD_CONTRIB_STORAGE_PREFIX,
+  NICOAD_CONTRIB_FETCH_MESSAGE_TYPE
+} from '../lib/nicoadContributionRankingApi.js';
 import { appendGiftEvents } from '../lib/giftEventStore.js';
 import { resolveGiftSenderBucketKey } from '../lib/giftSenderObservation.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
@@ -10099,6 +10105,8 @@ async function start() {
   setTimeout(() => {
     if (stopContentIntervalsIfContextInvalidated()) return;
     maybeFetchKokenContribRankingMirrorOnce();
+    // nicoad 広告ランキング API も同 sibling として（koken と同規約・別キー）。
+    maybeFetchNicoadContribRankingMirrorOnce();
   }, 10_000);
   kokenContribApiIntervalId = /** @type {number} */ (
     /** @type {unknown} */ (
@@ -10112,6 +10120,7 @@ async function start() {
           return;
         }
         maybeFetchKokenContribRankingMirrorOnce();
+        maybeFetchNicoadContribRankingMirrorOnce();
       }, KOKEN_CONTRIB_API_FETCH_MS)
     )
   );
@@ -10127,6 +10136,10 @@ const KOKEN_CONTRIB_API_MIN_GAP_MS = 25_000;
 let kokenContribApiIntervalId = null;
 /** @type {number} */
 let _kokenContribApiLastAttemptAt = 0;
+/** nicoad 広告ランキング API の再入抑止（koken と同じ min-gap 規約）。 */
+const NICOAD_CONTRIB_API_MIN_GAP_MS = 25_000;
+/** @type {number} */
+let _nicoadContribApiLastAttemptAt = 0;
 
 /**
  * koken 公式ギフト貢献度ランキング 無認証 API を SW 経由で取得し、専用 storage
@@ -10182,6 +10195,73 @@ function maybeFetchKokenContribRankingMirrorOnce() {
           chrome.storage.local
             .set({
               [kokenContribStorageKey(lid)]: {
+                rows,
+                capturedAt: Date.now(),
+                liveId: lid
+              }
+            })
+            .catch((err) => {
+              if (!isContextInvalidatedError(err)) {
+                /* best-effort */
+              }
+            });
+        } catch {
+          /* no-op: storage 不可・context 消失 */
+        }
+      }
+    );
+  } catch {
+    /* no-op: sendMessage 不可（context invalidated 等）。次 tick で自己回復 */
+  }
+}
+
+/**
+ * nicoad（ニコニ広告）貢献度ランキング 無認証 API を SW 経由で取得し、専用 storage
+ * キー（nicoadContribStorageKey = nls_nicoad_api_ranking_<lv>）に保存する。
+ *
+ * 広告ランキングは従来 HTML scrape（nls_nicoad_ranking_<lv>）で取得していたが、
+ * その DOM に広告主の uid が出ず、記名広告主のアカウントリンク/アバターが付かな
+ * かった。本 API は記名行に userId/userPageUrl を返す（2026-05-23 実機確証）。
+ * popup マージで API 由来（userPageUrl 付き）を優先し、scrape をフォールバックに
+ * することで、既存の officialDomRankingRowsToStripRooms(rows, {userKeyKind:'ad'})
+ * の uid リンク化経路が自動発火する。
+ *
+ * 制約は maybeFetchKokenContribRankingMirrorOnce と同一（NDGR/gift hotpath 非干渉・
+ * SW 経由 fetch・rows>0 のみ書込＝fail-soft・専用キーで scrape 値を clobber しない・
+ * liveId echo 一致確認・min-gap 再入抑止・callback 喪失時も次 tick で自己回復）。
+ */
+function maybeFetchNicoadContribRankingMirrorOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '')
+      .trim()
+      .toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _nicoadContribApiLastAttemptAt < NICOAD_CONTRIB_API_MIN_GAP_MS) return;
+    _nicoadContribApiLastAttemptAt = now;
+    chrome.runtime.sendMessage(
+      { type: NICOAD_CONTRIB_FETCH_MESSAGE_TYPE, liveId: lid },
+      (resp) => {
+        const le = chrome.runtime.lastError;
+        if (le) return;
+        if (!resp || resp.ok !== true || resp.json == null) return;
+        let rows = null;
+        try {
+          rows = normalizeNicoadRankingResponse(resp.json);
+        } catch {
+          rows = null;
+        }
+        if (!Array.isArray(rows) || rows.length === 0) return;
+        const curLid = String(liveId || '')
+          .trim()
+          .toLowerCase();
+        if (curLid !== lid) return;
+        try {
+          chrome.storage.local
+            .set({
+              [nicoadContribStorageKey(lid)]: {
                 rows,
                 capturedAt: Date.now(),
                 liveId: lid
@@ -11061,6 +11141,27 @@ async function persistOfficialEventDomBundleNow() {
         });
         if (staleKokenKeys.length) {
           await chrome.storage.local.remove(staleKokenKeys);
+        }
+      } catch { /* best-effort */ }
+      // nicoad API 鏡の専用キー（nicoadContribStorageKey = nls_nicoad_api_ranking_）も
+      // 同規約で cleanup（現 lv 保護・別 lv で 24h 超 or capturedAt 不明は prune）。
+      try {
+        const NICOAD_TTL_MS = 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const curLid = String(lid || '').trim().toLowerCase();
+        const staleNicoadKeys = Object.keys(all).filter((k) => {
+          if (!k.startsWith(NICOAD_CONTRIB_STORAGE_PREFIX)) return false;
+          const klv = k.slice(NICOAD_CONTRIB_STORAGE_PREFIX.length);
+          if (klv && curLid && klv === curLid) return false;
+          const v = all[k];
+          const cap =
+            v && typeof v === 'object' && typeof v.capturedAt === 'number'
+              ? v.capturedAt
+              : 0;
+          return cap === 0 || nowMs - cap >= NICOAD_TTL_MS;
+        });
+        if (staleNicoadKeys.length) {
+          await chrome.storage.local.remove(staleNicoadKeys);
         }
       } catch { /* best-effort */ }
       const nicoadLvs = Object.keys(all)
