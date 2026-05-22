@@ -244,16 +244,32 @@ describe('suggestPlacementUpgradeForWideViewport', () => {
     ).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
   });
 
-  it('既に beside / floating / dock_bottom は対象外（昇格しない）', () => {
+  it('既に beside / floating は対象外（昇格しない）', () => {
     for (const stored of [
       INLINE_PANEL_PLACEMENT_BESIDE,
-      INLINE_PANEL_PLACEMENT_FLOATING,
-      INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
+      INLINE_PANEL_PLACEMENT_FLOATING
     ]) {
       expect(
         suggestPlacementUpgradeForWideViewport({ ...base, stored })
       ).toBe(null);
     }
+  });
+
+  it('🐛 dock_bottom（実質の既定配置）は昇格対象（修正前は除外＝大画面で横付きにならない真因）', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({
+        ...base,
+        stored: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
+      })
+    ).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
+    // ただし自分で「画面下いっぱい」を選んだ人（USER_EXPLICIT）は昇格しない
+    expect(
+      suggestPlacementUpgradeForWideViewport({
+        ...base,
+        stored: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
+        userExplicit: true
+      })
+    ).toBe(null);
   });
 
   it('viewportInnerWidth が 0 / NaN でも安全（昇格しない）', () => {
@@ -280,7 +296,10 @@ describe('suggestPlacementUpgradeForWideViewport', () => {
     [INLINE_PANEL_PLACEMENT_BELOW, false, WIDE, 'always', true, INLINE_PANEL_PLACEMENT_BESIDE],
     [INLINE_PANEL_PLACEMENT_BELOW, false, NARROW, 'always', false, null],
     [INLINE_PANEL_PLACEMENT_BELOW, true, WIDE, 'always', false, null],
-    [INLINE_PANEL_PLACEMENT_DOCK_BOTTOM, false, WIDE, 'always', false, null],
+    [INLINE_PANEL_PLACEMENT_DOCK_BOTTOM, false, WIDE, 'always', false, INLINE_PANEL_PLACEMENT_BESIDE],
+    [INLINE_PANEL_PLACEMENT_DOCK_BOTTOM, false, NARROW, 'always', false, null],
+    [INLINE_PANEL_PLACEMENT_DOCK_BOTTOM, true, WIDE, 'always', false, null],
+    [INLINE_PANEL_PLACEMENT_FLOATING, false, WIDE, 'always', false, null],
     ['', false, WIDE, 'once', false, INLINE_PANEL_PLACEMENT_BESIDE]
   ])(
     'マトリクス: (%s, explicit=%s, vw=%i, %s, onceDone=%s) → %s',

@@ -2,7 +2,6 @@
  * インラインパネルを「タブ幅に近い」まで広げる幅の純粋計算（content-entry から利用）。
  */
 
-import { INLINE_VIEWPORT_BESIDE_MIN_WIDTH } from './inlinePanelLayout.js';
 import {
   INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_BESIDE,
@@ -107,62 +106,12 @@ export function shouldConsumeViewportWideOnce(opts) {
  * storage.onChanged の外側、同期変数経由）が担う。描画ホットパスからは呼ばない。
  */
 
-/**
- * 昇格対象になりうる保存値か（below / 未設定のみ。dock_bottom/floating は明示性が高く対象外）
- * @param {unknown} stored
- * @returns {boolean}
+/*
+ * 横付き昇格のロジックは「配置の単一の真実」= inlinePanelPlacementResolver.js に
+ * 集約済み。ここはそこへ委譲する薄い別名（既存 import 互換の維持）。昇格候補の
+ * 語彙（dock_bottom も既定配置として昇格対象）は resolver 側 1 箇所だけが持つ。
  */
-function isPlacementUpgradeCandidate(stored) {
-  const s = String(stored || '').trim();
-  return s === '' || s === INLINE_PANEL_PLACEMENT_BELOW;
-}
-
-/**
- * 大画面のとき below/未設定 を beside に「昇格」すべきか判定し、昇格後の保存値を返す。
- * 昇格不要なら null（呼出元は何も書かない）。
- *
- * @param {{
- *   stored: string,
- *   userExplicit: boolean,
- *   viewportInnerWidth: number,
- *   policy: 'off' | 'always' | 'once' | string,
- *   onceDone: boolean
- * }} opts
- * @returns {typeof INLINE_PANEL_PLACEMENT_BESIDE | null}
- */
-export function suggestPlacementUpgradeForWideViewport(opts) {
-  const {
-    stored,
-    userExplicit,
-    viewportInnerWidth,
-    policy,
-    onceDone
-  } = opts || {};
-  // ユーザーが配置を明示選択済みなら、その意思を最優先（昇格しない）。
-  if (userExplicit === true) return null;
-  // off は機能無効。
-  if (policy === INLINE_PANEL_VIEWPORT_WIDE_OFF) return null;
-  // floating / dock_bottom / 既に beside は対象外。below / 未設定のみ。
-  if (!isPlacementUpgradeCandidate(stored)) return null;
-  // 横付きが現実的に収まるタブ幅未満では昇格しない（降格と同じ閾値）。
-  const w = Number(viewportInnerWidth) || 0;
-  if (w < INLINE_VIEWPORT_BESIDE_MIN_WIDTH) return null;
-  // 「1 回だけ」方針で既に消費済みなら昇格しない。
-  if (policy === INLINE_PANEL_VIEWPORT_WIDE_ONCE && onceDone === true) {
-    return null;
-  }
-  return INLINE_PANEL_PLACEMENT_BESIDE;
-}
-
-/**
- * 昇格を「1 回だけ」方針で消費したフラグ（onceDone）を立てるべきか。
- * 実際に昇格保存が起きたとき（suggestPlacementUpgradeForWideViewport が beside を返した）
- * かつ policy === once のときだけ true。always では消費しない（毎回評価し続ける）。
- * @param {{ policy: string, upgradedTo: string | null }} opts
- * @returns {boolean}
- */
-export function shouldConsumePlacementUpgradeOnce(opts) {
-  if (!opts) return false;
-  if (opts.policy !== INLINE_PANEL_VIEWPORT_WIDE_ONCE) return false;
-  return opts.upgradedTo === INLINE_PANEL_PLACEMENT_BESIDE;
-}
+export {
+  resolveWideViewportPlacementUpgrade as suggestPlacementUpgradeForWideViewport,
+  shouldConsumeWideViewportUpgradeOnce as shouldConsumePlacementUpgradeOnce
+} from './inlinePanelPlacementResolver.js';

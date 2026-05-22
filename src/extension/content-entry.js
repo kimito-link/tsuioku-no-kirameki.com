@@ -187,10 +187,9 @@ import {
 } from '../lib/inlinePanelLayout.js';
 import {
   resolveWidenedInlinePanelWidthPx,
-  shouldConsumeViewportWideOnce,
-  suggestPlacementUpgradeForWideViewport,
-  shouldConsumePlacementUpgradeOnce
+  shouldConsumeViewportWideOnce
 } from '../lib/inlinePanelViewportWide.js';
+import { resolveInlinePanelPlacementDecision } from '../lib/inlinePanelPlacementResolver.js';
 import {
   scoreInlineHostAnchorCandidate,
   stackedLayoutAnchorOverrides,
@@ -5660,24 +5659,21 @@ async function maybeUpgradePlacementForWideViewport(rawStoredPlacement) {
   if (!hasExtensionContext()) return;
   if (!isWatchInlinePanelTopFrame()) return;
   const vp = nlsLayoutViewportSize();
-  const upgradedTo = suggestPlacementUpgradeForWideViewport({
+  // 配置の単一の真実（resolver）で昇格判定＋once消費を一括解決。
+  // 昇格候補の語彙（dock_bottom も既定として昇格対象）は resolver 1 箇所が持つ。
+  const decision = resolveInlinePanelPlacementDecision({
     stored: String(rawStoredPlacement || ''),
     userExplicit: inlinePanelPlacementUserExplicit,
     viewportInnerWidth: vp.innerWidth,
     policy: inlinePanelViewportWidePolicy,
     onceDone: inlinePanelViewportWideOnceDone
   });
-  if (upgradedTo == null) return;
+  if (decision.upgradeTo == null) return;
   // 同期の見た目を即追従（書込の onChanged を待たない）。
-  inlinePanelPlacementMode = normalizeInlinePanelPlacement(upgradedTo);
+  inlinePanelPlacementMode = normalizeInlinePanelPlacement(decision.upgradeTo);
   /** @type {Record<string, unknown>} */
-  const patch = { [KEY_INLINE_PANEL_PLACEMENT]: upgradedTo };
-  if (
-    shouldConsumePlacementUpgradeOnce({
-      policy: inlinePanelViewportWidePolicy,
-      upgradedTo
-    })
-  ) {
+  const patch = { [KEY_INLINE_PANEL_PLACEMENT]: decision.upgradeTo };
+  if (decision.consumeOnce) {
     inlinePanelViewportWideOnceDone = true;
     patch[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE] = true;
   }

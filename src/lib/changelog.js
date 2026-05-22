@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.300',
+    date: '2026-05-22',
+    summary: '画面下固定からも大画面で横付きに',
+    items: Object.freeze([
+      '[修正] 大きな画面で開いてもパネルが「横付き」から始まらない問題を直しました——既定の配置（画面下いっぱい）が自動横付きの対象から漏れており、実際にはほとんどの方が横付きにならない状態でした。今後は配置を自分で選んでいなければ、画面下いっぱいからでも大画面で横付きに切り替わります',
+      '[内部] 配置の決め方を 1 つの部品（resolver）に集約し、「既定の配置とは何か」の認識ズレで同じ不具合が再発しないようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.299',
     date: '2026-05-22',
     summary: '大きな画面で自動的に横付きに',
