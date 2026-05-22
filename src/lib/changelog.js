@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.310',
+    date: '2026-05-22',
+    summary: '内部整理: やさしさナッジの表示判断をlib化',
+    items: Object.freeze([
+      '[内部] コメント送信前の「やさしい言い換え」案内の表示判断（どの文言・表情を出すか）を、テストしやすい部品（純関数）に切り出しました。2回押しの確認の流れや見た目・動作は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.309',
     date: '2026-05-22',
     summary: '内部整理: コメントティッカー描画をlib化',
