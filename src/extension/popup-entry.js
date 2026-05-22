@@ -22,6 +22,7 @@ import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFrom
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
 import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
 import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
+import { GIFT_HISTORY_LANE_MAX } from '../lib/giftRankStripConfig.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 import {
@@ -6025,7 +6026,7 @@ async function computeGiftRankStripRoomsContext(liveId) {
     const sorted = [...throwsRows].sort(
       (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
     );
-    const rooms = sorted.slice(0, 12).map((r) => {
+    const rooms = sorted.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
       const userKey = String(r?.userId || '');
       const rawNickname = String(r?.nickname || '');
       const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
@@ -6121,7 +6122,7 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
     );
     const senderN = sorted.length;
     const throwM = sorted.reduce((s, r) => s + (Number(r?.throwCount) || 0), 0);
-    const rooms = sorted.slice(0, 12).map((r) => {
+    const rooms = sorted.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
       const userKey = String(r?.userId || '');
       const rawNickname = String(r?.nickname || '');
       const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
@@ -6559,6 +6560,23 @@ async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
  * watch ページ programStats から取れる数値で「X,XXX pt」形式の fallback HTML を
  * 組み立てるのが本版の戦略。
  */
+/**
+ * v0.1.304: 番組累計pt をギフト履歴ヘッダ右の inline span (#giftHistoryProgramPt) に反映。
+ * 値が無いときは「—」のプレースホルダ（枠＝span は常設＝枠維持原則 OK）。独立レーンは
+ * CSS で畳んであるが DOM/JS は残しているので renderNorthStarLane('programPoints') も従来通り走る。
+ * @param {number|null} value
+ */
+function syncGiftHistoryHeaderProgramPt(value) {
+  const el = document.getElementById('giftHistoryProgramPt');
+  if (!el) return;
+  const numEl = el.querySelector('.nl-north-star-lane__program-pt-num');
+  const hasValue = typeof value === 'number' && Number.isFinite(value) && value >= 0;
+  if (numEl) {
+    numEl.textContent = hasValue ? value.toLocaleString('en-US') : '—';
+  }
+  el.classList.toggle('is-placeholder', !hasValue);
+}
+
 function refreshNorthStarProgramPointsLane() {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
@@ -6569,6 +6587,8 @@ function refreshNorthStarProgramPointsLane() {
     ? snap.officialGiftPointsNdgr
     : null;
   const value = domValue != null ? domValue : ndgrValue;
+  // ギフト履歴ヘッダの inline 累計pt を同期（独立レーンは CSS で非表示・下記は従来通り）。
+  syncGiftHistoryHeaderProgramPt(value);
   const fallback = buildNorthStarProgramPointsFallbackHtml(value);
   if (fallback) {
     renderNorthStarLane('programPoints', fallback);

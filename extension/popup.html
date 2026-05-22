@@ -2936,13 +2936,52 @@
       .nl-north-star-lane[data-lane='giftHistory'] > .nl-north-star-lane__shell {
         min-height: 84px;
       }
+      /* v0.1.304: 番組累計pt をギフト履歴ヘッダ右にインライン統合（独立レーンは畳む）。
+         label を flex にして pt を右寄せ。色は --nl-lane-accent-program(青) で、ギフトの
+         pink(--nl-lane-accent-gift)と分け「別指標」を一目で示す（誤認防止は色+文言+title）。 */
+      .nl-north-star-lane__heading--with-pt > .nl-north-star-lane__label {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 2px 8px;
+      }
+      .nl-north-star-lane__program-pt {
+        margin-left: auto;
+        color: color-mix(in srgb, var(--nl-lane-accent-program) 78%, var(--nl-text) 22%);
+        font-weight: 700;
+        font-size: 11px;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+      .nl-north-star-lane__program-pt.is-placeholder {
+        color: color-mix(in srgb, var(--nl-text) 45%, transparent);
+      }
+      .nl-north-star-lane__program-pt-label {
+        font-size: 9.5px;
+        font-weight: 600;
+        opacity: 0.85;
+      }
+      .nl-north-star-lane__program-pt-num {
+        font-size: 13px;
+      }
+      .nl-north-star-lane__program-pt-unit {
+        font-size: 9px;
+        font-weight: 600;
+        opacity: 0.8;
+        margin-left: 1px;
+      }
+      /* 番組累計pt はヘッダに統合したので独立レーンは畳む（DOM/JS は残し参照切れ防止）。 */
+      .nl-north-star-lane[data-lane='programPoints'] {
+        display: none;
+      }
       .nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank--below-cards .nl-top-support-rank__list {
         padding: 3px 2px 5px;
       }
       .nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank--below-cards .nl-top-support-rank__line {
+        /* v0.1.304: grid 化に伴い固定幅 min/max-width を撤去（grid トラックが幅を決める。
+           max-width が残ると 1fr 全幅化・折返しを阻害）。padding だけ giftHistory 専用に残す。 */
         padding: 3px 3px 4px;
-        min-width: 50px;
-        max-width: 68px;
       }
       .nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank__note {
         font-size: clamp(8px, 1.7vw, 9px);
@@ -3525,10 +3564,10 @@
         flex: 1 1 auto;
         min-height: 0;
       }
-      /* 北極星内の横カードを帯より一段コンパクトに（高さを抑える） */
+      /* 北極星内の横カードを帯より一段コンパクトに（高さを抑える）。
+         v0.1.304: grid 化で固定幅 min/max-width を撤去（grid トラックが幅を決める）。 */
       .nl-north-star-lane__body.nl-top-support-rank--below-cards .nl-top-support-rank__line {
-        min-width: 48px;
-        max-width: 64px;
+        min-width: 0;
         padding: 4px 3px 5px;
         gap: 2px;
       }
@@ -3744,15 +3783,19 @@
         text-align: center;
       }
 
+      /* v0.1.304: 横スクロール固定幅 → grid auto-fit。人数でカード幅が自動可変。
+         1人=全幅 / 2人=半分 / 3人=3分割 …（少人数は分け合う＝1fr）。
+         minmax の下限 --nl-rank-card-min が「最小可読幅」を死守し、収まらない人数は
+         自動で次段へ折り返す（最大10件なので 2-3段で全件が常に見える＝見落とし防止）。
+         auto-fill ではなく auto-fit（auto-fill は 1人時に空トラックを作り全幅に伸びない）。 */
       .nl-top-support-rank--below-cards .nl-top-support-rank__list {
-        flex-direction: row;
-        flex-wrap: nowrap;
+        display: grid;
+        grid-template-columns: repeat(
+          auto-fit,
+          minmax(var(--nl-rank-card-min, 58px), 1fr)
+        );
         gap: 6px;
-        overflow-x: auto;
-        overflow-y: hidden;
         padding: 4px 2px 8px;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-gutter: stable;
         border-top: 1px solid color-mix(in srgb, var(--nl-border) 45%, transparent);
       }
 
@@ -3761,10 +3804,9 @@
         flex-direction: column;
         align-items: center;
         gap: 3px;
-        flex: 0 0 auto;
-        min-width: 54px;
-        max-width: 76px;
-        width: min-content;
+        /* grid トラックが幅を決めるので flex 固定幅・min/max-width は付けない
+           （max-width を残すと 1fr で全幅に伸びず・折返しも阻害する死にコードになる）。 */
+        min-width: 0;
         padding: 5px 4px 6px;
         box-sizing: border-box;
         border-radius: 8px;
@@ -8448,16 +8490,16 @@
               ></aside>
             </div>
           </div>
-          <div class="nl-north-star-gift-stack" aria-label="ギフト指標の2レーン">
-            <div class="nl-north-star-gift-stack__ribbon" role="presentation">
-              <span class="nl-north-star-gift-stack__ribbon-label">ギフト指標（2段）</span>
-              <span class="nl-north-star-gift-stack__ribbon-note">上段＝ユーザー別、下段＝番組累計pt（別指標）</span>
-            </div>
+          <div class="nl-north-star-gift-stack" aria-label="ギフト指標">
             <div class="nl-north-star-lane" data-lane="giftHistory">
-            <div class="nl-north-star-lane__heading">
-              <p class="nl-north-star-lane__label">この番組へのギフト履歴</p>
+            <div class="nl-north-star-lane__heading nl-north-star-lane__heading--with-pt">
+              <p class="nl-north-star-lane__label">この番組へのギフト履歴<span
+                  class="nl-north-star-lane__program-pt is-placeholder"
+                  id="giftHistoryProgramPt"
+                  title="番組ギフト累計pt（ティッカー等）。表示中ユーザー別の合計ではありません"
+                ><span class="nl-north-star-lane__program-pt-label">累計</span> <b class="nl-north-star-lane__program-pt-num">—</b><small class="nl-north-star-lane__program-pt-unit">pt</small></span></p>
               <p class="nl-north-star-lane__sublabel">
-                ユーザー別。履歴が無いときはコメント観測の「投げ回数」で代替（下段の累計ptとは別）。
+                ユーザー別（多い順・最大10）。履歴が無いときはコメント観測の「投げ回数」で代替。右上「累計」は番組全体の別指標です。
               </p>
             </div>
             <div class="nl-north-star-lane__shell">
