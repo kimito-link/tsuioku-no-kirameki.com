@@ -232,16 +232,27 @@ export function topSupportRankLineModels(stripRooms, opts) {
     const nickRaw = String(r?.nickname || '').trim();
     const useOfficialDomNick =
       /^__(ad|contrib)_\d+_/i.test(userKey) && Boolean(nickRaw);
-    // 公式DOMランキングの匿名合成キー（__anon_ad_N / __anon_contrib_N）は、
-    // 内部キーを表示に漏らさず「匿名」と出す（公式ページ相当）。id 行・u/ リンクも出さない。
-    const isAnonOfficialDomRank = isAnonymousOfficialDomRankUserKey(userKey);
+    // 公式DOMランキング行で「使える公式表示名が無い」ものは、内部合成キーを表示に
+    // 漏らさず「匿名」と出す（公式ページ相当）。id 行・u/ リンク・title も出さない。
+    //
+    // v0.1.308 は明示的匿名キー（__anon_ad_N / __anon_contrib_N）だけを対象に
+    // していたが、scrape が name を読めず isAnonymous も付かなかった行は
+    // `__ad_N_` / `__contrib_N_`（name 空サフィックス）になり、useOfficialDomNick が
+    // false のまま下流の uid フォールバックで `u/__ad_N_` と内部キーが漏れていた。
+    // → 「公式DOMランク行 かつ 使える公式表示名が無い」を一律 匿名表示に倒す（v0.1.315）。
+    const isAnonOfficialDomRank =
+      isAnonymousOfficialDomRankUserKey(userKey) ||
+      (isOfficialRank && !useOfficialDomNick);
     const resolvedNickForLine = useOfficialDomNick
       ? nickRaw
       : isAnonOfficialDomRank
         ? '匿名'
         : anonymousNicknameFallback(userKey, nickRaw);
 
-    const idTitle = isUnknown || isAnonOfficialDomRank ? '' : String(r.userKey);
+    // 公式DOMランク行（名前付き含む）の合成キーは id title にも出さない
+    // （id span 自体が抑制される行だが、モデル単体でも内部キーを持たせない）。
+    const idTitle =
+      isUnknown || isAnonOfficialDomRank || useOfficialDomNick ? '' : String(r.userKey);
     let idShort = isUnknown
       ? '—'
       : useOfficialDomNick || isAnonOfficialDomRank
@@ -262,9 +273,14 @@ export function topSupportRankLineModels(stripRooms, opts) {
       }
     }
 
+    // title（hover ラベル）も合成キーを漏らさない。匿名は「匿名」、公式DOMランクの
+    // 名前付き行は公式表示名のみ（`displayUserLabel` だと `名前（__ad_0_名前）` と
+    // 内部キーが括弧で出てしまう）。非公式行は従来どおり id 併記。
     const fullLabelForTitle = isAnonOfficialDomRank
       ? '匿名'
-      : displayUserLabel(userKey, r?.nickname);
+      : useOfficialDomNick
+        ? nickRaw
+        : displayUserLabel(userKey, r?.nickname);
 
     let hasAccent = false;
     let accentColorCss = null;

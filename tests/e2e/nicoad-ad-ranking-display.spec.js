@@ -45,7 +45,10 @@ test('広告ランキング: nls_nicoad_ranking_ を seed すると北極星レ�
           ranking: [
             { rank: 1, name: '広告タロウ', contribution: 5000, isAnonymous: false, userId: '111' },
             { rank: 2, name: '広告ジロウ', contribution: 3000, isAnonymous: false, userId: '222' },
-            { rank: 3, name: '', contribution: 1000, isAnonymous: true }
+            { rank: 3, name: '', contribution: 1000, isAnonymous: true },
+            // v0.1.315: scrape が name を読めず isAnonymous も付かなかった行。
+            // __ad_N_（name 空サフィックス）になり、旧版は `u/__ad_3_` と内部キーが漏れていた。
+            { rank: 4, name: '', contribution: 500, isAnonymous: false }
           ]
         }
       });
@@ -90,6 +93,10 @@ test('広告ランキング: nls_nicoad_ranking_ を seed すると北極星レ�
   expect(text).toContain('匿名');
   expect(text).not.toContain('__anon');
   expect(text).not.toContain('u/__anon');
+
+  // v0.1.315: name 空サフィックス行（rank 4, __ad_N_）も内部キーを漏らさない
+  expect(text).not.toContain('__ad_');
+  expect(text).not.toContain('u/__ad_');
 
   await popup.screenshot({ path: 'test-results/nicoad-ad-ranking.png', fullPage: false });
 });
