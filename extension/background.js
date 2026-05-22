@@ -529,6 +529,15 @@ async function fetchKokenContribRankingJson(liveId) {
       credentials: 'omit', // 無認証 API。cookie を不要に送らない
       cache: 'no-store', // サーバが no-store。毎回フレッシュ
       redirect: 'error', // 想定外リダイレクトは失敗扱い（abuse 面の保守）
+      // niconico ブラウザ版フロントエンド署名。現状この API はヘッダ全省略でも
+      // 200 を返すが、将来 niconico 側が 401/403 で弾くようになっても通り続ける
+      // 予防的補強（VOD クライアント Re:NNDD が access-rights/nv-comment で必須化
+      // していた定数 = niconico.js 由来。x-frontend-id:6=ブラウザ版 / version:0）。
+      // 無認証契約は不変（credentials:'omit' のまま・cookie は送らない）。
+      headers: {
+        'x-frontend-id': '6',
+        'x-frontend-version': '0'
+      },
       signal: ac.signal
     });
     let json = null;

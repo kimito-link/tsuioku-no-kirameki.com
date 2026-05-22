@@ -14,6 +14,10 @@
  *     GET https://api.koken.nicovideo.jp/v1/userperspective/contents/gift/live/<lv>/ranking?rank=20
  *
  *   - 認証不要（cookie / X-Frontend-Id / 全ヘッダ省略でも 200。credentials:'omit'）。
+ *     ただし SW 側の fetch は予防的に `x-frontend-id:6` / `x-frontend-version:0`
+ *     （niconico ブラウザ版フロントエンド署名）を送る。将来 niconico が無署名を
+ *     401/403 で弾くようになっても通り続けるための保険で、無認証契約は不変。
+ *     （VOD クライアント Re:NNDD が同署名を必須化していた知見＝reference 参照。）
  *   - `gift` と `nicoad`(広告) は URL パスの contributionType で構造分離。本経路は
  *     selector を一切使わないので、過去の「同型 DOM 広告混入事故(lv350481542)」
  *     class は原理的に発生しない。
