@@ -118,6 +118,7 @@ import {
   isGiftRankingLaneEnabledFromStorage,
   isGiftRankingLaneEnabledFromChange
 } from '../lib/giftRankingLaneOptIn.js';
+import { shouldRetryRankingAcquisitionOnVisible } from '../lib/rankingVisibleRetryDecision.js';
 import { buildOfficialDomFromRelayEvent } from '../lib/iframeOfficialDomFromRelay.js';
 import { iframeOfficialDomStorageKey } from '../lib/officialContributionRankingResolver.js';
 import { isTrustedGiftSubAppRelayMessage } from '../lib/giftSubAppRelayTrust.js';
@@ -346,6 +347,19 @@ let tabVisibleHarvestDebounceTimer = null;
 /** visible 復帰時の重い再走査を抑える冷却時間 */
 const TAB_VISIBLE_HARVEST_MIN_MS = 12_000;
 let lastTabVisibleHarvestAt = 0;
+/**
+ * v0.1.312: 複数タブ症状1 対策。貢献度ランキングは cross-origin koken iframe を
+ * mount→scrape する経路のため、**非可視/非フォーカスのタブでは Vue が render に
+ * 到達せず scrape 失敗**し、レーンが「取得中」のまま張り付く（初回 2s + 30s 一発
+ * リトライが裏タブで両方失敗すると、その後の復帰で何も再試行されない）。
+ *
+ * 対策: タブが可視に復帰したとき、ランキング未取得 かつ rescue-link 状態でない
+ * かつ前回試行から RANKING_VISIBLE_RETRY_MIN_MS 経過していれば、autoOpen を
+ * もう一度だけ試す。可視タブ限定なので裏タブで失敗連発しない。await は
+ * setTimeout/呼び出しのみ＝描画 hot path に I/O を足さない。
+ */
+const RANKING_VISIBLE_RETRY_MIN_MS = 60_000;
+let lastRankingVisibleRetryAt = 0;
 const MAX_SELF_POSTED_ITEMS = 48;
 const SELF_POST_RECENT_TTL_MS = 24 * 60 * 60 * 1000;
 const SELF_POST_NATIVE_DEDUPE_MS = 5000;
@@ -9048,9 +9062,43 @@ function tryPeriodicQuietDeepHarvest() {
  * バックグラウンドに回したあと visible に戻ったとき、仮想リストの取りこぼしを拾い直す。
  * 連打で deep が積まないよう短いデバウンスのみ。
  */
+/**
+ * v0.1.312: タブが可視に復帰したとき、貢献度ランキングが未取得なら autoOpen を
+ * もう一度だけ試す（複数タブ症状1）。可視タブ限定・冷却時間つき・rescue-link
+ * 配信者は skip（既存 30s リトライと同じ判定）。await I/O は呼び出しのみ。
+ */
+function maybeRetryRankingAcquisitionOnVisible() {
+  try {
+    let lastAutoOpenStatus = '';
+    try {
+      lastAutoOpenStatus = String(getRankingLifetimeDiag().autoOpenLastStatus || '');
+    } catch { /* no-op */ }
+    const decide = shouldRetryRankingAcquisitionOnVisible({
+      laneEnabled: isGiftRankingLaneEnabled(),
+      recording,
+      hasLiveId: Boolean(String(liveId || '').trim()),
+      locationAllowed: locationAllowsCommentRecording(),
+      visible:
+        typeof document === 'undefined' || document.visibilityState === 'visible',
+      haveRanking:
+        Array.isArray(lastOfficialEventDomBundle?.contributionRanking) &&
+        lastOfficialEventDomBundle.contributionRanking.length > 0,
+      nowMs: Date.now(),
+      lastRetryAtMs: lastRankingVisibleRetryAt,
+      minIntervalMs: RANKING_VISIBLE_RETRY_MIN_MS,
+      lastAutoOpenStatus
+    });
+    if (!decide) return;
+    lastRankingVisibleRetryAt = Date.now();
+    _autoOpenGiftSidebarTriedLiveId = ''; // 1 度だけ再試行を許可
+    void tryAutoOpenGiftSidebarOnceForScrape();
+  } catch { /* no-op */ }
+}
+
 function onTabVisibleForCommentHarvest() {
   if (document.visibilityState !== 'visible') return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  maybeRetryRankingAcquisitionOnVisible();
   scanVisibleCommentsNow();
   const now = Date.now();
   const needsRecovery = shouldForceDeepHarvestRecovery({
