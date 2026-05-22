@@ -140,8 +140,12 @@ function buildRowHtml(m, opts) {
   const nameSuffix = isNameEmpty ? '' : opts.nameSuffix;
   const nameHtml = `${escHtml(m.nameLine)}${escHtml(nameSuffix)}`;
 
-  // pt: カンマ区切り + unit suffix（'貢' 等）。
-  const ptHtml = `${escHtml(formatPt(m.count))} ${escHtml(opts.unitSuffix)}`;
+  // pt: カンマ区切り + unit suffix（'貢' 等）。数値を主役にし単位は弱める span で包む。
+  const unit = String(opts.unitSuffix || '').trim();
+  const unitHtml = unit
+    ? ` <span class="nl-contrib-ranking-list__pt-unit">${escHtml(unit)}</span>`
+    : '';
+  const ptHtml = `${escHtml(formatPt(m.count))}${unitHtml}`;
 
   // 行 title（hover で full label）。
   const titleAttr = m.fullLabelForTitle ? escHtml(m.fullLabelForTitle) : '';

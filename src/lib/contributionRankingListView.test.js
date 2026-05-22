@@ -111,7 +111,9 @@ describe('buildContributionRankingListHtml — 1 行の中身', () => {
     const html = buildContributionRankingListHtml([model(1, 'フロア熱狂', 5105)], baseOpts);
     expect(html).toContain('>1<');
     expect(html).toContain('フロア熱狂 さん');
-    expect(html).toContain('5,105 貢');
+    // 数値と単位は別要素（単位は弱める span）。数値・単位それぞれを確認。
+    expect(html).toContain('5,105');
+    expect(html).toContain('nl-contrib-ranking-list__pt-unit">貢<');
   });
 
   it('isUnknown 行は「さん」suffix を付けない', () => {
@@ -183,9 +185,10 @@ describe('buildContributionRankingListHtml — 1 行の中身', () => {
     expect(html).toContain('data-tier="normal"');
   });
 
-  it('count = 0 でも崩れず "0 貢" と出す', () => {
+  it('count = 0 でも崩れず "0" + 単位を出す', () => {
     const html = buildContributionRankingListHtml([model(10, 'Z', 0)], baseOpts);
-    expect(html).toContain('0 貢');
+    expect(html).toContain('__pt">0 ');
+    expect(html).toContain('nl-contrib-ranking-list__pt-unit">貢<');
   });
 
   it('count が大きくてもカンマ区切りで読みやすい（123,456,789）', () => {
@@ -193,13 +196,13 @@ describe('buildContributionRankingListHtml — 1 行の中身', () => {
       [model(1, 'B', 123456789)],
       baseOpts
     );
-    expect(html).toContain('123,456,789 貢');
+    expect(html).toContain('123,456,789');
   });
 
   it('count が NaN/非数値でも 0 に正規化される（落ちない）', () => {
     // @ts-expect-error 不正入力の防御確認
     const html = buildContributionRankingListHtml([model(1, 'A', 'bogus')], baseOpts);
-    expect(html).toContain('0 貢');
+    expect(html).toContain('__pt">0 ');
   });
 });
 
@@ -229,14 +232,15 @@ describe('buildContributionRankingListHtml — opts 切替', () => {
     expect(html).toContain('>A<');
   });
 
-  it('unitSuffix 空でも 後置 pt 単位は単に「100」と出る', () => {
+  it('unitSuffix 空なら単位 span を出さず数値のみ', () => {
     const html = buildContributionRankingListHtml([m1], {
       noteText: '',
       ariaLabel: 'L',
       unitSuffix: '',
       defaultThumbSrc: ''
     });
-    expect(html).toContain('100 ');
+    expect(html).toContain('>100<');
+    expect(html).not.toContain('nl-contrib-ranking-list__pt-unit');
   });
 
   it('opts 自体が undefined でも落ちず、ariaLabel default が効く', () => {
