@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.309',
+    date: '2026-05-22',
+    summary: '内部整理: コメントティッカー描画をlib化',
+    items: Object.freeze([
+      '[内部] 最新コメントのティッカー表示を組み立てる処理を、テストしやすい部品（純関数）に切り出しました。見た目・動作は変わりません（大きなファイルを少しずつ整理していく一歩目です）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.308',
     date: '2026-05-22',
     summary: '広告ランキングの匿名行を「匿名」表示に',
