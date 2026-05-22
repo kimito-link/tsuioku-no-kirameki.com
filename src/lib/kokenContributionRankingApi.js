@@ -126,6 +126,29 @@ function sanitizeHttpUrl(value) {
 }
 
 /**
+ * v0.1.316: niconico の「ユーザーページ」URL だけ通す。
+ * 公式 API が返す userPageUrl をそのままリンク化に使うが、想定外ホストや
+ * javascript: 等を弾く（推測ではなく公式提供値の検疫のみ）。
+ * 受理形: https://www.nicovideo.jp/user/<digits>（クエリ/末尾スラッシュ許容）。
+ * @param {unknown} value
+ * @returns {string} 受理時は正規化 URL、非該当は ''
+ */
+function sanitizeNicoUserPageUrl(value) {
+  const s = String(value == null ? '' : value).trim();
+  if (!/^https:\/\//i.test(s)) return '';
+  let u;
+  try {
+    u = new URL(s);
+  } catch {
+    return '';
+  }
+  if (u.hostname.toLowerCase() !== 'www.nicovideo.jp') return '';
+  const m = u.pathname.match(/^\/user\/(\d{1,18})\/?$/);
+  if (!m) return '';
+  return `https://www.nicovideo.jp/user/${m[1]}`;
+}
+
+/**
  * koken 公式 API の生 JSON を、既存 popup 描画が読む ContributionRankerRow[] に
  * 正規化する。
  *
@@ -170,12 +193,25 @@ export function normalizeKokenRankingResponse(json) {
     if (!Number.isFinite(contribution) || contribution < 0) contribution = 0;
     contribution = Math.trunc(contribution);
 
+    // v0.1.316: 記名行は公式 API の userPageUrl（無ければ supporterId から組み立て）を
+    // そのまま採用。匿名行（supporterId/userPageUrl 欠落）は付けない＝推測ゼロ・誤マージ不能。
+    let userPageUrl = '';
+    if (!isAnonymous) {
+      const officialUrl = sanitizeNicoUserPageUrl(r.userPageUrl);
+      if (officialUrl) {
+        userPageUrl = officialUrl;
+      } else if (/^\d{1,18}$/.test(String(r.supporterId).trim())) {
+        userPageUrl = `https://www.nicovideo.jp/user/${String(r.supporterId).trim()}`;
+      }
+    }
+
     rows.push({
       rank,
       name,
       contribution,
       isAnonymous,
-      thumbnailUrl: sanitizeHttpUrl(r.supporterThumbnailUrl)
+      thumbnailUrl: sanitizeHttpUrl(r.supporterThumbnailUrl),
+      ...(userPageUrl ? { userPageUrl } : {})
     });
   }
 

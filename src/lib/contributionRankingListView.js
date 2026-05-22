@@ -31,7 +31,7 @@
  *   └────────────────────────────┘
  */
 
-import { isHttpOrHttpsUrl } from './supportGrowthTileSrc.js';
+import { isHttpOrHttpsUrl, isAnonymousStyleNicoUserId } from './supportGrowthTileSrc.js';
 
 /**
  * @typedef {import('./topSupportRankStripLines.js').TopSupportRankLineModel} TopSupportRankLineModel
@@ -138,7 +138,16 @@ function buildRowHtml(m, opts) {
   // のときは suffix 無しで透過表示。
   const isNameEmpty = m.isUnknown || m.nameLine === '—' || m.nameLine === '（未取得）';
   const nameSuffix = isNameEmpty ? '' : opts.nameSuffix;
-  const nameHtml = `${escHtml(m.nameLine)}${escHtml(nameSuffix)}`;
+  const nameInner = `${escHtml(m.nameLine)}${escHtml(nameSuffix)}`;
+  // v0.1.316: userKey が実数値 uid（公式 API の userPageUrl 由来）のときだけ、
+  // 名前を niconico ユーザーページへのリンクにする。匿名・合成キー・未取得行は
+  // isAnonymousStyleNicoUserId が true を返すのでリンク化しない（推測ゼロ・公式提供分のみ）。
+  const linkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
+  const nameHtml = linkable
+    ? `<a class="nl-contrib-ranking-list__name-link" href="https://www.nicovideo.jp/user/${escHtml(
+        m.userKey
+      )}" target="_blank" rel="noopener noreferrer">${nameInner}</a>`
+    : nameInner;
 
   // pt: カンマ区切り + unit suffix（'貢' 等）。数値を主役にし単位は弱める span で包む。
   const unit = String(opts.unitSuffix || '').trim();

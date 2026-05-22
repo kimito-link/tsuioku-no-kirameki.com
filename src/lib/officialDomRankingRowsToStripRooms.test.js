@@ -29,4 +29,39 @@ describe('officialDomRankingRowsToStripRooms', () => {
   it('非配列は空', () => {
     expect(officialDomRankingRowsToStripRooms(/** @type {any} */ (null))).toEqual([]);
   });
+
+  it('v0.1.316: 記名行に公式 userPageUrl があれば userKey に実 uid を採用（リンク化経路へ）', () => {
+    const rooms = officialDomRankingRowsToStripRooms(
+      [
+        {
+          name: 'タロウ',
+          contribution: 100,
+          isAnonymous: false,
+          userPageUrl: 'https://www.nicovideo.jp/user/4046119'
+        },
+        { name: 'ジロウ', contribution: 50, isAnonymous: false },
+        { name: '名無し', contribution: 10, isAnonymous: true }
+      ],
+      { userKeyKind: 'contrib' }
+    );
+    expect(rooms[0].userKey).toBe('4046119');
+    expect(rooms[0].nickname).toBe('タロウ');
+    expect(rooms[1].userKey).toMatch(/^__contrib_/);
+    expect(rooms[2].userKey).toBe('__anon_contrib_2');
+  });
+
+  it('v0.1.316: 想定外ホストの userPageUrl は uid 採用しない（合成キーに倒す）', () => {
+    const rooms = officialDomRankingRowsToStripRooms(
+      [
+        {
+          name: 'X',
+          contribution: 1,
+          isAnonymous: false,
+          userPageUrl: 'https://evil.example.com/user/999'
+        }
+      ],
+      { userKeyKind: 'contrib' }
+    );
+    expect(rooms[0].userKey).toMatch(/^__contrib_/);
+  });
 });
