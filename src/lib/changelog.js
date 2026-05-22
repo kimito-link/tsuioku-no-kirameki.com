@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.307',
+    date: '2026-05-22',
+    summary: '広告ランキングが正しく表示されるように',
+    items: Object.freeze([
+      '[修正] ニコニ広告のランキング（北極星レーンの「+α 広告ランキング」）が、データは取れているのに表示まで届かないことがあった問題を直しました。広告ページから取り込んだランキングを専用の置き場（広告ランキング）として受け渡し、応援帯と同じ見た目で1〜上位まで表示します',
+      '[改善] 取り込みの状況が分かるよう、診断に広告ランキングの件数（adContribCount）を追加しました（不具合の切り分け用）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.306',
     date: '2026-05-22',
     summary: '別ウィンドウ表示の下の空白を解消',
