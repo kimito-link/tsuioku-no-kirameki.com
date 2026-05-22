@@ -193,6 +193,23 @@
         max-height: min(var(--nl-pop-height), 580px, 100vh);
       }
 
+      /*
+       * 0.1.306: standalone popup window（chrome.windows.create({type:'popup'})）
+       * だけ、html/body を 580px cap ではなくウィンドウ実高（100vh）まで使う。
+       * 経緯: active watch では window 高 780 に対し body が 580 で止まり、その差
+       * 200px が「下の大きな空白」として残っていた。standalone window の viewport
+       * はウィンドウそのものなので 100vh でも 2 重スクロールにはならず、`.nl-main`
+       * がウィンドウ全高でスクロールして空きが消える。
+       * action popup（ツールバーのドロップダウン）はこのクラスが付かない（JS 側で
+       * win.type==='popup' のときだけ付与）ため、従来の 580px cap を維持する。
+       * nl-popup-window は :not(.nl-inline) と両立（inline 埋め込みには付かない）。
+       */
+      html.nl-popup-window,
+      html.nl-popup-window body {
+        height: min(var(--nl-pop-height), 100vh);
+        max-height: 100vh;
+      }
+
       /* 親 iframe の高さ内に収め、はみ出しは内側スクロール（820px 級の白塔を防ぐ） */
       html.nl-inline {
         width: 100%;
