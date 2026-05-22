@@ -2772,7 +2772,11 @@
       .nl-north-star-lanes {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        /* レーン間は gap を唯一の「あいだ」機構にする（旧: gap10 + 隣接 margin8 +
+           padding8 ≈ 26px/境界 の三重取り）。gap を 8px に締め、隣接 margin は撤去、
+           内側 padding-top は separator 用に最小限だけ残す＝高さ変動を伴わない純減
+           （CLS リスクゼロ）。空レーンの min-height は別途のため不変。 */
+        gap: 8px;
         margin-top: 6px;
         padding: 8px;
         border-radius: 8px;
@@ -2891,8 +2895,9 @@
          うるさくしない・3 年後に色変えたければ 1 箇所修正で済む） */
       #northStarLanes .nl-north-star-lane + .nl-north-star-lane {
         position: relative;
-        margin-top: 8px;
-        padding-top: 8px;
+        /* margin-top は撤去（container gap が「あいだ」を担う）。padding-top は
+           separator(::before, top:0) の上に文字が貼り付かない最小余白だけ残す。 */
+        padding-top: 5px;
       }
       #northStarLanes .nl-north-star-lane + .nl-north-star-lane::before {
         content: '';
