@@ -3,7 +3,6 @@ import {
   INLINE_PANEL_DEFAULT_PLACEMENTS,
   isDefaultInlinePanelPlacement,
   resolveWideViewportPlacementUpgrade,
-  shouldConsumeWideViewportUpgradeOnce,
   resolveInlinePanelPlacementDecision
 } from './inlinePanelPlacementResolver.js';
 import { INLINE_VIEWPORT_BESIDE_MIN_WIDTH } from './inlinePanelLayout.js';
@@ -106,12 +105,27 @@ describe('resolveWideViewportPlacementUpgrade', () => {
         policy: INLINE_PANEL_VIEWPORT_WIDE_OFF
       })
     ).toBe(null);
+    // 🐛 v0.1.301: onceDone は配置昇格をブロックしない（幅広げ機能との共有フラグ
+    // 誤ブロックの撤去）。once 方針で onceDone=true でも昇格する。
     expect(
       resolveWideViewportPlacementUpgrade({ ...base, onceDone: true })
-    ).toBe(null);
+    ).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
   });
 
-  it('always は onceDone に関わらず昇格', () => {
+  it('🐛 共有 once フラグ撤去: once + onceDone=true でも昇格（実機 below 固定の主因）', () => {
+    // 過去セッションで「幅広げ once」が消費され onceDone=true でも、配置昇格は別物。
+    expect(
+      resolveWideViewportPlacementUpgrade({
+        stored: INLINE_PANEL_PLACEMENT_BELOW,
+        userExplicit: false,
+        viewportInnerWidth: 1257,
+        policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+        onceDone: true
+      })
+    ).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
+  });
+
+  it('always も onceDone に関わらず昇格', () => {
     expect(
       resolveWideViewportPlacementUpgrade({
         ...base,
@@ -127,53 +141,27 @@ describe('resolveWideViewportPlacementUpgrade', () => {
   });
 });
 
-describe('shouldConsumeWideViewportUpgradeOnce', () => {
-  it('once + 実際に beside 昇格のときだけ true', () => {
-    expect(
-      shouldConsumeWideViewportUpgradeOnce({
-        policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
-        upgradedTo: INLINE_PANEL_PLACEMENT_BESIDE
-      })
-    ).toBe(true);
-    expect(
-      shouldConsumeWideViewportUpgradeOnce({
-        policy: INLINE_PANEL_VIEWPORT_WIDE_ALWAYS,
-        upgradedTo: INLINE_PANEL_PLACEMENT_BESIDE
-      })
-    ).toBe(false);
-    expect(
-      shouldConsumeWideViewportUpgradeOnce({
-        policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
-        upgradedTo: null
-      })
-    ).toBe(false);
-  });
-});
-
 describe('resolveInlinePanelPlacementDecision（昇格＋降格の総合解決）', () => {
-  it('dock_bottom を大画面で開く → 昇格 beside・実効 beside・once 消費', () => {
+  it('dock_bottom を大画面で開く → 昇格 beside・実効 beside', () => {
     const d = resolveInlinePanelPlacementDecision({
       stored: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
       userExplicit: false,
       viewportInnerWidth: WIDE,
-      policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
-      onceDone: false
+      policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE
     });
     expect(d.upgradeTo).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
     expect(d.nextStored).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
-    expect(d.consumeOnce).toBe(true);
     expect(d.effective).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
   });
 
-  it('昇格しても実効は降格ロジックを通る（境界以下なら below に落ちる）', () => {
-    // 幅が昇格閾値以上だが、effectiveInlinePanelPlacement の降格境界（同値）で
-    // ちょうど beside を維持するケース。NARROW では昇格自体が起きない。
+  it('🐛 実機再現: below + 非明示 + 1257px → beside（onceDone を渡しても）', () => {
+    // 診断バンドル lv350583010 の実値。修正前はここが below のままだった。
     const d = resolveInlinePanelPlacementDecision({
-      stored: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
+      stored: INLINE_PANEL_PLACEMENT_BELOW,
       userExplicit: false,
-      viewportInnerWidth: INLINE_VIEWPORT_BESIDE_MIN_WIDTH,
-      policy: INLINE_PANEL_VIEWPORT_WIDE_ALWAYS,
-      onceDone: false
+      viewportInnerWidth: 1257,
+      policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+      onceDone: true
     });
     expect(d.upgradeTo).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
     expect(d.effective).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
@@ -184,12 +172,10 @@ describe('resolveInlinePanelPlacementDecision（昇格＋降格の総合解決�
       stored: INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
       userExplicit: true,
       viewportInnerWidth: WIDE,
-      policy: INLINE_PANEL_VIEWPORT_WIDE_ALWAYS,
-      onceDone: false
+      policy: INLINE_PANEL_VIEWPORT_WIDE_ALWAYS
     });
     expect(d.upgradeTo).toBe(null);
     expect(d.nextStored).toBe(INLINE_PANEL_PLACEMENT_DOCK_BOTTOM);
-    expect(d.consumeOnce).toBe(false);
     expect(d.effective).toBe(INLINE_PANEL_PLACEMENT_DOCK_BOTTOM);
   });
 
@@ -198,8 +184,7 @@ describe('resolveInlinePanelPlacementDecision（昇格＋降格の総合解決�
       stored: INLINE_PANEL_PLACEMENT_BESIDE,
       userExplicit: true,
       viewportInnerWidth: NARROW,
-      policy: INLINE_PANEL_VIEWPORT_WIDE_OFF,
-      onceDone: false
+      policy: INLINE_PANEL_VIEWPORT_WIDE_OFF
     });
     expect(d.upgradeTo).toBe(null);
     expect(d.effective).toBe(INLINE_PANEL_PLACEMENT_BELOW);
@@ -208,6 +193,5 @@ describe('resolveInlinePanelPlacementDecision（昇格＋降格の総合解決�
   it('opts 欠落でも安全', () => {
     const d = resolveInlinePanelPlacementDecision(undefined);
     expect(d.upgradeTo).toBe(null);
-    expect(d.consumeOnce).toBe(false);
   });
 });

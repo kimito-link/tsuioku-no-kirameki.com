@@ -5659,26 +5659,22 @@ async function maybeUpgradePlacementForWideViewport(rawStoredPlacement) {
   if (!hasExtensionContext()) return;
   if (!isWatchInlinePanelTopFrame()) return;
   const vp = nlsLayoutViewportSize();
-  // 配置の単一の真実（resolver）で昇格判定＋once消費を一括解決。
-  // 昇格候補の語彙（dock_bottom も既定として昇格対象）は resolver 1 箇所が持つ。
+  // 配置の単一の真実（resolver）で昇格判定。昇格候補の語彙（dock_bottom も既定
+  // として昇格対象）は resolver 1 箇所が持つ。配置昇格は once フラグに依存しない
+  // （昇格後 stored=beside で自然に再発防止＝幅広げ once との共有フラグに触れない）。
   const decision = resolveInlinePanelPlacementDecision({
     stored: String(rawStoredPlacement || ''),
     userExplicit: inlinePanelPlacementUserExplicit,
     viewportInnerWidth: vp.innerWidth,
-    policy: inlinePanelViewportWidePolicy,
-    onceDone: inlinePanelViewportWideOnceDone
+    policy: inlinePanelViewportWidePolicy
   });
   if (decision.upgradeTo == null) return;
   // 同期の見た目を即追従（書込の onChanged を待たない）。
   inlinePanelPlacementMode = normalizeInlinePanelPlacement(decision.upgradeTo);
-  /** @type {Record<string, unknown>} */
-  const patch = { [KEY_INLINE_PANEL_PLACEMENT]: decision.upgradeTo };
-  if (decision.consumeOnce) {
-    inlinePanelViewportWideOnceDone = true;
-    patch[KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE] = true;
-  }
   try {
-    await chrome.storage.local.set(patch);
+    await chrome.storage.local.set({
+      [KEY_INLINE_PANEL_PLACEMENT]: decision.upgradeTo
+    });
   } catch {
     // no-op（次回 watch 表示時に再評価される）
   }
@@ -7270,6 +7266,21 @@ function buildAiSharePageDiagnostics() {
         effectiveLayoutWidthMode:
           nlsInlinePanelLayoutRenderSnapshot.effectiveLayoutWidthMode,
         capturedAtMs: nlsInlinePanelLayoutRenderSnapshot.capturedAtMs
+      },
+      // 大画面で横付き昇格が「なぜ効いた／効かないか」を診断で直接見えるようにする
+      // （ここが空だと推測になり、確認せず報告する事故の元になる）。
+      wideViewportUpgradeDiag: {
+        policy: inlinePanelViewportWidePolicy,
+        onceDoneSharedFlag: inlinePanelViewportWideOnceDone,
+        userExplicit: inlinePanelPlacementUserExplicit,
+        // いま再評価したら昇格するか（保存済み stored を入力に）
+        wouldUpgradeNow:
+          resolveInlinePanelPlacementDecision({
+            stored: inlinePanelPlacementMode,
+            userExplicit: inlinePanelPlacementUserExplicit,
+            viewportInnerWidth: viewportInnerWidthDiag,
+            policy: inlinePanelViewportWidePolicy
+          }).upgradeTo || null
       },
       floatingAnchor: inlineFloatingAnchor,
       insertionPlan,

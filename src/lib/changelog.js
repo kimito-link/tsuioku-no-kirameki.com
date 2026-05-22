@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.301',
+    date: '2026-05-22',
+    summary: '横付き昇格が効かない共有フラグ問題を修正',
+    items: Object.freeze([
+      '[修正] 大きな画面でも横付きにならない問題をさらに修正——「幅をタブ幅まで広げる」機能と内部フラグを共有していたため、過去にその機能が一度動いた環境では横付きへの自動切り替えが永久に発火しませんでした。配置の自動横付きはこのフラグに依存しないよう切り離しました（一度横付きになれば設定が保存されるので、繰り返し切り替わることもありません）',
+      '[内部] 横付きが効いた／効かない理由を診断バンドルで直接確認できる項目（wideViewportUpgradeDiag）を追加しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.300',
     date: '2026-05-22',
     summary: '画面下固定からも大画面で横付きに',

@@ -25,8 +25,7 @@ import {
   INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_BESIDE,
   INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
-  INLINE_PANEL_VIEWPORT_WIDE_OFF,
-  INLINE_PANEL_VIEWPORT_WIDE_ONCE
+  INLINE_PANEL_VIEWPORT_WIDE_OFF
 } from './storageKeys.js';
 
 /**
@@ -70,51 +69,48 @@ export function isDefaultInlinePanelPlacement(stored) {
  * 大画面のとき既定配置を横付き(beside)へ「昇格」すべきか判定。昇格不要なら null。
  *
  * USER_EXPLICIT=true（自分で配置を選んだ）は最優先で no-op＝意思を守る。
+ *
+ * 🐛 修正(2026-05-22 v0.1.301): 旧実装は `once` 方針のとき `onceDone` で昇格を
+ * ブロックしていたが、この `onceDone`(KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE) は
+ * **幅をタブ幅まで広げる機能と共有**のフラグで、過去セッションで「幅広げ once」が
+ * 消費されると、配置昇格が永久に発火しなくなっていた（実機 lv350583010 で below
+ * 固定の主因）。そもそも配置昇格は「保存値を beside に書き換える」ので、一度昇格
+ * すれば stored=beside＝以後 isDefaultInlinePanelPlacement が false になり**自然に
+ * 二度と昇格しない**。よって onceDone ゲートは不要かつ有害。撤去し、policy は
+ * off 以外なら昇格する（once も always も配置昇格では同義＝1 回で恒久化）。
  * @param {InlinePlacementDecisionInput} [opts]
  * @returns {typeof INLINE_PANEL_PLACEMENT_BESIDE | null}
  */
 export function resolveWideViewportPlacementUpgrade(opts) {
-  const { stored, userExplicit, viewportInnerWidth, policy, onceDone } =
-    opts || {};
+  const { stored, userExplicit, viewportInnerWidth, policy } = opts || {};
   if (userExplicit === true) return null;
   if (policy === INLINE_PANEL_VIEWPORT_WIDE_OFF) return null;
   // 昇格対象は「既定配置」のみ（語彙は INLINE_PANEL_DEFAULT_PLACEMENTS 一元管理）。
   if (!isDefaultInlinePanelPlacement(stored)) return null;
   const w = Number(viewportInnerWidth) || 0;
   if (w < INLINE_VIEWPORT_BESIDE_MIN_WIDTH) return null;
-  if (policy === INLINE_PANEL_VIEWPORT_WIDE_ONCE && onceDone === true) {
-    return null;
-  }
+  // onceDone ゲートは撤去（幅広げ機能との共有フラグで誤ブロックしていた）。
+  // 再昇格防止は「昇格後 stored=beside＝候補外」で自然に担保される。
   return INLINE_PANEL_PLACEMENT_BESIDE;
-}
-
-/**
- * `once` 方針で昇格を消費したフラグを立てるべきか（実際に beside へ昇格したときだけ）。
- * @param {{ policy: string, upgradedTo: string | null }} opts
- * @returns {boolean}
- */
-export function shouldConsumeWideViewportUpgradeOnce(opts) {
-  if (!opts) return false;
-  if (opts.policy !== INLINE_PANEL_VIEWPORT_WIDE_ONCE) return false;
-  return opts.upgradedTo === INLINE_PANEL_PLACEMENT_BESIDE;
 }
 
 /**
  * 配置の総合解決（単一エントリポイント）。
  *
- * 1. 昇格（既定配置→beside）を判定。昇格するなら保存すべき新しい stored 値と
- *    once 消費フラグを返す。
+ * 1. 昇格（既定配置→beside）を判定。昇格するなら保存すべき新しい stored 値を返す。
  * 2. 昇格後（または据え置きの）保存値に対し、`effectiveInlinePanelPlacement` の
  *    降格（狭いタブで beside→below）を適用して実効配置を出す。
  *
  * これにより「保存値の昇格」と「実効値の降格」が 1 関数で一貫し、呼出側が順序を
  * 間違えたり片方を忘れたりする再発を防ぐ。
  *
+ * 注: 配置昇格は once フラグに依存しない（昇格後 stored=beside で自然に再発防止）。
+ * よって consumeOnce のような副作用フラグは返さない。
+ *
  * @param {InlinePlacementDecisionInput} [opts]
  * @returns {{
  *   upgradeTo: (typeof INLINE_PANEL_PLACEMENT_BESIDE) | null,
  *   nextStored: string,
- *   consumeOnce: boolean,
  *   effective: string
  * }}
  */
@@ -123,13 +119,9 @@ export function resolveInlinePanelPlacementDecision(opts) {
   const safe = opts || {};
   const upgradeTo = resolveWideViewportPlacementUpgrade(safe);
   const nextStored = upgradeTo ?? String(safe.stored ?? '');
-  const consumeOnce = shouldConsumeWideViewportUpgradeOnce({
-    policy: safe.policy,
-    upgradedTo: upgradeTo
-  });
   const effective = effectiveInlinePanelPlacement(
     nextStored,
     safe.viewportInnerWidth
   );
-  return { upgradeTo, nextStored, consumeOnce, effective };
+  return { upgradeTo, nextStored, effective };
 }

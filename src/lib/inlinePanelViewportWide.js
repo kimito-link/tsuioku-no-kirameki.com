@@ -111,7 +111,4 @@ export function shouldConsumeViewportWideOnce(opts) {
  * 集約済み。ここはそこへ委譲する薄い別名（既存 import 互換の維持）。昇格候補の
  * 語彙（dock_bottom も既定配置として昇格対象）は resolver 側 1 箇所だけが持つ。
  */
-export {
-  resolveWideViewportPlacementUpgrade as suggestPlacementUpgradeForWideViewport,
-  shouldConsumeWideViewportUpgradeOnce as shouldConsumePlacementUpgradeOnce
-} from './inlinePanelPlacementResolver.js';
+export { resolveWideViewportPlacementUpgrade as suggestPlacementUpgradeForWideViewport } from './inlinePanelPlacementResolver.js';
