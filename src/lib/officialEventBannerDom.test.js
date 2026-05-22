@@ -142,6 +142,39 @@ describe('scrapeOfficialEventBannerFromDom', () => {
       expect(r.title).toBe('なち');
     }
   });
+
+  // v0.1.323: 「現在50位」誤表示の根本修正の回帰固定（実機 lv350582635）。
+  // 配信者本人の「応援しよう」見出しが無い別 UI（サポーター順位リスト等）に「現在N位」が
+  // あっても、それを配信者のイベント順位として拾わない（テキストアンカー近傍限定）。
+  it('配信者見出しの外にある「現在50位」は拾わない（無関係順位の誤検出防止）', () => {
+    document.body.innerHTML = `
+      <div class="supporter-ranking-panel">
+        <div class="ranker-row"><span>サポーター</span><p>現在<span>50</span>位</p></div>
+        <div class="ranker-row"><span>別の人</span><p>現在<span>12</span>位</p></div>
+      </div>`;
+    const r = scrapeOfficialEventBannerFromDom(document);
+    // 「応援しよう」見出しが無い＝イベント参加が確証できない → rank を出さない
+    if (r) {
+      expect(r.rank).toBeNull();
+    } else {
+      expect(r).toBeNull();
+    }
+  });
+
+  it('見出しはあるがイベントパネルの外の「現在N位」は拾わない', () => {
+    // 配信者見出しはあるが、その近傍ブロックには順位が無く、遠い別ブロックに「現在99位」がある
+    document.body.innerHTML = `
+      <div class="root">
+        <div class="header-block"><h2 class="e1awe04q14"><span class="e1awe04q12">ほし</span>を応援しよう！</h2></div>
+        <div class="unrelated-far-block"><div><div><div><p>現在<span>99</span>位</p></div></div></div></div>
+      </div>`;
+    const r = scrapeOfficialEventBannerFromDom(document);
+    // 見出しの祖先4階層内に順位パネルが無い → rank は採らない（99 を誤検出しない）
+    if (r) {
+      expect(r.rank).toBeNull();
+      expect(r.title).toBe('ほし');
+    }
+  });
 });
 
 describe('scrapeOfficialEventBalloonFromDom', () => {
