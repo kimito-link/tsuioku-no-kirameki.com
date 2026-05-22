@@ -3,8 +3,10 @@ import {
   resolveViewportRelaxedPanelWidthPx,
   resolveViewportWidePolicyTargetWidthPx,
   resolveWidenedInlinePanelWidthPx,
-  shouldConsumeViewportWideOnce
+  shouldConsumeViewportWideOnce,
+  suggestPlacementUpgradeForWideViewport
 } from './inlinePanelViewportWide.js';
+import { INLINE_VIEWPORT_BESIDE_MIN_WIDTH } from './inlinePanelLayout.js';
 import {
   INLINE_PANEL_PLACEMENT_BELOW,
   INLINE_PANEL_PLACEMENT_BESIDE,
@@ -158,5 +160,21 @@ describe('shouldConsumeViewportWideOnce', () => {
         documentVisibilityState: 'visible'
       })
     ).toBe(false);
+  });
+});
+
+
+// 横付き昇格ロジックの本体テストは inlinePanelPlacementResolver.test.js に集約。
+// ここでは「再エクスポートの別名が resolver へ正しく繋がっているか」だけ確認する。
+describe('suggestPlacementUpgradeForWideViewport（resolver への別名）', () => {
+  it('別名が機能している（below + 非明示 + 広い → beside）', () => {
+    expect(
+      suggestPlacementUpgradeForWideViewport({
+        stored: INLINE_PANEL_PLACEMENT_BELOW,
+        userExplicit: false,
+        viewportInnerWidth: INLINE_VIEWPORT_BESIDE_MIN_WIDTH + 40,
+        policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE
+      })
+    ).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
   });
 });
