@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.319',
+    date: '2026-05-22',
+    summary: 'イベント現在順位の取得を新画面に対応',
+    items: Object.freeze([
+      '[改善] 「イベント現在順位」が出ないことがある問題に対応しました。配信者の応援パネルが新しい作りに変わっていたため、そこから「現在◯位」と累計スコアを正しく読み取れるようにしました（古い作りにも引き続き対応）。読み取れないときは従来どおり目安表示や枠の維持に留め、誤った順位は出しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.318',
     date: '2026-05-22',
     summary: 'ギフト履歴を送り主別の合計ptで多い順に',

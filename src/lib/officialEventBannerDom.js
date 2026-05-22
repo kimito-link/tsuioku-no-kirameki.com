@@ -83,7 +83,9 @@ export function scrapeOfficialEventBannerFromDom(root) {
   } catch {
     return null;
   }
-  if (!wrapper) return null;
+  // v0.1.319: 旧 `.owner-name`「参加しています」wrapper が無い場合、audition iframe の
+  // 新 CSS-modules DOM（「<配信者>さんを応援しよう！」+「現在N位」）から取得を試みる。
+  if (!wrapper) return scrapeEventBannerFromNewAuditionDom(base, doc);
 
   /**
    * simple class selector を試し、空なら CSS Modules ハッシュ化用の partial match に
@@ -140,8 +142,132 @@ export function scrapeOfficialEventBannerFromDom(root) {
       ? String(wrapper.href || '').trim()
       : (wrapper.getAttribute?.('href') || '').trim();
 
-  if (rank == null && score == null && !title) return null;
+  if (rank == null && score == null && !title) {
+    // 旧 wrapper は居たが中身が空＝新 DOM の可能性。フォールバック。
+    return scrapeEventBannerFromNewAuditionDom(base, doc);
+  }
   return { rank, score, title, iconUrl, ownerText, href };
+}
+
+/**
+ * v0.1.319: audition iframe の新 CSS-modules DOM から「現在順位」「累計スコア」
+ * 「配信者名」を掬う純関数（旧 `.owner-name`/`.rank-num` 構造に当たらない時の
+ * フォールバック）。emotion ハッシュ `css-XXXX` は不安定なので使わず、テキスト
+ * パターン（`現在N位`）と安定 suffix（`eNNNN`）・構造を主軸にする。
+ *
+ * 取り違え防止: rank は「現在」と「位」の間の数字のみ（目標/達成まで/順位UPの数値は
+ * 採らない）。score は現在順位パネル内の「累計スコア」位置（rank を含む `p` の
+ * 近傍・ギフトアイコン svg 隣）の数値。
+ *
+ * @param {Document|Element} base
+ * @param {Document} doc
+ * @returns {OfficialEventBannerData|null}
+ */
+function scrapeEventBannerFromNewAuditionDom(base, doc) {
+  /** @type {ParentNode} */
+  const scope = /** @type {any} */ (base) || doc;
+  if (!scope || typeof (/** @type {any} */ (scope).querySelectorAll) !== 'function') {
+    return null;
+  }
+
+  // 1) 「現在N位」テキストを持つ要素を探す（最も誤認しにくいアンカー）。
+  /** @type {HTMLElement|null} */
+  let rankHostEl = null;
+  /** @type {number|null} */
+  let rank = null;
+  try {
+    const candidates = /** @type {NodeListOf<HTMLElement>} */ (
+      scope.querySelectorAll('p, div, span')
+    );
+    for (const el of candidates) {
+      if (!(el instanceof HTMLElement)) continue;
+      // 自要素直下のテキスト + 子 span のテキストを連結（`現在<span>17</span>位`）
+      const t = String(el.textContent || '').replace(/[\s,]/g, '');
+      const m = /現在(\d+)位/.exec(t);
+      if (m) {
+        // 最も内側（テキストが短い）要素を採用＝親の長文に巻き込まれない
+        const n = parseInt(m[1], 10);
+        if (Number.isFinite(n) && n > 0) {
+          if (rankHostEl == null || t.length < String(rankHostEl.textContent || '').replace(/[\s,]/g, '').length) {
+            rankHostEl = el;
+            rank = n;
+          }
+        }
+      }
+    }
+  } catch { /* no-op */ }
+
+  // 2) 配信者名: 「<名>さんを応援しよう！」の見出し。`eNNNN` suffix or テキストから。
+  /** @type {string} */
+  let title = '';
+  try {
+    const heads = /** @type {NodeListOf<HTMLElement>} */ (
+      scope.querySelectorAll('h2, h1, [class*="e1awe04q"]')
+    );
+    for (const h of heads) {
+      if (!(h instanceof HTMLElement)) continue;
+      const t = String(h.textContent || '').trim();
+      if (/を応援しよう/.test(t)) {
+        // 「を応援しよう！」「さん」を除いた配信者名
+        const name = t
+          .replace(/を応援しよう[！!]?\s*$/, '')
+          .replace(/さん\s*$/, '')
+          .trim();
+        if (name) {
+          title = name;
+          break;
+        }
+      }
+    }
+  } catch { /* no-op */ }
+
+  // 3) 累計スコア: 現在順位パネル（rankHostEl の祖先ブロック）内で、rank/目標等を
+  //    除いた「累計」位置の数値。安定的に取りにくいので、rank が取れた時のみ
+  //    「rankHostEl の最も近い共通祖先配下の、rank と異なる最初のカンマ区切り数値」を採る。
+  //    取り違えが疑わしいときは score=null（誤値を出さない＝正確性優先）。
+  /** @type {number|null} */
+  let score = null;
+  try {
+    if (rankHostEl) {
+      // 現在順位パネルらしいブロック（rank の p の親＝rank と score を兄弟に持つ階層）を
+      // 起点に。closest は自要素を返すので使わず、親を 1〜2 階層辿る。
+      const panel =
+        (rankHostEl.parentElement instanceof HTMLElement ? rankHostEl.parentElement : null) ||
+        null;
+      if (panel instanceof HTMLElement) {
+        // パネル直下テキストから最初の「N,NNN」形（rank の裸数字より桁が大きい累計）を拾う。
+        // 「達成まで/順位UPまで」は別ブロック（e1izyqjk* / e1awe04q6）なので、
+        // rank と同じ最上段パネル（e1awe04q4 付近）に限定して誤認を避ける。
+        const numEls = /** @type {NodeListOf<HTMLElement>} */ (
+          panel.querySelectorAll('p, span')
+        );
+        for (const ne of numEls) {
+          if (!(ne instanceof HTMLElement)) continue;
+          const raw = String(ne.textContent || '');
+          if (/現在\d+位/.test(raw.replace(/[\s,]/g, ''))) continue; // rank 行は除外
+          if (/あと|まで|達成|目標/.test(raw)) continue; // 差分・目標は除外
+          const digits = raw.replace(/[^\d]/g, '');
+          if (/^\d+$/.test(digits) && digits.length >= 2) {
+            const v = parseInt(digits, 10);
+            if (Number.isFinite(v) && v > 0 && v !== rank) {
+              score = v;
+              break;
+            }
+          }
+        }
+      }
+    }
+  } catch { /* no-op */ }
+
+  if (rank == null && score == null && !title) return null;
+  return {
+    rank,
+    score,
+    title,
+    iconUrl: '',
+    ownerText: title ? `${title}さんを応援しよう！` : '',
+    href: ''
+  };
 }
 
 /**
