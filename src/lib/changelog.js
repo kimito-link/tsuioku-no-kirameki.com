@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.320',
+    date: '2026-05-23',
+    summary: '貢献度ランキング取得の安定性を補強',
+    items: Object.freeze([
+      '[改善] 公式の貢献度ランキングを取得する通信に、ニコニコのブラウザ版と同じ目印を添えるようにしました。今は無くても取得できますが、将来ニコニコ側の仕様が変わって目印が必須になっても、引き続き取得できるようにするための備えです（ログインは不要のまま・送る情報は増えません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.319',
     date: '2026-05-22',
     summary: 'イベント現在順位の取得を新画面に対応',
