@@ -2772,7 +2772,11 @@
       .nl-north-star-lanes {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        /* レーン間は gap を唯一の「あいだ」機構にする（旧: gap10 + 隣接 margin8 +
+           padding8 ≈ 26px/境界 の三重取り）。gap を 8px に締め、隣接 margin は撤去、
+           内側 padding-top は separator 用に最小限だけ残す＝高さ変動を伴わない純減
+           （CLS リスクゼロ）。空レーンの min-height は別途のため不変。 */
+        gap: 8px;
         margin-top: 6px;
         padding: 8px;
         border-radius: 8px;
@@ -2891,8 +2895,9 @@
          うるさくしない・3 年後に色変えたければ 1 箇所修正で済む） */
       #northStarLanes .nl-north-star-lane + .nl-north-star-lane {
         position: relative;
-        margin-top: 8px;
-        padding-top: 8px;
+        /* margin-top は撤去（container gap が「あいだ」を担う）。padding-top は
+           separator(::before, top:0) の上に文字が貼り付かない最小余白だけ残す。 */
+        padding-top: 5px;
       }
       #northStarLanes .nl-north-star-lane + .nl-north-star-lane::before {
         content: '';
@@ -8785,7 +8790,7 @@
                 />
                 プレイヤー行の下
                 <span class="nl-panel-placement-hint"
-                  >選択どおりプレイヤー行の<strong>下</strong>に出します（タブ幅で自動的に横付きへ切り替わりません）。パネルが動画とコメントの<strong>あいだまで広く</strong>見えるのは、下の「幅」で視聴画面いっぱいや「タブ幅いっぱいまで広げる」を選んでいる場合などです。常に画面下端に固定したい場合は「画面下いっぱい」を選んでください。</span>
+                  >選択どおりプレイヤー行の<strong>下</strong>に出します。広い画面で自動的に横付きにしたいときは、下の「幅の広げ方」を「広げない」以外にしてください（次に手前のタブで watch を開いたとき横付きへ切り替わります。自分で「下」を選んだ場合はその選択が優先され、自動では変わりません）。パネルが動画とコメントの<strong>あいだまで広く</strong>見えるのは、下の「幅」で視聴画面いっぱいや「タブ幅いっぱいまで広げる」を選んでいる場合などです。常に画面下端に固定したい場合は「画面下いっぱい」を選んでください。</span>
               </label>
               <label>
                 <input
@@ -8796,7 +8801,7 @@
                 />
                 横付き（親のレイアウトに合わせる・従来に近い）
                 <span class="nl-panel-placement-hint nl-panel-placement-hint--warning"
-                  >⚠️ 実際の位置は<strong>視聴中のブラウザタブの幅</strong>（このパネル内の幅ではありません）で決まります。タブ幅が約1200px未満のときは公式UIとの競合回避のため、自動で「プレイヤー行の下」になります。列の横に十分な隙間が無いときも同様です。</span>
+                  >⚠️ 実際の位置は<strong>視聴中のブラウザタブの幅</strong>（このパネル内の幅ではありません）で決まります。タブ幅が約1100px未満のときは公式UIとの競合回避のため、自動で「プレイヤー行の下」になります。列の横に十分な隙間が無いときも同様です。</span>
               </label>
               <label>
                 <input
@@ -8902,7 +8907,7 @@
                 />
                 初めての1回だけ広げて試す
               </label>
-              <span class="nl-muted nl-panel-width-hint">画面下固定・浮遊では無効です。「1回だけ」は既定で、watch を<strong>手前のタブ</strong>で開いてパネルが描画されたタイミングで消費され、その後は動画列基準の幅に戻ります（いつでも詳細設定から変更できます）。位置が<strong>横付き</strong>のときは、公式の動画列とコメント列のあいだに収まる幅までに抑え、レイアウトが折り返して下に落ちないようにします。</span>
+              <span class="nl-muted nl-panel-width-hint">画面下固定・浮遊では無効です。「1回だけ」は既定で、watch を<strong>手前のタブ</strong>で開いてパネルが描画されたタイミングで消費され、その後は動画列基準の幅に戻ります（いつでも詳細設定から変更できます）。位置が<strong>横付き</strong>のときは、公式の動画列とコメント列のあいだに収まる幅までに抑え、レイアウトが折り返して下に落ちないようにします。<br />なお、<strong>配置を自分で選んでいない</strong>状態でこれを「広げない」以外にすると、タブ幅が広い（約1100px以上）ときに watch を手前のタブで開いた<strong>1回</strong>、配置が自動で<strong>横付き</strong>に切り替わります（「常に」のときは毎回判定）。自分で「下」や「画面下いっぱい」を選んだ場合は、その選択が優先され自動では変わりません。</span>
             </div>
             <div class="nl-panel-calm-motion">
               <label for="calmPanelMotion">

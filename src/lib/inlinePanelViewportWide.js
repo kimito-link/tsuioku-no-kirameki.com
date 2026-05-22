@@ -85,3 +85,30 @@ export function shouldConsumeViewportWideOnce(opts) {
     p === INLINE_PANEL_PLACEMENT_BELOW || p === INLINE_PANEL_PLACEMENT_BESIDE
   );
 }
+
+/*
+ * ── 大画面での横付き(beside)昇格（opt-in） ─────────────────────────────
+ *
+ * 課題: `effectiveInlinePanelPlacement`(inlinePanelLayout.js) は
+ * 「beside を狭いタブで below に**降格**」するのみで、below/未設定を beside に
+ * **昇格**するコードは存在しない。初期既定は install 時 1 度きり
+ * (`suggestInitialInlinePanelPlacement`)。よって狭い窓で初回起動したユーザーは
+ * below 固定のまま、後で画面を広げても永久に横付きにならない（実機報告）。
+ *
+ * 方針（会議室 4 AI 合意）:
+ *   - 無条件の自動昇格は却下。USER_EXPLICIT（ユーザーが意図的に配置を選んだ）の
+ *     意思を**逆方向に侵害**し、リサイズ時の beside⇆below 往復も生むため。
+ *   - `effectiveInlinePanelPlacement` の純関数契約（降格のみ）は崩さない。
+ *     昇格は「**保存値を 1 回だけ書き換える**」別関数として分離する。
+ *   - 既存 viewportWide ポリシー(off/always/once)の作法に乗せる。
+ *
+ * 本関数は純粋判定のみ。storage 書き込み・DOM・await は呼出元（content start /
+ * storage.onChanged の外側、同期変数経由）が担う。描画ホットパスからは呼ばない。
+ */
+
+/*
+ * 横付き昇格のロジックは「配置の単一の真実」= inlinePanelPlacementResolver.js に
+ * 集約済み。ここはそこへ委譲する薄い別名（既存 import 互換の維持）。昇格候補の
+ * 語彙（dock_bottom も既定配置として昇格対象）は resolver 側 1 箇所だけが持つ。
+ */
+export { resolveWideViewportPlacementUpgrade as suggestPlacementUpgradeForWideViewport } from './inlinePanelPlacementResolver.js';

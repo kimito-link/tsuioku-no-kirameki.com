@@ -166,14 +166,23 @@ async function setViewportWideStorage(context, mode) {
   );
 }
 
+const KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT =
+  'nls_inline_panel_placement_user_explicit_v1';
+
 /**
  * @param {import('@playwright/test').BrowserContext} context
  * @param {{
  *   widthMode?: string|null,
  *   placement?: string|null,
  *   floatingAnchor?: string|null,
- *   touchFloatingAnchor?: boolean
+ *   touchFloatingAnchor?: boolean,
+ *   userExplicit?: boolean
  * }} opts
+ *
+ * 注: 本番では popup で配置を選ぶと `storagePatchInlinePanelPlacementWithExplicit`
+ * が USER_EXPLICIT=true を必ず立てる。よって「配置を指定した＝ユーザーが選んだ」を
+ * 既定の現実モデルとし、userExplicit は **既定 true**。大画面自動横付き昇格の
+ * 検証など「既定のまま開いた（非明示）」を再現したいテストだけ userExplicit:false を渡す。
  */
 async function setInlinePanelModes(context, opts = {}) {
   /*
@@ -188,10 +197,12 @@ async function setInlinePanelModes(context, opts = {}) {
       placement,
       floatingAnchor,
       touchFloatingAnchor,
+      userExplicit,
       widthKey,
       placementKey,
       anchorKey,
-      migratedKey
+      migratedKey,
+      explicitKey
     }) => {
       const removeKeys = [];
       /** @type {Record<string, unknown>} */
@@ -203,6 +214,11 @@ async function setInlinePanelModes(context, opts = {}) {
       if (touchFloatingAnchor) {
         if (floatingAnchor == null) removeKeys.push(anchorKey);
         else save[anchorKey] = floatingAnchor;
+      }
+      // USER_EXPLICIT: 本番の placement 選択と同じく既定で true。false 指定時は
+      // 「非明示（既定のまま）」を再現するため明示的に false を保存する。
+      if (placement != null) {
+        save[explicitKey] = userExplicit !== false;
       }
       /* 移行フラグは常に true で固定し、content/background のワンショット再書き込みを封じる */
       save[migratedKey] = true;
@@ -218,10 +234,12 @@ async function setInlinePanelModes(context, opts = {}) {
       placement: opts.placement ?? null,
       floatingAnchor: opts.floatingAnchor ?? null,
       touchFloatingAnchor: opts.touchFloatingAnchor === true,
+      userExplicit: opts.userExplicit,
       widthKey: KEY_INLINE_PANEL_WIDTH_MODE,
       placementKey: KEY_INLINE_PANEL_PLACEMENT,
       anchorKey: KEY_INLINE_FLOATING_ANCHOR,
-      migratedKey: KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED
+      migratedKey: KEY_INLINE_PANEL_FLOAT_TO_DOCK_MIGRATED,
+      explicitKey: KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT
     }
   );
 }
@@ -415,7 +433,8 @@ test.describe('inline panel alignment', () => {
     });
 
     const page = await context.newPage();
-    await page.setViewportSize({ width: 1100, height: 720 });
+    // 閾値(1100px)未満なら beside は実効 below へ降格。1000px で検証。
+    await page.setViewportSize({ width: 1000, height: 720 });
     await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
     await page.evaluate(injectTwoColumnPlayerRow);
 
@@ -720,8 +739,8 @@ test.describe('inline panel viewport size matrix', () => {
     await setViewportWideStorage(context, 'reset');
   });
 
-  for (const vw of [1199, 1200]) {
-    test(`beside: ビューポート ${vw}px で実効配置が閾値（1200px）通り切り替わる`, async ({
+  for (const vw of [1099, 1100]) {
+    test(`beside: ビューポート ${vw}px で実効配置が閾値（1100px）通り切り替わる`, async ({
       context
     }) => {
       await setInlinePanelModes(context, {
@@ -734,7 +753,7 @@ test.describe('inline panel viewport size matrix', () => {
       await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
       await page.evaluate(injectTwoColumnPlayerRow);
 
-      if (vw < 1200) {
+      if (vw < 1100) {
         await expect
           .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
           .toMatchObject({
@@ -780,6 +799,92 @@ test.describe('inline panel viewport size matrix', () => {
         });
     });
   }
+
+  /*
+   * ⭐ 実機報告「大きな画面で開いてもデフォで横付きにならない」の回帰ガード。
+   * placement を自分で選んでいない（USER_EXPLICIT 未設定）状態で、既定配置
+   * (below / dock_bottom) のまま広いビューポートで開くと、自動で beside に
+   * 昇格して視聴行の内側（mock-player-row 内・VIDEO の直後）に出ることを、
+   * 実ブラウザ + 実拡張で検証する。
+   */
+  for (const startPlacement of ['below', 'dock_bottom']) {
+    test(`自動横付き昇格: ${startPlacement}(非明示) を 1600px で開くと beside になる`, async ({
+      context
+    }) => {
+      // 既定のまま開いたユーザー＝非明示。policy も既定(once)。
+      await setInlinePanelModes(context, {
+        widthMode: 'video',
+        placement: startPlacement,
+        userExplicit: false
+      });
+
+      const page = await context.newPage();
+      await page.setViewportSize({ width: 1600, height: 900 });
+      await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+      await page.evaluate(injectTwoColumnPlayerRow);
+
+      await expect
+        .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+        .toMatchObject({
+          display: 'block',
+          parentId: 'mock-player-row',
+          prevElementTag: 'VIDEO',
+          floatingClass: false
+        });
+    });
+  }
+
+  test('🐛 共有フラグ回帰: below(非明示) + 幅広げ once 消費済み でも 1600px で beside になる', async ({
+    context
+  }) => {
+    // 診断 lv350583010 の再現: 過去に「幅広げ once」が消費され onceDone=true でも、
+    // 配置の自動横付きはブロックされてはならない（v0.1.301 で共有フラグから切り離し）。
+    await setInlinePanelModes(context, {
+      widthMode: 'video',
+      placement: 'below',
+      userExplicit: false
+    });
+    await setViewportWideStorage(context, { policy: 'once', onceDone: true });
+
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    await page.evaluate(injectTwoColumnPlayerRow);
+
+    await expect
+      .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+      .toMatchObject({
+        display: 'block',
+        parentId: 'mock-player-row',
+        prevElementTag: 'VIDEO',
+        floatingClass: false
+      });
+  });
+
+  test('自動横付き昇格は USER_EXPLICIT のとき発火しない（below のまま行の外）', async ({
+    context
+  }) => {
+    // 自分で「下」を選んだ人（USER_EXPLICIT=true・setInlinePanelModes 既定）は、
+    // 広い画面でも下のまま（意思尊重＝自動横付き昇格しない）。
+    await setInlinePanelModes(context, {
+      widthMode: 'video',
+      placement: 'below'
+    });
+
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    await page.evaluate(injectTwoColumnPlayerRow);
+
+    await expect
+      .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+      .toMatchObject({
+        display: 'block',
+        parentTag: 'BODY',
+        prevElementId: 'mock-player-row',
+        floatingClass: false
+      });
+  });
 
   for (const vw of [1280, 1440, 1920, 2560]) {
     test(`beside+幅拡大(常に)+列間ギャップ大: ${vw}px で行内かつ幅がタブ幅を超えない`, async ({

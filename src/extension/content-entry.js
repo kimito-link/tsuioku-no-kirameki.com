@@ -9,6 +9,7 @@ import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
   KEY_INLINE_PANEL_PLACEMENT,
+  KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
   KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
   KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
   KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
@@ -188,6 +189,7 @@ import {
   resolveWidenedInlinePanelWidthPx,
   shouldConsumeViewportWideOnce
 } from '../lib/inlinePanelViewportWide.js';
+import { resolveInlinePanelPlacementDecision } from '../lib/inlinePanelPlacementResolver.js';
 import {
   scoreInlineHostAnchorCandidate,
   stackedLayoutAnchorOverrides,
@@ -2954,6 +2956,13 @@ let inlinePanelWidthMode = normalizeInlinePanelWidthMode(undefined);
 let inlinePanelPlacementMode = normalizeInlinePanelPlacement(undefined);
 
 /**
+ * ユーザーが popup で配置を**明示選択**したか（KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT）。
+ * 大画面での横付き昇格（suggestPlacementUpgradeForWideViewport）は、これが true の
+ * ときは絶対に行わない＝v0.1.282 の「意思固定」ガードを逆方向に侵害しないため。
+ */
+let inlinePanelPlacementUserExplicit = false;
+
+/**
  * AI 診断用: `renderInlineHostAnchoredToVideo` 直近で確定したレイアウト実効値。
  * ストレージの widthMode とは異なり、列間挿入時の強制 video 幅などが分かる。
  */
@@ -5017,7 +5026,8 @@ function buildAiShareFastDiagnosticsPayload() {
       ...inlinePanelDiagPlacementHints(
         inlinePanelPlacementMode,
         placementEffectiveFast,
-        viewportInnerWidthFast
+        viewportInnerWidthFast,
+        nlsInlinePanelLayoutRenderSnapshot.besideFlexRowColumnRuntime
       ),
       widthMode: inlinePanelWidthMode,
       layoutRenderSnapshot: {
@@ -5311,15 +5321,24 @@ function getEffectiveInlinePanelPlacement() {
  * @param {string} placementMode
  * @param {string} placementEffective
  * @param {number} viewportInnerWidth
+ * @param {boolean} [besideFlexRowColumnRuntime] 実効 beside で、実際に動画列の隣へ
+ *   挿入できたか（false かつ幅は足りているなら、ページ構造の都合で下へ逃げている＝課題B）。
  */
 function inlinePanelDiagPlacementHints(
   placementMode,
   placementEffective,
-  viewportInnerWidth
+  viewportInnerWidth,
+  besideFlexRowColumnRuntime
 ) {
   const w = Number(viewportInnerWidth) || 0;
   const min = INLINE_VIEWPORT_BESIDE_MIN_WIDTH;
   const wideEnoughForBeside = w >= min;
+  // 横付き指定・幅は足りているのに、実 DOM で動画列の隣に挿せず下へ逃げている状態。
+  // ニコ生のページ構造（SPA・配信者設定）依存で、拡張側では直せないケースがある。
+  const besideWantedButRanAsBelow =
+    placementMode === INLINE_PANEL_PLACEMENT_BESIDE &&
+    placementEffective === INLINE_PANEL_PLACEMENT_BESIDE &&
+    besideFlexRowColumnRuntime === false;
   let placementInterpretationHintJa = '';
   if (
     placementMode === INLINE_PANEL_PLACEMENT_BELOW &&
@@ -5327,16 +5346,20 @@ function inlinePanelDiagPlacementHints(
     wideEnoughForBeside
   ) {
     placementInterpretationHintJa =
-      '保存されている配置は「下」です。横付きにするには拡張ポップアップの「配置」で「横付き」を選んでください（画面やタブを広げただけでは自動では切り替わりません）。';
+      '保存されている配置は「下」です。横付きにするには拡張ポップアップの「配置」で「横付き」を選んでください。広い画面で自動的に横付きにしたい場合は「下／横付きのときの幅の広げ方」を「広げない」以外にすると、次に手前のタブで watch を開いたとき横付きへ切り替わります（配置を自分で選んだ場合はその選択が優先されます）。';
   } else if (
     placementMode === INLINE_PANEL_PLACEMENT_BESIDE &&
     placementEffective === INLINE_PANEL_PLACEMENT_BELOW
   ) {
     placementInterpretationHintJa = `横付きを選んでいますが、タブ幅が不足しているため実効は「下」です（横付きには概ね ${min}px 以上のタブ内幅が必要です）。`;
+  } else if (besideWantedButRanAsBelow) {
+    placementInterpretationHintJa =
+      '横付きを選んでいてタブ幅も足りていますが、このページの構造では動画列の横に十分な隙間を確保できず、下に表示しています（配信者の設定やニコ生本体のレイアウト都合で、拡張側では横に出せないことがあります）。';
   }
   return {
     besideMinWidthPx: min,
     viewportWideEnoughForBeside: wideEnoughForBeside,
+    besideWantedButRanAsBelow,
     placementInterpretationHintJa
   };
 }
@@ -5581,6 +5604,7 @@ async function loadPageFrameSettings() {
     KEY_POPUP_FRAME_CUSTOM,
     KEY_INLINE_PANEL_WIDTH_MODE,
     KEY_INLINE_PANEL_PLACEMENT,
+    KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
     KEY_INLINE_FLOATING_ANCHOR,
     KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
     KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
@@ -5592,6 +5616,8 @@ async function loadPageFrameSettings() {
   inlinePanelPlacementMode = normalizeInlinePanelPlacement(
     bag[KEY_INLINE_PANEL_PLACEMENT]
   );
+  inlinePanelPlacementUserExplicit =
+    bag[KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT] === true;
   inlineFloatingAnchor = normalizeInlineFloatingAnchor(
     bag[KEY_INLINE_FLOATING_ANCHOR]
   );
@@ -5611,6 +5637,47 @@ async function loadPageFrameSettings() {
       : DEFAULT_PAGE_FRAME;
   pageFrameState.custom = sanitizePageFrameCustom(bag[KEY_POPUP_FRAME_CUSTOM]);
   applyPageFramePalette(pageFrameState.frameId, pageFrameState.custom);
+  renderPageFrameOverlay();
+  // 設定読込が終わってから、大画面なら横付きへ昇格すべきか評価する（opt-in）。
+  // ここは描画ホットパスの**外側**。判定は同期純関数、書込のみ await。
+  void maybeUpgradePlacementForWideViewport(bag[KEY_INLINE_PANEL_PLACEMENT]);
+}
+
+/**
+ * 大画面で below/未設定 を横付き(beside)へ「昇格」させる（opt-in・1 回限り or 常時）。
+ *
+ * - 判定は同期純関数 `suggestPlacementUpgradeForWideViewport`（USER_EXPLICIT=true は no-op）。
+ * - 昇格時は保存値 beside を書く。書込で onChanged → loadPageFrameSettings が再走するが、
+ *   保存値が beside（昇格対象外）になり、`once` は onceDone=true になるので **2 度目は no-op**
+ *   ＝ループしない。`effectiveInlinePanelPlacement` の純関数契約（降格のみ）は不変。
+ * - 描画後にウィンドウを広げてもこの関数は走らない（リサイズ追従はしない）。狙いは
+ *   「watch を開いた時点のタブ幅で 1 回だけ意思決定」＝beside⇆below 往復を作らない。
+ *
+ * @param {unknown} rawStoredPlacement chrome.storage の生値（未設定なら undefined）
+ */
+async function maybeUpgradePlacementForWideViewport(rawStoredPlacement) {
+  if (!hasExtensionContext()) return;
+  if (!isWatchInlinePanelTopFrame()) return;
+  const vp = nlsLayoutViewportSize();
+  // 配置の単一の真実（resolver）で昇格判定。昇格候補の語彙（dock_bottom も既定
+  // として昇格対象）は resolver 1 箇所が持つ。配置昇格は once フラグに依存しない
+  // （昇格後 stored=beside で自然に再発防止＝幅広げ once との共有フラグに触れない）。
+  const decision = resolveInlinePanelPlacementDecision({
+    stored: String(rawStoredPlacement || ''),
+    userExplicit: inlinePanelPlacementUserExplicit,
+    viewportInnerWidth: vp.innerWidth,
+    policy: inlinePanelViewportWidePolicy
+  });
+  if (decision.upgradeTo == null) return;
+  // 同期の見た目を即追従（書込の onChanged を待たない）。
+  inlinePanelPlacementMode = normalizeInlinePanelPlacement(decision.upgradeTo);
+  try {
+    await chrome.storage.local.set({
+      [KEY_INLINE_PANEL_PLACEMENT]: decision.upgradeTo
+    });
+  } catch {
+    // no-op（次回 watch 表示時に再評価される）
+  }
   renderPageFrameOverlay();
 }
 
@@ -7188,7 +7255,8 @@ function buildAiSharePageDiagnostics() {
       ...inlinePanelDiagPlacementHints(
         inlinePanelPlacementMode,
         placementEffective,
-        viewportInnerWidthDiag
+        viewportInnerWidthDiag,
+        nlsInlinePanelLayoutRenderSnapshot.besideFlexRowColumnRuntime
       ),
       widthMode: inlinePanelWidthMode,
       layoutRenderSnapshot: {
@@ -7198,6 +7266,21 @@ function buildAiSharePageDiagnostics() {
         effectiveLayoutWidthMode:
           nlsInlinePanelLayoutRenderSnapshot.effectiveLayoutWidthMode,
         capturedAtMs: nlsInlinePanelLayoutRenderSnapshot.capturedAtMs
+      },
+      // 大画面で横付き昇格が「なぜ効いた／効かないか」を診断で直接見えるようにする
+      // （ここが空だと推測になり、確認せず報告する事故の元になる）。
+      wideViewportUpgradeDiag: {
+        policy: inlinePanelViewportWidePolicy,
+        onceDoneSharedFlag: inlinePanelViewportWideOnceDone,
+        userExplicit: inlinePanelPlacementUserExplicit,
+        // いま再評価したら昇格するか（保存済み stored を入力に）
+        wouldUpgradeNow:
+          resolveInlinePanelPlacementDecision({
+            stored: inlinePanelPlacementMode,
+            userExplicit: inlinePanelPlacementUserExplicit,
+            viewportInnerWidth: viewportInnerWidthDiag,
+            policy: inlinePanelViewportWidePolicy
+          }).upgradeTo || null
       },
       floatingAnchor: inlineFloatingAnchor,
       insertionPlan,
@@ -9427,6 +9510,14 @@ async function start() {
         );
         renderPageFrameOverlay();
       }
+    }
+
+    if (changes[KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT]) {
+      // ユーザーが配置を明示選択した瞬間に in-memory フラグを追従させる。
+      // これを怠ると、後続の loadPageFrameSettings が古い false を見て、明示選択を
+      // 上書きする方向に横付き昇格してしまう（意思の逆侵害）。
+      inlinePanelPlacementUserExplicit =
+        changes[KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT].newValue === true;
     }
 
     if (changes[KEY_INLINE_PANEL_PLACEMENT]) {
