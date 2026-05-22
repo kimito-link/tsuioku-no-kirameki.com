@@ -794,6 +794,27 @@ const interceptedNicknames = new Map();
 let _liveIdChangedNonSwitchCount = 0;
 
 /**
+ * v0.1.311: パネル消失バグ対策（会議室確定）。
+ *
+ * `syncLiveIdFromLocation` は PAGE_FRAME_LOOP_MS(=360ms) ごとに走り、従来は
+ * 「watch URL でない & コメントパネル DOM 未検出」を **1 tick** 検出しただけで
+ * `hidePageFrameOverlay()` + liveId=null 等の破壊的 cleanup を即実行していた。
+ * niconico の SPA 遷移トランジェント・DOM 一時未検出でパネルが点滅消失する
+ * （複数タブ環境で顕著）。
+ *
+ * 対策: 非 watch を **連続 NON_WATCH_HIDE_TICK_THRESHOLD 回**観測してから初めて
+ * hide / cleanup する。watch（または有効なコメントパネル）が見えたら即 0 に戻す。
+ * in-memory カウンタのみ・await I/O なし（描画 hot path に I/O を足さない＝
+ * 北極星ピボット regression を繰り返さない）。
+ *
+ * 360ms × 5 ≒ 1.8s 連続で非 watch のときだけ消える。単一タブの通常離脱は
+ * その後正しく hide される（挙動維持）。
+ * @type {number}
+ */
+let _nonWatchTickCount = 0;
+const NON_WATCH_HIDE_TICK_THRESHOLD = 5;
+
+/**
  * 0.1.173: ランキング表示の lifetime 観測。診断シートで「いつ何が取れたか」を
  * 1 か所で読めるようにする。globalThis に保持（ホットリロード対応 / SPA でも累積）。
  *
@@ -4654,7 +4675,11 @@ function buildGiftDiagnosticsBundle() {
       //   一時的 URL parse 失敗 / 視聴離脱 / 初回起動 等で「liveIdChanged だけ true」
       //   だった回数を観測。これが過剰だと SPA navigation 起因で false positive
       //   clear が走っていた可能性 (v0.1.247 修正前のバグ)。新版では 0 件のはず。
-      liveIdChangedNonSwitchCount: _liveIdChangedNonSwitchCount
+      liveIdChangedNonSwitchCount: _liveIdChangedNonSwitchCount,
+      // v0.1.311: 非 watch 連続観測カウンタ（hide デバウンス）。閾値到達で hide。
+      //   高止まりせず 0〜閾値内を推移していれば、トランジェント誤 hide を抑止できている。
+      nonWatchTickCount: _nonWatchTickCount,
+      nonWatchHideTickThreshold: NON_WATCH_HIDE_TICK_THRESHOLD
     },
     // 0.1.179: 「サムネあり・ID 空（匿名扱い）」事象の真因切り分け。
     // intercepted comment entry を 4 象限で集計し、avatar あり+uid 空 のサンプルを 5 件 dump。
@@ -8682,6 +8707,8 @@ function syncLiveIdFromLocation() {
         void flushNdgrChatRowsBatch(slice);
       }
     }
+    // watch ページを確認＝非 watch デバウンスを解除。
+    _nonWatchTickCount = 0;
     renderPageFrameOverlay();
     return;
   }
@@ -8740,7 +8767,18 @@ function syncLiveIdFromLocation() {
         void flushNdgrChatRowsBatch(slice);
       }
     }
+    // 有効なコメントパネルを確認＝非 watch デバウンスを解除。
+    _nonWatchTickCount = 0;
     renderPageFrameOverlay();
+    return;
+  }
+
+  // v0.1.311: 非 watch を 1 tick 観測しただけで即 hide/cleanup すると、niconico の
+  //   SPA 遷移トランジェントや DOM 一時未検出でパネルが点滅消失する（複数タブで顕著）。
+  //   連続 NON_WATCH_HIDE_TICK_THRESHOLD 回観測してから初めて hide / 破壊的 cleanup する。
+  //   閾値未満の間は何もせず return（liveId 等の状態を温存）＝await I/O なし・追加のみ。
+  _nonWatchTickCount += 1;
+  if (_nonWatchTickCount < NON_WATCH_HIDE_TICK_THRESHOLD) {
     return;
   }
 
