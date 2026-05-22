@@ -170,34 +170,20 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
     return null;
   }
 
-  // 1) 「現在N位」テキストを持つ要素を探す（最も誤認しにくいアンカー）。
-  /** @type {HTMLElement|null} */
-  let rankHostEl = null;
-  /** @type {number|null} */
-  let rank = null;
-  try {
-    const candidates = /** @type {NodeListOf<HTMLElement>} */ (
-      scope.querySelectorAll('p, div, span')
-    );
-    for (const el of candidates) {
-      if (!(el instanceof HTMLElement)) continue;
-      // 自要素直下のテキスト + 子 span のテキストを連結（`現在<span>17</span>位`）
-      const t = String(el.textContent || '').replace(/[\s,]/g, '');
-      const m = /現在(\d+)位/.exec(t);
-      if (m) {
-        // 最も内側（テキストが短い）要素を採用＝親の長文に巻き込まれない
-        const n = parseInt(m[1], 10);
-        if (Number.isFinite(n) && n > 0) {
-          if (rankHostEl == null || t.length < String(rankHostEl.textContent || '').replace(/[\s,]/g, '').length) {
-            rankHostEl = el;
-            rank = n;
-          }
-        }
-      }
-    }
-  } catch { /* no-op */ }
+  // v0.1.323: 「現在50位」誤表示の根本修正（Scrapling 流のテキストアンカー近傍限定）。
+  //   旧実装は scope 全体の p/div/span から `現在(\d+)位` を総当りで拾い、配信者本人の
+  //   イベント参加とは独立に rank を採っていた。そのため配信者がイベント不参加でも、
+  //   audition iframe 内の別 UI（サポーター順位リスト等）の「現在N位」を誤検出して
+  //   「現在50位」のような無関係な順位を表示していた（実機 lv350582635: eventRank 全 null
+  //   なのに 50 が出る）。
+  //   修正方針: ①配信者本人の「<名>さんを応援しよう！」見出し(headEl)を先に確定する。
+  //   ②rank は headEl が取れた時だけ、かつ headEl の祖先ブロック(イベントパネル)内に
+  //   限定して採る＝配信者本人の現在順位だけを拾う。見出しが無ければイベント参加が
+  //   確証できないので rank も score も採らない（根拠なき数値を出さない＝正確性優先）。
 
-  // 2) 配信者名: 「<名>さんを応援しよう！」の見出し。`eNNNN` suffix or テキストから。
+  // 1) 配信者名と、その見出し要素（アンカー）を先に確定する。
+  /** @type {HTMLElement|null} */
+  let headEl = null;
   /** @type {string} */
   let title = '';
   try {
@@ -215,7 +201,111 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
           .trim();
         if (name) {
           title = name;
+          headEl = h;
           break;
+        }
+      }
+    }
+  } catch { /* no-op */ }
+
+  // 2) 「現在N位」を、配信者本人の見出しの近傍（祖先イベントパネル内）に限定して採る。
+  //    見出し(headEl)が無い＝イベント参加が確証できないので rank は採らない。
+  /** @type {HTMLElement|null} */
+  let rankHostEl = null;
+  /** @type {number|null} */
+  let rank = null;
+  try {
+    if (headEl) {
+      // 見出しの祖先を数階層辿り、最初に「現在N位」を含むブロックを順位パネルとみなす。
+      // これにより、配信者本人のイベントパネルの外（別 UI のサポーター順位等）は対象外。
+      // 順位パネルは「見出し＋現在順位＋累計＋順位UPまで」が同居する compact なブロック。
+      // 誤検出（実機 lv350582635「現在50位」/ 見出しと別枝の順位）を防ぐため、順位パネルは
+      //   ① 現在N位を含む
+      //   ② stripped テキストが上限以内（共通祖先まで昇った巨大ブロックを除外）
+      //   ③ headEl から DOM 距離が近い（見出しと同じ枝に順位がある）
+      // の 3 条件を満たす「見出しの直近の tight な祖先」だけを採る。
+      const RANK_PANEL_MAX_TEXT = 200;
+      // headEl の祖先集合（距離付き）。順位要素がこの近傍にあるかの判定に使う。
+      /** @type {Map<HTMLElement, number>} */
+      const headAncestorDist = new Map();
+      {
+        let a = headEl;
+        let d = 0;
+        while (a instanceof HTMLElement && d <= 3) {
+          headAncestorDist.set(a, d);
+          a = a.parentElement;
+          d++;
+        }
+      }
+      /** @type {HTMLElement|null} */
+      let panel = headEl.parentElement instanceof HTMLElement ? headEl.parentElement : null;
+      /** @type {HTMLElement|null} */
+      let rankPanel = null;
+      for (let depth = 0; depth < 3 && panel instanceof HTMLElement; depth++) {
+        const stripped = String(panel.textContent || '').replace(/[\s,]/g, '');
+        if (/現在\d+位/.test(stripped)) {
+          if (stripped.length <= RANK_PANEL_MAX_TEXT) {
+            // ③ panel 配下の「現在N位」要素が headEl の近傍（共通祖先が headEl から
+            //   2 階層以内）にあるか確認＝見出しと別枝の順位（far block）を弾く。
+            const rankNodes = /** @type {NodeListOf<HTMLElement>} */ (
+              panel.querySelectorAll('p, div, span')
+            );
+            let nearRank = false;
+            for (const rn of rankNodes) {
+              if (!(rn instanceof HTMLElement)) continue;
+              if (!/現在\d+位/.test(String(rn.textContent || '').replace(/[\s,]/g, ''))) {
+                continue;
+              }
+              // rn の祖先を辿り、headEl の祖先集合に最初に当たる距離（共通祖先の headEl 側距離）
+              let p2 = rn;
+              let found = -1;
+              let up = 0;
+              while (p2 instanceof HTMLElement && up <= 4) {
+                if (headAncestorDist.has(p2)) {
+                  found = headAncestorDist.get(p2);
+                  break;
+                }
+                p2 = p2.parentElement;
+                up++;
+              }
+              // 共通祖先が headEl から 1 階層以内（headEl 自身か headEl.parentElement）
+              //   ＝見出しと順位が同じ枝にある。実 DOM では見出し h2 と「現在N位」p は
+              //   共通の親 div 配下（距離 1）。距離 2 以上＝共通祖先の別々の子に分かれる
+              //   ＝別枝（far block）なので弾く。
+              if (found >= 0 && found <= 1) {
+                nearRank = true;
+                break;
+              }
+            }
+            if (nearRank) rankPanel = panel;
+          }
+          break; // 最初に現在N位を含む祖先で打ち切り
+        }
+        panel = panel.parentElement instanceof HTMLElement ? panel.parentElement : null;
+      }
+      if (rankPanel) {
+        const candidates = /** @type {NodeListOf<HTMLElement>} */ (
+          rankPanel.querySelectorAll('p, div, span')
+        );
+        for (const el of candidates) {
+          if (!(el instanceof HTMLElement)) continue;
+          // 自要素直下のテキスト + 子 span のテキストを連結（`現在<span>17</span>位`）
+          const t = String(el.textContent || '').replace(/[\s,]/g, '');
+          const m = /現在(\d+)位/.exec(t);
+          if (m) {
+            // 最も内側（テキストが短い）要素を採用＝親の長文に巻き込まれない
+            const n = parseInt(m[1], 10);
+            if (Number.isFinite(n) && n > 0) {
+              if (
+                rankHostEl == null ||
+                t.length <
+                  String(rankHostEl.textContent || '').replace(/[\s,]/g, '').length
+              ) {
+                rankHostEl = el;
+                rank = n;
+              }
+            }
+          }
         }
       }
     }
