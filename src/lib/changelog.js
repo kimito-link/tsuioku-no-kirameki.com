@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.308',
+    date: '2026-05-22',
+    summary: '広告ランキングの匿名行を「匿名」表示に',
+    items: Object.freeze([
+      '[修正] 広告ランキング・貢献度ランキングで、名前が公開されていない行に内部用の文字列（__anon_ad_2 や u/__anon_ad_2 のような）がそのまま出ることがあった問題を直しました。公式ページと同じく「匿名」と表示し、内部のIDやリンクは出しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.307',
     date: '2026-05-22',
     summary: '広告ランキングが正しく表示されるように',

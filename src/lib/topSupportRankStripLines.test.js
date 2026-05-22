@@ -286,6 +286,30 @@ describe('topSupportRankLineModels', () => {
     expect(row.idShort).toBe('');
   });
 
+  it('公式ランキングの匿名行 __anon_ad_N は「匿名」と表示し内部キーを漏らさない', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__anon_ad_2', nickname: '', count: 1000, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('匿名');
+    // id 行・タイトルに __anon_ad_2 / u/__anon_ad_2 が出ない
+    expect(row.idShort).toBe('');
+    expect(row.idTitle).toBe('');
+    expect(row.fullLabelForTitle).toBe('匿名');
+    expect(row.nameLine).not.toContain('__anon');
+    expect(row.fullLabelForTitle).not.toContain('__anon');
+  });
+
+  it('貢献度ランキングの匿名行 __anon_contrib_N も「匿名」と表示する', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '__anon_contrib_0', nickname: '', count: 50, avatarUrl: '' }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.nameLine).toBe('匿名');
+    expect(row.idShort).toBe('');
+    expect(row.fullLabelForTitle).toBe('匿名');
+  });
+
   it('placeNumberMode:dense で同回数は同順位（本家ランキングタブの貢献度に近い並び方）', () => {
     const rooms = [
       { userKey: '1', nickname: 'a', count: 40 },
