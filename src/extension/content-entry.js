@@ -1943,6 +1943,7 @@ window.addEventListener('message', (e) => {
     lastScrapeAttempts: 0,
     lastItemsCount: 0,
     lastContribCount: 0,
+    lastAdContribCount: 0,
     lastEventBannerPresent: false
   };
   cur.count += 1;
@@ -1950,6 +1951,8 @@ window.addEventListener('message', (e) => {
   cur.lastScrapeAttempts = Number(e.data.scrapeAttempts) || 0;
   cur.lastItemsCount = Number(e.data.itemsCount) || 0;
   cur.lastContribCount = Number(e.data.contribCount) || 0;
+  // v0.1.306: nicoad は adContribCount で広告ランキング件数を別報告する
+  cur.lastAdContribCount = Number(e.data.adContribCount) || 0;
   cur.lastEventBannerPresent = e.data.eventBannerPresent === true;
   // v0.1.282: scrape 空時に iframe 側が同梱する DOM 概形（観測専用・bounded・
   // 送信側で PII 非収集済）。Scope B 安全修正の前提エビデンス。object のみ採用。
@@ -2016,6 +2019,30 @@ window.addEventListener('message', (e) => {
     }
   }
 
+  // 1b. v0.1.306: nicoad iframe が adContributionRanking（広告ランキング）を直接
+  //     relay で送ってきた場合、nls_nicoad_ranking_{lid} に書き込む。
+  //     従来は tryHarvestNicoadContributionRankingOnce がストレージに直接書く経路の
+  //     みだったが、iframe relay 経由で確実に届く新経路を追加する（二重安全）。
+  //     iframeOfficialDomFromRelay の「nicoad は貢献度として信頼しない」設計は維持。
+  const adRankingFromRelay = Array.isArray(e.data.adContributionRanking)
+    ? /** @type {Array<unknown>} */ (e.data.adContributionRanking)
+    : null;
+  if (adRankingFromRelay && adRankingFromRelay.length > 0) {
+    chrome.storage.local
+      .set({
+        [`nls_nicoad_ranking_${lid}`]: {
+          capturedAt: Date.now(),
+          ranking: adRankingFromRelay,
+          sourceUrl: String(e.data.frameUrl || '').slice(0, 200)
+        }
+      })
+      .catch((err) => {
+        if (!isContextInvalidatedError(err)) {
+          /* best-effort */
+        }
+      });
+  }
+
   // 2. v0.1.217: 公式サイドバー DOM の貢献度ランキング + イベント参加バナーを
   //    `nls_iframe_official_dom_<liveId>` storage に保存。popup の
   //    refreshGiftRankStrip が _lastOfficialEventDomBundle.contributionRanking
@@ -2039,6 +2066,7 @@ window.addEventListener('message', (e) => {
       });
   }
 });
+
 /** @type {number|null} */
 let lastWatchUrlTimer = null;
 
@@ -5034,12 +5062,15 @@ function buildGiftDiagnosticsBundle() {
           return { hasHeartbeat: false, mountSuccess: false };
         }
         const contrib = Number(hb.lastContribCount) || 0;
+        const adContrib = Number(hb.lastAdContribCount) || 0;
         const items = Number(hb.lastItemsCount) || 0;
         const banner = !!hb.lastEventBannerPresent;
         return {
           hasHeartbeat: true,
-          mountSuccess: contrib > 0 || items > 0 || banner,
+          // v0.1.306: nicoad は adContrib で広告ランキングを報告するため、それも mountSuccess に含める
+          mountSuccess: contrib > 0 || adContrib > 0 || items > 0 || banner,
           lastContribCount: contrib,
+          lastAdContribCount: adContrib,
           lastItemsCount: items,
           lastEventBannerPresent: banner,
           heartbeatCount: Number(hb.count) || 0
@@ -10339,6 +10370,8 @@ function maybeStartGiftSubAppIframeRelay() {
     let totalCounts = [];
     /** @type {Array<unknown>|null} */
     let contributionRanking = null;
+    /** @type {Array<unknown>|null} */
+    let adContributionRanking = null;
     /** @type {unknown} */
     let eventBanner = null;
     try {
@@ -10353,8 +10386,25 @@ function maybeStartGiftSubAppIframeRelay() {
       //   確認された。既存 lib の selector は本構造に対応済み（旧構造 fallback で
       //   `.contribution-ranking-list .ranker` を拾う、`.owner-name` を起点に
       //   バナーを掬う）。同じ scan tick で 3 種類すべて scrape して親に送る。
+      //
+      // v0.1.306: nicoad iframe は「広告ランキング」を表示する専用ページ。
+      //   scrapeContributionRankingFromDom がヒットする DOM 要素は「貢献度ランキング」
+      //   ではなく「広告ランキング」なので、nicoad ソースの場合は contributionRanking
+      //   (貢献度)フィールドには入れず、adContributionRanking(広告)フィールドで送る。
+      //   これにより親受信側が正しく広告ランキングとして nls_nicoad_ranking_{lid} に
+      //   書き込めるようになる（v0.1.230 の「nicoad は貢献度として信頼しない」設計を
+      //   維持しつつ、広告ランキングとして直接 relay する経路を追加）。
+      const frameSource = classifyGiftSubAppFrameSource(href);
       try {
-        contributionRanking = scrapeContributionRankingFromDom(document) || [];
+        const scraped = scrapeContributionRankingFromDom(document) || [];
+        if (frameSource === 'nicoad') {
+          // nicoad は広告ランキング専用経路: adContributionRanking フィールドで送る
+          // contributionRanking は空のまま（受信側で貢献度として誤採用しない）
+          adContributionRanking = scraped.length > 0 ? scraped : null;
+          contributionRanking = [];
+        } else {
+          contributionRanking = scraped;
+        }
       } catch { contributionRanking = []; }
       try {
         eventBanner = scrapeOfficialEventBannerFromDom(document) || null;
@@ -10374,6 +10424,7 @@ function maybeStartGiftSubAppIframeRelay() {
     const scrapeEmptyForProbe =
       items.length === 0 &&
       (!contributionRanking || contributionRanking.length === 0) &&
+      (!adContributionRanking || adContributionRanking.length === 0) &&
       !eventBanner;
     // 会議室(2026-05-19) Q1 FIX: koken 別ドメイン supporter iframe は gift 履歴
     // (items>0) を持つため上の scrapeEmptyForProbe が false になり domShapeProbe が
@@ -10411,6 +10462,8 @@ function maybeStartGiftSubAppIframeRelay() {
           scrapeAttempts,
           itemsCount: items.length,
           contribCount: Array.isArray(contributionRanking) ? contributionRanking.length : 0,
+          // v0.1.306: nicoad は adContributionRanking で送るので別カウンタで報告
+          adContribCount: Array.isArray(adContributionRanking) ? adContributionRanking.length : 0,
           eventBannerPresent: !!eventBanner,
           sentAt: Date.now(),
           ...(scrapeEmptyForProbe
@@ -10429,6 +10482,7 @@ function maybeStartGiftSubAppIframeRelay() {
       if (
         items.length === 0 &&
         (!contributionRanking || contributionRanking.length === 0) &&
+        (!adContributionRanking || adContributionRanking.length === 0) &&
         !eventBanner
       ) {
         return;
@@ -10437,6 +10491,7 @@ function maybeStartGiftSubAppIframeRelay() {
         items,
         totalCounts,
         contributionRanking,
+        adContributionRanking,
         eventBanner
       });
       if (payload === lastSent) return;
@@ -10453,6 +10508,7 @@ function maybeStartGiftSubAppIframeRelay() {
             items,
             totalCounts,
             contributionRanking,
+            adContributionRanking,
             eventBanner,
             scannedAt: Date.now(),
             frameUrl: href
