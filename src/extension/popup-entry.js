@@ -172,6 +172,7 @@ import {
 import { resolveBroadcasterFollowTarget } from '../lib/broadcasterFollowTarget.js';
 import { retrySnapshotRequestUntilReady } from '../lib/popupWatchSnapshotRetry.js';
 import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
+import { buildCommentTickerLatestHtml } from '../lib/commentTickerLatestHtml.js';
 import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
 import { createBooleanSettingController } from '../lib/popupBooleanSettingController.js';
 import { createBooleanSettingsRegistry } from '../lib/popupBooleanSettingsRegistry.js';
@@ -949,22 +950,16 @@ function renderCommentTicker(comments) {
   const tip = label
     ? `${noPrefix}${label}：${rawText || '（コメント本文なし）'}`
     : `${noPrefix}${rawText || '（コメント本文なし）'}`;
-  const labelHtml = label
-    ? `<span class="nl-ticker-latest__name">${escapeHtml(label)}</span>` +
-      `<span class="nl-ticker-latest__colon">：</span>`
-    : '';
   // 数値 ID を持つユーザーの場合、行全体（アバター＋名前＋本文）を niconico ユーザーページへのリンクにする。
   // 匿名（a:xxx）やハッシュ風 ID は buildCommentTickerNameHref が '' を返すので、リンクにはならない span のまま。
+  // HTML 文字列の組み立ては純関数 buildCommentTickerLatestHtml に外出し（pure refactor）。
   const userPageHref = buildCommentTickerNameHref(latest.userId);
-  const rowInnerHtml =
-    `<span class="nl-ticker-latest__row">` +
-    `<img class="nl-ticker-latest__avatar" alt="" src="${escapeHtml(avatarSrc)}">` +
-    labelHtml +
-    `<span class="nl-ticker-latest__text">${escapeHtml(textShown)}</span>` +
-    `</span>`;
-  segA.innerHTML = userPageHref
-    ? `<a class="nl-ticker-item nl-ticker-latest nl-ticker-latest--linkable" aria-live="polite" href="${escapeAttr(userPageHref)}" target="_blank" rel="noopener noreferrer">${rowInnerHtml}</a>`
-    : `<span class="nl-ticker-item nl-ticker-latest" aria-live="polite">${rowInnerHtml}</span>`;
+  segA.innerHTML = buildCommentTickerLatestHtml({
+    label,
+    avatarSrc,
+    textShown,
+    userPageHref
+  });
   const line = /** @type {HTMLElement|null} */ (segA.querySelector('.nl-ticker-latest'));
   if (line) line.title = tip;
   const avatar = /** @type {HTMLImageElement|null} */ (
