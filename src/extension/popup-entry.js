@@ -4791,8 +4791,8 @@ async function buildYukkuriImageDataUrlMap() {
 }
 
 /**
- * `nls_event_dom_<lv>` を 1 回読むだけのヘルパ。HTML レポート / マーケ分析の
- * 出力時にもこの bundle を使ってゆっくり解説を組み立てるので外出しする。
+ * `nls_event_dom_<lv>` と `nls_nicoad_ranking_<lv>` を読んでマージした bundle を返すヘルパ。
+ * HTML レポート / マーケ分析の出力時にもこの bundle を使ってゆっくり解説を組み立てるので外出しする。
  * @param {string} liveId
  * @returns {Promise<import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null>}
  */
@@ -4801,11 +4801,32 @@ async function readOfficialEventDomBundleFromStorage(liveId) {
   if (!lid) return null;
   try {
     const key = eventDomStorageKey(lid);
-    const bag = await chrome.storage.local.get(key);
+    const adKey = `nls_nicoad_ranking_${lid}`;
+    const bag = await chrome.storage.local.get([key, adKey]);
     const v = bag?.[key];
-    return v && typeof v === 'object' && !Array.isArray(v)
+    let bundle = v && typeof v === 'object' && !Array.isArray(v)
       ? /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle} */ (v)
       : null;
+
+    const adVal = bag?.[adKey];
+    if (adVal && typeof adVal === 'object' && Array.isArray(adVal.ranking) && adVal.ranking.length > 0) {
+      if (!bundle) {
+        bundle = {
+          capturedAt: adVal.capturedAt || Date.now(),
+          adContributionRanking: adVal.ranking,
+          contributionRanking: null,
+          programStats: null,
+          eventCumulativeScoreMirrorHtml: null,
+          adRankingMirrorHtml: null
+        };
+      } else if (!Array.isArray(bundle.adContributionRanking) || bundle.adContributionRanking.length === 0) {
+        bundle = {
+          ...bundle,
+          adContributionRanking: adVal.ranking
+        };
+      }
+    }
+    return bundle;
   } catch {
     return null;
   }
@@ -4813,20 +4834,7 @@ async function readOfficialEventDomBundleFromStorage(liveId) {
 
 /** @param {string} liveId */
 async function refreshOfficialEventDomBundle(liveId) {
-  const lid = String(liveId || '').trim().toLowerCase();
-  if (!lid) {
-    _lastOfficialEventDomBundle = null;
-    return;
-  }
-  try {
-    const key = eventDomStorageKey(lid);
-    const bag = await chrome.storage.local.get(key);
-    const v = bag?.[key];
-    _lastOfficialEventDomBundle =
-      v && typeof v === 'object' && !Array.isArray(v) ? v : null;
-  } catch {
-    _lastOfficialEventDomBundle = null;
-  }
+  _lastOfficialEventDomBundle = await readOfficialEventDomBundleFromStorage(liveId);
 }
 
 /**
