@@ -69,6 +69,21 @@ function isAnonymousOfficialDomRankUserKey(userKey) {
 }
 
 /**
+ * ギフト履歴の合成 userKey か。
+ * `__gift_${i}_${name}` / `__anon_gift_${i}` / `__gift_sender_${bucket}` を対象。
+ * v0.1.318: これらは内部用の合成キーであり、id 行（idShort/idTitle）に出すと
+ * `__anon_gift_0` / `__gift_sender_むめい` 等の内部文字列が画面に漏れる。名前は
+ * nickname で出るので、id 行は抑制する（公式ランクキーと同じ扱い）。リンク化も
+ * `isAnonymousStyleNicoUserId` が true を返すので発生しない。
+ *
+ * @param {string} userKey
+ * @returns {boolean}
+ */
+function isSyntheticGiftSenderKey(userKey) {
+  return /^__(?:anon_gift|gift)_/.test(String(userKey || ''));
+}
+
+/**
  * 公式 DOM/API ランキング（貢献度・広告）の匿名行の表示ラベル。
  * v0.1.317: niconico 公式は匿名を「名無し」と表記する（koken API supporterName /
  * 公式 DOM とも "名無し"）。レーンは「niconico の表示に準拠」と謳うので、内部キーは
@@ -258,13 +273,16 @@ export function topSupportRankLineModels(stripRooms, opts) {
         ? OFFICIAL_RANK_ANON_LABEL
         : anonymousNicknameFallback(userKey, nickRaw);
 
-    // 公式DOMランク行（名前付き含む）の合成キーは id title にも出さない
-    // （id span 自体が抑制される行だが、モデル単体でも内部キーを持たせない）。
+    // 合成キー（公式ランク／ギフト履歴）は id 行・id title に内部キーを出さない。
+    // 名前は nickname で出るので id 行は抑制する（v0.1.318: ギフト合成キーも追加）。
+    const isSyntheticGift = isSyntheticGiftSenderKey(userKey);
     const idTitle =
-      isUnknown || isAnonOfficialDomRank || useOfficialDomNick ? '' : String(r.userKey);
+      isUnknown || isAnonOfficialDomRank || useOfficialDomNick || isSyntheticGift
+        ? ''
+        : String(r.userKey);
     let idShort = isUnknown
       ? '—'
-      : useOfficialDomNick || isAnonOfficialDomRank
+      : useOfficialDomNick || isAnonOfficialDomRank || isSyntheticGift
         ? ''
         : shortUserKeyDisplay(userKey) || String(userKey);
 
@@ -289,7 +307,10 @@ export function topSupportRankLineModels(stripRooms, opts) {
       ? OFFICIAL_RANK_ANON_LABEL
       : useOfficialDomNick
         ? nickRaw
-        : displayUserLabel(userKey, r?.nickname);
+        : isSyntheticGift
+          ? // ギフト合成キーは title にも内部キーを出さず nickname のみ（空なら「名無し」）
+            String(r?.nickname || '').trim() || '名無し'
+          : displayUserLabel(userKey, r?.nickname);
 
     let hasAccent = false;
     let accentColorCss = null;

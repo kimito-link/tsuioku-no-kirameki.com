@@ -158,6 +158,78 @@ export function summarizeGiftEvents(events) {
 }
 
 /**
+ * v0.1.318: ギフト送信者ごとに合計ポイントと投げ回数を集計し、合計pt降順で返す。
+ *
+ * ユーザー要望「投げた人ごとに、どれぐらい投げたか正確な数(pt)を多い順に」用。
+ * ギフト履歴レーンが、公式 DOM 履歴も保存 throws も無い配信で「回数」しか出せて
+ * いなかった不足を、個別 event の point 合算（正確な投げ量）で埋める。
+ *
+ * 送信者キー（会議室確定）: userId（非空）優先 → 無ければ nickname → 無ければ
+ * '名無し'。userId 優先で nickname 表記揺れを吸収。nickname バケットは同名別人
+ * 合算リスクがあるが、公式 DOM 履歴も name 別集計なので整合・許容。
+ *
+ * point は NDGR decode の値（n-air-app atoms.proto 準拠 field4）。0 は無料ギフト
+ * として計上、欠落/非数値は 0 扱い（fail-soft）。
+ *
+ * @param {StoredGiftEvent[]|null|undefined} events
+ * @returns {Array<{ userKey: string, nickname: string, totalPoints: number, throwCount: number }>}
+ */
+export function aggregateGiftSenderTotals(events) {
+  if (!Array.isArray(events)) return [];
+  /** @type {Map<string, { userKey: string, nickname: string, totalPoints: number, throwCount: number, lastAt: number }>} */
+  const map = new Map();
+  for (const e of events) {
+    if (!e || typeof e !== 'object') continue;
+    const uid = String(e.userId ?? '').trim();
+    const nick = String(e.nickname ?? '').trim();
+    // 送信者バケットキー: uid > nickname > '名無し'
+    const key = uid || nick || '名無し';
+    const point =
+      typeof e.point === 'number' && Number.isFinite(e.point) && e.point > 0
+        ? e.point
+        : 0;
+    const at =
+      typeof e.capturedAt === 'number' && Number.isFinite(e.capturedAt)
+        ? e.capturedAt
+        : 0;
+    const existing = map.get(key);
+    if (!existing) {
+      // userKey: uid があれば実 uid（後段でリンク化）。uid 無しは合成キー
+      // `__gift_sender_<bucket>`（リンク化されない・行ごとに一意でバケット衝突なし）。
+      // nickname が空のバケットは「名無し」表示。
+      const userKey = uid || `__gift_sender_${key}`;
+      map.set(key, {
+        userKey,
+        nickname: uid ? nick : nick || '名無し',
+        totalPoints: point,
+        throwCount: 1,
+        lastAt: at
+      });
+    } else {
+      existing.totalPoints += point;
+      existing.throwCount += 1;
+      // 表示 nickname は最新 event のものを採用（表記揺れ時の最新優先）
+      if (at >= existing.lastAt && nick) {
+        existing.nickname = nick;
+        existing.lastAt = at;
+      }
+    }
+  }
+  return [...map.values()]
+    .map((v) => ({
+      userKey: v.userKey,
+      nickname: v.nickname,
+      totalPoints: v.totalPoints,
+      throwCount: v.throwCount
+    }))
+    .sort((a, b) => {
+      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+      if (b.throwCount !== a.throwCount) return b.throwCount - a.throwCount;
+      return String(a.nickname).localeCompare(String(b.nickname));
+    });
+}
+
+/**
  * @param {IncomingGiftEvent|null|undefined} raw
  * @param {number} now
  * @returns {StoredGiftEvent|null}
