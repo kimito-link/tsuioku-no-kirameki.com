@@ -281,3 +281,42 @@ describe('buildContributionRankingListHtml — §6.2 回帰検出ロック', () 
     expect(normalCount).toBe(7);
   });
 });
+
+describe('buildContributionRankingListHtml — v0.1.316 公式リンク化', () => {
+  const opts = { noteText: '', ariaLabel: 'L', unitSuffix: '貢', defaultThumbSrc: '' };
+
+  it('userKey が実数値 uid の行は名前を user ページへの <a> にする', () => {
+    const html = buildContributionRankingListHtml(
+      [model(1, 'タロウ', 100, { userKey: '4046119' })],
+      opts
+    );
+    expect(html).toContain(
+      '<a class="nl-contrib-ranking-list__name-link" href="https://www.nicovideo.jp/user/4046119" target="_blank" rel="noopener noreferrer">'
+    );
+    expect(html).toContain('タロウ');
+  });
+
+  it('合成キー（__contrib_）の行はリンク化しない', () => {
+    const html = buildContributionRankingListHtml([model(1, 'ジロウ', 50)], opts);
+    expect(html).not.toContain('name-link');
+    expect(html).not.toContain('nicovideo.jp/user/');
+    expect(html).toContain('ジロウ');
+  });
+
+  it('匿名キー（__anon_contrib_）の行はリンク化しない', () => {
+    const html = buildContributionRankingListHtml(
+      [model(1, '匿名', 10, { userKey: '__anon_contrib_0' })],
+      opts
+    );
+    expect(html).not.toContain('name-link');
+    expect(html).not.toContain('nicovideo.jp/user/');
+  });
+
+  it('未取得行（isUnknown）はリンク化しない', () => {
+    const html = buildContributionRankingListHtml(
+      [model(null, '—', 0, { isUnknown: true, userKey: '__unknown__' })],
+      opts
+    );
+    expect(html).not.toContain('name-link');
+  });
+});

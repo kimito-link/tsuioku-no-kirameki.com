@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.316',
+    date: '2026-05-22',
+    summary: '貢献度ランキングの記名上位をリンク化',
+    items: Object.freeze([
+      '[追加] 貢献度ランキングで、公式に名前とユーザーページが分かっている上位の方を、ニコニコのユーザーページへのリンクにしました（クリックで開けます）。名前が公開されていない「匿名」の方はリンクにしません（取り違えを防ぐため、公式が出している確かな情報の分だけリンクします）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.315',
     date: '2026-05-22',
     summary: '広告/貢献度ランキングの内部キー漏れを追加修正',

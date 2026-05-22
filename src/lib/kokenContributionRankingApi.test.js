@@ -137,7 +137,8 @@ describe('normalizeKokenRankingResponse', () => {
         contribution: 51000,
         isAnonymous: false,
         thumbnailUrl:
-          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/13068/130688509.jpg?1772616652'
+          'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/13068/130688509.jpg?1772616652',
+        userPageUrl: 'https://www.nicovideo.jp/user/130688509'
       },
       {
         rank: 3,
@@ -190,7 +191,14 @@ describe('normalizeKokenRankingResponse', () => {
       }
     });
     expect(rows).toEqual([
-      { rank: 2, name: 'ありな', contribution: 8, isAnonymous: false, thumbnailUrl: '' }
+      {
+        rank: 2,
+        name: 'ありな',
+        contribution: 8,
+        isAnonymous: false,
+        thumbnailUrl: '',
+        userPageUrl: 'https://www.nicovideo.jp/user/43'
+      }
     ]);
   });
 
@@ -217,15 +225,30 @@ describe('normalizeKokenRankingResponse', () => {
       }
     });
     expect(rows).toEqual([
-      { rank: 1, name: 'a', contribution: 0, isAnonymous: false, thumbnailUrl: '' },
+      {
+        rank: 1,
+        name: 'a',
+        contribution: 0,
+        isAnonymous: false,
+        thumbnailUrl: '',
+        userPageUrl: 'https://www.nicovideo.jp/user/1'
+      },
       {
         rank: 2,
         name: 'b',
         contribution: 0,
         isAnonymous: false,
-        thumbnailUrl: 'http://example.com/x.png'
+        thumbnailUrl: 'http://example.com/x.png',
+        userPageUrl: 'https://www.nicovideo.jp/user/2'
       },
-      { rank: 3, name: 'c', contribution: 12, isAnonymous: false, thumbnailUrl: '' }
+      {
+        rank: 3,
+        name: 'c',
+        contribution: 12,
+        isAnonymous: false,
+        thumbnailUrl: '',
+        userPageUrl: 'https://www.nicovideo.jp/user/3'
+      }
     ]);
   });
 
@@ -260,7 +283,47 @@ describe('normalizeKokenRankingResponse', () => {
       }
     });
     expect(rows).toEqual([
-      { rank: 1, name: 'ok', contribution: 1, isAnonymous: false, thumbnailUrl: '' }
+      {
+        rank: 1,
+        name: 'ok',
+        contribution: 1,
+        isAnonymous: false,
+        thumbnailUrl: '',
+        userPageUrl: 'https://www.nicovideo.jp/user/9'
+      }
     ]);
+  });
+
+  it('v0.1.316: userPageUrl は公式値を優先、無ければ supporterId 由来、匿名は付けない', () => {
+    const rows = normalizeKokenRankingResponse({
+      data: {
+        rankers: [
+          // 公式 userPageUrl あり → そのまま採用
+          {
+            rank: 1,
+            supporterId: 111,
+            supporterName: 'A',
+            contribution: 10,
+            userPageUrl: 'https://www.nicovideo.jp/user/111'
+          },
+          // userPageUrl 無し → supporterId から組み立て
+          { rank: 2, supporterId: 222, supporterName: 'B', contribution: 5 },
+          // 匿名 → userPageUrl を付けない
+          { rank: 3, supporterName: '名無し', contribution: 1 },
+          // 想定外ホストの userPageUrl は捨て、supporterId 由来に倒す
+          {
+            rank: 4,
+            supporterId: 444,
+            supporterName: 'D',
+            contribution: 2,
+            userPageUrl: 'https://evil.example.com/user/444'
+          }
+        ]
+      }
+    });
+    expect(rows[0].userPageUrl).toBe('https://www.nicovideo.jp/user/111');
+    expect(rows[1].userPageUrl).toBe('https://www.nicovideo.jp/user/222');
+    expect('userPageUrl' in rows[2]).toBe(false); // 匿名は付けない
+    expect(rows[3].userPageUrl).toBe('https://www.nicovideo.jp/user/444'); // 不正ホスト→supporterId
   });
 });

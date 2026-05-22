@@ -252,7 +252,8 @@ export function scrapeOfficialEventBalloonFromDom(root) {
  *   name: string,
  *   contribution: number,
  *   isAnonymous: boolean,
- *   thumbnailUrl: string
+ *   thumbnailUrl: string,
+ *   userPageUrl?: string
  * }} ContributionRankerRow
  */
 
