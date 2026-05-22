@@ -152,6 +152,7 @@ import {
 } from '../lib/cheerPalette.js';
 import { EXTENSION_CHANGELOG } from '../lib/changelog.js';
 import { detectCommentKindnessNudge } from '../lib/commentKindnessNudge.js';
+import { resolveCommentKindnessDisplayModel } from '../lib/commentKindnessDisplayModel.js';
 import {
   audioConstraintsForDevice,
   probeMicrophoneLevel
@@ -1063,10 +1064,19 @@ function paintCommentKindnessUi(rawText) {
   const view = resolveCommentKindnessView(rawText);
   if (!wrap || !face || !title || !body || !confirm) return view;
 
-  if (!view.warning) {
+  // 表示判断（DOM 非依存）は純関数 resolveCommentKindnessDisplayModel に委譲。
+  // armedText の 2 回押しハンドシェイクや lastVisibleKey/forceHop の読み書きは
+  // ここ（popup の可変状態）に残す。
+  const model = resolveCommentKindnessDisplayModel(view, {
+    forceHop: COMMENT_KINDNESS_UI_STATE.forceHop,
+    lastVisibleKey: COMMENT_KINDNESS_UI_STATE.lastVisibleKey,
+    faceLevels: Object.keys(COMMENT_KINDNESS_FACE_SRC)
+  });
+
+  if (!model.visible) {
     wrap.hidden = true;
     wrap.setAttribute('aria-hidden', 'true');
-    wrap.dataset.level = 'mild';
+    wrap.dataset.level = model.level;
     body.textContent = '';
     confirm.textContent = '';
     COMMENT_KINDNESS_UI_STATE.lastVisibleKey = '';
@@ -1076,18 +1086,13 @@ function paintCommentKindnessUi(rawText) {
 
   wrap.hidden = false;
   wrap.setAttribute('aria-hidden', 'false');
-  wrap.dataset.level = view.warning.level;
-  title.textContent = view.warning.title;
-  body.textContent = view.warning.body;
-  confirm.textContent = view.confirmPending
-    ? view.warning.confirm
-    : '送る前に、ひと呼吸おいて言い換えも考えてみよう。';
-  face.src = COMMENT_KINDNESS_FACE_SRC[view.warning.level] || COMMENT_KINDNESS_FACE_SRC.mild;
+  wrap.dataset.level = model.level;
+  title.textContent = model.title;
+  body.textContent = model.body;
+  confirm.textContent = model.confirmText;
+  face.src = COMMENT_KINDNESS_FACE_SRC[model.faceLevel] || COMMENT_KINDNESS_FACE_SRC.mild;
 
-  const shouldHop =
-    COMMENT_KINDNESS_UI_STATE.forceHop ||
-    COMMENT_KINDNESS_UI_STATE.lastVisibleKey !== view.visibleKey;
-  if (shouldHop) {
+  if (model.shouldHop) {
     face.classList.remove('is-hop');
     void face.offsetWidth;
     face.classList.add('is-hop');
@@ -1095,7 +1100,7 @@ function paintCommentKindnessUi(rawText) {
       face.classList.remove('is-hop');
     }, 520);
   }
-  COMMENT_KINDNESS_UI_STATE.lastVisibleKey = view.visibleKey;
+  COMMENT_KINDNESS_UI_STATE.lastVisibleKey = model.visibleKey;
   COMMENT_KINDNESS_UI_STATE.forceHop = false;
   return view;
 }
