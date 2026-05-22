@@ -28,6 +28,7 @@ import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStrip
 import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
 import { GIFT_HISTORY_LANE_MAX } from '../lib/giftRankStripConfig.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
+import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 import {
   iframeOfficialDomStorageKey,
@@ -6149,6 +6150,45 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
       unitSuffix: 'pt',
       ariaLabel: '公式サイドバー履歴のユーザー別集計'
     };
+  }
+  // v0.1.318: 公式履歴も保存 throws も無いとき、個別ギフト event
+  // （nls_gift_events_<lid>）を送信者別に「正確な投げ量(pt)」で集計し降順ランキング。
+  // ＝従来この後の「投げ回数(回)」フォールバックより前に、pt がある分は pt で出す。
+  // 集計が空 or 全 pt=0 のときだけ従来の回数フォールバックへフォールスルー。
+  /** @type {Array<{userId?:string;nickname?:string;point?:number;capturedAt?:number}>} */
+  let giftEvents = [];
+  try {
+    const evBag = await chrome.storage.local.get(`nls_gift_events_${lid}`);
+    const v = evBag[`nls_gift_events_${lid}`];
+    if (Array.isArray(v)) giftEvents = /** @type {any} */ (v);
+  } catch {
+    /* no-op */
+  }
+  if (giftEvents.length > 0) {
+    const senderTotals = aggregateGiftSenderTotals(giftEvents);
+    const totalPtSum = senderTotals.reduce((s, r) => s + (Number(r.totalPoints) || 0), 0);
+    // pt が 1 件でもあるときだけ pt ランキングを採用（全 0 は回数の方が情報量あり）
+    if (senderTotals.length > 0 && totalPtSum > 0) {
+      const senderN = senderTotals.length;
+      const throwM = senderTotals.reduce((s, r) => s + (Number(r.throwCount) || 0), 0);
+      const rooms = senderTotals.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
+        const userKey = String(r.userKey || '');
+        const nickname =
+          (userKey && _nicknameResolveMap.get(userKey)) || String(r.nickname || '');
+        return {
+          userKey,
+          nickname,
+          count: Number(r.totalPoints) || 0,
+          avatarUrl: rememberedAvatarUrlForUserId(userKey) || ''
+        };
+      });
+      return {
+        rooms,
+        noteText: `ライブ受信したギフトの送り主別 累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントや貢献度ランキングとは別指標）`,
+        unitSuffix: 'pt',
+        ariaLabel: 'ライブ受信ギフトの送り主別 累計ポイントが多い順'
+      };
+    }
   }
   const key = giftUsersStorageKey(lid);
   let raw = /** @type {unknown[]} */ ([]);

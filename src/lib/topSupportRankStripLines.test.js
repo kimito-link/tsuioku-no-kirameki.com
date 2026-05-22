@@ -348,6 +348,36 @@ describe('topSupportRankLineModels', () => {
     expect(row.fullLabelForTitle).not.toContain('__ad_');
   });
 
+  it('v0.1.318: ギフト合成キー（__anon_gift_/__gift_/__gift_sender_）は id 行に内部キーを漏らさない', () => {
+    const rows = topSupportRankLineModels(
+      [
+        { userKey: '__anon_gift_0', nickname: '名無し', count: 100 },
+        { userKey: '__gift_1_たろう', nickname: 'たろう', count: 50 },
+        { userKey: '__gift_sender_むめい', nickname: 'むめい', count: 30 }
+      ],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    for (const r of rows) {
+      expect(r.idShort).toBe('');
+      expect(r.idTitle).toBe('');
+      expect(r.fullLabelForTitle).not.toContain('__gift');
+      expect(r.fullLabelForTitle).not.toContain('__anon');
+      expect(r.nameLine).not.toContain('__gift');
+    }
+    // 名前は nickname で出る
+    expect(rows[1].nameLine).toBe('たろう');
+    expect(rows[2].nameLine).toBe('むめい');
+  });
+
+  it('v0.1.318: ギフトでも実数値 uid 行は id/リンク用 userKey を保持（合成キー扱いしない）', () => {
+    const [row] = topSupportRankLineModels(
+      [{ userKey: '4046119', nickname: 'タロウ', count: 10 }],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.idShort).toBe('4046119'); // 実 uid は id 行に出る（リンク化対象）
+    expect(row.nameLine).toBe('タロウ');
+  });
+
   it('placeNumberMode:dense で同回数は同順位（本家ランキングタブの貢献度に近い並び方）', () => {
     const rooms = [
       { userKey: '1', nickname: 'a', count: 40 },

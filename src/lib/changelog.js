@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.318',
+    date: '2026-05-22',
+    summary: 'ギフト履歴を送り主別の合計ptで多い順に',
+    items: Object.freeze([
+      '[改善] ギフト履歴を、ギフトを贈った人ごとに「合計ポイント」で集計し、多い順に並べるようにしました。公式の履歴が画面に無い配信でも、受信したギフトから正確な投げ量（pt）で順位づけします（これまでは公式履歴が無いと「投げ回数」しか出せませんでした）',
+      '[修正] ギフト履歴の行に、内部用の文字列（__anon_gift_… 等）が出ることがあった問題を直しました（名前だけを表示）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.317',
     date: '2026-05-22',
     summary: '匿名表記を公式準拠の「名無し」に統一',
