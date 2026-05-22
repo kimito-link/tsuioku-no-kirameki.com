@@ -331,3 +331,78 @@ describe('shouldConsumePlacementUpgradeOnce', () => {
     expect(shouldConsumePlacementUpgradeOnce({})).toBe(false);
   });
 });
+
+describe('昇格＋once消費の連携シーケンス（マルチモニタ等の堅牢性）', () => {
+  // 2 関数を組み合わせ、content-entry の maybeUpgradePlacementForWideViewport が
+  // 依拠する「狭いモニタで開いても once を消費しない＝後で広いモニタに移したら昇格する」
+  // という堅牢性（gemini 抜け漏れ指摘）を純関数レベルで固定する。
+  function step({ stored, viewportInnerWidth, policy, onceDone }) {
+    const upgradedTo = suggestPlacementUpgradeForWideViewport({
+      stored,
+      userExplicit: false,
+      viewportInnerWidth,
+      policy,
+      onceDone
+    });
+    const consume = shouldConsumePlacementUpgradeOnce({ policy, upgradedTo });
+    return {
+      upgradedTo,
+      // 呼出元はこのとき stored=beside / onceDone=true を保存する
+      nextStored: upgradedTo ?? stored,
+      nextOnceDone: consume ? true : onceDone
+    };
+  }
+
+  it('once: 狭いモニタで開く→消費しない→広いモニタに移すと昇格する', () => {
+    // 1) 狭いモニタ（900px）で watch を開く → 昇格なし・once 未消費のまま
+    const s1 = step({
+      stored: INLINE_PANEL_PLACEMENT_BELOW,
+      viewportInnerWidth: 900,
+      policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+      onceDone: false
+    });
+    expect(s1.upgradedTo).toBe(null);
+    expect(s1.nextStored).toBe(INLINE_PANEL_PLACEMENT_BELOW);
+    expect(s1.nextOnceDone).toBe(false);
+
+    // 2) 広いモニタ（1600px）に移して再度開く → ここで初めて昇格・once 消費
+    const s2 = step({
+      stored: s1.nextStored,
+      viewportInnerWidth: 1600,
+      policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+      onceDone: s1.nextOnceDone
+    });
+    expect(s2.upgradedTo).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
+    expect(s2.nextStored).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
+    expect(s2.nextOnceDone).toBe(true);
+
+    // 3) その後はもう昇格対象でない（beside 保存済み）＝再昇格しない
+    const s3 = step({
+      stored: s2.nextStored,
+      viewportInnerWidth: 1600,
+      policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+      onceDone: s2.nextOnceDone
+    });
+    expect(s3.upgradedTo).toBe(null);
+  });
+
+  it('once: 広いモニタで 1 回昇格・消費したら、狭く戻ってもまた広げても再昇格しない', () => {
+    const s1 = step({
+      stored: INLINE_PANEL_PLACEMENT_BELOW,
+      viewportInnerWidth: 1600,
+      policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+      onceDone: false
+    });
+    expect(s1.upgradedTo).toBe(INLINE_PANEL_PLACEMENT_BESIDE);
+    expect(s1.nextOnceDone).toBe(true);
+    // stored が beside になっているので以後どの幅でも null
+    expect(
+      step({
+        stored: s1.nextStored,
+        viewportInnerWidth: 2560,
+        policy: INLINE_PANEL_VIEWPORT_WIDE_ONCE,
+        onceDone: s1.nextOnceDone
+      }).upgradedTo
+    ).toBe(null);
+  });
+});
