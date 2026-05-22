@@ -285,6 +285,12 @@ import {
 import { parseCommentIngestLog } from '../lib/commentIngestLog.js';
 import { pickDevMonitorDebugSubset } from '../lib/devMonitorDebugSubset.js';
 import {
+  computeAcquisitionPercents,
+  computeRadarPolygonPoints,
+  computeAcquisitionPieGradient,
+  ACQUISITION_RADAR_GEOMETRY
+} from '../lib/acquisitionDashboardChart.js';
+import {
   summarizeStoredCommentAvatarStats,
   summarizeStoredCommentProfileGaps
 } from '../lib/devMonitorAvatarStats.js';
@@ -7569,101 +7575,24 @@ function renderAcquisitionDashboard(p) {
     return;
   }
 
+  // DOM 非依存の数値計算は純関数 acquisitionDashboardChart.js に委譲（pure refactor）。
   const avs = p.avatarStats;
-  const t = avs && typeof avs.total === 'number' ? Math.max(0, avs.total) : 0;
-  const withHttpStored =
-    avs && typeof avs.withHttpAvatar === 'number' && Number.isFinite(avs.withHttpAvatar)
-      ? Math.max(0, avs.withHttpAvatar)
-      : 0;
-  const resolvedRaw =
-    avs && typeof avs.withResolvedAvatar === 'number' && Number.isFinite(avs.withResolvedAvatar)
-      ? Math.max(0, avs.withResolvedAvatar)
-      : null;
-  const thumbNumerator =
-    resolvedRaw != null ? Math.min(resolvedRaw, t || resolvedRaw) : withHttpStored;
-  const thumb = t > 0 ? (thumbNumerator / t) * 100 : 0;
-  const idPct = t > 0 ? ((t - avs.missingUserId) / t) * 100 : 0;
-  const nick = t > 0 ? (avs.withNickname / t) * 100 : 0;
-  const oc =
-    p.snapshot &&
-    typeof p.snapshot.officialCommentCount === 'number' &&
-    Number.isFinite(p.snapshot.officialCommentCount)
-      ? p.snapshot.officialCommentCount
-      : null;
-  /** @type {number|null} */
-  let commentPct = null;
-  if (oc != null && oc > 0) {
-    commentPct = Math.min(100, (p.displayCount / oc) * 100);
-  }
+  const { thumb, idPct, nick, commentPct, total: t } = computeAcquisitionPercents({
+    avatarStats: avs,
+    snapshot: p.snapshot,
+    displayCount: p.displayCount
+  });
   const radarComment = commentPct != null ? commentPct : 0;
 
-  const cx = 60;
-  const cy = 60;
-  const R = 44;
-  const vals = [thumb, idPct, nick, radarComment];
-  const polyPts = vals
-    .map((pct, i) => {
-      const th = -Math.PI / 2 + (i * Math.PI) / 2;
-      const rr = (Math.max(0, Math.min(100, pct)) / 100) * R;
-      const x = cx + rr * Math.cos(th);
-      const y = cy + rr * Math.sin(th);
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(' ');
-  const ringPts = [0, 1, 2, 3]
-    .map((i) => {
-      const th = -Math.PI / 2 + (i * Math.PI) / 2;
-      const x = cx + R * Math.cos(th);
-      const y = cy + R * Math.sin(th);
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(' ');
-  const midR = R * 0.5;
-  const midPts = [0, 1, 2, 3]
-    .map((i) => {
-      const th = -Math.PI / 2 + (i * Math.PI) / 2;
-      const x = cx + midR * Math.cos(th);
-      const y = cy + midR * Math.sin(th);
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(' ');
-  const axisLines = [0, 1, 2, 3]
-    .map((i) => {
-      const th = -Math.PI / 2 + (i * Math.PI) / 2;
-      const x2 = cx + R * Math.cos(th);
-      const y2 = cy + R * Math.sin(th);
-      return `<line x1="${cx}" y1="${cy}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(
-        2
-      )}" stroke="#94a3b8" stroke-width="0.45" opacity="0.4"/>`;
-    })
-    .join('');
+  const { polyPts, ringPts, midPts, axisLines } = computeRadarPolygonPoints(
+    [thumb, idPct, nick, radarComment],
+    ACQUISITION_RADAR_GEOMETRY
+  );
 
   const fmt = (n) => `${n.toFixed(1)}%`;
   const commentBar = commentPct != null ? fmt(commentPct) : '—';
 
-  const wThumb = Math.max(0, thumb);
-  const wId = Math.max(0, idPct);
-  const wNick = Math.max(0, nick);
-  const wComm = commentPct != null ? Math.max(0, commentPct) : 0;
-  const wSum = wThumb + wId + wNick + wComm;
-  /** @type {string} */
-  let pieDiskBackground = '#94a3b8';
-  if (wSum > 0.001) {
-    let a = 0;
-    /** @type {string[]} */
-    const segs = [];
-    const pushSeg = (frac, color) => {
-      const deg = (frac / wSum) * 360;
-      const b = a + deg;
-      segs.push(`${color} ${a}deg ${b}deg`);
-      a = b;
-    };
-    pushSeg(wThumb, '#0f8fd8');
-    pushSeg(wId, '#6366f1');
-    pushSeg(wNick, '#ea580c');
-    pushSeg(wComm, '#0d9488');
-    pieDiskBackground = `conic-gradient(${segs.join(',')})`;
-  }
+  const pieDiskBackground = computeAcquisitionPieGradient({ thumb, idPct, nick, commentPct });
 
   const footExtra =
     t <= 0
