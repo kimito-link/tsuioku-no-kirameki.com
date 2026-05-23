@@ -10,6 +10,10 @@ import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
  * v0.1.316: 貢献度ランキングレーンが、公式 koken API 由来の userPageUrl がある
  * 記名行だけを niconico ユーザーページへの <a> リンクにすることを実ブラウザで実証。
  * 匿名行・uid 無し行はリンク化しない（推測ゼロ・公式提供分のみ・誤マージ不能）。
+ *
+ * v0.1.338: 貢献度ランキングを縦リストから「横並びカード」（ギフト履歴/広告と同型の
+ *   `nl-top-support-rank--below-cards`）に統一。リンク行は `a.nl-top-support-rank__line--linkable`
+ *   になり、href・rel・「さん」付き表示・上位10名 cap は維持。匿名行はリンク化しない。
  */
 
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
@@ -78,8 +82,11 @@ test('貢献度ランキング: 記名行(公式userPageUrl)はリンク化・�
     })
     .toBe(true);
 
-  // 記名行は user ページへの <a>
-  const link = body.locator('a.nl-contrib-ranking-list__name-link');
+  // v0.1.338: 横並びカード（ギフト履歴/広告と同型）に統一されている。
+  await expect(body).toHaveClass(/nl-top-support-rank--below-cards/);
+
+  // 記名行は user ページへの <a>（横カードの linkable 行）。
+  const link = body.locator('a.nl-top-support-rank__line--linkable');
   await expect(link).toHaveCount(1);
   await expect(link).toHaveAttribute('href', 'https://www.nicovideo.jp/user/4046119');
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
