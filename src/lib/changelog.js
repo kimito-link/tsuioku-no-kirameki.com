@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.343',
+    date: '2026-05-24',
+    summary: '応援タイムラインの開いた状態を覚える',
+    items: Object.freeze([
+      '[改善] 応援タイムラインを一度開いておくと、画面の更新後や次に開いたときも開いたままになるようにしました（これまでは更新のたびに閉じていました）。既定は閉じたままなので、普段の見え方は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.342',
     date: '2026-05-24',
     summary: '応援タイムラインのギフトに送信者の顔を表示',
