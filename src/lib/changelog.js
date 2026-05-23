@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.346',
+    date: '2026-05-24',
+    summary: 'ランキングを枠なし表示にして全部見えるように',
+    items: Object.freeze([
+      '[改善] 貢献度ランキング・広告ランキング・ギフト履歴のカードを「枠なし」表示にしました。これまでは枠の中に小さなスクロールがあって何人かが見切れていましたが、全員のカードが折り返してそのまま全部表示されます（縦スクロールはページ全体の1本にまとまります）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.345',
     date: '2026-05-24',
     summary: '別ウィンドウの下の空白を応援タイムラインで埋める',
