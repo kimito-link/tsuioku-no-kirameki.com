@@ -87,6 +87,9 @@ export const KEY_FOLD_ANONYMOUS_IN_RANK_STRIP = 'nls_fold_anonymous_in_rank_stri
 /** 応援ビジュアル詳細（ユーザーレーン・グリッド・診断ブロック）を開いているか */
 export const KEY_SUPPORT_VISUAL_EXPANDED = 'nls_support_visual_expanded';
 
+/** 応援タイムライン（コメント＋ギフトの時系列）を開いているか（v0.1.343・既定 false=閉じ） */
+export const KEY_SUPPORT_TIMELINE_OPEN = 'nls_support_timeline_open_v1';
+
 /** ポップアップ利用条件（外部アイコン・書き出し等）の同意済みフラグ */
 export const KEY_USAGE_TERMS_ACK = 'nls_usage_terms_ack_v1';
 

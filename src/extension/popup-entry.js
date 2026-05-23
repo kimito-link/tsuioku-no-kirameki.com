@@ -101,6 +101,7 @@ import {
   KEY_FOLD_ANONYMOUS_IN_RANK_STRIP,
   KEY_STORY_GROWTH_COLLAPSED,
   KEY_SUPPORT_VISUAL_EXPANDED,
+  KEY_SUPPORT_TIMELINE_OPEN,
   KEY_USAGE_TERMS_ACK,
   KEY_VOICE_AUTOSEND,
   KEY_VOICE_INPUT_DEVICE,
@@ -6782,6 +6783,41 @@ async function refreshSupportActivityTimeline(liveId) {
     }
   }
   if (details instanceof HTMLElement) details.hidden = false;
+}
+
+/**
+ * v0.1.343: 応援タイムラインの開閉状態を永続化（単一枠の完成度向上）。
+ *   既定は閉じ（普段の表示は不変）。一度開いたら storage に保存し、次回以降・更新後も
+ *   開いたままにする。`supportVisualDetails` と同型の軽量版（多フレーム scroll 連携は不要）。
+ *   load 時に一度だけ hydrate + toggle リスナ配線（多重配線を guard）。
+ */
+let supportTimelineOpenWired = false;
+let suppressSupportTimelineTogglePersist = false;
+async function wireSupportTimelineOpenPersistence() {
+  const details = /** @type {HTMLDetailsElement|null} */ ($('supportTimelineDetails'));
+  if (!(details instanceof HTMLDetailsElement)) return;
+  // hydrate: 保存値が true のときだけ開く（既定 false=閉じ）。
+  try {
+    const bag = await storageGetSafe(KEY_SUPPORT_TIMELINE_OPEN, {});
+    const want = bag[KEY_SUPPORT_TIMELINE_OPEN] === true;
+    if (details.open !== want) {
+      suppressSupportTimelineTogglePersist = true;
+      try {
+        details.open = want;
+      } finally {
+        suppressSupportTimelineTogglePersist = false;
+      }
+    }
+  } catch {
+    /* best-effort: 既定のまま */
+  }
+  if (supportTimelineOpenWired) return;
+  supportTimelineOpenWired = true;
+  details.addEventListener('toggle', () => {
+    if (suppressSupportTimelineTogglePersist) return;
+    const open = Boolean(details.open);
+    void storageSetSafe({ [KEY_SUPPORT_TIMELINE_OPEN]: open }).catch(() => {});
+  });
 }
 
 /** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
@@ -14019,6 +14055,7 @@ function initPopup() {
         const refreshDone = safeRefresh();
         await applySupportVisualExpandedFromStorage().catch(() => {});
         wireSupportVisualUi();
+        void wireSupportTimelineOpenPersistence().catch(() => {});
         document.documentElement.setAttribute('data-nl-support-wired', '');
         void applyThumbSelectFromStorage().catch(() => {});
         // registry 登録済みのブール設定を storage から一括同期
