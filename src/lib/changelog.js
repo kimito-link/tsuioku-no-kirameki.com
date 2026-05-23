@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.337',
+    date: '2026-05-23',
+    summary: 'カードが全部「—」で固まる不具合を修正',
+    items: Object.freeze([
+      '[修正] タブをたくさん開いているときなどに、上部のカード（記録・来場者数など）やランキングが全部「—」のまま固まることがある不具合を直しました。内部のデータ読み込みがまれに応答しなくなっても、表示を止めずに次の更新で自然に復活するようにしました（コメントは今までどおり流れます）。あわせて「AI共有用にコピー（診断まとめ）」が同じ状況で取得できないことも起きにくくなります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.336',
     date: '2026-05-23',
     summary: '横付きを押しても変わらない時に理由を表示',

@@ -250,6 +250,38 @@ describe('readStorageBagWithRetry', () => {
     );
     expect(bag).toEqual({});
   });
+
+  it('固まった試行(resolveしない)は per-attempt タイムアウトで失敗扱いにして次へ進む', async () => {
+    let n = 0;
+    const bag = await readStorageBagWithRetry(
+      () => {
+        n += 1;
+        // 1回目は永久に固まる（resolve も reject もしない）。2回目は成功。
+        if (n < 2) return new Promise(() => {});
+        return Promise.resolve({ ok: true });
+      },
+      { attempts: 3, delaysMs: [1, 1], perAttemptTimeoutMs: 30 }
+    );
+    expect(bag.ok).toBe(true);
+    expect(n).toBe(2);
+  });
+
+  it('全試行が固まっても {} を返す（永久ハングしない）', async () => {
+    const bag = await readStorageBagWithRetry(() => new Promise(() => {}), {
+      attempts: 2,
+      delaysMs: [1],
+      perAttemptTimeoutMs: 20
+    });
+    expect(bag).toEqual({});
+  });
+
+  it('通常の高速 read はタイムアウトに到達せず即返る（挙動不変）', async () => {
+    const bag = await readStorageBagWithRetry(async () => ({ fast: 1 }), {
+      attempts: 4,
+      perAttemptTimeoutMs: 1000
+    });
+    expect(bag.fast).toBe(1);
+  });
 });
 
 describe('hydrateUserCommentProfileMapFromStorage', () => {

@@ -346,8 +346,17 @@ export function pruneUserCommentProfileMap(
 
 /**
  * chrome.storage.local.get が起動直後などで失敗することがあるため再試行する。
+ *
+ * ⭐ ハング対策（v0.1.336）: MV3 では多タブで storage を叩き続けると
+ *   `chrome.storage.local.get` の Promise が **reject も resolve もせず固まる**ことがある。
+ *   その場合、素の `await readFn()` は永久に返らず、これを描画前ゲートに使っている
+ *   popup の refresh が丸ごと停止して全カードが「—」固定になる（実機 lv350592761:
+ *   storage_read_failed + 多タブ 27+119）。よって各試行に per-attempt タイムアウトを設け、
+ *   固まった試行は「失敗した試行」として次へ送り、全滅時は従来どおり {} を返す。
+ *   通常時（高速に解決する read）はタイムアウトに到達しないので挙動は完全に不変。
+ *
  * @param {() => Promise<Record<string, unknown>>} readFn
- * @param {{ attempts?: number, delaysMs?: number[] }} [opts]
+ * @param {{ attempts?: number, delaysMs?: number[], perAttemptTimeoutMs?: number }} [opts]
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function readStorageBagWithRetry(readFn, opts = {}) {
@@ -356,6 +365,14 @@ export async function readStorageBagWithRetry(readFn, opts = {}) {
     Array.isArray(opts.delaysMs) && opts.delaysMs.length
       ? opts.delaysMs
       : [0, 50, 120, 280];
+  // 0 以下や未指定なら既定 2000ms。タイムアウト無効化したい呼出は明示的に Infinity を渡す。
+  const rawTimeout = Number(opts.perAttemptTimeoutMs);
+  const perAttemptTimeoutMs =
+    Number.isFinite(rawTimeout) && rawTimeout > 0
+      ? rawTimeout
+      : rawTimeout === Infinity
+      ? Infinity
+      : 2000;
   for (let i = 0; i < attempts; i += 1) {
     if (i > 0) {
       const ms = Math.max(
@@ -367,7 +384,30 @@ export async function readStorageBagWithRetry(readFn, opts = {}) {
       }
     }
     try {
-      const bag = await readFn();
+      // per-attempt タイムアウトで「固まった read」を失敗扱いにして次の試行へ送る。
+      // Infinity のときは race を組まず素の await（タイムアウト無効）。
+      const bag =
+        perAttemptTimeoutMs === Infinity
+          ? await readFn()
+          : await (async () => {
+              /** @type {ReturnType<typeof setTimeout>|null} */
+              let timer = null;
+              const TIMED_OUT = Symbol('storage_read_attempt_timeout');
+              try {
+                const result = await Promise.race([
+                  readFn(),
+                  new Promise((resolve) => {
+                    timer = setTimeout(() => resolve(TIMED_OUT), perAttemptTimeoutMs);
+                  })
+                ]);
+                if (result === TIMED_OUT) {
+                  return undefined; // 固まった→この試行は失敗扱い
+                }
+                return result;
+              } finally {
+                if (timer != null) clearTimeout(timer);
+              }
+            })();
       if (bag && typeof bag === 'object' && !Array.isArray(bag)) {
         return /** @type {Record<string, unknown>} */ (bag);
       }
