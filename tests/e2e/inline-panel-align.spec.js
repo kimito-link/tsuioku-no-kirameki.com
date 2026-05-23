@@ -974,4 +974,78 @@ test.describe('inline panel 初回表示ゲート', () => {
     // 初回に「below 位置で可視」が一度も観測されないこと＝崩れフラッシュ抹消。
     expect(sawBelowVisible, `below 可視を観測したフレーム index: ${sawBelowVisible}`).toEqual([]);
   });
+
+  /*
+   * ⭐ v0.1.330 退行ガード（実機報告「横付きが初回だけ下→横にジャンプ」）。
+   * 既定 dock_bottom(非明示) で広いビューポートで開くと自動横付き昇格するが、
+   * 旧実装は「初回 renderPageFrameOverlay を stored=dock_bottom で一度描画 →
+   * 直後の async 昇格で beside へ」という順序のため、dock_bottom パネル
+   * （position:fixed・画面下に固定）が一瞬可視になってから横へジャンプして見えた。
+   * 修正後は初回描画前に in-memory を beside 確定させるので、dock_bottom 位置で
+   * 可視になるフレームが一度も無いまま beside（行内・VIDEO 直後）に出る。
+   */
+  for (const startPlacement of ['dock_bottom', 'below']) {
+    test(`${startPlacement}(非明示) を 1600px で開いても初回に ${startPlacement} で可視にならず beside で出る`, async ({
+      context
+    }) => {
+      await setInlinePanelModes(context, {
+        widthMode: 'video',
+        placement: startPlacement,
+        userExplicit: false
+      });
+
+      const page = await context.newPage();
+      await page.setViewportSize({ width: 1600, height: 900 });
+      await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+      // 視聴行を即注入（昇格の中間描画フラッシュを捉えるため、行は最初から在る）。
+      await page.evaluate(injectTwoColumnPlayerRow);
+
+      /*
+       * 起動直後の数百msを細かくサンプルし、「既定配置(dock_bottom=fixed/画面下、
+       * または below=BODY 直下で動画の下)で可視」が一度も無いことを確認する。
+       * dock_bottom は position:fixed、below は VIDEO の bottom 以下に host top が来る。
+       */
+      const sawDefaultPlacementVisible = [];
+      for (let i = 0; i < 16; i++) {
+        const s = await page.evaluate(
+          ({ hostId, mode }) => {
+            const host = document.getElementById(hostId);
+            if (!host) return { present: false };
+            const cs = getComputedStyle(host);
+            const visible = cs.display !== 'none' && host.offsetParent !== null;
+            if (!visible) return { present: true, visible: false, atDefault: false };
+            if (mode === 'dock_bottom') {
+              // dock_bottom は fixed で画面下に固定される。
+              const atDefault = cs.position === 'fixed';
+              return { present: true, visible: true, atDefault };
+            }
+            // below: 動画の下（VIDEO の bottom 以下に host top）かつ行の外（BODY 直下）。
+            const v = document.querySelector('video');
+            const hb = host.getBoundingClientRect();
+            const vb = v ? v.getBoundingClientRect() : null;
+            const atDefault = vb ? hb.top >= vb.bottom - 8 : false;
+            return { present: true, visible: true, atDefault };
+          },
+          { hostId: INLINE_HOST_ID, mode: startPlacement }
+        );
+        if (s.present && s.visible && s.atDefault) sawDefaultPlacementVisible.push(i);
+        await page.waitForTimeout(40);
+      }
+
+      // 最終的に beside（行内・VIDEO 直後）へ確定する。
+      await expect
+        .poll(() => hostPlacementMetrics(page), { timeout: 25_000 })
+        .toMatchObject({
+          display: 'block',
+          parentId: 'mock-player-row',
+          prevElementTag: 'VIDEO',
+          floatingClass: false
+        });
+
+      expect(
+        sawDefaultPlacementVisible,
+        `${startPlacement} 位置で可視を観測したフレーム index: ${sawDefaultPlacementVisible}`
+      ).toEqual([]);
+    });
+  }
 });
