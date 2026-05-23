@@ -241,6 +241,49 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('184（既知のみ）');
   });
 
+  it('commentsForAnalytics があると配信内容の流れを時間帯別に出す', () => {
+    const base = Date.now() - 1_000_000;
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      { id: 'n1', liveId: 'lv123', commentNo: '1', text: 'わこつ 初見です', userId: 'u1', nickname: '', capturedAt: base, vpos: 0, is184: false, selfPosted: false },
+      { id: 'n2', liveId: 'lv123', commentNo: '2', text: '今日も楽しい', userId: 'u2', nickname: '', capturedAt: base + 60_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'n3', liveId: 'lv123', commentNo: '3', text: 'ゲーム展開がすごい', userId: 'u3', nickname: '', capturedAt: base + 360_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'n4', liveId: 'lv123', commentNo: '4', text: 'ナイス ナイス', userId: 'u4', nickname: '', capturedAt: base + 420_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'n5', liveId: 'lv123', commentNo: '5', text: '8888 おめでとう', userId: 'u5', nickname: '', capturedAt: base + 780_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'n6', liveId: 'lv123', commentNo: '6', text: 'ありがとう 最高', userId: 'u6', nickname: '', capturedAt: base + 840_000, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments
+    });
+    expect(html).toContain('id="mkt-narrative"');
+    expect(html).toContain('配信内容の流れ');
+    expect(html).toContain('冒頭');
+    expect(html).toContain('中盤');
+    expect(html).toContain('終盤');
+    expect(html).toContain('初見');
+    expect(html).toContain('8888 おめでとう');
+  });
+
+  it('maskShareLabels の配信内容の流れでは代表コメント本文を省略する', () => {
+    const base = Date.now() - 1_000_000;
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      { id: 'm1', liveId: 'lv123', commentNo: '1', text: '秘密の代表コメント 初見', userId: 'u1', nickname: '', capturedAt: base, vpos: 0, is184: false, selfPosted: false },
+      { id: 'm2', liveId: 'lv123', commentNo: '2', text: '最高', userId: 'u2', nickname: '', capturedAt: base + 60_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'm3', liveId: 'lv123', commentNo: '3', text: 'ナイス', userId: 'u3', nickname: '', capturedAt: base + 120_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'm4', liveId: 'lv123', commentNo: '4', text: '8888', userId: 'u4', nickname: '', capturedAt: base + 180_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'm5', liveId: 'lv123', commentNo: '5', text: 'ありがとう', userId: 'u5', nickname: '', capturedAt: base + 240_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'm6', liveId: 'lv123', commentNo: '6', text: 'おつ', userId: 'u6', nickname: '', capturedAt: base + 300_000, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      maskShareLabels: true
+    });
+    expect(html).toContain('共有向け出力では話題語と代表コメント本文を省略');
+    const section = html.match(/<section id="mkt-narrative"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(section).not.toContain('秘密の代表コメント');
+  });
+
   it('末尾に nl-marketing-export-v1 の JSON が埋め込まれパースできる', () => {
     const html = buildMarketingDashboardHtml(minimal());
     expect(html).toContain('id="nl-marketing-export-v1"');
