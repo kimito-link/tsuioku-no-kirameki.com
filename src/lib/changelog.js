@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.345',
+    date: '2026-05-24',
+    summary: '別ウィンドウの下の空白を応援タイムラインで埋める',
+    items: Object.freeze([
+      '[改善] 別ウィンドウで配信を見ているとき、下にできていた大きな空白を「応援タイムライン」（コメント＋ギフトの時系列）で埋めるようにしました。別ウィンドウでは最初から開いた状態で下に常設され、コメントとギフトの流れがそのまま見られます（ツールバーの小窓・ページ内表示はこれまでどおりで、普段の見え方は変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.344',
     date: '2026-05-24',
     summary: 'ランキングのカードが3枚目で見切れる問題を修正',
