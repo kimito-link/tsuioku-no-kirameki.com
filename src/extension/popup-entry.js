@@ -6600,7 +6600,23 @@ async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
       snap.officialNicoEventRankNdgr > 0
         ? Math.trunc(snap.officialNicoEventRankNdgr)
         : null;
-    if (ndgrRank != null) {
+    // v0.1.325: NDGR rank 単独で「現在N位」を出さない（実機 lv350589034: イベント
+    //   不参加の配信で NDGR rank=50 が出て誤表示）。NDGR field は「ギフトイベント」
+    //   不参加の配信でも別文脈の順位値が乗ることがあるため、イベント参加が他シグナル
+    //   （イベントタイトル / バナー / スコア）で確証できる時だけ「目安」表示する。
+    //   確証が無ければ出さない＝feedback_ndgr_field6_silence に回帰（誤った数字より
+    //   出さないを選ぶ）。
+    const nonEmptyStr = (v) => typeof v === 'string' && v.trim().length > 0;
+    const eventConfirmed =
+      nonEmptyStr(snap?.officialNicoEventTitleNdgr) ||
+      nonEmptyStr(snap?.officialNicoEventTitle) ||
+      !!bundle?.eventBanner ||
+      !!bundle?.eventBalloon ||
+      nonEmptyStr(bundle?.eventCumulativeScoreMirrorHtml) ||
+      nonEmptyStr(bundle?.eventCurrentRankMirrorHtml) ||
+      (typeof snap?.officialEventGiftScoreNdgr === 'number' &&
+        Number.isFinite(snap.officialEventGiftScoreNdgr));
+    if (ndgrRank != null && eventConfirmed) {
       const fallback = buildNorthStarRankFallbackHtml(ndgrRank);
       if (fallback) {
         html =
