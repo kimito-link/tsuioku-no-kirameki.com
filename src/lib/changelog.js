@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.347',
+    date: '2026-05-24',
+    summary: '古いタブで全部「—」に固まる不具合を修正',
+    items: Object.freeze([
+      '[修正] 拡張を更新した後に古いタブが残っていると、推移グラフの保存でエラーが起きてカードが「—」や「読み込み中」のまま固まることがある問題を直しました。古いタブはそのまま静かに終了させ、新しいタブの表示は固まらず通常どおり動きます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.346',
     date: '2026-05-24',
     summary: 'ランキングを枠なし表示にして全部見えるように',

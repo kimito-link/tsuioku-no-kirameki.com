@@ -4,6 +4,7 @@
 
 import { devMonitorTrendStorageKey } from './storageKeys.js';
 import { readStorageBagWithRetry } from './userCommentProfileCache.js';
+import { isContextInvalidatedError } from './reportSilentError.js';
 
 const STORAGE_PREFIX = 'nl-dev-monitor-trend:';
 const MAX_SESSION_POINTS = 24;
@@ -253,6 +254,20 @@ async function readChromeStorageBag(chromeObj, key) {
       await new Promise((resolve, reject) => {
         try {
           chromeObj.get(key, (/** @type {Record<string, unknown>} */ r) => {
+            // lastError を読まないと Chrome が未読エラーを console に出す。
+            // context invalidated（古いタブの廃棄）なら空袋で resolve し固まらせない。
+            const lastErr =
+              typeof chrome !== 'undefined' && chrome.runtime
+                ? chrome.runtime.lastError
+                : undefined;
+            if (lastErr) {
+              if (isContextInvalidatedError(lastErr)) {
+                resolve({});
+                return;
+              }
+              reject(lastErr);
+              return;
+            }
             if (r && typeof r === 'object' && !Array.isArray(r)) {
               resolve(r);
               return;
@@ -260,6 +275,10 @@ async function readChromeStorageBag(chromeObj, key) {
             resolve({});
           });
         } catch (err) {
+          if (isContextInvalidatedError(err)) {
+            resolve({});
+            return;
+          }
           reject(err);
         }
       }),
@@ -332,12 +351,30 @@ export async function persistTrendPointChrome(liveId, sample) {
   );
   await new Promise((resolve) => {
     try {
-      chromeObj.set({ [key]: JSON.stringify(merged) }, () => resolve(undefined));
+      chromeObj.set({ [key]: JSON.stringify(merged) }, () => {
+        // コールバックで lastError を読まないと Chrome が未読エラーを console に出す。
+        // 拡張更新後に古いタブの content script が生き残ると context invalidated になるが、
+        // これは正常な廃棄なので警告を出さず静かにスキップする。
+        const lastErr =
+          typeof chrome !== 'undefined' && chrome.runtime
+            ? chrome.runtime.lastError
+            : undefined;
+        if (lastErr && !isContextInvalidatedError(lastErr)) {
+          console.warn(
+            `${DEV_MONITOR_TREND_LOG_PREFIX} persistTrendPointChrome: chrome.storage.local.set failed`,
+            lastErr
+          );
+        }
+        resolve(undefined);
+      });
     } catch (err) {
-      console.warn(
-        `${DEV_MONITOR_TREND_LOG_PREFIX} persistTrendPointChrome: chrome.storage.local.set failed`,
-        err
-      );
+      // 同期 throw（context invalidated 含む）。invalidated は正常な廃棄として黙過。
+      if (!isContextInvalidatedError(err)) {
+        console.warn(
+          `${DEV_MONITOR_TREND_LOG_PREFIX} persistTrendPointChrome: chrome.storage.local.set failed`,
+          err
+        );
+      }
       resolve(undefined);
     }
   });
