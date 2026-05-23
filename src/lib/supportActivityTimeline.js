@@ -39,7 +39,8 @@
  *   nickname: string,
  *   itemName: string,
  *   point: number,
- *   message: string
+ *   message: string,
+ *   avatarUrl: string
  * }} TimelineGiftItem
  *
  * @typedef {TimelineCommentItem | TimelineGiftItem} TimelineItem
@@ -119,7 +120,9 @@ function normalizeGifts(gifts) {
       nickname: safeStr(g.nickname, 200),
       itemName: safeStr(g.itemName, 120),
       point,
-      message: safeStr(g.message, 300)
+      message: safeStr(g.message, 300),
+      // v0.1.342: 送信者アバター（呼出側が rememberedAvatarUrlForUserId で enrich して渡す）。
+      avatarUrl: safeStr(g.avatarUrl, 400)
     });
   }
   return out;

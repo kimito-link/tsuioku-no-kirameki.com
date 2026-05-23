@@ -4679,6 +4679,29 @@
         flex: 0 0 auto;
         font-size: 13px;
       }
+      /* v0.1.342: ギフト送信者アバター（🎁バッジ重ね）。「誰が」を顔で見せる。 */
+      .nl-tl-gift__avatar-wrap {
+        position: relative;
+        flex: 0 0 auto;
+        width: 22px;
+        height: 22px;
+      }
+      .nl-tl-gift__avatar {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        object-fit: cover;
+        background: #fff;
+        border: 1px solid color-mix(in srgb, #ffb020 50%, var(--nl-border));
+      }
+      .nl-tl-gift__badge {
+        position: absolute;
+        right: -3px;
+        bottom: -3px;
+        font-size: 9px;
+        line-height: 1;
+        filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
+      }
       .nl-tl-gift__name {
         flex: 0 1 auto;
         min-width: 0;

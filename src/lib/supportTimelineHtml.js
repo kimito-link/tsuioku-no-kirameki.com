@@ -73,8 +73,18 @@ export function buildTimelineRowHtml(item, opts) {
       Number(item.point) > 0
         ? `<span class="nl-tl-gift__pt">${pt}pt</span>`
         : '';
+    // v0.1.342: 送信者アバター（あれば）に🎁バッジを重ねて「誰が」を視覚化。
+    //   アバターが無い（未設定/匿名）ときは default または🎁のみ。
+    const gAv = String(item.avatarUrl || '').trim() || defaultAvatar;
+    const gAvRp = /^https?:\/\//i.test(gAv) ? ' referrerpolicy="no-referrer"' : '';
+    const avatarBlock = gAv
+      ? `<span class="nl-tl-gift__avatar-wrap">` +
+        `<img class="nl-tl-gift__avatar" src="${escapeAttr(gAv)}" alt="" decoding="async"${gAvRp} />` +
+        `<span class="nl-tl-gift__badge" aria-hidden="true">🎁</span>` +
+        `</span>`
+      : `<span class="nl-tl-gift__icon" aria-hidden="true">🎁</span>`;
     const inner =
-      `<span class="nl-tl-gift__icon" aria-hidden="true">🎁</span>` +
+      avatarBlock +
       `<span class="nl-tl-gift__name">${name}</span>` +
       `<span class="nl-tl-gift__item">${itemName}</span>` +
       ptBlock +
