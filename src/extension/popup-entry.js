@@ -1369,6 +1369,15 @@ const watchMetaCache = {
 let watchPopupRefreshGeneration = 0;
 
 /**
+ * 直近で成功した refresh 冒頭の設定 bag（KEY_RECORDING 等）。
+ * v0.1.336: 多タブで storage.get が固まったサイクルでは、空 {} で設定をハイドレートすると
+ *   記録トグル等が一瞬 OFF 表示にチラつく。固まったときはこの last-good を再利用して
+ *   トグル状態のチラつきを防ぐ（取れたら毎回更新）。null=まだ一度も成功していない。
+ * @type {Record<string, unknown> | null}
+ */
+let lastGoodRefreshOpenBag = null;
+
+/**
  * 直近の paintWatchPopupUi が対象とした liveId。放送切替時にクロス配信データ汚染を検知して
  * 関連キャッシュを強制リセットするための追跡変数。値は空文字列=まだ描画なし。
  */
@@ -8774,29 +8783,54 @@ async function refresh() {
    *   INLINE_MODE（popup が watch ページ iframe）では従来どおり
    *   activeTab が watch URL に直接マッチする。
    */
-  const [tabs, lastFocusedNormal, openBag] = await Promise.all([
-    chrome.tabs.query({ active: true, currentWindow: true }),
-    chrome.windows.getLastFocused({ populate: true, windowTypes: ['normal'] })
-      .catch(() => /** @type {chrome.windows.Window|null} */ (null)),
-    chrome.storage.local.get([
-      KEY_SELF_POSTED_RECENTS,
-      KEY_LAST_WATCH_URL,
-      KEY_RECORDING,
-      KEY_DEEP_HARVEST_QUIET_UI,
-      KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
-      KEY_INLINE_PANEL_WIDTH_MODE,
-      KEY_INLINE_PANEL_PLACEMENT,
-      KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
-      KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
-      KEY_INLINE_FLOATING_ANCHOR,
-      KEY_CALM_PANEL_MOTION,
-      KEY_STORAGE_WRITE_ERROR,
-      KEY_COMMENT_PANEL_STATUS,
-      KEY_MARKETING_EXPORT_MASK_LABELS,
-      KEY_ANONYMOUS_IDENTICON_ENABLED,
-      KEY_FOLD_ANONYMOUS_IN_RANK_STRIP
-    ])
+  /*
+   * v0.1.336: 描画前ゲートのハング根治。従来は素の `await Promise.all([tabs, win, storage])`
+   *   で、多タブ時に storage.get（または tabs.query）が固まると refresh 全体が永久停止し、
+   *   全カードが「—」固定になっていた（実機 lv350592761: storage_read_failed + 多タブ 27+119）。
+   *   各メンバを withTimeout + 個別フォールバックで握り、固まっても best-effort で描画を続行する。
+   *   通常時（高速解決）はタイムアウトに到達しないので挙動は完全に不変。
+   */
+  const [tabs, lastFocusedNormal, openBagRaw] = await Promise.all([
+    withTimeout(
+      chrome.tabs.query({ active: true, currentWindow: true }),
+      1200,
+      'refresh_tabs_query_timeout'
+    ).catch(() => /** @type {chrome.tabs.Tab[]} */ ([])),
+    withTimeout(
+      chrome.windows.getLastFocused({ populate: true, windowTypes: ['normal'] }),
+      1200,
+      'refresh_last_focused_timeout'
+    ).catch(() => /** @type {chrome.windows.Window|null} */ (null)),
+    withTimeout(
+      chrome.storage.local.get([
+        KEY_SELF_POSTED_RECENTS,
+        KEY_LAST_WATCH_URL,
+        KEY_RECORDING,
+        KEY_DEEP_HARVEST_QUIET_UI,
+        KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
+        KEY_INLINE_PANEL_WIDTH_MODE,
+        KEY_INLINE_PANEL_PLACEMENT,
+        KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY,
+        KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE,
+        KEY_INLINE_FLOATING_ANCHOR,
+        KEY_CALM_PANEL_MOTION,
+        KEY_STORAGE_WRITE_ERROR,
+        KEY_COMMENT_PANEL_STATUS,
+        KEY_MARKETING_EXPORT_MASK_LABELS,
+        KEY_ANONYMOUS_IDENTICON_ENABLED,
+        KEY_FOLD_ANONYMOUS_IN_RANK_STRIP
+      ]),
+      1500,
+      'refresh_open_bag_timeout'
+    ).catch(() => /** @type {Record<string, unknown> | null} */ (null))
   ]);
+  /*
+   * storage が固まった（openBagRaw=null）サイクルでは、空 {} で設定を上書きすると記録トグル等が
+   * 一瞬 OFF にチラつく。直近成功時の bag（lastGoodRefreshOpenBag）を再利用してチラつきを防ぐ。
+   * まだ一度も成功していなければ {}（安全側の既定にフォールバック）。取れたら last-good を更新。
+   */
+  const openBag = openBagRaw || lastGoodRefreshOpenBag || {};
+  if (openBagRaw) lastGoodRefreshOpenBag = openBagRaw;
   const lastFocusedNormalActiveTab =
     lastFocusedNormal?.tabs?.find((t) => t?.active) ?? null;
   applySelfPostedRecentsFromBag(openBag);
@@ -9173,7 +9207,11 @@ async function refresh() {
   const data = await readStorageBagWithRetry(
     () =>
       chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
-    { attempts: 4, delaysMs: [0, 50, 120, 280] }
+    // v0.1.336: 描画前ゲート。多タブで storage.get が固まると paintWatchPopupUi が
+    //   永久に走らず全カード「—」固定になっていた。per-attempt 900ms で固まりを
+    //   失敗扱いにし、最悪でも 4 試行で {} に落として描画を続行する（前回 arr/snapshot は
+    //   in-memory に残るので、空配列でも次 poll で自然復活）。
+    { attempts: 4, delaysMs: [0, 50, 120, 280], perAttemptTimeoutMs: 900 }
   );
   let arr = Array.isArray(data[key]) ? data[key] : [];
   popupUserCommentProfileMap = normalizeUserCommentProfileMap(
