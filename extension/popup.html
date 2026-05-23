@@ -4619,6 +4619,36 @@
         padding: 10px 6px;
         text-align: center;
       }
+      /*
+        v0.1.345: 別ウィンドウ(standalone window)かつ配信中(not empty-state)のとき、
+        応援タイムラインを JS で .nl-main 末尾へ移して下部常設にし、ウィンドウ下の空白を埋める。
+        ⭐文脈ゲートは html.nl-popup-window:not(.nl-empty-state) のみ＝action popup / inline は不変。
+        会議結論: order は効かない(grid セル内)→DOM 移動 + .nl-main を flex 列化して残余高を割当。
+        二重スクロール防止: タイムライン body の内側スクロール(max-height/overflow-y)を解除し、
+        .nl-main 1 本のスクロールに委ねる(既存 supportVisualDetails[open] と同思想)。
+      */
+      html.nl-popup-window:not(.nl-empty-state) .nl-main {
+        display: flex;
+        flex-direction: column;
+      }
+      html.nl-popup-window:not(.nl-empty-state)
+        .nl-main
+        > #supportTimelineDetails[data-nl-timeline-docked='window-bottom'] {
+        flex: 1 1 auto;
+        min-height: 160px;
+        margin-top: 6px;
+        display: flex;
+        flex-direction: column;
+      }
+      html.nl-popup-window:not(.nl-empty-state)
+        .nl-main
+        > #supportTimelineDetails[data-nl-timeline-docked='window-bottom']
+        .nl-support-timeline__body {
+        flex: 1 1 auto;
+        /* 内側スクロールを解除＝.nl-main 1 本に委ねる（double-scroll 契約を維持）。 */
+        max-height: none;
+        overflow-y: visible;
+      }
       /* コメント行: 1行コンパクト（アバター・名前・本文）。 */
       .nl-tl-row {
         display: flex;
