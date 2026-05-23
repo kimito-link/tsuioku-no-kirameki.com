@@ -11,6 +11,52 @@ import { escapeAttr } from '../shared/html/escape.js';
 export const NORTH_STAR_WAITING_STATES = new Set(['not_yet', 'iframe_unrendered']);
 
 /**
+ * v0.1.332: 「待機UIの正直化」の発火閾値（ミリ秒）。
+ *
+ * rescue-link 配信（「お困りの方はこちら」が出る broadcaster 等）では koken API /
+ * 公式 DOM / iframe の 3 経路とも永久に空になり、`iframe_unrendered` の待機UIが
+ * 永遠に出続けて「固まった」印象を与える（真因3）。一定時間（この閾値）を超えても
+ * 取得できないときだけ、「この配信では公式の貢献度一覧が取得できないようです
+ * （配信者側の設定によります）」という確定文言へ**単方向 1 回だけ**遷移する。
+ *
+ * 50s は handoff 設計の 45-60s 範囲の中央。短すぎると「取れる配信」を諦めたと
+ * 誤認させ、長すぎると固まった印象が残る。数値（順位/件数）は一切出さない
+ * （feedback_ndgr_field6_silence 遵守）。
+ */
+export const NORTH_STAR_WAIT_HONEST_THRESHOLD_MS = 50_000;
+
+/**
+ * 確定文言（取得不能を正直に伝える）。rescue-link 配信などで閾値超過時に出す。
+ * 数値は出さず、原因を断定しない（「配信者側の設定によります」）。
+ * @param {string} laneId
+ * @returns {string|null} 該当レーンの確定文言。対象外は null
+ */
+function getNorthStarWaitGiveUpFootnote(laneId) {
+  const lid = String(laneId || '');
+  if (lid === 'contributionRanking') {
+    return '（この配信では公式の貢献度一覧が取得できないようです。配信者側の設定によります）';
+  }
+  if (lid === 'giftHistory') {
+    return '（この配信では公式のギフト一覧が取得できないようです。配信者側の設定によります）';
+  }
+  return null;
+}
+
+/**
+ * elapsedMs が確定文言へ遷移する閾値を超えているか（数値が有限で閾値以上）。
+ * 省略時（undefined）/ 非数値 / 閾値未満は false ＝現行の待機文言のまま（後方互換）。
+ * @param {number|undefined} elapsedMs
+ * @returns {boolean}
+ */
+function isNorthStarWaitElapsedOverThreshold(elapsedMs) {
+  return (
+    typeof elapsedMs === 'number' &&
+    Number.isFinite(elapsedMs) &&
+    elapsedMs >= NORTH_STAR_WAIT_HONEST_THRESHOLD_MS
+  );
+}
+
+/**
  * @param {unknown} state
  * @returns {boolean}
  */
@@ -21,11 +67,19 @@ export function isNorthStarLaneWaitingState(state) {
 /**
  * @param {string} laneId
  * @param {string} state `not_yet` | `iframe_unrendered`
+ * @param {number} [elapsedMs] v0.1.332: 待機開始からの経過ミリ秒（省略可）。
+ *   `iframe_unrendered` で閾値超過時のみ確定文言へ単方向遷移。省略時は現行と完全同一。
  * @returns {string} プレーン文言（textContent 用）
  */
-export function getNorthStarWaitFootnote(laneId, state) {
+export function getNorthStarWaitFootnote(laneId, state, elapsedMs) {
   const st = String(state || '').trim();
   const lid = String(laneId || '');
+  // v0.1.332: 取得不能を正直に伝える確定文言（rescue-link 配信等）。
+  //   iframe_unrendered が閾値超で続くときだけ。not_yet（起動直後）には出さない。
+  if (st === 'iframe_unrendered' && isNorthStarWaitElapsedOverThreshold(elapsedMs)) {
+    const giveUp = getNorthStarWaitGiveUpFootnote(lid);
+    if (giveUp) return giveUp;
+  }
   if (st === 'not_yet') {
     if (lid === 'eventScore') {
       return '（イベント累計スコアの反映を待っています）';
@@ -64,11 +118,35 @@ export function getNorthStarWaitFootnote(laneId, state) {
  *
  * @param {string} laneId
  * @param {string} state
+ * @param {number} [elapsedMs] v0.1.332: 待機開始からの経過ミリ秒（省略可）。
+ *   `iframe_unrendered` で閾値超過時のみ確定メッセージ（ローテーションせず1件）へ
+ *   単方向遷移。省略時は現行と完全同一。
  * @returns {readonly NorthStarWaitLine[]}
  */
-export function getNorthStarWaitRotationMessages(laneId, state) {
+export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
   const st = String(state || '').trim();
   const lid = String(laneId || '');
+
+  // v0.1.332: 取得不能が確定したら、回し続けず「諦め」を1件だけ正直に伝える。
+  //   点滅・ローテーションは固まった印象を強めるので単一メッセージにする。
+  if (st === 'iframe_unrendered' && isNorthStarWaitElapsedOverThreshold(elapsedMs)) {
+    if (lid === 'contributionRanking') {
+      return Object.freeze([
+        Object.freeze({
+          badge: 'こん太',
+          line: 'この配信では公式の貢献度一覧が出ないみたい。配信者さんの設定によることがあるよ。'
+        })
+      ]);
+    }
+    if (lid === 'giftHistory') {
+      return Object.freeze([
+        Object.freeze({
+          badge: 'こん太',
+          line: 'この配信では公式のギフト一覧が出ないみたい。配信者さんの設定によることがあるよ。'
+        })
+      ]);
+    }
+  }
 
   if (st === 'iframe_unrendered' && lid === 'contributionRanking') {
     return Object.freeze([
