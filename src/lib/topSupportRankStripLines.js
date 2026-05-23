@@ -21,7 +21,8 @@ import { formatNicknameWithUidFallback } from './giftDisplayNickname.js';
  *   nickname: string,
  *   count: number,
  *   avatarUrl?: string,
- *   rankHint?: number|null
+ *   rankHint?: number|null,
+ *   hideIdLine?: boolean
  * }} TopSupportRankRoom
  */
 
@@ -254,6 +255,7 @@ export function topSupportRankLineModels(stripRooms, opts) {
     const thumbNeedsNoReferrer = isHttpOrHttpsUrl(thumbSrc);
 
     const nickRaw = String(r?.nickname || '').trim();
+    const hideIdLine = Boolean(r?.hideIdLine);
     const useOfficialDomNick =
       /^__(ad|contrib)_\d+_/i.test(userKey) && Boolean(nickRaw);
     // 公式DOMランキング行で「使える公式表示名が無い」ものは、内部合成キーを表示に
@@ -277,12 +279,12 @@ export function topSupportRankLineModels(stripRooms, opts) {
     // 名前は nickname で出るので id 行は抑制する（v0.1.318: ギフト合成キーも追加）。
     const isSyntheticGift = isSyntheticGiftSenderKey(userKey);
     const idTitle =
-      isUnknown || isAnonOfficialDomRank || useOfficialDomNick || isSyntheticGift
+      isUnknown || isAnonOfficialDomRank || useOfficialDomNick || isSyntheticGift || hideIdLine
         ? ''
         : String(r.userKey);
     let idShort = isUnknown
       ? '—'
-      : useOfficialDomNick || isAnonOfficialDomRank || isSyntheticGift
+      : useOfficialDomNick || isAnonOfficialDomRank || isSyntheticGift || hideIdLine
         ? ''
         : shortUserKeyDisplay(userKey) || String(userKey);
 

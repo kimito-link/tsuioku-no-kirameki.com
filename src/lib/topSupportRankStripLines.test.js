@@ -104,6 +104,24 @@ describe('topSupportRankLineModels', () => {
     expect(row.thumbNeedsNoReferrer).toBe(true);
   });
 
+  it('公式API由来の記名ランキング行は uid 行を隠し、名前を主表示にする', () => {
+    const [row] = topSupportRankLineModels(
+      [
+        {
+          userKey: '142322324',
+          nickname: 'すぅ',
+          count: 5000,
+          hideIdLine: true
+        }
+      ],
+      { defaultThumbSrc: DEF_THUMB }
+    );
+    expect(row.idShort).toBe('');
+    expect(row.idTitle).toBe('');
+    expect(row.nameLine).toBe('すぅ');
+    expect(row.fullLabelForTitle).toContain('142322324');
+  });
+
   it('匿名IDで http サムネが無いとき anonymousFallbackThumbSrc を使う', () => {
     const tv = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/tv.jpg';
     const [row] = topSupportRankLineModels(

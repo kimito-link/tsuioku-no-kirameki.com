@@ -9,7 +9,8 @@
  *   nickname: string,
  *   count: number,
  *   avatarUrl?: string,
- *   rankHint?: number|null
+ *   rankHint?: number|null,
+ *   hideIdLine?: boolean
  * }} OfficialStripRoom
  */
 
@@ -58,7 +59,8 @@ export function officialDomRankingRowsToStripRooms(ranking, opts = {}) {
       nickname: String(row.name || ''),
       count: contribution,
       avatarUrl: thumb,
-      ...(rankHint != null ? { rankHint } : {})
+      ...(rankHint != null ? { rankHint } : {}),
+      ...(officialUid && String(row.name || '').trim() ? { hideIdLine: true } : {})
     };
   });
 }

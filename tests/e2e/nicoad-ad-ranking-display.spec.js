@@ -182,6 +182,10 @@ test('広告ランキング: nicoad API 由来（userPageUrl 付き）が scrape
   expect(text).toContain('API広告タロウ');
   expect(text).toContain('API広告ジロウ');
   expect(text).not.toContain('スクレイプ広告');
+  // v0.1.327: API 由来で uid リンク化できる行も、カード本文は名前を優先する。
+  // uid は href に残し、狭いカード内で数字だけが目立つ状態を避ける。
+  expect(text).not.toContain('5428353');
+  expect(text).not.toContain('36715409');
 
   // 記名広告主に公式 user ページリンクが付く（他ビューワーに無い uid リンク化）
   const linkHrefs = await body.locator('a[href*="nicovideo.jp/user/"]').evaluateAll((els) =>

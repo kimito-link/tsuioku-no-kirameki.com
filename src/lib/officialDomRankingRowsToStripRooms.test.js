@@ -46,6 +46,7 @@ describe('officialDomRankingRowsToStripRooms', () => {
     );
     expect(rooms[0].userKey).toBe('4046119');
     expect(rooms[0].nickname).toBe('タロウ');
+    expect(rooms[0].hideIdLine).toBe(true);
     expect(rooms[1].userKey).toMatch(/^__contrib_/);
     expect(rooms[2].userKey).toBe('__anon_contrib_2');
   });
