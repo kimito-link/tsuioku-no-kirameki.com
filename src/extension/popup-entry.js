@@ -5820,12 +5820,55 @@ function teardownNorthStarLaneWaitingUi(body) {
  * @param {string} laneId
  * @param {string} state
  */
-function fillNorthStarWaitHintsRailIfApplicable(body, laneId, state) {
+/**
+ * v0.1.332: 待機UIの正直化用。レーンが「待機状態」になった最初の時刻を
+ * `liveId|laneId` 単位で覚え、経過 ms を**同期計算のみ**で求める（await I/O 厳禁）。
+ * rescue-link 配信で `iframe_unrendered` が閾値超で続くとき、待機メッセージを
+ * 「取得できないようです（配信者側の設定によります）」へ単方向遷移させる。
+ * liveId 切替で renderUserRooms 側がクリアする（新配信の誤確定を防ぐ）。
+ * @type {Map<string, number>}
+ */
+const _northStarLaneWaitStartAt = new Map();
+
+/** 現在の watch liveId（snapshot 由来・同期参照のみ）。 */
+function currentNorthStarWaitLiveId() {
+  return String(watchMetaCache.snapshot?.liveId || '').trim().toLowerCase();
+}
+
+/**
+ * 当該レーンが待機状態を続けている経過 ms を返す（同期）。初回は now を記録して 0。
+ * 待機状態でない state では記録をクリアして undefined（＝メッセージ関数へ渡さない）。
+ * @param {string} laneId
+ * @param {string} state
+ * @returns {number|undefined}
+ */
+function trackNorthStarLaneWaitElapsedMs(laneId, state) {
+  const lid = currentNorthStarWaitLiveId();
+  const key = `${lid}|${String(laneId || '')}`;
+  if (!isNorthStarLaneWaitingState(state)) {
+    _northStarLaneWaitStartAt.delete(key);
+    return undefined;
+  }
+  const now = Date.now();
+  const started = _northStarLaneWaitStartAt.get(key);
+  if (typeof started !== 'number') {
+    _northStarLaneWaitStartAt.set(key, now);
+    return 0;
+  }
+  return Math.max(0, now - started);
+}
+
+/** liveId 切替時に待機開始時刻 Map をクリア（新配信の誤確定表示を防ぐ）。 */
+function clearNorthStarLaneWaitStartTimes() {
+  _northStarLaneWaitStartAt.clear();
+}
+
+function fillNorthStarWaitHintsRailIfApplicable(body, laneId, state, elapsedMs) {
   if (!(body instanceof HTMLElement)) return;
   if (!isNorthStarLaneWaitingState(state)) return;
   const rail = resolveNorthStarLaneAsideEl(body);
   if (!rail) return;
-  const msgs = getNorthStarWaitRotationMessages(laneId, state);
+  const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
   const html = buildNorthStarWaitHintsRailHtml(msgs);
   if (!html) return;
   rail.innerHTML = html;
@@ -5837,14 +5880,16 @@ function mountNorthStarLaneWaitingUi(body, laneId, state) {
   teardownNorthStarLaneWaitingUi(body);
   body.setAttribute('data-lane-state', String(state || 'not_yet'));
   body.innerHTML = buildNorthStarLaneWaitingShellHtml(laneId);
+  // v0.1.332: 経過 ms を同期計算（await I/O なし）。閾値超で確定文言へ遷移。
+  const elapsedMs = trackNorthStarLaneWaitElapsedMs(laneId, state);
   const shortEl = body.querySelector('.nl-north-star-lane-wait__short');
   if (shortEl) {
-    const msgs = getNorthStarWaitRotationMessages(laneId, state);
+    const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
     const m = msgs.length ? msgs[0] : { badge: 'りんく', line: '取得状況を確認しています。' };
     // 台詞ローテは text 差し替えで「ちかちか」しやすいので静止表示（先頭1件のみ）
     shortEl.textContent = `${m.badge}：${m.line}`;
   }
-  fillNorthStarWaitHintsRailIfApplicable(body, laneId, state);
+  fillNorthStarWaitHintsRailIfApplicable(body, laneId, state, elapsedMs);
   syncNorthStarLaneGadgetFromBodyState(body);
 }
 
@@ -6750,10 +6795,14 @@ function renderUserRooms(entries, liveId = '') {
   if (lvPrimed) {
     if (_northStarBundleLoadingShellLiveId !== lvPrimed) {
       _northStarBundleLoadingShellLiveId = lvPrimed;
+      // v0.1.332: liveId が変わったので待機開始時刻 Map をクリア（前配信の経過 ms を
+      //   持ち越して新配信でいきなり「取得できない」確定文言が出るのを防ぐ）。
+      clearNorthStarLaneWaitStartTimes();
       mountAllNorthStarLanesBundleLoadingUi(lvPrimed);
     }
   } else {
     _northStarBundleLoadingShellLiveId = '';
+    clearNorthStarLaneWaitStartTimes();
     void refreshAllNorthStarMirrorLanes('');
   }
   // bundle 取得 → 5チップ/NDGR/参加バナーを即塗装 → ランキング帯・北極星鏡（待ちが長い）→ prompt。
