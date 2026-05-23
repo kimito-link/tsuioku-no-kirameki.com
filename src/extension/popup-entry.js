@@ -5386,6 +5386,10 @@ function renderTopSupportRankStrip(stripRooms) {
       const idText = escapeHtml(m.idShort);
       const nameText = escapeHtml(m.nameLine);
       const idTitle = m.isUnknown ? '' : escapeAttr(m.idTitle);
+      const idBlock =
+        String(m.idShort || '').trim() === ''
+          ? ''
+          : `<span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>`;
       let lineClass = `nl-top-support-rank__line${m.isUnknown ? ' nl-top-support-rank__line--unknown' : ''}`;
       let lineStyle = '';
       if (m.hasAccent && m.accentColorCss) {
@@ -5400,9 +5404,9 @@ function renderTopSupportRankStrip(stripRooms) {
       const innerHtml = `${placeHtml}
         <span class="nl-top-support-rank__count">${m.count}件</span>
         <span class="nl-top-support-rank__thumb-wrap">
-          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
+          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="${nameText}" decoding="async"${thumbRp} />
         </span>
-        <span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>
+        ${idBlock}
         <span class="nl-top-support-rank__name">${nameText}</span>`;
       return isLinkable
         ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${innerHtml}</a>`
@@ -6319,7 +6323,7 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
       const inner = `${placeHtml}
         <span class="nl-top-support-rank__count">${m.count}${escapeHtml(unitSuffix)}</span>
         <span class="nl-top-support-rank__thumb-wrap">
-          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="" decoding="async"${thumbRp} />
+          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="${nameText}" decoding="async"${thumbRp} />
         </span>
         ${idBlock}
         <span class="nl-top-support-rank__name">${nameText}</span>`;

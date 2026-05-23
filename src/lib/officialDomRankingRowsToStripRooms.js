@@ -27,6 +27,22 @@ function extractNicoUidFromUserPageUrl(value) {
 }
 
 /**
+ * 公式 DOM/API 行の表示名。通常は `name` だが、DOM 差分で `.name` が空でも
+ * user icon の alt/title 側に広告主名が入ることがあるため、alt 系フィールドを
+ * fallback として受ける。
+ * @param {Record<string, unknown>} row
+ * @returns {string}
+ */
+function pickOfficialRankDisplayName(row) {
+  const fields = ['name', 'thumbnailAltName', 'thumbnailAlt', 'avatarAlt', 'imageAlt', 'alt'];
+  for (const f of fields) {
+    const s = String(row[f] == null ? '' : row[f]).trim();
+    if (s) return s;
+  }
+  return '';
+}
+
+/**
  * @param {unknown[]} ranking `contributionRanking` / `adContributionRanking` の配列
  * @param {{ userKeyKind?: 'contrib' | 'ad' }} [opts]
  * @returns {OfficialStripRoom[]}
@@ -38,6 +54,7 @@ export function officialDomRankingRowsToStripRooms(ranking, opts = {}) {
     const row = /** @type {Record<string, unknown>} */ (raw && typeof raw === 'object' ? raw : {});
     const isAnonymous = Boolean(row.isAnonymous);
     const thumb = String(row.thumbnailUrl ?? '').trim();
+    const displayName = pickOfficialRankDisplayName(row);
     const contribution = Number(row.contribution) || 0;
     const rankRaw = row.rank;
     const rankHint =
@@ -52,15 +69,15 @@ export function officialDomRankingRowsToStripRooms(ranking, opts = {}) {
     const anonKey = kind === 'ad' ? `__anon_ad_${i}` : `__anon_contrib_${i}`;
     const namedKey =
       kind === 'ad'
-        ? `__ad_${i}_${String(row.name || '').slice(0, 12)}`
-        : `__contrib_${i}_${String(row.name || '').slice(0, 12)}`;
+        ? `__ad_${i}_${displayName.slice(0, 12)}`
+        : `__contrib_${i}_${displayName.slice(0, 12)}`;
     return {
       userKey: officialUid || (isAnonymous ? anonKey : namedKey),
-      nickname: String(row.name || ''),
+      nickname: displayName,
       count: contribution,
       avatarUrl: thumb,
       ...(rankHint != null ? { rankHint } : {}),
-      ...(officialUid && String(row.name || '').trim() ? { hideIdLine: true } : {})
+      ...(officialUid && displayName ? { hideIdLine: true } : {})
     };
   });
 }
