@@ -10822,6 +10822,17 @@ function maybeInjectHiddenOfficialIframes(liveId) {
   if (!isTop) return; // 親 frame だけ
   if (!document?.body) return;
 
+  // v0.1.323: 軽量化。koken / nicoad の hidden iframe は廃止し、無認証 API に一本化した。
+  //   理由: cross-origin の重い Vue アプリ iframe を 3 つ常駐させていたが、実機診断
+  //   (lv350582635)で koken/nicoad iframe は mountSuccess:false（成果ゼロ）なのに CPU を
+  //   食い「PC 全体が重い」とユーザー報告。一方、貢献度ランキングは koken 無認証 API
+  //   (maybeFetchKokenContribRankingMirrorOnce / kokenContributionRankingApi)、広告ランキングは
+  //   nicoad 無認証 API (maybeFetchNicoadContribRankingMirrorOnce / nicoadContributionRankingApi)
+  //   で iframe 非依存に取得できることを実証済み（OneComme も NDGR/REST 直取得で iframe を
+  //   使っていない＝reference_scrapling_self_healing_scrape / handoff 参照）。よって koken/
+  //   nicoad iframe は不要。audition iframe のみ残す（イベントバナー/順位/サポーターは
+  //   現状 audition scrape 依存のため。将来 on-demand fallback 化も検討）。
+  //   ギフト履歴 scrape は別 iframe (gift.nicovideo.jp) 由来＝本変更の影響を受けない。
   /** @type {{ id: string, url: string }[]} */
   const targets = [
     {
@@ -10830,20 +10841,6 @@ function maybeInjectHiddenOfficialIframes(liveId) {
         'https://audition.nicovideo.jp/embedded/richview/live?content_id=' +
         encodeURIComponent(lid) +
         '&frontend_id=9&frontend_version=644.0.0'
-    },
-    {
-      id: 'nls-hidden-koken-iframe',
-      url:
-        'https://koken.nicovideo.jp/supporter/contents/live/' +
-        encodeURIComponent(lid) +
-        '/gift'
-    },
-    {
-      id: 'nls-hidden-nicoad-iframe',
-      url:
-        'https://nicoad.nicovideo.jp/live/publish/' +
-        encodeURIComponent(lid) +
-        '?frontend_id=9'
     }
   ];
 
