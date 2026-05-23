@@ -131,6 +131,11 @@ import {
 import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
 import { effectiveInlinePanelPlacement } from '../lib/inlinePanelLayout.js';
 import {
+  buildSupportActivityTimeline,
+  summarizeTimelineGifts
+} from '../lib/supportActivityTimeline.js';
+import { buildSupportTimelineBodyHtml } from '../lib/supportTimelineHtml.js';
+import {
   buildAiShareInlinePanelStorageReadback,
   buildInlinePanelStorageSetFailedMessage,
   isInlinePanelPlacementWriteVerified,
@@ -6701,6 +6706,69 @@ function refreshNorthStarProgramPointsLane() {
   renderNorthStarLane('programPoints', null, state);
 }
 
+/**
+ * v0.1.340: 応援タイムライン（コメント＋ギフトを時刻順に1本の流れで）。
+ *   既存の comments storage と gift_events storage を読み、純関数で時系列マージして
+ *   折り畳みパネルに描画する。OneComme 体験の移植＝「誰がいつ何を投げたか」を物語として読める。
+ *   描画ホットパスではなく lane 一括更新の sibling（既に await 連鎖の外）。storage 読みは
+ *   best-effort（失敗は空表示）。最新 120 件 cap。
+ * @param {string} liveId
+ */
+async function refreshSupportActivityTimeline(liveId) {
+  const details = $('supportTimelineDetails');
+  const body = $('supportTimelineBody');
+  const meta = $('supportTimelineGiftMeta');
+  if (!(body instanceof HTMLElement)) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) {
+    // watch 未解決のときはタイムラインを畳んで空に（誤誘導しない）。
+    body.innerHTML = buildSupportTimelineBodyHtml([]);
+    if (meta instanceof HTMLElement) meta.hidden = true;
+    return;
+  }
+
+  /** @type {any[]} */
+  let comments = [];
+  /** @type {any[]} */
+  let giftEvents = [];
+  try {
+    const commentsKey = commentsStorageKey(lid);
+    const giftEventsKey = `nls_gift_events_${lid}`;
+    const bag = await chrome.storage.local.get([commentsKey, giftEventsKey]);
+    comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    giftEvents = Array.isArray(bag[giftEventsKey]) ? bag[giftEventsKey] : [];
+  } catch {
+    /* best-effort: 空のまま */
+  }
+
+  const timeline = buildSupportActivityTimeline(comments, giftEvents, {
+    order: 'desc',
+    limit: 120
+  });
+  body.innerHTML = buildSupportTimelineBodyHtml(timeline, {
+    defaultAvatar: STORY_GRID_DEFAULT_TILE_IMG
+  });
+  bindOnErrorHideHandlersWithin(body);
+  // 実 http アバターは load guard 経由でフォールバック差し替え（フリッカ防止）。
+  body.querySelectorAll('img.nl-tl-row__avatar').forEach((img) => {
+    if (!(img instanceof HTMLImageElement)) return;
+    const src = img.getAttribute('src') || '';
+    if (isHttpOrHttpsUrl(src)) storyAvatarLoadGuard.noteRemoteAttempt(img, src);
+  });
+
+  // ヘッダにギフト要約（件数・合計pt）を出す。ギフト 0 件なら非表示。
+  if (meta instanceof HTMLElement) {
+    const g = summarizeTimelineGifts(timeline);
+    if (g.giftCount > 0) {
+      meta.textContent = `🎁 ${g.giftCount}件 / ${g.giftPoints.toLocaleString('en-US')}pt`;
+      meta.hidden = false;
+    } else {
+      meta.hidden = true;
+    }
+  }
+  if (details instanceof HTMLElement) details.hidden = false;
+}
+
 /** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
 async function refreshAllNorthStarMirrorLanes(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
@@ -6710,6 +6778,7 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
   refreshNorthStarAdRankingLane();
   await refreshNorthStarEventCurrentRankLaneAsync(lid);
   refreshNorthStarEventCumulativeScoreLane();
+  await refreshSupportActivityTimeline(lid);
 }
 
 /**
