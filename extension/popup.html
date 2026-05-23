@@ -1387,6 +1387,67 @@
         font-weight: 800;
       }
 
+      /* v0.1.334: ヘッダーの「パネル位置」クイック切替バー。狭幅(260-420px)でも
+         見切れないよう flex-wrap + box-sizing + max-width:100% を徹底（v0.1.333 の
+         見切れ修正と同じ原則）。 */
+      .nl-placement-quickbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 6px;
+        margin: 0 0 6px;
+        box-sizing: border-box;
+        max-width: 100%;
+        font-size: 10.5px;
+      }
+      .nl-placement-quickbar__label {
+        font-weight: 700;
+        color: var(--nl-muted);
+        flex: 0 0 auto;
+      }
+      .nl-placement-quickbar__value {
+        font-weight: 800;
+        color: var(--nl-accent, #0f8fd8);
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: help;
+      }
+      .nl-placement-quickbar__toggles {
+        display: inline-flex;
+        gap: 3px;
+        flex: 0 0 auto;
+      }
+      .nl-placement-quickbar__chip,
+      .nl-placement-quickbar__more {
+        font: inherit;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.1;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-surface);
+        color: var(--nl-text);
+        cursor: pointer;
+        white-space: nowrap;
+        box-sizing: border-box;
+      }
+      .nl-placement-quickbar__more {
+        color: var(--nl-muted);
+        margin-left: auto;
+      }
+      .nl-placement-quickbar__chip[aria-pressed='true'] {
+        background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 16%, transparent);
+        border-color: color-mix(in srgb, var(--nl-accent, #0f8fd8) 55%, var(--nl-border) 45%);
+        color: var(--nl-accent, #0f8fd8);
+      }
+      .nl-placement-quickbar__chip:hover,
+      .nl-placement-quickbar__more:hover {
+        border-color: color-mix(in srgb, var(--nl-accent, #0f8fd8) 50%, var(--nl-border) 50%);
+      }
+
       .nl-usage-terms-gate {
         position: fixed;
         inset: 0;
@@ -8152,6 +8213,55 @@
       >
         <span class="nl-version-badge__label">ビルド</span>
         <span id="nlVersionBadgeValue" class="nl-version-badge__value">—</span>
+      </div>
+      <!--
+        v0.1.334: ページ内パネルの位置クイック切替（詳細設定の奥にあった
+        inlinePanelPlacement を、ヘッダーから直接・現在値明示つきで操作）。
+        既定 hidden。JS が「watch を扱える文脈」と判定したら外す。
+        保存は既存 saveInlinePanelPlacement を呼ぶだけ＝storage キーを増やさず二重管理しない。
+      -->
+      <div
+        id="nlPlacementQuickbar"
+        class="nl-placement-quickbar"
+        role="group"
+        aria-label="ページ内パネルの位置"
+        hidden
+      >
+        <span class="nl-placement-quickbar__label">パネル位置</span>
+        <span
+          id="nlPlacementQuickValue"
+          class="nl-placement-quickbar__value"
+          title="ページ内パネルを視聴ページのどこに出すか。実際の位置は視聴中タブの幅でも変わります（広いと横付きになりやすい）。"
+          >—</span
+        >
+        <span class="nl-placement-quickbar__toggles">
+          <button
+            type="button"
+            id="nlPlacementQuickBeside"
+            class="nl-placement-quickbar__chip"
+            aria-pressed="false"
+            title="プレイヤーの横に並べます（視聴中タブが十分広いとき）"
+          >
+            横付き
+          </button>
+          <button
+            type="button"
+            id="nlPlacementQuickBelow"
+            class="nl-placement-quickbar__chip"
+            aria-pressed="false"
+            title="プレイヤー行の下に出します"
+          >
+            下
+          </button>
+        </span>
+        <button
+          type="button"
+          id="nlPlacementQuickMore"
+          class="nl-placement-quickbar__more"
+          title="画面下いっぱい・ポップアップ風など、他の位置や幅の設定を開きます"
+        >
+          詳細
+        </button>
       </div>
       <!--
         0.1.55 (AK) → 0.1.106: 既定は hidden。refresh が「非 watch」のときだけ外す。
