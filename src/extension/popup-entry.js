@@ -129,6 +129,7 @@ import {
   normalizeFoldAnonymousInRankStrip,
   KEY_GIFT_RANKING_LANE_ENABLED
 } from '../lib/storageKeys.js';
+import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
 import {
   buildAiShareInlinePanelStorageReadback,
   buildInlinePanelStorageSetFailedMessage,
@@ -12846,11 +12847,18 @@ function initPopup() {
     wrap.hidden = !show;
     wrap.setAttribute('aria-hidden', show ? 'false' : 'true');
   };
+  // v0.1.334: ラジオ変更時もヘッダークイックバーを追従させる（双方向同期）。
+  //   refreshPlacementQuickbar は同スコープ後方の const だが、リスナ発火は実行時
+  //   （初期化後）なので TDZ にならない。?.() で未定義時も安全。
+  const syncQuickbarAfterRadioChange = () => {
+    void refreshPlacementQuickbar();
+  };
   radioPlacementDockBottomEl?.addEventListener('change', (e) => {
     const t = e.target;
     if (t instanceof HTMLInputElement && t.checked) {
       syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_DOCK_BOTTOM);
+      syncQuickbarAfterRadioChange();
     }
   });
   radioPlacementBelowEl?.addEventListener('change', (e) => {
@@ -12858,6 +12866,7 @@ function initPopup() {
     if (t instanceof HTMLInputElement && t.checked) {
       syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BELOW);
+      syncQuickbarAfterRadioChange();
     }
   });
   radioPlacementBesideEl?.addEventListener('change', (e) => {
@@ -12865,6 +12874,7 @@ function initPopup() {
     if (t instanceof HTMLInputElement && t.checked) {
       syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BESIDE);
+      syncQuickbarAfterRadioChange();
     }
   });
   radioPlacementFloatingEl?.addEventListener('change', (e) => {
@@ -12872,8 +12882,76 @@ function initPopup() {
     if (t instanceof HTMLInputElement && t.checked) {
       syncFloatingAnchorWrapFromPlacementRadios();
       void saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_FLOATING);
+      syncQuickbarAfterRadioChange();
     }
   });
+
+  /*
+   * v0.1.334: ヘッダーの「パネル位置」クイックバー。
+   * - 現在値ラベルを表示（保存値ベース・同期計算のみ・await は storage 読みのみ）。
+   * - 横付き/下チップ click は既存 saveInlinePanelPlacement を直接呼ぶ（storage キーを
+   *   増やさず二重管理しない）。dock_bottom/floating 選択時は両チップ非アクティブ。
+   * - 「詳細」は設定 details を開いて配置セクションへスクロール（4状態すべて触れる導線）。
+   * - watch を扱える文脈でのみ表示（action popup も watch タブ対象に保存が効くので表示）。
+   */
+  const quickbarEl = $('nlPlacementQuickbar');
+  const quickbarValueEl = $('nlPlacementQuickValue');
+  const quickbarBesideEl = $('nlPlacementQuickBeside');
+  const quickbarBelowEl = $('nlPlacementQuickBelow');
+  const quickbarMoreEl = $('nlPlacementQuickMore');
+  const refreshPlacementQuickbar = async () => {
+    if (!(quickbarEl instanceof HTMLElement)) return;
+    let placement = INLINE_PANEL_PLACEMENT_DOCK_BOTTOM;
+    try {
+      const bag = await chrome.storage.local.get(KEY_INLINE_PANEL_PLACEMENT);
+      placement = normalizeInlinePanelPlacement(bag[KEY_INLINE_PANEL_PLACEMENT]);
+    } catch {
+      /* best-effort: 既定のまま */
+    }
+    const model = buildPlacementQuickbarModel({ placement });
+    if (quickbarValueEl instanceof HTMLElement) {
+      quickbarValueEl.textContent = model.currentLabel + (model.effectiveNote || '');
+    }
+    if (quickbarBesideEl instanceof HTMLElement) {
+      quickbarBesideEl.setAttribute('aria-pressed', model.besideActive ? 'true' : 'false');
+    }
+    if (quickbarBelowEl instanceof HTMLElement) {
+      quickbarBelowEl.setAttribute('aria-pressed', model.belowActive ? 'true' : 'false');
+    }
+  };
+  quickbarBesideEl?.addEventListener('click', () => {
+    void (async () => {
+      await saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BESIDE);
+      await refreshPlacementQuickbar();
+    })();
+  });
+  quickbarBelowEl?.addEventListener('click', () => {
+    void (async () => {
+      await saveInlinePanelPlacement(INLINE_PANEL_PLACEMENT_BELOW);
+      await refreshPlacementQuickbar();
+    })();
+  });
+  quickbarMoreEl?.addEventListener('click', () => {
+    const settings = $('nlPopupSettings');
+    if (settings instanceof HTMLDetailsElement) settings.open = true;
+    const target = $('inlinePanelPlacementDockBottom');
+    const section =
+      target instanceof HTMLElement ? target.closest('.nl-panel-width') : null;
+    if (section instanceof HTMLElement) {
+      section.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    // フォーカスは現在チェック中のラジオへ（キーボード操作の連続性）。
+    const checked = /** @type {HTMLElement|null} */ (
+      document.querySelector('input[name="inlinePanelPlacement"]:checked')
+    );
+    if (checked && typeof checked.focus === 'function') checked.focus();
+  });
+  // watch を扱える文脈（inline / side panel / standalone window / action popup）で表示。
+  // 非 watch（タブ未特定）でも保存自体は可能なので、ここでは常時表示しつつ初期値を反映。
+  if (quickbarEl instanceof HTMLElement) {
+    quickbarEl.hidden = false;
+    void refreshPlacementQuickbar();
+  }
 
   /** @type {HTMLInputElement|null} */
   const radioFloatingAnchorTopRightEl = $('inlineFloatingAnchorTopRight');
