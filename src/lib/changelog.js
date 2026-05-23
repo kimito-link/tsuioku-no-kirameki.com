@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.338',
+    date: '2026-05-23',
+    summary: '貢献度ランキングを横並びカードに統一',
+    items: Object.freeze([
+      '[改善] 貢献度ランキングを、ギフト履歴や広告ランキングと同じ「横並びのカード」表示に統一しました。これまでは縦長のリストで右に小さなスクロールバーが出て見づらかったのを、コメント数ランキングのような横カードに揃えました。1〜3位の金/銀/銅の色分け、「さん」付き表示、公式ユーザーページへのリンク、上位10名までの表示はそのままです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.337',
     date: '2026-05-23',
     summary: 'カードが全部「—」で固まる不具合を修正',

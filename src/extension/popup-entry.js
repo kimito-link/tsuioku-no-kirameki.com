@@ -34,7 +34,6 @@ import {
   iframeOfficialDomStorageKey,
   resolveContributionRankingRowsFromSources
 } from '../lib/officialContributionRankingResolver.js';
-import { buildContributionRankingListHtml } from '../lib/contributionRankingListView.js';
 import {
   findCharaTrioSlotByLaneId,
   tierToTrioCharaSrc,
@@ -6462,69 +6461,19 @@ function refreshNorthStarAdRankingLane() {
 }
 
 /**
- * 北極星 レーン 1 (貢献度ランキング) 専用の縦リスト描画。
- *
- * v0.1.287 (Antigravity §6.2): 既存 `paintTopSupportRankStyleIntoElement()`
- *   （横スクロールカード列）から本レーンだけ独立させた縦リスト UI。
- *   1-3 位の金/銀/銅 tier、カンマ区切り pt、「さん」suffix を §1.2 図に準拠。
- *
- * HTML 生成は純関数 `buildContributionRankingListHtml()` に委譲＝unit test で
- * 構造を固定。本関数は I/O 副作用（class 付け替え / avatar load guard / 上下
- * gadget 連携 / a11y 属性）にだけ責任を持つ。
- *
- * @param {HTMLElement} el body 要素（#northStarLaneBody-contributionRanking）
- * @param {{ userKey:string, nickname:string, count:number, avatarUrl?:string, rankHint?:number|null }[]} rooms
- * @param {{ noteText: string, unitSuffix: string, ariaLabel: string }} opts
- */
-function paintContributionRankingListIntoElement(el, rooms, opts) {
-  if (!(el instanceof HTMLElement)) return;
-  teardownNorthStarLaneWaitingUi(el);
-  el.setAttribute('data-lane-state', 'ok');
-  // 既存横スクロール class は付けない＝完全に独立した縦リスト host。
-  el.classList.remove('nl-top-support-rank', 'nl-top-support-rank--below-cards');
-  el.classList.add('nl-contrib-ranking-list-host');
-  el.hidden = false;
-  el.removeAttribute('aria-hidden');
-  el.setAttribute('aria-label', opts.ariaLabel);
-
-  const rankScheme = getStoryColorScheme();
-  const models = topSupportRankLineModels(rooms, {
-    defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
-    anonymousFallbackThumbSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
-    colorScheme: rankScheme,
-    anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled
-      ? (uid) => getCachedAnonymousIdenticonDataUrl(uid)
-      : undefined
-  });
-
-  el.innerHTML = buildContributionRankingListHtml(models, {
-    noteText: opts.noteText,
-    ariaLabel: opts.ariaLabel,
-    unitSuffix: opts.unitSuffix,
-    defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG
-  });
-
-  bindOnErrorHideHandlersWithin(el);
-  // avatar load guard 連携（実 http URL が load fail したら下流でフォールバック）。
-  const thumbs = el.querySelectorAll('img.nl-contrib-ranking-list__thumb');
-  models.forEach((m, i) => {
-    const img = thumbs[i];
-    if (!(img instanceof HTMLImageElement)) return;
-    if (isHttpOrHttpsUrl(m.thumbSrc)) {
-      storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
-    }
-  });
-
-  syncNorthStarLaneGadgetFromBodyState(el);
-  // 縦リストに順位を含むため、右列の縦レールで同データを二重表示しない。
-  clearNorthStarVerticalRailForBody(el);
-}
-
-/**
  * 北極星 レーン 1 (貢献度ランキング)。
  *
- * v0.1.287: 専用縦リスト UI（金/銀/銅 tier）に切替。既存 nl-top-support-rank
- *   からの完全独立＝adRanking/giftHistory の横スクロール表示は不変。
+ * v0.1.337: 縦リスト UI（v0.1.287）から、ギフト履歴／広告ランキングと同じ
+ *   **横カード列**（`paintTopSupportRankStyleIntoElement` / `--below-cards`）に統一。
+ *   ユーザー要望「貢献度ランキングもコメント数ランキングのような横並びにしたい」
+ *   （縦リストは右に縦スクロールバーが出て見づらい）。金/銀/銅 tier・「さん」suffix・
+ *   公式ユーザーページへのリンク・1-10 位 cap は `topSupportRankLineModels` 由来で
+ *   横カードでもそのまま維持される（両表示が同じモデルを使うため）。数値の見切れも
+ *   v0.1.335 の `--below-cards` 数値行 CSS をそのまま継承する。
+ *
+ * 注: 縦リスト専用だった `paintContributionRankingListIntoElement` は本切替で未使用に
+ *   なるため同 PR で削除した（孤立する死蔵コードを残さない）。純関数
+ *   `buildContributionRankingListHtml` 自体は lib に残置（テスト・将来の縦オプション用）。
  */
 async function refreshNorthStarContributionRankingLaneAsync(liveId) {
   const body = document.getElementById('northStarLaneBody-contributionRanking');
@@ -6534,13 +6483,16 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
   const snap = watchMetaCache.snapshot;
   if (ranking && ranking.length > 0) {
     // v0.1.284: 10 位までで打ち切り（koken API は rank=20 で取るが UI は 1-10 位
-    // が正本＝ニコ生本体表示と並びを揃え、11位以降のノイズで縦が膨らむのを防ぐ）。
+    // が正本＝ニコ生本体表示と並びを揃え、11位以降のノイズで横が膨らむのを防ぐ）。
     const top10 = ranking.slice(0, 10);
     const rooms = officialDomRankingRowsToStripRooms(top10, { userKeyKind: 'contrib' });
-    paintContributionRankingListIntoElement(body, rooms, {
+    // 縦リスト専用 host class が前回付いていたら剥がしてから横カードへ切替。
+    body.classList.remove('nl-contrib-ranking-list-host');
+    paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
       unitSuffix: '貢',
-      ariaLabel: '貢献度ランキング'
+      ariaLabel: '貢献度ランキング',
+      isNorthStarBody: true
     });
     return;
   }
