@@ -120,7 +120,20 @@ export function determineNorthStarLaneState(laneId, ctx) {
       const dom = numOrNull(bundle?.eventBanner?.rank);
       const mirror = strNonEmpty(bundle?.eventCurrentRankMirrorHtml);
       const ndgr = numOrNull(snap?.officialNicoEventRankNdgr);
-      if (dom != null || mirror || (ndgr != null && ndgr > 0)) return 'ok';
+      // DOM banner rank / 鏡 HTML は配信者本人の順位が確証できるので無条件 ok。
+      if (dom != null || mirror) return 'ok';
+      // v0.1.325: NDGR rank 単独では ok にしない（実機 lv350589034: イベント不参加の
+      //   配信で NDGR rank=50 が出て誤表示）。NDGR rank を採るのは、rank 以外の
+      //   イベント参加シグナル（タイトル/バナー/バルーン/スコア）が確証できる時だけ。
+      //   ＝popup-entry の表示ガードと整合（feedback_ndgr_field6_silence に回帰）。
+      const eventConfirmedExclRank =
+        strNonEmpty(snap?.officialNicoEventTitleNdgr) ||
+        strNonEmpty(snap?.officialNicoEventTitle) ||
+        !!bundle?.eventBanner ||
+        !!bundle?.eventBalloon ||
+        strNonEmpty(bundle?.eventCumulativeScoreMirrorHtml) ||
+        numOrNull(snap?.officialEventGiftScoreNdgr) != null;
+      if (ndgr != null && ndgr > 0 && eventConfirmedExclRank) return 'ok';
       // v0.1.282: NDGR 等がイベント参加を示す state を返す（reason/診断用）。
       // ⛔ 2026-05-19: この state の「可視表示」は撤回（northStarLaneVisibility
       // で非表示へ）。空 placeholder のスペース浪費をユーザーが却下したため。

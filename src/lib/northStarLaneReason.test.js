@@ -96,20 +96,28 @@ describe('determineNorthStarLaneState', () => {
       expect(determineNorthStarLaneState('eventRank', { bundle })).toBe('ok');
     });
 
-    it('v0.1.284: NDGR rank presence > 0 → ok（実描画は「目安」注記つき）。', () => {
-      // v0.1.284 で feedback_ndgr_field6_silence の「単独表示禁止」を
-      // ユーザー明示要求（lv350553787 で 67 が観測されているのに何も出ない）に
-      // 合わせ部分解除。refreshNorthStarEventCurrentRankLaneAsync が
-      // 「※ NDGR 推定値」注記つきで render するため、reason も ok を返す。
+    it('v0.1.325: NDGR rank + イベント参加シグナル（タイトル等）あり → ok（目安表示）', () => {
+      // v0.1.325: NDGR rank 単独では ok にしない（実機 lv350589034 で不参加配信に
+      // rank=50 が出た誤表示を是正）。rank 以外のイベント参加シグナル（ここでは
+      // イベントタイトル）が確証できる時だけ ok＝目安表示する。
       const bundle = { programStats: { giftPoints: 100 } };
-      const snap = { officialNicoEventRankNdgr: 50 };
+      const snap = { officialNicoEventRankNdgr: 50, officialNicoEventTitleNdgr: 'はるまつり' };
       expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('ok');
     });
 
-    it('v0.1.284: NDGR rank presence > 0 のみ・ギフト無 → ok（注記つき表示）', () => {
+    it('v0.1.325: NDGR rank 単独（イベント参加シグナル無し）→ ok にしない（誤表示防止）', () => {
+      // 実機 lv350589034: イベント不参加の配信で NDGR rank=50 が乗り「現在50位」と
+      // 誤表示していた。rank 以外の確証が無ければ ok にしない（feedback_ndgr_field6_silence）。
       const bundle = {};
       const snap = { officialNicoEventRankNdgr: 50 };
-      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('ok');
+      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).not.toBe('ok');
+    });
+
+    it('v0.1.325: NDGR rank + giftPoints のみ（イベント参加シグナル無し）→ ok にしない', () => {
+      // giftPoints>0 はギフト配信の証だがイベント参加の証ではない。rank=50 を出さない。
+      const bundle = { programStats: { giftPoints: 900 } };
+      const snap = { officialNicoEventRankNdgr: 50 };
+      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).not.toBe('ok');
     });
 
     it('mirror html で ok', () => {
@@ -232,11 +240,14 @@ describe('determineNorthStarLaneState', () => {
       expect(determineNorthStarLaneState('programPoints', { bundle, snap })).toBe('ok');
     });
 
-    it('v0.1.284: レーン 5 (イベント順位) → ok（NDGR 順位 > 0 を「目安」注記つき表示）', () => {
-      // v0.1.284: ユーザー明示要求で field6 silence の単独表示禁止を部分解除。
-      // refreshNorthStarEventCurrentRankLaneAsync が「※ NDGR 推定値」注記つき
-      // で render するため、reason も ok を返す。
-      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).toBe('ok');
+    it('v0.1.325: レーン 5 (イベント順位) → NDGR 順位50 単独・参加シグナル無しは ok にしない', () => {
+      // v0.1.325: この fixture の snap は officialNicoEventRankNdgr:50 だが、イベント
+      // タイトル/バナー/バルーン/スコアが全て無い＝イベント参加が確証できない。
+      // 実機 lv350589034 で不参加配信に rank=50 が出た誤表示を是正し、rank 以外の
+      // 参加シグナルが無ければ ok にしない（誤った「現在50位」を出さない）。
+      // この fixture は giftPoints:550>0 なので iframe_unrendered（ギフトはあるが
+      // sidebar 取れず）に倒れる。
+      expect(determineNorthStarLaneState('eventRank', { bundle, snap })).not.toBe('ok');
     });
 
     it('+α (広告ランキング) → ok (5 件取れている)', () => {
@@ -312,15 +323,17 @@ describe('event_present_unscrapable（v0.1.282 参加検出・実機 lv350558940
     ).toBe('event_present_unscrapable');
   });
 
-  it('v0.1.284: eventRank: NDGR rank > 0 → ok（「目安」注記つき表示。旧 event_present_unscrapable から昇格）', () => {
-    // v0.1.284: ユーザー明示要求で field6 silence の単独表示禁止を部分解除。
-    // NDGR rank が presence > 0 ならレーンを ok にして「※ NDGR 推定値」付きで表示。
+  it('v0.1.325: eventRank: NDGR rank 単独（title空・score無）は ok にしない（誤表示防止）', () => {
+    // v0.1.325: snapParticipating は rank=2 だが title 空・score null・banner 無し
+    // ＝イベント参加が rank 以外で確証できない。実機 lv350589034 で不参加配信に
+    // rank が出た誤表示を是正し、rank 単独では ok にしない。giftPoints>0 なので
+    // iframe_unrendered に倒れる（ギフトはあるが sidebar 取れず）。
     expect(
       determineNorthStarLaneState('eventRank', {
         bundle: bundleNoScrape,
         snap: snapParticipating
       })
-    ).toBe('ok');
+    ).not.toBe('ok');
   });
 
   it('真のイベント不参加（NDGR シグナル皆無）は従来どおり no_event', () => {
