@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.335',
+    date: '2026-05-23',
+    summary: 'ランキングのカードで数字を読みやすく',
+    items: Object.freeze([
+      '[修正] 広告ランキングのカードで、ポイントの数字（41万など桁の多い値）が「410…」と省略されて読めない問題を直しました。数字を名前の下の広い行に置いて、全部読めるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.334',
     date: '2026-05-23',
     summary: 'パネル位置の切り替えを上部からすぐ操作可能に',
