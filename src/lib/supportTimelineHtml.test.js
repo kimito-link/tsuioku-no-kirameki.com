@@ -24,7 +24,8 @@ const gItem = (over = {}) => ({
   nickname: over.nickname ?? 'おくりぬし',
   itemName: over.itemName ?? 'スパチャ',
   point: over.point ?? 500,
-  message: over.message ?? ''
+  message: over.message ?? '',
+  avatarUrl: over.avatarUrl ?? ''
 });
 
 describe('buildTimelineRowHtml', () => {
@@ -54,6 +55,30 @@ describe('buildTimelineRowHtml', () => {
   it('無料ギフト（pt0）は pt 表示を出さない', () => {
     const html = buildTimelineRowHtml(gItem({ point: 0 }));
     expect(html).not.toContain('pt</span>');
+  });
+
+  it('送信者アバターありのギフト行は avatar img + 🎁バッジを出す（v0.1.342）', () => {
+    const html = buildTimelineRowHtml(
+      gItem({ userId: 'a:x', avatarUrl: 'https://x/y.jpg' })
+    );
+    expect(html).toContain('nl-tl-gift__avatar');
+    expect(html).toContain('src="https://x/y.jpg"');
+    expect(html).toContain('nl-tl-gift__badge');
+    expect(html).toContain('referrerpolicy="no-referrer"');
+  });
+
+  it('アバターなしギフト行は default が無ければ🎁アイコンのみ', () => {
+    const html = buildTimelineRowHtml(gItem({ userId: 'a:x', avatarUrl: '' }));
+    expect(html).toContain('nl-tl-gift__icon');
+    expect(html).not.toContain('nl-tl-gift__avatar');
+  });
+
+  it('アバターなしでも defaultAvatar 指定時はそれを使う', () => {
+    const html = buildTimelineRowHtml(gItem({ userId: 'a:x', avatarUrl: '' }), {
+      defaultAvatar: '/img/tile.png'
+    });
+    expect(html).toContain('nl-tl-gift__avatar');
+    expect(html).toContain('src="/img/tile.png"');
   });
 
   it('XSS: テキスト・名前をエスケープ', () => {

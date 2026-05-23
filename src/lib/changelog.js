@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.342',
+    date: '2026-05-24',
+    summary: '応援タイムラインのギフトに送信者の顔を表示',
+    items: Object.freeze([
+      '[改善] 応援タイムラインのギフト行に、贈った人の顔アイコン（プレゼントマーク付き）を表示するようにしました。「誰が」投げたかが顔で一目で分かります（アイコン未設定の人はマークのみ）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.341',
     date: '2026-05-24',
     summary: '応援タイムラインに「何分前」を表示',
