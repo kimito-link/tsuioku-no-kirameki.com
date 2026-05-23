@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.325',
+    date: '2026-05-23',
+    summary: '振り返りに「配信内容の流れ」を追加',
+    items: Object.freeze([
+      '[追加] 振り返りレポートに「配信内容の流れ」を追加しました。記録されたコメントだけをもとに、配信の冒頭・中盤・終盤でどんな話題が盛り上がったか、コメント数や人数の移り変わり、次回に活かせるヒントをまとめて表示します（録画や外部データは使わず、記録に無いことは補いません）。共有用の出力では、話題語と代表コメントの本文は伏せてプライバシーに配慮します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.324',
     date: '2026-05-23',
     summary: '動作を軽くしました（裏の重い読み込みを削減）',
