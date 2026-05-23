@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.339',
+    date: '2026-05-23',
+    summary: 'アイコンが出ない原因を診断に記録(裏側)',
+    items: Object.freeze([
+      '[改善] 「照合できているのに顔アイコンが出ない」場合の原因を特定するため、アイコン画像の読み込み成否を診断情報（AI共有用）に記録するようにしました。表示や動作は変わりません（次回いただく診断で、どのアイコンが読み込めていないかが分かり、根本対処につなげます）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.338',
     date: '2026-05-23',
     summary: '貢献度ランキングを横並びカードに統一',

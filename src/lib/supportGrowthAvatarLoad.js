@@ -161,11 +161,45 @@ export function createSupportAvatarLoadGuard(options) {
     if (k) succeededKeys.add(k);
   }
 
+  /**
+   * v0.1.339: 「照合済みなのにサムネが出ない」②の真因切り分け用診断。
+   *   合成 usericon URL（/nicoaccount/usericon/...）の load 成否を集計して、
+   *   どれだけが 404/timeout で fallback に落ちているかを実機ログで可視化する。
+   *   key は `origin+pathname` 小文字（probe 結果ベース）なので副作用なしの読み取りのみ。
+   * @returns {{
+   *   succeededTotal: number, failedTotal: number,
+   *   usericonSucceeded: number, usericonFailed: number,
+   *   failedUsericonSamples: string[]
+   * }}
+   */
+  function getDiagnostics() {
+    /** @param {string} k */
+    const isUsericon = (k) => /\/nicoaccount\/usericon\//i.test(String(k || ''));
+    let usericonSucceeded = 0;
+    for (const k of succeededKeys) if (isUsericon(k)) usericonSucceeded += 1;
+    let usericonFailed = 0;
+    /** @type {string[]} */
+    const failedUsericonSamples = [];
+    for (const k of failedKeys) {
+      if (!isUsericon(k)) continue;
+      usericonFailed += 1;
+      if (failedUsericonSamples.length < 5) failedUsericonSamples.push(k);
+    }
+    return {
+      succeededTotal: succeededKeys.size,
+      failedTotal: failedKeys.size,
+      usericonSucceeded,
+      usericonFailed,
+      failedUsericonSamples
+    };
+  }
+
   return {
     pickDisplaySrc,
     noteRemoteAttempt,
     clearFailedUrls,
     markFailedForTests,
-    markSucceededForTests
+    markSucceededForTests,
+    getDiagnostics
   };
 }

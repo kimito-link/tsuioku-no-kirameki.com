@@ -11631,6 +11631,16 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
             String(snap.broadcasterIconUrl || '').trim()
           )
         };
+      })(),
+      // v0.1.339: 「照合済みなのにサムネが出ない」②の実機切り分け。合成 usericon URL の
+      //   load 成否を集計（同期読み取りのみ）。usericonFailed が多い・失敗サンプルが特定の
+      //   形に偏るなら 404/CORS が真因＝nvapi 経由等の対処へ進む判断材料にする。
+      avatarLoadDiag: (() => {
+        try {
+          return storyAvatarLoadGuard.getDiagnostics();
+        } catch {
+          return null;
+        }
       })()
     },
     content: null,
