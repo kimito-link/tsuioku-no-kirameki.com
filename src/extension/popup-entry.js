@@ -6783,6 +6783,8 @@ async function refreshSupportActivityTimeline(liveId) {
     }
   }
   if (details instanceof HTMLElement) details.hidden = false;
+  // v0.1.345: 別ウィンドウでは下部常設にして空白を埋める（冪等・他文脈は no-op）。
+  relocateSupportTimelineForStandaloneWindow();
 }
 
 /**
@@ -6797,9 +6799,20 @@ async function wireSupportTimelineOpenPersistence() {
   const details = /** @type {HTMLDetailsElement|null} */ ($('supportTimelineDetails'));
   if (!(details instanceof HTMLDetailsElement)) return;
   // hydrate: 保存値が true のときだけ開く（既定 false=閉じ）。
+  // v0.1.345: 別ウィンドウ(standalone window=nl-popup-window)では「キー未設定なら既定で開く」
+  //   ＝配信中の下の空白を応援タイムラインで埋める。⚠️storage は書かない（同一 popup.html を
+  //   読む action popup へ open=true が波及して「普段の表示が変わる」のを防ぐ）。保存値が
+  //   明示 false/true のときはそれを最優先（手動操作を尊重）。
   try {
     const bag = await storageGetSafe(KEY_SUPPORT_TIMELINE_OPEN, {});
-    const want = bag[KEY_SUPPORT_TIMELINE_OPEN] === true;
+    const raw = bag[KEY_SUPPORT_TIMELINE_OPEN];
+    const isStandaloneWindow = document.documentElement.classList.contains('nl-popup-window');
+    let want;
+    if (raw === true || raw === false) {
+      want = raw; // 明示保存（手動開閉）を最優先
+    } else {
+      want = isStandaloneWindow; // 未設定: 別ウィンドウだけ既定オープン（書き込まない）
+    }
     if (details.open !== want) {
       suppressSupportTimelineTogglePersist = true;
       try {
@@ -6818,6 +6831,33 @@ async function wireSupportTimelineOpenPersistence() {
     const open = Boolean(details.open);
     void storageSetSafe({ [KEY_SUPPORT_TIMELINE_OPEN]: open }).catch(() => {});
   });
+}
+
+/**
+ * v0.1.345: 別ウィンドウ(standalone window)かつ配信中(=not empty-state)のとき、応援タイムラインを
+ *   `.nl-main` 末尾へ移して下部常設にし、ウィンドウ下の空白を埋める。`order` は効かない
+ *   （タイムラインは grid セル内＝.nl-main の直接の子ではない）ので DOM 移動が必要（会議結論）。
+ *   冪等: 既に `.nl-main` 直下にいれば動かさない（toggle 再発火・スクロール位置リセットを防ぐ）。
+ *   action popup / inline では何もしない（普段の表示は不変）。空白埋めの見せ方は CSS が
+ *   `html.nl-popup-window:not(.nl-empty-state)` 配下で担う。
+ */
+function relocateSupportTimelineForStandaloneWindow() {
+  const details = $('supportTimelineDetails');
+  if (!(details instanceof HTMLElement)) return;
+  const root = document.documentElement;
+  const isStandaloneWindow = root.classList.contains('nl-popup-window');
+  const isEmptyState = root.classList.contains('nl-empty-state');
+  const main = /** @type {HTMLElement|null} */ (document.querySelector('.nl-main'));
+  if (!(main instanceof HTMLElement)) return;
+  if (isStandaloneWindow && !isEmptyState) {
+    // 下部常設へ（既に main 直下末尾なら冪等 no-op）。
+    if (details.parentElement !== main || details.nextElementSibling !== null) {
+      main.appendChild(details);
+    }
+    details.dataset.nlTimelineDocked = 'window-bottom';
+  }
+  // 注: standalone でない/空状態へ戻ったときの「元位置へ戻す」は、文脈が固定の単一 popup
+  //   インスタンスでは実害が無いため行わない（action popup は別プロセスで初期 DOM のまま）。
 }
 
 /** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
