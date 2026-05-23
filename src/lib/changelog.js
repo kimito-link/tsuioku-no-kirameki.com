@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.348',
+    date: '2026-05-24',
+    summary: '古いタブが残したエラー警告の出っぱなしを解消',
+    items: Object.freeze([
+      '[修正] 拡張を更新した後に古いタブ（前の配信ページ）が残っていると、記録処理がエラー警告をブラウザのコンソールに出し続けることがある問題を直しました。古いタブはそのまま静かに終了させ、不要な警告や保存処理が止まります（新しいタブの記録・表示はこれまでどおりで、普段の見え方は変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.347',
     date: '2026-05-24',
     summary: '古いタブで全部「—」に固まる不具合を修正',
