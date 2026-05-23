@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.327',
+    date: '2026-05-23',
+    summary: '広告ランキングの名前を見やすく修正',
+    items: Object.freeze([
+      '[改善] 広告ランキングで、名前が分かっている広告主さんはユーザーIDより名前を優先して見せるようにしました。リンク先はこれまでどおりニコニコのユーザーページです。小さなカード内で数字だけが目立って、名前が出ていないように見える状態を避けます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.326',
     date: '2026-05-23',
     summary: 'イベント現在順位の誤表示をさらに修正',
