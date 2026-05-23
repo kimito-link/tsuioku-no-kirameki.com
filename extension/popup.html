@@ -1659,6 +1659,11 @@
         border: 1px solid var(--nl-border);
         border-radius: 8px;
         background: var(--nl-bg-soft);
+        /* v0.1.333: 長い項目テキスト（長い英数字連続・item 名等）が枠の右端を超えて
+           見切れる症状を是正。box-sizing で padding 込みで枠内に収め、長語も折り返す。 */
+        box-sizing: border-box;
+        max-width: 100%;
+        overflow-wrap: anywhere;
       }
 
       .nl-changelog-entry:last-child {
@@ -1695,11 +1700,17 @@
       .nl-changelog-entry__items {
         margin: 0;
         padding-left: 18px;
+        /* v0.1.333: padding-left 込みで親幅に収める（list-style 分が右へ押し出さない）。 */
+        box-sizing: border-box;
+        max-width: 100%;
       }
 
       .nl-changelog-entry__items li {
         margin: 2px 0;
         line-height: 1.4;
+        /* 長い語も折り返して枠内に収める（見切れ防止）。 */
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -1720,6 +1731,18 @@
         overflow-x: auto;
         gap: 5px;
         padding-bottom: 2px;
+        /* v0.1.333: チップ（枠切替 >2 >3 …）が多いと右が隠れて「見切れ」に見えるが、
+           実際は横スクロール領域。薄いスクロールバーを見せて「横スクロールできる」ことを
+           伝える（機能は不変・スクロール不要なら scrollbar も出ない＝誤誘導しない）。 */
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
+      }
+      .nl-frame-grid::-webkit-scrollbar {
+        height: 6px;
+      }
+      .nl-frame-grid::-webkit-scrollbar-thumb {
+        background: color-mix(in srgb, var(--nl-border) 70%, transparent);
+        border-radius: 999px;
       }
 
       .nl-frame-chip {
@@ -3822,7 +3845,10 @@
 
       .nl-top-support-rank--below-cards .nl-top-support-rank__line {
         display: grid;
-        grid-template-columns: auto minmax(34px, 42px) auto;
+        /* v0.1.333: count 列を minmax(0,auto) に（長い pt 数値「13349」等が auto で
+           カード幅 min58px を超えて右端からはみ出す実機症状を是正。0 まで縮めて
+           カード内に収め、count 側で ellipsis）。place/thumb は固定なので 3列目だけ可縮に。 */
+        grid-template-columns: auto minmax(34px, 42px) minmax(0, auto);
         grid-template-areas:
           "place thumb count"
           "name name name"
@@ -3830,6 +3856,8 @@
         align-items: center;
         justify-items: center;
         gap: 4px 6px;
+        /* カード枠を絶対に超えない（はみ出した数値・名前はカード内でクリップ）。 */
+        overflow: hidden;
         /* grid トラックが幅を決めるので flex 固定幅・min/max-width は付けない
            （max-width を残すと 1fr で全幅に伸びず・折返しも阻害する死にコードになる）。 */
         min-width: 0;
@@ -3864,6 +3892,14 @@
         align-self: start;
         font-size: 10px;
         line-height: 1.2;
+        /* v0.1.333: 長い pt 数値「13349 貢」等がカード幅を超えて右端からはみ出す
+           症状を是正。カード幅内に収め、収まらない極端な桁は末尾を隠す（他カードへ
+           被るより良い）。数値は通常 5-6 桁でカード幅 58px+ に収まる。 */
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .nl-top-support-rank--below-cards .nl-top-support-rank__id {
