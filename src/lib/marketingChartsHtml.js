@@ -36,6 +36,7 @@ import {
   buildWeekdayHourHeatmap,
   computeBroadcastGrowthScore
 } from './broadcastCrossCompare.js';
+import { buildBroadcastNarrative } from './broadcastNarrativeBuilder.js';
 import { buildOpeningFiveMinutePoints } from './openingFiveMinuteCorrelation.js';
 import {
   buildBroadcastWaveformFingerprint,
@@ -216,6 +217,55 @@ function sectionContentShape(r) {
   return `<section class="mkt-section"><h2>コメント本文・属性の傾向</h2>
 <p class="mkt-note">記録された本文のみを対象。184 は <code>is184</code> が付いている行だけで割合を計算します。</p>
 <div class="mkt-kpi-grid">${inner}</div></section>`;
+}
+
+/**
+ * @param {import('./broadcastNarrativeBuilder.js').BroadcastNarrative} narrative
+ * @param {boolean} maskShare
+ */
+function sectionBroadcastNarrative(narrative, maskShare) {
+  if (!narrative || !Array.isArray(narrative.segments) || narrative.segments.length === 0) {
+    return '';
+  }
+  const segmentHtml = narrative.segments
+    .map((seg) => {
+      const keywords = maskShare
+        ? '<span class="mkt-narrative-muted">共有向けでは話題語を省略</span>'
+        : seg.keywords.length
+        ? seg.keywords
+            .map((word) => `<span class="mkt-narrative-keyword">${escapeHtml(word)}</span>`)
+            .join('')
+        : '<span class="mkt-narrative-muted">目立つ語は少なめ</span>';
+      const samples =
+        !maskShare && seg.sampleComments.length
+          ? `<ul class="mkt-narrative-samples">${seg.sampleComments.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ul>`
+          : '';
+      return `<article class="mkt-narrative-card">
+<div class="mkt-narrative-card__head">
+<strong>${escapeHtml(seg.label)}</strong>
+<span>${seg.startMinute}〜${seg.endMinute}分 / ${seg.commentCount}件 / ${seg.uniqueUsers}人</span>
+</div>
+<div class="mkt-narrative-keywords">${keywords}</div>
+${samples}
+</article>`;
+    })
+    .join('');
+  const hints = narrative.improvementHints.length
+    ? `<ul class="mkt-narrative-hints">${narrative.improvementHints.map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ul>`
+    : '';
+  const sampleNote = maskShare
+    ? '<p class="mkt-note">共有向け出力では話題語と代表コメント本文を省略しています。</p>'
+    : '';
+  const summaryLine = maskShare
+    ? `${narrative.peakSegmentLabel || '全体'}にコメントが最も集まりました。`
+    : narrative.summaryLine;
+  return `<section class="mkt-section mkt-section--narrative">
+<h2>配信内容の流れ</h2>
+<p class="mkt-lead">${escapeHtml(summaryLine)}</p>
+${sampleNote}
+<div class="mkt-narrative-grid">${segmentHtml}</div>
+${hints ? `<h3 class="mkt-narrative-subhead">次回に活かすなら</h3>${hints}` : ''}
+</section>`;
 }
 
 /** @param {number} ms */
@@ -1761,6 +1811,12 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
           : []
     : (cs) => (Array.isArray(cs) ? cs : []);
   const currentCommentsForLayer = filterBroadcaster(commentsForAnalytics);
+  const broadcastNarrative = buildBroadcastNarrative({
+    report: r,
+    comments: currentCommentsForLayer,
+    broadcasterUserId,
+    includeSamples: !maskShare
+  });
   const pastBroadcastsForLayer = pastBroadcasts.map((b) => ({
     liveId: String(b?.liveId || ''),
     comments: filterBroadcaster(b?.comments)
@@ -1942,6 +1998,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-sg-caution', label: '読み取りの注意' },
     { id: 'mkt-kpi', label: 'KPI サマリ' },
     { id: 'mkt-content', label: 'コメント本文・属性の傾向' },
+    { id: 'mkt-narrative', label: '配信内容の流れ' },
     { id: 'mkt-quarter', label: '冒頭・終盤（四分位）' },
     { id: 'mkt-timeline', label: 'コメントタイムライン' },
     { id: 'mkt-velocity', label: 'コメ速度カーブ（PRO）' },
@@ -1982,6 +2039,7 @@ ${sectionAdviceAfterKpi(r)}
 ${dynamicAdviceCardsHtml('kpi', metricsForAdvice)}
 ${idWrap('mkt-content', sectionContentShape(r))}
 ${sectionAdviceAfterContentShape(r)}
+${idWrap('mkt-narrative', sectionBroadcastNarrative(broadcastNarrative, maskShare))}
 ${idWrap('mkt-quarter', sectionQuarterEngagement(r))}
 ${sectionAdviceAfterQuarterEngagement(r)}
 ${idWrap('mkt-timeline', sectionTimeline(r))}
@@ -2532,6 +2590,19 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-sg-time{font-size:.82rem;color:#cbd5e1}
 .mkt-sg-simple-list{margin:.4rem 0;padding-left:1.2rem}
 .mkt-sg-simple-list li{margin-bottom:.45rem}
+.mkt-section--narrative h2{border-left-color:#38bdf8}
+.mkt-narrative-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem;margin:.8rem 0}
+.mkt-narrative-card{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.8rem;min-width:0}
+.mkt-narrative-card__head{display:flex;justify-content:space-between;gap:.6rem;align-items:baseline;font-size:.82rem;color:#cbd5e1;margin-bottom:.5rem;flex-wrap:wrap}
+.mkt-narrative-card__head strong{color:#f8fafc;font-size:.95rem}
+.mkt-narrative-keywords{display:flex;flex-wrap:wrap;gap:.35rem}
+.mkt-narrative-keyword{display:inline-block;border:1px solid rgba(56,189,248,.45);background:rgba(56,189,248,.12);color:#bae6fd;border-radius:999px;padding:.12rem .45rem;font-size:.74rem}
+.mkt-narrative-muted{color:#64748b;font-size:.78rem}
+.mkt-narrative-samples{margin:.65rem 0 0;padding-left:1.1rem;color:#e2e8f0;font-size:.8rem;line-height:1.55}
+.mkt-narrative-samples li{margin-bottom:.25rem}
+.mkt-narrative-subhead{font-size:.9rem;margin:.9rem 0 .35rem;color:#f8fafc}
+.mkt-narrative-hints{margin:.3rem 0 0;padding-left:1.2rem;color:#cbd5e1;font-size:.84rem}
+.mkt-narrative-hints li{margin-bottom:.35rem}
 .mkt-sg-gift-block{margin-bottom:1rem;padding:.6rem .4rem;border-top:1px solid #334155}
 .mkt-sg-gift-block h3{margin:.2rem 0 .4rem;font-size:.95rem;color:#e2e8f0}
 .mkt-sg-clip{margin-bottom:.85rem;padding-bottom:.6rem;border-bottom:1px dashed #334155}
