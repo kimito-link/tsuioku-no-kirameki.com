@@ -5825,10 +5825,49 @@ async function loadPageFrameSettings() {
       : DEFAULT_PAGE_FRAME;
   pageFrameState.custom = sanitizePageFrameCustom(bag[KEY_POPUP_FRAME_CUSTOM]);
   applyPageFramePalette(pageFrameState.frameId, pageFrameState.custom);
+  // 初回描画の**前に**横付き昇格を in-memory へ確定させる（同期・純関数のみ）。
+  // こうしないと初回 renderPageFrameOverlay が stored(below/dock_bottom/未設定)で
+  // 一度描画 → 直後の昇格で beside へジャンプ＝「下→横」退行になる。判定は
+  // resolveInlinePanelPlacementDecision（USER_EXPLICIT は no-op）。await/書込は
+  // ここでは一切しない（描画ホットパスに I/O を足さない＝ハング回帰防止）。永続化は
+  // 描画後の maybeUpgradePlacementForWideViewport が fire-and-forget で担う。
+  maybeResolveWideViewportBesidePlacementInMemory(bag[KEY_INLINE_PANEL_PLACEMENT]);
   renderPageFrameOverlay();
   // 設定読込が終わってから、大画面なら横付きへ昇格すべきか評価する（opt-in）。
   // ここは描画ホットパスの**外側**。判定は同期純関数、書込のみ await。
   void maybeUpgradePlacementForWideViewport(bag[KEY_INLINE_PANEL_PLACEMENT]);
+}
+
+/**
+ * 横付き昇格の判定入力を 1 箇所で組み立てる（事前確定と永続化で同一入力を保証＝ドリフト防止）。
+ * 純粋・同期。配置昇格は once フラグに依存しない（resolver の契約）。
+ * @param {unknown} rawStoredPlacement chrome.storage の生値（未設定なら undefined）
+ * @returns {{ stored: string, userExplicit: boolean, viewportInnerWidth: number, policy: string }}
+ */
+function buildWideViewportPlacementDecisionInput(rawStoredPlacement) {
+  return {
+    stored: String(rawStoredPlacement || ''),
+    userExplicit: inlinePanelPlacementUserExplicit,
+    viewportInnerWidth: nlsLayoutViewportSize().innerWidth,
+    policy: inlinePanelViewportWidePolicy
+  };
+}
+
+/**
+ * 初回描画の前に、大画面なら in-memory の配置を beside へ確定させる（同期・書込なし）。
+ * resolveInlinePanelPlacementDecision が upgradeTo を返すときだけ inlinePanelPlacementMode を
+ * 更新する。USER_EXPLICIT=true / 幅不足 / policy=off では upgradeTo==null＝何もしない。
+ * storage への永続化はここではしない（描画後の maybeUpgradePlacementForWideViewport が担う）。
+ * @param {unknown} rawStoredPlacement chrome.storage の生値
+ */
+function maybeResolveWideViewportBesidePlacementInMemory(rawStoredPlacement) {
+  if (!hasExtensionContext()) return;
+  if (!isWatchInlinePanelTopFrame()) return;
+  const decision = resolveInlinePanelPlacementDecision(
+    buildWideViewportPlacementDecisionInput(rawStoredPlacement)
+  );
+  if (decision.upgradeTo == null) return;
+  inlinePanelPlacementMode = normalizeInlinePanelPlacement(decision.upgradeTo);
 }
 
 /**
@@ -5846,16 +5885,14 @@ async function loadPageFrameSettings() {
 async function maybeUpgradePlacementForWideViewport(rawStoredPlacement) {
   if (!hasExtensionContext()) return;
   if (!isWatchInlinePanelTopFrame()) return;
-  const vp = nlsLayoutViewportSize();
   // 配置の単一の真実（resolver）で昇格判定。昇格候補の語彙（dock_bottom も既定
   // として昇格対象）は resolver 1 箇所が持つ。配置昇格は once フラグに依存しない
   // （昇格後 stored=beside で自然に再発防止＝幅広げ once との共有フラグに触れない）。
-  const decision = resolveInlinePanelPlacementDecision({
-    stored: String(rawStoredPlacement || ''),
-    userExplicit: inlinePanelPlacementUserExplicit,
-    viewportInnerWidth: vp.innerWidth,
-    policy: inlinePanelViewportWidePolicy
-  });
+  // 入力は buildWideViewportPlacementDecisionInput で組み立て、初回描画前の
+  // in-memory 確定（maybeResolveWideViewportBesidePlacementInMemory）と同一入力を保証する。
+  const decision = resolveInlinePanelPlacementDecision(
+    buildWideViewportPlacementDecisionInput(rawStoredPlacement)
+  );
   if (decision.upgradeTo == null) return;
   // 同期の見た目を即追従（書込の onChanged を待たない）。
   inlinePanelPlacementMode = normalizeInlinePanelPlacement(decision.upgradeTo);

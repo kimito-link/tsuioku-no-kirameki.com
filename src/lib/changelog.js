@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.330',
+    date: '2026-05-23',
+    summary: '横付きパネル初回の下→横ジャンプを解消',
+    items: Object.freeze([
+      '[修正] 横長の画面で配信ページを開いたとき、サイドパネルが一瞬下に出てから横へ飛ぶ「ガタつき」をなくしました。最初から横付きの位置で表示します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.329',
     date: '2026-05-23',
     summary: '広告ランキングを大きく読みやすく',
