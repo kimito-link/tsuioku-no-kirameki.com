@@ -1447,6 +1447,24 @@
       .nl-placement-quickbar__more:hover {
         border-color: color-mix(in srgb, var(--nl-accent, #0f8fd8) 50%, var(--nl-border) 50%);
       }
+      /*
+        v0.1.336: 横付き降格時の説明行。狭ウィンドウで「横付きを押しても変わらない」
+        誤解を解く。降格時だけ JS が hidden を外す（既定は非表示＝場所を取らない）。
+      */
+      .nl-placement-quickbar__hint {
+        flex: 1 0 100%;
+        margin: -2px 0 6px;
+        padding: 4px 8px;
+        border-radius: 8px;
+        font-size: 10px;
+        line-height: 1.35;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--nl-text) 78%, #b06f00 22%);
+        background: color-mix(in srgb, #ffb020 14%, var(--nl-surface));
+        border: 1px solid color-mix(in srgb, #ffb020 40%, var(--nl-border));
+        box-sizing: border-box;
+        max-width: 100%;
+      }
 
       .nl-usage-terms-gate {
         position: fixed;
@@ -8263,6 +8281,18 @@
           詳細
         </button>
       </div>
+      <!--
+        v0.1.336: 横付きを選んでもウィンドウが狭い（約1100px未満）と実効が「下」に
+        降格して見た目が変わらない件の説明行。降格時だけ JS が文言を入れて hidden を外す。
+        「押しても何も変わらない」誤解の直接の解（実機 lv350592761: 幅1065px で降格）。
+      -->
+      <p
+        id="nlPlacementQuickHint"
+        class="nl-placement-quickbar__hint"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></p>
       <!--
         0.1.55 (AK) → 0.1.106: 既定は hidden。refresh が「非 watch」のときだけ外す。
         FOUC（ランキングだけ先に見える）防止。
