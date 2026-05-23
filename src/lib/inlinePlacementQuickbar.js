@@ -33,16 +33,28 @@ export function placementQuickLabel(placement) {
 }
 
 /**
+ * 横付きが「画面の広さ」要件で実効降格する最小幅（px）の表示用しきい値。
+ * ロジックの真実は inlinePanelLayout.js の INLINE_VIEWPORT_BESIDE_MIN_WIDTH（=1100）。
+ * ここはユーザー向け文言にだけ使う近似表示（「約1100px」）なので import 依存を増やさず
+ * 文言を独立させる（万一定数が変わっても文言は安全側の説明に留まる）。
+ */
+const BESIDE_MIN_WIDTH_HINT_PX = 1100;
+
+/**
  * クイックバーの表示モデルを純粋に組み立てる。
  *
  * - currentLabel: 現在保存されている配置のラベル。
  * - effectiveNote: 実効配置が保存値と違う（例: beside を選んだが狭タブで below 降格）
  *   ときだけ「(今は〜で表示中)」の補足。同じ/不明なら ''。
+ * - besideNarrowHint: 「横付きを選んだのに実効が下（=狭ウィンドウで降格）」のときだけ、
+ *   なぜ変わらないか＋どうすれば横付きになるかを行動可能に説明する文言。それ以外は ''。
+ *   ⭐ これが「横付きを押しても何も変わらない」誤解の直接の解（実機 lv350592761:
+ *   viewportInnerWidth 1065 < 1100 で beside→below 降格していた）。
  * - besideActive / belowActive: 2 トグルチップの押下状態（保存値基準）。dock_bottom/
  *   floating のときは両方 false（「他の位置」を選んでいる）。
  *
  * @param {{ placement?: string, effectivePlacement?: string }} input
- * @returns {{ currentLabel: string, effectiveNote: string, besideActive: boolean, belowActive: boolean }}
+ * @returns {{ currentLabel: string, effectiveNote: string, besideNarrowHint: string, besideActive: boolean, belowActive: boolean }}
  */
 export function buildPlacementQuickbarModel(input) {
   const placement = String(input?.placement || '').trim() || 'dock_bottom';
@@ -55,9 +67,16 @@ export function buildPlacementQuickbarModel(input) {
     effectiveNote = `（今は${placementQuickLabel(eff)}で表示中）`;
   }
 
+  // 「横付きを選んだのに下で表示中」＝狭ウィンドウ降格。これだけは原因と対処を明示。
+  let besideNarrowHint = '';
+  if (placement === 'beside' && eff === 'below') {
+    besideNarrowHint = `横付きは画面が広いとき（約${BESIDE_MIN_WIDTH_HINT_PX}px〜）に切り替わります。ウィンドウを広げると横に並びます。`;
+  }
+
   return {
     currentLabel,
     effectiveNote,
+    besideNarrowHint,
     besideActive: placement === 'beside',
     belowActive: placement === 'below'
   };
