@@ -3909,14 +3909,15 @@
         /* v0.1.333: count 列を minmax(0,auto) に（長い pt 数値「13349」等が auto で
            カード幅 min58px を超えて右端からはみ出す実機症状を是正。0 まで縮めて
            カード内に収め、count 側で ellipsis）。place/thumb は固定なので 3列目だけ可縮に。 */
-        grid-template-columns: auto minmax(34px, 42px) minmax(0, auto);
+        grid-template-columns: auto minmax(0, 1fr);
         grid-template-areas:
-          "place thumb count"
-          "name name name"
-          "id id id";
+          "place thumb"
+          "name name"
+          "count count"
+          "id id";
         align-items: center;
         justify-items: center;
-        gap: 4px 6px;
+        gap: 3px 6px;
         /* カード枠を絶対に超えない（はみ出した数値・名前はカード内でクリップ）。 */
         overflow: hidden;
         /* grid トラックが幅を決めるので flex 固定幅・min/max-width は付けない
@@ -3951,16 +3952,15 @@
         grid-area: count;
         justify-self: end;
         align-self: start;
-        font-size: 10px;
+        font-size: clamp(9px, 2.4vw, 11px);
         line-height: 1.2;
-        /* v0.1.333: 長い pt 数値「13349 貢」等がカード幅を超えて右端からはみ出す
-           症状を是正。カード幅内に収め、収まらない極端な桁は末尾を隠す（他カードへ
-           被るより良い）。数値は通常 5-6 桁でカード幅 58px+ に収まる。 */
-        min-width: 0;
+        /* v0.1.335: 全幅行に下ろしたので ellipsis をやめ、数値全体を読めるようにする
+           （6 桁 410xxx も折り返さず収まる。frame は overflow:hidden が死守）。 */
+        justify-self: center;
         max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
         white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        font-weight: 800;
       }
 
       .nl-top-support-rank--below-cards .nl-top-support-rank__id {
