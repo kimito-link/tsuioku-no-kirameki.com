@@ -161,4 +161,39 @@ describe('createSupportAvatarLoadGuard', () => {
     expect(probe).toBeNull();
     expect(img.src).toContain('123456789');
   });
+
+  describe('getDiagnostics（②サムネ未表示の実機切り分け）', () => {
+    it('usericon URL の成功/失敗を集計し、失敗サンプルを最大5件返す', () => {
+      const g = createSupportAvatarLoadGuard({ fallbackSrc: FALLBACK });
+      g.markSucceededForTests(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/100000.jpg'
+      );
+      for (let i = 0; i < 7; i += 1) {
+        g.markFailedForTests(
+          `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${i}/${i}99999.jpg`
+        );
+      }
+      // usericon でない URL（成否集計には含むが usericon カウントには含めない）
+      g.markFailedForTests('https://example.com/other.png');
+      const d = g.getDiagnostics();
+      expect(d.usericonSucceeded).toBe(1);
+      expect(d.usericonFailed).toBe(7);
+      expect(d.failedTotal).toBe(8); // usericon7 + other1
+      expect(d.succeededTotal).toBe(1);
+      expect(d.failedUsericonSamples.length).toBe(5); // 最大5件
+      expect(d.failedUsericonSamples.every((s) => s.includes('usericon'))).toBe(true);
+    });
+
+    it('何も無いときは全て 0 / 空配列', () => {
+      const g = createSupportAvatarLoadGuard({ fallbackSrc: FALLBACK });
+      const d = g.getDiagnostics();
+      expect(d).toEqual({
+        succeededTotal: 0,
+        failedTotal: 0,
+        usericonSucceeded: 0,
+        usericonFailed: 0,
+        failedUsericonSamples: []
+      });
+    });
+  });
 });
