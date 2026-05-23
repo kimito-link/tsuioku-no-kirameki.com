@@ -8,6 +8,8 @@
  * @see src/lib/supportActivityTimeline.js - 入力 TimelineItem の型と生成
  */
 
+import { formatRelativeTimeJa } from './supportActivityTimeline.js';
+
 /** @param {unknown} s */
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -51,12 +53,17 @@ function commentTextShown(text, commentNo) {
 /**
  * TimelineItem 1 件を行 HTML に。
  * @param {import('./supportActivityTimeline.js').TimelineItem} item
- * @param {{ defaultAvatar?: string }} [opts]
+ * @param {{ defaultAvatar?: string, now?: number }} [opts]
  * @returns {string}
  */
 export function buildTimelineRowHtml(item, opts) {
   if (!item || typeof item !== 'object') return '';
   const defaultAvatar = String(opts?.defaultAvatar || '');
+  // 「いつ」の相対時刻（v0.1.341）。空（未来/不正）なら出さない。
+  const agoLabel = formatRelativeTimeJa(item.at, opts?.now);
+  const agoBlock = agoLabel
+    ? `<span class="nl-tl-time" aria-hidden="true">${escapeHtml(agoLabel)}</span>`
+    : '';
 
   if (item.kind === 'gift') {
     const name = escapeHtml(item.nickname || '名無し');
@@ -70,9 +77,10 @@ export function buildTimelineRowHtml(item, opts) {
       `<span class="nl-tl-gift__icon" aria-hidden="true">🎁</span>` +
       `<span class="nl-tl-gift__name">${name}</span>` +
       `<span class="nl-tl-gift__item">${itemName}</span>` +
-      ptBlock;
+      ptBlock +
+      agoBlock;
     const title = escapeAttr(
-      `${item.nickname || '名無し'} が ${item.itemName || 'ギフト'}${Number(item.point) > 0 ? `（${formatPoint(item.point)}pt）` : ''} を贈りました`
+      `${item.nickname || '名無し'} が ${item.itemName || 'ギフト'}${Number(item.point) > 0 ? `（${formatPoint(item.point)}pt）` : ''} を贈りました${agoLabel ? `（${agoLabel}）` : ''}`
     );
     if (isNumericUid(item.userId)) {
       const href = `https://www.nicovideo.jp/user/${escapeAttr(item.userId)}`;
@@ -93,8 +101,11 @@ export function buildTimelineRowHtml(item, opts) {
   const inner =
     avBlock +
     `<span class="nl-tl-row__name">${name}</span>` +
-    `<span class="nl-tl-row__text">${text}</span>`;
-  const title = escapeAttr(`${item.nickname || '名無し'}：${commentTextShown(item.text, item.commentNo)}`);
+    `<span class="nl-tl-row__text">${text}</span>` +
+    agoBlock;
+  const title = escapeAttr(
+    `${item.nickname || '名無し'}：${commentTextShown(item.text, item.commentNo)}${agoLabel ? `（${agoLabel}）` : ''}`
+  );
   if (isNumericUid(item.userId)) {
     const href = `https://www.nicovideo.jp/user/${escapeAttr(item.userId)}`;
     return `<a class="nl-tl-row${selfCls}" href="${href}" target="_blank" rel="noopener noreferrer" title="${title}">${inner}</a>`;
@@ -105,7 +116,7 @@ export function buildTimelineRowHtml(item, opts) {
 /**
  * タイムライン全体の body HTML（行を連結）。空なら案内文。
  * @param {readonly import('./supportActivityTimeline.js').TimelineItem[]} timeline
- * @param {{ defaultAvatar?: string }} [opts]
+ * @param {{ defaultAvatar?: string, now?: number }} [opts]
  * @returns {string}
  */
 export function buildSupportTimelineBodyHtml(timeline, opts) {

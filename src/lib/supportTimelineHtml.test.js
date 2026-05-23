@@ -6,7 +6,7 @@ import {
 
 const cItem = (over = {}) => ({
   kind: 'comment',
-  at: 100,
+  at: over.at ?? 100,
   key: 'c:1',
   userId: over.userId ?? '100',
   nickname: over.nickname ?? 'なまえ',
@@ -18,7 +18,7 @@ const cItem = (over = {}) => ({
 
 const gItem = (over = {}) => ({
   kind: 'gift',
-  at: 100,
+  at: over.at ?? 100,
   key: 'g:1',
   userId: over.userId ?? '200',
   nickname: over.nickname ?? 'おくりぬし',
@@ -96,5 +96,31 @@ describe('buildSupportTimelineBodyHtml', () => {
     expect(html).toContain('ギフトA');
     expect(html).toContain('コメB');
     expect(html.indexOf('ギフトA')).toBeLessThan(html.indexOf('コメB'));
+  });
+});
+
+describe('相対時刻（now 渡し・v0.1.341）', () => {
+  const now = 1_000_000_000_000;
+  it('コメント行に相対時刻 span が出る', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', at: now - 5 * 60_000 }), { now });
+    expect(html).toContain('nl-tl-time');
+    expect(html).toContain('5分前');
+  });
+  it('ギフト行に相対時刻 span が出る', () => {
+    const html = buildTimelineRowHtml(gItem({ userId: 'a:x', at: now - 30_000 }), { now });
+    expect(html).toContain('nl-tl-time');
+    expect(html).toContain('30秒前');
+  });
+  it('now 未指定や未来は時刻 span を出さない', () => {
+    // at が大きな未来 → 空
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', at: now + 600_000 }), { now });
+    expect(html).not.toContain('nl-tl-time');
+  });
+  it('body 全体に now を伝播', () => {
+    const html = buildSupportTimelineBodyHtml(
+      [gItem({ userId: 'a:x', at: now - 60_000, itemName: 'ギ' })],
+      { now }
+    );
+    expect(html).toContain('1分前');
   });
 });
