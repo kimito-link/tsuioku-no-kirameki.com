@@ -1659,6 +1659,11 @@
         border: 1px solid var(--nl-border);
         border-radius: 8px;
         background: var(--nl-bg-soft);
+        /* v0.1.333: 長い項目テキスト（長い英数字連続・item 名等）が枠の右端を超えて
+           見切れる症状を是正。box-sizing で padding 込みで枠内に収め、長語も折り返す。 */
+        box-sizing: border-box;
+        max-width: 100%;
+        overflow-wrap: anywhere;
       }
 
       .nl-changelog-entry:last-child {
@@ -1695,11 +1700,17 @@
       .nl-changelog-entry__items {
         margin: 0;
         padding-left: 18px;
+        /* v0.1.333: padding-left 込みで親幅に収める（list-style 分が右へ押し出さない）。 */
+        box-sizing: border-box;
+        max-width: 100%;
       }
 
       .nl-changelog-entry__items li {
         margin: 2px 0;
         line-height: 1.4;
+        /* 長い語も折り返して枠内に収める（見切れ防止）。 */
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       @media (prefers-reduced-motion: reduce) {
