@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.336',
+    date: '2026-05-23',
+    summary: '横付きを押しても変わらない時に理由を表示',
+    items: Object.freeze([
+      '[改善] 上部の「パネル位置」で「横付き」を押しても見た目が変わらないことがある件に、理由の案内を出すようにしました。横付きは画面が広いとき（約1100px〜）だけプレイヤーの横に並び、狭いと自動で「下」に表示されます。今その状態だと「ウィンドウを広げると横に並びます」と表示し、広げた瞬間に案内が消えて横並びになります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.335',
     date: '2026-05-23',
     summary: 'ランキングのカードで数字を読みやすく',

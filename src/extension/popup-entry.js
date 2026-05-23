@@ -130,6 +130,7 @@ import {
   KEY_GIFT_RANKING_LANE_ENABLED
 } from '../lib/storageKeys.js';
 import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
+import { effectiveInlinePanelPlacement } from '../lib/inlinePanelLayout.js';
 import {
   buildAiShareInlinePanelStorageReadback,
   buildInlinePanelStorageSetFailedMessage,
@@ -12899,6 +12900,7 @@ function initPopup() {
   const quickbarBesideEl = $('nlPlacementQuickBeside');
   const quickbarBelowEl = $('nlPlacementQuickBelow');
   const quickbarMoreEl = $('nlPlacementQuickMore');
+  const quickbarHintEl = $('nlPlacementQuickHint');
   const refreshPlacementQuickbar = async () => {
     if (!(quickbarEl instanceof HTMLElement)) return;
     let placement = INLINE_PANEL_PLACEMENT_DOCK_BOTTOM;
@@ -12908,7 +12910,17 @@ function initPopup() {
     } catch {
       /* best-effort: 既定のまま */
     }
-    const model = buildPlacementQuickbarModel({ placement });
+    // v0.1.336: 「横付きを押しても変わらない」誤解の解。
+    //   実効配置（狭ウィンドウで beside→below 降格）は `window.innerWidth` で決まるが、
+    //   その幅が「視聴ページの幅」と一致するのは INLINE_MODE（ページ内 iframe）だけ。
+    //   action popup / 別ウィンドウでは popup 自身の幅（狭い）になり実効を誤判定するので、
+    //   effectivePlacement は INLINE_MODE のときだけ計算して渡す（それ以外は未指定＝
+    //   降格ヒントを出さない＝誤誘導しない）。
+    let effectivePlacement;
+    if (INLINE_MODE) {
+      effectivePlacement = effectiveInlinePanelPlacement(placement, window.innerWidth);
+    }
+    const model = buildPlacementQuickbarModel({ placement, effectivePlacement });
     if (quickbarValueEl instanceof HTMLElement) {
       quickbarValueEl.textContent = model.currentLabel + (model.effectiveNote || '');
     }
@@ -12917,6 +12929,11 @@ function initPopup() {
     }
     if (quickbarBelowEl instanceof HTMLElement) {
       quickbarBelowEl.setAttribute('aria-pressed', model.belowActive ? 'true' : 'false');
+    }
+    if (quickbarHintEl instanceof HTMLElement) {
+      const hint = model.besideNarrowHint || '';
+      quickbarHintEl.textContent = hint;
+      quickbarHintEl.hidden = hint === '';
     }
   };
   quickbarBesideEl?.addEventListener('click', () => {
@@ -12951,6 +12968,18 @@ function initPopup() {
   if (quickbarEl instanceof HTMLElement) {
     quickbarEl.hidden = false;
     void refreshPlacementQuickbar();
+  }
+  // v0.1.336: INLINE_MODE ではウィンドウ幅で横付き降格ヒントが変わるので、リサイズ時にも
+  //   追従させる（広げた瞬間にヒントが消え、狭めた瞬間に出る）。同期計算＋DOM 更新のみで
+  //   storage I/O は走らせない（描画ホットパスに await を足さない方針）。debounce で過剰更新回避。
+  if (quickbarEl instanceof HTMLElement && INLINE_MODE) {
+    let quickbarResizeTimer = 0;
+    window.addEventListener('resize', () => {
+      if (quickbarResizeTimer) window.clearTimeout(quickbarResizeTimer);
+      quickbarResizeTimer = window.setTimeout(() => {
+        void refreshPlacementQuickbar();
+      }, 150);
+    });
   }
 
   /** @type {HTMLInputElement|null} */
