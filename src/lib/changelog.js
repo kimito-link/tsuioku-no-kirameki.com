@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.334',
+    date: '2026-05-23',
+    summary: 'パネル位置の切り替えを上部からすぐ操作可能に',
+    items: Object.freeze([
+      '[改善] ページ内パネルの位置（横付き／下など）を、画面上部の「ビルド」表示の近くからすぐ切り替えられるようにしました。今どの位置かが一目で分かり、「横付き」「下」のボタンでその場で変更、「詳細」で画面下いっぱい・ポップアップ風などの細かい設定を開けます（設定の置き場所は変えていないので、これまでどおり詳細設定からも変更できます）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.333',
     date: '2026-05-23',
     summary: 'はみ出して見切れる表示をまとめて修正',
