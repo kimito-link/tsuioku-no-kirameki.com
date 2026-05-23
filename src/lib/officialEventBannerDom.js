@@ -474,6 +474,50 @@ export function scrapeOfficialEventBalloonFromDom(root) {
  */
 
 /**
+ * ランキング行内の画像 alt/title/aria-label から、広告主名として使えそうな
+ * 表示テキストだけを取り出す。公式 DOM の実装差分で `.name` が空でも、
+ * user icon 側の alt に名前が入っているケースを救う。
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeRankerAltName(value) {
+  let s = String(value == null ? '' : value).trim();
+  if (!s) return '';
+  s = s
+    .replace(/\s+/g, ' ')
+    .replace(/(?:さん)?(?:の)?(?:プロフィール画像|ユーザーアイコン|アイコン|サムネイル|avatar|icon|thumbnail)$/i, '')
+    .replace(/\s*さん\s*$/u, '')
+    .trim();
+  if (!s) return '';
+  if (/^(?:ユーザー|ゲスト|匿名|名無し)?(?:アイコン|サムネイル|avatar|icon|thumbnail)$/i.test(s)) {
+    return '';
+  }
+  return s;
+}
+
+/**
+ * @param {HTMLElement|null} thumbEl
+ * @returns {string}
+ */
+function pickRankerNameFromThumbAlt(thumbEl) {
+  if (!(thumbEl instanceof HTMLElement)) return '';
+  const img = thumbEl.matches('img') ? thumbEl : thumbEl.querySelector('img');
+  const candidates = [
+    img instanceof HTMLElement ? img.getAttribute('alt') : '',
+    img instanceof HTMLElement ? img.getAttribute('title') : '',
+    img instanceof HTMLElement ? img.getAttribute('aria-label') : '',
+    thumbEl.getAttribute('title'),
+    thumbEl.getAttribute('aria-label')
+  ];
+  for (const c of candidates) {
+    const name = normalizeRankerAltName(c);
+    if (name) return name;
+  }
+  return '';
+}
+
+/**
  * @param {Document|Element} root
  * @returns {ContributionRankerRow[]|null}
  */
@@ -543,7 +587,9 @@ export function scrapeContributionRankingFromDom(root) {
       li.querySelector('.thumbnail') ||
       li.querySelector('[class*="thumbnail"]');
 
-    if (!(nameEl instanceof HTMLElement) || !(contribEl instanceof HTMLElement)) {
+    const altName = pickRankerNameFromThumbAlt(thumbEl instanceof HTMLElement ? thumbEl : null);
+
+    if (!(contribEl instanceof HTMLElement) || (!(nameEl instanceof HTMLElement) && !altName)) {
       continue;
     }
     /** @type {number|null} */
@@ -571,18 +617,22 @@ export function scrapeContributionRankingFromDom(root) {
     if (rank == null) continue;
 
     // name 抽出時に honorific（「さん」）が含まれていたら除く
-    const nameClone = nameEl.cloneNode(true);
+    const nameClone = nameEl instanceof HTMLElement ? nameEl.cloneNode(true) : null;
     if (nameClone instanceof HTMLElement) {
       const honorific = nameClone.querySelector('.honorific, [class*="honorific"]');
       if (honorific) honorific.remove();
     }
     const name = String(
-      nameClone instanceof HTMLElement ? nameClone.textContent : nameEl.textContent || ''
-    ).trim();
+      nameClone instanceof HTMLElement
+        ? nameClone.textContent
+        : nameEl instanceof HTMLElement
+          ? nameEl.textContent || ''
+          : altName
+    ).trim() || altName;
     if (!name) continue;
     const isAnonymous =
       (rankerEl instanceof HTMLElement && rankerEl.hasAttribute('disabled')) ||
-      nameEl.getAttribute('data-button-disabled') === 'true' ||
+      (nameEl instanceof HTMLElement && nameEl.getAttribute('data-button-disabled') === 'true') ||
       name === '名無し';
 
     const contribDigits = String(contribEl.textContent || '').replace(/[^\d]/g, '');

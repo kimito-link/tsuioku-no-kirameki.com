@@ -26,6 +26,25 @@ describe('officialDomRankingRowsToStripRooms', () => {
     expect(rooms[0].rankHint).toBe(4);
   });
 
+  it('name が空でも thumbnailAltName があれば表示名として使う', () => {
+    const rooms = officialDomRankingRowsToStripRooms(
+      [
+        {
+          name: '',
+          thumbnailAltName: 'ぷぅ',
+          contribution: 2400,
+          isAnonymous: false,
+          rank: 2,
+          thumbnailUrl: 'https://example.com/u.png'
+        }
+      ],
+      { userKeyKind: 'ad' }
+    );
+    expect(rooms[0].userKey).toContain('__ad_0_ぷぅ');
+    expect(rooms[0].nickname).toBe('ぷぅ');
+    expect(rooms[0].avatarUrl).toBe('https://example.com/u.png');
+  });
+
   it('非配列は空', () => {
     expect(officialDomRankingRowsToStripRooms(/** @type {any} */ (null))).toEqual([]);
   });
