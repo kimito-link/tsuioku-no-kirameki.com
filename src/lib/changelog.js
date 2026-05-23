@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.333',
+    date: '2026-05-23',
+    summary: 'ランキングのカードで数字がはみ出す表示を修正',
+    items: Object.freeze([
+      '[修正] 広告ランキング・ギフト履歴のカード表示で、ポイントの数字（13349 など桁の多い値）がカードの右端からはみ出して見切れることがある問題を直しました。数字をカードの中に収めて、見切れないようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.332',
     date: '2026-05-23',
     summary: '取得できない配信での待機表示を正直に',
