@@ -672,6 +672,104 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* ニコニコ ユーザープロフィール 無認証 API の CORS バイパス fetch proxy        */
+/* 記名 uid から nickname + 個人サムネを引き、既存 profile cache に反映する。  */
+/* content は uid だけ送り、URL は SW が固定 host/path から自作する。          */
+/* 契約・正規化は src/lib/nicoUserProfileApi.js（lib 側に契約 test）。        */
+/* ------------------------------------------------------------------ */
+
+// src/lib/nicoUserProfileApi.js の NICO_USER_PROFILE_FETCH_MESSAGE_TYPE と文字列同期。
+const NICO_USER_PROFILE_FETCH_MESSAGE_TYPE = 'NLS_NICO_USER_PROFILE_FETCH';
+const NICO_USER_PROFILE_UID_RE = /^\d{1,18}$/;
+const NICO_USER_PROFILE_FETCH_TIMEOUT_MS = 8000;
+const NICO_USER_PROFILE_LRU_MAX = 512;
+const NICO_USER_PROFILE_LRU_TTL_MS = 10 * 60 * 1000;
+/** @type {Map<string, number>} */
+const _nicoUserProfileLru = new Map();
+
+function _nicoUserProfileLruShouldSkip(uid, now) {
+  const at = _nicoUserProfileLru.get(uid);
+  return at != null && now - at < NICO_USER_PROFILE_LRU_TTL_MS;
+}
+
+function _nicoUserProfileLruNote(uid, now) {
+  if (_nicoUserProfileLru.has(uid)) _nicoUserProfileLru.delete(uid);
+  _nicoUserProfileLru.set(uid, now);
+  while (_nicoUserProfileLru.size > NICO_USER_PROFILE_LRU_MAX) {
+    const oldest = _nicoUserProfileLru.keys().next().value;
+    if (oldest === undefined) break;
+    _nicoUserProfileLru.delete(oldest);
+  }
+}
+
+async function fetchNicoUserProfileJson(uid) {
+  const id = String(uid == null ? '' : uid).trim();
+  if (!NICO_USER_PROFILE_UID_RE.test(id) || Number(id) <= 0) return { ok: false };
+  const now = Date.now();
+  if (_nicoUserProfileLruShouldSkip(id, now)) return { ok: false, skipped: true };
+  _nicoUserProfileLruNote(id, now);
+  const url = 'https://nvapi.nicovideo.jp/v1/users/' + encodeURIComponent(id);
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, NICO_USER_PROFILE_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit',
+      cache: 'no-store',
+      redirect: 'error',
+      headers: {
+        'x-frontend-id': '6',
+        'x-frontend-version': '0'
+      },
+      signal: ac.signal
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== NICO_USER_PROFILE_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchNicoUserProfileJson(msg.uid)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true;
+});
+
+/* ------------------------------------------------------------------ */
 /* ツールバー: ページ内インラインがあれば前面化、なければ popup 窓（src/lib/uiUxOpenStrategy と整合） */
 /* ------------------------------------------------------------------ */
 

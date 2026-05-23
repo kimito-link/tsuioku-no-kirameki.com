@@ -182,6 +182,11 @@ import {
   NICOAD_CONTRIB_STORAGE_PREFIX,
   NICOAD_CONTRIB_FETCH_MESSAGE_TYPE
 } from '../lib/nicoadContributionRankingApi.js';
+import {
+  normalizeNicoUserProfileResponse,
+  isResolvableNicoUid,
+  NICO_USER_PROFILE_FETCH_MESSAGE_TYPE
+} from '../lib/nicoUserProfileApi.js';
 import { appendGiftEvents } from '../lib/giftEventStore.js';
 import { resolveGiftSenderBucketKey } from '../lib/giftSenderObservation.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
@@ -10107,6 +10112,7 @@ async function start() {
     maybeFetchKokenContribRankingMirrorOnce();
     // nicoad 広告ランキング API も同 sibling として（koken と同規約・別キー）。
     maybeFetchNicoadContribRankingMirrorOnce();
+    void maybeResolveNamedUserProfilesOnce();
   }, 10_000);
   kokenContribApiIntervalId = /** @type {number} */ (
     /** @type {unknown} */ (
@@ -10121,6 +10127,7 @@ async function start() {
         }
         maybeFetchKokenContribRankingMirrorOnce();
         maybeFetchNicoadContribRankingMirrorOnce();
+        void maybeResolveNamedUserProfilesOnce();
       }, KOKEN_CONTRIB_API_FETCH_MS)
     )
   );
@@ -10140,6 +10147,10 @@ let _kokenContribApiLastAttemptAt = 0;
 const NICOAD_CONTRIB_API_MIN_GAP_MS = 25_000;
 /** @type {number} */
 let _nicoadContribApiLastAttemptAt = 0;
+/** 1 tick で nvapi に問い合わせる記名 uid の最大数。 */
+const NICO_PROFILE_RESOLVE_BATCH = 3;
+/** content 側でも問い合わせ済み uid を覚え、SW LRU と二重に抑制する。 */
+const _nicoProfileResolveAttempted = new Set();
 
 /**
  * koken 公式ギフト貢献度ランキング 無認証 API を SW 経由で取得し、専用 storage
@@ -10279,6 +10290,111 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
     );
   } catch {
     /* no-op: sendMessage 不可（context invalidated 等）。次 tick で自己回復 */
+  }
+}
+
+/**
+ * 記名 uid（コメント/ギフト送信者で判明している数値 uid）を少数ずつ nvapi で解決し、
+ * 既存 userCommentProfileCache に nickname/avatarUrl を足す。匿名・合成キーは除外。
+ */
+async function maybeResolveNamedUserProfilesOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+
+    const commentsKey = commentsStorageKey(lid);
+    const giftsKey = giftUsersStorageKey(lid);
+    const bag = await chrome.storage.local.get([
+      commentsKey,
+      giftsKey,
+      KEY_USER_COMMENT_PROFILE_CACHE
+    ]);
+    const profileMap = normalizeUserCommentProfileMap(
+      bag[KEY_USER_COMMENT_PROFILE_CACHE]
+    );
+    let comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    const giftUsers = Array.isArray(bag[giftsKey]) ? bag[giftsKey] : [];
+
+    /** @type {string[]} */
+    const candidates = [];
+    const seen = new Set();
+    const pushCandidate = (rawUid) => {
+      const uid = String(rawUid || '').trim();
+      if (!uid || seen.has(uid)) return;
+      seen.add(uid);
+      if (!isResolvableNicoUid(uid)) return;
+      if (_nicoProfileResolveAttempted.has(uid)) return;
+      const hit = profileMap[uid];
+      const hasNick = hit && String(hit.nickname || '').trim() !== '';
+      const hasAvatar = hit && String(hit.avatarUrl || '').trim() !== '';
+      if (hasNick && hasAvatar) return;
+      candidates.push(uid);
+    };
+
+    for (const c of comments) {
+      pushCandidate(/** @type {{ userId?: unknown }} */ (c)?.userId);
+      if (candidates.length >= NICO_PROFILE_RESOLVE_BATCH) break;
+    }
+    if (candidates.length < NICO_PROFILE_RESOLVE_BATCH) {
+      for (const g of giftUsers) {
+        pushCandidate(/** @type {{ userId?: unknown }} */ (g)?.userId);
+        if (candidates.length >= NICO_PROFILE_RESOLVE_BATCH) break;
+      }
+    }
+    if (!candidates.length) return;
+
+    const broadcasterCtx = {
+      broadcasterUid: broadcasterUidCache,
+      broadcasterIconUrl: broadcasterIconUrlCache
+    };
+    const askOne = (uid) =>
+      new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage(
+            { type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid },
+            (resp) => {
+              const le = chrome.runtime.lastError;
+              if (le) return resolve(null);
+              if (!resp || resp.ok !== true || resp.json == null) return resolve(null);
+              try {
+                resolve(normalizeNicoUserProfileResponse(resp.json));
+              } catch {
+                resolve(null);
+              }
+            }
+          );
+        } catch {
+          resolve(null);
+        }
+      });
+
+    let cacheTouched = false;
+    for (const uid of candidates) {
+      _nicoProfileResolveAttempted.add(uid);
+      const p = await askOne(uid);
+      if (!p) continue;
+      if (upsertUserCommentProfileFromEntry(profileMap, p, broadcasterCtx)) {
+        cacheTouched = true;
+      }
+    }
+    if (!cacheTouched) return;
+
+    const curLid = String(liveId || '').trim().toLowerCase();
+    if (curLid !== lid) return;
+
+    const pruned = pruneUserCommentProfileMap(profileMap);
+    const applied = applyUserCommentProfileMapToEntries(comments, pruned);
+    if (applied.patched > 0) comments = applied.next;
+
+    const save = { [KEY_USER_COMMENT_PROFILE_CACHE]: pruned };
+    if (applied.patched > 0) save[commentsKey] = comments;
+    await chrome.storage.local.set(save);
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      /* best-effort */
+    }
   }
 }
 /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */

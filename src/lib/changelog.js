@@ -26,6 +26,22 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.329',
+    date: '2026-05-23',
+    summary: '広告ランキングを大きく読みやすく',
+    items: Object.freeze([
+      '[改善] 広告ランキングなどに出る上位の人を、サムネイル・名前・ポイントが埋もれない大きなカードで表示するようにしました。公式ページ側で名前が通常の場所に出ず、サムネイル画像の説明だけに入っている場合も、その名前を拾って表示します'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.328',
+    date: '2026-05-23',
+    summary: '記名ユーザーの名前とアイコン補完を強化',
+    items: Object.freeze([
+      '[改善] コメントやギフト送信者などで記名ユーザーIDが分かっている場合に、ニコニコの公開プロフィールから名前とアイコンを少しずつ補完するようにしました。匿名ユーザーや内部用の仮IDは対象にせず、既存のローカルキャッシュだけに保存します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.327',
     date: '2026-05-23',
     summary: '広告ランキングの名前を見やすく修正',

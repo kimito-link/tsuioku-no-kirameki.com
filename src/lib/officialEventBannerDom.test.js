@@ -362,6 +362,34 @@ describe('scrapeContributionRankingFromDom', () => {
     );
   });
 
+  it('name が空でもサムネイル img alt に広告主名があれば名前として使う', () => {
+    document.body.innerHTML = `
+      <div class="content-supporter-section">
+        <div class="wrapper">
+          <ul class="wrapper">
+            <li class="item">
+              <i class="rank">2</i>
+              <div class="info">
+                <button class="ranker">
+                  <span class="name"></span>
+                  <span class="thumbnail"><img src="https://example.com/u.png" alt="ぷぅさんのアイコン" width="40" height="40" /></span>
+                </button>
+                <p class="contribution">2,400 <svg></svg></p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>`;
+    const rows = scrapeContributionRankingFromDom(document);
+    expect(rows?.[0]).toMatchObject({
+      rank: 2,
+      name: 'ぷぅ',
+      contribution: 2400,
+      isAnonymous: false,
+      thumbnailUrl: 'https://example.com/u.png'
+    });
+  });
+
   it('実 niconico DOM (貢献度ランキング・旧構造) から rank/name/contribution/thumb を取り出す', () => {
     document.body.innerHTML = `
       <div class="wrapper">

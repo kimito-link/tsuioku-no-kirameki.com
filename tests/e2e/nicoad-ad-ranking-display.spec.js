@@ -199,5 +199,23 @@ test('広告ランキング: nicoad API 由来（userPageUrl 付き）が scrape
   expect(text).not.toContain('__ad_');
   expect(text).not.toContain('u/__');
 
+  const firstCard = body.locator('.nl-top-support-rank__line').first();
+  await expect(firstCard.locator('.nl-top-support-rank__name')).toHaveText('API広告タロウ');
+  const metrics = await firstCard.evaluate((el) => {
+    const card = el.getBoundingClientRect();
+    const name = el.querySelector('.nl-top-support-rank__name');
+    const thumb = el.querySelector('.nl-top-support-rank__thumb-wrap');
+    const nameStyle = name ? getComputedStyle(name) : null;
+    const thumbRect = thumb ? thumb.getBoundingClientRect() : null;
+    return {
+      cardHeight: card.height,
+      nameFontPx: nameStyle ? parseFloat(nameStyle.fontSize) : 0,
+      thumbWidth: thumbRect ? thumbRect.width : 0
+    };
+  });
+  expect(metrics.cardHeight).toBeGreaterThanOrEqual(80);
+  expect(metrics.nameFontPx).toBeGreaterThanOrEqual(10);
+  expect(metrics.thumbWidth).toBeGreaterThanOrEqual(32);
+
   await popup.screenshot({ path: 'test-results/nicoad-ad-ranking-api.png', fullPage: false });
 });
