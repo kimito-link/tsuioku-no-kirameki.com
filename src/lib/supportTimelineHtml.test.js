@@ -1,0 +1,100 @@
+import { describe, it, expect } from 'vitest';
+import {
+  buildTimelineRowHtml,
+  buildSupportTimelineBodyHtml
+} from './supportTimelineHtml.js';
+
+const cItem = (over = {}) => ({
+  kind: 'comment',
+  at: 100,
+  key: 'c:1',
+  userId: over.userId ?? '100',
+  nickname: over.nickname ?? 'なまえ',
+  text: over.text ?? 'こめんと',
+  commentNo: over.commentNo ?? '1',
+  avatarUrl: over.avatarUrl ?? '',
+  selfPosted: over.selfPosted ?? false
+});
+
+const gItem = (over = {}) => ({
+  kind: 'gift',
+  at: 100,
+  key: 'g:1',
+  userId: over.userId ?? '200',
+  nickname: over.nickname ?? 'おくりぬし',
+  itemName: over.itemName ?? 'スパチャ',
+  point: over.point ?? 500,
+  message: over.message ?? ''
+});
+
+describe('buildTimelineRowHtml', () => {
+  it('記名コメントは user ページへの <a>・本文と名前を出す', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: '4046119', text: 'やっほー' }));
+    expect(html).toContain('href="https://www.nicovideo.jp/user/4046119"');
+    expect(html).toContain('やっほー');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('nl-tl-row');
+  });
+
+  it('匿名コメント（a:xxx）はリンクにせず div', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:abc' }));
+    expect(html).toContain('<div class="nl-tl-row');
+    expect(html).not.toContain('nicovideo.jp/user');
+  });
+
+  it('ギフト行は🎁・名前・item・pt を出し記名はリンク', () => {
+    const html = buildTimelineRowHtml(gItem({ userId: '5', itemName: 'かしわもち', point: 1200 }));
+    expect(html).toContain('🎁');
+    expect(html).toContain('かしわもち');
+    expect(html).toContain('1,200pt');
+    expect(html).toContain('href="https://www.nicovideo.jp/user/5"');
+    expect(html).toContain('nl-tl-gift');
+  });
+
+  it('無料ギフト（pt0）は pt 表示を出さない', () => {
+    const html = buildTimelineRowHtml(gItem({ point: 0 }));
+    expect(html).not.toContain('pt</span>');
+  });
+
+  it('XSS: テキスト・名前をエスケープ', () => {
+    const html = buildTimelineRowHtml(
+      cItem({ userId: 'a:x', text: '<img src=x onerror=alert(1)>', nickname: '<b>悪</b>' })
+    );
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('&lt;img');
+    expect(html).toContain('&lt;b&gt;悪');
+  });
+
+  it('selfPosted コメントに self クラス', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', selfPosted: true }));
+    expect(html).toContain('nl-tl-row--self');
+  });
+
+  it('本文なしコメントは代替文言（No.付き）', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', text: '', commentNo: '42' }));
+    expect(html).toContain('本文なし・No.42');
+  });
+
+  it('http アバターに referrerpolicy no-referrer', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', avatarUrl: 'https://x/y.jpg' }));
+    expect(html).toContain('referrerpolicy="no-referrer"');
+    expect(html).toContain('src="https://x/y.jpg"');
+  });
+});
+
+describe('buildSupportTimelineBodyHtml', () => {
+  it('空なら案内文', () => {
+    expect(buildSupportTimelineBodyHtml([])).toContain('まだコメントもギフトもありません');
+    expect(buildSupportTimelineBodyHtml(null)).toContain('記録ON');
+  });
+
+  it('複数要素を連結（コメント＋ギフト混在）', () => {
+    const html = buildSupportTimelineBodyHtml([
+      gItem({ userId: 'a:x', itemName: 'ギフトA' }),
+      cItem({ userId: 'a:y', text: 'コメB' })
+    ]);
+    expect(html).toContain('ギフトA');
+    expect(html).toContain('コメB');
+    expect(html.indexOf('ギフトA')).toBeLessThan(html.indexOf('コメB'));
+  });
+});

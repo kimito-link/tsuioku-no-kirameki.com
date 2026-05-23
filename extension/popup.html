@@ -4550,6 +4550,159 @@
         font-weight: 800;
       }
 
+      /* ====================================================================
+       * v0.1.340: 応援タイムライン（コメント＋ギフトを時刻順に1本の流れで）。
+       * 既定折り畳み（details）。コメント行はコンパクト、ギフト行は色付きカードで強調。
+       * ==================================================================== */
+      .nl-support-timeline {
+        margin: 6px 0 0;
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        background: var(--nl-surface);
+        box-sizing: border-box;
+        max-width: 100%;
+      }
+      .nl-support-timeline__summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 7px 10px;
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--nl-text);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .nl-support-timeline__summary::-webkit-details-marker {
+        display: none;
+      }
+      .nl-support-timeline__summary::before {
+        content: '▸';
+        color: var(--nl-muted);
+        font-size: 10px;
+      }
+      .nl-support-timeline[open] .nl-support-timeline__summary::before {
+        content: '▾';
+      }
+      .nl-support-timeline__gift-meta {
+        font-size: 10px;
+        font-weight: 700;
+        color: #b06f00;
+        background: color-mix(in srgb, #ffb020 18%, var(--nl-surface));
+        border: 1px solid color-mix(in srgb, #ffb020 40%, var(--nl-border));
+        border-radius: 999px;
+        padding: 1px 8px;
+      }
+      .nl-support-timeline__body {
+        max-height: 320px;
+        overflow-y: auto;
+        padding: 4px 6px 8px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 45%, transparent);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .nl-support-timeline__empty {
+        font-size: 10.5px;
+        color: var(--nl-muted);
+        padding: 10px 6px;
+        text-align: center;
+      }
+      /* コメント行: 1行コンパクト（アバター・名前・本文）。 */
+      .nl-tl-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        padding: 3px 6px;
+        border-radius: 7px;
+        font-size: 11px;
+        line-height: 1.3;
+        color: var(--nl-text);
+        text-decoration: none;
+      }
+      a.nl-tl-row:hover {
+        background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
+      }
+      .nl-tl-row__avatar {
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        flex: 0 0 auto;
+        object-fit: cover;
+        background: #fff;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 60%, transparent);
+      }
+      .nl-tl-row__name {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 9em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 700;
+        color: var(--nl-muted);
+      }
+      .nl-tl-row__text {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-tl-row--self .nl-tl-row__name {
+        color: var(--nl-accent, #0f8fd8);
+      }
+      /* ギフト行: 強調カード（誰がいつ何を投げたかが映える）。 */
+      .nl-tl-gift {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 8px;
+        font-size: 11px;
+        line-height: 1.3;
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, #ffb020 16%, var(--nl-surface)),
+          color-mix(in srgb, #ff7eb6 12%, var(--nl-surface))
+        );
+        border: 1px solid color-mix(in srgb, #ffb020 38%, var(--nl-border));
+        text-decoration: none;
+        color: var(--nl-text);
+      }
+      a.nl-tl-gift:hover {
+        border-color: color-mix(in srgb, #ffb020 60%, var(--nl-border));
+      }
+      .nl-tl-gift__icon {
+        flex: 0 0 auto;
+        font-size: 13px;
+      }
+      .nl-tl-gift__name {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 8em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 800;
+      }
+      .nl-tl-gift__item {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--nl-muted);
+      }
+      .nl-tl-gift__pt {
+        flex: 0 0 auto;
+        font-weight: 800;
+        color: #b06f00;
+        font-variant-numeric: tabular-nums;
+      }
+
       .nl-count-hero__label {
         display: inline-flex;
         align-items: center;
@@ -9437,6 +9590,24 @@
                 </div>
               </div>
             </div>
+            <!--
+              v0.1.340: 応援タイムライン。コメントとギフト着弾を時刻順に1本の流れで見せる
+              （OneComme 体験の移植＝誰がいつ何を投げたかが物語として読める）。既定折り畳みで
+              UIUX 阻害ゼロ。中身は純関数 buildSupportActivityTimeline でマージ・描画は JS。
+            -->
+            <details id="supportTimelineDetails" class="nl-support-timeline">
+              <summary class="nl-support-timeline__summary">
+                <span class="nl-support-timeline__summary-label">応援タイムライン（コメント＋ギフト）</span>
+                <span id="supportTimelineGiftMeta" class="nl-support-timeline__gift-meta" hidden></span>
+              </summary>
+              <div
+                id="supportTimelineBody"
+                class="nl-support-timeline__body"
+                role="log"
+                aria-label="コメントとギフトの時系列"
+                aria-live="off"
+              ></div>
+            </details>
           </div>
           <div id="roomHeatSummary" class="room-heat nl-heat-summary" role="status" aria-live="polite">
             <div class="room-heat-head">
