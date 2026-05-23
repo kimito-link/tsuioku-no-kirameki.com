@@ -113,6 +113,11 @@ test('応援タイムライン: コメントとギフトが時刻順に混在し
   await expect(popup.locator('#supportTimelineGiftMeta')).toContainText('1件');
   await expect(popup.locator('#supportTimelineGiftMeta')).toContainText('1,200pt');
 
+  // v0.1.341: 相対時刻（「たった今／N秒前／N分前」）が各行に出る。
+  await expect(body.locator('.nl-tl-time').first()).toBeVisible();
+  const agoText = (await body.locator('.nl-tl-time').first().innerText()).trim();
+  expect(agoText).toMatch(/(たった今|秒前|分前)/u);
+
   await popup.screenshot({
     path: 'test-results/support-activity-timeline.png',
     fullPage: false

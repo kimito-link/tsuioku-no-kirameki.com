@@ -188,3 +188,29 @@ export function summarizeTimelineGifts(timeline) {
   }
   return { giftCount, giftPoints, giftSenders: senders.size };
 }
+
+/**
+ * epoch ms を「いつ」の相対時刻ラベルに（v0.1.341・タイムライン各行用）。
+ *   〜10秒=「たった今」/ 〜60秒=「N秒前」/ 〜60分=「N分前」/ 〜24時間=「N時間前」/
+ *   それ以上=「N日前」。未来や不正値は ''（出さない）。now 省略時は Date.now()。
+ * @param {unknown} at epoch ms
+ * @param {number} [now] epoch ms（テスト用に注入可）
+ * @returns {string}
+ */
+export function formatRelativeTimeJa(at, now) {
+  const t = Number(at);
+  if (!Number.isFinite(t) || t <= 0) return '';
+  const ref = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+  const diffMs = ref - t;
+  // 未来（時計ずれ等）は出さない。わずかな未来は「たった今」に丸める。
+  if (diffMs < -5000) return '';
+  const sec = Math.max(0, Math.floor(diffMs / 1000));
+  if (sec < 10) return 'たった今';
+  if (sec < 60) return `${sec}秒前`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}分前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}時間前`;
+  const day = Math.floor(hr / 24);
+  return `${day}日前`;
+}

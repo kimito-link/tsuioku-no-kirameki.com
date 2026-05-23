@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildSupportActivityTimeline,
-  summarizeTimelineGifts
+  summarizeTimelineGifts,
+  formatRelativeTimeJa
 } from './supportActivityTimeline.js';
 
 const comment = (over = {}) => ({
@@ -139,5 +140,31 @@ describe('summarizeTimelineGifts', () => {
       giftPoints: 0,
       giftSenders: 0
     });
+  });
+});
+
+describe('formatRelativeTimeJa', () => {
+  const now = 1_000_000_000_000;
+  it('10秒未満は「たった今」', () => {
+    expect(formatRelativeTimeJa(now - 0, now)).toBe('たった今');
+    expect(formatRelativeTimeJa(now - 9000, now)).toBe('たった今');
+  });
+  it('秒・分・時間・日', () => {
+    expect(formatRelativeTimeJa(now - 30_000, now)).toBe('30秒前');
+    expect(formatRelativeTimeJa(now - 5 * 60_000, now)).toBe('5分前');
+    expect(formatRelativeTimeJa(now - 3 * 3_600_000, now)).toBe('3時間前');
+    expect(formatRelativeTimeJa(now - 2 * 86_400_000, now)).toBe('2日前');
+  });
+  it('境界: 60秒→1分・60分→1時間・24時間→1日', () => {
+    expect(formatRelativeTimeJa(now - 60_000, now)).toBe('1分前');
+    expect(formatRelativeTimeJa(now - 3_600_000, now)).toBe('1時間前');
+    expect(formatRelativeTimeJa(now - 86_400_000, now)).toBe('1日前');
+  });
+  it('わずかな未来は「たった今」、大きな未来や不正値は空', () => {
+    expect(formatRelativeTimeJa(now + 2000, now)).toBe('たった今');
+    expect(formatRelativeTimeJa(now + 60_000, now)).toBe('');
+    expect(formatRelativeTimeJa(0, now)).toBe('');
+    expect(formatRelativeTimeJa('bad', now)).toBe('');
+    expect(formatRelativeTimeJa(null, now)).toBe('');
   });
 });

@@ -6746,7 +6746,8 @@ async function refreshSupportActivityTimeline(liveId) {
     limit: 120
   });
   body.innerHTML = buildSupportTimelineBodyHtml(timeline, {
-    defaultAvatar: STORY_GRID_DEFAULT_TILE_IMG
+    defaultAvatar: STORY_GRID_DEFAULT_TILE_IMG,
+    now: Date.now()
   });
   bindOnErrorHideHandlersWithin(body);
   // 実 http アバターは load guard 経由でフォールバック差し替え（フリッカ防止）。

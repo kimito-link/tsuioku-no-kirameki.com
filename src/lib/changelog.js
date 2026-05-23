@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.341',
+    date: '2026-05-24',
+    summary: '応援タイムラインに「何分前」を表示',
+    items: Object.freeze([
+      '[改善] 応援タイムラインの各行に「たった今／3分前／2時間前」のような相対時刻を小さく表示し、「誰がいつ何を投げたか」の“いつ”が一目で分かるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.340',
     date: '2026-05-24',
     summary: '応援タイムライン(コメント＋ギフト)を追加',
