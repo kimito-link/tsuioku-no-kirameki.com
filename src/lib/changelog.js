@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.331',
+    date: '2026-05-23',
+    summary: '貢献度ランキングの取得を速く',
+    items: Object.freeze([
+      '[改善] 配信ページを開いてから貢献度ランキングが出るまでの待ち時間を短くしました（最初の取得を早め、別タブから戻った瞬間にも取り直します）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.330',
     date: '2026-05-23',
     summary: '横付きパネル初回の下→横ジャンプを解消',

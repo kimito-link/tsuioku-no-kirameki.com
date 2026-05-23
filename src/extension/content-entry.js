@@ -9147,6 +9147,15 @@ function onTabVisibleForCommentHarvest() {
   if (document.visibilityState !== 'visible') return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
   maybeRetryRankingAcquisitionOnVisible();
+  // v0.1.331: 可視復帰の瞬間に koken/nicoad 公式 API も即リトライ（貢献度ランキング
+  //   「取得中」張り付き対策）。周期 interval は hidden タブで return するため、popup を
+  //   見ている間 watch タブが非可視だと取得が止まり、可視復帰まで待機 UI が張り付く。
+  //   ここで 1 発撃てば interval tick（最大 30s）を待たずに供給を再開できる。min-gap
+  //   (KOKEN/NICOAD_CONTRIB_API_MIN_GAP_MS) で再入抑止済み＝連打にならない。fetch は
+  //   SW が行うので harvest と CPU 競合しない。maybeRetryRankingAcquisitionOnVisible の
+  //   iframe scrape 経路とは独立（API 経路は rescue-link 配信でも返ることがある）。
+  maybeFetchKokenContribRankingMirrorOnce();
+  maybeFetchNicoadContribRankingMirrorOnce();
   scanVisibleCommentsNow();
   const now = Date.now();
   const needsRecovery = shouldForceDeepHarvestRecovery({
@@ -10142,15 +10151,20 @@ async function start() {
 
   // 核心: koken 公式貢献度ランキング無認証 API の鏡（officialEventDomScrape の
   // sibling。NDGR/gift hotpath 非干渉・SW 経由・専用キー・rows>0 のみ書込）。
-  // 初回は startup harvest 窓を外して 10s 後、以後 30s 間隔。teardown は
+  // 初回は startup harvest 窓を外して 3.5s 後、以後 30s 間隔。teardown は
   // stopContentIntervalsIfContextInvalidated（kokenContribApiIntervalId）。
+  // v0.1.331: 初回を 10s→3.5s に短縮（貢献度レーンの「取得中」張り付き対策）。
+  //   旧 10s は起動直後のコメント大量取り込み(deep harvest)バーストと競合させない猶予
+  //   だったが、harvest の主バーストは ~2-3s で収まるため 3.5s でも干渉せず、watch を
+  //   開いてから貢献度ランキングが出るまでの体感待ち（最大 10s+min-gap）を大幅短縮できる。
+  //   API fetch は SW が行い content は liveId 送信のみ＝harvest の CPU と競合しない。
   setTimeout(() => {
     if (stopContentIntervalsIfContextInvalidated()) return;
     maybeFetchKokenContribRankingMirrorOnce();
     // nicoad 広告ランキング API も同 sibling として（koken と同規約・別キー）。
     maybeFetchNicoadContribRankingMirrorOnce();
     void maybeResolveNamedUserProfilesOnce();
-  }, 10_000);
+  }, 3_500);
   kokenContribApiIntervalId = /** @type {number} */ (
     /** @type {unknown} */ (
       setInterval(() => {
