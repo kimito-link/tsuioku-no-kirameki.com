@@ -25,7 +25,8 @@ const gift = (over = {}) => ({
   point: over.point ?? 500,
   message: over.message ?? '',
   contributionRank: null,
-  capturedAt: over.capturedAt ?? 1000
+  capturedAt: over.capturedAt ?? 1000,
+  ...(over.avatarUrl != null ? { avatarUrl: over.avatarUrl } : {})
 });
 
 describe('buildSupportActivityTimeline', () => {
@@ -77,6 +78,17 @@ describe('buildSupportActivityTimeline', () => {
   it('ギフトの数値・文字フィールドを正規化し負の point は 0 に', () => {
     const tl = buildSupportActivityTimeline([], [gift({ point: -5, itemName: 'x' })]);
     expect(tl[0]).toMatchObject({ kind: 'gift', point: 0, itemName: 'x' });
+  });
+
+  it('ギフトの avatarUrl を carry する（呼出側 enrich 用・v0.1.342）', () => {
+    const tl = buildSupportActivityTimeline(
+      [],
+      [gift({ avatarUrl: 'https://x/a.jpg' })]
+    );
+    expect(tl[0]).toMatchObject({ kind: 'gift', avatarUrl: 'https://x/a.jpg' });
+    // avatarUrl 無しは空文字
+    const tl2 = buildSupportActivityTimeline([], [gift({})]);
+    expect(tl2[0].avatarUrl).toBe('');
   });
 
   it('不正要素（null/非object/時刻なし）は捨てるが時刻0は残す', () => {

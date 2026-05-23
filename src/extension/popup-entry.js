@@ -6741,7 +6741,18 @@ async function refreshSupportActivityTimeline(liveId) {
     /* best-effort: 空のまま */
   }
 
-  const timeline = buildSupportActivityTimeline(comments, giftEvents, {
+  // v0.1.342: ギフト送信者のアバターを、コメント側と同じ解決経路（記名 uid→保存済み/
+  //   nvapi 解決済みアバター）で enrich＝「誰が」を顔で見せる。未解決はそのまま空で渡し、
+  //   描画側が default/🎁 にフォールバックする（純加法・元データ不変）。
+  const giftEventsEnriched = giftEvents.map((g) => {
+    if (!g || typeof g !== 'object') return g;
+    if (String(g.avatarUrl || '').trim()) return g;
+    const uid = String(g.userId || '').trim();
+    const av = uid ? rememberedAvatarUrlForUserId(uid) : '';
+    return av ? { ...g, avatarUrl: av } : g;
+  });
+
+  const timeline = buildSupportActivityTimeline(comments, giftEventsEnriched, {
     order: 'desc',
     limit: 120
   });
@@ -6751,11 +6762,14 @@ async function refreshSupportActivityTimeline(liveId) {
   });
   bindOnErrorHideHandlersWithin(body);
   // 実 http アバターは load guard 経由でフォールバック差し替え（フリッカ防止）。
-  body.querySelectorAll('img.nl-tl-row__avatar').forEach((img) => {
-    if (!(img instanceof HTMLImageElement)) return;
-    const src = img.getAttribute('src') || '';
-    if (isHttpOrHttpsUrl(src)) storyAvatarLoadGuard.noteRemoteAttempt(img, src);
-  });
+  // コメント行アバター + ギフト行送信者アバターの両方。
+  body
+    .querySelectorAll('img.nl-tl-row__avatar, img.nl-tl-gift__avatar')
+    .forEach((img) => {
+      if (!(img instanceof HTMLImageElement)) return;
+      const src = img.getAttribute('src') || '';
+      if (isHttpOrHttpsUrl(src)) storyAvatarLoadGuard.noteRemoteAttempt(img, src);
+    });
 
   // ヘッダにギフト要約（件数・合計pt）を出す。ギフト 0 件なら非表示。
   if (meta instanceof HTMLElement) {

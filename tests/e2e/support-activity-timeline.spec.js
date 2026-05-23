@@ -16,6 +16,7 @@ const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 const KEY_RECORDING = 'nls_recording_enabled';
 const KEY_COMMENTS = 'nls_comments_lv888888888';
 const KEY_GIFT_EVENTS = 'nls_gift_events_lv888888888';
+const KEY_PROFILE_CACHE = 'nls_user_comment_profile_v1';
 
 async function swOf(context) {
   let sw = context.serviceWorkers()[0];
@@ -28,18 +29,28 @@ test('応援タイムライン: コメントとギフトが時刻順に混在し
   const extensionId = new URL(sw.url()).hostname;
 
   await sw.evaluate(
-    async ({ watchKey, recKey, cKey, gKey, watchUrl }) => {
+    async ({ watchKey, recKey, cKey, gKey, pKey, watchUrl }) => {
       const base = Date.now() - 60_000;
       const comments = [
         { id: 'lv888888888::c1', liveId: 'lv888888888', commentNo: '1', userId: '100', nickname: 'あ', text: 'こめんと1', capturedAt: base + 1000 },
         { id: 'lv888888888::c2', liveId: 'lv888888888', commentNo: '2', userId: '4046119', nickname: 'い', text: 'こめんと2', capturedAt: base + 3000 }
       ];
       const giftEvents = [
-        { userId: '200', nickname: 'おくりぬし', itemId: 'g1', itemName: 'かしわもち', point: 1200, message: '', contributionRank: null, capturedAt: base + 2000 }
+        { userId: '380000', nickname: 'おくりぬし', itemId: 'g1', itemName: 'かしわもち', point: 1200, message: '', contributionRank: null, capturedAt: base + 2000 }
       ];
+      // ギフト送信者 380000 の avatar を profile cache に seed（uid を含む usericon URL=
+      // broadcaster guard を通る）。enrich でギフト行に顔が出ることを実証する。
+      const profileCache = {
+        '380000': {
+          nickname: 'おくりぬし',
+          avatarUrl: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/38/380000.jpg',
+          updatedAt: Date.now()
+        }
+      };
       await chrome.storage.local.set({
         [watchKey]: watchUrl,
         [recKey]: true,
+        [pKey]: profileCache,
         [cKey]: comments,
         [gKey]: giftEvents
       });
@@ -49,6 +60,7 @@ test('応援タイムライン: コメントとギフトが時刻順に混在し
       recKey: KEY_RECORDING,
       cKey: KEY_COMMENTS,
       gKey: KEY_GIFT_EVENTS,
+      pKey: KEY_PROFILE_CACHE,
       watchUrl: MOCK_WATCH
     }
   );
@@ -117,6 +129,12 @@ test('応援タイムライン: コメントとギフトが時刻順に混在し
   await expect(body.locator('.nl-tl-time').first()).toBeVisible();
   const agoText = (await body.locator('.nl-tl-time').first().innerText()).trim();
   expect(agoText).toMatch(/(たった今|秒前|分前)/u);
+
+  // v0.1.342: ギフト行に送信者アバター（profile cache から enrich）が顔として出る。
+  const giftAvatar = body.locator('.nl-tl-gift .nl-tl-gift__avatar');
+  await expect(giftAvatar).toHaveCount(1);
+  await expect(giftAvatar).toHaveAttribute('src', /usericon\/s\/38\/380000\.jpg/);
+  await expect(body.locator('.nl-tl-gift .nl-tl-gift__badge')).toBeAttached();
 
   await popup.screenshot({
     path: 'test-results/support-activity-timeline.png',
