@@ -1731,6 +1731,18 @@
         overflow-x: auto;
         gap: 5px;
         padding-bottom: 2px;
+        /* v0.1.333: チップ（枠切替 >2 >3 …）が多いと右が隠れて「見切れ」に見えるが、
+           実際は横スクロール領域。薄いスクロールバーを見せて「横スクロールできる」ことを
+           伝える（機能は不変・スクロール不要なら scrollbar も出ない＝誤誘導しない）。 */
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
+      }
+      .nl-frame-grid::-webkit-scrollbar {
+        height: 6px;
+      }
+      .nl-frame-grid::-webkit-scrollbar-thumb {
+        background: color-mix(in srgb, var(--nl-border) 70%, transparent);
+        border-radius: 999px;
       }
 
       .nl-frame-chip {
