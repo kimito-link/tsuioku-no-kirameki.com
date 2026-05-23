@@ -83,10 +83,10 @@ test('カード見切れ: 広告ランキングの長い pt 数値がカード�
 
   // 各カードの __count が親カード（__line）の幅を超えていないか計測。
   const result = await popup.evaluate(() => {
+    // --below-cards クラスは body 要素(#northStarLaneBody-adRanking)自身に付くため、
+    // 子孫結合子を介さず直接 __line を探す。
     const lines = Array.from(
-      document.querySelectorAll(
-        '#northStarLaneBody-adRanking .nl-top-support-rank--below-cards .nl-top-support-rank__line'
-      )
+      document.querySelectorAll('#northStarLaneBody-adRanking .nl-top-support-rank__line')
     );
     const counts = lines.map((line) => {
       const c = line.querySelector('.nl-top-support-rank__count');
