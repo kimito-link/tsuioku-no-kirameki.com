@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.332',
+    date: '2026-05-23',
+    summary: '取得できない配信での待機表示を正直に',
+    items: Object.freeze([
+      '[改善] 公式の貢献度・ギフト一覧がどうしても取得できない配信で、待機メッセージが出続けて「固まった」ように見える問題を改善しました。一定時間たっても取得できないときは「この配信では公式の一覧が取得できないようです（配信者側の設定によります）」とお伝えするようにしました（取得できる配信ではこれまでどおりすぐ表示します。順位などの数値を勝手に作って出すことはしません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.331',
     date: '2026-05-23',
     summary: '貢献度ランキングの取得を速く',
