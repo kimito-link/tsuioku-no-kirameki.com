@@ -1822,11 +1822,10 @@ window.addEventListener('message', (e) => {
         if (storageTouched) {
           chrome.storage.local.set({ [key]: next }).catch((err) => {
             if (!isContextInvalidatedError(err) && hasExtensionContext()) {
-              try {
-                chrome.storage.local.set({
-                  [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(liveId, err)
-                });
-              } catch { /* best-effort */ }
+              setStorageLocalSilent(
+                { [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(liveId, err) },
+                { warn: false }
+              );
             }
           });
         }
@@ -1848,14 +1847,10 @@ window.addEventListener('message', (e) => {
         if (storageTouched) {
           chrome.storage.local.set({ [eventsKey]: next }).catch((err) => {
             if (!isContextInvalidatedError(err) && hasExtensionContext()) {
-              try {
-                chrome.storage.local.set({
-                  [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(
-                    liveId,
-                    err
-                  )
-                });
-              } catch { /* best-effort */ }
+              setStorageLocalSilent(
+                { [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(liveId, err) },
+                { warn: false }
+              );
             }
           });
         }
@@ -3400,13 +3395,7 @@ function maybePersistViewportWideOnceConsumed() {
     return;
   }
   inlinePanelViewportWideOnceDone = true;
-  try {
-    void chrome.storage.local.set({
-      [KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]: true
-    });
-  } catch {
-    // no-op
-  }
+  setStorageLocalSilent({ [KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE]: true });
 }
 
 /**
@@ -5413,9 +5402,9 @@ function persistAiShareFastDiagnostics() {
       resolvedTabUrl: sanitizeWatchUrlForDiag(window.location.href),
       persistedAt: new Date().toISOString()
     };
-    void chrome.storage.local.set({ [KEY_AI_SHARE_FAST_DIAG]: payload });
+    setStorageLocalSilent({ [KEY_AI_SHARE_FAST_DIAG]: payload });
   } catch {
-    // no-op
+    // no-op: payload 構築（buildAiShareFastDiagnosticsPayload 等）の同期失敗のみ
   }
 }
 
@@ -6166,6 +6155,40 @@ function isContextInvalidatedError(err) {
   return isCtxInvalidated(err);
 }
 
+/**
+ * fire-and-forget の chrome.storage.local.set。
+ *
+ * 同期 try/catch は set() の「非同期 reject」を捕まえられないため、拡張更新後に
+ * 古いタブ（stale content script）が set を投げると context invalidated の reject が
+ * unhandled rejection / unchecked lastError として console に漏れる。これを唯一の
+ * 入口に集約し、context invalidated は古いタブの正常な廃棄として黙過する。
+ *
+ * 通常時（context 有効）は同じ set を発火し完了順序も変わらない。変わるのは失敗時に
+ * 未処理 reject が console に漏れなくなる点だけ。先頭の hasExtensionContext() は早期
+ * return 最適化で、race を塞ぐのは .catch()（チェック〜settle 間に invalidate する窓が
+ * 残るため必須）。
+ *
+ * @param {Record<string, unknown>} obj
+ * @param {{ warn?: boolean }} [opts] warn=false でエラー報告経路（再帰ノイズ回避）
+ */
+function setStorageLocalSilent(obj, { warn = true } = {}) {
+  if (!hasExtensionContext()) return;
+  try {
+    const p = chrome.storage.local.set(obj);
+    if (p && typeof p.catch === 'function') {
+      p.catch((err) => {
+        if (warn && !isContextInvalidatedError(err)) {
+          console.warn('[content] storage.local.set failed', err);
+        }
+      });
+    }
+  } catch (err) {
+    if (warn && !isContextInvalidatedError(err)) {
+      console.warn('[content] storage.local.set threw', err);
+    }
+  }
+}
+
 /** @param {string} context @param {unknown} err */
 function reportSilentErrorToStorage(context, err) {
   const p = buildSilentErrorPayload(context, err, liveId);
@@ -6173,9 +6196,11 @@ function reportSilentErrorToStorage(context, err) {
   void recordDiagnosticException(`content:${context}`, err, { liveId: p.liveId }).catch(
     () => {}
   );
-  try {
-    chrome.storage.local.set({ [KEY_STORAGE_WRITE_ERROR]: { at: p.at, ...(p.liveId ? { liveId: p.liveId } : {}), ...(p.message ? { message: p.message } : {}) } });
-  } catch { /* best-effort */ }
+  // エラー報告経路なので失敗時も console に出さず完全黙過（reload 時のノイズ回避）。
+  setStorageLocalSilent(
+    { [KEY_STORAGE_WRITE_ERROR]: { at: p.at, ...(p.liveId ? { liveId: p.liveId } : {}), ...(p.message ? { message: p.message } : {}) } },
+    { warn: false }
+  );
 }
 
 /** @param {Element|null|undefined} el */
@@ -12032,15 +12057,13 @@ function tryHarvestNicoadContributionRankingOnce() {
     try {
       const ranking = scrapeContributionRankingFromDom(document);
       if (Array.isArray(ranking) && ranking.length > 0) {
-        try {
-          chrome.storage.local.set({
-            [`nls_nicoad_ranking_${lid}`]: {
-              capturedAt: Date.now(),
-              ranking,
-              sourceUrl: url
-            }
-          });
-        } catch { /* no-op */ }
+        setStorageLocalSilent({
+          [`nls_nicoad_ranking_${lid}`]: {
+            capturedAt: Date.now(),
+            ranking,
+            sourceUrl: url
+          }
+        });
         return true;
       }
     } catch { /* no-op */ }
@@ -12056,6 +12079,9 @@ function tryHarvestNicoadContributionRankingOnce() {
 
   const poll = () => {
     if (done) return;
+    // 拡張更新後の古いタブ（context invalidated）ではループを止める。
+    // set は setStorageLocalSilent 側でも黙過されるが、無駄な tick / DOM 走査を避ける。
+    if (!hasExtensionContext()) return;
     const state = ensureContributionTabActive();
     if (state === 'ready' || state === 'clicked') {
       if (tryScrape()) {
