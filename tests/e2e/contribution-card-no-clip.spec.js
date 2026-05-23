@@ -7,17 +7,17 @@ import {
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 
 /*
- * v0.1.344: 貢献度ランキングの横並びカードが 2 行に折り返したとき、3 枚目以降が枠の下端で
- * 途中まで切れて見える問題（実機: カムイ/まさる/かめいは の 3 枚目が見切れ）を是正したことを
- * 実ブラウザで実証する。
+ * v0.1.346: ランキング「フレームなし」化（ユーザー要望: ランキング関連は全部フレームなしに）。
+ * 貢献度/広告/ギフト履歴の横並びカードレーンは、高さ上限と内側スクロールを撤廃し、全カードを
+ * 折り返したまま丸ごと表示する（カードが切れない・内側スクロールが無い）。縦スクロールは
+ * .nl-main 1 本に委ねる。
  *
- * 真因は body の max-height:176px + overflow:hidden で 2 行目以降がスクロールバーも無く clip
- * されていたこと。修正: list を overflow-y:auto にし body 上限を 220px に上げ、2 行目まで丸ごと
- * 見え、それ以上はスクロールで全カードに到達できる（カードが途中で切れない）。
+ * （旧 v0.1.344 は body max-height:220px + list overflow-y:auto で「2 行目まで表示・残りは
+ *  内側スクロール」だったが、ユーザーが内側スクロール自体を嫌ったため撤廃。）
  *
- * 検証: 多数の貢献者を seed して 2 行以上に折り返させ、(1) どのカードも上端が list の可視範囲に
- * 入る位置までスクロール到達できる＝list が overflow-y:auto でスクロール可能、(2) 最後のカードの
- * 下端が、最大スクロール時に list の可視下端を超えて切れていない、を確認する。
+ * 検証: 多数の貢献者を seed して 2 行以上に折り返させ、(1) list が内側スクロール領域でない
+ * （scrollHeight <= clientHeight）、(2) どのカードも body の内側に収まり下端で clip されていない、
+ * を確認する。
  */
 
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
@@ -30,7 +30,7 @@ async function swOf(context) {
   return sw;
 }
 
-test('貢献度カード見切れ: 2行に折り返しても 3 枚目以降が切れずスクロール到達できる', async ({
+test('貢献度カード: フレームなしで全カードが切れず内側スクロールも無い', async ({
   context
 }) => {
   const sw = await swOf(context);
@@ -89,29 +89,34 @@ test('貢献度カード見切れ: 2行に折り返しても 3 枚目以降が�
     const body = document.getElementById('northStarLaneBody-contributionRanking');
     const list = body?.querySelector('.nl-top-support-rank__list');
     const lines = Array.from(body?.querySelectorAll('.nl-top-support-rank__line') || []);
-    if (!(list instanceof HTMLElement)) return null;
-    // list をスクロールできる（折り返しで内容が可視高を超える）。
-    const scrollable = list.scrollHeight > list.clientHeight + 1;
-    // 最大までスクロールして、最後のカードの下端が list 可視下端を超えて切れていないか。
-    list.scrollTop = list.scrollHeight;
-    const last = lines[lines.length - 1];
-    let lastFullyVisibleAtBottom = false;
-    if (last instanceof HTMLElement) {
-      const lr = last.getBoundingClientRect();
-      const cr = list.getBoundingClientRect();
-      // 最後のカード下端が list 可視下端の少し内側（+2px 許容）に収まる＝切れていない。
-      lastFullyVisibleAtBottom = lr.bottom <= cr.bottom + 2;
+    if (!(body instanceof HTMLElement) || !(list instanceof HTMLElement)) return null;
+    // フレームなし: body も list も内側スクロール領域でない（コンテンツ高まで伸びる）。
+    const bodyScrolls = body.scrollHeight > body.clientHeight + 1;
+    const listScrolls = list.scrollHeight > list.clientHeight + 1;
+    // どのカードも body の内側に収まり、下端で clip されていない（=見切れていない）。
+    const bodyRect = body.getBoundingClientRect();
+    let allCardsWithinBody = true;
+    for (const line of lines) {
+      if (!(line instanceof HTMLElement)) continue;
+      const lr = line.getBoundingClientRect();
+      // カード下端が body の下端（+2px 許容）を超えていない＝切れていない。
+      if (lr.bottom > bodyRect.bottom + 2) {
+        allCardsWithinBody = false;
+        break;
+      }
     }
-    return { lineCount: lines.length, scrollable, lastFullyVisibleAtBottom };
+    return { lineCount: lines.length, bodyScrolls, listScrolls, allCardsWithinBody };
   });
 
-  console.log('=== contribution clip probe ===', JSON.stringify(probe));
+  console.log('=== contribution no-frame probe ===', JSON.stringify(probe));
   expect(probe).not.toBeNull();
-  // 2 行に折り返す枚数を seed したので複数行＝スクロール可能なはず。
+  // 2 行に折り返す枚数を seed。
   expect(probe.lineCount).toBeGreaterThanOrEqual(5);
-  expect(probe.scrollable).toBe(true);
-  // 最大スクロール時、最後のカードが下端で切れていない（=見切れていない）。
-  expect(probe.lastFullyVisibleAtBottom).toBe(true);
+  // フレームなし: 内側スクロールが無い（body/list ともスクロール領域でない）。
+  expect(probe.bodyScrolls).toBe(false);
+  expect(probe.listScrolls).toBe(false);
+  // 全カードが body 内に収まり、下端で切れていない。
+  expect(probe.allCardsWithinBody).toBe(true);
 
   await popup.screenshot({
     path: 'test-results/contribution-card-no-clip.png',
