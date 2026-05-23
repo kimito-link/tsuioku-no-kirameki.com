@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.344',
+    date: '2026-05-24',
+    summary: 'ランキングのカードが3枚目で見切れる問題を修正',
+    items: Object.freeze([
+      '[修正] 貢献度ランキング・広告ランキングの横並びカードが2行になったとき、3枚目以降が枠の下で途中まで切れて見える問題を直しました。2行目まで丸ごと見えるように枠を広げ、それより多い分はカード単位でスクロールできるようにしました（カードが途中で切れません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.343',
     date: '2026-05-24',
     summary: '応援タイムラインの開いた状態を覚える',
