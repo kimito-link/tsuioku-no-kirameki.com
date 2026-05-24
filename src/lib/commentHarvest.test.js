@@ -111,6 +111,57 @@ describe('findLargestVerticalScrollHost', () => {
     Object.defineProperty(b, 'scrollHeight', { value: 300, configurable: true });
     expect(findLargestVerticalScrollHost(wrap)).toBe(b);
   });
+
+  // v0.1.355: getComputedStyle を「勝てる delta の候補」だけに絞る最適化の検証。
+  it('delta 最大でも overflow 不可なら選ばれない（computed が scrollable でない）', () => {
+    const wrap = document.createElement('div');
+    // インライン style に overflow を書かない（happy-dom の computed も visible 既定）。
+    wrap.innerHTML = `
+      <div class="a" style="overflow:auto"></div>
+      <div class="big"></div>`;
+    document.body.appendChild(wrap);
+    const a = wrap.querySelector('.a');
+    const big = wrap.querySelector('.big');
+    Object.defineProperty(a, 'clientHeight', { value: 30, configurable: true });
+    Object.defineProperty(a, 'scrollHeight', { value: 120, configurable: true });
+    // big は delta 最大だが overflow 指定なし → 選ばれない。
+    Object.defineProperty(big, 'clientHeight', { value: 10, configurable: true });
+    Object.defineProperty(big, 'scrollHeight', { value: 999, configurable: true });
+    expect(findLargestVerticalScrollHost(wrap)).toBe(a);
+  });
+
+  it('勝てない delta の node では getComputedStyle を呼ばない（軽量化の実証）', () => {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="win" style="overflow:auto"></div>
+      <div class="lose" style="overflow:auto"></div>`;
+    document.body.appendChild(wrap);
+    const win = wrap.querySelector('.win');
+    const lose = wrap.querySelector('.lose');
+    // win を先に訪問させ bestDelta を 400 に上げる → 後続 lose(delta 50) は gate を通らない。
+    Object.defineProperty(win, 'clientHeight', { value: 30, configurable: true });
+    Object.defineProperty(win, 'scrollHeight', { value: 430, configurable: true });
+    Object.defineProperty(lose, 'clientHeight', { value: 30, configurable: true });
+    Object.defineProperty(lose, 'scrollHeight', { value: 80, configurable: true });
+
+    const realGCS = globalThis.window.getComputedStyle.bind(globalThis.window);
+    /** @type {Element[]} */
+    const styled = [];
+    const spy = (el, ...rest) => {
+      styled.push(el);
+      return realGCS(el, ...rest);
+    };
+    globalThis.window.getComputedStyle = /** @type {any} */ (spy);
+    try {
+      expect(findLargestVerticalScrollHost(wrap)).toBe(win);
+    } finally {
+      globalThis.window.getComputedStyle = /** @type {any} */ (realGCS);
+    }
+    // wrap(delta 0) と lose(delta 50 <= bestDelta 400+8) は getComputedStyle されない。
+    expect(styled).toContain(win);
+    expect(styled).not.toContain(lose);
+    expect(styled).not.toContain(wrap);
+  });
 });
 
 describe('mergeVirtualHarvestRows', () => {
