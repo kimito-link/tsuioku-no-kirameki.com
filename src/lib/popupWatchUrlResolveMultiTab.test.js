@@ -114,4 +114,49 @@ describe('pickWatchUrlFromMultipleSources', () => {
     expect(r.url).toBe('https://live.nicovideo.jp/watch/lv22');
     expect(r.source).toBe('lastFocusedNormal');
   });
+
+  // 0.1.349: inline iframe（watch ページ内）の多タブ混信修正。
+  // background タブの iframe では activeTab が「前面の別タブ」を指すので、
+  // content script 由来の自タブ liveId（inlineWatchUrl）を最優先で採用する。
+  it('inlineWatchUrl があれば activeTab より最優先（背景タブの混信を回避）', () => {
+    const r = pickWatchUrlFromMultipleSources({
+      inlineWatchUrl: 'https://live.nicovideo.jp/watch/lv1000', // 自タブ
+      activeTab: { url: 'https://live.nicovideo.jp/watch/lv2000' }, // 前面の別タブ
+      lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv3000' },
+      lastWatchUrlRaw: 'https://live.nicovideo.jp/watch/lv4000' // last-write-wins
+    });
+    expect(r.url).toBe('https://live.nicovideo.jp/watch/lv1000');
+    expect(r.source).toBe('inlineParam');
+  });
+
+  it('inlineWatchUrl が空 / 非 niconico → 従来の activeTab 経路にフォールバック', () => {
+    const r = pickWatchUrlFromMultipleSources({
+      inlineWatchUrl: '',
+      activeTab: { url: 'https://live.nicovideo.jp/watch/lv2000' },
+      lastWatchUrlRaw: ''
+    });
+    expect(r.url).toBe('https://live.nicovideo.jp/watch/lv2000');
+    expect(r.source).toBe('activeTab');
+  });
+
+  it('inlineWatchUrl が非 watch（chrome-extension URL 等）→ 無視して次候補', () => {
+    const r = pickWatchUrlFromMultipleSources({
+      inlineWatchUrl: 'chrome-extension://aaaaa/popup.html',
+      activeTab: undefined,
+      lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv55' },
+      lastWatchUrlRaw: ''
+    });
+    expect(r.url).toBe('https://live.nicovideo.jp/watch/lv55');
+    expect(r.source).toBe('lastFocusedNormal');
+  });
+
+  it('inlineWatchUrl が undefined（standalone popup）でも throw せず従来挙動', () => {
+    const r = pickWatchUrlFromMultipleSources({
+      activeTab: { url: 'chrome-extension://aaaaa/popup.html' },
+      lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv77' },
+      lastWatchUrlRaw: ''
+    });
+    expect(r.url).toBe('https://live.nicovideo.jp/watch/lv77');
+    expect(r.source).toBe('lastFocusedNormal');
+  });
 });

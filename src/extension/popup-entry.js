@@ -489,6 +489,27 @@ const INLINE_SIDE_PANEL = (() => {
   }
 })();
 
+/**
+ * watch ページ内 iframe（INLINE_EMBED_WATCH）の自タブ liveId から構築した watch URL。
+ *
+ * 0.1.349: content script が iframe src に焼き込んだ `&lv=<id>` を読む。background
+ *   タブの iframe では chrome.tabs.query({active,currentWindow}) が前面の別タブを返す
+ *   ため、自タブ liveId を明示的に受け取って watch URL 解決の最優先ソースにする
+ *   （多タブで一方のパネルが「—」/「(取得中...)」で永続的に固まる問題の根治）。
+ *   sidepanel は静的 HTML で lv を持たないので空のまま（従来挙動）。
+ */
+const INLINE_OWN_WATCH_URL = (() => {
+  if (!INLINE_EMBED_WATCH) return '';
+  try {
+    const lv = (new URLSearchParams(window.location.search).get('lv') || '')
+      .trim()
+      .toLowerCase();
+    return /^lv\d+$/.test(lv) ? `https://live.nicovideo.jp/watch/${lv}` : '';
+  } catch {
+    return '';
+  }
+})();
+
 function applyResponsivePopupLayout() {
   const root = document.documentElement;
   const body = document.body;
@@ -8969,6 +8990,7 @@ async function refresh() {
    *   挟むと complex multi-tab で正しい URL が拾える。
    */
   const watchUrlPick = pickWatchUrlFromMultipleSources({
+    inlineWatchUrl: INLINE_OWN_WATCH_URL,
     activeTab: tabs[0],
     lastFocusedNormalActiveTab,
     lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL]
@@ -8976,6 +8998,9 @@ async function refresh() {
   const url = watchUrlPick.url;
   if (
     isNicoLiveWatchUrl(url) &&
+    // inlineParam は書き戻さない: background タブの inline panel が自 lv を
+    // 共有 nls_last_watch_url に last-write-wins で上書きすると、standalone popup
+    // 側の混信を悪化させる。inline panel は自前の lv で解決するので不要。
     (watchUrlPick.source === 'activeTab' ||
       watchUrlPick.source === 'lastFocusedNormal')
   ) {
