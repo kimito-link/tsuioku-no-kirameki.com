@@ -7720,11 +7720,27 @@ const __NLS_MSG_LISTENER_BOUND_KEY__ = '__NLS_CONTENT_MSG_LISTENER_BOUND__';
 const nlsContentMsgListenerHost =
   typeof globalThis !== 'undefined' ? globalThis : window;
 if (!(/** @type {Record<string, unknown>} */ (nlsContentMsgListenerHost))[__NLS_MSG_LISTENER_BOUND_KEY__]) {
-  /** @type {Record<string, unknown>} */ (nlsContentMsgListenerHost)[__NLS_MSG_LISTENER_BOUND_KEY__] = true;
-  bindContentScriptMessageListener();
+  // v0.1.356: bind 成功時のみフラグを立てる。拡張更新の瞬間など chrome.runtime が
+  //   未定義のタイミングで bind に失敗したとき、フラグだけ立って「登録済みなのに
+  //   listener 無し」で固定されるのを防ぐ（次回 context が有効なら再試行できる）。
+  if (bindContentScriptMessageListener()) {
+    /** @type {Record<string, unknown>} */ (nlsContentMsgListenerHost)[__NLS_MSG_LISTENER_BOUND_KEY__] = true;
+  }
 }
 
+/**
+ * content script のメッセージリスナを登録する。
+ * @returns {boolean} 登録できたら true、context 無効で登録を見送ったら false
+ */
 function bindContentScriptMessageListener() {
+// v0.1.356: 拡張更新（chrome://extensions の「更新」/再読み込み）の瞬間、古いタブの
+//   content script では chrome.runtime が undefined になる。その間に SPA navigation 等で
+//   ここが再評価されると `chrome.runtime.onMessage` の参照自体が同期 TypeError
+//   （Cannot read properties of undefined (reading 'onMessage')）を投げ、chrome://extensions の
+//   エラー一覧に載って利用者を不安にさせる。実害は無い（古いタブの正常な廃棄）が、
+//   onMessage に触れる前にガードして例外を出さない。promise の reject ではないので
+//   consoleErrorBuffer の unhandledrejection 抑止（v0.1.354）では捕まえられない別経路。
+if (!chrome?.runtime?.onMessage?.addListener) return false;
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!hasExtensionContext()) return;
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
@@ -8044,6 +8060,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 });
+return true;
 }
 
 function rememberWatchPageUrl() {
