@@ -26,20 +26,19 @@ export function isInsideRecommendedLiveSection(element) {
     return false;
   }
   const el = /** @type {Element} */ (element);
-  const selectors = [
-    '[class*="program-card-list"]',
-    '[class*="program-card"]',
-    '[class*="program-recommend"]',
-    '[class*="loading-form"]',
-    '[class*="loading-target"]',
-    '[class*="program-statistics"]'
-  ];
-  for (const sel of selectors) {
-    try {
-      if (el.closest(sel)) return true;
-    } catch {
-      // セレクタが古い環境で SyntaxError 等を出しても無視して継続
-    }
+  // v0.1.351: 高流量時のパフォーマンス改善。従来は selector ごとに closest を
+  //   個別実行し、コメント 1 行あたり最大 8 回も祖先チェーンを登っていた
+  //   （extractCommentsFromNode が root + 行ごと + parseCommentElement で呼ぶため、
+  //   100 行のコメント欄では単一 MutationObserver イベントで数百回）。
+  //   closest はカンマ区切りで「いずれかにマッチする最近祖先」を 1 回の祖先走査で
+  //   返すため、結合 selector にすると走査回数が 1/8 になる（真偽値の意味は不変＝
+  //   どれか 1 つでも祖先マッチすれば true）。
+  const COMBINED_SELECTOR =
+    '[class*="program-card-list"],[class*="program-card"],[class*="program-recommend"],[class*="loading-form"],[class*="loading-target"],[class*="program-statistics"]';
+  try {
+    if (el.closest(COMBINED_SELECTOR)) return true;
+  } catch {
+    // セレクタが古い環境で SyntaxError 等を出しても無視して継続
   }
   // ProgramRecommendPanel 専用 URL（コメント欄の user リンクとは衝突しにくい）
   try {
