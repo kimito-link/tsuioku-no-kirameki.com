@@ -2482,7 +2482,22 @@ function ensureInlinePopupIframe(host) {
   if (!(host instanceof HTMLDivElement)) return;
   const expectedSrc = (() => {
     try {
-      return chrome.runtime.getURL('popup.html') + '?inline=1';
+      // v0.1.349: 自タブ liveId を src に焼き込んで inline popup に渡す。
+      //   background タブの iframe は chrome.tabs.query({active,currentWindow}) で
+      //   前面の別タブを拾い、別 lv の空 storage を読んで全カード「—」+ ランキング
+      //   「(取得中...)」で永続的に固まる（F5 でも背景のままなので直らない）。
+      //   liveId 変数は background タブだと初期に未確定のことがある
+      //   （tickFromInterval の syncLiveIdFromLocation が visible 時のみ走るため）。
+      //   自タブの URL は常に権威があり即座に取れるので window.location を最優先で読む。
+      const u = new URL(chrome.runtime.getURL('popup.html'));
+      u.searchParams.set('inline', '1');
+      const ownLv = String(
+        extractLiveIdFromUrl(window.location.href) || liveId || ''
+      )
+        .trim()
+        .toLowerCase();
+      if (/^lv\d+$/.test(ownLv)) u.searchParams.set('lv', ownLv);
+      return u.href;
     } catch {
       return '';
     }

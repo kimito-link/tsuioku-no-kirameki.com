@@ -16,9 +16,20 @@
  *   アクティブタブ」（chrome.windows.getLastFocused({windowTypes:['normal']})
  *   から取得）を 2 番目の候補に追加し、storage よりも優先する。
  *
+ * 追加（0.1.349 多タブ inline 混信修正）:
+ *   watch ページ内 iframe（`popup.html?inline=1`）は、background タブに居ると
+ *   `chrome.tabs.query({active:true, currentWindow:true})` が「自タブでなく前面の
+ *   別タブ」を返す（currentWindow=呼び出し元ページを含む window、active=その window
+ *   の前面タブ）。結果 background タブの inline panel が別タブ/last-write-wins の
+ *   liveId を解決し、自タブの per-live storage が空 → 全カード「—」+ ランキング
+ *   「(取得中...)」で永続的に固まる（F5 でも背景のままなので直らない）。
+ *   content script は自タブ liveId を知っているので、iframe src に `&lv=<id>` を
+ *   焼き込んで popup に渡す。その値をここで `inlineWatchUrl` として最優先で採用する。
+ *
  * 優先順位:
+ *   0. inlineWatchUrl（inline iframe が自タブ liveId から構築した watch URL。最優先）
  *   1. activeTab.url が niconico watch URL
- *      （INLINE_MODE で popup が watch ページ内 iframe の場合）
+ *      （INLINE_MODE で popup が前面 watch タブ内 iframe の場合の従来経路）
  *   2. lastFocusedNormalActiveTab.url が niconico watch URL
  *      （standalone popup → 通常 window のアクティブタブ）
  *   3. lastWatchUrlRaw（storage `nls_last_watch_url`、複数タブで last-write-wins）
@@ -32,7 +43,7 @@ import { isNicoLiveWatchUrl } from './broadcastUrl.js';
  */
 
 /**
- * @typedef {'activeTab' | 'lastFocusedNormal' | 'storage' | 'none'} WatchUrlSource
+ * @typedef {'inlineParam' | 'activeTab' | 'lastFocusedNormal' | 'storage' | 'none'} WatchUrlSource
  */
 
 /**
@@ -44,6 +55,7 @@ import { isNicoLiveWatchUrl } from './broadcastUrl.js';
 
 /**
  * @param {{
+ *   inlineWatchUrl?: unknown,
  *   activeTab?: TabLike | null | undefined,
  *   lastFocusedNormalActiveTab?: TabLike | null | undefined,
  *   lastWatchUrlRaw?: unknown
@@ -55,7 +67,16 @@ export function pickWatchUrlFromMultipleSources(input) {
     return { url: '', source: 'none' };
   }
 
-  // 1. activeTab（INLINE_MODE: popup が watch ページ内 iframe のとき有効）
+  // 0. inlineWatchUrl（inline iframe が自タブ liveId から構築。最優先）
+  //    background タブの iframe で tabs.query が前面の別タブを拾う混信を、
+  //    content script 由来の自タブ liveId で確定させる（多タブ「—」固まり根治）。
+  const inlineUrl =
+    typeof input.inlineWatchUrl === 'string' ? input.inlineWatchUrl.trim() : '';
+  if (isNicoLiveWatchUrl(inlineUrl)) {
+    return { url: inlineUrl, source: 'inlineParam' };
+  }
+
+  // 1. activeTab（INLINE_MODE: popup が前面 watch タブ内 iframe のとき有効）
   const activeUrl = String(input.activeTab?.url ?? '').trim();
   if (isNicoLiveWatchUrl(activeUrl)) {
     return { url: activeUrl, source: 'activeTab' };
