@@ -102,4 +102,64 @@ describe('isIgnoredErrorMessage', () => {
     expect(isIgnoredErrorMessage(undefined)).toBe(true);
     expect(isIgnoredErrorMessage('')).toBe(true);
   });
+
+  // v0.1.354: 拡張更新後の古いタブの context invalidated は実害なしなので ignored。
+  it('Extension context invalidated を ignored 判定', () => {
+    expect(isIgnoredErrorMessage('Extension context invalidated.')).toBe(true);
+    expect(
+      isIgnoredErrorMessage('Error: Extension context invalidated.')
+    ).toBe(true);
+  });
+});
+
+describe('install: context invalidated の unhandledrejection 抑止', () => {
+  /** addEventListener を捕まえる簡易 target */
+  function makeTarget() {
+    /** @type {Record<string, Function>} */
+    const listeners = {};
+    return {
+      addEventListener: (type, fn) => {
+        listeners[type] = fn;
+      },
+      removeEventListener: () => {},
+      fireRejection: (reason) => {
+        let prevented = false;
+        const e = {
+          reason,
+          preventDefault: () => {
+            prevented = true;
+          }
+        };
+        listeners.unhandledrejection?.(e);
+        return prevented;
+      }
+    };
+  }
+
+  it('context invalidated の rejection は preventDefault され、ring buffer に載らない（ignored）', () => {
+    const buf = createConsoleErrorBuffer();
+    const target = makeTarget();
+    buf.install(target);
+    const prevented = target.fireRejection(
+      new Error('Extension context invalidated.')
+    );
+    expect(prevented).toBe(true);
+    const snap = buf.snapshot();
+    expect(snap.totalCount).toBe(0); // 実害エラーとしては記録しない
+    expect(snap.ignoredCount).toBe(1);
+    expect(snap.recentErrors).toHaveLength(0);
+  });
+
+  it('通常の rejection は preventDefault されず、ring buffer に載る', () => {
+    const buf = createConsoleErrorBuffer();
+    const target = makeTarget();
+    buf.install(target);
+    const prevented = target.fireRejection(
+      new Error('TypeError: foo is not a function')
+    );
+    expect(prevented).toBe(false);
+    const snap = buf.snapshot();
+    expect(snap.totalCount).toBe(1);
+    expect(snap.recentErrors[0].message).toContain('TypeError');
+  });
 });
