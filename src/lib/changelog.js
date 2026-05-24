@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.352',
+    date: '2026-05-24',
+    summary: 'イベント参加中なら順位なしでもカード表示',
+    items: Object.freeze([
+      '[改善] イベントに参加している配信で、公式の順位やスコアがまだ取得できていない場合でも、イベントカード（配信者名・イベント名）が表示され続けるようにしました。これまでは順位が取れないとカードごと消えていました。順位やスコアは取得できたときに併記し、取れないときはその欄だけ隠します（イベントに参加していない配信では、これまでどおり何も表示しません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.351',
     date: '2026-05-24',
     summary: 'コメントが多い配信での重さ・カクつきを軽減',
