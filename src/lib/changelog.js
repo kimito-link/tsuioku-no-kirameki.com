@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.351',
+    date: '2026-05-24',
+    summary: 'コメントが多い配信での重さ・カクつきを軽減',
+    items: Object.freeze([
+      '[改善] コメントが速く大量に流れる配信で、ページが重くなったり反応が遅くなったりするのを軽減しました。コメントを記録するときに毎回おこなっていた「おすすめ生放送の判定」の内部処理を効率化し、コメント1件あたりの処理を大幅に減らしました（記録される内容や見え方はこれまでどおりです）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.350',
     date: '2026-05-24',
     summary: '広告ランキングの2行目以降が見切れる問題を修正',

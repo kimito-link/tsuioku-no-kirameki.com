@@ -13,21 +13,15 @@ export function isInsideRecommendedUserSection(element) {
     return false;
   }
   const el = /** @type {Element} */ (element);
-  const classSelectors = [
-    '[class*="user-recommend"]',
-    '[class*="UserRecommend"]',
-    '[class*="recommend-user"]',
-    '[class*="RecommendCreator"]',
-    '[class*="FollowingRecommend"]',
-    '[class*="follow-recommend"]',
-    '[class*="FollowRecommend"]'
-  ];
-  for (const sel of classSelectors) {
-    try {
-      if (el.closest(sel)) return true;
-    } catch {
-      // ignore invalid selector in old engines
-    }
+  // v0.1.351: 高流量時のパフォーマンス改善。selector ごとの個別 closest（最大 7 回の
+  //   祖先走査）を、カンマ区切りの結合 selector による 1 回の走査に置き換える。
+  //   closest はいずれかにマッチする最近祖先を返すので真偽値の意味は不変。
+  const COMBINED_CLASS_SELECTOR =
+    '[class*="user-recommend"],[class*="UserRecommend"],[class*="recommend-user"],[class*="RecommendCreator"],[class*="FollowingRecommend"],[class*="follow-recommend"],[class*="FollowRecommend"]';
+  try {
+    if (el.closest(COMBINED_CLASS_SELECTOR)) return true;
+  } catch {
+    // ignore invalid selector in old engines
   }
   try {
     const a = el.closest('a[href*="/user/"]');
