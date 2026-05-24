@@ -919,12 +919,19 @@ function recordGiftSenderObservation(userId, nickname) {
   cur.count += 1;
   cur.lastAt = Date.now();
   diag.giftSenders.set(key, cur);
-  // 上限：100 user まで（古い順に削る）
+  // 上限：100 user まで（最古 lastAt を 1 件削る）。
+  // v0.1.353: 全コピー+全ソートで最古 1 件を取っていた（GC プレッシャー）のを、
+  //   O(N) の最小スキャンに置換。削除対象（最小 lastAt のキー）は完全に同一。
   if (diag.giftSenders.size > 100) {
-    const oldest = [...diag.giftSenders.entries()].sort(
-      (a, b) => a[1].lastAt - b[1].lastAt
-    )[0];
-    if (oldest) diag.giftSenders.delete(oldest[0]);
+    let oldestKey = null;
+    let oldestAt = Infinity;
+    for (const [k, v] of diag.giftSenders) {
+      if (v.lastAt < oldestAt) {
+        oldestAt = v.lastAt;
+        oldestKey = k;
+      }
+    }
+    if (oldestKey != null) diag.giftSenders.delete(oldestKey);
   }
 }
 
@@ -954,12 +961,15 @@ function recordGiftCommentObservation(parsed, rawText) {
   }
   _d.giftCommentObservations.set(key, entry);
   if (_d.giftCommentObservations.size > 500) {
-    const entries = [..._d.giftCommentObservations.entries()].sort(
-      (a, b) => a[1].firstObservedAt - b[1].firstObservedAt
-    );
-    const drop = entries.length - 500;
-    for (let i = 0; i < drop; i++) {
-      _d.giftCommentObservations.delete(entries[i][0]);
+    // v0.1.353: 全コピー+全ソートで最古 drop 件を削っていたのを、Map の挿入順走査に置換。
+    //   このエントリは insert-once（更新なし）で firstObservedAt=挿入時刻のため、
+    //   Map の挿入順 == firstObservedAt 昇順。よって先頭から drop 件が「最古 drop 件」と
+    //   完全に一致する（ソート不要・GC プレッシャー削減）。
+    let drop = _d.giftCommentObservations.size - 500;
+    for (const k of _d.giftCommentObservations.keys()) {
+      if (drop <= 0) break;
+      _d.giftCommentObservations.delete(k);
+      drop -= 1;
     }
   }
 }

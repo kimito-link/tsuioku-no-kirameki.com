@@ -59,8 +59,23 @@ describe('detectCommentPropagation (L1 コメ伝染)', () => {
       c(t0 + 65_000, 'E', '草'),
       c(t0 + 70_000, 'F', '草')
     ], { windowMs: 30_000, minDistinctUsers: 3 });
-    // 2 つの伝染ピーク
-    expect(r.length).toBeGreaterThanOrEqual(2);
+    // 最初のクラスタ ABC と、60 秒離れたクラスタ DEF
+    expect(r).toHaveLength(2);
+    expect(r.every((b) => b.text === '草' && b.userCount === 3)).toBe(true);
+  });
+
+  it('ウィンドウ外側のユーザーでも境界込みで minDistinct に達したら伝染として拾う', () => {
+    const r = detectCommentPropagation(
+      [
+        c(t0, 'A', 'きらめき'),
+        c(t0 + 20_000, 'B', 'きらめき'),
+        c(t0 + 31_000, 'C', 'きらめき')
+      ],
+      { windowMs: 30_000, minDistinctUsers: 3 }
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0].userCount).toBe(3);
+    expect(r[0].lastAt).toBe(t0 + 31_000);
   });
 
   it('短すぎるテキスト（normalizeForEcho で空になる）は無視', () => {
