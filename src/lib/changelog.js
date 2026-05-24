@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.355',
+    date: '2026-05-24',
+    summary: 'コメント走査の重い処理を軽量化（動作は不変）',
+    items: Object.freeze([
+      '[改善] コメント欄のスクロール位置を探す内部処理を軽量化しました。これまでは要素を1つずつ重い方法で調べていましたが、明らかに対象外のものは軽い判定で飛ばすようにしました（選ぶ対象・記録内容・見え方はこれまでとまったく同じで、重さだけ減らしています）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.354',
     date: '2026-05-24',
     summary: '古いタブのエラー警告漏れを根本対策（動作は不変）',

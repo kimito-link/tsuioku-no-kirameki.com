@@ -121,21 +121,28 @@ export function findLargestVerticalScrollHost(el) {
   /** @param {Element} node */
   const walk = (node) => {
     if (node.nodeType !== 1) return;
-    const st = win.getComputedStyle(node);
-    const oy = st.overflowY;
-    const ox = st.overflow;
-    const scrollable =
-      oy === 'auto' ||
-      oy === 'scroll' ||
-      oy === 'overlay' ||
-      ox === 'auto' ||
-      ox === 'scroll';
+    // v0.1.355: getComputedStyle はレイアウトを強制する重い呼び出し。delta が現 best 以下なら
+    //   この node は best を更新できない（更新条件は delta > bestDelta + 8）ので、先に安い
+    //   scrollHeight/clientHeight で枝刈りし、勝てる候補だけ getComputedStyle する。返す要素は
+    //   従来と完全に同一（delta <= bestDelta+8 の node は computed style に関わらず best にならない）。
+    //   子孫 walk は必ず残す（delta=0 の親でも子孫に本物の scroll host がいるため）。
     const delta = node.scrollHeight - node.clientHeight;
-    // インライン overflow がテスト環境で computed に乗らない場合の救済
-    const inlineY = String(node.getAttribute('style') || '').includes('overflow');
-    if (delta > bestDelta + 8 && (scrollable || inlineY)) {
-      bestDelta = delta;
-      best = node;
+    if (delta > bestDelta + 8) {
+      const st = win.getComputedStyle(node);
+      const oy = st.overflowY;
+      const ox = st.overflow;
+      const scrollable =
+        oy === 'auto' ||
+        oy === 'scroll' ||
+        oy === 'overlay' ||
+        ox === 'auto' ||
+        ox === 'scroll';
+      // インライン overflow がテスト環境で computed に乗らない場合の救済
+      const inlineY = String(node.getAttribute('style') || '').includes('overflow');
+      if (scrollable || inlineY) {
+        bestDelta = delta;
+        best = node;
+      }
     }
     for (const c of node.children) walk(c);
   };
