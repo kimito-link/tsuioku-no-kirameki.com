@@ -4733,29 +4733,34 @@ function paintOfficialEventBannerCard(snapshot) {
     return '';
   };
 
-  // 表示は「公式 DOM 由来の banner (bundle.eventBanner) が居る時だけ」。
-  // NDGR field 6 単独は、イベントに参加していない配信にも値が返ることが
-  // 確認されているため誤情報の温床。沈黙を選ぶ（誤情報より沈黙）。
+  // 表示は、イベントへの参加が確認できる時（公式 DOM 由来のバナー/バルーン、または NDGR 由来のイベントタイトルが存在する時）。
+  // NDGR の rank/score 単独による非参加配信での誤表示を防ぐため、バナー/バルーンまたはタイトルを必須条件とします。
+  // 順位（rank）が取れなくても、配信者名と累計スコアを表示できるようにします。
   const broadcasterName = pickStr(snap?.broadcasterName);
-  const isEventBanner = banner != null && asNum(banner.rank) != null;
-  if (!isEventBanner) {
+  const title = pickStr(
+    banner?.title,
+    snap?.officialNicoEventTitleNdgr,
+    snap?.officialNicoEventTitle
+  );
+  const rank = asNum(banner?.rank) ?? asNum(snap?.officialNicoEventRankNdgr) ?? asNum(snap?.officialNicoEventRank);
+  const score = asNum(balloon?.eventTotalScore) ?? asNum(banner?.score) ?? asNum(snap?.officialEventGiftScoreNdgr);
+
+  const hasEvent =
+    banner != null ||
+    balloon != null ||
+    title !== '';
+
+  if (!hasEvent) {
     hide();
     return;
   }
-  const rank = asNum(banner?.rank);
-  const score = asNum(balloon?.eventTotalScore) ?? asNum(banner?.score);
-  const title = pickStr(banner?.title);
+
   const iconUrl = pickStr(banner?.iconUrl);
   const href = pickStr(banner?.href);
   const ownerText = pickStr(
     banner?.ownerText,
     broadcasterName ? `${broadcasterName}さんが参加しています！` : ''
   );
-
-  if (rank == null && score == null && !title) {
-    hide();
-    return;
-  }
 
   card.hidden = false;
   card.removeAttribute('aria-hidden');
