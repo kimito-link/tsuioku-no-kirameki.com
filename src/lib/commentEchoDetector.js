@@ -86,17 +86,49 @@ function detectClusters(comments, cfg) {
       cur.lastAt = it.at;
       cur.users.add(it.uid);
       cur.commentCount += 1;
-    } else {
-      // close existing if any
-      if (cur && cur.users.size >= cfg.minDistinctUsers) {
-        bursts.push({
-          text: it.key,
-          firstAt: cur.firstAt,
-          lastAt: cur.lastAt,
-          userCount: cur.users.size,
-          commentCount: cur.commentCount
+    } else if (cur) {
+      // アンカー firstAt が窓外でも、末尾 lastAt と近ければ連鎖の続き（境界ユーザー救済）。
+      // 末尾から窓より離れていれば別ピーク開始（離れた伝染を合体させない）。
+      const tailContiguous = it.at - cur.lastAt <= cfg.windowMs;
+      if (!tailContiguous) {
+        if (cur.users.size >= cfg.minDistinctUsers) {
+          bursts.push({
+            text: it.key,
+            firstAt: cur.firstAt,
+            lastAt: cur.lastAt,
+            userCount: cur.users.size,
+            commentCount: cur.commentCount
+          });
+        }
+        open.set(it.key, {
+          firstAt: it.at,
+          lastAt: it.at,
+          users: new Set([it.uid]),
+          commentCount: 1
         });
+      } else {
+        const boostedUsers = new Set(cur.users);
+        boostedUsers.add(it.uid);
+        const boostedCount = cur.commentCount + 1;
+        if (boostedUsers.size >= cfg.minDistinctUsers) {
+          bursts.push({
+            text: it.key,
+            firstAt: cur.firstAt,
+            lastAt: it.at,
+            userCount: boostedUsers.size,
+            commentCount: boostedCount
+          });
+          open.delete(it.key);
+        } else {
+          open.set(it.key, {
+            firstAt: it.at,
+            lastAt: it.at,
+            users: new Set([it.uid]),
+            commentCount: 1
+          });
+        }
       }
+    } else {
       open.set(it.key, {
         firstAt: it.at,
         lastAt: it.at,
