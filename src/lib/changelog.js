@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.353',
+    date: '2026-05-24',
+    summary: 'ギフト集計の内部処理を軽量化（動作は不変）',
+    items: Object.freeze([
+      '[改善] ギフトの送信者・履歴を内部で集計する処理を軽量化しました。記録数が上限に達したときに毎回おこなっていた並べ替えを、より軽い方法に置き換えています（記録される内容や表示はこれまでとまったく同じです）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.352',
     date: '2026-05-24',
     summary: 'イベント参加中なら順位なしでもカード表示',
