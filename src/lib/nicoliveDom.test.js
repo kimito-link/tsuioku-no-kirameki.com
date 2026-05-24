@@ -88,6 +88,58 @@ describe('parseCommentElement', () => {
     expect(li).not.toBeNull();
     expect(parseCommentElement(/** @type {Element} */ (li))).toBeNull();
   });
+
+  /*
+   * resolveUserIdOnElement の characterization（uid 解決の現挙動固定）。
+   * v0.1.356 でホットパス最適化（重い抽出 querySelectorAll('*')/outerHTML を最後に並べ替え）を
+   * 行う前に、「どの uid をどの経路で拾うか」を public な parseCommentElement 越しに固定する。
+   * 最適化後もこれらが全て同じ uid を返すこと＝解決率不変の担保。
+   */
+  describe('uid 解決の経路（最適化前の characterization）', () => {
+    it('祖先（親 li）の data-user-id を closest で拾う', () => {
+      document.body.innerHTML = `
+        <li data-user-id="111222333">
+          <div class="row"><span class="comment-text">7 やあ</span></div>
+        </li>`;
+      const textEl = document.querySelector('.comment-text');
+      expect(parseCommentElement(/** @type {Element} */ (textEl))?.userId).toBe('111222333');
+    });
+
+    it('祖先方向のプロフィールリンク（el の子に無く親側にある）から拾う', () => {
+      document.body.innerHTML = `
+        <li>
+          <a href="https://www.nicovideo.jp/user/44455566">icon</a>
+          <span id="t">9 ほんぶん</span>
+        </li>`;
+      const t = document.getElementById('t');
+      expect(parseCommentElement(/** @type {Element} */ (t))?.userId).toBe('44455566');
+    });
+
+    it('data-author-id（closest が見ない属性名）を子孫スキャンで拾う', () => {
+      const li = document.createElement('li');
+      li.innerHTML = '<span data-author-id="77788899900"></span>3 body';
+      expect(parseCommentElement(li)?.userId).toBe('77788899900');
+    });
+
+    it('ニコユーザーアイコン img の src から uid を拾う', () => {
+      const li = document.createElement('li');
+      li.innerHTML =
+        '<img src="https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/123/12345678.jpg"> 5 やあ';
+      expect(parseCommentElement(li)?.userId).toBe('12345678');
+    });
+
+    // 注: outerHTML 経路（"user_id":"..." JSON 断片）の直接検証は extractUserIdFromOuterHtml の
+    //   単体テストで担保する。happy-dom は text 内の " を &quot; に escape して outerHTML に出すため、
+    //   実ブラウザと挙動が異なり parseCommentElement 越しの characterization には不向き。
+
+    it('どの経路でも取れないと userId は null（本文・番号は出る）', () => {
+      const li = document.createElement('li');
+      li.textContent = '12 だれかわからない発言';
+      const p = parseCommentElement(li);
+      expect(p?.commentNo).toBe('12');
+      expect(p?.userId).toBeNull();
+    });
+  });
 });
 
 describe('extractUserIdFromDataAttributes', () => {
