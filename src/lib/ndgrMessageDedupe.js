@@ -180,6 +180,10 @@ export function createNdgrMessageDedupe({ perLiveMax = 4096 } = {}) {
   function clear() {
     if (buckets.size > 0) stats.bucketsCleared += buckets.size;
     buckets.clear();
+    // v0.1.356: currentLiveId もリセットする。従来は buckets だけ消して currentLiveId が
+    //   古い lv のまま残り、clear 後に同じ lv で resetForLive しても切替扱いにならず
+    //   （buckets 空なのに live 継続中という不整合）。clear は「完全な初期化」なので null に戻す。
+    currentLiveId = null;
   }
 
   return { accept, resetForLive, clearOtherLives, snapshot, clear };
