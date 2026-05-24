@@ -137,6 +137,52 @@ function storedCommentDedupeKey(lid, ex) {
 }
 
 /**
+ * mergeNewComments の incoming が dedupe キー計算で使う capturedAt を決める。
+ * - 収集側が `row.capturedAt` を載せればそれを最優先（NDGR／将来のソース時刻）。
+ * - commentNo 欠落時、ストレージ上に同一 `{ text,userId?,commentNo 空}` が 1 件だけあるなら、
+ *   その行の capturedAt でキーを組み直す（秒境界を跨いだ再取り込みでの二重保存抑止）。
+ * - それ以外は呼び出し時点の `fallbackMs`（通常 `Date.now()`）。
+ *
+ * @param {StoredComment[]} next
+ * @param {{ capturedAt?: number, commentNo?: string, text: string, userId?: string|null }} row
+ * @param {number} fallbackMs
+ * @returns {number}
+ */
+function deriveIncomingDedupeCapturedAt(next, row, fallbackMs) {
+  const cap = Number(row.capturedAt);
+  if (typeof cap === 'number' && Number.isFinite(cap) && cap > 0) {
+    return cap;
+  }
+  const commentNo = String(row.commentNo ?? '').trim();
+  if (commentNo) {
+    return fallbackMs;
+  }
+  const text = normalizeCommentText(row.text);
+  const uid = String(row.userId ?? '').trim();
+
+  /** @type {number|null} */
+  let lone = null;
+  let hits = 0;
+  for (const ex of next) {
+    /** @type {StoredComment} */
+    const entry = /** @type {StoredComment} */ (ex);
+    if (String(entry.commentNo ?? '').trim()) continue;
+    if (normalizeCommentText(entry.text) !== text) continue;
+    if (String(entry.userId ?? '').trim() !== uid) continue;
+    hits += 1;
+    if (hits === 1) {
+      const raw = Number(entry.capturedAt);
+      lone =
+        typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
+    } else {
+      lone = null;
+    }
+  }
+
+  return hits === 1 && lone != null ? lone : fallbackMs;
+}
+
+/**
  * 既存コメントに incoming の情報をパッチ適用（純関数）。
  * avatarUrl / userId / nickname / avatarObserved を「強い方優先」で更新する。
  *
@@ -231,7 +277,7 @@ export function patchExistingComment(existing, incoming) {
 /**
  * @param {string} liveId
  * @param {StoredComment[]} existing
- * @param {{ commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean }[]} incoming
+ * @param {{ commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }[]} incoming
  * @returns {{ next: StoredComment[], added: StoredComment[], storageTouched: boolean }}
  */
 export function mergeNewComments(liveId, existing, incoming) {
@@ -246,16 +292,16 @@ export function mergeNewComments(liveId, existing, incoming) {
   }
   const added = [];
   const next = /** @type {StoredComment[]} */ ([...existing]);
-  const now = Date.now();
   let storageTouched = false;
   for (const row of incoming) {
     const text = normalizeCommentText(row.text);
     if (!text) continue;
     const commentNo = String(row.commentNo ?? '').trim();
+    const capForDedupe = deriveIncomingDedupeCapturedAt(next, row, Date.now());
     const key = buildDedupeKey(lid, {
       commentNo,
       text,
-      capturedAt: now
+      capturedAt: capForDedupe
     });
 
     const idx = keyToIndex.get(key);
