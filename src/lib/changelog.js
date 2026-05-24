@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.350',
+    date: '2026-05-24',
+    summary: '広告ランキングの2行目以降が見切れる問題を修正',
+    items: Object.freeze([
+      '[修正] 広告ランキングの横並びカードが2行になったとき、7位以降が枠の下で途中まで切れて見える（中で小さくスクロールする）問題を直しました。貢献度ランキングと同じく枠の高さ上限をなくし、全員のカードを折り返してそのまま全部表示します（縦スクロールはページ全体の1本にまとまります）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.349',
     date: '2026-05-24',
     summary: '複数タブで片方が「—」固まりする不具合を修正',
