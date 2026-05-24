@@ -38,7 +38,12 @@
 const IGNORED_PATTERNS = [
   /ERR_BLOCKED_BY_CLIENT/,
   /ResizeObserver loop completed/,
-  /^Script error\.?$/i
+  /^Script error\.?$/i,
+  // v0.1.354: 拡張更新後の古いタブ（stale content script）では、保留中の chrome.* Promise が
+  //   一斉に "Extension context invalidated" で reject する。これは古いタブの正常な廃棄であり
+  //   実害が無いので ring buffer に載せない（診断ノイズ削減）。あわせて install の
+  //   rejectionListener が preventDefault して "Uncaught (in promise)" の console 出力も抑止する。
+  /Extension context invalidated/
 ];
 
 /**
@@ -153,6 +158,14 @@ export function createConsoleErrorBuffer(opts = {}) {
               : 'unhandled rejection';
         const stack =
           reason && typeof reason.stack === 'string' ? reason.stack : undefined;
+        // v0.1.354: context invalidated（古いタブの正常な廃棄）の未処理 rejection は、
+        //   preventDefault で "Uncaught (in promise)" の console 出力を抑止する。
+        //   fire-and-forget な `void asyncFn()`（内部で await chrome.*）が拡張更新後に
+        //   reject しても、ここで一括して黙過できる（個別 call site の .catch 漏れに依存しない）。
+        //   他の rejection は従来どおり（preventDefault せず record のみ）。
+        if (/Extension context invalidated/.test(message) && typeof e?.preventDefault === 'function') {
+          e.preventDefault();
+        }
         record({
           message,
           stack,

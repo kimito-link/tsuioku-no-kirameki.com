@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.354',
+    date: '2026-05-24',
+    summary: '古いタブのエラー警告漏れを根本対策（動作は不変）',
+    items: Object.freeze([
+      '[修正] 拡張を更新した後に古いタブ（前の配信ページ）が残っていると、ブラウザのコンソールに「Extension context invalidated」というエラーがまれに出続けることがある問題を、出る経路をまとめて根本的に抑えるようにしました。古いタブの正常な終了に伴うものなので実害はなく、新しいタブの記録・表示はこれまでどおりです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.353',
     date: '2026-05-24',
     summary: 'コメント二重記録の防止と内部処理の軽量化',
