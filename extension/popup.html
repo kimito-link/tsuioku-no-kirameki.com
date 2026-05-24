@@ -3094,6 +3094,15 @@
       .nl-north-star-lane[data-lane='programPoints'] {
         display: none;
       }
+      /* v0.1.359: 補助レーン（イベント累計スコア / イベント現在順位 / 広告ランキング）が
+         `no_event` 等で非表示になるべき時、JS が付ける `hidden` 属性を効かせる。
+         `.nl-north-star-lane { display: flex }` が UA の `[hidden]{display:none}` を
+         specificity で上書きしてしまい、空レーンが ~170px の縦スペースを占有していた
+         （実機: 非イベント配信で空の「イベント累計スコア/現在順位」枠が残る誤表示）。
+         他の `[hidden]` ルールと同様 `!important` で確実に畳む。 */
+      .nl-north-star-lane[hidden] {
+        display: none !important;
+      }
       .nl-north-star-lane[data-lane='giftHistory'] .nl-top-support-rank--below-cards .nl-top-support-rank__list {
         padding: 4px 2px 8px;
       }

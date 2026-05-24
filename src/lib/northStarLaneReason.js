@@ -54,6 +54,38 @@ export function hasEventParticipationSignal(bundle, snap) {
 }
 
 /**
+ * v0.1.359: 「このイベントに**確実に参加している**」と言い切れる公式 DOM 由来の
+ * 証拠だけを判定する厳格版（表示ゲート専用）。
+ *
+ * 経緯: NDGR statistics の rank/score/title は、ギフトイベント不参加の配信でも
+ * 別文脈の値が乗ることがあり（実機: 非イベント配信で「現在 N 位」「スコア 72」/
+ * 文字化けタイトルが誤表示）、`hasEventParticipationSignal` のような NDGR を含む
+ * 緩い判定を表示可否に使うと誤表示が出る。表示は公式 watch ページ DOM の確かな
+ * 証拠が在るときだけに限る（ユーザー要望「参加してない時は出さない」）。
+ *
+ * 採用する証拠（いずれも実イベント UI 由来で narrow）:
+ *  - eventBanner: 「○○さんが参加しています！」グリーンバナー（owner-name テキストで識別）。
+ *  - eventBalloon.eventTotalScore: ギフト欄の「イベント累計スコア」ラベル限定。
+ *    （`番組累計ポイント` は非イベントでも出るので eventBalloon の存在だけでは採らない）
+ *  - eventCumulativeScoreMirrorHtml / eventCurrentRankMirrorHtml: audition embed
+ *    （実イベント UI）由来の鏡 HTML。これらは eventBanner と同時にのみセットされる。
+ *
+ * NDGR 値はこの判定に**含めない**。NDGR は「目安」補助として、この判定が true の
+ * ときに限り別途添えてよい。
+ *
+ * @param {any} bundle
+ * @returns {boolean}
+ */
+export function officialEventConfirmedFromDom(bundle) {
+  if (!bundle || typeof bundle !== 'object') return false;
+  if (bundle.eventBanner) return true;
+  if (numOrNull(bundle?.eventBalloon?.eventTotalScore) != null) return true;
+  if (strNonEmpty(bundle?.eventCumulativeScoreMirrorHtml)) return true;
+  if (strNonEmpty(bundle?.eventCurrentRankMirrorHtml)) return true;
+  return false;
+}
+
+/**
  * @param {string} laneId popup.html の `data-lane="<laneId>"` に対応。
  *   'contributionRanking' | 'giftHistory' | 'eventScore' | 'programPoints' |
  *   'eventRank' | 'adRanking'
@@ -96,55 +128,37 @@ export function determineNorthStarLaneState(laneId, ctx) {
       return 'iframe_unrendered';
     }
     case 'eventScore': {
+      // v0.1.359: 公式 DOM 証拠が無い時は ok にしない（NDGR score 単独で「72」等を
+      //   非イベント配信に誤表示していたのを根絶）。表示は公式イベント UI 由来のみ。
+      if (!officialEventConfirmedFromDom(bundle)) return 'no_event';
       const dom = numOrNull(bundle?.eventBanner?.score);
       const balloon = numOrNull(bundle?.eventBalloon?.eventTotalScore);
       const mirror = strNonEmpty(bundle?.eventCumulativeScoreMirrorHtml);
       const ndgr = numOrNull(snap?.officialEventGiftScoreNdgr);
+      // 参加確証ありで具体値が在る → ok（NDGR は補助として可）。
       if (dom != null || balloon != null || mirror || ndgr != null) return 'ok';
-      // v0.1.282: 値は無いが NDGR 等がイベント参加を示す → 参加中・取得困難
-      if (hasEventParticipationSignal(bundle, snap)) {
-        return 'event_present_unscrapable';
-      }
-      // banner も balloon も NDGR も無い → イベント不参加
-      return 'no_event';
+      // 参加確証はあるが具体スコアが取れていない → 参加中・取得困難
+      return 'event_present_unscrapable';
     }
     case 'eventRank': {
-      // 鏡 mirrorHtml / banner.rank があれば ok。
-      // v0.1.241: NDGR field 6 単独は「ギフト欄の現在 N 位」と一致しないことが多いため、
-      // 「ok」判定として無条件採用はしない（純粋数値表示は誤情報リスク）。
-      // v0.1.284 撤回部分: ユーザー明示要求（lv350553787 で 67 が観測されているのに
-      // 何も出ない＝feedback_root_cause_autonomous）に合わせ、NDGR rank があれば
-      // 「目安」明示の上で表示（refreshNorthStarEventCurrentRankLaneAsync 側で
-      // ※注記つきの fallback HTML を作る）。よって reason も ok を返す。
-      // 「参考として貢献度上位」併記は撤去済（contributionRanking レーンが正本）。
+      // v0.1.359: 表示は公式 DOM 証拠（banner / balloon の event 累計 / 鏡 HTML）が
+      //   在る時だけ。NDGR rank/title/score 単独では「参加」と見なさない（実機:
+      //   非イベント配信で NDGR rank/score が乗り「現在 N 位」を誤表示。
+      //   feedback_ndgr_field6_silence に完全回帰）。
+      if (!officialEventConfirmedFromDom(bundle)) {
+        // 参加確証は無いが、ギフトはある配信ならランキングは contributionRanking 側。
+        // ここ（eventRank）は「イベント不参加」を明示し空けない。
+        return 'no_event';
+      }
       const dom = numOrNull(bundle?.eventBanner?.rank);
       const mirror = strNonEmpty(bundle?.eventCurrentRankMirrorHtml);
       const ndgr = numOrNull(snap?.officialNicoEventRankNdgr);
-      // DOM banner rank / 鏡 HTML は配信者本人の順位が確証できるので無条件 ok。
+      // DOM banner rank / 鏡 HTML は配信者本人の順位が確証できるので ok。
       if (dom != null || mirror) return 'ok';
-      // v0.1.325: NDGR rank 単独では ok にしない（実機 lv350589034: イベント不参加の
-      //   配信で NDGR rank=50 が出て誤表示）。NDGR rank を採るのは、rank 以外の
-      //   イベント参加シグナル（タイトル/バナー/バルーン/スコア）が確証できる時だけ。
-      //   ＝popup-entry の表示ガードと整合（feedback_ndgr_field6_silence に回帰）。
-      const eventConfirmedExclRank =
-        strNonEmpty(snap?.officialNicoEventTitleNdgr) ||
-        strNonEmpty(snap?.officialNicoEventTitle) ||
-        !!bundle?.eventBanner ||
-        !!bundle?.eventBalloon ||
-        strNonEmpty(bundle?.eventCumulativeScoreMirrorHtml) ||
-        numOrNull(snap?.officialEventGiftScoreNdgr) != null;
-      if (ndgr != null && ndgr > 0 && eventConfirmedExclRank) return 'ok';
-      // v0.1.282: NDGR 等がイベント参加を示す state を返す（reason/診断用）。
-      // ⛔ 2026-05-19: この state の「可視表示」は撤回（northStarLaneVisibility
-      // で非表示へ）。空 placeholder のスペース浪費をユーザーが却下したため。
-      if (hasEventParticipationSignal(bundle, snap)) {
-        return 'event_present_unscrapable';
-      }
-      const gpDom = numOrNull(bundle?.programStats?.giftPoints);
-      const gpNdgr = numOrNull(snap?.officialGiftPointsNdgr);
-      const gp = gpDom != null ? gpDom : gpNdgr;
-      if (gp != null && gp > 0) return 'iframe_unrendered';
-      return 'no_event';
+      // 参加確証ありで NDGR rank も在る → 「目安」付きで ok（補助表示）。
+      if (ndgr != null && ndgr > 0) return 'ok';
+      // 参加はしているが順位が取れていない。
+      return 'event_present_unscrapable';
     }
     case 'programPoints': {
       const dom = numOrNull(bundle?.programStats?.giftPoints);

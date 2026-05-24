@@ -8,7 +8,8 @@ import {
   decodeChat,
   decodeGift,
   decodeChunkedMessage,
-  decodePackedSegment
+  decodePackedSegment,
+  isPlausibleEventTitleText
 } from './ndgrDecode.js';
 
 function encodeVarint(value) {
@@ -113,6 +114,26 @@ describe('decodeStatistics', () => {
     expect(stats.eventGiftScore).toBe(111);
     expect(stats.eventRank).toBe(7);
     expect(stats.eventTitle).toBe('春のギフト');
+  });
+
+  it('v0.1.359: field7 が非テキストのバイト列(文字化け)なら eventTitle に採らない', () => {
+    // 非イベント配信で field7 にネスト message 等のバイナリが乗るケースを模す。
+    // 不正 UTF-8 シーケンス（孤立した継続バイト等）→ TextDecoder で U+FFFD になる。
+    const garbled = [0x57, 0x30, 0x4d, 0xff, 0xfe, 0x80, 0x81, 0x00, 0x4f, 0x9c];
+    const buf = new Uint8Array([
+      ...varintField(6, 50), // rank だけ乗っている（非イベントでも乗りうる）
+      ...lenDelimited(7, garbled)
+    ]);
+    const stats = decodeStatistics(buf, 0, buf.length);
+    expect(stats.eventRank).toBe(50);
+    // 文字化けは弾かれて eventTitle は null（＝下流のイベント誤表示を断つ）。
+    expect(stats.eventTitle).toBeNull();
+  });
+
+  it('v0.1.359: 正規の日本語タイトルは弾かれない（誤検知しない）', () => {
+    const buf = new Uint8Array([...strField(7, '春のクリエイター応援祭2026')]);
+    const stats = decodeStatistics(buf, 0, buf.length);
+    expect(stats.eventTitle).toBe('春のクリエイター応援祭2026');
   });
 
   it('ndgrStatisticsHasWireSignal: giftPoints のみでも true', () => {
@@ -1008,5 +1029,39 @@ describe('decodePackedSegment', () => {
     expect(results[0].chats[0].rawUserId).toBe(111);
     expect(results[1].chats[0].no).toBe(2);
     expect(results[1].chats[0].rawUserId).toBe(222);
+  });
+});
+
+describe('isPlausibleEventTitleText (v0.1.359)', () => {
+  it('正規のイベント名は true（日本語/英数/記号）', () => {
+    expect(isPlausibleEventTitleText('春のギフト')).toBe(true);
+    expect(isPlausibleEventTitleText('クリエイターズギフトスタジオ2026')).toBe(true);
+    expect(isPlausibleEventTitleText('Spring Gift Fest!')).toBe(true);
+    expect(isPlausibleEventTitleText('🎁ギフト祭り🎁')).toBe(true);
+  });
+
+  it('replacement char(U+FFFD)を含む文字列は false', () => {
+    expect(isPlausibleEventTitleText('W0M�w�~O�MT')).toBe(false);
+    expect(isPlausibleEventTitleText('正常�混在')).toBe(false);
+  });
+
+  it('C0/C1 制御文字を含む文字列は false（タブ/改行/復帰は許容）', () => {
+    expect(isPlausibleEventTitleText('abc\x00def')).toBe(false); // NUL
+    expect(isPlausibleEventTitleText('abc\x1bdef')).toBe(false); // ESC
+    expect(isPlausibleEventTitleText('abc\x85def')).toBe(false); // C1
+    // タブ/改行/復帰は通常テキストにも稀に混じるので許容（可読文字があれば true）。
+    expect(isPlausibleEventTitleText('春の\tギフト')).toBe(true);
+  });
+
+  it('空・空白のみ・可読文字なしは false', () => {
+    expect(isPlausibleEventTitleText('')).toBe(false);
+    expect(isPlausibleEventTitleText('   ')).toBe(false);
+    expect(isPlausibleEventTitleText('\t\n')).toBe(false);
+  });
+
+  it('非文字列は false', () => {
+    expect(isPlausibleEventTitleText(null)).toBe(false);
+    expect(isPlausibleEventTitleText(undefined)).toBe(false);
+    expect(isPlausibleEventTitleText(123)).toBe(false);
   });
 });

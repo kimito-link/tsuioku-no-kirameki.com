@@ -46,7 +46,10 @@ import {
   buildNorthStarScoreFallbackHtml,
   buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
-import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+import {
+  determineNorthStarLaneState,
+  officialEventConfirmedFromDom
+} from '../lib/northStarLaneReason.js';
 import { shouldShowNorthStarLane } from '../lib/northStarLaneVisibility.js';
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
 import {
@@ -4733,9 +4736,10 @@ function paintOfficialEventBannerCard(snapshot) {
     return '';
   };
 
-  // 表示は、イベントへの参加が確認できる時（公式 DOM 由来のバナー/バルーン、または NDGR 由来のイベントタイトルが存在する時）。
-  // NDGR の rank/score 単独による非参加配信での誤表示を防ぐため、バナー/バルーンまたはタイトルを必須条件とします。
-  // 順位（rank）が取れなくても、配信者名と累計スコアを表示できるようにします。
+  // v0.1.359: 表示可否は公式 DOM 証拠（banner / balloon の event 累計スコア / 鏡 HTML）
+  //   が在る時だけ。NDGR の title/score/rank 単独では「参加」と見なさない（実機:
+  //   非イベント配信で NDGR の文字化けタイトル/スコアが乗り「○○さんが参加しています！」
+  //   を誤表示）。確証が取れたら NDGR 値は補助として併用可。
   const broadcasterName = pickStr(snap?.broadcasterName);
   const title = pickStr(
     banner?.title,
@@ -4745,10 +4749,7 @@ function paintOfficialEventBannerCard(snapshot) {
   const rank = asNum(banner?.rank) ?? asNum(snap?.officialNicoEventRankNdgr) ?? asNum(snap?.officialNicoEventRank);
   const score = asNum(balloon?.eventTotalScore) ?? asNum(banner?.score) ?? asNum(snap?.officialEventGiftScoreNdgr);
 
-  const hasEvent =
-    banner != null ||
-    balloon != null ||
-    title !== '';
+  const hasEvent = officialEventConfirmedFromDom(bundle);
 
   if (!hasEvent) {
     hide();
@@ -6577,15 +6578,19 @@ function refreshNorthStarEventCumulativeScoreLane() {
     renderNorthStarLane('eventScore', mirrorHtml);
     return;
   }
-  const ndgrScore = typeof snap?.officialEventGiftScoreNdgr === 'number'
-    ? snap.officialEventGiftScoreNdgr
-    : null;
-  const fallback = buildNorthStarScoreFallbackHtml(ndgrScore);
-  if (fallback) {
-    renderNorthStarLane('eventScore', fallback);
-    return;
+  // v0.1.359: 公式 DOM 証拠が無い時は NDGR スコアを出さない（非イベント配信で
+  //   「72」等を誤表示していたのを根絶）。NDGR は参加確証ありの補助に限定。
+  if (officialEventConfirmedFromDom(bundle)) {
+    const ndgrScore = typeof snap?.officialEventGiftScoreNdgr === 'number'
+      ? snap.officialEventGiftScoreNdgr
+      : null;
+    const fallback = buildNorthStarScoreFallbackHtml(ndgrScore);
+    if (fallback) {
+      renderNorthStarLane('eventScore', fallback);
+      return;
+    }
   }
-  // v0.1.244: 鏡も NDGR fallback も無い → reason 判定
+  // 鏡も（確証ありの）NDGR fallback も無い → reason 判定
   const state = determineNorthStarLaneState('eventScore', { bundle, snap });
   renderNorthStarLane('eventScore', null, state);
 }
@@ -6644,22 +6649,12 @@ async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
       snap.officialNicoEventRankNdgr > 0
         ? Math.trunc(snap.officialNicoEventRankNdgr)
         : null;
-    // v0.1.325: NDGR rank 単独で「現在N位」を出さない（実機 lv350589034: イベント
-    //   不参加の配信で NDGR rank=50 が出て誤表示）。NDGR field は「ギフトイベント」
-    //   不参加の配信でも別文脈の順位値が乗ることがあるため、イベント参加が他シグナル
-    //   （イベントタイトル / バナー / スコア）で確証できる時だけ「目安」表示する。
-    //   確証が無ければ出さない＝feedback_ndgr_field6_silence に回帰（誤った数字より
-    //   出さないを選ぶ）。
-    const nonEmptyStr = (v) => typeof v === 'string' && v.trim().length > 0;
-    const eventConfirmed =
-      nonEmptyStr(snap?.officialNicoEventTitleNdgr) ||
-      nonEmptyStr(snap?.officialNicoEventTitle) ||
-      !!bundle?.eventBanner ||
-      !!bundle?.eventBalloon ||
-      nonEmptyStr(bundle?.eventCumulativeScoreMirrorHtml) ||
-      nonEmptyStr(bundle?.eventCurrentRankMirrorHtml) ||
-      (typeof snap?.officialEventGiftScoreNdgr === 'number' &&
-        Number.isFinite(snap.officialEventGiftScoreNdgr));
+    // v0.1.359: NDGR rank 単独で「現在N位」を出さない。イベント参加は公式 DOM 証拠
+    //   （banner / balloon の event 累計スコア / 鏡 HTML）でのみ確証する。NDGR の
+    //   title/score も確証材料にしない（実機: 非イベント配信で NDGR rank/score/
+    //   文字化けタイトルが乗り「現在N位」を誤表示）。確証ありの時だけ NDGR rank を
+    //   「目安」付きで補助表示＝feedback_ndgr_field6_silence に完全回帰。
+    const eventConfirmed = officialEventConfirmedFromDom(bundle);
     if (ndgrRank != null && eventConfirmed) {
       const fallback = buildNorthStarRankFallbackHtml(ndgrRank);
       if (fallback) {

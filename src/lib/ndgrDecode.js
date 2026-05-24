@@ -145,6 +145,51 @@ export function mergeNdgrStatistics(a, b) {
 }
 
 /**
+ * NDGR statistics の field 7/8/9 を eventTitle 候補として拾うが、
+ * これらは「ギフトイベント」以外のバイナリ値（ネスト message のバイト列等）が
+ * 乗ることがある。TextDecoder(fatal:false) はそれを replacement char (U+FFFD) や
+ * 制御文字だらけの文字列にデコードしてしまい、文字化けタイトルとして表示される
+ * 原因になっていた（実機: `W0M☒...` のような文字列）。
+ *
+ * 「人間が読めるイベント名」として妥当かを判定する純関数。妥当でなければ false。
+ * 日本語/英数/記号など正規のタイトルは通し、replacement・制御文字（タブ/改行を除く
+ * C0/C1）の比率が高い／可読文字がほとんど無い文字列を弾く。
+ *
+ * @param {string} s
+ * @returns {boolean}
+ */
+export function isPlausibleEventTitleText(s) {
+  if (typeof s !== 'string') return false;
+  const str = s.trim();
+  if (!str) return false;
+  // 文字単位で走査（コードポイント単位）。
+  const chars = Array.from(str);
+  let bad = 0; // replacement / 制御文字
+  let printable = 0; // 可読文字（空白以外）
+  for (const ch of chars) {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp === 0xfffd) {
+      bad += 1;
+      continue;
+    }
+    // C0 制御文字（タブ\t=9・改行\n=10・復帰\r=13 は許容）と C1 制御文字。
+    const isC0 = cp < 0x20 && cp !== 9 && cp !== 10 && cp !== 13;
+    const isC1 = cp >= 0x7f && cp <= 0x9f;
+    if (isC0 || isC1) {
+      bad += 1;
+      continue;
+    }
+    // 空白以外を可読文字とみなす。
+    if (!/\s/.test(ch)) printable += 1;
+  }
+  // 1文字でも replacement/制御が混じるイベント名は実在しない想定＝弾く。
+  if (bad > 0) return false;
+  // 可読文字が無い（記号や空白だけ等）も弾く。
+  if (printable < 1) return false;
+  return true;
+}
+
+/**
  * @param {Uint8Array} buf
  * @param {number} start
  * @param {number} end
@@ -176,6 +221,8 @@ export function decodeStatistics(buf, start, end) {
   let eventTitle = null;
   for (const cand of titleCandidates) {
     if (!cand || cand.length > 400 || /^https?:\/\//i.test(cand)) continue;
+    // 文字化け（非テキストのバイト列を誤デコードしたもの）は eventTitle に採らない。
+    if (!isPlausibleEventTitleText(cand)) continue;
     if (!eventTitle || cand.length > eventTitle.length) eventTitle = cand;
   }
   return {
