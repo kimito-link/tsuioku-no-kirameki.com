@@ -152,4 +152,76 @@ describe('createPersistCoalescer', () => {
     expect(flushFn).toHaveBeenCalledTimes(1);
     expect(c.pending()).toBe(500);
   });
+
+  it('await flushFn の途中で追加入力されても flushFn が重ならず直列フラッシュできる', async () => {
+    // burst + Promise の順序だけに依存しないよう実タイマ
+    vi.useRealTimers();
+
+    try {
+      /** @type {(() => void) | null} */
+      let gateOpen = null;
+      const barrier = new Promise((resolve) => {
+        gateOpen = resolve;
+      });
+
+      /** @returns {{ id: string }[]} */
+      const batch = (pfx) =>
+        [...Array.from({ length: 5 }, (_, i) => ({ id: `${pfx}${i}` }))];
+
+      /** @type {ReturnType<typeof createPersistCoalescer> | null} */
+      let sink = null;
+
+      let seededSecondBatch = false;
+      let overlap = 0;
+      let maxOverlap = 0;
+
+      const flushFn = vi.fn(async () => {
+        overlap += 1;
+        maxOverlap = Math.max(maxOverlap, overlap);
+        try {
+          if (!seededSecondBatch) {
+            seededSecondBatch = true;
+            /* flushBody の drain 〜 await flush の間にもう一通り「積める」状態を再現する */
+            sink?.enqueue(batch('b'));
+          }
+          await barrier;
+        } finally {
+          overlap -= 1;
+        }
+      });
+
+      sink = createPersistCoalescer(flushFn, 600_000, 5);
+
+      sink.enqueue(batch('a'));
+
+      await new Promise((r) => queueMicrotask(r));
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+
+      expect(maxOverlap).toBe(1);
+      expect(flushFn).toHaveBeenCalledTimes(1);
+
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+      /** キュー済みフラッシュまで */
+      await new Promise((r) => queueMicrotask(r));
+
+      expect(maxOverlap).toBe(1);
+      expect(flushFn).toHaveBeenCalledTimes(1);
+      gateOpen?.();
+      await barrier;
+      /** @type {Promise<void>} */
+      const job0 = flushFn.mock.results[0]?.value;
+      if (job0 && typeof /** @type {any} */ (job0)?.then === 'function') await job0;
+      /** @type {Promise<void>} */
+      const job1 = flushFn.mock.results[1]?.value;
+      if (job1 && typeof /** @type {any} */ (job1)?.then === 'function') await job1;
+
+      expect(flushFn).toHaveBeenCalledTimes(2);
+      expect(flushFn.mock.calls[0][0]).toHaveLength(5);
+      expect(flushFn.mock.calls[1][0]).toHaveLength(5);
+      expect(maxOverlap).toBe(1);
+      expect(sink.pending()).toBe(0);
+    } finally {
+      vi.useFakeTimers();
+    }
+  });
 });
