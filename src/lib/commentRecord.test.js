@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   COMMENT_TEXT_MAX_CHARS,
   normalizeCommentText,
@@ -244,6 +244,29 @@ describe('mergeNewComments', () => {
     expect(afterNdgr.next).toHaveLength(1);
     expect(afterNdgr.added).toHaveLength(0);
     expect(afterNdgr.storageTouched).toBe(false);
+  });
+
+  it('commentNo が空でも、秒境界を跨いだ再取り込みで二重追加されない', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 3, 1, 15, 0, 1, 990));
+
+    const existingRow = createCommentEntry({
+      liveId: 'lv1',
+      commentNo: '',
+      text: 'same anon line',
+      userId: 'a:beef',
+      nickname: '匿名'
+    });
+    vi.advanceTimersByTime(2500);
+
+    const { next, added } = mergeNewComments('lv1', [existingRow], [
+      { commentNo: '', text: 'same anon line', userId: 'a:beef' }
+    ]);
+
+    vi.useRealTimers();
+
+    expect(next).toHaveLength(1);
+    expect(added).toHaveLength(0);
   });
 
   it('existing が欠損フィールドでも落ちない', () => {
