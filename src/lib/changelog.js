@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.362',
+    date: '2026-05-25',
+    summary: 'ギフトのお知らせがコメントとして記録される不具合を修正',
+    items: Object.freeze([
+      '[修正] 「○○さんがギフト「XXX（Npt）」を贈りました」というギフトのお知らせ行が、まれに通常のコメントとして記録され、応援した人の一覧に混ざってしまうことがある不具合を直しました。コメント欄から記録する経路にもギフトのお知らせを除外する処理を入れ、記録対象から外すようにしました（コメントそのものの記録はこれまでどおりです）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.355',
     date: '2026-05-24',
     summary: 'コメント走査の重い処理を軽量化（動作は不変）',
