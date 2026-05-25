@@ -17,6 +17,7 @@ import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
 import { resolveReportUserThumbSrc } from './reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from './userThumbGrid.js';
+import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc.js';
 import { buildConcurrentTimelineSeries } from './concurrentTimelineSeries.js';
 import { analyzeConcurrentPeak } from './concurrentPeakAnalysis.js';
 import { detectCommentSilenceZones } from './commentSilenceZones.js';
@@ -58,6 +59,8 @@ import {
   buildSupportGrowthInsights,
   supportGrowthMetricsForAdvice
 } from './supportGrowthInsights.js';
+
+const DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${escapeHtml(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'"`;
 
 /**
  * @param {'tanu' | 'link' | 'konta'} role
@@ -1121,7 +1124,7 @@ function sectionDepartedHeavy(departed, maskShare, identiconResolver) {
         identiconResolver
       });
       const thumbCell = thumbSrc
-        ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+        ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
         : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>';
       return `<tr>
 <td>${i + 1}</td>
@@ -1169,7 +1172,7 @@ function sectionAttendanceMatrix(matrix, maskShare, identiconResolver) {
         identiconResolver
       });
       const thumbCell = thumbSrc
-        ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+        ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
         : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>';
       const cells = u.attendance
         .map(
@@ -2204,7 +2207,7 @@ function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcaster
     const labelHtml = buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
     const countText = `${u.count}件`;
     return `<li class="mkt-thumb-grid__cell">
-<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}></span>
 <span class="mkt-thumb-grid__label">${labelHtml}</span>
 <span class="mkt-thumb-grid__count">${escapeHtml(countText)}</span>
 </li>`;
