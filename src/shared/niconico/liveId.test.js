@@ -2,7 +2,8 @@
  * shared/niconico/liveId.js の契約テスト。
  *
  * この関数は表示用ではなく「比較用のキー」を作る。
- * 変換後の文字列は常に小文字 + `lv` 接頭辞で始まる or 空文字のどちらか。
+ * この関数は表示用ではなく「比較用のキー」を作る。
+ * 変換後の文字列は常に小文字で、放送 ID は「`lv……` で始まる」か「`ch……` で始まる」か空。
  */
 
 import { describe, expect, it } from 'vitest';
@@ -33,5 +34,10 @@ describe('normalizeLv', () => {
 
   it('数値入力も OK', () => {
     expect(normalizeLv(42)).toBe('lv42');
+  });
+
+  it('チャンネル放送 ch は ch 接頭辞のまま保つ（lv で二重につけない）', () => {
+    expect(normalizeLv('CH2646440')).toBe('ch2646440');
+    expect(normalizeLv('ch99')).toBe('ch99');
   });
 });

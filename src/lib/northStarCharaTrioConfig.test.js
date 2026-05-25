@@ -16,7 +16,8 @@ import {
   buildCharaTrioRenderModel,
   describeCharaTrioTier,
   buildCharaTrioSlotTitle,
-  resolveCharaTrioSlotScrollTargetLaneId
+  resolveCharaTrioSlotScrollTargetLaneId,
+  resolveCharaTrioSlotScrollLaneIdCandidates
 } from './northStarCharaTrioConfig.js';
 
 describe('NORTH_STAR_CHARA_TRIO_SLOTS 不変条件', () => {
@@ -162,6 +163,37 @@ describe('resolveCharaTrioSlotScrollTargetLaneId', () => {
     expect(resolveCharaTrioSlotScrollTargetLaneId(null)).toBe(null);
     // @ts-expect-error 不正入力の防御
     expect(resolveCharaTrioSlotScrollTargetLaneId(undefined)).toBe(null);
+  });
+});
+
+describe('resolveCharaTrioSlotScrollLaneIdCandidates', () => {
+  it('konta: 広告→ギフト→貢献度（補助 hidden 時のフォールバック）', () => {
+    expect(resolveCharaTrioSlotScrollLaneIdCandidates('konta')).toEqual([
+      'adRanking',
+      'giftHistory',
+      'contributionRanking'
+    ]);
+  });
+
+  it('rink: 貢献度→ギフト（コア同士は重複なし）', () => {
+    expect(resolveCharaTrioSlotScrollLaneIdCandidates('rink')).toEqual([
+      'contributionRanking',
+      'giftHistory'
+    ]);
+  });
+
+  it('tanu: ギフト→貢献度', () => {
+    expect(resolveCharaTrioSlotScrollLaneIdCandidates('tanu')).toEqual([
+      'giftHistory',
+      'contributionRanking'
+    ]);
+  });
+
+  it('未知 slot は空配列', () => {
+    expect(resolveCharaTrioSlotScrollLaneIdCandidates('hoge')).toEqual([]);
+    expect(resolveCharaTrioSlotScrollLaneIdCandidates('')).toEqual([]);
+    // @ts-expect-error 不正入力の防御
+    expect(resolveCharaTrioSlotScrollLaneIdCandidates(null)).toEqual([]);
   });
 });
 

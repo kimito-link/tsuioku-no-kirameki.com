@@ -10,7 +10,8 @@ import {
  * 別 live のタブから誤って受け取ったデータの混入を防ぐ生成ガード。
  *
  * snapshot 専用の `snapshotLooksAlignedWithWatchUrl` を NLS_* 応答全般に拡張した
- * generic 版。応答に `liveId` または `frameHref` が含まれていれば lv 比較する。
+ * generic 版。応答に `liveId` または `frameHref` が含まれていれば
+ * `extractLiveIdFromUrl`（`lv…` / `ch…`）で比較する。
  *
  * @param {{ liveId?: unknown, frameHref?: unknown } | null | undefined} response
  * @param {string | null | undefined} watchUrl
@@ -19,21 +20,21 @@ import {
 export function responseAlignedWithWatchUrl(response, watchUrl) {
   const watch = String(watchUrl || '').trim();
   if (!watch) return true;
-  const expectedLv = extractLiveIdFromUrl(watch);
-  if (!expectedLv) return true; // ch 等で lv が抽出できない場合は緩く通す
+  const expectedBv = extractLiveIdFromUrl(watch);
+  if (!expectedBv) return true; // pathname から lv/ch が抽出できない場合は緩く通す
   if (!response || typeof response !== 'object') return true;
   const r = /** @type {{ liveId?: unknown, frameHref?: unknown }} */ (response);
-  const respLv = extractLiveIdFromUrl(String(r.liveId || ''));
-  const frameLv = extractLiveIdFromUrl(String(r.frameHref || ''));
-  if (respLv && respLv !== expectedLv) return false;
-  if (frameLv && frameLv !== expectedLv) return false;
+  const respBv = extractLiveIdFromUrl(String(r.liveId || ''));
+  const frameBv = extractLiveIdFromUrl(String(r.frameHref || ''));
+  if (respBv && respBv !== expectedBv) return false;
+  if (frameBv && frameBv !== expectedBv) return false;
   return true;
 }
 
 /**
  * snapshot が「解決済み watch URL」と同じ放送由来かを判定する。
- * - lv が取れる場合は lv 優先で厳密判定
- * - lv が取れない（ch など）場合は URL 緩一致にフォールバック
+ * - lv / ch が URL から取れる場合は放送 ID 優先で厳密判定
+ * - 取れない場合は URL 緩一致にフォールバック
  *
  * @param {unknown} snapshot
  * @param {string | null | undefined} watchUrl
@@ -49,20 +50,20 @@ export function snapshotLooksAlignedWithWatchUrl(
   if (!watch) return true;
   if (!snapshot || typeof snapshot !== 'object') return false;
 
-  const expectedLv = extractLiveIdFromUrl(watch);
+  const expectedBv = extractLiveIdFromUrl(watch);
   const s = /** @type {Record<string, unknown>} */ (snapshot);
   const snapLiveId = extractLiveIdFromUrl(String(s.liveId || ''));
   const snapUrl = String(s.url || '').trim();
-  const snapUrlLv = extractLiveIdFromUrl(snapUrl);
-  const tabLv = extractLiveIdFromUrl(String(candidateTabUrl || ''));
+  const snapUrlBv = extractLiveIdFromUrl(snapUrl);
+  const tabBv = extractLiveIdFromUrl(String(candidateTabUrl || ''));
 
-  if (expectedLv) {
-    if (snapLiveId && snapLiveId !== expectedLv) return false;
-    if (snapUrlLv && snapUrlLv !== expectedLv) return false;
-    if (tabLv && tabLv !== expectedLv) return false;
+  if (expectedBv) {
+    if (snapLiveId && snapLiveId !== expectedBv) return false;
+    if (snapUrlBv && snapUrlBv !== expectedBv) return false;
+    if (tabBv && tabBv !== expectedBv) return false;
 
-    if (snapLiveId === expectedLv) return true;
-    if (snapUrlLv === expectedLv) return true;
+    if (snapLiveId === expectedBv) return true;
+    if (snapUrlBv === expectedBv) return true;
 
     if (snapUrl) {
       return watchPageUrlsMatchForSnapshot(snapUrl, watch);

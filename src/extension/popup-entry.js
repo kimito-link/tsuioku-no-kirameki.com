@@ -31,6 +31,7 @@ import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 import { eventParticipationStorageKey } from '../lib/eventParticipationProgramsApi.js';
+import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import {
   iframeOfficialDomStorageKey,
   resolveContributionRankingRowsFromSources
@@ -39,9 +40,10 @@ import {
   findCharaTrioSlotByLaneId,
   tierToTrioCharaSrc,
   buildCharaTrioSlotTitle,
-  resolveCharaTrioSlotScrollTargetLaneId
+  resolveCharaTrioSlotScrollLaneIdCandidates
 } from '../lib/northStarCharaTrioConfig.js';
 import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
+import { isStatValuePlaceholderText } from '../lib/liveStatValuePlaceholder.js';
 import {
   buildNorthStarRankFallbackHtml,
   buildNorthStarScoreFallbackHtml,
@@ -698,21 +700,6 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
   _prevSupportCount = null;
   _prevViewerCount = null;
   _prevConcurrentEstimated = null;
-}
-
-/**
- * `.nl-live-stat-value` に流す文言が「数字以外（フォールバック）」かを判定する。
- * 数字 (`'1,234'`) と「~」プレフィックス推定値 (`'~250'`) は数値扱い。
- * 「（取得不可）」「計測中…」「—」「-」などはフォールバック扱いで、CSS 側で
- * 小さめサイズに切り替える（極太22px のままだと幅100px のカードで縦書き状に
- * 折り返されて読めなくなる、0.1.68 修正）。
- * @param {string} text
- * @returns {boolean}
- */
-function isStatValuePlaceholderText(text) {
-  const t = String(text ?? '').trim();
-  if (!t) return true;
-  return !/^~?[\d,，]+$/.test(t);
 }
 
 /** 記録・同接・来場の三カードに、数値確定までキャラ重ねのローディングを同期する。 */
@@ -6286,9 +6273,17 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
     const totalPtSum = senderTotals.reduce((s, r) => s + (Number(r.totalPoints) || 0), 0);
     // pt が 1 件でもあるときだけ pt ランキングを採用（全 0 は回数の方が情報量あり）
     if (senderTotals.length > 0 && totalPtSum > 0) {
-      const senderN = senderTotals.length;
-      const throwM = senderTotals.reduce((s, r) => s + (Number(r.throwCount) || 0), 0);
-      const rooms = senderTotals.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
+      const positiveOnly = senderTotals.filter(
+        (r) => (Number(r.totalPoints) || 0) > 0
+      );
+      const rankedSenders =
+        positiveOnly.length > 0 ? positiveOnly : senderTotals;
+      const senderN = rankedSenders.length;
+      const throwM = rankedSenders.reduce(
+        (s, r) => s + (Number(r.throwCount) || 0),
+        0
+      );
+      const rooms = rankedSenders.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
         const userKey = String(r.userKey || '');
         const nickname =
           (userKey && _nicknameResolveMap.get(userKey)) || String(r.nickname || '');
@@ -6537,6 +6532,31 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
 }
 
 /**
+ * イベント参加中レーン用: 公式バナー由来の「この配信の順位」一行（beforeNote）。
+ * @returns {string} HTML snippet（未取得時は空文字）
+ */
+function buildEventBroadcasterLaneCurrentRankPretext() {
+  const bundle = _lastOfficialEventDomBundle;
+  const rank =
+    typeof bundle?.eventBanner?.rank === 'number' &&
+    Number.isFinite(bundle.eventBanner.rank) &&
+    bundle.eventBanner.rank > 0
+      ? Math.floor(bundle.eventBanner.rank)
+      : null;
+  if (rank == null) return '';
+  const scoreRaw = bundle?.eventBanner?.score;
+  const score =
+    typeof scoreRaw === 'number' && Number.isFinite(scoreRaw) && scoreRaw >= 0
+      ? scoreRaw
+      : null;
+  const line =
+    score != null
+      ? `この配信のイベント順位: ${rank}位（💎 ${Number(score).toLocaleString('ja-JP')}）`
+      : `この配信のイベント順位: ${rank}位`;
+  return `<p class="nl-top-support-rank__pretext">${escapeHtml(line)}</p>`;
+}
+
+/**
  * 第2弾 北極星レーン「同じイベントに参加中の配信者」。
  *
  * content が参加番組一覧 API（イベント参加中のみ）から視聴者数降順で正規化して
@@ -6546,6 +6566,9 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
  * ⚠️ この API は順位/スコアを持たない名簿なので、表示は「視聴者数の多い順」であって
  * イベントスコア順位ではない（UI の note で明示）。スコア順位（プレイヤーパネルの
  * ゴリアテ1位…）は別ソース＝[[reference_event_participant_broadcaster_ranking_research]]。
+ *
+ * v0.1.370: audition richview relay（nls_event_score_ranking_<lv>）に 💎 スコア順
+ * TOP10 があればこちらを優先表示する（参加 API の視聴者数順はフォールバック）。
  *
  * fail-soft: イベント不参加（保存が無い）配信ではレーン枠ごと隠す（空枠で縦を食わない＝
  * [[reference_north_star_lane_hidden_css_specificity]]）。
@@ -6558,28 +6581,66 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
 
   /** @type {any[]|null} */
-  let rows = null;
+  let participationRows = null;
+  /** @type {any[]|null} */
+  let eventScoreRows = null;
   if (/^lv\d{1,15}$/.test(lid)) {
     try {
-      const key = eventParticipationStorageKey(lid);
-      const bag = await chrome.storage.local.get([key]);
-      const v = bag[key];
-      if (v && typeof v === 'object' && Array.isArray(v.rows)) rows = v.rows;
+      const pKey = eventParticipationStorageKey(lid);
+      const sKey = eventScoreRankingStorageKey(lid);
+      const bag = await chrome.storage.local.get([pKey, sKey]);
+      const pv = bag[pKey];
+      if (pv && typeof pv === 'object' && Array.isArray(pv.rows))
+        participationRows = pv.rows;
+      const sv = bag[sKey];
+      if (
+        sv &&
+        typeof sv === 'object' &&
+        Array.isArray(sv.rows) &&
+        sv.rows.length > 0
+      ) {
+        eventScoreRows = sv.rows;
+      }
     } catch {
       /* no-op */
     }
   }
 
-  if (rows && rows.length > 0) {
+  const pretext = buildEventBroadcasterLaneCurrentRankPretext();
+
+  if (eventScoreRows && eventScoreRows.length > 0) {
+    setNorthStarLaneHidden('eventBroadcasters', false);
+    const contribRows = eventScoreRows.slice(0, 10).map((raw) => {
+      const row = raw && typeof raw === 'object' ? raw : {};
+      const contribution =
+        typeof row.score === 'number' && Number.isFinite(row.score) ? row.score : 0;
+      return { ...row, contribution };
+    });
+    const rooms = officialDomRankingRowsToStripRooms(contribRows, { userKeyKind: 'contrib' });
+    paintTopSupportRankStyleIntoElement(body, rooms, {
+      noteText: 'イベント参加中💎スコア上位10（公式一覧に準拠）',
+      unitSuffix: '💎',
+      ariaLabel: 'イベント💎スコア順ランキング',
+      isNorthStarBody: true,
+      beforeNoteHtml: pretext
+    });
+    return;
+  }
+
+  if (participationRows && participationRows.length > 0) {
     setNorthStarLaneHidden('eventBroadcasters', false);
     // 既に正規化済み（rank/name/contribution=視聴者数/thumbnailUrl/userPageUrl）。
     // 記名（userPageUrl 付き）行は uid リンク経路が発火する＝userKeyKind:'contrib' で十分。
-    const rooms = officialDomRankingRowsToStripRooms(rows.slice(0, 10), { userKeyKind: 'contrib' });
+    const rooms = officialDomRankingRowsToStripRooms(
+      participationRows.slice(0, 10),
+      { userKeyKind: 'contrib' }
+    );
     paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText: '同じイベントに参加中の配信者（視聴者数の多い順。イベントの順位ではありません）',
       unitSuffix: '人',
       ariaLabel: 'イベント参加中の配信者',
-      isNorthStarBody: true
+      isNorthStarBody: true,
+      beforeNoteHtml: pretext
     });
     return;
   }
@@ -7703,6 +7764,40 @@ function scrollNlMainToRevealElement(el) {
     pad
   );
   if (delta !== 0) main.scrollTop += delta;
+}
+
+/**
+ * 北極星 trio / 関連 UI（こん太の顔など）から、担当レーンへスクロールする。
+ * `adRanking` など補助レーンが `hidden` のときは、`northStarLaneVisibility` のコア常設へフォールバックする。
+ *
+ * @param {string} slotId rink | konta | tanu
+ */
+function scrollNorthStarForCharaTrioSlot(slotId) {
+  const laneIds = resolveCharaTrioSlotScrollLaneIdCandidates(slotId);
+  for (let i = 0; i < laneIds.length; i++) {
+    const laneId = String(laneIds[i] ?? '').trim();
+    if (!laneId) continue;
+    const lane = document.querySelector(
+      `.nl-north-star-lane[data-lane="${laneId.replace(/"/g, '')}"]`
+    );
+    if (!(lane instanceof HTMLElement)) continue;
+    if (lane.hidden) continue;
+    let cs = null;
+    try {
+      cs = globalThis.getComputedStyle(lane);
+    } catch {
+      cs = null;
+    }
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) continue;
+
+    try {
+      lane.scrollIntoView({ behavior: 'auto', block: 'start' });
+    } catch {
+      lane.scrollIntoView(true);
+    }
+    scrollNlMainToRevealElement(lane);
+    return;
+  }
 }
 
 /** 開いた直後のレイアウト確定後にコールバック（1フレームでは高さ未反映のことがある） */
@@ -12225,13 +12320,17 @@ async function runOneTimeBackfillRemoveRecommendedUserChipPollution() {
 /**
  * 北極星 3 キャラ trio パネルの各 slot に click / keydown handler を attach する。
  *
- * v0.1.294 (Antigravity §6.4 続編): trio slot を click すると対応レーンへ smooth
- * scroll する。「気になるキャラを押す → 詳細レーンへ即移動」の自然な UX。
+ * v0.1.294〜: trio slot を activate すると対応レーンへスクロール（`behavior:auto`）。
+ * 「気になるキャラを押す → 詳細レーンへ移動」の自然な UX。
+ *
+ * v0.1.376: `adRanking` が非表示でもコアへフォールバック（無反応の解消）。
+ * v0.1.377: クリックは capture でスロットが先に処理（pointer-events で子を無効化すると
+ * `.nl-north-star-chara-trio__pct-num` 等が抜けて反応しない事故があった）。
  *
  * - 二重 bind 防止: `dataset.nlClickBound === '1'` チェック
+ * - mouse: capture phase で子の上のクリックも必ずここへ
  * - keyboard: Enter / Space で activate（role="button" + tabindex="0" で a11y 確保）
- * - 純関数 resolveCharaTrioSlotScrollTargetLaneId() で slot → lane の解決を行う
- *   ＝3 年後に scroll target を変えたい時は本関数を触らず純関数 1 箇所修正で済む
+ * - lane 優先順は `resolveCharaTrioSlotScrollLaneIdCandidates()`（純関数）に集約
  */
 function attachCharaTrioSlotClickHandlers() {
   const slots = document.querySelectorAll('.nl-north-star-chara-trio__slot[data-nl-trio-slot]');
@@ -12242,22 +12341,9 @@ function attachCharaTrioSlotClickHandlers() {
     slotEl.setAttribute('role', 'button');
     slotEl.tabIndex = 0;
     const onActivate = () => {
-      const slotId = String(slotEl.dataset.nlTrioSlot || '');
-      const laneId = resolveCharaTrioSlotScrollTargetLaneId(slotId);
-      if (!laneId) return;
-      const lane = document.querySelector(
-        `.nl-north-star-lane[data-lane="${laneId}"]`
-      );
-      if (lane instanceof HTMLElement) {
-        try {
-          lane.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } catch {
-          // 一部古い環境では options 引数未対応 → fallback
-          lane.scrollIntoView(true);
-        }
-      }
+      scrollNorthStarForCharaTrioSlot(String(slotEl.dataset.nlTrioSlot || ''));
     };
-    slotEl.addEventListener('click', onActivate);
+    slotEl.addEventListener('click', onActivate, true);
     slotEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -12267,8 +12353,33 @@ function attachCharaTrioSlotClickHandlers() {
   });
 }
 
+/**
+ * 「推定同時接続」カード全体クリックでもこん太と同様に北極星レーンへ飛ぶ（空き領域含む）。
+ * capture で子の値ラベルを押しても確実に拾う。
+ */
+function attachWatchConcurrentCardCharaNorthStarJump() {
+  const card = document.getElementById('watchConcurrentCard');
+  if (!(card instanceof HTMLElement)) return;
+  if (card.dataset.nlConcurrentCharaJumpBound === '1') return;
+  card.dataset.nlConcurrentCharaJumpBound = '1';
+  const go = () => scrollNorthStarForCharaTrioSlot('konta');
+  card.addEventListener('click', go, true);
+  const icon = card.querySelector(':scope > img.nl-live-stat-icon');
+  if (icon instanceof HTMLElement) {
+    icon.tabIndex = 0;
+    icon.setAttribute('role', 'button');
+    icon.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        go();
+      }
+    });
+  }
+}
+
 function initPopup() {
   attachCharaTrioSlotClickHandlers();
+  attachWatchConcurrentCardCharaNorthStarJump();
   void runOneTimeBackfillRemoveGiftSystemMessages();
   void runOneTimeBackfillRemoveRecommendedLivePollution();
   void runOneTimeBackfillRemoveRecommendedLivePollutionV2();

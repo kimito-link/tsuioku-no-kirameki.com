@@ -87,6 +87,12 @@ import {
   captureAuditionRichviewEventScoreDiagProbe,
   isAuditionRichviewLivePath
 } from '../lib/captureAuditionRichviewEventScoreDiagProbe.js';
+import { scrapeEventScoreRankingFromRichviewDom } from '../lib/scrapeEventScoreRankingFromRichviewDom.js';
+import {
+  eventScoreRankingStorageKey,
+  EVENT_SCORE_RANKING_STORAGE_PREFIX,
+  validateEventScoreRankingRelayPayload
+} from '../lib/eventScoreRankingRelay.js';
 import { classifyGiftSubAppFrameSource } from '../lib/giftSubAppFrameSource.js';
 import { captureSameOriginContributionRankingDomShape } from '../lib/sameOriginContribRankingDomShape.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
@@ -2049,6 +2055,47 @@ window.addEventListener('message', (e) => {
 
 window.addEventListener('message', (e) => {
   if (!e?.data || typeof e.data.type !== 'string') return;
+  if (e.data.type !== 'NLS_EVENT_SCORE_RANKING_FROM_IFRAME') return;
+  if (
+    !isTrustedGiftSubAppRelayMessage({
+      data: e.data,
+      origin: e.origin,
+      isSelfSource: e.source === window
+    })
+  ) {
+    return;
+  }
+  const lid = resolveGiftRelayStorageLiveId(liveId, e.data.frameUrl);
+  if (!lid || !hasExtensionContext()) return;
+  const rows = Array.isArray(e.data.rows) ? e.data.rows : null;
+  const check = validateEventScoreRankingRelayPayload({
+    frameUrl: e.data.frameUrl,
+    rows,
+    destinationLiveId: lid
+  });
+  if (!check.ok) return;
+  try {
+    chrome.storage.local
+      .set({
+        [eventScoreRankingStorageKey(lid)]: {
+          rows: rows.slice(0, 10),
+          capturedAt: Date.now(),
+          liveId: lid,
+          frameUrl: String(e.data.frameUrl || '').slice(0, 500)
+        }
+      })
+      .catch((err) => {
+        if (!isContextInvalidatedError(err)) {
+          /* best-effort */
+        }
+      });
+  } catch {
+    /* no-op */
+  }
+});
+
+window.addEventListener('message', (e) => {
+  if (!e?.data || typeof e.data.type !== 'string') return;
   if (e.data.type !== 'NLS_GIFT_HISTORY_FROM_IFRAME') return;
   // v0.1.234 認証強化: heartbeat と同じく cross-origin iframe trust 検証を通す
   if (
@@ -2363,7 +2410,7 @@ function ensurePageFrameStyle() {
       width: 100%;
       margin: 2px 0 2px;
       opacity: 0;
-      transition: opacity 0.25s ease-in-out;
+      transition: opacity 0.14s ease-out;
       pointer-events: auto;
       position: relative;
       z-index: 2147482000;
@@ -2390,7 +2437,8 @@ function ensurePageFrameStyle() {
       box-shadow: none !important;
       outline: none !important;
       pointer-events: auto;
-      background: transparent;
+      /* popup.html --nl-bg と揃え、load 前後の白フラッシュや黒一瞬を抑える（透明にして親の背景に馴染ませる） */
+      background-color: transparent;
       display: block;
     }
     #${INLINE_POPUP_HOST_ID} iframe:focus,
@@ -2485,6 +2533,15 @@ function pickPrimaryInlinePopupHostFromDom() {
  * @param {HTMLIFrameElement} iframe
  */
 function attachInlineIframeRevealFallback(host, iframe) {
+  const revealIframeAndHost = () => {
+    // ダブル rAF でレイアウト確定〜初回ペイントに寄せ、空枠／黒の一瞬を減らす
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        iframe.style.visibility = 'visible';
+        host.style.opacity = '1';
+      });
+    });
+  };
   iframe.addEventListener(
     'load',
     () => {
@@ -2492,18 +2549,14 @@ function attachInlineIframeRevealFallback(host, iframe) {
         clearTimeout(inlineIframeVisibilityTimer);
         inlineIframeVisibilityTimer = null;
       }
-      requestAnimationFrame(() => {
-        iframe.style.visibility = 'visible';
-        host.style.opacity = '1';
-      });
+      revealIframeAndHost();
     },
     { once: true }
   );
   if (inlineIframeVisibilityTimer) clearTimeout(inlineIframeVisibilityTimer);
   inlineIframeVisibilityTimer = setTimeout(() => {
     inlineIframeVisibilityTimer = null;
-    iframe.style.visibility = 'visible';
-    host.style.opacity = '1';
+    revealIframeAndHost();
   }, 2000);
 }
 
@@ -2540,6 +2593,11 @@ function ensureInlinePopupIframe(host) {
     Boolean(expectedSrc) && Boolean(existing) && srcTrim === expectedSrc;
 
   if (sameSrc && existing) {
+    try {
+      existing.style.backgroundColor = 'transparent';
+    } catch {
+      // no-op
+    }
     let docState = null;
     try {
       docState = existing.contentDocument?.readyState ?? null;
@@ -2584,7 +2642,15 @@ function ensureInlinePopupIframe(host) {
     iframe.setAttribute('allow', 'microphone');
     iframe.style.pointerEvents = 'auto';
     iframe.style.visibility = 'hidden';
+    // 読み込み直後の下地が白っぽく見えるのを防ぐ（透明にして親の背景に馴染ませる）
+    iframe.style.backgroundColor = 'transparent';
     host.appendChild(iframe);
+  } else {
+    try {
+      iframe.style.backgroundColor = 'transparent';
+    } catch {
+      // no-op
+    }
   }
   if (expectedSrc) {
     iframe.setAttribute('src', expectedSrc);
@@ -4173,7 +4239,8 @@ function showToolbarOpenInstantFeedback() {
 }
 
 /**
- * iframe レイアウト確定後の smooth scroll / focus（ツールバー応答とは非同期）。
+ * iframe レイアウト確定後の scrollIntoView / focus（ツールバー応答とは非同期）。
+ * 0.1.374: 追従スクロールは `smooth` だと本体の重いレイアウトと重なり黒フレーム体感が出やすいので `auto` に寄せる。
  */
 function scheduleInlinePanelToolbarFocusPolish() {
   void (async () => {
@@ -4197,7 +4264,7 @@ function scheduleInlinePanelToolbarFocusPolish() {
       if (!ready) return;
       try {
         suppressOwnScrollCountingFor(1000);
-        ready.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        ready.scrollIntoView({ block: 'nearest', behavior: 'auto' });
       } catch {
         try {
           ready.scrollIntoView();
@@ -4237,7 +4304,7 @@ function scheduleInlinePanelToolbarFocusPolish() {
  *
  * 0.1.274+: **同期で boolean を返す**。background の `tabs.sendMessage` が
  *   microtask までブロックされ「こん太を押しても一瞬何も起きない」体感になるのを避ける。
- *   smooth scroll / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
+ *   async scrollIntoView / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
  *
  * @returns {boolean}
  */
@@ -7823,7 +7890,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
      * 0.1.11 (B1 race fix): background の `tabs.sendMessage` が遅いと「こん太を押しても
      *   一瞬何も起きない」体感になる。`focusInlinePanelHostFromToolbar` は同期で boolean
      *   を返し、`sendResponse` もこのターンで完了させる（return false）。
-     *   smooth scroll / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
+     *   async scrollIntoView / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
      */
     let focused = false;
     try {
@@ -10077,6 +10144,10 @@ async function start() {
       clearInterval(kokenContribApiIntervalId);
       kokenContribApiIntervalId = null;
     }
+    if (eventParticipationFetchIntervalId != null) {
+      clearInterval(eventParticipationFetchIntervalId);
+      eventParticipationFetchIntervalId = null;
+    }
     // 0.1.29 (AD): 拡張リロード後、旧 MutationObserver が DOM 変化のたびに
     // 走り続けて CPU を消費する。callback 内の hasExtensionContext() check で
     // 早期 return するが、observer 自体を disconnect しておく方が確実。
@@ -10223,7 +10294,8 @@ async function start() {
   // 核心: koken 公式貢献度ランキング無認証 API の鏡（officialEventDomScrape の
   // sibling。NDGR/gift hotpath 非干渉・SW 経由・専用キー・rows>0 のみ書込）。
   // 初回は startup harvest 窓を外して 3.5s 後、以後 30s 間隔。teardown は
-  // stopContentIntervalsIfContextInvalidated（kokenContribApiIntervalId）。
+  // stopContentIntervalsIfContextInvalidated（kokenContribApiIntervalId と
+  // eventParticipationFetchIntervalId）。
   // v0.1.331: 初回を 10s→3.5s に短縮（貢献度レーンの「取得中」張り付き対策）。
   //   旧 10s は起動直後のコメント大量取り込み(deep harvest)バーストと競合させない猶予
   //   だったが、harvest の主バーストは ~2-3s で収まるため 3.5s でも干渉せず、watch を
@@ -10251,9 +10323,23 @@ async function start() {
         }
         maybeFetchKokenContribRankingMirrorOnce();
         maybeFetchNicoadContribRankingMirrorOnce();
-        maybeFetchEventParticipationMirrorOnce();
         void maybeResolveNamedUserProfilesOnce();
       }, KOKEN_CONTRIB_API_FETCH_MS)
+    )
+  );
+  eventParticipationFetchIntervalId = /** @type {number} */ (
+    /** @type {unknown} */ (
+      setInterval(() => {
+        if (stopContentIntervalsIfContextInvalidated()) return;
+        if (!recording || !liveId) return;
+        if (
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'hidden'
+        ) {
+          return;
+        }
+        maybeFetchEventParticipationMirrorOnce();
+      }, EVENT_PARTICIPATION_API_FETCH_MS)
     )
   );
 }
@@ -10266,14 +10352,18 @@ const KOKEN_CONTRIB_API_FETCH_MS = 30_000;
 const KOKEN_CONTRIB_API_MIN_GAP_MS = 25_000;
 /** @type {number|null} */
 let kokenContribApiIntervalId = null;
+/** @type {number|null} */
+let eventParticipationFetchIntervalId = null;
 /** @type {number} */
 let _kokenContribApiLastAttemptAt = 0;
 /** nicoad 広告ランキング API の再入抑止（koken と同じ min-gap 規約）。 */
 const NICOAD_CONTRIB_API_MIN_GAP_MS = 25_000;
 /** @type {number} */
 let _nicoadContribApiLastAttemptAt = 0;
-/** 参加配信者一覧 API（第2弾）の再入抑止（koken/nicoad と同じ min-gap 規約）。 */
-const EVENT_PARTICIPATION_API_MIN_GAP_MS = 25_000;
+/** 参加配信者一覧 API の専用ポーリング間隔（ms）。30s の koken と切り離して遅延を減らす。 */
+const EVENT_PARTICIPATION_API_FETCH_MS = 12_000;
+/** 参加配信者一覧 API の再入抑止（FETCH 周期に合わせ 10s、v0.1.370）。 */
+const EVENT_PARTICIPATION_API_MIN_GAP_MS = 10_000;
 /** @type {number} */
 let _eventParticipationApiLastAttemptAt = 0;
 /** 1 tick で nvapi に問い合わせる記名 uid の最大数。 */
@@ -10843,6 +10933,8 @@ function maybeStartGiftSubAppIframeRelay() {
 
   /** @type {string} */
   let lastSent = '';
+  /** audition richview のイベント💎順位 TOP10 relay 重複抑制 */
+  let lastEventScoreRankingSig = '';
   /** v0.1.227: scan tick の累積回数。heartbeat に乗せて「relay は起動してるが scrape 0 件」を区別する */
   let scrapeAttempts = 0;
   /**
@@ -10977,6 +11069,39 @@ function maybeStartGiftSubAppIframeRelay() {
         },
         '*'
       );
+    } catch {
+      /* no-op */
+    }
+
+    // v0.1.370: gift 履歴が空でも、richview 内にイベント💎順位リストがあれば親へ送る。
+    let eventScoreRowsForRelay = null;
+    try {
+      if (isAuditionRichviewLivePath(href)) {
+        eventScoreRowsForRelay = scrapeEventScoreRankingFromRichviewDom(document);
+      }
+    } catch {
+      eventScoreRowsForRelay = null;
+    }
+    try {
+      if (eventScoreRowsForRelay && eventScoreRowsForRelay.length > 0) {
+        const top10 = eventScoreRowsForRelay.slice(0, 10);
+        const sig = JSON.stringify(
+          top10.map((r) => [r.rank, r.score, r.name, r.isAnonymous, r.thumbnailUrl])
+        );
+        if (sig !== lastEventScoreRankingSig) {
+          lastEventScoreRankingSig = sig;
+          const target = window.top || window.parent;
+          target.postMessage(
+            {
+              type: 'NLS_EVENT_SCORE_RANKING_FROM_IFRAME',
+              frameUrl: href,
+              rows: top10,
+              scrapedAt: Date.now()
+            },
+            '*'
+          );
+        }
+      }
     } catch {
       /* no-op */
     }
@@ -11519,6 +11644,26 @@ async function persistOfficialEventDomBundleNow() {
         });
         if (staleEventPartKeys.length) {
           await chrome.storage.local.remove(staleEventPartKeys);
+        }
+      } catch { /* best-effort */ }
+      // イベント💎順位 relay キャッシュ（nls_event_score_ranking_<lv>）も同規約で cleanup
+      try {
+        const EVENT_SCORE_RANKING_TTL_MS = 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const curLid = String(lid || '').trim().toLowerCase();
+        const staleEvtScoreKeys = Object.keys(all).filter((k) => {
+          if (!k.startsWith(EVENT_SCORE_RANKING_STORAGE_PREFIX)) return false;
+          const klv = k.slice(EVENT_SCORE_RANKING_STORAGE_PREFIX.length);
+          if (klv && curLid && klv === curLid) return false;
+          const v = all[k];
+          const cap =
+            v && typeof v === 'object' && typeof v.capturedAt === 'number'
+              ? v.capturedAt
+              : 0;
+          return cap === 0 || nowMs - cap >= EVENT_SCORE_RANKING_TTL_MS;
+        });
+        if (staleEvtScoreKeys.length) {
+          await chrome.storage.local.remove(staleEvtScoreKeys);
         }
       } catch { /* best-effort */ }
       const nicoadLvs = Object.keys(all)

@@ -1,5 +1,5 @@
 /**
- * ニコ生 放送 ID (lv…) の正規化ユーティリティ。
+ * ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
  *
  * レイヤ: shared/ (ドメイン非依存 / 最下層)
  *
@@ -24,5 +24,6 @@
 export function normalizeLv(v) {
   const s = String(v ?? '').trim().toLowerCase();
   if (!s) return '';
+  if (s.startsWith('ch')) return s;
   return s.startsWith('lv') ? s : `lv${s}`;
 }

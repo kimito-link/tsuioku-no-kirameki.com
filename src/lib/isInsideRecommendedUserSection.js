@@ -17,7 +17,7 @@ export function isInsideRecommendedUserSection(element) {
   //   祖先走査）を、カンマ区切りの結合 selector による 1 回の走査に置き換える。
   //   closest はいずれかにマッチする最近祖先を返すので真偽値の意味は不変。
   const COMBINED_CLASS_SELECTOR =
-    '[class*="user-recommend"],[class*="UserRecommend"],[class*="recommend-user"],[class*="RecommendCreator"],[class*="FollowingRecommend"],[class*="follow-recommend"],[class*="FollowRecommend"]';
+    '[class*="user-recommend"],[class*="UserRecommend"],[class*="recommend-user"],[class*="RecommendCreator"],[class*="FollowingRecommend"],[class*="follow-recommend"],[class*="FollowRecommend"],[class*="RecommendedUser"],[class*="recommended-user"],[class*="SuggestedCreator"],[class*="SideRecommend"],[class*="PickUpUser"],[class*="PickupUser"]';
   try {
     if (el.closest(COMBINED_CLASS_SELECTOR)) return true;
   } catch {
@@ -30,7 +30,10 @@ export function isInsideRecommendedUserSection(element) {
       if (
         /[?&]ref=recommend/i.test(href) ||
         /[?&]ref=follow_recommend/i.test(href) ||
-        /[?&]ref=suggested_follow/i.test(href)
+        /[?&]ref=suggested_follow/i.test(href) ||
+        /[?&]ref=user_recommend/i.test(href) ||
+        /[?&]ref=watch_follow_recommend/i.test(href) ||
+        /[?&]ref=profile_pickup/i.test(href)
       ) {
         return true;
       }

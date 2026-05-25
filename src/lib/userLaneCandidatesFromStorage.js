@@ -98,23 +98,10 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
       Boolean(String(/** @type {{ text?: unknown }} */ (e)?.text ?? '').trim())
     );
   }
-  /** 集約結果の liveId 表示に lid を使うか（フォールバック後は行ベース） */
-  let useLidForOutput = filterByLive;
-  if (filterByLive && rows.length === 0) {
-    /*
-     * 当 lv でまだ StoredComment が無い（視聴開始直後など）状態。
-     * 空配列を返す代わりに全 live を集約して仮表示する合法フォールバックなので、
-     * エンドユーザ向けには警告ではなく debug トレースに留める。
-     * （以前は console.warn で黄色スタックを毎回出していた — UX 的にノイズ）
-     */
-    console.debug('[lane] filter matched 0, fallback all');
-    rows = requireText
-      ? allRows.filter((e) =>
-          Boolean(String(/** @type {{ text?: unknown }} */ (e)?.text ?? '').trim())
-        )
-      : allRows;
-    useLidForOutput = false;
-  }
+  // v0.1.373: 当ライブ一致 0 件のときに「全ライブ混在フォールバック」すると、
+  //   別放送やおすすめ列由来で蓄積した別ユーザが「この配信の応援」と誤認されやすい。
+  //   UI は空のままで正しく、ユーザーに誤情報を見せない（契約より UX を優先）。
+  const useLidForOutput = filterByLive;
 
   /** @type {Map<string, unknown[]>} */
   const byUid = new Map();
