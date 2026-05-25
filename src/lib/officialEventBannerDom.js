@@ -179,6 +179,25 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
     /** @type {HTMLElement[]} */
     let heads = /** @type {HTMLElement[]} */ (Array.from(scope.querySelectorAll('h2, h1, [class*="e1awe04q"]')));
     if (heads.length === 0) {
+      const candidates = Array.from(scope.querySelectorAll('div, p, span, h1, h2, h3, h4, strong, b'));
+      for (const el of candidates) {
+        const text = String(el.textContent || '').replace(/\s+/g, '');
+        if (text.includes('参加して') || text.includes('が参加') || text.includes('を応援')) {
+          let childHasText = false;
+          for (let i = 0; i < el.children.length; i++) {
+             const childText = String(el.children[i].textContent || '').replace(/\s+/g, '');
+             if (childText.includes('参加して') || childText.includes('が参加') || childText.includes('を応援')) {
+               childHasText = true;
+               break;
+             }
+          }
+          if (!childHasText) {
+            heads.push(/** @type {HTMLElement} */ (el));
+          }
+        }
+      }
+    }
+    if (heads.length === 0) {
       heads = /** @type {HTMLElement[]} */ (Array.from(scope.querySelectorAll('p, span, div, strong, b')));
     }
     for (const h of heads) {
@@ -213,7 +232,9 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
     }
   } catch { /* no-op */ }
 
-  // 2) 「現在N位」を、配信者本人の見出しの近傍（祖先イベントパネル内）に限定して採る。
+  if (!headEl) return null;
+
+  // 2) 「現在N位」を、配信者さんの見出しの近傍（祖先イベントパネル内）に限定して採る。
   //    見出し(headEl)が無い＝イベント参加が確証できないので rank は採らない。
   /** @type {HTMLElement|null} */
   let rankHostEl = null;
@@ -234,12 +255,11 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
         }
       }
       /** @type {Element|null} */
-      let panel = headEl.parentElement?.nodeType === 1 ? headEl.parentElement : null;
-      /** @type {Element|null} */
+      let panel = headEl;
       let rankPanel = null;
-      for (let depth = 0; depth < 3 && panel?.nodeType === 1; depth++) {
+      for (let depth = 0; depth < 8 && panel?.nodeType === 1; depth++) {
         const stripped = String(panel.textContent || '').replace(/[\s,]/g, '');
-        if (/現在\d+位/.test(stripped)) {
+        if (/(?:現在|暫定|第|順位は)?\d+位/.test(stripped)) {
           if (stripped.length <= RANK_PANEL_MAX_TEXT) {
             const rankNodes = /** @type {NodeListOf<HTMLElement>} */ (
               panel.querySelectorAll('p, div, span')
@@ -247,7 +267,7 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
             let nearRank = false;
             for (const rn of rankNodes) {
               if (rn.nodeType !== 1) continue;
-              if (!/現在\d+位/.test(String(rn.textContent || '').replace(/[\s,]/g, ''))) {
+              if (!/(?:現在|暫定|第|順位は)?\d+位/.test(String(rn.textContent || '').replace(/[\s,]/g, ''))) {
                 continue;
               }
               let p2 = rn;
@@ -279,7 +299,7 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
         for (const el of candidates) {
           if (el.nodeType !== 1) continue;
           const t = String(el.textContent || '').replace(/[\s,]/g, '');
-          const m = /現在(\d+)位/.exec(t);
+          const m = /(?:現在|暫定|第|順位は)?(\d+)位/.exec(t);
           if (m) {
             const n = parseInt(m[1], 10);
             if (Number.isFinite(n) && n > 0) {
@@ -314,12 +334,16 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
         for (const ne of numEls) {
           if (ne.nodeType !== 1) continue;
           const raw = String(ne.textContent || '').trim();
-          if (/現在\d+位/.test(raw.replace(/[\s,]/g, ''))) continue;
-          if (/あと|まで|達成|目標/.test(raw)) continue;
+          let scoreText = raw;
+          if (/(?:現在|暫定|第|順位は)?\d+位/.test(raw.replace(/[\s,]/g, ''))) {
+            scoreText = raw.replace(/(?:現在|暫定|第|順位は)?\s*[\d,]+\s*位/g, '').trim();
+            if (!scoreText) continue;
+          }
+          if (/あと|まで|達成|目標/.test(scoreText)) continue;
           // イベント名（例: 2026 横浜）の年号などを誤検出しないよう、数字・記号・pt・スコア等以外の全角文字が含まれる場合は除外
-          const hasKanjiOrKana = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(raw.replace(/スコア|ポイント/g, ''));
+          const hasKanjiOrKana = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(scoreText.replace(/スコア|ポイント/g, ''));
           if (hasKanjiOrKana) continue;
-          const digits = raw.replace(/[^\d]/g, '');
+          const digits = scoreText.replace(/[^\d]/g, '');
           if (/^\d+$/.test(digits) && digits.length >= 2) {
             const v = parseInt(digits, 10);
             if (Number.isFinite(v) && v > 0 && v !== rank) {
@@ -352,7 +376,7 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
         walk(panel);
         for (const s of strings) {
           const st = s.replace(/\s+/g, '');
-          if (/(?:さん(?:を応援しよう|が参加)|参加しています|現在|^\d+$|^位$|順位UP|まであと|達成)/.test(st)) continue;
+          if (/(?:さん(?:を応援しよう|が参加)|参加しています|現在|^\d+$|^位$|順位UP|まであと|達成まであと)/.test(st)) continue;
           if (/^[\d,]+$/.test(st)) continue;
           if (/\d{4}\.\d{2}\.\d{2}/.test(st) || /開催期間/.test(st)) continue;
           if (!title || s.length > title.length) {
@@ -702,6 +726,30 @@ export function scrapeContributionRankingFromDom(root) {
   }
   if (rows.length === 0) return null;
   return rows;
+}
+
+/**
+ * ギフトサイドバー内で現在アクティブなタブの名前（「貢献度ランキング」「イベントランキング」等）を取得する。
+ * @param {Document|Element|null|undefined} root
+ * @returns {string}
+ */
+export function getActiveGiftSidebarTabName(root) {
+  if (!root) return '';
+  try {
+    const tabs = /** @type {any} */ (root).querySelectorAll?.('button[role="tab"], .tab, [class*="tab"]');
+    if (!tabs) return '';
+    for (const tab of /** @type {Iterable<Element>} */ (tabs)) {
+      if (!(tab instanceof HTMLElement)) continue;
+      if (
+        tab.getAttribute('aria-selected') === 'true' ||
+        tab.classList.contains('active') ||
+        tab.classList.contains('selected')
+      ) {
+        return String(tab.textContent || '').trim();
+      }
+    }
+  } catch { /* no-op */ }
+  return '';
 }
 
 /**
