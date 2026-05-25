@@ -23,3 +23,4 @@ keys.txt
 *.key
 secrets.json
 credentials.json
+.webui_secret_key
