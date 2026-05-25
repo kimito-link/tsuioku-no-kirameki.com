@@ -13,7 +13,10 @@ import {
   displayUserLabel
 } from './userRooms.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
-import { formatNicknameWithUidFallback } from './giftDisplayNickname.js';
+import {
+  formatNicknameWithUidFallback,
+  scrubGiftRankingNickname
+} from './giftDisplayNickname.js';
 
 /**
  * @typedef {{
@@ -254,7 +257,7 @@ export function topSupportRankLineModels(stripRooms, opts) {
     }
     const thumbNeedsNoReferrer = isHttpOrHttpsUrl(thumbSrc);
 
-    const nickRaw = String(r?.nickname || '').trim();
+    const nickRaw = scrubGiftRankingNickname(String(r?.nickname ?? ''));
     const hideIdLine = Boolean(r?.hideIdLine);
     const useOfficialDomNick =
       /^__(ad|contrib)_\d+_/i.test(userKey) && Boolean(nickRaw);

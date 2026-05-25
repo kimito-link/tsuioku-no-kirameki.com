@@ -96,6 +96,44 @@ describe('collectInterceptSignalsFromObject', () => {
       }
     ]);
   });
+
+  it('広告・ランキングを示すキー（score, advertiserUserId 等）があれば enqueue は行わず learnUser のみ生成する', () => {
+    const { enqueues, learnUsers } = collectInterceptSignalsFromObject({
+      no: '6',
+      advertiserUserId: '15412541',
+      advertiserName: '太ももちゃん',
+      iconUrl: 'https://cdn.example/ad.png',
+      score: 27285
+    });
+    expect(enqueues).toHaveLength(0);
+    expect(learnUsers).toEqual([
+      {
+        uid: '15412541',
+        name: '太ももちゃん',
+        av: 'https://cdn.example/ad.png'
+      }
+    ]);
+  });
+
+  it('ネストした子オブジェクトに広告キーが含まれている場合も enqueue をブロックする', () => {
+    const { enqueues, learnUsers } = collectInterceptSignalsFromObject({
+      no: '6',
+      chat: {
+        userId: '15412541',
+        name: '太ももちゃん',
+        iconUrl: 'https://cdn.example/ad.png',
+        advertiserUserId: '15412541'
+      }
+    });
+    expect(enqueues).toHaveLength(0);
+    expect(learnUsers).toEqual([
+      {
+        uid: '15412541',
+        name: '太ももちゃん',
+        av: 'https://cdn.example/ad.png'
+      }
+    ]);
+  });
 });
 
 describe('walkJsonForInterceptSignals', () => {

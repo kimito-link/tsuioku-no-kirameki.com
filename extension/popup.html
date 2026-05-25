@@ -84,7 +84,7 @@
         justify-content: center;
         flex-direction: column;
         gap: 12px;
-        background: linear-gradient(180deg, #f6fff8, #eef9f3);
+        background: linear-gradient(180deg, var(--nl-bg, #f6fff8), var(--nl-bg-soft, #eef9f3));
         transition: opacity 220ms ease-out;
         animation: nl-init-shade-css-failsafe 15s ease-out forwards;
       }
@@ -92,21 +92,50 @@
         width: clamp(56px, 14vw, 72px);
         height: clamp(56px, 14vw, 72px);
         border-radius: 50%;
-        background: #fff;
-        border: 2px solid #1f2937;
-        box-shadow: 2px 2px 0 #1f2937;
+        background: var(--nl-surface, #fff);
+        border: 2px solid var(--nl-text, #1f2937);
+        box-shadow: 2px 2px 0 var(--nl-text, #1f2937);
         animation: nl-init-shade-bob 1.2s ease-in-out infinite;
       }
       .nl-init-shade__msg {
-        font-size: clamp(12px, 3vw, 14px);
+        font-size: clamp(12px, 3.2vw, 14px);
         font-weight: 700;
-        color: #2a6f4d;
+        color: var(--nl-rank-count, #2a6f4d);
         letter-spacing: 0.06em;
+        text-align: center;
+        max-width: 90%;
+      }
+      .nl-init-shade__submsg {
+        font-size: clamp(10px, 2.5vw, 11.5px);
+        font-weight: 500;
+        color: var(--nl-muted, #5b6475);
+        text-align: center;
+        max-width: 84%;
+        line-height: 1.45;
+        margin-top: -2px;
       }
       .nl-init-shade--done {
         opacity: 0;
         pointer-events: none;
         animation: none;
+      }
+
+      /* システムのダークモード設定時、JS 起動前の初回ロードシェード */
+      @media (prefers-color-scheme: dark) {
+        .nl-init-shade {
+          background: linear-gradient(180deg, var(--nl-bg, #0b1220), var(--nl-bg-soft, #111827));
+        }
+        .nl-init-shade__face {
+          background: var(--nl-surface, #0f172a);
+          border-color: var(--nl-text-sub, #cbd5e1);
+          box-shadow: 2px 2px 0 var(--nl-text-sub, #cbd5e1);
+        }
+        .nl-init-shade__msg {
+          color: var(--nl-accent, #60a5fa);
+        }
+        .nl-init-shade__submsg {
+          color: var(--nl-muted, #94a3b8);
+        }
       }
       @keyframes nl-init-shade-bob {
         0%, 100% { transform: translateY(0); }
@@ -1354,9 +1383,9 @@
         }
       }
 
-      /* cloak 中の inline-embed-watch: 親ホストの暗い背景を透かして白フラッシュを防ぐ */
-      html.nl-inline-embed-watch[data-nl-popup-primary-cloak='1'],
-      html.nl-inline-embed-watch[data-nl-popup-primary-cloak='1'] body {
+      /* cloak 中: 親ホストの暗い背景を透かして白フラッシュを防ぐ（JS 読み込み中も有効にするためクラス限定を外す） */
+      html[data-nl-popup-primary-cloak='1'],
+      html[data-nl-popup-primary-cloak='1'] body {
         background: transparent !important;
       }
 
@@ -2205,6 +2234,7 @@
 
       .nl-live-stat-card--concurrent {
         border-color: var(--nl-border);
+        cursor: pointer;
       }
 
       .nl-live-stat-icon.nl-chara-bounce-small {
@@ -3397,7 +3427,7 @@
         border-radius: 8px;
         background: color-mix(in srgb, var(--nl-surface) 80%, transparent);
         border-left: 2px solid transparent;
-        /* v0.1.294: slot click で対応レーンへ smooth scroll する操作の affordance */
+        /* trio slot click で対応レーンへ scroll（`.nl-main` と補正つき／補助はコアへフォールバック）*/
         cursor: pointer;
         outline: none;
         user-select: none;
@@ -8375,7 +8405,8 @@
         alt=""
         decoding="async"
       />
-      <div class="nl-init-shade__msg">読み込み中…</div>
+      <div class="nl-init-shade__msg">りんく・こん太・たぬ姉が準備中だよ！</div>
+      <div class="nl-init-shade__submsg">ギフト履歴や公式ランキングなどは、一度開くと取り込みが速くなるよ！</div>
     </div>
     <header class="nl-header">
       <div class="nl-header-brand">
@@ -8707,6 +8738,8 @@
             src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
             alt=""
             decoding="async"
+            title="広告ランキングのレーンへ移動（非表示のときは貢献度またはギフト履歴へスクロールします）"
+            aria-label="広告ランキングへスクロール（表示がないときはコア情報へ）"
           />
           <div class="nl-live-stat-label">推定同時接続</div>
           <div class="nl-concurrent-body">
@@ -8964,9 +8997,10 @@
                   class="nl-north-star-lane__program-pt is-placeholder"
                   id="giftHistoryProgramPt"
                   title="番組ギフト累計pt（ティッカー等）。表示中ユーザー別の合計ではありません"
+                  style="display: none !important;"
                 ><span class="nl-north-star-lane__program-pt-label">累計</span> <b class="nl-north-star-lane__program-pt-num">—</b><small class="nl-north-star-lane__program-pt-unit">pt</small></span></p>
               <p class="nl-north-star-lane__sublabel">
-                ユーザー別（多い順・最大10）。履歴が無いときはコメント観測の「投げ回数」で代替。右上「累計」は番組全体の別指標です。
+                ユーザー別（多い順・最大10）。履歴が無いときはコメント観測の「投げ回数」で代替。
               </p>
             </div>
             <div class="nl-north-star-lane__shell">

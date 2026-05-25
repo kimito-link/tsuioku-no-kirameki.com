@@ -15,6 +15,20 @@ describe('isTrustedGiftSubAppRelayMessage', () => {
     ).toBe(true);
   });
 
+  it('audition iframe のイベントスコア relay も許可する', () => {
+    expect(
+      isTrustedGiftSubAppRelayMessage({
+        origin: 'https://audition.nicovideo.jp',
+        isSelfSource: false,
+        data: {
+          type: 'NLS_EVENT_SCORE_RANKING_FROM_IFRAME',
+          frameUrl:
+            'https://audition.nicovideo.jp/embedded/richview/live?content_id=lv1'
+        }
+      })
+    ).toBe(true);
+  });
+
   it('localhost dev iframe の heartbeat を許可する（origin と frameUrl の host 一致）', () => {
     expect(
       isTrustedGiftSubAppRelayMessage({

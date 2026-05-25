@@ -177,12 +177,28 @@ describe('shouldRespondFocusedNowFromToolbar', () => {
       expect(shouldRespondFocusedNowFromToolbar(host, deps)).toBe(false);
     });
 
-    it('getComputedStyle が throw → 保守的に true（popup window race 回避）', () => {
+    it('getComputedStyle が throw → false（popup window fallback で沈黙を避ける）', () => {
       const host = { isConnected: true };
       const deps = {
-        getComputedStyle: () => { throw new Error('detached'); }
+        getComputedStyle: () => {
+          throw new Error('detached');
+        }
       };
-      expect(shouldRespondFocusedNowFromToolbar(host, deps)).toBe(true);
+      expect(shouldRespondFocusedNowFromToolbar(host, deps)).toBe(false);
+    });
+
+    it('getComputedStyle の戻りが null/非オブジェクト → false', () => {
+      const host = { isConnected: true };
+      expect(
+        shouldRespondFocusedNowFromToolbar(host, {
+          getComputedStyle: () => null
+        })
+      ).toBe(false);
+      expect(
+        shouldRespondFocusedNowFromToolbar(host, {
+          getComputedStyle: () => 'bad'
+        })
+      ).toBe(false);
     });
 
     it('deps.getComputedStyle が関数でない → true（旧互換扱い）', () => {
