@@ -29,6 +29,7 @@
         --nl-lane-accent-ad: #7fd49a;
         --nl-lane-accent-event-rank: #b69cff;
         --nl-lane-accent-event-score: #ffb86c;
+        --nl-lane-accent-event-broadcasters: #6fd0c8;
         --nl-record-on: #0f9f6f;
         --nl-header-start: #0f8fd8;
         --nl-header-end: #14b8a6;
@@ -2965,6 +2966,12 @@
         position: relative;
         isolation: isolate;
       }
+      /* hidden 属性は display:flex に specificity 負けするので明示的に勝たせる
+         （reference_north_star_lane_hidden_css_specificity）。イベント不参加で
+         参加配信者レーンを枠ごと隠すときに空枠が居座らないようにする。 */
+      .nl-north-star-lane[hidden] {
+        display: none !important;
+      }
       .nl-north-star-lane--full {
         width: 100%;
       }
@@ -3009,6 +3016,9 @@
       }
       .nl-north-star-lane[data-lane='eventScore'] > .nl-north-star-lane__heading {
         border-left-color: color-mix(in srgb, var(--nl-lane-accent-event-score) 75%, var(--nl-border) 25%);
+      }
+      .nl-north-star-lane[data-lane='eventBroadcasters'] > .nl-north-star-lane__heading {
+        border-left-color: color-mix(in srgb, var(--nl-lane-accent-event-broadcasters) 75%, var(--nl-border) 25%);
       }
       /* レーン間の subtle horizontal separator（gradient で端を fade out して
          うるさくしない・3 年後に色変えたければ 1 箇所修正で済む） */
@@ -8158,6 +8168,7 @@
         --nl-lane-accent-ad: #8fdfaa;
         --nl-lane-accent-event-rank: #c4afff;
         --nl-lane-accent-event-score: #ffc77f;
+        --nl-lane-accent-event-broadcasters: #82ddd4;
       }
 
       html.nl-skin-panel-dark body {
@@ -9166,6 +9177,44 @@
                 id="northStarLaneAside-eventScore"
                 class="nl-north-star-lane__rail"
                 aria-label="（この項目はスコア表示のみ）"
+                hidden
+              ></aside>
+            </div>
+          </div>
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventBroadcasters" hidden>
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">同じイベントに参加中の配信者</p>
+              <p class="nl-north-star-lane__sublabel">視聴者数の多い順です（イベントの順位ではありません）。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div
+                id="northStarLaneBody-eventBroadcasters"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-eventBroadcasters"
+                class="nl-north-star-lane__rail"
+                aria-label="（この項目は配信者一覧のみ）"
                 hidden
               ></aside>
             </div>
