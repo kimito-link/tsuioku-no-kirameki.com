@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.364',
+    date: '2026-05-25',
+    summary: 'マーケ サムネ未設定者を公式既定アイコンに',
+    items: Object.freeze([
+      '[修正] マーケティングレポートのサムネ付きユーザー一覧で、ニコニコ側のユーザーアイコンが未設定の場合に、壊れた画像のように見えることがあったため、公式の既定アイコンへ表示を切り替えるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.355',
     date: '2026-05-24',
     summary: 'コメント走査の重い処理を軽量化（動作は不変）',

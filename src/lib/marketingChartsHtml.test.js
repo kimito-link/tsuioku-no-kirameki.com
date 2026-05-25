@@ -336,6 +336,9 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('class="mkt-rank-av"');
     expect(html).toContain('mkt-section--thumb-grid');
     expect(html).toContain('class="mkt-thumb-grid__avatar"');
+    expect(html).toContain(
+      'onerror="this.onerror=null;this.src=\'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg\'"'
+    );
   });
 
   it('匿名 a: には identiconResolver の戻りを最低サムネとして当てる', () => {
