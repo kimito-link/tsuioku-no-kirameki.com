@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.363',
+    date: '2026-05-25',
+    summary: 'ギフト収益の目安計算の土台を追加（表示は今後）',
+    items: Object.freeze([
+      '[内部] ギフトの合計ポイントから、配信者が受け取る収益のおおよその目安を計算する仕組みを追加しました。ニコニコは還元率が公式に非公開のため「目安」として幅で出す方針で、まだ画面には表示されません（マーケ分析への表示は今後追加します）。この更新だけでは見た目や動作は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.355',
     date: '2026-05-24',
     summary: 'コメント走査の重い処理を軽量化（動作は不変）',
