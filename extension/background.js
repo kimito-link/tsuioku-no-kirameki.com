@@ -672,6 +672,90 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* 企画イベント「参加番組一覧」公式 API の CORS バイパス fetch proxy           */
+/* 第2弾「同じイベントに参加している他の配信者」。koken/nicoad と同型。         */
+/* この API は無認証で本文が取れる（2026-05-25 実機 event472 で確証）が、       */
+/* ブラウザ content/MAIN world からの fetch は CORS で全滅＝本文を読めるのは     */
+/* host_permissions 特権を持つ SW のみ。content は planningEventId(数値)だけ     */
+/* 送り、URL は SW が固定 host/path から自作する（SSRF面遮断）。               */
+/* 契約・正規化は src/lib/eventParticipationProgramsApi.js（lib 側に契約 test）。*/
+/* ------------------------------------------------------------------ */
+
+// src/lib/eventParticipationProgramsApi.js の EVENT_PARTICIPATION_FETCH_MESSAGE_TYPE
+// と文字列同期（background は ESM import 不可の手書き成果物。lib 側に契約 test）。
+const EVENT_PARTICIPATION_FETCH_MESSAGE_TYPE = 'NLS_EVENT_PARTICIPATION_FETCH';
+const EVENT_PARTICIPATION_ID_RE = /^[1-9]\d{0,17}$/;
+const EVENT_PARTICIPATION_FETCH_TIMEOUT_MS = 8000;
+
+async function fetchEventParticipationJson(planningEventId) {
+  const id = String(planningEventId == null ? '' : planningEventId).trim();
+  if (!EVENT_PARTICIPATION_ID_RE.test(id)) return { ok: false };
+  const url =
+    'https://api.live2.nicovideo.jp/api/v1/planning-event/participation-programs?planningEventId=' +
+    encodeURIComponent(id);
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, EVENT_PARTICIPATION_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit', // 無認証で本文が取れる API。cookie を不要に送らない
+      cache: 'no-store',
+      redirect: 'error',
+      // niconico 生放送ブラウザ版フロントエンド署名（koken/nicoad と同じ予防的補強。
+      // x-frontend-id:9=生放送 web。無認証契約は不変）。
+      headers: {
+        'x-frontend-id': '9',
+        'x-frontend-version': '0'
+      },
+      signal: ac.signal
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== EVENT_PARTICIPATION_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchEventParticipationJson(msg.planningEventId)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
+/* ------------------------------------------------------------------ */
 /* ニコニコ ユーザープロフィール 無認証 API の CORS バイパス fetch proxy        */
 /* 記名 uid から nickname + 個人サムネを引き、既存 profile cache に反映する。  */
 /* content は uid だけ送り、URL は SW が固定 host/path から自作する。          */

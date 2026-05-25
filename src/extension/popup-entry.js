@@ -30,6 +30,7 @@ import { GIFT_HISTORY_LANE_MAX } from '../lib/giftRankStripConfig.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
+import { eventParticipationStorageKey } from '../lib/eventParticipationProgramsApi.js';
 import {
   iframeOfficialDomStorageKey,
   resolveContributionRankingRowsFromSources
@@ -5986,7 +5987,8 @@ const NORTH_STAR_BUNDLE_LOADING_LANE_IDS = Object.freeze([
   'programPoints',
   'adRanking',
   'eventRank',
-  'eventScore'
+  'eventScore',
+  'eventBroadcasters'
 ]);
 
 /**
@@ -6535,6 +6537,75 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
 }
 
 /**
+ * 第2弾 北極星レーン「同じイベントに参加中の配信者」。
+ *
+ * content が参加番組一覧 API（イベント参加中のみ）から視聴者数降順で正規化して
+ * 専用キー（eventParticipationStorageKey = nls_event_participation_<lv>）に保存した
+ * rows を読み、応援帯と同型の横カードで表示する。
+ *
+ * ⚠️ この API は順位/スコアを持たない名簿なので、表示は「視聴者数の多い順」であって
+ * イベントスコア順位ではない（UI の note で明示）。スコア順位（プレイヤーパネルの
+ * ゴリアテ1位…）は別ソース＝[[reference_event_participant_broadcaster_ranking_research]]。
+ *
+ * fail-soft: イベント不参加（保存が無い）配信ではレーン枠ごと隠す（空枠で縦を食わない＝
+ * [[reference_north_star_lane_hidden_css_specificity]]）。
+ *
+ * @param {string} liveId
+ */
+async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
+  const body = document.getElementById('northStarLaneBody-eventBroadcasters');
+  if (!(body instanceof HTMLElement)) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+
+  /** @type {any[]|null} */
+  let rows = null;
+  if (/^lv\d{1,15}$/.test(lid)) {
+    try {
+      const key = eventParticipationStorageKey(lid);
+      const bag = await chrome.storage.local.get([key]);
+      const v = bag[key];
+      if (v && typeof v === 'object' && Array.isArray(v.rows)) rows = v.rows;
+    } catch {
+      /* no-op */
+    }
+  }
+
+  if (rows && rows.length > 0) {
+    setNorthStarLaneHidden('eventBroadcasters', false);
+    // 既に正規化済み（rank/name/contribution=視聴者数/thumbnailUrl/userPageUrl）。
+    // 記名（userPageUrl 付き）行は uid リンク経路が発火する＝userKeyKind:'contrib' で十分。
+    const rooms = officialDomRankingRowsToStripRooms(rows.slice(0, 10), { userKeyKind: 'contrib' });
+    paintTopSupportRankStyleIntoElement(body, rooms, {
+      noteText: '同じイベントに参加中の配信者（視聴者数の多い順。イベントの順位ではありません）',
+      unitSuffix: '人',
+      ariaLabel: 'イベント参加中の配信者',
+      isNorthStarBody: true
+    });
+    return;
+  }
+
+  // 参加データが無い＝イベント不参加 or 未取得。レーン枠ごと隠して空枠で縦を食わない。
+  setNorthStarLaneHidden('eventBroadcasters', true);
+}
+
+/**
+ * 北極星レーンの枠（`.nl-north-star-lane[data-lane=<laneId>]`）の表示/非表示を切替える。
+ * 空データのイベント系レーンを丸ごと隠して縦スペースを食わせない用途。
+ * `hidden` 属性は CSS `.nl-north-star-lane[hidden]{display:none!important}` で確実に
+ * 効く（specificity 負け対策＝[[reference_north_star_lane_hidden_css_specificity]]）。
+ * @param {string} laneId
+ * @param {boolean} hidden
+ */
+function setNorthStarLaneHidden(laneId, hidden) {
+  const lane = document.querySelector(
+    '.nl-north-star-lane[data-lane="' + String(laneId || '').replace(/"/g, '') + '"]'
+  );
+  if (!(lane instanceof HTMLElement)) return;
+  if (hidden) lane.setAttribute('hidden', '');
+  else lane.removeAttribute('hidden');
+}
+
+/**
  * 北極星 レーン 2 (この番組へのギフト履歴)。履歴起点の集計をランキング表示。
  */
 async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
@@ -6895,6 +6966,7 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
   refreshNorthStarAdRankingLane();
   await refreshNorthStarEventCurrentRankLaneAsync(lid);
   refreshNorthStarEventCumulativeScoreLane();
+  await refreshNorthStarEventBroadcastersLaneAsync(lid);
   await refreshSupportActivityTimeline(lid);
 }
 

@@ -4,7 +4,9 @@ import {
   extractEmbeddedDataProps,
   pickViewerCountFromEmbeddedData,
   pickWsUrlFromEmbeddedData,
-  pickProgramBeginAt
+  pickProgramBeginAt,
+  pickPlanningEventId,
+  pickIsEventParticipating
 } from './embeddedDataExtract.js';
 
 const SAMPLE_PROPS = JSON.stringify({
@@ -114,5 +116,30 @@ describe('pickProgramBeginAt', () => {
     expect(pickProgramBeginAt({})).toBeNull();
     expect(pickProgramBeginAt({ program: {} })).toBeNull();
     expect(pickProgramBeginAt(null)).toBeNull();
+  });
+});
+
+describe('pickPlanningEventId', () => {
+  it('planningEvent.id（正の整数）を数値文字列で返す', () => {
+    expect(pickPlanningEventId({ planningEvent: { id: 472 } })).toBe('472');
+    expect(pickPlanningEventId({ planningEvent: { id: '472' } })).toBe('472');
+  });
+  it('参加していない/不正 id は null', () => {
+    expect(pickPlanningEventId({})).toBeNull();
+    expect(pickPlanningEventId({ planningEvent: {} })).toBeNull();
+    expect(pickPlanningEventId({ planningEvent: { id: 0 } })).toBeNull();
+    expect(pickPlanningEventId({ planningEvent: { id: '0' } })).toBeNull();
+    expect(pickPlanningEventId({ planningEvent: { id: 'abc' } })).toBeNull();
+    expect(pickPlanningEventId(null)).toBeNull();
+  });
+});
+
+describe('pickIsEventParticipating', () => {
+  it('programAudition.isEnabled===true のときだけ true', () => {
+    expect(pickIsEventParticipating({ programAudition: { isEnabled: true } })).toBe(true);
+    expect(pickIsEventParticipating({ programAudition: { isEnabled: false } })).toBe(false);
+    expect(pickIsEventParticipating({ programAudition: {} })).toBe(false);
+    expect(pickIsEventParticipating({})).toBe(false);
+    expect(pickIsEventParticipating(null)).toBe(false);
   });
 });

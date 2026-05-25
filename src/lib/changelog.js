@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.365',
+    date: '2026-05-25',
+    summary: '同じイベント参加中の配信者一覧を表示',
+    items: Object.freeze([
+      '[新機能] ギフトイベントに参加中の配信のとき、同じイベントに参加している他の配信者の一覧を、視聴者数の多い順で表示するようにしました（配信者のアイコン・名前・ユーザーページへのリンク付き）。これはイベントの順位ではなく、いま一緒にイベントへ参加している配信者を知るためのものです。イベントに参加していない配信では表示されません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.364',
     date: '2026-05-25',
     summary: 'マーケ サムネ未設定者を公式既定アイコンに',

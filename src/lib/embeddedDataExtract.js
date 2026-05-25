@@ -54,6 +54,33 @@ export function pickWsUrlFromEmbeddedData(props) {
 }
 
 /**
+ * embedded-data props から参加中の企画イベント ID（planningEvent.id）を取り出す。
+ * 第2弾「同じイベントに参加している他の配信者」の取得に使う planningEventId。
+ * 正の整数のみ受理（API の SSRF 面と整合）。
+ * @param {Record<string, any>} props
+ * @returns {string | null} 数値文字列（例 "472"）または null
+ */
+export function pickPlanningEventId(props) {
+  if (!props || typeof props !== 'object') return null;
+  const raw = props?.planningEvent?.id;
+  if (raw == null) return null;
+  const id = String(raw).trim();
+  if (!/^[1-9]\d{0,17}$/.test(id)) return null;
+  return id;
+}
+
+/**
+ * この配信が企画イベントに参加中か（programAudition.isEnabled）。
+ * イベント参加証拠＝[[reference_event_participant_broadcaster_ranking_research]]。
+ * @param {Record<string, any>} props
+ * @returns {boolean}
+ */
+export function pickIsEventParticipating(props) {
+  if (!props || typeof props !== 'object') return false;
+  return props?.programAudition?.isEnabled === true;
+}
+
+/**
  * embedded-data props から配信開始時刻を epoch ms として取得する。
  * ISO 8601 文字列・Unix 秒・epoch ms のいずれにも対応。
  * @param {Record<string, any>} props
