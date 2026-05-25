@@ -22,7 +22,8 @@
  *   lastContribCount: number,
  *   lastEventBannerPresent: boolean,
  *   lastDomShape?: Record<string, unknown>|null,
- *   lastKokenContribShape?: Record<string, unknown>|null
+ *   lastKokenContribShape?: Record<string, unknown>|null,
+ *   lastRichviewEventScoreDiag?: Record<string, unknown>|null
  * }} GiftSubAppRelayHeartbeatEntryRaw
  */
 
@@ -47,7 +48,8 @@
  *   lastContribCount: number,
  *   lastEventBannerPresent: boolean,
  *   lastDomShape?: Record<string, unknown>|null,
- *   lastKokenContribShape?: Record<string, unknown>|null
+ *   lastKokenContribShape?: Record<string, unknown>|null,
+ *   lastRichviewEventScoreDiag?: Record<string, unknown>|null
  * }} GiftSubAppRelayHeartbeatEntry
  */
 
@@ -135,6 +137,12 @@ export function snapshotIframeRelayDiag(state, nowMs) {
           typeof e.lastKokenContribShape === 'object' &&
           !Array.isArray(e.lastKokenContribShape)
             ? e.lastKokenContribShape
+            : null,
+        lastRichviewEventScoreDiag:
+          e.lastRichviewEventScoreDiag &&
+          typeof e.lastRichviewEventScoreDiag === 'object' &&
+          !Array.isArray(e.lastRichviewEventScoreDiag)
+            ? e.lastRichviewEventScoreDiag
             : null
       };
       heartbeatFrameCount += 1;

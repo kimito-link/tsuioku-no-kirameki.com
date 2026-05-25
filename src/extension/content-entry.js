@@ -83,6 +83,10 @@ import {
 } from '../lib/officialEventBannerDom.js';
 import { findGiftSidebarRankTabElement } from '../lib/giftSidebarRankTabPick.js';
 import { captureGiftSubAppIframeDomShape } from '../lib/giftSubAppIframeDomShape.js';
+import {
+  captureAuditionRichviewEventScoreDiagProbe,
+  isAuditionRichviewLivePath
+} from '../lib/captureAuditionRichviewEventScoreDiagProbe.js';
 import { classifyGiftSubAppFrameSource } from '../lib/giftSubAppFrameSource.js';
 import { captureSameOriginContributionRankingDomShape } from '../lib/sameOriginContribRankingDomShape.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
@@ -2030,6 +2034,14 @@ window.addEventListener('message', (e) => {
     !Array.isArray(e.data.kokenContribShapeProbe)
   ) {
     cur.lastKokenContribShape = e.data.kokenContribShapeProbe;
+  }
+  // PR1: audition richview 内のイベントスコア順位 DOM 観測（1 ショット・bounded）。
+  if (
+    e.data.richviewEventScoreDiagProbe &&
+    typeof e.data.richviewEventScoreDiagProbe === 'object' &&
+    !Array.isArray(e.data.richviewEventScoreDiagProbe)
+  ) {
+    cur.lastRichviewEventScoreDiag = e.data.richviewEventScoreDiagProbe;
   }
   map[url] = cur;
   pruneRelayDiagMap(map);
@@ -10838,6 +10850,8 @@ function maybeStartGiftSubAppIframeRelay() {
    * 送るための one-shot ガード（mount 後の毎 tick 連投を防ぐ）。
    */
   let kokenContribShapeSent = false;
+  /** audition `/embedded/richview/live` 向けイベントスコア順位 DOM 診断（親へ 1 回のみ） */
+  let richviewEventScoreDiagSent = false;
   const scanAndPost = () => {
     scrapeAttempts += 1;
     /** @type {Array<unknown>} */
@@ -10929,6 +10943,19 @@ function maybeStartGiftSubAppIframeRelay() {
     } catch {
       kokenContribShapeProbe = null;
     }
+    /** @type {Record<string, unknown>|null} */
+    let richviewEventScoreDiagProbe = null;
+    try {
+      if (!richviewEventScoreDiagSent && isAuditionRichviewLivePath(href)) {
+        const cr = Array.isArray(contributionRanking) ? contributionRanking.length : 0;
+        richviewEventScoreDiagProbe = captureAuditionRichviewEventScoreDiagProbe(document, {
+          contribRowCount: cr
+        });
+        richviewEventScoreDiagSent = true;
+      }
+    } catch {
+      richviewEventScoreDiagProbe = null;
+    }
     try {
       const target = window.top || window.parent;
       target.postMessage(
@@ -10945,7 +10972,8 @@ function maybeStartGiftSubAppIframeRelay() {
           ...(scrapeEmptyForProbe
             ? { domShapeProbe: captureGiftSubAppIframeDomShape(document) }
             : {}),
-          ...(kokenContribShapeProbe ? { kokenContribShapeProbe } : {})
+          ...(kokenContribShapeProbe ? { kokenContribShapeProbe } : {}),
+          ...(richviewEventScoreDiagProbe ? { richviewEventScoreDiagProbe } : {})
         },
         '*'
       );
