@@ -176,9 +176,11 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
   /** @type {string} */
   let broadcasterName = '';
   try {
-    const heads = /** @type {NodeListOf<HTMLElement>} */ (
-      scope.querySelectorAll('h2, h1, [class*="e1awe04q"]')
-    );
+    /** @type {HTMLElement[]} */
+    let heads = /** @type {HTMLElement[]} */ (Array.from(scope.querySelectorAll('h2, h1, [class*="e1awe04q"]')));
+    if (heads.length === 0) {
+      heads = /** @type {HTMLElement[]} */ (Array.from(scope.querySelectorAll('p, span, div, strong, b')));
+    }
     for (const h of heads) {
       if (h.nodeType !== 1) continue;
       const t = String(h.textContent || '').trim();
@@ -314,8 +316,9 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
           const raw = String(ne.textContent || '').trim();
           if (/現在\d+位/.test(raw.replace(/[\s,]/g, ''))) continue;
           if (/あと|まで|達成|目標/.test(raw)) continue;
-          // イベント名（例: 2026 横浜）の年号などを誤検出しないよう、数字とカンマ・pt・スコア等以外の文字が含まれる場合は除外
-          if (/[^\d,.\sptスコア]/.test(raw)) continue;
+          // イベント名（例: 2026 横浜）の年号などを誤検出しないよう、数字・記号・pt・スコア等以外の全角文字が含まれる場合は除外
+          const hasKanjiOrKana = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(raw.replace(/スコア|ポイント/g, ''));
+          if (hasKanjiOrKana) continue;
           const digits = raw.replace(/[^\d]/g, '');
           if (/^\d+$/.test(digits) && digits.length >= 2) {
             const v = parseInt(digits, 10);
@@ -335,7 +338,12 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
             if (txt.length > 2) strings.push(txt);
           } else if (node.nodeType === 1 /* ELEMENT_NODE */) {
             const el = /** @type {Element} */ (node);
-            if (el.tagName === 'SVG' || el.tagName === 'IMG') return;
+            if (el.tagName === 'SVG') return;
+            if (el.tagName === 'IMG') {
+              const alt = el.getAttribute('alt') || el.getAttribute('title');
+              if (alt && alt.trim().length > 2) strings.push(alt.trim());
+              return;
+            }
             for (let i = 0; i < el.childNodes.length; i++) {
               walk(el.childNodes[i]);
             }
@@ -344,8 +352,9 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
         walk(panel);
         for (const s of strings) {
           const st = s.replace(/\s+/g, '');
-          if (/(?:さん(?:を応援しよう|が参加)|参加しています|現在|^\d+$|^位$|順位UP|まであと)/.test(st)) continue;
+          if (/(?:さん(?:を応援しよう|が参加)|参加しています|現在|^\d+$|^位$|順位UP|まであと|達成)/.test(st)) continue;
           if (/^[\d,]+$/.test(st)) continue;
+          if (/\d{4}\.\d{2}\.\d{2}/.test(st) || /開催期間/.test(st)) continue;
           if (!title || s.length > title.length) {
             title = s;
           }
@@ -353,6 +362,17 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
       }
     }
   } catch { /* no-op */ }
+
+  if (!title) {
+    const imgs = Array.from(scope.querySelectorAll('img'));
+    for (const img of imgs) {
+      const alt = img.getAttribute('alt') || img.getAttribute('title');
+      if (alt && alt.trim().length > 2 && !alt.includes('アイコン')) {
+        title = alt.trim();
+        break;
+      }
+    }
+  }
 
   if (rank == null && score == null && !title && !broadcasterName) return null;
 
