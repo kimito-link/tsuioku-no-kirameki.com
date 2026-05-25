@@ -70,12 +70,12 @@ describe('EVENT_PARTICIPATION_FETCH_MESSAGE_TYPE', () => {
 });
 
 describe('eventParticipationStorageKey / PREFIX', () => {
-  it('eventId 単位のキーを prefix + 小文字 id で作る', () => {
-    expect(eventParticipationStorageKey(472)).toBe('nls_event_participation_472');
-    expect(eventParticipationStorageKey('  472 ')).toBe('nls_event_participation_472');
+  it('liveId 単位のキーを prefix + 小文字 lv で作る', () => {
+    expect(eventParticipationStorageKey('lv350605771')).toBe('nls_event_participation_lv350605771');
+    expect(eventParticipationStorageKey('  LV350605771 ')).toBe('nls_event_participation_lv350605771');
   });
   it('PREFIX は key の先頭と一致する（prune 用）', () => {
-    expect(eventParticipationStorageKey(472).startsWith(EVENT_PARTICIPATION_STORAGE_PREFIX)).toBe(true);
+    expect(eventParticipationStorageKey('lv1').startsWith(EVENT_PARTICIPATION_STORAGE_PREFIX)).toBe(true);
   });
   it('null/undefined でも prefix のみで落ちない', () => {
     expect(eventParticipationStorageKey(null)).toBe('nls_event_participation_');

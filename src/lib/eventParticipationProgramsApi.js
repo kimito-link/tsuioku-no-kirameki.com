@@ -66,17 +66,25 @@ const PLANNING_EVENT_ID_RE = /^[1-9]\d{0,17}$/;
 export const EVENT_PARTICIPATION_DEFAULT_MAX = 10;
 
 /**
- * 参加配信者一覧を置く chrome.storage.local キー。eventId 単位（liveId ではない）。
+ * 参加配信者一覧を置く chrome.storage.local キー。**視聴中の自分の liveId 単位**
+ * （eventId ではなく liveId でキーする）。
+ *
+ * 理由: popup は watch ページの embedded-data を読めず planningEventId を知り得ない
+ * （popup は別ページ）。一方 liveId は popup/content/prune すべてが持つ。よって koken/
+ * nicoad と同じく liveId キーにすると、popup は手持ちの liveId だけで読めて discovery
+ * 不要・prune も現 liveId 保護が効く。データは event-scoped（同じ値が参加者全員で同一）
+ * だが、保存するのは「視聴者自身の lv」1 件分なので重複は実質ゼロ。
+ *
  * content（書込）/ popup（読込）/ content の stale prune の 3 箇所が合意する必要が
  * あるため、ドリフト防止に単一の純関数へ集約する。
  *
- * @param {string|number} planningEventId
+ * @param {string} liveId 視聴中の自分の番組 lv
  * @returns {string}
  */
-export function eventParticipationStorageKey(planningEventId) {
+export function eventParticipationStorageKey(liveId) {
   return (
     'nls_event_participation_' +
-    String(planningEventId == null ? '' : planningEventId).trim().toLowerCase()
+    String(liveId == null ? '' : liveId).trim().toLowerCase()
   );
 }
 

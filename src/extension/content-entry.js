@@ -10437,6 +10437,7 @@ function maybeFetchEventParticipationMirrorOnce() {
     const selfLid = String(liveId || '')
       .trim()
       .toLowerCase();
+    if (!/^lv\d{1,15}$/.test(selfLid)) return; // 保存キーは自分の lv（popup が読める単位）
     const now = Date.now();
     if (now - _eventParticipationApiLastAttemptAt < EVENT_PARTICIPATION_API_MIN_GAP_MS) return;
     _eventParticipationApiLastAttemptAt = now;
@@ -10456,22 +10457,18 @@ function maybeFetchEventParticipationMirrorOnce() {
           rows = null;
         }
         if (!Array.isArray(rows) || rows.length === 0) return;
-        // 応答到着までに別イベントへ遷移していたら stale 書込しない。
-        const curProps = (() => {
-          try {
-            return extractEmbeddedDataProps(document);
-          } catch {
-            return null;
-          }
-        })();
-        const curEventId = pickPlanningEventId(curProps);
-        if (curEventId !== eventId) return;
+        // 応答到着までに別 lv へ遷移していたら stale 書込しない。
+        const curLid = String(liveId || '')
+          .trim()
+          .toLowerCase();
+        if (curLid !== selfLid) return;
         try {
           chrome.storage.local
             .set({
-              [eventParticipationStorageKey(eventId)]: {
+              [eventParticipationStorageKey(selfLid)]: {
                 rows,
                 capturedAt: Date.now(),
+                liveId: selfLid,
                 planningEventId: eventId
               }
             })
@@ -11475,15 +11472,16 @@ async function persistOfficialEventDomBundleNow() {
         }
       } catch { /* best-effort */ }
       // 第2弾: 参加配信者一覧の専用キー（eventParticipationStorageKey =
-      // nls_event_participation_<eventId>）も同規約で cleanup。eventId キーなので
-      // liveId 保護は使えないが、視聴中の現イベントは 30s ごとに再書込され capturedAt が
-      // 常にフレッシュ＝24h 閾値に当たらない。よって純 TTL prune で安全（古い別イベント
-      // と capturedAt 不明だけ消える）。
+      // nls_event_participation_<lv>）も koken/nicoad と同規約で cleanup
+      // （現 lv 保護・別 lv で 24h 超 or capturedAt 不明は prune）。
       try {
         const EVENT_PARTICIPATION_TTL_MS = 24 * 60 * 60 * 1000;
         const nowMs = Date.now();
+        const curLid = String(lid || '').trim().toLowerCase();
         const staleEventPartKeys = Object.keys(all).filter((k) => {
           if (!k.startsWith(EVENT_PARTICIPATION_STORAGE_PREFIX)) return false;
+          const klv = k.slice(EVENT_PARTICIPATION_STORAGE_PREFIX.length);
+          if (klv && curLid && klv === curLid) return false;
           const v = all[k];
           const cap =
             v && typeof v === 'object' && typeof v.capturedAt === 'number'
