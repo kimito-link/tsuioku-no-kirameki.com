@@ -183,6 +183,12 @@ import {
   NICOAD_CONTRIB_FETCH_MESSAGE_TYPE
 } from '../lib/nicoadContributionRankingApi.js';
 import {
+  normalizeEventParticipationResponse,
+  eventParticipationStorageKey,
+  EVENT_PARTICIPATION_STORAGE_PREFIX,
+  EVENT_PARTICIPATION_FETCH_MESSAGE_TYPE
+} from '../lib/eventParticipationProgramsApi.js';
+import {
   normalizeNicoUserProfileResponse,
   isResolvableNicoUid,
   NICO_USER_PROFILE_FETCH_MESSAGE_TYPE
@@ -230,7 +236,9 @@ import { indexOfMaxRectArea } from '../lib/inlinePopupHostPrimaryPick.js';
 import {
   extractEmbeddedDataProps,
   pickViewerCountFromEmbeddedData,
-  pickProgramBeginAt
+  pickProgramBeginAt,
+  pickPlanningEventId,
+  pickIsEventParticipating
 } from '../lib/embeddedDataExtract.js';
 import { countRecentActiveUsers } from '../lib/concurrentEstimate.js';
 import { summarizeOfficialCommentHistory } from '../lib/officialStatsWindow.js';
@@ -9206,6 +9214,7 @@ function onTabVisibleForCommentHarvest() {
   //   iframe scrape 経路とは独立（API 経路は rescue-link 配信でも返ることがある）。
   maybeFetchKokenContribRankingMirrorOnce();
   maybeFetchNicoadContribRankingMirrorOnce();
+  maybeFetchEventParticipationMirrorOnce();
   scanVisibleCommentsNow();
   const now = Date.now();
   const needsRecovery = shouldForceDeepHarvestRecovery({
@@ -10213,6 +10222,8 @@ async function start() {
     maybeFetchKokenContribRankingMirrorOnce();
     // nicoad 広告ランキング API も同 sibling として（koken と同規約・別キー）。
     maybeFetchNicoadContribRankingMirrorOnce();
+    // 第2弾: 参加配信者一覧 API（イベント参加中のみ・eventId キー）。
+    maybeFetchEventParticipationMirrorOnce();
     void maybeResolveNamedUserProfilesOnce();
   }, 3_500);
   kokenContribApiIntervalId = /** @type {number} */ (
@@ -10228,6 +10239,7 @@ async function start() {
         }
         maybeFetchKokenContribRankingMirrorOnce();
         maybeFetchNicoadContribRankingMirrorOnce();
+        maybeFetchEventParticipationMirrorOnce();
         void maybeResolveNamedUserProfilesOnce();
       }, KOKEN_CONTRIB_API_FETCH_MS)
     )
@@ -10248,6 +10260,10 @@ let _kokenContribApiLastAttemptAt = 0;
 const NICOAD_CONTRIB_API_MIN_GAP_MS = 25_000;
 /** @type {number} */
 let _nicoadContribApiLastAttemptAt = 0;
+/** 参加配信者一覧 API（第2弾）の再入抑止（koken/nicoad と同じ min-gap 規約）。 */
+const EVENT_PARTICIPATION_API_MIN_GAP_MS = 25_000;
+/** @type {number} */
+let _eventParticipationApiLastAttemptAt = 0;
 /** 1 tick で nvapi に問い合わせる記名 uid の最大数。 */
 const NICO_PROFILE_RESOLVE_BATCH = 3;
 /** content 側でも問い合わせ済み uid を覚え、SW LRU と二重に抑制する。 */
@@ -10377,6 +10393,86 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
                 rows,
                 capturedAt: Date.now(),
                 liveId: lid
+              }
+            })
+            .catch((err) => {
+              if (!isContextInvalidatedError(err)) {
+                /* best-effort */
+              }
+            });
+        } catch {
+          /* no-op: storage 不可・context 消失 */
+        }
+      }
+    );
+  } catch {
+    /* no-op: sendMessage 不可（context invalidated 等）。次 tick で自己回復 */
+  }
+}
+
+/**
+ * 第2弾「同じイベントに参加している他の配信者」一覧を SW 経由で取得し、専用 storage
+ * キー（eventParticipationStorageKey = nls_event_participation_<eventId>）に保存する。
+ *
+ * 取得元は企画イベント参加番組一覧 API（api.live2.../planning-event/participation-programs）。
+ * planningEventId は embedded-data の planningEvent.id から、参加判定は
+ * programAudition.isEnabled から得る（[[reference_event_participant_broadcaster_ranking_research]]）。
+ * ⚠️ この API は順位/スコアを持たない名簿なので、normalize 側で視聴者数降順に並べる
+ * （UI で「参加中の配信者・視聴者数順」と明示＝順位は捏造しない）。自分の番組
+ * （現 liveId）は selfProgramId で除外する。
+ *
+ * 制約は koken/nicoad と同一（iframe 内では走らない・SW 経由 fetch・rows>0 のみ書込＝
+ * fail-soft・eventId echo 一致確認・min-gap 再入抑止・callback 喪失時も次 tick で自己回復）。
+ */
+function maybeFetchEventParticipationMirrorOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    if (typeof document === 'undefined') return;
+    const props = extractEmbeddedDataProps(document);
+    // イベント参加中でなければ何もしない（fail-soft・非イベントでは出さない）。
+    if (!pickIsEventParticipating(props)) return;
+    const eventId = pickPlanningEventId(props);
+    if (!eventId) return;
+    const selfLid = String(liveId || '')
+      .trim()
+      .toLowerCase();
+    const now = Date.now();
+    if (now - _eventParticipationApiLastAttemptAt < EVENT_PARTICIPATION_API_MIN_GAP_MS) return;
+    _eventParticipationApiLastAttemptAt = now;
+    chrome.runtime.sendMessage(
+      { type: EVENT_PARTICIPATION_FETCH_MESSAGE_TYPE, planningEventId: eventId },
+      (resp) => {
+        const le = chrome.runtime.lastError;
+        if (le) return;
+        if (!resp || resp.ok !== true || resp.json == null) return;
+        let rows = null;
+        try {
+          rows = normalizeEventParticipationResponse(resp.json, {
+            metric: 'viewers',
+            selfProgramId: selfLid
+          });
+        } catch {
+          rows = null;
+        }
+        if (!Array.isArray(rows) || rows.length === 0) return;
+        // 応答到着までに別イベントへ遷移していたら stale 書込しない。
+        const curProps = (() => {
+          try {
+            return extractEmbeddedDataProps(document);
+          } catch {
+            return null;
+          }
+        })();
+        const curEventId = pickPlanningEventId(curProps);
+        if (curEventId !== eventId) return;
+        try {
+          chrome.storage.local
+            .set({
+              [eventParticipationStorageKey(eventId)]: {
+                rows,
+                capturedAt: Date.now(),
+                planningEventId: eventId
               }
             })
             .catch((err) => {
@@ -11376,6 +11472,27 @@ async function persistOfficialEventDomBundleNow() {
         });
         if (staleNicoadKeys.length) {
           await chrome.storage.local.remove(staleNicoadKeys);
+        }
+      } catch { /* best-effort */ }
+      // 第2弾: 参加配信者一覧の専用キー（eventParticipationStorageKey =
+      // nls_event_participation_<eventId>）も同規約で cleanup。eventId キーなので
+      // liveId 保護は使えないが、視聴中の現イベントは 30s ごとに再書込され capturedAt が
+      // 常にフレッシュ＝24h 閾値に当たらない。よって純 TTL prune で安全（古い別イベント
+      // と capturedAt 不明だけ消える）。
+      try {
+        const EVENT_PARTICIPATION_TTL_MS = 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const staleEventPartKeys = Object.keys(all).filter((k) => {
+          if (!k.startsWith(EVENT_PARTICIPATION_STORAGE_PREFIX)) return false;
+          const v = all[k];
+          const cap =
+            v && typeof v === 'object' && typeof v.capturedAt === 'number'
+              ? v.capturedAt
+              : 0;
+          return cap === 0 || nowMs - cap >= EVENT_PARTICIPATION_TTL_MS;
+        });
+        if (staleEventPartKeys.length) {
+          await chrome.storage.local.remove(staleEventPartKeys);
         }
       } catch { /* best-effort */ }
       const nicoadLvs = Object.keys(all)
