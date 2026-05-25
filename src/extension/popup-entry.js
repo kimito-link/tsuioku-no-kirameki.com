@@ -25,12 +25,12 @@ import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsFor
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
 import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
-import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
+
 import { GIFT_HISTORY_LANE_MAX } from '../lib/giftRankStripConfig.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
-import { eventParticipationStorageKey } from '../lib/eventParticipationProgramsApi.js';
+
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import {
   iframeOfficialDomStorageKey,
@@ -4725,13 +4725,9 @@ function paintOfficialEventBannerCard(snapshot) {
   // NDGR の rank/score 単独による非参加配信での誤表示を防ぐため、バナー/バルーンまたはタイトルを必須条件とします。
   // 順位（rank）が取れなくても、配信者名と累計スコアを表示できるようにします。
   const broadcasterName = pickStr(snap?.broadcasterName);
-  const title = pickStr(
-    banner?.title,
-    snap?.officialNicoEventTitleNdgr,
-    snap?.officialNicoEventTitle
-  );
-  const rank = asNum(banner?.rank) ?? asNum(snap?.officialNicoEventRankNdgr) ?? asNum(snap?.officialNicoEventRank);
-  const score = asNum(balloon?.eventTotalScore) ?? asNum(banner?.score) ?? asNum(snap?.officialEventGiftScoreNdgr);
+  const title = pickStr(banner?.title);
+  const rank = asNum(banner?.rank);
+  const score = asNum(balloon?.eventTotalScore) ?? asNum(banner?.score);
 
   const hasEvent =
     banner != null ||
@@ -6161,33 +6157,7 @@ async function computeGiftRankStripRoomsContext(liveId) {
       ariaLabel: '公式サイドバー履歴のユーザー別集計'
     };
   }
-  const key = giftUsersStorageKey(lid);
-  let raw = /** @type {unknown[]} */ ([]);
-  try {
-    const bag = await chrome.storage.local.get(key);
-    raw = Array.isArray(bag[key]) ? bag[key] : [];
-  } catch {
-    return { kind: 'hide' };
-  }
-  const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
-  const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
-  if (!stripRooms.length) {
-    return { kind: 'hide' };
-  }
-  const rooms = stripRooms.map((r) => ({
-    userKey: r.userKey,
-    nickname: (r.userKey && _nicknameResolveMap.get(r.userKey)) || r.nickname,
-    count: r.count,
-    avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
-  }));
-  return {
-    kind: 'ok',
-    rooms,
-    noteText:
-      '履歴タブがDOMに無いときの代替。数値は「投げ回数」（pt ではありません）。公式履歴のptや番組累計ポイントとは別です',
-    unitSuffix: '回',
-    ariaLabel: 'ライブ通信で観測したギフト/投げの回数が多い順'
-  };
+  return { kind: 'hide' };
 }
 
 /**
@@ -6302,30 +6272,7 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
       };
     }
   }
-  const key = giftUsersStorageKey(lid);
-  let raw = /** @type {unknown[]} */ ([]);
-  try {
-    const bag = await chrome.storage.local.get(key);
-    raw = Array.isArray(bag[key]) ? bag[key] : [];
-  } catch {
-    return null;
-  }
-  const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
-  const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
-  if (!stripRooms.length) return null;
-  const rooms = stripRooms.map((r) => ({
-    userKey: r.userKey,
-    nickname: (r.userKey && _nicknameResolveMap.get(r.userKey)) || r.nickname,
-    count: r.count,
-    avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
-  }));
-  return {
-    rooms,
-    noteText:
-      '履歴タブがDOMに無いときの代替。数値は「投げ回数」（pt ではありません）。公式履歴のptや番組累計ポイントとは別です',
-    unitSuffix: '回',
-    ariaLabel: 'ライブ通信で観測したギフト/投げの回数が多い順'
-  };
+  return null;
 }
 
 /**
@@ -6580,18 +6527,15 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
   if (!(body instanceof HTMLElement)) return;
   const lid = String(liveId || '').trim().toLowerCase();
 
-  /** @type {any[]|null} */
-  let participationRows = null;
-  /** @type {any[]|null} */
-  let eventScoreRows = null;
-  if (/^lv\d{1,15}$/.test(lid)) {
+  const bundle = _lastOfficialEventDomBundle;
+  let eventScoreRows = Array.isArray(bundle?.eventRanking) && bundle.eventRanking.length > 0 
+    ? bundle.eventRanking 
+    : null;
+
+  if (!eventScoreRows && /^lv\d{1,15}$/.test(lid)) {
     try {
-      const pKey = eventParticipationStorageKey(lid);
       const sKey = eventScoreRankingStorageKey(lid);
-      const bag = await chrome.storage.local.get([pKey, sKey]);
-      const pv = bag[pKey];
-      if (pv && typeof pv === 'object' && Array.isArray(pv.rows))
-        participationRows = pv.rows;
+      const bag = await chrome.storage.local.get([sKey]);
       const sv = bag[sKey];
       if (
         sv &&
@@ -6618,27 +6562,9 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
     });
     const rooms = officialDomRankingRowsToStripRooms(contribRows, { userKeyKind: 'contrib' });
     paintTopSupportRankStyleIntoElement(body, rooms, {
-      noteText: 'イベント参加中💎スコア上位10（公式一覧に準拠）',
+      noteText: 'イベントランキング上位10名（公式一覧に準拠）',
       unitSuffix: '💎',
-      ariaLabel: 'イベント💎スコア順ランキング',
-      isNorthStarBody: true,
-      beforeNoteHtml: pretext
-    });
-    return;
-  }
-
-  if (participationRows && participationRows.length > 0) {
-    setNorthStarLaneHidden('eventBroadcasters', false);
-    // 既に正規化済み（rank/name/contribution=視聴者数/thumbnailUrl/userPageUrl）。
-    // 記名（userPageUrl 付き）行は uid リンク経路が発火する＝userKeyKind:'contrib' で十分。
-    const rooms = officialDomRankingRowsToStripRooms(
-      participationRows.slice(0, 10),
-      { userKeyKind: 'contrib' }
-    );
-    paintTopSupportRankStyleIntoElement(body, rooms, {
-      noteText: '同じイベントに参加中の配信者（視聴者数の多い順。イベントの順位ではありません）',
-      unitSuffix: '人',
-      ariaLabel: 'イベント参加中の配信者',
+      ariaLabel: 'イベントランキング',
       isNorthStarBody: true,
       beforeNoteHtml: pretext
     });
@@ -6769,40 +6695,6 @@ async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
       }
     }
   }
-  if (!html) {
-    const ndgrRank =
-      typeof snap?.officialNicoEventRankNdgr === 'number' &&
-      Number.isFinite(snap.officialNicoEventRankNdgr) &&
-      snap.officialNicoEventRankNdgr > 0
-        ? Math.trunc(snap.officialNicoEventRankNdgr)
-        : null;
-    // v0.1.325: NDGR rank 単独で「現在N位」を出さない（実機 lv350589034: イベント
-    //   不参加の配信で NDGR rank=50 が出て誤表示）。NDGR field は「ギフトイベント」
-    //   不参加の配信でも別文脈の順位値が乗ることがあるため、イベント参加が他シグナル
-    //   （イベントタイトル / バナー / スコア）で確証できる時だけ「目安」表示する。
-    //   確証が無ければ出さない＝feedback_ndgr_field6_silence に回帰（誤った数字より
-    //   出さないを選ぶ）。
-    const nonEmptyStr = (v) => typeof v === 'string' && v.trim().length > 0;
-    const eventConfirmed =
-      nonEmptyStr(snap?.officialNicoEventTitleNdgr) ||
-      nonEmptyStr(snap?.officialNicoEventTitle) ||
-      !!bundle?.eventBanner ||
-      !!bundle?.eventBalloon ||
-      nonEmptyStr(bundle?.eventCumulativeScoreMirrorHtml) ||
-      nonEmptyStr(bundle?.eventCurrentRankMirrorHtml) ||
-      (typeof snap?.officialEventGiftScoreNdgr === 'number' &&
-        Number.isFinite(snap.officialEventGiftScoreNdgr));
-    if (ndgrRank != null && eventConfirmed) {
-      const fallback = buildNorthStarRankFallbackHtml(ndgrRank);
-      if (fallback) {
-        html =
-          `<div class="nl-north-star-rank-bundle__head">${fallback}` +
-          `<p class="nl-north-star-rank-bundle__hint">※ NDGR 推定値（公式画面の「現在順位」と一致しない場合があります）</p>` +
-          `</div>`;
-      }
-    }
-  }
-
   if (!html) {
     const state = determineNorthStarLaneState('eventRank', { bundle, snap });
     renderNorthStarLane('eventRank', null, state);
