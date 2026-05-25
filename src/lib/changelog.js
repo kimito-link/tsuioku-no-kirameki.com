@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.367',
+    date: '2026-05-25',
+    summary: '公式 iframe のイベント順位ディープ調査ログ',
+    items: Object.freeze([
+      '[開発者向け] ニコニコ公式のイベント用埋め込み（audition の richview）の中で、この拡張の仕組みが動いているとき、AI 共有の診断 JSON にイベント順位まわりの DOM の件数などの概要が一度だけ載るようになりました。まだ画面の並び順は変えません。個人が特定できる情報は載せません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.365',
     date: '2026-05-25',
     summary: '同じイベント参加中の配信者一覧を表示',
