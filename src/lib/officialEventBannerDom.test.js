@@ -145,6 +145,29 @@ describe('scrapeOfficialEventBannerFromDom', () => {
     }
   });
 
+  it('新 DOM で「さんが参加しています！」テキストの場合も rank / score / ownerText を取得する', () => {
+    document.body.innerHTML = `
+      <div class="css-pae4zt e1gjhmvh15"><div class="css-1fe7eha e1gjhmvh14"><div>
+        <h2 class="css-12moxus e1awe04q14"><div class="css-1h4q7ss e1awe04q13">
+          <span class="css-1kputv7 e1awe04q12">太ももちゃん</span><span class="css-1oa92lc e1awe04q11">さんが</span>
+        </div><span class="css-mmdt3g e1awe04q10">参加しています！</span></h2>
+        <div class="css-96vxbf e1awe04q4"><div class="css-ffd3sq e1awe04q3"><div class="css-1m8f490 e1awe04q2">
+          <p class="css-1xc9pbi e1awe04q1">ニコニコ生放送プレミアムナイター2026 横浜</p>
+          <p class="css-1xc9pbi e1awe04q1">現在<span class="css-ggzujz e1awe04q0">6</span>位</p>
+          <div class="css-1uc38g"><svg viewBox="0 0 16 16" class="css-jh4whz"></svg><p class="css-1qqb6me">27,835</p></div>
+        </div>
+        </div></div></div>
+      </div></div></div>`;
+    const r = scrapeOfficialEventBannerFromDom(document);
+    expect(r).not.toBeNull();
+    if (r) {
+      expect(r.rank).toBe(6);
+      expect(r.title).toBe('ニコニコ生放送プレミアムナイター2026 横浜');
+      expect(r.ownerText).toBe('太ももちゃんさんを応援しよう！'); // standard format
+      expect(r.score).toBe(27835);
+    }
+  });
+
   // v0.1.323: 「現在50位」誤表示の根本修正の回帰固定（実機 lv350582635）。
   // 配信者本人の「応援しよう」見出しが無い別 UI（サポーター順位リスト等）に「現在N位」が
   // あっても、それを配信者のイベント順位として拾わない（テキストアンカー近傍限定）。
