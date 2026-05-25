@@ -181,6 +181,27 @@ describe('mergeGiftUsers', () => {
     expect(byKey.get('__anon_ライス')?.nickname).toBe('ライス');
   });
 
+  it('文字化け anonymous 名（U+FFFD）は名前を採らずスキップ（__anon_文字化け を作らない）', () => {
+    const garbled = '��x';
+    const { next, added, storageTouched } = mergeGiftUsers([], [
+      { userId: '', nickname: garbled }
+    ]);
+    // uid 無し + 文字化け名は空に倒れ、表示価値が無いので保存されない。
+    expect(next).toHaveLength(0);
+    expect(added).toHaveLength(0);
+    expect(storageTouched).toBe(false);
+  });
+
+  it('文字化け名でも uid があれば保存しニックは空にする', () => {
+    const { next, added } = mergeGiftUsers([], [
+      { userId: '777', nickname: 'ok�' }
+    ]);
+    expect(next).toHaveLength(1);
+    expect(added).toHaveLength(1);
+    expect(next[0].userId).toBe('777');
+    expect(next[0].nickname).toBe('');
+  });
+
   it('同じ nickname の anonymous gift は 1 bucket に集約', () => {
     const { next, added } = mergeGiftUsers([], [
       { userId: '', nickname: '同名' },
