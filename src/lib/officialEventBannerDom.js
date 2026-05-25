@@ -185,7 +185,7 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
   /** @type {HTMLElement|null} */
   let headEl = null;
   /** @type {string} */
-  let title = '';
+  let broadcasterName = '';
   try {
     const heads = /** @type {NodeListOf<HTMLElement>} */ (
       scope.querySelectorAll('h2, h1, [class*="e1awe04q"]')
@@ -200,7 +200,7 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
           .replace(/さん\s*$/, '')
           .trim();
         if (name) {
-          title = name;
+          broadcasterName = name;
           headEl = h;
           break;
         }
@@ -349,13 +349,13 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
     }
   } catch { /* no-op */ }
 
-  if (rank == null && score == null && !title) return null;
+  if (rank == null && score == null && !broadcasterName) return null;
   return {
     rank,
     score,
-    title,
+    title: '',
     iconUrl: '',
-    ownerText: title ? `${title}さんを応援しよう！` : '',
+    ownerText: broadcasterName ? `${broadcasterName}さんを応援しよう！` : '',
     href: ''
   };
 }
