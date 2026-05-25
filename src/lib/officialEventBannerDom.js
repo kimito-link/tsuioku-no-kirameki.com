@@ -170,17 +170,6 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
     return null;
   }
 
-  // v0.1.323: 「現在50位」誤表示の根本修正（Scrapling 流のテキストアンカー近傍限定）。
-  //   旧実装は scope 全体の p/div/span から `現在(\d+)位` を総当りで拾い、配信者本人の
-  //   イベント参加とは独立に rank を採っていた。そのため配信者がイベント不参加でも、
-  //   audition iframe 内の別 UI（サポーター順位リスト等）の「現在N位」を誤検出して
-  //   「現在50位」のような無関係な順位を表示していた（実機 lv350582635: eventRank 全 null
-  //   なのに 50 が出る）。
-  //   修正方針: ①配信者本人の「<名>さんを応援しよう！」見出し(headEl)を先に確定する。
-  //   ②rank は headEl が取れた時だけ、かつ headEl の祖先ブロック(イベントパネル)内に
-  //   限定して採る＝配信者本人の現在順位だけを拾う。見出しが無ければイベント参加が
-  //   確証できないので rank も score も採らない（根拠なき数値を出さない＝正確性優先）。
-
   // 1) 配信者名と、その見出し要素（アンカー）を先に確定する。
   /** @type {HTMLElement|null} */
   let headEl = null;
@@ -191,14 +180,28 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
       scope.querySelectorAll('h2, h1, [class*="e1awe04q"]')
     );
     for (const h of heads) {
-      if (!(h instanceof HTMLElement)) continue;
+      if (h.nodeType !== 1) continue;
       const t = String(h.textContent || '').trim();
-      if (/を応援しよう/.test(t)) {
-        // 「を応援しよう！」「さん」を除いた配信者名
-        const name = t
-          .replace(/を応援しよう[！!]?\s*$/, '')
-          .replace(/さん\s*$/, '')
-          .trim();
+      const fullText = (h.textContent || '').replace(/\s+/g, '');
+      
+      if (/を応援しよう/.test(t) || fullText.includes('さんが参加') || fullText.includes('が参加')) {
+        let name = '';
+        if (fullText.includes('さんが参加') || fullText.includes('が参加')) {
+          const spans = Array.from(h.querySelectorAll('span'));
+          const sangaSpan = spans.find((s) => s.textContent?.includes('さんが') || s.textContent?.includes('が参加'));
+          if (sangaSpan && sangaSpan.previousElementSibling) {
+            name = sangaSpan.previousElementSibling.textContent?.trim() || '';
+          } else {
+            const m = /^(.*?)(?:さんが参加|が参加)/.exec(fullText);
+            if (m) name = m[1].trim();
+          }
+        } else {
+          name = t
+            .replace(/を応援しよう[！!]?\s*$/, '')
+            .replace(/さん\s*$/, '')
+            .trim();
+        }
+        
         if (name) {
           broadcasterName = name;
           headEl = h;
@@ -216,16 +219,7 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
   let rank = null;
   try {
     if (headEl) {
-      // 見出しの祖先を数階層辿り、最初に「現在N位」を含むブロックを順位パネルとみなす。
-      // これにより、配信者本人のイベントパネルの外（別 UI のサポーター順位等）は対象外。
-      // 順位パネルは「見出し＋現在順位＋累計＋順位UPまで」が同居する compact なブロック。
-      // 誤検出（実機 lv350582635「現在50位」/ 見出しと別枝の順位）を防ぐため、順位パネルは
-      //   ① 現在N位を含む
-      //   ② stripped テキストが上限以内（共通祖先まで昇った巨大ブロックを除外）
-      //   ③ headEl から DOM 距離が近い（見出しと同じ枝に順位がある）
-      // の 3 条件を満たす「見出しの直近の tight な祖先」だけを採る。
       const RANK_PANEL_MAX_TEXT = 200;
-      // headEl の祖先集合（距離付き）。順位要素がこの近傍にあるかの判定に使う。
       /** @type {Map<HTMLElement, number>} */
       const headAncestorDist = new Map();
       {
@@ -237,30 +231,27 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
           d++;
         }
       }
-      /** @type {HTMLElement|null} */
-      let panel = headEl.parentElement instanceof HTMLElement ? headEl.parentElement : null;
-      /** @type {HTMLElement|null} */
+      /** @type {Element|null} */
+      let panel = headEl.parentElement?.nodeType === 1 ? headEl.parentElement : null;
+      /** @type {Element|null} */
       let rankPanel = null;
-      for (let depth = 0; depth < 3 && panel instanceof HTMLElement; depth++) {
+      for (let depth = 0; depth < 3 && panel?.nodeType === 1; depth++) {
         const stripped = String(panel.textContent || '').replace(/[\s,]/g, '');
         if (/現在\d+位/.test(stripped)) {
           if (stripped.length <= RANK_PANEL_MAX_TEXT) {
-            // ③ panel 配下の「現在N位」要素が headEl の近傍（共通祖先が headEl から
-            //   2 階層以内）にあるか確認＝見出しと別枝の順位（far block）を弾く。
             const rankNodes = /** @type {NodeListOf<HTMLElement>} */ (
               panel.querySelectorAll('p, div, span')
             );
             let nearRank = false;
             for (const rn of rankNodes) {
-              if (!(rn instanceof HTMLElement)) continue;
+              if (rn.nodeType !== 1) continue;
               if (!/現在\d+位/.test(String(rn.textContent || '').replace(/[\s,]/g, ''))) {
                 continue;
               }
-              // rn の祖先を辿り、headEl の祖先集合に最初に当たる距離（共通祖先の headEl 側距離）
               let p2 = rn;
               let found = -1;
               let up = 0;
-              while (p2 instanceof HTMLElement && up <= 4) {
+              while (p2?.nodeType === 1 && up <= 4) {
                 if (headAncestorDist.has(p2)) {
                   found = headAncestorDist.get(p2);
                   break;
@@ -268,10 +259,6 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
                 p2 = p2.parentElement;
                 up++;
               }
-              // 共通祖先が headEl から 1 階層以内（headEl 自身か headEl.parentElement）
-              //   ＝見出しと順位が同じ枝にある。実 DOM では見出し h2 と「現在N位」p は
-              //   共通の親 div 配下（距離 1）。距離 2 以上＝共通祖先の別々の子に分かれる
-              //   ＝別枝（far block）なので弾く。
               if (found >= 0 && found <= 1) {
                 nearRank = true;
                 break;
@@ -279,21 +266,19 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
             }
             if (nearRank) rankPanel = panel;
           }
-          break; // 最初に現在N位を含む祖先で打ち切り
+          break;
         }
-        panel = panel.parentElement instanceof HTMLElement ? panel.parentElement : null;
+        panel = panel.parentElement?.nodeType === 1 ? panel.parentElement : null;
       }
       if (rankPanel) {
         const candidates = /** @type {NodeListOf<HTMLElement>} */ (
           rankPanel.querySelectorAll('p, div, span')
         );
         for (const el of candidates) {
-          if (!(el instanceof HTMLElement)) continue;
-          // 自要素直下のテキスト + 子 span のテキストを連結（`現在<span>17</span>位`）
+          if (el.nodeType !== 1) continue;
           const t = String(el.textContent || '').replace(/[\s,]/g, '');
           const m = /現在(\d+)位/.exec(t);
           if (m) {
-            // 最も内側（テキストが短い）要素を採用＝親の長文に巻き込まれない
             const n = parseInt(m[1], 10);
             if (Number.isFinite(n) && n > 0) {
               if (
@@ -311,31 +296,26 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
     }
   } catch { /* no-op */ }
 
-  // 3) 累計スコア: 現在順位パネル（rankHostEl の祖先ブロック）内で、rank/目標等を
-  //    除いた「累計」位置の数値。安定的に取りにくいので、rank が取れた時のみ
-  //    「rankHostEl の最も近い共通祖先配下の、rank と異なる最初のカンマ区切り数値」を採る。
-  //    取り違えが疑わしいときは score=null（誤値を出さない＝正確性優先）。
+  // 3) 累計スコア
   /** @type {number|null} */
   let score = null;
+  let title = '';
   try {
     if (rankHostEl) {
-      // 現在順位パネルらしいブロック（rank の p の親＝rank と score を兄弟に持つ階層）を
-      // 起点に。closest は自要素を返すので使わず、親を 1〜2 階層辿る。
       const panel =
-        (rankHostEl.parentElement instanceof HTMLElement ? rankHostEl.parentElement : null) ||
+        (rankHostEl.parentElement?.nodeType === 1 ? rankHostEl.parentElement : null) ||
         null;
-      if (panel instanceof HTMLElement) {
-        // パネル直下テキストから最初の「N,NNN」形（rank の裸数字より桁が大きい累計）を拾う。
-        // 「達成まで/順位UPまで」は別ブロック（e1izyqjk* / e1awe04q6）なので、
-        // rank と同じ最上段パネル（e1awe04q4 付近）に限定して誤認を避ける。
+      if (panel?.nodeType === 1) {
         const numEls = /** @type {NodeListOf<HTMLElement>} */ (
           panel.querySelectorAll('p, span')
         );
         for (const ne of numEls) {
-          if (!(ne instanceof HTMLElement)) continue;
-          const raw = String(ne.textContent || '');
-          if (/現在\d+位/.test(raw.replace(/[\s,]/g, ''))) continue; // rank 行は除外
-          if (/あと|まで|達成|目標/.test(raw)) continue; // 差分・目標は除外
+          if (ne.nodeType !== 1) continue;
+          const raw = String(ne.textContent || '').trim();
+          if (/現在\d+位/.test(raw.replace(/[\s,]/g, ''))) continue;
+          if (/あと|まで|達成|目標/.test(raw)) continue;
+          // イベント名（例: 2026 横浜）の年号などを誤検出しないよう、数字とカンマ・pt・スコア等以外の文字が含まれる場合は除外
+          if (/[^\d,.\sptスコア]/.test(raw)) continue;
           const digits = raw.replace(/[^\d]/g, '');
           if (/^\d+$/.test(digits) && digits.length >= 2) {
             const v = parseInt(digits, 10);
@@ -346,19 +326,58 @@ function scrapeEventBannerFromNewAuditionDom(base, doc) {
           }
         }
       }
+      if (panel) {
+        /** @type {string[]} */
+        const strings = [];
+        const walk = (/** @type {Node} */ node) => {
+          if (node.nodeType === 3 /* TEXT_NODE */) {
+            const txt = (node.nodeValue || '').trim();
+            if (txt.length > 2) strings.push(txt);
+          } else if (node.nodeType === 1 /* ELEMENT_NODE */) {
+            const el = /** @type {Element} */ (node);
+            if (el.tagName === 'SVG' || el.tagName === 'IMG') return;
+            for (let i = 0; i < el.childNodes.length; i++) {
+              walk(el.childNodes[i]);
+            }
+          }
+        };
+        walk(panel);
+        for (const s of strings) {
+          const st = s.replace(/\s+/g, '');
+          if (/(?:さん(?:を応援しよう|が参加)|参加しています|現在|^\d+$|^位$|順位UP|まであと)/.test(st)) continue;
+          if (/^[\d,]+$/.test(st)) continue;
+          if (!title || s.length > title.length) {
+            title = s;
+          }
+        }
+      }
     }
   } catch { /* no-op */ }
 
-  if (rank == null && score == null && !broadcasterName) return null;
+  if (rank == null && score == null && !title && !broadcasterName) return null;
+
   return {
     rank,
     score,
-    title: '',
+    title: title || '',
     iconUrl: '',
     ownerText: broadcasterName ? `${broadcasterName}さんを応援しよう！` : '',
     href: ''
   };
 }
+
+/**
+ * niconico ギフトサイドバーの「履歴」タブから個別ギフト履歴を掬う。
+ * 貢献度ランキング（.contribution-ranking-list）はランキングタブを開かないと
+ * DOM に出ないが、履歴タブは多くの場合デフォルト or ユーザーがすぐ開く位置にあるので、
+ * ここから集約することで「貢献度ランキング相当」のデータが取れる。
+ *
+ * 実 DOM 構造（2026-05 時点で確認）:
+ *
+ *   <ul class="gift-history-list">
+ *     <li class="item">
+ *       （任意）送り主の user icon（`nicoaccount/usericon` を含む img）と
+ */
 
 /**
  * niconico 側のバルーン（リロードボタン付きの累計表示パネル）から
