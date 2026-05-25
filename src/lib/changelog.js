@@ -34,6 +34,14 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     ])
   }),
   Object.freeze({
+    version: '0.1.366',
+    date: '2026-05-25',
+    summary: '参加中の配信者一覧で同じ人の重複を解消',
+    items: Object.freeze([
+      '[修正] 同じイベントに参加中の配信者一覧で、同じ配信者が複数の番組で参加していると同じ人が何枚も重複して並んでしまう問題を直しました。同じ配信者は1件にまとめ、いちばん視聴者数の多い番組を代表として表示します（視聴者数の多い順の表示であることは変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.365',
     date: '2026-05-25',
     summary: '同じイベント参加中の配信者一覧を表示',

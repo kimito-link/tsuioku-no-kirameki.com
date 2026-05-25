@@ -54,7 +54,7 @@ describe('EXTENSION_CHANGELOG', () => {
     expect(new Set(versions).size).toBe(versions.length);
   });
 
-  it('現在の manifest.json バージョン（0.1.367）が先頭にある', () => {
+it('現在の manifest.json バージョン（0.1.367）が先頭にある', () => {
     expect(EXTENSION_CHANGELOG[0].version).toBe('0.1.367');
   });
 

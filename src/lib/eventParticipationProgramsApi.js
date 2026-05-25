@@ -260,10 +260,32 @@ export function normalizeEventParticipationResponse(json, options = {}) {
 
   if (collected.length === 0) return null;
 
-  // 実数値の降順（同値は元順で安定）。
-  collected.sort((a, b) => (b.count - a.count) || (a.order - b.order));
+  // 同一配信者の重複排除（実機 2026-05-25 lv350606186 で「この」「太ももちゃん」が
+  // 各 4 枚並ぶ症状＝同じ配信者が複数番組でイベント参加していると、API は
+  // **番組（programId）単位**で別行を返すため）。ユーザーが見たいのは「配信者の
+  // 一覧」なので、同じ配信者は 1 件に集約する。
+  //   - 集約キー: 記名（uid 在り）は `u:<uid>`、非記名（channel/community 等で
+  //     programProviderId が非数値）は表示名 `n:<lower(name)>` で寄せる。
+  //   - 代表に残すのは **count（視聴者数 or コメント数）が最大の番組**。盛り上がって
+  //     いる方を見せる。同値なら元の登場順が早い方（order 小）を残す＝安定。
+  //   - thumbnail/uid/programId/order も代表番組のものに揃える（行の自己整合）。
+  // sort より前に集約する（集約後の代表 count で全体を並べるため）。
+  /** @type {Map<string, {name:string, count:number, programId:string, uid:string, thumbnailUrl:string, order:number}>} */
+  const byProvider = new Map();
+  for (let i = 0; i < collected.length; i++) {
+    const c = collected[i];
+    const key = c.uid ? `u:${c.uid}` : `n:${c.name.toLowerCase()}`;
+    const prev = byProvider.get(key);
+    if (!prev || c.count > prev.count || (c.count === prev.count && c.order < prev.order)) {
+      byProvider.set(key, c);
+    }
+  }
+  const deduped = Array.from(byProvider.values());
 
-  const rows = collected.slice(0, max).map((c, idx) => {
+  // 実数値の降順（同値は元順で安定）。
+  deduped.sort((a, b) => (b.count - a.count) || (a.order - b.order));
+
+  const rows = deduped.slice(0, max).map((c, idx) => {
     /** @type {{rank:number, name:string, contribution:number, isAnonymous:boolean, programId:string, userPageUrl?:string, thumbnailUrl:string}} */
     const row = {
       rank: idx + 1,
