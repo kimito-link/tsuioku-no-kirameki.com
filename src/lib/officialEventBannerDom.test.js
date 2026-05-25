@@ -127,7 +127,8 @@ describe('scrapeOfficialEventBannerFromDom', () => {
     const r = scrapeOfficialEventBannerFromDom(document);
     expect(r).not.toBeNull();
     expect(r.rank).toBe(17); // 「現在17位」だけを採る（1,180/10,440 と混同しない）
-    expect(r.title).toBe('なち'); // 「を応援しよう！」「さん」除去
+    expect(r.title).toBe(''); // NDGRから拾うためDOM側は空で返す
+    expect(r.ownerText).toBe('なちさんを応援しよう！');
     expect(r.score).toBe(10440); // 累計スコア（順位UPまで 1,180 は採らない）
   });
 
@@ -136,10 +137,11 @@ describe('scrapeOfficialEventBannerFromDom', () => {
       <div><h2 class="e1awe04q14"><span class="e1awe04q12">なち</span>を応援しよう！</h2>
       <div class="e1awe04q6"><p>順位UPまであと</p><p class="css-1d9a3hd">1,180</p></div></div>`;
     const r = scrapeOfficialEventBannerFromDom(document);
-    // rank は取れない（title だけ）。誤って 1,180 を rank にしない
+    // rank は取れない（title は空）。誤って 1,180 を rank にしない
     if (r) {
       expect(r.rank).toBeNull();
-      expect(r.title).toBe('なち');
+      expect(r.title).toBe('');
+      expect(r.ownerText).toBe('なちさんを応援しよう！');
     }
   });
 
@@ -172,7 +174,8 @@ describe('scrapeOfficialEventBannerFromDom', () => {
     // 見出しの祖先4階層内に順位パネルが無い → rank は採らない（99 を誤検出しない）
     if (r) {
       expect(r.rank).toBeNull();
-      expect(r.title).toBe('ほし');
+      expect(r.title).toBe('');
+      expect(r.ownerText).toBe('ほしさんを応援しよう！');
     }
   });
 });
