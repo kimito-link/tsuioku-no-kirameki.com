@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.361',
+    date: '2026-05-25',
+    summary: 'ギフトの送り主名が文字化けして表示される不具合を修正',
+    items: Object.freeze([
+      '[修正] ギフト履歴の一覧で、送り主の名前がまれに文字化け（記号や四角が並んだ読めない文字列）して表示されることがある不具合を直しました。内部データの一部を誤って名前として読んでしまうことがあったため、文字として正しく読めないものは名前に使わず「名無し」と表示します（ギフトの集計やポイントの順位はこれまでどおりです）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.355',
     date: '2026-05-24',
     summary: 'コメント走査の重い処理を軽量化（動作は不変）',

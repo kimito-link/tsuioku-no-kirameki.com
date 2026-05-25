@@ -230,6 +230,41 @@ export function aggregateGiftSenderTotals(events) {
 }
 
 /**
+ * v0.1.361: ギフト送信者名 / メッセージが「人間が読めるテキスト」として妥当かを
+ * 判定する純関数。妥当でなければ false。
+ *
+ * 経緯（実機 2026-05-25）: ギフト履歴レーンの「投げ回数」フォールバックに
+ * `▨▨ơ�?▨` のような文字化け名が表示された。NDGR(protobuf) の decodeGift /
+ * decodeNxGiftEvent は送り主名を TextDecoder(fatal:false) でデコードするが、
+ * ギフト field 番号の揺れ（atoms.proto 差し替え）でネスト message のバイト列等を
+ * 名前フィールドとして読むことがあり、replacement char (U+FFFD) や制御文字
+ * だらけの文字列になって通っていた。第1弾（v0.1.359 の isPlausibleEventTitleText）
+ * と同型のガードを、ギフト保存の単一チョークポイント normalizeGiftEvent に置く。
+ *
+ * 判定: replacement(U+FFFD) / C0(タブ・改行・復帰を除く) / C1 制御文字を 1 つでも
+ * 含む、または可読文字が 1 つも無い文字列を弾く。日本語/英数/記号など正規の名前は
+ * 通す。匿名の正規表示「名無し」「匿名」も当然通る。
+ *
+ * @param {string} s
+ * @returns {boolean}
+ */
+function isPlausibleSenderText(s) {
+  if (typeof s !== 'string') return false;
+  const str = s.trim();
+  if (!str) return false;
+  let printable = 0;
+  for (const ch of str) {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp === 0xfffd) return false;
+    const isC0 = cp < 0x20 && cp !== 9 && cp !== 10 && cp !== 13;
+    const isC1 = cp >= 0x7f && cp <= 0x9f;
+    if (isC0 || isC1) return false;
+    if (!/\s/.test(ch)) printable += 1;
+  }
+  return printable >= 1;
+}
+
+/**
  * @param {IncomingGiftEvent|null|undefined} raw
  * @param {number} now
  * @returns {StoredGiftEvent|null}
@@ -237,12 +272,18 @@ export function aggregateGiftSenderTotals(events) {
 function normalizeGiftEvent(raw, now) {
   if (!raw || typeof raw !== 'object') return null;
   const userId = String(raw.userId ?? '').trim();
-  const nickname = String(raw.nickname ?? '').trim();
+  // v0.1.361: 文字化け（非テキストのバイト列を誤デコードした）送り主名は名前として
+  //   採らない＝空に倒し、後段で「名無し」表示にフォールバックさせる（誤った名前より
+  //   名無しを選ぶ。userId が在ればリンク・集計は従来どおり機能する）。
+  const nicknameRaw = String(raw.nickname ?? '').trim();
+  const nickname = isPlausibleSenderText(nicknameRaw) ? nicknameRaw : '';
   const itemId = String(raw.itemId ?? '').trim();
   const itemName = String(raw.itemName ?? '').trim();
   const point =
     typeof raw.point === 'number' && Number.isFinite(raw.point) ? raw.point : 0;
-  const message = String(raw.message ?? '').trim();
+  // v0.1.361: ギフトメッセージも同様に文字化けを弾く（表示・エクスポートに出るため）。
+  const messageRaw = String(raw.message ?? '').trim();
+  const message = isPlausibleSenderText(messageRaw) ? messageRaw : '';
   const contributionRank =
     typeof raw.contributionRank === 'number' && Number.isFinite(raw.contributionRank)
       ? raw.contributionRank
