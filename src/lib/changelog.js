@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.396',
+    date: '2026-05-26',
+    summary: '保存失敗時にワンクリック再読み込み案内',
+    items: Object.freeze([
+      'HTML保存・マーケ分析で「拡張の接続が切れました（Extension context invalidated）」が出たとき、すぐ直せるように「このパネルを再読み込み」ボタン付きの案内をその場で大きく出すようにしました。拡張を更新した直後に古い画面のまま押すと起きる現象で、ボタン一つで復帰できます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.395',
     date: '2026-05-26',
     summary: 'ギフト履歴が古い時はライブ受信分に自動切替',

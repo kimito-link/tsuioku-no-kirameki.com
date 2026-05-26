@@ -13147,7 +13147,15 @@ function initPopup() {
           }
         }
       }
-      if (stEl) {
+      // v0.1.396: context-invalidated（フォールバックも出せなかった）ときは、
+      //   即・ワンクリック復帰できるよう再読み込みバナーを出して案内を残す。
+      if (isExtensionContextInvalidatedError(msg)) {
+        renderExtensionContextBanner(true);
+        if (stEl) {
+          stEl.textContent =
+            '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります';
+        }
+      } else if (stEl) {
         stEl.textContent =
           msg === 'marketing_storage_timeout'
             ? '分析がタイムアウトしました（再試行してください）'
@@ -13751,29 +13759,45 @@ function initPopup() {
     exportBtn.disabled = true;
     exportBtn.setAttribute('aria-busy', 'true');
     if (postStatus) postStatus.textContent = 'HTML レポートを準備しています…';
+    // v0.1.396: context-invalidated のときは案内を残すため、finally の自動復帰を抑止する。
+    let keepStatusMessage = false;
     try {
       await yieldToBrowserPaint();
       await downloadCommentsHtml(lv, key, watchUrl);
       if (postStatus) postStatus.textContent = 'ダウンロードを開始しました';
     } catch (e) {
-      // v0.1.282: 失敗理由を握り潰さず可視化（従来は空 catch で原因不明だった）。
-      try {
-        console.error('[nls] HTML レポート保存に失敗', e);
-      } catch {
-        /* no-op */
-      }
-      const reason = String(e?.message || e || '').trim();
-      if (postStatus) {
-        postStatus.textContent = reason
-          ? `HTML の保存に失敗しました（${reason.slice(0, 80)}）`
-          : 'HTML の保存に失敗しました';
+      // v0.1.396: 「拡張の接続が切れた（Extension context invalidated）」ときは、
+      //   消える文言だけ出すと「壊れた」と誤解される。即・ワンクリック復帰できるよう
+      //   再読み込みバナーを出し、復帰するまで案内を残す。
+      if (isExtensionContextInvalidatedError(e)) {
+        keepStatusMessage = true;
+        renderExtensionContextBanner(true);
+        if (postStatus) {
+          postStatus.textContent =
+            '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります';
+        }
+      } else {
+        // v0.1.282: 失敗理由を握り潰さず可視化（従来は空 catch で原因不明だった）。
+        try {
+          console.error('[nls] HTML レポート保存に失敗', e);
+        } catch {
+          /* no-op */
+        }
+        const reason = String(e?.message || e || '').trim();
+        if (postStatus) {
+          postStatus.textContent = reason
+            ? `HTML の保存に失敗しました（${reason.slice(0, 80)}）`
+            : 'HTML の保存に失敗しました';
+        }
       }
     } finally {
       exportBtn.removeAttribute('aria-busy');
       exportBtn.disabled = false;
-      window.setTimeout(() => {
-        if (postStatus) postStatus.textContent = prevPostStatus;
-      }, 2800);
+      if (!keepStatusMessage) {
+        window.setTimeout(() => {
+          if (postStatus) postStatus.textContent = prevPostStatus;
+        }, 2800);
+      }
     }
   });
 
@@ -13830,9 +13854,16 @@ function initPopup() {
         await appendSelfPostedComment(lvPost, text);
         optimisticLogged = true;
       }
-      if (!hasExtensionContext()) return;
+      // v0.1.396: context が切れていたら、送信中…固定を解きつつ復帰バナーを出す。
+      if (!hasExtensionContext()) {
+        renderExtensionContextBanner(true);
+        return;
+      }
       const result = await requestPostCommentToOpenTab(text, watchUrl);
-      if (!hasExtensionContext()) return;
+      if (!hasExtensionContext()) {
+        renderExtensionContextBanner(true);
+        return;
+      }
       if (result.ok) {
         if (commentInput) commentInput.value = '';
         COMMENT_KINDNESS_UI_STATE.armedText = '';
@@ -13845,20 +13876,53 @@ function initPopup() {
         await revertLastSelfPostedComment(lvPost, text);
         optimisticLogged = false;
       }
-      setCommentPostNotice(
-        withCommentSendTroubleshootHint(result.error || '送信に失敗しました。'),
-        'error'
-      );
+      // v0.1.396: requestPostCommentToOpenTab は context-invalidated を内部 catch して
+      //   {ok:false, error:'…Extension context invalidated…'} で返す。この場合は
+      //   通常の失敗文言でなく、ワンクリック復帰バナーを出す（送信中…固まりの根治）。
+      if (isExtensionContextInvalidatedError(result.error || '')) {
+        renderExtensionContextBanner(true);
+        setCommentPostNotice(
+          '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります。',
+          'error'
+        );
+      } else {
+        setCommentPostNotice(
+          withCommentSendTroubleshootHint(result.error || '送信に失敗しました。'),
+          'error'
+        );
+      }
     } catch (e) {
       if (optimisticLogged && lvPost) {
         await revertLastSelfPostedComment(lvPost, text).catch(() => {});
       }
-      if (isExtensionContextInvalidatedError(e) || !hasExtensionContext()) return;
+      // v0.1.396: 拡張の接続が切れた（Extension context invalidated）ときは、
+      //   「送信中…」のまま固まって見える（context 喪失で repaint も走らない）。
+      //   即・ワンクリック復帰できるよう再読み込みバナーを出して案内する。
+      if (isExtensionContextInvalidatedError(e) || !hasExtensionContext()) {
+        try {
+          renderExtensionContextBanner(true);
+        } catch {
+          /* no-op */
+        }
+        return;
+      }
       throw e;
     } finally {
       COMMENT_POST_UI_STATE.submitting = false;
       if (hasExtensionContext()) {
         paintCommentComposeUi();
+      } else {
+        // v0.1.396: context 喪失時も「送信中…」固定を解くため、最低限ボタンだけ復帰させる。
+        //   paintCommentComposeUi は storage 等に触れて再 throw し得るので直接 DOM を戻す。
+        try {
+          if (postBtn) {
+            postBtn.disabled = false;
+            postBtn.textContent = 'コメント送信';
+            postBtn.removeAttribute('aria-busy');
+          }
+        } catch {
+          /* no-op */
+        }
       }
     }
   }
