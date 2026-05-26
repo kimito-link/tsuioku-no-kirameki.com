@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.405',
+    date: '2026-05-27',
+    summary: '途中参加でも過去コメントを取り込む（β）',
+    items: Object.freeze([
+      '途中から開いた配信でも、配信の最初までさかのぼって過去のコメントを取り込めるようにしました（記録ONのとき・詳細設定の上の「過去のコメントも取り込む（β）」ボタンを1回押すと開始します）',
+      '安全のため初期状態ではオフです。取り込みは少しずつ・控えめな間隔で行い、タブを切り替えると止まります（配信サーバーに負担をかけないため）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.404',
     date: '2026-05-27',
     summary: '内部: 過去コメント遡及の巡回エンジン追加',
