@@ -262,6 +262,12 @@ import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
 import { buildReportThumbedUsersSectionHtml } from '../lib/reportThumbedUsersSectionHtml.js';
 import {
+  buildReportLinkRows,
+  buildReportMetaRows,
+  buildReportScriptRows,
+  buildReportNoopenerRows
+} from '../lib/reportHeadInfoRowsHtml.js';
+import {
   summarizeBroadcastTiming,
   summarizeCommentBodyStats,
   summarizeIdentifierStats
@@ -10822,57 +10828,8 @@ async function buildHtmlReportDocument(
     `;
   });
 
-  /** @param {{ rel: string, href: string, as: string, type: string }[]} links */
-  const linkRows = (links) =>
-    links.map((v) => {
-      const search = escapeAttr(
-        `${v.rel} ${v.href} ${v.as} ${v.type}`.toLowerCase()
-      );
-      return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(v.rel)}</td>
-          <td>${escapeHtml(v.href || '-')}</td>
-          <td>${escapeHtml(v.as || '-')}</td>
-          <td>${escapeHtml(v.type || '-')}</td>
-        </tr>
-      `;
-    });
-
-  /** @param {{ key: string, value: string }[]} metas */
-  const metaRows = (metas) =>
-    metas.map((v) => {
-      const search = escapeAttr(`${v.key} ${v.value}`.toLowerCase());
-      return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(v.key)}</td>
-          <td>${escapeHtml(v.value || '-')}</td>
-        </tr>
-      `;
-    });
-
-  /** @param {{ src: string, type: string }[]} scripts */
-  const scriptRows = (scripts) =>
-    scripts.map((v) => {
-      const search = escapeAttr(`${v.src} ${v.type}`.toLowerCase());
-      return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(v.type || 'text/javascript')}</td>
-          <td>${escapeHtml(v.src || '-')}</td>
-        </tr>
-      `;
-    });
-
-  /** @param {{ text: string, href: string }[]} links */
-  const noopenerRows = (links) =>
-    links.map((v) => {
-      const search = escapeAttr(`${v.text} ${v.href}`.toLowerCase());
-      return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(v.text || '-')}</td>
-          <td>${escapeHtml(v.href || '-')}</td>
-        </tr>
-      `;
-    });
+  // C-7 pure refactor: head 情報テーブルの行ビルダは reportHeadInfoRowsHtml.js に
+  //   抽出（linkRows/metaRows/scriptRows/noopenerRows・挙動不変・characterization 済）。
 
   /*
    * 0.1.21 (V): HTML レポート無料拡張で追加する集計群。
@@ -10914,7 +10871,7 @@ async function buildHtmlReportDocument(
   const reportCommentsCsv = buildReportCommentsCsv(commentsForReport);
   const reportCsvFilename = `tsuioku-comments-${liveId || 'unknown'}.csv`;
 
-  const headLinkRows = snapshot ? linkRows(snapshot.links) : [];
+  const headLinkRows = snapshot ? buildReportLinkRows(snapshot.links) : [];
   const { friendly: friendlyMetas, technical: technicalMetas } =
     partitionMetasForHtmlReport(snapshot?.metas);
   const friendlyMetaRowsHtml = friendlyMetas.map((v) => {
@@ -10926,9 +10883,11 @@ async function buildHtmlReportDocument(
           <td class="mono">${escapeHtml(v.value || '-')}</td>
         </tr>`;
   });
-  const headTechnicalMetaRows = metaRows(technicalMetas);
-  const headScriptRows = snapshot ? scriptRows(snapshot.scripts) : [];
-  const headNoopenerRows = snapshot ? noopenerRows(snapshot.noopenerLinks) : [];
+  const headTechnicalMetaRows = buildReportMetaRows(technicalMetas);
+  const headScriptRows = snapshot ? buildReportScriptRows(snapshot.scripts) : [];
+  const headNoopenerRows = snapshot
+    ? buildReportNoopenerRows(snapshot.noopenerLinks)
+    : [];
 
   /** 次回向けの軽量メモ（マーケ分析より薄い） */
   let nextMemoSectionHtml = '';
