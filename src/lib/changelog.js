@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.391',
+    date: '2026-05-26',
+    summary: 'マーケ分析にもイベント順位を追加',
+    items: Object.freeze([
+      'マーケ分析のHTMLレポートにも「イベント順位」セクションを追加しました。参加中のイベント名・配信者本人の現在順位と累計💎・参加配信者の上位ランキング（サムネ付き）を載せます（イベントに参加していないときは出ません）。サムネは安全なURLだけ表示します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.390',
     date: '2026-05-26',
     summary: 'HTMLレポートにイベント順位を追加',
