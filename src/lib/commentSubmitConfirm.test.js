@@ -85,7 +85,21 @@ describe('waitUntilEditorReflectsSubmit', () => {
     await expect(p).resolves.toBe(false);
   });
 
-  it('COMMENT_SUBMIT_CONFIRM_PROBE_MS は昇順で 5 点', () => {
-    expect(COMMENT_SUBMIT_CONFIRM_PROBE_MS).toEqual([280, 700, 1400, 2500, 4000]);
+  it('COMMENT_SUBMIT_CONFIRM_PROBE_MS は昇順（早期点 70/150ms を前置・v0.1.396）', () => {
+    expect(COMMENT_SUBMIT_CONFIRM_PROBE_MS).toEqual([70, 150, 280, 700, 1400, 2500, 4000]);
+    // 昇順であること（waitUntilEditorReflectsSubmit が delta>=0 を前提とする）。
+    const arr = [...COMMENT_SUBMIT_CONFIRM_PROBE_MS];
+    expect(arr).toEqual([...arr].sort((a, b) => a - b));
+  });
+
+  it('送信後すぐ欄がクリアされたら最初の早期点(70ms)以内で成功扱い', async () => {
+    let ticks = 0;
+    const p = waitUntilEditorReflectsSubmit({
+      expectedNormalized: 'hi',
+      // 1 回目の sleep(70ms) 後にはクリア済み（空）を返す。
+      readNormalized: () => (ticks++ === 0 ? 'hi' : ''),
+      sleep: () => Promise.resolve()
+    });
+    await expect(p).resolves.toBe(true);
   });
 });
