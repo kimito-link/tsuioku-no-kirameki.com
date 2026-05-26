@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.388',
+    date: '2026-05-26',
+    summary: '取得手順を絵（図解）で案内',
+    items: Object.freeze([
+      '貢献度ランキング・ギフト履歴が読み込み中のとき、文章だけでなく「①ギフトボタンを押す→②『履歴』『ランキング』タブを開く」という手順の図解（ボタンとタブの絵）を出すようにしました。どこを押せばよいか一目でわかります（画像は使わず軽量。データが取れたら消えます）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.387',
     date: '2026-05-26',
     summary: '取得中レーンに開くべきタブを案内',
