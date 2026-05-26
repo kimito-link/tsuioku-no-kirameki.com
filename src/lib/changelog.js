@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.387',
+    date: '2026-05-26',
+    summary: '取得中レーンに開くべきタブを案内',
+    items: Object.freeze([
+      '貢献度ランキング・ギフト履歴が「読み込み中」のとき、どの画面を開けば表示されやすいかを具体的に案内するようにしました（「画面のギフトボタン→『ランキング』『履歴』タブを開くと出やすい」）。データが取れたら案内は自然に消えます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.386',
     date: '2026-05-26',
     summary: 'スクロールのカクつきを解消',
