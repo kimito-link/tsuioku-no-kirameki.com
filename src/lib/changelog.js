@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.404',
+    date: '2026-05-27',
+    summary: '内部: 過去コメント遡及の巡回エンジン追加',
+    items: Object.freeze([
+      '[内部] 「途中から開いても配信の最初からコメントを取り込む」将来機能に向けて、過去ログを配信開始まで遡る巡回エンジン（上限・待機・中断つき）を追加しました（部品追加のみ・まだ使われておらず、見た目や動作は一切変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.403',
     date: '2026-05-27',
     summary: '内部: 過去コメント遡及の巡回情報デコーダ追加',
