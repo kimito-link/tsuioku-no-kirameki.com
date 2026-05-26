@@ -11434,9 +11434,14 @@ async function runNdgrBackfillOnce() {
       // 行に整形し、各行に過去コメント実時刻 capturedAt を付与する。
       const rows = ndgrChatsToMergeRows(ev.chats);
       for (const row of rows) {
-        // 過去コメントの実時刻 ≒ 配信開始 + vpos（センチ秒）。配信開始が取れない
-        // 配信では capturedAt を載せず、persistCommentRows 側の Date.now フォール
-        // バックに委ねる（ソートは vpos 二次キーが効く）。
+        // 過去コメントの実時刻 ≒ 配信開始 + vpos（センチ秒）。コメント一覧は
+        // capturedAt 昇順/降順で並ぶ（popup-entry / commentVelocityTimeline 等）ので、
+        // 実時刻を入れることで過去ログが時系列の正しい位置に並ぶ。
+        // ⚠️ 配信開始(programBeginAtMs)が取れない稀なケースは capturedAt を載せず、
+        //    persistCommentRows 側の Date.now フォールバックに委ねる（その配信では
+        //    backfill 分が「今」に寄る＝表示順は不正確になるが、データ自体は欠落せず
+        //    dedupe も commentNo ベースで正しい）。通常の watch ページでは embedded-data
+        //    から取れるので、この劣化は稀。
         const cap = deriveBackfillCapturedAt({
           vpos: row.vpos,
           programStartMs: startMs
