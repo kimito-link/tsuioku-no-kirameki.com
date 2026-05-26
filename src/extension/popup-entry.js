@@ -134,7 +134,8 @@ import {
   normalizeMarketingExportMaskLabels,
   normalizeAnonymousIdenticonEnabled,
   normalizeFoldAnonymousInRankStrip,
-  KEY_GIFT_RANKING_LANE_ENABLED
+  KEY_GIFT_RANKING_LANE_ENABLED,
+  KEY_BACKFILL_ENABLED
 } from '../lib/storageKeys.js';
 import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
 import { effectiveInlinePanelPlacement } from '../lib/inlinePanelLayout.js';
@@ -153,6 +154,7 @@ import {
   storagePatchInlinePanelWidthMode
 } from '../lib/inlinePanelPlacementStorage.js';
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
+import { isBackfillEnabledFromStorage } from '../lib/backfillOptIn.js';
 import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold.js';
 import {
   summarizeGiftSubAppHistory,
@@ -5592,6 +5594,80 @@ async function refreshGiftRankingFetchPrompt(liveId) {
   applyGiftRankingFetchPromptLabel(enabled);
 }
 
+// ── v0.1.405: 過去ログ一括バックフィル opt-in prompt ────────────────────────────
+//   押下で content 側の巡回（runNdgrBackfillOnce）が 1 回起動する。進捗は content が
+//   data-nls-backfill 属性に書く（このタブの DOM ではないので、popup からは取得済み
+//   件数のリフレッシュ（観測コメント数）で十分。ここではボタン状態と文言だけ管理）。
+let _backfillFetchPromptBound = false;
+function bindBackfillFetchPromptButtonOnce() {
+  if (_backfillFetchPromptBound) return;
+  const btn = /** @type {HTMLButtonElement|null} */ (
+    document.getElementById('enableBackfillFetchBtn')
+  );
+  if (!btn) return;
+  _backfillFetchPromptBound = true;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      // ワンショット起動: 既に true でも、もう一度「続きから」やり直せるよう、
+      // 一旦 remove → set し直して onChanged の false→true 立ち上がりを必ず発火させる。
+      await chrome.storage.local.remove(KEY_BACKFILL_ENABLED);
+      await chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: true });
+      applyBackfillFetchStatus('過去のコメントを取り込み中です…');
+    } catch {
+      /* no-op */
+    } finally {
+      // 連打防止に少し置いてから戻す。
+      setTimeout(() => {
+        btn.disabled = false;
+      }, 1500);
+    }
+  });
+}
+
+/**
+ * バックフィルの状態テキストを表示/更新。空文字で非表示。
+ * @param {string} text
+ */
+function applyBackfillFetchStatus(text) {
+  const el = /** @type {HTMLElement|null} */ (document.getElementById('backfillFetchStatus'));
+  if (!el) return;
+  const t = String(text || '').trim();
+  if (!t) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = t;
+}
+
+/**
+ * バックフィル prompt の表示切り替え（lid があるときだけ表示）。
+ * @param {string} liveId
+ */
+async function refreshBackfillFetchPrompt(liveId) {
+  const prompt = /** @type {HTMLElement|null} */ (document.getElementById('backfillFetchPrompt'));
+  if (!prompt) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) {
+    prompt.hidden = true;
+    prompt.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  prompt.hidden = false;
+  prompt.setAttribute('aria-hidden', 'false');
+  // 既に ON 済みなら（同一配信中の再オープン）状態テキストを控えめに残す。
+  let enabled = false;
+  try {
+    const bag = await chrome.storage.local.get(KEY_BACKFILL_ENABLED);
+    enabled = isBackfillEnabledFromStorage(bag);
+  } catch {
+    enabled = false;
+  }
+  if (!enabled) applyBackfillFetchStatus('');
+}
+
 /**
  * @param {HTMLElement} body `#northStarLaneBody-*`
  * @returns {string}
@@ -7225,6 +7301,8 @@ function renderUserRooms(entries, liveId = '') {
     await refreshAllNorthStarMirrorLanes(String(liveId || '').trim().toLowerCase());
     // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
     await refreshGiftRankingFetchPrompt(liveId);
+    // v0.1.405: 過去ログ一括バックフィルの prompt を反映。
+    await refreshBackfillFetchPrompt(liveId);
   })();
 
   const list = Array.isArray(entries) ? entries : [];
@@ -12520,6 +12598,7 @@ function initPopup() {
   initOfflineBannerOnce();
   paintVersionBadge();
   bindGiftRankingFetchPromptButtonOnce();
+  bindBackfillFetchPromptButtonOnce();
   void globalThis.chrome?.storage?.local
     ?.get(KEY_CALM_PANEL_MOTION)
     ?.then((b) => {

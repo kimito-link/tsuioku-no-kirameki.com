@@ -43,6 +43,14 @@ export const KEY_AUTO_BACKUP_STATE = 'nls_auto_backup_state';
  */
 export const KEY_GIFT_RANKING_LANE_ENABLED = 'nls_gift_ranking_lane_enabled';
 
+/**
+ * 過去ログ一括バックフィル（NDGR backward 巡回）の opt-in フラグ。
+ * v0.1.405: 「途中から開いても配信の最初からコメントを取り込む」機能。連続 fetch
+ * （cross-origin・throttle つき）を伴うため、初期 OFF + ユーザーが明示的にボタンを
+ * 押したときだけ 1 回起動する（ワンショット）。ギフトランキングレーンと同作法。
+ */
+export const KEY_BACKFILL_ENABLED = 'nls_backfill_enabled';
+
 /** ポップアップの着せ替えフレーム設定 */
 export const KEY_POPUP_FRAME = 'nls_popup_frame';
 
