@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.398',
+    date: '2026-05-26',
+    summary: '全カードが「—」で固まる不具合を修正',
+    items: Object.freeze([
+      '一部の配信（イベント参加中など）で、来場者数・コメント数・ギフト・貢献度ランキングなど全部のカードが「—」「取得中…」のまま固まることがある不具合を修正しました。情報の取得が稀に応答しないまま止まると更新が全部止まってしまう状態を、一定時間で必ず打ち切って復帰するようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.397',
     date: '2026-05-26',
     summary: '内部: 取得経路の見直しに向けた観測を追加',
