@@ -384,7 +384,13 @@ import {
     giftsName: 0,
     giftsItem: 0,
     giftsPoint: 0,
-    giftsRank: 0
+    giftsRank: 0,
+    // v0.1.397 観測PR: NDGR statistics に乗ってくるイベント系シグナルの出現回数。
+    //   「統一取得源(WS+NDGR)にイベント順位/スコアを寄せられるか」を実機で確かめるための
+    //   計測のみ（挙動変更なし）。実配信で es/er/et が増えれば NDGR から取れている証拠。
+    eventScore: 0,
+    eventRank: 0,
+    eventTitle: 0
   };
 
   /**
@@ -536,6 +542,10 @@ import {
     if (result.stats && ndgrStatisticsHasWireSignal(result.stats)) {
       _ndgr.stats++;
       const st = result.stats;
+      // v0.1.397 観測PR: イベント系シグナルの出現を計測（挙動には影響しない）。
+      if (st.eventGiftScore != null) _ndgr.eventScore++;
+      if (st.eventRank != null) _ndgr.eventRank++;
+      if (st.eventTitle) _ndgr.eventTitle++;
       postNlsIntercept(
         {
           type: MSG_STATISTICS,
@@ -662,7 +672,9 @@ import {
         'data-nls-ndgr',
         `s=${_ndgr.stats} c=${_ndgr.chats} g=${_ndgr.gifts} d=${_ndgr.decoded}` +
           ` gu=${_ndgr.giftsUid} gn=${_ndgr.giftsName} gi=${_ndgr.giftsItem}` +
-          ` gp=${_ndgr.giftsPoint} gr=${_ndgr.giftsRank}`
+          ` gp=${_ndgr.giftsPoint} gr=${_ndgr.giftsRank}` +
+          // v0.1.397 観測PR: es=eventScore er=eventRank et=eventTitle の出現回数。
+          ` es=${_ndgr.eventScore} er=${_ndgr.eventRank} et=${_ndgr.eventTitle}`
       );
     }
     publishNdgrTagHistogram();

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.397',
+    date: '2026-05-26',
+    summary: '内部: 取得経路の見直しに向けた観測を追加',
+    items: Object.freeze([
+      '[内部] 配信のリアルタイム通信（来場者数・コメント・ギフト・イベント順位など）を、今より速く正確に取り込む仕組みへ作り直すための下準備として、どの情報がリアルタイムで届いているかを測る観測を追加しました。見た目・動作は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.396',
     date: '2026-05-26',
     summary: '保存失敗時にワンクリック再読み込み案内',
