@@ -2743,6 +2743,17 @@
         letter-spacing: 0.02em;
       }
 
+      /* v0.1.393: カード鮮度（最終更新: ○秒前・自動更新中）。note より一段控えめ。 */
+      .nl-top-support-rank__freshness {
+        margin: -2px 0 5px;
+        font-size: clamp(7px, 1.6vw, 8px);
+        font-weight: 600;
+        color: var(--nl-muted);
+        opacity: 0.85;
+        line-height: 1.3;
+        text-align: center;
+      }
+
       /* イベントランキング上部の「配信者本人の現在順位」= 大きなメダル風バッジ */
       .nl-event-self {
         display: flex;
