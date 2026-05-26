@@ -303,10 +303,11 @@ describe('scrapeEventScoreRankingFromRichviewDom', () => {
 
 describe('scrapeEventSelfStatusFromRichviewDom', () => {
   // 実機バナー構造（2026-05-26 採取）: e1awe04q* クラスタ + select（複数イベント切替）。
-  // selectOpts は <option> テキスト配列（selectedIndex は使わない＝広告を指すことがあるため）。
-  function bannerHtml({ rank, score, diff, selectOpts }) {
+  // selectedIdx で「選択中（公式バナーが表示中）の option」を指定。イベント名はそれをそのまま反映。
+  function bannerHtml({ rank, score, diff, selectOpts, selectedIdx }) {
+    const sel = typeof selectedIdx === 'number' ? selectedIdx : 0;
     const opts = (selectOpts || ['イベントX'])
-      .map((t, i) => `<option${i === 0 ? ' selected' : ''}>${t}</option>`)
+      .map((t, i) => `<option${i === sel ? ' selected' : ''}>${t}</option>`)
       .join('');
     return `
       <div class="css-x ef7q2pk1">
@@ -332,30 +333,27 @@ describe('scrapeEventSelfStatusFromRichviewDom', () => {
     expect(s?.eventName).toBe('横浜DeNAベイスターズ始球式オーディション');
   });
 
-  it('⭐イベント名: select が広告キャンペーン(selected)とギフトイベントを持つ時、ギフトイベントを選ぶ', () => {
-    // 実機 lv350613081 の罠: selectedIndex=0 は広告だが、ランキングは始球式(idx1)のもの。
+  it('⭐イベント名はバナー(select)の選択中をそのまま反映（推測しない・公式と一致）', () => {
+    // 実機: 選択中=「5月病なんか…」がこの配信者の参加イベント。別 option(始球式)は無関係。
+    // 公式が選択・表示しているものを正としてそのまま出す（2026-05-26 ユーザー確定）。
     document.body.innerHTML = bannerHtml({
-      rank: 2, score: 3471100, diff: 1659800,
+      rank: 2, score: 3477700, diff: 1659800, selectedIdx: 0,
       selectOpts: [
         '5月病なんか銀河系まで飛んでいけ！ニコニ広告で憂うつパージ！',
         'ニコニコ生放送プレミアムナイター2026 横浜DeNAベイスターズ 始球式オーディション'
       ]
     });
     const s = scrapeEventSelfStatusFromRichviewDom(document);
-    expect(s?.eventName).toBe('ニコニコ生放送プレミアムナイター2026 横浜DeNAベイスターズ 始球式オーディション');
-    expect(s?.eventName).not.toMatch(/ニコニ広告|憂うつパージ/);
+    expect(s?.eventName).toBe('5月病なんか銀河系まで飛んでいけ！ニコニ広告で憂うつパージ！');
   });
 
-  it('イベント名: option が広告1つだけならそれを出す（option 単一は採用）', () => {
-    document.body.innerHTML = bannerHtml({ rank: 3, score: 100, diff: 50, selectOpts: ['ニコニ広告で憂うつパージ！'] });
+  it('イベント名: 選択中が別 option（idx1）ならそちらを反映', () => {
+    document.body.innerHTML = bannerHtml({
+      rank: 1, score: 100, diff: 0, selectedIdx: 1,
+      selectOpts: ['イベントA', 'イベントB（選択中）']
+    });
     const s = scrapeEventSelfStatusFromRichviewDom(document);
-    expect(s?.eventName).toBe('ニコニ広告で憂うつパージ！');
-  });
-
-  it('イベント名: 複数の広告 option しか無ければ誤判定回避で空', () => {
-    document.body.innerHTML = bannerHtml({ rank: 3, score: 100, diff: 50, selectOpts: ['ニコニ広告A', 'ニコニ広告で憂うつパージ！'] });
-    const s = scrapeEventSelfStatusFromRichviewDom(document);
-    expect(s?.eventName).toBe('');
+    expect(s?.eventName).toBe('イベントB（選択中）');
   });
 
   it('該当バナーが無ければ null', () => {

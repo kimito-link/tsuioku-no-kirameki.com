@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.384',
+    date: '2026-05-26',
+    summary: 'イベント名を公式バナー表示どおりに反映',
+    items: Object.freeze([
+      'レーン上部のイベント名を、公式バナーが今表示しているイベントそのままに直しました。配信者が複数イベントに参加していても、勝手に別イベント名を選ばず、公式の表示と一致させます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.383',
     date: '2026-05-26',
     summary: 'りんくが順位を案内・名前とイベント名を修正',
