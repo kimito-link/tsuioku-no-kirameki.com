@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.389',
+    date: '2026-05-26',
+    summary: 'キャラ案内をレーン全幅で大きく表示',
+    items: Object.freeze([
+      '読み込み中の案内（りんく・こん太・たぬ姉）を、狭い右側ではなくレーン全体の広いスペースで大きく表示するようにしました。アイコンを大きく、セリフも読みやすく折り返し、手順の図解も一緒に並べます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.388',
     date: '2026-05-26',
     summary: '取得手順を絵（図解）で案内',

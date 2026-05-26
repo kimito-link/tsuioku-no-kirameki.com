@@ -55,6 +55,7 @@ import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRow
 import {
   isNorthStarLaneWaitingState,
   buildNorthStarLaneWaitingShellHtml,
+  buildNorthStarLaneOpenHintDiagramHtml,
   getNorthStarWaitRotationMessages
 } from '../lib/northStarLaneWaitingUi.js';
 import {
@@ -62,7 +63,7 @@ import {
   acquisitionTierFromPct
 } from '../lib/northStarAcquisitionGauge.js';
 import { northStarLaneGadgetCharaPathByTier } from '../lib/northStarLaneGadgetChara.js';
-import { buildNorthStarWaitHintsRailHtml } from '../lib/formatNorthStarWaitHintsRailHtml.js';
+import { buildNorthStarWaitCharacterGuideHtml } from '../lib/formatNorthStarWaitHintsRailHtml.js';
 import { buildNorthStarAdRankingStatsHtml } from '../lib/buildNorthStarAdRankingStatsHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
@@ -5889,18 +5890,6 @@ function clearNorthStarLaneWaitStartTimes() {
   _northStarLaneWaitStartAt.clear();
 }
 
-function fillNorthStarWaitHintsRailIfApplicable(body, laneId, state, elapsedMs) {
-  if (!(body instanceof HTMLElement)) return;
-  if (!isNorthStarLaneWaitingState(state)) return;
-  const rail = resolveNorthStarLaneAsideEl(body);
-  if (!rail) return;
-  const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
-  const html = buildNorthStarWaitHintsRailHtml(msgs);
-  if (!html) return;
-  rail.innerHTML = html;
-  rail.hidden = false;
-  rail.setAttribute('aria-hidden', 'false');
-}
 
 function mountNorthStarLaneWaitingUi(body, laneId, state) {
   teardownNorthStarLaneWaitingUi(body);
@@ -5908,14 +5897,26 @@ function mountNorthStarLaneWaitingUi(body, laneId, state) {
   body.innerHTML = buildNorthStarLaneWaitingShellHtml(laneId);
   // v0.1.332: 経過 ms を同期計算（await I/O なし）。閾値超で確定文言へ遷移。
   const elapsedMs = trackNorthStarLaneWaitElapsedMs(laneId, state);
-  const shortEl = body.querySelector('.nl-north-star-lane-wait__short');
-  if (shortEl) {
-    const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
-    const m = msgs.length ? msgs[0] : { badge: 'りんく', line: '取得状況を確認しています。' };
-    // 台詞ローテは text 差し替えで「ちかちか」しやすいので静止表示（先頭1件のみ）
-    shortEl.textContent = `${m.badge}：${m.line}`;
+  // v0.1.389: 狭い右レールに詰め込まず、レーン本体の広いスペースで 3 キャラ（りんく/
+  //   こん太/たぬ姉）が大きく案内する。本体の `__short` 1 行＋手順図解は撤去し、
+  //   キャラガイド（アバター大＋折り返しセリフ＋手順図解）に置換。空きスペース活用。
+  const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
+  const waitRoot = body.querySelector('[data-north-star-wait="1"]') || body;
+  const diagram = buildNorthStarLaneOpenHintDiagramHtml(laneId);
+  const guideHtml = buildNorthStarWaitCharacterGuideHtml(msgs, diagram);
+  if (guideHtml) {
+    // 1 行＋図解だけのシェルを、全幅キャラガイドへ差し替え
+    waitRoot.innerHTML = guideHtml;
+  } else {
+    // フォールバック（メッセージが無い等）: 従来の 1 行表示
+    const shortEl = body.querySelector('.nl-north-star-lane-wait__short');
+    if (shortEl) {
+      const m = msgs.length ? msgs[0] : { badge: 'りんく', line: '取得状況を確認しています。' };
+      shortEl.textContent = `${m.badge}：${m.line}`;
+    }
   }
-  fillNorthStarWaitHintsRailIfApplicable(body, laneId, state, elapsedMs);
+  // 本体で全幅案内するので、狭い右レールには重複表示しない（空のまま）。
+  clearNorthStarVerticalRailForBody(body);
   syncNorthStarLaneGadgetFromBodyState(body);
 }
 
