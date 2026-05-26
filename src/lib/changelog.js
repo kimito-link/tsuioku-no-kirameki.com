@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.394',
+    date: '2026-05-26',
+    summary: 'イベント順位を参加中は自動で取り直し',
+    items: Object.freeze([
+      'イベントに参加している配信を見ているときは、イベント順位（参加配信者の💎ランキング）を一定間隔で自動的に取り直すようにしました（取得を有効にしている場合）。取得用の枠は1つだけ・短時間で片付ける作りなので、PCが重くなりにくいよう配慮しています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.393',
     date: '2026-05-26',
     summary: 'カードに「最終更新○秒前」を表示',
