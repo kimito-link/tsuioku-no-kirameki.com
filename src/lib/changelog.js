@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.386',
+    date: '2026-05-26',
+    summary: 'スクロールのカクつきを解消',
+    items: Object.freeze([
+      'ページをスクロールするたびに拡張パネルの位置を計算し直していたため、スクロールがカクついていました。スクロール中は重い再計算をやめ、スクロールが止まってから整え直すようにして、するするスクロールできるようにしました（パネルの位置や見た目は変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.385',
     date: '2026-05-26',
     summary: 'イベントランキングの動作を軽量化',
