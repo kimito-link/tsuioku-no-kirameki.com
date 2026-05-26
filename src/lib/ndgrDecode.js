@@ -874,3 +874,100 @@ export function decodePackedSegment(buf, start, end) {
   });
   return results;
 }
+
+/**
+ * NDGR ChunkedEntry（`/api/view/v4/:view?at={unixtime}` の応答）から、過去ログ
+ * バックフィルの巡回に必要な URI と long-poll ポインタを抽出する。
+ *
+ * ChunkedEntry は oneof:
+ *   backward (BackwardSegment.segment.uri … さらに過去へ辿るポインタ)
+ *   previous (同上・古い経路)
+ *   segment  (MessageSegment.uri … その時刻のコメント本体 = ChunkedMessage stream)
+ *   next     (ReadyForNext.at … 次にポーリングすべき unixtime)
+ *   snapshot (Snapshot.uri … 視聴者数等のスナップショット)
+ *
+ * ⚠️ niconico は NDGR の field 番号を過去に何度も差し替えている（decodeGift の
+ *   v0.1.209/211/233 の経緯参照）。そこで本デコーダは field 番号に依存せず、
+ *   「length-delimited 値の中に現れる NDGR URI 文字列を再帰的に拾い、URL の path で
+ *   分類する」防御的方式を採る。これにより oneof の field 番号が変わっても壊れない。
+ *   `next.at`（long-poll ポインタ）だけは varint なので、URI を持つ message 以外の
+ *   トップレベル varint をベストエフォートで拾う。
+ *
+ * @typedef {{
+ *   backwardUri: string,
+ *   segmentUris: string[],
+ *   snapshotUri: string,
+ *   nextAt: number|null
+ * }} NdgrChunkedEntryNav
+ *
+ * @param {Uint8Array} buf
+ * @param {number} [start]
+ * @param {number} [end]
+ * @returns {NdgrChunkedEntryNav}
+ */
+export function decodeChunkedEntry(buf, start, end) {
+  const s0 = start ?? 0;
+  const e0 = end ?? buf.length;
+  /** @type {NdgrChunkedEntryNav} */
+  const nav = { backwardUri: '', segmentUris: [], snapshotUri: '', nextAt: null };
+
+  // NDGR の view/segment/backward/snapshot URI かを path で判定（host は mpn.live 等で
+  // 変わり得るので host には依存しない）。
+  /** @param {string} u */
+  const classify = (u) => {
+    const s = String(u || '');
+    if (!/^https?:\/\//.test(s)) return null;
+    if (/\/data\/backward\/v\d\//.test(s)) return 'backward';
+    if (/\/data\/segment\/v\d\//.test(s)) return 'segment';
+    if (/\/data\/snapshot\/v\d\//.test(s)) return 'snapshot';
+    if (/\/api\/view\/v\d\//.test(s)) return 'view';
+    return null;
+  };
+
+  // 再帰的に length-delimited 値を掘り、URI 文字列を分類して集める。
+  // ループ・暴走防止に深さ上限を設ける（ChunkedEntry は浅いネスト）。
+  /**
+   * @param {number} s
+   * @param {number} e
+   * @param {number} depth
+   */
+  const walk = (s, e, depth) => {
+    if (depth > 6) return;
+    pbForEach(buf, s, e, (_fn, wt, val, fs, fe) => {
+      if (wt === 0) {
+        // ベストエフォートで long-poll ポインタ（unixtime/相対値）を拾う。
+        // 妥当な範囲の正の整数のみ採用（最初に見つかった 1 個を next.at とする）。
+        if (
+          nav.nextAt == null &&
+          typeof val === 'number' &&
+          Number.isFinite(val) &&
+          val > 0
+        ) {
+          nav.nextAt = val;
+        }
+        return;
+      }
+      if (wt !== 2) return;
+      const str = decodeStr(buf, fs, fe);
+      const kind = classify(str);
+      if (kind === 'backward') {
+        if (!nav.backwardUri) nav.backwardUri = str;
+        return;
+      }
+      if (kind === 'segment') {
+        if (!nav.segmentUris.includes(str)) nav.segmentUris.push(str);
+        return;
+      }
+      if (kind === 'snapshot') {
+        if (!nav.snapshotUri) nav.snapshotUri = str;
+        return;
+      }
+      // URI でなければ、ネストした message の可能性があるので掘り下げる。
+      // 文字列としての妥当性が低い（= バイナリ message っぽい）ものだけ再帰。
+      walk(fs, fe, depth + 1);
+    });
+  };
+
+  walk(s0, e0, 0);
+  return nav;
+}
