@@ -12,8 +12,10 @@ import {
   scrapeProgramStatisticsMenuFromDom,
   scrapeGiftHistoryFromDom,
   scrapeAdContributionRankingRowsAndMirrorFromDom,
-  scrapeEventInfoMirrorParts
+  scrapeEventInfoMirrorParts,
+  getActiveGiftSidebarTabName
 } from './officialEventBannerDom.js';
+import { scrapeEventScoreRankingFromRichviewDom } from './scrapeEventScoreRankingFromRichviewDom.js';
 
 /**
  * niconico の audition embed URL を直接 fetch して、HTML 内のバナー情報を掬う。
@@ -127,6 +129,7 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
  *   eventBanner: ReturnType<typeof scrapeOfficialEventBannerFromDom>,
  *   eventBalloon: ReturnType<typeof scrapeOfficialEventBalloonFromDom>,
  *   contributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
+ *   eventRanking: ReturnType<typeof scrapeEventScoreRankingFromRichviewDom>,
  *   adContributionRanking: ReturnType<typeof scrapeContributionRankingFromDom>,
  *   adRankingStoredAt?: number,
  *   adRankingMirrorHtml: string|null,
@@ -138,7 +141,7 @@ export async function fetchNicoadContributionRankingFromPublishPage(liveId) {
  */
 
 /**
- * Document から 4 種すべてを掬って 1 オブジェクトに束ねる。
+ * Document から全種を掬って 1 オブジェクトに束ねる。
  * 全部 null（取れなかった）のときは null を返す（保存 skip 用）。
  *
  * @param {Document|Element} root
@@ -152,13 +155,24 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
       : Date.now();
   const eventBanner = scrapeOfficialEventBannerFromDom(root);
   const eventBalloon = scrapeOfficialEventBalloonFromDom(root);
-  const contributionRanking = scrapeContributionRankingFromDom(root);
+  
+  let contributionRanking = null;
+  let eventRanking = null;
+  const activeTab = getActiveGiftSidebarTabName(root);
+  if (activeTab.includes('イベントランキング')) {
+    eventRanking = scrapeEventScoreRankingFromRichviewDom(root);
+  } else {
+    // 貢献度ランキング、またはタブが見つからない場合は従来通り Contribution を試みる
+    contributionRanking = scrapeContributionRankingFromDom(root);
+  }
+
   const programStats = scrapeProgramStatisticsMenuFromDom(root);
   const giftHistory = scrapeGiftHistoryFromDom(root);
   if (
     !eventBanner &&
     !eventBalloon &&
     !contributionRanking &&
+    !eventRanking &&
     !programStats &&
     !giftHistory
   ) {
@@ -169,6 +183,7 @@ export function collectOfficialEventDomBundle(root, opts = {}) {
     eventBanner,
     eventBalloon,
     contributionRanking,
+    eventRanking,
     adContributionRanking: null,
     adRankingMirrorHtml: null,
     eventCumulativeScoreMirrorHtml: null,
@@ -253,6 +268,7 @@ export function mergeOfficialEventDomBundle(prev, next) {
     eventBanner: next.eventBanner || prev.eventBanner,
     eventBalloon: next.eventBalloon || prev.eventBalloon,
     contributionRanking: next.contributionRanking || prev.contributionRanking,
+    eventRanking: next.eventRanking || prev.eventRanking,
     adContributionRanking,
     adRankingStoredAt,
     adRankingMirrorHtml:

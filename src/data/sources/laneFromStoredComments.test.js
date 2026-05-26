@@ -132,7 +132,7 @@ describe('laneCandidatesFromStoredComments: liveId フィルタ委譲', () => {
       ],
       'lv_a'
     );
-    // userLaneCandidatesFromStorage は fallback があるので 1 人に絞れた場合それだけ返る
+    // userLaneCandidatesFromStorage は当ライブに行が無いとき空を返す（別ライブ混入なし）
     expect(out.map((x) => x.userId)).toEqual(['100001']);
   });
   it('liveId 省略 → 全 live 混在 OK', () => {

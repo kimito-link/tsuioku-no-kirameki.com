@@ -14,7 +14,7 @@
  * I10: 同じ userId の nickname が両方とも弱ニックなら、いずれか 1 つを採用
  *      （'匿名' 同士なら '匿名' を返す）
  * I11: 第2引数 liveId フィルタと行の liveId/lvId の表記ゆれ（lv 接頭辞・大小）でも
- *      集約結果が 0 件にならない（同一放送として扱われる）
+ *      同一放送として正しくマッチする（ただし該当行が 1 件も無ければ空配列）
  */
 
 import { describe, expect, it } from 'vitest';
@@ -306,6 +306,29 @@ maybe('userLaneCandidatesFromStorage invariants', () => {
     const out = userLaneCandidatesFromStorage(storedComments, liveIdFilter);
     expect(out).toHaveLength(1);
     expect(out[0].userId).toBe(expectedUserId);
+  });
+
+  it('v0.1.373: 当ライブ一致 0 件なら別ライブユーザーは混入しない（全件フォールバック廃止）', () => {
+    const out = userLaneCandidatesFromStorage(
+      [
+        {
+          userId: '111',
+          nickname: 'OtherLive',
+          liveId: 'lv999',
+          text: 'hi',
+          capturedAt: 1
+        },
+        {
+          userId: '222',
+          nickname: 'AlsoOther',
+          lvId: '888',
+          text: 'x',
+          capturedAt: 2
+        }
+      ],
+      'lv123'
+    );
+    expect(out).toHaveLength(0);
   });
 
   it.each([

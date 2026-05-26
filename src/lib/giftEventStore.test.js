@@ -311,6 +311,16 @@ describe('aggregateGiftSenderTotals', () => {
     expect(r[0].userKey).toBe('4046119');
     expect(r[0].nickname).toBe('タロウ');
   });
+
+  it('プレースホルダ nick（… のみ等）は空に正規化（表示は u/<uid> へ）', () => {
+    const events = [
+      makeEvent({ userId: '46650056', nickname: '...', point: 600, capturedAt: NOW })
+    ];
+    const r = aggregateGiftSenderTotals(events);
+    expect(r).toHaveLength(1);
+    expect(r[0].nickname).toBe('');
+    expect(r[0].totalPoints).toBe(600);
+  });
 });
 
 /**

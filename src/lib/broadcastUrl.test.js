@@ -56,6 +56,15 @@ describe('extractLiveIdFromUrl', () => {
       extractLiveIdFromUrl('https://live.nicovideo.jp/watch/LV42')
     ).toBe('lv42');
   });
+
+  it('チャンネル放送 watch/ch から ID を取得', () => {
+    expect(
+      extractLiveIdFromUrl('https://live.nicovideo.jp/watch/ch2646440')
+    ).toBe('ch2646440');
+    expect(extractLiveIdFromUrl('https://live.nicovideo.jp/watch/CH2646440')).toBe(
+      'ch2646440'
+    );
+  });
 });
 
 describe('isNicoLiveWatchUrl', () => {

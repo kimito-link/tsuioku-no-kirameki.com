@@ -127,7 +127,8 @@ describe('scrapeOfficialEventBannerFromDom', () => {
     const r = scrapeOfficialEventBannerFromDom(document);
     expect(r).not.toBeNull();
     expect(r.rank).toBe(17); // 「現在17位」だけを採る（1,180/10,440 と混同しない）
-    expect(r.title).toBe('なち'); // 「を応援しよう！」「さん」除去
+    expect(r.title).toBe(''); // NDGRから拾うためDOM側は空で返す
+    expect(r.ownerText).toBe('なちさんを応援しよう！');
     expect(r.score).toBe(10440); // 累計スコア（順位UPまで 1,180 は採らない）
   });
 
@@ -136,10 +137,34 @@ describe('scrapeOfficialEventBannerFromDom', () => {
       <div><h2 class="e1awe04q14"><span class="e1awe04q12">なち</span>を応援しよう！</h2>
       <div class="e1awe04q6"><p>順位UPまであと</p><p class="css-1d9a3hd">1,180</p></div></div>`;
     const r = scrapeOfficialEventBannerFromDom(document);
-    // rank は取れない（title だけ）。誤って 1,180 を rank にしない
+    // rank は取れない（title は空）。誤って 1,180 を rank にしない
     if (r) {
       expect(r.rank).toBeNull();
-      expect(r.title).toBe('なち');
+      expect(r.title).toBe('');
+      expect(r.ownerText).toBe('なちさんを応援しよう！');
+    }
+  });
+
+  it('新 DOM で「さんが参加しています！」テキストの場合も rank / score / ownerText を取得する', () => {
+    document.body.innerHTML = `
+      <div class="css-pae4zt e1gjhmvh15"><div class="css-1fe7eha e1gjhmvh14"><div>
+        <h2 class="css-12moxus e1awe04q14"><div class="css-1h4q7ss e1awe04q13">
+          <span class="css-1kputv7 e1awe04q12">太ももちゃん</span><span class="css-1oa92lc e1awe04q11">さんが</span>
+        </div><span class="css-mmdt3g e1awe04q10">参加しています！</span></h2>
+        <div class="css-96vxbf e1awe04q4"><div class="css-ffd3sq e1awe04q3"><div class="css-1m8f490 e1awe04q2">
+          <p class="css-1xc9pbi e1awe04q1">ニコニコ生放送プレミアムナイター2026 横浜</p>
+          <p class="css-1xc9pbi e1awe04q1">現在<span class="css-ggzujz e1awe04q0">6</span>位</p>
+          <div class="css-1uc38g"><svg viewBox="0 0 16 16" class="css-jh4whz"></svg><p class="css-1qqb6me">27,835</p></div>
+        </div>
+        </div></div></div>
+      </div></div></div>`;
+    const r = scrapeOfficialEventBannerFromDom(document);
+    expect(r).not.toBeNull();
+    if (r) {
+      expect(r.rank).toBe(6);
+      expect(r.title).toBe('ニコニコ生放送プレミアムナイター2026 横浜');
+      expect(r.ownerText).toBe('太ももちゃんさんを応援しよう！'); // standard format
+      expect(r.score).toBe(27835);
     }
   });
 
@@ -172,7 +197,8 @@ describe('scrapeOfficialEventBannerFromDom', () => {
     // 見出しの祖先4階層内に順位パネルが無い → rank は採らない（99 を誤検出しない）
     if (r) {
       expect(r.rank).toBeNull();
-      expect(r.title).toBe('ほし');
+      expect(r.title).toBe('');
+      expect(r.ownerText).toBe('ほしさんを応援しよう！');
     }
   });
 });

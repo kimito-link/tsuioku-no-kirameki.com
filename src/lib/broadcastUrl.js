@@ -2,7 +2,8 @@
  * ニコニコ生放送 URL / パスから lv ID を取り出す（純関数・DOM非依存）
  */
 
-const LV_RE = /\blv\d+/i;
+/** 生放送の watch / embed パスに現れる `lv123` / `ch456`（チャンネル枠） */
+const BROADCAST_ID_RE = /\b(lv|ch)\d+/i;
 
 /**
  * @param {string | null | undefined} url
@@ -13,10 +14,10 @@ export function extractLiveIdFromUrl(url) {
   if (!s) return null;
   try {
     const u = new URL(s);
-    const m = u.pathname.match(LV_RE) || u.href.match(LV_RE);
+    const m = u.pathname.match(BROADCAST_ID_RE) || u.href.match(BROADCAST_ID_RE);
     return m ? m[0].toLowerCase() : null;
   } catch {
-    const m = s.match(LV_RE);
+    const m = s.match(BROADCAST_ID_RE);
     return m ? m[0].toLowerCase() : null;
   }
 }
@@ -83,7 +84,16 @@ export function extractLiveIdFromDom(doc) {
     extractLiveIdFromUrl(String(raw || ''));
 
   for (const a of doc.querySelectorAll(
-    'a[href*="/watch/lv"], a[href*="watch/lv"], a[href*="/embed/lv"], a[href*="embed/lv"]'
+    [
+      'a[href*="/watch/lv"]',
+      'a[href*="watch/lv"]',
+      'a[href*="/embed/lv"]',
+      'a[href*="embed/lv"]',
+      'a[href*="/watch/ch"]',
+      'a[href*="watch/ch"]',
+      'a[href*="/embed/ch"]',
+      'a[href*="embed/ch"]'
+    ].join(', ')
   )) {
     const id = tryHref(a.getAttribute('href'));
     if (id) return id;

@@ -84,7 +84,7 @@
         justify-content: center;
         flex-direction: column;
         gap: 12px;
-        background: linear-gradient(180deg, #f6fff8, #eef9f3);
+        background: linear-gradient(180deg, var(--nl-bg, #f6fff8), var(--nl-bg-soft, #eef9f3));
         transition: opacity 220ms ease-out;
         animation: nl-init-shade-css-failsafe 15s ease-out forwards;
       }
@@ -92,21 +92,50 @@
         width: clamp(56px, 14vw, 72px);
         height: clamp(56px, 14vw, 72px);
         border-radius: 50%;
-        background: #fff;
-        border: 2px solid #1f2937;
-        box-shadow: 2px 2px 0 #1f2937;
+        background: var(--nl-surface, #fff);
+        border: 2px solid var(--nl-text, #1f2937);
+        box-shadow: 2px 2px 0 var(--nl-text, #1f2937);
         animation: nl-init-shade-bob 1.2s ease-in-out infinite;
       }
       .nl-init-shade__msg {
-        font-size: clamp(12px, 3vw, 14px);
+        font-size: clamp(12px, 3.2vw, 14px);
         font-weight: 700;
-        color: #2a6f4d;
+        color: var(--nl-rank-count, #2a6f4d);
         letter-spacing: 0.06em;
+        text-align: center;
+        max-width: 90%;
+      }
+      .nl-init-shade__submsg {
+        font-size: clamp(10px, 2.5vw, 11.5px);
+        font-weight: 500;
+        color: var(--nl-muted, #5b6475);
+        text-align: center;
+        max-width: 84%;
+        line-height: 1.45;
+        margin-top: -2px;
       }
       .nl-init-shade--done {
         opacity: 0;
         pointer-events: none;
         animation: none;
+      }
+
+      /* システムのダークモード設定時、JS 起動前の初回ロードシェード */
+      @media (prefers-color-scheme: dark) {
+        .nl-init-shade {
+          background: linear-gradient(180deg, var(--nl-bg, #0b1220), var(--nl-bg-soft, #111827));
+        }
+        .nl-init-shade__face {
+          background: var(--nl-surface, #0f172a);
+          border-color: var(--nl-text-sub, #cbd5e1);
+          box-shadow: 2px 2px 0 var(--nl-text-sub, #cbd5e1);
+        }
+        .nl-init-shade__msg {
+          color: var(--nl-accent, #60a5fa);
+        }
+        .nl-init-shade__submsg {
+          color: var(--nl-muted, #94a3b8);
+        }
       }
       @keyframes nl-init-shade-bob {
         0%, 100% { transform: translateY(0); }
@@ -1354,9 +1383,9 @@
         }
       }
 
-      /* cloak 中の inline-embed-watch: 親ホストの暗い背景を透かして白フラッシュを防ぐ */
-      html.nl-inline-embed-watch[data-nl-popup-primary-cloak='1'],
-      html.nl-inline-embed-watch[data-nl-popup-primary-cloak='1'] body {
+      /* cloak 中: 親ホストの暗い背景を透かして白フラッシュを防ぐ（JS 読み込み中も有効にするためクラス限定を外す） */
+      html[data-nl-popup-primary-cloak='1'],
+      html[data-nl-popup-primary-cloak='1'] body {
         background: transparent !important;
       }
 
@@ -2205,6 +2234,7 @@
 
       .nl-live-stat-card--concurrent {
         border-color: var(--nl-border);
+        cursor: pointer;
       }
 
       .nl-live-stat-icon.nl-chara-bounce-small {
@@ -2711,6 +2741,122 @@
         color: var(--nl-muted);
         line-height: 1.3;
         letter-spacing: 0.02em;
+      }
+
+      /* v0.1.393: カード鮮度（最終更新: ○秒前・自動更新中）。note より一段控えめ。 */
+      .nl-top-support-rank__freshness {
+        margin: -2px 0 5px;
+        font-size: clamp(7px, 1.6vw, 8px);
+        font-weight: 600;
+        color: var(--nl-muted);
+        opacity: 0.85;
+        line-height: 1.3;
+        text-align: center;
+      }
+
+      /* イベントランキング上部の「配信者本人の現在順位」= 大きなメダル風バッジ */
+      .nl-event-self {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 8px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 18%, transparent),
+          color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 6%, transparent)
+        );
+        border: 1px solid color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 35%, var(--nl-border) 65%);
+        line-height: 1.25;
+      }
+      /* 左の大きな順位バッジ */
+      .nl-event-self__badge {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-width: 52px;
+        padding: 4px 8px;
+        border-radius: 10px;
+        background: var(--nl-bg, #fff);
+        border: 2px solid color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 55%, var(--nl-border) 45%);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+      }
+      .nl-event-self__badge--top1 {
+        border-color: #e0a90c;
+        background: linear-gradient(135deg, #fff7e0, #ffe9a8);
+      }
+      .nl-event-self__badge--top2 {
+        border-color: #9aa7b4;
+        background: linear-gradient(135deg, #f5f8fb, #dfe6ee);
+      }
+      .nl-event-self__badge--top3 {
+        border-color: #c8814a;
+        background: linear-gradient(135deg, #fbeede, #f0d3b4);
+      }
+      .nl-event-self__medal {
+        font-size: clamp(16px, 4.5vw, 22px);
+        line-height: 1;
+      }
+      .nl-event-self__rank-num {
+        font-size: clamp(20px, 6vw, 30px);
+        font-weight: 800;
+        color: var(--nl-lane-accent-event-broadcasters, #056dff);
+        line-height: 1;
+        letter-spacing: -0.02em;
+      }
+      .nl-event-self__badge--top1 .nl-event-self__rank-num { color: #b8860b; }
+      .nl-event-self__badge--top2 .nl-event-self__rank-num { color: #6b7886; }
+      .nl-event-self__badge--top3 .nl-event-self__rank-num { color: #a5632f; }
+      .nl-event-self__rank-suffix {
+        font-size: 0.45em;
+        font-weight: 700;
+        margin-left: 1px;
+      }
+      /* 右の本文 */
+      .nl-event-self__body {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .nl-event-self__event {
+        margin: 0 0 3px;
+        font-size: clamp(8px, 2vw, 10px);
+        font-weight: 700;
+        color: var(--nl-fg);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      /* ゆっくりりんくの語りかけ吹き出し */
+      .nl-event-self__talk {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin: 0;
+      }
+      .nl-event-self__rinku {
+        flex: 0 0 auto;
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+      }
+      .nl-event-self__talk-text {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: clamp(9px, 2.3vw, 12px);
+        font-weight: 700;
+        line-height: 1.35;
+        color: var(--nl-fg);
+        background: var(--nl-bg, #fff);
+        border: 1px solid color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 25%, var(--nl-border) 75%);
+        border-radius: 8px;
+        padding: 4px 7px;
+      }
+      .nl-event-self__talk-text strong {
+        color: var(--nl-lane-accent-event-broadcasters, #056dff);
+        font-size: 1.08em;
       }
 
       .nl-top-support-rank__list {
@@ -3397,7 +3543,7 @@
         border-radius: 8px;
         background: color-mix(in srgb, var(--nl-surface) 80%, transparent);
         border-left: 2px solid transparent;
-        /* v0.1.294: slot click で対応レーンへ smooth scroll する操作の affordance */
+        /* trio slot click で対応レーンへ scroll（`.nl-main` と補正つき／補助はコアへフォールバック）*/
         cursor: pointer;
         outline: none;
         user-select: none;
@@ -3819,6 +3965,136 @@
         display: -webkit-box;
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 3;
+      }
+      /* 「ギフトボタン→○○タブを開くと出やすい」手順図解（画像なし・SVG/CSS） */
+      .nl-open-hint {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 8%, transparent);
+        border: 1px dashed color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 30%, var(--nl-border) 70%);
+      }
+      .nl-open-hint__step {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .nl-open-hint__num {
+        flex: 0 0 auto;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: var(--nl-lane-accent-event-broadcasters, #056dff);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 800;
+        line-height: 15px;
+        text-align: center;
+      }
+      .nl-open-hint__gift-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: var(--nl-bg, #fff);
+        border: 1px solid color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 45%, var(--nl-border) 55%);
+        color: var(--nl-lane-accent-event-broadcasters, #056dff);
+      }
+      .nl-open-hint__tabs {
+        display: inline-flex;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-bg, #fff);
+      }
+      .nl-open-hint__tab {
+        font-size: 8px;
+        font-weight: 700;
+        padding: 3px 5px;
+        color: var(--nl-muted);
+        border-right: 1px solid var(--nl-border);
+        white-space: nowrap;
+      }
+      .nl-open-hint__tab:last-child {
+        border-right: none;
+      }
+      .nl-open-hint__tab--active {
+        background: var(--nl-lane-accent-event-broadcasters, #056dff);
+        color: #fff;
+      }
+      .nl-open-hint__arrow {
+        color: var(--nl-muted);
+        font-weight: 800;
+        font-size: 12px;
+      }
+      .nl-open-hint__caption {
+        font-size: 9px;
+        font-weight: 700;
+        color: color-mix(in srgb, var(--nl-text) 80%, transparent);
+        white-space: nowrap;
+      }
+      /* レーン本体の全幅で 3 キャラ（りんく/こん太/たぬ姉）が大きく案内する待機ガイド */
+      .nl-wait-guide {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+      }
+      .nl-wait-guide .nl-open-hint {
+        margin-top: 0;
+        margin-bottom: 2px;
+      }
+      .nl-wait-guide__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+      }
+      .nl-wait-guide__row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .nl-wait-guide__avatar {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 10%, transparent);
+      }
+      .nl-wait-guide__bubble {
+        flex: 1 1 auto;
+        min-width: 0;
+        background: var(--nl-bg, #fff);
+        border: 1px solid color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 22%, var(--nl-border) 78%);
+        border-radius: 10px;
+        padding: 6px 10px;
+        line-height: 1.45;
+      }
+      .nl-wait-guide__name {
+        display: block;
+        font-size: clamp(9px, 2vw, 11px);
+        font-weight: 800;
+        color: var(--nl-lane-accent-event-broadcasters, #056dff);
+        margin-bottom: 1px;
+      }
+      .nl-wait-guide__line {
+        display: block;
+        font-size: clamp(10px, 2.3vw, 13px);
+        font-weight: 600;
+        color: var(--nl-text);
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
       .nl-north-star-lane-wait__gauge {
         height: 9px;
@@ -8375,7 +8651,8 @@
         alt=""
         decoding="async"
       />
-      <div class="nl-init-shade__msg">読み込み中…</div>
+      <div class="nl-init-shade__msg">りんく こん太 たぬ姉が いまからよみこむよー</div>
+      <div class="nl-init-shade__submsg">ギフト履歴や 他のランキングなどは、一度開くと取り込みがはやくなるよー</div>
     </div>
     <header class="nl-header">
       <div class="nl-header-brand">
@@ -8707,6 +8984,8 @@
             src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
             alt=""
             decoding="async"
+            title="広告ランキングのレーンへ移動（非表示のときは貢献度またはギフト履歴へスクロールします）"
+            aria-label="広告ランキングへスクロール（表示がないときはコア情報へ）"
           />
           <div class="nl-live-stat-label">推定同時接続</div>
           <div class="nl-concurrent-body">
@@ -8964,9 +9243,10 @@
                   class="nl-north-star-lane__program-pt is-placeholder"
                   id="giftHistoryProgramPt"
                   title="番組ギフト累計pt（ティッカー等）。表示中ユーザー別の合計ではありません"
+                  style="display: none !important;"
                 ><span class="nl-north-star-lane__program-pt-label">累計</span> <b class="nl-north-star-lane__program-pt-num">—</b><small class="nl-north-star-lane__program-pt-unit">pt</small></span></p>
               <p class="nl-north-star-lane__sublabel">
-                ユーザー別（多い順・最大10）。履歴が無いときはコメント観測の「投げ回数」で代替。右上「累計」は番組全体の別指標です。
+                ユーザー別（多い順・最大10）。履歴が無いときはコメント観測の「投げ回数」で代替。
               </p>
             </div>
             <div class="nl-north-star-lane__shell">
@@ -9183,8 +9463,8 @@
           </div>
           <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventBroadcasters" hidden>
             <div class="nl-north-star-lane__heading">
-              <p class="nl-north-star-lane__label">同じイベントに参加中の配信者</p>
-              <p class="nl-north-star-lane__sublabel">視聴者数の多い順です（イベントの順位ではありません）。</p>
+              <p class="nl-north-star-lane__label">イベントランキング</p>
+              <p class="nl-north-star-lane__sublabel">このイベントの💎スコア順（公式ランキングに準拠）。</p>
             </div>
             <div class="nl-north-star-lane__shell">
               <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
@@ -9214,7 +9494,7 @@
               <aside
                 id="northStarLaneAside-eventBroadcasters"
                 class="nl-north-star-lane__rail"
-                aria-label="（この項目は配信者一覧のみ）"
+                aria-label="（この項目はイベントランキングのみ）"
                 hidden
               ></aside>
             </div>

@@ -235,4 +235,56 @@ describe('normalizeEventParticipationResponse', () => {
   it('EVENT_PARTICIPATION_DEFAULT_MAX は 10', () => {
     expect(EVENT_PARTICIPATION_DEFAULT_MAX).toBe(10);
   });
+
+  it('同一配信者（同 uid）が複数番組で参加していても 1 件に集約し、代表は最大視聴者数の番組', () => {
+    // 実機 2026-05-25 lv350606186 で「この」が 4 枚（1186/1077/509/469）並んだ症状の再現。
+    const dup = {
+      meta: { status: 200 },
+      data: [
+        { programId: 'lv1', statistics: { viewers: 509 }, programProvider: { name: 'この', programProviderId: '100' } },
+        { programId: 'lv2', statistics: { viewers: 1186 }, programProvider: { name: 'この', programProviderId: '100' } },
+        { programId: 'lv3', statistics: { viewers: 469 }, programProvider: { name: 'この', programProviderId: '100' } },
+        { programId: 'lv4', statistics: { viewers: 1077 }, programProvider: { name: 'この', programProviderId: '100' } },
+        { programId: 'lv9', statistics: { viewers: 300 }, programProvider: { name: '別人', programProviderId: '200' } }
+      ]
+    };
+    const rows = normalizeEventParticipationResponse(dup);
+    // 「この」は 1 件のみ・代表は最大の 1186・代表 programId は lv2
+    const kono = rows.filter((r) => r.name === 'この');
+    expect(kono).toHaveLength(1);
+    expect(kono[0].contribution).toBe(1186);
+    expect(kono[0].programId).toBe('lv2');
+    // 全体は 2 件（この / 別人）で、視聴者数降順
+    expect(rows.map((r) => r.name)).toEqual(['この', '別人']);
+  });
+
+  it('uid が違えば同名でも別配信者として残す', () => {
+    const sameName = {
+      meta: { status: 200 },
+      data: [
+        { programId: 'lvA', statistics: { viewers: 10 }, programProvider: { name: 'みなみ', programProviderId: '111' } },
+        { programId: 'lvB', statistics: { viewers: 8 }, programProvider: { name: 'みなみ', programProviderId: '222' } }
+      ]
+    };
+    const rows = normalizeEventParticipationResponse(sameName);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.userPageUrl)).toEqual([
+      'https://www.nicovideo.jp/user/111',
+      'https://www.nicovideo.jp/user/222'
+    ]);
+  });
+
+  it('非記名（uid 無し・channel/community）は表示名で集約する', () => {
+    const ch = {
+      meta: { status: 200 },
+      data: [
+        { programId: 'lv1', statistics: { viewers: 4 }, programProvider: { name: '公式ch', programProviderId: 'ch555' } },
+        { programId: 'lv2', statistics: { viewers: 7 }, programProvider: { name: '公式ch', programProviderId: 'ch555' } }
+      ]
+    };
+    const rows = normalizeEventParticipationResponse(ch);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].contribution).toBe(7); // 代表は最大視聴者数
+    expect(rows[0].userPageUrl).toBeUndefined(); // 非記名はリンク無し
+  });
 });
