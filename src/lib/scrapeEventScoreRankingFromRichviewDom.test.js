@@ -1,7 +1,10 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect } from 'vitest';
 import { scrapeContributionRankingFromDom } from './officialEventBannerDom.js';
-import { scrapeEventScoreRankingFromRichviewDom } from './scrapeEventScoreRankingFromRichviewDom.js';
+import {
+  scrapeEventScoreRankingFromRichviewDom,
+  scrapeEventSelfStatusFromRichviewDom
+} from './scrapeEventScoreRankingFromRichviewDom.js';
 
 function supporterSectionHtml(rankScoreRows) {
   const lis = rankScoreRows
@@ -295,5 +298,52 @@ describe('scrapeEventScoreRankingFromRichviewDom', () => {
     expect(rows).toHaveLength(2);
     expect(rows?.[0]).toMatchObject({ rank: 1, score: 433100, name: 'ミュート', isAnonymous: false, thumbnailUrl: 'https://example.test/avatar1.jpg' });
     expect(rows?.[1]).toMatchObject({ rank: 2, score: 233920, name: 'この', isAnonymous: false, thumbnailUrl: 'https://example.test/avatar2.jpg' });
+  });
+});
+
+describe('scrapeEventSelfStatusFromRichviewDom', () => {
+  // 実機バナー構造（2026-05-26 採取）: e1awe04q* クラスタ + select。
+  function bannerHtml({ rank, score, diff, broadcaster, eventName }) {
+    return `
+      <div class="css-x ef7q2pk1">
+        <select class="css-y elcxquj20">
+          <option>別イベントA</option>
+          <option selected>${eventName}</option>
+        </select>
+        <div class="css-x e1awe04q14">
+          <span class="css-1kputv7 e1awe04q12">現在</span><span class="css-1oa92lc e1awe04q11">位</span>
+          <span class="css-mmdt3g e1awe04q10">${broadcaster}さん</span>
+          <span class="css-ggzujz e1awe04q0">${rank}</span>
+          <p class="css-1qqb6me">${String(score).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</p>
+          <p class="css-1d9a3hd">${String(diff).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</p>
+        </div>
+      </div>`;
+  }
+
+  it('本人の順位・累計スコア・順位UPまでの差・イベント名を取得', () => {
+    document.body.innerHTML = bannerHtml({ rank: 2, score: 3453400, diff: 1517300, broadcaster: 'この', eventName: '横浜DeNAベイスターズ始球式オーディション' });
+    const s = scrapeEventSelfStatusFromRichviewDom(document);
+    expect(s).not.toBeNull();
+    expect(s?.rank).toBe(2);
+    expect(s?.score).toBe(3453400);
+    expect(s?.diffToNext).toBe(1517300);
+    expect(s?.broadcasterName).toBe('この');
+    expect(s?.eventName).toBe('横浜DeNAベイスターズ始球式オーディション');
+  });
+
+  it('該当バナーが無ければ null', () => {
+    document.body.innerHTML = '<div class="nothing"></div>';
+    expect(scrapeEventSelfStatusFromRichviewDom(document)).toBeNull();
+  });
+
+  it('root が空なら null', () => {
+    expect(scrapeEventSelfStatusFromRichviewDom(null)).toBeNull();
+  });
+
+  it('スコアは「現在」「位」等のラベルを数値に取り違えない（数字のみ採用）', () => {
+    document.body.innerHTML = bannerHtml({ rank: 1, score: 9999999, diff: 0, broadcaster: 'あめ', eventName: 'イベントX' });
+    const s = scrapeEventSelfStatusFromRichviewDom(document);
+    expect(s?.rank).toBe(1);
+    expect(s?.score).toBe(9999999);
   });
 });

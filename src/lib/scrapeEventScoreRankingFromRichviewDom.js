@@ -43,6 +43,57 @@ function normalizeRankerAltName(value) {
 }
 
 /**
+ * 要素（またはその子孫）からサムネ画像 URL を拾う。
+ * richview のアバターは `el69c2m3` 空 div に Emotion クラス由来の CSS background-image で
+ * 描画されるため、inline style だけでなく **computed style** も見る必要がある。
+ *
+ * @param {HTMLElement|null} el
+ * @param {{ searchDescendants?: boolean }} [opts]
+ * @returns {string}
+ */
+function pickThumbnailUrlFromElement(el, opts) {
+  if (!(el instanceof HTMLElement)) return '';
+  const fromBg = (/** @type {string} */ bg) => {
+    const m = String(bg || '').match(/url\(["']?([^"')]+)["']?\)/);
+    return m && /^https?:\/\//i.test(m[1]) ? m[1] : '';
+  };
+  const probe = (/** @type {HTMLElement} */ node) => {
+    // 1) inline background-image
+    let u = fromBg(node.style?.backgroundImage || '');
+    if (u) return u;
+    // 2) computed background-image（Emotion クラス由来。getComputedStyle が使える環境のみ）
+    try {
+      const gcs = typeof globalThis !== 'undefined' && typeof globalThis.getComputedStyle === 'function'
+        ? globalThis.getComputedStyle(node)
+        : null;
+      if (gcs) {
+        u = fromBg(gcs.backgroundImage || '');
+        if (u) return u;
+      }
+    } catch { /* no-op */ }
+    // 3) <img src> / lazy data-src
+    const img = node.matches('img') ? node : node.querySelector('img[src], img[data-src]');
+    if (img instanceof HTMLImageElement) {
+      const s = String(img.currentSrc || img.src || '').trim();
+      if (/^https?:\/\//i.test(s)) return s;
+      const ds = String(img.getAttribute('data-src') || '').trim();
+      if (/^https?:\/\//i.test(ds)) return ds;
+    }
+    return '';
+  };
+  const direct = probe(el);
+  if (direct) return direct;
+  if (opts?.searchDescendants) {
+    for (const d of el.querySelectorAll('*')) {
+      if (!(d instanceof HTMLElement)) continue;
+      const u = probe(d);
+      if (u) return u;
+    }
+  }
+  return '';
+}
+
+/**
  * @param {HTMLElement|null} thumbEl
  * @returns {string}
  */
@@ -151,6 +202,93 @@ function findScoreValueInElement(li, rank) {
 }
 
 /**
+ * @typedef {{
+ *   rank: number|null,
+ *   score: number|null,
+ *   diffToNext: number|null,
+ *   eventName: string,
+ *   broadcasterName: string,
+ * }} EventSelfStatus
+ */
+
+/**
+ * richview バナーから「配信者本人の現在順位 / 累計スコア / 順位UPまでの差 / 参加中イベント名」を掬う。
+ * 実DOM（2026-05-26 実機採取 lv350612434・[[reference_richview_event_ranking_emotion_dom]]）:
+ *   バナーは Emotion クラスタ e1awe04q*:
+ *     span.e1awe04q12 "現在" / span.e1awe04q11 "位"(ラベル) / span.e1awe04q10 "○○さん"(配信者名)
+ *     span.e1awe04q0  本人の順位の数字（例 "2"）
+ *     p.css-1qqb6me   本人の累計スコア（9桁・例 3,453,400）  ← css hash 不安定なので位置でも同定
+ *     p.css-1d9a3hd   順位UPまでの差（例 1,517,300）
+ *   イベント名は <select> の選択中 option（複数イベント参加時の現在表示分）。
+ *
+ * fail-soft: 取れない項目は null/空。順位が無くてもイベント名だけ返すこともある。
+ *
+ * @param {Document|Element|null|undefined} root
+ * @returns {EventSelfStatus|null}
+ */
+export function scrapeEventSelfStatusFromRichviewDom(root) {
+  if (!root) return null;
+  /** @type {any} */
+  const r = root;
+  const q = (/** @type {string} */ sel) => {
+    try { return r.querySelector?.(sel) || null; } catch { return null; }
+  };
+
+  // 本人の順位（span.e1awe04q0・数字）
+  let rank = null;
+  const rankEl = q('[class~="e1awe04q0"], [class*="e1awe04q0"]');
+  if (rankEl) {
+    const d = String(rankEl.textContent || '').replace(/[^\d]/g, '');
+    if (/^\d+$/.test(d)) { const n = parseInt(d, 10); if (Number.isFinite(n) && n > 0) rank = n; }
+  }
+
+  // 配信者名（span.e1awe04q10）「○○さん」→「さん」除去
+  let broadcasterName = '';
+  const nameEl = q('[class~="e1awe04q10"], [class*="e1awe04q10"]');
+  if (nameEl) broadcasterName = String(nameEl.textContent || '').replace(/\s+/g, ' ').replace(/\s*さん\s*$/u, '').trim();
+
+  // バナー領域内の 9 桁前後の数値2つ＝累計スコア / 順位UPまでの差。
+  // css hash に依存せず、e1awe04q0(順位)の祖先パネル内の数字リーフを大きい順に。
+  let score = null;
+  let diffToNext = null;
+  try {
+    let panel = rankEl instanceof HTMLElement ? rankEl : null;
+    for (let i = 0; i < 6 && panel && panel.parentElement; i++) panel = panel.parentElement;
+    const scope = panel || (rankEl instanceof HTMLElement ? rankEl : null);
+    if (scope instanceof HTMLElement) {
+      /** @type {number[]} */
+      const nums = [];
+      for (const el of scope.querySelectorAll('p, span, strong, b')) {
+        if (!(el instanceof HTMLElement) || el.children.length > 0) continue;
+        if (rankEl && (el === rankEl || el.contains(rankEl) || rankEl.contains(el))) continue;
+        const t = String(el.textContent || '').trim();
+        if (!/^[\d,]+$/.test(t)) continue; // 数字のみ（「現在」「位」等は除外）
+        const v = parseInt(t.replace(/[^\d]/g, ''), 10);
+        if (Number.isFinite(v) && v >= 100) nums.push(v); // 順位の 1-2 桁は拾わない
+      }
+      // 累計スコア = 最大、差 = 2 番目（順位UPまでの差はスコアより小さい想定）
+      nums.sort((a, b) => b - a);
+      if (nums.length >= 1) score = nums[0];
+      if (nums.length >= 2) diffToNext = nums[1];
+    }
+  } catch { /* no-op */ }
+
+  // 参加中イベント名（<select> の選択 option）。複数なければ単一 option。
+  let eventName = '';
+  try {
+    const sel = q('select');
+    if (sel && typeof sel.selectedIndex === 'number' && sel.options) {
+      const o = sel.options[sel.selectedIndex];
+      if (o) eventName = String(o.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+  } catch { /* no-op */ }
+
+  // 全部空なら null
+  if (rank == null && score == null && !eventName && !broadcasterName) return null;
+  return { rank, score, diffToNext, eventName, broadcasterName };
+}
+
+/**
  * ★本命★ 実機 richview の「イベントランキング」（=このイベントに参加している
  * 配信者たちの💎スコア順位。1位あめ / 2位この / … 25位）を掬う（2026-05-26 ユーザー提供生HTMLで確定）。
  *
@@ -228,17 +366,11 @@ function scrapeRealEventRankingRows(root) {
     // サムネ（el69c2m3 の背景画像。1-3 位以外は空のことが多い→空許容）
     let thumbnailUrl = '';
     const thumbEl = row.querySelector('[class~="el69c2m3"], [class*="el69c2m3"]');
-    if (thumbEl instanceof HTMLElement) {
-      const bg = String(thumbEl.style?.backgroundImage || '');
-      const m = bg.match(/url\(["']?([^"')]+)["']?\)/);
-      if (m && /^https?:\/\//i.test(m[1])) thumbnailUrl = m[1];
-      if (!thumbnailUrl) {
-        const img = thumbEl.querySelector('img[src]');
-        if (img instanceof HTMLImageElement) {
-          const u = String(img.currentSrc || img.src || '').trim();
-          if (/^https?:\/\//i.test(u)) thumbnailUrl = u;
-        }
-      }
+    thumbnailUrl = pickThumbnailUrlFromElement(thumbEl instanceof HTMLElement ? thumbEl : null);
+    // サムネ要素が空（el69c2m3 が空 div で背景画像が CSS クラス由来）の場合に備え、
+    // 行内のどこかに http 背景/img があればそれも拾う。
+    if (!thumbnailUrl && row instanceof HTMLElement) {
+      thumbnailUrl = pickThumbnailUrlFromElement(row, { searchDescendants: true });
     }
 
     rows.push({ rank, score, name, isAnonymous, thumbnailUrl });

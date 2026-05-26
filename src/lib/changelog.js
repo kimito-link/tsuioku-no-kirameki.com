@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.381',
+    date: '2026-05-26',
+    summary: 'イベント順位に本人状況とサムネを追加',
+    items: Object.freeze([
+      'イベントランキングのレーン上部に、参加中のイベント名と「配信者本人の現在順位・累計💎・順位UPまでの差」を表示するようにしました。上位入賞をねらう励みになります',
+      '各配信者のサムネイルが灰色のままだったのを直しました（公式画面では画像が文字に頼らない形＝CSSの背景で表示されているため、その読み取りに対応）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.380',
     date: '2026-05-26',
     summary: 'イベントランキングを正しい一覧から取得',
