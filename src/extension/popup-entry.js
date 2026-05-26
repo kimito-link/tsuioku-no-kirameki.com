@@ -1388,6 +1388,23 @@ const watchMetaCache = {
   snapshotFetchActive: false
 };
 
+// v0.1.398: snapshot fetch ハング耐性 e2e（snapshot-fetch-hang-resilient.spec.js）が、
+//   「fetch が永久ハングしても snapshotFetchActive が永久 true に張り付かない（withTimeout で
+//   必ず finally に到達しリセットされる）」ことを実拡張で観測するための read-only getter。
+//   挙動には一切影響しない（値を読むだけ）。
+try {
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, '__nlsSnapshotFetchActive', {
+      configurable: true,
+      get() {
+        return Boolean(watchMetaCache.snapshotFetchActive);
+      }
+    });
+  }
+} catch {
+  /* defineProperty 不可環境では無視 */
+}
+
 /** 遅延フェーズの描画が直近の refresh に属するか判定する */
 let watchPopupRefreshGeneration = 0;
 
