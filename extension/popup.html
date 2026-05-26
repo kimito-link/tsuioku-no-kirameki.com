@@ -2809,32 +2809,43 @@
         flex: 1 1 auto;
         min-width: 0;
       }
-      .nl-event-self__who {
-        margin: 0;
+      .nl-event-self__event {
+        margin: 0 0 3px;
         font-size: clamp(8px, 2vw, 10px);
         font-weight: 700;
-        color: var(--nl-muted);
+        color: var(--nl-fg);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .nl-event-self__score {
-        margin: 1px 0 0;
-        font-size: clamp(12px, 3.2vw, 16px);
-        font-weight: 800;
-        color: var(--nl-fg);
+      /* ゆっくりりんくの語りかけ吹き出し */
+      .nl-event-self__talk {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin: 0;
       }
-      .nl-event-self__push {
-        margin: 2px 0 0;
-        font-size: clamp(8px, 2.1vw, 11px);
+      .nl-event-self__rinku {
+        flex: 0 0 auto;
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+      }
+      .nl-event-self__talk-text {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: clamp(9px, 2.3vw, 12px);
         font-weight: 700;
+        line-height: 1.35;
         color: var(--nl-fg);
+        background: var(--nl-bg, #fff);
+        border: 1px solid color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 25%, var(--nl-border) 75%);
+        border-radius: 8px;
+        padding: 4px 7px;
       }
-      .nl-event-self__push strong {
+      .nl-event-self__talk-text strong {
         color: var(--nl-lane-accent-event-broadcasters, #056dff);
-      }
-      .nl-event-self__push--top strong {
-        color: #b8860b;
+        font-size: 1.08em;
       }
 
       .nl-top-support-rank__list {

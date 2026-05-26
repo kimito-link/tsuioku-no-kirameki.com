@@ -273,19 +273,52 @@ export function scrapeEventSelfStatusFromRichviewDom(root) {
     }
   } catch { /* no-op */ }
 
-  // 参加中イベント名（<select> の選択 option）。複数なければ単一 option。
-  let eventName = '';
-  try {
-    const sel = q('select');
-    if (sel && typeof sel.selectedIndex === 'number' && sel.options) {
-      const o = sel.options[sel.selectedIndex];
-      if (o) eventName = String(o.textContent || '').replace(/\s+/g, ' ').trim();
-    }
-  } catch { /* no-op */ }
+  // 参加中イベント名（<select> の option）。
+  // ⚠️ 罠（実機 lv350613081）: select は配信者が参加中の複数イベントを切替でき、
+  //   selectedIndex がギフトイベントでなく「ニコニ広告キャンペーン」を指すことがある
+  //   （表示中のランキングは始球式イベントなのに）。そのため selectedIndex を鵜呑みに
+  //   せず、広告マーカー（ニコニ広告/憂うつパージ/銀河系まで飛んでいけ）を除外し、
+  //   ギフトイベントらしいキーワード（オーディション/始球式/ナイター/イベント）を優先する。
+  const eventName = pickEventNameFromSelectOptions(q('select'));
+
+  // 配信者名は richview から取らない（e1awe04q10 は「を応援しよう！」という断片を拾うため）。
+  // 呼び出し側（popup）が持つ正本 broadcasterName を使う。ここでは空で返す。
+  void broadcasterName;
 
   // 全部空なら null
-  if (rank == null && score == null && !eventName && !broadcasterName) return null;
-  return { rank, score, diffToNext, eventName, broadcasterName };
+  if (rank == null && score == null && !eventName) return null;
+  return { rank, score, diffToNext, eventName, broadcasterName: '' };
+}
+
+/**
+ * richview の <select>（参加中イベント切替）から「ギフトイベントらしい」名前を選ぶ。
+ * selectedIndex は広告キャンペーンを指すことがあるため、広告マーカーを除外し、
+ * ギフトイベント語を優先、無ければ非広告の最長 option を採る。誤判定なら ''（出さない）。
+ *
+ * @param {any} sel
+ * @returns {string}
+ */
+function pickEventNameFromSelectOptions(sel) {
+  try {
+    if (!sel || !sel.options) return '';
+    /** @type {string[]} */
+    const opts = Array.from(sel.options)
+      .map((/** @type {any} */ o) => String(o?.textContent || '').replace(/\s+/g, ' ').trim())
+      .filter((s) => s.length >= 2);
+    if (opts.length === 0) return '';
+    const AD = /ニコニ広告|憂うつパージ|銀河系まで飛んでいけ|広告で/;
+    const EVENT = /オーディション|始球式|ナイター|イベント|大会|選手権|グランプリ|フェス|総選挙/;
+    const nonAd = opts.filter((s) => !AD.test(s));
+    // 1) 非広告かつイベント語を含む（最長）
+    const eventLike = nonAd.filter((s) => EVENT.test(s)).sort((a, b) => b.length - a.length);
+    if (eventLike.length) return eventLike[0];
+    // 2) 非広告の最長
+    if (nonAd.length) return nonAd.sort((a, b) => b.length - a.length)[0];
+    // 3) option が1つだけ（広告でも）ならそれ、複数なら誤判定回避で出さない
+    return opts.length === 1 ? opts[0] : '';
+  } catch {
+    return '';
+  }
 }
 
 /**

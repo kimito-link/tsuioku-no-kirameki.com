@@ -6505,18 +6505,23 @@ function buildEventBroadcasterLaneCurrentRankPretext() {
 
 /**
  * イベントランキングレーン上部に出す「配信者本人の現在状況」ヘッダ HTML を作る。
- * richview バナー由来の selfStatus（順位/累計スコア/順位UPまでの差/イベント名）から組み立てる。
- * fail-soft: selfStatus が無い・空なら空文字（ヘッダ無し）。
+ * ゆっくりりんく（キャラ）が語りかける形＝「○○さんは現在○位です。みんなで応援しよう！」。
  *
- * @param {{rank?:number|null,score?:number|null,diffToNext?:number|null,eventName?:string,broadcasterName?:string}|null|undefined} self
+ * 配信者名は richview から取れない（「を応援しよう！」を拾う）ため、呼び出し側が渡す
+ * 正本 broadcasterName を使う。イベント名は selfStatus.eventName（広告キャンペーン除外済み）。
+ * fail-soft: 本人順位が無ければヘッダ無し。
+ *
+ * @param {{rank?:number|null,score?:number|null,diffToNext?:number|null,eventName?:string}|null|undefined} self
+ * @param {string} [broadcasterName] 拡張が持つ正本配信者名
  * @returns {string}
  */
-function buildEventSelfStatusHeaderHtml(self) {
+function buildEventSelfStatusHeaderHtml(self, broadcasterName) {
   if (!self || typeof self !== 'object') return '';
   const rank = typeof self.rank === 'number' && Number.isFinite(self.rank) && self.rank > 0 ? Math.trunc(self.rank) : null;
   const score = typeof self.score === 'number' && Number.isFinite(self.score) && self.score >= 0 ? Math.trunc(self.score) : null;
   const diff = typeof self.diffToNext === 'number' && Number.isFinite(self.diffToNext) && self.diffToNext >= 0 ? Math.trunc(self.diffToNext) : null;
-  const broadcasterName = String(self.broadcasterName || '').trim();
+  const eventName = String(self.eventName || '').trim();
+  const name = String(broadcasterName || '').trim();
   const fmt = (/** @type {number} */ n) => n.toLocaleString('en-US');
 
   // 本人の順位が確定できなければヘッダ自体を出さない（順位を大きく見せるのが主目的）。
@@ -6525,32 +6530,36 @@ function buildEventSelfStatusHeaderHtml(self) {
   // 1-3 位はメダル絵文字、それ以外は順位数字を強調。
   const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
   const tierClass = rank <= 3 ? ` nl-event-self__badge--top${rank}` : '';
-  const who = broadcasterName ? `${escapeHtml(broadcasterName)}さん` : '配信者';
-
-  // 大きなメダル風バッジ: [🥈 / 2位] + 名前 + 累計💎 + 「あと💎X で N-1位！」
   const badgeInner = medal
     ? `<span class="nl-event-self__medal">${medal}</span><span class="nl-event-self__rank-num">${rank}<span class="nl-event-self__rank-suffix">位</span></span>`
     : `<span class="nl-event-self__rank-num nl-event-self__rank-num--plain">${rank}<span class="nl-event-self__rank-suffix">位</span></span>`;
 
-  const scoreLine = score != null
-    ? `<p class="nl-event-self__score">💎 ${fmt(score)}</p>`
-    : '';
-
-  // 煽り: 1 位以外で差が取れていれば「あと💎X で {rank-1}位！」
-  let pushLine = '';
-  if (rank > 1 && diff != null && diff > 0) {
-    pushLine = `<p class="nl-event-self__push">あと <strong>💎 ${fmt(diff)}</strong> で <strong>${rank - 1}位</strong>！</p>`;
-  } else if (rank === 1) {
-    pushLine = `<p class="nl-event-self__push nl-event-self__push--top">🎉 現在 <strong>1位</strong>！この調子！</p>`;
+  // ゆっくりりんくの語りかけ。配信者名がある時だけ名前入りに。
+  const whoLabel = name ? `${escapeHtml(name)}さん` : 'この配信者さん';
+  const scoreTxt = score != null ? `（💎${fmt(score)}）` : '';
+  const talkMain = `${whoLabel}は現在 <strong>${rank}位</strong> ${scoreTxt}だよ！`;
+  let talkPush;
+  if (rank === 1) {
+    talkPush = '🎉 堂々の<strong>1位</strong>！みんなで応援して守ろう！';
+  } else if (diff != null && diff > 0) {
+    talkPush = `あと <strong>💎${fmt(diff)}</strong> で <strong>${rank - 1}位</strong>！みんなでランキングに入れるよう応援しよう！`;
+  } else {
+    talkPush = 'みんなでランキングに入れるよう応援しよう！';
   }
+
+  const eventLine = eventName
+    ? `<p class="nl-event-self__event">🏆 ${escapeHtml(eventName)}</p>`
+    : '';
 
   return (
     `<div class="nl-event-self">` +
       `<div class="nl-event-self__badge${tierClass}">${badgeInner}</div>` +
       `<div class="nl-event-self__body">` +
-        `<p class="nl-event-self__who">${who}の現在順位</p>` +
-        scoreLine +
-        pushLine +
+        eventLine +
+        `<p class="nl-event-self__talk">` +
+          `<img class="nl-event-self__rinku" src="${CHARA_IMG_BASE}/link/link-yukkuri-smile-mouth-open.png" alt="ゆっくりりんく" onerror="this.style.display='none'" />` +
+          `<span class="nl-event-self__talk-text">${talkMain} ${talkPush}</span>` +
+        `</p>` +
       `</div>` +
     `</div>`
   );
@@ -6609,7 +6618,10 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
   }
 
   const pretext = buildEventBroadcasterLaneCurrentRankPretext();
-  const selfHeaderHtml = buildEventSelfStatusHeaderHtml(selfStatus);
+  // 配信者名は richview からは正しく取れない（「を応援しよう！」を拾う）ため、
+  // 拡張が持つ正本 watchMetaCache.snapshot.broadcasterName を使う。
+  const broadcasterNameFromSnapshot = String(watchMetaCache.snapshot?.broadcasterName || '').trim();
+  const selfHeaderHtml = buildEventSelfStatusHeaderHtml(selfStatus, broadcasterNameFromSnapshot);
   const beforeNoteHtml = (selfHeaderHtml || '') + (pretext || '');
 
   if (eventScoreRows && eventScoreRows.length > 0) {
