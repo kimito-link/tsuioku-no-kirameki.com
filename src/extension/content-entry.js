@@ -87,7 +87,7 @@ import {
   captureAuditionRichviewEventScoreDiagProbe,
   isAuditionRichviewLivePath
 } from '../lib/captureAuditionRichviewEventScoreDiagProbe.js';
-import { scrapeEventScoreRankingFromRichviewDom, scrapeEventSelfStatusFromRichviewDom } from '../lib/scrapeEventScoreRankingFromRichviewDom.js';
+import { scrapeEventScoreRankingFromRichviewDom, scrapeEventSelfStatusFromRichviewDom, computeRichviewEventCheapSig } from '../lib/scrapeEventScoreRankingFromRichviewDom.js';
 import {
   eventScoreRankingStorageKey,
   EVENT_SCORE_RANKING_STORAGE_PREFIX,
@@ -10952,6 +10952,12 @@ function maybeStartGiftSubAppIframeRelay() {
   let lastSent = '';
   /** audition richview のイベント💎順位 TOP10 relay 重複抑制 */
   let lastEventScoreRankingSig = '';
+  /** v0.1.385: richview scrape の二段化キャッシュ（cheap sig が同じなら重い scrape を skip） */
+  let _lastRichviewCheapSig = '';
+  /** @type {ReturnType<typeof scrapeEventScoreRankingFromRichviewDom>} */
+  let _lastRichviewScrapeRows = null;
+  /** @type {ReturnType<typeof scrapeEventSelfStatusFromRichviewDom>} */
+  let _lastRichviewSelfStatus = null;
   /** v0.1.227: scan tick の累積回数。heartbeat に乗せて「relay は起動してるが scrape 0 件」を区別する */
   let scrapeAttempts = 0;
   /**
@@ -11091,21 +11097,28 @@ function maybeStartGiftSubAppIframeRelay() {
     }
 
     // v0.1.370: gift 履歴が空でも、richview 内にイベント💎順位リストがあれば親へ送る。
+    // v0.1.385(codex 会議): 重い scrape(getComputedStyle 等)を毎 4 秒回さない二段化。
+    //   ① cheap signature（順位/名前/スコアのテキストのみ・getComputedStyle 無し）を読む
+    //   ② 前回と同じなら前回 rows/selfStatus を再利用し full scrape を skip（挙動不変）
     let eventScoreRowsForRelay = null;
-    try {
-      if (isAuditionRichviewLivePath(href)) {
-        eventScoreRowsForRelay = scrapeEventScoreRankingFromRichviewDom(document);
-      }
-    } catch {
-      eventScoreRowsForRelay = null;
-    }
-    // 本人の現在順位 / 累計スコア / 順位UPまでの差 / 参加中イベント名（バナー由来）。
     let eventSelfStatusForRelay = null;
     try {
       if (isAuditionRichviewLivePath(href)) {
-        eventSelfStatusForRelay = scrapeEventSelfStatusFromRichviewDom(document);
+        const cheapSig = computeRichviewEventCheapSig(document);
+        if (cheapSig && cheapSig === _lastRichviewCheapSig && _lastRichviewScrapeRows) {
+          // 変化なし → 重い scrape を skip して前回値を再利用
+          eventScoreRowsForRelay = _lastRichviewScrapeRows;
+          eventSelfStatusForRelay = _lastRichviewSelfStatus;
+        } else {
+          eventScoreRowsForRelay = scrapeEventScoreRankingFromRichviewDom(document);
+          eventSelfStatusForRelay = scrapeEventSelfStatusFromRichviewDom(document);
+          _lastRichviewCheapSig = cheapSig;
+          _lastRichviewScrapeRows = eventScoreRowsForRelay;
+          _lastRichviewSelfStatus = eventSelfStatusForRelay;
+        }
       }
     } catch {
+      eventScoreRowsForRelay = null;
       eventSelfStatusForRelay = null;
     }
     try {

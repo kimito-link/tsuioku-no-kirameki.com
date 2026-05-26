@@ -3,7 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { scrapeContributionRankingFromDom } from './officialEventBannerDom.js';
 import {
   scrapeEventScoreRankingFromRichviewDom,
-  scrapeEventSelfStatusFromRichviewDom
+  scrapeEventSelfStatusFromRichviewDom,
+  computeRichviewEventCheapSig
 } from './scrapeEventScoreRankingFromRichviewDom.js';
 
 function supporterSectionHtml(rankScoreRows) {
@@ -370,5 +371,46 @@ describe('scrapeEventSelfStatusFromRichviewDom', () => {
     const s = scrapeEventSelfStatusFromRichviewDom(document);
     expect(s?.rank).toBe(1);
     expect(s?.score).toBe(9999999);
+  });
+});
+
+describe('computeRichviewEventCheapSig（重い scrape を skip するための軽い署名）', () => {
+  function rankingHtml(rows) {
+    const items = rows
+      .map(({ rank, score, name }) => `
+        <div class="css-12vetqo el69c2m4">
+          <div class="css-1wdbxvj ebq6m483"><span class="css-89z9eu ebq6m481">${rank}</span><span class="ebq6m480">位</span></div>
+          <div><p class="el69c2m2"><span class="css-1ybg0xk el69c2m1">${name}</span><span class="el69c2m0">さん</span></p>
+          <div class="css-8zj0aw"><svg></svg><p class="css-z40gn4">${String(score).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</p></div></div>
+        </div>`)
+      .join('');
+    return `<div class="ef7q2pk1"><div class="css-ezqgwq">${items}</div></div>`;
+  }
+
+  it('同じ内容なら同じ署名（skip 判定に使える）', () => {
+    document.body.innerHTML = rankingHtml([{ rank: 1, score: 100, name: 'A' }, { rank: 2, score: 50, name: 'B' }]);
+    const a = computeRichviewEventCheapSig(document);
+    const b = computeRichviewEventCheapSig(document);
+    expect(a).toBe(b);
+    expect(a.length).toBeGreaterThan(0);
+  });
+
+  it('スコアが変われば署名も変わる（再 scrape を促す）', () => {
+    document.body.innerHTML = rankingHtml([{ rank: 1, score: 100, name: 'A' }]);
+    const before = computeRichviewEventCheapSig(document);
+    document.body.innerHTML = rankingHtml([{ rank: 1, score: 200, name: 'A' }]);
+    const after = computeRichviewEventCheapSig(document);
+    expect(after).not.toBe(before);
+  });
+
+  it('該当 DOM が無ければ空に近い（self/ev だけ）', () => {
+    document.body.innerHTML = '<div class="nothing"></div>';
+    const sig = computeRichviewEventCheapSig(document);
+    // 行が無くても self:/ev: の骨格は返る（落ちない）
+    expect(typeof sig).toBe('string');
+  });
+
+  it('root が空なら空文字', () => {
+    expect(computeRichviewEventCheapSig(null)).toBe('');
   });
 });
