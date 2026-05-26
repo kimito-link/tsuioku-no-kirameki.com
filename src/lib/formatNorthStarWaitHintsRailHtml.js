@@ -14,6 +14,43 @@ export function northStarWaitBadgeToMarketingPngRelative(badgeLabel) {
 }
 
 /**
+ * 北極星「本体エリア全幅」版: 待機中にレーン全体を使って 3 キャラが大きく案内する HTML。
+ * 右列の狭い rail（buildNorthStarWaitHintsRailHtml）でなく、空きがちな本体スペースを活用する。
+ * アバターは大きめ、セリフは折り返して読みやすく。手順図解（diagramHtml）があれば先頭に差し込む。
+ *
+ * @param {ReadonlyArray<{ badge: string; line: string }>} messages
+ * @param {string} [diagramHtml] 手順図解 HTML（無ければ省略）
+ * @returns {string} 空配列なら空文字
+ */
+export function buildNorthStarWaitCharacterGuideHtml(messages, diagramHtml) {
+  const list = Array.isArray(messages) ? messages.slice(0, 3) : [];
+  if (!list.length) return '';
+  const rows = list
+    .map((m) => {
+      const badge = escapeHtml(String(m.badge || '').trim() || '案内');
+      const line = escapeHtml(String(m.line || '').trim());
+      const src = escapeAttr(northStarWaitBadgeToMarketingPngRelative(m.badge));
+      return (
+        `<li class="nl-wait-guide__row" role="listitem">` +
+        `<img class="nl-wait-guide__avatar" src="${src}" alt="" width="40" height="40" decoding="async" />` +
+        `<span class="nl-wait-guide__bubble">` +
+        `<span class="nl-wait-guide__name">${badge}</span>` +
+        `<span class="nl-wait-guide__line">${line}</span>` +
+        `</span>` +
+        `</li>`
+      );
+    })
+    .join('');
+  const diagram = typeof diagramHtml === 'string' ? diagramHtml : '';
+  return (
+    `<div class="nl-wait-guide" data-nl-wait-guide="1" role="note">` +
+    diagram +
+    `<ul class="nl-wait-guide__list" role="list">${rows}</ul>` +
+    `</div>`
+  );
+}
+
+/**
  * 北極星右列: 待機中の「3キャラ一言」HTML（ランキング rail とは別レイヤ）。
  *
  * @param {ReadonlyArray<{ badge: string; line: string }>} messages
