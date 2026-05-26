@@ -152,7 +152,7 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
     return Object.freeze([
       Object.freeze({
         badge: 'りんく',
-        line: '公式のギフト欄を開けると、貢献度の一覧が出やすいよ。'
+        line: '画面のギフトボタン→「ランキング」タブを開くと、貢献度の一覧が出やすいよ。'
       }),
       Object.freeze({
         badge: 'こん太',
@@ -169,7 +169,7 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
     return Object.freeze([
       Object.freeze({
         badge: 'りんく',
-        line: 'この番組のギフト履歴を探しているよ。公式の一覧を待ってる。'
+        line: '画面のギフトボタン→「履歴」タブを開くと、この番組のギフト履歴が出やすいよ。'
       }),
       Object.freeze({
         badge: 'こん太',
@@ -251,7 +251,7 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
       return Object.freeze([
         Object.freeze({
           badge: 'りんく',
-          line: '貢献度の一覧は、公式のギフトまわりの準備待ちになりやすいんだ。'
+          line: '画面のギフトボタン→「ランキング」タブを開くと、貢献度の一覧が出やすいよ。'
         }),
         Object.freeze({
           badge: 'こん太',
@@ -267,7 +267,7 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
       return Object.freeze([
         Object.freeze({
           badge: 'りんく',
-          line: 'この番組のギフト履歴も、公式の一覧の出方とセットだよ。'
+          line: '画面のギフトボタン→「履歴」タブを開くと、この番組のギフト履歴が出やすいよ。'
         }),
         Object.freeze({
           badge: 'こん太',
