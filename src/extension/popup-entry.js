@@ -32,6 +32,7 @@ import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
+import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
 import {
   iframeOfficialDomStorageKey,
   resolveContributionRankingRowsFromSources
@@ -10437,7 +10438,8 @@ async function buildHtmlReportDocument(
   snapshot,
   snapshotError,
   liveId,
-  watchUrl
+  watchUrl,
+  eventRankingModel
 ) {
   const exportedAtIso = new Date().toISOString();
   const exportedAtJst = formatDateTime(Date.now());
@@ -10897,6 +10899,72 @@ async function buildHtmlReportDocument(
       </section>`;
   } catch {
     nextMemoSectionHtml = '';
+  }
+
+  // イベント順位セクション（Phase B・会議 2026-05-26）。eventRankingModel が無ければ空＝
+  //   イベント不参加/未取得はセクションごと省略（fail-soft・誤値ゼロ）。
+  //   サムネは model 側で http/https のみに正規化済みだが、出力時も escapeAttr で二重防御。
+  let eventRankingSectionHtml = '';
+  try {
+    const erm = eventRankingModel;
+    if (erm && typeof erm === 'object') {
+      const fmtN = (/** @type {number} */ n) => Number(n).toLocaleString('en-US');
+      const self = erm.self && typeof erm.self === 'object' ? erm.self : null;
+      const evName = String(erm.eventName || '').trim();
+      const rows = Array.isArray(erm.rows) ? erm.rows : [];
+
+      const headParts = [];
+      if (evName) headParts.push(`<p class="event-rank__name">🏆 ${escapeHtml(evName)}</p>`);
+      if (self && (self.rank != null || self.score != null)) {
+        const who = self.broadcasterName ? `${escapeHtml(String(self.broadcasterName))}さん` : 'この配信者さん';
+        const rk = self.rank != null ? `現在 <strong>${escapeHtml(String(self.rank))}</strong> 位` : '';
+        const sc = self.score != null ? ` 💎 <strong>${escapeHtml(fmtN(self.score))}</strong>` : '';
+        headParts.push(`<p class="event-rank__self">${who} ${rk}${sc}</p>`);
+        if (self.rank != null && self.rank > 1 && self.diffToNext != null && self.diffToNext > 0) {
+          headParts.push(`<p class="event-rank__diff">あと 💎 ${escapeHtml(fmtN(self.diffToNext))} で ${escapeHtml(String(self.rank - 1))} 位</p>`);
+        }
+      }
+
+      const rowsHtml = rows
+        .map((r) => {
+          const rank = escapeHtml(String(r.rank));
+          const name = escapeHtml(String(r.name || '名無し'));
+          const score = escapeHtml(fmtN(Number(r.score) || 0));
+          // model 側で http/https のみに正規化済み。出力時も二重で scheme 検証（S-2）。
+          const thumb = /^https?:\/\//i.test(String(r.thumbnailUrl || '')) ? String(r.thumbnailUrl) : '';
+          const img = thumb
+            ? `<img class="event-rank__thumb" src="${escapeAttr(thumb)}" alt="" width="28" height="28" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" />`
+            : `<span class="event-rank__thumb event-rank__thumb--none" aria-hidden="true"></span>`;
+          return (
+            `<tr>` +
+            `<td class="event-rank__rank">${rank}</td>` +
+            `<td>${img}</td>` +
+            `<td class="event-rank__user">${name}</td>` +
+            `<td class="event-rank__score">💎 ${score}</td>` +
+            `</tr>`
+          );
+        })
+        .join('');
+
+      const staleNote = erm.isStale
+        ? `<p class="event-rank__stale">※ この順位は少し前に取得した値です（配信中に変動します）。</p>`
+        : '';
+
+      if (headParts.length > 0 || rowsHtml) {
+        eventRankingSectionHtml =
+          `<section class="card" id="sec-event-ranking" style="margin-top:12px;">` +
+          `<h2>イベント順位</h2>` +
+          `<p class="guide-lead">この配信が参加しているイベントの💎スコア順ランキングなのだ（公式の表示に準拠）。</p>` +
+          (headParts.length ? `<div class="event-rank__head">${headParts.join('')}</div>` : '') +
+          (rowsHtml
+            ? `<table class="event-rank__table"><thead><tr><th>順位</th><th></th><th>配信者</th><th>累計💎</th></tr></thead><tbody>${rowsHtml}</tbody></table>`
+            : '') +
+          staleNote +
+          `</section>`;
+      }
+    }
+  } catch {
+    eventRankingSectionHtml = '';
   }
 
   return `<!doctype html>
@@ -11480,6 +11548,20 @@ async function buildHtmlReportDocument(
         color: #cbd5e1;
         font-weight: 600;
       }
+      /* イベント順位セクション（Phase B） */
+      .event-rank__head { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: rgba(5,109,255,0.12); border: 1px solid rgba(5,109,255,0.35); }
+      .event-rank__name { margin: 0 0 4px; font-weight: 700; color: #e2e8f0; }
+      .event-rank__self { margin: 0; font-size: 1.05rem; font-weight: 700; color: #e2e8f0; }
+      .event-rank__self strong { color: #60a5fa; }
+      .event-rank__diff { margin: 3px 0 0; font-size: 0.85rem; color: #93a4be; }
+      .event-rank__table { width: 100%; border-collapse: collapse; }
+      .event-rank__table th, .event-rank__table td { padding: 5px 8px; border-bottom: 1px solid rgba(148,164,190,0.2); text-align: left; vertical-align: middle; }
+      .event-rank__rank { width: 2.4em; font-weight: 800; color: #60a5fa; }
+      .event-rank__thumb { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; display: block; }
+      .event-rank__thumb--none { display: inline-block; background: rgba(148,164,190,0.25); }
+      .event-rank__user { font-weight: 600; color: #e2e8f0; }
+      .event-rank__score { white-space: nowrap; font-weight: 700; color: #cbd5e1; }
+      .event-rank__stale { margin: 6px 0 0; font-size: 0.8rem; color: #93a4be; }
       ${yukkuriReportCss}
     </style>
   </head>
@@ -11493,6 +11575,8 @@ async function buildHtmlReportDocument(
 
       ${yukkuriReportHtml}
 
+      ${eventRankingSectionHtml}
+
       <div class="search-box">
         <input id="q" type="search" placeholder="タイトル・配信者・タグ・メタ・script・コメントを横断検索（例: 珈琲 / まめ。２ / コーヒー / og:title）">
         <div id="searchResult" class="hint">検索対象: <span id="totalCount">0</span> 件</div>
@@ -11502,6 +11586,7 @@ async function buildHtmlReportDocument(
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
           <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
+          ${eventRankingSectionHtml ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
           <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
           <li><a href="#sec-id-breakdown">内訳統計（ID 種別比率）</a></li>
@@ -11768,20 +11853,33 @@ async function resolveSnapshotForHtmlExport(watchUrl) {
  * @param {string} watchUrl
  */
 async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
-  const [data, { snapshot, error }] = await Promise.all([
+  const lidForEvent = String(liveId || '').trim().toLowerCase();
+  const eventKey = /^lv\d{1,15}$/.test(lidForEvent) ? eventScoreRankingStorageKey(lidForEvent) : null;
+  const [data, { snapshot, error }, eventBag] = await Promise.all([
     chrome.storage.local.get(storageKey),
-    resolveSnapshotForHtmlExport(watchUrl)
+    resolveSnapshotForHtmlExport(watchUrl),
+    eventKey ? chrome.storage.local.get(eventKey).catch(() => ({})) : Promise.resolve({})
   ]);
   const comments = Array.isArray(data[storageKey])
     ? /** @type {PopupCommentEntry[]} */ (data[storageKey])
     : [];
+  // イベント順位（あれば）。取れない/イベント不参加は null＝レポートでセクションごと省略。
+  let eventRankingModel = null;
+  try {
+    if (eventKey && eventBag && eventBag[eventKey]) {
+      eventRankingModel = buildEventRankingReportModel(eventBag[eventKey], { nowMs: Date.now() });
+    }
+  } catch {
+    eventRankingModel = null;
+  }
 
   const html = await buildHtmlReportDocument(
     comments,
     snapshot,
     error,
     liveId,
-    watchUrl
+    watchUrl,
+    eventRankingModel
   );
 
   const blob = new Blob([html], {
