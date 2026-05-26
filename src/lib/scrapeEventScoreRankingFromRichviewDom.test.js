@@ -146,6 +146,66 @@ describe('scrapeEventScoreRankingFromRichviewDom', () => {
     expect(scrapeEventScoreRankingFromRichviewDom(document)).toBeNull();
   });
 
+  // 実機 richview（Emotion CSS）の本物構造（2026-05-26 lv350612434 採取）。
+  // 行=div.e16w44943 / 順位=div.e1abt54u0 / 名前=a.e16w44941 / 敬称=span.e16w44940 / スコア=💎隣の p。
+  function emotionRichviewHtml(rows) {
+    const items = rows
+      .map(
+        ({ rank, score, name, uid, anon }) => `
+        <div class="css-o9iyhf e16w44943">
+          <div class="css-zv4d0p e1abt54u0">${rank}</div>
+          <div class="css-q9a1wl e16w44942">
+            ${anon ? '' : `<a class="css-122p9lk e16w44941" href="https://www.nicovideo.jp/user/${uid || '0'}">${name}</a>`}
+            <span class="css-nps8g0 e16w44940">さん</span>
+          </div>
+          <div class="css-vcb5i6">
+            <svg class="css-jh4whz"><path></path></svg>
+            <p class="css-1d9a3hd">${String(score).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</p>
+          </div>
+        </div>`
+      )
+      .join('');
+    return `
+      <div class="css-w7d8dq ef7q2pk4">
+        <div class="css-1hz5wm5 e1gjhmvh3">
+          ${items}
+        </div>
+      </div>`;
+  }
+
+  it('実機 richview Emotion 構造から 💎 順位・スコア・記名 uid を取得（本命パス）', () => {
+    document.body.innerHTML = emotionRichviewHtml([
+      { rank: 1, score: 432295, name: 'ミュート', uid: '111' },
+      { rank: 2, score: 233795, name: 'この', uid: '222' },
+      { rank: 3, score: 133435, name: '零羽こはね', uid: '333' }
+    ]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(rows).not.toBeNull();
+    expect(rows).toHaveLength(3);
+    expect(rows?.[0]).toMatchObject({ rank: 1, score: 432295, name: 'ミュート', isAnonymous: false, userId: '111' });
+    expect(rows?.[1]).toMatchObject({ rank: 2, score: 233795, name: 'この', isAnonymous: false, userId: '222' });
+    expect(rows?.[2]).toMatchObject({ rank: 3, score: 133435, name: '零羽こはね', isAnonymous: false, userId: '333' });
+  });
+
+  it('Emotion 構造で名前リンクが無い行（匿名）は「名無し」で残し行は捨てない', () => {
+    document.body.innerHTML = emotionRichviewHtml([
+      { rank: 1, score: 500, name: 'A', uid: '1' },
+      { rank: 2, score: 300, anon: true }
+    ]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(rows).not.toBeNull();
+    expect(rows).toHaveLength(2);
+    expect(rows?.[1]).toMatchObject({ rank: 2, score: 300, name: '名無し', isAnonymous: true });
+  });
+
+  it('Emotion 構造でも順位が飛べば全体 null（誤値ゼロ）', () => {
+    document.body.innerHTML = emotionRichviewHtml([
+      { rank: 1, score: 500, name: 'A', uid: '1' },
+      { rank: 3, score: 300, name: 'C', uid: '3' }
+    ]);
+    expect(scrapeEventScoreRankingFromRichviewDom(document)).toBeNull();
+  });
+
   it('Emotion 等のランダムCSSクラス（css-xxx）でも順位・スコアが抽出できれば取得できる', () => {
     document.body.innerHTML = `
       <div>
