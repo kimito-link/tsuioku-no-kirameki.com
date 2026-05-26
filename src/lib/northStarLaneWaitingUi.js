@@ -312,16 +312,93 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
 }
 
 /**
- * innerHTML 用の静的シェル（1 行のみ。台詞は popup-entry で textContent）。
+ * 「公式ギフト欄の○○タブを開くと出やすい」を示す手順図解（仮の見た目・SVG/CSS のみ）。
+ * 画像ファイル不要。giftHistory / contributionRanking のように「タブを開くと取れる」
+ * レーンでだけ出す。data 取得後は待機UIごと消えるので恒久表示にはならない。
+ *
+ * @param {string} laneId
+ * @returns {string} 該当レーンは図解 HTML、対象外は ''（図解なし）
+ */
+export function buildNorthStarLaneOpenHintDiagramHtml(laneId) {
+  const lid = String(laneId || '');
+  /** @type {{ tab: string } | null} */
+  let cfg = null;
+  if (lid === 'giftHistory') cfg = { tab: '履歴' };
+  else if (lid === 'contributionRanking') cfg = { tab: 'ランキング' };
+  if (!cfg) return '';
+
+  // タブ列（番組ギフト / マイギフト / 履歴 / ランキング）。該当タブだけ active。
+  const tabs = ['番組ギフト', 'マイギフト', '履歴', 'ランキング'];
+  const tabsHtml = tabs
+    .map((t) => {
+      const active = t === cfg.tab;
+      const cls = active
+        ? 'nl-open-hint__tab nl-open-hint__tab--active'
+        : 'nl-open-hint__tab';
+      return `<span class="${cls}">${escapeText(t)}</span>`;
+    })
+    .join('');
+
+  // 仮スクショ風: ①ギフトボタン(🎁 風 SVG) → ②タブ列(該当をハイライト)
+  return (
+    `<div class="nl-open-hint" aria-hidden="true">` +
+      `<div class="nl-open-hint__step">` +
+        `<span class="nl-open-hint__num">1</span>` +
+        `<span class="nl-open-hint__gift-btn" title="ギフトボタン">` +
+          giftIconSvg() +
+        `</span>` +
+        `<span class="nl-open-hint__caption">ギフトを押す</span>` +
+      `</div>` +
+      `<span class="nl-open-hint__arrow">→</span>` +
+      `<div class="nl-open-hint__step">` +
+        `<span class="nl-open-hint__num">2</span>` +
+        `<span class="nl-open-hint__tabs">${tabsHtml}</span>` +
+        `<span class="nl-open-hint__caption">「${escapeText(cfg.tab)}」を開く</span>` +
+      `</div>` +
+    `</div>`
+  );
+}
+
+/**
+ * ギフトボタン風の小さな SVG（プレゼント箱）。仮の絵。
+ * @returns {string}
+ */
+function giftIconSvg() {
+  return (
+    `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">` +
+    `<rect x="3" y="9" width="18" height="11" rx="1.5" fill="currentColor" opacity="0.18"/>` +
+    `<rect x="3" y="9" width="18" height="11" rx="1.5" stroke="currentColor" stroke-width="1.6"/>` +
+    `<path d="M3 9h18M12 9v11" stroke="currentColor" stroke-width="1.6"/>` +
+    `<path d="M12 9C9 9 7.5 4 9.5 3.2 11 2.6 12 6 12 9zM12 9c3 0 4.5-5 2.5-5.8C13 2.6 12 6 12 9z" stroke="currentColor" stroke-width="1.4" fill="none"/>` +
+    `</svg>`
+  );
+}
+
+/**
+ * textContent 相当の最小エスケープ（< > & のみ）。escapeAttr は属性用なので本文用に別途。
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeText(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * innerHTML 用の静的シェル（台詞 1 行 + 該当レーンは手順図解。台詞は popup-entry で textContent）。
  *
  * @param {string} laneId
  * @returns {string}
  */
 export function buildNorthStarLaneWaitingShellHtml(laneId) {
   const lid = escapeAttr(laneId);
+  const diagram = buildNorthStarLaneOpenHintDiagramHtml(laneId);
   return (
     `<div class="nl-north-star-lane-wait nl-north-star-lane-wait--compact" data-north-star-wait="1" data-lane-id="${lid}" role="status" aria-live="off" aria-busy="true">` +
     `<p class="nl-north-star-lane-wait__short"></p>` +
+    diagram +
     `</div>`
   );
 }

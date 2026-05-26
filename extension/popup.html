@@ -3955,6 +3955,79 @@
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 3;
       }
+      /* 「ギフトボタン→○○タブを開くと出やすい」手順図解（画像なし・SVG/CSS） */
+      .nl-open-hint {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 8%, transparent);
+        border: 1px dashed color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 30%, var(--nl-border) 70%);
+      }
+      .nl-open-hint__step {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .nl-open-hint__num {
+        flex: 0 0 auto;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: var(--nl-lane-accent-event-broadcasters, #056dff);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 800;
+        line-height: 15px;
+        text-align: center;
+      }
+      .nl-open-hint__gift-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: var(--nl-bg, #fff);
+        border: 1px solid color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 45%, var(--nl-border) 55%);
+        color: var(--nl-lane-accent-event-broadcasters, #056dff);
+      }
+      .nl-open-hint__tabs {
+        display: inline-flex;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-bg, #fff);
+      }
+      .nl-open-hint__tab {
+        font-size: 8px;
+        font-weight: 700;
+        padding: 3px 5px;
+        color: var(--nl-muted);
+        border-right: 1px solid var(--nl-border);
+        white-space: nowrap;
+      }
+      .nl-open-hint__tab:last-child {
+        border-right: none;
+      }
+      .nl-open-hint__tab--active {
+        background: var(--nl-lane-accent-event-broadcasters, #056dff);
+        color: #fff;
+      }
+      .nl-open-hint__arrow {
+        color: var(--nl-muted);
+        font-weight: 800;
+        font-size: 12px;
+      }
+      .nl-open-hint__caption {
+        font-size: 9px;
+        font-weight: 700;
+        color: color-mix(in srgb, var(--nl-text) 80%, transparent);
+        white-space: nowrap;
+      }
       .nl-north-star-lane-wait__gauge {
         height: 9px;
         border-radius: 999px;
