@@ -1367,7 +1367,8 @@ function renderExtensionContextBanner(visible) {
  *   key: string,
  *   snapshot: WatchPageSnapshot|null,
  *   fetchInflight: boolean,
- *   fetchError: string
+ *   fetchError: string,
+ *   snapshotFetchActive: boolean
  * }}
  */
 // 0.1.31 (AF): blob URL の revoke を queue 管理。15 秒で revoke / 同時 3 個まで。
@@ -1377,8 +1378,12 @@ const objectUrlRevokeQueue = createObjectUrlRevokeQueue();
 const watchMetaCache = {
   key: '',
   snapshot: null,
+  // fetchInflight は「（接続中…）表示を出すか」用＝stale snapshot がある間は false。
   fetchInflight: false,
-  fetchError: ''
+  fetchError: '',
+  // v0.1.392: stale snapshot の有無に関わらず、実際の snapshot fetch が走っている間 true。
+  //   3 秒 polling で fetch が重なるのを防ぐためのガード（fetchInflight とは別目的）。
+  snapshotFetchActive: false
 };
 
 /** 遅延フェーズの描画が直近の refresh に属するか判定する */
@@ -9687,6 +9692,8 @@ async function refresh() {
     //   永久に「(接続中…)」表示の症状を防ぐ。
     /** @type {{ snapshot?: any, error?: string }} */
     let snapResult = { snapshot: null, error: '' };
+    // v0.1.392: 短間隔 polling の重複ガード。stale snapshot の有無に関わらず立てる。
+    watchMetaCache.snapshotFetchActive = true;
     try {
       snapResult = await requestWatchPageSnapshotFromOpenTab(url);
     } catch (err) {
@@ -9699,6 +9706,7 @@ async function refresh() {
       };
     } finally {
       watchMetaCache.fetchInflight = false;
+      watchMetaCache.snapshotFetchActive = false;
     }
     watchMetaCache.fetchError = String(snapResult.error || '');
     const cacheKeyStillTargetsThisRefresh = watchMetaCache.key === snapshotKey;
@@ -14462,7 +14470,13 @@ function initPopup() {
     // no-op
   }
 
-  const POLL_INTERVAL_MS = INLINE_MODE ? 10_000 : 30_000;
+  // v0.1.392: 公式パネル（来場/コメント/💎/ギフト）の数値を「ほぼリアルタイム」に
+  //   追従させるため、前面表示中の inline パネル / サイドパネルは 3 秒間隔で更新する。
+  //   上流（ニコ生ページ DOM）は常時 live なので、遅れの実体はこの polling 間隔だった。
+  //   別ウィンドウ（standalone）は副次ビューで背景化しやすいので従来どおり 30 秒。
+  //   tick は document.hidden で背景タブを skip し、in-flight fetch 中は次の tick を
+  //   見送る（遅い回線で fetch が重なってメッセージが積み上がるのを防ぐ）。
+  const POLL_INTERVAL_MS = INLINE_MODE || INLINE_SIDE_PANEL ? 3_000 : 30_000;
   // setInterval の id を保持し、拡張 context invalidated（chrome://extensions の
   // 再読み込みなど）後はループから抜けて clearInterval する。これがないと、popup
   // を閉じない限り「early return するだけの空 tick」が永続的に走り続けて、
@@ -14479,6 +14493,9 @@ function initPopup() {
           return;
         }
         if (typeof document !== 'undefined' && document.hidden) return;
+        // v0.1.392: 短間隔 polling で fetch が重ならないよう、前回の取得がまだ
+        //   進行中なら今回の tick は見送る（その fetch がじき新しい値を届ける）。
+        if (watchMetaCache.snapshotFetchActive) return;
         // 0.1.92: stale-while-revalidate パターン。
         //   key だけ無効化して fetch を促し、snapshot 自体は保持して
         //   fetch 中も古い数値を表示し続ける（loading 状態の点滅を防ぐ）。
