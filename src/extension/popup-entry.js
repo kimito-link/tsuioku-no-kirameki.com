@@ -265,6 +265,7 @@ import {
   summarizeCommentBodyStats,
   summarizeIdentifierStats
 } from '../lib/broadcastReportSummary.js';
+import { formatBroadcastDurationLabel } from '../lib/broadcastDurationLabel.js';
 import { buildReportCommentsCsv } from '../lib/reportCommentsCsv.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
@@ -10920,17 +10921,8 @@ async function buildHtmlReportDocument(
     typeof ratio === 'number' && Number.isFinite(ratio)
       ? `${Math.round(ratio * 1000) / 10}%`
       : '-';
-  const durationLabel = (() => {
-    const min = reportTiming.durationMinutes;
-    if (!min || min <= 0) return '-';
-    const totalSeconds = Math.round(reportTiming.durationMs / 1000);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    if (h > 0) return `${h}時間${m}分${s}秒`;
-    if (m > 0) return `${m}分${s}秒`;
-    return `${s}秒`;
-  })();
+  // C-7 pure refactor: 整形ロジックは broadcastDurationLabel.js に抽出（挙動不変・test 済）。
+  const durationLabel = formatBroadcastDurationLabel(reportTiming);
 
   // 0.1.21 (V): 自分のコメント抜粋（自コメだけのテーブル）。
   const selfPostedComments = commentsForReport.filter((c) => Boolean(c?.selfPosted));
