@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.393',
+    date: '2026-05-26',
+    summary: 'カードに「最終更新○秒前」を表示',
+    items: Object.freeze([
+      '貢献度ランキング・広告ランキング・ギフト履歴の各カードに「最終更新: ○秒前」を表示するようにしました。自動で更新されるカード（貢献度・広告）には「自動更新中」と添え、ギフト履歴のように開いた時だけ取り込むカードは経過時間だけを正直に出すので、数字が古いのか最新なのかが一目でわかります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.392',
     date: '2026-05-26',
     summary: '数値の更新をほぼリアルタイムに',

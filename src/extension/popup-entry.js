@@ -33,6 +33,7 @@ import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
+import { formatCardFreshnessNote } from '../lib/cardFreshnessNote.js';
 import {
   iframeOfficialDomStorageKey,
   resolveContributionRankingRowsFromSources
@@ -6052,6 +6053,38 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
  * @param {string} liveId
  * @returns {Promise<any[]|null>}
  */
+/**
+ * v0.1.393: カードの鮮度表示用に、storage の値から capturedAt(epoch ms) を取り出す。
+ * 値が `{capturedAt}` を持つ object でも、`{capturedAt}` を持つ行配列でも拾える（最大値）。
+ * 取れなければ null（鮮度注記を出さない）。
+ * @param {string} storageKey
+ * @returns {Promise<number|null>}
+ */
+async function readCardCapturedAtMs(storageKey) {
+  const key = String(storageKey || '').trim();
+  if (!key) return null;
+  try {
+    const bag = await chrome.storage.local.get(key);
+    const v = bag[key];
+    if (!v) return null;
+    if (typeof v === 'object' && !Array.isArray(v)) {
+      const c = Number(/** @type {any} */ (v).capturedAt);
+      return Number.isFinite(c) && c > 0 ? c : null;
+    }
+    if (Array.isArray(v)) {
+      let max = 0;
+      for (const r of v) {
+        const c = Number(r && typeof r === 'object' ? /** @type {any} */ (r).capturedAt : 0);
+        if (Number.isFinite(c) && c > max) max = c;
+      }
+      return max > 0 ? max : null;
+    }
+  } catch {
+    /* no-op */
+  }
+  return null;
+}
+
 async function resolveOfficialContributionRankingRows(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
 
@@ -6199,7 +6232,7 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
       ariaLabel: 'この番組へのギフト履歴のユーザー別集計'
     };
   }
-  /** @type {{ userId?: string; nickname?: string; totalPoints?: number }[]} */
+  /** @type {{ userId?: string; nickname?: string; totalPoints?: number; capturedAt?: number }[]} */
   let throwsRows = [];
   try {
     const throwsBag = await chrome.storage.local.get(`nls_gift_history_throws_${lid}`);
@@ -6225,11 +6258,20 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
         avatarUrl: String(r?.avatarUrl || '').trim()
       };
     });
+    // v0.1.393: 鮮度表示。ギフト履歴は「ギフトタブを開いた時だけ」取り込む経路で
+    //   自動更新ではない＝autoRefreshing は付けず「最終更新: ○分前」だけ正直に出す。
+    let capMax = 0;
+    for (const r of sorted) {
+      const c = Number(r?.capturedAt);
+      if (Number.isFinite(c) && c > capMax) capMax = c;
+    }
+    const freshnessNote = capMax > 0 ? formatCardFreshnessNote(capMax) : '';
     return {
       rooms,
       noteText: `保存済み公式履歴からユーザー別累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントとは別指標）`,
       unitSuffix: 'pt',
-      ariaLabel: '公式サイドバー履歴のユーザー別集計'
+      ariaLabel: '公式サイドバー履歴のユーザー別集計',
+      freshnessNote
     };
   }
   // v0.1.318: 公式履歴も保存 throws も無いとき、個別ギフト event
@@ -6293,6 +6335,7 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
  *   prependHtml?: string;
  *   beforeNoteHtml?: string;
  *   isNorthStarBody?: boolean;
+ *   freshnessNote?: string;
  * }} opts
  */
 function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
@@ -6302,7 +6345,8 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
     ariaLabel,
     prependHtml = '',
     beforeNoteHtml = '',
-    isNorthStarBody = false
+    isNorthStarBody = false,
+    freshnessNote = ''
   } = opts;
   if (!(el instanceof HTMLElement)) return;
   if (isNorthStarBody) {
@@ -6370,10 +6414,14 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
         : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${inner}</div>`;
     })
     .join('');
+  const freshnessHtml = freshnessNote
+    ? `<p class="nl-top-support-rank__freshness" aria-live="polite">🕒 ${escapeHtml(freshnessNote)}</p>`
+    : '';
   el.innerHTML =
     prependHtml +
     (beforeNoteHtml || '') +
     `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
+    freshnessHtml +
     `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
   bindOnErrorHideHandlersWithin(el);
   const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
@@ -6424,13 +6472,19 @@ function refreshNorthStarAdRankingLane() {
       rankingContributionSum: rankingSum,
       rankingRowCount: adRows.length
     });
+    // v0.1.393: 鮮度表示。nicoad API/bundle は 30 秒間隔で自動更新されるので autoRefreshing。
+    const freshnessNote = formatCardFreshnessNote(
+      typeof bundle?.capturedAt === 'number' ? bundle.capturedAt : null,
+      { autoRefreshing: true }
+    );
     paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText:
         'ニコニ広告の貢献度ランキング（公式ページ相当）。画面上部の累計ptなどと、各行の「貢」は指標や期間が異なり一致しないことがあります',
       unitSuffix: '貢',
       ariaLabel: '広告ランキング',
       beforeNoteHtml,
-      isNorthStarBody: true
+      isNorthStarBody: true,
+      freshnessNote
     });
     return;
   }
@@ -6471,11 +6525,17 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
     const rooms = officialDomRankingRowsToStripRooms(top10, { userKeyKind: 'contrib' });
     // 縦リスト専用 host class が前回付いていたら剥がしてから横カードへ切替。
     body.classList.remove('nl-contrib-ranking-list-host');
+    // v0.1.393: 鮮度表示。koken API は 30 秒間隔で自動更新されるので autoRefreshing。
+    const freshnessNote = formatCardFreshnessNote(
+      await readCardCapturedAtMs(kokenContribStorageKey(String(liveId || '').trim().toLowerCase())),
+      { autoRefreshing: true }
+    );
     paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
       unitSuffix: '貢',
       ariaLabel: '貢献度ランキング',
-      isNorthStarBody: true
+      isNorthStarBody: true,
+      freshnessNote
     });
     return;
   }
@@ -6685,7 +6745,8 @@ async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
       noteText: ctx.noteText,
       unitSuffix: ctx.unitSuffix,
       ariaLabel: ctx.ariaLabel,
-      isNorthStarBody: true
+      isNorthStarBody: true,
+      freshnessNote: ctx.freshnessNote || ''
     });
     return;
   }
