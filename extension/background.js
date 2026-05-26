@@ -946,13 +946,36 @@ const POPUP_WINDOW_HEIGHT = 780;
 /** @type {Promise<void>} */
 let _openPopupWindowChain = Promise.resolve();
 
-async function openOrFocusPopupWindow() {
-  const job = _openPopupWindowChain.then(() => doOpenOrFocusPopupWindow());
+/**
+ * @param {number|undefined} anchorWindowId ツールバーを押したタブの所属ウィンドウ。
+ *   未指定時は getLastFocused にフォールバック（複数の通常ウィンドウが開いていて
+ *   「配信を見ているウィンドウ」と最後フォーカスウィンドウがずれると、popup が
+ *   別ウィンドウ側に出て「押しても開かない」と誤認されやすい）。
+ */
+async function openOrFocusPopupWindow(anchorWindowId) {
+  const run = async () => {
+    try {
+      await doOpenOrFocusPopupWindow(anchorWindowId, false);
+    } catch {
+      await sleep(150);
+      try {
+        await doOpenOrFocusPopupWindow(anchorWindowId, true);
+      } catch {
+        /* 最終手段でも失敗時は諦める（無限ループしない） */
+      }
+    }
+  };
+  const job = _openPopupWindowChain.then(run);
   _openPopupWindowChain = job.catch(() => {});
-  await job;
+  // job 自体が reject しうるので、ここでも握りつぶして handler 側の未処理拒否を防ぐ
+  await job.catch(() => {});
 }
 
-async function doOpenOrFocusPopupWindow() {
+/**
+ * @param {number|undefined} anchorWindowId
+ * @param {boolean} stripPositionHints create が座標だけで連続失敗するとき用最小幅の opts
+ */
+async function doOpenOrFocusPopupWindow(anchorWindowId, stripPositionHints) {
   const url = chrome.runtime.getURL('popup.html');
   await closeAllOurExtensionPopupWindows();
   await sleep(70);
@@ -978,33 +1001,47 @@ async function doOpenOrFocusPopupWindow() {
   /** @type {{ left?: number, top?: number }} */
   const positionHint = {};
   try {
-    const lastNormal = await chrome.windows.getLastFocused({
-      windowTypes: ['normal']
-    });
+    /** @type {chrome.windows.Window|undefined} */
+    let anchor =
+      typeof anchorWindowId === 'number' && Number.isFinite(anchorWindowId)
+        ? await chrome.windows.get(anchorWindowId).catch(() => undefined)
+        : undefined;
     if (
-      lastNormal &&
-      typeof lastNormal.left === 'number' &&
-      typeof lastNormal.top === 'number' &&
-      typeof lastNormal.width === 'number'
+      !anchor ||
+      (anchor.type !== 'normal' &&
+        anchor.type !== 'maximized' &&
+        anchor.type !== 'fullscreen')
+    ) {
+      anchor = await chrome.windows.getLastFocused({
+        windowTypes: ['normal']
+      });
+    }
+    if (
+      anchor &&
+      typeof anchor.left === 'number' &&
+      typeof anchor.top === 'number' &&
+      typeof anchor.width === 'number'
     ) {
       // Chrome window の右**内側**に popup の右端を合わせる（content の右側と被るが必ず同モニタ）
-      const left = lastNormal.left + lastNormal.width - POPUP_WINDOW_WIDTH;
-      const top = lastNormal.top;
-      positionHint.left = Math.max(lastNormal.left, Math.round(left));
+      const left = anchor.left + anchor.width - POPUP_WINDOW_WIDTH;
+      const top = anchor.top;
+      positionHint.left = Math.max(anchor.left, Math.round(left));
       positionHint.top = Math.max(0, Math.round(top));
     }
   } catch {
-    // no-op: getLastFocused が取れなければ Chrome のデフォルト位置にする
+    // no-op: 取れなければ Chrome のデフォルト位置にする
   }
-  const createOpts = {
+  const baseCreate = {
     url,
     type: 'popup',
     width: POPUP_WINDOW_WIDTH,
     height: POPUP_WINDOW_HEIGHT,
     focused: true,
-    state: 'normal',
-    ...positionHint
+    state: 'normal'
   };
+  const createOpts = stripPositionHints
+    ? baseCreate
+    : { ...baseCreate, ...positionHint };
   /** @type {chrome.windows.Window | undefined} */
   let created;
   try {
@@ -1015,7 +1052,12 @@ async function doOpenOrFocusPopupWindow() {
     try {
       created = await chrome.windows.create(createOpts);
     } catch {
-      return;
+      // 座標付きが環境で拒否されるケースの最後の手段（位置は Chrome 任せ）
+      try {
+        created = await chrome.windows.create(baseCreate);
+      } catch {
+        /* created 未設定のまま下で throw */
+      }
     }
   }
   if (created && created.id != null) {
@@ -1024,7 +1066,9 @@ async function doOpenOrFocusPopupWindow() {
     } catch {
       // no-op
     }
+    return;
   }
+  throw new Error('nls-popup-window-create-failed');
 }
 
 /**
@@ -1043,39 +1087,49 @@ async function doOpenOrFocusPopupWindow() {
  * @param {import('chrome').tabs.Tab|undefined} tab
  */
 async function handleBrowserActionClick(tab) {
-  const policy = await getToolbarActionPolicy();
-  if (policy === 'always_open_popup') {
-    // 旧設定の人は popup window を維持（互換）
-    await openOrFocusPopupWindow();
-    return;
-  }
-  const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
-  if (tid !== chrome.tabs.TAB_ID_NONE) {
+  try {
+    const policy = await getToolbarActionPolicy();
+    if (policy === 'always_open_popup') {
+      // 旧設定の人は popup window を維持（互換）
+      await openOrFocusPopupWindow(tab?.windowId);
+      return;
+    }
+    const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
+    if (tid !== chrome.tabs.TAB_ID_NONE) {
+      try {
+        /*
+         * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
+         * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
+         * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
+         * フレームに broadcast され、iframe の listener が
+         *   if (!isWatchInlinePanelTopFrame()) return false;
+         * で同期 false を返して port を閉じてしまう。top frame の async listener が
+         * sendResponse({focused:true}) する前に port closed エラーになり、
+         * background が popup 窓を fallback として開いてしまう（user 報告：
+         * インラインパネル + popup 窓が同時に出る）。
+         */
+        const res = await chrome.tabs.sendMessage(
+          tid,
+          { type: 'NLS_FOCUS_INLINE_PANEL' },
+          { frameId: 0 }
+        );
+        if (res && res.focused) return;
+      } catch {
+        // コンテンツ未注入・対象外 URL
+      }
+    }
+    await openOrFocusPopupWindow(tab?.windowId);
+  } catch {
     try {
-      /*
-       * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
-       * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
-       * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
-       * フレームに broadcast され、iframe の listener が
-       *   if (!isWatchInlinePanelTopFrame()) return false;
-       * で同期 false を返して port を閉じてしまう。top frame の async listener が
-       * sendResponse({focused:true}) する前に port closed エラーになり、
-       * background が popup 窓を fallback として開いてしまう（user 報告：
-       * インラインパネル + popup 窓が同時に出る）。
-       */
-      const res = await chrome.tabs.sendMessage(
-        tid,
-        { type: 'NLS_FOCUS_INLINE_PANEL' },
-        { frameId: 0 }
-      );
-      if (res && res.focused) return;
+      await openOrFocusPopupWindow(tab?.windowId);
     } catch {
-      // コンテンツ未注入・対象外 URL
+      /* no-op */
     }
   }
-  await openOrFocusPopupWindow();
 }
 
 chrome.action.onClicked.addListener((tab) => {
-  void handleBrowserActionClick(tab);
+  void handleBrowserActionClick(tab).catch(() => {
+    void openOrFocusPopupWindow(tab?.windowId);
+  });
 });

@@ -8,8 +8,36 @@ import {
   resolveGiftRankDisplayNickname,
   enrichIncomingGiftThrowUsersWithInterceptNicknames,
   upgradeGiftUserRowsWithInterceptNicknames,
-  formatNicknameWithUidFallback
+  formatNicknameWithUidFallback,
+  scrubGiftRankingNickname
 } from './giftDisplayNickname.js';
+
+describe('scrubGiftRankingNickname', () => {
+  it('ドットのみ・省略記号のみは空', () => {
+    expect(scrubGiftRankingNickname('...')).toBe('');
+    expect(scrubGiftRankingNickname('…')).toBe('');
+    expect(scrubGiftRankingNickname('   …   ')).toBe('');
+  });
+
+  it('replacement 文字過多は空', () => {
+    expect(scrubGiftRankingNickname('\uFFFD\uFFFD\uFFFD\uFFFD')).toBe('');
+  });
+
+  it('通常のニックは保持', () => {
+    expect(scrubGiftRankingNickname('Quma')).toBe('Quma');
+    expect(scrubGiftRankingNickname('meteoキッズたけこず')).toBe(
+      'meteoキッズたけこず'
+    );
+  });
+
+  it('nicolive_ 内部ラベルは空', () => {
+    expect(scrubGiftRankingNickname('nicolive_foo')).toBe('');
+  });
+
+  it('先頭末尾の不可視を除去', () => {
+    expect(scrubGiftRankingNickname('\u200B\uFEFFQuma')).toBe('Quma');
+  });
+});
 
 // 0.1.181: 「サムネあり匿名」事象の修正
 describe('formatNicknameWithUidFallback', () => {

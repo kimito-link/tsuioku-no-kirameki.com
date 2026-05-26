@@ -25,12 +25,16 @@ import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsFor
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
 import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
-import { prepareGiftRankStrip } from '../lib/giftRankStripPrep.js';
+
 import { GIFT_HISTORY_LANE_MAX } from '../lib/giftRankStripConfig.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
-import { eventParticipationStorageKey } from '../lib/eventParticipationProgramsApi.js';
+
+import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
+import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
+import { formatCardFreshnessNote } from '../lib/cardFreshnessNote.js';
+import { pickGiftHistorySource } from '../lib/giftHistorySourcePreference.js';
 import {
   iframeOfficialDomStorageKey,
   resolveContributionRankingRowsFromSources
@@ -39,9 +43,10 @@ import {
   findCharaTrioSlotByLaneId,
   tierToTrioCharaSrc,
   buildCharaTrioSlotTitle,
-  resolveCharaTrioSlotScrollTargetLaneId
+  resolveCharaTrioSlotScrollLaneIdCandidates
 } from '../lib/northStarCharaTrioConfig.js';
 import { sanitizeMirrorHtml } from '../lib/mirrorSanitize.js';
+import { isStatValuePlaceholderText } from '../lib/liveStatValuePlaceholder.js';
 import {
   buildNorthStarRankFallbackHtml,
   buildNorthStarScoreFallbackHtml,
@@ -53,6 +58,7 @@ import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRow
 import {
   isNorthStarLaneWaitingState,
   buildNorthStarLaneWaitingShellHtml,
+  buildNorthStarLaneOpenHintDiagramHtml,
   getNorthStarWaitRotationMessages
 } from '../lib/northStarLaneWaitingUi.js';
 import {
@@ -60,7 +66,7 @@ import {
   acquisitionTierFromPct
 } from '../lib/northStarAcquisitionGauge.js';
 import { northStarLaneGadgetCharaPathByTier } from '../lib/northStarLaneGadgetChara.js';
-import { buildNorthStarWaitHintsRailHtml } from '../lib/formatNorthStarWaitHintsRailHtml.js';
+import { buildNorthStarWaitCharacterGuideHtml } from '../lib/formatNorthStarWaitHintsRailHtml.js';
 import { buildNorthStarAdRankingStatsHtml } from '../lib/buildNorthStarAdRankingStatsHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
@@ -698,21 +704,6 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
   _prevSupportCount = null;
   _prevViewerCount = null;
   _prevConcurrentEstimated = null;
-}
-
-/**
- * `.nl-live-stat-value` に流す文言が「数字以外（フォールバック）」かを判定する。
- * 数字 (`'1,234'`) と「~」プレフィックス推定値 (`'~250'`) は数値扱い。
- * 「（取得不可）」「計測中…」「—」「-」などはフォールバック扱いで、CSS 側で
- * 小さめサイズに切り替える（極太22px のままだと幅100px のカードで縦書き状に
- * 折り返されて読めなくなる、0.1.68 修正）。
- * @param {string} text
- * @returns {boolean}
- */
-function isStatValuePlaceholderText(text) {
-  const t = String(text ?? '').trim();
-  if (!t) return true;
-  return !/^~?[\d,，]+$/.test(t);
 }
 
 /** 記録・同接・来場の三カードに、数値確定までキャラ重ねのローディングを同期する。 */
@@ -1378,7 +1369,8 @@ function renderExtensionContextBanner(visible) {
  *   key: string,
  *   snapshot: WatchPageSnapshot|null,
  *   fetchInflight: boolean,
- *   fetchError: string
+ *   fetchError: string,
+ *   snapshotFetchActive: boolean
  * }}
  */
 // 0.1.31 (AF): blob URL の revoke を queue 管理。15 秒で revoke / 同時 3 個まで。
@@ -1388,8 +1380,12 @@ const objectUrlRevokeQueue = createObjectUrlRevokeQueue();
 const watchMetaCache = {
   key: '',
   snapshot: null,
+  // fetchInflight は「（接続中…）表示を出すか」用＝stale snapshot がある間は false。
   fetchInflight: false,
-  fetchError: ''
+  fetchError: '',
+  // v0.1.392: stale snapshot の有無に関わらず、実際の snapshot fetch が走っている間 true。
+  //   3 秒 polling で fetch が重なるのを防ぐためのガード（fetchInflight とは別目的）。
+  snapshotFetchActive: false
 };
 
 /** 遅延フェーズの描画が直近の refresh に属するか判定する */
@@ -4738,13 +4734,9 @@ function paintOfficialEventBannerCard(snapshot) {
   // NDGR の rank/score 単独による非参加配信での誤表示を防ぐため、バナー/バルーンまたはタイトルを必須条件とします。
   // 順位（rank）が取れなくても、配信者名と累計スコアを表示できるようにします。
   const broadcasterName = pickStr(snap?.broadcasterName);
-  const title = pickStr(
-    banner?.title,
-    snap?.officialNicoEventTitleNdgr,
-    snap?.officialNicoEventTitle
-  );
-  const rank = asNum(banner?.rank) ?? asNum(snap?.officialNicoEventRankNdgr) ?? asNum(snap?.officialNicoEventRank);
-  const score = asNum(balloon?.eventTotalScore) ?? asNum(banner?.score) ?? asNum(snap?.officialEventGiftScoreNdgr);
+  const title = pickStr(banner?.title);
+  const rank = asNum(banner?.rank);
+  const score = asNum(balloon?.eventTotalScore) ?? asNum(banner?.score);
 
   const hasEvent =
     banner != null ||
@@ -5906,18 +5898,6 @@ function clearNorthStarLaneWaitStartTimes() {
   _northStarLaneWaitStartAt.clear();
 }
 
-function fillNorthStarWaitHintsRailIfApplicable(body, laneId, state, elapsedMs) {
-  if (!(body instanceof HTMLElement)) return;
-  if (!isNorthStarLaneWaitingState(state)) return;
-  const rail = resolveNorthStarLaneAsideEl(body);
-  if (!rail) return;
-  const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
-  const html = buildNorthStarWaitHintsRailHtml(msgs);
-  if (!html) return;
-  rail.innerHTML = html;
-  rail.hidden = false;
-  rail.setAttribute('aria-hidden', 'false');
-}
 
 function mountNorthStarLaneWaitingUi(body, laneId, state) {
   teardownNorthStarLaneWaitingUi(body);
@@ -5925,14 +5905,26 @@ function mountNorthStarLaneWaitingUi(body, laneId, state) {
   body.innerHTML = buildNorthStarLaneWaitingShellHtml(laneId);
   // v0.1.332: 経過 ms を同期計算（await I/O なし）。閾値超で確定文言へ遷移。
   const elapsedMs = trackNorthStarLaneWaitElapsedMs(laneId, state);
-  const shortEl = body.querySelector('.nl-north-star-lane-wait__short');
-  if (shortEl) {
-    const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
-    const m = msgs.length ? msgs[0] : { badge: 'りんく', line: '取得状況を確認しています。' };
-    // 台詞ローテは text 差し替えで「ちかちか」しやすいので静止表示（先頭1件のみ）
-    shortEl.textContent = `${m.badge}：${m.line}`;
+  // v0.1.389: 狭い右レールに詰め込まず、レーン本体の広いスペースで 3 キャラ（りんく/
+  //   こん太/たぬ姉）が大きく案内する。本体の `__short` 1 行＋手順図解は撤去し、
+  //   キャラガイド（アバター大＋折り返しセリフ＋手順図解）に置換。空きスペース活用。
+  const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
+  const waitRoot = body.querySelector('[data-north-star-wait="1"]') || body;
+  const diagram = buildNorthStarLaneOpenHintDiagramHtml(laneId);
+  const guideHtml = buildNorthStarWaitCharacterGuideHtml(msgs, diagram);
+  if (guideHtml) {
+    // 1 行＋図解だけのシェルを、全幅キャラガイドへ差し替え
+    waitRoot.innerHTML = guideHtml;
+  } else {
+    // フォールバック（メッセージが無い等）: 従来の 1 行表示
+    const shortEl = body.querySelector('.nl-north-star-lane-wait__short');
+    if (shortEl) {
+      const m = msgs.length ? msgs[0] : { badge: 'りんく', line: '取得状況を確認しています。' };
+      shortEl.textContent = `${m.badge}：${m.line}`;
+    }
   }
-  fillNorthStarWaitHintsRailIfApplicable(body, laneId, state, elapsedMs);
+  // 本体で全幅案内するので、狭い右レールには重複表示しない（空のまま）。
+  clearNorthStarVerticalRailForBody(body);
   syncNorthStarLaneGadgetFromBodyState(body);
 }
 
@@ -6062,6 +6054,38 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
  * @param {string} liveId
  * @returns {Promise<any[]|null>}
  */
+/**
+ * v0.1.393: カードの鮮度表示用に、storage の値から capturedAt(epoch ms) を取り出す。
+ * 値が `{capturedAt}` を持つ object でも、`{capturedAt}` を持つ行配列でも拾える（最大値）。
+ * 取れなければ null（鮮度注記を出さない）。
+ * @param {string} storageKey
+ * @returns {Promise<number|null>}
+ */
+async function readCardCapturedAtMs(storageKey) {
+  const key = String(storageKey || '').trim();
+  if (!key) return null;
+  try {
+    const bag = await chrome.storage.local.get(key);
+    const v = bag[key];
+    if (!v) return null;
+    if (typeof v === 'object' && !Array.isArray(v)) {
+      const c = Number(/** @type {any} */ (v).capturedAt);
+      return Number.isFinite(c) && c > 0 ? c : null;
+    }
+    if (Array.isArray(v)) {
+      let max = 0;
+      for (const r of v) {
+        const c = Number(r && typeof r === 'object' ? /** @type {any} */ (r).capturedAt : 0);
+        if (Number.isFinite(c) && c > max) max = c;
+      }
+      return max > 0 ? max : null;
+    }
+  } catch {
+    /* no-op */
+  }
+  return null;
+}
+
 async function resolveOfficialContributionRankingRows(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
 
@@ -6174,33 +6198,7 @@ async function computeGiftRankStripRoomsContext(liveId) {
       ariaLabel: '公式サイドバー履歴のユーザー別集計'
     };
   }
-  const key = giftUsersStorageKey(lid);
-  let raw = /** @type {unknown[]} */ ([]);
-  try {
-    const bag = await chrome.storage.local.get(key);
-    raw = Array.isArray(bag[key]) ? bag[key] : [];
-  } catch {
-    return { kind: 'hide' };
-  }
-  const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
-  const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
-  if (!stripRooms.length) {
-    return { kind: 'hide' };
-  }
-  const rooms = stripRooms.map((r) => ({
-    userKey: r.userKey,
-    nickname: (r.userKey && _nicknameResolveMap.get(r.userKey)) || r.nickname,
-    count: r.count,
-    avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
-  }));
-  return {
-    kind: 'ok',
-    rooms,
-    noteText:
-      '履歴タブがDOMに無いときの代替。数値は「投げ回数」（pt ではありません）。公式履歴のptや番組累計ポイントとは別です',
-    unitSuffix: '回',
-    ariaLabel: 'ライブ通信で観測したギフト/投げの回数が多い順'
-  };
+  return { kind: 'hide' };
 }
 
 /**
@@ -6217,6 +6215,11 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) return null;
   const bundle = _lastOfficialEventDomBundle;
+
+  // --- 源1+2: iframe 由来（公式サイドバー DOM = bundle.giftHistory / 保存 throws）。
+  //   bundle が在ればそれ（タブを開いている間の最新スクレイプ）、無ければ保存 throws。
+  /** @type {{ rooms: any[]; noteText: string; ariaLabel: string; capturedAt: number } | null} */
+  let iframeCtx = null;
   const giftHistory = Array.isArray(bundle?.giftHistory) ? bundle.giftHistory : null;
   if (giftHistory && giftHistory.length > 0) {
     const aggregated = aggregateGiftHistoryByUser(giftHistory);
@@ -6228,50 +6231,57 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
     }));
     const senderN = aggregated.length;
     const throwM = aggregated.reduce((s, a) => s + (Number(a.giftCount) || 0), 0);
-    return {
+    iframeCtx = {
       rooms,
       noteText: `公式履歴DOM由来のユーザー別累計pt順。送り主${senderN}名・履歴${throwM}件（番組累計ポイントとは別指標）`,
-      unitSuffix: 'pt',
-      ariaLabel: 'この番組へのギフト履歴のユーザー別集計'
+      ariaLabel: 'この番組へのギフト履歴のユーザー別集計',
+      capturedAt: typeof bundle?.capturedAt === 'number' ? bundle.capturedAt : 0
     };
-  }
-  /** @type {{ userId?: string; nickname?: string; totalPoints?: number }[]} */
-  let throwsRows = [];
-  try {
-    const throwsBag = await chrome.storage.local.get(`nls_gift_history_throws_${lid}`);
-    const v = throwsBag[`nls_gift_history_throws_${lid}`];
-    if (Array.isArray(v)) throwsRows = /** @type {any} */ (v);
-  } catch {
-    /* no-op */
-  }
-  if (throwsRows.length > 0) {
-    const sorted = [...throwsRows].sort(
-      (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
-    );
-    const senderN = sorted.length;
-    const throwM = sorted.reduce((s, r) => s + (Number(r?.throwCount) || 0), 0);
-    const rooms = sorted.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
-      const userKey = String(r?.userId || '');
-      const rawNickname = String(r?.nickname || '');
-      const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
-      return {
-        userKey,
-        nickname,
-        count: Number(r?.totalPoints) || 0,
-        avatarUrl: String(r?.avatarUrl || '').trim()
+  } else {
+    /** @type {{ userId?: string; nickname?: string; totalPoints?: number; throwCount?: number; capturedAt?: number }[]} */
+    let throwsRows = [];
+    try {
+      const throwsBag = await chrome.storage.local.get(`nls_gift_history_throws_${lid}`);
+      const v = throwsBag[`nls_gift_history_throws_${lid}`];
+      if (Array.isArray(v)) throwsRows = /** @type {any} */ (v);
+    } catch {
+      /* no-op */
+    }
+    if (throwsRows.length > 0) {
+      const sorted = [...throwsRows].sort(
+        (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
+      );
+      const senderN = sorted.length;
+      const throwM = sorted.reduce((s, r) => s + (Number(r?.throwCount) || 0), 0);
+      const rooms = sorted.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
+        const userKey = String(r?.userId || '');
+        const rawNickname = String(r?.nickname || '');
+        const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
+        return {
+          userKey,
+          nickname,
+          count: Number(r?.totalPoints) || 0,
+          avatarUrl: String(r?.avatarUrl || '').trim()
+        };
+      });
+      let capMax = 0;
+      for (const r of sorted) {
+        const c = Number(r?.capturedAt);
+        if (Number.isFinite(c) && c > capMax) capMax = c;
+      }
+      iframeCtx = {
+        rooms,
+        noteText: `保存済み公式履歴からユーザー別累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントとは別指標）`,
+        ariaLabel: '公式サイドバー履歴のユーザー別集計',
+        capturedAt: capMax
       };
-    });
-    return {
-      rooms,
-      noteText: `保存済み公式履歴からユーザー別累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントとは別指標）`,
-      unitSuffix: 'pt',
-      ariaLabel: '公式サイドバー履歴のユーザー別集計'
-    };
+    }
   }
-  // v0.1.318: 公式履歴も保存 throws も無いとき、個別ギフト event
-  // （nls_gift_events_<lid>）を送信者別に「正確な投げ量(pt)」で集計し降順ランキング。
-  // ＝従来この後の「投げ回数(回)」フォールバックより前に、pt がある分は pt で出す。
-  // 集計が空 or 全 pt=0 のときだけ従来の回数フォールバックへフォールスルー。
+
+  // --- 源3: NDGR ライブ（nls_gift_events）。コメントと同じ常時接続で届く＝負荷ゼロで最新。
+  //   v0.1.318: 送信者別に「正確な投げ量(pt)」で集計し降順。pt>0 のときだけ採用。
+  /** @type {{ rooms: any[]; noteText: string; ariaLabel: string; latestAt: number } | null} */
+  let liveCtx = null;
   /** @type {Array<{userId?:string;nickname?:string;point?:number;capturedAt?:number}>} */
   let giftEvents = [];
   try {
@@ -6284,14 +6294,21 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
   if (giftEvents.length > 0) {
     const senderTotals = aggregateGiftSenderTotals(giftEvents);
     const totalPtSum = senderTotals.reduce((s, r) => s + (Number(r.totalPoints) || 0), 0);
-    // pt が 1 件でもあるときだけ pt ランキングを採用（全 0 は回数の方が情報量あり）
     if (senderTotals.length > 0 && totalPtSum > 0) {
-      const senderN = senderTotals.length;
-      const throwM = senderTotals.reduce((s, r) => s + (Number(r.throwCount) || 0), 0);
-      const rooms = senderTotals.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
+      const positiveOnly = senderTotals.filter((r) => (Number(r.totalPoints) || 0) > 0);
+      const rankedSenders = positiveOnly.length > 0 ? positiveOnly : senderTotals;
+      const senderN = rankedSenders.length;
+      const throwM = rankedSenders.reduce((s, r) => s + (Number(r.throwCount) || 0), 0);
+      // ライブの最新時刻は生イベント（各 capturedAt）から取る
+      //   （aggregateGiftSenderTotals の戻りは lastAt を含まないため）。
+      let latestAt = 0;
+      for (const e of giftEvents) {
+        const c = Number(e?.capturedAt);
+        if (Number.isFinite(c) && c > latestAt) latestAt = c;
+      }
+      const rooms = rankedSenders.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
         const userKey = String(r.userKey || '');
-        const nickname =
-          (userKey && _nicknameResolveMap.get(userKey)) || String(r.nickname || '');
+        const nickname = (userKey && _nicknameResolveMap.get(userKey)) || String(r.nickname || '');
         return {
           userKey,
           nickname,
@@ -6299,38 +6316,54 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
           avatarUrl: rememberedAvatarUrlForUserId(userKey) || ''
         };
       });
-      return {
+      liveCtx = {
         rooms,
         noteText: `ライブ受信したギフトの送り主別 累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントや貢献度ランキングとは別指標）`,
-        unitSuffix: 'pt',
-        ariaLabel: 'ライブ受信ギフトの送り主別 累計ポイントが多い順'
+        ariaLabel: 'ライブ受信ギフトの送り主別 累計ポイントが多い順',
+        latestAt
       };
     }
   }
-  const key = giftUsersStorageKey(lid);
-  let raw = /** @type {unknown[]} */ ([]);
-  try {
-    const bag = await chrome.storage.local.get(key);
-    raw = Array.isArray(bag[key]) ? bag[key] : [];
-  } catch {
-    return null;
+
+  // --- 源の選択（v0.1.395・会議 D）: iframe を基本に保ちつつ、iframe が明らかに古く、
+  //   かつライブの方が新しいときだけライブへ切替（gift hot path は不変・読み取り側のみ）。
+  const pick = pickGiftHistorySource({
+    iframeAvailable: !!iframeCtx,
+    iframeCapturedAtMs: iframeCtx ? iframeCtx.capturedAt : 0,
+    liveAvailable: !!liveCtx,
+    liveLatestAtMs: liveCtx ? liveCtx.latestAt : 0,
+    nowMs: Date.now()
+  });
+  if (pick === 'live' && liveCtx) {
+    return {
+      rooms: liveCtx.rooms,
+      noteText: liveCtx.noteText,
+      unitSuffix: 'pt',
+      ariaLabel: liveCtx.ariaLabel,
+      freshnessNote: liveCtx.latestAt > 0 ? formatCardFreshnessNote(liveCtx.latestAt, { autoRefreshing: true }) : ''
+    };
   }
-  const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
-  const { stripRooms } = prepareGiftRankStrip(raw, { broadcasterUid });
-  if (!stripRooms.length) return null;
-  const rooms = stripRooms.map((r) => ({
-    userKey: r.userKey,
-    nickname: (r.userKey && _nicknameResolveMap.get(r.userKey)) || r.nickname,
-    count: r.count,
-    avatarUrl: rememberedAvatarUrlForUserId(r.userKey) || ''
-  }));
-  return {
-    rooms,
-    noteText:
-      '履歴タブがDOMに無いときの代替。数値は「投げ回数」（pt ではありません）。公式履歴のptや番組累計ポイントとは別です',
-    unitSuffix: '回',
-    ariaLabel: 'ライブ通信で観測したギフト/投げの回数が多い順'
-  };
+  if (iframeCtx) {
+    return {
+      rooms: iframeCtx.rooms,
+      noteText: iframeCtx.noteText,
+      unitSuffix: 'pt',
+      ariaLabel: iframeCtx.ariaLabel,
+      // 鮮度表示。iframe 由来は「ギフトタブを開いた時だけ」更新＝自動更新中は付けず経過のみ正直に。
+      freshnessNote: iframeCtx.capturedAt > 0 ? formatCardFreshnessNote(iframeCtx.capturedAt) : ''
+    };
+  }
+  if (liveCtx) {
+    // iframe 由来が無くライブだけある（途中参加でタブ未オープン等）。
+    return {
+      rooms: liveCtx.rooms,
+      noteText: liveCtx.noteText,
+      unitSuffix: 'pt',
+      ariaLabel: liveCtx.ariaLabel,
+      freshnessNote: liveCtx.latestAt > 0 ? formatCardFreshnessNote(liveCtx.latestAt, { autoRefreshing: true }) : ''
+    };
+  }
+  return null;
 }
 
 /**
@@ -6344,6 +6377,7 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
  *   prependHtml?: string;
  *   beforeNoteHtml?: string;
  *   isNorthStarBody?: boolean;
+ *   freshnessNote?: string;
  * }} opts
  */
 function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
@@ -6353,7 +6387,8 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
     ariaLabel,
     prependHtml = '',
     beforeNoteHtml = '',
-    isNorthStarBody = false
+    isNorthStarBody = false,
+    freshnessNote = ''
   } = opts;
   if (!(el instanceof HTMLElement)) return;
   if (isNorthStarBody) {
@@ -6421,10 +6456,14 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
         : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${inner}</div>`;
     })
     .join('');
+  const freshnessHtml = freshnessNote
+    ? `<p class="nl-top-support-rank__freshness" aria-live="polite">🕒 ${escapeHtml(freshnessNote)}</p>`
+    : '';
   el.innerHTML =
     prependHtml +
     (beforeNoteHtml || '') +
     `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
+    freshnessHtml +
     `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
   bindOnErrorHideHandlersWithin(el);
   const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
@@ -6475,13 +6514,19 @@ function refreshNorthStarAdRankingLane() {
       rankingContributionSum: rankingSum,
       rankingRowCount: adRows.length
     });
+    // v0.1.393: 鮮度表示。nicoad API/bundle は 30 秒間隔で自動更新されるので autoRefreshing。
+    const freshnessNote = formatCardFreshnessNote(
+      typeof bundle?.capturedAt === 'number' ? bundle.capturedAt : null,
+      { autoRefreshing: true }
+    );
     paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText:
         'ニコニ広告の貢献度ランキング（公式ページ相当）。画面上部の累計ptなどと、各行の「貢」は指標や期間が異なり一致しないことがあります',
       unitSuffix: '貢',
       ariaLabel: '広告ランキング',
       beforeNoteHtml,
-      isNorthStarBody: true
+      isNorthStarBody: true,
+      freshnessNote
     });
     return;
   }
@@ -6522,11 +6567,17 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
     const rooms = officialDomRankingRowsToStripRooms(top10, { userKeyKind: 'contrib' });
     // 縦リスト専用 host class が前回付いていたら剥がしてから横カードへ切替。
     body.classList.remove('nl-contrib-ranking-list-host');
+    // v0.1.393: 鮮度表示。koken API は 30 秒間隔で自動更新されるので autoRefreshing。
+    const freshnessNote = formatCardFreshnessNote(
+      await readCardCapturedAtMs(kokenContribStorageKey(String(liveId || '').trim().toLowerCase())),
+      { autoRefreshing: true }
+    );
     paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
       unitSuffix: '貢',
       ariaLabel: '貢献度ランキング',
-      isNorthStarBody: true
+      isNorthStarBody: true,
+      freshnessNote
     });
     return;
   }
@@ -6534,6 +6585,93 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
   body.classList.remove('nl-contrib-ranking-list-host');
   const state = determineNorthStarLaneState('contributionRanking', { bundle, snap });
   renderNorthStarLane('contributionRanking', null, state);
+}
+
+/**
+ * イベント参加中レーン用: 公式バナー由来の「この配信の順位」一行（beforeNote）。
+ * @returns {string} HTML snippet（未取得時は空文字）
+ */
+function buildEventBroadcasterLaneCurrentRankPretext() {
+  const bundle = _lastOfficialEventDomBundle;
+  const rank =
+    typeof bundle?.eventBanner?.rank === 'number' &&
+    Number.isFinite(bundle.eventBanner.rank) &&
+    bundle.eventBanner.rank > 0
+      ? Math.floor(bundle.eventBanner.rank)
+      : null;
+  if (rank == null) return '';
+  const scoreRaw = bundle?.eventBanner?.score;
+  const score =
+    typeof scoreRaw === 'number' && Number.isFinite(scoreRaw) && scoreRaw >= 0
+      ? scoreRaw
+      : null;
+  const line =
+    score != null
+      ? `この配信のイベント順位: ${rank}位（💎 ${Number(score).toLocaleString('ja-JP')}）`
+      : `この配信のイベント順位: ${rank}位`;
+  return `<p class="nl-top-support-rank__pretext">${escapeHtml(line)}</p>`;
+}
+
+/**
+ * イベントランキングレーン上部に出す「配信者本人の現在状況」ヘッダ HTML を作る。
+ * ゆっくりりんく（キャラ）が語りかける形＝「○○さんは現在○位です。みんなで応援しよう！」。
+ *
+ * 配信者名は richview から取れない（「を応援しよう！」を拾う）ため、呼び出し側が渡す
+ * 正本 broadcasterName を使う。イベント名は selfStatus.eventName（広告キャンペーン除外済み）。
+ * fail-soft: 本人順位が無ければヘッダ無し。
+ *
+ * @param {{rank?:number|null,score?:number|null,diffToNext?:number|null,eventName?:string}|null|undefined} self
+ * @param {string} [broadcasterName] 拡張が持つ正本配信者名
+ * @returns {string}
+ */
+function buildEventSelfStatusHeaderHtml(self, broadcasterName) {
+  if (!self || typeof self !== 'object') return '';
+  const rank = typeof self.rank === 'number' && Number.isFinite(self.rank) && self.rank > 0 ? Math.trunc(self.rank) : null;
+  const score = typeof self.score === 'number' && Number.isFinite(self.score) && self.score >= 0 ? Math.trunc(self.score) : null;
+  const diff = typeof self.diffToNext === 'number' && Number.isFinite(self.diffToNext) && self.diffToNext >= 0 ? Math.trunc(self.diffToNext) : null;
+  const eventName = String(self.eventName || '').trim();
+  const name = String(broadcasterName || '').trim();
+  const fmt = (/** @type {number} */ n) => n.toLocaleString('en-US');
+
+  // 本人の順位が確定できなければヘッダ自体を出さない（順位を大きく見せるのが主目的）。
+  if (rank == null) return '';
+
+  // 1-3 位はメダル絵文字、それ以外は順位数字を強調。
+  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+  const tierClass = rank <= 3 ? ` nl-event-self__badge--top${rank}` : '';
+  const badgeInner = medal
+    ? `<span class="nl-event-self__medal">${medal}</span><span class="nl-event-self__rank-num">${rank}<span class="nl-event-self__rank-suffix">位</span></span>`
+    : `<span class="nl-event-self__rank-num nl-event-self__rank-num--plain">${rank}<span class="nl-event-self__rank-suffix">位</span></span>`;
+
+  // ゆっくりりんくの語りかけ。配信者名がある時だけ名前入りに。
+  const whoLabel = name ? `${escapeHtml(name)}さん` : 'この配信者さん';
+  const scoreTxt = score != null ? `（💎${fmt(score)}）` : '';
+  const talkMain = `${whoLabel}は現在 <strong>${rank}位</strong> ${scoreTxt}だよ！`;
+  let talkPush;
+  if (rank === 1) {
+    talkPush = '🎉 堂々の<strong>1位</strong>！みんなで応援して守ろう！';
+  } else if (diff != null && diff > 0) {
+    talkPush = `あと <strong>💎${fmt(diff)}</strong> で <strong>${rank - 1}位</strong>！みんなでランキングに入れるよう応援しよう！`;
+  } else {
+    talkPush = 'みんなでランキングに入れるよう応援しよう！';
+  }
+
+  const eventLine = eventName
+    ? `<p class="nl-event-self__event">🏆 ${escapeHtml(eventName)}</p>`
+    : '';
+
+  return (
+    `<div class="nl-event-self">` +
+      `<div class="nl-event-self__badge${tierClass}">${badgeInner}</div>` +
+      `<div class="nl-event-self__body">` +
+        eventLine +
+        `<p class="nl-event-self__talk">` +
+          `<img class="nl-event-self__rinku" src="${CHARA_IMG_BASE}/link/link-yukkuri-smile-mouth-open.png" alt="ゆっくりりんく" onerror="this.style.display='none'" />` +
+          `<span class="nl-event-self__talk-text">${talkMain} ${talkPush}</span>` +
+        `</p>` +
+      `</div>` +
+    `</div>`
+  );
 }
 
 /**
@@ -6547,6 +6685,9 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
  * イベントスコア順位ではない（UI の note で明示）。スコア順位（プレイヤーパネルの
  * ゴリアテ1位…）は別ソース＝[[reference_event_participant_broadcaster_ranking_research]]。
  *
+ * v0.1.370: audition richview relay（nls_event_score_ranking_<lv>）に 💎 スコア順
+ * TOP10 があればこちらを優先表示する（参加 API の視聴者数順はフォールバック）。
+ *
  * fail-soft: イベント不参加（保存が無い）配信ではレーン枠ごと隠す（空枠で縦を食わない＝
  * [[reference_north_star_lane_hidden_css_specificity]]）。
  *
@@ -6557,29 +6698,56 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
   if (!(body instanceof HTMLElement)) return;
   const lid = String(liveId || '').trim().toLowerCase();
 
-  /** @type {any[]|null} */
-  let rows = null;
-  if (/^lv\d{1,15}$/.test(lid)) {
+  const bundle = _lastOfficialEventDomBundle;
+  let eventScoreRows = Array.isArray(bundle?.eventRanking) && bundle.eventRanking.length > 0 
+    ? bundle.eventRanking 
+    : null;
+
+  /** @type {{rank?:number|null,score?:number|null,diffToNext?:number|null,eventName?:string,broadcasterName?:string}|null} */
+  let selfStatus = null;
+  if (!eventScoreRows && /^lv\d{1,15}$/.test(lid)) {
     try {
-      const key = eventParticipationStorageKey(lid);
-      const bag = await chrome.storage.local.get([key]);
-      const v = bag[key];
-      if (v && typeof v === 'object' && Array.isArray(v.rows)) rows = v.rows;
+      const sKey = eventScoreRankingStorageKey(lid);
+      const bag = await chrome.storage.local.get([sKey]);
+      const sv = bag[sKey];
+      if (
+        sv &&
+        typeof sv === 'object' &&
+        Array.isArray(sv.rows) &&
+        sv.rows.length > 0
+      ) {
+        eventScoreRows = sv.rows;
+      }
+      if (sv && typeof sv === 'object' && sv.selfStatus && typeof sv.selfStatus === 'object') {
+        selfStatus = sv.selfStatus;
+      }
     } catch {
       /* no-op */
     }
   }
 
-  if (rows && rows.length > 0) {
+  const pretext = buildEventBroadcasterLaneCurrentRankPretext();
+  // 配信者名は richview からは正しく取れない（「を応援しよう！」を拾う）ため、
+  // 拡張が持つ正本 watchMetaCache.snapshot.broadcasterName を使う。
+  const broadcasterNameFromSnapshot = String(watchMetaCache.snapshot?.broadcasterName || '').trim();
+  const selfHeaderHtml = buildEventSelfStatusHeaderHtml(selfStatus, broadcasterNameFromSnapshot);
+  const beforeNoteHtml = (selfHeaderHtml || '') + (pretext || '');
+
+  if (eventScoreRows && eventScoreRows.length > 0) {
     setNorthStarLaneHidden('eventBroadcasters', false);
-    // 既に正規化済み（rank/name/contribution=視聴者数/thumbnailUrl/userPageUrl）。
-    // 記名（userPageUrl 付き）行は uid リンク経路が発火する＝userKeyKind:'contrib' で十分。
-    const rooms = officialDomRankingRowsToStripRooms(rows.slice(0, 10), { userKeyKind: 'contrib' });
+    const contribRows = eventScoreRows.slice(0, 10).map((raw) => {
+      const row = raw && typeof raw === 'object' ? raw : {};
+      const contribution =
+        typeof row.score === 'number' && Number.isFinite(row.score) ? row.score : 0;
+      return { ...row, contribution };
+    });
+    const rooms = officialDomRankingRowsToStripRooms(contribRows, { userKeyKind: 'contrib' });
     paintTopSupportRankStyleIntoElement(body, rooms, {
-      noteText: '同じイベントに参加中の配信者（視聴者数の多い順。イベントの順位ではありません）',
-      unitSuffix: '人',
-      ariaLabel: 'イベント参加中の配信者',
-      isNorthStarBody: true
+      noteText: 'イベントランキング上位10名（公式一覧に準拠）',
+      unitSuffix: '💎',
+      ariaLabel: 'イベントランキング',
+      isNorthStarBody: true,
+      beforeNoteHtml
     });
     return;
   }
@@ -6619,7 +6787,8 @@ async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
       noteText: ctx.noteText,
       unitSuffix: ctx.unitSuffix,
       ariaLabel: ctx.ariaLabel,
-      isNorthStarBody: true
+      isNorthStarBody: true,
+      freshnessNote: ctx.freshnessNote || ''
     });
     return;
   }
@@ -6708,40 +6877,6 @@ async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
       }
     }
   }
-  if (!html) {
-    const ndgrRank =
-      typeof snap?.officialNicoEventRankNdgr === 'number' &&
-      Number.isFinite(snap.officialNicoEventRankNdgr) &&
-      snap.officialNicoEventRankNdgr > 0
-        ? Math.trunc(snap.officialNicoEventRankNdgr)
-        : null;
-    // v0.1.325: NDGR rank 単独で「現在N位」を出さない（実機 lv350589034: イベント
-    //   不参加の配信で NDGR rank=50 が出て誤表示）。NDGR field は「ギフトイベント」
-    //   不参加の配信でも別文脈の順位値が乗ることがあるため、イベント参加が他シグナル
-    //   （イベントタイトル / バナー / スコア）で確証できる時だけ「目安」表示する。
-    //   確証が無ければ出さない＝feedback_ndgr_field6_silence に回帰（誤った数字より
-    //   出さないを選ぶ）。
-    const nonEmptyStr = (v) => typeof v === 'string' && v.trim().length > 0;
-    const eventConfirmed =
-      nonEmptyStr(snap?.officialNicoEventTitleNdgr) ||
-      nonEmptyStr(snap?.officialNicoEventTitle) ||
-      !!bundle?.eventBanner ||
-      !!bundle?.eventBalloon ||
-      nonEmptyStr(bundle?.eventCumulativeScoreMirrorHtml) ||
-      nonEmptyStr(bundle?.eventCurrentRankMirrorHtml) ||
-      (typeof snap?.officialEventGiftScoreNdgr === 'number' &&
-        Number.isFinite(snap.officialEventGiftScoreNdgr));
-    if (ndgrRank != null && eventConfirmed) {
-      const fallback = buildNorthStarRankFallbackHtml(ndgrRank);
-      if (fallback) {
-        html =
-          `<div class="nl-north-star-rank-bundle__head">${fallback}` +
-          `<p class="nl-north-star-rank-bundle__hint">※ NDGR 推定値（公式画面の「現在順位」と一致しない場合があります）</p>` +
-          `</div>`;
-      }
-    }
-  }
-
   if (!html) {
     const state = determineNorthStarLaneState('eventRank', { bundle, snap });
     renderNorthStarLane('eventRank', null, state);
@@ -7703,6 +7838,40 @@ function scrollNlMainToRevealElement(el) {
     pad
   );
   if (delta !== 0) main.scrollTop += delta;
+}
+
+/**
+ * 北極星 trio / 関連 UI（こん太の顔など）から、担当レーンへスクロールする。
+ * `adRanking` など補助レーンが `hidden` のときは、`northStarLaneVisibility` のコア常設へフォールバックする。
+ *
+ * @param {string} slotId rink | konta | tanu
+ */
+function scrollNorthStarForCharaTrioSlot(slotId) {
+  const laneIds = resolveCharaTrioSlotScrollLaneIdCandidates(slotId);
+  for (let i = 0; i < laneIds.length; i++) {
+    const laneId = String(laneIds[i] ?? '').trim();
+    if (!laneId) continue;
+    const lane = document.querySelector(
+      `.nl-north-star-lane[data-lane="${laneId.replace(/"/g, '')}"]`
+    );
+    if (!(lane instanceof HTMLElement)) continue;
+    if (lane.hidden) continue;
+    let cs = null;
+    try {
+      cs = globalThis.getComputedStyle(lane);
+    } catch {
+      cs = null;
+    }
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) continue;
+
+    try {
+      lane.scrollIntoView({ behavior: 'auto', block: 'start' });
+    } catch {
+      lane.scrollIntoView(true);
+    }
+    scrollNlMainToRevealElement(lane);
+    return;
+  }
 }
 
 /** 開いた直後のレイアウト確定後にコールバック（1フレームでは高さ未反映のことがある） */
@@ -9626,6 +9795,8 @@ async function refresh() {
     //   永久に「(接続中…)」表示の症状を防ぐ。
     /** @type {{ snapshot?: any, error?: string }} */
     let snapResult = { snapshot: null, error: '' };
+    // v0.1.392: 短間隔 polling の重複ガード。stale snapshot の有無に関わらず立てる。
+    watchMetaCache.snapshotFetchActive = true;
     try {
       snapResult = await requestWatchPageSnapshotFromOpenTab(url);
     } catch (err) {
@@ -9638,6 +9809,7 @@ async function refresh() {
       };
     } finally {
       watchMetaCache.fetchInflight = false;
+      watchMetaCache.snapshotFetchActive = false;
     }
     watchMetaCache.fetchError = String(snapResult.error || '');
     const cacheKeyStillTargetsThisRefresh = watchMetaCache.key === snapshotKey;
@@ -10377,7 +10549,8 @@ async function buildHtmlReportDocument(
   snapshot,
   snapshotError,
   liveId,
-  watchUrl
+  watchUrl,
+  eventRankingModel
 ) {
   const exportedAtIso = new Date().toISOString();
   const exportedAtJst = formatDateTime(Date.now());
@@ -10837,6 +11010,72 @@ async function buildHtmlReportDocument(
       </section>`;
   } catch {
     nextMemoSectionHtml = '';
+  }
+
+  // イベント順位セクション（Phase B・会議 2026-05-26）。eventRankingModel が無ければ空＝
+  //   イベント不参加/未取得はセクションごと省略（fail-soft・誤値ゼロ）。
+  //   サムネは model 側で http/https のみに正規化済みだが、出力時も escapeAttr で二重防御。
+  let eventRankingSectionHtml = '';
+  try {
+    const erm = eventRankingModel;
+    if (erm && typeof erm === 'object') {
+      const fmtN = (/** @type {number} */ n) => Number(n).toLocaleString('en-US');
+      const self = erm.self && typeof erm.self === 'object' ? erm.self : null;
+      const evName = String(erm.eventName || '').trim();
+      const rows = Array.isArray(erm.rows) ? erm.rows : [];
+
+      const headParts = [];
+      if (evName) headParts.push(`<p class="event-rank__name">🏆 ${escapeHtml(evName)}</p>`);
+      if (self && (self.rank != null || self.score != null)) {
+        const who = self.broadcasterName ? `${escapeHtml(String(self.broadcasterName))}さん` : 'この配信者さん';
+        const rk = self.rank != null ? `現在 <strong>${escapeHtml(String(self.rank))}</strong> 位` : '';
+        const sc = self.score != null ? ` 💎 <strong>${escapeHtml(fmtN(self.score))}</strong>` : '';
+        headParts.push(`<p class="event-rank__self">${who} ${rk}${sc}</p>`);
+        if (self.rank != null && self.rank > 1 && self.diffToNext != null && self.diffToNext > 0) {
+          headParts.push(`<p class="event-rank__diff">あと 💎 ${escapeHtml(fmtN(self.diffToNext))} で ${escapeHtml(String(self.rank - 1))} 位</p>`);
+        }
+      }
+
+      const rowsHtml = rows
+        .map((r) => {
+          const rank = escapeHtml(String(r.rank));
+          const name = escapeHtml(String(r.name || '名無し'));
+          const score = escapeHtml(fmtN(Number(r.score) || 0));
+          // model 側で http/https のみに正規化済み。出力時も二重で scheme 検証（S-2）。
+          const thumb = /^https?:\/\//i.test(String(r.thumbnailUrl || '')) ? String(r.thumbnailUrl) : '';
+          const img = thumb
+            ? `<img class="event-rank__thumb" src="${escapeAttr(thumb)}" alt="" width="28" height="28" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" />`
+            : `<span class="event-rank__thumb event-rank__thumb--none" aria-hidden="true"></span>`;
+          return (
+            `<tr>` +
+            `<td class="event-rank__rank">${rank}</td>` +
+            `<td>${img}</td>` +
+            `<td class="event-rank__user">${name}</td>` +
+            `<td class="event-rank__score">💎 ${score}</td>` +
+            `</tr>`
+          );
+        })
+        .join('');
+
+      const staleNote = erm.isStale
+        ? `<p class="event-rank__stale">※ この順位は少し前に取得した値です（配信中に変動します）。</p>`
+        : '';
+
+      if (headParts.length > 0 || rowsHtml) {
+        eventRankingSectionHtml =
+          `<section class="card" id="sec-event-ranking" style="margin-top:12px;">` +
+          `<h2>イベント順位</h2>` +
+          `<p class="guide-lead">この配信が参加しているイベントの💎スコア順ランキングなのだ（公式の表示に準拠）。</p>` +
+          (headParts.length ? `<div class="event-rank__head">${headParts.join('')}</div>` : '') +
+          (rowsHtml
+            ? `<table class="event-rank__table"><thead><tr><th>順位</th><th></th><th>配信者</th><th>累計💎</th></tr></thead><tbody>${rowsHtml}</tbody></table>`
+            : '') +
+          staleNote +
+          `</section>`;
+      }
+    }
+  } catch {
+    eventRankingSectionHtml = '';
   }
 
   return `<!doctype html>
@@ -11420,6 +11659,20 @@ async function buildHtmlReportDocument(
         color: #cbd5e1;
         font-weight: 600;
       }
+      /* イベント順位セクション（Phase B） */
+      .event-rank__head { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: rgba(5,109,255,0.12); border: 1px solid rgba(5,109,255,0.35); }
+      .event-rank__name { margin: 0 0 4px; font-weight: 700; color: #e2e8f0; }
+      .event-rank__self { margin: 0; font-size: 1.05rem; font-weight: 700; color: #e2e8f0; }
+      .event-rank__self strong { color: #60a5fa; }
+      .event-rank__diff { margin: 3px 0 0; font-size: 0.85rem; color: #93a4be; }
+      .event-rank__table { width: 100%; border-collapse: collapse; }
+      .event-rank__table th, .event-rank__table td { padding: 5px 8px; border-bottom: 1px solid rgba(148,164,190,0.2); text-align: left; vertical-align: middle; }
+      .event-rank__rank { width: 2.4em; font-weight: 800; color: #60a5fa; }
+      .event-rank__thumb { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; display: block; }
+      .event-rank__thumb--none { display: inline-block; background: rgba(148,164,190,0.25); }
+      .event-rank__user { font-weight: 600; color: #e2e8f0; }
+      .event-rank__score { white-space: nowrap; font-weight: 700; color: #cbd5e1; }
+      .event-rank__stale { margin: 6px 0 0; font-size: 0.8rem; color: #93a4be; }
       ${yukkuriReportCss}
     </style>
   </head>
@@ -11433,6 +11686,8 @@ async function buildHtmlReportDocument(
 
       ${yukkuriReportHtml}
 
+      ${eventRankingSectionHtml}
+
       <div class="search-box">
         <input id="q" type="search" placeholder="タイトル・配信者・タグ・メタ・script・コメントを横断検索（例: 珈琲 / まめ。２ / コーヒー / og:title）">
         <div id="searchResult" class="hint">検索対象: <span id="totalCount">0</span> 件</div>
@@ -11442,6 +11697,7 @@ async function buildHtmlReportDocument(
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
           <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
+          ${eventRankingSectionHtml ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
           <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
           <li><a href="#sec-id-breakdown">内訳統計（ID 種別比率）</a></li>
@@ -11708,20 +11964,33 @@ async function resolveSnapshotForHtmlExport(watchUrl) {
  * @param {string} watchUrl
  */
 async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
-  const [data, { snapshot, error }] = await Promise.all([
+  const lidForEvent = String(liveId || '').trim().toLowerCase();
+  const eventKey = /^lv\d{1,15}$/.test(lidForEvent) ? eventScoreRankingStorageKey(lidForEvent) : null;
+  const [data, { snapshot, error }, eventBag] = await Promise.all([
     chrome.storage.local.get(storageKey),
-    resolveSnapshotForHtmlExport(watchUrl)
+    resolveSnapshotForHtmlExport(watchUrl),
+    eventKey ? chrome.storage.local.get(eventKey).catch(() => ({})) : Promise.resolve({})
   ]);
   const comments = Array.isArray(data[storageKey])
     ? /** @type {PopupCommentEntry[]} */ (data[storageKey])
     : [];
+  // イベント順位（あれば）。取れない/イベント不参加は null＝レポートでセクションごと省略。
+  let eventRankingModel = null;
+  try {
+    if (eventKey && eventBag && eventBag[eventKey]) {
+      eventRankingModel = buildEventRankingReportModel(eventBag[eventKey], { nowMs: Date.now() });
+    }
+  } catch {
+    eventRankingModel = null;
+  }
 
   const html = await buildHtmlReportDocument(
     comments,
     snapshot,
     error,
     liveId,
-    watchUrl
+    watchUrl,
+    eventRankingModel
   );
 
   const blob = new Blob([html], {
@@ -12225,13 +12494,17 @@ async function runOneTimeBackfillRemoveRecommendedUserChipPollution() {
 /**
  * 北極星 3 キャラ trio パネルの各 slot に click / keydown handler を attach する。
  *
- * v0.1.294 (Antigravity §6.4 続編): trio slot を click すると対応レーンへ smooth
- * scroll する。「気になるキャラを押す → 詳細レーンへ即移動」の自然な UX。
+ * v0.1.294〜: trio slot を activate すると対応レーンへスクロール（`behavior:auto`）。
+ * 「気になるキャラを押す → 詳細レーンへ移動」の自然な UX。
+ *
+ * v0.1.376: `adRanking` が非表示でもコアへフォールバック（無反応の解消）。
+ * v0.1.377: クリックは capture でスロットが先に処理（pointer-events で子を無効化すると
+ * `.nl-north-star-chara-trio__pct-num` 等が抜けて反応しない事故があった）。
  *
  * - 二重 bind 防止: `dataset.nlClickBound === '1'` チェック
+ * - mouse: capture phase で子の上のクリックも必ずここへ
  * - keyboard: Enter / Space で activate（role="button" + tabindex="0" で a11y 確保）
- * - 純関数 resolveCharaTrioSlotScrollTargetLaneId() で slot → lane の解決を行う
- *   ＝3 年後に scroll target を変えたい時は本関数を触らず純関数 1 箇所修正で済む
+ * - lane 優先順は `resolveCharaTrioSlotScrollLaneIdCandidates()`（純関数）に集約
  */
 function attachCharaTrioSlotClickHandlers() {
   const slots = document.querySelectorAll('.nl-north-star-chara-trio__slot[data-nl-trio-slot]');
@@ -12242,22 +12515,9 @@ function attachCharaTrioSlotClickHandlers() {
     slotEl.setAttribute('role', 'button');
     slotEl.tabIndex = 0;
     const onActivate = () => {
-      const slotId = String(slotEl.dataset.nlTrioSlot || '');
-      const laneId = resolveCharaTrioSlotScrollTargetLaneId(slotId);
-      if (!laneId) return;
-      const lane = document.querySelector(
-        `.nl-north-star-lane[data-lane="${laneId}"]`
-      );
-      if (lane instanceof HTMLElement) {
-        try {
-          lane.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } catch {
-          // 一部古い環境では options 引数未対応 → fallback
-          lane.scrollIntoView(true);
-        }
-      }
+      scrollNorthStarForCharaTrioSlot(String(slotEl.dataset.nlTrioSlot || ''));
     };
-    slotEl.addEventListener('click', onActivate);
+    slotEl.addEventListener('click', onActivate, true);
     slotEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -12267,8 +12527,33 @@ function attachCharaTrioSlotClickHandlers() {
   });
 }
 
+/**
+ * 「推定同時接続」カード全体クリックでもこん太と同様に北極星レーンへ飛ぶ（空き領域含む）。
+ * capture で子の値ラベルを押しても確実に拾う。
+ */
+function attachWatchConcurrentCardCharaNorthStarJump() {
+  const card = document.getElementById('watchConcurrentCard');
+  if (!(card instanceof HTMLElement)) return;
+  if (card.dataset.nlConcurrentCharaJumpBound === '1') return;
+  card.dataset.nlConcurrentCharaJumpBound = '1';
+  const go = () => scrollNorthStarForCharaTrioSlot('konta');
+  card.addEventListener('click', go, true);
+  const icon = card.querySelector(':scope > img.nl-live-stat-icon');
+  if (icon instanceof HTMLElement) {
+    icon.tabIndex = 0;
+    icon.setAttribute('role', 'button');
+    icon.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        go();
+      }
+    });
+  }
+}
+
 function initPopup() {
   attachCharaTrioSlotClickHandlers();
+  attachWatchConcurrentCardCharaNorthStarJump();
   void runOneTimeBackfillRemoveGiftSystemMessages();
   void runOneTimeBackfillRemoveRecommendedLivePollution();
   void runOneTimeBackfillRemoveRecommendedLivePollutionV2();
@@ -12696,8 +12981,13 @@ function initPopup() {
       const maskShare = Boolean(maskEl?.checked);
       // 0.1.22〜0.1.30: 同接サンプル / 過去配信 / 公式 DOM bundle / ゆっくり画像は互いに独立なので
       // 直列 await せず Promise.all で並列化（DL 開始までの体感ラグを短縮）。
-      const [sessionSummaryRows, pastBroadcasts, bundleForMkt, yukkuriImageMapForMkt] =
-        await Promise.all([
+      const [
+        sessionSummaryRows,
+        pastBroadcasts,
+        bundleForMkt,
+        yukkuriImageMapForMkt,
+        eventRankingForMkt
+      ] = await Promise.all([
           (async () => {
             try {
               const db = await openBroadcastSessionSummaryDb();
@@ -12729,7 +13019,22 @@ function initPopup() {
             }
           })(),
           readOfficialEventDomBundleFromStorage(lid),
-          buildYukkuriImageDataUrlMap()
+          buildYukkuriImageDataUrlMap(),
+          // イベント💎順位（あれば）。HTMLレポートと同じ正本 model を渡す（marketing は
+          // opts.eventRanking で受ける）。取れない/イベント不参加は null＝セクション省略。
+          (async () => {
+            try {
+              const lidLc = String(lid || '').trim().toLowerCase();
+              if (!/^lv\d{1,15}$/.test(lidLc)) return null;
+              const ek = eventScoreRankingStorageKey(lidLc);
+              const bag = await chrome.storage.local.get(ek).catch(() => ({}));
+              return bag && bag[ek]
+                ? buildEventRankingReportModel(bag[ek], { nowMs: Date.now() })
+                : null;
+            } catch {
+              return null;
+            }
+          })()
         ]);
       // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
       // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
@@ -12758,7 +13063,8 @@ function initPopup() {
           typeof watchMetaCache.snapshot?.streamAgeMin === 'number'
             ? watchMetaCache.snapshot.streamAgeMin
             : undefined,
-        yukkuriImageDataUrlMap: yukkuriImageMapForMkt
+        yukkuriImageDataUrlMap: yukkuriImageMapForMkt,
+        eventRanking: eventRankingForMkt
       });
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -12841,7 +13147,15 @@ function initPopup() {
           }
         }
       }
-      if (stEl) {
+      // v0.1.396: context-invalidated（フォールバックも出せなかった）ときは、
+      //   即・ワンクリック復帰できるよう再読み込みバナーを出して案内を残す。
+      if (isExtensionContextInvalidatedError(msg)) {
+        renderExtensionContextBanner(true);
+        if (stEl) {
+          stEl.textContent =
+            '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります';
+        }
+      } else if (stEl) {
         stEl.textContent =
           msg === 'marketing_storage_timeout'
             ? '分析がタイムアウトしました（再試行してください）'
@@ -13445,29 +13759,45 @@ function initPopup() {
     exportBtn.disabled = true;
     exportBtn.setAttribute('aria-busy', 'true');
     if (postStatus) postStatus.textContent = 'HTML レポートを準備しています…';
+    // v0.1.396: context-invalidated のときは案内を残すため、finally の自動復帰を抑止する。
+    let keepStatusMessage = false;
     try {
       await yieldToBrowserPaint();
       await downloadCommentsHtml(lv, key, watchUrl);
       if (postStatus) postStatus.textContent = 'ダウンロードを開始しました';
     } catch (e) {
-      // v0.1.282: 失敗理由を握り潰さず可視化（従来は空 catch で原因不明だった）。
-      try {
-        console.error('[nls] HTML レポート保存に失敗', e);
-      } catch {
-        /* no-op */
-      }
-      const reason = String(e?.message || e || '').trim();
-      if (postStatus) {
-        postStatus.textContent = reason
-          ? `HTML の保存に失敗しました（${reason.slice(0, 80)}）`
-          : 'HTML の保存に失敗しました';
+      // v0.1.396: 「拡張の接続が切れた（Extension context invalidated）」ときは、
+      //   消える文言だけ出すと「壊れた」と誤解される。即・ワンクリック復帰できるよう
+      //   再読み込みバナーを出し、復帰するまで案内を残す。
+      if (isExtensionContextInvalidatedError(e)) {
+        keepStatusMessage = true;
+        renderExtensionContextBanner(true);
+        if (postStatus) {
+          postStatus.textContent =
+            '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります';
+        }
+      } else {
+        // v0.1.282: 失敗理由を握り潰さず可視化（従来は空 catch で原因不明だった）。
+        try {
+          console.error('[nls] HTML レポート保存に失敗', e);
+        } catch {
+          /* no-op */
+        }
+        const reason = String(e?.message || e || '').trim();
+        if (postStatus) {
+          postStatus.textContent = reason
+            ? `HTML の保存に失敗しました（${reason.slice(0, 80)}）`
+            : 'HTML の保存に失敗しました';
+        }
       }
     } finally {
       exportBtn.removeAttribute('aria-busy');
       exportBtn.disabled = false;
-      window.setTimeout(() => {
-        if (postStatus) postStatus.textContent = prevPostStatus;
-      }, 2800);
+      if (!keepStatusMessage) {
+        window.setTimeout(() => {
+          if (postStatus) postStatus.textContent = prevPostStatus;
+        }, 2800);
+      }
     }
   });
 
@@ -13524,9 +13854,16 @@ function initPopup() {
         await appendSelfPostedComment(lvPost, text);
         optimisticLogged = true;
       }
-      if (!hasExtensionContext()) return;
+      // v0.1.396: context が切れていたら、送信中…固定を解きつつ復帰バナーを出す。
+      if (!hasExtensionContext()) {
+        renderExtensionContextBanner(true);
+        return;
+      }
       const result = await requestPostCommentToOpenTab(text, watchUrl);
-      if (!hasExtensionContext()) return;
+      if (!hasExtensionContext()) {
+        renderExtensionContextBanner(true);
+        return;
+      }
       if (result.ok) {
         if (commentInput) commentInput.value = '';
         COMMENT_KINDNESS_UI_STATE.armedText = '';
@@ -13539,20 +13876,53 @@ function initPopup() {
         await revertLastSelfPostedComment(lvPost, text);
         optimisticLogged = false;
       }
-      setCommentPostNotice(
-        withCommentSendTroubleshootHint(result.error || '送信に失敗しました。'),
-        'error'
-      );
+      // v0.1.396: requestPostCommentToOpenTab は context-invalidated を内部 catch して
+      //   {ok:false, error:'…Extension context invalidated…'} で返す。この場合は
+      //   通常の失敗文言でなく、ワンクリック復帰バナーを出す（送信中…固まりの根治）。
+      if (isExtensionContextInvalidatedError(result.error || '')) {
+        renderExtensionContextBanner(true);
+        setCommentPostNotice(
+          '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります。',
+          'error'
+        );
+      } else {
+        setCommentPostNotice(
+          withCommentSendTroubleshootHint(result.error || '送信に失敗しました。'),
+          'error'
+        );
+      }
     } catch (e) {
       if (optimisticLogged && lvPost) {
         await revertLastSelfPostedComment(lvPost, text).catch(() => {});
       }
-      if (isExtensionContextInvalidatedError(e) || !hasExtensionContext()) return;
+      // v0.1.396: 拡張の接続が切れた（Extension context invalidated）ときは、
+      //   「送信中…」のまま固まって見える（context 喪失で repaint も走らない）。
+      //   即・ワンクリック復帰できるよう再読み込みバナーを出して案内する。
+      if (isExtensionContextInvalidatedError(e) || !hasExtensionContext()) {
+        try {
+          renderExtensionContextBanner(true);
+        } catch {
+          /* no-op */
+        }
+        return;
+      }
       throw e;
     } finally {
       COMMENT_POST_UI_STATE.submitting = false;
       if (hasExtensionContext()) {
         paintCommentComposeUi();
+      } else {
+        // v0.1.396: context 喪失時も「送信中…」固定を解くため、最低限ボタンだけ復帰させる。
+        //   paintCommentComposeUi は storage 等に触れて再 throw し得るので直接 DOM を戻す。
+        try {
+          if (postBtn) {
+            postBtn.disabled = false;
+            postBtn.textContent = 'コメント送信';
+            postBtn.removeAttribute('aria-busy');
+          }
+        } catch {
+          /* no-op */
+        }
       }
     }
   }
@@ -14267,7 +14637,13 @@ function initPopup() {
     // no-op
   }
 
-  const POLL_INTERVAL_MS = INLINE_MODE ? 10_000 : 30_000;
+  // v0.1.392: 公式パネル（来場/コメント/💎/ギフト）の数値を「ほぼリアルタイム」に
+  //   追従させるため、前面表示中の inline パネル / サイドパネルは 3 秒間隔で更新する。
+  //   上流（ニコ生ページ DOM）は常時 live なので、遅れの実体はこの polling 間隔だった。
+  //   別ウィンドウ（standalone）は副次ビューで背景化しやすいので従来どおり 30 秒。
+  //   tick は document.hidden で背景タブを skip し、in-flight fetch 中は次の tick を
+  //   見送る（遅い回線で fetch が重なってメッセージが積み上がるのを防ぐ）。
+  const POLL_INTERVAL_MS = INLINE_MODE || INLINE_SIDE_PANEL ? 3_000 : 30_000;
   // setInterval の id を保持し、拡張 context invalidated（chrome://extensions の
   // 再読み込みなど）後はループから抜けて clearInterval する。これがないと、popup
   // を閉じない限り「early return するだけの空 tick」が永続的に走り続けて、
@@ -14284,6 +14660,9 @@ function initPopup() {
           return;
         }
         if (typeof document !== 'undefined' && document.hidden) return;
+        // v0.1.392: 短間隔 polling で fetch が重ならないよう、前回の取得がまだ
+        //   進行中なら今回の tick は見送る（その fetch がじき新しい値を届ける）。
+        if (watchMetaCache.snapshotFetchActive) return;
         // 0.1.92: stale-while-revalidate パターン。
         //   key だけ無効化して fetch を促し、snapshot 自体は保持して
         //   fetch 中も古い数値を表示し続ける（loading 状態の点滅を防ぐ）。

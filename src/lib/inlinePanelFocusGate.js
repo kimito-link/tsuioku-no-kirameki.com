@@ -62,12 +62,14 @@ export function shouldRespondFocusedNowFromToolbar(host, deps) {
   if (!deps || typeof deps.getComputedStyle !== 'function') return true;
   try {
     const cs = deps.getComputedStyle(host);
-    if (!cs || typeof cs !== 'object') return true;
+    // 取得不能は「見えている」とは言えない → false で popup 窓 fallback（沈黙しない）
+    if (!cs || typeof cs !== 'object') return false;
     if (cs.display === 'none') return false;
     if (cs.visibility === 'hidden') return false;
     return true;
   } catch {
-    // computedStyle 取得失敗（detached 等）→ 保守的に true（popup window race を避ける）
-    return true;
+    // computedStyle 取得失敗（detached / cross-origin shadow 境界等）も false。
+    // 旧「true」は background が fallback しないため「kon-ta 押しても何も起きない」に直結した。
+    return false;
   }
 }

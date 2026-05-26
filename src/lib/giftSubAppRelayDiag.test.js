@@ -198,6 +198,46 @@ describe('snapshotIframeRelayDiag', () => {
       r.heartbeatsByFrameUrl['https://nicoad.nicovideo.jp/live/publish/lv1'];
     expect(ad.lastKokenContribShape).toBeNull();
   });
+
+  it('PR1 richview: lastRichviewEventScoreDiag を object のみ passthrough（配列は弾く）', () => {
+    const diag = { probe: 'richview-event-score-diag-v1', bodyTextLen: 42 };
+    const r = snapshotIframeRelayDiag(
+      {
+        iframeRelayMessagesReceivedTotal: 0,
+        iframeRelayMessagesByFrameUrl: {},
+        iframeRelayLastReceivedAt: 0,
+        iframeRelayHeartbeatsByFrameUrl: {
+          'https://audition.nicovideo.jp/embedded/richview/live?content_id=lv1': {
+            count: 1,
+            lastAt: 9000,
+            lastScrapeAttempts: 1,
+            lastItemsCount: 0,
+            lastContribCount: 0,
+            lastEventBannerPresent: false,
+            lastRichviewEventScoreDiag: diag
+          },
+          'https://audition.nicovideo.jp/embedded/richview/live?content_id=lv2': {
+            count: 1,
+            lastAt: 9000,
+            lastScrapeAttempts: 1,
+            lastItemsCount: 0,
+            lastContribCount: 0,
+            lastEventBannerPresent: false,
+            lastRichviewEventScoreDiag: [1, 2]
+          }
+        },
+        scanCrossOriginThrows: 0,
+        scanSameOriginAccess: 0
+      },
+      10000
+    );
+    const a =
+      r.heartbeatsByFrameUrl['https://audition.nicovideo.jp/embedded/richview/live?content_id=lv1'];
+    expect(a.lastRichviewEventScoreDiag).toEqual(diag);
+    const b =
+      r.heartbeatsByFrameUrl['https://audition.nicovideo.jp/embedded/richview/live?content_id=lv2'];
+    expect(b.lastRichviewEventScoreDiag).toBeNull();
+  });
 });
 
 describe('formatRelayDiagOneLine', () => {

@@ -1,9 +1,10 @@
 /**
  * @typedef {import('./marketingAggregate.js').MarketingReport} MarketingReport
  * @typedef {import('./marketingAggregate.js').UserCommentProfile} UserCommentProfile
+ * @typedef {import('./eventRankingReportModel.js').EventRankingReportModel} EventRankingReportModel
  */
 
-import { escapeHtml } from './htmlEscape.js';
+import { escapeAttr, escapeHtml } from './htmlEscape.js';
 import { maskLabelForShare } from './privacyDisplay.js';
 import { MKT_ADVISOR_AVATAR_DATA_URI } from './marketingHtmlAdvisorAvatars.js';
 import { yukkuriBroadcastSummaryEmbeddedCss } from './yukkuriBroadcastSummary.js';
@@ -1755,7 +1756,8 @@ ${dynamicAdviceCardsHtml('askTiming', metricsFull)}
  *   broadcasterName?: string,
  *   recordedCommentCount?: number,
  *   streamAgeMin?: number,
- *   yukkuriImageDataUrlMap?: Record<string, string>
+ *   yukkuriImageDataUrlMap?: Record<string, string>,
+ *   eventRanking?: EventRankingReportModel | null
  * }} [opts]
  * @returns {string}
  */
@@ -1999,6 +2001,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-listener-care', label: 'リスナーお返し' },
     { id: 'mkt-ask-timing', label: 'お願いの出しどころ' },
     { id: 'mkt-sg-caution', label: '読み取りの注意' },
+    { id: 'mkt-event-ranking', label: 'イベント順位' },
     { id: 'mkt-kpi', label: 'KPI サマリ' },
     { id: 'mkt-content', label: 'コメント本文・属性の傾向' },
     { id: 'mkt-narrative', label: '配信内容の流れ' },
@@ -2037,6 +2040,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
 __NL_TOC_PLACEHOLDER__
 ${sectionAdviceIntro()}
 ${renderSupportGrowthSections(sgInsights, metricsForAdvice)}
+${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare))}
 ${idWrap('mkt-kpi', sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
 ${dynamicAdviceCardsHtml('kpi', metricsForAdvice)}
@@ -2246,6 +2250,96 @@ function sectionMachineReadableJson(embedJson, maskShare) {
 <h2>表計算・ツール向け JSON</h2>
 <p class="mkt-note">${maskNote} 中身は <code>id="nl-marketing-export-v1"</code> の <code>script</code> 要素にあります（<code>schemaVersion</code>・<code>report</code> 形式）。</p>
 <script type="application/json" id="nl-marketing-export-v1">${embedJson}</script>
+</section>`;
+}
+
+/** @param {unknown} v */
+function finiteIntOrNull(v) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+  return Math.trunc(v);
+}
+
+/** @param {unknown} v */
+function formatEventRankingNumber(v) {
+  const n = finiteIntOrNull(v);
+  return n == null ? '—' : n.toLocaleString('ja-JP');
+}
+
+/** @param {unknown} v */
+function safeEventRankingThumbnailUrl(v) {
+  const s = String(v == null ? '' : v).trim();
+  return /^https?:/i.test(s) ? s : '';
+}
+
+/**
+ * @param {EventRankingReportModel | null | undefined} eventRanking
+ * @param {boolean} maskShare
+ */
+function sectionEventRanking(eventRanking, maskShare) {
+  if (!eventRanking || typeof eventRanking !== 'object') return '';
+  const model = /** @type {EventRankingReportModel} */ (eventRanking);
+  const rows = Array.isArray(model.rows) ? model.rows : [];
+  const eventName = String(model.eventName || '').trim();
+  const self = model.self && typeof model.self === 'object' ? model.self : null;
+  if (!eventName && !self && rows.length === 0) return '';
+
+  const selfRank = self ? finiteIntOrNull(self.rank) : null;
+  const selfScore = self ? finiteIntOrNull(self.score) : null;
+  const selfDiff = self ? finiteIntOrNull(self.diffToNext) : null;
+  const selfName = self ? String(self.broadcasterName || '').trim() : '';
+  const nextRankLabel =
+    selfRank != null && selfRank > 1 && selfDiff != null && selfDiff > 0
+      ? `あと💎${selfDiff.toLocaleString('ja-JP')} で ${selfRank - 1}位`
+      : '上位との差分なし';
+  const selfHtml = self
+    ? `<div class="mkt-event-self" aria-label="本人のイベント順位">
+<div class="mkt-event-self__card"><span class="mkt-event-self__label">現在順位</span><strong>${escapeHtml(selfRank == null ? '—' : `${selfRank.toLocaleString('ja-JP')}位`)}</strong></div>
+<div class="mkt-event-self__card"><span class="mkt-event-self__label">累計💎</span><strong>${escapeHtml(formatEventRankingNumber(selfScore))}</strong></div>
+<div class="mkt-event-self__card"><span class="mkt-event-self__label">${escapeHtml(selfName || '本人')}</span><strong>${escapeHtml(nextRankLabel)}</strong></div>
+</div>`
+    : '';
+
+  const topRows = rows
+    .slice(0, 10)
+    .map((row) => {
+      const rank = finiteIntOrNull(row?.rank);
+      const score = finiteIntOrNull(row?.score);
+      if (rank == null || rank <= 0) return '';
+      const name = String(row?.name || '').trim() || '名無し';
+      const thumbSrc = safeEventRankingThumbnailUrl(row?.thumbnailUrl);
+      const thumbHtml = thumbSrc
+        ? `<img class="mkt-event-rank__thumb" src="${escapeAttr(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.hidden=true">`
+        : '<span class="mkt-event-rank__thumb mkt-event-rank__thumb--empty"></span>';
+      const anon = row?.isAnonymous === true
+        ? '<span class="mkt-event-rank__anon">匿名</span>'
+        : '';
+      return `<tr>
+<td class="mkt-event-rank__rank">${escapeHtml(`${rank}位`)}</td>
+<td class="mkt-event-rank__thumb-cell">${thumbHtml}</td>
+<td class="mkt-event-rank__name">${escapeHtml(name)}${anon}</td>
+<td class="mkt-event-rank__score">💎${escapeHtml(formatEventRankingNumber(score))}</td>
+</tr>`;
+    })
+    .filter(Boolean)
+    .join('');
+  const tableHtml = topRows
+    ? `<h3 class="mkt-event-rank__subhead">参加配信者TOP</h3>
+<div class="mkt-event-rank__table-wrap"><table class="mkt-event-rank__table"><tbody>${topRows}</tbody></table></div>`
+    : '<p class="mkt-note">参加配信者TOPはまだ取得できていません。</p>';
+  const staleNote = model.isStale
+    ? '<p class="mkt-note mkt-event-rank__stale">少し前に取得した値です。最新の順位とは異なる場合があります。</p>'
+    : '';
+  const maskNote = maskShare
+    ? '<p class="mkt-note">イベント順位は公開ランキング由来のため、共有向け出力でも配信者名を表示します。</p>'
+    : '';
+
+  return `<section class="mkt-section mkt-section--event-ranking" aria-label="イベント順位">
+<h2>🏆 イベント順位</h2>
+${eventName ? `<p class="mkt-event-rank__event-name">${escapeHtml(eventName)}</p>` : ''}
+${selfHtml}
+${tableHtml}
+${staleNote}
+${maskNote}
 </section>`;
 }
 
@@ -2517,6 +2611,24 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-rank-bar{position:relative;height:22px;background:#0f172a;border-radius:4px;overflow:hidden}
 .mkt-rank-bar__fill{height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:4px}
 .mkt-rank-bar__label{position:absolute;right:6px;top:2px;font-size:.75rem;color:#f8fafc;font-weight:600}
+.mkt-section--event-ranking h2{border-left-color:#facc15}
+.mkt-event-rank__event-name{margin:.15rem 0 .75rem;font-size:.9rem;color:#fde68a;font-weight:700;line-height:1.45}
+.mkt-event-self{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin:.7rem 0 .95rem}
+.mkt-event-self__card{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.75rem;min-width:0}
+.mkt-event-self__label{display:block;font-size:.72rem;color:#94a3b8;margin-bottom:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mkt-event-self__card strong{display:block;color:#f8fafc;font-size:1rem;line-height:1.35;overflow-wrap:anywhere}
+.mkt-event-rank__subhead{margin:.3rem 0 .45rem;font-size:.9rem;color:#e2e8f0}
+.mkt-event-rank__table-wrap{overflow-x:auto}
+.mkt-event-rank__table{width:100%;border-collapse:collapse}
+.mkt-event-rank__table td{padding:.4rem .45rem;border-bottom:1px solid #334155;vertical-align:middle}
+.mkt-event-rank__rank{width:3.6rem;color:#fde68a;font-weight:700;font-size:.82rem;text-align:right}
+.mkt-event-rank__thumb-cell{width:38px}
+.mkt-event-rank__thumb{width:30px;height:30px;border-radius:8px;object-fit:cover;display:block;background:#0f172a}
+.mkt-event-rank__thumb--empty{border:1px dashed #475569}
+.mkt-event-rank__name{font-size:.85rem;color:#e2e8f0;min-width:140px;overflow-wrap:anywhere}
+.mkt-event-rank__score{text-align:right;font-variant-numeric:tabular-nums;font-size:.85rem;color:#f8fafc;white-space:nowrap}
+.mkt-event-rank__anon{display:inline-block;margin-left:.35rem;border:1px solid #475569;border-radius:999px;padding:0 .4rem;color:#94a3b8;font-size:.68rem}
+.mkt-event-rank__stale{color:#fbbf24}
 /* 0.1.12 (F3): サムネ付きユーザー一覧グリッド。トップコメンター表とは別軸で、
    どんな顔ぶれが応援してくれたかを視覚的に振り返るための面。 */
 .mkt-section--thumb-grid h2{border-left-color:#fb923c}

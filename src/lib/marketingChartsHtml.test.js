@@ -32,11 +32,110 @@ function minimal() {
   return aggregateMarketingReport(comments, 'lv123');
 }
 
+/** @param {Partial<import('./eventRankingReportModel.js').EventRankingReportModel>} [overrides] */
+function eventRankingFixture(overrides = {}) {
+  return {
+    eventName: '5月病なんか銀河系まで飛んでいけ！',
+    self: {
+      rank: 2,
+      score: 12345,
+      diffToNext: 100,
+      broadcasterName: '公開配信者Link'
+    },
+    rows: [
+      {
+        rank: 1,
+        score: 23456,
+        name: 'こん太Channel',
+        isAnonymous: false,
+        thumbnailUrl: 'https://example.test/konta.jpg',
+        userId: '111'
+      },
+      {
+        rank: 2,
+        score: 12345,
+        name: '公開配信者Link',
+        isAnonymous: false,
+        thumbnailUrl: 'data:image/png;base64,evil',
+        userId: '222'
+      }
+    ],
+    capturedAt: Date.now() - 30_000,
+    ageMs: 30_000,
+    isStale: false,
+    ...overrides
+  };
+}
+
 describe('buildMarketingDashboardHtml', () => {
   it('完全な HTML ドキュメントを返す', () => {
     const html = buildMarketingDashboardHtml(minimal());
     expect(html).toContain('<!DOCTYPE html>');
     expect(html).toContain('lv123');
+  });
+
+  it('eventRanking opt が無いときはイベント順位セクションを出さない', () => {
+    const html = buildMarketingDashboardHtml(minimal());
+    expect(html).not.toContain('id="mkt-event-ranking"');
+    expect(html).not.toContain('<h2>🏆 イベント順位</h2>');
+  });
+
+  it('eventRanking opt があるとイベント名・本人順位・参加配信者TOPを出す', () => {
+    const html = buildMarketingDashboardHtml(minimal(), {
+      eventRanking: eventRankingFixture({ isStale: true })
+    });
+    expect(html).toContain('id="mkt-event-ranking"');
+    expect(html).toContain('5月病なんか銀河系まで飛んでいけ！');
+    expect(html).toContain('公開配信者Link');
+    expect(html).toContain('2位');
+    expect(html).toContain('12,345');
+    expect(html).toContain('あと💎100 で 1位');
+    expect(html).toContain('参加配信者TOP');
+    expect(html).toContain('こん太Channel');
+    expect(html).toContain('💎23,456');
+    expect(html).toContain('少し前に取得した値');
+  });
+
+  it('eventRanking の data: サムネは落とし https サムネだけ残す', () => {
+    const html = buildMarketingDashboardHtml(minimal(), {
+      eventRanking: eventRankingFixture({
+        eventName: '悪い<script>alert(1)</script>',
+        rows: [
+          {
+            rank: 1,
+            score: 50,
+            name: '安全サムネ',
+            isAnonymous: false,
+            thumbnailUrl: 'https://example.test/safe.jpg'
+          },
+          {
+            rank: 2,
+            score: 40,
+            name: '<b>危険サムネ</b>',
+            isAnonymous: false,
+            thumbnailUrl: 'data:image/png;base64,evil'
+          }
+        ]
+      })
+    });
+    expect(html).toContain('https://example.test/safe.jpg');
+    expect(html).not.toContain('data:image/png;base64,evil');
+    expect(html).toContain('onerror="this.onerror=null;this.hidden=true"');
+    expect(html).toContain('悪い&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).toContain('&lt;b&gt;危険サムネ&lt;/b&gt;');
+    expect(html).not.toContain('悪い<script>alert(1)</script>');
+  });
+
+  it('maskShareLabels=true でも公開イベントランキングの配信者名は伏せない', () => {
+    const html = buildMarketingDashboardHtml(minimal(), {
+      maskShareLabels: true,
+      eventRanking: eventRankingFixture()
+    });
+    expect(html).toContain('共有向けに表示名を伏せた出力');
+    expect(html).toContain('イベント順位は公開ランキング由来');
+    expect(html).toContain('公開配信者Link');
+    expect(html).toContain('こん太Channel');
+    expect(html).toContain('https://example.test/konta.jpg');
   });
 
   it('KPI セクションが含まれる', () => {

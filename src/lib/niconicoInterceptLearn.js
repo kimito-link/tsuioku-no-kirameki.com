@@ -96,6 +96,40 @@ export function extractLearnUsersFromNicoUserIconUrlsInString(text) {
   return out;
 }
 
+export const AD_OR_RANKING_KEYS = Object.freeze([
+  'advertiserUserId',
+  'advertiser_user_id',
+  'advertiserName',
+  'advertiser_name',
+  'nicoadId',
+  'nicoad_id',
+  'adPoint',
+  'ad_point',
+  'totalAdPoint',
+  'total_ad_point',
+  'contribution',
+  'contributionRank',
+  'contribution_rank',
+  'rank',
+  'score',
+  'giftPoint',
+  'gift_point',
+  'adPoints',
+  'giftPoints'
+]);
+
+/**
+ * @param {Record<string, unknown>} rec
+ * @returns {boolean}
+ */
+function isAdOrRankingObject(rec) {
+  if (!rec) return false;
+  for (const k of AD_OR_RANKING_KEYS) {
+    if (rec[k] !== undefined) return true;
+  }
+  return false;
+}
+
 /**
  * 1オブジェクト（配列でない）について、従来 `dig` 内と同じキー走査でシグナルを返す。
  * @param {unknown} obj
@@ -142,11 +176,15 @@ export function collectInterceptSignalsFromObject(obj) {
     }
   }
 
+  let childAdOrRank = false;
   if (no == null || uid == null || name == null || !av) {
     for (const sub of INTERCEPT_NESTED_KEYS) {
       const child = rec[sub];
       if (!child || typeof child !== 'object' || Array.isArray(child)) continue;
       const ch = /** @type {Record<string, unknown>} */ (child);
+      if (isAdOrRankingObject(ch)) {
+        childAdOrRank = true;
+      }
       if (no == null) {
         for (const k of INTERCEPT_NO_KEYS) {
           if (ch[k] != null) {
@@ -184,8 +222,9 @@ export function collectInterceptSignalsFromObject(obj) {
 
   const sUid = uid != null ? String(uid).trim() : '';
   const sName = name != null ? String(name).trim() : '';
+  const isAdOrRank = isAdOrRankingObject(rec) || childAdOrRank;
 
-  if (no != null && (uid != null || name != null || av)) {
+  if (no != null && (uid != null || name != null || av) && !isAdOrRank) {
     const n = String(no ?? '').trim();
     if (n) {
       enqueues.push({ no: n, uid: sUid, name: sName, av });

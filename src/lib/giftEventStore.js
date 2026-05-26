@@ -40,6 +40,8 @@
  * }} GiftEventAppendResult
  */
 
+import { scrubGiftRankingNickname } from './giftDisplayNickname.js';
+
 const DEFAULT_MAX_EVENTS = 500;
 
 /**
@@ -181,7 +183,7 @@ export function aggregateGiftSenderTotals(events) {
   for (const e of events) {
     if (!e || typeof e !== 'object') continue;
     const uid = String(e.userId ?? '').trim();
-    const nick = String(e.nickname ?? '').trim();
+    const nick = scrubGiftRankingNickname(String(e.nickname ?? ''));
     // 送信者バケットキー: uid > nickname > '名無し'
     const key = uid || nick || '名無し';
     const point =

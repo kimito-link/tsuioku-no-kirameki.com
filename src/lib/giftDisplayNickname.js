@@ -27,6 +27,53 @@ export function isLikelyInternalNdgGiftOrCampaignLabel(s) {
 }
 
 /**
+ * C0 制御文字のうち TAB・LF・CR 以外を除去（旧 `\u0000-\u001F` 由来のゴミ対策）。
+ * `no-control-regex` を踏ませないため正規表現ではなくコードポイントで判定する。
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+function stripNicknameC0ControlsExceptTabLfCr(s) {
+  let out = '';
+  for (const ch of s) {
+    const cp = /** @type {number} */ (ch.codePointAt(0));
+    if (cp <= 31 && cp !== 9 && cp !== 10 && cp !== 13) continue;
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * NDGR / ギフト履歴ランキング向けに nickname を軽く正規化し、文字化け・プレースホルダのみを除外する。
+ * 空を返した場合は下流が `formatNicknameWithUidFallback` で `u/<uid>` へ落ちる。
+ *
+ * @param {unknown} raw
+ * @returns {string}
+ */
+export function scrubGiftRankingNickname(raw) {
+  const trimmed = stripNicknameC0ControlsExceptTabLfCr(String(raw ?? ''))
+    .replace(/\u200B|\uFEFF/g, '')
+    .trim();
+  if (!trimmed) return '';
+  if (isLikelyInternalNdgGiftOrCampaignLabel(trimmed)) return '';
+  // ドット／中黒のみ等の欠損テキスト
+  if (/^[.\u2026\u2022\u22EF\u30FB\u3000⋯‥・\s]{1,32}$/u.test(trimmed)) {
+    return '';
+  }
+  const fffdMatches = trimmed.match(/\uFFFD/gu);
+  const ffdc = fffdMatches ? fffdMatches.length : 0;
+  if (ffdc > 0 && ffdc / trimmed.length > 0.2) return '';
+  let bad = 0;
+  for (const ch of trimmed) {
+    const cp = /** @type {number} */ (ch.codePointAt(0));
+    if (cp === 0xfffd || cp < 0x20 || (cp >= 0xd800 && cp <= 0xdfff)) bad += 1;
+    else if (cp >= 0xe000 && cp <= 0xf8ff) bad += 1;
+  }
+  if (bad / trimmed.length > 0.35) return '';
+  return trimmed;
+}
+
+/**
  * 応援グリッド用途で「本家 UI に近い表示名」として信頼できるか
  * （{@link supportGridStrongNickname} かつ内部ラベルではない）
  * @param {string} nick

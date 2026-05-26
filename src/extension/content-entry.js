@@ -83,6 +83,17 @@ import {
 } from '../lib/officialEventBannerDom.js';
 import { findGiftSidebarRankTabElement } from '../lib/giftSidebarRankTabPick.js';
 import { captureGiftSubAppIframeDomShape } from '../lib/giftSubAppIframeDomShape.js';
+import {
+  captureAuditionRichviewEventScoreDiagProbe,
+  isAuditionRichviewLivePath
+} from '../lib/captureAuditionRichviewEventScoreDiagProbe.js';
+import { scrapeEventScoreRankingFromRichviewDom, scrapeEventSelfStatusFromRichviewDom, computeRichviewEventCheapSig } from '../lib/scrapeEventScoreRankingFromRichviewDom.js';
+import {
+  eventScoreRankingStorageKey,
+  EVENT_SCORE_RANKING_STORAGE_PREFIX,
+  validateEventScoreRankingRelayPayload
+} from '../lib/eventScoreRankingRelay.js';
+import { decideHiddenOfficialIframeInject } from '../lib/hiddenOfficialIframeReinjectGate.js';
 import { classifyGiftSubAppFrameSource } from '../lib/giftSubAppFrameSource.js';
 import { captureSameOriginContributionRankingDomShape } from '../lib/sameOriginContribRankingDomShape.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
@@ -2031,8 +2042,74 @@ window.addEventListener('message', (e) => {
   ) {
     cur.lastKokenContribShape = e.data.kokenContribShapeProbe;
   }
+  // PR1: audition richview 内のイベントスコア順位 DOM 観測（1 ショット・bounded）。
+  if (
+    e.data.richviewEventScoreDiagProbe &&
+    typeof e.data.richviewEventScoreDiagProbe === 'object' &&
+    !Array.isArray(e.data.richviewEventScoreDiagProbe)
+  ) {
+    cur.lastRichviewEventScoreDiag = e.data.richviewEventScoreDiagProbe;
+  }
   map[url] = cur;
   pruneRelayDiagMap(map);
+});
+
+window.addEventListener('message', (e) => {
+  if (!e?.data || typeof e.data.type !== 'string') return;
+  if (e.data.type !== 'NLS_EVENT_SCORE_RANKING_FROM_IFRAME') return;
+  if (
+    !isTrustedGiftSubAppRelayMessage({
+      data: e.data,
+      origin: e.origin,
+      isSelfSource: e.source === window
+    })
+  ) {
+    return;
+  }
+  const lid = resolveGiftRelayStorageLiveId(liveId, e.data.frameUrl);
+  if (!lid || !hasExtensionContext()) return;
+  const rows = Array.isArray(e.data.rows) ? e.data.rows : null;
+  const check = validateEventScoreRankingRelayPayload({
+    frameUrl: e.data.frameUrl,
+    rows,
+    destinationLiveId: lid
+  });
+  if (!check.ok) return;
+  // 本人ステータス（順位/スコア/差/イベント名）は付随情報。型を軽く検証して保存。
+  let selfStatus = null;
+  try {
+    const s = e.data.selfStatus;
+    if (s && typeof s === 'object' && !Array.isArray(s)) {
+      const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+      const strClip = (v) => (typeof v === 'string' ? v.slice(0, 80) : '');
+      selfStatus = {
+        rank: numOrNull(s.rank),
+        score: numOrNull(s.score),
+        diffToNext: numOrNull(s.diffToNext),
+        eventName: strClip(s.eventName),
+        broadcasterName: strClip(s.broadcasterName)
+      };
+    }
+  } catch { selfStatus = null; }
+  try {
+    chrome.storage.local
+      .set({
+        [eventScoreRankingStorageKey(lid)]: {
+          rows: rows.slice(0, 10),
+          selfStatus,
+          capturedAt: Date.now(),
+          liveId: lid,
+          frameUrl: String(e.data.frameUrl || '').slice(0, 500)
+        }
+      })
+      .catch((err) => {
+        if (!isContextInvalidatedError(err)) {
+          /* best-effort */
+        }
+      });
+  } catch {
+    /* no-op */
+  }
 });
 
 window.addEventListener('message', (e) => {
@@ -2228,6 +2305,14 @@ let pageFrameLayoutDebounceTimer = null;
 /** scroll レイアウトを 1 フレーム 1 回に抑える（連続 scroll でデバウンスが延び続けるのを防ぐ） */
 /** @type {number|null} */
 let pageFrameLayoutScrollRafId = null;
+/**
+ * v0.1.386: scroll 由来のインライン再レイアウト用デバウンスタイマ。
+ * 旧実装は scroll ごとに rAF で renderPageFrameOverlay（getBoundingClientRect 多数+style 書き）を
+ * 走らせ、毎フレーム forced reflow でスクロールがカクついた。スクロール中は再レイアウトを遅延し、
+ * スクロール停止後に 1 回だけ実行する（位置の追従は document flow + 360ms interval が担保）。
+ * @type {ReturnType<typeof setTimeout>|null}
+ */
+let pageFrameLayoutScrollDebounceTimer = null;
 /** 非可視時 livePanelScan の間引き位相（0..stride-1 で 0 のときだけ実行） */
 let hiddenLivePanelScanPhase = 0;
 /** 非可視時 pageFrame メンテ（ended 検知・診断書き込み等）の間引き位相 */
@@ -2351,7 +2436,7 @@ function ensurePageFrameStyle() {
       width: 100%;
       margin: 2px 0 2px;
       opacity: 0;
-      transition: opacity 0.25s ease-in-out;
+      transition: opacity 0.14s ease-out;
       pointer-events: auto;
       position: relative;
       z-index: 2147482000;
@@ -2378,7 +2463,8 @@ function ensurePageFrameStyle() {
       box-shadow: none !important;
       outline: none !important;
       pointer-events: auto;
-      background: transparent;
+      /* popup.html --nl-bg と揃え、load 前後の白フラッシュや黒一瞬を抑える（透明にして親の背景に馴染ませる） */
+      background-color: transparent;
       display: block;
     }
     #${INLINE_POPUP_HOST_ID} iframe:focus,
@@ -2473,6 +2559,15 @@ function pickPrimaryInlinePopupHostFromDom() {
  * @param {HTMLIFrameElement} iframe
  */
 function attachInlineIframeRevealFallback(host, iframe) {
+  const revealIframeAndHost = () => {
+    // ダブル rAF でレイアウト確定〜初回ペイントに寄せ、空枠／黒の一瞬を減らす
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        iframe.style.visibility = 'visible';
+        host.style.opacity = '1';
+      });
+    });
+  };
   iframe.addEventListener(
     'load',
     () => {
@@ -2480,18 +2575,14 @@ function attachInlineIframeRevealFallback(host, iframe) {
         clearTimeout(inlineIframeVisibilityTimer);
         inlineIframeVisibilityTimer = null;
       }
-      requestAnimationFrame(() => {
-        iframe.style.visibility = 'visible';
-        host.style.opacity = '1';
-      });
+      revealIframeAndHost();
     },
     { once: true }
   );
   if (inlineIframeVisibilityTimer) clearTimeout(inlineIframeVisibilityTimer);
   inlineIframeVisibilityTimer = setTimeout(() => {
     inlineIframeVisibilityTimer = null;
-    iframe.style.visibility = 'visible';
-    host.style.opacity = '1';
+    revealIframeAndHost();
   }, 2000);
 }
 
@@ -2528,6 +2619,11 @@ function ensureInlinePopupIframe(host) {
     Boolean(expectedSrc) && Boolean(existing) && srcTrim === expectedSrc;
 
   if (sameSrc && existing) {
+    try {
+      existing.style.backgroundColor = 'transparent';
+    } catch {
+      // no-op
+    }
     let docState = null;
     try {
       docState = existing.contentDocument?.readyState ?? null;
@@ -2572,7 +2668,15 @@ function ensureInlinePopupIframe(host) {
     iframe.setAttribute('allow', 'microphone');
     iframe.style.pointerEvents = 'auto';
     iframe.style.visibility = 'hidden';
+    // 読み込み直後の下地が白っぽく見えるのを防ぐ（透明にして親の背景に馴染ませる）
+    iframe.style.backgroundColor = 'transparent';
     host.appendChild(iframe);
+  } else {
+    try {
+      iframe.style.backgroundColor = 'transparent';
+    } catch {
+      // no-op
+    }
   }
   if (expectedSrc) {
     iframe.setAttribute('src', expectedSrc);
@@ -4161,7 +4265,8 @@ function showToolbarOpenInstantFeedback() {
 }
 
 /**
- * iframe レイアウト確定後の smooth scroll / focus（ツールバー応答とは非同期）。
+ * iframe レイアウト確定後の scrollIntoView / focus（ツールバー応答とは非同期）。
+ * 0.1.374: 追従スクロールは `smooth` だと本体の重いレイアウトと重なり黒フレーム体感が出やすいので `auto` に寄せる。
  */
 function scheduleInlinePanelToolbarFocusPolish() {
   void (async () => {
@@ -4185,7 +4290,7 @@ function scheduleInlinePanelToolbarFocusPolish() {
       if (!ready) return;
       try {
         suppressOwnScrollCountingFor(1000);
-        ready.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        ready.scrollIntoView({ block: 'nearest', behavior: 'auto' });
       } catch {
         try {
           ready.scrollIntoView();
@@ -4225,7 +4330,7 @@ function scheduleInlinePanelToolbarFocusPolish() {
  *
  * 0.1.274+: **同期で boolean を返す**。background の `tabs.sendMessage` が
  *   microtask までブロックされ「こん太を押しても一瞬何も起きない」体感になるのを避ける。
- *   smooth scroll / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
+ *   async scrollIntoView / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
  *
  * @returns {boolean}
  */
@@ -5985,11 +6090,16 @@ function startPageFrameLoop() {
   }
 
   function scheduleScrollThrottledPageFrameLayout() {
-    if (pageFrameLayoutScrollRafId != null) return;
-    pageFrameLayoutScrollRafId = requestAnimationFrame(() => {
-      pageFrameLayoutScrollRafId = null;
+    // v0.1.386: スクロール中は重い再レイアウト（getBoundingClientRect 多数+style 書き＝
+    // forced reflow）を毎フレーム走らせず、停止後に 1 回だけ実行（するするスクロール）。
+    // スクロール中もパネルは document flow で自然に追従し、360ms interval が位置を補正する。
+    if (pageFrameLayoutScrollDebounceTimer != null) {
+      clearTimeout(pageFrameLayoutScrollDebounceTimer);
+    }
+    pageFrameLayoutScrollDebounceTimer = setTimeout(() => {
+      pageFrameLayoutScrollDebounceTimer = null;
       tickPageFrameLayoutFromScrollResize();
-    });
+    }, PAGE_FRAME_LAYOUT_SCROLL_DEBOUNCE_MS);
   }
 
   function scheduleResizeDebouncedPageFrameLayout() {
@@ -6010,6 +6120,10 @@ function startPageFrameLoop() {
         // no-op
       }
       pageFrameLayoutScrollRafId = null;
+    }
+    if (pageFrameLayoutScrollDebounceTimer != null) {
+      clearTimeout(pageFrameLayoutScrollDebounceTimer);
+      pageFrameLayoutScrollDebounceTimer = null;
     }
     if (pageFrameLayoutDebounceTimer != null) {
       clearTimeout(pageFrameLayoutDebounceTimer);
@@ -7811,7 +7925,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
      * 0.1.11 (B1 race fix): background の `tabs.sendMessage` が遅いと「こん太を押しても
      *   一瞬何も起きない」体感になる。`focusInlinePanelHostFromToolbar` は同期で boolean
      *   を返し、`sendResponse` もこのターンで完了させる（return false）。
-     *   smooth scroll / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
+     *   async scrollIntoView / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
      */
     let focused = false;
     try {
@@ -10065,6 +10179,10 @@ async function start() {
       clearInterval(kokenContribApiIntervalId);
       kokenContribApiIntervalId = null;
     }
+    if (eventParticipationFetchIntervalId != null) {
+      clearInterval(eventParticipationFetchIntervalId);
+      eventParticipationFetchIntervalId = null;
+    }
     // 0.1.29 (AD): 拡張リロード後、旧 MutationObserver が DOM 変化のたびに
     // 走り続けて CPU を消費する。callback 内の hasExtensionContext() check で
     // 早期 return するが、observer 自体を disconnect しておく方が確実。
@@ -10091,6 +10209,14 @@ async function start() {
         // no-op
       }
       pageFrameLayoutScrollRafId = null;
+    }
+    if (pageFrameLayoutScrollDebounceTimer != null) {
+      try {
+        clearTimeout(pageFrameLayoutScrollDebounceTimer);
+      } catch {
+        // no-op
+      }
+      pageFrameLayoutScrollDebounceTimer = null;
     }
     if (pageFrameLayoutDebounceTimer != null) {
       try {
@@ -10211,7 +10337,8 @@ async function start() {
   // 核心: koken 公式貢献度ランキング無認証 API の鏡（officialEventDomScrape の
   // sibling。NDGR/gift hotpath 非干渉・SW 経由・専用キー・rows>0 のみ書込）。
   // 初回は startup harvest 窓を外して 3.5s 後、以後 30s 間隔。teardown は
-  // stopContentIntervalsIfContextInvalidated（kokenContribApiIntervalId）。
+  // stopContentIntervalsIfContextInvalidated（kokenContribApiIntervalId と
+  // eventParticipationFetchIntervalId）。
   // v0.1.331: 初回を 10s→3.5s に短縮（貢献度レーンの「取得中」張り付き対策）。
   //   旧 10s は起動直後のコメント大量取り込み(deep harvest)バーストと競合させない猶予
   //   だったが、harvest の主バーストは ~2-3s で収まるため 3.5s でも干渉せず、watch を
@@ -10239,9 +10366,23 @@ async function start() {
         }
         maybeFetchKokenContribRankingMirrorOnce();
         maybeFetchNicoadContribRankingMirrorOnce();
-        maybeFetchEventParticipationMirrorOnce();
         void maybeResolveNamedUserProfilesOnce();
       }, KOKEN_CONTRIB_API_FETCH_MS)
+    )
+  );
+  eventParticipationFetchIntervalId = /** @type {number} */ (
+    /** @type {unknown} */ (
+      setInterval(() => {
+        if (stopContentIntervalsIfContextInvalidated()) return;
+        if (!recording || !liveId) return;
+        if (
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'hidden'
+        ) {
+          return;
+        }
+        maybeFetchEventParticipationMirrorOnce();
+      }, EVENT_PARTICIPATION_API_FETCH_MS)
     )
   );
 }
@@ -10254,14 +10395,18 @@ const KOKEN_CONTRIB_API_FETCH_MS = 30_000;
 const KOKEN_CONTRIB_API_MIN_GAP_MS = 25_000;
 /** @type {number|null} */
 let kokenContribApiIntervalId = null;
+/** @type {number|null} */
+let eventParticipationFetchIntervalId = null;
 /** @type {number} */
 let _kokenContribApiLastAttemptAt = 0;
 /** nicoad 広告ランキング API の再入抑止（koken と同じ min-gap 規約）。 */
 const NICOAD_CONTRIB_API_MIN_GAP_MS = 25_000;
 /** @type {number} */
 let _nicoadContribApiLastAttemptAt = 0;
-/** 参加配信者一覧 API（第2弾）の再入抑止（koken/nicoad と同じ min-gap 規約）。 */
-const EVENT_PARTICIPATION_API_MIN_GAP_MS = 25_000;
+/** 参加配信者一覧 API の専用ポーリング間隔（ms）。30s の koken と切り離して遅延を減らす。 */
+const EVENT_PARTICIPATION_API_FETCH_MS = 12_000;
+/** 参加配信者一覧 API の再入抑止（FETCH 周期に合わせ 10s、v0.1.370）。 */
+const EVENT_PARTICIPATION_API_MIN_GAP_MS = 10_000;
 /** @type {number} */
 let _eventParticipationApiLastAttemptAt = 0;
 /** 1 tick で nvapi に問い合わせる記名 uid の最大数。 */
@@ -10831,6 +10976,14 @@ function maybeStartGiftSubAppIframeRelay() {
 
   /** @type {string} */
   let lastSent = '';
+  /** audition richview のイベント💎順位 TOP10 relay 重複抑制 */
+  let lastEventScoreRankingSig = '';
+  /** v0.1.385: richview scrape の二段化キャッシュ（cheap sig が同じなら重い scrape を skip） */
+  let _lastRichviewCheapSig = '';
+  /** @type {ReturnType<typeof scrapeEventScoreRankingFromRichviewDom>} */
+  let _lastRichviewScrapeRows = null;
+  /** @type {ReturnType<typeof scrapeEventSelfStatusFromRichviewDom>} */
+  let _lastRichviewSelfStatus = null;
   /** v0.1.227: scan tick の累積回数。heartbeat に乗せて「relay は起動してるが scrape 0 件」を区別する */
   let scrapeAttempts = 0;
   /**
@@ -10838,6 +10991,8 @@ function maybeStartGiftSubAppIframeRelay() {
    * 送るための one-shot ガード（mount 後の毎 tick 連投を防ぐ）。
    */
   let kokenContribShapeSent = false;
+  /** audition `/embedded/richview/live` 向けイベントスコア順位 DOM 診断（親へ 1 回のみ） */
+  let richviewEventScoreDiagSent = false;
   const scanAndPost = () => {
     scrapeAttempts += 1;
     /** @type {Array<unknown>} */
@@ -10929,6 +11084,19 @@ function maybeStartGiftSubAppIframeRelay() {
     } catch {
       kokenContribShapeProbe = null;
     }
+    /** @type {Record<string, unknown>|null} */
+    let richviewEventScoreDiagProbe = null;
+    try {
+      if (!richviewEventScoreDiagSent && isAuditionRichviewLivePath(href)) {
+        const cr = Array.isArray(contributionRanking) ? contributionRanking.length : 0;
+        richviewEventScoreDiagProbe = captureAuditionRichviewEventScoreDiagProbe(document, {
+          contribRowCount: cr
+        });
+        richviewEventScoreDiagSent = true;
+      }
+    } catch {
+      richviewEventScoreDiagProbe = null;
+    }
     try {
       const target = window.top || window.parent;
       target.postMessage(
@@ -10945,10 +11113,62 @@ function maybeStartGiftSubAppIframeRelay() {
           ...(scrapeEmptyForProbe
             ? { domShapeProbe: captureGiftSubAppIframeDomShape(document) }
             : {}),
-          ...(kokenContribShapeProbe ? { kokenContribShapeProbe } : {})
+          ...(kokenContribShapeProbe ? { kokenContribShapeProbe } : {}),
+          ...(richviewEventScoreDiagProbe ? { richviewEventScoreDiagProbe } : {})
         },
         '*'
       );
+    } catch {
+      /* no-op */
+    }
+
+    // v0.1.370: gift 履歴が空でも、richview 内にイベント💎順位リストがあれば親へ送る。
+    // v0.1.385(codex 会議): 重い scrape(getComputedStyle 等)を毎 4 秒回さない二段化。
+    //   ① cheap signature（順位/名前/スコアのテキストのみ・getComputedStyle 無し）を読む
+    //   ② 前回と同じなら前回 rows/selfStatus を再利用し full scrape を skip（挙動不変）
+    let eventScoreRowsForRelay = null;
+    let eventSelfStatusForRelay = null;
+    try {
+      if (isAuditionRichviewLivePath(href)) {
+        const cheapSig = computeRichviewEventCheapSig(document);
+        if (cheapSig && cheapSig === _lastRichviewCheapSig && _lastRichviewScrapeRows) {
+          // 変化なし → 重い scrape を skip して前回値を再利用
+          eventScoreRowsForRelay = _lastRichviewScrapeRows;
+          eventSelfStatusForRelay = _lastRichviewSelfStatus;
+        } else {
+          eventScoreRowsForRelay = scrapeEventScoreRankingFromRichviewDom(document);
+          eventSelfStatusForRelay = scrapeEventSelfStatusFromRichviewDom(document);
+          _lastRichviewCheapSig = cheapSig;
+          _lastRichviewScrapeRows = eventScoreRowsForRelay;
+          _lastRichviewSelfStatus = eventSelfStatusForRelay;
+        }
+      }
+    } catch {
+      eventScoreRowsForRelay = null;
+      eventSelfStatusForRelay = null;
+    }
+    try {
+      if (eventScoreRowsForRelay && eventScoreRowsForRelay.length > 0) {
+        const top10 = eventScoreRowsForRelay.slice(0, 10);
+        const sig = JSON.stringify([
+          top10.map((r) => [r.rank, r.score, r.name, r.isAnonymous, r.thumbnailUrl]),
+          eventSelfStatusForRelay
+        ]);
+        if (sig !== lastEventScoreRankingSig) {
+          lastEventScoreRankingSig = sig;
+          const target = window.top || window.parent;
+          target.postMessage(
+            {
+              type: 'NLS_EVENT_SCORE_RANKING_FROM_IFRAME',
+              frameUrl: href,
+              rows: top10,
+              selfStatus: eventSelfStatusForRelay || null,
+              scrapedAt: Date.now()
+            },
+            '*'
+          );
+        }
+      }
     } catch {
       /* no-op */
     }
@@ -11014,6 +11234,19 @@ function maybeStartGiftSubAppIframeRelay() {
 
 /** @type {string} */
 let _hiddenOfficialIframesInjectedForLid = '';
+
+/**
+ * v0.1.394: イベント参加中のイベント順位 on-demand 再取得。
+ *   既存の hidden audition iframe は「liveId ごとに1回だけ inject→60秒で破棄」で、
+ *   イベント順位が ~60 秒分しか更新されなかった（会議で「開き直さないと変わらない」と判明）。
+ *   イベント参加中（isEventParticipating）に限り、クールダウンを置いて再 inject を許し、
+ *   イベント順位を定期更新する。iframe は常に1本・60秒で破棄＝v0.1.323 の「3本常駐で重い」
+ *   再発を避ける（参加中のみ・1本ずつ・クールダウンで負荷を bound）。
+ * @type {number}
+ */
+let _lastHiddenOfficialIframeInjectAt = 0;
+/** 再 inject の最小間隔（ms）。iframe 寿命 60 秒 + 余白＝同時に2本にならない。 */
+const HIDDEN_OFFICIAL_IFRAME_REINJECT_COOLDOWN_MS = 90_000;
 
 /**
  * v0.1.228: ギフトランキング取得経路（autoOpen / hidden iframe inject /
@@ -11114,15 +11347,28 @@ function pruneRelayDiagMap(map, max = 12) {
  *   - SPA 遷移で liveId が変わったら再 inject 可能
  *
  * @param {string} liveId 例 'lv350474211'
+ * @param {{ isEventParticipating?: boolean }} [opts]
+ *   v0.1.394: isEventParticipating=true のときは、クールダウン経過後の再 inject を
+ *   許してイベント順位を定期更新する（参加中のみ・1本ずつ・60秒破棄で負荷 bound）。
  */
-function maybeInjectHiddenOfficialIframes(liveId) {
-  // v0.1.228: opt-in gate（autoOpen と同じ理由で、ユーザーが明示的に取得開始
-  // した時のみ inject する）。OFF default。
-  if (!isGiftRankingLaneEnabled()) return;
+function maybeInjectHiddenOfficialIframes(liveId, opts = {}) {
   const lid = String(liveId || '').trim();
-  if (!lid) return;
-  if (_hiddenOfficialIframesInjectedForLid === lid) return;
+  const now = Date.now();
+  // v0.1.228 opt-in gate + v0.1.394 イベント参加中の再 inject 判定を純関数に集約。
+  const decision = decideHiddenOfficialIframeInject({
+    optInEnabled: isGiftRankingLaneEnabled(),
+    liveId: lid,
+    alreadyInjectedLiveId: _hiddenOfficialIframesInjectedForLid,
+    isEventParticipating: opts.isEventParticipating === true,
+    iframeStillPresent:
+      typeof document !== 'undefined' && !!document.getElementById('nls-hidden-audition-iframe'),
+    lastInjectAtMs: _lastHiddenOfficialIframeInjectAt,
+    nowMs: now,
+    cooldownMs: HIDDEN_OFFICIAL_IFRAME_REINJECT_COOLDOWN_MS
+  });
+  if (!decision.inject) return;
   _hiddenOfficialIframesInjectedForLid = lid;
+  _lastHiddenOfficialIframeInjectAt = now;
   let isTop = true;
   try {
     isTop = window.self === window.top;
@@ -11382,7 +11628,20 @@ async function persistOfficialEventDomBundleNow() {
   //   load されるため、SPA でも Vue が完全 render → iframe content script の
   //   relay 経路 (v0.1.216/217) で過去 gift history / 貢献度ランキング /
   //   イベント参加バナーがすべて popup に反映される。kimito さん操作 0 回。
-  try { maybeInjectHiddenOfficialIframes(lid); } catch { /* no-op */ }
+  // v0.1.394: イベント参加中はクールダウン付きで再 inject を許し、イベント順位を
+  //   定期更新する（参加中のみ・1本ずつ・60秒破棄＝負荷 bound）。参加判定は
+  //   embedded-data props（maybeFetchEventParticipationMirrorOnce と同じ source）。
+  let _isEventParticipatingForInject = false;
+  try {
+    if (typeof document !== 'undefined') {
+      _isEventParticipatingForInject = pickIsEventParticipating(extractEmbeddedDataProps(document)) === true;
+    }
+  } catch {
+    _isEventParticipatingForInject = false;
+  }
+  try {
+    maybeInjectHiddenOfficialIframes(lid, { isEventParticipating: _isEventParticipatingForInject });
+  } catch { /* no-op */ }
   // 0.1.175: コメント DOM 経由のギフト送信者観測（autoOpen 迂回ルート）
   try { harvestGiftCommentsFromCommentTableDom(); } catch { /* no-op */ }
   // v0.1.198: ギフトサブアプリ DOM（iframe 内含む全 frame）を走査して popup へ
@@ -11491,6 +11750,26 @@ async function persistOfficialEventDomBundleNow() {
         });
         if (staleEventPartKeys.length) {
           await chrome.storage.local.remove(staleEventPartKeys);
+        }
+      } catch { /* best-effort */ }
+      // イベント💎順位 relay キャッシュ（nls_event_score_ranking_<lv>）も同規約で cleanup
+      try {
+        const EVENT_SCORE_RANKING_TTL_MS = 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const curLid = String(lid || '').trim().toLowerCase();
+        const staleEvtScoreKeys = Object.keys(all).filter((k) => {
+          if (!k.startsWith(EVENT_SCORE_RANKING_STORAGE_PREFIX)) return false;
+          const klv = k.slice(EVENT_SCORE_RANKING_STORAGE_PREFIX.length);
+          if (klv && curLid && klv === curLid) return false;
+          const v = all[k];
+          const cap =
+            v && typeof v === 'object' && typeof v.capturedAt === 'number'
+              ? v.capturedAt
+              : 0;
+          return cap === 0 || nowMs - cap >= EVENT_SCORE_RANKING_TTL_MS;
+        });
+        if (staleEvtScoreKeys.length) {
+          await chrome.storage.local.remove(staleEvtScoreKeys);
         }
       } catch { /* best-effort */ }
       const nicoadLvs = Object.keys(all)

@@ -74,7 +74,7 @@ describe('snapshotLooksAlignedWithWatchUrl', () => {
     ).toBe(false);
   });
 
-  it('ch 放送（lv 不在）は URL 緩一致で true', () => {
+  it('ch 放送は URL に ch ID が含まれ、緩一致／ID 一致で true', () => {
     expect(
       snapshotLooksAlignedWithWatchUrl(
         { url: 'https://live.nicovideo.jp/watch/ch2646436?ref=abc' },
@@ -83,7 +83,7 @@ describe('snapshotLooksAlignedWithWatchUrl', () => {
     ).toBe(true);
   });
 
-  it('ch 放送（lv 不在）は URL 不一致で false', () => {
+  it('ch 放送で URL の ch ID が異なれば false', () => {
     expect(
       snapshotLooksAlignedWithWatchUrl(
         { url: 'https://live.nicovideo.jp/watch/ch123' },
@@ -142,12 +142,27 @@ describe('responseAlignedWithWatchUrl', () => {
     ).toBe(true);
   });
 
-  it('expected lv が抽出できない（ch のみ）なら true', () => {
+  it('expected が ch で response が別 lv を名乗るなら false（混入拒否）', () => {
     expect(
       responseAlignedWithWatchUrl(
         { liveId: 'lv100' },
         'https://live.nicovideo.jp/watch/ch2646436'
       )
+    ).toBe(false);
+  });
+
+  it('expected が ch で response.liveId が同じ ch なら true', () => {
+    expect(
+      responseAlignedWithWatchUrl(
+        { liveId: 'ch2646436' },
+        'https://live.nicovideo.jp/watch/ch2646436'
+      )
+    ).toBe(true);
+  });
+
+  it('watch から放送 ID が抽出できなければ緩く通す', () => {
+    expect(
+      responseAlignedWithWatchUrl({ liveId: 'lv100' }, 'https://live.nicovideo.jp/')
     ).toBe(true);
   });
 

@@ -190,8 +190,7 @@ export function tierToTrioCharaSrc(slotId, tier) {
  * trio slot click 時に scroll する対象 laneId を解決する純関数。
  *
  * 本実装では trio パネル自体は北極星パネル最上部にあり、対応 laneId のレーンは
- * その下にある＝slot click で smooth scroll させると「気になるキャラを押せば
- * 詳細レーンへ飛ぶ」自然な操作になる。
+ * その下にあり、trio でクリックすれば詳細レーンへ飛ぶ自然な配置になる。
  *
  * @param {string} slotId
  * @returns {string|null} 対応 laneId、未知 slot は null
@@ -199,6 +198,30 @@ export function tierToTrioCharaSrc(slotId, tier) {
 export function resolveCharaTrioSlotScrollTargetLaneId(slotId) {
   const slot = findCharaTrioSlotById(slotId);
   return slot ? slot.laneId : null;
+}
+
+/**
+ * `northStarLaneVisibility.js` のコア常設 2 レーンと同じ並び。trio が指す本命が補助レーンで
+ * `hidden` のときでも、順に試せばスクロール先が必ず残る。
+ *
+ * @type {readonly ('contributionRanking'|'giftHistory')[]}
+ */
+const TRIO_SCROLL_CORE_FALLBACK_ORDER = Object.freeze(['giftHistory', 'contributionRanking']);
+
+/**
+ * trio slot を click したときに順にスクロール候補とする laneId の列。
+ *
+ * 本命（rink→contrib / konta→ad / tanu→gift）を先頭にし、続けてコア常設だけを試す。
+ * 本命自体がコアの場合は重複を除いた並びになる（rink → contrib, gift など）。
+ *
+ * @param {string} slotId
+ * @returns {readonly string[]}
+ */
+export function resolveCharaTrioSlotScrollLaneIdCandidates(slotId) {
+  const primary = resolveCharaTrioSlotScrollTargetLaneId(slotId);
+  if (!primary) return Object.freeze([]);
+  const tail = TRIO_SCROLL_CORE_FALLBACK_ORDER.filter((id) => id !== primary);
+  return Object.freeze([primary, ...tail]);
 }
 
 /**
