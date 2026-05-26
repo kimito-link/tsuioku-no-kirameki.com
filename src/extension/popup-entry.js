@@ -260,6 +260,7 @@ import {
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
+import { buildReportThumbedUsersSectionHtml } from '../lib/reportThumbedUsersSectionHtml.js';
 import {
   summarizeBroadcastTiming,
   summarizeCommentBodyStats,
@@ -10756,43 +10757,12 @@ async function buildHtmlReportDocument(
       maxNumeric: 80,
       maxAnonymous: 80
     });
-  /**
-   * @param {import('../lib/userThumbGrid.js').ResolvedThumbGridUser} u
-   */
-  const reportThumbCellHtml = (u) => {
-    const label = displayUserLabel(u.userId, u.nickname || '');
-    const labelHtml = buildUserProfileLinkedLabelHtml(u.userId, label);
-    return `<li class="report-thumb-grid__cell">
-        <span class="report-thumb-grid__avatar-wrap"><img class="report-thumb-grid__avatar" src="${escapeAttr(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
-        <span class="report-thumb-grid__label">${labelHtml}</span>
-        <span class="report-thumb-grid__count">${u.count}件</span>
-      </li>`;
-  };
-  const thumbNumericBlockHtml =
-    thumbNumericUsers.length > 0
-      ? `
-          <h3 class="report-thumb-grid__heading">数値 ID（個人サムネ・ニコ既定アイコン）<span class="report-thumb-grid__heading-count">${thumbNumericUsers.length}名</span></h3>
-          <ol class="report-thumb-grid">${thumbNumericUsers.map(reportThumbCellHtml).join('')}</ol>
-        `
-      : '';
-  const thumbAnonymousBlockHtml =
-    thumbAnonymousUsers.length > 0
-      ? `
-          <h3 class="report-thumb-grid__heading">匿名（識別子から生成した identicon）<span class="report-thumb-grid__heading-count">${thumbAnonymousUsers.length}名</span></h3>
-          <ol class="report-thumb-grid">${thumbAnonymousUsers.map(reportThumbCellHtml).join('')}</ol>
-        `
-      : '';
-  const thumbedUsersSectionHtml =
-    thumbNumericUsers.length > 0 || thumbAnonymousUsers.length > 0
-      ? `
-        <section class="card" id="sec-thumb-grid">
-          <h2>サムネ付きユーザー一覧</h2>
-          <p class="guide-lead">アイコンが解決できた応援ユーザーを件数の多い順、種別ごとに並べたのだ（各カテゴリ最大 80 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順なのだ。</p>
-          ${thumbNumericBlockHtml}
-          ${thumbAnonymousBlockHtml}
-        </section>
-      `
-      : '';
+  // C-7 pure refactor: セクション組み立ては reportThumbedUsersSectionHtml.js に抽出
+  //   （挙動不変・characterization test 済）。categorize（データ）は従来通り popup 側。
+  const thumbedUsersSectionHtml = buildReportThumbedUsersSectionHtml({
+    numericUsers: thumbNumericUsers,
+    anonymousUsers: thumbAnonymousUsers
+  });
 
   /*
    * 0.1.12 (F2 追加): 全コメント一覧の各行にも「最低サムネ」を表示する。
