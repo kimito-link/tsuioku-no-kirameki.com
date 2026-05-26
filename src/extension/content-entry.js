@@ -35,6 +35,7 @@ import {
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
   KEY_GIFT_RANKING_LANE_ENABLED,
+  KEY_BACKFILL_ENABLED,
   commentsStorageKey,
   giftUsersStorageKey,
   eventDomStorageKey,
@@ -259,6 +260,13 @@ import {
   COMMENT_INGEST_SOURCE,
   maybeAppendCommentIngestLog
 } from '../lib/commentIngestLog.js';
+import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
+import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
+import {
+  isBackfillEnabledFromStorage,
+  isBackfillJustEnabledFromChange
+} from '../lib/backfillOptIn.js';
+import { deriveBackfillCapturedAt } from '../lib/backfillCapturedAt.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
 import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
@@ -9928,6 +9936,13 @@ async function start() {
     }).catch(() => { /* OFF default を維持 */ });
   } catch { /* no-op */ }
 
+  // v0.1.405: 過去ログ一括バックフィル opt-in flag の初期読み込み（async）。
+  try {
+    chrome.storage.local.get(KEY_BACKFILL_ENABLED).then((bag) => {
+      _backfillEnabled = isBackfillEnabledFromStorage(bag);
+    }).catch(() => { /* OFF default を維持 */ });
+  } catch { /* no-op */ }
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (!hasExtensionContext()) return;
     if (area !== 'local') return;
@@ -9950,6 +9965,20 @@ async function start() {
           _autoOpenGiftSidebarTriedLiveId = '';
           void tryAutoOpenGiftSidebarOnceForScrape();
         }, 1000);
+      }
+    }
+
+    // v0.1.405: 過去ログ一括バックフィル opt-in。popup ボタン押下から伝播し、
+    // false → true の立ち上がりで巡回を 1 回起動する（ワンショット）。top frame 限定。
+    if (changes[KEY_BACKFILL_ENABLED]) {
+      const justEnabled = isBackfillJustEnabledFromChange(changes[KEY_BACKFILL_ENABLED]);
+      _backfillEnabled = isBackfillEnabledFromStorage({
+        [KEY_BACKFILL_ENABLED]: changes[KEY_BACKFILL_ENABLED].newValue
+      });
+      if (justEnabled && isWatchInlinePanelTopFrame()) {
+        // 押下ごとに「続きから」やり直せるよう、ワンショット guard を解除して起動。
+        _backfillTriedLiveId = '';
+        void runNdgrBackfillOnce();
       }
     }
 
@@ -11268,6 +11297,173 @@ let _giftRankingLaneEnabled = false;
  */
 function isGiftRankingLaneEnabled() {
   return _giftRankingLaneEnabled === true;
+}
+
+// ── v0.1.405: 過去ログ一括バックフィル（NDGR backward 巡回）の opt-in 配線 ──────
+//   設計（2026-05-27 会議室で確定）:
+//   - 「フラグ」ではなく「1 回のアクション」として扱う（_backfillTriedLiveId で
+//     ワンショット化。SPA 遷移のたびの再巡回を防ぐ）。
+//   - fetch は content world で cross-origin（mpn.live.nicovideo.jp）に対して
+//     `credentials:'omit'` で撃つ（hot path の page-intercept とは別世界）。
+//   - 取り込みは flushNdgrChatRowsBatch を経由せず、capturedAt/vpos を保持したまま
+//     persistCommentRows に直接流す（flush は capturedAt を握り潰すため）。
+
+/** @type {boolean} 起動直後 false、初回 storage 読み込み完了後に正しい値。 */
+let _backfillEnabled = false;
+/** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
+let _backfillTriedLiveId = '';
+/** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
+let _backfillAbort = null;
+/** @type {{ seg: number, rows: number, done: 0|1 }} 進捗（data 属性で可視化）。 */
+const _backfillProgress = { seg: 0, rows: 0, done: 0 };
+
+/** 進捗を documentElement の data 属性へ反映（popup が読む）。 */
+function publishBackfillProgress() {
+  try {
+    const root = document.documentElement;
+    if (!root) return;
+    root.setAttribute(
+      'data-nls-backfill',
+      `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done}`
+    );
+  } catch {
+    /* no-op */
+  }
+}
+
+/**
+ * PR1 で MAIN world が露出した NDGR view ベース URL（`?at=` 前）を content から読む。
+ * @returns {string}
+ */
+function readNdgrViewBaseUri() {
+  try {
+    const v = document.documentElement?.getAttribute('data-nls-ndgr-view-uri');
+    return /^https?:\/\//.test(String(v || '')) ? String(v) : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 既存ストレージの最小 commentNo を求める（ここに到達したら巡回を早期終了できる）。
+ * @returns {Promise<number|null>}
+ */
+async function readKnownMinCommentNo() {
+  try {
+    if (!liveId) return null;
+    const key = commentsStorageKey(liveId);
+    const bag = await chrome.storage.local.get(key);
+    const arr = Array.isArray(bag?.[key]) ? bag[key] : [];
+    /** @type {number|null} */
+    let min = null;
+    for (const row of arr) {
+      const n = Number(String(row?.commentNo ?? '').trim());
+      if (!Number.isFinite(n)) continue;
+      if (min == null || n < min) min = n;
+    }
+    return min;
+  } catch {
+    return null;
+  }
+}
+
+/** cross-origin NDGR を `credentials:'omit'` で取得し ArrayBuffer を Uint8Array で返す。 */
+async function backfillFetchBinary(url, opts) {
+  const res = await fetch(url, {
+    method: 'GET',
+    credentials: 'omit', // ⭐ cross-origin（mpn.live）必須。include だと Failed to fetch
+    cache: 'no-store',
+    signal: opts?.signal
+  });
+  const buf = res.ok ? new Uint8Array(await res.arrayBuffer()) : new Uint8Array();
+  return { ok: res.ok, status: res.status, bytes: buf };
+}
+
+/**
+ * 過去ログ一括バックフィルを 1 回だけ起動する（ワンショット）。
+ * 巡回エンジン（crawlNdgrBackward）を実 fetch / 実 sleep で駆動し、yield された
+ * 過去 chat を capturedAt 保持で persistCommentRows に流す。
+ * @returns {Promise<void>}
+ */
+async function runNdgrBackfillOnce() {
+  if (_backfillTriedLiveId && _backfillTriedLiveId === liveId) return; // 二重起動防止
+  if (!_backfillEnabled) return;
+  if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  if (!hasExtensionContext()) return;
+  const viewBase = readNdgrViewBaseUri();
+  if (!viewBase) return; // MAIN world がまだ view を観測していない（参加直後等）
+  _backfillTriedLiveId = liveId;
+
+  // 前回分があれば畳む。新しい AbortController を立て、タブ非表示で中断する。
+  if (_backfillAbort) {
+    try { _backfillAbort.abort(); } catch { /* no-op */ }
+  }
+  const ac = new AbortController();
+  _backfillAbort = ac;
+  const onHidden = () => {
+    if (document.visibilityState === 'hidden') {
+      try { ac.abort(); } catch { /* no-op */ }
+    }
+  };
+  document.addEventListener('visibilitychange', onHidden);
+
+  _backfillProgress.seg = 0;
+  _backfillProgress.rows = 0;
+  _backfillProgress.done = 0;
+  publishBackfillProgress();
+
+  const knownMin = await readKnownMinCommentNo();
+  const startMs =
+    programBeginAtMs != null && Number.isFinite(programBeginAtMs) && programBeginAtMs > 0
+      ? programBeginAtMs
+      : null;
+
+  try {
+    const gen = crawlNdgrBackward({
+      viewBase,
+      fetchBinary: backfillFetchBinary,
+      knownMinCommentNo: knownMin,
+      signal: ac.signal
+    });
+    for (;;) {
+      const step = await gen.next();
+      if (step.done) break;
+      const ev = step.value;
+      _backfillProgress.seg = ev.segmentsFetched;
+      // ev.chats は生 NdgrChat[]。ndgrChatsToMergeRows で gift guard + vpos 保持の
+      // 行に整形し、各行に過去コメント実時刻 capturedAt を付与する。
+      const rows = ndgrChatsToMergeRows(ev.chats);
+      for (const row of rows) {
+        // 過去コメントの実時刻 ≒ 配信開始 + vpos（センチ秒）。コメント一覧は
+        // capturedAt 昇順/降順で並ぶ（popup-entry / commentVelocityTimeline 等）ので、
+        // 実時刻を入れることで過去ログが時系列の正しい位置に並ぶ。
+        // ⚠️ 配信開始(programBeginAtMs)が取れない稀なケースは capturedAt を載せず、
+        //    persistCommentRows 側の Date.now フォールバックに委ねる（その配信では
+        //    backfill 分が「今」に寄る＝表示順は不正確になるが、データ自体は欠落せず
+        //    dedupe も commentNo ベースで正しい）。通常の watch ページでは embedded-data
+        //    から取れるので、この劣化は稀。
+        const cap = deriveBackfillCapturedAt({
+          vpos: row.vpos,
+          programStartMs: startMs
+        });
+        if (cap != null) row.capturedAt = cap;
+      }
+      _backfillProgress.rows += rows.length;
+      publishBackfillProgress();
+      // ⛔ flushNdgrChatRowsBatch を経由しない（capturedAt 握り潰し回避）。
+      //    persistCommentRows → mergeNewComments は capturedAt/vpos を素通しする。
+      if (rows.length) {
+        persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.BACKFILL });
+      }
+    }
+  } catch {
+    /* 巡回失敗はサイレント（best-effort）。RT 取り込みには影響しない */
+  } finally {
+    document.removeEventListener('visibilitychange', onHidden);
+    if (_backfillAbort === ac) _backfillAbort = null;
+    _backfillProgress.done = 1;
+    publishBackfillProgress();
+  }
 }
 
 /**

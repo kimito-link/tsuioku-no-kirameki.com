@@ -9522,6 +9522,31 @@
             ギフトランキング取得を開始（β）
           </button>
         </div>
+        <!-- v0.1.405: 過去ログ一括バックフィル opt-in prompt。途中参加でも配信開始まで
+             遡って過去コメントを取り込む。連続 fetch を伴うため初期 OFF・押下で 1 回起動。 -->
+        <div
+          id="backfillFetchPrompt"
+          class="nl-gift-ranking-prompt"
+          hidden
+          aria-hidden="true"
+        >
+          <p class="nl-gift-ranking-prompt__text">
+            途中から開いた配信でも、<strong>配信の最初までさかのぼって過去のコメント</strong>を取り込みます（記録ONのときのみ・1回押すと開始）。
+          </p>
+          <button
+            type="button"
+            id="enableBackfillFetchBtn"
+            class="nl-gift-ranking-prompt__btn"
+          >
+            過去のコメントも取り込む（β）
+          </button>
+          <p
+            id="backfillFetchStatus"
+            class="nl-gift-ranking-prompt__text"
+            aria-live="polite"
+            hidden
+          ></p>
+        </div>
       </div>
 
       <p class="nl-record-nav-hint">

@@ -14,6 +14,8 @@ export const COMMENT_INGEST_SOURCE = {
   DEEP: 'deep',
   /** page-intercept 経由の投稿同期（MAIN→content） */
   INTERCEPT_POST: 'intercept_post',
+  /** v0.1.405: 過去ログ一括バックフィル（NDGR backward 巡回）由来の過去コメント */
+  BACKFILL: 'backfill',
   UNKNOWN: 'unknown'
 };
 
@@ -32,6 +34,9 @@ const SOURCE_MERGE_PRIORITY = /** @type {Readonly<Record<string, number>>} */ ({
   [COMMENT_INGEST_SOURCE.DEEP]: 40,
   [COMMENT_INGEST_SOURCE.VISIBLE]: 30,
   [COMMENT_INGEST_SOURCE.INTERCEPT_POST]: 35,
+  // backfill は過去ログ専用経路。RT/DOM と混在した batch では生きている RT 経路を
+  // 優先する（backfill は低め）。
+  [COMMENT_INGEST_SOURCE.BACKFILL]: 25,
   [COMMENT_INGEST_SOURCE.MUTATION]: 20,
   [COMMENT_INGEST_SOURCE.UNKNOWN]: 0
 });
