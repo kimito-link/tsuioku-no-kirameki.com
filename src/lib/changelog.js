@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.390',
+    date: '2026-05-26',
+    summary: 'HTMLレポートにイベント順位を追加',
+    items: Object.freeze([
+      'コメント記録のHTML出力に「イベント順位」セクションを追加しました。参加中のイベント名・配信者本人の現在順位と累計💎・参加配信者の上位ランキング（サムネ付き）を載せます（イベントに参加していないときは出ません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.389',
     date: '2026-05-26',
     summary: 'キャラ案内をレーン全幅で大きく表示',
