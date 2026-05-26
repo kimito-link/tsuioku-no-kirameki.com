@@ -19,6 +19,51 @@
  */
 
 /**
+ * richview の「軽い署名」を作る純関数（v0.1.385・codex 会議の二段化用）。
+ * 順位/名前/スコアの**テキストのみ**を連結する（getComputedStyle もサムネ走査もしない）。
+ * これが前回と同じなら重い full scrape（サムネの getComputedStyle 等）を skip できる。
+ * イベント名の切替も検知できるよう select の選択値も含める。
+ *
+ * @param {Document|Element|null|undefined} root
+ * @returns {string} 変化検知用の署名（空なら算出不可）
+ */
+export function computeRichviewEventCheapSig(root) {
+  if (!root) return '';
+  /** @type {any} */
+  const r = root;
+  try {
+    const rows = r.querySelectorAll?.('[class~="el69c2m4"]') || [];
+    /** @type {string[]} */
+    const parts = [];
+    for (const row of /** @type {Iterable<Element>} */ (rows)) {
+      if (!(row instanceof HTMLElement)) continue;
+      const rankEl = row.querySelector('[class~="ebq6m481"], [class*="ebq6m481"]');
+      const nameEl = row.querySelector('[class~="el69c2m1"], [class*="el69c2m1"]');
+      const scoreEl = row.querySelector('[class~="css-z40gn4"], [class*="css-z40gn4"]');
+      const rk = String((rankEl && rankEl.textContent) || '').replace(/\s+/g, '');
+      const nm = String((nameEl && nameEl.textContent) || '').replace(/\s+/g, '');
+      const sc = String((scoreEl && scoreEl.textContent) || '').replace(/\s+/g, '');
+      parts.push(rk + ':' + nm + ':' + sc);
+    }
+    // バナーの本人順位/スコア + 選択中イベント名も署名に含める
+    const selfRank = r.querySelector?.('[class~="e1awe04q0"], [class*="e1awe04q0"]');
+    const sel = r.querySelector?.('select');
+    let selTxt = '';
+    try {
+      if (sel && sel.options) {
+        const o = sel.options[sel.selectedIndex >= 0 ? sel.selectedIndex : 0];
+        selTxt = o ? String(o.textContent || '').replace(/\s+/g, '') : '';
+      }
+    } catch { /* no-op */ }
+    parts.push('self:' + String((selfRank && selfRank.textContent) || '').replace(/\s+/g, ''));
+    parts.push('ev:' + selTxt);
+    return parts.join('|');
+  } catch {
+    return '';
+  }
+}
+
+/**
  * scrapeContributionRankingFromDom と揃える（関数は export せず、このモジュール専用のコピー）。
  *
  * @param {unknown} value
@@ -43,9 +88,17 @@ function normalizeRankerAltName(value) {
 }
 
 /**
+ * 取得成功したサムネ URL を要素単位でキャッシュ（getComputedStyle 再呼び出し回避）。
+ * 同じ行要素は再描画されない限り URL が変わらないため、成功分は WeakMap で再利用する。
+ * @type {WeakMap<HTMLElement, string>}
+ */
+const _thumbUrlCache = typeof WeakMap === 'function' ? new WeakMap() : /** @type {any} */ (null);
+
+/**
  * 要素（またはその子孫）からサムネ画像 URL を拾う。
  * richview のアバターは `el69c2m3` 空 div に Emotion クラス由来の CSS background-image で
  * 描画されるため、inline style だけでなく **computed style** も見る必要がある。
+ * 成功 URL は WeakMap キャッシュ（4 秒ごとの getComputedStyle 連打を避ける／挙動不変）。
  *
  * @param {HTMLElement|null} el
  * @param {{ searchDescendants?: boolean }} [opts]
@@ -53,6 +106,10 @@ function normalizeRankerAltName(value) {
  */
 function pickThumbnailUrlFromElement(el, opts) {
   if (!(el instanceof HTMLElement)) return '';
+  if (_thumbUrlCache) {
+    const cached = _thumbUrlCache.get(el);
+    if (typeof cached === 'string' && cached) return cached;
+  }
   const fromBg = (/** @type {string} */ bg) => {
     const m = String(bg || '').match(/url\(["']?([^"')]+)["']?\)/);
     return m && /^https?:\/\//i.test(m[1]) ? m[1] : '';
@@ -82,12 +139,18 @@ function pickThumbnailUrlFromElement(el, opts) {
     return '';
   };
   const direct = probe(el);
-  if (direct) return direct;
+  if (direct) {
+    if (_thumbUrlCache) _thumbUrlCache.set(el, direct);
+    return direct;
+  }
   if (opts?.searchDescendants) {
     for (const d of el.querySelectorAll('*')) {
       if (!(d instanceof HTMLElement)) continue;
       const u = probe(d);
-      if (u) return u;
+      if (u) {
+        if (_thumbUrlCache) _thumbUrlCache.set(el, u);
+        return u;
+      }
     }
   }
   return '';
@@ -383,14 +446,19 @@ function scrapeRealEventRankingRows(root) {
     }
     if (score == null || score <= 0) return null;
 
-    // サムネ（el69c2m3 の背景画像。1-3 位以外は空のことが多い→空許容）
+    // サムネ抽出は重い（getComputedStyle・行内走査）。表示は上位 10 名だけなので、
+    // **rank<=10 の行だけ**サムネを取る（順位/名前/スコアの検証は全行のまま＝dense-unique 維持）。
+    // ＝4 秒ごとの周期コストを最大25行→10行に削減（codex 会議 2026-05-26 の最小修正）。
+    // 取得済み URL は WeakMap キャッシュで getComputedStyle 再呼び出しを避ける。
     let thumbnailUrl = '';
-    const thumbEl = row.querySelector('[class~="el69c2m3"], [class*="el69c2m3"]');
-    thumbnailUrl = pickThumbnailUrlFromElement(thumbEl instanceof HTMLElement ? thumbEl : null);
-    // サムネ要素が空（el69c2m3 が空 div で背景画像が CSS クラス由来）の場合に備え、
-    // 行内のどこかに http 背景/img があればそれも拾う。
-    if (!thumbnailUrl && row instanceof HTMLElement) {
-      thumbnailUrl = pickThumbnailUrlFromElement(row, { searchDescendants: true });
+    if (rank <= 10) {
+      const thumbEl = row.querySelector('[class~="el69c2m3"], [class*="el69c2m3"]');
+      const thumbHost = thumbEl instanceof HTMLElement ? thumbEl : null;
+      thumbnailUrl = pickThumbnailUrlFromElement(thumbHost);
+      // el69c2m3 が空（CSS クラス由来背景）の保険＝行内探索。これも rank<=10 限定。
+      if (!thumbnailUrl) {
+        thumbnailUrl = pickThumbnailUrlFromElement(row, { searchDescendants: true });
+      }
     }
 
     rows.push({ rank, score, name, isAnonymous, thumbnailUrl });

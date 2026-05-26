@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.385',
+    date: '2026-05-26',
+    summary: 'イベントランキングの動作を軽量化',
+    items: Object.freeze([
+      'イベントランキングの読み取りを軽くしました。表示する上位10名ぶんだけサムネを取り、内容が変わっていないときは重い再読み取りを省くようにして、カクつきやCPU負荷を抑えます（表示内容は変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.384',
     date: '2026-05-26',
     summary: 'イベント名を公式バナー表示どおりに反映',
