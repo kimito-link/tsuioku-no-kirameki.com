@@ -2304,6 +2304,14 @@ let pageFrameLayoutDebounceTimer = null;
 /** scroll レイアウトを 1 フレーム 1 回に抑える（連続 scroll でデバウンスが延び続けるのを防ぐ） */
 /** @type {number|null} */
 let pageFrameLayoutScrollRafId = null;
+/**
+ * v0.1.386: scroll 由来のインライン再レイアウト用デバウンスタイマ。
+ * 旧実装は scroll ごとに rAF で renderPageFrameOverlay（getBoundingClientRect 多数+style 書き）を
+ * 走らせ、毎フレーム forced reflow でスクロールがカクついた。スクロール中は再レイアウトを遅延し、
+ * スクロール停止後に 1 回だけ実行する（位置の追従は document flow + 360ms interval が担保）。
+ * @type {ReturnType<typeof setTimeout>|null}
+ */
+let pageFrameLayoutScrollDebounceTimer = null;
 /** 非可視時 livePanelScan の間引き位相（0..stride-1 で 0 のときだけ実行） */
 let hiddenLivePanelScanPhase = 0;
 /** 非可視時 pageFrame メンテ（ended 検知・診断書き込み等）の間引き位相 */
@@ -6081,11 +6089,16 @@ function startPageFrameLoop() {
   }
 
   function scheduleScrollThrottledPageFrameLayout() {
-    if (pageFrameLayoutScrollRafId != null) return;
-    pageFrameLayoutScrollRafId = requestAnimationFrame(() => {
-      pageFrameLayoutScrollRafId = null;
+    // v0.1.386: スクロール中は重い再レイアウト（getBoundingClientRect 多数+style 書き＝
+    // forced reflow）を毎フレーム走らせず、停止後に 1 回だけ実行（するするスクロール）。
+    // スクロール中もパネルは document flow で自然に追従し、360ms interval が位置を補正する。
+    if (pageFrameLayoutScrollDebounceTimer != null) {
+      clearTimeout(pageFrameLayoutScrollDebounceTimer);
+    }
+    pageFrameLayoutScrollDebounceTimer = setTimeout(() => {
+      pageFrameLayoutScrollDebounceTimer = null;
       tickPageFrameLayoutFromScrollResize();
-    });
+    }, PAGE_FRAME_LAYOUT_SCROLL_DEBOUNCE_MS);
   }
 
   function scheduleResizeDebouncedPageFrameLayout() {
@@ -6106,6 +6119,10 @@ function startPageFrameLoop() {
         // no-op
       }
       pageFrameLayoutScrollRafId = null;
+    }
+    if (pageFrameLayoutScrollDebounceTimer != null) {
+      clearTimeout(pageFrameLayoutScrollDebounceTimer);
+      pageFrameLayoutScrollDebounceTimer = null;
     }
     if (pageFrameLayoutDebounceTimer != null) {
       clearTimeout(pageFrameLayoutDebounceTimer);
@@ -10191,6 +10208,14 @@ async function start() {
         // no-op
       }
       pageFrameLayoutScrollRafId = null;
+    }
+    if (pageFrameLayoutScrollDebounceTimer != null) {
+      try {
+        clearTimeout(pageFrameLayoutScrollDebounceTimer);
+      } catch {
+        // no-op
+      }
+      pageFrameLayoutScrollDebounceTimer = null;
     }
     if (pageFrameLayoutDebounceTimer != null) {
       try {
