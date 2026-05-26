@@ -2743,6 +2743,39 @@
         letter-spacing: 0.02em;
       }
 
+      /* イベントランキング上部の「配信者本人の現在状況」ヘッダ */
+      .nl-event-self {
+        margin: 0 0 6px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--nl-lane-accent-event-broadcasters, #056dff) 30%, var(--nl-border) 70%);
+        line-height: 1.35;
+      }
+      .nl-event-self__event {
+        margin: 0 0 2px;
+        font-size: clamp(8px, 2vw, 10px);
+        font-weight: 700;
+        color: var(--nl-fg);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-event-self__rank {
+        margin: 0;
+        font-size: clamp(9px, 2.4vw, 12px);
+        font-weight: 700;
+        color: var(--nl-fg);
+      }
+      .nl-event-self__rank strong {
+        color: var(--nl-lane-accent-event-broadcasters, #056dff);
+      }
+      .nl-event-self__diff {
+        margin: 1px 0 0;
+        font-size: clamp(7px, 1.8vw, 9px);
+        color: var(--nl-muted);
+      }
+
       .nl-top-support-rank__list {
         display: flex;
         flex-direction: column;

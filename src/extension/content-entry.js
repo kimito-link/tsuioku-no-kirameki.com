@@ -87,7 +87,7 @@ import {
   captureAuditionRichviewEventScoreDiagProbe,
   isAuditionRichviewLivePath
 } from '../lib/captureAuditionRichviewEventScoreDiagProbe.js';
-import { scrapeEventScoreRankingFromRichviewDom } from '../lib/scrapeEventScoreRankingFromRichviewDom.js';
+import { scrapeEventScoreRankingFromRichviewDom, scrapeEventSelfStatusFromRichviewDom } from '../lib/scrapeEventScoreRankingFromRichviewDom.js';
 import {
   eventScoreRankingStorageKey,
   EVENT_SCORE_RANKING_STORAGE_PREFIX,
@@ -2074,11 +2074,28 @@ window.addEventListener('message', (e) => {
     destinationLiveId: lid
   });
   if (!check.ok) return;
+  // 本人ステータス（順位/スコア/差/イベント名）は付随情報。型を軽く検証して保存。
+  let selfStatus = null;
+  try {
+    const s = e.data.selfStatus;
+    if (s && typeof s === 'object' && !Array.isArray(s)) {
+      const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+      const strClip = (v) => (typeof v === 'string' ? v.slice(0, 80) : '');
+      selfStatus = {
+        rank: numOrNull(s.rank),
+        score: numOrNull(s.score),
+        diffToNext: numOrNull(s.diffToNext),
+        eventName: strClip(s.eventName),
+        broadcasterName: strClip(s.broadcasterName)
+      };
+    }
+  } catch { selfStatus = null; }
   try {
     chrome.storage.local
       .set({
         [eventScoreRankingStorageKey(lid)]: {
           rows: rows.slice(0, 10),
+          selfStatus,
           capturedAt: Date.now(),
           liveId: lid,
           frameUrl: String(e.data.frameUrl || '').slice(0, 500)
@@ -11082,12 +11099,22 @@ function maybeStartGiftSubAppIframeRelay() {
     } catch {
       eventScoreRowsForRelay = null;
     }
+    // 本人の現在順位 / 累計スコア / 順位UPまでの差 / 参加中イベント名（バナー由来）。
+    let eventSelfStatusForRelay = null;
+    try {
+      if (isAuditionRichviewLivePath(href)) {
+        eventSelfStatusForRelay = scrapeEventSelfStatusFromRichviewDom(document);
+      }
+    } catch {
+      eventSelfStatusForRelay = null;
+    }
     try {
       if (eventScoreRowsForRelay && eventScoreRowsForRelay.length > 0) {
         const top10 = eventScoreRowsForRelay.slice(0, 10);
-        const sig = JSON.stringify(
-          top10.map((r) => [r.rank, r.score, r.name, r.isAnonymous, r.thumbnailUrl])
-        );
+        const sig = JSON.stringify([
+          top10.map((r) => [r.rank, r.score, r.name, r.isAnonymous, r.thumbnailUrl]),
+          eventSelfStatusForRelay
+        ]);
         if (sig !== lastEventScoreRankingSig) {
           lastEventScoreRankingSig = sig;
           const target = window.top || window.parent;
@@ -11096,6 +11123,7 @@ function maybeStartGiftSubAppIframeRelay() {
               type: 'NLS_EVENT_SCORE_RANKING_FROM_IFRAME',
               frameUrl: href,
               rows: top10,
+              selfStatus: eventSelfStatusForRelay || null,
               scrapedAt: Date.now()
             },
             '*'

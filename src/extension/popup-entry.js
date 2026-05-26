@@ -6504,6 +6504,42 @@ function buildEventBroadcasterLaneCurrentRankPretext() {
 }
 
 /**
+ * イベントランキングレーン上部に出す「配信者本人の現在状況」ヘッダ HTML を作る。
+ * richview バナー由来の selfStatus（順位/累計スコア/順位UPまでの差/イベント名）から組み立てる。
+ * fail-soft: selfStatus が無い・空なら空文字（ヘッダ無し）。
+ *
+ * @param {{rank?:number|null,score?:number|null,diffToNext?:number|null,eventName?:string,broadcasterName?:string}|null|undefined} self
+ * @returns {string}
+ */
+function buildEventSelfStatusHeaderHtml(self) {
+  if (!self || typeof self !== 'object') return '';
+  const rank = typeof self.rank === 'number' && Number.isFinite(self.rank) && self.rank > 0 ? Math.trunc(self.rank) : null;
+  const score = typeof self.score === 'number' && Number.isFinite(self.score) && self.score >= 0 ? Math.trunc(self.score) : null;
+  const diff = typeof self.diffToNext === 'number' && Number.isFinite(self.diffToNext) && self.diffToNext >= 0 ? Math.trunc(self.diffToNext) : null;
+  const eventName = String(self.eventName || '').trim();
+  const broadcasterName = String(self.broadcasterName || '').trim();
+  const fmt = (/** @type {number} */ n) => n.toLocaleString('en-US');
+
+  // 何も無ければヘッダ自体を出さない
+  if (rank == null && score == null && !eventName) return '';
+
+  const parts = [];
+  if (eventName) {
+    parts.push(`<p class="nl-event-self__event">🏆 ${escapeHtml(eventName)}</p>`);
+  }
+  if (rank != null || score != null) {
+    const who = broadcasterName ? `${escapeHtml(broadcasterName)}さん ` : '';
+    const rankTxt = rank != null ? `現在 <strong>${rank}</strong> 位` : '';
+    const scoreTxt = score != null ? ` 💎 <strong>${fmt(score)}</strong>` : '';
+    parts.push(`<p class="nl-event-self__rank">${who}${rankTxt}${scoreTxt}</p>`);
+  }
+  if (diff != null && rank != null && rank > 1) {
+    parts.push(`<p class="nl-event-self__diff">順位UPまであと 💎 ${fmt(diff)}</p>`);
+  }
+  return `<div class="nl-event-self">${parts.join('')}</div>`;
+}
+
+/**
  * 第2弾 北極星レーン「同じイベントに参加中の配信者」。
  *
  * content が参加番組一覧 API（イベント参加中のみ）から視聴者数降順で正規化して
@@ -6532,6 +6568,8 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
     ? bundle.eventRanking 
     : null;
 
+  /** @type {{rank?:number|null,score?:number|null,diffToNext?:number|null,eventName?:string,broadcasterName?:string}|null} */
+  let selfStatus = null;
   if (!eventScoreRows && /^lv\d{1,15}$/.test(lid)) {
     try {
       const sKey = eventScoreRankingStorageKey(lid);
@@ -6545,12 +6583,17 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
       ) {
         eventScoreRows = sv.rows;
       }
+      if (sv && typeof sv === 'object' && sv.selfStatus && typeof sv.selfStatus === 'object') {
+        selfStatus = sv.selfStatus;
+      }
     } catch {
       /* no-op */
     }
   }
 
   const pretext = buildEventBroadcasterLaneCurrentRankPretext();
+  const selfHeaderHtml = buildEventSelfStatusHeaderHtml(selfStatus);
+  const beforeNoteHtml = (selfHeaderHtml || '') + (pretext || '');
 
   if (eventScoreRows && eventScoreRows.length > 0) {
     setNorthStarLaneHidden('eventBroadcasters', false);
@@ -6566,7 +6609,7 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
       unitSuffix: '💎',
       ariaLabel: 'イベントランキング',
       isNorthStarBody: true,
-      beforeNoteHtml: pretext
+      beforeNoteHtml
     });
     return;
   }
