@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.392',
+    date: '2026-05-26',
+    summary: '数値の更新をほぼリアルタイムに',
+    items: Object.freeze([
+      'ページ内パネル（とサイドパネル）の来場者数・コメント数・💎・ギフトなどの数値を、これまでの約10秒ごとから約3秒ごとの更新にして、ほぼリアルタイムで追従するようにしました。配信ページが裏に隠れている間や取得中は無駄な更新をしないので負荷は抑えています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.391',
     date: '2026-05-26',
     summary: 'マーケ分析にもイベント順位を追加',
