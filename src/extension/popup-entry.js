@@ -12870,8 +12870,13 @@ function initPopup() {
       const maskShare = Boolean(maskEl?.checked);
       // 0.1.22〜0.1.30: 同接サンプル / 過去配信 / 公式 DOM bundle / ゆっくり画像は互いに独立なので
       // 直列 await せず Promise.all で並列化（DL 開始までの体感ラグを短縮）。
-      const [sessionSummaryRows, pastBroadcasts, bundleForMkt, yukkuriImageMapForMkt] =
-        await Promise.all([
+      const [
+        sessionSummaryRows,
+        pastBroadcasts,
+        bundleForMkt,
+        yukkuriImageMapForMkt,
+        eventRankingForMkt
+      ] = await Promise.all([
           (async () => {
             try {
               const db = await openBroadcastSessionSummaryDb();
@@ -12903,7 +12908,22 @@ function initPopup() {
             }
           })(),
           readOfficialEventDomBundleFromStorage(lid),
-          buildYukkuriImageDataUrlMap()
+          buildYukkuriImageDataUrlMap(),
+          // イベント💎順位（あれば）。HTMLレポートと同じ正本 model を渡す（marketing は
+          // opts.eventRanking で受ける）。取れない/イベント不参加は null＝セクション省略。
+          (async () => {
+            try {
+              const lidLc = String(lid || '').trim().toLowerCase();
+              if (!/^lv\d{1,15}$/.test(lidLc)) return null;
+              const ek = eventScoreRankingStorageKey(lidLc);
+              const bag = await chrome.storage.local.get(ek).catch(() => ({}));
+              return bag && bag[ek]
+                ? buildEventRankingReportModel(bag[ek], { nowMs: Date.now() })
+                : null;
+            } catch {
+              return null;
+            }
+          })()
         ]);
       // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
       // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
@@ -12932,7 +12952,8 @@ function initPopup() {
           typeof watchMetaCache.snapshot?.streamAgeMin === 'number'
             ? watchMetaCache.snapshot.streamAgeMin
             : undefined,
-        yukkuriImageDataUrlMap: yukkuriImageMapForMkt
+        yukkuriImageDataUrlMap: yukkuriImageMapForMkt,
+        eventRanking: eventRankingForMkt
       });
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
