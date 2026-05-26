@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.402',
+    date: '2026-05-26',
+    summary: '内部: 過去コメント一括取得の下準備（観測）',
+    items: Object.freeze([
+      '[内部] 「途中から開いても配信の最初からコメントを取り込めるようにする」将来機能の下準備として、取り込みの基点になる情報を観測する仕組みを追加しました（観測のみ・見た目や動作は一切変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.401',
     date: '2026-05-26',
     summary: '内部: HTMLレポートのhead情報表を部品化',
