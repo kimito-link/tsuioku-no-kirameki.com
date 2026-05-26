@@ -1388,6 +1388,23 @@ const watchMetaCache = {
   snapshotFetchActive: false
 };
 
+// v0.1.398: snapshot fetch ハング耐性 e2e（snapshot-fetch-hang-resilient.spec.js）が、
+//   「fetch が永久ハングしても snapshotFetchActive が永久 true に張り付かない（withTimeout で
+//   必ず finally に到達しリセットされる）」ことを実拡張で観測するための read-only getter。
+//   挙動には一切影響しない（値を読むだけ）。
+try {
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, '__nlsSnapshotFetchActive', {
+      configurable: true,
+      get() {
+        return Boolean(watchMetaCache.snapshotFetchActive);
+      }
+    });
+  }
+} catch {
+  /* defineProperty 不可環境では無視 */
+}
+
 /** 遅延フェーズの描画が直近の refresh に属するか判定する */
 let watchPopupRefreshGeneration = 0;
 
@@ -1875,6 +1892,13 @@ async function copyTextToClipboard(text) {
     return copyTextViaExecCommand(text);
   }
 }
+
+// v0.1.398: watch snapshot fetch の上限時間。配下の chrome API（tabs.query /
+//   scripting.executeScript / tabs.sendMessage）は timeout を持たず多タブ stall 下で
+//   永久 pending になり得るため、withTimeout でこの値に有界化して snapshotFetchActive の
+//   永久 true（=全カード「—」固定）を構造的に防ぐ。通常の内部 retry は最大 ~11s 進行
+//   し得るので、正常だが遅いだけの fetch を中断しないよう 15s と余裕を取る。
+const SNAPSHOT_FETCH_TIMEOUT_MS = 15_000;
 
 /**
  * @template T
@@ -9798,7 +9822,20 @@ async function refresh() {
     // v0.1.392: 短間隔 polling の重複ガード。stale snapshot の有無に関わらず立てる。
     watchMetaCache.snapshotFetchActive = true;
     try {
-      snapResult = await requestWatchPageSnapshotFromOpenTab(url);
+      // v0.1.398: snapshot fetch を必ず有界化する。配下の chrome.tabs.query /
+      //   scripting.executeScript / tabs.sendMessage はいずれも timeout を持たず、
+      //   多タブ stall 下で reject せず永久 pending になり得る（storage stall の
+      //   tabs/scripting 版）。その場合 await が settle せず finally に到達しないため
+      //   snapshotFetchActive が永久 true → polling 全停止 → 全カード「—」固定 という
+      //   退行が起きる（実機 v0.1.397 で観測）。withTimeout でラップすれば必ず
+      //   settle → finally が必ず走り、フラグが構造的に stranded し得なくなる。
+      //   通常 fetch の内部 retry は最大 ~11s 進行し得るので 15s と十分余裕を取る
+      //   （正常だが遅いだけの fetch は中断しない）。
+      snapResult = await withTimeout(
+        requestWatchPageSnapshotFromOpenTab(url),
+        SNAPSHOT_FETCH_TIMEOUT_MS,
+        'snapshot_fetch_timeout'
+      );
     } catch (err) {
       snapResult = {
         snapshot: null,
