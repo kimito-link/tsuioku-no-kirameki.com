@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.382',
+    date: '2026-05-26',
+    summary: '本人の現在順位を大きなメダルで強調',
+    items: Object.freeze([
+      'イベントランキング上部の「配信者本人の現在順位」を、大きなメダル風バッジで目立つようにしました。累計💎と「あと💎いくつで1つ上の順位」も併記して、上位入賞をねらう励みになります',
+      '上部に出していたイベント名が、別キャンペーン名と混ざって正しくないことがあったため、いったん表示をやめました（順位とスコアの表示は変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.381',
     date: '2026-05-26',
     summary: 'イベント順位に本人状況とサムネを追加',
