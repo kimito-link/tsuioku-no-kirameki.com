@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.399',
+    date: '2026-05-26',
+    summary: '内部: HTMLレポートの整形処理を部品化',
+    items: Object.freeze([
+      '[内部] HTML保存レポートの「配信時間」表示を作る処理を、テストしやすい小さな部品に切り出しました（コードの見通しを良くする整理で、表示・動作は一切変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.398',
     date: '2026-05-26',
     summary: '全カードが「—」で固まる不具合を修正',
