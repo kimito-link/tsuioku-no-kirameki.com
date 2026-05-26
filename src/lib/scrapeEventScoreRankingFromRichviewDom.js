@@ -14,6 +14,7 @@
  *   name: string,
  *   isAnonymous: boolean,
  *   thumbnailUrl: string,
+ *   userId?: string,
  * }} EventScoreRankingRow
  */
 
@@ -150,11 +151,139 @@ function findScoreValueInElement(li, rank) {
 }
 
 /**
+ * 実機 richview SPA（Emotion CSS）のサポーター順位リストを掬う（2026-05-26 実機採取）。
+ *
+ * 実DOM（[[reference_richview_event_ranking_emotion_dom]]）:
+ *   div.e16w44943            ← 行
+ *   ├ div.e1abt54u0          ← 順位（数字）
+ *   ├ div.e16w44942          ← 名前+サムネ wrapper
+ *   │ ├ a.e16w44941          ← 名前（リンク）
+ *   │ └ span.e16w44940       ← 敬称「さん」
+ *   └ div.css-vcb5i6         ← スコア wrapper（svg💎 + p[数字]）
+ *
+ * Emotion の後段ラベル（e16w44943 等）は source 由来で安定。前段 css-xxxxx は描画毎に変わる。
+ * 順位は安定ラベル e1abt54u0 で確定。スコアは「行内・順位 div 以外の数字テキスト（💎の隣の p）」で位置同定し、
+ * css-1d9a3hd のような不安定 hash はハードコードしない。
+ *
+ * @param {Document|Element} root
+ * @returns {EventScoreRankingRow[]|null} 1 件以上採れたら配列、無ければ null
+ */
+function scrapeEmotionRichviewSupporterRows(root) {
+  /** @type {NodeListOf<Element>|Element[]} */
+  let rowEls = [];
+  try {
+    rowEls = /** @type {any} */ (root).querySelectorAll?.('[class~="e16w44943"]') || [];
+  } catch {
+    return null;
+  }
+  if (!rowEls || rowEls.length === 0) return null;
+
+  /** @type {EventScoreRankingRow[]} */
+  const rows = [];
+  for (const row of /** @type {Iterable<Element>} */ (rowEls)) {
+    if (!(row instanceof HTMLElement)) continue;
+
+    // 順位（安定ラベル e1abt54u0・数字のみ）
+    const rankEl = row.querySelector('[class~="e1abt54u0"], [class*="e1abt54u0"]');
+    const rankDigits = String((rankEl && rankEl.textContent) || '').replace(/[^\d]/g, '');
+    if (!/^\d+$/.test(rankDigits)) return null; // 順位が確定できなければ全体不採用（誤値ゼロ）
+    const rank = parseInt(rankDigits, 10);
+    if (!Number.isFinite(rank) || rank <= 0) return null;
+
+    // 名前（a.e16w44941）。敬称 span.e16w44940 は除去。無ければ「名無し」で継続（行は捨てない）。
+    const nameEl = row.querySelector('a[class~="e16w44941"], a[class*="e16w44941"]');
+    /** @type {HTMLAnchorElement|null} */
+    const nameAnchor = nameEl instanceof HTMLAnchorElement ? nameEl : null;
+    let name = '';
+    if (nameEl instanceof HTMLElement) {
+      const clone = nameEl.cloneNode(true);
+      if (clone instanceof HTMLElement) {
+        for (const h of clone.querySelectorAll('[class~="e16w44940"], [class*="e16w44940"], .honorific, [class*="honorific"]')) {
+          h.remove();
+        }
+        name = String(clone.textContent || '').replace(/\s+/g, ' ').trim();
+      }
+    }
+    const isAnonymous = !name || name === '名無し';
+    if (!name) name = '名無し';
+
+    // userId（名前リンクの href /user/<uid> から拾えれば）。サムネ合成や記名リンクに使える。
+    let userId = '';
+    try {
+      const href = nameAnchor ? String(nameAnchor.getAttribute('href') || '') : '';
+      const m = href.match(/\/user\/(\d{2,})/);
+      if (m) userId = m[1];
+    } catch { /* no-op */ }
+
+    // スコア: 行内で「順位 div 以外」かつ「数字のみ」のリーフ要素を探す。💎svg の隣の <p> が本命。
+    let score = null;
+    /** @type {HTMLElement[]} */
+    const numLeaves = [];
+    for (const el of row.querySelectorAll('p, span, div, strong, b')) {
+      if (!(el instanceof HTMLElement)) continue;
+      if (el.children.length > 0) continue; // リーフのみ
+      if (rankEl && (el === rankEl || rankEl.contains(el) || el.contains(rankEl))) continue;
+      const t = String(el.textContent || '').trim();
+      if (!t) continue;
+      const cleaned = t.replace(/,/g, '').replace(/[💎pt\s]/giu, '').trim();
+      if (/^\d+$/.test(cleaned)) numLeaves.push(el);
+    }
+    // スコアは順位より桁が大きい想定。複数あれば最大値（💎pt）を採る。
+    for (const el of numLeaves) {
+      const v = parseInt(String(el.textContent || '').replace(/[^\d]/g, ''), 10);
+      if (Number.isFinite(v) && v > 0) {
+        if (score == null || v > score) score = v;
+      }
+    }
+    if (score == null) return null; // スコアが確定できない＝不採用
+
+    // サムネ（遅延読み込みのことが多い・無ければ空）
+    let thumbnailUrl = '';
+    const thumbWrap = row.querySelector('[class~="e16w44942"], [class*="e16w44942"]') || row;
+    if (thumbWrap instanceof HTMLElement) {
+      const img = thumbWrap.querySelector('img[src]');
+      if (img instanceof HTMLImageElement) {
+        const u = String(img.currentSrc || img.src || '').trim();
+        if (/^https?:\/\//i.test(u)) thumbnailUrl = u;
+      }
+      if (!thumbnailUrl) {
+        for (const el of thumbWrap.querySelectorAll('[style*="background-image"]')) {
+          const bg = el instanceof HTMLElement ? String(el.style?.backgroundImage || '') : '';
+          const m = bg.match(/url\(["']?([^"')]+)["']?\)/);
+          if (m && /^https?:\/\//i.test(m[1])) { thumbnailUrl = m[1]; break; }
+        }
+      }
+    }
+
+    rows.push({
+      rank,
+      score,
+      name,
+      isAnonymous,
+      thumbnailUrl,
+      ...(userId ? { userId } : {})
+    });
+  }
+
+  if (rows.length === 0 || !ranksAreDenseAndUnique(rows)) return null;
+  rows.sort((a, b) => a.rank - b.rank);
+  return rows;
+}
+
+/**
  * @param {Document|Element|null|undefined} root
  * @returns {EventScoreRankingRow[]|null}
  */
 export function scrapeEventScoreRankingFromRichviewDom(root) {
   if (!root) return null;
+
+  // 1) 実機 richview（Emotion CSS）の本命構造を最優先で試す。
+  try {
+    const emotionRows = scrapeEmotionRichviewSupporterRows(/** @type {any} */ (root));
+    if (emotionRows && emotionRows.length > 0) return emotionRows;
+  } catch {
+    /* fall through to legacy paths */
+  }
 
   /** @type {NodeListOf<Element>|Element[]} */
   let lis = [];

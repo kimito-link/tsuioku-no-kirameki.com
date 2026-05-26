@@ -26,7 +26,10 @@ const common = {
   minifyWhitespace: true,
   minifySyntax: true,
   minifyIdentifiers: false,
-  legalComments: 'none'
+  legalComments: 'none',
+  // 全 bundle に build id を埋め込む（content からも参照可能にして、診断で
+  // 「本当に新しい bundle が反映されたか」を切り分けられるようにする）。
+  define: { NL_BUILD_ID: JSON.stringify(BUILD_ID) }
 };
 
 const popupDefine = { NL_BUILD_ID: JSON.stringify(BUILD_ID) };
