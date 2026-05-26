@@ -93,6 +93,7 @@ import {
   EVENT_SCORE_RANKING_STORAGE_PREFIX,
   validateEventScoreRankingRelayPayload
 } from '../lib/eventScoreRankingRelay.js';
+import { decideHiddenOfficialIframeInject } from '../lib/hiddenOfficialIframeReinjectGate.js';
 import { classifyGiftSubAppFrameSource } from '../lib/giftSubAppFrameSource.js';
 import { captureSameOriginContributionRankingDomShape } from '../lib/sameOriginContribRankingDomShape.js';
 import { scrapeGiftHistoryList } from '../lib/scrapeGiftHistoryList.js';
@@ -11235,6 +11236,19 @@ function maybeStartGiftSubAppIframeRelay() {
 let _hiddenOfficialIframesInjectedForLid = '';
 
 /**
+ * v0.1.394: イベント参加中のイベント順位 on-demand 再取得。
+ *   既存の hidden audition iframe は「liveId ごとに1回だけ inject→60秒で破棄」で、
+ *   イベント順位が ~60 秒分しか更新されなかった（会議で「開き直さないと変わらない」と判明）。
+ *   イベント参加中（isEventParticipating）に限り、クールダウンを置いて再 inject を許し、
+ *   イベント順位を定期更新する。iframe は常に1本・60秒で破棄＝v0.1.323 の「3本常駐で重い」
+ *   再発を避ける（参加中のみ・1本ずつ・クールダウンで負荷を bound）。
+ * @type {number}
+ */
+let _lastHiddenOfficialIframeInjectAt = 0;
+/** 再 inject の最小間隔（ms）。iframe 寿命 60 秒 + 余白＝同時に2本にならない。 */
+const HIDDEN_OFFICIAL_IFRAME_REINJECT_COOLDOWN_MS = 90_000;
+
+/**
  * v0.1.228: ギフトランキング取得経路（autoOpen / hidden iframe inject /
  *   cross-origin iframe scrape）の opt-in cache。
  *
@@ -11333,15 +11347,28 @@ function pruneRelayDiagMap(map, max = 12) {
  *   - SPA 遷移で liveId が変わったら再 inject 可能
  *
  * @param {string} liveId 例 'lv350474211'
+ * @param {{ isEventParticipating?: boolean }} [opts]
+ *   v0.1.394: isEventParticipating=true のときは、クールダウン経過後の再 inject を
+ *   許してイベント順位を定期更新する（参加中のみ・1本ずつ・60秒破棄で負荷 bound）。
  */
-function maybeInjectHiddenOfficialIframes(liveId) {
-  // v0.1.228: opt-in gate（autoOpen と同じ理由で、ユーザーが明示的に取得開始
-  // した時のみ inject する）。OFF default。
-  if (!isGiftRankingLaneEnabled()) return;
+function maybeInjectHiddenOfficialIframes(liveId, opts = {}) {
   const lid = String(liveId || '').trim();
-  if (!lid) return;
-  if (_hiddenOfficialIframesInjectedForLid === lid) return;
+  const now = Date.now();
+  // v0.1.228 opt-in gate + v0.1.394 イベント参加中の再 inject 判定を純関数に集約。
+  const decision = decideHiddenOfficialIframeInject({
+    optInEnabled: isGiftRankingLaneEnabled(),
+    liveId: lid,
+    alreadyInjectedLiveId: _hiddenOfficialIframesInjectedForLid,
+    isEventParticipating: opts.isEventParticipating === true,
+    iframeStillPresent:
+      typeof document !== 'undefined' && !!document.getElementById('nls-hidden-audition-iframe'),
+    lastInjectAtMs: _lastHiddenOfficialIframeInjectAt,
+    nowMs: now,
+    cooldownMs: HIDDEN_OFFICIAL_IFRAME_REINJECT_COOLDOWN_MS
+  });
+  if (!decision.inject) return;
   _hiddenOfficialIframesInjectedForLid = lid;
+  _lastHiddenOfficialIframeInjectAt = now;
   let isTop = true;
   try {
     isTop = window.self === window.top;
@@ -11601,7 +11628,20 @@ async function persistOfficialEventDomBundleNow() {
   //   load されるため、SPA でも Vue が完全 render → iframe content script の
   //   relay 経路 (v0.1.216/217) で過去 gift history / 貢献度ランキング /
   //   イベント参加バナーがすべて popup に反映される。kimito さん操作 0 回。
-  try { maybeInjectHiddenOfficialIframes(lid); } catch { /* no-op */ }
+  // v0.1.394: イベント参加中はクールダウン付きで再 inject を許し、イベント順位を
+  //   定期更新する（参加中のみ・1本ずつ・60秒破棄＝負荷 bound）。参加判定は
+  //   embedded-data props（maybeFetchEventParticipationMirrorOnce と同じ source）。
+  let _isEventParticipatingForInject = false;
+  try {
+    if (typeof document !== 'undefined') {
+      _isEventParticipatingForInject = pickIsEventParticipating(extractEmbeddedDataProps(document)) === true;
+    }
+  } catch {
+    _isEventParticipatingForInject = false;
+  }
+  try {
+    maybeInjectHiddenOfficialIframes(lid, { isEventParticipating: _isEventParticipatingForInject });
+  } catch { /* no-op */ }
   // 0.1.175: コメント DOM 経由のギフト送信者観測（autoOpen 迂回ルート）
   try { harvestGiftCommentsFromCommentTableDom(); } catch { /* no-op */ }
   // v0.1.198: ギフトサブアプリ DOM（iframe 内含む全 frame）を走査して popup へ
