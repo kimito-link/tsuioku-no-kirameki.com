@@ -34,6 +34,7 @@ import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
 import { formatCardFreshnessNote } from '../lib/cardFreshnessNote.js';
+import { pickGiftHistorySource } from '../lib/giftHistorySourcePreference.js';
 import {
   iframeOfficialDomStorageKey,
   resolveContributionRankingRowsFromSources
@@ -6214,6 +6215,11 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) return null;
   const bundle = _lastOfficialEventDomBundle;
+
+  // --- 源1+2: iframe 由来（公式サイドバー DOM = bundle.giftHistory / 保存 throws）。
+  //   bundle が在ればそれ（タブを開いている間の最新スクレイプ）、無ければ保存 throws。
+  /** @type {{ rooms: any[]; noteText: string; ariaLabel: string; capturedAt: number } | null} */
+  let iframeCtx = null;
   const giftHistory = Array.isArray(bundle?.giftHistory) ? bundle.giftHistory : null;
   if (giftHistory && giftHistory.length > 0) {
     const aggregated = aggregateGiftHistoryByUser(giftHistory);
@@ -6225,59 +6231,57 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
     }));
     const senderN = aggregated.length;
     const throwM = aggregated.reduce((s, a) => s + (Number(a.giftCount) || 0), 0);
-    return {
+    iframeCtx = {
       rooms,
       noteText: `公式履歴DOM由来のユーザー別累計pt順。送り主${senderN}名・履歴${throwM}件（番組累計ポイントとは別指標）`,
-      unitSuffix: 'pt',
-      ariaLabel: 'この番組へのギフト履歴のユーザー別集計'
+      ariaLabel: 'この番組へのギフト履歴のユーザー別集計',
+      capturedAt: typeof bundle?.capturedAt === 'number' ? bundle.capturedAt : 0
     };
-  }
-  /** @type {{ userId?: string; nickname?: string; totalPoints?: number; capturedAt?: number }[]} */
-  let throwsRows = [];
-  try {
-    const throwsBag = await chrome.storage.local.get(`nls_gift_history_throws_${lid}`);
-    const v = throwsBag[`nls_gift_history_throws_${lid}`];
-    if (Array.isArray(v)) throwsRows = /** @type {any} */ (v);
-  } catch {
-    /* no-op */
-  }
-  if (throwsRows.length > 0) {
-    const sorted = [...throwsRows].sort(
-      (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
-    );
-    const senderN = sorted.length;
-    const throwM = sorted.reduce((s, r) => s + (Number(r?.throwCount) || 0), 0);
-    const rooms = sorted.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
-      const userKey = String(r?.userId || '');
-      const rawNickname = String(r?.nickname || '');
-      const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
-      return {
-        userKey,
-        nickname,
-        count: Number(r?.totalPoints) || 0,
-        avatarUrl: String(r?.avatarUrl || '').trim()
-      };
-    });
-    // v0.1.393: 鮮度表示。ギフト履歴は「ギフトタブを開いた時だけ」取り込む経路で
-    //   自動更新ではない＝autoRefreshing は付けず「最終更新: ○分前」だけ正直に出す。
-    let capMax = 0;
-    for (const r of sorted) {
-      const c = Number(r?.capturedAt);
-      if (Number.isFinite(c) && c > capMax) capMax = c;
+  } else {
+    /** @type {{ userId?: string; nickname?: string; totalPoints?: number; throwCount?: number; capturedAt?: number }[]} */
+    let throwsRows = [];
+    try {
+      const throwsBag = await chrome.storage.local.get(`nls_gift_history_throws_${lid}`);
+      const v = throwsBag[`nls_gift_history_throws_${lid}`];
+      if (Array.isArray(v)) throwsRows = /** @type {any} */ (v);
+    } catch {
+      /* no-op */
     }
-    const freshnessNote = capMax > 0 ? formatCardFreshnessNote(capMax) : '';
-    return {
-      rooms,
-      noteText: `保存済み公式履歴からユーザー別累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントとは別指標）`,
-      unitSuffix: 'pt',
-      ariaLabel: '公式サイドバー履歴のユーザー別集計',
-      freshnessNote
-    };
+    if (throwsRows.length > 0) {
+      const sorted = [...throwsRows].sort(
+        (a, b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
+      );
+      const senderN = sorted.length;
+      const throwM = sorted.reduce((s, r) => s + (Number(r?.throwCount) || 0), 0);
+      const rooms = sorted.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
+        const userKey = String(r?.userId || '');
+        const rawNickname = String(r?.nickname || '');
+        const nickname = (userKey && _nicknameResolveMap.get(userKey)) || rawNickname;
+        return {
+          userKey,
+          nickname,
+          count: Number(r?.totalPoints) || 0,
+          avatarUrl: String(r?.avatarUrl || '').trim()
+        };
+      });
+      let capMax = 0;
+      for (const r of sorted) {
+        const c = Number(r?.capturedAt);
+        if (Number.isFinite(c) && c > capMax) capMax = c;
+      }
+      iframeCtx = {
+        rooms,
+        noteText: `保存済み公式履歴からユーザー別累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントとは別指標）`,
+        ariaLabel: '公式サイドバー履歴のユーザー別集計',
+        capturedAt: capMax
+      };
+    }
   }
-  // v0.1.318: 公式履歴も保存 throws も無いとき、個別ギフト event
-  // （nls_gift_events_<lid>）を送信者別に「正確な投げ量(pt)」で集計し降順ランキング。
-  // ＝従来この後の「投げ回数(回)」フォールバックより前に、pt がある分は pt で出す。
-  // 集計が空 or 全 pt=0 のときだけ従来の回数フォールバックへフォールスルー。
+
+  // --- 源3: NDGR ライブ（nls_gift_events）。コメントと同じ常時接続で届く＝負荷ゼロで最新。
+  //   v0.1.318: 送信者別に「正確な投げ量(pt)」で集計し降順。pt>0 のときだけ採用。
+  /** @type {{ rooms: any[]; noteText: string; ariaLabel: string; latestAt: number } | null} */
+  let liveCtx = null;
   /** @type {Array<{userId?:string;nickname?:string;point?:number;capturedAt?:number}>} */
   let giftEvents = [];
   try {
@@ -6290,22 +6294,21 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
   if (giftEvents.length > 0) {
     const senderTotals = aggregateGiftSenderTotals(giftEvents);
     const totalPtSum = senderTotals.reduce((s, r) => s + (Number(r.totalPoints) || 0), 0);
-    // pt が 1 件でもあるときだけ pt ランキングを採用（全 0 は回数の方が情報量あり）
     if (senderTotals.length > 0 && totalPtSum > 0) {
-      const positiveOnly = senderTotals.filter(
-        (r) => (Number(r.totalPoints) || 0) > 0
-      );
-      const rankedSenders =
-        positiveOnly.length > 0 ? positiveOnly : senderTotals;
+      const positiveOnly = senderTotals.filter((r) => (Number(r.totalPoints) || 0) > 0);
+      const rankedSenders = positiveOnly.length > 0 ? positiveOnly : senderTotals;
       const senderN = rankedSenders.length;
-      const throwM = rankedSenders.reduce(
-        (s, r) => s + (Number(r.throwCount) || 0),
-        0
-      );
+      const throwM = rankedSenders.reduce((s, r) => s + (Number(r.throwCount) || 0), 0);
+      // ライブの最新時刻は生イベント（各 capturedAt）から取る
+      //   （aggregateGiftSenderTotals の戻りは lastAt を含まないため）。
+      let latestAt = 0;
+      for (const e of giftEvents) {
+        const c = Number(e?.capturedAt);
+        if (Number.isFinite(c) && c > latestAt) latestAt = c;
+      }
       const rooms = rankedSenders.slice(0, GIFT_HISTORY_LANE_MAX).map((r) => {
         const userKey = String(r.userKey || '');
-        const nickname =
-          (userKey && _nicknameResolveMap.get(userKey)) || String(r.nickname || '');
+        const nickname = (userKey && _nicknameResolveMap.get(userKey)) || String(r.nickname || '');
         return {
           userKey,
           nickname,
@@ -6313,13 +6316,52 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
           avatarUrl: rememberedAvatarUrlForUserId(userKey) || ''
         };
       });
-      return {
+      liveCtx = {
         rooms,
         noteText: `ライブ受信したギフトの送り主別 累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントや貢献度ランキングとは別指標）`,
-        unitSuffix: 'pt',
-        ariaLabel: 'ライブ受信ギフトの送り主別 累計ポイントが多い順'
+        ariaLabel: 'ライブ受信ギフトの送り主別 累計ポイントが多い順',
+        latestAt
       };
     }
+  }
+
+  // --- 源の選択（v0.1.395・会議 D）: iframe を基本に保ちつつ、iframe が明らかに古く、
+  //   かつライブの方が新しいときだけライブへ切替（gift hot path は不変・読み取り側のみ）。
+  const pick = pickGiftHistorySource({
+    iframeAvailable: !!iframeCtx,
+    iframeCapturedAtMs: iframeCtx ? iframeCtx.capturedAt : 0,
+    liveAvailable: !!liveCtx,
+    liveLatestAtMs: liveCtx ? liveCtx.latestAt : 0,
+    nowMs: Date.now()
+  });
+  if (pick === 'live' && liveCtx) {
+    return {
+      rooms: liveCtx.rooms,
+      noteText: liveCtx.noteText,
+      unitSuffix: 'pt',
+      ariaLabel: liveCtx.ariaLabel,
+      freshnessNote: liveCtx.latestAt > 0 ? formatCardFreshnessNote(liveCtx.latestAt, { autoRefreshing: true }) : ''
+    };
+  }
+  if (iframeCtx) {
+    return {
+      rooms: iframeCtx.rooms,
+      noteText: iframeCtx.noteText,
+      unitSuffix: 'pt',
+      ariaLabel: iframeCtx.ariaLabel,
+      // 鮮度表示。iframe 由来は「ギフトタブを開いた時だけ」更新＝自動更新中は付けず経過のみ正直に。
+      freshnessNote: iframeCtx.capturedAt > 0 ? formatCardFreshnessNote(iframeCtx.capturedAt) : ''
+    };
+  }
+  if (liveCtx) {
+    // iframe 由来が無くライブだけある（途中参加でタブ未オープン等）。
+    return {
+      rooms: liveCtx.rooms,
+      noteText: liveCtx.noteText,
+      unitSuffix: 'pt',
+      ariaLabel: liveCtx.ariaLabel,
+      freshnessNote: liveCtx.latestAt > 0 ? formatCardFreshnessNote(liveCtx.latestAt, { autoRefreshing: true }) : ''
+    };
   }
   return null;
 }

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.395',
+    date: '2026-05-26',
+    summary: 'ギフト履歴が古い時はライブ受信分に自動切替',
+    items: Object.freeze([
+      'ギフト履歴カードが「ギフトタブを開いた時の値」で止まって古くなっていた場合、ライブで受信しているギフト（コメントと同じ常時接続なので勝手に届きます）に自動で切り替えて表示するようにしました。タブを開き直さなくても、新しいギフトがちゃんと反映されます（取得したばかりの公式の値が新しいうちはそのまま使います）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.394',
     date: '2026-05-26',
     summary: 'イベント順位を参加中は自動で取り直し',
