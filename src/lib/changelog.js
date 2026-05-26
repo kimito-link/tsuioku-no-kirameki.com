@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.380',
+    date: '2026-05-26',
+    summary: 'イベントランキングを正しい一覧から取得',
+    items: Object.freeze([
+      'イベントランキングのレーンに、誤って「この番組への応援者（サポーター）」の順位を出していたのを直しました。公式の「イベントランキング」（このイベントに参加している配信者の💎スコア順＝1位から）を読むようにし、本人や他の配信者の順位・スコアがそのまま並ぶようにしました。上位入賞の特典をねらう励みになります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.379',
     date: '2026-05-26',
     summary: 'イベント順位の取得を実機DOMに対応',

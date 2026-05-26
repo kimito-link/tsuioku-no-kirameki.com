@@ -173,6 +173,72 @@ describe('scrapeEventScoreRankingFromRichviewDom', () => {
       </div>`;
   }
 
+  // ★本命★ 実機「イベントランキング」(参加配信者の💎順位)の本物構造（2026-05-26 ユーザー提供生HTML）。
+  // 行=el69c2m4 / 順位=ebq6m481(「位」=ebq6m480) / 名前=el69c2m1(敬称=el69c2m0) / スコア=css-z40gn4。
+  function realEventRankingHtml(rows) {
+    const items = rows
+      .map(
+        ({ rank, score, name, thumb }) => `
+        <div class="css-12vetqo el69c2m4">
+          <div class="css-1wdbxvj ebq6m483">
+            <span class="css-89z9eu ebq6m481">${rank}</span><span class="css-v76r9i ebq6m480">位</span>
+          </div>
+          <div class="css-x el69c2m3"${thumb ? ` style="background-image:url(${thumb})"` : ''}></div>
+          <div>
+            <p class="css-1dtdcds el69c2m2"><span class="css-1ybg0xk el69c2m1">${name}</span><span class="css-spovqj el69c2m0">さん</span></p>
+            <div class="css-8zj0aw"><svg class="css-jh4whz"><path></path></svg><p class="css-z40gn4">${String(score).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</p></div>
+          </div>
+        </div>`
+      )
+      .join('');
+    return `
+      <div class="css-1ghu3wd ef7q2pk1"><div><div class="css-1066lcq e1hv4cge5">
+        <h2 class="css-1row0ay e1hv4cge4">イベントランキング</h2>
+        <button class="css-7ozhqr e10ycgko1"><span>更新</span></button>
+      </div><div class="css-ezqgwq">${items}</div></div></div>`;
+  }
+
+  it('★本命★ 実機「イベントランキング」(参加配信者)構造から 💎 順位・スコアを取得', () => {
+    document.body.innerHTML = realEventRankingHtml([
+      { rank: 1, score: 4965200, name: 'あめ！' },
+      { rank: 2, score: 3452500, name: 'この', thumb: 'https://example.test/kono.jpg' },
+      { rank: 3, score: 2825600, name: 'ぴとなちゃん♡' }
+    ]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(rows).not.toBeNull();
+    expect(rows).toHaveLength(3);
+    expect(rows?.[0]).toMatchObject({ rank: 1, score: 4965200, name: 'あめ！', isAnonymous: false });
+    expect(rows?.[1]).toMatchObject({ rank: 2, score: 3452500, name: 'この', isAnonymous: false, thumbnailUrl: 'https://example.test/kono.jpg' });
+    expect(rows?.[2]).toMatchObject({ rank: 3, score: 2825600, name: 'ぴとなちゃん♡', isAnonymous: false });
+  });
+
+  it('★本命★ 敬称「さん」を名前に含めない', () => {
+    document.body.innerHTML = realEventRankingHtml([
+      { rank: 1, score: 100, name: '屋敷' },
+      { rank: 2, score: 50, name: 'さやか☆' }
+    ]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(rows?.[0].name).toBe('屋敷');
+    expect(rows?.[1].name).toBe('さやか☆');
+  });
+
+  it('本命(イベントランキング)とサポーター両方あれば本命が勝つ', () => {
+    document.body.innerHTML =
+      realEventRankingHtml([
+        { rank: 1, score: 4965200, name: 'あめ！' },
+        { rank: 2, score: 3452500, name: 'この' }
+      ]) +
+      emotionRichviewHtml([
+        { rank: 1, score: 999, name: 'サポーターA', uid: '1' },
+        { rank: 2, score: 888, name: 'サポーターB', uid: '2' }
+      ]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(rows).not.toBeNull();
+    // 本命のスコア(4965200/3452500)であってサポーター(999/888)ではない
+    expect(rows?.[0].score).toBe(4965200);
+    expect(rows?.[1].score).toBe(3452500);
+  });
+
   it('実機 richview Emotion 構造から 💎 順位・スコア・記名 uid を取得（本命パス）', () => {
     document.body.innerHTML = emotionRichviewHtml([
       { rank: 1, score: 432295, name: 'ミュート', uid: '111' },
