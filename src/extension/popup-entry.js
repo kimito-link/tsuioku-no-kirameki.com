@@ -260,6 +260,13 @@ import {
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
+import { buildReportThumbedUsersSectionHtml } from '../lib/reportThumbedUsersSectionHtml.js';
+import {
+  buildReportLinkRows,
+  buildReportMetaRows,
+  buildReportScriptRows,
+  buildReportNoopenerRows
+} from '../lib/reportHeadInfoRowsHtml.js';
 import {
   summarizeBroadcastTiming,
   summarizeCommentBodyStats,
@@ -10756,43 +10763,12 @@ async function buildHtmlReportDocument(
       maxNumeric: 80,
       maxAnonymous: 80
     });
-  /**
-   * @param {import('../lib/userThumbGrid.js').ResolvedThumbGridUser} u
-   */
-  const reportThumbCellHtml = (u) => {
-    const label = displayUserLabel(u.userId, u.nickname || '');
-    const labelHtml = buildUserProfileLinkedLabelHtml(u.userId, label);
-    return `<li class="report-thumb-grid__cell">
-        <span class="report-thumb-grid__avatar-wrap"><img class="report-thumb-grid__avatar" src="${escapeAttr(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
-        <span class="report-thumb-grid__label">${labelHtml}</span>
-        <span class="report-thumb-grid__count">${u.count}件</span>
-      </li>`;
-  };
-  const thumbNumericBlockHtml =
-    thumbNumericUsers.length > 0
-      ? `
-          <h3 class="report-thumb-grid__heading">数値 ID（個人サムネ・ニコ既定アイコン）<span class="report-thumb-grid__heading-count">${thumbNumericUsers.length}名</span></h3>
-          <ol class="report-thumb-grid">${thumbNumericUsers.map(reportThumbCellHtml).join('')}</ol>
-        `
-      : '';
-  const thumbAnonymousBlockHtml =
-    thumbAnonymousUsers.length > 0
-      ? `
-          <h3 class="report-thumb-grid__heading">匿名（識別子から生成した identicon）<span class="report-thumb-grid__heading-count">${thumbAnonymousUsers.length}名</span></h3>
-          <ol class="report-thumb-grid">${thumbAnonymousUsers.map(reportThumbCellHtml).join('')}</ol>
-        `
-      : '';
-  const thumbedUsersSectionHtml =
-    thumbNumericUsers.length > 0 || thumbAnonymousUsers.length > 0
-      ? `
-        <section class="card" id="sec-thumb-grid">
-          <h2>サムネ付きユーザー一覧</h2>
-          <p class="guide-lead">アイコンが解決できた応援ユーザーを件数の多い順、種別ごとに並べたのだ（各カテゴリ最大 80 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順なのだ。</p>
-          ${thumbNumericBlockHtml}
-          ${thumbAnonymousBlockHtml}
-        </section>
-      `
-      : '';
+  // C-7 pure refactor: セクション組み立ては reportThumbedUsersSectionHtml.js に抽出
+  //   （挙動不変・characterization test 済）。categorize（データ）は従来通り popup 側。
+  const thumbedUsersSectionHtml = buildReportThumbedUsersSectionHtml({
+    numericUsers: thumbNumericUsers,
+    anonymousUsers: thumbAnonymousUsers
+  });
 
   /*
    * 0.1.12 (F2 追加): 全コメント一覧の各行にも「最低サムネ」を表示する。
@@ -10852,57 +10828,8 @@ async function buildHtmlReportDocument(
     `;
   });
 
-  /** @param {{ rel: string, href: string, as: string, type: string }[]} links */
-  const linkRows = (links) =>
-    links.map((v) => {
-      const search = escapeAttr(
-        `${v.rel} ${v.href} ${v.as} ${v.type}`.toLowerCase()
-      );
-      return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(v.rel)}</td>
-          <td>${escapeHtml(v.href || '-')}</td>
-          <td>${escapeHtml(v.as || '-')}</td>
-          <td>${escapeHtml(v.type || '-')}</td>
-        </tr>
-      `;
-    });
-
-  /** @param {{ key: string, value: string }[]} metas */
-  const metaRows = (metas) =>
-    metas.map((v) => {
-      const search = escapeAttr(`${v.key} ${v.value}`.toLowerCase());
-      return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(v.key)}</td>
-          <td>${escapeHtml(v.value || '-')}</td>
-        </tr>
-      `;
-    });
-
-  /** @param {{ src: string, type: string }[]} scripts */
-  const scriptRows = (scripts) =>
-    scripts.map((v) => {
-      const search = escapeAttr(`${v.src} ${v.type}`.toLowerCase());
-      return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(v.type || 'text/javascript')}</td>
-          <td>${escapeHtml(v.src || '-')}</td>
-        </tr>
-      `;
-    });
-
-  /** @param {{ text: string, href: string }[]} links */
-  const noopenerRows = (links) =>
-    links.map((v) => {
-      const search = escapeAttr(`${v.text} ${v.href}`.toLowerCase());
-      return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(v.text || '-')}</td>
-          <td>${escapeHtml(v.href || '-')}</td>
-        </tr>
-      `;
-    });
+  // C-7 pure refactor: head 情報テーブルの行ビルダは reportHeadInfoRowsHtml.js に
+  //   抽出（linkRows/metaRows/scriptRows/noopenerRows・挙動不変・characterization 済）。
 
   /*
    * 0.1.21 (V): HTML レポート無料拡張で追加する集計群。
@@ -10944,7 +10871,7 @@ async function buildHtmlReportDocument(
   const reportCommentsCsv = buildReportCommentsCsv(commentsForReport);
   const reportCsvFilename = `tsuioku-comments-${liveId || 'unknown'}.csv`;
 
-  const headLinkRows = snapshot ? linkRows(snapshot.links) : [];
+  const headLinkRows = snapshot ? buildReportLinkRows(snapshot.links) : [];
   const { friendly: friendlyMetas, technical: technicalMetas } =
     partitionMetasForHtmlReport(snapshot?.metas);
   const friendlyMetaRowsHtml = friendlyMetas.map((v) => {
@@ -10956,9 +10883,11 @@ async function buildHtmlReportDocument(
           <td class="mono">${escapeHtml(v.value || '-')}</td>
         </tr>`;
   });
-  const headTechnicalMetaRows = metaRows(technicalMetas);
-  const headScriptRows = snapshot ? scriptRows(snapshot.scripts) : [];
-  const headNoopenerRows = snapshot ? noopenerRows(snapshot.noopenerLinks) : [];
+  const headTechnicalMetaRows = buildReportMetaRows(technicalMetas);
+  const headScriptRows = snapshot ? buildReportScriptRows(snapshot.scripts) : [];
+  const headNoopenerRows = snapshot
+    ? buildReportNoopenerRows(snapshot.noopenerLinks)
+    : [];
 
   /** 次回向けの軽量メモ（マーケ分析より薄い） */
   let nextMemoSectionHtml = '';
