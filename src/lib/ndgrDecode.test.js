@@ -8,7 +8,8 @@ import {
   decodeChat,
   decodeGift,
   decodeChunkedMessage,
-  decodePackedSegment
+  decodePackedSegment,
+  decodeChunkedEntry
 } from './ndgrDecode.js';
 
 function encodeVarint(value) {
@@ -1008,5 +1009,77 @@ describe('decodePackedSegment', () => {
     expect(results[0].chats[0].rawUserId).toBe(111);
     expect(results[1].chats[0].no).toBe(2);
     expect(results[1].chats[0].rawUserId).toBe(222);
+  });
+});
+
+describe('decodeChunkedEntry（過去ログbackfillの巡回URI抽出）', () => {
+  // 実機 PoC（lv350560887）で確認した URI 形式に合わせたフィクスチャ。
+  const BACKWARD =
+    'https://mpn.live.nicovideo.jp/data/backward/v4/BBx9QmnWKGtTH5cqqR293za2Jw6D0M2MYcY7v8g0IrrVDciWGp4q6PxpFZ1Iv_bkbhFeaqs6mmj22BbsBqOWLIE';
+  const SNAPSHOT =
+    'https://mpn.live.nicovideo.jp/data/snapshot/v4/BBzAHzHRxMsfqIM7Q0dJNEYKij8zrBVrbcFKmQu3HokY9Bj3FDdOvkiTmzDZWUfLcgT4jLQnT3A0UagIRg';
+  const SEG1 =
+    'https://mpn.live.nicovideo.jp/data/segment/v4/BByZ7HR-QFxOQitHk_LXFubmHl1gw-I70n-50bzaIGgTCZL8a-lBHw-0Hk_DmTe9dcleLFIY8cV_mlQ25rNz';
+  const SEG2 =
+    'https://mpn.live.nicovideo.jp/data/segment/v4/BBxXCuX6CNQfVSwiiHiE8c3wjyjF4zSzRW_H0QTUIESpGaRPYGYQ_NEftkZR4K8VL-qKN0lmfKJ3wCQO_bdi';
+
+  it('ネストした backward/segment/snapshot URI を field 番号に依存せず抽出する', () => {
+    // ChunkedEntry の各 oneof は「message の中に uri 文字列」が入る形（PoC で確認）。
+    // ここでは field 番号を意図的にバラバラ（backward=1, segment=2, snapshot=9）にして、
+    // 番号非依存（path 分類）で拾えることを確認する。
+    const backwardMsg = lenDelimited(1, strField(1, BACKWARD)); // backward.segment.uri 相当
+    const segMsg1 = lenDelimited(2, strField(1, SEG1));
+    const segMsg2 = lenDelimited(2, strField(1, SEG2));
+    const snapMsg = lenDelimited(9, strField(1, SNAPSHOT));
+    const buf = new Uint8Array([
+      ...backwardMsg,
+      ...segMsg1,
+      ...segMsg2,
+      ...snapMsg
+    ]);
+    const nav = decodeChunkedEntry(buf);
+    expect(nav.backwardUri).toBe(BACKWARD);
+    expect(nav.snapshotUri).toBe(SNAPSHOT);
+    expect(nav.segmentUris).toEqual([SEG1, SEG2]);
+  });
+
+  it('long-poll ポインタ（next.at varint）をベストエフォートで拾う', () => {
+    // ?at=now 応答（PoC では 9 バイト・field1=varint）相当。
+    const buf = new Uint8Array([...varintField(1, 1779809489)]);
+    const nav = decodeChunkedEntry(buf);
+    expect(nav.nextAt).toBe(1779809489);
+    expect(nav.backwardUri).toBe('');
+    expect(nav.segmentUris).toEqual([]);
+  });
+
+  it('同一 segment URI は重複排除する', () => {
+    const buf = new Uint8Array([
+      ...lenDelimited(2, strField(1, SEG1)),
+      ...lenDelimited(2, strField(1, SEG1))
+    ]);
+    const nav = decodeChunkedEntry(buf);
+    expect(nav.segmentUris).toEqual([SEG1]);
+  });
+
+  it('NDGR 以外の URI / 非URI 文字列は無視する', () => {
+    const buf = new Uint8Array([
+      ...strField(1, 'https://example.com/not-ndgr'),
+      ...strField(2, 'ただの文字列'),
+      ...lenDelimited(3, strField(1, SEG1))
+    ]);
+    const nav = decodeChunkedEntry(buf);
+    expect(nav.segmentUris).toEqual([SEG1]);
+    expect(nav.backwardUri).toBe('');
+    expect(nav.snapshotUri).toBe('');
+  });
+
+  it('空 buffer でも throw せず空の nav を返す', () => {
+    const nav = decodeChunkedEntry(new Uint8Array([]));
+    expect(nav).toEqual({
+      backwardUri: '',
+      segmentUris: [],
+      snapshotUri: '',
+      nextAt: null
+    });
   });
 });
