@@ -472,6 +472,34 @@ import {
    * 「既存の chats/gifts カウンタが伸びない vs 新 tag が伸びている」という形で観測する。
    */
   const _ndgrTagHistogram = { top: /** @type {Record<string, number>} */ ({}), msg: /** @type {Record<string, number>} */ ({}) };
+
+  // v0.1.402 観測PR（過去ログ一括バックフィルの足場・挙動には一切影響しない）:
+  //   将来「配信開始まで遡って過去コメントを取り込む」backward 巡回を実装するには、
+  //   巡回の基点になる NDGR view エンドポイントのベース URL（`?at=` クエリ前）が要る。
+  //   ニコ生プレイヤーが叩く `api/view/v4` を傍受した時に、その base URL と観測回数を
+  //   data 属性へ一度だけ露出して、実機 PoC（?at=過去 が本当に遡れるか）の足場にする。
+  //   ⛔ ここでは「観測（属性に出す）」だけで、自前 fetch も巡回も行わない（hot path 非干渉）。
+  const _ndgrViewUri = { base: '', count: 0 };
+  /** @param {string} rawUrl */
+  function observeNdgrViewUri(rawUrl) {
+    try {
+      const u = String(rawUrl || '');
+      // view ハンドシェイク URL のみ（segment/backward/snapshot は巡回の基点ではない）。
+      if (!/\/view\/v\d\//.test(u)) return;
+      const base = u.split('?')[0];
+      if (!base) return;
+      _ndgrViewUri.count += 1;
+      // 初回観測の base を保持（同一配信中は不変。複数来ても最初の view を基点とする）。
+      if (!_ndgrViewUri.base) _ndgrViewUri.base = base;
+      const root = document.documentElement;
+      if (!root) return;
+      root.setAttribute('data-nls-ndgr-view-uri', _ndgrViewUri.base.slice(0, 300));
+      root.setAttribute('data-nls-ndgr-view-uri-count', String(_ndgrViewUri.count));
+    } catch {
+      /* 観測失敗はページ挙動に影響させない */
+    }
+  }
+
   /** @param {{ top: Record<string, number>, msg: Record<string, number> } | undefined} h */
   function mergeNdgrTagHistogram(h) {
     if (!h) return;
@@ -870,6 +898,8 @@ import {
           const isJson = ct.includes('json');
           const isStream = ct.includes('event-stream') || ct.includes('ndjson');
           const isNdgr = /\/(view|segment|backward|snapshot)\/v\d\//.test(url) || url.includes('ndgr');
+          // v0.1.402 観測PR: backward 巡回バックフィルの基点 URL を一度だけ露出する（観測のみ）。
+          observeNdgrViewUri(url);
           // v0.1.245: niconico の一部 API は text/plain content-type で JSON body を返す
           //   実機観測: /v2/watch/member.json?__retry=0 が text/plain;charset=UTF-8。
           //   既存判定だけだと body が読まれず、user 情報 (userId + nickname + iconUrl)
