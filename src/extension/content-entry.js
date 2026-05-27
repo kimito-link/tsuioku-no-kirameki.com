@@ -11452,6 +11452,8 @@ let _backfillEnabled = false;
 let _backfillAutoEnabled = true;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
+/** @type {string} v0.1.422 診断: no_view_base warn を lv ごと 1 回に絞るための guard。 */
+let _diagNoViewBaseWarnedLid = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
 /**
@@ -11534,7 +11536,30 @@ async function runNdgrBackfillOnce() {
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
   if (!hasExtensionContext()) return;
   const viewBase = readNdgrViewBaseUri();
-  if (!viewBase) return; // MAIN world がまだ view を観測していない（参加直後等）
+  if (!viewBase) {
+    // v0.1.422 診断: 「1% でスピナーのまま」＝そもそも起動できていない最有力原因が
+    //   「MAIN world が NDGR view URI をまだ観測していない（data-nls-ndgr-view-uri 空）」。
+    //   tick 毎に呼ばれるので lv ごと 1 回だけ warn（spam 防止）。観測でき次第その後の
+    //   tick で起動する想定だが、長時間出続けるなら view 観測が来ていない証拠になる。
+    if (_diagNoViewBaseWarnedLid !== liveId) {
+      _diagNoViewBaseWarnedLid = liveId;
+      try {
+        console.warn(
+          '[NLS_BACKFILL_DIAG] no_view_base_yet',
+          JSON.stringify({
+            lid: String(liveId || '').trim().toLowerCase(),
+            recording,
+            auto: _backfillAutoEnabled,
+            manual: _backfillEnabled,
+            ts: new Date().toISOString()
+          })
+        );
+      } catch {
+        /* no-op */
+      }
+    }
+    return; // MAIN world がまだ view を観測していない（参加直後等）
+  }
   _backfillTriedLiveId = liveId;
 
   // 前回分があれば畳む。新しい AbortController を立て、タブ非表示で中断する。
@@ -11560,6 +11585,13 @@ async function runNdgrBackfillOnce() {
     programBeginAtMs != null && Number.isFinite(programBeginAtMs) && programBeginAtMs > 0
       ? programBeginAtMs
       : null;
+
+  // v0.1.422 診断: 取り込みが配信によって 1%/90%/入口なし と不安定な原因（cap_elapsed か
+  //   rate_limited か no_entry か）を実機で確定するため、起動時刻と前提を記録し、finally で
+  //   stopReason・seg・rows・経過秒とともに console.warn する。chrome://extensions のエラー画面に
+  //   残る（ナビゲーションで消えない）。原因特定後にこの診断は撤去する。
+  const _diagStartedAt = Date.now();
+  const _diagLid = String(liveId || '').trim().toLowerCase();
 
   try {
     // v0.1.411: knownMinCommentNo は渡さない（早期終了で途中参加のギャップを埋め損ねる
@@ -11620,6 +11652,31 @@ async function runNdgrBackfillOnce() {
     if (_backfillAbort === ac) _backfillAbort = null;
     _backfillProgress.done = 1;
     publishBackfillProgress();
+    // v0.1.422 診断: 終了時に原因究明用の要約を console.warn（chrome://extensions に残る）。
+    try {
+      const elapsedSec = Math.round((Date.now() - _diagStartedAt) / 1000);
+      // 公式コメント数（取れていれば）と記録の到達率の手がかりも添える。
+      const official =
+        officialCommentCount != null && Number.isFinite(officialCommentCount)
+          ? Math.floor(officialCommentCount)
+          : null;
+      console.warn(
+        '[NLS_BACKFILL_DIAG]',
+        JSON.stringify({
+          lid: _diagLid,
+          stop: _backfillProgress.stopReason || '(none)',
+          seg: _backfillProgress.seg,
+          rows: _backfillProgress.rows,
+          elapsedSec,
+          aborted: ac.signal.aborted,
+          hadProgramStart: startMs != null,
+          official,
+          ts: new Date().toISOString()
+        })
+      );
+    } catch {
+      /* no-op */
+    }
   }
 }
 
