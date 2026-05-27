@@ -77,15 +77,34 @@ export const NDGR_BACKFILL_FETCH_GAP_MS = 15;
 export const NDGR_BACKFILL_SEED_LAG_SEC = 90;
 
 /**
- * 1 本の backward 連鎖は時刻区画ごとに next=N で終端する。配信開始まで届かせるには、
+ * 1 本の backward 連鎖は時刻区画（バケット）ごとに next=N で終端する。配信開始まで届かせるには、
  * 終端のたびに「さらに前の時刻」から再シードして次の区画を辿る。その再シード回数の上限。
- * 18h 級でも 1 区画が数十分ぶんなら数十回で開始に届く。暴走防止に 200 で頭打ち。
+ *
+ * ⭐v0.1.431: 旧コメントは「1 区画＝数十分」と想定し 200 で足りるとしていたが、実機 lv350604301 で
+ *   バケットは実測**約 30〜45 秒**と判明（旧 200 では ~46 分配信でも途中で cap_reseeds に達し得た）。
+ *   バケット幅 50s で再シードするので、所要回数 ≒ 配信秒数 / 50。18h 配信なら 64800/50 ≈ 1296 回。
+ *   余裕を見て 4000 にする（真の終了は通常 reached_start。cap_elapsed/bytes/rows と hidden 中断が
+ *   最終防波堤なので、回数 cap で長尺を途中打ち切りしないことを優先）。
  */
-export const NDGR_BACKFILL_MAX_RESEEDS = 200;
+export const NDGR_BACKFILL_MAX_RESEEDS = 4000;
 /** 再シード時刻を「最古コメント実時刻 − この秒数」にして区画の取りこぼしを防ぐ。 */
 export const NDGR_BACKFILL_RESEED_BUFFER_SEC = 5;
 /** 配信開始時刻が不明なときの再シード後退幅（秒・保守的な固定窓）。 */
 export const NDGR_BACKFILL_RESEED_STEP_SEC = 1200;
+/**
+ * v0.1.431: 1 つの ChunkedEntry / backward 連鎖がカバーする時間区画（バケット）の幅（秒）。
+ *
+ * ⭐実機 lv350604301（爆速配信・2026-05-27）で決定的に観測: NDGR の `?at={t}` 応答は
+ *   約 30〜45 秒ごとのバケットに量子化されている。例えば `at=600` も `at=595`（=最古 vpos−5s
+ *   バッファ）も**同一のバケット＝同一 backward URI**を返す。つまり旧来の「最古 vpos − 5s」
+ *   再シードは、たった今読み終えたバケットに舞い戻り、その backward URI が既に visited のため
+ *   入口が見つからず no_progress 扱い→数回リトライ後に 34% 等で停止していた（32%停止の真因）。
+ *
+ *   そこで再シードは「直前に種をまいた at」より**最低でも 1 バケット分前**へ必ず下げる。実機
+ *   検証では at をバケット幅ぶん戻すと 57 ホップで 46 分配信の冒頭(+26秒)まで重複ゼロで到達した。
+ *   余裕を見て実測上限 45s よりやや大きい 50s にする（隙間に落ちても次バケットに入れる）。
+ */
+export const NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC = 50;
 /**
  * v0.1.429: 「配信開始に到達した」と判定する最古 vpos のしきい値（センチ秒）。
  * 最古コメントの vpos がこの値以下＝配信開始〜30秒以内なら、本当に最初まで遡れたとみなす。
@@ -304,6 +323,12 @@ export async function* crawlNdgrBackward(opts) {
   const nowSec = Math.floor(t0 / 1000);
   /** @type {number|null} これまでに遡れた最古コメントの vpos（センチ秒）。再シード判定用。 */
   let globalMinVpos = null;
+  /**
+   * @type {number|null} v0.1.431: 直前に「種をまいた at（秒）」。次の再シードは必ずこれより
+   *   最低 1 バケット分（NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC）前へ下げ、同じバケットへ
+   *   舞い戻って visited 詰まり→偽 no_progress になるのを防ぐ（爆速配信 34% 停止の真因）。
+   */
+  let lastSeedAtSec = null;
   /** @type {number} v0.1.429: 「古い区画へ進めなかった」連続回数（起点を戻してリトライする）。 */
   let noProgressStreak = 0;
   /** @type {{ rateLimited?: boolean, aborted?: boolean }} ヘルパからの異常通知 */
@@ -335,6 +360,27 @@ export async function* crawlNdgrBackward(opts) {
     return '';
   };
 
+  /**
+   * v0.1.431: 次の再シード at（秒）を決める。`desiredAtSec`（vpos 由来の理想点）を尊重しつつ、
+   * 直前に種をまいた at（lastSeedAtSec）より必ず最低 1 バケット分前へ下げる（単調減少を保証）。
+   * これにより、量子化された NDGR バケット（≒30〜45秒）の中で「同じバケットに舞い戻る」のを
+   * 防ぐ（同一バケットは同一 backward URI を返し visited 詰まり→偽 no_progress を起こす）。
+   *
+   * ⚠️ programStart で「切り上げ」はしない: 切り上げると lastSeedAtSec より後ろに戻り得て
+   *   単調減少が壊れる（種が programStart 前のテスト/異常配信で再シードが前進してしまう）。
+   *   programStart を少し下回る at は NDGR が冒頭バケットか空を返し自然に終端するので無害。
+   * @param {number} desiredAtSec
+   * @returns {number}
+   */
+  const nextSeedAtSec = (desiredAtSec) => {
+    let next = Math.floor(desiredAtSec);
+    if (lastSeedAtSec != null) {
+      const ceil = lastSeedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+      if (next > ceil) next = ceil; // 直前の種より最低 1 バケット前に強制（単調減少）
+    }
+    return next;
+  };
+
   // === 初回の入口探し: 起点が「過去への入口」を持たないことがある（押すタイミングで
   //   ライブ最先端に近すぎる等）。1 回で諦めず、起点を順に深い過去へずらして確実に
   //   入口を見つける（実機「1 回目0件のムラ」の根治）。配信開始時刻が分かればそれも候補に。===
@@ -355,7 +401,7 @@ export async function* crawlNdgrBackward(opts) {
     initialBackwardUri = await seekBackwardUri(cand);
     if (abend.aborted) return done('aborted');
     if (abend.rateLimited) return done('rate_limited');
-    if (initialBackwardUri) { seedAtSec = cand; break; }
+    if (initialBackwardUri) { seedAtSec = cand; lastSeedAtSec = cand; break; }
   }
   if (!initialBackwardUri) return done('backward_exhausted');
 
@@ -368,7 +414,13 @@ export async function* crawlNdgrBackward(opts) {
     if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
 
     // 入口 URI: 初回は探索済み、再シード後は seedAtSec から探す。
-    let backwardUri = reseed === 0 ? initialBackwardUri : await seekBackwardUri(seedAtSec);
+    let backwardUri;
+    if (reseed === 0) {
+      backwardUri = initialBackwardUri;
+    } else {
+      lastSeedAtSec = seedAtSec; // この at で種をまいた（次回はこれより 1 バケット前へ）
+      backwardUri = await seekBackwardUri(seedAtSec);
+    }
     if (abend.aborted) return done('aborted');
     if (abend.rateLimited) return done('rate_limited');
     // 入口が無い場合の扱い（v0.1.430 真因追補: 高速・大量配信で 32% 等で止まる）:
@@ -388,14 +440,10 @@ export async function* crawlNdgrBackward(opts) {
       if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
         return done('no_progress');
       }
-      // 起点をさらに前へ大きく戻して再探索（区画の隙間/visited 回避）。
-      const backExtraSec = NDGR_BACKFILL_RESEED_STEP_SEC * noProgressStreak;
-      if (programStartSec != null && globalMinVpos != null) {
-        const baseOffsetSec = Math.floor(globalMinVpos / 100);
-        seedAtSec = Math.max(programStartSec, programStartSec + baseOffsetSec - backExtraSec);
-      } else {
-        seedAtSec -= backExtraSec;
-      }
+      // v0.1.431: 起点を「直前の種より 1 バケット分ずつ」前へ戻して再探索する。旧実装は
+      //   1200s×streak も戻し、46 分級の配信では配信開始を飛び越して programStart に張り付き、
+      //   毎回同じ場所＝ no_progress 即終了だった。バケット幅で着実に隣のバケットへ降ろす。
+      seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
       continue;
     }
 
@@ -472,31 +520,27 @@ export async function* crawlNdgrBackward(opts) {
         // reached_start とは言わない（『ぜんぶ届いた』を出さない）。
         return done('no_progress');
       }
-      // 起点を「直前 globalMinVpos より、リトライ回数に応じてさらに前」へ大きく戻す。
-      const backExtraSec = NDGR_BACKFILL_RESEED_STEP_SEC * noProgressStreak;
-      if (programStartSec != null && globalMinVpos != null) {
-        const baseOffsetSec = Math.floor(globalMinVpos / 100);
-        seedAtSec = Math.max(
-          programStartSec,
-          programStartSec + baseOffsetSec - backExtraSec
-        );
-      } else {
-        seedAtSec -= backExtraSec;
-      }
+      // v0.1.431: 起点を「直前の種より 1 バケット分ずつ」前へ戻す（旧 1200s×streak は配信開始を
+      //   飛び越え programStart 張り付き→毎回同じ場所→偽 no_progress だった）。
+      seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
       continue; // 同じ reseed 予算内で次の起点を試す
     }
     // 進めた。最古 vpos を更新し、no-progress 連続カウンタをリセット。
     noProgressStreak = 0;
     globalMinVpos = chainMinVpos;
-    // 次の区画は「最古コメントの実時刻より少し前」から。vpos(センチ秒)→秒に直し、
-    //   配信開始(秒) + 最古オフセット - バッファ で再シードする。配信開始が不明なら
-    //   現在からの相対で代替（seedAtSec を窓ぶん戻す）。
-    const oldestOffsetSec = Math.floor(chainMinVpos / 100);
+    // 次の区画は「最古コメントの実時刻より少し前」から。vpos(センチ秒)→秒に直して
+    //   配信開始(秒) + 最古オフセット - バッファ を理想点にしつつ、v0.1.431 では
+    //   nextSeedAtSec で「直前の種より最低 1 バケット前」に強制する。これが無いと、量子化された
+    //   NDGR バケット（≒30〜45秒）内で oldestOffset-5s が同じバケットに舞い戻り、その backward URI
+    //   が既に visited → 入口なし → 偽 no_progress で 34% 等で停止していた（爆速配信の真因）。
     if (programStartSec != null) {
-      seedAtSec = programStartSec + oldestOffsetSec - NDGR_BACKFILL_RESEED_BUFFER_SEC;
+      const oldestOffsetSec = Math.floor(chainMinVpos / 100);
+      seedAtSec = nextSeedAtSec(
+        programStartSec + oldestOffsetSec - NDGR_BACKFILL_RESEED_BUFFER_SEC
+      );
     } else {
-      // 配信開始不明: 直近区画ぶん（保守的に固定窓）だけ戻す。
-      seedAtSec -= NDGR_BACKFILL_RESEED_STEP_SEC;
+      // 配信開始不明: 直前の種から 1 バケットぶん確実に戻す（相対）。
+      seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
     }
   }
   return done('cap_reseeds');

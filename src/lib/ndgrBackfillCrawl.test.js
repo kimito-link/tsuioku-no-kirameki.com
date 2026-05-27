@@ -199,15 +199,15 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
 
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
-    // chain1 入口（直近区画）。vpos=6000(=60秒地点) の新しめコメント。next=N で区画終端。
+    // chain1 入口（直近区画）。SEED_AT=910 で見つかる。vpos=6000(=60秒地点)。next=N で区画終端。
     map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
     map.set(BK_A, packedSegmentBytes([{ no: 50, content: '新区画', name: 'u', vpos: 6000 }]));
-    // 再シード時刻 = PROGRAM_START + floor(6000/100) - BUFFER(5) = 1000 + 60 - 5 = 1055。
-    // そこに chain2 入口（さらに前の区画）。vpos=100(=1秒地点) の配信開始付近コメント。
-    map.set(atUrl(1055), viewEntryBytes({ backwardUri: BK_B }));
+    // v0.1.431: 再シードは「直前の種(910)より最低 1 バケット(50)前」に強制される（同一バケット
+    //   舞い戻り＝偽 no_progress の根治）。vpos 由来の理想点 1055 は ceil=910-50=860 に丸められ、
+    //   再シードは atUrl(860) になる。そこに chain2 入口（さらに前の区画・vpos=100=配信開始付近）。
+    map.set(atUrl(860), viewEntryBytes({ backwardUri: BK_B }));
     map.set(BK_B, packedSegmentBytes([{ no: 5, content: '配信開始付近', name: 'u', vpos: 100 }]));
-    // chain2 終端の再シード時刻 = 1000 + floor(100/100) - 5 = 996。そこに入口無し=配信開始到達。
-    map.set(atUrl(996), viewEntryBytes({})); // backward も next も無い
+    // chain2 の最古 vpos=100 は NEAR_START(3000) 以内＝配信開始到達で reached_start。追加 entry 不要。
 
     const { fetchBinary } = makeFetchFromMap(map);
     const { sleep } = makeNoopSleep();
@@ -238,16 +238,16 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
 
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
-    // 区画1: vpos=60000(=600秒地点)。next=N で終端。
+    // 区画1: SEED_AT=910 で見つかる。vpos=60000(=600秒地点)。next=N で終端。
     map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
     map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
-    // 自然な再シード時刻 = PROGRAM_START + floor(60000/100) - 5 = 1000 + 600 - 5 = 1595。
-    //   そこには「前回と同じ vpos=60000」の区画しか無い（= 進めない・overlap）。
-    map.set(atUrl(1595), viewEntryBytes({ backwardUri: BK_STUCK }));
+    // v0.1.431: 再シードは「直前の種より 1 バケット(50)前」に強制されるので、910 から
+    //   860→810… と 50 ずつ降りていく。最初の再シード(860)は「前回と同じ vpos=60000」の区画
+    //   （= 進めない・overlap）。即 reached_start にせず次のバケットへ降りるのが核心。
+    map.set(atUrl(860), viewEntryBytes({ backwardUri: BK_STUCK }));
     map.set(BK_STUCK, packedSegmentBytes([{ no: 50, content: '同じ', name: 'u', vpos: 60000 }]));
-    // 起点を STEP(1200)×1 戻したリトライ時刻 = max(PROGRAM_START, PROGRAM_START + 600 - 1200) =
-    //   max(1000, 400) = 1000。そこに「さらに古い vpos=100(=1秒地点)」の区画。
-    map.set(atUrl(1000), viewEntryBytes({ backwardUri: BK_OLD }));
+    // 次の再シード(810)で「古い vpos=100(=1秒地点)」の区画に届く（早期 reached_start にしない）。
+    map.set(atUrl(810), viewEntryBytes({ backwardUri: BK_OLD }));
     map.set(BK_OLD, packedSegmentBytes([{ no: 5, content: '配信序盤', name: 'u', vpos: 100 }]));
 
     const { fetchBinary } = makeFetchFromMap(map);
@@ -268,23 +268,74 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('reached_start');
   });
 
+  it('爆速配信: 各区画が同一バケットを返しても、再シードを1バケット前へ確実に進めて配信開始まで遡る（v0.1.431・34%停止の真因）', async () => {
+    // ⛔ 実機 lv350604301（爆速配信・2026-05-27）で決定的に観測した真因:
+    //   NDGR の `?at={t}` 応答は約 30〜45 秒のバケットに量子化されている。区画を読み終え
+    //   「最古 vpos − 5s」で再シードすると、たった今読んだバケットに舞い戻り、その backward URI
+    //   が既に visited のため入口なし→偽 no_progress→数回リトライ後 34% 等で停止していた。
+    //
+    //   ここでは「at が同じバケット幅(50)内なら同じ区画(同 vpos)を返す」サーバを模し、旧来の
+    //   vpos−5s 再シードでは進めないが、v0.1.431 の「直前の種より最低 1 バケット前」強制で
+    //   バケットを1つずつ確実に降り、配信開始(vpos<=NEAR_START)まで遡れることを検証する。
+    // 実機に近い時間幾何: now=4000s, 配信開始=1000s ⇒ 約 3000 秒（60 バケット）の配信。
+    const NOW_MS = 4_000_000;
+    const NOW_SEC = Math.floor(NOW_MS / 1000); // 4000
+    const PROGRAM_START = 1000;
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(NOW_SEC));
+
+    // バケット幅 50 で量子化されたサーバ: at を 50 で床に丸めたバケットごとに区画が決まる。
+    //   バケット境界 b の vpos(センチ秒) = (b - PROGRAM_START) * 100。最古ほど vpos 小。
+    //   初回シードは now-90=3910 で見つかり、そこから 50 ずつ確実に降りて、b≈1000 近傍
+    //   (vpos<=NEAR_START)で reached_start。旧 vpos−5s 再シードでは同一バケットに舞い戻り頓挫する。
+    //   ⚠️ 各バケットは固有 URI（同一だと chain で visited 即終了し再シード経路を試せない）。
+    for (let at = NOW_SEC; at >= PROGRAM_START - 50; at -= 1) {
+      const bucket = Math.floor(at / 50) * 50; // 同一バケットは同一 backward URI
+      const uri = `https://mpn.live.nicovideo.jp/data/backward/v4/Q_${bucket}`;
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
+      const vpos = Math.max(0, (bucket - PROGRAM_START) * 100); // 古いバケットほど小さい vpos
+      map.set(uri, packedSegmentBytes([{ no: bucket, content: `b${bucket}`, name: 'u', vpos }]));
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => NOW_MS,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 同一バケット舞い戻りで詰まらず、配信開始付近(vpos<=NEAR_START=3000)まで遡れた。
+    expect(result.stopReason).toBe('reached_start');
+    // 複数の異なるバケットを実際に取り込んでいる（1 区画で止まっていない）。
+    const distinctBuckets = new Set(chatsAll.map((c) => c.no));
+    expect(distinctBuckets.size).toBeGreaterThan(3);
+  });
+
   it('進めない区画が続いてリトライ上限に達したら reached_start でなく no_progress（嘘の達成を出さない）', async () => {
     // 起点を何度戻しても前回と同じ vpos の区画にしか入れない＝古いものに届かない。
     // この場合「配信開始まで遡った」とは言えないので reached_start ではなく no_progress。
     const PROGRAM_START = 1000;
     const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/NP_A';
-    const BK_SAME = 'https://mpn.live.nicovideo.jp/data/backward/v4/NP_SAME';
 
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
     map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
     map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
-    // どの再シード時刻に行っても「同じ vpos=60000」の区画（進めない）。リトライ起点も同じ応答。
-    // 自然再シード 1595・リトライ 1000/ -200... すべて同じ vpos の区画を返す = 進めない。
-    for (const at of [1595, 1000, 400, 200, 100, 50]) {
-      map.set(atUrl(at), viewEntryBytes({ backwardUri: BK_SAME }));
+    // v0.1.431: 再シードは 910 から 50 ずつ降りる（860→810→760→710→660…）。どの at でも
+    //   「同じ vpos=60000 帯」の別 URI を返す＝古いものに永遠に届かない（進めない）。リトライ
+    //   上限(4)まで降りても vpos が縮まないので no_progress（reached_start にしない）。
+    //   ⚠️ 同一 URI だと chain で visited 即 break→null→no_progress に落ちて「リトライを尽くした」
+    //      経路を試せないので、at ごとに別 URI(BK_SAME_<at>) を割り当てて vpos だけ同じにする。
+    for (const at of [860, 810, 760, 710, 660, 610]) {
+      const uri = `https://mpn.live.nicovideo.jp/data/backward/v4/NP_SAME_${at}`;
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
+      map.set(uri, packedSegmentBytes([{ no: 49, content: '同じ帯', name: 'u', vpos: 60000 }]));
     }
-    map.set(BK_SAME, packedSegmentBytes([{ no: 49, content: '同じ帯', name: 'u', vpos: 60000 }]));
 
     const { fetchBinary } = makeFetchFromMap(map);
     const { sleep } = makeNoopSleep();

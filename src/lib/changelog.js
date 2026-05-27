@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.431',
+    date: '2026-05-27',
+    summary: 'コメントが速い配信でも過去ログを最後まで取り込み',
+    items: Object.freeze([
+      'コメントがとても速い配信で、過去コメントの取り込みが途中（3割ほど）で止まってしまうことがある問題を直しました。さかのぼる位置の戻し方を見直し、同じところを何度も読み直して足踏みすることなく、配信のはじめまで一気に取り込めるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.430',
     date: '2026-05-27',
     summary: '途中から開いた配信で過去コメントがより多く取れるよう改善',
