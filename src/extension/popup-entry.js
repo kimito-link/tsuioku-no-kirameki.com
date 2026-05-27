@@ -141,7 +141,7 @@ import {
   KEY_BACKFILL_AUTO_DISABLED,
   KEY_BACKFILL_PROGRESS
 } from '../lib/storageKeys.js';
-import { backfillRinkuNarration } from '../lib/backfillRinkuNarration.js';
+import { backfillRinkuNarration, backfillRecordCardHint } from '../lib/backfillRinkuNarration.js';
 import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
 import { effectiveInlinePanelPlacement } from '../lib/inlinePanelLayout.js';
 import {
@@ -5651,6 +5651,7 @@ function renderBackfillRinku(progress) {
     box.hidden = true;
     box.setAttribute('aria-hidden', 'true');
     box.removeAttribute('data-phase');
+    applyBackfillRecordCardHint(null);
     return;
   }
   const n = backfillRinkuNarration(progress);
@@ -5658,6 +5659,27 @@ function renderBackfillRinku(progress) {
   box.setAttribute('aria-hidden', 'false');
   box.setAttribute('data-phase', n.phase);
   leadEl.textContent = n.lead;
+  // v0.1.432: 記録の数字が増えない理由（入口なし/途中/混雑）を記録カードの位置にも短く出す。
+  applyBackfillRecordCardHint(progress);
+}
+
+/**
+ * v0.1.432: 記録カード（記録 件数の真下）に「過去ログ取り込みの状況」短文を出す。
+ * no_entry/partial/paused のときだけ表示。それ以外は隠す（演出はボタン下のりんくに任せる）。
+ * 取り込みハートビート（#liveStatCommentsIngest）とは別行なので互いに干渉しない。
+ * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }|null} progress
+ */
+function applyBackfillRecordCardHint(progress) {
+  const el = /** @type {HTMLElement|null} */ (document.getElementById('liveStatCommentsBackfillHint'));
+  if (!el) return;
+  const hint = progress && progress.started ? backfillRecordCardHint(progress) : '';
+  if (!hint) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = hint;
 }
 
 /**

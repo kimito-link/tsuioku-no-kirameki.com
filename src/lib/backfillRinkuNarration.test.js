@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   backfillNarrationPhase,
   backfillRinkuNarration,
-  backfillReachedStreamStart
+  backfillReachedStreamStart,
+  backfillRecordCardHint
 } from './backfillRinkuNarration.js';
 
 describe('backfillReachedStreamStart', () => {
@@ -155,5 +156,37 @@ describe('backfillRinkuNarration', () => {
     const r = backfillRinkuNarration({ started: true, rows: 238, done: 1 });
     expect(r.phase).toBe('partial');
     expect(r.lead).not.toContain('ぜんぶ届いた');
+  });
+});
+
+describe('backfillRecordCardHint（記録カードに出す短文・v0.1.432）', () => {
+  it('no_entry（入口が見つからない）は記録カードにヒントを出す', () => {
+    const h = backfillRecordCardHint({ started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' });
+    expect(h).not.toBe('');
+    expect(h).toContain('過去ログ');
+    // 断定しない（「無い」でなく「今は遡れない／また取り込める」トーン）。
+    expect(h).toContain('少し経つと');
+  });
+
+  it('partial（途中まで）は「続きを取り込む」ヒント', () => {
+    const h = backfillRecordCardHint({ started: true, rows: 238, done: 1, stopReason: 'cap_elapsed' });
+    expect(h).toContain('途中まで');
+    expect(h).toContain('もう一度');
+  });
+
+  it('paused（混雑）は「一時中断」ヒント', () => {
+    const h = backfillRecordCardHint({ started: true, rows: 100, done: 1, stopReason: 'rate_limited' });
+    expect(h).toContain('中断');
+  });
+
+  it('取り込み中（fetching / progress）は記録カードに出さない（演出はボタン下に任せる）', () => {
+    expect(backfillRecordCardHint({ started: true, rows: 0, done: 0 })).toBe('');
+    expect(backfillRecordCardHint({ started: true, rows: 50, done: 0 })).toBe('');
+  });
+
+  it('達成（done）・空（done_empty）・待機（idle）は記録カードに出さない', () => {
+    expect(backfillRecordCardHint({ started: true, rows: 390, done: 1, stopReason: 'reached_start' })).toBe('');
+    expect(backfillRecordCardHint({ started: true, rows: 0, done: 1, stopReason: 'reached_start' })).toBe('');
+    expect(backfillRecordCardHint({})).toBe('');
   });
 });

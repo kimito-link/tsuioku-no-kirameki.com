@@ -2714,6 +2714,21 @@
         font-weight: 600;
       }
 
+      /* v0.1.432: 過去ログ取り込みの状況（入口なし/途中/混雑）を記録カードの位置に出す行。
+         長めの文なので折り返す（official と同様）。控えめに目を引く色。 */
+      .nl-live-stat-sub--backfill-hint {
+        white-space: normal;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        word-break: break-word;
+        margin-top: 3px;
+        color: var(--nl-muted);
+        font-weight: 600;
+        line-height: 1.3;
+      }
+
       /* 応援ランキング専用ゾーン（記録カード内のゆっくりアイコン本体には触れない） */
       .nl-top-support-rank {
         width: 100%;
@@ -9053,6 +9068,14 @@
           <div
             class="nl-live-stat-sub nl-live-stat-sub--ingest"
             id="liveStatCommentsIngest"
+            hidden
+            aria-live="polite"
+          ></div>
+          <!-- v0.1.432: 過去ログ取り込みの状況（入口なし/途中/混雑）を記録カードの位置にも出す。
+               記録の数字が増えない理由を、まず目が行くここに短く表示（ボタン下の語りは別途維持）。 -->
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--backfill-hint"
+            id="liveStatCommentsBackfillHint"
             hidden
             aria-live="polite"
           ></div>

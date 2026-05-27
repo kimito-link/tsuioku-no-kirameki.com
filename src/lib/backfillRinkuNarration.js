@@ -156,3 +156,33 @@ export function backfillRinkuNarration(progress) {
       };
   }
 }
+
+/**
+ * v0.1.432: 記録カード（記録 件数の真下）に出す「過去ログ取り込みの状況」短文を返す。
+ *
+ * ユーザー要望（2026-05-28）: 「いまは遡れる入口が見つからなかったよ…」のような状況は、
+ *   取り込みボタンの下のピンク枠だと気づきにくい。記録の数字が増えない理由を、まず目が行く
+ *   記録カードの位置にも短く出したい。
+ *
+ * ボタン下の温かい語り（lead）はそのまま残し、ここでは「記録が止まっている/途中」の状況
+ *   （no_entry / partial / paused）のときだけ簡潔なヒントを返す。取り込み中（fetching/progress）
+ *   や達成（done）・空（done_empty）・待機（idle）では空文字＝記録カードには何も出さない
+ *   （進行中の演出はボタン下のりんくに任せ、記録カードを散らかさない）。
+ *
+ * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }} progress
+ * @returns {string} 記録カードに出す短文（出さないときは ''）。
+ */
+export function backfillRecordCardHint(progress) {
+  const phase = backfillNarrationPhase(progress);
+  switch (phase) {
+    case 'no_entry':
+      return '過去ログは今は遡れませんでした（少し経つと取り込めることがあります）';
+    case 'partial':
+      return '過去ログは途中まで取り込みました（もう一度押すと続きを取り込みます）';
+    case 'paused':
+      return '混雑のため一時中断（少し待つと続きを取り込みます）';
+    default:
+      // idle / fetching / progress / done / done_empty は記録カードに出さない。
+      return '';
+  }
+}

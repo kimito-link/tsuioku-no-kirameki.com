@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.432',
+    date: '2026-05-28',
+    summary: '過去ログが取れないとき記録カードにも理由を表示',
+    items: Object.freeze([
+      '過去コメントが取り込めないとき（配信側の都合で遡れない・混雑・途中まで等）の案内を、取り込みボタンの下だけでなく「記録」カードの数字のすぐ下にも短く表示するようにしました。記録が増えない理由がひと目でわかります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.431',
     date: '2026-05-27',
     summary: 'コメントが速い配信でも過去ログを最後まで取り込み',
