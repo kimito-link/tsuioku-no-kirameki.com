@@ -226,6 +226,82 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('reached_start');
   });
 
+  it('途中参加: 再シードで「進めない」区画に当たっても即停止せず、起点を戻して遡り続ける（v0.1.429 真因修正）', async () => {
+    // ⛔ 真因（実機: 途中参加の全配信で 1〜5% しか取れない＋『ぜんぶ届いた』誤表示）:
+    //   旧実装は「前回より古い vpos へ進めなかった」を即 reached_start にして数%で停止した。
+    //   ここでは再シード先で前回と同じ vpos の区画に当たる（進めない）状況を作り、起点を
+    //   さらに大きく戻して古い区画へ到達できることを確認する（早期 reached_start にしない）。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/MJ_A';
+    const BK_STUCK = 'https://mpn.live.nicovideo.jp/data/backward/v4/MJ_STUCK';
+    const BK_OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/MJ_OLD';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1: vpos=60000(=600秒地点)。next=N で終端。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // 自然な再シード時刻 = PROGRAM_START + floor(60000/100) - 5 = 1000 + 600 - 5 = 1595。
+    //   そこには「前回と同じ vpos=60000」の区画しか無い（= 進めない・overlap）。
+    map.set(atUrl(1595), viewEntryBytes({ backwardUri: BK_STUCK }));
+    map.set(BK_STUCK, packedSegmentBytes([{ no: 50, content: '同じ', name: 'u', vpos: 60000 }]));
+    // 起点を STEP(1200)×1 戻したリトライ時刻 = max(PROGRAM_START, PROGRAM_START + 600 - 1200) =
+    //   max(1000, 400) = 1000。そこに「さらに古い vpos=100(=1秒地点)」の区画。
+    map.set(atUrl(1000), viewEntryBytes({ backwardUri: BK_OLD }));
+    map.set(BK_OLD, packedSegmentBytes([{ no: 5, content: '配信序盤', name: 'u', vpos: 100 }]));
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 「進めない」区画(no=50 重複)で諦めず、起点を戻して序盤(no=5・vpos=100)まで遡る。
+    expect(chatsAll.map((c) => c.no)).toContain(5);
+    // 序盤(vpos<=NEAR_START)に到達したので reached_start。早期停止していないことが核心。
+    expect(result.stopReason).toBe('reached_start');
+  });
+
+  it('進めない区画が続いてリトライ上限に達したら reached_start でなく no_progress（嘘の達成を出さない）', async () => {
+    // 起点を何度戻しても前回と同じ vpos の区画にしか入れない＝古いものに届かない。
+    // この場合「配信開始まで遡った」とは言えないので reached_start ではなく no_progress。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/NP_A';
+    const BK_SAME = 'https://mpn.live.nicovideo.jp/data/backward/v4/NP_SAME';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // どの再シード時刻に行っても「同じ vpos=60000」の区画（進めない）。リトライ起点も同じ応答。
+    // 自然再シード 1595・リトライ 1000/ -200... すべて同じ vpos の区画を返す = 進めない。
+    for (const at of [1595, 1000, 400, 200, 100, 50]) {
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: BK_SAME }));
+    }
+    map.set(BK_SAME, packedSegmentBytes([{ no: 49, content: '同じ帯', name: 'u', vpos: 60000 }]));
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 古いものに届かないので reached_start とは言わない（『ぜんぶ届いた』誤表示の防止）。
+    expect(result.stopReason).toBe('no_progress');
+  });
+
   it('segment 数 cap に達したら cap_segments で停止する', async () => {
     // backward を延々辿れるチェーン（BK_i → BK_{i+1}）。各 1 件 chat。
     const map = new Map();

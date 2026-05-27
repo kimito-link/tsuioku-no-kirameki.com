@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.429',
+    date: '2026-05-27',
+    summary: '途中から開いた配信で過去コメントが1回で最後まで取れるよう修正',
+    items: Object.freeze([
+      '途中から開いた配信で、過去コメントの取り込みが数%で止まってしまう問題を修正しました（これまでは「もう一度押す」と続きが取れていましたが、1回で配信のはじめまで遡れるようにしました）。さかのぼる途中で一度つまずいても、もっと前から探し直して取り続けます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.424',
     date: '2026-05-27',
     summary: 'ニコ生以外のページで別の配信の記録が出る問題を再修正',

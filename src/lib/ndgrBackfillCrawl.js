@@ -86,6 +86,17 @@ export const NDGR_BACKFILL_MAX_RESEEDS = 200;
 export const NDGR_BACKFILL_RESEED_BUFFER_SEC = 5;
 /** 配信開始時刻が不明なときの再シード後退幅（秒・保守的な固定窓）。 */
 export const NDGR_BACKFILL_RESEED_STEP_SEC = 1200;
+/**
+ * v0.1.429: 「配信開始に到達した」と判定する最古 vpos のしきい値（センチ秒）。
+ * 最古コメントの vpos がこの値以下＝配信開始〜30秒以内なら、本当に最初まで遡れたとみなす。
+ * これ以外の「進めなかった」は reached_start にせず、起点を戻してリトライ/no_progress に倒す。
+ */
+export const NDGR_BACKFILL_NEAR_START_VPOS_CS = 3000; // 30秒 ×100(センチ秒)
+/**
+ * v0.1.429: 「前回より古い区画へ進めなかった」ときに、起点をさらに大きく戻して再挑戦する
+ * 最大連続回数。これを超えても進めなければ no_progress で終える（reached_start とは言わない）。
+ */
+export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 4;
 
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
@@ -95,7 +106,7 @@ export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
  * @typedef {(
  *   'backward_exhausted' | 'reached_start' | 'cap_reseeds' | 'visited_revisit' |
  *   'cap_segments' | 'cap_elapsed' | 'cap_bytes' | 'cap_rows' | 'aborted' |
- *   'rate_limited' | 'no_view_base' | 'no_entry'
+ *   'rate_limited' | 'no_view_base' | 'no_entry' | 'no_progress'
  * )} NdgrBackfillStopReason
  */
 
@@ -293,6 +304,8 @@ export async function* crawlNdgrBackward(opts) {
   const nowSec = Math.floor(t0 / 1000);
   /** @type {number|null} これまでに遡れた最古コメントの vpos（センチ秒）。再シード判定用。 */
   let globalMinVpos = null;
+  /** @type {number} v0.1.429: 「古い区画へ進めなかった」連続回数（起点を戻してリトライする）。 */
+  let noProgressStreak = 0;
   /** @type {{ rateLimited?: boolean, aborted?: boolean }} ヘルパからの異常通知 */
   const abend = {};
 
@@ -407,14 +420,50 @@ export async function* crawlNdgrBackward(opts) {
       backwardUri = nextUri;
     }
 
-    // === 再シード判定: この区画で「これまでより古い vpos」へ進めたか。 ===
-    //   進めていなければ（または vpos 不明なら）配信開始に到達とみなして終了。
-    if (
-      chainMinVpos == null ||
-      (globalMinVpos != null && chainMinVpos >= globalMinVpos)
-    ) {
-      return done(reseed === 0 ? 'backward_exhausted' : 'reached_start');
+    // === 再シード判定（v0.1.429 真因修正: 早期終了で途中参加が数%しか取れないバグ）===
+    //   旧実装は「この区画で前回より古い vpos へ進めなかった」を即 reached_start（配信開始
+    //   到達）とみなして終了していた。だが「進めなかった」≠「配信開始」: 途中参加だと
+    //   再シード起点(programStart+最古vpos-5s)で見つかる区画が前回と重なり/1区画戻れない
+    //   ことが頻発し、まだ vpos が大きい(配信序盤まで程遠い)のに『着いた』と誤判定→数%で停止
+    //   ＋『ぜんぶ届いた』誤表示。実機で途中参加の全配信で 1〜5% 再現。
+    //
+    //   正しい停止＝(A) 真に古いものが無い: chainMinVpos が配信開始近傍(<=NEAR_START_VPOS)に
+    //   到達 → reached_start。(B) backward 入口が尽きた(backwardUri 無し)→ 上の if で既に処理。
+    //   「進めなかっただけ」は (C) 起点をさらに大きく戻して数回リトライ。リトライしても進めない
+    //   なら reached_start ではなく no_progress で終える(嘘の達成を言わない)。
+    if (chainMinVpos == null) {
+      // この区画で 1 件も vpos が取れなかった＝これ以上の手掛かり無し。初回なら入口問題、
+      // 再シード後なら『取り切った』とは言い切れないので no_progress。
+      return done(reseed === 0 ? 'backward_exhausted' : 'no_progress');
     }
+    // 配信開始近傍に到達したら本当の完了。NEAR_START_VPOS_CS（センチ秒）以内＝開始〜数十秒。
+    if (chainMinVpos <= NDGR_BACKFILL_NEAR_START_VPOS_CS) {
+      return done('reached_start');
+    }
+    const madeProgress = globalMinVpos == null || chainMinVpos < globalMinVpos;
+    if (!madeProgress) {
+      // 進めなかった。即 reached_start にせず、起点をさらに大きく戻してリトライする。
+      noProgressStreak += 1;
+      if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
+        // 何度戻しても古い区画に入れない＝ここで諦める。ただし配信開始とは限らないので
+        // reached_start とは言わない（『ぜんぶ届いた』を出さない）。
+        return done('no_progress');
+      }
+      // 起点を「直前 globalMinVpos より、リトライ回数に応じてさらに前」へ大きく戻す。
+      const backExtraSec = NDGR_BACKFILL_RESEED_STEP_SEC * noProgressStreak;
+      if (programStartSec != null && globalMinVpos != null) {
+        const baseOffsetSec = Math.floor(globalMinVpos / 100);
+        seedAtSec = Math.max(
+          programStartSec,
+          programStartSec + baseOffsetSec - backExtraSec
+        );
+      } else {
+        seedAtSec -= backExtraSec;
+      }
+      continue; // 同じ reseed 予算内で次の起点を試す
+    }
+    // 進めた。最古 vpos を更新し、no-progress 連続カウンタをリセット。
+    noProgressStreak = 0;
     globalMinVpos = chainMinVpos;
     // 次の区画は「最古コメントの実時刻より少し前」から。vpos(センチ秒)→秒に直し、
     //   配信開始(秒) + 最古オフセット - バッファ で再シードする。配信開始が不明なら

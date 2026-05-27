@@ -69,6 +69,19 @@ describe('backfillNarrationPhase', () => {
     ).toBe('no_entry');
   });
 
+  it('no_progress（v0.1.429・進めず途中終了）で件数ありは partial（reached_start でなく「もう一度」）', () => {
+    // ⭐取れてないのに『ぜんぶ届いた』を出さないことの核心。no_progress は reached_start でない。
+    expect(
+      backfillNarrationPhase({ started: true, rows: 7408, done: 1, stopReason: 'no_progress' })
+    ).toBe('partial');
+  });
+
+  it('no_progress・件数0は no_entry', () => {
+    expect(
+      backfillNarrationPhase({ started: true, rows: 0, done: 1, stopReason: 'no_progress' })
+    ).toBe('no_entry');
+  });
+
   it('stopReason 無し（旧経路）は安全側＝件数ありで partial / 件数0で no_entry（done と断定しない）', () => {
     expect(backfillNarrationPhase({ started: true, rows: 300, done: 1 })).toBe('partial');
     expect(backfillNarrationPhase({ started: true, rows: 0, done: 1 })).toBe('no_entry');
