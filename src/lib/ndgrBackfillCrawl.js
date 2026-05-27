@@ -65,6 +65,13 @@ export const NDGR_BACKFILL_DEFAULT_CAPS = Object.freeze({
  */
 export const NDGR_BACKFILL_FETCH_GAP_MS = 30;
 
+/**
+ * 巡回の起点を「現在より何秒前」にするか。`?at=now` の nextAt は未来方向ポインタで
+ * backward が出ないため、封済みになっている過去（この秒数前）を起点に View を読む。
+ * 直近この秒数ぶんは RT 記録が拾うので、起点を少し過去にしても取りこぼさない。
+ */
+export const NDGR_BACKFILL_SEED_LAG_SEC = 90;
+
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
 
@@ -237,20 +244,21 @@ export async function* crawlNdgrBackward(opts) {
   if (nowNav.nextAt == null) return done('no_entry');
 
   // --- 2) backward 連鎖の入口 URI（backward.segment.uri）を探す ---
-  //   ⭐ 2026-05-27 OSS 3実装（NDGRClient/NdgrClientSharp/rinsuki-lab）の正解:
-  //   View の ChunkedEntry stream を ?at={next.at} で読み、`backward` フィールドを持つ
-  //   entry が現れるまで `next` ポインタを辿る（NDGRClient の外側 while ループ）。
-  //   1 回の ?at={nextAt} だけだと live-tip 応答に backward が無いことがあり、旧実装は
-  //   そこで即 backward_exhausted（実機で押しても無反応の回帰）していた。next を数回
-  //   辿れば backward が出る。出たらそれが過去への入口。以降は Backward API
-  //   （PackedSegment・下記 3）を辿る。View の live segment は long-poll で空なので使わない。
+  //   ⭐ 実機で確定（2026-05-27）: 起点は「過去の実時刻」にする。`?at=now` が返す nextAt は
+  //   未来方向の long-poll ポインタで、それを起点に next を辿っても backward は出ない
+  //   （実機 v0.1.409 で backward_exhausted seg=0）。一方 `?at={少し過去の unixtime}` で
+  //   叩くと、その時刻帯の ChunkedEntry に backward.segment.uri が埋まる（v0.1.408 実機で
+  //   bwd=Y を確認）。そこで現在より NDGR_BACKFILL_SEED_LAG_SEC 秒前を起点に View を読み、
+  //   backward が無ければ next を辿って探す。出たら過去への入口。以降は Backward API
+  //   （PackedSegment・下記 3）を辿る。直近 lag 秒ぶんは RT 記録が拾うので取りこぼさない。
   const t0 = now();
   /** @type {Set<string>} 再訪防止（backward URI / at URL を一意キーに） */
   const visited = new Set();
   /** @type {string} backward 連鎖の入口 URI（見つかるまで '') */
   let backwardUri = '';
-  let seedAt = nowNav.nextAt;
-  // next を辿る回数の上限（暴走防止）。通常は数回で backward が出る。
+  // 起点 = 現在より少し過去の unixtime（秒）。封済みになっている時刻帯を狙う。
+  let seedAt = Math.floor(t0 / 1000) - NDGR_BACKFILL_SEED_LAG_SEC;
+  // backward が出るまで View を辿る回数の上限（暴走防止）。
   for (let hop = 0; hop < 20; hop += 1) {
     if (isAborted(signal)) return done('aborted');
     if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
