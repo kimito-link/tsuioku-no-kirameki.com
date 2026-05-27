@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.418',
+    date: '2026-05-27',
+    summary: '過去コメントを自動で取り込むように（OFFにもできます）',
+    items: Object.freeze([
+      'ボタンを押さなくても、配信を開いて記録ONなら、過去のコメントを自動で取り込むようにしました（途中から開いても配信の最初までさかのぼります）',
+      '自動取り込みは「詳細設定」の記録の下で OFF にできます（OFF にすると「過去のコメントを取り込む」ボタンを押したときだけ取り込みます）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.417',
     date: '2026-05-27',
     summary: '過去コメントの取り込みが1回でより多く遡れるよう改善',

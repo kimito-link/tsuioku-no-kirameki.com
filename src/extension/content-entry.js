@@ -36,6 +36,7 @@ import {
   KEY_THUMB_INTERVAL_MS,
   KEY_GIFT_RANKING_LANE_ENABLED,
   KEY_BACKFILL_ENABLED,
+  KEY_BACKFILL_AUTO_DISABLED,
   KEY_BACKFILL_PROGRESS,
   commentsStorageKey,
   giftUsersStorageKey,
@@ -265,7 +266,9 @@ import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
 import {
   isBackfillEnabledFromStorage,
-  isBackfillJustEnabledFromChange
+  isBackfillJustEnabledFromChange,
+  isBackfillAutoStartEnabled,
+  isBackfillAutoJustEnabledFromChange
 } from '../lib/backfillOptIn.js';
 import { deriveBackfillCapturedAt } from '../lib/backfillCapturedAt.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
@@ -6177,6 +6180,7 @@ function startPageFrameLoop() {
     }
     maybeRunEndedBulkHarvest();
     maybeOfficialGapQuietDeepHarvest();
+    maybeAutoStartBackfill(); // v0.1.418: 自動で過去ログ取り込み（既定 ON・OFF も可）。
     persistAiShareFastDiagnostics();
     // 0.1.32 (AG): バックグラウンドで prewarm を skip した分、tick で再 schedule
     // を試みる。visibilitychange は tick を呼ぶので、可視化された瞬間に prewarm
@@ -10033,10 +10037,12 @@ async function start() {
   } catch { /* no-op */ }
 
   // v0.1.405: 過去ログ一括バックフィル opt-in flag の初期読み込み（async）。
+  // v0.1.418: 自動開始フラグ（既定 ON）も一緒に読む。
   try {
-    chrome.storage.local.get(KEY_BACKFILL_ENABLED).then((bag) => {
+    chrome.storage.local.get([KEY_BACKFILL_ENABLED, KEY_BACKFILL_AUTO_DISABLED]).then((bag) => {
       _backfillEnabled = isBackfillEnabledFromStorage(bag);
-    }).catch(() => { /* OFF default を維持 */ });
+      _backfillAutoEnabled = isBackfillAutoStartEnabled(bag);
+    }).catch(() => { /* 既定（手動 OFF・自動 ON）を維持 */ });
   } catch { /* no-op */ }
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -10073,6 +10079,21 @@ async function start() {
       });
       if (justEnabled && isWatchInlinePanelTopFrame()) {
         // 押下ごとに「続きから」やり直せるよう、ワンショット guard を解除して起動。
+        _backfillTriedLiveId = '';
+        void runNdgrBackfillOnce();
+      }
+    }
+
+    // v0.1.418: 自動開始フラグの同期。OFF→ON（自動を有効に戻した）瞬間に guard を解除して
+    //   即起動する（次の maintenance tick を待たずに反応）。ON→OFF は次の起動を止めるだけ。
+    if (changes[KEY_BACKFILL_AUTO_DISABLED]) {
+      _backfillAutoEnabled = isBackfillAutoStartEnabled({
+        [KEY_BACKFILL_AUTO_DISABLED]: changes[KEY_BACKFILL_AUTO_DISABLED].newValue
+      });
+      const autoJustEnabled = isBackfillAutoJustEnabledFromChange(
+        changes[KEY_BACKFILL_AUTO_DISABLED]
+      );
+      if (autoJustEnabled && isWatchInlinePanelTopFrame()) {
         _backfillTriedLiveId = '';
         void runNdgrBackfillOnce();
       }
@@ -11404,8 +11425,13 @@ function isGiftRankingLaneEnabled() {
 //   - 取り込みは flushNdgrChatRowsBatch を経由せず、capturedAt/vpos を保持したまま
 //     persistCommentRows に直接流す（flush は capturedAt を握り潰すため）。
 
-/** @type {boolean} 起動直後 false、初回 storage 読み込み完了後に正しい値。 */
+/** @type {boolean} 手動ボタンで起動されたか（押下で true）。初回 storage 読み込みで反映。 */
 let _backfillEnabled = false;
+/**
+ * @type {boolean} v0.1.418: 自動開始が有効か（既定 true＝勝手に取り込む）。
+ * ユーザーが設定で「自動取り込み」を OFF にしたときだけ false。初回 storage 読み込みで反映。
+ */
+let _backfillAutoEnabled = true;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
@@ -11484,7 +11510,9 @@ async function backfillFetchBinary(url, opts) {
  */
 async function runNdgrBackfillOnce() {
   if (_backfillTriedLiveId && _backfillTriedLiveId === liveId) return; // 二重起動防止
-  if (!_backfillEnabled) return;
+  // v0.1.418: 手動ボタン押下（_backfillEnabled）か自動開始 ON（_backfillAutoEnabled・既定）の
+  //   どちらかで起動する。両方 OFF（自動を切ってボタンも押していない）のときだけ起動しない。
+  if (!_backfillEnabled && !_backfillAutoEnabled) return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
   if (!hasExtensionContext()) return;
   const viewBase = readNdgrViewBaseUri();
@@ -11575,6 +11603,19 @@ async function runNdgrBackfillOnce() {
     _backfillProgress.done = 1;
     publishBackfillProgress();
   }
+}
+
+/**
+ * v0.1.418: 自動開始の試行（maintenance tick から毎周期呼ばれる）。
+ *   自動 ON（既定）かつ top frame のときだけ runNdgrBackfillOnce を試す。実際の起動可否
+ *   （記録 ON / liveId / view base 観測済み / ワンショット guard）は runNdgrBackfillOnce が
+ *   判定するので、ここは「自動が許可されているか」と top frame だけ見て委ねる＝view base が
+ *   遅れて観測される配信でも、観測でき次第その後の tick で 1 回起動する。
+ */
+function maybeAutoStartBackfill() {
+  if (!_backfillAutoEnabled) return;
+  if (!isWatchInlinePanelTopFrame()) return;
+  void runNdgrBackfillOnce();
 }
 
 /**

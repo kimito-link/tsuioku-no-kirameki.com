@@ -138,6 +138,7 @@ import {
   normalizeFoldAnonymousInRankStrip,
   KEY_GIFT_RANKING_LANE_ENABLED,
   KEY_BACKFILL_ENABLED,
+  KEY_BACKFILL_AUTO_DISABLED,
   KEY_BACKFILL_PROGRESS
 } from '../lib/storageKeys.js';
 import { backfillRinkuNarration } from '../lib/backfillRinkuNarration.js';
@@ -158,7 +159,7 @@ import {
   storagePatchInlinePanelWidthMode
 } from '../lib/inlinePanelPlacementStorage.js';
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
-import { isBackfillEnabledFromStorage } from '../lib/backfillOptIn.js';
+import { isBackfillEnabledFromStorage, isBackfillAutoStartEnabled } from '../lib/backfillOptIn.js';
 import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold.js';
 import {
   summarizeGiftSubAppHistory,
@@ -5695,10 +5696,16 @@ async function refreshBackfillFetchPrompt(liveId) {
   prompt.setAttribute('aria-hidden', 'false');
   bindBackfillProgressListenerOnce();
   // 既に ON 済みなら（同一配信中の再オープン）状態テキストを控えめに残す。
+  // v0.1.418: 自動取り込みトグルの hydrate も一緒に行う（既定 ON＝checked）。
   let enabled = false;
   try {
-    const bag = await chrome.storage.local.get(KEY_BACKFILL_ENABLED);
+    const bag = await chrome.storage.local.get([
+      KEY_BACKFILL_ENABLED,
+      KEY_BACKFILL_AUTO_DISABLED
+    ]);
     enabled = isBackfillEnabledFromStorage(bag);
+    const autoEl = /** @type {HTMLInputElement|null} */ ($('backfillAutoStartToggle'));
+    if (autoEl) autoEl.checked = isBackfillAutoStartEnabled(bag);
   } catch {
     enabled = false;
   }
@@ -9392,6 +9399,7 @@ async function refresh() {
         KEY_LAST_WATCH_URL,
         KEY_RECORDING,
         KEY_DEEP_HARVEST_QUIET_UI,
+        KEY_BACKFILL_AUTO_DISABLED,
         KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
         KEY_INLINE_PANEL_WIDTH_MODE,
         KEY_INLINE_PANEL_PLACEMENT,
@@ -9433,6 +9441,13 @@ async function refresh() {
   applyCalmPanelMotionClass(calmOn);
   const calmMotionElHydrate = /** @type {HTMLInputElement|null} */ ($('calmPanelMotion'));
   if (calmMotionElHydrate) calmMotionElHydrate.checked = calmOn;
+  // v0.1.418: 過去ログ自動取り込みトグルのハイドレート（既定 ON＝checked）。lid 非依存で
+  //   常に正しい状態にする（refreshBackfillFetchPrompt は lid 無しだと早期 return するため、
+  //   ここで全体 refresh のたびに反映する）。
+  const backfillAutoHydrate = /** @type {HTMLInputElement|null} */ ($('backfillAutoStartToggle'));
+  if (backfillAutoHydrate) {
+    backfillAutoHydrate.checked = isBackfillAutoStartEnabled(openBag);
+  }
   const mktMaskHydrate = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
   if (mktMaskHydrate) {
     mktMaskHydrate.checked = normalizeMarketingExportMaskLabels(
@@ -13874,6 +13889,18 @@ function initPopup() {
       const on = Boolean(calmMotionEl.checked);
       applyCalmPanelMotionClass(on);
       await storageSetSafe({ [KEY_CALM_PANEL_MOTION]: on });
+    } catch {
+      //
+    }
+  });
+
+  // v0.1.418: 過去ログ自動取り込みトグル。checked=自動 ON（既定）→ disabled キーは false、
+  //   unchecked=自動 OFF → disabled=true（反転セマンティクス）。content が onChanged で反応し、
+  //   ON に戻した瞬間は guard 解除で即起動する。
+  const backfillAutoEl = /** @type {HTMLInputElement|null} */ ($('backfillAutoStartToggle'));
+  backfillAutoEl?.addEventListener('change', async () => {
+    try {
+      await storageSetSafe({ [KEY_BACKFILL_AUTO_DISABLED]: !backfillAutoEl.checked });
     } catch {
       //
     }
