@@ -146,6 +146,46 @@ export function buildMultiTabHint(count) {
 }
 
 /**
+ * v0.1.414: standalone popup の multitab「中身が空」救済ウォッチドッグの判定。
+ *
+ * 別ウィンドウ POP は自タブを持たず getLastFocused の前面タブから lv を推測するため、
+ * 複数タブ時に「未 populate の別タブ lv」を拾い、lv は取れる（source≠storage/none）ので
+ * 「前回の配信」フォールバックが走らず全カード/全チップ「—」固定になる残穴があった。
+ *
+ * この関数は「いま解決した lv に実データが全く無く、かつ解決ソースが "推測"
+ * （dataBacked / lastFocusedNormal / storage）」のとき true を返す。呼び出し側は
+ * true のとき空状態と同じ「前回の配信」復元に倒し、「—」のまま居座らせない。
+ *
+ * 前面 activeTab / inlineParam（self-tab の真実）では救済しない＝ユーザーが今まさに
+ * 見ている配信が始まったばかりで空なだけかもしれず、別配信を出すのは誤りなので false。
+ *
+ * @param {{
+ *   watchUrlSource: string,
+ *   hasSnapshotForLv: boolean,
+ *   storedCommentCount: number,
+ *   onNicoUserProfilePage?: boolean,
+ *   inlineMode?: boolean
+ * }} input
+ * @returns {boolean} true = 「前回の配信」復元に倒すべき
+ */
+export function shouldRescueEmptyResolvedWatch(input) {
+  if (!input || typeof input !== 'object') return false;
+  if (input.inlineMode === true) return false;
+  if (input.onNicoUserProfilePage === true) return false;
+  const src = String(input.watchUrlSource || '').trim();
+  const resolvedFromGuess =
+    src === 'dataBacked' || src === 'lastFocusedNormal' || src === 'storage';
+  if (!resolvedFromGuess) return false;
+  const count =
+    typeof input.storedCommentCount === 'number' &&
+    Number.isFinite(input.storedCommentCount)
+      ? input.storedCommentCount
+      : 0;
+  const hasAnyUsableData = input.hasSnapshotForLv === true || count > 0;
+  return !hasAnyUsableData;
+}
+
+/**
  * @param {string} title
  * @param {number} max
  * @returns {string}

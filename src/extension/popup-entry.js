@@ -5,6 +5,7 @@ import {
   watchPageUrlsMatchForSnapshot
 } from '../lib/broadcastUrl.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
+import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import {
@@ -10139,16 +10140,18 @@ async function refresh() {
    *   見ている配信が始まったばかりで空なだけかもしれないので、別配信を出すのは誤り。
    *   INLINE_MODE（watch 埋め込み iframe）も空状態 UI を持たないので対象外。
    */
-  if (!INLINE_MODE && isFreshRefresh()) {
-    const resolvedFromGuess =
-      watchUrlPick.source === 'dataBacked' ||
-      watchUrlPick.source === 'lastFocusedNormal' ||
-      watchUrlPick.source === 'storage';
+  if (isFreshRefresh()) {
     const snapForLv =
       watchMetaCache.snapshot != null &&
       String(watchMetaCache.snapshot?.liveId || '').trim().toLowerCase() === lv;
-    const hasAnyUsableData = snapForLv || arr.length > 0;
-    if (resolvedFromGuess && !hasAnyUsableData && !onNicoUserProfilePage) {
+    const rescueEmpty = shouldRescueEmptyResolvedWatch({
+      watchUrlSource: watchUrlPick.source,
+      hasSnapshotForLv: snapForLv,
+      storedCommentCount: arr.length,
+      onNicoUserProfilePage,
+      inlineMode: INLINE_MODE
+    });
+    if (rescueEmpty) {
       // 前回の配信を復元（applyLastBroadcastReviewToEmptyState が履歴ありなら cards に流し、
       // 無ければ nl-empty-no-history で畳む）。全部「—」のまま居座らせない。
       // この lv には流すべきデータが無いので、以降の遅延ハイドレート/intercept は

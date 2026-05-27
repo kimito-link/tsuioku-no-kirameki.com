@@ -7,6 +7,7 @@ import {
   labelStatSurfaceMode,
   labelWatchUrlSource,
   resolvePopupStatSurfaceMode,
+  shouldRescueEmptyResolvedWatch,
   shouldShowPopupRecoveryBar,
   truncateUiTitle
 } from './popupContextBarModel.js';
@@ -14,8 +15,60 @@ import {
 describe('popupContextBarModel', () => {
   it('labelWatchUrlSource', () => {
     expect(labelWatchUrlSource('activeTab')).toBe('前面タブ');
+    expect(labelWatchUrlSource('dataBacked')).toBe('記録のある配信タブ');
     expect(labelWatchUrlSource('lastFocusedNormal')).toBe('直前のブラウザタブ');
     expect(labelWatchUrlSource('storage')).toBe('直近の視聴URL（保存）');
+  });
+
+  describe('shouldRescueEmptyResolvedWatch（v0.1.414 multitab「中身が空」救済）', () => {
+    const base = {
+      watchUrlSource: 'lastFocusedNormal',
+      hasSnapshotForLv: false,
+      storedCommentCount: 0,
+      onNicoUserProfilePage: false,
+      inlineMode: false
+    };
+
+    it('推測解決（lastFocusedNormal）でデータ皆無 → 救済する（true）', () => {
+      expect(shouldRescueEmptyResolvedWatch(base)).toBe(true);
+    });
+
+    it('推測解決（storage）でデータ皆無 → 救済する（true）', () => {
+      expect(shouldRescueEmptyResolvedWatch({ ...base, watchUrlSource: 'storage' })).toBe(true);
+    });
+
+    it('推測解決（dataBacked）でデータ皆無 → 救済する（true）', () => {
+      expect(shouldRescueEmptyResolvedWatch({ ...base, watchUrlSource: 'dataBacked' })).toBe(true);
+    });
+
+    it('前面 activeTab はデータ皆無でも救済しない（自タブ尊重・false）', () => {
+      expect(shouldRescueEmptyResolvedWatch({ ...base, watchUrlSource: 'activeTab' })).toBe(false);
+    });
+
+    it('inlineParam（self-tab）は救済しない（false）', () => {
+      expect(shouldRescueEmptyResolvedWatch({ ...base, watchUrlSource: 'inlineParam' })).toBe(false);
+    });
+
+    it('記録が 1 件でもあれば救済しない（false）', () => {
+      expect(shouldRescueEmptyResolvedWatch({ ...base, storedCommentCount: 1 })).toBe(false);
+    });
+
+    it('lv 一致 snapshot があれば救済しない（false）', () => {
+      expect(shouldRescueEmptyResolvedWatch({ ...base, hasSnapshotForLv: true })).toBe(false);
+    });
+
+    it('INLINE_MODE では救済しない（空状態 UI を持たない・false）', () => {
+      expect(shouldRescueEmptyResolvedWatch({ ...base, inlineMode: true })).toBe(false);
+    });
+
+    it('ニコ生ユーザープロフィールページ上では救済しない（stale 応援者誤表示回避・false）', () => {
+      expect(shouldRescueEmptyResolvedWatch({ ...base, onNicoUserProfilePage: true })).toBe(false);
+    });
+
+    it('入力が無効でも throw せず false', () => {
+      expect(shouldRescueEmptyResolvedWatch(null)).toBe(false);
+      expect(shouldRescueEmptyResolvedWatch(undefined)).toBe(false);
+    });
   });
 
   it('buildContextSourceLine: storage かつ接続あり', () => {
