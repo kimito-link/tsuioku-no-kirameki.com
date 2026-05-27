@@ -305,12 +305,6 @@ export async function* crawlNdgrBackward(opts) {
     for (const r of results) {
       if (r && Array.isArray(r.chats) && r.chats.length) chats.push(...r.chats);
     }
-    // ⛔ NLS_BACKFILL_DIAG4: backward ホップ可視化（確定後に除去）。
-    try {
-      console.warn(
-        `[NLS_BACKFILL_DIAG4] bw hop bytes=${bwRes.bytes.length} msgs=${results.length} chats=${chats.length} next=${nextUri ? 'Y' : 'N'}`
-      );
-    } catch { /* no-op */ }
 
     if (chats.length) {
       rowsSeen += chats.length;
