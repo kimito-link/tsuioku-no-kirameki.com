@@ -2256,6 +2256,12 @@ function noteInlinePanelRenderError(where, err) {
 const PAGE_FRAME_LOOP_MS = INGEST_TIMING.pageFrameLoopMs;
 const PAGE_FRAME_LAYOUT_SCROLL_DEBOUNCE_MS =
   INGEST_TIMING.pageFrameLayoutScrollDebounceMs;
+/**
+ * v0.1.406: interval レイアウトのシグネチャ間引きで、形状不変が続いても
+ * この tick 数ごとに 1 回はフル描画する保険（取りこぼし自己修復）。
+ * 360ms × 8 ≒ 約 2.9 秒に 1 回。
+ */
+const INLINE_LAYOUT_FORCE_RENDER_EVERY = 8;
 const HIDDEN_LIVE_PANEL_SCAN_STRIDE = INGEST_TIMING.hiddenLivePanelScanStride;
 const AI_SHARE_FAST_DIAG_HIDDEN_MIN_MS =
   INGEST_TIMING.aiShareFastDiagHiddenMinIntervalMs;
@@ -2321,6 +2327,19 @@ let pageFrameLayoutScrollRafId = null;
  * @type {ReturnType<typeof setTimeout>|null}
  */
 let pageFrameLayoutScrollDebounceTimer = null;
+/**
+ * v0.1.406: interval（360ms）由来のインライン再レイアウトを「形状が変わったときだけ」走らせる
+ * ための前回シグネチャ。renderPageFrameOverlay は getBoundingClientRect 多数+style 書き
+ * （forced reflow）で、定常状態（プレイヤー位置・ビューポート不変）でも毎 360ms 走ると
+ * メインスレッドを周期的にブロックし、ホイールスクロールが「反応しない瞬間」を生む。
+ * scroll/resize は専用デバウンスで常にフル描画するので、interval は変化検知で間引いてよい。
+ * シグネチャはスクロール位置（rect.top/left）を含めない＝スクロールでは再レイアウトしない
+ * （パネルは document flow で自然追従する）。
+ * @type {string|null}
+ */
+let lastInlineLayoutSignature = null;
+/** interval スキップが続いても定期的に 1 回はフル描画する保険カウンタ（取りこぼし自己修復）。 */
+let inlineLayoutForceRenderCounter = 0;
 /** 非可視時 livePanelScan の間引き位相（0..stride-1 で 0 のときだけ実行） */
 let hiddenLivePanelScanPhase = 0;
 /** 非可視時 pageFrame メンテ（ended 検知・診断書き込み等）の間引き位相 */
@@ -6041,6 +6060,39 @@ async function maybeUpgradePlacementForWideViewport(rawStoredPlacement) {
   renderPageFrameOverlay();
 }
 
+/**
+ * v0.1.406: interval レイアウト間引き用の「形状シグネチャ」を安価に計算する。
+ * 含めるのは「再レイアウトが要る変化」だけ＝ビューポート寸法・配置モード・プレイヤー
+ * ターゲットの有無と寸法（幅高さを 4px 量子化）。⚠️ スクロール位置（rect.top/left）は
+ * 含めない：パネルは document flow で自然追従するので、スクロールで再レイアウトしない
+ * （これがホイール詰まりの主因だった）。失敗時は null を返し、呼び出し側でフル描画に倒す。
+ * @returns {string|null}
+ */
+function computeInlineLayoutSignature() {
+  try {
+    if (!isWatchInlinePanelTopFrame()) return 'not-top';
+    if (!isNicoLiveWatchUrl(window.location.href)) return 'not-watch';
+    const vp = nlsViewportSize();
+    const placement = getEffectiveInlinePanelPlacement();
+    const target = findWatchFrameTargetElement();
+    let tw = 0;
+    let th = 0;
+    let hasTarget = 0;
+    if (target instanceof HTMLElement) {
+      hasTarget = 1;
+      const r = target.getBoundingClientRect();
+      // 4px 量子化で微小ゆらぎ（サブピクセル）による無駄な再描画を防ぐ。
+      tw = Math.round(r.width / 4);
+      th = Math.round(r.height / 4);
+    }
+    const vw = Math.round((vp?.width || 0) / 4);
+    const vh = Math.round((vp?.height || 0) / 4);
+    return `${placement}|${vw}x${vh}|t${hasTarget}:${tw}x${th}`;
+  } catch {
+    return null; // 不明なときは間引かずフル描画に倒す（安全側）。
+  }
+}
+
 function startPageFrameLoop() {
   if (pageFrameLoopTimer) return;
 
@@ -6060,15 +6112,38 @@ function startPageFrameLoop() {
       isNicoLiveWatchUrl(window.location.href)
     ) {
       maybeReconnectCommentMutationObserverAfterInlineLayout();
-    } else {
-      renderPageFrameOverlay();
+      return;
     }
+    /*
+     * v0.1.406: スクロールが「反応しない瞬間」の根治。renderPageFrameOverlay は
+     * getBoundingClientRect 多数+style 書き（forced reflow）で重く、定常状態で毎 360ms
+     * 走るとホイール入力が落ちる。形状シグネチャ（ビューポート+プレイヤー寸法+配置・
+     * スクロール位置は含めない）が前回と同じなら、重い再描画を間引いて軽量な監視ルート
+     * 取り直しだけ行う。scroll/resize は専用デバウンスで別途フル描画するので追従は保たれる。
+     * 保険として一定 tick ごとに 1 回はフル描画し、万一の取りこぼしを自己修復する。
+     */
+    inlineLayoutForceRenderCounter += 1;
+    const forceRender =
+      inlineLayoutForceRenderCounter >= INLINE_LAYOUT_FORCE_RENDER_EVERY;
+    const sig = computeInlineLayoutSignature();
+    if (!forceRender && sig != null && sig === lastInlineLayoutSignature) {
+      // 形状不変＝重い再レイアウトは不要。記録の堅牢性のため監視ルートだけ取り直す。
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
+      return;
+    }
+    inlineLayoutForceRenderCounter = 0;
+    renderPageFrameOverlay();
+    // 描画後の確定シグネチャを保存（描画で host 寸法等が変わるため再計算する）。
+    lastInlineLayoutSignature = computeInlineLayoutSignature();
   }
 
   /** scroll/resize 由来。Playwright/headless で visibility が hidden の間も DOM 反映が必要なため常にフル描画 */
   function tickPageFrameLayoutFromScrollResize() {
     if (!hasExtensionContext()) return;
     renderPageFrameOverlay();
+    // interval 間引きのシグネチャを最新化（直後の interval tick が重複描画しないように）。
+    lastInlineLayoutSignature = computeInlineLayoutSignature();
+    inlineLayoutForceRenderCounter = 0;
   }
 
   function tickPageFrameMaintenance() {
@@ -6141,6 +6216,9 @@ function startPageFrameLoop() {
       hiddenLivePanelScanPhase = 0;
       hiddenPageFrameMaintenancePhase = 0;
       hiddenLiveIdPollPhase = 0;
+      // タブ復帰時は形状が変わっている可能性が高いので、間引きシグネチャを無効化して
+      // 次の tick で確実にフル描画させる。
+      lastInlineLayoutSignature = null;
       try {
         syncLiveIdFromLocation();
       } catch {
