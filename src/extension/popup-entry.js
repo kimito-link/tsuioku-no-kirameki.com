@@ -8967,6 +8967,10 @@ async function populateStorySourceEntriesFromStorageFallback(opts = {}) {
 let _lastPopupStateForResize = /** @type {string|null} */ (null);
 async function resizePopupWindowForState(input) {
   if (INLINE_MODE) return;
+  // v0.1.406: 拡張リロード後に古い popup が残っていると chrome.windows.update が
+  // 「Extension context invalidated」で throw し、chrome://extensions のエラー欄を
+  // 賑わせていた（無害だが不安にさせる）。コンテキスト無効なら静かに諦める。
+  if (!hasExtensionContext()) return;
   const emptyState = input?.emptyState === true;
   const hasHistory = input?.hasHistory === true;
   const stateKey = emptyState
@@ -9056,7 +9060,14 @@ async function resizePopupWindowForState(input) {
       width: POPUP_WINDOW_WIDTH
     });
   } catch (err) {
-    if (typeof console !== 'undefined' && console?.warn) {
+    // 「Extension context invalidated」はリロード後の古い popup で起こる無害な失敗。
+    // 騒がしくしない（chrome://extensions のエラー欄に出さない）。それ以外だけ warn。
+    const msg = String((err && err.message) || err || '');
+    if (
+      !/context invalidated/i.test(msg) &&
+      typeof console !== 'undefined' &&
+      console?.warn
+    ) {
       console.warn('[resizePopupWindow] failed:', err);
     }
   }
