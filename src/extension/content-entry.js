@@ -11521,6 +11521,40 @@ async function backfillFetchBinary(url, opts) {
 }
 
 /**
+ * v0.1.431: バックフィル消費ループで「ブラウザに制御を譲る」ための yield。爆速・長尺配信では
+ * 1 回の取り込みで数千区画を処理し得るため、その間メインスレッドを占有すると watch ページが
+ * 「応答しません」になる（実機で観測）。区画をまとめて処理するたびにここで一拍譲り、描画/入力
+ * を通す。`scheduler.yield`（あれば最優先・本来の用途）→ MessageChannel/setTimeout(0) の順。
+ * @returns {Promise<void>}
+ */
+function backfillYieldToPage() {
+  try {
+    // Chrome 129+ の scheduler.yield は「描画を挟んで続行」に最適。あれば使う。
+    const sched = /** @type {any} */ (globalThis).scheduler;
+    if (sched && typeof sched.yield === 'function') {
+      return sched.yield();
+    }
+  } catch {
+    /* fall through */
+  }
+  // フォールバック: マクロタスク境界（setTimeout 0）でイベントループに制御を返す。
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+/**
+ * v0.1.431: バックフィルの「区画ごとに毎回 persist」をやめ、この行数を超えてから 1 回 persist
+ * する（複数区画ぶんをまとめる）。persist フラッシュは巨大コメント配列を毎回 read-merge-write
+ * する O(N) なので、爆速配信で区画ごとに叩くとフラッシュが多発し固まる主因になる。まとめると
+ * フラッシュ回数が激減し、メインスレッド占有が下がる（記録の正確性は mergeNewComments の
+ * dedupe が担保＝まとめても重複/欠落しない）。
+ */
+const NDGR_BACKFILL_PERSIST_BATCH_ROWS = 800;
+/** v0.1.431: この区画数を処理するごとにブラウザへ一拍制御を譲る（描画/入力を通す）。 */
+const NDGR_BACKFILL_YIELD_EVERY_SEGMENTS = 6;
+
+/**
  * 過去ログ一括バックフィルを 1 回だけ起動する（ワンショット）。
  * 巡回エンジン（crawlNdgrBackward）を実 fetch / 実 sleep で駆動し、yield された
  * 過去 chat を capturedAt 保持で persistCommentRows に流す。
@@ -11561,6 +11595,21 @@ async function runNdgrBackfillOnce() {
       ? programBeginAtMs
       : null;
 
+  // v0.1.431: 区画ごとに毎回 persist せず、行をバッファに貯めて NDGR_BACKFILL_PERSIST_BATCH_ROWS
+  //   を超えたら 1 回 persist する（巨大配列の read-merge-write 多発＝固まりの主因を緩和）。
+  //   ⭐ try の外で宣言し、abort/例外で抜けても finally で必ず吐き出す＝取り込み済み行を取りこぼさない。
+  /** @type {ParsedCommentRow[]} */
+  let pendingBackfillRows = [];
+  let segmentsSinceYield = 0;
+  const flushPendingBackfillRows = () => {
+    if (!pendingBackfillRows.length) return;
+    // ⛔ flushNdgrChatRowsBatch を経由しない（capturedAt 握り潰し回避）。
+    //    persistCommentRows → mergeNewComments は capturedAt/vpos を素通しする。
+    const batch = pendingBackfillRows;
+    pendingBackfillRows = [];
+    persistCommentRows(batch, { source: COMMENT_INGEST_SOURCE.BACKFILL });
+  };
+
   try {
     // v0.1.411: knownMinCommentNo は渡さない（早期終了で途中参加のギャップを埋め損ねる
     //   バグのため crawl 側で撤去）。重複は mergeNewComments の dedupe が弾く。
@@ -11572,6 +11621,7 @@ async function runNdgrBackfillOnce() {
       programStartSec: startMs != null ? Math.floor(startMs / 1000) : null,
       signal: ac.signal
     });
+
     for (;;) {
       const step = await gen.next();
       if (step.done) {
@@ -11602,12 +11652,21 @@ async function runNdgrBackfillOnce() {
         });
         if (cap != null) row.capturedAt = cap;
       }
-      _backfillProgress.rows += rows.length;
-      publishBackfillProgress();
-      // ⛔ flushNdgrChatRowsBatch を経由しない（capturedAt 握り潰し回避）。
-      //    persistCommentRows → mergeNewComments は capturedAt/vpos を素通しする。
       if (rows.length) {
-        persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.BACKFILL });
+        pendingBackfillRows.push(...rows);
+        _backfillProgress.rows += rows.length;
+      }
+      publishBackfillProgress();
+      // 一定行たまったら 1 回だけ persist（フラッシュ回数を激減＝固まり緩和）。
+      if (pendingBackfillRows.length >= NDGR_BACKFILL_PERSIST_BATCH_ROWS) {
+        flushPendingBackfillRows();
+      }
+      // v0.1.431: 数区画ごとにブラウザへ制御を譲り、watch ページが「応答しません」に
+      //   ならないようにする（描画/入力を通す）。MAX_RESEEDS を増やしても固まらない担保。
+      segmentsSinceYield += 1;
+      if (segmentsSinceYield >= NDGR_BACKFILL_YIELD_EVERY_SEGMENTS) {
+        segmentsSinceYield = 0;
+        await backfillYieldToPage();
       }
     }
   } catch {
@@ -11616,6 +11675,9 @@ async function runNdgrBackfillOnce() {
     //   stopReason を立てる（未設定なら aborted 扱い＝popup は「途中/また後で」になる）。
     if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'aborted';
   } finally {
+    // v0.1.431: 正常終了・abort・例外いずれの抜け方でも、バッファに残った取り込み済み行を
+    //   必ず吐き出す（per-segment persist をやめてバッチ化したぶん、ここで取りこぼし防止）。
+    flushPendingBackfillRows();
     document.removeEventListener('visibilitychange', onHidden);
     if (_backfillAbort === ac) _backfillAbort = null;
     _backfillProgress.done = 1;
