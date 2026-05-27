@@ -371,9 +371,32 @@ export async function* crawlNdgrBackward(opts) {
     let backwardUri = reseed === 0 ? initialBackwardUri : await seekBackwardUri(seedAtSec);
     if (abend.aborted) return done('aborted');
     if (abend.rateLimited) return done('rate_limited');
-    // 入口が無い＝（再シード後なら）これ以上前は無い＝配信開始に到達。
+    // 入口が無い場合の扱い（v0.1.430 真因追補: 高速・大量配信で 32% 等で止まる）:
+    //   旧実装は「再シードで入口が見つからない＝配信開始到達(reached_start)」としていた。だが
+    //   高速配信では、再シード時刻が区画の隙間に落ちたり候補 URL が既 visited だと、まだ古い
+    //   コメントが残っていても入口が見つからないことがある（= 偽の reached_start・32% 停止の主因）。
+    //   そこで「入口が見つからない」も即終了せず、起点をさらに前へ大きく戻して数回リトライする。
+    //   本当に配信開始まで遡れたか（最古 vpos が近傍か）で reached_start を判定し、retry を
+    //   使い切っても入口が出ないなら no_progress（嘘の達成を出さない）。
     if (!backwardUri) {
-      return done(reseed === 0 ? 'backward_exhausted' : 'reached_start');
+      if (reseed === 0) return done('backward_exhausted');
+      // 既に配信開始近傍まで遡れているなら、入口が無いのは自然＝本当の reached_start。
+      if (globalMinVpos != null && globalMinVpos <= NDGR_BACKFILL_NEAR_START_VPOS_CS) {
+        return done('reached_start');
+      }
+      noProgressStreak += 1;
+      if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
+        return done('no_progress');
+      }
+      // 起点をさらに前へ大きく戻して再探索（区画の隙間/visited 回避）。
+      const backExtraSec = NDGR_BACKFILL_RESEED_STEP_SEC * noProgressStreak;
+      if (programStartSec != null && globalMinVpos != null) {
+        const baseOffsetSec = Math.floor(globalMinVpos / 100);
+        seedAtSec = Math.max(programStartSec, programStartSec + baseOffsetSec - backExtraSec);
+      } else {
+        seedAtSec -= backExtraSec;
+      }
+      continue;
     }
 
     // --- 3) backward URI を PackedSegment として next.uri で辿る（1 区画ぶん） ---

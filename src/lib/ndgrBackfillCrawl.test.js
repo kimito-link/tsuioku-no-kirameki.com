@@ -302,6 +302,65 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('no_progress');
   });
 
+  it('再シードで入口が見つからなくても vpos が序盤まで程遠いなら reached_start にしない（v0.1.430・32%停止の主因）', async () => {
+    // ⛔ 高速・大量配信で 32% 等で止まる主因: 再シード時刻が区画の隙間に落ち「入口が見つからない」
+    //   ＝旧実装は即 reached_start としていたが、まだ vpos=60000(=600秒地点)で序盤まで程遠い。
+    //   起点を戻して再探索→それでも入口が出ないなら no_progress（reached_start にしない）。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/GAP_A';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1: vpos=60000。next=N で終端。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // 以降どの再シード時刻に行っても入口が無い（隙間）。entry はあるが backward を持たない。
+    for (const at of [1595, 1000, 400, 200, 100, 50, 20]) {
+      map.set(atUrl(at), viewEntryBytes({})); // backward も next も無い極小 entry
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // vpos=60000 は NEAR_START(3000) より遥かに大きい＝序盤未到達。reached_start にしない。
+    expect(result.stopReason).toBe('no_progress');
+  });
+
+  it('再シードで入口が無くても、既に序盤(vpos<=NEAR_START)まで遡れていれば reached_start（本当の完了）', async () => {
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/DONE_A';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1で序盤 vpos=50(=0.5秒地点)まで到達。next=N で終端。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 2, content: '序盤', name: 'u', vpos: 50 }]));
+    // 再シード時刻に入口は無い（もう最初まで来た）。
+    map.set(atUrl(996), viewEntryBytes({}));
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 序盤(vpos=50<=3000)まで遡れた後に入口が無い＝本当の配信開始到達。
+    expect(result.stopReason).toBe('reached_start');
+  });
+
   it('segment 数 cap に達したら cap_segments で停止する', async () => {
     // backward を延々辿れるチェーン（BK_i → BK_{i+1}）。各 1 件 chat。
     const map = new Map();
