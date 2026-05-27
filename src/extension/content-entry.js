@@ -11458,29 +11458,6 @@ function readNdgrViewBaseUri() {
   }
 }
 
-/**
- * 既存ストレージの最小 commentNo を求める（ここに到達したら巡回を早期終了できる）。
- * @returns {Promise<number|null>}
- */
-async function readKnownMinCommentNo() {
-  try {
-    if (!liveId) return null;
-    const key = commentsStorageKey(liveId);
-    const bag = await chrome.storage.local.get(key);
-    const arr = Array.isArray(bag?.[key]) ? bag[key] : [];
-    /** @type {number|null} */
-    let min = null;
-    for (const row of arr) {
-      const n = Number(String(row?.commentNo ?? '').trim());
-      if (!Number.isFinite(n)) continue;
-      if (min == null || n < min) min = n;
-    }
-    return min;
-  } catch {
-    return null;
-  }
-}
-
 /** cross-origin NDGR を `credentials:'omit'` で取得し ArrayBuffer を Uint8Array で返す。 */
 async function backfillFetchBinary(url, opts) {
   const res = await fetch(url, {
@@ -11526,17 +11503,17 @@ async function runNdgrBackfillOnce() {
   _backfillProgress.done = 0;
   publishBackfillProgress();
 
-  const knownMin = await readKnownMinCommentNo();
   const startMs =
     programBeginAtMs != null && Number.isFinite(programBeginAtMs) && programBeginAtMs > 0
       ? programBeginAtMs
       : null;
 
   try {
+    // v0.1.411: knownMinCommentNo は渡さない（早期終了で途中参加のギャップを埋め損ねる
+    //   バグのため crawl 側で撤去）。重複は mergeNewComments の dedupe が弾く。
     const gen = crawlNdgrBackward({
       viewBase,
       fetchBinary: backfillFetchBinary,
-      knownMinCommentNo: knownMin,
       signal: ac.signal
     });
     for (;;) {

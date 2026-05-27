@@ -79,7 +79,7 @@ export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
  * 巡回の終了理由。
  * @typedef {(
  *   'backward_exhausted' | 'visited_revisit' | 'cap_segments' | 'cap_elapsed' |
- *   'cap_bytes' | 'cap_rows' | 'known_min_reached' | 'aborted' | 'rate_limited' |
+ *   'cap_bytes' | 'cap_rows' | 'aborted' | 'rate_limited' |
  *   'no_view_base' | 'no_entry'
  * )} NdgrBackfillStopReason
  */
@@ -197,8 +197,6 @@ function minNoOf(chats) {
  *   `credentials:'omit'` で叩く責務を持つ（cross-origin 必須）。
  * @param {(ms: number) => Promise<void>} [opts.sleep] throttle/backoff 用。既定は実 setTimeout。
  * @param {() => number} [opts.now] 経過時間計測用。既定は Date.now。
- * @param {number|null} [opts.knownMinCommentNo] 既存ストレージの最小 commentNo。
- *   ここに到達したら以降は全て dedupe で捨てられるため早期終了する。
  * @param {Partial<NdgrBackfillCaps>} [opts.caps] 上限の上書き。
  * @param {number} [opts.fetchGapMs] fetch 間の待機 ms。
  * @param {AbortSignal} [opts.signal] タブ非表示 / SPA 遷移での中断用。
@@ -212,8 +210,6 @@ export async function* crawlNdgrBackward(opts) {
       ? opts.sleep
       : (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
   const now = typeof opts?.now === 'function' ? opts.now : () => Date.now();
-  const knownMin =
-    opts?.knownMinCommentNo == null ? null : Number(opts.knownMinCommentNo);
   const caps = { ...NDGR_BACKFILL_DEFAULT_CAPS, ...(opts?.caps || {}) };
   const gapMs =
     typeof opts?.fetchGapMs === 'number' && opts.fetchGapMs >= 0
@@ -318,10 +314,13 @@ export async function* crawlNdgrBackward(opts) {
       };
       // 行数 cap（storage 膨張の最終防波堤）。
       if (rowsSeen >= caps.rows) return done('cap_rows');
-      // 既存ストレージの最古に到達 → 以降は全て dedupe で捨てられるので早期終了。
-      if (knownMin != null && minNo != null && minNo <= knownMin) {
-        return done('known_min_reached');
-      }
+      // ⛔ v0.1.411: 旧 known_min_reached 早期終了は撤去。
+      //   途中参加だと storage には「直近 RT 分」しか無く、その手前（配信開始〜参加時刻）は
+      //   空。backfill は now-90s 付近から始まるため最初の segment が RT 範囲と重なり、
+      //   「minNo <= knownMin だからもう全部記録済み」と誤判定して即終了し、肝心の手前の
+      //   ギャップを埋められなかった（実機 1892 件中 118=6% で停止）。storage は連続でなく
+      //   ギャップがあるので、この前提は成立しない。重なった分は mergeNewComments の dedupe
+      //   が弾くので再取得は無害。配信開始（backward 尽き）or cap まで遡り切る。
     }
 
     // next.uri が無ければ配信開始に到達（唯一の自然終了）。
