@@ -9,6 +9,7 @@ import {
   decodeGift,
   decodeChunkedMessage,
   decodePackedSegment,
+  decodePackedSegmentNav,
   decodeChunkedEntry
 } from './ndgrDecode.js';
 
@@ -1012,6 +1013,45 @@ describe('decodePackedSegment', () => {
   });
 });
 
+describe('decodePackedSegmentNav（Backward API = PackedSegment の messages + next.uri）', () => {
+  // ⭐ v0.1.406: 過去ログ全件遡及の核心。Backward 応答は PackedSegment（messages インライン
+  //   + Next{uri}）。OSS 3実装（NDGRClient/NdgrClientSharp/rinsuki-lab）で確定した構造。
+  const NEXT_BW =
+    'https://mpn.live.nicovideo.jp/data/backward/v4/BBxNextBackwardUriExampleToken1234567890';
+
+  /** chat 1 件を ChunkedMessage（field2=NicoliveMessage, field1=Chat）に包む。 */
+  function chatCm({ no, content }) {
+    const chat = [...strField(1, content), ...varintField(8, no)];
+    const nicolive = lenDelimited(1, chat); // NicoliveMessage.field1 = Chat
+    return lenDelimited(2, [...nicolive]); // ChunkedMessage.field2 = NicoliveMessage
+  }
+
+  it('messages をインライン抽出し next.uri を返す', () => {
+    const packed = new Uint8Array([
+      ...lenDelimited(1, chatCm({ no: 7, content: 'a' })), // PackedSegment.messages[0]
+      ...lenDelimited(1, chatCm({ no: 8, content: 'b' })), // messages[1]
+      ...lenDelimited(2, strField(1, NEXT_BW)) // next { uri }
+    ]);
+    const { results, nextUri } = decodePackedSegmentNav(packed);
+    const nos = results.flatMap((r) => r.chats.map((c) => c.no));
+    expect(nos).toEqual([7, 8]);
+    expect(nextUri).toBe(NEXT_BW);
+  });
+
+  it('next が無ければ nextUri は空（配信開始）', () => {
+    const packed = new Uint8Array([...lenDelimited(1, chatCm({ no: 1, content: 'x' }))]);
+    const { results, nextUri } = decodePackedSegmentNav(packed);
+    expect(results.flatMap((r) => r.chats.map((c) => c.no))).toEqual([1]);
+    expect(nextUri).toBe('');
+  });
+
+  it('空 buffer でも throw せず空を返す', () => {
+    const { results, nextUri } = decodePackedSegmentNav(new Uint8Array([]));
+    expect(results).toEqual([]);
+    expect(nextUri).toBe('');
+  });
+});
+
 describe('decodeChunkedEntry（過去ログbackfillの巡回URI抽出）', () => {
   // 実機 PoC（lv350560887）で確認した URI 形式に合わせたフィクスチャ。
   const BACKWARD =
@@ -1071,6 +1111,46 @@ describe('decodeChunkedEntry（過去ログbackfillの巡回URI抽出）', () =>
     expect(nav.segmentUris).toEqual([SEG1]);
     expect(nav.backwardUri).toBe('');
     expect(nav.snapshotUri).toBe('');
+  });
+
+  // ⭐ v0.1.406: 実機ヘッドフルで判明した真因の回帰テスト。NDGR の `?at=` 応答は
+  //   length-delimited stream（`[varint長][ChunkedEntry]…`）であり、バッファ先頭は
+  //   field tag ではなく「最初のフレームの長さ varint」。旧実装はこれを単一 bare message
+  //   として offset 0 から解析し、長さ varint を tag 誤読して URI を1つも拾えなかった
+  //   （実機 hex `e5 02…`＝長さ357 を field44/wt5 と誤読 → pbForEach 即 break）。
+  //   フレーム分割して各フレームを walk することで実機応答から URI を抽出できる。
+  /** length-delimited フレーム = 先頭に「メッセージ長 varint」+ メッセージ本体（tag なし）。 */
+  function frame(messageBytes) {
+    return [...encodeVarint(messageBytes.length), ...messageBytes];
+  }
+
+  it('length-delimited stream（フレーム化された実機応答）から URI を抽出する', () => {
+    // 各フレームが 1 個の ChunkedEntry message（中に backward/segment/snapshot の
+    // ネスト message）。これが実機 `?at=` 応答の本物の構造。
+    const entry1 = [
+      ...lenDelimited(1, strField(1, BACKWARD)),
+      ...lenDelimited(2, strField(1, SEG1))
+    ];
+    const entry2 = [
+      ...lenDelimited(2, strField(1, SEG2)),
+      ...lenDelimited(9, strField(1, SNAPSHOT))
+    ];
+    const buf = new Uint8Array([...frame(entry1), ...frame(entry2)]);
+    const nav = decodeChunkedEntry(buf);
+    expect(nav.backwardUri).toBe(BACKWARD);
+    expect(nav.segmentUris).toEqual([SEG1, SEG2]);
+    expect(nav.snapshotUri).toBe(SNAPSHOT);
+  });
+
+  it('フレーム先頭の長さ varint が複数バイト（>127）でも正しく分割する', () => {
+    // 実機の最初のフレーム長は 357（=`e5 02`、2バイト varint）だった。複数バイト長で
+    // フレーム境界がズレないことを、長い詰め物入りメッセージで確認する。
+    const filler = lenDelimited(15, new Array(400).fill(0x00)); // URI でない長いネスト
+    const entry = [...filler, ...lenDelimited(1, strField(1, BACKWARD))];
+    expect(entry.length).toBeGreaterThan(127); // フレーム長が 2 バイト varint になる
+    const buf = new Uint8Array([...frame(entry)]);
+    const nav = decodeChunkedEntry(buf);
+    expect(nav.backwardUri).toBe(BACKWARD);
   });
 
   it('空 buffer でも throw せず空の nav を返す', () => {

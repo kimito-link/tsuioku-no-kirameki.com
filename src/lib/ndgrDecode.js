@@ -876,6 +876,56 @@ export function decodePackedSegment(buf, start, end) {
 }
 
 /**
+ * Backward API（`/data/backward/v4/...`）の応答をデコードする。
+ *
+ * ⭐ 過去ログ全件遡及の核心（2026-05-27 OSS 3実装=NDGRClient/NdgrClientSharp/
+ *   rinsuki-lab で確定。詳細は memory reference_ndgr_backward_packedsegment_protocol）。
+ *   Backward API の応答は **単一の PackedSegment**（View/segment と違い length-delimited
+ *   stream ではなく body 全体が 1 メッセージ）:
+ *     PackedSegment {
+ *       repeated ChunkedMessage messages = 1;   // ← コメント本体（インライン）
+ *       Next { string uri = 1 } next = 2;        // ← 次に古い backward URI（無ければ配信開始）
+ *       StateSnapshot snapshot = 3;              // 状態（コメントではない・無視）
+ *     }
+ *   旧実装は backward 応答を decodeChunkedEntry（path 分類）で誤解釈し、別 segment fetch を
+ *   試みて chat を 0 件しか拾えず、数ホップで backward_exhausted していた。本関数で
+ *   messages をインライン抽出し next.uri で連鎖するのが正解。
+ *
+ * @param {Uint8Array} buf Backward API 応答の body 全体。
+ * @param {number} [start] 解析開始オフセット（既定 0）。
+ * @param {number} [end] 解析終了オフセット（既定 buf.length）。
+ * @returns {{ results: NdgrDecodeResult[], nextUri: string }}
+ *   results = 各 ChunkedMessage のデコード結果（chats を含む）。
+ *   nextUri = 次に古い backward URI（`/data/backward/v4/...`）。無ければ ''（配信開始）。
+ */
+export function decodePackedSegmentNav(buf, start, end) {
+  const s0 = start ?? 0;
+  const e0 = end ?? buf.length;
+  /** @type {NdgrDecodeResult[]} */
+  const results = [];
+  let nextUri = '';
+  pbForEach(buf, s0, e0, (fn, wt, _v, s, e) => {
+    if (wt !== 2) return;
+    if (fn === 1) {
+      // messages: repeated ChunkedMessage（コメント本体）。
+      results.push(decodeChunkedMessage(buf, s, e));
+      return;
+    }
+    if (fn === 2 && !nextUri) {
+      // next: Next{ string uri = 1 }。内側 field1 の文字列を取り出す。
+      pbForEach(buf, s, e, (ifn, iwt, _iv, is, ie) => {
+        if (ifn === 1 && iwt === 2 && !nextUri) {
+          const u = decodeStr(buf, is, ie);
+          if (/^https?:\/\//.test(u)) nextUri = u;
+        }
+      });
+    }
+    // fn === 3（snapshot）は状態スナップショットなので無視。
+  });
+  return { results, nextUri };
+}
+
+/**
  * NDGR ChunkedEntry（`/api/view/v4/:view?at={unixtime}` の応答）から、過去ログ
  * バックフィルの巡回に必要な URI と long-poll ポインタを抽出する。
  *
@@ -892,6 +942,18 @@ export function decodePackedSegment(buf, start, end) {
  *   分類する」防御的方式を採る。これにより oneof の field 番号が変わっても壊れない。
  *   `next.at`（long-poll ポインタ）だけは varint なので、URI を持つ message 以外の
  *   トップレベル varint をベストエフォートで拾う。
+ *
+ * ⭐ v0.1.406: 実機ヘッドフルで「取り込み0件」の真因が判明し対処。NDGR の `?at=` 応答は
+ *   **length-delimited stream**（`[varint長][ChunkedEntry][varint長][ChunkedEntry]…`）であり、
+ *   バッファ先頭は protobuf の field tag ではなく「最初のフレームの長さ varint」。旧実装は
+ *   バッファを offset 0 から単一の bare message として `pbForEach` していたため、長さ varint
+ *   （例 357=`e5 02`）を tag(field44,wt5) と誤読し pbForEach が即 break → URI を1つも拾えず
+ *   `backward_exhausted seg=0` で巡回が即終了していた（RT 側は createLengthDelimitedStream-
+ *   Accumulator でデフレーム済なのに backfill 巡回だけ抜けていた非対称）。
+ *   そこで本関数は **(1) バッファ全体を bare message として walk（旧来・テストフィクスチャ
+ *   や単一メッセージ応答との後方互換）+ (2) length-delimited フレームに分割して各フレームを
+ *   walk** の両方を行い結果を union する。`classify()` は厳格に NDGR URI path のみ採用するため、
+ *   bare 応答をフレーム誤分割しても偽 URI は混入しない（両方式の安全な重ね掛け）。
  *
  * @typedef {{
  *   backwardUri: string,
@@ -968,6 +1030,26 @@ export function decodeChunkedEntry(buf, start, end) {
     });
   };
 
+  // (1) バッファ全体を bare message として walk（旧来＝単一メッセージ応答・テスト
+  //     フィクスチャとの後方互換）。
   walk(s0, e0, 0);
+
+  // (2) length-delimited stream として各フレームを walk。NDGR の `?at=` 応答はこの
+  //     形（`[varint長][ChunkedEntry]…`）で来るため、こちらが実機での主経路。
+  //     pbVarint で長さを読み、フレームの絶対オフセット [fStart, fEnd) を walk する
+  //     （subarray の byteOffset 計算を避けるため絶対オフセットで処理）。
+  let o = s0;
+  let guard = 0;
+  while (o < e0 && guard < 100_000) {
+    guard += 1;
+    const lv = pbVarint(buf, o);
+    if (!lv) break;
+    const fStart = lv[1];
+    const fEnd = fStart + lv[0];
+    if (lv[0] <= 0 || fEnd > e0) break; // 長さ0 / バッファ超過 = フレーミングでない
+    walk(fStart, fEnd, 1);
+    o = fEnd;
+  }
+
   return nav;
 }

@@ -29,7 +29,7 @@
  */
 
 import { decodeChunkedEntry } from './ndgrDecode.js';
-import { decodePackedSegment } from './ndgrDecode.js';
+import { decodePackedSegmentNav } from './ndgrDecode.js';
 
 /**
  * 巡回の各種上限（保守的な初期値）。PoC で rate limit 未測定のため、意図的に
@@ -45,19 +45,32 @@ import { decodePackedSegment } from './ndgrDecode.js';
 
 /** @type {Readonly<NdgrBackfillCaps>} */
 export const NDGR_BACKFILL_DEFAULT_CAPS = Object.freeze({
-  // segment fetch の総数。PoC で 1 backward ≒ 68KB に複数 segment。300 で長時間
-  // 配信もほぼカバーしつつ暴走を止める。
-  segments: 300,
-  // 経過時間の上限。throttle 込みで「待てる」体感の上限。
-  elapsedMs: 90_000,
-  // 累計受信バイトの上限。68KB × 数百 ≒ 数 MB が想定。30MB は安全マージン。
-  bytes: 30_000_000,
+  // backward hop（= PackedSegment fetch）の総数。1 hop ≒ 数十秒〜数分の時間窓。実機で
+  // 18h 配信は数千 hop 必要（segment窓が短いと 4000+）。最長尺でも遡りきれるよう 20000 に。
+  // 実際の終了は通常 backward_exhausted（next.uri 無し＝配信開始）。bytes/rows が最終防波堤。
+  segments: 20_000,
+  // 経過時間の上限。長尺（18h・数千 hop）でも遡りきれるよう 10 分まで許容（進捗UI前提）。
+  elapsedMs: 600_000,
+  // 累計受信バイトの上限。長尺でも数十 MB 想定。60MB は安全マージン。
+  bytes: 60_000_000,
   // 取り込み chat 行の累計上限（storage 膨張の最終防波堤）。
-  rows: 50_000
+  rows: 100_000
 });
 
-/** 各 fetch 間の最小待機（直列・並列度 1）。BAN 回避のため保守的に。 */
-export const NDGR_BACKFILL_FETCH_GAP_MS = 600;
+/**
+ * 各 fetch 間の最小待機（直列・並列度 1）。実機で 200ms だと 18h 配信を 5 分で遡りきれず
+ * 39% 止まりだった（数千 hop ×200ms が時間 cap を超過）。広く使われている参考実装
+ * NDGRClient は backward 間 10ms。それより安全側の 30ms（約33req/s）にする。mpn.live は
+ * CDN 系。429/403 を受けたら NDGR_BACKFILL_BACKOFF_MS で必ず減速・最終的に停止する。
+ */
+export const NDGR_BACKFILL_FETCH_GAP_MS = 30;
+
+/**
+ * 巡回の起点を「現在より何秒前」にするか。`?at=now` の nextAt は未来方向ポインタで
+ * backward が出ないため、封済みになっている過去（この秒数前）を起点に View を読む。
+ * 直近この秒数ぶんは RT 記録が拾うので、起点を少し過去にしても取りこぼさない。
+ */
+export const NDGR_BACKFILL_SEED_LAG_SEC = 90;
 
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
@@ -225,57 +238,76 @@ export async function* crawlNdgrBackward(opts) {
   if (isAborted(signal)) return done('aborted');
   const nowRes = await fetchWithThrottle(ctx, buildViewAtUrl(viewBase, 'now'), true);
   if (nowRes.rateLimited) return done('rate_limited');
-  if (!nowRes.bytes) return done('no_entry');
+  if (!nowRes.bytes || nowRes.bytes.length === 0) return done('no_entry');
   bytesFetched += nowRes.bytes.length;
   const nowNav = decodeChunkedEntry(nowRes.bytes);
   if (nowNav.nextAt == null) return done('no_entry');
 
-  // --- 2) 最初の ChunkedEntry を ?at={nextAt} で取得 ---
+  // --- 2) backward 連鎖の入口 URI（backward.segment.uri）を探す ---
+  //   ⭐ 実機で確定（2026-05-27）: 起点は「過去の実時刻」にする。`?at=now` が返す nextAt は
+  //   未来方向の long-poll ポインタで、それを起点に next を辿っても backward は出ない
+  //   （実機 v0.1.409 で backward_exhausted seg=0）。一方 `?at={少し過去の unixtime}` で
+  //   叩くと、その時刻帯の ChunkedEntry に backward.segment.uri が埋まる（v0.1.408 実機で
+  //   bwd=Y を確認）。そこで現在より NDGR_BACKFILL_SEED_LAG_SEC 秒前を起点に View を読み、
+  //   backward が無ければ next を辿って探す。出たら過去への入口。以降は Backward API
+  //   （PackedSegment・下記 3）を辿る。直近 lag 秒ぶんは RT 記録が拾うので取りこぼさない。
   const t0 = now();
   /** @type {Set<string>} 再訪防止（backward URI / at URL を一意キーに） */
   const visited = new Set();
-  /** @type {string} 次に取得すべき ChunkedEntry の URL（最初は ?at=nextAt、以降は backwardUri） */
-  let nextEntryUrl = buildViewAtUrl(viewBase, nowNav.nextAt);
-  let firstFetch = false; // ?at=now で 1 回 fetch 済みなので、以降は gap を入れる
+  /** @type {string} backward 連鎖の入口 URI（見つかるまで '') */
+  let backwardUri = '';
+  // 起点 = 現在より少し過去の unixtime（秒）。封済みになっている時刻帯を狙う。
+  let seedAt = Math.floor(t0 / 1000) - NDGR_BACKFILL_SEED_LAG_SEC;
+  // backward が出るまで View を辿る回数の上限（暴走防止）。
+  for (let hop = 0; hop < 20; hop += 1) {
+    if (isAborted(signal)) return done('aborted');
+    if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
+    const atUrl = buildViewAtUrl(viewBase, seedAt);
+    if (visited.has(atUrl)) break; // 同じ at に戻された＝これ以上進めない
+    visited.add(atUrl);
+    const entryRes = await fetchWithThrottle(ctx, atUrl, false);
+    if (entryRes.rateLimited) return done('rate_limited');
+    if (!entryRes.bytes || entryRes.bytes.length === 0) return done('no_entry');
+    bytesFetched += entryRes.bytes.length;
+    const entryNav = decodeChunkedEntry(entryRes.bytes);
+    if (entryNav.backwardUri) {
+      backwardUri = entryNav.backwardUri; // 過去への入口を発見
+      break;
+    }
+    // backward がまだ無ければ next を辿る（進めない/同じなら終了）。
+    if (entryNav.nextAt == null || entryNav.nextAt === seedAt) break;
+    seedAt = entryNav.nextAt;
+  }
+  if (!backwardUri) return done('backward_exhausted');
 
+  // --- 3) backward URI を PackedSegment として辿り、配信開始まで遡る ---
+  //   Backward API の応答は ChunkedEntry ではなく PackedSegment（body 全体が 1 メッセージ・
+  //   length-delimited 分割しない）。コメントは messages にインライン、次に古い URI は
+  //   next.uri。next が無くなったら配信開始＝完了。旧実装はここを decodeChunkedEntry で
+  //   誤解釈し chat を 0 件しか拾えず数ホップで backward_exhausted していた。
   for (;;) {
     if (isAborted(signal)) return done('aborted');
     if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
     if (bytesFetched >= caps.bytes) return done('cap_bytes');
-    if (visited.has(nextEntryUrl)) return done('visited_revisit');
-    visited.add(nextEntryUrl);
+    if (segmentsFetched >= caps.segments) return done('cap_segments');
+    if (visited.has(backwardUri)) return done('visited_revisit');
+    visited.add(backwardUri);
 
-    const entryRes = await fetchWithThrottle(ctx, nextEntryUrl, firstFetch);
-    firstFetch = false;
-    if (entryRes.rateLimited) return done('rate_limited');
-    if (!entryRes.bytes) return done('no_entry');
-    bytesFetched += entryRes.bytes.length;
-    const nav = decodeChunkedEntry(entryRes.bytes);
+    const bwRes = await fetchWithThrottle(ctx, backwardUri, false);
+    if (bwRes.rateLimited) return done('rate_limited');
+    if (!bwRes.bytes || bwRes.bytes.length === 0) return done('backward_exhausted');
+    bytesFetched += bwRes.bytes.length;
+    segmentsFetched += 1;
 
-    // --- 3) この ChunkedEntry の各 segment を fetch して chats を yield ---
-    for (const segUri of nav.segmentUris) {
-      if (isAborted(signal)) return done('aborted');
-      if (segmentsFetched >= caps.segments) return done('cap_segments');
-      if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
-      if (bytesFetched >= caps.bytes) return done('cap_bytes');
-      if (visited.has(segUri)) continue;
-      visited.add(segUri);
+    const { results, nextUri } = decodePackedSegmentNav(bwRes.bytes);
+    /** @type {import('./ndgrDecode.js').NdgrChat[]} */
+    const chats = [];
+    for (const r of results) {
+      if (r && Array.isArray(r.chats) && r.chats.length) chats.push(...r.chats);
+    }
 
-      const segRes = await fetchWithThrottle(ctx, segUri, false);
-      if (segRes.rateLimited) return done('rate_limited');
-      if (!segRes.bytes) continue; // この segment は諦めて次へ（best-effort）
-      bytesFetched += segRes.bytes.length;
-      segmentsFetched += 1;
-
-      const decoded = decodePackedSegment(segRes.bytes);
-      /** @type {import('./ndgrDecode.js').NdgrChat[]} */
-      const chats = [];
-      for (const r of decoded) {
-        if (r && Array.isArray(r.chats)) chats.push(...r.chats);
-      }
-      if (!chats.length) continue;
+    if (chats.length) {
       rowsSeen += chats.length;
-
       const minNo = minNoOf(chats);
       yield {
         chats,
@@ -284,7 +316,6 @@ export async function* crawlNdgrBackward(opts) {
         bytesFetched,
         minCommentNo: minNo
       };
-
       // 行数 cap（storage 膨張の最終防波堤）。
       if (rowsSeen >= caps.rows) return done('cap_rows');
       // 既存ストレージの最古に到達 → 以降は全て dedupe で捨てられるので早期終了。
@@ -293,8 +324,8 @@ export async function* crawlNdgrBackward(opts) {
       }
     }
 
-    // --- 4) backward URI で 1 つ前の ChunkedEntry へ ---
-    if (!nav.backwardUri) return done('backward_exhausted');
-    nextEntryUrl = nav.backwardUri;
+    // next.uri が無ければ配信開始に到達（唯一の自然終了）。
+    if (!nextUri) return done('backward_exhausted');
+    backwardUri = nextUri;
   }
 }

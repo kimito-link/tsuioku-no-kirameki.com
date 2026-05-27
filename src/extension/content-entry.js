@@ -2321,6 +2321,26 @@ let pageFrameLayoutScrollRafId = null;
  * @type {ReturnType<typeof setTimeout>|null}
  */
 let pageFrameLayoutScrollDebounceTimer = null;
+/**
+ * v0.1.407: インライン再レイアウトの「要再描画」フラグ（Observer 駆動）。
+ *
+ * 旧 v0.1.406 はシグネチャ間引きを入れたが、間引き判定自体が毎 360ms tick で
+ * getBoundingClientRect を呼び、スキップ時も同期 layout を強制 → ホイールスクロールが
+ * 詰まる主因が残っていた（世界の拡張調査 reference_inline_panel_scroll_and_render_perf）。
+ * 正解=geometry ポーリングを廃し、ResizeObserver（プレイヤー寸法変化）+ IntersectionObserver
+ * （可視/位置変化）が「変化したときだけ」このフラグを立て、interval/observer は reflow を
+ * 強制せずに再描画要否を判断する。observer の callback はメインスレッド外で配送され、
+ * getBoundingClientRect のような同期 reflow を起こさない。
+ * 初回は true（最初の tick で必ず描画）。
+ */
+let inlineLayoutDirty = true;
+/** プレイヤー追従の ResizeObserver / IntersectionObserver と、現在 observe 中のターゲット。 */
+/** @type {ResizeObserver|null} */
+let inlinePlayerResizeObserver = null;
+/** @type {IntersectionObserver|null} */
+let inlinePlayerIntersectionObserver = null;
+/** @type {Element|null} */
+let inlineObservedPlayerTarget = null;
 /** 非可視時 livePanelScan の間引き位相（0..stride-1 で 0 のときだけ実行） */
 let hiddenLivePanelScanPhase = 0;
 /** 非可視時 pageFrame メンテ（ended 検知・診断書き込み等）の間引き位相 */
@@ -6041,6 +6061,62 @@ async function maybeUpgradePlacementForWideViewport(rawStoredPlacement) {
   renderPageFrameOverlay();
 }
 
+/** 要再描画フラグを立てる（observer callback から呼ぶ。reflow を強制しない軽量処理）。 */
+function markInlineLayoutDirty() {
+  inlineLayoutDirty = true;
+}
+
+/**
+ * v0.1.407: プレイヤーターゲットに ResizeObserver（寸法変化）+ IntersectionObserver
+ * （可視/位置変化）を張り、geometry が変わったときだけ inlineLayoutDirty を立てる。
+ * これで interval が毎 tick getBoundingClientRect を呼ぶ必要が無くなり、スクロール中の
+ * 強制 reflow が消える（世界の拡張調査 reference_inline_panel_scroll_and_render_perf）。
+ * ターゲットが変わったら張り替える。失敗時は dirty を立てて従来描画にフォールバック。
+ */
+function ensureInlinePlayerObservers() {
+  try {
+    if (typeof ResizeObserver === 'undefined') {
+      // observer 非対応環境では従来どおり毎 tick 描画（dirty を立て続ける）。
+      inlineLayoutDirty = true;
+      return;
+    }
+    if (!isWatchInlinePanelTopFrame() || !isNicoLiveWatchUrl(window.location.href)) {
+      return;
+    }
+    // ⭐ 定常状態（観測中のターゲットが生きている）なら、findWatchFrameTargetElement
+    //   （getBoundingClientRect を含む）を呼ばずに即返す＝毎 tick の reflow をゼロにする。
+    if (
+      inlineObservedPlayerTarget instanceof Element &&
+      inlineObservedPlayerTarget.isConnected
+    ) {
+      return;
+    }
+    const target = findWatchFrameTargetElement();
+    if (!(target instanceof Element)) {
+      // ターゲット未検出（プレイヤー未ロード等）。確実に再試行させる。
+      inlineLayoutDirty = true;
+      return;
+    }
+    if (target === inlineObservedPlayerTarget) return; // 既に観測中
+    // 旧 observer を破棄して張り替え。
+    try { inlinePlayerResizeObserver?.disconnect(); } catch { /* no-op */ }
+    try { inlinePlayerIntersectionObserver?.disconnect(); } catch { /* no-op */ }
+    inlinePlayerResizeObserver = new ResizeObserver(markInlineLayoutDirty);
+    inlinePlayerResizeObserver.observe(target);
+    if (typeof IntersectionObserver !== 'undefined') {
+      inlinePlayerIntersectionObserver = new IntersectionObserver(
+        markInlineLayoutDirty,
+        { threshold: [0, 0.01, 1] }
+      );
+      inlinePlayerIntersectionObserver.observe(target);
+    }
+    inlineObservedPlayerTarget = target;
+    inlineLayoutDirty = true; // 張り替え直後は 1 度描画する。
+  } catch {
+    inlineLayoutDirty = true; // 不明時は安全側（描画する）。
+  }
+}
+
 function startPageFrameLoop() {
   if (pageFrameLoopTimer) return;
 
@@ -6060,9 +6136,24 @@ function startPageFrameLoop() {
       isNicoLiveWatchUrl(window.location.href)
     ) {
       maybeReconnectCommentMutationObserverAfterInlineLayout();
-    } else {
-      renderPageFrameOverlay();
+      return;
     }
+    /*
+     * v0.1.407: スクロール詰まりの根治。重い renderPageFrameOverlay（getBoundingClientRect
+     * 多数+style 書き=forced reflow）は「要再描画フラグが立っているときだけ」走らせる。
+     * フラグは ResizeObserver/IntersectionObserver が geometry 変化時に立てる（reflow を
+     * 強制しない）。フラグが寝ているときは getBoundingClientRect を一切呼ばず、軽量な
+     * 監視ルート取り直しだけ行う＝ホイール入力を落とさない。observer 未確立の初回や
+     * フォールバック時はフラグが true のままなので確実に描画される。
+     */
+    ensureInlinePlayerObservers();
+    if (!inlineLayoutDirty) {
+      // geometry 不変＝重い再レイアウト不要。記録の堅牢性のため監視ルートだけ取り直す。
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
+      return;
+    }
+    inlineLayoutDirty = false;
+    renderPageFrameOverlay();
   }
 
   /** scroll/resize 由来。Playwright/headless で visibility が hidden の間も DOM 反映が必要なため常にフル描画 */
@@ -6100,7 +6191,8 @@ function startPageFrameLoop() {
   function scheduleScrollThrottledPageFrameLayout() {
     // v0.1.386: スクロール中は重い再レイアウト（getBoundingClientRect 多数+style 書き＝
     // forced reflow）を毎フレーム走らせず、停止後に 1 回だけ実行（するするスクロール）。
-    // スクロール中もパネルは document flow で自然に追従し、360ms interval が位置を補正する。
+    // スクロール中もパネルは document flow で自然に追従する（v0.1.407 以降、位置補正は
+    // 360ms interval の毎 tick reflow ではなく Resize/IntersectionObserver 駆動）。
     if (pageFrameLayoutScrollDebounceTimer != null) {
       clearTimeout(pageFrameLayoutScrollDebounceTimer);
     }
@@ -6141,6 +6233,9 @@ function startPageFrameLoop() {
       hiddenLivePanelScanPhase = 0;
       hiddenPageFrameMaintenancePhase = 0;
       hiddenLiveIdPollPhase = 0;
+      // タブ復帰時は形状が変わっている可能性が高いので、要再描画フラグを立てて
+      // 次の tick で確実にフル描画させる。
+      inlineLayoutDirty = true;
       try {
         syncLiveIdFromLocation();
       } catch {
