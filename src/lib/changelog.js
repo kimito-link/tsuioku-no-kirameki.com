@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.408',
+    date: '2026-05-27',
+    summary: '開いた直後に「—」が並ぶ一瞬の表示を解消',
+    items: Object.freeze([
+      'パネルを開いた直後やページ再読み込み直後に、記録・同時接続・来場者数などが一瞬すべて「—」になる表示を解消しました。前回取得した値を保存しておき、開いた瞬間にそれを表示してから最新値に更新します（壊れて見えないようにするため）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.407',
     date: '2026-05-27',
     summary: 'スクロールの引っかかりをさらに改善（位置監視を最適化）',
