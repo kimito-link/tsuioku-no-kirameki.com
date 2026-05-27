@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.419',
+    date: '2026-05-27',
+    summary: '長時間の配信でも動作が重くなりにくいよう内部改善',
+    items: Object.freeze([
+      '配信を長く見ているときの裏側の処理を軽くしました（数秒おきの整理処理で、毎回すべての保存データを読み込んでいたのをやめ、必要な分だけ読むようにしました）。記録の中身や見え方は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.418',
     date: '2026-05-27',
     summary: '過去コメントを自動で取り込むように（OFFにもできます）',
