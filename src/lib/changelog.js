@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.407',
+    date: '2026-05-27',
+    summary: 'スクロールの引っかかりをさらに改善（位置監視を最適化）',
+    items: Object.freeze([
+      'マウスホイールのスクロールが一瞬反応しない問題を、根本から改善しました。パネル位置の計算を「定期的に毎回」ではなく「プレイヤーのサイズや位置が実際に変わったときだけ」行うようにし、スクロール中に画面計測が走らないようにしました（世界の配信向け拡張で使われている手法に倣いました）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.406',
     date: '2026-05-27',
     summary: '配信ページのスクロールが引っかかる問題を改善',
