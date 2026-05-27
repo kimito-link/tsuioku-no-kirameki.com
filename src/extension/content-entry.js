@@ -11410,8 +11410,12 @@ let _backfillEnabled = false;
 let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
-/** @type {{ seg: number, rows: number, done: 0|1 }} 進捗（data 属性で可視化）。 */
-const _backfillProgress = { seg: 0, rows: 0, done: 0 };
+/**
+ * @type {{ seg: number, rows: number, done: 0|1, stopReason: string }} 進捗（data 属性で可視化）。
+ * v0.1.415: stopReason を持つ。done=1 でも「本当に配信開始まで到達した（reached_start）」かを
+ *   popup 側（backfillRinkuNarration）が区別し、嘘の達成宣言をしないため。
+ */
+const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '' };
 
 /** 進捗を documentElement の data 属性へ反映（popup が読む）。 */
 function publishBackfillProgress() {
@@ -11420,13 +11424,14 @@ function publishBackfillProgress() {
     if (!root) return;
     root.setAttribute(
       'data-nls-backfill',
-      `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done}`
+      `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done} stop=${_backfillProgress.stopReason || ''}`
     );
   } catch {
     /* no-op */
   }
   // v0.1.410: りんく演出用に進捗を storage へも橋渡し（別フレームの popup/パネルが
   //   onChanged で読む）。fire-and-forget・無害失敗は黙殺（setStorageLocalSilent）。
+  // v0.1.415: stopReason も橋渡し（done=1 でも reached_start か途中かを popup が区別する）。
   try {
     setStorageLocalSilent(
       {
@@ -11435,6 +11440,7 @@ function publishBackfillProgress() {
           seg: _backfillProgress.seg,
           rows: _backfillProgress.rows,
           done: _backfillProgress.done,
+          stopReason: _backfillProgress.stopReason || '',
           ts: Date.now()
         }
       },
@@ -11501,6 +11507,7 @@ async function runNdgrBackfillOnce() {
   _backfillProgress.seg = 0;
   _backfillProgress.rows = 0;
   _backfillProgress.done = 0;
+  _backfillProgress.stopReason = '';
   publishBackfillProgress();
 
   const startMs =
@@ -11521,7 +11528,14 @@ async function runNdgrBackfillOnce() {
     });
     for (;;) {
       const step = await gen.next();
-      if (step.done) break;
+      if (step.done) {
+        // v0.1.415: generator の return 値（{ stopReason, ... }）を捕捉する。これまで捨てて
+        //   いたため、time-out/混雑/入口なしで途中終了しても finally が一律 done=1 を立て、
+        //   popup が「ぜんぶ届いた」と誤宣言していた（13% で達成宣言→後から増える事象）。
+        //   reached_start の時だけ達成、それ以外は正直な文言にするため stopReason を渡す。
+        _backfillProgress.stopReason = String(step.value?.stopReason || '');
+        break;
+      }
       const ev = step.value;
       _backfillProgress.seg = ev.segmentsFetched;
       // ev.chats は生 NdgrChat[]。ndgrChatsToMergeRows で gift guard + vpos 保持の
@@ -11552,6 +11566,9 @@ async function runNdgrBackfillOnce() {
     }
   } catch {
     /* 巡回失敗はサイレント（best-effort）。RT 取り込みには影響しない */
+    // 例外で抜けた＝最後まで遡れていない。reached_start ではないので達成宣言しないよう
+    //   stopReason を立てる（未設定なら aborted 扱い＝popup は「途中/また後で」になる）。
+    if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'aborted';
   } finally {
     document.removeEventListener('visibilitychange', onHidden);
     if (_backfillAbort === ac) _backfillAbort = null;

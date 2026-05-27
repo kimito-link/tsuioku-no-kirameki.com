@@ -3053,16 +3053,34 @@
         color: #9b2f6a;
         font-weight: 600;
       }
-      /* 取り込み中: りんくが「過去へさかのぼる」ように左へ小さく往復＋ふわっと上下。 */
+      /* v0.1.415 取り込み中: りんくが元気に「ぴょんぴょん跳ねて」過去を取りに行く演出。
+         ゆっくり解説のローディングのように、待ち時間を楽しく・飽きさせない。
+         （ユーザー提案 2026-05-27「飛び跳ねたり動いたりしたほうが飽きない」）
+         img = ホップ（上下に跳ねつつ軽く回転＝駆け回る感）。
+         bubble 全体 = ふわっと上下に弾む（一緒に動いて生き生きと）。 */
       .nl-backfill-rinku[data-phase='fetching'] .nl-backfill-rinku__img,
       .nl-backfill-rinku[data-phase='progress'] .nl-backfill-rinku__img {
-        animation: nlBackfillRewind 1.1s ease-in-out infinite;
+        animation: nlBackfillHop 0.72s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
       }
-      @keyframes nlBackfillRewind {
-        0% { transform: translateX(0) rotate(0deg); }
-        35% { transform: translateX(-4px) rotate(-7deg); }
-        70% { transform: translateX(1px) rotate(3deg); }
-        100% { transform: translateX(0) rotate(0deg); }
+      .nl-backfill-rinku[data-phase='fetching'],
+      .nl-backfill-rinku[data-phase='progress'] {
+        animation: nlBackfillBob 1.6s ease-in-out infinite;
+      }
+      /* ぴょんぴょん跳ねる（上下バウンド＋着地でちょっと潰れる＋左右に体を振る）。 */
+      @keyframes nlBackfillHop {
+        0% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+        18% { transform: translateY(-9px) scale(0.94, 1.08) rotate(-6deg); }
+        40% { transform: translateY(0) scale(1.08, 0.92) rotate(0deg); }
+        46% { transform: translateY(-2px) scale(1, 1) rotate(4deg); }
+        62% { transform: translateY(-7px) scale(0.96, 1.06) rotate(7deg); }
+        82% { transform: translateY(0) scale(1.06, 0.94) rotate(0deg); }
+        100% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+      }
+      /* 吹き出し全体もゆれて一緒に弾む（控えめ）。 */
+      @keyframes nlBackfillBob {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(-2px); }
+        100% { transform: translateY(0); }
       }
       /* 完了: ぴょこっと弾んで、薄いきらめきリング。 */
       .nl-backfill-rinku[data-phase='done'] .nl-backfill-rinku__img {
@@ -3082,8 +3100,19 @@
         0% { box-shadow: 0 0 0 0 rgba(244, 122, 178, 0.55); }
         100% { box-shadow: 0 0 0 14px rgba(244, 122, 178, 0); }
       }
+      /* v0.1.415 途中まで/混雑/入口なし: 動かず「ひと息」つく静かな状態（嘘の達成演出をしない）。
+         背景を少し落ち着いた色にして「完了とは違う」を視覚でも伝える。 */
+      .nl-backfill-rinku[data-phase='partial'],
+      .nl-backfill-rinku[data-phase='paused'],
+      .nl-backfill-rinku[data-phase='no_entry'],
+      .nl-backfill-rinku[data-phase='done_empty'] {
+        background: linear-gradient(180deg, #fbf7fa, #f3eef2);
+        border-color: #e3d3de;
+      }
       @media (prefers-reduced-motion: reduce) {
         .nl-backfill-rinku__img,
+        .nl-backfill-rinku[data-phase='fetching'],
+        .nl-backfill-rinku[data-phase='progress'],
         .nl-backfill-rinku[data-phase='done'] {
           animation: none !important;
         }
