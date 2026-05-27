@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.414',
+    date: '2026-05-27',
+    summary: '複数配信を同時に開いても別窓パネルが「—」で固まらないよう改善',
+    items: Object.freeze([
+      '複数の配信タブを開いているとき、別ウィンドウのパネルが「どの配信を表示するか」を取り違えて全部「—」のまま固まることがある問題を改善しました（記録のたまっている配信を優先して表示し、それでも空のときは「前回の配信」を表示して、空欄のまま放置しないようにしました）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.413',
     date: '2026-05-27',
     summary: '過去コメント取り込みが1回で確実に始まるよう改善',

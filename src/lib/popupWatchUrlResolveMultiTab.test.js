@@ -159,4 +159,88 @@ describe('pickWatchUrlFromMultipleSources', () => {
     expect(r.url).toBe('https://live.nicovideo.jp/watch/lv77');
     expect(r.source).toBe('lastFocusedNormal');
   });
+
+  // 0.1.414: standalone popup の multitab「中身が空」混信救済。
+  //   activeTab が watch でないとき、開いている watch タブのうち「実データのある lv」を優先。
+  //   lv は実フォーマット（lv+数字）でないと extractLiveIdFromUrl / isNicoLiveWatchUrl が
+  //   通らないので、テストも実 lv 番号を使う。
+  describe('liveIdsWithData による standalone 混信救済', () => {
+    it('standalone で lastFocused の lv にデータ無し・candidateにある別 lv にデータ有り → データのある方を採用', () => {
+      const r = pickWatchUrlFromMultipleSources({
+        activeTab: { url: 'chrome-extension://aaaaa/popup.html' }, // standalone（自タブ無し）
+        lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv100' },
+        lastWatchUrlRaw: 'https://live.nicovideo.jp/watch/lv100',
+        candidateUrls: [
+          'https://live.nicovideo.jp/watch/lv100',
+          'https://live.nicovideo.jp/watch/lv200' // 記録のある配信
+        ],
+        liveIdsWithData: ['lv200']
+      });
+      expect(r.url).toBe('https://live.nicovideo.jp/watch/lv200');
+      expect(r.source).toBe('dataBacked');
+    });
+
+    it('lastFocused 自体がデータのある lv → lastFocused を dataBacked として採用（storage の空 lv に負けない）', () => {
+      const r = pickWatchUrlFromMultipleSources({
+        activeTab: { url: 'chrome-extension://aaaaa/popup.html' },
+        lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv200' },
+        lastWatchUrlRaw: 'https://live.nicovideo.jp/watch/lv300',
+        candidateUrls: [
+          'https://live.nicovideo.jp/watch/lv200',
+          'https://live.nicovideo.jp/watch/lv300'
+        ],
+        liveIdsWithData: ['lv200']
+      });
+      expect(r.url).toBe('https://live.nicovideo.jp/watch/lv200');
+      expect(r.source).toBe('dataBacked');
+    });
+
+    it('liveIdsWithData が空（情報なし）→ 従来順（lastFocusedNormal）で解決', () => {
+      const r = pickWatchUrlFromMultipleSources({
+        activeTab: { url: 'chrome-extension://aaaaa/popup.html' },
+        lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv101' },
+        lastWatchUrlRaw: 'https://live.nicovideo.jp/watch/lv102',
+        candidateUrls: ['https://live.nicovideo.jp/watch/lv101', 'https://live.nicovideo.jp/watch/lv102'],
+        liveIdsWithData: []
+      });
+      expect(r.url).toBe('https://live.nicovideo.jp/watch/lv101');
+      expect(r.source).toBe('lastFocusedNormal');
+    });
+
+    it('前面 activeTab が watch なら liveIdsWithData に関わらず activeTab を尊重（自タブ優先）', () => {
+      const r = pickWatchUrlFromMultipleSources({
+        activeTab: { url: 'https://live.nicovideo.jp/watch/lv400' }, // 今見ている配信（まだ空でも）
+        lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv200' },
+        lastWatchUrlRaw: '',
+        candidateUrls: ['https://live.nicovideo.jp/watch/lv200'],
+        liveIdsWithData: ['lv200']
+      });
+      expect(r.url).toBe('https://live.nicovideo.jp/watch/lv400');
+      expect(r.source).toBe('activeTab');
+    });
+
+    it('inlineWatchUrl があれば liveIdsWithData に関わらず inlineParam 最優先（self-tab の真実）', () => {
+      const r = pickWatchUrlFromMultipleSources({
+        inlineWatchUrl: 'https://live.nicovideo.jp/watch/lv500',
+        activeTab: { url: 'https://live.nicovideo.jp/watch/lv400' },
+        lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv200' },
+        candidateUrls: ['https://live.nicovideo.jp/watch/lv200'],
+        liveIdsWithData: ['lv200']
+      });
+      expect(r.url).toBe('https://live.nicovideo.jp/watch/lv500');
+      expect(r.source).toBe('inlineParam');
+    });
+
+    it('liveIdsWithData を Set で渡しても動く', () => {
+      const r = pickWatchUrlFromMultipleSources({
+        activeTab: undefined,
+        lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv100' },
+        lastWatchUrlRaw: '',
+        candidateUrls: ['https://live.nicovideo.jp/watch/lv200'],
+        liveIdsWithData: new Set(['lv200'])
+      });
+      expect(r.url).toBe('https://live.nicovideo.jp/watch/lv200');
+      expect(r.source).toBe('dataBacked');
+    });
+  });
 });

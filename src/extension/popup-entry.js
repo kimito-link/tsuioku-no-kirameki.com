@@ -9358,7 +9358,7 @@ async function refresh() {
    *   各メンバを withTimeout + 個別フォールバックで握り、固まっても best-effort で描画を続行する。
    *   通常時（高速解決）はタイムアウトに到達しないので挙動は完全に不変。
    */
-  const [tabs, lastFocusedNormal, openBagRaw] = await Promise.all([
+  const [tabs, lastFocusedNormal, openBagRaw, allTabsForData] = await Promise.all([
     withTimeout(
       chrome.tabs.query({ active: true, currentWindow: true }),
       1200,
@@ -9390,7 +9390,15 @@ async function refresh() {
       ]),
       1500,
       'refresh_open_bag_timeout'
-    ).catch(() => /** @type {Record<string, unknown> | null} */ (null))
+    ).catch(() => /** @type {Record<string, unknown> | null} */ (null)),
+    // v0.1.414: standalone popup の multitab「中身が空」混信救済用。開いている
+    //   全 watch タブを列挙し、後で「実データのある lv」を優先選択する材料にする。
+    //   有界化（best-effort）。tabs 権限なし環境では空配列。
+    withTimeout(
+      chrome.tabs.query({}),
+      1200,
+      'refresh_all_tabs_timeout'
+    ).catch(() => /** @type {chrome.tabs.Tab[]} */ ([]))
   ]);
   /*
    * storage が固まった（openBagRaw=null）サイクルでは、空 {} で設定を上書きすると記録トグル等が
@@ -9423,12 +9431,34 @@ async function refresh() {
    *   従来の resolveWatchUrlFromTabAndStash は activeTab → storage の 2 段だが、
    *   standalone popup ではこの間に「直前の通常 window のアクティブタブ」を
    *   挟むと complex multi-tab で正しい URL が拾える。
+   *
+   * v0.1.414: さらに standalone popup で activeTab が watch でないとき、開いている
+   *   watch タブのうち「実データ（記録/snapshot）のある lv」を優先採用する
+   *   （candidateUrls / liveIdsWithData）。未 populate の別タブ lv を拾って全チップ
+   *   「—」固定になる混信を構造的に避ける。inlineParam / 前面 activeTab は self-tab の
+   *   真実なので、この優先は適用されない（ユーザーが今見ている配信を尊重）。
    */
+  const openWatchUrls = (
+    Array.isArray(allTabsForData) ? allTabsForData : []
+  )
+    .map((t) => String(t?.url || '').trim())
+    .filter((u) => isNicoLiveWatchUrl(u));
+  let dataBacked = { candidateUrls: openWatchUrls, liveIdsWithData: /** @type {string[]} */ ([]) };
+  // activeTab が既に watch なら自タブ尊重で混信救済は不要＝storage 走査も省く。
+  if (!isNicoLiveWatchUrl(String(tabs[0]?.url || '').trim()) && !INLINE_OWN_WATCH_URL) {
+    try {
+      dataBacked = await collectDataBackedWatchLvs(openWatchUrls);
+    } catch {
+      /* best-effort: 失敗時は従来順で解決 */
+    }
+  }
   const watchUrlPick = pickWatchUrlFromMultipleSources({
     inlineWatchUrl: INLINE_OWN_WATCH_URL,
     activeTab: tabs[0],
     lastFocusedNormalActiveTab,
-    lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL]
+    lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL],
+    candidateUrls: dataBacked.candidateUrls,
+    liveIdsWithData: dataBacked.liveIdsWithData
   });
   const url = watchUrlPick.url;
   if (
@@ -10097,6 +10127,40 @@ async function refresh() {
   paintWatchPopupUi();
   markPopupRefreshContentPainted();
   revealPopupPrimaryOnce();
+
+  /*
+   * v0.1.414 ウォッチドッグ（standalone popup multitab「中身が空」救済の最終防衛）:
+   *   lv は解決したが、その lv に実データが全く無い（snapshot 無し・記録 0 件・fetch も
+   *   失敗/空）＝「—」だらけになるケースで、かつ解決ソースが "推測"（dataBacked /
+   *   lastFocusedNormal / storage）だった場合だけ、空状態と同じ「前回の配信」復元に倒す。
+   *   これで複数タブで未 populate の lv を拾っても全カード/全チップ「—」固定にならない。
+   *
+   *   前面 activeTab / inlineParam（self-tab の真実）では救済しない＝ユーザーが今まさに
+   *   見ている配信が始まったばかりで空なだけかもしれないので、別配信を出すのは誤り。
+   *   INLINE_MODE（watch 埋め込み iframe）も空状態 UI を持たないので対象外。
+   */
+  if (!INLINE_MODE && isFreshRefresh()) {
+    const resolvedFromGuess =
+      watchUrlPick.source === 'dataBacked' ||
+      watchUrlPick.source === 'lastFocusedNormal' ||
+      watchUrlPick.source === 'storage';
+    const snapForLv =
+      watchMetaCache.snapshot != null &&
+      String(watchMetaCache.snapshot?.liveId || '').trim().toLowerCase() === lv;
+    const hasAnyUsableData = snapForLv || arr.length > 0;
+    if (resolvedFromGuess && !hasAnyUsableData && !onNicoUserProfilePage) {
+      // 前回の配信を復元（applyLastBroadcastReviewToEmptyState が履歴ありなら cards に流し、
+      // 無ければ nl-empty-no-history で畳む）。全部「—」のまま居座らせない。
+      // この lv には流すべきデータが無いので、以降の遅延ハイドレート/intercept は
+      // 走らせず return＝復元した「前回の配信」表示が後段の再描画で潰れないようにする。
+      await applyLastBroadcastReviewToEmptyState();
+      if (!isFreshRefresh()) return;
+      markPopupRefreshContentPainted();
+      revealPopupPrimaryOnce();
+      return;
+    }
+  }
+
   scheduleDeferredUserCommentProfileHydrate({
     refreshGen,
     commentsKey: key,
@@ -10245,6 +10309,68 @@ async function refresh() {
  * 0.1.36 (AK): prioritizeWatchTabCandidates を src/lib/watchTabPrioritize.js
  * に切り出し済み。chrome 依存なしの純粋関数。
  */
+
+/**
+ * 0.1.414 standalone popup の multitab「中身が空」混信救済:
+ *   開いている全 watch タブの URL と、そのうち「実データ（記録 or snapshot）が
+ *   storage にある lv 集合」を返す。pickWatchUrlFromMultipleSources の
+ *   `candidateUrls` / `liveIdsWithData` に渡し、未 populate の別タブ lv を拾って
+ *   全チップ「—」固定になる混信を避ける（記録中の配信を確実に拾う）。
+ *
+ *   コスト最小化のため、storage は「開いている watch タブの lv に対応するキーだけ」
+ *   を読む（全件 get(null) はしない）。すべて withTimeout で有界化し、固まっても
+ *   best-effort（空集合）で返す＝refresh をブロックしない。
+ *
+ * @param {string[]} openWatchUrls 開いている watch タブの URL 群
+ * @returns {Promise<{ candidateUrls: string[], liveIdsWithData: string[] }>}
+ */
+async function collectDataBackedWatchLvs(openWatchUrls) {
+  const urls = Array.isArray(openWatchUrls)
+    ? openWatchUrls.map((u) => String(u || '').trim()).filter((u) => isNicoLiveWatchUrl(u))
+    : [];
+  // URL 重複と lv 重複を整理
+  /** @type {Map<string, string>} lv(lower) -> 最初に見つかった URL */
+  const lvToUrl = new Map();
+  for (const u of urls) {
+    const lv = String(extractLiveIdFromUrl(u) || '').trim().toLowerCase();
+    if (lv && !lvToUrl.has(lv)) lvToUrl.set(lv, u);
+  }
+  const lvs = [...lvToUrl.keys()];
+  if (lvs.length === 0 || !hasExtensionContext()) {
+    return { candidateUrls: [...new Set(urls)], liveIdsWithData: [] };
+  }
+  // 各 lv の記録キー / snapshot キーだけを読む（小さく有界）。
+  /** @type {string[]} */
+  const keys = [];
+  for (const lv of lvs) {
+    keys.push(commentsStorageKey(lv));
+    keys.push(watchSnapshotStorageKey(lv));
+  }
+  /** @type {Record<string, unknown>} */
+  let bag = {};
+  try {
+    bag = await withTimeout(
+      chrome.storage.local.get(keys),
+      900,
+      'data_backed_lvs_timeout'
+    );
+  } catch {
+    return { candidateUrls: [...lvToUrl.values()], liveIdsWithData: [] };
+  }
+  /** @type {string[]} */
+  const withData = [];
+  for (const lv of lvs) {
+    const comments = bag[commentsStorageKey(lv)];
+    const hasComments = Array.isArray(comments) && comments.length > 0;
+    const snap = bag[watchSnapshotStorageKey(lv)];
+    const hasSnap =
+      snap != null &&
+      typeof snap === 'object' &&
+      String(/** @type {any} */ (snap).liveId || '').trim().toLowerCase() === lv;
+    if (hasComments || hasSnap) withData.push(lv);
+  }
+  return { candidateUrls: [...lvToUrl.values()], liveIdsWithData: withData };
+}
 
 /**
  * 対象 watch と同じ lv のタブだけ集める（前面が別放送なら除外）。
