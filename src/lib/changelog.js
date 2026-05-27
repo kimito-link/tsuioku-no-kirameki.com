@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.426',
+    date: '2026-05-27',
+    summary: '複数タブ時、ランキング取得の重複アクセスを減らして軽量化',
+    items: Object.freeze([
+      '同じ配信を複数のタブで開いているとき、貢献度・広告ランキングなどの取得を「代表の1タブ」だけが行うようにして、無駄な重複アクセスを減らしました（タブを多く開くほど軽くなります）。表示・記録の中身は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.425',
     date: '2026-05-27',
     summary: '複数タブを開いたときの動作を安定させる土台づくり（内部）',

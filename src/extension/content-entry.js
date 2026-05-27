@@ -265,6 +265,7 @@ import {
 } from '../lib/commentIngestLog.js';
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
+import { runIfTabLeader } from '../lib/tabLeaderLock.js';
 import {
   isBackfillEnabledFromStorage,
   isBackfillJustEnabledFromChange,
@@ -10510,12 +10511,11 @@ async function start() {
   //   API fetch は SW が行い content は liveId 送信のみ＝harvest の CPU と競合しない。
   setTimeout(() => {
     if (stopContentIntervalsIfContextInvalidated()) return;
-    maybeFetchKokenContribRankingMirrorOnce();
-    // nicoad 広告ランキング API も同 sibling として（koken と同規約・別キー）。
-    maybeFetchNicoadContribRankingMirrorOnce();
-    // 第2弾: 参加配信者一覧 API（イベント参加中のみ・eventId キー）。
-    maybeFetchEventParticipationMirrorOnce();
-    void maybeResolveNamedUserProfilesOnce();
+    // PR1-b（多タブ集約）: 外部 API fetch は「同一 liveId を見ている全タブで同じ結果」に
+    //   なる共有可能な仕事。タブ間リーダー1つだけが叩けば 7×→1×。Web Locks 不可環境は
+    //   fail-open で全タブ実行（従来動作）。書込先は per-liveId キーで、followerも storage
+    //   から読むので描画は不変。
+    void runExternalApiFetchesAsTabLeader();
   }, 3_500);
   kokenContribApiIntervalId = /** @type {number} */ (
     /** @type {unknown} */ (
@@ -10528,9 +10528,8 @@ async function start() {
         ) {
           return;
         }
-        maybeFetchKokenContribRankingMirrorOnce();
-        maybeFetchNicoadContribRankingMirrorOnce();
-        void maybeResolveNamedUserProfilesOnce();
+        // PR1-b: koken/nicoad/profile はタブ間リーダー1つだけが叩く（多タブ集約）。
+        void runExternalApiFetchesAsTabLeader({ includeEventParticipation: false });
       }, KOKEN_CONTRIB_API_FETCH_MS)
     )
   );
@@ -10545,7 +10544,11 @@ async function start() {
         ) {
           return;
         }
-        maybeFetchEventParticipationMirrorOnce();
+        // PR1-b: 参加配信者一覧もタブ間リーダー1つだけが叩く。
+        void runIfTabLeader(
+          'nls-extfetch-evt-' + String(liveId || '').trim().toLowerCase(),
+          () => { maybeFetchEventParticipationMirrorOnce(); }
+        );
       }, EVENT_PARTICIPATION_API_FETCH_MS)
     )
   );
@@ -10577,6 +10580,29 @@ let _eventParticipationApiLastAttemptAt = 0;
 const NICO_PROFILE_RESOLVE_BATCH = 3;
 /** content 側でも問い合わせ済み uid を覚え、SW LRU と二重に抑制する。 */
 const _nicoProfileResolveAttempted = new Set();
+
+/**
+ * PR1-b（多タブ集約）: 外部 API fetch（koken/nicoad/profile/参加者）を、同一 liveId を
+ * 見ているタブのうち **Web Locks リーダー1タブだけ** が叩くようにまとめる。これらは
+ * 「同一 liveId で全タブ同じ結果」になる共有可能な仕事なので、N タブ独立 fetch（7×）を
+ * 1× に減らせる。書込先は per-liveId キーで、follower も storage から読むため描画は不変。
+ *
+ * fail-open: Web Locks 非対応や例外時は全タブ実行（従来動作）＝取りこぼし無し。
+ * ロックは liveId 単位。リーダータブが閉じれば Chrome がロックを自動解放し別タブが昇格。
+ *
+ * @param {{ includeEventParticipation?: boolean }} [opts]
+ */
+function runExternalApiFetchesAsTabLeader(opts = {}) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return Promise.resolve();
+  const includeEvt = opts.includeEventParticipation !== false;
+  return runIfTabLeader('nls-extfetch-' + lid, () => {
+    maybeFetchKokenContribRankingMirrorOnce();
+    maybeFetchNicoadContribRankingMirrorOnce();
+    if (includeEvt) maybeFetchEventParticipationMirrorOnce();
+    void maybeResolveNamedUserProfilesOnce();
+  });
+}
 
 /**
  * koken 公式ギフト貢献度ランキング 無認証 API を SW 経由で取得し、専用 storage
