@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.425',
+    date: '2026-05-27',
+    summary: '複数タブを開いたときの動作を安定させる土台づくり（内部）',
+    items: Object.freeze([
+      '配信タブを複数同時に開いたときの動作を将来もっと軽く・安定させるための土台（多タブでも固まらないかを自動で確かめる仕組み）を追加しました。見え方・記録の中身は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.424',
     date: '2026-05-27',
     summary: 'ニコ生以外のページで別の配信の記録が出る問題を再修正',
