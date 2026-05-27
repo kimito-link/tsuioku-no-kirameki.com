@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.410',
+    date: '2026-05-27',
+    summary: '過去コメント取り込みを「りんくの語り」で楽しく',
+    items: Object.freeze([
+      '「過去のコメントも取り込む（β）」を押すと、りんくがセリフと動きで取り込みの様子を伝えるようにしました（「むかしまでさかのぼってるよ…！」→「○件あつめた！」→「ぜんぶ届いた✨」と進み、取り込み件数もその場で増えていきます）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.409',
     date: '2026-05-27',
     summary: '過去コメントの一括取り込みを配信開始まで遡れるよう作り直し',

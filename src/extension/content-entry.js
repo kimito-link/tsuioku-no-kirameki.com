@@ -36,6 +36,7 @@ import {
   KEY_THUMB_INTERVAL_MS,
   KEY_GIFT_RANKING_LANE_ENABLED,
   KEY_BACKFILL_ENABLED,
+  KEY_BACKFILL_PROGRESS,
   commentsStorageKey,
   giftUsersStorageKey,
   eventDomStorageKey,
@@ -11420,6 +11421,24 @@ function publishBackfillProgress() {
     root.setAttribute(
       'data-nls-backfill',
       `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done}`
+    );
+  } catch {
+    /* no-op */
+  }
+  // v0.1.410: りんく演出用に進捗を storage へも橋渡し（別フレームの popup/パネルが
+  //   onChanged で読む）。fire-and-forget・無害失敗は黙殺（setStorageLocalSilent）。
+  try {
+    setStorageLocalSilent(
+      {
+        [KEY_BACKFILL_PROGRESS]: {
+          lid: String(liveId || ''),
+          seg: _backfillProgress.seg,
+          rows: _backfillProgress.rows,
+          done: _backfillProgress.done,
+          ts: Date.now()
+        }
+      },
+      { warn: false }
     );
   } catch {
     /* no-op */

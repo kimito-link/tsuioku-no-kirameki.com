@@ -51,6 +51,14 @@ export const KEY_GIFT_RANKING_LANE_ENABLED = 'nls_gift_ranking_lane_enabled';
  */
 export const KEY_BACKFILL_ENABLED = 'nls_backfill_enabled';
 
+/**
+ * v0.1.410: 過去ログ取り込みの進捗（りんく演出用）。content の publishBackfillProgress が
+ * `{ lid, seg, rows, done, ts }` を書き、popup/インラインパネルが onChanged で読んで
+ * りんくのセリフ（「○件あつめた！」「全部で○件✨」）・カウントアップ・動きを更新する。
+ * data-nls-backfill 属性は親ページ DOM なので別フレームから読めない→storage で橋渡しする。
+ */
+export const KEY_BACKFILL_PROGRESS = 'nls_backfill_progress_v1';
+
 /** ポップアップの着せ替えフレーム設定 */
 export const KEY_POPUP_FRAME = 'nls_popup_frame';
 
