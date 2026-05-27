@@ -9655,9 +9655,18 @@ async function refresh() {
    *   standalone / side panel は「実質アクティブ watch が無い」ときだけ表示し、
    *   activeTab / lastFocused で watch が取れたときは非表示（0.1.106）。
    */
+  // v0.1.421: dataBacked（v0.1.414 で追加した「記録のある配信タブを優先」ソース）も
+  //   storage と同じく「実質アクティブ watch ではない」扱いにする。さもないと、ニコ生以外の
+  //   ページ（X 等）で POP を開いたとき、別の watch タブの記録（応援○件＋アイコングリッド）が
+  //   フルのアクティブ表示として出てしまう（実機バグ報告 2026-05-27）。dataBacked は
+  //   foreground の watch ではなく「データのある直近の配信」なので、前回配信レビュー
+  //   （empty-state）として軽く出すのが正しい。lv 解決自体は正しいので、レビューに出る
+  //   配信も正しいものになる。前面 activeTab / inlineParam（自タブの真実）は従来どおり
+  //   アクティブ表示。
   const treatAsNoActiveWatch =
     !isNicoLiveWatchUrl(url) ||
     watchUrlPick.source === 'storage' ||
+    watchUrlPick.source === 'dataBacked' ||
     watchUrlPick.source === 'none';
 
   const noWatchHint = $('noWatchRankingHint');
