@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.417',
+    date: '2026-05-27',
+    summary: '過去コメントの取り込みが1回でより多く遡れるよう改善',
+    items: Object.freeze([
+      '過去コメントの取り込みを高速化し（取得間隔を詰め、時間の上限を10分→15分に延長）、1回でより多く・配信の最初まで遡りやすくしました。混雑時は自動で減速する仕組みは従来どおりです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.416',
     date: '2026-05-27',
     summary: '「過去のコメントも取り込む」ボタンをコメント入力の近くへ移動',
