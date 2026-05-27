@@ -10494,7 +10494,18 @@ async function start() {
         ) {
           return;
         }
-        void persistOfficialEventDomBundleNow();
+        // PR3（多タブ集約）: 公式 DOM scrape（5s毎・programStats/eventBanner 等）は同一 liveId
+        //   で全タブ同じ結果＝共有可能。書込先 nls_event_dom_<lv> は全タブが読むので、リーダー
+        //   1タブだけ scrape すれば十分。fail-open（Web Locks 非対応は全タブ）。初回 1 発は
+        //   gate せず各タブが即イベントデータを得る（下の init 直後呼び出し）。
+        const lid = String(liveId || '').trim().toLowerCase();
+        if (!/^lv\d{1,15}$/.test(lid)) {
+          void persistOfficialEventDomBundleNow();
+          return;
+        }
+        void runIfTabLeader('nls-domscrape-' + lid, () => {
+          void persistOfficialEventDomBundleNow();
+        });
       }, OFFICIAL_EVENT_DOM_SCRAPE_MS)
     )
   );

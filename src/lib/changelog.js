@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.428',
+    date: '2026-05-27',
+    summary: '複数タブ時、公式情報の読み取りも代表1タブにまとめて軽量化',
+    items: Object.freeze([
+      '同じ配信を複数のタブで開いているとき、公式パネルの情報（来場・コメント数・イベント情報など）の読み取りも「代表の1タブ」だけが行うようにして、各タブの負荷を減らしました。表示・記録の中身は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.427',
     date: '2026-05-27',
     summary: '同じ配信を複数タブで開いても過去ログ取得が重くならないよう改善',
