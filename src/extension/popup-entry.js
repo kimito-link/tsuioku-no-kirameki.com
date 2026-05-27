@@ -119,6 +119,7 @@ import {
   INLINE_PANEL_VIEWPORT_WIDE_ALWAYS,
   INLINE_PANEL_VIEWPORT_WIDE_ONCE,
   commentsStorageKey,
+  watchSnapshotStorageKey,
   giftUsersStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
@@ -8967,6 +8968,10 @@ async function populateStorySourceEntriesFromStorageFallback(opts = {}) {
 let _lastPopupStateForResize = /** @type {string|null} */ (null);
 async function resizePopupWindowForState(input) {
   if (INLINE_MODE) return;
+  // v0.1.406: 拡張リロード後に古い popup が残っていると chrome.windows.update が
+  // 「Extension context invalidated」で throw し、chrome://extensions のエラー欄を
+  // 賑わせていた（無害だが不安にさせる）。コンテキスト無効なら静かに諦める。
+  if (!hasExtensionContext()) return;
   const emptyState = input?.emptyState === true;
   const hasHistory = input?.hasHistory === true;
   const stateKey = emptyState
@@ -9056,7 +9061,14 @@ async function resizePopupWindowForState(input) {
       width: POPUP_WINDOW_WIDTH
     });
   } catch (err) {
-    if (typeof console !== 'undefined' && console?.warn) {
+    // 「Extension context invalidated」はリロード後の古い popup で起こる無害な失敗。
+    // 騒がしくしない（chrome://extensions のエラー欄に出さない）。それ以外だけ warn。
+    const msg = String((err && err.message) || err || '');
+    if (
+      !/context invalidated/i.test(msg) &&
+      typeof console !== 'undefined' &&
+      console?.warn
+    ) {
       console.warn('[resizePopupWindow] failed:', err);
     }
   }
@@ -9696,10 +9708,12 @@ async function refresh() {
     }
   }
 
+  // v0.1.407: cached-first render 用に、前回保存した watch snapshot も一緒に読む。
+  const snapKey = watchSnapshotStorageKey(lv);
   /** @type {Record<string, unknown>} */
   const data = await readStorageBagWithRetry(
     () =>
-      chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
+      chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE, snapKey]),
     // v0.1.336: 描画前ゲート。多タブで storage.get が固まると paintWatchPopupUi が
     //   永久に走らず全カード「—」固定になっていた。per-attempt 900ms で固まりを
     //   失敗扱いにし、最悪でも 4 試行で {} に落として描画を続行する（前回 arr/snapshot は
@@ -9707,6 +9721,20 @@ async function refresh() {
     { attempts: 4, delaysMs: [0, 50, 120, 280], perAttemptTimeoutMs: 900 }
   );
   let arr = Array.isArray(data[key]) ? data[key] : [];
+  // v0.1.407: cached-first render。in-memory snapshot がまだ無い初回 boot で、前回保存
+  //   した snapshot があれば即採用する＝開いた瞬間に「—／取得中…」でなく前回値を出す。
+  //   live fetch が後で来たら通常どおり上書き（stale-while-revalidate）。lv 一致のみ採用。
+  if (watchSnapshot == null) {
+    const cachedSnap = data[snapKey];
+    if (
+      cachedSnap &&
+      typeof cachedSnap === 'object' &&
+      String(/** @type {any} */ (cachedSnap).liveId || '').trim().toLowerCase() === lv
+    ) {
+      watchSnapshot = /** @type {any} */ (cachedSnap);
+      watchMetaCache.snapshot = watchSnapshot;
+    }
+  }
   popupUserCommentProfileMap = normalizeUserCommentProfileMap(
     data[KEY_USER_COMMENT_PROFILE_CACHE]
   );
@@ -9957,6 +9985,22 @@ async function refresh() {
         fetchedSnapshot: snapResult.snapshot,
         merge: mergeWatchSnapshotPreservingBroadcaster
       });
+      // v0.1.407: cached-first render 用に write-through。次回 boot で即描画できるよう、
+      //   lv 一致の確定 snapshot を chrome.storage.local に保存（fire-and-forget・無害失敗は無視）。
+      try {
+        const snapToPersist = watchMetaCache.snapshot;
+        if (
+          snapToPersist &&
+          String(snapToPersist.liveId || '').trim().toLowerCase() === lv &&
+          hasExtensionContext()
+        ) {
+          void chrome.storage.local
+            .set({ [snapKey]: snapToPersist })
+            .catch(() => {});
+        }
+      } catch {
+        /* no-op */
+      }
     } else if (
       cacheKeyStillTargetsThisRefresh &&
       snapResult.snapshot != null &&

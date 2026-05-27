@@ -366,6 +366,17 @@ export function commentsStorageKey(liveId) {
   return `nls_comments_${id}`;
 }
 
+/**
+ * v0.1.407: 配信ごとの「最後に取得した watch スナップショット」キャッシュキー。
+ * popup/パネルを開き直した瞬間に前回値を即描画して「—／取得中…」フラッシュを消すため、
+ * 取得成功時に書き、boot で読む（cached-first render）。
+ * @param {string} liveId lv123
+ */
+export function watchSnapshotStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_watch_snapshot_${id}`;
+}
+
 /** @param {string} liveId lv123 */
 export function giftUsersStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();
