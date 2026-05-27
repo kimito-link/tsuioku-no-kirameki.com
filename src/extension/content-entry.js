@@ -265,6 +265,7 @@ import {
 } from '../lib/commentIngestLog.js';
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
+import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
 import {
   isBackfillEnabledFromStorage,
   isBackfillJustEnabledFromChange,
@@ -11455,6 +11456,18 @@ let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
 /**
+ * v0.1.431: liveId ごとの「一過性 stop での自動リトライ回数」。実機 lv350625305 等で観測＝
+ * 過去ログの入口探しが押したタイミングで一過性に空振り(backward_exhausted/no_entry)し、
+ * one-shot guard で二度と再試行されず 11% 等で固定されていた（UI も「少し経ってからもう一度」
+ * と案内）。LIVE 中はこれを自動化＝一過性 stop なら少し待って再試行する。
+ * @type {Record<string, number>}
+ */
+const _backfillTransientRetryByLiveId = {};
+/** 一過性 stop で自動リトライする最大回数（liveId ごと）。 */
+const NDGR_BACKFILL_TRANSIENT_RETRY_MAX = 5;
+/** 一過性 stop 後、次の自動再試行を許可するまでの待機（ms）。view URI 安定/封済み化を待つ。 */
+const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
+/**
  * @type {{ seg: number, rows: number, done: 0|1, stopReason: string }} 進捗（data 属性で可視化）。
  * v0.1.415: stopReason を持つ。done=1 でも「本当に配信開始まで到達した（reached_start）」かを
  *   popup 側（backfillRinkuNarration）が区別し、嘘の達成宣言をしないため。
@@ -11682,6 +11695,30 @@ async function runNdgrBackfillOnce() {
     if (_backfillAbort === ac) _backfillAbort = null;
     _backfillProgress.done = 1;
     publishBackfillProgress();
+
+    // v0.1.431: 一過性 stop（入口が一時的に見つからない等）なら one-shot guard を一定時間後に
+    //   解除し、maintenance tick の maybeAutoStartBackfill が自動で再試行する（UI 案内「少し
+    //   経ってからもう一度」を自動化）。完了/やり切り/中断では再試行しない。タブが今 LIVE を
+    //   見ていて自動取り込み ON のときだけ（隠れタブ・OFF では無駄に叩かない）。
+    const lidAtFinish = liveId;
+    const retried = _backfillTransientRetryByLiveId[lidAtFinish] || 0;
+    if (
+      shouldScheduleBackfillTransientRetry({
+        stopReason: String(_backfillProgress.stopReason || ''),
+        retriedCount: retried,
+        maxRetries: NDGR_BACKFILL_TRANSIENT_RETRY_MAX,
+        autoEnabled: _backfillAutoEnabled,
+        tabHidden: document.visibilityState === 'hidden'
+      })
+    ) {
+      _backfillTransientRetryByLiveId[lidAtFinish] = retried + 1;
+      setTimeout(() => {
+        // 同じ配信を今も見ていて guard がこの liveId のままなら解除＝次 tick で再起動。
+        if (liveId === lidAtFinish && _backfillTriedLiveId === lidAtFinish) {
+          _backfillTriedLiveId = '';
+        }
+      }, NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS);
+    }
   }
 }
 
