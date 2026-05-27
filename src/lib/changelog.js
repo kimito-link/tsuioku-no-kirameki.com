@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.420',
+    date: '2026-05-27',
+    summary: 'コメント保存の裏側処理を軽量化（長時間配信の重さ対策・続き）',
+    items: Object.freeze([
+      'コメントを保存するたびに、たまった全コメントを何度もなめ直していた処理を見直し、変化があったときだけ全体を処理するようにしました。記録の中身や見え方は変わりません（長く見ているほど効きます）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.419',
     date: '2026-05-27',
     summary: '長時間の配信でも動作が重くなりにくいよう内部改善',

@@ -8804,25 +8804,42 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       broadcasterUid: broadcasterUidCache,
       broadcasterIconUrl: broadcasterIconUrlCache
     };
+    // v0.1.420 perf: profile map への upsert は incoming（enriched）だけで十分。
+    //   既存 next の各エントリの profile 情報は、追加された過去フラッシュで既に upsert
+    //   され KEY_USER_COMMENT_PROFILE_CACHE に永続化されている（毎フラッシュ再読込）。
+    //   毎回 next 全件を再 upsert するのは O(N) の無駄＝長尺で重い主因の一つ。さらに
+    //   prune（後段 pruneUserCommentProfileMap）の意図（map サイズ上限）とも整合する
+    //   （pruned ユーザーを next 全件ループで毎回復活させない）。記録行自体は自分の
+    //   nickname/avatar を保持するので表示は失われない（map は enrichment キャッシュ）。
     for (const r of enriched) {
       if (upsertUserCommentProfileFromEntry(profileMap, r, broadcasterCtx2)) cacheTouched = true;
     }
-    for (const e of next) {
-      if (upsertUserCommentProfileFromEntry(profileMap, e, broadcasterCtx2)) cacheTouched = true;
-    }
-    const profileApplied = applyUserCommentProfileMapToEntries(next, profileMap);
-    if (profileApplied.patched > 0) {
-      next = profileApplied.next;
-      storageTouched = true;
-    }
-    const bfAv = backfillNumericSyntheticAvatarsOnStoredComments(next);
-    if (bfAv.patched > 0) {
-      next = bfAv.next;
-      storageTouched = true;
+    // v0.1.420 perf: applyUserCommentProfileMapToEntries は「profile が新しく判明したら
+    //   過去コメントにも反映」する全件パス。profile map に今回変化が無く（cacheTouched=false）
+    //   かつ新規行も無い（added=0）なら、同じ map を同じ next に再適用しても結果は不変
+    //   （patched=0）＝丸ごと skip しても挙動同一。変化があった時だけ全件適用する。
+    if (cacheTouched || added.length > 0) {
+      const profileApplied = applyUserCommentProfileMapToEntries(next, profileMap);
+      if (profileApplied.patched > 0) {
+        next = profileApplied.next;
+        storageTouched = true;
+      }
+      // synthetic avatar 除去は「applyUserCommentProfileMapToEntries が avatar を付け得た時」
+      //   と「新規行が合成 avatar を持ち得る時」だけ意味がある。古い確定行は前フラッシュで
+      //   除去済みなので、上記ガードと同条件でだけ全件スキャンする。
+      const bfAv = backfillNumericSyntheticAvatarsOnStoredComments(next);
+      if (bfAv.patched > 0) {
+        next = bfAv.next;
+        storageTouched = true;
+      }
     }
     // v0.1.225 観測強化: 保存される予定の next の uid 解決状況を snapshot
-    // （AI 共有診断 savedCommentsUidStats）
-    _lastSavedCommentsUidStats = aggregateSavedCommentsUidStats(next);
+    // （AI 共有診断 savedCommentsUidStats）。
+    // v0.1.420 perf: これは診断専用の O(N) 集計。今回 next が変わっていない（profile も
+    //   added も無い）フラッシュでは前回値が正確なまま＝再集計を skip しても診断は不変。
+    if (cacheTouched || added.length > 0 || storageTouched) {
+      _lastSavedCommentsUidStats = aggregateSavedCommentsUidStats(next);
+    }
     const profileKeysBefore = Object.keys(profileMap).length;
     profileMap = pruneUserCommentProfileMap(profileMap);
     if (Object.keys(profileMap).length !== profileKeysBefore) cacheTouched = true;
