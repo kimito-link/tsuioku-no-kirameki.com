@@ -271,14 +271,18 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(calls).not.toContain(BK1);
   });
 
-  it('既知の最小 commentNo に到達したら known_min_reached で早期終了する', async () => {
+  it('既知コメントと重なっても早期終了せず、配信開始まで遡る（途中参加ギャップ埋めの回帰）', async () => {
+    // ⛔ v0.1.411 回帰: 旧 known_min_reached は「直近 RT と重なった瞬間に全部記録済みと
+    //   誤判定」して途中(6%)で止め、配信開始〜参加時刻のギャップを埋め損ねた。今は
+    //   knownMinCommentNo を渡しても無視し、backward が尽きるまで遡る。重複は呼び出し側
+    //   dedupe が弾く。
     const BK0 = `https://mpn.live.nicovideo.jp/data/backward/v4/MIN_BK0`;
     const BK1 = `https://mpn.live.nicovideo.jp/data/backward/v4/MIN_BK1`;
 
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
     map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
-    // BK0 の最小 no=20。既知最小=20 なので BK0 取り込み後に早期終了。
+    // BK0 は直近 RT と重なる範囲（no=25,20）。さらに前の BK1 に未記録の過去（no=5）。
     map.set(
       BK0,
       packedSegmentBytes(
@@ -289,7 +293,7 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
         BK1
       )
     );
-    map.set(BK1, packedSegmentBytes([{ no: 5, content: 'z', name: 'u' }]));
+    map.set(BK1, packedSegmentBytes([{ no: 5, content: 'z', name: 'u' }])); // next 無し=配信開始
 
     const { fetchBinary, calls } = makeFetchFromMap(map);
     const { sleep } = makeNoopSleep();
@@ -299,13 +303,15 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
         fetchBinary,
         sleep,
         now: () => 1_000_000,
+        // 旧 API 互換で渡してみるが、もう無視される（早期終了しない）。
         knownMinCommentNo: 20
       })
     );
 
-    expect(result.stopReason).toBe('known_min_reached');
-    expect(chatsAll.map((c) => c.no)).toEqual([25, 20]);
-    expect(calls).not.toContain(BK1); // 早期終了でコスト削減
+    // 重なり(BK0)で止まらず BK1 まで遡り、配信開始(backward_exhausted)で終了する。
+    expect(result.stopReason).toBe('backward_exhausted');
+    expect(chatsAll.map((c) => c.no)).toEqual([25, 20, 5]);
+    expect(calls).toContain(BK1); // ギャップ(no=5)を埋めるため BK1 も取得する
   });
 
   it('429 を backoff 上限まで受けたら rate_limited で停止し backoff を踏む', async () => {

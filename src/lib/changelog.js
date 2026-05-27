@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.411',
+    date: '2026-05-27',
+    summary: '過去コメント取り込みが途中で止まる問題を修正',
+    items: Object.freeze([
+      '途中から開いた配信で、過去コメントの取り込みが途中までしか進まず止まることがある問題を修正しました（直近の記録と重なった時点で「もう全部取り込んだ」と早合点して止めていたのをやめ、配信の最初までしっかり遡るようにしました）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.410',
     date: '2026-05-27',
     summary: '過去コメント取り込みを「りんくの語り」で楽しく',
