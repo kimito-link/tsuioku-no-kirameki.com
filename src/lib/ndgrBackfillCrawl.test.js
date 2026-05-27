@@ -3,8 +3,13 @@ import {
   crawlNdgrBackward,
   NDGR_BACKFILL_DEFAULT_CAPS,
   NDGR_BACKFILL_FETCH_GAP_MS,
-  NDGR_BACKFILL_BACKOFF_MS
+  NDGR_BACKFILL_BACKOFF_MS,
+  NDGR_BACKFILL_SEED_LAG_SEC
 } from './ndgrBackfillCrawl.js';
+
+// テストは now を固定（1_000_000ms）注入する。seed は floor(now/1000) - SEED_LAG_SEC。
+const FIXED_NOW_MS = 1_000_000;
+const SEED_AT = Math.floor(FIXED_NOW_MS / 1000) - NDGR_BACKFILL_SEED_LAG_SEC;
 
 // ── protobuf wire encoders（ndgrDecode.test.js と同形） ──────────────────────
 function encodeVarint(value) {
@@ -133,8 +138,8 @@ async function drain(gen) {
   return { result: res.value, events, chatsAll };
 }
 
-// 共通: ?at=now → nextAt=1000 → ?at=1000（View ChunkedEntry）。
-const ENTRY_AT = atUrl(1000);
+// 共通: ?at=now（liveness）→ seed は過去時刻 ?at={SEED_AT}（View ChunkedEntry）から。
+const ENTRY_AT = atUrl(SEED_AT);
 
 describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () => {
   it('backward(PackedSegment) を next.uri で辿り、配信開始で backward_exhausted で停止する', async () => {
@@ -213,10 +218,12 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
       t += 120_000;
       return t;
     };
+    // crawl 内で最初に now() が呼ばれて t0=120000 → seed = floor(120000/1000) - LAG。
+    const seedAtForTest = Math.floor(120_000 / 1000) - NDGR_BACKFILL_SEED_LAG_SEC;
 
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
-    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: `https://mpn.live.nicovideo.jp/data/backward/v4/T_BK_0` }));
+    map.set(atUrl(seedAtForTest), viewEntryBytes({ backwardUri: `https://mpn.live.nicovideo.jp/data/backward/v4/T_BK_0` }));
     for (let i = 0; i < 20; i += 1) {
       const cur = `https://mpn.live.nicovideo.jp/data/backward/v4/T_BK_${i}`;
       const next = `https://mpn.live.nicovideo.jp/data/backward/v4/T_BK_${i + 1}`;
@@ -359,8 +366,8 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
   it('View ChunkedEntry に backward 入口が無く next も進まなければ backward_exhausted で停止する', async () => {
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
-    // backward 無し・next=1000（= seedAt と同じ＝これ以上進めない）→ seed ループ終了。
-    map.set(ENTRY_AT, viewEntryBytes({ nextAt: 1000 }));
+    // backward 無し・next=SEED_AT（= seedAt と同じ＝これ以上進めない）→ seed ループ終了。
+    map.set(ENTRY_AT, viewEntryBytes({ nextAt: SEED_AT }));
     const { fetchBinary } = makeFetchFromMap(map);
     const { sleep } = makeNoopSleep();
     const { result } = await drain(
