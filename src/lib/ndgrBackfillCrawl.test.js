@@ -489,11 +489,12 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
 
   it('デフォルト定数が想定値（長尺配信を最後まで遡れる値）', () => {
     // v0.1.406: 18h 配信を 200ms で 5 分だと 39% 止まりだった実機結果＋OSS実装(10ms)の知見で緩和。
+    // v0.1.417: 13% 等の途中終了の完走率を上げるため elapsedMs 10→15分・gap 30→15ms。
     expect(NDGR_BACKFILL_DEFAULT_CAPS.segments).toBe(20_000);
-    expect(NDGR_BACKFILL_DEFAULT_CAPS.elapsedMs).toBe(600_000);
+    expect(NDGR_BACKFILL_DEFAULT_CAPS.elapsedMs).toBe(900_000);
     expect(NDGR_BACKFILL_DEFAULT_CAPS.bytes).toBe(60_000_000);
     expect(NDGR_BACKFILL_DEFAULT_CAPS.rows).toBe(100_000);
-    expect(NDGR_BACKFILL_FETCH_GAP_MS).toBe(30);
+    expect(NDGR_BACKFILL_FETCH_GAP_MS).toBe(15);
     expect(NDGR_BACKFILL_BACKOFF_MS).toEqual([2_000, 4_000, 8_000]);
   });
 });

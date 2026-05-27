@@ -52,6 +52,15 @@ export const KEY_GIFT_RANKING_LANE_ENABLED = 'nls_gift_ranking_lane_enabled';
 export const KEY_BACKFILL_ENABLED = 'nls_backfill_enabled';
 
 /**
+ * v0.1.418: 過去ログ取り込みの「自動開始」をユーザーが OFF にしたか。
+ * 既定（未設定）は自動 ON＝配信を開いて記録 ON なら勝手に過去を取り込む（ユーザー要望
+ * 「ボタンなしで勝手に取り込んだ方が楽」2026-05-27）。true を入れたときだけ自動を止め、
+ * 従来どおり手動ボタン押下でのみ起動する。安全網（429 backoff・タブ非表示で中断・記録 ON
+ * のみ・重複排除）は自動/手動で共通。
+ */
+export const KEY_BACKFILL_AUTO_DISABLED = 'nls_backfill_auto_disabled';
+
+/**
  * v0.1.410: 過去ログ取り込みの進捗（りんく演出用）。content の publishBackfillProgress が
  * `{ lid, seg, rows, done, ts }` を書き、popup/インラインパネルが onChanged で読んで
  * りんくのセリフ（「○件あつめた！」「全部で○件✨」）・カウントアップ・動きを更新する。
