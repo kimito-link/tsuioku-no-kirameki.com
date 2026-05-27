@@ -11427,7 +11427,14 @@ async function runNdgrBackfillOnce() {
     });
     for (;;) {
       const step = await gen.next();
-      if (step.done) break;
+      if (step.done) {
+        // ⛔ NLS_BACKFILL_DIAG3: 停止理由の確認（確定後に除去）。
+        try {
+          const v = step.value || {};
+          console.warn(`[NLS_BACKFILL_DIAG3] stop reason=${v.stopReason} seg=${v.segmentsFetched} rowsSeen=${v.rowsSeen} bytes=${v.bytesFetched}`);
+        } catch { /* no-op */ }
+        break;
+      }
       const ev = step.value;
       _backfillProgress.seg = ev.segmentsFetched;
       // ev.chats は生 NdgrChat[]。ndgrChatsToMergeRows で gift guard + vpos 保持の
