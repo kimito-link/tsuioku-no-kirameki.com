@@ -49,10 +49,16 @@ function nowEntryBytes(nextAt) {
  * segment.uri）。decodeChunkedEntry は path 分類で `/data/backward/v4/` を backwardUri と
  * して拾うので、ここでは backward URI を持つ message を埋めるだけでよい（field 番号非依存）。
  */
-function viewEntryBytes({ backwardUri } = {}) {
-  // next.at(field4 varint) を常に入れて非空にする（空 buffer だと no_entry 判定に落ちるため）。
-  const out = [...varintField(4, 1779800000)];
+function viewEntryBytes({ backwardUri, nextAt } = {}) {
+  // nextAt を指定すると next.at(field4 varint) を入れる（seed の next 追従テスト用）。
+  // 指定なしでも非空にするため、何も無いときは backward も next も無い極小 entry にする。
+  const out = [];
+  if (nextAt != null) out.push(...varintField(4, nextAt));
   if (backwardUri) out.push(...lenDelimited(2, strField(1, backwardUri)));
+  // backward も next も無いと空 buffer になり no_entry 判定に落ちるため、無害な padding を足す。
+  // ⚠️ varint(wt0) は decodeChunkedEntry が nextAt として拾うので、len-delimited(wt2) の
+  //    非 URI 文字列で padding する（nextAt も backward も生まれない）。
+  if (out.length === 0) out.push(...strField(15, 'pad'));
   return new Uint8Array(out);
 }
 
@@ -350,16 +356,39 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('no_entry');
   });
 
-  it('View ChunkedEntry に backward 入口が無ければ backward_exhausted で停止する', async () => {
+  it('View ChunkedEntry に backward 入口が無く next も進まなければ backward_exhausted で停止する', async () => {
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
-    map.set(ENTRY_AT, viewEntryBytes({})); // backward 無し
+    // backward 無し・next=1000（= seedAt と同じ＝これ以上進めない）→ seed ループ終了。
+    map.set(ENTRY_AT, viewEntryBytes({ nextAt: 1000 }));
     const { fetchBinary } = makeFetchFromMap(map);
     const { sleep } = makeNoopSleep();
     const { result } = await drain(
       crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
     );
     expect(result.stopReason).toBe('backward_exhausted');
+  });
+
+  it('seed: backward が無い entry なら next を辿り、現れた backward から遡る（実機回帰）', async () => {
+    // 実機回帰: ?at={nextAt}（live-tip）に backward が無く next だけ → 次を辿ると backward
+    // が出る。旧実装は 1 回で諦めて backward_exhausted（押しても無反応）だった。
+    const BK0 = `https://mpn.live.nicovideo.jp/data/backward/v4/SEED_BK0`;
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // hop0: ?at=1000 は backward 無し・next=2000。
+    map.set(ENTRY_AT, viewEntryBytes({ nextAt: 2000 }));
+    // hop1: ?at=2000 で backward 入口が出る。
+    map.set(atUrl(2000), viewEntryBytes({ backwardUri: BK0 }));
+    map.set(BK0, packedSegmentBytes([{ no: 42, content: '遡れた', name: 'u' }])); // next 無し
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
+    );
+
+    expect(result.stopReason).toBe('backward_exhausted');
+    expect(chatsAll.map((c) => c.no)).toEqual([42]); // backward を辿って取り込めた
   });
 
   it('?at=now には gap を入れず、2 回目以降に fetchGap を入れる', async () => {

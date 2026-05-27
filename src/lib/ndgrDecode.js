@@ -892,6 +892,8 @@ export function decodePackedSegment(buf, start, end) {
  *   messages をインライン抽出し next.uri で連鎖するのが正解。
  *
  * @param {Uint8Array} buf Backward API 応答の body 全体。
+ * @param {number} [start] 解析開始オフセット（既定 0）。
+ * @param {number} [end] 解析終了オフセット（既定 buf.length）。
  * @returns {{ results: NdgrDecodeResult[], nextUri: string }}
  *   results = 各 ChunkedMessage のデコード結果（chats を含む）。
  *   nextUri = 次に古い backward URI（`/data/backward/v4/...`）。無ければ ''（配信開始）。

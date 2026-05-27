@@ -236,23 +236,41 @@ export async function* crawlNdgrBackward(opts) {
   const nowNav = decodeChunkedEntry(nowRes.bytes);
   if (nowNav.nextAt == null) return done('no_entry');
 
-  // --- 2) ?at={nextAt} で ChunkedEntry を取得し、backward 連鎖の入口 URI を得る ---
-  //   ⭐ 2026-05-27 OSS 3実装（NDGRClient/NdgrClientSharp/rinsuki-lab）で確定した正解:
-  //   View の ChunkedEntry から得るのは「過去への入口 = backward.segment.uri」。ここから先は
-  //   View（ChunkedEntry stream）ではなく Backward API（PackedSegment）を辿る（下記 3）。
-  //   View 応答の live segment は long-poll で空（実機 segBytes=3）なので過去ログ源にしない。
+  // --- 2) backward 連鎖の入口 URI（backward.segment.uri）を探す ---
+  //   ⭐ 2026-05-27 OSS 3実装（NDGRClient/NdgrClientSharp/rinsuki-lab）の正解:
+  //   View の ChunkedEntry stream を ?at={next.at} で読み、`backward` フィールドを持つ
+  //   entry が現れるまで `next` ポインタを辿る（NDGRClient の外側 while ループ）。
+  //   1 回の ?at={nextAt} だけだと live-tip 応答に backward が無いことがあり、旧実装は
+  //   そこで即 backward_exhausted（実機で押しても無反応の回帰）していた。next を数回
+  //   辿れば backward が出る。出たらそれが過去への入口。以降は Backward API
+  //   （PackedSegment・下記 3）を辿る。View の live segment は long-poll で空なので使わない。
   const t0 = now();
-  const entryRes = await fetchWithThrottle(ctx, buildViewAtUrl(viewBase, nowNav.nextAt), false);
-  if (entryRes.rateLimited) return done('rate_limited');
-  if (!entryRes.bytes || entryRes.bytes.length === 0) return done('no_entry');
-  bytesFetched += entryRes.bytes.length;
-  const entryNav = decodeChunkedEntry(entryRes.bytes);
-  if (!entryNav.backwardUri) return done('backward_exhausted');
-
-  /** @type {Set<string>} 再訪防止（backward URI を一意キーに） */
+  /** @type {Set<string>} 再訪防止（backward URI / at URL を一意キーに） */
   const visited = new Set();
-  /** @type {string} 次に取得すべき backward URI（PackedSegment の next.uri で連鎖） */
-  let backwardUri = entryNav.backwardUri;
+  /** @type {string} backward 連鎖の入口 URI（見つかるまで '') */
+  let backwardUri = '';
+  let seedAt = nowNav.nextAt;
+  // next を辿る回数の上限（暴走防止）。通常は数回で backward が出る。
+  for (let hop = 0; hop < 20; hop += 1) {
+    if (isAborted(signal)) return done('aborted');
+    if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
+    const atUrl = buildViewAtUrl(viewBase, seedAt);
+    if (visited.has(atUrl)) break; // 同じ at に戻された＝これ以上進めない
+    visited.add(atUrl);
+    const entryRes = await fetchWithThrottle(ctx, atUrl, false);
+    if (entryRes.rateLimited) return done('rate_limited');
+    if (!entryRes.bytes || entryRes.bytes.length === 0) return done('no_entry');
+    bytesFetched += entryRes.bytes.length;
+    const entryNav = decodeChunkedEntry(entryRes.bytes);
+    if (entryNav.backwardUri) {
+      backwardUri = entryNav.backwardUri; // 過去への入口を発見
+      break;
+    }
+    // backward がまだ無ければ next を辿る（進めない/同じなら終了）。
+    if (entryNav.nextAt == null || entryNav.nextAt === seedAt) break;
+    seedAt = entryNav.nextAt;
+  }
+  if (!backwardUri) return done('backward_exhausted');
 
   // --- 3) backward URI を PackedSegment として辿り、配信開始まで遡る ---
   //   Backward API の応答は ChunkedEntry ではなく PackedSegment（body 全体が 1 メッセージ・
@@ -281,7 +299,6 @@ export async function* crawlNdgrBackward(opts) {
     }
     // ⛔ NLS_BACKFILL_DIAG4: backward ホップ可視化（確定後に除去）。
     try {
-      // eslint-disable-next-line no-console
       console.warn(
         `[NLS_BACKFILL_DIAG4] bw hop bytes=${bwRes.bytes.length} msgs=${results.length} chats=${chats.length} next=${nextUri ? 'Y' : 'N'}`
       );
