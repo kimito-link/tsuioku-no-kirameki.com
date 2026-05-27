@@ -96,6 +96,7 @@ import {
   EVENT_SCORE_RANKING_STORAGE_PREFIX,
   validateEventScoreRankingRelayPayload
 } from '../lib/eventScoreRankingRelay.js';
+import { pickPrunableStorageKeys } from '../lib/prunableStorageKeys.js';
 import { decideHiddenOfficialIframeInject } from '../lib/hiddenOfficialIframeReinjectGate.js';
 import { classifyGiftSubAppFrameSource } from '../lib/giftSubAppFrameSource.js';
 import { captureSameOriginContributionRankingDomShape } from '../lib/sameOriginContribRankingDomShape.js';
@@ -11963,6 +11964,41 @@ function bundleHasAdContributionRankingRows(bundle) {
   return Array.isArray(bundle?.adContributionRanking) && bundle.adContributionRanking.length > 0;
 }
 
+/**
+ * v0.1.419: 定期 prune（stale な event-dom / koken / nicoad / 参加者 / event-score キー削除）
+ *   のために、storage の **prune 対象 prefix のキーだけ** を読む。従来は
+ *   `chrome.storage.local.get(null)` で全 storage（巨大な nls_comments_<lv> 配列含む）を読んで
+ *   いたため長時間配信ほど重かった（[[reference_storage_local_live_db_perf_overhaul]] ①）。
+ *
+ *   手順: ① cheap にキー名一覧を得る（`getKeys()` が在れば値ゼロで取得・無ければ従来 get(null)
+ *   に fallback）② prune 対象 prefix のキーだけに絞る ③ その分だけ値を読む。返り値は従来の
+ *   `all` と同形（prune ロジックは無改変で使える）。
+ *
+ * @returns {Promise<Record<string, any>>} prune 対象 prefix のキーだけを含む bag
+ */
+async function readPrunableStorageBagCheap() {
+  const local = chrome.storage.local;
+  /** @type {string[]} */
+  let allKeys = [];
+  // getKeys() は Chrome 130+。値を読まずキー名だけ取れて軽い。無い環境では get(null) に倒す。
+  if (typeof (/** @type {any} */ (local).getKeys) === 'function') {
+    try {
+      allKeys = await (/** @type {any} */ (local).getKeys());
+    } catch {
+      allKeys = [];
+    }
+  }
+  if (!allKeys || allKeys.length === 0) {
+    // fallback（旧 Chrome / getKeys 失敗）: 従来どおり全部読む。挙動は不変（重いだけ）。
+    const all = await local.get(null);
+    return all && typeof all === 'object' ? all : {};
+  }
+  const wanted = pickPrunableStorageKeys(allKeys);
+  if (wanted.length === 0) return {};
+  const bag = await local.get(wanted);
+  return bag && typeof bag === 'object' ? bag : {};
+}
+
 async function persistOfficialEventDomBundleNow() {
   if (!hasExtensionContext()) return;
   const lid = String(liveId || '').trim().toLowerCase();
@@ -12025,7 +12061,9 @@ async function persistOfficialEventDomBundleNow() {
   // race 警告が常時出ていた問題への対応（純関数 pruneStaleEventDomLvs は v0.1.203
   // Patch 4 で先に作成済み）。
   try {
-    const all = await chrome.storage.local.get(null);
+    // v0.1.419: 従来の get(null)（全 storage・巨大コメント配列含む）を、prune 対象 prefix の
+    //   キーだけ読む cheap read に置換（長時間配信の重さ対策）。返り値は従来 all と同形。
+    const all = await readPrunableStorageBagCheap();
     if (all && typeof all === 'object') {
       const entries = buildEventDomEntriesFromStorageBag(all);
       const { keep, prune } = pruneStaleEventDomLvs(entries, lid, Date.now());
