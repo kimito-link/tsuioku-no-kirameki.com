@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.413',
+    date: '2026-05-27',
+    summary: '過去コメント取り込みが1回で確実に始まるよう改善',
+    items: Object.freeze([
+      '「過去のコメントも取り込む（β）」が、押すタイミングによってまれに0件で終わってしまう問題を改善しました（取り込みの起点が見つからないときに、もっと前の時間帯へ順にずらして確実に見つけるようにしました）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.412',
     date: '2026-05-27',
     summary: '過去コメント取り込みが長い配信でも最後まで届くよう改善',
