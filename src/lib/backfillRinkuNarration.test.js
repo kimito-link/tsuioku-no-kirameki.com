@@ -174,6 +174,36 @@ describe('backfillRecordCardHint（記録カードに出す短文・v0.1.432）'
     expect(h).toContain('もう一度');
   });
 
+  it('partial でも記録が公式の95%以上なら「途中まで」を出さない（実質取り切れている・v0.1.432）', () => {
+    // 実機: 記録207/公式203 のように reached_start でなくても実質100%なら『途中まで』と言わない。
+    const h = backfillRecordCardHint(
+      { started: true, rows: 207, done: 1, stopReason: 'no_progress' },
+      { officialCount: 203 }
+    );
+    expect(h).toBe('');
+  });
+
+  it('partial で記録が公式の95%未満なら「途中まで」を出す', () => {
+    const h = backfillRecordCardHint(
+      { started: true, rows: 239, done: 1, stopReason: 'no_progress' },
+      { officialCount: 2064 }
+    );
+    expect(h).toContain('途中まで');
+  });
+
+  it('partial で公式件数が無い（不明）なら従来通り「途中まで」を出す', () => {
+    const h = backfillRecordCardHint({ started: true, rows: 238, done: 1, stopReason: 'cap_elapsed' }, {});
+    expect(h).toContain('途中まで');
+  });
+
+  it('no_entry は公式に近くても（記録少なめ前提）出す＝officialCount に関わらず表示', () => {
+    const h = backfillRecordCardHint(
+      { started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' },
+      { officialCount: 0 }
+    );
+    expect(h).toContain('過去ログ');
+  });
+
   it('paused（混雑）は「一時中断」ヒント', () => {
     const h = backfillRecordCardHint({ started: true, rows: 100, done: 1, stopReason: 'rate_limited' });
     expect(h).toContain('中断');

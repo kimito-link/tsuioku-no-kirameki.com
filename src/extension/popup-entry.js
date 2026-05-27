@@ -5672,7 +5672,13 @@ function renderBackfillRinku(progress) {
 function applyBackfillRecordCardHint(progress) {
   const el = /** @type {HTMLElement|null} */ (document.getElementById('liveStatCommentsBackfillHint'));
   if (!el) return;
-  const hint = progress && progress.started ? backfillRecordCardHint(progress) : '';
+  // v0.1.432: 公式件数を渡し、実質取り切れている（記録が公式の95%以上）partial では出さない。
+  const oc = watchMetaCache.snapshot?.officialCommentCount;
+  const officialCount = typeof oc === 'number' && Number.isFinite(oc) ? oc : null;
+  const hint =
+    progress && progress.started
+      ? backfillRecordCardHint(progress, { officialCount })
+      : '';
   if (!hint) {
     el.hidden = true;
     el.textContent = '';

@@ -158,6 +158,14 @@ export function backfillRinkuNarration(progress) {
 }
 
 /**
+ * v0.1.432: 「実質取り切れている」とみなす、記録/公式の比率しきい値。これ以上なら partial
+ * （途中まで）のヒントは出さない。公式件数は配信中も増え続け匿名/削除/システム差で数件ズレる
+ * ため、ぴったり一致しなくても「ほぼ取れている」なら『途中まで』とは言わない（実機で記録207/
+ * 公式203 のように実質100%でも reached_start に至らず partial 判定になることがあるため）。
+ */
+export const BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO = 0.95;
+
+/**
  * v0.1.432: 記録カード（記録 件数の真下）に出す「過去ログ取り込みの状況」短文を返す。
  *
  * ユーザー要望（2026-05-28）: 「いまは遡れる入口が見つからなかったよ…」のような状況は、
@@ -169,16 +177,33 @@ export function backfillRinkuNarration(progress) {
  *   や達成（done）・空（done_empty）・待機（idle）では空文字＝記録カードには何も出さない
  *   （進行中の演出はボタン下のりんくに任せ、記録カードを散らかさない）。
  *
+ * v0.1.432 追補（ユーザー要望）: partial（途中まで）でも、記録が公式件数の
+ *   BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO 以上なら実質取り切れているので出さない
+ *   （「ちゃんと取れたのに『途中まで』と言われる」違和感を消す）。no_entry/paused は記録が
+ *   少ない状況なので比率に関わらず出す。
+ *
  * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }} progress
+ * @param {{ officialCount?: number|null }} [opts] 公式コメント数（比率判定用・無ければ比率判定しない）。
  * @returns {string} 記録カードに出す短文（出さないときは ''）。
  */
-export function backfillRecordCardHint(progress) {
+export function backfillRecordCardHint(progress, opts = {}) {
   const phase = backfillNarrationPhase(progress);
   switch (phase) {
     case 'no_entry':
       return '過去ログは今は遡れませんでした（少し経つと取り込めることがあります）';
-    case 'partial':
+    case 'partial': {
+      // 実質取り切れている（記録が公式の95%以上）なら『途中まで』を出さない。
+      const rows = Number(progress && progress.rows) || 0;
+      const official = Number(opts && opts.officialCount);
+      if (
+        Number.isFinite(official) &&
+        official > 0 &&
+        rows >= official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO
+      ) {
+        return '';
+      }
       return '過去ログは途中まで取り込みました（もう一度押すと続きを取り込みます）';
+    }
     case 'paused':
       return '混雑のため一時中断（少し待つと続きを取り込みます）';
     default:
