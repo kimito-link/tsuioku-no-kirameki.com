@@ -49,8 +49,10 @@ export const NDGR_BACKFILL_DEFAULT_CAPS = Object.freeze({
   // 18h 配信は数千 hop 必要（segment窓が短いと 4000+）。最長尺でも遡りきれるよう 20000 に。
   // 実際の終了は通常 backward_exhausted（next.uri 無し＝配信開始）。bytes/rows が最終防波堤。
   segments: 20_000,
-  // 経過時間の上限。長尺（18h・数千 hop）でも遡りきれるよう 10 分まで許容（進捗UI前提）。
-  elapsedMs: 600_000,
+  // 経過時間の上限。長尺（18h・数千 hop）でも遡りきれるよう許容（進捗UI前提）。
+  // v0.1.417: 10分→15分。実機で 13% 等の途中終了（cap_elapsed 疑い）を減らし完走率を上げる。
+  //   進捗はりんく演出で可視化され、タブ非表示で abort されるので長くても無害。
+  elapsedMs: 900_000,
   // 累計受信バイトの上限。長尺でも数十 MB 想定。60MB は安全マージン。
   bytes: 60_000_000,
   // 取り込み chat 行の累計上限（storage 膨張の最終防波堤）。
@@ -62,8 +64,10 @@ export const NDGR_BACKFILL_DEFAULT_CAPS = Object.freeze({
  * 39% 止まりだった（数千 hop ×200ms が時間 cap を超過）。広く使われている参考実装
  * NDGRClient は backward 間 10ms。それより安全側の 30ms（約33req/s）にする。mpn.live は
  * CDN 系。429/403 を受けたら NDGR_BACKFILL_BACKOFF_MS で必ず減速・最終的に停止する。
+ * v0.1.417: 30ms→15ms。同じ 10 分でも 2 倍の hop を進められ、長尺の完走率を上げる。
+ *   NDGRClient の 10ms より安全側を保ちつつ、429/403 backoff の安全網は不変（混雑時は自動減速）。
  */
-export const NDGR_BACKFILL_FETCH_GAP_MS = 30;
+export const NDGR_BACKFILL_FETCH_GAP_MS = 15;
 
 /**
  * 巡回の起点を「現在より何秒前」にするか。`?at=now` の nextAt は未来方向ポインタで

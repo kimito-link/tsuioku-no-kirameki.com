@@ -36,6 +36,7 @@ import {
   KEY_THUMB_INTERVAL_MS,
   KEY_GIFT_RANKING_LANE_ENABLED,
   KEY_BACKFILL_ENABLED,
+  KEY_BACKFILL_AUTO_DISABLED,
   KEY_BACKFILL_PROGRESS,
   commentsStorageKey,
   giftUsersStorageKey,
@@ -265,7 +266,9 @@ import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
 import {
   isBackfillEnabledFromStorage,
-  isBackfillJustEnabledFromChange
+  isBackfillJustEnabledFromChange,
+  isBackfillAutoStartEnabled,
+  isBackfillAutoJustEnabledFromChange
 } from '../lib/backfillOptIn.js';
 import { deriveBackfillCapturedAt } from '../lib/backfillCapturedAt.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
@@ -6177,6 +6180,7 @@ function startPageFrameLoop() {
     }
     maybeRunEndedBulkHarvest();
     maybeOfficialGapQuietDeepHarvest();
+    maybeAutoStartBackfill(); // v0.1.418: 自動で過去ログ取り込み（既定 ON・OFF も可）。
     persistAiShareFastDiagnostics();
     // 0.1.32 (AG): バックグラウンドで prewarm を skip した分、tick で再 schedule
     // を試みる。visibilitychange は tick を呼ぶので、可視化された瞬間に prewarm
@@ -10033,10 +10037,12 @@ async function start() {
   } catch { /* no-op */ }
 
   // v0.1.405: 過去ログ一括バックフィル opt-in flag の初期読み込み（async）。
+  // v0.1.418: 自動開始フラグ（既定 ON）も一緒に読む。
   try {
-    chrome.storage.local.get(KEY_BACKFILL_ENABLED).then((bag) => {
+    chrome.storage.local.get([KEY_BACKFILL_ENABLED, KEY_BACKFILL_AUTO_DISABLED]).then((bag) => {
       _backfillEnabled = isBackfillEnabledFromStorage(bag);
-    }).catch(() => { /* OFF default を維持 */ });
+      _backfillAutoEnabled = isBackfillAutoStartEnabled(bag);
+    }).catch(() => { /* 既定（手動 OFF・自動 ON）を維持 */ });
   } catch { /* no-op */ }
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -10073,6 +10079,21 @@ async function start() {
       });
       if (justEnabled && isWatchInlinePanelTopFrame()) {
         // 押下ごとに「続きから」やり直せるよう、ワンショット guard を解除して起動。
+        _backfillTriedLiveId = '';
+        void runNdgrBackfillOnce();
+      }
+    }
+
+    // v0.1.418: 自動開始フラグの同期。OFF→ON（自動を有効に戻した）瞬間に guard を解除して
+    //   即起動する（次の maintenance tick を待たずに反応）。ON→OFF は次の起動を止めるだけ。
+    if (changes[KEY_BACKFILL_AUTO_DISABLED]) {
+      _backfillAutoEnabled = isBackfillAutoStartEnabled({
+        [KEY_BACKFILL_AUTO_DISABLED]: changes[KEY_BACKFILL_AUTO_DISABLED].newValue
+      });
+      const autoJustEnabled = isBackfillAutoJustEnabledFromChange(
+        changes[KEY_BACKFILL_AUTO_DISABLED]
+      );
+      if (autoJustEnabled && isWatchInlinePanelTopFrame()) {
         _backfillTriedLiveId = '';
         void runNdgrBackfillOnce();
       }
@@ -11404,14 +11425,23 @@ function isGiftRankingLaneEnabled() {
 //   - 取り込みは flushNdgrChatRowsBatch を経由せず、capturedAt/vpos を保持したまま
 //     persistCommentRows に直接流す（flush は capturedAt を握り潰すため）。
 
-/** @type {boolean} 起動直後 false、初回 storage 読み込み完了後に正しい値。 */
+/** @type {boolean} 手動ボタンで起動されたか（押下で true）。初回 storage 読み込みで反映。 */
 let _backfillEnabled = false;
+/**
+ * @type {boolean} v0.1.418: 自動開始が有効か（既定 true＝勝手に取り込む）。
+ * ユーザーが設定で「自動取り込み」を OFF にしたときだけ false。初回 storage 読み込みで反映。
+ */
+let _backfillAutoEnabled = true;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
-/** @type {{ seg: number, rows: number, done: 0|1 }} 進捗（data 属性で可視化）。 */
-const _backfillProgress = { seg: 0, rows: 0, done: 0 };
+/**
+ * @type {{ seg: number, rows: number, done: 0|1, stopReason: string }} 進捗（data 属性で可視化）。
+ * v0.1.415: stopReason を持つ。done=1 でも「本当に配信開始まで到達した（reached_start）」かを
+ *   popup 側（backfillRinkuNarration）が区別し、嘘の達成宣言をしないため。
+ */
+const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '' };
 
 /** 進捗を documentElement の data 属性へ反映（popup が読む）。 */
 function publishBackfillProgress() {
@@ -11420,13 +11450,14 @@ function publishBackfillProgress() {
     if (!root) return;
     root.setAttribute(
       'data-nls-backfill',
-      `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done}`
+      `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done} stop=${_backfillProgress.stopReason || ''}`
     );
   } catch {
     /* no-op */
   }
   // v0.1.410: りんく演出用に進捗を storage へも橋渡し（別フレームの popup/パネルが
   //   onChanged で読む）。fire-and-forget・無害失敗は黙殺（setStorageLocalSilent）。
+  // v0.1.415: stopReason も橋渡し（done=1 でも reached_start か途中かを popup が区別する）。
   try {
     setStorageLocalSilent(
       {
@@ -11435,6 +11466,7 @@ function publishBackfillProgress() {
           seg: _backfillProgress.seg,
           rows: _backfillProgress.rows,
           done: _backfillProgress.done,
+          stopReason: _backfillProgress.stopReason || '',
           ts: Date.now()
         }
       },
@@ -11478,7 +11510,9 @@ async function backfillFetchBinary(url, opts) {
  */
 async function runNdgrBackfillOnce() {
   if (_backfillTriedLiveId && _backfillTriedLiveId === liveId) return; // 二重起動防止
-  if (!_backfillEnabled) return;
+  // v0.1.418: 手動ボタン押下（_backfillEnabled）か自動開始 ON（_backfillAutoEnabled・既定）の
+  //   どちらかで起動する。両方 OFF（自動を切ってボタンも押していない）のときだけ起動しない。
+  if (!_backfillEnabled && !_backfillAutoEnabled) return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
   if (!hasExtensionContext()) return;
   const viewBase = readNdgrViewBaseUri();
@@ -11501,6 +11535,7 @@ async function runNdgrBackfillOnce() {
   _backfillProgress.seg = 0;
   _backfillProgress.rows = 0;
   _backfillProgress.done = 0;
+  _backfillProgress.stopReason = '';
   publishBackfillProgress();
 
   const startMs =
@@ -11521,7 +11556,14 @@ async function runNdgrBackfillOnce() {
     });
     for (;;) {
       const step = await gen.next();
-      if (step.done) break;
+      if (step.done) {
+        // v0.1.415: generator の return 値（{ stopReason, ... }）を捕捉する。これまで捨てて
+        //   いたため、time-out/混雑/入口なしで途中終了しても finally が一律 done=1 を立て、
+        //   popup が「ぜんぶ届いた」と誤宣言していた（13% で達成宣言→後から増える事象）。
+        //   reached_start の時だけ達成、それ以外は正直な文言にするため stopReason を渡す。
+        _backfillProgress.stopReason = String(step.value?.stopReason || '');
+        break;
+      }
       const ev = step.value;
       _backfillProgress.seg = ev.segmentsFetched;
       // ev.chats は生 NdgrChat[]。ndgrChatsToMergeRows で gift guard + vpos 保持の
@@ -11552,12 +11594,28 @@ async function runNdgrBackfillOnce() {
     }
   } catch {
     /* 巡回失敗はサイレント（best-effort）。RT 取り込みには影響しない */
+    // 例外で抜けた＝最後まで遡れていない。reached_start ではないので達成宣言しないよう
+    //   stopReason を立てる（未設定なら aborted 扱い＝popup は「途中/また後で」になる）。
+    if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'aborted';
   } finally {
     document.removeEventListener('visibilitychange', onHidden);
     if (_backfillAbort === ac) _backfillAbort = null;
     _backfillProgress.done = 1;
     publishBackfillProgress();
   }
+}
+
+/**
+ * v0.1.418: 自動開始の試行（maintenance tick から毎周期呼ばれる）。
+ *   自動 ON（既定）かつ top frame のときだけ runNdgrBackfillOnce を試す。実際の起動可否
+ *   （記録 ON / liveId / view base 観測済み / ワンショット guard）は runNdgrBackfillOnce が
+ *   判定するので、ここは「自動が許可されているか」と top frame だけ見て委ねる＝view base が
+ *   遅れて観測される配信でも、観測でき次第その後の tick で 1 回起動する。
+ */
+function maybeAutoStartBackfill() {
+  if (!_backfillAutoEnabled) return;
+  if (!isWatchInlinePanelTopFrame()) return;
+  void runNdgrBackfillOnce();
 }
 
 /**

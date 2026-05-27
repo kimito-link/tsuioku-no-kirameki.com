@@ -5,6 +5,7 @@ import {
   watchPageUrlsMatchForSnapshot
 } from '../lib/broadcastUrl.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
+import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import {
@@ -137,6 +138,7 @@ import {
   normalizeFoldAnonymousInRankStrip,
   KEY_GIFT_RANKING_LANE_ENABLED,
   KEY_BACKFILL_ENABLED,
+  KEY_BACKFILL_AUTO_DISABLED,
   KEY_BACKFILL_PROGRESS
 } from '../lib/storageKeys.js';
 import { backfillRinkuNarration } from '../lib/backfillRinkuNarration.js';
@@ -157,7 +159,7 @@ import {
   storagePatchInlinePanelWidthMode
 } from '../lib/inlinePanelPlacementStorage.js';
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
-import { isBackfillEnabledFromStorage } from '../lib/backfillOptIn.js';
+import { isBackfillEnabledFromStorage, isBackfillAutoStartEnabled } from '../lib/backfillOptIn.js';
 import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold.js';
 import {
   summarizeGiftSubAppHistory,
@@ -5633,10 +5635,13 @@ function bindBackfillFetchPromptButtonOnce() {
 }
 
 /**
- * v0.1.410: 過去ログ取り込みの「りんくの語り」を描画する。進捗 `{ started, rows, done }`
- * から backfillRinkuNarration でセリフ・フェーズを決め、bubble の文言と data-phase
- *（＝CSS の動き）を更新する。progress が null/未開始なら bubble を隠す。
- * @param {{ started?: boolean, rows?: number, done?: number|boolean }|null} progress
+ * v0.1.410: 過去ログ取り込みの「りんくの語り」を描画する。進捗
+ * `{ started, rows, done, stopReason }` から backfillRinkuNarration でセリフ・フェーズを
+ * 決め、bubble の文言と data-phase（＝CSS の動き）を更新する。progress が null/未開始なら
+ * bubble を隠す。
+ * v0.1.415: stopReason で「本当に配信開始まで遡り切った（reached_start）」時だけ達成を言い、
+ *   途中/混雑/入口なしは正直な文言にする（嘘の達成宣言をしない）。
+ * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }|null} progress
  */
 function renderBackfillRinku(progress) {
   const box = document.getElementById('backfillRinku');
@@ -5691,25 +5696,38 @@ async function refreshBackfillFetchPrompt(liveId) {
   prompt.setAttribute('aria-hidden', 'false');
   bindBackfillProgressListenerOnce();
   // 既に ON 済みなら（同一配信中の再オープン）状態テキストを控えめに残す。
+  // v0.1.418: 自動取り込みトグルの hydrate も一緒に行う（既定 ON＝checked）。
   let enabled = false;
   try {
-    const bag = await chrome.storage.local.get(KEY_BACKFILL_ENABLED);
+    const bag = await chrome.storage.local.get([
+      KEY_BACKFILL_ENABLED,
+      KEY_BACKFILL_AUTO_DISABLED
+    ]);
     enabled = isBackfillEnabledFromStorage(bag);
+    const autoEl = /** @type {HTMLInputElement|null} */ ($('backfillAutoStartToggle'));
+    if (autoEl) autoEl.checked = isBackfillAutoStartEnabled(bag);
   } catch {
     enabled = false;
   }
   if (!enabled) applyBackfillFetchStatus('');
-  // v0.1.411: 開いた瞬間に「過去の結果」が出ないようにする。復元するのは「いま走っている
-  //   取り込み」だけ＝未完了(done falsy)かつ直近(ts が数分以内)の進捗のときのみ。完了済み
-  //   /古い進捗は idle（bubble 非表示）にする（押す前から done_empty 等が出る誤表示を防ぐ）。
+  // v0.1.411: 開いた瞬間に「過去の結果」が出ないようにする。復元するのは直近(ts が数分以内)
+  //   かつ表示中の配信(lid 一致)の進捗のみ。古い進捗は idle（bubble 非表示）。
+  // v0.1.415: 完了直後の結果（done=1）も「直近」なら復元するよう変更。途中で止まった/遡り
+  //   切った等のセリフをユーザーが読めるようにする（以前は running 限定で、完了メッセージが
+  //   次の poll で即消えていた＝「いまの分まで遡った・もう一度」を読めなかった）。古い完了の
+  //   誤表示は ts < 180s の recent ガードで防ぐ（押す前＝別セッションの古い結果は出ない）。
   try {
     const bag = await chrome.storage.local.get(KEY_BACKFILL_PROGRESS);
     const prog = bag && bag[KEY_BACKFILL_PROGRESS];
     const recent =
       prog && typeof prog.ts === 'number' && Date.now() - prog.ts < 180_000;
-    const running = prog && !(prog.done === 1 || prog.done === true);
-    if (prog && String(prog.lid || '').toLowerCase() === lid && recent && running) {
-      renderBackfillRinku({ started: true, rows: prog.rows, done: prog.done });
+    if (prog && String(prog.lid || '').toLowerCase() === lid && recent) {
+      renderBackfillRinku({
+        started: true,
+        rows: prog.rows,
+        done: prog.done,
+        stopReason: prog.stopReason
+      });
     } else {
       renderBackfillRinku(null); // 押す前は何も出さない（idle）。
     }
@@ -5732,7 +5750,13 @@ function bindBackfillProgressListenerOnce() {
     if (!prog) return;
     // 表示中の配信の進捗だけ反映（別タブ/別配信の進捗で上書きしない）。
     if (String(prog.lid || '').toLowerCase() !== _backfillPromptLiveId) return;
-    renderBackfillRinku({ started: true, rows: prog.rows, done: prog.done });
+    // v0.1.415: stopReason も渡す（done=1 でも reached_start か途中かで文言を分ける）。
+    renderBackfillRinku({
+      started: true,
+      rows: prog.rows,
+      done: prog.done,
+      stopReason: prog.stopReason
+    });
   });
 }
 
@@ -9358,7 +9382,7 @@ async function refresh() {
    *   各メンバを withTimeout + 個別フォールバックで握り、固まっても best-effort で描画を続行する。
    *   通常時（高速解決）はタイムアウトに到達しないので挙動は完全に不変。
    */
-  const [tabs, lastFocusedNormal, openBagRaw] = await Promise.all([
+  const [tabs, lastFocusedNormal, openBagRaw, allTabsForData] = await Promise.all([
     withTimeout(
       chrome.tabs.query({ active: true, currentWindow: true }),
       1200,
@@ -9375,6 +9399,7 @@ async function refresh() {
         KEY_LAST_WATCH_URL,
         KEY_RECORDING,
         KEY_DEEP_HARVEST_QUIET_UI,
+        KEY_BACKFILL_AUTO_DISABLED,
         KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
         KEY_INLINE_PANEL_WIDTH_MODE,
         KEY_INLINE_PANEL_PLACEMENT,
@@ -9390,7 +9415,15 @@ async function refresh() {
       ]),
       1500,
       'refresh_open_bag_timeout'
-    ).catch(() => /** @type {Record<string, unknown> | null} */ (null))
+    ).catch(() => /** @type {Record<string, unknown> | null} */ (null)),
+    // v0.1.414: standalone popup の multitab「中身が空」混信救済用。開いている
+    //   全 watch タブを列挙し、後で「実データのある lv」を優先選択する材料にする。
+    //   有界化（best-effort）。tabs 権限なし環境では空配列。
+    withTimeout(
+      chrome.tabs.query({}),
+      1200,
+      'refresh_all_tabs_timeout'
+    ).catch(() => /** @type {chrome.tabs.Tab[]} */ ([]))
   ]);
   /*
    * storage が固まった（openBagRaw=null）サイクルでは、空 {} で設定を上書きすると記録トグル等が
@@ -9408,6 +9441,13 @@ async function refresh() {
   applyCalmPanelMotionClass(calmOn);
   const calmMotionElHydrate = /** @type {HTMLInputElement|null} */ ($('calmPanelMotion'));
   if (calmMotionElHydrate) calmMotionElHydrate.checked = calmOn;
+  // v0.1.418: 過去ログ自動取り込みトグルのハイドレート（既定 ON＝checked）。lid 非依存で
+  //   常に正しい状態にする（refreshBackfillFetchPrompt は lid 無しだと早期 return するため、
+  //   ここで全体 refresh のたびに反映する）。
+  const backfillAutoHydrate = /** @type {HTMLInputElement|null} */ ($('backfillAutoStartToggle'));
+  if (backfillAutoHydrate) {
+    backfillAutoHydrate.checked = isBackfillAutoStartEnabled(openBag);
+  }
   const mktMaskHydrate = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
   if (mktMaskHydrate) {
     mktMaskHydrate.checked = normalizeMarketingExportMaskLabels(
@@ -9423,12 +9463,34 @@ async function refresh() {
    *   従来の resolveWatchUrlFromTabAndStash は activeTab → storage の 2 段だが、
    *   standalone popup ではこの間に「直前の通常 window のアクティブタブ」を
    *   挟むと complex multi-tab で正しい URL が拾える。
+   *
+   * v0.1.414: さらに standalone popup で activeTab が watch でないとき、開いている
+   *   watch タブのうち「実データ（記録/snapshot）のある lv」を優先採用する
+   *   （candidateUrls / liveIdsWithData）。未 populate の別タブ lv を拾って全チップ
+   *   「—」固定になる混信を構造的に避ける。inlineParam / 前面 activeTab は self-tab の
+   *   真実なので、この優先は適用されない（ユーザーが今見ている配信を尊重）。
    */
+  const openWatchUrls = (
+    Array.isArray(allTabsForData) ? allTabsForData : []
+  )
+    .map((t) => String(t?.url || '').trim())
+    .filter((u) => isNicoLiveWatchUrl(u));
+  let dataBacked = { candidateUrls: openWatchUrls, liveIdsWithData: /** @type {string[]} */ ([]) };
+  // activeTab が既に watch なら自タブ尊重で混信救済は不要＝storage 走査も省く。
+  if (!isNicoLiveWatchUrl(String(tabs[0]?.url || '').trim()) && !INLINE_OWN_WATCH_URL) {
+    try {
+      dataBacked = await collectDataBackedWatchLvs(openWatchUrls);
+    } catch {
+      /* best-effort: 失敗時は従来順で解決 */
+    }
+  }
   const watchUrlPick = pickWatchUrlFromMultipleSources({
     inlineWatchUrl: INLINE_OWN_WATCH_URL,
     activeTab: tabs[0],
     lastFocusedNormalActiveTab,
-    lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL]
+    lastWatchUrlRaw: openBag[KEY_LAST_WATCH_URL],
+    candidateUrls: dataBacked.candidateUrls,
+    liveIdsWithData: dataBacked.liveIdsWithData
   });
   const url = watchUrlPick.url;
   if (
@@ -10097,6 +10159,42 @@ async function refresh() {
   paintWatchPopupUi();
   markPopupRefreshContentPainted();
   revealPopupPrimaryOnce();
+
+  /*
+   * v0.1.414 ウォッチドッグ（standalone popup multitab「中身が空」救済の最終防衛）:
+   *   lv は解決したが、その lv に実データが全く無い（snapshot 無し・記録 0 件・fetch も
+   *   失敗/空）＝「—」だらけになるケースで、かつ解決ソースが "推測"（dataBacked /
+   *   lastFocusedNormal / storage）だった場合だけ、空状態と同じ「前回の配信」復元に倒す。
+   *   これで複数タブで未 populate の lv を拾っても全カード/全チップ「—」固定にならない。
+   *
+   *   前面 activeTab / inlineParam（self-tab の真実）では救済しない＝ユーザーが今まさに
+   *   見ている配信が始まったばかりで空なだけかもしれないので、別配信を出すのは誤り。
+   *   INLINE_MODE（watch 埋め込み iframe）も空状態 UI を持たないので対象外。
+   */
+  if (isFreshRefresh()) {
+    const snapForLv =
+      watchMetaCache.snapshot != null &&
+      String(watchMetaCache.snapshot?.liveId || '').trim().toLowerCase() === lv;
+    const rescueEmpty = shouldRescueEmptyResolvedWatch({
+      watchUrlSource: watchUrlPick.source,
+      hasSnapshotForLv: snapForLv,
+      storedCommentCount: arr.length,
+      onNicoUserProfilePage,
+      inlineMode: INLINE_MODE
+    });
+    if (rescueEmpty) {
+      // 前回の配信を復元（applyLastBroadcastReviewToEmptyState が履歴ありなら cards に流し、
+      // 無ければ nl-empty-no-history で畳む）。全部「—」のまま居座らせない。
+      // この lv には流すべきデータが無いので、以降の遅延ハイドレート/intercept は
+      // 走らせず return＝復元した「前回の配信」表示が後段の再描画で潰れないようにする。
+      await applyLastBroadcastReviewToEmptyState();
+      if (!isFreshRefresh()) return;
+      markPopupRefreshContentPainted();
+      revealPopupPrimaryOnce();
+      return;
+    }
+  }
+
   scheduleDeferredUserCommentProfileHydrate({
     refreshGen,
     commentsKey: key,
@@ -10245,6 +10343,68 @@ async function refresh() {
  * 0.1.36 (AK): prioritizeWatchTabCandidates を src/lib/watchTabPrioritize.js
  * に切り出し済み。chrome 依存なしの純粋関数。
  */
+
+/**
+ * 0.1.414 standalone popup の multitab「中身が空」混信救済:
+ *   開いている全 watch タブの URL と、そのうち「実データ（記録 or snapshot）が
+ *   storage にある lv 集合」を返す。pickWatchUrlFromMultipleSources の
+ *   `candidateUrls` / `liveIdsWithData` に渡し、未 populate の別タブ lv を拾って
+ *   全チップ「—」固定になる混信を避ける（記録中の配信を確実に拾う）。
+ *
+ *   コスト最小化のため、storage は「開いている watch タブの lv に対応するキーだけ」
+ *   を読む（全件 get(null) はしない）。すべて withTimeout で有界化し、固まっても
+ *   best-effort（空集合）で返す＝refresh をブロックしない。
+ *
+ * @param {string[]} openWatchUrls 開いている watch タブの URL 群
+ * @returns {Promise<{ candidateUrls: string[], liveIdsWithData: string[] }>}
+ */
+async function collectDataBackedWatchLvs(openWatchUrls) {
+  const urls = Array.isArray(openWatchUrls)
+    ? openWatchUrls.map((u) => String(u || '').trim()).filter((u) => isNicoLiveWatchUrl(u))
+    : [];
+  // URL 重複と lv 重複を整理
+  /** @type {Map<string, string>} lv(lower) -> 最初に見つかった URL */
+  const lvToUrl = new Map();
+  for (const u of urls) {
+    const lv = String(extractLiveIdFromUrl(u) || '').trim().toLowerCase();
+    if (lv && !lvToUrl.has(lv)) lvToUrl.set(lv, u);
+  }
+  const lvs = [...lvToUrl.keys()];
+  if (lvs.length === 0 || !hasExtensionContext()) {
+    return { candidateUrls: [...new Set(urls)], liveIdsWithData: [] };
+  }
+  // 各 lv の記録キー / snapshot キーだけを読む（小さく有界）。
+  /** @type {string[]} */
+  const keys = [];
+  for (const lv of lvs) {
+    keys.push(commentsStorageKey(lv));
+    keys.push(watchSnapshotStorageKey(lv));
+  }
+  /** @type {Record<string, unknown>} */
+  let bag = {};
+  try {
+    bag = await withTimeout(
+      chrome.storage.local.get(keys),
+      900,
+      'data_backed_lvs_timeout'
+    );
+  } catch {
+    return { candidateUrls: [...lvToUrl.values()], liveIdsWithData: [] };
+  }
+  /** @type {string[]} */
+  const withData = [];
+  for (const lv of lvs) {
+    const comments = bag[commentsStorageKey(lv)];
+    const hasComments = Array.isArray(comments) && comments.length > 0;
+    const snap = bag[watchSnapshotStorageKey(lv)];
+    const hasSnap =
+      snap != null &&
+      typeof snap === 'object' &&
+      String(/** @type {any} */ (snap).liveId || '').trim().toLowerCase() === lv;
+    if (hasComments || hasSnap) withData.push(lv);
+  }
+  return { candidateUrls: [...lvToUrl.values()], liveIdsWithData: withData };
+}
 
 /**
  * 対象 watch と同じ lv のタブだけ集める（前面が別放送なら除外）。
@@ -13729,6 +13889,18 @@ function initPopup() {
       const on = Boolean(calmMotionEl.checked);
       applyCalmPanelMotionClass(on);
       await storageSetSafe({ [KEY_CALM_PANEL_MOTION]: on });
+    } catch {
+      //
+    }
+  });
+
+  // v0.1.418: 過去ログ自動取り込みトグル。checked=自動 ON（既定）→ disabled キーは false、
+  //   unchecked=自動 OFF → disabled=true（反転セマンティクス）。content が onChanged で反応し、
+  //   ON に戻した瞬間は guard 解除で即起動する。
+  const backfillAutoEl = /** @type {HTMLInputElement|null} */ ($('backfillAutoStartToggle'));
+  backfillAutoEl?.addEventListener('change', async () => {
+    try {
+      await storageSetSafe({ [KEY_BACKFILL_AUTO_DISABLED]: !backfillAutoEl.checked });
     } catch {
       //
     }
