@@ -11511,9 +11511,12 @@ async function runNdgrBackfillOnce() {
   try {
     // v0.1.411: knownMinCommentNo は渡さない（早期終了で途中参加のギャップを埋め損ねる
     //   バグのため crawl 側で撤去）。重複は mergeNewComments の dedupe が弾く。
+    // v0.1.411: programStartSec を渡す。区画終端での再シード時刻を「配信開始+最古vpos」で
+    //   精密化し、長尺で配信開始まで遡り切れるようにする（複数 backward 区画を橋渡し）。
     const gen = crawlNdgrBackward({
       viewBase,
       fetchBinary: backfillFetchBinary,
+      programStartSec: startMs != null ? Math.floor(startMs / 1000) : null,
       signal: ac.signal
     });
     for (;;) {

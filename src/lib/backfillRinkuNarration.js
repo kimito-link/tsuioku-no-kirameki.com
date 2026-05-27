@@ -56,9 +56,12 @@ export function backfillRinkuNarration(progress) {
         count
       };
     case 'done':
+      // ⚠️ 完了時は「正確な件数」を出さない。公式件数は配信中も増え続け、匿名/削除/
+      //   システム메ッセージ差で数件ずれるため、ぴったり一致しない＝「数が合わない」と
+      //   気にさせてしまう（ユーザー指摘 2026-05-27）。達成感だけを伝える。
       return {
         phase,
-        lead: `ぜんぶ届いた！全部で ${n}件 の応援が集まったよ✨`,
+        lead: '配信のはじめまで、ぜんぶ届いたよ！応援を集めきったよ✨',
         animating: false,
         count
       };

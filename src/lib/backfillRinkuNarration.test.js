@@ -51,11 +51,12 @@ describe('backfillRinkuNarration', () => {
     expect(r.count).toBe(1234);
   });
 
-  it('done は「届いた」+件数・animating=false', () => {
+  it('done は「届いた」・正確な件数は出さない・animating=false', () => {
     const r = backfillRinkuNarration({ started: true, rows: 390, done: 1 });
     expect(r.phase).toBe('done');
-    expect(r.lead).toContain('390件');
     expect(r.lead).toContain('届いた');
+    // 完了時は公式件数とのズレを気にさせないため、正確な件数を出さない。
+    expect(r.lead).not.toContain('390');
     expect(r.animating).toBe(false);
   });
 
