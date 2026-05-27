@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.424',
+    date: '2026-05-27',
+    summary: 'ニコ生以外のページで別の配信の記録が出る問題を再修正',
+    items: Object.freeze([
+      'ニコ生以外のページ（X など）で別ウィンドウのパネルを開いたとき、別の配信の記録が「いま見ている配信」のように表示される問題を修正しました。記録のある配信は「前回の配信」として控えめに表示します（パネル表示には影響しない範囲だけを変更しています）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.423',
     date: '2026-05-27',
     summary: 'パネルが表示されない不具合に対応して安定版へ戻しました',
