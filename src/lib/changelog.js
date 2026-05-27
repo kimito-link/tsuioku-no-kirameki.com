@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.422',
+    date: '2026-05-27',
+    summary: '過去コメント取り込みの状況を調べるための診断を追加（内部）',
+    items: Object.freeze([
+      '配信によって過去コメントの取り込み量がばらつく原因を調べるため、取り込みの結果を内部ログに記録するようにしました（見え方・記録の中身は変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.421',
     date: '2026-05-27',
     summary: 'ニコ生以外のページで別の配信の記録が出てしまう問題を修正',
