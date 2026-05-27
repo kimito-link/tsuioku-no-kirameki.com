@@ -9688,6 +9688,22 @@
               </span>
             </label>
           </div>
+          <!-- v0.1.418: 過去ログ自動取り込み（既定 ON）。OFF にすると手動ボタンのみ。 -->
+          <div class="nl-record-sub">
+            <label for="backfillAutoStartToggle" class="nl-record-sub__label">
+              <input
+                type="checkbox"
+                id="backfillAutoStartToggle"
+                checked
+                aria-label="途中から開いた配信でも、過去のコメントを自動で取り込む"
+              />
+              <span>
+                途中から開いても、過去のコメントを自動で取り込む
+                <span class="nl-record-sub__hint"
+                  >既定 ON。配信を開いて記録 ON なら、配信の最初までさかのぼって自動で取り込みます（りんくが取り込み中を教えてくれます）。OFF にすると下の「過去のコメントも取り込む」ボタンを押したときだけ取り込みます。</span>
+              </span>
+            </label>
+          </div>
           <div class="nl-record-sub">
             <label for="inlinePanelAutoshowToggle" class="nl-record-sub__label">
               <input
@@ -10030,14 +10046,14 @@
           aria-hidden="true"
         >
           <p class="nl-gift-ranking-prompt__text">
-            途中から開いた配信でも、<strong>配信の最初までさかのぼって過去のコメント</strong>を取り込みます（記録ONのときのみ・1回押すと開始）。
+            途中から開いた配信でも、<strong>配信の最初までさかのぼって過去のコメント</strong>を取り込みます（記録ONのとき）。<strong>ふだんは自動</strong>で取り込みます。途中で止まったときや、もう一度やり直したいときはこのボタンを押してください。
           </p>
           <button
             type="button"
             id="enableBackfillFetchBtn"
             class="nl-gift-ranking-prompt__btn"
           >
-            過去のコメントも取り込む（β）
+            過去のコメントを取り込む（やり直し）
           </button>
           <p
             id="backfillFetchStatus"
