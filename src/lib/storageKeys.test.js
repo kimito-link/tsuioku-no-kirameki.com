@@ -22,6 +22,7 @@ import {
   INLINE_PANEL_PLACEMENT_FLOATING,
   INLINE_PANEL_PLACEMENT_DOCK_BOTTOM,
   commentsStorageKey,
+  watchSnapshotStorageKey,
   devMonitorTrendStorageKey,
   giftUsersStorageKey,
   giftSubAppHistoryStorageKey,
@@ -108,6 +109,12 @@ describe('storage key constants', () => {
     expect(commentsStorageKey('LV123')).toBe('nls_comments_lv123');
     expect(commentsStorageKey('  LV99  ')).toBe('nls_comments_lv99');
     expect(commentsStorageKey('')).toBe('nls_comments_');
+  });
+
+  it('watchSnapshotStorageKey は trim + 小文字（cached-first render 用）', () => {
+    expect(watchSnapshotStorageKey('LV123')).toBe('nls_watch_snapshot_lv123');
+    expect(watchSnapshotStorageKey('  LV99  ')).toBe('nls_watch_snapshot_lv99');
+    expect(watchSnapshotStorageKey('')).toBe('nls_watch_snapshot_');
   });
 
   it('giftUsersStorageKey は trim + 小文字', () => {
