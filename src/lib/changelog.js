@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.409',
+    date: '2026-05-27',
+    summary: '過去コメントの一括取り込みを配信開始まで遡れるよう作り直し',
+    items: Object.freeze([
+      '「過去のコメントも取り込む（β）」を作り直し、長い配信でも配信の最初まで遡って取り込めるようにしました（取り込みの仕組みを正しい方式に直し、起点の探し方も改善しました）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.408',
     date: '2026-05-27',
     summary: '開いた直後に「—」が並ぶ一瞬の表示を解消',
