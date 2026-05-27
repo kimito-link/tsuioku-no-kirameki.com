@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.427',
+    date: '2026-05-27',
+    summary: '同じ配信を複数タブで開いても過去ログ取得が重くならないよう改善',
+    items: Object.freeze([
+      '同じ配信を複数のタブで開いているとき、過去コメントの取り込みを「代表の1タブ」だけが行うようにして、通信が何倍にもならないようにしました（タブを多く開くほど効きます）。代表タブを閉じても別タブが自動で引き継ぎます。表示・記録の中身は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.426',
     date: '2026-05-27',
     summary: '複数タブ時、ランキング取得の重複アクセスを減らして軽量化',

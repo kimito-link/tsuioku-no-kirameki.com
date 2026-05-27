@@ -11659,7 +11659,16 @@ async function runNdgrBackfillOnce() {
 function maybeAutoStartBackfill() {
   if (!_backfillAutoEnabled) return;
   if (!isWatchInlinePanelTopFrame()) return;
-  void runNdgrBackfillOnce();
+  // PR2（多タブ集約）: 自動取り込みは「同一 liveId のタブのうち1つだけ」が走ればよい
+  //   （過去ログは全タブ同じ・最大の負荷源 467→66 req/s）。Web Locks リーダー1タブだけ起動。
+  //   ⭐lock は crawl 実行中ずっと保持されるので、リーダー1タブが配信開始まで遡り切る間
+  //   他タブは起動しない。リーダーが閉じれば Chrome がロック自動解放→次 tick で別タブが昇格し
+  //   「続きから」やり直せる（runNdgrBackfillOnce 内の _backfillTriedLiveId は per-liveId なので
+  //   別タブでは未起動扱い＝昇格後に走れる）。fail-open: Web Locks 非対応なら全タブ起動（従来）。
+  //   ⚠️手動ボタン経路（onChanged で直接 runNdgrBackfillOnce）は gate しない＝押したタブで必ず走る。
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return;
+  void runIfTabLeader('nls-backfill-' + lid, () => runNdgrBackfillOnce());
 }
 
 /**
