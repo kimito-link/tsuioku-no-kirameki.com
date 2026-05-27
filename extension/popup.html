@@ -3002,6 +3002,13 @@
         align-items: flex-start;
       }
       .nl-gift-ranking-prompt[hidden] { display: none; }
+      /* v0.1.415: コメント入力エリア直下に置く過去ログ取り込み prompt。
+         送信行と区別がつくよう上に細い区切りと余白を入れる（打つ場所のそばで自然に目に入る）。 */
+      .nl-backfill-prompt--near-compose {
+        margin-top: 10px;
+        padding-top: 12px;
+        border-top: 1px dashed rgba(155, 47, 106, 0.28);
+      }
       .nl-gift-ranking-prompt__text {
         margin: 0;
         font-size: 12px;
@@ -9614,53 +9621,8 @@
             ギフトランキング取得を開始（β）
           </button>
         </div>
-        <!-- v0.1.405: 過去ログ一括バックフィル opt-in prompt。途中参加でも配信開始まで
-             遡って過去コメントを取り込む。連続 fetch を伴うため初期 OFF・押下で 1 回起動。 -->
-        <div
-          id="backfillFetchPrompt"
-          class="nl-gift-ranking-prompt"
-          hidden
-          aria-hidden="true"
-        >
-          <p class="nl-gift-ranking-prompt__text">
-            途中から開いた配信でも、<strong>配信の最初までさかのぼって過去のコメント</strong>を取り込みます（記録ONのときのみ・1回押すと開始）。
-          </p>
-          <button
-            type="button"
-            id="enableBackfillFetchBtn"
-            class="nl-gift-ranking-prompt__btn"
-          >
-            過去のコメントも取り込む（β）
-          </button>
-          <p
-            id="backfillFetchStatus"
-            class="nl-gift-ranking-prompt__text"
-            aria-live="polite"
-            hidden
-          ></p>
-          <!-- v0.1.410: りんくの語り（取り込みの進捗をセリフ＋動きで伝える）。
-               押下で表示。data-phase で動き（巻き戻し→集める→きらめき）を切替。 -->
-          <div
-            id="backfillRinku"
-            class="nl-backfill-rinku"
-            hidden
-            aria-hidden="true"
-          >
-            <img
-              id="backfillRinkuImg"
-              class="nl-backfill-rinku__img"
-              src="images/logo/konta-yukkuri-icon-48.png"
-              alt=""
-              width="40"
-              height="40"
-            />
-            <p
-              id="backfillRinkuLead"
-              class="nl-backfill-rinku__lead"
-              aria-live="polite"
-            ></p>
-          </div>
-        </div>
+        <!-- v0.1.415: 過去ログ取り込み prompt は「コメント入力の近く」へ移動した
+             （コメント送信エリア直下・下記 nl-comment-compose 内）。ユーザー提案 2026-05-27。 -->
       </div>
 
       <p class="nl-record-nav-hint">
@@ -10057,6 +10019,54 @@
             </div>
           </div>
           <span id="postStatus" role="status" aria-live="polite" aria-atomic="true"></span>
+        </div>
+        <!-- v0.1.405/v0.1.415: 過去ログ一括バックフィル opt-in prompt。途中参加でも配信開始まで
+             遡って過去コメントを取り込む。連続 fetch を伴うため初期 OFF・押下で 1 回起動。
+             v0.1.415: コメント入力の近く（送信エリア直下）に配置＝打つ場所のそばで目に入る。 -->
+        <div
+          id="backfillFetchPrompt"
+          class="nl-gift-ranking-prompt nl-backfill-prompt--near-compose"
+          hidden
+          aria-hidden="true"
+        >
+          <p class="nl-gift-ranking-prompt__text">
+            途中から開いた配信でも、<strong>配信の最初までさかのぼって過去のコメント</strong>を取り込みます（記録ONのときのみ・1回押すと開始）。
+          </p>
+          <button
+            type="button"
+            id="enableBackfillFetchBtn"
+            class="nl-gift-ranking-prompt__btn"
+          >
+            過去のコメントも取り込む（β）
+          </button>
+          <p
+            id="backfillFetchStatus"
+            class="nl-gift-ranking-prompt__text"
+            aria-live="polite"
+            hidden
+          ></p>
+          <!-- v0.1.410: りんくの語り（取り込みの進捗をセリフ＋動きで伝える）。
+               押下で表示。data-phase で動き（さかのぼる→集める→きらめき）を切替。 -->
+          <div
+            id="backfillRinku"
+            class="nl-backfill-rinku"
+            hidden
+            aria-hidden="true"
+          >
+            <img
+              id="backfillRinkuImg"
+              class="nl-backfill-rinku__img"
+              src="images/logo/konta-yukkuri-icon-48.png"
+              alt=""
+              width="40"
+              height="40"
+            />
+            <p
+              id="backfillRinkuLead"
+              class="nl-backfill-rinku__lead"
+              aria-live="polite"
+            ></p>
+          </div>
         </div>
         <p
           class="nl-export-toolbar__hint nl-compose-toolbar-hint"

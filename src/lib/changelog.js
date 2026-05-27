@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.416',
+    date: '2026-05-27',
+    summary: '「過去のコメントも取り込む」ボタンをコメント入力の近くへ移動',
+    items: Object.freeze([
+      '「過去のコメントも取り込む（β）」ボタンを、コメント入力欄のすぐ下に移動しました（打つ場所のそばで自然に目に入るように）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.415',
     date: '2026-05-27',
     summary: '過去ログ取り込みの「ぜんぶ届いた」を正直に＋りんくが跳ねる演出',
