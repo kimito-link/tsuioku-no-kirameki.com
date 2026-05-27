@@ -5634,10 +5634,13 @@ function bindBackfillFetchPromptButtonOnce() {
 }
 
 /**
- * v0.1.410: 過去ログ取り込みの「りんくの語り」を描画する。進捗 `{ started, rows, done }`
- * から backfillRinkuNarration でセリフ・フェーズを決め、bubble の文言と data-phase
- *（＝CSS の動き）を更新する。progress が null/未開始なら bubble を隠す。
- * @param {{ started?: boolean, rows?: number, done?: number|boolean }|null} progress
+ * v0.1.410: 過去ログ取り込みの「りんくの語り」を描画する。進捗
+ * `{ started, rows, done, stopReason }` から backfillRinkuNarration でセリフ・フェーズを
+ * 決め、bubble の文言と data-phase（＝CSS の動き）を更新する。progress が null/未開始なら
+ * bubble を隠す。
+ * v0.1.415: stopReason で「本当に配信開始まで遡り切った（reached_start）」時だけ達成を言い、
+ *   途中/混雑/入口なしは正直な文言にする（嘘の達成宣言をしない）。
+ * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }|null} progress
  */
 function renderBackfillRinku(progress) {
   const box = document.getElementById('backfillRinku');
@@ -5700,17 +5703,24 @@ async function refreshBackfillFetchPrompt(liveId) {
     enabled = false;
   }
   if (!enabled) applyBackfillFetchStatus('');
-  // v0.1.411: 開いた瞬間に「過去の結果」が出ないようにする。復元するのは「いま走っている
-  //   取り込み」だけ＝未完了(done falsy)かつ直近(ts が数分以内)の進捗のときのみ。完了済み
-  //   /古い進捗は idle（bubble 非表示）にする（押す前から done_empty 等が出る誤表示を防ぐ）。
+  // v0.1.411: 開いた瞬間に「過去の結果」が出ないようにする。復元するのは直近(ts が数分以内)
+  //   かつ表示中の配信(lid 一致)の進捗のみ。古い進捗は idle（bubble 非表示）。
+  // v0.1.415: 完了直後の結果（done=1）も「直近」なら復元するよう変更。途中で止まった/遡り
+  //   切った等のセリフをユーザーが読めるようにする（以前は running 限定で、完了メッセージが
+  //   次の poll で即消えていた＝「いまの分まで遡った・もう一度」を読めなかった）。古い完了の
+  //   誤表示は ts < 180s の recent ガードで防ぐ（押す前＝別セッションの古い結果は出ない）。
   try {
     const bag = await chrome.storage.local.get(KEY_BACKFILL_PROGRESS);
     const prog = bag && bag[KEY_BACKFILL_PROGRESS];
     const recent =
       prog && typeof prog.ts === 'number' && Date.now() - prog.ts < 180_000;
-    const running = prog && !(prog.done === 1 || prog.done === true);
-    if (prog && String(prog.lid || '').toLowerCase() === lid && recent && running) {
-      renderBackfillRinku({ started: true, rows: prog.rows, done: prog.done });
+    if (prog && String(prog.lid || '').toLowerCase() === lid && recent) {
+      renderBackfillRinku({
+        started: true,
+        rows: prog.rows,
+        done: prog.done,
+        stopReason: prog.stopReason
+      });
     } else {
       renderBackfillRinku(null); // 押す前は何も出さない（idle）。
     }
@@ -5733,7 +5743,13 @@ function bindBackfillProgressListenerOnce() {
     if (!prog) return;
     // 表示中の配信の進捗だけ反映（別タブ/別配信の進捗で上書きしない）。
     if (String(prog.lid || '').toLowerCase() !== _backfillPromptLiveId) return;
-    renderBackfillRinku({ started: true, rows: prog.rows, done: prog.done });
+    // v0.1.415: stopReason も渡す（done=1 でも reached_start か途中かで文言を分ける）。
+    renderBackfillRinku({
+      started: true,
+      rows: prog.rows,
+      done: prog.done,
+      stopReason: prog.stopReason
+    });
   });
 }
 
