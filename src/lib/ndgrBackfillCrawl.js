@@ -72,15 +72,26 @@ export const NDGR_BACKFILL_FETCH_GAP_MS = 30;
  */
 export const NDGR_BACKFILL_SEED_LAG_SEC = 90;
 
+/**
+ * 1 本の backward 連鎖は時刻区画ごとに next=N で終端する。配信開始まで届かせるには、
+ * 終端のたびに「さらに前の時刻」から再シードして次の区画を辿る。その再シード回数の上限。
+ * 18h 級でも 1 区画が数十分ぶんなら数十回で開始に届く。暴走防止に 200 で頭打ち。
+ */
+export const NDGR_BACKFILL_MAX_RESEEDS = 200;
+/** 再シード時刻を「最古コメント実時刻 − この秒数」にして区画の取りこぼしを防ぐ。 */
+export const NDGR_BACKFILL_RESEED_BUFFER_SEC = 5;
+/** 配信開始時刻が不明なときの再シード後退幅（秒・保守的な固定窓）。 */
+export const NDGR_BACKFILL_RESEED_STEP_SEC = 1200;
+
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
 
 /**
  * 巡回の終了理由。
  * @typedef {(
- *   'backward_exhausted' | 'visited_revisit' | 'cap_segments' | 'cap_elapsed' |
- *   'cap_bytes' | 'cap_rows' | 'aborted' | 'rate_limited' |
- *   'no_view_base' | 'no_entry'
+ *   'backward_exhausted' | 'reached_start' | 'cap_reseeds' | 'visited_revisit' |
+ *   'cap_segments' | 'cap_elapsed' | 'cap_bytes' | 'cap_rows' | 'aborted' |
+ *   'rate_limited' | 'no_view_base' | 'no_entry'
  * )} NdgrBackfillStopReason
  */
 
@@ -180,6 +191,24 @@ function minNoOf(chats) {
 }
 
 /**
+ * chat 配列から最小 vpos（センチ秒・配信開始からの経過）を求める。空/不明なら null。
+ * 再シード時刻の算出（最古コメントの実時刻）に使う。
+ * @param {import('./ndgrDecode.js').NdgrChat[]} chats
+ * @returns {number|null}
+ */
+function minVposOf(chats) {
+  /** @type {number|null} */
+  let min = null;
+  for (const c of chats) {
+    if (!c || c.vpos == null) continue;
+    const v = Number(c.vpos);
+    if (!Number.isFinite(v) || v < 0) continue;
+    if (min == null || v < min) min = v;
+  }
+  return min;
+}
+
+/**
  * NDGR を backward 方向に巡回し、過去コメント（NdgrChat[]）を segment ごとに yield
  * する async generator。実 I/O は注入された fetchBinary / sleep / now のみ。
  *
@@ -199,6 +228,9 @@ function minNoOf(chats) {
  * @param {() => number} [opts.now] 経過時間計測用。既定は Date.now。
  * @param {Partial<NdgrBackfillCaps>} [opts.caps] 上限の上書き。
  * @param {number} [opts.fetchGapMs] fetch 間の待機 ms。
+ * @param {number|null} [opts.programStartSec] 配信開始の unixtime（秒）。区画終端での
+ *   再シード時刻を「配信開始 + 最古コメント vpos」で精密に算出するのに使う。不明なら
+ *   固定窓で後退する（精度は落ちるが動作する）。
  * @param {AbortSignal} [opts.signal] タブ非表示 / SPA 遷移での中断用。
  * @returns {AsyncGenerator<NdgrBackfillProgress, { stopReason: NdgrBackfillStopReason, segmentsFetched: number, rowsSeen: number, bytesFetched: number }, void>}
  */
@@ -210,6 +242,10 @@ export async function* crawlNdgrBackward(opts) {
       ? opts.sleep
       : (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
   const now = typeof opts?.now === 'function' ? opts.now : () => Date.now();
+  const programStartSec =
+    typeof opts?.programStartSec === 'number' && opts.programStartSec > 0
+      ? Math.floor(opts.programStartSec)
+      : null;
   const caps = { ...NDGR_BACKFILL_DEFAULT_CAPS, ...(opts?.caps || {}) };
   const gapMs =
     typeof opts?.fetchGapMs === 'number' && opts.fetchGapMs >= 0
@@ -250,81 +286,108 @@ export async function* crawlNdgrBackward(opts) {
   const t0 = now();
   /** @type {Set<string>} 再訪防止（backward URI / at URL を一意キーに） */
   const visited = new Set();
-  /** @type {string} backward 連鎖の入口 URI（見つかるまで '') */
-  let backwardUri = '';
   // 起点 = 現在より少し過去の unixtime（秒）。封済みになっている時刻帯を狙う。
-  let seedAt = Math.floor(t0 / 1000) - NDGR_BACKFILL_SEED_LAG_SEC;
-  // backward が出るまで View を辿る回数の上限（暴走防止）。
-  for (let hop = 0; hop < 20; hop += 1) {
+  let seedAtSec = Math.floor(t0 / 1000) - NDGR_BACKFILL_SEED_LAG_SEC;
+  /** @type {number|null} これまでに遡れた最古コメントの vpos（センチ秒）。再シード判定用。 */
+  let globalMinVpos = null;
+
+  // === 外側ループ: 「?at={時刻} で backward 連鎖を辿る」を、配信開始に届くまで時刻を
+  //   遡らせて繰り返す。1 本の backward 連鎖は時刻区画ごとに next=N で終端する（実機で
+  //   約60%で打ち切られた真因）。終端しても配信開始でなければ、これまでの最古 vpos から
+  //   さらに前の ?at で再シードして次の区画を取りに行く。新しく遡れなくなったら終了。===
+  for (let reseed = 0; reseed < NDGR_BACKFILL_MAX_RESEEDS; reseed += 1) {
     if (isAborted(signal)) return done('aborted');
     if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
-    const atUrl = buildViewAtUrl(viewBase, seedAt);
-    if (visited.has(atUrl)) break; // 同じ at に戻された＝これ以上進めない
-    visited.add(atUrl);
-    const entryRes = await fetchWithThrottle(ctx, atUrl, false);
-    if (entryRes.rateLimited) return done('rate_limited');
-    if (!entryRes.bytes || entryRes.bytes.length === 0) return done('no_entry');
-    bytesFetched += entryRes.bytes.length;
-    const entryNav = decodeChunkedEntry(entryRes.bytes);
-    if (entryNav.backwardUri) {
-      backwardUri = entryNav.backwardUri; // 過去への入口を発見
-      break;
+
+    // --- 2) この ?at={seedAtSec} で backward 連鎖の入口 URI を探す ---
+    let backwardUri = '';
+    let viewAt = seedAtSec;
+    for (let hop = 0; hop < 20; hop += 1) {
+      if (isAborted(signal)) return done('aborted');
+      if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
+      const atUrl = buildViewAtUrl(viewBase, viewAt);
+      if (visited.has(atUrl)) break;
+      visited.add(atUrl);
+      const entryRes = await fetchWithThrottle(ctx, atUrl, false);
+      if (entryRes.rateLimited) return done('rate_limited');
+      if (!entryRes.bytes || entryRes.bytes.length === 0) break;
+      bytesFetched += entryRes.bytes.length;
+      const entryNav = decodeChunkedEntry(entryRes.bytes);
+      if (entryNav.backwardUri) {
+        backwardUri = entryNav.backwardUri;
+        break;
+      }
+      if (entryNav.nextAt == null || entryNav.nextAt === viewAt) break;
+      viewAt = entryNav.nextAt;
     }
-    // backward がまだ無ければ next を辿る（進めない/同じなら終了）。
-    if (entryNav.nextAt == null || entryNav.nextAt === seedAt) break;
-    seedAt = entryNav.nextAt;
+    // この時刻区画に入口が無い＝（再シード後なら）これ以上前は無い＝配信開始に到達。
+    if (!backwardUri) {
+      return done(reseed === 0 ? 'backward_exhausted' : 'reached_start');
+    }
+
+    // --- 3) backward URI を PackedSegment として next.uri で辿る（1 区画ぶん） ---
+    let chainMinVpos = null;
+    for (;;) {
+      if (isAborted(signal)) return done('aborted');
+      if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
+      if (bytesFetched >= caps.bytes) return done('cap_bytes');
+      if (segmentsFetched >= caps.segments) return done('cap_segments');
+      if (visited.has(backwardUri)) break; // この区画は辿り終えた
+      visited.add(backwardUri);
+
+      const bwRes = await fetchWithThrottle(ctx, backwardUri, false);
+      if (bwRes.rateLimited) return done('rate_limited');
+      if (!bwRes.bytes || bwRes.bytes.length === 0) break; // この区画終わり
+      bytesFetched += bwRes.bytes.length;
+      segmentsFetched += 1;
+
+      const { results, nextUri } = decodePackedSegmentNav(bwRes.bytes);
+      /** @type {import('./ndgrDecode.js').NdgrChat[]} */
+      const chats = [];
+      for (const r of results) {
+        if (r && Array.isArray(r.chats) && r.chats.length) chats.push(...r.chats);
+      }
+
+      if (chats.length) {
+        rowsSeen += chats.length;
+        const minNo = minNoOf(chats);
+        const minVpos = minVposOf(chats);
+        if (minVpos != null && (chainMinVpos == null || minVpos < chainMinVpos)) {
+          chainMinVpos = minVpos;
+        }
+        yield {
+          chats,
+          segmentsFetched,
+          rowsSeen,
+          bytesFetched,
+          minCommentNo: minNo
+        };
+        if (rowsSeen >= caps.rows) return done('cap_rows');
+      }
+
+      if (!nextUri) break; // この区画の終端（next=N）。外側ループで再シードする。
+      backwardUri = nextUri;
+    }
+
+    // === 再シード判定: この区画で「これまでより古い vpos」へ進めたか。 ===
+    //   進めていなければ（または vpos 不明なら）配信開始に到達とみなして終了。
+    if (
+      chainMinVpos == null ||
+      (globalMinVpos != null && chainMinVpos >= globalMinVpos)
+    ) {
+      return done(reseed === 0 ? 'backward_exhausted' : 'reached_start');
+    }
+    globalMinVpos = chainMinVpos;
+    // 次の区画は「最古コメントの実時刻より少し前」から。vpos(センチ秒)→秒に直し、
+    //   配信開始(秒) + 最古オフセット - バッファ で再シードする。配信開始が不明なら
+    //   現在からの相対で代替（seedAtSec を窓ぶん戻す）。
+    const oldestOffsetSec = Math.floor(chainMinVpos / 100);
+    if (programStartSec != null) {
+      seedAtSec = programStartSec + oldestOffsetSec - NDGR_BACKFILL_RESEED_BUFFER_SEC;
+    } else {
+      // 配信開始不明: 直近区画ぶん（保守的に固定窓）だけ戻す。
+      seedAtSec -= NDGR_BACKFILL_RESEED_STEP_SEC;
+    }
   }
-  if (!backwardUri) return done('backward_exhausted');
-
-  // --- 3) backward URI を PackedSegment として辿り、配信開始まで遡る ---
-  //   Backward API の応答は ChunkedEntry ではなく PackedSegment（body 全体が 1 メッセージ・
-  //   length-delimited 分割しない）。コメントは messages にインライン、次に古い URI は
-  //   next.uri。next が無くなったら配信開始＝完了。旧実装はここを decodeChunkedEntry で
-  //   誤解釈し chat を 0 件しか拾えず数ホップで backward_exhausted していた。
-  for (;;) {
-    if (isAborted(signal)) return done('aborted');
-    if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
-    if (bytesFetched >= caps.bytes) return done('cap_bytes');
-    if (segmentsFetched >= caps.segments) return done('cap_segments');
-    if (visited.has(backwardUri)) return done('visited_revisit');
-    visited.add(backwardUri);
-
-    const bwRes = await fetchWithThrottle(ctx, backwardUri, false);
-    if (bwRes.rateLimited) return done('rate_limited');
-    if (!bwRes.bytes || bwRes.bytes.length === 0) return done('backward_exhausted');
-    bytesFetched += bwRes.bytes.length;
-    segmentsFetched += 1;
-
-    const { results, nextUri } = decodePackedSegmentNav(bwRes.bytes);
-    /** @type {import('./ndgrDecode.js').NdgrChat[]} */
-    const chats = [];
-    for (const r of results) {
-      if (r && Array.isArray(r.chats) && r.chats.length) chats.push(...r.chats);
-    }
-
-    if (chats.length) {
-      rowsSeen += chats.length;
-      const minNo = minNoOf(chats);
-      yield {
-        chats,
-        segmentsFetched,
-        rowsSeen,
-        bytesFetched,
-        minCommentNo: minNo
-      };
-      // 行数 cap（storage 膨張の最終防波堤）。
-      if (rowsSeen >= caps.rows) return done('cap_rows');
-      // ⛔ v0.1.411: 旧 known_min_reached 早期終了は撤去。
-      //   途中参加だと storage には「直近 RT 分」しか無く、その手前（配信開始〜参加時刻）は
-      //   空。backfill は now-90s 付近から始まるため最初の segment が RT 範囲と重なり、
-      //   「minNo <= knownMin だからもう全部記録済み」と誤判定して即終了し、肝心の手前の
-      //   ギャップを埋められなかった（実機 1892 件中 118=6% で停止）。storage は連続でなく
-      //   ギャップがあるので、この前提は成立しない。重なった分は mergeNewComments の dedupe
-      //   が弾くので再取得は無害。配信開始（backward 尽き）or cap まで遡り切る。
-    }
-
-    // next.uri が無ければ配信開始に到達（唯一の自然終了）。
-    if (!nextUri) return done('backward_exhausted');
-    backwardUri = nextUri;
-  }
+  return done('cap_reseeds');
 }

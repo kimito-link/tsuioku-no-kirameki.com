@@ -165,13 +165,14 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.segmentsFetched).toBe(2);
   });
 
-  it('同一 backward URI に戻されても無限ループせず visited_revisit で停止する', async () => {
+  it('同一 backward URI に戻されても無限ループせず安全に停止し、1 回だけ取り込む', async () => {
     const SELF = `https://mpn.live.nicovideo.jp/data/backward/v4/SELF_LOOP`;
 
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
     map.set(ENTRY_AT, viewEntryBytes({ backwardUri: SELF }));
-    // SELF の next がまた SELF（自己ループ）。
+    // SELF の next がまた SELF（自己ループ）。visited で 2 回目を弾き区画終了→再シードも
+    // 進めない（vpos 不明）ので停止する。
     map.set(SELF, packedSegmentBytes([{ no: 5, content: 'once', name: 'u' }], SELF));
 
     const { fetchBinary } = makeFetchFromMap(map);
@@ -180,8 +181,49 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
       crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
     );
 
-    expect(result.stopReason).toBe('visited_revisit');
+    // 無限ループせず終了し（visited 保護）、SELF は 1 回だけ取り込む。
+    expect(['backward_exhausted', 'reached_start', 'visited_revisit']).toContain(
+      result.stopReason
+    );
     expect(chatsAll.map((c) => c.no)).toEqual([5]); // 1 回だけ取り込む
+  });
+
+  it('区画(next=N)で終端しても、さらに前の時刻から再シードして配信開始まで遡る（60%止まり回帰）', async () => {
+    // ⛔ v0.1.411 回帰: 1 本の backward 連鎖は時刻区画ごとに next=N で終端する。
+    //   実機で「now-90s から始めた連鎖が約60%で next=N→終了」し、残り40%（さらに前の
+    //   区画）に届かなかった。再シードで次の区画を辿れることを確認する。
+    const PROGRAM_START = 1000; // 配信開始 unixtime（秒）
+    // chain1: seed(=PROGRAM_START + (90000ms前 相当)... テストでは ENTRY_AT=atUrl(SEED_AT)）。
+    const BK_A = `https://mpn.live.nicovideo.jp/data/backward/v4/CHAIN1`;
+    const BK_B = `https://mpn.live.nicovideo.jp/data/backward/v4/CHAIN2`;
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // chain1 入口（直近区画）。vpos=6000(=60秒地点) の新しめコメント。next=N で区画終端。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '新区画', name: 'u', vpos: 6000 }]));
+    // 再シード時刻 = PROGRAM_START + floor(6000/100) - BUFFER(5) = 1000 + 60 - 5 = 1055。
+    // そこに chain2 入口（さらに前の区画）。vpos=100(=1秒地点) の配信開始付近コメント。
+    map.set(atUrl(1055), viewEntryBytes({ backwardUri: BK_B }));
+    map.set(BK_B, packedSegmentBytes([{ no: 5, content: '配信開始付近', name: 'u', vpos: 100 }]));
+    // chain2 終端の再シード時刻 = 1000 + floor(100/100) - 5 = 996。そこに入口無し=配信開始到達。
+    map.set(atUrl(996), viewEntryBytes({})); // backward も next も無い
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 区画1(no=50)で止まらず、再シードで区画2(no=5)まで遡り、配信開始で終了する。
+    expect(chatsAll.map((c) => c.no)).toEqual([50, 5]);
+    expect(result.stopReason).toBe('reached_start');
   });
 
   it('segment 数 cap に達したら cap_segments で停止する', async () => {

@@ -5699,14 +5699,19 @@ async function refreshBackfillFetchPrompt(liveId) {
     enabled = false;
   }
   if (!enabled) applyBackfillFetchStatus('');
-  // v0.1.410: 取り込み中に popup を開き直したら、保存済み進捗からりんくの語りを復元する。
+  // v0.1.411: 開いた瞬間に「過去の結果」が出ないようにする。復元するのは「いま走っている
+  //   取り込み」だけ＝未完了(done falsy)かつ直近(ts が数分以内)の進捗のときのみ。完了済み
+  //   /古い進捗は idle（bubble 非表示）にする（押す前から done_empty 等が出る誤表示を防ぐ）。
   try {
     const bag = await chrome.storage.local.get(KEY_BACKFILL_PROGRESS);
     const prog = bag && bag[KEY_BACKFILL_PROGRESS];
-    if (prog && String(prog.lid || '').toLowerCase() === lid) {
+    const recent =
+      prog && typeof prog.ts === 'number' && Date.now() - prog.ts < 180_000;
+    const running = prog && !(prog.done === 1 || prog.done === true);
+    if (prog && String(prog.lid || '').toLowerCase() === lid && recent && running) {
       renderBackfillRinku({ started: true, rows: prog.rows, done: prog.done });
     } else {
-      renderBackfillRinku(null);
+      renderBackfillRinku(null); // 押す前は何も出さない（idle）。
     }
   } catch {
     /* no-op */
