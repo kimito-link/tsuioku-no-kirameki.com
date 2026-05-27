@@ -25,8 +25,8 @@ import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 const STORAGE_COMMENTS = 'nls_comments_lv888888888';
 
-test.describe('standalone popup multitab empty-dash 根治 (v0.1.414)', () => {
-  test('ライブ watch を前面に standalone popup → 実データが出て全チップ「—」固定で居座らない', async ({
+test.describe('standalone popup multitab empty-dash 根治 (v0.1.414/424)', () => {
+  test('standalone POP（前面 watch 無し・別タブに記録あり）→ レビュー(empty-state)になり、別配信をフルのアクティブ表示として誤表示しない', async ({
     context
   }) => {
     let sw = context.serviceWorkers()[0];
@@ -121,27 +121,25 @@ test.describe('standalone popup multitab empty-dash 根治 (v0.1.414)', () => {
 
     console.log('[multitab-empty-dash] state:', JSON.stringify(state));
 
-    // 記録 seed 済み + ライブ watch なので、ウォッチドッグは誤発火しないはず（過剰救済の回帰ガード）。
+    // v0.1.424: このシナリオ＝standalone popup（前面は popup window 自身）+ 別 normal window に
+    //   watch タブ。これは「ニコ生以外のページで POP を開いた」実機バグと同型で、正しい挙動は
+    //   「データのある配信を **前回配信レビュー（empty-state）** として軽く出す」＝全チップ
+    //   フルのアクティブ表示にしない（実機: X 等で別タブの記録 470 件がフル表示される誤情報）。
+    //   北極星の保証は「全カード/全チップが『—』のまま永久に居座らない」こと。empty-state は
+    //   レビュー/案内を出す＝stuck-dash ではない。
+    const emptyHint = await popupPage.evaluate(() => {
+      const liveTxt = (document.getElementById('liveId')?.textContent || '').trim();
+      return { liveTxt };
+    });
+
     expect(
       state.isEmptyState,
-      `データのある watch を前面にしたのに empty-state に倒れた（過剰救済の退行・rootClasses=${state.rootClasses}）`
-    ).toBe(false);
-
-    // 記録カードは「—」でなく数値（seed 3 件以上）になっているはず。
-    const recordedRaw = String(state.recordCount || '').replace(/[,，\s]/g, '');
-    expect(
-      /^\d+$/.test(recordedRaw),
-      `記録カードが「—」固定（recordCount=${state.recordCount}）`
+      `standalone POP（前面 watch 無し）はレビュー(empty-state)になるべき・rootClasses=${state.rootClasses}`
     ).toBe(true);
-    expect(Number(recordedRaw)).toBeGreaterThanOrEqual(3);
-
-    // 全チップが「—」のまま、は退行（来場は mock が数値を返すので少なくとも 1 つは数値）。
-    const allChipsDash = state.chips.every(
-      (t) => t === '—' || t === '－' || t === '-' || t === '' || t == null
-    );
+    // 別タブの記録がフルのアクティブ表示として出ていない（X 等での誤情報フル表示の回帰ガード）。
     expect(
-      allChipsDash,
-      `全チップ「—」固定（chips=${JSON.stringify(state.chips)}）`
+      emptyHint.liveTxt.includes('lv888888888') && !emptyHint.liveTxt.includes('直近'),
+      `別配信 lv がアクティブ表示として直に出ている（誤情報フル表示の退行）・liveTxt=${emptyHint.liveTxt}`
     ).toBe(false);
   });
 });
