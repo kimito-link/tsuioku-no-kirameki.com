@@ -3026,6 +3026,69 @@
         cursor: progress;
       }
 
+      /* v0.1.410: 過去ログ取り込みの「りんくの語り」。押下で表示。
+         data-phase で動きを切替（fetching/progress=さかのぼる揺れ、done=きらめき）。 */
+      .nl-backfill-rinku {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 7px 10px;
+        background: linear-gradient(180deg, #fff7fb, #fdeef6);
+        border: 1px solid #f4cfe2;
+        border-radius: 10px;
+      }
+      .nl-backfill-rinku__img {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: #fff;
+        transform-origin: center;
+      }
+      .nl-backfill-rinku__lead {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.45;
+        color: #9b2f6a;
+        font-weight: 600;
+      }
+      /* 取り込み中: りんくが「過去へさかのぼる」ように左へ小さく往復＋ふわっと上下。 */
+      .nl-backfill-rinku[data-phase='fetching'] .nl-backfill-rinku__img,
+      .nl-backfill-rinku[data-phase='progress'] .nl-backfill-rinku__img {
+        animation: nlBackfillRewind 1.1s ease-in-out infinite;
+      }
+      @keyframes nlBackfillRewind {
+        0% { transform: translateX(0) rotate(0deg); }
+        35% { transform: translateX(-4px) rotate(-7deg); }
+        70% { transform: translateX(1px) rotate(3deg); }
+        100% { transform: translateX(0) rotate(0deg); }
+      }
+      /* 完了: ぴょこっと弾んで、薄いきらめきリング。 */
+      .nl-backfill-rinku[data-phase='done'] .nl-backfill-rinku__img {
+        animation: nlBackfillPop 0.6s ease-out 1;
+      }
+      .nl-backfill-rinku[data-phase='done'] {
+        box-shadow: 0 0 0 0 rgba(244, 122, 178, 0.55);
+        animation: nlBackfillSparkle 0.9s ease-out 1;
+      }
+      @keyframes nlBackfillPop {
+        0% { transform: scale(1); }
+        40% { transform: scale(1.18) rotate(4deg); }
+        70% { transform: scale(0.96); }
+        100% { transform: scale(1); }
+      }
+      @keyframes nlBackfillSparkle {
+        0% { box-shadow: 0 0 0 0 rgba(244, 122, 178, 0.55); }
+        100% { box-shadow: 0 0 0 14px rgba(244, 122, 178, 0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-backfill-rinku__img,
+        .nl-backfill-rinku[data-phase='done'] {
+          animation: none !important;
+        }
+      }
+
       /* v0.1.236: 北極星 6 レーン常設枠。
          「取得できる/出来ないに関わらず popup に枠を残す」原則（kimito さん 2026-05-09 明示）。
          鏡のように貼り付け原則: 値が取れたら niconico DOM の outerHTML をそのまま流し込む。
@@ -9546,6 +9609,28 @@
             aria-live="polite"
             hidden
           ></p>
+          <!-- v0.1.410: りんくの語り（取り込みの進捗をセリフ＋動きで伝える）。
+               押下で表示。data-phase で動き（巻き戻し→集める→きらめき）を切替。 -->
+          <div
+            id="backfillRinku"
+            class="nl-backfill-rinku"
+            hidden
+            aria-hidden="true"
+          >
+            <img
+              id="backfillRinkuImg"
+              class="nl-backfill-rinku__img"
+              src="images/logo/konta-yukkuri-icon-48.png"
+              alt=""
+              width="40"
+              height="40"
+            />
+            <p
+              id="backfillRinkuLead"
+              class="nl-backfill-rinku__lead"
+              aria-live="polite"
+            ></p>
+          </div>
         </div>
       </div>
 

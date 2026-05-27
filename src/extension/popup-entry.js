@@ -136,8 +136,10 @@ import {
   normalizeAnonymousIdenticonEnabled,
   normalizeFoldAnonymousInRankStrip,
   KEY_GIFT_RANKING_LANE_ENABLED,
-  KEY_BACKFILL_ENABLED
+  KEY_BACKFILL_ENABLED,
+  KEY_BACKFILL_PROGRESS
 } from '../lib/storageKeys.js';
+import { backfillRinkuNarration } from '../lib/backfillRinkuNarration.js';
 import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
 import { effectiveInlinePanelPlacement } from '../lib/inlinePanelLayout.js';
 import {
@@ -5614,7 +5616,11 @@ function bindBackfillFetchPromptButtonOnce() {
       // 一旦 remove → set し直して onChanged の false→true 立ち上がりを必ず発火させる。
       await chrome.storage.local.remove(KEY_BACKFILL_ENABLED);
       await chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: true });
-      applyBackfillFetchStatus('過去のコメントを取り込み中です…');
+      // v0.1.410: 前回の進捗が残っていると古い「届いた」が一瞬出るので、押下時にクリア。
+      try { await chrome.storage.local.remove(KEY_BACKFILL_PROGRESS); } catch { /* no-op */ }
+      // りんくが「さかのぼってる」と語り始める（plain status は使わず bubble に集約）。
+      applyBackfillFetchStatus('');
+      renderBackfillRinku({ started: true, rows: 0, done: 0 });
     } catch {
       /* no-op */
     } finally {
@@ -5624,6 +5630,29 @@ function bindBackfillFetchPromptButtonOnce() {
       }, 1500);
     }
   });
+}
+
+/**
+ * v0.1.410: 過去ログ取り込みの「りんくの語り」を描画する。進捗 `{ started, rows, done }`
+ * から backfillRinkuNarration でセリフ・フェーズを決め、bubble の文言と data-phase
+ *（＝CSS の動き）を更新する。progress が null/未開始なら bubble を隠す。
+ * @param {{ started?: boolean, rows?: number, done?: number|boolean }|null} progress
+ */
+function renderBackfillRinku(progress) {
+  const box = document.getElementById('backfillRinku');
+  const leadEl = document.getElementById('backfillRinkuLead');
+  if (!(box instanceof HTMLElement) || !(leadEl instanceof HTMLElement)) return;
+  if (!progress || !progress.started) {
+    box.hidden = true;
+    box.setAttribute('aria-hidden', 'true');
+    box.removeAttribute('data-phase');
+    return;
+  }
+  const n = backfillRinkuNarration(progress);
+  box.hidden = false;
+  box.setAttribute('aria-hidden', 'false');
+  box.setAttribute('data-phase', n.phase);
+  leadEl.textContent = n.lead;
 }
 
 /**
@@ -5651,13 +5680,16 @@ async function refreshBackfillFetchPrompt(liveId) {
   const prompt = /** @type {HTMLElement|null} */ (document.getElementById('backfillFetchPrompt'));
   if (!prompt) return;
   const lid = String(liveId || '').trim().toLowerCase();
+  _backfillPromptLiveId = lid; // v0.1.410: 進捗リスナーのスコープ用に保持。
   if (!lid) {
     prompt.hidden = true;
     prompt.setAttribute('aria-hidden', 'true');
+    renderBackfillRinku(null);
     return;
   }
   prompt.hidden = false;
   prompt.setAttribute('aria-hidden', 'false');
+  bindBackfillProgressListenerOnce();
   // 既に ON 済みなら（同一配信中の再オープン）状態テキストを控えめに残す。
   let enabled = false;
   try {
@@ -5667,6 +5699,36 @@ async function refreshBackfillFetchPrompt(liveId) {
     enabled = false;
   }
   if (!enabled) applyBackfillFetchStatus('');
+  // v0.1.410: 取り込み中に popup を開き直したら、保存済み進捗からりんくの語りを復元する。
+  try {
+    const bag = await chrome.storage.local.get(KEY_BACKFILL_PROGRESS);
+    const prog = bag && bag[KEY_BACKFILL_PROGRESS];
+    if (prog && String(prog.lid || '').toLowerCase() === lid) {
+      renderBackfillRinku({ started: true, rows: prog.rows, done: prog.done });
+    } else {
+      renderBackfillRinku(null);
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+/** v0.1.410: 進捗リスナーのスコープ用に保持する現在の lv。 */
+let _backfillPromptLiveId = '';
+/** v0.1.410: KEY_BACKFILL_PROGRESS の onChanged をりんく語りへ反映（1 回だけ登録）。 */
+let _backfillProgressListenerBound = false;
+function bindBackfillProgressListenerOnce() {
+  if (_backfillProgressListenerBound) return;
+  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged?.addListener) return;
+  _backfillProgressListenerBound = true;
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes[KEY_BACKFILL_PROGRESS]) return;
+    const prog = changes[KEY_BACKFILL_PROGRESS].newValue;
+    if (!prog) return;
+    // 表示中の配信の進捗だけ反映（別タブ/別配信の進捗で上書きしない）。
+    if (String(prog.lid || '').toLowerCase() !== _backfillPromptLiveId) return;
+    renderBackfillRinku({ started: true, rows: prog.rows, done: prog.done });
+  });
 }
 
 /**
