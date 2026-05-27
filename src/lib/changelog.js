@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.406',
+    date: '2026-05-27',
+    summary: '配信ページのスクロールが引っかかる問題を改善',
+    items: Object.freeze([
+      'コメントが多い配信などで、マウスホイールのスクロールが一瞬反応しないことがある問題を改善しました（パネル位置の再計算を、形が変わったときだけ行うようにして、スクロール中の処理を軽くしました）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.405',
     date: '2026-05-27',
     summary: '途中参加でも過去コメントを取り込む（β）',
