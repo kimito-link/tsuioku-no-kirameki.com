@@ -1,4 +1,23 @@
 /**
+ * v0.1.431: 連続フラッシュの合間にイベントループへ制御を返す既定の yield。
+ * `scheduler.yield`（描画を挟んで続行・本来の用途）→ MessageChannel/setTimeout(0) の順。
+ * @returns {Promise<void>}
+ */
+function defaultYieldBetweenFlushes() {
+  try {
+    const sched = /** @type {any} */ (globalThis).scheduler;
+    if (sched && typeof sched.yield === 'function') {
+      return sched.yield();
+    }
+  } catch {
+    /* fall through */
+  }
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+/**
  * ストレージ書き込みのコアレシング（ロミさんの throttle パターン応用）。
  * 複数ソース（MutationObserver, NDGR, deepHarvest）からの行を
  * 最小間隔にまとめて1回の read-merge-write にする。
@@ -6,11 +25,24 @@
  * burstThreshold を指定すると、バッファが閾値を超えた時点で最小間隔を待たず
  * 即時 flush する（誕生日・ファンミ等の高流量で体感レイテンシを短縮）。
  *
+ * ⭐v0.1.431: 高流量（過去ログ一括取り込み等）でバッファが連続して埋まると、flushBody の
+ *   while ループが flush を背中合わせに何度も走らせ、その間メインスレッドを離さない。
+ *   各 flush は巨大コメント配列の O(N) マージ＝1回でも重く、連続だと watch ページが
+ *   「応答しません」になる（実機 4 万コメ配信で観測）。そこで「2 回目以降の連続 flush」の
+ *   手前で yieldBetweenFlushes により一拍ブラウザへ制御を返す（描画/入力を通す）。1 回で
+ *   終わる通常フロー（RT 記録）は yield せず＝体感レイテンシ不変。
+ *
  * @param {(batch: unknown[], meta: { sources: string[] }) => Promise<void>} flushFn
  * @param {number} [minIntervalMs]
  * @param {number} [burstThreshold] 0 以下は無効（既定の throttle 挙動）
+ * @param {() => Promise<void>} [yieldBetweenFlushes] 連続 flush の合間の yield（テスト注入用）
  */
-export function createPersistCoalescer(flushFn, minIntervalMs = 300, burstThreshold = 0) {
+export function createPersistCoalescer(
+  flushFn,
+  minIntervalMs = 300,
+  burstThreshold = 0,
+  yieldBetweenFlushes = defaultYieldBetweenFlushes
+) {
   /** @type {{ rows: unknown[], source?: string }[]} */
   let buffer = [];
   /** @type {ReturnType<typeof setTimeout>|null} */
@@ -40,11 +72,21 @@ export function createPersistCoalescer(flushFn, minIntervalMs = 300, burstThresh
       return { rows, sourcesOut };
     };
 
+    let flushedOnce = false;
     while (buffer.length) {
+      // v0.1.431: 2 回目以降の連続 flush の手前で一拍ブラウザへ制御を返す。これにより
+      //   高流量（過去ログ取り込み）で巨大配列の O(N) マージが背中合わせに走っても、
+      //   描画/入力が通り「応答しません」を防ぐ。初回 flush は yield しない＝通常フロー不変。
+      if (flushedOnce) {
+        await yieldBetweenFlushes();
+        // yield 中にバッファが空になった可能性（clear など）に備えて再確認。
+        if (!buffer.length) break;
+      }
       lastFlushTime = Date.now();
       const { rows, sourcesOut } = drainChunksOnce();
       if (!rows.length) continue;
       await flushFn(rows, { sources: sourcesOut });
+      flushedOnce = true;
     }
   }
 
