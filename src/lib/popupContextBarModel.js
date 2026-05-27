@@ -11,6 +11,7 @@ import { resolveWatchMetaCardState } from './watchMetaCardStateGate.js';
 export function labelWatchUrlSource(source) {
   const s = String(source || '').trim();
   if (s === 'activeTab') return '前面タブ';
+  if (s === 'dataBacked') return '記録のある配信タブ';
   if (s === 'lastFocusedNormal') return '直前のブラウザタブ';
   if (s === 'storage') return '直近の視聴URL（保存）';
   if (s === 'none') return '—';
