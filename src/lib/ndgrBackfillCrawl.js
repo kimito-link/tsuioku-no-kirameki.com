@@ -286,10 +286,61 @@ export async function* crawlNdgrBackward(opts) {
   const t0 = now();
   /** @type {Set<string>} 再訪防止（backward URI / at URL を一意キーに） */
   const visited = new Set();
-  // 起点 = 現在より少し過去の unixtime（秒）。封済みになっている時刻帯を狙う。
-  let seedAtSec = Math.floor(t0 / 1000) - NDGR_BACKFILL_SEED_LAG_SEC;
+  const nowSec = Math.floor(t0 / 1000);
   /** @type {number|null} これまでに遡れた最古コメントの vpos（センチ秒）。再シード判定用。 */
   let globalMinVpos = null;
+  /** @type {{ rateLimited?: boolean, aborted?: boolean }} ヘルパからの異常通知 */
+  const abend = {};
+
+  /**
+   * ?at={startAt} から View を読み、backward が出るまで next を辿って入口 URI を返す。
+   * 見つからなければ ''。rate limit/abort は abend に立てて呼び出し側で停止する。
+   * @param {number} startAt
+   * @returns {Promise<string>}
+   */
+  const seekBackwardUri = async (startAt) => {
+    let viewAt = startAt;
+    for (let hop = 0; hop < 20; hop += 1) {
+      if (isAborted(signal)) { abend.aborted = true; return ''; }
+      if (now() - t0 >= caps.elapsedMs) { abend.aborted = true; return ''; }
+      const atUrl = buildViewAtUrl(viewBase, viewAt);
+      if (visited.has(atUrl)) return '';
+      visited.add(atUrl);
+      const entryRes = await fetchWithThrottle(ctx, atUrl, false);
+      if (entryRes.rateLimited) { abend.rateLimited = true; return ''; }
+      if (!entryRes.bytes || entryRes.bytes.length === 0) return '';
+      bytesFetched += entryRes.bytes.length;
+      const entryNav = decodeChunkedEntry(entryRes.bytes);
+      if (entryNav.backwardUri) return entryNav.backwardUri;
+      if (entryNav.nextAt == null || entryNav.nextAt === viewAt) return '';
+      viewAt = entryNav.nextAt;
+    }
+    return '';
+  };
+
+  // === 初回の入口探し: 起点が「過去への入口」を持たないことがある（押すタイミングで
+  //   ライブ最先端に近すぎる等）。1 回で諦めず、起点を順に深い過去へずらして確実に
+  //   入口を見つける（実機「1 回目0件のムラ」の根治）。配信開始時刻が分かればそれも候補に。===
+  /** @type {number[]} 起点候補（現在からの秒数 lag）。浅い→深い順に試す。 */
+  const seedLags = [
+    NDGR_BACKFILL_SEED_LAG_SEC, 300, 900, 1800, 3600, 7200, 21600, 43200
+  ];
+  /** @type {number[]} 実際に試す at（秒）。programStart 近傍も末尾に足す。 */
+  const seedCandidates = seedLags.map((lag) => nowSec - lag);
+  if (programStartSec != null) {
+    // 配信開始の少し後（最初の数十秒）も候補に。ここは確実に backward を持つはず。
+    seedCandidates.push(programStartSec + 60);
+  }
+  let seedAtSec = nowSec - NDGR_BACKFILL_SEED_LAG_SEC;
+  let initialBackwardUri = '';
+  for (const cand of seedCandidates) {
+    if (cand <= 0) continue;
+    initialBackwardUri = await seekBackwardUri(cand);
+    if (abend.aborted) return done('aborted');
+    if (abend.rateLimited) return done('rate_limited');
+    if (initialBackwardUri) { seedAtSec = cand; break; }
+  }
+  if (!initialBackwardUri) return done('backward_exhausted');
 
   // === 外側ループ: 「?at={時刻} で backward 連鎖を辿る」を、配信開始に届くまで時刻を
   //   遡らせて繰り返す。1 本の backward 連鎖は時刻区画ごとに next=N で終端する（実機で
@@ -299,28 +350,11 @@ export async function* crawlNdgrBackward(opts) {
     if (isAborted(signal)) return done('aborted');
     if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
 
-    // --- 2) この ?at={seedAtSec} で backward 連鎖の入口 URI を探す ---
-    let backwardUri = '';
-    let viewAt = seedAtSec;
-    for (let hop = 0; hop < 20; hop += 1) {
-      if (isAborted(signal)) return done('aborted');
-      if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
-      const atUrl = buildViewAtUrl(viewBase, viewAt);
-      if (visited.has(atUrl)) break;
-      visited.add(atUrl);
-      const entryRes = await fetchWithThrottle(ctx, atUrl, false);
-      if (entryRes.rateLimited) return done('rate_limited');
-      if (!entryRes.bytes || entryRes.bytes.length === 0) break;
-      bytesFetched += entryRes.bytes.length;
-      const entryNav = decodeChunkedEntry(entryRes.bytes);
-      if (entryNav.backwardUri) {
-        backwardUri = entryNav.backwardUri;
-        break;
-      }
-      if (entryNav.nextAt == null || entryNav.nextAt === viewAt) break;
-      viewAt = entryNav.nextAt;
-    }
-    // この時刻区画に入口が無い＝（再シード後なら）これ以上前は無い＝配信開始に到達。
+    // 入口 URI: 初回は探索済み、再シード後は seedAtSec から探す。
+    let backwardUri = reseed === 0 ? initialBackwardUri : await seekBackwardUri(seedAtSec);
+    if (abend.aborted) return done('aborted');
+    if (abend.rateLimited) return done('rate_limited');
+    // 入口が無い＝（再シード後なら）これ以上前は無い＝配信開始に到達。
     if (!backwardUri) {
       return done(reseed === 0 ? 'backward_exhausted' : 'reached_start');
     }

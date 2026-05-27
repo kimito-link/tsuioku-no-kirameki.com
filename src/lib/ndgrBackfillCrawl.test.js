@@ -390,6 +390,31 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(calls.length).toBe(0); // 1 件も fetch しない
   });
 
+  it('初回起点(now-90s)に入口が無くても、より深い過去へ起点をずらして見つける（1回目0件ムラの回帰）', async () => {
+    // ⛔ 回帰: 起点 now-90s がタイミングによって backward を持たず 0 件で終わるムラ。
+    //   起点候補 [now-90, now-300, ...] を順に試して確実に入口を見つける。
+    //   now=1_000_000ms → nowSec=1000 → 候補 [910, 700, 100, ...]。
+    const BK0 = `https://mpn.live.nicovideo.jp/data/backward/v4/ESC_BK0`;
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 910（now-90）= 入口なし・next も自分自身（これ以上進めない）→ この候補は不発。
+    map.set(atUrl(910), viewEntryBytes({ nextAt: 910 }));
+    // 700（now-300）= 入口あり。escalate でここに到達して遡れる。
+    map.set(atUrl(700), viewEntryBytes({ backwardUri: BK0 }));
+    map.set(BK0, packedSegmentBytes([{ no: 7, content: 'esc', name: 'u' }])); // next 無し
+
+    const { fetchBinary, calls } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
+    );
+
+    // 910 で諦めず 700 まで起点をずらして取り込めた（0 件にならない）。
+    expect(chatsAll.map((c) => c.no)).toEqual([7]);
+    expect(calls).toContain(atUrl(700));
+    expect(result.stopReason === 'reached_start' || result.stopReason === 'backward_exhausted').toBe(true);
+  });
+
   it('viewBase が空 / fetchBinary 不正なら no_view_base で何もしない', async () => {
     const g1 = crawlNdgrBackward({ viewBase: '', fetchBinary: async () => ({ ok: true, status: 200, bytes: new Uint8Array() }) });
     const r1 = await drain(g1);
