@@ -3168,7 +3168,7 @@
         border-color: #f3b6cf;
       }
 
-      /* v0.1.450 PR2: A 内 actions 行（後続 PR3 で「もう一度ためす」ボタンを追加する受け皿）。
+      /* v0.1.450 PR2: A 内 actions 行（PR3 で「もう一度ためす」ボタンを動的挿入する受け皿）。
          空のままだと完全に視覚不変、要素が入ったときだけ高さを取る（:empty で margin 0）。 */
       .nl-backfill-rinku__actions {
         display: flex;
@@ -3181,6 +3181,55 @@
         margin: 0;
         padding: 0;
         display: none;
+      }
+      /* v0.1.450 PR3: A 内「もう一度ためす」ボタン。コンパクト・控えめだが押せるサイズ。
+         コメント入力直下のフルサイズボタン (.nl-gift-ranking-prompt__btn) より小さく
+         記録カード内に収まる寸法。caught_up 時は親 .nl-backfill-rinku[data-phase='caught_up']
+         背景が明るくなるが、ボタン自体はトーン控えめのまま。 */
+      .nl-backfill-rinku__retry-btn {
+        appearance: none;
+        -webkit-appearance: none;
+        background: linear-gradient(180deg, #ffe5ef, #ffd4e3);
+        color: #8a2553;
+        border: 1px solid #f3b6cf;
+        border-radius: 14px;
+        padding: 3px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.4;
+        cursor: pointer;
+        transition: background 120ms ease, transform 80ms ease, opacity 120ms ease;
+      }
+      .nl-backfill-rinku__retry-btn:hover {
+        background: linear-gradient(180deg, #ffd4e3, #ffc1d3);
+      }
+      .nl-backfill-rinku__retry-btn:active {
+        transform: translateY(1px);
+      }
+      .nl-backfill-rinku__retry-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      /* caught_up（95%以上届いた）は「念のため」程度の控えめ表示にする。 */
+      .nl-backfill-rinku[data-phase='caught_up'] ~ .nl-backfill-rinku__actions
+        .nl-backfill-rinku__retry-btn,
+      .nl-live-stat-sub--backfill-hint:has(
+          .nl-backfill-rinku[data-phase='caught_up']
+        )
+        .nl-backfill-rinku__retry-btn {
+        background: transparent;
+        border-color: #e9c5d4;
+        color: #a05477;
+        font-weight: 500;
+      }
+      /* retry_started トースト時はボタンを軽く沈ませて「押した」の余韻を出す。 */
+      .nl-backfill-rinku[data-phase='retry_started'] ~ .nl-backfill-rinku__actions
+        .nl-backfill-rinku__retry-btn,
+      .nl-live-stat-sub--backfill-hint:has(
+          .nl-backfill-rinku[data-phase='retry_started']
+        )
+        .nl-backfill-rinku__retry-btn {
+        opacity: 0.7;
       }
 
       /* v0.1.236: 北極星 6 レーン常設枠。

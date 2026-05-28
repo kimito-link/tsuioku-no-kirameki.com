@@ -5610,6 +5610,51 @@ async function refreshGiftRankingFetchPrompt(liveId) {
 //   押下で content 側の巡回（runNdgrBackfillOnce）が 1 回起動する。進捗は content が
 //   data-nls-backfill 属性に書く（このタブの DOM ではないので、popup からは取得済み
 //   件数のリフレッシュ（観測コメント数）で十分。ここではボタン状態と文言だけ管理）。
+//
+// v0.1.450 (PR3): ボタンは 2 箇所に存在し共通の trigger を呼ぶ:
+//   1) コメント入力直下 #enableBackfillFetchBtn (B = #backfillFetchPrompt 内・PR4 で廃止予定)
+//   2) 記録カード内 #recordCardBackfillRetryBtn (A = #liveStatCommentsBackfillHint 内・新規)
+
+/**
+ * v0.1.450: 「もう一度ためす」押下時刻（押下直後トーストの表示判定用）。
+ *   0 = 未押下 / 過去 1.8秒以内なら applyBackfillRecordCardHint がトースト dataPhase で
+ *   表示する（純関数 backfillRecordCardHintDomState）。
+ */
+let _backfillRetryStartedAt = 0;
+
+/**
+ * v0.1.450: 「もう一度ためす」押下処理の共通実装。A/B 両ボタンから呼ぶ。
+ *   ・storage の KEY_BACKFILL_ENABLED を false→true 立ち上げ
+ *   ・前回進捗をクリア
+ *   ・押下時刻をマーク → A 内 hint がトースト「ありがとう、もう一度…」を出す
+ *   ・1.8 秒後にもう一度 hint を再評価して通常フェーズに戻す
+ */
+async function triggerBackfillRetry() {
+  try {
+    await chrome.storage.local.remove(KEY_BACKFILL_ENABLED);
+    await chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: true });
+    try { await chrome.storage.local.remove(KEY_BACKFILL_PROGRESS); } catch { /* no-op */ }
+    _backfillRetryStartedAt = Date.now();
+    applyBackfillFetchStatus('');
+    // B 廃止後（PR4）も A 内 hint が「ありがとう…」のトーストで「押した感」を出す。
+    // 現状（PR3 並存期）はボタン下 #backfillRinku の進行中演出も同時に動く。
+    renderBackfillRinku({ started: true, rows: 0, done: 0 });
+    // A 内 hint を再描画（progress を直に渡さなくても retryStartedAt が効くよう
+    //  applyBackfillRecordCardHint は started:true,done:0 仮想 progress で呼ぶ）。
+    applyBackfillRecordCardHint({ started: true, rows: 0, done: 0 });
+    // トースト期間が終わった瞬間に通常表示へ戻すため、1.8秒後+少し余裕で再描画。
+    setTimeout(() => {
+      // 現在進行中の進捗が分からないので、最後に観測した progress を再評価する手段がない。
+      //   進捗 listener が次の onChanged で必ず再描画してくれるが、何も起きないまま
+      //   1.8秒経った場合のフォールバックとして、started:true でない仮想 progress を渡せば
+      //   hidden に戻る。content が進捗を書いていれば listener が即上書きするので不整合は出ない。
+      applyBackfillRecordCardHint(null);
+    }, 2000);
+  } catch {
+    /* no-op */
+  }
+}
+
 let _backfillFetchPromptBound = false;
 function bindBackfillFetchPromptButtonOnce() {
   if (_backfillFetchPromptBound) return;
@@ -5621,21 +5666,51 @@ function bindBackfillFetchPromptButtonOnce() {
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     try {
-      // ワンショット起動: 既に true でも、もう一度「続きから」やり直せるよう、
-      // 一旦 remove → set し直して onChanged の false→true 立ち上がりを必ず発火させる。
-      await chrome.storage.local.remove(KEY_BACKFILL_ENABLED);
-      await chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: true });
-      // v0.1.410: 前回の進捗が残っていると古い「届いた」が一瞬出るので、押下時にクリア。
-      try { await chrome.storage.local.remove(KEY_BACKFILL_PROGRESS); } catch { /* no-op */ }
-      // りんくが「さかのぼってる」と語り始める（plain status は使わず bubble に集約）。
-      applyBackfillFetchStatus('');
-      renderBackfillRinku({ started: true, rows: 0, done: 0 });
-    } catch {
-      /* no-op */
+      await triggerBackfillRetry();
     } finally {
       // 連打防止に少し置いてから戻す。
       setTimeout(() => {
         btn.disabled = false;
+      }, 1500);
+    }
+  });
+}
+
+/**
+ * v0.1.450: A 内「もう一度ためす」ボタンを動的に作成して #recordCardBackfillActions に挿入。
+ *   ボタンは HTML には書かず、JS から生成（B との並存期間中も干渉しないように）。
+ *   一度だけ挿入し、click でも共通 trigger を呼ぶ。
+ */
+let _recordCardBackfillRetryBtnBound = false;
+function bindRecordCardBackfillRetryButtonOnce() {
+  if (_recordCardBackfillRetryBtnBound) return;
+  const slot = /** @type {HTMLElement|null} */ (
+    document.getElementById('recordCardBackfillActions')
+  );
+  if (!slot) return;
+  // 二重挿入防止: 既に DOM 内にあれば再利用、無ければ作成。
+  /** @type {HTMLButtonElement|null} */
+  let btn = /** @type {HTMLButtonElement|null} */ (
+    document.getElementById('recordCardBackfillRetryBtn')
+  );
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'recordCardBackfillRetryBtn';
+    btn.className = 'nl-backfill-rinku__retry-btn';
+    btn.textContent = '↻ もう一度ためす';
+    btn.title = '過去ログをもう一度さかのぼり直します';
+    slot.appendChild(btn);
+  }
+  _recordCardBackfillRetryBtnBound = true;
+  btn.addEventListener('click', async () => {
+    if (!btn) return;
+    btn.disabled = true;
+    try {
+      await triggerBackfillRetry();
+    } finally {
+      setTimeout(() => {
+        if (btn) btn.disabled = false;
       }, 1500);
     }
   });
@@ -5685,10 +5760,25 @@ function applyBackfillRecordCardHint(progress) {
   // v0.1.438: 記録カード下にもボタン下と同じ「こん太(キャラ)+吹き出し」UI を出す（ユーザー指摘
   //   「片方しかキャラがいないのは寂しい」・統合性原則）。新規 純関数 backfillRecordCardHintDomState
   //   が hidden/dataPhase/lead をまとめて返すのでそれを DOM に流すだけ。
+  // v0.1.450 (PR3): 押下直後 1.8秒間は「ありがとう、もう一度…」のトーストを純関数側で出す。
+  //   retryStartedAtMs/nowMs を opts に渡すと、純関数が dataPhase='retry_started' を返す
+  //   （他のフェーズ判定より優先・進行中の沈黙も上書き）。
   const state =
     progress && progress.started
-      ? backfillRecordCardHintDomState(progress, { officialCount })
-      : { hidden: true, dataPhase: '', lead: '' };
+      ? backfillRecordCardHintDomState(progress, {
+          officialCount,
+          retryStartedAtMs: _backfillRetryStartedAt,
+          nowMs: Date.now()
+        })
+      : // progress 無しでもトースト期間中なら表示するため、純関数を必ず呼ぶ。
+        backfillRecordCardHintDomState(
+          { started: true, rows: 0, done: 0 },
+          {
+            officialCount,
+            retryStartedAtMs: _backfillRetryStartedAt,
+            nowMs: Date.now()
+          }
+        );
   // 外側の wrapper（既存 #liveStatCommentsBackfillHint）の hidden を切替
   el.hidden = state.hidden;
   // 内側のこん太吹き出しを更新（v0.1.438 で追加された DOM）
@@ -5703,6 +5793,13 @@ function applyBackfillRecordCardHint(progress) {
   }
   if (lead) {
     lead.textContent = state.lead;
+  }
+  // v0.1.450 (PR3): A 内「もう一度ためす」ボタンを必要なら挿入（一度きり）。
+  //   visible になっているとき(=no_entry/partial/paused/retry_started/caught_up 等)に
+  //   ボタンが受け皿 #recordCardBackfillActions に入る。CSS の :empty 判定で
+  //   actions 行が空のときは表示されないので、ボタン挿入だけで「ボタンを表示する」判定になる。
+  if (!state.hidden) {
+    bindRecordCardBackfillRetryButtonOnce();
   }
 }
 
