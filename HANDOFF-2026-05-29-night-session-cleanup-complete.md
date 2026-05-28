@@ -1,8 +1,8 @@
-# HANDOFF: 2026-05-29 夜セッション・全 PR 整理完了
+# HANDOFF: 2026-05-29 夜セッション・全 PR 整理完了 + e2e 全緑実証
 
 ## 一言で
 
-**master = v0.1.448**(CI test-and-build ✅・e2e は最後の flaky 1 件を PR #169 で修正中)。**Open PR ゼロ**(処理完了 17 件)。
+**master = v0.1.448**(CI 両ジョブ緑実証済・PR #169 merge 後の master で e2e success 確定)。**Open PR ゼロ**(処理完了 17 件)。**e2e long-standing failure 3/3 完全解消**。
 
 ## 今夜の成果(順番)
 
@@ -15,7 +15,12 @@
 | #166 | #142(close) | comment dedupe userId 修正 (v0.1.447) | ✅ Merged |
 | #167 | #143/#144/#145(close) | gift 文字化け/汚染/収益コア (v0.1.448) | ✅ Merged |
 | #168 | #137(close) | uid 解決 characterization テスト | ✅ Merged |
-| #169 | (新規) | save-ctx flaky 安定化(e2e 残 1 件) | 進行中 |
+| #169 | (新規) | save-ctx flaky 安定化(e2e 残 1 件) | ✅ Merged |
+| #170 | (新規) | 明日朝用 handoff prompt doc | ✅ Merged |
+
+**5ee1c68 (PR #169 merge 後) の master CI が両ジョブ緑で実証完了**: 
+- test-and-build ✅
+- e2e ✅ (long-standing failure 3/3 全て解消の確定証明)
 
 **一括 close した 13 PR**: #72/#76/#77/#78/#79/#80(codex 系古い) + #38/#39/#41/#42/#43/#44/#75(dependabot)。ユーザー判断「古すぎる・master と乖離・必要なら作り直す」。
 
