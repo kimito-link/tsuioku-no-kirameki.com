@@ -9849,7 +9849,11 @@
               </span>
             </label>
           </div>
-          <!-- v0.1.418: 過去ログ自動取り込み（既定 ON）。OFF にすると手動ボタンのみ。 -->
+          <!-- v0.1.418: 過去ログ自動取り込み（既定 ON）。OFF にすると手動ボタンのみ。
+               v0.1.450 (PR4): 動機説明（なぜ取り込むか）と手動 trigger の案内をここに統合。
+               以前は下の #backfillFetchPrompt（コメント入力直下）にあった説明文を、ボタン廃止に
+               合わせて自動取り込みトグル説明に吸収。
+               「もう一度ためす」ボタンは記録カード内（記録件数の下・上集約）に移動。 -->
           <div class="nl-record-sub">
             <label for="backfillAutoStartToggle" class="nl-record-sub__label">
               <input
@@ -9861,7 +9865,7 @@
               <span>
                 途中から開いても、過去のコメントを自動で取り込む
                 <span class="nl-record-sub__hint"
-                  >既定 ON。配信を開いて記録 ON なら、配信の最初までさかのぼって自動で取り込みます（りんくが取り込み中を教えてくれます）。OFF にすると下の「過去のコメントも取り込む」ボタンを押したときだけ取り込みます。</span>
+                  >既定 ON。配信を開いて記録 ON なら、配信の最初までさかのぼって自動で取り込みます（こん太が取り込み中を教えてくれます）。途中で止まったり、もう一度やり直したいときは、記録カード内に出る「↻ もう一度ためす」ボタンを押してください。OFF にすると自動取り込みは走らず、このボタン押下時だけ取り込みます。</span>
               </span>
             </label>
           </div>
@@ -10197,56 +10201,16 @@
           </div>
           <span id="postStatus" role="status" aria-live="polite" aria-atomic="true"></span>
         </div>
-        <!-- v0.1.405/v0.1.415: 過去ログ一括バックフィル opt-in prompt。途中参加でも配信開始まで
-             遡って過去コメントを取り込む。連続 fetch を伴うため初期 OFF・押下で 1 回起動。
-             v0.1.415: コメント入力の近く（送信エリア直下）に配置＝打つ場所のそばで目に入る。 -->
-        <div
-          id="backfillFetchPrompt"
-          class="nl-gift-ranking-prompt nl-backfill-prompt--near-compose"
-          hidden
-          aria-hidden="true"
-        >
-          <p class="nl-gift-ranking-prompt__text">
-            途中から開いた配信でも、<strong>配信の最初までさかのぼって過去のコメント</strong>を取り込みます（記録ONのとき）。<strong>ふだんは自動</strong>で取り込みます。途中で止まったときや、もう一度やり直したいときはこのボタンを押してください。
-          </p>
-          <!-- v0.1.410: りんくの語り（取り込みの進捗をセリフ＋動きで伝える）。
-               押下で表示。data-phase で動き（さかのぼる→集める→きらめき）を切替。
-               v0.1.449: ボタンの上に置く（説明 → 状況 → 行動 の自然な視線の流れ）。
-               未表示時は hidden=display:none で flex item から消えるため初期見た目は不変。 -->
-          <div
-            id="backfillRinku"
-            class="nl-backfill-rinku"
-            hidden
-            aria-hidden="true"
-          >
-            <img
-              id="backfillRinkuImg"
-              class="nl-backfill-rinku__img"
-              src="images/logo/konta-yukkuri-icon-48.png"
-              alt=""
-              width="40"
-              height="40"
-            />
-            <p
-              id="backfillRinkuLead"
-              class="nl-backfill-rinku__lead"
-              aria-live="polite"
-            ></p>
-          </div>
-          <button
-            type="button"
-            id="enableBackfillFetchBtn"
-            class="nl-gift-ranking-prompt__btn"
-          >
-            過去のコメントを取り込む（やり直し）
-          </button>
-          <p
-            id="backfillFetchStatus"
-            class="nl-gift-ranking-prompt__text"
-            aria-live="polite"
-            hidden
-          ></p>
-        </div>
+        <!-- v0.1.450 (PR4): 過去ログ取り込み prompt #backfillFetchPrompt を廃止。
+             ユーザー指摘「下までスクロールしなくていい・上だけに集約したい」(2026-05-29) を受けて
+             会議で確定した「上集約・下廃止」設計に従い、ボタン/りんく/状態はすべて記録カード内
+             #liveStatCommentsBackfillHint (A) に集約済 (PR1/2/3)。
+
+             機能の所在 (PR1〜3 で確立):
+               * 過去ログ取り込みボタン: #recordCardBackfillRetryBtn (A 内動的挿入)
+               * りんくの語り: #recordCardBackfillRinku (A 内・進捗 onChanged listener が更新)
+               * 押下直後トースト: PR1 純関数 backfillRecordCardHintDomState の retry_started フェーズ
+               * 動機説明 (なぜ取り込むか): #backfillAutoStartToggle 説明文に統合 (本 PR で更新済) -->
         <p
           class="nl-export-toolbar__hint nl-compose-toolbar-hint"
           id="exportToolbarHint"
