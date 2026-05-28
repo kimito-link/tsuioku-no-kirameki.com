@@ -10137,21 +10137,10 @@
           <p class="nl-gift-ranking-prompt__text">
             途中から開いた配信でも、<strong>配信の最初までさかのぼって過去のコメント</strong>を取り込みます（記録ONのとき）。<strong>ふだんは自動</strong>で取り込みます。途中で止まったときや、もう一度やり直したいときはこのボタンを押してください。
           </p>
-          <button
-            type="button"
-            id="enableBackfillFetchBtn"
-            class="nl-gift-ranking-prompt__btn"
-          >
-            過去のコメントを取り込む（やり直し）
-          </button>
-          <p
-            id="backfillFetchStatus"
-            class="nl-gift-ranking-prompt__text"
-            aria-live="polite"
-            hidden
-          ></p>
           <!-- v0.1.410: りんくの語り（取り込みの進捗をセリフ＋動きで伝える）。
-               押下で表示。data-phase で動き（さかのぼる→集める→きらめき）を切替。 -->
+               押下で表示。data-phase で動き（さかのぼる→集める→きらめき）を切替。
+               v0.1.449: ボタンの上に置く（説明 → 状況 → 行動 の自然な視線の流れ）。
+               未表示時は hidden=display:none で flex item から消えるため初期見た目は不変。 -->
           <div
             id="backfillRinku"
             class="nl-backfill-rinku"
@@ -10172,6 +10161,19 @@
               aria-live="polite"
             ></p>
           </div>
+          <button
+            type="button"
+            id="enableBackfillFetchBtn"
+            class="nl-gift-ranking-prompt__btn"
+          >
+            過去のコメントを取り込む（やり直し）
+          </button>
+          <p
+            id="backfillFetchStatus"
+            class="nl-gift-ranking-prompt__text"
+            aria-live="polite"
+            hidden
+          ></p>
         </div>
         <p
           class="nl-export-toolbar__hint nl-compose-toolbar-hint"
