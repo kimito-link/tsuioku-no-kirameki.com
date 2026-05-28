@@ -146,7 +146,8 @@ import {
   KEY_BACKFILL_PROGRESS
 } from '../lib/storageKeys.js';
 import {
-  backfillRinkuNarration,
+  // v0.1.450 (PR4): backfillRinkuNarration は B 用 #backfillRinku 描画関数で使われていたが、
+  //   B 廃止により未使用化。A 内 hint は backfillRecordCardHintDomState のみで完結する。
   backfillRecordCardHintDomState
 } from '../lib/backfillRinkuNarration.js';
 import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
@@ -166,7 +167,10 @@ import {
   storagePatchInlinePanelWidthMode
 } from '../lib/inlinePanelPlacementStorage.js';
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
-import { isBackfillEnabledFromStorage, isBackfillAutoStartEnabled } from '../lib/backfillOptIn.js';
+// v0.1.450 (PR4): isBackfillEnabledFromStorage は refreshBackfillFetchPrompt（B 用）で使われ
+//   ていたが、B 廃止により未使用。自動取り込みトグル hydrate は isBackfillAutoStartEnabled のみ
+//   で完結する。
+import { isBackfillAutoStartEnabled } from '../lib/backfillOptIn.js';
 import { partitionRankedRoomsForStrip } from '../lib/topSupportRankAnonymousFold.js';
 import {
   summarizeGiftSubAppHistory,
@@ -5610,64 +5614,82 @@ async function refreshGiftRankingFetchPrompt(liveId) {
 //   押下で content 側の巡回（runNdgrBackfillOnce）が 1 回起動する。進捗は content が
 //   data-nls-backfill 属性に書く（このタブの DOM ではないので、popup からは取得済み
 //   件数のリフレッシュ（観測コメント数）で十分。ここではボタン状態と文言だけ管理）。
-let _backfillFetchPromptBound = false;
-function bindBackfillFetchPromptButtonOnce() {
-  if (_backfillFetchPromptBound) return;
-  const btn = /** @type {HTMLButtonElement|null} */ (
-    document.getElementById('enableBackfillFetchBtn')
-  );
-  if (!btn) return;
-  _backfillFetchPromptBound = true;
-  btn.addEventListener('click', async () => {
-    btn.disabled = true;
-    try {
-      // ワンショット起動: 既に true でも、もう一度「続きから」やり直せるよう、
-      // 一旦 remove → set し直して onChanged の false→true 立ち上がりを必ず発火させる。
-      await chrome.storage.local.remove(KEY_BACKFILL_ENABLED);
-      await chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: true });
-      // v0.1.410: 前回の進捗が残っていると古い「届いた」が一瞬出るので、押下時にクリア。
-      try { await chrome.storage.local.remove(KEY_BACKFILL_PROGRESS); } catch { /* no-op */ }
-      // りんくが「さかのぼってる」と語り始める（plain status は使わず bubble に集約）。
-      applyBackfillFetchStatus('');
-      renderBackfillRinku({ started: true, rows: 0, done: 0 });
-    } catch {
-      /* no-op */
-    } finally {
-      // 連打防止に少し置いてから戻す。
-      setTimeout(() => {
-        btn.disabled = false;
-      }, 1500);
-    }
-  });
+//
+// v0.1.450 (PR4): コメント入力直下 #backfillFetchPrompt (B) を廃止し、ボタンは記録カード内
+//   #recordCardBackfillRetryBtn (A) のみに集約（会議 2026-05-29 確定）。
+
+/**
+ * v0.1.450: 「もう一度ためす」押下時刻（押下直後トーストの表示判定用）。
+ *   0 = 未押下 / 過去 1.8秒以内なら applyBackfillRecordCardHint がトースト dataPhase で
+ *   表示する（純関数 backfillRecordCardHintDomState）。
+ */
+let _backfillRetryStartedAt = 0;
+
+/**
+ * v0.1.450: 「もう一度ためす」押下処理。A 内ボタン (#recordCardBackfillRetryBtn) のみが呼ぶ。
+ *   ・storage の KEY_BACKFILL_ENABLED を false→true 立ち上げ
+ *   ・前回進捗をクリア
+ *   ・押下時刻をマーク → A 内 hint がトースト「ありがとう、もう一度…」を出す
+ *   ・2 秒後にフォールバック再描画（進捗 listener が動かなかった場合の保険）
+ */
+async function triggerBackfillRetry() {
+  try {
+    await chrome.storage.local.remove(KEY_BACKFILL_ENABLED);
+    await chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: true });
+    try { await chrome.storage.local.remove(KEY_BACKFILL_PROGRESS); } catch { /* no-op */ }
+    _backfillRetryStartedAt = Date.now();
+    // A 内 hint を即描画（純関数 backfillRecordCardHintDomState が retryStartedAt を見て
+    //   dataPhase='retry_started' を返し、トースト文言「ありがとう、もう一度…」を出す）。
+    applyBackfillRecordCardHint({ started: true, rows: 0, done: 0 });
+    // トースト期間（1.8秒）終了後にもう一度再描画。
+    //   進捗 listener が次の onChanged で再描画してくれるが、content が KEY_BACKFILL_PROGRESS を
+    //   まだ書いていないなど何も起きないまま 1.8秒経った場合のフォールバック。
+    //   null を渡すと started:false 扱いで純関数判定→トースト期間外なら hidden に戻る。
+    setTimeout(() => {
+      applyBackfillRecordCardHint(null);
+    }, 2000);
+  } catch {
+    /* no-op */
+  }
 }
 
 /**
- * v0.1.410: 過去ログ取り込みの「りんくの語り」を描画する。進捗
- * `{ started, rows, done, stopReason }` から backfillRinkuNarration でセリフ・フェーズを
- * 決め、bubble の文言と data-phase（＝CSS の動き）を更新する。progress が null/未開始なら
- * bubble を隠す。
- * v0.1.415: stopReason で「本当に配信開始まで遡り切った（reached_start）」時だけ達成を言い、
- *   途中/混雑/入口なしは正直な文言にする（嘘の達成宣言をしない）。
- * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }|null} progress
+ * v0.1.450: A 内「もう一度ためす」ボタンを動的に作成して #recordCardBackfillActions に挿入。
+ *   ボタンは HTML には書かず、JS から生成。一度だけ挿入し、click で triggerBackfillRetry を呼ぶ。
  */
-function renderBackfillRinku(progress) {
-  const box = document.getElementById('backfillRinku');
-  const leadEl = document.getElementById('backfillRinkuLead');
-  if (!(box instanceof HTMLElement) || !(leadEl instanceof HTMLElement)) return;
-  if (!progress || !progress.started) {
-    box.hidden = true;
-    box.setAttribute('aria-hidden', 'true');
-    box.removeAttribute('data-phase');
-    applyBackfillRecordCardHint(null);
-    return;
+let _recordCardBackfillRetryBtnBound = false;
+function bindRecordCardBackfillRetryButtonOnce() {
+  if (_recordCardBackfillRetryBtnBound) return;
+  const slot = /** @type {HTMLElement|null} */ (
+    document.getElementById('recordCardBackfillActions')
+  );
+  if (!slot) return;
+  // 二重挿入防止: 既に DOM 内にあれば再利用、無ければ作成。
+  /** @type {HTMLButtonElement|null} */
+  let btn = /** @type {HTMLButtonElement|null} */ (
+    document.getElementById('recordCardBackfillRetryBtn')
+  );
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'recordCardBackfillRetryBtn';
+    btn.className = 'nl-backfill-rinku__retry-btn';
+    btn.textContent = '↻ もう一度ためす';
+    btn.title = '過去ログをもう一度さかのぼり直します';
+    slot.appendChild(btn);
   }
-  const n = backfillRinkuNarration(progress);
-  box.hidden = false;
-  box.setAttribute('aria-hidden', 'false');
-  box.setAttribute('data-phase', n.phase);
-  leadEl.textContent = n.lead;
-  // v0.1.432: 記録の数字が増えない理由（入口なし/途中/混雑）を記録カードの位置にも短く出す。
-  applyBackfillRecordCardHint(progress);
+  _recordCardBackfillRetryBtnBound = true;
+  btn.addEventListener('click', async () => {
+    if (!btn) return;
+    btn.disabled = true;
+    try {
+      await triggerBackfillRetry();
+    } finally {
+      setTimeout(() => {
+        if (btn) btn.disabled = false;
+      }, 1500);
+    }
+  });
 }
 
 /**
@@ -5685,10 +5707,25 @@ function applyBackfillRecordCardHint(progress) {
   // v0.1.438: 記録カード下にもボタン下と同じ「こん太(キャラ)+吹き出し」UI を出す（ユーザー指摘
   //   「片方しかキャラがいないのは寂しい」・統合性原則）。新規 純関数 backfillRecordCardHintDomState
   //   が hidden/dataPhase/lead をまとめて返すのでそれを DOM に流すだけ。
+  // v0.1.450 (PR3): 押下直後 1.8秒間は「ありがとう、もう一度…」のトーストを純関数側で出す。
+  //   retryStartedAtMs/nowMs を opts に渡すと、純関数が dataPhase='retry_started' を返す
+  //   （他のフェーズ判定より優先・進行中の沈黙も上書き）。
   const state =
     progress && progress.started
-      ? backfillRecordCardHintDomState(progress, { officialCount })
-      : { hidden: true, dataPhase: '', lead: '' };
+      ? backfillRecordCardHintDomState(progress, {
+          officialCount,
+          retryStartedAtMs: _backfillRetryStartedAt,
+          nowMs: Date.now()
+        })
+      : // progress 無しでもトースト期間中なら表示するため、純関数を必ず呼ぶ。
+        backfillRecordCardHintDomState(
+          { started: true, rows: 0, done: 0 },
+          {
+            officialCount,
+            retryStartedAtMs: _backfillRetryStartedAt,
+            nowMs: Date.now()
+          }
+        );
   // 外側の wrapper（既存 #liveStatCommentsBackfillHint）の hidden を切替
   el.hidden = state.hidden;
   // 内側のこん太吹き出しを更新（v0.1.438 で追加された DOM）
@@ -5704,87 +5741,63 @@ function applyBackfillRecordCardHint(progress) {
   if (lead) {
     lead.textContent = state.lead;
   }
-}
-
-/**
- * バックフィルの状態テキストを表示/更新。空文字で非表示。
- * @param {string} text
- */
-function applyBackfillFetchStatus(text) {
-  const el = /** @type {HTMLElement|null} */ (document.getElementById('backfillFetchStatus'));
-  if (!el) return;
-  const t = String(text || '').trim();
-  if (!t) {
-    el.hidden = true;
-    el.textContent = '';
-    return;
+  // v0.1.450 (PR3): A 内「もう一度ためす」ボタンを必要なら挿入（一度きり）。
+  //   visible になっているとき(=no_entry/partial/paused/retry_started/caught_up 等)に
+  //   ボタンが受け皿 #recordCardBackfillActions に入る。CSS の :empty 判定で
+  //   actions 行が空のときは表示されないので、ボタン挿入だけで「ボタンを表示する」判定になる。
+  if (!state.hidden) {
+    bindRecordCardBackfillRetryButtonOnce();
   }
-  el.hidden = false;
-  el.textContent = t;
 }
 
 /**
- * バックフィル prompt の表示切り替え（lid があるときだけ表示）。
+ * v0.1.450 (PR4): A 内 hint の現在 lv を保持（progress listener のスコープ用）。
+ *   旧 _backfillPromptLiveId からリネーム（B 廃止に伴う命名整理）。
+ */
+let _backfillHintLiveId = '';
+
+/**
+ * v0.1.450 (PR4): A 内 hint の表示制御。lid を受け取り、必要なら復元 + listener bind。
+ *   旧 refreshBackfillFetchPrompt（B 用）の代替。B 廃止に伴い記録カード hint だけを面倒見る。
+ *   ・lid 無し: hint を hidden に倒し、listener も bind しない
+ *   ・lid あり: listener を bind し、直近進捗があれば復元（押す前は idle のまま）
+ *   ・自動取り込みトグルの hydrate は本流（line 9624 周辺）に任せる（B 由来の二重 hydrate は廃止）
  * @param {string} liveId
  */
-async function refreshBackfillFetchPrompt(liveId) {
-  const prompt = /** @type {HTMLElement|null} */ (document.getElementById('backfillFetchPrompt'));
-  if (!prompt) return;
+async function refreshBackfillRecordCardHint(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
-  _backfillPromptLiveId = lid; // v0.1.410: 進捗リスナーのスコープ用に保持。
+  _backfillHintLiveId = lid;
   if (!lid) {
-    prompt.hidden = true;
-    prompt.setAttribute('aria-hidden', 'true');
-    renderBackfillRinku(null);
+    applyBackfillRecordCardHint(null);
     return;
   }
-  prompt.hidden = false;
-  prompt.setAttribute('aria-hidden', 'false');
   bindBackfillProgressListenerOnce();
-  // 既に ON 済みなら（同一配信中の再オープン）状態テキストを控えめに残す。
-  // v0.1.418: 自動取り込みトグルの hydrate も一緒に行う（既定 ON＝checked）。
-  let enabled = false;
-  try {
-    const bag = await chrome.storage.local.get([
-      KEY_BACKFILL_ENABLED,
-      KEY_BACKFILL_AUTO_DISABLED
-    ]);
-    enabled = isBackfillEnabledFromStorage(bag);
-    const autoEl = /** @type {HTMLInputElement|null} */ ($('backfillAutoStartToggle'));
-    if (autoEl) autoEl.checked = isBackfillAutoStartEnabled(bag);
-  } catch {
-    enabled = false;
-  }
-  if (!enabled) applyBackfillFetchStatus('');
-  // v0.1.411: 開いた瞬間に「過去の結果」が出ないようにする。復元するのは直近(ts が数分以内)
-  //   かつ表示中の配信(lid 一致)の進捗のみ。古い進捗は idle（bubble 非表示）。
-  // v0.1.415: 完了直後の結果（done=1）も「直近」なら復元するよう変更。途中で止まった/遡り
-  //   切った等のセリフをユーザーが読めるようにする（以前は running 限定で、完了メッセージが
-  //   次の poll で即消えていた＝「いまの分まで遡った・もう一度」を読めなかった）。古い完了の
-  //   誤表示は ts < 180s の recent ガードで防ぐ（押す前＝別セッションの古い結果は出ない）。
+  // v0.1.411/v0.1.415: 直近進捗（ts が 180s 以内・lid 一致）があれば復元。古い完了の誤表示は
+  //   recent ガードで防ぐ（押す前＝別セッションの古い結果は出ない）。
   try {
     const bag = await chrome.storage.local.get(KEY_BACKFILL_PROGRESS);
     const prog = bag && bag[KEY_BACKFILL_PROGRESS];
     const recent =
       prog && typeof prog.ts === 'number' && Date.now() - prog.ts < 180_000;
     if (prog && String(prog.lid || '').toLowerCase() === lid && recent) {
-      renderBackfillRinku({
+      applyBackfillRecordCardHint({
         started: true,
         rows: prog.rows,
         done: prog.done,
         stopReason: prog.stopReason
       });
     } else {
-      renderBackfillRinku(null); // 押す前は何も出さない（idle）。
+      applyBackfillRecordCardHint(null); // 押す前は何も出さない（hidden）。
     }
   } catch {
     /* no-op */
   }
 }
 
-/** v0.1.410: 進捗リスナーのスコープ用に保持する現在の lv。 */
-let _backfillPromptLiveId = '';
-/** v0.1.410: KEY_BACKFILL_PROGRESS の onChanged をりんく語りへ反映（1 回だけ登録）。 */
+/**
+ * v0.1.410/v0.1.450 (PR4): KEY_BACKFILL_PROGRESS の onChanged を A 内 hint へ反映（1 回だけ登録）。
+ *   PR4 で B(#backfillRinku) 廃止 → A 内 applyBackfillRecordCardHint に切替。
+ */
 let _backfillProgressListenerBound = false;
 function bindBackfillProgressListenerOnce() {
   if (_backfillProgressListenerBound) return;
@@ -5795,9 +5808,9 @@ function bindBackfillProgressListenerOnce() {
     const prog = changes[KEY_BACKFILL_PROGRESS].newValue;
     if (!prog) return;
     // 表示中の配信の進捗だけ反映（別タブ/別配信の進捗で上書きしない）。
-    if (String(prog.lid || '').toLowerCase() !== _backfillPromptLiveId) return;
+    if (String(prog.lid || '').toLowerCase() !== _backfillHintLiveId) return;
     // v0.1.415: stopReason も渡す（done=1 でも reached_start か途中かで文言を分ける）。
-    renderBackfillRinku({
+    applyBackfillRecordCardHint({
       started: true,
       rows: prog.rows,
       done: prog.done,
@@ -7439,8 +7452,9 @@ function renderUserRooms(entries, liveId = '') {
     await refreshAllNorthStarMirrorLanes(String(liveId || '').trim().toLowerCase());
     // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
     await refreshGiftRankingFetchPrompt(liveId);
-    // v0.1.405: 過去ログ一括バックフィルの prompt を反映。
-    await refreshBackfillFetchPrompt(liveId);
+    // v0.1.405/v0.1.450 (PR4): 過去ログ一括バックフィルの A 内 hint を反映。
+    //   B (#backfillFetchPrompt) は廃止済。記録カード内 hint のみを面倒見る。
+    await refreshBackfillRecordCardHint(liveId);
   })();
 
   const list = Array.isArray(entries) ? entries : [];
@@ -9523,9 +9537,10 @@ async function refresh() {
   applyCalmPanelMotionClass(calmOn);
   const calmMotionElHydrate = /** @type {HTMLInputElement|null} */ ($('calmPanelMotion'));
   if (calmMotionElHydrate) calmMotionElHydrate.checked = calmOn;
-  // v0.1.418: 過去ログ自動取り込みトグルのハイドレート（既定 ON＝checked）。lid 非依存で
-  //   常に正しい状態にする（refreshBackfillFetchPrompt は lid 無しだと早期 return するため、
-  //   ここで全体 refresh のたびに反映する）。
+  // v0.1.418/v0.1.450 (PR4): 過去ログ自動取り込みトグルのハイドレート（既定 ON＝checked）。
+  //   lid 非依存で常に正しい状態にする（refreshBackfillRecordCardHint は lid 無しだと
+  //   早期 return するため、ここで全体 refresh のたびに反映する。
+  //   旧 refreshBackfillFetchPrompt は B (#backfillFetchPrompt) 廃止に伴い削除済）。
   const backfillAutoHydrate = /** @type {HTMLInputElement|null} */ ($('backfillAutoStartToggle'));
   if (backfillAutoHydrate) {
     backfillAutoHydrate.checked = isBackfillAutoStartEnabled(openBag);
@@ -13038,7 +13053,9 @@ function initPopup() {
   initOfflineBannerOnce();
   paintVersionBadge();
   bindGiftRankingFetchPromptButtonOnce();
-  bindBackfillFetchPromptButtonOnce();
+  // v0.1.450 (PR4): bindBackfillFetchPromptButtonOnce（B 用ボタン bind）は削除。
+  //   A 内の「↻ もう一度ためす」ボタンは applyBackfillRecordCardHint 内で visible 時に
+  //   bindRecordCardBackfillRetryButtonOnce が呼ばれる lazy bind 設計。
   void globalThis.chrome?.storage?.local
     ?.get(KEY_CALM_PANEL_MOTION)
     ?.then((b) => {
