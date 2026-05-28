@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   backfillNarrationPhase,
   backfillRinkuNarration,
-  backfillReachedStreamStart
+  backfillReachedStreamStart,
+  backfillRecordCardHint,
+  backfillRecordCardHintDomState
 } from './backfillRinkuNarration.js';
 
 describe('backfillReachedStreamStart', () => {
@@ -66,6 +68,19 @@ describe('backfillNarrationPhase', () => {
   it('cap_*・件数0は no_entry', () => {
     expect(
       backfillNarrationPhase({ started: true, rows: 0, done: 1, stopReason: 'cap_segments' })
+    ).toBe('no_entry');
+  });
+
+  it('no_progress（v0.1.429・進めず途中終了）で件数ありは partial（reached_start でなく「もう一度」）', () => {
+    // ⭐取れてないのに『ぜんぶ届いた』を出さないことの核心。no_progress は reached_start でない。
+    expect(
+      backfillNarrationPhase({ started: true, rows: 7408, done: 1, stopReason: 'no_progress' })
+    ).toBe('partial');
+  });
+
+  it('no_progress・件数0は no_entry', () => {
+    expect(
+      backfillNarrationPhase({ started: true, rows: 0, done: 1, stopReason: 'no_progress' })
     ).toBe('no_entry');
   });
 
@@ -142,5 +157,140 @@ describe('backfillRinkuNarration', () => {
     const r = backfillRinkuNarration({ started: true, rows: 238, done: 1 });
     expect(r.phase).toBe('partial');
     expect(r.lead).not.toContain('ぜんぶ届いた');
+  });
+});
+
+describe('backfillRecordCardHint（記録カードに出す短文・v0.1.432）', () => {
+  it('no_entry（入口が見つからない）は記録カードにヒントを出す', () => {
+    const h = backfillRecordCardHint({ started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' });
+    expect(h).not.toBe('');
+    expect(h).toContain('過去ログ');
+    // 断定しない（「無い」でなく「今は遡れない／また取り込める」トーン）。
+    expect(h).toContain('少し経つと');
+  });
+
+  it('partial（途中まで）は「続きを取り込む」ヒント', () => {
+    const h = backfillRecordCardHint({ started: true, rows: 238, done: 1, stopReason: 'cap_elapsed' });
+    expect(h).toContain('途中まで');
+    expect(h).toContain('もう一度');
+  });
+
+  it('partial でも記録が公式の95%以上なら「途中まで」とは言わない（v0.1.432）', () => {
+    // 実機: 記録207/公式203 のように reached_start でなくても実質100%なら『途中まで』と言わない。
+    const h = backfillRecordCardHint(
+      { started: true, rows: 207, done: 1, stopReason: 'no_progress' },
+      { officialCount: 203 }
+    );
+    expect(h).not.toContain('途中まで');
+  });
+
+  it('partial で記録が公式の95%以上なら肯定的な caught-up 文を出す（沈黙しない・v0.1.435）', () => {
+    // ⛔ v0.1.432 で空文字にしていたが、実機でボタン下に「いまの分まで遡ったよ」が出る一方
+    //   記録カード下が完全沈黙＝「片方しか反応しない＝対応されてない」と感じる UX 問題が再現。
+    //   世界標準（Nielsen NN/g #1 Visibility / Material Design 3 / Instagram caught-up）に合わせ、
+    //   「ほぼ完了」は沈黙でなく肯定的な状態の名前化で表現する。
+    const h = backfillRecordCardHint(
+      { started: true, rows: 1919, done: 1, stopReason: 'no_progress' },
+      { officialCount: 1908 }
+    );
+    expect(h).not.toBe('');
+    expect(h).toContain('いまの分まで届いてるよ');
+  });
+
+  it('partial で記録が公式の95%未満なら「途中まで」を出す', () => {
+    const h = backfillRecordCardHint(
+      { started: true, rows: 239, done: 1, stopReason: 'no_progress' },
+      { officialCount: 2064 }
+    );
+    expect(h).toContain('途中まで');
+  });
+
+  it('partial で公式件数が無い（不明）なら従来通り「途中まで」を出す', () => {
+    const h = backfillRecordCardHint({ started: true, rows: 238, done: 1, stopReason: 'cap_elapsed' }, {});
+    expect(h).toContain('途中まで');
+  });
+
+  it('no_entry は公式に近くても（記録少なめ前提）出す＝officialCount に関わらず表示', () => {
+    const h = backfillRecordCardHint(
+      { started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' },
+      { officialCount: 0 }
+    );
+    expect(h).toContain('過去ログ');
+  });
+
+  it('paused（混雑）は「一時中断」ヒント', () => {
+    const h = backfillRecordCardHint({ started: true, rows: 100, done: 1, stopReason: 'rate_limited' });
+    expect(h).toContain('中断');
+  });
+
+  it('取り込み中（fetching / progress）は記録カードに出さない（演出はボタン下に任せる）', () => {
+    expect(backfillRecordCardHint({ started: true, rows: 0, done: 0 })).toBe('');
+    expect(backfillRecordCardHint({ started: true, rows: 50, done: 0 })).toBe('');
+  });
+
+  it('達成（done）・空（done_empty）・待機（idle）は記録カードに出さない', () => {
+    expect(backfillRecordCardHint({ started: true, rows: 390, done: 1, stopReason: 'reached_start' })).toBe('');
+    expect(backfillRecordCardHint({ started: true, rows: 0, done: 1, stopReason: 'reached_start' })).toBe('');
+    expect(backfillRecordCardHint({})).toBe('');
+  });
+});
+
+describe('backfillRecordCardHintDomState（記録カード下こん太吹き出しの DOM 状態・v0.1.438）', () => {
+  it('no_entry: hidden=false / data-phase=no_entry / lead に文言', () => {
+    const s = backfillRecordCardHintDomState({
+      started: true,
+      rows: 0,
+      done: 1,
+      stopReason: 'backward_exhausted'
+    });
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('no_entry');
+    expect(s.lead).toContain('遡れませんでした');
+  });
+
+  it('partial(<95%): hidden=false / data-phase=partial / 「途中まで」文言', () => {
+    const s = backfillRecordCardHintDomState(
+      { started: true, rows: 239, done: 1, stopReason: 'no_progress' },
+      { officialCount: 2064 }
+    );
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('partial');
+    expect(s.lead).toContain('途中まで');
+  });
+
+  it('partial(>=95%): caught_up data-phase で「いまの分まで届いてるよ ✨」', () => {
+    const s = backfillRecordCardHintDomState(
+      { started: true, rows: 1919, done: 1, stopReason: 'no_progress' },
+      { officialCount: 1908 }
+    );
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('caught_up');
+    expect(s.lead).toContain('いまの分まで届いてるよ');
+  });
+
+  it('paused: hidden=false / data-phase=paused / 「中断」文言', () => {
+    const s = backfillRecordCardHintDomState({
+      started: true,
+      rows: 100,
+      done: 1,
+      stopReason: 'rate_limited'
+    });
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('paused');
+    expect(s.lead).toContain('中断');
+  });
+
+  it('fetching/progress/done/done_empty/idle: hidden=true / data-phase=空 / lead=空', () => {
+    const idle = backfillRecordCardHintDomState({});
+    expect(idle).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    const fetching = backfillRecordCardHintDomState({ started: true, rows: 0, done: 0 });
+    expect(fetching).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    const done = backfillRecordCardHintDomState({
+      started: true,
+      rows: 100,
+      done: 1,
+      stopReason: 'reached_start'
+    });
+    expect(done).toEqual({ hidden: true, dataPhase: '', lead: '' });
   });
 });
