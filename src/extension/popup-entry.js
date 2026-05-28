@@ -5,6 +5,7 @@ import {
   watchPageUrlsMatchForSnapshot
 } from '../lib/broadcastUrl.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
+import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
@@ -9085,6 +9086,42 @@ async function populateStorySourceEntriesFromStorageFallback(opts = {}) {
  * @returns {Promise<void>}
  */
 let _lastPopupStateForResize = /** @type {string|null} */ (null);
+/**
+ * v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたあと」閉じる。
+ *
+ * ユーザー要望（2026-05-28）: POP は最初に配信へ飛ぶときだけ出ればよく、その後は配信ページの
+ *   横付きパネルを見るので POP が居座る必要はない。むしろ居座ると getLastFocused 混信で後続の
+ *   パネル表示を阻害する。配信タブを開いたらこの POP ウィンドウは自分で閉じる。
+ *
+ * ⚠️ 安全: 閉じるのは「自分が standalone popup window（type==='popup'）かつ非 INLINE_MODE」の
+ *   ときだけ。インライン/サイドパネル（iframe）では絶対に閉じない（純関数 shouldClose… で判定）。
+ *   失敗は静かに無視（best-effort・パネル表示を壊さない）。
+ *
+ * @param {boolean} openedStreamTab 直前に配信タブを開けたか。
+ * @returns {Promise<void>}
+ */
+async function closeStandalonePopupAfterNavigate(openedStreamTab) {
+  if (INLINE_MODE) return; // iframe（インライン/サイドパネル）は閉じない
+  if (!hasExtensionContext()) return;
+  try {
+    const win = await chrome.windows.getCurrent();
+    if (
+      !shouldCloseStandalonePopupAfterNavigate({
+        inlineMode: INLINE_MODE,
+        windowType: win?.type,
+        openedStreamTab
+      })
+    ) {
+      return;
+    }
+    if (typeof win?.id === 'number') {
+      await chrome.windows.remove(win.id);
+    }
+  } catch {
+    // best-effort: 取得/クローズ失敗は静かに諦める（パネル表示には影響しない）
+  }
+}
+
 async function resizePopupWindowForState(input) {
   if (INLINE_MODE) return;
   // v0.1.406: 拡張リロード後に古い popup が残っていると chrome.windows.update が
@@ -14681,11 +14718,27 @@ function initPopup() {
     if (!url) return;
     try {
       void chrome.tabs.create({ url });
+      // v0.1.433: 配信に飛ばしたら別ウィンドウ POP は用済み＝自分を閉じる（居座り→混信防止）。
+      void closeStandalonePopupAfterNavigate(true);
     } catch (err) {
       if (typeof console !== 'undefined' && console?.warn) {
         console.warn('[lastBroadcastReopen] tabs.create failed:', err);
       }
     }
+  });
+
+  // v0.1.433: 「配信を探す」導線（ランキング等の外部リンク）を押したら、別ウィンドウ POP は
+  //   役目を終えるので閉じる。ユーザー要望「POP は最初に飛ぶときだけ。飛んだら配信を見るので
+  //   POP に表示は要らない」。リンクは target=_blank で新タブが開くので、閉じても遷移は完了する。
+  //   ⚠️ インライン/サイドパネル（iframe）では閉じない（closeStandalonePopupAfterNavigate が判定）。
+  const noWatchHintLinks = document.querySelectorAll('#noWatchRankingHint a[href]');
+  noWatchHintLinks.forEach((a) => {
+    a.addEventListener('click', () => {
+      // 新タブ遷移（_blank）を妨げないよう、ウィンドウを閉じるのは次マクロタスクへ。
+      setTimeout(() => {
+        void closeStandalonePopupAfterNavigate(true);
+      }, 0);
+    });
   });
 
   postBtn?.addEventListener('click', () => {

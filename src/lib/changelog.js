@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.433',
+    date: '2026-05-28',
+    summary: '別ウィンドウは配信を開いたら自動で閉じるように',
+    items: Object.freeze([
+      '別ウィンドウのパネルから配信を開いたとき、その別ウィンドウが開いたまま残って、次に配信ページを開いてもプレイヤー下のパネルが出なくなることがある問題を直しました。別ウィンドウは配信に移動したら自動で閉じるようにして、プレイヤー下のパネルがちゃんと出るようにしています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.432',
     date: '2026-05-28',
     summary: '過去ログが取れないとき記録カードにも理由を表示',
