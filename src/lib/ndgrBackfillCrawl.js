@@ -30,6 +30,7 @@
 
 import { decodeChunkedEntry } from './ndgrDecode.js';
 import { decodePackedSegmentNav } from './ndgrDecode.js';
+import { parseGiftCommentText } from './parseGiftComment.js';
 
 /**
  * 巡回の各種上限（保守的な初期値）。PoC で rate limit 未測定のため、意図的に
@@ -77,15 +78,59 @@ export const NDGR_BACKFILL_FETCH_GAP_MS = 15;
 export const NDGR_BACKFILL_SEED_LAG_SEC = 90;
 
 /**
- * 1 本の backward 連鎖は時刻区画ごとに next=N で終端する。配信開始まで届かせるには、
+ * 1 本の backward 連鎖は時刻区画（バケット）ごとに next=N で終端する。配信開始まで届かせるには、
  * 終端のたびに「さらに前の時刻」から再シードして次の区画を辿る。その再シード回数の上限。
- * 18h 級でも 1 区画が数十分ぶんなら数十回で開始に届く。暴走防止に 200 で頭打ち。
+ *
+ * ⭐v0.1.431: 旧コメントは「1 区画＝数十分」と想定し 200 で足りるとしていたが、実機 lv350604301 で
+ *   バケットは実測**約 30〜45 秒**と判明（旧 200 では ~46 分配信でも途中で cap_reseeds に達し得た）。
+ *   バケット幅 50s で再シードするので、所要回数 ≒ 配信秒数 / 50。18h 配信なら 64800/50 ≈ 1296 回。
+ *   余裕を見て 4000 にする（真の終了は通常 reached_start。cap_elapsed/bytes/rows と hidden 中断が
+ *   最終防波堤なので、回数 cap で長尺を途中打ち切りしないことを優先）。
  */
-export const NDGR_BACKFILL_MAX_RESEEDS = 200;
+export const NDGR_BACKFILL_MAX_RESEEDS = 4000;
 /** 再シード時刻を「最古コメント実時刻 − この秒数」にして区画の取りこぼしを防ぐ。 */
 export const NDGR_BACKFILL_RESEED_BUFFER_SEC = 5;
 /** 配信開始時刻が不明なときの再シード後退幅（秒・保守的な固定窓）。 */
 export const NDGR_BACKFILL_RESEED_STEP_SEC = 1200;
+/**
+ * v0.1.431: 1 つの ChunkedEntry / backward 連鎖がカバーする時間区画（バケット）の幅（秒）。
+ *
+ * ⭐実機 lv350604301（爆速配信・2026-05-27）で決定的に観測: NDGR の `?at={t}` 応答は
+ *   約 30〜45 秒ごとのバケットに量子化されている。例えば `at=600` も `at=595`（=最古 vpos−5s
+ *   バッファ）も**同一のバケット＝同一 backward URI**を返す。つまり旧来の「最古 vpos − 5s」
+ *   再シードは、たった今読み終えたバケットに舞い戻り、その backward URI が既に visited のため
+ *   入口が見つからず no_progress 扱い→数回リトライ後に 34% 等で停止していた（32%停止の真因）。
+ *
+ *   そこで再シードは「直前に種をまいた at」より**最低でも 1 バケット分前**へ必ず下げる。実機
+ *   検証では at をバケット幅ぶん戻すと 57 ホップで 46 分配信の冒頭(+26秒)まで重複ゼロで到達した。
+ *   余裕を見て実測上限 45s よりやや大きい 50s にする（隙間に落ちても次バケットに入れる）。
+ */
+export const NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC = 50;
+/**
+ * v0.1.429: 「配信開始に到達した」と判定する最古 vpos のしきい値（センチ秒）。
+ * 最古コメントの vpos がこの値以下＝配信開始〜30秒以内なら、本当に最初まで遡れたとみなす。
+ * これ以外の「進めなかった」は reached_start にせず、起点を戻してリトライ/no_progress に倒す。
+ */
+export const NDGR_BACKFILL_NEAR_START_VPOS_CS = 3000; // 30秒 ×100(センチ秒)
+/**
+ * v0.1.434: 「配信開始に到達した」と判定するのに必要な、開始近傍(NEAR_START_VPOS_CS 以内)の
+ * vpos を持つ chat の最小件数。
+ *
+ *   なぜ単一最小値ではダメか（誤判定の真因）: 運営アナウンス / システムメッセージ / ギフトの
+ *   お知らせ等は vpos=0 や極小になりがち。これが配信【中盤】の区画に 1 件紛れると、その区画の
+ *   最小 vpos が極小になり「最小 vpos ≤ 30秒」が成立 → まだ序盤まで程遠いのに reached_start
+ *   （『ぜんぶ届いた』）を誤発火していた（実機で 47%/51% 停止）。
+ *
+ *   一方、本当の配信開始区画には冒頭の低 vpos コメントが【複数】ある（vpos≈0 が大量）。そこで
+ *   「開始近傍の vpos が 2 件以上」を要求すれば、外れ値 1 件では発火せず、真の開始は確実に通る。
+ *   ⛔ vpos=0 を一律無視するのは不可（真の開始では実際に vpos≈0 が大量にあり、取り逃す）。
+ */
+export const NDGR_BACKFILL_NEAR_START_MIN_HITS = 2;
+/**
+ * v0.1.429: 「前回より古い区画へ進めなかった」ときに、起点をさらに大きく戻して再挑戦する
+ * 最大連続回数。これを超えても進めなければ no_progress で終える（reached_start とは言わない）。
+ */
+export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 4;
 
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
@@ -95,7 +140,7 @@ export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
  * @typedef {(
  *   'backward_exhausted' | 'reached_start' | 'cap_reseeds' | 'visited_revisit' |
  *   'cap_segments' | 'cap_elapsed' | 'cap_bytes' | 'cap_rows' | 'aborted' |
- *   'rate_limited' | 'no_view_base' | 'no_entry'
+ *   'rate_limited' | 'no_view_base' | 'no_entry' | 'no_progress'
  * )} NdgrBackfillStopReason
  */
 
@@ -213,6 +258,84 @@ function minVposOf(chats) {
 }
 
 /**
+ * v0.1.436: 「この chat は記録パスで保存される一般コメントか」を判定する既定フィルタ。
+ *
+ *   chainLooksLikeStreamStart の vpos 集計は「記録に残るコメント」だけを母集団にすべきで、
+ *   記録パス(ndgrChatRows.js の ndgrChatsToMergeRows: no==null skip + parseGiftCommentText
+ *   skip) で除外される運営/system/gift お知らせを reached_start 投票から外す必要がある
+ *   （実機 55% で『ぜんぶ届いた』誤発火の追加真因＝中盤区画に運営/gift が 2 件以上紛れて
+ *   minHits=2 をすり抜けていた）。
+ *
+ *   ⛔ no==null だけでは gift をすり抜ける場合がある（gift 行は送信者 uid を no に持つ実例が
+ *      存在する＝backfillRemoveGiftSystemMessages.js のコメント参照）。だから 2 段ガード。
+ *
+ * @param {import('./ndgrDecode.js').NdgrChat} chat
+ * @returns {boolean} 記録パスで保存される一般コメントなら true。運営/system/gift は false。
+ */
+function defaultIsPersistableChat(chat) {
+  if (!chat || chat.no == null) return false; // 運営/system 候補
+  const text = typeof chat.content === 'string' ? chat.content : '';
+  if (text && parseGiftCommentText(text)) return false; // gift お知らせ
+  return true;
+}
+
+/**
+ * v0.1.434: この区画(chats)が「配信の開始区画」らしいかを判定する純関数。
+ *
+ *   真の開始区画には冒頭の低 vpos コメントが【複数】ある（配信開始直後に挨拶等で vpos≈0 が
+ *   大量に流れる）。一方、配信【中盤】の区画に運営/システム/ギフトお知らせが 1 件だけ紛れると
+ *   その vpos も極小になりがちで、「単一最小 vpos ≤ 開始近傍」では中盤を開始と誤判定してしまう
+ *   （実機 47%/51% で『ぜんぶ届いた』誤表示の真因）。
+ *
+ *   そこで「開始近傍(nearStartCs 以内)の vpos を持つ chat が minNearStartHits 件以上」を要求する。
+ *   外れ値 1 件では発火せず、低 vpos が複数ある真の開始区画は確実に通る。vpos の有効性判定は
+ *   minVposOf と揃える（null / 非有限 / 負を無視）。
+ *
+ *   v0.1.436 追補: 投票母集団は「記録パスで保存される一般コメント」に揃える（isPersistableChat）。
+ *     運営/system/gift お知らせ(vpos=0/極小)が中盤区画に複数紛れて minHits=2 をすり抜ける
+ *     ケースを根治（実機 55% で『ぜんぶ届いた』誤発火）。既定 = defaultIsPersistableChat。
+ *
+ * @param {import('./ndgrDecode.js').NdgrChat[]} chats 1 区画ぶんの chat 配列。
+ * @param {{
+ *   nearStartCs?: number,
+ *   minNearStartHits?: number,
+ *   isPersistableChat?: (chat: import('./ndgrDecode.js').NdgrChat) => boolean
+ * }} [opts]
+ *   nearStartCs: 開始近傍とみなす vpos しきい値（センチ秒・既定 NDGR_BACKFILL_NEAR_START_VPOS_CS）。
+ *   minNearStartHits: 開始近傍 vpos の必要件数（既定 NDGR_BACKFILL_NEAR_START_MIN_HITS）。
+ *   isPersistableChat: 母集団フィルタ（既定 defaultIsPersistableChat＝記録パスと同等の 2 段ガード）。
+ *     テストで挙動を完全制御する用途や、将来の persist 仕様変更にも追従できるよう注入可能にする。
+ * @returns {boolean} 開始区画らしければ true。空配列 / 全 vpos 欠落 / 近傍が件数未満なら false。
+ */
+export function chainLooksLikeStreamStart(chats, opts) {
+  if (!Array.isArray(chats) || chats.length === 0) return false;
+  const nearStartCs =
+    typeof opts?.nearStartCs === 'number' && opts.nearStartCs >= 0
+      ? opts.nearStartCs
+      : NDGR_BACKFILL_NEAR_START_VPOS_CS;
+  const minHits =
+    typeof opts?.minNearStartHits === 'number' && opts.minNearStartHits >= 1
+      ? Math.floor(opts.minNearStartHits)
+      : NDGR_BACKFILL_NEAR_START_MIN_HITS;
+  const isPersistable =
+    typeof opts?.isPersistableChat === 'function'
+      ? opts.isPersistableChat
+      : defaultIsPersistableChat;
+  let hits = 0;
+  for (const c of chats) {
+    if (!isPersistable(c)) continue; // v0.1.436: 運営/system/gift は投票母集団から外す
+    if (!c || c.vpos == null) continue;
+    const v = Number(c.vpos);
+    if (!Number.isFinite(v) || v < 0) continue;
+    if (v <= nearStartCs) {
+      hits += 1;
+      if (hits >= minHits) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * NDGR を backward 方向に巡回し、過去コメント（NdgrChat[]）を segment ごとに yield
  * する async generator。実 I/O は注入された fetchBinary / sleep / now のみ。
  *
@@ -262,8 +385,14 @@ export async function* crawlNdgrBackward(opts) {
   let bytesFetched = 0;
 
   const summary = () => ({ segmentsFetched, rowsSeen, bytesFetched });
-  /** @param {NdgrBackfillStopReason} reason */
-  const done = (reason) => ({ stopReason: reason, ...summary() });
+  /**
+   * v0.1.443: `reached_start` 発火時に、どんな chats(vpos 一覧)が判定の根拠だったかを
+   *   診断情報として戻り値に含める。実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を
+   *   後追いで特定するためのもの(描画パスには触らない・既存呼出は無視できる optional)。
+   * @param {NdgrBackfillStopReason} reason
+   * @param {{ reachedStartChats?: import('./ndgrDecode.js').NdgrChat[], reachedStartPath?: 'main'|'side' }} [diag]
+   */
+  const done = (reason, diag) => ({ stopReason: reason, ...summary(), diagnostics: diag || null });
 
   if (!viewBase) return done('no_view_base');
   if (typeof fetchBinary !== 'function') return done('no_view_base');
@@ -293,6 +422,26 @@ export async function* crawlNdgrBackward(opts) {
   const nowSec = Math.floor(t0 / 1000);
   /** @type {number|null} これまでに遡れた最古コメントの vpos（センチ秒）。再シード判定用。 */
   let globalMinVpos = null;
+  /**
+   * @type {boolean} v0.1.434: 直近に「本当に古い区画へ進めた」とき、その区画が開始区画らしかったか
+   *   （chainLooksLikeStreamStart の結果）。副経路（入口が尽きた時）の reached_start 判定に使う。
+   *   globalMinVpos は区画をまたいだ単一最小値で外れ値 1 件に汚染されうるため、単一最小値でなく
+   *   「最後に取り込めた区画が開始近傍 vpos を複数持っていたか」をこのフラグで記録して参照する。
+   */
+  let reachedStreamStartChain = false;
+  /**
+   * @type {import('./ndgrDecode.js').NdgrChat[]|null} v0.1.443: フラグが true になった時の chats の
+   *   スナップショット。副経路発火時の診断情報として戻り値に含めるためのもの（描画パス非干渉）。
+   */
+  let reachedStreamStartChats = null;
+  /**
+   * @type {number|null} v0.1.431: 直前に「種をまいた at（秒）」。次の再シードは必ずこれより
+   *   最低 1 バケット分（NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC）前へ下げ、同じバケットへ
+   *   舞い戻って visited 詰まり→偽 no_progress になるのを防ぐ（爆速配信 34% 停止の真因）。
+   */
+  let lastSeedAtSec = null;
+  /** @type {number} v0.1.429: 「古い区画へ進めなかった」連続回数（起点を戻してリトライする）。 */
+  let noProgressStreak = 0;
   /** @type {{ rateLimited?: boolean, aborted?: boolean }} ヘルパからの異常通知 */
   const abend = {};
 
@@ -322,6 +471,27 @@ export async function* crawlNdgrBackward(opts) {
     return '';
   };
 
+  /**
+   * v0.1.431: 次の再シード at（秒）を決める。`desiredAtSec`（vpos 由来の理想点）を尊重しつつ、
+   * 直前に種をまいた at（lastSeedAtSec）より必ず最低 1 バケット分前へ下げる（単調減少を保証）。
+   * これにより、量子化された NDGR バケット（≒30〜45秒）の中で「同じバケットに舞い戻る」のを
+   * 防ぐ（同一バケットは同一 backward URI を返し visited 詰まり→偽 no_progress を起こす）。
+   *
+   * ⚠️ programStart で「切り上げ」はしない: 切り上げると lastSeedAtSec より後ろに戻り得て
+   *   単調減少が壊れる（種が programStart 前のテスト/異常配信で再シードが前進してしまう）。
+   *   programStart を少し下回る at は NDGR が冒頭バケットか空を返し自然に終端するので無害。
+   * @param {number} desiredAtSec
+   * @returns {number}
+   */
+  const nextSeedAtSec = (desiredAtSec) => {
+    let next = Math.floor(desiredAtSec);
+    if (lastSeedAtSec != null) {
+      const ceil = lastSeedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+      if (next > ceil) next = ceil; // 直前の種より最低 1 バケット前に強制（単調減少）
+    }
+    return next;
+  };
+
   // === 初回の入口探し: 起点が「過去への入口」を持たないことがある（押すタイミングで
   //   ライブ最先端に近すぎる等）。1 回で諦めず、起点を順に深い過去へずらして確実に
   //   入口を見つける（実機「1 回目0件のムラ」の根治）。配信開始時刻が分かればそれも候補に。===
@@ -342,7 +512,7 @@ export async function* crawlNdgrBackward(opts) {
     initialBackwardUri = await seekBackwardUri(cand);
     if (abend.aborted) return done('aborted');
     if (abend.rateLimited) return done('rate_limited');
-    if (initialBackwardUri) { seedAtSec = cand; break; }
+    if (initialBackwardUri) { seedAtSec = cand; lastSeedAtSec = cand; break; }
   }
   if (!initialBackwardUri) return done('backward_exhausted');
 
@@ -355,16 +525,54 @@ export async function* crawlNdgrBackward(opts) {
     if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
 
     // 入口 URI: 初回は探索済み、再シード後は seedAtSec から探す。
-    let backwardUri = reseed === 0 ? initialBackwardUri : await seekBackwardUri(seedAtSec);
+    let backwardUri;
+    if (reseed === 0) {
+      backwardUri = initialBackwardUri;
+    } else {
+      lastSeedAtSec = seedAtSec; // この at で種をまいた（次回はこれより 1 バケット前へ）
+      backwardUri = await seekBackwardUri(seedAtSec);
+    }
     if (abend.aborted) return done('aborted');
     if (abend.rateLimited) return done('rate_limited');
-    // 入口が無い＝（再シード後なら）これ以上前は無い＝配信開始に到達。
+    // 入口が無い場合の扱い（v0.1.430 真因追補: 高速・大量配信で 32% 等で止まる）:
+    //   旧実装は「再シードで入口が見つからない＝配信開始到達(reached_start)」としていた。だが
+    //   高速配信では、再シード時刻が区画の隙間に落ちたり候補 URL が既 visited だと、まだ古い
+    //   コメントが残っていても入口が見つからないことがある（= 偽の reached_start・32% 停止の主因）。
+    //   そこで「入口が見つからない」も即終了せず、起点をさらに前へ大きく戻して数回リトライする。
+    //   本当に配信開始まで遡れたか（最古 vpos が近傍か）で reached_start を判定し、retry を
+    //   使い切っても入口が出ないなら no_progress（嘘の達成を出さない）。
     if (!backwardUri) {
-      return done(reseed === 0 ? 'backward_exhausted' : 'reached_start');
+      if (reseed === 0) return done('backward_exhausted');
+      // 既に配信開始近傍まで遡れているなら、入口が無いのは自然＝本当の reached_start。
+      // v0.1.434: 単一最小 vpos(globalMinVpos)ではなく「最後に遡れた区画が開始区画らしかったか」を
+      //   見る。外れ値 1 件で globalMinVpos が極小化していても、その区画が開始近傍 vpos を複数
+      //   持たなければフラグは立たず、正しく no_progress（→ partial）に倒れる。
+      if (reachedStreamStartChain) {
+        // v0.1.443: 副経路発火時の判定根拠を診断情報として残す。
+        return done('reached_start', {
+          reachedStartChats: reachedStreamStartChats ? reachedStreamStartChats.slice() : [],
+          reachedStartPath: 'side'
+        });
+      }
+      noProgressStreak += 1;
+      if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
+        return done('no_progress');
+      }
+      // v0.1.431: 起点を「直前の種より 1 バケット分ずつ」前へ戻して再探索する。旧実装は
+      //   1200s×streak も戻し、46 分級の配信では配信開始を飛び越して programStart に張り付き、
+      //   毎回同じ場所＝ no_progress 即終了だった。バケット幅で着実に隣のバケットへ降ろす。
+      seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
+      continue;
     }
 
     // --- 3) backward URI を PackedSegment として next.uri で辿る（1 区画ぶん） ---
     let chainMinVpos = null;
+    /**
+     * @type {import('./ndgrDecode.js').NdgrChat[]} v0.1.434: この区画で取り込んだ chat を貯める。
+     *   reached_start 判定を「単一最小 vpos」でなく「開始近傍 vpos が複数あるか」で行うため、区画の
+     *   chat 配列を chainLooksLikeStreamStart に渡せるようにする。再シードのたびにリセット（1 区画ぶん）。
+     */
+    const chainChats = [];
     for (;;) {
       if (isAborted(signal)) return done('aborted');
       if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
@@ -388,6 +596,7 @@ export async function* crawlNdgrBackward(opts) {
 
       if (chats.length) {
         rowsSeen += chats.length;
+        chainChats.push(...chats); // v0.1.434: 区画の chat を集約（開始区画らしさの判定に使う）
         const minNo = minNoOf(chats);
         const minVpos = minVposOf(chats);
         if (minVpos != null && (chainMinVpos == null || minVpos < chainMinVpos)) {
@@ -407,24 +616,68 @@ export async function* crawlNdgrBackward(opts) {
       backwardUri = nextUri;
     }
 
-    // === 再シード判定: この区画で「これまでより古い vpos」へ進めたか。 ===
-    //   進めていなければ（または vpos 不明なら）配信開始に到達とみなして終了。
-    if (
-      chainMinVpos == null ||
-      (globalMinVpos != null && chainMinVpos >= globalMinVpos)
-    ) {
-      return done(reseed === 0 ? 'backward_exhausted' : 'reached_start');
+    // === 再シード判定（v0.1.429 真因修正: 早期終了で途中参加が数%しか取れないバグ）===
+    //   旧実装は「この区画で前回より古い vpos へ進めなかった」を即 reached_start（配信開始
+    //   到達）とみなして終了していた。だが「進めなかった」≠「配信開始」: 途中参加だと
+    //   再シード起点(programStart+最古vpos-5s)で見つかる区画が前回と重なり/1区画戻れない
+    //   ことが頻発し、まだ vpos が大きい(配信序盤まで程遠い)のに『着いた』と誤判定→数%で停止
+    //   ＋『ぜんぶ届いた』誤表示。実機で途中参加の全配信で 1〜5% 再現。
+    //
+    //   正しい停止＝(A) 真に古いものが無い: chainMinVpos が配信開始近傍(<=NEAR_START_VPOS)に
+    //   到達 → reached_start。(B) backward 入口が尽きた(backwardUri 無し)→ 上の if で既に処理。
+    //   「進めなかっただけ」は (C) 起点をさらに大きく戻して数回リトライ。リトライしても進めない
+    //   なら reached_start ではなく no_progress で終える(嘘の達成を言わない)。
+    if (chainMinVpos == null) {
+      // この区画で 1 件も vpos が取れなかった＝これ以上の手掛かり無し。初回なら入口問題、
+      // 再シード後なら『取り切った』とは言い切れないので no_progress。
+      return done(reseed === 0 ? 'backward_exhausted' : 'no_progress');
     }
+    // 配信開始近傍に到達したら本当の完了。v0.1.434: 単一最小 vpos ではなく「開始近傍(NEAR_START_VPOS_CS
+    //   以内)の vpos が複数あるか」で判定する。運営/system/gift の極小 vpos が中盤の区画に 1 件紛れても
+    //   発火しない（47%/51% で『ぜんぶ届いた』誤表示の真因）。真の開始区画は冒頭の低 vpos が複数→通る。
+    if (chainLooksLikeStreamStart(chainChats, { nearStartCs: NDGR_BACKFILL_NEAR_START_VPOS_CS })) {
+      // v0.1.443: 主経路発火時の判定根拠を診断情報として残す（実機で誤判定の真因確定用）。
+      return done('reached_start', { reachedStartChats: chainChats.slice(), reachedStartPath: 'main' });
+    }
+    const madeProgress = globalMinVpos == null || chainMinVpos < globalMinVpos;
+    if (!madeProgress) {
+      // 進めなかった。即 reached_start にせず、起点をさらに大きく戻してリトライする。
+      noProgressStreak += 1;
+      if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
+        // 何度戻しても古い区画に入れない＝ここで諦める。ただし配信開始とは限らないので
+        // reached_start とは言わない（『ぜんぶ届いた』を出さない）。
+        return done('no_progress');
+      }
+      // v0.1.431: 起点を「直前の種より 1 バケット分ずつ」前へ戻す（旧 1200s×streak は配信開始を
+      //   飛び越え programStart 張り付き→毎回同じ場所→偽 no_progress だった）。
+      seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
+      continue; // 同じ reseed 予算内で次の起点を試す
+    }
+    // 進めた。最古 vpos を更新し、no-progress 連続カウンタをリセット。
+    noProgressStreak = 0;
     globalMinVpos = chainMinVpos;
-    // 次の区画は「最古コメントの実時刻より少し前」から。vpos(センチ秒)→秒に直し、
-    //   配信開始(秒) + 最古オフセット - バッファ で再シードする。配信開始が不明なら
-    //   現在からの相対で代替（seedAtSec を窓ぶん戻す）。
-    const oldestOffsetSec = Math.floor(chainMinVpos / 100);
+    // v0.1.434: この「実際に遡れた区画」が開始区画らしかったかを記録。入口が尽きた時（副経路）の
+    //   reached_start 判定に使う。単一最小値ではなく開始近傍 vpos の複数性で見るので外れ値に強い。
+    reachedStreamStartChain = chainLooksLikeStreamStart(chainChats, {
+      nearStartCs: NDGR_BACKFILL_NEAR_START_VPOS_CS
+    });
+    // v0.1.443: フラグが立った瞬間の chats を診断用に保存（副経路発火時に戻り値で参照する）。
+    if (reachedStreamStartChain) {
+      reachedStreamStartChats = chainChats.slice();
+    }
+    // 次の区画は「最古コメントの実時刻より少し前」から。vpos(センチ秒)→秒に直して
+    //   配信開始(秒) + 最古オフセット - バッファ を理想点にしつつ、v0.1.431 では
+    //   nextSeedAtSec で「直前の種より最低 1 バケット前」に強制する。これが無いと、量子化された
+    //   NDGR バケット（≒30〜45秒）内で oldestOffset-5s が同じバケットに舞い戻り、その backward URI
+    //   が既に visited → 入口なし → 偽 no_progress で 34% 等で停止していた（爆速配信の真因）。
     if (programStartSec != null) {
-      seedAtSec = programStartSec + oldestOffsetSec - NDGR_BACKFILL_RESEED_BUFFER_SEC;
+      const oldestOffsetSec = Math.floor(chainMinVpos / 100);
+      seedAtSec = nextSeedAtSec(
+        programStartSec + oldestOffsetSec - NDGR_BACKFILL_RESEED_BUFFER_SEC
+      );
     } else {
-      // 配信開始不明: 直近区画ぶん（保守的に固定窓）だけ戻す。
-      seedAtSec -= NDGR_BACKFILL_RESEED_STEP_SEC;
+      // 配信開始不明: 直前の種から 1 バケットぶん確実に戻す（相対）。
+      seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
     }
   }
   return done('cap_reseeds');

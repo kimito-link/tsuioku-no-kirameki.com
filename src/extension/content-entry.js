@@ -266,6 +266,8 @@ import {
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
 import { runIfTabLeader } from '../lib/tabLeaderLock.js';
+import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
+import { calculateBackfillRetryDelayMs } from '../lib/backfillRetryBackoff.js';
 import {
   isBackfillEnabledFromStorage,
   isBackfillJustEnabledFromChange,
@@ -11509,6 +11511,29 @@ let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
 /**
+ * v0.1.431: liveId ごとの「一過性 stop での自動リトライ回数」。実機 lv350625305 等で観測＝
+ * 過去ログの入口探しが押したタイミングで一過性に空振り(backward_exhausted/no_entry)し、
+ * one-shot guard で二度と再試行されず 11% 等で固定されていた（UI も「少し経ってからもう一度」
+ * と案内）。LIVE 中はこれを自動化＝一過性 stop なら少し待って再試行する。
+ * @type {Record<string, number>}
+ */
+const _backfillTransientRetryByLiveId = {};
+/**
+ * 一過性 stop で自動リトライする最大回数（liveId ごと）。
+ *   v0.1.442: 5 → 7 に拡張。指数バックオフ化と合わせて「最後まで諦めず頑張る」を実現
+ *   （ユーザー要望「とれない場合、もう1回頑張って取る機能」）。世界標準（AWS / TanStack Query）
+ *   は 3-5 回が多いが、ニコ生は混雑頻度が高いため 7 回まで許容する。
+ */
+const NDGR_BACKFILL_TRANSIENT_RETRY_MAX = 7;
+/**
+ * @deprecated v0.1.442: 指数バックオフ + Full Jitter（calculateBackfillRetryDelayMs）に
+ *   置き換えたため未参照。⚠️ 万一の退避用に残してある: 下の setTimeout の第二引数を
+ *   `NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS` に 1 行戻すだけで v0.1.441 までの「20秒固定」
+ *   挙動に完全復帰する。
+ */
+// eslint-disable-next-line no-unused-vars
+const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
+/**
  * @type {{ seg: number, rows: number, done: 0|1, stopReason: string }} 進捗（data 属性で可視化）。
  * v0.1.415: stopReason を持つ。done=1 でも「本当に配信開始まで到達した（reached_start）」かを
  *   popup 側（backfillRinkuNarration）が区別し、嘘の達成宣言をしないため。
@@ -11575,6 +11600,40 @@ async function backfillFetchBinary(url, opts) {
 }
 
 /**
+ * v0.1.431: バックフィル消費ループで「ブラウザに制御を譲る」ための yield。爆速・長尺配信では
+ * 1 回の取り込みで数千区画を処理し得るため、その間メインスレッドを占有すると watch ページが
+ * 「応答しません」になる（実機で観測）。区画をまとめて処理するたびにここで一拍譲り、描画/入力
+ * を通す。`scheduler.yield`（あれば最優先・本来の用途）→ MessageChannel/setTimeout(0) の順。
+ * @returns {Promise<void>}
+ */
+function backfillYieldToPage() {
+  try {
+    // Chrome 129+ の scheduler.yield は「描画を挟んで続行」に最適。あれば使う。
+    const sched = /** @type {any} */ (globalThis).scheduler;
+    if (sched && typeof sched.yield === 'function') {
+      return sched.yield();
+    }
+  } catch {
+    /* fall through */
+  }
+  // フォールバック: マクロタスク境界（setTimeout 0）でイベントループに制御を返す。
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+/**
+ * v0.1.431: バックフィルの「区画ごとに毎回 persist」をやめ、この行数を超えてから 1 回 persist
+ * する（複数区画ぶんをまとめる）。persist フラッシュは巨大コメント配列を毎回 read-merge-write
+ * する O(N) なので、爆速配信で区画ごとに叩くとフラッシュが多発し固まる主因になる。まとめると
+ * フラッシュ回数が激減し、メインスレッド占有が下がる（記録の正確性は mergeNewComments の
+ * dedupe が担保＝まとめても重複/欠落しない）。
+ */
+const NDGR_BACKFILL_PERSIST_BATCH_ROWS = 800;
+/** v0.1.431: この区画数を処理するごとにブラウザへ一拍制御を譲る（描画/入力を通す）。 */
+const NDGR_BACKFILL_YIELD_EVERY_SEGMENTS = 6;
+
+/**
  * 過去ログ一括バックフィルを 1 回だけ起動する（ワンショット）。
  * 巡回エンジン（crawlNdgrBackward）を実 fetch / 実 sleep で駆動し、yield された
  * 過去 chat を capturedAt 保持で persistCommentRows に流す。
@@ -11615,6 +11674,21 @@ async function runNdgrBackfillOnce() {
       ? programBeginAtMs
       : null;
 
+  // v0.1.431: 区画ごとに毎回 persist せず、行をバッファに貯めて NDGR_BACKFILL_PERSIST_BATCH_ROWS
+  //   を超えたら 1 回 persist する（巨大配列の read-merge-write 多発＝固まりの主因を緩和）。
+  //   ⭐ try の外で宣言し、abort/例外で抜けても finally で必ず吐き出す＝取り込み済み行を取りこぼさない。
+  /** @type {ParsedCommentRow[]} */
+  let pendingBackfillRows = [];
+  let segmentsSinceYield = 0;
+  const flushPendingBackfillRows = () => {
+    if (!pendingBackfillRows.length) return;
+    // ⛔ flushNdgrChatRowsBatch を経由しない（capturedAt 握り潰し回避）。
+    //    persistCommentRows → mergeNewComments は capturedAt/vpos を素通しする。
+    const batch = pendingBackfillRows;
+    pendingBackfillRows = [];
+    persistCommentRows(batch, { source: COMMENT_INGEST_SOURCE.BACKFILL });
+  };
+
   try {
     // v0.1.411: knownMinCommentNo は渡さない（早期終了で途中参加のギャップを埋め損ねる
     //   バグのため crawl 側で撤去）。重複は mergeNewComments の dedupe が弾く。
@@ -11626,6 +11700,7 @@ async function runNdgrBackfillOnce() {
       programStartSec: startMs != null ? Math.floor(startMs / 1000) : null,
       signal: ac.signal
     });
+
     for (;;) {
       const step = await gen.next();
       if (step.done) {
@@ -11634,6 +11709,37 @@ async function runNdgrBackfillOnce() {
         //   popup が「ぜんぶ届いた」と誤宣言していた（13% で達成宣言→後から増える事象）。
         //   reached_start の時だけ達成、それ以外は正直な文言にするため stopReason を渡す。
         _backfillProgress.stopReason = String(step.value?.stopReason || '');
+        // v0.1.443: reached_start 発火時の判定根拠(chats の vpos 一覧)を診断面に残す。
+        //   実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を後追いで確定するためのもの。
+        //   描画パスには影響しない（globalThis への代入と console.warn 1 回のみ）。
+        try {
+          const diag = step.value && /** @type {any} */ (step.value).diagnostics;
+          if (
+            diag &&
+            _backfillProgress.stopReason === 'reached_start' &&
+            Array.isArray(diag.reachedStartChats)
+          ) {
+            const summary = {
+              lid: liveId,
+              path: diag.reachedStartPath || 'unknown',
+              rows: _backfillProgress.rows,
+              count: diag.reachedStartChats.length,
+              // 各 chat の vpos / no / content 先頭 30 字だけ抽出（プライバシー配慮）
+              chats: diag.reachedStartChats.slice(0, 20).map((/** @type {any} */ c) => ({
+                vpos: c.vpos,
+                no: c.no,
+                content: typeof c.content === 'string' ? c.content.slice(0, 30) : ''
+              })),
+              ts: Date.now()
+            };
+            /** @type {any} */ (globalThis).__nlsLastReachedStartDiag = summary;
+            if (typeof console !== 'undefined' && console && typeof console.warn === 'function') {
+              console.warn('[NLS_REACHED_START_DIAG]', summary);
+            }
+          }
+        } catch {
+          /* no-op */
+        }
         break;
       }
       const ev = step.value;
@@ -11656,12 +11762,21 @@ async function runNdgrBackfillOnce() {
         });
         if (cap != null) row.capturedAt = cap;
       }
-      _backfillProgress.rows += rows.length;
-      publishBackfillProgress();
-      // ⛔ flushNdgrChatRowsBatch を経由しない（capturedAt 握り潰し回避）。
-      //    persistCommentRows → mergeNewComments は capturedAt/vpos を素通しする。
       if (rows.length) {
-        persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.BACKFILL });
+        pendingBackfillRows.push(...rows);
+        _backfillProgress.rows += rows.length;
+      }
+      publishBackfillProgress();
+      // 一定行たまったら 1 回だけ persist（フラッシュ回数を激減＝固まり緩和）。
+      if (pendingBackfillRows.length >= NDGR_BACKFILL_PERSIST_BATCH_ROWS) {
+        flushPendingBackfillRows();
+      }
+      // v0.1.431: 数区画ごとにブラウザへ制御を譲り、watch ページが「応答しません」に
+      //   ならないようにする（描画/入力を通す）。MAX_RESEEDS を増やしても固まらない担保。
+      segmentsSinceYield += 1;
+      if (segmentsSinceYield >= NDGR_BACKFILL_YIELD_EVERY_SEGMENTS) {
+        segmentsSinceYield = 0;
+        await backfillYieldToPage();
       }
     }
   } catch {
@@ -11670,10 +11785,41 @@ async function runNdgrBackfillOnce() {
     //   stopReason を立てる（未設定なら aborted 扱い＝popup は「途中/また後で」になる）。
     if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'aborted';
   } finally {
+    // v0.1.431: 正常終了・abort・例外いずれの抜け方でも、バッファに残った取り込み済み行を
+    //   必ず吐き出す（per-segment persist をやめてバッチ化したぶん、ここで取りこぼし防止）。
+    flushPendingBackfillRows();
     document.removeEventListener('visibilitychange', onHidden);
     if (_backfillAbort === ac) _backfillAbort = null;
     _backfillProgress.done = 1;
     publishBackfillProgress();
+
+    // v0.1.431: 一過性 stop（入口が一時的に見つからない等）なら one-shot guard を一定時間後に
+    //   解除し、maintenance tick の maybeAutoStartBackfill が自動で再試行する（UI 案内「少し
+    //   経ってからもう一度」を自動化）。完了/やり切り/中断では再試行しない。タブが今 LIVE を
+    //   見ていて自動取り込み ON のときだけ（隠れタブ・OFF では無駄に叩かない）。
+    const lidAtFinish = liveId;
+    const retried = _backfillTransientRetryByLiveId[lidAtFinish] || 0;
+    if (
+      shouldScheduleBackfillTransientRetry({
+        stopReason: String(_backfillProgress.stopReason || ''),
+        retriedCount: retried,
+        maxRetries: NDGR_BACKFILL_TRANSIENT_RETRY_MAX,
+        autoEnabled: _backfillAutoEnabled,
+        tabHidden: document.visibilityState === 'hidden'
+      })
+    ) {
+      _backfillTransientRetryByLiveId[lidAtFinish] = retried + 1;
+      // v0.1.442: 旧 20 秒固定 → 指数バックオフ + Full Jitter（世界標準準拠）。
+      //   1 回目: 0〜1秒（すぐもう一度試す）/ ... / 7 回目: 0〜45秒（最後まで諦めない）。
+      //   Full Jitter で複数ユーザーの同時リトライを時間分散＝サーバー同時殺到を回避。
+      const retryDelayMs = calculateBackfillRetryDelayMs(retried);
+      setTimeout(() => {
+        // 同じ配信を今も見ていて guard がこの liveId のままなら解除＝次 tick で再起動。
+        if (liveId === lidAtFinish && _backfillTriedLiveId === lidAtFinish) {
+          _backfillTriedLiveId = '';
+        }
+      }, retryDelayMs);
+    }
   }
 }
 
