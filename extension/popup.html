@@ -3168,6 +3168,21 @@
         border-color: #f3b6cf;
       }
 
+      /* v0.1.450 PR2: A 内 actions 行（後続 PR3 で「もう一度ためす」ボタンを追加する受け皿）。
+         空のままだと完全に視覚不変、要素が入ったときだけ高さを取る（:empty で margin 0）。 */
+      .nl-backfill-rinku__actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+      }
+      .nl-backfill-rinku__actions:empty {
+        margin: 0;
+        padding: 0;
+        display: none;
+      }
+
       /* v0.1.236: 北極星 6 レーン常設枠。
          「取得できる/出来ないに関わらず popup に枠を残す」原則（kimito さん 2026-05-09 明示）。
          鏡のように貼り付け原則: 値が取れたら niconico DOM の outerHTML をそのまま流し込む。
@@ -9144,6 +9159,14 @@
                 aria-live="polite"
               ></p>
             </div>
+            <!-- v0.1.450 PR2: ボタン受け入れ用の actions 行（空・JS が後で埋める）。
+                 後続 PR3 で #recordCardBackfillRetryBtn を追加してコメント入力直下の
+                 #backfillFetchPrompt を廃止し、上集約する設計（会議 2026-05-29 確定）。
+                 この PR では空のままなので見た目変化なし（:empty で margin 0 にしておく）。 -->
+            <div
+              id="recordCardBackfillActions"
+              class="nl-backfill-rinku__actions"
+            ></div>
           </div>
           <div
             id="liveStatCardCommentsLoad"
