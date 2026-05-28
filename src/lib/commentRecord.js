@@ -132,7 +132,13 @@ function storedCommentDedupeKey(lid, ex) {
   return buildDedupeKey(lid, {
     commentNo: ex.commentNo,
     text: ex.text,
-    capturedAt: ex.capturedAt
+    capturedAt: ex.capturedAt,
+    // 0.1.360: userId を渡す。buildDedupeKey は commentNo 欠落時のみ uid を key に
+    //   含める（0.1.46 AB）が、この seed 側で uid を渡し忘れていたため、既存行の
+    //   key が常に空 uid で組まれ、incoming 側に uid を足しても seed と一致せず
+    //   コメ被り検出が機能しないままだった。incoming 側（mergeNewComments）と
+    //   必ず同時に揃える。
+    userId: ex.userId
   });
 }
 
@@ -301,7 +307,13 @@ export function mergeNewComments(liveId, existing, incoming) {
     const key = buildDedupeKey(lid, {
       commentNo,
       text,
-      capturedAt: capForDedupe
+      capturedAt: capForDedupe,
+      // 0.1.360: userId を渡す。これが無いと commentNo 欠落の同秒・同本文・別ユーザー
+      //   が空 uid の同一 key に潰れ、1 件にマージ（しかも別ユーザーの nickname を
+      //   後付けする属性取り違え）が起きていた。buildDedupeKey は commentNo がある
+      //   行では uid を無視する（番号が一意）ので NDGR/DOM 経路は不変。seed 側
+      //   storedCommentDedupeKey と必ず同時に揃える。
+      userId: row.userId
     });
 
     const idx = keyToIndex.get(key);

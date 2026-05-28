@@ -269,6 +269,48 @@ describe('mergeNewComments', () => {
     expect(added).toHaveLength(0);
   });
 
+  /*
+   * 0.1.360: commentNo 欠落の「同秒・同本文・別ユーザー」が 1 件に潰れる退行を防ぐ。
+   *   buildDedupeKey は uid を key に含めるのに（0.1.46 AB / 上の unit test）、
+   *   mergeNewComments が uid を渡し忘れていたため統合上は無効化されていた。
+   *   intercept-post 経路（content-entry.js: no = b.no ?? b.commentNo ?? ''）は
+   *   commentNo 空 + 実 userId を載せて届くので実際に到達する。
+   */
+  it('commentNo 空・同秒・同本文でも別 userId なら別エントリ（コメ被り検出に必要）', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 3, 1, 15, 0, 0, 500));
+
+    const { next, added, storageTouched } = mergeNewComments('lv1', [], [
+      { commentNo: '', text: '8888', userId: 'u1', nickname: 'Alice' },
+      { commentNo: '', text: '8888', userId: 'u2', nickname: 'Bob' }
+    ]);
+
+    vi.useRealTimers();
+
+    expect(added).toHaveLength(2);
+    expect(next).toHaveLength(2);
+    expect(storageTouched).toBe(true);
+    // 別ユーザーの属性が混ざった hybrid 行になっていないこと。
+    const byUid = new Map(next.map((r) => [r.userId, r]));
+    expect(byUid.get('u1')?.nickname).toBe('Alice');
+    expect(byUid.get('u2')?.nickname).toBe('Bob');
+  });
+
+  it('commentNo 空・同秒・同本文・同 userId は 1 件（同一ユーザーの再取り込みは dedupe）', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 3, 1, 15, 0, 0, 500));
+
+    const { next, added } = mergeNewComments('lv1', [], [
+      { commentNo: '', text: '草', userId: 'u1' },
+      { commentNo: '', text: '草', userId: 'u1' }
+    ]);
+
+    vi.useRealTimers();
+
+    expect(added).toHaveLength(1);
+    expect(next).toHaveLength(1);
+  });
+
   it('existing が欠損フィールドでも落ちない', () => {
     const existing = /** @type {any[]} */ ([{ commentNo: '1', text: 'old' }]);
     const { next, added, storageTouched } = mergeNewComments('lv1', existing, [
