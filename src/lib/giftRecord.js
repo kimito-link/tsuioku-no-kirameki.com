@@ -4,6 +4,7 @@
 
 import {
   isLikelyInternalNdgGiftOrCampaignLabel,
+  isPlausibleGiftDisplayText,
   nicknameShouldReplaceExisting
 } from './giftDisplayNickname.js';
 
@@ -126,7 +127,11 @@ export function mergeGiftUsers(existing, incoming) {
 
   for (const inc of incoming) {
     const uid = String(inc.userId || '').trim();
-    const nick = String(inc.nickname || '').trim();
+    // v0.1.361: 文字化け（U+FFFD/制御文字混じり）の送り主名は名前として採らない＝
+    //   空に倒す。uid 無しだと __anon_<garbled> バケットを作って文字化け名を表示して
+    //   しまうため。ガードは giftEventStore と共有（giftDisplayNickname に集約）。
+    const nickRaw = String(inc.nickname || '').trim();
+    const nick = isPlausibleGiftDisplayText(nickRaw) ? nickRaw : '';
     // v0.1.215: anonymous gift（uid 空 + nickname あり）も bucket key を
     //   __anon_<nickname> にして storage に格納する。これで popup「ユーザー
     //   別の応援件数」 fallback (refreshGiftRankStrip) で anonymous gift も

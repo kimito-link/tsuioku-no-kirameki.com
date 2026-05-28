@@ -6,6 +6,41 @@
 import { supportGridStrongNickname } from './supportGridDisplayTier.js';
 
 /**
+ * v0.1.361: ギフト送り主名 / メッセージが「人間が読めるテキスト」として妥当かを
+ * 判定する純関数。妥当でなければ false。
+ *
+ * 経緯（実機 2026-05-25）: ギフト履歴の「投げ回数」フォールバックに `▨▨ơ?▨` の
+ * ような文字化け名が表示された。NDGR(protobuf) の decodeGift / decodeNxGiftEvent は
+ * 送り主名を TextDecoder(fatal:false) でデコードするが、ギフト field 番号の揺れ
+ * （atoms.proto 差し替え）でネスト message のバイト列等を名前として読むことがあり、
+ * replacement char (U+FFFD) や制御文字だらけの文字列になって通っていた。第1弾
+ * （v0.1.359 の isPlausibleEventTitleText）と同型のガードをギフト表示名にも展開する。
+ *
+ * 判定: replacement(U+FFFD) / C0(タブ・改行・復帰を除く) / C1 制御文字を 1 つでも
+ * 含む、または可読文字（空白以外）が無い文字列を弾く。日本語/英数/絵文字/記号など
+ * 正規の名前は通す。「名無し」「匿名」も当然通る。giftEventStore / giftRecord の
+ * 両保存経路で共有して使う（文字化けガードの実装分散を避ける）。
+ *
+ * @param {unknown} s
+ * @returns {boolean}
+ */
+export function isPlausibleGiftDisplayText(s) {
+  if (typeof s !== 'string') return false;
+  const str = s.trim();
+  if (!str) return false;
+  let printable = 0;
+  for (const ch of str) {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp === 0xfffd) return false;
+    const isC0 = cp < 0x20 && cp !== 9 && cp !== 10 && cp !== 13;
+    const isC1 = cp >= 0x7f && cp <= 0x9f;
+    if (isC0 || isC1) return false;
+    if (!/\s/.test(ch)) printable += 1;
+  }
+  return printable >= 1;
+}
+
+/**
  * @param {unknown} s
  * @returns {boolean}
  */
