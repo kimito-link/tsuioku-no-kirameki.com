@@ -5704,6 +5704,22 @@ function applyBackfillRecordCardHint(progress) {
   // v0.1.432: 公式件数を渡し、実質取り切れている（記録が公式の95%以上）partial では出さない。
   const oc = watchMetaCache.snapshot?.officialCommentCount;
   const officialCount = typeof oc === 'number' && Number.isFinite(oc) ? oc : null;
+  // ⚠️ v0.1.452 重大バグ修正（ユーザー実機 2026-05-29）:
+  //   95% 判定の分子に progress.rows（backfill エンジンの処理行数・dedupe 前）を使うと、
+  //   実機で 4%/7%/59% しか記録できていなくても「caught_up=いまの分まで届いてるよ ✨」と
+  //   誤判定されていた。dedupe 後の実記録総数（記録カード #liveStatComments の表示値）を
+  //   recordedCount として純関数に渡し、それで比較する。textContent から「123」「1,234」
+  //   等を整数に戻す。プレースホルダ「—」「-」等は null に倒し、純関数は recordedCount が
+  //   null/未定義なら従来の progress.rows へフォールバックする（後方互換）。
+  const liveStatEl = /** @type {HTMLElement|null} */ (document.getElementById('liveStatComments'));
+  let recordedCount = null;
+  if (liveStatEl) {
+    const txt = String(liveStatEl.textContent || '').replace(/[,，]/g, '').trim();
+    if (/^\d+$/.test(txt)) {
+      const n = parseInt(txt, 10);
+      if (Number.isFinite(n) && n >= 0) recordedCount = n;
+    }
+  }
   // v0.1.438: 記録カード下にもボタン下と同じ「こん太(キャラ)+吹き出し」UI を出す（ユーザー指摘
   //   「片方しかキャラがいないのは寂しい」・統合性原則）。新規 純関数 backfillRecordCardHintDomState
   //   が hidden/dataPhase/lead をまとめて返すのでそれを DOM に流すだけ。
@@ -5714,6 +5730,7 @@ function applyBackfillRecordCardHint(progress) {
     progress && progress.started
       ? backfillRecordCardHintDomState(progress, {
           officialCount,
+          recordedCount,
           retryStartedAtMs: _backfillRetryStartedAt,
           nowMs: Date.now()
         })
@@ -5722,6 +5739,7 @@ function applyBackfillRecordCardHint(progress) {
           { started: true, rows: 0, done: 0 },
           {
             officialCount,
+            recordedCount,
             retryStartedAtMs: _backfillRetryStartedAt,
             nowMs: Date.now()
           }

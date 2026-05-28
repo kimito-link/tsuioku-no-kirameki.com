@@ -210,6 +210,76 @@ describe('backfillRecordCardHint（記録カードに出す短文・v0.1.432）'
     expect(h).toContain('途中まで');
   });
 
+  // v0.1.452: caught_up 誤判定の根治（ユーザー実機 2026-05-29 報告）
+  describe('caught_up 誤判定の根治（v0.1.452・recordedCount で比較）', () => {
+    it('progress.rows が公式以上でも、recordedCount が少なければ caught_up にならない（実機 4%）', () => {
+      // 実機再現: 公式 343 件、記録 13 件（dedupe 後・4%）、progress.rows は dedupe 前で
+      //   公式以上に膨らんでいるケース。recordedCount=13 で比較すれば「途中まで」になる。
+      const h = backfillRecordCardHint(
+        { started: true, rows: 1500, done: 1, stopReason: 'no_progress' },
+        { officialCount: 343, recordedCount: 13 }
+      );
+      expect(h).not.toContain('いまの分まで届いてるよ');
+      expect(h).toContain('途中まで');
+    });
+
+    it('progress.rows が公式以上でも、recordedCount が少なければ caught_up にならない（実機 7%）', () => {
+      const h = backfillRecordCardHint(
+        { started: true, rows: 2000, done: 1, stopReason: 'no_progress' },
+        { officialCount: 1297, recordedCount: 93 }
+      );
+      expect(h).not.toContain('いまの分まで届いてるよ');
+      expect(h).toContain('途中まで');
+    });
+
+    it('progress.rows が公式以上でも、recordedCount が少なければ caught_up にならない（実機 59%）', () => {
+      const h = backfillRecordCardHint(
+        { started: true, rows: 2500, done: 1, stopReason: 'no_progress' },
+        { officialCount: 1465, recordedCount: 860 }
+      );
+      expect(h).not.toContain('いまの分まで届いてるよ');
+      expect(h).toContain('途中まで');
+    });
+
+    it('recordedCount が公式の 95% 以上なら caught_up になる（v0.1.432 趣旨は維持）', () => {
+      const h = backfillRecordCardHint(
+        { started: true, rows: 1919, done: 1, stopReason: 'no_progress' },
+        { officialCount: 1908, recordedCount: 1900 }
+      );
+      expect(h).toContain('いまの分まで届いてるよ');
+    });
+
+    it('recordedCount 未指定なら従来通り progress.rows で比較（後方互換）', () => {
+      const h = backfillRecordCardHint(
+        { started: true, rows: 1919, done: 1, stopReason: 'no_progress' },
+        { officialCount: 1908 }
+      );
+      expect(h).toContain('いまの分まで届いてるよ');
+    });
+
+    it('recordedCount が 0 でも 0 として比較される（0=取れていない なら必ず partial 文言）', () => {
+      const h = backfillRecordCardHint(
+        { started: true, rows: 2000, done: 1, stopReason: 'no_progress' },
+        { officialCount: 1000, recordedCount: 0 }
+      );
+      expect(h).not.toContain('いまの分まで届いてるよ');
+      expect(h).toContain('途中まで');
+    });
+
+    it('recordedCount が NaN や負値なら従来通り progress.rows で比較（後方互換）', () => {
+      const hNaN = backfillRecordCardHint(
+        { started: true, rows: 1919, done: 1, stopReason: 'no_progress' },
+        { officialCount: 1908, recordedCount: NaN }
+      );
+      expect(hNaN).toContain('いまの分まで届いてるよ');
+      const hNeg = backfillRecordCardHint(
+        { started: true, rows: 1919, done: 1, stopReason: 'no_progress' },
+        { officialCount: 1908, recordedCount: -5 }
+      );
+      expect(hNeg).toContain('いまの分まで届いてるよ');
+    });
+  });
+
   it('no_entry は公式に近くても（記録少なめ前提）出す＝officialCount に関わらず表示', () => {
     const h = backfillRecordCardHint(
       { started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' },

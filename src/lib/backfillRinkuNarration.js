@@ -200,8 +200,26 @@ export const BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT = 'いまの分まで届い
  *   （「ちゃんと取れたのに『途中まで』と言われる」違和感を消す）。no_entry/paused は記録が
  *   少ない状況なので比率に関わらず出す。
  *
+ * ⚠️ v0.1.452 重大バグ修正（ユーザー実機 2026-05-29 報告）:
+ *   実機で公式 343 件・記録 13 件（公式の約4%）なのに「いまの分まで届いてるよ ✨」が
+ *   表示されてしまう「caught_up 誤判定」が発生していた。同じ症状が公式 1,297 件・記録 93 件
+ *   (約7%)、公式 1,465 件・記録 860 件 (約59%) 等で再現。
+ *
+ *   真因: 95% 判定で使っていた `progress.rows` は backfill エンジンの処理行数(dedupe 前)で、
+ *     公式件数を**過大に超える**ことがある（取り込み試行回数 ≒ 公式件数を超えるが、dedupe で
+ *     重複が弾かれて実際の記録総数は遥かに少ない）。これを公式件数と比較していたため、
+ *     実際には 4% しか取れていなくても「公式の 95% 以上」と誤判定されていた。
+ *
+ *   修正: `opts.recordedCount`（dedupe 後の実保存件数 = popup の記録カード `#liveStatComments`
+ *     表示値）を新規受け取り、それが渡されていればそれで比較する。未指定なら従来の
+ *     progress.rows で比較（後方互換）。呼び出し元 popup-entry.js は recordedCount を渡す
+ *     ように更新する。
+ *
  * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }} progress
- * @param {{ officialCount?: number|null }} [opts] 公式コメント数（比率判定用・無ければ比率判定しない）。
+ * @param {{ officialCount?: number|null, recordedCount?: number|null }} [opts]
+ *   officialCount: 公式コメント数（比率判定用・無ければ比率判定しない）。
+ *   recordedCount: dedupe 後の実記録総数（v0.1.452 caught_up 比較の正本）。未指定なら
+ *     後方互換で progress.rows を使う。
  * @returns {string} 記録カードに出す短文（出さないときは ''）。
  */
 export function backfillRecordCardHint(progress, opts = {}) {
@@ -212,12 +230,18 @@ export function backfillRecordCardHint(progress, opts = {}) {
     case 'partial': {
       // 実質取り切れている（記録が公式の95%以上）なら『途中まで』を出さない。
       // v0.1.435: でも沈黙もしない＝肯定的な caught-up 文を出す（Nielsen 可視性原則・上の定数 doc 参照）。
-      const rows = Number(progress && progress.rows) || 0;
+      // v0.1.452: 比較の分子は recordedCount（dedupe 後）優先。progress.rows は dedupe 前で
+      //   公式件数を過大に超えやすく caught_up 誤判定の原因だった（実機 4%/7%/59% で再現）。
+      const recordedRaw = Number(opts && opts.recordedCount);
+      const rowsForRatio =
+        Number.isFinite(recordedRaw) && recordedRaw >= 0
+          ? recordedRaw
+          : Number(progress && progress.rows) || 0;
       const official = Number(opts && opts.officialCount);
       if (
         Number.isFinite(official) &&
         official > 0 &&
-        rows >= official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO
+        rowsForRatio >= official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO
       ) {
         return BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT;
       }
@@ -275,7 +299,14 @@ export const BACKFILL_RECORD_HINT_RETRY_STARTED_TEXT =
  *   完全に従来挙動を保つ。
  *
  * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }} progress
- * @param {{ officialCount?: number|null, retryStartedAtMs?: number|null, nowMs?: number|null }} [opts]
+ * @param {{
+ *   officialCount?: number|null,
+ *   recordedCount?: number|null,
+ *   retryStartedAtMs?: number|null,
+ *   nowMs?: number|null
+ * }} [opts]
+ *   recordedCount: dedupe 後の実記録総数（v0.1.452 caught_up 誤判定修正）。未指定なら
+ *     後方互換で progress.rows を使う。
  * @returns {{ hidden: boolean, dataPhase: string, lead: string }}
  *   hidden: 記録カード下のこん太を非表示にすべきか。
  *   dataPhase: CSS 切替用の data-phase 値
