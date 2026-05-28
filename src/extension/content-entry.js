@@ -11655,6 +11655,37 @@ async function runNdgrBackfillOnce() {
         //   popup が「ぜんぶ届いた」と誤宣言していた（13% で達成宣言→後から増える事象）。
         //   reached_start の時だけ達成、それ以外は正直な文言にするため stopReason を渡す。
         _backfillProgress.stopReason = String(step.value?.stopReason || '');
+        // v0.1.443: reached_start 発火時の判定根拠(chats の vpos 一覧)を診断面に残す。
+        //   実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を後追いで確定するためのもの。
+        //   描画パスには影響しない（globalThis への代入と console.warn 1 回のみ）。
+        try {
+          const diag = step.value && /** @type {any} */ (step.value).diagnostics;
+          if (
+            diag &&
+            _backfillProgress.stopReason === 'reached_start' &&
+            Array.isArray(diag.reachedStartChats)
+          ) {
+            const summary = {
+              lid: liveId,
+              path: diag.reachedStartPath || 'unknown',
+              rows: _backfillProgress.rows,
+              count: diag.reachedStartChats.length,
+              // 各 chat の vpos / no / content 先頭 30 字だけ抽出（プライバシー配慮）
+              chats: diag.reachedStartChats.slice(0, 20).map((/** @type {any} */ c) => ({
+                vpos: c.vpos,
+                no: c.no,
+                content: typeof c.content === 'string' ? c.content.slice(0, 30) : ''
+              })),
+              ts: Date.now()
+            };
+            /** @type {any} */ (globalThis).__nlsLastReachedStartDiag = summary;
+            if (typeof console !== 'undefined' && console && typeof console.warn === 'function') {
+              console.warn('[NLS_REACHED_START_DIAG]', summary);
+            }
+          }
+        } catch {
+          /* no-op */
+        }
         break;
       }
       const ev = step.value;

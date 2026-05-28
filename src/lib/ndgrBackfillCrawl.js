@@ -385,8 +385,14 @@ export async function* crawlNdgrBackward(opts) {
   let bytesFetched = 0;
 
   const summary = () => ({ segmentsFetched, rowsSeen, bytesFetched });
-  /** @param {NdgrBackfillStopReason} reason */
-  const done = (reason) => ({ stopReason: reason, ...summary() });
+  /**
+   * v0.1.443: `reached_start` 発火時に、どんな chats(vpos 一覧)が判定の根拠だったかを
+   *   診断情報として戻り値に含める。実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を
+   *   後追いで特定するためのもの(描画パスには触らない・既存呼出は無視できる optional)。
+   * @param {NdgrBackfillStopReason} reason
+   * @param {{ reachedStartChats?: import('./ndgrDecode.js').NdgrChat[], reachedStartPath?: 'main'|'side' }} [diag]
+   */
+  const done = (reason, diag) => ({ stopReason: reason, ...summary(), diagnostics: diag || null });
 
   if (!viewBase) return done('no_view_base');
   if (typeof fetchBinary !== 'function') return done('no_view_base');
@@ -423,6 +429,11 @@ export async function* crawlNdgrBackward(opts) {
    *   「最後に取り込めた区画が開始近傍 vpos を複数持っていたか」をこのフラグで記録して参照する。
    */
   let reachedStreamStartChain = false;
+  /**
+   * @type {import('./ndgrDecode.js').NdgrChat[]|null} v0.1.443: フラグが true になった時の chats の
+   *   スナップショット。副経路発火時の診断情報として戻り値に含めるためのもの（描画パス非干渉）。
+   */
+  let reachedStreamStartChats = null;
   /**
    * @type {number|null} v0.1.431: 直前に「種をまいた at（秒）」。次の再シードは必ずこれより
    *   最低 1 バケット分（NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC）前へ下げ、同じバケットへ
@@ -537,7 +548,11 @@ export async function* crawlNdgrBackward(opts) {
       //   見る。外れ値 1 件で globalMinVpos が極小化していても、その区画が開始近傍 vpos を複数
       //   持たなければフラグは立たず、正しく no_progress（→ partial）に倒れる。
       if (reachedStreamStartChain) {
-        return done('reached_start');
+        // v0.1.443: 副経路発火時の判定根拠を診断情報として残す。
+        return done('reached_start', {
+          reachedStartChats: reachedStreamStartChats ? reachedStreamStartChats.slice() : [],
+          reachedStartPath: 'side'
+        });
       }
       noProgressStreak += 1;
       if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
@@ -621,7 +636,8 @@ export async function* crawlNdgrBackward(opts) {
     //   以内)の vpos が複数あるか」で判定する。運営/system/gift の極小 vpos が中盤の区画に 1 件紛れても
     //   発火しない（47%/51% で『ぜんぶ届いた』誤表示の真因）。真の開始区画は冒頭の低 vpos が複数→通る。
     if (chainLooksLikeStreamStart(chainChats, { nearStartCs: NDGR_BACKFILL_NEAR_START_VPOS_CS })) {
-      return done('reached_start');
+      // v0.1.443: 主経路発火時の判定根拠を診断情報として残す（実機で誤判定の真因確定用）。
+      return done('reached_start', { reachedStartChats: chainChats.slice(), reachedStartPath: 'main' });
     }
     const madeProgress = globalMinVpos == null || chainMinVpos < globalMinVpos;
     if (!madeProgress) {
@@ -645,6 +661,10 @@ export async function* crawlNdgrBackward(opts) {
     reachedStreamStartChain = chainLooksLikeStreamStart(chainChats, {
       nearStartCs: NDGR_BACKFILL_NEAR_START_VPOS_CS
     });
+    // v0.1.443: フラグが立った瞬間の chats を診断用に保存（副経路発火時に戻り値で参照する）。
+    if (reachedStreamStartChain) {
+      reachedStreamStartChats = chainChats.slice();
+    }
     // 次の区画は「最古コメントの実時刻より少し前」から。vpos(センチ秒)→秒に直して
     //   配信開始(秒) + 最古オフセット - バッファ を理想点にしつつ、v0.1.431 では
     //   nextSeedAtSec で「直前の種より最低 1 バケット前」に強制する。これが無いと、量子化された

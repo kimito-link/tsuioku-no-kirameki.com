@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.443',
+    date: '2026-05-28',
+    summary: '完了判定の根拠を診断面に残せるように（開発者向け）',
+    items: Object.freeze([
+      '過去ログ取り込みで「配信のはじめまで届いた」と判定された時、その判断の根拠となった内部データを開発者用の診断面に残すようにしました。ユーザーの方の見た目には何も変わりません。「途中までしか取れていないのに完了と表示される」現象が万一またあった時、原因を素早く突き止めるためのものです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.442',
     date: '2026-05-28',
     summary: '過去ログを取り損ねたとき、もう一度ねばって取りにいく',

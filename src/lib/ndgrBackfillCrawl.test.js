@@ -853,6 +853,65 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     // 中盤＋運営×2＋gift×1 では reached_start にしない（55% 誤判定の根治）。
     expect(result.stopReason).toBe('no_progress');
   });
+
+  // v0.1.443: reached_start 発火時、判定根拠となった chats を診断情報として戻り値に含める。
+  //   実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を後追いで特定するためのもの。
+  it('主経路 reached_start 発火時、診断情報に chats と path=main が含まれる', async () => {
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/V443_DIAG_A';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(
+      BK_A,
+      packedSegmentBytes([
+        { no: 1, content: 'こんばんは', name: 'u1', vpos: 50 },
+        { no: 2, content: 'はじまった', name: 'u2', vpos: 150 }
+      ])
+    );
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    expect(result.stopReason).toBe('reached_start');
+    expect(result.diagnostics).toBeTruthy();
+    expect(result.diagnostics.reachedStartPath).toBe('main');
+    expect(Array.isArray(result.diagnostics.reachedStartChats)).toBe(true);
+    expect(result.diagnostics.reachedStartChats.length).toBeGreaterThan(0);
+    // chats の各要素は NdgrChat 構造（vpos を持つ）
+    const firstChat = result.diagnostics.reachedStartChats[0];
+    expect(typeof firstChat.vpos).toBe('number');
+  });
+
+  it('非 reached_start で終わる場合、diagnostics は null', async () => {
+    // 入口が見つからないだけのケース → no_entry / backward_exhausted。
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({})); // backward 無し
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000
+      })
+    );
+
+    expect(result.stopReason).not.toBe('reached_start');
+    expect(result.diagnostics).toBeNull();
+  });
 });
 
 describe('chainLooksLikeStreamStart（区画が配信開始らしいかの純判定・v0.1.434）', () => {
