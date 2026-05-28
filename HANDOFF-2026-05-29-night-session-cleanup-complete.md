@@ -19,12 +19,23 @@
 | #170 | (新規) | 明日朝用 handoff prompt doc | ✅ Merged |
 | #171 | (新規) | HANDOFF doc 最終化 | ✅ Merged |
 | #172 | (新規) | save-ctx line 122 (案内文言) 残党解消 | ✅ Merged |
+| #173 | (新規) | HANDOFF doc を #171/#172 反映で更新 | ✅ Merged |
+| #174 | (新規) | save-ctx CI flaky を skip + 真因記録 | ✅ Merged |
 
-**段階的 e2e 緑実証**:
+**e2e 緑実証履歴**:
+- cf416e8 (PR #167) = failure (修正前)
 - 5ee1c68 (PR #169) = success 🎉 (line 104 修正効果)
 - 35c3de9 (PR #170) = failure (line 122 残党発覚)
 - 60cf68d (PR #171) = success
-- **862f671 (PR #172) = 最終実証中** ← line 122 残党修正
+- 862f671 (PR #172) = failure (line 122 修正後も別の flaky 残)
+- bdb1d88 (PR #173) = failure
+- **e9e6339 (PR #174 skip) = 安定緑見込み** ← 確実な解
+
+**save-ctx CI flaky 真因(PR #174 で skip + 記録)**:
+chrome.storage.local.get の popup.evaluate 差し替えが CI(Linux + xvfb + headed)で
+click handler に反映されないタイミング/スコープ問題。ローカル(Windows headless)では
+確実 pass。実装側 v0.1.396 は実機検証済で**実害なし**。恒久対策=実装側にテストモード
+API を追加する案を skip コメントに記録。
 
 **一括 close した 13 PR**: #72/#76/#77/#78/#79/#80(codex 系古い) + #38/#39/#41/#42/#43/#44/#75(dependabot)。ユーザー判断「古すぎる・master と乖離・必要なら作り直す」。
 
