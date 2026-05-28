@@ -8484,6 +8484,22 @@
         display: none !important;
       }
 
+      /*
+       * 0.1.357: 北極星レーン(公式値レーン)とキャラ三連は **アクティブな配信専用**。
+       * 配信なし(empty state)では live ランキングを取得する liveId が無く、
+       * 各レーンは中身ゼロのプレースホルダのまま ~1300px の空き枠を確保してしまう。
+       * 別ウィンドウ(standalone popup)では body が content 高に伸びる(8117)ため
+       * この空き枠がそのまま「下半分の大きな白い空白」になっていた。
+       * 履歴あり/なしどちらの empty でも live レーンは出さない(前回サマリの stat
+       * cards / chips / event banner は #liveStatCards の別の子なので残る)。
+       * これらは #liveStatCards の内側にあるので .nl-live-stat-cards の hide 規則
+       * (no-history)とは独立に、empty-state 共通で畳む。
+       */
+      html.nl-empty-state body #northStarLanes,
+      html.nl-empty-state body #northStarCharaTrio {
+        display: none !important;
+      }
+
       /* 履歴ゼロ追加: 「前回の配信」cards / indicator / actions も hide */
       html.nl-empty-no-history body .nl-live-stat-cards,
       html.nl-empty-no-history body .nl-last-broadcast-indicator,

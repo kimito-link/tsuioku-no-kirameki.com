@@ -20,7 +20,18 @@
  */
 export function normalizeForEcho(text) {
   let s = String(text == null ? '' : text);
-  // 全角 W → 半角 w
+  // v0.1.356: 表記ゆれ吸収を強化。NFKC で半角カナ→全角カナ・全角英数→半角等を畳む
+  //   （従来は「ﾊﾝｶｸ」と「ハンカク」、全角数字などが別キーになりエコー検出を取りこぼしていた）。
+  try {
+    s = s.normalize('NFKC');
+  } catch {
+    // 環境が normalize 非対応でも続行
+  }
+  // カタカナ→ひらがなに畳む（「オツ」と「おつ」を同一視）。U+30A1..U+30F6 を 0x60 引いて変換。
+  s = s.replace(/[ァ-ヶ]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+  // 全角 W → 半角 w（NFKC で吸収されるが、明示的に残す）
   s = s.replace(/[Ｗｗ]/g, 'w');
   s = s.toLowerCase();
   // 句読点・記号を一部除去（!? 。、 など）

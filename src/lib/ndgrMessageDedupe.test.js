@@ -144,6 +144,25 @@ describe('createNdgrMessageDedupe', () => {
     expect(d.accept({ liveId: 'lv1', messageId: 'a' }).accepted).toBe(true);
   });
 
+  // v0.1.356 (Bug6): clear は currentLiveId も null に戻す。従来は buckets だけ消えて
+  //   currentLiveId が古い lv のまま残り、clear 後に同 lv で resetForLive しても切替扱いに
+  //   ならなかった（buckets 空なのに live 継続中という不整合）。
+  it('clear 後は currentLiveId が null に戻り、同 lv の resetForLive が切替として記録される', () => {
+    const d = createNdgrMessageDedupe();
+    d.resetForLive('lv1');
+    expect(d.snapshot().currentLiveId).toBe('lv1');
+    const resetsBefore = d.snapshot().resets;
+
+    d.clear();
+    // clear で currentLiveId は null に戻る。
+    expect(d.snapshot().currentLiveId).toBe(null);
+
+    // 同じ lv1 でも、currentLiveId が null に戻っているので切替として記録される。
+    d.resetForLive('lv1');
+    expect(d.snapshot().currentLiveId).toBe('lv1');
+    expect(d.snapshot().resets).toBe(resetsBefore + 1);
+  });
+
   it('drop 件数は accepted と独立にカウントされる', () => {
     const d = createNdgrMessageDedupe();
     d.accept({ liveId: 'lv1', messageId: 'a' });

@@ -13,13 +13,30 @@ function c(at, userId, text) {
 describe('normalizeForEcho', () => {
   it('全角w→半角w / 大文字小文字統一 / 句読点除去', () => {
     expect(normalizeForEcho('Ｗｗｗ！！')).toBe('www');
-    expect(normalizeForEcho('カワイイ。。。')).toBe('カワイイ');
     expect(normalizeForEcho('  8888 ')).toBe('8888');
   });
 
   it('短すぎる文字列 → 空（"a" などは雑音）', () => {
     expect(normalizeForEcho('a')).toBe('');
     expect(normalizeForEcho('')).toBe('');
+  });
+
+  // v0.1.356 (Bug5): 表記ゆれ吸収。カタカナ↔ひらがな・半角カナ・全角英数を畳んで
+  //   「オツ」と「おつ」、「ﾊﾝｶｸ」と「ハンカク」を同一キーにする（エコー検出の取りこぼし解消）。
+  it('カタカナはひらがなに畳む（オツ == おつ）', () => {
+    expect(normalizeForEcho('オツ')).toBe(normalizeForEcho('おつ'));
+    expect(normalizeForEcho('カワイイ。。。')).toBe('かわいい');
+  });
+
+  it('半角カナ・全角英数を NFKC で畳む', () => {
+    // 半角カナ「ｵﾂ」→ 全角「オツ」→ ひらがな「おつ」
+    expect(normalizeForEcho('ｵﾂ')).toBe(normalizeForEcho('おつ'));
+    // 全角数字「８８８８」→ 半角「8888」
+    expect(normalizeForEcho('８８８８')).toBe('8888');
+  });
+
+  it('濁点付き半角カナも全角濁音に畳んで一致（ﾊﾞﾝ == バン）', () => {
+    expect(normalizeForEcho('ﾊﾞﾝ')).toBe(normalizeForEcho('ばん'));
   });
 });
 

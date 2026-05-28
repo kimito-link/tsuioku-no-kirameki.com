@@ -261,6 +261,11 @@ export async function harvestVirtualCommentList(opts) {
     }
   };
 
+  // v0.1.356: focusEl は runVirtualScrollSweep が参照するので、定義より前に宣言する
+  //   （実害は無い＝sweep の初回呼び出しは下の代入後だが、読み順を素直にする）。
+  const focusEl =
+    doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
+
   /**
    * @param {Map<string, { commentNo?: string, text: string, userId?: string|null, avatarUrl?: string }>} map
    * @param {boolean} restoreFocusAfter
@@ -340,9 +345,6 @@ export async function harvestVirtualCommentList(opts) {
       }
     }
   };
-
-  const focusEl =
-    doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
 
   const out = new Map();
   await runVirtualScrollSweep(out, !twoPass);
