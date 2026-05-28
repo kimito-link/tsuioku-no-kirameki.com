@@ -4,7 +4,8 @@ import {
   backfillRinkuNarration,
   backfillReachedStreamStart,
   backfillRecordCardHint,
-  backfillRecordCardHintDomState
+  backfillRecordCardHintDomState,
+  BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT
 } from './backfillRinkuNarration.js';
 
 describe('backfillReachedStreamStart', () => {
@@ -280,6 +281,57 @@ describe('backfillRecordCardHint（記録カードに出す短文・v0.1.432）'
     });
   });
 
+  // v0.1.453: 100% 警告ループの根治（ユーザー実機 2026-05-29 報告）
+  //   公式 2,679・記録 2,679（100%）で最後のサイクルが no_entry/no_progress で終わると
+  //   phase=no_entry になり「過去ログは今は遡れませんでした」が出続ける false negative を、
+  //   phase に依らず recordedCount >= 公式 95% なら caught_up 文言に倒すことで解消する。
+  describe('100% 警告ループの根治（v0.1.453・phase 非依存の 95% 対称化）', () => {
+    it('no_entry でも記録が公式の 95% 以上なら caught_up 文言（警告ループ解消）', () => {
+      // 実機: 公式 2,679・記録 2,679（100%）なのに backward_exhausted で終わったケース。
+      const h = backfillRecordCardHint(
+        { started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' },
+        { officialCount: 2679, recordedCount: 2679 }
+      );
+      expect(h).toBe(BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT);
+      expect(h).not.toContain('遡れませんでした');
+    });
+
+    it('no_entry で記録が公式の 95% 未満なら従来の no_entry 警告（回帰防止）', () => {
+      const h = backfillRecordCardHint(
+        { started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' },
+        { officialCount: 2679, recordedCount: 100 }
+      );
+      expect(h).toContain('遡れませんでした');
+      expect(h).not.toBe(BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT);
+    });
+
+    it('paused でも記録が公式の 95% 以上なら caught_up 文言（混雑中断でも達成扱い）', () => {
+      const h = backfillRecordCardHint(
+        { started: true, rows: 0, done: 1, stopReason: 'rate_limited' },
+        { officialCount: 1000, recordedCount: 1000 }
+      );
+      expect(h).toBe(BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT);
+      expect(h).not.toContain('中断');
+    });
+
+    it('paused で記録が公式の 95% 未満なら従来の「一時中断」（回帰防止）', () => {
+      const h = backfillRecordCardHint(
+        { started: true, rows: 0, done: 1, stopReason: 'rate_limited' },
+        { officialCount: 1000, recordedCount: 200 }
+      );
+      expect(h).toContain('中断');
+      expect(h).not.toBe(BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT);
+    });
+
+    it('no_entry で公式件数が無い（不明）なら従来通り no_entry 警告（比率判定しない）', () => {
+      const h = backfillRecordCardHint(
+        { started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' },
+        {}
+      );
+      expect(h).toContain('遡れませんでした');
+    });
+  });
+
   it('no_entry は公式に近くても（記録少なめ前提）出す＝officialCount に関わらず表示', () => {
     const h = backfillRecordCardHint(
       { started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' },
@@ -332,6 +384,28 @@ describe('backfillRecordCardHintDomState（記録カード下こん太吹き出�
     const s = backfillRecordCardHintDomState(
       { started: true, rows: 1919, done: 1, stopReason: 'no_progress' },
       { officialCount: 1908 }
+    );
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('caught_up');
+    expect(s.lead).toContain('いまの分まで届いてるよ');
+  });
+
+  // v0.1.453: phase=no_entry/paused でも recordedCount >= 95% なら caught_up data-phase。
+  //   実機 100% 警告ループ（公式 2,679・記録 2,679 なのに no_entry 警告）の DOM 側の根治。
+  it('no_entry(>=95%): caught_up data-phase で「いまの分まで届いてるよ ✨」（警告ループ解消）', () => {
+    const s = backfillRecordCardHintDomState(
+      { started: true, rows: 0, done: 1, stopReason: 'backward_exhausted' },
+      { officialCount: 2679, recordedCount: 2679 }
+    );
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('caught_up');
+    expect(s.lead).toContain('いまの分まで届いてるよ');
+  });
+
+  it('paused(>=95%): caught_up data-phase で「いまの分まで届いてるよ ✨」', () => {
+    const s = backfillRecordCardHintDomState(
+      { started: true, rows: 0, done: 1, stopReason: 'rate_limited' },
+      { officialCount: 1000, recordedCount: 1000 }
     );
     expect(s.hidden).toBe(false);
     expect(s.dataPhase).toBe('caught_up');
