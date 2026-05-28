@@ -70,6 +70,12 @@ test('保存が context-invalidated のとき、ワンクリック再読み込�
   await expect(popup.locator('#extensionContextBanner')).toBeHidden();
 
   // 保存処理の裏の storage.get を「Extension context invalidated」で投げさせる。
+  // さらに「フォールバック保存(STORY_SOURCE_STATE.entries 経由)」も失敗させる必要がある:
+  //   v0.1.396 の click handler は catch ブロックで isExtensionContextInvalidatedError
+  //   なら fallbackComments.length > 0 のとき URL.createObjectURL でメモリ DL を試み、
+  //   成功すると return して banner を出さない。CI 環境ではタイミングで entries が
+  //   populated されていて flaky に return → banner 出ない → test 失敗していた。
+  //   URL.createObjectURL も throw させてフォールバック保存も必ず失敗させる。
   await popup.evaluate(() => {
     const orig = chrome.storage.local.get.bind(chrome.storage.local);
     // @ts-ignore - テスト用に差し替え
@@ -83,6 +89,15 @@ test('保存が context-invalidated のとき、ワンクリック再読み込�
       return Promise.reject(err);
     };
     void orig;
+    // フォールバック保存パスも確実に失敗させる(catch の通常エラー表示にフォールスルー
+    // させ、msg は元の "Extension context invalidated." が保持されて isExtensionContext
+    // InvalidatedError(msg) が true → banner 表示)。
+    const origCreate = URL.createObjectURL.bind(URL);
+    // @ts-ignore - テスト用に差し替え
+    URL.createObjectURL = () => {
+      throw new Error('Extension context invalidated.');
+    };
+    void origCreate;
   });
 
   // HTML 保存ボタンの入力契約を整えてクリック。
