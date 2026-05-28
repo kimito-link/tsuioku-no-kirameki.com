@@ -11,6 +11,8 @@
  * 副作用なし。
  */
 
+import { isPlausibleGiftDisplayText } from './giftDisplayNickname.js';
+
 /**
  * @typedef {{
  *   userId: string,
@@ -239,12 +241,18 @@ export function aggregateGiftSenderTotals(events) {
 function normalizeGiftEvent(raw, now) {
   if (!raw || typeof raw !== 'object') return null;
   const userId = String(raw.userId ?? '').trim();
-  const nickname = String(raw.nickname ?? '').trim();
+  // v0.1.361: 文字化け（非テキストのバイト列を誤デコードした）送り主名は名前として
+  //   採らない＝空に倒し、後段で「名無し」表示にフォールバックさせる（誤った名前より
+  //   名無しを選ぶ。userId が在ればリンク・集計は従来どおり機能する）。
+  const nicknameRaw = String(raw.nickname ?? '').trim();
+  const nickname = isPlausibleGiftDisplayText(nicknameRaw) ? nicknameRaw : '';
   const itemId = String(raw.itemId ?? '').trim();
   const itemName = String(raw.itemName ?? '').trim();
   const point =
     typeof raw.point === 'number' && Number.isFinite(raw.point) ? raw.point : 0;
-  const message = String(raw.message ?? '').trim();
+  // v0.1.361: ギフトメッセージも同様に文字化けを弾く（表示・エクスポートに出るため）。
+  const messageRaw = String(raw.message ?? '').trim();
+  const message = isPlausibleGiftDisplayText(messageRaw) ? messageRaw : '';
   const contributionRank =
     typeof raw.contributionRank === 'number' && Number.isFinite(raw.contributionRank)
       ? raw.contributionRank
