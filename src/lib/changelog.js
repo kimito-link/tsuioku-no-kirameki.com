@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.449',
+    date: '2026-05-29',
+    summary: '過去ログ取り込みの「りんくの語り」をボタンの上に配置',
+    items: Object.freeze([
+      '過去のコメントを取り込む（やり直し）ボタンの位置を見直し、こん太の語り（「いまの分まで遡ったよ！」など）をボタンの上に置きました。「説明 → 状況 → 行動」の自然な視線の流れになり、押したあとの進捗もより目に入りやすくなります（押す前の見た目は変わりません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.448',
     date: '2026-05-29',
     summary: 'ギフト周りの取りこぼし・汚染・収益目安の追加（3件）',
