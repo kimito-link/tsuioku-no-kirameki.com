@@ -232,6 +232,24 @@ export function backfillRecordCardHint(progress, opts = {}) {
 }
 
 /**
+ * v0.1.450: 「もう一度ためす」ボタン押下直後に短時間だけ表示する確認文言の長さ（ms）。
+ *
+ * 背景（2026-05-29 会議）: ボタン下の `#backfillFetchPrompt` を廃止して記録カード内
+ *   `#liveStatCommentsBackfillHint` に集約する設計。進行中（fetching/progress）は
+ *   引き続き沈黙（記録カードを散らかさない設計思想を維持）だが、押下直後だけは
+ *   「ありがとう、もう一度…」のトーストを短時間出して『押した感』を出す。
+ *   それ以降は #liveStatCommentsIngest（取り込みハートビート行）と
+ *   no_entry/partial/paused 時の hint に任せる。
+ */
+export const BACKFILL_RECORD_HINT_RETRY_TOAST_MS = 1800;
+
+/**
+ * v0.1.450: ボタン押下直後トースト文言。
+ */
+export const BACKFILL_RECORD_HINT_RETRY_STARTED_TEXT =
+  'ありがとう、もう一度さかのぼり始めるね';
+
+/**
  * v0.1.438: 記録カード下に出す「こん太のお知らせ吹き出し」の DOM 状態を返す純関数。
  *
  * 背景（ユーザー指摘・2026-05-28）:
@@ -246,14 +264,42 @@ export function backfillRecordCardHint(progress, opts = {}) {
  *   - data-phase は CSS のスタイル切替に使う。caught-up(95%以上 partial) は明るめ、
  *     partial/paused/no_entry は落ち着き目（ボタン下と同じ規則）。
  *
+ * v0.1.450 拡張（B 廃止に伴う「押した感」のフォールバック）:
+ *   `opts.retryStartedAtMs` と `opts.nowMs` が両方与えられ、差が
+ *   BACKFILL_RECORD_HINT_RETRY_TOAST_MS 以内なら、他のフェーズ判定より優先して
+ *   `dataPhase='retry_started'` を返し、トースト文言を表示する。これにより
+ *   ボタン押下後に進行中（fetching/progress=沈黙）まで一瞬で行っても、ユーザーは
+ *   `押した→反応した` を確認できる。
+ *
+ *   ⚠️ 副作用フリー: 既存呼び出し（opts に retryStartedAtMs/nowMs が無い場合）は
+ *   完全に従来挙動を保つ。
+ *
  * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }} progress
- * @param {{ officialCount?: number|null }} [opts]
+ * @param {{ officialCount?: number|null, retryStartedAtMs?: number|null, nowMs?: number|null }} [opts]
  * @returns {{ hidden: boolean, dataPhase: string, lead: string }}
  *   hidden: 記録カード下のこん太を非表示にすべきか。
- *   dataPhase: CSS 切替用の data-phase 値（'caught_up' | 'partial' | 'paused' | 'no_entry' | ''）。
+ *   dataPhase: CSS 切替用の data-phase 値
+ *     （'retry_started' | 'caught_up' | 'partial' | 'paused' | 'no_entry' | ''）。
  *   lead: 吹き出しに出す文言（hidden=true のときは ''）。
  */
 export function backfillRecordCardHintDomState(progress, opts = {}) {
+  // v0.1.450: 押下直後トーストが優先（fetching/progress の沈黙より強い）。
+  const retryStartedAt = Number(opts && opts.retryStartedAtMs);
+  const now = Number(opts && opts.nowMs);
+  if (
+    Number.isFinite(retryStartedAt) &&
+    retryStartedAt > 0 &&
+    Number.isFinite(now) &&
+    now >= retryStartedAt &&
+    now - retryStartedAt <= BACKFILL_RECORD_HINT_RETRY_TOAST_MS
+  ) {
+    return {
+      hidden: false,
+      dataPhase: 'retry_started',
+      lead: BACKFILL_RECORD_HINT_RETRY_STARTED_TEXT
+    };
+  }
+
   const phase = backfillNarrationPhase(progress);
   const lead = backfillRecordCardHint(progress, opts);
   if (!lead) {
