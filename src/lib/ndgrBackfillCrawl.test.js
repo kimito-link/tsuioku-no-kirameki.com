@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   crawlNdgrBackward,
+  chainLooksLikeStreamStart,
   NDGR_BACKFILL_DEFAULT_CAPS,
   NDGR_BACKFILL_FETCH_GAP_MS,
   NDGR_BACKFILL_BACKOFF_MS,
-  NDGR_BACKFILL_SEED_LAG_SEC
+  NDGR_BACKFILL_SEED_LAG_SEC,
+  NDGR_BACKFILL_NEAR_START_VPOS_CS
 } from './ndgrBackfillCrawl.js';
 
 // テストは now を固定（1_000_000ms）注入する。seed は floor(now/1000) - SEED_LAG_SEC。
@@ -206,8 +208,16 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     //   舞い戻り＝偽 no_progress の根治）。vpos 由来の理想点 1055 は ceil=910-50=860 に丸められ、
     //   再シードは atUrl(860) になる。そこに chain2 入口（さらに前の区画・vpos=100=配信開始付近）。
     map.set(atUrl(860), viewEntryBytes({ backwardUri: BK_B }));
-    map.set(BK_B, packedSegmentBytes([{ no: 5, content: '配信開始付近', name: 'u', vpos: 100 }]));
-    // chain2 の最古 vpos=100 は NEAR_START(3000) 以内＝配信開始到達で reached_start。追加 entry 不要。
+    // v0.1.434: 真の配信開始区画には冒頭の低 vpos コメントが【複数】ある（reached_start 判定が
+    //   「開始近傍 vpos が 2 件以上」を要求するため）。chain2 に NEAR_START(3000) 以内の vpos を
+    //   2 件入れる（実機の配信開始＝挨拶等で vpos≈0 が大量、を反映）。
+    map.set(
+      BK_B,
+      packedSegmentBytes([
+        { no: 5, content: '配信開始付近', name: 'u', vpos: 100 },
+        { no: 6, content: 'こんばんは', name: 'u2', vpos: 200 }
+      ])
+    );
 
     const { fetchBinary } = makeFetchFromMap(map);
     const { sleep } = makeNoopSleep();
@@ -221,8 +231,8 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
       })
     );
 
-    // 区画1(no=50)で止まらず、再シードで区画2(no=5)まで遡り、配信開始で終了する。
-    expect(chatsAll.map((c) => c.no)).toEqual([50, 5]);
+    // 区画1(no=50)で止まらず、再シードで区画2(no=5,6)まで遡り、配信開始で終了する。
+    expect(chatsAll.map((c) => c.no)).toEqual([50, 5, 6]);
     expect(result.stopReason).toBe('reached_start');
   });
 
@@ -247,8 +257,18 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     map.set(atUrl(860), viewEntryBytes({ backwardUri: BK_STUCK }));
     map.set(BK_STUCK, packedSegmentBytes([{ no: 50, content: '同じ', name: 'u', vpos: 60000 }]));
     // 次の再シード(810)で「古い vpos=100(=1秒地点)」の区画に届く（早期 reached_start にしない）。
-    map.set(atUrl(810), viewEntryBytes({ backwardUri: BK_OLD }));
-    map.set(BK_OLD, packedSegmentBytes([{ no: 5, content: '配信序盤', name: 'u', vpos: 100 }]));
+    //   v0.1.434: 真の開始区画は低 vpos が複数（判定が開始近傍 vpos 2 件以上を要求）→ 2 件入れる。
+    map.set(
+      atUrl(810),
+      viewEntryBytes({ backwardUri: BK_OLD })
+    );
+    map.set(
+      BK_OLD,
+      packedSegmentBytes([
+        { no: 5, content: '配信序盤', name: 'u', vpos: 100 },
+        { no: 6, content: 'はじまった', name: 'u2', vpos: 250 }
+      ])
+    );
 
     const { fetchBinary } = makeFetchFromMap(map);
     const { sleep } = makeNoopSleep();
@@ -294,7 +314,16 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
       const uri = `https://mpn.live.nicovideo.jp/data/backward/v4/Q_${bucket}`;
       map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
       const vpos = Math.max(0, (bucket - PROGRAM_START) * 100); // 古いバケットほど小さい vpos
-      map.set(uri, packedSegmentBytes([{ no: bucket, content: `b${bucket}`, name: 'u', vpos }]));
+      // v0.1.434: reached_start 判定は「開始近傍 vpos が 2 件以上」を要求する。実機でも各バケット
+      //   には複数コメントが流れる（爆速配信＝秒23コメ）。最古バケット(vpos≈0)が確実に複数の
+      //   低 vpos を持つよう、各バケットに 2 件入れる（2 件目は +10cs ずらすが同バケット内）。
+      map.set(
+        uri,
+        packedSegmentBytes([
+          { no: bucket, content: `b${bucket}`, name: 'u', vpos },
+          { no: bucket + 1, content: `b${bucket}_2`, name: 'u2', vpos: vpos + 10 }
+        ])
+      );
     }
 
     const { fetchBinary } = makeFetchFromMap(map);
@@ -391,8 +420,16 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
     // 区画1で序盤 vpos=50(=0.5秒地点)まで到達。next=N で終端。
+    //   v0.1.434: 副経路（入口尽き時）の reached_start も「最後に遡れた区画が開始区画らしいか
+    //   （開始近傍 vpos が 2 件以上）」で判定する。区画1に低 vpos を 2 件入れて真の到達を表す。
     map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
-    map.set(BK_A, packedSegmentBytes([{ no: 2, content: '序盤', name: 'u', vpos: 50 }]));
+    map.set(
+      BK_A,
+      packedSegmentBytes([
+        { no: 2, content: '序盤', name: 'u', vpos: 50 },
+        { no: 3, content: 'はじまり', name: 'u2', vpos: 120 }
+      ])
+    );
     // 再シード時刻に入口は無い（もう最初まで来た）。
     map.set(atUrl(996), viewEntryBytes({}));
 
@@ -682,5 +719,155 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(NDGR_BACKFILL_DEFAULT_CAPS.rows).toBe(100_000);
     expect(NDGR_BACKFILL_FETCH_GAP_MS).toBe(15);
     expect(NDGR_BACKFILL_BACKOFF_MS).toEqual([2_000, 4_000, 8_000]);
+  });
+
+  // === v0.1.434: reached_start 誤判定（47%/51% で『ぜんぶ届いた』）の修正 ===
+  it('途中区画に vpos 極小の外れ値が 1 件紛れても reached_start にしない（47%/51% 誤完了の真因）', async () => {
+    // ⛔ 真因（実機: 47%/51% しか遡れていないのに『配信のはじめまで、ぜんぶ届いた』と誤表示）:
+    //   運営/system/gift お知らせは vpos=0 や極小になりがち。これが配信【中盤】の区画に 1 件
+    //   紛れると、その区画の最小 vpos が極小になり「単一最小 vpos ≤ 30秒」が成立 → まだ中盤
+    //   なのに reached_start を誤発火していた。修正後は「開始近傍 vpos が 2 件以上」を要求する
+    //   ので、本体 vpos=60000(=600秒地点) の中盤区画に外れ値 1 件があっても発火しない。
+    const PROGRAM_START = 1000;
+    const BK_MID = 'https://mpn.live.nicovideo.jp/data/backward/v4/FP_MID';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画: 本体は中盤(vpos=60000)。だが運営お知らせ風の vpos=0 が 1 件だけ紛れている。
+    //   旧実装: 最小 vpos=0 ≤ 3000 → reached_start（誤）。新実装: 近傍 vpos は 1 件のみ → 不発。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_MID }));
+    map.set(
+      BK_MID,
+      packedSegmentBytes([
+        { no: null, content: '【運営】まもなく終了します', name: '運営', vpos: 0 },
+        { no: 800, content: '中盤コメント', name: 'u', vpos: 60000 },
+        { no: 801, content: 'まだ中盤', name: 'u2', vpos: 60500 }
+      ])
+    );
+    // 以降どの再シード時刻にも入口は無い（これ以上は遡れない状況）。それでも『ぜんぶ届いた』は
+    //   出さず、no_progress（→ narration は「もう一度押すと続き」）に倒れるのが正しい。
+    for (const at of [860, 810, 760, 710, 660, 610]) {
+      map.set(atUrl(at), viewEntryBytes({}));
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 中盤＋外れ値 1 件では reached_start にしない（嘘の『ぜんぶ届いた』を出さない）。
+    expect(result.stopReason).toBe('no_progress');
+  });
+
+  it('副経路（入口尽き）でも、最後の区画が外れ値 1 件のみ低 vpos なら reached_start にしない', async () => {
+    // line 388 の「序盤まで遡れていれば reached_start」の対称ケース。globalMinVpos が外れ値で
+    //   極小化していても、最後に遡れた区画が開始近傍 vpos を【複数】持たなければ reached_start に
+    //   しない（reachedStreamStartChain フラグで判定）。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/FP2_A';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1: 本体は中盤(vpos=60000)＋外れ値 vpos=0 が 1 件。next=N で終端。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(
+      BK_A,
+      packedSegmentBytes([
+        { no: null, content: '【システム】', name: 'system', vpos: 0 },
+        { no: 500, content: '中盤', name: 'u', vpos: 60000 }
+      ])
+    );
+    // 再シード時刻に入口は無い（もう辿れない）。旧実装は globalMinVpos=0 ≤ 3000 で reached_start
+    //   （誤）。新実装は最後の区画が近傍 vpos 1 件のみ → フラグ立たず no_progress。
+    map.set(atUrl(996), viewEntryBytes({}));
+    map.set(atUrl(946), viewEntryBytes({}));
+    map.set(atUrl(896), viewEntryBytes({}));
+    map.set(atUrl(846), viewEntryBytes({}));
+    map.set(atUrl(796), viewEntryBytes({}));
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    expect(result.stopReason).toBe('no_progress');
+  });
+});
+
+describe('chainLooksLikeStreamStart（区画が配信開始らしいかの純判定・v0.1.434）', () => {
+  const C = (vpos) => ({ no: 1, content: 'c', name: 'u', vpos });
+
+  it('開始近傍 vpos が 2 件以上あれば true（真の配信開始区画＝低 vpos 多数）', () => {
+    expect(chainLooksLikeStreamStart([C(0), C(50), C(120), C(8000)])).toBe(true);
+  });
+
+  it('開始近傍 vpos が 1 件だけ（外れ値混入の中盤区画）なら false', () => {
+    // min は 0 だが、それ以外は中盤(60000〜)。誤判定の核心ケース。
+    expect(chainLooksLikeStreamStart([C(0), C(60000), C(61000), C(62000)])).toBe(false);
+  });
+
+  it('2 件目がしきい値ちょうど(3000)なら true、しきい値超(3001)なら false', () => {
+    expect(chainLooksLikeStreamStart([C(10), C(3000), C(60000)])).toBe(true);
+    expect(chainLooksLikeStreamStart([C(10), C(3001), C(60000)])).toBe(false);
+  });
+
+  it('空配列・非配列は false', () => {
+    expect(chainLooksLikeStreamStart([])).toBe(false);
+    expect(chainLooksLikeStreamStart(null)).toBe(false);
+    expect(chainLooksLikeStreamStart(undefined)).toBe(false);
+  });
+
+  it('全件 vpos 欠落（null）は false', () => {
+    expect(
+      chainLooksLikeStreamStart([
+        { no: 1, content: 'a', name: 'u', vpos: null },
+        { no: 2, content: 'b', name: 'u', vpos: null }
+      ])
+    ).toBe(false);
+  });
+
+  it('負・非有限の vpos は無視してカウントする', () => {
+    // vpos=-1 と NaN は無効。有効な近傍は 10 の 1 件のみ → false。
+    expect(
+      chainLooksLikeStreamStart([
+        { no: 1, content: 'a', name: 'u', vpos: -1 },
+        { no: 2, content: 'b', name: 'u', vpos: Number.NaN },
+        C(10)
+      ])
+    ).toBe(false);
+    // 有効な近傍が 2 件あれば無効値が混じっても true。
+    expect(
+      chainLooksLikeStreamStart([{ no: 1, content: 'a', name: 'u', vpos: -5 }, C(10), C(20)])
+    ).toBe(true);
+  });
+
+  it('minNearStartHits を 3 に上げると、近傍 2 件では false・3 件で true', () => {
+    expect(chainLooksLikeStreamStart([C(0), C(100)], { minNearStartHits: 3 })).toBe(false);
+    expect(chainLooksLikeStreamStart([C(0), C(100), C(200)], { minNearStartHits: 3 })).toBe(true);
+  });
+
+  it('nearStartCs を狭めると、その範囲内の件数で判定する', () => {
+    // nearStartCs=100 にすると vpos=200 は近傍外。近傍は 0,50 の 2 件 → true。
+    expect(chainLooksLikeStreamStart([C(0), C(50), C(200)], { nearStartCs: 100 })).toBe(true);
+    // 0 のみ近傍 → 1 件で false。
+    expect(chainLooksLikeStreamStart([C(0), C(150), C(200)], { nearStartCs: 100 })).toBe(false);
+  });
+
+  it('既定しきい値は NDGR_BACKFILL_NEAR_START_VPOS_CS(3000) を使う', () => {
+    expect(NDGR_BACKFILL_NEAR_START_VPOS_CS).toBe(3000);
+    expect(chainLooksLikeStreamStart([C(2999), C(3000)])).toBe(true);
+    expect(chainLooksLikeStreamStart([C(2999), C(3001)])).toBe(false);
   });
 });

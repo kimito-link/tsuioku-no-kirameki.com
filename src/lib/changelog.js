@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.434',
+    date: '2026-05-28',
+    summary: '過去ログの「ぜんぶ届いた」誤表示を修正',
+    items: Object.freeze([
+      '配信の途中までしか取り込めていないのに「配信のはじめまで、ぜんぶ届いたよ」と表示されることがある問題を直しました。本当に配信の最初まで遡れたかをより正確に見分けるようにして、まだ続きがあるときは「もう一度押すと続きを取り込みます」と正直にお伝えします'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.433',
     date: '2026-05-28',
     summary: '別ウィンドウは配信を開いたら自動で閉じるように',

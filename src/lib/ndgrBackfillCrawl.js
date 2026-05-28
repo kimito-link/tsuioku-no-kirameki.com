@@ -112,6 +112,20 @@ export const NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC = 50;
  */
 export const NDGR_BACKFILL_NEAR_START_VPOS_CS = 3000; // 30秒 ×100(センチ秒)
 /**
+ * v0.1.434: 「配信開始に到達した」と判定するのに必要な、開始近傍(NEAR_START_VPOS_CS 以内)の
+ * vpos を持つ chat の最小件数。
+ *
+ *   なぜ単一最小値ではダメか（誤判定の真因）: 運営アナウンス / システムメッセージ / ギフトの
+ *   お知らせ等は vpos=0 や極小になりがち。これが配信【中盤】の区画に 1 件紛れると、その区画の
+ *   最小 vpos が極小になり「最小 vpos ≤ 30秒」が成立 → まだ序盤まで程遠いのに reached_start
+ *   （『ぜんぶ届いた』）を誤発火していた（実機で 47%/51% 停止）。
+ *
+ *   一方、本当の配信開始区画には冒頭の低 vpos コメントが【複数】ある（vpos≈0 が大量）。そこで
+ *   「開始近傍の vpos が 2 件以上」を要求すれば、外れ値 1 件では発火せず、真の開始は確実に通る。
+ *   ⛔ vpos=0 を一律無視するのは不可（真の開始では実際に vpos≈0 が大量にあり、取り逃す）。
+ */
+export const NDGR_BACKFILL_NEAR_START_MIN_HITS = 2;
+/**
  * v0.1.429: 「前回より古い区画へ進めなかった」ときに、起点をさらに大きく戻して再挑戦する
  * 最大連続回数。これを超えても進めなければ no_progress で終える（reached_start とは言わない）。
  */
@@ -243,6 +257,47 @@ function minVposOf(chats) {
 }
 
 /**
+ * v0.1.434: この区画(chats)が「配信の開始区画」らしいかを判定する純関数。
+ *
+ *   真の開始区画には冒頭の低 vpos コメントが【複数】ある（配信開始直後に挨拶等で vpos≈0 が
+ *   大量に流れる）。一方、配信【中盤】の区画に運営/システム/ギフトお知らせが 1 件だけ紛れると
+ *   その vpos も極小になりがちで、「単一最小 vpos ≤ 開始近傍」では中盤を開始と誤判定してしまう
+ *   （実機 47%/51% で『ぜんぶ届いた』誤表示の真因）。
+ *
+ *   そこで「開始近傍(nearStartCs 以内)の vpos を持つ chat が minNearStartHits 件以上」を要求する。
+ *   外れ値 1 件では発火せず、低 vpos が複数ある真の開始区画は確実に通る。vpos の有効性判定は
+ *   minVposOf と揃える（null / 非有限 / 負を無視）。
+ *
+ * @param {import('./ndgrDecode.js').NdgrChat[]} chats 1 区画ぶんの chat 配列。
+ * @param {{ nearStartCs?: number, minNearStartHits?: number }} [opts]
+ *   nearStartCs: 開始近傍とみなす vpos しきい値（センチ秒・既定 NDGR_BACKFILL_NEAR_START_VPOS_CS）。
+ *   minNearStartHits: 開始近傍 vpos の必要件数（既定 NDGR_BACKFILL_NEAR_START_MIN_HITS）。
+ * @returns {boolean} 開始区画らしければ true。空配列 / 全 vpos 欠落 / 近傍が件数未満なら false。
+ */
+export function chainLooksLikeStreamStart(chats, opts) {
+  if (!Array.isArray(chats) || chats.length === 0) return false;
+  const nearStartCs =
+    typeof opts?.nearStartCs === 'number' && opts.nearStartCs >= 0
+      ? opts.nearStartCs
+      : NDGR_BACKFILL_NEAR_START_VPOS_CS;
+  const minHits =
+    typeof opts?.minNearStartHits === 'number' && opts.minNearStartHits >= 1
+      ? Math.floor(opts.minNearStartHits)
+      : NDGR_BACKFILL_NEAR_START_MIN_HITS;
+  let hits = 0;
+  for (const c of chats) {
+    if (!c || c.vpos == null) continue;
+    const v = Number(c.vpos);
+    if (!Number.isFinite(v) || v < 0) continue;
+    if (v <= nearStartCs) {
+      hits += 1;
+      if (hits >= minHits) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * NDGR を backward 方向に巡回し、過去コメント（NdgrChat[]）を segment ごとに yield
  * する async generator。実 I/O は注入された fetchBinary / sleep / now のみ。
  *
@@ -323,6 +378,13 @@ export async function* crawlNdgrBackward(opts) {
   const nowSec = Math.floor(t0 / 1000);
   /** @type {number|null} これまでに遡れた最古コメントの vpos（センチ秒）。再シード判定用。 */
   let globalMinVpos = null;
+  /**
+   * @type {boolean} v0.1.434: 直近に「本当に古い区画へ進めた」とき、その区画が開始区画らしかったか
+   *   （chainLooksLikeStreamStart の結果）。副経路（入口が尽きた時）の reached_start 判定に使う。
+   *   globalMinVpos は区画をまたいだ単一最小値で外れ値 1 件に汚染されうるため、単一最小値でなく
+   *   「最後に取り込めた区画が開始近傍 vpos を複数持っていたか」をこのフラグで記録して参照する。
+   */
+  let reachedStreamStartChain = false;
   /**
    * @type {number|null} v0.1.431: 直前に「種をまいた at（秒）」。次の再シードは必ずこれより
    *   最低 1 バケット分（NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC）前へ下げ、同じバケットへ
@@ -433,7 +495,10 @@ export async function* crawlNdgrBackward(opts) {
     if (!backwardUri) {
       if (reseed === 0) return done('backward_exhausted');
       // 既に配信開始近傍まで遡れているなら、入口が無いのは自然＝本当の reached_start。
-      if (globalMinVpos != null && globalMinVpos <= NDGR_BACKFILL_NEAR_START_VPOS_CS) {
+      // v0.1.434: 単一最小 vpos(globalMinVpos)ではなく「最後に遡れた区画が開始区画らしかったか」を
+      //   見る。外れ値 1 件で globalMinVpos が極小化していても、その区画が開始近傍 vpos を複数
+      //   持たなければフラグは立たず、正しく no_progress（→ partial）に倒れる。
+      if (reachedStreamStartChain) {
         return done('reached_start');
       }
       noProgressStreak += 1;
@@ -449,6 +514,12 @@ export async function* crawlNdgrBackward(opts) {
 
     // --- 3) backward URI を PackedSegment として next.uri で辿る（1 区画ぶん） ---
     let chainMinVpos = null;
+    /**
+     * @type {import('./ndgrDecode.js').NdgrChat[]} v0.1.434: この区画で取り込んだ chat を貯める。
+     *   reached_start 判定を「単一最小 vpos」でなく「開始近傍 vpos が複数あるか」で行うため、区画の
+     *   chat 配列を chainLooksLikeStreamStart に渡せるようにする。再シードのたびにリセット（1 区画ぶん）。
+     */
+    const chainChats = [];
     for (;;) {
       if (isAborted(signal)) return done('aborted');
       if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
@@ -472,6 +543,7 @@ export async function* crawlNdgrBackward(opts) {
 
       if (chats.length) {
         rowsSeen += chats.length;
+        chainChats.push(...chats); // v0.1.434: 区画の chat を集約（開始区画らしさの判定に使う）
         const minNo = minNoOf(chats);
         const minVpos = minVposOf(chats);
         if (minVpos != null && (chainMinVpos == null || minVpos < chainMinVpos)) {
@@ -507,8 +579,10 @@ export async function* crawlNdgrBackward(opts) {
       // 再シード後なら『取り切った』とは言い切れないので no_progress。
       return done(reseed === 0 ? 'backward_exhausted' : 'no_progress');
     }
-    // 配信開始近傍に到達したら本当の完了。NEAR_START_VPOS_CS（センチ秒）以内＝開始〜数十秒。
-    if (chainMinVpos <= NDGR_BACKFILL_NEAR_START_VPOS_CS) {
+    // 配信開始近傍に到達したら本当の完了。v0.1.434: 単一最小 vpos ではなく「開始近傍(NEAR_START_VPOS_CS
+    //   以内)の vpos が複数あるか」で判定する。運営/system/gift の極小 vpos が中盤の区画に 1 件紛れても
+    //   発火しない（47%/51% で『ぜんぶ届いた』誤表示の真因）。真の開始区画は冒頭の低 vpos が複数→通る。
+    if (chainLooksLikeStreamStart(chainChats, { nearStartCs: NDGR_BACKFILL_NEAR_START_VPOS_CS })) {
       return done('reached_start');
     }
     const madeProgress = globalMinVpos == null || chainMinVpos < globalMinVpos;
@@ -528,6 +602,11 @@ export async function* crawlNdgrBackward(opts) {
     // 進めた。最古 vpos を更新し、no-progress 連続カウンタをリセット。
     noProgressStreak = 0;
     globalMinVpos = chainMinVpos;
+    // v0.1.434: この「実際に遡れた区画」が開始区画らしかったかを記録。入口が尽きた時（副経路）の
+    //   reached_start 判定に使う。単一最小値ではなく開始近傍 vpos の複数性で見るので外れ値に強い。
+    reachedStreamStartChain = chainLooksLikeStreamStart(chainChats, {
+      nearStartCs: NDGR_BACKFILL_NEAR_START_VPOS_CS
+    });
     // 次の区画は「最古コメントの実時刻より少し前」から。vpos(センチ秒)→秒に直して
     //   配信開始(秒) + 最古オフセット - バッファ を理想点にしつつ、v0.1.431 では
     //   nextSeedAtSec で「直前の種より最低 1 バケット前」に強制する。これが無いと、量子化された
