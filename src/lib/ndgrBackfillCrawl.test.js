@@ -382,6 +382,105 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('no_progress');
   });
 
+  it('途中参加: 再シードで「空区画(vpos の無い運営コメントだけ)」に当たっても即停止せず、飛び越えて配信開始まで遡る（v0.1.455 真因修正・12%/33%/78%ばらつき停止）', async () => {
+    // ⛔ 真因（実機 v0.1.454・2026-05-29 で 12%/33%/78% にばらついて途中停止）:
+    //   旧実装は再シード起点がたまたま「コメントの無い時間帯の隙間」や「運営コメントだけ
+    //   （vpos を持たない）の区画」に落ちて chainMinVpos==null になると、reseed>0 で即
+    //   no_progress で**一発終了**していた（リトライ無し）。配信のどの地点で空区画を引くかは
+    //   運次第なので停止率がばらつき、「もう一度」も同じ起点で同じ空区画に落ちて決定的に
+    //   同じ所で死ぬ（902→907）。
+    //   修正: 空区画も「進めなかった」と同じリトライ経路に合流させ、起点をさらに前へ戻して
+    //   次の区画を試す＝空区画を飛び越えて遡り続ける。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/EMPTY_A';
+    const BK_EMPTY = 'https://mpn.live.nicovideo.jp/data/backward/v4/EMPTY_GAP';
+    const BK_OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/EMPTY_OLD';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1: SEED_AT=910 で見つかる。vpos=60000(=600秒地点)。next=N で終端。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // 最初の再シード(860)は「vpos を 1 件も持たない区画」（運営コメントだけ＝記録対象 vpos なし）。
+    //   chainMinVpos==null になる。旧実装はここで即 no_progress だったが、修正後は飛び越える。
+    map.set(atUrl(860), viewEntryBytes({ backwardUri: BK_EMPTY }));
+    map.set(BK_EMPTY, packedSegmentBytes([{ no: 99, content: '【運営】お知らせ', name: 'sys' }])); // vpos 省略
+    // 次の再シード(810)で「古い vpos=100(=1秒地点)」の配信開始区画に届く。
+    map.set(atUrl(810), viewEntryBytes({ backwardUri: BK_OLD }));
+    map.set(
+      BK_OLD,
+      packedSegmentBytes([
+        { no: 5, content: '配信序盤', name: 'u', vpos: 100 },
+        { no: 6, content: 'はじまった', name: 'u2', vpos: 250 }
+      ])
+    );
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 空区画(no=99 運営)で諦めず飛び越え、配信序盤(no=5・vpos=100)まで遡って reached_start。
+    expect(chatsAll.map((c) => c.no)).toContain(5);
+    expect(chatsAll.map((c) => c.no)).toContain(6);
+    expect(result.stopReason).toBe('reached_start');
+  });
+
+  it('途中参加: 空区画が連続しても、リトライ上限(12)内なら飛び越えて配信開始まで遡る（v0.1.455・無コメント区間の飛び越え）', async () => {
+    // 配信序盤に長い無コメント区間（運営コメントだけの区画が連続）がある配信を模す。
+    //   旧実装（上限4・空区画即終了）では飛び越えられなかった。v0.1.455 では空区画もリトライ
+    //   経路に合流し、上限を 12 に引き上げたので、連続した空区画を飛び越えて開始まで届く。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/MULTI_A';
+    const BK_OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/MULTI_OLD';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // 860→810→760→710→660→610 と 6 連続で「vpos を持たない空区画」を返す（無コメント区間）。
+    //   旧上限4なら 710 で力尽きていたが、上限12なら通過できる。
+    let i = 0;
+    for (const at of [860, 810, 760, 710, 660, 610]) {
+      const uri = `https://mpn.live.nicovideo.jp/data/backward/v4/MULTI_EMPTY_${at}`;
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
+      map.set(uri, packedSegmentBytes([{ no: 90 + i, content: '【運営】', name: 'sys' }])); // vpos 無し
+      i += 1;
+    }
+    // 560 でようやく配信開始区画（低 vpos 複数）に届く。
+    map.set(atUrl(560), viewEntryBytes({ backwardUri: BK_OLD }));
+    map.set(
+      BK_OLD,
+      packedSegmentBytes([
+        { no: 5, content: '配信序盤', name: 'u', vpos: 80 },
+        { no: 6, content: 'はじまった', name: 'u2', vpos: 200 }
+      ])
+    );
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 6 連続の空区画を飛び越えて配信序盤(no=5)まで遡れた。
+    expect(chatsAll.map((c) => c.no)).toContain(5);
+    expect(result.stopReason).toBe('reached_start');
+  });
+
   it('再シードで入口が見つからなくても vpos が序盤まで程遠いなら reached_start にしない（v0.1.430・32%停止の主因）', async () => {
     // ⛔ 高速・大量配信で 32% 等で止まる主因: 再シード時刻が区画の隙間に落ち「入口が見つからない」
     //   ＝旧実装は即 reached_start としていたが、まだ vpos=60000(=600秒地点)で序盤まで程遠い。

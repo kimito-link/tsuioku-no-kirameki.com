@@ -129,8 +129,14 @@ export const NDGR_BACKFILL_NEAR_START_MIN_HITS = 2;
 /**
  * v0.1.429: 「前回より古い区画へ進めなかった」ときに、起点をさらに大きく戻して再挑戦する
  * 最大連続回数。これを超えても進めなければ no_progress で終える（reached_start とは言わない）。
+ *
+ * v0.1.455: 4 → 12 に引き上げ。真因修正で「空区画（コメントの無い時間帯の隙間／運営コメント
+ *   だけの区画）」もこのリトライ経路に合流させたため、連続した無コメント区間を飛び越えるには
+ *   より多くの試行が要る。1 回のリトライで起点を 1 バケット（≒50秒）前へ戻すので、12 回で
+ *   最大 ≒600秒（10分）ぶんの空区間を飛び越えられる。進捗が 1 回でもあれば streak は 0 に
+ *   リセットされる（連続空振りのみカウント）ので、正常配信での無駄な遡りは増えない。
  */
-export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 4;
+export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 12;
 
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
@@ -627,21 +633,36 @@ export async function* crawlNdgrBackward(opts) {
     //   到達 → reached_start。(B) backward 入口が尽きた(backwardUri 無し)→ 上の if で既に処理。
     //   「進めなかっただけ」は (C) 起点をさらに大きく戻して数回リトライ。リトライしても進めない
     //   なら reached_start ではなく no_progress で終える(嘘の達成を言わない)。
-    if (chainMinVpos == null) {
-      // この区画で 1 件も vpos が取れなかった＝これ以上の手掛かり無し。初回なら入口問題、
-      // 再シード後なら『取り切った』とは言い切れないので no_progress。
-      return done(reseed === 0 ? 'backward_exhausted' : 'no_progress');
-    }
-    // 配信開始近傍に到達したら本当の完了。v0.1.434: 単一最小 vpos ではなく「開始近傍(NEAR_START_VPOS_CS
-    //   以内)の vpos が複数あるか」で判定する。運営/system/gift の極小 vpos が中盤の区画に 1 件紛れても
-    //   発火しない（47%/51% で『ぜんぶ届いた』誤表示の真因）。真の開始区画は冒頭の低 vpos が複数→通る。
-    if (chainLooksLikeStreamStart(chainChats, { nearStartCs: NDGR_BACKFILL_NEAR_START_VPOS_CS })) {
+    // ⚡ v0.1.455 真因修正（数値トレースで確定・ユーザー実機 2026-05-29 で 12%/33%/78% にばらつき停止）:
+    //   旧実装は「この区画で 1 件も vpos が取れなかった（chainMinVpos==null＝空区画）」を、
+    //   reseed>0 なら即 no_progress で**一発終了**していた（リトライ無し）。だが空区画は
+    //   「配信開始に着いた」ではなく「再シード起点がたまたまコメントの無い時間帯の隙間や
+    //   運営コメントだけの区画に落ちただけ」のことが頻発する。一度引くだけで諦めるため、
+    //   配信のどの地点でも突然停止し（どこで空区画を引くかは運次第＝12%/33%/78% のばらつき）、
+    //   「もう一度」を押しても同じ起点で同じ空区画に落ちて決定的に同じ所で死ぬ（902→907）。
+    //   修正: 空区画も「進めなかった」と同じリトライ経路に合流させ、起点をさらに前へ戻して
+    //   次の区画を試す（＝空区画を飛び越えて遡り続ける）。リトライ上限を超えたら no_progress。
+    //   reseed===0（初回）で空なら従来通り入口問題＝backward_exhausted。
+    //
+    //   配信開始近傍に到達したら本当の完了。v0.1.434: 単一最小 vpos ではなく「開始近傍
+    //   (NEAR_START_VPOS_CS 以内)の vpos が複数あるか」で判定する。運営/system/gift の極小 vpos が
+    //   中盤の区画に 1 件紛れても発火しない（47%/51% で『ぜんぶ届いた』誤表示の真因）。真の開始
+    //   区画は冒頭の低 vpos が複数→通る。空区画（chainChats 空）は当然この判定を通らない。
+    if (chainMinVpos != null &&
+        chainLooksLikeStreamStart(chainChats, { nearStartCs: NDGR_BACKFILL_NEAR_START_VPOS_CS })) {
       // v0.1.443: 主経路発火時の判定根拠を診断情報として残す（実機で誤判定の真因確定用）。
       return done('reached_start', { reachedStartChats: chainChats.slice(), reachedStartPath: 'main' });
     }
-    const madeProgress = globalMinVpos == null || chainMinVpos < globalMinVpos;
+    // v0.1.455: 「空区画(chainMinVpos==null)」も「前回より古い vpos へ進めなかった」も、どちらも
+    //   『進捗が無かった』として同じリトライ経路で扱う（空区画を飛び越えて遡り続ける）。
+    const madeProgress =
+      chainMinVpos != null && (globalMinVpos == null || chainMinVpos < globalMinVpos);
     if (!madeProgress) {
-      // 進めなかった。即 reached_start にせず、起点をさらに大きく戻してリトライする。
+      // reseed===0（初回）で空区画なら、そもそも入口で何も取れていない＝入口問題。
+      if (reseed === 0 && chainMinVpos == null) {
+        return done('backward_exhausted');
+      }
+      // 進めなかった／空区画だった。即終了せず、起点をさらに前へ戻してリトライする。
       noProgressStreak += 1;
       if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
         // 何度戻しても古い区画に入れない＝ここで諦める。ただし配信開始とは限らないので
