@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.451',
+    date: '2026-05-29',
+    summary: '拡張機能のエラー画面に出ていた診断ログを抑制',
+    items: Object.freeze([
+      'chrome://extensions のエラー一覧に「[NLS_REACHED_START_DIAG] [object Object]」と何度も出ていた診断ログを廃止しました。これは過去ログ取り込みの真因究明用に v0.1.443 で入れた一時的なログでしたが、ユーザーから見るとエラーのように見えて混乱の元になっていました。診断データは globalThis.__nlsLastReachedStartDiag に内部保存され、開発者は必要なときに読み出せます（記録の中身や見え方には影響ありません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.450',
     date: '2026-05-29',
     summary: '過去ログ取り込みボタンを記録カード上に集約（下廃止）',

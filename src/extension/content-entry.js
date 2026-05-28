@@ -11717,7 +11717,13 @@ async function runNdgrBackfillOnce() {
         _backfillProgress.stopReason = String(step.value?.stopReason || '');
         // v0.1.443: reached_start 発火時の判定根拠(chats の vpos 一覧)を診断面に残す。
         //   実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を後追いで確定するためのもの。
-        //   描画パスには影響しない（globalThis への代入と console.warn 1 回のみ）。
+        //   描画パスには影響しない（globalThis への代入のみ）。
+        //
+        // v0.1.451 (2026-05-29 ユーザー指摘): console.warn は chrome://extensions の「エラー」
+        //   リストに自動収集され、ユーザーが見ると「[NLS_REACHED_START_DIAG] [object Object]」
+        //   と表示されて混乱の元になっていた。診断は必要なときに開発者が
+        //   `globalThis.__nlsLastReachedStartDiag` を直接読めば足りるので、自動 console 出力は
+        //   廃止。globalThis 代入は維持（次に reached_start が出たときの根拠を 1 件保持）。
         try {
           const diag = step.value && /** @type {any} */ (step.value).diagnostics;
           if (
@@ -11739,9 +11745,8 @@ async function runNdgrBackfillOnce() {
               ts: Date.now()
             };
             /** @type {any} */ (globalThis).__nlsLastReachedStartDiag = summary;
-            if (typeof console !== 'undefined' && console && typeof console.warn === 'function') {
-              console.warn('[NLS_REACHED_START_DIAG]', summary);
-            }
+            // v0.1.451: console.warn は廃止（chrome://extensions のエラー表示を汚さないため）。
+            //   診断は globalThis.__nlsLastReachedStartDiag を読めば取得できる。
           }
         } catch {
           /* no-op */
