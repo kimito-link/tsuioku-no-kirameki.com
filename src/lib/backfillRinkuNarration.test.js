@@ -293,4 +293,94 @@ describe('backfillRecordCardHintDomState（記録カード下こん太吹き出�
     });
     expect(done).toEqual({ hidden: true, dataPhase: '', lead: '' });
   });
+
+  // v0.1.450: 押下直後トースト（B 廃止に伴う「押した感」のフォールバック）
+  describe('retry_started トースト（v0.1.450・押下直後 1.8秒）', () => {
+    it('押下直後（diff=0ms）は fetching でもトーストを優先して出す', () => {
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 0, done: 0 },
+        { retryStartedAtMs: 1_000_000, nowMs: 1_000_000 }
+      );
+      expect(s.hidden).toBe(false);
+      expect(s.dataPhase).toBe('retry_started');
+      expect(s.lead).toContain('ありがとう');
+      expect(s.lead).toContain('もう一度');
+    });
+
+    it('押下から 1.8秒以内は出続ける（境界 1800ms 含む）', () => {
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 50, done: 0 },
+        { retryStartedAtMs: 1_000_000, nowMs: 1_001_800 }
+      );
+      expect(s.dataPhase).toBe('retry_started');
+    });
+
+    it('押下から 1.8秒を超えたら通常フェーズに戻る（progress なら沈黙）', () => {
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 50, done: 0 },
+        { retryStartedAtMs: 1_000_000, nowMs: 1_001_801 }
+      );
+      // 進行中（progress）は従来通り沈黙＝記録カードに出さない。
+      expect(s).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    });
+
+    it('押下から 1.8秒を超えたら no_entry なら通常 hint に切り替わる', () => {
+      const s = backfillRecordCardHintDomState(
+        {
+          started: true,
+          rows: 0,
+          done: 1,
+          stopReason: 'no_entry'
+        },
+        { retryStartedAtMs: 1_000_000, nowMs: 1_005_000 }
+      );
+      expect(s.hidden).toBe(false);
+      expect(s.dataPhase).toBe('no_entry');
+      expect(s.lead).toContain('遡れませんでした');
+    });
+
+    it('retryStartedAtMs が未指定なら従来挙動（後方互換）', () => {
+      const s = backfillRecordCardHintDomState({
+        started: true,
+        rows: 0,
+        done: 0
+      });
+      expect(s).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    });
+
+    it('nowMs が未指定なら従来挙動（後方互換）', () => {
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 0, done: 0 },
+        { retryStartedAtMs: 1_000_000 }
+      );
+      expect(s).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    });
+
+    it('retryStartedAtMs が 0 や負値・NaN なら従来挙動', () => {
+      const zero = backfillRecordCardHintDomState(
+        { started: true, rows: 0, done: 0 },
+        { retryStartedAtMs: 0, nowMs: 1_000_000 }
+      );
+      expect(zero).toEqual({ hidden: true, dataPhase: '', lead: '' });
+      const negative = backfillRecordCardHintDomState(
+        { started: true, rows: 0, done: 0 },
+        { retryStartedAtMs: -500, nowMs: 1_000_000 }
+      );
+      expect(negative).toEqual({ hidden: true, dataPhase: '', lead: '' });
+      const nan = backfillRecordCardHintDomState(
+        { started: true, rows: 0, done: 0 },
+        { retryStartedAtMs: NaN, nowMs: 1_000_000 }
+      );
+      expect(nan).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    });
+
+    it('nowMs が retryStartedAtMs より過去（時計戻り）なら従来挙動', () => {
+      // 時計の戻りで now < retryStartedAtMs になった場合はトーストを出さない（誤検知防止）。
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 0, done: 0 },
+        { retryStartedAtMs: 1_000_000, nowMs: 999_000 }
+      );
+      expect(s).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    });
+  });
 });
