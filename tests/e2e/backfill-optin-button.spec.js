@@ -14,13 +14,17 @@ import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
  * （ndgrBackfillCrawl.test.js 12件）で実 wire フィクスチャ検証済みなので、ここでは
  * UI 操作が KEY_BACKFILL_ENABLED を立て、content の onChanged 起動の引き金になる
  * 「false → true 立ち上がり」を確実に作ることを実拡張ロードで実証する。
+ *
+ * v0.1.444 spec 追従: v0.1.410 で押下後の plain status (#backfillFetchStatus) は廃止され、
+ *   「りんくの語り」bubble (#backfillRinku) に集約された。bubble が見えること（押下が
+ *   render を引き金にしたこと）で配線成立を確かめる。
  */
 const KEY_RECORDING = 'nls_recording_enabled';
 const KEY_BACKFILL_ENABLED = 'nls_backfill_enabled';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 
 test.describe('過去ログ取り込み opt-in ボタン（β）', () => {
-  test('ボタン押下で KEY_BACKFILL_ENABLED が true になり、状態テキストが出る', async ({
+  test('ボタン押下で KEY_BACKFILL_ENABLED が true になり、りんくの語り bubble が出る', async ({
     context
   }) => {
     let sw = context.serviceWorkers()[0];
@@ -87,8 +91,15 @@ test.describe('過去ログ取り込み opt-in ボタン（β）', () => {
       )
       .toBe(true);
 
-    // 状態テキストが表示される（「取り込み中…」）。
-    await expect(popup.locator('#backfillFetchStatus')).toBeVisible({ timeout: 10_000 });
+    // v0.1.410 から押下後の状態テキストは「りんくの語り」bubble (#backfillRinku) に集約。
+    // bubble が hidden=false になり、語りテキスト要素も中身を持つことを確認する。
+    const bubble = popup.locator('#backfillRinku');
+    await expect(bubble).toBeVisible({ timeout: 10_000 });
+    const lead = popup.locator('#backfillRinkuLead');
+    await expect(lead).toBeVisible({ timeout: 10_000 });
+    await expect.poll(async () => (await lead.textContent())?.trim().length ?? 0, {
+      timeout: 10_000
+    }).toBeGreaterThan(0);
   });
 
   test('lid が無い（empty state）ときは prompt を出さない', async ({ context }) => {
