@@ -166,6 +166,24 @@ export function backfillRinkuNarration(progress) {
 export const BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO = 0.95;
 
 /**
+ * v0.1.435: 実質取り切れている（記録/公式 >= NEAR_COMPLETE_RATIO）partial 状態の記録カード短文。
+ *
+ *   ⭐ なぜ「沈黙＝空文字」をやめるか（実機 UX 検証・2026-05-28）:
+ *     v0.1.432 では「数が合っているのに『途中まで』と言う違和感」を消すため、実質取り切れている
+ *     partial では記録カードを空文字にして沈黙させた。しかし実機ではボタン下に「いまの分まで
+ *     遡ったよ！もう一度押すと続きも取りに行くね」と表示される一方で、記録カード下は完全沈黙
+ *     ＝ユーザー視点で「片方しか反応しない＝対応されていない」と感じる現象が再現した。
+ *
+ *   ⭐ 世界標準の UX 定石（Nielsen Norman #1 Visibility of System Status / Material Design 3
+ *     Progress Indicator Guidelines / Instagram "You're all caught up" / Slack "Catch up"）:
+ *     「ほぼ完了」状態は沈黙でなく**肯定的な"状態の名前化"**で表現する。数字でなく状態名で。
+ *
+ *   ⭐ こん太の声として、ボタン下の「いまの分まで遡ったよ！」と対になる短い肯定文を出す。
+ *     「途中まで」とは言わない（v0.1.432 の趣旨は維持）、でも沈黙もしない＝両立。
+ */
+export const BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT = 'いまの分まで届いてるよ ✨';
+
+/**
  * v0.1.432: 記録カード（記録 件数の真下）に出す「過去ログ取り込みの状況」短文を返す。
  *
  * ユーザー要望（2026-05-28）: 「いまは遡れる入口が見つからなかったよ…」のような状況は、
@@ -193,6 +211,7 @@ export function backfillRecordCardHint(progress, opts = {}) {
       return '過去ログは今は遡れませんでした（少し経つと取り込めることがあります）';
     case 'partial': {
       // 実質取り切れている（記録が公式の95%以上）なら『途中まで』を出さない。
+      // v0.1.435: でも沈黙もしない＝肯定的な caught-up 文を出す（Nielsen 可視性原則・上の定数 doc 参照）。
       const rows = Number(progress && progress.rows) || 0;
       const official = Number(opts && opts.officialCount);
       if (
@@ -200,7 +219,7 @@ export function backfillRecordCardHint(progress, opts = {}) {
         official > 0 &&
         rows >= official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO
       ) {
-        return '';
+        return BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT;
       }
       return '過去ログは途中まで取り込みました（もう一度押すと続きを取り込みます）';
     }

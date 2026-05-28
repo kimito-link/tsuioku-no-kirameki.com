@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.435',
+    date: '2026-05-28',
+    summary: '記録カードに「いまの分まで届いてるよ」を表示',
+    items: Object.freeze([
+      '過去コメントが実質取り切れているとき、取り込みボタンの下には「いまの分まで遡ったよ！」と表示されるのに、記録カードのところは何も出ていない違和感を直しました。記録カードのところにも「いまの分まで届いてるよ ✨」と短く出して、両方が対になるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.434',
     date: '2026-05-28',
     summary: '過去ログの「ぜんぶ届いた」誤表示を修正',

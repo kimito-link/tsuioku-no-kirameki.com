@@ -174,13 +174,26 @@ describe('backfillRecordCardHint（記録カードに出す短文・v0.1.432）'
     expect(h).toContain('もう一度');
   });
 
-  it('partial でも記録が公式の95%以上なら「途中まで」を出さない（実質取り切れている・v0.1.432）', () => {
+  it('partial でも記録が公式の95%以上なら「途中まで」とは言わない（v0.1.432）', () => {
     // 実機: 記録207/公式203 のように reached_start でなくても実質100%なら『途中まで』と言わない。
     const h = backfillRecordCardHint(
       { started: true, rows: 207, done: 1, stopReason: 'no_progress' },
       { officialCount: 203 }
     );
-    expect(h).toBe('');
+    expect(h).not.toContain('途中まで');
+  });
+
+  it('partial で記録が公式の95%以上なら肯定的な caught-up 文を出す（沈黙しない・v0.1.435）', () => {
+    // ⛔ v0.1.432 で空文字にしていたが、実機でボタン下に「いまの分まで遡ったよ」が出る一方
+    //   記録カード下が完全沈黙＝「片方しか反応しない＝対応されてない」と感じる UX 問題が再現。
+    //   世界標準（Nielsen NN/g #1 Visibility / Material Design 3 / Instagram caught-up）に合わせ、
+    //   「ほぼ完了」は沈黙でなく肯定的な状態の名前化で表現する。
+    const h = backfillRecordCardHint(
+      { started: true, rows: 1919, done: 1, stopReason: 'no_progress' },
+      { officialCount: 1908 }
+    );
+    expect(h).not.toBe('');
+    expect(h).toContain('いまの分まで届いてるよ');
   });
 
   it('partial で記録が公式の95%未満なら「途中まで」を出す', () => {
