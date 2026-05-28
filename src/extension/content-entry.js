@@ -266,6 +266,7 @@ import {
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
 import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
+import { calculateBackfillRetryDelayMs } from '../lib/backfillRetryBackoff.js';
 import {
   isBackfillEnabledFromStorage,
   isBackfillJustEnabledFromChange,
@@ -11463,9 +11464,20 @@ let _backfillAbort = null;
  * @type {Record<string, number>}
  */
 const _backfillTransientRetryByLiveId = {};
-/** 一過性 stop で自動リトライする最大回数（liveId ごと）。 */
-const NDGR_BACKFILL_TRANSIENT_RETRY_MAX = 5;
-/** 一過性 stop 後、次の自動再試行を許可するまでの待機（ms）。view URI 安定/封済み化を待つ。 */
+/**
+ * 一過性 stop で自動リトライする最大回数（liveId ごと）。
+ *   v0.1.442: 5 → 7 に拡張。指数バックオフ化と合わせて「最後まで諦めず頑張る」を実現
+ *   （ユーザー要望「とれない場合、もう1回頑張って取る機能」）。世界標準（AWS / TanStack Query）
+ *   は 3-5 回が多いが、ニコ生は混雑頻度が高いため 7 回まで許容する。
+ */
+const NDGR_BACKFILL_TRANSIENT_RETRY_MAX = 7;
+/**
+ * @deprecated v0.1.442: 指数バックオフ + Full Jitter（calculateBackfillRetryDelayMs）に
+ *   置き換えたため未参照。⚠️ 万一の退避用に残してある: 下の setTimeout の第二引数を
+ *   `NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS` に 1 行戻すだけで v0.1.441 までの「20秒固定」
+ *   挙動に完全復帰する。
+ */
+// eslint-disable-next-line no-unused-vars
 const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
 /**
  * @type {{ seg: number, rows: number, done: 0|1, stopReason: string }} 進捗（data 属性で可視化）。
@@ -11712,12 +11724,16 @@ async function runNdgrBackfillOnce() {
       })
     ) {
       _backfillTransientRetryByLiveId[lidAtFinish] = retried + 1;
+      // v0.1.442: 旧 20 秒固定 → 指数バックオフ + Full Jitter（世界標準準拠）。
+      //   1 回目: 0〜1秒（すぐもう一度試す）/ ... / 7 回目: 0〜45秒（最後まで諦めない）。
+      //   Full Jitter で複数ユーザーの同時リトライを時間分散＝サーバー同時殺到を回避。
+      const retryDelayMs = calculateBackfillRetryDelayMs(retried);
       setTimeout(() => {
         // 同じ配信を今も見ていて guard がこの liveId のままなら解除＝次 tick で再起動。
         if (liveId === lidAtFinish && _backfillTriedLiveId === lidAtFinish) {
           _backfillTriedLiveId = '';
         }
-      }, NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS);
+      }, retryDelayMs);
     }
   }
 }

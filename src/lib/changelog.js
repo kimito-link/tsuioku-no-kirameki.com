@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.442',
+    date: '2026-05-28',
+    summary: '過去ログを取り損ねたとき、もう一度ねばって取りにいく',
+    items: Object.freeze([
+      '過去ログの入口が一時的に見つからず数%で止まってしまったときの自動再挑戦を強化しました。これまでは20秒待ってから5回まででしたが、これからは「すぐもう一度・だんだん間隔を伸ばして・最大7回」と粘り強く取りにいきます。1回目の再挑戦が早くなって「すぐ頑張ってくれた」感が増えます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.441',
     date: '2026-05-28',
     summary: '上段カードが「—」で固まる残症状を改善',
