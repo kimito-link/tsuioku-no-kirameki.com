@@ -36,8 +36,14 @@ export function createTtlCache(opts) {
   function set(key, value) {
     store.set(key, { value, expiresAt: Date.now() + ttlMs });
     if (maxSize > 0 && store.size > maxSize) {
-      const oldest = store.keys().next().value;
-      if (oldest !== undefined) store.delete(oldest);
+      // v0.1.356: maxSize 超過時、まず期限切れエントリを掃除する。従来は挿入順最古を
+      //   無条件に削っていたため、期限切れの死んだエントリが残っているのに有効なエントリを
+      //   優先削除してしまうことがあった。死んでいるものから先に落とす。
+      evictExpired();
+      if (store.size > maxSize) {
+        const oldest = store.keys().next().value;
+        if (oldest !== undefined) store.delete(oldest);
+      }
     }
   }
 

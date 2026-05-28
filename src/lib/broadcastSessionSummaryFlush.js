@@ -14,6 +14,11 @@ import { readStorageBagWithRetry } from './userCommentProfileCache.js';
 
 const FLUSH_MIN_INTERVAL_MS = 60_000;
 
+// v0.1.356: throttle を liveId 別に持つ。従来はモジュールグローバルの単一 lastFlushAt
+//   だったため、配信を切り替えた直後（新 lv）でも、前の配信の flush から 60s 未満なら
+//   新配信の最初のサマリ sample が落ちていた（配信切替直後にサマリが書かれない）。
+//   lv が変わったら別キーになり、新配信は即座に flush できる。
+let lastFlushLiveId = '';
 let lastFlushAt = 0;
 const BROADCAST_SESSION_SUMMARY_LOG_PREFIX = '[broadcastSessionSummaryFlush]';
 
@@ -206,7 +211,9 @@ export async function maybeFlushBroadcastSessionSummarySample(input) {
   if (!lid) return;
 
   const now = Date.now();
-  if (now - lastFlushAt < FLUSH_MIN_INTERVAL_MS) return;
+  // 同一 lv の継続中だけ throttle する。lv が変わったら（配信切替）即 flush を許す。
+  if (lid === lastFlushLiveId && now - lastFlushAt < FLUSH_MIN_INTERVAL_MS) return;
+  lastFlushLiveId = lid;
   lastFlushAt = now;
 
   const comments = Array.isArray(input.comments) ? input.comments : [];
