@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.440',
+    date: '2026-05-28',
+    summary: '隠れタブの再描画を止めて多タブを軽く',
+    items: Object.freeze([
+      '複数のタブで拡張のパネルを開いているとき、見えていないタブの中身は無理に書き直さないようにしました。前面に戻したときには自動で最新の状態に追いつきます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.439',
     date: '2026-05-28',
     summary: '100%取れた時にこん太のアイコンだけ残るのを修正',

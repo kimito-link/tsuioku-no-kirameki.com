@@ -8,6 +8,7 @@ import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMult
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
 import { refreshTaskGuarded } from '../lib/refreshTaskGuard.js';
+import { decideVisibilityAction } from '../lib/popupVisibilityGate.js';
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import {
@@ -12537,6 +12538,15 @@ function isHighFrequencyCommentRelatedStorageKey(key) {
 function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   const keys = Object.keys(changes || {});
   if (!keys.length) return;
+  // v0.1.440: 隠れタブ(他タブが前面)では re-render を skip して多タブ reflow N→1 を達成。
+  //   可視復帰時の catch-up は既存 visibilitychange listener が担うので追加処理は不要。
+  //   描画パスには触らない＝v0.1.421/422 パネル消失リグレッションを構造的に再発させない。
+  const action = decideVisibilityAction({
+    hidden: typeof document !== 'undefined' && document.hidden === true,
+    gateEnabled: true,
+    initialDone: initialRefreshDone
+  });
+  if (action === 'skip') return;
   const allHighFreq = keys.every((k) =>
     isHighFrequencyCommentRelatedStorageKey(k)
   );
