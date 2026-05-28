@@ -282,7 +282,7 @@ import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { isInsideRecommendedLiveSection } from '../lib/isInsideRecommendedLiveSection.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { recordDiagnosticException } from '../lib/diagnosticRingStore.js';
-import { isCommentUiScraperPollutionRow } from '../lib/backfillRemoveRecommendedLivePollution.js';
+import { isPersistableHarvestedCommentRow } from '../lib/persistableCommentRow.js';
 import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
 import {
@@ -8719,8 +8719,14 @@ const persistCoalescer = createPersistCoalescer(async (/** @type {ParsedCommentR
  * @param {{ source?: string }} [opts] ndgr | mutation | deep | visible
  */
 function persistCommentRows(rows, opts = {}) {
+  // v0.1.362: ギフトのシステム行（「○○さんがギフト「XXX（Npt）」を贈りました」）を
+  //   通常コメントとして保存しない。NDGR 経路は cleanNdgrChatRows / ndgrChatRows で
+  //   既に parseGiftCommentText で除外しているが、DOM ハーベスト経路（deep/visible/
+  //   mutation の3経路がここを共有）にはガードが無く、NDGR ギフト event を取り逃した
+  //   配信でコメントテーブルのギフト行が「ユーザー別応援件数」に混入し得た（NDGR/DOM
+  //   の非対称）。判定は isPersistableHarvestedCommentRow（純関数・両経路で共有）に集約。
   const filtered = Array.isArray(rows)
-    ? rows.filter((r) => !isCommentUiScraperPollutionRow(r))
+    ? rows.filter((r) => isPersistableHarvestedCommentRow(r))
     : [];
   const gate = diagnosePersistGate({
     hasRows: !!filtered.length,

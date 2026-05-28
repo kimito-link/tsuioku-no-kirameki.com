@@ -61,6 +61,46 @@ describe('appendGiftEvents', () => {
     expect(r.added[0].itemId).toBe('stamp_anon');
   });
 
+  it('文字化け送り主名（replacement char）は名前として採らず空にする（userId は保持）', () => {
+    // U+FFFD を含む誤デコード名。実機: ギフト履歴に `▨▨ơ�?▨` が出た。
+    const garbled = '��x';
+    const r = appendGiftEvents(
+      [],
+      [{ userId: 'u123', nickname: garbled, itemId: 'stamp_1', point: 50 }],
+      NOW
+    );
+    expect(r.added).toHaveLength(1);
+    expect(r.added[0].userId).toBe('u123');
+    expect(r.added[0].nickname).toBe('');
+  });
+
+  it('文字化け名だけのイベント（userId/itemId 無し）は丸ごと捨てる', () => {
+    const r = appendGiftEvents([], [{ nickname: '��' }], NOW);
+    expect(r.added).toEqual([]);
+    expect(r.storageTouched).toBe(false);
+  });
+
+  it('正常な日本語/絵文字の送り主名は保持する', () => {
+    const r = appendGiftEvents(
+      [],
+      [{ userId: 'u1', nickname: 'なちファン🎉', itemId: 'stamp_2', point: 100 }],
+      NOW
+    );
+    expect(r.added).toHaveLength(1);
+    expect(r.added[0].nickname).toBe('なちファン🎉');
+  });
+
+  it('文字化けギフトメッセージは空にする（名前は正常なら保持）', () => {
+    const r = appendGiftEvents(
+      [],
+      [{ userId: 'u9', nickname: 'Alice', message: 'ok��', itemId: 's', point: 10 }],
+      NOW
+    );
+    expect(r.added).toHaveLength(1);
+    expect(r.added[0].nickname).toBe('Alice');
+    expect(r.added[0].message).toBe('');
+  });
+
   it('FIFO trims when exceeding maxEvents', () => {
     const existing = [];
     for (let i = 0; i < 10; i++) {
