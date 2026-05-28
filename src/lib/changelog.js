@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.438',
+    date: '2026-05-28',
+    summary: '記録カードにもこん太のお知らせを表示',
+    items: Object.freeze([
+      '過去ログ取り込みのお知らせを、取り込みボタンの下だけでなく「記録」カードの数字のすぐ下にもこん太の吹き出しで表示するようにしました。記録が増えない理由（入口がない・途中まで・混雑）も、いまの分まで届いているお知らせも、両方の場所で同じ見た目でお伝えします'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.437',
     date: '2026-05-28',
     summary: '上段カードが全部「—」で固まる症状を改善',

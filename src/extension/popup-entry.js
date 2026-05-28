@@ -143,7 +143,10 @@ import {
   KEY_BACKFILL_AUTO_DISABLED,
   KEY_BACKFILL_PROGRESS
 } from '../lib/storageKeys.js';
-import { backfillRinkuNarration, backfillRecordCardHint } from '../lib/backfillRinkuNarration.js';
+import {
+  backfillRinkuNarration,
+  backfillRecordCardHintDomState
+} from '../lib/backfillRinkuNarration.js';
 import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
 import { effectiveInlinePanelPlacement } from '../lib/inlinePanelLayout.js';
 import {
@@ -5677,17 +5680,28 @@ function applyBackfillRecordCardHint(progress) {
   // v0.1.432: 公式件数を渡し、実質取り切れている（記録が公式の95%以上）partial では出さない。
   const oc = watchMetaCache.snapshot?.officialCommentCount;
   const officialCount = typeof oc === 'number' && Number.isFinite(oc) ? oc : null;
-  const hint =
+  // v0.1.438: 記録カード下にもボタン下と同じ「こん太(キャラ)+吹き出し」UI を出す（ユーザー指摘
+  //   「片方しかキャラがいないのは寂しい」・統合性原則）。新規 純関数 backfillRecordCardHintDomState
+  //   が hidden/dataPhase/lead をまとめて返すのでそれを DOM に流すだけ。
+  const state =
     progress && progress.started
-      ? backfillRecordCardHint(progress, { officialCount })
-      : '';
-  if (!hint) {
-    el.hidden = true;
-    el.textContent = '';
-    return;
+      ? backfillRecordCardHintDomState(progress, { officialCount })
+      : { hidden: true, dataPhase: '', lead: '' };
+  // 外側の wrapper（既存 #liveStatCommentsBackfillHint）の hidden を切替
+  el.hidden = state.hidden;
+  // 内側のこん太吹き出しを更新（v0.1.438 で追加された DOM）
+  const rinku = /** @type {HTMLElement|null} */ (document.getElementById('recordCardBackfillRinku'));
+  const lead = /** @type {HTMLElement|null} */ (document.getElementById('recordCardBackfillRinkuLead'));
+  if (rinku) {
+    if (state.dataPhase) {
+      rinku.setAttribute('data-phase', state.dataPhase);
+    } else {
+      rinku.removeAttribute('data-phase');
+    }
   }
-  el.hidden = false;
-  el.textContent = hint;
+  if (lead) {
+    lead.textContent = state.lead;
+  }
 }
 
 /**

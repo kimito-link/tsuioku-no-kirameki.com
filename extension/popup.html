@@ -3140,6 +3140,28 @@
         }
       }
 
+      /* v0.1.438: 記録カード内のこん太吹き出し（ボタン下と同じ class を再利用しつつ
+         カード内に収まる小さめのサイズ・余白に調整。ボタン下の見た目には影響しない）。 */
+      .nl-backfill-rinku--record-card {
+        margin-top: 3px;
+        padding: 4px 8px;
+        gap: 6px;
+      }
+      .nl-backfill-rinku--record-card .nl-backfill-rinku__img {
+        width: 32px;
+        height: 32px;
+      }
+      .nl-backfill-rinku--record-card .nl-backfill-rinku__lead {
+        font-size: 11px;
+        line-height: 1.4;
+      }
+      /* v0.1.438: caught_up（95%以上で「いまの分まで届いてるよ ✨」）は明るめ背景で
+         「ほぼ完了」感を伝える（partial/paused/no_entry の落ち着き色とは区別）。 */
+      .nl-backfill-rinku[data-phase='caught_up'] {
+        background: linear-gradient(180deg, #fff9fc, #fde9f1);
+        border-color: #f3b6cf;
+      }
+
       /* v0.1.236: 北極星 6 レーン常設枠。
          「取得できる/出来ないに関わらず popup に枠を残す」原則（kimito さん 2026-05-09 明示）。
          鏡のように貼り付け原則: 値が取れたら niconico DOM の outerHTML をそのまま流し込む。
@@ -9072,13 +9094,35 @@
             aria-live="polite"
           ></div>
           <!-- v0.1.432: 過去ログ取り込みの状況（入口なし/途中/混雑）を記録カードの位置にも出す。
-               記録の数字が増えない理由を、まず目が行くここに短く表示（ボタン下の語りは別途維持）。 -->
+               v0.1.438: ボタン下と同じ「こん太(キャラ)+ピンク吹き出し」UI に統一（ユーザー指摘・統合性原則）。
+               既存ボタン下の #backfillRinku は無変更。ここはもう一つのインスタンス（class 共有 / id は別）。
+               外側 nl-live-stat-sub--backfill-hint はレイアウト位置の維持・内側は .nl-backfill-rinku の再利用。 -->
           <div
             class="nl-live-stat-sub nl-live-stat-sub--backfill-hint"
             id="liveStatCommentsBackfillHint"
             hidden
             aria-live="polite"
-          ></div>
+          >
+            <div
+              id="recordCardBackfillRinku"
+              class="nl-backfill-rinku nl-backfill-rinku--record-card"
+              aria-hidden="true"
+            >
+              <img
+                id="recordCardBackfillRinkuImg"
+                class="nl-backfill-rinku__img"
+                src="images/logo/konta-yukkuri-icon-48.png"
+                width="32"
+                height="32"
+                alt=""
+              />
+              <p
+                id="recordCardBackfillRinkuLead"
+                class="nl-backfill-rinku__lead"
+                aria-live="polite"
+              ></p>
+            </div>
+          </div>
           <div
             id="liveStatCardCommentsLoad"
             class="nl-live-stat-card__char-load"

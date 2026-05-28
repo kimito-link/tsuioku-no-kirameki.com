@@ -230,3 +230,39 @@ export function backfillRecordCardHint(progress, opts = {}) {
       return '';
   }
 }
+
+/**
+ * v0.1.438: 記録カード下に出す「こん太のお知らせ吹き出し」の DOM 状態を返す純関数。
+ *
+ * 背景（ユーザー指摘・2026-05-28）:
+ *   取り込みボタンの下には「こん太(オレンジ髪のキャラ)+ピンク吹き出し」が出るのに、
+ *   記録カード下には文字だけ＝同じこん太のお知らせなのに統一感がなく「もう一人のこん太が
+ *   いないと寂しい」とユーザー指摘。世界UX標準(統合性原則・Material Design 3)にも合う。
+ *
+ * 設計:
+ *   - 既存の `backfillRecordCardHint(progress, opts)` をそのまま使ってテキストを取得
+ *     (文言とロジック・95%以上判定 すべて維持・後方互換)。
+ *   - 加えて UI に必要な hidden/data-phase を返し、popup-entry.js がそれを DOM に流すだけ。
+ *   - data-phase は CSS のスタイル切替に使う。caught-up(95%以上 partial) は明るめ、
+ *     partial/paused/no_entry は落ち着き目（ボタン下と同じ規則）。
+ *
+ * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }} progress
+ * @param {{ officialCount?: number|null }} [opts]
+ * @returns {{ hidden: boolean, dataPhase: string, lead: string }}
+ *   hidden: 記録カード下のこん太を非表示にすべきか。
+ *   dataPhase: CSS 切替用の data-phase 値（'caught_up' | 'partial' | 'paused' | 'no_entry' | ''）。
+ *   lead: 吹き出しに出す文言（hidden=true のときは ''）。
+ */
+export function backfillRecordCardHintDomState(progress, opts = {}) {
+  const phase = backfillNarrationPhase(progress);
+  const lead = backfillRecordCardHint(progress, opts);
+  if (!lead) {
+    return { hidden: true, dataPhase: '', lead: '' };
+  }
+  // caught_up は phase=partial だが文言が NEAR_COMPLETE_TEXT に差し替わっているケース。
+  //   CSS で明るめ背景にしたい（区別したい）ので別 data-phase を返す。
+  if (phase === 'partial' && lead === BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT) {
+    return { hidden: false, dataPhase: 'caught_up', lead };
+  }
+  return { hidden: false, dataPhase: phase, lead };
+}

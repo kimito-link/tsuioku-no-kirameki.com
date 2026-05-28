@@ -3,7 +3,8 @@ import {
   backfillNarrationPhase,
   backfillRinkuNarration,
   backfillReachedStreamStart,
-  backfillRecordCardHint
+  backfillRecordCardHint,
+  backfillRecordCardHintDomState
 } from './backfillRinkuNarration.js';
 
 describe('backfillReachedStreamStart', () => {
@@ -231,5 +232,65 @@ describe('backfillRecordCardHint（記録カードに出す短文・v0.1.432）'
     expect(backfillRecordCardHint({ started: true, rows: 390, done: 1, stopReason: 'reached_start' })).toBe('');
     expect(backfillRecordCardHint({ started: true, rows: 0, done: 1, stopReason: 'reached_start' })).toBe('');
     expect(backfillRecordCardHint({})).toBe('');
+  });
+});
+
+describe('backfillRecordCardHintDomState（記録カード下こん太吹き出しの DOM 状態・v0.1.438）', () => {
+  it('no_entry: hidden=false / data-phase=no_entry / lead に文言', () => {
+    const s = backfillRecordCardHintDomState({
+      started: true,
+      rows: 0,
+      done: 1,
+      stopReason: 'backward_exhausted'
+    });
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('no_entry');
+    expect(s.lead).toContain('遡れませんでした');
+  });
+
+  it('partial(<95%): hidden=false / data-phase=partial / 「途中まで」文言', () => {
+    const s = backfillRecordCardHintDomState(
+      { started: true, rows: 239, done: 1, stopReason: 'no_progress' },
+      { officialCount: 2064 }
+    );
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('partial');
+    expect(s.lead).toContain('途中まで');
+  });
+
+  it('partial(>=95%): caught_up data-phase で「いまの分まで届いてるよ ✨」', () => {
+    const s = backfillRecordCardHintDomState(
+      { started: true, rows: 1919, done: 1, stopReason: 'no_progress' },
+      { officialCount: 1908 }
+    );
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('caught_up');
+    expect(s.lead).toContain('いまの分まで届いてるよ');
+  });
+
+  it('paused: hidden=false / data-phase=paused / 「中断」文言', () => {
+    const s = backfillRecordCardHintDomState({
+      started: true,
+      rows: 100,
+      done: 1,
+      stopReason: 'rate_limited'
+    });
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('paused');
+    expect(s.lead).toContain('中断');
+  });
+
+  it('fetching/progress/done/done_empty/idle: hidden=true / data-phase=空 / lead=空', () => {
+    const idle = backfillRecordCardHintDomState({});
+    expect(idle).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    const fetching = backfillRecordCardHintDomState({ started: true, rows: 0, done: 0 });
+    expect(fetching).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    const done = backfillRecordCardHintDomState({
+      started: true,
+      rows: 100,
+      done: 1,
+      stopReason: 'reached_start'
+    });
+    expect(done).toEqual({ hidden: true, dataPhase: '', lead: '' });
   });
 });
