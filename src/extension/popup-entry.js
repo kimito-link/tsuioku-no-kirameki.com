@@ -9,6 +9,7 @@ import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupC
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
 import { refreshTaskGuarded } from '../lib/refreshTaskGuard.js';
 import { decideVisibilityAction } from '../lib/popupVisibilityGate.js';
+import { executeScriptWithTimeout } from '../lib/executeScriptWithTimeout.js';
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import {
@@ -10708,28 +10709,39 @@ async function triggerReloadWatchTabFromPopup() {
  */
 async function listWatchFramesWithInnerText(tabId) {
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      func: () => {
-        const href = String(location.href || '');
-        const panel = !!(
-          document.querySelector('.ga-ns-comment-panel') ||
-          document.querySelector('.comment-panel') ||
-          document.querySelector('[class*="comment-data-grid"]')
-        );
-        const hasVideo = !!document.querySelector('video');
-        const inner = document.body?.innerText || '';
-        const len = inner.length;
-        const text = inner.slice(0, 120_000);
-        const score =
-          (panel ? 8_000_000 : 0) +
-          (hasVideo ? 400_000 : 0) +
-          Math.min(len, 5_000_000) +
-          (/\/watch\/lv\d+/i.test(href) ? 50_000 : 0) +
-          (href.includes('nicovideo.jp') && href.includes('watch') ? 25_000 : 0);
-        return { score, text, href };
-      }
-    });
+    // v0.1.441: chrome.scripting.executeScript は timeout を持たない API。多タブ stall・
+    //   タブ suspension・content-script 注入競合等で永久 pending になり得る。これが
+    //   refresh_intercept_export_timeout(v0.1.437・12s) と snapshot_fetch_timeout(v0.1.398・15s)
+    //   の本丸の真因（実機 chrome://extensions エラー画面で確定）。8s で内側保護し、
+    //   タイムアウト時は空配列を返す＝既存 catch 経路と完全等価で挙動不変。
+    const results = await executeScriptWithTimeout(
+      () =>
+        chrome.scripting.executeScript({
+          target: { tabId, allFrames: true },
+          func: () => {
+            const href = String(location.href || '');
+            const panel = !!(
+              document.querySelector('.ga-ns-comment-panel') ||
+              document.querySelector('.comment-panel') ||
+              document.querySelector('[class*="comment-data-grid"]')
+            );
+            const hasVideo = !!document.querySelector('video');
+            const inner = document.body?.innerText || '';
+            const len = inner.length;
+            const text = inner.slice(0, 120_000);
+            const score =
+              (panel ? 8_000_000 : 0) +
+              (hasVideo ? 400_000 : 0) +
+              Math.min(len, 5_000_000) +
+              (/\/watch\/lv\d+/i.test(href) ? 50_000 : 0) +
+              (href.includes('nicovideo.jp') && href.includes('watch') ? 25_000 : 0);
+            return { score, text, href };
+          }
+        }),
+      8_000,
+      'list_watch_frames_executescript_timeout',
+      /** @type {chrome.scripting.InjectionResult[]} */ ([])
+    );
     /** @type {{ frameId: number, score: number, text: string, href: string }[]} */
     const out = [];
     for (const row of results || []) {

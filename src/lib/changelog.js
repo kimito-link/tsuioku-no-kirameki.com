@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.441',
+    date: '2026-05-28',
+    summary: '上段カードが「—」で固まる残症状を改善',
+    items: Object.freeze([
+      '長時間配信や複数タブで上段カードが「—」のままになる症状を、さらに直しました。表示の準備に使うブラウザ機能が応答しなくなったときも、決まった時間で見切りをつけて次に進むようにしています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.440',
     date: '2026-05-28',
     summary: '隠れタブの再描画を止めて多タブを軽く',
