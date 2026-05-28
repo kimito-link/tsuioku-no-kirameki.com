@@ -9214,9 +9214,18 @@ async function flushToStorage() {
   const rows = [];
   for (const n of pendingRoots) {
     if (n.nodeType === Node.ELEMENT_NODE) {
-      extractCommentsFromNode(/** @type {Element} */ (n)).forEach(
+      const el = /** @type {Element} */ (n);
+      extractCommentsFromNode(el).forEach(
         (/** @type {ParsedCommentRow} */ r) => rows.push(r)
       );
+      // ⚡ v0.1.454 スクロール重さ対策（P1.3）: MutationObserver callback で 1 行ごとに
+      //   同期実行していた img の load バインドを、ここ（80ms デバウンス flush・clear 前）に
+      //   まとめて移設。querySelectorAll('img') の連発を 80ms に 1 回束ねてメインスレッド
+      //   占有を下げる。once ガード（dataset.nlsCommentAvBound）があるので入れ子ノードの
+      //   重複走査でも実害なし。早期 return（ext context無/recording無/liveId無）時は bind
+      //   されないが、その状況では load ハンドラ自身も no-op に倒れ、次の flush や 550ms
+      //   scanVisibleCommentsNow が拾うため取りこぼさない。
+      bindCommentPanelUserIconLoads(el);
     }
   }
   pendingRoots.clear();
@@ -10047,11 +10056,17 @@ async function start() {
     }
     for (const rec of records) {
       if (rec.type === 'childList') {
+        // ⚡ v0.1.454 スクロール重さ対策（P1.3）:
+        //   以前はここで追加ノードごとに bindCommentPanelUserIconLoads(n) を**同期**呼び出し
+        //   していた（その中で n.querySelectorAll('img') を毎回走査）。コメントが大量に流れる
+        //   配信では childList mutation が連発し、1行ごとの querySelector('img') がメイン
+        //   スレッドを占有してホイール入力が落ちる（スクロールがガクつく）主因だった。
+        //   icon bind は「これから遅延ロードされる img の load を待つ」補助でしかなく、80ms
+        //   遅れても load イベントを取り逃さない（bind 時点で未ロードの img が対象）。そこで
+        //   bind は enqueueNode と同じ pendingRoots に乗せ、既存の 80ms デバウンス flush
+        //   （flushToStorage）でまとめて1回だけ走らせる（"1行ごと" → "80msに1回束ねて"）。
         rec.addedNodes.forEach((/** @type {Node} */ n) => {
           enqueueNode(n);
-          if (n.nodeType === Node.ELEMENT_NODE) {
-            bindCommentPanelUserIconLoads(/** @type {Element} */ (n));
-          }
         });
       } else if (rec.type === 'characterData' && rec.target?.parentElement) {
         const row = closestHarvestableNicoCommentRow(rec.target.parentElement);
