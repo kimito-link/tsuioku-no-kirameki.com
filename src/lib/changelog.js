@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.437',
+    date: '2026-05-28',
+    summary: '上段カードが全部「—」で固まる症状を改善',
+    items: Object.freeze([
+      '長時間の配信中に上段の応援数や同時接続のカードが全部「—」のまま固まってしまうことがある問題を、さらに直しました。表示の準備に使うブラウザ機能が一時的に応答しなくなっても、少し待って先に進めるようにして、画面が止まりにくくしています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.436',
     date: '2026-05-28',
     summary: '運営のお知らせ等での「ぜんぶ届いた」誤表示を修正',

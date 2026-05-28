@@ -7,6 +7,7 @@ import {
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
+import { refreshTaskGuarded } from '../lib/refreshTaskGuard.js';
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import {
@@ -9796,16 +9797,29 @@ async function refresh() {
     // ユーザープロフィールページ上では、プロフィール本人やおすすめユーザーを
     // 「応援者」と誤解しやすいため fallback 復元しない。
     if (!onNicoUserProfilePage) {
-      await populateStorySourceEntriesFromStorageFallback({
-        excludeUserIds: activeProfileUserIds
-      });
+      // v0.1.437: 内部で IDB.open / storageGetSafe が裸 await。stall でハング→「—」固定
+      //   の根治。2.5s で有界化し、フォールバックは何もしない (undefined)。
+      await refreshTaskGuarded(
+        populateStorySourceEntriesFromStorageFallback({
+          excludeUserIds: activeProfileUserIds
+        }),
+        2500,
+        'refresh_populate_story_fallback_timeout_a',
+        undefined
+      );
     }
     // 0.1.69 (AY): standalone popup / side panel では「前回の配信」を cards に
     // 復元する。INLINE_MODE（watch ページ内 iframe）は empty state 自体が
     // 発生しない想定なのでスキップ。clearWatchMetaCard() の直後に呼ぶことで
     // is-placeholder を上書きできる順序を保証する。
     if (!INLINE_MODE) {
-      await applyLastBroadcastReviewToEmptyState();
+      // v0.1.437: 内部で IDB.open が裸 await。stall ハング根治。
+      await refreshTaskGuarded(
+        applyLastBroadcastReviewToEmptyState(),
+        2500,
+        'refresh_apply_last_broadcast_timeout_a',
+        undefined
+      );
     } else {
       clearLastBroadcastReviewArtifacts();
     }
@@ -9866,14 +9880,26 @@ async function refresh() {
     // lv が取り出せなかった場合も、同じ保存ベース fallback を試みる。
     // ただしユーザープロフィールページでは stale な応援者表示を出さない。
     if (!onNicoUserProfilePage) {
-      await populateStorySourceEntriesFromStorageFallback({
-        excludeUserIds: activeProfileUserIds
-      });
+      // v0.1.437: 「lv 取り出せず empty state」経路でも IDB stall ハング根治。
+      await refreshTaskGuarded(
+        populateStorySourceEntriesFromStorageFallback({
+          excludeUserIds: activeProfileUserIds
+        }),
+        2500,
+        'refresh_populate_story_fallback_timeout_b',
+        undefined
+      );
     }
     // 0.1.69 (AY): 同じ「watch URL があるけど lv 抜けない」レアケースでも
     // empty state なので、前回の配信を復元する。
     if (!INLINE_MODE) {
-      await applyLastBroadcastReviewToEmptyState();
+      // v0.1.437: IDB stall ハング根治。
+      await refreshTaskGuarded(
+        applyLastBroadcastReviewToEmptyState(),
+        2500,
+        'refresh_apply_last_broadcast_timeout_b',
+        undefined
+      );
     } else {
       clearLastBroadcastReviewArtifacts();
     }
@@ -9962,7 +9988,8 @@ async function refresh() {
       save[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
     }
     if (Object.keys(save).length) {
-      await storageSetSafe(save);
+      // v0.1.437: storage.set 多タブ stall で永久 pending → 全カード「—」固定再発の根治。
+      await refreshTaskGuarded(storageSetSafe(save), 1500, 'refresh_story_avatar_storage_set_timeout', false);
     }
   }
   STORY_AVATAR_DIAG_STATE.total = arr.length;
@@ -10221,7 +10248,13 @@ async function refresh() {
     );
     if (strippedAfterSnap.patched > 0) {
       arr = strippedAfterSnap.next;
-      await storageSetSafe({ [key]: arr });
+      // v0.1.437: storage.set ハングで「—」固まり再発を防ぐ。
+      await refreshTaskGuarded(
+        storageSetSafe({ [key]: arr }),
+        1500,
+        'refresh_story_avatar_post_snap_storage_set_timeout',
+        false
+      );
       if (!isFreshRefresh()) return;
     }
     STORY_AVATAR_DIAG_STATE.stripped += strippedAfterSnap.patched;
@@ -10292,9 +10325,16 @@ async function refresh() {
   void (async () => {
     try {
       if (refreshGen !== watchPopupRefreshGeneration) return;
-      const interceptResult = await requestInterceptCacheFromOpenTab(url, {
-        deep: shouldDeep
-      });
+      // v0.1.437: 内部で chrome.scripting.executeScript / tabsSendMessageWithRetry が
+      //   裸 await されており、多タブ stall で永久 pending → background async タスクが
+      //   settle せず次の refresh 周期が詰まる → 全カード「—」固定再発の本丸の真因。
+      //   12s で有界化。タイムアウトしたら空 items + diag.code='timeout' で best-effort 続行。
+      const interceptResult = await refreshTaskGuarded(
+        requestInterceptCacheFromOpenTab(url, { deep: shouldDeep }),
+        12_000,
+        'refresh_intercept_export_timeout',
+        { items: [], diag: { code: 'timeout', detail: '' } }
+      );
       const interceptItems = interceptResult.items;
       const interceptDiag = interceptResult.diag;
       if (refreshGen !== watchPopupRefreshGeneration) return;
@@ -10359,7 +10399,13 @@ async function refresh() {
             // stale な arr で storage を上書きして「新しい refresh の arr」を
             // 巻き戻すリスクがある。書く前に世代を確認して skip する。
             if (refreshGen !== watchPopupRefreshGeneration) return;
-            await storageSetSafe(saveIc);
+            // v0.1.437: storage.set ハング根治。
+            await refreshTaskGuarded(
+              storageSetSafe(saveIc),
+              1500,
+              'refresh_intercept_merge_storage_set_timeout',
+              false
+            );
           }
         }
       } else {
@@ -10373,14 +10419,27 @@ async function refresh() {
         selfPostedRecentsCache = reconciledOwnPosted.remaining;
         // 0.1.28 (AC): 同上。stale 世代の writeback を抑止。
         if (refreshGen !== watchPopupRefreshGeneration) return;
-        await storageSetSafe({
-          [key]: arr,
-          [KEY_SELF_POSTED_RECENTS]: { items: selfPostedRecentsCache }
-        });
+        // v0.1.437: storage.set ハング根治。
+        await refreshTaskGuarded(
+          storageSetSafe({
+            [key]: arr,
+            [KEY_SELF_POSTED_RECENTS]: { items: selfPostedRecentsCache }
+          }),
+          1500,
+          'refresh_self_posted_storage_set_timeout',
+          false
+        );
       }
       if (refreshGen !== watchPopupRefreshGeneration) return;
+      // v0.1.437: sendMessageToWatchTabs は内部で tabsSendMessageWithRetry 等が裸 await。
+      //   多タブ stall でハング → thumbCount が永久に「…」のまま固まる。5s で有界化。
       const stats = /** @type {{ ok?: boolean, count?: number }|null} */ (
-        await sendMessageToWatchTabs(url, { type: 'NLS_THUMB_STATS' })
+        await refreshTaskGuarded(
+          sendMessageToWatchTabs(url, { type: 'NLS_THUMB_STATS' }),
+          5_000,
+          'refresh_thumb_stats_timeout',
+          null
+        )
       );
       if (refreshGen !== watchPopupRefreshGeneration) return;
       if (thumbCountEl) {
