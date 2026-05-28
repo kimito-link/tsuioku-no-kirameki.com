@@ -184,6 +184,37 @@ export const BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO = 0.95;
 export const BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT = 'いまの分まで届いてるよ ✨';
 
 /**
+ * v0.1.453: 実質取り切れている（記録が公式の 95% 以上）かを純粋に判定する内部ヘルパ。
+ *
+ * 呼び出し元の判定ロジックを集約することで、phase が partial か no_entry か paused かに
+ * 関わらず「実質達成」のときは同じ caught_up 文言を返せるようにする。
+ *
+ * 設計（ユーザー実機 2026-05-29 報告で確定）:
+ *   - 実機で公式 2,679 件・記録 2,679 件（100%）なのに「過去ログは今は遡れませんでした」が
+ *     出続ける問題があった。最後の backfill サイクルが no_entry/no_progress で終わると
+ *     phase=no_entry になるが、実質的には既に全件取れているのに警告が出続ける UX 破綻。
+ *     （v0.1.452 で caught_up 誤判定＝false positive を recordedCount で直したのに対し、
+ *       こちらは「達成しているのに警告が出る」逆方向＝false negative の根治。）
+ *   - 修正: phase に依らず recordedCount(または rows) >= official * 0.95 なら caught_up
+ *     文言を出す（hidden には倒さない。「届いてる ✨」を出すことで「これ以上やり直す必要はない」
+ *     と伝える）。
+ *
+ * @param {{ rows?: number }} progress
+ * @param {{ officialCount?: number|null, recordedCount?: number|null }} opts
+ * @returns {boolean}
+ */
+function isBackfillRecordEffectivelyCaughtUp(progress, opts) {
+  const official = Number(opts && opts.officialCount);
+  if (!Number.isFinite(official) || official <= 0) return false;
+  const recordedRaw = Number(opts && opts.recordedCount);
+  const rowsForRatio =
+    Number.isFinite(recordedRaw) && recordedRaw >= 0
+      ? recordedRaw
+      : Number(progress && progress.rows) || 0;
+  return rowsForRatio >= official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO;
+}
+
+/**
  * v0.1.432: 記録カード（記録 件数の真下）に出す「過去ログ取り込みの状況」短文を返す。
  *
  * ユーザー要望（2026-05-28）: 「いまは遡れる入口が見つからなかったよ…」のような状況は、
@@ -224,29 +255,22 @@ export const BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT = 'いまの分まで届い
  */
 export function backfillRecordCardHint(progress, opts = {}) {
   const phase = backfillNarrationPhase(progress);
+
+  // v0.1.453: 実質達成（recordedCount >= 公式の 95%）なら phase に依らず caught_up 文言。
+  //   no_entry/partial/paused のどれでも「実質取れている」なら警告を出さず肯定的に伝える。
+  //   実機で 100% 取れているのに「過去ログは今は遡れませんでした」が出続けるバグの根治。
+  if (
+    (phase === 'no_entry' || phase === 'partial' || phase === 'paused') &&
+    isBackfillRecordEffectivelyCaughtUp(progress, opts)
+  ) {
+    return BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT;
+  }
+
   switch (phase) {
     case 'no_entry':
       return '過去ログは今は遡れませんでした（少し経つと取り込めることがあります）';
-    case 'partial': {
-      // 実質取り切れている（記録が公式の95%以上）なら『途中まで』を出さない。
-      // v0.1.435: でも沈黙もしない＝肯定的な caught-up 文を出す（Nielsen 可視性原則・上の定数 doc 参照）。
-      // v0.1.452: 比較の分子は recordedCount（dedupe 後）優先。progress.rows は dedupe 前で
-      //   公式件数を過大に超えやすく caught_up 誤判定の原因だった（実機 4%/7%/59% で再現）。
-      const recordedRaw = Number(opts && opts.recordedCount);
-      const rowsForRatio =
-        Number.isFinite(recordedRaw) && recordedRaw >= 0
-          ? recordedRaw
-          : Number(progress && progress.rows) || 0;
-      const official = Number(opts && opts.officialCount);
-      if (
-        Number.isFinite(official) &&
-        official > 0 &&
-        rowsForRatio >= official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO
-      ) {
-        return BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT;
-      }
+    case 'partial':
       return '過去ログは途中まで取り込みました（もう一度押すと続きを取り込みます）';
-    }
     case 'paused':
       return '混雑のため一時中断（少し待つと続きを取り込みます）';
     default:
@@ -336,9 +360,11 @@ export function backfillRecordCardHintDomState(progress, opts = {}) {
   if (!lead) {
     return { hidden: true, dataPhase: '', lead: '' };
   }
-  // caught_up は phase=partial だが文言が NEAR_COMPLETE_TEXT に差し替わっているケース。
-  //   CSS で明るめ背景にしたい（区別したい）ので別 data-phase を返す。
-  if (phase === 'partial' && lead === BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT) {
+  // v0.1.453: phase が partial/no_entry/paused のいずれでも、文言が NEAR_COMPLETE_TEXT に
+  //   差し替わっているなら caught_up data-phase を出す（CSS で明るめ背景＝「届いた ✨」感）。
+  //   実機 2026-05-29: 公式 2,679・記録 2,679（100%）なのに no_entry で警告が出続ける問題を
+  //   解消するため、phase が no_entry でも recordedCount >= 95% なら caught_up に。
+  if (lead === BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT) {
     return { hidden: false, dataPhase: 'caught_up', lead };
   }
   return { hidden: false, dataPhase: phase, lead };
