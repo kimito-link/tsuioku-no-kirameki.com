@@ -804,6 +804,55 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
 
     expect(result.stopReason).toBe('no_progress');
   });
+
+  // ⛔ 実機(糖分さん配信・LIVE 2h30m)で v0.1.434 でも 55%/55% で『ぜんぶ届いた』誤発火が残った真因:
+  //    運営/system のお知らせ(vpos=0 や極小)が中盤区画に【2 件以上】紛れると、v0.1.434 の
+  //    minHits=2 をすり抜けて reached_start を誤発火していた。v0.1.436 で投票母集団から運営/system
+  //    /gift を除外（記録パスと同じガード）して根治する。
+  it('中盤区画に運営/system/gift が 2 件以上紛れていても reached_start にしない（v0.1.436・55% 誤判定の核心）', async () => {
+    const PROGRAM_START = 1000;
+    const BK_MID = 'https://mpn.live.nicovideo.jp/data/backward/v4/FP3_MID';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画: 本体は中盤(vpos=60000・600 秒地点)。だが運営お知らせ 2 件＋gift 1 件＝低 vpos が 3 件混入。
+    //   旧(v0.1.435): no==null/gift も投票してしまい minHits=2 成立 → reached_start（誤）。
+    //   新(v0.1.436): 投票母集団から除外 → 一般コメは中盤 1 件のみ → false → no_progress（正）。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_MID }));
+    map.set(
+      BK_MID,
+      packedSegmentBytes([
+        { no: null, content: '【運営】まもなく終了 A', name: '運営', vpos: 0 },
+        { no: null, content: '【運営】まもなく終了 B', name: '運営', vpos: 0 },
+        {
+          no: 9001,
+          content: 'Aさんがギフト「emerald（10pt）」を贈りました',
+          name: 'A',
+          vpos: 50
+        },
+        { no: 500, content: '中盤コメント', name: 'u', vpos: 60000 }
+      ])
+    );
+    // 以降どの再シード時刻にも入口は無い（これ以上は遡れない状況）。それでも『ぜんぶ届いた』は
+    //   出さず、no_progress に倒れるのが正しい挙動。
+    for (const at of [860, 810, 760, 710, 660, 610]) {
+      map.set(atUrl(at), viewEntryBytes({}));
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 中盤＋運営×2＋gift×1 では reached_start にしない（55% 誤判定の根治）。
+    expect(result.stopReason).toBe('no_progress');
+  });
 });
 
 describe('chainLooksLikeStreamStart（区画が配信開始らしいかの純判定・v0.1.434）', () => {
@@ -869,5 +918,64 @@ describe('chainLooksLikeStreamStart（区画が配信開始らしいかの純判
     expect(NDGR_BACKFILL_NEAR_START_VPOS_CS).toBe(3000);
     expect(chainLooksLikeStreamStart([C(2999), C(3000)])).toBe(true);
     expect(chainLooksLikeStreamStart([C(2999), C(3001)])).toBe(false);
+  });
+
+  // === v0.1.436: 運営/system/gift 投票母集団からの除外（55% 誤判定の追加修正） ===
+  it('運営/system(no==null) は近傍カウントから除外する＝外れ値 1 件 + 実コメ 1 件では false', () => {
+    // 運営アナウンス（no==null・vpos=0）と一般低 vpos コメ 1 件のみ。実コメは 1 件しか近傍にいない。
+    const sys = { no: null, content: '【運営】まもなく終了', name: '運営', vpos: 0 };
+    const real = { no: 1, content: 'こんばんは', name: 'u', vpos: 100 };
+    const mid = { no: 2, content: '中盤', name: 'u', vpos: 60000 };
+    expect(chainLooksLikeStreamStart([sys, real, mid])).toBe(false);
+  });
+
+  it('運営/system(no==null) は除外しても、実コメ 2 件以上が近傍にあれば true（真の開始は維持）', () => {
+    const sys1 = { no: null, content: '【運営】開始', name: '運営', vpos: 0 };
+    const real1 = { no: 1, content: 'はじまった', name: 'u', vpos: 50 };
+    const real2 = { no: 2, content: 'やった', name: 'u2', vpos: 200 };
+    expect(chainLooksLikeStreamStart([sys1, real1, real2])).toBe(true);
+  });
+
+  it('運営/system(no==null) が 2 件以上紛れていても false（55% 誤判定の核心ケース）', () => {
+    // ⛔ v0.1.435 までは「近傍 vpos 2 件以上」で true → 運営が 2 件紛れた中盤区画でも誤発火していた。
+    //   v0.1.436 では運営は投票母集団から外れるため、本体が中盤(vpos=60000)なら false。
+    const sys1 = { no: null, content: '【運営】お知らせ A', name: '運営', vpos: 0 };
+    const sys2 = { no: null, content: '【運営】お知らせ B', name: '運営', vpos: 0 };
+    const mid = { no: 500, content: '中盤', name: 'u', vpos: 60000 };
+    expect(chainLooksLikeStreamStart([sys1, sys2, mid])).toBe(false);
+  });
+
+  it('ギフトお知らせ(no あり・content が gift パターン)も近傍カウントから除外する', () => {
+    // gift 行は no を持つことがある（送信者 uid）。content の gift パターンで弾く必要がある。
+    const gift1 = {
+      no: 9001,
+      content: 'Aさんがギフト「emerald（10pt）」を贈りました',
+      name: 'A',
+      vpos: 0
+    };
+    const gift2 = {
+      no: 9002,
+      content: 'Bさんがギフト「emerald（10pt）」を贈りました',
+      name: 'B',
+      vpos: 100
+    };
+    const mid = { no: 500, content: '中盤', name: 'u', vpos: 60000 };
+    expect(chainLooksLikeStreamStart([gift1, gift2, mid])).toBe(false);
+  });
+
+  it('isPersistableChat を注入で「全件 false」にすると母集団 0 → false（注入の優先性）', () => {
+    expect(
+      chainLooksLikeStreamStart([C(0), C(50), C(100)], { isPersistableChat: () => false })
+    ).toBe(false);
+  });
+
+  it('isPersistableChat を注入で「全件 true」にすると、既定で弾かれる no==null も計上される', () => {
+    const sys1 = { no: null, content: '【運営】', name: '運営', vpos: 0 };
+    const sys2 = { no: null, content: '【運営】', name: '運営', vpos: 100 };
+    // 既定では運営は除外 → false。注入で全件通せば 2 件カウント → true。
+    expect(chainLooksLikeStreamStart([sys1, sys2])).toBe(false);
+    expect(
+      chainLooksLikeStreamStart([sys1, sys2], { isPersistableChat: () => true })
+    ).toBe(true);
   });
 });

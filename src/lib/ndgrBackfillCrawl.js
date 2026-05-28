@@ -30,6 +30,7 @@
 
 import { decodeChunkedEntry } from './ndgrDecode.js';
 import { decodePackedSegmentNav } from './ndgrDecode.js';
+import { parseGiftCommentText } from './parseGiftComment.js';
 
 /**
  * 巡回の各種上限（保守的な初期値）。PoC で rate limit 未測定のため、意図的に
@@ -257,6 +258,28 @@ function minVposOf(chats) {
 }
 
 /**
+ * v0.1.436: 「この chat は記録パスで保存される一般コメントか」を判定する既定フィルタ。
+ *
+ *   chainLooksLikeStreamStart の vpos 集計は「記録に残るコメント」だけを母集団にすべきで、
+ *   記録パス(ndgrChatRows.js の ndgrChatsToMergeRows: no==null skip + parseGiftCommentText
+ *   skip) で除外される運営/system/gift お知らせを reached_start 投票から外す必要がある
+ *   （実機 55% で『ぜんぶ届いた』誤発火の追加真因＝中盤区画に運営/gift が 2 件以上紛れて
+ *   minHits=2 をすり抜けていた）。
+ *
+ *   ⛔ no==null だけでは gift をすり抜ける場合がある（gift 行は送信者 uid を no に持つ実例が
+ *      存在する＝backfillRemoveGiftSystemMessages.js のコメント参照）。だから 2 段ガード。
+ *
+ * @param {import('./ndgrDecode.js').NdgrChat} chat
+ * @returns {boolean} 記録パスで保存される一般コメントなら true。運営/system/gift は false。
+ */
+function defaultIsPersistableChat(chat) {
+  if (!chat || chat.no == null) return false; // 運営/system 候補
+  const text = typeof chat.content === 'string' ? chat.content : '';
+  if (text && parseGiftCommentText(text)) return false; // gift お知らせ
+  return true;
+}
+
+/**
  * v0.1.434: この区画(chats)が「配信の開始区画」らしいかを判定する純関数。
  *
  *   真の開始区画には冒頭の低 vpos コメントが【複数】ある（配信開始直後に挨拶等で vpos≈0 が
@@ -268,10 +291,20 @@ function minVposOf(chats) {
  *   外れ値 1 件では発火せず、低 vpos が複数ある真の開始区画は確実に通る。vpos の有効性判定は
  *   minVposOf と揃える（null / 非有限 / 負を無視）。
  *
+ *   v0.1.436 追補: 投票母集団は「記録パスで保存される一般コメント」に揃える（isPersistableChat）。
+ *     運営/system/gift お知らせ(vpos=0/極小)が中盤区画に複数紛れて minHits=2 をすり抜ける
+ *     ケースを根治（実機 55% で『ぜんぶ届いた』誤発火）。既定 = defaultIsPersistableChat。
+ *
  * @param {import('./ndgrDecode.js').NdgrChat[]} chats 1 区画ぶんの chat 配列。
- * @param {{ nearStartCs?: number, minNearStartHits?: number }} [opts]
+ * @param {{
+ *   nearStartCs?: number,
+ *   minNearStartHits?: number,
+ *   isPersistableChat?: (chat: import('./ndgrDecode.js').NdgrChat) => boolean
+ * }} [opts]
  *   nearStartCs: 開始近傍とみなす vpos しきい値（センチ秒・既定 NDGR_BACKFILL_NEAR_START_VPOS_CS）。
  *   minNearStartHits: 開始近傍 vpos の必要件数（既定 NDGR_BACKFILL_NEAR_START_MIN_HITS）。
+ *   isPersistableChat: 母集団フィルタ（既定 defaultIsPersistableChat＝記録パスと同等の 2 段ガード）。
+ *     テストで挙動を完全制御する用途や、将来の persist 仕様変更にも追従できるよう注入可能にする。
  * @returns {boolean} 開始区画らしければ true。空配列 / 全 vpos 欠落 / 近傍が件数未満なら false。
  */
 export function chainLooksLikeStreamStart(chats, opts) {
@@ -284,8 +317,13 @@ export function chainLooksLikeStreamStart(chats, opts) {
     typeof opts?.minNearStartHits === 'number' && opts.minNearStartHits >= 1
       ? Math.floor(opts.minNearStartHits)
       : NDGR_BACKFILL_NEAR_START_MIN_HITS;
+  const isPersistable =
+    typeof opts?.isPersistableChat === 'function'
+      ? opts.isPersistableChat
+      : defaultIsPersistableChat;
   let hits = 0;
   for (const c of chats) {
+    if (!isPersistable(c)) continue; // v0.1.436: 運営/system/gift は投票母集団から外す
     if (!c || c.vpos == null) continue;
     const v = Number(c.vpos);
     if (!Number.isFinite(v) || v < 0) continue;

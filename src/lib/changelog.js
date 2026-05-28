@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.436',
+    date: '2026-05-28',
+    summary: '運営のお知らせ等での「ぜんぶ届いた」誤表示を修正',
+    items: Object.freeze([
+      '運営のお知らせやギフトの通知が中盤の区画に複数まじっていると、まだ続きがあるのに「配信のはじめまで、ぜんぶ届いたよ」と表示されることがある問題をさらに直しました。記録に残らないお知らせは判定からも除外するようにして、本当に最初まで遡れたときだけ完了をお伝えします'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.435',
     date: '2026-05-28',
     summary: '記録カードに「いまの分まで届いてるよ」を表示',
