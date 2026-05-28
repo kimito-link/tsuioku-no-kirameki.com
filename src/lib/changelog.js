@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.447',
+    date: '2026-05-29',
+    summary: '同秒・同本文・別ユーザーのコメントが1件に潰れる不具合を修正',
+    items: Object.freeze([
+      '同じ秒に同じ短文（「8888」「草」など）を別のユーザーが打ったとき、コメント番号のない経路（リアルタイム配信での観測）で1件に潰れて u2 の uid に u1 のニックネームが混ざる症状を修正しました。重複排除のキーに userId を含める設計でしたが、呼び出し側の 2 箇所で userId を渡し忘れていた純関数バグの根治です（NDGR/DOM 経由のコメントは不変）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.446',
     date: '2026-05-28',
     summary: '過去ログ取り込みの取りこぼし・固まり・誤判定を根本修正（15件）',
