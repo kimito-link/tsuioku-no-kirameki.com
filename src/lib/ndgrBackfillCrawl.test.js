@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   crawlNdgrBackward,
+  chainLooksLikeStreamStart,
   NDGR_BACKFILL_DEFAULT_CAPS,
   NDGR_BACKFILL_FETCH_GAP_MS,
   NDGR_BACKFILL_BACKOFF_MS,
-  NDGR_BACKFILL_SEED_LAG_SEC
+  NDGR_BACKFILL_SEED_LAG_SEC,
+  NDGR_BACKFILL_NEAR_START_VPOS_CS
 } from './ndgrBackfillCrawl.js';
 
 // テストは now を固定（1_000_000ms）注入する。seed は floor(now/1000) - SEED_LAG_SEC。
@@ -199,15 +201,23 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
 
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
-    // chain1 入口（直近区画）。vpos=6000(=60秒地点) の新しめコメント。next=N で区画終端。
+    // chain1 入口（直近区画）。SEED_AT=910 で見つかる。vpos=6000(=60秒地点)。next=N で区画終端。
     map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
     map.set(BK_A, packedSegmentBytes([{ no: 50, content: '新区画', name: 'u', vpos: 6000 }]));
-    // 再シード時刻 = PROGRAM_START + floor(6000/100) - BUFFER(5) = 1000 + 60 - 5 = 1055。
-    // そこに chain2 入口（さらに前の区画）。vpos=100(=1秒地点) の配信開始付近コメント。
-    map.set(atUrl(1055), viewEntryBytes({ backwardUri: BK_B }));
-    map.set(BK_B, packedSegmentBytes([{ no: 5, content: '配信開始付近', name: 'u', vpos: 100 }]));
-    // chain2 終端の再シード時刻 = 1000 + floor(100/100) - 5 = 996。そこに入口無し=配信開始到達。
-    map.set(atUrl(996), viewEntryBytes({})); // backward も next も無い
+    // v0.1.431: 再シードは「直前の種(910)より最低 1 バケット(50)前」に強制される（同一バケット
+    //   舞い戻り＝偽 no_progress の根治）。vpos 由来の理想点 1055 は ceil=910-50=860 に丸められ、
+    //   再シードは atUrl(860) になる。そこに chain2 入口（さらに前の区画・vpos=100=配信開始付近）。
+    map.set(atUrl(860), viewEntryBytes({ backwardUri: BK_B }));
+    // v0.1.434: 真の配信開始区画には冒頭の低 vpos コメントが【複数】ある（reached_start 判定が
+    //   「開始近傍 vpos が 2 件以上」を要求するため）。chain2 に NEAR_START(3000) 以内の vpos を
+    //   2 件入れる（実機の配信開始＝挨拶等で vpos≈0 が大量、を反映）。
+    map.set(
+      BK_B,
+      packedSegmentBytes([
+        { no: 5, content: '配信開始付近', name: 'u', vpos: 100 },
+        { no: 6, content: 'こんばんは', name: 'u2', vpos: 200 }
+      ])
+    );
 
     const { fetchBinary } = makeFetchFromMap(map);
     const { sleep } = makeNoopSleep();
@@ -221,8 +231,221 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
       })
     );
 
-    // 区画1(no=50)で止まらず、再シードで区画2(no=5)まで遡り、配信開始で終了する。
-    expect(chatsAll.map((c) => c.no)).toEqual([50, 5]);
+    // 区画1(no=50)で止まらず、再シードで区画2(no=5,6)まで遡り、配信開始で終了する。
+    expect(chatsAll.map((c) => c.no)).toEqual([50, 5, 6]);
+    expect(result.stopReason).toBe('reached_start');
+  });
+
+  it('途中参加: 再シードで「進めない」区画に当たっても即停止せず、起点を戻して遡り続ける（v0.1.429 真因修正）', async () => {
+    // ⛔ 真因（実機: 途中参加の全配信で 1〜5% しか取れない＋『ぜんぶ届いた』誤表示）:
+    //   旧実装は「前回より古い vpos へ進めなかった」を即 reached_start にして数%で停止した。
+    //   ここでは再シード先で前回と同じ vpos の区画に当たる（進めない）状況を作り、起点を
+    //   さらに大きく戻して古い区画へ到達できることを確認する（早期 reached_start にしない）。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/MJ_A';
+    const BK_STUCK = 'https://mpn.live.nicovideo.jp/data/backward/v4/MJ_STUCK';
+    const BK_OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/MJ_OLD';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1: SEED_AT=910 で見つかる。vpos=60000(=600秒地点)。next=N で終端。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // v0.1.431: 再シードは「直前の種より 1 バケット(50)前」に強制されるので、910 から
+    //   860→810… と 50 ずつ降りていく。最初の再シード(860)は「前回と同じ vpos=60000」の区画
+    //   （= 進めない・overlap）。即 reached_start にせず次のバケットへ降りるのが核心。
+    map.set(atUrl(860), viewEntryBytes({ backwardUri: BK_STUCK }));
+    map.set(BK_STUCK, packedSegmentBytes([{ no: 50, content: '同じ', name: 'u', vpos: 60000 }]));
+    // 次の再シード(810)で「古い vpos=100(=1秒地点)」の区画に届く（早期 reached_start にしない）。
+    //   v0.1.434: 真の開始区画は低 vpos が複数（判定が開始近傍 vpos 2 件以上を要求）→ 2 件入れる。
+    map.set(
+      atUrl(810),
+      viewEntryBytes({ backwardUri: BK_OLD })
+    );
+    map.set(
+      BK_OLD,
+      packedSegmentBytes([
+        { no: 5, content: '配信序盤', name: 'u', vpos: 100 },
+        { no: 6, content: 'はじまった', name: 'u2', vpos: 250 }
+      ])
+    );
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 「進めない」区画(no=50 重複)で諦めず、起点を戻して序盤(no=5・vpos=100)まで遡る。
+    expect(chatsAll.map((c) => c.no)).toContain(5);
+    // 序盤(vpos<=NEAR_START)に到達したので reached_start。早期停止していないことが核心。
+    expect(result.stopReason).toBe('reached_start');
+  });
+
+  it('爆速配信: 各区画が同一バケットを返しても、再シードを1バケット前へ確実に進めて配信開始まで遡る（v0.1.431・34%停止の真因）', async () => {
+    // ⛔ 実機 lv350604301（爆速配信・2026-05-27）で決定的に観測した真因:
+    //   NDGR の `?at={t}` 応答は約 30〜45 秒のバケットに量子化されている。区画を読み終え
+    //   「最古 vpos − 5s」で再シードすると、たった今読んだバケットに舞い戻り、その backward URI
+    //   が既に visited のため入口なし→偽 no_progress→数回リトライ後 34% 等で停止していた。
+    //
+    //   ここでは「at が同じバケット幅(50)内なら同じ区画(同 vpos)を返す」サーバを模し、旧来の
+    //   vpos−5s 再シードでは進めないが、v0.1.431 の「直前の種より最低 1 バケット前」強制で
+    //   バケットを1つずつ確実に降り、配信開始(vpos<=NEAR_START)まで遡れることを検証する。
+    // 実機に近い時間幾何: now=4000s, 配信開始=1000s ⇒ 約 3000 秒（60 バケット）の配信。
+    const NOW_MS = 4_000_000;
+    const NOW_SEC = Math.floor(NOW_MS / 1000); // 4000
+    const PROGRAM_START = 1000;
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(NOW_SEC));
+
+    // バケット幅 50 で量子化されたサーバ: at を 50 で床に丸めたバケットごとに区画が決まる。
+    //   バケット境界 b の vpos(センチ秒) = (b - PROGRAM_START) * 100。最古ほど vpos 小。
+    //   初回シードは now-90=3910 で見つかり、そこから 50 ずつ確実に降りて、b≈1000 近傍
+    //   (vpos<=NEAR_START)で reached_start。旧 vpos−5s 再シードでは同一バケットに舞い戻り頓挫する。
+    //   ⚠️ 各バケットは固有 URI（同一だと chain で visited 即終了し再シード経路を試せない）。
+    for (let at = NOW_SEC; at >= PROGRAM_START - 50; at -= 1) {
+      const bucket = Math.floor(at / 50) * 50; // 同一バケットは同一 backward URI
+      const uri = `https://mpn.live.nicovideo.jp/data/backward/v4/Q_${bucket}`;
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
+      const vpos = Math.max(0, (bucket - PROGRAM_START) * 100); // 古いバケットほど小さい vpos
+      // v0.1.434: reached_start 判定は「開始近傍 vpos が 2 件以上」を要求する。実機でも各バケット
+      //   には複数コメントが流れる（爆速配信＝秒23コメ）。最古バケット(vpos≈0)が確実に複数の
+      //   低 vpos を持つよう、各バケットに 2 件入れる（2 件目は +10cs ずらすが同バケット内）。
+      map.set(
+        uri,
+        packedSegmentBytes([
+          { no: bucket, content: `b${bucket}`, name: 'u', vpos },
+          { no: bucket + 1, content: `b${bucket}_2`, name: 'u2', vpos: vpos + 10 }
+        ])
+      );
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => NOW_MS,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 同一バケット舞い戻りで詰まらず、配信開始付近(vpos<=NEAR_START=3000)まで遡れた。
+    expect(result.stopReason).toBe('reached_start');
+    // 複数の異なるバケットを実際に取り込んでいる（1 区画で止まっていない）。
+    const distinctBuckets = new Set(chatsAll.map((c) => c.no));
+    expect(distinctBuckets.size).toBeGreaterThan(3);
+  });
+
+  it('進めない区画が続いてリトライ上限に達したら reached_start でなく no_progress（嘘の達成を出さない）', async () => {
+    // 起点を何度戻しても前回と同じ vpos の区画にしか入れない＝古いものに届かない。
+    // この場合「配信開始まで遡った」とは言えないので reached_start ではなく no_progress。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/NP_A';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // v0.1.431: 再シードは 910 から 50 ずつ降りる（860→810→760→710→660…）。どの at でも
+    //   「同じ vpos=60000 帯」の別 URI を返す＝古いものに永遠に届かない（進めない）。リトライ
+    //   上限(4)まで降りても vpos が縮まないので no_progress（reached_start にしない）。
+    //   ⚠️ 同一 URI だと chain で visited 即 break→null→no_progress に落ちて「リトライを尽くした」
+    //      経路を試せないので、at ごとに別 URI(BK_SAME_<at>) を割り当てて vpos だけ同じにする。
+    for (const at of [860, 810, 760, 710, 660, 610]) {
+      const uri = `https://mpn.live.nicovideo.jp/data/backward/v4/NP_SAME_${at}`;
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
+      map.set(uri, packedSegmentBytes([{ no: 49, content: '同じ帯', name: 'u', vpos: 60000 }]));
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 古いものに届かないので reached_start とは言わない（『ぜんぶ届いた』誤表示の防止）。
+    expect(result.stopReason).toBe('no_progress');
+  });
+
+  it('再シードで入口が見つからなくても vpos が序盤まで程遠いなら reached_start にしない（v0.1.430・32%停止の主因）', async () => {
+    // ⛔ 高速・大量配信で 32% 等で止まる主因: 再シード時刻が区画の隙間に落ち「入口が見つからない」
+    //   ＝旧実装は即 reached_start としていたが、まだ vpos=60000(=600秒地点)で序盤まで程遠い。
+    //   起点を戻して再探索→それでも入口が出ないなら no_progress（reached_start にしない）。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/GAP_A';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1: vpos=60000。next=N で終端。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // 以降どの再シード時刻に行っても入口が無い（隙間）。entry はあるが backward を持たない。
+    for (const at of [1595, 1000, 400, 200, 100, 50, 20]) {
+      map.set(atUrl(at), viewEntryBytes({})); // backward も next も無い極小 entry
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // vpos=60000 は NEAR_START(3000) より遥かに大きい＝序盤未到達。reached_start にしない。
+    expect(result.stopReason).toBe('no_progress');
+  });
+
+  it('再シードで入口が無くても、既に序盤(vpos<=NEAR_START)まで遡れていれば reached_start（本当の完了）', async () => {
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/DONE_A';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1で序盤 vpos=50(=0.5秒地点)まで到達。next=N で終端。
+    //   v0.1.434: 副経路（入口尽き時）の reached_start も「最後に遡れた区画が開始区画らしいか
+    //   （開始近傍 vpos が 2 件以上）」で判定する。区画1に低 vpos を 2 件入れて真の到達を表す。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(
+      BK_A,
+      packedSegmentBytes([
+        { no: 2, content: '序盤', name: 'u', vpos: 50 },
+        { no: 3, content: 'はじまり', name: 'u2', vpos: 120 }
+      ])
+    );
+    // 再シード時刻に入口は無い（もう最初まで来た）。
+    map.set(atUrl(996), viewEntryBytes({}));
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 序盤(vpos=50<=3000)まで遡れた後に入口が無い＝本当の配信開始到達。
     expect(result.stopReason).toBe('reached_start');
   });
 
@@ -496,5 +719,322 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(NDGR_BACKFILL_DEFAULT_CAPS.rows).toBe(100_000);
     expect(NDGR_BACKFILL_FETCH_GAP_MS).toBe(15);
     expect(NDGR_BACKFILL_BACKOFF_MS).toEqual([2_000, 4_000, 8_000]);
+  });
+
+  // === v0.1.434: reached_start 誤判定（47%/51% で『ぜんぶ届いた』）の修正 ===
+  it('途中区画に vpos 極小の外れ値が 1 件紛れても reached_start にしない（47%/51% 誤完了の真因）', async () => {
+    // ⛔ 真因（実機: 47%/51% しか遡れていないのに『配信のはじめまで、ぜんぶ届いた』と誤表示）:
+    //   運営/system/gift お知らせは vpos=0 や極小になりがち。これが配信【中盤】の区画に 1 件
+    //   紛れると、その区画の最小 vpos が極小になり「単一最小 vpos ≤ 30秒」が成立 → まだ中盤
+    //   なのに reached_start を誤発火していた。修正後は「開始近傍 vpos が 2 件以上」を要求する
+    //   ので、本体 vpos=60000(=600秒地点) の中盤区画に外れ値 1 件があっても発火しない。
+    const PROGRAM_START = 1000;
+    const BK_MID = 'https://mpn.live.nicovideo.jp/data/backward/v4/FP_MID';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画: 本体は中盤(vpos=60000)。だが運営お知らせ風の vpos=0 が 1 件だけ紛れている。
+    //   旧実装: 最小 vpos=0 ≤ 3000 → reached_start（誤）。新実装: 近傍 vpos は 1 件のみ → 不発。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_MID }));
+    map.set(
+      BK_MID,
+      packedSegmentBytes([
+        { no: null, content: '【運営】まもなく終了します', name: '運営', vpos: 0 },
+        { no: 800, content: '中盤コメント', name: 'u', vpos: 60000 },
+        { no: 801, content: 'まだ中盤', name: 'u2', vpos: 60500 }
+      ])
+    );
+    // 以降どの再シード時刻にも入口は無い（これ以上は遡れない状況）。それでも『ぜんぶ届いた』は
+    //   出さず、no_progress（→ narration は「もう一度押すと続き」）に倒れるのが正しい。
+    for (const at of [860, 810, 760, 710, 660, 610]) {
+      map.set(atUrl(at), viewEntryBytes({}));
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 中盤＋外れ値 1 件では reached_start にしない（嘘の『ぜんぶ届いた』を出さない）。
+    expect(result.stopReason).toBe('no_progress');
+  });
+
+  it('副経路（入口尽き）でも、最後の区画が外れ値 1 件のみ低 vpos なら reached_start にしない', async () => {
+    // line 388 の「序盤まで遡れていれば reached_start」の対称ケース。globalMinVpos が外れ値で
+    //   極小化していても、最後に遡れた区画が開始近傍 vpos を【複数】持たなければ reached_start に
+    //   しない（reachedStreamStartChain フラグで判定）。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/FP2_A';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1: 本体は中盤(vpos=60000)＋外れ値 vpos=0 が 1 件。next=N で終端。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(
+      BK_A,
+      packedSegmentBytes([
+        { no: null, content: '【システム】', name: 'system', vpos: 0 },
+        { no: 500, content: '中盤', name: 'u', vpos: 60000 }
+      ])
+    );
+    // 再シード時刻に入口は無い（もう辿れない）。旧実装は globalMinVpos=0 ≤ 3000 で reached_start
+    //   （誤）。新実装は最後の区画が近傍 vpos 1 件のみ → フラグ立たず no_progress。
+    map.set(atUrl(996), viewEntryBytes({}));
+    map.set(atUrl(946), viewEntryBytes({}));
+    map.set(atUrl(896), viewEntryBytes({}));
+    map.set(atUrl(846), viewEntryBytes({}));
+    map.set(atUrl(796), viewEntryBytes({}));
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    expect(result.stopReason).toBe('no_progress');
+  });
+
+  // ⛔ 実機(糖分さん配信・LIVE 2h30m)で v0.1.434 でも 55%/55% で『ぜんぶ届いた』誤発火が残った真因:
+  //    運営/system のお知らせ(vpos=0 や極小)が中盤区画に【2 件以上】紛れると、v0.1.434 の
+  //    minHits=2 をすり抜けて reached_start を誤発火していた。v0.1.436 で投票母集団から運営/system
+  //    /gift を除外（記録パスと同じガード）して根治する。
+  it('中盤区画に運営/system/gift が 2 件以上紛れていても reached_start にしない（v0.1.436・55% 誤判定の核心）', async () => {
+    const PROGRAM_START = 1000;
+    const BK_MID = 'https://mpn.live.nicovideo.jp/data/backward/v4/FP3_MID';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画: 本体は中盤(vpos=60000・600 秒地点)。だが運営お知らせ 2 件＋gift 1 件＝低 vpos が 3 件混入。
+    //   旧(v0.1.435): no==null/gift も投票してしまい minHits=2 成立 → reached_start（誤）。
+    //   新(v0.1.436): 投票母集団から除外 → 一般コメは中盤 1 件のみ → false → no_progress（正）。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_MID }));
+    map.set(
+      BK_MID,
+      packedSegmentBytes([
+        { no: null, content: '【運営】まもなく終了 A', name: '運営', vpos: 0 },
+        { no: null, content: '【運営】まもなく終了 B', name: '運営', vpos: 0 },
+        {
+          no: 9001,
+          content: 'Aさんがギフト「emerald（10pt）」を贈りました',
+          name: 'A',
+          vpos: 50
+        },
+        { no: 500, content: '中盤コメント', name: 'u', vpos: 60000 }
+      ])
+    );
+    // 以降どの再シード時刻にも入口は無い（これ以上は遡れない状況）。それでも『ぜんぶ届いた』は
+    //   出さず、no_progress に倒れるのが正しい挙動。
+    for (const at of [860, 810, 760, 710, 660, 610]) {
+      map.set(atUrl(at), viewEntryBytes({}));
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 中盤＋運営×2＋gift×1 では reached_start にしない（55% 誤判定の根治）。
+    expect(result.stopReason).toBe('no_progress');
+  });
+
+  // v0.1.443: reached_start 発火時、判定根拠となった chats を診断情報として戻り値に含める。
+  //   実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を後追いで特定するためのもの。
+  it('主経路 reached_start 発火時、診断情報に chats と path=main が含まれる', async () => {
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/V443_DIAG_A';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(
+      BK_A,
+      packedSegmentBytes([
+        { no: 1, content: 'こんばんは', name: 'u1', vpos: 50 },
+        { no: 2, content: 'はじまった', name: 'u2', vpos: 150 }
+      ])
+    );
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    expect(result.stopReason).toBe('reached_start');
+    expect(result.diagnostics).toBeTruthy();
+    expect(result.diagnostics.reachedStartPath).toBe('main');
+    expect(Array.isArray(result.diagnostics.reachedStartChats)).toBe(true);
+    expect(result.diagnostics.reachedStartChats.length).toBeGreaterThan(0);
+    // chats の各要素は NdgrChat 構造（vpos を持つ）
+    const firstChat = result.diagnostics.reachedStartChats[0];
+    expect(typeof firstChat.vpos).toBe('number');
+  });
+
+  it('非 reached_start で終わる場合、diagnostics は null', async () => {
+    // 入口が見つからないだけのケース → no_entry / backward_exhausted。
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({})); // backward 無し
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000
+      })
+    );
+
+    expect(result.stopReason).not.toBe('reached_start');
+    expect(result.diagnostics).toBeNull();
+  });
+});
+
+describe('chainLooksLikeStreamStart（区画が配信開始らしいかの純判定・v0.1.434）', () => {
+  const C = (vpos) => ({ no: 1, content: 'c', name: 'u', vpos });
+
+  it('開始近傍 vpos が 2 件以上あれば true（真の配信開始区画＝低 vpos 多数）', () => {
+    expect(chainLooksLikeStreamStart([C(0), C(50), C(120), C(8000)])).toBe(true);
+  });
+
+  it('開始近傍 vpos が 1 件だけ（外れ値混入の中盤区画）なら false', () => {
+    // min は 0 だが、それ以外は中盤(60000〜)。誤判定の核心ケース。
+    expect(chainLooksLikeStreamStart([C(0), C(60000), C(61000), C(62000)])).toBe(false);
+  });
+
+  it('2 件目がしきい値ちょうど(3000)なら true、しきい値超(3001)なら false', () => {
+    expect(chainLooksLikeStreamStart([C(10), C(3000), C(60000)])).toBe(true);
+    expect(chainLooksLikeStreamStart([C(10), C(3001), C(60000)])).toBe(false);
+  });
+
+  it('空配列・非配列は false', () => {
+    expect(chainLooksLikeStreamStart([])).toBe(false);
+    expect(chainLooksLikeStreamStart(null)).toBe(false);
+    expect(chainLooksLikeStreamStart(undefined)).toBe(false);
+  });
+
+  it('全件 vpos 欠落（null）は false', () => {
+    expect(
+      chainLooksLikeStreamStart([
+        { no: 1, content: 'a', name: 'u', vpos: null },
+        { no: 2, content: 'b', name: 'u', vpos: null }
+      ])
+    ).toBe(false);
+  });
+
+  it('負・非有限の vpos は無視してカウントする', () => {
+    // vpos=-1 と NaN は無効。有効な近傍は 10 の 1 件のみ → false。
+    expect(
+      chainLooksLikeStreamStart([
+        { no: 1, content: 'a', name: 'u', vpos: -1 },
+        { no: 2, content: 'b', name: 'u', vpos: Number.NaN },
+        C(10)
+      ])
+    ).toBe(false);
+    // 有効な近傍が 2 件あれば無効値が混じっても true。
+    expect(
+      chainLooksLikeStreamStart([{ no: 1, content: 'a', name: 'u', vpos: -5 }, C(10), C(20)])
+    ).toBe(true);
+  });
+
+  it('minNearStartHits を 3 に上げると、近傍 2 件では false・3 件で true', () => {
+    expect(chainLooksLikeStreamStart([C(0), C(100)], { minNearStartHits: 3 })).toBe(false);
+    expect(chainLooksLikeStreamStart([C(0), C(100), C(200)], { minNearStartHits: 3 })).toBe(true);
+  });
+
+  it('nearStartCs を狭めると、その範囲内の件数で判定する', () => {
+    // nearStartCs=100 にすると vpos=200 は近傍外。近傍は 0,50 の 2 件 → true。
+    expect(chainLooksLikeStreamStart([C(0), C(50), C(200)], { nearStartCs: 100 })).toBe(true);
+    // 0 のみ近傍 → 1 件で false。
+    expect(chainLooksLikeStreamStart([C(0), C(150), C(200)], { nearStartCs: 100 })).toBe(false);
+  });
+
+  it('既定しきい値は NDGR_BACKFILL_NEAR_START_VPOS_CS(3000) を使う', () => {
+    expect(NDGR_BACKFILL_NEAR_START_VPOS_CS).toBe(3000);
+    expect(chainLooksLikeStreamStart([C(2999), C(3000)])).toBe(true);
+    expect(chainLooksLikeStreamStart([C(2999), C(3001)])).toBe(false);
+  });
+
+  // === v0.1.436: 運営/system/gift 投票母集団からの除外（55% 誤判定の追加修正） ===
+  it('運営/system(no==null) は近傍カウントから除外する＝外れ値 1 件 + 実コメ 1 件では false', () => {
+    // 運営アナウンス（no==null・vpos=0）と一般低 vpos コメ 1 件のみ。実コメは 1 件しか近傍にいない。
+    const sys = { no: null, content: '【運営】まもなく終了', name: '運営', vpos: 0 };
+    const real = { no: 1, content: 'こんばんは', name: 'u', vpos: 100 };
+    const mid = { no: 2, content: '中盤', name: 'u', vpos: 60000 };
+    expect(chainLooksLikeStreamStart([sys, real, mid])).toBe(false);
+  });
+
+  it('運営/system(no==null) は除外しても、実コメ 2 件以上が近傍にあれば true（真の開始は維持）', () => {
+    const sys1 = { no: null, content: '【運営】開始', name: '運営', vpos: 0 };
+    const real1 = { no: 1, content: 'はじまった', name: 'u', vpos: 50 };
+    const real2 = { no: 2, content: 'やった', name: 'u2', vpos: 200 };
+    expect(chainLooksLikeStreamStart([sys1, real1, real2])).toBe(true);
+  });
+
+  it('運営/system(no==null) が 2 件以上紛れていても false（55% 誤判定の核心ケース）', () => {
+    // ⛔ v0.1.435 までは「近傍 vpos 2 件以上」で true → 運営が 2 件紛れた中盤区画でも誤発火していた。
+    //   v0.1.436 では運営は投票母集団から外れるため、本体が中盤(vpos=60000)なら false。
+    const sys1 = { no: null, content: '【運営】お知らせ A', name: '運営', vpos: 0 };
+    const sys2 = { no: null, content: '【運営】お知らせ B', name: '運営', vpos: 0 };
+    const mid = { no: 500, content: '中盤', name: 'u', vpos: 60000 };
+    expect(chainLooksLikeStreamStart([sys1, sys2, mid])).toBe(false);
+  });
+
+  it('ギフトお知らせ(no あり・content が gift パターン)も近傍カウントから除外する', () => {
+    // gift 行は no を持つことがある（送信者 uid）。content の gift パターンで弾く必要がある。
+    const gift1 = {
+      no: 9001,
+      content: 'Aさんがギフト「emerald（10pt）」を贈りました',
+      name: 'A',
+      vpos: 0
+    };
+    const gift2 = {
+      no: 9002,
+      content: 'Bさんがギフト「emerald（10pt）」を贈りました',
+      name: 'B',
+      vpos: 100
+    };
+    const mid = { no: 500, content: '中盤', name: 'u', vpos: 60000 };
+    expect(chainLooksLikeStreamStart([gift1, gift2, mid])).toBe(false);
+  });
+
+  it('isPersistableChat を注入で「全件 false」にすると母集団 0 → false（注入の優先性）', () => {
+    expect(
+      chainLooksLikeStreamStart([C(0), C(50), C(100)], { isPersistableChat: () => false })
+    ).toBe(false);
+  });
+
+  it('isPersistableChat を注入で「全件 true」にすると、既定で弾かれる no==null も計上される', () => {
+    const sys1 = { no: null, content: '【運営】', name: '運営', vpos: 0 };
+    const sys2 = { no: null, content: '【運営】', name: '運営', vpos: 100 };
+    // 既定では運営は除外 → false。注入で全件通せば 2 件カウント → true。
+    expect(chainLooksLikeStreamStart([sys1, sys2])).toBe(false);
+    expect(
+      chainLooksLikeStreamStart([sys1, sys2], { isPersistableChat: () => true })
+    ).toBe(true);
   });
 });

@@ -5,7 +5,11 @@ import {
   watchPageUrlsMatchForSnapshot
 } from '../lib/broadcastUrl.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
+import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
+import { refreshTaskGuarded } from '../lib/refreshTaskGuard.js';
+import { decideVisibilityAction } from '../lib/popupVisibilityGate.js';
+import { executeScriptWithTimeout } from '../lib/executeScriptWithTimeout.js';
 import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import {
@@ -141,7 +145,10 @@ import {
   KEY_BACKFILL_AUTO_DISABLED,
   KEY_BACKFILL_PROGRESS
 } from '../lib/storageKeys.js';
-import { backfillRinkuNarration } from '../lib/backfillRinkuNarration.js';
+import {
+  backfillRinkuNarration,
+  backfillRecordCardHintDomState
+} from '../lib/backfillRinkuNarration.js';
 import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
 import { effectiveInlinePanelPlacement } from '../lib/inlinePanelLayout.js';
 import {
@@ -5651,6 +5658,7 @@ function renderBackfillRinku(progress) {
     box.hidden = true;
     box.setAttribute('aria-hidden', 'true');
     box.removeAttribute('data-phase');
+    applyBackfillRecordCardHint(null);
     return;
   }
   const n = backfillRinkuNarration(progress);
@@ -5658,6 +5666,44 @@ function renderBackfillRinku(progress) {
   box.setAttribute('aria-hidden', 'false');
   box.setAttribute('data-phase', n.phase);
   leadEl.textContent = n.lead;
+  // v0.1.432: 記録の数字が増えない理由（入口なし/途中/混雑）を記録カードの位置にも短く出す。
+  applyBackfillRecordCardHint(progress);
+}
+
+/**
+ * v0.1.432: 記録カード（記録 件数の真下）に「過去ログ取り込みの状況」短文を出す。
+ * no_entry/partial/paused のときだけ表示。それ以外は隠す（演出はボタン下のりんくに任せる）。
+ * 取り込みハートビート（#liveStatCommentsIngest）とは別行なので互いに干渉しない。
+ * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }|null} progress
+ */
+function applyBackfillRecordCardHint(progress) {
+  const el = /** @type {HTMLElement|null} */ (document.getElementById('liveStatCommentsBackfillHint'));
+  if (!el) return;
+  // v0.1.432: 公式件数を渡し、実質取り切れている（記録が公式の95%以上）partial では出さない。
+  const oc = watchMetaCache.snapshot?.officialCommentCount;
+  const officialCount = typeof oc === 'number' && Number.isFinite(oc) ? oc : null;
+  // v0.1.438: 記録カード下にもボタン下と同じ「こん太(キャラ)+吹き出し」UI を出す（ユーザー指摘
+  //   「片方しかキャラがいないのは寂しい」・統合性原則）。新規 純関数 backfillRecordCardHintDomState
+  //   が hidden/dataPhase/lead をまとめて返すのでそれを DOM に流すだけ。
+  const state =
+    progress && progress.started
+      ? backfillRecordCardHintDomState(progress, { officialCount })
+      : { hidden: true, dataPhase: '', lead: '' };
+  // 外側の wrapper（既存 #liveStatCommentsBackfillHint）の hidden を切替
+  el.hidden = state.hidden;
+  // 内側のこん太吹き出しを更新（v0.1.438 で追加された DOM）
+  const rinku = /** @type {HTMLElement|null} */ (document.getElementById('recordCardBackfillRinku'));
+  const lead = /** @type {HTMLElement|null} */ (document.getElementById('recordCardBackfillRinkuLead'));
+  if (rinku) {
+    if (state.dataPhase) {
+      rinku.setAttribute('data-phase', state.dataPhase);
+    } else {
+      rinku.removeAttribute('data-phase');
+    }
+  }
+  if (lead) {
+    lead.textContent = state.lead;
+  }
 }
 
 /**
@@ -9057,6 +9103,42 @@ async function populateStorySourceEntriesFromStorageFallback(opts = {}) {
  * @returns {Promise<void>}
  */
 let _lastPopupStateForResize = /** @type {string|null} */ (null);
+/**
+ * v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたあと」閉じる。
+ *
+ * ユーザー要望（2026-05-28）: POP は最初に配信へ飛ぶときだけ出ればよく、その後は配信ページの
+ *   横付きパネルを見るので POP が居座る必要はない。むしろ居座ると getLastFocused 混信で後続の
+ *   パネル表示を阻害する。配信タブを開いたらこの POP ウィンドウは自分で閉じる。
+ *
+ * ⚠️ 安全: 閉じるのは「自分が standalone popup window（type==='popup'）かつ非 INLINE_MODE」の
+ *   ときだけ。インライン/サイドパネル（iframe）では絶対に閉じない（純関数 shouldClose… で判定）。
+ *   失敗は静かに無視（best-effort・パネル表示を壊さない）。
+ *
+ * @param {boolean} openedStreamTab 直前に配信タブを開けたか。
+ * @returns {Promise<void>}
+ */
+async function closeStandalonePopupAfterNavigate(openedStreamTab) {
+  if (INLINE_MODE) return; // iframe（インライン/サイドパネル）は閉じない
+  if (!hasExtensionContext()) return;
+  try {
+    const win = await chrome.windows.getCurrent();
+    if (
+      !shouldCloseStandalonePopupAfterNavigate({
+        inlineMode: INLINE_MODE,
+        windowType: win?.type,
+        openedStreamTab
+      })
+    ) {
+      return;
+    }
+    if (typeof win?.id === 'number') {
+      await chrome.windows.remove(win.id);
+    }
+  } catch {
+    // best-effort: 取得/クローズ失敗は静かに諦める（パネル表示には影響しない）
+  }
+}
+
 async function resizePopupWindowForState(input) {
   if (INLINE_MODE) return;
   // v0.1.406: 拡張リロード後に古い popup が残っていると chrome.windows.update が
@@ -9731,16 +9813,29 @@ async function refresh() {
     // ユーザープロフィールページ上では、プロフィール本人やおすすめユーザーを
     // 「応援者」と誤解しやすいため fallback 復元しない。
     if (!onNicoUserProfilePage) {
-      await populateStorySourceEntriesFromStorageFallback({
-        excludeUserIds: activeProfileUserIds
-      });
+      // v0.1.437: 内部で IDB.open / storageGetSafe が裸 await。stall でハング→「—」固定
+      //   の根治。2.5s で有界化し、フォールバックは何もしない (undefined)。
+      await refreshTaskGuarded(
+        populateStorySourceEntriesFromStorageFallback({
+          excludeUserIds: activeProfileUserIds
+        }),
+        2500,
+        'refresh_populate_story_fallback_timeout_a',
+        undefined
+      );
     }
     // 0.1.69 (AY): standalone popup / side panel では「前回の配信」を cards に
     // 復元する。INLINE_MODE（watch ページ内 iframe）は empty state 自体が
     // 発生しない想定なのでスキップ。clearWatchMetaCard() の直後に呼ぶことで
     // is-placeholder を上書きできる順序を保証する。
     if (!INLINE_MODE) {
-      await applyLastBroadcastReviewToEmptyState();
+      // v0.1.437: 内部で IDB.open が裸 await。stall ハング根治。
+      await refreshTaskGuarded(
+        applyLastBroadcastReviewToEmptyState(),
+        2500,
+        'refresh_apply_last_broadcast_timeout_a',
+        undefined
+      );
     } else {
       clearLastBroadcastReviewArtifacts();
     }
@@ -9801,14 +9896,26 @@ async function refresh() {
     // lv が取り出せなかった場合も、同じ保存ベース fallback を試みる。
     // ただしユーザープロフィールページでは stale な応援者表示を出さない。
     if (!onNicoUserProfilePage) {
-      await populateStorySourceEntriesFromStorageFallback({
-        excludeUserIds: activeProfileUserIds
-      });
+      // v0.1.437: 「lv 取り出せず empty state」経路でも IDB stall ハング根治。
+      await refreshTaskGuarded(
+        populateStorySourceEntriesFromStorageFallback({
+          excludeUserIds: activeProfileUserIds
+        }),
+        2500,
+        'refresh_populate_story_fallback_timeout_b',
+        undefined
+      );
     }
     // 0.1.69 (AY): 同じ「watch URL があるけど lv 抜けない」レアケースでも
     // empty state なので、前回の配信を復元する。
     if (!INLINE_MODE) {
-      await applyLastBroadcastReviewToEmptyState();
+      // v0.1.437: IDB stall ハング根治。
+      await refreshTaskGuarded(
+        applyLastBroadcastReviewToEmptyState(),
+        2500,
+        'refresh_apply_last_broadcast_timeout_b',
+        undefined
+      );
     } else {
       clearLastBroadcastReviewArtifacts();
     }
@@ -9897,7 +10004,8 @@ async function refresh() {
       save[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
     }
     if (Object.keys(save).length) {
-      await storageSetSafe(save);
+      // v0.1.437: storage.set 多タブ stall で永久 pending → 全カード「—」固定再発の根治。
+      await refreshTaskGuarded(storageSetSafe(save), 1500, 'refresh_story_avatar_storage_set_timeout', false);
     }
   }
   STORY_AVATAR_DIAG_STATE.total = arr.length;
@@ -10156,7 +10264,13 @@ async function refresh() {
     );
     if (strippedAfterSnap.patched > 0) {
       arr = strippedAfterSnap.next;
-      await storageSetSafe({ [key]: arr });
+      // v0.1.437: storage.set ハングで「—」固まり再発を防ぐ。
+      await refreshTaskGuarded(
+        storageSetSafe({ [key]: arr }),
+        1500,
+        'refresh_story_avatar_post_snap_storage_set_timeout',
+        false
+      );
       if (!isFreshRefresh()) return;
     }
     STORY_AVATAR_DIAG_STATE.stripped += strippedAfterSnap.patched;
@@ -10227,9 +10341,16 @@ async function refresh() {
   void (async () => {
     try {
       if (refreshGen !== watchPopupRefreshGeneration) return;
-      const interceptResult = await requestInterceptCacheFromOpenTab(url, {
-        deep: shouldDeep
-      });
+      // v0.1.437: 内部で chrome.scripting.executeScript / tabsSendMessageWithRetry が
+      //   裸 await されており、多タブ stall で永久 pending → background async タスクが
+      //   settle せず次の refresh 周期が詰まる → 全カード「—」固定再発の本丸の真因。
+      //   12s で有界化。タイムアウトしたら空 items + diag.code='timeout' で best-effort 続行。
+      const interceptResult = await refreshTaskGuarded(
+        requestInterceptCacheFromOpenTab(url, { deep: shouldDeep }),
+        12_000,
+        'refresh_intercept_export_timeout',
+        { items: [], diag: { code: 'timeout', detail: '' } }
+      );
       const interceptItems = interceptResult.items;
       const interceptDiag = interceptResult.diag;
       if (refreshGen !== watchPopupRefreshGeneration) return;
@@ -10294,7 +10415,13 @@ async function refresh() {
             // stale な arr で storage を上書きして「新しい refresh の arr」を
             // 巻き戻すリスクがある。書く前に世代を確認して skip する。
             if (refreshGen !== watchPopupRefreshGeneration) return;
-            await storageSetSafe(saveIc);
+            // v0.1.437: storage.set ハング根治。
+            await refreshTaskGuarded(
+              storageSetSafe(saveIc),
+              1500,
+              'refresh_intercept_merge_storage_set_timeout',
+              false
+            );
           }
         }
       } else {
@@ -10308,14 +10435,27 @@ async function refresh() {
         selfPostedRecentsCache = reconciledOwnPosted.remaining;
         // 0.1.28 (AC): 同上。stale 世代の writeback を抑止。
         if (refreshGen !== watchPopupRefreshGeneration) return;
-        await storageSetSafe({
-          [key]: arr,
-          [KEY_SELF_POSTED_RECENTS]: { items: selfPostedRecentsCache }
-        });
+        // v0.1.437: storage.set ハング根治。
+        await refreshTaskGuarded(
+          storageSetSafe({
+            [key]: arr,
+            [KEY_SELF_POSTED_RECENTS]: { items: selfPostedRecentsCache }
+          }),
+          1500,
+          'refresh_self_posted_storage_set_timeout',
+          false
+        );
       }
       if (refreshGen !== watchPopupRefreshGeneration) return;
+      // v0.1.437: sendMessageToWatchTabs は内部で tabsSendMessageWithRetry 等が裸 await。
+      //   多タブ stall でハング → thumbCount が永久に「…」のまま固まる。5s で有界化。
       const stats = /** @type {{ ok?: boolean, count?: number }|null} */ (
-        await sendMessageToWatchTabs(url, { type: 'NLS_THUMB_STATS' })
+        await refreshTaskGuarded(
+          sendMessageToWatchTabs(url, { type: 'NLS_THUMB_STATS' }),
+          5_000,
+          'refresh_thumb_stats_timeout',
+          null
+        )
       );
       if (refreshGen !== watchPopupRefreshGeneration) return;
       if (thumbCountEl) {
@@ -10569,28 +10709,39 @@ async function triggerReloadWatchTabFromPopup() {
  */
 async function listWatchFramesWithInnerText(tabId) {
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      func: () => {
-        const href = String(location.href || '');
-        const panel = !!(
-          document.querySelector('.ga-ns-comment-panel') ||
-          document.querySelector('.comment-panel') ||
-          document.querySelector('[class*="comment-data-grid"]')
-        );
-        const hasVideo = !!document.querySelector('video');
-        const inner = document.body?.innerText || '';
-        const len = inner.length;
-        const text = inner.slice(0, 120_000);
-        const score =
-          (panel ? 8_000_000 : 0) +
-          (hasVideo ? 400_000 : 0) +
-          Math.min(len, 5_000_000) +
-          (/\/watch\/lv\d+/i.test(href) ? 50_000 : 0) +
-          (href.includes('nicovideo.jp') && href.includes('watch') ? 25_000 : 0);
-        return { score, text, href };
-      }
-    });
+    // v0.1.441: chrome.scripting.executeScript は timeout を持たない API。多タブ stall・
+    //   タブ suspension・content-script 注入競合等で永久 pending になり得る。これが
+    //   refresh_intercept_export_timeout(v0.1.437・12s) と snapshot_fetch_timeout(v0.1.398・15s)
+    //   の本丸の真因（実機 chrome://extensions エラー画面で確定）。8s で内側保護し、
+    //   タイムアウト時は空配列を返す＝既存 catch 経路と完全等価で挙動不変。
+    const results = await executeScriptWithTimeout(
+      () =>
+        chrome.scripting.executeScript({
+          target: { tabId, allFrames: true },
+          func: () => {
+            const href = String(location.href || '');
+            const panel = !!(
+              document.querySelector('.ga-ns-comment-panel') ||
+              document.querySelector('.comment-panel') ||
+              document.querySelector('[class*="comment-data-grid"]')
+            );
+            const hasVideo = !!document.querySelector('video');
+            const inner = document.body?.innerText || '';
+            const len = inner.length;
+            const text = inner.slice(0, 120_000);
+            const score =
+              (panel ? 8_000_000 : 0) +
+              (hasVideo ? 400_000 : 0) +
+              Math.min(len, 5_000_000) +
+              (/\/watch\/lv\d+/i.test(href) ? 50_000 : 0) +
+              (href.includes('nicovideo.jp') && href.includes('watch') ? 25_000 : 0);
+            return { score, text, href };
+          }
+        }),
+      8_000,
+      'list_watch_frames_executescript_timeout',
+      /** @type {chrome.scripting.InjectionResult[]} */ ([])
+    );
     /** @type {{ frameId: number, score: number, text: string, href: string }[]} */
     const out = [];
     for (const row of results || []) {
@@ -12399,6 +12550,15 @@ function isHighFrequencyCommentRelatedStorageKey(key) {
 function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   const keys = Object.keys(changes || {});
   if (!keys.length) return;
+  // v0.1.440: 隠れタブ(他タブが前面)では re-render を skip して多タブ reflow N→1 を達成。
+  //   可視復帰時の catch-up は既存 visibilitychange listener が担うので追加処理は不要。
+  //   描画パスには触らない＝v0.1.421/422 パネル消失リグレッションを構造的に再発させない。
+  const action = decideVisibilityAction({
+    hidden: typeof document !== 'undefined' && document.hidden === true,
+    gateEnabled: true,
+    initialDone: initialRefreshDone
+  });
+  if (action === 'skip') return;
   const allHighFreq = keys.every((k) =>
     isHighFrequencyCommentRelatedStorageKey(k)
   );
@@ -14653,11 +14813,27 @@ function initPopup() {
     if (!url) return;
     try {
       void chrome.tabs.create({ url });
+      // v0.1.433: 配信に飛ばしたら別ウィンドウ POP は用済み＝自分を閉じる（居座り→混信防止）。
+      void closeStandalonePopupAfterNavigate(true);
     } catch (err) {
       if (typeof console !== 'undefined' && console?.warn) {
         console.warn('[lastBroadcastReopen] tabs.create failed:', err);
       }
     }
+  });
+
+  // v0.1.433: 「配信を探す」導線（ランキング等の外部リンク）を押したら、別ウィンドウ POP は
+  //   役目を終えるので閉じる。ユーザー要望「POP は最初に飛ぶときだけ。飛んだら配信を見るので
+  //   POP に表示は要らない」。リンクは target=_blank で新タブが開くので、閉じても遷移は完了する。
+  //   ⚠️ インライン/サイドパネル（iframe）では閉じない（closeStandalonePopupAfterNavigate が判定）。
+  const noWatchHintLinks = document.querySelectorAll('#noWatchRankingHint a[href]');
+  noWatchHintLinks.forEach((a) => {
+    a.addEventListener('click', () => {
+      // 新タブ遷移（_blank）を妨げないよう、ウィンドウを閉じるのは次マクロタスクへ。
+      setTimeout(() => {
+        void closeStandalonePopupAfterNavigate(true);
+      }, 0);
+    });
   });
 
   postBtn?.addEventListener('click', () => {

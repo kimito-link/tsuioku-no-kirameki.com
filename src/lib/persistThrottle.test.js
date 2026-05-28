@@ -190,7 +190,10 @@ describe('createPersistCoalescer', () => {
         }
       });
 
-      sink = createPersistCoalescer(flushFn, 600_000, 5);
+      // v0.1.431: 連続 flush 間 yield は「重ならない直列性」の検証には無関係なので、
+      //   この test では microtask 解決の no-op yield を注入し従来のタイミングを保つ
+      //   （setTimeout(0) のマクロタスク待ちを増やさずに直列性だけを見る）。
+      sink = createPersistCoalescer(flushFn, 600_000, 5, () => Promise.resolve());
 
       sink.enqueue(batch('a'));
 
@@ -211,6 +214,9 @@ describe('createPersistCoalescer', () => {
       /** @type {Promise<void>} */
       const job0 = flushFn.mock.results[0]?.value;
       if (job0 && typeof /** @type {any} */ (job0)?.then === 'function') await job0;
+      // v0.1.431: flush1 完了後、while ループは yieldBetweenFlushes（注入の no-op）を 1 拍
+      //   挟んでから flush2 を呼ぶ。その microtask を消化してから flush2 を待つ。
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
       /** @type {Promise<void>} */
       const job1 = flushFn.mock.results[1]?.value;
       if (job1 && typeof /** @type {any} */ (job1)?.then === 'function') await job1;
@@ -220,6 +226,59 @@ describe('createPersistCoalescer', () => {
       expect(flushFn.mock.calls[1][0]).toHaveLength(5);
       expect(maxOverlap).toBe(1);
       expect(sink.pending()).toBe(0);
+    } finally {
+      vi.useFakeTimers();
+    }
+  });
+
+  it('連続フラッシュの合間に yield してメインスレッドを離す（v0.1.431・固まり防止）', async () => {
+    // ⛔ 実機 4 万コメ配信で「ページが応答しません」になる主因: バッファが連続して埋まると
+    //   flushBody の while ループが巨大配列 O(N) マージを背中合わせに走らせメインスレッドを
+    //   離さない。2 回目以降の flush 手前で yield が呼ばれることを検証する（初回は呼ばない）。
+    vi.useRealTimers();
+    try {
+      let yieldCount = 0;
+      const yieldFn = () => {
+        yieldCount += 1;
+        return Promise.resolve();
+      };
+      let seeded = false;
+      /** @type {ReturnType<typeof createPersistCoalescer>|null} */
+      let sink = null;
+      const flushFn = vi.fn(async () => {
+        // 1 回目の flush 実行中に 2 回目ぶんを積む → while ループが 2 周する。
+        if (!seeded) {
+          seeded = true;
+          sink?.enqueue([{ id: 'x1' }, { id: 'x2' }, { id: 'x3' }, { id: 'x4' }, { id: 'x5' }]);
+        }
+      });
+      sink = createPersistCoalescer(flushFn, 600_000, 5, yieldFn);
+      sink.enqueue([{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }, { id: 'a4' }, { id: 'a5' }]);
+
+      // フラッシュ連鎖が落ち着くまで待つ。
+      for (let i = 0; i < 20; i += 1) await Promise.resolve();
+      await sink.flush();
+      for (let i = 0; i < 20; i += 1) await Promise.resolve();
+
+      expect(flushFn).toHaveBeenCalledTimes(2); // 2 回 flush した
+      expect(yieldCount).toBeGreaterThanOrEqual(1); // 2 回目の手前で最低 1 回 yield した
+    } finally {
+      vi.useFakeTimers();
+    }
+  });
+
+  it('1 回で終わる通常フローでは yield しない（RT 記録の体感レイテンシ不変）', async () => {
+    vi.useRealTimers();
+    try {
+      let yieldCount = 0;
+      const yieldFn = () => { yieldCount += 1; return Promise.resolve(); };
+      const flushFn = vi.fn().mockResolvedValue(undefined);
+      const sink = createPersistCoalescer(flushFn, 0, 0, yieldFn);
+      sink.enqueue([{ id: '1' }]);
+      await sink.flush();
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+      expect(flushFn).toHaveBeenCalledTimes(1);
+      expect(yieldCount).toBe(0); // 連続 flush でないので yield しない
     } finally {
       vi.useFakeTimers();
     }
