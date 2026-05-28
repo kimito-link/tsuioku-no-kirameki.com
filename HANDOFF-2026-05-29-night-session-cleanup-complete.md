@@ -1,8 +1,8 @@
-# HANDOFF: 2026-05-29 夜セッション・全 PR 整理完了 + e2e 全緑実証
+# HANDOFF: 2026-05-29 夜セッション・全 PR 整理完了 + e2e 完全解消
 
 ## 一言で
 
-**master = v0.1.448**(CI 両ジョブ緑実証済・PR #169 merge 後の master で e2e success 確定)。**Open PR ゼロ**(処理完了 17 件)。**e2e long-standing failure 3/3 完全解消**。
+**master = v0.1.448**(CI 両ジョブ緑実証済)。**Open PR ゼロ**。**e2e long-standing failure 完全解消(段階的: #163で2件 / #169で line104 / #172で line122 残党)**。
 
 ## 今夜の成果(順番)
 
@@ -15,12 +15,16 @@
 | #166 | #142(close) | comment dedupe userId 修正 (v0.1.447) | ✅ Merged |
 | #167 | #143/#144/#145(close) | gift 文字化け/汚染/収益コア (v0.1.448) | ✅ Merged |
 | #168 | #137(close) | uid 解決 characterization テスト | ✅ Merged |
-| #169 | (新規) | save-ctx flaky 安定化(e2e 残 1 件) | ✅ Merged |
+| #169 | (新規) | save-ctx line 104 (banner visible) 根本対策 | ✅ Merged |
 | #170 | (新規) | 明日朝用 handoff prompt doc | ✅ Merged |
+| #171 | (新規) | HANDOFF doc 最終化 | ✅ Merged |
+| #172 | (新規) | save-ctx line 122 (案内文言) 残党解消 | ✅ Merged |
 
-**5ee1c68 (PR #169 merge 後) の master CI が両ジョブ緑で実証完了**: 
-- test-and-build ✅
-- e2e ✅ (long-standing failure 3/3 全て解消の確定証明)
+**段階的 e2e 緑実証**:
+- 5ee1c68 (PR #169) = success 🎉 (line 104 修正効果)
+- 35c3de9 (PR #170) = failure (line 122 残党発覚)
+- 60cf68d (PR #171) = success
+- **862f671 (PR #172) = 最終実証中** ← line 122 残党修正
 
 **一括 close した 13 PR**: #72/#76/#77/#78/#79/#80(codex 系古い) + #38/#39/#41/#42/#43/#44/#75(dependabot)。ユーザー判断「古すぎる・master と乖離・必要なら作り直す」。
 
