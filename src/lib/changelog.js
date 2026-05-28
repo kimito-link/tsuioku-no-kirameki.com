@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.439',
+    date: '2026-05-28',
+    summary: '100%取れた時にこん太のアイコンだけ残るのを修正',
+    items: Object.freeze([
+      '過去ログを100%取り込めたときに、記録カードの下にこん太のアイコンだけ残ってしまう（吹き出しの言葉は無いのに顔だけ見える）見た目の問題を直しました。お知らせが無いときはちゃんと隠れるようにしています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.438',
     date: '2026-05-28',
     summary: '記録カードにもこん太のお知らせを表示',

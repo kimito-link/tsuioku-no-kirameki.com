@@ -2728,6 +2728,12 @@
         font-weight: 600;
         line-height: 1.3;
       }
+      /* v0.1.439: display:-webkit-box が hidden 属性のデフォルト display:none を上書きしてしまうため、
+         hidden 属性を尊重するルールを明示。これがないと「100% 取れた時(done)」に hidden=true を
+         セットしてもキャラだけ残って吹き出しテキストは空、という見た目になる（v0.1.438 で顕在化）。 */
+      .nl-live-stat-sub--backfill-hint[hidden] {
+        display: none;
+      }
 
       /* 応援ランキング専用ゾーン（記録カード内のゆっくりアイコン本体には触れない） */
       .nl-top-support-rank {
