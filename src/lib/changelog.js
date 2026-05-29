@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.472',
+    date: '2026-05-30',
+    summary: 'スクロール重さ・レポート失敗を改善',
+    items: Object.freeze([
+      '長時間配信でパネルのスクロールが重くなる問題を緩和しました',
+      'マーケ分析レポートがタイムアウトで失敗しやすかった問題を改善しました',
+      'HTMLレポート生成にもタイムアウト保護を追加しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.471',
     date: '2026-05-30',
     summary: '長時間配信でさかのぼりが途中で止まる問題を根治',
