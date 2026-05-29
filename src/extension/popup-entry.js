@@ -11403,6 +11403,13 @@ async function buildHtmlReportDocument(
     anonymousUsers: thumbAnonymousUsers
   });
 
+  // 0.1.17 (R): 配信者本人のコメントは「応援コメント一覧」から除外（応援者ではない）。
+  const commentsForReport = reportBroadcasterUserId
+    ? comments.filter(
+        (c) => String(c?.userId || '').trim() !== reportBroadcasterUserId
+      )
+    : comments;
+
   // v0.1.469: きらめきの賞 — 単一ランキングを多軸の賞に変える。誰も負けない設計。
   //   returningUserKeys / firstTimeUserKeys は storage にまだないため空配列で初回出荷。
   //   将来 broadcastSessionSummaryDb 等から継続参加者データを引ける。
@@ -11444,12 +11451,6 @@ async function buildHtmlReportDocument(
     });
     userKeyToResolvedThumb.set(room.userKey, src);
   }
-  // 0.1.17 (R): 配信者本人のコメントは「応援コメント一覧」から除外（応援者ではない）。
-  const commentsForReport = reportBroadcasterUserId
-    ? comments.filter(
-        (c) => String(c?.userId || '').trim() !== reportBroadcasterUserId
-      )
-    : comments;
   const commentRows = commentsForReport.map((c, idx) => {
     const commentNo = String(c.commentNo || '').trim();
     const text = String(c.text || '').trim();
