@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.459',
+    date: '2026-05-29',
+    summary: '過去ログ取り込みが途中で止まっても自動で続きを取り込むように',
+    items: Object.freeze([
+      '過去ログの取り込みが時間切れ等で途中で止まったとき、これまでは「もう一度ためす」を手動で押す必要がありました。v0.1.459 からは、取り込み完了まで自動で続きを取り込み直します（最大10回）。コメントが多い配信（6,000件超など）でも、手動操作なしで順番に遡り続けます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.458',
     date: '2026-05-29',
     summary: '過去ログ取り込みが途中で固まる問題を根治（タイムアウト＋自動リトライ）',

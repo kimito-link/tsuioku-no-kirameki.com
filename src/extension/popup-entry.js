@@ -5626,6 +5626,14 @@ async function refreshGiftRankingFetchPrompt(liveId) {
 let _backfillRetryStartedAt = 0;
 
 /**
+ * v0.1.459: 自動リトライ回数カウンタ。
+ *   reached_start に到達するか上限(10回)に達するまで自動で続きを取り込む。
+ *   配信切り替わりで liveId が変わったタイミングでリセット。
+ */
+let _backfillAutoRetryCount = 0;
+const BACKFILL_AUTO_RETRY_MAX = 10;
+
+/**
  * v0.1.450: 「もう一度ためす」押下処理。A 内ボタン (#recordCardBackfillRetryBtn) のみが呼ぶ。
  *   ・storage の KEY_BACKFILL_ENABLED を false→true 立ち上げ
  *   ・前回進捗をクリア
@@ -5784,6 +5792,8 @@ let _backfillHintLiveId = '';
  */
 async function refreshBackfillRecordCardHint(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
+  // v0.1.459: 配信が切り替わったらカウンタをリセット（前の配信の回数を引き継がない）。
+  if (lid !== _backfillHintLiveId) _backfillAutoRetryCount = 0;
   _backfillHintLiveId = lid;
   if (!lid) {
     applyBackfillRecordCardHint(null);
@@ -5834,6 +5844,16 @@ function bindBackfillProgressListenerOnce() {
       done: prog.done,
       stopReason: prog.stopReason
     });
+    // v0.1.459: 途中停止（done=1 かつ reached_start 以外）なら自動で続きを取り込む。
+    //   上限 BACKFILL_AUTO_RETRY_MAX 回まで。reached_start または上限到達で自動停止。
+    if (
+      prog.done === 1 &&
+      prog.stopReason !== 'reached_start' &&
+      _backfillAutoRetryCount < BACKFILL_AUTO_RETRY_MAX
+    ) {
+      _backfillAutoRetryCount += 1;
+      triggerBackfillRetry();
+    }
   });
 }
 
