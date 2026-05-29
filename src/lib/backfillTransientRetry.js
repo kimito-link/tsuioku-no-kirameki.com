@@ -47,7 +47,11 @@ export function shouldScheduleBackfillTransientRetry(args) {
   if (!BACKFILL_TRANSIENT_STOP_REASONS.has(stopReason)) return false;
   if (!args?.autoEnabled) return false;
   if (args?.tabHidden) return false;
-  if (!Number.isFinite(retriedCount) || !Number.isFinite(maxRetries)) return false;
-  if (retriedCount >= maxRetries) return false;
+  // cap_elapsed は「長尺配信で時間が足りなかっただけ」なので回数制限なしで続ける。
+  // 他の一過性 stop（入口探し失敗等）は上限を守って無限ループを防ぐ。
+  if (stopReason !== 'cap_elapsed') {
+    if (!Number.isFinite(retriedCount) || !Number.isFinite(maxRetries)) return false;
+    if (retriedCount >= maxRetries) return false;
+  }
   return true;
 }
