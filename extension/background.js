@@ -698,12 +698,7 @@ async function fetchEventParticipationJson(planningEventId) {
       credentials: 'omit', // 無認証で本文が取れる API。cookie を不要に送らない
       cache: 'no-store',
       redirect: 'error',
-      // niconico 生放送ブラウザ版フロントエンド署名（koken/nicoad と同じ予防的補強。
-      // x-frontend-id:9=生放送 web。無認証契約は不変）。
-      headers: {
-        'x-frontend-id': '9',
-        'x-frontend-version': '0'
-      },
+      // x-frontend-id/x-frontend-version ヘッダは削除済み（koken/nicoad と同じ理由）。
       signal: ac.signal
     });
     let json = null;
@@ -798,10 +793,7 @@ async function fetchNicoUserProfileJson(uid) {
       credentials: 'omit',
       cache: 'no-store',
       redirect: 'error',
-      headers: {
-        'x-frontend-id': '6',
-        'x-frontend-version': '0'
-      },
+      // x-frontend-id/x-frontend-version ヘッダは削除済み（koken/nicoad と同じ理由）。
       signal: ac.signal
     });
     let json = null;
