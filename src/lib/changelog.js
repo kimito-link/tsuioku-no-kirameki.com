@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.470',
+    date: '2026-05-30',
+    summary: '複数タブで全部「—」になる問題を根治',
+    items: Object.freeze([
+      '複数タブを開いているとき、パネルの数値（記録・同接・未場者数など）が全部「—」のまま固定される問題を根治しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.466',
     date: '2026-05-30',
     summary: '自動リトライと「届いてるよ」ちらちらを根治',
