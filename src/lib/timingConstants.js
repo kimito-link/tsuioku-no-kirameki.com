@@ -13,8 +13,11 @@ export const INGEST_TIMING = /** @type {const} */ ({
   ndgrPendingMax: 1200,
   interceptReconcileMs: 320,
   endedHarvestCheckMs: 4000,
-  coalescerMinMs: 300,
-  // 高流量時は 300ms 待たずに早期 flush（体感レイテンシ短縮）。
+  // v0.1.472: 300ms→800ms。長尺配信で storage 配列が大きくなると 300ms ごとの
+  //   全件 read/write がメインスレッドを圧迫してスクロールが重くなるため緩和。
+  //   高流量時は coalescerBurstThreshold で早期 flush するので体感変化は小さい。
+  coalescerMinMs: 800,
+  // 高流量時は待たずに早期 flush（体感レイテンシ短縮）。
   // NDGR_CHAT_ROWS_POST_CHUNK=220 より少し上に置き、1チャンク=即flushを避ける。
   coalescerBurstThreshold: 260,
   visibleScanDelayMs: 380,

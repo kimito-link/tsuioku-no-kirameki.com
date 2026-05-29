@@ -279,6 +279,8 @@ import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
 import { buildReportThumbedUsersSectionHtml } from '../lib/reportThumbedUsersSectionHtml.js';
+import { computeKiramekiAwards } from '../lib/kiramekiAwards.js';
+import { buildKiramekiAwardsSectionHtml, KIRAMEKI_AWARDS_CSS } from '../lib/kiramekiAwardsSectionHtml.js';
 import {
   buildReportLinkRows,
   buildReportMetaRows,
@@ -7861,11 +7863,13 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
   let lastRejectError = '';
   let sawSendError = false;
 
-  let gotOkFromCandidate = false;
-  for (const candidate of candidates) {
-    // v0.1.468: 1つのタブから ok 応答を得たら残タブへの送信をやめる。
-    //   複数タブ×複数 frameId への送信累積が 12s タイムアウトを超える原因だった。
-    if (gotOkFromCandidate) break;
+  // v0.1.470: listWatchFramesWithInnerText を全候補タブで並列実行する。
+  //   従来の直列実装では 8s(listWatchFrames) × N タブ が積み重なり、
+  //   2タブ以上で 12s の refreshTaskGuarded タイムアウトを超えて全カード「—」固定になっていた。
+  //   並列化により wall-clock = 最速タブの 8s 1回だけになる。
+  //   ok を得たタブ以外の結果は破棄する（v0.1.468 の「ok後は残タブ送信しない」と組み合わせ）。
+  /** @type {Promise<{ ok: boolean, items: { no: string, uid: string, name: string, av: string }[], lastRejectError: string, sawOkFalse: boolean, sawSendError: boolean }>[]} */
+  const perTabPromises = candidates.map(async (candidate) => {
     try {
       const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
       const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
@@ -7887,29 +7891,35 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
           );
           if (!res) continue;
           if (res.ok === true) {
-            // 0.1.178: liveId 整合ガード — 別 live の export を merge しない
             if (!responseAlignedWithWatchUrl(res, watchUrl)) {
-              lastRejectError = `live_mismatch (resp=${String(res.liveId || '')})`;
-              continue;
+              return { ok: false, items: [], lastRejectError: `live_mismatch (resp=${String(res.liveId || '')})`, sawOkFalse: false, sawSendError: false };
             }
-            sawOkTrue = true;
-            gotOkFromCandidate = true;
-            const chunk = normalizeInterceptCacheItems(res.items);
-            merged.push(...chunk);
-            break;
+            return { ok: true, items: normalizeInterceptCacheItems(res.items), lastRejectError: '', sawOkFalse: false, sawSendError: false };
           }
           if (res.ok === false) {
-            sawOkFalse = true;
             const er = String(res.error || '').trim();
-            if (er) lastRejectError = er;
+            return { ok: false, items: [], lastRejectError: er, sawOkFalse: true, sawSendError: false };
           }
         } catch {
-          sawSendError = true;
+          // sendMessage 失敗 → 次の frameId を試す
         }
       }
     } catch {
-      sawSendError = true;
+      // listWatchFrames 失敗
     }
+    return { ok: false, items: [], lastRejectError: '', sawOkFalse: false, sawSendError: true };
+  });
+
+  const tabResults = await Promise.all(perTabPromises);
+  for (const r of tabResults) {
+    if (r.ok) {
+      sawOkTrue = true;
+      merged.push(...r.items);
+      break; // 最初の ok タブの結果のみ使用
+    }
+    if (r.sawOkFalse) sawOkFalse = true;
+    if (r.sawSendError) sawSendError = true;
+    if (r.lastRejectError) lastRejectError = r.lastRejectError;
   }
 
   const items = mergeInterceptCacheItems(merged);
@@ -10939,16 +10949,17 @@ async function requestWatchPageSnapshotFromOpenTabOnce(watchUrl) {
     };
   }
 
-  for (const candidate of candidates) {
+  // v0.1.470: 全候補タブを並列で試す。直列だと 8s(listWatchFrames) × N タブが
+  //   積み重なり、snapshot fetch 全体が 15s タイムアウトに引っかかって
+  //   同接・来場・経過チップが「—」固定になっていた。
+  /** @type {Promise<{ snapshot: WatchPageSnapshot|null, error: string }>[]} */
+  const tabPromises = candidates.map(async (candidate) => {
     try {
       const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
       const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
       const viewerProbe = probeViewerCountFromFrameTexts(ranked);
       const tried = new Set();
-      const tryOrder = [
-        ...ranked.map((r) => r.frameId),
-        0
-      ];
+      const tryOrder = [...ranked.map((r) => r.frameId), 0];
       for (const fid of tryOrder) {
         if (tried.has(fid)) continue;
         tried.add(fid);
@@ -10959,13 +10970,7 @@ async function requestWatchPageSnapshotFromOpenTabOnce(watchUrl) {
             { frameId: fid, maxAttempts: 5, delayMs: 90 }
           );
           if (res?.ok && res.snapshot) {
-            if (
-              !snapshotLooksAlignedWithWatchUrl(
-                res.snapshot,
-                watchUrl,
-                candidate.url
-              )
-            ) {
+            if (!snapshotLooksAlignedWithWatchUrl(res.snapshot, watchUrl, candidate.url)) {
               continue;
             }
             const merged = mergeViewerProbeIntoSnapshot(
@@ -10979,8 +10984,14 @@ async function requestWatchPageSnapshotFromOpenTabOnce(watchUrl) {
         }
       }
     } catch {
-      // try next candidate tab
+      // このタブは失敗
     }
+    return { snapshot: null, error: '' };
+  });
+
+  const tabResults = await Promise.all(tabPromises);
+  for (const r of tabResults) {
+    if (r.snapshot != null) return r;
   }
 
   return {
@@ -11293,7 +11304,7 @@ async function buildHtmlReportDocument(
     imageDataUrlMap: yukkuriReportImageMap
   });
   const yukkuriReportCss =
-    yukkuriBroadcastSummaryEmbeddedCss() + mangaBroadcastSummaryEmbeddedCss();
+    yukkuriBroadcastSummaryEmbeddedCss() + mangaBroadcastSummaryEmbeddedCss() + KIRAMEKI_AWARDS_CSS;
 
   // 0.1.17 (R): 配信者本人 userId をスナップショットから取得し、応援コメント集計
   // から除外。HTML レポートのユーザー別テーブル / サムネ付き一覧 / 全コメント一覧
@@ -11392,6 +11403,38 @@ async function buildHtmlReportDocument(
     anonymousUsers: thumbAnonymousUsers
   });
 
+  // 0.1.17 (R): 配信者本人のコメントは「応援コメント一覧」から除外（応援者ではない）。
+  const commentsForReport = reportBroadcasterUserId
+    ? comments.filter(
+        (c) => String(c?.userId || '').trim() !== reportBroadcasterUserId
+      )
+    : comments;
+
+  // v0.1.469: きらめきの賞 — 単一ランキングを多軸の賞に変える。誰も負けない設計。
+  //   returningUserKeys / firstTimeUserKeys は storage にまだないため空配列で初回出荷。
+  //   将来 broadcastSessionSummaryDb 等から継続参加者データを引ける。
+  const { awards: kiramekiAwards } = computeKiramekiAwards({
+    comments: commentsForReport,
+    aggregatedRooms,
+    returningUserKeys: [],
+    firstTimeUserKeys: [],
+    broadcasterUserId: reportBroadcasterUserId
+  });
+  const kiramekiAwardsSectionHtml = buildKiramekiAwardsSectionHtml(
+    kiramekiAwards,
+    aggregatedRooms,
+    {
+      resolveAvatarSrc: (room) =>
+        resolveReportUserThumbSrc({
+          userId: String(room?.userKey || ''),
+          avatarUrl: String(room?.avatarUrl || ''),
+          identiconResolver: getCachedAnonymousIdenticonDataUrl
+        }),
+      escapeHtml,
+      escapeAttr
+    }
+  );
+
   /*
    * 0.1.12 (F2 追加): 全コメント一覧の各行にも「最低サムネ」を表示する。
    *   ・ユーザー列に小さい 20px サムネをインライン配置（行高さを増やさず識別性 UP）
@@ -11408,12 +11451,6 @@ async function buildHtmlReportDocument(
     });
     userKeyToResolvedThumb.set(room.userKey, src);
   }
-  // 0.1.17 (R): 配信者本人のコメントは「応援コメント一覧」から除外（応援者ではない）。
-  const commentsForReport = reportBroadcasterUserId
-    ? comments.filter(
-        (c) => String(c?.userId || '').trim() !== reportBroadcasterUserId
-      )
-    : comments;
   const commentRows = commentsForReport.map((c, idx) => {
     const commentNo = String(c.commentNo || '').trim();
     const text = String(c.text || '').trim();
@@ -12361,6 +12398,7 @@ async function buildHtmlReportDocument(
             </tbody>
           </table>
         </section>
+        ${kiramekiAwardsSectionHtml}
         ${thumbedUsersSectionHtml}
       </div>
       ${htmlReportConceptGuideCardHtml}
@@ -12564,13 +12602,10 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
     eventRankingModel = null;
   }
 
-  const html = await buildHtmlReportDocument(
-    comments,
-    snapshot,
-    error,
-    liveId,
-    watchUrl,
-    eventRankingModel
+  const html = await withTimeout(
+    buildHtmlReportDocument(comments, snapshot, error, liveId, watchUrl, eventRankingModel),
+    60_000,
+    'html_report_build_timeout'
   );
 
   const blob = new Blob([html], {
@@ -13550,7 +13585,7 @@ function initPopup() {
       const gKey = giftUsersStorageKey(lid);
       const data = await withTimeout(
         chrome.storage.local.get([sKey, gKey]),
-        8_000,
+        30_000,
         'marketing_storage_timeout'
       );
       const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (

@@ -26,6 +26,33 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.472',
+    date: '2026-05-30',
+    summary: 'スクロール重さ・レポート失敗を改善',
+    items: Object.freeze([
+      '長時間配信でパネルのスクロールが重くなる問題を緩和しました',
+      'マーケ分析レポートがタイムアウトで失敗しやすかった問題を改善しました',
+      'HTMLレポート生成にもタイムアウト保護を追加しました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.471',
+    date: '2026-05-30',
+    summary: '長時間配信でさかのぼりが途中で止まる問題を根治',
+    items: Object.freeze([
+      '7時間など長時間の配信で、さかのぼり取り込みが72%などで止まってしまう問題を根治しました',
+      '時間制限（15分）で一時停止するたびに自動で続きから再開し、配信開始まで遡り切るようになります'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.470',
+    date: '2026-05-30',
+    summary: '複数タブで全部「—」になる問題を根治',
+    items: Object.freeze([
+      '複数タブを開いているとき、パネルの数値（記録・同接・未場者数など）が全部「—」のまま固定される問題を根治しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.466',
     date: '2026-05-30',
     summary: '自動リトライと「届いてるよ」ちらちらを根治',
