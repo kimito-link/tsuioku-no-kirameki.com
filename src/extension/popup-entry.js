@@ -5776,6 +5776,13 @@ function applyBackfillRecordCardHint(progress) {
 let _backfillHintLiveId = '';
 
 /**
+ * v0.1.463: caught_up（記録が公式の95%以上）に一度達したら、同じ配信で
+ *   progress が更新されても自動リトライ・再描画ちらちらを起こさないフラグ。
+ *   配信切り替わり（_backfillHintLiveId 更新）でリセット。
+ */
+let _backfillCaughtUpForLiveId = '';
+
+/**
  * v0.1.450 (PR4): A 内 hint の表示制御。lid を受け取り、必要なら復元 + listener bind。
  *   旧 refreshBackfillFetchPrompt（B 用）の代替。B 廃止に伴い記録カード hint だけを面倒見る。
  *   ・lid 無し: hint を hidden に倒し、listener も bind しない
@@ -5785,6 +5792,8 @@ let _backfillHintLiveId = '';
  */
 async function refreshBackfillRecordCardHint(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
+  // 配信が切り替わったら caught_up フラグをリセット。
+  if (lid !== _backfillHintLiveId) _backfillCaughtUpForLiveId = '';
   _backfillHintLiveId = lid;
   if (!lid) {
     applyBackfillRecordCardHint(null);
@@ -5828,6 +5837,8 @@ function bindBackfillProgressListenerOnce() {
     if (!prog) return;
     // 表示中の配信の進捗だけ反映（別タブ/別配信の進捗で上書きしない）。
     if (String(prog.lid || '').toLowerCase() !== _backfillHintLiveId) return;
+    // v0.1.463: 既に caught_up 確定済みの配信なら progress 更新を無視してちらちらを防ぐ。
+    if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return;
     // v0.1.415: stopReason も渡す（done=1 でも reached_start か途中かで文言を分ける）。
     applyBackfillRecordCardHint({
       started: true,
@@ -5856,8 +5867,8 @@ function bindBackfillProgressListenerOnce() {
       if (!alreadyCaughtUp) {
         triggerBackfillRetry();
       } else {
-        // caught_up: 自動取り込みを無効化して再起動ループを止める。
-        // 次に「もう一度ためす」を押すか別の配信に切り替えるまで自動起動しない。
+        // caught_up 確定: フラグを立てて以降の progress 更新を無視し、ちらちらを止める。
+        _backfillCaughtUpForLiveId = _backfillHintLiveId;
         chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
       }
     }

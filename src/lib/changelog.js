@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.463',
+    date: '2026-05-30',
+    summary: '「届いてるよ」が何度もちらちらする問題を根治',
+    items: Object.freeze([
+      '95%以上取れた配信で「いまの分まで届いてるよ ✨」が繰り返し表示される問題を根治しました。caught_up と判定した後は同じ配信では以降の更新を無視するようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.462',
     date: '2026-05-30',
     summary: '95%以上取れたら自動取り込みを停止してちらちらを解消',
