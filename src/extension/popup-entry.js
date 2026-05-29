@@ -12601,13 +12601,10 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
     eventRankingModel = null;
   }
 
-  const html = await buildHtmlReportDocument(
-    comments,
-    snapshot,
-    error,
-    liveId,
-    watchUrl,
-    eventRankingModel
+  const html = await withTimeout(
+    buildHtmlReportDocument(comments, snapshot, error, liveId, watchUrl, eventRankingModel),
+    60_000,
+    'html_report_build_timeout'
   );
 
   const blob = new Blob([html], {
@@ -13587,7 +13584,7 @@ function initPopup() {
       const gKey = giftUsersStorageKey(lid);
       const data = await withTimeout(
         chrome.storage.local.get([sKey, gKey]),
-        8_000,
+        30_000,
         'marketing_storage_timeout'
       );
       const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
