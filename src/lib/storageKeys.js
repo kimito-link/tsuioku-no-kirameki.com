@@ -401,6 +401,18 @@ export function giftUsersStorageKey(liveId) {
 }
 
 /**
+ * v0.1.456 レジューム: 配信ごとの「過去ログ巡回で前回到達した最古コメント vpos」を保存する
+ * キー。「もう一度ためす」押下や自動リトライ時にこれを読んで crawlNdgrBackward の
+ * resumeFromVpos に渡し、前回の続きから掘り始める（同じ区画の取り直し＝dedupe 弾きで
+ * 増えない問題の解消）。reached_start（配信開始まで到達）で完了したらクリアする。
+ * @param {string} liveId lv123
+ */
+export function backfillResumeStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_backfill_resume_${id}`;
+}
+
+/**
  * niconico の watch ページ DOM から掬った
  *   - 配信者参加イベントバナー
  *   - イベント累計／番組累計バルーン

@@ -548,6 +548,162 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('reached_start');
   });
 
+  // v0.1.456 レジューム（続きから）: 「もう一度」で前回の最古到達点から掘り直す。
+  describe('レジューム（続きから・v0.1.456）', () => {
+    it('return に最古到達点 minVposReached が乗る（保存用）', async () => {
+      // 1 区画だけ取り込み、入口が尽きるが序盤未到達＝no_progress で止まるマップ。
+      // その区画の最古 vpos が minVposReached として返ることを確認。
+      const PROGRAM_START = 1000;
+      const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/RES_A';
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+      // vpos=60000(=600秒地点)。序盤(<=3000)に届かない。next 無しで区画終端。
+      map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+      // 以降どの再シード at にも入口なし→ no_progress で終わる。
+      for (const at of [860, 810, 760, 710, 660, 610, 560, 510, 460, 410, 360, 310, 260]) {
+        map.set(atUrl(at), viewEntryBytes({}));
+      }
+
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result } = await drain(
+        crawlNdgrBackward({
+          viewBase: VIEW_BASE,
+          fetchBinary,
+          sleep,
+          now: () => 1_000_000,
+          programStartSec: PROGRAM_START
+        })
+      );
+
+      expect(result.stopReason).toBe('no_progress');
+      // 取り込めた最古 vpos が返る（呼び出し側はこれを保存して次回 resume に使う）。
+      expect(result.minVposReached).toBe(60000);
+    });
+
+    it('resumeFromVpos を渡すと、前回の続き（古い区画）から掘り始める（中核）', async () => {
+      // ⭐レジュームの直接検証: 浅い区画(BK_NEW)を map に登録しないことで「resume が効いて
+      //   いれば浅い区画を fetch せず、いきなり続きの古い区画 BK_OLD から取り込む」ことを示す。
+      //   resumeFromVpos=60000 → 起点 at = PROGRAM_START + 600 - 5 = 1595。そこに BK_OLD。
+      const PROGRAM_START = 1000;
+      const BK_OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/RES_OLD';
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      // resume 由来 at(1595)に「前回の続き＝配信序盤」の区画。低 vpos 複数で reached_start。
+      map.set(atUrl(1595), viewEntryBytes({ backwardUri: BK_OLD }));
+      map.set(
+        BK_OLD,
+        packedSegmentBytes([
+          { no: 5, content: '配信序盤', name: 'u', vpos: 100 },
+          { no: 6, content: 'はじまった', name: 'u2', vpos: 200 }
+        ])
+      );
+
+      const { fetchBinary, calls } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result, chatsAll } = await drain(
+        crawlNdgrBackward({
+          viewBase: VIEW_BASE,
+          fetchBinary,
+          sleep,
+          now: () => 1_000_000,
+          programStartSec: PROGRAM_START,
+          resumeFromVpos: 60000
+        })
+      );
+
+      // 続きの古い区画(no=5,6)を取り込んで配信開始到達。
+      expect(chatsAll.map((c) => c.no)).toEqual([5, 6]);
+      expect(result.stopReason).toBe('reached_start');
+      // ⭐ resume 起点(1595)を最優先で叩いた＝従来の浅い seed(now-90=910 等)を先に試していない。
+      expect(calls).toContain(atUrl(1595));
+      // 浅い区画 ENTRY_AT(910) は登録すらしていない＝呼ばれても 404 で空。resume が先に当たって
+      //   そこで reached_start するので、910 を起点にした掘り込みは発生しない。
+      expect(calls.indexOf(atUrl(1595))).toBeLessThan(
+        calls.indexOf(ENTRY_AT) === -1 ? Infinity : calls.indexOf(ENTRY_AT)
+      );
+    });
+
+    it('resumeFromVpos 由来 at に入口が無ければ従来の seed 探索にフォールバックする', async () => {
+      // resume 起点(1595)には入口が無い（失効）。従来候補(now-90=910)に入口があり取り込める。
+      const PROGRAM_START = 1000;
+      const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/RES_FB';
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(atUrl(1595), viewEntryBytes({})); // resume 起点は空（失効）
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A })); // 従来候補に入口
+      map.set(
+        BK_A,
+        packedSegmentBytes([
+          { no: 5, content: '序盤', name: 'u', vpos: 80 },
+          { no: 6, content: 'はじまり', name: 'u2', vpos: 150 }
+        ])
+      );
+
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result, chatsAll } = await drain(
+        crawlNdgrBackward({
+          viewBase: VIEW_BASE,
+          fetchBinary,
+          sleep,
+          now: () => 1_000_000,
+          programStartSec: PROGRAM_START,
+          resumeFromVpos: 60000
+        })
+      );
+
+      // 失効しても従来 seed にフォールバックして取り込めた。
+      expect(chatsAll.map((c) => c.no)).toContain(5);
+      expect(result.stopReason).toBe('reached_start');
+    });
+
+    it('resumeFromVpos=null（初回）は従来動作（後方互換）', async () => {
+      // 既存の基本ケースと同じ map で、resumeFromVpos を渡さなくても従来どおり取り込める。
+      const BK0 = `https://mpn.live.nicovideo.jp/data/backward/v4/RES_N0`;
+      const BK1 = `https://mpn.live.nicovideo.jp/data/backward/v4/RES_N1`;
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+      map.set(BK0, packedSegmentBytes([{ no: 50, content: '新', name: 'u1' }], BK1));
+      map.set(BK1, packedSegmentBytes([{ no: 10, content: '開始直後', name: 'u2' }]));
+
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result, chatsAll } = await drain(
+        crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
+      );
+
+      expect(result.stopReason).toBe('backward_exhausted');
+      expect(chatsAll.map((c) => c.no)).toEqual([50, 10]);
+    });
+
+    it('programStart 不明だと resumeFromVpos があっても従来動作（at を算出できない）', async () => {
+      // resumeFromVpos はあるが programStartSec 無し→ resume at を計算できないので従来 seed のみ。
+      const BK0 = `https://mpn.live.nicovideo.jp/data/backward/v4/RES_NPS`;
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+      map.set(BK0, packedSegmentBytes([{ no: 10, content: '開始', name: 'u' }]));
+
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { chatsAll } = await drain(
+        crawlNdgrBackward({
+          viewBase: VIEW_BASE,
+          fetchBinary,
+          sleep,
+          now: () => 1_000_000,
+          resumeFromVpos: 60000 // programStartSec 無し
+        })
+      );
+
+      // 従来どおり ENTRY_AT から取り込めた（resume は無視）。
+      expect(chatsAll.map((c) => c.no)).toContain(10);
+    });
+  });
+
   it('segment 数 cap に達したら cap_segments で停止する', async () => {
     // backward を延々辿れるチェーン（BK_i → BK_{i+1}）。各 1 件 chat。
     const map = new Map();
