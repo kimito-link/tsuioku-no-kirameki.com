@@ -141,3 +141,83 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 - **CWS 申請関連のファイル**（`src/images/googlechrom/`, `build/store-listing/` の `description-ja.txt` / `privacy-justifications-ja.txt`）は、仕様・文言を変える際に必ず「審査通過後の差分提出」を意識する
 - **プライバシー周り**の文言を変更したら、`privacy.html` と `description-ja.txt` と `privacy-justifications-ja.txt` の 3 点を同期させる（片方だけ変わると審査で齟齬として指摘される）
 - **拡張 bump は build + commit + push + 本体 pull + chrome://extensions リロード + watch タブ F5 まで 1 セット**（途中で止めると Chrome に届かない）
+
+---
+
+## 10. AI ツール役割分担（Claude Code 司令塔アーキテクチャ・2026-05-29 確立）
+
+### 10.1 大原則
+
+**ユーザーは Claude Code とだけ会話する**。Claude Code が司令塔として他の AI コーディングツール（Codex CLI / cursor-agent CLI / OpenCode）を呼び出し、結果を読み戻して統合する。
+
+これにより：
+- ユーザーは複数ツール画面を切り替えなくていい（**コピペの手間ゼロ**）
+- 各ツールの強みを活かしつつ、Claude Max のクレジット消費を分散できる
+- 全ツールが共通の AGENTS.md を読むので、文脈の食い違いが構造的に起きない
+
+### 10.2 役割マトリクス
+
+| 段階 | 担当ツール | 起動方法 | 理由 |
+|---|---|---|---|
+| 会議・真因究明・設計判断 | **Claude Code 本体** | メイン会話 | サブエージェント並列・MCP・MEMORY統合 |
+| 並列探索・OSS 世界調査 | Claude Code サブエージェント | `Agent` ツール | 1Mコンテキスト・並列リサーチ |
+| 並列実装（5〜30 ユニット） | Claude Code `/batch` スキル | スラッシュコマンド | 公式機能 v2.1.63+（worktree 隔離） |
+| **marketing/HTML レポート/放送系の実装** | **Codex CLI** | `.claude/agents/codex-impl.md` | 過去実績（[memory/codex_collaboration_rules.md](memory/codex_collaboration_rules.md)） |
+| **複数ファイル横断リファクタ** | **cursor-agent CLI** | `.claude/agents/cursor-impl.md` | Tab補完・横断編集が速い・クレジット温存 |
+| **ローカル雑用（無料・要 ollama）** | **OpenCode** | `.claude/agents/opencode-local.md` | MEMORY で実証済み（DeepSeek V4 Flash） |
+| コードレビュー | Claude Code `/code-review` + Codex/Cursor BugBot 経由 | 司令塔から両方走らせて結果統合 | 多視点レビューで品質UP |
+| PR運用（commit/push/PR作成） | Claude Code 本体 | `gh` CLI（Bash） | 既に確立した運用 |
+| 実機検証（ブラウザ操作） | **Claude Code（Claude-in-Chrome MCP）** | MCP 経由 | **代替不可**（他ツールには無い機能） |
+| MEMORY/reference 更新 | **Claude Code 本体専用** | `Edit` | **他ツールに渡さない**（食い違い防止） |
+
+### 10.3 ツール起動の技術詳細
+
+#### Codex CLI（インストール済み: `codex-cli 0.128.0`）
+```bash
+# 例: Codex に marketing 系の実装を依頼
+codex exec "memory/codex_collaboration_rules.md に従って ..."
+```
+Codex は起動時に AGENTS.md を自動読込する（[公式仕様](https://developers.openai.com/codex/guides/agents-md)）。
+
+#### cursor-agent CLI（実体: `C:\Users\info\AppData\Local\cursor-agent\cursor-agent.cmd`）
+```bash
+# Bash から呼ぶ場合は cmd 経由
+"/c/Users/info/AppData/Local/cursor-agent/cursor-agent.cmd" -p "..." --output-format json
+```
+cursor-agent は AGENTS.md と CLAUDE.md の両方を自動読込（[公式仕様](https://cursor.com/docs/cli/using)）。
+
+#### OpenCode（インストール済み: `opencode 1.15.10`）
+```bash
+# MEMORY 実証済み: NVIDIA DeepSeek V4 Flash が安定
+opencode --model nvidia/deepseek-ai/deepseek-v4-flash ...
+```
+
+### 10.4 ⛔ やってはいけないこと
+
+- **MEMORY.md を他ツールに編集させる** → Claude Code 専用領域。食い違いリスク
+- **Grok Build / Antigravity を確実な情報なしに組み込む** → 2026-05時点で CLI/MCP対応の一次ソース裏取り未完了。実機検証してから
+- **サブエージェントが別のサブエージェントを呼ぶ**（[公式禁止](https://code.claude.com/docs/en/sub-agents)）→ メイン会話から並列に呼ぶ
+- **同じ作業を複数ツールで重複実装** → 役割を上のマトリクスで固定する
+
+### 10.5 ハンドオフのコピペレス手順
+
+1. Claude Code が会議結論を `memory/reference_*.md` に書く + ブランチ作成 + push
+2. Claude Code が `.claude/agents/<tool>-impl.md` 呼び出し → サブエージェントが Bash で外部 CLI 起動
+3. 外部 CLI は AGENTS.md + 該当 reference を自動読込
+4. 外部 CLI が実装 → ブランチに push
+5. Claude Code が `git diff` で読み戻して `/code-review` + Claude-in-Chrome 実機検証
+6. Claude Code が MEMORY/reference 更新 + PR merge
+
+各ステップで「ファイル経由」のみで情報伝達 → コピペ発生ゼロ。
+
+### 10.6 並列・自動評価（Arena Mode 相当）の実装
+
+Claude Code の `/batch` で 5〜30 並列の worktree 実装は既に可能。さらに「複数案を並列実装→自動評価→最良を選ぶ」(Grok Build の Arena Mode に相当する) を実現するには:
+
+```
+Claude Code main → 複数の `.claude/agents/judge-*.md` を並列起動
+                  → 各 judge が観点(correctness/perf/security)で採点
+                  → 多数決で最良案採択
+```
+
+これは今日の作業で既に実践している「ネガティブコントロール + 複数仮説評価」の自動化版。
