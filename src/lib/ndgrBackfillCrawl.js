@@ -157,7 +157,8 @@ export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
  *   segmentsFetched: number,
  *   rowsSeen: number,
  *   bytesFetched: number,
- *   minCommentNo: number|null
+ *   minCommentNo: number|null,
+ *   minVposReached?: number|null
  * }} NdgrBackfillProgress
  */
 
@@ -364,8 +365,11 @@ export function chainLooksLikeStreamStart(chats, opts) {
  * @param {number|null} [opts.programStartSec] 配信開始の unixtime（秒）。区画終端での
  *   再シード時刻を「配信開始 + 最古コメント vpos」で精密に算出するのに使う。不明なら
  *   固定窓で後退する（精度は落ちるが動作する）。
+ * @param {number|null} [opts.resumeFromVpos] v0.1.456 レジューム: 前回到達した最古コメント
+ *   vpos（センチ秒）。非 null かつ programStartSec が分かるとき、初回 seed 探索の候補先頭に
+ *   「配信開始 + この vpos の少し前」を積んで前回の続きから掘る。無ければ従来の seed 探索。
  * @param {AbortSignal} [opts.signal] タブ非表示 / SPA 遷移での中断用。
- * @returns {AsyncGenerator<NdgrBackfillProgress, { stopReason: NdgrBackfillStopReason, segmentsFetched: number, rowsSeen: number, bytesFetched: number }, void>}
+ * @returns {AsyncGenerator<NdgrBackfillProgress, { stopReason: NdgrBackfillStopReason, segmentsFetched: number, rowsSeen: number, bytesFetched: number, minVposReached: number|null }, void>}
  */
 export async function* crawlNdgrBackward(opts) {
   const viewBase = String(opts?.viewBase || '').trim();
@@ -379,6 +383,15 @@ export async function* crawlNdgrBackward(opts) {
     typeof opts?.programStartSec === 'number' && opts.programStartSec > 0
       ? Math.floor(opts.programStartSec)
       : null;
+  // v0.1.456 レジューム: 前回の巡回で到達した最古コメント vpos（センチ秒）。非 null かつ
+  //   programStartSec が分かるとき、初回 seed 探索の候補先頭に「配信開始 + この vpos の少し前」
+  //   を積み、前回の続きから掘り始める（同じ区画の取り直しを避ける）。無効値は無視して従来動作。
+  const resumeFromVpos =
+    typeof opts?.resumeFromVpos === 'number' &&
+    Number.isFinite(opts.resumeFromVpos) &&
+    opts.resumeFromVpos > 0
+      ? Math.floor(opts.resumeFromVpos)
+      : null;
   const caps = { ...NDGR_BACKFILL_DEFAULT_CAPS, ...(opts?.caps || {}) };
   const gapMs =
     typeof opts?.fetchGapMs === 'number' && opts.fetchGapMs >= 0
@@ -389,8 +402,23 @@ export async function* crawlNdgrBackward(opts) {
   let segmentsFetched = 0;
   let rowsSeen = 0;
   let bytesFetched = 0;
+  // v0.1.456 レジューム: この巡回で到達した最古コメント vpos。summary() / done() が参照する
+  //   ため、早期 return（no_view_base/aborted/no_entry 等）が呼ばれる前にここで宣言する
+  //   （let の TDZ 回避）。実値は下の resumeFromVpos 確定後に再代入する。
+  /** @type {number|null} これまでに遡れた最古コメントの vpos（センチ秒）。再シード判定用。 */
+  let globalMinVpos = null;
 
-  const summary = () => ({ segmentsFetched, rowsSeen, bytesFetched });
+  // v0.1.456 レジューム: この巡回で到達した最古コメント vpos を呼び出し側へ返すため
+  //   summary に含める。呼び出し側（content-entry runNdgrBackfillOnce）はこれを per-liveId
+  //   storage に保存し、「もう一度」押下や自動リトライ時に opts.resumeFromVpos として渡す。
+  //   これにより毎回ゼロから seed 探索して同じ区画を取り直し dedupe で弾かれる無駄
+  //   （実機 125→135→143 しか増えない）を解消し、押すたびに続きから前進できる。
+  const summary = () => ({
+    segmentsFetched,
+    rowsSeen,
+    bytesFetched,
+    minVposReached: globalMinVpos
+  });
   /**
    * v0.1.443: `reached_start` 発火時に、どんな chats(vpos 一覧)が判定の根拠だったかを
    *   診断情報として戻り値に含める。実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を
@@ -426,8 +454,11 @@ export async function* crawlNdgrBackward(opts) {
   /** @type {Set<string>} 再訪防止（backward URI / at URL を一意キーに） */
   const visited = new Set();
   const nowSec = Math.floor(t0 / 1000);
-  /** @type {number|null} これまでに遡れた最古コメントの vpos（センチ秒）。再シード判定用。 */
-  let globalMinVpos = null;
+  // v0.1.456 レジューム: globalMinVpos は上で宣言済み（TDZ 回避）。ここで前回到達点
+  //   (resumeFromVpos)を代入する。これにより「続きから」掘ったときの madeProgress 判定
+  //   （chainMinVpos < globalMinVpos）が前回の最古点を基準にでき、前回より古い区画に
+  //   入れたときだけ前進扱いになる。resumeFromVpos が null なら従来どおり null のまま。
+  globalMinVpos = resumeFromVpos;
   /**
    * @type {boolean} v0.1.434: 直近に「本当に古い区画へ進めた」とき、その区画が開始区画らしかったか
    *   （chainLooksLikeStreamStart の結果）。副経路（入口が尽きた時）の reached_start 判定に使う。
@@ -510,6 +541,15 @@ export async function* crawlNdgrBackward(opts) {
   if (programStartSec != null) {
     // 配信開始の少し後（最初の数十秒）も候補に。ここは確実に backward を持つはず。
     seedCandidates.push(programStartSec + 60);
+  }
+  // v0.1.456 レジューム: 前回到達点(resumeFromVpos)と programStart が分かるとき、候補の
+  //   先頭に「配信開始 + 最古オフセット − バッファ」を積む。最優先で前回の続きから掘り始め、
+  //   入口が見つからなければ後続の従来候補（浅い→深い lag）に自然にフォールバックする。
+  //   resumeFromVpos があっても programStart 不明なら従来どおり（at を算出できないため）。
+  if (resumeFromVpos != null && programStartSec != null) {
+    const resumeAtSec =
+      programStartSec + Math.floor(resumeFromVpos / 100) - NDGR_BACKFILL_RESEED_BUFFER_SEC;
+    if (resumeAtSec > 0) seedCandidates.unshift(resumeAtSec);
   }
   let seedAtSec = nowSec - NDGR_BACKFILL_SEED_LAG_SEC;
   let initialBackwardUri = '';
@@ -608,12 +648,22 @@ export async function* crawlNdgrBackward(opts) {
         if (minVpos != null && (chainMinVpos == null || minVpos < chainMinVpos)) {
           chainMinVpos = minVpos;
         }
+        // v0.1.456 レジューム: この時点で到達している最古 vpos（過去区画の globalMinVpos と
+        //   今 chain の chainMinVpos の小さい方）を載せる。呼び出し側が persist バッチ境界で
+        //   coalesce 保存し、途中中断でも続きから再開できるようにする。
+        const minVposSoFar =
+          globalMinVpos == null
+            ? chainMinVpos
+            : chainMinVpos == null
+              ? globalMinVpos
+              : Math.min(globalMinVpos, chainMinVpos);
         yield {
           chats,
           segmentsFetched,
           rowsSeen,
           bytesFetched,
-          minCommentNo: minNo
+          minCommentNo: minNo,
+          minVposReached: minVposSoFar
         };
         if (rowsSeen >= caps.rows) return done('cap_rows');
       }
