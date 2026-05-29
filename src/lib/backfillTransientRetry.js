@@ -23,7 +23,10 @@ export const BACKFILL_TRANSIENT_STOP_REASONS = new Set([
   'backward_exhausted',
   'no_entry',
   'no_view_base',
-  'rate_limited'
+  'rate_limited',
+  // v0.1.467: 時間 cap（15分）は「続きがある長尺配信で時間が足りなかっただけ」なので
+  //   一過性扱いにして続きから再試行する。cap_rows/cap_bytes は容量ガードで再試行しない。
+  'cap_elapsed'
 ]);
 
 /**
