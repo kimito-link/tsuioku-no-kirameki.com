@@ -7,55 +7,67 @@
 ## コピペする内容(ここから)
 
 ```
-おはようございます。前日(2026-05-29)の引き継ぎです。
+おはようございます。前日(2026-05-29〜30)の引き継ぎです。
 
 # 状況把握(まずこれを順番に)
 
 1. AGENTS.md を読む(§10「AI ツール役割分担」が最重要)
 2. memory/MEMORY.md の先頭エントリを読む
 3. git log --oneline -10 で確認
-4. gh pr view 193 で PR #193 の CI 状態確認
+4. gh pr view 194 で PR #194 の CI 状態確認
 
 # 前日の到達点
 
-master = v0.1.458(#191 まで merge 済)
-feat/backfill-auto-retry ブランチ = v0.1.459(PR #193 CI 待ち)
+master = v0.1.459(PR #193 merge 済)
+feat/backfill-unlimited-auto-retry ブランチ = v0.1.462(PR #194 CI 緑・未 merge)
+ローカルに v0.1.463 のコードが未コミット状態
 
 ## 今日やったこと
 
-### 実機検証(Claude-in-Chrome)
-- あやりん配信(個人・31分): 記録1,357 > 公式1,345 = 101% ✅
-- ふいすぽっ配信(個人・31分): 記録1,153 / 公式1,203 = 96% ✅
-- まめ。2配信(コメント多・41分): 記録2,262 / 公式6,180 = 37%で停止 ❌
+### PR #193 merge(v0.1.459)
+- 自動リトライ実装(途中停止 → 最大10回自動再起動)
+- CI 両方 SUCCESS → master に merge 済み
 
-### 根本原因の特定
-- バックフィルは cap_elapsed=15分 で自動停止する設計
-- コメント6,000件超の配信は15分では全件取れない
-- これまでは「もう一度ためす」を手動で何度も押す必要があった
+### 実機検証で問題発見 → v0.1.460〜462 を追加実装(PR #194)
+- v0.1.460: 自動リトライ上限(10回)を撤廃 → reached_start まで無制限に継続
+- v0.1.461: 95%以上取れた配信で自動リトライが繰り返す問題を修正
+- v0.1.462: caught_up 時に KEY_BACKFILL_ENABLED=false で再起動ループを止める
+- PR #194 CI: test-and-build ✅ e2e ✅ → merge 待ち
 
-### 実装: v0.1.459 自動リトライ(PR #193)
-- 途中停止(done=1 かつ reached_start 以外)を検知したら自動で再起動
-- 最大10回まで自動リトライ → reached_start で停止
-- 配信切り替わり時はカウンタリセット
-- テスト: 4227件 全緑
+### v0.1.463 未完(ローカルのみ・コミット未)
+- 「いまの分まで届いてるよ」が何度もちらちらする問題の根治
+- _backfillCaughtUpForLiveId フラグで caught_up 後の progress 更新を無視
+- ビルド・テスト・コミット・push が途中で中断
+- popup-entry.js と changelog.js に変更あり(バージョンは 0.1.463)
+- manifest.json / package.json も 0.1.463 に更新済み
+- changelog.test.js も 0.1.463 に更新済み
 
-### その他確認事項
-- [nl-refresh-timeout] エラーはバグではなく意図的な診断ログ(正常)
-- .claude/settings.json を新規作成(Claude-in-Chrome 系ツールを全て allow)
+## 実機で確認した現象まとめ
+
+| 現象 | 状態 |
+|---|---|
+| 自動リトライが動く(8,700件配信で継続) | ✅ v0.1.460 で確認 |
+| 100%取れた配信でちらちらしない | ⚠️ v0.1.462 で改善中・v0.1.463 で根治予定 |
+| [nl-refresh-timeout] エラー | ✅ 正常(意図的診断ログ) |
+| タブ切り替えで一瞬「—」になる | 既知問題・大改修が必要 |
 
 # 残っている作業
 
-## A. PR #193 の CI 確認 → merge(最優先)
-- CI が緑なら master に merge
-- merge 後: 拡張機能をリロードして まめ。2 等で自動リトライが動くか確認
+## A. v0.1.463 をビルド・テスト・push・PR更新(最優先)
+手順:
+1. npm run build && npm test → 全緑確認
+2. git add src/extension/popup-entry.js src/lib/changelog.js src/lib/changelog.test.js extension/manifest.json package.json extension/dist/popup.js
+3. git commit -m "fix(backfill): 「届いてるよ」が何度もちらちらする問題を根治 v0.1.463"
+4. git push
+5. PR #194 に自動追加される
 
-## B. 会議⑨: 公式 commentCount 照合の設計(次)
-- 「取れたつもりで取れていない」を実行時に検出する仕組み
-- 残り件数を UI に表示する
+## B. PR #194 を master に merge
+- CI が緑を確認してから merge
+- merge 後: 拡張機能リロードして実機確認
 
-## C. 公式チャンネル向け正直な UI メッセージ(低優先)
-- テレ朝/NHK 等は終了番組プレミアム必須で取れない
-- 「公式チャンネルは対応していません」と UI に表示
+## C. 実機確認項目
+- 柴犬配信(100%取れた配信)で「いまの分まで届いてるよ」が一度だけ出て止まるか
+- 8,700件超の配信で自動リトライが reached_start まで続くか
 
 # 守ってほしいこと
 
@@ -72,20 +84,21 @@ feat/backfill-auto-retry ブランチ = v0.1.459(PR #193 CI 待ち)
 
 ## 補足(自分用・コピペ対象外)
 
-### 今日の実機検証まとめ
-
-| 配信 | 経過 | 記録 | 公式 | 取得率 | 判定 |
-|---|---|---|---|---|---|
-| あやりん | 31分 | 1,357 | 1,345 | 101% | ✅ |
-| ふいすぽっ | 31分 | 1,153 | 1,203 | 96% | ✅ |
-| まめ。2 | 41分 | 2,262 | 6,180 | 37% | ❌→v0.1.459で改善予定 |
-
 ### ブランチ状態
 
-- `master`: v0.1.458(clean)
-- `feat/backfill-auto-retry`: v0.1.459(PR #193 CI 待ち)
+- `master`: v0.1.459(clean)
+- `feat/backfill-unlimited-auto-retry`: v0.1.462(PR #194 CI 緑・未 merge)
+- ローカル: v0.1.463 コード変更あり・未コミット
 
-### Claude Code 設定
+### v0.1.463 変更ファイル一覧
+- `src/extension/popup-entry.js`: `_backfillCaughtUpForLiveId` フラグ追加
+- `src/lib/changelog.js`: v0.1.463 エントリ追加
+- `src/lib/changelog.test.js`: バージョン 0.1.463 に更新
+- `extension/manifest.json`: 0.1.463
+- `package.json`: 0.1.463
 
-- `.claude/settings.json` を今日新規作成(Claude-in-Chrome 系ツールを全て allow)
-- モデル: Sonnet 4.6 · Max(変更不要)
+### PR #194 コミット履歴
+- v0.1.460: 自動リトライ無制限化
+- v0.1.461: 95%以上で自動リトライしない
+- v0.1.462: caught_up 時に自動取り込み停止
+- v0.1.463: (追加予定) ちらちら根治
