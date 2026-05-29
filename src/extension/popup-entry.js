@@ -7861,7 +7861,11 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
   let lastRejectError = '';
   let sawSendError = false;
 
+  let gotOkFromCandidate = false;
   for (const candidate of candidates) {
+    // v0.1.468: 1つのタブから ok 応答を得たら残タブへの送信をやめる。
+    //   複数タブ×複数 frameId への送信累積が 12s タイムアウトを超える原因だった。
+    if (gotOkFromCandidate) break;
     try {
       const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
       const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
@@ -7889,9 +7893,10 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
               continue;
             }
             sawOkTrue = true;
+            gotOkFromCandidate = true;
             const chunk = normalizeInterceptCacheItems(res.items);
             merged.push(...chunk);
-            continue;
+            break;
           }
           if (res.ok === false) {
             sawOkFalse = true;
