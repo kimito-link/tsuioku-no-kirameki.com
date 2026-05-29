@@ -27,10 +27,14 @@ describe('shouldScheduleBackfillTransientRetry', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'reached_start' })).toBe(false);
   });
 
-  it('やり切り(no_progress / cap_elapsed / cap_rows)は再試行しない', () => {
-    for (const stopReason of ['no_progress', 'cap_elapsed', 'cap_rows', 'cap_reseeds', 'cap_bytes', 'cap_segments']) {
+  it('やり切り(no_progress / cap_rows / cap_bytes / cap_segments / cap_reseeds)は再試行しない', () => {
+    for (const stopReason of ['no_progress', 'cap_rows', 'cap_reseeds', 'cap_bytes', 'cap_segments']) {
       expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason })).toBe(false);
     }
+  });
+
+  it('時間 cap（cap_elapsed）は続きがある長尺配信向けに再試行する', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'cap_elapsed' })).toBe(true);
   });
 
   it('意図的中断(aborted)は再試行しない（タブ非表示などユーザー起因）', () => {
