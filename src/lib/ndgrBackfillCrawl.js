@@ -144,6 +144,20 @@ export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 12;
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
 
 /**
+ * v0.1.458: 一過性失敗（タイムアウト/ネットワーク失敗/5xx/空応答）のリトライ待機列（ms）。
+ *
+ * 会議⑧（世界調査）で判明: NDGRClient/NdgrClientSharp の backward 巡回は fetch が1回でも
+ *   失敗すると全ループが死ぬ（リトライ皆無）。一方 YouTube/Twitch の成熟ツール(chat-downloader)
+ *   は max 15 回・指数バックオフでリトライする。我々は backfill が best-effort で「1回失敗＝
+ *   その先を諦める」だったため、一過性のタイムアウト/瞬断で取得率が落ちていた可能性がある。
+ *   そこで限定回数（3回）・指数バックオフで再試行してから諦める。429/403 は別系統
+ *   （NDGR_BACKFILL_BACKOFF_MS）で扱うのでここには含めない（サーバー拒否は長めに待つ）。
+ *   ⚠️ ハング型はリトライより per-request タイムアウト（backfillFetchBinary 側）が主因対策で、
+ *   これは「タイムアウト後に数回だけ救済する」補助。回数を抑えて総待機時間の暴発を防ぐ。
+ */
+export const NDGR_BACKFILL_TRANSIENT_RETRY_MS = Object.freeze([500, 1_000, 2_000]);
+
+/**
  * 巡回の終了理由。
  * @typedef {(
  *   'backward_exhausted' | 'reached_start' | 'cap_reseeds' | 'visited_revisit' |
@@ -202,16 +216,28 @@ async function fetchWithThrottle(ctx, url, isFirst) {
   if (!isFirst) await ctx.sleep(ctx.gapMs);
   if (isAborted(ctx.signal)) return { bytes: null, rateLimited: false };
 
-  let backoffIdx = 0;
+  let backoffIdx = 0; // 429/403 用の backoff インデックス
+  let transientIdx = 0; // v0.1.458: タイムアウト/ネットワーク失敗/5xx/空応答 用のリトライ
   for (;;) {
     let res;
     try {
       res = await ctx.fetchBinary(url, { signal: ctx.signal });
     } catch {
-      // ネットワーク失敗・Abort 等。これ以上の遡及は諦める（best-effort）。
+      // v0.1.458: ネットワーク失敗・per-request タイムアウト（backfillFetchBinary が
+      //   AbortError を throw）等の一過性失敗。crawl 全体が abort されたのでなければ、
+      //   限定回数だけ指数バックオフでリトライしてから諦める（YouTube/Twitch 流。旧実装は
+      //   1回失敗＝即諦めで取得率が落ちていた）。
+      if (isAborted(ctx.signal)) return { bytes: null, rateLimited: false };
+      if (transientIdx < NDGR_BACKFILL_TRANSIENT_RETRY_MS.length) {
+        await ctx.sleep(NDGR_BACKFILL_TRANSIENT_RETRY_MS[transientIdx]);
+        transientIdx += 1;
+        if (isAborted(ctx.signal)) return { bytes: null, rateLimited: false };
+        continue;
+      }
+      // リトライを使い切った → これ以上の遡及は諦める（best-effort）。
       return { bytes: null, rateLimited: false };
     }
-    if (res && res.ok && res.bytes) {
+    if (res && res.ok && res.bytes && res.bytes.length > 0) {
       return { bytes: res.bytes, rateLimited: false };
     }
     const status = res ? res.status : 0;
@@ -226,7 +252,16 @@ async function fetchWithThrottle(ctx, url, isFirst) {
       // backoff を使い切った → これ以上叩かない。
       return { bytes: null, rateLimited: true };
     }
-    // その他のエラー（404 等）は best-effort で打ち切り。
+    // v0.1.458: 5xx（サーバー一時障害）と「ok だが空応答」も一過性とみなしてリトライ。
+    //   NDGR/CDN が一瞬詰まって空や 5xx を返すケースを救済する（旧実装は即打ち切り）。
+    if ((status >= 500 || status === 0 || !res || !res.bytes || res.bytes.length === 0) &&
+        transientIdx < NDGR_BACKFILL_TRANSIENT_RETRY_MS.length) {
+      await ctx.sleep(NDGR_BACKFILL_TRANSIENT_RETRY_MS[transientIdx]);
+      transientIdx += 1;
+      if (isAborted(ctx.signal)) return { bytes: null, rateLimited: false };
+      continue;
+    }
+    // その他のエラー（404 等・恒久的）は best-effort で打ち切り。
     return { bytes: null, rateLimited: false };
   }
 }

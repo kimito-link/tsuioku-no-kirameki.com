@@ -819,6 +819,120 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     });
   });
 
+  // v0.1.458 一過性失敗のリトライ（会議⑧・世界調査）: タイムアウト/ネットワーク失敗/5xx/
+  //   空応答を限定回数リトライしてから諦める。旧実装は1回失敗＝即諦めで取得率が落ちていた。
+  describe('一過性失敗のリトライ（v0.1.458）', () => {
+    // 指定 URL が最初の failCount 回だけ「失敗の種類」で返り、その後 success bytes を返す fetch。
+    function makeFlakyFetch({ flakyUrl, failKind, failCount, successBytes, baseMap }) {
+      const calls = [];
+      let seen = 0;
+      const fetchBinary = async (url) => {
+        calls.push(url);
+        if (url === flakyUrl) {
+          seen += 1;
+          if (seen <= failCount) {
+            if (failKind === 'throw') throw new Error('network fail / timeout');
+            if (failKind === '5xx') return { ok: false, status: 503, bytes: new Uint8Array() };
+            if (failKind === 'empty') return { ok: true, status: 200, bytes: new Uint8Array() };
+          }
+          return { ok: true, status: 200, bytes: successBytes };
+        }
+        const entry = baseMap.get(url);
+        if (entry == null) return { ok: false, status: 404, bytes: new Uint8Array() };
+        if (entry instanceof Uint8Array) return { ok: true, status: 200, bytes: entry };
+        return {
+          ok: entry.status >= 200 && entry.status < 300,
+          status: entry.status,
+          bytes: entry.bytes || new Uint8Array()
+        };
+      };
+      return { fetchBinary, calls, getSeen: () => seen };
+    }
+
+    for (const failKind of ['throw', '5xx', 'empty']) {
+      it(`backward fetch が ${failKind} で失敗しても 2 回までならリトライして取り込む`, async () => {
+        const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/RETRY_BK0';
+        const baseMap = new Map();
+        baseMap.set(atUrl('now'), nowEntryBytes(1000));
+        baseMap.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+        // BK0 は最初 2 回失敗 → 3 回目で chats を返す（next 無し＝終端）。
+        const { fetchBinary, getSeen } = makeFlakyFetch({
+          flakyUrl: BK0,
+          failKind,
+          failCount: 2,
+          successBytes: packedSegmentBytes([{ no: 10, content: '遅れて取れた', name: 'u' }]),
+          baseMap
+        });
+        const { sleep } = makeNoopSleep();
+        const { result, chatsAll } = await drain(
+          crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
+        );
+
+        // 2 回失敗してもリトライで最終的に取り込めた（旧実装なら 0 件で打ち切り）。
+        expect(chatsAll.map((c) => c.no)).toEqual([10]);
+        expect(getSeen()).toBe(3); // 失敗2 + 成功1
+        expect(result.stopReason).toBe('backward_exhausted');
+      });
+    }
+
+    it('リトライ上限（3回）を超えて失敗し続けたら best-effort で打ち切る（無限リトライしない）', async () => {
+      const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/RETRY_FOREVER';
+      const baseMap = new Map();
+      baseMap.set(atUrl('now'), nowEntryBytes(1000));
+      baseMap.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+      // BK0 は永遠に throw（failCount を大きく）。リトライ上限で諦めるはず。
+      const { fetchBinary, getSeen } = makeFlakyFetch({
+        flakyUrl: BK0,
+        failKind: 'throw',
+        failCount: 9999,
+        successBytes: new Uint8Array(),
+        baseMap
+      });
+      const { sleep } = makeNoopSleep();
+      const { result } = await drain(
+        crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
+      );
+
+      // 初回 backward が取れない＝backward_exhausted（reseed=0 で打ち切り）。無限ループしない。
+      expect(result.stopReason).toBe('backward_exhausted');
+      // 初回 1 + リトライ 3 = 4 回叩いて諦める（NDGR_BACKFILL_TRANSIENT_RETRY_MS が 3 要素）。
+      expect(getSeen()).toBe(4);
+    });
+
+    it('429 はリトライでなく backoff 系統で扱う（transient とは別）', async () => {
+      const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/RETRY_429';
+      const baseMap = new Map();
+      baseMap.set(atUrl('now'), nowEntryBytes(1000));
+      baseMap.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+      // BK0 は最初 1 回 429 → 2 回目で成功。backoff(2000ms) で1回待ってリトライするはず。
+      const { fetchBinary, getSeen } = makeFlakyFetch({
+        flakyUrl: BK0,
+        failKind: '5xx', // makeFlakyFetch は 5xx を返すが、ここでは 429 を直接返したいので下で上書き
+        failCount: 0,
+        successBytes: packedSegmentBytes([{ no: 10, content: 'ok', name: 'u' }]),
+        baseMap
+      });
+      // 429 を1回だけ返すラッパに差し替え。
+      let n429 = 0;
+      const wrapped = async (url, o) => {
+        if (url === BK0 && n429 === 0) {
+          n429 += 1;
+          return { ok: false, status: 429, bytes: new Uint8Array() };
+        }
+        return fetchBinary(url, o);
+      };
+      const { sleep, slept } = makeNoopSleep();
+      const { chatsAll } = await drain(
+        crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary: wrapped, sleep, now: () => 1_000_000 })
+      );
+
+      expect(chatsAll.map((c) => c.no)).toEqual([10]);
+      // backoff 列の先頭（2000ms）で待ったことを確認（transient の 500ms ではない）。
+      expect(slept).toContain(2000);
+      void getSeen;
+    });
+  });
+
   it('segment 数 cap に達したら cap_segments で停止する', async () => {
     // backward を延々辿れるチェーン（BK_i → BK_{i+1}）。各 1 件 chat。
     const map = new Map();
