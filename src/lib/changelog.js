@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.471',
+    date: '2026-05-30',
+    summary: '長時間配信でさかのぼりが途中で止まる問題を根治',
+    items: Object.freeze([
+      '7時間など長時間の配信で、さかのぼり取り込みが72%などで止まってしまう問題を根治しました',
+      '時間制限（15分）で一時停止するたびに自動で続きから再開し、配信開始まで遡り切るようになります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.470',
     date: '2026-05-30',
     summary: '複数タブで全部「—」になる問題を根治',
