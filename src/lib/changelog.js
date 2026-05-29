@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.466',
+    date: '2026-05-30',
+    summary: '自動リトライと「届いてるよ」ちらちらを根治',
+    items: Object.freeze([
+      '取り込み完了後も「届いてるよ ✨」が繰り返す問題、およびパネルを開いた直後に自動リトライが始まらない問題を同時に根治しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.465',
     date: '2026-05-30',
     summary: '「届いてるよ」が繰り返す問題を根治',

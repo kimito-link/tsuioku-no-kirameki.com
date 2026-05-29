@@ -5811,9 +5811,11 @@ async function refreshBackfillRecordCardHint(liveId) {
       prog && typeof prog.ts === 'number' && Date.now() - prog.ts < 180_000;
     if (prog && String(prog.lid || '').toLowerCase() === lid && recent) {
       // v0.1.464/v0.1.465: popup が開いた時点で既に done=1 になっていると onChanged が来ない。
-      //   storage.get で読んだ場合も同じ判定（自動リトライ or caught_up フラグ立て）を走らせる。
-      maybeAutoRetryBackfillFromProg(prog);
-      // caught_up フラグが立った場合は表示しない（↑ の関数がフラグを設定する）。
+      //   storage.get 経由では caught_up フラグ設定のみ行い、triggerBackfillRetry は呼ばない。
+      //   （popup 開き直しで自動フラグが立ち e2e 「ボタン前は null」テストが壊れるため。
+      //     自動リトライ本体は content 側 maybeAutoStartBackfill が担う設計。）
+      markCaughtUpIfComplete(prog);
+      // caught_up フラグが立った場合は「届いてるよ」を再表示しない。
       if (_backfillCaughtUpForLiveId === lid) return;
       applyBackfillRecordCardHint({
         started: true,
@@ -5830,20 +5832,20 @@ async function refreshBackfillRecordCardHint(liveId) {
 }
 
 /**
- * v0.1.464: 自動リトライ判定を共通化。onChanged と refreshBackfillRecordCardHint 両方から呼ぶ。
- *   途中停止（done=1 かつ reached_start 以外）で公式の95%未満なら triggerBackfillRetry。
- *   95%以上なら caught_up フラグを立てて以降の更新を無視しちらちらを止める。
- * @param {{ done?: number, stopReason?: string, lid?: string }} prog
+ * caught_up（95%以上 or reached_start）かどうかを判定して caught_up フラグを立てる内部ヘルパ。
+ * @param {{ done?: number, stopReason?: string }} prog
+ * @returns {boolean} caught_up フラグを立てた場合 true
  */
-function maybeAutoRetryBackfillFromProg(prog) {
-  if (!prog || prog.done !== 1) return;
-  if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return;
-  // reached_start（配信開始まで遡り切った）= 完全完了。フラグを立てて以降の表示を止める。
+function markCaughtUpIfComplete(prog) {
+  if (!prog || prog.done !== 1) return false;
+  if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return true;
+  // reached_start = 配信開始まで遡り切った = 完全完了。
   if (prog.stopReason === 'reached_start') {
     _backfillCaughtUpForLiveId = _backfillHintLiveId;
     chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
-    return;
+    return true;
   }
+  // 95%以上取れていれば実質完了。
   const oc = watchMetaCache.snapshot?.officialCommentCount;
   const officialCount = typeof oc === 'number' && Number.isFinite(oc) && oc > 0 ? oc : null;
   const liveStatEl = document.getElementById('liveStatComments');
@@ -5855,17 +5857,31 @@ function maybeAutoRetryBackfillFromProg(prog) {
       if (Number.isFinite(n) && n >= 0) recordedCount = n;
     }
   }
-  const alreadyCaughtUp =
+  if (
     officialCount !== null &&
     recordedCount !== null &&
-    recordedCount >= officialCount * 0.95;
-  if (!alreadyCaughtUp) {
-    triggerBackfillRetry();
-  } else {
-    // caught_up 確定（95%以上）: フラグを立てて以降の progress 更新を無視し、ちらちらを止める。
+    recordedCount >= officialCount * 0.95
+  ) {
     _backfillCaughtUpForLiveId = _backfillHintLiveId;
     chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
+    return true;
   }
+  return false;
+}
+
+/**
+ * v0.1.464/v0.1.465: onChanged 経由の progress 更新時に呼ぶ。
+ *   caught_up でなければ自動リトライ（triggerBackfillRetry）を起動。
+ *   refreshBackfillRecordCardHint（storage.get 経由）からは呼ばない。
+ *   理由: popup 開いた瞬間に自動でフラグが立ち、e2e「ボタン前は null」が壊れるため。
+ *   自動リトライ本体は content 側 maybeAutoStartBackfill が担う設計。
+ * @param {{ done?: number, stopReason?: string }} prog
+ */
+function maybeAutoRetryBackfillFromProg(prog) {
+  if (!prog || prog.done !== 1) return;
+  if (markCaughtUpIfComplete(prog)) return; // caught_up 確定 → リトライ不要
+  // 95%未満の途中停止 → 自動リトライ（onChanged 経由のみ）。
+  triggerBackfillRetry();
 }
 
 /**
