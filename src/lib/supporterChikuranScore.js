@@ -274,7 +274,7 @@ function touchAggregate(agg, p) {
   agg.sources.add(p.source);
 }
 
-function createEmptyAggregate(key, identityKind) {
+function createEmptyAggregate(/** @type {string} */ key, /** @type {'userId' | 'name' | 'anonymous'} */ identityKind) {
   return {
     supporterKey: key,
     identityKind,

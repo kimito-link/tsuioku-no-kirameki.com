@@ -157,7 +157,7 @@ function identifySender(raw) {
  *   sources: Set<string>
  * }}
  */
-function emptyAgg(id) {
+function emptyAgg(/** @type {{ key: string, userId: string, label: string, isAnonymous: boolean }} */ id) {
   return {
     key: id.key,
     userId: id.userId,

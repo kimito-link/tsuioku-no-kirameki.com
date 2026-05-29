@@ -1973,7 +1973,7 @@ function pickMarketingPoint(row) {
  * @returns {number}
  */
 function sumMarketingPoints(rows) {
-  return rows.reduce((sum, row) => sum + pickMarketingPoint(row), 0);
+  return /** @type {number} */ (rows.reduce((sum, row) => /** @type {number} */ (sum) + pickMarketingPoint(row), 0));
 }
 
 /**
