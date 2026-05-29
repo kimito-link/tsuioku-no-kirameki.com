@@ -40,6 +40,7 @@ import {
   KEY_BACKFILL_PROGRESS,
   commentsStorageKey,
   giftUsersStorageKey,
+  backfillResumeStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
   isRecordingEnabled,
@@ -11695,6 +11696,38 @@ async function runNdgrBackfillOnce() {
       ? programBeginAtMs
       : null;
 
+  // v0.1.456 レジューム: 前回この配信で到達した最古コメント vpos を読み、crawl の
+  //   resumeFromVpos に渡す。これで「もう一度ためす」や自動リトライが前回の続きから
+  //   掘り始め、同じ区画を取り直して dedupe で弾かれる無駄（実機 125→135→143）を解消。
+  //   読めない/壊れているときは null＝従来どおり seed 探索から（後方互換）。
+  const resumeKey = liveId ? backfillResumeStorageKey(liveId) : null;
+  let resumeFromVpos = null;
+  if (resumeKey) {
+    try {
+      const bag = await chrome.storage.local.get(resumeKey);
+      const saved = bag && bag[resumeKey];
+      const v = saved && Number(saved.minVpos);
+      if (Number.isFinite(v) && v > 0) resumeFromVpos = Math.floor(v);
+    } catch {
+      resumeFromVpos = null;
+    }
+  }
+
+  // v0.1.456 レジューム: この巡回で到達した最古 vpos を保存するヘルパ。前回より古い
+  //   （= 小さい）vpos に進めたときだけ上書きする（後退防止）。storage 負荷を避けるため
+  //   毎 yield では呼ばず、finally と persist バッチ境界からのみ低頻度で呼ぶ。
+  const saveBackfillResume = (/** @type {number|null} */ minVpos) => {
+    if (!resumeKey) return;
+    const v = Number(minVpos);
+    if (!Number.isFinite(v) || v <= 0) return;
+    // 前回保存値より小さい（より古い）ときだけ更新。
+    if (resumeFromVpos != null && v >= resumeFromVpos) return;
+    resumeFromVpos = Math.floor(v);
+    setStorageLocalSilent({
+      [resumeKey]: { lid: liveId, minVpos: Math.floor(v), ts: Date.now() }
+    });
+  };
+
   // v0.1.431: 区画ごとに毎回 persist せず、行をバッファに貯めて NDGR_BACKFILL_PERSIST_BATCH_ROWS
   //   を超えたら 1 回 persist する（巨大配列の read-merge-write 多発＝固まりの主因を緩和）。
   //   ⭐ try の外で宣言し、abort/例外で抜けても finally で必ず吐き出す＝取り込み済み行を取りこぼさない。
@@ -11719,6 +11752,8 @@ async function runNdgrBackfillOnce() {
       viewBase,
       fetchBinary: backfillFetchBinary,
       programStartSec: startMs != null ? Math.floor(startMs / 1000) : null,
+      // v0.1.456 レジューム: 前回到達点から続きを掘る（無ければ null＝従来の seed 探索）。
+      resumeFromVpos,
       signal: ac.signal
     });
 
@@ -11730,6 +11765,16 @@ async function runNdgrBackfillOnce() {
         //   popup が「ぜんぶ届いた」と誤宣言していた（13% で達成宣言→後から増える事象）。
         //   reached_start の時だけ達成、それ以外は正直な文言にするため stopReason を渡す。
         _backfillProgress.stopReason = String(step.value?.stopReason || '');
+        // v0.1.456 レジューム: 終了時に最古到達 vpos を保存（次回「もう一度」で続きから）。
+        //   reached_start（配信開始まで到達）で完了したら resume をクリア＝次回はゼロから。
+        //   それ以外（no_progress/cap_*/aborted/rate_limited 等）は続きから再開できるよう残す。
+        if (resumeKey) {
+          if (_backfillProgress.stopReason === 'reached_start') {
+            setStorageLocalSilent({ [resumeKey]: null });
+          } else {
+            saveBackfillResume(step.value && step.value.minVposReached);
+          }
+        }
         // v0.1.443: reached_start 発火時の判定根拠(chats の vpos 一覧)を診断面に残す。
         //   実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を後追いで確定するためのもの。
         //   描画パスには影響しない（globalThis への代入のみ）。
@@ -11796,6 +11841,10 @@ async function runNdgrBackfillOnce() {
       // 一定行たまったら 1 回だけ persist（フラッシュ回数を激減＝固まり緩和）。
       if (pendingBackfillRows.length >= NDGR_BACKFILL_PERSIST_BATCH_ROWS) {
         flushPendingBackfillRows();
+        // v0.1.456 レジューム: persist バッチ境界（低頻度）で最古到達 vpos を coalesce 保存。
+        //   途中でタブを閉じる/中断しても、次回「もう一度」で続きから再開できる（毎 yield で
+        //   書くと storage.local 多発＝固まりの主因になるのでバッチ境界に便乗）。
+        saveBackfillResume(ev.minVposReached);
       }
       // v0.1.431: 数区画ごとにブラウザへ制御を譲り、watch ページが「応答しません」に
       //   ならないようにする（描画/入力を通す）。MAX_RESEEDS を増やしても固まらない担保。
