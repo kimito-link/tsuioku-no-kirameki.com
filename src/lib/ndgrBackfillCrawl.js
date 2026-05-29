@@ -30,6 +30,8 @@
 
 import { decodeChunkedEntry } from './ndgrDecode.js';
 import { decodePackedSegmentNav } from './ndgrDecode.js';
+import { decodeChunkedMessage } from './ndgrDecode.js';
+import { splitLengthDelimitedMessages } from './lengthDelimitedStream.js';
 import { parseGiftCommentText } from './parseGiftComment.js';
 
 /**
@@ -484,29 +486,110 @@ export async function* crawlNdgrBackward(opts) {
 
   /**
    * ?at={startAt} から View を読み、backward が出るまで next を辿って入口 URI を返す。
-   * 見つからなければ ''。rate limit/abort は abend に立てて呼び出し側で停止する。
+   * 見つからなければ backwardUri=''。rate limit/abort は abend に立てて呼び出し側で停止する。
+   *
+   * v0.1.457 previous 回収: backward が見つかった ChunkedEntry に含まれる previous URI
+   *   （直近過去の MessageSegment・ライブ最前〜backward 入口の隙間を埋める）も一緒に返す。
+   *   呼び出し側が backward 連鎖を辿る前にこれを回収して取得率を上げる（世界実装＝
+   *   NdgrClientSharp が必須にしている処理）。previous が無ければ空配列。
    * @param {number} startAt
-   * @returns {Promise<string>}
+   * @returns {Promise<{ backwardUri: string, previousUris: string[] }>}
    */
   const seekBackwardUri = async (startAt) => {
     let viewAt = startAt;
     for (let hop = 0; hop < 20; hop += 1) {
-      if (isAborted(signal)) { abend.aborted = true; return ''; }
-      if (now() - t0 >= caps.elapsedMs) { abend.aborted = true; return ''; }
+      if (isAborted(signal)) { abend.aborted = true; return { backwardUri: '', previousUris: [] }; }
+      if (now() - t0 >= caps.elapsedMs) { abend.aborted = true; return { backwardUri: '', previousUris: [] }; }
       const atUrl = buildViewAtUrl(viewBase, viewAt);
-      if (visited.has(atUrl)) return '';
+      if (visited.has(atUrl)) return { backwardUri: '', previousUris: [] };
       visited.add(atUrl);
       const entryRes = await fetchWithThrottle(ctx, atUrl, false);
-      if (entryRes.rateLimited) { abend.rateLimited = true; return ''; }
-      if (!entryRes.bytes || entryRes.bytes.length === 0) return '';
+      if (entryRes.rateLimited) { abend.rateLimited = true; return { backwardUri: '', previousUris: [] }; }
+      if (!entryRes.bytes || entryRes.bytes.length === 0) return { backwardUri: '', previousUris: [] };
       bytesFetched += entryRes.bytes.length;
       const entryNav = decodeChunkedEntry(entryRes.bytes);
-      if (entryNav.backwardUri) return entryNav.backwardUri;
-      if (entryNav.nextAt == null || entryNav.nextAt === viewAt) return '';
+      if (entryNav.backwardUri) {
+        return {
+          backwardUri: entryNav.backwardUri,
+          previousUris: Array.isArray(entryNav.previousUris) ? entryNav.previousUris : []
+        };
+      }
+      if (entryNav.nextAt == null || entryNav.nextAt === viewAt) {
+        return { backwardUri: '', previousUris: [] };
+      }
       viewAt = entryNav.nextAt;
     }
-    return '';
+    return { backwardUri: '', previousUris: [] };
   };
+
+  /**
+   * v0.1.457 previous 回収: previous URI 群（直近過去の MessageSegment）を fetch して
+   *   chats を yield する。MessageSegment URI の中身は ChunkedMessage の length-delimited
+   *   stream なので、splitLengthDelimitedMessages でフレーム分割 → decodeChunkedMessage で
+   *   各フレームを decode → chats を集約（backward の PackedSegment とは別形式）。
+   *
+   *   backward と同じ防波堤（caps の elapsedMs/bytes/segments/rows・visited 二重 fetch 防止・
+   *   rate limit/abort）を適用する。停止すべきときは done(...) を返す（呼び出し側が return）。
+   *   取得失敗（403/404・空）は best-effort でスキップ（公式チャンネル耐性）。
+   *
+   * @param {string[]} uris
+   * @returns {AsyncGenerator<NdgrBackfillProgress, ReturnType<typeof done>|null, void>}
+   */
+  async function* drainPreviousUris(uris) {
+    for (const uri of uris) {
+      if (!uri || visited.has(uri)) continue;
+      visited.add(uri);
+      if (isAborted(signal)) return done('aborted');
+      if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
+      if (bytesFetched >= caps.bytes) return done('cap_bytes');
+      if (segmentsFetched >= caps.segments) return done('cap_segments');
+
+      const res = await fetchWithThrottle(ctx, uri, false);
+      if (res.rateLimited) return done('rate_limited');
+      if (!res.bytes || res.bytes.length === 0) continue; // 取得失敗はスキップ（best-effort）
+      bytesFetched += res.bytes.length;
+      segmentsFetched += 1;
+
+      // MessageSegment URI の中身 = ChunkedMessage の length-delimited stream。
+      /** @type {import('./ndgrDecode.js').NdgrChat[]} */
+      const chats = [];
+      try {
+        const frames = splitLengthDelimitedMessages(res.bytes);
+        for (const frame of frames) {
+          const decoded = decodeChunkedMessage(frame);
+          if (decoded && Array.isArray(decoded.chats) && decoded.chats.length) {
+            chats.push(...decoded.chats);
+          }
+        }
+      } catch {
+        // decode 失敗はスキップ（壊れたフレームで巡回を止めない）。
+        continue;
+      }
+
+      if (chats.length) {
+        rowsSeen += chats.length;
+        const minNo = minNoOf(chats);
+        const minVpos = minVposOf(chats);
+        // previous chats も最古 vpos に反映（レジューム minVposReached / reached_start に統合）。
+        if (
+          minVpos != null &&
+          (globalMinVpos == null || minVpos < globalMinVpos)
+        ) {
+          globalMinVpos = minVpos;
+        }
+        yield {
+          chats,
+          segmentsFetched,
+          rowsSeen,
+          bytesFetched,
+          minCommentNo: minNo,
+          minVposReached: globalMinVpos
+        };
+        if (rowsSeen >= caps.rows) return done('cap_rows');
+      }
+    }
+    return null; // 正常完走（停止理由なし＝呼び出し側は続行）
+  }
 
   /**
    * v0.1.431: 次の再シード at（秒）を決める。`desiredAtSec`（vpos 由来の理想点）を尊重しつつ、
@@ -553,12 +636,22 @@ export async function* crawlNdgrBackward(opts) {
   }
   let seedAtSec = nowSec - NDGR_BACKFILL_SEED_LAG_SEC;
   let initialBackwardUri = '';
+  // v0.1.457 previous 回収: 初回 seed で backward が見つかった ChunkedEntry の previous URI。
+  //   backward 連鎖を辿る前に回収して「ライブ最前〜入口の隙間」を埋める。
+  /** @type {string[]} */
+  let initialPreviousUris = [];
   for (const cand of seedCandidates) {
     if (cand <= 0) continue;
-    initialBackwardUri = await seekBackwardUri(cand);
+    const seek = await seekBackwardUri(cand);
     if (abend.aborted) return done('aborted');
     if (abend.rateLimited) return done('rate_limited');
-    if (initialBackwardUri) { seedAtSec = cand; lastSeedAtSec = cand; break; }
+    if (seek.backwardUri) {
+      initialBackwardUri = seek.backwardUri;
+      initialPreviousUris = seek.previousUris;
+      seedAtSec = cand;
+      lastSeedAtSec = cand;
+      break;
+    }
   }
   if (!initialBackwardUri) return done('backward_exhausted');
 
@@ -570,13 +663,23 @@ export async function* crawlNdgrBackward(opts) {
     if (isAborted(signal)) return done('aborted');
     if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
 
+    // v0.1.457 previous 回収: 初回 seed で得た previous（ライブ最前〜入口の隙間）を、
+    //   backward 連鎖を辿る最初の反復の冒頭で1回だけ回収する（会議⑦＝案B・最小変更。
+    //   再シードごとの回収は不要＝再シードは backward で過去を辿るため）。
+    if (reseed === 0 && initialPreviousUris.length) {
+      const stop = yield* drainPreviousUris(initialPreviousUris);
+      initialPreviousUris = []; // 二重回収しない
+      if (stop) return stop;
+    }
+
     // 入口 URI: 初回は探索済み、再シード後は seedAtSec から探す。
     let backwardUri;
     if (reseed === 0) {
       backwardUri = initialBackwardUri;
     } else {
       lastSeedAtSec = seedAtSec; // この at で種をまいた（次回はこれより 1 バケット前へ）
-      backwardUri = await seekBackwardUri(seedAtSec);
+      const seek = await seekBackwardUri(seedAtSec);
+      backwardUri = seek.backwardUri;
     }
     if (abend.aborted) return done('aborted');
     if (abend.rateLimited) return done('rate_limited');

@@ -1108,7 +1108,10 @@ describe('decodeChunkedEntry（過去ログbackfillの巡回URI抽出）', () =>
       ...lenDelimited(3, strField(1, SEG1))
     ]);
     const nav = decodeChunkedEntry(buf);
-    expect(nav.segmentUris).toEqual([SEG1]);
+    // v0.1.457: SEG1 は ChunkedEntry field3（previous）由来なので previousUris に入る
+    //   （field1=segment ではないため segmentUris ではない）。
+    expect(nav.previousUris).toEqual([SEG1]);
+    expect(nav.segmentUris).toEqual([]);
     expect(nav.backwardUri).toBe('');
     expect(nav.snapshotUri).toBe('');
   });
@@ -1158,8 +1161,31 @@ describe('decodeChunkedEntry（過去ログbackfillの巡回URI抽出）', () =>
     expect(nav).toEqual({
       backwardUri: '',
       segmentUris: [],
+      previousUris: [],
       snapshotUri: '',
       nextAt: null
     });
+  });
+
+  // v0.1.457 previous 回収: segment(field1=ライブ edge) と previous(field3=直近過去)を
+  //   ChunkedEntry の field 番号で振り分ける。
+  it('field1(segment) は segmentUris・field3(previous) は previousUris に振り分ける', () => {
+    // segment と previous は同じ /data/segment/v4/ path だが、ChunkedEntry の field が違う。
+    const buf = new Uint8Array([
+      ...lenDelimited(1, strField(1, SEG1)), // field1 = segment(ライブ edge)
+      ...lenDelimited(3, strField(1, SEG2)), // field3 = previous(直近過去)
+      ...lenDelimited(2, strField(1, BACKWARD)) // field2 = backward(入口)
+    ]);
+    const nav = decodeChunkedEntry(buf);
+    expect(nav.segmentUris).toEqual([SEG1]); // ライブ edge は segmentUris
+    expect(nav.previousUris).toEqual([SEG2]); // 直近過去は previousUris
+    expect(nav.backwardUri).toBe(BACKWARD);
+  });
+
+  it('previous が無い ChunkedEntry では previousUris は空（後方互換）', () => {
+    const buf = new Uint8Array([...lenDelimited(2, strField(1, BACKWARD))]);
+    const nav = decodeChunkedEntry(buf);
+    expect(nav.previousUris).toEqual([]);
+    expect(nav.backwardUri).toBe(BACKWARD);
   });
 });
