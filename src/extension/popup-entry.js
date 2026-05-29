@@ -5625,13 +5625,6 @@ async function refreshGiftRankingFetchPrompt(liveId) {
  */
 let _backfillRetryStartedAt = 0;
 
-/**
- * v0.1.459: 自動リトライ回数カウンタ。
- *   reached_start に到達するか上限(10回)に達するまで自動で続きを取り込む。
- *   配信切り替わりで liveId が変わったタイミングでリセット。
- */
-let _backfillAutoRetryCount = 0;
-const BACKFILL_AUTO_RETRY_MAX = 10;
 
 /**
  * v0.1.450: 「もう一度ためす」押下処理。A 内ボタン (#recordCardBackfillRetryBtn) のみが呼ぶ。
@@ -5783,6 +5776,13 @@ function applyBackfillRecordCardHint(progress) {
 let _backfillHintLiveId = '';
 
 /**
+ * v0.1.463: caught_up（記録が公式の95%以上）に一度達したら、同じ配信で
+ *   progress が更新されても自動リトライ・再描画ちらちらを起こさないフラグ。
+ *   配信切り替わり（_backfillHintLiveId 更新）でリセット。
+ */
+let _backfillCaughtUpForLiveId = '';
+
+/**
  * v0.1.450 (PR4): A 内 hint の表示制御。lid を受け取り、必要なら復元 + listener bind。
  *   旧 refreshBackfillFetchPrompt（B 用）の代替。B 廃止に伴い記録カード hint だけを面倒見る。
  *   ・lid 無し: hint を hidden に倒し、listener も bind しない
@@ -5792,14 +5792,16 @@ let _backfillHintLiveId = '';
  */
 async function refreshBackfillRecordCardHint(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
-  // v0.1.459: 配信が切り替わったらカウンタをリセット（前の配信の回数を引き継がない）。
-  if (lid !== _backfillHintLiveId) _backfillAutoRetryCount = 0;
+  // 配信が切り替わったら caught_up フラグをリセット。
+  if (lid !== _backfillHintLiveId) _backfillCaughtUpForLiveId = '';
   _backfillHintLiveId = lid;
   if (!lid) {
     applyBackfillRecordCardHint(null);
     return;
   }
   bindBackfillProgressListenerOnce();
+  // caught_up 確定済みの配信なら再表示しない（refresh のたびに「届いてるよ」が出るのを防ぐ）。
+  if (_backfillCaughtUpForLiveId === lid) return;
   // v0.1.411/v0.1.415: 直近進捗（ts が 180s 以内・lid 一致）があれば復元。古い完了の誤表示は
   //   recent ガードで防ぐ（押す前＝別セッションの古い結果は出ない）。
   try {
@@ -5808,6 +5810,13 @@ async function refreshBackfillRecordCardHint(liveId) {
     const recent =
       prog && typeof prog.ts === 'number' && Date.now() - prog.ts < 180_000;
     if (prog && String(prog.lid || '').toLowerCase() === lid && recent) {
+      // v0.1.464/v0.1.465: popup が開いた時点で既に done=1 になっていると onChanged が来ない。
+      //   storage.get 経由では caught_up フラグ設定のみ行い、triggerBackfillRetry は呼ばない。
+      //   （popup 開き直しで自動フラグが立ち e2e 「ボタン前は null」テストが壊れるため。
+      //     自動リトライ本体は content 側 maybeAutoStartBackfill が担う設計。）
+      markCaughtUpIfComplete(prog);
+      // caught_up フラグが立った場合は「届いてるよ」を再表示しない。
+      if (_backfillCaughtUpForLiveId === lid) return;
       applyBackfillRecordCardHint({
         started: true,
         rows: prog.rows,
@@ -5820,6 +5829,59 @@ async function refreshBackfillRecordCardHint(liveId) {
   } catch {
     /* no-op */
   }
+}
+
+/**
+ * caught_up（95%以上 or reached_start）かどうかを判定して caught_up フラグを立てる内部ヘルパ。
+ * @param {{ done?: number, stopReason?: string }} prog
+ * @returns {boolean} caught_up フラグを立てた場合 true
+ */
+function markCaughtUpIfComplete(prog) {
+  if (!prog || prog.done !== 1) return false;
+  if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return true;
+  // reached_start = 配信開始まで遡り切った = 完全完了。
+  if (prog.stopReason === 'reached_start') {
+    _backfillCaughtUpForLiveId = _backfillHintLiveId;
+    chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
+    return true;
+  }
+  // 95%以上取れていれば実質完了。
+  const oc = watchMetaCache.snapshot?.officialCommentCount;
+  const officialCount = typeof oc === 'number' && Number.isFinite(oc) && oc > 0 ? oc : null;
+  const liveStatEl = document.getElementById('liveStatComments');
+  let recordedCount = null;
+  if (liveStatEl) {
+    const txt = String(liveStatEl.textContent || '').replace(/[,，]/g, '').trim();
+    if (/^\d+$/.test(txt)) {
+      const n = parseInt(txt, 10);
+      if (Number.isFinite(n) && n >= 0) recordedCount = n;
+    }
+  }
+  if (
+    officialCount !== null &&
+    recordedCount !== null &&
+    recordedCount >= officialCount * 0.95
+  ) {
+    _backfillCaughtUpForLiveId = _backfillHintLiveId;
+    chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
+    return true;
+  }
+  return false;
+}
+
+/**
+ * v0.1.464/v0.1.465: onChanged 経由の progress 更新時に呼ぶ。
+ *   caught_up でなければ自動リトライ（triggerBackfillRetry）を起動。
+ *   refreshBackfillRecordCardHint（storage.get 経由）からは呼ばない。
+ *   理由: popup 開いた瞬間に自動でフラグが立ち、e2e「ボタン前は null」が壊れるため。
+ *   自動リトライ本体は content 側 maybeAutoStartBackfill が担う設計。
+ * @param {{ done?: number, stopReason?: string }} prog
+ */
+function maybeAutoRetryBackfillFromProg(prog) {
+  if (!prog || prog.done !== 1) return;
+  if (markCaughtUpIfComplete(prog)) return; // caught_up 確定 → リトライ不要
+  // 95%未満の途中停止 → 自動リトライ（onChanged 経由のみ）。
+  triggerBackfillRetry();
 }
 
 /**
@@ -5837,6 +5899,8 @@ function bindBackfillProgressListenerOnce() {
     if (!prog) return;
     // 表示中の配信の進捗だけ反映（別タブ/別配信の進捗で上書きしない）。
     if (String(prog.lid || '').toLowerCase() !== _backfillHintLiveId) return;
+    // v0.1.463: 既に caught_up 確定済みの配信なら progress 更新を無視してちらちらを防ぐ。
+    if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return;
     // v0.1.415: stopReason も渡す（done=1 でも reached_start か途中かで文言を分ける）。
     applyBackfillRecordCardHint({
       started: true,
@@ -5844,16 +5908,7 @@ function bindBackfillProgressListenerOnce() {
       done: prog.done,
       stopReason: prog.stopReason
     });
-    // v0.1.459: 途中停止（done=1 かつ reached_start 以外）なら自動で続きを取り込む。
-    //   上限 BACKFILL_AUTO_RETRY_MAX 回まで。reached_start または上限到達で自動停止。
-    if (
-      prog.done === 1 &&
-      prog.stopReason !== 'reached_start' &&
-      _backfillAutoRetryCount < BACKFILL_AUTO_RETRY_MAX
-    ) {
-      _backfillAutoRetryCount += 1;
-      triggerBackfillRetry();
-    }
+    maybeAutoRetryBackfillFromProg(prog);
   });
 }
 
@@ -13488,10 +13543,8 @@ function initPopup() {
       await yieldToBrowserPaint();
       const sKey = commentsStorageKey(lid);
       const gKey = giftUsersStorageKey(lid);
-      const giftEventsKey = `nls_gift_events_${lid}`;
-      const giftHistoryThrowsKey = `nls_gift_history_throws_${lid}`;
       const data = await withTimeout(
-        chrome.storage.local.get([sKey, gKey, giftEventsKey, giftHistoryThrowsKey]),
+        chrome.storage.local.get([sKey, gKey]),
         8_000,
         'marketing_storage_timeout'
       );
@@ -13499,12 +13552,6 @@ function initPopup() {
         Array.isArray(data[sKey]) ? data[sKey] : []
       );
       const giftUsersForMarketing = Array.isArray(data[gKey]) ? data[gKey] : [];
-      const giftEventsForMarketing = Array.isArray(data[giftEventsKey])
-        ? data[giftEventsKey]
-        : [];
-      const giftHistoryThrowsForMarketing = Array.isArray(data[giftHistoryThrowsKey])
-        ? data[giftHistoryThrowsKey]
-        : [];
       if (comments.length === 0) {
         if (stEl) stEl.textContent = 'コメントが0件です';
         if (btn) btn.disabled = false;
@@ -13593,8 +13640,6 @@ function initPopup() {
         commentsForAnalytics: comments,
         pastBroadcasts,
         giftUsers: giftUsersForMarketing,
-        giftEvents: giftEventsForMarketing,
-        giftHistoryThrows: giftHistoryThrowsForMarketing,
         officialEventDomBundle: bundleForMkt,
         broadcastTitle: String(
           watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
