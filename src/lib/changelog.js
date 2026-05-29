@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.460',
+    date: '2026-05-30',
+    summary: '過去ログ取り込みの自動継続を無制限に（「もう一度ためす」不要に）',
+    items: Object.freeze([
+      '過去ログの取り込みが途中で止まっても、reached_start（配信の最初）に到達するまで自動で続けるようにしました（v0.1.459 は10回上限がありましたが撤廃）。コメントが何万件あっても手動で「もう一度ためす」を押す必要がなくなります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.459',
     date: '2026-05-29',
     summary: '過去ログ取り込みが途中で止まっても自動で続きを取り込むように',
