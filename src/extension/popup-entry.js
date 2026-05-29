@@ -5855,6 +5855,10 @@ function bindBackfillProgressListenerOnce() {
         recordedCount >= officialCount * 0.95;
       if (!alreadyCaughtUp) {
         triggerBackfillRetry();
+      } else {
+        // caught_up: 自動取り込みを無効化して再起動ループを止める。
+        // 次に「もう一度ためす」を押すか別の配信に切り替えるまで自動起動しない。
+        chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
       }
     }
   });

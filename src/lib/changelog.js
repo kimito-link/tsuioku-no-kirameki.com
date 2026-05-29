@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.462',
+    date: '2026-05-30',
+    summary: '95%以上取れたら自動取り込みを停止してちらちらを解消',
+    items: Object.freeze([
+      '取り込み済みのコメントが公式件数の95%以上になったとき、自動取り込みを停止するようにしました。「いまの分まで届いてるよ ✨」や「ありがとう、もう一度…」が繰り返し表示され続ける問題が解消されます。「もう一度ためす」を押すか別の配信に切り替えると再度取り込みが始まります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.461',
     date: '2026-05-30',
     summary: '自動リトライが100%取れた配信でちらちら繰り返す問題を修正',
