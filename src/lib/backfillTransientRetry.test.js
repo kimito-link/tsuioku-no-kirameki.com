@@ -58,6 +58,18 @@ describe('shouldScheduleBackfillTransientRetry', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, retriedCount: 4, maxRetries: 5 })).toBe(true);
   });
 
+  it('cap_elapsed は上限到達後も再試行する（7時間等の長尺配信で止まらないよう）', () => {
+    const args = { ...base, stopReason: 'cap_elapsed', retriedCount: 7, maxRetries: 7 };
+    expect(shouldScheduleBackfillTransientRetry(args)).toBe(true);
+    expect(shouldScheduleBackfillTransientRetry({ ...args, retriedCount: 100 })).toBe(true);
+  });
+
+  it('cap_elapsed でも auto OFF / hidden では再試行しない', () => {
+    const args = { ...base, stopReason: 'cap_elapsed', retriedCount: 100, maxRetries: 7 };
+    expect(shouldScheduleBackfillTransientRetry({ ...args, autoEnabled: false })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...args, tabHidden: true })).toBe(false);
+  });
+
   it('数値が不正なら安全側で再試行しない', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, retriedCount: NaN })).toBe(false);
     expect(shouldScheduleBackfillTransientRetry({ ...base, maxRetries: undefined })).toBe(false);
