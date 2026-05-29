@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.461',
+    date: '2026-05-30',
+    summary: '自動リトライが100%取れた配信でちらちら繰り返す問題を修正',
+    items: Object.freeze([
+      '取り込み済みのコメントが公式件数の95%以上の場合は自動リトライを行わないようにしました。コメントが少ない配信で「ありがとう、もう一度さかのぼり始めるね」が繰り返し表示され続ける問題が解消されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.460',
     date: '2026-05-30',
     summary: '過去ログ取り込みの自動継続を無制限に（「もう一度ためす」不要に）',

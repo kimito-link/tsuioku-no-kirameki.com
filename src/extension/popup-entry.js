@@ -5835,10 +5835,27 @@ function bindBackfillProgressListenerOnce() {
       done: prog.done,
       stopReason: prog.stopReason
     });
-    // v0.1.460: 途中停止（done=1 かつ reached_start 以外）なら自動で続きを取り込む。
-    //   reached_start または配信切り替わりまで無制限に自動継続。
+    // v0.1.461: 途中停止（done=1 かつ reached_start 以外）で、かつ記録が公式の95%未満のとき
+    //   のみ自動リトライ。95%以上取れていれば実質完了とみなして無限ループを防ぐ。
     if (prog.done === 1 && prog.stopReason !== 'reached_start') {
-      triggerBackfillRetry();
+      const oc = watchMetaCache.snapshot?.officialCommentCount;
+      const officialCount = typeof oc === 'number' && Number.isFinite(oc) && oc > 0 ? oc : null;
+      const liveStatEl = document.getElementById('liveStatComments');
+      let recordedCount = null;
+      if (liveStatEl) {
+        const txt = String(liveStatEl.textContent || '').replace(/[,，]/g, '').trim();
+        if (/^\d+$/.test(txt)) {
+          const n = parseInt(txt, 10);
+          if (Number.isFinite(n) && n >= 0) recordedCount = n;
+        }
+      }
+      const alreadyCaughtUp =
+        officialCount !== null &&
+        recordedCount !== null &&
+        recordedCount >= officialCount * 0.95;
+      if (!alreadyCaughtUp) {
+        triggerBackfillRetry();
+      }
     }
   });
 }
