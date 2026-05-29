@@ -13488,8 +13488,10 @@ function initPopup() {
       await yieldToBrowserPaint();
       const sKey = commentsStorageKey(lid);
       const gKey = giftUsersStorageKey(lid);
+      const giftEventsKey = `nls_gift_events_${lid}`;
+      const giftHistoryThrowsKey = `nls_gift_history_throws_${lid}`;
       const data = await withTimeout(
-        chrome.storage.local.get([sKey, gKey]),
+        chrome.storage.local.get([sKey, gKey, giftEventsKey, giftHistoryThrowsKey]),
         8_000,
         'marketing_storage_timeout'
       );
@@ -13497,6 +13499,12 @@ function initPopup() {
         Array.isArray(data[sKey]) ? data[sKey] : []
       );
       const giftUsersForMarketing = Array.isArray(data[gKey]) ? data[gKey] : [];
+      const giftEventsForMarketing = Array.isArray(data[giftEventsKey])
+        ? data[giftEventsKey]
+        : [];
+      const giftHistoryThrowsForMarketing = Array.isArray(data[giftHistoryThrowsKey])
+        ? data[giftHistoryThrowsKey]
+        : [];
       if (comments.length === 0) {
         if (stEl) stEl.textContent = 'コメントが0件です';
         if (btn) btn.disabled = false;
@@ -13585,6 +13593,8 @@ function initPopup() {
         commentsForAnalytics: comments,
         pastBroadcasts,
         giftUsers: giftUsersForMarketing,
+        giftEvents: giftEventsForMarketing,
+        giftHistoryThrows: giftHistoryThrowsForMarketing,
         officialEventDomBundle: bundleForMkt,
         broadcastTitle: String(
           watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
