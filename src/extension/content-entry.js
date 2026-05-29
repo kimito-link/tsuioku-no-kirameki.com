@@ -11609,16 +11609,50 @@ function readNdgrViewBaseUri() {
   }
 }
 
+/**
+ * 1 リクエストの上限時間（ms）。これを超えたら abort して best-effort で次へ。
+ *
+ * ⚠️ v0.1.458 ハング型根治（会議⑧・実機 だぁナス3h/1%・あゆ45m/17% でメッセージすら出ない）:
+ *   旧 backfillFetchBinary は `opts.signal`（crawl 全体の AbortController）だけで、
+ *   **per-request タイムアウトが無かった**。NDGR/CDN が「接続だけ維持して body を返さない」
+ *   状態になると `await fetch` が永久に settle せず、generator が gen.next() で永久停止 →
+ *   finally の `_backfillProgress.done = 1` に到達せず done=0 のまま固まる（=記録カードが
+ *   fetching 扱いで沈黙＝「メッセージが出ない」症状）。同ファイルの pollStatsFromPage は
+ *   POLL_TIMEOUT_MS=12000 でこのパターンを実装済みなのに backfill だけ抜けていた
+ *   （v0.1.398 の snapshot fetch timeout 欠落と同型）。世界実装(NDGRClient fetchProtobufStream
+ *   read 40s / chat-downloader 5s)も per-request timeout を持つ。
+ */
+const NDGR_BACKFILL_REQUEST_TIMEOUT_MS = 10000;
+
 /** cross-origin NDGR を `credentials:'omit'` で取得し ArrayBuffer を Uint8Array で返す。 */
 async function backfillFetchBinary(url, opts) {
-  const res = await fetch(url, {
-    method: 'GET',
-    credentials: 'omit', // ⭐ cross-origin（mpn.live）必須。include だと Failed to fetch
-    cache: 'no-store',
-    signal: opts?.signal
-  });
-  const buf = res.ok ? new Uint8Array(await res.arrayBuffer()) : new Uint8Array();
-  return { ok: res.ok, status: res.status, bytes: buf };
+  // v0.1.458: crawl 全体の signal（タブ非表示/SPA 遷移）に加え、この 1 リクエスト専用の
+  //   タイムアウト signal を合成する。どちらが先に abort しても fetch が確実に settle する。
+  const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const tid = ac ? setTimeout(() => ac.abort(), NDGR_BACKFILL_REQUEST_TIMEOUT_MS) : null;
+  // crawl の signal が既に/後で abort したら、この AC も abort して fetch を止める。
+  const onParentAbort = () => {
+    try { ac?.abort(); } catch { /* no-op */ }
+  };
+  if (opts?.signal) {
+    if (opts.signal.aborted) onParentAbort();
+    else opts.signal.addEventListener('abort', onParentAbort, { once: true });
+  }
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit', // ⭐ cross-origin（mpn.live）必須。include だと Failed to fetch
+      cache: 'no-store',
+      signal: ac ? ac.signal : opts?.signal
+    });
+    const buf = res.ok ? new Uint8Array(await res.arrayBuffer()) : new Uint8Array();
+    return { ok: res.ok, status: res.status, bytes: buf };
+  } finally {
+    if (tid != null) clearTimeout(tid);
+    if (opts?.signal) {
+      try { opts.signal.removeEventListener('abort', onParentAbort); } catch { /* no-op */ }
+    }
+  }
 }
 
 /**
