@@ -279,6 +279,8 @@ import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
 import { buildReportThumbedUsersSectionHtml } from '../lib/reportThumbedUsersSectionHtml.js';
+import { computeKiramekiAwards } from '../lib/kiramekiAwards.js';
+import { buildKiramekiAwardsSectionHtml, KIRAMEKI_AWARDS_CSS } from '../lib/kiramekiAwardsSectionHtml.js';
 import {
   buildReportLinkRows,
   buildReportMetaRows,
@@ -11293,7 +11295,7 @@ async function buildHtmlReportDocument(
     imageDataUrlMap: yukkuriReportImageMap
   });
   const yukkuriReportCss =
-    yukkuriBroadcastSummaryEmbeddedCss() + mangaBroadcastSummaryEmbeddedCss();
+    yukkuriBroadcastSummaryEmbeddedCss() + mangaBroadcastSummaryEmbeddedCss() + KIRAMEKI_AWARDS_CSS;
 
   // 0.1.17 (R): 配信者本人 userId をスナップショットから取得し、応援コメント集計
   // から除外。HTML レポートのユーザー別テーブル / サムネ付き一覧 / 全コメント一覧
@@ -11391,6 +11393,31 @@ async function buildHtmlReportDocument(
     numericUsers: thumbNumericUsers,
     anonymousUsers: thumbAnonymousUsers
   });
+
+  // v0.1.469: きらめきの賞 — 単一ランキングを多軸の賞に変える。誰も負けない設計。
+  //   returningUserKeys / firstTimeUserKeys は storage にまだないため空配列で初回出荷。
+  //   将来 broadcastSessionSummaryDb 等から継続参加者データを引ける。
+  const { awards: kiramekiAwards } = computeKiramekiAwards({
+    comments: commentsForReport,
+    aggregatedRooms,
+    returningUserKeys: [],
+    firstTimeUserKeys: [],
+    broadcasterUserId: reportBroadcasterUserId
+  });
+  const kiramekiAwardsSectionHtml = buildKiramekiAwardsSectionHtml(
+    kiramekiAwards,
+    aggregatedRooms,
+    {
+      resolveAvatarSrc: (room) =>
+        resolveReportUserThumbSrc({
+          userId: String(room?.userKey || ''),
+          avatarUrl: String(room?.avatarUrl || ''),
+          identiconResolver: getCachedAnonymousIdenticonDataUrl
+        }),
+      escapeHtml,
+      escapeAttr
+    }
+  );
 
   /*
    * 0.1.12 (F2 追加): 全コメント一覧の各行にも「最低サムネ」を表示する。
@@ -12361,6 +12388,7 @@ async function buildHtmlReportDocument(
             </tbody>
           </table>
         </section>
+        ${kiramekiAwardsSectionHtml}
         ${thumbedUsersSectionHtml}
       </div>
       ${htmlReportConceptGuideCardHtml}
