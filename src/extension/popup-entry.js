@@ -5814,11 +5814,47 @@ async function refreshBackfillRecordCardHint(liveId) {
         done: prog.done,
         stopReason: prog.stopReason
       });
+      // v0.1.464: popup が開いた時点で既に done=1 になっていると onChanged が来ないため
+      //   自動リトライが発火しない。storage.get で読んだ場合も同じ判定を走らせる。
+      maybeAutoRetryBackfillFromProg(prog);
     } else {
       applyBackfillRecordCardHint(null); // 押す前は何も出さない（hidden）。
     }
   } catch {
     /* no-op */
+  }
+}
+
+/**
+ * v0.1.464: 自動リトライ判定を共通化。onChanged と refreshBackfillRecordCardHint 両方から呼ぶ。
+ *   途中停止（done=1 かつ reached_start 以外）で公式の95%未満なら triggerBackfillRetry。
+ *   95%以上なら caught_up フラグを立てて以降の更新を無視しちらちらを止める。
+ * @param {{ done?: number, stopReason?: string, lid?: string }} prog
+ */
+function maybeAutoRetryBackfillFromProg(prog) {
+  if (!prog || prog.done !== 1 || prog.stopReason === 'reached_start') return;
+  if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return;
+  const oc = watchMetaCache.snapshot?.officialCommentCount;
+  const officialCount = typeof oc === 'number' && Number.isFinite(oc) && oc > 0 ? oc : null;
+  const liveStatEl = document.getElementById('liveStatComments');
+  let recordedCount = null;
+  if (liveStatEl) {
+    const txt = String(liveStatEl.textContent || '').replace(/[,，]/g, '').trim();
+    if (/^\d+$/.test(txt)) {
+      const n = parseInt(txt, 10);
+      if (Number.isFinite(n) && n >= 0) recordedCount = n;
+    }
+  }
+  const alreadyCaughtUp =
+    officialCount !== null &&
+    recordedCount !== null &&
+    recordedCount >= officialCount * 0.95;
+  if (!alreadyCaughtUp) {
+    triggerBackfillRetry();
+  } else {
+    // caught_up 確定: フラグを立てて以降の progress 更新を無視し、ちらちらを止める。
+    _backfillCaughtUpForLiveId = _backfillHintLiveId;
+    chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
   }
 }
 
@@ -5846,32 +5882,7 @@ function bindBackfillProgressListenerOnce() {
       done: prog.done,
       stopReason: prog.stopReason
     });
-    // v0.1.461: 途中停止（done=1 かつ reached_start 以外）で、かつ記録が公式の95%未満のとき
-    //   のみ自動リトライ。95%以上取れていれば実質完了とみなして無限ループを防ぐ。
-    if (prog.done === 1 && prog.stopReason !== 'reached_start') {
-      const oc = watchMetaCache.snapshot?.officialCommentCount;
-      const officialCount = typeof oc === 'number' && Number.isFinite(oc) && oc > 0 ? oc : null;
-      const liveStatEl = document.getElementById('liveStatComments');
-      let recordedCount = null;
-      if (liveStatEl) {
-        const txt = String(liveStatEl.textContent || '').replace(/[,，]/g, '').trim();
-        if (/^\d+$/.test(txt)) {
-          const n = parseInt(txt, 10);
-          if (Number.isFinite(n) && n >= 0) recordedCount = n;
-        }
-      }
-      const alreadyCaughtUp =
-        officialCount !== null &&
-        recordedCount !== null &&
-        recordedCount >= officialCount * 0.95;
-      if (!alreadyCaughtUp) {
-        triggerBackfillRetry();
-      } else {
-        // caught_up 確定: フラグを立てて以降の progress 更新を無視し、ちらちらを止める。
-        _backfillCaughtUpForLiveId = _backfillHintLiveId;
-        chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
-      }
-    }
+    maybeAutoRetryBackfillFromProg(prog);
   });
 }
 
