@@ -141,15 +141,13 @@ describe('computeKiramekiAwards', () => {
       aggregatedRooms: roomsWithBroadcaster,
       broadcasterUserId: 'broadcaster'
     });
-    for (const award of awards) {
-      // aggregatedRooms から除外されていないので tomoshibi には入るが
-      // broadcaster を aggregatedRooms から除くのは呼び出し側責務
-      // ここでは broadcasterUserId が文字数カウントから除外されることを確認
-      const kotoba = awards.find((a) => a.id === 'kotoba');
-      // broadcaster は文字数カウントから除外されるので kotoba に入らないはず
-      // （aggregatedRooms には入っているので tomoshibi には入る）
-      expect(kotoba.userKeys).not.toContain('broadcaster');
-    }
+    // aggregatedRooms から除外されていないので tomoshibi には入るが
+    // broadcaster を aggregatedRooms から除くのは呼び出し側責務
+    // ここでは broadcasterUserId が文字数カウントから除外されることを確認
+    const kotoba = awards.find((a) => a.id === 'kotoba');
+    // broadcaster は文字数カウントから除外されるので kotoba に入らないはず
+    // （aggregatedRooms には入っているので tomoshibi には入る）
+    expect(kotoba.userKeys).not.toContain('broadcaster');
   });
 
   it('参加者0人でも安全に動く', () => {
