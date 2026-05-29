@@ -208,7 +208,7 @@ export function scoreSentimentTimeline(comments, opts = {}) {
   return { buckets, totals };
 }
 
-/* ═══ L14: 自分が言わなかった語 TOP ═══ */
+/* ═══ L14: 視聴者発の人気語 TOP ═══ */
 
 const STOP_WORDS = new Set([
   'です', 'ます', 'する', 'いる', 'ある', 'なる', 'こと', 'もの', 'よう',
