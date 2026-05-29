@@ -5800,6 +5800,8 @@ async function refreshBackfillRecordCardHint(liveId) {
     return;
   }
   bindBackfillProgressListenerOnce();
+  // caught_up 確定済みの配信なら再表示しない（refresh のたびに「届いてるよ」が出るのを防ぐ）。
+  if (_backfillCaughtUpForLiveId === lid) return;
   // v0.1.411/v0.1.415: 直近進捗（ts が 180s 以内・lid 一致）があれば復元。古い完了の誤表示は
   //   recent ガードで防ぐ（押す前＝別セッションの古い結果は出ない）。
   try {
@@ -5808,15 +5810,17 @@ async function refreshBackfillRecordCardHint(liveId) {
     const recent =
       prog && typeof prog.ts === 'number' && Date.now() - prog.ts < 180_000;
     if (prog && String(prog.lid || '').toLowerCase() === lid && recent) {
+      // v0.1.464/v0.1.465: popup が開いた時点で既に done=1 になっていると onChanged が来ない。
+      //   storage.get で読んだ場合も同じ判定（自動リトライ or caught_up フラグ立て）を走らせる。
+      maybeAutoRetryBackfillFromProg(prog);
+      // caught_up フラグが立った場合は表示しない（↑ の関数がフラグを設定する）。
+      if (_backfillCaughtUpForLiveId === lid) return;
       applyBackfillRecordCardHint({
         started: true,
         rows: prog.rows,
         done: prog.done,
         stopReason: prog.stopReason
       });
-      // v0.1.464: popup が開いた時点で既に done=1 になっていると onChanged が来ないため
-      //   自動リトライが発火しない。storage.get で読んだ場合も同じ判定を走らせる。
-      maybeAutoRetryBackfillFromProg(prog);
     } else {
       applyBackfillRecordCardHint(null); // 押す前は何も出さない（hidden）。
     }
@@ -5832,8 +5836,14 @@ async function refreshBackfillRecordCardHint(liveId) {
  * @param {{ done?: number, stopReason?: string, lid?: string }} prog
  */
 function maybeAutoRetryBackfillFromProg(prog) {
-  if (!prog || prog.done !== 1 || prog.stopReason === 'reached_start') return;
+  if (!prog || prog.done !== 1) return;
   if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return;
+  // reached_start（配信開始まで遡り切った）= 完全完了。フラグを立てて以降の表示を止める。
+  if (prog.stopReason === 'reached_start') {
+    _backfillCaughtUpForLiveId = _backfillHintLiveId;
+    chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
+    return;
+  }
   const oc = watchMetaCache.snapshot?.officialCommentCount;
   const officialCount = typeof oc === 'number' && Number.isFinite(oc) && oc > 0 ? oc : null;
   const liveStatEl = document.getElementById('liveStatComments');
@@ -5852,7 +5862,7 @@ function maybeAutoRetryBackfillFromProg(prog) {
   if (!alreadyCaughtUp) {
     triggerBackfillRetry();
   } else {
-    // caught_up 確定: フラグを立てて以降の progress 更新を無視し、ちらちらを止める。
+    // caught_up 確定（95%以上）: フラグを立てて以降の progress 更新を無視し、ちらちらを止める。
     _backfillCaughtUpForLiveId = _backfillHintLiveId;
     chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
   }

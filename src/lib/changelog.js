@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.465',
+    date: '2026-05-30',
+    summary: '「届いてるよ」が繰り返す問題を根治',
+    items: Object.freeze([
+      '取り込み完了後も「いまの分まで届いてるよ ✨」が何度も表示され続ける問題を根治しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.464',
     date: '2026-05-30',
     summary: '自動レジュームが始まらないことがある問題を修正',
