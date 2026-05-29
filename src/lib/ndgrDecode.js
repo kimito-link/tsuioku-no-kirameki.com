@@ -958,6 +958,7 @@ export function decodePackedSegmentNav(buf, start, end) {
  * @typedef {{
  *   backwardUri: string,
  *   segmentUris: string[],
+ *   previousUris: string[],
  *   snapshotUri: string,
  *   nextAt: number|null
  * }} NdgrChunkedEntryNav
@@ -971,7 +972,13 @@ export function decodeChunkedEntry(buf, start, end) {
   const s0 = start ?? 0;
   const e0 = end ?? buf.length;
   /** @type {NdgrChunkedEntryNav} */
-  const nav = { backwardUri: '', segmentUris: [], snapshotUri: '', nextAt: null };
+  const nav = {
+    backwardUri: '',
+    segmentUris: [],
+    previousUris: [],
+    snapshotUri: '',
+    nextAt: null
+  };
 
   // NDGR の view/segment/backward/snapshot URI かを path で判定（host は mpn.live 等で
   // 変わり得るので host には依存しない）。
@@ -988,14 +995,24 @@ export function decodeChunkedEntry(buf, start, end) {
 
   // 再帰的に length-delimited 値を掘り、URI 文字列を分類して集める。
   // ループ・暴走防止に深さ上限を設ける（ChunkedEntry は浅いネスト）。
+  //
+  // v0.1.457 previous 回収: ChunkedEntry の `segment`(field1=ライブ edge) と
+  //   `previous`(field3=直近過去) は同じ MessageSegment 型・同じ /data/segment/v4/ path で
+  //   path 分類だけでは区別できない。そこで「ChunkedEntry 直下の field 番号」を再帰に伝播し
+  //   （entryField）、その配下で見つかった segment URI を field3 由来なら previousUris、
+  //   それ以外（field1=ライブ edge 等）は従来どおり segmentUris に振り分ける。判定不能
+  //   （entryField 不明）なら安全側で segmentUris にフォールバック（後方互換）。
   /**
    * @param {number} s
    * @param {number} e
    * @param {number} depth
+   * @param {number|null} entryField この walk が属する ChunkedEntry 直下の field 番号。
+   *   トップレベル（ChunkedEntry そのものを walk 中）は null。再帰で MessageSegment へ
+   *   降りるときに、その MessageSegment が紐づく ChunkedEntry field（1=segment/3=previous）を渡す。
    */
-  const walk = (s, e, depth) => {
+  const walk = (s, e, depth, entryField) => {
     if (depth > 6) return;
-    pbForEach(buf, s, e, (_fn, wt, val, fs, fe) => {
+    pbForEach(buf, s, e, (fn, wt, val, fs, fe) => {
       if (wt === 0) {
         // ベストエフォートで long-poll ポインタ（unixtime/相対値）を拾う。
         // 妥当な範囲の正の整数のみ採用（最初に見つかった 1 個を next.at とする）。
@@ -1017,7 +1034,13 @@ export function decodeChunkedEntry(buf, start, end) {
         return;
       }
       if (kind === 'segment') {
-        if (!nav.segmentUris.includes(str)) nav.segmentUris.push(str);
+        // v0.1.457: ChunkedEntry field3（previous）由来の segment URI は previousUris へ。
+        //   それ以外（field1=ライブ edge / 判定不能）は従来どおり segmentUris へ。
+        if (entryField === 3) {
+          if (!nav.previousUris.includes(str)) nav.previousUris.push(str);
+        } else if (!nav.segmentUris.includes(str)) {
+          nav.segmentUris.push(str);
+        }
         return;
       }
       if (kind === 'snapshot') {
@@ -1026,13 +1049,18 @@ export function decodeChunkedEntry(buf, start, end) {
       }
       // URI でなければ、ネストした message の可能性があるので掘り下げる。
       // 文字列としての妥当性が低い（= バイナリ message っぽい）ものだけ再帰。
-      walk(fs, fe, depth + 1);
+      // v0.1.457: トップレベル（entryField==null）から降りるときは、この子の field 番号
+      //   （fn）を entryField として伝播する。これにより配下の MessageSegment.uri が
+      //   field1（segment）か field3（previous）かを区別できる。既に entryField が
+      //   確定している深い階層ではそれを維持する。
+      const nextEntryField = entryField == null ? fn : entryField;
+      walk(fs, fe, depth + 1, nextEntryField);
     });
   };
 
   // (1) バッファ全体を bare message として walk（旧来＝単一メッセージ応答・テスト
-  //     フィクスチャとの後方互換）。
-  walk(s0, e0, 0);
+  //     フィクスチャとの後方互換）。entryField=null（トップレベル＝ChunkedEntry 自身）。
+  walk(s0, e0, 0, null);
 
   // (2) length-delimited stream として各フレームを walk。NDGR の `?at=` 応答はこの
   //     形（`[varint長][ChunkedEntry]…`）で来るため、こちらが実機での主経路。
@@ -1047,7 +1075,7 @@ export function decodeChunkedEntry(buf, start, end) {
     const fStart = lv[1];
     const fEnd = fStart + lv[0];
     if (lv[0] <= 0 || fEnd > e0) break; // 長さ0 / バッファ超過 = フレーミングでない
-    walk(fStart, fEnd, 1);
+    walk(fStart, fEnd, 1, null); // 各フレーム＝1 ChunkedEntry。entryField は直下で確定。
     o = fEnd;
   }
 

@@ -56,11 +56,16 @@ function nowEntryBytes(nextAt) {
  * segment.uri）。decodeChunkedEntry は path 分類で `/data/backward/v4/` を backwardUri と
  * して拾うので、ここでは backward URI を持つ message を埋めるだけでよい（field 番号非依存）。
  */
-function viewEntryBytes({ backwardUri, nextAt } = {}) {
+function viewEntryBytes({ backwardUri, nextAt, previousUris } = {}) {
   // nextAt を指定すると next.at(field4 varint) を入れる（seed の next 追従テスト用）。
   // 指定なしでも非空にするため、何も無いときは backward も next も無い極小 entry にする。
   const out = [];
   if (nextAt != null) out.push(...varintField(4, nextAt));
+  // v0.1.457: previous URI（field3 = MessageSegment）。decodeChunkedEntry が field 番号で
+  //   previousUris に振り分ける（field1=segment と区別）。複数指定可。
+  if (Array.isArray(previousUris)) {
+    for (const pu of previousUris) out.push(...lenDelimited(3, strField(1, pu)));
+  }
   if (backwardUri) out.push(...lenDelimited(2, strField(1, backwardUri)));
   // backward も next も無いと空 buffer になり no_entry 判定に落ちるため、無害な padding を足す。
   // ⚠️ varint(wt0) は decodeChunkedEntry が nextAt として拾うので、len-delimited(wt2) の
@@ -99,6 +104,20 @@ function packedSegmentBytes(chats, nextUri) {
   // PackedSegment.messages = field1 repeated ChunkedMessage。各 ChunkedMessage を field1 で包む。
   for (const c of chats) out.push(...lenDelimited(1, chatChunkedMessage(c)));
   if (nextUri) out.push(...lenDelimited(2, strField(1, nextUri))); // next{uri}
+  return new Uint8Array(out);
+}
+
+/**
+ * v0.1.457: MessageSegment URI（previous/segment）が指す先の応答 = ChunkedMessage の
+ *   length-delimited stream（PackedSegment とは別形式）。各 ChunkedMessage を
+ *   `[varint長][本体]` のフレームにして連結する（splitLengthDelimitedMessages で分割できる形）。
+ */
+function messageSegmentStreamBytes(chats) {
+  const out = [];
+  for (const c of chats) {
+    const msg = chatChunkedMessage(c); // ChunkedMessage 本体（tag 付き）
+    out.push(...encodeVarint(msg.length), ...msg); // length-delimited フレーム
+  }
   return new Uint8Array(out);
 }
 
@@ -701,6 +720,102 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
 
       // 従来どおり ENTRY_AT から取り込めた（resume は無視）。
       expect(chatsAll.map((c) => c.no)).toContain(10);
+    });
+  });
+
+  // v0.1.457 previous 回収: 世界実装(NdgrClientSharp)が必須にしている previous(直近過去・
+  //   ライブ最前〜backward 入口の隙間)の回収。backward を辿る前に取り込む。
+  describe('previous セグメント回収（v0.1.457）', () => {
+    it('初回 seed の previous を backward より先に取り込む（取得率UP）', async () => {
+      const PUri = 'https://mpn.live.nicovideo.jp/data/segment/v4/PREV0';
+      const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/BK0';
+      const BK1 = 'https://mpn.live.nicovideo.jp/data/backward/v4/BK1';
+
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      // 初回 seed の ChunkedEntry に previous(field3=PUri) と backward(BK0)。
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0, previousUris: [PUri] }));
+      // previous URI の中身 = ChunkedMessage stream（最前付近の新しめコメント）。
+      map.set(
+        PUri,
+        messageSegmentStreamBytes([
+          { no: 90, content: '最前の方1', name: 'p1' },
+          { no: 91, content: '最前の方2', name: 'p2' }
+        ])
+      );
+      // backward チェーン（より過去）。
+      map.set(BK0, packedSegmentBytes([{ no: 50, content: '中盤', name: 'u1' }], BK1));
+      map.set(BK1, packedSegmentBytes([{ no: 10, content: '開始直後', name: 'u2' }]));
+
+      const { fetchBinary, calls } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result, chatsAll } = await drain(
+        crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
+      );
+
+      // previous(90,91) も backward(50,10) も両方取り込めた。
+      expect(chatsAll.map((c) => c.no).sort((a, b) => a - b)).toEqual([10, 50, 90, 91]);
+      // ⭐ previous URI が backward URI より先に叩かれた（C# 順序準拠）。
+      expect(calls.indexOf(PUri)).toBeLessThan(calls.indexOf(BK0));
+      expect(result.stopReason).toBe('backward_exhausted');
+    });
+
+    it('previous URI が 404（取得失敗）でも backward は従来どおり完走する（公式CH 耐性）', async () => {
+      const PUri = 'https://mpn.live.nicovideo.jp/data/segment/v4/PREV_404';
+      const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/BK0';
+
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0, previousUris: [PUri] }));
+      // PUri は map に登録しない＝404。backward だけ登録。
+      map.set(BK0, packedSegmentBytes([{ no: 10, content: '開始直後', name: 'u' }]));
+
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result, chatsAll } = await drain(
+        crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
+      );
+
+      // previous は取れなかったが backward は完走。
+      expect(chatsAll.map((c) => c.no)).toEqual([10]);
+      expect(result.stopReason).toBe('backward_exhausted');
+    });
+
+    it('previous が無い ChunkedEntry でも従来どおり backward を取り込む（後方互換）', async () => {
+      const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/BK0';
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 })); // previousUris 指定なし
+      map.set(BK0, packedSegmentBytes([{ no: 10, content: '開始', name: 'u' }]));
+
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result, chatsAll } = await drain(
+        crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
+      );
+
+      expect(chatsAll.map((c) => c.no)).toEqual([10]);
+      expect(result.stopReason).toBe('backward_exhausted');
+    });
+
+    it('previous の chats も最古 vpos に反映される（レジューム minVposReached に統合）', async () => {
+      const PUri = 'https://mpn.live.nicovideo.jp/data/segment/v4/PREV_VP';
+      const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/BK0';
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0, previousUris: [PUri] }));
+      // previous に大きい vpos（最前付近）、backward に小さい vpos（過去）。
+      map.set(PUri, messageSegmentStreamBytes([{ no: 90, content: '最前', name: 'p', vpos: 90000 }]));
+      map.set(BK0, packedSegmentBytes([{ no: 10, content: '過去', name: 'u', vpos: 5000 }]));
+
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result } = await drain(
+        crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 })
+      );
+
+      // 最古 vpos は backward の 5000（previous の 90000 より小さい）。
+      expect(result.minVposReached).toBe(5000);
     });
   });
 
