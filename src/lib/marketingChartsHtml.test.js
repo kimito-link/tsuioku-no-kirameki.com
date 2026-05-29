@@ -180,6 +180,269 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('ギフト前後');
   });
 
+  it('giftEvents と保存履歴を渡すとギフト深掘りセクションが含まれる', () => {
+    const base = Date.now() - 900_000;
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      { id: 'g1', liveId: 'lv123', commentNo: '1', text: 'わこつ', userId: 'u1', nickname: '静かな支援者', capturedAt: base, vpos: 0, is184: false, selfPosted: false },
+      { id: 'g2', liveId: 'lv123', commentNo: '2', text: 'ナイス', userId: 'u2', nickname: '見る人', capturedAt: base + 60_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'g3', liveId: 'lv123', commentNo: '3', text: 'ありがとう 8888', userId: 'u3', nickname: '見る人2', capturedAt: base + 230_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'g4', liveId: 'lv123', commentNo: '4', text: 'ありがとう 最高', userId: 'u4', nickname: '見る人3', capturedAt: base + 240_000, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      giftEvents: [
+        {
+          userId: 'u1',
+          nickname: '静かな支援者',
+          itemId: 'gift1',
+          itemName: '花束',
+          point: 1200,
+          message: '',
+          contributionRank: 1,
+          capturedAt: base + 180_000
+        }
+      ],
+      giftHistoryThrows: [
+        {
+          userId: 'u1',
+          nickname: '静かな支援者',
+          throwCount: 2,
+          totalPoints: 1200,
+          capturedAt: base + 180_000
+        }
+      ],
+      officialEventDomBundle: /** @type {any} */ ({
+        programStats: { giftPoints: 2400 },
+        contributionRanking: [
+          { rank: 1, name: '静かな支援者', contribution: 1200, isAnonymous: false }
+        ]
+      })
+    });
+
+    expect(html).toContain('id="mkt-gift-deep"');
+    expect(html).toContain('ギフト深掘り');
+    expect(html).toContain('たくさんギフトが飛ぶ人の傾向');
+    expect(html).toContain('ギフトが飛んだタイミング');
+    expect(html).toContain('静かな支援者');
+    expect(html).toContain('ランキング上位の応援者');
+    expect(html).toContain('開始から約3分');
+    expect(html).toContain('data-label="送り主"');
+    expect(html).toContain('@media(max-width:560px)');
+  });
+
+  it('コメント・ギフト・広告から応援者ちくらんβセクションを出す', () => {
+    const base = Date.now() - 600_000;
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      { id: 'sc1', liveId: 'lv123', commentNo: '1', text: 'わこつ', userId: '88210441', nickname: '応援リーダー', capturedAt: base, vpos: 0, is184: false, selfPosted: false },
+      { id: 'sc2', liveId: 'lv123', commentNo: '2', text: '8888', userId: '88210441', nickname: '応援リーダー', capturedAt: base + 120_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'sc3', liveId: 'lv123', commentNo: '3', text: '広告しました', userId: '900001', nickname: '広告の人', capturedAt: base + 180_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'sc4', liveId: 'lv123', commentNo: '4', text: '配信者コメント', userId: '55555', nickname: '配信者本人', capturedAt: base + 240_000, vpos: 0, is184: false, selfPosted: true },
+      { id: 'sc5', liveId: 'lv123', commentNo: '5', text: '匿名応援', userId: '', nickname: '匿名', capturedAt: base + 300_000, vpos: 0, is184: true, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      broadcasterUserId: '55555',
+      giftEvents: [
+        {
+          userId: '88210441',
+          nickname: '応援リーダー',
+          itemId: 'gift-a',
+          itemName: '花束',
+          point: 500,
+          capturedAt: base + 260_000
+        }
+      ],
+      giftHistoryThrows: [
+        {
+          userId: '88210441',
+          nickname: '応援リーダー',
+          throwCount: 2,
+          totalPoints: 800,
+          capturedAt: base + 260_000
+        }
+      ],
+      officialEventDomBundle: /** @type {any} */ ({
+        adContributionRanking: [
+          { userId: '900001', name: '広告の人', contribution: 1200 }
+        ]
+      })
+    });
+    const section = html.match(/<section class="mkt-section mkt-section--supporter-chikuran"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(section).toContain('id="mkt-supporter-chikuran"');
+    expect(section).toContain('応援者ちくらん β');
+    expect(section).toContain('公式順位ではありません');
+    expect(section).toContain('応援リーダー');
+    expect(section).toContain('href="https://www.nicovideo.jp/user/88210441"');
+    expect(section).toContain('data-label="応援者"');
+    expect(section).toContain('data-label="ローカル勢い"');
+    expect(section).toContain('ギフト貢献度');
+    expect(section).toContain('広告');
+    expect(section).not.toContain('配信者本人');
+    expect(html).toContain('応援者ちくらんβ');
+    expect(html).toContain('.mkt-supporter-table');
+  });
+
+  it('共有伏せ字では応援者ちくらんβの実名リンクとサムネを出さない', () => {
+    const base = Date.now() - 600_000;
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      { id: 'sm1', liveId: 'lv123', commentNo: '1', text: 'わこつ', userId: '88210441', nickname: '応援リーダー', avatarUrl: 'https://example.test/avatar.jpg', capturedAt: base, vpos: 0, is184: false, selfPosted: false },
+      { id: 'sm2', liveId: 'lv123', commentNo: '2', text: '8888', userId: '88210441', nickname: '応援リーダー', avatarUrl: 'https://example.test/avatar.jpg', capturedAt: base + 120_000, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      maskShareLabels: true,
+      giftEvents: [
+        {
+          userId: '88210441',
+          nickname: '応援リーダー',
+          itemId: 'gift-a',
+          itemName: '花束',
+          point: 500,
+          capturedAt: base + 260_000
+        }
+      ]
+    });
+    const section = html.match(/<section class="mkt-section mkt-section--supporter-chikuran"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(section).toContain('id="mkt-supporter-chikuran"');
+    expect(section).not.toContain('href="https://www.nicovideo.jp/user/88210441"');
+    expect(section).not.toContain('応援リーダー');
+    expect(section).not.toContain('https://example.test/avatar.jpg');
+  });
+
+  it('多種類の入力データからマーケ総合サマリを出す', () => {
+    const base = Date.now() - 1_200_000;
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      { id: 'md1', liveId: 'lv123', commentNo: '1', text: 'わこつ 最高', userId: '88210441', nickname: '応援リーダー', capturedAt: base, vpos: 0, is184: false, selfPosted: false },
+      { id: 'md2', liveId: 'lv123', commentNo: '2', text: '8888', userId: '88210441', nickname: '応援リーダー', capturedAt: base + 60_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'md3', liveId: 'lv123', commentNo: '3', text: '広告しました', userId: '900001', nickname: '広告の人', capturedAt: base + 120_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'md4', liveId: 'lv123', commentNo: '4', text: 'ギフトだ', userId: '900002', nickname: 'ギフトの人', capturedAt: base + 180_000, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      sessionSummaryRows: [
+        { liveId: 'lv123', capturedAt: base, viewerCountFromDom: 400, officialCommentCount: 10 },
+        { liveId: 'lv123', capturedAt: base + 300_000, viewerCountFromDom: 1200, officialCommentCount: 80 }
+      ],
+      pastBroadcasts: [
+        { liveId: 'lv122', comments: comments.slice(0, 2) }
+      ],
+      giftUsers: [
+        { userId: '88210441', nickname: '応援リーダー', throwCount: 2, capturedAt: base + 240_000 }
+      ],
+      giftEvents: [
+        { userId: '88210441', nickname: '応援リーダー', itemId: 'gift-a', itemName: '花束', point: 500, capturedAt: base + 240_000 },
+        { userId: '900002', nickname: 'ギフトの人', itemId: 'gift-b', itemName: 'クラッカー', point: 300, capturedAt: base + 360_000 }
+      ],
+      giftHistoryThrows: [
+        { userId: '88210441', nickname: '応援リーダー', throwCount: 2, totalPoints: 500, capturedAt: base + 240_000 }
+      ],
+      officialEventDomBundle: /** @type {any} */ ({
+        programStats: { watchCount: 1500, commentCount: 90, giftPoints: 900 },
+        giftHistory: [
+          { advertiserName: '応援リーダー', giftName: '花束', point: 500, time: '00:04' }
+        ],
+        contributionRanking: [
+          { userId: '88210441', name: '応援リーダー', contribution: 500 }
+        ],
+        adContributionRanking: [
+          { userId: '900001', name: '広告の人', contribution: 1200 }
+        ]
+      }),
+      eventRanking: eventRankingFixture()
+    });
+    const section = html.match(/<section class="mkt-section mkt-section--data-summary"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(section).toContain('id="mkt-data-summary"');
+    expect(section).toContain('マーケ総合サマリ');
+    expect(section).toContain('10/10');
+    expect(section).toContain('来場・公式コメント');
+    expect(section).toContain('ギフト送信者・イベント');
+    expect(section).toContain('ニコニ広告');
+    expect(section).toContain('応援者ちくらんβ');
+    expect(section).toContain('イベント順位');
+    expect(section).toContain('花束');
+    expect(section).toContain('クラッカー');
+    expect(section).toContain('data-label="領域"');
+    expect(section).toContain('data-label="データ"');
+    expect(html).toContain('マーケ総合サマリ');
+    expect(html).toContain('.mkt-data-matrix');
+    const funnel = html.match(/<section class="mkt-section mkt-section--funnel"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(funnel).toContain('id="mkt-marketing-funnel"');
+    expect(funnel).toContain('マーケファネル');
+    expect(funnel).toContain('来場から支援までの流れ');
+    expect(funnel).toContain('優先度ボード');
+    expect(funnel).toContain('データ診断');
+    expect(funnel).toContain('来場→発言');
+    expect(funnel).toContain('応援者→ギフト');
+    expect(funnel).toContain('ギフト後の反応');
+    expect(funnel).toContain('data-label="前段比"');
+    expect(funnel).toContain('時系列サンプル');
+    expect(html).toContain('.mkt-funnel-table');
+    const segmentAction = html.match(/<section class="mkt-section mkt-section--segment-action"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(segmentAction).toContain('id="mkt-segment-action"');
+    expect(segmentAction).toContain('層別マーケ診断');
+    expect(segmentAction).toContain('ヘビー・中間');
+    expect(segmentAction).toContain('一見・ライト');
+    expect(segmentAction).toContain('匿名コメント');
+    expect(segmentAction).toContain('応援の重なり');
+    expect(segmentAction).toContain('data-label="層"');
+    expect(segmentAction).toContain('ギフト主導');
+    expect(html).toContain('.mkt-segment-action-table');
+    const skills = html.match(/<section class="mkt-section mkt-section--analysis-skills"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(skills).toContain('id="mkt-analysis-skills"');
+    expect(skills).toContain('分析スキルボード');
+    expect(skills).toContain('Build');
+    expect(skills).toContain('Run');
+    expect(skills).toContain('Diagnose');
+    expect(skills).toContain('必要時だけ');
+    expect(skills).toContain('応援者ちくらんβ');
+    expect(skills).toContain('ギフト深掘り');
+    expect(skills).toContain('data-label="スキル"');
+    expect(html).toContain('.mkt-skill-table');
+    const harness = html.match(/<section class="mkt-section mkt-section--harness"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(harness).toContain('id="mkt-harness-scaling"');
+    expect(harness).toContain('分析ハーネス設計');
+    expect(harness).toContain('System scaling');
+    expect(harness).toContain('記憶基盤');
+    expect(harness).toContain('動的コンテキスト');
+    expect(harness).toContain('スキルルーティング');
+    expect(harness).toContain('検証・ガバナンス');
+    expect(harness).toContain('信頼性ゲート');
+    expect(harness).toContain('data-label="層"');
+    expect(harness).toContain('data-label="ゲート"');
+    expect(html).toContain('.mkt-harness-layer-table');
+  });
+
+  it('公式来場者数があると来場→コメント変換率セクションを出す', () => {
+    const base = Date.now() - 900_000;
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      { id: 'a1', liveId: 'lv123', commentNo: '1', text: 'わこつ', userId: 'u1', nickname: 'A', capturedAt: base, vpos: 0, is184: false, selfPosted: false },
+      { id: 'a2', liveId: 'lv123', commentNo: '2', text: '8888', userId: 'u2', nickname: 'B', capturedAt: base + 60_000, vpos: 0, is184: false, selfPosted: false },
+      { id: 'a3', liveId: 'lv123', commentNo: '3', text: 'ナイス', userId: 'u3', nickname: 'C', capturedAt: base + 120_000, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      sessionSummaryRows: [
+        { liveId: 'lv123', capturedAt: base, viewerCountFromDom: 300, officialCommentCount: 3 },
+        { liveId: 'lv123', capturedAt: base + 300_000, viewerCountFromDom: 900, officialCommentCount: 20 }
+      ],
+      officialEventDomBundle: /** @type {any} */ ({
+        programStats: { watchCount: 1200, commentCount: 24 }
+      })
+    });
+
+    expect(html).toContain('id="mkt-audience-gap"');
+    expect(html).toContain('来場→コメント変換率');
+    expect(html).toContain('静かな観客');
+    expect(html).toContain('100人あたりコメント');
+    expect(html).toContain('来場が増えたのに静かだった時間');
+    expect(html).toContain('data-label="来場増"');
+  });
+
   it('トップコメンターの数値 ID は niconico ユーザーページへのリンクで包まれる（手元用）', () => {
     // minimal() の user u1..u10 は数値でないため、リンク化されない。
     // 数値 ID を持つレポートを作って挙動を確認する。
