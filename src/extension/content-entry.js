@@ -300,7 +300,8 @@ import {
   MAP_LIMITS,
   HARVEST_TIMING,
   OFFICIAL_GAP_DEEP_TIMING,
-  INLINE_FIRST_PAINT
+  INLINE_FIRST_PAINT,
+  BACKFILL_FALSE_COMPLETION_RATIO
 } from '../lib/timingConstants.js';
 import {
   createFirstPaintGateState,
@@ -12210,9 +12211,14 @@ function maybeRearmBackfillForGapCatchup() {
     const recorded = Number(observedRecordedCommentCount) || 0;
     const gap = Math.max(0, (Number.isFinite(official) ? official : 0) - recorded);
     const rearmCount = _backfillGapRearmByLiveId[lid] || 0;
-    // reached_start 誤完了の救済しきい値: 記録が公式の半分未満なら明らかな誤完了とみなす。
+    // reached_start 誤完了の救済しきい値: 記録が公式の BACKFILL_FALSE_COMPLETION_RATIO 未満なら
+    //   明らかな誤完了とみなす。記録カードの「未達」表示（backfillRinkuNarration）と同じ比率を使い、
+    //   「未達と出るのに自動回復しない」帯が出ないよう一致させる。
+    //   gap >= official*(1-ratio) ⇔ recorded <= official*ratio。
     const reachedStartGapOverride =
-      Number.isFinite(official) && official > 0 ? Math.floor(official * 0.5) : 0;
+      Number.isFinite(official) && official > 0
+        ? Math.floor(official * (1 - BACKFILL_FALSE_COMPLETION_RATIO))
+        : 0;
     if (
       shouldRearmBackfillForOfficialGap({
         backfillRunning: _backfillAbort != null,
@@ -12254,6 +12260,11 @@ function maybeAutoStartBackfill() {
   //   ハング（実機: 記録118/公式595 で 5 分更新なし）を検知して abort→再開させる。done=0 で
   //   _backfillAbort が残るとウォッチドッグ（done=1 前提）が再開できないため、ここで打ち切って
   //   finally に done=1 を立てさせ、次 tick で forceFullSweep 付き再開につなげる。
+  // ⭐コードレビュー反映: stall を検知して abort した tick では、その場で再起動しない。
+  //   旧 crawl の finally（done=1/stopReason を無条件に立てる）と同 tick で新 run が並走すると、
+  //   一瞬「完了」が出る/進捗が上書きされる揺れが起きるため。abort 後は return して、次 tick の
+  //   maybeAutoStartBackfill（旧 run の unwind 後・done=1 確定後）に再開を委ねる。
+  let didStallAbortThisTick = false;
   try {
     const now = Date.now();
     const gap = Math.max(
@@ -12281,10 +12292,13 @@ function maybeAutoStartBackfill() {
       _backfillProgress.stopReason = 'stalled';
       _backfillTriedLiveId = '';
       try { _backfillAbort?.abort(); } catch { /* no-op */ }
+      didStallAbortThisTick = true;
     }
   } catch {
     /* no-op */
   }
+  // stall abort した tick は、旧 run の finally と競合させないため再起動を次 tick に委ねる。
+  if (didStallAbortThisTick) return;
   // PR2（多タブ集約）: 自動取り込みは「同一 liveId のタブのうち1つだけ」が走ればよい
   //   （過去ログは全タブ同じ・最大の負荷源 467→66 req/s）。Web Locks リーダー1タブだけ起動。
   //   ⭐lock は crawl 実行中ずっと保持されるので、リーダー1タブが配信開始まで遡り切る間

@@ -18,6 +18,8 @@
  * @module backfillRinkuNarration
  */
 
+import { BACKFILL_FALSE_COMPLETION_RATIO } from './timingConstants.js';
+
 /**
  * @typedef {(
  *   'idle' | 'fetching' | 'progress' |
@@ -396,7 +398,11 @@ export function backfillRecordCardHintDomState(progress, opts = {}) {
   //   reached_start 等で done/done_empty（＝「配信のはじめまで届いた」）と判定されたのに、
   //   実記録が公式件数に遠く届いていない場合は「ぜんぶ届いた」ではなく未達を診断表示する。
   //   実機で 記録118/公式595(20%) のまま自動回復しない放送の原因（stopReason）を、利用者が
-  //   見たまま報告できるようにする。自動再開（watchdog の reachedStartGapOverride）の根拠とも整合。
+  //   見たまま報告できるようにする。
+  //   ⭐しきい値は watchdog の reached_start 再 sweep（reachedStartGapOverride）と同じ
+  //     BACKFILL_FALSE_COMPLETION_RATIO(0.5) を使う。これにより「未達と表示するのに自動回復
+  //     しない」帯（旧: カード 0.95 / 再 sweep 0.5）の不整合を解消する。50〜95% の near-complete な
+  //     reached_start は AGENTS §3.3 を尊重して静観（達成扱い・カードには出さない）。
   if (phase === 'done' || phase === 'done_empty') {
     const official = Number(opts && opts.officialCount);
     const recorded = Number(opts && opts.recordedCount);
@@ -405,7 +411,7 @@ export function backfillRecordCardHintDomState(progress, opts = {}) {
       official > 0 &&
       Number.isFinite(recorded) &&
       recorded >= 0 &&
-      recorded < official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO
+      recorded < official * BACKFILL_FALSE_COMPLETION_RATIO
     ) {
       const suffix = backfillStuckDiagnosticsSuffix(progress, opts);
       return {

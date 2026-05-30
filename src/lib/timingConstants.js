@@ -96,3 +96,16 @@ export const OFFICIAL_GAP_DEEP_TIMING = /** @type {const} */ ({
   //   no_progress が永遠に続く異常ケースは上限 40 で有界化（暴走防止）。
   maxGapRearms: 40
 });
+
+/**
+ * reached_start（配信開始まで到達＝遡り切ったとみなす）で終わったのに、実記録が公式件数の
+ * この比率に満たない場合を「明らかな誤完了」とみなすしきい値。
+ *
+ * fix/broadcast-bulk-catchup（2026-05-31・コードレビュー反映）:
+ *   記録カードの「公式件数に届いていません」表示（backfillRinkuNarration）と、watchdog の
+ *   reached_start 再 sweep 許可（content-entry の reachedStartGapOverride）で**同じしきい値**を
+ *   使い、「未達と表示するのに自動回復しない」帯（旧: カード 0.95 / 再sweep 0.5 の不整合）を解消する。
+ *   0.5 未満（記録が公式の半分未満）だけを誤完了として扱い、50〜95% の near-complete な
+ *   reached_start は AGENTS §3.3「reached_start のときだけ達成宣言」を尊重して静観する。
+ */
+export const BACKFILL_FALSE_COMPLETION_RATIO = 0.5;
