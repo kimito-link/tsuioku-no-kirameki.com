@@ -579,7 +579,9 @@ describe('backfillStuckDiagnosticsSuffix（止まった理由＋残り件数の�
   });
 
   describe('誤完了の可視化（reached_start なのに公式に未達・実機118/595）', () => {
-    it('reached_start(done) でも記録が公式の95%未満なら未達を診断表示する', () => {
+    // ⭐しきい値は watchdog の reached_start 再 sweep（reachedStartGapOverride）と同じ
+    //   BACKFILL_FALSE_COMPLETION_RATIO(0.5) を使う。「未達と表示するのに自動回復しない」帯を作らない。
+    it('reached_start(done) で記録が公式の半分未満なら未達を診断表示する（実機20%）', () => {
       const s = backfillRecordCardHintDomState(
         { started: true, rows: 118, done: 1, stopReason: 'reached_start' },
         { officialCount: 595, recordedCount: 118 }
@@ -588,6 +590,16 @@ describe('backfillStuckDiagnosticsSuffix（止まった理由＋残り件数の�
       expect(s.dataPhase).toBe('partial');
       expect(s.lead).toContain('公式件数に届いていません');
       expect(s.lead).toContain('（理由: reached_start・残り約477件）');
+    });
+
+    it('reached_start(done) で記録が公式の50〜95% なら達成扱いで隠す（watchdog と整合・自動回復しない帯を作らない）', () => {
+      // 70%: 旧実装は「届いていません」を出しつつ watchdog は再 sweep しない不整合帯だった。
+      //   新実装は near-complete な reached_start を達成扱いにして静観する（AGENTS §3.3）。
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 700, done: 1, stopReason: 'reached_start' },
+        { officialCount: 1000, recordedCount: 700 }
+      );
+      expect(s.hidden).toBe(true);
     });
 
     it('reached_start(done) で記録が公式の95%以上なら従来どおり達成（隠す）', () => {
