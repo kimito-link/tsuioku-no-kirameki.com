@@ -1097,6 +1097,16 @@ async function handleBrowserActionClick(tab) {
           { frameId: 0 }
         );
         if (res && res.focused) return;
+        // v0.1.486: 初期化直後は host/iframe が未準備で focused=false になりやすい。
+        //   すぐ popup fallback を開くと「一瞬開いて消える/何も出ない」体験になるため、
+        //   短い猶予を置いて再確認する（最小差分・既存 fallback は維持）。
+        await new Promise((r) => setTimeout(r, 700));
+        const resRetry = await chrome.tabs.sendMessage(
+          tid,
+          { type: 'NLS_FOCUS_INLINE_PANEL' },
+          { frameId: 0 }
+        );
+        if (resRetry && resRetry.focused) return;
       } catch {
         // コンテンツ未注入・対象外 URL
       }
@@ -1110,6 +1120,49 @@ async function handleBrowserActionClick(tab) {
     }
   }
 }
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
+  if (msg.type === 'NLS_FOCUS_INLINE_PANEL_FROM_POPUP') {
+    void (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
+        if (tid === chrome.tabs.TAB_ID_NONE) {
+          sendResponse({ focused: false });
+          return;
+        }
+        try {
+          const res = await chrome.tabs.sendMessage(
+            tid,
+            { type: 'NLS_FOCUS_INLINE_PANEL' },
+            { frameId: 0 }
+          );
+          if (res && res.focused) {
+            sendResponse({ focused: true });
+            return;
+          }
+        } catch {
+          // no-op
+        }
+        await new Promise((r) => setTimeout(r, 700));
+        try {
+          const resRetry = await chrome.tabs.sendMessage(
+            tid,
+            { type: 'NLS_FOCUS_INLINE_PANEL' },
+            { frameId: 0 }
+          );
+          sendResponse({ focused: Boolean(resRetry && resRetry.focused) });
+        } catch {
+          sendResponse({ focused: false });
+        }
+      } catch {
+        sendResponse({ focused: false });
+      }
+    })();
+    return true;
+  }
+});
 
 chrome.action.onClicked.addListener((tab) => {
   void handleBrowserActionClick(tab).catch(() => {

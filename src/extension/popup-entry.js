@@ -281,6 +281,7 @@ import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
 import { buildReportThumbedUsersSectionHtml } from '../lib/reportThumbedUsersSectionHtml.js';
 import { computeKiramekiAwards } from '../lib/kiramekiAwards.js';
 import { buildKiramekiAwardsSectionHtml, KIRAMEKI_AWARDS_CSS } from '../lib/kiramekiAwardsSectionHtml.js';
+import { resolveKiramekiReturningAndFirstTimeUserKeys } from '../lib/resolveKiramekiReturningAndFirstTimeUserKeys.js';
 import {
   buildReportLinkRows,
   buildReportMetaRows,
@@ -504,6 +505,15 @@ const INLINE_MODE = (() => {
   }
 })();
 
+/** ツールバーの default_popup 経由で開かれた短命 popup か。 */
+const TOOLBAR_POPUP = (() => {
+  try {
+    return new URLSearchParams(window.location.search).get('toolbar') === '1';
+  } catch {
+    return false;
+  }
+})();
+
 /** watch ページ埋め込み iframe（サイドパネル用 `dock=sidepanel` とは UI を分ける） */
 const INLINE_EMBED_WATCH = (() => {
   if (!INLINE_MODE) return false;
@@ -618,6 +628,17 @@ function applyResponsivePopupLayout() {
   const compact = innerH < 580 || height < 580 || width < 340;
   body.classList.toggle('nl-tight', tight);
   body.classList.toggle('nl-compact', compact);
+
+  // v0.1.492: Chrome Extension popup (Browser Action) の 100vh 見切れバグ対策。
+  //   CSS 側で 100vh を外すと初期描画時にポップアップが開かなくなる現象が報告されたため、
+  //   初期は CSS の min(..., 100vh) で安全に開き、直後に JS でピクセル指定に上書きして
+  //   下部が見切れる問題（内容が途中で切れる）を根本解決する。
+  if (!INLINE_MODE && !root.classList.contains('nl-popup-window')) {
+    setTimeout(() => {
+      root.style.height = `${height}px`;
+      body.style.height = `${height}px`;
+    }, 150);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1413,7 +1434,13 @@ const watchMetaCache = {
   fetchError: '',
   // v0.1.392: stale snapshot の有無に関わらず、実際の snapshot fetch が走っている間 true。
   //   3 秒 polling で fetch が重なるのを防ぐためのガード（fetchInflight とは別目的）。
-  snapshotFetchActive: false
+  snapshotFetchActive: false,
+  // v0.1.481: 読み取り成功時の最新コメント配列を { lv, arr } で退避する。多タブで
+  //   chrome.storage.local.get がタイムアウトして {} が返ったとき、空配列で描画して全カードを
+  //   「—」固定にしてしまう穴（v0.1.336/437 のガードは「固まり防止」止まりで空塗りつぶしは残存）を
+  //   塞ぐ。読めなかったときは同一 lv の前回値を保持して描画を継続する（stale-while-revalidate）。
+  /** @type {{ lv: string, arr: unknown[] }|null} */
+  lastCommentsArr: null
 };
 
 // v0.1.398: snapshot fetch ハング耐性 e2e（snapshot-fetch-hang-resilient.spec.js）が、
@@ -1462,6 +1489,17 @@ function markPopupRefreshContentPainted() {
 
 /** 初回ハイドレート完了まで `.nl-popup-primary` を覆う（2 回目以降の safeRefresh では再クロークしない） */
 let popupPrimaryRevealDone = false;
+let popupPrimaryRevealFallbackTimer = null;
+
+function clearPopupPrimaryRevealFallback() {
+  if (popupPrimaryRevealFallbackTimer == null) return;
+  try {
+    clearTimeout(popupPrimaryRevealFallbackTimer);
+  } catch {
+    // no-op
+  }
+  popupPrimaryRevealFallbackTimer = null;
+}
 
 function ensurePopupPrimaryCloakedBeforeFirstReveal() {
   if (popupPrimaryRevealDone) return;
@@ -1477,6 +1515,7 @@ function ensurePopupPrimaryCloakedBeforeFirstReveal() {
 function revealPopupPrimaryOnce() {
   if (popupPrimaryRevealDone) return;
   popupPrimaryRevealDone = true;
+  clearPopupPrimaryRevealFallback();
   try {
     document.documentElement.removeAttribute('data-nl-popup-primary-cloak');
     const el = /** @type {HTMLElement|null} */ ($('nlPopupPrimary'));
@@ -1484,6 +1523,17 @@ function revealPopupPrimaryOnce() {
   } catch {
     // no-op
   }
+}
+
+function schedulePopupPrimaryRevealFallback(delayMs) {
+  if (popupPrimaryRevealDone || popupPrimaryRevealFallbackTimer != null) return;
+  const waitMs = Math.max(0, Number(delayMs) || 0);
+  popupPrimaryRevealFallbackTimer = setTimeout(() => {
+    popupPrimaryRevealFallbackTimer = null;
+    if (popupPrimaryRevealDone) return;
+    markPopupRefreshContentPainted();
+    revealPopupPrimaryOnce();
+  }, waitMs);
 }
 
 function hideCommentVelocityLine() {
@@ -4174,7 +4224,8 @@ function bindStoryGrowthInteractions(root) {
   bindStoryDetailHoverBridge();
 
   root.addEventListener('click', (ev) => {
-    const t = /** @type {HTMLElement} */ (ev.target);
+    const t = ev.target;
+    if (!(t instanceof Element)) return;
     const img = t.closest('img.nl-story-growth-icon');
     if (!img || !root.contains(img)) return;
     const sid = img.getAttribute('data-comment-id');
@@ -4189,7 +4240,8 @@ function bindStoryGrowthInteractions(root) {
 
   root.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
-    const t = /** @type {HTMLElement} */ (ev.target);
+    const t = ev.target;
+    if (!(t instanceof Element)) return;
     if (!t.matches('img.nl-story-growth-icon')) return;
     ev.preventDefault();
     t.click();
@@ -7870,7 +7922,67 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
   //   ok を得たタブ以外の結果は破棄する（v0.1.468 の「ok後は残タブ送信しない」と組み合わせ）。
   /** @type {Promise<{ ok: boolean, items: { no: string, uid: string, name: string, av: string }[], lastRejectError: string, sawOkFalse: boolean, sawSendError: boolean }>[]} */
   const perTabPromises = candidates.map(async (candidate) => {
+    /**
+     * @param {number} fid
+     * @param {{ maxAttempts?: number, delayMs?: number }} [sendOpts]
+     */
+    const tryExportAtFrame = async (fid, sendOpts = {}) => {
+      const res = /** @type {{ ok?: boolean, items?: unknown, error?: unknown, liveId?: string, frameHref?: string }|null} */ (
+        await tabsSendMessageWithRetry(
+          candidate.id,
+          {
+            type: 'NLS_EXPORT_INTERCEPT_CACHE',
+            ...(opts.deep ? { deep: true } : {})
+          },
+          {
+            frameId: fid,
+            maxAttempts: sendOpts.maxAttempts ?? 5,
+            delayMs: sendOpts.delayMs ?? 90
+          }
+        )
+      );
+      if (!res) return null;
+      if (res.ok === true) {
+        if (!responseAlignedWithWatchUrl(res, watchUrl)) {
+          return {
+            ok: false,
+            items: [],
+            lastRejectError: `live_mismatch (resp=${String(res.liveId || '')})`,
+            sawOkFalse: false,
+            sawSendError: false
+          };
+        }
+        return {
+          ok: true,
+          items: normalizeInterceptCacheItems(res.items),
+          lastRejectError: '',
+          sawOkFalse: false,
+          sawSendError: false
+        };
+      }
+      if (res.ok === false) {
+        const er = String(res.error || '').trim();
+        return {
+          ok: false,
+          items: [],
+          lastRejectError: er,
+          sawOkFalse: true,
+          sawSendError: false
+        };
+      }
+      return null;
+    };
+
     try {
+      // executeScript(8s) より先に top frame へ送る。背景タブ throttle で 8s+ が積み上がり
+      // refresh_intercept_export_timeout(12s) になるのを避ける。
+      try {
+        const fast = await tryExportAtFrame(0, { maxAttempts: 3, delayMs: 60 });
+        if (fast) return fast;
+      } catch {
+        // slow path へ
+      }
+
       const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
       const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
       const tried = new Set();
@@ -7878,28 +7990,10 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
       for (const fid of tryOrder) {
         if (tried.has(fid)) continue;
         tried.add(fid);
+        if (fid === 0) continue;
         try {
-          const res = /** @type {{ ok?: boolean, items?: unknown, error?: unknown, liveId?: string, frameHref?: string }|null} */ (
-            await tabsSendMessageWithRetry(
-              candidate.id,
-              {
-                type: 'NLS_EXPORT_INTERCEPT_CACHE',
-                ...(opts.deep ? { deep: true } : {})
-              },
-              { frameId: fid, maxAttempts: 5, delayMs: 90 }
-            )
-          );
-          if (!res) continue;
-          if (res.ok === true) {
-            if (!responseAlignedWithWatchUrl(res, watchUrl)) {
-              return { ok: false, items: [], lastRejectError: `live_mismatch (resp=${String(res.liveId || '')})`, sawOkFalse: false, sawSendError: false };
-            }
-            return { ok: true, items: normalizeInterceptCacheItems(res.items), lastRejectError: '', sawOkFalse: false, sawSendError: false };
-          }
-          if (res.ok === false) {
-            const er = String(res.error || '').trim();
-            return { ok: false, items: [], lastRejectError: er, sawOkFalse: true, sawSendError: false };
-          }
+          const hit = await tryExportAtFrame(fid);
+          if (hit) return hit;
         } catch {
           // sendMessage 失敗 → 次の frameId を試す
         }
@@ -8669,6 +8763,7 @@ function renderDevMonitorSecondaryViz(p, opts = {}) {
  *   liveId: string,
  *   displayCount: number,
  *   storageCount: number,
+ *   commentReadState?: string,
  *   avatarStats?: import('../lib/devMonitorAvatarStats.js').StoredCommentAvatarStats|null,
  *   profileGaps?: import('../lib/devMonitorAvatarStats.js').StoredCommentProfileGaps|null
  * }} p
@@ -8701,6 +8796,14 @@ function renderDevMonitorPanel(p) {
   }
 
   const snap = p.snapshot;
+  let snapshotStateLabel = 'missing';
+  if (snap) {
+    snapshotStateLabel = 'ok';
+  } else if (watchMetaCache.fetchInflight) {
+    snapshotStateLabel = 'fetch_inflight';
+  } else if (watchMetaCache.fetchError) {
+    snapshotStateLabel = `error:${watchMetaCache.fetchError}`;
+  }
   const oc =
     snap &&
     typeof snap.officialCommentCount === 'number' &&
@@ -8713,6 +8816,10 @@ function renderDevMonitorPanel(p) {
   /** @type {[string, string][]} */
   const rows = [];
   rows.push(['配信ID（lv…）', p.liveId || '—']);
+  rows.push(['snapshot状態', snapshotStateLabel]);
+  if (p.commentReadState) {
+    rows.push(['コメント配列取得', p.commentReadState]);
+  }
   rows.push(['このPCに保存した件数', String(p.storageCount)]);
   rows.push(['一覧に出している件数', String(p.displayCount)]);
   rows.push(['公式の累計コメント数', oc != null ? String(oc) : '—']);
@@ -8921,11 +9028,9 @@ async function renderDevMonitorGiftRankingExtras() {
     const headerHtml =
       '<div class="nl-dev-monitor__row" style="opacity:0.7;font-size:0.85em;margin-top:6px;">' +
       '<dt>── 取得状況サマリ（AI 共有診断と同じ raw data） ──</dt><dd></dd></div>';
-    // v0.1.212: popup「AI 診断（Gemini Nano）」ボタン
-    const aiDiagHtml =
-      '<div class="nl-dev-monitor__row" id="aiDiagSection" style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">' +
-      '<dt><button id="aiDiagBtn" type="button" style="padding:6px 12px;font-size:0.9em;cursor:pointer;background:#2563eb;color:#fff;border:none;border-radius:4px;">🤖 AI 診断（Gemini Nano）</button></dt>' +
-      '<dd id="aiDiagResult" style="white-space:pre-wrap;font-size:0.85em;line-height:1.5;color:#94a3b8;margin-top:4px;">クリックでオンデバイス AI に「主因 / 対処 / 備考」を 3 行で診断してもらいます（外部送信なし、Chrome 138+ 必要）</dd></div>';
+    // v0.1.483: 「AI 診断（Gemini Nano）」ボタンはユーザー要望で UI から撤去。
+    //   ハンドラ（attachAiDiagButtonHandler）は呼び出して delegated listener を維持するが、
+    //   対応するボタンを描画しないため発火しない（関数は将来の再利用・lint 用に残置）。
     extrasEl.innerHTML =
       headerHtml +
       rows
@@ -8933,8 +9038,7 @@ async function renderDevMonitorGiftRankingExtras() {
           ([dt, dd]) =>
             `<div class="nl-dev-monitor__row"><dt>${escapeHtml(dt)}</dt><dd>${escapeHtml(dd)}</dd></div>`
         )
-        .join('') +
-      aiDiagHtml;
+        .join('');
     attachAiDiagButtonHandler(fastCache);
   } catch {
     extrasEl.innerHTML = '';
@@ -9549,11 +9653,9 @@ async function refresh() {
     return;
   }
   renderExtensionContextBanner(false);
-  // 以前は 1200ms の保険だけに頼っていたが、稀に初期化パスが途中停止したとき
-  // "本体だけ空" が 1.2 秒以上も続くのが悪印象だったため短縮。CSS 側に 450ms の
-  // auto-reveal アニメーションを入れてあるので、この保険が発火しないときでも
-  // ユーザーが見えなくなることはない（二重の防衛）。
-  setTimeout(revealPopupPrimaryOnce, 400);
+  // 以前は 1200ms の保険だけに頼っていたが、初回描画が途中で止まった時だけ
+  // fallback するように変更。CSS 側の auto-reveal も含めて「最悪でも一定時間で
+  // 見える」保険は維持する。
 
   // 世代番号は refresh の最初に確保する。放送切替で新しい refresh が走った後、古い refresh の
   // await から戻ってきた paintWatchPopupUi が新しい放送の描画を上書きしないよう、以降の paint は
@@ -9924,6 +10026,7 @@ async function refresh() {
       liveId: '',
       displayCount: 0,
       storageCount: 0,
+      commentReadState: 'no_watch',
       avatarStats: null,
       profileGaps: null
     });
@@ -10008,6 +10111,7 @@ async function refresh() {
       liveId: '',
       displayCount: 0,
       storageCount: 0,
+      commentReadState: 'no_watch',
       avatarStats: null,
       profileGaps: null
     });
@@ -10078,17 +10182,44 @@ async function refresh() {
 
   // v0.1.407: cached-first render 用に、前回保存した watch snapshot も一緒に読む。
   const snapKey = watchSnapshotStorageKey(lv);
-  /** @type {Record<string, unknown>} */
-  const data = await readStorageBagWithRetry(
-    () =>
-      chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE, snapKey]),
-    // v0.1.336: 描画前ゲート。多タブで storage.get が固まると paintWatchPopupUi が
-    //   永久に走らず全カード「—」固定になっていた。per-attempt 900ms で固まりを
-    //   失敗扱いにし、最悪でも 4 試行で {} に落として描画を続行する（前回 arr/snapshot は
-    //   in-memory に残るので、空配列でも次 poll で自然復活）。
+  // v0.1.484: 大規模放送（コメント数が多い）で全カード「—」固定になる退行の根治。
+  //   従来は巨大なコメント配列(key)と、軽量な snapshot(snapKey) / profile cache を
+  //   1 回の storage.get でまとめて取っていた。コメントが数千件ある放送では配列の
+  //   デシリアライズだけで per-attempt 予算(900ms)を超え、get 全体が timeout →
+  //   data={} → arr=[] かつ snapshot も巻き添えで消え、配信者・視聴者・メタカードまで
+  //   「—」固定になっていた（lastCommentsArr フォールバックは「過去に一度読めた」
+  //   session しか救えず、初回 cold open の大規模放送を救えない）。
+  // v0.1.485: まず軽量読み（snapshot + profile）だけで初回描画を進め、重い配列読みは
+  //   別 Promise で後追いする。これで「重い配列待ちで popup が空のまま」状態を減らす。
+  const heavyDataPromise = readStorageBagWithRetry(
+    () => chrome.storage.local.get([key]),
+    { attempts: 4, delaysMs: [0, 50, 120, 280], perAttemptTimeoutMs: 1500 }
+  );
+  // v0.1.336: 描画前ゲート（軽量読みは固まりを per-attempt 900ms で失敗扱いにし、
+  //   最悪 4 試行で {} に落として描画を続行）。
+  const lightData = await readStorageBagWithRetry(
+    () => chrome.storage.local.get([KEY_USER_COMMENT_PROFILE_CACHE, snapKey]),
     { attempts: 4, delaysMs: [0, 50, 120, 280], perAttemptTimeoutMs: 900 }
   );
-  let arr = Array.isArray(data[key]) ? data[key] : [];
+  /** @type {Record<string, unknown>} */
+  const data = { ...lightData };
+  // v0.1.481: 多タブ storage.get タイムアウトで data={} → arr=[] → 全カード「—」固定の根治。
+  //   読めたとき（data[key] が配列）だけ lv 付きで in-memory 退避し、読めなかった（key 不在＝
+  //   timeout/失敗）ときは同一 lv の前回値を保持して空で塗りつぶさない。別 lv のデータは使わない。
+  let readCommentsOk = Array.isArray(data[key]);
+  let arr = readCommentsOk ? /** @type {unknown[]} */ (data[key]) : [];
+  let commentReadState = readCommentsOk ? 'storage_ok' : 'missing';
+  if (readCommentsOk) {
+    watchMetaCache.lastCommentsArr = { lv, arr };
+  } else if (
+    watchMetaCache.lastCommentsArr &&
+    watchMetaCache.lastCommentsArr.lv === lv &&
+    Array.isArray(watchMetaCache.lastCommentsArr.arr) &&
+    watchMetaCache.lastCommentsArr.arr.length > 0
+  ) {
+    arr = watchMetaCache.lastCommentsArr.arr;
+    commentReadState = 'fallback_cached';
+  }
   // v0.1.407: cached-first render。in-memory snapshot がまだ無い初回 boot で、前回保存
   //   した snapshot があれば即採用する＝開いた瞬間に「—／取得中…」でなく前回値を出す。
   //   live fetch が後で来たら通常どおり上書き（stale-while-revalidate）。lv 一致のみ採用。
@@ -10106,31 +10237,42 @@ async function refresh() {
   popupUserCommentProfileMap = normalizeUserCommentProfileMap(
     data[KEY_USER_COMMENT_PROFILE_CACHE]
   );
-  const normalizedStored = normalizeStoredCommentEntries(
-    /** @type {PopupCommentEntry[]} */ (arr)
-  );
-  if (normalizedStored.changed) {
-    arr = normalizedStored.next;
-  }
-  const profAfterNormalize = popupMergeUserCommentProfileCache(arr);
-  arr = profAfterNormalize.arr;
-  if (
-    normalizedStored.changed ||
-    profAfterNormalize.commentsPatched ||
-    profAfterNormalize.cacheTouched
-  ) {
-    const save = {};
-    if (normalizedStored.changed || profAfterNormalize.commentsPatched) {
-      save[key] = arr;
+  const applyStoredCommentEntries = async (nextArr, allowWrite) => {
+    let applied = nextArr;
+    const normalizedStored = normalizeStoredCommentEntries(
+      /** @type {PopupCommentEntry[]} */ (applied)
+    );
+    if (normalizedStored.changed) {
+      applied = normalizedStored.next;
     }
-    if (profAfterNormalize.cacheTouched) {
-      save[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
+    const profAfterNormalize = popupMergeUserCommentProfileCache(applied);
+    applied = profAfterNormalize.arr;
+    if (
+      allowWrite &&
+      (normalizedStored.changed ||
+        profAfterNormalize.commentsPatched ||
+        profAfterNormalize.cacheTouched)
+    ) {
+      const save = {};
+      if (normalizedStored.changed || profAfterNormalize.commentsPatched) {
+        save[key] = applied;
+      }
+      if (profAfterNormalize.cacheTouched) {
+        save[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
+      }
+      if (Object.keys(save).length) {
+        // v0.1.437: storage.set 多タブ stall で永久 pending → 全カード「—」固定再発の根治。
+        await refreshTaskGuarded(
+          storageSetSafe(save),
+          1500,
+          'refresh_story_avatar_storage_set_timeout',
+          false
+        );
+      }
     }
-    if (Object.keys(save).length) {
-      // v0.1.437: storage.set 多タブ stall で永久 pending → 全カード「—」固定再発の根治。
-      await refreshTaskGuarded(storageSetSafe(save), 1500, 'refresh_story_avatar_storage_set_timeout', false);
-    }
-  }
+    return applied;
+  };
+  arr = await applyStoredCommentEntries(arr, readCommentsOk);
   STORY_AVATAR_DIAG_STATE.total = arr.length;
   STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
   STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
@@ -10262,6 +10404,7 @@ async function refresh() {
         liveId: lv,
         displayCount: displayEntries.length,
         storageCount: arr.length,
+        commentReadState,
         avatarStats: { ...baseAv, withResolvedAvatar: resolvedTotal },
         profileGaps: summarizeStoredCommentProfileGaps(arr)
       });
@@ -10272,6 +10415,21 @@ async function refresh() {
     void renderGiftQuickStatsPanel(lv);
     void renderGiftSubAppHistoryPanel(lv);
   }
+
+  // 重いコメント配列の読み取りが後から完了したら、同一 liveId のときだけ再描画。
+  void heavyDataPromise.then(async (heavyData) => {
+    if (watchMetaCache.key !== snapshotKey) return;
+    if (!heavyData || typeof heavyData !== 'object') return;
+    if (!Array.isArray(heavyData[key])) return;
+    if (refreshGen !== watchPopupRefreshGeneration) return;
+    const nextArr = /** @type {unknown[]} */ (heavyData[key]);
+    if (!nextArr.length && arr.length) return;
+    readCommentsOk = true;
+    arr = nextArr;
+    watchMetaCache.lastCommentsArr = { lv, arr };
+    arr = await applyStoredCommentEntries(arr, true);
+    paintWatchPopupUi();
+  });
 
   // 放送切替を検知して、直前放送に紐付くキャッシュ（rank strip の再描画抑止キー、
   // 直近コメント数・視聴者数の差分比較用値）を強制リセットする。paintWatchPopupUi より前で
@@ -10292,8 +10450,7 @@ async function refresh() {
     watchMetaCache.fetchError = '';
     if (isFreshRefresh()) {
       paintWatchPopupUi();
-      markPopupRefreshContentPainted();
-      revealPopupPrimaryOnce();
+      schedulePopupPrimaryRevealFallback(1500);
     }
     // 視聴タブのリロード直後は content script が readiness 揃わず、単発の
     // NLS_EXPORT_WATCH_SNAPSHOT が snapshot=null で返る瞬間がある。
@@ -10962,6 +11119,33 @@ async function requestWatchPageSnapshotFromOpenTabOnce(watchUrl) {
   /** @type {Promise<{ snapshot: WatchPageSnapshot|null, error: string }>[]} */
   const tabPromises = candidates.map(async (candidate) => {
     try {
+      try {
+        const fastRes = await tabsSendMessageWithRetry(
+          candidate.id,
+          { type: 'NLS_EXPORT_WATCH_SNAPSHOT' },
+          { frameId: 0, maxAttempts: 3, delayMs: 60 }
+        );
+        if (fastRes?.ok && fastRes.snapshot) {
+          if (
+            snapshotLooksAlignedWithWatchUrl(
+              fastRes.snapshot,
+              watchUrl,
+              candidate.url
+            )
+          ) {
+            return {
+              snapshot: mergeViewerProbeIntoSnapshot(
+                /** @type {WatchPageSnapshot} */ (fastRes.snapshot),
+                null
+              ),
+              error: ''
+            };
+          }
+        }
+      } catch {
+        // slow path へ
+      }
+
       const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
       const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
       const viewerProbe = probeViewerCountFromFrameTexts(ranked);
@@ -10970,6 +11154,7 @@ async function requestWatchPageSnapshotFromOpenTabOnce(watchUrl) {
       for (const fid of tryOrder) {
         if (tried.has(fid)) continue;
         tried.add(fid);
+        if (fid === 0) continue;
         try {
           const res = await tabsSendMessageWithRetry(
             candidate.id,
@@ -11419,9 +11604,10 @@ async function buildHtmlReportDocument(
 
   // v0.1.469: きらめきの賞 — 単一ランキングを多軸の賞に変える。誰も負けない設計。
   // v0.1.477: returningUserKeys / firstTimeUserKeys を IDB + storage から実際に取得。
-  //   過去配信のコメント userId と照合して「かよい」「はじまり」を判定する。
-  const kiramekiReturningUserKeys = [];
-  const kiramekiFirstTimeUserKeys = [];
+  //   過去配信のコメント userId と aggregatedRooms.userKey を照合して判定する。
+  //   過去履歴なし（初回配信）のときは全員をはじまり扱い。
+  let kiramekiReturningUserKeys = [];
+  let kiramekiFirstTimeUserKeys = [];
   try {
     const lid = String(liveId || '').trim().toLowerCase();
     if (lid && /^lv\d{1,15}$/.test(lid)) {
@@ -11430,11 +11616,10 @@ async function buildHtmlReportDocument(
         limit: 20,
         excludeLiveId: lid
       });
+      const pastUserIdSet = new Set();
       if (pastLiveIds.length > 0) {
         const pastKeys = pastLiveIds.map((id) => `nls_comments_${id}`);
         const pastBag = await chrome.storage.local.get(pastKeys);
-        // 過去配信に出現したことがある userId を集める
-        const pastUserIdSet = new Set();
         for (const id of pastLiveIds) {
           const k = `nls_comments_${id}`;
           const cs = Array.isArray(pastBag[k]) ? pastBag[k] : [];
@@ -11443,18 +11628,15 @@ async function buildHtmlReportDocument(
             if (uid) pastUserIdSet.add(uid);
           }
         }
-        // 今回コメントした userId を分類
-        const currentUserIds = new Set(
-          commentsForReport.map((c) => String(c?.userId || '').trim()).filter(Boolean)
-        );
-        for (const uid of currentUserIds) {
-          if (pastUserIdSet.has(uid)) {
-            kiramekiReturningUserKeys.push(uid);
-          } else {
-            kiramekiFirstTimeUserKeys.push(uid);
-          }
-        }
       }
+      const currentUserKeys = aggregatedRooms
+        .map((r) => String(r?.userKey || '').trim())
+        .filter((k) => k && k !== UNKNOWN_USER_KEY);
+      ({ returningUserKeys: kiramekiReturningUserKeys, firstTimeUserKeys: kiramekiFirstTimeUserKeys } =
+        resolveKiramekiReturningAndFirstTimeUserKeys({
+          currentUserKeys,
+          pastUserIds: pastUserIdSet
+        }));
     }
   } catch {
     // IDB 失敗時は空配列のまま（きらめきの賞はかよい/はじまり無しで生成される）
@@ -12851,29 +13033,26 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
   const manifest = chrome.runtime.getManifest();
   let lastErr = '';
   let fastCache = null;
+  // v0.1.482: 多タブ storage 混雑時の「コピーが遅くて貼れない」の根治。これまで
+  //   storageReadback(3キー) と fastDiag(1キー) を別々に storage.get しており、混雑時に
+  //   2 回詰まったうえ fastDiag が 1200ms で諦めて重いライブ収集(8s+6.5s)に落ちていた。
+  //   → 4 キーを 1 回の get に束ねて storage 往復を半減し、待ち時間も 5000ms に延ばして
+  //     「速報キャッシュを確実に使う＝速い」方へ倒す。1 回の get なら混雑下でも往復 1 回で済む。
   try {
-    const rb = await withTimeout(
+    const bag = await withTimeout(
       chrome.storage.local.get([
         KEY_INLINE_PANEL_PLACEMENT,
         KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT,
-        KEY_INLINE_PANEL_WIDTH_MODE
+        KEY_INLINE_PANEL_WIDTH_MODE,
+        KEY_AI_SHARE_FAST_DIAG
       ]),
-      1200,
-      'ai_share_storage_readback_timeout'
+      5000,
+      'ai_share_storage_bundle_timeout'
     );
-    payload.popup.storageReadback =
-      buildAiShareInlinePanelStorageReadback(rb);
+    payload.popup.storageReadback = buildAiShareInlinePanelStorageReadback(bag);
+    fastCache = bag?.[KEY_AI_SHARE_FAST_DIAG] || null;
   } catch {
     payload.popup.storageReadback = { error: 'storage_read_failed' };
-  }
-  try {
-    const fastBag = await withTimeout(
-      chrome.storage.local.get(KEY_AI_SHARE_FAST_DIAG),
-      1200,
-      'ai_share_fast_cache_timeout'
-    );
-    fastCache = fastBag?.[KEY_AI_SHARE_FAST_DIAG] || null;
-  } catch {
     fastCache = null;
   }
   const fastContent =
@@ -12885,11 +13064,27 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       ? fastCache.content
       : null;
   const resolvedFastUrl = String(fastCache?.resolvedTabUrl || '').trim();
+  // 速報キャッシュは「常に使って高速のまま、古さは弾かずに明示する」方針（2026-05-30）。
+  //   watch タブがバックグラウンドだと Chrome がタイマーを間引き、キャッシュが数十秒〜
+  //   分単位で古くなることがある。ここで弾いて live 収集に落とすと、8s+6.5s のタイムアウトを
+  //   伴う重い経路になり「コピーが遅い」を招く（実機報告）。代わりに cacheAgeMs / cacheStale を
+  //   バンドルに添えて、古ければ人間/AI 側で「F5 して採り直し」と判断できるようにする。
+  //   （URL が現タブとずれている場合だけは従来どおり使わず live 収集へ。）
+  const AI_SHARE_FAST_DIAG_STALE_HINT_MS = 180_000;
+  const fastPersistedAtMs = (() => {
+    const t = Date.parse(String(fastCache?.persistedAt || ''));
+    return Number.isFinite(t) ? t : NaN;
+  })();
   if (fastContent && canUseFastAiShareDiagnostics(resolvedFastUrl, watchUrl)) {
     payload.content = /** @type {Record<string, unknown>} */ (fastContent);
     if (resolvedFastUrl) payload.resolvedTabUrl = resolvedFastUrl.slice(0, 240);
     const persistedAt = String(fastCache?.persistedAt || '').trim();
     if (persistedAt) payload.cachedAt = persistedAt;
+    if (Number.isFinite(fastPersistedAtMs)) {
+      const ageMs = Math.max(0, Date.now() - fastPersistedAtMs);
+      payload.cacheAgeMs = ageMs;
+      payload.cacheStale = ageMs > AI_SHARE_FAST_DIAG_STALE_HINT_MS;
+    }
   } else if (fastContent && resolvedFastUrl) {
     lastErr = `fast_diag_live_mismatch: ${resolvedFastUrl.slice(0, 140)}`;
   }
@@ -13221,7 +13416,29 @@ function attachWatchConcurrentCardCharaNorthStarJump() {
   }
 }
 
-function initPopup() {
+function bridgeToolbarPopupToInlinePanel() {
+  if (!TOOLBAR_POPUP || INLINE_MODE || !hasExtensionContext()) return;
+  // Browser Action の default_popup は必ず表示される保険として残す。
+  // watch タブ側のインライン前面化に成功したときだけ閉じ、失敗時は通常 popup として残す。
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const res = await chrome.runtime.sendMessage({
+          type: 'NLS_FOCUS_INLINE_PANEL_FROM_POPUP'
+        });
+        if (res && res.focused === true) {
+          window.close();
+        }
+      } catch {
+        // background/content が応答しない場合は popup を残す。
+      }
+    })();
+  }, 0);
+}
+
+async function initPopup() {
+  applyResponsivePopupLayout();
+  bridgeToolbarPopupToInlinePanel();
   attachCharaTrioSlotClickHandlers();
   attachWatchConcurrentCardCharaNorthStarJump();
   void runOneTimeBackfillRemoveGiftSystemMessages();
@@ -13243,9 +13460,9 @@ function initPopup() {
           inlineDefault: INLINE_MODE
         })
       );
-    });
+    })
+    ?.catch(() => {});
   ensureStoryGrowthColorSchemeListener();
-  applyResponsivePopupLayout();
   if (INLINE_EMBED_WATCH) {
     const supportVisualDetails = /** @type {HTMLDetailsElement|null} */ (
       $('supportVisualDetails')
@@ -13916,7 +14133,7 @@ function initPopup() {
     }
   });
 
-  toggle.addEventListener('change', async () => {
+  toggle?.addEventListener('change', async () => {
     const next = toggle.checked;
     try {
       const ok = await storageSetSafe({ [KEY_RECORDING]: next });
@@ -13929,7 +14146,7 @@ function initPopup() {
       toggle.checked = !next;
     }
   });
-  toggle.addEventListener('click', (e) => {
+  toggle?.addEventListener('click', (e) => {
     e.stopPropagation();
   });
 
@@ -14434,7 +14651,7 @@ function initPopup() {
     }
   });
 
-  exportBtn.addEventListener('click', async () => {
+  exportBtn?.addEventListener('click', async () => {
     const lv = exportBtn.dataset.liveId;
     const key = exportBtn.dataset.storageKey;
     const watchUrl = exportBtn.dataset.watchUrl || '';
