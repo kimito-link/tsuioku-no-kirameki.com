@@ -11418,13 +11418,52 @@ async function buildHtmlReportDocument(
     : comments;
 
   // v0.1.469: きらめきの賞 — 単一ランキングを多軸の賞に変える。誰も負けない設計。
-  //   returningUserKeys / firstTimeUserKeys は storage にまだないため空配列で初回出荷。
-  //   将来 broadcastSessionSummaryDb 等から継続参加者データを引ける。
+  // v0.1.477: returningUserKeys / firstTimeUserKeys を IDB + storage から実際に取得。
+  //   過去配信のコメント userId と照合して「かよい」「はじまり」を判定する。
+  const kiramekiReturningUserKeys = [];
+  const kiramekiFirstTimeUserKeys = [];
+  try {
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (lid && /^lv\d{1,15}$/.test(lid)) {
+      const sumDb = await openBroadcastSessionSummaryDb();
+      const pastLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
+        limit: 20,
+        excludeLiveId: lid
+      });
+      if (pastLiveIds.length > 0) {
+        const pastKeys = pastLiveIds.map((id) => `nls_comments_${id}`);
+        const pastBag = await chrome.storage.local.get(pastKeys);
+        // 過去配信に出現したことがある userId を集める
+        const pastUserIdSet = new Set();
+        for (const id of pastLiveIds) {
+          const k = `nls_comments_${id}`;
+          const cs = Array.isArray(pastBag[k]) ? pastBag[k] : [];
+          for (const c of cs) {
+            const uid = String(c?.userId || '').trim();
+            if (uid) pastUserIdSet.add(uid);
+          }
+        }
+        // 今回コメントした userId を分類
+        const currentUserIds = new Set(
+          commentsForReport.map((c) => String(c?.userId || '').trim()).filter(Boolean)
+        );
+        for (const uid of currentUserIds) {
+          if (pastUserIdSet.has(uid)) {
+            kiramekiReturningUserKeys.push(uid);
+          } else {
+            kiramekiFirstTimeUserKeys.push(uid);
+          }
+        }
+      }
+    }
+  } catch {
+    // IDB 失敗時は空配列のまま（きらめきの賞はかよい/はじまり無しで生成される）
+  }
   const { awards: kiramekiAwards } = computeKiramekiAwards({
     comments: commentsForReport,
     aggregatedRooms,
-    returningUserKeys: [],
-    firstTimeUserKeys: [],
+    returningUserKeys: kiramekiReturningUserKeys,
+    firstTimeUserKeys: kiramekiFirstTimeUserKeys,
     broadcasterUserId: reportBroadcasterUserId
   });
   const kiramekiAwardsSectionHtml = buildKiramekiAwardsSectionHtml(
