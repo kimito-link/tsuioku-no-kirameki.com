@@ -13207,6 +13207,9 @@ function initPopup() {
     if (supportVisualDetails) supportVisualDetails.open = true;
   }
   void applyUsageTermsGateState();
+  // マーケ分析DLボタンの即応性向上: popup 起動時に画像キャッシュを warm-up する。
+  // buildYukkuriImageDataUrlMap は Promise キャッシュ済みなので複数呼びは無害。
+  void buildYukkuriImageDataUrlMap();
   if (INLINE_MODE) {
     const watchDetails = /** @type {HTMLDetailsElement|null} */ (
       document.querySelector('.nl-watch-settings-details')
@@ -13578,7 +13581,7 @@ function initPopup() {
       return;
     }
     if (btn) btn.disabled = true;
-    if (stEl) stEl.textContent = '分析中…';
+    if (stEl) stEl.textContent = '分析中… (1/3) データ取得';
     try {
       await yieldToBrowserPaint();
       const sKey = commentsStorageKey(lid);
@@ -13601,6 +13604,7 @@ function initPopup() {
       const reportBroadcasterUid = String(
         watchMetaCache.snapshot?.broadcasterUserId || ''
       ).trim();
+      if (stEl) stEl.textContent = '分析中… (2/3) 集計・画像準備';
       const report = aggregateMarketingReport(comments, lid, {
         broadcasterUserId: reportBroadcasterUid
       });
@@ -13663,6 +13667,7 @@ function initPopup() {
             }
           })()
         ]);
+      if (stEl) stEl.textContent = '分析中… (3/3) HTML生成';
       // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
       // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
       // ユーザーの opt-out が尊重される）。

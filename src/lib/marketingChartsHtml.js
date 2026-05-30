@@ -79,7 +79,13 @@ function adviceCard(role, displayName, lines) {
   const avatarSrc = MKT_ADVISOR_AVATAR_DATA_URI[role];
   const alt =
     role === 'link' ? 'りんく' : role === 'konta' ? 'こん太' : 'たぬ姉';
-  return `<article class="mkt-advice-row mkt-advice--${role}" role="note">
+  // アドバイスカードは <details> で折りたたみ表示。読みたい人だけ開ける。
+  return `<details class="mkt-advice-details mkt-advice--${role}">
+<summary class="mkt-advice-summary">
+<img class="mkt-advice__avatar mkt-advice__avatar--summary" src="${avatarSrc}" alt="${escapeHtml(alt)}" width="28" height="28" loading="lazy" decoding="async">
+<span class="mkt-advice__name">${escapeHtml(displayName)}のコメント</span>
+</summary>
+<article class="mkt-advice-row" role="note">
 <div class="mkt-advice__avatar-wrap">
 <img class="mkt-advice__avatar" src="${avatarSrc}" alt="${escapeHtml(alt)}" width="56" height="56" loading="lazy" decoding="async">
 </div>
@@ -87,7 +93,8 @@ function adviceCard(role, displayName, lines) {
 <div class="mkt-advice__name">${escapeHtml(displayName)}</div>
 ${ps}
 </div>
-</article>`;
+</article>
+</details>`;
 }
 
 /** ページ冒頭：機能一覧とスタンス（配信スタイルを否定しない） */
@@ -3757,6 +3764,7 @@ ${sectionAudienceEngagementGap(audienceGap)}
 ${sectionSupporterChikuranBeta(supporterChikuran, maskShare, identiconResolver)}
 ${sectionGiftMomentum(giftMomentum, maskShare)}
 ${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare))}
+${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare)}
 ${idWrap('mkt-kpi', sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
 ${dynamicAdviceCardsHtml('kpi', metricsForAdvice)}
@@ -4059,6 +4067,42 @@ ${maskNote}
 </section>`;
 }
 
+/**
+ * ヒーローカード: 配信の一言まとめ + 主要3数値を大きく冒頭表示。
+ * @param {MarketingReport} r
+ * @param {string} summaryLine narrative.summaryLine（なければ空文字）
+ * @param {boolean} maskShare
+ */
+function sectionHeroCard(r, summaryLine, maskShare) {
+  const copyId = 'mkt-hero-copy-btn';
+  const copyText = maskShare
+    ? `${r.totalComments.toLocaleString()}件 / ${r.uniqueUsers.toLocaleString()}人 / ${r.durationMinutes}分`
+    : (summaryLine || `${r.totalComments.toLocaleString()}件 / ${r.uniqueUsers.toLocaleString()}人 / ${r.durationMinutes}分`);
+  const copyScript = `<script>
+(function(){
+  var btn=document.getElementById('${copyId}');
+  if(!btn)return;
+  btn.addEventListener('click',function(){
+    var t=${JSON.stringify(copyText)};
+    if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){btn.textContent='✅ コピーしました';setTimeout(function(){btn.textContent='📋 一言まとめをコピー';},2000);})}
+    else{var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();btn.textContent='✅ コピーしました';setTimeout(function(){btn.textContent='📋 一言まとめをコピー';},2000);}
+  });
+})();
+</script>`;
+  return `<section class="mkt-section mkt-hero-card" aria-label="配信ハイライト">
+<div class="mkt-hero-summary">${escapeHtml(copyText)}</div>
+<div class="mkt-hero-stats">
+<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(r.totalComments.toLocaleString())}</span><span class="mkt-hero-stat__label">コメント</span></span>
+<span class="mkt-hero-stat__sep">·</span>
+<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(r.uniqueUsers.toLocaleString())}</span><span class="mkt-hero-stat__label">参加者</span></span>
+<span class="mkt-hero-stat__sep">·</span>
+<span class="mkt-hero-stat"><span class="mkt-hero-stat__val">${escapeHtml(String(r.durationMinutes))}</span><span class="mkt-hero-stat__label">分</span></span>
+</div>
+<button id="${copyId}" class="mkt-hero-copy">📋 一言まとめをコピー</button>
+${copyScript}
+</section>`;
+}
+
 /** @param {MarketingReport} r */
 function sectionKpi(r) {
   const cards = [
@@ -4300,6 +4344,15 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-departed-thumb--empty{border:1px dashed #334155}
 .mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
 .mkt-spec-note{font-size:.72rem;color:#fbbf24;background:rgba(251,191,36,0.08);border-left:3px solid #fbbf24;padding:.4rem .6rem;margin:0 0 .8rem;border-radius:0 4px 4px 0}
+.mkt-hero-card{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border:1px solid #38bdf8;border-radius:16px;padding:clamp(1rem,4vw,1.6rem);text-align:center;box-shadow:0 0 24px rgba(56,189,248,.15)}
+.mkt-hero-summary{font-size:clamp(.9rem,2.5vw,1.1rem);color:#e2e8f0;line-height:1.6;margin:0 0 .8rem}
+.mkt-hero-stats{display:flex;align-items:center;justify-content:center;gap:.5rem;flex-wrap:wrap;margin:0 0 1rem}
+.mkt-hero-stat{display:flex;flex-direction:column;align-items:center;gap:.1rem}
+.mkt-hero-stat__val{font-size:clamp(1.4rem,5vw,2rem);font-weight:700;color:#38bdf8;line-height:1}
+.mkt-hero-stat__label{font-size:.72rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em}
+.mkt-hero-stat__sep{color:#475569;font-size:1.5rem;line-height:1;margin:0 .25rem}
+.mkt-hero-copy{background:#0284c7;color:#fff;border:none;border-radius:8px;padding:.5rem 1.1rem;font-size:.85rem;cursor:pointer;transition:background .15s}
+.mkt-hero-copy:hover{background:#0369a1}
 .mkt-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.8rem}
 .mkt-kpi{background:#0f172a;border-radius:10px;padding:.8rem;text-align:center;border:1px solid #334155}
 .mkt-kpi__icon{font-size:1.4rem;display:block}
@@ -4384,6 +4437,14 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-advice-stack--intro{gap:clamp(1rem,3.5vw,1.5rem)}
 .mkt-advice-stack--next{gap:clamp(.65rem,2.4vw,.9rem);margin:.65rem 0 .85rem}
 .mkt-advice-after{display:flex;flex-direction:column;gap:clamp(.75rem,2.5vw,1rem);margin:.85rem 0 0}
+.mkt-advice-details{border-radius:10px;background:#0a0f1a;border:1px solid #1e293b;margin:.5rem 0}
+.mkt-advice-summary{display:flex;align-items:center;gap:.5rem;padding:.45rem .75rem;cursor:pointer;list-style:none;user-select:none;border-radius:10px;transition:background .15s}
+.mkt-advice-summary::-webkit-details-marker{display:none}
+.mkt-advice-summary::before{content:"▶";font-size:.65rem;color:#64748b;transition:transform .15s;flex-shrink:0}
+.mkt-advice-details[open]>.mkt-advice-summary::before{transform:rotate(90deg)}
+.mkt-advice-summary:hover{background:#0f172a}
+.mkt-advice__avatar--summary{width:28px;height:28px;border-radius:6px;object-fit:contain;background:#0f172a;border:1px solid #334155;flex-shrink:0}
+.mkt-advice-details>.mkt-advice-row{margin:.25rem .75rem .75rem;max-width:calc(100% - 1.5rem)}
 .mkt-advice-row{display:flex;flex-direction:row;align-items:flex-start;gap:clamp(.65rem,2.5vw,.95rem);max-width:100%}
 .mkt-advice__avatar-wrap{flex-shrink:0;width:clamp(48px,12vw,56px)}
 .mkt-advice__avatar{width:clamp(48px,12vw,56px);height:clamp(48px,12vw,56px);object-fit:contain;display:block;border-radius:12px;background:#0f172a;border:1px solid #334155;box-shadow:0 4px 12px rgba(0,0,0,.2)}

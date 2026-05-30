@@ -572,9 +572,10 @@ describe('buildMarketingDashboardHtml', () => {
     );
     expect(sectionMatch).toBeTruthy();
     const introBlock = String(sectionMatch?.[0] || '');
-    expect((introBlock.match(/mkt-advice-row mkt-advice--link/g) || []).length).toBe(1);
-    expect((introBlock.match(/mkt-advice-row mkt-advice--konta/g) || []).length).toBe(1);
-    expect((introBlock.match(/mkt-advice-row mkt-advice--tanu/g) || []).length).toBe(1);
+    // v0.1.475: adviceCard が <details> 構造になったため mkt-advice--role は details タグに付く
+    expect((introBlock.match(/mkt-advice-details mkt-advice--link/g) || []).length).toBe(1);
+    expect((introBlock.match(/mkt-advice-details mkt-advice--konta/g) || []).length).toBe(1);
+    expect((introBlock.match(/mkt-advice-details mkt-advice--tanu/g) || []).length).toBe(1);
   });
 
   it('機能一覧とスタイル否定しない文言・分析メモの案内が含まれる', () => {
