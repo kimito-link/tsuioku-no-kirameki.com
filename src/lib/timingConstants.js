@@ -15,11 +15,15 @@ export const INGEST_TIMING = /** @type {const} */ ({
   endedHarvestCheckMs: 4000,
   // v0.1.472: 300ms→800ms。長尺配信で storage 配列が大きくなると 300ms ごとの
   //   全件 read/write がメインスレッドを圧迫してスクロールが重くなるため緩和。
-  //   高流量時は coalescerBurstThreshold で早期 flush するので体感変化は小さい。
-  coalescerMinMs: 800,
-  // 高流量時は待たずに早期 flush（体感レイテンシ短縮）。
-  // NDGR_CHAT_ROWS_POST_CHUNK=220 より少し上に置き、1チャンク=即flushを避ける。
-  coalescerBurstThreshold: 260,
+  // v0.1.488: さらに 1200ms へ。多タブ+高コメント配信で I/O 競合が起きやすいため
+  //   書き込み頻度を一段落とし、storage.get のタイムアウトを抑える。
+  // v0.1.489: 1500ms へ延長し、burstThreshold を無効化（0）。
+  //   高流量時に O(N) マージが頻発して watch ページ全体がフリーズする問題（応答しません）を防ぐため、
+  //   純粋な時間間隔でのみ書き込むように変更。
+  coalescerMinMs: 1500,
+  // 以前は高流量時に即時 flush していたが、巨大配列の同期マージが連続すると
+  // メインスレッドを占有するため無効化（0）。
+  coalescerBurstThreshold: 0,
   visibleScanDelayMs: 380,
   pageFrameLoopMs: 360,
   /** scroll/resize からのインライン再レイアウトのみ（メンテ処理は走らせない） */
@@ -82,5 +86,13 @@ export const OFFICIAL_GAP_DEEP_TIMING = /** @type {const} */ ({
   cooldownMs: 36_000,
   minOfficialComments: 120,
   minGapAbsolute: 170,
-  gapRatioOfOfficial: 0.058
+  gapRatioOfOfficial: 0.058,
+  // 公式ギャップが残ったまま NDGR バックフィルが未完了で止まっているとき、ワンショット
+  //   guard を解除して「続きから」再開する上限回数（liveId 単位）。cooldownMs(36s) で
+  //   throttle される。
+  //   fix/broadcast-bulk-catchup（2026-05-31）: 「一気に・自動で・手動ボタン無しで取り切る」
+  //   方針に合わせ 12→40 へ引き上げ（36s × 40 ≒ 24 分ぶん粘れる）。長尺・高流量で 1 巡回
+  //   15 分上限に複数回ぶつかる放送でも、ギャップが埋まるまで自動で続きを遡れるようにする。
+  //   no_progress が永遠に続く異常ケースは上限 40 で有界化（暴走防止）。
+  maxGapRearms: 40
 });

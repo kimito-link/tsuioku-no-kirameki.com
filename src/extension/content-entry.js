@@ -307,6 +307,7 @@ import {
   observeFirstPaintFrame
 } from '../lib/inlineFirstPaintGate.js';
 import { shouldTriggerOfficialGapDeepHarvest } from '../lib/shouldTriggerOfficialGapDeepHarvest.js';
+import { shouldRearmBackfillForOfficialGap } from '../lib/shouldRearmBackfillForOfficialGap.js';
 import {
   shouldForceDeepHarvestForReason,
   shouldForceDeepHarvestRecovery,
@@ -1225,6 +1226,39 @@ function maybeOfficialGapQuietDeepHarvest() {
     return;
   }
   lastOfficialGapDeepHarvestAt = Date.now();
+
+  // 自動補充の核心（2026-05-30）: DOM deep harvest は「参加前の過去」を埋められないため、
+  //   公式ギャップが残ったまま NDGR バックフィルが未完了で止まっているなら、ワンショット
+  //   guard を解除して次 tick の maybeAutoStartBackfill に「続きから」再開させる。
+  //   暴走防止に maxGapRearms で上限を設ける（cooldownMs でも throttle 済み）。
+  try {
+    const lid = String(liveId || '').trim();
+    if (lid) {
+      const gap = Math.max(
+        0,
+        (Number(officialCommentCount) || 0) - (Number(observedRecordedCommentCount) || 0)
+      );
+      const rearmCount = _backfillGapRearmByLiveId[lid] || 0;
+      if (
+        shouldRearmBackfillForOfficialGap({
+          backfillRunning: _backfillAbort != null,
+          backfillFinishedOnce: _backfillProgress.done === 1,
+          guardMatchesLiveId: _backfillTriedLiveId === liveId,
+          stopReason: _backfillProgress.stopReason,
+          gap,
+          minGap: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
+          rearmCount,
+          maxRearms: OFFICIAL_GAP_DEEP_TIMING.maxGapRearms
+        })
+      ) {
+        _backfillGapRearmByLiveId[lid] = rearmCount + 1;
+        _backfillTriedLiveId = '';
+      }
+    }
+  } catch {
+    /* no-op（再開判定の失敗は記録/描画に影響させない） */
+  }
+
   void runDeepHarvest({
     stabilityFollowUp: false,
     force: true,
@@ -3266,6 +3300,15 @@ let inlineFloatingAnchor = normalizeInlineFloatingAnchor(undefined);
  * 既定 OFF の狙いは「こん太を押す前から勝手に出る」UX 不一致の回避。
  */
 let inlinePanelAutoshowEnabled = normalizeInlinePanelAutoshowEnabled(undefined);
+
+/**
+ * autoshow を 1 回だけ許可したセッションフラグ。
+ * 設定が OFF に戻っても、このタブでは表示を維持する。
+ */
+let inlinePanelAutoshowActivatedThisSession = false;
+
+/** autoshow の 1 回きり解除を要求済みか */
+let inlinePanelAutoshowResetRequested = false;
 
 /** プレイヤー行の下／横付きでタブ幅に近いまで広げる方針（storage から更新） */
 let inlinePanelViewportWidePolicy =
@@ -5415,7 +5458,29 @@ function buildAiShareFastDiagnosticsPayload() {
       endedBulkHarvestLastCheckedAgo:
         endedBulkHarvestLastCheckedAt > 0
           ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
-          : null
+          : null,
+      // 自動補充デバッグ（2026-05-30）: 過去ログ巡回（NDGR backfill）が「起動したか / 何で
+      //   止まったか / view base を観測できているか」を可視化。backfill が 0 行のとき、
+      //   起動前（viewBase 未観測 or 自動 OFF）なのか、起動して stop したのかを切り分ける。
+      backfill: {
+        autoEnabled: _backfillAutoEnabled,
+        manualEnabled: _backfillEnabled,
+        triedLiveId: String(_backfillTriedLiveId || ''),
+        running: _backfillAbort != null,
+        seg: _backfillProgress.seg,
+        rows: _backfillProgress.rows,
+        done: _backfillProgress.done,
+        stopReason: String(_backfillProgress.stopReason || ''),
+        gapRearmCount: _backfillGapRearmByLiveId[String(liveId || '')] || 0,
+        ndgrViewBaseObserved: Boolean(readNdgrViewBaseUri()),
+        fullSweepForced: _backfillLastRunMeta.fullSweepForced,
+        resumeFromVpos: _backfillLastRunMeta.resumeFromVpos
+      },
+      officialCommentCount:
+        officialCommentCount != null && Number.isFinite(officialCommentCount)
+          ? Math.floor(officialCommentCount)
+          : null,
+      observedRecordedCommentCount
     },
     giftDiagnostics: buildGiftDiagnosticsBundle(),
     // v0.1.200: おすすめ生放送セクションの観測値（汚染源候補数）。
@@ -5857,7 +5922,11 @@ function renderPageFrameOverlay() {
    * インラインパネルを一切表示しない（「こん太を押す前は extension を出さない」が既定動作）。
    * ツールバークリックで toolbarInitiatedShowThisSession が立つと以降は通常どおり表示する。
    */
-  if (!inlinePanelAutoshowEnabled && !toolbarInitiatedShowThisSession) {
+  if (
+    !inlinePanelAutoshowEnabled &&
+    !toolbarInitiatedShowThisSession &&
+    !inlinePanelAutoshowActivatedThisSession
+  ) {
     hidePageFrameOverlay();
     /*
      * try/finally に入らないため、ここでも監視ルートを取り直す。
@@ -5865,6 +5934,23 @@ function renderPageFrameOverlay() {
      */
     maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
+  }
+
+  // autoshow ON のときは「次回だけ表示」にし、1 回表示したら OFF に戻す。
+  if (inlinePanelAutoshowEnabled && !toolbarInitiatedShowThisSession) {
+    if (!inlinePanelAutoshowActivatedThisSession) {
+      inlinePanelAutoshowActivatedThisSession = true;
+    }
+    if (!inlinePanelAutoshowResetRequested) {
+      inlinePanelAutoshowResetRequested = true;
+      try {
+        void chrome.storage?.local?.set({
+          [KEY_INLINE_PANEL_AUTOSHOW_ENABLED]: false
+        });
+      } catch {
+        // no-op
+      }
+    }
   }
 
   renderingPageFrame = true;
@@ -7818,7 +7904,29 @@ function buildAiSharePageDiagnostics() {
       endedBulkHarvestLastCheckedAgo:
         endedBulkHarvestLastCheckedAt > 0
           ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
-          : null
+          : null,
+      // 自動補充デバッグ（2026-05-30）: 過去ログ巡回（NDGR backfill）が「起動したか / 何で
+      //   止まったか / view base を観測できているか」を可視化。backfill が 0 行のとき、
+      //   起動前（viewBase 未観測 or 自動 OFF）なのか、起動して stop したのかを切り分ける。
+      backfill: {
+        autoEnabled: _backfillAutoEnabled,
+        manualEnabled: _backfillEnabled,
+        triedLiveId: String(_backfillTriedLiveId || ''),
+        running: _backfillAbort != null,
+        seg: _backfillProgress.seg,
+        rows: _backfillProgress.rows,
+        done: _backfillProgress.done,
+        stopReason: String(_backfillProgress.stopReason || ''),
+        gapRearmCount: _backfillGapRearmByLiveId[String(liveId || '')] || 0,
+        ndgrViewBaseObserved: Boolean(readNdgrViewBaseUri()),
+        fullSweepForced: _backfillLastRunMeta.fullSweepForced,
+        resumeFromVpos: _backfillLastRunMeta.resumeFromVpos
+      },
+      officialCommentCount:
+        officialCommentCount != null && Number.isFinite(officialCommentCount)
+          ? Math.floor(officialCommentCount)
+          : null,
+      observedRecordedCommentCount
     },
     giftDiagnostics: buildGiftDiagnosticsBundle(),
     // v0.1.200: おすすめ生放送セクションの観測値（汚染源候補数）。
@@ -8753,8 +8861,77 @@ function persistCommentRows(rows, opts = {}) {
 }
 
 /**
+ * readStorageBagWithRetry 互換 + タイムアウト回数のメタ取得。
+ * @param {() => Promise<Record<string, unknown>>} readFn
+ * @param {{ attempts?: number, delaysMs?: number[], perAttemptTimeoutMs?: number }} [opts]
+ * @returns {Promise<{ bag: Record<string, unknown>, timedOutCount: number, succeeded: boolean }>}
+ */
+async function readStorageBagWithRetryMeta(readFn, opts = {}) {
+  const attempts = Math.max(1, Math.min(Number(opts.attempts) || 4, 8));
+  const delays =
+    Array.isArray(opts.delaysMs) && opts.delaysMs.length
+      ? opts.delaysMs
+      : [0, 50, 120, 280];
+  // 0 以下や未指定なら既定 2000ms。タイムアウト無効化したい呼出は明示的に Infinity を渡す。
+  const rawTimeout = Number(opts.perAttemptTimeoutMs);
+  const perAttemptTimeoutMs =
+    Number.isFinite(rawTimeout) && rawTimeout > 0
+      ? rawTimeout
+      : rawTimeout === Infinity
+      ? Infinity
+      : 2000;
+  let timedOutCount = 0;
+  for (let i = 0; i < attempts; i += 1) {
+    if (i > 0) {
+      const ms = Math.max(
+        0,
+        Number(delays[Math.min(i - 1, delays.length - 1)]) || 0
+      );
+      if (ms > 0) {
+        await new Promise((r) => setTimeout(r, ms));
+      }
+    }
+    try {
+      const bag =
+        perAttemptTimeoutMs === Infinity
+          ? await readFn()
+          : await (async () => {
+              /** @type {ReturnType<typeof setTimeout>|null} */
+              let timer = null;
+              const TIMED_OUT = Symbol('storage_read_attempt_timeout');
+              try {
+                const result = await Promise.race([
+                  readFn(),
+                  new Promise((resolve) => {
+                    timer = setTimeout(() => resolve(TIMED_OUT), perAttemptTimeoutMs);
+                  })
+                ]);
+                if (result === TIMED_OUT) {
+                  timedOutCount += 1;
+                  return undefined;
+                }
+                return result;
+              } finally {
+                if (timer != null) clearTimeout(timer);
+              }
+            })();
+      if (bag && typeof bag === 'object' && !Array.isArray(bag)) {
+        return {
+          bag: /** @type {Record<string, unknown>} */ (bag),
+          timedOutCount,
+          succeeded: true
+        };
+      }
+    } catch {
+      // 次の試行へ
+    }
+  }
+  return { bag: {}, timedOutCount, succeeded: false };
+}
+
+/**
  * @param {ParsedCommentRow[]|null|undefined} rows
- * @param {{ source?: string }} [opts]
+ * @param {{ source?: string, retryCount?: number, scrollRetryCount?: number }} [opts]
  */
 async function persistCommentRowsImpl(rows, opts = {}) {
   if (
@@ -8766,12 +8943,28 @@ async function persistCommentRowsImpl(rows, opts = {}) {
   ) {
     return;
   }
+  // v0.1.487: スクロール中は重い read/merge/write を後ろ倒しし、体感のカクつきを抑える。
+  const now = Date.now();
+  const scrollQuietMs = Math.max(0, now - lastUserInitiatedScrollAt);
+  const scrollRetryCount = Math.max(0, Number(opts?.scrollRetryCount) || 0);
+  const SCROLL_DEFER_MS = 900;
+  if (scrollQuietMs < SCROLL_DEFER_MS && scrollRetryCount < 2) {
+    const delay = Math.max(120, SCROLL_DEFER_MS - scrollQuietMs);
+    setTimeout(() => {
+      persistCommentRows(rows, {
+        source: opts?.source,
+        retryCount: opts?.retryCount,
+        scrollRetryCount: scrollRetryCount + 1
+      });
+    }, delay);
+    return;
+  }
   lastPersistCommentBatchSize = rows.length;
   const pipelineT0 = Date.now();
   const enriched = enrichRowsWithInterceptedUserIds(rows);
   const key = commentsStorageKey(liveId);
   try {
-    const bag = await readStorageBagWithRetry(
+    const { bag, timedOutCount, succeeded } = await readStorageBagWithRetryMeta(
       () =>
         chrome.storage.local.get([
           key,
@@ -8783,6 +8976,27 @@ async function persistCommentRowsImpl(rows, opts = {}) {
         ]),
       { attempts: 4, delaysMs: [0, 50, 120, 280] }
     );
+    const hasStoredKey = Object.prototype.hasOwnProperty.call(bag, key);
+    const readFailed =
+      !hasStoredKey && timedOutCount > 0 && !succeeded;
+    if (readFailed) {
+      const retryCount = Math.max(0, Number(opts?.retryCount) || 0);
+      console.debug(formatPipelinePhase('read_failed', {
+        liveId,
+        timedOutCount,
+        retryCount
+      }));
+      if (retryCount < 2) {
+        const delay = 250 + retryCount * 350;
+        setTimeout(() => {
+          persistCommentRows(rows, {
+            source: opts?.source,
+            retryCount: retryCount + 1
+          });
+        }, delay);
+      }
+      return;
+    }
     const existing = Array.isArray(bag[key]) ? bag[key] : [];
     console.debug(formatPipelinePhase('start', {
       liveId,
@@ -11532,6 +11746,21 @@ let _backfillAbort = null;
  */
 const _backfillTransientRetryByLiveId = {};
 /**
+ * 自動補充（公式ギャップ追い）: liveId ごとの「ギャップ残存による NDGR バックフィル再開回数」。
+ *   非一過性 stop（no_progress / cap_reseeds / visited_revisit / aborted 等）で止まっても、
+ *   公式件数との差が大きい間は guard を解除して続きから掘り直す。OFFICIAL_GAP_DEEP_TIMING.
+ *   maxGapRearms で上限を設けて暴走を防ぐ。_backfillTransientRetryByLiveId とは別カウンタ
+ *   （こちらは「DOM では埋まらない過去」を NDGR で埋め続けるための安全網）。
+ * @type {Record<string, number>}
+ */
+const _backfillGapRearmByLiveId = {};
+/**
+ * 自動補充デバッグ（2026-05-30）: 直近巡回が「full sweep（resume 無効化）」だったかを診断面に出す。
+ *   resume 起因の中抜け（seg:3/rows:14・76%停止）を直したことを実機スナップショットで確認するため。
+ * @type {{ fullSweepForced: boolean, resumeFromVpos: number|null }}
+ */
+const _backfillLastRunMeta = { fullSweepForced: false, resumeFromVpos: null };
+/**
  * 一過性 stop で自動リトライする最大回数（liveId ごと）。
  *   v0.1.442: 5 → 7 に拡張。指数バックオフ化と合わせて「最後まで諦めず頑張る」を実現
  *   （ユーザー要望「とれない場合、もう1回頑張って取る機能」）。世界標準（AWS / TanStack Query）
@@ -11552,6 +11781,8 @@ const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
  *   popup 側（backfillRinkuNarration）が区別し、嘘の達成宣言をしないため。
  */
 const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '' };
+/** @type {number} バックフィル進捗が最後に動いた時刻 */
+let _backfillLastProgressAt = 0;
 
 /** 進捗を documentElement の data 属性へ反映（popup が読む）。 */
 function publishBackfillProgress() {
@@ -11714,6 +11945,7 @@ async function runNdgrBackfillOnce() {
   _backfillProgress.rows = 0;
   _backfillProgress.done = 0;
   _backfillProgress.stopReason = '';
+  _backfillLastProgressAt = Date.now();
   publishBackfillProgress();
 
   const startMs =
@@ -11727,7 +11959,26 @@ async function runNdgrBackfillOnce() {
   //   読めない/壊れているときは null＝従来どおり seed 探索から（後方互換）。
   const resumeKey = liveId ? backfillResumeStorageKey(liveId) : null;
   let resumeFromVpos = null;
-  if (resumeKey) {
+  // 自動補充の完全性優先（2026-05-30 真因修正・ユーザー実機 lv350642072 で seg:3/rows:14・76%停止）:
+  //   resume は「前回到達した最古 vpos の続きから」掘る最適化だが、過去に配信開始近傍まで届いた
+  //   resume 地点が storage に残っていると、今回の巡回はその地点（＝配信のほぼ最後尾）へジャンプし、
+  //   数区画だけ遡って reached_start で完了扱いになる。結果「今〜resume 地点」の中盤が永久に
+  //   取りこぼされ、公式件数に届かない。ユーザー指摘「本来はレジュームの必要なく一気にとれる」が正。
+  //   → 公式とのギャップが大きいときは resume を使わず now から一気に full sweep し、中抜けを埋める。
+  //     stale な resume 地点も消して、次回以降の full sweep を妨げない。ギャップが小さい
+  //     （ほぼ埋まっている）ときだけ従来どおり resume で続きを足す。
+  const gapForSweep = Math.max(
+    0,
+    (Number(officialCommentCount) || 0) - (Number(observedRecordedCommentCount) || 0)
+  );
+  const forceFullSweep =
+    officialCommentCount != null &&
+    Number.isFinite(officialCommentCount) &&
+    gapForSweep >= OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute;
+  if (resumeKey && forceFullSweep) {
+    // stale resume を破棄して full sweep を保証（次回の自動補充も now から遡れるように）。
+    setStorageLocalSilent({ [resumeKey]: null });
+  } else if (resumeKey) {
     try {
       const bag = await chrome.storage.local.get(resumeKey);
       const saved = bag && bag[resumeKey];
@@ -11737,6 +11988,8 @@ async function runNdgrBackfillOnce() {
       resumeFromVpos = null;
     }
   }
+  _backfillLastRunMeta.fullSweepForced = forceFullSweep;
+  _backfillLastRunMeta.resumeFromVpos = resumeFromVpos;
 
   // v0.1.456 レジューム: この巡回で到達した最古 vpos を保存するヘルパ。前回より古い
   //   （= 小さい）vpos に進めたときだけ上書きする（後退防止）。storage 負荷を避けるため
@@ -11840,6 +12093,7 @@ async function runNdgrBackfillOnce() {
       }
       const ev = step.value;
       _backfillProgress.seg = ev.segmentsFetched;
+      _backfillLastProgressAt = Date.now();
       // ev.chats は生 NdgrChat[]。ndgrChatsToMergeRows で gift guard + vpos 保持の
       // 行に整形し、各行に過去コメント実時刻 capturedAt を付与する。
       const rows = ndgrChatsToMergeRows(ev.chats);
@@ -11861,6 +12115,7 @@ async function runNdgrBackfillOnce() {
       if (rows.length) {
         pendingBackfillRows.push(...rows);
         _backfillProgress.rows += rows.length;
+        _backfillLastProgressAt = Date.now();
       }
       publishBackfillProgress();
       // 一定行たまったら 1 回だけ persist（フラッシュ回数を激減＝固まり緩和）。
@@ -11924,6 +12179,63 @@ async function runNdgrBackfillOnce() {
 }
 
 /**
+ * fix/broadcast-bulk-catchup（2026-05-31）: 公式件数とのギャップが埋まるまで、手動ボタン
+ *   無しで NDGR バックフィルを自動で何度でも続きから再開させる専用ウォッチドッグ。
+ *
+ * 既存の maybeOfficialGapQuietDeepHarvest 内の再開判定は DOM deep harvest のゲート
+ *   （shouldTriggerOfficialGapDeepHarvest: 公式 120 件以上・タブ可視・gap 比率など）に
+ *   相乗りしていたため、ゲート未通過の放送では再開がかからず「7% で固定」になり得た。
+ *   ここでは DOM harvest と独立に、純関数 shouldRearmBackfillForOfficialGap の判定だけで
+ *   guard（_backfillTriedLiveId）を解除する。実際の再起動は同 tick の後段（リーダー1タブ）が担う。
+ *
+ * - タブ非表示中は何もしない（crawl は hidden で abort されるため・可視復帰後の tick で再開）。
+ * - 自前クールダウン（OFFICIAL_GAP_DEEP_TIMING.cooldownMs）で throttle。
+ * - reached_start でも「記録が公式の半分未満」の明らかな誤完了だけは上限つきで再 sweep を許可。
+ */
+let _lastBackfillGapCatchupRearmAt = 0;
+function maybeRearmBackfillForGapCatchup() {
+  try {
+    if (!_backfillAutoEnabled) return;
+    if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      return;
+    }
+    const lid = String(liveId || '').trim();
+    if (!/^lv\d{1,15}$/.test(lid.toLowerCase())) return;
+    const now = Date.now();
+    if (now - _lastBackfillGapCatchupRearmAt < OFFICIAL_GAP_DEEP_TIMING.cooldownMs) {
+      return;
+    }
+    const official = Number(officialCommentCount);
+    const recorded = Number(observedRecordedCommentCount) || 0;
+    const gap = Math.max(0, (Number.isFinite(official) ? official : 0) - recorded);
+    const rearmCount = _backfillGapRearmByLiveId[lid] || 0;
+    // reached_start 誤完了の救済しきい値: 記録が公式の半分未満なら明らかな誤完了とみなす。
+    const reachedStartGapOverride =
+      Number.isFinite(official) && official > 0 ? Math.floor(official * 0.5) : 0;
+    if (
+      shouldRearmBackfillForOfficialGap({
+        backfillRunning: _backfillAbort != null,
+        backfillFinishedOnce: _backfillProgress.done === 1,
+        guardMatchesLiveId: _backfillTriedLiveId === liveId,
+        stopReason: _backfillProgress.stopReason,
+        gap,
+        minGap: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
+        rearmCount,
+        maxRearms: OFFICIAL_GAP_DEEP_TIMING.maxGapRearms,
+        reachedStartGapOverride
+      })
+    ) {
+      _lastBackfillGapCatchupRearmAt = now;
+      _backfillGapRearmByLiveId[lid] = rearmCount + 1;
+      _backfillTriedLiveId = '';
+    }
+  } catch {
+    /* no-op: 再開判定の失敗は記録/描画に影響させない */
+  }
+}
+
+/**
  * v0.1.418: 自動開始の試行（maintenance tick から毎周期呼ばれる）。
  *   自動 ON（既定）かつ top frame のときだけ runNdgrBackfillOnce を試す。実際の起動可否
  *   （記録 ON / liveId / view base 観測済み / ワンショット guard）は runNdgrBackfillOnce が
@@ -11933,6 +12245,46 @@ async function runNdgrBackfillOnce() {
 function maybeAutoStartBackfill() {
   if (!_backfillAutoEnabled) return;
   if (!isWatchInlinePanelTopFrame()) return;
+  // fix/broadcast-bulk-catchup（2026-05-31）: DOM deep harvest のゲートに依存しない専用
+  //   ウォッチドッグ。公式件数とのギャップが残る限り guard を解除して続きから自動再開させる。
+  maybeRearmBackfillForGapCatchup();
+  // v0.1.489: backfill が「動いているはずなのに 0 行のまま」なら一旦 abort して再起動を促す。
+  //   コメント取得が長時間 0 のまま固定される症状の緩和。
+  // fix/broadcast-bulk-catchup（2026-05-31）拡張: rows>0 でも「途中で固まったまま長時間進まない」
+  //   ハング（実機: 記録118/公式595 で 5 分更新なし）を検知して abort→再開させる。done=0 で
+  //   _backfillAbort が残るとウォッチドッグ（done=1 前提）が再開できないため、ここで打ち切って
+  //   finally に done=1 を立てさせ、次 tick で forceFullSweep 付き再開につなげる。
+  try {
+    const now = Date.now();
+    const gap = Math.max(
+      0,
+      (Number(officialCommentCount) || 0) - (Number(observedRecordedCommentCount) || 0)
+    );
+    const noProgressMs =
+      _backfillLastProgressAt > 0 ? now - _backfillLastProgressAt : 0;
+    const gapRemains = gap >= OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute;
+    // 0 行のまま固まり（起動直後の入口取得に失敗等）: 60 秒で打ち切り。
+    const stalledEmpty =
+      _backfillAbort != null &&
+      _backfillProgress.seg === 0 &&
+      _backfillProgress.rows === 0 &&
+      noProgressMs > 60_000 &&
+      gapRemains;
+    // 途中まで取れたが進まなくなったハング: no_progress のバックオフ睡眠（最大 ~45 秒）を
+    //   誤検知しないよう、より長い 150 秒のしきい値で打ち切る。
+    const stalledMidRun =
+      _backfillAbort != null &&
+      _backfillProgress.rows > 0 &&
+      noProgressMs > 150_000 &&
+      gapRemains;
+    if (stalledEmpty || stalledMidRun) {
+      _backfillProgress.stopReason = 'stalled';
+      _backfillTriedLiveId = '';
+      try { _backfillAbort?.abort(); } catch { /* no-op */ }
+    }
+  } catch {
+    /* no-op */
+  }
   // PR2（多タブ集約）: 自動取り込みは「同一 liveId のタブのうち1つだけ」が走ればよい
   //   （過去ログは全タブ同じ・最大の負荷源 467→66 req/s）。Web Locks リーダー1タブだけ起動。
   //   ⭐lock は crawl 実行中ずっと保持されるので、リーダー1タブが配信開始まで遡り切る間

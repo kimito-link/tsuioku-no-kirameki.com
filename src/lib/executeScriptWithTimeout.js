@@ -15,7 +15,7 @@
  *   - **executor を関数で受ける**（`Promise<T>` ではなく `() => Promise<T>`）ことで、
  *     テスト時の呼出回数検証や mock 差替えが容易。これが `refreshTaskGuard` との設計差。
  *   - fallback は呼出側が決める（reject せず値返し=既存 `catch { return []; }` 経路と互換）。
- *   - 通常パスでは何も実行されない（timeout 発火時のみ console.warn + 診断面更新）。
+ *   - 通常パスでは何も実行されない（timeout 発火時のみ console.debug + 診断面更新）。
  *
  * @template T
  * @param {() => Promise<T>} executor 実行する非同期関数（例: () => chrome.scripting.executeScript({...})）。
@@ -49,8 +49,10 @@ export async function executeScriptWithTimeout(executor, ms, taskCode, fallback)
         /* no-op */
       }
       try {
-        if (typeof console !== 'undefined' && console && typeof console.warn === 'function') {
-          console.warn(`[nl-refresh-timeout] ${taskCode}`);
+        // console.debug にする（console.warn だと chrome://extensions のエラー欄に
+        // 赤く並んで「壊れた」と誤認させるため）。診断は __nlsLastTimedOutTask に残る。
+        if (typeof console !== 'undefined' && console && typeof console.debug === 'function') {
+          console.debug(`[nl-refresh-timeout] ${taskCode}`);
         }
       } catch {
         /* no-op */
