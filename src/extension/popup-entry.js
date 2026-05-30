@@ -10332,7 +10332,14 @@ async function refresh() {
       watchMetaCache.snapshotFetchActive = false;
     }
     watchMetaCache.fetchError = String(snapResult.error || '');
-    const cacheKeyStillTargetsThisRefresh = watchMetaCache.key === snapshotKey;
+    // v0.1.476: INLINE_MODE の 3秒 polling tick が watchMetaCache.key='' にリセットするため、
+    //   15秒の fetch 完了時には key が必ず '' になっている race を根治する。
+    //   polling tick による key リセットは「次の fetch を促す」目的のみで、
+    //   現在走行中の fetch の結果の採用可否とは別件。
+    //   lv が変わっていなければ（別放送への切り替えでなければ）snapshot を採用する。
+    const cacheKeyStillTargetsThisRefresh =
+      watchMetaCache.key === snapshotKey ||
+      (watchMetaCache.key === '' && snapshotKey.startsWith(lv + '|'));
     const fetchedSnapshotAligned =
       snapResult.snapshot == null
         ? true

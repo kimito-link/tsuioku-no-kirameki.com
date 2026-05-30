@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.476',
+    date: '2026-05-30',
+    summary: '全部— 固定になる race condition を根治',
+    items: Object.freeze([
+      'インラインパネルで同接・来場・経過などが—固定のまま回復しない問題を根治しました',
+      '3秒 polling が snapshot key をリセットするタイミングと15秒 fetch の完了が競合し、取得結果が破棄され続けていた原因を修正しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.472',
     date: '2026-05-30',
     summary: 'スクロール重さ・レポート失敗を改善',
