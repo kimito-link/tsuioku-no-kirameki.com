@@ -76,8 +76,7 @@ import { mergeGiftUsers } from '../lib/giftRecord.js';
 import {
   collectOfficialEventDomBundle,
   mergeOfficialEventDomBundle,
-  fetchOfficialEventBannerFromAuditionEmbed,
-  fetchNicoadContributionRankingFromPublishPage
+  fetchOfficialEventBannerFromAuditionEmbed
 } from '../lib/officialEventDomBundle.js';
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
 import {
@@ -1577,8 +1576,7 @@ function resetOfficialStatsState() {
   _autoOpenGiftSidebarTriedLiveId = '';
   // audition embed の fetch も新 liveId で再実行を許す
   _auditionBannerFetchedForLid = '';
-  // ニコニ広告 fetch も新 liveId で再実行を許す
-  _nicoadContribFetchedForLid = '';
+  // (v0.1.474: _nicoadContribFetchedForLid 削除済み)
   // v0.1.198: gift sub-app DOM スキャン結果も新 liveId で初期化
   _giftSubAppHistoryCache = {
     history: [],
@@ -11017,13 +11015,6 @@ let _giftSubAppHistoryCache = {
 const _consoleErrorBuffer = createConsoleErrorBuffer({ capacity: 20 });
 
 /**
- * ニコニ広告ページの「貢献度ランキング（広告 pt 順）」を fetch 済の liveId。
- * 0.1.169 で追加。同じ liveId につき 1 度きり。
- * @type {string}
- */
-let _nicoadContribFetchedForLid = '';
-
-/**
  * 「ギフトサイドバーが開いた瞬間／ユーザーがランキングタブに切り替えた瞬間」を
  * MutationObserver で検知して即スクレイプする。タブクリックの自動化はサイト側の
  * 実装変化に弱いので、こちらの DOM 観測に頼るのが堅実。
@@ -12564,64 +12555,10 @@ async function persistOfficialEventDomBundleNow() {
       } catch { /* no-op */ }
     }
   }
-  // 0.1.169: ニコニ広告ページから貢献度ランキング（広告 pt 順）を fetch。
-  // モチベーション源として popup に表示する。同じ liveId につき 1 度きり。
-  const haveAdRankingAlready =
-    bundleHasAdContributionRankingRows(fresh) ||
-    bundleHasAdContributionRankingRows(lastOfficialEventDomBundle);
-  if (!haveAdRankingAlready && _nicoadContribFetchedForLid !== lid) {
-    _nicoadContribFetchedForLid = lid;
-    try {
-      const fetched = await fetchNicoadContributionRankingFromPublishPage(lid);
-      // v0.1.237: 北極星「鏡のように貼り付け」用の outerHTML を取り出し、bundle に添える。
-      //   `fetchNicoadContributionRankingFromPublishPage` は戻り値 Array に
-      //   非列挙の `mirrorHtml` を Object.defineProperty で添付して返す（JSON 化で
-      //   消えるので、ここで取り出して別 field 化しないと storage 経由で popup へ届かない）。
-      /** @type {any} */
-      const fetchedAny = fetched;
-      const mirrorRaw = fetchedAny?.mirrorHtml;
-      const mirrorHtml =
-        typeof mirrorRaw === 'string' && mirrorRaw.trim().length > 0
-          ? mirrorRaw.trim()
-          : null;
-      const hasRows = Array.isArray(fetched) && fetched.length > 0;
-      if (Array.isArray(fetched) && (hasRows || mirrorHtml)) {
-        fresh = fresh
-          ? {
-              ...fresh,
-              ...(hasRows ? { adContributionRanking: fetched } : {}),
-              ...(mirrorHtml ? { adRankingMirrorHtml: mirrorHtml } : {})
-            }
-          : {
-              capturedAt: Date.now(),
-              eventBanner: null,
-              eventBalloon: null,
-              contributionRanking: null,
-              adContributionRanking: hasRows ? fetched : null,
-              adRankingMirrorHtml: mirrorHtml,
-              programStats: null,
-              giftHistory: null
-            };
-        try {
-          document.documentElement?.setAttribute(
-            'data-nls-nicoad-fetch',
-            'ok'
-          );
-        } catch { /* no-op */ }
-      } else {
-        try {
-          document.documentElement?.setAttribute(
-            'data-nls-nicoad-fetch',
-            'empty'
-          );
-        } catch { /* no-op */ }
-      }
-    } catch {
-      try {
-        document.documentElement?.setAttribute('data-nls-nicoad-fetch', 'error');
-      } catch { /* no-op */ }
-    }
-  }
+  // v0.1.474: 旧 DOM-scrape (fetchNicoadContributionRankingFromPublishPage) を削除。
+  // nicoad.nicovideo.jp への cross-origin fetch が CORS preflight 失敗でエラーログを
+  // 汚染していた。nicoad ランキングは SW 経由 JSON API (NLS_NICOAD_CONTRIB_FETCH) で
+  // 取得済みのため、旧 scrape 経路は不要。
   // 0.1.171: ニコニ広告ページが SPA で fetch だと SSR empty なため、
   // ユーザーが別タブで nicoad ページを開いたときに content script が scrape して
   // chrome.storage.local の `nls_nicoad_ranking_<lv>` に保存する設計（content-entry.js
