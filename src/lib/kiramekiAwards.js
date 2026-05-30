@@ -216,7 +216,12 @@ export function computeKiramekiAwards(input) {
     broadcasterUserId = ''
   } = input || {};
 
-  const allUserKeys = aggregatedRooms.map((r) => r.userKey);
+  // 防御フィルタ: userKey が空・count が数値でない room を除外（NaN ソート防止）
+  const validRooms = aggregatedRooms.filter(
+    (r) => r != null && typeof r.userKey === 'string' && r.userKey.trim() !== '' &&
+      typeof r.count === 'number' && Number.isFinite(r.count)
+  );
+  const allUserKeys = validRooms.map((r) => r.userKey);
   const returningSet = new Set(returningUserKeys);
   const firstTimeSet = new Set(firstTimeUserKeys);
   const userTotalCharsMap = buildUserTotalCharsMap(comments, broadcasterUserId);
@@ -224,7 +229,7 @@ export function computeKiramekiAwards(input) {
   const sottoSet = buildSottoUserSet(comments, broadcasterUserId);
 
   // ひかり: コメント件数の多い上位N人（同率は全員）
-  const sortedByCount = [...aggregatedRooms].sort((a, b) => b.count - a.count);
+  const sortedByCount = [...validRooms].sort((a, b) => b.count - a.count);
   const hikariThreshold = sortedByCount[HIKARI_TOP_N - 1]?.count ?? 0;
   const hikariSet = new Set(
     hikariThreshold > 0
