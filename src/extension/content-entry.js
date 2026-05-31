@@ -10279,6 +10279,14 @@ let lastCommentPanelRestoreActionAt = 0;
 let lastUserInitiatedScrollAt = 0;
 
 /**
+ * 「本物のユーザー操作（wheel / touchmove / スクロール系キー）」だけで更新する最後の epoch ms。
+ * lastUserInitiatedScrollAt と違い scroll イベント（capture）では更新しないため、ニコ生コメント欄の
+ * 自動スクロール（新着追従）で汚染されない。DOM ハーベストのスクロール見送り判定に使う。
+ * @type {number}
+ */
+let lastGenuineUserScrollAt = 0;
+
+/**
  * 自分で scrollIntoView を叩いた直後、その副作用として firing する scroll イベントを
  * 「ユーザスクロール」と誤認しないためのサプレッション締切（epoch ms）。
  * @type {number}
@@ -10297,7 +10305,13 @@ function suppressOwnScrollCountingFor(ms) {
 
 /** wheel/touch/key で呼ぶ（これらは確実にユーザ起点）。 */
 function noteUserInitiatedScroll() {
-  lastUserInitiatedScrollAt = Date.now();
+  const now = Date.now();
+  lastUserInitiatedScrollAt = now;
+  // ⚠️ DOM ハーベスト見送り判定（shouldDeferDomHarvestDuringScroll）はこちらだけを使う。
+  //   lastUserInitiatedScrollAt は scroll イベント（capture）でも更新され、ニコ生コメント欄の
+  //   「新着追従の自動スクロール」が発火する scroll で常時汚染される。それを使うとハーベストが
+  //   永久に見送られ「記録が増えない」回帰になる。genuine（wheel/touch/key）だけで判定する。
+  lastGenuineUserScrollAt = now;
 }
 
 /**
@@ -10645,7 +10659,7 @@ async function start() {
     if (
       shouldDeferDomHarvestDuringScroll(
         Date.now(),
-        lastUserInitiatedScrollAt,
+        lastGenuineUserScrollAt,
         DOM_HARVEST_SCROLL_DEFER_MS
       )
     ) {

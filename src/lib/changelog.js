@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.494',
+    date: '2026-05-31',
+    summary: '記録が増えなくなる回帰を修正',
+    items: Object.freeze([
+      '直前の更新で、コメント欄の自動スクロールを「ユーザー操作」と誤判定し、記録が増えなくなる場合があった問題を修正しました',
+      'スクロール中の負荷軽減は、実際のホイール/タッチ操作のときだけ働くようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.493',
     date: '2026-05-31',
     summary: '大型配信のスクロール重さを改善',
