@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.496',
+    date: '2026-05-31',
+    summary: 'ツールバーアイコン無反応を修正',
+    items: Object.freeze([
+      '視聴ページが重い・固まっている状態でも、ツールバーのアイコンを押せば必ずポップアップ窓が開くようにしました',
+      '応答待ちでアイコンが無反応になる（Chromeを全部閉じるまで直らない）問題の対策です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.495',
     date: '2026-05-31',
     summary: 'スクロール中の重さをさらに軽減',

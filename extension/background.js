@@ -1069,6 +1069,51 @@ async function doOpenOrFocusPopupWindow(anchorWindowId, stripPositionHints) {
  *
  * @param {import('chrome').tabs.Tab|undefined} tab
  */
+/**
+ * v0.1.496: chrome.tabs.sendMessage を必ず有界化する。
+ *   視聴タブのメインスレッドが重い処理（大量コメントの全件マージ等）でフリーズしていると、
+ *   content script の async listener が sendResponse する前に固まり、sendMessage の Promise が
+ *   いつまでも resolve/reject しない。これを await するとツールバー押下ハンドラ自体がハングし、
+ *   popup 窓 fallback にすら到達しない＝「アイコンを押しても無反応・Chrome を全部閉じるまで直らない」
+ *   の主因になる。タイムアウトを設け、応答が無ければ未フォーカス扱いで fallback に進める。
+ * @param {number} tid
+ * @param {unknown} message
+ * @param {number} timeoutMs
+ * @returns {Promise<any>} 応答 or タイムアウト時 null
+ */
+function sendTabMessageWithTimeout(tid, message, timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    }, Math.max(1, Number(timeoutMs) || 1200));
+    try {
+      chrome.tabs
+        .sendMessage(tid, message, { frameId: 0 })
+        .then((res) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(res);
+        })
+        .catch(() => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(null);
+        });
+    } catch {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(null);
+      }
+    }
+  });
+}
+
 async function handleBrowserActionClick(tab) {
   try {
     const policy = await getToolbarActionPolicy();
@@ -1079,37 +1124,36 @@ async function handleBrowserActionClick(tab) {
     }
     const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
     if (tid !== chrome.tabs.TAB_ID_NONE) {
-      try {
-        /*
-         * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
-         * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
-         * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
-         * フレームに broadcast され、iframe の listener が
-         *   if (!isWatchInlinePanelTopFrame()) return false;
-         * で同期 false を返して port を閉じてしまう。top frame の async listener が
-         * sendResponse({focused:true}) する前に port closed エラーになり、
-         * background が popup 窓を fallback として開いてしまう（user 報告：
-         * インラインパネル + popup 窓が同時に出る）。
-         */
-        const res = await chrome.tabs.sendMessage(
-          tid,
-          { type: 'NLS_FOCUS_INLINE_PANEL' },
-          { frameId: 0 }
-        );
-        if (res && res.focused) return;
-        // v0.1.486: 初期化直後は host/iframe が未準備で focused=false になりやすい。
-        //   すぐ popup fallback を開くと「一瞬開いて消える/何も出ない」体験になるため、
-        //   短い猶予を置いて再確認する（最小差分・既存 fallback は維持）。
-        await new Promise((r) => setTimeout(r, 700));
-        const resRetry = await chrome.tabs.sendMessage(
-          tid,
-          { type: 'NLS_FOCUS_INLINE_PANEL' },
-          { frameId: 0 }
-        );
-        if (resRetry && resRetry.focused) return;
-      } catch {
-        // コンテンツ未注入・対象外 URL
-      }
+      /*
+       * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
+       * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
+       * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
+       * フレームに broadcast され、iframe の listener が
+       *   if (!isWatchInlinePanelTopFrame()) return false;
+       * で同期 false を返して port を閉じてしまう。top frame の async listener が
+       * sendResponse({focused:true}) する前に port closed エラーになり、
+       * background が popup 窓を fallback として開いてしまう（user 報告：
+       * インラインパネル + popup 窓が同時に出る）。
+       *
+       * v0.1.496: タブがフリーズしていても固まらないよう sendTabMessageWithTimeout で
+       *   有界化。応答が無ければ null → fallback の popup 窓を開く。
+       */
+      const res = await sendTabMessageWithTimeout(
+        tid,
+        { type: 'NLS_FOCUS_INLINE_PANEL' },
+        1200
+      );
+      if (res && res.focused) return;
+      // v0.1.486: 初期化直後は host/iframe が未準備で focused=false になりやすい。
+      //   すぐ popup fallback を開くと「一瞬開いて消える/何も出ない」体験になるため、
+      //   短い猶予を置いて再確認する（最小差分・既存 fallback は維持）。
+      await new Promise((r) => setTimeout(r, 700));
+      const resRetry = await sendTabMessageWithTimeout(
+        tid,
+        { type: 'NLS_FOCUS_INLINE_PANEL' },
+        1200
+      );
+      if (resRetry && resRetry.focused) return;
     }
     await openOrFocusPopupWindow(tab?.windowId);
   } catch {
