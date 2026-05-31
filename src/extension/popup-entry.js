@@ -13107,8 +13107,10 @@ function dismissInitialLoadShade() {
 let inlineShadeDataPollTimer = null;
 let inlineShadeDataFallbackTimer = null;
 // INLINE 幕の安全上限。データが来なくてもこの時間で必ず外す（永久ローディング防止）。
-//   prewarm（画面外先読み）でも、表示時にキャラ幕が見えるよう十分長くとる。
-const INLINE_SHADE_DATA_FALLBACK_MS = 20_000;
+//   記録済みコメント／レーン候補が乗れば inlineWatchPanelHasRealDataForShade() が即 true を
+//   返して早期解除されるため、この上限は「初回かつ完全に空」の最悪ケースだけに効く。
+//   20 秒は体感が長すぎたので 10 秒に短縮（prewarm 表示でも十分キャラ幕が見える）。
+const INLINE_SHADE_DATA_FALLBACK_MS = 10_000;
 
 function inlineWatchPanelHasRealDataForShade() {
   try {

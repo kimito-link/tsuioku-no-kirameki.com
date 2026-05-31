@@ -11096,6 +11096,23 @@ async function start() {
         } else {
           hiddenLivePanelScanPhase = 0;
         }
+        // ⚡ スクロール重さ対策（v0.1.495）: 本物のユーザー操作（wheel/touch/キー）でスクロール
+        //   している最中は、この定期スキャンを丸ごと見送る。scanVisibleCommentsNow は
+        //   extractCommentsFromNode（パネル全 DOM 走査）＋ persistCommentRows（全コメント配列の
+        //   read-merge）を行い、probeAndRestoreCommentPanelHealth も走るため、スクロール中に
+        //   挟まると 1.6 万件級の配列処理がフレームを奪って「重すぎて動かない」主因になる。
+        //   一次取得は NDGR 傍受が担い、見送った回収はスクロール静止後の次 tick が拾うので
+        //   記録は欠落しない。lastGenuineUserScrollAt はコメント欄の自動スクロール（scroll
+        //   イベント）では汚染されない＝新着追従では誤って見送らない。
+        if (
+          shouldDeferDomHarvestDuringScroll(
+            Date.now(),
+            lastGenuineUserScrollAt,
+            DOM_HARVEST_SCROLL_DEFER_MS
+          )
+        ) {
+          return;
+        }
         scanVisibleCommentsNow();
         void probeAndRestoreCommentPanelHealth();
       }, LIVE_PANEL_SCAN_MS)
