@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.493',
+    date: '2026-05-31',
+    summary: '大型配信のスクロール重さを改善',
+    items: Object.freeze([
+      'コメントが速く流れる長尺配信で、ページのスクロールがガクつく問題を改善しました',
+      'スクロール中はコメント欄の重い再走査を一時的に見送り、指を離すと再開します（記録の取りこぼしはありません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.492',
     date: '2026-05-31',
     summary: '大型配信で固まる問題を改善',
