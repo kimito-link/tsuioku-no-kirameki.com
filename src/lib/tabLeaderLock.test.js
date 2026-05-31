@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { isWebLocksAvailable, runIfTabLeader } from './tabLeaderLock.js';
+import {
+  isWebLocksAvailable,
+  runIfTabLeader,
+  runWhileGlobalLeader,
+  GLOBAL_BACKFILL_LOCK,
+  GLOBAL_FORWARD_LOCK
+} from './tabLeaderLock.js';
 
 /** 単純な Web Locks モック: 同名ロックは同時に1つだけ holder を許す。 */
 function makeMockNavigator() {
@@ -115,5 +121,69 @@ describe('runIfTabLeader', () => {
     expect(
       (await runIfTabLeader('n', /** @type {any} */ (null), { navigatorOverride: nav })).ran
     ).toBe(false);
+  });
+});
+
+describe('runWhileGlobalLeader', () => {
+  it('ロック名は backfill / forward で別（forward が backfill を締め出さない）', () => {
+    expect(GLOBAL_BACKFILL_LOCK).toBe('nls-heavy-backfill');
+    expect(GLOBAL_FORWARD_LOCK).toBe('nls-heavy-forward');
+    expect(GLOBAL_BACKFILL_LOCK).not.toBe(GLOBAL_FORWARD_LOCK);
+  });
+
+  it('別ライブ相当の2タブが同じグローバルロックを取り合う→同時1本だけ実行', async () => {
+    const nav = makeMockNavigator();
+    let releaseTab1;
+    const tab1Held = new Promise((resolve) => {
+      releaseTab1 = resolve;
+    });
+    // タブ1（live A）がグローバル backfill ロックを長く保持
+    const tab1 = runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, async () => {
+      await tab1Held;
+    }, { navigatorOverride: nav });
+
+    await new Promise((r) => setTimeout(r, 5));
+    // タブ2（別 live B）は同じグローバルロックを取れず実行されない（フォロワー）
+    const fn2 = vi.fn();
+    const r2 = await runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, fn2, {
+      navigatorOverride: nav
+    });
+    expect(r2.ran).toBe(false);
+    expect(fn2).not.toHaveBeenCalled();
+
+    releaseTab1();
+    await tab1;
+  });
+
+  it('backfill と forward は別ロックなので同時に走れる', async () => {
+    const nav = makeMockNavigator();
+    let releaseBf;
+    const bfHeld = new Promise((resolve) => {
+      releaseBf = resolve;
+    });
+    const bf = runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, async () => {
+      await bfHeld;
+    }, { navigatorOverride: nav });
+
+    await new Promise((r) => setTimeout(r, 5));
+    // backfill ロック保持中でも forward ロックは別名なので取れる
+    const fwdFn = vi.fn();
+    const rf = await runWhileGlobalLeader(GLOBAL_FORWARD_LOCK, fwdFn, {
+      navigatorOverride: nav
+    });
+    expect(rf.ran).toBe(true);
+    expect(fwdFn).toHaveBeenCalledTimes(1);
+
+    releaseBf();
+    await bf;
+  });
+
+  it('Web Locks 非対応は fail-open で実行', async () => {
+    const fn = vi.fn();
+    const r = await runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, fn, {
+      navigatorOverride: {}
+    });
+    expect(r.ran).toBe(true);
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });

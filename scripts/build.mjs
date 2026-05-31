@@ -50,6 +50,14 @@ const targets = [
     outfile: 'extension/dist/popup.js',
     target: 'chrome100',
     define: popupDefine
+  },
+  {
+    // feat/multitab-scale-globalcap: コメント IDB の常駐書き手（Offscreen Document）。
+    //   Offscreen は chrome.runtime + IndexedDB だけ使える文脈なので、src/lib の純関数
+    //   （commentDb / commentRecord）をそのまま bundle して使う。offscreen は 109+ のみ。
+    entryPoints: ['src/extension/offscreen-entry.js'],
+    outfile: 'extension/dist/offscreen.js',
+    target: 'chrome111'
   }
 ];
 

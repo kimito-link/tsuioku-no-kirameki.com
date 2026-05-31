@@ -16,6 +16,8 @@ export const COMMENT_INGEST_SOURCE = {
   INTERCEPT_POST: 'intercept_post',
   /** v0.1.405: 過去ログ一括バックフィル（NDGR backward 巡回）由来の過去コメント */
   BACKFILL: 'backfill',
+  /** v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）由来のライブ新着 */
+  NDGR_FORWARD: 'ndgr_forward',
   UNKNOWN: 'unknown'
 };
 
@@ -31,6 +33,9 @@ const INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA = 10;
 /** コアレサーで複数経路が混ざったときの監査ログ source の優先（高い方を採用） */
 const SOURCE_MERGE_PRIORITY = /** @type {Readonly<Record<string, number>>} */ ({
   [COMMENT_INGEST_SOURCE.NDGR]: 50,
+  // v0.1.511: 前方向 NDGR 継続取得もライブ NDGR 由来（権威性は傍受とほぼ同等）。傍受 batch と
+  //   混在したときは傍受(50)を優先しつつ、DOM 系より高くする。
+  [COMMENT_INGEST_SOURCE.NDGR_FORWARD]: 45,
   [COMMENT_INGEST_SOURCE.DEEP]: 40,
   [COMMENT_INGEST_SOURCE.VISIBLE]: 30,
   [COMMENT_INGEST_SOURCE.INTERCEPT_POST]: 35,

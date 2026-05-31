@@ -137,8 +137,21 @@ export const NDGR_BACKFILL_NEAR_START_MIN_HITS = 2;
  *   より多くの試行が要る。1 回のリトライで起点を 1 バケット（≒50秒）前へ戻すので、12 回で
  *   最大 ≒600秒（10分）ぶんの空区間を飛び越えられる。進捗が 1 回でもあれば streak は 0 に
  *   リセットされる（連続空振りのみカウント）ので、正常配信での無駄な遡りは増えない。
+ *
+ * ⭐fix/ndgr-no-progress-bridge（2026-06-01・実機で確定）: 12 → 240 に引き上げ。
+ *   実機（歌枠・ギフト多め）で `seg=16 rows=5102 done=1 stop=no_progress`、記録が公式の約68%で
+ *   頭打ちになる症状を data-nls-backfill で観測。真因は「12×50秒＝10分」の橋渡し予算が短すぎる
+ *   こと：歌枠の長い間奏／雑談など【コメントが疎な区間】や、コメントが少ない時間帯で NDGR が
+ *   1 区画に広い時間幅をまとめた【幅広バケット】（同一 backward URI が 50秒ステップでは何度も
+ *   visited で即 break）を、10 分ぶんしか跨げず途中で no_progress に倒れていた。
+ *   240×50秒＝12,000秒（約200分）まで橋渡しできるようにし、現実的な疎区間・幅広バケットを
+ *   跨いで配信開始まで遡り切れるようにする。
+ *   ⚠️ 後退（区画スキップ）防止のためステップ幅は 50秒のまま据え置き（幅を広げると populated
+ *      バケットを飛び越して取りこぼす）。1 reseed は ?at fetch 1 回（≒15〜30ms）で軽く、総量は
+ *      caps.elapsedMs(15分)/segments/bytes で有界。正常完了は通常 reached_start / backward_exhausted
+ *      で早期終了するので、この引き上げは「途中で詰まった配信」だけを救済し正常配信は不変。
  */
-export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 12;
+export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 240;
 
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);

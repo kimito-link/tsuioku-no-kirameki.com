@@ -68,6 +68,81 @@ export const KEY_BACKFILL_AUTO_DISABLED = 'nls_backfill_auto_disabled';
  */
 export const KEY_BACKFILL_PROGRESS = 'nls_backfill_progress_v1';
 
+/**
+ * v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in フラグ。
+ * 既定 OFF（true 厳密一致でだけ有効）。リーダータブ 1 本が放送中ずっと NDGR の nextAt を
+ * long-poll で辿り、page-intercept 傍受/DOM harvest が取りこぼした新着を独立経路で補う。
+ * 連続 fetch（cross-origin・throttle つき）を伴うため、実機検証が済むまでは既定 OFF にする。
+ */
+export const KEY_NDGR_FORWARD_ENABLED = 'nls_ndgr_forward_enabled';
+
+/**
+ * v0.1.513: チャンクモード保存の dedupe を「毎フラッシュ全件 read+merge（O(N)）」から
+ * インメモリ・インクリメンタル（O(追加分)）へ切り替える opt-in フラグ。
+ *
+ * 経緯: 4 万件超の巨大放送で、チャンクモードでも persist のたびに全チャンクを read して
+ * mergeNewComments（O(N)）していたため、フラッシュごとにメインスレッドが詰まり「記録が
+ * 増えない／パネルが裏でローディングのまま」になっていた。content 側で liveId ごとに
+ * dedupe 状態（キー集合 + loneDedupe index）をインメモリに 1 回だけ構築し、以後は追加分
+ * だけ照合して追記専用チャンクに append する。既定 OFF（true 厳密一致でだけ有効）にして
+ * 段階導入し、実機検証後に既定 ON へ昇格する。
+ */
+export const KEY_INCREMENTAL_DEDUP_ENABLED = 'nls_incremental_dedup_enabled';
+
+/**
+ * v0.1.514: コメント本体の保存先を chrome.storage.local（値まるごと structured clone・
+ * 約120 writes/min・50MB 超で劣化・多タブで単一ストアを奪い合い）から **IndexedDB**
+ * （拡張オリジン・SW が単一書き手・popup が同一オリジンで直接読む）へ移す opt-in フラグ。
+ *
+ * 経緯（2026-05-31 世界事例リサーチ）: 4万件超×多タブで chrome.storage.local が構造的に
+ * 限界に達し、保存と表示が単一ストアを奪い合って read/write が timeout → 「記録が増えない」
+ * 「パネルが裏ロード継続/—固定」。IndexedDB は 1 件＝1 レコード追記・index 範囲読み/件数取得
+ * （全件 deserialize 不要）・GB 級容量・書き込みレート制限なしで、サムネ（thumbDb.js）実績の
+ * 作法。既定 OFF（true 厳密一致でだけ有効）にして段階導入し、実機検証後に既定 ON へ昇格する。
+ * @see src/lib/commentDb.js / extension/background.js（NLS_CDB_*）
+ */
+export const KEY_COMMENT_IDB_ENABLED = 'nls_comment_idb_enabled';
+
+/**
+ * feat/multitab-scale-globalcap（2026-05-31）: IDB モードの「単一書き手」を ephemeral な
+ * Service Worker（5分で停止し得る・append のたび DB open/close）から **Offscreen Document**
+ * （MV3 で唯一の常駐 DOM 文脈・DB を開きっぱなしで保持）へ移す opt-in フラグ。
+ *
+ * 経緯: SW writer は (1) idle/5分で停止して append 往復が詰まる、(2) 全タブの append が
+ * 1本に直列化して 1 タブの巨大バックフィルが他タブを待たせる、という弱点があった。Offscreen は
+ * 常駐し DB を保持できるため、append のたびの open/close を避け、途中停止による取りこぼしも防ぐ。
+ * ⚠️ Offscreen は chrome.runtime（messaging）と IndexedDB だけが使える（chrome.storage 不可）。
+ * そこで summary / auto-backup state の chrome.storage 書きと初回移行は SW 側に残し、Offscreen は
+ * IDB 追記＋件数集計＋ popup への BroadcastChannel 通知だけを担う。
+ *
+ * 既定 OFF（true 厳密一致でだけ有効）。OFF のときは従来どおり SW が IDB を直接書く（v0.1.515 経路）。
+ * @see src/extension/offscreen-entry.js / extension/background.js（NLS_OFFSCREEN_CDB_*）
+ */
+export const KEY_CDB_OFFSCREEN_ENABLED = 'nls_cdb_offscreen_enabled';
+
+/** popup/パネルが Offscreen からの件数 push を受ける BroadcastChannel 名。 */
+export const CDB_BROADCAST_CHANNEL = 'nls_cdb_summary_channel_v1';
+
+/**
+ * IDB モードの軽量サマリ（件数 + 直近 N 件）を popup 初期描画用に置くキー。
+ * SW（書き手）が append のたびに更新し、popup/パネルが onChanged で読む。
+ * @param {string} liveId lv123
+ */
+export function commentDbSummaryKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cdb_summary_${id}`;
+}
+
+/**
+ * IDB モードで「既存 chrome.storage.local（main/chunk/tail）→ IDB」初回移行が済んだ印。
+ * SW が live ごとに 1 回だけ移行し、これを true にする（再移行で二重投入しない）。
+ * @param {string} liveId lv123
+ */
+export function commentDbMigratedKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cdb_migrated_${id}`;
+}
+
 /** ポップアップの着せ替えフレーム設定 */
 export const KEY_POPUP_FRAME = 'nls_popup_frame';
 

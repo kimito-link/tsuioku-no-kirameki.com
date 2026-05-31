@@ -24,6 +24,17 @@ export const INGEST_TIMING = /** @type {const} */ ({
   // 以前は高流量時に即時 flush していたが、巨大配列の同期マージが連続すると
   // メインスレッドを占有するため無効化（0）。
   coalescerBurstThreshold: 0,
+  // v0.1.502: 永続化「書き込み」の有界化タイムアウト。多タブで共有 chrome.storage.local
+  //   が巨大配列書き込みで stall すると get/set/remove の await が settle せず、
+  //   persistCommentRowsChain / flushMutex の直列チェーンを永久ブロックして「最終取り込み
+  //   ◯秒前」のまま記録が止まる退行が起きる（読み取り側 2000ms 有界化の書き込み版が未対応
+  //   だった非対称）。書き込みは read より重いので read(2000ms)より長めに取る。timeout 時は
+  //   未永続 rows を再エンキューして自動回復させる。
+  // v0.1.504: 4000→10000。1万件級の単一キー配列の構造化クローン set は環境（OneDrive 配下の
+  //   プロファイル等）によって 4 秒を超えることがあり、毎回 timeout→再エンキュー→より大きな
+  //   set を再発行…の thrash で記録が ~1万件で頭打ちになる退行を確認。正当に重いだけの書き込みは
+  //   完了させ、真に stuck したケースだけ外側ガード（×4=40s）で解放する。
+  persistWriteTimeoutMs: 10000,
   visibleScanDelayMs: 380,
   pageFrameLoopMs: 360,
   /** scroll/resize からのインライン再レイアウトのみ（メンテ処理は走らせない） */

@@ -124,6 +124,8 @@ import {
   INLINE_PANEL_VIEWPORT_WIDE_ALWAYS,
   INLINE_PANEL_VIEWPORT_WIDE_ONCE,
   commentsStorageKey,
+  commentDbSummaryKey,
+  CDB_BROADCAST_CHANNEL,
   watchSnapshotStorageKey,
   giftUsersStorageKey,
   eventDomStorageKey,
@@ -200,6 +202,22 @@ import {
   buildDedupeKey,
   normalizeCommentText
 } from '../lib/commentRecord.js';
+import { tailStorageKey } from '../lib/commentTailBuffer.js';
+import {
+  summaryStorageKey,
+  isCommentSummary
+} from '../lib/commentSummary.js';
+import {
+  chunkIndexKey,
+  isChunkIndex,
+  readChunkedComments
+} from '../lib/commentChunkStore.js';
+import {
+  isCommentDbAvailable,
+  openCommentDb,
+  countCommentsForLive as countCommentsForLiveDb,
+  readAllCommentsForLive as readAllCommentsFromDb
+} from '../lib/commentDb.js';
 import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js';
 import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
 import { mergeStoredCommentDedupeVariants } from '../lib/storedCommentDedupeMerge.js';
@@ -245,6 +263,7 @@ import {
   UNKNOWN_USER_KEY
 } from '../lib/userRooms.js';
 import {
+  buildSupportAccentIndex,
   supportOrdinalForIndex,
   supportSameUserTotalInEntries,
   supportUserKeyFromEntry
@@ -1439,7 +1458,9 @@ const watchMetaCache = {
   //   chrome.storage.local.get がタイムアウトして {} が返ったとき、空配列で描画して全カードを
   //   「—」固定にしてしまう穴（v0.1.336/437 のガードは「固まり防止」止まりで空塗りつぶしは残存）を
   //   塞ぐ。読めなかったときは同一 lv の前回値を保持して描画を継続する（stale-while-revalidate）。
-  /** @type {{ lv: string, arr: unknown[] }|null} */
+  // v0.1.513: chunkTotal は「この arr が映しているチャンク index.total」。次回 refresh で total が
+  //   不変なら全チャンク再読みを skip して再利用する版印（非チャンク経路では null）。
+  /** @type {{ lv: string, arr: unknown[], chunkTotal: number|null }|null} */
   lastCommentsArr: null
 };
 
@@ -3170,10 +3191,23 @@ const STORY_REACTION_STATE = {
       : false
 };
 
+/**
+ * story growth グリッドの DOM セル数の上限。コメントが極端に多い放送でも `<img>` を
+ * 無制限に作らないための安全弁（超過時は「直近 N 件」だけを描画する＝ウィンドウ表示）。
+ * 通常配信（数百件規模）はこの値未満なので従来どおり全件描画され、見た目は変わらない。
+ */
+const STORY_GROWTH_MAX_CELLS = 800;
+
 const STORY_GROWTH_STATE = {
   liveId: '',
   renderedCount: 0,
   targetCount: 0,
+  /**
+   * 上限（STORY_GROWTH_MAX_CELLS）超過時に、グリッドが描画する直近ウィンドウの
+   * 先頭が STORY_SOURCE_STATE.entries の何番目かを示す絶対オフセット。
+   * 上限未満では常に 0（= 全件・従来挙動）。
+   */
+  sourceOffset: 0,
   root: /** @type {HTMLElement|null} */ (null),
   timer: /** @type {ReturnType<typeof setTimeout>|null} */ (null),
   /** クリックで固定したコメントの安定 ID（`comment.id` ベース、レガシーは dedupe キー） */
@@ -3859,8 +3893,12 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
  */
 function getStoryEntryByIndex(index) {
   const entries = STORY_SOURCE_STATE.entries;
-  if (!Number.isFinite(index) || index < 0 || index >= entries.length) return null;
-  return entries[index];
+  if (!Number.isFinite(index) || index < 0) return null;
+  // 上限超過時は直近ウィンドウだけを描画するため、表示スロット index に
+  // sourceOffset を足して絶対インデックスへ変換する（offset=0 のときは従来どおり）。
+  const abs = (STORY_GROWTH_STATE.sourceOffset || 0) + Math.floor(index);
+  if (abs < 0 || abs >= entries.length) return null;
+  return entries[abs];
 }
 
 function renderStoryCommentDetailPanel() {
@@ -4146,6 +4184,109 @@ function storyDetailRecentEntries(entries, focusEntry, liveId, opts = {}) {
 
 /**
  * 同一 commentNo の重複保存があるとき、短く自然な本文と欠損の少ないメタを優先する。
+ * v0.1.505: テールバッファ（nls_ctail_<lv>・content が新着を安く追記する場所。まだメイン
+ * 配列へ畳み込まれていない生行）を、表示用の PopupCommentEntry 形へ軽く整える。カウントと
+ * 集計を real-time にするために、メイン配列へ concat して使う（書き戻しはしない＝表示専用）。
+ * 件数は最大でも TAIL_COMPACT_COUNT 級（数百）なので O(N) で十分軽い。
+ *
+ * @param {unknown} rows テール生行（enriched ParsedCommentRow 相当）
+ * @param {string} lv liveId
+ * @returns {PopupCommentEntry[]}
+ */
+function normalizeTailRowsForDisplay(rows, lv) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  const lid = String(lv || '').trim().toLowerCase();
+  /** @type {PopupCommentEntry[]} */
+  const out = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const r = /** @type {Record<string, unknown>} */ (rows[i]);
+    if (!r || typeof r !== 'object') continue;
+    const text = String(r.text ?? '').trim();
+    if (!text) continue;
+    const cap = Number(r.capturedAt);
+    out.push(
+      /** @type {PopupCommentEntry} */ ({
+        ...r,
+        id: String(r.id || `nls_tail_${lid}_${i}`),
+        liveId: lid,
+        text,
+        capturedAt: Number.isFinite(cap) && cap > 0 ? cap : Date.now()
+      })
+    );
+  }
+  return out;
+}
+
+/**
+ * v0.1.509: 放送の全コメント（追記専用チャンク or 従来 main にフォールバック）＋未畳み込みテールを
+ * 連結して返す共有ヘルパ。レポート/エクスポート/タイムライン/マーケ分析がテール分を取りこぼさず、
+ * かつチャンク移行後も正しく全件を読めるようにする（4-C）。
+ * @param {string} lv lv123
+ * @returns {Promise<unknown[]>}
+ */
+/**
+ * v0.1.514: 拡張オリジン IndexedDB（SW 集約書きの正本）に当該 live のデータがあれば、それを
+ * 全件読んで返す。無ければ（未移行・未使用）null を返して呼び出し側を従来 chrome.storage 経路に
+ * フォールバックさせる。content（ページオリジン）は IDB を直接触れないが、popup は拡張オリジン
+ * ＝SW と同一オリジンなので同じ DB を直接読める。
+ * @param {string} lv
+ * @returns {Promise<unknown[]|null>}
+ */
+async function readAllCommentsFromCommentDb(lv) {
+  if (!isCommentDbAvailable()) return null;
+  let db = null;
+  try {
+    db = await openCommentDb();
+    const cnt = await countCommentsForLiveDb(db, lv);
+    if (cnt <= 0) return null;
+    return await readAllCommentsFromDb(db, lv);
+  } catch {
+    return null;
+  } finally {
+    try {
+      if (db) db.close();
+    } catch {
+      /* no-op */
+    }
+  }
+}
+
+async function readAllCommentsForLive(lv) {
+  // v0.1.514: IDB に当該 live のデータがあれば最優先（SW 集約書きの正本）。
+  const fromDb = await readAllCommentsFromCommentDb(lv);
+  if (Array.isArray(fromDb) && fromDb.length) return fromDb;
+  const mainKey = commentsStorageKey(lv);
+  let rows = [];
+  try {
+    const res = await readChunkedComments(lv, mainKey, (keys) =>
+      readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
+        attempts: 3,
+        delaysMs: [0, 80, 200],
+        perAttemptTimeoutMs: 1200
+      })
+    );
+    rows = Array.isArray(res.rows) ? res.rows : [];
+  } catch {
+    rows = [];
+  }
+  try {
+    const tKey = tailStorageKey(lv);
+    const tailBag = await readStorageBagWithRetry(
+      () => chrome.storage.local.get([tKey]),
+      { attempts: 2, delaysMs: [0, 120], perAttemptTimeoutMs: 900 }
+    );
+    const tail = normalizeTailRowsForDisplay(
+      /** @type {Record<string, unknown>} */ (tailBag)[tKey],
+      lv
+    );
+    if (tail.length) rows = rows.concat(tail);
+  } catch {
+    /* テールは任意（取れなければ本体のみ） */
+  }
+  return rows;
+}
+
+/**
  * 旧バグで混ざった「複数コメント連結行」を UI 表示前に潰す。
  *
  * @param {PopupCommentEntry[]} entries
@@ -4381,7 +4522,15 @@ function storyGrowthImgAssignSrc(img, nextSrc) {
   img.src = next;
 }
 
-function applyStoryGrowthIconAttributes(img, index, isNew) {
+/**
+ * @param {HTMLImageElement} img
+ * @param {number} index 表示スロット（0 始まり）
+ * @param {boolean} isNew
+ * @param {{ ordinal: number, total: number }} [accent]
+ *   patch/rebuild が 1 パス O(N) で事前計算した同一ユーザー ordinal/total。
+ *   省略時のみ従来の per-cell O(N) 計算へフォールバック（ホットパスからは必ず渡す）。
+ */
+function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   const entry = getStoryEntryByIndex(index);
   const stable = commentStableId(entry);
   const selected = Boolean(stable && STORY_GROWTH_STATE.pinnedCommentId === stable);
@@ -4406,7 +4555,10 @@ function applyStoryGrowthIconAttributes(img, index, isNew) {
 
   const entries = STORY_SOURCE_STATE.entries;
   const storyKey = entry ? supportUserKeyFromEntry(entry) : UNKNOWN_USER_KEY;
-  const ordinal = supportOrdinalForIndex(entries, index);
+  const absIndex = (STORY_GROWTH_STATE.sourceOffset || 0) + index;
+  const ordinal = accent
+    ? accent.ordinal
+    : supportOrdinalForIndex(entries, absIndex);
   img.classList.remove('nl-story-growth-icon--user-accent');
 
   const cell = img.closest('.nl-story-growth-cell');
@@ -4434,7 +4586,9 @@ function applyStoryGrowthIconAttributes(img, index, isNew) {
   const hoverHint = storyHoverPreviewEnabled()
     ? 'マウスを乗せるとプレビュー、'
     : '';
-  const totalSame = supportSameUserTotalInEntries(entries, storyKey);
+  const totalSame = accent
+    ? accent.total
+    : supportSameUserTotalInEntries(entries, storyKey);
   const sameUserBlurb =
     entry && totalSame > 1
       ? `同一ユーザー${ordinal}件目、一覧に同ユーザー計${totalSame}件。`
@@ -4454,8 +4608,9 @@ function applyStoryGrowthIconAttributes(img, index, isNew) {
 /**
  * @param {boolean} isNew
  * @param {number} index
+ * @param {{ ordinal: number, total: number }} [accent]
  */
-function createStoryGrowthCell(isNew, index) {
+function createStoryGrowthCell(isNew, index, accent) {
   const cell = document.createElement('span');
   cell.className = 'nl-story-growth-cell';
   const media = document.createElement('span');
@@ -4463,8 +4618,22 @@ function createStoryGrowthCell(isNew, index) {
   const img = document.createElement('img');
   media.appendChild(img);
   cell.appendChild(media);
-  applyStoryGrowthIconAttributes(img, index, isNew);
+  applyStoryGrowthIconAttributes(img, index, isNew, accent);
   return cell;
+}
+
+/**
+ * 現在の描画ウィンドウ（sourceOffset から count 件）の同一ユーザー ordinal/total を
+ * 1 パス O(count) で事前計算する。per-cell の O(N) 計算を撤廃して全体を O(N) にする。
+ * @param {number} count
+ * @returns {{ ordinals: number[], totals: number[] }}
+ */
+function buildStoryAccentForWindow(count) {
+  return buildSupportAccentIndex(
+    STORY_SOURCE_STATE.entries,
+    STORY_GROWTH_STATE.sourceOffset || 0,
+    count
+  );
 }
 
 /**
@@ -4479,8 +4648,12 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
     rebuildStoryGrowth(root, n);
     return;
   }
+  const accent = buildStoryAccentForWindow(n);
   for (let i = 0; i < n; i += 1) {
-    applyStoryGrowthIconAttributes(/** @type {HTMLImageElement} */ (imgs[i]), i, false);
+    applyStoryGrowthIconAttributes(/** @type {HTMLImageElement} */ (imgs[i]), i, false, {
+      ordinal: accent.ordinals[i] || 0,
+      total: accent.totals[i] || 0
+    });
   }
   if (opts.pulseLast && n > 0) {
     const last = /** @type {HTMLImageElement} */ (imgs[n - 1]);
@@ -4498,9 +4671,15 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
 function rebuildStoryGrowth(root, total) {
   root.innerHTML = '';
   if (total <= 0) return;
+  const accent = buildStoryAccentForWindow(total);
   const frag = document.createDocumentFragment();
   for (let i = 0; i < total; i += 1) {
-    frag.appendChild(createStoryGrowthCell(false, i));
+    frag.appendChild(
+      createStoryGrowthCell(false, i, {
+        ordinal: accent.ordinals[i] || 0,
+        total: accent.totals[i] || 0
+      })
+    );
   }
   root.appendChild(frag);
 }
@@ -4513,7 +4692,9 @@ function rebuildStoryGrowth(root, total) {
 function syncStoryGrowth(liveId, count, root) {
   const nextLiveId = String(liveId || '');
   const targetFull = Math.max(0, Math.floor(Number(count) || 0));
-  const target = targetFull;
+  // 上限を超える分は描画しない（直近 STORY_GROWTH_MAX_CELLS 件だけをウィンドウ表示）。
+  // 通常配信は上限未満なので target===targetFull で従来挙動。
+  const target = Math.min(targetFull, STORY_GROWTH_MAX_CELLS);
   const changedLive = STORY_GROWTH_STATE.liveId !== nextLiveId;
   const changedRoot = STORY_GROWTH_STATE.root !== root;
 
@@ -4532,6 +4713,12 @@ function syncStoryGrowth(liveId, count, root) {
 
   STORY_GROWTH_STATE.root = root;
   STORY_GROWTH_STATE.targetCount = target;
+  // 描画ウィンドウの先頭オフセット。entries 全体（lane/集計用）は不変で、グリッドだけ
+  // 直近 target 件を表示する。上限未満では srcLen<=target ＝ offset 0（全件）。
+  {
+    const srcLen = STORY_SOURCE_STATE.entries.length;
+    STORY_GROWTH_STATE.sourceOffset = Math.max(0, srcLen - target);
+  }
 
   if (!root) return;
   bindStoryGrowthInteractions(root);
@@ -7371,10 +7558,10 @@ async function refreshSupportActivityTimeline(liveId) {
   /** @type {any[]} */
   let giftEvents = [];
   try {
-    const commentsKey = commentsStorageKey(lid);
     const giftEventsKey = `nls_gift_events_${lid}`;
-    const bag = await chrome.storage.local.get([commentsKey, giftEventsKey]);
-    comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    // v0.1.509: 本体は全チャンク＋テールを連結（取りこぼし・チャンク移行後対応）。
+    comments = await readAllCommentsForLive(lid);
+    const bag = await chrome.storage.local.get([giftEventsKey]);
     giftEvents = Array.isArray(bag[giftEventsKey]) ? bag[giftEventsKey] : [];
   } catch {
     /* best-effort: 空のまま */
@@ -10157,6 +10344,11 @@ async function refresh() {
 
   const snapshotKey = `${lv}|${url}|s17`;
   const key = commentsStorageKey(lv);
+  // v0.1.505: 未畳み込みの新着（テール）も読んで「メイン＋テール」をカウント/集計に使う。
+  const tailKey = tailStorageKey(lv);
+  // v0.1.508: パネル 0 秒表示用の軽量サマリ（件数・直近コメント）。本体巨大配列の heavy read
+  //   が多タブ飽和で timeout しても、これで件数カードと ticker を即描画して「—」固定を防ぐ。
+  const summaryKey = summaryStorageKey(lv);
   const snapshotCacheHit =
     watchMetaCache.key === snapshotKey && watchMetaCache.snapshot != null;
 
@@ -10191,16 +10383,107 @@ async function refresh() {
   //   session しか救えず、初回 cold open の大規模放送を救えない）。
   // v0.1.485: まず軽量読み（snapshot + profile）だけで初回描画を進め、重い配列読みは
   //   別 Promise で後追いする。これで「重い配列待ちで popup が空のまま」状態を減らす。
-  const heavyDataPromise = readStorageBagWithRetry(
-    () => chrome.storage.local.get([key]),
-    { attempts: 4, delaysMs: [0, 50, 120, 280], perAttemptTimeoutMs: 1500 }
-  );
   // v0.1.336: 描画前ゲート（軽量読みは固まりを per-attempt 900ms で失敗扱いにし、
   //   最悪 4 試行で {} に落として描画を続行）。
   const lightData = await readStorageBagWithRetry(
-    () => chrome.storage.local.get([KEY_USER_COMMENT_PROFILE_CACHE, snapKey]),
+    () =>
+      chrome.storage.local.get([
+        KEY_USER_COMMENT_PROFILE_CACHE,
+        snapKey,
+        tailKey,
+        summaryKey,
+        commentDbSummaryKey(lv),
+        chunkIndexKey(lv)
+      ]),
     { attempts: 4, delaysMs: [0, 50, 120, 280], perAttemptTimeoutMs: 900 }
   );
+  // v0.1.509: チャンク移行済みか（移行済みなら popup は main キーへ一切書き戻さない＝
+  //   バックアップ温存。正規化 patch は表示時 profile 再適用で担保される）。
+  const lightChunkIndexRaw = /** @type {Record<string, unknown>} */ (lightData)[
+    chunkIndexKey(lv)
+  ];
+  const commentsChunked = isChunkIndex(lightChunkIndexRaw, lv);
+  // v0.1.514: SW が IDB へ書いた軽量サマリ（件数 + 直近 N 件）。これが存在する live は IDB が
+  //   正本（content はもう chrome.storage の本体/チャンク/テールへ書かない）。total を
+  //   「全件配列のバージョン印」に使い、heavy read は IDB から行う。
+  const cdbSummaryRaw = /** @type {Record<string, unknown>} */ (lightData)[
+    commentDbSummaryKey(lv)
+  ];
+  const cdbSummary =
+    cdbSummaryRaw &&
+    typeof cdbSummaryRaw === 'object' &&
+    Number(/** @type {any} */ (cdbSummaryRaw).v) === 1 &&
+    String(/** @type {any} */ (cdbSummaryRaw).liveId || '').trim().toLowerCase() === lv &&
+    Number.isFinite(Number(/** @type {any} */ (cdbSummaryRaw).total))
+      ? /** @type {{ total: number, recent: Array<Record<string, unknown>> }} */ (
+          cdbSummaryRaw
+        )
+      : null;
+  const idbMode = !!cdbSummary;
+  // v0.1.513: チャンクは追記専用なので index.total が「全件配列のバージョン印」になる。
+  //   前回の heavy read 結果（lastCommentsArr）が同じ total を映していれば、全チャンク再読み
+  //   （O(N)）を skip してキャッシュを再利用する。多タブ × 巨大放送で、テール/スナップショット
+  //   更新のたびに全チャンクを読み直して storage I/O を飽和させていた「裏ローディング継続」を
+  //   断つ。total が増えた（新チャンク追記）ときだけ読み直す。
+  // v0.1.514: IDB モードは cdbSummary.total を同じバージョン印として使う。
+  const currentChunkTotal = idbMode
+    ? Math.max(0, Number(cdbSummary.total) || 0)
+    : commentsChunked
+    ? Math.max(0, Number(/** @type {any} */ (lightChunkIndexRaw).total) || 0)
+    : null;
+  const cachedHeavy = watchMetaCache.lastCommentsArr;
+  const canReuseHeavyChunkRead =
+    (idbMode || commentsChunked) &&
+    currentChunkTotal != null &&
+    cachedHeavy &&
+    cachedHeavy.lv === lv &&
+    Number(cachedHeavy.chunkTotal) === currentChunkTotal &&
+    Array.isArray(cachedHeavy.arr) &&
+    cachedHeavy.arr.length > 0;
+  // v0.1.509: 本体は追記専用チャンク（無ければ従来 main にフォールバック）から読む。
+  //   readStorageBagWithRetry を getMany として渡し、固まり時は {} に落として描画継続する。
+  // v0.1.514: IDB モードは拡張オリジン IDB を直接読む（chrome.storage I/O の奪い合いから解放）。
+  const heavyDataPromise = canReuseHeavyChunkRead
+    ? Promise.resolve(/** @type {unknown[]} */ (cachedHeavy.arr))
+    : idbMode
+    ? readAllCommentsFromCommentDb(lv)
+        .then((rows) => (Array.isArray(rows) ? rows : []))
+        .catch(() => null)
+    : readChunkedComments(lv, key, (keys) =>
+        readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
+          attempts: 4,
+          delaysMs: [0, 50, 120, 280],
+          perAttemptTimeoutMs: 1500
+        })
+      )
+        .then((r) => (Array.isArray(r.rows) ? r.rows : []))
+        .catch(() => null);
+  // テールは小さい（最大でも数百件）ので軽量読みで取得し、初回 paint・heavy 再描画の両方で
+  //   メイン配列へ concat する（表示専用・書き戻さない）。
+  const tailDisplayRows = normalizeTailRowsForDisplay(
+    /** @type {Record<string, unknown>} */ (lightData)[tailKey],
+    lv
+  );
+  // v0.1.508: 軽量サマリ（件数・直近コメント）。本体配列が読めない/まだ来ていない初期 paint で
+  //   件数カードと ticker を埋めるのに使う（表示専用・書き戻さない）。
+  const summaryRaw = /** @type {Record<string, unknown>} */ (lightData)[summaryKey];
+  const commentSummary = isCommentSummary(summaryRaw, lv)
+    ? /** @type {{ recordedCount: number, recent: Array<Record<string, unknown>> }} */ (
+        summaryRaw
+      )
+    : null;
+  // v0.1.514: IDB モードは SW が書いた cdbSummary（total + 直近 N 件）を優先して件数カード・
+  //   ticker を 0 秒描画する（従来の nls_csummary は IDB モードでは更新されない）。
+  const summaryRecordedCount = idbMode
+    ? Math.max(0, Number(cdbSummary.total) || 0)
+    : commentSummary
+    ? Math.max(0, Number(commentSummary.recordedCount) || 0)
+    : null;
+  const summaryDisplayRows = idbMode
+    ? normalizeTailRowsForDisplay(cdbSummary.recent, lv)
+    : commentSummary
+    ? normalizeTailRowsForDisplay(commentSummary.recent, lv)
+    : [];
   /** @type {Record<string, unknown>} */
   const data = { ...lightData };
   // v0.1.481: 多タブ storage.get タイムアウトで data={} → arr=[] → 全カード「—」固定の根治。
@@ -10210,7 +10493,8 @@ async function refresh() {
   let arr = readCommentsOk ? /** @type {unknown[]} */ (data[key]) : [];
   let commentReadState = readCommentsOk ? 'storage_ok' : 'missing';
   if (readCommentsOk) {
-    watchMetaCache.lastCommentsArr = { lv, arr };
+    // 従来 main 経路（非チャンク）。chunkTotal は持たない（チャンク再利用判定の対象外）。
+    watchMetaCache.lastCommentsArr = { lv, arr, chunkTotal: null };
   } else if (
     watchMetaCache.lastCommentsArr &&
     watchMetaCache.lastCommentsArr.lv === lv &&
@@ -10219,6 +10503,12 @@ async function refresh() {
   ) {
     arr = watchMetaCache.lastCommentsArr.arr;
     commentReadState = 'fallback_cached';
+  } else if (summaryDisplayRows.length > 0) {
+    // v0.1.508: 本体配列がまだ無い（cold open・多タブ飽和で heavy read 未完了）ときは、
+    //   軽量サマリの直近コメントで ticker を即描画する。件数カードは summaryRecordedCount で
+    //   埋める（後で heavy read が来たら通常どおり全件で上書き）。
+    arr = summaryDisplayRows;
+    commentReadState = 'summary';
   }
   // v0.1.407: cached-first render。in-memory snapshot がまだ無い初回 boot で、前回保存
   //   した snapshot があれば即採用する＝開いた瞬間に「—／取得中…」でなく前回値を出す。
@@ -10254,7 +10544,12 @@ async function refresh() {
         profAfterNormalize.cacheTouched)
     ) {
       const save = {};
-      if (normalizedStored.changed || profAfterNormalize.commentsPatched) {
+      // v0.1.509: チャンク移行済みでは main キーへ書き戻さない（バックアップ温存。正規化 patch は
+      //   表示時 profile 再適用で担保）。profile cache は従来どおり更新する。
+      if (
+        !commentsChunked &&
+        (normalizedStored.changed || profAfterNormalize.commentsPatched)
+      ) {
         save[key] = applied;
       }
       if (profAfterNormalize.cacheTouched) {
@@ -10273,6 +10568,11 @@ async function refresh() {
     return applied;
   };
   arr = await applyStoredCommentEntries(arr, readCommentsOk);
+  // v0.1.505: メイン書き戻し後にテール（未畳み込み新着）を表示用に concat。書き戻しは
+  //   メインのみなので、テールがメインへ二重永続することはない。
+  if (tailDisplayRows.length) {
+    arr = /** @type {unknown[]} */ (arr).concat(tailDisplayRows);
+  }
   STORY_AVATAR_DIAG_STATE.total = arr.length;
   STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
   STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
@@ -10305,11 +10605,14 @@ async function refresh() {
     arr = strippedViewerAvatar.next;
     const profAfterStrip = popupMergeUserCommentProfileCache(arr);
     arr = profAfterStrip.arr;
-    const saveStrip = { [key]: arr };
+    // v0.1.509: チャンク移行済みでは main キーへ書き戻さない（バックアップ温存）。profile cache のみ更新。
+    const saveStrip = commentsChunked ? {} : { [key]: arr };
     if (profAfterStrip.cacheTouched) {
       saveStrip[KEY_USER_COMMENT_PROFILE_CACHE] = popupUserCommentProfileMap;
     }
-    await storageSetSafe(saveStrip);
+    if (Object.keys(saveStrip).length) {
+      await storageSetSafe(saveStrip);
+    }
   }
   STORY_AVATAR_DIAG_STATE.stripped = strippedViewerAvatar.patched;
   if (INTERCEPT_BACKFILL_STATE.liveId !== lv) {
@@ -10354,7 +10657,15 @@ async function refresh() {
       broadcasterUidForCommentExclude
     );
     STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
-    setCountDisplay(displayEntries.length, watchSnapshot);
+    // v0.1.508: 本体全件が読めているときは displayEntries.length（配信者除外後の表示件数）を、
+    //   まだ読めていない（summary/missing）ときは軽量サマリの記録件数を出して「—」やゼロ表示を防ぐ。
+    const hasReliableFullArray =
+      commentReadState === 'storage_ok' || commentReadState === 'fallback_cached';
+    const countToShow =
+      !hasReliableFullArray && summaryRecordedCount != null
+        ? Math.max(summaryRecordedCount, displayEntries.length)
+        : displayEntries.length;
+    setCountDisplay(countToShow, watchSnapshot);
     void updateIngestHeartbeatDisplay(lv);
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));
     exportBtn.disabled = false;
@@ -10393,8 +10704,22 @@ async function refresh() {
       snapshot: watchSnapshot
     });
     renderWatchMetaCard(watchSnapshot, arr);
+    // v0.1.503 perf: renderCharacterScene→syncStoryGrowth が source signature 一致時は
+    //   既に patch 済み／skip 済み。ここで毎ポーリング無条件に O(N) patch を回すと、
+    //   同一サイトの複数 watch タブが 1 プロセスを共有する環境でメインスレッドが固まり
+    //   「ページが応答しません」になる。signature が変わった（または DOM セル数がずれた）
+    //   ときだけ patch する。querySelectorAll の length は O(セル数=上限以下) で軽い。
     const growthEl = /** @type {HTMLElement|null} */ ($('sceneStoryGrowth'));
-    if (growthEl) patchStoryGrowthIconsFromSource(growthEl);
+    if (growthEl) {
+      const renderedImgCount = growthEl.querySelectorAll(
+        'img.nl-story-growth-icon'
+      ).length;
+      const sigChanged = storySourceSignature() !== STORY_GROWTH_STATE.sourceSig;
+      if (sigChanged || renderedImgCount !== STORY_GROWTH_STATE.renderedCount) {
+        patchStoryGrowthIconsFromSource(growthEl);
+        STORY_GROWTH_STATE.sourceSig = storySourceSignature();
+      }
+    }
 
     {
       const baseAv = summarizeStoredCommentAvatarStats(arr);
@@ -10416,18 +10741,28 @@ async function refresh() {
     void renderGiftSubAppHistoryPanel(lv);
   }
 
-  // 重いコメント配列の読み取りが後から完了したら、同一 liveId のときだけ再描画。
-  void heavyDataPromise.then(async (heavyData) => {
+  // 重いコメント配列（全チャンク連結 or 従来 main）の読み取りが後から完了したら、
+  //   同一 liveId のときだけ再描画。v0.1.509: heavyDataPromise は配列 or null を resolve する。
+  void heavyDataPromise.then(async (nextArr) => {
     if (watchMetaCache.key !== snapshotKey) return;
-    if (!heavyData || typeof heavyData !== 'object') return;
-    if (!Array.isArray(heavyData[key])) return;
+    if (!Array.isArray(nextArr)) return;
     if (refreshGen !== watchPopupRefreshGeneration) return;
-    const nextArr = /** @type {unknown[]} */ (heavyData[key]);
     if (!nextArr.length && arr.length) return;
     readCommentsOk = true;
+    commentReadState = 'storage_ok';
     arr = nextArr;
-    watchMetaCache.lastCommentsArr = { lv, arr };
+    // v0.1.513: チャンク版は index.total を一緒に控え、次回 refresh で total 不変なら全チャンク
+    //   再読みを skip して再利用できるようにする（多タブ飽和の「裏ローディング継続」対策）。
+    watchMetaCache.lastCommentsArr = {
+      lv,
+      arr,
+      chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null
+    };
     arr = await applyStoredCommentEntries(arr, true);
+    // v0.1.505: heavy 再描画でもテール（未畳み込み新着）を表示用に concat（書き戻しはメインのみ）。
+    if (tailDisplayRows.length) {
+      arr = /** @type {unknown[]} */ (arr).concat(tailDisplayRows);
+    }
     paintWatchPopupUi();
   });
 
@@ -10815,6 +11150,8 @@ async function collectDataBackedWatchLvs(openWatchUrls) {
   for (const lv of lvs) {
     keys.push(commentsStorageKey(lv));
     keys.push(watchSnapshotStorageKey(lv));
+    // v0.1.509: チャンク移行後の放送は本体が main ではなくチャンクに在るので index も見る（軽い）。
+    keys.push(chunkIndexKey(lv));
   }
   /** @type {Record<string, unknown>} */
   let bag = {};
@@ -10831,7 +11168,10 @@ async function collectDataBackedWatchLvs(openWatchUrls) {
   const withData = [];
   for (const lv of lvs) {
     const comments = bag[commentsStorageKey(lv)];
-    const hasComments = Array.isArray(comments) && comments.length > 0;
+    const chunkIdx = bag[chunkIndexKey(lv)];
+    const hasComments =
+      (Array.isArray(comments) && comments.length > 0) ||
+      (isChunkIndex(chunkIdx, lv) && Number(/** @type {any} */ (chunkIdx).total) > 0);
     const snap = bag[watchSnapshotStorageKey(lv)];
     const hasSnap =
       snap != null &&
@@ -11618,13 +11958,13 @@ async function buildHtmlReportDocument(
       });
       const pastUserIdSet = new Set();
       if (pastLiveIds.length > 0) {
-        const pastKeys = pastLiveIds.map((id) => `nls_comments_${id}`);
-        const pastBag = await chrome.storage.local.get(pastKeys);
-        for (const id of pastLiveIds) {
-          const k = `nls_comments_${id}`;
-          const cs = Array.isArray(pastBag[k]) ? pastBag[k] : [];
-          for (const c of cs) {
-            const uid = String(c?.userId || '').trim();
+        // v0.1.509: 過去配信もチャンク移行後対応＋テール込みで userId を集める。
+        const pastArrays = await Promise.all(
+          pastLiveIds.map((id) => readAllCommentsForLive(id))
+        );
+        for (const cs of pastArrays) {
+          for (const c of Array.isArray(cs) ? cs : []) {
+            const uid = String(/** @type {any} */ (c)?.userId || '').trim();
             if (uid) pastUserIdSet.add(uid);
           }
         }
@@ -12812,14 +13152,12 @@ async function resolveSnapshotForHtmlExport(watchUrl) {
 async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
   const lidForEvent = String(liveId || '').trim().toLowerCase();
   const eventKey = /^lv\d{1,15}$/.test(lidForEvent) ? eventScoreRankingStorageKey(lidForEvent) : null;
-  const [data, { snapshot, error }, eventBag] = await Promise.all([
-    chrome.storage.local.get(storageKey),
+  // v0.1.509: 本体は全チャンク＋未畳み込みテールを連結（チャンク移行後対応・テール取りこぼし修正）。
+  const [comments, { snapshot, error }, eventBag] = await Promise.all([
+    readAllCommentsForLive(liveId),
     resolveSnapshotForHtmlExport(watchUrl),
     eventKey ? chrome.storage.local.get(eventKey).catch(() => ({})) : Promise.resolve({})
   ]);
-  const comments = Array.isArray(data[storageKey])
-    ? /** @type {PopupCommentEntry[]} */ (data[storageKey])
-    : [];
   // イベント順位（あれば）。取れない/イベント不参加は null＝レポートでセクションごと省略。
   let eventRankingModel = null;
   try {
@@ -12831,7 +13169,14 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
   }
 
   const html = await withTimeout(
-    buildHtmlReportDocument(comments, snapshot, error, liveId, watchUrl, eventRankingModel),
+    buildHtmlReportDocument(
+      /** @type {PopupCommentEntry[]} */ (comments),
+      snapshot,
+      error,
+      liveId,
+      watchUrl,
+      eventRankingModel
+    ),
     60_000,
     'html_report_build_timeout'
   );
@@ -13162,6 +13507,12 @@ function dismissInlineShadeWhenDataReady(fallbackMs) {
 function isHighFrequencyCommentRelatedStorageKey(key) {
   const k = String(key || '');
   if (/^nls_comments_/i.test(k)) return true;
+  // v0.1.508: 軽量サマリ／テールの更新でも coalesced 再描画を回す（巨大放送では本体配列が
+  //   低頻度でしか畳み込まれず、これらが新着の主な更新シグナルになるため）。
+  if (/^nls_csummary_/i.test(k)) return true;
+  // v0.1.514: IDB モードの新着シグナルは SW が書く nls_cdb_summary_<lv>。
+  if (/^nls_cdb_summary_/i.test(k)) return true;
+  if (/^nls_ctail_/i.test(k)) return true;
   if (/^nls_gift_users_/i.test(k)) return true;
   if (k === KEY_SELF_POSTED_RECENTS) return true;
   if (k.startsWith(KEY_DEV_MONITOR_TREND_PREFIX)) return true;
@@ -13686,6 +14037,30 @@ function bridgeToolbarPopupToInlinePanel() {
 }
 
 async function initPopup() {
+  // feat/multitab-scale-globalcap: ビルドバッジは「ローカル値（manifest + NL_BUILD_ID）」だけで
+  //   塗れる＝データ取得や content readiness に一切依存しない。多タブで描画スレッドが混んでも
+  //   「ビルド —」固定にならないよう、initPopup の最初に無条件で塗る（以降の setup が遅延/失敗
+  //   しても建値は出る）。
+  try {
+    paintVersionBadge();
+  } catch {
+    /* no-op */
+  }
+  // feat/multitab-scale-globalcap: 絶対フェイルセーフ。初回 refresh が（多タブで描画スレッドが
+  //   枯渇する等で）いつまでも解決しなくても、ローディング幕を必ず一定時間で外す。既存の
+  //   dismissInlineShadeWhenDataReady は refresh の finally に依存するため、refresh 自体が
+  //   進まないと幕が残る。これは refresh 完了に依存しない最後の安全網（永久ローディング防止）。
+  try {
+    setTimeout(() => {
+      try {
+        dismissInitialLoadShade();
+      } catch {
+        /* no-op */
+      }
+    }, INLINE_SHADE_DATA_FALLBACK_MS + 2_000);
+  } catch {
+    /* no-op */
+  }
   applyResponsivePopupLayout();
   bridgeToolbarPopupToInlinePanel();
   attachCharaTrioSlotClickHandlers();
@@ -14106,15 +14481,18 @@ async function initPopup() {
     if (stEl) stEl.textContent = '分析中… (1/3) データ取得';
     try {
       await yieldToBrowserPaint();
-      const sKey = commentsStorageKey(lid);
       const gKey = giftUsersStorageKey(lid);
-      const data = await withTimeout(
-        chrome.storage.local.get([sKey, gKey]),
+      // v0.1.509: 本体は全チャンク＋未畳み込みテールを連結（チャンク移行後対応・テール取りこぼし修正）。
+      const [commentsRaw, data] = await withTimeout(
+        Promise.all([
+          readAllCommentsForLive(lid),
+          chrome.storage.local.get([gKey])
+        ]),
         30_000,
         'marketing_storage_timeout'
       );
       const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
-        Array.isArray(data[sKey]) ? data[sKey] : []
+        Array.isArray(commentsRaw) ? commentsRaw : []
       );
       const giftUsersForMarketing = Array.isArray(data[gKey]) ? data[gKey] : [];
       if (comments.length === 0) {
@@ -14157,14 +14535,17 @@ async function initPopup() {
                 excludeLiveId: lid
               });
               if (!recentLiveIds.length) return [];
-              const keys = recentLiveIds.map((id) => `nls_comments_${id}`);
-              const bag = await chrome.storage.local.get(keys);
+              // v0.1.509: 過去配信もチャンク移行後対応＋テール込みで読む。
+              const pastArrays = await Promise.all(
+                recentLiveIds.map((id) => readAllCommentsForLive(id))
+              );
               /** @type {{ liveId: string, comments: import('../lib/commentRecord.js').StoredComment[] }[]} */
               const out = [];
-              for (const id of recentLiveIds) {
-                const k = `nls_comments_${id}`;
-                const cs = Array.isArray(bag[k]) ? bag[k] : [];
-                if (cs.length) out.push({ liveId: id, comments: cs });
+              for (let i = 0; i < recentLiveIds.length; i += 1) {
+                const cs = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
+                  Array.isArray(pastArrays[i]) ? pastArrays[i] : []
+                );
+                if (cs.length) out.push({ liveId: recentLiveIds[i], comments: cs });
               }
               return out;
             } catch {
@@ -15808,6 +16189,43 @@ async function initPopup() {
         () => {
           try {
             stCh.removeListener(onStorageChanged);
+          } catch {
+            // best-effort
+          }
+        },
+        { once: true }
+      );
+    }
+  } catch {
+    // best-effort
+  }
+
+  // feat/multitab-scale-globalcap: Offscreen 書き手からの件数 push（BroadcastChannel）を購読。
+  //   Offscreen は append 後すぐ {liveId,total,recent} を broadcast する。SW が summary を
+  //   chrome.storage に書く（onChanged）より一拍速くパネル件数を更新できる。受けたら既存の
+  //   coalesced refresh を回すだけ（描画ロジックは触らない＝回帰リスク最小）。
+  try {
+    if (typeof BroadcastChannel === 'function') {
+      const cdbBc = new BroadcastChannel(CDB_BROADCAST_CHANNEL);
+      const onCdbBroadcast = (ev) => {
+        const data = ev && ev.data;
+        if (!data || data.type !== 'cdb_summary') return;
+        const lv = String(data.liveId || '').trim().toLowerCase();
+        if (!/^lv\d{1,15}$/.test(lv)) return;
+        // summary key 変更を合成して既存の coalesced refresh 経路に乗せる（hidden-skip /
+        //   合流 / high-freq 判定をそのまま再利用＝表示中の配信だけ refresh のロジックも共通）。
+        scheduleCoalescedStorageRefresh(
+          { [commentDbSummaryKey(lv)]: { newValue: { total: Number(data.total) || 0 } } },
+          () => safeRefresh()
+        );
+      };
+      cdbBc.addEventListener('message', onCdbBroadcast);
+      window.addEventListener(
+        'pagehide',
+        () => {
+          try {
+            cdbBc.removeEventListener('message', onCdbBroadcast);
+            cdbBc.close();
           } catch {
             // best-effort
           }
