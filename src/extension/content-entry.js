@@ -266,6 +266,7 @@ import {
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
 import { computeBackfillFlushThreshold } from '../lib/backfillFlushThreshold.js';
+import { shouldDeferDomHarvestDuringScroll } from '../lib/domHarvestScrollDefer.js';
 import { runIfTabLeader } from '../lib/tabLeaderLock.js';
 import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
 import { calculateBackfillRetryDelayMs } from '../lib/backfillRetryBackoff.js';
@@ -345,6 +346,13 @@ import {
  */
 
 const DEBOUNCE_MS = INGEST_TIMING.debounceMs;
+/**
+ * スクロール中は DOM ハーベスト（MutationObserver 由来の重い走査）を見送る窓（ms）。
+ * 連続スクロールではホイール tick ごとに lastUserInitiatedScrollAt が更新されるため、
+ * この窓を少し長め（>1 tick 間隔）に取ると「スクロール中はずっと見送り、指を離して
+ * ~この時間後に再開」になる。取りこぼしは NDGR 傍受 + 550ms 定期 scan が回収する。
+ */
+const DOM_HARVEST_SCROLL_DEFER_MS = 220;
 const LIVE_POLL_MS = INGEST_TIMING.livePollMs;
 const STATS_POLL_MS = INGEST_TIMING.statsPollMs;
 /** 返信サジェスト等と同様に DOM 更新がテキスト差し替えだけのときの取りこぼし防止 */
@@ -10625,6 +10633,21 @@ async function start() {
       !recording ||
       !liveId ||
       !locationAllowsCommentRecording()
+    ) {
+      return;
+    }
+    // ⚡ スクロール重さ対策: ユーザーがスクロール中は、ミューテーションの逐次処理
+    //   （childList の enqueue・characterData の closest 遡上）を丸ごと見送る。
+    //   流速の速い長尺配信ではスクロール中に大量ミューテーションが連発し、この走査が
+    //   メインスレッドを奪って入力が落ちる（ガクつき）主因になる。コメントの一次取得は
+    //   NDGR 傍受、取りこぼし回収は 550ms 間隔の scanVisibleCommentsNow（パネル全体を
+    //   dedupe 付きで再ハーベスト）が担うため、見送っても記録は欠落しない。
+    if (
+      shouldDeferDomHarvestDuringScroll(
+        Date.now(),
+        lastUserInitiatedScrollAt,
+        DOM_HARVEST_SCROLL_DEFER_MS
+      )
     ) {
       return;
     }
