@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.492',
+    date: '2026-05-31',
+    summary: '大型配信で固まる問題を改善',
+    items: Object.freeze([
+      '数万コメントの大型配信で、さかのぼり取り込み中にページが「応答しません」と固まりやすい問題を改善しました',
+      '保存済み件数に応じて書き込み頻度を自動調整し、配信サイズが大きくてもメインスレッドを長く止めないようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.476',
     date: '2026-05-30',
     summary: '全部— 固定になる race condition を根治',
