@@ -500,6 +500,61 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('reached_start');
   });
 
+  it('長い疎区間/幅広バケットが 30 連続でも、橋渡し予算(240)内なら配信開始まで遡り切る（fix/ndgr-no-progress-bridge・実機68%頭打ち no_progress の真因解消）', async () => {
+    // ⛔ 真因（実機 2026-06-01・歌枠/ギフト多め・data-nls-backfill = seg=16 rows=5102 stop=no_progress・
+    //   記録が公式の約68%で頭打ち）: 旧上限 12（12×50秒=10分）では、歌枠の長い間奏/雑談など
+    //   「コメントが疎で 1 区画に同じ vpos 帯しか返らない（＝進めない）区間」が 10 分を超えると
+    //   途中で no_progress に倒れ、配信開始まで遡れず公式件数に届かなかった。
+    //   修正: 上限を 240（240×50秒≒200分）に引き上げ、現実的な疎区間を跨いで開始まで遡り切る。
+    //   ⚠️ ステップ幅は 50秒のまま（区画スキップ防止）。これは「12 連続では届かず・240 なら届く」
+    //      ことを担保するため、30 連続の『進めない区画』を置く（旧上限12なら 13 連続目で no_progress）。
+    const PROGRAM_START = 1000;
+    const NOW_SEC = 100_000; // 開始まで多数の再シードを正の at で踏めるよう、now を十分後ろに置く
+    const SEED = NOW_SEC - NDGR_BACKFILL_SEED_LAG_SEC; // 初回 seed 候補
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/SPARSE_A';
+    const BK_OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/SPARSE_OLD';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(NOW_SEC));
+    // 初回: 中盤(vpos=60000=600秒地点)の区画。これで globalMinVpos=60000・madeProgress。
+    map.set(atUrl(SEED), viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // 第1再シードは programStart+600-5=1595 から。そこから 50秒ずつ 30 区画、どれも「同じ
+    //   vpos=60000 帯の別 URI」= 前回より古い vpos へ進めない（幅広バケット/疎区間を模す）。
+    let at = PROGRAM_START + Math.floor(60000 / 100) - 5; // 1595
+    for (let k = 0; k < 30; k += 1) {
+      const uri = `https://mpn.live.nicovideo.jp/data/backward/v4/SPARSE_SAME_${at}`;
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
+      map.set(uri, packedSegmentBytes([{ no: 49, content: '同じ帯', name: 'u', vpos: 60000 }]));
+      at -= 50;
+    }
+    // ようやく配信開始区画（開始近傍の低 vpos が複数）に届く。
+    map.set(atUrl(at), viewEntryBytes({ backwardUri: BK_OLD }));
+    map.set(
+      BK_OLD,
+      packedSegmentBytes([
+        { no: 5, content: '配信序盤', name: 'u', vpos: 80 },
+        { no: 6, content: 'はじまった', name: 'u2', vpos: 200 }
+      ])
+    );
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => NOW_SEC * 1000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 30 連続の「進めない区画」を跨いで配信序盤(no=5)まで遡れ、reached_start で正しく完了。
+    expect(chatsAll.map((c) => c.no)).toContain(5);
+    expect(result.stopReason).toBe('reached_start');
+  });
+
   it('再シードで入口が見つからなくても vpos が序盤まで程遠いなら reached_start にしない（v0.1.430・32%停止の主因）', async () => {
     // ⛔ 高速・大量配信で 32% 等で止まる主因: 再シード時刻が区画の隙間に落ち「入口が見つからない」
     //   ＝旧実装は即 reached_start としていたが、まだ vpos=60000(=600秒地点)で序盤まで程遠い。

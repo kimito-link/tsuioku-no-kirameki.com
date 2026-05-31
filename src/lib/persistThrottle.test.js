@@ -283,4 +283,47 @@ describe('createPersistCoalescer', () => {
       vi.useFakeTimers();
     }
   });
+
+  it('遅い flushFn が一旦 settle すれば後続 flush は実行される（v0.1.502・flushMutex が永久ブロックしない）', async () => {
+    // 多タブ stall 退行の核: 1 回目の flush（書き込み）がハングすると flushMutex が
+    //   永久ポイズンされ、以降の flush が一切走らない（=「最終取り込み ◯秒前」固定）。
+    //   修正後は content 側で必ず settle させる前提なので、コアレッサ契約として
+    //   「遅い flushFn でも settle すれば後続が再開する」ことを担保する回帰テスト。
+    vi.useRealTimers();
+    try {
+      /** @type {(() => void)|null} */
+      let releaseFirst = null;
+      const firstGate = new Promise((resolve) => {
+        releaseFirst = /** @type {() => void} */ (resolve);
+      });
+      let call = 0;
+      const flushFn = vi.fn(async () => {
+        call += 1;
+        if (call === 1) await firstGate; // 1 回目だけ「ハング」を模擬（後で解放）
+      });
+      const sink = createPersistCoalescer(flushFn, 0, 0);
+
+      // flush() で即トリガー（setTimeout マクロタスクに依存しない）。1 回目は firstGate で停止。
+      sink.enqueue([{ id: 'a' }]);
+      const firstFlush = sink.flush();
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+      expect(flushFn).toHaveBeenCalledTimes(1); // 1 回目は走ったが未解決
+
+      // 1 回目がまだ pending の間に 2 回目を積んでも、まだ flush されない（直列待ち）。
+      sink.enqueue([{ id: 'b' }]);
+      const secondFlush = sink.flush();
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+      expect(flushFn).toHaveBeenCalledTimes(1);
+
+      // 1 回目が settle すれば、待っていた 2 回目が走る（永久ブロックしない）。
+      releaseFirst?.();
+      await firstFlush;
+      await secondFlush;
+      for (let i = 0; i < 20; i += 1) await Promise.resolve();
+      expect(flushFn).toHaveBeenCalledTimes(2);
+      expect(sink.pending()).toBe(0);
+    } finally {
+      vi.useFakeTimers();
+    }
+  });
 });

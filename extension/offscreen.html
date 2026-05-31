@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>nicolivelog comment store (offscreen)</title>
+  </head>
+  <body>
+    <!--
+      画面に出ない常駐 DOM 文脈。コメント IndexedDB の単一書き手として動く。
+      ロジックは dist/offscreen.js（src/extension/offscreen-entry.js を esbuild した bundle）。
+    -->
+    <script src="dist/offscreen.js"></script>
+  </body>
+</html>

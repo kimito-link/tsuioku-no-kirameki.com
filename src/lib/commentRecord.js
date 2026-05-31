@@ -143,49 +143,92 @@ function storedCommentDedupeKey(lid, ex) {
 }
 
 /**
- * mergeNewComments の incoming が dedupe キー計算で使う capturedAt を決める。
- * - 収集側が `row.capturedAt` を載せればそれを最優先（NDGR／将来のソース時刻）。
- * - commentNo 欠落時、ストレージ上に同一 `{ text,userId?,commentNo 空}` が 1 件だけあるなら、
- *   その行の capturedAt でキーを組み直す（秒境界を跨いだ再取り込みでの二重保存抑止）。
- * - それ以外は呼び出し時点の `fallbackMs`（通常 `Date.now()`）。
- *
- * @param {StoredComment[]} next
- * @param {{ capturedAt?: number, commentNo?: string, text: string, userId?: string|null }} row
- * @param {number} fallbackMs
- * @returns {number}
+ * commentNo 欠落行の dedupe-capturedAt 推定用 index のキー（`text \u0001 uid`）。
+ * @param {string} text 正規化済みテキスト
+ * @param {string} uid trim 済み userId
  */
-function deriveIncomingDedupeCapturedAt(next, row, fallbackMs) {
-  const cap = Number(row.capturedAt);
-  if (typeof cap === 'number' && Number.isFinite(cap) && cap > 0) {
-    return cap;
-  }
-  const commentNo = String(row.commentNo ?? '').trim();
-  if (commentNo) {
-    return fallbackMs;
-  }
-  const text = normalizeCommentText(row.text);
-  const uid = String(row.userId ?? '').trim();
+function loneDedupeIndexKey(text, uid) {
+  return `${text}\u0001${uid}`;
+}
 
-  /** @type {number|null} */
-  let lone = null;
-  let hits = 0;
-  for (const ex of next) {
-    /** @type {StoredComment} */
-    const entry = /** @type {StoredComment} */ (ex);
-    if (String(entry.commentNo ?? '').trim()) continue;
-    if (normalizeCommentText(entry.text) !== text) continue;
-    if (String(entry.userId ?? '').trim() !== uid) continue;
-    hits += 1;
-    if (hits === 1) {
-      const raw = Number(entry.capturedAt);
-      lone =
-        typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
+/**
+ * @param {unknown} v
+ * @returns {number|null} 正の有限数なら数値、それ以外は null
+ */
+function validCapturedAt(v) {
+  const n = Number(v);
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * commentNo 欠落の「同一 `{text,uid}` がストレージに 1 件だけか」を O(1) で参照するための
+ * index を作る／更新するヘルパ群。旧 `deriveIncomingDedupeCapturedAt` が incoming ごとに
+ * `next` 全件を走査（O(N×I)）していたのを置き換え、mergeNewComments の add/patch で
+ * インクリメンタルに保つことで O(N+I) にする。
+ *
+ * 値は `{ count, cap }`。`cap` は count===1 のときの行の capturedAt（無効なら null）で、
+ * count>1 では意味を持たない（null）。これは旧実装の「ちょうど1件一致かつ有効 cap なら
+ * それを使い、そうでなければ fallback」という挙動と一致する。
+ * @returns {{
+ *   add: (text: string, uid: string, capRaw: unknown) => void,
+ *   remove: (text: string, uid: string) => void,
+ *   lookup: (row: { capturedAt?: number, commentNo?: string, text: string, userId?: string|null }, fallbackMs: number) => number
+ * }}
+ */
+function createLoneDedupeIndex() {
+  /** @type {Map<string, { count: number, cap: number|null }>} */
+  const map = new Map();
+  /**
+   * @param {string} text
+   * @param {string} uid
+   * @param {unknown} capRaw
+   */
+  const add = (text, uid, capRaw) => {
+    const k = loneDedupeIndexKey(text, uid);
+    const rec = map.get(k);
+    if (!rec) {
+      map.set(k, { count: 1, cap: validCapturedAt(capRaw) });
     } else {
-      lone = null;
+      rec.count += 1;
+      rec.cap = null;
     }
-  }
-
-  return hits === 1 && lone != null ? lone : fallbackMs;
+  };
+  /**
+   * @param {string} text
+   * @param {string} uid
+   */
+  const remove = (text, uid) => {
+    const k = loneDedupeIndexKey(text, uid);
+    const rec = map.get(k);
+    if (!rec) return;
+    rec.count -= 1;
+    if (rec.count <= 0) {
+      map.delete(k);
+    } else {
+      // count が 1 に戻っても残った行の cap は不明なので null（=fallback）。
+      //   patch で uid が付け替わった極めて稀な経路でのみ到達し、安全側に倒れる。
+      rec.cap = null;
+    }
+  };
+  /**
+   * incoming が dedupe キー計算で使う capturedAt を決める（旧 deriveIncomingDedupeCapturedAt と同義）。
+   * - `row.capturedAt` が有効ならそれを最優先。
+   * - commentNo があれば fallback（番号が一意キー）。
+   * - commentNo 欠落時、同一 `{text,uid}` がちょうど 1 件・有効 cap ならその cap、なければ fallback。
+   * @param {{ capturedAt?: number, commentNo?: string, text: string, userId?: string|null }} row
+   * @param {number} fallbackMs
+   */
+  const lookup = (row, fallbackMs) => {
+    const cap = validCapturedAt(row.capturedAt);
+    if (cap != null) return cap;
+    const commentNo = String(row.commentNo ?? '').trim();
+    if (commentNo) return fallbackMs;
+    const text = normalizeCommentText(row.text);
+    const uid = String(row.userId ?? '').trim();
+    const rec = map.get(loneDedupeIndexKey(text, uid));
+    return rec && rec.count === 1 && rec.cap != null ? rec.cap : fallbackMs;
+  };
+  return { add, remove, lookup };
 }
 
 /**
@@ -290,11 +333,21 @@ export function mergeNewComments(liveId, existing, incoming) {
   const lid = String(liveId || '').trim().toLowerCase();
   /** @type {Map<string, number>} */
   const keyToIndex = new Map();
+  // commentNo 欠落行の dedupe-capturedAt 推定を O(1) 参照にする index（keyToIndex と同じ
+  //   1 パスで構築。以降 add/patch でインクリメンタルに保つ）。
+  const loneDedupe = createLoneDedupeIndex();
   for (let i = 0; i < existing.length; i += 1) {
     const e = existing[i];
     const ex = /** @type {StoredComment} */ (e);
     const key = storedCommentDedupeKey(lid, ex);
     if (!keyToIndex.has(key)) keyToIndex.set(key, i);
+    if (!String(ex.commentNo ?? '').trim()) {
+      loneDedupe.add(
+        normalizeCommentText(ex.text),
+        String(ex.userId ?? '').trim(),
+        ex.capturedAt
+      );
+    }
   }
   const added = [];
   const next = /** @type {StoredComment[]} */ ([...existing]);
@@ -303,7 +356,7 @@ export function mergeNewComments(liveId, existing, incoming) {
     const text = normalizeCommentText(row.text);
     if (!text) continue;
     const commentNo = String(row.commentNo ?? '').trim();
-    const capForDedupe = deriveIncomingDedupeCapturedAt(next, row, Date.now());
+    const capForDedupe = loneDedupe.lookup(row, Date.now());
     const key = buildDedupeKey(lid, {
       commentNo,
       text,
@@ -318,10 +371,27 @@ export function mergeNewComments(liveId, existing, incoming) {
 
     const idx = keyToIndex.get(key);
     if (idx != null && idx >= 0 && idx < next.length) {
-      const result = patchExistingComment(next[idx], row);
+      const before = /** @type {StoredComment} */ (next[idx]);
+      const result = patchExistingComment(before, row);
       if (result.touched) {
         next[idx] = result.entry;
         storageTouched = true;
+        // commentNo 欠落行の uid（avatar 由来で後付けされる場合がある）が変わったら
+        //   loneDedupe index を付け替える。text/commentNo は patch で不変だが念のため確認。
+        const wasLone = !String(before.commentNo ?? '').trim();
+        const isLone = !String(result.entry.commentNo ?? '').trim();
+        if (wasLone || isLone) {
+          const oText = normalizeCommentText(before.text);
+          const oUid = String(before.userId ?? '').trim();
+          const nText = normalizeCommentText(result.entry.text);
+          const nUid = String(result.entry.userId ?? '').trim();
+          if (oText !== nText || oUid !== nUid || wasLone !== isLone) {
+            if (wasLone) loneDedupe.remove(oText, oUid);
+            if (isLone) {
+              loneDedupe.add(nText, nUid, result.entry.capturedAt);
+            }
+          }
+        }
       }
       continue;
     }
@@ -342,9 +412,130 @@ export function mergeNewComments(liveId, existing, incoming) {
     });
     added.push(entry);
     next.push(entry);
+    // 同一バッチ内の後続 incoming が「直近で追加された同一 {text,uid}」を参照できるよう、
+    //   commentNo 欠落の新規行は index にも反映（旧実装が next 全件を走査していたのと同義）。
+    if (!commentNo) {
+      loneDedupe.add(
+        normalizeCommentText(entry.text),
+        String(entry.userId ?? '').trim(),
+        entry.capturedAt
+      );
+    }
   }
   if (added.length) storageTouched = true;
   return { next, added, storageTouched };
+}
+
+/**
+ * v0.1.513: チャンクモード保存の「毎フラッシュ全件 read+merge（O(N)）」を O(追加分) に置き換える
+ *   ためのインクリメンタル dedupe 状態を、既存行から **1 回だけ** 構築する純関数。
+ *
+ *   `mergeNewComments` の seed ループ（keyToIndex / loneDedupe 構築）と **同一のキー関数**を使う。
+ *   ただしチャンクモードでは過去行への patch を永続化しない設計（content-entry の追記専用チャンク）
+ *   なので、行インデックス（patch 用）は持たず、重複判定に必要な **キー集合 Set** と
+ *   commentNo 欠落行の capturedAt 推定 index（loneDedupe）だけを保持する。
+ *
+ * @param {string} liveId
+ * @param {StoredComment[]} existing 既存の保存済みコメント（全チャンク連結 or main 配列）
+ * @returns {{ keySet: Set<string>, loneDedupe: ReturnType<typeof createLoneDedupeIndex> }}
+ */
+export function buildCommentDedupeState(liveId, existing) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  /** @type {Set<string>} */
+  const keySet = new Set();
+  const loneDedupe = createLoneDedupeIndex();
+  const rows = Array.isArray(existing) ? existing : [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const ex = /** @type {StoredComment} */ (rows[i]);
+    if (!ex) continue;
+    keySet.add(storedCommentDedupeKey(lid, ex));
+    if (!String(ex.commentNo ?? '').trim()) {
+      loneDedupe.add(
+        normalizeCommentText(ex.text),
+        String(ex.userId ?? '').trim(),
+        ex.capturedAt
+      );
+    }
+  }
+  return { keySet, loneDedupe };
+}
+
+/**
+ * v0.1.513: `mergeNewComments` の「新規追加」分岐だけをインクリメンタルに行う純関数。
+ *   `state`（buildCommentDedupeState の戻り値）を **その場で更新**しながら、incoming のうち
+ *   本当に新規だった行だけを `added` として返す。全件配列 `next` は作らない（O(追加分)）。
+ *
+ *   ⚠️ `mergeNewComments` との差分は「既存一致行への patch を行わない」点のみ。チャンクモードでは
+ *   その patch は元々永続化されない（追記専用・表示時 enrich で代替）ため、保存結果は同一。
+ *   dedupe の採否（どの incoming を added にするか）は `mergeNewComments` と完全一致する
+ *   （同じ buildDedupeKey / loneDedupe.lookup を同じ順序で使う）。
+ *
+ * 戻り値の `undo()` は、この呼び出しが state に加えた変更（keySet への追加・loneDedupe の add）を
+ *   巻き戻す。チャンク write が timeout 等で失敗して同じ rows を再投入（requeue）する場合に呼ぶと、
+ *   state が「もう追加済み」と誤認して再投入分を dedupe で握り潰す＝記録欠落を防げる。
+ *
+ * @param {string} liveId
+ * @param {{ keySet: Set<string>, loneDedupe: ReturnType<typeof createLoneDedupeIndex> }} state
+ * @param {Array<{ commentNo?: string, text?: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }>} incoming
+ * @returns {{ added: StoredComment[], undo: () => void }}
+ */
+export function mergeNewCommentsIncremental(liveId, state, incoming) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const keySet = state && state.keySet instanceof Set ? state.keySet : new Set();
+  const loneDedupe =
+    state && state.loneDedupe ? state.loneDedupe : createLoneDedupeIndex();
+  /** @type {StoredComment[]} */
+  const added = [];
+  // undo 用に「この呼び出しで keySet に足したキー」「loneDedupe に add した {text,uid}」を記録。
+  /** @type {string[]} */
+  const addedKeys = [];
+  /** @type {Array<{ text: string, uid: string }>} */
+  const addedLone = [];
+  const rows = Array.isArray(incoming) ? incoming : [];
+  for (const row of rows) {
+    const text = normalizeCommentText(row.text);
+    if (!text) continue;
+    const commentNo = String(row.commentNo ?? '').trim();
+    const capForDedupe = loneDedupe.lookup(
+      { capturedAt: row.capturedAt, commentNo, text, userId: row.userId },
+      Date.now()
+    );
+    const key = buildDedupeKey(lid, {
+      commentNo,
+      text,
+      capturedAt: capForDedupe,
+      userId: row.userId
+    });
+    if (keySet.has(key)) continue; // 既出（patch はチャンクモードでは永続化しないので skip）
+    keySet.add(key);
+    addedKeys.push(key);
+    const rawAv = String(row.avatarUrl || '').trim();
+    const validAvatar = isHttpOrHttpsUrl(rawAv) ? rawAv : '';
+    const entry = createCommentEntry({
+      liveId: lid,
+      commentNo,
+      text,
+      userId: row.userId ?? null,
+      nickname: row.nickname || '',
+      avatarUrl: validAvatar || undefined,
+      avatarObserved: row.avatarObserved || false,
+      vpos: row.vpos,
+      accountStatus: row.accountStatus,
+      is184: row.is184
+    });
+    added.push(entry);
+    if (!commentNo) {
+      const lt = normalizeCommentText(entry.text);
+      const lu = String(entry.userId ?? '').trim();
+      loneDedupe.add(lt, lu, entry.capturedAt);
+      addedLone.push({ text: lt, uid: lu });
+    }
+  }
+  const undo = () => {
+    for (const k of addedKeys) keySet.delete(k);
+    for (const { text, uid } of addedLone) loneDedupe.remove(text, uid);
+  };
+  return { added, undo };
 }
 
 /**

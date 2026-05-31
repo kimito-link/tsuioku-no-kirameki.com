@@ -28,6 +28,518 @@ function commentsStorageKey(liveId) {
   return `nls_comments_${id}`;
 }
 
+// v0.1.509: 追記専用チャンク（src/lib/commentChunkStore.js）のキー/読み出しのローカル版。
+//   background は src/lib をバンドルしないため、commentsStorageKey と同様にミラーする。
+function chunkIndexKeyLocal(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cchunk_index_${id}`;
+}
+function chunkStorageKeyLocal(liveId, seq) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cchunk_${id}_${Math.max(0, Math.floor(Number(seq) || 0))}`;
+}
+function tailStorageKeyLocal(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_ctail_${id}`;
+}
+function isChunkIndexLocal(obj, liveId) {
+  if (!obj || typeof obj !== 'object') return false;
+  if (Number(obj.v) !== 1) return false;
+  if (!Array.isArray(obj.seqs)) return false;
+  if (!Number.isFinite(Number(obj.total))) return false;
+  const want = String(liveId || '').trim().toLowerCase();
+  if (String(obj.liveId || '').trim().toLowerCase() !== want) return false;
+  return true;
+}
+// 本体（チャンク or 従来 main にフォールバック）＋未畳み込みテールを連結して返す。
+async function readAllCommentsForLiveLocal(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const idxKey = chunkIndexKeyLocal(lid);
+  const mainKey = commentsStorageKey(lid);
+  let rows = [];
+  const idxBag = await chrome.storage.local.get(idxKey);
+  const index = idxBag[idxKey];
+  if (isChunkIndexLocal(index, lid) && Array.isArray(index.seqs) && index.seqs.length) {
+    const seqs = index.seqs.slice().sort((a, b) => a - b);
+    const keys = seqs.map((seq) => chunkStorageKeyLocal(lid, seq));
+    const bag = await chrome.storage.local.get(keys);
+    for (const k of keys) {
+      const part = bag[k];
+      if (Array.isArray(part)) rows = rows.concat(part);
+    }
+  } else {
+    const mainBag = await chrome.storage.local.get(mainKey);
+    rows = Array.isArray(mainBag[mainKey]) ? mainBag[mainKey] : [];
+  }
+  const tKey = tailStorageKeyLocal(lid);
+  const tailBag = await chrome.storage.local.get(tKey);
+  const tail = Array.isArray(tailBag[tKey]) ? tailBag[tKey] : [];
+  if (tail.length) {
+    rows = rows.concat(
+      tail.filter((r) => r && typeof r === 'object' && String(r.text ?? '').trim())
+    );
+  }
+  return rows;
+}
+
+/* ================================================================== */
+/* v0.1.514: コメント本体 IndexedDB（拡張オリジン・SW が単一書き手）            */
+/*                                                                      */
+/* chrome.storage.local（値まるごと structured clone・約120 writes/min・       */
+/* 50MB 超で劣化・多タブで単一ストアを奪い合い）から IndexedDB へ移す。SW が     */
+/* 全タブの append を 1 本に集約して書くので、ページ描画スレッドは重い書きから    */
+/* 解放され、多タブ競合も根治する。                                            */
+/*                                                                      */
+/* スキーマ定数は src/lib/commentDb.js の正本をミラー（ESM import 不可の手書き    */
+/* SW のため）。drift は src/lib/commentDb.test.js がリテラル検査で検知する。     */
+/* dedupe キー（dkey）は content（buildDedupeKey）が付与して渡す。SW はキー式を   */
+/* 持たず dkey だけで重複判定する（移行時だけ下の buildDedupeKeyLocal を使う）。   */
+/* ================================================================== */
+const COMMENT_DB_NAME = 'nls_comment_db_v1';
+const COMMENT_DB_STORE = 'comments';
+const COMMENT_DB_VERSION = 1;
+const COMMENT_DB_INDEX_BY_LIVE = 'byLive';
+const COMMENT_DB_INDEX_BY_DKEY = 'byDkey';
+const COMMENT_TEXT_MAX_CHARS = 1000;
+const CDB_APPEND_MESSAGE_TYPE = 'NLS_CDB_APPEND';
+const CDB_ENSURE_MESSAGE_TYPE = 'NLS_CDB_ENSURE';
+const CDB_SUMMARY_RECENT_MAX = 60;
+const CDB_MIGRATE_BATCH = 2000;
+
+/* feat/multitab-scale-globalcap: Offscreen 書き手への転送（opt-in）。              */
+/*   SW は ephemeral（5分で停止し append のたび DB open/close）なので、IDB の常駐    */
+/*   書き手を Offscreen Document に逃がす経路を用意する。content が mode:'offscreen' */
+/*   で生 rows を送ってきたときだけ、Offscreen を保証して転送し、戻りの total/recent  */
+/*   で summary（chrome.storage）を書く（Offscreen は storage 不可なので SW が書く）。 */
+const OFFSCREEN_URL = 'offscreen.html';
+const OFFSCREEN_APPEND_TYPE = 'NLS_OFFSCREEN_CDB_APPEND';
+let _creatingOffscreen = null;
+
+async function hasOffscreenDocument() {
+  try {
+    if (chrome.runtime.getContexts) {
+      const ctxs = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT']
+      });
+      return Array.isArray(ctxs) && ctxs.length > 0;
+    }
+  } catch {
+    /* fall through */
+  }
+  // 古い Chrome 用フォールバック（SW グローバルの clients）。getContexts は 116+、offscreen は
+  //   109+ なので 109〜115 ではこちらで存在確認する。
+  try {
+    const swClients = globalThis.clients;
+    if (swClients && swClients.matchAll) {
+      const matched = await swClients.matchAll();
+      const want = chrome.runtime.getURL(OFFSCREEN_URL);
+      return matched.some((c) => c.url === want);
+    }
+  } catch {
+    /* no-op */
+  }
+  return false;
+}
+
+async function ensureOffscreenDocument() {
+  if (!chrome.offscreen || !chrome.offscreen.createDocument) return false;
+  try {
+    if (await hasOffscreenDocument()) return true;
+    if (_creatingOffscreen) {
+      await _creatingOffscreen;
+      return true;
+    }
+    _creatingOffscreen = chrome.offscreen.createDocument({
+      url: OFFSCREEN_URL,
+      reasons: ['WORKERS'],
+      justification:
+        'Maintain a persistent IndexedDB writer for locally-stored broadcast comments across multiple tabs.'
+    });
+    await _creatingOffscreen;
+    _creatingOffscreen = null;
+    return true;
+  } catch {
+    _creatingOffscreen = null;
+    // 競合（既に作成済み等）は存在確認で吸収する。
+    try {
+      return await hasOffscreenDocument();
+    } catch {
+      return false;
+    }
+  }
+}
+
+function deriveAppendTabKey(sender) {
+  const tabId = sender && sender.tab && sender.tab.id != null ? sender.tab.id : null;
+  const frameId = sender && sender.frameId != null ? sender.frameId : 0;
+  if (tabId != null) return `t${tabId}:${frameId}`;
+  return `u${(sender && sender.url) || '_'}`;
+}
+
+function commentDbSummaryKeyLocal(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cdb_summary_${id}`;
+}
+function commentDbMigratedKeyLocal(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cdb_migrated_${id}`;
+}
+
+// src/lib/commentRecord.js の normalizeCommentText / buildDedupeKey ミラー（移行専用）。
+function normalizeCommentTextLocal(value) {
+  return String(value || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .join('\n')
+    .trim()
+    .slice(0, COMMENT_TEXT_MAX_CHARS);
+}
+function buildDedupeKeyLocal(liveId, rec) {
+  const text = normalizeCommentTextLocal(rec && rec.text);
+  const no = String((rec && rec.commentNo) ?? '').trim();
+  if (no) return `${liveId}|${no}|${text}`;
+  const sec = Math.floor(Number((rec && rec.capturedAt) || 0) / 1000);
+  const uid = String((rec && rec.userId) ?? '').trim();
+  return `${liveId}||${text}|${sec}|${uid}`;
+}
+
+function openCommentDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(COMMENT_DB_NAME, COMMENT_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(COMMENT_DB_STORE)) {
+        const store = db.createObjectStore(COMMENT_DB_STORE, {
+          keyPath: 'id',
+          autoIncrement: true
+        });
+        store.createIndex(COMMENT_DB_INDEX_BY_LIVE, 'liveId', { unique: false });
+        store.createIndex(COMMENT_DB_INDEX_BY_DKEY, 'dkey', { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function normalizeCommentDbRecord(liveId, row) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !row || typeof row !== 'object') return null;
+  const text = String(row.text ?? '').trim();
+  if (!text) return null;
+  const dkey = String(row.dkey ?? '').trim();
+  if (!dkey) return null;
+  const rec = {
+    liveId: lid,
+    dkey,
+    commentNo: String(row.commentNo ?? '').trim(),
+    text,
+    userId: row.userId != null ? String(row.userId) : null,
+    capturedAt: Math.max(0, Number(row.capturedAt) || 0) || Date.now()
+  };
+  if (row.nickname) rec.nickname = String(row.nickname);
+  if (row.avatarUrl) rec.avatarUrl = String(row.avatarUrl);
+  if (row.avatarObserved) rec.avatarObserved = true;
+  if (row.vpos != null) rec.vpos = Number(row.vpos);
+  if (row.accountStatus != null) rec.accountStatus = Number(row.accountStatus);
+  if (row.is184) rec.is184 = true;
+  if (row.selfPosted) rec.selfPosted = true;
+  return rec;
+}
+
+function appendCommentsToDb(db, liveId, rows) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const list = Array.isArray(rows) ? rows : [];
+  return new Promise((resolve, reject) => {
+    if (!lid || list.length === 0) {
+      resolve({ added: 0 });
+      return;
+    }
+    let added = 0;
+    const batchSeen = new Set();
+    const tx = db.transaction(COMMENT_DB_STORE, 'readwrite');
+    const store = tx.objectStore(COMMENT_DB_STORE);
+    const dkeyIndex = store.index(COMMENT_DB_INDEX_BY_DKEY);
+    for (const row of list) {
+      const rec = normalizeCommentDbRecord(lid, row);
+      if (!rec) continue;
+      if (batchSeen.has(rec.dkey)) continue;
+      batchSeen.add(rec.dkey);
+      const getReq = dkeyIndex.getKey(rec.dkey);
+      getReq.onsuccess = () => {
+        if (getReq.result === undefined || getReq.result === null) {
+          const addReq = store.add(rec);
+          // 個別 add の失敗（稀な制約衝突など）はトランザクション全体を abort させない。
+          addReq.onerror = (e) => {
+            try {
+              e.preventDefault();
+            } catch {
+              /* no-op */
+            }
+          };
+          addReq.onsuccess = () => {
+            added += 1;
+          };
+        }
+      };
+      // 個別 getKey の失敗も全体を巻き込まない。
+      getReq.onerror = (e) => {
+        try {
+          e.preventDefault();
+        } catch {
+          /* no-op */
+        }
+      };
+    }
+    tx.oncomplete = () => resolve({ added });
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+function countCommentsForLiveDb(db, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  return new Promise((resolve, reject) => {
+    if (!lid) {
+      resolve(0);
+      return;
+    }
+    const tx = db.transaction(COMMENT_DB_STORE, 'readonly');
+    const idx = tx.objectStore(COMMENT_DB_STORE).index(COMMENT_DB_INDEX_BY_LIVE);
+    const req = idx.count(IDBKeyRange.only(lid));
+    req.onsuccess = () => {
+      const n = Number(req.result);
+      resolve(Number.isFinite(n) && n >= 0 ? n : 0);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function readRecentCommentsForLiveDb(db, liveId, n) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const want = Math.max(0, Math.floor(Number(n) || 0));
+  return new Promise((resolve, reject) => {
+    if (!lid || want === 0) {
+      resolve([]);
+      return;
+    }
+    const out = [];
+    const tx = db.transaction(COMMENT_DB_STORE, 'readonly');
+    const idx = tx.objectStore(COMMENT_DB_STORE).index(COMMENT_DB_INDEX_BY_LIVE);
+    const curReq = idx.openCursor(IDBKeyRange.only(lid), 'prev');
+    curReq.onsuccess = () => {
+      const cursor = curReq.result;
+      if (!cursor || out.length >= want) {
+        out.reverse();
+        resolve(out);
+        return;
+      }
+      out.push(cursor.value);
+      cursor.continue();
+    };
+    curReq.onerror = () => reject(curReq.error);
+  });
+}
+
+function readAllCommentsForLiveDb(db, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  return new Promise((resolve, reject) => {
+    if (!lid) {
+      resolve([]);
+      return;
+    }
+    const out = [];
+    const tx = db.transaction(COMMENT_DB_STORE, 'readonly');
+    const idx = tx.objectStore(COMMENT_DB_STORE).index(COMMENT_DB_INDEX_BY_LIVE);
+    const curReq = idx.openCursor(IDBKeyRange.only(lid));
+    curReq.onsuccess = () => {
+      const cursor = curReq.result;
+      if (!cursor) {
+        resolve(out);
+        return;
+      }
+      out.push(cursor.value);
+      cursor.continue();
+    };
+    curReq.onerror = () => reject(curReq.error);
+  });
+}
+
+// 既存 chrome.storage.local（main/chunk/tail）→ IDB の初回移行（live ごと 1 回）。
+async function ensureLiveMigratedToDb(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const mkey = commentDbMigratedKeyLocal(lid);
+  const bag = await chrome.storage.local.get(mkey);
+  if (bag[mkey] === true) return;
+  let existing = [];
+  try {
+    existing = await readAllCommentsForLiveLocal(lid);
+  } catch {
+    existing = [];
+  }
+  if (existing.length) {
+    const db = await openCommentDb();
+    try {
+      for (let i = 0; i < existing.length; i += CDB_MIGRATE_BATCH) {
+        const slice = existing.slice(i, i + CDB_MIGRATE_BATCH).map((r) => ({
+          ...r,
+          dkey: buildDedupeKeyLocal(lid, r)
+        }));
+        await appendCommentsToDb(db, lid, slice);
+      }
+    } finally {
+      db.close();
+    }
+  }
+  await chrome.storage.local.set({ [mkey]: true });
+}
+
+// 与えられた total/recent から summary（chrome.storage）+ auto-backup 状態を書く。
+//   Offscreen 経路では Offscreen が IDB から集計した値を渡してくる（SW は再走査しない）。
+async function writeCommentDbSummaryFromValues(liveId, watchUrl, total, recentInput) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return 0;
+  const now = Date.now();
+  const recent = (Array.isArray(recentInput) ? recentInput : []).map((r) => ({
+    commentNo: String(r.commentNo ?? ''),
+    text: String(r.text ?? ''),
+    userId: r.userId != null ? String(r.userId) : null,
+    capturedAt: Number(r.capturedAt) || 0,
+    is184: r.is184 === true
+  }));
+  const summary = { v: 1, liveId: lid, total, updatedAt: now, recent };
+
+  // auto-backup 状態（5分周期の backup が IDB から読み直すためのメタ）。
+  const stBag = await chrome.storage.local.get(KEY_AUTO_BACKUP_STATE);
+  const st = normalizeAutoBackupState(stBag[KEY_AUTO_BACKUP_STATE]);
+  const prev = st.lives[lid] || {};
+  st.lives[lid] = {
+    ...prev,
+    liveId: lid,
+    commentCount: total,
+    updatedAt: now,
+    lastCommentAt: now,
+    watchUrl: String(watchUrl || prev.watchUrl || '').trim()
+  };
+
+  await chrome.storage.local.set({
+    [commentDbSummaryKeyLocal(lid)]: summary,
+    [KEY_AUTO_BACKUP_STATE]: st
+  });
+  return total;
+}
+
+// append 後に popup 初期描画用の軽量サマリと auto-backup 状態を更新する（SW 直書き経路）。
+async function writeCommentDbSummaryAndBackupState(db, liveId, watchUrl) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return 0;
+  const total = await countCommentsForLiveDb(db, lid);
+  const recentFull = await readRecentCommentsForLiveDb(db, lid, CDB_SUMMARY_RECENT_MAX);
+  return writeCommentDbSummaryFromValues(lid, watchUrl, total, recentFull);
+}
+
+async function handleCommentDbAppend(msg, sender) {
+  const lid = String(msg?.liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return { ok: false };
+  if (!isIndexedDbAvailable()) return { ok: false, reason: 'no_idb' };
+  await ensureLiveMigratedToDb(lid);
+  const watchUrl =
+    String(msg?.watchUrl || '').trim() ||
+    (sender && sender.tab && sender.tab.url ? String(sender.tab.url) : '');
+
+  // feat/multitab-scale-globalcap: Offscreen 書き手モード（content が mode:'offscreen' + 生 rows）。
+  //   Offscreen を保証して転送し、戻りの total/recent で summary を書く（Offscreen は storage 不可）。
+  //   Offscreen を作れない/応答しない環境は no_offscreen を返し、content が従来経路へフォールバック。
+  if (msg?.mode === 'offscreen') {
+    const rawRows = Array.isArray(msg?.rawRows) ? msg.rawRows : [];
+    const ready = await ensureOffscreenDocument();
+    if (!ready) return { ok: false, reason: 'no_offscreen' };
+    let resp = null;
+    try {
+      resp = await chrome.runtime.sendMessage({
+        type: OFFSCREEN_APPEND_TYPE,
+        liveId: lid,
+        rawRows,
+        tabKey: deriveAppendTabKey(sender)
+      });
+    } catch {
+      resp = null;
+    }
+    if (!resp || !resp.ok) return { ok: false, reason: 'offscreen_failed' };
+    const total = await writeCommentDbSummaryFromValues(
+      lid,
+      watchUrl,
+      Number(resp.total) || 0,
+      Array.isArray(resp.recent) ? resp.recent : []
+    );
+    return { ok: true, added: Number(resp.added) || 0, total };
+  }
+
+  // 従来（v0.1.515）: dkey 付き rows を SW が直接 IDB へ書く。
+  const rows = Array.isArray(msg?.rows) ? msg.rows : [];
+  const db = await openCommentDb();
+  let added = 0;
+  let total = 0;
+  try {
+    const res = await appendCommentsToDb(db, lid, rows);
+    added = res.added;
+    total = await writeCommentDbSummaryAndBackupState(db, lid, watchUrl);
+  } finally {
+    db.close();
+  }
+  return { ok: true, added, total };
+}
+
+async function handleCommentDbEnsure(msg) {
+  const lid = String(msg?.liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return { ok: false };
+  if (!isIndexedDbAvailable()) return { ok: false, reason: 'no_idb' };
+  await ensureLiveMigratedToDb(lid);
+  const db = await openCommentDb();
+  try {
+    const total = await writeCommentDbSummaryAndBackupState(
+      db,
+      lid,
+      String(msg?.watchUrl || '').trim()
+    );
+    return { ok: true, total };
+  } finally {
+    db.close();
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || (msg.type !== CDB_APPEND_MESSAGE_TYPE && msg.type !== CDB_ENSURE_MESSAGE_TYPE)) {
+    return undefined;
+  }
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  const work =
+    msg.type === CDB_APPEND_MESSAGE_TYPE
+      ? handleCommentDbAppend(msg, sender)
+      : handleCommentDbEnsure(msg);
+  work.then(reply).catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
 function normalizeAutoBackupState(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const rawLives =
@@ -157,9 +669,26 @@ async function backupLiveCommentsIfNeeded(liveId, meta, lastWatchUrl) {
     return null;
   }
 
-  const key = commentsStorageKey(lid);
-  const bag = await chrome.storage.local.get(key);
-  const comments = Array.isArray(bag[key]) ? bag[key] : [];
+  // v0.1.509: 全チャンク＋テールを連結して backup（チャンク移行後も取りこぼさない）。
+  // v0.1.514: IDB 移行済みの live は IDB を正本として読む（chrome.storage は空/旧のため）。
+  let comments = [];
+  let migratedToDb = false;
+  try {
+    const mbag = await chrome.storage.local.get(commentDbMigratedKeyLocal(lid));
+    migratedToDb = mbag[commentDbMigratedKeyLocal(lid)] === true;
+  } catch {
+    migratedToDb = false;
+  }
+  if (migratedToDb && isIndexedDbAvailable()) {
+    const db = await openCommentDb();
+    try {
+      comments = await readAllCommentsForLiveDb(db, lid);
+    } finally {
+      db.close();
+    }
+  } else {
+    comments = await readAllCommentsForLiveLocal(lid);
+  }
   if (!comments.length) return null;
 
   const exportedAt = Date.now();
