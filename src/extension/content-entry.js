@@ -265,6 +265,7 @@ import {
 } from '../lib/commentIngestLog.js';
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
+import { computeBackfillFlushThreshold } from '../lib/backfillFlushThreshold.js';
 import { runIfTabLeader } from '../lib/tabLeaderLock.js';
 import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
 import { calculateBackfillRetryDelayMs } from '../lib/backfillRetryBackoff.js';
@@ -2516,6 +2517,13 @@ function ensurePageFrameStyle() {
       flex: 0 0 auto;
       flex-shrink: 0;
       align-self: flex-start;
+      /* iframe(popup.html) が初回ペイントするまでの数百 ms、透明 iframe 越しに
+         ニコ生の黒背景が透けて「なにもない」黒帯に見える問題の対策。
+         popup.html のダークローディング幕(.nl-init-shade)と同じグラデを host に敷き、
+         読み込み中は黒ではなく「ローディング中のパネル」に見せる。中身が描画されると
+         popup の不透明な背景が前面に来るので、この下地は隠れる（継ぎ目なし）。 */
+      background: linear-gradient(180deg, #fffaf2, #eef9f3);
+      border-radius: 12px;
     }
     #${INLINE_POPUP_HOST_ID}:focus,
     #${INLINE_POPUP_HOST_ID}:focus-within {
@@ -2548,8 +2556,8 @@ function ensurePageFrameStyle() {
     #${INLINE_POPUP_HOST_ID}.nls-inline-host--dock-bottom {
       -webkit-overflow-scrolling: touch;
       min-height: 200px;
-      /* 読み込み遅延時に黒ベタ面が残らないよう透明寄りにする */
-      background: transparent;
+      /* 読み込み中は黒ベタではなく popup ダークローディング幕と同じ下地を見せる */
+      background: linear-gradient(180deg, #fffaf2, #eef9f3);
     }
     #${INLINE_POPUP_HOST_ID}.nls-inline-host--dock-bottom iframe {
       width: 100% !important;
@@ -2557,6 +2565,92 @@ function ensurePageFrameStyle() {
       min-height: 220px;
       max-height: min(680px, 56vh);
       background: transparent;
+    }
+    /* iframe(popup.html) が描画し終わるまでの間に出す「読み込み中」表示。
+       黒い空白の代わりに りんく・こん太・たぬ姉 が並んでぴょこぴょこ動き、セリフが
+       切り替わる。iframe は load まで visibility:hidden なので、その間だけこのレイヤが
+       見え、popup が描画されると iframe(z-index:2) が上に重なって自然に消える。 */
+    #${INLINE_POPUP_HOST_ID} iframe { position: relative; z-index: 2; }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 18px 16px;
+      box-sizing: border-box;
+      text-align: center;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #fffaf2, #eef9f3);
+      pointer-events: none;
+      opacity: 1;
+      transition: opacity 0.24s ease-out;
+    }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading--done {
+      opacity: 0;
+    }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading__chars {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 14px;
+    }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading__char {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid rgb(31 41 55 / 30%);
+      box-shadow: 2px 2px 0 rgb(31 41 55 / 18%);
+      object-fit: cover;
+      transition: transform 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out;
+      animation: nls-inline-loading-bob 1.5s ease-in-out infinite;
+    }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading__char:nth-child(2) { animation-delay: 0.25s; }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading__char:nth-child(3) { animation-delay: 0.5s; }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading__char.is-speaking {
+      border-color: #2a6f4d;
+      box-shadow: 0 0 0 2px rgb(42 111 77 / 40%), 2px 3px 0 rgb(42 111 77 / 35%);
+      animation: nls-inline-loading-bob-speaking 1.5s ease-in-out infinite;
+    }
+    @keyframes nls-inline-loading-bob-speaking {
+      0%, 100% { transform: scale(1.16) translateY(-2px); }
+      50% { transform: scale(1.16) translateY(-9px); }
+    }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading__bubble {
+      min-height: 1.4em;
+      max-width: 92%;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1f2937;
+      letter-spacing: 0.02em;
+      line-height: 1.5;
+      transition: opacity 0.18s ease-out;
+    }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading__bubble.is-swapping { opacity: 0; }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading__speaker {
+      color: #2a6f4d;
+      margin-right: 4px;
+    }
+    #${INLINE_POPUP_HOST_ID} .nls-inline-loading__submsg {
+      font-size: 11px;
+      font-weight: 500;
+      color: #5b6573;
+      max-width: 88%;
+      line-height: 1.45;
+    }
+    @keyframes nls-inline-loading-bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-7px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #${INLINE_POPUP_HOST_ID} .nls-inline-loading__char { animation: none; }
+      #${INLINE_POPUP_HOST_ID} .nls-inline-loading,
+      #${INLINE_POPUP_HOST_ID} .nls-inline-loading__bubble,
+      #${INLINE_POPUP_HOST_ID} .nls-inline-loading__char { transition: none; }
     }
   `;
   document.head.appendChild(style);
@@ -2624,6 +2718,268 @@ function pickPrimaryInlinePopupHostFromDom() {
 }
 
 /**
+ * インラインパネルのローディング演出。りんく・こん太・たぬ姉 が並んで動き、セリフを
+ * 切り替えながら「読み込み中」を伝える。iframe(popup.html) が描画されるまでの黒い空白を
+ * キャラの待機画面に置き換える。
+ * @type {ReturnType<typeof setInterval>|null}
+ */
+let inlineLoadingCycleTimer = null;
+let inlineLoadingLipTimer = /** @type {ReturnType<typeof setInterval>|null} */ (null);
+/** @type {ReturnType<typeof setTimeout>[]} */
+let inlineLoadingBlinkTimers = [];
+let inlineLoadingSpeaking = /** @type {string|null} */ (null);
+
+/** ローディングで回すセリフ（誰が・何を言うか）。読み込み中の安心感を出す。 */
+const INLINE_LOADING_LINES = /** @type {const} */ ([
+  { who: 'konta', name: 'こん太', text: 'みんなの応援コメント、集めてるよ〜' },
+  { who: 'link', name: 'りんく', text: '過去ログをさかのぼって取り込み中！' },
+  { who: 'tanunee', name: 'たぬ姉', text: '匿名コメントもレーンに振り分けてるわ' },
+  { who: 'konta', name: 'こん太', text: 'わくわく…もうちょっと待っててね' },
+  { who: 'link', name: 'りんく', text: '今日のきらめき、まとめてるところだよ' },
+  { who: 'tanunee', name: 'たぬ姉', text: 'ギフトや貢献度も整えています…' }
+]);
+
+/*
+ * 各キャラのフレーム（軽量サムネ）。idle=目開き口閉じ / talk=口開き / half=半目 / blink=閉眼。
+ *   popup 幕と同じ並び。こん太は normal-mouth-open が無いので talk は smile-mouth-open。
+ */
+const INLINE_LOADING_FRAMES = {
+  link: {
+    idle: 'images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png',
+    talk: 'images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-open.thumb128.png',
+    half: 'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.thumb128.png',
+    blink: 'images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.thumb128.png'
+  },
+  konta: {
+    idle: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png',
+    talk: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.thumb128.png',
+    half: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png',
+    blink: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-blink-mouth-closed.thumb128.png'
+  },
+  tanunee: {
+    idle: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png',
+    talk: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-open.thumb128.png',
+    half: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png',
+    blink: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-blink-mouth-closed.thumb128.png'
+  }
+};
+
+/** キャラのフレーム URL を解決する。失敗時は空文字。 */
+function inlineLoadingFrameUrl(who, frame) {
+  try {
+    const set = INLINE_LOADING_FRAMES[who];
+    if (!set) return '';
+    const rel = set[frame] || set.idle;
+    if (!rel) return '';
+    return chrome.runtime.getURL(rel);
+  } catch {
+    return '';
+  }
+}
+
+function inlineLoadingPrefersReducedMotion() {
+  try {
+    return (
+      typeof matchMedia === 'function' &&
+      matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+  } catch {
+    return false;
+  }
+}
+
+function inlineLoadingStopLipSync() {
+  if (inlineLoadingLipTimer != null) {
+    clearInterval(inlineLoadingLipTimer);
+    inlineLoadingLipTimer = null;
+  }
+}
+
+function inlineLoadingClearBlinks() {
+  for (const t of inlineLoadingBlinkTimers) clearTimeout(t);
+  inlineLoadingBlinkTimers = [];
+}
+
+/**
+ * host 内にローディング演出レイヤを用意し、セリフ巡回を開始する（冪等）。
+ * @param {HTMLDivElement} host
+ */
+function ensureInlineLoadingPlaceholder(host) {
+  if (!(host instanceof HTMLElement)) return;
+  let layer = host.querySelector('.nls-inline-loading');
+  if (layer) return;
+  layer = document.createElement('div');
+  layer.className = 'nls-inline-loading';
+  layer.setAttribute('aria-hidden', 'true');
+
+  const charsRow = document.createElement('div');
+  charsRow.className = 'nls-inline-loading__chars';
+  /** @type {Record<string, HTMLImageElement>} */
+  const charEls = {};
+  for (const who of ['link', 'konta', 'tanunee']) {
+    const img = document.createElement('img');
+    img.className = 'nls-inline-loading__char';
+    img.dataset.who = who;
+    img.alt = '';
+    img.decoding = 'async';
+    const src = inlineLoadingFrameUrl(who, 'idle');
+    if (src) img.src = src;
+    charsRow.appendChild(img);
+    charEls[who] = img;
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'nls-inline-loading__bubble';
+  const speaker = document.createElement('span');
+  speaker.className = 'nls-inline-loading__speaker';
+  const serif = document.createElement('span');
+  serif.className = 'nls-inline-loading__serif';
+  bubble.appendChild(speaker);
+  bubble.appendChild(serif);
+
+  const submsg = document.createElement('div');
+  submsg.className = 'nls-inline-loading__submsg';
+  submsg.textContent = '一度開くと次からの取り込みがはやくなるよ';
+
+  layer.appendChild(charsRow);
+  layer.appendChild(bubble);
+  layer.appendChild(submsg);
+  // iframe より前に挿入（iframe は z-index:2 で上に来る）。
+  host.insertBefore(layer, host.firstChild);
+
+  const reduceMotion = inlineLoadingPrefersReducedMotion();
+
+  const setFrame = (who, frame) => {
+    const el = charEls[who];
+    if (!el) return;
+    const src = inlineLoadingFrameUrl(who, frame);
+    if (src && el.getAttribute('src') !== src) el.src = src;
+  };
+  const startLip = (who) => {
+    inlineLoadingStopLipSync();
+    let open = false;
+    inlineLoadingLipTimer = setInterval(() => {
+      open = !open;
+      setFrame(who, open ? 'talk' : 'idle');
+    }, 150);
+  };
+  const scheduleBlink = (who) => {
+    const delay = 1800 + Math.random() * 3200;
+    const t = setTimeout(() => {
+      if (who !== inlineLoadingSpeaking) {
+        setFrame(who, 'half');
+        const t2 = setTimeout(() => {
+          if (who !== inlineLoadingSpeaking) setFrame(who, 'blink');
+        }, 70);
+        const t3 = setTimeout(() => {
+          if (who !== inlineLoadingSpeaking) setFrame(who, 'half');
+        }, 150);
+        const t4 = setTimeout(() => {
+          if (who !== inlineLoadingSpeaking) setFrame(who, 'idle');
+        }, 220);
+        inlineLoadingBlinkTimers.push(t2, t3, t4);
+      }
+      scheduleBlink(who);
+    }, delay);
+    inlineLoadingBlinkTimers.push(t);
+  };
+
+  let idx = 0;
+  const applyLine = (i) => {
+    const line = INLINE_LOADING_LINES[i % INLINE_LOADING_LINES.length];
+    if (!line) return;
+    speaker.textContent = line.name + '：';
+    serif.textContent = line.text;
+    inlineLoadingSpeaking = line.who;
+    for (const who of Object.keys(charEls)) {
+      const el = charEls[who];
+      el.classList.toggle('is-speaking', who === line.who);
+      if (who !== line.who) setFrame(who, 'idle');
+    }
+    if (reduceMotion) {
+      setFrame(line.who, 'talk');
+    } else {
+      startLip(line.who);
+    }
+  };
+  applyLine(idx);
+  if (!reduceMotion) {
+    for (const who of Object.keys(charEls)) scheduleBlink(who);
+  }
+
+  if (inlineLoadingCycleTimer != null) {
+    clearInterval(inlineLoadingCycleTimer);
+    inlineLoadingCycleTimer = null;
+  }
+  inlineLoadingCycleTimer = setInterval(() => {
+    // レイヤが既に外れていたら止める（保険）。
+    if (!layer || !layer.isConnected) {
+      inlineLoadingStopLipSync();
+      inlineLoadingClearBlinks();
+      if (inlineLoadingCycleTimer != null) {
+        clearInterval(inlineLoadingCycleTimer);
+        inlineLoadingCycleTimer = null;
+      }
+      return;
+    }
+    bubble.classList.add('is-swapping');
+    setTimeout(() => {
+      idx = (idx + 1) % INLINE_LOADING_LINES.length;
+      applyLine(idx);
+      bubble.classList.remove('is-swapping');
+    }, 180);
+  }, 2000);
+}
+
+/**
+ * ローディング演出レイヤをフェードアウトして撤去する（冪等）。
+ * @param {HTMLElement} host
+ */
+function removeInlineLoadingPlaceholder(host) {
+  if (inlineLoadingCycleTimer != null) {
+    clearInterval(inlineLoadingCycleTimer);
+    inlineLoadingCycleTimer = null;
+  }
+  inlineLoadingStopLipSync();
+  inlineLoadingClearBlinks();
+  inlineLoadingSpeaking = null;
+  if (!(host instanceof HTMLElement)) return;
+  const layer = host.querySelector('.nls-inline-loading');
+  if (!(layer instanceof HTMLElement)) return;
+  layer.classList.add('nls-inline-loading--done');
+  setTimeout(() => {
+    try {
+      layer.remove();
+    } catch {
+      // no-op
+    }
+  }, 280);
+}
+
+/** 表示の瞬間にキャラ層を出してから撤去するまでの猶予（iframe(popup) の初回ペイント待ち）。 */
+let inlineLoadingHandoffTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
+
+/**
+ * host を表示する瞬間のハンドオフ。prewarm では iframe を画面外で先読みするため、
+ * 表示時点で host のキャラ層が既に撤去済みのことがある（→ 一瞬白い地色が見える）。
+ * 表示の瞬間にキャラ層を出し直し、iframe(popup) が自前のキャラ幕／データを描き終える
+ * 猶予をとってから撤去する。これで「最初に白」を消す。
+ * @param {HTMLElement} host
+ */
+function handoffInlineLoadingToIframe(host) {
+  if (!(host instanceof HTMLElement)) return;
+  ensureInlineLoadingPlaceholder(/** @type {HTMLDivElement} */ (host));
+  if (inlineLoadingHandoffTimer != null) {
+    clearTimeout(inlineLoadingHandoffTimer);
+    inlineLoadingHandoffTimer = null;
+  }
+  inlineLoadingHandoffTimer = setTimeout(() => {
+    inlineLoadingHandoffTimer = null;
+    removeInlineLoadingPlaceholder(host);
+  }, 1600);
+}
+
+/**
  * iframe 表示の load / 2s フェイルセーフ。`src` を変えない same-src 再入でも張り直せる。
  * @param {HTMLDivElement} host
  * @param {HTMLIFrameElement} iframe
@@ -2635,6 +2991,7 @@ function attachInlineIframeRevealFallback(host, iframe) {
       requestAnimationFrame(() => {
         iframe.style.visibility = 'visible';
         host.style.opacity = '1';
+        handoffInlineLoadingToIframe(host);
       });
     });
   };
@@ -2721,6 +3078,7 @@ function ensureInlinePopupIframe(host) {
     if (shouldReveal) {
       existing.style.visibility = 'visible';
       host.style.opacity = '1';
+      handoffInlineLoadingToIframe(host);
       return;
     }
     if (cs.display === 'none' || cs.visibility === 'hidden') {
@@ -2741,6 +3099,8 @@ function ensureInlinePopupIframe(host) {
     // 読み込み直後の下地が白っぽく見えるのを防ぐ（透明にして親の背景に馴染ませる）
     iframe.style.backgroundColor = 'transparent';
     host.appendChild(iframe);
+    // iframe が描画されるまでの黒い空白を、キャラの待機ローディングに置き換える。
+    ensureInlineLoadingPlaceholder(host);
   } else {
     try {
       iframe.style.backgroundColor = 'transparent';
@@ -11902,13 +12262,17 @@ function backfillYieldToPage() {
 }
 
 /**
- * v0.1.431: バックフィルの「区画ごとに毎回 persist」をやめ、この行数を超えてから 1 回 persist
+ * v0.1.431: バックフィルの「区画ごとに毎回 persist」をやめ、一定行たまってから 1 回 persist
  * する（複数区画ぶんをまとめる）。persist フラッシュは巨大コメント配列を毎回 read-merge-write
  * する O(N) なので、爆速配信で区画ごとに叩くとフラッシュが多発し固まる主因になる。まとめると
  * フラッシュ回数が激減し、メインスレッド占有が下がる（記録の正確性は mergeNewComments の
  * dedupe が担保＝まとめても重複/欠落しない）。
+ *
+ * v0.1.xxx: その「一定行数」は固定値ではなく保存済み件数に応じて動的に引き上げる
+ * （computeBackfillFlushThreshold / src/lib/backfillFlushThreshold.js）。固定 800 行だと巨大放送
+ * ほど flush 回数が増え総コスト O(N^2) ＝「応答しません」の主因になるため、件数比例で溜めて
+ * flush 回数を放送サイズに依存させない（メモリは max で頭打ち）。
  */
-const NDGR_BACKFILL_PERSIST_BATCH_ROWS = 800;
 /** v0.1.431: この区画数を処理するごとにブラウザへ一拍制御を譲る（描画/入力を通す）。 */
 const NDGR_BACKFILL_YIELD_EVERY_SEGMENTS = 6;
 
@@ -12120,7 +12484,14 @@ async function runNdgrBackfillOnce() {
       }
       publishBackfillProgress();
       // 一定行たまったら 1 回だけ persist（フラッシュ回数を激減＝固まり緩和）。
-      if (pendingBackfillRows.length >= NDGR_BACKFILL_PERSIST_BATCH_ROWS) {
+      // v0.1.xxx: 閾値を「保存済み件数」に応じて動的に引き上げる（computeBackfillFlushThreshold）。
+      //   固定 800 行だと巨大放送ほど flush 回数が増え、full-array の read-merge-write（O(N)）が
+      //   積み重なって総コスト O(N^2) ＝「応答しません」の主因。保存件数比例で溜めてから書くと
+      //   flush 回数が放送サイズに依存せず、メモリは max(8000 行)で頭打ち。dedupe が正確性担保。
+      const backfillFlushThreshold = computeBackfillFlushThreshold(
+        observedRecordedCommentCount
+      );
+      if (pendingBackfillRows.length >= backfillFlushThreshold) {
         flushPendingBackfillRows();
         // v0.1.456 レジューム: persist バッチ境界（低頻度）で最古到達 vpos を coalesce 保存。
         //   途中でタブを閉じる/中断しても、次回「もう一度」で続きから再開できる（毎 yield で

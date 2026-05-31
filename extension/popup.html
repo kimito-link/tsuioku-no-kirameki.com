@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんくの追憶のきらめき</title>
+    <!-- ローディング幕で最初に出る3キャラ（通常顔）のサムネだけ最優先で先読み（空丸を防ぐ）。
+         笑顔は喋る瞬間に差し替えるので preload しない（preload 未使用警告を避けるため）。 -->
+    <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png" />
+    <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png" />
+    <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png" />
     <style>
       :root {
         color-scheme: light dark;
@@ -86,6 +91,7 @@
         gap: 12px;
         background: linear-gradient(180deg, var(--nl-bg, #f6fff8), var(--nl-bg-soft, #eef9f3));
         transition: opacity 220ms ease-out;
+        will-change: opacity;
         animation: nl-init-shade-css-failsafe 15s ease-out forwards;
       }
       .nl-init-shade__face {
@@ -96,6 +102,39 @@
         border: 2px solid var(--nl-text, #1f2937);
         box-shadow: 2px 2px 0 var(--nl-text, #1f2937);
         animation: nl-init-shade-bob 1.2s ease-in-out infinite;
+      }
+      .nl-init-shade__chars {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: clamp(10px, 4vw, 18px);
+      }
+      .nl-init-shade__char {
+        width: clamp(54px, 13vw, 68px);
+        height: clamp(54px, 13vw, 68px);
+        border-radius: 50%;
+        background: var(--nl-surface, #fff);
+        border: 2px solid color-mix(in srgb, var(--nl-text, #1f2937) 45%, transparent);
+        box-shadow: 2px 2px 0 color-mix(in srgb, var(--nl-text, #1f2937) 30%, transparent);
+        object-fit: cover;
+        transition: transform 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out;
+        animation: nl-init-shade-bob 1.5s ease-in-out infinite;
+      }
+      .nl-init-shade__char:nth-child(2) { animation-delay: 0.25s; }
+      .nl-init-shade__char:nth-child(3) { animation-delay: 0.5s; }
+      .nl-init-shade__char.is-speaking {
+        border-color: var(--nl-accent, #2a6f4d);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-accent, #2a6f4d) 45%, transparent), 2px 3px 0 color-mix(in srgb, var(--nl-accent, #2a6f4d) 40%, transparent);
+        /* 通常の bob はそのまま transform を握るので、話者は scale 付き bob に差し替える */
+        animation: nl-init-shade-bob-speaking 1.5s ease-in-out infinite;
+      }
+      @keyframes nl-init-shade-bob-speaking {
+        0%, 100% { transform: scale(1.16) translateY(-2px); }
+        50% { transform: scale(1.16) translateY(-9px); }
+      }
+      .nl-init-shade__speaker {
+        color: var(--nl-accent, #2a6f4d);
+        margin-right: 4px;
       }
       .nl-init-shade__msg {
         font-size: clamp(12px, 3.2vw, 14px);
@@ -130,6 +169,18 @@
           border-color: var(--nl-text-sub, #cbd5e1);
           box-shadow: 2px 2px 0 var(--nl-text-sub, #cbd5e1);
         }
+        .nl-init-shade__char {
+          background: var(--nl-surface, #0f172a);
+          border-color: color-mix(in srgb, var(--nl-text-sub, #cbd5e1) 55%, transparent);
+          box-shadow: 2px 2px 0 color-mix(in srgb, var(--nl-text-sub, #cbd5e1) 35%, transparent);
+        }
+        .nl-init-shade__char.is-speaking {
+          border-color: var(--nl-accent, #60a5fa);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-accent, #60a5fa) 50%, transparent), 2px 3px 0 color-mix(in srgb, var(--nl-accent, #60a5fa) 40%, transparent);
+        }
+        .nl-init-shade__speaker {
+          color: var(--nl-accent, #60a5fa);
+        }
         .nl-init-shade__msg {
           color: var(--nl-accent, #60a5fa);
         }
@@ -147,6 +198,7 @@
       }
       @media (prefers-reduced-motion: reduce) {
         .nl-init-shade__face { animation: none; }
+        .nl-init-shade__char { animation: none; transition: none; }
         .nl-init-shade { transition: none; }
       }
 
@@ -8869,13 +8921,35 @@
       を反転して fade-out。詳細 popup-entry.js: dismissInitialLoadShade()。
     -->
     <div id="nlInitialLoadShade" class="nl-init-shade" aria-hidden="true">
-      <img
-        class="nl-init-shade__face"
-        src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-blink-mouth-open.png"
-        alt=""
-        decoding="async"
-      />
-      <div class="nl-init-shade__msg">りんく こん太 たぬ姉が いまからよみこむよー</div>
+      <div class="nl-init-shade__chars">
+        <img
+          class="nl-init-shade__char"
+          data-who="link"
+          src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
+          alt=""
+          decoding="async"
+          fetchpriority="high"
+        />
+        <img
+          class="nl-init-shade__char"
+          data-who="konta"
+          src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
+          alt=""
+          decoding="async"
+          fetchpriority="high"
+        />
+        <img
+          class="nl-init-shade__char"
+          data-who="tanunee"
+          src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
+          alt=""
+          decoding="async"
+          fetchpriority="high"
+        />
+      </div>
+      <div class="nl-init-shade__msg">
+        <span class="nl-init-shade__speaker" id="nlInitShadeSpeaker"></span><span id="nlInitShadeSerif">りんく こん太 たぬ姉が いまからよみこむよー</span>
+      </div>
       <div class="nl-init-shade__submsg">ギフト履歴や 他のランキングなどは、一度開くと取り込みがはやくなるよー</div>
     </div>
     <header class="nl-header">

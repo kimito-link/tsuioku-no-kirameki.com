@@ -12885,10 +12885,196 @@ const NL_INIT_SHADE_BORN_AT = (() => {
     return Date.now();
   }
 })();
+/*
+ * ローディング幕のキャラ演出。りんく・こん太・たぬ姉 が並んで動き、セリフを切り替える。
+ * 「読み込み中に黒い空白／空のカードだけ」を、3キャラの待機画面に置き換える要望（2026-05-31）。
+ */
+const INIT_SHADE_LINES = [
+  { who: 'konta', name: 'こん太', text: 'みんなの応援コメント、集めてるよ〜' },
+  { who: 'link', name: 'りんく', text: '過去ログをさかのぼって取り込み中！' },
+  { who: 'tanunee', name: 'たぬ姉', text: '匿名コメントもレーンに振り分けてるわ' },
+  { who: 'konta', name: 'こん太', text: 'わくわく…もうちょっと待っててね' },
+  { who: 'link', name: 'りんく', text: '今日のきらめき、まとめてるところだよ' },
+  { who: 'tanunee', name: 'たぬ姉', text: 'ギフトや貢献度も整えています…' }
+];
+
+/*
+ * 各キャラのフレーム（軽量サムネ thumb128）。
+ *   idle=目開き口閉じ / talk=口開き（しゃべり） / half=半目 / blink=閉眼 / happy=笑顔（完了）
+ *   こん太は normal-mouth-open が無いので talk/happy は smile-mouth-open を使う。
+ */
+const INIT_SHADE_FRAMES = {
+  link: {
+    idle: 'images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png',
+    talk: 'images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-open.thumb128.png',
+    half: 'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.thumb128.png',
+    blink: 'images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.thumb128.png',
+    happy: 'images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.thumb128.png'
+  },
+  konta: {
+    idle: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png',
+    talk: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.thumb128.png',
+    half: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png',
+    blink: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-blink-mouth-closed.thumb128.png',
+    happy: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.thumb128.png'
+  },
+  tanunee: {
+    idle: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png',
+    talk: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-open.thumb128.png',
+    half: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png',
+    blink: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-blink-mouth-closed.thumb128.png',
+    happy: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.thumb128.png'
+  }
+};
+
+function initShadeFrameSrc(who, frame) {
+  const set = INIT_SHADE_FRAMES[who];
+  if (!set) return '';
+  return set[frame] || set.idle || '';
+}
+
+function initShadePrefersReducedMotion() {
+  try {
+    return (
+      typeof matchMedia === 'function' &&
+      matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+  } catch {
+    return false;
+  }
+}
+
+let initShadeCharCycleTimer = null;
+let initShadeLipTimer = null;
+/** @type {ReturnType<typeof setTimeout>[]} */
+let initShadeBlinkTimers = [];
+let initShadeSpeaking = /** @type {string|null} */ (null);
+/** @type {Record<string, HTMLElement>} */
+let initShadeCharEls = {};
+
+function initShadeSetFrame(who, frame) {
+  const el = initShadeCharEls[who];
+  if (!el) return;
+  const src = initShadeFrameSrc(who, frame);
+  if (src && el.getAttribute('src') !== src) el.setAttribute('src', src);
+}
+
+function initShadeStopLipSync() {
+  if (initShadeLipTimer != null) {
+    clearInterval(initShadeLipTimer);
+    initShadeLipTimer = null;
+  }
+}
+
+// 話者だけ口 open↔closed を高速で切替（しゃべってる感）。
+function initShadeStartLipSync(who) {
+  initShadeStopLipSync();
+  let open = false;
+  initShadeLipTimer = setInterval(() => {
+    open = !open;
+    initShadeSetFrame(who, open ? 'talk' : 'idle');
+  }, 150);
+}
+
+function initShadeClearBlinks() {
+  for (const t of initShadeBlinkTimers) clearTimeout(t);
+  initShadeBlinkTimers = [];
+}
+
+// 待機キャラがランダムにまばたき（idle→half→blink→half→idle）。話者中はスキップ。
+function initShadeScheduleBlink(who) {
+  const delay = 1800 + Math.random() * 3200;
+  const t = setTimeout(() => {
+    if (who !== initShadeSpeaking) {
+      initShadeSetFrame(who, 'half');
+      const t2 = setTimeout(() => {
+        if (who !== initShadeSpeaking) initShadeSetFrame(who, 'blink');
+      }, 70);
+      const t3 = setTimeout(() => {
+        if (who !== initShadeSpeaking) initShadeSetFrame(who, 'half');
+      }, 150);
+      const t4 = setTimeout(() => {
+        if (who !== initShadeSpeaking) initShadeSetFrame(who, 'idle');
+      }, 220);
+      initShadeBlinkTimers.push(t2, t3, t4);
+    }
+    initShadeScheduleBlink(who);
+  }, delay);
+  initShadeBlinkTimers.push(t);
+}
+
+function startInitShadeCharCycle() {
+  if (initShadeCharCycleTimer != null) return;
+  const speaker = document.getElementById('nlInitShadeSpeaker');
+  const serif = document.getElementById('nlInitShadeSerif');
+  initShadeCharEls = {};
+  for (const el of Array.from(document.querySelectorAll('.nl-init-shade__char'))) {
+    const who = el.getAttribute('data-who');
+    if (who && el instanceof HTMLElement) initShadeCharEls[who] = el;
+  }
+  if (!serif || Object.keys(initShadeCharEls).length === 0) return;
+  const reduceMotion = initShadePrefersReducedMotion();
+  let idx = 0;
+  const applyLine = (i) => {
+    const line = INIT_SHADE_LINES[i % INIT_SHADE_LINES.length];
+    if (!line) return;
+    if (speaker) speaker.textContent = line.name + '：';
+    serif.textContent = line.text;
+    initShadeSpeaking = line.who;
+    for (const who of Object.keys(initShadeCharEls)) {
+      const el = initShadeCharEls[who];
+      el.classList.toggle('is-speaking', who === line.who);
+      if (who !== line.who) initShadeSetFrame(who, 'idle');
+    }
+    if (reduceMotion) {
+      // 動きを抑える設定では口パクせず、話者は口開きで「話してる」感だけ出す。
+      initShadeSetFrame(line.who, 'talk');
+    } else {
+      initShadeStartLipSync(line.who);
+    }
+  };
+  for (const who of Object.keys(initShadeCharEls)) initShadeSetFrame(who, 'idle');
+  applyLine(idx);
+  if (!reduceMotion) {
+    for (const who of Object.keys(initShadeCharEls)) initShadeScheduleBlink(who);
+  }
+  initShadeCharCycleTimer = setInterval(() => {
+    const shade = document.getElementById('nlInitialLoadShade');
+    if (!shade || shade.classList.contains('nl-init-shade--done')) {
+      stopInitShadeCharCycle();
+      return;
+    }
+    idx = (idx + 1) % INIT_SHADE_LINES.length;
+    applyLine(idx);
+  }, 2600);
+}
+
+function stopInitShadeCharCycle() {
+  if (initShadeCharCycleTimer != null) {
+    clearInterval(initShadeCharCycleTimer);
+    initShadeCharCycleTimer = null;
+  }
+  initShadeStopLipSync();
+  initShadeClearBlinks();
+  initShadeSpeaking = null;
+}
+
 function dismissInitialLoadShade() {
+  stopInitShadeCharCycle();
   const shade = document.getElementById('nlInitialLoadShade');
   if (!(shade instanceof HTMLElement)) return;
   if (shade.classList.contains('nl-init-shade--done')) return;
+  // 完了の一拍：フェード前に全員を笑顔にして「できた！」感を残す（Peak-End）。
+  try {
+    for (const el of Array.from(shade.querySelectorAll('.nl-init-shade__char'))) {
+      const who = el.getAttribute('data-who');
+      const src = initShadeFrameSrc(who, 'happy');
+      if (src && el instanceof HTMLElement) el.setAttribute('src', src);
+      el.classList.remove('is-speaking');
+    }
+  } catch {
+    // no-op
+  }
   const now =
     typeof performance !== 'undefined' && performance.now
       ? performance.now()
@@ -12907,6 +13093,67 @@ function dismissInitialLoadShade() {
       }
     }, 260);
   }, wait);
+}
+
+/*
+ * INLINE_MODE 専用: ローディング幕を「実データ（snapshot）が乗るまで」維持する。
+ *   インライン iframe は初回 refresh が snapshot=null（content script の readiness が
+ *   まだ揃っていない瞬間）で返ると、幕を外した直後に全カード「—」+ ランキング
+ *   「(取得中...)」の空スケルトンが一瞬見えてしまう（ユーザー実機報告 2026-05-31）。
+ *   snapshot が non-null になる＝公式値や来場/コメ数が「—」でなくなるので、それまで
+ *   ニコ生に馴染んだローディング幕を出し続ける。fallback で必ず外して永久ローディングを防ぐ。
+ *   standalone popup は対象外（INLINE_MODE ガード・既に十分速い）。
+ */
+let inlineShadeDataPollTimer = null;
+let inlineShadeDataFallbackTimer = null;
+// INLINE 幕の安全上限。データが来なくてもこの時間で必ず外す（永久ローディング防止）。
+//   prewarm（画面外先読み）でも、表示時にキャラ幕が見えるよう十分長くとる。
+const INLINE_SHADE_DATA_FALLBACK_MS = 20_000;
+
+function inlineWatchPanelHasRealDataForShade() {
+  try {
+    const snap = watchMetaCache && watchMetaCache.snapshot;
+    if (!snap) return false;
+    // 公式コメント数が数値で入っている＝カードが「—」でなくなる主要シグナル。
+    //   0 でも「実データ（開始直後の正しい 0）」なので finite なら真とみなす。
+    if (Number.isFinite(Number(snap.officialCommentCount))) return true;
+    // 公式数がまだでも、来場/視聴者数が取れていれば実データありとみなす（保険）。
+    if (Number.isFinite(Number(snap.viewers))) return true;
+    if (Number.isFinite(Number(snap.watchCount))) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function clearInlineShadeDataWaiters() {
+  if (inlineShadeDataPollTimer != null) {
+    clearInterval(inlineShadeDataPollTimer);
+    inlineShadeDataPollTimer = null;
+  }
+  if (inlineShadeDataFallbackTimer != null) {
+    clearTimeout(inlineShadeDataFallbackTimer);
+    inlineShadeDataFallbackTimer = null;
+  }
+}
+
+/** @param {number} fallbackMs データが来なくても外す上限（永久ローディング防止） */
+function dismissInlineShadeWhenDataReady(fallbackMs) {
+  if (inlineWatchPanelHasRealDataForShade()) {
+    dismissInitialLoadShade();
+    return;
+  }
+  const cap = Math.max(0, Number(fallbackMs) || 0);
+  inlineShadeDataPollTimer = setInterval(() => {
+    if (inlineWatchPanelHasRealDataForShade()) {
+      clearInlineShadeDataWaiters();
+      dismissInitialLoadShade();
+    }
+  }, 200);
+  inlineShadeDataFallbackTimer = setTimeout(() => {
+    clearInlineShadeDataWaiters();
+    dismissInitialLoadShade();
+  }, cap);
 }
 
 /** @param {string} key */
@@ -13533,7 +13780,17 @@ async function initPopup() {
         // 初回 refresh が終わった瞬間、ロードシェードをフェードアウト。
         // 「白→空→ガタガタ」の見え方を「シェード→単一フェード」に圧縮する。
         if (wasInitialRefresh) {
-          requestAnimationFrame(() => dismissInitialLoadShade());
+          // INLINE_MODE は snapshot=null で返った直後の空「—」スケルトンを見せないため、
+          //   実データ（snapshot）が乗るまで幕を維持（fallback で必ず外す）。
+          if (INLINE_MODE && !inlineWatchPanelHasRealDataForShade()) {
+            // prewarm では iframe を画面外で先読みするため、この finally は
+            //   ユーザーが見る前に走り得る。短い fallback だと「画面外で幕が外れて
+            //   → 表示時には空白」になる。実データが乗るまでキャラ幕を維持し、
+            //   長めの安全上限でのみ強制解除する（永久ローディング防止）。
+            dismissInlineShadeWhenDataReady(INLINE_SHADE_DATA_FALLBACK_MS);
+          } else {
+            requestAnimationFrame(() => dismissInitialLoadShade());
+          }
         }
         requestAnimationFrame(() => {
           applyResponsivePopupLayout();
@@ -15613,6 +15870,13 @@ async function initPopup() {
   }
 }
 
+// ローディング幕のキャラ演出を即開始（初回 paint と同時に動かす）。
+try {
+  startInitShadeCharCycle();
+} catch {
+  // no-op
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initPopup);
 } else {
@@ -15621,8 +15885,15 @@ if (document.readyState === 'loading') {
 
 // 安全網：万が一 initPopup が throw して initialRefreshDone が立たなくても、
 // 最大 5 秒でロードシェードを撤去する（ユーザーが永遠に「読み込み中…」を見続けるのを防ぐ）。
+//   ただし INLINE_MODE は prewarm（画面外先読み）でこの 5 秒が表示前に経過し得る。
+//   その場合は実データが乗るまでキャラ幕を維持し、長めの上限でだけ外す
+//   （短い 5 秒固定だと「表示時には空白」になるため）。
 setTimeout(() => {
-  dismissInitialLoadShade();
+  if (INLINE_MODE) {
+    dismissInlineShadeWhenDataReady(INLINE_SHADE_DATA_FALLBACK_MS);
+  } else {
+    dismissInitialLoadShade();
+  }
 }, 5000);
 
 // 最終安全網: initPopup や refresh が throw / 中断しても、window load 後に
