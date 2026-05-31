@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.497',
+    date: '2026-05-31',
+    summary: '記録0の回帰修正＋裏タブのスリープ化',
+    items: Object.freeze([
+      'コメント欄の自動スクロールを誤検知して保存が滞り「記録が増えない／0のまま」になる問題を修正しました',
+      '見ていない（裏の）視聴タブでは保存頻度を下げ、同時に複数の重い配信を開いてもページが固まりにくくしました',
+      '裏タブを再び表示したときは、その場ですぐ記録が追いつきます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.496',
     date: '2026-05-31',
     summary: 'ツールバーアイコン無反応を修正',
