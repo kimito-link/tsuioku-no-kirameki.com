@@ -9183,12 +9183,32 @@ let _lastSavedCommentsUidStats = {
 
 const MIN_PERSIST_INTERVAL_MS = INGEST_TIMING.coalescerMinMs;
 const PERSIST_BURST_THRESHOLD = INGEST_TIMING.coalescerBurstThreshold;
+// v0.1.497: 同一オリジン（live.nicovideo.jp）の複数 watch タブは Chrome が同一レンダラー
+//   プロセス＝同一メインスレッドにまとめる。裏タブが大量コメントの全件 read-merge-write を
+//   1.5 秒ごとに走らせると、見ているタブまで巻き込んで「ページが応答しません」になる
+//   （実機で 443 件の前面タブが、裏の 3 万件タブ起因で固まると確認）。隠れているタブでは
+//   保存の最小間隔を大きく伸ばし、メインスレッドの占有を抑える（スリープモード）。
+//   コメントはコアレッサ内バッファ＋NDGR 受信で保持され、可視復帰時に追いつく。
+const HIDDEN_PERSIST_INTERVAL_MS = 12_000;
 
-const persistCoalescer = createPersistCoalescer(async (/** @type {ParsedCommentRow[]} */ batch) => {
-  const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(batch));
-  persistCommentRowsChain = job.catch((err) => reportSilentErrorToStorage('persist', err));
-  await job;
-}, MIN_PERSIST_INTERVAL_MS, PERSIST_BURST_THRESHOLD);
+const persistCoalescer = createPersistCoalescer(
+  async (/** @type {ParsedCommentRow[]} */ batch) => {
+    const job = persistCommentRowsChain.then(() => persistCommentRowsImpl(batch));
+    persistCommentRowsChain = job.catch((err) => reportSilentErrorToStorage('persist', err));
+    await job;
+  },
+  () => {
+    try {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return HIDDEN_PERSIST_INTERVAL_MS;
+      }
+    } catch {
+      /* no-op */
+    }
+    return MIN_PERSIST_INTERVAL_MS;
+  },
+  PERSIST_BURST_THRESHOLD
+);
 
 /**
  * @param {ParsedCommentRow[]|null|undefined} rows
@@ -9313,8 +9333,14 @@ async function persistCommentRowsImpl(rows, opts = {}) {
     return;
   }
   // v0.1.487: スクロール中は重い read/merge/write を後ろ倒しし、体感のカクつきを抑える。
+  // v0.1.497: 判定を lastGenuineUserScrollAt（wheel/touch/キーのみ）に変更。以前は
+  //   lastUserInitiatedScrollAt を見ていたが、これは scroll イベント（capture）でも更新され、
+  //   ニコ生コメント欄の高速な「新着追従の自動スクロール」で常時汚染される。高流量配信では
+  //   毎 persist が「スクロール中」と誤判定され、後ろ倒し＆リトライ churn で保存が滞り
+  //   「記録 0／なかなか増えない」を招いていた（v0.1.494 と同型のバグの persist 版）。
+  //   本物のユーザー操作中だけ後ろ倒しする。
   const now = Date.now();
-  const scrollQuietMs = Math.max(0, now - lastUserInitiatedScrollAt);
+  const scrollQuietMs = Math.max(0, now - lastGenuineUserScrollAt);
   const scrollRetryCount = Math.max(0, Number(opts?.scrollRetryCount) || 0);
   const SCROLL_DEFER_MS = 900;
   if (scrollQuietMs < SCROLL_DEFER_MS && scrollRetryCount < 2) {
@@ -10061,6 +10087,13 @@ function maybeRetryRankingAcquisitionOnVisible() {
 function onTabVisibleForCommentHarvest() {
   if (document.visibilityState !== 'visible') return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  // v0.1.497: 隠れている間は保存間隔を 12 秒に伸ばしているため、コアレッサ内に
+  //   未保存バッファが溜まり得る。可視に戻った瞬間に 1 回フラッシュして即座に追いつく。
+  try {
+    void persistCoalescer.flush();
+  } catch {
+    /* no-op */
+  }
   maybeRetryRankingAcquisitionOnVisible();
   // v0.1.331: 可視復帰の瞬間に koken/nicoad 公式 API も即リトライ（貢献度ランキング
   //   「取得中」張り付き対策）。周期 interval は hidden タブで return するため、popup を
