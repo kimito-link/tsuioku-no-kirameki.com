@@ -69,6 +69,14 @@ export const KEY_BACKFILL_AUTO_DISABLED = 'nls_backfill_auto_disabled';
 export const KEY_BACKFILL_PROGRESS = 'nls_backfill_progress_v1';
 
 /**
+ * B案: NDGR 過去ログバックフィルを、vpos ヒューリスティックではなく backward /
+ * previous ポインタ枯渇で完了判定する決定論エンジンへ切り替えるフラグ。
+ * 既定 ON。明示 false のときだけ旧 crawlNdgrBackward へ戻す kill switch。
+ */
+export const KEY_NDGR_DETERMINISTIC_BACKFILL =
+  'nls_ndgr_deterministic_backfill_enabled';
+
+/**
  * v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in フラグ。
  * 既定 OFF（true 厳密一致でだけ有効）。リーダータブ 1 本が放送中ずっと NDGR の nextAt を
  * long-poll で辿り、page-intercept 傍受/DOM harvest が取りこぼした新着を独立経路で補う。

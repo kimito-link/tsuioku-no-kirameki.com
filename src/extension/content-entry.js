@@ -38,6 +38,7 @@ import {
   KEY_BACKFILL_ENABLED,
   KEY_BACKFILL_AUTO_DISABLED,
   KEY_BACKFILL_PROGRESS,
+  KEY_NDGR_DETERMINISTIC_BACKFILL,
   KEY_NDGR_FORWARD_ENABLED,
   KEY_INCREMENTAL_DEDUP_ENABLED,
   KEY_COMMENT_IDB_ENABLED,
@@ -299,7 +300,10 @@ import {
   maybeAppendCommentIngestLog
 } from '../lib/commentIngestLog.js';
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
-import { crawlNdgrBackward } from '../lib/ndgrBackfillCrawl.js';
+import {
+  crawlNdgrBackward,
+  crawlNdgrBackwardDeterministic
+} from '../lib/ndgrBackfillCrawl.js';
 import { crawlNdgrForward } from '../lib/ndgrForwardCrawl.js';
 import { computeBackfillFlushThreshold } from '../lib/backfillFlushThreshold.js';
 import { shouldDeferDomHarvestDuringScroll } from '../lib/domHarvestScrollDefer.js';
@@ -11830,9 +11834,15 @@ async function start() {
   // v0.1.405: 過去ログ一括バックフィル opt-in flag の初期読み込み（async）。
   // v0.1.418: 自動開始フラグ（既定 ON）も一緒に読む。
   try {
-    chrome.storage.local.get([KEY_BACKFILL_ENABLED, KEY_BACKFILL_AUTO_DISABLED]).then((bag) => {
+    chrome.storage.local.get([
+      KEY_BACKFILL_ENABLED,
+      KEY_BACKFILL_AUTO_DISABLED,
+      KEY_NDGR_DETERMINISTIC_BACKFILL
+    ]).then((bag) => {
       _backfillEnabled = isBackfillEnabledFromStorage(bag);
       _backfillAutoEnabled = isBackfillAutoStartEnabled(bag);
+      _ndgrDeterministicBackfillEnabled =
+        !(bag && bag[KEY_NDGR_DETERMINISTIC_BACKFILL] === false);
     }).catch(() => { /* 既定（手動 OFF・自動 ON）を維持 */ });
   } catch { /* no-op */ }
 
@@ -11915,6 +11925,12 @@ async function start() {
         _backfillTriedLiveId = '';
         void runNdgrBackfillOnce();
       }
+    }
+
+    // B案: 決定論 NDGR バックフィルの kill switch。明示 false のときだけ旧エンジンへ戻す。
+    if (changes[KEY_NDGR_DETERMINISTIC_BACKFILL]) {
+      _ndgrDeterministicBackfillEnabled =
+        changes[KEY_NDGR_DETERMINISTIC_BACKFILL].newValue !== false;
     }
 
     // v0.1.511: 前方向 NDGR 継続取得 opt-in。OFF→ON の立ち上がりで即起動（次 tick を待たない）。
@@ -13331,6 +13347,10 @@ let _backfillEnabled = false;
  * ユーザーが設定で「自動取り込み」を OFF にしたときだけ false。初回 storage 読み込みで反映。
  */
 let _backfillAutoEnabled = true;
+/**
+ * @type {boolean} B案: 決定論 NDGR バックフィルを使うか。既定 true、明示 false だけ旧エンジン。
+ */
+let _ndgrDeterministicBackfillEnabled = true;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
@@ -13634,12 +13654,17 @@ async function runNdgrBackfillOnce() {
     //   バグのため crawl 側で撤去）。重複は mergeNewComments の dedupe が弾く。
     // v0.1.411: programStartSec を渡す。区画終端での再シード時刻を「配信開始+最古vpos」で
     //   精密化し、長尺で配信開始まで遡り切れるようにする（複数 backward 区画を橋渡し）。
-    const gen = crawlNdgrBackward({
+    const crawlBackward = _ndgrDeterministicBackfillEnabled
+      ? crawlNdgrBackwardDeterministic
+      : crawlNdgrBackward;
+    // 決定論エンジンは vpos を停止/到達判定に使わないため、旧 vpos resume は旧エンジン限定。
+    const crawlResumeFromVpos = _ndgrDeterministicBackfillEnabled ? null : resumeFromVpos;
+    const gen = crawlBackward({
       viewBase,
       fetchBinary: backfillFetchBinary,
       programStartSec: startMs != null ? Math.floor(startMs / 1000) : null,
       // v0.1.456 レジューム: 前回到達点から続きを掘る（無ければ null＝従来の seed 探索）。
-      resumeFromVpos,
+      resumeFromVpos: crawlResumeFromVpos,
       signal: ac.signal
     });
 
