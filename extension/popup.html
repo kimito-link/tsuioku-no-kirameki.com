@@ -2768,6 +2768,23 @@
         font-weight: 600;
       }
 
+      /* 記録停止の自己回復ステータス。普段は hidden。停止検知→自動復旧の直後だけ短時間出す。
+         注意を引きつつ落ち着いた琥珀色。長文なので折り返す。 */
+      .nl-live-stat-sub--recovery {
+        white-space: normal;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        word-break: break-word;
+        color: #b26a00;
+        font-weight: 700;
+      }
+
+      .nl-live-stat-sub--recovery[hidden] {
+        display: none;
+      }
+
       /* v0.1.432: 過去ログ取り込みの状況（入口なし/途中/混雑）を記録カードの位置に出す行。
          長めの文なので折り返す（official と同様）。控えめに目を引く色。 */
       .nl-live-stat-sub--backfill-hint {
@@ -9293,6 +9310,15 @@
               class="nl-backfill-rinku__actions"
             ></div>
           </div>
+          <!-- 記録停止の自己回復ステータス（本番でも表示）。普段は hidden。
+               「公式は増えてるのに記録が止まった」を検知して自動復旧した直後だけ
+               短時間表示する。値の出所は chrome.storage.local の nls_recording_watchdog_v1。 -->
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--recovery"
+            id="liveStatCommentsRecovery"
+            hidden
+            aria-live="polite"
+          ></div>
           <div
             id="liveStatCardCommentsLoad"
             class="nl-live-stat-card__char-load"

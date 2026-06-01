@@ -105,6 +105,7 @@ import {
   KEY_COMMENT_PANEL_STATUS,
   KEY_COMMENT_INGEST_LOG,
   KEY_STORAGE_WRITE_ERROR,
+  KEY_RECORDING_WATCHDOG,
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
   KEY_COMMENT_ENTER_SEND,
@@ -6041,6 +6042,8 @@ async function refreshBackfillRecordCardHint(liveId) {
     return;
   }
   bindBackfillProgressListenerOnce();
+  bindRecordingRecoveryListenerOnce();
+  void refreshRecordingRecoveryHint(lid);
   // caught_up 確定済みの配信なら再表示しない（refresh のたびに「届いてるよ」が出るのを防ぐ）。
   if (_backfillCaughtUpForLiveId === lid) return;
   // v0.1.411/v0.1.415: 直近進捗（ts が 180s 以内・lid 一致）があれば復元。古い完了の誤表示は
@@ -6150,6 +6153,87 @@ function bindBackfillProgressListenerOnce() {
       stopReason: prog.stopReason
     });
     maybeAutoRetryBackfillFromProg(prog);
+  });
+}
+
+/**
+ * 記録停止の自己回復ステータスを記録カード内 #liveStatCommentsRecovery に出す。
+ *   content 側ウォッチドッグが「公式は増えてるのに記録が止まった」を検知して自動復旧したとき、
+ *   chrome.storage.local の KEY_RECORDING_WATCHDOG にスナップショットを書く。それを読んで
+ *   直近 RECOVERY_FRESH_MS 以内なら短時間だけ表示する（普段は hidden＝UIUX 阻害ゼロ）。
+ * @param {{ at?: number, liveId?: string, attempt?: number, recorded?: number, official?: number,
+ *   actions?: { flush?: boolean, reseed?: boolean, forwardCrawl?: boolean } }|null} snap
+ * @param {string} [currentLid] 表示中の配信 id（別配信の回復で上書きしないため）
+ */
+function applyRecordingRecoveryHint(snap, currentLid) {
+  const el = /** @type {HTMLElement|null} */ (
+    document.getElementById('liveStatCommentsRecovery')
+  );
+  if (!el) return;
+  const RECOVERY_FRESH_MS = 180_000;
+  const at = Number(snap && snap.at) || 0;
+  const fresh = at > 0 && Date.now() - at <= RECOVERY_FRESH_MS;
+  // 表示中の配信に紐づく回復だけ出す（snap.liveId が無い場合は配信非依存として許可）。
+  const lidOk =
+    !snap ||
+    !snap.liveId ||
+    !currentLid ||
+    String(snap.liveId).toLowerCase() === String(currentLid).toLowerCase();
+  if (!snap || !fresh || !lidOk) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  const acts = snap.actions || {};
+  const steps = [
+    acts.flush ? '保存の即時実行' : '',
+    acts.reseed ? '保存方式の作り直し' : '',
+    acts.forwardCrawl ? '独立経路での取得' : ''
+  ]
+    .filter(Boolean)
+    .join('→');
+  const attempt = Number(snap.attempt) || 1;
+  const rec = Number.isFinite(Number(snap.recorded)) ? Number(snap.recorded) : null;
+  const off = Number.isFinite(Number(snap.official)) ? Number(snap.official) : null;
+  const countNote =
+    rec != null && off != null
+      ? `（記録${rec.toLocaleString()}／公式${off.toLocaleString()}）`
+      : '';
+  // recovered=false（既定）は検知のみ（取り込みに手を出さない）。
+  el.textContent =
+    snap.recovered && steps
+      ? `記録の停止を検知 → 自動で復旧中（${attempt}回目: ${steps}）${countNote}`
+      : `記録の停止を検知（監視中）${countNote}`;
+  el.hidden = false;
+}
+
+/**
+ * KEY_RECORDING_WATCHDOG を読んで回復ヒントを反映する。
+ * @param {string} [currentLid]
+ * @returns {Promise<void>}
+ */
+async function refreshRecordingRecoveryHint(currentLid) {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.storage?.local?.get) return;
+    const bag = await chrome.storage.local.get([KEY_RECORDING_WATCHDOG]);
+    applyRecordingRecoveryHint(bag ? bag[KEY_RECORDING_WATCHDOG] : null, currentLid);
+  } catch {
+    /* no-op */
+  }
+}
+
+/** KEY_RECORDING_WATCHDOG の onChanged を回復ヒントへ反映（1 回だけ登録）。 */
+let _recordingRecoveryListenerBound = false;
+function bindRecordingRecoveryListenerOnce() {
+  if (_recordingRecoveryListenerBound) return;
+  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged?.addListener) return;
+  _recordingRecoveryListenerBound = true;
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes[KEY_RECORDING_WATCHDOG]) return;
+    applyRecordingRecoveryHint(
+      changes[KEY_RECORDING_WATCHDOG].newValue || null,
+      _backfillHintLiveId
+    );
   });
 }
 
@@ -11951,35 +12035,47 @@ async function buildHtmlReportDocument(
   try {
     const lid = String(liveId || '').trim().toLowerCase();
     if (lid && /^lv\d{1,15}$/.test(lid)) {
-      const sumDb = await openBroadcastSessionSummaryDb();
-      const pastLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
-        limit: 20,
-        excludeLiveId: lid
-      });
-      const pastUserIdSet = new Set();
-      if (pastLiveIds.length > 0) {
-        // v0.1.509: 過去配信もチャンク移行後対応＋テール込みで userId を集める。
-        const pastArrays = await Promise.all(
-          pastLiveIds.map((id) => readAllCommentsForLive(id))
-        );
-        for (const cs of pastArrays) {
-          for (const c of Array.isArray(cs) ? cs : []) {
-            const uid = String(/** @type {any} */ (c)?.userId || '').trim();
-            if (uid) pastUserIdSet.add(uid);
+      // この過去スキャンは「きらめきの賞」かよい/はじまり判定 *専用* の任意処理。
+      //   過去配信を全件読むため重く、ヘビーユーザーだと 60s の全体タイムアウト
+      //   （html_report_build_timeout）を単独で食い潰していた（marketing は 10 配信
+      //   で通るのに report は 20 配信で落ちる差はここ）。レポート本体を人質に
+      //   取らないよう、ここだけ 15s の枠で打ち切り、超えたら賞の精度だけ落として
+      //   （かよい/はじまり無し）本体は必ず出す。limit も 20→12 に下げて典型負荷も半減。
+      await withTimeout(
+        (async () => {
+          const sumDb = await openBroadcastSessionSummaryDb();
+          const pastLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
+            limit: 12,
+            excludeLiveId: lid
+          });
+          const pastUserIdSet = new Set();
+          if (pastLiveIds.length > 0) {
+            // v0.1.509: 過去配信もチャンク移行後対応＋テール込みで userId を集める。
+            const pastArrays = await Promise.all(
+              pastLiveIds.map((id) => readAllCommentsForLive(id))
+            );
+            for (const cs of pastArrays) {
+              for (const c of Array.isArray(cs) ? cs : []) {
+                const uid = String(/** @type {any} */ (c)?.userId || '').trim();
+                if (uid) pastUserIdSet.add(uid);
+              }
+            }
           }
-        }
-      }
-      const currentUserKeys = aggregatedRooms
-        .map((r) => String(r?.userKey || '').trim())
-        .filter((k) => k && k !== UNKNOWN_USER_KEY);
-      ({ returningUserKeys: kiramekiReturningUserKeys, firstTimeUserKeys: kiramekiFirstTimeUserKeys } =
-        resolveKiramekiReturningAndFirstTimeUserKeys({
-          currentUserKeys,
-          pastUserIds: pastUserIdSet
-        }));
+          const currentUserKeys = aggregatedRooms
+            .map((r) => String(r?.userKey || '').trim())
+            .filter((k) => k && k !== UNKNOWN_USER_KEY);
+          ({ returningUserKeys: kiramekiReturningUserKeys, firstTimeUserKeys: kiramekiFirstTimeUserKeys } =
+            resolveKiramekiReturningAndFirstTimeUserKeys({
+              currentUserKeys,
+              pastUserIds: pastUserIdSet
+            }));
+        })(),
+        15_000,
+        'kirameki_past_scan_timeout'
+      );
     }
   } catch {
-    // IDB 失敗時は空配列のまま（きらめきの賞はかよい/はじまり無しで生成される）
+    // IDB 失敗 / スキャン打ち切り時は空配列のまま（賞はかよい/はじまり無しで生成）
   }
   const { awards: kiramekiAwards } = computeKiramekiAwards({
     comments: commentsForReport,
@@ -14505,6 +14601,9 @@ async function initPopup() {
         watchMetaCache.snapshot?.broadcasterUserId || ''
       ).trim();
       if (stEl) stEl.textContent = '分析中… (2/3) 集計・画像準備';
+      // 集計は件数が多いと数百ms 同期で詰まり、上の status すら描画されず「固まった」
+      //   ように見える。重い同期処理の前に 1 フレーム譲ってステータスを確実に出す。
+      await yieldToBrowserPaint();
       const report = aggregateMarketingReport(comments, lid, {
         broadcasterUserId: reportBroadcasterUid
       });
@@ -14571,6 +14670,9 @@ async function initPopup() {
           })()
         ]);
       if (stEl) stEl.textContent = '分析中… (3/3) HTML生成';
+      // HTML 文字列生成（数万コメ・画像 data URL 込み）は最重量の同期処理。直前に
+      //   1 フレーム譲り、「(3/3) HTML生成」を描画してから走らせる（体感の固まり解消）。
+      await yieldToBrowserPaint();
       // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
       // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
       // ユーザーの opt-out が尊重される）。
