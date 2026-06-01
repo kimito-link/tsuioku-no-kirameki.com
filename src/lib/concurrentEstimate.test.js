@@ -6,11 +6,96 @@ import {
   DIRECT_VIEWERS_NOWCAST_MAX_MS,
   estimateConcurrentViewers,
   dynamicMultiplier,
+  getPlatformProfile,
+  NICONICO_PROFILE,
   resolveConcurrentViewers,
   resolveDirectViewersThresholds,
   retentionRate,
   DEFAULT_WINDOW_MS
 } from './concurrentEstimate.js';
+
+describe('getPlatformProfile / プロファイル化', () => {
+  it('未指定・null・未知 id は既定（ニコ生）にフォールバック', () => {
+    expect(getPlatformProfile()).toBe(NICONICO_PROFILE);
+    expect(getPlatformProfile(null)).toBe(NICONICO_PROFILE);
+    expect(getPlatformProfile('unknown-site')).toBe(NICONICO_PROFILE);
+    expect(getPlatformProfile(42)).toBe(NICONICO_PROFILE);
+    expect(getPlatformProfile({})).toBe(NICONICO_PROFILE);
+  });
+
+  it("id 文字列 'niconico' でニコ生プロファイルを返す", () => {
+    expect(getPlatformProfile('niconico')).toBe(NICONICO_PROFILE);
+  });
+
+  it('プロファイルオブジェクトをそのまま受け取れる', () => {
+    const custom = {
+      id: 'demo',
+      label: 'demo',
+      defaultMultiplier: 3,
+      multiplierTable: [
+        [10, 2],
+        [1000, 8]
+      ],
+      visitorSoftCapRatio: 0.5,
+      retention: { peak: 0.6, decay: 0.01, floor: 0.05, fallback: 0.3 },
+      directViewers: { freshMs: 30_000, nowcastMaxMs: 120_000 }
+    };
+    expect(getPlatformProfile(custom)).toBe(custom);
+  });
+
+  it('ニコ生プロファイルを明示しても既定と同じ結果（互換）', () => {
+    const base = estimateConcurrentViewers({
+      recentActiveUsers: 60,
+      totalVisitors: 8754,
+      streamAgeMin: 173
+    });
+    const withProfile = estimateConcurrentViewers({
+      recentActiveUsers: 60,
+      totalVisitors: 8754,
+      streamAgeMin: 173,
+      profile: 'niconico'
+    });
+    expect(withProfile).toEqual(base);
+  });
+
+  it('カスタムプロファイルで倍率・滞留・ソフトキャップが切り替わる', () => {
+    const custom = {
+      id: 'demo',
+      label: 'demo',
+      defaultMultiplier: 3,
+      multiplierTable: [
+        [100, 2],
+        [10000, 4]
+      ],
+      visitorSoftCapRatio: 0.5,
+      retention: { peak: 0.6, decay: 0.01, floor: 0.05, fallback: 0.3 },
+      directViewers: { freshMs: 30_000, nowcastMaxMs: 120_000 }
+    };
+    expect(dynamicMultiplier(null, custom)).toBe(3);
+    expect(dynamicMultiplier(100, custom)).toBe(2);
+    expect(dynamicMultiplier(10000, custom)).toBe(4);
+    expect(retentionRate(0, custom)).toBeCloseTo(0.6, 2);
+    expect(retentionRate(NaN, custom)).toBeCloseTo(0.3, 2);
+    const r = estimateConcurrentViewers({
+      recentActiveUsers: 100,
+      totalVisitors: 500,
+      multiplier: 10,
+      profile: custom
+    });
+    expect(r.estimated).toBe(Math.round(500 * 0.5));
+    expect(r.capped).toBe(true);
+  });
+
+  it('resolveDirectViewersThresholds はプロファイルの directViewers を既定に使う', () => {
+    const custom = {
+      ...NICONICO_PROFILE,
+      directViewers: { freshMs: 33_000, nowcastMaxMs: 111_000 }
+    };
+    const t = resolveDirectViewersThresholds(null, custom);
+    expect(t.freshMs).toBe(33_000);
+    expect(t.nowcastMaxMs).toBe(111_000);
+  });
+});
 
 describe('countRecentActiveUsers', () => {
   it('空 Map なら 0', () => {
