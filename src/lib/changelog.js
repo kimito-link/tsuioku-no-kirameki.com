@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.528',
+    date: '2026-06-02',
+    summary: '自動巡回を既定ONにして、見ていない間も背後でデータ収集',
+    items: Object.freeze([
+      '自動巡回（Autopatrol）を既定ONにしました。拡張を開いていなくても・配信を見ていなくても、PCを起動している間は背後で放送中の配信を1つずつ短時間ひらき、同接推定の較正データを貯め続けます',
+      'コメント本文は保存しません（較正用の数値サンプルのみ）。背景タブが1枚ずつ自動で開閉します',
+      '止めたいときは設定の「配信を見ていなくても自動巡回して較正データを貯める」をOFFにしてください（OFFにすると次回以降は巡回しません）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.527',
     date: '2026-06-02',
     summary: '保存ボタンを即有効化＋HTMLレポートの薄い文字を読みやすく',

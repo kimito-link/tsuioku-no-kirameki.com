@@ -1035,7 +1035,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 /*   開くか」のオーケストレーションだけ）。                                       */
 /*                                                                      */
 /* 安全側の既定:                                                          */
-/*   ・既定 OFF（KEY_AUTOPATROL_ENABLED が true のときだけ動く）              */
+/*   ・既定 ON（KEY_AUTOPATROL_ENABLED が明示的に false のときだけ止まる）       */
 /*   ・同時に開く巡回タブは常に 1 枚。HOLD 経過で閉じて次へ。                  */
 /*   ・alarm 駆動の状態機械（alarm が rotation スケジューラ兼 SW キープアライブ）。*/
 /*   ・巡回タブには #nls_autopatrol=1 を付け、content が source=autopatrol で記録。*/
@@ -1110,9 +1110,12 @@ async function saveAutopatrolState(st) {
 async function getAutopatrolEnabled() {
   try {
     const bag = await chrome.storage.local.get(KEY_AUTOPATROL_ENABLED);
-    return bag[KEY_AUTOPATROL_ENABLED] === true;
+    // v0.1.528: 既定 ON。ユーザーが明示的に false を保存したときだけ OFF。
+    //   「拡張を開いていなくても背後でデータを貯めたい」要望に対応（未設定=ON）。
+    return bag[KEY_AUTOPATROL_ENABLED] !== false;
   } catch {
-    return false;
+    // 読めないときも貯め続けたい（背景収集を止めない）＝ON 側に倒す。
+    return true;
   }
 }
 

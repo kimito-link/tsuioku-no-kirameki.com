@@ -2393,7 +2393,8 @@ popupBooleanSettingsRegistry.register(
 popupBooleanSettingsRegistry.register(
   createBooleanSettingController({
     key: KEY_AUTOPATROL_ENABLED,
-    normalize: (raw) => raw === true,
+    // v0.1.528: 既定 ON（未設定=ON）。明示的に false を保存したときだけ OFF。
+    normalize: (raw) => raw !== false,
     getCheckbox: () => /** @type {HTMLInputElement|null} */ ($('autopatrolEnabled'))
   })
 );
@@ -2413,7 +2414,8 @@ async function refreshAutopatrolStatusLine() {
     ]);
     const sampleCount = parseCalibrationLog(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]).items.length;
     const sampleLabel = `記録 ${sampleCount.toLocaleString('ja-JP')} サンプル`;
-    const enabled = bag[KEY_AUTOPATROL_ENABLED] === true;
+    // v0.1.528: 既定 ON（未設定=ON）。明示的に false のときだけ OFF 表示。
+    const enabled = bag[KEY_AUTOPATROL_ENABLED] !== false;
     if (!enabled) {
       statusEl.textContent = `OFF（手動視聴の記録は継続）／ ${sampleLabel}`;
       return;
