@@ -1089,12 +1089,88 @@ export async function* crawlNdgrBackwardDeterministic(opts) {
     if (resumeAtSec > 0) seedCandidates.unshift(resumeAtSec);
   }
 
+  /** @type {number|null} 直近に ?at seed した実時刻（秒）。再シードを単調に古くする。 */
+  let lastSeedAtSec = null;
+  /** @type {number} キュー枯渇後の ?at 再シード試行回数。 */
+  let reseedAttempts = 0;
+  /** @type {number} 連続して未訪問 entry に進めなかった回数。 */
+  let noProgressStreak = 0;
+  /** @type {number} 初回 seed 後に、新しい entry へ橋渡しできた回数。 */
+  let successfulReseeds = 0;
+
+  /**
+   * @param {number} desiredAtSec
+   * @returns {number}
+   */
+  const nextSeedAtSec = (desiredAtSec) => {
+    let next = Math.floor(desiredAtSec);
+    if (!Number.isFinite(next)) {
+      next = (lastSeedAtSec ?? (nowSec - NDGR_BACKFILL_SEED_LAG_SEC)) -
+        NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+    }
+    if (lastSeedAtSec != null) {
+      const ceiling = lastSeedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+      if (next > ceiling) next = ceiling;
+    }
+    return next;
+  };
+
+  /**
+   * これまで到達した最古コメントの実時刻を優先し、算出できないときは直近 seed から
+   * 1 bucket ずつ後退する。停止判定には使わず、次の ChunkedEntry 入口探索にだけ使う。
+   *
+   * @returns {number}
+   */
+  const nextReseedAtSec = () => {
+    if (programStartSec != null && globalMinVpos != null) {
+      return nextSeedAtSec(programStartSec + Math.floor(globalMinVpos / 100));
+    }
+    return nextSeedAtSec(
+      (lastSeedAtSec ?? (nowSec - NDGR_BACKFILL_SEED_LAG_SEC)) -
+        NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC
+    );
+  };
+
+  /**
+   * キュー枯渇時に、前 bucket の ChunkedEntry を ?at で取り直す。
+   * - 新しい pointer が得られたらキューへ積む。
+   * - entry は返ったが pointer がすべて visited の場合は、少なくとも一度 bucket を
+   *   跨いだ後だけ true exhaustion とみなし reached_start を許す。
+   * - entry 自体が無い/空振りは bounded retry の対象で、reached_start とは言わない。
+   *
+   * @returns {Promise<NdgrBackfillStopReason|''>}
+   */
+  const reseedWhenIdle = async () => {
+    if (reseedAttempts >= NDGR_BACKFILL_MAX_RESEEDS) return 'cap_reseeds';
+    const seedAtSec = nextReseedAtSec();
+    reseedAttempts += 1;
+    lastSeedAtSec = seedAtSec;
+
+    const seek = await seekEntryPointers(seedAtSec);
+    if (seek.stopReason) return seek.stopReason;
+    if (seek.entry) {
+      if (enqueueEntryPointers(seek.entry)) {
+        successfulReseeds += 1;
+        noProgressStreak = 0;
+        return '';
+      }
+      if (rowsSeen > 0 && successfulReseeds > 0) {
+        return 'reached_start';
+      }
+    }
+
+    noProgressStreak += 1;
+    if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) return 'no_progress';
+    return '';
+  };
+
   let seeded = false;
   for (const cand of seedCandidates) {
     if (cand <= 0) continue;
     const seek = await seekEntryPointers(cand);
     if (seek.stopReason) return done(seek.stopReason);
     if (seek.entry && enqueueEntryPointers(seek.entry)) {
+      lastSeedAtSec = cand;
       seeded = true;
       break;
     }
@@ -1105,7 +1181,10 @@ export async function* crawlNdgrBackwardDeterministic(opts) {
     const before = limitReason();
     if (before) return done(before);
     if (!backwardQueue.length && !previousQueue.length) {
-      return done(rowsSeen > 0 ? 'reached_start' : 'backward_exhausted');
+      if (rowsSeen <= 0) return done('backward_exhausted');
+      const stop = await reseedWhenIdle();
+      if (stop) return done(stop);
+      continue;
     }
 
     if (backwardQueue.length) {
