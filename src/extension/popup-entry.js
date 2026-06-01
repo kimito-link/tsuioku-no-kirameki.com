@@ -10660,6 +10660,25 @@ async function refresh() {
 
   const snapshotKey = `${lv}|${url}|s17`;
   const key = commentsStorageKey(lv);
+  // v0.1.527: 保存系ボタン（HTMLレポート💾／スクショ📷／マーケ📊）を lv 判明のこの時点で
+  //   即有効化する。従来は重い snapshot fetch + 巨大コメント配列の storage 読みが終わって
+  //   paintWatchPopupUi が走るまで（実機で数秒〜十数秒）グレーアウトのままで「watch を開いても
+  //   すぐ押せない」体感だった。クリック時のダウンロード処理は storage をその場で読み直すため、
+  //   先に押せるようにしても安全（dataset は下流の paintWatchPopupUi で再確定＝冪等）。
+  exportBtn.disabled = false;
+  exportBtn.dataset.liveId = lv;
+  exportBtn.dataset.storageKey = key;
+  exportBtn.dataset.watchUrl = url;
+  if (captureBtn) {
+    captureBtn.disabled = false;
+    captureBtn.dataset.watchUrl = url;
+  }
+  {
+    const mktQuickEarly = /** @type {HTMLButtonElement|null} */ ($('exportMarketingQuickBtn'));
+    if (mktQuickEarly) mktQuickEarly.disabled = false;
+    const mktOrigEarly = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
+    if (mktOrigEarly) mktOrigEarly.disabled = false;
+  }
   // v0.1.505: 未畳み込みの新着（テール）も読んで「メイン＋テール」をカウント/集計に使う。
   const tailKey = tailStorageKey(lv);
   // v0.1.508: パネル 0 秒表示用の軽量サマリ（件数・直近コメント）。本体巨大配列の heavy read
@@ -14800,7 +14819,12 @@ async function initPopup() {
     const prm = lastDevMonitorPanelParams;
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     const btn = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
-    const lid = String(prm?.liveId || '').trim();
+    // v0.1.527: ボタンを lv 判明時点で早期有効化したため、devMonitor パネルの params が
+    //   まだ未確定（lastDevMonitorPanelParams=null）でクリックされ得る。その場合は保存ボタンが
+    //   持つ liveId を使う（マーケ集計は liveId から storage を読み直すため prm は liveId だけ必要）。
+    const lid = String(
+      /** @type {any} */ (prm)?.liveId || $('exportJson')?.dataset.liveId || ''
+    ).trim();
     if (!lid) {
       if (stEl) stEl.textContent = 'liveId なし';
       return;

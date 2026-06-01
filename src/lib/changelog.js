@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.527',
+    date: '2026-06-02',
+    summary: '保存ボタンを即有効化＋HTMLレポートの薄い文字を読みやすく',
+    items: Object.freeze([
+      'HTMLレポート💾・スクショ📷・マーケ分析📊の保存ボタンを、watchを開いてliveIdが分かった時点ですぐ押せるようにしました（重いデータ読み込みの完了を待たず、グレーアウトの時間を短縮）',
+      'HTMLレポートの「きらめきの賞」の文字が薄くて読みにくかったのを、見出し・説明・人数・ニックネーム・「該当者なし」などすべて濃いめの色に調整しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.526',
     date: '2026-06-01',
     summary: '応援者ランキングの各行に会員種別バッジを表示',

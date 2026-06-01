@@ -1,24 +1,24 @@
 export const KIRAMEKI_AWARDS_CSS = `
 .kirameki-awards { margin: 2rem 0; }
-.kirameki-awards__heading { font-size: 1.4rem; margin-bottom: 0.4rem; }
-.kirameki-awards__lead { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
+.kirameki-awards__heading { font-size: 1.4rem; margin-bottom: 0.4rem; color: #14171a; }
+.kirameki-awards__lead { color: #3a4046; font-size: 0.92rem; margin-bottom: 1.5rem; line-height: 1.6; }
 .kirameki-awards__group { margin-bottom: 1.5rem; }
-.kirameki-awards__group-label { font-size: 1rem; color: #888; border-bottom: 1px solid #eee; padding-bottom: 0.3rem; margin-bottom: 0.8rem; }
-.kirameki-award { background: #fafafa; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; }
-.kirameki-award--all { background: linear-gradient(135deg, #fffbe6, #fff8f0); border-color: #ffd54f; }
-.kirameki-award--daily { background: #f0f7ff; border-color: #90caf9; }
+.kirameki-awards__group-label { font-size: 1.05rem; font-weight: 700; color: #1f2429; border-bottom: 2px solid #d4d8dd; padding-bottom: 0.3rem; margin-bottom: 0.8rem; }
+.kirameki-award { background: #fafafa; border: 1px solid #d8dadd; border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; }
+.kirameki-award--all { background: linear-gradient(135deg, #fff4cc, #fff0e0); border-color: #f0b400; }
+.kirameki-award--daily { background: #eaf3ff; border-color: #5aa7e8; }
 .kirameki-award__header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
 .kirameki-award__emoji { font-size: 1.5rem; }
-.kirameki-award__name { font-size: 1.05rem; font-weight: bold; flex: 1; }
-.kirameki-award__count { font-size: 0.85rem; color: #888; }
-.kirameki-award__desc { font-size: 0.85rem; color: #666; margin-bottom: 0.8rem; line-height: 1.5; }
+.kirameki-award__name { font-size: 1.08rem; font-weight: 700; flex: 1; color: #14171a; }
+.kirameki-award__count { font-size: 0.85rem; font-weight: 600; color: #404750; }
+.kirameki-award__desc { font-size: 0.86rem; color: #353b42; margin-bottom: 0.8rem; line-height: 1.55; }
 .kirameki-award__recipients { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .kirameki-award__recipient { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; width: 56px; }
 .kirameki-award__avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
-.kirameki-award__avatar--empty { width: 48px; height: 48px; border-radius: 50%; background: #ddd; display: inline-block; }
-.kirameki-award__nickname { font-size: 0.65rem; color: #555; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
-.kirameki-award__more { font-size: 0.8rem; color: #888; margin-top: 0.5rem; }
-.kirameki-award__empty { font-size: 0.85rem; color: #aaa; font-style: italic; }
+.kirameki-award__avatar--empty { width: 48px; height: 48px; border-radius: 50%; background: #c4c8cc; display: inline-block; }
+.kirameki-award__nickname { font-size: 0.67rem; color: #2c3138; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
+.kirameki-award__more { font-size: 0.8rem; font-weight: 600; color: #404750; margin-top: 0.5rem; }
+.kirameki-award__empty { font-size: 0.86rem; color: #5a626b; font-style: italic; }
 `;
 
 const CATEGORY_LABELS = {
