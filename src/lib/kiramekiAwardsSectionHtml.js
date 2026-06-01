@@ -1,3 +1,5 @@
+import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
+
 export const KIRAMEKI_AWARDS_CSS = `
 .kirameki-awards { margin: 2rem 0; }
 .kirameki-awards__heading { font-size: 1.4rem; margin-bottom: 0.4rem; color: #14171a; }
@@ -19,6 +21,8 @@ export const KIRAMEKI_AWARDS_CSS = `
 .kirameki-award__nickname { font-size: 0.67rem; color: #2c3138; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
 .kirameki-award__more { font-size: 0.8rem; font-weight: 600; color: #404750; margin-top: 0.5rem; }
 .kirameki-award__empty { font-size: 0.86rem; color: #5a626b; font-style: italic; }
+.kirameki-award__nickname .nl-user-profile-link { color: #1c64c4; text-decoration: none; }
+.kirameki-award__nickname .nl-user-profile-link:hover { text-decoration: underline; }
 `;
 
 const CATEGORY_LABELS = {
@@ -87,11 +91,12 @@ function resolveUserKeys(award) {
  *   nickname: string,
  *   avatarSrc: string
  * }} recipient
- * @param {{ escapeHtml: (value: unknown) => string, escapeAttr: (value: unknown) => string }} escape
+ * @param {{ escapeAttr: (value: unknown) => string }} escape
  * @returns {string}
  */
-function buildRecipientHtml(recipient, { escapeHtml, escapeAttr }) {
-  const nicknameHtml = escapeHtml(recipient.nickname);
+function buildRecipientHtml(recipient, { escapeAttr }) {
+  // 数値 ID の受賞者はニックネームをユーザーページへリンク化（匿名/ハッシュ系は素のテキスト）。
+  const nicknameHtml = buildUserProfileLinkedLabelHtml(recipient.userKey, recipient.nickname);
   const avatarHtml = recipient.avatarSrc
     ? `<img src="${escapeAttr(recipient.avatarSrc)}" alt="${escapeAttr(recipient.nickname)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="kirameki-award__avatar">`
     : '<span class="kirameki-award__avatar kirameki-award__avatar--empty"></span>';

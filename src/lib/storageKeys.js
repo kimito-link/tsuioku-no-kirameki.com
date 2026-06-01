@@ -249,11 +249,22 @@ export const KEY_SELF_POSTED_RECENTS = 'nls_self_posted_recents';
 export const KEY_USER_COMMENT_PROFILE_CACHE = 'nls_user_comment_profile_v1';
 
 /**
+ * v0.1.533: コメンター（数値 userId）のフォロー/フォロワー数・プレミアム・LV を
+ * userId 単位でためる横断キャッシュ（live を跨いで再利用）。レポートで「フォロワー数」を
+ * 出すために使う。レート制限回避のため、巡回ごとに上位 N 名だけを数件ずつ取得し、
+ * TTL 内（既定 24h）は再取得しない。値:
+ *   { [userId]: { followerCount?, followeeCount?, isPremium?, level?, fetchedAt } }
+ * 上限件数を超えたら fetchedAt が古いものから捨てる。キャッシュクリア対象。
+ */
+export const KEY_COMMENTER_FOLLOW_CACHE = 'nls_commenter_follow_v1';
+
+/**
  * UI の「キャッシュクリア」で chrome.storage.local から削除するキー。
  * 応援コメント記録（nls_comments_*）・ギフト記録・各種設定は含めない。
  */
 export const EXTENSION_SOFT_CACHE_STORAGE_KEYS = Object.freeze([
-  KEY_USER_COMMENT_PROFILE_CACHE
+  KEY_USER_COMMENT_PROFILE_CACHE,
+  KEY_COMMENTER_FOLLOW_CACHE
 ]);
 
 /** 視聴ページインラインパネルの幅: 視聴ブロック全幅 or 動画幅のみ */
@@ -559,4 +570,39 @@ export function eventDomStorageKey(liveId) {
 export function giftSubAppHistoryStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();
   return `nls_gift_subapp_history_${id}`;
+}
+
+/**
+ * v0.1.531: 配信者プロフィール（nvapi ユーザー情報＋プロフィールページ解析）の統合結果を保存。
+ * レポートのヘッダーカードに「プレミアム会員・フォロー/フォロワー・LV・配信開始日・
+ * 累計配信日数・欲しいものリスト」等を反映するための専用キー。取得できた項目だけ入る。
+ *
+ *   {
+ *     userId, nickname, avatarUrl, pageUrl, level, isPremium,
+ *     followeeCount, followerCount, broadcastStartDate,
+ *     cumulativeBroadcastDays, wishlistUrl, broadcastRequestEnabled, capturedAt
+ *   }
+ *
+ * @param {string} liveId lv123
+ */
+export function broadcasterProfileStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_broadcaster_profile_${id}`;
+}
+
+/**
+ * v0.1.534: 配信ごとの「数値IDコメンター × フォロー/フォロワー」スナップショット。
+ * 背後巡回で取得できた分を随時更新し、マーケ分析の全量表・JSON 埋め込みの正本にする。
+ *
+ *   {
+ *     liveId, capturedAt,
+ *     totalNumericCommenters, withFollowData,
+ *     rows: [{ userId, commentCount, nickname, followerCount?, followeeCount?, level?, isPremium?, followFetchedAt? }]
+ *   }
+ *
+ * @param {string} liveId lv123
+ */
+export function commenterFollowLiveStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_commenter_follow_live_${id}`;
 }

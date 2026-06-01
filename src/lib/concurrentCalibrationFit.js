@@ -258,3 +258,118 @@ export function computeCalibrationFit(parsedOrItems, opts = {}) {
     notes
   };
 }
+
+/**
+ * @typedef {{
+ *   profile: import('./concurrentEstimate.js').PlatformProfile,
+ *   applied: boolean,
+ *   basis: 'official'|'cross-signal'|'insufficient',
+ *   sampleCount: number,
+ *   multiplierScale: number|null,
+ *   avgSessionMin: number|null,
+ *   perPersonCommentsPerMin: number|null
+ * }} CalibratedProfileResult
+ */
+
+/**
+ * 較正フィット報告（computeCalibrationFit の戻り値）から「自動補正済み PlatformProfile」を作る純関数。
+ *
+ * 安全設計:
+ *   ・fit.ready が false（サンプル不足）なら base をそのまま返す → 従来の固定係数にフォールバック。
+ *   ・ready のときだけ推奨係数を適用する:
+ *       - multiplierScale … multiplierTable と defaultMultiplier に乗算（signalA→estimated に効く）
+ *       - avgSessionMin   … session.avgSessionMin を上書き（研究中シグナル C）
+ *       - perPersonCommentsPerMin … chatDensity.perPersonCommentsPerMin を上書き（研究中シグナル D）
+ *   ・各推奨値は computeCalibrationFit 内で健全域へ clamp 済み。
+ *
+ * 注意（フィードバックループ防止）: この補正は「表示（estimated の算出）」にのみ使うこと。
+ *   較正サンプルのロギング（signalA 等の記録）は必ず生の固定プロファイルで行い、
+ *   補正後の値を再フィットしないこと（さもないと係数が発散しうる）。
+ *
+ * @param {import('./concurrentEstimate.js').PlatformProfile} baseProfile
+ * @param {CalibrationFitReport|null|undefined} fit
+ * @returns {CalibratedProfileResult}
+ */
+export function buildCalibratedPlatformProfile(baseProfile, fit) {
+  const base =
+    baseProfile &&
+    typeof baseProfile === 'object' &&
+    Array.isArray(/** @type {any} */ (baseProfile).multiplierTable)
+      ? /** @type {import('./concurrentEstimate.js').PlatformProfile} */ (baseProfile)
+      : NICONICO_PROFILE;
+
+  const fallback = /** @type {CalibratedProfileResult} */ ({
+    profile: base,
+    applied: false,
+    basis: (fit && fit.basis) || 'insufficient',
+    sampleCount: (fit && fit.sampleCount) || 0,
+    multiplierScale: null,
+    avgSessionMin: null,
+    perPersonCommentsPerMin: null
+  });
+
+  if (!fit || !fit.ready || !fit.suggested) return fallback;
+
+  const s = fit.suggested;
+  const scale =
+    typeof s.multiplierScale === 'number' && Number.isFinite(s.multiplierScale) && s.multiplierScale > 0
+      ? s.multiplierScale
+      : null;
+  const avgSession =
+    typeof s.avgSessionMin === 'number' && Number.isFinite(s.avgSessionMin) && s.avgSessionMin > 0
+      ? s.avgSessionMin
+      : null;
+  const perPerson =
+    typeof s.perPersonCommentsPerMin === 'number' &&
+    Number.isFinite(s.perPersonCommentsPerMin) &&
+    s.perPersonCommentsPerMin > 0
+      ? s.perPersonCommentsPerMin
+      : null;
+
+  // 適用できる係数が 1 つも無ければ補正しない（base のまま）。
+  if (scale == null && avgSession == null && perPerson == null) return fallback;
+
+  const baseSession = base.session && typeof base.session === 'object' ? base.session : null;
+  const baseChat = base.chatDensity && typeof base.chatDensity === 'object' ? base.chatDensity : null;
+
+  /** @type {import('./concurrentEstimate.js').PlatformProfile} */
+  const profile = Object.freeze({
+    ...base,
+    defaultMultiplier:
+      scale != null ? round(base.defaultMultiplier * scale, 2) : base.defaultMultiplier,
+    multiplierTable:
+      scale != null
+        ? Object.freeze(
+            base.multiplierTable.map(
+              ([v, m]) => /** @type {readonly [number, number]} */ ([v, round(m * scale, 2)])
+            )
+          )
+        : base.multiplierTable,
+    session: Object.freeze({
+      avgSessionMin:
+        avgSession != null
+          ? avgSession
+          : baseSession && typeof baseSession.avgSessionMin === 'number'
+            ? baseSession.avgSessionMin
+            : 15
+    }),
+    chatDensity: Object.freeze({
+      perPersonCommentsPerMin:
+        perPerson != null
+          ? perPerson
+          : baseChat && typeof baseChat.perPersonCommentsPerMin === 'number'
+            ? baseChat.perPersonCommentsPerMin
+            : 0.2
+    })
+  });
+
+  return {
+    profile,
+    applied: true,
+    basis: fit.basis,
+    sampleCount: fit.sampleCount,
+    multiplierScale: scale,
+    avgSessionMin: avgSession,
+    perPersonCommentsPerMin: perPerson
+  };
+}

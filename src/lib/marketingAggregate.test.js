@@ -53,6 +53,19 @@ describe('aggregateMarketingReport', () => {
     expect(r.topUsers[0].count).toBe(12);
   });
 
+  it('allNumericCommenters は数値 userId のみコメ数順で全件返す', () => {
+    const comments = [
+      c(1, '1001', 'a', 0),
+      c(2, '1001', 'b', 1000),
+      c(3, '2002', 'c', 2000),
+      c(4, 'a:hash', 'd', 3000)
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1');
+    expect(r.allNumericCommenters.length).toBe(2);
+    expect(r.allNumericCommenters[0].userId).toBe('1001');
+    expect(r.allNumericCommenters[0].count).toBe(2);
+  });
+
   it('別の liveId のコメントはフィルタされる', () => {
     const comments = [
       c(1, 'u1', 'yes', 0),

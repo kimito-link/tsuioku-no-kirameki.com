@@ -14,7 +14,12 @@ import {
   mangaBroadcastSummaryEmbeddedCss
 } from './mangaBroadcastSummary.js';
 import { buildMarketingEmbedScriptInnerText } from './marketingReportEmbed.js';
+import { buildCommenterFollowAnalytics } from './commenterFollowAnalytics.js';
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
+import {
+  buildBroadcasterProfileMarketingCardHtml,
+  BROADCASTER_PROFILE_MARKETING_CSS
+} from './broadcasterProfileCard.js';
 import { displayUserLabel, UNKNOWN_USER_KEY } from './userRooms.js';
 import { resolveReportUserThumbSrc } from './reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from './userThumbGrid.js';
@@ -1223,14 +1228,17 @@ function sectionDepartedHeavy(departed, maskShare, identiconResolver) {
         avatarUrl: '',
         identiconResolver
       });
-      const thumbCell = thumbSrc
-        ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
-        : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink(
+        d.userId,
+        thumbSrc
+          ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+          : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>'
+      );
       return `<tr>
 <td>${i + 1}</td>
 <td>${thumbCell}</td>
 <td>${labelHtml}</td>
-<td class="mkt-mono">${escapeHtml(d.userId)}</td>
+<td class="mkt-mono">${/^\d{1,18}$/.test(String(d.userId || '')) ? buildUserProfileLinkedLabelHtml(d.userId, d.userId) : escapeHtml(d.userId)}</td>
 <td>${d.totalComments}</td>
 <td>${d.broadcastCount}</td>
 </tr>`;
@@ -1271,9 +1279,12 @@ function sectionAttendanceMatrix(matrix, maskShare, identiconResolver) {
         avatarUrl: '',
         identiconResolver
       });
-      const thumbCell = thumbSrc
-        ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
-        : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink(
+        u.userId,
+        thumbSrc
+          ? `<img class="mkt-departed-thumb" src="${escapeHtml(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+          : '<span class="mkt-departed-thumb mkt-departed-thumb--empty"></span>'
+      );
       const cells = u.attendance
         .map(
           (v) =>
@@ -1841,10 +1852,28 @@ ${dynamicAdviceCardsHtml('askTiming', metricsFull)}
 }
 
 /**
+ * サムネ img をユーザーページへのリンクで包む（数値 uid のときだけ）。
+ * 匿名/ハッシュ系・maskShare はそのまま（リンクにしない）。
+ * @param {string|undefined|null} userId
+ * @param {string} innerHtml サムネ img/span の HTML
+ * @param {boolean} [maskShare]
+ * @returns {string}
+ */
+function wrapThumbWithProfileLink(userId, innerHtml, maskShare = false) {
+  const uid = String(userId == null ? '' : userId).trim();
+  if (maskShare || !/^\d{1,18}$/.test(uid)) return innerHtml;
+  return (
+    `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(uid)}"` +
+    ` target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${innerHtml}</a>`
+  );
+}
+
+/**
  * @param {import('./giftMomentumAnalytics.js').GiftMomentumAnalysis} analysis
  * @param {boolean} maskShare
+ * @param {((uid: string) => string) | undefined} [identiconResolver]
  */
-function sectionGiftMomentum(analysis, maskShare) {
+function sectionGiftMomentum(analysis, maskShare, identiconResolver = undefined) {
   if (!analysis || analysis.hasSignals !== true) return '';
   const cards = [
     {
@@ -1904,8 +1933,20 @@ function sectionGiftMomentum(analysis, maskShare) {
           : escapeHtml(rawLabel);
       const points = row.totalPoints > 0 ? `${formatEventRankingNumber(row.totalPoints)}pt` : '—';
       const rank = row.rank != null ? `<span class="mkt-gift-rank">貢献度${row.rank}位</span>` : '';
+      const thumbSrc = maskShare
+        ? ''
+        : resolveReportUserThumbSrc({
+            userId: row.userId || '',
+            avatarUrl: '',
+            identiconResolver
+          });
+      const thumbImg = thumbSrc
+        ? `<img class="mkt-gift-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+        : '<span class="mkt-gift-thumb mkt-gift-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink(row.userId, thumbImg, maskShare);
       return `<tr>
 <td data-label="#">${i + 1}</td>
+<td data-label="サムネ">${thumbCell}</td>
 <td data-label="送り主" class="mkt-gift-sender">${nameHtml}${rank}</td>
 <td data-label="タイプ"><span class="mkt-gift-type">${escapeHtml(row.typeLabel)}</span></td>
 <td data-label="pt" class="mkt-num">${escapeHtml(points)}</td>
@@ -1917,7 +1958,7 @@ function sectionGiftMomentum(analysis, maskShare) {
     .join('');
   const senderTable = senderRows
     ? `<div class="mkt-table-scroll"><table class="mkt-rank mkt-gift-table">
-<thead><tr><th>#</th><th>送り主</th><th>タイプ</th><th>pt</th><th>投げ</th><th>コメント</th><th>根拠</th></tr></thead>
+<thead><tr><th>#</th><th>サムネ</th><th>送り主</th><th>タイプ</th><th>pt</th><th>投げ</th><th>コメント</th><th>根拠</th></tr></thead>
 <tbody>${senderRows}</tbody>
 </table></div>`
     : '<p class="mkt-note">送り主別の行はまだ作れません。</p>';
@@ -3301,9 +3342,12 @@ function supporterChikuranAvatarHtml(row, rank, maskShare, identiconResolver) {
     avatarUrl: row.avatarUrl || '',
     identiconResolver
   });
-  return thumbSrc
-    ? `<img class="mkt-supporter-avatar" src="${escapeAttr(thumbSrc)}" alt="" width="34" height="34" loading="lazy" decoding="async" ${DEFAULT_USERICON_ONERROR_ATTR}>`
-    : `<span class="mkt-supporter-avatar mkt-supporter-avatar--empty" aria-hidden="true">${rank}</span>`;
+  return wrapThumbWithProfileLink(
+    row.userId,
+    thumbSrc
+      ? `<img class="mkt-supporter-avatar" src="${escapeAttr(thumbSrc)}" alt="" width="34" height="34" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+      : `<span class="mkt-supporter-avatar mkt-supporter-avatar--empty" aria-hidden="true">${rank}</span>`
+  );
 }
 
 /**
@@ -3325,7 +3369,12 @@ function supporterChikuranSummaryLine(rows, maskShare) {
       ? displayUserLabel(top.userId, top.displayName || '')
       : top.displayName || '応援者';
   const name = !top.isAnonymousAggregate && maskShare ? maskLabelForShare(rawName) : rawName;
-  return `${name}さんが、このPCで見た応援の勢いでは先頭です${detail}。`;
+  // 先頭応援者の名前は、数値 ID かつ非匿名・非マスク時だけユーザーページへリンク化する。
+  const nameHtml =
+    !top.isAnonymousAggregate && !maskShare && top.userId && /^\d+$/.test(top.userId)
+      ? buildUserProfileLinkedLabelHtml(top.userId, name)
+      : escapeHtml(name);
+  return `${nameHtml}さんが、このPCで見た応援の勢いでは先頭です${escapeHtml(detail)}。`;
 }
 
 /**
@@ -3409,7 +3458,7 @@ function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver) {
 <h2>応援者ちくらん β（ローカル）</h2>
 <p class="mkt-note">このPCに残ったコメント・ギフト・広告・貢献度だけで見た<strong>応援する人が主役</strong>の勢いです。公式順位ではありません。</p>
 <div class="mkt-supporter-card-grid">${cardHtml}</div>
-<p class="mkt-supporter-summary">${escapeHtml(supporterChikuranSummaryLine(rows, maskShare))}</p>
+<p class="mkt-supporter-summary">${supporterChikuranSummaryLine(rows, maskShare)}</p>
 <div class="mkt-table-scroll"><table class="mkt-rank mkt-supporter-table">
 <thead><tr><th>#</th><th>応援者</th><th>ローカル勢い</th><th>コメ</th><th>直近15分</th><th>ギフト</th><th>広告pt</th><th>根拠</th></tr></thead>
 <tbody>${rowHtml}</tbody>
@@ -3432,6 +3481,8 @@ function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver) {
  *   officialEventDomBundle?: import('./officialEventDomBundle.js').OfficialEventDomBundle | null,
  *   broadcastTitle?: string,
  *   broadcasterName?: string,
+ *   broadcasterProfile?: import('./broadcasterProfileCard.js').BroadcasterProfileModel | null,
+ *   noopenerLinks?: Array<{ text?: string, href?: string }>,
  *   recordedCommentCount?: number,
  *   streamAgeMin?: number,
  *   yukkuriImageDataUrlMap?: Record<string, string>,
@@ -3810,6 +3861,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-ask-timing', label: 'お願いの出しどころ' },
     { id: 'mkt-sg-caution', label: '読み取りの注意' },
     { id: 'mkt-event-ranking', label: 'イベント順位' },
+    { id: 'mkt-ext-links', label: '支援物資・外部リンク' },
     { id: 'mkt-kpi', label: 'KPI サマリ' },
     { id: 'mkt-content', label: 'コメント本文・属性の傾向' },
     { id: 'mkt-narrative', label: '配信内容の流れ' },
@@ -3839,6 +3891,8 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-derived', label: '累積コメント数と5分窓' },
     { id: 'mkt-segment', label: 'ユーザーセグメント' },
     { id: 'mkt-top-users', label: 'トップコメンター TOP 20' },
+    { id: 'mkt-commenter-follow', label: '数値IDコメンター（フォロー情報）' },
+    { id: 'mkt-commenter-follow-analytics', label: 'フォロー×コメント分析' },
     { id: 'mkt-thumb-grid', label: 'サムネ付きユーザー一覧' },
     { id: 'mkt-vpos', label: 'vpos 三分割（再生位置）' },
     { id: 'mkt-hour', label: '時間帯ヒートマップ' },
@@ -3856,8 +3910,9 @@ ${sectionMarketingFunnelBoard(marketingFunnelBoard)}
 ${sectionMarketingSegmentActionBoard(marketingSegmentActionBoard)}
 ${sectionAudienceEngagementGap(audienceGap)}
 ${sectionSupporterChikuranBeta(supporterChikuran, maskShare, identiconResolver)}
-${sectionGiftMomentum(giftMomentum, maskShare)}
-${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare))}
+${sectionGiftMomentum(giftMomentum, maskShare, identiconResolver)}
+${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare, opts.broadcasterProfile ?? null))}
+${idWrap('mkt-ext-links', sectionBroadcasterExternalLinks(opts.noopenerLinks))}
 ${sectionHeroCard(r, broadcastNarrative?.summaryLine || '', maskShare)}
 ${idWrap('mkt-kpi', sectionKpi(r))}
 ${sectionAdviceAfterKpi(r)}
@@ -3931,6 +3986,8 @@ ${idWrap('mkt-segment', sectionSegment(r))}
 ${sectionAdviceAfterSegment(r)}
 ${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId))}
 ${sectionAdviceAfterRank(r)}
+${idWrap('mkt-commenter-follow', sectionCommenterFollowDirectory(r, maskShare, identiconResolver, broadcasterUserId))}
+${sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId)}
 ${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
 ${idWrap('mkt-vpos', sectionVposThirds(r))}
 ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
@@ -3943,6 +4000,7 @@ ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
     bundle: opts?.officialEventDomBundle ?? null,
     broadcastTitle: typeof opts?.broadcastTitle === 'string' ? opts.broadcastTitle : '',
     broadcasterName: typeof opts?.broadcasterName === 'string' ? opts.broadcasterName : '',
+    broadcasterUserId: String(broadcasterUserId || opts?.broadcasterProfile?.userId || ''),
     recordedCommentCount:
       typeof opts?.recordedCommentCount === 'number' ? opts.recordedCommentCount : undefined,
     streamAgeMin: typeof opts?.streamAgeMin === 'number' ? opts.streamAgeMin : undefined
@@ -3955,19 +4013,26 @@ ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
         : undefined
   });
 
+  // 配信者プロフィールカード（名前リンク＋アイコン＋LV＋プロフィール/欲しいものリスト等）。
+  // 取得できた項目だけ表示。未取得なら空＝カードごと省略。
+  const broadcasterProfileCardHtml = buildBroadcasterProfileMarketingCardHtml(
+    opts?.broadcasterProfile ?? null
+  );
+
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>配信マーケ分析 — ${escapeHtml(r.liveId)}</title>
-<style>${CSS_BODY}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
+<style>${CSS_BODY}${BROADCASTER_PROFILE_MARKETING_CSS}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
 </head>
 <body>
 <header class="mkt-header">
 <h1 class="mkt-header__title">📊 配信マーケティング分析</h1>
 <p class="mkt-header__sub">${escapeHtml(r.liveId)} — ${new Date().toLocaleString('ja-JP')} 出力${escapeHtml(subSuffix)} · JSON埋め込み ${escapeHtml(exportedAtIso)}</p>
 </header>
+${broadcasterProfileCardHtml}
 ${yukkuriHtml}
 <main class="mkt-main">
 ${finalBody}
@@ -3975,6 +4040,43 @@ ${finalBody}
 <footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — ${escapeHtml(exportedAtIso)}</footer>
 ${idWrap('mkt-json', sectionMachineReadableJson(embedJson, maskShare))}
 </body></html>`;
+}
+
+/**
+ * watch スナップショットの noopenerLinks（支援物資・Amazon 欲しいものリスト・外部リンク等）を
+ * リンクチップとして出す。http/https のみ・最大 20 件。空なら省略。
+ *
+ * @param {Array<{ text?: string, href?: string }>|undefined|null} links
+ * @returns {string}
+ */
+function sectionBroadcasterExternalLinks(links) {
+  if (!Array.isArray(links) || links.length === 0) return '';
+  const seen = new Set();
+  const chips = [];
+  for (const l of links) {
+    const href = String(l?.href || '').trim();
+    if (!/^https?:\/\//i.test(href) || seen.has(href)) continue;
+    seen.add(href);
+    let label = String(l?.text || '').replace(/\s+/g, ' ').trim();
+    if (!label) {
+      try {
+        label = new URL(href).hostname.replace(/^www\./, '');
+      } catch {
+        label = href;
+      }
+    }
+    if (label.length > 60) label = `${label.slice(0, 57)}…`;
+    chips.push(
+      `<a class="mkt-ext-link-chip" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
+    );
+    if (chips.length >= 20) break;
+  }
+  if (chips.length === 0) return '';
+  return `<section class="mkt-section mkt-section--ext-links" aria-label="支援物資・外部リンク">
+<h2>🔗 支援物資・外部リンク</h2>
+<p class="mkt-note">配信ページに記載された外部リンク（欲しいものリスト・支援物資・SNS 等）です。リンク先は配信者の管理下にあります。</p>
+<div class="mkt-ext-link-chips">${chips.join('')}</div>
+</section>`;
 }
 
 /**
@@ -4020,6 +4122,13 @@ function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcaster
 
   if (numericIdUsers.length === 0 && anonymousUsers.length === 0) return '';
 
+  /** @type {Map<string, import('./marketingAggregate.js').UserCommentProfile>} */
+  const followByUid = new Map();
+  for (const u of r.allNumericCommenters || []) {
+    const uid = String(u.userId || '').trim();
+    if (uid) followByUid.set(uid, u);
+  }
+
   /**
    * @param {import('./userThumbGrid.js').ResolvedThumbGridUser} u
    * @returns {string}
@@ -4029,9 +4138,12 @@ function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcaster
     const rawLabel = displayUserLabel(u.userId, u.nickname || '');
     const labelHtml = buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
     const countText = `${u.count}件`;
+    const followHtml = followerInlineHtml(followByUid.get(String(u.userId || '')) || null, maskShare);
+    const avatarInner = `<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}></span>`;
     return `<li class="mkt-thumb-grid__cell">
-<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}></span>
+${wrapThumbWithProfileLink(u.userId, avatarInner)}
 <span class="mkt-thumb-grid__label">${labelHtml}</span>
+${followHtml}
 <span class="mkt-thumb-grid__count">${escapeHtml(countText)}</span>
 </li>`;
   };
@@ -4093,14 +4205,19 @@ function safeEventRankingThumbnailUrl(v) {
 /**
  * @param {EventRankingReportModel | null | undefined} eventRanking
  * @param {boolean} maskShare
+ * @param {import('./broadcasterProfileCard.js').BroadcasterProfileModel | null} [broadcasterProfile]
  */
-function sectionEventRanking(eventRanking, maskShare) {
+function sectionEventRanking(eventRanking, maskShare, broadcasterProfile) {
   if (!eventRanking || typeof eventRanking !== 'object') return '';
   const model = /** @type {EventRankingReportModel} */ (eventRanking);
   const rows = Array.isArray(model.rows) ? model.rows : [];
   const eventName = String(model.eventName || '').trim();
   const self = model.self && typeof model.self === 'object' ? model.self : null;
   if (!eventName && !self && rows.length === 0) return '';
+  // 本人カードの配信者名を可能ならリンク化するための userId（プロフィール由来）。
+  const selfUid = String(
+    (broadcasterProfile && /** @type {any} */ (broadcasterProfile).userId) || ''
+  ).trim();
 
   const selfRank = self ? finiteIntOrNull(self.rank) : null;
   const selfScore = self ? finiteIntOrNull(self.score) : null;
@@ -4114,7 +4231,7 @@ function sectionEventRanking(eventRanking, maskShare) {
     ? `<div class="mkt-event-self" aria-label="本人のイベント順位">
 <div class="mkt-event-self__card"><span class="mkt-event-self__label">現在順位</span><strong>${escapeHtml(selfRank == null ? '—' : `${selfRank.toLocaleString('ja-JP')}位`)}</strong></div>
 <div class="mkt-event-self__card"><span class="mkt-event-self__label">累計💎</span><strong>${escapeHtml(formatEventRankingNumber(selfScore))}</strong></div>
-<div class="mkt-event-self__card"><span class="mkt-event-self__label">${escapeHtml(selfName || '本人')}</span><strong>${escapeHtml(nextRankLabel)}</strong></div>
+<div class="mkt-event-self__card"><span class="mkt-event-self__label">${/^\d{1,18}$/.test(selfUid) ? buildUserProfileLinkedLabelHtml(selfUid, selfName || '本人') : escapeHtml(selfName || '本人')}</span><strong>${escapeHtml(nextRankLabel)}</strong></div>
 </div>`
     : '';
 
@@ -4125,17 +4242,24 @@ function sectionEventRanking(eventRanking, maskShare) {
       const score = finiteIntOrNull(row?.score);
       if (rank == null || rank <= 0) return '';
       const name = String(row?.name || '').trim() || '名無し';
+      const rowUid = String(row?.userId || '').trim();
+      const nameHtml = /^\d{1,18}$/.test(rowUid)
+        ? buildUserProfileLinkedLabelHtml(rowUid, name)
+        : escapeHtml(name);
       const thumbSrc = safeEventRankingThumbnailUrl(row?.thumbnailUrl);
-      const thumbHtml = thumbSrc
-        ? `<img class="mkt-event-rank__thumb" src="${escapeAttr(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.hidden=true">`
-        : '<span class="mkt-event-rank__thumb mkt-event-rank__thumb--empty"></span>';
+      const thumbHtml = wrapThumbWithProfileLink(
+        rowUid,
+        thumbSrc
+          ? `<img class="mkt-event-rank__thumb" src="${escapeAttr(thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.onerror=null;this.hidden=true">`
+          : '<span class="mkt-event-rank__thumb mkt-event-rank__thumb--empty"></span>'
+      );
       const anon = row?.isAnonymous === true
         ? '<span class="mkt-event-rank__anon">匿名</span>'
         : '';
       return `<tr>
 <td class="mkt-event-rank__rank">${escapeHtml(`${rank}位`)}</td>
 <td class="mkt-event-rank__thumb-cell">${thumbHtml}</td>
-<td class="mkt-event-rank__name">${escapeHtml(name)}${anon}</td>
+<td class="mkt-event-rank__name">${nameHtml}${anon}</td>
 <td class="mkt-event-rank__score">💎${escapeHtml(formatEventRankingNumber(score))}</td>
 </tr>`;
     })
@@ -4321,6 +4445,420 @@ function sectionSegment(r) {
 }
 
 /**
+ * accountStatus（2=プレミアム / 1=一般）から会員種別バッジ HTML を返す。不明は空。
+ * @param {number|undefined} accountStatus
+ * @returns {string}
+ */
+function memberAccountBadgeHtml(accountStatus) {
+  if (accountStatus === 2) return '<span class="mkt-acct-badge mkt-acct-badge--prem">プレミアム</span>';
+  if (accountStatus === 1) return '<span class="mkt-acct-badge mkt-acct-badge--reg">一般</span>';
+  return '';
+}
+
+/**
+ * コメンターのフォロー/フォロワー数チップ（背景巡回で取得できた人のみ）。
+ * maskShare 時や未取得時は空。
+ * @param {{ followerCount?: number, followeeCount?: number, userLevel?: number }} u
+ * @param {boolean} maskShare
+ * @returns {string}
+ */
+function followerInlineHtml(u, maskShare) {
+  if (maskShare || !u) return '';
+  const parts = [];
+  if (typeof u.followerCount === 'number' && u.followerCount >= 0) {
+    parts.push(`フォロワー ${formatEventRankingNumber(u.followerCount)}`);
+  }
+  if (typeof u.followeeCount === 'number' && u.followeeCount >= 0) {
+    parts.push(`フォロー ${formatEventRankingNumber(u.followeeCount)}`);
+  }
+  if (typeof u.userLevel === 'number' && u.userLevel > 0) {
+    parts.push(`LV${u.userLevel}`);
+  }
+  if (!parts.length) return '';
+  return `<span class="mkt-follow-chip">${escapeHtml(parts.join(' / '))}</span>`;
+}
+
+/** フォロー一覧の初期表示行数（スクロール負荷対策。残りはボタンで展開）。 */
+const COMMENTER_FOLLOW_TABLE_INITIAL_ROWS = 40;
+const COMMENTER_FOLLOW_SCATTER_MAX_POINTS = 600;
+
+/**
+ * コメンター一覧の「残りを表示」ボタン用インライン script。
+ * @returns {string}
+ */
+function commenterFollowExpandScriptHtml() {
+  return `<script>
+(function(){
+  var btn=document.querySelector('.mkt-cf-more-btn');
+  if(!btn)return;
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.mkt-cf-row--hidden').forEach(function(row){
+      row.classList.remove('mkt-cf-row--hidden');
+    });
+    var wrap=btn.closest('.mkt-cf-more-wrap');
+    if(wrap)wrap.remove();
+  });
+})();
+</script>`;
+}
+
+/**
+ * 数値 ID コメンター全員のフォロー/フォロワー付き一覧（取得できた分だけ値あり）。
+ * @param {MarketingReport} r
+ * @param {boolean} maskShare
+ * @param {((uid: string) => string) | undefined} identiconResolver
+ * @param {string} [broadcasterUserId]
+ */
+function sectionCommenterFollowDirectory(r, maskShare, identiconResolver = undefined, broadcasterUserId = '') {
+  const src = Array.isArray(r.allNumericCommenters) ? r.allNumericCommenters : [];
+  const broadcasterUid = String(broadcasterUserId || '').trim();
+  const users = broadcasterUid
+    ? src.filter((u) => String(u.userId || '').trim() !== broadcasterUid)
+    : src;
+  if (!users.length) return '';
+
+  const ds = r.commenterFollowDataset;
+  const dsNote =
+    ds && typeof ds.withFollowData === 'number' && typeof ds.totalNumericCommenters === 'number'
+      ? `（スナップショット: ${ds.withFollowData}/${ds.totalNumericCommenters} 名にフォロー情報）`
+      : '';
+
+  const rows = users
+    .map((u, i) => {
+      const rawLabel = displayUserLabel(u.userId, u.nickname || '');
+      const nameCellHtml = maskShare
+        ? escapeHtml(maskLabelForShare(rawLabel))
+        : buildUserProfileLinkedLabelHtml(u.userId, rawLabel);
+      const badgeHtml = maskShare ? '' : memberAccountBadgeHtml(u.accountStatus);
+      const thumbSrc = maskShare
+        ? ''
+        : resolveReportUserThumbSrc({
+            userId: u.userId || '',
+            avatarUrl: u.avatarUrl || '',
+            identiconResolver
+          });
+      const thumbInner = thumbSrc
+        ? `<img class="mkt-cf-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+        : '<span class="mkt-cf-thumb mkt-cf-thumb--empty"></span>';
+      const thumbCell = wrapThumbWithProfileLink(u.userId, thumbInner, maskShare);
+      const followers =
+        typeof u.followerCount === 'number' ? formatEventRankingNumber(u.followerCount) : '—';
+      const following =
+        typeof u.followeeCount === 'number' ? formatEventRankingNumber(u.followeeCount) : '—';
+      const level = typeof u.userLevel === 'number' && u.userLevel > 0 ? String(u.userLevel) : '—';
+      const prem =
+        u.isPremium === true ? 'プレミアム' : u.isPremium === false ? '一般' : '—';
+      const hiddenClass =
+        i >= COMMENTER_FOLLOW_TABLE_INITIAL_ROWS ? ' mkt-cf-row mkt-cf-row--hidden' : ' mkt-cf-row';
+      return `<tr class="${hiddenClass.trim()}">
+<td data-label="#">${i + 1}</td>
+<td data-label="サムネ">${thumbCell}</td>
+<td data-label="ユーザー" class="mkt-cf-user">${nameCellHtml}${badgeHtml}</td>
+<td data-label="コメ">${u.count}</td>
+<td data-label="フォロワー" class="mkt-num">${escapeHtml(followers)}</td>
+<td data-label="フォロー" class="mkt-num">${escapeHtml(following)}</td>
+<td data-label="LV" class="mkt-num">${escapeHtml(level)}</td>
+<td data-label="会員">${escapeHtml(prem)}</td>
+</tr>`;
+    })
+    .join('');
+
+  const hiddenCount = Math.max(0, users.length - COMMENTER_FOLLOW_TABLE_INITIAL_ROWS);
+  const moreHtml =
+    hiddenCount > 0
+      ? `<p class="mkt-cf-more-wrap"><button type="button" class="mkt-cf-more-btn">残り ${hiddenCount} 名を表示（スクロール軽量化のため折りたたみ中）</button></p>${commenterFollowExpandScriptHtml()}`
+      : '';
+
+  return `<section class="mkt-section mkt-section--commenter-follow">
+<h2>数値IDコメンター一覧（フォロー情報）</h2>
+<p class="mkt-note">記録に現れた数値 userId ユーザー ${users.length} 名をコメ数順に並べ、背景取得できたフォロワー/フォロー/LV/会員情報を載せます${escapeHtml(dsNote ? ` ${dsNote}` : '')}。</p>
+<p class="mkt-spec-note">※ フォロー情報は配信中に少数ずつ取得するため、DL時点で未取得の行は「—」です。同じ配信を開いたまま時間を置くか、再DLすると埋まります。横断キャッシュ（24h）で別配信でも再利用します。</p>
+<div class="mkt-table-scroll"><table class="mkt-rank mkt-cf-table">
+<thead><tr><th>#</th><th>サムネ</th><th>ユーザー</th><th>コメ</th><th>フォロワー</th><th>フォロー</th><th>LV</th><th>会員</th></tr></thead>
+<tbody>${rows}</tbody>
+</table></div>
+${moreHtml}
+</section>`;
+}
+
+/** @param {'highFollowerRegulars'|'localEnthusiasts'|'quietSupporters'|'other'} segmentId */
+function commenterFollowSegmentColor(segmentId) {
+  if (segmentId === 'highFollowerRegulars') return '#38bdf8';
+  if (segmentId === 'localEnthusiasts') return '#f59e0b';
+  if (segmentId === 'quietSupporters') return '#a78bfa';
+  return '#64748b';
+}
+
+/** @param {number} value */
+function formatCommenterFollowPct(value) {
+  return Number.isInteger(value) ? `${value}%` : `${value.toFixed(1)}%`;
+}
+
+/**
+ * @param {ReturnType<typeof buildCommenterFollowAnalytics>} analytics
+ * @returns {string}
+ */
+function commenterFollowScatterSvg(analytics) {
+  const points = analytics.scatterPoints;
+  if (points.length === 0) {
+    return '<p class="mkt-note">フォロワー数が取れたコメンターがまだいないため、散布図は未表示です。時間を置いて再DLすると点が増えます。</p>';
+  }
+  const W = 900;
+  const H = 320;
+  const padL = 62;
+  const padR = 24;
+  const padT = 22;
+  const padB = 46;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const maxX = Math.max(
+    1,
+    analytics.thresholds.followerCount.threshold,
+    ...points.map((p) => p.followerCount)
+  );
+  const maxY = Math.max(
+    1,
+    analytics.thresholds.commentCount.threshold,
+    ...points.map((p) => p.commentCount)
+  );
+  /** @param {number} v */
+  const xOf = (v) => padL + (Math.max(0, Math.min(maxX, v)) / maxX) * innerW;
+  /** @param {number} v */
+  const yOf = (v) => padT + innerH - (Math.max(0, Math.min(maxY, v)) / maxY) * innerH;
+  const tickValues = [0, 0.25, 0.5, 0.75, 1];
+  const xTicks = tickValues
+    .map((ratio) => {
+      const x = padL + ratio * innerW;
+      const value = Math.round(maxX * ratio);
+      return `<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT + innerH}" class="mkt-cfa-grid-line"></line><text x="${x.toFixed(1)}" y="${H - 18}" text-anchor="middle" class="mkt-axis">${formatEventRankingNumber(value)}</text>`;
+    })
+    .join('');
+  const yTicks = tickValues
+    .map((ratio) => {
+      const y = padT + innerH - ratio * innerH;
+      const value = Math.round(maxY * ratio);
+      return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL + innerW}" y2="${y.toFixed(1)}" class="mkt-cfa-grid-line"></line><text x="${padL - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" class="mkt-axis">${formatEventRankingNumber(value)}</text>`;
+    })
+    .join('');
+  const thresholdX = xOf(analytics.thresholds.followerCount.threshold);
+  const thresholdY = yOf(analytics.thresholds.commentCount.threshold);
+  const thresholdLines =
+    analytics.thresholds.sampleSize > 0
+      ? `<line x1="${thresholdX.toFixed(1)}" y1="${padT}" x2="${thresholdX.toFixed(1)}" y2="${padT + innerH}" class="mkt-cfa-threshold"></line><line x1="${padL}" y1="${thresholdY.toFixed(1)}" x2="${padL + innerW}" y2="${thresholdY.toFixed(1)}" class="mkt-cfa-threshold"></line>`
+      : '';
+  const plotted = points.slice(0, COMMENTER_FOLLOW_SCATTER_MAX_POINTS);
+  const circles = plotted
+    .map((p) => {
+      const title = `${p.label} / フォロワー ${formatEventRankingNumber(p.followerCount)} / コメ ${formatEventRankingNumber(p.commentCount)}`;
+      return `<circle cx="${xOf(p.followerCount).toFixed(1)}" cy="${yOf(p.commentCount).toFixed(1)}" r="4" fill="${commenterFollowSegmentColor(p.segmentId)}" fill-opacity=".82"><title>${escapeHtml(title)}</title></circle>`;
+    })
+    .join('');
+  const sampleNote =
+    points.length > plotted.length
+      ? `<p class="mkt-note">散布図は表示負荷を抑えるため、コメ数上位 ${plotted.length} 点を描画しています。CSV には全員分が入ります。</p>`
+      : '';
+  const legend = [
+    ['highFollowerRegulars', '高フォロワー常連'],
+    ['localEnthusiasts', 'ローカル熱心層'],
+    ['quietSupporters', '静かな支援'],
+    ['other', 'その他']
+  ]
+    .map(
+      ([id, label]) =>
+        `<span class="mkt-cfa-legend-item"><i style="background:${commenterFollowSegmentColor(/** @type {any} */ (id))}"></i>${escapeHtml(label)}</span>`
+    )
+    .join('');
+  return `<div class="mkt-chart-wrap mkt-cfa-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg mkt-cfa-svg" role="img" aria-label="フォロワー数とコメント数の散布図">
+<rect x="${padL}" y="${padT}" width="${innerW}" height="${innerH}" class="mkt-cfa-plot-bg"></rect>
+${xTicks}${yTicks}${thresholdLines}
+<line x1="${padL}" y1="${padT + innerH}" x2="${padL + innerW}" y2="${padT + innerH}" class="mkt-cfa-axis-line"></line>
+<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}" class="mkt-cfa-axis-line"></line>
+${circles}
+<text x="${padL + innerW / 2}" y="${H - 4}" text-anchor="middle" class="mkt-axis">フォロワー数</text>
+<text x="14" y="${padT + innerH / 2}" text-anchor="middle" class="mkt-axis" transform="rotate(-90 14 ${padT + innerH / 2})">コメント数</text>
+</svg>
+</div>
+<div class="mkt-cfa-legend">${legend}</div>
+${sampleNote}`;
+}
+
+/**
+ * @param {ReturnType<typeof buildCommenterFollowAnalytics>} analytics
+ * @returns {string}
+ */
+function commenterFollowSegmentCardsHtml(analytics) {
+  const segments = [
+    analytics.segments.highFollowerRegulars,
+    analytics.segments.localEnthusiasts,
+    analytics.segments.quietSupporters
+  ];
+  return segments
+    .map((seg) => {
+      const examples = seg.representatives.length
+        ? `<ul class="mkt-cfa-examples">${seg.representatives
+            .map((row) => {
+              const rawLabel = displayUserLabel(row.userId, row.nickname || '');
+              const label = buildUserProfileLinkedLabelHtml(row.userId, rawLabel);
+              const stats = `コメ ${formatEventRankingNumber(row.commentCount)} / フォロワー ${formatEventRankingNumber(row.followerCount)}`;
+              return `<li>${label}<span>${escapeHtml(stats)}</span></li>`;
+            })
+            .join('')}</ul>`
+        : '<p class="mkt-note">該当者はまだいません。</p>';
+      return `<article class="mkt-cfa-card mkt-cfa-card--${escapeAttr(seg.id)}">
+<div class="mkt-cfa-card__head"><span class="mkt-cfa-card__dot" style="background:${commenterFollowSegmentColor(seg.id)}"></span><h3>${escapeHtml(seg.label)}</h3></div>
+<strong class="mkt-cfa-card__count">${formatEventRankingNumber(seg.count)}名 <small>${escapeHtml(formatCommenterFollowPct(seg.pctOfFollowed))}</small></strong>
+<p>${escapeHtml(seg.description)}</p>
+${examples}
+</article>`;
+    })
+    .join('');
+}
+
+/**
+ * @param {string} buttonId
+ * @returns {string}
+ */
+function commenterFollowCsvDownloadScriptHtml(buttonId) {
+  return `<script>
+(function(){
+  var btn=document.getElementById(${JSON.stringify(buttonId)});
+  if(!btn)return;
+  function first(values){for(var i=0;i<values.length;i++){if(values[i]!==undefined&&values[i]!==null&&values[i]!=='')return values[i];}return '';}
+  function csvCell(value){
+    if(value===undefined||value===null)return '';
+    var s=String(value);
+    return /[",\\r\\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  }
+  function toInt(value){
+    var n=Number(value);
+    return Number.isFinite(n)&&n>=0?Math.floor(n):'';
+  }
+  function normalize(src, follow){
+    src=src||{}; follow=follow||{};
+    var userId=String(first([src.userId,follow.userId])).trim();
+    if(!userId)return null;
+    return {
+      userId:userId,
+      nickname:String(first([src.nickname,follow.nickname])),
+      commentCount:toInt(first([src.count,src.commentCount,follow.commentCount])),
+      followerCount:toInt(first([src.followerCount,follow.followerCount])),
+      followeeCount:toInt(first([src.followeeCount,follow.followeeCount])),
+      userLevel:toInt(first([src.userLevel,src.level,follow.userLevel,follow.level])),
+      isPremium:first([src.isPremium,follow.isPremium]),
+      accountStatus:toInt(src.accountStatus),
+      firstAt:toInt(src.firstAt),
+      lastAt:toInt(src.lastAt),
+      followFetchedAt:toInt(first([src.followFetchedAt,follow.followFetchedAt,follow.fetchedAt])),
+      avatarUrl:String(first([src.avatarUrl,follow.avatarUrl]))
+    };
+  }
+  btn.addEventListener('click',function(){
+    var script=document.getElementById('nl-marketing-export-v1');
+    if(!script){btn.textContent='JSON が見つかりません';return;}
+    var payload;
+    try{payload=JSON.parse(script.textContent||'{}');}
+    catch(e){btn.textContent='JSON を読めません';return;}
+    var report=payload.report||{};
+    var all=Array.isArray(report.allNumericCommenters)?report.allNumericCommenters:[];
+    var followRows=report.commenterFollowDataset&&Array.isArray(report.commenterFollowDataset.rows)?report.commenterFollowDataset.rows:[];
+    var followByUid={};
+    followRows.forEach(function(row){
+      var uid=String(row&&row.userId||'').trim();
+      if(uid)followByUid[uid]=row;
+    });
+    var rows=[];
+    var seen={};
+    all.forEach(function(src){
+      var uid=String(src&&src.userId||'').trim();
+      var row=normalize(src,uid?followByUid[uid]:null);
+      if(row){rows.push(row);seen[row.userId]=true;}
+    });
+    followRows.forEach(function(follow){
+      var uid=String(follow&&follow.userId||'').trim();
+      if(!uid||seen[uid])return;
+      var row=normalize(follow,null);
+      if(row)rows.push(row);
+    });
+    var headers=['userId','nickname','commentCount','followerCount','followeeCount','userLevel','isPremium','accountStatus','firstAt','lastAt','followFetchedAt','avatarUrl'];
+    var lines=[headers.join(',')].concat(rows.map(function(row){return headers.map(function(key){return csvCell(row[key]);}).join(',');}));
+    var blob=new Blob(['\\ufeff'+lines.join('\\r\\n')],{type:'text/csv;charset=utf-8'});
+    var a=document.createElement('a');
+    var url=URL.createObjectURL(blob);
+    var liveId=String(payload.liveId||report.liveId||'marketing').replace(/[^a-zA-Z0-9_-]/g,'');
+    a.href=url;
+    a.download='commenter-follow-'+(liveId||'marketing')+'.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},15000);
+    var old=btn.textContent;
+    btn.textContent='CSV を作成しました';
+    setTimeout(function(){btn.textContent=old;},1800);
+  });
+})();
+</script>`;
+}
+
+/**
+ * 数値 ID コメンターのフォロワー数×コメント数分析。
+ * @param {MarketingReport} r
+ * @param {boolean} maskShare
+ * @param {string} [broadcasterUserId]
+ */
+function sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId = '') {
+  const allNumericCommenters = Array.isArray(r.allNumericCommenters) ? r.allNumericCommenters : [];
+  if (!allNumericCommenters.length) return '';
+  if (maskShare) {
+    return `<section class="mkt-section mkt-section--commenter-follow-analytics" id="mkt-commenter-follow-analytics">
+<h2>フォロー×コメント分析</h2>
+<p class="mkt-note">共有向け出力では、個人単位の散布図・セグメント代表例・CSV ダウンロードを非表示にしています。手元用で書き出すと確認できます。</p>
+</section>`;
+  }
+
+  const analytics = buildCommenterFollowAnalytics(allNumericCommenters, {
+    commenterFollowDataset: r.commenterFollowDataset,
+    excludeUserId: broadcasterUserId
+  });
+  if (!analytics.rows.length) return '';
+
+  const threshold = analytics.thresholds;
+  const csvButtonId = 'mkt-commenter-follow-csv';
+  const csvButton =
+    analytics.rows.length > 0
+      ? `<button type="button" id="${csvButtonId}" class="mkt-cfa-csv-btn">CSV をダウンロード</button>${commenterFollowCsvDownloadScriptHtml(csvButtonId)}`
+      : '';
+  const stats = [
+    { label: '数値IDコメンター', value: `${formatEventRankingNumber(analytics.rows.length)}名`, hint: 'CSV は全員分' },
+    { label: 'フォロー情報あり', value: `${formatEventRankingNumber(analytics.rowsWithFollowerCount.length)}名`, hint: '散布図の母数' },
+    {
+      label: '高フォロワーしきい値',
+      value: formatEventRankingNumber(threshold.followerCount.threshold),
+      hint: `p${threshold.highPercentile}`
+    },
+    {
+      label: '高コメントしきい値',
+      value: `${formatEventRankingNumber(threshold.commentCount.threshold)}件`,
+      hint: `p${threshold.highPercentile}`
+    }
+  ]
+    .map(
+      (card) =>
+        `<div class="mkt-cfa-stat"><span>${escapeHtml(card.label)}</span><strong>${escapeHtml(card.value)}</strong><small>${escapeHtml(card.hint)}</small></div>`
+    )
+    .join('');
+
+  return `<section class="mkt-section mkt-section--commenter-follow-analytics" id="mkt-commenter-follow-analytics">
+<h2>フォロー×コメント分析</h2>
+<p class="mkt-note">数値 ID コメンターを、フォロワー数（横軸）とこの配信でのコメント数（縦軸）で見ます。しきい値は取得済みデータの中央値・上位パーセンタイルから自動計算した目安です。</p>
+<div class="mkt-cfa-toolbar">${csvButton}</div>
+<div class="mkt-cfa-stats">${stats}</div>
+${commenterFollowScatterSvg(analytics)}
+<div class="mkt-cfa-segments">${commenterFollowSegmentCardsHtml(analytics)}</div>
+</section>`;
+}
+
+/**
  * @param {MarketingReport} r
  * @param {boolean} [maskShare] 共有向けに表示名を伏せ、サムネ URL を出さない
  * @param {((uid: string) => string) | undefined} [identiconResolver]
@@ -4353,10 +4891,13 @@ function sectionTopUsers(r, maskShare = false, identiconResolver = undefined, br
             avatarUrl: u.avatarUrl || '',
             identiconResolver
           });
-      const avImg =
+      const avImg = wrapThumbWithProfileLink(
+        u.userId,
         !resolvedAvatar
           ? '<span class="mkt-rank-av mkt-rank-av--empty"></span>'
-          : `<img src="${escapeHtml(resolvedAvatar)}" class="mkt-rank-av" alt="" loading="lazy" referrerpolicy="no-referrer">`;
+          : `<img src="${escapeHtml(resolvedAvatar)}" class="mkt-rank-av" alt="" loading="lazy" referrerpolicy="no-referrer">`,
+        maskShare
+      );
       // ランキング内で複数の匿名 (a:xxxx) ユーザーがすべて「匿名」と表示されて
       // 識別不能になる問題を避けるため、共通の displayUserLabel を通して
       // 「nickname（shortId）」形にする。数値 ID のときは niconico プロフィール
@@ -4368,10 +4909,12 @@ function sectionTopUsers(r, maskShare = false, identiconResolver = undefined, br
       const nameCellHtml = maskShare
         ? escapeHtml(maskLabelForShare(rawLabel))
         : buildUserProfileLinkedLabelHtml(uidForLabel, rawLabel);
+      const badgeHtml = maskShare ? '' : memberAccountBadgeHtml(u.accountStatus);
+      const followHtml = followerInlineHtml(u, maskShare);
       return `<tr>
 <td class="mkt-rank-n">${i + 1}</td>
 <td>${avImg}</td>
-<td class="mkt-rank-name">${nameCellHtml}</td>
+<td class="mkt-rank-name">${nameCellHtml}${badgeHtml}${followHtml}</td>
 <td class="mkt-rank-bar"><div class="mkt-rank-bar__fill" style="width:${pct.toFixed(1)}%"></div><span class="mkt-rank-bar__label">${u.count}</span></td>
 </tr>`;
     })
@@ -4406,12 +4949,17 @@ function sectionHourHeatmap(r) {
 
 const CSS_BODY = `
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.65;scroll-behavior:smooth;-webkit-text-size-adjust:100%;font-size:16px}
+body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f172a;color:#e2e8f0;line-height:1.65;-webkit-text-size-adjust:100%;font-size:16px}
 .mkt-header{padding:2rem 1.5rem 1rem;background:linear-gradient(135deg,#1e293b,#0f172a);border-bottom:1px solid #334155}
 .mkt-header__title{margin:0;font-size:1.6rem;font-weight:700}
 .mkt-header__sub{margin:.3rem 0 0;font-size:.85rem;color:#94a3b8}
 .mkt-main{max-width:1080px;margin:0 auto;padding:1.5rem 1rem}
-.mkt-section{background:#1e293b;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1.2rem;border:1px solid #334155;scroll-margin-top:1rem}
+.mkt-cf-row--hidden{display:none}
+.mkt-cf-more-wrap{margin:.75rem 0 0;text-align:center}
+.mkt-cf-more-btn{cursor:pointer;border:1px solid #475569;background:#0f172a;color:#cbd5e1;border-radius:999px;padding:.45rem 1rem;font-size:.82rem}
+.mkt-cf-more-btn:hover{border-color:#93c5fd;color:#f8fafc}
+.mkt-thumb-grid__cell{content-visibility:auto;contain-intrinsic-size:auto 88px}
+.mkt-section{content-visibility:auto;contain-intrinsic-size:auto 360px;contain:layout style paint;background:#1e293b;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1.2rem;border:1px solid #334155;scroll-margin-top:1rem}
 .mkt-section h2{margin:0 0 .8rem;font-size:1.1rem;line-height:1.35;color:#f8fafc;border-left:4px solid #3b82f6;padding-left:.6rem}
 .mkt-section p,.mkt-section li{overflow-wrap:anywhere}
 .mkt-subhead{margin:1rem 0 .55rem;font-size:.95rem;line-height:1.4;color:#f8fafc}
@@ -4437,7 +4985,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-bar__fill{display:block;height:100%}
 .mkt-departed-thumb{width:24px;height:24px;border-radius:6px;object-fit:cover;display:inline-block;background:#0f172a}
 .mkt-departed-thumb--empty{border:1px dashed #334155}
-.mkt-note{font-size:.78rem;color:#94a3b8;margin:0 0 .6rem}
+.mkt-note{font-size:.78rem;color:#aab6c8;margin:0 0 .6rem}
 .mkt-spec-note{font-size:.72rem;color:#fbbf24;background:rgba(251,191,36,0.08);border-left:3px solid #fbbf24;padding:.4rem .6rem;margin:0 0 .8rem;border-radius:0 4px 4px 0}
 .mkt-hero-card{background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border:1px solid #38bdf8;border-radius:16px;padding:clamp(1rem,4vw,1.6rem);text-align:center;box-shadow:0 0 24px rgba(56,189,248,.15)}
 .mkt-hero-summary{font-size:clamp(.9rem,2.5vw,1.1rem);color:#e2e8f0;line-height:1.6;margin:0 0 .8rem}
@@ -4474,10 +5022,50 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-rank th{font-size:.72rem;color:#94a3b8;font-weight:700;white-space:nowrap;background:#17233a}
 .mkt-rank td{color:#dbeafe}
 .mkt-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.mkt-rank-n{width:2rem;color:#64748b;text-align:right;font-size:.8rem}
+.mkt-rank-n{width:2rem;color:#94a3b8;text-align:right;font-size:.8rem}
 .mkt-rank-av{width:28px;height:28px;border-radius:50%;object-fit:cover;display:block}
 .mkt-rank-av--empty{background:#334155}
-.mkt-rank-name{font-size:.85rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mkt-rank-name{font-size:.85rem;max-width:220px}
+.mkt-rank-name>.nl-user-profile-link,.mkt-rank-name>span:not(.mkt-acct-badge):not(.mkt-follow-chip){display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+.mkt-follow-chip{display:block;margin-top:2px;font-size:.7rem;color:#94a3b8;white-space:normal}
+.mkt-section--commenter-follow h2{border-left-color:#22d3ee}
+.mkt-cf-thumb{width:28px;height:28px;border-radius:50%;object-fit:cover;background:#0f172a;vertical-align:middle}
+.mkt-cf-thumb--empty{display:inline-block;width:28px;height:28px;border:1px solid #334155;border-radius:50%}
+.mkt-cf-user .nl-user-profile-link{color:#93c5fd}
+.mkt-section--commenter-follow-analytics h2{border-left-color:#93c5fd}
+.mkt-cfa-toolbar{display:flex;justify-content:flex-end;gap:.5rem;margin:0 0 .75rem;flex-wrap:wrap}
+.mkt-cfa-csv-btn{cursor:pointer;border:1px solid rgba(147,197,253,.55);background:#0f172a;color:#dbeafe;border-radius:8px;padding:.48rem .8rem;font-size:.82rem;font-weight:700}
+.mkt-cfa-csv-btn:hover{background:#17233a;border-color:#bfdbfe;color:#f8fafc}
+.mkt-cfa-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;margin:.65rem 0 .9rem}
+.mkt-cfa-stat{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.65rem .75rem;min-width:0}
+.mkt-cfa-stat span{display:block;font-size:.72rem;color:#93c5fd;margin-bottom:.1rem}
+.mkt-cfa-stat strong{display:block;font-size:1.05rem;line-height:1.35;color:#f8fafc;overflow-wrap:anywhere}
+.mkt-cfa-stat small{display:block;margin-top:.12rem;font-size:.68rem;color:#94a3b8}
+.mkt-cfa-chart-wrap{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.5rem;margin:.35rem 0 .55rem}
+.mkt-cfa-svg{max-height:340px}
+.mkt-cfa-plot-bg{fill:#0b1220;stroke:#334155;stroke-width:1}
+.mkt-cfa-grid-line{stroke:#1f2a44;stroke-width:1}
+.mkt-cfa-axis-line{stroke:#64748b;stroke-width:1.2}
+.mkt-cfa-threshold{stroke:#fbbf24;stroke-width:1.4;stroke-dasharray:5 5;opacity:.78}
+.mkt-cfa-legend{display:flex;flex-wrap:wrap;gap:.45rem .7rem;margin:.25rem 0 .85rem;font-size:.76rem;color:#cbd5e1}
+.mkt-cfa-legend-item{display:inline-flex;align-items:center;gap:.28rem}
+.mkt-cfa-legend-item i{display:inline-block;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.16)}
+.mkt-cfa-segments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem;margin:.8rem 0 0}
+.mkt-cfa-card{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.78rem;min-width:0}
+.mkt-cfa-card__head{display:flex;align-items:center;gap:.42rem;margin-bottom:.3rem}
+.mkt-cfa-card__head h3{margin:0;font-size:.92rem;line-height:1.35;color:#f8fafc}
+.mkt-cfa-card__dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 10px}
+.mkt-cfa-card__count{display:block;font-size:1.05rem;line-height:1.3;color:#e0f2fe;margin:.15rem 0 .25rem}
+.mkt-cfa-card__count small{font-size:.72rem;color:#94a3b8;margin-left:.25rem}
+.mkt-cfa-card p{margin:.2rem 0 .55rem;color:#cbd5e1;font-size:.78rem;line-height:1.55}
+.mkt-cfa-examples{list-style:none;margin:.35rem 0 0;padding:0;display:flex;flex-direction:column;gap:.35rem}
+.mkt-cfa-examples li{display:flex;justify-content:space-between;gap:.6rem;align-items:baseline;border-top:1px solid #1f2a44;padding-top:.35rem;font-size:.78rem;line-height:1.45}
+.mkt-cfa-examples li span{color:#94a3b8;text-align:right;white-space:nowrap;font-size:.72rem}
+.mkt-thumb-grid__cell .mkt-follow-chip{margin-top:2px;font-size:.65rem;line-height:1.2}
+/* レポート全体の共通リンク色。セクションごとに個別指定が無くても
+   ユーザープロフィールリンクが暗い既定青のまま埋もれないようにする。 */
+.mkt-section .nl-user-profile-link,.mkt-main .nl-user-profile-link{color:#93c5fd;text-decoration:underline;text-underline-offset:2px}
+.mkt-section .nl-user-profile-link:hover,.mkt-main .nl-user-profile-link:hover{color:#dbeafe}
 .mkt-rank-name .nl-user-profile-link{color:#93c5fd;text-decoration:underline;text-underline-offset:2px}
 .mkt-rank-name .nl-user-profile-link:hover{color:#bfdbfe}
 .mkt-rank-bar{position:relative;height:22px;background:#0f172a;border-radius:4px;overflow:hidden}
@@ -4518,7 +5106,7 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-hour{border-radius:6px;text-align:center;padding:.5rem .2rem;min-height:52px;display:flex;flex-direction:column;justify-content:center;border:1px solid #334155}
 .mkt-hour__label{font-size:.7rem;color:#94a3b8}
 .mkt-hour__val{font-size:.9rem;font-weight:600}
-.mkt-footer{text-align:center;padding:1.5rem;font-size:.72rem;color:#475569}
+.mkt-footer{text-align:center;padding:1.5rem;font-size:.72rem;color:#8b97a8}
 .mkt-section--embed h2{border-left-color:#22d3ee}
 .mkt-section--embed script{display:none}
 .mkt-section--features h2{border-left-color:#34d399}
@@ -4564,6 +5152,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
   .mkt-toc{grid-template-columns:1fr}
   .mkt-rank-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
   .mkt-rank{min-width:520px}
+  .mkt-cfa-toolbar{justify-content:flex-start}
+  .mkt-cfa-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mkt-cfa-segments{grid-template-columns:1fr}
+  .mkt-cfa-examples li{display:block}
+  .mkt-cfa-examples li span{display:block;text-align:left;white-space:normal;margin-top:.08rem}
   .mkt-advice-row{gap:.7rem}
   .mkt-advice__bubble::before{top:14px}
 }

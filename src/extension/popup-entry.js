@@ -39,6 +39,11 @@ import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import { eventVotingRankingStorageKey } from '../lib/auditionEventRankingApi.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
+import {
+  normalizeBroadcasterProfileModel,
+  buildBroadcasterProfileReportRowsHtml,
+  broadcasterNameCellHtml
+} from '../lib/broadcasterProfileCard.js';
 import { formatCardFreshnessNote } from '../lib/cardFreshnessNote.js';
 import { pickGiftHistorySource } from '../lib/giftHistorySourcePreference.js';
 import {
@@ -150,13 +155,26 @@ import {
   KEY_BACKFILL_PROGRESS,
   KEY_AUTOPATROL_ENABLED,
   KEY_AUTOPATROL_STATE,
-  KEY_CONCURRENT_CALIBRATION_RING_V1
+  KEY_CONCURRENT_CALIBRATION_RING_V1,
+  KEY_COMMENTER_FOLLOW_CACHE,
+  broadcasterProfileStorageKey,
+  commenterFollowLiveStorageKey
 } from '../lib/storageKeys.js';
+import {
+  normalizeCommenterFollowMap,
+  normalizeCommenterFollowLiveSnapshot,
+  applyFollowFieldsToUser
+} from '../lib/commenterFollowCache.js';
 import {
   parseCalibrationLog,
   serializeCalibrationJson,
   serializeCalibrationCsv
 } from '../lib/concurrentCalibrationLog.js';
+import {
+  computeCalibrationFit,
+  buildCalibratedPlatformProfile
+} from '../lib/concurrentCalibrationFit.js';
+import { NICONICO_PROFILE } from '../lib/concurrentEstimate.js';
 import {
   // v0.1.450 (PR4): backfillRinkuNarration は B 用 #backfillRinku 描画関数で使われていたが、
   //   B 廃止により未使用化。A 内 hint は backfillRecordCardHintDomState のみで完結する。
@@ -2403,15 +2421,49 @@ popupBooleanSettingsRegistry.register(
  * 自動巡回の状態テキスト（#autopatrolStatus）を storage から更新する。
  * 訪問数・採取中の配信・待ち件数・直近エラーを 1 行で見せる。
  */
+/**
+ * 自動補正（オートキャリブレーション）の現在のプロファイル＋メタ。
+ * 較正リングから導いた fit が ready のときだけ profile を持つ。未較正なら null（＝既定係数）。
+ * renderWatchMetaCard から同期参照するため module-level に保持し、
+ * refreshAutopatrolStatusLine（5 秒間隔・較正リングを既に読む）で更新する。
+ * @type {{ profile: import('../lib/concurrentEstimate.js').PlatformProfile|null, info: import('../lib/buildWatchMetaCardAudienceViewModel.js').WatchMetaCalibrationInfo|null }}
+ */
+let _autoCalibration = { profile: null, info: null };
+
+/**
+ * 較正リングの中身から自動補正プロファイルを再計算してキャッシュへ反映する。
+ * 表示（estimated）専用。較正サンプルのロギングは生のまま（フィードバックループ防止）。
+ * @param {unknown} ringBagValue  KEY_CONCURRENT_CALIBRATION_RING_V1 の値
+ */
+function refreshAutoCalibrationProfileCache(ringBagValue) {
+  try {
+    const fit = computeCalibrationFit(ringBagValue, { platform: 'niconico' });
+    const r = buildCalibratedPlatformProfile(NICONICO_PROFILE, fit);
+    _autoCalibration = {
+      profile: r.applied ? r.profile : null,
+      info: {
+        applied: r.applied,
+        basis: r.basis,
+        sampleCount: r.sampleCount,
+        multiplierScale: r.multiplierScale
+      }
+    };
+  } catch {
+    /* 失敗時は前回キャッシュを保持（補正なしでも安全にフォールバック） */
+  }
+}
+
 async function refreshAutopatrolStatusLine() {
   try {
     const statusEl = $('autopatrolStatus');
-    if (!statusEl) return;
     const bag = await chrome.storage.local.get([
       KEY_AUTOPATROL_ENABLED,
       KEY_AUTOPATROL_STATE,
       KEY_CONCURRENT_CALIBRATION_RING_V1
     ]);
+    // 自動補正キャッシュは status 要素の有無に関わらず更新する。
+    refreshAutoCalibrationProfileCache(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]);
+    if (!statusEl) return;
     const sampleCount = parseCalibrationLog(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]).items.length;
     const sampleLabel = `記録 ${sampleCount.toLocaleString('ja-JP')} サンプル`;
     // v0.1.528: 既定 ON（未設定=ON）。明示的に false のときだけ OFF 表示。
@@ -5534,7 +5586,11 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
       prevForReactions: {
         viewerCount: _prevViewerCount,
         concurrentEstimated: _prevConcurrentEstimated
-      }
+      },
+      // 自動補正（オートキャリブレーション）: 較正データが十分なら係数プロファイルを適用。
+      // 未較正のあいだは null → 既定係数にフォールバック（挙動互換）。
+      profile: _autoCalibration.profile ?? undefined,
+      calibration: _autoCalibration.info ?? undefined
     }
   );
 
@@ -12091,6 +12147,99 @@ function yukkuriReportAvatarHtml(dataUrl, fallbackClass, fallbackChar) {
  * @param {string} watchUrl
  * @returns {Promise<string>}
  */
+/**
+ * watch スナップショットの配信者項目と、取得済みプロフィール詳細（storage）を
+ * 1 つの raw オブジェクトにマージする。stored の空値は snapshot を上書きしない。
+ *
+ * @param {any} snapshot
+ * @param {any} stored
+ * @returns {Record<string, unknown>}
+ */
+function mergeBroadcasterProfileRaw(snapshot, stored) {
+  const s = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  /** @type {Record<string, unknown>} */
+  const base = {
+    userId: s.broadcasterUserId,
+    nickname: s.broadcasterName,
+    avatarUrl: s.broadcasterIconUrl,
+    pageUrl: s.broadcasterPageUrl,
+    level: s.broadcasterLevel,
+    startAtText: s.startAtText
+  };
+  if (stored && typeof stored === 'object') {
+    for (const [k, v] of Object.entries(stored)) {
+      if (v === null || v === undefined || v === '') continue;
+      base[k] = v;
+    }
+  }
+  return base;
+}
+
+/**
+ * snapshot＋storage から配信者プロフィールモデルを解決する（取得分のみ）。
+ *
+ * @param {any} snapshot
+ * @param {string} liveId
+ * @returns {Promise<import('../lib/broadcasterProfileCard.js').BroadcasterProfileModel|null>}
+ */
+async function resolveBroadcasterProfileModel(snapshot, liveId) {
+  let stored = null;
+  try {
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (/^lv\d{1,15}$/.test(lid)) {
+      const pk = broadcasterProfileStorageKey(lid);
+      const pbag = await chrome.storage.local.get(pk).catch(() => ({}));
+      stored = pbag && pbag[pk] && typeof pbag[pk] === 'object' ? pbag[pk] : null;
+    }
+  } catch {
+    stored = null;
+  }
+  return normalizeBroadcasterProfileModel(mergeBroadcasterProfileRaw(snapshot, stored));
+}
+
+/**
+ * コメンターのフォロー/フォロワー横断キャッシュと配信別スナップショットを読み、
+ * マーケ report の topUsers / allNumericCommenters へ後付けする。`commenterFollowDataset`
+ * に全量行も載せ、JSON 埋め込み・全コメンター表の正本にする。
+ * @param {{ topUsers?: any[], allNumericCommenters?: any[], commenterFollowDataset?: unknown }} report
+ * @param {string} [liveId]
+ * @returns {Promise<void>}
+ */
+async function attachCommenterFollowToReport(report, liveId) {
+  try {
+    if (!report) return;
+    const lid = String(liveId || report.liveId || '').trim().toLowerCase();
+    const keys = [KEY_COMMENTER_FOLLOW_CACHE];
+    if (/^lv\d{1,15}$/.test(lid)) keys.push(commenterFollowLiveStorageKey(lid));
+    const bag = await chrome.storage.local.get(keys).catch(() => ({}));
+    const followMap = normalizeCommenterFollowMap(bag?.[KEY_COMMENTER_FOLLOW_CACHE]);
+    const liveSnapshot = /^lv\d{1,15}$/.test(lid)
+      ? normalizeCommenterFollowLiveSnapshot(bag?.[commenterFollowLiveStorageKey(lid)])
+      : null;
+    if (liveSnapshot) report.commenterFollowDataset = liveSnapshot;
+
+    /** @type {Map<string, import('../lib/commenterFollowCache.js').CommenterFollowRow>} */
+    const rowByUid = new Map();
+    if (liveSnapshot?.rows?.length) {
+      for (const row of liveSnapshot.rows) rowByUid.set(row.userId, row);
+    }
+
+    const mergeUser = (u) => {
+      if (!u) return;
+      const uid = String(u.userId || '').trim();
+      if (!/^\d{1,18}$/.test(uid)) return;
+      const row = rowByUid.get(uid);
+      if (row) applyFollowFieldsToUser(u, row);
+      else applyFollowFieldsToUser(u, followMap[uid]);
+    };
+
+    for (const u of report.allNumericCommenters || []) mergeUser(u);
+    for (const u of report.topUsers || []) mergeUser(u);
+  } catch {
+    /* best-effort */
+  }
+}
+
 async function buildHtmlReportDocument(
   comments,
   snapshot,
@@ -12107,7 +12256,6 @@ async function buildHtmlReportDocument(
   const safeBroadcastTitle = escapeHtml(
     snapshot?.broadcastTitle || snapshot?.title || '-'
   );
-  const safeBroadcasterName = escapeHtml(snapshot?.broadcasterName || '-');
   const safeStartAtText = escapeHtml(snapshot?.startAtText || '-');
   // <img src> に流す URL は http/https のみ許可。data:image/svg+xml,<svg onload=...>
   // のような scheme で SVG を仕込まれると、保存 HTML を file:// で開いた瞬間に
@@ -12154,11 +12302,47 @@ async function buildHtmlReportDocument(
   } catch {
     eventDomBundleForReport = null;
   }
+
+  // 配信者プロフィール（概要カードのリンク化＋取得できた詳細項目の反映）。
+  const broadcasterProfileModel = await resolveBroadcasterProfileModel(snapshot, liveId);
+  const broadcasterProfileRowsHtml = buildBroadcasterProfileReportRowsHtml(
+    broadcasterProfileModel
+  );
+  // 支援物資・外部リンク（配信ページの noopenerLinks。http/https のみ・最大20件）。
+  const externalLinksHtml = (() => {
+    const links = Array.isArray(snapshot?.noopenerLinks) ? snapshot.noopenerLinks : [];
+    const seen = new Set();
+    const chips = [];
+    for (const l of links) {
+      const href = String(l?.href || '').trim();
+      if (!isHttpOrHttpsUrl(href) || seen.has(href)) continue;
+      seen.add(href);
+      let label = String(l?.text || '').replace(/\s+/g, ' ').trim();
+      if (!label) {
+        try {
+          label = new URL(href).hostname.replace(/^www\./, '');
+        } catch {
+          label = href;
+        }
+      }
+      if (label.length > 60) label = `${label.slice(0, 57)}…`;
+      chips.push(
+        `<a class="tag-chip nl-user-profile-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
+      );
+      if (chips.length >= 20) break;
+    }
+    return chips.length
+      ? `<h2 style="margin-top:12px;">支援物資・外部リンク</h2><div class="tag-list">${chips.join('')}</div>`
+      : '';
+  })();
   // 漫画コマ風の「番組のおさらい」セクション。レスポンシブ（clamp + container query）。
   const mangaReportPanels = buildMangaBroadcastPanels({
     bundle: eventDomBundleForReport,
     broadcastTitle: String(snapshot?.broadcastTitle || snapshot?.title || ''),
     broadcasterName: String(snapshot?.broadcasterName || ''),
+    broadcasterUserId: String(
+      broadcasterProfileModel?.userId || snapshot?.broadcasterUserId || ''
+    ),
     recordedCommentCount: Array.isArray(comments) ? comments.length : 0,
     streamAgeMin:
       typeof snapshot?.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0
@@ -12561,7 +12745,13 @@ async function buildHtmlReportDocument(
       const headParts = [];
       if (evName) headParts.push(`<p class="event-rank__name">🏆 ${escapeHtml(evName)}</p>`);
       if (self && (self.rank != null || self.score != null)) {
-        const who = self.broadcasterName ? `${escapeHtml(String(self.broadcasterName))}さん` : 'この配信者さん';
+        const selfUid = String(broadcasterProfileModel?.userId || '').trim();
+        const selfNameHtml = self.broadcasterName
+          ? /^\d{1,18}$/.test(selfUid)
+            ? buildUserProfileLinkedLabelHtml(selfUid, String(self.broadcasterName))
+            : escapeHtml(String(self.broadcasterName))
+          : '';
+        const who = self.broadcasterName ? `${selfNameHtml}さん` : 'この配信者さん';
         const rk = self.rank != null ? `現在 <strong>${escapeHtml(String(self.rank))}</strong> 位` : '';
         const sc = self.score != null ? ` 💎 <strong>${escapeHtml(fmtN(self.score))}</strong>` : '';
         headParts.push(`<p class="event-rank__self">${who} ${rk}${sc}</p>`);
@@ -12573,13 +12763,20 @@ async function buildHtmlReportDocument(
       const rowsHtml = rows
         .map((r) => {
           const rank = escapeHtml(String(r.rank));
-          const name = escapeHtml(String(r.name || '名無し'));
+          const rowUid = String(r.userId || '').trim();
+          const rawName = String(r.name || '名無し');
+          const name = /^\d{1,18}$/.test(rowUid)
+            ? buildUserProfileLinkedLabelHtml(rowUid, rawName)
+            : escapeHtml(rawName);
           const score = escapeHtml(fmtN(Number(r.score) || 0));
           // model 側で http/https のみに正規化済み。出力時も二重で scheme 検証（S-2）。
           const thumb = /^https?:\/\//i.test(String(r.thumbnailUrl || '')) ? String(r.thumbnailUrl) : '';
-          const img = thumb
+          const imgInner = thumb
             ? `<img class="event-rank__thumb" src="${escapeAttr(thumb)}" alt="" width="28" height="28" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" />`
             : `<span class="event-rank__thumb event-rank__thumb--none" aria-hidden="true"></span>`;
+          const img = /^\d{1,18}$/.test(rowUid)
+            ? `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(rowUid)}" target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${imgInner}</a>`
+            : imgInner;
           return (
             `<tr>` +
             `<td class="event-rank__rank">${rank}</td>` +
@@ -13252,7 +13449,8 @@ async function buildHtmlReportDocument(
             <tbody>
               <tr class="search-item" data-search="${escapeAttr(liveId.toLowerCase())}"><th>liveId</th><td class="mono">${safeLiveId}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcastTitle || '').toLowerCase())}"><th>放送タイトル</th><td>${safeBroadcastTitle}</td></tr>
-              <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcasterName || '').toLowerCase())}"><th>配信者名</th><td>${safeBroadcasterName}</td></tr>
+              <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcasterName || '').toLowerCase())}"><th>配信者名</th><td>${broadcasterNameCellHtml(broadcasterProfileModel, snapshot?.broadcasterName || '')}</td></tr>
+              ${broadcasterProfileRowsHtml}
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.startAtText || '').toLowerCase())}"><th>開始時刻（公式表記）</th><td>${safeStartAtText}</td></tr>
               <tr><th>最初の記録コメント</th><td>${escapeHtml(formatTimingDate(reportTiming.firstCapturedAt))}</td></tr>
               <tr><th>最後の記録コメント</th><td>${escapeHtml(formatTimingDate(reportTiming.lastCapturedAt))}</td></tr>
@@ -13287,6 +13485,7 @@ async function buildHtmlReportDocument(
                   .join('')}</div>`
               : '<div class="mono">取得なし</div>'
           }
+          ${externalLinksHtml}
           ${
             safeSnapshotError
               ? `<div class="warn">${safeSnapshotError}</div>`
@@ -14865,6 +15064,7 @@ async function initPopup() {
       const report = aggregateMarketingReport(comments, lid, {
         broadcasterUserId: reportBroadcasterUid
       });
+      await attachCommenterFollowToReport(report, lid);
       const maskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
       const maskShare = Boolean(maskEl?.checked);
       // 0.1.22〜0.1.30: 同接サンプル / 過去配信 / 公式 DOM bundle / ゆっくり画像は互いに独立なので
@@ -14927,6 +15127,10 @@ async function initPopup() {
             }
           })()
         ]);
+      const broadcasterProfileForMkt = await resolveBroadcasterProfileModel(
+        watchMetaCache.snapshot,
+        lid
+      );
       if (stEl) stEl.textContent = '分析中… (3/3) HTML生成';
       // HTML 文字列生成（数万コメ・画像 data URL 込み）は最重量の同期処理。直前に
       //   1 フレーム譲り、「(3/3) HTML生成」を描画してから走らせる（体感の固まり解消）。
@@ -14953,6 +15157,10 @@ async function initPopup() {
           watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
         ),
         broadcasterName: String(watchMetaCache.snapshot?.broadcasterName || ''),
+        broadcasterProfile: broadcasterProfileForMkt,
+        noopenerLinks: Array.isArray(watchMetaCache.snapshot?.noopenerLinks)
+          ? watchMetaCache.snapshot.noopenerLinks
+          : [],
         recordedCommentCount: Array.isArray(comments) ? comments.length : 0,
         streamAgeMin:
           typeof watchMetaCache.snapshot?.streamAgeMin === 'number'
@@ -15015,6 +15223,9 @@ async function initPopup() {
                 watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
               ),
               broadcasterName: String(watchMetaCache.snapshot?.broadcasterName || ''),
+              broadcasterProfile: normalizeBroadcasterProfileModel(
+                mergeBroadcasterProfileRaw(watchMetaCache.snapshot, null)
+              ),
               recordedCommentCount: Array.isArray(fallbackComments) ? fallbackComments.length : 0,
               streamAgeMin:
                 typeof watchMetaCache.snapshot?.streamAgeMin === 'number'

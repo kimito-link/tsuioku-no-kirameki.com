@@ -1904,6 +1904,90 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;
 });
 
+// --- 配信者プロフィール HTML ページ取得（LV/プレミアム/フォロー/欲しいものリスト解析用）---
+// src/lib/nicoUserProfileApi.js の NICO_USER_PROFILE_PAGE_FETCH_MESSAGE_TYPE と文字列同期。
+const NICO_USER_PROFILE_PAGE_FETCH_MESSAGE_TYPE = 'NLS_NICO_USER_PROFILE_PAGE_FETCH';
+const NICO_USER_PROFILE_PAGE_MAX_BYTES = 2_500_000;
+const NICO_USER_PROFILE_PAGE_LRU_TTL_MS = 30 * 60 * 1000;
+/** @type {Map<string, number>} */
+const _nicoUserProfilePageLru = new Map();
+
+async function fetchNicoUserProfilePageHtml(uid) {
+  const id = String(uid == null ? '' : uid).trim();
+  // SSRF 対策: 正の数値 uid のみ。URL の path 以外は固定。
+  if (!NICO_USER_PROFILE_UID_RE.test(id) || Number(id) <= 0) return { ok: false };
+  const now = Date.now();
+  const at = _nicoUserProfilePageLru.get(id);
+  if (at != null && now - at < NICO_USER_PROFILE_PAGE_LRU_TTL_MS) {
+    return { ok: false, skipped: true };
+  }
+  if (_nicoUserProfilePageLru.has(id)) _nicoUserProfilePageLru.delete(id);
+  _nicoUserProfilePageLru.set(id, now);
+  while (_nicoUserProfilePageLru.size > NICO_USER_PROFILE_LRU_MAX) {
+    const oldest = _nicoUserProfilePageLru.keys().next().value;
+    if (oldest === undefined) break;
+    _nicoUserProfilePageLru.delete(oldest);
+  }
+  const url = 'https://www.nicovideo.jp/user/' + encodeURIComponent(id);
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, NICO_USER_PROFILE_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit',
+      cache: 'no-store',
+      redirect: 'follow',
+      signal: ac.signal
+    });
+    let html = '';
+    try {
+      html = await res.text();
+    } catch {
+      html = '';
+    }
+    if (html.length > NICO_USER_PROFILE_PAGE_MAX_BYTES) {
+      html = html.slice(0, NICO_USER_PROFILE_PAGE_MAX_BYTES);
+    }
+    return { ok: res.ok, status: res.status, html, finalUrl: res.url || url };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== NICO_USER_PROFILE_PAGE_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchNicoUserProfilePageHtml(msg.uid)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true;
+});
+
 /* ------------------------------------------------------------------ */
 /* ツールバー: ページ内インラインがあれば前面化、なければ popup 窓（src/lib/uiUxOpenStrategy と整合） */
 /* ------------------------------------------------------------------ */

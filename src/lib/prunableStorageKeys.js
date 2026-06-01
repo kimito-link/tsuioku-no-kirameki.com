@@ -31,7 +31,9 @@ export const PRUNABLE_STORAGE_KEY_PREFIXES = Object.freeze([
   'nls_event_participation_',
   'nls_event_score_ranking_',
   'nls_event_voting_ranking_',
-  'nls_nicoad_ranking_'
+  'nls_nicoad_ranking_',
+  'nls_broadcaster_profile_',
+  'nls_commenter_follow_live_'
 ]);
 
 /**

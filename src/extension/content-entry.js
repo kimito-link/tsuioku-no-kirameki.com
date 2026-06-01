@@ -29,6 +29,7 @@ import {
   KEY_DEEP_HARVEST_QUIET_UI,
   KEY_SELF_POSTED_RECENTS,
   KEY_USER_COMMENT_PROFILE_CACHE,
+  KEY_COMMENTER_FOLLOW_CACHE,
   KEY_COMMENT_PANEL_STATUS,
   KEY_COMMENT_INGEST_LOG,
   KEY_STORAGE_WRITE_ERROR,
@@ -50,6 +51,8 @@ import {
   backfillResumeStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
+  broadcasterProfileStorageKey,
+  commenterFollowLiveStorageKey,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
@@ -115,6 +118,18 @@ import {
   upsertUserCommentProfileFromEntry,
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
+import {
+  normalizeCommenterFollowMap,
+  commenterFollowEntryFromProfile,
+  upsertCommenterFollowEntry,
+  isFreshFollowEntry,
+  COMMENTER_FOLLOW_TTL_MS,
+  COMMENTER_FOLLOW_FETCH_BATCH,
+  collectNumericCommentersFromComments,
+  buildCommenterFollowRows,
+  buildCommenterFollowLiveSnapshot,
+  pickFollowUidsToFetch
+} from '../lib/commenterFollowCache.js';
 import { mergeGiftUsers } from '../lib/giftRecord.js';
 import {
   collectOfficialEventDomBundle,
@@ -261,8 +276,11 @@ import {
 import {
   normalizeNicoUserProfileResponse,
   isResolvableNicoUid,
-  NICO_USER_PROFILE_FETCH_MESSAGE_TYPE
+  NICO_USER_PROFILE_FETCH_MESSAGE_TYPE,
+  NICO_USER_PROFILE_PAGE_FETCH_MESSAGE_TYPE
 } from '../lib/nicoUserProfileApi.js';
+import { extractNicoUserBroadcastStats } from '../lib/nicoUserProfilePage.js';
+import { normalizeBroadcasterProfileModel } from '../lib/broadcasterProfileCard.js';
 import { appendGiftEvents } from '../lib/giftEventStore.js';
 import { resolveGiftSenderBucketKey } from '../lib/giftSenderObservation.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
@@ -11358,6 +11376,7 @@ function onTabVisibleForCommentHarvest() {
   maybeFetchEventParticipationMirrorOnce();
   maybeFetchKokenGiftHistoryMirrorOnce();
   maybeFetchAuditionEventRankingMirrorOnce();
+  maybeFetchBroadcasterProfileMirrorOnce();
   scanVisibleCommentsNow();
   const now = Date.now();
   const needsRecovery = shouldForceDeepHarvestRecovery({
@@ -12818,6 +12837,10 @@ const EVENT_PARTICIPATION_API_MIN_GAP_MS = 10_000;
 let _eventParticipationApiLastAttemptAt = 0;
 /** 1 tick で nvapi に問い合わせる記名 uid の最大数。 */
 const NICO_PROFILE_RESOLVE_BATCH = 3;
+/** follow 専用バッチの再入抑止（nvapi レート制限対策）。 */
+const COMMENTER_FOLLOW_FETCH_MIN_GAP_MS = 8_000;
+/** @type {number} */
+let _commenterFollowFetchLastAt = 0;
 /** content 側でも問い合わせ済み uid を覚え、SW LRU と二重に抑制する。 */
 const _nicoProfileResolveAttempted = new Set();
 
@@ -12845,7 +12868,9 @@ function runExternalApiFetchesAsTabLeader(opts = {}) {
     //   タブリーダー集約・min-gap 再入抑止・rows>0 のみ書込（fail-soft）。
     maybeFetchKokenGiftHistoryMirrorOnce();
     maybeFetchAuditionEventRankingMirrorOnce();
+    maybeFetchBroadcasterProfileMirrorOnce();
     void maybeResolveNamedUserProfilesOnce();
+    void maybeFetchCommenterFollowBatchOnce();
   });
 }
 
@@ -13131,6 +13156,117 @@ function maybeFetchKokenGiftHistoryMirrorOnce() {
   }
 }
 
+/** 配信者プロフィール取得（nvapi + プロフィール HTML）の再入抑止。プロフィールは滅多に変わらない。 */
+const BROADCASTER_PROFILE_API_MIN_GAP_MS = 5 * 60 * 1000;
+/** @type {number} */
+let _broadcasterProfileApiLastAttemptAt = 0;
+
+/**
+ * 配信者プロフィール（プレミアム会員・フォロー/フォロワー・LV・配信開始日・累計配信日数・
+ * 欲しいものリスト等）を取得し、`nls_broadcaster_profile_<lv>` に保存する。レポート2種の
+ * ヘッダーカードがこれを読む。nvapi JSON とプロフィール HTML を SW 経由で並行取得し統合。
+ *
+ * 制約は他経路と同一: top-frame のみ・数値 uid のみ・SW 経由 fetch（SSRF 対策）・liveId echo
+ * 一致確認・min-gap 再入抑止・取得できた項目だけ保存（fail-soft）。
+ */
+function maybeFetchBroadcasterProfileMirrorOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '')
+      .trim()
+      .toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const uid = String(detectBroadcasterUserIdFromDom() || '').trim();
+    if (!isResolvableNicoUid(uid)) return; // 数値 uid（ユーザー/コミュ放送）だけ。運営/業者は対象外
+    const now = Date.now();
+    if (now - _broadcasterProfileApiLastAttemptAt < BROADCASTER_PROFILE_API_MIN_GAP_MS) return;
+    _broadcasterProfileApiLastAttemptAt = now;
+
+    /** @type {Record<string, unknown>} */
+    const merged = { userId: uid };
+    let pending = 2;
+    const finish = () => {
+      pending -= 1;
+      if (pending > 0) return;
+      const curLid = String(liveId || '')
+        .trim()
+        .toLowerCase();
+      if (curLid !== lid) return; // 応答到着までに別 lv へ遷移していたら stale 書込しない
+      const model = normalizeBroadcasterProfileModel(merged);
+      if (!model) return;
+      try {
+        chrome.storage.local
+          .set({
+            [broadcasterProfileStorageKey(lid)]: { ...model, capturedAt: Date.now() }
+          })
+          .catch((err) => {
+            if (!isContextInvalidatedError(err)) {
+              /* best-effort */
+            }
+          });
+      } catch {
+        /* no-op */
+      }
+    };
+
+    // nvapi /v1/users/<id>（LV/プレミアム/フォロー/フォロワー/アイコン/表示名）。
+    chrome.runtime.sendMessage(
+      { type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid },
+      (resp) => {
+        const le = chrome.runtime.lastError;
+        if (le) {
+          finish();
+          return;
+        }
+        try {
+          if (resp && resp.ok === true && resp.json != null) {
+            const p = normalizeNicoUserProfileResponse(resp.json);
+            if (p) Object.assign(merged, p); // nvapi を優先（authoritative）
+          }
+        } catch {
+          /* no-op */
+        }
+        finish();
+      }
+    );
+
+    // プロフィール HTML（配信開始日/累計配信日数/欲しいものリスト/放送リクエスト等の補完）。
+    chrome.runtime.sendMessage(
+      { type: NICO_USER_PROFILE_PAGE_FETCH_MESSAGE_TYPE, uid },
+      (resp) => {
+        const le = chrome.runtime.lastError;
+        if (le) {
+          finish();
+          return;
+        }
+        try {
+          if (
+            resp &&
+            resp.ok === true &&
+            typeof resp.html === 'string' &&
+            resp.html &&
+            typeof DOMParser !== 'undefined'
+          ) {
+            const doc = new DOMParser().parseFromString(resp.html, 'text/html');
+            const stats = extractNicoUserBroadcastStats(doc);
+            for (const [k, v] of Object.entries(stats)) {
+              if (v === null || v === undefined || v === '') continue;
+              // HTML は補完のみ。nvapi で既に取れている項目は上書きしない。
+              if (merged[k] === undefined) merged[k] = v;
+            }
+          }
+        } catch {
+          /* no-op */
+        }
+        finish();
+      }
+    );
+  } catch {
+    /* no-op: 次 tick で自己回復 */
+  }
+}
+
 /** audition イベント💎ランキング API の再入抑止。 */
 const AUDITION_EVENT_RANKING_API_MIN_GAP_MS = 12_000;
 /** @type {number} */
@@ -13278,11 +13414,15 @@ async function maybeResolveNamedUserProfilesOnce() {
     const bag = await chrome.storage.local.get([
       commentsKey,
       giftsKey,
-      KEY_USER_COMMENT_PROFILE_CACHE
+      KEY_USER_COMMENT_PROFILE_CACHE,
+      KEY_COMMENTER_FOLLOW_CACHE
     ]);
     const profileMap = normalizeUserCommentProfileMap(
       bag[KEY_USER_COMMENT_PROFILE_CACHE]
     );
+    // フォロー/フォロワー横断キャッシュ（数値 uid キー・TTL 付き）。同じ nvapi 応答から拾う。
+    const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
+    const followNow = Date.now();
     let comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
     const giftUsers = Array.isArray(bag[giftsKey]) ? bag[giftsKey] : [];
 
@@ -13298,7 +13438,12 @@ async function maybeResolveNamedUserProfilesOnce() {
       const hit = profileMap[uid];
       const hasNick = hit && String(hit.nickname || '').trim() !== '';
       const hasAvatar = hit && String(hit.avatarUrl || '').trim() !== '';
-      if (hasNick && hasAvatar) return;
+      // フォロー情報が未取得/TTL 切れなら、nick/avatar が揃っていても候補に入れる
+      // （同じ nvapi 応答で follow も拾える）。
+      const followHit = followMap[uid];
+      const hasFreshFollow =
+        followHit && isFreshFollowEntry(Number(followHit.fetchedAt), followNow, COMMENTER_FOLLOW_TTL_MS);
+      if (hasNick && hasAvatar && hasFreshFollow) return;
       candidates.push(uid);
     };
 
@@ -13340,6 +13485,7 @@ async function maybeResolveNamedUserProfilesOnce() {
       });
 
     let cacheTouched = false;
+    let followTouched = false;
     for (const uid of candidates) {
       _nicoProfileResolveAttempted.add(uid);
       const p = await askOne(uid);
@@ -13347,18 +13493,120 @@ async function maybeResolveNamedUserProfilesOnce() {
       if (upsertUserCommentProfileFromEntry(profileMap, p, broadcasterCtx)) {
         cacheTouched = true;
       }
+      // 同じ nvapi 応答からフォロー/フォロワー/プレミアム/LV を follow キャッシュへ。
+      const followEntry = commenterFollowEntryFromProfile(p, Date.now());
+      if (followEntry && upsertCommenterFollowEntry(followMap, uid, followEntry)) {
+        followTouched = true;
+      }
     }
-    if (!cacheTouched) return;
+    if (!cacheTouched && !followTouched) return;
 
     const curLid = String(liveId || '').trim().toLowerCase();
     if (curLid !== lid) return;
 
-    const pruned = pruneUserCommentProfileMap(profileMap);
-    const applied = applyUserCommentProfileMapToEntries(comments, pruned);
-    if (applied.patched > 0) comments = applied.next;
+    /** @type {Record<string, unknown>} */
+    const save = {};
+    if (cacheTouched) {
+      const pruned = pruneUserCommentProfileMap(profileMap);
+      const applied = applyUserCommentProfileMapToEntries(comments, pruned);
+      if (applied.patched > 0) comments = applied.next;
+      save[KEY_USER_COMMENT_PROFILE_CACHE] = pruned;
+      if (applied.patched > 0) save[commentsKey] = comments;
+    }
+    if (followTouched) {
+      save[KEY_COMMENTER_FOLLOW_CACHE] = followMap;
+    }
+    if (Object.keys(save).length) await chrome.storage.local.set(save);
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      /* best-effort */
+    }
+  }
+}
 
-    const save = { [KEY_USER_COMMENT_PROFILE_CACHE]: pruned };
-    if (applied.patched > 0) save[commentsKey] = comments;
+/**
+ * 数値 ID コメンター全員を対象に、未取得/TTL 切れ分だけ nvapi から follow 情報を
+ * 少数ずつ取得し、横断キャッシュ + 配信別スナップショット（`nls_commenter_follow_live_<lv>`）
+ * を更新する。名前解決（maybeResolveNamedUserProfilesOnce）とは独立した follow 専用経路。
+ */
+async function maybeFetchCommenterFollowBatchOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _commenterFollowFetchLastAt < COMMENTER_FOLLOW_FETCH_MIN_GAP_MS) return;
+    _commenterFollowFetchLastAt = now;
+
+    const commentsKey = commentsStorageKey(lid);
+    const bag = await chrome.storage.local.get([
+      commentsKey,
+      KEY_USER_COMMENT_PROFILE_CACHE,
+      KEY_COMMENTER_FOLLOW_CACHE
+    ]);
+    const comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
+    const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
+    const broadcasterUid = String(detectBroadcasterUserIdFromDom() || broadcasterUidCache || '').trim();
+    const stats = collectNumericCommentersFromComments(comments, {
+      excludeUserId: broadcasterUid
+    });
+    if (!stats.length) return;
+
+    const toFetch = pickFollowUidsToFetch(
+      stats.map((s) => s.userId),
+      followMap,
+      { nowMs: now, limit: COMMENTER_FOLLOW_FETCH_BATCH }
+    );
+
+    const askOne = (uid) =>
+      new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage(
+            { type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid },
+            (resp) => {
+              const le = chrome.runtime.lastError;
+              if (le) return resolve(null);
+              if (!resp || resp.ok !== true || resp.json == null) return resolve(null);
+              try {
+                resolve(normalizeNicoUserProfileResponse(resp.json));
+              } catch {
+                resolve(null);
+              }
+            }
+          );
+        } catch {
+          resolve(null);
+        }
+      });
+
+    let followTouched = false;
+    for (const uid of toFetch) {
+      const p = await askOne(uid);
+      if (!p) continue;
+      const followEntry = commenterFollowEntryFromProfile(p, Date.now());
+      if (followEntry && upsertCommenterFollowEntry(followMap, uid, followEntry)) {
+        followTouched = true;
+      }
+      if (upsertUserCommentProfileFromEntry(profileMap, p, {
+        broadcasterUid: broadcasterUidCache,
+        broadcasterIconUrl: broadcasterIconUrlCache
+      })) {
+        /* nickname も同時に補完（best-effort） */
+      }
+    }
+
+    const curLid = String(liveId || '').trim().toLowerCase();
+    if (curLid !== lid) return;
+
+    const rows = buildCommenterFollowRows(stats, followMap, profileMap);
+    const snapshot = buildCommenterFollowLiveSnapshot(lid, rows, Date.now());
+    if (!snapshot) return;
+
+    /** @type {Record<string, unknown>} */
+    const save = { [commenterFollowLiveStorageKey(lid)]: snapshot };
+    if (followTouched) save[KEY_COMMENTER_FOLLOW_CACHE] = followMap;
     await chrome.storage.local.set(save);
   } catch (err) {
     if (!isContextInvalidatedError(err)) {
@@ -13366,6 +13614,7 @@ async function maybeResolveNamedUserProfilesOnce() {
     }
   }
 }
+
 /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */
 let lastOfficialEventDomBundle = null;
 /**

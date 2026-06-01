@@ -14,12 +14,27 @@ import { maskLabelForShare } from './privacyDisplay.js';
 export function cloneReportForJsonEmbed(report, maskShareLabels) {
   const r = /** @type {MarketingReport} */ (JSON.parse(JSON.stringify(report)));
   if (!maskShareLabels) return r;
-  r.topUsers = r.topUsers.map((u) => ({
+  /** @param {import('./marketingAggregate.js').UserCommentProfile} u */
+  const maskUser = (u) => ({
     ...u,
     nickname: maskLabelForShare(String(u.nickname || '')),
     userId: maskLabelForShare(String(u.userId || '')),
     avatarUrl: ''
-  }));
+  });
+  r.topUsers = r.topUsers.map(maskUser);
+  if (Array.isArray(r.allNumericCommenters)) {
+    r.allNumericCommenters = r.allNumericCommenters.map(maskUser);
+  }
+  if (r.commenterFollowDataset && Array.isArray(r.commenterFollowDataset.rows)) {
+    r.commenterFollowDataset = {
+      ...r.commenterFollowDataset,
+      rows: r.commenterFollowDataset.rows.map((row) => ({
+        ...row,
+        userId: maskLabelForShare(String(row.userId || '')),
+        nickname: maskLabelForShare(String(row.nickname || ''))
+      }))
+    };
+  }
   return r;
 }
 

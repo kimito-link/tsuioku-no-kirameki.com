@@ -70,11 +70,22 @@ import { resolveWatchMetaCardState } from './watchMetaCardStateGate.js';
  */
 
 /**
+ * @typedef {{
+ *   applied?: boolean,
+ *   basis?: string,
+ *   sampleCount?: number,
+ *   multiplierScale?: number|null
+ * }} WatchMetaCalibrationInfo
+ */
+
+/**
  * @param {WatchMetaSnapshotMerged} snapshot
  * @param {{
  *   commentEntries?: readonly unknown[],
  *   nowMs: number,
- *   prevForReactions: WatchMetaCardReactionPrev
+ *   prevForReactions: WatchMetaCardReactionPrev,
+ *   profile?: import('./concurrentEstimate.js').PlatformProfile|string|null,
+ *   calibration?: WatchMetaCalibrationInfo|null
  * }} opts
  * @returns {WatchMetaCardAudienceViewModel}
  */
@@ -203,7 +214,10 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       recentActiveUsers: recentActive,
       totalVisitors: typeof vc === 'number' && vc > 0 ? vc : undefined,
       streamAgeMin: streamAge,
-      commentsPerMin
+      commentsPerMin,
+      // 自動補正（オートキャリブレーション）: 較正データから導いた係数プロファイル。
+      // 未指定なら従来どおり既定（ニコ生）プロファイルで推定（挙動互換）。
+      profile: opts?.profile ?? undefined
     });
 
     nextConcurrentEstimated = resolved.estimated;
@@ -255,6 +269,23 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
     }
     if (sparseConcurrent) {
       parts.push(SPARSE_CONCURRENT_ESTIMATE_NOTE);
+    }
+    // 自動補正（オートキャリブレーション）が効いているときは診断に明示する。
+    // official のときは表示値に影響しないため注記しない（公式直値が優先）。
+    if (
+      opts?.calibration &&
+      opts.calibration.applied &&
+      resolved.method !== 'official'
+    ) {
+      const c = opts.calibration;
+      const basisLabel = c.basis === 'official' ? '真値' : '自己整合';
+      const scaleStr =
+        typeof c.multiplierScale === 'number' && Number.isFinite(c.multiplierScale)
+          ? `×${c.multiplierScale}`
+          : '';
+      const cntStr =
+        typeof c.sampleCount === 'number' && c.sampleCount > 0 ? ` ${c.sampleCount}件` : '';
+      parts.push(`自動補正ON(${basisLabel}${cntStr}${scaleStr ? ` 倍率${scaleStr}` : ''})`);
     }
 
     /** @type {string} */

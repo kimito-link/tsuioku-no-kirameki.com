@@ -105,6 +105,33 @@ describe('buildMangaBroadcastPanels', () => {
     expect(ev.highlight.label).toContain('順位');
   });
 
+  it('broadcasterUserId を渡すと opening の配信者名が user リンク（lineHtml）になる', () => {
+    const panels = buildMangaBroadcastPanels({
+      ...sampleInput(),
+      broadcasterUserId: '142919600'
+    });
+    const opening = panels.find((p) => p.sceneId === 'opening');
+    expect(opening.dialogues[0].lineHtml).toContain(
+      'https://www.nicovideo.jp/user/142919600'
+    );
+    expect(opening.dialogues[0].lineHtml).toContain('あかねこ。');
+  });
+
+  it('貢献者に userId があると top-fans の名前が user リンク（lineHtml）になる', () => {
+    const input = sampleInput();
+    input.bundle.contributionRanking[0] = {
+      ...input.bundle.contributionRanking[0],
+      userId: '6329015'
+    };
+    const panels = buildMangaBroadcastPanels(input);
+    const fans = panels.find((p) => p.sceneId === 'top-fans');
+    expect(fans.dialogues[0].lineHtml).toContain(
+      'https://www.nicovideo.jp/user/6329015'
+    );
+    expect(fans.dialogues[0].lineHtml).toContain('なぎ');
+    expect(fans.dialogues[1].lineHtml).toBeUndefined();
+  });
+
   it('top-fans は 3 人会話で 1〜3 位を順に紹介、1位を highlight', () => {
     const panels = buildMangaBroadcastPanels(sampleInput());
     const fans = panels.find((p) => p.sceneId === 'top-fans');

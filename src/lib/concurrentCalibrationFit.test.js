@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeCalibrationFit,
+  buildCalibratedPlatformProfile,
   CALIBRATION_FIT_MIN_TRUTH_SAMPLES,
   CALIBRATION_FIT_MIN_CROSS_SAMPLES
 } from './concurrentCalibrationFit.js';
+import { NICONICO_PROFILE, dynamicMultiplier } from './concurrentEstimate.js';
 
 /** @param {number} i @param {object} extra */
 function baseSample(i, extra) {
@@ -104,5 +106,61 @@ describe('computeCalibrationFit', () => {
     expect(r.suggested.multiplierScale).toBeLessThanOrEqual(3);
     expect(r.suggested.avgSessionMin).toBeLessThanOrEqual(240);
     expect(r.suggested.perPersonCommentsPerMin).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('buildCalibratedPlatformProfile', () => {
+  /** @param {number} n @param {object} extra */
+  function crossItems(n, extra) {
+    const items = [];
+    for (let i = 0; i < n; i++) items.push(baseSample(i, extra));
+    return items;
+  }
+
+  it('ready でないとき（サンプル不足）は base をそのまま返す＝補正なし', () => {
+    const fit = computeCalibrationFit({ items: [] });
+    const r = buildCalibratedPlatformProfile(NICONICO_PROFILE, fit);
+    expect(r.applied).toBe(false);
+    expect(r.profile).toBe(NICONICO_PROFILE);
+    expect(r.multiplierScale).toBeNull();
+  });
+
+  it('fit が null でも安全に base を返す', () => {
+    const r = buildCalibratedPlatformProfile(NICONICO_PROFILE, null);
+    expect(r.applied).toBe(false);
+    expect(r.profile).toBe(NICONICO_PROFILE);
+  });
+
+  it('ready のとき multiplierScale を倍率テーブル/defaultMultiplier に乗算する', () => {
+    const fit = computeCalibrationFit({
+      items: crossItems(CALIBRATION_FIT_MIN_CROSS_SAMPLES + 5, {
+        signalA: 100,
+        signalB: 400, // R = geomean = 200 → multiplierScale = 2
+        totalVisitors: 2000,
+        streamAgeMin: 50,
+        commentsPerMin: 10
+      })
+    });
+    expect(fit.ready).toBe(true);
+    expect(fit.suggested.multiplierScale).toBeCloseTo(2, 2);
+
+    const r = buildCalibratedPlatformProfile(NICONICO_PROFILE, fit);
+    expect(r.applied).toBe(true);
+    expect(r.basis).toBe('cross-signal');
+    // base の倍率が ×2 されている（dynamicMultiplier 経由で確認）。
+    const baseMult = dynamicMultiplier(2000, NICONICO_PROFILE);
+    const calMult = dynamicMultiplier(2000, r.profile);
+    expect(calMult).toBeCloseTo(baseMult * 2, 1);
+    // session / chatDensity も推奨値で上書きされている。
+    expect(r.profile.session.avgSessionMin).toBeCloseTo(5, 1);
+    expect(r.profile.chatDensity.perPersonCommentsPerMin).toBeCloseTo(0.05, 3);
+    // base は不変（凍結クローンを返している）。
+    expect(NICONICO_PROFILE.session.avgSessionMin).toBe(15);
+  });
+
+  it('不正な base はニコ生プロファイルにフォールバックする', () => {
+    const fit = computeCalibrationFit({ items: [] });
+    const r = buildCalibratedPlatformProfile(/** @type {any} */ ({}), fit);
+    expect(r.profile).toBe(NICONICO_PROFILE);
   });
 });

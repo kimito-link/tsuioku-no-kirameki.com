@@ -13,7 +13,12 @@ import { isSameAvatarUrl } from './avatarUrlCompare.js';
  *   avatarUrl: string,
  *   count: number,
  *   firstAt: number,
- *   lastAt: number
+ *   lastAt: number,
+ *   accountStatus?: number,
+ *   followerCount?: number,
+ *   followeeCount?: number,
+ *   isPremium?: boolean,
+ *   userLevel?: number
  * }} UserCommentProfile
  */
 
@@ -82,6 +87,8 @@ import { isSameAvatarUrl } from './avatarUrlCompare.js';
  *   durationMinutes: number,
  *   commentsPerMinute: number,
  *   topUsers: UserCommentProfile[],
+ *   allNumericCommenters: UserCommentProfile[],
+ *   commenterFollowDataset?: import('./commenterFollowCache.js').CommenterFollowLiveSnapshot|null,
  *   timeline: TimelineBucket[],
  *   segmentCounts: { heavy: number, mid: number, light: number, once: number },
  *   segmentPcts: { heavy: number, mid: number, light: number, once: number },
@@ -161,6 +168,12 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
     const t = c.capturedAt || 0;
     timestamps.push(t);
 
+    // accountStatus（NDGR field 4）: 2=プレミアム / 1=一般 / 0・null=不明。
+    // ユーザー単位では「最も強い既知の属性」を採用する（premium が一度でも付けば premium）。
+    const rowAccount =
+      typeof c.accountStatus === 'number' && (c.accountStatus === 1 || c.accountStatus === 2)
+        ? c.accountStatus
+        : 0;
     const existing = userMap.get(uid);
     if (existing) {
       existing.count++;
@@ -168,6 +181,7 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
       if (!existing.avatarUrl && c.avatarUrl) existing.avatarUrl = c.avatarUrl;
       if (t < existing.firstAt) existing.firstAt = t;
       if (t > existing.lastAt) existing.lastAt = t;
+      if (rowAccount > (existing.accountStatus || 0)) existing.accountStatus = rowAccount;
     } else {
       userMap.set(uid, {
         userId: uid,
@@ -175,7 +189,8 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
         avatarUrl: c.avatarUrl || '',
         count: 1,
         firstAt: t,
-        lastAt: t
+        lastAt: t,
+        accountStatus: rowAccount
       });
     }
   }
@@ -284,6 +299,7 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
     commentsPerMinute:
       Math.round((filtered.length / durationMinutes) * 10) / 10,
     topUsers: users.slice(0, 30),
+    allNumericCommenters: users.filter((u) => /^\d{1,18}$/.test(String(u.userId || ''))),
     timeline,
     segmentCounts: { heavy, mid, light, once },
     segmentPcts: {

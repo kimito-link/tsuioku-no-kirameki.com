@@ -85,4 +85,34 @@ describe('nicoUserProfileApi', () => {
     expect(normalizeNicoUserProfileResponse({ data: { user: { id: 7 } } })).toBeNull();
     expect(normalizeNicoUserProfileResponse({ meta: { status: 500 } })).toBeNull();
   });
+
+  it('拡張: LV / プレミアム / フォロー / フォロワー を取得できたら付与する', () => {
+    const p = normalizeNicoUserProfileResponse({
+      data: {
+        followeeCount: 12,
+        followerCount: 3400,
+        user: {
+          id: 7,
+          nickname: 'A',
+          isPremium: true,
+          userLevel: { currentLevel: 55 }
+        }
+      }
+    });
+    expect(p).toMatchObject({
+      userId: '7',
+      nickname: 'A',
+      level: 55,
+      isPremium: true,
+      followeeCount: 12,
+      followerCount: 3400
+    });
+  });
+
+  it('拡張: 拡張項目が無い場合は従来の3キーのみ（後方互換）', () => {
+    const p = normalizeNicoUserProfileResponse({
+      data: { user: { id: 7, nickname: 'only-name' } }
+    });
+    expect(p).toEqual({ userId: '7', nickname: 'only-name', avatarUrl: '' });
+  });
 });
