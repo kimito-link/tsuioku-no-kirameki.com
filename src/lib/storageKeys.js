@@ -27,6 +27,17 @@ export const KEY_RECORDING_WATCHDOG = 'nls_recording_watchdog_v1';
 /** AI共有・不具合調査用のエラーリング（最大80件・本文はマスク済み・local only） */
 export const KEY_DIAGNOSTICS_ERROR_RING_V1 = 'nls_diagnostics_error_ring_v1';
 
+/**
+ * 同接推定の較正データ（リングバッファ・最大2000件・local only・PII なし）。
+ * 推定算出のたびに throttled で 1 サンプル（A/B/C/D/blend・来場・コメ毎分・経過・
+ * 公式同接があれば誤差）を積む。手動視聴と自動巡回(autopatrol)の両方が同じ器へ書く。
+ * 後から CSV/JSON でエクスポートし、係数（avgSessionMin / perPersonCommentsPerMin /
+ * 倍率）の較正に使う。キャッシュクリアでは消さない（EXTENSION_SOFT_CACHE_STORAGE_KEYS 非対象）。
+ * @see src/lib/concurrentCalibrationLog.js
+ */
+export const KEY_CONCURRENT_CALIBRATION_RING_V1 =
+  'nls_concurrent_calibration_ring_v1';
+
 /** 記録ON時にコメントパネル DOM が見つからない状態の警告（サイト改修の検知用・PII なし） */
 export const KEY_COMMENT_PANEL_STATUS = 'nls_comment_panel_status';
 
