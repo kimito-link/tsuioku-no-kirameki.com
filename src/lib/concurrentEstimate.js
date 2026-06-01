@@ -63,6 +63,63 @@ const MULTIPLIER_TABLE = /** @type {const} */ ([
 const VISITOR_SOFT_CAP_RATIO = 0.35;
 
 /**
+ * プラットフォーム別の推定係数プロファイル。
+ *
+ * 同接推定の「考え方（コア）」はサイト共通だが、文化ごとの係数は異なる。
+ * 将来 YouTube / Twitch / Kick などを足すときは、このプロファイルを増やして
+ * 各関数に `profile` で渡すだけで挙動を切り替えられる（コアは変更不要）。
+ *
+ * @typedef {object} PlatformProfile
+ * @property {string} id  プラットフォーム識別子（例: 'niconico'）
+ * @property {string} label  表示名
+ * @property {number} defaultMultiplier  来場者数が不明なときの倍率
+ * @property {ReadonlyArray<readonly [number, number]>} multiplierTable  来場者数→倍率（対数補間）
+ * @property {number} visitorSoftCapRatio  active_only 時の来場者比ソフトキャップ
+ * @property {{ peak: number, decay: number, floor: number, fallback: number }} retention  滞留率の指数減衰パラメータ
+ * @property {{ freshMs: number, nowcastMaxMs: number }} directViewers  公式同接値の鮮度しきい値（ヒント無し時の既定）
+ */
+
+/**
+ * ニコ生プロファイル（既定）。
+ * 数値は従来のハードコード値そのまま（挙動互換）。
+ * @type {PlatformProfile}
+ */
+export const NICONICO_PROFILE = Object.freeze({
+  id: 'niconico',
+  label: 'ニコ生',
+  defaultMultiplier: 7,
+  multiplierTable: MULTIPLIER_TABLE,
+  visitorSoftCapRatio: VISITOR_SOFT_CAP_RATIO,
+  retention: Object.freeze({ peak: 0.48, decay: 0.005, floor: 0.08, fallback: 0.4 }),
+  directViewers: Object.freeze({
+    freshMs: DIRECT_VIEWERS_FRESH_MS,
+    nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS
+  })
+});
+
+/** @type {Readonly<Record<string, PlatformProfile>>} */
+const PLATFORM_PROFILES = Object.freeze({
+  niconico: NICONICO_PROFILE
+});
+
+/**
+ * プロファイルを解決する。プロファイルオブジェクト・id 文字列・未指定のいずれも受ける。
+ * 未知の値は安全に既定（ニコ生）へフォールバックする。
+ *
+ * @param {PlatformProfile|string|null|undefined} [profileOrId]
+ * @returns {PlatformProfile}
+ */
+export function getPlatformProfile(profileOrId) {
+  if (profileOrId && typeof profileOrId === 'object' && Array.isArray(profileOrId.multiplierTable)) {
+    return /** @type {PlatformProfile} */ (profileOrId);
+  }
+  if (typeof profileOrId === 'string' && PLATFORM_PROFILES[profileOrId]) {
+    return PLATFORM_PROFILES[profileOrId];
+  }
+  return NICONICO_PROFILE;
+}
+
+/**
  * @param {number} value
  * @param {number} min
  * @param {number} max
@@ -75,9 +132,11 @@ function clamp(value, min, max) {
 /**
  * statistics.viewers の実測更新間隔ヒントがある場合の freshness 閾値を返す。
  * @param {number|undefined|null} officialViewerIntervalMs
+ * @param {PlatformProfile|string|null} [profile]
  * @returns {{ freshMs: number, nowcastMaxMs: number }}
  */
-export function resolveDirectViewersThresholds(officialViewerIntervalMs) {
+export function resolveDirectViewersThresholds(officialViewerIntervalMs, profile) {
+  const p = getPlatformProfile(profile);
   const hinted =
     typeof officialViewerIntervalMs === 'number' &&
     Number.isFinite(officialViewerIntervalMs) &&
@@ -86,8 +145,8 @@ export function resolveDirectViewersThresholds(officialViewerIntervalMs) {
       : null;
   if (hinted == null) {
     return {
-      freshMs: DIRECT_VIEWERS_FRESH_MS,
-      nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS
+      freshMs: p.directViewers.freshMs,
+      nowcastMaxMs: p.directViewers.nowcastMaxMs
     };
   }
   const freshMs = clamp(Math.round(hinted * 1.6), 45_000, 120_000);
@@ -102,13 +161,15 @@ export function resolveDirectViewersThresholds(officialViewerIntervalMs) {
 /**
  * 来場者数から動的倍率を算出（対数補間）。
  * @param {number|undefined|null} totalVisitors
+ * @param {PlatformProfile|string|null} [profile]
  * @returns {number}
  */
-export function dynamicMultiplier(totalVisitors) {
+export function dynamicMultiplier(totalVisitors, profile) {
+  const p = getPlatformProfile(profile);
   if (typeof totalVisitors !== 'number' || !Number.isFinite(totalVisitors) || totalVisitors <= 0) {
-    return 7;
+    return p.defaultMultiplier;
   }
-  const T = MULTIPLIER_TABLE;
+  const T = p.multiplierTable;
   if (totalVisitors <= T[0][0]) return T[0][1];
   if (totalVisitors >= T[T.length - 1][0]) return T[T.length - 1][1];
 
@@ -120,7 +181,7 @@ export function dynamicMultiplier(totalVisitors) {
       return Math.round((m0 + t * (m1 - m0)) * 10) / 10;
     }
   }
-  return 7;
+  return p.defaultMultiplier;
 }
 
 /**
@@ -130,11 +191,13 @@ export function dynamicMultiplier(totalVisitors) {
  * 0分: 48%, 30分: 41%, 60分: 35%, 120分: 26%, 180分: 20%, 300分: 11%
  *
  * @param {number} ageMin  配信開始からの経過分数
+ * @param {PlatformProfile|string|null} [profile]
  * @returns {number} 0–1 の滞留率
  */
-export function retentionRate(ageMin) {
-  if (typeof ageMin !== 'number' || !Number.isFinite(ageMin) || ageMin < 0) return 0.40;
-  return Math.max(0.08, 0.48 * Math.exp(-0.005 * ageMin));
+export function retentionRate(ageMin, profile) {
+  const { peak, decay, floor, fallback } = getPlatformProfile(profile).retention;
+  if (typeof ageMin !== 'number' || !Number.isFinite(ageMin) || ageMin < 0) return fallback;
+  return Math.max(floor, peak * Math.exp(-decay * ageMin));
 }
 
 /**
@@ -177,14 +240,17 @@ export function countRecentActiveUsers(userTimestamps, now, windowMs) {
  * @param {number} [params.totalVisitors]    来場者数（倍率計算 + キャップに使用）
  * @param {number} [params.streamAgeMin]     配信経過分数（滞留推定に使用）
  * @param {number} [params.multiplier]       倍率を手動指定する場合（省略時は動的算出）
+ * @param {PlatformProfile|string} [params.profile]  プラットフォーム係数（省略時はニコ生）
  * @returns {ConcurrentEstimateResult}
  */
 export function estimateConcurrentViewers({
   recentActiveUsers,
   totalVisitors,
   streamAgeMin,
-  multiplier
+  multiplier,
+  profile
 }) {
+  const p = getPlatformProfile(profile);
   const active = typeof recentActiveUsers === 'number' && recentActiveUsers >= 0
     ? Math.floor(recentActiveUsers)
     : 0;
@@ -194,14 +260,14 @@ export function estimateConcurrentViewers({
 
   const m = typeof multiplier === 'number' && multiplier > 0
     ? multiplier
-    : dynamicMultiplier(hasVisitors ? totalVisitors : null);
+    : dynamicMultiplier(hasVisitors ? totalVisitors : null, p);
 
   const signalA = active > 0 ? active * m : 0;
 
   let signalB = 0;
   let retPct = /** @type {number|null} */ (null);
   if (hasVisitors && hasAge) {
-    retPct = retentionRate(/** @type {number} */ (streamAgeMin));
+    retPct = retentionRate(/** @type {number} */ (streamAgeMin), p);
     signalB = Math.round(/** @type {number} */ (totalVisitors) * retPct);
   }
 
@@ -223,7 +289,7 @@ export function estimateConcurrentViewers({
   let capped = false;
   if (hasVisitors) {
     if (method === 'active_only') {
-      const softCap = Math.round(/** @type {number} */ (totalVisitors) * VISITOR_SOFT_CAP_RATIO);
+      const softCap = Math.round(/** @type {number} */ (totalVisitors) * p.visitorSoftCapRatio);
       if (estimated > softCap) {
         estimated = softCap;
         capped = true;
@@ -302,6 +368,7 @@ export function calcCommentCaptureRatio({
  * @param {number} [params.totalVisitors]
  * @param {number} [params.streamAgeMin]
  * @param {number} [params.multiplier]
+ * @param {PlatformProfile|string} [params.profile]  プラットフォーム係数（省略時はニコ生）
  * @returns {ConcurrentResolutionResult}
  */
 export function resolveConcurrentViewers({
@@ -315,13 +382,16 @@ export function resolveConcurrentViewers({
   recentActiveUsers,
   totalVisitors,
   streamAgeMin,
-  multiplier
+  multiplier,
+  profile
 }) {
+  const p = getPlatformProfile(profile);
   const base = estimateConcurrentViewers({
     recentActiveUsers,
     totalVisitors,
     streamAgeMin,
-    multiplier
+    multiplier,
+    profile: p
   });
 
   const now = typeof nowMs === 'number' && Number.isFinite(nowMs) ? nowMs : Date.now();
@@ -335,7 +405,7 @@ export function resolveConcurrentViewers({
       : null;
   const freshnessMs =
     official != null && updatedAt != null ? Math.max(0, now - updatedAt) : null;
-  const thresholds = resolveDirectViewersThresholds(officialViewerIntervalMs);
+  const thresholds = resolveDirectViewersThresholds(officialViewerIntervalMs, p);
   const captureRatio =
     previousStatisticsComments != null || currentStatisticsComments != null || receivedCommentsDelta != null
       ? calcCommentCaptureRatio({
