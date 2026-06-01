@@ -11842,7 +11842,7 @@ async function start() {
       _backfillEnabled = isBackfillEnabledFromStorage(bag);
       _backfillAutoEnabled = isBackfillAutoStartEnabled(bag);
       _ndgrDeterministicBackfillEnabled =
-        !(bag && bag[KEY_NDGR_DETERMINISTIC_BACKFILL] === false);
+        bag != null && bag[KEY_NDGR_DETERMINISTIC_BACKFILL] === true;
     }).catch(() => { /* 既定（手動 OFF・自動 ON）を維持 */ });
   } catch { /* no-op */ }
 
@@ -11927,10 +11927,10 @@ async function start() {
       }
     }
 
-    // B案: 決定論 NDGR バックフィルの kill switch。明示 false のときだけ旧エンジンへ戻す。
+    // B案: 決定論 NDGR バックフィルの opt-in。検証中につき既定 OFF、明示 true のときだけ新エンジン。
     if (changes[KEY_NDGR_DETERMINISTIC_BACKFILL]) {
       _ndgrDeterministicBackfillEnabled =
-        changes[KEY_NDGR_DETERMINISTIC_BACKFILL].newValue !== false;
+        changes[KEY_NDGR_DETERMINISTIC_BACKFILL].newValue === true;
     }
 
     // v0.1.511: 前方向 NDGR 継続取得 opt-in。OFF→ON の立ち上がりで即起動（次 tick を待たない）。
@@ -13348,9 +13348,11 @@ let _backfillEnabled = false;
  */
 let _backfillAutoEnabled = true;
 /**
- * @type {boolean} B案: 決定論 NDGR バックフィルを使うか。既定 true、明示 false だけ旧エンジン。
+ * @type {boolean} B案: 決定論 NDGR バックフィルを使うか。検証中につき既定 false（旧エンジン）。
+ *   バケット橋渡し（?at 再シード）未実装のため誤 reached_start のリスクがあり、明示 true の
+ *   ときだけ新エンジンを使う opt-in にしている（橋渡し追加・実機検証後に既定 ON へ戻す予定）。
  */
-let _ndgrDeterministicBackfillEnabled = true;
+let _ndgrDeterministicBackfillEnabled = false;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
