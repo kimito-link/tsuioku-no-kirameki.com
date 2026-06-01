@@ -37,6 +37,47 @@ export const BACKFILL_GAP_REARM_BLOCKED_STOP_REASONS = new Set([
 ]);
 
 /**
+ * fix/backfill-all-sizes（2026-06-01）: 放送サイズに依らずギャップを追い切るための「実効
+ * 再アーム停止しきい値」を返す純関数。
+ *
+ * 真因（実機 lv350655041・公式344/記録155=gap189）: 再アーム停止が固定絶対値 minGapAbsolute(170)
+ *   のみだったため、記録が 174 件（gap169<170）に達した時点で打ち切られ、約49%で頭打ちになった。
+ *   170 は大型放送（公式 数千〜万）でギフト/運営/system の取り込み対象外ぶんを延々追わないための
+ *   絶対上限であって、公式が小さい放送では「割合的にまだ大穴」なのに止まる副作用があった。
+ *
+ * 設計: 実効しきい値 = clamp(round(official × ratio), smallFloor, minGapAbsolute)。
+ *   - 大型（official 14000・ratio 0.058 → 812）→ clamp で minGapAbsolute(170) に収束＝従来不変。
+ *   - 中規模（official 2000 → 116）→ 116（91.5%→94%相当へ）。
+ *   - 小規模（official 344 → 20）→ 20（49%→約94%まで追う）。
+ *   - 極小（official 50 → 3）→ smallFloor(8) で底打ち（ギフト/運営ぶんを延々追わない）。
+ * official が不明/非正なら従来どおり minGapAbsolute を返す（後方互換＝挙動を変えない）。
+ *
+ * @param {object} args
+ * @param {number|null|undefined} args.official 公式コメント累計（statistics.comments）。
+ * @param {number} args.minGapAbsolute 大型放送向けの絶対上限（OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute）。
+ * @param {number} args.gapRatioOfOfficial 公式件数に対する許容残差の割合（同 gapRatioOfOfficial）。
+ * @param {number} args.smallFloor 極小放送での下限（同 minGapFloorSmall）。
+ * @returns {number} 実効再アーム停止しきい値（このギャップ未満なら再アームしない）。
+ */
+export function computeEffectiveBackfillRearmMinGap(args) {
+  const minGapAbsolute = Number(args && args.minGapAbsolute);
+  const absolute = Number.isFinite(minGapAbsolute) && minGapAbsolute > 0 ? minGapAbsolute : 0;
+  const official = Number(args && args.official);
+  // official 不明/非正は従来どおり絶対上限（挙動不変）。
+  if (!Number.isFinite(official) || official <= 0) return absolute;
+  const ratio = Number(args && args.gapRatioOfOfficial);
+  const smallFloorRaw = Number(args && args.smallFloor);
+  const smallFloor = Number.isFinite(smallFloorRaw) && smallFloorRaw >= 0 ? smallFloorRaw : 0;
+  if (!Number.isFinite(ratio) || ratio <= 0) return absolute;
+  const ratioGap = Math.round(official * ratio);
+  // clamp(ratioGap, smallFloor, absolute)
+  let eff = ratioGap;
+  if (eff < smallFloor) eff = smallFloor;
+  if (absolute > 0 && eff > absolute) eff = absolute;
+  return eff;
+}
+
+/**
  * @param {object} args
  * @param {boolean} args.backfillRunning いま巡回中か（_backfillAbort != null）。
  * @param {boolean} args.backfillFinishedOnce 一度でも巡回が終了したか（_backfillProgress.done===1）。

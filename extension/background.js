@@ -1742,3 +1742,82 @@ chrome.action.onClicked.addListener((tab) => {
     void openOrFocusPopupWindow(tab?.windowId);
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* dev 専用ホットリロード（手動 reload 卒業・2026-06-01）                       */
+/* content（dev watch ビルドのみ）が NLS_DEV_RELOAD_PEEK で現在のシグナル id を   */
+/* 問い合わせ、変化を検知したら NLS_DEV_RELOAD_GO を送ってくる。判定の状態機械は   */
+/* content 側の純関数（src/lib/devReloadSignal.js・単体テスト済み）が持つ。       */
+/* SW は「シグナルファイルを読む」「タブ reload + runtime.reload」だけ担当する。   */
+/* 本番ビルドでは content がこれらを一切送らない（NL_DEV_HOTRELOAD=false で除去）  */
+/* 上、シグナルファイル dist/dev-reload-id.txt も同梱されない（build.mjs/stage    */
+/* スクリプトが生成・コピーしない）ため、PEEK が来ても id=null で必ず no-op になる。*/
+/* ------------------------------------------------------------------ */
+const DEV_RELOAD_SIGNAL_PATH = 'dist/dev-reload-id.txt';
+let _devReloadGoInFlight = false;
+
+async function readDevReloadSignalId() {
+  try {
+    const res = await fetch(chrome.runtime.getURL(DEV_RELOAD_SIGNAL_PATH), {
+      cache: 'no-store'
+    });
+    if (!res || !res.ok) return null;
+    const text = String(await res.text()).trim();
+    if (!text || text.length > 128) return null;
+    return text;
+  } catch {
+    return null;
+  }
+}
+
+async function doDevReloadGo() {
+  if (_devReloadGoInFlight) return;
+  _devReloadGoInFlight = true;
+  try {
+    // 先にタブを reload（ブラウザ側ナビゲーションは runtime.reload を跨いで生き残り、
+    //   再注入時には新しい dist/content.js が入る）→ そのあと拡張本体を reload。
+    const tabs = await queryTargetTabs();
+    for (const tab of tabs) {
+      if (!tab.id || tab.id === chrome.tabs.TAB_ID_NONE) continue;
+      try {
+        await chrome.tabs.reload(tab.id);
+      } catch {
+        /* no-op */
+      }
+    }
+    try {
+      chrome.runtime.reload();
+    } catch {
+      /* no-op */
+    }
+  } finally {
+    _devReloadGoInFlight = false;
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || (msg.type !== 'NLS_DEV_RELOAD_PEEK' && msg.type !== 'NLS_DEV_RELOAD_GO')) {
+    return undefined;
+  }
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  if (msg.type === 'NLS_DEV_RELOAD_PEEK') {
+    readDevReloadSignalId()
+      .then((id) => {
+        try {
+          sendResponse({ id });
+        } catch {
+          /* no-op */
+        }
+      })
+      .catch(() => {
+        try {
+          sendResponse({ id: null });
+        } catch {
+          /* no-op */
+        }
+      });
+    return true; // 非同期 sendResponse
+  }
+  void doDevReloadGo();
+  return undefined;
+});

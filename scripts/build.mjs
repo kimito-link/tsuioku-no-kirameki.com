@@ -29,10 +29,13 @@ const common = {
   legalComments: 'none',
   // 全 bundle に build id を埋め込む（content からも参照可能にして、診断で
   // 「本当に新しい bundle が反映されたか」を切り分けられるようにする）。
-  define: { NL_BUILD_ID: JSON.stringify(BUILD_ID) }
+  // NL_DEV_HOTRELOAD: 本番ビルドは false 固定。content の dev ホットリロード/記録監視
+  //   コードは `if (NL_DEV_HOTRELOAD)` ガード内にあり、false 注入で esbuild が dead-code
+  //   除去するため、配布版には一切含まれない（dev 専用機能の混入防止）。
+  define: { NL_BUILD_ID: JSON.stringify(BUILD_ID), NL_DEV_HOTRELOAD: 'false' }
 };
 
-const popupDefine = { NL_BUILD_ID: JSON.stringify(BUILD_ID) };
+const popupDefine = { NL_BUILD_ID: JSON.stringify(BUILD_ID), NL_DEV_HOTRELOAD: 'false' };
 
 const targets = [
   {

@@ -74,6 +74,10 @@ def stage(version: str) -> Path:
     gitkeep = dest / 'dist' / '.gitkeep'
     if gitkeep.exists():
         gitkeep.unlink()
+    # dev ホットリロード用シグナル（build:watch の置き土産）は配布物から必ず除く
+    dev_reload_signal = dest / 'dist' / 'dev-reload-id.txt'
+    if dev_reload_signal.exists():
+        dev_reload_signal.unlink()
 
     # 2) 提出対象の画像ホワイトリスト。0.1.6 提出物の構成を踏襲する。
     #    extension/images/ には LP 用・マーケ用・アプリアイコンのマスター（大容量）も含まれるが、
