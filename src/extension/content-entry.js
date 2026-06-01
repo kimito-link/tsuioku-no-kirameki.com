@@ -58,6 +58,12 @@ import {
   captureVideoToPngDataUrl
 } from '../lib/videoCapture.js';
 import { addThumbBlob, countThumbsForLive, isIndexedDbAvailable } from '../lib/thumbDb.js';
+import { createDevReloadState, applyDevReloadSignal } from '../lib/devReloadSignal.js';
+import {
+  createProgressSamples,
+  pushProgressSample,
+  evaluateCommentProgress
+} from '../lib/commentProgressMonitor.js';
 import {
   isThumbAutoEnabled,
   normalizeThumbIntervalMsForHost
@@ -350,7 +356,10 @@ import {
   observeFirstPaintFrame
 } from '../lib/inlineFirstPaintGate.js';
 import { shouldTriggerOfficialGapDeepHarvest } from '../lib/shouldTriggerOfficialGapDeepHarvest.js';
-import { shouldRearmBackfillForOfficialGap } from '../lib/shouldRearmBackfillForOfficialGap.js';
+import {
+  shouldRearmBackfillForOfficialGap,
+  computeEffectiveBackfillRearmMinGap
+} from '../lib/shouldRearmBackfillForOfficialGap.js';
 import {
   shouldForceDeepHarvestForReason,
   shouldForceDeepHarvestRecovery,
@@ -1289,6 +1298,13 @@ function maybeOfficialGapQuietDeepHarvest() {
         (Number(officialCommentCount) || 0) - (Number(observedRecordedCommentCount) || 0)
       );
       const rearmCount = _backfillGapRearmByLiveId[lid] || 0;
+      // fix/backfill-all-sizes: 停止しきい値を放送サイズで実効化（小中規模が約49%で打ち切られる退化の修正）。
+      const effectiveMinGap = computeEffectiveBackfillRearmMinGap({
+        official: officialCommentCount,
+        minGapAbsolute: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
+        gapRatioOfOfficial: OFFICIAL_GAP_DEEP_TIMING.gapRatioOfOfficial,
+        smallFloor: OFFICIAL_GAP_DEEP_TIMING.minGapFloorSmall
+      });
       if (
         shouldRearmBackfillForOfficialGap({
           backfillRunning: _backfillAbort != null,
@@ -1296,7 +1312,7 @@ function maybeOfficialGapQuietDeepHarvest() {
           guardMatchesLiveId: _backfillTriedLiveId === liveId,
           stopReason: _backfillProgress.stopReason,
           gap,
-          minGap: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
+          minGap: effectiveMinGap,
           rearmCount,
           maxRearms: OFFICIAL_GAP_DEEP_TIMING.maxGapRearms
         })
@@ -11567,6 +11583,125 @@ async function pollStatsFromPage() {
   }
 }
 
+/* ============================ dev 専用ツール ============================ */
+/* NL_DEV_HOTRELOAD（esbuild --define）が true の dev watch ビルドだけで動く。     */
+/* 本番（scripts/build.mjs）は NL_DEV_HOTRELOAD=false 注入で、下の if と関数群が    */
+/* まるごと dead-code 除去される（配布版には一切含まれない）。                      */
+/* ① ホットリロード: SW にシグナル id を問い合わせ（純関数 applyDevReloadSignal で  */
+/*    変化検知）、変わっていたら SW にタブ reload + runtime.reload を依頼する。      */
+/* ② 記録監視: 公式件数と記録件数を定期サンプリングし、達成/停滞/成長を画面左下の    */
+/*    オーバーレイ＋コンソールに出す（件数を凝視しなくて済む）。                      */
+let _devToolingStarted = false;
+function startDevHotReloadAndMonitor() {
+  if (_devToolingStarted) return;
+  _devToolingStarted = true;
+
+  // --- ① ホットリロード ---
+  let reloadState = createDevReloadState();
+  async function pollReloadSignal() {
+    let resp = null;
+    try {
+      resp = await chrome.runtime.sendMessage({ type: 'NLS_DEV_RELOAD_PEEK' });
+    } catch {
+      return; // SW 不在・コンテキスト無効は次回
+    }
+    const out = applyDevReloadSignal(reloadState, resp && resp.id);
+    reloadState = out.state;
+    if (out.shouldReload) {
+      try {
+        console.info('[nls-dev-reload] rebuild detected -> reloading extension + tabs');
+        chrome.runtime.sendMessage({ type: 'NLS_DEV_RELOAD_GO', id: out.id });
+      } catch {
+        /* no-op */
+      }
+    }
+  }
+  try {
+    setInterval(pollReloadSignal, 1500);
+  } catch {
+    /* no-op */
+  }
+  void pollReloadSignal();
+
+  // --- ② 記録監視 ---
+  let samples = createProgressSamples();
+  let lastStatus = '';
+  const overlay = createDevMonitorOverlay();
+  function tickMonitor() {
+    try {
+      samples = pushProgressSample(samples, {
+        t: Date.now(),
+        recorded: Number(observedRecordedCommentCount) || 0,
+        official: officialCommentCount
+      });
+      const ev = evaluateCommentProgress(samples);
+      if (overlay) overlay.update(ev);
+      if (ev.status !== lastStatus) {
+        lastStatus = ev.status;
+        try {
+          console.info(`[nls-dev-monitor] ${ev.status}: ${ev.label}`);
+        } catch {
+          /* no-op */
+        }
+      }
+    } catch {
+      /* no-op */
+    }
+  }
+  try {
+    setInterval(tickMonitor, 10_000);
+  } catch {
+    /* no-op */
+  }
+  void tickMonitor();
+}
+
+function createDevMonitorOverlay() {
+  try {
+    if (typeof document === 'undefined' || !document.body) return null;
+    const el = document.createElement('div');
+    el.id = 'nls-dev-monitor';
+    el.style.cssText = [
+      'position:fixed',
+      'left:8px',
+      'bottom:8px',
+      'z-index:2147483646',
+      'font:12px/1.4 system-ui,-apple-system,sans-serif',
+      'padding:6px 10px',
+      'border-radius:8px',
+      'color:#fff',
+      'background:rgba(20,20,28,.88)',
+      'border-left:4px solid #888',
+      'pointer-events:none',
+      'box-shadow:0 2px 8px rgba(0,0,0,.4)',
+      'max-width:46vw',
+      'white-space:nowrap',
+      'overflow:hidden',
+      'text-overflow:ellipsis'
+    ].join(';');
+    el.textContent = '記録監視: データ待ち';
+    document.body.appendChild(el);
+    const COLORS = {
+      reached: '#37d67a',
+      growing: '#4aa3ff',
+      stalled: '#ff6b6b',
+      idle: '#9aa0aa'
+    };
+    return {
+      update(ev) {
+        try {
+          el.style.borderLeftColor = COLORS[ev && ev.status] || '#888';
+          el.textContent = `記録監視: ${ev && ev.label ? ev.label : '—'}`;
+        } catch {
+          /* no-op */
+        }
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function start() {
   if (!hasExtensionContext()) return;
   if (!shouldRunWatchContentInThisFrame()) return;
@@ -11608,6 +11743,16 @@ async function start() {
     }
   }
   bindNativeSelfPostedRecorder();
+
+  // dev watch ビルドのみ: ホットリロード + 記録自動監視を起動（top frame で 1 回）。
+  //   本番ビルドは NL_DEV_HOTRELOAD=false で丸ごと dead-code 除去される。
+  if (
+    typeof NL_DEV_HOTRELOAD !== 'undefined' &&
+    NL_DEV_HOTRELOAD &&
+    isWatchInlinePanelTopFrame()
+  ) {
+    startDevHotReloadAndMonitor();
+  }
 
   // 0.1.29 (AD): start() が二度呼ばれた場合に旧 observer を必ず disconnect。
   // 通常は __nlsBootGlobal flag で二重 start を防いでいるが、SPA 遷移や
@@ -13428,6 +13573,12 @@ async function runNdgrBackfillOnce() {
     0,
     (Number(officialCommentCount) || 0) - (Number(observedRecordedCommentCount) || 0)
   );
+  // fix/backfill-all-sizes（レビュー会議室・2026-06-01 反映）: forceFullSweep のしきい値は
+  //   あえて minGapAbsolute(170) のまま据え置く。ここを小規模向けに下げると、再アームのたびに
+  //   resume を破棄して now から全 sweep し直し、記録済みの直近区間を毎回再フェッチする無駄
+  //   （Gemini レビュー最優先指摘）が出る。小〜中規模は resume で「続きから（より古い vpos へ）」
+  //   掘る方が効率的に穴を埋められるので、full sweep は大ギャップ（stale resume の誤完了復旧）
+  //   専用のまま残す。約49%停滞の解消は再アーム停止しきい値の実効化（下記）だけで足りる。
   const forceFullSweep =
     officialCommentCount != null &&
     Number.isFinite(officialCommentCount) &&
@@ -13682,6 +13833,13 @@ function maybeRearmBackfillForGapCatchup() {
       Number.isFinite(official) && official > 0
         ? Math.floor(official * (1 - BACKFILL_FALSE_COMPLETION_RATIO))
         : 0;
+    // fix/backfill-all-sizes: 停止しきい値を放送サイズで実効化（小中規模が約49%で打ち切られる退化の修正）。
+    const effectiveMinGap = computeEffectiveBackfillRearmMinGap({
+      official: officialCommentCount,
+      minGapAbsolute: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
+      gapRatioOfOfficial: OFFICIAL_GAP_DEEP_TIMING.gapRatioOfOfficial,
+      smallFloor: OFFICIAL_GAP_DEEP_TIMING.minGapFloorSmall
+    });
     if (
       shouldRearmBackfillForOfficialGap({
         backfillRunning: _backfillAbort != null,
@@ -13689,7 +13847,7 @@ function maybeRearmBackfillForGapCatchup() {
         guardMatchesLiveId: _backfillTriedLiveId === liveId,
         stopReason: _backfillProgress.stopReason,
         gap,
-        minGap: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
+        minGap: effectiveMinGap,
         rearmCount,
         maxRearms: OFFICIAL_GAP_DEEP_TIMING.maxGapRearms,
         reachedStartGapOverride
@@ -13744,7 +13902,18 @@ function maybeAutoStartBackfill() {
     );
     const noProgressMs =
       _backfillLastProgressAt > 0 ? now - _backfillLastProgressAt : 0;
-    const gapRemains = gap >= OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute;
+    // fix/backfill-all-sizes（レビュー会議室・2026-06-01 反映）: ハング検知の残ギャップしきい値も
+    //   再アーム判定と同じ effectiveMinGap に揃える。ここだけ固定 170 のままだと、小〜中規模で
+    //   gap が [effectiveMinGap, 170) の帯でハングした場合に abort されず（gap<170）、かつ
+    //   再アームも _backfillRunning=true でブロックされ、バックフィルが永久に再開しないデッドロック
+    //   になる（code-reviewer・Gemini が一致で指摘）。
+    const stallEffectiveMinGap = computeEffectiveBackfillRearmMinGap({
+      official: officialCommentCount,
+      minGapAbsolute: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
+      gapRatioOfOfficial: OFFICIAL_GAP_DEEP_TIMING.gapRatioOfOfficial,
+      smallFloor: OFFICIAL_GAP_DEEP_TIMING.minGapFloorSmall
+    });
+    const gapRemains = gap >= stallEffectiveMinGap;
     // 0 行のまま固まり（起動直後の入口取得に失敗等）: 60 秒で打ち切り。
     const stalledEmpty =
       _backfillAbort != null &&

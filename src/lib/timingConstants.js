@@ -98,6 +98,15 @@ export const OFFICIAL_GAP_DEEP_TIMING = /** @type {const} */ ({
   minOfficialComments: 120,
   minGapAbsolute: 170,
   gapRatioOfOfficial: 0.058,
+  // fix/backfill-all-sizes（2026-06-01）: 再アーム停止しきい値の「割合下限」。
+  //   旧実装は停止しきい値が固定絶対値 minGapAbsolute(170) のみで、小〜中規模放送だと
+  //   「割合的にはまだ大穴」なのに打ち切られていた（実機: 公式344・記録155=gap189 で、
+  //   記録174=gap169<170 に達した時点で再アーム停止＝約49%で頭打ち）。
+  //   そこで実効しきい値を clamp(round(official×gapRatioOfOfficial), minGapFloorSmall,
+  //   minGapAbsolute) にする。大型は従来どおり 170（不変＝負荷/暴走を増やさない）、小中規模は
+  //   割合に応じて下げて約94%まで自動追従、極小はこの floor で底打ちして「取り込み対象外
+  //   （ギフト/運営/system）ぶん」を延々追わない（cooldownMs × maxGapRearms で別途有界）。
+  minGapFloorSmall: 8,
   // 公式ギャップが残ったまま NDGR バックフィルが未完了で止まっているとき、ワンショット
   //   guard を解除して「続きから」再開する上限回数（liveId 単位）。cooldownMs(36s) で
   //   throttle される。
