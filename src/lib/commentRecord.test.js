@@ -5,6 +5,8 @@ import {
   buildDedupeKey,
   createCommentEntry,
   mergeNewComments,
+  mergeNewCommentsIncremental,
+  buildCommentDedupeState,
   patchExistingComment,
   backfillNumericSyntheticAvatarsOnStoredComments
 } from './commentRecord.js';
@@ -309,6 +311,34 @@ describe('mergeNewComments', () => {
 
     expect(added).toHaveLength(1);
     expect(next).toHaveLength(1);
+  });
+
+  it('commentNo 空: 同一 {text,uid} が既に 2 件あると lone cap を流用せず別秒では別エントリ', () => {
+    // v0.1.503: deriveIncomingDedupeCapturedAt の index 化後も「ちょうど1件のときだけ
+    //   その cap を流用、2 件以上は fallback(now)」という旧挙動が保たれることの回帰確認。
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 3, 1, 15, 0, 0, 100));
+    const a = createCommentEntry({
+      liveId: 'lv1',
+      commentNo: '',
+      text: 'dup line',
+      userId: 'a:dup'
+    });
+    const b = createCommentEntry({
+      liveId: 'lv1',
+      commentNo: '',
+      text: 'dup line',
+      userId: 'a:dup'
+    });
+    // 次の秒へ進めてから、cap/commentNo の無い同一行を再取り込み
+    vi.setSystemTime(Date.UTC(2026, 3, 1, 15, 0, 3, 0));
+    const { next, added } = mergeNewComments('lv1', [a, b], [
+      { commentNo: '', text: 'dup line', userId: 'a:dup' }
+    ]);
+    vi.useRealTimers();
+    // 既存 2 件は同秒同 key なので storage 上は 2 行のまま、incoming は別秒キーで 1 件追加
+    expect(added).toHaveLength(1);
+    expect(next).toHaveLength(3);
   });
 
   it('existing が欠損フィールドでも落ちない', () => {
@@ -961,5 +991,120 @@ describe('backfillNumericSyntheticAvatarsOnStoredComments', () => {
     expect(next[0].avatarUrl).toBeUndefined();
     expect(next[1].avatarUrl).toBeUndefined();
     expect(next[2].avatarUrl).toBe('https://example.com/real-avatar.jpg');
+  });
+});
+
+describe('mergeNewCommentsIncremental（チャンクモード用 O(追加分) dedupe）', () => {
+  // added の「採否」が既存 mergeNewComments と一致するかを安定フィールドで比較するヘルパ。
+  //   id / capturedAt は createCommentEntry が都度生成するので比較対象から外す。
+  const sig = (r) => `${r.commentNo ?? ''}|${r.text ?? ''}|${r.userId ?? ''}`;
+  const sigs = (arr) => arr.map(sig);
+
+  /** 既存 mergeNewComments と incremental で「added の signature 列」が一致することを検証。 */
+  const expectSameAdded = (lid, existing, incoming) => {
+    const full = mergeNewComments(lid, existing, incoming);
+    const inc = mergeNewCommentsIncremental(
+      lid,
+      buildCommentDedupeState(lid, existing),
+      incoming
+    );
+    expect(sigs(inc.added)).toEqual(sigs(full.added));
+    return { full, inc };
+  };
+
+  it('commentNo 付き: 既存と重複する番号は added されず、新規番号だけ added（既存 merge と一致）', () => {
+    const existing = [
+      createCommentEntry({ liveId: 'lv1', commentNo: '1', text: 'a', userId: 'u1' }),
+      createCommentEntry({ liveId: 'lv1', commentNo: '2', text: 'b', userId: 'u2' })
+    ];
+    const incoming = [
+      { commentNo: '2', text: 'b', userId: 'u2' }, // 重複
+      { commentNo: '3', text: 'c', userId: 'u3' }, // 新規
+      { commentNo: '4', text: 'd', userId: 'u4' } // 新規
+    ];
+    const { inc } = expectSameAdded('lv1', existing, incoming);
+    expect(sigs(inc.added)).toEqual(['3|c|u3', '4|d|u4']);
+  });
+
+  it('184 匿名・同秒・同本文・別ユーザーは別行として added（uid で分かれる・既存 merge と一致）', () => {
+    const cap = 1_700_000_000_000; // 同一秒に収める固定 capturedAt
+    const existing = [];
+    const incoming = [
+      { text: '8888', userId: 'a1', capturedAt: cap },
+      { text: '8888', userId: 'a2', capturedAt: cap },
+      { text: '8888', userId: 'a1', capturedAt: cap } // a1 は重複
+    ];
+    const { inc } = expectSameAdded('lv1', existing, incoming);
+    // a1 / a2 の 2 件だけ added（3 件目 a1 は dedupe）。
+    expect(inc.added.map((r) => r.userId)).toEqual(['a1', 'a2']);
+  });
+
+  it('バッチ内重複（同一 commentNo が複数回）は 1 件だけ added（既存 merge と一致）', () => {
+    const incoming = [
+      { commentNo: '10', text: 'x', userId: 'u' },
+      { commentNo: '10', text: 'x', userId: 'u' },
+      { commentNo: '11', text: 'y', userId: 'u' }
+    ];
+    const { inc } = expectSameAdded('lv1', [], incoming);
+    expect(sigs(inc.added)).toEqual(['10|x|u', '11|y|u']);
+  });
+
+  it('既存一致行は added されない（patch 相当・チャンクモードでは永続化しないので追加ゼロ）', () => {
+    const existing = [
+      createCommentEntry({ liveId: 'lv1', commentNo: '5', text: 'hello', userId: null })
+    ];
+    // avatar / uid を後追いで持つ同一 commentNo 行 → 既存 merge では patch、incremental では skip。
+    const incoming = [
+      {
+        commentNo: '5',
+        text: 'hello',
+        userId: '12345',
+        avatarUrl: 'https://example.com/a.jpg'
+      }
+    ];
+    const { inc } = expectSameAdded('lv1', existing, incoming);
+    expect(inc.added).toHaveLength(0);
+  });
+
+  it('state を跨ぐ連続フラッシュでも重複が累積排除される（同一 state を使い回す）', () => {
+    const state = buildCommentDedupeState('lv1', []);
+    const flush1 = mergeNewCommentsIncremental('lv1', state, [
+      { commentNo: '1', text: 'a', userId: 'u1' },
+      { commentNo: '2', text: 'b', userId: 'u2' }
+    ]);
+    expect(sigs(flush1.added)).toEqual(['1|a|u1', '2|b|u2']);
+    // 2 回目: 1 は既出、3 は新規。
+    const flush2 = mergeNewCommentsIncremental('lv1', state, [
+      { commentNo: '1', text: 'a', userId: 'u1' },
+      { commentNo: '3', text: 'c', userId: 'u3' }
+    ]);
+    expect(sigs(flush2.added)).toEqual(['3|c|u3']);
+  });
+
+  it('空テキストは added されない（既存 merge と一致）', () => {
+    const incoming = [
+      { commentNo: '1', text: '   ', userId: 'u' },
+      { commentNo: '2', text: 'ok', userId: 'u' }
+    ];
+    const { inc } = expectSameAdded('lv1', [], incoming);
+    expect(sigs(inc.added)).toEqual(['2|ok|u']);
+  });
+
+  it('undo() で state が巻き戻り、同一 rows を再投入すると再び added される（write 失敗→requeue 相当）', () => {
+    const state = buildCommentDedupeState('lv1', []);
+    const incoming = [
+      { commentNo: '1', text: 'a', userId: 'u1' },
+      { text: '草', userId: 'u2', capturedAt: 1_700_000_000_000 } // commentNo 欠落（loneDedupe 経路）
+    ];
+    const first = mergeNewCommentsIncremental('lv1', state, incoming);
+    expect(first.added).toHaveLength(2);
+    // 巻き戻す（永続化失敗を想定）。
+    first.undo();
+    // 同一 rows を再投入 → state は空に戻っているので再び 2 件 added（欠落しない）。
+    const second = mergeNewCommentsIncremental('lv1', state, incoming);
+    expect(second.added).toHaveLength(2);
+    // 巻き戻さず 3 回目を投入したら、今度は dedupe で 0 件（state が反映済み）。
+    const third = mergeNewCommentsIncremental('lv1', state, incoming);
+    expect(third.added).toHaveLength(0);
   });
 });

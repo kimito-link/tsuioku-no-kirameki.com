@@ -15,11 +15,26 @@ export const INGEST_TIMING = /** @type {const} */ ({
   endedHarvestCheckMs: 4000,
   // v0.1.472: 300ms→800ms。長尺配信で storage 配列が大きくなると 300ms ごとの
   //   全件 read/write がメインスレッドを圧迫してスクロールが重くなるため緩和。
-  //   高流量時は coalescerBurstThreshold で早期 flush するので体感変化は小さい。
-  coalescerMinMs: 800,
-  // 高流量時は待たずに早期 flush（体感レイテンシ短縮）。
-  // NDGR_CHAT_ROWS_POST_CHUNK=220 より少し上に置き、1チャンク=即flushを避ける。
-  coalescerBurstThreshold: 260,
+  // v0.1.488: さらに 1200ms へ。多タブ+高コメント配信で I/O 競合が起きやすいため
+  //   書き込み頻度を一段落とし、storage.get のタイムアウトを抑える。
+  // v0.1.489: 1500ms へ延長し、burstThreshold を無効化（0）。
+  //   高流量時に O(N) マージが頻発して watch ページ全体がフリーズする問題（応答しません）を防ぐため、
+  //   純粋な時間間隔でのみ書き込むように変更。
+  coalescerMinMs: 1500,
+  // 以前は高流量時に即時 flush していたが、巨大配列の同期マージが連続すると
+  // メインスレッドを占有するため無効化（0）。
+  coalescerBurstThreshold: 0,
+  // v0.1.502: 永続化「書き込み」の有界化タイムアウト。多タブで共有 chrome.storage.local
+  //   が巨大配列書き込みで stall すると get/set/remove の await が settle せず、
+  //   persistCommentRowsChain / flushMutex の直列チェーンを永久ブロックして「最終取り込み
+  //   ◯秒前」のまま記録が止まる退行が起きる（読み取り側 2000ms 有界化の書き込み版が未対応
+  //   だった非対称）。書き込みは read より重いので read(2000ms)より長めに取る。timeout 時は
+  //   未永続 rows を再エンキューして自動回復させる。
+  // v0.1.504: 4000→10000。1万件級の単一キー配列の構造化クローン set は環境（OneDrive 配下の
+  //   プロファイル等）によって 4 秒を超えることがあり、毎回 timeout→再エンキュー→より大きな
+  //   set を再発行…の thrash で記録が ~1万件で頭打ちになる退行を確認。正当に重いだけの書き込みは
+  //   完了させ、真に stuck したケースだけ外側ガード（×4=40s）で解放する。
+  persistWriteTimeoutMs: 10000,
   visibleScanDelayMs: 380,
   pageFrameLoopMs: 360,
   /** scroll/resize からのインライン再レイアウトのみ（メンテ処理は走らせない） */
@@ -82,5 +97,35 @@ export const OFFICIAL_GAP_DEEP_TIMING = /** @type {const} */ ({
   cooldownMs: 36_000,
   minOfficialComments: 120,
   minGapAbsolute: 170,
-  gapRatioOfOfficial: 0.058
+  gapRatioOfOfficial: 0.058,
+  // fix/backfill-all-sizes（2026-06-01）: 再アーム停止しきい値の「割合下限」。
+  //   旧実装は停止しきい値が固定絶対値 minGapAbsolute(170) のみで、小〜中規模放送だと
+  //   「割合的にはまだ大穴」なのに打ち切られていた（実機: 公式344・記録155=gap189 で、
+  //   記録174=gap169<170 に達した時点で再アーム停止＝約49%で頭打ち）。
+  //   そこで実効しきい値を clamp(round(official×gapRatioOfOfficial), minGapFloorSmall,
+  //   minGapAbsolute) にする。大型は従来どおり 170（不変＝負荷/暴走を増やさない）、小中規模は
+  //   割合に応じて下げて約94%まで自動追従、極小はこの floor で底打ちして「取り込み対象外
+  //   （ギフト/運営/system）ぶん」を延々追わない（cooldownMs × maxGapRearms で別途有界）。
+  minGapFloorSmall: 8,
+  // 公式ギャップが残ったまま NDGR バックフィルが未完了で止まっているとき、ワンショット
+  //   guard を解除して「続きから」再開する上限回数（liveId 単位）。cooldownMs(36s) で
+  //   throttle される。
+  //   fix/broadcast-bulk-catchup（2026-05-31）: 「一気に・自動で・手動ボタン無しで取り切る」
+  //   方針に合わせ 12→40 へ引き上げ（36s × 40 ≒ 24 分ぶん粘れる）。長尺・高流量で 1 巡回
+  //   15 分上限に複数回ぶつかる放送でも、ギャップが埋まるまで自動で続きを遡れるようにする。
+  //   no_progress が永遠に続く異常ケースは上限 40 で有界化（暴走防止）。
+  maxGapRearms: 40
 });
+
+/**
+ * reached_start（配信開始まで到達＝遡り切ったとみなす）で終わったのに、実記録が公式件数の
+ * この比率に満たない場合を「明らかな誤完了」とみなすしきい値。
+ *
+ * fix/broadcast-bulk-catchup（2026-05-31・コードレビュー反映）:
+ *   記録カードの「公式件数に届いていません」表示（backfillRinkuNarration）と、watchdog の
+ *   reached_start 再 sweep 許可（content-entry の reachedStartGapOverride）で**同じしきい値**を
+ *   使い、「未達と表示するのに自動回復しない」帯（旧: カード 0.95 / 再sweep 0.5 の不整合）を解消する。
+ *   0.5 未満（記録が公式の半分未満）だけを誤完了として扱い、50〜95% の near-complete な
+ *   reached_start は AGENTS §3.3「reached_start のときだけ達成宣言」を尊重して静観する。
+ */
+export const BACKFILL_FALSE_COMPLETION_RATIO = 0.5;

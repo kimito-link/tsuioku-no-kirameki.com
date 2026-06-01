@@ -78,7 +78,6 @@ export async function appendBroadcastSessionSummarySample(db, row) {
     const store = tx.objectStore(BROADCAST_SUMMARY_STORE);
     const addReq = store.add({ ...row, liveId: lid });
     addReq.onerror = () => reject(addReq.error);
-    addReq.onsuccess = () => resolve(undefined);
     tx.oncomplete = () => resolve(undefined);
     tx.onerror = () => reject(tx.error);
   });
@@ -158,8 +157,8 @@ export async function pruneBroadcastSessionSummaryForLive(db, liveId) {
         const id = all[i].id;
         if (typeof id === 'number') store.delete(id);
       }
-      resolve(undefined);
     };
+    tx.oncomplete = () => resolve(undefined);
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -189,7 +188,6 @@ export async function pruneBroadcastSessionSummaryGlobal(db) {
     curReq.onsuccess = () => {
       const cur = curReq.result;
       if (!cur || dropped >= toDrop) {
-        resolve(undefined);
         return;
       }
       const row = /** @type {BroadcastSessionSummaryRow} */ (cur.value);
@@ -200,6 +198,7 @@ export async function pruneBroadcastSessionSummaryGlobal(db) {
       }
       cur.continue();
     };
+    tx.oncomplete = () => resolve(undefined);
     tx.onerror = () => reject(tx.error);
   });
 }

@@ -178,3 +178,51 @@ export function supportSameUserTotalInEntries(entries, userKey) {
   }
   return n;
 }
+
+/**
+ * story growth グリッド用に、表示ウィンドウ `[offset, offset+count)` の各セルについて
+ * 「同一ユーザーキーがウィンドウ内で何件目か（ordinal, 1 始まり）」と「ウィンドウ内総数
+ * （total）」を 1 パス O(count) でまとめて求める。
+ *
+ * これまではセルごとに {@link supportOrdinalForIndex}（O(index)）と
+ * {@link supportSameUserTotalInEntries}（O(N)）を呼んでいたため、グリッド全体の
+ * patch が O(N²) になり、コメントの多い放送で「ページが応答しません」を誘発していた。
+ * 同じ結果（offset=0 のときは従来の per-cell 計算と完全一致）を O(count) で返す。
+ *
+ * @param {ReadonlyArray<unknown>} entries
+ * @param {number} [offset=0] ウィンドウ先頭の絶対インデックス
+ * @param {number} [count] ウィンドウのセル数（既定は `entries.length - offset`）
+ * @returns {{ ordinals: number[], totals: number[] }}
+ *   `ordinals[i]` / `totals[i]` はウィンドウ内 i 番目（= 絶対 offset+i）のセルに対応。
+ */
+export function buildSupportAccentIndex(entries, offset = 0, count) {
+  if (!Array.isArray(entries)) return { ordinals: [], totals: [] };
+  const start = Math.max(0, Math.floor(Number(offset) || 0));
+  const requested =
+    count == null ? entries.length - start : Math.floor(Number(count) || 0);
+  const end = Math.min(entries.length, start + Math.max(0, requested));
+  const len = Math.max(0, end - start);
+  /** @type {number[]} */
+  const ordinals = new Array(len);
+  /** @type {number[]} */
+  const totals = new Array(len);
+  /** @type {string[]} */
+  const keys = new Array(len);
+  /** @type {Map<string, number>} */
+  const totalByKey = new Map();
+  for (let i = 0; i < len; i += 1) {
+    const key = supportUserKeyFromEntry(entries[start + i]);
+    keys[i] = key;
+    totalByKey.set(key, (totalByKey.get(key) || 0) + 1);
+  }
+  /** @type {Map<string, number>} */
+  const running = new Map();
+  for (let i = 0; i < len; i += 1) {
+    const key = keys[i];
+    const r = (running.get(key) || 0) + 1;
+    running.set(key, r);
+    ordinals[i] = r;
+    totals[i] = totalByKey.get(key) || 0;
+  }
+  return { ordinals, totals };
+}

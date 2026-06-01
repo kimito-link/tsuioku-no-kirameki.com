@@ -12,6 +12,9 @@ nicolivelog-extension-investigation.zip
 # Chrome Web Store 申請用ビルド成果物
 build/
 
+# dev ホットリロード用シグナル（build:watch が生成・配布物には含めない）
+extension/dist/dev-reload-id.txt
+
 # API キー・シークレット（誤コミット防止 / 2026-05-17 nl-keys.txt 事故対策）
 nl-keys.txt
 keys.txt

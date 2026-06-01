@@ -22,24 +22,24 @@ describe('executeScriptWithTimeout（chrome.scripting.executeScript 永久 pendi
 
   it('executor が永久 pending なら ms 経過後に fallback、診断面に taskCode が残る', async () => {
     const hang = () => new Promise(() => {}); // 永遠に settle しない
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     const r = await executeScriptWithTimeout(hang, 10, 'list_watch_frames_executescript_timeout', []);
     expect(r).toEqual([]);
     expect(/** @type {{ __nlsLastTimedOutTask?: string }} */ (globalThis).__nlsLastTimedOutTask).toBe(
       'list_watch_frames_executescript_timeout'
     );
-    expect(warnSpy).toHaveBeenCalledWith('[nl-refresh-timeout] list_watch_frames_executescript_timeout');
-    warnSpy.mockRestore();
+    expect(debugSpy).toHaveBeenCalledWith('[nl-refresh-timeout] list_watch_frames_executescript_timeout');
+    debugSpy.mockRestore();
   });
 
   it('executor が別理由で reject しても fallback を返し、診断面には残さない', async () => {
     const failing = () => Promise.reject(new Error('chrome api unavailable'));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     const r = await executeScriptWithTimeout(failing, 1_000, 'x_timeout', null);
     expect(r).toBeNull();
     expect(/** @type {{ __nlsLastTimedOutTask?: string }} */ (globalThis).__nlsLastTimedOutTask).toBeUndefined();
-    expect(warnSpy).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
+    expect(debugSpy).not.toHaveBeenCalled();
+    debugSpy.mockRestore();
   });
 
   it('executor は 1 回だけ呼ばれる（race の重複呼び出しを起こさない）', async () => {
@@ -57,20 +57,20 @@ describe('executeScriptWithTimeout（chrome.scripting.executeScript 永久 pendi
 
   it('fallback として undefined / 空配列 / null など型違いを受け取れる', async () => {
     const hang = () => new Promise(() => {});
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     expect(await executeScriptWithTimeout(hang, 5, 't1', [])).toEqual([]);
     expect(await executeScriptWithTimeout(hang, 5, 't2', null)).toBeNull();
     expect(await executeScriptWithTimeout(hang, 5, 't3', undefined)).toBeUndefined();
-    warnSpy.mockRestore();
+    debugSpy.mockRestore();
   });
 
   it('連続タイムアウト時、診断面は最後の taskCode で上書きされる', async () => {
     const hang = () => new Promise(() => {});
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     await executeScriptWithTimeout(hang, 5, 'task_A', []);
     expect(/** @type {{ __nlsLastTimedOutTask?: string }} */ (globalThis).__nlsLastTimedOutTask).toBe('task_A');
     await executeScriptWithTimeout(hang, 5, 'task_B', []);
     expect(/** @type {{ __nlsLastTimedOutTask?: string }} */ (globalThis).__nlsLastTimedOutTask).toBe('task_B');
-    warnSpy.mockRestore();
+    debugSpy.mockRestore();
   });
 });

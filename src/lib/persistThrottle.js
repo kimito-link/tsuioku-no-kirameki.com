@@ -33,7 +33,10 @@ function defaultYieldBetweenFlushes() {
  *   終わる通常フロー（RT 記録）は yield せず＝体感レイテンシ不変。
  *
  * @param {(batch: unknown[], meta: { sources: string[] }) => Promise<void>} flushFn
- * @param {number} [minIntervalMs]
+ * @param {number | (() => number)} [minIntervalMs] 数値 or「呼ぶたび評価される関数」。
+ *   関数にすると、隠れタブ（document.hidden）では間隔を伸ばす等、状況に応じて動的に
+ *   スロットルできる（v0.1.497: 同一プロセスの裏タブが重い書き込みでメインスレッドを
+ *   奪い、見ているタブまで固まる問題への対策）。
  * @param {number} [burstThreshold] 0 以下は無効（既定の throttle 挙動）
  * @param {() => Promise<void>} [yieldBetweenFlushes] 連続 flush の合間の yield（テスト注入用）
  */
@@ -43,6 +46,13 @@ export function createPersistCoalescer(
   burstThreshold = 0,
   yieldBetweenFlushes = defaultYieldBetweenFlushes
 ) {
+  /** @returns {number} 現在の最小間隔（ms）。関数指定なら都度評価する。 */
+  const resolveMinIntervalMs = () => {
+    const raw =
+      typeof minIntervalMs === 'function' ? minIntervalMs() : minIntervalMs;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : 300;
+  };
   /** @type {{ rows: unknown[], source?: string }[]} */
   let buffer = [];
   /** @type {ReturnType<typeof setTimeout>|null} */
@@ -119,7 +129,7 @@ export function createPersistCoalescer(
     }
     if (timer) return;
     const delay = lastFlushTime
-      ? Math.max(0, minIntervalMs - (Date.now() - lastFlushTime))
+      ? Math.max(0, resolveMinIntervalMs() - (Date.now() - lastFlushTime))
       : 0;
     timer = setTimeout(() => {
       void enqueueFlushSerialized();

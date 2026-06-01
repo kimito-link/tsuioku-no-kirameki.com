@@ -5,6 +5,7 @@ import {
   backfillReachedStreamStart,
   backfillRecordCardHint,
   backfillRecordCardHintDomState,
+  backfillStuckDiagnosticsSuffix,
   BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT
 } from './backfillRinkuNarration.js';
 
@@ -525,6 +526,97 @@ describe('backfillRecordCardHintDomState（記録カード下こん太吹き出�
         { retryStartedAtMs: 1_000_000, nowMs: 999_000 }
       );
       expect(s).toEqual({ hidden: true, dataPhase: '', lead: '' });
+    });
+  });
+});
+
+describe('backfillStuckDiagnosticsSuffix（止まった理由＋残り件数の診断接尾辞・fix/broadcast-bulk-catchup）', () => {
+  it('stopReason と残りギャップの両方を出す', () => {
+    const s = backfillStuckDiagnosticsSuffix(
+      { stopReason: 'no_progress' },
+      { officialCount: 1255, recordedCount: 86 }
+    );
+    expect(s).toBe('（理由: no_progress・残り約1,169件）');
+  });
+
+  it('公式/記録が無いときは理由だけ出す', () => {
+    expect(backfillStuckDiagnosticsSuffix({ stopReason: 'cap_elapsed' })).toBe(
+      '（理由: cap_elapsed）'
+    );
+  });
+
+  it('ギャップが 0 以下なら件数は出さない', () => {
+    expect(
+      backfillStuckDiagnosticsSuffix(
+        { stopReason: 'no_entry' },
+        { officialCount: 100, recordedCount: 100 }
+      )
+    ).toBe('（理由: no_entry）');
+  });
+
+  it('stopReason も件数も無ければ空文字', () => {
+    expect(backfillStuckDiagnosticsSuffix({})).toBe('');
+    expect(backfillStuckDiagnosticsSuffix({ stopReason: '' }, {})).toBe('');
+  });
+
+  it('記録カードの partial 文言の末尾に診断接尾辞が付く', () => {
+    const s = backfillRecordCardHintDomState(
+      { started: true, rows: 50, done: 1, stopReason: 'no_progress' },
+      { officialCount: 1255, recordedCount: 86 }
+    );
+    expect(s.hidden).toBe(false);
+    expect(s.dataPhase).toBe('partial');
+    expect(s.lead).toContain('（理由: no_progress・残り約1,169件）');
+  });
+
+  it('caught_up（95%以上）では診断接尾辞を付けない', () => {
+    const s = backfillRecordCardHintDomState(
+      { started: true, rows: 980, done: 1, stopReason: 'no_progress' },
+      { officialCount: 1000, recordedCount: 980 }
+    );
+    expect(s.dataPhase).toBe('caught_up');
+    expect(s.lead).toBe(BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT);
+  });
+
+  describe('誤完了の可視化（reached_start なのに公式に未達・実機118/595）', () => {
+    // ⭐しきい値は watchdog の reached_start 再 sweep（reachedStartGapOverride）と同じ
+    //   BACKFILL_FALSE_COMPLETION_RATIO(0.5) を使う。「未達と表示するのに自動回復しない」帯を作らない。
+    it('reached_start(done) で記録が公式の半分未満なら未達を診断表示する（実機20%）', () => {
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 118, done: 1, stopReason: 'reached_start' },
+        { officialCount: 595, recordedCount: 118 }
+      );
+      expect(s.hidden).toBe(false);
+      expect(s.dataPhase).toBe('partial');
+      expect(s.lead).toContain('公式件数に届いていません');
+      expect(s.lead).toContain('（理由: reached_start・残り約477件）');
+    });
+
+    it('reached_start(done) で記録が公式の50〜95% なら達成扱いで隠す（watchdog と整合・自動回復しない帯を作らない）', () => {
+      // 70%: 旧実装は「届いていません」を出しつつ watchdog は再 sweep しない不整合帯だった。
+      //   新実装は near-complete な reached_start を達成扱いにして静観する（AGENTS §3.3）。
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 700, done: 1, stopReason: 'reached_start' },
+        { officialCount: 1000, recordedCount: 700 }
+      );
+      expect(s.hidden).toBe(true);
+    });
+
+    it('reached_start(done) で記録が公式の95%以上なら従来どおり達成（隠す）', () => {
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 980, done: 1, stopReason: 'reached_start' },
+        { officialCount: 1000, recordedCount: 980 }
+      );
+      // 達成扱い→記録カードには出さない（hidden）。
+      expect(s.hidden).toBe(true);
+    });
+
+    it('公式件数が分からなければ done は従来どおり隠す（誤検知しない）', () => {
+      const s = backfillRecordCardHintDomState(
+        { started: true, rows: 118, done: 1, stopReason: 'reached_start' },
+        {}
+      );
+      expect(s.hidden).toBe(true);
     });
   });
 });

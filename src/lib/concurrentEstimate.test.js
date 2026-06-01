@@ -1,16 +1,103 @@
 import { describe, it, expect } from 'vitest';
 import {
   calcCommentCaptureRatio,
+  chatDensityConcurrent,
   countRecentActiveUsers,
   DIRECT_VIEWERS_FRESH_MS,
   DIRECT_VIEWERS_NOWCAST_MAX_MS,
   estimateConcurrentViewers,
   dynamicMultiplier,
+  getPlatformProfile,
+  littlesLawConcurrent,
+  NICONICO_PROFILE,
   resolveConcurrentViewers,
   resolveDirectViewersThresholds,
   retentionRate,
   DEFAULT_WINDOW_MS
 } from './concurrentEstimate.js';
+
+describe('getPlatformProfile / プロファイル化', () => {
+  it('未指定・null・未知 id は既定（ニコ生）にフォールバック', () => {
+    expect(getPlatformProfile()).toBe(NICONICO_PROFILE);
+    expect(getPlatformProfile(null)).toBe(NICONICO_PROFILE);
+    expect(getPlatformProfile('unknown-site')).toBe(NICONICO_PROFILE);
+    expect(getPlatformProfile(42)).toBe(NICONICO_PROFILE);
+    expect(getPlatformProfile({})).toBe(NICONICO_PROFILE);
+  });
+
+  it("id 文字列 'niconico' でニコ生プロファイルを返す", () => {
+    expect(getPlatformProfile('niconico')).toBe(NICONICO_PROFILE);
+  });
+
+  it('プロファイルオブジェクトをそのまま受け取れる', () => {
+    const custom = {
+      id: 'demo',
+      label: 'demo',
+      defaultMultiplier: 3,
+      multiplierTable: [
+        [10, 2],
+        [1000, 8]
+      ],
+      visitorSoftCapRatio: 0.5,
+      retention: { peak: 0.6, decay: 0.01, floor: 0.05, fallback: 0.3 },
+      directViewers: { freshMs: 30_000, nowcastMaxMs: 120_000 }
+    };
+    expect(getPlatformProfile(custom)).toBe(custom);
+  });
+
+  it('ニコ生プロファイルを明示しても既定と同じ結果（互換）', () => {
+    const base = estimateConcurrentViewers({
+      recentActiveUsers: 60,
+      totalVisitors: 8754,
+      streamAgeMin: 173
+    });
+    const withProfile = estimateConcurrentViewers({
+      recentActiveUsers: 60,
+      totalVisitors: 8754,
+      streamAgeMin: 173,
+      profile: 'niconico'
+    });
+    expect(withProfile).toEqual(base);
+  });
+
+  it('カスタムプロファイルで倍率・滞留・ソフトキャップが切り替わる', () => {
+    const custom = {
+      id: 'demo',
+      label: 'demo',
+      defaultMultiplier: 3,
+      multiplierTable: [
+        [100, 2],
+        [10000, 4]
+      ],
+      visitorSoftCapRatio: 0.5,
+      retention: { peak: 0.6, decay: 0.01, floor: 0.05, fallback: 0.3 },
+      directViewers: { freshMs: 30_000, nowcastMaxMs: 120_000 }
+    };
+    expect(dynamicMultiplier(null, custom)).toBe(3);
+    expect(dynamicMultiplier(100, custom)).toBe(2);
+    expect(dynamicMultiplier(10000, custom)).toBe(4);
+    expect(retentionRate(0, custom)).toBeCloseTo(0.6, 2);
+    expect(retentionRate(NaN, custom)).toBeCloseTo(0.3, 2);
+    const r = estimateConcurrentViewers({
+      recentActiveUsers: 100,
+      totalVisitors: 500,
+      multiplier: 10,
+      profile: custom
+    });
+    expect(r.estimated).toBe(Math.round(500 * 0.5));
+    expect(r.capped).toBe(true);
+  });
+
+  it('resolveDirectViewersThresholds はプロファイルの directViewers を既定に使う', () => {
+    const custom = {
+      ...NICONICO_PROFILE,
+      directViewers: { freshMs: 33_000, nowcastMaxMs: 111_000 }
+    };
+    const t = resolveDirectViewersThresholds(null, custom);
+    expect(t.freshMs).toBe(33_000);
+    expect(t.nowcastMaxMs).toBe(111_000);
+  });
+});
 
 describe('countRecentActiveUsers', () => {
   it('空 Map なら 0', () => {
@@ -283,6 +370,103 @@ describe('estimateConcurrentViewers', () => {
     });
     expect(r.estimated).toBeGreaterThan(15);
     expect(r.estimated).toBeLessThan(120);
+  });
+});
+
+describe('littlesLawConcurrent（研究中シグナル C）', () => {
+  it('L = λ × W を四捨五入で返す', () => {
+    expect(littlesLawConcurrent({ visitorsPerMin: 16.67, avgSessionMin: 15 })).toBe(250);
+  });
+
+  it('入力不足（λ または W が 0/無効）なら 0', () => {
+    expect(littlesLawConcurrent({ visitorsPerMin: 0, avgSessionMin: 15 })).toBe(0);
+    expect(littlesLawConcurrent({ visitorsPerMin: 10, avgSessionMin: 0 })).toBe(0);
+    expect(littlesLawConcurrent({ visitorsPerMin: NaN, avgSessionMin: 15 })).toBe(0);
+    expect(littlesLawConcurrent({ visitorsPerMin: 10, avgSessionMin: undefined })).toBe(0);
+  });
+});
+
+describe('chatDensityConcurrent（研究中シグナル D）', () => {
+  it('コメ/分 ÷ 1人あたり発言ペース を四捨五入で返す', () => {
+    expect(chatDensityConcurrent({ commentsPerMin: 50, perPersonCommentsPerMin: 0.2 })).toBe(250);
+  });
+
+  it('入力不足なら 0', () => {
+    expect(chatDensityConcurrent({ commentsPerMin: 0, perPersonCommentsPerMin: 0.2 })).toBe(0);
+    expect(chatDensityConcurrent({ commentsPerMin: 50, perPersonCommentsPerMin: 0 })).toBe(0);
+    expect(chatDensityConcurrent({ commentsPerMin: 50, perPersonCommentsPerMin: undefined })).toBe(0);
+  });
+});
+
+describe('estimateConcurrentViewers: 研究中シグナルの足し込み（既定は不変）', () => {
+  it('signalC は来場累計÷経過分×平均滞在で近似される（既定プロファイル）', () => {
+    const r = estimateConcurrentViewers({
+      recentActiveUsers: 40,
+      totalVisitors: 3000,
+      streamAgeMin: 180
+    });
+    // λ ≈ 3000/180 = 16.67, W=15 → ≈ 250
+    expect(r.signalC).toBe(250);
+    expect(r.visitorsPerMin).toBeCloseTo(16.67, 1);
+  });
+
+  it('明示 visitorsPerMin / commentsPerMin で C・D を算出', () => {
+    const r = estimateConcurrentViewers({
+      recentActiveUsers: 40,
+      totalVisitors: 3000,
+      streamAgeMin: 180,
+      visitorsPerMin: 20,
+      commentsPerMin: 50
+    });
+    expect(r.signalC).toBe(Math.round(20 * 15));
+    expect(r.signalD).toBe(Math.round(50 / 0.2));
+    expect(r.commentsPerMin).toBe(50);
+  });
+
+  it('commentsPerMin 未指定なら signalD=0', () => {
+    const r = estimateConcurrentViewers({ recentActiveUsers: 30, totalVisitors: 2580 });
+    expect(r.signalD).toBe(0);
+  });
+
+  it('blended は存在する正シグナルの幾何平均、estimated は従来どおり', () => {
+    const r = estimateConcurrentViewers({
+      recentActiveUsers: 60,
+      totalVisitors: 8754,
+      streamAgeMin: 173
+    });
+    // estimated は A,B のみの従来計算（C/D は混ぜない）
+    expect(r.estimated).toBeGreaterThan(800);
+    expect(r.estimated).toBeLessThan(1400);
+    expect(r.blendedSignalCount).toBeGreaterThanOrEqual(3);
+    const present = [r.signalA, r.signalB, r.signalC, r.signalD].filter((s) => s > 0);
+    const expectedBlend = Math.round(
+      Math.exp(present.reduce((a, s) => a + Math.log(s), 0) / present.length)
+    );
+    expect(r.blended).toBe(expectedBlend);
+  });
+
+  it('session/chatDensity を持たないカスタムプロファイルでも落ちない（C/D=0）', () => {
+    const custom = {
+      id: 'demo',
+      label: 'demo',
+      defaultMultiplier: 3,
+      multiplierTable: [
+        [100, 2],
+        [10000, 4]
+      ],
+      visitorSoftCapRatio: 0.5,
+      retention: { peak: 0.6, decay: 0.01, floor: 0.05, fallback: 0.3 },
+      directViewers: { freshMs: 30_000, nowcastMaxMs: 120_000 }
+    };
+    const r = estimateConcurrentViewers({
+      recentActiveUsers: 20,
+      totalVisitors: 2000,
+      streamAgeMin: 60,
+      commentsPerMin: 40,
+      profile: custom
+    });
+    expect(r.signalC).toBe(0);
+    expect(r.signalD).toBe(0);
   });
 });
 

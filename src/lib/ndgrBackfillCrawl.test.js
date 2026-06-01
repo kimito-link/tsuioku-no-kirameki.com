@@ -1,17 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import {
   crawlNdgrBackward,
+  crawlNdgrBackwardDeterministic,
   chainLooksLikeStreamStart,
   NDGR_BACKFILL_DEFAULT_CAPS,
   NDGR_BACKFILL_FETCH_GAP_MS,
   NDGR_BACKFILL_BACKOFF_MS,
   NDGR_BACKFILL_SEED_LAG_SEC,
+  NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC,
   NDGR_BACKFILL_NEAR_START_VPOS_CS
 } from './ndgrBackfillCrawl.js';
 
 // テストは now を固定（1_000_000ms）注入する。seed は floor(now/1000) - SEED_LAG_SEC。
 const FIXED_NOW_MS = 1_000_000;
 const SEED_AT = Math.floor(FIXED_NOW_MS / 1000) - NDGR_BACKFILL_SEED_LAG_SEC;
+const RESEED_AT_1 = SEED_AT - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+const RESEED_AT_2 = RESEED_AT_1 - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
 
 // ── protobuf wire encoders（ndgrDecode.test.js と同形） ──────────────────────
 function encodeVarint(value) {
@@ -496,6 +500,61 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     );
 
     // 6 連続の空区画を飛び越えて配信序盤(no=5)まで遡れた。
+    expect(chatsAll.map((c) => c.no)).toContain(5);
+    expect(result.stopReason).toBe('reached_start');
+  });
+
+  it('長い疎区間/幅広バケットが 30 連続でも、橋渡し予算(240)内なら配信開始まで遡り切る（fix/ndgr-no-progress-bridge・実機68%頭打ち no_progress の真因解消）', async () => {
+    // ⛔ 真因（実機 2026-06-01・歌枠/ギフト多め・data-nls-backfill = seg=16 rows=5102 stop=no_progress・
+    //   記録が公式の約68%で頭打ち）: 旧上限 12（12×50秒=10分）では、歌枠の長い間奏/雑談など
+    //   「コメントが疎で 1 区画に同じ vpos 帯しか返らない（＝進めない）区間」が 10 分を超えると
+    //   途中で no_progress に倒れ、配信開始まで遡れず公式件数に届かなかった。
+    //   修正: 上限を 240（240×50秒≒200分）に引き上げ、現実的な疎区間を跨いで開始まで遡り切る。
+    //   ⚠️ ステップ幅は 50秒のまま（区画スキップ防止）。これは「12 連続では届かず・240 なら届く」
+    //      ことを担保するため、30 連続の『進めない区画』を置く（旧上限12なら 13 連続目で no_progress）。
+    const PROGRAM_START = 1000;
+    const NOW_SEC = 100_000; // 開始まで多数の再シードを正の at で踏めるよう、now を十分後ろに置く
+    const SEED = NOW_SEC - NDGR_BACKFILL_SEED_LAG_SEC; // 初回 seed 候補
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/SPARSE_A';
+    const BK_OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/SPARSE_OLD';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(NOW_SEC));
+    // 初回: 中盤(vpos=60000=600秒地点)の区画。これで globalMinVpos=60000・madeProgress。
+    map.set(atUrl(SEED), viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // 第1再シードは programStart+600-5=1595 から。そこから 50秒ずつ 30 区画、どれも「同じ
+    //   vpos=60000 帯の別 URI」= 前回より古い vpos へ進めない（幅広バケット/疎区間を模す）。
+    let at = PROGRAM_START + Math.floor(60000 / 100) - 5; // 1595
+    for (let k = 0; k < 30; k += 1) {
+      const uri = `https://mpn.live.nicovideo.jp/data/backward/v4/SPARSE_SAME_${at}`;
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
+      map.set(uri, packedSegmentBytes([{ no: 49, content: '同じ帯', name: 'u', vpos: 60000 }]));
+      at -= 50;
+    }
+    // ようやく配信開始区画（開始近傍の低 vpos が複数）に届く。
+    map.set(atUrl(at), viewEntryBytes({ backwardUri: BK_OLD }));
+    map.set(
+      BK_OLD,
+      packedSegmentBytes([
+        { no: 5, content: '配信序盤', name: 'u', vpos: 80 },
+        { no: 6, content: 'はじまった', name: 'u2', vpos: 200 }
+      ])
+    );
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => NOW_SEC * 1000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 30 連続の「進めない区画」を跨いで配信序盤(no=5)まで遡れ、reached_start で正しく完了。
     expect(chatsAll.map((c) => c.no)).toContain(5);
     expect(result.stopReason).toBe('reached_start');
   });
@@ -1395,6 +1454,285 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
 
     expect(result.stopReason).not.toBe('reached_start');
     expect(result.diagnostics).toBeNull();
+  });
+});
+
+describe('crawlNdgrBackwardDeterministic（決定論 NDGR バックフィル）', () => {
+  it('再シードで前区画 entry を取得し、真枯渇したときだけ reached_start にする', async () => {
+    const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_MID';
+    const BK1 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_OLD';
+    const BK2 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_START';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+    map.set(
+      BK0,
+      packedSegmentBytes([
+        { no: 900, content: '中盤なのに低vpos A', name: 'u1', vpos: 0 },
+        { no: 901, content: '中盤なのに低vpos B', name: 'u2', vpos: 100 }
+      ], BK1)
+    );
+    map.set(BK1, packedSegmentBytes([{ no: 100, content: 'さらに古い区画', name: 'u3', vpos: 50000 }]));
+    map.set(atUrl(RESEED_AT_1), viewEntryBytes({ backwardUri: BK2 }));
+    map.set(BK2, packedSegmentBytes([{ no: 50, content: '再シードで届いた開始側', name: 'u4', vpos: 40000 }]));
+    map.set(atUrl(RESEED_AT_2), viewEntryBytes({ backwardUri: BK2 }));
+
+    const { fetchBinary, calls } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackwardDeterministic({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => FIXED_NOW_MS })
+    );
+
+    expect(result.stopReason).toBe('reached_start');
+    expect(chatsAll.map((c) => c.no)).toEqual([900, 901, 100, 50]);
+    expect(calls).toContain(BK1);
+    expect(calls).toContain(atUrl(RESEED_AT_1));
+    expect(calls).toContain(atUrl(RESEED_AT_2));
+  });
+
+  it('1 バケット終端だけでは reached_start と言わず、再シード空振りは no_progress に倒す', async () => {
+    const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_SINGLE_BUCKET';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+    map.set(BK0, packedSegmentBytes([{ no: 1, content: '単一バケット', name: 'u', vpos: 80000 }]));
+
+    const { fetchBinary, calls } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackwardDeterministic({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => FIXED_NOW_MS })
+    );
+
+    expect(result.stopReason).toBe('no_progress');
+    expect(chatsAll.map((c) => c.no)).toEqual([1]);
+    expect(calls).toContain(atUrl(RESEED_AT_1));
+  });
+
+  it('programStartSec があれば到達済み最古 vpos の実時刻で ?at 再シードする', async () => {
+    const PROGRAM_START = 100;
+    const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_REALTIME_MID';
+    const BK1 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_REALTIME_OLD';
+    const FIRST_RESEED_AT = PROGRAM_START + Math.floor(75500 / 100);
+    const SECOND_RESEED_AT = PROGRAM_START + Math.floor(70000 / 100);
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+    map.set(BK0, packedSegmentBytes([{ no: 80, content: 'mid', name: 'u', vpos: 75500 }]));
+    map.set(atUrl(FIRST_RESEED_AT), viewEntryBytes({ backwardUri: BK1 }));
+    map.set(BK1, packedSegmentBytes([{ no: 70, content: 'old', name: 'u', vpos: 70000 }]));
+    map.set(atUrl(SECOND_RESEED_AT), viewEntryBytes({ backwardUri: BK1 }));
+
+    const { fetchBinary, calls } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackwardDeterministic({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => FIXED_NOW_MS,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    expect(result.stopReason).toBe('reached_start');
+    expect(chatsAll.map((c) => c.no)).toEqual([80, 70]);
+    expect(calls).toContain(atUrl(FIRST_RESEED_AT));
+    expect(calls).toContain(atUrl(SECOND_RESEED_AT));
+  });
+
+  it('Backward 連鎖終端後、ChunkedEntry.previousUris の MessageSegment を橋渡し回収する', async () => {
+    const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_BRIDGE_BK0';
+    const BK1 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_BRIDGE_OLD';
+    const PREV = 'https://mpn.live.nicovideo.jp/data/segment/v4/DET_PREV0';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0, previousUris: [PREV] }));
+    map.set(BK0, packedSegmentBytes([{ no: 50, content: 'backward', name: 'u', vpos: 5000 }]));
+    map.set(PREV, messageSegmentStreamBytes([{ no: 49, content: 'previous bridge', name: 'p', vpos: 4900 }]));
+    map.set(atUrl(RESEED_AT_1), viewEntryBytes({ backwardUri: BK1 }));
+    map.set(BK1, packedSegmentBytes([{ no: 40, content: 'reseed bridge', name: 'r', vpos: 4000 }]));
+    map.set(atUrl(RESEED_AT_2), viewEntryBytes({ backwardUri: BK1 }));
+
+    const { fetchBinary, calls } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackwardDeterministic({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => FIXED_NOW_MS })
+    );
+
+    expect(result.stopReason).toBe('reached_start');
+    expect(chatsAll.map((c) => c.no)).toEqual([50, 49, 40]);
+    expect(calls.indexOf(PREV)).toBeGreaterThan(calls.indexOf(BK0));
+    expect(calls).toContain(atUrl(RESEED_AT_1));
+  });
+
+  it('循環・重複ポインタは visited で 1 回だけ取得し、無限ループしない', async () => {
+    const A = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_LOOP_A';
+    const B = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_LOOP_B';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: A }));
+    map.set(A, packedSegmentBytes([{ no: 2, content: 'A', name: 'u' }], B));
+    map.set(B, packedSegmentBytes([{ no: 1, content: 'B', name: 'u' }], A));
+
+    const { fetchBinary, calls } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackwardDeterministic({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => FIXED_NOW_MS })
+    );
+
+    expect(result.stopReason).toBe('no_progress');
+    expect(chatsAll.map((c) => c.no)).toEqual([2, 1]);
+    expect(calls.filter((u) => u === A).length).toBe(1);
+    expect(calls.filter((u) => u === B).length).toBe(1);
+  });
+
+  it('segments / bytes / rows / elapsed の cap で正しい stopReason を返す', async () => {
+    {
+      const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_CAP_SEG0';
+      const BK1 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_CAP_SEG1';
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+      map.set(BK0, packedSegmentBytes([{ no: 1, content: 'a', name: 'u' }], BK1));
+      map.set(BK1, packedSegmentBytes([{ no: 2, content: 'b', name: 'u' }]));
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result } = await drain(
+        crawlNdgrBackwardDeterministic({
+          viewBase: VIEW_BASE,
+          fetchBinary,
+          sleep,
+          now: () => FIXED_NOW_MS,
+          caps: { segments: 1 }
+        })
+      );
+      expect(result.stopReason).toBe('cap_segments');
+    }
+
+    {
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result } = await drain(
+        crawlNdgrBackwardDeterministic({
+          viewBase: VIEW_BASE,
+          fetchBinary,
+          sleep,
+          now: () => FIXED_NOW_MS,
+          caps: { bytes: 1 }
+        })
+      );
+      expect(result.stopReason).toBe('cap_bytes');
+    }
+
+    {
+      const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_CAP_ROWS';
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+      map.set(
+        BK0,
+        packedSegmentBytes([
+          { no: 1, content: 'a', name: 'u' },
+          { no: 2, content: 'b', name: 'u' }
+        ])
+      );
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result } = await drain(
+        crawlNdgrBackwardDeterministic({
+          viewBase: VIEW_BASE,
+          fetchBinary,
+          sleep,
+          now: () => FIXED_NOW_MS,
+          caps: { rows: 2 }
+        })
+      );
+      expect(result.stopReason).toBe('cap_rows');
+    }
+
+    {
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      let tick = FIXED_NOW_MS;
+      const nowFn = () => {
+        tick += 10_000;
+        return tick;
+      };
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep } = makeNoopSleep();
+      const { result } = await drain(
+        crawlNdgrBackwardDeterministic({
+          viewBase: VIEW_BASE,
+          fetchBinary,
+          sleep,
+          now: nowFn,
+          caps: { elapsedMs: 1 }
+        })
+      );
+      expect(result.stopReason).toBe('cap_elapsed');
+    }
+  });
+
+  it('AbortSignal と 429 backoff 枯渇で正しく停止する', async () => {
+    {
+      const ac = new AbortController();
+      ac.abort();
+      const { fetchBinary, calls } = makeFetchFromMap(new Map());
+      const { sleep } = makeNoopSleep();
+      const { result } = await drain(
+        crawlNdgrBackwardDeterministic({
+          viewBase: VIEW_BASE,
+          fetchBinary,
+          sleep,
+          now: () => FIXED_NOW_MS,
+          signal: ac.signal
+        })
+      );
+      expect(result.stopReason).toBe('aborted');
+      expect(calls.length).toBe(0);
+    }
+
+    {
+      const BK0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_429';
+      const map = new Map();
+      map.set(atUrl('now'), nowEntryBytes(1000));
+      map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+      map.set(BK0, { status: 429, bytes: new Uint8Array() });
+      const { fetchBinary } = makeFetchFromMap(map);
+      const { sleep, slept } = makeNoopSleep();
+      const { result } = await drain(
+        crawlNdgrBackwardDeterministic({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => FIXED_NOW_MS })
+      );
+      expect(result.stopReason).toBe('rate_limited');
+      for (const b of NDGR_BACKFILL_BACKOFF_MS) expect(slept).toContain(b);
+    }
+  });
+
+  it('途中参加の入口から backward next を辿り、開始側まで全区画の chats を流す', async () => {
+    const MID = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_JOIN_MID';
+    const OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_JOIN_OLD';
+    const START = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_JOIN_START';
+    const EARLIER = 'https://mpn.live.nicovideo.jp/data/backward/v4/DET_JOIN_RESEED';
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: MID }));
+    map.set(MID, packedSegmentBytes([{ no: 300, content: '参加地点', name: 'u', vpos: 30000 }], OLD));
+    map.set(OLD, packedSegmentBytes([{ no: 200, content: '古い区画', name: 'u', vpos: 20000 }], START));
+    map.set(START, packedSegmentBytes([{ no: 100, content: '開始側', name: 'u', vpos: 1000 }]));
+    map.set(atUrl(RESEED_AT_1), viewEntryBytes({ backwardUri: EARLIER }));
+    map.set(EARLIER, packedSegmentBytes([{ no: 50, content: '再シード開始側', name: 'u', vpos: 500 }]));
+    map.set(atUrl(RESEED_AT_2), viewEntryBytes({ backwardUri: EARLIER }));
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackwardDeterministic({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => FIXED_NOW_MS })
+    );
+
+    expect(result.stopReason).toBe('reached_start');
+    expect(chatsAll.map((c) => c.no)).toEqual([300, 200, 100, 50]);
   });
 });
 

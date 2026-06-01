@@ -76,6 +76,25 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.estTitle).toContain('直接値');
   });
 
+  it('来場＋経過があれば診断 title に研究中シグナル（C/blend）を併記する', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: 3000,
+        recentActiveUsers: 40,
+        streamAgeMin: 180,
+        officialViewerCount: 500,
+        officialStatsUpdatedAt: nowMs - 4_000
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estTitle).toContain('研究中');
+    expect(vm.concurrent.estTitle).toContain('C[リトル]');
+    // 主値（直接値）は据え置きで研究中シグナルに引っぱられない
+    expect(vm.concurrent.estText).toBe('500');
+    expect(vm.concurrent.numericEstimated).toBe(500);
+  });
+
   it('マージ後も officialViewerCount は来場補完値と混同されない', () => {
     const merged = mergeProgramStatsWatchIntoWatchMetaSnapshot(
       {

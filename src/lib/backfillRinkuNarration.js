@@ -18,6 +18,8 @@
  * @module backfillRinkuNarration
  */
 
+import { BACKFILL_FALSE_COMPLETION_RATIO } from './timingConstants.js';
+
 /**
  * @typedef {(
  *   'idle' | 'fetching' | 'progress' |
@@ -280,6 +282,41 @@ export function backfillRecordCardHint(progress, opts = {}) {
 }
 
 /**
+ * 診断用: 取り込みが途中で止まったときに、止まった理由(stopReason)と公式件数との
+ * 残りギャップを「人が読める短い接尾辞」にして返す純関数。
+ *
+ * 目的（fix/broadcast-bulk-catchup・2026-05-31）:
+ *   「ある放送だけ 7% で止まる」原因を切り分けるため、記録カードのヒント末尾に
+ *   実際の stopReason（no_progress / reached_start / cap_elapsed / cap_rows など）と、
+ *   公式件数までの残り件数を出して、利用者が見たまま報告できるようにする。
+ *
+ * 表示するのは「まだ取り切れていない」状態（partial / paused / no_entry）のときだけ。
+ * caught_up / done / retry_started では付けない（達成感を濁さない）。
+ *
+ * @param {{ stopReason?: string }} progress
+ * @param {{ officialCount?: number|null, recordedCount?: number|null }} [opts]
+ * @returns {string} 例: '（理由: no_progress・残り約1,169件）'。出さないときは ''。
+ */
+export function backfillStuckDiagnosticsSuffix(progress, opts = {}) {
+  const reason = String((progress && progress.stopReason) || '').trim();
+  const official = Number(opts && opts.officialCount);
+  const recorded = Number(opts && opts.recordedCount);
+  const parts = [];
+  if (reason) parts.push(`理由: ${reason}`);
+  if (
+    Number.isFinite(official) &&
+    official > 0 &&
+    Number.isFinite(recorded) &&
+    recorded >= 0
+  ) {
+    const gap = Math.max(0, official - recorded);
+    if (gap > 0) parts.push(`残り約${gap.toLocaleString('ja-JP')}件`);
+  }
+  if (!parts.length) return '';
+  return `（${parts.join('・')}）`;
+}
+
+/**
  * v0.1.450: 「もう一度ためす」ボタン押下直後に短時間だけ表示する確認文言の長さ（ms）。
  *
  * 背景（2026-05-29 会議）: ボタン下の `#backfillFetchPrompt` を廃止して記録カード内
@@ -356,6 +393,35 @@ export function backfillRecordCardHintDomState(progress, opts = {}) {
   }
 
   const phase = backfillNarrationPhase(progress);
+
+  // 誤完了の可視化（fix/broadcast-bulk-catchup・2026-05-31）:
+  //   reached_start 等で done/done_empty（＝「配信のはじめまで届いた」）と判定されたのに、
+  //   実記録が公式件数に遠く届いていない場合は「ぜんぶ届いた」ではなく未達を診断表示する。
+  //   実機で 記録118/公式595(20%) のまま自動回復しない放送の原因（stopReason）を、利用者が
+  //   見たまま報告できるようにする。
+  //   ⭐しきい値は watchdog の reached_start 再 sweep（reachedStartGapOverride）と同じ
+  //     BACKFILL_FALSE_COMPLETION_RATIO(0.5) を使う。これにより「未達と表示するのに自動回復
+  //     しない」帯（旧: カード 0.95 / 再 sweep 0.5）の不整合を解消する。50〜95% の near-complete な
+  //     reached_start は AGENTS §3.3 を尊重して静観（達成扱い・カードには出さない）。
+  if (phase === 'done' || phase === 'done_empty') {
+    const official = Number(opts && opts.officialCount);
+    const recorded = Number(opts && opts.recordedCount);
+    if (
+      Number.isFinite(official) &&
+      official > 0 &&
+      Number.isFinite(recorded) &&
+      recorded >= 0 &&
+      recorded < official * BACKFILL_FALSE_COMPLETION_RATIO
+    ) {
+      const suffix = backfillStuckDiagnosticsSuffix(progress, opts);
+      return {
+        hidden: false,
+        dataPhase: 'partial',
+        lead: `過去ログが公式件数に届いていません${suffix}`
+      };
+    }
+  }
+
   const lead = backfillRecordCardHint(progress, opts);
   if (!lead) {
     return { hidden: true, dataPhase: '', lead: '' };
@@ -367,5 +433,9 @@ export function backfillRecordCardHintDomState(progress, opts = {}) {
   if (lead === BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT) {
     return { hidden: false, dataPhase: 'caught_up', lead };
   }
-  return { hidden: false, dataPhase: phase, lead };
+  // 診断接尾辞（fix/broadcast-bulk-catchup）: まだ取り切れていない partial/paused/no_entry の
+  //   ときだけ、止まった理由と残り件数を末尾に出す。原因切り分け用。
+  const suffix = backfillStuckDiagnosticsSuffix(progress, opts);
+  const leadWithDiag = suffix ? `${lead}${suffix}` : lead;
+  return { hidden: false, dataPhase: phase, lead: leadWithDiag };
 }

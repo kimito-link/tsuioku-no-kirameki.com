@@ -8,6 +8,7 @@ import {
   supportUserKeyFromEntry,
   supportOrdinalForIndex,
   supportSameUserTotalInEntries,
+  buildSupportAccentIndex,
   ACCENT_OKLCH_LIGHT,
   ACCENT_OKLCH_DARK,
   ACCENT_HEX_LIGHT
@@ -145,5 +146,60 @@ describe('supportSameUserTotalInEntries', () => {
     const entries = [{ userId: 'a' }, { userId: 'b' }, { userId: 'a' }];
     expect(supportSameUserTotalInEntries(entries, 'a')).toBe(2);
     expect(supportSameUserTotalInEntries(entries, 'b')).toBe(1);
+  });
+});
+
+describe('buildSupportAccentIndex', () => {
+  it('offset=0 全件は per-cell の supportOrdinalForIndex / Total と完全一致', () => {
+    const entries = [
+      { userId: 'a' },
+      { userId: 'b' },
+      { userId: 'a' },
+      { nickname: 'x' },
+      { userId: 'a' },
+      { nickname: 'y' }
+    ];
+    const { ordinals, totals } = buildSupportAccentIndex(entries);
+    expect(ordinals).toHaveLength(entries.length);
+    for (let i = 0; i < entries.length; i += 1) {
+      expect(ordinals[i]).toBe(supportOrdinalForIndex(entries, i));
+      const key = supportUserKeyFromEntry(entries[i]);
+      expect(totals[i]).toBe(supportSameUserTotalInEntries(entries, key));
+    }
+    // userId なしはまとめて UNKNOWN として数える
+    expect(ordinals).toEqual([1, 1, 2, 1, 3, 2]);
+    expect(totals).toEqual([3, 1, 3, 2, 3, 2]);
+  });
+
+  it('ウィンドウ（offset>0）は窓内だけで ordinal/total を数える', () => {
+    const entries = [
+      { userId: 'a' },
+      { userId: 'a' },
+      { userId: 'b' },
+      { userId: 'a' }
+    ];
+    // 直近 2 件（index 2,3 = b,a）だけのウィンドウ
+    const { ordinals, totals } = buildSupportAccentIndex(entries, 2, 2);
+    expect(ordinals).toEqual([1, 1]);
+    expect(totals).toEqual([1, 1]);
+  });
+
+  it('count が残り件数より大きくても entries 末尾で頭打ち', () => {
+    const entries = [{ userId: 'a' }, { userId: 'a' }];
+    const { ordinals, totals } = buildSupportAccentIndex(entries, 1, 999);
+    expect(ordinals).toEqual([1]);
+    expect(totals).toEqual([1]);
+  });
+
+  it('空・非配列・範囲外 offset は空配列', () => {
+    expect(buildSupportAccentIndex([])).toEqual({ ordinals: [], totals: [] });
+    expect(buildSupportAccentIndex(/** @type {any} */ (null))).toEqual({
+      ordinals: [],
+      totals: []
+    });
+    expect(buildSupportAccentIndex([{ userId: 'a' }], 5)).toEqual({
+      ordinals: [],
+      totals: []
+    });
   });
 });
