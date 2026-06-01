@@ -37,6 +37,7 @@ import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
+import { eventVotingRankingStorageKey } from '../lib/auditionEventRankingApi.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
 import { formatCardFreshnessNote } from '../lib/cardFreshnessNote.js';
 import { pickGiftHistorySource } from '../lib/giftHistorySourcePreference.js';
@@ -146,8 +147,16 @@ import {
   KEY_GIFT_RANKING_LANE_ENABLED,
   KEY_BACKFILL_ENABLED,
   KEY_BACKFILL_AUTO_DISABLED,
-  KEY_BACKFILL_PROGRESS
+  KEY_BACKFILL_PROGRESS,
+  KEY_AUTOPATROL_ENABLED,
+  KEY_AUTOPATROL_STATE,
+  KEY_CONCURRENT_CALIBRATION_RING_V1
 } from '../lib/storageKeys.js';
+import {
+  parseCalibrationLog,
+  serializeCalibrationJson,
+  serializeCalibrationCsv
+} from '../lib/concurrentCalibrationLog.js';
 import {
   // v0.1.450 (PR4): backfillRinkuNarration は B 用 #backfillRinku 描画関数で使われていたが、
   //   B 廃止により未使用化。A 内 hint は backfillRecordCardHintDomState のみで完結する。
@@ -1841,6 +1850,49 @@ async function downloadSessionSummaryJson(liveId) {
   }
 }
 
+/**
+ * 同接推定 較正データ（KEY_CONCURRENT_CALIBRATION_RING_V1）を JSON/CSV でダウンロードする。
+ * @param {'json'|'csv'} format
+ */
+async function downloadCalibrationData(format) {
+  try {
+    const bag = await chrome.storage.local.get(KEY_CONCURRENT_CALIBRATION_RING_V1);
+    const parsed = parseCalibrationLog(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]);
+    if (!parsed.items.length) return;
+    const isCsv = format === 'csv';
+    const text = isCsv
+      ? serializeCalibrationCsv(parsed)
+      : serializeCalibrationJson(parsed);
+    const blob = new Blob([text], {
+      type: isCsv ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8'
+    });
+    const url = URL.createObjectURL(blob);
+    try {
+      await chrome.downloads.download({
+        url,
+        filename: `nicolivelog-concurrent-calibration-${Date.now()}.${isCsv ? 'csv' : 'json'}`,
+        saveAs: true,
+        conflictAction: 'uniquify'
+      });
+    } finally {
+      objectUrlRevokeQueue.enqueue(url);
+    }
+  } catch {
+    // no-op
+  }
+}
+
+/** 較正データを全消去する（リングバッファを空にする）。 */
+async function clearCalibrationData() {
+  try {
+    await chrome.storage.local.set({
+      [KEY_CONCURRENT_CALIBRATION_RING_V1]: { v: 1, items: [] }
+    });
+  } catch {
+    // no-op
+  }
+}
+
 const INTERCEPT_BACKFILL_STATE = {
   liveId: '',
   deepTried: false
@@ -2332,6 +2384,58 @@ popupBooleanSettingsRegistry.register(
       /** @type {HTMLInputElement|null} */ ($('commentEnterSend'))
   })
 );
+
+/**
+ * 自動巡回（Phase 2b）の ON/OFF。既定 OFF（raw === true のときだけ ON）。
+ * 書き込み副作用（SW への通知）は storage.onChanged 経由なので、ここは
+ * checkbox のハイドレートのみ。write は下のコールサイト change ハンドラで行う。
+ */
+popupBooleanSettingsRegistry.register(
+  createBooleanSettingController({
+    key: KEY_AUTOPATROL_ENABLED,
+    normalize: (raw) => raw === true,
+    getCheckbox: () => /** @type {HTMLInputElement|null} */ ($('autopatrolEnabled'))
+  })
+);
+
+/**
+ * 自動巡回の状態テキスト（#autopatrolStatus）を storage から更新する。
+ * 訪問数・採取中の配信・待ち件数・直近エラーを 1 行で見せる。
+ */
+async function refreshAutopatrolStatusLine() {
+  try {
+    const statusEl = $('autopatrolStatus');
+    if (!statusEl) return;
+    const bag = await chrome.storage.local.get([
+      KEY_AUTOPATROL_ENABLED,
+      KEY_AUTOPATROL_STATE,
+      KEY_CONCURRENT_CALIBRATION_RING_V1
+    ]);
+    const sampleCount = parseCalibrationLog(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]).items.length;
+    const sampleLabel = `記録 ${sampleCount.toLocaleString('ja-JP')} サンプル`;
+    const enabled = bag[KEY_AUTOPATROL_ENABLED] === true;
+    if (!enabled) {
+      statusEl.textContent = `OFF（手動視聴の記録は継続）／ ${sampleLabel}`;
+      return;
+    }
+    const st =
+      bag[KEY_AUTOPATROL_STATE] && typeof bag[KEY_AUTOPATROL_STATE] === 'object'
+        ? bag[KEY_AUTOPATROL_STATE]
+        : {};
+    const visited = Math.max(0, Number(st.visitedCount) || 0);
+    const cur =
+      typeof st.currentLiveId === 'string' && st.currentLiveId ? st.currentLiveId : null;
+    const qn = Array.isArray(st.queue) ? st.queue.length : 0;
+    const parts = [`ON・累計 ${visited} 配信`];
+    parts.push(cur ? `採取中 ${cur}` : '次の配信を準備中');
+    parts.push(`待ち ${qn}`);
+    parts.push(sampleLabel);
+    if (st.lastError) parts.push(`※${st.lastError}`);
+    statusEl.textContent = parts.join(' / ');
+  } catch {
+    /* no-op */
+  }
+}
 
 /**
  * @param {unknown} userId
@@ -6657,7 +6761,8 @@ const NORTH_STAR_BUNDLE_LOADING_LANE_IDS = Object.freeze([
   'adRanking',
   'eventRank',
   'eventScore',
-  'eventBroadcasters'
+  'eventBroadcasters',
+  'eventVotingSupporters'
 ]);
 
 /**
@@ -7416,7 +7521,26 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
       const row = raw && typeof raw === 'object' ? raw : {};
       const contribution =
         typeof row.score === 'number' && Number.isFinite(row.score) ? row.score : 0;
-      return { ...row, contribution };
+      // richview のイベントランキング行は a[href] を持たないが、scrape 時にアバター
+      // URL から uid を復元している。記名（uid あり）なら公式ユーザーページ URL に
+      // 変換して、既存 strip の uid リンク経路（officialDomRankingRowsToStripRooms）を
+      // 発火させる＝クリックで配信者ページへ飛べる。
+      // userId 未付与の旧保存データ（v0.1.522 以前）でも、保存済みアイコン URL から
+      // popup 側で uid を復元してリンク化する（再スクレイプ＝ページ再読込を待たない）。
+      let uid = String(row.userId || '').trim();
+      if (!/^\d{1,18}$/.test(uid)) {
+        const am = String(row.thumbnailUrl || '').match(
+          /\/usericon\/\d+\/(\d{2,18})\.(?:jpe?g|png|gif|webp)/i
+        );
+        uid = am ? am[1] : '';
+      }
+      const userPageUrl =
+        typeof row.userPageUrl === 'string' && row.userPageUrl
+          ? row.userPageUrl
+          : /^\d{1,18}$/.test(uid)
+            ? `https://www.nicovideo.jp/user/${uid}`
+            : undefined;
+      return { ...row, contribution, ...(userPageUrl ? { userPageUrl } : {}) };
     });
     const rooms = officialDomRankingRowsToStripRooms(contribRows, { userKeyKind: 'contrib' });
     paintTopSupportRankStyleIntoElement(body, rooms, {
@@ -7431,6 +7555,94 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
 
   // 参加データが無い＝イベント不参加 or 未取得。レーン枠ごと隠して空枠で縦を食わない。
   setNorthStarLaneHidden('eventBroadcasters', true);
+}
+
+/**
+ * 応援者ランキング（イベント投票）レーン。SW が無認証 capi（voting_user_ranking）から取得し
+ * `nls_event_voting_ranking_<lv>` へ保存した行を読んで描画する。貢献度ランキング（ギフトのみ）
+ * とは別指標（イベント投票＝ギフト＋ニコニ広告のスコア）。イベント参加中（rows>0）だけ表示し、
+ * それ以外はレーンごと隠す（普段はクラッタにならない）。
+ * @param {string} liveId
+ */
+async function refreshNorthStarEventVotingSupportersLaneAsync(liveId) {
+  const body = document.getElementById('northStarLaneBody-eventVotingSupporters');
+  if (!(body instanceof HTMLElement)) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) {
+    setNorthStarLaneHidden('eventVotingSupporters', true);
+    return;
+  }
+
+  /** @type {Array<{rank?:number,name?:string,contribution?:number,isAnonymous?:boolean,thumbnailUrl?:string,userPageUrl?:string,accountType?:string}>|null} */
+  let rows = null;
+  try {
+    const vKey = eventVotingRankingStorageKey(lid);
+    const bag = await chrome.storage.local.get([vKey]);
+    const v = bag[vKey];
+    if (v && typeof v === 'object' && Array.isArray(v.rows) && v.rows.length > 0) {
+      rows = v.rows;
+    }
+  } catch {
+    /* no-op */
+  }
+
+  if (rows && rows.length > 0) {
+    setNorthStarLaneHidden('eventVotingSupporters', false);
+    const top = rows.slice(0, 10);
+    const premiumN = top.filter((r) => r && r.accountType === 'premium').length;
+    const rooms = officialDomRankingRowsToStripRooms(top, { userKeyKind: 'contrib' });
+    paintTopSupportRankStyleIntoElement(body, rooms, {
+      noteText: `イベント投票スコア順（ギフト＋ニコニ広告）。上位${rooms.length}名・うちプレミアム${premiumN}名`,
+      unitSuffix: 'pt',
+      ariaLabel: '応援者ランキング（イベント投票）',
+      isNorthStarBody: true
+    });
+    // 各行に会員種別バッジを付与。共有 painter（多レーン共用・テスト多数）を汚さないよう、
+    // このレーン限定で描画後 DOM を index 対応（rooms は top と 1:1・順序保存）で装飾する。
+    decorateEventVotingSupporterAccountBadges(body, top);
+    return;
+  }
+
+  // 投票データが無い＝イベント不参加 or 未取得。レーンごと隠して空枠で縦を食わない。
+  setNorthStarLaneHidden('eventVotingSupporters', true);
+}
+
+/**
+ * 応援者ランキング行へ会員種別バッジ（プレミアム/一般）を付ける。
+ * paintTopSupportRankStyleIntoElement が body.innerHTML を毎回貼り替えるため冪等
+ * （再描画で古いバッジは消え、ここで貼り直す）。rows[i] と list の i 番目は 1:1。
+ * textContent 経由＝XSS 安全。レスポンシブ配慮で小さめの pill（折返し抑止）。
+ *
+ * @param {HTMLElement} body
+ * @param {Array<{accountType?:string}>} rows
+ */
+function decorateEventVotingSupporterAccountBadges(body, rows) {
+  if (!(body instanceof HTMLElement) || !Array.isArray(rows)) return;
+  const list = body.querySelector('.nl-top-support-rank__list');
+  if (!(list instanceof HTMLElement)) return;
+  const lines = list.children;
+  for (let i = 0; i < lines.length && i < rows.length; i += 1) {
+    const row = rows[i];
+    const line = lines[i];
+    if (!row || !(line instanceof HTMLElement)) continue;
+    const nameEl = line.querySelector('.nl-top-support-rank__name');
+    if (!(nameEl instanceof HTMLElement)) continue;
+    if (nameEl.querySelector('.nl-event-voting-badge')) continue;
+    const isPremium = row.accountType === 'premium';
+    const badge = document.createElement('span');
+    badge.className =
+      'nl-event-voting-badge' +
+      (isPremium ? ' nl-event-voting-badge--premium' : ' nl-event-voting-badge--regular');
+    badge.textContent = isPremium ? 'プレミアム' : '一般';
+    badge.title = isPremium ? 'プレミアム会員' : '一般会員';
+    badge.style.cssText =
+      'margin-inline-start:4px;padding:0 5px;border-radius:8px;font-size:9px;font-weight:700;' +
+      'line-height:1.6;white-space:nowrap;vertical-align:middle;' +
+      (isPremium
+        ? 'color:#7a5200;background:linear-gradient(135deg,#ffe6a3,#ffcf5e);'
+        : 'color:#5b6470;background:#e7e9ec;');
+    nameEl.appendChild(badge);
+  }
 }
 
 /**
@@ -7798,6 +8010,7 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
   await refreshNorthStarEventCurrentRankLaneAsync(lid);
   refreshNorthStarEventCumulativeScoreLane();
   await refreshNorthStarEventBroadcastersLaneAsync(lid);
+  await refreshNorthStarEventVotingSupportersLaneAsync(lid);
   await refreshSupportActivityTimeline(lid);
 }
 
@@ -14924,6 +15137,51 @@ async function initPopup() {
       //
     }
   });
+
+  // 自動巡回（Phase 2b）: ON にすると、配信を見ていない間も SW が放送中の配信を
+  //   背景タブで巡回して同接推定の較正データを貯める。書き込みは SW が storage.onChanged
+  //   で検知して即 ON/OFF（巡回タブの開閉・alarm）する。
+  const autopatrolToggle = /** @type {HTMLInputElement|null} */ ($('autopatrolEnabled'));
+  autopatrolToggle?.addEventListener('change', async () => {
+    const next = autopatrolToggle.checked;
+    try {
+      const ok = await storageSetSafe({ [KEY_AUTOPATROL_ENABLED]: next });
+      if (!ok) {
+        autopatrolToggle.checked = !next;
+        return;
+      }
+      refreshAutopatrolStatusLine();
+    } catch {
+      autopatrolToggle.checked = !next;
+    }
+  });
+  autopatrolToggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  // 較正データのエクスポート/クリア。
+  $('calibrationExportJsonBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void downloadCalibrationData('json');
+  });
+  $('calibrationExportCsvBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void downloadCalibrationData('csv');
+  });
+  $('calibrationClearBtn')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const ok =
+      typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? window.confirm('貯めた較正データ（数値のみ）を全消去します。よろしいですか？')
+        : true;
+    if (!ok) return;
+    await clearCalibrationData();
+    refreshAutopatrolStatusLine();
+  });
+
+  // 開いている間は状態（訪問数・現在の配信・記録サンプル数）を数秒ごとに更新する。
+  refreshAutopatrolStatusLine();
+  setInterval(refreshAutopatrolStatusLine, 5000);
 
   // 視聴ページの自動表示 ON/OFF：OFF のときはツールバーアイコンを押すまで
   // インラインパネルを出さない（こん太を押す前から勝手に出るのを避ける）。

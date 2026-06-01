@@ -1002,6 +1002,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     } else {
       await injectIntoExistingTabs();
     }
+    await resumeAutopatrolIfEnabled();
   })();
 });
 
@@ -1011,11 +1012,334 @@ chrome.runtime.onStartup.addListener(() => {
   void migrateFloatingPanelToDockProfileOnce();
   void migrateBelowPanelToDockProfileOnce();
   void injectIntoExistingTabs();
+  void resumeAutopatrolIfEnabled();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm?.name !== AUTO_BACKUP_ALARM) return;
-  void runAutoBackupCycle();
+  if (alarm?.name === AUTO_BACKUP_ALARM) {
+    void runAutoBackupCycle();
+    return;
+  }
+  if (alarm?.name === AUTOPATROL_ALARM) {
+    void runAutopatrolTick();
+  }
+});
+
+/* ================================================================== */
+/* 自動巡回（Autopatrol / Phase 2b）                                          */
+/*                                                                      */
+/* 目的: ユーザーが配信を見ていない間も、ニコ生ランキング(公開・無認証)から      */
+/*   現在放送中の lv を拾い、背景タブで 1 つずつ短時間開いて同接推定の較正データ  */
+/*   を貯める。記録自体は content-entry の maybeLogConcurrentCalibrationSample   */
+/*   が KEY_CONCURRENT_CALIBRATION_RING_V1 へ throttled で積む（SW は「どの配信を */
+/*   開くか」のオーケストレーションだけ）。                                       */
+/*                                                                      */
+/* 安全側の既定:                                                          */
+/*   ・既定 OFF（KEY_AUTOPATROL_ENABLED が true のときだけ動く）              */
+/*   ・同時に開く巡回タブは常に 1 枚。HOLD 経過で閉じて次へ。                  */
+/*   ・alarm 駆動の状態機械（alarm が rotation スケジューラ兼 SW キープアライブ）。*/
+/*   ・巡回タブには #nls_autopatrol=1 を付け、content が source=autopatrol で記録。*/
+/*   ・発見は公開ランキング HTML の特権 fetch + lv 正規表現抽出（API契約に非依存）。*/
+/* ================================================================== */
+
+const KEY_AUTOPATROL_ENABLED = 'nls_autopatrol_enabled_v1';
+const KEY_AUTOPATROL_STATE = 'nls_autopatrol_state_v1';
+const AUTOPATROL_ALARM = 'nls_autopatrol_tick';
+/** alarm 周期（分）。Chrome は最小 0.5 分=30秒。古い版では 1 分に丸められても動く。 */
+const AUTOPATROL_TICK_MINUTES = 0.5;
+/** 1 配信を背景タブで保持する時間。content が ~30秒ごとに記録するので数サンプル取れる。 */
+const AUTOPATROL_HOLD_MS = 120000;
+/** queue がこの数未満になったら発見を補充する。 */
+const AUTOPATROL_QUEUE_MIN = 4;
+/** queue の上限（肥大防止）。 */
+const AUTOPATROL_QUEUE_MAX = 200;
+/** 直近に訪れた lv を覚えておく上限（すぐ再訪しないため）。 */
+const AUTOPATROL_VISITED_MAX = 400;
+/** 発見 fetch の最小間隔（連打で公開ページを叩かない）。 */
+const AUTOPATROL_DISCOVER_MIN_INTERVAL_MS = 60000;
+const AUTOPATROL_DISCOVER_TIMEOUT_MS = 8000;
+const AUTOPATROL_DISCOVERY_URL = 'https://live.nicovideo.jp/ranking';
+const AUTOPATROL_WATCH_BASE = 'https://live.nicovideo.jp/watch/';
+const AUTOPATROL_TAB_MARK = '#nls_autopatrol=1';
+const AUTOPATROL_LV_RE = /lv\d{5,12}/g;
+const AUTOPATROL_LV_ONE_RE = /^lv\d{5,12}$/;
+
+/** 同時実行ガード（alarm と storage 変更が重なっても tick を二重に走らせない）。 */
+let _autopatrolTickInFlight = false;
+
+/** @param {unknown} raw */
+function normalizeAutopatrolState(raw) {
+  const s = raw && typeof raw === 'object' ? raw : {};
+  const arr = (v) =>
+    Array.isArray(v) ? v.filter((x) => AUTOPATROL_LV_ONE_RE.test(String(x))) : [];
+  return {
+    queue: arr(s.queue).slice(0, AUTOPATROL_QUEUE_MAX),
+    visited: arr(s.visited).slice(-AUTOPATROL_VISITED_MAX),
+    currentTabId:
+      typeof s.currentTabId === 'number' && Number.isFinite(s.currentTabId)
+        ? s.currentTabId
+        : null,
+    currentLiveId: AUTOPATROL_LV_ONE_RE.test(String(s.currentLiveId)) ? s.currentLiveId : null,
+    openedAt: Math.max(0, Number(s.openedAt) || 0),
+    visitedCount: Math.max(0, Number(s.visitedCount) || 0),
+    lastDiscoverAt: Math.max(0, Number(s.lastDiscoverAt) || 0),
+    lastError: String(s.lastError || '').slice(0, 64),
+    updatedAt: Math.max(0, Number(s.updatedAt) || 0)
+  };
+}
+
+async function loadAutopatrolState() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_AUTOPATROL_STATE);
+    return normalizeAutopatrolState(bag[KEY_AUTOPATROL_STATE]);
+  } catch {
+    return normalizeAutopatrolState(null);
+  }
+}
+
+async function saveAutopatrolState(st) {
+  const next = normalizeAutopatrolState(st);
+  next.updatedAt = Date.now();
+  try {
+    await chrome.storage.local.set({ [KEY_AUTOPATROL_STATE]: next });
+  } catch {
+    /* no-op */
+  }
+}
+
+async function getAutopatrolEnabled() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_AUTOPATROL_ENABLED);
+    return bag[KEY_AUTOPATROL_ENABLED] === true;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureAutopatrolAlarm() {
+  try {
+    const existing = await chrome.alarms.get(AUTOPATROL_ALARM);
+    if (existing) return;
+    chrome.alarms.create(AUTOPATROL_ALARM, {
+      delayInMinutes: AUTOPATROL_TICK_MINUTES,
+      periodInMinutes: AUTOPATROL_TICK_MINUTES
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
+async function clearAutopatrolAlarm() {
+  try {
+    await chrome.alarms.clear(AUTOPATROL_ALARM);
+  } catch {
+    /* no-op */
+  }
+}
+
+/** 公開ランキング HTML を特権 fetch して lv を抽出（無認証・本文は SW のみ読める）。 */
+async function discoverOnairLvIds() {
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, AUTOPATROL_DISCOVER_TIMEOUT_MS);
+  try {
+    const res = await fetch(AUTOPATROL_DISCOVERY_URL, {
+      method: 'GET',
+      credentials: 'omit', // 匿名ランキング（偏りのない公開順位）。cookie を送らない
+      cache: 'no-store',
+      signal: ac.signal
+    });
+    if (!res || !res.ok) return [];
+    const text = await res.text();
+    const matches = text.match(AUTOPATROL_LV_RE) || [];
+    /** @type {string[]} */
+    const out = [];
+    const seen = new Set();
+    for (const m of matches) {
+      const lv = String(m).toLowerCase();
+      if (seen.has(lv)) continue;
+      seen.add(lv);
+      out.push(lv);
+    }
+    return out;
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** @param {string[]} arr Fisher–Yates シャッフル（巡回の偏りを減らす）。 */
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = arr[i];
+    arr[i] = arr[j];
+    arr[j] = t;
+  }
+  return arr;
+}
+
+/** @param {number} tabId @returns {Promise<chrome.tabs.Tab|null>} */
+async function getTabSafe(tabId) {
+  try {
+    return await chrome.tabs.get(tabId);
+  } catch {
+    return null;
+  }
+}
+
+/** 巡回タブだけを安全に閉じる（マーカー URL を確認してユーザータブを誤爆しない）。 */
+async function closeAutopatrolTab(tabId, expectLiveId) {
+  if (typeof tabId !== 'number') return;
+  const tab = await getTabSafe(tabId);
+  if (!tab) return;
+  const url = String(tab.url || tab.pendingUrl || '');
+  const looksPatrol =
+    url.includes('nls_autopatrol') ||
+    (expectLiveId && url.includes(String(expectLiveId)));
+  if (!looksPatrol) return; // 念のため: マーカーが無いタブは閉じない
+  try {
+    await chrome.tabs.remove(tabId);
+  } catch {
+    /* already closed */
+  }
+}
+
+/** 巡回タブを背景で開く（active:false）。 */
+async function openAutopatrolTab(lv) {
+  const url = AUTOPATROL_WATCH_BASE + encodeURIComponent(lv) + AUTOPATROL_TAB_MARK;
+  const tab = await chrome.tabs.create({ url, active: false });
+  return tab && tab.id != null ? tab.id : null;
+}
+
+/**
+ * 自動巡回の 1 tick（alarm / storage 変更 / 起動から呼ばれる）。
+ * 1 tick = 「今開いている巡回タブの面倒を見る」or「次の配信を 1 つ開く」のどちらか。
+ */
+async function runAutopatrolTick() {
+  if (_autopatrolTickInFlight) return;
+  _autopatrolTickInFlight = true;
+  try {
+    const enabled = await getAutopatrolEnabled();
+    const st = await loadAutopatrolState();
+
+    if (!enabled) {
+      if (st.currentTabId != null) {
+        await closeAutopatrolTab(st.currentTabId, st.currentLiveId);
+      }
+      st.currentTabId = null;
+      st.currentLiveId = null;
+      st.openedAt = 0;
+      await saveAutopatrolState(st);
+      await clearAutopatrolAlarm();
+      return;
+    }
+
+    // alarm が消えていたら張り直す（起動直後・更新後の自己回復）。
+    await ensureAutopatrolAlarm();
+
+    // 1) 既に巡回タブがあるなら、保持時間/生存を見て「待つ or 閉じる」。
+    if (st.currentTabId != null) {
+      const tab = await getTabSafe(st.currentTabId);
+      const age = Date.now() - (st.openedAt || 0);
+      if (tab && age < AUTOPATROL_HOLD_MS) {
+        await saveAutopatrolState(st); // updatedAt 更新（生存ハートビート）
+        return;
+      }
+      if (tab) await closeAutopatrolTab(st.currentTabId, st.currentLiveId);
+      st.currentTabId = null;
+      st.currentLiveId = null;
+      st.openedAt = 0;
+    }
+
+    // 2) queue が少なければ発見で補充（公開ページを叩きすぎないよう間隔ガード）。
+    const now = Date.now();
+    if (
+      st.queue.length < AUTOPATROL_QUEUE_MIN &&
+      now - (st.lastDiscoverAt || 0) >= AUTOPATROL_DISCOVER_MIN_INTERVAL_MS
+    ) {
+      st.lastDiscoverAt = now;
+      const ids = await discoverOnairLvIds();
+      if (ids.length) {
+        const visitedSet = new Set(st.visited);
+        const inQueue = new Set(st.queue);
+        const fresh = ids.filter((id) => !visitedSet.has(id) && !inQueue.has(id));
+        shuffleInPlace(fresh);
+        st.queue = st.queue.concat(fresh).slice(0, AUTOPATROL_QUEUE_MAX);
+        st.lastError = st.queue.length ? '' : 'queue_empty_after_discover';
+      } else {
+        st.lastError = 'discover_empty';
+      }
+    }
+
+    // 3) 次の配信を 1 つ開く。
+    const next = st.queue.shift();
+    if (!next) {
+      await saveAutopatrolState(st);
+      return; // 次の tick で再発見
+    }
+    try {
+      const tabId = await openAutopatrolTab(next);
+      if (tabId != null) {
+        st.currentTabId = tabId;
+        st.currentLiveId = next;
+        st.openedAt = Date.now();
+        st.visited.push(next);
+        if (st.visited.length > AUTOPATROL_VISITED_MAX) {
+          st.visited = st.visited.slice(-AUTOPATROL_VISITED_MAX);
+        }
+        st.visitedCount = (st.visitedCount || 0) + 1;
+        st.lastError = '';
+      } else {
+        st.lastError = 'open_no_tabid';
+      }
+    } catch {
+      st.lastError = 'open_failed';
+    }
+    await saveAutopatrolState(st);
+  } catch {
+    /* best-effort: 次の tick で立て直す */
+  } finally {
+    _autopatrolTickInFlight = false;
+  }
+}
+
+/** 起動/更新時: トグルが ON なら巡回を再開（alarm 張り直し＋遺児タブの後始末）。 */
+async function resumeAutopatrolIfEnabled() {
+  try {
+    if (!(await getAutopatrolEnabled())) return;
+    // 前セッションの巡回タブ参照は無効（タブは消えている）。状態を綺麗にしてから再開。
+    const st = await loadAutopatrolState();
+    if (st.currentTabId != null) {
+      await closeAutopatrolTab(st.currentTabId, st.currentLiveId);
+    }
+    st.currentTabId = null;
+    st.currentLiveId = null;
+    st.openedAt = 0;
+    await saveAutopatrolState(st);
+    await ensureAutopatrolAlarm();
+    void runAutopatrolTick();
+  } catch {
+    /* no-op */
+  }
+}
+
+// popup のトグル（KEY_AUTOPATROL_ENABLED の書き込み）に反応して即 ON/OFF。
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local' || !changes[KEY_AUTOPATROL_ENABLED]) return;
+  const enabled = changes[KEY_AUTOPATROL_ENABLED].newValue === true;
+  if (enabled) {
+    void ensureAutopatrolAlarm();
+    void runAutopatrolTick(); // すぐ 1 件目を開く
+  } else {
+    void runAutopatrolTick(); // OFF 後始末（巡回タブを閉じ alarm 解除）
+  }
 });
 
 /* ------------------------------------------------------------------ */
@@ -1265,6 +1589,218 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
   };
   fetchEventParticipationJson(msg.planningEventId)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
+/* ------------------------------------------------------------------ */
+/* koken ギフト履歴（個別イベント）無認証 API の CORS バイパス fetch proxy        */
+/* 「ギフト履歴もすぐとりたい」（2026-06-01）: 従来は koken iframe のサイドバー DOM */
+/* を開いたときだけ scrape できた gift-history-list を、無認証 capi から即時取得    */
+/* する。koken 貢献度ランキングと同 namespace の /histories（実機で無認証200を確証）。*/
+/* content は liveId だけ送り、URL は SW が固定 host/path から自作する（SSRF面遮断）。*/
+/* 契約・正規化は src/lib/kokenGiftHistoryApi.js（lib 側に契約 test）。            */
+/* ------------------------------------------------------------------ */
+
+// src/lib/kokenGiftHistoryApi.js の KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE と文字列同期。
+const KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE = 'NLS_KOKEN_GIFT_HISTORY_FETCH';
+const KOKEN_GIFT_HISTORY_LIVE_ID_RE = /^lv\d{1,15}$/;
+const KOKEN_GIFT_HISTORY_FETCH_TIMEOUT_MS = 8000;
+
+async function fetchKokenGiftHistoryJson(liveId) {
+  const lid = String(liveId == null ? '' : liveId)
+    .trim()
+    .toLowerCase();
+  if (!KOKEN_GIFT_HISTORY_LIVE_ID_RE.test(lid)) return { ok: false };
+  const url =
+    'https://api.koken.nicovideo.jp/v1/userperspective/contents/gift/live/' +
+    encodeURIComponent(lid) +
+    '/histories';
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, KOKEN_GIFT_HISTORY_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit', // 無認証で本文が取れる API。
+      cache: 'no-store',
+      redirect: 'error',
+      signal: ac.signal
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchKokenGiftHistoryJson(msg.liveId)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
+/* ------------------------------------------------------------------ */
+/* audition イベント💎ランキング 無認証 API の CORS バイパス fetch proxy（2段）   */
+/* 「対象の場所をひらかないとでない」（2026-06-01）: richview iframe を mount せずに */
+/* イベント💎ランキングを即時取得する。SW が liveId から (1) entry_items を引いて   */
+/* audition.key を取り、(2) rankings を引く 2 段 fetch を行う。key は厳格 regex で   */
+/* 検証してから rankings URL を組む（任意文字列 fetch=SSRF 防止）。実機で無認証200。 */
+/* 契約・正規化は src/lib/auditionEventRankingApi.js（lib 側に契約 test）。        */
+/* ------------------------------------------------------------------ */
+
+// src/lib/auditionEventRankingApi.js の AUDITION_EVENT_RANKING_FETCH_MESSAGE_TYPE /
+// AUDITION_KEY_RE と文字列/正規表現同期（background は ESM import 不可の手書き成果物）。
+const AUDITION_EVENT_RANKING_FETCH_MESSAGE_TYPE = 'NLS_AUDITION_EVENT_RANKING_FETCH';
+const AUDITION_EVENT_LIVE_ID_RE = /^lv\d{1,15}$/;
+const AUDITION_EVENT_KEY_RE = /^[a-z0-9][a-z0-9_-]{1,80}$/i;
+const AUDITION_EVENT_POSITIVE_INT_RE = /^[1-9]\d{0,17}$/;
+const AUDITION_EVENT_FETCH_TIMEOUT_MS = 8000;
+
+async function fetchAuditionJsonOnce(url) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, AUDITION_EVENT_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit', // 無認証で本文が取れる capi。
+      cache: 'no-store',
+      redirect: 'error',
+      signal: ac.signal
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false, json: null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchAuditionEventRankingJson(liveId) {
+  const lid = String(liveId == null ? '' : liveId)
+    .trim()
+    .toLowerCase();
+  if (!AUDITION_EVENT_LIVE_ID_RE.test(lid)) return { ok: false };
+
+  // (1) entry_items: live → audition.key
+  const entryUrl =
+    'https://audition.nicovideo.jp/capi/v1/entry_items?item_type=live&item_id=' +
+    encodeURIComponent(lid) +
+    '&include_owner_items=true&expose_platform=live';
+  const entry = await fetchAuditionJsonOnce(entryUrl);
+  if (!entry.ok || entry.json == null) return { ok: false };
+
+  // audition.key / entry_item id を取り出して厳格検証（SSRF 面遮断）。
+  let auditionKey = '';
+  let entryId = '';
+  try {
+    const items =
+      entry.json && entry.json.data && Array.isArray(entry.json.data.entry_items)
+        ? entry.json.data.entry_items
+        : null;
+    const e0 = items && items.length ? items[0] : null;
+    const k = e0 && e0.audition ? String(e0.audition.key || '').trim() : '';
+    if (AUDITION_EVENT_KEY_RE.test(k)) auditionKey = k;
+    const idStr = e0 ? String(e0.id == null ? '' : e0.id).trim() : '';
+    if (AUDITION_EVENT_POSITIVE_INT_RE.test(idStr)) entryId = idStr;
+  } catch {
+    auditionKey = '';
+    entryId = '';
+  }
+  // 非イベント（entry_items 空 / key 無し）は rankings を引かず entry のみ返す。
+  if (!auditionKey) {
+    return { ok: true, entryItemsJson: entry.json, rankingsJson: null, votingJson: null };
+  }
+
+  // (2) rankings: audition 全体の💎順位、(3) voting_user_ranking: 応援者（投票）順
+  //     entryId があれば応援者ランキングも並行取得（無ければ rankings のみ）。
+  const rankUrl =
+    'https://audition.nicovideo.jp/capi/v1/auditions/' +
+    encodeURIComponent(auditionKey) +
+    '/rankings?limit=25';
+  const votingUrl = entryId
+    ? 'https://audition.nicovideo.jp/capi/v1/entry_items/' +
+      encodeURIComponent(entryId) +
+      '/voting_user_ranking?limit=20'
+    : null;
+  const [rank, voting] = await Promise.all([
+    fetchAuditionJsonOnce(rankUrl),
+    votingUrl ? fetchAuditionJsonOnce(votingUrl) : Promise.resolve({ ok: false, json: null })
+  ]);
+  return {
+    ok: true,
+    entryItemsJson: entry.json,
+    rankingsJson: rank.ok ? rank.json : null,
+    votingJson: voting.ok ? voting.json : null
+  };
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== AUDITION_EVENT_RANKING_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchAuditionEventRankingJson(msg.liveId)
     .then(reply)
     .catch(() => reply({ ok: false }));
   return true; // 非同期 sendResponse のため message channel を保持

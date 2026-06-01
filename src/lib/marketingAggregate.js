@@ -46,6 +46,15 @@ import { isSameAvatarUrl } from './avatarUrlCompare.js';
 
 /**
  * @typedef {{
+ *   premiumCount: number,
+ *   standardCount: number,
+ *   knownCount: number,
+ *   pctPremiumOfKnown: number
+ * }} MarketingPremiumStats
+ */
+
+/**
+ * @typedef {{
  *   early: number,
  *   mid: number,
  *   late: number
@@ -81,6 +90,7 @@ import { isSameAvatarUrl } from './avatarUrlCompare.js';
  *   selfPostedCount: number,
  *   selfPostedPct: number,
  *   is184: Marketing184Stats,
+ *   premium: MarketingPremiumStats,
  *   timelineCumulative: number[],
  *   timelineRolling5Min: number[],
  *   maxSilenceGapMs: number,
@@ -254,6 +264,7 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
       ? Math.round((selfPostedCount / filtered.length) * 1000) / 10
       : 0;
   const is184 = compute184Stats(filtered);
+  const premium = computePremiumStats(filtered);
   const timelineCumulative = computeTimelineCumulative(timeline);
   const timelineRolling5Min = computeTimelineRolling5(timeline);
   const maxSilenceGapMs = computeMaxSilenceGapMs(timestamps);
@@ -286,6 +297,7 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
     selfPostedCount,
     selfPostedPct,
     is184,
+    premium,
     timelineCumulative,
     timelineRolling5Min,
     maxSilenceGapMs,
@@ -344,6 +356,30 @@ function compute184Stats(filtered) {
     count184,
     knownCount: k,
     pctOfKnown: k > 0 ? Math.round((count184 / k) * 1000) / 10 : 0
+  };
+}
+
+/**
+ * accountStatus（NDGR field 4）の enum: 1=一般 / 2=プレミアム。0=未指定・null は
+ * 「不明」として母数から除外する（DOM 取り込み行は accountStatus を持たないことが多い）。
+ * @param {StoredComment[]} filtered
+ * @returns {MarketingPremiumStats}
+ */
+function computePremiumStats(filtered) {
+  let premiumCount = 0;
+  let standardCount = 0;
+  for (const c of filtered) {
+    const s = c.accountStatus;
+    if (s === 2) premiumCount += 1;
+    else if (s === 1) standardCount += 1;
+  }
+  const knownCount = premiumCount + standardCount;
+  return {
+    premiumCount,
+    standardCount,
+    knownCount,
+    pctPremiumOfKnown:
+      knownCount > 0 ? Math.round((premiumCount / knownCount) * 1000) / 10 : 0
   };
 }
 

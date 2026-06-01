@@ -7614,6 +7614,35 @@
         margin-bottom: 3px;
       }
 
+      .nl-calib-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+
+      .nl-calib-actions__btn {
+        flex: 1 1 auto;
+        min-width: 84px;
+        padding: 5px 10px;
+        font-size: clamp(10px, calc(var(--nl-base-font) * 0.8), 12px);
+        line-height: 1.3;
+        color: var(--nl-text);
+        background: color-mix(in srgb, var(--nl-border) 22%, transparent);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 80%, transparent);
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      .nl-calib-actions__btn:hover {
+        background: color-mix(in srgb, var(--nl-border) 36%, transparent);
+      }
+
+      .nl-calib-actions__btn--danger {
+        color: #b91c1c;
+        border-color: color-mix(in srgb, #b91c1c 40%, var(--nl-border));
+      }
+
       .nl-export-toolbar__actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -9560,6 +9589,82 @@
               <p class="nl-north-star-chara-trio__pct" aria-live="polite"><span class="nl-north-star-chara-trio__pct-num">—</span></p>
             </div>
           </div>
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventBroadcasters" hidden>
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">イベントランキング</p>
+              <p class="nl-north-star-lane__sublabel">このイベントの💎スコア順（公式ランキングに準拠）。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div
+                id="northStarLaneBody-eventBroadcasters"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-eventBroadcasters"
+                class="nl-north-star-lane__rail"
+                aria-label="（この項目はイベントランキングのみ）"
+                hidden
+              ></aside>
+            </div>
+          </div>
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventVotingSupporters" hidden>
+            <div class="nl-north-star-lane__heading">
+              <p class="nl-north-star-lane__label">応援者ランキング</p>
+              <p class="nl-north-star-lane__sublabel">この配信者へのイベント投票（ギフト＋ニコニ広告）スコア順。イベント参加中のみ表示。</p>
+            </div>
+            <div class="nl-north-star-lane__shell">
+              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
+                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
+                <div class="nl-north-star-lane__acq" aria-hidden="true">
+                  <div class="nl-north-star-lane__acq-track">
+                    <div class="nl-north-star-lane__acq-fill"></div>
+                  </div>
+                </div>
+                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
+                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
+                  <img
+                    class="nl-north-star-lane__chara"
+                    src="images/marketing-html-avatars/rink-72.png"
+                    alt=""
+                    width="38"
+                    height="38"
+                    decoding="async"
+                  />
+                </div>
+              </div>
+              <div
+                id="northStarLaneBody-eventVotingSupporters"
+                class="nl-north-star-lane__body"
+                data-lane-state="not_yet"
+              ></div>
+              <aside
+                id="northStarLaneAside-eventVotingSupporters"
+                class="nl-north-star-lane__rail"
+                aria-label="（この項目は応援者ランキングのみ）"
+                hidden
+              ></aside>
+            </div>
+          </div>
           <div class="nl-north-star-lane" data-lane="contributionRanking">
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">貢献度ランキング</p>
@@ -9823,44 +9928,6 @@
               ></aside>
             </div>
           </div>
-          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="eventBroadcasters" hidden>
-            <div class="nl-north-star-lane__heading">
-              <p class="nl-north-star-lane__label">イベントランキング</p>
-              <p class="nl-north-star-lane__sublabel">このイベントの💎スコア順（公式ランキングに準拠）。</p>
-            </div>
-            <div class="nl-north-star-lane__shell">
-              <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
-                <p class="nl-north-star-lane__acq-title">現在の取得率</p>
-                <div class="nl-north-star-lane__acq" aria-hidden="true">
-                  <div class="nl-north-star-lane__acq-track">
-                    <div class="nl-north-star-lane__acq-fill"></div>
-                  </div>
-                </div>
-                <p class="nl-north-star-lane__acq-pct"><span class="nl-north-star-lane__acq-pct-num">—</span></p>
-                <div class="nl-north-star-lane__chara-wrap" data-nl-acq-tier="wait">
-                  <img
-                    class="nl-north-star-lane__chara"
-                    src="images/marketing-html-avatars/rink-72.png"
-                    alt=""
-                    width="38"
-                    height="38"
-                    decoding="async"
-                  />
-                </div>
-              </div>
-              <div
-                id="northStarLaneBody-eventBroadcasters"
-                class="nl-north-star-lane__body"
-                data-lane-state="not_yet"
-              ></div>
-              <aside
-                id="northStarLaneAside-eventBroadcasters"
-                class="nl-north-star-lane__rail"
-                aria-label="（この項目はイベントランキングのみ）"
-                hidden
-              ></aside>
-            </div>
-          </div>
           <p class="nl-north-star-lanes__note">
             公式ページで見えている値を、できる範囲でこの欄に写します。取得できない項目は空欄のままにすることがあります。
           </p>
@@ -9984,6 +10051,42 @@
                   >既定 OFF。ON にすると、次回の視聴ページで1回だけ自動表示し、その後はOFFに戻ります。</span>
               </span>
             </label>
+          </div>
+          <div class="nl-record-sub">
+            <label for="autopatrolEnabled" class="nl-record-sub__label">
+              <input
+                type="checkbox"
+                id="autopatrolEnabled"
+                aria-label="配信を見ていない間も放送中の配信を自動巡回して同接推定の較正データを貯める"
+              />
+              <span>
+                配信を見ていなくても自動巡回して較正データを貯める
+                <span class="nl-record-sub__hint"
+                  >既定 OFF。ON にすると、放送中の配信を背景タブで1つずつ短時間ひらき、同接推定の較正データを少しずつ貯めます（PCを起動している間だけ・コメント本文は保存しません）。</span>
+                <span
+                  id="autopatrolStatus"
+                  class="nl-record-sub__hint"
+                  aria-live="polite"
+                  >OFF（配信を見ていない間は巡回しません）</span>
+              </span>
+            </label>
+            <div class="nl-calib-actions">
+              <button
+                type="button"
+                id="calibrationExportJsonBtn"
+                class="nl-calib-actions__btn"
+              >較正データ JSON</button>
+              <button
+                type="button"
+                id="calibrationExportCsvBtn"
+                class="nl-calib-actions__btn"
+              >較正データ CSV</button>
+              <button
+                type="button"
+                id="calibrationClearBtn"
+                class="nl-calib-actions__btn nl-calib-actions__btn--danger"
+              >較正データを消去</button>
+            </div>
           </div>
           <div
             class="nl-record nl-panel-width nl-settings-panel-layout"

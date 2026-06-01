@@ -22,6 +22,7 @@ import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc
 import { buildConcurrentTimelineSeries } from './concurrentTimelineSeries.js';
 import { analyzeConcurrentPeak } from './concurrentPeakAnalysis.js';
 import { detectCommentSilenceZones } from './commentSilenceZones.js';
+import { computeCommentFatigue } from './commentFatigue.js';
 import {
   buildCommentVelocityTimeline,
   buildLaughterDensityTimeline
@@ -181,6 +182,7 @@ function sectionContentShape(r) {
   if (r.totalComments <= 0) return '';
   const ts = r.textStats;
   const i = r.is184;
+  const p = r.premium || { premiumCount: 0, knownCount: 0, pctPremiumOfKnown: 0 };
   const silence = formatSilenceGapLabel(r.maxSilenceGapMs);
   const cards = [
     {
@@ -217,6 +219,14 @@ function sectionContentShape(r) {
       icon: '🎭'
     },
     {
+      label: 'プレミアム会員（既知のみ）',
+      value:
+        p.knownCount > 0
+          ? `${p.pctPremiumOfKnown}%（${p.premiumCount}/${p.knownCount}件）`
+          : 'データなし',
+      icon: '⭐'
+    },
+    {
       label: '最長のコメント間隔',
       value: silence,
       icon: '⏸️'
@@ -229,7 +239,7 @@ function sectionContentShape(r) {
     )
     .join('');
   return `<section class="mkt-section"><h2>コメント本文・属性の傾向</h2>
-<p class="mkt-note">記録された本文のみを対象。184 は <code>is184</code> が付いている行だけで割合を計算します。</p>
+<p class="mkt-note">記録された本文のみを対象。184・プレミアム会員は、その属性が記録に付いている行だけ（既知のみ）で割合を計算します。一般/プレミアムが取れるのは主に NDGR 取り込み行で、DOM のみの行は母数から除外されます。</p>
 <div class="mkt-kpi-grid">${inner}</div></section>`;
 }
 
@@ -953,6 +963,85 @@ ${yLabels}
 <polyline points="${rollingPts}" fill="none" stroke="#fb923c" stroke-width="2" stroke-dasharray="4 3"/>
 </svg>
 </div></section>`;
+}
+
+/**
+ * v0.1.522: コメント疲労カーブ。配信者の体感「短時間枠ほど冒頭バーストして後半失速する」を
+ * 定量化する。在籍時間（各人の初コメからの経過分）ごとの 1 人あたりコメ数と残存率の 2 本の
+ * 折れ線 + 個人ペース鈍化の KPI。userId が取れる行のみ対象。
+ * @param {import('./commentFatigue.js').CommentFatigueReport} fatigue
+ */
+function sectionCommentFatigue(fatigue) {
+  if (!fatigue || !Array.isArray(fatigue.tenureBuckets) || fatigue.tenureBuckets.length < 2) {
+    return '';
+  }
+  const buckets = fatigue.tenureBuckets;
+  const kpis = [
+    {
+      label: 'ペースが落ちた人',
+      value:
+        fatigue.analyzedCount > 0
+          ? `${fatigue.slowedPct}%（${fatigue.slowedCount}/${fatigue.analyzedCount}人）`
+          : 'データ不足',
+      icon: '🥵'
+    },
+    {
+      label: '失速の中央値（後半÷前半の間隔）',
+      value: fatigue.analyzedCount > 0 ? `×${fatigue.medianSlowdownRatio}` : '-',
+      icon: '🐢'
+    },
+    {
+      label: '追跡できたコメンター',
+      value: `${fatigue.trackedUsers}人（3コメ以上 ${fatigue.multiCommenterCount}人）`,
+      icon: '👥'
+    }
+  ];
+  const kpiHtml = kpis
+    .map(
+      (c) =>
+        `<div class="mkt-kpi mkt-kpi--compact"><span class="mkt-kpi__icon">${c.icon}</span><span class="mkt-kpi__val">${escapeHtml(c.value)}</span><span class="mkt-kpi__label">${escapeHtml(c.label)}</span></div>`
+    )
+    .join('');
+
+  const W = 900;
+  const H = 200;
+  const pad = 40;
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  const n = buckets.length;
+  const maxPerUser = Math.max(1, ...buckets.map((b) => b.perUser));
+  /** @param {number} i */
+  const xOf = (i) => pad + (innerW * i) / Math.max(1, n - 1);
+  /** @param {number} v @param {number} max */
+  const yOf = (v, max) => pad + innerH - (v / max) * innerH;
+  const perUserPts = buckets
+    .map((b, i) => `${xOf(i).toFixed(1)},${yOf(b.perUser, maxPerUser).toFixed(1)}`)
+    .join(' ');
+  const retentionPts = buckets
+    .map((b, i) => `${xOf(i).toFixed(1)},${yOf(b.retentionPct, 100).toFixed(1)}`)
+    .join(' ');
+  const xLabels = buckets
+    .filter((_, i) => i % Math.ceil(n / 8) === 0 || i === n - 1)
+    .map((b) => {
+      const x = xOf(b.minute);
+      return `<text x="${x.toFixed(1)}" y="${H - pad + 16}" text-anchor="middle" class="mkt-axis">${b.minute}</text>`;
+    })
+    .join('');
+
+  return `<section class="mkt-section" id="mkt-fatigue">
+<h2>コメント疲労カーブ（在籍時間別）<span class="mkt-pro-tag">PRO</span></h2>
+<p class="mkt-note">「短い時間でコメントを打つと疲れて失速する」を可視化。横軸＝各コメンターが<strong>初コメしてからの経過分</strong>。水色＝1人あたりコメ数（右肩下がりなら発話量が減衰）、黄＝残存率（初コメ直後を100%として何%が発話を続けているか）。userId が取れる行のみ対象（匿名184は同一人物として追跡不可のため除外）。</p>
+<div class="mkt-kpi-grid">${kpiHtml}</div>
+<div class="mkt-chart-wrap">
+<svg viewBox="0 0 ${W} ${H}" class="mkt-svg" role="img" aria-label="在籍時間別のコメント疲労カーブ">
+<rect x="${pad}" y="${pad}" width="${innerW}" height="${innerH}" fill="none" stroke="#334155" stroke-width="0.5"/>
+${xLabels}
+<polyline points="${retentionPts}" fill="none" stroke="#facc15" stroke-width="2" stroke-dasharray="4 3"/>
+<polyline points="${perUserPts}" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
+</div>
+<p class="mkt-note">※ 水色は最大値、黄は0〜100%でスケールしています。両方とも右肩下がりだと「冒頭に勢いよくコメ→だんだん疲れて減る」傾向です。</p>
+</section>`;
 }
 
 /**
@@ -3393,6 +3482,10 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
   const laughterDensity = buildLaughterDensityTimeline(commentsForAnalytics, {
     bucketMs: 30_000
   });
+  const commentFatigue = computeCommentFatigue(commentsForAnalytics, {
+    broadcasterUserId,
+    maxTenureMin: 30
+  });
 
   // 0.1.23 (X): 過去 N 配信を突き合わせるユーザー層分析。pastBroadcasts 未渡しなら
   // 空集計が返る（純粋関数側で吸収）。配信者本人は除外する。
@@ -3723,6 +3816,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-quarter', label: '冒頭・終盤（四分位）' },
     { id: 'mkt-timeline', label: 'コメントタイムライン' },
     { id: 'mkt-velocity', label: 'コメ速度カーブ（PRO）' },
+    { id: 'mkt-fatigue', label: 'コメント疲労カーブ（PRO）' },
     { id: 'mkt-concurrent', label: '同接推移カーブ（PRO）' },
     { id: 'mkt-silence', label: '沈黙ゾーン × 沈黙の質（PRO）' },
     { id: 'mkt-laughter', label: '笑い密度（PRO）' },
@@ -3777,6 +3871,7 @@ ${idWrap('mkt-timeline', sectionTimeline(r))}
 ${sectionAdviceAfterTimeline(r)}
 ${sectionCommentVelocityCurve(velocityTimeline)}
 ${adviceAfterCommentVelocity()}
+${sectionCommentFatigue(commentFatigue)}
 ${sectionConcurrentTimeline(concurrentSeries, concurrentPeak)}
 ${adviceAfterConcurrent()}
 ${dynamicAdviceCardsHtml('concurrent', metricsForAdvice)}

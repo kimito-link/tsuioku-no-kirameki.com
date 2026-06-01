@@ -38,6 +38,17 @@ export const KEY_DIAGNOSTICS_ERROR_RING_V1 = 'nls_diagnostics_error_ring_v1';
 export const KEY_CONCURRENT_CALIBRATION_RING_V1 =
   'nls_concurrent_calibration_ring_v1';
 
+/**
+ * 自動巡回（Phase 2b）の ON/OFF トグル。true のとき SW が公開ランキングから
+ * 放送中 lv を拾い、背景タブで 1 つずつ短時間開いて較正データを貯める。既定 OFF。
+ * popup が書き込み、background.js が storage.onChanged で即時 ON/OFF する。
+ * @see extension/background.js（Autopatrol セクション）
+ */
+export const KEY_AUTOPATROL_ENABLED = 'nls_autopatrol_enabled_v1';
+
+/** 自動巡回のランタイム状態（queue / visited / 現在タブ / 訪問数 / 最終エラー）。SW が書く。 */
+export const KEY_AUTOPATROL_STATE = 'nls_autopatrol_state_v1';
+
 /** 記録ON時にコメントパネル DOM が見つからない状態の警告（サイト改修の検知用・PII なし） */
 export const KEY_COMMENT_PANEL_STATUS = 'nls_comment_panel_status';
 

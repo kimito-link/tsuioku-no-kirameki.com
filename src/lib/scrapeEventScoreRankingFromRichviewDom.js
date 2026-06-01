@@ -32,18 +32,32 @@ export function computeRichviewEventCheapSig(root) {
   /** @type {any} */
   const r = root;
   try {
-    const rows = r.querySelectorAll?.('[class~="el69c2m4"]') || [];
     /** @type {string[]} */
     const parts = [];
-    for (const row of /** @type {Iterable<Element>} */ (rows)) {
-      if (!(row instanceof HTMLElement)) continue;
-      const rankEl = row.querySelector('[class~="ebq6m481"], [class*="ebq6m481"]');
-      const nameEl = row.querySelector('[class~="el69c2m1"], [class*="el69c2m1"]');
-      const scoreEl = row.querySelector('[class~="css-z40gn4"], [class*="css-z40gn4"]');
-      const rk = String((rankEl && rankEl.textContent) || '').replace(/\s+/g, '');
-      const nm = String((nameEl && nameEl.textContent) || '').replace(/\s+/g, '');
-      const sc = String((scoreEl && scoreEl.textContent) || '').replace(/\s+/g, '');
-      parts.push(rk + ':' + nm + ':' + sc);
+    // ハッシュ非依存の構造ベース抽出を最優先（getComputedStyle を呼ばずテキストのみ）。
+    let usedStructural = false;
+    try {
+      const core = extractEventRankingRowsCore(/** @type {any} */ (root));
+      if (core && core.length > 0) {
+        usedStructural = true;
+        for (const row of core) {
+          parts.push(String(row.rank) + ':' + row.name.replace(/\s+/g, '') + ':' + String(row.score));
+        }
+      }
+    } catch { /* fall back to class-based below */ }
+
+    if (!usedStructural) {
+      const rows = r.querySelectorAll?.('[class~="el69c2m4"]') || [];
+      for (const row of /** @type {Iterable<Element>} */ (rows)) {
+        if (!(row instanceof HTMLElement)) continue;
+        const rankEl = row.querySelector('[class~="ebq6m481"], [class*="ebq6m481"]');
+        const nameEl = row.querySelector('[class~="el69c2m1"], [class*="el69c2m1"]');
+        const scoreEl = row.querySelector('[class~="css-z40gn4"], [class*="css-z40gn4"]');
+        const rk = String((rankEl && rankEl.textContent) || '').replace(/\s+/g, '');
+        const nm = String((nameEl && nameEl.textContent) || '').replace(/\s+/g, '');
+        const sc = String((scoreEl && scoreEl.textContent) || '').replace(/\s+/g, '');
+        parts.push(rk + ':' + nm + ':' + sc);
+      }
     }
     // バナーの本人順位/スコア + 選択中イベント名も署名に含める
     const selfRank = r.querySelector?.('[class~="e1awe04q0"], [class*="e1awe04q0"]');
@@ -154,6 +168,22 @@ function pickThumbnailUrlFromElement(el, opts) {
     }
   }
   return '';
+}
+
+/**
+ * niconico のアバター URL から user id を取り出す（リンク化用）。
+ * 例: https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/388/3882670.jpg?xxxx
+ *     → '3882670'（パスの shard ディレクトリではなくファイル名側が uid）。
+ * richview のイベントランキング行は a[href] を持たないが、アバター背景画像の URL に
+ * uid が埋まっているので、ここから記名配信者のユーザーページリンクを復元できる。
+ *
+ * @param {unknown} url
+ * @returns {string} 数値 uid（取れたとき）または ''
+ */
+function extractUserIdFromNicoAvatarUrl(url) {
+  const s = String(url == null ? '' : url);
+  const m = s.match(/\/usericon\/\d+\/(\d{2,18})\.(?:jpe?g|png|gif|webp)/i);
+  return m ? m[1] : '';
 }
 
 /**
@@ -372,6 +402,250 @@ function pickSelectedEventName(sel) {
 }
 
 /**
+ * 見出し「イベントランキング」のテキストを起点に、Emotion クラスハッシュへ一切
+ * 依存せず**構造＋テキストだけ**で行を掬う堅牢版（2026-06-01 実機 lv350658954 で確定）。
+ *
+ * 背景: 2026-06 にニコ生が Emotion クラスタを改名（行 el69c2m4→e1oms6s84 / 名前
+ *   el69c2m1→e1oms6s81 等）。前段ラベルは「安定」と思われていたが実際は再デプロイで
+ *   変わるため、クラス名追従は再発する。見出しテキストと「N位」「💎スコア」という
+ *   ユーザー可視の不変要素を頼りにすれば、次の改名でも壊れない。
+ *
+ * スコープ確定の安全性:
+ *   - 見出しの祖先を上に辿り「位」リーフを1つ以上含む最小の祖先だけを採用する。
+ *     バナー(参加中のイベント/現在N位)とサポーターランキング(○○さんのサポーター)は
+ *     **別サブツリー**＝この祖先には入らない（実機で supInScope=0 を確認）。
+ *
+ * @type {(root: Document|Element) => Array<{rank:number,score:number,name:string,isAnonymous:boolean,rowEl:HTMLElement}>|null}
+ */
+function extractEventRankingRowsCore(root) {
+  const heading = findEventRankingHeading(root);
+  if (!heading) return null;
+  const scope = findEventRankingScope(heading);
+  if (!scope) return null;
+
+  // スコープ内の「位」リーフ＝各行の順位ラベル。
+  /** @type {HTMLElement[]} */
+  const iLeaves = [];
+  for (const el of scope.querySelectorAll('*')) {
+    if (!(el instanceof HTMLElement) || el.children.length > 0) continue;
+    if (String(el.textContent || '').trim() === '位') iLeaves.push(el);
+  }
+  if (iLeaves.length === 0) return null;
+
+  /** @type {Array<{rank:number,score:number,name:string,isAnonymous:boolean,rowEl:HTMLElement}>} */
+  const rows = [];
+  /** @type {Set<HTMLElement>} */
+  const seenRows = new Set();
+  for (const iLeaf of iLeaves) {
+    const rank = pickRankNearILeaf(iLeaf);
+    if (rank == null) return null; // 確定不能は全体不採用（誤値ゼロ方針）
+
+    const row = climbToRowWithScore(iLeaf, scope);
+    if (!(row instanceof HTMLElement)) return null;
+    if (seenRows.has(row)) continue;
+    seenRows.add(row);
+
+    const score = pickScoreInRow(row, iLeaf);
+    if (score == null || score <= 0) return null;
+
+    let name = pickNameInRow(row);
+    const isAnonymous = !name || name === '名無し';
+    if (!name) name = '名無し';
+
+    rows.push({ rank, score, name, isAnonymous, rowEl: row });
+  }
+
+  if (rows.length === 0 || !ranksAreDenseAndUnique(/** @type {any} */ (rows))) return null;
+  rows.sort((a, b) => a.rank - b.rank);
+  return rows;
+}
+
+/**
+ * テキスト完全一致「イベントランキング」の見出しを、最も末端（子孫数最小）で返す。
+ * @param {Document|Element} root
+ * @returns {HTMLElement|null}
+ */
+function findEventRankingHeading(root) {
+  /** @type {HTMLElement|null} */
+  let best = null;
+  let bestCount = Infinity;
+  let cands;
+  try {
+    cands = /** @type {any} */ (root).querySelectorAll?.('*') || [];
+  } catch {
+    return null;
+  }
+  for (const el of cands) {
+    if (!(el instanceof HTMLElement)) continue;
+    if (String(el.textContent || '').trim() !== 'イベントランキング') continue;
+    const c = el.getElementsByTagName('*').length;
+    if (c < bestCount) {
+      best = el;
+      bestCount = c;
+    }
+  }
+  return best;
+}
+
+/**
+ * 見出しから上方向に、「位」リーフを含む最小の祖先（=ランキングリスト領域）を探す。
+ * @param {HTMLElement} heading
+ * @returns {HTMLElement|null}
+ */
+function findEventRankingScope(heading) {
+  /** @type {HTMLElement|null} */
+  let scope = heading;
+  for (let i = 0; i < 8 && scope && scope.parentElement; i++) {
+    scope = scope.parentElement;
+    if (countILeaves(scope) >= 1) return scope;
+  }
+  return null;
+}
+
+/**
+ * @param {HTMLElement} el
+ * @returns {number}
+ */
+function countILeaves(el) {
+  let n = 0;
+  for (const node of el.querySelectorAll('*')) {
+    if (!(node instanceof HTMLElement) || node.children.length > 0) continue;
+    if (String(node.textContent || '').trim() === '位') n++;
+  }
+  return n;
+}
+
+/**
+ * 「位」リーフの近傍から順位の数字を確定する。直前の兄弟→同ブロック内リーフの順。
+ * @param {HTMLElement} iLeaf
+ * @returns {number|null}
+ */
+function pickRankNearILeaf(iLeaf) {
+  let sib = iLeaf.previousElementSibling;
+  while (sib) {
+    if (sib instanceof HTMLElement && sib.children.length === 0) {
+      const d = String(sib.textContent || '').replace(/[^\d]/g, '');
+      if (/^\d+$/.test(d)) {
+        const n = parseInt(d, 10);
+        if (n > 0) return n;
+      }
+    }
+    sib = sib.previousElementSibling;
+  }
+  const block = iLeaf.parentElement;
+  if (block instanceof HTMLElement) {
+    for (const el of block.querySelectorAll('*')) {
+      if (!(el instanceof HTMLElement) || el.children.length > 0 || el === iLeaf) continue;
+      const d = String(el.textContent || '').replace(/[^\d]/g, '');
+      if (/^\d+$/.test(d)) {
+        const n = parseInt(d, 10);
+        if (n > 0) return n;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 「位」リーフから上方向に、スコア（カンマ付き or 100 以上の数値リーフ）を含む
+ * 最初の祖先＝行要素を返す。
+ * @param {HTMLElement} iLeaf
+ * @param {HTMLElement} scope
+ * @returns {HTMLElement|null}
+ */
+function climbToRowWithScore(iLeaf, scope) {
+  let node = iLeaf.parentElement;
+  for (let i = 0; i < 8 && node && node !== scope; i++) {
+    if (hasScoreLeaf(node)) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+/**
+ * @param {HTMLElement} row
+ * @returns {boolean}
+ */
+function hasScoreLeaf(row) {
+  for (const el of row.querySelectorAll('*')) {
+    if (!(el instanceof HTMLElement) || el.children.length > 0) continue;
+    const t = String(el.textContent || '').trim();
+    const cleaned = t.replace(/,/g, '').replace(/[💎pt\s]/giu, '').trim();
+    if (/^\d+$/.test(cleaned)) {
+      if (t.includes(',') || parseInt(cleaned, 10) >= 100) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 行内の数値リーフ最大値をスコアとして返す（順位ブロックは除外）。
+ * @param {HTMLElement} row
+ * @param {HTMLElement} iLeaf
+ * @returns {number|null}
+ */
+function pickScoreInRow(row, iLeaf) {
+  const rankBlock = iLeaf.parentElement;
+  /** @type {number|null} */
+  let best = null;
+  for (const el of row.querySelectorAll('*')) {
+    if (!(el instanceof HTMLElement) || el.children.length > 0) continue;
+    if (el === iLeaf || (rankBlock && rankBlock.contains(el))) continue;
+    const t = String(el.textContent || '').trim();
+    const cleaned = t.replace(/,/g, '').replace(/[💎pt\s]/giu, '').trim();
+    if (/^\d+$/.test(cleaned)) {
+      const v = parseInt(cleaned, 10);
+      if (v > 0 && (best == null || v > best)) best = v;
+    }
+  }
+  return best;
+}
+
+/**
+ * 行内で「数字/位/さん/カンマ数値」でない最長テキストリーフを名前として返す。
+ * @param {HTMLElement} row
+ * @returns {string}
+ */
+function pickNameInRow(row) {
+  let best = '';
+  for (const el of row.querySelectorAll('*')) {
+    if (!(el instanceof HTMLElement) || el.children.length > 0) continue;
+    const t = String(el.textContent || '').trim();
+    if (!t) continue;
+    if (t === '位' || t === 'さん' || t === '💎' || t === 'pt' || t === '更新') continue;
+    const cleaned = t.replace(/,/g, '').replace(/[💎pt\s]/giu, '').trim();
+    if (/^\d+$/.test(cleaned)) continue;
+    if (t.length > best.length) best = t;
+  }
+  return normalizeRankerAltName(best);
+}
+
+/**
+ * {@link extractEventRankingRowsCore} を EventScoreRankingRow[] に変換（上位10名のみサムネ取得）。
+ * @param {Document|Element} root
+ * @returns {EventScoreRankingRow[]|null}
+ */
+function scrapeEventRankingByStructure(root) {
+  const core = extractEventRankingRowsCore(root);
+  if (!core || core.length === 0) return null;
+  return core.map((r) => {
+    let thumbnailUrl = '';
+    if (r.rank <= 10) {
+      thumbnailUrl = pickThumbnailUrlFromElement(r.rowEl, { searchDescendants: true });
+    }
+    const userId = extractUserIdFromNicoAvatarUrl(thumbnailUrl);
+    return {
+      rank: r.rank,
+      score: r.score,
+      name: r.name,
+      isAnonymous: r.isAnonymous,
+      thumbnailUrl,
+      ...(userId ? { userId } : {})
+    };
+  });
+}
+
+/**
  * ★本命★ 実機 richview の「イベントランキング」（=このイベントに参加している
  * 配信者たちの💎スコア順位。1位あめ / 2位この / … 25位）を掬う（2026-05-26 ユーザー提供生HTMLで確定）。
  *
@@ -461,7 +735,8 @@ function scrapeRealEventRankingRows(root) {
       }
     }
 
-    rows.push({ rank, score, name, isAnonymous, thumbnailUrl });
+    const userId = extractUserIdFromNicoAvatarUrl(thumbnailUrl);
+    rows.push({ rank, score, name, isAnonymous, thumbnailUrl, ...(userId ? { userId } : {}) });
   }
 
   if (rows.length === 0 || !ranksAreDenseAndUnique(rows)) return null;
@@ -591,7 +866,16 @@ function scrapeEmotionRichviewSupporterRows(root) {
 export function scrapeEventScoreRankingFromRichviewDom(root) {
   if (!root) return null;
 
-  // 1) ★本命★ 実機 richview の「イベントランキング」（参加配信者の💎順位）を最優先。
+  // 0) ★最優先★ 見出し「イベントランキング」起点のハッシュ非依存・構造ベース抽出。
+  //    Emotion クラスタ改名（el69c2m*→e1oms6s8* 等）でも壊れない正本経路。
+  try {
+    const structRows = scrapeEventRankingByStructure(/** @type {any} */ (root));
+    if (structRows && structRows.length > 0) return structRows;
+  } catch {
+    /* fall through */
+  }
+
+  // 1) ★本命(旧)★ クラス固定の実機イベントランキング抽出（古い DOM / fixture 互換の高速路）。
   try {
     const realRows = scrapeRealEventRankingRows(/** @type {any} */ (root));
     if (realRows && realRows.length > 0) return realRows;

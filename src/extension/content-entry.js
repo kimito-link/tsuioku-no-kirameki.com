@@ -44,6 +44,7 @@ import {
   KEY_INCREMENTAL_DEDUP_ENABLED,
   KEY_COMMENT_IDB_ENABLED,
   KEY_CDB_OFFSCREEN_ENABLED,
+  KEY_CONCURRENT_CALIBRATION_RING_V1,
   commentsStorageKey,
   giftUsersStorageKey,
   backfillResumeStorageKey,
@@ -246,6 +247,18 @@ import {
   EVENT_PARTICIPATION_FETCH_MESSAGE_TYPE
 } from '../lib/eventParticipationProgramsApi.js';
 import {
+  normalizeKokenGiftHistoryResponse,
+  giftHistoryThrowsStorageKey,
+  KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE
+} from '../lib/kokenGiftHistoryApi.js';
+import {
+  pickAuditionContextFromEntryItems,
+  normalizeAuditionRankingsResponse,
+  normalizeAuditionVotingUserRankingResponse,
+  eventVotingRankingStorageKey,
+  AUDITION_EVENT_RANKING_FETCH_MESSAGE_TYPE
+} from '../lib/auditionEventRankingApi.js';
+import {
   normalizeNicoUserProfileResponse,
   isResolvableNicoUid,
   NICO_USER_PROFILE_FETCH_MESSAGE_TYPE
@@ -298,6 +311,15 @@ import {
   pickIsEventParticipating
 } from '../lib/embeddedDataExtract.js';
 import { countRecentActiveUsers } from '../lib/concurrentEstimate.js';
+import {
+  resolveConcurrentFromSnapshot,
+  deriveCommentsPerMinFromSnapshot
+} from '../lib/concurrentResolvedFromSnapshot.js';
+import {
+  buildCalibrationSample,
+  appendCalibrationSample,
+  CALIBRATION_SOURCE
+} from '../lib/concurrentCalibrationLog.js';
 import { summarizeOfficialCommentHistory } from '../lib/officialStatsWindow.js';
 import { buildWatchSnapshotOfficialFields } from '../lib/watchSnapshotOfficialFields.js';
 import { mergeUserIdForEnrichment } from '../lib/userIdPreference.js';
@@ -6761,6 +6783,7 @@ function startPageFrameLoop() {
     maybeAutoStartBackfill(); // v0.1.418: 自動で過去ログ取り込み（既定 ON・OFF も可）。
     maybeStartNdgrForwardCrawl(); // v0.1.511: 前方向 NDGR 継続取得（opt-in・既定 OFF）。
     maybeRunRecordingStallWatchdog(); // 記録停止の自己診断＋自己回復（公式コメの伸びを独立信号に）。
+    maybeLogConcurrentCalibrationSample(); // 同接推定の較正データを throttled 記録（手動視聴＋自動巡回）。
     persistAiShareFastDiagnostics();
     // 0.1.32 (AG): バックグラウンドで prewarm を skip した分、tick で再 schedule
     // を試みる。visibilitychange は tick を呼ぶので、可視化された瞬間に prewarm
@@ -7589,6 +7612,101 @@ function bindNativeSelfPostedRecorder() {
     },
     true
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* 同接推定 較正データロガー（Phase 1 配線）                                   */
+/* 推定を算出するたびに A/B/C/D/blend・来場/コメ毎分/経過 等を throttled で      */
+/* chrome.storage.local のリングバッファ（KEY_CONCURRENT_CALIBRATION_RING_V1）  */
+/* へ積む。popup を開いていない背景タブ（自動巡回 b）でも貯まるよう content 側に  */
+/* 置く。throttle/cap/重複間引きは appendCalibrationSample（純関数・テスト済）。  */
+/* PII は積まない（数値・liveId・platform・ts・source のみ）。                    */
+/* ------------------------------------------------------------------ */
+
+/** 較正サンプルの記録を試みる最小間隔（appendCalibrationSample 側 30s と整合）。 */
+const CALIBRATION_LOG_ATTEMPT_INTERVAL_MS = 25000;
+let _lastCalibrationLogAttemptAt = 0;
+let _calibrationLogInFlight = false;
+
+/**
+ * このタブが自動巡回(b)で開かれたかを URL ハッシュのマーカーで判定する。
+ * SW が背景タブを開くとき `#nls_autopatrol=1` を付ける（content は読み取るだけ）。
+ * @returns {boolean}
+ */
+function isAutopatrolTab() {
+  try {
+    return /(?:^|[#&?])nls_autopatrol=1(?:$|[&])/.test(String(window.location.hash || ''));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 同接推定の較正サンプルを 1 件追記する（throttled・best-effort・fire-and-forget）。
+ * 呼び出しは page-frame maintenance tick から（hidden striding 済み）。
+ */
+function maybeLogConcurrentCalibrationSample() {
+  try {
+    // top frame の watch ページのみ（iframe では走らせない）。
+    if (typeof window === 'undefined' || window.self !== window.top) return;
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+    if (_calibrationLogInFlight) return;
+    const now = Date.now();
+    if (now - _lastCalibrationLogAttemptAt < CALIBRATION_LOG_ATTEMPT_INTERVAL_MS) return;
+
+    const lid = extractLiveIdFromUrl(window.location.href) || liveId || '';
+    if (!/^lv\d{1,15}$/.test(String(lid))) return;
+
+    _lastCalibrationLogAttemptAt = now;
+
+    let snapshot = null;
+    try {
+      snapshot = collectWatchPageSnapshot();
+    } catch {
+      snapshot = null;
+    }
+    if (!snapshot) return;
+
+    const resolved = resolveConcurrentFromSnapshot(snapshot, now);
+    if (!resolved || !(Number(resolved.estimated) > 0)) return;
+
+    const sample = buildCalibrationSample({
+      nowMs: now,
+      platform: 'niconico',
+      liveId: lid,
+      source: isAutopatrolTab() ? CALIBRATION_SOURCE.AUTOPATROL : CALIBRATION_SOURCE.MANUAL,
+      resolved,
+      totalVisitors:
+        typeof snapshot.viewerCountFromDom === 'number' ? snapshot.viewerCountFromDom : null,
+      recentActiveUsers:
+        typeof snapshot.recentActiveUsers === 'number' ? snapshot.recentActiveUsers : null,
+      streamAgeMin: typeof snapshot.streamAgeMin === 'number' ? snapshot.streamAgeMin : null,
+      commentsPerMin: deriveCommentsPerMinFromSnapshot(snapshot) ?? null,
+      // ニコ生は公式「同接」を出さないため officialConcurrent は null（来場=累計は別軸）。
+      officialConcurrent: null
+    });
+
+    _calibrationLogInFlight = true;
+    void (async () => {
+      try {
+        const bag = await chrome.storage.local.get(KEY_CONCURRENT_CALIBRATION_RING_V1);
+        const next = appendCalibrationSample(
+          bag[KEY_CONCURRENT_CALIBRATION_RING_V1],
+          sample,
+          { nowMs: now }
+        );
+        if (next) {
+          await chrome.storage.local.set({ [KEY_CONCURRENT_CALIBRATION_RING_V1]: next });
+        }
+      } catch {
+        /* best-effort: 較正データは取りこぼしても害がない */
+      } finally {
+        _calibrationLogInFlight = false;
+      }
+    })();
+  } catch {
+    _calibrationLogInFlight = false;
+  }
 }
 
 /**
@@ -11238,6 +11356,8 @@ function onTabVisibleForCommentHarvest() {
   maybeFetchKokenContribRankingMirrorOnce();
   maybeFetchNicoadContribRankingMirrorOnce();
   maybeFetchEventParticipationMirrorOnce();
+  maybeFetchKokenGiftHistoryMirrorOnce();
+  maybeFetchAuditionEventRankingMirrorOnce();
   scanVisibleCommentsNow();
   const now = Date.now();
   const needsRecovery = shouldForceDeepHarvestRecovery({
@@ -12720,6 +12840,11 @@ function runExternalApiFetchesAsTabLeader(opts = {}) {
     maybeFetchKokenContribRankingMirrorOnce();
     maybeFetchNicoadContribRankingMirrorOnce();
     if (includeEvt) maybeFetchEventParticipationMirrorOnce();
+    // 2026-06-01: ギフト履歴 / イベント💎ランキングも「パネルを開かずに即時取得」する
+    //   無認証 API 経路（koken /histories・audition capi 2 段）。koken/nicoad と同じ
+    //   タブリーダー集約・min-gap 再入抑止・rows>0 のみ書込（fail-soft）。
+    maybeFetchKokenGiftHistoryMirrorOnce();
+    maybeFetchAuditionEventRankingMirrorOnce();
     void maybeResolveNamedUserProfilesOnce();
   });
 }
@@ -12939,6 +13064,201 @@ function maybeFetchEventParticipationMirrorOnce() {
     );
   } catch {
     /* no-op: sendMessage 不可（context invalidated 等）。次 tick で自己回復 */
+  }
+}
+
+/** koken ギフト履歴 API の再入抑止（FETCH 周期に合わせ 10s）。 */
+const KOKEN_GIFT_HISTORY_API_MIN_GAP_MS = 10_000;
+/** @type {number} */
+let _kokenGiftHistoryApiLastAttemptAt = 0;
+
+/**
+ * 「ギフト履歴もすぐとりたい」（2026-06-01）: koken の個別ギフト履歴を SW 経由で取得し、
+ * 既存の `nls_gift_history_throws_<lv>`（送り主別の累計pt集計）へ保存する。これにより
+ * ギフトタブ（koken iframe）を**開かなくても**ギフト履歴レーンが即時に出る。
+ *
+ * 取得元は koken 公式ギフト履歴 API（api.koken.../userperspective/.../histories）。
+ * DOM scrape 版（NLS_GIFT_HISTORY_FROM_IFRAME）と同じ保存キー・保存形なので popup の
+ * 既存読み取りをそのまま流用。さらに本経路は記名行に**数値 uid** を入れるためリンクが効く。
+ *
+ * 制約は koken/nicoad と同一（iframe 内では走らない・SW 経由 fetch・rows>0 のみ書込＝
+ * fail-soft・liveId echo 一致確認・min-gap 再入抑止・callback 喪失時も次 tick で自己回復）。
+ */
+function maybeFetchKokenGiftHistoryMirrorOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '')
+      .trim()
+      .toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _kokenGiftHistoryApiLastAttemptAt < KOKEN_GIFT_HISTORY_API_MIN_GAP_MS) return;
+    _kokenGiftHistoryApiLastAttemptAt = now;
+    chrome.runtime.sendMessage(
+      { type: KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE, liveId: lid },
+      (resp) => {
+        const le = chrome.runtime.lastError;
+        if (le) return;
+        if (!resp || resp.ok !== true || resp.json == null) return;
+        let rows = null;
+        try {
+          rows = normalizeKokenGiftHistoryResponse(resp.json, { now: Date.now() });
+        } catch {
+          rows = null;
+        }
+        // rows>0 のときだけ上書き（空/null は既存値を保全＝fail-soft）。
+        if (!Array.isArray(rows) || rows.length === 0) return;
+        const curLid = String(liveId || '')
+          .trim()
+          .toLowerCase();
+        if (curLid !== lid) return; // 応答到着までに別 lv へ遷移していたら stale 書込しない
+        try {
+          chrome.storage.local
+            .set({ [giftHistoryThrowsStorageKey(lid)]: rows })
+            .catch((err) => {
+              if (!isContextInvalidatedError(err)) {
+                /* best-effort */
+              }
+            });
+        } catch {
+          /* no-op */
+        }
+      }
+    );
+  } catch {
+    /* no-op: 次 tick で自己回復 */
+  }
+}
+
+/** audition イベント💎ランキング API の再入抑止。 */
+const AUDITION_EVENT_RANKING_API_MIN_GAP_MS = 12_000;
+/** @type {number} */
+let _auditionEventRankingApiLastAttemptAt = 0;
+
+/**
+ * 「対象の場所をひらかないとでない」（2026-06-01）: イベント💎ランキングを SW 経由（無認証
+ * capi 2 段 fetch）で取得し、relay と同じ `nls_event_score_ranking_<lv>` へ保存する。これに
+ * より richview iframe（RANK パネル）を**開かなくても**イベントランキングが即時に出る。
+ *
+ * イベント参加中（embedded-data の programAudition.isEnabled）のときだけ走る（非イベント
+ * では entry_items が空＝無駄打ちしない）。selfStatus（自分の順位/差）も entry_items から
+ * 復元し、diffToNext は rankings の 1 つ上の score との差で算出する。
+ *
+ * 制約は koken/nicoad と同一（iframe 内では走らない・SW 経由 fetch・rows>0 のみ書込＝
+ * fail-soft・liveId echo 一致確認・min-gap 再入抑止）。
+ */
+function maybeFetchAuditionEventRankingMirrorOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    if (typeof document === 'undefined') return;
+    const props = extractEmbeddedDataProps(document);
+    if (!pickIsEventParticipating(props)) return; // 非イベントでは出さない
+    const lid = String(liveId || '')
+      .trim()
+      .toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _auditionEventRankingApiLastAttemptAt < AUDITION_EVENT_RANKING_API_MIN_GAP_MS) return;
+    _auditionEventRankingApiLastAttemptAt = now;
+    chrome.runtime.sendMessage(
+      { type: AUDITION_EVENT_RANKING_FETCH_MESSAGE_TYPE, liveId: lid },
+      (resp) => {
+        const le = chrome.runtime.lastError;
+        if (le) return;
+        if (!resp || resp.ok !== true) return;
+        const curLid = String(liveId || '')
+          .trim()
+          .toLowerCase();
+        if (curLid !== lid) return; // 応答到着までに別 lv へ遷移していたら stale 書込しない
+
+        let norm = null;
+        try {
+          norm = normalizeAuditionRankingsResponse(resp.rankingsJson, { max: 10 });
+        } catch {
+          norm = null;
+        }
+        // イベント💎ランキング（rows>0 のときだけ上書き＝fail-soft）。
+        if (norm && Array.isArray(norm.rows) && norm.rows.length > 0) {
+          let ctx = null;
+          try {
+            ctx = pickAuditionContextFromEntryItems(resp.entryItemsJson);
+          } catch {
+            ctx = null;
+          }
+          let selfStatus = null;
+          if (ctx && ctx.selfStatus) {
+            const s = ctx.selfStatus;
+            let diffToNext = null;
+            if (typeof s.rank === 'number' && s.rank > 1 && typeof s.score === 'number') {
+              const above = norm.rows.find((r) => r.rank === s.rank - 1);
+              if (above && typeof above.score === 'number') {
+                const d = above.score - s.score;
+                if (Number.isFinite(d) && d >= 0) diffToNext = d;
+              }
+            }
+            selfStatus = {
+              rank: s.rank,
+              score: s.score,
+              diffToNext,
+              eventName: s.eventName,
+              broadcasterName: s.broadcasterName
+            };
+          }
+          try {
+            chrome.storage.local
+              .set({
+                [eventScoreRankingStorageKey(lid)]: {
+                  rows: norm.rows.slice(0, 10),
+                  selfStatus,
+                  capturedAt: Date.now(),
+                  liveId: lid,
+                  source: 'capi'
+                }
+              })
+              .catch((err) => {
+                if (!isContextInvalidatedError(err)) {
+                  /* best-effort */
+                }
+              });
+          } catch {
+            /* no-op */
+          }
+        }
+
+        // 応援者ランキング（イベント投票・ギフト＋ニコニ広告）。貢献度(ギフトのみ)とは
+        // 別指標。rows>0 のときだけ専用キーへ保存（popup の応援者レーンが読む）。
+        let voting = null;
+        try {
+          voting = normalizeAuditionVotingUserRankingResponse(resp.votingJson, { max: 10 });
+        } catch {
+          voting = null;
+        }
+        if (Array.isArray(voting) && voting.length > 0) {
+          try {
+            chrome.storage.local
+              .set({
+                [eventVotingRankingStorageKey(lid)]: {
+                  rows: voting,
+                  capturedAt: Date.now(),
+                  liveId: lid,
+                  source: 'capi'
+                }
+              })
+              .catch((err) => {
+                if (!isContextInvalidatedError(err)) {
+                  /* best-effort */
+                }
+              });
+          } catch {
+            /* no-op */
+          }
+        }
+      }
+    );
+  } catch {
+    /* no-op: 次 tick で自己回復 */
   }
 }
 
@@ -14890,6 +15210,27 @@ async function persistOfficialEventDomBundleNow() {
         });
         if (staleEvtScoreKeys.length) {
           await chrome.storage.local.remove(staleEvtScoreKeys);
+        }
+      } catch { /* best-effort */ }
+      // 応援者ランキング（イベント投票）キャッシュ（nls_event_voting_ranking_<lv>）も同規約で cleanup
+      try {
+        const EVENT_VOTING_RANKING_TTL_MS = 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const curLid = String(lid || '').trim().toLowerCase();
+        const VOTING_PREFIX = 'nls_event_voting_ranking_';
+        const staleVotingKeys = Object.keys(all).filter((k) => {
+          if (!k.startsWith(VOTING_PREFIX)) return false;
+          const klv = k.slice(VOTING_PREFIX.length);
+          if (klv && curLid && klv === curLid) return false;
+          const v = all[k];
+          const cap =
+            v && typeof v === 'object' && typeof v.capturedAt === 'number'
+              ? v.capturedAt
+              : 0;
+          return cap === 0 || nowMs - cap >= EVENT_VOTING_RANKING_TTL_MS;
+        });
+        if (staleVotingKeys.length) {
+          await chrome.storage.local.remove(staleVotingKeys);
         }
       } catch { /* best-effort */ }
       const nicoadLvs = Object.keys(all)

@@ -26,6 +26,8 @@ describe('aggregateMarketingReport', () => {
     expect(r.textStats.avgChars).toBe(0);
     expect(r.selfPostedCount).toBe(0);
     expect(r.is184.knownCount).toBe(0);
+    expect(r.premium.knownCount).toBe(0);
+    expect(r.premium.pctPremiumOfKnown).toBe(0);
     expect(r.timelineCumulative.length).toBe(r.timeline.length);
     expect(r.vposThirds).toBeNull();
     expect(r.quarterEngagement.skippedShortSpan).toBe(true);
@@ -114,6 +116,30 @@ describe('aggregateMarketingReport', () => {
     if (r.vposThirds) {
       expect(r.vposThirds.early + r.vposThirds.mid + r.vposThirds.late).toBe(7);
     }
+  });
+
+  it('プレミアム会員率は accountStatus(1=一般/2=プレミアム)の既知行のみで計算する', () => {
+    const comments = [
+      { ...c(1, 'a', 'p1', 0), accountStatus: 2 },
+      { ...c(2, 'b', 'p2', 1000), accountStatus: 2 },
+      { ...c(3, 'c', 's1', 2000), accountStatus: 1 },
+      { ...c(4, 'd', 's2', 3000), accountStatus: 1 },
+      { ...c(5, 'e', 'unspecified', 4000), accountStatus: 0 },
+      { ...c(6, 'f', 'noattr', 5000) }
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1');
+    // 既知 = premium(2) + standard(2) = 4。未指定(0)/属性なしは母数から除外。
+    expect(r.premium.premiumCount).toBe(2);
+    expect(r.premium.standardCount).toBe(2);
+    expect(r.premium.knownCount).toBe(4);
+    expect(r.premium.pctPremiumOfKnown).toBe(50);
+  });
+
+  it('プレミアム判定の対象行が無ければ既知0・割合0', () => {
+    const comments = [c(1, 'a', 'x', 0), c(2, 'b', 'y', 1000)];
+    const r = aggregateMarketingReport(comments, 'lv1');
+    expect(r.premium.knownCount).toBe(0);
+    expect(r.premium.pctPremiumOfKnown).toBe(0);
   });
 
   it('四分位エンゲージメント（長いスパンで冒頭・終盤の人数）', () => {
