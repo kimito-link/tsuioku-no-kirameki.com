@@ -77,11 +77,15 @@ const VISITOR_SOFT_CAP_RATIO = 0.35;
  * @property {number} visitorSoftCapRatio  active_only 時の来場者比ソフトキャップ
  * @property {{ peak: number, decay: number, floor: number, fallback: number }} retention  滞留率の指数減衰パラメータ
  * @property {{ freshMs: number, nowcastMaxMs: number }} directViewers  公式同接値の鮮度しきい値（ヒント無し時の既定）
+ * @property {{ avgSessionMin: number }} [session]  リトルの法則 W（平均滞在分）。研究中シグナル C 用。
+ * @property {{ perPersonCommentsPerMin: number }} [chatDensity]  ひとり当たりの発言ペース（コメ/分/人）。研究中シグナル D 用。
  */
 
 /**
  * ニコ生プロファイル（既定）。
  * 数値は従来のハードコード値そのまま（挙動互換）。
+ * session / chatDensity は研究中シグナル C・D 用の暫定値で、既定の estimated には
+ * 影響しない（base.signalC/signalD/blended として「足す」だけ。較正後に統合予定）。
  * @type {PlatformProfile}
  */
 export const NICONICO_PROFILE = Object.freeze({
@@ -94,7 +98,11 @@ export const NICONICO_PROFILE = Object.freeze({
   directViewers: Object.freeze({
     freshMs: DIRECT_VIEWERS_FRESH_MS,
     nowcastMaxMs: DIRECT_VIEWERS_NOWCAST_MAX_MS
-  })
+  }),
+  // 暫定値（要較正）: ニコ生の平均滞在は配信尺・ジャンルで大きく変わる。
+  session: Object.freeze({ avgSessionMin: 15 }),
+  // 暫定値（要較正）: アクティブ参加者 1 人あたり ~5 分に 1 コメント想定。
+  chatDensity: Object.freeze({ perPersonCommentsPerMin: 0.2 })
 });
 
 /** @type {Readonly<Record<string, PlatformProfile>>} */
@@ -201,6 +209,64 @@ export function retentionRate(ageMin, profile) {
 }
 
 /**
+ * 研究中シグナル C：リトルの法則 L = λ × W。
+ * 同時にいる人数 ≒ 来場の増えるペース（人/分）× 平均滞在時間（分）。
+ *
+ * @param {object} params
+ * @param {number|null|undefined} params.visitorsPerMin  λ：毎分の新規来場者（来場累計の傾き）
+ * @param {number|null|undefined} params.avgSessionMin   W：平均滞在分
+ * @returns {number} 推定同接（人）。入力不足なら 0。
+ */
+export function littlesLawConcurrent({ visitorsPerMin, avgSessionMin }) {
+  if (
+    typeof visitorsPerMin !== 'number' ||
+    !Number.isFinite(visitorsPerMin) ||
+    visitorsPerMin <= 0 ||
+    typeof avgSessionMin !== 'number' ||
+    !Number.isFinite(avgSessionMin) ||
+    avgSessionMin <= 0
+  ) {
+    return 0;
+  }
+  return Math.round(visitorsPerMin * avgSessionMin);
+}
+
+/**
+ * 研究中シグナル D：チャット密度。
+ * 同時にいる人数 ≒ コメント速度（コメ/分）÷ 1人あたり発言ペース（コメ/分/人）。
+ *
+ * @param {object} params
+ * @param {number|null|undefined} params.commentsPerMin            コメント速度（コメ/分）
+ * @param {number|null|undefined} params.perPersonCommentsPerMin   ひとり当たりの発言ペース（コメ/分/人）
+ * @returns {number} 推定同接（人）。入力不足なら 0。
+ */
+export function chatDensityConcurrent({ commentsPerMin, perPersonCommentsPerMin }) {
+  if (
+    typeof commentsPerMin !== 'number' ||
+    !Number.isFinite(commentsPerMin) ||
+    commentsPerMin <= 0 ||
+    typeof perPersonCommentsPerMin !== 'number' ||
+    !Number.isFinite(perPersonCommentsPerMin) ||
+    perPersonCommentsPerMin <= 0
+  ) {
+    return 0;
+  }
+  return Math.round(commentsPerMin / perPersonCommentsPerMin);
+}
+
+/**
+ * 正のシグナル集合の幾何平均（四捨五入）。空なら 0。
+ * @param {ReadonlyArray<number>} signals
+ * @returns {number}
+ */
+function geometricMeanOfPositive(signals) {
+  const positive = signals.filter((s) => typeof s === 'number' && Number.isFinite(s) && s > 0);
+  if (positive.length === 0) return 0;
+  const sumLog = positive.reduce((acc, s) => acc + Math.log(s), 0);
+  return Math.round(Math.exp(sumLog / positive.length));
+}
+
+/**
  * タイムスタンプ付き userId Map から、指定ウィンドウ内のアクティブユーザー数を返す。
  *
  * @param {ReadonlyMap<string, number>} userTimestamps  userId → lastSeenAt (ms)
@@ -227,9 +293,19 @@ export function countRecentActiveUsers(userTimestamps, now, windowMs) {
  *   method: 'combined'|'active_only'|'retention_only'|'none',
  *   signalA: number,
  *   signalB: number,
+ *   signalC: number,
+ *   signalD: number,
+ *   blended: number,
+ *   blendedSignalCount: number,
+ *   visitorsPerMin: number|null,
+ *   commentsPerMin: number|null,
  *   retentionPct: number|null,
  *   streamAgeMin: number|null
  * }} ConcurrentEstimateResult
+ *
+ * signalC（リトルの法則）/ signalD（チャット密度）/ blended（A〜D の幾何平均）は
+ * 研究中シグナル。既定の `estimated` には影響せず、診断・将来統合用の参考値として
+ * 「足す」だけ（較正後に `estimated` への統合を検討する）。
  */
 
 /**
@@ -240,6 +316,8 @@ export function countRecentActiveUsers(userTimestamps, now, windowMs) {
  * @param {number} [params.totalVisitors]    来場者数（倍率計算 + キャップに使用）
  * @param {number} [params.streamAgeMin]     配信経過分数（滞留推定に使用）
  * @param {number} [params.multiplier]       倍率を手動指定する場合（省略時は動的算出）
+ * @param {number} [params.visitorsPerMin]    研究中シグナル C 用：来場の増えるペース（人/分）。省略時は来場累計÷経過分で近似。
+ * @param {number} [params.commentsPerMin]    研究中シグナル D 用：コメント速度（コメ/分）。省略時は signalD=0。
  * @param {PlatformProfile|string} [params.profile]  プラットフォーム係数（省略時はニコ生）
  * @returns {ConcurrentEstimateResult}
  */
@@ -248,6 +326,8 @@ export function estimateConcurrentViewers({
   totalVisitors,
   streamAgeMin,
   multiplier,
+  visitorsPerMin,
+  commentsPerMin,
   profile
 }) {
   const p = getPlatformProfile(profile);
@@ -270,6 +350,33 @@ export function estimateConcurrentViewers({
     retPct = retentionRate(/** @type {number} */ (streamAgeMin), p);
     signalB = Math.round(/** @type {number} */ (totalVisitors) * retPct);
   }
+
+  // 研究中シグナル C：リトルの法則。明示の visitorsPerMin が無ければ
+  // 「来場累計 ÷ 経過分」で平均到着率を近似する（経過 0 分は不可）。
+  let vpm = /** @type {number|null} */ (null);
+  if (typeof visitorsPerMin === 'number' && Number.isFinite(visitorsPerMin) && visitorsPerMin > 0) {
+    vpm = visitorsPerMin;
+  } else if (
+    hasVisitors &&
+    hasAge &&
+    /** @type {number} */ (streamAgeMin) > 0
+  ) {
+    vpm = /** @type {number} */ (totalVisitors) / /** @type {number} */ (streamAgeMin);
+  }
+  const signalC = littlesLawConcurrent({
+    visitorsPerMin: vpm,
+    avgSessionMin: p.session?.avgSessionMin
+  });
+
+  // 研究中シグナル D：チャット密度。コメント速度の明示がある場合のみ算出。
+  const cpm =
+    typeof commentsPerMin === 'number' && Number.isFinite(commentsPerMin) && commentsPerMin > 0
+      ? commentsPerMin
+      : null;
+  const signalD = chatDensityConcurrent({
+    commentsPerMin: cpm,
+    perPersonCommentsPerMin: p.chatDensity?.perPersonCommentsPerMin
+  });
 
   let estimated = 0;
   /** @type {'combined'|'active_only'|'retention_only'|'none'} */
@@ -301,14 +408,25 @@ export function estimateConcurrentViewers({
     }
   }
 
+  const signalAInt = Math.round(signalA);
+  const blendSignals = [signalAInt, signalB, signalC, signalD];
+  const blended = geometricMeanOfPositive(blendSignals);
+  const blendedSignalCount = blendSignals.filter((s) => s > 0).length;
+
   return {
     estimated,
     activeCommenters: active,
     multiplier: m,
     capped,
     method,
-    signalA: Math.round(signalA),
+    signalA: signalAInt,
     signalB,
+    signalC,
+    signalD,
+    blended,
+    blendedSignalCount,
+    visitorsPerMin: vpm != null ? Math.round(vpm * 100) / 100 : null,
+    commentsPerMin: cpm,
     retentionPct: retPct != null ? Math.round(retPct * 100) : null,
     streamAgeMin: hasAge ? /** @type {number} */ (streamAgeMin) : null,
   };
@@ -368,6 +486,8 @@ export function calcCommentCaptureRatio({
  * @param {number} [params.totalVisitors]
  * @param {number} [params.streamAgeMin]
  * @param {number} [params.multiplier]
+ * @param {number} [params.visitorsPerMin]  研究中シグナル C 用（来場/分）
+ * @param {number} [params.commentsPerMin]  研究中シグナル D 用（コメ/分）
  * @param {PlatformProfile|string} [params.profile]  プラットフォーム係数（省略時はニコ生）
  * @returns {ConcurrentResolutionResult}
  */
@@ -383,6 +503,8 @@ export function resolveConcurrentViewers({
   totalVisitors,
   streamAgeMin,
   multiplier,
+  visitorsPerMin,
+  commentsPerMin,
   profile
 }) {
   const p = getPlatformProfile(profile);
@@ -391,6 +513,8 @@ export function resolveConcurrentViewers({
     totalVisitors,
     streamAgeMin,
     multiplier,
+    visitorsPerMin,
+    commentsPerMin,
     profile: p
   });
 
