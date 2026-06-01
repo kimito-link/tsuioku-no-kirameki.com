@@ -7662,6 +7662,25 @@ async function refreshSupportActivityTimeline(liveId) {
     return av ? { ...g, avatarUrl: av } : g;
   });
 
+  // v0.1.522: チャンク移行後は main コメントキーへ書き戻さない設計（保存は生 nickname のまま、
+  //   表示時に profile 再適用で担保）。ユーザーレーンと同様に、応援タイムラインも描画直前に
+  //   プロファイル表示名を再適用し、内部表示名（stamp_* / nicolive_* など）が行に漏れないようにする。
+  //   in-memory キャッシュが未ロードのときは storage から読み直す（描画順に依存しない）。
+  let timelineProfileMap = popupUserCommentProfileMap;
+  if (!timelineProfileMap || !Object.keys(timelineProfileMap).length) {
+    try {
+      const profBag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
+      timelineProfileMap = normalizeUserCommentProfileMap(
+        profBag[KEY_USER_COMMENT_PROFILE_CACHE]
+      );
+    } catch {
+      timelineProfileMap = null;
+    }
+  }
+  if (timelineProfileMap && Object.keys(timelineProfileMap).length) {
+    comments = applyUserCommentProfileMapToEntries(comments, timelineProfileMap).next;
+  }
+
   const timeline = buildSupportActivityTimeline(comments, giftEventsEnriched, {
     order: 'desc',
     limit: 120

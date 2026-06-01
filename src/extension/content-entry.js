@@ -3762,6 +3762,47 @@ let inlinePanelAutoshowActivatedThisSession = false;
 /** autoshow の 1 回きり解除を要求済みか */
 let inlinePanelAutoshowResetRequested = false;
 
+/** 1 回きり autoshow 解除（storage への false 書き込み）を予約したタイマー。 */
+let inlinePanelAutoshowResetTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (
+  null
+);
+
+/**
+ * 1 回きり autoshow の「storage を OFF に戻す」書き込みを遅延させる待ち時間（ms）。
+ *
+ * autoshow=true は「次に視聴ページを開いたとき 1 回だけパネルを自動表示する」ワンショット
+ * 信号で、表示後はストレージを false に戻して以後の新規ロードで勝手に出ないようにする。
+ * しかし多タブ同時起動（同一 Chrome プロファイル）では、最初の 1 タブが即座に false を書くと、
+ * まだ autoshow を読み込めていない兄弟タブが false を読んでしまい **永久にパネルが出ない**
+ * 退行になる（多タブ storage stall の e2e で再現）。表示可否はタブごとのセッションフラグ
+ * （inlinePanelAutoshowActivatedThisSession）で即時に確定するため、storage 解除書き込みだけを
+ * 起動バーストを十分に越えるまで遅らせれば、同時に開いた全タブが true を読んで表示できる。
+ * 解除の目的は「後続の“新規”ロードで自動表示しない」ことだけなので、数秒遅らせても実害はない。
+ */
+const INLINE_PANEL_AUTOSHOW_ONESHOT_RESET_DELAY_MS = 15_000;
+
+/**
+ * 1 回きり autoshow の storage 解除を 1 度だけ予約する。
+ * すでに予約済みなら何もしない（多重 set を避ける）。
+ */
+function scheduleInlinePanelAutoshowOneShotReset() {
+  try {
+    if (inlinePanelAutoshowResetTimer != null) return;
+    inlinePanelAutoshowResetTimer = setTimeout(() => {
+      inlinePanelAutoshowResetTimer = null;
+      try {
+        void chrome.storage?.local?.set({
+          [KEY_INLINE_PANEL_AUTOSHOW_ENABLED]: false
+        });
+      } catch {
+        // no-op
+      }
+    }, INLINE_PANEL_AUTOSHOW_ONESHOT_RESET_DELAY_MS);
+  } catch {
+    // no-op
+  }
+}
+
 /** プレイヤー行の下／横付きでタブ幅に近いまで広げる方針（storage から更新） */
 let inlinePanelViewportWidePolicy =
   normalizeInlinePanelViewportWidePolicy(undefined);
@@ -6389,19 +6430,15 @@ function renderPageFrameOverlay() {
   }
 
   // autoshow ON のときは「次回だけ表示」にし、1 回表示したら OFF に戻す。
+  // 表示可否はセッションフラグで即確定し、storage 解除書き込みだけ遅延させる
+  // （多タブ同時起動で兄弟タブが false を読んで永久に出なくなる退行の回避）。
   if (inlinePanelAutoshowEnabled && !toolbarInitiatedShowThisSession) {
     if (!inlinePanelAutoshowActivatedThisSession) {
       inlinePanelAutoshowActivatedThisSession = true;
     }
     if (!inlinePanelAutoshowResetRequested) {
       inlinePanelAutoshowResetRequested = true;
-      try {
-        void chrome.storage?.local?.set({
-          [KEY_INLINE_PANEL_AUTOSHOW_ENABLED]: false
-        });
-      } catch {
-        // no-op
-      }
+      scheduleInlinePanelAutoshowOneShotReset();
     }
   }
 
