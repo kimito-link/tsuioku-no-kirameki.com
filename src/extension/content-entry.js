@@ -11840,10 +11840,14 @@ function createDevMonitorOverlay() {
     ].join(';');
     el.style.whiteSpace = 'normal';
     const mainLine = document.createElement('div');
-    mainLine.textContent = '記録監視: データ待ち';
+    mainLine.textContent = '記録監視（速報）: データ待ち';
+    const noteLine = document.createElement('div');
+    noteLine.textContent = '※速報値・確定保存はパネルの「記録」が正';
+    noteLine.style.cssText = 'margin-top:1px;font-size:10px;opacity:.7';
     const wdLine = document.createElement('div');
     wdLine.style.cssText = 'margin-top:2px;font-size:11px;opacity:.85;display:none';
     el.appendChild(mainLine);
+    el.appendChild(noteLine);
     el.appendChild(wdLine);
     document.body.appendChild(el);
     const COLORS = {
@@ -11859,7 +11863,7 @@ function createDevMonitorOverlay() {
       update(ev) {
         try {
           el.style.borderLeftColor = COLORS[ev && ev.status] || '#888';
-          mainLine.textContent = `記録監視: ${ev && ev.label ? ev.label : '—'}`;
+          mainLine.textContent = `記録監視（速報）: ${ev && ev.label ? ev.label : '—'}`;
         } catch {
           /* no-op */
         }
