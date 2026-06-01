@@ -142,3 +142,28 @@
 - 追加テストと結果（`npm test` の該当 spec）。
 - プロトコル上の不確実点（`previous` だけで開始到達できたか等、実機検証が要る項目）。
 - 既存契約（§5）への影響評価。
+
+---
+
+## 9. レビュー結果（2026-06-01・司令塔）と follow-up 指示（Codex 第2弾）
+
+### 9.1 第1弾（commit ad9d3b1）のレビュー
+- ✅ 構造・契約・配線・フラグ・テスト（64 passed）は良好。旧エンジン併存・vpos resume 無効化も妥当。
+- 🔴 **重大**: バケット橋渡しの前提が、このリポジトリの実機知見と矛盾。
+  - 新エンジンは「backward `nextUri` 連鎖 ＋ 初回 ChunkedEntry の `previousUris`」を辿り切ったら `reached_start`。テストもこの前提（1 連鎖で参加地点→開始まで到達）。
+  - だが `ndgrBackfillCrawl.js` 行81-92 の実機コメント（lv350604301）: **backward 連鎖は約30〜45秒のバケットごとに `nextUri=''` 終端**し、開始まで遡るには `?at` 再シードで前区画の **新 ChunkedEntry** を取り直す（18h で約1300回）。
+  - `previousUris` は `/data/segment/v4/` の **segment（コメント塊）**であって、前区画の backwardUri を持つ ChunkedEntry ではない（`decodeChunkedEntry`: field3 previous＝直近過去 segment）。
+  - → メインループに `?at` 再シードが無い現状は、**初回バケット終端で誤 reached_start** する恐れ大（途中参加で数%まで悪化し得る）。
+- 暫定対応: フラグ既定を **OFF（opt-in）** へ戻した（誤動作で現行記録を悪化させないため）。
+
+### 9.2 Codex 第2弾でやること（橋渡しの実装）
+`crawlNdgrBackwardDeterministic` のメインループに **`?at` 再シードによるバケット橋渡し**を追加する:
+
+1. backward `nextUri` 連鎖と初回 entry の `previousUris` を辿り切って **両キューが空**になっても、即 `reached_start` にしない。
+2. 代わりに **`?at` 再シード**を行う: 「これまで到達した最古コメントの実時刻」（`programStartSec + floor(globalMinVpos/100)` か、無ければ直近 seed から `NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC=50` 秒ずつ後退）を `?at` にして `seekEntryPointers` を呼び、**新しい ChunkedEntry**（未訪問の backwardUri / previousUris）が得られたらキューに積んで連鎖を継続。
+3. **`reached_start` は「再シードしても未訪問の古い entry が得られない＝ポインタ真枯渇」のときだけ**。再シードで何度も空振りする異常系は、旧エンジンと同じ `NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX` / `NDGR_BACKFILL_MAX_RESEEDS` 相当の上限で有界化し、尽きたら `no_progress` または `cap_reseeds`（`reached_start` とは言わない）。
+4. 後退ステップ・visited・バッファ（`NDGR_BACKFILL_RESEED_BUFFER_SEC`）など既存定数を流用。caps/backoff/abort は不変。
+5. テスト追加: 「backward 連鎖がバケット終端（nextUri='')→ `?at` 再シードで前区画 entry を取得 → さらに遡る → 真の枯渇で reached_start」というマルチバケット fixture。**1 バケットで誤 reached_start しないこと**を必ず検証（vpos≈0 を中盤バケットに複数仕込んでも止まらない既存ケースは維持）。
+6. 検証後、フラグ既定を ON に戻す PR は**司令塔が**判断（Codex は既定 OFF のままにしておく）。
+
+> 要は「`previousUris` 優先 → 足りなければ `?at` 再シードでバケットを跨ぐ」ハイブリッド。reached_start の唯一の条件は**ポインタ＋再シードが真に枯渇**したとき。

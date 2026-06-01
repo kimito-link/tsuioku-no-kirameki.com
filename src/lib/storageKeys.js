@@ -71,7 +71,9 @@ export const KEY_BACKFILL_PROGRESS = 'nls_backfill_progress_v1';
 /**
  * B案: NDGR 過去ログバックフィルを、vpos ヒューリスティックではなく backward /
  * previous ポインタ枯渇で完了判定する決定論エンジンへ切り替えるフラグ。
- * 既定 ON。明示 false のときだけ旧 crawlNdgrBackward へ戻す kill switch。
+ * 検証中につき既定 OFF（旧 crawlNdgrBackward）。明示 true のときだけ新エンジンを使う opt-in。
+ *   理由: バケット橋渡し（?at 再シードで前区画の ChunkedEntry を取り直す）が未実装で、
+ *   1 バケット終端で誤 reached_start する恐れがあるため。橋渡し追加・実機検証後に既定 ON へ。
  */
 export const KEY_NDGR_DETERMINISTIC_BACKFILL =
   'nls_ndgr_deterministic_backfill_enabled';
