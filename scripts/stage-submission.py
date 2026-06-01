@@ -66,11 +66,18 @@ def stage(version: str) -> Path:
     copy_file(EXT_DIR / 'background.js', dest / 'background.js')
     copy_file(EXT_DIR / 'popup.html', dest / 'popup.html')
     copy_file(EXT_DIR / 'sidepanel.html', dest / 'sidepanel.html')
+    # offscreen.html は chrome.offscreen.createDocument が読む常駐 IDB 書き手のページ
+    #   （dist/offscreen.js を参照）。manifest には現れないが提出物に含める必要がある。
+    copy_file(EXT_DIR / 'offscreen.html', dest / 'offscreen.html')
     copy_tree(EXT_DIR / 'dist', dest / 'dist')
     # dist/.gitkeep は提出物に不要
     gitkeep = dest / 'dist' / '.gitkeep'
     if gitkeep.exists():
         gitkeep.unlink()
+    # dev ホットリロード用シグナル（build:watch の置き土産）は配布物から必ず除く
+    dev_reload_signal = dest / 'dist' / 'dev-reload-id.txt'
+    if dev_reload_signal.exists():
+        dev_reload_signal.unlink()
 
     # 2) 提出対象の画像ホワイトリスト。0.1.6 提出物の構成を踏襲する。
     #    extension/images/ には LP 用・マーケ用・アプリアイコンのマスター（大容量）も含まれるが、
@@ -162,9 +169,11 @@ def verify_zip(zip_path: Path) -> None:
         'background.js',
         'popup.html',
         'sidepanel.html',
+        'offscreen.html',
         'dist/content.js',
         'dist/page-intercept.js',
-        'dist/popup.js'
+        'dist/popup.js',
+        'dist/offscreen.js'
     }
     with zipfile.ZipFile(zip_path, 'r') as zf:
         names = set(zf.namelist())

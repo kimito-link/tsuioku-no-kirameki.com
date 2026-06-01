@@ -80,3 +80,30 @@ export async function runIfTabLeader(name, fn, opts = {}) {
   }
   return { ran };
 }
+
+/**
+ * グローバル（ライブ非依存）の重処理ロック名。
+ *
+ * feat/multitab-scale-globalcap（2026-05-31）: 既存 runIfTabLeader は per-liveId ロック
+ *   （'nls-backfill-<lv>' 等）なので、別放送どうしを別タブで開くと「各タブが自分のリーダー」になり、
+ *   フルバックフィルが共有レンダラのメインスレッドで同時多発して前面タブごと固める。これを防ぐため、
+ *   liveId に依存しない固定名ロックで「全タブ横断・同時 1 本」に絞る。backfill と forward は
+ *   目的が違う（backfill は遡り切ったら終わる／forward は放送中ずっと走る）ので別ロックにし、
+ *   forward が backfill を永久に締め出さないようにする。
+ */
+export const GLOBAL_BACKFILL_LOCK = 'nls-heavy-backfill';
+/** 前方向継続取得（forward crawl）のグローバルロック名。 */
+export const GLOBAL_FORWARD_LOCK = 'nls-heavy-forward';
+
+/**
+ * ライブ非依存のグローバルリーダーとして fn を実行する（全タブ横断で同時 1 本）。
+ * runIfTabLeader の薄いラッパ（固定名ロック）。fail-open 原則・戻り値は runIfTabLeader と同じ。
+ *
+ * @param {string} lockName グローバルロック名（例: GLOBAL_BACKFILL_LOCK）
+ * @param {() => void | Promise<void>} fn リーダーだけが実行する処理
+ * @param {{ navigatorOverride?: any }} [opts]
+ * @returns {Promise<{ ran: boolean }>} ran=true ならこのタブがグローバルリーダーとして実行した
+ */
+export async function runWhileGlobalLeader(lockName, fn, opts = {}) {
+  return runIfTabLeader(lockName, fn, opts);
+}

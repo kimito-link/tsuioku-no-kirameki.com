@@ -137,8 +137,21 @@ export const NDGR_BACKFILL_NEAR_START_MIN_HITS = 2;
  *   より多くの試行が要る。1 回のリトライで起点を 1 バケット（≒50秒）前へ戻すので、12 回で
  *   最大 ≒600秒（10分）ぶんの空区間を飛び越えられる。進捗が 1 回でもあれば streak は 0 に
  *   リセットされる（連続空振りのみカウント）ので、正常配信での無駄な遡りは増えない。
+ *
+ * ⭐fix/ndgr-no-progress-bridge（2026-06-01・実機で確定）: 12 → 240 に引き上げ。
+ *   実機（歌枠・ギフト多め）で `seg=16 rows=5102 done=1 stop=no_progress`、記録が公式の約68%で
+ *   頭打ちになる症状を data-nls-backfill で観測。真因は「12×50秒＝10分」の橋渡し予算が短すぎる
+ *   こと：歌枠の長い間奏／雑談など【コメントが疎な区間】や、コメントが少ない時間帯で NDGR が
+ *   1 区画に広い時間幅をまとめた【幅広バケット】（同一 backward URI が 50秒ステップでは何度も
+ *   visited で即 break）を、10 分ぶんしか跨げず途中で no_progress に倒れていた。
+ *   240×50秒＝12,000秒（約200分）まで橋渡しできるようにし、現実的な疎区間・幅広バケットを
+ *   跨いで配信開始まで遡り切れるようにする。
+ *   ⚠️ 後退（区画スキップ）防止のためステップ幅は 50秒のまま据え置き（幅を広げると populated
+ *      バケットを飛び越して取りこぼす）。1 reseed は ?at fetch 1 回（≒15〜30ms）で軽く、総量は
+ *      caps.elapsedMs(15分)/segments/bytes で有界。正常完了は通常 reached_start / backward_exhausted
+ *      で早期終了するので、この引き上げは「途中で詰まった配信」だけを救済し正常配信は不変。
  */
-export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 12;
+export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 240;
 
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
@@ -890,4 +903,372 @@ export async function* crawlNdgrBackward(opts) {
     }
   }
   return done('cap_reseeds');
+}
+
+/**
+ * NDGR を backward / previous ポインタだけで決定論的に巡回する新バックフィルエンジン。
+ *
+ * 旧 crawlNdgrBackward と同じ generator 契約を保つが、`reached_start` の判定に
+ * chainLooksLikeStreamStart / vpos 近傍ヒューリスティックは使わない。未訪問の
+ * backward / previous ポインタが尽きた時だけ reached_start とする。
+ *
+ * @param {object} opts
+ * @param {string} opts.viewBase NDGR view エンドポイントのベース URL（`?at=` 前）。
+ * @param {(url: string, o: { signal?: AbortSignal }) => Promise<{ ok: boolean, status: number, bytes: Uint8Array }>} opts.fetchBinary
+ * @param {(ms: number) => Promise<void>} [opts.sleep]
+ * @param {() => number} [opts.now]
+ * @param {Partial<NdgrBackfillCaps>} [opts.caps]
+ * @param {number} [opts.fetchGapMs]
+ * @param {number|null} [opts.programStartSec]
+ * @param {number|null} [opts.resumeFromVpos]
+ * @param {AbortSignal} [opts.signal]
+ * @returns {AsyncGenerator<NdgrBackfillProgress, { stopReason: NdgrBackfillStopReason, segmentsFetched: number, rowsSeen: number, bytesFetched: number, minVposReached: number|null, diagnostics: object|null }, void>}
+ */
+export async function* crawlNdgrBackwardDeterministic(opts) {
+  const viewBase = String(opts?.viewBase || '').trim();
+  const fetchBinary = opts?.fetchBinary;
+  const sleep =
+    typeof opts?.sleep === 'function'
+      ? opts.sleep
+      : (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
+  const now = typeof opts?.now === 'function' ? opts.now : () => Date.now();
+  const programStartSec =
+    typeof opts?.programStartSec === 'number' && opts.programStartSec > 0
+      ? Math.floor(opts.programStartSec)
+      : null;
+  const resumeFromVpos =
+    typeof opts?.resumeFromVpos === 'number' &&
+    Number.isFinite(opts.resumeFromVpos) &&
+    opts.resumeFromVpos > 0
+      ? Math.floor(opts.resumeFromVpos)
+      : null;
+  const caps = { ...NDGR_BACKFILL_DEFAULT_CAPS, ...(opts?.caps || {}) };
+  const gapMs =
+    typeof opts?.fetchGapMs === 'number' && opts.fetchGapMs >= 0
+      ? opts.fetchGapMs
+      : NDGR_BACKFILL_FETCH_GAP_MS;
+  const signal = opts?.signal;
+
+  let segmentsFetched = 0;
+  let rowsSeen = 0;
+  let bytesFetched = 0;
+  /** @type {number|null} */
+  let globalMinVpos = resumeFromVpos;
+  const t0 = now();
+
+  const summary = () => ({
+    segmentsFetched,
+    rowsSeen,
+    bytesFetched,
+    minVposReached: globalMinVpos
+  });
+  const done = (/** @type {NdgrBackfillStopReason} */ reason) => ({
+    stopReason: reason,
+    ...summary(),
+    diagnostics: /** @type {object|null} */ (null)
+  });
+
+  if (!viewBase) return done('no_view_base');
+  if (typeof fetchBinary !== 'function') return done('no_view_base');
+  if (isAborted(signal)) return done('aborted');
+
+  const ctx = { fetchBinary, sleep, signal, gapMs };
+  /** @type {Set<string>} view/backward/previous の再訪防止キー。 */
+  const visited = new Set();
+  /** @type {string[]} */
+  const backwardQueue = [];
+  /** @type {string[]} */
+  const previousQueue = [];
+
+  /** @returns {NdgrBackfillStopReason|''} */
+  const limitReason = () => {
+    if (isAborted(signal)) return 'aborted';
+    if (now() - t0 >= caps.elapsedMs) return 'cap_elapsed';
+    if (bytesFetched >= caps.bytes) return 'cap_bytes';
+    if (segmentsFetched >= caps.segments) return 'cap_segments';
+    return '';
+  };
+
+  /**
+   * @param {'backward'|'previous'} kind
+   * @param {string} uri
+   * @param {boolean} [front]
+   * @returns {boolean}
+   */
+  const enqueuePointer = (kind, uri, front = false) => {
+    const u = String(uri || '').trim();
+    if (!u) return false;
+    const key = `${kind}:${u}`;
+    if (visited.has(key)) return false;
+    visited.add(key);
+    if (kind === 'backward') {
+      if (front) backwardQueue.unshift(u);
+      else backwardQueue.push(u);
+      return true;
+    }
+    previousQueue.push(u);
+    return true;
+  };
+
+  /** @param {{ backwardUri?: string, previousUris?: string[] }} entry */
+  const enqueueEntryPointers = (entry) => {
+    let added = false;
+    if (entry && entry.backwardUri) {
+      added = enqueuePointer('backward', entry.backwardUri) || added;
+    }
+    const prevs = Array.isArray(entry?.previousUris) ? entry.previousUris : [];
+    for (const uri of prevs) {
+      added = enqueuePointer('previous', uri) || added;
+    }
+    return added;
+  };
+
+  /**
+   * ?at={startAt} から ChunkedEntry を読み、backward / previous の未訪問ポインタを返す。
+   * backward が無い entry では nextAt を最大 20 hop だけ辿る（旧エンジンと同じ入口探索）。
+   *
+   * @param {number} startAt
+   * @returns {Promise<{ entry: { backwardUri: string, previousUris: string[] }|null, stopReason: NdgrBackfillStopReason|'' }>}
+   */
+  const seekEntryPointers = async (startAt) => {
+    let viewAt = startAt;
+    for (let hop = 0; hop < 20; hop += 1) {
+      const before = limitReason();
+      if (before) return { entry: null, stopReason: before };
+      const url = buildViewAtUrl(viewBase, viewAt);
+      const key = `view:${url}`;
+      if (visited.has(key)) return { entry: null, stopReason: '' };
+      visited.add(key);
+
+      const entryRes = await fetchWithThrottle(ctx, url, false);
+      if (entryRes.rateLimited) return { entry: null, stopReason: 'rate_limited' };
+      if (isAborted(signal)) return { entry: null, stopReason: 'aborted' };
+      if (!entryRes.bytes || entryRes.bytes.length === 0) {
+        return { entry: null, stopReason: '' };
+      }
+      bytesFetched += entryRes.bytes.length;
+      if (bytesFetched >= caps.bytes) return { entry: null, stopReason: 'cap_bytes' };
+
+      const entryNav = decodeChunkedEntry(entryRes.bytes);
+      const previousUris = Array.isArray(entryNav.previousUris) ? entryNav.previousUris : [];
+      if (entryNav.backwardUri || previousUris.length) {
+        return {
+          entry: {
+            backwardUri: entryNav.backwardUri || '',
+            previousUris
+          },
+          stopReason: ''
+        };
+      }
+      if (entryNav.nextAt == null || entryNav.nextAt === viewAt) {
+        return { entry: null, stopReason: '' };
+      }
+      viewAt = entryNav.nextAt;
+    }
+    return { entry: null, stopReason: '' };
+  };
+
+  const nowRes = await fetchWithThrottle(ctx, buildViewAtUrl(viewBase, 'now'), true);
+  if (nowRes.rateLimited) return done('rate_limited');
+  if (isAborted(signal)) return done('aborted');
+  if (!nowRes.bytes || nowRes.bytes.length === 0) return done('no_entry');
+  bytesFetched += nowRes.bytes.length;
+  if (bytesFetched >= caps.bytes) return done('cap_bytes');
+  const nowNav = decodeChunkedEntry(nowRes.bytes);
+  if (nowNav.nextAt == null) return done('no_entry');
+
+  const nowSec = Math.floor(t0 / 1000);
+  const seedLags = [
+    NDGR_BACKFILL_SEED_LAG_SEC, 300, 900, 1800, 3600, 7200, 21600, 43200
+  ];
+  const seedCandidates = seedLags.map((lag) => nowSec - lag);
+  if (programStartSec != null) seedCandidates.push(programStartSec + 60);
+  if (resumeFromVpos != null && programStartSec != null) {
+    const resumeAtSec =
+      programStartSec + Math.floor(resumeFromVpos / 100) - NDGR_BACKFILL_RESEED_BUFFER_SEC;
+    if (resumeAtSec > 0) seedCandidates.unshift(resumeAtSec);
+  }
+
+  /** @type {number|null} 直近に ?at seed した実時刻（秒）。再シードを単調に古くする。 */
+  let lastSeedAtSec = null;
+  /** @type {number} キュー枯渇後の ?at 再シード試行回数。 */
+  let reseedAttempts = 0;
+  /** @type {number} 連続して未訪問 entry に進めなかった回数。 */
+  let noProgressStreak = 0;
+  /** @type {number} 初回 seed 後に、新しい entry へ橋渡しできた回数。 */
+  let successfulReseeds = 0;
+
+  /**
+   * @param {number} desiredAtSec
+   * @returns {number}
+   */
+  const nextSeedAtSec = (desiredAtSec) => {
+    let next = Math.floor(desiredAtSec);
+    if (!Number.isFinite(next)) {
+      next = (lastSeedAtSec ?? (nowSec - NDGR_BACKFILL_SEED_LAG_SEC)) -
+        NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+    }
+    if (lastSeedAtSec != null) {
+      const ceiling = lastSeedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+      if (next > ceiling) next = ceiling;
+    }
+    return next;
+  };
+
+  /**
+   * これまで到達した最古コメントの実時刻を優先し、算出できないときは直近 seed から
+   * 1 bucket ずつ後退する。停止判定には使わず、次の ChunkedEntry 入口探索にだけ使う。
+   *
+   * @returns {number}
+   */
+  const nextReseedAtSec = () => {
+    if (programStartSec != null && globalMinVpos != null) {
+      return nextSeedAtSec(programStartSec + Math.floor(globalMinVpos / 100));
+    }
+    return nextSeedAtSec(
+      (lastSeedAtSec ?? (nowSec - NDGR_BACKFILL_SEED_LAG_SEC)) -
+        NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC
+    );
+  };
+
+  /**
+   * キュー枯渇時に、前 bucket の ChunkedEntry を ?at で取り直す。
+   * - 新しい pointer が得られたらキューへ積む。
+   * - entry は返ったが pointer がすべて visited の場合は、少なくとも一度 bucket を
+   *   跨いだ後だけ true exhaustion とみなし reached_start を許す。
+   * - entry 自体が無い/空振りは bounded retry の対象で、reached_start とは言わない。
+   *
+   * @returns {Promise<NdgrBackfillStopReason|''>}
+   */
+  const reseedWhenIdle = async () => {
+    if (reseedAttempts >= NDGR_BACKFILL_MAX_RESEEDS) return 'cap_reseeds';
+    const seedAtSec = nextReseedAtSec();
+    reseedAttempts += 1;
+    lastSeedAtSec = seedAtSec;
+
+    const seek = await seekEntryPointers(seedAtSec);
+    if (seek.stopReason) return seek.stopReason;
+    if (seek.entry) {
+      if (enqueueEntryPointers(seek.entry)) {
+        successfulReseeds += 1;
+        noProgressStreak = 0;
+        return '';
+      }
+      if (rowsSeen > 0 && successfulReseeds > 0) {
+        return 'reached_start';
+      }
+    }
+
+    noProgressStreak += 1;
+    if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) return 'no_progress';
+    return '';
+  };
+
+  let seeded = false;
+  for (const cand of seedCandidates) {
+    if (cand <= 0) continue;
+    const seek = await seekEntryPointers(cand);
+    if (seek.stopReason) return done(seek.stopReason);
+    if (seek.entry && enqueueEntryPointers(seek.entry)) {
+      lastSeedAtSec = cand;
+      seeded = true;
+      break;
+    }
+  }
+  if (!seeded) return done('backward_exhausted');
+
+  for (;;) {
+    const before = limitReason();
+    if (before) return done(before);
+    if (!backwardQueue.length && !previousQueue.length) {
+      if (rowsSeen <= 0) return done('backward_exhausted');
+      const stop = await reseedWhenIdle();
+      if (stop) return done(stop);
+      continue;
+    }
+
+    if (backwardQueue.length) {
+      const uri = backwardQueue.shift();
+      if (!uri) continue;
+      const bwRes = await fetchWithThrottle(ctx, uri, false);
+      if (bwRes.rateLimited) return done('rate_limited');
+      if (isAborted(signal)) return done('aborted');
+      if (!bwRes.bytes || bwRes.bytes.length === 0) continue;
+      bytesFetched += bwRes.bytes.length;
+      segmentsFetched += 1;
+
+      const { results, nextUri } = decodePackedSegmentNav(bwRes.bytes);
+      /** @type {import('./ndgrDecode.js').NdgrChat[]} */
+      const chats = [];
+      for (const r of results) {
+        if (r && Array.isArray(r.chats) && r.chats.length) chats.push(...r.chats);
+      }
+      if (chats.length) {
+        rowsSeen += chats.length;
+        const minVpos = minVposOf(chats);
+        if (minVpos != null && (globalMinVpos == null || minVpos < globalMinVpos)) {
+          globalMinVpos = minVpos;
+        }
+        yield {
+          chats,
+          segmentsFetched,
+          rowsSeen,
+          bytesFetched,
+          minCommentNo: minNoOf(chats),
+          minVposReached: globalMinVpos
+        };
+        if (rowsSeen >= caps.rows) return done('cap_rows');
+      }
+      if (nextUri) enqueuePointer('backward', nextUri, true);
+      if (bytesFetched >= caps.bytes) return done('cap_bytes');
+      if (segmentsFetched >= caps.segments && (backwardQueue.length || previousQueue.length)) {
+        return done('cap_segments');
+      }
+      continue;
+    }
+
+    const uri = previousQueue.shift();
+    if (!uri) continue;
+    const prevRes = await fetchWithThrottle(ctx, uri, false);
+    if (prevRes.rateLimited) return done('rate_limited');
+    if (isAborted(signal)) return done('aborted');
+    if (!prevRes.bytes || prevRes.bytes.length === 0) continue;
+    bytesFetched += prevRes.bytes.length;
+    segmentsFetched += 1;
+
+    /** @type {import('./ndgrDecode.js').NdgrChat[]} */
+    const chats = [];
+    try {
+      const frames = splitLengthDelimitedMessages(prevRes.bytes);
+      for (const frame of frames) {
+        const decoded = decodeChunkedMessage(frame);
+        if (decoded && Array.isArray(decoded.chats) && decoded.chats.length) {
+          chats.push(...decoded.chats);
+        }
+      }
+    } catch {
+      // 壊れた previous segment は best-effort で捨て、他のポインタ巡回を続ける。
+    }
+
+    if (chats.length) {
+      rowsSeen += chats.length;
+      const minVpos = minVposOf(chats);
+      if (minVpos != null && (globalMinVpos == null || minVpos < globalMinVpos)) {
+        globalMinVpos = minVpos;
+      }
+      yield {
+        chats,
+        segmentsFetched,
+        rowsSeen,
+        bytesFetched,
+        minCommentNo: minNoOf(chats),
+        minVposReached: globalMinVpos
+      };
+      if (rowsSeen >= caps.rows) return done('cap_rows');
+    }
+    if (bytesFetched >= caps.bytes) return done('cap_bytes');
+    if (segmentsFetched >= caps.segments && (backwardQueue.length || previousQueue.length)) {
+      return done('cap_segments');
+    }
+  }
 }

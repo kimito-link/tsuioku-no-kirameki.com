@@ -144,6 +144,23 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       typeof snapshot.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0
         ? snapshot.streamAgeMin
         : undefined;
+    // 研究中シグナル D 用：公式 statistics コメント増分 ÷ サンプル窓（分）でコメ/分を近似。
+    // 表示の主値には影響せず、base.signalD / blended の観察用（較正前は診断のみ）。
+    const commentsPerMin = (() => {
+      const delta = snapshot.officialStatisticsCommentsDelta;
+      const winMs = snapshot.officialCommentSampleWindowMs;
+      if (
+        typeof delta === 'number' &&
+        Number.isFinite(delta) &&
+        delta > 0 &&
+        typeof winMs === 'number' &&
+        Number.isFinite(winMs) &&
+        winMs > 0
+      ) {
+        return delta / (winMs / 60000);
+      }
+      return undefined;
+    })();
     const resolved = resolveConcurrentViewers({
       nowMs,
       officialViewers:
@@ -185,7 +202,8 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
           : undefined,
       recentActiveUsers: recentActive,
       totalVisitors: typeof vc === 'number' && vc > 0 ? vc : undefined,
-      streamAgeMin: streamAge
+      streamAgeMin: streamAge,
+      commentsPerMin
     });
 
     nextConcurrentEstimated = resolved.estimated;
@@ -223,6 +241,18 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       parts.push(`base:${baseMethod}`);
     }
     parts.push(`信頼度 ${Math.round(resolved.confidence * 100)}%`);
+    // 研究中シグナル C/D/blend の診断表示（主値には未統合・観察/較正用）。
+    // official のときも併記して「公式同接 vs 研究中シグナル」の答え合わせに使う。
+    {
+      /** @type {string[]} */
+      const rs = [];
+      if (base.signalC > 0) rs.push(`C[リトル]≈${base.signalC}`);
+      if (base.signalD > 0) rs.push(`D[密度]≈${base.signalD}`);
+      if (base.blended > 0) {
+        rs.push(`blend≈${base.blended}(${base.blendedSignalCount}信号)`);
+      }
+      if (rs.length > 0) parts.push(`研究中 ${rs.join(' ')}`);
+    }
     if (sparseConcurrent) {
       parts.push(SPARSE_CONCURRENT_ESTIMATE_NOTE);
     }

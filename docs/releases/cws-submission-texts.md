@@ -91,7 +91,15 @@ Chrome Web Store の Developer Dashboard で各バージョン提出時に入力
 >
 > side panel に何かを描画する目的でも、ユーザーデータの送信用途でも使用しません。
 
-### 2-8. ホスト権限 `https://*.nicovideo.jp/*` が必要な理由
+### 2-8. offscreen が必要な理由
+
+> 記録した応援コメントの保存先である IndexedDB への書き込みを、常駐できる非表示ドキュメント (offscreen document) に集約するために必要です。
+>
+> Manifest V3 の background service worker は数分の待機で停止し、起動のたびにデータベースを開閉するため、コメント数が数万件ある放送を複数タブで開くと保存が直列化して詰まり「記録が増えない」状態になります。offscreen document に IndexedDB を開いたまま保持させることで、保存処理を 1 か所に集約し、視聴ページや service worker の停止に影響されず安定して追記できます。
+>
+> 用途は拡張機能内のローカル IndexedDB への書き込みのみで、音声・映像の取得や外部サーバーへの送信には一切使用しません。
+
+### 2-9. ホスト権限 `https://*.nicovideo.jp/*` が必要な理由
 
 > 本拡張機能は、ニコニコ生放送 (live.nicovideo.jp / live2.nicovideo.jp / www.nicovideo.jp 等) の配信ページ上でユーザー本人が視聴中の応援コメントをローカル記録・可視化することが単一用途であり、この用途を満たすためには nicovideo.jp ドメイン配下の watch ページに対して content script を注入し、コメント DOM・配信メタ情報 (タイトル・配信者 ID・同時接続数・コメント時刻等) を取得する必要があります。
 >
@@ -140,7 +148,7 @@ Chrome Web Store の Developer Dashboard で各バージョン提出時に入力
    （`privacy.html` §6 と整合）
 2. ✅ 「データ使用 → 個人を特定できる情報」にチェックが入っているか
    （`privacy.html` §2 のユーザー ID 保存と整合）
-3. ✅ scripting / downloads / alarms / tabs / sidePanel の理由欄が空欄でないか
+3. ✅ scripting / downloads / alarms / tabs / sidePanel / offscreen の理由欄が空欄でないか
 4. ✅ アップロード ZIP は `python scripts/stage-submission.py <version>` で生成した
    `build/tsuioku-no-kirameki-X.X.X.zip` で、master の version と一致しているか
 5. ✅ 「審査の合格後に自動的に公開する」が意図通りか（再確認）

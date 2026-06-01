@@ -11,8 +11,10 @@
  *
  * 設計:
  *   - 単機能の薄いラッパ。`withTimeout(promise, ms, taskCode).catch(() => fallback)` 等価。
- *   - 違いは「タイムアウトしたタスク名」を診断面（console.warn + window.__nlsLastTimedOutTask）に
+ *   - 違いは「タイムアウトしたタスク名」を診断面（console.debug + window.__nlsLastTimedOutTask）に
  *     残すこと。次の実機検証で「何が止まったか」をユーザーから引き出せる。
+ *     （expected timeout を console.warn にすると chrome://extensions の Errors に赤表示され
+ *      誤解を招くため debug に留める。）
  *   - **描画パスには触らない**（v0.1.422 でパネル消失リグレッションを起こした教訓）。
  *     描画は呼び出し側の責務。本関数は値の解決/フォールバックだけを返す。
  *   - 拒否されたら（タイムアウト or 元の reject）fallback を返して呑む。refresh は best-effort
@@ -49,8 +51,10 @@ export async function refreshTaskGuarded(promise, ms, taskCode, fallback) {
         /* no-op (test/Node 環境で window 無し等) */
       }
       try {
-        if (typeof console !== 'undefined' && console && typeof console.warn === 'function') {
-          console.warn(`[nl-refresh-timeout] ${taskCode}`);
+        // console.debug にする（console.warn だと chrome://extensions のエラー欄に
+        // 赤く並んで「壊れた」と誤認させるため）。診断は __nlsLastTimedOutTask に残る。
+        if (typeof console !== 'undefined' && console && typeof console.debug === 'function') {
+          console.debug(`[nl-refresh-timeout] ${taskCode}`);
         }
       } catch {
         /* no-op */

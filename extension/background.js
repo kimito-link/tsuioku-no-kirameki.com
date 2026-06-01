@@ -28,6 +28,518 @@ function commentsStorageKey(liveId) {
   return `nls_comments_${id}`;
 }
 
+// v0.1.509: 追記専用チャンク（src/lib/commentChunkStore.js）のキー/読み出しのローカル版。
+//   background は src/lib をバンドルしないため、commentsStorageKey と同様にミラーする。
+function chunkIndexKeyLocal(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cchunk_index_${id}`;
+}
+function chunkStorageKeyLocal(liveId, seq) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cchunk_${id}_${Math.max(0, Math.floor(Number(seq) || 0))}`;
+}
+function tailStorageKeyLocal(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_ctail_${id}`;
+}
+function isChunkIndexLocal(obj, liveId) {
+  if (!obj || typeof obj !== 'object') return false;
+  if (Number(obj.v) !== 1) return false;
+  if (!Array.isArray(obj.seqs)) return false;
+  if (!Number.isFinite(Number(obj.total))) return false;
+  const want = String(liveId || '').trim().toLowerCase();
+  if (String(obj.liveId || '').trim().toLowerCase() !== want) return false;
+  return true;
+}
+// 本体（チャンク or 従来 main にフォールバック）＋未畳み込みテールを連結して返す。
+async function readAllCommentsForLiveLocal(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const idxKey = chunkIndexKeyLocal(lid);
+  const mainKey = commentsStorageKey(lid);
+  let rows = [];
+  const idxBag = await chrome.storage.local.get(idxKey);
+  const index = idxBag[idxKey];
+  if (isChunkIndexLocal(index, lid) && Array.isArray(index.seqs) && index.seqs.length) {
+    const seqs = index.seqs.slice().sort((a, b) => a - b);
+    const keys = seqs.map((seq) => chunkStorageKeyLocal(lid, seq));
+    const bag = await chrome.storage.local.get(keys);
+    for (const k of keys) {
+      const part = bag[k];
+      if (Array.isArray(part)) rows = rows.concat(part);
+    }
+  } else {
+    const mainBag = await chrome.storage.local.get(mainKey);
+    rows = Array.isArray(mainBag[mainKey]) ? mainBag[mainKey] : [];
+  }
+  const tKey = tailStorageKeyLocal(lid);
+  const tailBag = await chrome.storage.local.get(tKey);
+  const tail = Array.isArray(tailBag[tKey]) ? tailBag[tKey] : [];
+  if (tail.length) {
+    rows = rows.concat(
+      tail.filter((r) => r && typeof r === 'object' && String(r.text ?? '').trim())
+    );
+  }
+  return rows;
+}
+
+/* ================================================================== */
+/* v0.1.514: コメント本体 IndexedDB（拡張オリジン・SW が単一書き手）            */
+/*                                                                      */
+/* chrome.storage.local（値まるごと structured clone・約120 writes/min・       */
+/* 50MB 超で劣化・多タブで単一ストアを奪い合い）から IndexedDB へ移す。SW が     */
+/* 全タブの append を 1 本に集約して書くので、ページ描画スレッドは重い書きから    */
+/* 解放され、多タブ競合も根治する。                                            */
+/*                                                                      */
+/* スキーマ定数は src/lib/commentDb.js の正本をミラー（ESM import 不可の手書き    */
+/* SW のため）。drift は src/lib/commentDb.test.js がリテラル検査で検知する。     */
+/* dedupe キー（dkey）は content（buildDedupeKey）が付与して渡す。SW はキー式を   */
+/* 持たず dkey だけで重複判定する（移行時だけ下の buildDedupeKeyLocal を使う）。   */
+/* ================================================================== */
+const COMMENT_DB_NAME = 'nls_comment_db_v1';
+const COMMENT_DB_STORE = 'comments';
+const COMMENT_DB_VERSION = 1;
+const COMMENT_DB_INDEX_BY_LIVE = 'byLive';
+const COMMENT_DB_INDEX_BY_DKEY = 'byDkey';
+const COMMENT_TEXT_MAX_CHARS = 1000;
+const CDB_APPEND_MESSAGE_TYPE = 'NLS_CDB_APPEND';
+const CDB_ENSURE_MESSAGE_TYPE = 'NLS_CDB_ENSURE';
+const CDB_SUMMARY_RECENT_MAX = 60;
+const CDB_MIGRATE_BATCH = 2000;
+
+/* feat/multitab-scale-globalcap: Offscreen 書き手への転送（opt-in）。              */
+/*   SW は ephemeral（5分で停止し append のたび DB open/close）なので、IDB の常駐    */
+/*   書き手を Offscreen Document に逃がす経路を用意する。content が mode:'offscreen' */
+/*   で生 rows を送ってきたときだけ、Offscreen を保証して転送し、戻りの total/recent  */
+/*   で summary（chrome.storage）を書く（Offscreen は storage 不可なので SW が書く）。 */
+const OFFSCREEN_URL = 'offscreen.html';
+const OFFSCREEN_APPEND_TYPE = 'NLS_OFFSCREEN_CDB_APPEND';
+let _creatingOffscreen = null;
+
+async function hasOffscreenDocument() {
+  try {
+    if (chrome.runtime.getContexts) {
+      const ctxs = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT']
+      });
+      return Array.isArray(ctxs) && ctxs.length > 0;
+    }
+  } catch {
+    /* fall through */
+  }
+  // 古い Chrome 用フォールバック（SW グローバルの clients）。getContexts は 116+、offscreen は
+  //   109+ なので 109〜115 ではこちらで存在確認する。
+  try {
+    const swClients = globalThis.clients;
+    if (swClients && swClients.matchAll) {
+      const matched = await swClients.matchAll();
+      const want = chrome.runtime.getURL(OFFSCREEN_URL);
+      return matched.some((c) => c.url === want);
+    }
+  } catch {
+    /* no-op */
+  }
+  return false;
+}
+
+async function ensureOffscreenDocument() {
+  if (!chrome.offscreen || !chrome.offscreen.createDocument) return false;
+  try {
+    if (await hasOffscreenDocument()) return true;
+    if (_creatingOffscreen) {
+      await _creatingOffscreen;
+      return true;
+    }
+    _creatingOffscreen = chrome.offscreen.createDocument({
+      url: OFFSCREEN_URL,
+      reasons: ['WORKERS'],
+      justification:
+        'Maintain a persistent IndexedDB writer for locally-stored broadcast comments across multiple tabs.'
+    });
+    await _creatingOffscreen;
+    _creatingOffscreen = null;
+    return true;
+  } catch {
+    _creatingOffscreen = null;
+    // 競合（既に作成済み等）は存在確認で吸収する。
+    try {
+      return await hasOffscreenDocument();
+    } catch {
+      return false;
+    }
+  }
+}
+
+function deriveAppendTabKey(sender) {
+  const tabId = sender && sender.tab && sender.tab.id != null ? sender.tab.id : null;
+  const frameId = sender && sender.frameId != null ? sender.frameId : 0;
+  if (tabId != null) return `t${tabId}:${frameId}`;
+  return `u${(sender && sender.url) || '_'}`;
+}
+
+function commentDbSummaryKeyLocal(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cdb_summary_${id}`;
+}
+function commentDbMigratedKeyLocal(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_cdb_migrated_${id}`;
+}
+
+// src/lib/commentRecord.js の normalizeCommentText / buildDedupeKey ミラー（移行専用）。
+function normalizeCommentTextLocal(value) {
+  return String(value || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .join('\n')
+    .trim()
+    .slice(0, COMMENT_TEXT_MAX_CHARS);
+}
+function buildDedupeKeyLocal(liveId, rec) {
+  const text = normalizeCommentTextLocal(rec && rec.text);
+  const no = String((rec && rec.commentNo) ?? '').trim();
+  if (no) return `${liveId}|${no}|${text}`;
+  const sec = Math.floor(Number((rec && rec.capturedAt) || 0) / 1000);
+  const uid = String((rec && rec.userId) ?? '').trim();
+  return `${liveId}||${text}|${sec}|${uid}`;
+}
+
+function openCommentDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(COMMENT_DB_NAME, COMMENT_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(COMMENT_DB_STORE)) {
+        const store = db.createObjectStore(COMMENT_DB_STORE, {
+          keyPath: 'id',
+          autoIncrement: true
+        });
+        store.createIndex(COMMENT_DB_INDEX_BY_LIVE, 'liveId', { unique: false });
+        store.createIndex(COMMENT_DB_INDEX_BY_DKEY, 'dkey', { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function normalizeCommentDbRecord(liveId, row) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !row || typeof row !== 'object') return null;
+  const text = String(row.text ?? '').trim();
+  if (!text) return null;
+  const dkey = String(row.dkey ?? '').trim();
+  if (!dkey) return null;
+  const rec = {
+    liveId: lid,
+    dkey,
+    commentNo: String(row.commentNo ?? '').trim(),
+    text,
+    userId: row.userId != null ? String(row.userId) : null,
+    capturedAt: Math.max(0, Number(row.capturedAt) || 0) || Date.now()
+  };
+  if (row.nickname) rec.nickname = String(row.nickname);
+  if (row.avatarUrl) rec.avatarUrl = String(row.avatarUrl);
+  if (row.avatarObserved) rec.avatarObserved = true;
+  if (row.vpos != null) rec.vpos = Number(row.vpos);
+  if (row.accountStatus != null) rec.accountStatus = Number(row.accountStatus);
+  if (row.is184) rec.is184 = true;
+  if (row.selfPosted) rec.selfPosted = true;
+  return rec;
+}
+
+function appendCommentsToDb(db, liveId, rows) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const list = Array.isArray(rows) ? rows : [];
+  return new Promise((resolve, reject) => {
+    if (!lid || list.length === 0) {
+      resolve({ added: 0 });
+      return;
+    }
+    let added = 0;
+    const batchSeen = new Set();
+    const tx = db.transaction(COMMENT_DB_STORE, 'readwrite');
+    const store = tx.objectStore(COMMENT_DB_STORE);
+    const dkeyIndex = store.index(COMMENT_DB_INDEX_BY_DKEY);
+    for (const row of list) {
+      const rec = normalizeCommentDbRecord(lid, row);
+      if (!rec) continue;
+      if (batchSeen.has(rec.dkey)) continue;
+      batchSeen.add(rec.dkey);
+      const getReq = dkeyIndex.getKey(rec.dkey);
+      getReq.onsuccess = () => {
+        if (getReq.result === undefined || getReq.result === null) {
+          const addReq = store.add(rec);
+          // 個別 add の失敗（稀な制約衝突など）はトランザクション全体を abort させない。
+          addReq.onerror = (e) => {
+            try {
+              e.preventDefault();
+            } catch {
+              /* no-op */
+            }
+          };
+          addReq.onsuccess = () => {
+            added += 1;
+          };
+        }
+      };
+      // 個別 getKey の失敗も全体を巻き込まない。
+      getReq.onerror = (e) => {
+        try {
+          e.preventDefault();
+        } catch {
+          /* no-op */
+        }
+      };
+    }
+    tx.oncomplete = () => resolve({ added });
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+function countCommentsForLiveDb(db, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  return new Promise((resolve, reject) => {
+    if (!lid) {
+      resolve(0);
+      return;
+    }
+    const tx = db.transaction(COMMENT_DB_STORE, 'readonly');
+    const idx = tx.objectStore(COMMENT_DB_STORE).index(COMMENT_DB_INDEX_BY_LIVE);
+    const req = idx.count(IDBKeyRange.only(lid));
+    req.onsuccess = () => {
+      const n = Number(req.result);
+      resolve(Number.isFinite(n) && n >= 0 ? n : 0);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function readRecentCommentsForLiveDb(db, liveId, n) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const want = Math.max(0, Math.floor(Number(n) || 0));
+  return new Promise((resolve, reject) => {
+    if (!lid || want === 0) {
+      resolve([]);
+      return;
+    }
+    const out = [];
+    const tx = db.transaction(COMMENT_DB_STORE, 'readonly');
+    const idx = tx.objectStore(COMMENT_DB_STORE).index(COMMENT_DB_INDEX_BY_LIVE);
+    const curReq = idx.openCursor(IDBKeyRange.only(lid), 'prev');
+    curReq.onsuccess = () => {
+      const cursor = curReq.result;
+      if (!cursor || out.length >= want) {
+        out.reverse();
+        resolve(out);
+        return;
+      }
+      out.push(cursor.value);
+      cursor.continue();
+    };
+    curReq.onerror = () => reject(curReq.error);
+  });
+}
+
+function readAllCommentsForLiveDb(db, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  return new Promise((resolve, reject) => {
+    if (!lid) {
+      resolve([]);
+      return;
+    }
+    const out = [];
+    const tx = db.transaction(COMMENT_DB_STORE, 'readonly');
+    const idx = tx.objectStore(COMMENT_DB_STORE).index(COMMENT_DB_INDEX_BY_LIVE);
+    const curReq = idx.openCursor(IDBKeyRange.only(lid));
+    curReq.onsuccess = () => {
+      const cursor = curReq.result;
+      if (!cursor) {
+        resolve(out);
+        return;
+      }
+      out.push(cursor.value);
+      cursor.continue();
+    };
+    curReq.onerror = () => reject(curReq.error);
+  });
+}
+
+// 既存 chrome.storage.local（main/chunk/tail）→ IDB の初回移行（live ごと 1 回）。
+async function ensureLiveMigratedToDb(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const mkey = commentDbMigratedKeyLocal(lid);
+  const bag = await chrome.storage.local.get(mkey);
+  if (bag[mkey] === true) return;
+  let existing = [];
+  try {
+    existing = await readAllCommentsForLiveLocal(lid);
+  } catch {
+    existing = [];
+  }
+  if (existing.length) {
+    const db = await openCommentDb();
+    try {
+      for (let i = 0; i < existing.length; i += CDB_MIGRATE_BATCH) {
+        const slice = existing.slice(i, i + CDB_MIGRATE_BATCH).map((r) => ({
+          ...r,
+          dkey: buildDedupeKeyLocal(lid, r)
+        }));
+        await appendCommentsToDb(db, lid, slice);
+      }
+    } finally {
+      db.close();
+    }
+  }
+  await chrome.storage.local.set({ [mkey]: true });
+}
+
+// 与えられた total/recent から summary（chrome.storage）+ auto-backup 状態を書く。
+//   Offscreen 経路では Offscreen が IDB から集計した値を渡してくる（SW は再走査しない）。
+async function writeCommentDbSummaryFromValues(liveId, watchUrl, total, recentInput) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return 0;
+  const now = Date.now();
+  const recent = (Array.isArray(recentInput) ? recentInput : []).map((r) => ({
+    commentNo: String(r.commentNo ?? ''),
+    text: String(r.text ?? ''),
+    userId: r.userId != null ? String(r.userId) : null,
+    capturedAt: Number(r.capturedAt) || 0,
+    is184: r.is184 === true
+  }));
+  const summary = { v: 1, liveId: lid, total, updatedAt: now, recent };
+
+  // auto-backup 状態（5分周期の backup が IDB から読み直すためのメタ）。
+  const stBag = await chrome.storage.local.get(KEY_AUTO_BACKUP_STATE);
+  const st = normalizeAutoBackupState(stBag[KEY_AUTO_BACKUP_STATE]);
+  const prev = st.lives[lid] || {};
+  st.lives[lid] = {
+    ...prev,
+    liveId: lid,
+    commentCount: total,
+    updatedAt: now,
+    lastCommentAt: now,
+    watchUrl: String(watchUrl || prev.watchUrl || '').trim()
+  };
+
+  await chrome.storage.local.set({
+    [commentDbSummaryKeyLocal(lid)]: summary,
+    [KEY_AUTO_BACKUP_STATE]: st
+  });
+  return total;
+}
+
+// append 後に popup 初期描画用の軽量サマリと auto-backup 状態を更新する（SW 直書き経路）。
+async function writeCommentDbSummaryAndBackupState(db, liveId, watchUrl) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return 0;
+  const total = await countCommentsForLiveDb(db, lid);
+  const recentFull = await readRecentCommentsForLiveDb(db, lid, CDB_SUMMARY_RECENT_MAX);
+  return writeCommentDbSummaryFromValues(lid, watchUrl, total, recentFull);
+}
+
+async function handleCommentDbAppend(msg, sender) {
+  const lid = String(msg?.liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return { ok: false };
+  if (!isIndexedDbAvailable()) return { ok: false, reason: 'no_idb' };
+  await ensureLiveMigratedToDb(lid);
+  const watchUrl =
+    String(msg?.watchUrl || '').trim() ||
+    (sender && sender.tab && sender.tab.url ? String(sender.tab.url) : '');
+
+  // feat/multitab-scale-globalcap: Offscreen 書き手モード（content が mode:'offscreen' + 生 rows）。
+  //   Offscreen を保証して転送し、戻りの total/recent で summary を書く（Offscreen は storage 不可）。
+  //   Offscreen を作れない/応答しない環境は no_offscreen を返し、content が従来経路へフォールバック。
+  if (msg?.mode === 'offscreen') {
+    const rawRows = Array.isArray(msg?.rawRows) ? msg.rawRows : [];
+    const ready = await ensureOffscreenDocument();
+    if (!ready) return { ok: false, reason: 'no_offscreen' };
+    let resp = null;
+    try {
+      resp = await chrome.runtime.sendMessage({
+        type: OFFSCREEN_APPEND_TYPE,
+        liveId: lid,
+        rawRows,
+        tabKey: deriveAppendTabKey(sender)
+      });
+    } catch {
+      resp = null;
+    }
+    if (!resp || !resp.ok) return { ok: false, reason: 'offscreen_failed' };
+    const total = await writeCommentDbSummaryFromValues(
+      lid,
+      watchUrl,
+      Number(resp.total) || 0,
+      Array.isArray(resp.recent) ? resp.recent : []
+    );
+    return { ok: true, added: Number(resp.added) || 0, total };
+  }
+
+  // 従来（v0.1.515）: dkey 付き rows を SW が直接 IDB へ書く。
+  const rows = Array.isArray(msg?.rows) ? msg.rows : [];
+  const db = await openCommentDb();
+  let added = 0;
+  let total = 0;
+  try {
+    const res = await appendCommentsToDb(db, lid, rows);
+    added = res.added;
+    total = await writeCommentDbSummaryAndBackupState(db, lid, watchUrl);
+  } finally {
+    db.close();
+  }
+  return { ok: true, added, total };
+}
+
+async function handleCommentDbEnsure(msg) {
+  const lid = String(msg?.liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return { ok: false };
+  if (!isIndexedDbAvailable()) return { ok: false, reason: 'no_idb' };
+  await ensureLiveMigratedToDb(lid);
+  const db = await openCommentDb();
+  try {
+    const total = await writeCommentDbSummaryAndBackupState(
+      db,
+      lid,
+      String(msg?.watchUrl || '').trim()
+    );
+    return { ok: true, total };
+  } finally {
+    db.close();
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || (msg.type !== CDB_APPEND_MESSAGE_TYPE && msg.type !== CDB_ENSURE_MESSAGE_TYPE)) {
+    return undefined;
+  }
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  const work =
+    msg.type === CDB_APPEND_MESSAGE_TYPE
+      ? handleCommentDbAppend(msg, sender)
+      : handleCommentDbEnsure(msg);
+  work.then(reply).catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
 function normalizeAutoBackupState(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const rawLives =
@@ -157,9 +669,26 @@ async function backupLiveCommentsIfNeeded(liveId, meta, lastWatchUrl) {
     return null;
   }
 
-  const key = commentsStorageKey(lid);
-  const bag = await chrome.storage.local.get(key);
-  const comments = Array.isArray(bag[key]) ? bag[key] : [];
+  // v0.1.509: 全チャンク＋テールを連結して backup（チャンク移行後も取りこぼさない）。
+  // v0.1.514: IDB 移行済みの live は IDB を正本として読む（chrome.storage は空/旧のため）。
+  let comments = [];
+  let migratedToDb = false;
+  try {
+    const mbag = await chrome.storage.local.get(commentDbMigratedKeyLocal(lid));
+    migratedToDb = mbag[commentDbMigratedKeyLocal(lid)] === true;
+  } catch {
+    migratedToDb = false;
+  }
+  if (migratedToDb && isIndexedDbAvailable()) {
+    const db = await openCommentDb();
+    try {
+      comments = await readAllCommentsForLiveDb(db, lid);
+    } finally {
+      db.close();
+    }
+  } else {
+    comments = await readAllCommentsForLiveLocal(lid);
+  }
   if (!comments.length) return null;
 
   const exportedAt = Date.now();
@@ -529,15 +1058,10 @@ async function fetchKokenContribRankingJson(liveId) {
       credentials: 'omit', // 無認証 API。cookie を不要に送らない
       cache: 'no-store', // サーバが no-store。毎回フレッシュ
       redirect: 'error', // 想定外リダイレクトは失敗扱い（abuse 面の保守）
-      // niconico ブラウザ版フロントエンド署名。現状この API はヘッダ全省略でも
-      // 200 を返すが、将来 niconico 側が 401/403 で弾くようになっても通り続ける
-      // 予防的補強（VOD クライアント Re:NNDD が access-rights/nv-comment で必須化
-      // していた定数 = niconico.js 由来。x-frontend-id:6=ブラウザ版 / version:0）。
-      // 無認証契約は不変（credentials:'omit' のまま・cookie は送らない）。
-      headers: {
-        'x-frontend-id': '6',
-        'x-frontend-version': '0'
-      },
+      // x-frontend-id/x-frontend-version ヘッダは削除済み。
+      // カスタムヘッダがあると CORS preflight (OPTIONS) が必須になり、
+      // niconico API が OPTIONS を返さないため preflight 失敗→CORSエラー。
+      // 実機確認済み「ヘッダ全省略でも 200 を返す」ため削除で解決。
       signal: ac.signal
     });
     let json = null;
@@ -624,11 +1148,7 @@ async function fetchNicoadContribRankingJson(liveId) {
       credentials: 'omit', // 無認証 API。cookie を不要に送らない
       cache: 'no-store',
       redirect: 'error',
-      // niconico ブラウザ版フロントエンド署名（koken と同じ予防的補強。無認証契約不変）。
-      headers: {
-        'x-frontend-id': '6',
-        'x-frontend-version': '0'
-      },
+      // x-frontend-id/x-frontend-version ヘッダは削除済み（koken と同じ理由）。
       signal: ac.signal
     });
     let json = null;
@@ -707,12 +1227,7 @@ async function fetchEventParticipationJson(planningEventId) {
       credentials: 'omit', // 無認証で本文が取れる API。cookie を不要に送らない
       cache: 'no-store',
       redirect: 'error',
-      // niconico 生放送ブラウザ版フロントエンド署名（koken/nicoad と同じ予防的補強。
-      // x-frontend-id:9=生放送 web。無認証契約は不変）。
-      headers: {
-        'x-frontend-id': '9',
-        'x-frontend-version': '0'
-      },
+      // x-frontend-id/x-frontend-version ヘッダは削除済み（koken/nicoad と同じ理由）。
       signal: ac.signal
     });
     let json = null;
@@ -807,10 +1322,7 @@ async function fetchNicoUserProfileJson(uid) {
       credentials: 'omit',
       cache: 'no-store',
       redirect: 'error',
-      headers: {
-        'x-frontend-id': '6',
-        'x-frontend-version': '0'
-      },
+      // x-frontend-id/x-frontend-version ヘッダは削除済み（koken/nicoad と同じ理由）。
       signal: ac.signal
     });
     let json = null;
@@ -1086,6 +1598,51 @@ async function doOpenOrFocusPopupWindow(anchorWindowId, stripPositionHints) {
  *
  * @param {import('chrome').tabs.Tab|undefined} tab
  */
+/**
+ * v0.1.496: chrome.tabs.sendMessage を必ず有界化する。
+ *   視聴タブのメインスレッドが重い処理（大量コメントの全件マージ等）でフリーズしていると、
+ *   content script の async listener が sendResponse する前に固まり、sendMessage の Promise が
+ *   いつまでも resolve/reject しない。これを await するとツールバー押下ハンドラ自体がハングし、
+ *   popup 窓 fallback にすら到達しない＝「アイコンを押しても無反応・Chrome を全部閉じるまで直らない」
+ *   の主因になる。タイムアウトを設け、応答が無ければ未フォーカス扱いで fallback に進める。
+ * @param {number} tid
+ * @param {unknown} message
+ * @param {number} timeoutMs
+ * @returns {Promise<any>} 応答 or タイムアウト時 null
+ */
+function sendTabMessageWithTimeout(tid, message, timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    }, Math.max(1, Number(timeoutMs) || 1200));
+    try {
+      chrome.tabs
+        .sendMessage(tid, message, { frameId: 0 })
+        .then((res) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(res);
+        })
+        .catch(() => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(null);
+        });
+    } catch {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(null);
+      }
+    }
+  });
+}
+
 async function handleBrowserActionClick(tab) {
   try {
     const policy = await getToolbarActionPolicy();
@@ -1096,27 +1653,36 @@ async function handleBrowserActionClick(tab) {
     }
     const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
     if (tid !== chrome.tabs.TAB_ID_NONE) {
-      try {
-        /*
-         * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
-         * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
-         * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
-         * フレームに broadcast され、iframe の listener が
-         *   if (!isWatchInlinePanelTopFrame()) return false;
-         * で同期 false を返して port を閉じてしまう。top frame の async listener が
-         * sendResponse({focused:true}) する前に port closed エラーになり、
-         * background が popup 窓を fallback として開いてしまう（user 報告：
-         * インラインパネル + popup 窓が同時に出る）。
-         */
-        const res = await chrome.tabs.sendMessage(
-          tid,
-          { type: 'NLS_FOCUS_INLINE_PANEL' },
-          { frameId: 0 }
-        );
-        if (res && res.focused) return;
-      } catch {
-        // コンテンツ未注入・対象外 URL
-      }
+      /*
+       * 0.1.16 (P): frameId: 0 を明示し、top frame の listener にのみ届ける。
+       * manifest.json の content.js は all_frames: true で iframe（プレイヤー埋込
+       * 等）にも注入されている。frameId 指定なしで sendMessage するとすべての
+       * フレームに broadcast され、iframe の listener が
+       *   if (!isWatchInlinePanelTopFrame()) return false;
+       * で同期 false を返して port を閉じてしまう。top frame の async listener が
+       * sendResponse({focused:true}) する前に port closed エラーになり、
+       * background が popup 窓を fallback として開いてしまう（user 報告：
+       * インラインパネル + popup 窓が同時に出る）。
+       *
+       * v0.1.496: タブがフリーズしていても固まらないよう sendTabMessageWithTimeout で
+       *   有界化。応答が無ければ null → fallback の popup 窓を開く。
+       */
+      const res = await sendTabMessageWithTimeout(
+        tid,
+        { type: 'NLS_FOCUS_INLINE_PANEL' },
+        1200
+      );
+      if (res && res.focused) return;
+      // v0.1.486: 初期化直後は host/iframe が未準備で focused=false になりやすい。
+      //   すぐ popup fallback を開くと「一瞬開いて消える/何も出ない」体験になるため、
+      //   短い猶予を置いて再確認する（最小差分・既存 fallback は維持）。
+      await new Promise((r) => setTimeout(r, 700));
+      const resRetry = await sendTabMessageWithTimeout(
+        tid,
+        { type: 'NLS_FOCUS_INLINE_PANEL' },
+        1200
+      );
+      if (resRetry && resRetry.focused) return;
     }
     await openOrFocusPopupWindow(tab?.windowId);
   } catch {
@@ -1128,8 +1694,130 @@ async function handleBrowserActionClick(tab) {
   }
 }
 
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
+  if (msg.type === 'NLS_FOCUS_INLINE_PANEL_FROM_POPUP') {
+    void (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
+        if (tid === chrome.tabs.TAB_ID_NONE) {
+          sendResponse({ focused: false });
+          return;
+        }
+        try {
+          const res = await chrome.tabs.sendMessage(
+            tid,
+            { type: 'NLS_FOCUS_INLINE_PANEL' },
+            { frameId: 0 }
+          );
+          if (res && res.focused) {
+            sendResponse({ focused: true });
+            return;
+          }
+        } catch {
+          // no-op
+        }
+        await new Promise((r) => setTimeout(r, 700));
+        try {
+          const resRetry = await chrome.tabs.sendMessage(
+            tid,
+            { type: 'NLS_FOCUS_INLINE_PANEL' },
+            { frameId: 0 }
+          );
+          sendResponse({ focused: Boolean(resRetry && resRetry.focused) });
+        } catch {
+          sendResponse({ focused: false });
+        }
+      } catch {
+        sendResponse({ focused: false });
+      }
+    })();
+    return true;
+  }
+});
+
 chrome.action.onClicked.addListener((tab) => {
   void handleBrowserActionClick(tab).catch(() => {
     void openOrFocusPopupWindow(tab?.windowId);
   });
+});
+
+/* ------------------------------------------------------------------ */
+/* dev 専用ホットリロード（手動 reload 卒業・2026-06-01）                       */
+/* content（dev watch ビルドのみ）が NLS_DEV_RELOAD_PEEK で現在のシグナル id を   */
+/* 問い合わせ、変化を検知したら NLS_DEV_RELOAD_GO を送ってくる。判定の状態機械は   */
+/* content 側の純関数（src/lib/devReloadSignal.js・単体テスト済み）が持つ。       */
+/* SW は「シグナルファイルを読む」「タブ reload + runtime.reload」だけ担当する。   */
+/* 本番ビルドでは content がこれらを一切送らない（NL_DEV_HOTRELOAD=false で除去）  */
+/* 上、シグナルファイル dist/dev-reload-id.txt も同梱されない（build.mjs/stage    */
+/* スクリプトが生成・コピーしない）ため、PEEK が来ても id=null で必ず no-op になる。*/
+/* ------------------------------------------------------------------ */
+const DEV_RELOAD_SIGNAL_PATH = 'dist/dev-reload-id.txt';
+let _devReloadGoInFlight = false;
+
+async function readDevReloadSignalId() {
+  try {
+    const res = await fetch(chrome.runtime.getURL(DEV_RELOAD_SIGNAL_PATH), {
+      cache: 'no-store'
+    });
+    if (!res || !res.ok) return null;
+    const text = String(await res.text()).trim();
+    if (!text || text.length > 128) return null;
+    return text;
+  } catch {
+    return null;
+  }
+}
+
+async function doDevReloadGo() {
+  if (_devReloadGoInFlight) return;
+  _devReloadGoInFlight = true;
+  try {
+    // 先にタブを reload（ブラウザ側ナビゲーションは runtime.reload を跨いで生き残り、
+    //   再注入時には新しい dist/content.js が入る）→ そのあと拡張本体を reload。
+    const tabs = await queryTargetTabs();
+    for (const tab of tabs) {
+      if (!tab.id || tab.id === chrome.tabs.TAB_ID_NONE) continue;
+      try {
+        await chrome.tabs.reload(tab.id);
+      } catch {
+        /* no-op */
+      }
+    }
+    try {
+      chrome.runtime.reload();
+    } catch {
+      /* no-op */
+    }
+  } finally {
+    _devReloadGoInFlight = false;
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || (msg.type !== 'NLS_DEV_RELOAD_PEEK' && msg.type !== 'NLS_DEV_RELOAD_GO')) {
+    return undefined;
+  }
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  if (msg.type === 'NLS_DEV_RELOAD_PEEK') {
+    readDevReloadSignalId()
+      .then((id) => {
+        try {
+          sendResponse({ id });
+        } catch {
+          /* no-op */
+        }
+      })
+      .catch(() => {
+        try {
+          sendResponse({ id: null });
+        } catch {
+          /* no-op */
+        }
+      });
+    return true; // 非同期 sendResponse
+  }
+  void doDevReloadGo();
+  return undefined;
 });

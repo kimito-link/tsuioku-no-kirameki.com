@@ -36,7 +36,9 @@ export default [
         ...browserChrome,
         Node: 'readonly',
         // scripts/build.mjs が esbuild --define で popup-entry.js に注入するビルド時刻
-        NL_BUILD_ID: 'readonly'
+        NL_BUILD_ID: 'readonly',
+        // esbuild --define で注入する dev フラグ（本番 false / dev watch true）。
+        NL_DEV_HOTRELOAD: 'readonly'
       }
     },
     rules: {

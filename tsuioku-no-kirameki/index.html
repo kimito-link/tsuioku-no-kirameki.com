@@ -9740,6 +9740,11 @@
               ニコ生には同時接続 API がありません。配信ページが表示する数字は累計来場者数（watchCount）です。
               君斗りんくの追憶のきらめきは、コメントと来場者の情報から独自に推定しています。
             </p>
+            <p>
+              この推定は、世界のライブ配信研究で使われてきた考え方
+              （<strong>リトルの法則</strong>・<strong>チャット密度</strong>・<strong>参加不平等（lurker は視聴者の 6〜9 割）</strong>）
+              を下敷きにしています。「ニコ生に無い同接を、限りなく近い計算式で出す」のがこのアプリの特徴です。
+            </p>
           </div>
 
           <div class="board fade d1">
@@ -9903,6 +9908,190 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="board fade d3" style="margin-top:20px">
+            <h3>世界の推定研究を下敷きにしているのだ</h3>
+            <p>同接を公開しない配信（ニコ生・TikTok など）では、外部ツールも含めて「推定」が世界標準なのだ。下の3つの考え方を土台にしているのだ。</p>
+            <div class="two-col">
+              <section class="lane left">
+                <div class="lane-title">土台にしている考え方</div>
+                <div class="stack">
+                  <div class="node blue"><strong>リトルの法則 L = λ × W</strong><span>同時にいる人数 ＝ 来場の増えるペース（人/分）× 平均滞在時間。性能工学でも「同時ユーザー数 ＝ スループット × 滞在」で使う定番なのだ。シグナル B（滞留率法）はこの簡易版なのだ。</span></div>
+                  <div class="node gold"><strong>参加不平等（90-9-1 / lurker 6〜9割）</strong><span>オンラインでは見る専が大多数で、コメントするのは1〜数割。だからコメンター数に倍率をかけて全体を推定するのだ（シグナル A）。規模が大きいほど lurker 率が上がる実測とも一致するのだ。</span></div>
+                  <div class="node brick"><strong>チャット密度（コメ/分）</strong><span>YouTube も内部指標にしている「コメント速度 ÷ 同接」。コメントの勢いは“今いる人数”の有力な手がかりなのだ。</span></div>
+                </div>
+                <div class="lane-note">出典の考え方：Little's law（待ち行列理論）／Nielsen の参加不平等（90-9-1）／Twitch の lurker 実測 60〜90%／YouTube のチャット密度。</div>
+              </section>
+              <section class="lane right">
+                <div class="lane-title">さらに精度を上げる研究中の信号</div>
+                <div class="stack">
+                  <div class="node slate"><strong>シグナル C：リトルの法則（研究中）</strong><span>来場者数の時系列の傾きから「1分あたり何人来たか」を実測し、平均滞在時間をかけて同接を出すのだ。原理ベースでいちばん素直なのだ。</span></div>
+                  <div class="node slate"><strong>シグナル D：チャット密度（研究中）</strong><span>コメ/分を「1人あたりの発言ペース」で割って“今いる人数”を出すのだ。盛り上がりに即応できるのだ。</span></div>
+                </div>
+                <div class="lane-note">C・D は現在のシグナル A・B に<strong>足す</strong>形で検証中なのだ（既存の計算は壊さないのだ）。揃うほど推定の幅が狭まるのだ。</div>
+              </section>
+            </div>
+          </div>
+
+          <style>
+            .lp-est-charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
+            .lp-est-chart{background:rgba(255,252,247,.82);border:1px solid rgba(88,62,28,.1);border-radius:18px;padding:14px 14px 10px}
+            .lp-est-chart h4{margin:0 0 4px;font-size:.96rem;color:var(--ink);line-height:1.35}
+            .lp-est-chart p{margin:0 0 6px;font-size:.8rem;color:var(--muted);line-height:1.55}
+            .lp-est-chart svg{width:100%;height:auto;display:block;overflow:visible}
+            .lp-est-axis{stroke:rgba(88,62,28,.32);stroke-width:1}
+            .lp-est-grid{stroke:rgba(88,62,28,.12);stroke-width:1;stroke-dasharray:3 3}
+            .lp-est-label{fill:var(--muted);font-size:10px}
+            .lp-est-tick{fill:var(--muted);font-size:9px}
+            .lp-est-val{fill:var(--ink);font-size:10px;font-weight:700}
+            @media (max-width:760px){.lp-est-charts{grid-template-columns:1fr}}
+          </style>
+          <div class="board fade d3" style="margin-top:20px">
+            <h3>グラフで見る推定の3つの土台</h3>
+            <p>言葉だけだと分かりにくいので、上の考え方を図にしてみたのだ。①②はアプリが実際に使っている係数をそのまま描いているのだ。</p>
+            <div class="lp-est-charts">
+              <div class="lp-est-chart">
+                <h4>① 規模が大きいほど倍率↑（参加不平等）</h4>
+                <p>来場が増えるほど「見る専」が増え、コメンターにかける倍率 m を上げるのだ（Twitch 等の lurker 6〜9 割の実測とも整合）。</p>
+                <svg viewBox="0 0 400 240" role="img" aria-label="来場規模が大きいほど倍率mが上がる曲線">
+                  <line class="lp-est-grid" x1="50" y1="70.5" x2="382" y2="70.5"/>
+                  <line class="lp-est-grid" x1="50" y1="151.4" x2="382" y2="151.4"/>
+                  <line class="lp-est-axis" x1="50" y1="24" x2="50" y2="200"/>
+                  <line class="lp-est-axis" x1="50" y1="200" x2="382" y2="200"/>
+                  <text class="lp-est-tick" x="46" y="73" text-anchor="end">×20</text>
+                  <text class="lp-est-tick" x="46" y="154" text-anchor="end">×10</text>
+                  <text class="lp-est-tick" x="46" y="203" text-anchor="end">×4</text>
+                  <polyline fill="none" stroke="#c98e2b" stroke-width="2.5" stroke-linejoin="round" points="50,200 157,183.8 189,175.7 240,151.4 285,111 370,30"/>
+                  <g fill="#9a5c08">
+                    <circle cx="50" cy="200" r="3.2"/>
+                    <circle cx="157" cy="183.8" r="3.2"/>
+                    <circle cx="189" cy="175.7" r="3.2"/>
+                    <circle cx="240" cy="151.4" r="3.2"/>
+                    <circle cx="285" cy="111" r="3.2"/>
+                    <circle cx="370" cy="30" r="3.2"/>
+                  </g>
+                  <text class="lp-est-val" x="370" y="22" text-anchor="middle">×25</text>
+                  <g class="lp-est-tick" text-anchor="middle">
+                    <text x="50" y="214">50</text>
+                    <text x="157" y="214">500</text>
+                    <text x="189" y="214">1千</text>
+                    <text x="240" y="214">3千</text>
+                    <text x="285" y="214">8千</text>
+                    <text x="370" y="214">5万</text>
+                  </g>
+                  <text class="lp-est-label" x="216" y="231" text-anchor="middle">来場規模（人・対数）</text>
+                </svg>
+              </div>
+              <div class="lp-est-chart">
+                <h4>② 時間が経つほど残る人は減る（滞留率）</h4>
+                <p>累計来場に「滞留率 r(t)」をかけるのだ。開始直後 48% から指数的に減り、底値 8% で下げ止まるのだ。</p>
+                <svg viewBox="0 0 400 240" role="img" aria-label="配信経過が長いほど滞留率が下がる曲線">
+                  <line class="lp-est-grid" x1="50" y1="36.8" x2="382" y2="36.8"/>
+                  <line class="lp-est-grid" x1="50" y1="172.8" x2="382" y2="172.8"/>
+                  <line class="lp-est-axis" x1="50" y1="24" x2="50" y2="200"/>
+                  <line class="lp-est-axis" x1="50" y1="200" x2="382" y2="200"/>
+                  <text class="lp-est-tick" x="46" y="40" text-anchor="end">48%</text>
+                  <text class="lp-est-tick" x="46" y="176" text-anchor="end">8%</text>
+                  <polyline fill="none" stroke="#255d9b" stroke-width="2.5" stroke-linejoin="round" points="50,36.8 82,59.5 114,79.1 146,95.9 178,110.4 242,133.6 306,150.8 370,163.6"/>
+                  <g fill="#1f568d">
+                    <circle cx="50" cy="36.8" r="3.2"/>
+                    <circle cx="114" cy="79.1" r="3.2"/>
+                    <circle cx="178" cy="110.4" r="3.2"/>
+                    <circle cx="242" cy="133.6" r="3.2"/>
+                    <circle cx="370" cy="163.6" r="3.2"/>
+                  </g>
+                  <text class="lp-est-tick" x="58" y="170" text-anchor="start">底値 8%</text>
+                  <g class="lp-est-tick" text-anchor="middle">
+                    <text x="50" y="214">0分</text>
+                    <text x="114" y="214">60分</text>
+                    <text x="178" y="214">120分</text>
+                    <text x="242" y="214">180分</text>
+                    <text x="370" y="214">300分</text>
+                  </g>
+                  <text class="lp-est-label" x="216" y="231" text-anchor="middle">配信からの経過時間</text>
+                </svg>
+              </div>
+              <div class="lp-est-chart">
+                <h4>③ 信号が増えるほど“幅”が狭まる</h4>
+                <p>信号を足すほど「ありえる範囲」が狭まるのだ。だから表示も幅つき（例：150〜320）で正直に出すのだ。③は考え方のイメージなのだ。</p>
+                <svg viewBox="0 0 400 240" role="img" aria-label="シグナルが増えるほど推定の幅が狭まる図">
+                  <line class="lp-est-grid" x1="216" y1="34" x2="216" y2="208"/>
+                  <text class="lp-est-label" x="216" y="26" text-anchor="middle">推定の中心</text>
+                  <text class="lp-est-label" x="50" y="52" text-anchor="start">A だけ（コメンター法）</text>
+                  <rect x="96" y="58" width="240" height="20" rx="10" fill="#637081" fill-opacity="0.45"/>
+                  <circle cx="216" cy="68" r="3.6" fill="#46515f"/>
+                  <text class="lp-est-tick" x="342" y="72" text-anchor="start">広い</text>
+                  <text class="lp-est-label" x="50" y="112" text-anchor="start">A＋B（現行）</text>
+                  <rect x="140" y="118" width="152" height="20" rx="10" fill="#3472b0" fill-opacity="0.5"/>
+                  <circle cx="216" cy="128" r="3.6" fill="#1f568d"/>
+                  <text class="lp-est-label" x="50" y="172" text-anchor="start">A＋B＋C＋D（目標）</text>
+                  <rect x="176" y="178" width="80" height="20" rx="10" fill="#c98e2b" fill-opacity="0.6"/>
+                  <circle cx="216" cy="188" r="3.6" fill="#9a5c08"/>
+                  <text class="lp-est-tick" x="262" y="192" text-anchor="start">狭い</text>
+                </svg>
+              </div>
+            </div>
+            <div class="lane-note" style="margin-top:8px">①②はアプリが使う実際の係数（倍率テーブル／減衰式 r(t)=max(0.08, 0.48·e<sup>−0.005t</sup>)）をそのまま描いているのだ。③は「信号が揃うほど不確かさが減る」考え方のイメージなのだ。</div>
+          </div>
+
+          <div class="board fade d3" style="margin-top:20px">
+            <h3>どのくらい信じていいの？（信用度の正直な話）</h3>
+            <p>
+              ニコ生は配信者にも実際の同接を出さないので、<strong>“答え合わせ”ができません</strong>。
+              だから「ぴったり当てる」より、<strong>幅つき・信頼度つきで正直に出す</strong>方針なのだ。
+            </p>
+            <div class="formula-table-wrap">
+            <table class="formula-table">
+              <tr><th>何を見るか</th><th>信用度の目安</th><th>ひとこと</th></tr>
+              <tr><td>桁・規模感（数百人か数千人か）</td><td>9 割以上</td><td>来場・コメンター・コメント速度が揃って効く</td></tr>
+              <tr><td>トレンド（増減・ピークの位置）</td><td>8〜9 割</td><td>時系列の傾きは素直に出る</td></tr>
+              <tr><td>絶対値が ±20% 以内</td><td>6〜7 割</td><td>lurker 率 6〜9割・平均滞在の幅が効く</td></tr>
+              <tr><td>絶対値が ±10% 以内</td><td>3〜5 割</td><td>答え合わせ無しでは届きにくい</td></tr>
+            </table>
+            </div>
+            <p style="margin-top:14px">
+              なので表示も「<strong>推定 約240人（150〜320・信頼度 中）</strong>」のように、断定ではなく幅で出すのが正直なのだ。
+              チャットから盛り上がりを当てる研究の精度もおおむね 8 割前後で、「もっともらしい目安」がこの種の推定の実力なのだ。
+            </p>
+          </div>
+
+          <div class="board fade d3" style="margin-top:20px">
+            <h3>いずれは“同接を出さない配信”全般へ（対応予定マップ）</h3>
+            <p>同接推定の考え方はサイト共通なのだ。だから「ニコ生から始めて、同接を出さない配信全般へ」広げていくのが狙いなのだ。サイトごとに違うのは<strong>データの取り方</strong>と<strong>文化ごとの係数</strong>だけなのだ。</p>
+            <div class="two-col">
+              <section class="lane left">
+                <div class="lane-title">A群：推定が刺さる（同接が非公開・累計のみ）</div>
+                <div class="formula-table-wrap">
+                <table class="formula-table">
+                  <tr><th>サイト</th><th>同接まわりの状況</th></tr>
+                  <tr><td>ニコ生</td><td>来場者数＝累計。同接は非公開（現行対応）</td></tr>
+                  <tr><td>Pococha</td><td>合計視聴者中心・同接は前面に出さない</td></tr>
+                  <tr><td>SHOWROOM</td><td>星／ポイント・ランキング主体</td></tr>
+                  <tr><td>IRIAM</td><td>視聴者数は控えめ・数字非重視</td></tr>
+                  <tr><td>17LIVE / ふわっち / ミラティブ</td><td>応援pt・累計寄りで同接が読みにくい</td></tr>
+                  <tr><td>TikTok / Instagram / X</td><td>同接を明示しない場面が多い（海外）</td></tr>
+                </table>
+                </div>
+                <div class="lane-note">ここが本アプリの主戦場なのだ。「累計来場 ≠ 今いる人」を推定で埋めるのだ。</div>
+              </section>
+              <section class="lane right">
+                <div class="lane-title">B群：答え合わせに使える（同接が公開）</div>
+                <div class="formula-table-wrap">
+                <table class="formula-table">
+                  <tr><th>サイト</th><th>同接</th></tr>
+                  <tr><td>YouTube Live</td><td>公式に同時視聴者を表示・取得可</td></tr>
+                  <tr><td>Twitch</td><td>公式に同接を表示・取得可</td></tr>
+                  <tr><td>Kick</td><td>公式に同接を表示・取得可</td></tr>
+                  <tr><td>OPENREC / ABEMA ほか</td><td>API 等で同接を取得可</td></tr>
+                </table>
+                </div>
+                <div class="lane-note">B群の“正解の同接”で計算式を較正 → A群へ転用するのだ。式を増やすより、この答え合わせ元を持つことが精度の最大のレバーなのだ。</div>
+              </section>
+            </div>
+            <p style="margin-top:14px;font-size:.9rem;color:var(--muted)">
+              ※各サイトの表示仕様は変わりやすいので、対応着手時に実機で再確認するのだ。設計は「共通の推定コア ＋ サイト別アダプタ ＋ サイト別の係数プロファイル」で、ニコ生をまず固めてから順次広げていくのだ。
+            </p>
           </div>
 
           <div class="mini-notes fade d3" style="margin-top:18px">
