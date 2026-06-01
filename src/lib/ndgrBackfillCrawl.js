@@ -904,3 +904,292 @@ export async function* crawlNdgrBackward(opts) {
   }
   return done('cap_reseeds');
 }
+
+/**
+ * NDGR を backward / previous ポインタだけで決定論的に巡回する新バックフィルエンジン。
+ *
+ * 旧 crawlNdgrBackward と同じ generator 契約を保つが、`reached_start` の判定に
+ * chainLooksLikeStreamStart / vpos 近傍ヒューリスティックは使わない。未訪問の
+ * backward / previous ポインタが尽きた時だけ reached_start とする。
+ *
+ * @param {object} opts
+ * @param {string} opts.viewBase NDGR view エンドポイントのベース URL（`?at=` 前）。
+ * @param {(url: string, o: { signal?: AbortSignal }) => Promise<{ ok: boolean, status: number, bytes: Uint8Array }>} opts.fetchBinary
+ * @param {(ms: number) => Promise<void>} [opts.sleep]
+ * @param {() => number} [opts.now]
+ * @param {Partial<NdgrBackfillCaps>} [opts.caps]
+ * @param {number} [opts.fetchGapMs]
+ * @param {number|null} [opts.programStartSec]
+ * @param {number|null} [opts.resumeFromVpos]
+ * @param {AbortSignal} [opts.signal]
+ * @returns {AsyncGenerator<NdgrBackfillProgress, { stopReason: NdgrBackfillStopReason, segmentsFetched: number, rowsSeen: number, bytesFetched: number, minVposReached: number|null, diagnostics: object|null }, void>}
+ */
+export async function* crawlNdgrBackwardDeterministic(opts) {
+  const viewBase = String(opts?.viewBase || '').trim();
+  const fetchBinary = opts?.fetchBinary;
+  const sleep =
+    typeof opts?.sleep === 'function'
+      ? opts.sleep
+      : (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
+  const now = typeof opts?.now === 'function' ? opts.now : () => Date.now();
+  const programStartSec =
+    typeof opts?.programStartSec === 'number' && opts.programStartSec > 0
+      ? Math.floor(opts.programStartSec)
+      : null;
+  const resumeFromVpos =
+    typeof opts?.resumeFromVpos === 'number' &&
+    Number.isFinite(opts.resumeFromVpos) &&
+    opts.resumeFromVpos > 0
+      ? Math.floor(opts.resumeFromVpos)
+      : null;
+  const caps = { ...NDGR_BACKFILL_DEFAULT_CAPS, ...(opts?.caps || {}) };
+  const gapMs =
+    typeof opts?.fetchGapMs === 'number' && opts.fetchGapMs >= 0
+      ? opts.fetchGapMs
+      : NDGR_BACKFILL_FETCH_GAP_MS;
+  const signal = opts?.signal;
+
+  let segmentsFetched = 0;
+  let rowsSeen = 0;
+  let bytesFetched = 0;
+  /** @type {number|null} */
+  let globalMinVpos = resumeFromVpos;
+  const t0 = now();
+
+  const summary = () => ({
+    segmentsFetched,
+    rowsSeen,
+    bytesFetched,
+    minVposReached: globalMinVpos
+  });
+  const done = (/** @type {NdgrBackfillStopReason} */ reason) => ({
+    stopReason: reason,
+    ...summary(),
+    diagnostics: /** @type {object|null} */ (null)
+  });
+
+  if (!viewBase) return done('no_view_base');
+  if (typeof fetchBinary !== 'function') return done('no_view_base');
+  if (isAborted(signal)) return done('aborted');
+
+  const ctx = { fetchBinary, sleep, signal, gapMs };
+  /** @type {Set<string>} view/backward/previous の再訪防止キー。 */
+  const visited = new Set();
+  /** @type {string[]} */
+  const backwardQueue = [];
+  /** @type {string[]} */
+  const previousQueue = [];
+
+  /** @returns {NdgrBackfillStopReason|''} */
+  const limitReason = () => {
+    if (isAborted(signal)) return 'aborted';
+    if (now() - t0 >= caps.elapsedMs) return 'cap_elapsed';
+    if (bytesFetched >= caps.bytes) return 'cap_bytes';
+    if (segmentsFetched >= caps.segments) return 'cap_segments';
+    return '';
+  };
+
+  /**
+   * @param {'backward'|'previous'} kind
+   * @param {string} uri
+   * @param {boolean} [front]
+   * @returns {boolean}
+   */
+  const enqueuePointer = (kind, uri, front = false) => {
+    const u = String(uri || '').trim();
+    if (!u) return false;
+    const key = `${kind}:${u}`;
+    if (visited.has(key)) return false;
+    visited.add(key);
+    if (kind === 'backward') {
+      if (front) backwardQueue.unshift(u);
+      else backwardQueue.push(u);
+      return true;
+    }
+    previousQueue.push(u);
+    return true;
+  };
+
+  /** @param {{ backwardUri?: string, previousUris?: string[] }} entry */
+  const enqueueEntryPointers = (entry) => {
+    let added = false;
+    if (entry && entry.backwardUri) {
+      added = enqueuePointer('backward', entry.backwardUri) || added;
+    }
+    const prevs = Array.isArray(entry?.previousUris) ? entry.previousUris : [];
+    for (const uri of prevs) {
+      added = enqueuePointer('previous', uri) || added;
+    }
+    return added;
+  };
+
+  /**
+   * ?at={startAt} から ChunkedEntry を読み、backward / previous の未訪問ポインタを返す。
+   * backward が無い entry では nextAt を最大 20 hop だけ辿る（旧エンジンと同じ入口探索）。
+   *
+   * @param {number} startAt
+   * @returns {Promise<{ entry: { backwardUri: string, previousUris: string[] }|null, stopReason: NdgrBackfillStopReason|'' }>}
+   */
+  const seekEntryPointers = async (startAt) => {
+    let viewAt = startAt;
+    for (let hop = 0; hop < 20; hop += 1) {
+      const before = limitReason();
+      if (before) return { entry: null, stopReason: before };
+      const url = buildViewAtUrl(viewBase, viewAt);
+      const key = `view:${url}`;
+      if (visited.has(key)) return { entry: null, stopReason: '' };
+      visited.add(key);
+
+      const entryRes = await fetchWithThrottle(ctx, url, false);
+      if (entryRes.rateLimited) return { entry: null, stopReason: 'rate_limited' };
+      if (isAborted(signal)) return { entry: null, stopReason: 'aborted' };
+      if (!entryRes.bytes || entryRes.bytes.length === 0) {
+        return { entry: null, stopReason: '' };
+      }
+      bytesFetched += entryRes.bytes.length;
+      if (bytesFetched >= caps.bytes) return { entry: null, stopReason: 'cap_bytes' };
+
+      const entryNav = decodeChunkedEntry(entryRes.bytes);
+      const previousUris = Array.isArray(entryNav.previousUris) ? entryNav.previousUris : [];
+      if (entryNav.backwardUri || previousUris.length) {
+        return {
+          entry: {
+            backwardUri: entryNav.backwardUri || '',
+            previousUris
+          },
+          stopReason: ''
+        };
+      }
+      if (entryNav.nextAt == null || entryNav.nextAt === viewAt) {
+        return { entry: null, stopReason: '' };
+      }
+      viewAt = entryNav.nextAt;
+    }
+    return { entry: null, stopReason: '' };
+  };
+
+  const nowRes = await fetchWithThrottle(ctx, buildViewAtUrl(viewBase, 'now'), true);
+  if (nowRes.rateLimited) return done('rate_limited');
+  if (isAborted(signal)) return done('aborted');
+  if (!nowRes.bytes || nowRes.bytes.length === 0) return done('no_entry');
+  bytesFetched += nowRes.bytes.length;
+  if (bytesFetched >= caps.bytes) return done('cap_bytes');
+  const nowNav = decodeChunkedEntry(nowRes.bytes);
+  if (nowNav.nextAt == null) return done('no_entry');
+
+  const nowSec = Math.floor(t0 / 1000);
+  const seedLags = [
+    NDGR_BACKFILL_SEED_LAG_SEC, 300, 900, 1800, 3600, 7200, 21600, 43200
+  ];
+  const seedCandidates = seedLags.map((lag) => nowSec - lag);
+  if (programStartSec != null) seedCandidates.push(programStartSec + 60);
+  if (resumeFromVpos != null && programStartSec != null) {
+    const resumeAtSec =
+      programStartSec + Math.floor(resumeFromVpos / 100) - NDGR_BACKFILL_RESEED_BUFFER_SEC;
+    if (resumeAtSec > 0) seedCandidates.unshift(resumeAtSec);
+  }
+
+  let seeded = false;
+  for (const cand of seedCandidates) {
+    if (cand <= 0) continue;
+    const seek = await seekEntryPointers(cand);
+    if (seek.stopReason) return done(seek.stopReason);
+    if (seek.entry && enqueueEntryPointers(seek.entry)) {
+      seeded = true;
+      break;
+    }
+  }
+  if (!seeded) return done('backward_exhausted');
+
+  for (;;) {
+    const before = limitReason();
+    if (before) return done(before);
+    if (!backwardQueue.length && !previousQueue.length) {
+      return done(rowsSeen > 0 ? 'reached_start' : 'backward_exhausted');
+    }
+
+    if (backwardQueue.length) {
+      const uri = backwardQueue.shift();
+      if (!uri) continue;
+      const bwRes = await fetchWithThrottle(ctx, uri, false);
+      if (bwRes.rateLimited) return done('rate_limited');
+      if (isAborted(signal)) return done('aborted');
+      if (!bwRes.bytes || bwRes.bytes.length === 0) continue;
+      bytesFetched += bwRes.bytes.length;
+      segmentsFetched += 1;
+
+      const { results, nextUri } = decodePackedSegmentNav(bwRes.bytes);
+      /** @type {import('./ndgrDecode.js').NdgrChat[]} */
+      const chats = [];
+      for (const r of results) {
+        if (r && Array.isArray(r.chats) && r.chats.length) chats.push(...r.chats);
+      }
+      if (chats.length) {
+        rowsSeen += chats.length;
+        const minVpos = minVposOf(chats);
+        if (minVpos != null && (globalMinVpos == null || minVpos < globalMinVpos)) {
+          globalMinVpos = minVpos;
+        }
+        yield {
+          chats,
+          segmentsFetched,
+          rowsSeen,
+          bytesFetched,
+          minCommentNo: minNoOf(chats),
+          minVposReached: globalMinVpos
+        };
+        if (rowsSeen >= caps.rows) return done('cap_rows');
+      }
+      if (nextUri) enqueuePointer('backward', nextUri, true);
+      if (bytesFetched >= caps.bytes) return done('cap_bytes');
+      if (segmentsFetched >= caps.segments && (backwardQueue.length || previousQueue.length)) {
+        return done('cap_segments');
+      }
+      continue;
+    }
+
+    const uri = previousQueue.shift();
+    if (!uri) continue;
+    const prevRes = await fetchWithThrottle(ctx, uri, false);
+    if (prevRes.rateLimited) return done('rate_limited');
+    if (isAborted(signal)) return done('aborted');
+    if (!prevRes.bytes || prevRes.bytes.length === 0) continue;
+    bytesFetched += prevRes.bytes.length;
+    segmentsFetched += 1;
+
+    /** @type {import('./ndgrDecode.js').NdgrChat[]} */
+    const chats = [];
+    try {
+      const frames = splitLengthDelimitedMessages(prevRes.bytes);
+      for (const frame of frames) {
+        const decoded = decodeChunkedMessage(frame);
+        if (decoded && Array.isArray(decoded.chats) && decoded.chats.length) {
+          chats.push(...decoded.chats);
+        }
+      }
+    } catch {
+      // 壊れた previous segment は best-effort で捨て、他のポインタ巡回を続ける。
+    }
+
+    if (chats.length) {
+      rowsSeen += chats.length;
+      const minVpos = minVposOf(chats);
+      if (minVpos != null && (globalMinVpos == null || minVpos < globalMinVpos)) {
+        globalMinVpos = minVpos;
+      }
+      yield {
+        chats,
+        segmentsFetched,
+        rowsSeen,
+        bytesFetched,
+        minCommentNo: minNoOf(chats),
+        minVposReached: globalMinVpos
+      };
+      if (rowsSeen >= caps.rows) return done('cap_rows');
+    }
+    if (bytesFetched >= caps.bytes) return done('cap_bytes');
+    if (segmentsFetched >= caps.segments && (backwardQueue.length || previousQueue.length)) {
+      return done('cap_segments');
+    }
+  }
+}
