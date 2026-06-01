@@ -16,6 +16,14 @@ export const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 /** 直近の chrome.storage.local 書き込み失敗（クォータ等）。成功時にコンテンツ側で削除する */
 export const KEY_STORAGE_WRITE_ERROR = 'nls_storage_write_error';
 
+/**
+ * 記録停止ウォッチドッグの直近スナップショット（自己診断の可視化用・local only）。
+ * 「公式コメは増えているのに記録が伸びない」を検知して段階回復したときに content が書く。
+ * dev オーバーレイがこれを読んで「書き込み停止検知→自動復旧（理由/回数）」を表示する。
+ * 値: `{ at, liveId?, reason, attempt, recorded, official, actions }`。
+ */
+export const KEY_RECORDING_WATCHDOG = 'nls_recording_watchdog_v1';
+
 /** AI共有・不具合調査用のエラーリング（最大80件・本文はマスク済み・local only） */
 export const KEY_DIAGNOSTICS_ERROR_RING_V1 = 'nls_diagnostics_error_ring_v1';
 

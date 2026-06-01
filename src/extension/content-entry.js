@@ -32,6 +32,7 @@ import {
   KEY_COMMENT_PANEL_STATUS,
   KEY_COMMENT_INGEST_LOG,
   KEY_STORAGE_WRITE_ERROR,
+  KEY_RECORDING_WATCHDOG,
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
   KEY_GIFT_RANKING_LANE_ENABLED,
@@ -60,6 +61,11 @@ import {
 } from '../lib/videoCapture.js';
 import { addThumbBlob, countThumbsForLive, isIndexedDbAvailable } from '../lib/thumbDb.js';
 import { createDevReloadState, applyDevReloadSignal } from '../lib/devReloadSignal.js';
+import {
+  evaluateRecordingStall,
+  pickStallRecoveryActions,
+  RECORDING_STALL_RECOVERY_COOLDOWN_MS
+} from '../lib/recordingStallWatchdog.js';
 import {
   createProgressSamples,
   pushProgressSample,
@@ -6717,6 +6723,7 @@ function startPageFrameLoop() {
     maybeOfficialGapQuietDeepHarvest();
     maybeAutoStartBackfill(); // v0.1.418: 自動で過去ログ取り込み（既定 ON・OFF も可）。
     maybeStartNdgrForwardCrawl(); // v0.1.511: 前方向 NDGR 継続取得（opt-in・既定 OFF）。
+    maybeRunRecordingStallWatchdog(); // 記録停止の自己診断＋自己回復（公式コメの伸びを独立信号に）。
     persistAiShareFastDiagnostics();
     // 0.1.32 (AG): バックグラウンドで prewarm を skip した分、tick で再 schedule
     // を試みる。visibilitychange は tick を呼ぶので、可視化された瞬間に prewarm
@@ -9997,6 +10004,132 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// ── 記録停止ウォッチドッグ（自己診断＋自己回復） ───────────────────────────────
+//   背景（2026-06-01 実機）: 複数ライブを同時タブで開くと、裏の大規模放送が
+//     「チャンク移行 set の一度のタイムアウト→以後 O(N) 書き込み固定→16s ガード常時到達」や
+//     「page-intercept 傍受の desync」で、記録カウントが伸びず止まる。
+//   人手のコンソール調査・F5 を不要にするのが狙い。独立信号（公式コメ数＝本家コメの伸び）と
+//     記録カウントを突き合わせ、「公式は増えているのに記録が一定時間伸びない」を検知して
+//     軽い手→重い手に段階回復する。判定ロジックは純関数（recordingStallWatchdog.js）。
+//   ⚠️バックフィル（過去ログ取り込み）は本質的に時間がかかり、記録が数十秒伸びない区間が
+//     普通にある。これを停止と誤検知して回復を撃つと取り込みを妨害するため、走行中＋直近
+//     この時間内に進捗があった間はウォッチドッグの回復を完全停止する（2026-06-01 回帰対策）。
+const WATCHDOG_BACKFILL_QUIET_MS = 60_000;
+//   ⚠️回復アクション（flush/再シード/前方向クロール）は既定 OFF（2026-06-01・安全側）:
+//     実機で、通常のバックフィル中に誤発動して取り込みを妨害し記録数を減らす回帰が出た。
+//     検知と可視化（メーター/パネル表示）は常時行うが、ストレージや取り込みに手を出す回復は
+//     この flag が true のときだけ。実機で「検知は正しいが回復が無害」を確認してから ON にする。
+const _wdRecoveryEnabled = false;
+let _wdLastRecorded = -1;
+let _wdRecordedGrowthAt = 0;
+let _wdLastOfficial = -1;
+let _wdOfficialGrowthAt = 0;
+let _wdLastRecoveryAt = 0;
+let _wdRecoveryAttempts = 0;
+
+/**
+ * 記録停止を検知して段階的に自己回復する。tickPageFrameMaintenance から定期呼び出し。
+ * 副作用は最小限（flush / シード再実行 / 前方向クロール起動）に留め、停止が解消すれば
+ * 試行カウンタを 0 に戻して次の停止に備える。
+ * @returns {void}
+ */
+function maybeRunRecordingStallWatchdog() {
+  if (!isWatchInlinePanelTopFrame()) return;
+  if (!hasExtensionContext()) return;
+  const now = Date.now();
+  const recorded = Number(observedRecordedCommentCount) || 0;
+  const official =
+    officialCommentCount != null && Number.isFinite(officialCommentCount)
+      ? Number(officialCommentCount)
+      : null;
+
+  // 成長タイムスタンプの更新。記録が伸びたら回復成功とみなし試行カウンタをリセットする。
+  if (recorded > _wdLastRecorded) {
+    _wdLastRecorded = recorded;
+    _wdRecordedGrowthAt = now;
+    _wdRecoveryAttempts = 0;
+  } else if (_wdRecordedGrowthAt === 0) {
+    _wdRecordedGrowthAt = now;
+  }
+  if (official != null && official > _wdLastOfficial) {
+    _wdLastOfficial = official;
+    _wdOfficialGrowthAt = now;
+  } else if (_wdOfficialGrowthAt === 0 && official != null) {
+    _wdOfficialGrowthAt = now;
+  }
+
+  // ⚠️バックフィル（過去ログ取り込み）中は黙らせる（2026-06-01 実機回帰の真因）:
+  //   バックフィルは NDGR segment を順に辿る性質上、記録が数十秒伸びない区間が普通にある。
+  //   それを「停止」と誤検知して再シード等を撃つと、取り込み自体を妨害し初動取得が頭打ちに
+  //   なる（実機: 9% で頭打ち＋記録数が 98→77 に減少）。バックフィルこそが「遅れの回復」役
+  //   なので、走行中／直近に進捗があった間は回復を一切行わない（成長追跡だけ続ける）。
+  const backfillActive =
+    _backfillAbort != null ||
+    (_backfillLastProgressAt > 0 &&
+      now - _backfillLastProgressAt < WATCHDOG_BACKFILL_QUIET_MS);
+
+  const verdict = evaluateRecordingStall({
+    recording,
+    officialCount: official,
+    recordedCount: recorded,
+    lastRecordedGrowthAtMs: _wdRecordedGrowthAt,
+    lastOfficialGrowthAtMs: _wdOfficialGrowthAt,
+    nowMs: now
+  });
+  if (!verdict.stalled) return;
+  if (backfillActive) return;
+
+  // 連打防止のクールダウン（前回の検知/回復から一定時間あけて観測する）。
+  if (now - _wdLastRecoveryAt < RECORDING_STALL_RECOVERY_COOLDOWN_MS) return;
+  _wdLastRecoveryAt = now;
+  _wdRecoveryAttempts += 1;
+  const actions = pickStallRecoveryActions(_wdRecoveryAttempts);
+
+  // ⚠️回復アクションは既定 OFF（検知＋可視化のみ）。ストレージ/取り込みに手を出さないので
+  //   バックフィルや通常記録を一切妨害しない。_wdRecoveryEnabled を true にしたときだけ実行。
+  if (_wdRecoveryEnabled) {
+    try {
+      if (actions.reseed) {
+        // シードを張り直す＝次フラッシュで seedTailFromMain が再実行され、チャンク移行（有界化）も
+        //   リトライされる。⚠️ persistCommentRowsChain は触らない（resolve で潰すと進行中の
+        //   書き込みを取りこぼして記録数が減る・2026-06-01 回帰）。
+        tailSeededLiveId = '';
+      }
+      if (actions.forwardCrawl) {
+        _ndgrForwardEnabled = true;
+        maybeStartNdgrForwardCrawl();
+      }
+      if (actions.flush) {
+        void persistCoalescer.flush();
+      }
+    } catch {
+      /* best-effort: 回復試行自体の失敗で例外を投げない */
+    }
+  }
+
+  // 自己診断スナップショットを書く（オーバーレイ/パネルが読んで可視化する・PII なし）。
+  //   recovered=false のときは「検知のみ（無害）」として表示する。
+  try {
+    setStorageLocalSilent(
+      {
+        [KEY_RECORDING_WATCHDOG]: {
+          at: now,
+          ...(liveId ? { liveId } : {}),
+          reason: verdict.reason,
+          attempt: _wdRecoveryAttempts,
+          recorded,
+          ...(official != null ? { official } : {}),
+          recovered: _wdRecoveryEnabled,
+          actions: _wdRecoveryEnabled ? actions : {}
+        }
+      },
+      { warn: false }
+    );
+  } catch {
+    /* no-op */
+  }
+}
+
 /**
  * @param {ParsedCommentRow[]|null|undefined} rows
  * @param {{ source?: string }} [opts] ndgr | mutation | deep | visible
@@ -11587,20 +11720,17 @@ async function pollStatsFromPage() {
   }
 }
 
-/* ============================ dev 専用ツール ============================ */
+/* ===================== dev 専用: ホットリロード ===================== */
 /* NL_DEV_HOTRELOAD（esbuild --define）が true の dev watch ビルドだけで動く。     */
-/* 本番（scripts/build.mjs）は NL_DEV_HOTRELOAD=false 注入で、下の if と関数群が    */
+/* 本番（scripts/build.mjs）は NL_DEV_HOTRELOAD=false 注入で、この関数と呼び出しが  */
 /* まるごと dead-code 除去される（配布版には一切含まれない）。                      */
-/* ① ホットリロード: SW にシグナル id を問い合わせ（純関数 applyDevReloadSignal で  */
-/*    変化検知）、変わっていたら SW にタブ reload + runtime.reload を依頼する。      */
-/* ② 記録監視: 公式件数と記録件数を定期サンプリングし、達成/停滞/成長を画面左下の    */
-/*    オーバーレイ＋コンソールに出す（件数を凝視しなくて済む）。                      */
-let _devToolingStarted = false;
-function startDevHotReloadAndMonitor() {
-  if (_devToolingStarted) return;
-  _devToolingStarted = true;
+/* SW にシグナル id を問い合わせ（純関数 applyDevReloadSignal で変化検知）、         */
+/* 変わっていたら SW にタブ reload + runtime.reload を依頼する。                     */
+let _devHotReloadStarted = false;
+function startDevHotReload() {
+  if (_devHotReloadStarted) return;
+  _devHotReloadStarted = true;
 
-  // --- ① ホットリロード ---
   let reloadState = createDevReloadState();
   async function pollReloadSignal() {
     let resp = null;
@@ -11626,8 +11756,19 @@ function startDevHotReloadAndMonitor() {
     /* no-op */
   }
   void pollReloadSignal();
+}
 
-  // --- ② 記録監視 ---
+/* ===================== 記録監視メーター（常設） ===================== */
+/* 公式件数と記録件数を定期サンプリングし、達成/停滞/成長を画面左下のオーバーレイ   */
+/* ＋コンソールに出す（件数を凝視しなくて済む）。                                    */
+/* dev / 本番を問わず常に動く。以前は dev 専用ツールに同梱していたため本番ビルドの   */
+/* たびにメーターが消える事故が再発していた（ユーザー報告・2026-06-01）。            */
+/* watch タブの top frame で 1 回だけ起動する。                                      */
+let _recordingMonitorStarted = false;
+function startRecordingProgressMonitor() {
+  if (_recordingMonitorStarted) return;
+  _recordingMonitorStarted = true;
+
   let samples = createProgressSamples();
   let lastStatus = '';
   const overlay = createDevMonitorOverlay();
@@ -11639,7 +11780,21 @@ function startDevHotReloadAndMonitor() {
         official: officialCommentCount
       });
       const ev = evaluateCommentProgress(samples);
-      if (overlay) overlay.update(ev);
+      if (overlay) {
+        overlay.update(ev);
+        // 自己回復ウォッチドッグの直近スナップショットを併記（自己診断の可視化）。
+        try {
+          chrome.storage.local
+            .get([KEY_RECORDING_WATCHDOG])
+            .then((bag) => {
+              const wd = bag && bag[KEY_RECORDING_WATCHDOG];
+              if (wd && typeof wd === 'object') overlay.updateWatchdog(wd);
+            })
+            .catch(() => {});
+        } catch {
+          /* no-op */
+        }
+      }
       if (ev.status !== lastStatus) {
         lastStatus = ev.status;
         try {
@@ -11683,7 +11838,13 @@ function createDevMonitorOverlay() {
       'overflow:hidden',
       'text-overflow:ellipsis'
     ].join(';');
-    el.textContent = '記録監視: データ待ち';
+    el.style.whiteSpace = 'normal';
+    const mainLine = document.createElement('div');
+    mainLine.textContent = '記録監視: データ待ち';
+    const wdLine = document.createElement('div');
+    wdLine.style.cssText = 'margin-top:2px;font-size:11px;opacity:.85;display:none';
+    el.appendChild(mainLine);
+    el.appendChild(wdLine);
     document.body.appendChild(el);
     const COLORS = {
       reached: '#37d67a',
@@ -11691,11 +11852,39 @@ function createDevMonitorOverlay() {
       stalled: '#ff6b6b',
       idle: '#9aa0aa'
     };
+    const REASON_LABEL = {
+      recorded_flat_while_official_advancing: '記録停止を検知'
+    };
     return {
       update(ev) {
         try {
           el.style.borderLeftColor = COLORS[ev && ev.status] || '#888';
-          el.textContent = `記録監視: ${ev && ev.label ? ev.label : '—'}`;
+          mainLine.textContent = `記録監視: ${ev && ev.label ? ev.label : '—'}`;
+        } catch {
+          /* no-op */
+        }
+      },
+      updateWatchdog(wd) {
+        try {
+          const at = Number(wd && wd.at) || 0;
+          // 直近120秒以内の回復イベントだけ表示（古い記録は隠す）。
+          if (!at || Date.now() - at > 120_000) {
+            wdLine.style.display = 'none';
+            return;
+          }
+          const reason = REASON_LABEL[wd.reason] || '記録停止を検知';
+          const acts = wd.actions || {};
+          const steps = [
+            acts.flush ? 'flush' : '',
+            acts.reseed ? '再シード' : '',
+            acts.forwardCrawl ? '前方向取得' : ''
+          ].filter(Boolean).join('+');
+          wdLine.textContent =
+            wd.recovered && steps
+              ? `自動復旧#${wd.attempt || 1}: ${reason} → ${steps}（記録${wd.recorded ?? '?'}/公式${wd.official ?? '?'}）`
+              : `${reason}（監視のみ・記録${wd.recorded ?? '?'}/公式${wd.official ?? '?'}）`;
+          wdLine.style.color = '#ffd166';
+          wdLine.style.display = 'block';
         } catch {
           /* no-op */
         }
@@ -11748,14 +11937,21 @@ async function start() {
   }
   bindNativeSelfPostedRecorder();
 
-  // dev watch ビルドのみ: ホットリロード + 記録自動監視を起動（top frame で 1 回）。
-  //   本番ビルドは NL_DEV_HOTRELOAD=false で丸ごと dead-code 除去される。
+  // 記録監視メーターは dev / 本番を問わず常設（top frame で 1 回）。
+  //   以前は dev 専用ツールに同梱していたため、本番ビルドのたびにメーターが消える
+  //   事故が再発していた（ユーザー報告・2026-06-01）。常設化して恒久対処。
+  if (isWatchInlinePanelTopFrame()) {
+    startRecordingProgressMonitor();
+  }
+
+  // ホットリロードは dev watch ビルドのみ（top frame で 1 回）。
+  //   本番ビルドは NL_DEV_HOTRELOAD=false で startDevHotReload ごと dead-code 除去される。
   if (
     typeof NL_DEV_HOTRELOAD !== 'undefined' &&
     NL_DEV_HOTRELOAD &&
     isWatchInlinePanelTopFrame()
   ) {
-    startDevHotReloadAndMonitor();
+    startDevHotReload();
   }
 
   // 0.1.29 (AD): start() が二度呼ばれた場合に旧 observer を必ず disconnect。
@@ -11841,15 +12037,13 @@ async function start() {
     ]).then((bag) => {
       _backfillEnabled = isBackfillEnabledFromStorage(bag);
       _backfillAutoEnabled = isBackfillAutoStartEnabled(bag);
-      // 明示設定があればそれを尊重。無ければ dev watch ビルドだけ既定 ON で検証し、
-      //   本番ビルドは既定 OFF（橋渡し実機検証が済むまでの安全策）。
+      // ⚠️既定 OFF（2026-06-01 実機回帰）: 決定論的エンジンは dev 既定 ON にしていたが、実機で
+      //   過少取得（公式の 2〜11% で頭打ち・複数放送で再現）が判明。実績ある旧エンジン
+      //   （crawlNdgrBackward）が「一気に取れる」ので、明示的に true を保存した環境だけ
+      //   決定論的エンジンを使う。dev でも既定 OFF に揃え、エンジン側のバグ修正が済むまで
+      //   旧エンジンを既定にする。
       const stored = bag ? bag[KEY_NDGR_DETERMINISTIC_BACKFILL] : undefined;
-      _ndgrDeterministicBackfillEnabled =
-        stored === true
-          ? true
-          : stored === false
-            ? false
-            : typeof NL_DEV_HOTRELOAD !== 'undefined' && NL_DEV_HOTRELOAD;
+      _ndgrDeterministicBackfillEnabled = stored === true;
     }).catch(() => { /* 既定（手動 OFF・自動 ON）を維持 */ });
   } catch { /* no-op */ }
 
