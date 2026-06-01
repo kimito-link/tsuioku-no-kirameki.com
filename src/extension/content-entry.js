@@ -11841,8 +11841,15 @@ async function start() {
     ]).then((bag) => {
       _backfillEnabled = isBackfillEnabledFromStorage(bag);
       _backfillAutoEnabled = isBackfillAutoStartEnabled(bag);
+      // 明示設定があればそれを尊重。無ければ dev watch ビルドだけ既定 ON で検証し、
+      //   本番ビルドは既定 OFF（橋渡し実機検証が済むまでの安全策）。
+      const stored = bag ? bag[KEY_NDGR_DETERMINISTIC_BACKFILL] : undefined;
       _ndgrDeterministicBackfillEnabled =
-        bag != null && bag[KEY_NDGR_DETERMINISTIC_BACKFILL] === true;
+        stored === true
+          ? true
+          : stored === false
+            ? false
+            : typeof NL_DEV_HOTRELOAD !== 'undefined' && NL_DEV_HOTRELOAD;
     }).catch(() => { /* 既定（手動 OFF・自動 ON）を維持 */ });
   } catch { /* no-op */ }
 
@@ -13348,11 +13355,13 @@ let _backfillEnabled = false;
  */
 let _backfillAutoEnabled = true;
 /**
- * @type {boolean} B案: 決定論 NDGR バックフィルを使うか。検証中につき既定 false（旧エンジン）。
- *   バケット橋渡し（?at 再シード）未実装のため誤 reached_start のリスクがあり、明示 true の
- *   ときだけ新エンジンを使う opt-in にしている（橋渡し追加・実機検証後に既定 ON へ戻す予定）。
+ * @type {boolean} B案: 決定論 NDGR バックフィルを使うか。
+ *   橋渡し（?at 再シード）実装済みだが本番実機検証が未了のため、本番ビルドは既定 OFF。
+ *   dev watch ビルド（NL_DEV_HOTRELOAD=true）だけ既定 ON にして開発者が検証する。
+ *   storage に明示値があれば常にそれを優先（start() の読み込み参照）。
  */
-let _ndgrDeterministicBackfillEnabled = false;
+let _ndgrDeterministicBackfillEnabled =
+  typeof NL_DEV_HOTRELOAD !== 'undefined' && NL_DEV_HOTRELOAD;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
