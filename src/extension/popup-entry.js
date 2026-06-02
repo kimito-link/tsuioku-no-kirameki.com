@@ -182,6 +182,13 @@ import {
   GIFT_BAHAMUT_MIN_GAP_MS
 } from '../lib/giftBahamutCelebration.js';
 import {
+  SELF_ACTION_CELEBRATION_MIN_GAP_MS,
+  buildSelfAdCelebrationSpec,
+  buildSelfCommentCelebrationSpec,
+  buildSelfGiftCelebrationSpec,
+  selfActionUsesGiftZoom
+} from '../lib/selfActionCelebration.js';
+import {
   flyTextLinesForSupportCelebration,
   flyTextLinesForGiftBahamut
 } from '../lib/celebrationFlyText.js';
@@ -879,6 +886,9 @@ let _lastGiftBahamutAt = 0;
 /** @type {number} */
 let _lastAdThrowCelebrationAt = 0;
 
+/** @type {number} */
+let _lastSelfActionCelebrationAt = 0;
+
 /** @type {Set<string>} */
 const _celebrationSessionDedupe = new Set();
 
@@ -942,6 +952,7 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
   _seenGiftCommentKeys.clear();
   _lastGiftBahamutAt = 0;
   _lastAdThrowCelebrationAt = 0;
+  _lastSelfActionCelebrationAt = 0;
   _celebrationSessionDedupe.clear();
 }
 
@@ -1300,6 +1311,130 @@ function maybePlayGiftBahamut(liveId, spec) {
 }
 
 /**
+ * @param {import('../lib/selfActionCelebration.js').SelfActionCelebrationSpec} spec
+ * @returns {import('../lib/celebrationFlyText.js').CelebrationFlyTextLine[]}
+ */
+function flyTextLinesForSelfActionCelebration(spec) {
+  const color = spec.kind === 'self_comment' ? '#6ee8ff' : spec.kind === 'self_gift' ? '#ffb84d' : '#fff56a';
+  /** @type {import('../lib/celebrationFlyText.js').CelebrationFlyTextLine[]} */
+  const lines = [
+    { text: spec.message, motion: 'burst', color, sizePx: 28 },
+    { text: 'ナイス！', motion: 'scroll', color: '#ffffff', sizePx: 22, lanePct: 18 },
+    { text: '888888888', motion: 'scroll', color: '#fff56a', sizePx: 24, lanePct: 38 },
+    { text: 'ありがとう！', motion: 'burst', color: '#b8ff8a', sizePx: 24 }
+  ];
+  if (spec.kind === 'self_ad') {
+    lines.splice(1, 0, { text: '広告！', motion: 'burst', color: '#ffb84d', sizePx: 26 });
+  } else if (spec.kind === 'self_gift') {
+    lines.splice(1, 0, { text: 'ギフト！', motion: 'burst', color: '#ff8ec8', sizePx: 26 });
+  }
+  return lines.slice(0, 6);
+}
+
+/**
+ * 自分操作用の軽量 shower。動き控えめ時は banner だけ出る。
+ * @param {import('../lib/selfActionCelebration.js').SelfActionCelebrationSpec} spec
+ */
+function playSelfActionCelebrationDom(spec) {
+  const anchor =
+    document.getElementById('supportVisualLiveCard') ||
+    document.getElementById('liveStatComments')?.closest('.nl-live-stat-card');
+  const useAnchor = anchor instanceof HTMLElement;
+  const mountRoot = useAnchor ? anchor : document.documentElement;
+
+  let host = mountRoot.querySelector('#nlSelfActionCelebration');
+  if (!(host instanceof HTMLElement)) {
+    host = document.createElement('div');
+    host.id = 'nlSelfActionCelebration';
+    host.className = 'nl-celebration-shower';
+    host.hidden = true;
+    host.setAttribute('aria-live', 'polite');
+    mountRoot.appendChild(host);
+  } else if (host.parentElement !== mountRoot) {
+    mountRoot.appendChild(host);
+  }
+
+  host.className = 'nl-celebration-shower';
+  host.classList.toggle('nl-celebration-shower--inline', INLINE_MODE);
+  host.classList.toggle('nl-celebration-shower--anchored', useAnchor);
+  host.innerHTML = '';
+  host.hidden = false;
+  host.removeAttribute('hidden');
+
+  const banner = document.createElement('div');
+  banner.className = 'nl-celebration-shower__banner';
+  banner.textContent = spec.message;
+  host.appendChild(banner);
+
+  appendCelebrationPikaLayer(host, 'soft');
+
+  if (supportCelebrationMotionEnabled()) {
+    const drops = document.createElement('div');
+    drops.className = 'nl-celebration-shower__drops';
+    const pool = supportCelebrationImagePool(spec.characterSet);
+    const dropCount = Math.max(6, Math.min(10, Math.floor(spec.dropCount)));
+    for (let i = 0; i < dropCount; i++) {
+      const img = document.createElement('img');
+      img.className = 'nl-celebration-drop';
+      img.src = pool[i % pool.length];
+      img.alt = '';
+      img.decoding = 'async';
+      img.style.left = `${10 + Math.random() * 80}%`;
+      img.style.width = `${22 + Math.floor(Math.random() * 14)}px`;
+      img.style.height = img.style.width;
+      img.style.animationDelay = `${Math.random() * spec.durationMs * 0.35}ms`;
+      img.style.setProperty('--nl-celebration-fall-dur', `${1300 + Math.random() * 900}ms`);
+      drops.appendChild(img);
+    }
+    host.appendChild(drops);
+    appendCelebrationFlyTextLayer(host, flyTextLinesForSelfActionCelebration(spec), spec.durationMs);
+  }
+
+  window.setTimeout(() => {
+    host.hidden = true;
+    host.innerHTML = '';
+  }, spec.durationMs + 350);
+}
+
+/**
+ * 自分操作は storage dedupe なし。popup セッション内の同一イベント抑制と短い連投抑制だけ。
+ * @param {string} liveId
+ * @param {import('../lib/selfActionCelebration.js').SelfActionCelebrationSpec|null|undefined} spec
+ */
+function maybePlaySelfActionCelebration(liveId, spec) {
+  const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!lid || !spec) return;
+  const sessionKey = `${lid}:${spec.sessionDedupeKey}`;
+  if (_celebrationSessionDedupe.has(sessionKey)) return;
+  const now = Date.now();
+  if (now - _lastSelfActionCelebrationAt < SELF_ACTION_CELEBRATION_MIN_GAP_MS) return;
+
+  _celebrationSessionDedupe.add(sessionKey);
+  _lastSelfActionCelebrationAt = now;
+
+  if (
+    supportCelebrationMotionEnabled() &&
+    selfActionUsesGiftZoom(spec.kind, spec.point)
+  ) {
+    const zoomSpec = pickGiftBahamutCelebration(
+      {
+        sender: spec.sender || 'あなた',
+        item: spec.item || 'ギフト',
+        point: spec.point || 0
+      },
+      spec.sourceDedupeKey || spec.sessionDedupeKey
+    );
+    if (zoomSpec) {
+      _lastGiftBahamutAt = now;
+      playGiftBahamutDom(zoomSpec);
+      return;
+    }
+  }
+
+  playSelfActionCelebrationDom(spec);
+}
+
+/**
  * @param {string} liveId
  * @param {string} dedupeKey
  * @returns {Promise<boolean>}
@@ -1447,6 +1582,33 @@ function nicoadCommentCelebrationKey(entry, liveId) {
 }
 
 /**
+ * ギフト/広告のシステムコメントが視聴者本人の操作かを、取れる範囲で保守的に判定する。
+ * @param {unknown} entry
+ * @param {string} parsedSender
+ * @param {string} liveId
+ * @param {unknown[]} entries
+ * @returns {boolean}
+ */
+function isCurrentViewerActionComment(entry, parsedSender, liveId, entries) {
+  const e = /** @type {{ userId?: unknown, nickname?: unknown, selfPosted?: unknown }} */ (entry);
+  if (e?.selfPosted === true) return true;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (lid && isOwnPostedSupportComment(/** @type {PopupCommentEntry} */ (entry), lid, /** @type {PopupCommentEntry[]} */ (entries))) {
+    return true;
+  }
+  const viewerUid = String(watchMetaCache.snapshot?.viewerUserId || '').trim();
+  const viewerNickname = String(watchMetaCache.snapshot?.viewerNickname || '').replace(/\s+/g, ' ').trim();
+  const entryUid = String(e?.userId || '').trim();
+  const entryNickname = String(e?.nickname || '').replace(/\s+/g, ' ').trim();
+  const sender = String(parsedSender || '').replace(/\s+/g, ' ').trim();
+  if (viewerUid && entryUid && viewerUid === entryUid) return true;
+  if (viewerUid && sender && viewerUid === sender) return true;
+  if (viewerNickname && sender && viewerNickname === sender) return true;
+  if (viewerNickname && entryNickname && viewerNickname === entryNickname) return true;
+  return false;
+}
+
+/**
  * コメントログの「○○pt広告しました」を検知して演出（投げた瞬間を拾う正本経路）。
  *
  * @param {unknown[]} entries
@@ -1468,6 +1630,18 @@ function scanCommentsForNicoadCelebrations(entries, liveId) {
     if (_seenNicoadCommentKeys.has(key)) continue;
     _seenNicoadCommentKeys.add(key);
     if (seedOnly) continue;
+    if (isCurrentViewerActionComment(entry, parsed.sender, lid, entries)) {
+      void maybePlaySelfActionCelebration(
+        lid,
+        buildSelfAdCelebrationSpec({
+          sender: parsed.sender,
+          point: parsed.point,
+          sessionDedupeKey: `ad_comment_${key}`,
+          sourceDedupeKey: key
+        })
+      );
+      continue;
+    }
     const spec = pickNicoadCommentCelebration(parsed, key);
     if (spec) void maybePlaySupportCelebration(lid, spec);
   }
@@ -1495,6 +1669,19 @@ function scanCommentsForGiftBahamut(entries, liveId) {
     if (_seenGiftCommentKeys.has(key)) continue;
     _seenGiftCommentKeys.add(key);
     if (seedOnly) continue;
+    if (isCurrentViewerActionComment(entry, parsed.sender, lid, entries)) {
+      maybePlaySelfActionCelebration(
+        lid,
+        buildSelfGiftCelebrationSpec({
+          sender: parsed.sender,
+          item: parsed.item,
+          point: parsed.point,
+          sessionDedupeKey: `gift_bahamut_${key}`,
+          sourceDedupeKey: key
+        })
+      );
+      continue;
+    }
     const spec = pickGiftBahamutCelebration(parsed, key);
     if (spec) maybePlayGiftBahamut(lid, spec);
   }
@@ -17097,6 +17284,12 @@ async function initPopup() {
       if (result.ok) {
         if (commentInput) commentInput.value = '';
         COMMENT_KINDNESS_UI_STATE.armedText = '';
+        maybePlaySelfActionCelebration(
+          lvPost || watchPopupLastPaintedLiveId,
+          buildSelfCommentCelebrationSpec({
+            sessionDedupeKey: `self_comment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+          })
+        );
         setCommentPostNotice('コメントを送信しました。', 'success');
         const growthEl = /** @type {HTMLElement|null} */ ($('sceneStoryGrowth'));
         if (growthEl) patchStoryGrowthIconsFromSource(growthEl);

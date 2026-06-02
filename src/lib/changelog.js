@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.557',
+    date: '2026-06-02',
+    summary: '自分操作時の軽い演出を追加',
+    items: Object.freeze([
+      'アプリからコメント送信に成功した直後、軽いぴかっ演出と短いキャラ shower を返すようにしました',
+      '本人のギフトログを検知したとき、少額は軽い演出、一定以上のptは既存のギフトズーム演出で反応します',
+      '本人のニコニ広告ログも軽い演出で反応します。他の人のギフトや広告、100件などの節目豪雨は従来どおりです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.556',
     date: '2026-06-02',
     summary: 'コメント節目をアプリ記録基準に修正＋ぴかっフラッシュ',
