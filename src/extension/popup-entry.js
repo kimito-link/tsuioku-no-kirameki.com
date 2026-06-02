@@ -182,6 +182,10 @@ import {
   GIFT_BAHAMUT_MIN_GAP_MS
 } from '../lib/giftBahamutCelebration.js';
 import {
+  flyTextLinesForSupportCelebration,
+  flyTextLinesForGiftBahamut
+} from '../lib/celebrationFlyText.js';
+import {
   normalizeCommenterFollowMap,
   normalizeCommenterFollowLiveSnapshot,
   applyFollowFieldsToUser,
@@ -985,6 +989,50 @@ function supportCelebrationImagePool(characterSet) {
 }
 
 /**
+ * ニコニコ／ボカロ MV 風 — 文字が飛び交うレイヤ
+ *
+ * @param {HTMLElement} host
+ * @param {import('../lib/celebrationFlyText.js').CelebrationFlyTextLine[]} lines
+ * @param {number} durationMs
+ */
+function appendCelebrationFlyTextLayer(host, lines, durationMs) {
+  if (!supportCelebrationMotionEnabled() || !lines.length) return;
+  const layer = document.createElement('div');
+  layer.className = 'nl-celebration-flytext';
+  lines.forEach((line, i) => {
+    const el = document.createElement('span');
+    el.className = `nl-celebration-flytext__line nl-celebration-flytext__line--${line.motion}`;
+    el.textContent = line.text;
+    const delayMs = Math.min(
+      durationMs * 0.75,
+      i * 140 + Math.random() * durationMs * 0.12
+    );
+    const durMs =
+      line.motion === 'scroll'
+        ? 3200 + Math.random() * 2800
+        : 2200 + Math.random() * 1600;
+    el.style.setProperty('--nl-fly-delay', `${delayMs}ms`);
+    el.style.setProperty('--nl-fly-dur', `${durMs}ms`);
+    el.style.setProperty('--nl-fly-color', line.color || '#ffffff');
+    el.style.setProperty('--nl-fly-size', `${line.sizePx || 22}px`);
+    if (line.motion === 'scroll') {
+      el.style.setProperty(
+        '--nl-fly-lane',
+        `${line.lanePct ?? 8 + ((i * 17) % 78)}%`
+      );
+    } else {
+      el.style.setProperty('--nl-fly-x0', `${-10 + Math.random() * 20}vw`);
+      el.style.setProperty('--nl-fly-y0', `${12 + ((i * 13) % 68)}%`);
+      el.style.setProperty('--nl-fly-x1', `${-50 + Math.random() * 100}px`);
+      el.style.setProperty('--nl-fly-y1', `${-50 - Math.random() * 90}px`);
+      el.style.setProperty('--nl-fly-rot', `${-12 + Math.random() * 24}deg`);
+    }
+    layer.appendChild(el);
+  });
+  host.appendChild(layer);
+}
+
+/**
  * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec} spec
  */
 function playSupportCelebrationDom(spec) {
@@ -1069,6 +1117,11 @@ function playSupportCelebrationDom(spec) {
       drops.appendChild(img);
     }
     host.appendChild(drops);
+    appendCelebrationFlyTextLayer(
+      host,
+      flyTextLinesForSupportCelebration(spec),
+      spec.durationMs
+    );
   }
 
   window.setTimeout(() => {
@@ -1128,6 +1181,12 @@ function playGiftBahamutDom(spec) {
   host.appendChild(banner);
 
   if (supportCelebrationMotionEnabled()) {
+    appendCelebrationFlyTextLayer(
+      host,
+      flyTextLinesForGiftBahamut(spec),
+      spec.durationMs
+    );
+
     const squad = document.createElement('div');
     squad.className = 'nl-gift-bahamut__squad';
     const labels = ['こん太', 'りんく', 'たぬ姉'];

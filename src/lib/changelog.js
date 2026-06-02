@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.555',
+    date: '2026-06-02',
+    summary: '演出にニコニコ／ボカロ MV 風の飛び文字を追加',
+    items: Object.freeze([
+      '888888888・尊い・草などが右から流れるニコ生コメント風スクロール',
+      '節目メッセージやギフト名がバーストで画面を横切る',
+      'コメント豪雨・ギフトズーム・広告／順位UP演出すべてに適用'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.554',
     date: '2026-06-02',
     summary: 'コメント豪雨 — 三キャラ混在・サイズアップ',

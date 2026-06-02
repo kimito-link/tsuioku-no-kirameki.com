@@ -3365,12 +3365,79 @@
       }
       @media (prefers-reduced-motion: reduce) {
         .nl-celebration-shower__banner,
-        .nl-celebration-drop {
+        .nl-celebration-drop,
+        .nl-celebration-flytext__line {
           animation: none !important;
         }
         .nl-celebration-shower--rinku-deluge .nl-celebration-shower__banner {
           animation: none !important;
         }
+      }
+
+      /* v0.1.555: ニコニコ／ボカロ MV 風 — 文字が飛び交う */
+      .nl-celebration-flytext {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 4;
+      }
+      .nl-celebration-flytext__line {
+        position: absolute;
+        left: 0;
+        white-space: nowrap;
+        font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+        color: var(--nl-fly-color, #fff);
+        font-size: var(--nl-fly-size, 22px);
+        line-height: 1.1;
+        text-shadow:
+          2px 2px 0 rgba(0, 0, 0, 0.85),
+          -1px -1px 0 rgba(0, 0, 0, 0.75),
+          0 0 12px rgba(0, 0, 0, 0.35);
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+      .nl-celebration-flytext__line--scroll {
+        top: var(--nl-fly-lane, 20%);
+        animation: nlFlyTextScroll var(--nl-fly-dur, 4.5s) linear var(--nl-fly-delay, 0s) forwards;
+      }
+      .nl-celebration-flytext__line--burst {
+        top: var(--nl-fly-y0, 30%);
+        left: 50%;
+        animation: nlFlyTextBurst var(--nl-fly-dur, 2.8s) cubic-bezier(0.22, 0.85, 0.28, 1)
+          var(--nl-fly-delay, 0s) forwards;
+      }
+      @keyframes nlFlyTextScroll {
+        0% { transform: translateX(108vw); opacity: 0; }
+        4% { opacity: 0.95; }
+        92% { opacity: 0.88; }
+        100% { transform: translateX(-115%); opacity: 0; }
+      }
+      @keyframes nlFlyTextBurst {
+        0% {
+          transform: translate(calc(-50% + var(--nl-fly-x0, 0vw)), 0) scale(0.35)
+            rotate(calc(var(--nl-fly-rot, 0deg) - 8deg));
+          opacity: 0;
+        }
+        12% {
+          transform: translate(calc(-50% + var(--nl-fly-x0, 0vw)), 0) scale(1.08)
+            rotate(var(--nl-fly-rot, 0deg));
+          opacity: 1;
+        }
+        100% {
+          transform: translate(
+              calc(-50% + var(--nl-fly-x0, 0vw) + var(--nl-fly-x1, 0px)),
+              var(--nl-fly-y1, -80px)
+            )
+            scale(0.92) rotate(calc(var(--nl-fly-rot, 0deg) + 10deg));
+          opacity: 0;
+        }
+      }
+      html.nl-calm-motion .nl-celebration-flytext__line {
+        animation: none !important;
+        display: none;
       }
 
       /* v0.1.551: ギフト到着 — 三キャラ画面ズーム（SFC マリオ風） */
@@ -3379,7 +3446,7 @@
         inset: 0;
         z-index: 2147483645;
         pointer-events: none;
-        overflow: hidden;
+        overflow: visible;
         perspective: 900px;
       }
       .nl-gift-bahamut__flash {
