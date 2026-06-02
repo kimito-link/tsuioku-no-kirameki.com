@@ -157,14 +157,55 @@ import {
   KEY_AUTOPATROL_STATE,
   KEY_CONCURRENT_CALIBRATION_RING_V1,
   KEY_COMMENTER_FOLLOW_CACHE,
+  KEY_COMMENTER_FOLLOWING_LIST_CACHE,
+  KEY_SUPPORT_CELEBRATION_STATE,
   broadcasterProfileStorageKey,
   commenterFollowLiveStorageKey
 } from '../lib/storageKeys.js';
 import {
+  pickCommentMilestoneCelebration,
+  pickEventRankUpCelebration,
+  pickGiftCountMilestoneCelebration,
+  pickAdPointsMilestoneCelebration,
+  pickAdAdvertiserCountMilestoneCelebration,
+  pickAdPointsIncreaseCelebration,
+  pickNicoadCommentCelebration,
+  isAdSupportCelebrationKind,
+  isSupportCelebrationAlreadyDone,
+  markSupportCelebrationDone,
+  celebratedKeysForLive,
+  withCelebratedKeysForLive
+} from '../lib/supportCelebration.js';
+import { parseNicoadCommentText, parseGiftCommentText } from '../lib/parseGiftComment.js';
+import {
+  pickGiftBahamutCelebration,
+  GIFT_BAHAMUT_MIN_GAP_MS
+} from '../lib/giftBahamutCelebration.js';
+import {
   normalizeCommenterFollowMap,
   normalizeCommenterFollowLiveSnapshot,
-  applyFollowFieldsToUser
+  applyFollowFieldsToUser,
+  buildCommenterFollowRows,
+  buildCommenterFollowLiveSnapshot,
+  pickFollowUidsToFetch,
+  upsertCommenterFollowEntry,
+  commenterFollowEntryFromProfile,
+  COMMENTER_FOLLOW_FETCH_BATCH
 } from '../lib/commenterFollowCache.js';
+import {
+  COMMENTER_FOLLOWING_LIST_MAX_PER_LIVE,
+  buildFollowingListEntryFromFetchResponse,
+  mergeFollowingListIntoRows,
+  normalizeFollowingListMap,
+  pickFollowingListUidsToFetch,
+  summarizeFollowingListCoverage,
+  upsertFollowingListEntry
+} from '../lib/commenterFollowingListCache.js';
+import {
+  NICO_USER_PROFILE_FETCH_MESSAGE_TYPE,
+  normalizeNicoUserProfileResponse
+} from '../lib/nicoUserProfileApi.js';
+import { NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE } from '../lib/nicoUserFollowingApi.js';
 import {
   parseCalibrationLog,
   serializeCalibrationJson,
@@ -342,6 +383,7 @@ import {
 } from '../lib/broadcastReportSummary.js';
 import { formatBroadcastDurationLabel } from '../lib/broadcastDurationLabel.js';
 import { buildReportCommentsCsv } from '../lib/reportCommentsCsv.js';
+import { buildReportCommentsTableSectionHtml } from '../lib/reportCommentsTableSection.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
@@ -394,8 +436,16 @@ import {
   trendToSparklineArrays
 } from '../lib/devMonitorTrendSession.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
+import { analyzeAudienceEngagementGap } from '../lib/audienceEngagementGap.js';
 import { buildReportMemoPayload } from '../lib/supportGrowthInsights.js';
-import { buildMarketingDashboardHtml } from '../lib/marketingChartsHtml.js';
+import {
+  buildMarketingDashboardHtml,
+  buildAudienceParticipationLeadSectionHtml,
+  audienceParticipationLeadEmbeddedCss
+} from '../lib/marketingChartsHtml.js';
+import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
+import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
+import { STORY_GROWTH_MAX_CELLS } from '../lib/storyGrowthLimits.js';
 import {
   yukkuriBroadcastSummaryEmbeddedCss,
   listYukkuriCharacterImagePaths
@@ -702,6 +752,39 @@ const RINKU_IMGS = /** @type {const} */ ({
   big:     `${CHARA_IMG_BASE}/link/link-yukkuri-blink-mouth-open.png`,
 });
 
+/** 豪雨演出用 — 三キャラ × thumb128（存在確認済みのみ） */
+const DELUGE_CHAR_POOLS = /** @type {const} */ ([
+  [
+    `${CHARA_IMG_BASE}/link/link-yukkuri-smile-mouth-open.thumb128.png`,
+    `${CHARA_IMG_BASE}/link/link-yukkuri-normal-mouth-closed.thumb128.png`,
+    `${CHARA_IMG_BASE}/link/link-yukkuri-blink-mouth-closed.thumb128.png`,
+    `${CHARA_IMG_BASE}/link/link-yukkuri-half-eyes-mouth-closed.thumb128.png`
+  ],
+  [
+    `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-smile-mouth-open.thumb128.png`,
+    `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-normal.thumb128.png`,
+    `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-blink-mouth-closed.thumb128.png`,
+    `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png`
+  ],
+  [
+    `${CHARA_IMG_BASE}/tanunee/tanuki-yukkuri-smile-mouth-open.thumb128.png`,
+    `${CHARA_IMG_BASE}/tanunee/tanuki-yukkuri-normal-mouth-open.thumb128.png`,
+    `${CHARA_IMG_BASE}/tanunee/tanuki-yukkuri-blink-mouth-closed.thumb128.png`,
+    `${CHARA_IMG_BASE}/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png`
+  ]
+]);
+
+/**
+ * りんく・こん太・たぬ姉を交互に混ぜる
+ * @param {number} index
+ * @returns {string}
+ */
+function delugeDropImageSrc(index) {
+  const charIdx = index % 3;
+  const pool = DELUGE_CHAR_POOLS[charIdx];
+  return pool[Math.floor(index / 3) % pool.length];
+}
+
 const KONTA_IMGS = /** @type {const} */ ({
   default: `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-smile-mouth-open.png`,
   small:   `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-smile-mouth-closed.png`,
@@ -754,6 +837,45 @@ function triggerCharaReaction(iconEl, { delta, thresholds, images }) {
 
 let _prevSupportCount = /** @type {number|null} */ (null);
 
+/** @type {number|null} */
+let _prevMilestoneCommentHighWater = null;
+
+/** @type {number|null} */
+let _prevEventBannerRank = null;
+
+/** @type {number|null} */
+let _prevGiftEventCount = null;
+
+/** @type {number|null} */
+let _prevAdPoints = null;
+
+/** @type {number|null} */
+let _prevAdAdvertiserCount = null;
+
+/** @type {Set<string>} */
+const _seenNicoadCommentKeys = new Set();
+
+/** @type {string} */
+let _nicoadCelebrationSeededLiveId = '';
+
+/** @type {string} */
+let _giftBahamutSeededLiveId = '';
+
+/** @type {Set<string>} */
+const _seenGiftCommentKeys = new Set();
+
+/** @type {number} */
+let _lastGiftBahamutAt = 0;
+
+/** @type {number} */
+let _lastAdThrowCelebrationAt = 0;
+
+/** @type {Set<string>} */
+const _celebrationSessionDedupe = new Set();
+
+/** @type {Record<string, string[]>|null} */
+let _celebrationStateCache = null;
+
 /** @type {string|null} */
 let _lastTopSupportRankStripStableKey = null;
 
@@ -798,8 +920,539 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
   watchPopupLastPaintedLiveId = norm;
   _lastTopSupportRankStripStableKey = null;
   _prevSupportCount = null;
+  _prevMilestoneCommentHighWater = null;
   _prevViewerCount = null;
   _prevConcurrentEstimated = null;
+  _prevEventBannerRank = null;
+  _prevGiftEventCount = null;
+  _prevAdPoints = null;
+  _prevAdAdvertiserCount = null;
+  _nicoadCelebrationSeededLiveId = '';
+  _giftBahamutSeededLiveId = '';
+  _seenNicoadCommentKeys.clear();
+  _seenGiftCommentKeys.clear();
+  _lastGiftBahamutAt = 0;
+  _lastAdThrowCelebrationAt = 0;
+  _celebrationSessionDedupe.clear();
+}
+
+// ---------------------------------------------------------------------------
+// マイルストーン演出（コメント / イベント順位 / ギフト）
+// ---------------------------------------------------------------------------
+
+async function loadSupportCelebrationState() {
+  if (_celebrationStateCache) return _celebrationStateCache;
+  try {
+    const bag = await chrome.storage.local.get(KEY_SUPPORT_CELEBRATION_STATE);
+    const raw = bag[KEY_SUPPORT_CELEBRATION_STATE];
+    _celebrationStateCache =
+      raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? /** @type {Record<string, string[]>} */ (raw)
+        : {};
+  } catch {
+    _celebrationStateCache = {};
+  }
+  return _celebrationStateCache;
+}
+
+function supportCelebrationMotionEnabled() {
+  try {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return false;
+  } catch {
+    /* no-op */
+  }
+  return !document.documentElement.classList.contains('nl-calm-motion');
+}
+
+/**
+ * @param {'rinku'|'konta'|'mixed'} characterSet
+ * @returns {string[]}
+ */
+function supportCelebrationImagePool(characterSet) {
+  if (characterSet === 'konta') {
+    return [KONTA_IMGS.default, KONTA_IMGS.medium, KONTA_IMGS.big];
+  }
+  if (characterSet === 'mixed') {
+    return [
+      RINKU_IMGS.default,
+      KONTA_IMGS.default,
+      RINKU_IMGS.big,
+      KONTA_IMGS.medium,
+      TANUNEE_IMGS.default
+    ];
+  }
+  return [RINKU_IMGS.default, RINKU_IMGS.medium, RINKU_IMGS.big, RINKU_IMGS.small];
+}
+
+/**
+ * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec} spec
+ */
+function playSupportCelebrationDom(spec) {
+  const isDeluge = spec.dropVariant === 'rinku_deluge';
+  const anchor =
+    document.getElementById('supportVisualLiveCard') ||
+    document.getElementById('liveStatComments')?.closest('.nl-live-stat-card');
+  // 豪雨は記録カード内に閉じず、表示ウィンドウ全体に fixed で被せる
+  const useAnchor = !isDeluge && anchor instanceof HTMLElement;
+  const mountRoot = useAnchor ? anchor : document.documentElement;
+
+  let host = mountRoot.querySelector('#nlCelebrationShower');
+  if (!(host instanceof HTMLElement)) {
+    host = document.createElement('div');
+    host.id = 'nlCelebrationShower';
+    host.className = 'nl-celebration-shower';
+    host.hidden = true;
+    host.setAttribute('aria-live', 'polite');
+    mountRoot.appendChild(host);
+  } else if (host.parentElement !== mountRoot) {
+    mountRoot.appendChild(host);
+  }
+
+  host.classList.toggle('nl-celebration-shower--inline', INLINE_MODE);
+  host.classList.toggle('nl-celebration-shower--anchored', useAnchor);
+  host.classList.toggle(
+    'nl-celebration-shower--rinku-deluge',
+    spec.dropVariant === 'rinku_deluge'
+  );
+
+  host.innerHTML = '';
+  host.hidden = false;
+  host.removeAttribute('hidden');
+
+  const banner = document.createElement('div');
+  banner.className = 'nl-celebration-shower__banner';
+  banner.textContent = spec.message;
+  host.appendChild(banner);
+
+  if (anchor instanceof HTMLElement && spec.kind === 'comment_milestone') {
+    anchor.classList.remove('nl-live-stat-card--celebrate');
+    void anchor.offsetWidth;
+    anchor.classList.add('nl-live-stat-card--celebrate');
+    window.setTimeout(() => {
+      anchor.classList.remove('nl-live-stat-card--celebrate');
+    }, 3200);
+  }
+
+  if (supportCelebrationMotionEnabled()) {
+    const drops = document.createElement('div');
+    drops.className = 'nl-celebration-shower__drops';
+    const isDeluge = spec.dropVariant === 'rinku_deluge';
+    const pool = isDeluge ? null : supportCelebrationImagePool(spec.characterSet);
+    const burstCount = isDeluge ? Math.ceil(spec.dropCount * 0.45) : 0;
+    for (let i = 0; i < spec.dropCount; i++) {
+      const img = document.createElement('img');
+      img.className = 'nl-celebration-drop';
+      if (isDeluge) img.classList.add('nl-celebration-drop--deluge');
+      img.src = isDeluge ? delugeDropImageSrc(i) : pool[i % pool.length];
+      img.alt = '';
+      img.decoding = 'async';
+      const leftPct = isDeluge ? 1 + Math.random() * 98 : 4 + Math.random() * 92;
+      const delayMs = isDeluge
+        ? i < burstCount
+          ? Math.random() * 220
+          : 180 + Math.random() * spec.durationMs * 0.72
+        : Math.random() * spec.durationMs * 0.45;
+      const durMs = isDeluge
+        ? 1200 + Math.random() * 1600
+        : 1800 + Math.random() * 1400;
+      const sizePx = isDeluge
+        ? 40 + Math.floor(Math.random() * 28) + (Math.random() < 0.1 ? 14 : 0)
+        : 24 + Math.floor(Math.random() * 20);
+      img.style.left = `${leftPct}%`;
+      img.style.width = `${sizePx}px`;
+      img.style.height = `${sizePx}px`;
+      img.style.animationDelay = `${delayMs}ms`;
+      img.style.setProperty('--nl-celebration-fall-dur', `${durMs}ms`);
+      if (isDeluge) {
+        img.style.setProperty('--nl-celebration-sway', `${-18 + Math.random() * 36}px`);
+      }
+      drops.appendChild(img);
+    }
+    host.appendChild(drops);
+  }
+
+  window.setTimeout(() => {
+    host.hidden = true;
+    host.innerHTML = '';
+  }, spec.durationMs + 400);
+}
+
+/**
+ * @param {import('../lib/giftBahamutCelebration.js').GiftBahamutTier} tier
+ * @returns {[string, string, string]}
+ */
+function giftBahamutSquadImageSrcs(tier) {
+  const lead =
+    tier === 'mega' || tier === 'large' ? KONTA_IMGS.big : KONTA_IMGS.medium;
+  const body =
+    tier === 'mega'
+      ? RINKU_IMGS.big
+      : tier === 'large'
+        ? RINKU_IMGS.medium
+        : RINKU_IMGS.default;
+  const tail =
+    tier === 'mega' || tier === 'large' ? TANUNEE_IMGS.big : TANUNEE_IMGS.default;
+  return [lead, body, tail];
+}
+
+/**
+ * @param {import('../lib/giftBahamutCelebration.js').GiftBahamutSpec} spec
+ */
+function playGiftBahamutDom(spec) {
+  const root = document.documentElement;
+  let host = root.querySelector('#nlGiftBahamut');
+  if (!(host instanceof HTMLElement)) {
+    host = document.createElement('div');
+    host.id = 'nlGiftBahamut';
+    host.className = 'nl-gift-bahamut';
+    host.hidden = true;
+    host.setAttribute('aria-live', 'polite');
+    root.appendChild(host);
+  }
+
+  host.className = `nl-gift-bahamut nl-gift-bahamut--${spec.tier}`;
+  host.classList.toggle('nl-gift-bahamut--inline', INLINE_MODE);
+  host.innerHTML = '';
+  host.hidden = false;
+  host.removeAttribute('hidden');
+  host.style.setProperty('--nl-bahamut-peak', String(spec.scale));
+  host.style.setProperty('--nl-bahamut-dur', `${spec.durationMs}ms`);
+
+  const flash = document.createElement('div');
+  flash.className = 'nl-gift-bahamut__flash';
+  host.appendChild(flash);
+
+  const banner = document.createElement('div');
+  banner.className = 'nl-gift-bahamut__banner';
+  banner.textContent = spec.message;
+  host.appendChild(banner);
+
+  if (supportCelebrationMotionEnabled()) {
+    const squad = document.createElement('div');
+    squad.className = 'nl-gift-bahamut__squad';
+    const labels = ['こん太', 'りんく', 'たぬ姉'];
+    const srcs = giftBahamutSquadImageSrcs(spec.tier);
+    srcs.forEach((src, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = `nl-gift-bahamut__char nl-gift-bahamut__char--${i === 1 ? 'center' : i === 0 ? 'lead' : 'tail'}`;
+      const img = document.createElement('img');
+      img.className = 'nl-gift-bahamut__img';
+      img.src = src;
+      img.alt = labels[i] || '';
+      img.decoding = 'async';
+      wrap.appendChild(img);
+      squad.appendChild(wrap);
+    });
+    host.appendChild(squad);
+
+    const trail = document.createElement('div');
+    trail.className = 'nl-gift-bahamut__trail';
+    const sparkCount =
+      spec.tier === 'mega' ? 14 : spec.tier === 'large' ? 10 : spec.tier === 'medium' ? 8 : 6;
+    const sparkDist =
+      spec.tier === 'mega' ? 150 : spec.tier === 'large' ? 120 : spec.tier === 'medium' ? 95 : 72;
+    for (let i = 0; i < sparkCount; i++) {
+      const angle = (i / sparkCount) * Math.PI * 2 - Math.PI / 2;
+      const spark = document.createElement('span');
+      spark.className = 'nl-gift-bahamut__spark';
+      spark.style.setProperty('--nl-spark-i', String(i));
+      spark.style.setProperty('--nl-spark-x', `${Math.cos(angle) * sparkDist}px`);
+      spark.style.setProperty('--nl-spark-y', `${Math.sin(angle) * sparkDist}px`);
+      trail.appendChild(spark);
+    }
+    host.appendChild(trail);
+  }
+
+  window.setTimeout(() => {
+    host.hidden = true;
+    host.innerHTML = '';
+  }, spec.durationMs + 500);
+}
+
+/**
+ * @param {string} liveId
+ * @param {import('../lib/giftBahamutCelebration.js').GiftBahamutSpec} spec
+ */
+function maybePlayGiftBahamut(liveId, spec) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !spec) return;
+  const sessionKey = `${lid}:${spec.dedupeKey}`;
+  if (_celebrationSessionDedupe.has(sessionKey)) return;
+  const now = Date.now();
+  if (now - _lastGiftBahamutAt < GIFT_BAHAMUT_MIN_GAP_MS) return;
+
+  _celebrationSessionDedupe.add(sessionKey);
+  _lastGiftBahamutAt = now;
+  playGiftBahamutDom(spec);
+}
+
+/**
+ * @param {string} liveId
+ * @param {string} dedupeKey
+ * @returns {Promise<boolean>}
+ */
+async function isSupportCelebrationStorageBlocked(liveId, dedupeKey) {
+  try {
+    const state = await refreshTaskGuarded(
+      loadSupportCelebrationState(),
+      700,
+      'celebration_dedupe_check_timeout',
+      null
+    );
+    if (!state) return false;
+    return isSupportCelebrationAlreadyDone(celebratedKeysForLive(state, liveId), dedupeKey);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {string} liveId
+ * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec|null|undefined} spec
+ */
+async function maybePlaySupportCelebration(liveId, spec) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !spec) return;
+  if (isAdSupportCelebrationKind(spec.kind)) {
+    const now = Date.now();
+    if (now - _lastAdThrowCelebrationAt < 2800) return;
+  }
+  const sessionKey = `${lid}:${spec.dedupeKey}`;
+  if (_celebrationSessionDedupe.has(sessionKey)) return;
+
+  const blocked = await isSupportCelebrationStorageBlocked(lid, spec.dedupeKey);
+  if (blocked) return;
+
+  _celebrationSessionDedupe.add(sessionKey);
+  playSupportCelebrationDom(spec);
+  if (isAdSupportCelebrationKind(spec.kind)) {
+    _lastAdThrowCelebrationAt = Date.now();
+  }
+  void persistSupportCelebrationDedupe(lid, spec.dedupeKey);
+}
+
+/**
+ * @param {string} liveId
+ * @param {string} dedupeKey
+ */
+async function persistSupportCelebrationDedupe(liveId, dedupeKey) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !dedupeKey) return;
+  const state = (await refreshTaskGuarded(
+    loadSupportCelebrationState(),
+    700,
+    'celebration_dedupe_persist_load_timeout',
+    _celebrationStateCache || {}
+  )) || _celebrationStateCache || {};
+  const keys = celebratedKeysForLive(state, lid);
+  if (isSupportCelebrationAlreadyDone(keys, dedupeKey)) return;
+  const nextKeys = markSupportCelebrationDone(keys, dedupeKey);
+  _celebrationStateCache = withCelebratedKeysForLive(state, lid, nextKeys);
+  void storageSetSafe({ [KEY_SUPPORT_CELEBRATION_STATE]: _celebrationStateCache }).catch(
+    () => {}
+  );
+}
+
+/**
+ * 記録件数・保存件数・公式コメなど複数経路の最大値でマイルストーンを判定する。
+ *
+ * @param {string} liveId
+ * @param {Array<number|null|undefined>} counts
+ */
+function noteCommentMilestoneHighWater(liveId, counts) {
+  const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!lid || !Array.isArray(counts)) return;
+  let next = -1;
+  for (const c of counts) {
+    if (typeof c === 'number' && Number.isFinite(c) && c >= 0 && c > next) {
+      next = c;
+    }
+  }
+  if (next < 0) return;
+  const prev = _prevMilestoneCommentHighWater;
+  if (prev != null && next > prev) {
+    void maybeCelebrateFromCommentCount(lid, prev, next);
+  }
+  _prevMilestoneCommentHighWater = next;
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ */
+async function maybeCelebrateFromCommentCount(liveId, prev, next) {
+  const spec = pickCommentMilestoneCelebration(prev, next);
+  if (spec) await maybePlaySupportCelebration(liveId, spec);
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prevRank
+ * @param {number|null|undefined} newRank
+ */
+async function maybeCelebrateFromEventRank(liveId, prevRank, newRank) {
+  const spec = pickEventRankUpCelebration(prevRank, newRank);
+  if (spec) await maybePlaySupportCelebration(liveId, spec);
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ */
+async function maybeCelebrateFromGiftCount(liveId, prev, next) {
+  const spec = pickGiftCountMilestoneCelebration(prev, next);
+  if (spec) await maybePlaySupportCelebration(liveId, spec);
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ */
+async function maybeCelebrateFromAdPoints(liveId, prev, next) {
+  const milestone = pickAdPointsMilestoneCelebration(prev, next);
+  if (milestone) {
+    await maybePlaySupportCelebration(liveId, milestone);
+    return;
+  }
+  const increase = pickAdPointsIncreaseCelebration(prev, next);
+  if (increase) await maybePlaySupportCelebration(liveId, increase);
+}
+
+/**
+ * @param {unknown} entry
+ * @param {string} liveId
+ * @returns {string}
+ */
+function nicoadCommentCelebrationKey(entry, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const no = String(/** @type {{ commentNo?: unknown, id?: unknown }} */ (entry)?.commentNo ?? /** @type {{ id?: unknown }} */ (entry)?.id ?? '').trim();
+  const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+  if (no) return `${lid}|no:${no}`;
+  const at = Number(/** @type {{ capturedAt?: unknown }} */ (entry)?.capturedAt) || 0;
+  return `${lid}|t:${at}|${text.slice(0, 80)}`;
+}
+
+/**
+ * コメントログの「○○pt広告しました」を検知して演出（投げた瞬間を拾う正本経路）。
+ *
+ * @param {unknown[]} entries
+ * @param {string} liveId
+ */
+function scanCommentsForNicoadCelebrations(entries, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !Array.isArray(entries)) return;
+  const seedOnly = _nicoadCelebrationSeededLiveId !== lid;
+  if (seedOnly) {
+    _nicoadCelebrationSeededLiveId = lid;
+    _seenNicoadCommentKeys.clear();
+  }
+  for (const entry of entries) {
+    const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+    const parsed = parseNicoadCommentText(text);
+    if (!parsed) continue;
+    const key = nicoadCommentCelebrationKey(entry, lid);
+    if (_seenNicoadCommentKeys.has(key)) continue;
+    _seenNicoadCommentKeys.add(key);
+    if (seedOnly) continue;
+    const spec = pickNicoadCommentCelebration(parsed, key);
+    if (spec) void maybePlaySupportCelebration(lid, spec);
+  }
+}
+
+/**
+ * ギフトコメント到着で三キャラ画面ズーム（SFC マリオ風）。
+ *
+ * @param {unknown[]} entries
+ * @param {string} liveId
+ */
+function scanCommentsForGiftBahamut(entries, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !Array.isArray(entries)) return;
+  const seedOnly = _giftBahamutSeededLiveId !== lid;
+  if (seedOnly) {
+    _giftBahamutSeededLiveId = lid;
+    _seenGiftCommentKeys.clear();
+  }
+  for (const entry of entries) {
+    const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+    const parsed = parseGiftCommentText(text);
+    if (!parsed) continue;
+    const key = nicoadCommentCelebrationKey(entry, lid);
+    if (_seenGiftCommentKeys.has(key)) continue;
+    _seenGiftCommentKeys.add(key);
+    if (seedOnly) continue;
+    const spec = pickGiftBahamutCelebration(parsed, key);
+    if (spec) maybePlayGiftBahamut(lid, spec);
+  }
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ */
+async function maybeCelebrateFromAdAdvertiserCount(liveId, prev, next) {
+  const spec = pickAdAdvertiserCountMilestoneCelebration(prev, next);
+  if (spec) await maybePlaySupportCelebration(liveId, spec);
+}
+
+/**
+ * @param {number|null|undefined} adPtsNum
+ */
+function trackAdPointsForCelebration(adPtsNum) {
+  if (typeof adPtsNum !== 'number' || !Number.isFinite(adPtsNum) || adPtsNum < 0) return;
+  const lid = watchPopupLastPaintedLiveId;
+  if (!lid) return;
+  const prev = _prevAdPoints;
+  if (prev != null && adPtsNum > prev) {
+    void maybeCelebrateFromAdPoints(lid, prev, adPtsNum);
+  }
+  _prevAdPoints = adPtsNum;
+}
+
+/**
+ * @param {string} liveId
+ * @param {number} advertiserCount
+ */
+function trackAdAdvertiserCountForCelebration(liveId, advertiserCount) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const count =
+    typeof advertiserCount === 'number' && Number.isFinite(advertiserCount) && advertiserCount >= 0
+      ? advertiserCount
+      : null;
+  if (count == null) return;
+  const prev = _prevAdAdvertiserCount;
+  if (prev != null && count > prev) {
+    void maybeCelebrateFromAdAdvertiserCount(lid, prev, count);
+  }
+  _prevAdAdvertiserCount = count;
+}
+
+/**
+ * @param {string} liveId
+ */
+async function maybeCelebrateGiftEventsAfterRefresh(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  /** @type {unknown[]} */
+  let giftEvents = [];
+  try {
+    const evBag = await chrome.storage.local.get(`nls_gift_events_${lid}`);
+    const v = evBag[`nls_gift_events_${lid}`];
+    if (Array.isArray(v)) giftEvents = v;
+  } catch {
+    return;
+  }
+  const count = giftEvents.length;
+  const prev = _prevGiftEventCount;
+  _prevGiftEventCount = count;
+  if (prev != null && count > prev) {
+    await maybeCelebrateFromGiftCount(lid, prev, count);
+  }
 }
 
 /** 記録・同接・来場の三カードに、数値確定までキャラ重ねのローディングを同期する。 */
@@ -954,7 +1607,9 @@ function setCountDisplay(value, watchSnapshot = null) {
       images: RINKU_IMGS,
     });
   }
-  if (!Number.isNaN(num)) _prevSupportCount = num;
+  if (!Number.isNaN(num)) {
+    _prevSupportCount = num;
+  }
   syncLiveStatThreeCardsCharLoadingOverlays();
 }
 
@@ -3354,8 +4009,29 @@ const STORY_REACTION_STATE = {
  * story growth グリッドの DOM セル数の上限。コメントが極端に多い放送でも `<img>` を
  * 無制限に作らないための安全弁（超過時は「直近 N 件」だけを描画する＝ウィンドウ表示）。
  * 通常配信（数百件規模）はこの値未満なので従来どおり全件描画され、見た目は変わらない。
+ * 上限値は src/lib/storyGrowthLimits.js（v0.1.539 で 800→360 に引き下げ）。
  */
-const STORY_GROWTH_MAX_CELLS = 800;
+
+/** `.nl-main` スクロール中の重い paint 見送り用（popupMainScrollDefer.js と同 ms）。 */
+let nlMainLastScrollAtMs = 0;
+
+function bindNlMainScrollPerfHook() {
+  const main = /** @type {HTMLElement|null} */ (document.querySelector('.nl-main'));
+  if (!main || main.dataset.nlScrollPerfBound === '1') return;
+  main.dataset.nlScrollPerfBound = '1';
+  main.addEventListener(
+    'scroll',
+    () => {
+      nlMainLastScrollAtMs = Date.now();
+    },
+    { passive: true }
+  );
+}
+
+/** @returns {boolean} */
+function shouldDeferHeavyPopupPaintNow() {
+  return shouldDeferHeavyPopupPaintDuringScroll(nlMainLastScrollAtMs);
+}
 
 const STORY_GROWTH_STATE = {
   liveId: '',
@@ -4775,6 +5451,8 @@ function createStoryGrowthCell(isNew, index, accent) {
   const media = document.createElement('span');
   media.className = 'nl-story-growth-cell__media';
   const img = document.createElement('img');
+  img.loading = 'lazy';
+  img.decoding = 'async';
   media.appendChild(img);
   cell.appendChild(media);
   applyStoryGrowthIconAttributes(img, index, isNew, accent);
@@ -4882,6 +5560,15 @@ function syncStoryGrowth(liveId, count, root) {
   if (!root) return;
   bindStoryGrowthInteractions(root);
   ensureStoryGrowthColorSchemeListener();
+
+  if (
+    shouldDeferHeavyPopupPaintNow() &&
+    !changedLive &&
+    target > STORY_GROWTH_STATE.renderedCount
+  ) {
+    STORY_GROWTH_STATE.targetCount = target;
+    return;
+  }
 
   const iconPx = `${resolveStoryIconSize(target)}px`;
   const storyBody = root.closest('.nl-story-body');
@@ -5248,6 +5935,16 @@ function paintOfficialEventBannerCard(snapshot) {
       thumbEl.removeAttribute('src');
     }
   }
+
+  if (rank != null) {
+    const lid = watchPopupLastPaintedLiveId;
+    if (lid && _prevEventBannerRank != null) {
+      void maybeCelebrateFromEventRank(lid, _prevEventBannerRank, rank);
+    }
+    _prevEventBannerRank = rank;
+  } else {
+    _prevEventBannerRank = null;
+  }
 }
 
 /**
@@ -5424,6 +6121,16 @@ function paintOfficialNicoStatsStrip(snapshot) {
   applyChip('officialStatNicoStreamAge', digest.streamAge);
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
+
+  const adPtsNum =
+    typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
+      ? ps.adPoints
+      : typeof snapshot?.officialAdPointsNdgr === 'number' &&
+          Number.isFinite(snapshot.officialAdPointsNdgr) &&
+          snapshot.officialAdPointsNdgr >= 0
+        ? snapshot.officialAdPointsNdgr
+        : null;
+  trackAdPointsForCelebration(adPtsNum);
 }
 
 /**
@@ -5483,6 +6190,7 @@ function paintOfficialNdgrGiftCard(snap) {
   if (elEv) elEv.textContent = fmt(ev);
   if (elRank) elRank.textContent = fmt(rk);
   if (elTitle) elTitle.textContent = title || '—';
+  trackAdPointsForCelebration(typeof ap === 'number' ? ap : null);
 }
 
 let _prevConcurrentEstimated = /** @type {number|null} */ (null);
@@ -7333,7 +8041,9 @@ function refreshNorthStarAdRankingLane() {
   const snap = watchMetaCache.snapshot;
   const body = document.getElementById('northStarLaneBody-adRanking');
   const adRows = Array.isArray(bundle?.adContributionRanking) ? bundle.adContributionRanking : [];
+  const lid = watchPopupLastPaintedLiveId;
   if (adRows.length > 0 && body instanceof HTMLElement) {
+    trackAdAdvertiserCountForCelebration(lid, adRows.length);
     const rooms = officialDomRankingRowsToStripRooms(adRows, { userKeyKind: 'ad' });
     let rankingSum = 0;
     for (const row of adRows) {
@@ -8070,6 +8780,7 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
   await refreshNorthStarEventBroadcastersLaneAsync(lid);
   await refreshNorthStarEventVotingSupportersLaneAsync(lid);
   await refreshSupportActivityTimeline(lid);
+  await maybeCelebrateGiftEventsAfterRefresh(lid);
 }
 
 /**
@@ -9003,6 +9714,7 @@ async function applyUsageTermsGateState() {
  * details が開いているときだけ 1 回スクロール位置を確認・補正する。
  */
 function correctSupportVisualScrollIfOpen() {
+  if (shouldDeferHeavyPopupPaintNow()) return;
   const details = /** @type {HTMLDetailsElement|null} */ (
     document.getElementById('supportVisualDetails')
   );
@@ -10632,6 +11344,9 @@ async function refresh() {
   }
 
   const lv = extractLiveIdFromUrl(url);
+  if (lv) {
+    resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
+  }
   if (liveEl) {
     liveEl.textContent = lv && !fromActiveTab ? `${lv}（直近の視聴ページ）` : lv || '-';
   }
@@ -11058,7 +11773,20 @@ async function refresh() {
       !hasReliableFullArray && summaryRecordedCount != null
         ? Math.max(summaryRecordedCount, displayEntries.length)
         : displayEntries.length;
+    scanCommentsForNicoadCelebrations(arr, lv);
+    scanCommentsForGiftBahamut(arr, lv);
     setCountDisplay(countToShow, watchSnapshot);
+    {
+      const ps = _lastOfficialEventDomBundle?.programStats || null;
+      const snap = watchMetaCache.snapshot;
+      noteCommentMilestoneHighWater(lv, [
+        arr.length,
+        countToShow,
+        summaryRecordedCount,
+        typeof ps?.commentCount === 'number' ? ps.commentCount : null,
+        typeof snap?.officialCommentCount === 'number' ? snap.officialCommentCount : null
+      ]);
+    }
     void updateIngestHeartbeatDisplay(lv);
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));
     exportBtn.disabled = false;
@@ -11103,7 +11831,7 @@ async function refresh() {
     //   「ページが応答しません」になる。signature が変わった（または DOM セル数がずれた）
     //   ときだけ patch する。querySelectorAll の length は O(セル数=上限以下) で軽い。
     const growthEl = /** @type {HTMLElement|null} */ ($('sceneStoryGrowth'));
-    if (growthEl) {
+    if (growthEl && !shouldDeferHeavyPopupPaintNow()) {
       const renderedImgCount = growthEl.querySelectorAll(
         'img.nl-story-growth-icon'
       ).length;
@@ -12198,6 +12926,75 @@ async function resolveBroadcasterProfileModel(snapshot, liveId) {
 }
 
 /**
+ * レポート出力時に未取得の数値 ID コメンターへ nvapi プロフィール（follow 数等）を補完取得する。
+ * @param {{ allNumericCommenters?: any[] }} report
+ * @param {Record<string, import('../lib/commenterFollowCache.js').CommenterFollowEntry>} followMap
+ * @returns {Promise<boolean>} followMap を更新したか
+ */
+async function backfillCommenterFollowProfilesForReport(report, followMap) {
+  const stats = (Array.isArray(report.allNumericCommenters) ? report.allNumericCommenters : [])
+    .map((u) => String(u?.userId || '').trim())
+    .filter((uid) => /^\d{1,18}$/.test(uid));
+  if (!stats.length) return false;
+
+  const toFetch = pickFollowUidsToFetch(stats, followMap, { limit: COMMENTER_FOLLOW_FETCH_BATCH });
+  if (!toFetch.length) return false;
+
+  let touched = false;
+  for (const uid of toFetch) {
+    const resp = await new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid }, (r) => {
+          const le = chrome.runtime.lastError;
+          if (le) return resolve(null);
+          resolve(r);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+    if (!resp || resp.ok !== true || resp.json == null) continue;
+    let profile = null;
+    try {
+      profile = normalizeNicoUserProfileResponse(resp.json);
+    } catch {
+      profile = null;
+    }
+    const entry = commenterFollowEntryFromProfile(profile, Date.now());
+    if (entry && upsertCommenterFollowEntry(followMap, uid, entry)) touched = true;
+    if (toFetch.indexOf(uid) < toFetch.length - 1) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+  if (touched) {
+    await chrome.storage.local.set({ [KEY_COMMENTER_FOLLOW_CACHE]: followMap }).catch(() => {});
+  }
+  return touched;
+}
+
+/**
+ * @param {string} liveId
+ * @returns {Promise<string>}
+ */
+async function resolveBroadcasterUserIdForReport(liveId, report) {
+  const fromReport = String(report?.broadcasterUserId || '').trim();
+  if (/^\d{1,18}$/.test(fromReport)) return fromReport;
+  const fromWatch = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+  if (/^\d{1,18}$/.test(fromWatch)) return fromWatch;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return '';
+  try {
+    const bag = await chrome.storage.local.get(watchSnapshotStorageKey(lid)).catch(() => ({}));
+    const snap = bag?.[watchSnapshotStorageKey(lid)];
+    const fromSnap = String(snap?.broadcasterUserId || '').trim();
+    if (/^\d{1,18}$/.test(fromSnap)) return fromSnap;
+  } catch {
+    /* best-effort */
+  }
+  return '';
+}
+
+/**
  * コメンターのフォロー/フォロワー横断キャッシュと配信別スナップショットを読み、
  * マーケ report の topUsers / allNumericCommenters へ後付けする。`commenterFollowDataset`
  * に全量行も載せ、JSON 埋め込み・全コメンター表の正本にする。
@@ -12212,11 +13009,16 @@ async function attachCommenterFollowToReport(report, liveId) {
     const keys = [KEY_COMMENTER_FOLLOW_CACHE];
     if (/^lv\d{1,15}$/.test(lid)) keys.push(commenterFollowLiveStorageKey(lid));
     const bag = await chrome.storage.local.get(keys).catch(() => ({}));
-    const followMap = normalizeCommenterFollowMap(bag?.[KEY_COMMENTER_FOLLOW_CACHE]);
+    let followMap = normalizeCommenterFollowMap(bag?.[KEY_COMMENTER_FOLLOW_CACHE]);
+    await backfillCommenterFollowProfilesForReport(report, followMap);
     const liveSnapshot = /^lv\d{1,15}$/.test(lid)
       ? normalizeCommenterFollowLiveSnapshot(bag?.[commenterFollowLiveStorageKey(lid)])
       : null;
     if (liveSnapshot) report.commenterFollowDataset = liveSnapshot;
+    report.commenterFollowPriorEntries = followMap;
+
+    const broadcasterUid = await resolveBroadcasterUserIdForReport(lid, report);
+    if (broadcasterUid) report.broadcasterUserId = broadcasterUid;
 
     /** @type {Map<string, import('../lib/commenterFollowCache.js').CommenterFollowRow>} */
     const rowByUid = new Map();
@@ -12230,11 +13032,110 @@ async function attachCommenterFollowToReport(report, liveId) {
       if (!/^\d{1,18}$/.test(uid)) return;
       const row = rowByUid.get(uid);
       if (row) applyFollowFieldsToUser(u, row);
-      else applyFollowFieldsToUser(u, followMap[uid]);
+      applyFollowFieldsToUser(u, followMap[uid]);
     };
 
     for (const u of report.allNumericCommenters || []) mergeUser(u);
     for (const u of report.topUsers || []) mergeUser(u);
+
+    await attachCommenterFollowingListToReport(report, lid, broadcasterUid);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * レポート生成時にフォロー一覧を最大10名まで補完取得し、dataset / coverage を付与する。
+ * @param {{ allNumericCommenters?: any[], commenterFollowDataset?: unknown, commenterFollowingListCache?: Record<string, unknown>, followingListCoverage?: unknown, broadcasterUserId?: string }} report
+ * @param {string} liveId
+ * @param {string} [broadcasterUidHint]
+ * @returns {Promise<void>}
+ */
+async function attachCommenterFollowingListToReport(report, liveId, broadcasterUidHint = '') {
+  try {
+    if (!report) return;
+    const lid = String(liveId || report.liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+
+    const bag = await chrome.storage.local
+      .get([KEY_COMMENTER_FOLLOWING_LIST_CACHE, commenterFollowLiveStorageKey(lid)])
+      .catch(() => ({}));
+    const followingListMap = normalizeFollowingListMap(bag?.[KEY_COMMENTER_FOLLOWING_LIST_CACHE]);
+    const liveSnapshot =
+      normalizeCommenterFollowLiveSnapshot(bag?.[commenterFollowLiveStorageKey(lid)]) ||
+      (report.commenterFollowDataset
+        ? normalizeCommenterFollowLiveSnapshot(report.commenterFollowDataset)
+        : null);
+
+    const broadcasterUid = String(
+      broadcasterUidHint ||
+        report.broadcasterUserId ||
+        watchMetaCache.snapshot?.broadcasterUserId ||
+        ''
+    ).trim();
+    if (broadcasterUid && !report.broadcasterUserId) report.broadcasterUserId = broadcasterUid;
+
+    /** @type {{ userId: string, commentCount: number }[]} */
+    const stats = (Array.isArray(report.allNumericCommenters) ? report.allNumericCommenters : [])
+      .map((u) => ({
+        userId: String(u?.userId || '').trim(),
+        commentCount: Number(u?.count) || 0
+      }))
+      .filter((u) => /^\d{1,18}$/.test(u.userId))
+      .sort((a, b) => b.commentCount - a.commentCount)
+      .slice(0, COMMENTER_FOLLOWING_LIST_MAX_PER_LIVE);
+
+    const candidateUids = stats.map((s) => s.userId);
+    const toFetch = pickFollowingListUidsToFetch(stats, followingListMap, {
+      limit: Math.max(0, COMMENTER_FOLLOWING_LIST_MAX_PER_LIVE - 3),
+      maxRank: COMMENTER_FOLLOWING_LIST_MAX_PER_LIVE,
+      forceRetryStatuses: ['error', 'login_required']
+    });
+
+    let listTouched = false;
+    for (const uid of toFetch) {
+      const resp = await new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage({ type: NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE, uid }, (r) => {
+            const le = chrome.runtime.lastError;
+            if (le) return resolve(null);
+            resolve(r);
+          });
+        } catch {
+          resolve(null);
+        }
+      });
+      const entry = buildFollowingListEntryFromFetchResponse(resp, Date.now());
+      if (entry && upsertFollowingListEntry(followingListMap, uid, entry)) {
+        listTouched = true;
+      }
+      if (toFetch.indexOf(uid) < toFetch.length - 1) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+
+    if (listTouched) {
+      await chrome.storage.local.set({ [KEY_COMMENTER_FOLLOWING_LIST_CACHE]: followingListMap }).catch(() => {});
+    }
+
+    const baseRows = liveSnapshot?.rows?.length
+      ? liveSnapshot.rows
+      : stats.map((s) => ({
+          userId: s.userId,
+          commentCount: s.commentCount,
+          nickname: ''
+        }));
+    const mergedRows = mergeFollowingListIntoRows(baseRows, followingListMap, broadcasterUid);
+    const snapshot = buildCommenterFollowLiveSnapshot(lid, mergedRows, Date.now());
+    if (snapshot) {
+      report.commenterFollowDataset = snapshot;
+      await chrome.storage.local
+        .set({ [commenterFollowLiveStorageKey(lid)]: snapshot })
+        .catch(() => {});
+    }
+
+    report.commenterFollowingListCache = followingListMap;
+    report.followingListCoverage = summarizeFollowingListCoverage(followingListMap, candidateUids);
   } catch {
     /* best-effort */
   }
@@ -12266,6 +13167,19 @@ async function buildHtmlReportDocument(
   const tags = Array.isArray(snapshot?.tags)
     ? snapshot.tags.filter((v) => String(v || '').trim())
     : [];
+
+  const lidForSummary = String(liveId || '').trim().toLowerCase();
+  /** 来場 KPI 用。画像 fetch と並列で IDB 読み（ネットワーク不要・DL 体感を増やさない）。 */
+  const sessionSummaryPromise = /^lv\d{1,15}$/.test(lidForSummary)
+    ? (async () => {
+        try {
+          const db = await openBroadcastSessionSummaryDb();
+          return await listBroadcastSessionSummaryForLive(db, lidForSummary, 200);
+        } catch {
+          return [];
+        }
+      })()
+    : Promise.resolve([]);
 
   const [dataLink, dataKonta, dataTanu] = await Promise.all([
     fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.link),
@@ -12463,6 +13377,39 @@ async function buildHtmlReportDocument(
       )
     : comments;
 
+  const sessionSummaryRows = await sessionSummaryPromise;
+  const participationSummaryReport = aggregateMarketingReport(commentsForReport, liveId, {
+    broadcasterUserId: reportBroadcasterUserId
+  });
+  const audienceGapForReport = analyzeAudienceEngagementGap(
+    {
+      liveId,
+      comments: commentsForReport,
+      samples: sessionSummaryRows,
+      snapshot,
+      visitorCount:
+        eventDomBundleForReport?.programStats?.watchCount ??
+        snapshot?.viewerCountFromDom ??
+        null,
+      officialCommentCount: eventDomBundleForReport?.programStats?.commentCount ?? null
+    },
+    { broadcasterUserId: reportBroadcasterUserId, liveId }
+  );
+  const participationLeadHtml = buildAudienceParticipationLeadSectionHtml(
+    audienceGapForReport,
+    participationSummaryReport,
+    {
+      sectionId: 'sec-participation-lead',
+      extraSectionClass: 'card search-item',
+      showDetailLink: false,
+      searchData: '来場 コメント 参加率 来場者 コメントした人'
+    }
+  );
+
+  // v0.1.537: マーケ分析と同型のコメンターフォロー一覧・散布図・CSV を HTML レポートにも載せる。
+  const commenterFollowMarketingReport = participationSummaryReport;
+  const attachFollowPromise = attachCommenterFollowToReport(commenterFollowMarketingReport, liveId);
+
   // v0.1.469: きらめきの賞 — 単一ランキングを多軸の賞に変える。誰も負けない設計。
   // v0.1.477: returningUserKeys / firstTimeUserKeys を IDB + storage から実際に取得。
   //   過去配信のコメント userId と aggregatedRooms.userKey を照合して判定する。
@@ -12536,6 +13483,14 @@ async function buildHtmlReportDocument(
     }
   );
 
+  await attachFollowPromise;
+  const commenterFollowBlock = buildHtmlReportCommenterFollowBlock({
+    report: commenterFollowMarketingReport,
+    identiconResolver: getCachedAnonymousIdenticonDataUrl,
+    broadcasterUserId: reportBroadcasterUserId,
+    exportedAt: exportedAtIso
+  });
+
   /*
    * 0.1.12 (F2 追加): 全コメント一覧の各行にも「最低サムネ」を表示する。
    *   ・ユーザー列に小さい 20px サムネをインライン配置（行高さを増やさず識別性 UP）
@@ -12552,41 +13507,6 @@ async function buildHtmlReportDocument(
     });
     userKeyToResolvedThumb.set(room.userKey, src);
   }
-  const commentRows = commentsForReport.map((c, idx) => {
-    const commentNo = String(c.commentNo || '').trim();
-    const text = String(c.text || '').trim();
-    const userId = c.userId ? String(c.userId) : '';
-    const userKey = userId || UNKNOWN_USER_KEY;
-    // 0.1.13 (I): nickname も渡す。集計テーブル側はずっと渡していたが、全コメント
-    // 一覧の各行は引数を落としていて、ハンドル名（「かんぺい」等）が出ていなかった。
-    // anonymousNicknameFallback 側で「ゲスト」「user XXXX」placeholder は filter する。
-    const userLabel = displayUserLabel(userKey, c.nickname || '');
-    const userLabelHtml = buildUserProfileLinkedLabelHtml(userId, userLabel);
-    const search = escapeAttr(
-      `${commentNo} ${text} ${userId} ${userLabel} ${c.liveId || ''}`.toLowerCase()
-    );
-    // 集計済みマップに無いユーザー（理論上ありえないが念のため）はその場で解決
-    let avatarSrc = userKeyToResolvedThumb.get(userKey);
-    if (avatarSrc === undefined) {
-      avatarSrc = resolveReportUserThumbSrc({
-        userId: userKey,
-        avatarUrl: c.avatarUrl || '',
-        identiconResolver: getCachedAnonymousIdenticonDataUrl
-      });
-    }
-    const avatarInlineHtml = avatarSrc
-      ? `<img class="report-comment-av" src="${escapeAttr(avatarSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
-      : '<span class="report-comment-av report-comment-av--empty"></span>';
-    return `
-      <tr class="search-item" data-search="${search}">
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(commentNo || '-')}</td>
-        <td><span class="report-user-cell">${avatarInlineHtml}<span class="report-user-cell__label">${userLabelHtml}</span></span></td>
-        <td>${escapeHtml(text || '-')}</td>
-        <td>${escapeHtml(formatDateTime(c.capturedAt || 0))}</td>
-      </tr>
-    `;
-  });
 
   // C-7 pure refactor: head 情報テーブルの行ビルダは reportHeadInfoRowsHtml.js に
   //   抽出（linkRows/metaRows/scriptRows/noopenerRows・挙動不変・characterization 済）。
@@ -12630,6 +13550,13 @@ async function buildHtmlReportDocument(
   // から JS が読み取り Blob 化してダウンロードする（再エスケープ不要）。
   const reportCommentsCsv = buildReportCommentsCsv(commentsForReport);
   const reportCsvFilename = `tsuioku-comments-${liveId || 'unknown'}.csv`;
+  const commentsTableSectionHtml = buildReportCommentsTableSectionHtml({
+    comments: commentsForReport,
+    userKeyToResolvedThumb,
+    identiconResolver: getCachedAnonymousIdenticonDataUrl,
+    formatDateTime,
+    reportCommentsCsv
+  });
 
   const headLinkRows = snapshot ? buildReportLinkRows(snapshot.links) : [];
   const { friendly: friendlyMetas, technical: technicalMetas } =
@@ -12865,6 +13792,8 @@ async function buildHtmlReportDocument(
         border: 1px solid var(--panel-border);
         border-radius: 12px;
         padding: 12px;
+        content-visibility: auto;
+        contain-intrinsic-size: auto 320px;
       }
       section.card h2 {
         margin: 0 0 10px;
@@ -12944,7 +13873,40 @@ async function buildHtmlReportDocument(
         color: var(--muted);
         font-size: 11px;
       }
-      html { scroll-behavior: smooth; }
+      .nl-report-comments-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .nl-comment-row {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 36px;
+      }
+      .nl-report-comments-more-wrap {
+        margin: 10px 0 0;
+        text-align: center;
+      }
+      .nl-report-comments-more-btn {
+        cursor: pointer;
+        border: 1px solid #475569;
+        background: #0f172a;
+        color: #cbd5e1;
+        border-radius: 999px;
+        padding: 0.45rem 1rem;
+        font-size: 0.82rem;
+      }
+      .nl-report-comments-more-btn:hover:not(:disabled) {
+        border-color: #93c5fd;
+        color: #f8fafc;
+      }
+      .nl-report-comments-more-btn:disabled {
+        cursor: default;
+        opacity: 0.85;
+      }
+      .report-thumb-grid__cell {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 88px;
+      }
+      html { scroll-behavior: auto; }
       .toc {
         background: var(--panel);
         border: 1px solid var(--panel-border);
@@ -13404,6 +14366,8 @@ async function buildHtmlReportDocument(
       .event-rank__user { font-weight: 600; color: #e2e8f0; }
       .event-rank__score { white-space: nowrap; font-weight: 700; color: #cbd5e1; }
       .event-rank__stale { margin: 6px 0 0; font-size: 0.8rem; color: #93a4be; }
+      ${commenterFollowBlock.css}
+      ${audienceParticipationLeadEmbeddedCss()}
       ${yukkuriReportCss}
     </style>
   </head>
@@ -13414,6 +14378,8 @@ async function buildHtmlReportDocument(
         <p>出力日時: ${escapeHtml(exportedAtJst)} / ISO: ${escapeHtml(exportedAtIso)}</p>
         <p class="mono">watch URL: ${safeWatchUrl}</p>
       </header>
+
+      ${participationLeadHtml}
 
       ${yukkuriReportHtml}
 
@@ -13427,12 +14393,15 @@ async function buildHtmlReportDocument(
       <nav class="toc" aria-label="目次">
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
+          <li><a href="#sec-participation-lead">来場とコメント参加</a></li>
           <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
           ${eventRankingSectionHtml ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
           <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
           <li><a href="#sec-id-breakdown">内訳統計（ID 種別比率）</a></li>
           ${thumbedUsersSectionHtml ? '<li><a href="#sec-thumb-grid">サムネ付きユーザー一覧</a></li>' : ''}
+          ${commenterFollowBlock.hasDirectory ? '<li><a href="#sec-commenter-follow">数値IDコメンター（フォロー情報）</a></li>' : ''}
+          ${commenterFollowBlock.hasAnalytics ? '<li><a href="#sec-commenter-follow-analytics">フォロー×コメント分析</a></li>' : ''}
           <li><a href="#sec-self-comments">自分のコメント抜粋</a></li>
           <li><a href="#sec-all-comments">保存コメント一覧（CSV ダウンロードあり）</a></li>
           <li><a href="#sec-share-meta">シェア・プレビュー向けの情報</a></li>
@@ -13516,6 +14485,8 @@ async function buildHtmlReportDocument(
         </section>
         ${kiramekiAwardsSectionHtml}
         ${thumbedUsersSectionHtml}
+        ${commenterFollowBlock.directoryHtml}
+        ${commenterFollowBlock.analyticsHtml}
       </div>
       ${htmlReportConceptGuideCardHtml}
       ${htmlReportSaveGuideCardHtml}
@@ -13571,18 +14542,7 @@ async function buildHtmlReportDocument(
         </table>
       </section>
 
-      <section class="card" id="sec-all-comments" style="margin-top:12px;">
-        <h2>保存コメント一覧</h2>
-        <p class="guide-lead">
-          <button type="button" id="nlReportCsvDownloadBtn" class="nl-report-csv-btn">CSV をダウンロード</button>
-          <span class="nl-report-csv-hint">Excel / Google Sheets で開けるのだ（UTF-8 BOM 付き）。</span>
-        </p>
-        <pre id="nlReportCsvData" hidden>${escapeHtml(reportCommentsCsv)}</pre>
-        <table>
-          <thead><tr><th>#</th><th>commentNo</th><th>user</th><th>text</th><th>capturedAt</th></tr></thead>
-          <tbody>${commentRows.join('') || '<tr><td colspan="5">コメントなし</td></tr>'}</tbody>
-        </table>
-      </section>
+      ${commentsTableSectionHtml}
 
       <p class="footer-note">
         このHTMLは「君斗りんくの追憶のきらめき」（開発識別子 nicolivelog）がローカル生成した振り返り用レポートです。ブラウザ内で検索して再利用できます。
@@ -13634,6 +14594,7 @@ async function buildHtmlReportDocument(
         }
       })();
     </script>
+    ${commenterFollowBlock.embedScriptHtml}
   </body>
 </html>`;
 }
@@ -14610,6 +15571,7 @@ async function initPopup() {
     /* no-op */
   }
   applyResponsivePopupLayout();
+  bindNlMainScrollPerfHook();
   bridgeToolbarPopupToInlinePanel();
   attachCharaTrioSlotClickHandlers();
   attachWatchConcurrentCardCharaNorthStarJump();

@@ -259,12 +259,26 @@ export const KEY_USER_COMMENT_PROFILE_CACHE = 'nls_user_comment_profile_v1';
 export const KEY_COMMENTER_FOLLOW_CACHE = 'nls_commenter_follow_v1';
 
 /**
+ * v0.1.541: コメンター（数値 userId）のフォロー先 userId リスト横断キャッシュ。
+ * nvapi /v1/users/{uid}/following/users（非公式・ログイン Cookie 必須）。
+ * 値: { [userId]: { userIds, totalCount?, fetchedAt, status, truncated, pageCount } }
+ */
+export const KEY_COMMENTER_FOLLOWING_LIST_CACHE = 'nls_commenter_following_list_v1';
+
+/**
+ * v0.1.545: 配信ごとのマイルストーン演出済み dedupe キー。
+ * 値: { [liveId]: string[] }（例: comment_100, event_rank_5, gift_10）
+ */
+export const KEY_SUPPORT_CELEBRATION_STATE = 'nls_support_celebration_v1';
+
+/**
  * UI の「キャッシュクリア」で chrome.storage.local から削除するキー。
  * 応援コメント記録（nls_comments_*）・ギフト記録・各種設定は含めない。
  */
 export const EXTENSION_SOFT_CACHE_STORAGE_KEYS = Object.freeze([
   KEY_USER_COMMENT_PROFILE_CACHE,
-  KEY_COMMENTER_FOLLOW_CACHE
+  KEY_COMMENTER_FOLLOW_CACHE,
+  KEY_COMMENTER_FOLLOWING_LIST_CACHE
 ]);
 
 /** 視聴ページインラインパネルの幅: 視聴ブロック全幅 or 動画幅のみ */

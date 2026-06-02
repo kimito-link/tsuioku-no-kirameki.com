@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseGiftCommentText, summarizeGiftComments } from './parseGiftComment.js';
+import { parseGiftCommentText, parseNicoadCommentText, summarizeGiftComments } from './parseGiftComment.js';
 
 describe('parseGiftCommentText', () => {
   it('標準形式（全角括弧）をパースできる', () => {
@@ -189,5 +189,31 @@ describe('summarizeGiftComments', () => {
     const r = summarizeGiftComments(rows);
     expect(r.totalCount).toBe(2);
     expect(r.uniqueSenderCount).toBe(2);
+  });
+});
+
+describe('parseNicoadCommentText', () => {
+  it('【ニコニ広告】プレフィックス付きをパース', () => {
+    expect(
+      parseNicoadCommentText(
+        '【ニコニ広告】君はりんく＠クリエイター応援さんが100pt広告しました'
+      )
+    ).toEqual({
+      sender: '君はりんく＠クリエイター応援',
+      point: 100
+    });
+  });
+
+  it('プレフィックス無しもパース', () => {
+    expect(parseNicoadCommentText('テストさんが50pt広告しました')).toEqual({
+      sender: 'テスト',
+      point: 50
+    });
+  });
+
+  it('ギフト行は null', () => {
+    expect(
+      parseNicoadCommentText('Aさんがギフト「X（10pt）」を贈りました')
+    ).toBeNull();
   });
 });
