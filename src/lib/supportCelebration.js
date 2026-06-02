@@ -135,7 +135,7 @@ export function pickCommentMilestoneCelebration(prev, next) {
   if (hit == null) return null;
   return {
     kind: 'comment_milestone',
-    message: `コメント ${hit.toLocaleString('ja-JP')} 件達成！`,
+    message: `アプリ記録 ${hit.toLocaleString('ja-JP')} 件達成！`,
     dropCount: dropCountForCommentMilestone(hit),
     durationMs: commentMilestoneDurationMs(hit),
     dedupeKey: `comment_${hit}`,

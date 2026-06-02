@@ -3440,6 +3440,111 @@
         display: none;
       }
 
+      /* v0.1.556: パチンコ／ボカロ MV 風 — ぴかっフラッシュ */
+      .nl-celebration-pika {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 8;
+        overflow: hidden;
+      }
+      .nl-celebration-pika__flash {
+        position: absolute;
+        inset: 0;
+        background: #fff;
+        opacity: 0;
+        animation: nlCelebrationPikaFlash 0.22s ease-out forwards;
+      }
+      .nl-celebration-pika__radial {
+        position: absolute;
+        left: 50%;
+        top: 42%;
+        width: min(120vw, 680px);
+        height: min(120vw, 680px);
+        transform: translate(-50%, -50%) scale(0.2);
+        border-radius: 50%;
+        opacity: 0;
+        background: radial-gradient(
+          circle,
+          rgba(255, 248, 180, 0.95) 0%,
+          rgba(255, 200, 80, 0.55) 22%,
+          rgba(255, 140, 200, 0.25) 45%,
+          transparent 68%
+        );
+        animation: nlCelebrationPikaRadial 0.55s cubic-bezier(0.15, 0.85, 0.25, 1) forwards;
+        mix-blend-mode: screen;
+      }
+      .nl-celebration-pika__stars {
+        position: absolute;
+        left: 50%;
+        top: 42%;
+        width: 0;
+        height: 0;
+        opacity: 0;
+        animation: nlCelebrationPikaStarsIn 0.08s ease-out forwards;
+      }
+      .nl-celebration-pika__star {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        margin: -5px 0 0 -5px;
+        background: linear-gradient(135deg, #fff 30%, #ffd54f 70%);
+        clip-path: polygon(
+          50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%
+        );
+        opacity: 0;
+        animation: nlCelebrationPikaStarBurst 0.65s ease-out calc(var(--nl-pika-i, 0) * 0.03s) forwards;
+      }
+      .nl-celebration-pika--jackpot .nl-celebration-pika__flash {
+        animation-duration: 0.28s;
+      }
+      .nl-celebration-pika--hard .nl-celebration-pika__radial {
+        width: min(100vw, 560px);
+        height: min(100vw, 560px);
+      }
+      @keyframes nlCelebrationPikaFlash {
+        0% { opacity: 0; }
+        18% { opacity: 0.88; }
+        100% { opacity: 0; }
+      }
+      @keyframes nlCelebrationPikaRadial {
+        0% { transform: translate(-50%, -50%) scale(0.15); opacity: 0; }
+        20% { opacity: 1; }
+        100% { transform: translate(-50%, -50%) scale(1.35); opacity: 0; }
+      }
+      @keyframes nlCelebrationPikaStarsIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      @keyframes nlCelebrationPikaStarBurst {
+        0% {
+          transform: translate(0, 0) scale(0.2) rotate(0deg);
+          opacity: 0;
+        }
+        25% {
+          transform: translate(calc(var(--nl-pika-x, 0px) * 0.35), calc(var(--nl-pika-y, 0px) * 0.35))
+            scale(1.2) rotate(45deg);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(var(--nl-pika-x, 0px), var(--nl-pika-y, 0px)) scale(0.3) rotate(120deg);
+          opacity: 0;
+        }
+      }
+      html.nl-calm-motion .nl-celebration-pika {
+        display: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-celebration-pika__flash,
+        .nl-celebration-pika__radial,
+        .nl-celebration-pika__star {
+          animation: none !important;
+          display: none;
+        }
+      }
+
       /* v0.1.551: ギフト到着 — 三キャラ画面ズーム（SFC マリオ風） */
       .nl-gift-bahamut {
         position: fixed;

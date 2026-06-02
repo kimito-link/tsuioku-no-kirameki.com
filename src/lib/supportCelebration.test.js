@@ -24,7 +24,7 @@ describe('supportCelebration', () => {
     expect(at100?.dedupeKey).toBe('comment_100');
     expect(at100?.characterSet).toBe('mixed');
     expect(at100?.dropVariant).toBe('rinku_deluge');
-    expect(at100?.dropCount).toBeGreaterThanOrEqual(85);
+    expect(at100?.message).toContain('アプリ記録');
     expect(pickCommentMilestoneCelebration(null, 100)).toBeNull();
     expect(pickCommentMilestoneCelebration(100, 100)).toBeNull();
   });

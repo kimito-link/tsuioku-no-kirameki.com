@@ -186,6 +186,11 @@ import {
   flyTextLinesForGiftBahamut
 } from '../lib/celebrationFlyText.js';
 import {
+  pikaTierForSupportCelebration,
+  pikaTierForGiftBahamut,
+  pikaBurstCountForTier
+} from '../lib/celebrationPika.js';
+import {
   normalizeCommenterFollowMap,
   normalizeCommenterFollowLiveSnapshot,
   applyFollowFieldsToUser,
@@ -1033,6 +1038,51 @@ function appendCelebrationFlyTextLayer(host, lines, durationMs) {
 }
 
 /**
+ * パチンコ／ボカロ MV 風 — 画面全体「ぴかっ」
+ *
+ * @param {HTMLElement} host
+ * @param {import('../lib/celebrationPika.js').CelebrationPikaTier} tier
+ */
+function appendCelebrationPikaLayer(host, tier) {
+  if (!supportCelebrationMotionEnabled() || !tier || tier === 'none') return;
+  const burstCount = pikaBurstCountForTier(tier);
+  if (burstCount <= 0) return;
+
+  const layer = document.createElement('div');
+  layer.className = `nl-celebration-pika nl-celebration-pika--${tier}`;
+  layer.setAttribute('aria-hidden', 'true');
+
+  for (let i = 0; i < burstCount; i++) {
+    const flash = document.createElement('div');
+    flash.className = 'nl-celebration-pika__flash';
+    flash.style.animationDelay = `${i * 180}ms`;
+    layer.appendChild(flash);
+
+    const radial = document.createElement('div');
+    radial.className = 'nl-celebration-pika__radial';
+    radial.style.animationDelay = `${80 + i * 180}ms`;
+    layer.appendChild(radial);
+
+    const stars = document.createElement('div');
+    stars.className = 'nl-celebration-pika__stars';
+    stars.style.animationDelay = `${120 + i * 180}ms`;
+    for (let s = 0; s < (tier === 'jackpot' ? 12 : tier === 'hard' ? 8 : 5); s++) {
+      const star = document.createElement('span');
+      star.className = 'nl-celebration-pika__star';
+      const angle = (s / (tier === 'jackpot' ? 12 : tier === 'hard' ? 8 : 5)) * Math.PI * 2;
+      const dist = tier === 'jackpot' ? 140 : tier === 'hard' ? 110 : 80;
+      star.style.setProperty('--nl-pika-x', `${Math.cos(angle) * dist}px`);
+      star.style.setProperty('--nl-pika-y', `${Math.sin(angle) * dist}px`);
+      star.style.setProperty('--nl-pika-i', String(s));
+      stars.appendChild(star);
+    }
+    layer.appendChild(stars);
+  }
+
+  host.insertBefore(layer, host.firstChild);
+}
+
+/**
  * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec} spec
  */
 function playSupportCelebrationDom(spec) {
@@ -1071,6 +1121,8 @@ function playSupportCelebrationDom(spec) {
   banner.className = 'nl-celebration-shower__banner';
   banner.textContent = spec.message;
   host.appendChild(banner);
+
+  appendCelebrationPikaLayer(host, pikaTierForSupportCelebration(spec));
 
   if (anchor instanceof HTMLElement && spec.kind === 'comment_milestone') {
     anchor.classList.remove('nl-live-stat-card--celebrate');
@@ -1170,6 +1222,8 @@ function playGiftBahamutDom(spec) {
   host.removeAttribute('hidden');
   host.style.setProperty('--nl-bahamut-peak', String(spec.scale));
   host.style.setProperty('--nl-bahamut-dur', `${spec.durationMs}ms`);
+
+  appendCelebrationPikaLayer(host, pikaTierForGiftBahamut(spec));
 
   const flash = document.createElement('div');
   flash.className = 'nl-gift-bahamut__flash';
@@ -1313,21 +1367,19 @@ async function persistSupportCelebrationDedupe(liveId, dedupeKey) {
 }
 
 /**
- * 記録件数・保存件数・公式コメなど複数経路の最大値でマイルストーンを判定する。
+ * アプリ側の記録件数（画面の「記録」）だけでマイルストーンを判定する。
+ * 公式コメント数（本家コメ）は含めない — 混在すると節目が一度も発火しない。
  *
  * @param {string} liveId
- * @param {Array<number|null|undefined>} counts
+ * @param {number|null|undefined} appRecordCount
  */
-function noteCommentMilestoneHighWater(liveId, counts) {
+function noteCommentMilestoneHighWater(liveId, appRecordCount) {
   const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
-  if (!lid || !Array.isArray(counts)) return;
-  let next = -1;
-  for (const c of counts) {
-    if (typeof c === 'number' && Number.isFinite(c) && c >= 0 && c > next) {
-      next = c;
-    }
+  if (!lid) return;
+  if (typeof appRecordCount !== 'number' || !Number.isFinite(appRecordCount) || appRecordCount < 0) {
+    return;
   }
-  if (next < 0) return;
+  const next = Math.floor(appRecordCount);
   const prev = _prevMilestoneCommentHighWater;
   if (prev != null && next > prev) {
     void maybeCelebrateFromCommentCount(lid, prev, next);
@@ -11838,13 +11890,7 @@ async function refresh() {
     {
       const ps = _lastOfficialEventDomBundle?.programStats || null;
       const snap = watchMetaCache.snapshot;
-      noteCommentMilestoneHighWater(lv, [
-        arr.length,
-        countToShow,
-        summaryRecordedCount,
-        typeof ps?.commentCount === 'number' ? ps.commentCount : null,
-        typeof snap?.officialCommentCount === 'number' ? snap.officialCommentCount : null
-      ]);
+      noteCommentMilestoneHighWater(lv, countToShow);
     }
     void updateIngestHeartbeatDisplay(lv);
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));

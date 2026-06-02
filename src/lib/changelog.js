@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.556',
+    date: '2026-06-02',
+    summary: 'コメント節目をアプリ記録基準に修正＋ぴかっフラッシュ',
+    items: Object.freeze([
+      '100件などの節目は画面の「記録」（アプリ側）で判定。公式コメント数は使わない',
+      'バナー表記を「アプリ記録 ○○ 件達成！」に変更',
+      '100件以上・ギフト大型・1000件でパチンコ風の白 flash＋金 radial＋星キラ'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.555',
     date: '2026-06-02',
     summary: '演出にニコニコ／ボカロ MV 風の飛び文字を追加',
