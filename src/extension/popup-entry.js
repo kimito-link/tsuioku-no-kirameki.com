@@ -8761,6 +8761,39 @@ function scheduleNorthStarEventLaneStuckTimeout(liveId) {
  * @param {string|null|undefined} mirrorHtml
  * @param {string} [fallbackState]
  */
+/**
+ * v0.1.619: 無認証 koken/nicoad 公式 API 直叩きに移行済みで「手元のタブ操作で取れる」ものが
+ * 無くなったレーン。データが無い/未取得のとき、待機UI(「取得中…」キャラ案内)を出さず
+ * **レーンごと静かに畳む**(イベントレーンと同じ思想・ユーザー実機要望「出すべきでないものは
+ * 出すな」)。データ(rows>0)が来れば各 refresh 関数が show して描画する。
+ * @type {ReadonlySet<string>}
+ */
+const NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES = new Set([
+  'contributionRanking',
+  'giftHistory',
+  'adRanking'
+]);
+
+/**
+ * 待機状態のレーンを「待機UIを出して見せる」か「畳んで隠す」かを決める共通処理。
+ * API 直叩き系(上記 set)は待機UIを出さず hide。それ以外は従来どおり待機UIを mount。
+ * @param {HTMLElement} body
+ * @param {string} laneId
+ * @param {string} state not_yet | iframe_unrendered 等
+ */
+function applyNorthStarLaneWaitingOrHide(body, laneId, state) {
+  if (NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES.has(laneId)) {
+    // 待機UIを出さず畳む。data-lane-state は診断用に保持しつつ body は空 + hidden。
+    teardownNorthStarLaneWaitingUi(body);
+    body.innerHTML = '';
+    clearNorthStarVerticalRailForBody(body);
+    setNorthStarLaneHidden(laneId, true);
+    syncNorthStarLaneGadgetFromBodyState(body);
+    return;
+  }
+  mountNorthStarLaneWaitingUi(body, laneId, state);
+}
+
 function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
   const body = document.getElementById('northStarLaneBody-' + String(laneId || ''));
   if (!(body instanceof HTMLElement)) return;
@@ -8773,7 +8806,7 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
       typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
     body.setAttribute('data-lane-state', st);
     if (isNorthStarLaneWaitingState(st)) {
-      mountNorthStarLaneWaitingUi(body, String(laneId || ''), st);
+      applyNorthStarLaneWaitingOrHide(body, String(laneId || ''), st);
     } else {
       body.innerHTML = '';
       clearNorthStarVerticalRailForBody(body);
@@ -8788,7 +8821,7 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
       typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
     body.setAttribute('data-lane-state', st);
     if (isNorthStarLaneWaitingState(st)) {
-      mountNorthStarLaneWaitingUi(body, String(laneId || ''), st);
+      applyNorthStarLaneWaitingOrHide(body, String(laneId || ''), st);
     } else {
       body.innerHTML = '';
       clearNorthStarVerticalRailForBody(body);
@@ -8799,6 +8832,8 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
 
   body.innerHTML = sanitized;
   body.setAttribute('data-lane-state', 'ok');
+  // v0.1.619: rows/mirror が来たら hidden を外して必ず表示(畳みから復帰)。
+  setNorthStarLaneHidden(String(laneId || ''), false);
   clearNorthStarVerticalRailForBody(body);
   syncNorthStarLaneGadgetFromBodyState(body);
 }
@@ -9291,6 +9326,12 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
   if (isNorthStarBody) {
     teardownNorthStarLaneWaitingUi(el);
     el.setAttribute('data-lane-state', 'ok');
+    // v0.1.619: データ(rows)が来たので、空のとき畳んでいた hidden を必ず外して表示する
+    //   (NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES の畳みからの復帰)。lane id は body id 由来。
+    {
+      const laneIdFromBody = String(el.id || '').replace(/^northStarLaneBody-/, '');
+      if (laneIdFromBody) setNorthStarLaneHidden(laneIdFromBody, false);
+    }
     // 応援／ギフト帯と同じ「横スクロールのカード列」見せ方（#topSupportRankStrip と同型クラス）
     // 北極星は .nl-north-star-lane__shell が grid（左ガジェット | 本体 | 右レール）。
     // span-cards は grid-column:1/-1 で本体だけ全幅化し、aside が次段へ落ちて
