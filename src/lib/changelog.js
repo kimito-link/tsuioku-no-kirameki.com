@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.612',
+    date: '2026-06-03',
+    summary: '応援者パワー診断の表にサムネとniconicoリンクを追加',
+    items: Object.freeze([
+      'マーケ分析の応援者パワー診断のトップ表に、ユーザーサムネ列と名前リンク（niconico ユーザーページ）を追加',
+      '共有モードではサムネとリンクは出さず、Tier別の集計のみ表示する設計を維持'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.611',
     date: '2026-06-03',
     summary: '応援者パワー診断をマーケ分析レポートに表示',
