@@ -11,8 +11,20 @@
 
 /** フォローキャッシュの保持上限（chrome.storage.local 容量対策） */
 export const COMMENTER_FOLLOW_CACHE_MAX = 8000;
-/** 再取得を抑止する鮮度（これより新しければ再 fetch しない） */
-export const COMMENTER_FOLLOW_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * 再取得を抑止する鮮度（これより新しければ再 fetch しない）。
+ *
+ * v0.1.607 (OSINT Phase 1-A): 24h → 6h に短縮。
+ *   旧 24h は「過去 24h 内に一度でも fetch した uid は再取得対象外」となり、
+ *   配信を毎日／数日ごとにやる人は **キャッシュ焼き付きで新規取得 1%** だった
+ *   (Explore 調査・2026-06-03 の真因 1 位)。
+ *   6h に短縮することで、長尺配信中でも 1 回は再取得され、配信またぎでも
+ *   半日経てば最新値が取れる。同時に nvapi への request 量も最大 4 倍までで
+ *   抑えられる（既存の COMMENTER_FOLLOW_FETCH_MIN_GAP_MS と BATCH 制限で
+ *   ピーク負荷は据え置き）。
+ *   OSINT の「日次推移を残す」設計は Phase 1-D の時系列追記ストレージで対応。
+ */
+export const COMMENTER_FOLLOW_TTL_MS = 6 * 60 * 60 * 1000;
 /** content 側の follow 専用バッチ（1 tick あたり nvapi 問い合わせ数） */
 export const COMMENTER_FOLLOW_FETCH_BATCH = 8;
 

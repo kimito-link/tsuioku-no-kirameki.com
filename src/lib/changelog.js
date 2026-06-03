@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.607',
+    date: '2026-06-03',
+    summary: 'コメンターのフォロワー情報が取れにくい問題を改善',
+    items: Object.freeze([
+      'コメンターのフォロワー数キャッシュを24時間→6時間に短縮（同じ配信内・配信またぎで再取得されやすくなる）',
+      'コメンターのフォロー先リストキャッシュを24時間→12時間に短縮（OSINTで新鮮なフォロー先データが集まる）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.606',
     date: '2026-06-03',
     summary: '長時間配信で「ページが応答しません」が出る不具合を修正',

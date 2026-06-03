@@ -3,8 +3,17 @@
  * chrome 依存なし。content / popup / 分析 HTML から利用。
  */
 
-/** 再取得を抑止する鮮度（24h） */
-export const COMMENTER_FOLLOWING_LIST_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * 再取得を抑止する鮮度。
+ *
+ * v0.1.607 (OSINT Phase 1-A): 24h → 12h に短縮。
+ *   フォロー先リスト取得は重い(N × 200 ID)・取得制限が厳しい(1 配信 3 名)ので
+ *   フォロワー数キャッシュ(6h)よりは長く取り、半日で再取得可能にする。
+ *   これにより配信またぎでの「焼き付き」を抑え、OSINT として新鮮な
+ *   フォロー先データが集まる。401/403/login_required も同じ TTL でキャッシュ
+ *   (認証回避は niconico ToS に反するため短縮しない)。
+ */
+export const COMMENTER_FOLLOWING_LIST_TTL_MS = 12 * 60 * 60 * 1000;
 /** 1 コメンターあたり保存する followee id 上限 */
 export const COMMENTER_FOLLOWING_LIST_MAX_UIDS_STORED = 200;
 /** 配信ごとにフォロー一覧を取るコメンター上限（配信3 + レポート7） */
