@@ -40,7 +40,6 @@ export function markWatchPopupLoadPhase(phase, extra = {}) {
   if (!debugEnabled()) return;
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const ms = Math.max(0, Math.round(now - _t0));
-  // eslint-disable-next-line no-console
   console.debug('[nls watch-popup load]', phase, {
     ms,
     liveId: _liveId,
