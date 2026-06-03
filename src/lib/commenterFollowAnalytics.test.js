@@ -210,3 +210,99 @@ describe('commenterFollowAnalytics', () => {
     expect(common[0]).toMatchObject({ userId: '7', overlapCount: 2 });
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* v0.1.610 Phase 2-B: includeSupporterPower opt-in 接続テスト                  */
+/* -------------------------------------------------------------------------- */
+
+describe('buildCommenterFollowAnalytics + supporterPower (Phase 2-B)', () => {
+  it('opt-in 無し(または false)は既存 fields のみで supporterPower 系は出ない(後方互換)', () => {
+    const a1 = buildCommenterFollowAnalytics(USERS);
+    expect(a1.rows.length).toBeGreaterThan(0);
+    expect(a1.supporterPowerRows).toBeUndefined();
+    expect(a1.supporterPowerSummary).toBeUndefined();
+
+    const a2 = buildCommenterFollowAnalytics(USERS, { includeSupporterPower: false });
+    expect(a2.supporterPowerRows).toBeUndefined();
+    expect(a2.supporterPowerSummary).toBeUndefined();
+  });
+
+  it('includeSupporterPower=true で supporterPowerRows と summary が追加される', () => {
+    const a = buildCommenterFollowAnalytics(USERS, {
+      includeSupporterPower: true
+    });
+    expect(Array.isArray(a.supporterPowerRows)).toBe(true);
+    expect(a.supporterPowerRows.length).toBe(a.rows.length);
+    for (const r of a.supporterPowerRows) {
+      expect(typeof r.power.score).toBe('number');
+      expect(r.power.score).toBeGreaterThanOrEqual(0);
+      expect(r.power.score).toBeLessThanOrEqual(100);
+      expect(['S', 'A', 'B', 'C', 'D', 'E']).toContain(r.power.tier);
+      expect(typeof r.power.percentile).toBe('number');
+      expect(typeof r.power.components.engagement).toBe('number');
+      expect(typeof r.power.components.loyalty).toBe('number');
+      expect(typeof r.power.components.influence).toBe('number');
+      expect(['highFollowerRegulars', 'localEnthusiasts', 'quietSupporters', 'other'])
+        .toContain(r.segmentId);
+    }
+    expect(typeof a.supporterPowerSummary.sampleSize).toBe('number');
+    expect(typeof a.supporterPowerSummary.medianScore).toBe('number');
+    expect(a.supporterPowerSummary.topRows.length).toBeGreaterThan(0);
+    expect(a.supporterPowerSummary.topRows.length).toBeLessThanOrEqual(10);
+    // tierCounts の合計は sampleSize と一致
+    const total = Object.values(a.supporterPowerSummary.tierCounts).reduce(
+      (s, n) => s + n, 0
+    );
+    expect(total).toBe(a.supporterPowerSummary.sampleSize);
+  });
+
+  it('既存 fields は opt-in 有無で完全に同じ(完全互換)', () => {
+    const a1 = buildCommenterFollowAnalytics(USERS);
+    const a2 = buildCommenterFollowAnalytics(USERS, { includeSupporterPower: true });
+    // 既存 fields の deep equal
+    expect(a2.rows).toEqual(a1.rows);
+    expect(a2.rowsWithFollowerCount).toEqual(a1.rowsWithFollowerCount);
+    expect(a2.thresholds).toEqual(a1.thresholds);
+    expect(a2.scatterPoints).toEqual(a1.scatterPoints);
+    expect(a2.segments).toEqual(a1.segments);
+    expect(a2.followDeltas).toEqual(a1.followDeltas);
+    expect(a2.followeeProfile).toEqual(a1.followeeProfile);
+    expect(a2.followTiming).toEqual(a1.followTiming);
+    expect(a2.broadcasterFollow).toEqual(a1.broadcasterFollow);
+    expect(a2.commonFollowees).toEqual(a1.commonFollowees);
+    expect(a2.followingListInsights).toEqual(a1.followingListInsights);
+  });
+
+  it('giftTotalsByUserId と loyaltyCountsByUserId を opts で渡せる', () => {
+    const a = buildCommenterFollowAnalytics(USERS, {
+      includeSupporterPower: true,
+      giftTotalsByUserId: { '1': 1000, '2': 500 },
+      loyaltyCountsByUserId: { '1': 20, '2': 5 },
+      loyaltyWindowSize: 30,
+      availableLiveCount: 30
+    });
+    const r1 = a.supporterPowerRows.find((r) => r.userId === '1');
+    const r2 = a.supporterPowerRows.find((r) => r.userId === '2');
+    expect(r1.giftTotalPoints).toBe(1000);
+    expect(r2.giftTotalPoints).toBe(500);
+    expect(r1.loyaltyCount).toBe(20);
+    expect(r2.loyaltyCount).toBe(5);
+    // gift・loyalty が高い r1 のスコアは r2 より高いはず
+    expect(r1.power.score).toBeGreaterThan(r2.power.score);
+  });
+
+  it('空入力でも supporterPowerRows は安全に未定義', () => {
+    const a = buildCommenterFollowAnalytics([], { includeSupporterPower: true });
+    // 空 rows なので supporterPower 計算もスキップされ undefined
+    expect(a.supporterPowerRows).toBeUndefined();
+    expect(a.supporterPowerSummary).toBeUndefined();
+  });
+
+  it('supporterPowerTopN で topRows の件数を制限できる', () => {
+    const a = buildCommenterFollowAnalytics(USERS, {
+      includeSupporterPower: true,
+      supporterPowerTopN: 1
+    });
+    expect(a.supporterPowerSummary.topRows.length).toBeLessThanOrEqual(1);
+  });
+});
