@@ -8864,6 +8864,17 @@ async function resolveOfficialContributionRankingRows(liveId) {
     }
   }
 
+  // v0.1.616: 観測。popup が koken storage を読めた件数を記録（書込成功＋読込経路の確認）。
+  //   content の externalFetchProbe.kokenLastRows と突き合わせれば、storage 書込/読込/
+  //   liveId 不一致のどこで切れたかが分かる。
+  _northStarRenderProbe.contribResolveCalls += 1;
+  try {
+    const ks = /** @type {any} */ (kokenStorage);
+    _northStarRenderProbe.lastContribResolveRows =
+      ks && Array.isArray(ks.rows) ? ks.rows.length : 0;
+  } catch {
+    _northStarRenderProbe.lastContribResolveRows = -2;
+  }
   return resolveContributionRankingRowsFromSources({
     kokenStorage,
     domBundle: _lastOfficialEventDomBundle,
@@ -10239,20 +10250,67 @@ async function syncKokenGiftHistoryForPopup(liveId, opts = {}) {
   }
 }
 
+/**
+ * v0.1.616: popup 側の北極星描画経路の可観測化。content の externalFetchProbe で
+ * 「取得は完璧(koken 69件等)」と確定したのに popup のレーンが描画されない真因を
+ * 一点に絞るための診断。診断 JSON の popup.northStarRenderProbe に出す。
+ * @type {{
+ *   refreshAllStarted: number,
+ *   refreshAllCompleted: number,
+ *   lastGiftSyncMs: number,
+ *   lastContribResolveRows: number,
+ *   contribResolveCalls: number,
+ *   lastReachedLane: string,
+ *   lastError: string,
+ *   lastRunAtBase: number
+ * }}
+ */
+const _northStarRenderProbe = {
+  refreshAllStarted: 0,
+  refreshAllCompleted: 0,
+  lastGiftSyncMs: -1,
+  lastContribResolveRows: -1,
+  contribResolveCalls: 0,
+  lastReachedLane: '',
+  lastError: '',
+  lastRunAtBase: 0
+};
+
 /** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
 async function refreshAllNorthStarMirrorLanes(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
-  await syncKokenGiftHistoryForPopup(lid);
-  await refreshNorthStarContributionRankingLaneAsync(lid);
-  await refreshNorthStarGiftHistoryLaneAsync(lid);
-  refreshNorthStarProgramPointsLane();
-  refreshNorthStarAdRankingLane();
-  await refreshNorthStarEventCurrentRankLaneAsync(lid);
-  refreshNorthStarEventCumulativeScoreLane();
-  await refreshNorthStarEventBroadcastersLaneAsync(lid);
-  await refreshNorthStarEventVotingSupportersLaneAsync(lid);
-  await refreshSupportActivityTimeline(lid);
-  await maybeCelebrateGiftEventsAfterRefresh(lid);
+  // v0.1.616: 観測。どこまで到達したか（先頭の重いギフト同期で詰まる仮説の検証）。
+  _northStarRenderProbe.refreshAllStarted += 1;
+  _northStarRenderProbe.lastRunAtBase = Date.now();
+  _northStarRenderProbe.lastReachedLane = 'start';
+  _northStarRenderProbe.lastError = '';
+  try {
+    const giftSyncStart = Date.now();
+    await syncKokenGiftHistoryForPopup(lid);
+    _northStarRenderProbe.lastGiftSyncMs = Math.max(0, Date.now() - giftSyncStart);
+    _northStarRenderProbe.lastReachedLane = 'after_gift_sync';
+    await refreshNorthStarContributionRankingLaneAsync(lid);
+    _northStarRenderProbe.lastReachedLane = 'after_contrib';
+    await refreshNorthStarGiftHistoryLaneAsync(lid);
+    _northStarRenderProbe.lastReachedLane = 'after_gift_history';
+    refreshNorthStarProgramPointsLane();
+    refreshNorthStarAdRankingLane();
+    _northStarRenderProbe.lastReachedLane = 'after_ad';
+    await refreshNorthStarEventCurrentRankLaneAsync(lid);
+    refreshNorthStarEventCumulativeScoreLane();
+    await refreshNorthStarEventBroadcastersLaneAsync(lid);
+    await refreshNorthStarEventVotingSupportersLaneAsync(lid);
+    _northStarRenderProbe.lastReachedLane = 'after_event_lanes';
+    await refreshSupportActivityTimeline(lid);
+    await maybeCelebrateGiftEventsAfterRefresh(lid);
+    _northStarRenderProbe.lastReachedLane = 'done';
+    _northStarRenderProbe.refreshAllCompleted += 1;
+  } catch (e) {
+    _northStarRenderProbe.lastError = String(
+      (e && /** @type {any} */ (e).message) || e || 'unknown'
+    ).slice(0, 200);
+    throw e;
+  }
 }
 
 /**
@@ -17408,6 +17466,30 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       avatarLoadDiag: (() => {
         try {
           return storyAvatarLoadGuard.getDiagnostics();
+        } catch {
+          return null;
+        }
+      })(),
+      // v0.1.616: 北極星描画経路の観測。content は取得完璧(koken 69件)なのに popup の
+      //   レーンが空の真因を一点に絞る。
+      //   refreshAllStarted>0 & refreshAllCompleted=0 → 途中で詰まる/throw（lastReachedLane
+      //   /lastError を見る）。lastContribResolveRows=0 で content kokenLastRows>0 →
+      //   storage 書込失敗 or liveId 不一致 or popup が別 storage を読んでいる。
+      northStarRenderProbe: (() => {
+        try {
+          return {
+            refreshAllStarted: _northStarRenderProbe.refreshAllStarted,
+            refreshAllCompleted: _northStarRenderProbe.refreshAllCompleted,
+            lastGiftSyncMs: _northStarRenderProbe.lastGiftSyncMs,
+            lastContribResolveRows: _northStarRenderProbe.lastContribResolveRows,
+            contribResolveCalls: _northStarRenderProbe.contribResolveCalls,
+            lastReachedLane: _northStarRenderProbe.lastReachedLane,
+            lastError: _northStarRenderProbe.lastError,
+            lastRunAgoMs:
+              _northStarRenderProbe.lastRunAtBase > 0
+                ? Math.max(0, Date.now() - _northStarRenderProbe.lastRunAtBase)
+                : null
+          };
         } catch {
           return null;
         }
