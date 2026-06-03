@@ -208,3 +208,78 @@
 
 ### 案 1: popup 側で triggerBackfillRetry にタブ間共有クールダウンを入れる(**最小手・15-30分で実装**)
 
+- 影響範囲: popup-entry.js のみ(7728・7987)。新 純関数 src/lib/multiTabBackfillRetryCooldown.js(session storage helper)。
+- 内容:
+  1. triggerBackfillRetry の冒頭で chrome.storage.session.get(nls_backfill_retry_at_<lv>) を読み、直近 10 秒以内なら何もしない(他タブが既に retry を叩いた)。
+  2. 自タブが retry を発火する場合、set(nls_backfill_retry_at_<lv>, Date.now())。
+  3. maybeAutoRetryBackfillFromProg の prog.stopReason を見て、rotation_yield(タブ間譲渡)・aborted(visibilitychange) なら **リトライしない**(content 側の自然な再起動に任せる)。
+  4. triggerBackfillRetry 内で _backfillRetriedCountByLiveId[lid] を加算し、3 回(または NDGR_BACKFILL_TRANSIENT_RETRY_MAX 同期)で打ち切る(現在は popup 側に上限なし)。
+- リスク:
+  - session storage は SW 死亡で消えるが、cooldown は数秒なので影響なし。
+  - 「ボタン押下時の即時 retry」は別経路(popup-entry.js:7775-7785)なのでこの修正の影響外(明示操作は通したい)。
+- v0.1.592 baseline との互換性: triggerBackfillRetry の挙動は「クールダウン中は noop」になるだけで、UI 表示は変わらず。エコシステム影響は backfill タイミングのみ。
+- 回帰テスト方針:
+  - 新 純関数 shouldAllowBackfillRetryNow のユニットテスト(cooldown 内 false / 過ぎたら true / null は true)
+  - e2e: 多タブ環境で KEY_BACKFILL_ENABLED の write 数を計測し、修正前後で 1 サイクルあたり 2N から 2 に削減することを確認
+
+### 案 2: コメント永続化を per-lv leader-only に集約(**根治・1-2 日**)
+
+- 影響範囲: content-entry.js の persistCoalescer 周辺(10424-)、bufferRowsToTail(10049-)、compactTailIntoMain(10120-)、persistCommentRowsImpl(10762-)、page-intercept-entry.js は不変。
+- 内容:
+  1. content-entry.js の persistCoalescer flush を runIfTabLeader(nls-persist-+lid, () => actualFlush()) でラップ。
+  2. follower タブは flush を skip するが、in-memory バッファ(tailRowsBuffer / recentCommentRing)は保持し続ける(リーダー昇格時に自分の蓄積を flush できるよう)。
+  3. リーダー交代時の取りこぼし防止: リーダー譲渡前に lastResortFlush(content-entry.js 既存)を呼んで畳み込み。
+  4. WS 傍受デコードはそのまま全タブで継続(これは fault-tolerance のため)、persist だけが集約される。
+  5. リーダーが hidden 化したら pagehide でロック解放 として 次タブが昇格 として 自分の in-memory バッファを flush。
+- リスク:
+  - リーダー交代の境界で短時間ギャップ(数 ms から 数十 ms)が出る可能性。WS 傍受は全タブで継続するので**取りこぼしは起きない**が、フォロワータブの「in-memory only」期間に拡張が context-invalidated されると未保存分が失われる。
+  - nls_ctail_ / nls_cchunk_index_ の write 頻度は **1/N に削減**(主目的)。
+  - existing tests を全部回す必要あり(persistThrottle.test.js / commentChunkStore.test.js など 20+ファイル)。
+- v0.1.592 baseline との互換性: persist の正本ロジック自体は不変(persistCommentRowsImpl ・ bufferRowsToTail の中身は変えず、起動条件だけ leader gate を足す)。
+- 回帰テスト方針:
+  - 新 e2e: 多タブ同一 lv で 5 分間放送し、main 配列の最終件数が 1 タブと N タブで差が 1 パーセント以内であることを確認。
+  - 既存 e2e の persist 系全部緑(extension-recording.spec.js / story-user-lane-profile-nickname.spec.js など)。
+  - unit: persistCoalescer の flush 経路が leader-aware になったことを mock で検証。
+
+### 案 3: 案 1 + 案 2 のハイブリッド(**推奨・ステップ実装**)
+
+- まず案 1(最小手)で「点滅の体感」を確実に削減 として ユーザー確認 として 安定したら案 2 で「取得低下」を根治。
+- 案 1 だけでは取得低下が完全には消えない可能性がある(WS 傍受の全タブ並列デコード + persist 競合は残る)。
+- 案 2 だけでは backfill retry ストームが残るので点滅は減らない。
+- 両方入れて「点滅ゼロ + 取得 ≒ 1 タブ時の率」を目指す。
+- 段階デリバリ: PR_α(案 1)・PR_β(案 2) の 2 つの独立 PR に分けてリスク分散。
+
+### 案 4: ウルトラC(Web Locks + SW 集約)を full deploy(**大改修・3-5 日**)
+
+- 既に tabLeaderLock.js + GLOBAL_BACKFILL_LOCK / GLOBAL_FORWARD_LOCK で実装の半分が入っている。残りを全部入れる:
+  1. **persist 経路を per-lv leader に集約**(案 2 と同じ)
+  2. **MAIN world WS 傍受の dedupe を session storage 経由でタブ間共有**(現状は per-tab だが、リーダーがコメント no を session に publish すれば follower は decode skip 可能)
+  3. **popup 描画の hidden-skip を「親 watch タブ visibility」基準に強化**(現状 document.hidden だけだが、chrome.tabs.getCurrent() で親 tab の active 判定を取れる)
+- リスク: 大改修ゆえに容易に新規 bug を入れる。v0.1.592 baseline の挙動を壊す可能性最大。
+- 推奨判断: **案 3 で十分**。ウルトラC の full deploy は「同接 1000+ 級放送 ×7 タブ並列」のような極端な使い方への対策。一般ユーザーは 1-2 タブなので過剰。
+
+## 推奨アクション
+
+### 司令塔への推奨
+
+**案 3(案 1 + 案 2 のハイブリッド・段階実装)** を推奨。理由:
+
+1. **案 1 だけで点滅は大幅に減る**: ユーザー報告の「すべてのタブで点滅」は主に triggerBackfillRetry ストームと推定。cooldown を入れれば 1 サイクルあたり N から 1 に削減され、体感の点滅頻度は 1/N に。
+2. **案 2 で取得低下を根治**: 多タブの write 競合が消えれば persistCommentRowsImpl の requeueOnReadFail が減り、新着行が安定して保存される。591 件中 79 件のような状態は、案 2 を入れれば 1 タブ時と同じ ≒ 95 パーセントに戻る見込み。
+3. **案 1 として ユーザー確認 として 案 2** の順なら、各段階で実機テスト + フォールバック可能。
+4. **既存の tabLeaderLock.js の延長**で済むので、ウルトラC への投資が無駄にならない。
+
+### ウルトラC(Web Locks + SW 集約)に踏み込むかの判断材料
+
+- **踏み込むべき理由(現時点で揃っている)**:
+  - 既に tabLeaderLock.js が存在し、 backfill / forward / scrape / extfetch が leader-locked として **persist だけが残った未完成領域**。同じパターンで実装できる。
+  - reference_multitab_scale_ultraC_leader_election に書かれた設計と完全に整合(PR1-b / PR2 系列の延長)。
+  - 修正案 2 はまさに「ウルトラC ステップ 3」(単一 writer + 書き込み coalesce)に該当。
+
+- **踏み込まないべき理由**:
+  - 一般ユーザーは 1-2 タブで十分快適に動いているはず(reference_multitab_scale_ultraC_leader_election: 「テスト自分だけが多タブ・一般は 1-2 タブ・緊急度は中」)。
+  - SW 集約(offscreen document による IDB 単一 writer)は v0.1.514 で試みて **実機破綻**(FORCE_DISABLE_COMMENT_IDB_PATH=true で封印中)した苦い経験あり。
+  - Web Locks 経路は **content world で完結**(tabLeaderLock.js)・SW 介在不要なので、案 2 のスコープでは offscreen/IDB 移行は **不要**。
+
+- **結論**: 案 3 = ウルトラC の **persist 領域だけを実装**。SW 集約 + offscreen の full deploy は今回はしない(v0.1.514 の教訓を尊重)。これは「ウルトラC の本流(Web Locks リーダー選出 + 単一 writer)」を **着実に persist まで延伸**するアプローチで、reference 文書の方針とも完全整合。
+
