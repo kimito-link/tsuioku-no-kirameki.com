@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.601',
+    date: '2026-06-03',
+    summary: '動きを減らす設定で同接ローディングが止まらない不具合を修正',
+    items: Object.freeze([
+      'prefers-reduced-motion 設定時、同接ローディングのりんく画像アニメーションが止まらないセレクタ不一致（__rink → __link）を修正'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.600',
     date: '2026-06-03',
     summary: '暫定ランキングとスクロール再試行の不具合修正',
