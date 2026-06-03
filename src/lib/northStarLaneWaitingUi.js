@@ -149,11 +149,13 @@ export function getNorthStarWaitFootnote(laneId, state, elapsedMs) {
     return '（起動直後・取得処理の途中です）';
   }
   if (st === 'iframe_unrendered') {
+    // v0.1.619: koken 公式 API 直叩きに移行済み。「まだ開いていない（タブ未オープン）」は
+    //   誤情報なので「公式から問い合わせ中」に統一。
     if (laneId === 'giftHistory') {
-      return '（公式のギフト一覧がまだ開いていないようです）';
+      return '（公式のギフト履歴を問い合わせ中です）';
     }
     if (laneId === 'contributionRanking') {
-      return '（公式の貢献度一覧がまだ開いていないようです）';
+      return '（公式の貢献度ランキングを問い合わせ中です）';
     }
     return '（公式ページの表示を待っています）';
   }
@@ -196,10 +198,11 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
   }
 
   if (st === 'iframe_unrendered' && lid === 'contributionRanking') {
+    // v0.1.619: koken 公式 API 直叩きに移行済み。「ランキングタブを開いて」は撤去。
     return Object.freeze([
       Object.freeze({
         badge: 'りんく',
-        line: '画面のギフトボタン→「ランキング」タブを開くと、貢献度の一覧が出やすいよ。'
+        line: 'ニコニコの公式から、貢献度ランキングを問い合わせ中だよ。'
       }),
       Object.freeze({
         badge: 'こん太',
@@ -207,20 +210,21 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
       }),
       Object.freeze({
         badge: 'たぬ姉',
-        line: '一覧が見えないときは、ページを開き直すのも手よ。'
+        line: 'ギフトがまだ少ない配信だと、ここは空のままになることがあるわよ。'
       })
     ]);
   }
 
   if (st === 'iframe_unrendered' && lid === 'giftHistory') {
+    // v0.1.619: koken 公式 API（/histories）直叩きに移行済み。「履歴タブを開いて」は撤去。
     return Object.freeze([
       Object.freeze({
         badge: 'りんく',
-        line: '画面のギフトボタン→「履歴」タブを開くと、この番組のギフト履歴が出やすいよ。'
+        line: 'ニコニコの公式から、ギフト履歴を問い合わせ中だよ。'
       }),
       Object.freeze({
         badge: 'こん太',
-        line: 'まだ空っぽに見えるときは、タブを切り替えてみてね。'
+        line: 'まだ空っぽに見えるときは、もう少し待っててね。'
       }),
       Object.freeze({
         badge: 'たぬ姉',
@@ -295,26 +299,32 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
       ]);
     }
     if (lid === 'contributionRanking') {
+      // v0.1.619: 貢献度ランキングは無認証 koken 公式 API から直接取得する設計に移行済み。
+      //   「ギフトボタン→ランキングタブを開いて」は iframe scrape 時代の誤誘導なので撤去
+      //   （API 直叩きでは手元のタブ操作は不要）。eventBroadcasters(v0.1.605) と同じく
+      //   「公式から問い合わせ中」を正直に伝え、データが無い配信は静かに空のままにする。
       return Object.freeze([
         Object.freeze({
           badge: 'りんく',
-          line: '画面のギフトボタン→「ランキング」タブを開くと、貢献度の一覧が出やすいよ。'
+          line: 'ニコニコの公式から、貢献度ランキングを問い合わせ中だよ。'
         }),
         Object.freeze({
           badge: 'こん太',
-          line: 'ランキングのタブが見えたら、もうちょっとだけ待ってて。'
+          line: '応答が返ってきたら、ここに並べるね！'
         }),
         Object.freeze({
           badge: 'たぬ姉',
-          line: '手元でギフト欄を開くと、進むことが多いわよ。'
+          line: 'ギフトがまだ少ない配信だと、ここは空のままになることがあるわよ。'
         })
       ]);
     }
     if (lid === 'giftHistory') {
+      // v0.1.619: ギフト履歴も無認証 koken 公式 API（/histories）直叩きに移行済み。
+      //   「履歴タブを開いて」は iframe 時代の誤誘導なので撤去。
       return Object.freeze([
         Object.freeze({
           badge: 'りんく',
-          line: '画面のギフトボタン→「履歴」タブを開くと、この番組のギフト履歴が出やすいよ。'
+          line: 'ニコニコの公式から、ギフト履歴を問い合わせ中だよ。'
         }),
         Object.freeze({
           badge: 'こん太',
@@ -322,7 +332,7 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
         }),
         Object.freeze({
           badge: 'たぬ姉',
-          line: '表示が付いたら、ここにリストが並ぶからね。'
+          line: '応答が返ってきたら、ここにリストが並ぶからね。'
         })
       ]);
     }
@@ -396,78 +406,24 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
 
 /**
  * 「公式ギフト欄の○○タブを開くと出やすい」を示す手順図解（仮の見た目・SVG/CSS のみ）。
- * 画像ファイル不要。giftHistory / contributionRanking のように「タブを開くと取れる」
- * レーンでだけ出す。data 取得後は待機UIごと消えるので恒久表示にはならない。
+ *
+ * v0.1.619: 貢献度ランキング / ギフト履歴は無認証 koken 公式 API 直叩きに移行済みで、
+ *   手元で「ギフトボタン→タブを開く」操作は一切不要になった。この図解は iframe scrape
+ *   時代の誤誘導なので**全レーンで非表示**にする（ユーザー実機指摘「API 直叩きなら消すべき」）。
+ *   関数自体は将来用途・テスト互換のため残置するが、常に '' を返す（図解なし）。
  *
  * @param {string} laneId
- * @returns {string} 該当レーンは図解 HTML、対象外は ''（図解なし）
+ * @returns {string} 常に ''（図解なし）。
  */
 export function buildNorthStarLaneOpenHintDiagramHtml(laneId) {
-  const lid = String(laneId || '');
-  /** @type {{ tab: string } | null} */
-  let cfg = null;
-  if (lid === 'giftHistory') cfg = { tab: '履歴' };
-  else if (lid === 'contributionRanking') cfg = { tab: 'ランキング' };
-  if (!cfg) return '';
-
-  // タブ列（番組ギフト / マイギフト / 履歴 / ランキング）。該当タブだけ active。
-  const tabs = ['番組ギフト', 'マイギフト', '履歴', 'ランキング'];
-  const tabsHtml = tabs
-    .map((t) => {
-      const active = t === cfg.tab;
-      const cls = active
-        ? 'nl-open-hint__tab nl-open-hint__tab--active'
-        : 'nl-open-hint__tab';
-      return `<span class="${cls}">${escapeText(t)}</span>`;
-    })
-    .join('');
-
-  // 仮スクショ風: ①ギフトボタン(🎁 風 SVG) → ②タブ列(該当をハイライト)
-  return (
-    `<div class="nl-open-hint" aria-hidden="true">` +
-      `<div class="nl-open-hint__step">` +
-        `<span class="nl-open-hint__num">1</span>` +
-        `<span class="nl-open-hint__gift-btn" title="ギフトボタン">` +
-          giftIconSvg() +
-        `</span>` +
-        `<span class="nl-open-hint__caption">ギフトを押す</span>` +
-      `</div>` +
-      `<span class="nl-open-hint__arrow">→</span>` +
-      `<div class="nl-open-hint__step">` +
-        `<span class="nl-open-hint__num">2</span>` +
-        `<span class="nl-open-hint__tabs">${tabsHtml}</span>` +
-        `<span class="nl-open-hint__caption">「${escapeText(cfg.tab)}」を開く</span>` +
-      `</div>` +
-    `</div>`
-  );
+  // v0.1.619: 全レーンで図解なし（koken/nicoad 公式 API 直叩きに移行済みで「タブを開く」
+  //   操作は不要・誤誘導になるため撤去）。引数は API 互換のため受けるが未使用。
+  void laneId;
+  return '';
 }
 
-/**
- * ギフトボタン風の小さな SVG（プレゼント箱）。仮の絵。
- * @returns {string}
- */
-function giftIconSvg() {
-  return (
-    `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">` +
-    `<rect x="3" y="9" width="18" height="11" rx="1.5" fill="currentColor" opacity="0.18"/>` +
-    `<rect x="3" y="9" width="18" height="11" rx="1.5" stroke="currentColor" stroke-width="1.6"/>` +
-    `<path d="M3 9h18M12 9v11" stroke="currentColor" stroke-width="1.6"/>` +
-    `<path d="M12 9C9 9 7.5 4 9.5 3.2 11 2.6 12 6 12 9zM12 9c3 0 4.5-5 2.5-5.8C13 2.6 12 6 12 9z" stroke="currentColor" stroke-width="1.4" fill="none"/>` +
-    `</svg>`
-  );
-}
-
-/**
- * textContent 相当の最小エスケープ（< > & のみ）。escapeAttr は属性用なので本文用に別途。
- * @param {string} s
- * @returns {string}
- */
-function escapeText(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
+// v0.1.619: giftIconSvg / escapeText は「タブを開く」手順図解専用だった。図解撤去に伴い
+//   未使用になったため削除（死蔵コードを残さない）。
 
 /**
  * innerHTML 用の静的シェル（台詞 1 行 + 該当レーンは手順図解。台詞は popup-entry で textContent）。

@@ -91,8 +91,9 @@ describe('northStarLaneWaitingUi', () => {
       expect(getNorthStarWaitFootnote('contributionRanking', 'iframe_unrendered')).toBe(
         getNorthStarWaitFootnote('contributionRanking', 'iframe_unrendered', undefined)
       );
+      // v0.1.619: koken API 直叩き化で「まだ開いていない（タブ未オープン）」→「問い合わせ中」へ。
       expect(getNorthStarWaitFootnote('contributionRanking', 'iframe_unrendered')).toContain(
-        'まだ開いていない'
+        '問い合わせ中'
       );
     });
 
@@ -108,9 +109,10 @@ describe('northStarLaneWaitingUi', () => {
     });
 
     it('閾値未満は現行文言のまま（footnote / rotation）', () => {
+      // v0.1.619: 閾値未満の iframe_unrendered は「問い合わせ中」（API 直叩き化）。
       expect(
         getNorthStarWaitFootnote('contributionRanking', 'iframe_unrendered', TH - 1)
-      ).toContain('まだ開いていない');
+      ).toContain('問い合わせ中');
       const msgs = getNorthStarWaitRotationMessages(
         'contributionRanking',
         'iframe_unrendered',
