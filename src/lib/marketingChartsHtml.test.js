@@ -978,4 +978,51 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('雑談');
     expect(html).toContain('来場人数（合算）');
   });
+
+  describe('v0.1.611 Phase 3-A: 応援者パワー診断セクション', () => {
+    it('数値ID コメンターがいるなら応援者パワー診断セクションが出る', () => {
+      const base = Date.parse('2024-01-01T00:00:00Z');
+      /** @type {import('./commentRecord.js').StoredComment[]} */
+      const comments = [];
+      // 数値 ID コメンター 6 名(smallSample mode で動く・5 名以上)
+      for (let uid = 1; uid <= 6; uid += 1) {
+        for (let i = 0; i < uid * 2; i += 1) {
+          comments.push({
+            id: `c-${uid}-${i}`,
+            liveId: 'lv123',
+            commentNo: String(uid * 100 + i),
+            text: `コメ${uid}`,
+            userId: String(uid),
+            capturedAt: base + (uid * 1000 + i) * 1000
+          });
+        }
+      }
+      const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'));
+      expect(html).toContain('id="mkt-supporter-power"');
+      expect(html).toContain('応援者パワー診断');
+      expect(html).toContain('mkt-spd-badge');
+      expect(html).toContain('mkt-spd-tier-table');
+      expect(html).toContain('mkt-spd-top-table');
+      // 説明: 重み付けの示唆
+      expect(html).toContain('応援量45%');
+    });
+
+    it('TOC に応援者パワー診断のリンクが含まれる', () => {
+      const base = Date.parse('2024-01-01T00:00:00Z');
+      /** @type {import('./commentRecord.js').StoredComment[]} */
+      const comments = [];
+      for (let uid = 1; uid <= 5; uid += 1) {
+        comments.push({
+          id: `c-${uid}`,
+          liveId: 'lv123',
+          commentNo: String(uid),
+          text: 'x',
+          userId: String(uid),
+          capturedAt: base + uid * 1000
+        });
+      }
+      const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'));
+      expect(html).toContain('応援者パワー診断（S/A/B/C/D/E）');
+    });
+  });
 });

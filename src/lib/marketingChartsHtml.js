@@ -4364,6 +4364,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-top-users', label: 'トップコメンター TOP 20' },
     { id: 'mkt-commenter-follow', label: '数値IDコメンター（フォロー情報）' },
     { id: 'mkt-commenter-follow-analytics', label: 'フォロー×コメント分析' },
+    { id: 'mkt-supporter-power', label: '応援者パワー診断（S/A/B/C/D/E）' },
     { id: 'mkt-interest-arrival', label: '興味タグ別来場' },
     { id: 'mkt-thumb-grid', label: 'サムネ付きユーザー一覧' },
     { id: 'mkt-vpos', label: 'vpos 三分割（再生位置）' },
@@ -4462,6 +4463,7 @@ ${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broad
 ${sectionAdviceAfterRank(r)}
 ${idWrap('mkt-commenter-follow', sectionCommenterFollowDirectory(r, maskShare, identiconResolver, broadcasterUserId))}
 ${sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId)}
+${sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId)}
 ${sectionInterestArrival(r)}
 ${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
 ${idWrap('mkt-vpos', sectionVposThirds(r))}
@@ -5588,6 +5590,138 @@ ${commenterFollowingListPanelHtml(analytics, r)}
 }
 
 /**
+ * v0.1.611 (OSINT Phase 3-A): 応援者パワー診断セクション。
+ *
+ * 設計レポート(docs/codex-supporter-power-scoring-design-v0607.md)の §244-262
+ * に従い、Tier 別の人数 + トップ10 の表 + 内訳バー(engagement/loyalty/influence)
+ * を表示する。
+ *
+ * - 既存 sectionCommenterFollowAnalytics は触らない(後方互換)
+ * - maskShare=true(共有向け)では Tier 別人数の集計だけ表示(個別 uid は伏せる)
+ * - SocialXup 風の色設計: S=amber, A=red, B=blue, C=green, D=slate, E=zinc
+ * - Phase 2-D の卒業/復帰カレンダーは別 PR で追加(本セクションは scoring のみ)
+ *
+ * @param {MarketingReport} r
+ * @param {boolean} maskShare
+ * @param {string} [broadcasterUserId]
+ * @param {{ sectionId?: string }} [sectionOpts]
+ * @returns {string}
+ */
+function sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId = '', sectionOpts = {}) {
+  const sectionId = String(sectionOpts.sectionId || 'mkt-supporter-power').trim();
+  const allNumericCommenters = Array.isArray(r.allNumericCommenters) ? r.allNumericCommenters : [];
+  if (!allNumericCommenters.length) return '';
+
+  // 既存 buildCommenterFollowAnalytics に includeSupporterPower=true で接続
+  // (Phase 2-B で追加した opts を使う・完全互換)
+  const analytics = buildCommenterFollowAnalytics(allNumericCommenters, {
+    commenterFollowDataset: r.commenterFollowDataset,
+    excludeUserId: broadcasterUserId,
+    priorFollowEntries: r.commenterFollowPriorEntries,
+    followingListMap: r.commenterFollowingListCache,
+    followingListCoverage: r.followingListCoverage,
+    durationMs: Math.max(0, Number(r.durationMinutes) || 0) * 60_000,
+    includeSupporterPower: true,
+    supporterPowerTopN: 10
+  });
+  if (!analytics.supporterPowerRows || analytics.supporterPowerRows.length === 0) return '';
+
+  const summary = analytics.supporterPowerSummary;
+  if (!summary) return '';
+
+  // Tier 色(Codex 設計 §244 のパレット)
+  /** @type {Record<'S'|'A'|'B'|'C'|'D'|'E', { badge: string, bg: string, label: string }>} */
+  const TIER_STYLE = {
+    S: { badge: '#f59e0b', bg: 'rgba(245, 158, 11, 0.14)', label: '最上位' },
+    A: { badge: '#ef4444', bg: 'rgba(239, 68, 68, 0.13)', label: '強い支援' },
+    B: { badge: '#3b82f6', bg: 'rgba(59, 130, 246, 0.13)', label: '目立つ支援' },
+    C: { badge: '#22c55e', bg: 'rgba(34, 197, 94, 0.12)', label: '安定参加' },
+    D: { badge: '#94a3b8', bg: 'rgba(148, 163, 184, 0.10)', label: '軽参加' },
+    E: { badge: '#52525b', bg: 'rgba(82, 82, 91, 0.10)', label: '観測少' }
+  };
+
+  // Tier 別人数のスタックバー
+  const tierBarParts = /** @type {const} */ (['S', 'A', 'B', 'C', 'D', 'E']).map((t) => {
+    const count = summary.tierCounts[t] || 0;
+    if (count === 0) return '';
+    const pct = (count / Math.max(1, summary.sampleSize)) * 100;
+    return `<span class="mkt-spd-bar__seg" style="flex:${pct} 0 0%;background:${TIER_STYLE[t].badge};" title="${t}: ${count}名"></span>`;
+  }).filter((s) => s).join('');
+
+  // Tier 集計表(全モード共通)
+  const tierTable = /** @type {const} */ (['S', 'A', 'B', 'C', 'D', 'E']).map((t) => {
+    const count = summary.tierCounts[t] || 0;
+    const style = TIER_STYLE[t];
+    return `<tr>
+<td><span class="mkt-spd-badge" style="background:${style.bg};color:${style.badge};border-color:${style.badge};">${t}</span></td>
+<td>${escapeHtml(style.label)}</td>
+<td style="text-align:right;">${formatEventRankingNumber(count)}名</td>
+</tr>`;
+  }).join('');
+
+  // 共有モードでは個別 uid を出さず、Tier 集計だけ
+  if (maskShare) {
+    return `<section class="mkt-section mkt-section--supporter-power" id="${escapeAttr(sectionId)}">
+<h2>応援者パワー診断</h2>
+<p class="mkt-note">配信を支えた応援者を「応援量45%＋常連度35%＋外部影響20%」で 0〜100 点にし、S/A/B/C/D/E の階級で見ます。共有向け出力では Tier 別の人数集計のみ表示しています。</p>
+<div class="mkt-spd-stats">
+<div class="mkt-spd-stat"><span>診断対象</span><strong>${formatEventRankingNumber(summary.sampleSize)}名</strong></div>
+<div class="mkt-spd-stat"><span>中央値スコア</span><strong>${formatEventRankingNumber(summary.medianScore)}点</strong></div>
+</div>
+<div class="mkt-spd-bar" role="img" aria-label="Tier別の構成比">${tierBarParts}</div>
+<table class="mkt-spd-tier-table"><thead><tr><th>階級</th><th>意味</th><th style="text-align:right;">人数</th></tr></thead><tbody>${tierTable}</tbody></table>
+</section>`;
+  }
+
+  // 通常モード: トップ10 の表
+  const topRows = summary.topRows.map((row, i) => {
+    const style = TIER_STYLE[row.power.tier];
+    const eng = Math.round(row.power.components.engagement);
+    const loy = Math.round(row.power.components.loyalty);
+    const inf = Math.round(row.power.components.influence);
+    const followerStr =
+      typeof row.followerCount === 'number'
+        ? formatEventRankingNumber(row.followerCount)
+        : '—';
+    const segmentLabel = (() => {
+      switch (row.segmentId) {
+        case 'highFollowerRegulars': return '高フォロワー常連';
+        case 'localEnthusiasts': return 'ローカル熱心層';
+        case 'quietSupporters': return '静かな支援';
+        default: return '';
+      }
+    })();
+    return `<tr style="background:${style.bg};">
+<td style="text-align:right;font-weight:600;">${i + 1}</td>
+<td><span class="mkt-spd-badge" style="background:#ffffff;color:${style.badge};border-color:${style.badge};">${row.power.tier}</span></td>
+<td><strong>${formatEventRankingNumber(row.power.score)}</strong><span class="mkt-spd-pct"> (p${row.power.percentile})</span></td>
+<td>${escapeHtml(row.nickname || row.userId)}${segmentLabel ? `<span class="mkt-spd-segment-label">${escapeHtml(segmentLabel)}</span>` : ''}</td>
+<td style="text-align:right;">${formatEventRankingNumber(row.commentCount)}</td>
+<td style="text-align:right;">${followerStr}</td>
+<td class="mkt-spd-components">
+<span class="mkt-spd-comp" title="応援量(コメ+ギフト)">応援 ${eng}</span>
+<span class="mkt-spd-comp" title="常連度">常連 ${loy}</span>
+<span class="mkt-spd-comp" title="外部影響(フォロワー等)">影響 ${inf}</span>
+</td>
+</tr>`;
+  }).join('');
+
+  return `<section class="mkt-section mkt-section--supporter-power" id="${escapeAttr(sectionId)}">
+<h2>応援者パワー診断</h2>
+<p class="mkt-note">配信を支えた応援者を「応援量45%＋常連度35%＋外部影響20%」で 0〜100 点にし、S/A/B/C/D/E の階級で表示します。フォロワー数だけで上位化しない設計で、コメント量・常連度を最重視します。</p>
+<div class="mkt-spd-stats">
+<div class="mkt-spd-stat"><span>診断対象</span><strong>${formatEventRankingNumber(summary.sampleSize)}名</strong></div>
+<div class="mkt-spd-stat"><span>中央値スコア</span><strong>${formatEventRankingNumber(summary.medianScore)}点</strong></div>
+</div>
+<div class="mkt-spd-bar" role="img" aria-label="Tier別の構成比">${tierBarParts}</div>
+<table class="mkt-spd-tier-table"><thead><tr><th>階級</th><th>意味</th><th style="text-align:right;">人数</th></tr></thead><tbody>${tierTable}</tbody></table>
+<h3 class="mkt-spd-top-heading">トップ ${summary.topRows.length} 応援者</h3>
+<table class="mkt-spd-top-table"><thead><tr><th>順位</th><th>階級</th><th>スコア</th><th>名前</th><th>コメ</th><th>フォロワー</th><th>内訳</th></tr></thead><tbody>${topRows}</tbody></table>
+<p class="mkt-note mkt-spd-formula-note">スコア計算: 応援量(コメ70%＋ギフト30%)・常連度(直近30配信)・外部影響(フォロワー60%＋LV20%＋フォロー先10%＋プレミアム10%)を log 正規化＋偏差値で合算。<br>Tier 判定: S=score≥90&amp;偏差99 / A=80&amp;95 / B=65&amp;80 / C=50&amp;50 / D=35 / E。サンプル20名未満はスコアのみ、5名未満は最高 A。</p>
+</section>`;
+}
+
+/**
  * @param {MarketingReport} r
  * @param {boolean} [maskShare] 共有向けに表示名を伏せ、サムネ URL を出さない
  * @param {((uid: string) => string) | undefined} [identiconResolver]
@@ -5783,6 +5917,27 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-cfa-stat span{display:block;font-size:.72rem;color:#93c5fd;margin-bottom:.1rem}
 .mkt-cfa-stat strong{display:block;font-size:1.05rem;line-height:1.35;color:#f8fafc;overflow-wrap:anywhere}
 .mkt-cfa-stat small{display:block;margin-top:.12rem;font-size:.68rem;color:#94a3b8}
+/* v0.1.611 (OSINT Phase 3-A): 応援者パワー診断 セクション CSS */
+.mkt-section--supporter-power h2{border-left-color:#f59e0b}
+.mkt-spd-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;margin:.65rem 0 .9rem}
+.mkt-spd-stat{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.65rem .75rem;min-width:0}
+.mkt-spd-stat span{display:block;font-size:.72rem;color:#fbbf24;margin-bottom:.1rem}
+.mkt-spd-stat strong{display:block;font-size:1.05rem;line-height:1.35;color:#f8fafc;overflow-wrap:anywhere}
+.mkt-spd-bar{display:flex;align-items:stretch;height:14px;border-radius:7px;overflow:hidden;margin:.6rem 0 .8rem;background:#0f172a;border:1px solid #334155}
+.mkt-spd-bar__seg{display:block;min-width:2px}
+.mkt-spd-tier-table{width:100%;border-collapse:collapse;margin:.4rem 0 1rem;font-size:.86rem}
+.mkt-spd-tier-table th,.mkt-spd-tier-table td{padding:.4rem .55rem;border-bottom:1px solid #1e293b;text-align:left}
+.mkt-spd-tier-table th{color:#fbbf24;font-weight:700;background:#0f172a}
+.mkt-spd-badge{display:inline-block;min-width:1.6em;padding:.12rem .42rem;border-radius:6px;border:1px solid currentColor;font-weight:800;font-size:.78rem;letter-spacing:.04em;text-align:center}
+.mkt-spd-top-heading{margin:1rem 0 .4rem;font-size:1rem;color:#fbbf24;font-weight:700}
+.mkt-spd-top-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.mkt-spd-top-table th,.mkt-spd-top-table td{padding:.4rem .45rem;border-bottom:1px solid #1e293b;text-align:left;vertical-align:top}
+.mkt-spd-top-table th{color:#fbbf24;font-weight:700;background:#0f172a;position:sticky;top:0}
+.mkt-spd-pct{font-size:.7rem;color:#94a3b8;margin-left:.3rem}
+.mkt-spd-segment-label{display:inline-block;margin-left:.4rem;padding:.05rem .3rem;font-size:.7rem;color:#cbd5e1;background:#1e293b;border-radius:4px}
+.mkt-spd-components{font-size:.74rem;color:#cbd5e1;white-space:nowrap}
+.mkt-spd-comp{display:inline-block;margin-right:.5rem;padding:.04rem .35rem;background:#0f172a;border:1px solid #334155;border-radius:4px}
+.mkt-spd-formula-note{margin-top:.8rem;font-size:.72rem;color:#94a3b8;line-height:1.6}
 .mkt-section--interest-arrival h2{border-left-color:#6ee7b7}
 .mkt-ia-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;margin:.65rem 0 .9rem}
 .mkt-ia-stat{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.65rem .75rem;min-width:0}
@@ -6244,6 +6399,27 @@ export const COMMENTER_FOLLOW_SECTION_CSS = `
 .mkt-cfa-stat span{display:block;font-size:.72rem;color:#93c5fd;margin-bottom:.1rem}
 .mkt-cfa-stat strong{display:block;font-size:1.05rem;line-height:1.35;color:#f8fafc;overflow-wrap:anywhere}
 .mkt-cfa-stat small{display:block;margin-top:.12rem;font-size:.68rem;color:#94a3b8}
+/* v0.1.611 (OSINT Phase 3-A): 応援者パワー診断 セクション CSS */
+.mkt-section--supporter-power h2{border-left-color:#f59e0b}
+.mkt-spd-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;margin:.65rem 0 .9rem}
+.mkt-spd-stat{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.65rem .75rem;min-width:0}
+.mkt-spd-stat span{display:block;font-size:.72rem;color:#fbbf24;margin-bottom:.1rem}
+.mkt-spd-stat strong{display:block;font-size:1.05rem;line-height:1.35;color:#f8fafc;overflow-wrap:anywhere}
+.mkt-spd-bar{display:flex;align-items:stretch;height:14px;border-radius:7px;overflow:hidden;margin:.6rem 0 .8rem;background:#0f172a;border:1px solid #334155}
+.mkt-spd-bar__seg{display:block;min-width:2px}
+.mkt-spd-tier-table{width:100%;border-collapse:collapse;margin:.4rem 0 1rem;font-size:.86rem}
+.mkt-spd-tier-table th,.mkt-spd-tier-table td{padding:.4rem .55rem;border-bottom:1px solid #1e293b;text-align:left}
+.mkt-spd-tier-table th{color:#fbbf24;font-weight:700;background:#0f172a}
+.mkt-spd-badge{display:inline-block;min-width:1.6em;padding:.12rem .42rem;border-radius:6px;border:1px solid currentColor;font-weight:800;font-size:.78rem;letter-spacing:.04em;text-align:center}
+.mkt-spd-top-heading{margin:1rem 0 .4rem;font-size:1rem;color:#fbbf24;font-weight:700}
+.mkt-spd-top-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.mkt-spd-top-table th,.mkt-spd-top-table td{padding:.4rem .45rem;border-bottom:1px solid #1e293b;text-align:left;vertical-align:top}
+.mkt-spd-top-table th{color:#fbbf24;font-weight:700;background:#0f172a;position:sticky;top:0}
+.mkt-spd-pct{font-size:.7rem;color:#94a3b8;margin-left:.3rem}
+.mkt-spd-segment-label{display:inline-block;margin-left:.4rem;padding:.05rem .3rem;font-size:.7rem;color:#cbd5e1;background:#1e293b;border-radius:4px}
+.mkt-spd-components{font-size:.74rem;color:#cbd5e1;white-space:nowrap}
+.mkt-spd-comp{display:inline-block;margin-right:.5rem;padding:.04rem .35rem;background:#0f172a;border:1px solid #334155;border-radius:4px}
+.mkt-spd-formula-note{margin-top:.8rem;font-size:.72rem;color:#94a3b8;line-height:1.6}
 .mkt-section--interest-arrival h2{border-left-color:#6ee7b7}
 .mkt-ia-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;margin:.65rem 0 .9rem}
 .mkt-ia-stat{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.65rem .75rem;min-width:0}
