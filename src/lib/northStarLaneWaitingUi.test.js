@@ -5,7 +5,10 @@ import {
   getNorthStarWaitRotationMessages,
   buildNorthStarLaneWaitingShellHtml,
   NORTH_STAR_WAITING_STATES,
-  NORTH_STAR_WAIT_HONEST_THRESHOLD_MS
+  NORTH_STAR_WAIT_HONEST_THRESHOLD_MS,
+  isNorthStarEventLaneWaitTimedOut,
+  NORTH_STAR_EVENT_LANE_WAIT_TIMEOUT_MS,
+  NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS
 } from './northStarLaneWaitingUi.js';
 
 describe('northStarLaneWaitingUi', () => {
@@ -166,6 +169,47 @@ describe('northStarLaneWaitingUi', () => {
       // iframe_unrendered + 閾値超でも、対象外レーンは現行の汎用待機文言のまま。
       const f = getNorthStarWaitFootnote('eventScore', 'iframe_unrendered', TH + 1);
       expect(f).not.toContain('取得できない');
+    });
+  });
+
+  describe('v0.1.615: イベント系レーン固まりタイムアウト', () => {
+    const TO = NORTH_STAR_EVENT_LANE_WAIT_TIMEOUT_MS;
+
+    it('タイムアウト定数は短すぎず長すぎない（5-30s・確定文言50sより手前）', () => {
+      expect(TO).toBeGreaterThanOrEqual(5_000);
+      expect(TO).toBeLessThan(NORTH_STAR_WAIT_HONEST_THRESHOLD_MS);
+    });
+
+    it('対象レーンは event 系2つのみ（貢献度/ギフトは別経路なので含めない）', () => {
+      expect(NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS.has('eventBroadcasters')).toBe(true);
+      expect(NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS.has('eventVotingSupporters')).toBe(true);
+      expect(NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS.has('contributionRanking')).toBe(false);
+      expect(NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS.has('giftHistory')).toBe(false);
+      expect(NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS.size).toBe(2);
+    });
+
+    it('閾値以上は true（>=・畳む）', () => {
+      expect(isNorthStarEventLaneWaitTimedOut(TO)).toBe(true);
+      expect(isNorthStarEventLaneWaitTimedOut(TO + 1)).toBe(true);
+    });
+
+    it('閾値未満は false（まだ待つ＝畳まない）', () => {
+      expect(isNorthStarEventLaneWaitTimedOut(TO - 1)).toBe(false);
+      expect(isNorthStarEventLaneWaitTimedOut(0)).toBe(false);
+    });
+
+    it('undefined / 非数値 / NaN / Infinity は false（後方互換・暴発防止）', () => {
+      expect(isNorthStarEventLaneWaitTimedOut(undefined)).toBe(false);
+      expect(isNorthStarEventLaneWaitTimedOut(NaN)).toBe(false);
+      // @ts-expect-error 故意に型外を渡して頑健性を確認
+      expect(isNorthStarEventLaneWaitTimedOut('13000')).toBe(false);
+      // Number.isFinite ガードにより Infinity も false（有界経過 ms 以外は畳まない）。
+      expect(isNorthStarEventLaneWaitTimedOut(Infinity)).toBe(false);
+    });
+
+    it('timeoutMs を明示で上書きできる', () => {
+      expect(isNorthStarEventLaneWaitTimedOut(6_000, 5_000)).toBe(true);
+      expect(isNorthStarEventLaneWaitTimedOut(4_000, 5_000)).toBe(false);
     });
   });
 });
