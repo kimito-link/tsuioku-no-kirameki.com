@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.610',
+    date: '2026-06-03',
+    summary: '応援者パワー診断を分析パイプラインに opt-in 接続',
+    items: Object.freeze([
+      'マーケ分析の集計に「応援者パワー診断」（S/A/B/C/D/E階級・0〜100点）を opt-in で追加。既存の散布図・セグメント・CSV は完全互換',
+      '内部 buildCommenterFollowAnalytics に includeSupporterPower オプションを追加し supporterPowerRows と summary を返す（UI 接続は次以降）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.609',
     date: '2026-06-03',
     summary: '応援者パワー診断（A〜E・0〜100点）の計算ロジックを土台に追加',
