@@ -57,6 +57,53 @@ function isNorthStarWaitElapsedOverThreshold(elapsedMs) {
 }
 
 /**
+ * v0.1.615: イベント系2レーン（eventBroadcasters / eventVotingSupporters）の
+ * 「問い合わせ中」固まり対策のタイムアウト（ミリ秒）。
+ *
+ * 真因: 公式 API バンドル取得の async チェーンが throw / hang すると hide 判定
+ * （refreshAllNorthStarMirrorLanes）へ到達せず、イベント非参加配信でも待機UIが
+ * 永久に残った（[[reference_event_ranking_lane_stuck_waiting_v0614]]）。案1（finally
+ * 保証）で throw 経路は塞いだが、await が永久 pending（hang）になる経路に備えて、
+ * 待機開始から本閾値を超えても rows が一度も来ないイベント系レーンは畳む（=非参加確定）。
+ *
+ * 13s は contributionRanking 等の 50s 確定文言より短い。イベント参加判定は無認証
+ * 公式 API が即答する設計（DOM iframe 待ちが不要）なので、参加中なら通常この時間内に
+ * rows が来る。短すぎて参加中の配信を取りこぼさないよう、参加中（rows>0）なら
+ * 通常経路の show が先に走り、タイムアウト hide はそもそも発火しない（呼び出し側でガード）。
+ */
+export const NORTH_STAR_EVENT_LANE_WAIT_TIMEOUT_MS = 13_000;
+
+/**
+ * タイムアウトで畳む対象のイベント系レーン id（公式 API 即答前提のレーンのみ）。
+ * 貢献度/ギフト履歴（iframe 経由・50s 確定文言を別途持つ）は対象外。
+ * @type {ReadonlySet<string>}
+ */
+export const NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS = new Set([
+  'eventBroadcasters',
+  'eventVotingSupporters'
+]);
+
+/**
+ * v0.1.615: イベント系レーンが待機開始からタイムアウトを超えたか（純関数・同期判定）。
+ *
+ * elapsedMs が省略 / 非数値 / 閾値未満なら false（畳まない＝現行の待機UIのまま）。
+ * 呼び出し側は「rows が一度も来ていない」ことを別途確認した上でのみ本判定で hide する。
+ * @param {number|undefined} elapsedMs 待機開始からの経過ミリ秒
+ * @param {number} [timeoutMs] 既定 NORTH_STAR_EVENT_LANE_WAIT_TIMEOUT_MS
+ * @returns {boolean}
+ */
+export function isNorthStarEventLaneWaitTimedOut(
+  elapsedMs,
+  timeoutMs = NORTH_STAR_EVENT_LANE_WAIT_TIMEOUT_MS
+) {
+  return (
+    typeof elapsedMs === 'number' &&
+    Number.isFinite(elapsedMs) &&
+    elapsedMs >= timeoutMs
+  );
+}
+
+/**
  * @param {unknown} state
  * @returns {boolean}
  */
