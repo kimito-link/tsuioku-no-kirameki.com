@@ -10348,6 +10348,22 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   //   タイムアウト時点で rows 未塗装のイベント系2レーンだけを畳む（参加中は待機マーカーが
   //   消えているので発火しない＝機能後退ゼロ）。
   scheduleNorthStarEventLaneStuckTimeout(northLv);
+  // 北極星レーンの確定描画（show/hide 内包）を「1回だけ」走らせるためのフラグ。
+  //   通常経路では prompt より前に即時（non-blocking）で走らせ、0.1.613 と同じ
+  //   描画タイミングを保つ（レーンが prompt の await を待たずに速く出る）。
+  //   bundle/gift が throw/hang して即時実行に到達しなかった場合のみ、finally の保険が走る。
+  let northStarLanesRenderStarted = false;
+  const renderNorthStarLanesOnce = () => {
+    if (northStarLanesRenderStarted) return Promise.resolve();
+    northStarLanesRenderStarted = true;
+    return refreshAllNorthStarMirrorLanes(northLv)
+      .then(() => {
+        markWatchPopupLoadPhase('north_star_done', { liveId: northLv });
+      })
+      .catch(() => {
+        /* レーン描画自体の失敗は次回更新で回復（恒久凍結は保険到達で既に回避済み） */
+      });
+  };
   void (async () => {
     try {
       // 案1b: bundle 取得失敗が後段（塗装〜hide）を巻き込まないよう個別に握る。
@@ -10387,6 +10403,9 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
       } catch {
         /* best-effort */
       }
+      // v0.1.615: レーン描画は prompt の await より前に non-blocking で発火（0.1.613 と同じ
+      //   タイミング＝レーンが速く出る）。await しないので後続 prompt と並行に進む。
+      void renderNorthStarLanesOnce();
       // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
       await refreshGiftRankingFetchPrompt(liveId);
       // v0.1.405/v0.1.450 (PR4): 過去ログ一括バックフィルの A 内 hint を反映。
@@ -10395,14 +10414,9 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     } catch {
       /* best-effort: 上記いずれかの throw でも finally の hide/show を保証する */
     } finally {
-      // 案1a: bundle / gift / prompt が失敗・hang しても、北極星6レーンの確定描画
-      //   （イベント系は rows 無しで hide）を必ず1回だけ走らせる。これが本バグの直し。
-      try {
-        await refreshAllNorthStarMirrorLanes(northLv);
-        markWatchPopupLoadPhase('north_star_done', { liveId: northLv });
-      } catch {
-        /* レーン描画自体の失敗は次回更新で回復（恒久凍結は finally 到達で既に回避済み） */
-      }
+      // 案1a（保険）: bundle/gift が throw/hang して上の即時実行に到達しなかった場合だけ、
+      //   ここで確定描画を走らせる（恒久凍結の根治）。既に走っていれば no-op。
+      await renderNorthStarLanesOnce();
     }
   })();
 
