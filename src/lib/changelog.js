@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.611',
+    date: '2026-06-03',
+    summary: '応援者パワー診断をマーケ分析レポートに表示',
+    items: Object.freeze([
+      'マーケ分析HTMLに「応援者パワー診断」セクションを追加（Tier別人数バー＋階級表＋トップ10応援者の表）',
+      '階級S/A/B/C/D/Eを色付きバッジで表示（S=amber, A=red, B=blue, C=green, D=slate, E=zinc）。共有モードでは個別名前を伏せて集計のみ',
+      '目次にも追加。フォロワー数だけで上位化しない設計をスコア式の注記で明示'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.610',
     date: '2026-06-03',
     summary: '応援者パワー診断を分析パイプラインに opt-in 接続',
