@@ -465,7 +465,9 @@ import {
   mergeNdgrBacklogWithCap,
   shouldDeferNdgrFlushUntilLiveId
 } from '../lib/ndgrBacklog.js';
-import { mergeStoredCommentsWithIntercept } from '../lib/mergeStoredCommentsWithIntercept.js';
+// v0.1.606: runInterceptReconcile から「comments key の全件 read/write」を撤去したため
+//   mergeStoredCommentsWithIntercept は本番 hot path で不要になった。
+//   ライブラリ自体は残し(unit test と将来の手動 enrich 用途のため)、import だけ外す。
 import {
   isWatchProgramEndedText,
   shouldRunEndedBulkHarvest
@@ -1463,7 +1465,10 @@ async function runInterceptReconcile(entries, users) {
   if (!recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
     return;
   }
-  const lidAtQueue = liveId;
+  // v0.1.606: 旧実装では lidAtQueue = liveId を保持して commentsStorageKey(lidAtQueue)
+  //   の get/set に使っていたが、本パスから巨大配列 read/write を撤去したため不要。
+  //   profile cache(KEY_USER_COMMENT_PROFILE_CACHE)は live 横断の global key なので、
+  //   reconcile 実行中に liveId が変わっても更新は安全(常に最新 profile を残す)。
   const mergedByNo = new Map();
   for (const it of entries) {
     const no = String(it?.no || '').trim();
@@ -1488,28 +1493,26 @@ async function runInterceptReconcile(entries, users) {
   const mergedUsers = [...mergedUsersByUid.values()];
   if (!mergedItems.length && !mergedUsers.length) return;
 
-  const key = commentsStorageKey(lidAtQueue);
-  // v0.1.502: interceptReconcile も persistCommentRowsChain を共有するため、ここの
-  //   unbounded な set がハングすると記録パスごとチェーンを永久ポイズンし得る。
-  //   ガード付き timeout で必ず settle させ、チェーンを解放する（best-effort enrich なので
-  //   timeout 時は今回分を捨て、次回 reconcile で再実行される）。
+  // v0.1.606: runInterceptReconcile から「comments key の全件 read/write」を撤去。
+  //   旧実装(〜v0.1.605)は nls_comments_<lv> を毎回 get → mergeStoredCommentsWithIntercept
+  //   と applyUserCommentProfileMapToEntries で全件 map → set していた。これは長時間
+  //   配信 + 大量コメント(12000 件級)で renderer main thread を 5 秒以上ブロックし
+  //   「ページが応答しません」ダイアログを誘発する真因だった(Codex 調査
+  //    docs/codex-watch-frozen-investigation-v0606.md・容疑 ε)。
+  //   通常 persist path(下方 v0.1.420 周辺)は「過去行 patch は永続化せず popup 側で
+  //   read-time enrich」と明記されており、reconcile は方針と逆行していた。
+  //   修正: profile cache(KEY_USER_COMMENT_PROFILE_CACHE) の upsert/prune だけ行い、
+  //   過去 comments への patch は popup 側の applyUserCommentProfileMapToEntries
+  //   (popup-entry.js:4062, 10013)に委ねる。chunk/tail/incremental dedupe の
+  //   防御策と整合し、毎回 O(N) の structured clone が消える。
+  // v0.1.502: persistCommentRowsChain で直列化＋ guard timeout で必ず settle。
+  //   best-effort なので timeout 時は次回 reconcile で再実行される。
   const job = persistCommentRowsChain.then(() =>
     runStorageOpWithTimeout(async () => {
     const bag = await readStorageBagWithRetry(
-      () => chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
+      () => chrome.storage.local.get([KEY_USER_COMMENT_PROFILE_CACHE]),
       { attempts: 4, delaysMs: [0, 50, 120, 280] }
     );
-    const existing = Array.isArray(bag[key]) ? bag[key] : [];
-    let next = existing;
-    let commentsTouched = false;
-    if (mergedItems.length) {
-      const merged = mergeStoredCommentsWithIntercept(existing, mergedItems);
-      if (merged.patched > 0) {
-        next = merged.next;
-        commentsTouched = true;
-      }
-    }
-
     let profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
     let cacheTouched = false;
     // 0.1.82: 永続キャッシュ書き込み時に broadcaster icon の取り違えを防ぐ
@@ -1527,22 +1530,15 @@ async function runInterceptReconcile(entries, users) {
         cacheTouched = true;
       }
     }
-    const applied = applyUserCommentProfileMapToEntries(next, profileMap);
-    if (applied.patched > 0) {
-      next = applied.next;
-      commentsTouched = true;
-    }
     const pruned = pruneUserCommentProfileMap(profileMap);
     if (Object.keys(pruned).length !== Object.keys(profileMap).length) {
       profileMap = pruned;
       cacheTouched = true;
     }
-    if (!commentsTouched && !cacheTouched) return;
-    /** @type {Record<string, unknown>} */
-    const saveBag = {};
-    if (commentsTouched) saveBag[key] = next;
-    if (cacheTouched) saveBag[KEY_USER_COMMENT_PROFILE_CACHE] = profileMap;
-    await chrome.storage.local.set(saveBag);
+    if (!cacheTouched) return;
+    await chrome.storage.local.set({
+      [KEY_USER_COMMENT_PROFILE_CACHE]: profileMap
+    });
     }, INGEST_TIMING.persistWriteTimeoutMs * 4).catch((err) => {
       if (err === STORAGE_OP_TIMED_OUT) {
         reportSilentErrorToStorage(

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.606',
+    date: '2026-06-03',
+    summary: '長時間配信で「ページが応答しません」が出る不具合を修正',
+    items: Object.freeze([
+      '視聴者プロフィール更新時に、コメント全件を毎回読み書きしてメインスレッドを長時間ブロックしていた経路を撤去（12000件級の配信で「ページが応答しません」が誘発される真因を解消）',
+      'プロフィール更新はキャッシュ側だけに限定し、過去コメントへの反映は表示時に行う設計（既存方針）に揃えた'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.605',
     date: '2026-06-03',
     summary: '取得中の文言が古かったのを公式API経由に合わせて修正',
