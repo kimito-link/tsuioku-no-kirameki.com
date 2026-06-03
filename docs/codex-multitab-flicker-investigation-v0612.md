@@ -283,3 +283,6 @@
 
 - **結論**: 案 3 = ウルトラC の **persist 領域だけを実装**。SW 集約 + offscreen の full deploy は今回はしない(v0.1.514 の教訓を尊重)。これは「ウルトラC の本流(Web Locks リーダー選出 + 単一 writer)」を **着実に persist まで延伸**するアプローチで、reference 文書の方針とも完全整合。
 
+---
+
+**司令塔(次セッション)に戻します。真因の最有力は容疑 γ(persist write 競合・多タブ) と 容疑 ζ(backfill rotation/retry ストーム) の合流。修正案は 4 案(案 3 推奨)、ウルトラ C(Web Locks + SW 集約)を取るかの判断材料は『既に tabLeaderLock.js は揃っているので persist 経路だけ leader 化する案 2 で 9 割が解決。SW 集約・offscreen IDB 移行は v0.1.514 の破綻教訓があるので今回はしない』。**
