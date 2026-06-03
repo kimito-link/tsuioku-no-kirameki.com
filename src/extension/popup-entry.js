@@ -452,7 +452,7 @@ import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
 import { buildReportThumbedUsersSectionHtml } from '../lib/reportThumbedUsersSectionHtml.js';
-import { computeKiramekiAwards } from '../lib/kiramekiAwards.js';
+import { computeKiramekiAwardsForHtmlReport } from '../lib/htmlReportKiramekiAwards.js';
 import { buildKiramekiAwardsSectionHtml, KIRAMEKI_AWARDS_CSS } from '../lib/kiramekiAwardsSectionHtml.js';
 import { resolveKiramekiReturningAndFirstTimeUserKeys } from '../lib/resolveKiramekiReturningAndFirstTimeUserKeys.js';
 import {
@@ -15400,14 +15400,26 @@ async function buildHtmlReportDocument(
   } catch {
     // IDB 失敗 / スキャン打ち切り時は空配列のまま（賞はかよい/はじまり無しで生成）
   }
-  const { awards: kiramekiAwards } = computeKiramekiAwards({
+  const {
+    awards: kiramekiAwards,
+    selection: kiramekiAwardsSelection
+  } = computeKiramekiAwardsForHtmlReport({
     comments: commentsForReport,
     aggregatedRooms,
     returningUserKeys: kiramekiReturningUserKeys,
     firstTimeUserKeys: kiramekiFirstTimeUserKeys,
     broadcasterUserId: reportBroadcasterUserId
+  }, {
+    heavyThreshold: HTML_REPORT_HEAVY_COMMENT_THRESHOLD
   });
-  const kiramekiAwardsSectionHtml = buildKiramekiAwardsSectionHtml(
+  const kiramekiAwardsApproxNoteHtml =
+    kiramekiAwardsSelection.mode === 'sampled'
+      ? `<section class="card" id="sec-kirameki-awards-heavy-note" style="margin-top:12px;">
+          <h2>きらめきの賞（簡易判定）</h2>
+          <p class="guide-lead">コメントが ${kiramekiAwardsSelection.originalCommentCount.toLocaleString('ja-JP')} 件あるため、賞の本文判定は代表 ${kiramekiAwardsSelection.awardCommentCount.toLocaleString('ja-JP')} 件で簡易集計しました。保存コメント一覧などの件数表示は実数のままです。</p>
+        </section>`
+      : '';
+  const kiramekiAwardsSectionHtml = `${kiramekiAwardsApproxNoteHtml}${buildKiramekiAwardsSectionHtml(
     kiramekiAwards,
     aggregatedRooms,
     {
@@ -15420,7 +15432,7 @@ async function buildHtmlReportDocument(
       escapeHtml,
       escapeAttr
     }
-  );
+  )}`;
 
   await attachFollowPromise;
   const commenterFollowBlock = buildHtmlReportCommenterFollowBlock({
