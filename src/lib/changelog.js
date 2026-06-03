@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.609',
+    date: '2026-06-03',
+    summary: '応援者パワー診断（A〜E・0〜100点）の計算ロジックを土台に追加',
+    items: Object.freeze([
+      '応援者パワー診断の計算ロジック（応援量45%＋常連度35%＋外部影響20%・0〜100点・S/A/B/C/D/E階級）を内部に追加（UI接続は次以降）',
+      '計算は対数正規化＋偏差値で、フォロワー数が多いだけで上位化しない設計。56件の単体テストで境界・欠損値・小規模配信を保護'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.608',
     date: '2026-06-03',
     summary: 'コメンターのフォロー情報を強制再取得するボタンを追加',
