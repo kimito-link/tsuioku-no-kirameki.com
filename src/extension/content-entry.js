@@ -191,7 +191,10 @@ import {
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
 } from '../lib/commentSubmitConfirm.js';
-import { createCommentSubmitProfiler } from '../lib/commentSubmitProfiling.js';
+import {
+  createCommentSubmitProfiler,
+  recordCommentSubmitTotal
+} from '../lib/commentSubmitProfiling.js';
 import { shouldAcceptCommentPostInWatchFrame } from '../lib/watchFrameCommentPostGate.js';
 import { findCommentSubmitButton } from '../lib/commentPostDom.js';
 import {
@@ -7407,6 +7410,8 @@ async function postCommentFromContentAsync(rawText, opts = {}) {
     : COMMENT_SUBMIT_CONFIRM_PROBE_MS;
 
   const prof = createCommentSubmitProfiler();
+  // v0.1.604: フラグ OFF でも総所要を rolling 観測（800ms 超は console.warn）。
+  const totalT0 = performance.now();
   try {
     prof?.mark('T2-editor-poll-start');
     let editor = findCommentEditorElement();
@@ -7507,6 +7512,7 @@ async function postCommentFromContentAsync(rawText, opts = {}) {
     }
   } finally {
     prof?.finish('nls-cmt-content');
+    recordCommentSubmitTotal('nls-cmt-content', Math.round(performance.now() - totalT0));
   }
 }
 

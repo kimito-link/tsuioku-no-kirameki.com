@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.604',
+    date: '2026-06-03',
+    summary: 'コメント送信の最悪値を圧縮し、遅さを常時観測できるように',
+    items: Object.freeze([
+      'コメント送信の最悪値を控えめに圧縮（入力欄探索 400→250ms・送信ボタン探索 700→500ms・React 反映待ち 50→35ms・フレーム再探索 4000→2500ms）。典型パスは変えず、引っかかった時の体感を改善',
+      '総所要 ms を常時記録（DevTools の globalThis.__nlsCommentSubmitTotals で直近20件・平均/最大が見える）。800ms 超は console.warn で目立たせて、遅さを可視化'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.603',
     date: '2026-06-03',
     summary: 'こん太再クリックで一瞬「数字無いPOP」が出る現象を改善',

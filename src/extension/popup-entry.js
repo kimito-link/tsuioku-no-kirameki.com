@@ -25,7 +25,10 @@ import {
   resolveCommentPostStatus,
   commentComposeAriaDescribedBy
 } from '../lib/commentPostStatusPresentation.js';
-import { createCommentSubmitProfiler } from '../lib/commentSubmitProfiling.js';
+import {
+  createCommentSubmitProfiler,
+  recordCommentSubmitTotal
+} from '../lib/commentSubmitProfiling.js';
 import { commentPostErrorWarrantsFrameDiscovery } from '../lib/commentPostRetriable.js';
 import { capCommentsForAnalytics } from '../lib/capCommentsForAnalytics.js';
 import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js';
@@ -14414,6 +14417,8 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
   }
 
   const prof = createCommentSubmitProfiler();
+  // v0.1.604: フラグ OFF でも総所要を rolling 観測（800ms 超は console.warn）。
+  const totalT0 = performance.now();
   const postPayload = { type: 'NLS_POST_COMMENT', text: trimmed, fastSubmit: true };
 
   /** @type {string} */
@@ -14474,8 +14479,11 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
           continue;
         }
 
+        // v0.1.604: 送信パスのフレーム再探索タイムアウトを 4s → 2.5s に短縮。
+        //   ping 経路が成功すれば即返るので通常パスには影響なし。
+        //   executeScript fallback の最悪値だけが 4s から 2.5s に縮む。
         const ranked = await getWatchFramesRankedForUrl(tabId, watchUrl, {
-          scriptTimeoutMs: 4_000
+          scriptTimeoutMs: 2_500
         });
         for (const fid of [...ranked.map((r) => r.frameId), 0]) {
           if (tried.has(fid)) continue;
@@ -14507,6 +14515,7 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
     };
   } finally {
     prof?.finish('nls-cmt-popup');
+    recordCommentSubmitTotal('nls-cmt-popup', Math.round(performance.now() - totalT0));
   }
 }
 
