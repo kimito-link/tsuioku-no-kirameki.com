@@ -3898,7 +3898,11 @@
         padding: 8px 8px 7px;
         border-radius: 8px;
         border: 1px solid color-mix(in srgb, var(--nl-border) 45%, transparent);
-        background: var(--nl-surface);
+        /* v0.1.602: 空レーン(取得中・未取得)が縦に並ぶと真っ白な大領域が
+           見えて「白抜け」体感になる(動画実証 2026-06-03)。デフォルトを
+           薄水色 var(--nl-bg-soft) にして、データが入った lane だけ白に戻す。
+           :has() は Chrome 105+ で利用可(MV3 拡張なので問題なし)。 */
+        background: var(--nl-bg-soft);
         min-height: 124px;
         box-sizing: border-box;
         align-self: stretch;
@@ -3906,6 +3910,9 @@
         width: 100%;
         position: relative;
         isolation: isolate;
+      }
+      .nl-north-star-lane:has(.nl-north-star-lane__body[data-lane-state='ok']) {
+        background: var(--nl-surface);
       }
       /* hidden 属性は display:flex に specificity 負けするので明示的に勝たせる
          （reference_north_star_lane_hidden_css_specificity）。イベント不参加で

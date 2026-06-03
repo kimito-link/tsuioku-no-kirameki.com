@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.602',
+    date: '2026-06-03',
+    summary: 'スクロール時に北極星レーンの空領域が真っ白に見える体感を改善',
+    items: Object.freeze([
+      'データ取得中の北極星レーンの背景を真っ白から薄水色に変更（データが入ったレーンだけ白に戻す）。スクロール時の白抜け体感を解消'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.601',
     date: '2026-06-03',
     summary: '動きを減らす設定で同接ローディングが止まらない不具合を修正',
