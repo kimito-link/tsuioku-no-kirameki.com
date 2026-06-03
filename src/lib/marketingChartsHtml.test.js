@@ -1024,5 +1024,54 @@ describe('buildMarketingDashboardHtml', () => {
       const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'));
       expect(html).toContain('応援者パワー診断（S/A/B/C/D/E）');
     });
+
+    describe('v0.1.612: サムネ + nicovideo.jp/user リンク', () => {
+      /** @returns {import('./marketingAggregate.js').MarketingReport} */
+      function makeReport() {
+        const base = Date.parse('2024-01-01T00:00:00Z');
+        /** @type {import('./commentRecord.js').StoredComment[]} */
+        const comments = [];
+        for (let uid = 1; uid <= 6; uid += 1) {
+          for (let i = 0; i < uid * 2; i += 1) {
+            comments.push({
+              id: `c-${uid}-${i}`,
+              liveId: 'lv123',
+              commentNo: String(uid * 100 + i),
+              text: 'x',
+              userId: String(uid),
+              avatarUrl: uid === 1 ? 'https://example.com/av.jpg' : '',
+              capturedAt: base + (uid * 1000 + i) * 1000
+            });
+          }
+        }
+        return aggregateMarketingReport(comments, 'lv123');
+      }
+
+      it('応援者パワー診断の表に <a class="mkt-spd-user-link"> が含まれる(数値uid 名前リンク)', () => {
+        const html = buildMarketingDashboardHtml(makeReport());
+        expect(html).toContain('mkt-spd-user-link');
+        // nicovideo.jp/user リンクが少なくとも 1 つ応援者パワー診断セクションに含まれる
+        const spdSection = html.split('id="mkt-supporter-power"')[1] || '';
+        expect(spdSection).toContain('https://www.nicovideo.jp/user/');
+      });
+
+      it('応援者パワー診断の表にサムネ class が含まれる', () => {
+        const html = buildMarketingDashboardHtml(makeReport());
+        expect(html).toContain('mkt-spd-thumb');
+      });
+
+      it('avatarUrl がある人は <img> でサムネが出る', () => {
+        const html = buildMarketingDashboardHtml(makeReport());
+        // 応援者パワー診断セクション内に <img class="mkt-spd-thumb" がある
+        const spdSection = html.split('id="mkt-supporter-power"')[1] || '';
+        expect(spdSection).toContain('mkt-spd-thumb');
+      });
+
+      it('表ヘッダに「サムネ」列が含まれる', () => {
+        const html = buildMarketingDashboardHtml(makeReport());
+        const spdSection = html.split('id="mkt-supporter-power"')[1] || '';
+        expect(spdSection).toMatch(/<th>サムネ<\/th>/);
+      });
+    });
   });
 });
