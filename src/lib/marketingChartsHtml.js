@@ -4463,7 +4463,7 @@ ${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broad
 ${sectionAdviceAfterRank(r)}
 ${idWrap('mkt-commenter-follow', sectionCommenterFollowDirectory(r, maskShare, identiconResolver, broadcasterUserId))}
 ${sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId)}
-${sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId)}
+${sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId, undefined, identiconResolver)}
 ${sectionInterestArrival(r)}
 ${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
 ${idWrap('mkt-vpos', sectionVposThirds(r))}
@@ -5601,13 +5601,25 @@ ${commenterFollowingListPanelHtml(analytics, r)}
  * - SocialXup 風の色設計: S=amber, A=red, B=blue, C=green, D=slate, E=zinc
  * - Phase 2-D の卒業/復帰カレンダーは別 PR で追加(本セクションは scoring のみ)
  *
+ * v0.1.612 (OSINT Phase 3-A 拡張): サムネ画像 + nicovideo.jp/user リンクを追加。
+ *   ユーザー報告「サムネID 取れるものは入れて・リンクを添える」(2026-06-03)に応える。
+ *   既存セクション(sectionCommenterFollowDirectory 等)で運用されている同型ヘルパー
+ *   resolveReportUserThumbSrc / wrapThumbWithProfileLink をそのまま流用。
+ *
  * @param {MarketingReport} r
  * @param {boolean} maskShare
  * @param {string} [broadcasterUserId]
  * @param {{ sectionId?: string }} [sectionOpts]
+ * @param {((uid: string) => string) | undefined} [identiconResolver]
  * @returns {string}
  */
-function sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId = '', sectionOpts = {}) {
+function sectionSupporterPowerDiagnostic(
+  r,
+  maskShare,
+  broadcasterUserId = '',
+  sectionOpts = {},
+  identiconResolver = undefined
+) {
   const sectionId = String(sectionOpts.sectionId || 'mkt-supporter-power').trim();
   const allNumericCommenters = Array.isArray(r.allNumericCommenters) ? r.allNumericCommenters : [];
   if (!allNumericCommenters.length) return '';
@@ -5674,6 +5686,20 @@ function sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId = '', s
   }
 
   // 通常モード: トップ10 の表
+  // v0.1.612: 既存 r.allNumericCommenters から userId -> avatarUrl 等の lookup map を作る。
+  //   supporterPowerRows には avatarUrl が含まれない(scoring 側で不要のため)ので、
+  //   ここで補完して resolveReportUserThumbSrc に渡す。
+  /** @type {Record<string, { avatarUrl?: string, accountStatus?: number }>} */
+  const avatarLookup = {};
+  for (const u of allNumericCommenters) {
+    const uid = String(u?.userId || '').trim();
+    if (!uid) continue;
+    avatarLookup[uid] = {
+      avatarUrl: String(u?.avatarUrl || '').trim(),
+      accountStatus: typeof u?.accountStatus === 'number' ? u.accountStatus : undefined
+    };
+  }
+
   const topRows = summary.topRows.map((row, i) => {
     const style = TIER_STYLE[row.power.tier];
     const eng = Math.round(row.power.components.engagement);
@@ -5691,11 +5717,37 @@ function sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId = '', s
         default: return '';
       }
     })();
+
+    // v0.1.612 サムネ+リンク追加(既存 sectionCommenterFollowDirectory と同型)
+    const lookup = avatarLookup[row.userId] || {};
+    const thumbSrc = maskShare
+      ? ''
+      : resolveReportUserThumbSrc({
+          userId: row.userId,
+          avatarUrl: lookup.avatarUrl || '',
+          identiconResolver
+        });
+    const thumbInner = thumbSrc
+      ? `<img class="mkt-spd-thumb" src="${escapeHtml(thumbSrc)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}>`
+      : '<span class="mkt-spd-thumb mkt-spd-thumb--empty"></span>';
+    const thumbCell = wrapThumbWithProfileLink(row.userId, thumbInner, maskShare);
+
+    // 名前セルも nicovideo.jp/user リンクで囲む(数値uid のときだけ・maskShare 時は無し)
+    const nickname = escapeHtml(row.nickname || row.userId);
+    const segmentLabelHtml = segmentLabel
+      ? `<span class="mkt-spd-segment-label">${escapeHtml(segmentLabel)}</span>`
+      : '';
+    const nameCellHtml =
+      !maskShare && /^\d{1,18}$/.test(row.userId)
+        ? `<a class="mkt-spd-user-link" href="https://www.nicovideo.jp/user/${encodeURIComponent(row.userId)}" target="_blank" rel="noopener noreferrer">${nickname}</a>${segmentLabelHtml}`
+        : `${nickname}${segmentLabelHtml}`;
+
     return `<tr style="background:${style.bg};">
 <td style="text-align:right;font-weight:600;">${i + 1}</td>
 <td><span class="mkt-spd-badge" style="background:#ffffff;color:${style.badge};border-color:${style.badge};">${row.power.tier}</span></td>
 <td><strong>${formatEventRankingNumber(row.power.score)}</strong><span class="mkt-spd-pct"> (p${row.power.percentile})</span></td>
-<td>${escapeHtml(row.nickname || row.userId)}${segmentLabel ? `<span class="mkt-spd-segment-label">${escapeHtml(segmentLabel)}</span>` : ''}</td>
+<td>${thumbCell}</td>
+<td>${nameCellHtml}</td>
 <td style="text-align:right;">${formatEventRankingNumber(row.commentCount)}</td>
 <td style="text-align:right;">${followerStr}</td>
 <td class="mkt-spd-components">
@@ -5716,8 +5768,8 @@ function sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId = '', s
 <div class="mkt-spd-bar" role="img" aria-label="Tier別の構成比">${tierBarParts}</div>
 <table class="mkt-spd-tier-table"><thead><tr><th>階級</th><th>意味</th><th style="text-align:right;">人数</th></tr></thead><tbody>${tierTable}</tbody></table>
 <h3 class="mkt-spd-top-heading">トップ ${summary.topRows.length} 応援者</h3>
-<table class="mkt-spd-top-table"><thead><tr><th>順位</th><th>階級</th><th>スコア</th><th>名前</th><th>コメ</th><th>フォロワー</th><th>内訳</th></tr></thead><tbody>${topRows}</tbody></table>
-<p class="mkt-note mkt-spd-formula-note">スコア計算: 応援量(コメ70%＋ギフト30%)・常連度(直近30配信)・外部影響(フォロワー60%＋LV20%＋フォロー先10%＋プレミアム10%)を log 正規化＋偏差値で合算。<br>Tier 判定: S=score≥90&amp;偏差99 / A=80&amp;95 / B=65&amp;80 / C=50&amp;50 / D=35 / E。サンプル20名未満はスコアのみ、5名未満は最高 A。</p>
+<table class="mkt-spd-top-table"><thead><tr><th>順位</th><th>階級</th><th>スコア</th><th>サムネ</th><th>名前</th><th>コメ</th><th>フォロワー</th><th>内訳</th></tr></thead><tbody>${topRows}</tbody></table>
+<p class="mkt-note mkt-spd-formula-note">スコア計算: 応援量(コメ70%＋ギフト30%)・常連度(直近30配信)・外部影響(フォロワー60%＋LV20%＋フォロー先10%＋プレミアム10%)を log 正規化＋偏差値で合算。<br>Tier 判定: S=score≥90&amp;偏差99 / A=80&amp;95 / B=65&amp;80 / C=50&amp;50 / D=35 / E。サンプル20名未満はスコアのみ、5名未満は最高 A。<br>サムネ・名前は数値ID時のみ niconico ユーザーページへリンクします(共有モードでは非表示)。</p>
 </section>`;
 }
 
@@ -5938,6 +5990,11 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-spd-components{font-size:.74rem;color:#cbd5e1;white-space:nowrap}
 .mkt-spd-comp{display:inline-block;margin-right:.5rem;padding:.04rem .35rem;background:#0f172a;border:1px solid #334155;border-radius:4px}
 .mkt-spd-formula-note{margin-top:.8rem;font-size:.72rem;color:#94a3b8;line-height:1.6}
+/* v0.1.612: サムネ + nicovideo.jp/user リンク(既存 sectionCommenterFollowDirectory と同型) */
+.mkt-spd-thumb{display:inline-block;width:28px;height:28px;border-radius:50%;background:#1e293b;border:1px solid #334155;object-fit:cover;vertical-align:middle}
+.mkt-spd-thumb--empty{background:#1e293b}
+.mkt-spd-user-link{color:#f8fafc;text-decoration:none;border-bottom:1px dotted #475569}
+.mkt-spd-user-link:hover{color:#fbbf24;border-bottom-color:#fbbf24}
 .mkt-section--interest-arrival h2{border-left-color:#6ee7b7}
 .mkt-ia-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;margin:.65rem 0 .9rem}
 .mkt-ia-stat{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.65rem .75rem;min-width:0}
@@ -6420,6 +6477,11 @@ export const COMMENTER_FOLLOW_SECTION_CSS = `
 .mkt-spd-components{font-size:.74rem;color:#cbd5e1;white-space:nowrap}
 .mkt-spd-comp{display:inline-block;margin-right:.5rem;padding:.04rem .35rem;background:#0f172a;border:1px solid #334155;border-radius:4px}
 .mkt-spd-formula-note{margin-top:.8rem;font-size:.72rem;color:#94a3b8;line-height:1.6}
+/* v0.1.612: サムネ + nicovideo.jp/user リンク(既存 sectionCommenterFollowDirectory と同型) */
+.mkt-spd-thumb{display:inline-block;width:28px;height:28px;border-radius:50%;background:#1e293b;border:1px solid #334155;object-fit:cover;vertical-align:middle}
+.mkt-spd-thumb--empty{background:#1e293b}
+.mkt-spd-user-link{color:#f8fafc;text-decoration:none;border-bottom:1px dotted #475569}
+.mkt-spd-user-link:hover{color:#fbbf24;border-bottom-color:#fbbf24}
 .mkt-section--interest-arrival h2{border-left-color:#6ee7b7}
 .mkt-ia-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;margin:.65rem 0 .9rem}
 .mkt-ia-stat{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:.65rem .75rem;min-width:0}
