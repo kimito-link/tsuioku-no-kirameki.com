@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.620',
+    date: '2026-06-04',
+    summary: 'データが無い配信でのランキングレーン畳みを確実に動作させる修正',
+    items: Object.freeze([
+      '広告ランキングとギフト0件の配信でレーンが畳まれず「問い合わせ中」が出続ける問題を修正しました（v0.1.619 の実装が一部のエラー状態で効いていなかった）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.619',
     date: '2026-06-04',
     summary: 'データが無い順位レーンの「問い合わせ中」を出さず静かに畳む',

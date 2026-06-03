@@ -8805,7 +8805,10 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
     const st =
       typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
     body.setAttribute('data-lane-state', st);
-    if (isNorthStarLaneWaitingState(st)) {
+    if (isNorthStarLaneWaitingState(st) || NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES.has(String(laneId || ''))) {
+      // waiting state (not_yet/iframe_unrendered) も、API直叩き系(fetch_error/no_program_gift等)も
+      // 同じ hide パスを通す。fetch_error は WAITING_STATES 外なので従来は else 側に落ちて
+      // 待機UIが残っていた (v0.1.620 修正)。
       applyNorthStarLaneWaitingOrHide(body, String(laneId || ''), st);
     } else {
       body.innerHTML = '';
@@ -8820,7 +8823,7 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
     const st =
       typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
     body.setAttribute('data-lane-state', st);
-    if (isNorthStarLaneWaitingState(st)) {
+    if (isNorthStarLaneWaitingState(st) || NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES.has(String(laneId || ''))) {
       applyNorthStarLaneWaitingOrHide(body, String(laneId || ''), st);
     } else {
       body.innerHTML = '';
