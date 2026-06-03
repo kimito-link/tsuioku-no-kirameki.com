@@ -39,6 +39,35 @@ describe('northStarLaneWaitingUi', () => {
     expect(b.length).toBeGreaterThanOrEqual(3);
   });
 
+  describe('v0.1.605: 取得経路の正直化', () => {
+    it('eventBroadcasters / eventVotingSupporters は「公式から問い合わせ中」と伝える', () => {
+      const eb = getNorthStarWaitRotationMessages('eventBroadcasters', 'not_yet');
+      const ev = getNorthStarWaitRotationMessages('eventVotingSupporters', 'not_yet');
+      expect(eb.length).toBeGreaterThanOrEqual(3);
+      expect(ev.length).toBeGreaterThanOrEqual(3);
+      expect(eb.some((m) => /公式から/.test(m.line))).toBe(true);
+      expect(ev.some((m) => /公式から/.test(m.line))).toBe(true);
+    });
+
+    it('default 文言は「配信ページから」を含まない（DOM scrape 時代の誤情報を撤去）', () => {
+      // 既知の laneId 以外（=default 分岐）を意図的に渡す。
+      const d = getNorthStarWaitRotationMessages('__unknown_lane__', 'not_yet');
+      expect(d.length).toBeGreaterThanOrEqual(3);
+      for (const m of d) {
+        expect(m.line).not.toMatch(/配信ページから/);
+      }
+    });
+
+    it('eventBroadcasters / eventVotingSupporters / default は「配信ページから」を含まない', () => {
+      for (const lid of ['eventBroadcasters', 'eventVotingSupporters', '__unknown__']) {
+        const msgs = getNorthStarWaitRotationMessages(lid, 'not_yet');
+        for (const m of msgs) {
+          expect(m.line).not.toMatch(/配信ページからデータを受け取り中/);
+        }
+      }
+    });
+  });
+
   it('buildNorthStarLaneWaitingShellHtml は data 属性と待機 UI 断片を含む', () => {
     const h = buildNorthStarLaneWaitingShellHtml('contributionRanking');
     expect(h).toContain('data-lane-id="contributionRanking"');

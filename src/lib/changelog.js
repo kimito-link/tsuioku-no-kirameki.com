@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.605',
+    date: '2026-06-03',
+    summary: '取得中の文言が古かったのを公式API経由に合わせて修正',
+    items: Object.freeze([
+      'イベントランキング・応援者ランキング待機中の文言を、ニコニコ公式 API から取得していることが分かる言い回しに変更',
+      '取得経路を断定しない default 文言を中立化（DOM スクレイプ時代の「配信ページから受け取り中」を撤去）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.604',
     date: '2026-06-03',
     summary: 'コメント送信の最悪値を圧縮し、遅さを常時観測できるように',
