@@ -296,6 +296,7 @@ import {
   mergeGiftSubAppHistoryPayload
 } from '../lib/kokenGiftHistoryApi.js';
 import { fetchKokenGiftHistoryAllViaExtension } from '../lib/kokenGiftHistoryFetchClient.js';
+import { shouldRunExternalFetchWhileHidden } from '../lib/hiddenTabExternalFetchGate.js';
 import {
   pickAuditionContextFromEntryItems,
   normalizeAuditionRankingsResponse,
@@ -13238,14 +13239,43 @@ async function start() {
       setInterval(() => {
         if (stopContentIntervalsIfContextInvalidated()) return;
         if (!recording || !liveId) return;
-        if (
-          typeof document !== 'undefined' &&
-          document.visibilityState === 'hidden'
-        ) {
+        // v0.1.616: 非可視タブでの fetch スキップを「未取得のときだけは叩く」に緩和。
+        //   貢献度ランキング等は無認証 API 直接 fetch 済みだが、ここで非可視を一律 return
+        //   していたため、視聴者が別タブにフォーカスを移すと koken/gift が永久に「取得中」
+        //   のまま固まっていた（実機 lv350673796 で真因確定）。可視は従来どおり常時 fetch、
+        //   非可視は「koken 貢献度 or ギフト履歴が storage に未取得」のときだけ一度取りにいく。
+        //   取れたら裏では叩かない（リソース最小）。リーダー1タブ集約済みでストーム無し。
+        const hidden =
+          typeof document !== 'undefined' && document.visibilityState === 'hidden';
+        if (!hidden) {
+          // PR1-b: koken/nicoad/profile はタブ間リーダー1つだけが叩く（多タブ集約）。
+          void runExternalApiFetchesAsTabLeader({ includeEventParticipation: false });
           return;
         }
-        // PR1-b: koken/nicoad/profile はタブ間リーダー1つだけが叩く（多タブ集約）。
-        void runExternalApiFetchesAsTabLeader({ includeEventParticipation: false });
+        const lid = String(liveId || '').trim().toLowerCase();
+        if (!/^lv\d{1,15}$/.test(lid)) return;
+        try {
+          chrome.storage.local
+            .get([kokenContribStorageKey(lid), giftSubAppHistoryStorageKey(lid)])
+            .then((bag) => {
+              const kokenAcquired = !!(bag && bag[kokenContribStorageKey(lid)]);
+              const giftAcquired = !!(bag && bag[giftSubAppHistoryStorageKey(lid)]);
+              if (
+                shouldRunExternalFetchWhileHidden({
+                  tabHidden: true,
+                  targetsAcquired: [kokenAcquired, giftAcquired]
+                }) &&
+                String(liveId || '').trim().toLowerCase() === lid // 応答までに遷移していない
+              ) {
+                void runExternalApiFetchesAsTabLeader({ includeEventParticipation: false });
+              }
+            })
+            .catch(() => {
+              /* best-effort: storage 不可なら今回はスキップ（可視復帰 or 次 tick で回復） */
+            });
+        } catch {
+          /* no-op: context 消失等 */
+        }
       }, KOKEN_CONTRIB_API_FETCH_MS)
     )
   );
