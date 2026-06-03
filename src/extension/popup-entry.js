@@ -9377,7 +9377,7 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
  * 北極星 +α 広告ランキング。`adContributionRanking` を応援帯と同型のランキングで表示し、
  * 無いときは鏡 HTML → reason 判定の順。
  */
-function refreshNorthStarAdRankingLane() {
+async function refreshNorthStarAdRankingLane() {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
   const body = document.getElementById('northStarLaneBody-adRanking');
@@ -9426,7 +9426,68 @@ function refreshNorthStarAdRankingLane() {
     renderNorthStarLane('adRanking', mirrorHtml);
     return;
   }
-  const state = determineNorthStarLaneState('adRanking', { bundle, snap });
+  // v0.1.617: bundle に広告行が無くても、nicoad API 直叩きが storage に rows を書いていれば
+  //   それを使って描画する。bundle 経由(readOfficialEventDomBundleFromStorage のマージ)は
+  //   stale bundle / 取得タイミングのずれで null になることがあり(実機 staleDomBundleSuspected)、
+  //   「API 直叩きで10件取れているのに広告レーンが fetch_error(問い合わせ中相当)」が起きていた。
+  //   ここで nicoad API storage を直接読んで、取れていれば ok 描画・state も ok にする。
+  const lidForApi = String(lid || '').trim().toLowerCase();
+  let nicoadApiRows = null;
+  let nicoadApiCapturedAt = null;
+  if (/^lv\d{1,15}$/.test(lidForApi) && body instanceof HTMLElement) {
+    try {
+      const apiKey = `nls_nicoad_api_ranking_${lidForApi}`;
+      const apiBag = await chrome.storage.local.get([apiKey]);
+      const apiVal = apiBag?.[apiKey];
+      if (
+        apiVal &&
+        typeof apiVal === 'object' &&
+        String(apiVal.liveId || '').trim().toLowerCase() === lidForApi &&
+        Array.isArray(apiVal.rows) &&
+        apiVal.rows.length > 0
+      ) {
+        nicoadApiRows = apiVal.rows;
+        nicoadApiCapturedAt =
+          typeof apiVal.capturedAt === 'number' ? apiVal.capturedAt : null;
+      }
+    } catch {
+      /* best-effort: storage 読めなければ従来の bundle 判定へ */
+    }
+  }
+  if (nicoadApiRows && body instanceof HTMLElement) {
+    trackAdAdvertiserCountForCelebration(lid, nicoadApiRows.length);
+    const rooms = officialDomRankingRowsToStripRooms(nicoadApiRows, { userKeyKind: 'ad' });
+    let rankingSum = 0;
+    for (const row of nicoadApiRows) {
+      const c = Number(row?.contribution);
+      if (Number.isFinite(c) && c > 0) rankingSum += c;
+    }
+    const ps = bundle?.programStats || null;
+    const programAdPts =
+      typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
+        ? ps.adPoints
+        : typeof snap?.officialAdPointsNdgr === 'number' &&
+            Number.isFinite(snap.officialAdPointsNdgr) &&
+            snap.officialAdPointsNdgr >= 0
+          ? snap.officialAdPointsNdgr
+          : null;
+    const beforeNoteHtml = buildNorthStarAdRankingStatsHtml({
+      programAdPts,
+      rankingContributionSum: rankingSum,
+      rankingRowCount: nicoadApiRows.length
+    });
+    paintTopSupportRankStyleIntoElement(body, rooms, {
+      noteText:
+        'ニコニ広告の貢献度ランキング（公式ページ相当）。画面上部の累計ptなどと、各行の「貢」は指標や期間が異なり一致しないことがあります',
+      unitSuffix: '貢',
+      ariaLabel: '広告ランキング',
+      beforeNoteHtml,
+      isNorthStarBody: true,
+      freshnessNote: formatCardFreshnessNote(nicoadApiCapturedAt, { autoRefreshing: true })
+    });
+    return;
+  }
+  const state = determineNorthStarLaneState('adRanking', { bundle, snap, nicoadApiRows });
   renderNorthStarLane('adRanking', null, state);
 }
 
@@ -9663,7 +9724,11 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
   }
 
   // 参加データが無い＝イベント不参加 or 未取得。レーン枠ごと隠して空枠で縦を食わない。
-  setNorthStarLaneHidden('eventBroadcasters', true);
+  // v0.1.617: hide と同時に待機UI(「ニコニコの公式から問い合わせ中」)を撤去する。
+  //   従来は hidden 属性で CSS 非表示にするだけで body 内に not_yet 待機UIが残り、
+  //   hide が効く前のフレームや再描画の競合で「問い合わせ中」がちらっと見えていた
+  //   (実機 red team 指摘)。data-lane-state も明示更新して診断とも整合させる。
+  hideAndClearNorthStarEventLane('eventBroadcasters', body);
 }
 
 /**
@@ -9678,7 +9743,7 @@ async function refreshNorthStarEventVotingSupportersLaneAsync(liveId) {
   if (!(body instanceof HTMLElement)) return;
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) {
-    setNorthStarLaneHidden('eventVotingSupporters', true);
+    hideAndClearNorthStarEventLane('eventVotingSupporters', body);
     return;
   }
 
@@ -9713,7 +9778,8 @@ async function refreshNorthStarEventVotingSupportersLaneAsync(liveId) {
   }
 
   // 投票データが無い＝イベント不参加 or 未取得。レーンごと隠して空枠で縦を食わない。
-  setNorthStarLaneHidden('eventVotingSupporters', true);
+  // v0.1.617: hide と同時に待機UIを撤去（「問い合わせ中」ちらつき防止・上の eventBroadcasters と同様）。
+  hideAndClearNorthStarEventLane('eventVotingSupporters', body);
 }
 
 /**
@@ -9769,6 +9835,31 @@ function setNorthStarLaneHidden(laneId, hidden) {
   if (!(lane instanceof HTMLElement)) return;
   if (hidden) lane.setAttribute('hidden', '');
   else lane.removeAttribute('hidden');
+}
+
+/**
+ * v0.1.617: イベント系レーン(eventBroadcasters / eventVotingSupporters)を「非参加で畳む」
+ * とき、hidden 属性を付けるだけでなく **body 内の待機UI(「ニコニコの公式から問い合わせ中」)を
+ * 撤去** し、data-lane-state を非待機(no_event)へ更新する。
+ *
+ * 従来は setNorthStarLaneHidden(true) で CSS 非表示にするだけで、body 内に not_yet の待機UIが
+ * 残ったままだった。hide が効く前のフレームや再描画の競合(重い配信で render が完了せず次 render が
+ * 走る)で「問い合わせ中」キャラ案内がちらっと見える原因になっていた(実機 red team 指摘)。
+ * これらは無認証 API 直叩き経路なので、rows が無い＝非参加が確定＝待機UIは不要。
+ *
+ * @param {string} laneId
+ * @param {HTMLElement} body 当該レーンの northStarLaneBody-<laneId>
+ */
+function hideAndClearNorthStarEventLane(laneId, body) {
+  setNorthStarLaneHidden(laneId, true);
+  if (body instanceof HTMLElement) {
+    // 待機UIの interval/クラスを止め、body の中身(待機キャラ案内)を空にする。
+    teardownNorthStarLaneWaitingUi(body);
+    if (body.querySelector('[data-north-star-wait="1"]')) {
+      body.innerHTML = '';
+    }
+    body.setAttribute('data-lane-state', 'no_event');
+  }
 }
 
 /**
@@ -10294,17 +10385,28 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
     await refreshNorthStarGiftHistoryLaneAsync(lid);
     _northStarRenderProbe.lastReachedLane = 'after_gift_history';
     refreshNorthStarProgramPointsLane();
-    refreshNorthStarAdRankingLane();
+    await refreshNorthStarAdRankingLane();
     _northStarRenderProbe.lastReachedLane = 'after_ad';
     await refreshNorthStarEventCurrentRankLaneAsync(lid);
     refreshNorthStarEventCumulativeScoreLane();
     await refreshNorthStarEventBroadcastersLaneAsync(lid);
     await refreshNorthStarEventVotingSupportersLaneAsync(lid);
     _northStarRenderProbe.lastReachedLane = 'after_event_lanes';
-    await refreshSupportActivityTimeline(lid);
-    await maybeCelebrateGiftEventsAfterRefresh(lid);
+    // v0.1.617: 北極星レーン(ランキング系)の確定描画はここで完了とみなす。
+    //   応援タイムライン / ギフト祝祭は「別DOM領域」で、かつ refreshSupportActivityTimeline は
+    //   readAllCommentsForLive で全コメント(実機9400件超)を読む激重処理。これを直列 await
+    //   していたため、重い配信で refreshAllNorthStarMirrorLanes が完了せず(診断 Completed:0)、
+    //   レーン描画が安定しない/ちらつく + v0.1.615 の event hide も確定しない真因になっていた。
+    //   → タイムライン/祝祭は非ブロック(fire-and-forget)に分離。各々 try/catch を内蔵する
+    //   ので失敗してもレーン描画(=既に完了済み)を巻き込まない。
     _northStarRenderProbe.lastReachedLane = 'done';
     _northStarRenderProbe.refreshAllCompleted += 1;
+    void refreshSupportActivityTimeline(lid).catch(() => {
+      /* best-effort: タイムライン描画失敗はレーン描画と独立 */
+    });
+    void maybeCelebrateGiftEventsAfterRefresh(lid).catch(() => {
+      /* best-effort */
+    });
   } catch (e) {
     _northStarRenderProbe.lastError = String(
       (e && /** @type {any} */ (e).message) || e || 'unknown'

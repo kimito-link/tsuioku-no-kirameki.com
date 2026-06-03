@@ -59,19 +59,29 @@ export function hasEventParticipationSignal(bundle, snap) {
  *   'eventRank' | 'adRanking'
  * @param {{
  *   bundle?: any,
- *   snap?: any
+ *   snap?: any,
+ *   kokenApiRows?: any[]|null,
+ *   nicoadApiRows?: any[]|null
  * }} ctx
+ *   v0.1.617: kokenApiRows / nicoadApiRows は無認証 API 直叩きで storage に入った rows。
+ *   取れていれば `ok` を返し、iframe scrape 時代の `iframe_unrendered` / `fetch_error`
+ *   (=「公式から問い合わせ中」キャラ案内)を出さない。省略時(undefined)は旧ロジックと完全同一
+ *   (bundle のみ参照)＝後方互換。
  * @returns {NorthStarLaneState}
  */
 export function determineNorthStarLaneState(laneId, ctx) {
   const bundle = ctx?.bundle || null;
   const snap = ctx?.snap || null;
+  const kokenApiRows = Array.isArray(ctx?.kokenApiRows) ? ctx.kokenApiRows : null;
+  const nicoadApiRows = Array.isArray(ctx?.nicoadApiRows) ? ctx.nicoadApiRows : null;
 
   // 起動直後（bundle / snap がどちらも空）→ not_yet
   if (!bundle && !snap) return 'not_yet';
 
   switch (laneId) {
     case 'contributionRanking': {
+      // v0.1.617: koken API 直叩きで取れていれば ok（iframe 時代の問い合わせ中を出さない）。
+      if (kokenApiRows && kokenApiRows.length > 0) return 'ok';
       const count = Array.isArray(bundle?.contributionRanking)
         ? bundle.contributionRanking.length
         : 0;
@@ -155,6 +165,8 @@ export function determineNorthStarLaneState(laneId, ctx) {
       return 'not_yet';
     }
     case 'adRanking': {
+      // v0.1.617: nicoad API 直叩きで取れていれば ok（iframe/relay 時代の fetch_error を出さない）。
+      if (nicoadApiRows && nicoadApiRows.length > 0) return 'ok';
       const count = Array.isArray(bundle?.adContributionRanking)
         ? bundle.adContributionRanking.length
         : 0;
