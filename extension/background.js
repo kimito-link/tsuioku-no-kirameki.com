@@ -2292,6 +2292,72 @@ async function closeAllOurExtensionPopupWindows() {
   }
 }
 
+/**
+ * v0.1.603: ツールバー再クリックで「既存 popup を毎回閉じて開き直す」体感
+ *   （閉じる→空白→再オープン→数字無いPOP→数字戻る、のチカチカ）を解消する。
+ *
+ * 戦略:
+ *   - 当拡張の popup.html を正しく載せている既存窓があれば、それを focus + サイズ補正
+ *     して再利用。中身の state（取得済みデータ・スクロール位置）は壊さない。
+ *   - 同時に「孤児 popup」（chrome-extension URL だが popup.html ではないもの）は
+ *     掃除する。0.1.269 で観測された「孤児が残ると create が黙殺される」対策を維持。
+ *   - 戻り値:
+ *     - true ... 既存窓を再利用済み（呼び出し側は windows.create をスキップして良い）
+ *     - false ... 再利用先が無い（呼び出し側は通常通り create する）
+ *
+ * @returns {Promise<boolean>}
+ */
+async function focusOurExtensionPopupOrCleanupOrphans() {
+  const popupUrlExact = chrome.runtime.getURL('popup.html');
+  const extPrefix = `chrome-extension://${chrome.runtime.id}/`;
+  let reused = false;
+  try {
+    const all = await chrome.windows.getAll({ populate: true });
+    for (const w of all) {
+      if (w.type !== 'popup' || w.id == null) continue;
+      const tabs = w.tabs || [];
+      let hostsPopupHtml = false;
+      let hostsOurExt = false;
+      for (const t of tabs) {
+        const u = String(t?.pendingUrl || t?.url || '');
+        if (!u.startsWith(extPrefix)) continue;
+        hostsOurExt = true;
+        // クエリ・ハッシュ等を許容しつつ popup.html かどうか判定
+        const base = u.split('?')[0].split('#')[0];
+        if (base === popupUrlExact) {
+          hostsPopupHtml = true;
+          break;
+        }
+      }
+      if (!hostsOurExt) continue;
+      if (hostsPopupHtml && !reused) {
+        // 正常な popup を 1 つだけ再利用（複数あれば 2 つ目以降は孤児扱いで掃除）
+        try {
+          await chrome.windows.update(w.id, {
+            width: POPUP_WINDOW_WIDTH,
+            height: POPUP_WINDOW_HEIGHT,
+            focused: true,
+            state: 'normal'
+          });
+          reused = true;
+          continue;
+        } catch {
+          // update 失敗時は孤児扱いで閉じる
+        }
+      }
+      // 孤児（popup.html ではない、あるいは update に失敗した重複窓）は掃除
+      try {
+        await chrome.windows.remove(w.id);
+      } catch {
+        // already closed
+      }
+    }
+  } catch {
+    // no-op: 取得失敗時は false を返して通常 create に任せる
+  }
+  return reused;
+}
+
 /** @param {number} ms */
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -2350,7 +2416,13 @@ async function openOrFocusPopupWindow(anchorWindowId) {
  */
 async function doOpenOrFocusPopupWindow(anchorWindowId, stripPositionHints) {
   const url = chrome.runtime.getURL('popup.html');
-  await closeAllOurExtensionPopupWindows();
+  // v0.1.603: 正常な popup が既に開いていれば閉じずに focus + サイズ補正で再利用。
+  //   孤児（chrome-extension URL だが popup.html でない窓・重複窓）は掃除する。
+  //   再利用できた場合は windows.create をスキップ＝中身の取得済みデータが保たれ、
+  //   ユーザーが見た「閉じる→数字無いPOP→数字戻る」のチカチカが解消される。
+  if (await focusOurExtensionPopupOrCleanupOrphans()) {
+    return;
+  }
   await sleep(70);
   /*
    * 0.1.61 (AQ) → 0.1.62 (AR) → 0.1.64 (AT3): popup を Chrome window の

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.603',
+    date: '2026-06-03',
+    summary: 'こん太再クリックで一瞬「数字無いPOP」が出る現象を改善',
+    items: Object.freeze([
+      'ポップアップを開いている時にツールバーのこん太を再クリックすると、既存ポップアップを毎回閉じて開き直していたのを、開いていればそのまま前面化＋サイズ補正するように変更（中身の取得済みデータ・スクロール位置を保持。チカチカを解消）',
+      '孤児ポップアップ（古い拡張ページ等）の掃除と起動失敗時の保険は従来どおり維持'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.602',
     date: '2026-06-03',
     summary: 'スクロール時に北極星レーンの空領域が真っ白に見える体感を改善',
