@@ -98,7 +98,10 @@ import {
   buildNorthStarScoreFallbackHtml,
   buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
-import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+import {
+  determineNorthStarLaneState,
+  hasEventParticipationSignal
+} from '../lib/northStarLaneReason.js';
 import { shouldShowNorthStarLane } from '../lib/northStarLaneVisibility.js';
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
 import {
@@ -9863,6 +9866,65 @@ function hideAndClearNorthStarEventLane(laneId, body) {
 }
 
 /**
+ * v0.1.617: イベント系2レーン(eventBroadcasters / eventVotingSupporters)を、
+ * 「イベント非参加が確定しているなら即・確実に畳む」。
+ *
+ * refreshAllNorthStarMirrorLanes の**最初**に呼ぶ。重いギフト同期や後続レーンの storage 読みで
+ * 連鎖が遅延/中断しても、非参加配信で「ニコニコの公式から問い合わせ中」キャラ案内が出続ける
+ * 問題を断つ(ユーザー実機指摘・福引券目標の単発配信 lv350672510)。
+ *
+ * 「参加シグナル」が1つでもあれば**触らない**(従来の描画関数 refreshNorthStarEventBroadcasters/
+ * VotingSupportersLaneAsync に委ねる＝参加中はちゃんと出す・機能後退ゼロ)。判定材料:
+ *   - イベントスコア storage(nls_event_score_ranking_<lv>)に rows
+ *   - イベント投票 storage(nls_event_voting_ranking_<lv>)に rows
+ *   - bundle.eventRanking / eventBanner / eventBalloon(公式バナー/バルーン痕跡)
+ *   - NDGR 由来のイベント参加シグナル(snapshot 経由・hasEventParticipationSignal)
+ * これらが**全て無い**ときだけ、両レーンを hide+待機UI撤去する。
+ *
+ * @param {string} liveId
+ */
+async function hideNorthStarEventLanesIfNotParticipating(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return;
+  const bundle = _lastOfficialEventDomBundle;
+  const snap = watchMetaCache.snapshot;
+  // bundle / NDGR 由来の参加痕跡(同期判定)。
+  const bundleEventRows =
+    Array.isArray(bundle?.eventRanking) && bundle.eventRanking.length > 0;
+  const participatingByBundleOrNdgr =
+    bundleEventRows || hasEventParticipationSignal(bundle, snap);
+  // storage 由来の参加痕跡(イベントスコア/投票に rows があれば参加中)。
+  let participatingByStorage = false;
+  try {
+    const sKey = eventScoreRankingStorageKey(lid);
+    const vKey = eventVotingRankingStorageKey(lid);
+    const bag = await chrome.storage.local.get([sKey, vKey]);
+    const sv = bag?.[sKey];
+    const vv = bag?.[vKey];
+    const sRows = sv && typeof sv === 'object' && Array.isArray(sv.rows) && sv.rows.length > 0;
+    const vRows = vv && typeof vv === 'object' && Array.isArray(vv.rows) && vv.rows.length > 0;
+    participatingByStorage = !!(sRows || vRows);
+  } catch {
+    /* storage 読めない時は判定を保守的に(=畳まない)＝従来描画に委ねる */
+    participatingByStorage = true;
+  }
+  if (participatingByBundleOrNdgr || participatingByStorage) {
+    return; // 参加シグナルあり＝触らない(従来の描画関数が出す)
+  }
+  // 参加シグナル皆無＝非参加確定。両レーンを即畳む。
+  const ebBody = document.getElementById('northStarLaneBody-eventBroadcasters');
+  const evBody = document.getElementById('northStarLaneBody-eventVotingSupporters');
+  hideAndClearNorthStarEventLane(
+    'eventBroadcasters',
+    ebBody instanceof HTMLElement ? ebBody : /** @type {any} */ (null)
+  );
+  hideAndClearNorthStarEventLane(
+    'eventVotingSupporters',
+    evBody instanceof HTMLElement ? evBody : /** @type {any} */ (null)
+  );
+}
+
+/**
  * 北極星ギフト履歴の個別投げ一覧パネル（ランキング body とは別 DOM）。
  */
 function clearNorthStarGiftThrowsPanel() {
@@ -10376,9 +10438,22 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
   _northStarRenderProbe.lastReachedLane = 'start';
   _northStarRenderProbe.lastError = '';
   try {
+    // v0.1.617: イベント系2レーンの「非参加なら即・確実に畳む」を連鎖の**最初**に行う。
+    //   重いギフト同期(実機9.4秒)や後続レーンの storage 読みで連鎖が遅延/中断しても、
+    //   イベント非参加レーンが「ニコニコの公式から問い合わせ中」を出し続ける問題を断つ。
+    //   イベント参加シグナルが無ければ event 2レーンを hide+待機UI撤去。参加中(rows あり/
+    //   bundle.eventBanner 等)なら従来の描画関数に委ねる(ここでは触らない)。
+    await hideNorthStarEventLanesIfNotParticipating(lid);
     const giftSyncStart = Date.now();
-    await syncKokenGiftHistoryForPopup(lid);
-    _northStarRenderProbe.lastGiftSyncMs = Math.max(0, Date.now() - giftSyncStart);
+    // v0.1.617: ギフト履歴の SW 全ページ取得(実機9.4秒)はレーン描画をブロックしない。
+    //   非ブロック(fire-and-forget)にして、ギフト履歴レーンは storage を別途読む既存経路に委ねる。
+    void syncKokenGiftHistoryForPopup(lid)
+      .then(() => {
+        _northStarRenderProbe.lastGiftSyncMs = Math.max(0, Date.now() - giftSyncStart);
+      })
+      .catch(() => {
+        /* best-effort */
+      });
     _northStarRenderProbe.lastReachedLane = 'after_gift_sync';
     await refreshNorthStarContributionRankingLaneAsync(lid);
     _northStarRenderProbe.lastReachedLane = 'after_contrib';
