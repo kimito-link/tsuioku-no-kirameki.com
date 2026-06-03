@@ -113,6 +113,50 @@ describe('pickFollowUidsToFetch', () => {
     });
     expect(out).toEqual(['2', '3']);
   });
+
+  describe('v0.1.608 Phase 1-C: forceRefetch オプション', () => {
+    it('forceRefetch=true で TTL チェックをスキップしキャッシュ済みも含める', () => {
+      const now = 2_000_000_000_000;
+      const cache = {
+        '1': { followerCount: 1, fetchedAt: now - 1000 }, // 新しいので通常は除外される
+        '2': { followerCount: 1, fetchedAt: now - 100 } // 同上
+      };
+      const out = pickFollowUidsToFetch(['1', '2', '3'], cache, {
+        nowMs: now,
+        limit: 10,
+        forceRefetch: true
+      });
+      expect(out).toEqual(['1', '2', '3']); // すべて取得対象に
+    });
+
+    it('forceRefetch=false(省略時)は従来挙動を維持(後方互換)', () => {
+      const now = 2_000_000_000_000;
+      const cache = {
+        '1': { followerCount: 1, fetchedAt: now - 1000 }
+      };
+      const out1 = pickFollowUidsToFetch(['1', '2'], cache, { nowMs: now });
+      const out2 = pickFollowUidsToFetch(['1', '2'], cache, {
+        nowMs: now,
+        forceRefetch: false
+      });
+      expect(out1).toEqual(['2']);
+      expect(out2).toEqual(['2']);
+    });
+
+    it('forceRefetch=true でも数値uid フィルタと limit と dedup は効く', () => {
+      const now = 2_000_000_000_000;
+      const cache = {
+        '1': { followerCount: 1, fetchedAt: now },
+        '2': { followerCount: 1, fetchedAt: now }
+      };
+      const out = pickFollowUidsToFetch(['1', '2', '1', 'a:x', '3', '4'], cache, {
+        nowMs: now,
+        limit: 3,
+        forceRefetch: true
+      });
+      expect(out).toEqual(['1', '2', '3']); // dedup + 数値のみ + limit=3
+    });
+  });
 });
 
 describe('collectNumericCommentersFromComments', () => {

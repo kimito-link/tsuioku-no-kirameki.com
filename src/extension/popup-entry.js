@@ -264,6 +264,7 @@ import {
   pickFollowUidsToFetch,
   upsertCommenterFollowEntry,
   commenterFollowEntryFromProfile,
+  collectNumericCommentersFromComments,
   COMMENTER_FOLLOW_FETCH_BATCH
 } from '../lib/commenterFollowCache.js';
 import {
@@ -14726,6 +14727,122 @@ async function backfillCommenterFollowProfilesForReport(report, followMap) {
 }
 
 /**
+ * v0.1.608 (OSINT Phase 1-C): コメンターのフォロー情報をキャッシュ無視で再取得する。
+ *
+ * 通常 path(`backfillCommenterFollowProfilesForReport` + content の `maybeFetchCommenterFollowBatchOnce`)は
+ * TTL チェックで再取得を抑止するため、配信を毎日／数日ごとにやる人では同じ uid が
+ * 焼き付き状態になり「フォロー情報が全然取れない」体感になる(Explore 調査の真因 1 位)。
+ * このボタン経由のフローでは:
+ *   - pickFollowUidsToFetch に forceRefetch=true を渡し TTL を無視
+ *   - 全数値コメンターを 8 名ずつバッチで取得(既存と同じレート制限)
+ *   - 進捗を status DOM に live update
+ *
+ * SW / nvapi への request 量は、既存の COMMENTER_FOLLOW_FETCH_MIN_GAP_MS(1s)+
+ * BATCH=8 + 200ms 間隔(backfillCommenterFollowProfilesForReport と同型)で抑制。
+ * 配信中に押しても通常パスと競合しない(キャッシュ書き込みは last-write-wins・両方とも
+ * upsertCommenterFollowEntry を経由するので重複行は出ない)。
+ *
+ * @param {string} liveId
+ * @param {(text: string) => void} [onStatus] 進捗表示コールバック
+ * @returns {Promise<{ totalCommenters: number, fetched: number, errors: number }>}
+ */
+async function forceRefetchAllCommenterFollowProfiles(liveId, onStatus) {
+  const setStatus =
+    typeof onStatus === 'function' ? (s) => { try { onStatus(String(s || '')); } catch { /* no-op */ } } : () => {};
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) {
+    setStatus('現在の watch タブの配信 ID が不明です。watch ページを開いてから試してください。');
+    return { totalCommenters: 0, fetched: 0, errors: 0 };
+  }
+
+  setStatus('コメンター一覧を読み込み中…');
+  /** @type {string[]} */
+  let allUids = [];
+  try {
+    // 当該配信のコメントから数値コメンターを集める(report 生成と同じ経路)。
+    const comments = await readAllCommentsForLive(lid);
+    const broadcasterUid = String(
+      watchMetaCache.snapshot?.broadcasterUserId || ''
+    ).trim();
+    const stats = collectNumericCommentersFromComments(
+      Array.isArray(comments) ? comments : [],
+      { excludeUserId: broadcasterUid }
+    );
+    allUids = stats.map((s) => s.userId).filter((u) => /^\d{1,18}$/.test(u));
+  } catch {
+    /* best-effort */
+  }
+  if (!allUids.length) {
+    setStatus('数値 ID のコメンターが見つかりませんでした。配信開始直後やコメントが少ない時はこの状態が出ます。');
+    return { totalCommenters: 0, fetched: 0, errors: 0 };
+  }
+
+  // 既存 follow キャッシュを読む。書き込みは差分 upsert で行うため、in-place 更新で OK。
+  /** @type {Record<string, any>} */
+  let followMap = {};
+  try {
+    const bag = await chrome.storage.local.get(KEY_COMMENTER_FOLLOW_CACHE);
+    followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]) || {};
+  } catch {
+    followMap = {};
+  }
+
+  let fetched = 0;
+  let errors = 0;
+  // forceRefetch=true で全件を対象に、BATCH=8 ずつ + 各 uid 間 200ms。
+  // limit を全件にして 1 度に pickFollowUidsToFetch を呼ばず、進捗表示のため
+  // 8 ずつ手動でスライス。
+  for (let i = 0; i < allUids.length; i += COMMENTER_FOLLOW_FETCH_BATCH) {
+    const slice = allUids.slice(i, i + COMMENTER_FOLLOW_FETCH_BATCH);
+    setStatus(
+      `フォロー情報を取得中… ${Math.min(i + slice.length, allUids.length)} / ${allUids.length}`
+    );
+    for (const uid of slice) {
+      const resp = await new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage(
+            { type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid },
+            (r) => {
+              const le = chrome.runtime.lastError;
+              if (le) return resolve(null);
+              resolve(r);
+            }
+          );
+        } catch {
+          resolve(null);
+        }
+      });
+      if (!resp || resp.ok !== true || resp.json == null) {
+        errors += 1;
+        continue;
+      }
+      let profile = null;
+      try {
+        profile = normalizeNicoUserProfileResponse(resp.json);
+      } catch {
+        profile = null;
+      }
+      const entry = commenterFollowEntryFromProfile(profile, Date.now());
+      if (entry && upsertCommenterFollowEntry(followMap, uid, entry)) {
+        fetched += 1;
+      }
+      // 各 uid 間 200ms(BG LRU と sendMessage 連発の保護)。
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    // バッチごとに storage flush(中断しても進捗が残る)。
+    try {
+      await chrome.storage.local.set({ [KEY_COMMENTER_FOLLOW_CACHE]: followMap });
+    } catch {
+      /* best-effort */
+    }
+  }
+  setStatus(
+    `完了: ${fetched} / ${allUids.length} 名取得${errors > 0 ? `(${errors} 名失敗)` : ''}`
+  );
+  return { totalCommenters: allUids.length, fetched, errors };
+}
+
+/**
  * @param {string} liveId
  * @returns {Promise<string>}
  */
@@ -17766,6 +17883,50 @@ async function initPopup() {
     watchMetaCache.key = '';
     watchMetaCache.snapshot = null;
     safeRefresh();
+  });
+
+  // v0.1.608 Phase 1-C: コメンターのフォロー情報を強制再取得(キャッシュ無視)
+  $('devMonitorForceRefetchCommenterFollowBtn')?.addEventListener('click', async () => {
+    const btn = /** @type {HTMLButtonElement|null} */ (
+      $('devMonitorForceRefetchCommenterFollowBtn')
+    );
+    const stEl = /** @type {HTMLElement|null} */ (
+      $('devMonitorForceRefetchCommenterFollowStatus')
+    );
+    if (!btn) return;
+    const originalText = btn.textContent || '';
+    btn.disabled = true;
+    btn.textContent = '取得中…';
+    const setStatus = (s) => {
+      if (stEl) stEl.textContent = s;
+    };
+    try {
+      const lid = String(
+        watchMetaCache.snapshot?.liveId || STORY_SOURCE_STATE.liveId || ''
+      )
+        .trim()
+        .toLowerCase();
+      const result = await forceRefetchAllCommenterFollowProfiles(lid, setStatus);
+      // 完了後、報告は setStatus 経由で済んでいる。3秒後にステータス文をフェードアウト的に薄く。
+      setTimeout(() => {
+        if (stEl && stEl.textContent && /^完了/.test(stEl.textContent)) {
+          stEl.textContent = `${stEl.textContent}（マーケ分析DLを押すと反映されます）`;
+        }
+      }, 500);
+      // 集計結果のみ console にログ(本番でも debug 目的で残してOK・件数だけ)
+      try {
+        console.info('[nls follow-osint] force refetch result:', result);
+      } catch {
+        /* no-op */
+      }
+    } catch (err) {
+      setStatus(
+        `エラー: ${err && typeof err === 'object' && 'message' in err ? String(/** @type {{message?:unknown}} */ (err).message || '') : String(err || 'unknown')}`
+      );
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   });
 
   $('devMonitorCopyAiBundleBtn')?.addEventListener('click', async () => {

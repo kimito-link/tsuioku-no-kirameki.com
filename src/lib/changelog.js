@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.608',
+    date: '2026-06-03',
+    summary: 'コメンターのフォロー情報を強制再取得するボタンを追加',
+    items: Object.freeze([
+      'マーケ分析セクションに「フォロー情報を強制再取得」ボタンを追加（キャッシュを無視して全コメンターのフォロワー数を取り直し、進捗を表示）',
+      '取得は8名ずつ・各uid間200ms間隔で既存と同じレート保護。配信中の通常取得とも競合しない設計'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.607',
     date: '2026-06-03',
     summary: 'コメンターのフォロワー情報が取れにくい問題を改善',

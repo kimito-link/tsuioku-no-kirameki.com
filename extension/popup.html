@@ -11709,6 +11709,20 @@
             <button type="button" class="nl-dev-monitor__btn nl-dev-monitor__btn--accent" id="devMonitorExportMarketingBtn" disabled>
               📊 マーケ分析DL
             </button>
+            <!-- v0.1.608 Phase 1-C: コメンターのフォロー情報を強制再取得(キャッシュ無視) -->
+            <button
+              type="button"
+              class="nl-dev-monitor__btn"
+              id="devMonitorForceRefetchCommenterFollowBtn"
+              title="コメンターのフォロワー数・フォロー先など niconico プロフィール情報を、キャッシュを無視して取り直します。マーケ分析の散布図やセグメントに最新値を反映させたい時に。"
+            >
+              🔄 フォロー情報を強制再取得
+            </button>
+            <span
+              id="devMonitorForceRefetchCommenterFollowStatus"
+              class="nl-dev-monitor__export-status"
+              aria-live="polite"
+            ></span>
             <span
               id="devMonitorExportTrendStatus"
               class="nl-dev-monitor__export-status"
