@@ -35,6 +35,17 @@ export function pikaTierForSupportCelebration(spec) {
     if (pt >= 1000) return 'soft';
     return 'none';
   }
+  if (
+    spec.kind === 'broadcaster_follower_milestone' ||
+    spec.kind === 'broadcaster_follower_increase'
+  ) {
+    if (spec.kind === 'broadcaster_follower_milestone') {
+      const n = Number(String(spec.dedupeKey || '').replace('bc_follower_', '')) || 0;
+      if (n >= 1000) return 'hard';
+      if (n >= 100) return 'soft';
+    }
+    return 'soft';
+  }
   return 'none';
 }
 

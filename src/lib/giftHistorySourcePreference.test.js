@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { pickGiftHistorySource, GIFT_IFRAME_STALE_MS } from './giftHistorySourcePreference.js';
+import {
+  pickGiftHistorySource,
+  pickKokenSubAppVsLiveGiftHistory,
+  GIFT_IFRAME_STALE_MS
+} from './giftHistorySourcePreference.js';
 
 const NOW = 1_700_000_000_000;
 
@@ -83,5 +87,60 @@ describe('pickGiftHistorySource', () => {
   it('不正引数は none', () => {
     expect(pickGiftHistorySource(null)).toBe('none');
     expect(pickGiftHistorySource(undefined)).toBe('none');
+  });
+});
+
+describe('pickKokenSubAppVsLiveGiftHistory', () => {
+  it('sub-app のみなら subApp', () => {
+    expect(
+      pickKokenSubAppVsLiveGiftHistory({
+        subAppAvailable: true,
+        subAppPointsSum: 5000,
+        subAppThrowCount: 3,
+        liveAvailable: false,
+        livePointsSum: 0,
+        liveThrowCount: 0
+      })
+    ).toBe('subApp');
+  });
+
+  it('ライブの pt・件数が明らかに多いなら live', () => {
+    expect(
+      pickKokenSubAppVsLiveGiftHistory({
+        subAppAvailable: true,
+        subAppPointsSum: 50,
+        subAppThrowCount: 1,
+        liveAvailable: true,
+        livePointsSum: 10000,
+        liveThrowCount: 20
+      })
+    ).toBe('live');
+  });
+
+  it('同程度なら subApp を維持', () => {
+    expect(
+      pickKokenSubAppVsLiveGiftHistory({
+        subAppAvailable: true,
+        subAppPointsSum: 4000,
+        subAppThrowCount: 10,
+        liveAvailable: true,
+        livePointsSum: 4200,
+        liveThrowCount: 11
+      })
+    ).toBe('subApp');
+  });
+
+  it('公式累計に近い方の源を優先する', () => {
+    expect(
+      pickKokenSubAppVsLiveGiftHistory({
+        subAppAvailable: true,
+        subAppPointsSum: 10790,
+        subAppThrowCount: 19,
+        liveAvailable: true,
+        livePointsSum: 10950,
+        liveThrowCount: 22,
+        officialProgramGiftPts: 10970
+      })
+    ).toBe('live');
   });
 });

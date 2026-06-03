@@ -41,6 +41,7 @@
  *   commentsPer100Visitors: number,
  *   recordedCommentsPer100Visitors: number,
  *   uniqueCommentersPer100Visitors: number,
+ *   commentParticipationPct: number,
  *   silentVisitorEstimate: number,
  *   quietAudienceWindows: QuietAudienceWindow[],
  *   insightLines: string[]
@@ -119,6 +120,16 @@ function ratioPer100(numerator, denominator) {
     return 0;
   }
   return Math.round((numerator / denominator) * 10000) / 100;
+}
+
+/**
+ * 来場者数に対するコメント参加率（0〜100、小数1桁）。
+ * @param {number} uniqueCommenters
+ * @param {number} totalVisitors
+ * @returns {number}
+ */
+export function computeCommentParticipationPct(uniqueCommenters, totalVisitors) {
+  return ratioPer100(uniqueCommenters, totalVisitors);
 }
 
 /**
@@ -243,6 +254,11 @@ function buildInsightLines(result) {
     return ['来場者数が未取得のため、来場とコメントの変換率は判定できません。'];
   }
   const lines = [];
+  if (result.totalVisitors > 0 && result.uniqueCommenters > 0) {
+    lines.push(
+      `来場${result.totalVisitors}人中${result.uniqueCommenters}人がコメント（${result.commentParticipationPct}%）。`
+    );
+  }
   lines.push(
     `来場100人あたりコメントは${result.commentsPer100Visitors}件、発言者は${result.uniqueCommentersPer100Visitors}人です。`
   );
@@ -307,6 +323,7 @@ export function analyzeAudienceEngagementGap(input, options = {}) {
   const commentsPer100Visitors = ratioPer100(effectiveCommentCount, totalVisitors);
   const recordedCommentsPer100Visitors = ratioPer100(recordedCommentCount, totalVisitors);
   const uniqueCommentersPer100Visitors = ratioPer100(uniqueCommenters, totalVisitors);
+  const commentParticipationPct = computeCommentParticipationPct(uniqueCommenters, totalVisitors);
   const thresholds = {
     minHighVisitorCount:
       Math.max(1, Math.trunc(Number(options.minHighVisitorCount) || DEFAULT_HIGH_VISITOR_COUNT)),
@@ -336,6 +353,7 @@ export function analyzeAudienceEngagementGap(input, options = {}) {
     commentsPer100Visitors,
     recordedCommentsPer100Visitors,
     uniqueCommentersPer100Visitors,
+    commentParticipationPct,
     silentVisitorEstimate: Math.max(0, Math.round(totalVisitors - uniqueCommenters)),
     quietAudienceWindows: findQuietAudienceWindows(
       samples,

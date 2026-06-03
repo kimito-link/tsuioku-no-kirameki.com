@@ -5,7 +5,10 @@ import {
   buildSelfAdCelebrationSpec,
   buildSelfCommentCelebrationSpec,
   buildSelfGiftCelebrationSpec,
-  selfActionUsesGiftZoom
+  selfActionUsesGiftZoom,
+  selfActionUsesAdPachinko,
+  selfAdCelebrationAsPachinkoThrow,
+  SELF_ACTION_AD_PACHINKO_MIN_POINT
 } from './selfActionCelebration.js';
 
 describe('selfActionCelebration', () => {
@@ -48,8 +51,19 @@ describe('selfActionCelebration', () => {
     expect(spec.kind).toBe('self_ad');
     expect(spec.message).toContain('1,200pt');
     expect(spec.sessionDedupeKey).toBe('ad-comment-key');
-    expect(spec.dropCount).toBeGreaterThanOrEqual(6);
-    expect(spec.dropCount).toBeLessThanOrEqual(10);
+    expect(spec.dropCount).toBeGreaterThan(12);
+  });
+
+  it('30pt以上の本人広告はパチンコ風 ad_throw に載せ替え可能', () => {
+    const spec = buildSelfAdCelebrationSpec({
+      point: SELF_ACTION_AD_PACHINKO_MIN_POINT,
+      sessionDedupeKey: 'ad-pachi'
+    });
+    expect(selfActionUsesAdPachinko(spec.kind, spec.point)).toBe(true);
+    const pachi = selfAdCelebrationAsPachinkoThrow(spec);
+    expect(pachi?.kind).toBe('ad_throw');
+    expect(pachi?.dropVariant).toBe('rinku_deluge');
+    expect(pachi?.dropCount).toBeGreaterThanOrEqual(16);
   });
 
   it('連投抑制の最小間隔は 2.5 秒', () => {

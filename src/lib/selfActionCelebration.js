@@ -12,7 +12,7 @@
  * @property {number} durationMs
  * @property {string} sessionDedupeKey
  * @property {number} dropCount
- * @property {'mixed'|'konta'} characterSet
+ * @property {'mixed'} characterSet
  * @property {string} [sender]
  * @property {string} [item]
  * @property {number} [point]
@@ -21,6 +21,8 @@
 
 export const SELF_ACTION_CELEBRATION_MIN_GAP_MS = 2500;
 export const SELF_ACTION_GIFT_ZOOM_MIN_POINT = 50;
+/** 自分広告をパチンコ風（多段ドロップ＋ ad_throw 級）にする最低 pt */
+export const SELF_ACTION_AD_PACHINKO_MIN_POINT = 30;
 
 /**
  * @param {unknown} value
@@ -84,7 +86,7 @@ export function buildSelfGiftCelebrationSpec(opts = {}) {
     durationMs: point >= SELF_ACTION_GIFT_ZOOM_MIN_POINT ? 2200 : 1900,
     sessionDedupeKey: dedupeKey('self_gift', opts.sessionDedupeKey),
     dropCount: point >= SELF_ACTION_GIFT_ZOOM_MIN_POINT ? 10 : 8,
-    characterSet: 'konta',
+    characterSet: 'mixed',
     sender: cleanText(opts.sender),
     item,
     point,
@@ -101,16 +103,41 @@ export function buildSelfAdCelebrationSpec(opts = {}) {
   const message = point > 0
     ? `${point.toLocaleString('ja-JP')}pt 広告！`
     : '広告ありがとう！';
+  const pachinko = point >= SELF_ACTION_AD_PACHINKO_MIN_POINT;
   return {
     kind: 'self_ad',
     message,
-    durationMs: point >= 500 ? 2200 : 1900,
+    durationMs: pachinko ? (point >= 500 ? 3000 : point >= 100 ? 2700 : 2500) : 1900,
     sessionDedupeKey: dedupeKey('self_ad', opts.sessionDedupeKey),
-    dropCount: point >= 500 ? 9 : 7,
-    characterSet: 'konta',
+    dropCount: pachinko
+      ? Math.min(34, 14 + Math.floor(point / 12))
+      : point >= 500
+        ? 12
+        : 10,
+    characterSet: 'mixed',
     sender: cleanText(opts.sender),
     point,
     sourceDedupeKey: cleanText(opts.sourceDedupeKey)
+  };
+}
+
+/**
+ * 自分広告をパチンコ風の ad_throw 演出（他者広告と同系の多段ドロップ）に載せ替える。
+ * @param {SelfActionCelebrationSpec} spec
+ * @returns {import('./supportCelebration.js').SupportCelebrationSpec|null}
+ */
+export function selfAdCelebrationAsPachinkoThrow(spec) {
+  if (!spec || spec.kind !== 'self_ad') return null;
+  const point = nonNegativeInt(spec.point);
+  if (point < SELF_ACTION_AD_PACHINKO_MIN_POINT) return null;
+  return {
+    kind: 'ad_throw',
+    message: spec.message,
+    dropCount: Math.min(36, Math.max(16, Number(spec.dropCount) || 14)),
+    durationMs: Math.max(2400, Number(spec.durationMs) || 2500),
+    dedupeKey: `self_ad_pachi_${spec.sessionDedupeKey}`,
+    characterSet: 'mixed',
+    dropVariant: 'rinku_deluge'
   };
 }
 
@@ -122,4 +149,13 @@ export function buildSelfAdCelebrationSpec(opts = {}) {
  */
 export function selfActionUsesGiftZoom(kind, point) {
   return kind === 'self_gift' && nonNegativeInt(point) >= SELF_ACTION_GIFT_ZOOM_MIN_POINT;
+}
+
+/**
+ * @param {SelfActionCelebrationKind} kind
+ * @param {number|null|undefined} point
+ * @returns {boolean}
+ */
+export function selfActionUsesAdPachinko(kind, point) {
+  return kind === 'self_ad' && nonNegativeInt(point) >= SELF_ACTION_AD_PACHINKO_MIN_POINT;
 }

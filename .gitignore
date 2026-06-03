@@ -9,6 +9,11 @@ docs/.visual-explainer/
 nicolivelog-marketing-*.html
 nicolivelog-extension-investigation.zip
 
+# Codex/外部CLI ハンドオフ用の一時プロンプト・動画フレーム抽出（配布物でない）
+.codex-exec-prompt-*.txt
+.codex-task-prompt.txt
+tmp-video-frames/
+
 # Chrome Web Store 申請用ビルド成果物
 build/
 

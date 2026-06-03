@@ -3,7 +3,7 @@
  * DOM / storage は popup-entry 側で扱う。
  */
 
-/** @typedef {'comment_milestone'|'event_rank_up'|'gift_milestone'|'ad_points_milestone'|'ad_advertiser_milestone'|'ad_points_increase'|'ad_throw'} SupportCelebrationKind */
+/** @typedef {'comment_milestone'|'event_rank_up'|'gift_milestone'|'ad_points_milestone'|'ad_advertiser_milestone'|'ad_points_increase'|'ad_throw'|'broadcaster_follower_milestone'|'broadcaster_follower_increase'} SupportCelebrationKind */
 
 /** @typedef {'rinku'|'konta'|'mixed'} SupportCelebrationCharacterSet */
 
@@ -44,6 +44,75 @@ export function pickHighestCrossedMilestone(prev, next, milestones) {
     if (prev < m && next >= m) hit = m;
   }
   return hit;
+}
+
+/**
+ * 累計ニコニ広告pt が既に到達しているマイルストーンの dedupeKey 一覧（起動時プライム用）。
+ *
+ * @param {number} adPoints
+ * @returns {string[]}
+ */
+export function adPointsMilestoneDedupeKeysAtOrBelow(adPoints) {
+  const pts = Number(adPoints);
+  if (!Number.isFinite(pts) || pts < 0) return [];
+  /** @type {string[]} */
+  const out = [];
+  for (const m of AD_POINTS_MILESTONES) {
+    if (pts >= m) out.push(`ad_pts_${m}`);
+  }
+  return out;
+}
+
+/**
+ * 既に到達しているギフト件数マイルストーンの dedupeKey 一覧（起動プライム用）。
+ *
+ * @param {number} giftEventCount
+ * @returns {string[]}
+ */
+export function giftCountMilestoneDedupeKeysAtOrBelow(giftEventCount) {
+  const n = Number(giftEventCount);
+  if (!Number.isFinite(n) || n < 0) return [];
+  /** @type {string[]} */
+  const out = [];
+  for (const m of GIFT_MILESTONES) {
+    if (n >= m) out.push(`gift_${m}`);
+  }
+  return out;
+}
+
+/**
+ * 既に到達しているコメント件数マイルストーンの dedupeKey 一覧（起動プライム用）。
+ *
+ * @param {number} commentCount
+ * @returns {string[]}
+ */
+export function commentMilestoneDedupeKeysAtOrBelow(commentCount) {
+  const n = Number(commentCount);
+  if (!Number.isFinite(n) || n < 0) return [];
+  /** @type {string[]} */
+  const out = [];
+  for (const m of COMMENT_MILESTONES) {
+    if (n >= m) out.push(`comment_${m}`);
+  }
+  return out;
+}
+
+/**
+ * 起動直後の「未取得 0 → 正本累計」ジャンプではマイルストーン演出を出さない。
+ *
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ * @returns {boolean}
+ */
+export function isStartupAdPointsJump(prev, next) {
+  if (prev == null || next == null || !Number.isFinite(prev) || !Number.isFinite(next)) {
+    return false;
+  }
+  if (next <= prev) return false;
+  if (prev <= 0 && next >= 1000) return true;
+  const delta = next - prev;
+  if (delta >= 8000 && prev < next * 0.05) return true;
+  return false;
 }
 
 /**
@@ -174,7 +243,7 @@ export function pickEventRankUpCelebration(prevRank, nextRank) {
     dropCount: dropCountForEventRankUp(prevRank, nextRank),
     durationMs: nextRank <= 3 ? 3400 : 2800,
     dedupeKey: `event_rank_${nextRank}`,
-    characterSet: nextRank <= 10 ? 'mixed' : 'konta'
+    characterSet: 'mixed'
   };
 }
 
@@ -195,7 +264,7 @@ export function pickGiftCountMilestoneCelebration(prev, next) {
     dropCount: dropCountForGiftMilestone(hit),
     durationMs: hit >= 25 ? 3000 : 2400,
     dedupeKey: `gift_${hit}`,
-    characterSet: 'konta'
+    characterSet: 'mixed'
   };
 }
 
@@ -210,14 +279,15 @@ export function pickAdPointsMilestoneCelebration(prev, next) {
   const message =
     hit === 1
       ? '最初のニコニ広告ptが付きました！'
-      : `ニコニ広告 ${hit.toLocaleString('ja-JP')} pt 突破！`;
+      : `ニコニ広告 ${hit.toLocaleString('ja-JP')}pt 達成！`;
   return {
     kind: 'ad_points_milestone',
     message,
     dropCount: dropCountForAdPointsMilestone(hit),
     durationMs: hit >= 50000 ? 3200 : hit >= 10000 ? 2800 : 2400,
     dedupeKey: `ad_pts_${hit}`,
-    characterSet: 'konta'
+    characterSet: 'mixed',
+    dropVariant: 'rinku_deluge'
   };
 }
 
@@ -239,7 +309,8 @@ export function pickAdAdvertiserCountMilestoneCelebration(prev, next) {
     dropCount: dropCountForAdAdvertiserMilestone(hit),
     durationMs: hit >= 10 ? 2800 : 2400,
     dedupeKey: `ad_adv_${hit}`,
-    characterSet: 'konta'
+    characterSet: 'mixed',
+    dropVariant: 'rinku_deluge'
   };
 }
 
@@ -264,7 +335,8 @@ export function pickAdPointsIncreaseCelebration(prev, next) {
     dropCount: Math.min(22, 8 + Math.floor(delta / 20)),
     durationMs: delta >= 500 ? 2800 : 2400,
     dedupeKey: `ad_throw_${next}`,
-    characterSet: 'konta'
+    characterSet: 'mixed',
+    dropVariant: 'rinku_deluge'
   };
 }
 
@@ -284,7 +356,8 @@ export function pickNicoadCommentCelebration(parsed, commentDedupeKey) {
     dropCount: Math.min(26, 10 + Math.floor(pt / 25)),
     durationMs: pt >= 500 ? 2800 : 2400,
     dedupeKey: `ad_comment_${commentDedupeKey}`,
-    characterSet: 'konta'
+    characterSet: 'mixed',
+    dropVariant: 'rinku_deluge'
   };
 }
 
@@ -299,6 +372,82 @@ export function isAdSupportCelebrationKind(kind) {
     kind === 'ad_points_increase' ||
     kind === 'ad_throw'
   );
+}
+
+/** 配信者プロフィールのフォロワー数（nvapi） */
+export const BROADCASTER_FOLLOWER_MILESTONES = Object.freeze([
+  1, 10, 50, 100, 500, 1000, 5000, 10000
+]);
+
+/**
+ * @param {number} milestone
+ * @returns {number}
+ */
+export function dropCountForBroadcasterFollowerMilestone(milestone) {
+  if (milestone >= 10000) return 34;
+  if (milestone >= 5000) return 28;
+  if (milestone >= 1000) return 22;
+  if (milestone >= 500) return 18;
+  if (milestone >= 100) return 14;
+  if (milestone >= 50) return 12;
+  return 10;
+}
+
+/**
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ * @returns {SupportCelebrationSpec|null}
+ */
+export function pickBroadcasterFollowerMilestoneCelebration(prev, next) {
+  const hit = pickHighestCrossedMilestone(prev, next, BROADCASTER_FOLLOWER_MILESTONES);
+  if (hit == null) return null;
+  const message =
+    hit === 1
+      ? 'フォロワーが付きました！'
+      : `フォロワー ${hit.toLocaleString('ja-JP')} 人達成！`;
+  return {
+    kind: 'broadcaster_follower_milestone',
+    message,
+    dropCount: dropCountForBroadcasterFollowerMilestone(hit),
+    durationMs: hit >= 1000 ? 2800 : hit >= 100 ? 2600 : 2400,
+    dedupeKey: `bc_follower_${hit}`,
+    characterSet: 'mixed',
+    dropVariant: 'rinku_deluge'
+  };
+}
+
+/**
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ * @returns {SupportCelebrationSpec|null}
+ */
+export function pickBroadcasterFollowerIncreaseCelebration(prev, next) {
+  if (prev == null || next == null || !Number.isFinite(prev) || !Number.isFinite(next)) {
+    return null;
+  }
+  if (next <= prev) return null;
+  if (pickHighestCrossedMilestone(prev, next, BROADCASTER_FOLLOWER_MILESTONES) != null) {
+    return null;
+  }
+  const delta = next - prev;
+  if (delta <= 0) return null;
+  return {
+    kind: 'broadcaster_follower_increase',
+    message: `フォロワー +${delta.toLocaleString('ja-JP')} 人！`,
+    dropCount: Math.min(20, 8 + Math.floor(delta / 2)),
+    durationMs: delta >= 10 ? 2600 : 2400,
+    dedupeKey: `bc_follower_inc_${next}`,
+    characterSet: 'mixed',
+    dropVariant: 'rinku_deluge'
+  };
+}
+
+/**
+ * @param {SupportCelebrationKind} kind
+ * @returns {boolean}
+ */
+export function isFollowerSupportCelebrationKind(kind) {
+  return kind === 'broadcaster_follower_milestone' || kind === 'broadcaster_follower_increase';
 }
 
 /**

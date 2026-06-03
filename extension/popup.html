@@ -832,6 +832,13 @@
         min-width: 0;
       }
 
+      .nl-story-userlane-tier-wrap--gift {
+        padding: 6px 6px 4px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 82%, #e8b84a 18%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 70%, #d4a017 30%);
+      }
+
       .nl-story-userlane-tier-hint {
         margin: 0;
         padding: 4px 6px;
@@ -3258,7 +3265,8 @@
         bottom: calc(100% + 6px);
         left: 50%;
         transform: translateX(-50%);
-        white-space: nowrap;
+        white-space: normal;
+        max-width: min(94vw, 420px);
       }
       @keyframes nlLiveStatCelebratePulse {
         0% { box-shadow: 0 0 0 0 rgba(244, 122, 178, 0.55); }
@@ -3280,7 +3288,7 @@
         top: 10%;
         left: 50%;
         transform: translateX(-50%);
-        max-width: min(92vw, 360px);
+        max-width: min(94vw, 420px);
         padding: 10px 16px;
         border-radius: 999px;
         background: linear-gradient(135deg, rgba(255, 248, 252, 0.96), rgba(255, 236, 246, 0.94));
@@ -3291,6 +3299,9 @@
         font-weight: 700;
         text-align: center;
         line-height: 1.35;
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
         animation: nlCelebrationBannerPop 0.55s cubic-bezier(.34, 1.56, .64, 1) 1;
       }
       .nl-celebration-shower__drops {
@@ -3378,7 +3389,7 @@
       .nl-celebration-flytext {
         position: absolute;
         inset: 0;
-        overflow: hidden;
+        overflow: visible;
         pointer-events: none;
         z-index: 4;
       }
@@ -3435,11 +3446,6 @@
           opacity: 0;
         }
       }
-      html.nl-calm-motion .nl-celebration-flytext__line {
-        animation: none !important;
-        display: none;
-      }
-
       /* v0.1.556: パチンコ／ボカロ MV 風 — ぴかっフラッシュ */
       .nl-celebration-pika {
         position: absolute;
@@ -3532,9 +3538,6 @@
           transform: translate(var(--nl-pika-x, 0px), var(--nl-pika-y, 0px)) scale(0.3) rotate(120deg);
           opacity: 0;
         }
-      }
-      html.nl-calm-motion .nl-celebration-pika {
-        display: none;
       }
       @media (prefers-reduced-motion: reduce) {
         .nl-celebration-pika__flash,
@@ -4054,6 +4057,175 @@
         font-size: clamp(8px, 1.7vw, 9px);
         line-height: 1.3;
         margin: 1px 0 2px;
+      }
+      /* 個別投げ一覧（マーケ同型）— ランキング body の flex/grid と分離した専用パネル */
+      .nl-north-star-lane[data-lane='giftHistory'] {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        min-width: 0;
+      }
+      .nl-north-star-lane__throws-panel {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 4px 6px 8px;
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 42%, transparent);
+        background: color-mix(in srgb, var(--nl-surface) 94%, var(--nl-bg-soft) 6%);
+        contain: layout style;
+      }
+      .nl-north-star-lane__throws-panel[hidden] {
+        display: none !important;
+      }
+      .nl-north-star-lane[data-lane='giftHistory'] .nl-north-star-lane__body {
+        max-height: none;
+      }
+      .nl-gift-ledger-section {
+        margin: 0;
+        min-width: 0;
+      }
+      .nl-gift-ledger-head {
+        margin: 0 0 4px;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 1.35;
+        color: color-mix(in srgb, var(--nl-text) 88%, transparent);
+      }
+      .nl-gift-ledger-spec-note {
+        margin: 0 0 4px;
+        font-size: 8.5px;
+        line-height: 1.3;
+        color: color-mix(in srgb, var(--nl-text) 55%, transparent);
+      }
+      .nl-gift-ledger-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+        width: 100%;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table {
+        width: 100%;
+        min-width: 580px;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 10px;
+        line-height: 1.35;
+        display: table;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table thead {
+        display: table-header-group;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table tbody {
+        display: table-row-group;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table tr {
+        display: table-row;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table th,
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table td {
+        display: table-cell;
+      }
+      .nl-gift-ledger-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+        line-height: 1.35;
+      }
+      .nl-gift-ledger-table th,
+      .nl-gift-ledger-table td {
+        padding: 4px 5px;
+        border-bottom: 1px solid color-mix(in srgb, var(--nl-border) 55%, transparent);
+        text-align: left;
+        vertical-align: middle;
+      }
+      .nl-gift-ledger-table th {
+        font-size: 8.5px;
+        font-weight: 800;
+        color: color-mix(in srgb, var(--nl-text) 58%, transparent);
+        white-space: nowrap;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-bg-soft) 8%);
+      }
+      .nl-gift-ledger-table td {
+        color: var(--nl-text);
+      }
+      .nl-gift-ledger-table .nl-num {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        font-weight: 700;
+      }
+      .nl-gift-ledger-itemcell {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        min-width: 100px;
+      }
+      .nl-gift-ledger-row__thumb {
+        width: 24px;
+        height: 24px;
+        border-radius: 5px;
+        object-fit: contain;
+        flex: 0 0 auto;
+        background: color-mix(in srgb, var(--nl-bg-soft) 70%, #fff 30%);
+      }
+      .nl-gift-ledger-row__thumb--empty {
+        display: inline-block;
+        border-radius: 5px;
+        background: color-mix(in srgb, var(--nl-border) 40%, transparent);
+      }
+      .nl-gift-ledger-thumb {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex: 0 0 auto;
+        display: block;
+      }
+      .nl-gift-ledger-thumb--empty {
+        display: inline-block;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--nl-border) 45%, transparent);
+      }
+      .nl-gift-ledger-time {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .nl-gift-ledger-sender .nl-user-profile-link {
+        color: var(--nl-accent, #0f8fd8);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .nl-gift-ledger-mono {
+        font-variant-numeric: tabular-nums;
+        font-size: 9px;
+      }
+      .nl-gift-ledger-evidence {
+        font-size: 8.5px;
+        color: color-mix(in srgb, var(--nl-text) 52%, transparent);
+        white-space: nowrap;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table th:nth-child(1),
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table td:nth-child(1) {
+        width: 2rem;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table th:nth-child(2),
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table td:nth-child(2) {
+        width: 4.2rem;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table th:nth-child(7),
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table td:nth-child(7) {
+        width: 3.5rem;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table th:nth-child(8),
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-table td:nth-child(8) {
+        width: 3.2rem;
+      }
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-itemcell span,
+      .nl-north-star-lane__throws-panel .nl-gift-ledger-sender {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
       }
       @media (max-width: 359px) {
         .nl-north-star-lane__gadget--summary {
@@ -6088,11 +6260,6 @@
         animation: none;
       }
 
-      html.nl-calm-motion .nl-celebration-shower__banner,
-      html.nl-calm-motion .nl-celebration-drop {
-        animation: none;
-      }
-
       html.nl-calm-motion .nl-support-visual-details__summary::before {
         transition: none;
       }
@@ -7543,6 +7710,152 @@
       .nl-cheer-chip:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+
+      /* v0.1.592: HTML/マーケ DL 待ち — りんく・こん太・たぬ姉の吹き出し */
+      .nl-export-wait {
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        margin: 8px 0 4px;
+        padding: 10px 10px 8px;
+        border-radius: 12px;
+        border: 1px solid color-mix(in srgb, var(--nl-accent, #2a6f4d) 28%, var(--nl-border) 72%);
+        background: linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--nl-bg-soft, #eef9f3) 92%, var(--nl-accent, #2a6f4d) 8%),
+          var(--nl-surface, #fff)
+        );
+      }
+      .nl-export-wait.is-visible {
+        display: flex;
+      }
+      .nl-export-wait__title {
+        margin: 0;
+        font-size: clamp(11px, 2.8vw, 12px);
+        font-weight: 800;
+        color: var(--nl-accent, #2a6f4d);
+        text-align: center;
+        letter-spacing: 0.04em;
+      }
+      .nl-export-wait__grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(6px, 2vw, 10px);
+        align-items: start;
+      }
+      .nl-export-wait__row {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        min-width: 0;
+        opacity: 0.72;
+        transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+      }
+      .nl-export-wait__row.is-speaking {
+        opacity: 1;
+        transform: translateY(-2px);
+      }
+      .nl-export-wait__char {
+        width: clamp(44px, 12vw, 52px);
+        height: clamp(44px, 12vw, 52px);
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid color-mix(in srgb, var(--nl-text, #1f2937) 35%, transparent);
+        box-shadow: 2px 2px 0 color-mix(in srgb, var(--nl-text, #1f2937) 22%, transparent);
+        background: var(--nl-surface, #fff);
+      }
+      .nl-export-wait__row.is-speaking .nl-export-wait__char {
+        border-color: var(--nl-accent, #2a6f4d);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-accent, #2a6f4d) 35%, transparent),
+          2px 3px 0 color-mix(in srgb, var(--nl-accent, #2a6f4d) 30%, transparent);
+      }
+      .nl-export-wait__bubble {
+        position: relative;
+        width: 100%;
+        padding: 6px 7px;
+        border-radius: 10px;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 80%, transparent);
+        background: var(--nl-surface, #fff);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+      }
+      .nl-export-wait__bubble::before {
+        content: '';
+        position: absolute;
+        top: -5px;
+        left: 50%;
+        width: 8px;
+        height: 8px;
+        margin-left: -4px;
+        background: var(--nl-surface, #fff);
+        border-top: 1px solid color-mix(in srgb, var(--nl-border) 80%, transparent);
+        border-left: 1px solid color-mix(in srgb, var(--nl-border) 80%, transparent);
+        transform: rotate(45deg);
+      }
+      .nl-export-wait__row--link .nl-export-wait__bubble {
+        border-left: 3px solid #38bdf8;
+      }
+      .nl-export-wait__row--konta .nl-export-wait__bubble {
+        border-left: 3px solid #fb923c;
+      }
+      .nl-export-wait__row--tanunee .nl-export-wait__bubble {
+        border-left: 3px solid #c4b5fd;
+      }
+      .nl-export-wait__name {
+        display: block;
+        font-size: 9px;
+        font-weight: 800;
+        margin: 0 0 2px;
+        letter-spacing: 0.02em;
+      }
+      .nl-export-wait__row--link .nl-export-wait__name {
+        color: #0284c7;
+      }
+      .nl-export-wait__row--konta .nl-export-wait__name {
+        color: #c2410c;
+      }
+      .nl-export-wait__row--tanunee .nl-export-wait__name {
+        color: #7c3aed;
+      }
+      .nl-export-wait__text {
+        margin: 0;
+        font-size: clamp(9px, 2.4vw, 10.5px);
+        line-height: 1.4;
+        font-weight: 600;
+        color: var(--nl-text, #1f2937);
+        overflow-wrap: anywhere;
+      }
+      .nl-export-wait__tech {
+        margin: 0;
+        font-size: 10px;
+        line-height: 1.35;
+        color: var(--nl-muted, #5b6475);
+        text-align: center;
+      }
+      @media (prefers-color-scheme: dark) {
+        .nl-export-wait {
+          background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--nl-bg-soft, #111827) 90%, var(--nl-accent, #60a5fa) 10%),
+            var(--nl-surface, #0f172a)
+          );
+        }
+        .nl-export-wait__title {
+          color: var(--nl-accent, #60a5fa);
+        }
+        .nl-export-wait__bubble,
+        .nl-export-wait__bubble::before {
+          background: var(--nl-surface, #0f172a);
+        }
+        .nl-export-wait__text {
+          color: var(--nl-text-sub, #e2e8f0);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-export-wait__row {
+          transition: none;
+        }
       }
 
       .nl-compose-send-row #postStatus {
@@ -10229,9 +10542,8 @@
               <p class="nl-north-star-lane__label">この番組へのギフト履歴<span
                   class="nl-north-star-lane__program-pt is-placeholder"
                   id="giftHistoryProgramPt"
-                  title="番組ギフト累計pt（ティッカー等）。表示中ユーザー別の合計ではありません"
-                  style="display: none !important;"
-                ><span class="nl-north-star-lane__program-pt-label">累計</span> <b class="nl-north-star-lane__program-pt-num">—</b><small class="nl-north-star-lane__program-pt-unit">pt</small></span></p>
+                  title="ニコ生プレイヤー表示の番組ギフト累計pt。下の一覧合計（履歴API）とは別指標です"
+                ><span class="nl-north-star-lane__program-pt-label">公式累計</span> <b class="nl-north-star-lane__program-pt-num">—</b><small class="nl-north-star-lane__program-pt-unit">pt</small></span></p>
               <p class="nl-north-star-lane__sublabel">
                 ユーザー別（多い順・最大10）。履歴が無いときはコメント観測の「投げ回数」で代替。
               </p>
@@ -10268,7 +10580,7 @@
                 aria-hidden="true"
               >
                 <p class="nl-north-star-lane__summary-title">表示の合計</p>
-                <p class="nl-north-star-lane__summary-note">一覧の数値のみ（下段の累計ptとは別）</p>
+                <p class="nl-north-star-lane__summary-note">公式番組累計（プレイヤー表示と同じ）</p>
                 <p class="nl-north-star-lane__summary-pt">
                   <span class="nl-north-star-lane__summary-pt-num">—</span><span
                     class="nl-north-star-lane__summary-pt-unit"
@@ -10292,6 +10604,12 @@
                 hidden
               ></aside>
             </div>
+            <div
+              id="northStarLaneThrows-giftHistory"
+              class="nl-north-star-lane__throws-panel"
+              hidden
+              aria-label="個別ギフト投げ一覧"
+            ></div>
           </div>
             <div class="nl-north-star-lane" data-lane="programPoints">
             <div class="nl-north-star-lane__heading">
@@ -10760,7 +11078,7 @@
             <div class="nl-panel-calm-motion">
               <label for="calmPanelMotion">
                 <input type="checkbox" id="calmPanelMotion" />
-                <span>パネル内の動きを抑える（ループアニメ・帯など）</span>
+                <span>パネル内の動きを抑える（ループアニメ・帯など。広告／ギフトの豪雨演出は出ます）</span>
               </label>
             </div>
             <div
@@ -10924,6 +11242,57 @@
                 </span>
               </button>
             </div>
+          </div>
+          <div
+            id="nlExportWaitPanel"
+            class="nl-export-wait"
+            hidden
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <p class="nl-export-wait__title" id="nlExportWaitTitle">レポートを組み立て中…</p>
+            <div class="nl-export-wait__grid">
+              <div class="nl-export-wait__row nl-export-wait__row--link" data-who="link">
+                <img
+                  class="nl-export-wait__char"
+                  data-who="link"
+                  src="images/yukkuri-charactore-english/link/link-yukkuri-normal-mouth-closed.thumb128.png"
+                  alt=""
+                  decoding="async"
+                />
+                <div class="nl-export-wait__bubble">
+                  <span class="nl-export-wait__name">りんく</span>
+                  <p class="nl-export-wait__text" data-export-wait-text="link">準備中…</p>
+                </div>
+              </div>
+              <div class="nl-export-wait__row nl-export-wait__row--konta" data-who="konta">
+                <img
+                  class="nl-export-wait__char"
+                  data-who="konta"
+                  src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-normal.thumb128.png"
+                  alt=""
+                  decoding="async"
+                />
+                <div class="nl-export-wait__bubble">
+                  <span class="nl-export-wait__name">こん太</span>
+                  <p class="nl-export-wait__text" data-export-wait-text="konta">準備中…</p>
+                </div>
+              </div>
+              <div class="nl-export-wait__row nl-export-wait__row--tanunee" data-who="tanunee">
+                <img
+                  class="nl-export-wait__char"
+                  data-who="tanunee"
+                  src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png"
+                  alt=""
+                  decoding="async"
+                />
+                <div class="nl-export-wait__bubble">
+                  <span class="nl-export-wait__name">たぬ姉</span>
+                  <p class="nl-export-wait__text" data-export-wait-text="tanunee">準備中…</p>
+                </div>
+              </div>
+            </div>
+            <p class="nl-export-wait__tech" id="nlExportWaitTech"></p>
           </div>
           <span id="postStatus" role="status" aria-live="polite" aria-atomic="true"></span>
         </div>
@@ -11115,6 +11484,28 @@
                         >
                           この段は「表示名と個人サムネがそろった人」だけ。いまの記録では該当者がいないので、下の段に並んでいます。
                         </p>
+                      </div>
+                      <div
+                        id="sceneStoryUserLaneGiftWrap"
+                        class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--gift"
+                      >
+                        <div
+                          id="sceneStoryUserLaneGuideMidGift"
+                          class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+                          hidden
+                        >
+                          <div
+                            id="sceneStoryUserLaneGuideLinesMidGift"
+                            class="nl-story-userlane-guide__lines"
+                            aria-label="応援ユーザーレーンの説明（ギフト・広告投げ主）"
+                          ></div>
+                        </div>
+                        <div
+                          id="sceneStoryUserLaneGift"
+                          class="nl-story-userlane nl-story-userlane--gift"
+                          aria-label="ギフト・広告を投げたユーザー"
+                          hidden
+                        ></div>
                       </div>
                       <div
                         id="sceneStoryUserLaneGuideMidKonta"

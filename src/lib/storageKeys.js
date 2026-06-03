@@ -234,6 +234,13 @@ export const KEY_SUPPORT_TIMELINE_OPEN = 'nls_support_timeline_open_v1';
 export const KEY_USAGE_TERMS_ACK = 'nls_usage_terms_ack_v1';
 
 /**
+ * 開示請求モード（v0.1.564）: popup 表示で該当疑いコメントを非表示にし、
+ * 記録は継続したうえで証拠パック（CSV / manifest / readme）を書き出す。
+ * 既定 OFF（raw === true のときだけ ON）。
+ */
+export const KEY_DISCLOSURE_REQUEST_MODE = 'nls_disclosure_request_mode_v1';
+
+/**
  * 将来の PRO / PREMIUM 等のエンタイトルメント（決済連携は別タスク）。
  * 値は `free` | `pro` | `premium` を想定。未設定は free 扱い。
  */

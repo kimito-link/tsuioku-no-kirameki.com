@@ -294,13 +294,18 @@ export function backfillRecordCardHint(progress, opts = {}) {
  * caught_up / done / retry_started では付けない（達成感を濁さない）。
  *
  * @param {{ stopReason?: string }} progress
- * @param {{ officialCount?: number|null, recordedCount?: number|null }} [opts]
+ * @param {{
+ *   officialCount?: number|null,
+ *   recordedCount?: number|null,
+ *   backfillWaitingOthers?: number
+ * }} [opts]
  * @returns {string} 例: '（理由: no_progress・残り約1,169件）'。出さないときは ''。
  */
 export function backfillStuckDiagnosticsSuffix(progress, opts = {}) {
   const reason = String((progress && progress.stopReason) || '').trim();
   const official = Number(opts && opts.officialCount);
   const recorded = Number(opts && opts.recordedCount);
+  const waitingOthers = Number(opts && opts.backfillWaitingOthers);
   const parts = [];
   if (reason) parts.push(`理由: ${reason}`);
   if (
@@ -311,6 +316,13 @@ export function backfillStuckDiagnosticsSuffix(progress, opts = {}) {
   ) {
     const gap = Math.max(0, official - recorded);
     if (gap > 0) parts.push(`残り約${gap.toLocaleString('ja-JP')}件`);
+  }
+  if (
+    Number.isFinite(waitingOthers) &&
+    waitingOthers > 0 &&
+    reason === 'reached_start'
+  ) {
+    parts.push(`他${waitingOthers}放送がバックフィル待ちの可能性`);
   }
   if (!parts.length) return '';
   return `（${parts.join('・')}）`;

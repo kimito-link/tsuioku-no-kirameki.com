@@ -220,7 +220,8 @@ export function pageUserLikelyTypingIn(doc) {
  *   scrollStepClientHeightRatio?: number,
  *   quietScroll?: boolean,
  *   preferRecentScrollEndFirst?: boolean,
- *   onBetweenVirtualPasses?: () => void
+ *   onBetweenVirtualPasses?: () => void,
+ *   shouldAbort?: () => boolean
  * }} opts
  */
 export async function harvestVirtualCommentList(opts) {
@@ -266,11 +267,14 @@ export async function harvestVirtualCommentList(opts) {
   const focusEl =
     doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
 
+  const shouldAbort = () => opts.shouldAbort?.() === true;
+
   /**
    * @param {Map<string, { commentNo?: string, text: string, userId?: string|null, avatarUrl?: string }>} map
    * @param {boolean} restoreFocusAfter
    */
   const runVirtualScrollSweep = async (map, restoreFocusAfter) => {
+    if (shouldAbort()) return;
     const host = panel ? /** @type {HTMLElement|null} */ (findCommentListScrollHost(doc)) : null;
     if (!host || host.scrollHeight <= host.clientHeight + 10) {
       mergeInto(map, extract(scanRoot));
@@ -299,24 +303,28 @@ export async function harvestVirtualCommentList(opts) {
       const step = Math.max(64, Math.floor(host.clientHeight * scrollStepRatio));
 
       if (preferRecentScrollEndFirst && max > 0) {
+        if (shouldAbort()) return;
         host.scrollTop = max;
         await raf(doc);
         await delay(waitMs);
         mergeInto(map, extract(scanRoot));
       }
 
+      if (shouldAbort()) return;
       host.scrollTop = 0;
       await raf(doc);
       await delay(waitMs);
       mergeInto(map, extract(scanRoot));
 
       for (let y = 0; y <= max; y += step) {
+        if (shouldAbort()) break;
         host.scrollTop = Math.min(y, max);
         await raf(doc);
         await delay(waitMs);
         mergeInto(map, extract(scanRoot));
       }
 
+      if (shouldAbort()) return;
       host.scrollTop = max;
       await raf(doc);
       await delay(waitMs);
@@ -348,10 +356,12 @@ export async function harvestVirtualCommentList(opts) {
 
   const out = new Map();
   await runVirtualScrollSweep(out, !twoPass);
-  if (twoPass) {
+  if (twoPass && !shouldAbort()) {
     await delay(twoPassGapMs);
-    opts.onBetweenVirtualPasses?.();
-    await runVirtualScrollSweep(out, true);
+    if (!shouldAbort()) {
+      opts.onBetweenVirtualPasses?.();
+      await runVirtualScrollSweep(out, true);
+    }
   }
 
   return [...out.values()];

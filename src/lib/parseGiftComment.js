@@ -54,6 +54,18 @@ export function parseGiftCommentText(text) {
  */
 
 /**
+ * @param {string} raw
+ * @returns {number|null}
+ */
+function parseNicoadPointToken(raw) {
+  const normalized = String(raw || '')
+    .replace(/,/g, '')
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+  const point = parseInt(normalized, 10);
+  return Number.isFinite(point) && point > 0 ? point : null;
+}
+
+/**
  * ニコニ広告のシステムコメントをパースする。
  * 例: 「【ニコニ広告】君はりんく＠クリエイター応援さんが100pt広告しました」
  *
@@ -65,12 +77,12 @@ export function parseNicoadCommentText(text) {
   const trimmed = text.trim();
   if (!trimmed) return null;
   const re =
-    /^(?:【[^】]*】\s*)*(.+?)さんが(\d+)\s*pt(?:広告しました|の(?:ニコニ)?広告)/;
+    /^(?:【[^】]*】\s*)*(.+?)さんが([\d,０-９]+)\s*pt(?:広告しました|の(?:ニコニコ)?広告)/i;
   const m = trimmed.match(re);
   if (!m) return null;
   const sender = m[1].trim();
-  const point = parseInt(m[2], 10);
-  if (!sender || !Number.isFinite(point) || point <= 0) return null;
+  const point = parseNicoadPointToken(m[2]);
+  if (!sender || point == null) return null;
   return { sender, point };
 }
 

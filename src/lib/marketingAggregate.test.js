@@ -32,6 +32,12 @@ describe('aggregateMarketingReport', () => {
     expect(r.vposThirds).toBeNull();
     expect(r.quarterEngagement.skippedShortSpan).toBe(true);
     expect(r.quarterEngagement.uniqueCommentersBothQuarters).toBe(0);
+    expect(r.interestArrivalSummary).toEqual({
+      totalArrivals: 0,
+      uniqueTags: 0,
+      messageCount: 0,
+      topTags: []
+    });
   });
 
   it('ユーザー別の集計・セグメント分類が正しい', () => {
@@ -264,5 +270,26 @@ describe('aggregateMarketingReport - liveId 表記 / avatar 補正', () => {
     });
     const top = r.topUsers.find((u) => u.userId === '99999');
     expect(top?.avatarUrl).toBe('');
+  });
+
+  it('興味タグ来場システムコメは KPI から除外し interestArrivalSummary に集計', () => {
+    const comments = [
+      c(1, 'u1', 'hello', 0),
+      c(2, null, '「料理」が好きな1人が来場しました', 1000),
+      c(3, null, '「料理」が好きな2人が来場しました', 2000),
+      c(4, null, '「雑談」が好きな1人が来場しました', 3000)
+    ];
+    const r = aggregateMarketingReport(comments, 'lv1');
+    expect(r.totalComments).toBe(1);
+    expect(r.uniqueUsers).toBe(1);
+    expect(r.interestArrivalSummary).toEqual({
+      totalArrivals: 4,
+      uniqueTags: 2,
+      messageCount: 3,
+      topTags: [
+        { tag: '料理', arrivals: 3, messageCount: 2 },
+        { tag: '雑談', arrivals: 1, messageCount: 1 }
+      ]
+    });
   });
 });

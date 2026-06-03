@@ -5,7 +5,7 @@ import {
   flyTextCountForDuration,
   nicoFlyPhraseAt
 } from './celebrationFlyText.js';
-import { pickCommentMilestoneCelebration } from './supportCelebration.js';
+import { pickCommentMilestoneCelebration, pickAdPointsMilestoneCelebration } from './supportCelebration.js';
 import { pickGiftBahamutCelebration } from './giftBahamutCelebration.js';
 
 describe('celebrationFlyText', () => {
@@ -21,6 +21,14 @@ describe('celebrationFlyText', () => {
     expect(lines.some((l) => l.motion === 'scroll')).toBe(true);
     expect(lines.some((l) => l.motion === 'burst')).toBe(true);
     expect(lines.some((l) => l.text.includes('100'))).toBe(true);
+  });
+
+  it('ニコニ広告5000ptは短い飛び文字に分割する', () => {
+    const spec = pickAdPointsMilestoneCelebration(4800, 5100);
+    const lines = flyTextLinesForSupportCelebration(spec);
+    expect(lines.some((l) => l.text === '5,000pt')).toBe(true);
+    expect(lines.some((l) => l.text === '達成！')).toBe(true);
+    expect(lines.some((l) => l.text.includes('ニコニ広告 5,000pt 達成'))).toBe(false);
   });
 
   it('ギフトに送信者・pt・888が含まれる', () => {

@@ -15,6 +15,9 @@ export const COMMENT_SUBMIT_CONFIRM_PROBE_MS = Object.freeze([
   70, 150, 280, 700, 1400, 2500, 4000
 ]);
 
+/** popup 通常送信向け（最大 ~450ms）。速いクリアは早期点、遅いときだけ後段へ。 */
+export const COMMENT_SUBMIT_CONFIRM_PROBE_FAST_MS = Object.freeze([40, 100, 200, 450]);
+
 /**
  * 送信が UI に反映されたとみなせるか（欄が空、または送った文と異なる内容になった）
  * @param {string} expectedNormalized normalizeCommentText 済みの送信文

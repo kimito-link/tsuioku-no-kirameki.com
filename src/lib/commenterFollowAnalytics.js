@@ -65,8 +65,94 @@ export const COMMENTER_FOLLOW_CSV_BOM = '\ufeff';
  *     highFollowerRegulars: CommenterFollowSegment,
  *     localEnthusiasts: CommenterFollowSegment,
  *     quietSupporters: CommenterFollowSegment
- *   }
+ *   },
+ *   followDeltas: CommenterFollowDeltaAnalysis,
+ *   followeeProfile: CommenterFolloweeProfileAnalysis,
+ *   followTiming: CommenterFollowTimingAnalysis,
+ *   broadcasterFollow: CommenterBroadcasterFollowAnalysis,
+ *   commonFollowees: CommenterCommonFolloweeRow[],
+ *   followingListInsights: string[]
  * }} CommenterFollowAnalytics
+ */
+
+/**
+ * @typedef {{
+ *   followedCount: number,
+ *   sampleSize: number,
+ *   pct: number,
+ *   notFetchedCount: number,
+ *   broadcasterUserId: string
+ * }} CommenterBroadcasterFollowAnalysis
+ */
+
+/**
+ * @typedef {{
+ *   userId: string,
+ *   overlapCount: number
+ * }} CommenterCommonFolloweeRow
+ */
+
+/**
+ * @typedef {{
+ *   userId: string,
+ *   nickname: string,
+ *   followerDelta: number,
+ *   followeeDelta: number,
+ *   priorFollowerCount: number,
+ *   currentFollowerCount: number,
+ *   currentFolloweeCount?: number,
+ *   commentCount: number,
+ *   firstAt?: number,
+ *   priorFetchedAt?: number
+ * }} CommenterFollowDeltaRow
+ */
+
+/**
+ * @typedef {{
+ *   comparedCount: number,
+ *   increased: CommenterFollowDeltaRow[],
+ *   decreased: CommenterFollowDeltaRow[],
+ *   unchangedCount: number,
+ *   netFollowerDelta: number,
+ *   netFolloweeDelta: number,
+ *   insightLines: string[]
+ * }} CommenterFollowDeltaAnalysis
+ */
+
+/**
+ * @typedef {{
+ *   label: string,
+ *   count: number,
+ *   pct: number
+ * }} CommenterFollowProfileBucket
+ */
+
+/**
+ * @typedef {{
+ *   sampleSize: number,
+ *   medianFolloweeCount: number,
+ *   premiumPct: number,
+ *   levelBuckets: CommenterFollowProfileBucket[],
+ *   followeeBuckets: CommenterFollowProfileBucket[],
+ *   insightLines: string[]
+ * }} CommenterFolloweeProfileAnalysis
+ */
+
+/**
+ * @typedef {{
+ *   label: string,
+ *   commenterCount: number,
+ *   increasedCount: number,
+ *   decreasedCount: number,
+ *   netFollowerDelta: number
+ * }} CommenterFollowTimingBucket
+ */
+
+/**
+ * @typedef {{
+ *   buckets: CommenterFollowTimingBucket[],
+ *   insightLines: string[]
+ * }} CommenterFollowTimingAnalysis
  */
 
 /**
@@ -411,9 +497,361 @@ export function buildCommenterFollowScatterPoints(allNumericCommenters, opts = {
 }
 
 /**
+ * 横断キャッシュの過去値と今回スナップショットを比較し、フォロワー/フォロー数の増減を出す。
+ * @param {CommenterFollowAnalyticsRow[]} rows
+ * @param {Record<string, unknown>} [priorMap]
+ * @returns {CommenterFollowDeltaAnalysis}
+ */
+export function analyzeCommenterFollowDeltas(rows, priorMap = {}) {
+  const prior = priorMap && typeof priorMap === 'object' ? priorMap : {};
+  /** @type {CommenterFollowDeltaRow[]} */
+  const increased = [];
+  /** @type {CommenterFollowDeltaRow[]} */
+  const decreased = [];
+  let unchangedCount = 0;
+  let comparedCount = 0;
+  let netFollowerDelta = 0;
+  let netFolloweeDelta = 0;
+
+  for (const row of rows) {
+    if (typeof row.followerCount !== 'number') continue;
+    const rawPrior = prior[row.userId];
+    const prevRec = asRecord(rawPrior);
+    if (!prevRec) continue;
+    const prevFollower = nonNegativeIntOrNull(prevRec.followerCount);
+    if (prevFollower === null) continue;
+    const prevFollowee = nonNegativeIntOrNull(prevRec.followeeCount) ?? 0;
+    const prevFetchedAt = nonNegativeIntOrNull(prevRec.fetchedAt) ?? 0;
+    const curFetchedAt = row.followFetchedAt ?? 0;
+    if (curFetchedAt > 0 && prevFetchedAt > 0 && curFetchedAt <= prevFetchedAt) continue;
+
+    const dFollower = row.followerCount - prevFollower;
+    const dFollowee = (row.followeeCount ?? 0) - prevFollowee;
+    comparedCount += 1;
+    netFollowerDelta += dFollower;
+    netFolloweeDelta += dFollowee;
+
+    if (dFollower === 0 && dFollowee === 0) {
+      unchangedCount += 1;
+      continue;
+    }
+
+    /** @type {CommenterFollowDeltaRow} */
+    const deltaRow = {
+      userId: row.userId,
+      nickname: row.nickname,
+      followerDelta: dFollower,
+      followeeDelta: dFollowee,
+      priorFollowerCount: prevFollower,
+      currentFollowerCount: row.followerCount,
+      commentCount: row.commentCount,
+      priorFetchedAt: prevFetchedAt || undefined
+    };
+    if (typeof row.followeeCount === 'number') deltaRow.currentFolloweeCount = row.followeeCount;
+    if (typeof row.firstAt === 'number') deltaRow.firstAt = row.firstAt;
+
+    if (dFollower > 0 || (dFollower === 0 && dFollowee > 0)) increased.push(deltaRow);
+    else decreased.push(deltaRow);
+  }
+
+  increased.sort(
+    (a, b) =>
+      b.followerDelta - a.followerDelta ||
+      b.followeeDelta - a.followeeDelta ||
+      b.commentCount - a.commentCount
+  );
+  decreased.sort(
+    (a, b) =>
+      a.followerDelta - b.followerDelta ||
+      a.followeeDelta - b.followeeDelta ||
+      b.commentCount - a.commentCount
+  );
+
+  /** @type {string[]} */
+  const insightLines = [];
+  if (comparedCount > 0) {
+    insightLines.push(
+      `キャッシュ比較 ${comparedCount}名中、フォロワー増 ${increased.length}名・減 ${decreased.length}名（純増 ${netFollowerDelta >= 0 ? '+' : ''}${netFollowerDelta}）。`
+    );
+    if (netFolloweeDelta !== 0) {
+      insightLines.push(
+        `フォロー数（followee）の純増減は ${netFolloweeDelta >= 0 ? '+' : ''}${netFolloweeDelta} です。`
+      );
+    }
+  } else {
+    insightLines.push(
+      '前回キャッシュとの比較データがまだありません。配信をまたいで同じコメンターが取れると増減が見えます。'
+    );
+  }
+
+  return {
+    comparedCount,
+    increased,
+    decreased,
+    unchangedCount,
+    netFollowerDelta,
+    netFolloweeDelta,
+    insightLines
+  };
+}
+
+/**
+ * コメンター本人の followeeCount・プレミアム・LV から「フォロー先の量・属性」の傾向を出す。
+ * @param {CommenterFollowAnalyticsRow[]} rows
+ * @returns {CommenterFolloweeProfileAnalysis}
+ */
+export function analyzeCommenterFolloweeProfile(rows) {
+  const withFollowee = rows.filter((row) => typeof row.followeeCount === 'number');
+  const withLevel = rows.filter((row) => typeof row.userLevel === 'number' && row.userLevel > 0);
+  const premiumCount = rows.filter((row) => row.isPremium === true).length;
+  const followeeValues = withFollowee.map((row) => Number(row.followeeCount));
+
+  /** @type {CommenterFollowProfileBucket[]} */
+  const followeeBuckets = [
+    { label: '0〜50人', count: 0, pct: 0 },
+    { label: '51〜200人', count: 0, pct: 0 },
+    { label: '201〜500人', count: 0, pct: 0 },
+    { label: '501人以上', count: 0, pct: 0 }
+  ];
+  for (const row of withFollowee) {
+    const n = Number(row.followeeCount);
+    if (n <= 50) followeeBuckets[0].count += 1;
+    else if (n <= 200) followeeBuckets[1].count += 1;
+    else if (n <= 500) followeeBuckets[2].count += 1;
+    else followeeBuckets[3].count += 1;
+  }
+  for (const bucket of followeeBuckets) {
+    bucket.pct = pctOf(bucket.count, withFollowee.length);
+  }
+
+  /** @type {CommenterFollowProfileBucket[]} */
+  const levelBuckets = [
+    { label: 'LV 1〜9', count: 0, pct: 0 },
+    { label: 'LV 10〜19', count: 0, pct: 0 },
+    { label: 'LV 20〜29', count: 0, pct: 0 },
+    { label: 'LV 30+', count: 0, pct: 0 }
+  ];
+  for (const row of withLevel) {
+    const lv = Number(row.userLevel);
+    if (lv < 10) levelBuckets[0].count += 1;
+    else if (lv < 20) levelBuckets[1].count += 1;
+    else if (lv < 30) levelBuckets[2].count += 1;
+    else levelBuckets[3].count += 1;
+  }
+  for (const bucket of levelBuckets) {
+    bucket.pct = pctOf(bucket.count, withLevel.length);
+  }
+
+  /** @type {string[]} */
+  const insightLines = [];
+  if (withFollowee.length) {
+    const median = computePercentile(followeeValues, 50);
+    insightLines.push(
+      `コメンター ${withFollowee.length}名のフォロー数（followee）中央値は ${Math.round(median)} 人です。`
+    );
+    const heavy = followeeBuckets[3].count + followeeBuckets[2].count;
+    if (heavy > 0) {
+      insightLines.push(
+        `201人以上フォローしている層が ${heavy}名（${pctOf(heavy, withFollowee.length)}%）。`
+      );
+    }
+  }
+  if (rows.length) {
+    insightLines.push(`プレミアム会員は ${premiumCount}名（${pctOf(premiumCount, rows.length)}%）。`);
+  }
+
+  return {
+    sampleSize: withFollowee.length,
+    medianFolloweeCount: followeeValues.length ? Math.round(computePercentile(followeeValues, 50)) : 0,
+    premiumPct: pctOf(premiumCount, rows.length),
+    levelBuckets,
+    followeeBuckets,
+    insightLines
+  };
+}
+
+/**
+ * 初コメ時刻の四分位ごとに、フォロワー増減が起きたコメンターを集計する。
+ * @param {CommenterFollowAnalyticsRow[]} rows
+ * @param {CommenterFollowDeltaAnalysis} deltas
+ * @param {{ durationMs?: number }} [opts]
+ * @returns {CommenterFollowTimingAnalysis}
+ */
+export function analyzeCommenterFollowTimingByCommentWindow(rows, deltas, opts = {}) {
+  const labels = ['序盤(0-25%)', '前半(25-50%)', '後半(50-75%)', '終盤(75-100%)'];
+  /** @type {CommenterFollowTimingBucket[]} */
+  const buckets = labels.map((label) => ({
+    label,
+    commenterCount: 0,
+    increasedCount: 0,
+    decreasedCount: 0,
+    netFollowerDelta: 0
+  }));
+
+  const timedRows = rows.filter((row) => typeof row.firstAt === 'number' && row.firstAt > 0);
+  if (!timedRows.length) {
+    return {
+      buckets,
+      insightLines: ['初コメ時刻が取れないため、配信内タイミング別の増減は出せません。']
+    };
+  }
+
+  const firstTimes = timedRows.map((row) => Number(row.firstAt));
+  const minAt = Math.min(...firstTimes);
+  const maxAt = Math.max(...firstTimes);
+  const spanMs =
+    Number.isFinite(Number(opts.durationMs)) && Number(opts.durationMs) > 0
+      ? Number(opts.durationMs)
+      : Math.max(1, maxAt - minAt);
+
+  /** @type {Map<string, CommenterFollowDeltaRow>} */
+  const deltaByUid = new Map();
+  for (const row of deltas.increased) deltaByUid.set(row.userId, row);
+  for (const row of deltas.decreased) deltaByUid.set(row.userId, row);
+
+  for (const row of timedRows) {
+    const rel = Math.max(0, Math.min(1, (Number(row.firstAt) - minAt) / spanMs));
+    const idx = Math.min(3, Math.floor(rel * 4));
+    buckets[idx].commenterCount += 1;
+    const delta = deltaByUid.get(row.userId);
+    if (!delta) continue;
+    if (delta.followerDelta > 0 || (delta.followerDelta === 0 && delta.followeeDelta > 0)) {
+      buckets[idx].increasedCount += 1;
+    } else if (delta.followerDelta < 0 || (delta.followerDelta === 0 && delta.followeeDelta < 0)) {
+      buckets[idx].decreasedCount += 1;
+    }
+    buckets[idx].netFollowerDelta += delta.followerDelta;
+  }
+
+  /** @type {string[]} */
+  const insightLines = [];
+  const busiest = buckets.reduce((best, bucket) =>
+    bucket.increasedCount + bucket.decreasedCount > best.increasedCount + best.decreasedCount
+      ? bucket
+      : best
+  );
+  if (busiest.increasedCount + busiest.decreasedCount > 0) {
+    insightLines.push(
+      `フォロワー増減が目立ったのは ${busiest.label}（増 ${busiest.increasedCount} / 減 ${busiest.decreasedCount}）。`
+    );
+  } else if (deltas.comparedCount > 0) {
+    insightLines.push('初コメ時刻帯ごとの増減差は小さめです。');
+  }
+
+  return { buckets, insightLines };
+}
+
+/**
+ * フォロー一覧取得済みコメンターのうち、配信者をフォローしている人数。
+ * @param {CommenterFollowAnalyticsRow[]} rows
+ * @param {Record<string, unknown>} [listMap]
+ * @param {string} [broadcasterUserId]
+ * @returns {CommenterBroadcasterFollowAnalysis}
+ */
+export function analyzeCommenterBroadcasterFollow(rows, listMap = {}, broadcasterUserId = '') {
+  const bUid = String(broadcasterUserId || '').trim();
+  const map = listMap && typeof listMap === 'object' ? listMap : {};
+  let sampleSize = 0;
+  let followedCount = 0;
+  let notFetchedCount = 0;
+  const seen = new Set();
+  for (const row of rows) {
+    const uid = String(row.userId || '').trim();
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    const hit = asRecord(map[uid]);
+    if (!hit || hit.status !== 'ok') {
+      notFetchedCount += 1;
+      continue;
+    }
+    sampleSize += 1;
+    const ids = Array.isArray(hit.userIds) ? hit.userIds.map((v) => String(v)) : [];
+    if (bUid && ids.includes(bUid)) followedCount += 1;
+  }
+  return {
+    followedCount,
+    sampleSize,
+    pct: pctOf(followedCount, sampleSize),
+    notFetchedCount,
+    broadcasterUserId: bUid
+  };
+}
+
+/**
+ * 複数コメンターが共通してフォローしている userId TOP。
+ * @param {Record<string, unknown>} [listMap]
+ * @param {{ topN?: number, minOverlap?: number }} [opts]
+ * @returns {CommenterCommonFolloweeRow[]}
+ */
+export function analyzeCommonFolloweesAmongCommenters(listMap = {}, opts = {}) {
+  const map = listMap && typeof listMap === 'object' ? listMap : {};
+  const topN =
+    Number.isFinite(Number(opts.topN)) && Number(opts.topN) > 0
+      ? Math.floor(Number(opts.topN))
+      : 20;
+  const minOverlap =
+    Number.isFinite(Number(opts.minOverlap)) && Number(opts.minOverlap) > 1
+      ? Math.floor(Number(opts.minOverlap))
+      : 2;
+  /** @type {Map<string, number>} */
+  const counter = new Map();
+  for (const entryRaw of Object.values(map)) {
+    const entry = asRecord(entryRaw);
+    if (!entry || entry.status !== 'ok') continue;
+    const ids = Array.isArray(entry.userIds) ? entry.userIds : [];
+    const seen = new Set();
+    for (const rawId of ids) {
+      const uid = String(rawId || '').trim();
+      if (!/^\d{1,18}$/.test(uid) || seen.has(uid)) continue;
+      seen.add(uid);
+      counter.set(uid, (counter.get(uid) || 0) + 1);
+    }
+  }
+  return [...counter.entries()]
+    .filter(([, count]) => count >= minOverlap)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, topN)
+    .map(([userId, overlapCount]) => ({ userId, overlapCount }));
+}
+
+/**
+ * @param {CommenterBroadcasterFollowAnalysis} broadcasterFollow
+ * @param {{ attempted?: number, ok?: number, forbidden?: number, loginRequired?: number, error?: number, notAttempted?: number }|undefined} coverage
+ * @returns {string[]}
+ */
+export function buildCommenterFollowingListInsights(broadcasterFollow, coverage) {
+  /** @type {string[]} */
+  const lines = [];
+  if (coverage?.loginRequired > 0) {
+    lines.push(
+      'ニコニコにログインした状態でレポートを出力すると、上位コメンターのフォロー先一覧が取得できます。'
+    );
+  }
+  if (coverage?.error > 0 && !coverage?.loginRequired) {
+    lines.push(
+      `${coverage.error}名のフォロー一覧取得に失敗しました。ニコニコにログインしているか確認し、レポートを再出力してください。`
+    );
+  }
+  if (coverage?.notAttempted > 0 && coverage?.attempted === 0) {
+    lines.push('フォロー一覧はまだ取得していません。配信中またはレポート出力時に上位コメンターから順に取得します。');
+  }
+  if (coverage?.forbidden > 0) {
+    lines.push(`${coverage.forbidden}名は公開設定によりフォロー一覧を取得できませんでした。`);
+  }
+  if (broadcasterFollow.sampleSize > 0 && broadcasterFollow.broadcasterUserId) {
+    lines.push(
+      `フォロー一覧取得済み ${broadcasterFollow.sampleSize}名のうち ${broadcasterFollow.followedCount}名が配信者をフォロー（${broadcasterFollow.pct}%）。`
+    );
+  } else if (broadcasterFollow.notFetchedCount > 0 && !lines.length) {
+    lines.push('配信者フォロー率を出すには、上位コメンターのフォロー一覧取得が必要です。');
+  }
+  return lines;
+}
+
+/**
  * しきい値・点・セグメントをまとめて返す。
  * @param {unknown} allNumericCommenters
- * @param {{ commenterFollowDataset?: unknown, excludeUserId?: string, highPercentile?: number }} [opts]
+ * @param {{ commenterFollowDataset?: unknown, excludeUserId?: string, highPercentile?: number, priorFollowEntries?: Record<string, unknown>, durationMs?: number, followingListMap?: Record<string, unknown>, followingListCoverage?: Record<string, unknown> }} [opts]
  * @returns {CommenterFollowAnalytics}
  */
 export function buildCommenterFollowAnalytics(allNumericCommenters, opts = {}) {
@@ -422,12 +860,35 @@ export function buildCommenterFollowAnalytics(allNumericCommenters, opts = {}) {
     highPercentile: opts.highPercentile
   });
   const rowsWithFollowerCount = rows.filter((row) => typeof row.followerCount === 'number');
+  const followDeltas = analyzeCommenterFollowDeltas(rows, opts.priorFollowEntries);
+  const followeeProfile = analyzeCommenterFolloweeProfile(rows);
+  const followTiming = analyzeCommenterFollowTimingByCommentWindow(rows, followDeltas, {
+    durationMs: opts.durationMs
+  });
+  const broadcasterFollow = analyzeCommenterBroadcasterFollow(
+    rows,
+    opts.followingListMap,
+    opts.excludeUserId
+  );
+  const commonFollowees = analyzeCommonFolloweesAmongCommenters(opts.followingListMap, {
+    topN: 20
+  });
+  const followingListInsights = buildCommenterFollowingListInsights(
+    broadcasterFollow,
+    opts.followingListCoverage
+  );
   return {
     rows,
     rowsWithFollowerCount,
     thresholds,
     scatterPoints: buildCommenterFollowScatterPoints(rows, { thresholds }),
-    segments: buildCommenterFollowSegments(rows, { thresholds })
+    segments: buildCommenterFollowSegments(rows, { thresholds }),
+    followDeltas,
+    followeeProfile,
+    followTiming,
+    broadcasterFollow,
+    commonFollowees,
+    followingListInsights
   };
 }
 

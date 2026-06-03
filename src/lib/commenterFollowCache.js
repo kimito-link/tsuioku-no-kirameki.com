@@ -44,7 +44,10 @@ export const COMMENTER_FOLLOW_FETCH_BATCH = 8;
  *   followeeCount?: number,
  *   level?: number,
  *   isPremium?: boolean,
- *   followFetchedAt?: number
+ *   followFetchedAt?: number,
+ *   followsBroadcaster?: boolean,
+ *   followingListStatus?: string,
+ *   followingListCount?: number
  * }} CommenterFollowRow
  */
 
@@ -335,6 +338,13 @@ export function normalizeCommenterFollowLiveSnapshot(raw) {
     if (typeof r.isPremium === 'boolean') row.isPremium = r.isPremium;
     const fetchedAt = Number(r.followFetchedAt);
     if (Number.isFinite(fetchedAt) && fetchedAt > 0) row.followFetchedAt = fetchedAt;
+    if (typeof r.followsBroadcaster === 'boolean') row.followsBroadcaster = r.followsBroadcaster;
+    const flStatus = String(r.followingListStatus || '').trim();
+    if (flStatus === 'ok' || flStatus === 'forbidden' || flStatus === 'error' || flStatus === 'login_required') {
+      row.followingListStatus = flStatus;
+    }
+    const flCount = posIntOrNull(r.followingListCount);
+    if (flCount !== null) row.followingListCount = flCount;
     rows.push(row);
   }
   rows.sort((a, b) => b.commentCount - a.commentCount);

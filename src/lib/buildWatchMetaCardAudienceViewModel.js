@@ -220,9 +220,36 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       profile: opts?.profile ?? undefined
     });
 
-    nextConcurrentEstimated = resolved.estimated;
-
     const directLike = resolved.method === 'official';
+    const staleOfficialZero =
+      resolved.method === 'official' &&
+      resolved.estimated <= 0 &&
+      typeof vc === 'number' &&
+      vc > 0;
+    const unresolvedFallback =
+      staleOfficialZero ||
+      (!directLike &&
+        resolved.method === 'fallback' &&
+        resolved.estimated <= 0 &&
+        resolved.base.method === 'none');
+    if (unresolvedFallback) {
+      concurrent = {
+        phase: 'loading',
+        estText: '推定中',
+        estIsPlaceholder: true,
+        estTitle:
+          '来場者数は取得済みです。コメント参加者または配信経過から推定材料を集めています。',
+        subText: '材料待ち',
+        concurrentLoadingHidden: true,
+        concurrentReadyHidden: false,
+        ariaBusy: true,
+        numericEstimated: null,
+        charReactionDelta: null
+      };
+      nextConcurrentEstimated = prev.concurrentEstimated;
+    } else {
+      nextConcurrentEstimated = resolved.estimated;
+
     const estStr = resolved.estimated.toLocaleString('ja-JP');
     /** @type {string[]} */
     const parts = [];
@@ -326,6 +353,7 @@ export function buildWatchMetaCardAudienceViewModel(snapshot, opts) {
       numericEstimated: resolved.estimated,
       charReactionDelta: concurrentReactionDelta
     };
+    }
   } else {
     concurrent = {
       phase: 'loading',

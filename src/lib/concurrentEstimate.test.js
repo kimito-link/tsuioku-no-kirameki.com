@@ -10,6 +10,7 @@ import {
   getPlatformProfile,
   littlesLawConcurrent,
   NICONICO_PROFILE,
+  coerceOfficialConcurrentViewersForResolve,
   resolveConcurrentViewers,
   resolveDirectViewersThresholds,
   retentionRate,
@@ -608,7 +609,32 @@ describe('resolveConcurrentViewers / resolveDirectViewersThresholds 境界（導
   });
 });
 
+describe('coerceOfficialConcurrentViewersForResolve', () => {
+  it('来場累計があるとき official 0 は欠測', () => {
+    expect(coerceOfficialConcurrentViewersForResolve(0, 4737)).toBeNull();
+    expect(coerceOfficialConcurrentViewersForResolve(0, null)).toBe(0);
+  });
+
+  it('正の official はそのまま', () => {
+    expect(coerceOfficialConcurrentViewersForResolve(420, 9000)).toBe(420);
+  });
+});
+
 describe('resolveConcurrentViewers', () => {
+  it('古い snapshot の official 0 + 来場ありは滞留推定へフォールバック', () => {
+    const now = 1_700_000_000_000;
+    const r = resolveConcurrentViewers({
+      nowMs: now,
+      officialViewers: 0,
+      officialUpdatedAtMs: now - 2000,
+      recentActiveUsers: 0,
+      totalVisitors: 4737,
+      streamAgeMin: 210
+    });
+    expect(r.method).toBe('fallback');
+    expect(r.estimated).toBeGreaterThan(100);
+  });
+
   it('fresh な official viewers があれば直値を返す', () => {
     const now = 1_000_000;
     const r = resolveConcurrentViewers({

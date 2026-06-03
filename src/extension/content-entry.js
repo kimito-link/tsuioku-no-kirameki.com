@@ -30,6 +30,7 @@ import {
   KEY_SELF_POSTED_RECENTS,
   KEY_USER_COMMENT_PROFILE_CACHE,
   KEY_COMMENTER_FOLLOW_CACHE,
+  KEY_COMMENTER_FOLLOWING_LIST_CACHE,
   KEY_COMMENT_PANEL_STATUS,
   KEY_COMMENT_INGEST_LOG,
   KEY_STORAGE_WRITE_ERROR,
@@ -102,6 +103,21 @@ import {
   SUMMARY_RECENT_ROWS_MAX
 } from '../lib/commentSummary.js';
 import {
+  buildPanelLiveSummary,
+  panelSummaryStorageKey
+} from '../lib/panelLiveSummary.js';
+import {
+  buildPanelMetricsResponse,
+  PANEL_METRICS_MESSAGE_TYPE
+} from '../lib/panelMetricsExport.js';
+import {
+  setBackfillPriorityLiveId,
+  registerBackfillWaiter,
+  clearBackfillWaiter,
+  BACKFILL_PRIORITY_COOLDOWN_MS,
+  GLOBAL_BACKFILL_ROTATION_MS
+} from '../lib/globalBackfillQueue.js';
+import {
   chunkIndexKey,
   chunkMigratedKey,
   isChunkIndex,
@@ -130,6 +146,14 @@ import {
   buildCommenterFollowLiveSnapshot,
   pickFollowUidsToFetch
 } from '../lib/commenterFollowCache.js';
+import {
+  COMMENTER_FOLLOWING_LIST_LIVE_MAX,
+  buildFollowingListEntryFromFetchResponse,
+  mergeFollowingListIntoRows,
+  normalizeFollowingListMap,
+  pickFollowingListUidsToFetch,
+  upsertFollowingListEntry
+} from '../lib/commenterFollowingListCache.js';
 import { mergeGiftUsers } from '../lib/giftRecord.js';
 import {
   collectOfficialEventDomBundle,
@@ -163,6 +187,7 @@ import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
 import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
 import { resolveGiftRelayStorageLiveId } from '../lib/giftRelayStorageLiveId.js';
 import {
+  COMMENT_SUBMIT_CONFIRM_PROBE_FAST_MS,
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
 } from '../lib/commentSubmitConfirm.js';
@@ -262,10 +287,12 @@ import {
   EVENT_PARTICIPATION_FETCH_MESSAGE_TYPE
 } from '../lib/eventParticipationProgramsApi.js';
 import {
-  normalizeKokenGiftHistoryResponse,
   giftHistoryThrowsStorageKey,
-  KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE
+  buildGiftSubAppPayloadFromDomRelay,
+  buildKokenGiftPersistPayload,
+  mergeGiftSubAppHistoryPayload
 } from '../lib/kokenGiftHistoryApi.js';
+import { fetchKokenGiftHistoryAllViaExtension } from '../lib/kokenGiftHistoryFetchClient.js';
 import {
   pickAuditionContextFromEntryItems,
   normalizeAuditionRankingsResponse,
@@ -279,6 +306,7 @@ import {
   NICO_USER_PROFILE_FETCH_MESSAGE_TYPE,
   NICO_USER_PROFILE_PAGE_FETCH_MESSAGE_TYPE
 } from '../lib/nicoUserProfileApi.js';
+import { NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE } from '../lib/nicoUserFollowingApi.js';
 import { extractNicoUserBroadcastStats } from '../lib/nicoUserProfilePage.js';
 import { normalizeBroadcasterProfileModel } from '../lib/broadcasterProfileCard.js';
 import { appendGiftEvents } from '../lib/giftEventStore.js';
@@ -352,7 +380,10 @@ import {
 } from '../lib/ndgrBackfillCrawl.js';
 import { crawlNdgrForward } from '../lib/ndgrForwardCrawl.js';
 import { computeBackfillFlushThreshold } from '../lib/backfillFlushThreshold.js';
-import { shouldDeferDomHarvestDuringScroll } from '../lib/domHarvestScrollDefer.js';
+import {
+  shouldDeferDomHarvestDuringScroll,
+  shouldDeferVisibleScanDuringScroll
+} from '../lib/domHarvestScrollDefer.js';
 import {
   runIfTabLeader,
   runWhileGlobalLeader,
@@ -381,13 +412,19 @@ import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated 
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
 import {
   parseGiftCommentText,
+  parseNicoadCommentText,
   summarizeGiftComments
 } from '../lib/parseGiftComment.js';
+import { maybePlayViewerNicoadCelebrationFromDomText } from '../lib/contentViewerNicoadCelebration.js';
 import { buildLiveMcpSnapshot } from '../lib/mcpBridge/buildLiveMcpSnapshot.js';
 import { buildMcpMismatchReasons } from '../lib/mcpBridge/buildMcpMismatchReasons.js';
 import { validateLiveMcpSnapshot } from '../lib/mcpBridge/validateLiveMcpSnapshot.js';
 import { trimMapToMax } from '../lib/trimMap.js';
 import { diagnosePersistGate } from '../lib/commentSubmitSteps.js';
+import {
+  NLS_PLAY_WATCH_CELEBRATION,
+  playWatchCelebrationRelay
+} from '../lib/watchCelebrationOverlay.js';
 import {
   STORAGE_OP_TIMED_OUT,
   runStorageOpWithTimeout
@@ -395,6 +432,7 @@ import {
 import {
   INGEST_TIMING,
   SUBMIT_TIMING,
+  SUBMIT_TIMING_FAST,
   MAP_LIMITS,
   HARVEST_TIMING,
   OFFICIAL_GAP_DEEP_TIMING,
@@ -452,6 +490,13 @@ const DEBOUNCE_MS = INGEST_TIMING.debounceMs;
  * ~この時間後に再開」になる。取りこぼしは NDGR 傍受 + 550ms 定期 scan が回収する。
  */
 const DOM_HARVEST_SCROLL_DEFER_MS = 220;
+/**
+ * deep harvest（仮想リスト全走査）は DOM ハーベストより重い。ユーザーがコメント欄を
+ * 読むためにスクロールしている間は開始・継続とも止め、静止後に再試行する。
+ */
+const DEEP_HARVEST_USER_SCROLL_DEFER_MS = 1500;
+/** 公式/記録がこの規模を超えると 2-pass deep は「ページが応答しません」級になりやすい */
+const DEEP_HARVEST_HEAVY_LIVE_COMMENT_THRESHOLD = 6000;
 const LIVE_POLL_MS = INGEST_TIMING.livePollMs;
 const STATS_POLL_MS = INGEST_TIMING.statsPollMs;
 /** 返信サジェスト等と同様に DOM 更新がテキスト差し替えだけのときの取りこぼし防止 */
@@ -608,6 +653,10 @@ const deepHarvestPipelineStats = {
 let deepHarvestZeroRowRetryBudget = 0;
 /** @type {ReturnType<typeof setTimeout>|null} */
 let deepHarvestZeroRowRetryTimer = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let deepHarvestScrollRetryTimer = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let visibleScanScrollRetryTimer = null;
 /** 直近の persistCommentRowsImpl に渡った行数（0 = 未実行またはスキップ） */
 let lastPersistCommentBatchSize = 0;
 /** @type {string[]} */
@@ -1758,6 +1807,7 @@ function resetOfficialStatsState() {
 function resetOfficialCommentSamplingState() {
   officialCommentHistory.length = 0;
   observedRecordedCommentCount = 0;
+  _lastPanelSummaryRecordedWritten = -1;
 }
 
 /** `#embedded-data` の遅延出現後に programBeginAt を一度だけ埋める（L3 補助） */
@@ -2324,6 +2374,7 @@ window.addEventListener('message', (e) => {
 
   // 1. gift 履歴 (v0.1.216): items を全置換で集計
   const items = Array.isArray(e.data.items) ? e.data.items : [];
+  const totalCountsRelay = Array.isArray(e.data.totalCounts) ? e.data.totalCounts : [];
   if (items.length > 0) {
     const r = aggregateGiftHistoryThrows(items, Date.now());
     if (r.storageTouched) {
@@ -2335,6 +2386,11 @@ window.addEventListener('message', (e) => {
           }
         });
     }
+  }
+  // v0.1.576: 北極星レーン正本（nls_gift_subapp_history）へも反映。従来は throws のみで
+  //   koken API の先頭ページだけが残り、履歴タブを開いても表示が追従しなかった。
+  if (items.length > 0 || totalCountsRelay.length > 0) {
+    void persistGiftSubAppHistoryFromIframeRelay(lid, items, totalCountsRelay);
   }
 
   // 1b. v0.1.306: nicoad iframe が adContributionRanking（広告ランキング）を直接
@@ -7298,7 +7354,7 @@ function canPostCommentInThisFrame() {
  * @param {string} rawText
  * @returns {Promise<boolean>}
  */
-async function confirmSubmittedCommentAsync(editor, rawText) {
+async function confirmSubmittedCommentAsync(editor, rawText, opts = {}) {
   const expected = normalizeCommentText(rawText);
   if (!expected) return false;
   return waitUntilEditorReflectsSubmit({
@@ -7310,7 +7366,7 @@ async function confirmSubmittedCommentAsync(editor, rawText) {
           : findCommentEditorElement();
       return normalizeCommentText(readCommentEditorText(currentEditor));
     },
-    probeEndpointsMs: COMMENT_SUBMIT_CONFIRM_PROBE_MS
+    probeEndpointsMs: opts.probeEndpointsMs ?? COMMENT_SUBMIT_CONFIRM_PROBE_MS
   });
 }
 
@@ -7332,9 +7388,10 @@ async function confirmSubmittedCommentAsync(editor, rawText) {
  * 区間マーカーは `src/lib/commentSubmitProfiling.js` の説明に準拠。
  *
  * @param {string} rawText
+ * @param {{ fastSubmit?: boolean }} [opts]
  * @returns {Promise<{ ok: boolean, error?: string }>}
  */
-async function postCommentFromContentAsync(rawText) {
+async function postCommentFromContentAsync(rawText, opts = {}) {
   if (!canPostCommentInThisFrame()) {
     return { ok: false, error: 'コメント欄のあるwatchフレームが見つかりません。' };
   }
@@ -7342,14 +7399,23 @@ async function postCommentFromContentAsync(rawText) {
   if (!text) {
     return { ok: false, error: 'コメントが空です。' };
   }
+  const fastSubmit = Boolean(opts.fastSubmit);
+  const submitTiming = fastSubmit ? SUBMIT_TIMING_FAST : SUBMIT_TIMING;
+  const reactSettleMs = submitTiming.reactSettleMs;
+  const confirmProbes = fastSubmit
+    ? COMMENT_SUBMIT_CONFIRM_PROBE_FAST_MS
+    : COMMENT_SUBMIT_CONFIRM_PROBE_MS;
 
   const prof = createCommentSubmitProfiler();
   try {
     prof?.mark('T2-editor-poll-start');
-    const editor = await pollUntil(findCommentEditorElement, {
-      timeoutMs: SUBMIT_TIMING.editorPollTimeoutMs,
-      intervalMs: SUBMIT_TIMING.editorPollIntervalMs
-    });
+    let editor = findCommentEditorElement();
+    if (!editor) {
+      editor = await pollUntil(findCommentEditorElement, {
+        timeoutMs: submitTiming.editorPollTimeoutMs,
+        intervalMs: submitTiming.editorPollIntervalMs
+      });
+    }
     prof?.mark('T2-editor-found');
     if (!editor) {
       return {
@@ -7364,16 +7430,20 @@ async function postCommentFromContentAsync(rawText) {
         editor.focus();
       }
       setEditorText(editor, text);
-      await new Promise((r) => {
-        requestAnimationFrame(() => requestAnimationFrame(r));
-      });
-      await new Promise((r) => setTimeout(r, SUBMIT_TIMING.reactSettleMs));
+      if (fastSubmit) {
+        await new Promise((r) => requestAnimationFrame(r));
+      } else {
+        await new Promise((r) => {
+          requestAnimationFrame(() => requestAnimationFrame(r));
+        });
+      }
+      await new Promise((r) => setTimeout(r, reactSettleMs));
       prof?.mark('T3-after-react-settle');
 
       const submitOnce = async () => {
         const btn = await pollUntil(() => findVisibleEnabledSubmitForEditor(editor), {
-          timeoutMs: SUBMIT_TIMING.buttonPollTimeoutMs,
-          intervalMs: SUBMIT_TIMING.buttonPollIntervalMs
+          timeoutMs: submitTiming.buttonPollTimeoutMs,
+          intervalMs: submitTiming.buttonPollIntervalMs
         });
         if (btn) {
           btn.click();
@@ -7391,26 +7461,38 @@ async function postCommentFromContentAsync(rawText) {
       }
       prof?.mark('T4-after-submit-click');
 
-      if (await confirmSubmittedCommentAsync(editor, text)) {
+      if (
+        await confirmSubmittedCommentAsync(editor, text, { probeEndpointsMs: confirmProbes })
+      ) {
         prof?.mark('T5-after-confirm-1');
         return { ok: true };
       }
       prof?.mark('T5-confirm-1-failed');
 
-      if (!(await submitOnce())) {
+      if (!fastSubmit) {
+        if (!(await submitOnce())) {
+          return {
+            ok: false,
+            error:
+              'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
+          };
+        }
+        prof?.mark('T4b-after-second-submit');
+
+        if (
+          await confirmSubmittedCommentAsync(editor, text, { probeEndpointsMs: confirmProbes })
+        ) {
+          prof?.mark('T5-after-confirm-2');
+          return { ok: true };
+        }
+        prof?.mark('T5-confirm-2-failed');
         return {
           ok: false,
           error:
             'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
         };
       }
-      prof?.mark('T4b-after-second-submit');
 
-      if (await confirmSubmittedCommentAsync(editor, text)) {
-        prof?.mark('T5-after-confirm-2');
-        return { ok: true };
-      }
-      prof?.mark('T5-confirm-2-failed');
       return {
         ok: false,
         error:
@@ -8803,6 +8885,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false;
   }
 
+  if (msg.type === NLS_PLAY_WATCH_CELEBRATION) {
+    if (!isWatchPageMainFrameForMessages()) return false;
+    try {
+      if (!isNicoLiveWatchUrl(window.location.href)) {
+        sendResponse({ ok: false, error: 'not_watch' });
+        return false;
+      }
+      playWatchCelebrationRelay(
+        document,
+        msg.payload,
+        (rel) => chrome.runtime.getURL(String(rel || ''))
+      );
+      sendResponse({ ok: true });
+    } catch (e) {
+      sendResponse({ ok: false, error: String(e?.message || e) });
+    }
+    return false;
+  }
+
   if (msg.type === 'NLS_CAPTURE_SCREENSHOT') {
     if (!isWatchPageMainFrameForMessages()) return;
     void (async () => {
@@ -8851,6 +8952,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'NLS_PING_COMMENT_FRAME') {
+    const hasEditor = Boolean(findCommentEditorElement());
+    const hasPanel = hasWatchCommentPanel();
+    const href = String(window.location.href || '');
+    const score =
+      (hasEditor ? 8_000_000 : 0) +
+      (hasPanel ? 4_000_000 : 0) +
+      (/\/watch\/lv\d+/i.test(href) ? 50_000 : 0);
+    sendResponse({ ok: true, score, href, hasEditor, hasPanel });
+    return true;
+  }
+
   if (msg.type === 'NLS_POST_COMMENT') {
     if (!canPostCommentInThisFrame()) {
       sendResponse({
@@ -8861,7 +8974,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     }
     const text =
       'text' in msg ? String(/** @type {{ text?: unknown }} */ (msg).text || '') : '';
-    void postCommentFromContentAsync(text)
+    const fastSubmit = Boolean(
+      /** @type {{ fastSubmit?: unknown }} */ (msg).fastSubmit
+    );
+    void postCommentFromContentAsync(text, { fastSubmit })
       .then((result) => sendResponse(result))
       .catch((err) =>
         sendResponse({
@@ -8924,6 +9040,31 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             : 'snapshot_error'
       });
     }
+  }
+
+  if (msg.type === PANEL_METRICS_MESSAGE_TYPE) {
+    if (!canExportWatchSnapshotFromThisFrame()) {
+      sendResponse({
+        ok: false,
+        error: 'watchページ以外では取得できません'
+      });
+      return;
+    }
+    syncLiveIdFromLocation();
+    try {
+      const payload = buildPanelSummaryPayloadForCurrentLive();
+      void persistPanelLiveSummaryIfDue(true);
+      sendResponse(buildPanelMetricsResponse(payload));
+    } catch (err) {
+      sendResponse({
+        ok: false,
+        error:
+          err && typeof err === 'object' && 'message' in err
+            ? String(/** @type {{ message?: unknown }} */ (err).message || 'panel_metrics_error')
+            : 'panel_metrics_error'
+      });
+    }
+    return;
   }
 
   if (msg.type === 'NLS_EXPORT_INTERCEPT_CACHE') {
@@ -9694,6 +9835,184 @@ async function seedTailFromMain(lid) {
   tailSeededLiveId = lid;
 }
 
+const PANEL_SUMMARY_WRITE_MIN_MS = 2_000;
+let _lastPanelSummaryWriteAt = 0;
+/** 進捗モニター用: 前回 storage に書いた recorded（変化時のみ force write） */
+let _lastPanelSummaryRecordedWritten = -1;
+/** タブ前面化直後は backfill 再アーム cooldown を短縮 */
+let _backfillPriorityBoostUntil = 0;
+
+/**
+ * @param {number} [nowMs]
+ * @returns {ReturnType<typeof buildPanelLiveSummary>|null}
+ */
+function buildPanelSummaryPayloadForCurrentLive(nowMs = Date.now()) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return null;
+  const WS_STALE_MS = 120_000;
+  /** @type {number|null} */
+  let viewerCountFromDom = null;
+  if (
+    wsViewerCount != null &&
+    wsViewerCountUpdatedAt > 0 &&
+    nowMs - wsViewerCountUpdatedAt < WS_STALE_MS
+  ) {
+    viewerCountFromDom = wsViewerCount;
+  }
+  if (viewerCountFromDom == null) {
+    try {
+      const props = extractEmbeddedDataProps(document);
+      if (props) viewerCountFromDom = pickViewerCountFromEmbeddedData(props);
+    } catch {
+      /* no-op */
+    }
+  }
+  if (viewerCountFromDom == null) {
+    try {
+      viewerCountFromDom = parseLiveViewerCountFromDocument(document);
+    } catch {
+      /* no-op */
+    }
+  }
+  const recentActive = countRecentActiveUsers(activeUserTimestamps, nowMs);
+  const streamAgeMin = resolvePanelSummaryStreamAgeMin(nowMs);
+  const officialCommentSummary = summarizeOfficialCommentHistory({
+    history: officialCommentHistory,
+    nowMs,
+    targetWindowMs:
+      typeof officialViewerIntervalMs === 'number' && officialViewerIntervalMs > 0
+        ? officialViewerIntervalMs
+        : 60_000,
+    minWindowMs: 15_000
+  });
+  const officialFields = buildWatchSnapshotOfficialFields({
+    nowMs,
+    officialViewerCount,
+    officialCommentCount,
+    officialStatsUpdatedAt,
+    officialCommentStatsUpdatedAt,
+    officialViewerIntervalMs,
+    officialCommentSummary,
+    officialAdPointsNdgr,
+    officialGiftPointsNdgr,
+    officialEventGiftScoreNdgr,
+    officialNicoEventRankNdgr,
+    officialNicoEventTitleNdgr,
+    officialNdgrStatsUpdatedAt
+  });
+  const resolved = resolveConcurrentFromSnapshot(
+    {
+      viewerCountFromDom,
+      ...officialFields,
+      recentActiveUsers: recentActive,
+      streamAgeMin
+    },
+    nowMs
+  );
+  return buildPanelLiveSummary({
+    liveId: lid,
+    recordedCount: observedRecordedCommentCount,
+    officialCount: officialFields.officialCommentCount,
+    viewerCountFromDom,
+    officialViewerCount: officialFields.officialViewerCount,
+    concurrentEstimated:
+      typeof resolved.estimated === 'number' && Number.isFinite(resolved.estimated)
+        ? resolved.estimated
+        : null,
+    recentActiveUsers: recentActive,
+    streamAgeMin,
+    officialStatsUpdatedAt: officialFields.officialStatsUpdatedAt,
+    officialStatsFreshnessMs: officialFields.officialStatsFreshnessMs,
+    officialCommentStatsUpdatedAt: officialFields.officialCommentStatsUpdatedAt,
+    officialCommentStatsFreshnessMs: officialFields.officialCommentStatsFreshnessMs,
+    officialViewerIntervalMs: officialFields.officialViewerIntervalMs,
+    officialStatisticsCommentsDelta: officialFields.officialStatisticsCommentsDelta,
+    officialReceivedCommentsDelta: officialFields.officialReceivedCommentsDelta,
+    officialCommentSampleWindowMs: officialFields.officialCommentSampleWindowMs,
+    officialCaptureRatio: officialFields.officialCaptureRatio,
+    lastIngestAt: nowMs,
+    recentRows: recentCommentRing,
+    nowMs
+  });
+}
+
+/**
+ * パネル速報経路でも同接の滞留フォールバックを使えるよう、snapshot 本体と同じ優先順で
+ * 配信経過分を軽量に解決する。
+ * @param {number} nowMs
+ * @returns {number|null}
+ */
+function resolvePanelSummaryStreamAgeMin(nowMs) {
+  try {
+    maybeFillProgramBeginFromEmbeddedData();
+  } catch {
+    // no-op
+  }
+  if (
+    programBeginAtMs != null &&
+    Number.isFinite(programBeginAtMs) &&
+    programBeginAtMs > 0
+  ) {
+    const age = (nowMs - programBeginAtMs) / 60000;
+    if (age >= 0) return Math.round(age);
+  }
+  try {
+    const props = extractEmbeddedDataProps(document);
+    const beginMs = props ? pickProgramBeginAt(props) : null;
+    if (beginMs != null && Number.isFinite(beginMs) && beginMs > 0) {
+      const age = (nowMs - beginMs) / 60000;
+      if (age >= 0) return Math.round(age);
+    }
+  } catch {
+    // no-op
+  }
+  try {
+    const satm = String(document.title || '').match(
+      /(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]*\)\s+(\d{1,2}):(\d{2})/
+    );
+    if (satm) {
+      const d = new Date(+satm[1], +satm[2] - 1, +satm[3], +satm[4], +satm[5]);
+      const age = (nowMs - d.getTime()) / 60000;
+      if (age >= 0 && age < 1440) return Math.round(age);
+    }
+  } catch {
+    // no-op
+  }
+  try {
+    const playerArea =
+      document
+        .querySelector('[class*="player" i], [class*="Player" i], [id*="player" i], video')
+        ?.closest('[class*="player" i], [class*="Player" i], [id*="player" i]') ||
+      document.querySelector('[class*="player" i], [class*="Player" i]');
+    const txt = playerArea?.textContent || '';
+    const pm = txt.match(/(\d{1,2}):(\d{2}):(\d{2})\s*\/\s*\d/);
+    if (pm) return +pm[1] * 60 + +pm[2];
+  } catch {
+    // no-op
+  }
+  return null;
+}
+
+/**
+ * @param {boolean} [force]
+ */
+async function persistPanelLiveSummaryIfDue(force = false) {
+  const now = Date.now();
+  if (!force && now - _lastPanelSummaryWriteAt < PANEL_SUMMARY_WRITE_MIN_MS) return;
+  const payload = buildPanelSummaryPayloadForCurrentLive(now);
+  if (!payload) return;
+  _lastPanelSummaryWriteAt = now;
+  const pKey = panelSummaryStorageKey(liveId);
+  try {
+    await runStorageOpWithTimeout(
+      () => chrome.storage.local.set({ [pKey]: payload }),
+      INGEST_TIMING.persistWriteTimeoutMs
+    );
+  } catch (err) {
+    if (err !== STORAGE_OP_TIMED_OUT) throw err;
+  }
+}
+
 /**
  * バッチ（新規コメント行）をテールへ安く追記し、heartbeat（最終取り込みログ）を更新する。
  * @param {ParsedCommentRow[]} rows
@@ -9740,6 +10059,8 @@ async function bufferRowsToTail(rows) {
     nowMs: now
   });
   const sKey = summaryStorageKey(liveId);
+  const panelPayload = buildPanelSummaryPayloadForCurrentLive(now);
+  const pKey = panelSummaryStorageKey(liveId);
   /** @type {Record<string, unknown>|null} */
   let ingestLogPayload = null;
   try {
@@ -9769,6 +10090,7 @@ async function bufferRowsToTail(rows) {
         chrome.storage.local.set({
           [tKey]: tailRowsBuffer,
           [sKey]: summaryPayload,
+          ...(panelPayload ? { [pKey]: panelPayload } : {}),
           ...(ingestLogPayload ? { [KEY_COMMENT_INGEST_LOG]: ingestLogPayload } : {})
         }),
       INGEST_TIMING.persistWriteTimeoutMs
@@ -11253,9 +11575,84 @@ function cancelPendingDeepHarvest() {
     clearTimeout(deepHarvestTimer);
     deepHarvestTimer = null;
   }
+  if (deepHarvestScrollRetryTimer != null) {
+    clearTimeout(deepHarvestScrollRetryTimer);
+    deepHarvestScrollRetryTimer = null;
+  }
+  if (visibleScanScrollRetryTimer != null) {
+    clearTimeout(visibleScanScrollRetryTimer);
+    visibleScanScrollRetryTimer = null;
+  }
   clearDeepHarvestZeroRowRetrySchedule();
   resetDeepHarvestStabilityFollowUp();
   removeDeepHarvestLoadingUi();
+}
+
+/**
+ * @param {number} [windowMs]
+ * @returns {boolean}
+ */
+function isUserScrollDeferringDomHarvest(windowMs = DOM_HARVEST_SCROLL_DEFER_MS) {
+  return shouldDeferDomHarvestDuringScroll(
+    Date.now(),
+    lastGenuineUserScrollAt,
+    windowMs
+  );
+}
+
+/** @returns {() => boolean} */
+function createDeepHarvestScrollAbort() {
+  return () =>
+    shouldDeferDomHarvestDuringScroll(
+      Date.now(),
+      lastGenuineUserScrollAt,
+      DEEP_HARVEST_USER_SCROLL_DEFER_MS
+    );
+}
+
+/**
+ * スクロール静止後に deep を 1 回だけ再試行する（連打防止）。
+ * @param {{ armStabilityFollowUp?: boolean, stabilityFollowUp?: boolean, force?: boolean }} opts
+ */
+function scheduleDeepHarvestAfterScrollQuiet(opts) {
+  if (deepHarvestScrollRetryTimer != null) {
+    clearTimeout(deepHarvestScrollRetryTimer);
+  }
+  removeDeepHarvestLoadingUi();
+  deepHarvestScrollRetryTimer = setTimeout(() => {
+    deepHarvestScrollRetryTimer = null;
+    if (isUserScrollDeferringDomHarvest(DEEP_HARVEST_USER_SCROLL_DEFER_MS)) {
+      scheduleDeepHarvestAfterScrollQuiet(opts);
+      return;
+    }
+    void runDeepHarvest(opts).catch((err) =>
+      reportSilentErrorToStorage('deepHarvest', err)
+    );
+  }, DEEP_HARVEST_USER_SCROLL_DEFER_MS);
+}
+
+/**
+ * スクロール静止後に visible scan を 1 回だけ再試行する。
+ */
+function scheduleVisibleScanAfterScrollQuiet() {
+  if (visibleScanScrollRetryTimer != null) {
+    clearTimeout(visibleScanScrollRetryTimer);
+  }
+  visibleScanScrollRetryTimer = setTimeout(() => {
+    visibleScanScrollRetryTimer = null;
+    if (
+      shouldDeferVisibleScanDuringScroll(
+        Date.now(),
+        lastGenuineUserScrollAt,
+        lastUserInitiatedScrollAt,
+        INGEST_TIMING.visibleScanScrollDeferMs
+      )
+    ) {
+      scheduleVisibleScanAfterScrollQuiet();
+      return;
+    }
+    scanVisibleCommentsNow();
+  }, INGEST_TIMING.visibleScanScrollDeferMs);
 }
 
 /** @param {string} reason */
@@ -11273,8 +11670,10 @@ function scheduleDeepHarvest(reason) {
     : DEEP_HARVEST_DELAY_MS;
   if (!wantQuietSchedule) {
     removeDeepHarvestLoadingUi();
-  } else {
+  } else if (!isUserScrollDeferringDomHarvest(DEEP_HARVEST_USER_SCROLL_DEFER_MS)) {
     ensureDeepHarvestLoadingUi();
+  } else {
+    removeDeepHarvestLoadingUi();
   }
   deepHarvestTimer = setTimeout(() => {
     deepHarvestTimer = null;
@@ -11356,6 +11755,10 @@ function maybeRetryRankingAcquisitionOnVisible() {
 function onTabVisibleForCommentHarvest() {
   if (document.visibilityState !== 'visible') return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  void setBackfillPriorityLiveId(liveId);
+  _backfillPriorityBoostUntil = Date.now() + 120_000;
+  _lastBackfillGapCatchupRearmAt = 0;
+  void persistPanelLiveSummaryIfDue(true);
   // v0.1.497/499: 隠れている間は保存間隔を広めにしているため、コアレッサ内に未保存
   //   バッファが溜まり得る。可視に戻った瞬間に 1 回フラッシュして即座に追いつく。
   try {
@@ -11377,7 +11780,9 @@ function onTabVisibleForCommentHarvest() {
   maybeFetchKokenGiftHistoryMirrorOnce();
   maybeFetchAuditionEventRankingMirrorOnce();
   maybeFetchBroadcasterProfileMirrorOnce();
-  scanVisibleCommentsNow();
+  if (!isUserScrollDeferringDomHarvest()) {
+    scanVisibleCommentsNow();
+  }
   const now = Date.now();
   const needsRecovery = shouldForceDeepHarvestRecovery({
     lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
@@ -11440,19 +11845,39 @@ async function runDeepHarvest(opts = {}) {
       return;
     }
   }
+  if (isUserScrollDeferringDomHarvest(DEEP_HARVEST_USER_SCROLL_DEFER_MS)) {
+    scheduleDeepHarvestAfterScrollQuiet(opts);
+    return;
+  }
+  const scaleForHeavyLive = Math.max(
+    observedRecordedCommentCount,
+    typeof officialCommentCount === 'number' && Number.isFinite(officialCommentCount)
+      ? officialCommentCount
+      : 0,
+    typeof wsCommentCount === 'number' && Number.isFinite(wsCommentCount)
+      ? wsCommentCount
+      : 0
+  );
+  const heavyLive = scaleForHeavyLive >= DEEP_HARVEST_HEAVY_LIVE_COMMENT_THRESHOLD;
   harvestRunning = true;
   try {
+    const shouldAbort = createDeepHarvestScrollAbort();
     const rows = await harvestVirtualCommentList({
       document,
       extractCommentsFromNode,
       waitMs: DEEP_HARVEST_SCROLL_WAIT_MS,
-      twoPass: !opts.stabilityFollowUp,
+      twoPass: !opts.stabilityFollowUp && !heavyLive,
       twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS,
       scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO,
       quietScroll: true,
       respectTyping: false,
-      preferRecentScrollEndFirst: true
+      preferRecentScrollEndFirst: true,
+      shouldAbort
     });
+    if (shouldAbort()) {
+      scheduleDeepHarvestAfterScrollQuiet(opts);
+      return;
+    }
     await persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.DEEP });
     deepHarvestPipelineStats.lastCompletedAt = Date.now();
     deepHarvestPipelineStats.lastRowCount = rows.length;
@@ -11548,6 +11973,17 @@ async function syncCommentHarvestPanelStatus() {
 
 function scanVisibleCommentsNow() {
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  if (
+    shouldDeferVisibleScanDuringScroll(
+      Date.now(),
+      lastGenuineUserScrollAt,
+      lastUserInitiatedScrollAt,
+      INGEST_TIMING.visibleScanScrollDeferMs
+    )
+  ) {
+    scheduleVisibleScanAfterScrollQuiet();
+    return;
+  }
   const panel = findNicoCommentPanel(document);
   const root = panel || findWatchCommentHarvestFallbackRoot(document);
   if (!root) return;
@@ -11768,7 +12204,20 @@ function attachCommentScrollHook() {
     () => {
       if (!recording || !liveId) return;
       clearTimeout(t);
-      t = setTimeout(() => scanVisibleCommentsNow(), INGEST_TIMING.visibleScanDelayMs);
+      t = setTimeout(() => {
+        if (
+          shouldDeferVisibleScanDuringScroll(
+            Date.now(),
+            lastGenuineUserScrollAt,
+            lastUserInitiatedScrollAt,
+            INGEST_TIMING.visibleScanScrollDeferMs
+          )
+        ) {
+          scheduleVisibleScanAfterScrollQuiet();
+          return;
+        }
+        scanVisibleCommentsNow();
+      }, INGEST_TIMING.visibleScanEndDebounceMs);
     },
     { passive: true }
   );
@@ -11950,11 +12399,16 @@ function startRecordingProgressMonitor() {
   const overlay = createDevMonitorOverlay();
   function tickMonitor() {
     try {
+      const recordedNow = Number(observedRecordedCommentCount) || 0;
       samples = pushProgressSample(samples, {
         t: Date.now(),
-        recorded: Number(observedRecordedCommentCount) || 0,
+        recorded: recordedNow,
         official: officialCommentCount
       });
+      if (recordedNow !== _lastPanelSummaryRecordedWritten) {
+        _lastPanelSummaryRecordedWritten = recordedNow;
+        void persistPanelLiveSummaryIfDue(true);
+      }
       const ev = evaluateCommentProgress(samples);
       if (overlay) {
         overlay.update(ev);
@@ -12691,6 +13145,7 @@ async function start() {
             DOM_HARVEST_SCROLL_DEFER_MS
           )
         ) {
+          scheduleVisibleScanAfterScrollQuiet();
           return;
         }
         scanVisibleCommentsNow();
@@ -12839,8 +13294,16 @@ let _eventParticipationApiLastAttemptAt = 0;
 const NICO_PROFILE_RESOLVE_BATCH = 3;
 /** follow 専用バッチの再入抑止（nvapi レート制限対策）。 */
 const COMMENTER_FOLLOW_FETCH_MIN_GAP_MS = 8_000;
+/** フォロー一覧専用バッチの再入抑止（1 req が重い）。 */
+const COMMENTER_FOLLOWING_LIST_FETCH_MIN_GAP_MS = 30_000;
 /** @type {number} */
 let _commenterFollowFetchLastAt = 0;
+/** @type {number} */
+let _commenterFollowingListFetchLastAt = 0;
+/** @type {string} */
+let _followingListCountLiveId = '';
+/** @type {number} */
+let _followingListFetchedThisLive = 0;
 /** content 側でも問い合わせ済み uid を覚え、SW LRU と二重に抑制する。 */
 const _nicoProfileResolveAttempted = new Set();
 
@@ -12871,6 +13334,7 @@ function runExternalApiFetchesAsTabLeader(opts = {}) {
     maybeFetchBroadcasterProfileMirrorOnce();
     void maybeResolveNamedUserProfilesOnce();
     void maybeFetchCommenterFollowBatchOnce();
+    void maybeFetchCommenterFollowingListBatchOnce();
   });
 }
 
@@ -13120,37 +13584,38 @@ function maybeFetchKokenGiftHistoryMirrorOnce() {
     const now = Date.now();
     if (now - _kokenGiftHistoryApiLastAttemptAt < KOKEN_GIFT_HISTORY_API_MIN_GAP_MS) return;
     _kokenGiftHistoryApiLastAttemptAt = now;
-    chrome.runtime.sendMessage(
-      { type: KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE, liveId: lid },
-      (resp) => {
-        const le = chrome.runtime.lastError;
-        if (le) return;
-        if (!resp || resp.ok !== true || resp.json == null) return;
-        let rows = null;
-        try {
-          rows = normalizeKokenGiftHistoryResponse(resp.json, { now: Date.now() });
-        } catch {
-          rows = null;
-        }
-        // rows>0 のときだけ上書き（空/null は既存値を保全＝fail-soft）。
-        if (!Array.isArray(rows) || rows.length === 0) return;
-        const curLid = String(liveId || '')
-          .trim()
-          .toLowerCase();
-        if (curLid !== lid) return; // 応答到着までに別 lv へ遷移していたら stale 書込しない
-        try {
-          chrome.storage.local
-            .set({ [giftHistoryThrowsStorageKey(lid)]: rows })
-            .catch((err) => {
-              if (!isContextInvalidatedError(err)) {
-                /* best-effort */
-              }
-            });
-        } catch {
-          /* no-op */
+    void (async () => {
+      const jsonPages = await fetchKokenGiftHistoryAllViaExtension(lid, {
+        timeoutMs: 8000,
+        maxPages: 15
+      });
+      if (!jsonPages.length) return;
+      const curLid = String(liveId || '')
+        .trim()
+        .toLowerCase();
+      if (curLid !== lid) return;
+      const subKey = giftSubAppHistoryStorageKey(lid);
+      const throwsKey = giftHistoryThrowsStorageKey(lid);
+      try {
+        const bag = await chrome.storage.local.get([subKey, throwsKey]);
+        const prevSub =
+          bag[subKey] && typeof bag[subKey] === 'object' ? bag[subKey] : null;
+        const { subApp, throws } = buildKokenGiftPersistPayload(jsonPages, prevSub, {
+          now: Date.now(),
+          liveId: lid
+        });
+        /** @type {Record<string, unknown>} */
+        const persist = {};
+        if (subApp) persist[subKey] = subApp;
+        if (throws?.length) persist[throwsKey] = throws;
+        if (Object.keys(persist).length === 0) return;
+        await chrome.storage.local.set(persist);
+      } catch (err) {
+        if (!isContextInvalidatedError(err)) {
+          /* best-effort */
         }
       }
-    );
+    })();
   } catch {
     /* no-op: 次 tick で自己回復 */
   }
@@ -13615,6 +14080,96 @@ async function maybeFetchCommenterFollowBatchOnce() {
   }
 }
 
+/**
+ * @param {unknown} resp
+ * @param {number} now
+ * @returns {import('../lib/commenterFollowingListCache.js').CommenterFollowingListEntry|null}
+ */
+function followingListEntryFromFetchResponse(resp, now) {
+  return buildFollowingListEntryFromFetchResponse(resp, now);
+}
+
+/**
+ * 数値 ID コメンター上位から、フォロー先 userId リストを nvapi で少数取得する。
+ * 配信あたり最大 {@link COMMENTER_FOLLOWING_LIST_LIVE_MAX} 名・30秒間隔。
+ */
+async function maybeFetchCommenterFollowingListBatchOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _commenterFollowingListFetchLastAt < COMMENTER_FOLLOWING_LIST_FETCH_MIN_GAP_MS) return;
+    if (lid !== _followingListCountLiveId) {
+      _followingListCountLiveId = lid;
+      _followingListFetchedThisLive = 0;
+    }
+    if (_followingListFetchedThisLive >= COMMENTER_FOLLOWING_LIST_LIVE_MAX) return;
+    _commenterFollowingListFetchLastAt = now;
+
+    const commentsKey = commentsStorageKey(lid);
+    const bag = await chrome.storage.local.get([
+      commentsKey,
+      KEY_USER_COMMENT_PROFILE_CACHE,
+      KEY_COMMENTER_FOLLOW_CACHE,
+      KEY_COMMENTER_FOLLOWING_LIST_CACHE
+    ]);
+    const comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
+    const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
+    const followingListMap = normalizeFollowingListMap(bag[KEY_COMMENTER_FOLLOWING_LIST_CACHE]);
+    const broadcasterUid = String(detectBroadcasterUserIdFromDom() || broadcasterUidCache || '').trim();
+    const stats = collectNumericCommentersFromComments(comments, {
+      excludeUserId: broadcasterUid
+    });
+    if (!stats.length) return;
+
+    const toFetch = pickFollowingListUidsToFetch(stats, followingListMap, { nowMs: now, limit: 1 });
+    if (!toFetch.length) return;
+
+    const uid = toFetch[0];
+    const resp = await new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE, uid }, (r) => {
+          const le = chrome.runtime.lastError;
+          if (le) return resolve(null);
+          resolve(r);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+
+    _followingListFetchedThisLive += 1;
+    const entry = followingListEntryFromFetchResponse(resp, now);
+    let listTouched = false;
+    if (entry && upsertFollowingListEntry(followingListMap, uid, entry)) {
+      listTouched = true;
+    }
+
+    const curLid = String(liveId || '').trim().toLowerCase();
+    if (curLid !== lid) return;
+
+    const rows = mergeFollowingListIntoRows(
+      buildCommenterFollowRows(stats, followMap, profileMap),
+      followingListMap,
+      broadcasterUid
+    );
+    const snapshot = buildCommenterFollowLiveSnapshot(lid, rows, Date.now());
+    if (!snapshot) return;
+
+    /** @type {Record<string, unknown>} */
+    const save = { [commenterFollowLiveStorageKey(lid)]: snapshot };
+    if (listTouched) save[KEY_COMMENTER_FOLLOWING_LIST_CACHE] = followingListMap;
+    await chrome.storage.local.set(save);
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      /* best-effort */
+    }
+  }
+}
+
 /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */
 let lastOfficialEventDomBundle = null;
 /**
@@ -13695,7 +14250,8 @@ function ensureOfficialEventDomObserver() {
     '.rank-num', '[class*="rank-num"]',
     '.gift-history-list', '[class*="gift-history-list"]',
     '.gift-history-list .item', '[class*="gift-history-list"] [class*="item"]',
-    '[data-comment-type="gift"]'
+    '[data-comment-type="gift"]',
+    '[data-comment-type="nicoad"]'
   ].join(', ');
   const trigger = () => {
     if (_officialEventDomObserverTimer) clearTimeout(_officialEventDomObserverTimer);
@@ -13733,6 +14289,41 @@ function ensureOfficialEventDomObserver() {
           ) {
             const parsed = parseGiftCommentText(text);
             if (parsed) recordGiftCommentObservation(parsed, text);
+          }
+          if (
+            text.length < 220 &&
+            /広告しました/i.test(text) &&
+            /pt/i.test(text)
+          ) {
+            const nicoadParsed = parseNicoadCommentText(text);
+            if (nicoadParsed) {
+              const viewer = collectLoggedInViewerProfile(
+                document,
+                window.location.href
+              );
+              maybePlayViewerNicoadCelebrationFromDomText(text, {
+                liveId,
+                viewerNickname: viewer.viewerNickname,
+                viewerUserId: viewer.viewerUserId,
+                resolveImageUrl: (rel) => chrome.runtime.getURL(String(rel || ''))
+              });
+              trigger();
+            }
+          }
+          if (node.matches?.('[data-comment-type="nicoad"]')) {
+            const rowText = String(node.textContent || '').trim();
+            if (rowText) {
+              const viewer = collectLoggedInViewerProfile(
+                document,
+                window.location.href
+              );
+              maybePlayViewerNicoadCelebrationFromDomText(rowText, {
+                liveId,
+                viewerNickname: viewer.viewerNickname,
+                viewerUserId: viewer.viewerUserId,
+                resolveImageUrl: (rel) => chrome.runtime.getURL(String(rel || ''))
+              });
+            }
           }
         } catch { /* no-op */ }
       }
@@ -14377,6 +14968,15 @@ async function runNdgrBackfillOnce() {
     }
   };
   document.addEventListener('visibilitychange', onHidden);
+  const rotationTid = setTimeout(() => {
+    if (_backfillProgress.stopReason) return;
+    _backfillProgress.stopReason = 'rotation_yield';
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, GLOBAL_BACKFILL_ROTATION_MS);
 
   _backfillProgress.seg = 0;
   _backfillProgress.rows = 0;
@@ -14595,13 +15195,18 @@ async function runNdgrBackfillOnce() {
     //   stopReason を立てる（未設定なら aborted 扱い＝popup は「途中/また後で」になる）。
     if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'aborted';
   } finally {
+    clearTimeout(rotationTid);
     // v0.1.431: 正常終了・abort・例外いずれの抜け方でも、バッファに残った取り込み済み行を
     //   必ず吐き出す（per-segment persist をやめてバッチ化したぶん、ここで取りこぼし防止）。
     flushPendingBackfillRows();
     document.removeEventListener('visibilitychange', onHidden);
     if (_backfillAbort === ac) _backfillAbort = null;
+    if (_backfillProgress.stopReason === 'rotation_yield') {
+      _backfillTriedLiveId = '';
+    }
     _backfillProgress.done = 1;
     publishBackfillProgress();
+    void clearBackfillWaiter(String(liveId || '').trim().toLowerCase());
 
     // v0.1.431: 一過性 stop（入口が一時的に見つからない等）なら one-shot guard を一定時間後に
     //   解除し、maintenance tick の maybeAutoStartBackfill が自動で再試行する（UI 案内「少し
@@ -14658,7 +15263,11 @@ function maybeRearmBackfillForGapCatchup() {
     const lid = String(liveId || '').trim();
     if (!/^lv\d{1,15}$/.test(lid.toLowerCase())) return;
     const now = Date.now();
-    if (now - _lastBackfillGapCatchupRearmAt < OFFICIAL_GAP_DEEP_TIMING.cooldownMs) {
+    const gapCooldown =
+      now < _backfillPriorityBoostUntil
+        ? BACKFILL_PRIORITY_COOLDOWN_MS
+        : OFFICIAL_GAP_DEEP_TIMING.cooldownMs;
+    if (now - _lastBackfillGapCatchupRearmAt < gapCooldown) {
       return;
     }
     const official = Number(officialCommentCount);
@@ -14788,7 +15397,15 @@ function maybeAutoStartBackfill() {
   //   ⚠️手動ボタン経路（onChanged で直接 runNdgrBackfillOnce）は gate しない＝押したタブで必ず走る。
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return;
-  void runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, () => runNdgrBackfillOnce());
+  void runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, () => runNdgrBackfillOnce()).then(
+    ({ ran }) => {
+      if (ran) {
+        void clearBackfillWaiter(lid);
+      } else {
+        void registerBackfillWaiter(lid);
+      }
+    }
+  );
 }
 
 // ── v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in 配線 ──────────────
@@ -15212,6 +15829,38 @@ function scanGiftSubAppDomAcrossFrames() {
 }
 
 /**
+ * ギフト iframe リレー（履歴タブ DOM）を nls_gift_subapp_history にマージ保存。
+ *
+ * @param {string} liveId
+ * @param {unknown[]} items
+ * @param {unknown[]} totalCounts
+ */
+async function persistGiftSubAppHistoryFromIframeRelay(liveId, items, totalCounts) {
+  if (!hasExtensionContext()) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const domPayload = buildGiftSubAppPayloadFromDomRelay(items, totalCounts, {
+    liveId: lid,
+    now: Date.now()
+  });
+  if (!domPayload) return;
+  const key = giftSubAppHistoryStorageKey(lid);
+  try {
+    const bag = await chrome.storage.local.get(key);
+    const merged = mergeGiftSubAppHistoryPayload(bag?.[key], domPayload);
+    if (!merged) return;
+    await chrome.storage.local.set({ [key]: merged });
+    _giftSubAppHistoryCache.history = merged.history;
+    _giftSubAppHistoryCache.totalCounts = merged.totalCounts;
+    _giftSubAppHistoryCache.lastObservedAt = merged.capturedAt;
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      /* best-effort */
+    }
+  }
+}
+
+/**
  * v0.1.198: スキャン結果と既存キャッシュをマージして persist する。
  * 「観測がある期間は更新、観測ゼロの期間は古い値を保持」のポリシー。
  */
@@ -15228,12 +15877,32 @@ async function persistGiftSubAppHistoryNow() {
   const cache = _giftSubAppHistoryCache;
   const haveFreshHistory = Array.isArray(fresh.history) && fresh.history.length > 0;
   const haveFreshTotalCounts = Array.isArray(fresh.totalCounts) && fresh.totalCounts.length > 0;
-  // フレッシュに値があるフィールドだけ更新。空でも古い値は消さない
+  // フレッシュに値があるフィールドだけ更新。履歴はマージ（部分スキャンで古い行が消えないように）
   if (haveFreshHistory) {
-    cache.history = fresh.history;
+    const merged = mergeGiftSubAppHistoryPayload(
+      {
+        liveId: lid,
+        capturedAt: cache.lastObservedAt || Date.now(),
+        source: 'dom-scrape',
+        history: cache.history,
+        totalCounts: cache.totalCounts
+      },
+      {
+        liveId: lid,
+        capturedAt: Date.now(),
+        source: 'dom-scrape',
+        history: fresh.history,
+        totalCounts: haveFreshTotalCounts ? fresh.totalCounts : []
+      }
+    );
+    if (merged?.history?.length) {
+      cache.history = merged.history;
+      if (merged.totalCounts.length) cache.totalCounts = merged.totalCounts;
+    } else {
+      cache.history = fresh.history;
+    }
     cache.lastObservedAt = Date.now();
-  }
-  if (haveFreshTotalCounts) {
+  } else if (haveFreshTotalCounts) {
     cache.totalCounts = fresh.totalCounts;
     cache.lastObservedAt = Date.now();
   }

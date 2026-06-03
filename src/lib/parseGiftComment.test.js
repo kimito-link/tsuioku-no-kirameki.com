@@ -211,6 +211,13 @@ describe('parseNicoadCommentText', () => {
     });
   });
 
+  it('100 pt のスペース区切りもパース', () => {
+    expect(parseNicoadCommentText('りんくさんが100 pt広告しました')).toEqual({
+      sender: 'りんく',
+      point: 100
+    });
+  });
+
   it('ギフト行は null', () => {
     expect(
       parseNicoadCommentText('Aさんがギフト「X（10pt）」を贈りました')

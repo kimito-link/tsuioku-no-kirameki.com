@@ -30,6 +30,8 @@ describe('lpIndexFeatures', () => {
     expect(html).toMatch(/四分位/);
     expect(html).toContain('schemaVersion');
     expect(html).toMatch(/5分|5 分/);
+    expect(html).toMatch(/koken 公式 API|一括取得/);
+    expect(html).toContain('mkt-gift-ledger');
   });
 
   it('マーケ分析の読み方ブロックと実装に沿った用語', () => {
@@ -44,5 +46,12 @@ describe('lpIndexFeatures', () => {
     expect(html).toContain('id="extension-guide-comment-voice"');
     expect(html).toMatch(/#commentInput|コメント送信/);
     expect(html).toMatch(/NLS_POST_COMMENT|ローカル/);
+  });
+
+  it('用語⑪が開示請求向け証拠の LP 説明を含む（popup には目立つ UI を置かない方針）', () => {
+    expect(html).toContain('id="extension-guide-disclosure-evidence"');
+    expect(html).toMatch(/開示請求|プロバイダ責任制限法/);
+    expect(html).toMatch(/SHA-256|SHA256/);
+    expect(html).toMatch(/ポップアップに目立つスイッチは置かない|萎縮/);
   });
 });

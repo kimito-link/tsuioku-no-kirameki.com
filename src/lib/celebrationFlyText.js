@@ -81,12 +81,31 @@ export function flyTextLinesForSupportCelebration(spec) {
   /** @type {CelebrationFlyTextLine[]} */
   const lines = [];
 
-  lines.push({
-    text: spec.message,
-    motion: 'burst',
-    color: '#fff56a',
-    sizePx: 34
-  });
+  if (spec.kind === 'ad_points_milestone') {
+    const pt = Number(String(spec.dedupeKey || '').replace('ad_pts_', '')) || 0;
+    if (pt === 1) {
+      lines.push({ text: '初ニコニ広告！', motion: 'burst', color: '#fff56a', sizePx: 34 });
+    } else {
+      lines.push(
+        { text: `${pt.toLocaleString('ja-JP')}pt`, motion: 'burst', color: '#fff56a', sizePx: 44 },
+        { text: '達成！', motion: 'burst', color: '#6ee8ff', sizePx: 36 },
+        { text: 'ニコニ広告', motion: 'scroll', color: '#ffb84d', sizePx: 28, lanePct: 24 }
+      );
+    }
+  } else if (
+    spec.kind === 'ad_points_increase' ||
+    spec.kind === 'ad_throw' ||
+    spec.kind === 'ad_advertiser_milestone'
+  ) {
+    lines.push({ text: spec.message, motion: 'burst', color: '#fff56a', sizePx: 28 });
+  } else {
+    lines.push({
+      text: spec.message,
+      motion: 'burst',
+      color: '#fff56a',
+      sizePx: 34
+    });
+  }
 
   if (spec.kind === 'comment_milestone') {
     const m = spec.dedupeKey.replace('comment_', '');
@@ -106,12 +125,29 @@ export function flyTextLinesForSupportCelebration(spec) {
       { text: '神', motion: 'scroll', color: '#6ee8ff', sizePx: 38 }
     );
   } else if (
-    spec.kind === 'ad_points_milestone' ||
     spec.kind === 'ad_points_increase' ||
     spec.kind === 'ad_throw'
   ) {
     lines.push(
       { text: '広告来た！', motion: 'burst', color: '#ffb84d', sizePx: 28 },
+      { text: '888888888', motion: 'scroll', color: '#fff56a', sizePx: 26 }
+    );
+  } else if (spec.kind === 'ad_advertiser_milestone') {
+    lines.push(
+      { text: '広告主登場！', motion: 'burst', color: '#ffb84d', sizePx: 28 },
+      { text: '888888888', motion: 'scroll', color: '#fff56a', sizePx: 26 }
+    );
+  } else if (spec.kind === 'ad_points_milestone') {
+    lines.push(
+      { text: '888888888', motion: 'scroll', color: '#fff56a', sizePx: 30 },
+      { text: '尊い', motion: 'scroll', color: '#ff8ec8', sizePx: 26, lanePct: 42 }
+    );
+  } else if (
+    spec.kind === 'broadcaster_follower_milestone' ||
+    spec.kind === 'broadcaster_follower_increase'
+  ) {
+    lines.push(
+      { text: 'フォロー来た！', motion: 'burst', color: '#ffb84d', sizePx: 28 },
       { text: '888888888', motion: 'scroll', color: '#fff56a', sizePx: 26 }
     );
   }

@@ -6,7 +6,11 @@ import {
   pickAdPointsMilestoneCelebration,
   pickAdAdvertiserCountMilestoneCelebration,
   pickAdPointsIncreaseCelebration,
+  adPointsMilestoneDedupeKeysAtOrBelow,
+  isStartupAdPointsJump,
   pickNicoadCommentCelebration,
+  pickBroadcasterFollowerMilestoneCelebration,
+  pickBroadcasterFollowerIncreaseCelebration,
   pickHighestCrossedMilestone,
   dropCountForCommentMilestone,
   commentMilestoneDurationMs,
@@ -60,6 +64,9 @@ describe('supportCelebration', () => {
 
   it('ニコニ広告ptマイルストーン', () => {
     expect(pickAdPointsMilestoneCelebration(0, 1)?.message).toContain('最初のニコニ広告');
+    const at5k = pickAdPointsMilestoneCelebration(4800, 5100);
+    expect(at5k?.message).toBe('ニコニ広告 5,000pt 達成！');
+    expect(at5k?.dropVariant).toBe('rinku_deluge');
     expect(pickAdPointsMilestoneCelebration(9000, 12000)?.dedupeKey).toBe('ad_pts_10000');
     expect(pickAdPointsMilestoneCelebration(12000, 12000)).toBeNull();
   });
@@ -75,6 +82,18 @@ describe('supportCelebration', () => {
     expect(pickAdPointsIncreaseCelebration(900, 1200)).toBeNull();
   });
 
+  it('adPointsMilestoneDedupeKeysAtOrBelow', () => {
+    expect(adPointsMilestoneDedupeKeysAtOrBelow(10000)).toContain('ad_pts_10000');
+    expect(adPointsMilestoneDedupeKeysAtOrBelow(10000)).toContain('ad_pts_5000');
+    expect(adPointsMilestoneDedupeKeysAtOrBelow(0)).toEqual([]);
+  });
+
+  it('isStartupAdPointsJump', () => {
+    expect(isStartupAdPointsJump(0, 15100)).toBe(true);
+    expect(isStartupAdPointsJump(9000, 12000)).toBe(false);
+    expect(isStartupAdPointsJump(14900, 15100)).toBe(false);
+  });
+
   it('ニコニ広告コメントから演出', () => {
     const spec = pickNicoadCommentCelebration(
       { sender: 'テスト', point: 100 },
@@ -82,6 +101,15 @@ describe('supportCelebration', () => {
     );
     expect(spec?.message).toContain('100 pt 広告');
     expect(spec?.dedupeKey).toBe('ad_comment_lv1|no:911');
+    expect(spec?.characterSet).toBe('mixed');
+  });
+
+  it('配信者フォロワー増加', () => {
+    const milestone = pickBroadcasterFollowerMilestoneCelebration(90, 110);
+    expect(milestone?.message).toContain('100 人達成');
+    expect(milestone?.dropVariant).toBe('rinku_deluge');
+    expect(pickBroadcasterFollowerIncreaseCelebration(120, 123)?.message).toContain('+3');
+    expect(pickBroadcasterFollowerIncreaseCelebration(99, 100)).toBeNull();
   });
 
   it('dedupe キー管理', () => {

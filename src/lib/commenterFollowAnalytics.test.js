@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   COMMENTER_FOLLOW_CSV_BOM,
+  analyzeCommenterBroadcasterFollow,
+  analyzeCommenterFollowDeltas,
+  analyzeCommenterFollowTimingByCommentWindow,
+  analyzeCommenterFolloweeProfile,
+  analyzeCommonFolloweesAmongCommenters,
   buildCommenterFollowAnalytics,
   buildCommenterFollowCsv,
   buildCommenterFollowCsvRows,
@@ -161,5 +166,47 @@ describe('commenterFollowAnalytics', () => {
     expect(analytics.rowsWithFollowerCount).toHaveLength(4);
     expect(analytics.scatterPoints).toHaveLength(4);
     expect(analytics.segments.quietSupporters.count).toBe(1);
+    expect(analytics.followeeProfile.sampleSize).toBe(3);
+    expect(analytics.followTiming.buckets).toHaveLength(4);
+    expect(analytics.broadcasterFollow).toBeDefined();
+    expect(analytics.commonFollowees).toBeDefined();
+  });
+
+  it('前回キャッシュと比較してフォロワー増減を出す', () => {
+    const rows = normalizeCommenterFollowAnalyticsRows(USERS);
+    const deltas = analyzeCommenterFollowDeltas(rows, {
+      '1': { followerCount: 180, followeeCount: 25, fetchedAt: 1000 },
+      '3': { followerCount: 120, followeeCount: 8, fetchedAt: 1000 }
+    });
+    expect(deltas.comparedCount).toBe(2);
+    expect(deltas.increased.some((r) => r.userId === '1' && r.followerDelta === 20)).toBe(true);
+    expect(deltas.decreased.some((r) => r.userId === '3' && r.followerDelta === -20)).toBe(true);
+  });
+
+  it('followee 分布と初コメ時刻帯別増減を出す', () => {
+    const rows = normalizeCommenterFollowAnalyticsRows(USERS);
+    const profile = analyzeCommenterFolloweeProfile(rows);
+    expect(profile.medianFolloweeCount).toBeGreaterThan(0);
+    expect(profile.followeeBuckets.some((b) => b.count > 0)).toBe(true);
+
+    const deltas = analyzeCommenterFollowDeltas(rows, {
+      '1': { followerCount: 180, followeeCount: 25, fetchedAt: 1000 }
+    });
+    const timing = analyzeCommenterFollowTimingByCommentWindow(rows, deltas, { durationMs: 400 });
+    expect(timing.buckets[0].commenterCount).toBe(1);
+  });
+
+  it('配信者フォロー率と共通フォロー先を集計する', () => {
+    const rows = normalizeCommenterFollowAnalyticsRows(USERS);
+    const listMap = {
+      '1': { userIds: ['7', '99'], status: 'ok', fetchedAt: 1, truncated: false, pageCount: 1 },
+      '2': { userIds: ['7'], status: 'ok', fetchedAt: 1, truncated: false, pageCount: 1 }
+    };
+    const bf = analyzeCommenterBroadcasterFollow(rows, listMap, '7');
+    expect(bf.sampleSize).toBe(2);
+    expect(bf.followedCount).toBe(2);
+    expect(bf.pct).toBe(100);
+    const common = analyzeCommonFolloweesAmongCommenters(listMap);
+    expect(common[0]).toMatchObject({ userId: '7', overlapCount: 2 });
   });
 });

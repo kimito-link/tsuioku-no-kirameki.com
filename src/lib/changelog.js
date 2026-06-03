@@ -26,6 +26,444 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.600',
+    date: '2026-06-03',
+    summary: '暫定ランキングとスクロール再試行の不具合修正',
+    items: Object.freeze([
+      'panelSummary の直近コメント（recent）を暫定ランキングに反映（recentRows だけ読んで空になる退行を修正）',
+      'スクロール静止後の visible / deep 再試行をデバウンス化（長時間スクロール後も取り込みが再開する）',
+      '定期 panel scan 見送り時も scroll-end キューへ載せる',
+      'ギフト履歴のページ重複で送り主別の貢献pt・件数が二重加算される不具合を修正（dedup 済み履歴から集計）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.599',
+    date: '2026-06-03',
+    summary: '読み込み体感とスクロール取り込みの改善',
+    items: Object.freeze([
+      'heavy 完了前にサマリ直近コメントで暫定応援ランキングを表示（件数カードとのギャップ解消）',
+      '北極星レーン更新をランキング描画から切り離し、数値表示後も UI がブロックされにくくする',
+      'スクロール終了後に visible scan を再開（deep は静止後のみ・見送り中は deep ローディング非表示）',
+      'ランキング集計は全件配列を cap してメインスレッド負荷を抑える（DevTools: nls_debug_watch_popup_load）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.598',
+    date: '2026-06-03',
+    summary: 'コメント欄スクロール中のフリーズを抑制',
+    items: Object.freeze([
+      'ユーザーがコメント欄をスクロールしている間は deep harvest（仮想走査）を開始・継続しない',
+      'スクロール終了後の visible スキャンも見送り、静止後に再試行',
+      '公式1万件級の放送では deep の2-passを抑え、応答しませんダイアログを避ける'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.597',
+    date: '2026-06-03',
+    summary: '来場ありなのに同接0固定を修正',
+    items: Object.freeze([
+      '古い snapshot の officialViewerCount:0 を公式同接と誤認しない（滞留推定へフォールバック）',
+      '本家寄せ帯で累計来場を officialViewerCount に載せない退行を修正',
+      'NDGR の広告pt 0 が DOM 未取得より優先されないよう、正本 DOM の正の値だけ反映'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.596',
+    date: '2026-06-03',
+    summary: '初回カードと同接0表示を改善',
+    items: Object.freeze([
+      '初回パネル表示で metrics 応答の timeout を待たず、軽量サマリから先に記録・来場カードを表示',
+      'パネル速報に直近コメント参加者・配信経過・公式統計の鮮度を載せ、同接推定の材料を補強',
+      '推定材料が足りないときは「~0」ではなく「推定中」と表示'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.595',
+    date: '2026-06-02',
+    summary: '初回パネルに速報件数を直結表示',
+    items: Object.freeze([
+      'NLS_EXPORT_PANEL_METRICS: content メモリの記録/公式/来場を popup が storage 待ちなしで取得',
+      '初回 refresh で metrics と軽量 storage を並列取得し、追い切り完了なのにカード「—」を防止',
+      'チャンク index.total を件数カードのフォールバックに追加',
+      '進捗モニター・metrics 要求時に panel サマリを storage へ同期',
+      'INLINE 初回幕: 記録数値または metrics 適用で解除'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.594',
+    date: '2026-06-02',
+    summary: '多タブ時のパネル「—」と取得率待ちの改善',
+    items: Object.freeze([
+      'パネル速報（記録・公式・来場・同接）を保存し、snapshot 待ちでもカードを更新',
+      'snapshot fetch 中は軽量サマリだけ polling で件数・来場を追従（全カード「—」固定を防止）',
+      'グローバルバックフィル: 前面タブ優先・90秒ローテーション・他放送待ちを診断表示',
+      'reached_start かつ公式ギャップ大のとき「他放送がバックフィル待ち」の可能性を案内'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.593',
+    date: '2026-06-02',
+    summary: 'コメント送信・DL の体感改善（待ちUI配線・生成短縮・計測）',
+    items: Object.freeze([
+      'HTML/マーケ DL: りんく・こん太・たぬ姉の待ち吹き出しを保存操作に配線',
+      'HTML build: 件数に応じたタイムアウト（resolveHtmlReportBuildTimeoutMs）を適用',
+      'DL: 記録中のコメントは storage 待ちせずメモリから即読込。2500件超は集計サンプル化',
+      'コメント送信: 軽量 frame ping・session に成功 frame 保存・fastSubmit editor 待ち 400ms',
+      '計測: popup DevTools で __nlsCommentSubmitProfile / __nlsExportProfile = true'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.592',
+    date: '2026-06-02',
+    summary: 'コメント送信の待ち時間をさらに短縮',
+    items: Object.freeze([
+      '送信確認の待ちを最大約450msに調整（遅い欄クリアでも8秒フレーム走査に落ちにくく）',
+      '確認失敗・送信ボタン不明時は全フレーム走査をスキップ（誤って+8秒待たない）',
+      '直前に成功したフレームを優先・コメント用フレーム走査は4秒打ち切り',
+      '入力欄が既に見えているときは editor ポーリングを省略（fastSubmit）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.591',
+    date: '2026-06-02',
+    summary: 'HTML/マーケ DL の保存ダイアログで意味のあるファイル名を表示',
+    items: Object.freeze([
+      'chrome.downloads + blob では「保存前に確認」時に UUID 名になる問題を修正',
+      '保存リンクのファイル名を日付_lvID.html に変更（例: 2026-06-02_lv350663807.html）',
+      'Save As 中に blob URL が切れないよう revoke 猶予を 120 秒に延長'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.590',
+    date: '2026-06-02',
+    summary: 'DLファイル名の改善と出力の段階計測・heavy時の短縮',
+    items: Object.freeze([
+      'HTML: 配信開始日（最初の記録コメント・JST）_lvID.html で保存（例: 2026-06-02_lv350663807.html）',
+      'マーケ: 同形式に _marketing を付与。完了時に read/build 等の段階 ms をステータス表示',
+      'DevTools で globalThis.__nlsExportProfile = true すると計測を console.table 出力',
+      '2500件超: マーケ JSON 埋め込み slim・koken 5秒打ち切り・過去配信読込省略・HTML ルーム集計 cap'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.589',
+    date: '2026-06-02',
+    summary: 'コメント送信と HTML/マーケ DL の体感速度を改善',
+    items: Object.freeze([
+      'コメント送信: フレーム0を先に試行・フレーム走査を45秒キャッシュ・確認待ちを最大約280msに短縮',
+      'コメント送信: 楽観追記の storage 書き込みを送信待ちから外す',
+      'HTML保存: 2500件超は全件CSV/overflow埋め込みを省略し、DL開始までの生成時間を大幅短縮',
+      'HTML/マーケ: メモリ上の記録コメントを2秒以内に使い、chrome.downloads でDL開始'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.588',
+    date: '2026-06-02',
+    summary: 'HTML・マーケ分析のダウンロード開始までの待ち時間を短縮',
+    items: Object.freeze([
+      'DL時のフォロー情報はキャッシュのみ使用（nvapi 補完待ちをしない）',
+      'マーケ分析はフォロー取得・画像・過去配信読込を並列化し、storage 書き戻しは DL 後に実行',
+      'HTMLレポートはスナップショット待ちを約4.5秒で打ち切り、画像・DOM bundle を並列読込',
+      '保存ボタン横のステータスに「読込中→組み立て中→DL開始」の段階表示を追加'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.587',
+    date: '2026-06-02',
+    summary: '分析の先頭にギフト・広告した人数を追加',
+    items: Object.freeze([
+      '来場・コメントに加え「アイテムを投げた人」「広告をした人」を4枚カードで表示',
+      '来場に対する参加率（%）をギフト・広告でも表示（記録ベース・演出とは別）',
+      'HTMLレポートの来場ブロックにも同じ4指標を反映'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.586',
+    date: '2026-06-02',
+    summary: 'アイコン列のちらつき抑制とギフト投げ主専用列',
+    items: Object.freeze([
+      'ギフト・広告を投げた人を「ギフト列」としてりんく列の直下に独立表示',
+      '応援レーンの二重描画をやめ、開幕3秒はギフト演出も抑止',
+      'コメント演出は初回 prime のみ・以降は新着分だけ検知（開いた瞬間の誤爆を防止）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.585',
+    date: '2026-06-02',
+    summary: '開幕演出の誤爆防止とギフト投げ主の座席表示',
+    items: Object.freeze([
+      'パネルを開いた直後は末尾コメントを既視扱いにし、過去のギフト演出連発を抑制',
+      '公式広告ptの増分から自分の広告投げ演出を即再生（コメント一致不要）',
+      'ギフト・広告を投げた数値IDユーザーをりんく列候補に合流（サムネ観測時に表示）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.584',
+    date: '2026-06-02',
+    summary: '自分の広告投げで演出が出ない問題を根治',
+    items: Object.freeze([
+      'コメント末尾の即時スキャンを heavy 全件読み込み待ちから独立',
+      'watch ページ DOM で自分の広告コメントを検知したらプレイヤー上に直接演出',
+      'ニコニ広告の長い表示名と視聴者ニックネームのゆるい一致を追加'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.583',
+    date: '2026-06-02',
+    summary: '自分の広告投げに演出が出るよう修正しパチンコ風に強化',
+    items: Object.freeze([
+      '新着広告コメントがシード処理で握りつぶされないよう修正',
+      'コメント末尾を随時スキャンして自分の広告を即検知',
+      '30pt以上の本人広告は多段ドロップ＋ドン／ジャンのパチンコ風演出'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.582',
+    date: '2026-06-02',
+    summary: 'ギフト履歴レーンの点滅を抑止',
+    items: Object.freeze([
+      'データが変わったときだけランキングを再描画（10秒ごとの全置換をやめる）',
+      'koken 同期は storage 更新時のみ再ペイント。鮮度注記は30秒ごとにテキストだけ更新'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.581',
+    date: '2026-06-02',
+    summary: 'ギフト履歴の表示合計を公式累計ptに揃える',
+    items: Object.freeze([
+      '公式番組累計があるとき右サマリー・内訳合計をプレイヤー表示と同じ数値に統一',
+      '履歴APIの取りこぼし分を「履歴未取得」行としてランキングに足す',
+      'koken API と NDGR ライブの選択で公式累計に近い方を優先'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.580',
+    date: '2026-06-02',
+    summary: 'ギフト投げ一覧のレイアウト崩れとpt表示の誤解を修正',
+    items: Object.freeze([
+      '投げ一覧をランキングカードと別パネルに分離（埋め込み幅でも表が崩れない）',
+      '公式累計ptをヘッダに表示し、一覧合計との差を注記で明示'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.579',
+    date: '2026-06-02',
+    summary: '北極星の個別投げ一覧をマーケ分析と同型に',
+    items: Object.freeze([
+      '投げ一覧: #・時刻・アイテム画像・送り主サムネ・アカウントリンク・ID・pt・出典',
+      'マーケ DL のギフト台帳テーブルと同じ列構成（popup 用ライトテーマ CSS）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.578',
+    date: '2026-06-02',
+    summary: '多タブ時の空表示と薄い koken 履歴を改善',
+    items: Object.freeze([
+      'koken API の histories が少ない放送では NDGR ライブ受信をギフト履歴レーンに優先表示',
+      '多タブ時: 埋め込みパネルはタブ復帰で即 refresh、data-backed lv 判定の storage 待ちを延長'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.577',
+    date: '2026-06-02',
+    summary: 'ギフト履歴を履歴タブなしで自動追従',
+    items: Object.freeze([
+      'watch 記録中: koken API を10秒周期・全ページ取得（content リーダータブ）',
+      'popup: 10秒ごとに koken 同期と北極星ギフト履歴の再描画',
+      '履歴タブの DOM は追記の加速用（必須ではない）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.576',
+    date: '2026-06-02',
+    summary: 'ギフト履歴タブを開いた内容を北極星に反映',
+    items: Object.freeze([
+      'iframe リレー（履歴 DOM）を nls_gift_subapp_history に保存（従来は throws のみ）',
+      'storage 更新で北極星ギフト履歴レーンを即再描画',
+      'koken API の nextCount ページングで全件取得に対応'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.575',
+    date: '2026-06-02',
+    summary: '開幕演出の誤爆を単一ゲートで防止',
+    items: Object.freeze([
+      'popupCelebrationGate: heavy 完了・プライム完了・件数整合・開幕3秒クールダウン',
+      'マイルストーン／Bahamut／広告pt／NDGR ギフト件数の演出をゲート後に集約',
+      '北極星ギフト履歴に個別投げテーブル（ViewModel）を追加',
+      '調査用 [nls-celeb] ログ（globalThis.__NLS_CELEB_DEBUG__）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.574',
+    date: '2026-06-02',
+    summary: 'ギフト履歴の合計表示を整理',
+    items: Object.freeze([
+      '送り主人数と表示カード数を分けて注記（上位10名まで）',
+      '右サマリーの pt を一覧カード合計と明示し全送り主 pt も区別',
+      '集計を lib 側で一本化（aggregateGiftSubAppHistoryBySender）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.573',
+    date: '2026-06-02',
+    summary: 'popupのギフト履歴と開幕演出誤爆を修正',
+    items: Object.freeze([
+      '北極星「ギフト履歴」を koken 個別履歴（sub-app）優先表示に変更',
+      'popup 開時に koken API でギフト履歴を同期（マーケ DL だけでなく）',
+      'コメント全件読込完了前のマイルストーン／ギフト演出の一斉誤爆を防止'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.572',
+    date: '2026-06-02',
+    summary: 'ギフト投げ台帳の回数水増しを修正',
+    items: Object.freeze([
+      'totalCounts と history の二重加算をやめ、アイテム別回数は公式 totalCounts を正とする',
+      'アイテム別 pt グラフ・送り主内訳にギフトサムネを表示',
+      'ギフト投げ履歴セクションに表示ルール注記を追加（NDGR 省略方針は維持）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.571',
+    date: '2026-06-02',
+    summary: 'ギフト履歴の蓄積とマーケ台帳の欠落を修正',
+    items: Object.freeze([
+      'sub-app 履歴の DOM スキャンをマージ保存に変更（部分取得で古い投げが消えない）',
+      'koken 履歴 ID で重複排除・マーケ DL 後に storage へ書き戻し',
+      '公式履歴がある配信では NDGR 重複行を台帳から除外、送り主グラフにサムネ表示'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.570',
+    date: '2026-06-02',
+    summary: 'ギフト投げ履歴にサムネ・ID・アカウント列を追加',
+    items: Object.freeze([
+      '送り主別表・投げ一覧にサムネ／アカウント／ID 列を追加（他マーケ表と同じルール）',
+      'アイテム列はギフト画像のみ、送り主アイコンはサムネ列に分離',
+      '数値 ID はプロフィールリンク・サムネもユーザーページへリンク'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.569',
+    date: '2026-06-02',
+    summary: 'マーケのギフト投げ履歴を送り主別に整理しグラフ表示',
+    items: Object.freeze([
+      '送り主別の「誰が・何を・合計いくら」表を追加（アイテム内訳付き）',
+      '送り主別 pt・アイテム別 pt の横棒グラフをマーケ HTML に追加',
+      'サマリーに送り主人数を表示'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.568',
+    date: '2026-06-02',
+    summary: '起動直後の応援演出の誤爆を防止',
+    items: Object.freeze([
+      'コメント全件読込前にギフト/広告コメのシードを完了しないよう修正（過去ログが一斉演出されない）',
+      '公式累計ニコニ広告ptで既達マイルストーンを storage にプライム（10,000pt 達成が起動時に出ない）',
+      '0→累計のジャンプは起動直後とみなして広告ptマイルストーン演出をスキップ'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.567',
+    date: '2026-06-02',
+    summary: 'マーケ DL で koken API からギフト履歴を一括取得',
+    items: Object.freeze([
+      'マーケ HTML 出力時に koken 公式 API（/histories）を自動 fetch（履歴タブを開かなくて可）',
+      '取得結果をギフト投げ履歴・storage（nls_gift_subapp_history）に反映し DOM 履歴とマージ',
+      '配信ページ常時取得（maybeFetchKokenGiftHistoryMirrorOnce）でも個別履歴 payload を保存'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.566',
+    date: '2026-06-02',
+    summary: 'マーケ分析にギフト投げ履歴（誰が・何を・いくら）を追加',
+    items: Object.freeze([
+      '「ギフト投げ履歴」セクションで送り主・アイテム・pt・時刻を一覧（公式履歴 sub-app / DOM / NDGR）',
+      'アイテム別の投げ数チップ（total-dold-count-list 相当）をマーケ HTML に表示',
+      'マーケ DL 時に gift events・履歴 throws・sub-app 履歴を storage から読み込み'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.565',
+    date: '2026-06-02',
+    summary: '開示請求の説明を LP に集約（popup UI は非表示）',
+    items: Object.freeze([
+      '開示請求モードのトグル・証拠ボタンを popup から外し、健全な視聴者が萎縮しない UI に',
+      'ハラスメント時の記録と証拠パック（CSV・JSON・特定情報・SHA-256）の説明を LP 用語⑪に追加',
+      '開示請求向け lib は内部に保持（将来の再有効化用）'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.564',
+    date: '2026-06-02',
+    summary: '開示請求モードと証拠パック書き出し',
+    items: Object.freeze([
+      '詳細設定に開示請求モードを追加（該当疑いコメントを popup 非表示・記録は継続）',
+      '開示請求に十分使える証拠パック（CSV・JSON・特定情報たたき台・manifest・SHA-256）を書き出し',
+      'コメント番号・userId・日時・本文をプロバイダ責任制限法の特定情報として整理'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.563',
+    date: '2026-06-02',
+    summary: '興味タグ来場をマーケ分析に追加',
+    items: Object.freeze([
+      'ニコ公式の「○○が好きなN人が来場しました」システムコメを専用指標として集計',
+      'マーケ HTML に興味タグ別来場セクション（タグランキング・来場人数合算）を追加',
+      '興味タグ来場行は通常 KPI（コメ数・発言者数など）から除外しノイズを防ぐ'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.562',
+    date: '2026-06-02',
+    summary: '埋め込みパネル演出を watch 画面全体に表示',
+    items: Object.freeze([
+      'watch ページ内 iframe から、三キャラ豪雨・ギフトズーム等を親ウィンドウ（動画＋コメント列全体）に中継',
+      'popup パネル内だけに閉じていた fixed 演出を、content script がトップフレームに描画',
+      '中継に失敗したときだけ従来どおりパネル内にフォールバック'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.561',
+    date: '2026-06-02',
+    summary: '100pt広告で三キャラ豪雨が出ない問題を修正',
+    items: Object.freeze([
+      'watch 埋め込みパネルは「動きを抑える」が既定 ON だったため、節目演出が吹き出し（バナー）だけになっていた不具合を修正',
+      '広告・ギフト・フォロワーなどの shower／豪雨／飛び文字は、動き抑え設定とは独立して表示（OS の「視差効果を減らす」のみ尊重）',
+      '自分が投げた 100pt 前後の広告でも、三キャラの降る数を少し増やしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.560',
+    date: '2026-06-02',
+    summary: '広告・フォロワー演出をパネル全体の豪雨に',
+    items: Object.freeze([
+      'ニコニ広告・自分操作・フォロワー増の演出を記録カード上から外し、パネル全体で三キャラが降る豪雨に変更',
+      'フォロワー数はパネル表示中に約45秒ごと nvapi 取得（従来5分更新では取りこぼしていた）',
+      'バナーは上部に小さく表示し、記録数字やボタンを塞がないように調整'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.559',
+    date: '2026-06-02',
+    summary: '自分広告100ptでも演出＋フォロワー増加演出',
+    items: Object.freeze([
+      'ニコニ広告のコメント検知を改善（seed 処理・本人判定・100pt 等の表記ゆれ）',
+      '公式の累計広告ptが増えた瞬間も即演出（storage 更新を待たず反映）',
+      '配信者プロフィールのフォロワー数が増えたとき、三キャラ shower でお祝い'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.558',
+    date: '2026-06-02',
+    summary: '広告5000pt達成の文字表示と三キャラ統一',
+    items: Object.freeze([
+      'ニコニ広告の節目バナーを「○○pt 達成！」表記に変更。長文が切れないよう折り返し表示',
+      '5000pt などの飛び文字を「5,000pt」「達成！」に分割して読みやすく',
+      'ギフト・広告・順位UP・自分操作を含む shower 演出を、りんく・こん太・たぬ姉の三キャラ混在に統一'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.557',
     date: '2026-06-02',
     summary: '自分操作時の軽い演出を追加',
@@ -174,7 +612,7 @@ export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
     version: '0.1.542',
     date: '2026-06-02',
-    summary: 'コメンターフォロー情報のレポート時補完と nvapi 認証エラー判定の修正',
+    summary: 'コメンターフォロー補完と nvapi 認証エラー判定修正',
     items: Object.freeze([
       'レポート出力時に数値 ID コメンターのプロフィール（フォロワー/フォロー数等）を最大8名まで自動取得するようにしました',
       'フォロー一覧 API の meta.status 401/403 を正しく login_required / forbidden と判定（従来は error 扱い）',

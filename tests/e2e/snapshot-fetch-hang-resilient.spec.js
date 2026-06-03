@@ -35,6 +35,7 @@ import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const KEY_RECORDING = 'nls_recording_enabled';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 const STORAGE_COMMENTS = 'nls_comments_lv888888888';
+const STORAGE_PANEL_SUMMARY = 'nls_panel_summary_lv888888888';
 
 test('snapshot fetch が永久ハングしても snapshotFetchActive は永久 true に張り付かない（全部—固定の根治）', async ({
   context
@@ -44,17 +45,28 @@ test('snapshot fetch が永久ハングしても snapshotFetchActive は永久 t
   const extensionId = new URL(sw.url()).hostname;
 
   await sw.evaluate(
-    async ({ recordingKey, lastWatchKey, commentsKey, watchUrl }) => {
+    async ({ recordingKey, lastWatchKey, commentsKey, panelSummaryKey, watchUrl }) => {
       await chrome.storage.local.set({
         [recordingKey]: true,
         [lastWatchKey]: watchUrl,
-        [commentsKey]: []
+        [commentsKey]: [],
+        [panelSummaryKey]: {
+          v: 1,
+          liveId: 'lv888888888',
+          recordedCount: 42,
+          officialCount: 100,
+          viewerCountFromDom: 55,
+          concurrentEstimated: 9,
+          updatedAt: Date.now(),
+          recent: []
+        }
       });
     },
     {
       recordingKey: KEY_RECORDING,
       lastWatchKey: KEY_LAST_WATCH_URL,
       commentsKey: STORAGE_COMMENTS,
+      panelSummaryKey: STORAGE_PANEL_SUMMARY,
       watchUrl: MOCK_WATCH
     }
   );
@@ -119,6 +131,20 @@ test('snapshot fetch が永久ハングしても snapshotFetchActive は永久 t
       message: 'snapshot fetch が開始して snapshotFetchActive=true になるまで'
     })
     .toBe(true);
+
+  // v0.1.594: fetch ハング中でも panel サマリで記録カードが「—」のままにならない。
+  await expect
+    .poll(
+      async () =>
+        (await popup.locator('#liveStatComments').innerText())
+          .trim()
+          .replace(/[,，\s]/g, ''),
+      {
+        timeout: 12_000,
+        message: 'snapshot fetch ハング中でも panel サマリで記録件数が表示されるまで'
+      }
+    )
+    .toBe('42');
 
   // 2) ★ 核心: fetch は永久ハングしているのに、snapshotFetchActive が false へ戻る瞬間が来る。
   //    = withTimeout が 15s で打ち切り finally が走り、フラグがリセットされた証拠。

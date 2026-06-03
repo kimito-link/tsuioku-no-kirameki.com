@@ -1611,15 +1611,22 @@ const KOKEN_GIFT_HISTORY_FETCH_MESSAGE_TYPE = 'NLS_KOKEN_GIFT_HISTORY_FETCH';
 const KOKEN_GIFT_HISTORY_LIVE_ID_RE = /^lv\d{1,15}$/;
 const KOKEN_GIFT_HISTORY_FETCH_TIMEOUT_MS = 8000;
 
-async function fetchKokenGiftHistoryJson(liveId) {
+async function fetchKokenGiftHistoryJson(liveId, nextCursor) {
   const lid = String(liveId == null ? '' : liveId)
     .trim()
     .toLowerCase();
   if (!KOKEN_GIFT_HISTORY_LIVE_ID_RE.test(lid)) return { ok: false };
-  const url =
+  let url =
     'https://api.koken.nicovideo.jp/v1/userperspective/contents/gift/live/' +
     encodeURIComponent(lid) +
     '/histories';
+  const cursor =
+    nextCursor != null && Number.isFinite(Number(nextCursor)) && Number(nextCursor) > 0
+      ? Math.floor(Number(nextCursor))
+      : null;
+  if (cursor != null) {
+    url += '?nextCount=' + encodeURIComponent(String(cursor));
+  }
   const ac = new AbortController();
   const timer = setTimeout(() => {
     try {
@@ -1670,7 +1677,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       /* port already closed: best-effort */
     }
   };
-  fetchKokenGiftHistoryJson(msg.liveId)
+  fetchKokenGiftHistoryJson(msg.liveId, msg.nextCursor)
     .then(reply)
     .catch(() => reply({ ok: false }));
   return true; // 非同期 sendResponse のため message channel を保持
@@ -1901,6 +1908,237 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   fetchNicoUserProfileJson(msg.uid)
     .then(reply)
     .catch(() => reply({ ok: false }));
+  return true;
+});
+
+/* ------------------------------------------------------------------ */
+/* コメンター フォロー一覧 nvapi（非公式・Cookie 必須）                          */
+/* src/lib/nicoUserFollowingApi.js の NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE 同期 */
+/* ------------------------------------------------------------------ */
+
+const NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE = 'NLS_NICO_USER_FOLLOWING_FETCH';
+const NICO_USER_FOLLOWING_FETCH_TIMEOUT_MS = 12_000;
+const NICO_USER_FOLLOWING_LRU_MAX = 64;
+const NICO_USER_FOLLOWING_LRU_TTL_MS = 10 * 60 * 1000;
+const NICO_USER_FOLLOWING_PAGE_SIZE = 100;
+const NICO_USER_FOLLOWING_MAX_PAGES = 2;
+const NICO_USER_FOLLOWING_MAX_USER_IDS = 200;
+/** @type {Map<string, number>} */
+const _nicoUserFollowingLru = new Map();
+
+function _nicoUserFollowingLruShouldSkip(uid, now) {
+  const at = _nicoUserFollowingLru.get(uid);
+  return at != null && now - at < NICO_USER_FOLLOWING_LRU_TTL_MS;
+}
+
+function _nicoUserFollowingLruNote(uid, now) {
+  if (_nicoUserFollowingLru.has(uid)) _nicoUserFollowingLru.delete(uid);
+  _nicoUserFollowingLru.set(uid, now);
+  while (_nicoUserFollowingLru.size > NICO_USER_FOLLOWING_LRU_MAX) {
+    const oldest = _nicoUserFollowingLru.keys().next().value;
+    if (oldest === undefined) break;
+    _nicoUserFollowingLru.delete(oldest);
+  }
+}
+
+function _buildNicoUserFollowingListUrl(uid, page) {
+  const params = new URLSearchParams();
+  params.set('pageSize', String(NICO_USER_FOLLOWING_PAGE_SIZE));
+  if (page > 1) params.set('page', String(page));
+  return (
+    'https://nvapi.nicovideo.jp/v1/users/' +
+    encodeURIComponent(uid) +
+    '/following/users?' +
+    params.toString()
+  );
+}
+
+/**
+ * @param {unknown} item
+ * @returns {string|null}
+ */
+function _extractFollowingUserId(item) {
+  if (item == null) return null;
+  if (typeof item === 'number' || typeof item === 'string') {
+    const s = String(item).trim();
+    return NICO_USER_PROFILE_UID_RE.test(s) && Number(s) > 0 ? s : null;
+  }
+  if (typeof item === 'object' && !Array.isArray(item)) {
+    const o = /** @type {Record<string, unknown>} */ (item);
+    return _extractFollowingUserId(o.id ?? o.userId);
+  }
+  return null;
+}
+
+/**
+ * @param {unknown} json
+ * @returns {{ userIds: string[], totalCount?: number, hasMore: boolean, pageCount: number }|null}
+ */
+function _normalizeFollowingListAggregate(json) {
+  if (!json || typeof json !== 'object') return null;
+  const j = /** @type {Record<string, any>} */ (json);
+  if (j.meta && Number(j.meta.status) !== 200) return null;
+  const data = j.data;
+  if (!data || typeof data !== 'object' || !Array.isArray(data.items)) return null;
+  /** @type {string[]} */
+  const userIds = [];
+  const seen = new Set();
+  for (const item of data.items) {
+    const uid = _extractFollowingUserId(item);
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    userIds.push(uid);
+  }
+  const totalCount = Number(data.totalCount ?? data.total ?? data.count);
+  const nextPage = Number(data.nextPage);
+  const hasMore =
+    (Number.isFinite(nextPage) && nextPage > 0) ||
+    (Number.isFinite(totalCount) && totalCount > userIds.length && data.items.length > 0);
+  /** @type {{ userIds: string[], totalCount?: number, hasMore: boolean, pageCount: number }} */
+  const out = { userIds, hasMore, pageCount: 1 };
+  if (Number.isFinite(totalCount) && totalCount >= 0) out.totalCount = Math.floor(totalCount);
+  return out;
+}
+
+/**
+ * @param {number} status
+ * @returns {'login_required'|'forbidden'|'error'}
+ */
+function _classifyFollowingFetchFailure(status) {
+  const code = Number(status);
+  if (code === 401) return 'login_required';
+  if (code === 403 || code === 404) return 'forbidden';
+  return 'error';
+}
+
+async function fetchNicoUserFollowingListJson(uid) {
+  const id = String(uid == null ? '' : uid).trim();
+  if (!NICO_USER_PROFILE_UID_RE.test(id) || Number(id) <= 0) return { ok: false };
+  const now = Date.now();
+  if (_nicoUserFollowingLruShouldSkip(id, now)) return { ok: false, skipped: true };
+  _nicoUserFollowingLruNote(id, now);
+
+  /** @type {string[]} */
+  const allIds = [];
+  const seen = new Set();
+  let totalCount;
+  let pageCount = 0;
+  let lastStatus = 0;
+
+  for (let page = 1; page <= NICO_USER_FOLLOWING_MAX_PAGES; page += 1) {
+    const url = _buildNicoUserFollowingListUrl(id, page);
+    const ac = new AbortController();
+    const timer = setTimeout(() => {
+      try {
+        ac.abort();
+      } catch {
+        /* no-op */
+      }
+    }, NICO_USER_FOLLOWING_FETCH_TIMEOUT_MS);
+    let res;
+    let json = null;
+    try {
+      res = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        redirect: 'error',
+        referrerPolicy: 'no-referrer',
+        headers: { Referer: 'https://www.nicovideo.jp/' },
+        signal: ac.signal
+      });
+      lastStatus = res.status;
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+    } catch {
+      return { ok: false, followingStatus: 'error' };
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const metaStatus =
+      json && typeof json === 'object' && json.meta != null
+        ? Number(/** @type {Record<string, unknown>} */ (json).meta?.status)
+        : NaN;
+    if (Number.isFinite(metaStatus) && metaStatus !== 200) {
+      return {
+        ok: false,
+        status: metaStatus,
+        followingStatus: _classifyFollowingFetchFailure(metaStatus)
+      };
+    }
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: lastStatus,
+        followingStatus: _classifyFollowingFetchFailure(lastStatus)
+      };
+    }
+
+    const normalized = _normalizeFollowingListAggregate(json);
+    if (!normalized) {
+      return { ok: false, status: lastStatus, followingStatus: 'error' };
+    }
+    pageCount += 1;
+    if (totalCount == null && normalized.totalCount != null) totalCount = normalized.totalCount;
+    for (const followUid of normalized.userIds) {
+      if (seen.has(followUid)) continue;
+      seen.add(followUid);
+      allIds.push(followUid);
+      if (allIds.length >= NICO_USER_FOLLOWING_MAX_USER_IDS) break;
+    }
+    const truncated = allIds.length >= NICO_USER_FOLLOWING_MAX_USER_IDS;
+    if (truncated || !normalized.hasMore || page >= NICO_USER_FOLLOWING_MAX_PAGES) {
+      return {
+        ok: true,
+        status: lastStatus,
+        followingStatus: 'ok',
+        userIds: allIds,
+        totalCount,
+        truncated,
+        pageCount
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    status: lastStatus,
+    followingStatus: 'ok',
+    userIds: allIds,
+    totalCount,
+    truncated: allIds.length >= NICO_USER_FOLLOWING_MAX_USER_IDS,
+    pageCount
+  };
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed */
+    }
+  };
+  fetchNicoUserFollowingListJson(msg.uid)
+    .then(reply)
+    .catch(() => reply({ ok: false, followingStatus: 'error' }));
   return true;
 });
 

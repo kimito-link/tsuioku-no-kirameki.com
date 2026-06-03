@@ -49,6 +49,22 @@ describe('resolveConcurrentFromSnapshot', () => {
     expect(typeof resolved.estimated).toBe('number');
   });
 
+  it('officialViewerCount 0 + 来場ありは滞留推定（古い snapshot 汚染）', () => {
+    const now = 1_700_000_000_000;
+    const resolved = resolveConcurrentFromSnapshot(
+      {
+        officialViewerCount: 0,
+        officialStatsUpdatedAt: now - 1000,
+        viewerCountFromDom: 4737,
+        recentActiveUsers: 0,
+        streamAgeMin: 210
+      },
+      now
+    );
+    expect(resolved.method).toBe('fallback');
+    expect(resolved.estimated).toBeGreaterThan(100);
+  });
+
   it('新鮮な公式同接があれば official 採用', () => {
     const now = 1_700_000_000_000;
     const resolved = resolveConcurrentFromSnapshot(

@@ -36,6 +36,10 @@ export const INGEST_TIMING = /** @type {const} */ ({
   //   完了させ、真に stuck したケースだけ外側ガード（×4=40s）で解放する。
   persistWriteTimeoutMs: 10000,
   visibleScanDelayMs: 380,
+  /** スクロール終了後に visible scan を 1 回だけ走らせる debounce */
+  visibleScanEndDebounceMs: 360,
+  /** visible scan の「スクロール中」見送り窓（deep より短い） */
+  visibleScanScrollDeferMs: 400,
   pageFrameLoopMs: 360,
   /** scroll/resize からのインライン再レイアウトのみ（メンテ処理は走らせない） */
   pageFrameLayoutScrollDebounceMs: 150,
@@ -69,6 +73,15 @@ export const SUBMIT_TIMING = /** @type {const} */ ({
   reactSettleMs: 220,
   buttonPollTimeoutMs: 1200,
   buttonPollIntervalMs: 80
+});
+
+/** popup 拡張からの fastSubmit（コメント欄は通常既に表示済み） */
+export const SUBMIT_TIMING_FAST = /** @type {const} */ ({
+  editorPollTimeoutMs: 400,
+  editorPollIntervalMs: 35,
+  reactSettleMs: 50,
+  buttonPollTimeoutMs: 700,
+  buttonPollIntervalMs: 45
 });
 
 export const MAP_LIMITS = /** @type {const} */ ({
