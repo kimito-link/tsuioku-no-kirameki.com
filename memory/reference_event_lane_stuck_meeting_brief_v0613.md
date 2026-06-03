@@ -110,3 +110,60 @@
 4. npm run verify 全緑 + 回帰テスト
 5. v0.1.615 bump
 6. docs/codex-event-lane-stuck-fix-v0613.md に真因+設計
+
+---
+
+## 7.【追記 2026-06-03 夜・2回目起動】真因 確定済み → 検証スキップ・実装直行
+
+> 1回目の Codex 起動は reasoning 段階で時間切れ・成果ゼロだった。
+> その後**司令塔が grep で真因を確定**したので、2回目は **検証フェーズを省略し即実装**せよ。
+
+### 確定した真因(grep 実証済み・再検証不要)
+`refreshAllNorthStarMirrorLanes`(popup-entry.js:10176・内部で event 2レーンの hide を呼ぶ)の
+**呼び出しは2箇所だけ**:
+- :10265(`liveId` が空のときだけ=通常配信では呼ばれない)
+- :10298(**try/catch 無しの async IIFE :10269-10306 の中**)
+
+IIFE は :10298 の手前で以下を **try/catch 無し**で await:
+- :10270 `await refreshOfficialEventDomBundle(liveId)`
+- :10296 `await refreshGiftRankStrip(liveId)`
+
+→ **どちらかが throw / hang すると :10298(hide)に到達しない**。
+→ **定期ポーリングの fallback も存在しない**。
+→ 結果、イベント非参加配信で event 2レーンが「問い合わせ中」のまま**恒久凍結**。症状と完全一致。
+
+### 採用する修正(司令塔が確定・Codex はこの通り実装)
+**案1(必須)+ 案2(必須)のハイブリッド**:
+
+- **案1: hide を非同期チェーンの失敗から独立させる**
+  - 方針a(推奨): async IIFE(:10269)を try/finally でくるみ、**finally で必ず**
+    `await refreshAllNorthStarMirrorLanes(northLv)` 相当を実行(=bundle/gift が失敗しても hide は走る)。
+    ただし二重実行を避けるため、現在 :10298 にある呼び出しと整理統合すること。
+  - もしくは方針b: refreshOfficialEventDomBundle / refreshGiftRankStrip を個別に try/catch で
+    囲み、throw が後続 await を止めないようにする(:10270, :10296)。
+  - **方針a + b 両方が安全**(finally 保証 + 個別 await の throw 握り)。Codex は両方入れてよい。
+
+- **案2: 待機UIにタイムアウト確定**
+  - event 2レーン(eventBroadcasters / eventVotingSupporters)が待機開始から N 秒(例 12-15秒)
+    経っても rows が来ないなら、`setNorthStarLaneHidden(..., true)` で**畳む**
+    (=「イベント非参加のようです」の確定状態)。
+  - 経過判定の土台あり: `clearNorthStarLaneWaitStartTimes` / wait開始時刻 Map(northStarLaneWaitingUi 系)。
+    既存の北極星待機の経過 ms 取得関数を流用すること。
+  - タイムアウト後の hide は冪等(参加中に後から rows が来たら再表示できる設計が理想だが、
+    最低限「非参加で固まらない」を満たせばよい)。
+
+### 機能後退ゼロの厳守(最重要)
+- **イベント参加中(rows>0)では従来通り出る**こと。タイムアウトで参加中の配信のランキングを
+  消してはならない。タイムアウト hide は「rows が一度も来ていない」場合のみ。
+- 案1 の finally 保証は hide だけでなく、**rows があれば show も**正しく走る
+  (refreshAllNorthStarMirrorLanes は show/hide 両方を内包しているので、それを確実に呼べばよい)。
+
+### 実装手順(Codex・最短ルート)
+1. `git checkout fix/event-ranking-lane-stuck-waiting && git pull`
+2. popup-entry.js :10269-10306 の async IIFE を案1(finally 保証 + 個別 try/catch)に改修
+3. event 2レーンの待機タイムアウト(案2)を追加(純関数化できる経過判定はlibへ)
+4. 回帰テスト追加(非参加で畳む / 参加中は出る / タイムアウト経過判定の純関数)
+5. v0.1.615 bump(manifest/package/changelog)
+6. `npm run verify` 全緑を**必ず確認**
+7. docs/codex-event-lane-stuck-fix-v0613.md に真因+採用案+テスト結果
+8. **commit + push まで必ず完遂**(前回 忘れた)
