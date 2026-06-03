@@ -198,7 +198,10 @@ export function upsertCommenterFollowEntry(map, uid, entry, opts = {}) {
  * 与えた候補 uid のうち、follow キャッシュに無い/TTL 切れのものを最大 limit 件返す。
  * @param {Iterable<string>} candidateUids
  * @param {Record<string, CommenterFollowEntry>} cache
- * @param {{ nowMs?: number, ttlMs?: number, limit?: number }} [opts]
+ * @param {{ nowMs?: number, ttlMs?: number, limit?: number, forceRefetch?: boolean }} [opts]
+ *   - forceRefetch: TTL チェックをスキップして、キャッシュ済みでも対象に含める。
+ *     popup の「強制再取得」ボタン用(v0.1.608 Phase 1-C)。既存呼び出しは
+ *     省略可なので互換性あり。
  * @returns {string[]}
  */
 export function pickFollowUidsToFetch(candidateUids, cache, opts = {}) {
@@ -207,6 +210,7 @@ export function pickFollowUidsToFetch(candidateUids, cache, opts = {}) {
   const limit = Number.isFinite(Number(opts.limit)) && Number(opts.limit) > 0
     ? Math.floor(Number(opts.limit))
     : COMMENTER_FOLLOW_FETCH_BATCH;
+  const forceRefetch = opts.forceRefetch === true;
   const safeCache = cache && typeof cache === 'object' ? cache : {};
   /** @type {string[]} */
   const out = [];
@@ -215,8 +219,10 @@ export function pickFollowUidsToFetch(candidateUids, cache, opts = {}) {
     const uid = String(raw || '').trim();
     if (!/^\d{1,18}$/.test(uid) || seen.has(uid)) continue;
     seen.add(uid);
-    const hit = safeCache[uid];
-    if (hit && isFreshFollowEntry(Number(hit.fetchedAt), nowMs, ttlMs)) continue;
+    if (!forceRefetch) {
+      const hit = safeCache[uid];
+      if (hit && isFreshFollowEntry(Number(hit.fetchedAt), nowMs, ttlMs)) continue;
+    }
     out.push(uid);
     if (out.length >= limit) break;
   }
