@@ -105,7 +105,10 @@ import {
   isNorthStarLaneWaitingState,
   buildNorthStarLaneWaitingShellHtml,
   buildNorthStarLaneOpenHintDiagramHtml,
-  getNorthStarWaitRotationMessages
+  getNorthStarWaitRotationMessages,
+  isNorthStarEventLaneWaitTimedOut,
+  NORTH_STAR_EVENT_LANE_WAIT_TIMEOUT_MS,
+  NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS
 } from '../lib/northStarLaneWaitingUi.js';
 import {
   acquisitionPctFromNorthStarLaneState,
@@ -8684,6 +8687,70 @@ function mountAllNorthStarLanesBundleLoadingUi(liveId) {
 }
 
 /**
+ * v0.1.615: 当該レーン body が「待機UIのまま（rows が一度も塗られていない）」か。
+ * paintTopSupportRankStyleIntoElement / renderNorthStarLane で実データが塗られると
+ * 待機マーカー（[data-north-star-wait]）は消える。残っていれば未取得＝畳んで良い。
+ * rows が来ていれば false を返すので、タイムアウト hide が参加中の表示を消すことはない。
+ * @param {string} laneId
+ * @returns {boolean}
+ */
+function isNorthStarLaneStillWaiting(laneId) {
+  const body = document.getElementById('northStarLaneBody-' + String(laneId || ''));
+  if (!(body instanceof HTMLElement)) return false;
+  return !!body.querySelector('[data-north-star-wait="1"]');
+}
+
+/** v0.1.615: イベント系レーン固まり監視のワンショット timer を張った liveId。 */
+let _northStarEventLaneStuckTimeoutLiveId = '';
+/** @type {ReturnType<typeof setTimeout>|null} */
+let _northStarEventLaneStuckTimeoutHandle = null;
+
+/**
+ * v0.1.615: イベント系2レーン（eventBroadcasters / eventVotingSupporters）の
+ * 「公式から問い合わせ中」恒久凍結を畳むワンショット監視。
+ *
+ * 案1（finally 保証）で throw 経路は塞いだが、async await が永久 pending（hang）で
+ * finally すら遅延する経路に備えた保険。待機開始からタイムアウト超過時点でも
+ * レーンが「待機UIのまま（rows 未塗装）」なら setNorthStarLaneHidden で畳む（=非参加確定）。
+ *
+ * 機能後退ゼロの担保:
+ *   ・rows が一度でも来ていれば待機マーカーが消えるので isNorthStarLaneStillWaiting が
+ *     false ＝ hide しない（参加中の配信のランキングを消さない）。
+ *   ・liveId 単位でワンショット（同一配信の更新ポーリングで timer を積み増さない）。
+ *   ・liveId が変われば前 timer を破棄して新規に張り直す。
+ *
+ * @param {string} liveId
+ */
+function scheduleNorthStarEventLaneStuckTimeout(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return;
+  // 同一 liveId で既に監視中なら二重に張らない（更新のたびに timer を積まない）。
+  if (_northStarEventLaneStuckTimeoutLiveId === lid && _northStarEventLaneStuckTimeoutHandle !== null) {
+    return;
+  }
+  if (_northStarEventLaneStuckTimeoutHandle !== null) {
+    clearTimeout(_northStarEventLaneStuckTimeoutHandle);
+    _northStarEventLaneStuckTimeoutHandle = null;
+  }
+  _northStarEventLaneStuckTimeoutLiveId = lid;
+  _northStarEventLaneStuckTimeoutHandle = setTimeout(() => {
+    _northStarEventLaneStuckTimeoutHandle = null;
+    // 待機開始からの経過 ms（同期）。待機状態でなければ undefined ＝畳まない。
+    for (const laneId of NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS) {
+      if (!isNorthStarLaneStillWaiting(laneId)) continue; // rows 済み＝触らない
+      const key = `${lid}|${laneId}`;
+      const started = _northStarLaneWaitStartAt.get(key);
+      const elapsedMs =
+        typeof started === 'number' ? Math.max(0, Date.now() - started) : undefined;
+      // 待機開始時刻が無い場合も、ここまで待機UIが残っている＝タイムアウト相当として畳む。
+      if (started === undefined || isNorthStarEventLaneWaitTimedOut(elapsedMs)) {
+        setNorthStarLaneHidden(laneId, true);
+      }
+    }
+  }, NORTH_STAR_EVENT_LANE_WAIT_TIMEOUT_MS);
+}
+
+/**
  * v0.1.237: 北極星「鏡のように貼り付け」レーン body へ mirrorHtml を sanitize して流し込む。
  * 取得待ち（not_yet / iframe_unrendered）はゲージ＋3 キャラのローディング UI。
  *
@@ -10266,43 +10333,77 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   }
   // bundle 取得 → 5チップ/NDGR/参加バナーを即塗装 → ランキング帯・北極星鏡（待ちが長い）→ prompt。
   // 以前は北極星の await が先で、公式チップが数十秒〜1分「—」のままになることがあった。
+  //
+  // v0.1.615: 真因対策（[[reference_event_ranking_lane_stuck_waiting_v0614]]）。
+  //   以前は refreshOfficialEventDomBundle / refreshGiftRankStrip を try/catch 無しで
+  //   await していたため、どちらかが throw / hang すると後段の
+  //   refreshAllNorthStarMirrorLanes（イベント系2レーンの hide / show を内包）へ到達せず、
+  //   イベント非参加配信で「公式から問い合わせ中」の待機UIが恒久凍結した。
+  //   ・案1a: IIFE 全体を try/finally でくるみ、finally で必ず refreshAllNorthStarMirrorLanes
+  //     を1回だけ実行する（rows があれば show、無ければ hide が確実に走る）。
+  //   ・案1b: throw しやすい個別 await を try/catch で囲み、1つの失敗が後続を止めない。
+  const northLv = String(liveId || '').trim().toLowerCase();
+  // 案2: hang 保険は IIFE の await より前に同期で仕込む。finally 内だと、prompt 系 await が
+  //   永久 pending のとき finally 自体に到達せず保険も張れないため（[[reference_event_ranking_lane_stuck_waiting_v0614]]）。
+  //   タイムアウト時点で rows 未塗装のイベント系2レーンだけを畳む（参加中は待機マーカーが
+  //   消えているので発火しない＝機能後退ゼロ）。
+  scheduleNorthStarEventLaneStuckTimeout(northLv);
   void (async () => {
-    await refreshOfficialEventDomBundle(liveId);
-    {
-      const snap = watchMetaCache.snapshot;
-      if (snap) {
-        paintOfficialNicoStatsStrip(
-          /** @type {Record<string, unknown>} */ (snap)
+    try {
+      // 案1b: bundle 取得失敗が後段（塗装〜hide）を巻き込まないよう個別に握る。
+      try {
+        await refreshOfficialEventDomBundle(liveId);
+      } catch {
+        /* best-effort: バンドル取得失敗でも finally の hide/show は走らせる */
+      }
+      {
+        const snap = watchMetaCache.snapshot;
+        if (snap) {
+          paintOfficialNicoStatsStrip(
+            /** @type {Record<string, unknown>} */ (snap)
+          );
+          paintOfficialNdgrGiftCard(
+            /** @type {Record<string, unknown>} */ (snap)
+          );
+          paintOfficialEventBannerCard(
+            /** @type {Record<string, unknown>} */ (snap)
+          );
+        } else {
+          paintOfficialEventBannerCard(null);
+        }
+      }
+      void trackBroadcasterFollowerForCelebration(northLv);
+      const snapMeta = watchMetaCache.snapshot;
+      if (snapMeta) {
+        renderWatchMetaCard(
+          /** @type {WatchPageSnapshot} */ (snapMeta),
+          Array.isArray(entries) ? entries : []
         );
-        paintOfficialNdgrGiftCard(
-          /** @type {Record<string, unknown>} */ (snap)
-        );
-        paintOfficialEventBannerCard(
-          /** @type {Record<string, unknown>} */ (snap)
-        );
-      } else {
-        paintOfficialEventBannerCard(null);
+      }
+      syncLiveStatThreeCardsCharLoadingOverlays();
+      // 案1b: ギフト帯取得失敗も後段を止めない。
+      try {
+        await refreshGiftRankStrip(liveId);
+      } catch {
+        /* best-effort */
+      }
+      // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
+      await refreshGiftRankingFetchPrompt(liveId);
+      // v0.1.405/v0.1.450 (PR4): 過去ログ一括バックフィルの A 内 hint を反映。
+      //   B (#backfillFetchPrompt) は廃止済。記録カード内 hint のみを面倒見る。
+      await refreshBackfillRecordCardHint(liveId);
+    } catch {
+      /* best-effort: 上記いずれかの throw でも finally の hide/show を保証する */
+    } finally {
+      // 案1a: bundle / gift / prompt が失敗・hang しても、北極星6レーンの確定描画
+      //   （イベント系は rows 無しで hide）を必ず1回だけ走らせる。これが本バグの直し。
+      try {
+        await refreshAllNorthStarMirrorLanes(northLv);
+        markWatchPopupLoadPhase('north_star_done', { liveId: northLv });
+      } catch {
+        /* レーン描画自体の失敗は次回更新で回復（恒久凍結は finally 到達で既に回避済み） */
       }
     }
-    void trackBroadcasterFollowerForCelebration(String(liveId || '').trim().toLowerCase());
-    const snapMeta = watchMetaCache.snapshot;
-    if (snapMeta) {
-      renderWatchMetaCard(
-        /** @type {WatchPageSnapshot} */ (snapMeta),
-        Array.isArray(entries) ? entries : []
-      );
-    }
-    syncLiveStatThreeCardsCharLoadingOverlays();
-    await refreshGiftRankStrip(liveId);
-    const northLv = String(liveId || '').trim().toLowerCase();
-    void refreshAllNorthStarMirrorLanes(northLv).then(() => {
-      markWatchPopupLoadPhase('north_star_done', { liveId: northLv });
-    });
-    // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
-    await refreshGiftRankingFetchPrompt(liveId);
-    // v0.1.405/v0.1.450 (PR4): 過去ログ一括バックフィルの A 内 hint を反映。
-    //   B (#backfillFetchPrompt) は廃止済。記録カード内 hint のみを面倒見る。
-    await refreshBackfillRecordCardHint(liveId);
   })();
 
   const list = capCommentsForAnalytics(Array.isArray(entries) ? entries : []);
