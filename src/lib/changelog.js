@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.616',
+    date: '2026-06-04',
+    summary: '裏タブだと貢献度・ギフトが取れなくなる不具合を修正',
+    items: Object.freeze([
+      '配信タブから別のタブやウィンドウにフォーカスを移すと、貢献度ランキングとギフト履歴が「取得中...」のまま取れなくなることがあった不具合を修正',
+      'まだ取れていないときは、タブが裏にあっても公式から取りにいくようにした（取れたら裏では静かにする）',
+      'すでに取れている配信では、これまで通り余分な取得はしない'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.615',
     date: '2026-06-03',
     summary: 'イベント順位レーンが「問い合わせ中」で固まる不具合を修正',
