@@ -1,7 +1,18 @@
 /**
  * 数値IDコメンターのフォロー情報を、マーケ分析HTMLで扱いやすい形へ整える純関数群。
  * chrome API / DOM / fetch には依存しない。
+ *
+ * v0.1.610 (OSINT Phase 2-B): `buildCommenterFollowAnalytics` の opts に
+ * `includeSupporterPower: true` を渡すと、応援者パワー診断(A〜E・0-100)の
+ * supporterPowerRows と supporterPowerSummary を追加 export する。
+ * 既存 return は名前も型も変更しない(Codex 設計の互換性方針)。
+ * 設計: docs/codex-supporter-power-scoring-design-v0607.md
  */
+
+import {
+  computeAllSupporterPowers,
+  buildSupporterPowerSummary
+} from './supporterPowerScoring.js';
 
 export const COMMENTER_FOLLOW_CSV_BOM = '\ufeff';
 
@@ -56,6 +67,29 @@ export const COMMENTER_FOLLOW_CSV_BOM = '\ufeff';
  */
 
 /**
+ * v0.1.610 Phase 2-B: 応援者パワー診断行(SupporterPower の row 形）。
+ * @typedef {{
+ *   userId: string,
+ *   nickname: string,
+ *   commentCount: number,
+ *   giftTotalPoints: number,
+ *   loyaltyCount: number|null,
+ *   followerCount: number|null,
+ *   followeeCount: number|null,
+ *   isPremium: boolean|null,
+ *   userLevel: number|null,
+ *   power: {
+ *     score: number,
+ *     tier: 'S'|'A'|'B'|'C'|'D'|'E',
+ *     components: { engagement: number, loyalty: number, influence: number },
+ *     percentile: number,
+ *     coverage: { hasGiftData: boolean, influenceFieldsAvailable: number }
+ *   },
+ *   segmentId: 'highFollowerRegulars'|'localEnthusiasts'|'quietSupporters'|'other'
+ * }} SupporterPowerRowEx
+ */
+
+/**
  * @typedef {{
  *   rows: CommenterFollowAnalyticsRow[],
  *   rowsWithFollowerCount: CommenterFollowAnalyticsRow[],
@@ -71,7 +105,14 @@ export const COMMENTER_FOLLOW_CSV_BOM = '\ufeff';
  *   followTiming: CommenterFollowTimingAnalysis,
  *   broadcasterFollow: CommenterBroadcasterFollowAnalysis,
  *   commonFollowees: CommenterCommonFolloweeRow[],
- *   followingListInsights: string[]
+ *   followingListInsights: string[],
+ *   supporterPowerRows?: SupporterPowerRowEx[],
+ *   supporterPowerSummary?: {
+ *     sampleSize: number,
+ *     tierCounts: Record<'S'|'A'|'B'|'C'|'D'|'E', number>,
+ *     medianScore: number,
+ *     topRows: SupporterPowerRowEx[]
+ *   }
  * }} CommenterFollowAnalytics
  */
 
@@ -850,8 +891,28 @@ export function buildCommenterFollowingListInsights(broadcasterFollow, coverage)
 
 /**
  * しきい値・点・セグメントをまとめて返す。
+ *
+ * v0.1.610 (OSINT Phase 2-B): `includeSupporterPower: true` の opt-in で
+ *   応援者パワー診断(A〜E・0-100、設計は docs/codex-supporter-power-scoring-design-v0607.md)
+ *   の rows と summary を追加 export する。既存 return は名前も型も一切変更しない
+ *   (Codex 設計の互換性方針)。
+ *
  * @param {unknown} allNumericCommenters
- * @param {{ commenterFollowDataset?: unknown, excludeUserId?: string, highPercentile?: number, priorFollowEntries?: Record<string, unknown>, durationMs?: number, followingListMap?: Record<string, unknown>, followingListCoverage?: Record<string, unknown> }} [opts]
+ * @param {{
+ *   commenterFollowDataset?: unknown,
+ *   excludeUserId?: string,
+ *   highPercentile?: number,
+ *   priorFollowEntries?: Record<string, unknown>,
+ *   durationMs?: number,
+ *   followingListMap?: Record<string, unknown>,
+ *   followingListCoverage?: Record<string, unknown>,
+ *   includeSupporterPower?: boolean,
+ *   giftTotalsByUserId?: Record<string, number>,
+ *   loyaltyCountsByUserId?: Record<string, number>,
+ *   loyaltyWindowSize?: number,
+ *   availableLiveCount?: number,
+ *   supporterPowerTopN?: number
+ * }} [opts]
  * @returns {CommenterFollowAnalytics}
  */
 export function buildCommenterFollowAnalytics(allNumericCommenters, opts = {}) {
@@ -877,7 +938,9 @@ export function buildCommenterFollowAnalytics(allNumericCommenters, opts = {}) {
     broadcasterFollow,
     opts.followingListCoverage
   );
-  return {
+
+  /** @type {CommenterFollowAnalytics} */
+  const out = {
     rows,
     rowsWithFollowerCount,
     thresholds,
@@ -889,6 +952,154 @@ export function buildCommenterFollowAnalytics(allNumericCommenters, opts = {}) {
     broadcasterFollow,
     commonFollowees,
     followingListInsights
+  };
+
+  // v0.1.610 Phase 2-B: opt-in で応援者パワー診断を計算。既存 fields は維持。
+  if (opts.includeSupporterPower === true) {
+    const sp = buildSupporterPowerOutputs(rows, opts);
+    if (sp) {
+      out.supporterPowerRows = sp.supporterPowerRows;
+      out.supporterPowerSummary = sp.supporterPowerSummary;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * v0.1.610 Phase 2-B: rows + opts から応援者パワー診断の出力を組み立てる。
+ *
+ * 既存 row(`CommenterFollowAnalyticsRow`)を SupporterInput に変換 →
+ * computeAllSupporterPowers で 0-100 score / Tier / percentile を計算 →
+ * 既存 row の補助フィールド(`segmentId`)も付けて返す。
+ *
+ * @param {CommenterFollowAnalyticsRow[]} rows
+ * @param {{
+ *   giftTotalsByUserId?: Record<string, number>,
+ *   loyaltyCountsByUserId?: Record<string, number>,
+ *   loyaltyWindowSize?: number,
+ *   availableLiveCount?: number,
+ *   highPercentile?: number,
+ *   supporterPowerTopN?: number
+ * }} opts
+ * @returns {{
+ *   supporterPowerRows: SupporterPowerRowEx[],
+ *   supporterPowerSummary: {
+ *     sampleSize: number,
+ *     tierCounts: Record<'S'|'A'|'B'|'C'|'D'|'E', number>,
+ *     medianScore: number,
+ *     topRows: SupporterPowerRowEx[]
+ *   }
+ * }|null}
+ */
+function buildSupporterPowerOutputs(rows, opts) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+
+  /** @type {Record<string, number>} */
+  const giftTotals = opts.giftTotalsByUserId && typeof opts.giftTotalsByUserId === 'object'
+    ? /** @type {any} */ (opts.giftTotalsByUserId)
+    : {};
+  /** @type {Record<string, number>} */
+  const loyaltyCounts = opts.loyaltyCountsByUserId && typeof opts.loyaltyCountsByUserId === 'object'
+    ? /** @type {any} */ (opts.loyaltyCountsByUserId)
+    : {};
+
+  // 既存 row → SupporterInput
+  const inputs = rows.map((r) => {
+    const giftRaw = giftTotals[r.userId];
+    const giftTotalPoints =
+      typeof giftRaw === 'number' && Number.isFinite(giftRaw) && giftRaw >= 0 ? giftRaw : 0;
+    const loyaltyRaw = loyaltyCounts[r.userId];
+    /** @type {number|undefined} */
+    let loyaltyCount;
+    if (typeof loyaltyRaw === 'number' && Number.isFinite(loyaltyRaw) && loyaltyRaw >= 0) {
+      loyaltyCount = Math.floor(loyaltyRaw);
+    }
+    /** @type {{
+     *   userId: string, nickname: string, commentCount: number,
+     *   giftTotalPoints: number, loyaltyCount?: number,
+     *   followerCount?: number, followeeCount?: number,
+     *   isPremium?: boolean, userLevel?: number
+     * }} */
+    const input = {
+      userId: r.userId,
+      nickname: r.nickname,
+      commentCount: r.commentCount,
+      giftTotalPoints
+    };
+    if (loyaltyCount !== undefined) input.loyaltyCount = loyaltyCount;
+    if (typeof r.followerCount === 'number') input.followerCount = r.followerCount;
+    if (typeof r.followeeCount === 'number') input.followeeCount = r.followeeCount;
+    if (typeof r.isPremium === 'boolean') input.isPremium = r.isPremium;
+    if (typeof r.userLevel === 'number') input.userLevel = r.userLevel;
+    return input;
+  });
+
+  const { rows: computed } = computeAllSupporterPowers(inputs, {
+    loyaltyWindowSize: opts.loyaltyWindowSize,
+    availableLiveCount: opts.availableLiveCount
+  });
+
+  // 既存セグメント分類を取り、行ごとに segmentId を付与する補助マップ。
+  // 「diagnostic Tier」と「解釈 segment」の併用は設計レポート §472 の方針。
+  const thresholdsForSeg = computeCommenterFollowThresholds(rows, {
+    highPercentile: opts.highPercentile
+  });
+  const segs = buildCommenterFollowSegments(rows, { thresholds: thresholdsForSeg });
+  /** @type {Record<string, 'highFollowerRegulars'|'localEnthusiasts'|'quietSupporters'|'other'>} */
+  const segmentMap = {};
+  for (const segId of /** @type {const} */ ([
+    'highFollowerRegulars',
+    'localEnthusiasts',
+    'quietSupporters'
+  ])) {
+    const bucket = /** @type {any} */ (segs?.[segId]);
+    const rowsForBucket = Array.isArray(bucket?.rows) ? bucket.rows : [];
+    for (const seg of rowsForBucket) {
+      if (seg?.userId) segmentMap[String(seg.userId)] = segId;
+    }
+  }
+
+  /** @type {SupporterPowerRowEx[]} */
+  const supporterPowerRows = computed.map((c) => ({
+    userId: c.input.userId,
+    nickname: c.input.nickname || '',
+    commentCount: c.input.commentCount,
+    giftTotalPoints: c.input.giftTotalPoints,
+    loyaltyCount: c.input.loyaltyCount ?? null,
+    followerCount: c.input.followerCount ?? null,
+    followeeCount: c.input.followeeCount ?? null,
+    isPremium: c.input.isPremium ?? null,
+    userLevel: c.input.userLevel ?? null,
+    power: c.power,
+    segmentId: segmentMap[c.input.userId] || 'other'
+  }));
+
+  const topN =
+    typeof opts.supporterPowerTopN === 'number' && opts.supporterPowerTopN > 0
+      ? Math.floor(opts.supporterPowerTopN)
+      : 10;
+  const summary = buildSupporterPowerSummary(
+    computed.map((c) => ({ input: c.input, power: c.power })),
+    { topN }
+  );
+  // summary.topRows は { input, power } 形なので、UI 用に supporterPowerRows と同じ shape に詰め直す
+  const topUidSet = new Set(summary.topRows.map((r) => r.input.userId));
+  const topRowsEx = supporterPowerRows.filter((r) => topUidSet.has(r.userId));
+  // summary.topRows と同じ順序を維持
+  /** @type {Record<string, number>} */
+  const orderIndex = {};
+  summary.topRows.forEach((r, i) => { orderIndex[r.input.userId] = i; });
+  topRowsEx.sort((a, b) => (orderIndex[a.userId] ?? 0) - (orderIndex[b.userId] ?? 0));
+
+  return {
+    supporterPowerRows,
+    supporterPowerSummary: {
+      sampleSize: summary.sampleSize,
+      tierCounts: summary.tierCounts,
+      medianScore: summary.medianScore,
+      topRows: topRowsEx
+    }
   };
 }
 
