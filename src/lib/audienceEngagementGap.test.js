@@ -21,6 +21,7 @@ describe('analyzeAudienceEngagementGap', () => {
     expect(out.level).toBe('silent-crowd');
     expect(out.commentsPer100Visitors).toBe(5);
     expect(out.uniqueCommentersPer100Visitors).toBe(1);
+    expect(out.commentParticipationPct).toBe(1);
     expect(out.silentVisitorEstimate).toBe(1188);
     expect(out.insightLines.join('\n')).toContain('静かな観客');
   });

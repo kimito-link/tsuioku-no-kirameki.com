@@ -35,16 +35,49 @@ export function displayUserLabel(userKey, nickname) {
 
 /**
  * @param {{ userId?: string|null, nickname?: string, text?: string, capturedAt?: number, avatarUrl?: string|null }[]} entries
- * @param {{ requireText?: boolean }} [options]
+ * @param {{ requireText?: boolean, sampleMaxEntries?: number }} [options]
  *   - `requireText: true` のとき、`text` が空の entry は集計から除外する。
+ *   - `sampleMaxEntries`: 件数超過時に均等サンプルしてから集計（heavy HTML 用）。
  *     ギフト送信のみ（コメント無し）のユーザーが「ユーザー別の応援件数」に
  *     混入する事象（ポンコツびぃちゃん lv350459157 で確認）を防ぐための filter。
- * @returns {{ userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string }[]}
+ * @returns {{ userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string, totalChars?: number }[]}
+ */
+/**
+ * @param {readonly { capturedAt?: number }[]} list
+ * @param {number} sampleMax
+ */
+function sampleEntriesEvenly(list, sampleMax) {
+  if (list.length <= sampleMax) return [...list];
+  const out = [];
+  const step = list.length / sampleMax;
+  for (let i = 0; i < sampleMax; i++) {
+    out.push(list[Math.floor(i * step)]);
+  }
+  return out;
+}
+
+/**
+ * @param {{ userId?: string|null, nickname?: string, text?: string, capturedAt?: number, avatarUrl?: string|null }[]} entries
+ * @param {{ requireText?: boolean, sampleMaxEntries?: number, trackCharTotals?: boolean, maxRooms?: number, sortByCount?: boolean }} [options]
+ * @returns {{ userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string, totalChars?: number }[]}
  */
 export function aggregateCommentsByUser(entries, options) {
-  const list = Array.isArray(entries) ? entries : [];
+  let list = Array.isArray(entries) ? entries : [];
+  const sampleMax =
+    typeof options?.sampleMaxEntries === 'number' && options.sampleMaxEntries > 0
+      ? Math.floor(options.sampleMaxEntries)
+      : 0;
+  if (sampleMax > 0 && list.length > sampleMax) {
+    list = sampleEntriesEvenly(list, sampleMax);
+  }
   const requireText = !!options?.requireText;
-  /** @type {Map<string, { userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string }>} */
+  const trackCharTotals = options?.trackCharTotals === true;
+  const maxRooms =
+    typeof options?.maxRooms === 'number' && options.maxRooms > 0
+      ? Math.floor(options.maxRooms)
+      : 0;
+  const sortByCount = options?.sortByCount === true;
+  /** @type {Map<string, { userKey: string, nickname: string, count: number, lastAt: number, lastText: string, avatarUrl: string, totalChars: number }>} */
   const map = new Map();
 
   for (const e of list) {
@@ -65,11 +98,13 @@ export function aggregateCommentsByUser(entries, options) {
         count: 0,
         lastAt: 0,
         lastText: '',
-        avatarUrl: ''
+        avatarUrl: '',
+        totalChars: 0
       });
     }
     const row = map.get(userKey);
     row.count += 1;
+    if (trackCharTotals) row.totalChars += text.length;
     if (nickname) {
       if (!row.nickname) row.nickname = nickname;
       else if (nickname.length > row.nickname.length) row.nickname = nickname;
@@ -81,5 +116,17 @@ export function aggregateCommentsByUser(entries, options) {
     }
   }
 
-  return [...map.values()].sort((a, b) => b.lastAt - a.lastAt);
+  let rows = [...map.values()];
+  if (sortByCount) {
+    rows.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt);
+  } else {
+    rows.sort((a, b) => b.lastAt - a.lastAt);
+  }
+  if (maxRooms > 0 && rows.length > maxRooms) {
+    rows = rows.slice(0, maxRooms);
+  }
+  if (!trackCharTotals) {
+    return rows.map(({ totalChars: _tc, ...rest }) => rest);
+  }
+  return rows;
 }

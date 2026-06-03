@@ -64,10 +64,15 @@ export function createObjectUrlRevokeQueue(opts = {}) {
 
   /**
    * @param {string} url
+   * @param {{ timeoutMs?: number }} [opts]
    * @returns {void}
    */
-  function enqueue(url) {
+  function enqueue(url, opts = {}) {
     if (!url) return;
+    const delay =
+      typeof opts?.timeoutMs === 'number' && opts.timeoutMs > 0
+        ? Math.floor(opts.timeoutMs)
+        : timeoutMs;
     // 上限超過時は最古から即 revoke
     while (queue.length >= maxConcurrent) {
       const oldest = queue.shift();
@@ -81,7 +86,7 @@ export function createObjectUrlRevokeQueue(opts = {}) {
       const idx = queue.indexOf(entry);
       if (idx >= 0) queue.splice(idx, 1);
       revokeFn(entry.url);
-    }, timeoutMs);
+    }, delay);
     queue.push(entry);
   }
 

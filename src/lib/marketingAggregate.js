@@ -5,6 +5,7 @@
 import { normalizeLv } from '../shared/niconico/liveId.js';
 import { extractNiconicoUserIdFromIconUrl } from '../shared/avatar/avatarUrlGuard.js';
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
+import { parseInterestArrivalComment } from './parseInterestArrivalComment.js';
 
 /**
  * @typedef {{
@@ -13,7 +14,12 @@ import { isSameAvatarUrl } from './avatarUrlCompare.js';
  *   avatarUrl: string,
  *   count: number,
  *   firstAt: number,
- *   lastAt: number
+ *   lastAt: number,
+ *   accountStatus?: number,
+ *   followerCount?: number,
+ *   followeeCount?: number,
+ *   isPremium?: boolean,
+ *   userLevel?: number
  * }} UserCommentProfile
  */
 
@@ -46,6 +52,15 @@ import { isSameAvatarUrl } from './avatarUrlCompare.js';
 
 /**
  * @typedef {{
+ *   premiumCount: number,
+ *   standardCount: number,
+ *   knownCount: number,
+ *   pctPremiumOfKnown: number
+ * }} MarketingPremiumStats
+ */
+
+/**
+ * @typedef {{
  *   early: number,
  *   mid: number,
  *   late: number
@@ -73,6 +88,19 @@ import { isSameAvatarUrl } from './avatarUrlCompare.js';
  *   durationMinutes: number,
  *   commentsPerMinute: number,
  *   topUsers: UserCommentProfile[],
+ *   allNumericCommenters: UserCommentProfile[],
+ *   commenterFollowDataset?: import('./commenterFollowCache.js').CommenterFollowLiveSnapshot|null,
+ *   commenterFollowPriorEntries?: Record<string, unknown>,
+ *   commenterFollowingListCache?: Record<string, unknown>,
+ *   followingListCoverage?: {
+ *     attempted: number,
+ *     ok: number,
+ *     forbidden: number,
+ *     loginRequired: number,
+ *     error: number,
+ *     notAttempted: number
+ *   },
+ *   broadcasterUserId?: string,
  *   timeline: TimelineBucket[],
  *   segmentCounts: { heavy: number, mid: number, light: number, once: number },
  *   segmentPcts: { heavy: number, mid: number, light: number, once: number },
@@ -81,12 +109,23 @@ import { isSameAvatarUrl } from './avatarUrlCompare.js';
  *   selfPostedCount: number,
  *   selfPostedPct: number,
  *   is184: Marketing184Stats,
+ *   premium: MarketingPremiumStats,
  *   timelineCumulative: number[],
  *   timelineRolling5Min: number[],
  *   maxSilenceGapMs: number,
  *   vposThirds: MarketingVposThirds | null,
- *   quarterEngagement: MarketingQuarterEngagement
+ *   quarterEngagement: MarketingQuarterEngagement,
+ *   interestArrivalSummary: MarketingInterestArrivalSummary
  * }} MarketingReport
+ */
+
+/**
+ * @typedef {{
+ *   totalArrivals: number,
+ *   uniqueTags: number,
+ *   messageCount: number,
+ *   topTags: { tag: string, arrivals: number, messageCount: number }[]
+ * }} MarketingInterestArrivalSummary
  */
 
 /**
@@ -142,15 +181,34 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
     );
   });
 
+  /** @type {StoredComment[]} */
+  const engagementComments = [];
+  /** @type {StoredComment[]} */
+  const interestArrivalComments = [];
+  for (const c of filtered) {
+    if (parseInterestArrivalComment(String(c.text || ''))) {
+      interestArrivalComments.push(c);
+    } else {
+      engagementComments.push(c);
+    }
+  }
+  const interestArrivalSummary = computeInterestArrivalSummary(interestArrivalComments);
+
   /** @type {Map<string, UserCommentProfile>} */
   const userMap = new Map();
   const timestamps = [];
 
-  for (const c of filtered) {
+  for (const c of engagementComments) {
     const uid = c.userId || `anon:${(c.commentNo || c.id || '').slice(0, 12)}`;
     const t = c.capturedAt || 0;
     timestamps.push(t);
 
+    // accountStatus（NDGR field 4）: 2=プレミアム / 1=一般 / 0・null=不明。
+    // ユーザー単位では「最も強い既知の属性」を採用する（premium が一度でも付けば premium）。
+    const rowAccount =
+      typeof c.accountStatus === 'number' && (c.accountStatus === 1 || c.accountStatus === 2)
+        ? c.accountStatus
+        : 0;
     const existing = userMap.get(uid);
     if (existing) {
       existing.count++;
@@ -158,6 +216,7 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
       if (!existing.avatarUrl && c.avatarUrl) existing.avatarUrl = c.avatarUrl;
       if (t < existing.firstAt) existing.firstAt = t;
       if (t > existing.lastAt) existing.lastAt = t;
+      if (rowAccount > (existing.accountStatus || 0)) existing.accountStatus = rowAccount;
     } else {
       userMap.set(uid, {
         userId: uid,
@@ -165,7 +224,8 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
         avatarUrl: c.avatarUrl || '',
         count: 1,
         firstAt: t,
-        lastAt: t
+        lastAt: t,
+        accountStatus: rowAccount
       });
     }
   }
@@ -206,7 +266,7 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
 
   /** @type {Map<number, { count: number, uids: Set<string> }>} */
   const bucketMap = new Map();
-  for (const c of filtered) {
+  for (const c of engagementComments) {
     const t = c.capturedAt || 0;
     const minute = Math.floor((t - minT) / 60000);
     const uid = c.userId || `anon:${(c.commentNo || '').slice(0, 12)}`;
@@ -247,32 +307,36 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
     hourDistribution[h]++;
   }
 
-  const textStats = computeTextStats(filtered);
-  const selfPostedCount = filtered.filter((c) => c.selfPosted === true).length;
+  const textStats = computeTextStats(engagementComments);
+  const selfPostedCount = engagementComments.filter((c) => c.selfPosted === true).length;
   const selfPostedPct =
-    filtered.length > 0
-      ? Math.round((selfPostedCount / filtered.length) * 1000) / 10
+    engagementComments.length > 0
+      ? Math.round((selfPostedCount / engagementComments.length) * 1000) / 10
       : 0;
-  const is184 = compute184Stats(filtered);
+  const is184 = compute184Stats(engagementComments);
+  const premium = computePremiumStats(engagementComments);
   const timelineCumulative = computeTimelineCumulative(timeline);
   const timelineRolling5Min = computeTimelineRolling5(timeline);
   const maxSilenceGapMs = computeMaxSilenceGapMs(timestamps);
-  const vposThirds = computeVposThirds(filtered);
-  const quarterEngagement = computeQuarterEngagement(filtered, minT, maxT);
+  const vposThirds = computeVposThirds(engagementComments);
+  const quarterEngagement = computeQuarterEngagement(engagementComments, minT, maxT);
 
   return {
     liveId,
-    totalComments: filtered.length,
+    totalComments: engagementComments.length,
     uniqueUsers: users.length,
     avgCommentsPerUser:
-      users.length > 0 ? Math.round((filtered.length / users.length) * 10) / 10 : 0,
+      users.length > 0
+        ? Math.round((engagementComments.length / users.length) * 10) / 10
+        : 0,
     medianCommentsPerUser: median,
     peakMinute,
     peakMinuteCount,
     durationMinutes,
     commentsPerMinute:
-      Math.round((filtered.length / durationMinutes) * 10) / 10,
+      Math.round((engagementComments.length / durationMinutes) * 10) / 10,
     topUsers: users.slice(0, 30),
+    allNumericCommenters: users.filter((u) => /^\d{1,18}$/.test(String(u.userId || ''))),
     timeline,
     segmentCounts: { heavy, mid, light, once },
     segmentPcts: {
@@ -286,11 +350,53 @@ export function aggregateMarketingReport(comments, liveId, opts = {}) {
     selfPostedCount,
     selfPostedPct,
     is184,
+    premium,
     timelineCumulative,
     timelineRolling5Min,
     maxSilenceGapMs,
     vposThirds,
-    quarterEngagement
+    quarterEngagement,
+    interestArrivalSummary
+  };
+}
+
+/** @param {StoredComment[]} interestArrivalComments */
+function computeInterestArrivalSummary(interestArrivalComments) {
+  /** @type {Map<string, { arrivals: number, messageCount: number }>} */
+  const tagMap = new Map();
+  let totalArrivals = 0;
+  let messageCount = 0;
+
+  for (const c of interestArrivalComments) {
+    const parsed = parseInterestArrivalComment(String(c.text || ''));
+    if (!parsed) continue;
+    messageCount += 1;
+    totalArrivals += parsed.count;
+    const prev = tagMap.get(parsed.tag) || { arrivals: 0, messageCount: 0 };
+    tagMap.set(parsed.tag, {
+      arrivals: prev.arrivals + parsed.count,
+      messageCount: prev.messageCount + 1
+    });
+  }
+
+  const topTags = [...tagMap.entries()]
+    .map(([tag, stats]) => ({
+      tag,
+      arrivals: stats.arrivals,
+      messageCount: stats.messageCount
+    }))
+    .sort(
+      (a, b) =>
+        b.arrivals - a.arrivals ||
+        b.messageCount - a.messageCount ||
+        a.tag.localeCompare(b.tag, 'ja')
+    );
+
+  return {
+    totalArrivals,
+    uniqueTags: tagMap.size,
+    messageCount,
+    topTags
   };
 }
 
@@ -344,6 +450,30 @@ function compute184Stats(filtered) {
     count184,
     knownCount: k,
     pctOfKnown: k > 0 ? Math.round((count184 / k) * 1000) / 10 : 0
+  };
+}
+
+/**
+ * accountStatus（NDGR field 4）の enum: 1=一般 / 2=プレミアム。0=未指定・null は
+ * 「不明」として母数から除外する（DOM 取り込み行は accountStatus を持たないことが多い）。
+ * @param {StoredComment[]} filtered
+ * @returns {MarketingPremiumStats}
+ */
+function computePremiumStats(filtered) {
+  let premiumCount = 0;
+  let standardCount = 0;
+  for (const c of filtered) {
+    const s = c.accountStatus;
+    if (s === 2) premiumCount += 1;
+    else if (s === 1) standardCount += 1;
+  }
+  const knownCount = premiumCount + standardCount;
+  return {
+    premiumCount,
+    standardCount,
+    knownCount,
+    pctPremiumOfKnown:
+      knownCount > 0 ? Math.round((premiumCount / knownCount) * 1000) / 10 : 0
   };
 }
 

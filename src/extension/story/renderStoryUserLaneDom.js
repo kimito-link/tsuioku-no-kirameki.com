@@ -4,10 +4,12 @@
  */
 
 import {
+  buildStoryUserLaneEmptyNoteGiftHtml,
   buildStoryUserLaneEmptyNoteKontaHtml,
   buildStoryUserLaneEmptyNoteLinkHtml,
   buildStoryUserLaneEmptyNoteTanuHtml,
   buildStoryUserLaneGuideFootAndRecordedHtml,
+  buildStoryUserLaneGuideGiftHtml,
   buildStoryUserLaneGuideKontaHtml,
   buildStoryUserLaneGuideTanuHtml,
   buildStoryUserLaneGuideTopHtml
@@ -18,12 +20,16 @@ import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCo
  * @typedef {{
  *   stack: HTMLElement,
  *   laneLink: HTMLElement,
+ *   laneGift: HTMLElement,
  *   laneKonta: HTMLElement,
  *   laneTanu: HTMLElement,
  *   hintLink: HTMLElement | null,
  *   linkWrap: HTMLElement | null,
+ *   giftWrap: HTMLElement | null,
  *   guideTop: HTMLElement | null,
  *   guideLinesTop: HTMLElement | null,
+ *   guideMidGift: HTMLElement | null,
+ *   guideLinesMidGift: HTMLElement | null,
  *   guideMidKonta: HTMLElement | null,
  *   guideLinesMidKonta: HTMLElement | null,
  *   guideMidTanu: HTMLElement | null,
@@ -72,12 +78,16 @@ export function resetStoryUserLaneDom(els) {
   const {
     stack,
     laneLink,
+    laneGift,
     laneKonta,
     laneTanu,
     hintLink,
     linkWrap,
+    giftWrap,
     guideTop,
     guideLinesTop,
+    guideMidGift,
+    guideLinesMidGift,
     guideMidKonta,
     guideLinesMidKonta,
     guideMidTanu,
@@ -87,13 +97,18 @@ export function resetStoryUserLaneDom(els) {
   } = els;
   removeStoryUserLaneEmptyNotesUnder(stack);
   laneLink.innerHTML = '';
+  laneGift.innerHTML = '';
   laneKonta.innerHTML = '';
   laneTanu.innerHTML = '';
   laneLink.hidden = true;
+  laneGift.hidden = true;
   laneKonta.hidden = true;
   laneTanu.hidden = true;
   if (hintLink) hintLink.hidden = true;
   if (linkWrap) linkWrap.hidden = true;
+  if (giftWrap) giftWrap.hidden = true;
+  if (guideMidGift) guideMidGift.hidden = true;
+  if (guideLinesMidGift) guideLinesMidGift.innerHTML = '';
   if (guideMidKonta) guideMidKonta.hidden = true;
   if (guideLinesMidKonta) guideLinesMidKonta.innerHTML = '';
   if (guideMidTanu) guideMidTanu.hidden = true;
@@ -176,8 +191,8 @@ function fillLaneTier(el, items, io) {
 
 /**
  * @param {StoryUserLaneDomElements} els
- * @param {{ faceLink: string, faceKonta: string, faceTanu: string }} faces
- * @param {{ link: unknown[], konta: unknown[], tanu: unknown[] }} buckets
+ * @param {{ faceLink: string, faceGift: string, faceKonta: string, faceTanu: string }} faces
+ * @param {{ link: unknown[], gift: unknown[], konta: unknown[], tanu: unknown[] }} buckets
  * @param {number} pickedLength
  * @param {StoryUserLaneDomIo} io
  * @param {{ recordedCommentRowsTotal?: number }} [opts] 診断の total と同じ記録件数（省略時はレーン直下の第2文なし）
@@ -193,12 +208,16 @@ export function paintStoryUserLaneDomFilled(
   const {
     stack,
     laneLink,
+    laneGift,
     laneKonta,
     laneTanu,
     hintLink,
     linkWrap,
+    giftWrap,
     guideTop,
     guideLinesTop,
+    guideMidGift,
+    guideLinesMidGift,
     guideMidKonta,
     guideLinesMidKonta,
     guideMidTanu,
@@ -208,6 +227,7 @@ export function paintStoryUserLaneDomFilled(
   } = els;
 
   fillLaneTier(laneLink, buckets.link, io);
+  fillLaneTier(laneGift, buckets.gift, io);
   fillLaneTier(laneKonta, buckets.konta, io);
   fillLaneTier(laneTanu, buckets.tanu, io);
 
@@ -215,6 +235,11 @@ export function paintStoryUserLaneDomFilled(
     laneLink,
     buckets.link.length === 0,
     buildStoryUserLaneEmptyNoteLinkHtml()
+  );
+  syncStoryUserLaneTierEmptyNote(
+    laneGift,
+    buckets.gift.length === 0,
+    buildStoryUserLaneEmptyNoteGiftHtml()
   );
   syncStoryUserLaneTierEmptyNote(
     laneKonta,
@@ -237,6 +262,15 @@ export function paintStoryUserLaneDomFilled(
     const showLinkWrap = !laneLink.hidden || (hintLink && !hintLink.hidden);
     linkWrap.hidden = !showLinkWrap;
   }
+  if (giftWrap) {
+    const showGiftWrap =
+      !laneGift.hidden ||
+      (guideMidGift && !guideMidGift.hidden) ||
+      Boolean(
+        laneGift.nextElementSibling?.classList?.contains('nl-story-userlane__empty-note')
+      );
+    giftWrap.hidden = !showGiftWrap;
+  }
 
   stack.setAttribute('aria-label', buildStoryUserLaneStackAriaLabel(pickedLength));
   stack.hidden = false;
@@ -245,6 +279,10 @@ export function paintStoryUserLaneDomFilled(
     guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceLink);
   }
   if (guideTop) guideTop.hidden = false;
+  if (guideLinesMidGift) {
+    guideLinesMidGift.innerHTML = buildStoryUserLaneGuideGiftHtml(faces.faceGift);
+  }
+  if (guideMidGift) guideMidGift.hidden = false;
   if (guideLinesMidKonta) {
     guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
       faces.faceKonta
@@ -271,19 +309,23 @@ export function paintStoryUserLaneDomFilled(
 /**
  * 候補ゼロだがエントリはあるときのガイドのみ表示。
  * @param {StoryUserLaneDomElements} els
- * @param {{ faceLink: string, faceKonta: string, faceTanu: string }} faces
+ * @param {{ faceLink: string, faceGift: string, faceKonta: string, faceTanu: string }} faces
  * @param {{ recordedCommentRowsTotal?: number }} [opts]
  */
 export function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
   const {
     stack,
     laneLink,
+    laneGift,
     laneKonta,
     laneTanu,
     hintLink,
     linkWrap,
+    giftWrap,
     guideTop,
     guideLinesTop,
+    guideMidGift,
+    guideLinesMidGift,
     guideMidKonta,
     guideLinesMidKonta,
     guideMidTanu,
@@ -293,18 +335,25 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
   } = els;
   removeStoryUserLaneEmptyNotesUnder(stack);
   laneLink.innerHTML = '';
+  laneGift.innerHTML = '';
   laneKonta.innerHTML = '';
   laneTanu.innerHTML = '';
   laneLink.hidden = true;
+  laneGift.hidden = true;
   laneKonta.hidden = true;
   laneTanu.hidden = true;
   if (hintLink) hintLink.hidden = true;
   if (linkWrap) linkWrap.hidden = true;
+  if (giftWrap) giftWrap.hidden = false;
   stack.hidden = false;
   if (guideLinesTop) {
     guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceLink);
   }
   if (guideTop) guideTop.hidden = false;
+  if (guideLinesMidGift) {
+    guideLinesMidGift.innerHTML = buildStoryUserLaneGuideGiftHtml(faces.faceGift);
+  }
+  if (guideMidGift) guideMidGift.hidden = false;
   if (guideLinesMidKonta) {
     guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
       faces.faceKonta

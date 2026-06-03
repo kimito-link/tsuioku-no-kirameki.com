@@ -56,6 +56,56 @@ describe('buildWatchMetaCardAudienceViewModel', () => {
     expect(vm.concurrent.charReactionDelta).toBe(null);
   });
 
+  it('古い official 0 + 来場ありは推定中ではなく滞留推定を出す', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: 4737,
+        recentActiveUsers: 0,
+        officialViewerCount: 0,
+        officialStatsUpdatedAt: nowMs - 3000,
+        streamAgeMin: 210
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).not.toBe('推定中');
+    expect(vm.concurrent.estText).not.toBe('0');
+    expect(vm.concurrent.numericEstimated).toBeGreaterThan(100);
+  });
+
+  it('来場あり・recentActiveUsers 0・経過不明なら ~0 ではなく推定中', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: 723,
+        recentActiveUsers: 0,
+        officialViewerCount: null
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: 33 } }
+    );
+    expect(vm.concurrent.estText).toBe('推定中');
+    expect(vm.concurrent.estIsPlaceholder).toBe(true);
+    expect(vm.concurrent.numericEstimated).toBe(null);
+    expect(vm.nextPrevForReactions.concurrentEstimated).toBe(33);
+  });
+
+  it('来場あり・recentActiveUsers 0 でも経過があれば滞留推定を表示する', () => {
+    const vm = buildWatchMetaCardAudienceViewModel(
+      {
+        liveId: 'lv1',
+        viewerCountFromDom: 723,
+        recentActiveUsers: 0,
+        officialViewerCount: null,
+        streamAgeMin: 420
+      },
+      { nowMs, prevForReactions: { viewerCount: null, concurrentEstimated: null } }
+    );
+    expect(vm.concurrent.estText).not.toBe('~0');
+    expect(vm.concurrent.estText).toMatch(/^~/u);
+    expect(vm.concurrent.numericEstimated).toBeGreaterThan(0);
+    expect(vm.concurrent.subText).toContain('5分内 0人');
+  });
+
   it('公式同接が新鮮なら直接値（~ なし）・sub は直接値', () => {
     const vm = buildWatchMetaCardAudienceViewModel(
       {

@@ -25,7 +25,17 @@ import {
   resolveCommentPostStatus,
   commentComposeAriaDescribedBy
 } from '../lib/commentPostStatusPresentation.js';
-import { createCommentSubmitProfiler } from '../lib/commentSubmitProfiling.js';
+import {
+  createCommentSubmitProfiler,
+  recordCommentSubmitTotal
+} from '../lib/commentSubmitProfiling.js';
+import { commentPostErrorWarrantsFrameDiscovery } from '../lib/commentPostRetriable.js';
+import { capCommentsForAnalytics } from '../lib/capCommentsForAnalytics.js';
+import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js';
+import {
+  markWatchPopupLoadPhase,
+  resetWatchPopupLoadDiagnostics
+} from '../lib/watchPopupLoadDiagnostics.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
@@ -35,11 +45,42 @@ import { GIFT_HISTORY_LANE_MAX } from '../lib/giftRankStripConfig.js';
 import { aggregateGiftHistoryByUser } from '../lib/officialEventBannerDom.js';
 import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
-
+import {
+  giftHistoryThrowsStorageKey,
+  buildGiftSubAppPayloadFromKokenJson,
+  buildKokenGiftPersistPayload,
+  mergeGiftSubAppHistoryPayload,
+  normalizeKokenGiftHistoryResponse
+} from '../lib/kokenGiftHistoryApi.js';
+import {
+  shouldDeferCelebrationsUntilHeavySettled,
+  shouldReprimeCommentMilestones
+} from '../lib/watchPopupCelebrationGuard.js';
+import { createPopupCelebrationGate } from '../lib/popupCelebrationGate.js';
+import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.js';
+import {
+  fetchKokenGiftHistoryAllViaExtension,
+  fetchKokenGiftHistoryViaExtension
+} from '../lib/kokenGiftHistoryFetchClient.js';
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
+import { eventVotingRankingStorageKey } from '../lib/auditionEventRankingApi.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
+import {
+  normalizeBroadcasterProfileModel,
+  buildBroadcasterProfileReportRowsHtml,
+  broadcasterNameCellHtml
+} from '../lib/broadcasterProfileCard.js';
 import { formatCardFreshnessNote } from '../lib/cardFreshnessNote.js';
-import { pickGiftHistorySource } from '../lib/giftHistorySourcePreference.js';
+import {
+  pickGiftHistorySource,
+  pickKokenSubAppVsLiveGiftHistory
+} from '../lib/giftHistorySourcePreference.js';
+import {
+  reconcileGiftHistoryNorthStarContext,
+  resolveGiftHistorySummaryPoints
+} from '../lib/giftHistoryOfficialReconcile.js';
+import { buildGiftHistoryNorthStarPaintKey } from '../lib/giftHistoryNorthStarPaintKey.js';
+import { senderLooksLikeViewer } from '../lib/viewerCelebrationMatch.js';
 import {
   iframeOfficialDomStorageKey,
   resolveContributionRankingRowsFromSources
@@ -146,8 +187,109 @@ import {
   KEY_GIFT_RANKING_LANE_ENABLED,
   KEY_BACKFILL_ENABLED,
   KEY_BACKFILL_AUTO_DISABLED,
-  KEY_BACKFILL_PROGRESS
+  KEY_BACKFILL_PROGRESS,
+  KEY_AUTOPATROL_ENABLED,
+  KEY_AUTOPATROL_STATE,
+  KEY_CONCURRENT_CALIBRATION_RING_V1,
+  KEY_COMMENTER_FOLLOW_CACHE,
+  KEY_COMMENTER_FOLLOWING_LIST_CACHE,
+  KEY_SUPPORT_CELEBRATION_STATE,
+  broadcasterProfileStorageKey,
+  commenterFollowLiveStorageKey
 } from '../lib/storageKeys.js';
+import {
+  pickCommentMilestoneCelebration,
+  pickEventRankUpCelebration,
+  pickGiftCountMilestoneCelebration,
+  pickAdPointsMilestoneCelebration,
+  adPointsMilestoneDedupeKeysAtOrBelow,
+  giftCountMilestoneDedupeKeysAtOrBelow,
+  commentMilestoneDedupeKeysAtOrBelow,
+  isStartupAdPointsJump,
+  pickAdAdvertiserCountMilestoneCelebration,
+  pickAdPointsIncreaseCelebration,
+  pickNicoadCommentCelebration,
+  pickBroadcasterFollowerMilestoneCelebration,
+  pickBroadcasterFollowerIncreaseCelebration,
+  isAdSupportCelebrationKind,
+  isFollowerSupportCelebrationKind,
+  isSupportCelebrationAlreadyDone,
+  markSupportCelebrationDone,
+  celebratedKeysForLive,
+  withCelebratedKeysForLive
+} from '../lib/supportCelebration.js';
+import { parseNicoadCommentText, parseGiftCommentText } from '../lib/parseGiftComment.js';
+import {
+  pickGiftBahamutCelebration,
+  GIFT_BAHAMUT_MIN_GAP_MS
+} from '../lib/giftBahamutCelebration.js';
+import {
+  SELF_ACTION_CELEBRATION_MIN_GAP_MS,
+  buildSelfAdCelebrationSpec,
+  buildSelfCommentCelebrationSpec,
+  buildSelfGiftCelebrationSpec,
+  selfActionUsesGiftZoom,
+  selfActionUsesAdPachinko,
+  selfAdCelebrationAsPachinkoThrow
+} from '../lib/selfActionCelebration.js';
+import {
+  shouldFullPrimeCelebrationCommentSeed,
+  celebrationSeedPrefixEndIndex
+} from '../lib/celebrationCommentScanSeed.js';
+import {
+  flyTextLinesForSupportCelebration,
+  flyTextLinesForGiftBahamut
+} from '../lib/celebrationFlyText.js';
+import {
+  pikaTierForSupportCelebration,
+  pikaTierForGiftBahamut
+} from '../lib/celebrationPika.js';
+import {
+  RINKU_IMGS,
+  KONTA_IMGS,
+  TANUNEE_IMGS,
+  CHARA_IMG_BASE
+} from '../lib/celebrationCharaAssets.js';
+import {
+  NLS_PLAY_WATCH_CELEBRATION,
+  playSupportCelebrationShower,
+  playSelfActionCelebrationShower,
+  playGiftBahamutCelebration
+} from '../lib/watchCelebrationOverlay.js';
+import {
+  normalizeCommenterFollowMap,
+  normalizeCommenterFollowLiveSnapshot,
+  applyFollowFieldsToUser,
+  buildCommenterFollowLiveSnapshot,
+  pickFollowUidsToFetch,
+  upsertCommenterFollowEntry,
+  commenterFollowEntryFromProfile,
+  COMMENTER_FOLLOW_FETCH_BATCH
+} from '../lib/commenterFollowCache.js';
+import {
+  COMMENTER_FOLLOWING_LIST_MAX_PER_LIVE,
+  buildFollowingListEntryFromFetchResponse,
+  mergeFollowingListIntoRows,
+  normalizeFollowingListMap,
+  pickFollowingListUidsToFetch,
+  summarizeFollowingListCoverage,
+  upsertFollowingListEntry
+} from '../lib/commenterFollowingListCache.js';
+import {
+  NICO_USER_PROFILE_FETCH_MESSAGE_TYPE,
+  normalizeNicoUserProfileResponse
+} from '../lib/nicoUserProfileApi.js';
+import { NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE } from '../lib/nicoUserFollowingApi.js';
+import {
+  parseCalibrationLog,
+  serializeCalibrationJson,
+  serializeCalibrationCsv
+} from '../lib/concurrentCalibrationLog.js';
+import {
+  computeCalibrationFit,
+  buildCalibratedPlatformProfile
+} from '../lib/concurrentCalibrationFit.js';
+import { NICONICO_PROFILE } from '../lib/concurrentEstimate.js';
 import {
   // v0.1.450 (PR4): backfillRinkuNarration は B 用 #backfillRinku 描画関数で使われていたが、
   //   B 廃止により未使用化。A 内 hint は backfillRecordCardHintDomState のみで完結する。
@@ -208,6 +350,16 @@ import {
   summaryStorageKey,
   isCommentSummary
 } from '../lib/commentSummary.js';
+import {
+  panelSummaryStorageKey,
+  isPanelLiveSummary,
+  watchSnapshotFromPanelSummary
+} from '../lib/panelLiveSummary.js';
+import { listBackfillWaitingLiveIds } from '../lib/globalBackfillQueue.js';
+import {
+  PANEL_METRICS_MESSAGE_TYPE,
+  resolvePanelMetricsFromMessageResponse
+} from '../lib/panelMetricsExport.js';
 import {
   chunkIndexKey,
   isChunkIndex,
@@ -315,6 +467,25 @@ import {
 } from '../lib/broadcastReportSummary.js';
 import { formatBroadcastDurationLabel } from '../lib/broadcastDurationLabel.js';
 import { buildReportCommentsCsv } from '../lib/reportCommentsCsv.js';
+import {
+  buildReportCommentsTableSectionHtml,
+  HTML_REPORT_AGGREGATE_ROOM_CAP,
+  HTML_REPORT_AGGREGATE_SAMPLE_MAX,
+  HTML_REPORT_HEAVY_COMMENT_THRESHOLD
+} from '../lib/reportCommentsTableSection.js';
+import {
+  buildHtmlReportDownloadFilename,
+  buildMarketingReportDownloadFilename
+} from '../lib/exportDownloadFilename.js';
+import {
+  createExportStageProfiler,
+  logExportStageProfileIfEnabled
+} from '../lib/exportStageProfiler.js';
+import { triggerAnchorBlobDownload } from '../lib/blobDownload.js';
+import {
+  exportWaitLinesForKind,
+  resolveHtmlReportBuildTimeoutMs
+} from '../lib/exportWaitNarration.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
@@ -334,8 +505,14 @@ import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js'
 import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.js';
 import {
   normalizeLv,
-  userLaneCandidatesFromStorage
+  userLaneCandidatesFromStorage,
+  enrichUserLaneAggregatesWithProfileAndDisplay
 } from '../lib/userLaneCandidatesFromStorage.js';
+import { buildGiftThrowerLaneEntries } from '../lib/userLaneMergeGiftThrowers.js';
+import {
+  runCelebrationCommentIncrementalScan,
+  resetCelebrationIncrementalScan
+} from '../lib/celebrationCommentIncrementalScan.js';
 import { laneStoreInstance } from '../data/store/laneStore.js';
 import { laneCandidatesFromStoredComments } from '../data/sources/laneFromStoredComments.js';
 import { findLatestLiveIdFromStoredComments } from '../data/acquirers/laneFromStorage.js';
@@ -367,8 +544,20 @@ import {
   trendToSparklineArrays
 } from '../lib/devMonitorTrendSession.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
+import { analyzeAudienceEngagementGap } from '../lib/audienceEngagementGap.js';
+import {
+  resolveMarketingSupportParticipationCounts,
+  supportParticipationPctAgainstVisitors
+} from '../lib/marketingSupportParticipationCounts.js';
 import { buildReportMemoPayload } from '../lib/supportGrowthInsights.js';
-import { buildMarketingDashboardHtml } from '../lib/marketingChartsHtml.js';
+import {
+  buildMarketingDashboardHtml,
+  buildAudienceParticipationLeadSectionHtml,
+  audienceParticipationLeadEmbeddedCss
+} from '../lib/marketingChartsHtml.js';
+import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
+import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
+import { STORY_GROWTH_MAX_CELLS } from '../lib/storyGrowthLimits.js';
 import {
   yukkuriBroadcastSummaryEmbeddedCss,
   listYukkuriCharacterImagePaths
@@ -666,29 +855,6 @@ function applyResponsivePopupLayout() {
 // ---------------------------------------------------------------------------
 const CHARA_BOUNCE_CLASSES = ['nl-chara-bounce-small', 'nl-chara-bounce-medium', 'nl-chara-bounce-big'];
 
-const CHARA_IMG_BASE = 'images/yukkuri-charactore-english';
-
-const RINKU_IMGS = /** @type {const} */ ({
-  default: `${CHARA_IMG_BASE}/link/link-yukkuri-smile-mouth-open.png`,
-  small:   `${CHARA_IMG_BASE}/link/link-yukkuri-smile-mouth-closed.png`,
-  medium:  `${CHARA_IMG_BASE}/link/link-yukkuri-smile-mouth-open.png`,
-  big:     `${CHARA_IMG_BASE}/link/link-yukkuri-blink-mouth-open.png`,
-});
-
-const KONTA_IMGS = /** @type {const} */ ({
-  default: `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-smile-mouth-open.png`,
-  small:   `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-smile-mouth-closed.png`,
-  medium:  `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-smile-mouth-open.png`,
-  big:     `${CHARA_IMG_BASE}/konta/kitsune-yukkuri-blink-mouth-open.png`,
-});
-
-const TANUNEE_IMGS = /** @type {const} */ ({
-  default: `${CHARA_IMG_BASE}/tanunee/tanuki-yukkuri-smile-mouth-open.png`,
-  small:   `${CHARA_IMG_BASE}/tanunee/tanuki-yukkuri-normal-mouth-open.png`,
-  medium:  `${CHARA_IMG_BASE}/tanunee/tanuki-yukkuri-smile-mouth-open.png`,
-  big:     `${CHARA_IMG_BASE}/tanunee/tanuki-yukkuri-blink-mouth-open.png`,
-});
-
 /** @type {Map<Element, number>} */
 const _charaRevertTimers = new Map();
 
@@ -725,7 +891,66 @@ function triggerCharaReaction(iconEl, { delta, thresholds, images }) {
   }, 600));
 }
 
+/** 開幕演出の単一ゲート（heavy / プライム / 件数整合 / 開幕クールダウン） */
+const popupCelebrationGate = createPopupCelebrationGate();
+
 let _prevSupportCount = /** @type {number|null} */ (null);
+
+/** @type {number|null} */
+let _prevMilestoneCommentHighWater = null;
+
+/** @type {number|null} */
+let _prevEventBannerRank = null;
+
+/** @type {number|null} */
+let _prevGiftEventCount = null;
+
+/** @type {number|null} */
+let _prevAdPoints = null;
+/** @type {number|null} */
+let _prevBroadcasterFollowerCount = null;
+
+/** @type {number|null} */
+let _prevAdAdvertiserCount = null;
+
+const _nicoadCelebrationPrimedKeys = new Set();
+/** @type {Set<string>} */
+const _nicoadCelebrationHandledKeys = new Set();
+
+/** @type {string} */
+let _nicoadCelebrationSeededLiveId = '';
+
+/** @type {string} */
+let _giftBahamutSeededLiveId = '';
+/** @type {string} 公式累計広告ptを起動プライム済みの liveId */
+let _adPointsCelebrationPrimedLiveId = '';
+/** @type {string} NDGR ギフト件数マイルストーンを起動プライム済みの liveId */
+let _giftEventCelebrationPrimedLiveId = '';
+/** @type {string} コメント件数マイルストーンを起動プライム済みの liveId */
+let _commentMilestoneCelebrationPrimedLiveId = '';
+
+/** @type {Map<string, number>} giftBahamut シード済みコメント配列長（liveId → length） */
+const _giftBahamutSeededEntryCountByLive = new Map();
+/** @type {Map<string, number>} 広告コメ演出シード済み配列長 */
+const _nicoadCelebrationSeededEntryCountByLive = new Map();
+
+/** @type {Set<string>} */
+const _seenGiftCommentKeys = new Set();
+
+/** @type {number} */
+let _lastGiftBahamutAt = 0;
+
+/** @type {number} */
+let _lastAdThrowCelebrationAt = 0;
+
+/** @type {number} */
+let _lastSelfActionCelebrationAt = 0;
+
+/** @type {Set<string>} */
+const _celebrationSessionDedupe = new Set();
+
+/** @type {Record<string, string[]>|null} */
+let _celebrationStateCache = null;
 
 /** @type {string|null} */
 let _lastTopSupportRankStripStableKey = null;
@@ -769,10 +994,1101 @@ function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
   const norm = String(nextLiveId || '').trim().toLowerCase();
   if (norm === watchPopupLastPaintedLiveId) return;
   watchPopupLastPaintedLiveId = norm;
+  _panelMetricsAppliedForLv = '';
+  _giftHistoryNorthStarPaintKey = '';
+  _giftHistoryThrowsPanelHtmlKey = '';
+  _giftHistoryNorthStarCapturedAtMs = 0;
   _lastTopSupportRankStripStableKey = null;
   _prevSupportCount = null;
+  _prevMilestoneCommentHighWater = null;
   _prevViewerCount = null;
   _prevConcurrentEstimated = null;
+  _prevEventBannerRank = null;
+  _prevGiftEventCount = null;
+  _prevAdPoints = null;
+  _prevAdAdvertiserCount = null;
+  _prevBroadcasterFollowerCount = null;
+  _lastBroadcasterFollowerPollAt = 0;
+  _broadcasterFollowerPollInFlight = false;
+  _nicoadCelebrationSeededLiveId = '';
+  _giftBahamutSeededLiveId = '';
+  _adPointsCelebrationPrimedLiveId = '';
+  _giftEventCelebrationPrimedLiveId = '';
+  _commentMilestoneCelebrationPrimedLiveId = '';
+  _giftBahamutSeededEntryCountByLive.clear();
+  _nicoadCelebrationSeededEntryCountByLive.clear();
+  _nicoadCelebrationPrimedKeys.clear();
+  _nicoadCelebrationHandledKeys.clear();
+  _seenGiftCommentKeys.clear();
+  resetCelebrationIncrementalScan(norm);
+  _lastGiftBahamutAt = 0;
+  _lastAdThrowCelebrationAt = 0;
+  _lastSelfActionCelebrationAt = 0;
+  _celebrationSessionDedupe.clear();
+}
+
+// ---------------------------------------------------------------------------
+// マイルストーン演出（コメント / イベント順位 / ギフト）
+// ---------------------------------------------------------------------------
+
+async function loadSupportCelebrationState() {
+  if (_celebrationStateCache) return _celebrationStateCache;
+  try {
+    const bag = await chrome.storage.local.get(KEY_SUPPORT_CELEBRATION_STATE);
+    const raw = bag[KEY_SUPPORT_CELEBRATION_STATE];
+    _celebrationStateCache =
+      raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? /** @type {Record<string, string[]>} */ (raw)
+        : {};
+  } catch {
+    _celebrationStateCache = {};
+  }
+  return _celebrationStateCache;
+}
+
+/** 節目・自分操作の shower／豪雨／飛び文字。OS の reduced-motion のみ尊重（nl-calm-motion では止めない）。 */
+function supportCelebrationMotionEnabled() {
+  try {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return false;
+  } catch {
+    /* no-op */
+  }
+  return true;
+}
+
+/**
+ * @param {string} rel
+ * @returns {string}
+ */
+function extensionCelebrationAssetUrl(rel) {
+  try {
+    if (globalThis.chrome?.runtime?.getURL) {
+      return chrome.runtime.getURL(String(rel || ''));
+    }
+  } catch {
+    /* no-op */
+  }
+  return String(rel || '');
+}
+
+/**
+ * watch 埋め込み iframe から親 watch タブへ演出を中継する URL。
+ * @returns {string}
+ */
+function resolveWatchUrlForCelebrationRelay() {
+  if (INLINE_OWN_WATCH_URL) return INLINE_OWN_WATCH_URL;
+  const fromState = String(COMMENT_POST_UI_STATE.watchUrl || '').trim();
+  if (fromState && isNicoLiveWatchUrl(fromState)) return fromState;
+  const snap = watchMetaCache.snapshot;
+  if (snap && typeof snap === 'object') {
+    for (const key of ['watchUrl', 'pageUrl', 'url']) {
+      const url = String(/** @type {Record<string, unknown>} */ (snap)[key] || '').trim();
+      if (url && isNicoLiveWatchUrl(url)) return url;
+    }
+  }
+  const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (/^lv\d+$/.test(lid)) return `https://live.nicovideo.jp/watch/${lid}`;
+  return '';
+}
+
+/**
+ * @param {import('../lib/watchCelebrationOverlay.js').WatchCelebrationRelayPayload} payload
+ * @returns {Promise<boolean>}
+ */
+async function relayCelebrationToWatchWindow(payload) {
+  if (!INLINE_EMBED_WATCH) return false;
+  const watchUrl = resolveWatchUrlForCelebrationRelay();
+  if (!watchUrl) return false;
+  try {
+    const res = /** @type {{ ok?: boolean }|null} */ (
+      await sendMessageToWatchTabs(watchUrl, {
+        type: NLS_PLAY_WATCH_CELEBRATION,
+        payload
+      })
+    );
+    return res?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec} spec
+ */
+function maybePulseCommentMilestoneStatCard(spec) {
+  if (spec.kind !== 'comment_milestone') return;
+  const statCard =
+    document.getElementById('liveStatComments')?.closest('.nl-live-stat-card');
+  if (!(statCard instanceof HTMLElement)) return;
+  statCard.classList.remove('nl-live-stat-card--celebrate');
+  void statCard.offsetWidth;
+  statCard.classList.add('nl-live-stat-card--celebrate');
+  window.setTimeout(() => {
+    statCard.classList.remove('nl-live-stat-card--celebrate');
+  }, 3200);
+}
+
+function playSupportCelebrationDomLocal(spec) {
+  playSupportCelebrationShower(document, spec, {
+    resolveImageUrl: extensionCelebrationAssetUrl,
+    flyTextLines: flyTextLinesForSupportCelebration(spec),
+    pikaTier: pikaTierForSupportCelebration(spec),
+    watchPage: false
+  });
+  maybePulseCommentMilestoneStatCard(spec);
+}
+
+/**
+ * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec} spec
+ */
+function playSupportCelebrationDom(spec) {
+  if (INLINE_EMBED_WATCH) {
+    void (async () => {
+      const ok = await relayCelebrationToWatchWindow({
+        variant: 'support',
+        spec,
+        flyTextLines: flyTextLinesForSupportCelebration(spec),
+        pikaTier: pikaTierForSupportCelebration(spec)
+      });
+      if (ok) {
+        maybePulseCommentMilestoneStatCard(spec);
+        return;
+      }
+      playSupportCelebrationDomLocal(spec);
+    })();
+    return;
+  }
+  playSupportCelebrationDomLocal(spec);
+}
+
+/**
+ * @param {import('../lib/giftBahamutCelebration.js').GiftBahamutSpec} spec
+ */
+function playGiftBahamutDomLocal(spec) {
+  playGiftBahamutCelebration(document, spec, {
+    resolveImageUrl: extensionCelebrationAssetUrl,
+    flyTextLines: flyTextLinesForGiftBahamut(spec),
+    pikaTier: pikaTierForGiftBahamut(spec),
+    watchPage: false
+  });
+}
+
+/**
+ * @param {import('../lib/giftBahamutCelebration.js').GiftBahamutSpec} spec
+ */
+function playGiftBahamutDom(spec) {
+  if (INLINE_EMBED_WATCH) {
+    void (async () => {
+      const ok = await relayCelebrationToWatchWindow({
+        variant: 'gift_bahamut',
+        spec,
+        flyTextLines: flyTextLinesForGiftBahamut(spec),
+        pikaTier: pikaTierForGiftBahamut(spec)
+      });
+      if (!ok) playGiftBahamutDomLocal(spec);
+    })();
+    return;
+  }
+  playGiftBahamutDomLocal(spec);
+}
+
+/**
+ * @param {string} liveId
+ * @param {import('../lib/giftBahamutCelebration.js').GiftBahamutSpec} spec
+ */
+function maybePlayGiftBahamut(liveId, spec) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !spec) return;
+  if (popupCelebrationGate.isWithinOpeningCooldown()) return;
+  if (popupCelebrationGate.isCelebrationPlaybackBlocked()) {
+    popupCelebrationGate.logCelebrationDebug('gift_bahamut', {
+      blocked: true,
+      dedupeKey: spec.dedupeKey
+    });
+    return;
+  }
+  const sessionKey = `${lid}:${spec.dedupeKey}`;
+  if (_celebrationSessionDedupe.has(sessionKey)) return;
+  const now = Date.now();
+  if (now - _lastGiftBahamutAt < GIFT_BAHAMUT_MIN_GAP_MS) return;
+
+  _celebrationSessionDedupe.add(sessionKey);
+  _lastGiftBahamutAt = now;
+  playGiftBahamutDom(spec);
+}
+
+/**
+ * @param {import('../lib/selfActionCelebration.js').SelfActionCelebrationSpec} spec
+ * @returns {import('../lib/celebrationFlyText.js').CelebrationFlyTextLine[]}
+ */
+function flyTextLinesForSelfActionCelebration(spec) {
+  const color = spec.kind === 'self_comment' ? '#6ee8ff' : spec.kind === 'self_gift' ? '#ffb84d' : '#fff56a';
+  /** @type {import('../lib/celebrationFlyText.js').CelebrationFlyTextLine[]} */
+  const lines = [
+    { text: spec.message, motion: 'burst', color, sizePx: 28 },
+    { text: 'ナイス！', motion: 'scroll', color: '#ffffff', sizePx: 22, lanePct: 18 },
+    { text: '888888888', motion: 'scroll', color: '#fff56a', sizePx: 24, lanePct: 38 },
+    { text: 'ありがとう！', motion: 'burst', color: '#b8ff8a', sizePx: 24 }
+  ];
+  if (spec.kind === 'self_ad') {
+    lines.splice(1, 0, { text: '広告！', motion: 'burst', color: '#ffb84d', sizePx: 26 });
+    if (selfActionUsesAdPachinko(spec.kind, spec.point)) {
+      lines.splice(2, 0, { text: 'ドン！', motion: 'burst', color: '#fff56a', sizePx: 30 });
+      lines.splice(3, 0, { text: 'ジャン！', motion: 'scroll', color: '#ff8ec8', sizePx: 26, lanePct: 52 });
+    }
+  } else if (spec.kind === 'self_gift') {
+    lines.splice(1, 0, { text: 'ギフト！', motion: 'burst', color: '#ff8ec8', sizePx: 26 });
+  }
+  return lines.slice(0, 6);
+}
+
+/**
+ * @param {import('../lib/selfActionCelebration.js').SelfActionCelebrationSpec} spec
+ */
+function playSelfActionCelebrationDomLocal(spec) {
+  playSelfActionCelebrationShower(document, spec, {
+    resolveImageUrl: extensionCelebrationAssetUrl,
+    flyTextLines: flyTextLinesForSelfActionCelebration(spec),
+    pikaTier: 'soft',
+    watchPage: false
+  });
+}
+
+/**
+ * 自分操作用の軽量 shower。動き控えめ時は banner だけ出る。
+ * @param {import('../lib/selfActionCelebration.js').SelfActionCelebrationSpec} spec
+ */
+function playSelfActionCelebrationDom(spec) {
+  if (INLINE_EMBED_WATCH) {
+    void (async () => {
+      const ok = await relayCelebrationToWatchWindow({
+        variant: 'self_action',
+        spec,
+        flyTextLines: flyTextLinesForSelfActionCelebration(spec),
+        pikaTier: 'soft'
+      });
+      if (!ok) playSelfActionCelebrationDomLocal(spec);
+    })();
+    return;
+  }
+  playSelfActionCelebrationDomLocal(spec);
+}
+
+/**
+ * 自分操作は storage dedupe なし。popup セッション内の同一イベント抑制と短い連投抑制だけ。
+ * @param {string} liveId
+ * @param {import('../lib/selfActionCelebration.js').SelfActionCelebrationSpec|null|undefined} spec
+ */
+function maybePlaySelfActionCelebration(liveId, spec) {
+  const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!lid || !spec) return;
+  if (popupCelebrationGate.isWithinOpeningCooldown()) return;
+  const sessionKey = `${lid}:${spec.sessionDedupeKey}`;
+  if (_celebrationSessionDedupe.has(sessionKey)) return;
+  const now = Date.now();
+  if (now - _lastSelfActionCelebrationAt < SELF_ACTION_CELEBRATION_MIN_GAP_MS) return;
+
+  _celebrationSessionDedupe.add(sessionKey);
+  _lastSelfActionCelebrationAt = now;
+
+  const pachiThrow = selfAdCelebrationAsPachinkoThrow(spec);
+  if (pachiThrow && supportCelebrationMotionEnabled()) {
+    playSupportCelebrationDom(pachiThrow);
+    return;
+  }
+
+  if (
+    supportCelebrationMotionEnabled() &&
+    selfActionUsesGiftZoom(spec.kind, spec.point)
+  ) {
+    const zoomSpec = pickGiftBahamutCelebration(
+      {
+        sender: spec.sender || 'あなた',
+        item: spec.item || 'ギフト',
+        point: spec.point || 0
+      },
+      spec.sourceDedupeKey || spec.sessionDedupeKey
+    );
+    if (zoomSpec) {
+      _lastGiftBahamutAt = now;
+      playGiftBahamutDom(zoomSpec);
+      return;
+    }
+  }
+
+  playSelfActionCelebrationDom(spec);
+}
+
+/**
+ * @param {string} liveId
+ * @param {string} dedupeKey
+ * @returns {Promise<boolean>}
+ */
+async function isSupportCelebrationStorageBlocked(liveId, dedupeKey) {
+  try {
+    const state = await refreshTaskGuarded(
+      loadSupportCelebrationState(),
+      700,
+      'celebration_dedupe_check_timeout',
+      null
+    );
+    if (!state) return false;
+    return isSupportCelebrationAlreadyDone(celebratedKeysForLive(state, liveId), dedupeKey);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {string} liveId
+ * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec|null|undefined} spec
+ */
+async function maybePlaySupportCelebration(liveId, spec) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !spec) return;
+  if (popupCelebrationGate.isCelebrationPlaybackBlocked()) {
+    popupCelebrationGate.logCelebrationDebug('support', {
+      blocked: true,
+      kind: spec.kind,
+      dedupeKey: spec.dedupeKey
+    });
+    return;
+  }
+  if (isAdSupportCelebrationKind(spec.kind) || isFollowerSupportCelebrationKind(spec.kind)) {
+    const now = Date.now();
+    if (now - _lastAdThrowCelebrationAt < 2800) return;
+  }
+  const sessionKey = `${lid}:${spec.dedupeKey}`;
+  if (_celebrationSessionDedupe.has(sessionKey)) return;
+
+  const blocked = await isSupportCelebrationStorageBlocked(lid, spec.dedupeKey);
+  if (blocked) return;
+
+  _celebrationSessionDedupe.add(sessionKey);
+  popupCelebrationGate.logCelebrationDebug('support', {
+    kind: spec.kind,
+    dedupeKey: spec.dedupeKey,
+    inline: INLINE_EMBED_WATCH
+  });
+  playSupportCelebrationDom(spec);
+  if (isAdSupportCelebrationKind(spec.kind) || isFollowerSupportCelebrationKind(spec.kind)) {
+    _lastAdThrowCelebrationAt = Date.now();
+  }
+  void persistSupportCelebrationDedupe(lid, spec.dedupeKey);
+}
+
+/**
+ * storage 待ちなしで即座に演出（広告pt増・フォロワー増などリアルタイム系）。
+ * @param {string} liveId
+ * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec|null|undefined} spec
+ */
+function maybePlaySupportCelebrationImmediate(liveId, spec) {
+  const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!lid || !spec) return;
+  if (popupCelebrationGate.isWithinOpeningCooldown()) return;
+  if (
+    popupCelebrationGate.isCelebrationPlaybackBlocked() &&
+    popupCelebrationGate.isViewerActionCelebrationBlocked()
+  ) {
+    popupCelebrationGate.logCelebrationDebug('support', {
+      blocked: true,
+      immediate: true,
+      kind: spec.kind,
+      dedupeKey: spec.dedupeKey
+    });
+    return;
+  }
+  if (isAdSupportCelebrationKind(spec.kind) || isFollowerSupportCelebrationKind(spec.kind)) {
+    const now = Date.now();
+    if (now - _lastAdThrowCelebrationAt < 2800) return;
+  }
+  const sessionKey = `${lid}:${spec.dedupeKey}`;
+  if (_celebrationSessionDedupe.has(sessionKey)) return;
+
+  _celebrationSessionDedupe.add(sessionKey);
+  playSupportCelebrationDom(spec);
+  if (isAdSupportCelebrationKind(spec.kind) || isFollowerSupportCelebrationKind(spec.kind)) {
+    _lastAdThrowCelebrationAt = Date.now();
+  }
+  void persistSupportCelebrationDedupe(lid, spec.dedupeKey);
+}
+
+/**
+ * @param {string} liveId
+ * @param {string} dedupeKey
+ */
+async function persistSupportCelebrationDedupe(liveId, dedupeKey) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !dedupeKey) return;
+  const state = (await refreshTaskGuarded(
+    loadSupportCelebrationState(),
+    700,
+    'celebration_dedupe_persist_load_timeout',
+    _celebrationStateCache || {}
+  )) || _celebrationStateCache || {};
+  const keys = celebratedKeysForLive(state, lid);
+  if (isSupportCelebrationAlreadyDone(keys, dedupeKey)) return;
+  const nextKeys = markSupportCelebrationDone(keys, dedupeKey);
+  _celebrationStateCache = withCelebratedKeysForLive(state, lid, nextKeys);
+  void storageSetSafe({ [KEY_SUPPORT_CELEBRATION_STATE]: _celebrationStateCache }).catch(
+    () => {}
+  );
+}
+
+/**
+ * アプリ側の記録件数（画面の「記録」）だけでマイルストーンを判定する。
+ * 公式コメント数（本家コメ）は含めない — 混在すると節目が一度も発火しない。
+ *
+ * @param {string} liveId
+ * @param {number|null|undefined} appRecordCount
+ */
+/**
+ * 記録コメント件数マイルストーンを storage にプライム（popup 再開直後の一斉演出防止）。
+ *
+ * @param {string} liveId
+ * @param {number} commentCount
+ */
+async function primeCommentMilestoneCelebrationsFromCount(liveId, commentCount) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || typeof commentCount !== 'number' || !Number.isFinite(commentCount) || commentCount < 0) {
+    return;
+  }
+  if (_commentMilestoneCelebrationPrimedLiveId === lid) return;
+  _commentMilestoneCelebrationPrimedLiveId = lid;
+  _prevMilestoneCommentHighWater = Math.floor(commentCount);
+  const toMark = commentMilestoneDedupeKeysAtOrBelow(commentCount);
+  if (!toMark.length) return;
+  try {
+    const state = (await loadSupportCelebrationState()) || {};
+    let keys = celebratedKeysForLive(state, lid);
+    for (const k of toMark) {
+      keys = markSupportCelebrationDone(keys, k);
+    }
+    _celebrationStateCache = withCelebratedKeysForLive(state, lid, keys);
+    void storageSetSafe({ [KEY_SUPPORT_CELEBRATION_STATE]: _celebrationStateCache }).catch(
+      () => {}
+    );
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * 軽量 paint → heavy 全件の件数ジャンプ時は再プライムしてマイルストーン誤爆を防ぐ。
+ *
+ * @param {string} liveId
+ * @param {number} commentCount
+ */
+async function ensureCommentMilestonePrimedForCount(liveId, commentCount) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || typeof commentCount !== 'number' || !Number.isFinite(commentCount) || commentCount < 0) {
+    return;
+  }
+  if (
+    shouldReprimeCommentMilestones({
+      primedLiveId: _commentMilestoneCelebrationPrimedLiveId,
+      liveId: lid,
+      prevHighWater: _prevMilestoneCommentHighWater,
+      newCount: commentCount
+    })
+  ) {
+    _commentMilestoneCelebrationPrimedLiveId = '';
+    popupCelebrationGate.resetPrimeForRepriming();
+  }
+  if (_commentMilestoneCelebrationPrimedLiveId !== lid) {
+    await primeCommentMilestoneCelebrationsFromCount(lid, commentCount);
+  }
+}
+
+function noteCommentMilestoneHighWater(liveId, appRecordCount) {
+  const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!lid) return;
+  if (typeof appRecordCount !== 'number' || !Number.isFinite(appRecordCount) || appRecordCount < 0) {
+    return;
+  }
+  const next = Math.floor(appRecordCount);
+  const prev = _prevMilestoneCommentHighWater;
+  if (prev != null && next > prev) {
+    void maybeCelebrateFromCommentCount(lid, prev, next);
+  }
+  _prevMilestoneCommentHighWater = next;
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ */
+async function maybeCelebrateFromCommentCount(liveId, prev, next) {
+  const spec = pickCommentMilestoneCelebration(prev, next);
+  if (spec) await maybePlaySupportCelebration(liveId, spec);
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prevRank
+ * @param {number|null|undefined} newRank
+ */
+async function maybeCelebrateFromEventRank(liveId, prevRank, newRank) {
+  const spec = pickEventRankUpCelebration(prevRank, newRank);
+  if (spec) await maybePlaySupportCelebration(liveId, spec);
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ */
+async function maybeCelebrateFromGiftCount(liveId, prev, next) {
+  const spec = pickGiftCountMilestoneCelebration(prev, next);
+  if (spec) await maybePlaySupportCelebration(liveId, spec);
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ */
+async function maybeCelebrateFromAdPoints(liveId, prev, next) {
+  const milestone = pickAdPointsMilestoneCelebration(prev, next);
+  if (milestone) {
+    maybePlaySupportCelebrationImmediate(liveId, milestone);
+    return;
+  }
+  const increase = pickAdPointsIncreaseCelebration(prev, next);
+  if (increase) maybePlaySupportCelebrationImmediate(liveId, increase);
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ */
+function maybeCelebrateFromBroadcasterFollower(liveId, prev, next) {
+  const milestone = pickBroadcasterFollowerMilestoneCelebration(prev, next);
+  if (milestone) {
+    maybePlaySupportCelebrationImmediate(liveId, milestone);
+    return;
+  }
+  const increase = pickBroadcasterFollowerIncreaseCelebration(prev, next);
+  if (increase) maybePlaySupportCelebrationImmediate(liveId, increase);
+}
+
+/** 配信者フォロワー数 — 演出用の nvapi ポーリング間隔（content の 5 分更新だけでは間に合わない） */
+const BROADCASTER_FOLLOWER_CELEBRATION_POLL_MS = 45_000;
+/** @type {number} */
+let _lastBroadcasterFollowerPollAt = 0;
+/** @type {boolean} */
+let _broadcasterFollowerPollInFlight = false;
+
+/**
+ * @param {string} liveId
+ */
+async function trackBroadcasterFollowerForCelebration(liveId) {
+  const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const model = await resolveBroadcasterProfileModel(watchMetaCache.snapshot, lid);
+  applyBroadcasterFollowerCountForCelebration(
+    lid,
+    typeof model?.followerCount === 'number' && Number.isFinite(model.followerCount)
+      ? Math.floor(model.followerCount)
+      : null
+  );
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null} next
+ */
+function applyBroadcasterFollowerCountForCelebration(liveId, next) {
+  const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!lid || next == null || next < 0) return;
+  const prev = _prevBroadcasterFollowerCount;
+  if (prev != null && next > prev) {
+    maybeCelebrateFromBroadcasterFollower(lid, prev, next);
+  }
+  _prevBroadcasterFollowerCount = next;
+}
+
+/**
+ * パネル表示中に nvapi でフォロワー数を定期取得（5 分に 1 回の storage 更新では取りこぼす）。
+ * @param {string} [liveId]
+ */
+async function pollBroadcasterFollowerCountForCelebration(liveId) {
+  const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!lid || _broadcasterFollowerPollInFlight) return;
+  const now = Date.now();
+  if (now - _lastBroadcasterFollowerPollAt < BROADCASTER_FOLLOWER_CELEBRATION_POLL_MS) return;
+
+  const snap = watchMetaCache.snapshot;
+  const uid = String(snap?.broadcasterUserId || '').trim();
+  if (!/^\d{1,18}$/.test(uid)) return;
+
+  _broadcasterFollowerPollInFlight = true;
+  _lastBroadcasterFollowerPollAt = now;
+  try {
+    const resp = await new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid }, (r) => {
+          const le = chrome.runtime.lastError;
+          if (le) return resolve(null);
+          resolve(r);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+    if (!resp || resp.ok !== true || resp.json == null) return;
+    let profile = null;
+    try {
+      profile = normalizeNicoUserProfileResponse(resp.json);
+    } catch {
+      profile = null;
+    }
+    const next =
+      typeof profile?.followerCount === 'number' && Number.isFinite(profile.followerCount)
+        ? Math.floor(profile.followerCount)
+        : null;
+    if (next == null) return;
+    applyBroadcasterFollowerCountForCelebration(lid, next);
+    const pk = broadcasterProfileStorageKey(lid);
+    const bag = await chrome.storage.local.get(pk).catch(() => ({}));
+    const existing =
+      bag && bag[pk] && typeof bag[pk] === 'object' ? /** @type {Record<string, unknown>} */ (bag[pk]) : {};
+    void chrome.storage.local
+      .set({
+        [pk]: {
+          ...existing,
+          userId: uid,
+          followerCount: next,
+          followeeCount:
+            typeof profile?.followeeCount === 'number' ? profile.followeeCount : existing.followeeCount,
+          capturedAt: Date.now()
+        }
+      })
+      .catch(() => {});
+  } finally {
+    _broadcasterFollowerPollInFlight = false;
+  }
+}
+
+/**
+ * event-dom / 配信者プロフィール storage 更新時に演出だけ即反映（full refresh 待たない）。
+ * @param {Record<string, chrome.storage.StorageChange>} changes
+ */
+function applyCelebrationSideEffectsFromStorageChanges(changes) {
+  const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const domKey = eventDomStorageKey(lid);
+  const profileKey = broadcasterProfileStorageKey(lid);
+  if (changes[domKey]) {
+    void refreshOfficialEventDomBundle(lid).then(() => {
+      const snap = watchMetaCache.snapshot;
+      if (!snap) return;
+      paintOfficialNicoStatsStrip(/** @type {Record<string, unknown>} */ (snap));
+      paintOfficialNdgrGiftCard(/** @type {Record<string, unknown>} */ (snap));
+    });
+  }
+  if (changes[profileKey]) {
+    void trackBroadcasterFollowerForCelebration(lid);
+  }
+}
+
+/**
+ * @param {unknown} entry
+ * @param {string} liveId
+ * @returns {string}
+ */
+function nicoadCommentCelebrationKey(entry, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const no = String(/** @type {{ commentNo?: unknown, id?: unknown }} */ (entry)?.commentNo ?? /** @type {{ id?: unknown }} */ (entry)?.id ?? '').trim();
+  const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+  if (no) return `${lid}|no:${no}`;
+  const at = Number(/** @type {{ capturedAt?: unknown }} */ (entry)?.capturedAt) || 0;
+  return `${lid}|t:${at}|${text.slice(0, 80)}`;
+}
+
+/**
+ * ギフト/広告のシステムコメントが視聴者本人の操作かを、取れる範囲で保守的に判定する。
+ * @param {unknown} entry
+ * @param {string} parsedSender
+ * @param {string} liveId
+ * @param {unknown[]} entries
+ * @returns {boolean}
+ */
+function isCurrentViewerActionComment(entry, parsedSender, liveId, entries) {
+  const e = /** @type {{ userId?: unknown, nickname?: unknown, selfPosted?: unknown }} */ (entry);
+  if (e?.selfPosted === true) return true;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (lid && isOwnPostedSupportComment(/** @type {PopupCommentEntry} */ (entry), lid, /** @type {PopupCommentEntry[]} */ (entries))) {
+    return true;
+  }
+  const viewerUid = String(watchMetaCache.snapshot?.viewerUserId || '').trim();
+  const viewerNickname = String(watchMetaCache.snapshot?.viewerNickname || '').replace(/\s+/g, ' ').trim();
+  const entryUid = String(e?.userId || '').trim();
+  const entryNickname = String(e?.nickname || '').replace(/\s+/g, ' ').trim();
+  const sender = String(parsedSender || '').replace(/\s+/g, ' ').trim();
+  if (viewerUid && entryUid && viewerUid === entryUid) return true;
+  if (viewerUid && sender && viewerUid === sender) return true;
+  if (viewerNickname && sender && viewerNickname === sender) return true;
+  if (viewerNickname && entryNickname && viewerNickname === entryNickname) return true;
+  if (viewerUid && popupUserCommentProfileMap instanceof Map) {
+    const profile = popupUserCommentProfileMap.get(viewerUid);
+    const profileNick = String(profile?.nickname || profile?.name || '').replace(/\s+/g, ' ').trim();
+    if (profileNick && sender && profileNick === sender) return true;
+  }
+  if (senderLooksLikeViewer(sender, viewerNickname, viewerUid)) return true;
+  return false;
+}
+
+/**
+ * コメント配列のギフト／広告演出（初回 prime のみ・以降は新着分だけ）。
+ * @param {unknown[]} entries
+ * @param {string} liveId
+ */
+function runPopupCelebrationCommentScan(entries, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !Array.isArray(entries) || entries.length === 0) return;
+  runCelebrationCommentIncrementalScan(entries, lid, {
+    primeEntry(entry) {
+      const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+      if (parseNicoadCommentText(text)) {
+        _nicoadCelebrationPrimedKeys.add(nicoadCommentCelebrationKey(entry, lid));
+      }
+      if (parseGiftCommentText(text)) {
+        _seenGiftCommentKeys.add(nicoadCommentCelebrationKey(entry, lid));
+      }
+    },
+    processEntry(entry) {
+      processNicoadCelebrationEntry(entry, lid, entries);
+      processGiftBahamutCelebrationEntry(entry, lid, entries);
+    }
+  });
+}
+
+/**
+ * @param {unknown} entry
+ * @param {string} liveId
+ * @param {unknown[]} entries
+ */
+function processNicoadCelebrationEntry(entry, liveId, entries) {
+  const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+  const parsed = parseNicoadCommentText(text);
+  if (!parsed) return;
+  const key = nicoadCommentCelebrationKey(entry, liveId);
+  if (_nicoadCelebrationHandledKeys.has(key)) return;
+  if (_nicoadCelebrationPrimedKeys.has(key)) return;
+  _nicoadCelebrationHandledKeys.add(key);
+  if (isCurrentViewerActionComment(entry, parsed.sender, liveId, entries)) {
+    maybePlaySelfActionCelebration(
+      liveId,
+      buildSelfAdCelebrationSpec({
+        sender: parsed.sender,
+        point: parsed.point,
+        sessionDedupeKey: `ad_comment_${key}`,
+        sourceDedupeKey: key
+      })
+    );
+    return;
+  }
+  const spec = pickNicoadCommentCelebration(parsed, key);
+  if (spec) maybePlaySupportCelebrationImmediate(liveId, spec);
+}
+
+/**
+ * コメントログの「○○pt広告しました」を検知して演出（投げた瞬間を拾う正本経路）。
+ *
+ * @param {unknown[]} entries
+ * @param {string} liveId
+ * @param {{ reliableFull?: boolean, scanTailCount?: number }} [scanOpts]
+ */
+function scanCommentsForNicoadCelebrations(entries, liveId, scanOpts = {}) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !Array.isArray(entries)) return;
+
+  const tailN =
+    typeof scanOpts.scanTailCount === 'number' && scanOpts.scanTailCount > 0
+      ? Math.trunc(scanOpts.scanTailCount)
+      : 0;
+  if (tailN > 0) {
+    const slice = entries.slice(-Math.min(entries.length, tailN));
+    for (const entry of slice) {
+      processNicoadCelebrationEntry(entry, lid, entries);
+    }
+    return;
+  }
+
+  const reliableFull = scanOpts.reliableFull === true;
+  if (!reliableFull) return;
+
+  const broadcastChanged = _nicoadCelebrationSeededLiveId !== lid;
+  const prevSeededLen = _nicoadCelebrationSeededEntryCountByLive.get(lid) ?? -1;
+
+  if (shouldFullPrimeCelebrationCommentSeed(broadcastChanged, prevSeededLen)) {
+    _nicoadCelebrationSeededLiveId = lid;
+    _nicoadCelebrationSeededEntryCountByLive.set(lid, entries.length);
+    _nicoadCelebrationPrimedKeys.clear();
+    _nicoadCelebrationHandledKeys.clear();
+    for (const entry of entries) {
+      const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+      if (!parseNicoadCommentText(text)) continue;
+      _nicoadCelebrationPrimedKeys.add(nicoadCommentCelebrationKey(entry, lid));
+    }
+    return;
+  }
+
+  const prefixEnd = celebrationSeedPrefixEndIndex(
+    broadcastChanged,
+    prevSeededLen,
+    entries.length
+  );
+  if (prefixEnd != null && entries.length > prefixEnd) {
+    for (let i = 0; i < prefixEnd; i++) {
+      const entry = entries[i];
+      const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+      if (!parseNicoadCommentText(text)) continue;
+      _nicoadCelebrationPrimedKeys.add(nicoadCommentCelebrationKey(entry, lid));
+    }
+    _nicoadCelebrationSeededEntryCountByLive.set(lid, entries.length);
+  }
+
+  for (const entry of entries) {
+    processNicoadCelebrationEntry(entry, lid, entries);
+  }
+}
+
+/**
+ * ギフトコメント到着で三キャラ画面ズーム（SFC マリオ風）。
+ *
+ * @param {unknown[]} entries
+ * @param {string} liveId
+ * @param {{ reliableFull?: boolean }} [scanOpts]
+ */
+/**
+ * @param {unknown} entry
+ * @param {string} liveId
+ * @param {unknown[]} entries
+ */
+function processGiftBahamutCelebrationEntry(entry, liveId, entries) {
+  const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+  const parsed = parseGiftCommentText(text);
+  if (!parsed) return;
+  const key = nicoadCommentCelebrationKey(entry, liveId);
+  if (_seenGiftCommentKeys.has(key)) return;
+  _seenGiftCommentKeys.add(key);
+  if (isCurrentViewerActionComment(entry, parsed.sender, liveId, entries)) {
+    maybePlaySelfActionCelebration(
+      liveId,
+      buildSelfGiftCelebrationSpec({
+        sender: parsed.sender,
+        item: parsed.item,
+        point: parsed.point,
+        sessionDedupeKey: `gift_bahamut_${key}`,
+        sourceDedupeKey: key
+      })
+    );
+    return;
+  }
+  const spec = pickGiftBahamutCelebration(parsed, key);
+  if (spec) maybePlayGiftBahamut(liveId, spec);
+}
+
+function scanCommentsForGiftBahamut(entries, liveId, scanOpts = {}) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !Array.isArray(entries)) return;
+
+  const tailN =
+    typeof scanOpts.scanTailCount === 'number' && scanOpts.scanTailCount > 0
+      ? Math.trunc(scanOpts.scanTailCount)
+      : 0;
+  if (tailN > 0) {
+    const slice = entries.slice(-Math.min(entries.length, tailN));
+    for (const entry of slice) {
+      processGiftBahamutCelebrationEntry(entry, lid, entries);
+    }
+    return;
+  }
+
+  const reliableFull = scanOpts.reliableFull === true;
+  if (!reliableFull) return;
+
+  const broadcastChanged = _giftBahamutSeededLiveId !== lid;
+  const prevSeededLen = _giftBahamutSeededEntryCountByLive.get(lid) ?? -1;
+
+  if (shouldFullPrimeCelebrationCommentSeed(broadcastChanged, prevSeededLen)) {
+    _giftBahamutSeededLiveId = lid;
+    _giftBahamutSeededEntryCountByLive.set(lid, entries.length);
+    _seenGiftCommentKeys.clear();
+    for (const entry of entries) {
+      const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+      const parsed = parseGiftCommentText(text);
+      if (!parsed) continue;
+      _seenGiftCommentKeys.add(nicoadCommentCelebrationKey(entry, lid));
+    }
+    return;
+  }
+
+  const prefixEnd = celebrationSeedPrefixEndIndex(
+    broadcastChanged,
+    prevSeededLen,
+    entries.length
+  );
+  if (prefixEnd != null && entries.length > prefixEnd) {
+    for (let i = 0; i < prefixEnd; i++) {
+      const entry = entries[i];
+      const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
+      const parsed = parseGiftCommentText(text);
+      if (!parsed) continue;
+      _seenGiftCommentKeys.add(nicoadCommentCelebrationKey(entry, lid));
+    }
+    _giftBahamutSeededEntryCountByLive.set(lid, entries.length);
+  }
+
+  for (const entry of entries) {
+    processGiftBahamutCelebrationEntry(entry, lid, entries);
+  }
+}
+
+/**
+ * @param {string} liveId
+ * @param {number|null|undefined} prev
+ * @param {number|null|undefined} next
+ */
+async function maybeCelebrateFromAdAdvertiserCount(liveId, prev, next) {
+  const spec = pickAdAdvertiserCountMilestoneCelebration(prev, next);
+  if (spec) await maybePlaySupportCelebration(liveId, spec);
+}
+
+/**
+ * @param {number|null|undefined} adPtsNum
+ */
+function trackAdPointsForCelebration(adPtsNum) {
+  if (typeof adPtsNum !== 'number' || !Number.isFinite(adPtsNum) || adPtsNum < 0) return;
+  const lid = watchPopupLastPaintedLiveId;
+  if (!lid) return;
+  const prev = _prevAdPoints;
+  if (prev != null && adPtsNum > prev && !isStartupAdPointsJump(prev, adPtsNum)) {
+    const rows = STORY_SOURCE_STATE.entries;
+    if (Array.isArray(rows) && rows.length > 0) {
+      runPopupCelebrationCommentScan(rows, lid);
+    }
+    if (!popupCelebrationGate.isCelebrationPlaybackBlocked()) {
+      void maybeCelebrateFromAdPoints(lid, prev, adPtsNum);
+    }
+  }
+  _prevAdPoints = adPtsNum;
+}
+
+/**
+ * 公式番組累計のニコニ広告ptで、既に達成済みのマイルストーンを storage にプライム（起動直後の誤爆防止）。
+ *
+ * @param {string} liveId
+ * @param {number} adPts
+ */
+async function primeAdPointsCelebrationsFromOfficialTotal(liveId, adPts) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || typeof adPts !== 'number' || !Number.isFinite(adPts) || adPts < 0) return;
+  if (_adPointsCelebrationPrimedLiveId === lid) return;
+  _adPointsCelebrationPrimedLiveId = lid;
+  _prevAdPoints = adPts;
+  const toMark = adPointsMilestoneDedupeKeysAtOrBelow(adPts);
+  if (!toMark.length) return;
+  try {
+    const state = (await loadSupportCelebrationState()) || {};
+    let keys = celebratedKeysForLive(state, lid);
+    for (const k of toMark) {
+      keys = markSupportCelebrationDone(keys, k);
+    }
+    _celebrationStateCache = withCelebratedKeysForLive(state, lid, keys);
+    void storageSetSafe({ [KEY_SUPPORT_CELEBRATION_STATE]: _celebrationStateCache }).catch(
+      () => {}
+    );
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * @param {string} liveId
+ * @param {number} advertiserCount
+ */
+function trackAdAdvertiserCountForCelebration(liveId, advertiserCount) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const count =
+    typeof advertiserCount === 'number' && Number.isFinite(advertiserCount) && advertiserCount >= 0
+      ? advertiserCount
+      : null;
+  if (count == null) return;
+  const prev = _prevAdAdvertiserCount;
+  if (prev != null && count > prev) {
+    void maybeCelebrateFromAdAdvertiserCount(lid, prev, count);
+  }
+  _prevAdAdvertiserCount = count;
+}
+
+/**
+ * @param {string} liveId
+ */
+/**
+ * NDGR ギフト件数マイルストーンを storage にプライム（popup 再開直後の一斉落下防止）。
+ *
+ * @param {string} liveId
+ * @param {number} giftEventCount
+ */
+async function primeGiftEventCelebrationsFromCount(liveId, giftEventCount) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (
+    !lid ||
+    typeof giftEventCount !== 'number' ||
+    !Number.isFinite(giftEventCount) ||
+    giftEventCount < 0
+  ) {
+    return;
+  }
+  if (_giftEventCelebrationPrimedLiveId === lid) return;
+  _giftEventCelebrationPrimedLiveId = lid;
+  _prevGiftEventCount = Math.floor(giftEventCount);
+  const toMark = giftCountMilestoneDedupeKeysAtOrBelow(giftEventCount);
+  if (!toMark.length) return;
+  try {
+    const state = (await loadSupportCelebrationState()) || {};
+    let keys = celebratedKeysForLive(state, lid);
+    for (const k of toMark) {
+      keys = markSupportCelebrationDone(keys, k);
+    }
+    _celebrationStateCache = withCelebratedKeysForLive(state, lid, keys);
+    void storageSetSafe({ [KEY_SUPPORT_CELEBRATION_STATE]: _celebrationStateCache }).catch(
+      () => {}
+    );
+  } catch {
+    /* best-effort */
+  }
+}
+
+async function maybeCelebrateGiftEventsAfterRefresh(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  if (popupCelebrationGate.isCelebrationPlaybackBlocked()) return;
+  /** @type {unknown[]} */
+  let giftEvents = [];
+  try {
+    const evBag = await chrome.storage.local.get(`nls_gift_events_${lid}`);
+    const v = evBag[`nls_gift_events_${lid}`];
+    if (Array.isArray(v)) giftEvents = v;
+  } catch {
+    return;
+  }
+  const count = giftEvents.length;
+  if (_giftEventCelebrationPrimedLiveId !== lid) {
+    await primeGiftEventCelebrationsFromCount(lid, count);
+    return;
+  }
+  const prev = _prevGiftEventCount;
+  _prevGiftEventCount = count;
+  if (prev != null && count > prev) {
+    await maybeCelebrateFromGiftCount(lid, prev, count);
+  }
 }
 
 /** 記録・同接・来場の三カードに、数値確定までキャラ重ねのローディングを同期する。 */
@@ -927,7 +2243,9 @@ function setCountDisplay(value, watchSnapshot = null) {
       images: RINKU_IMGS,
     });
   }
-  if (!Number.isNaN(num)) _prevSupportCount = num;
+  if (!Number.isNaN(num)) {
+    _prevSupportCount = num;
+  }
   syncLiveStatThreeCardsCharLoadingOverlays();
 }
 
@@ -1445,6 +2763,8 @@ function renderExtensionContextBanner(visible) {
 // 0.1.31 (AF): blob URL の revoke を queue 管理。15 秒で revoke / 同時 3 個まで。
 // 連続 DL でメモリが滞留する問題を抑止。詳細は src/lib/objectUrlRevokeQueue.js。
 const objectUrlRevokeQueue = createObjectUrlRevokeQueue();
+/** HTML/マーケ DL: Save As ダイアログ中に blob URL を早く revoke しない */
+const exportBlobRevokeQueue = createObjectUrlRevokeQueue({ timeoutMs: 120_000 });
 
 const watchMetaCache = {
   key: '',
@@ -1499,6 +2819,8 @@ let lastGoodRefreshOpenBag = null;
  * 関連キャッシュを強制リセットするための追跡変数。値は空文字列=まだ描画なし。
  */
 let watchPopupLastPaintedLiveId = '';
+/** 速報 metrics 直結でカードを一度でも塗った lv（初回幕解除用） */
+let _panelMetricsAppliedForLv = '';
 
 /** E2E / 体感計測用: メインコンテンツの初回ペイントが終わった印 */
 function markPopupRefreshContentPainted() {
@@ -1717,7 +3039,7 @@ async function renderGiftSubAppHistoryPanel(liveId) {
   }
   if (!summary.hasData) {
     mount.innerHTML =
-      '<p class="nl-sub">ギフトサイドバーがまだ開かれていないため、履歴は未取得です。サイドバーの「履歴」タブを開くと、最新 60+ 件と種類別集計を popup に取り込みます。</p>';
+      '<p class="nl-sub">koken 公式 API からギフト履歴を自動取得中です（記録開始後、数十秒以内に表示されます）。公式サイドバーの「履歴」タブを開くと、一覧の追記が速くなる場合があります。</p>';
     return;
   }
   const history = Array.isArray(payload?.history) ? /** @type {any[]} */ (payload.history) : [];
@@ -1838,6 +3160,49 @@ async function downloadSessionSummaryJson(liveId) {
     } catch {
       // no-op
     }
+  }
+}
+
+/**
+ * 同接推定 較正データ（KEY_CONCURRENT_CALIBRATION_RING_V1）を JSON/CSV でダウンロードする。
+ * @param {'json'|'csv'} format
+ */
+async function downloadCalibrationData(format) {
+  try {
+    const bag = await chrome.storage.local.get(KEY_CONCURRENT_CALIBRATION_RING_V1);
+    const parsed = parseCalibrationLog(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]);
+    if (!parsed.items.length) return;
+    const isCsv = format === 'csv';
+    const text = isCsv
+      ? serializeCalibrationCsv(parsed)
+      : serializeCalibrationJson(parsed);
+    const blob = new Blob([text], {
+      type: isCsv ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8'
+    });
+    const url = URL.createObjectURL(blob);
+    try {
+      await chrome.downloads.download({
+        url,
+        filename: `nicolivelog-concurrent-calibration-${Date.now()}.${isCsv ? 'csv' : 'json'}`,
+        saveAs: true,
+        conflictAction: 'uniquify'
+      });
+    } finally {
+      objectUrlRevokeQueue.enqueue(url);
+    }
+  } catch {
+    // no-op
+  }
+}
+
+/** 較正データを全消去する（リングバッファを空にする）。 */
+async function clearCalibrationData() {
+  try {
+    await chrome.storage.local.set({
+      [KEY_CONCURRENT_CALIBRATION_RING_V1]: { v: 1, items: [] }
+    });
+  } catch {
+    // no-op
   }
 }
 
@@ -1999,6 +3364,8 @@ async function copyTextToClipboard(text) {
 //   永久 true（=全カード「—」固定）を構造的に防ぐ。通常の内部 retry は最大 ~11s 進行
 //   し得るので、正常だが遅いだけの fetch を中断しないよう 15s と余裕を取る。
 const SNAPSHOT_FETCH_TIMEOUT_MS = 15_000;
+/** content メモリ速報（storage バイパス）の取得上限 */
+const PANEL_METRICS_FETCH_TIMEOUT_MS = 2_500;
 
 /**
  * @template T
@@ -2189,6 +3556,8 @@ const STORY_GUIDE_FACE_LINK =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
 const STORY_GUIDE_FACE_KONTA =
   'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png';
+/** ギフト・広告投げ主列の案内（こん太アイコンを流用） */
+const STORY_GUIDE_FACE_GIFT = STORY_GUIDE_FACE_KONTA;
 const STORY_GUIDE_FACE_TANU =
   'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png';
 /**
@@ -2332,6 +3701,94 @@ popupBooleanSettingsRegistry.register(
       /** @type {HTMLInputElement|null} */ ($('commentEnterSend'))
   })
 );
+
+/**
+ * 自動巡回（Phase 2b）の ON/OFF。既定 OFF（raw === true のときだけ ON）。
+ * 書き込み副作用（SW への通知）は storage.onChanged 経由なので、ここは
+ * checkbox のハイドレートのみ。write は下のコールサイト change ハンドラで行う。
+ */
+popupBooleanSettingsRegistry.register(
+  createBooleanSettingController({
+    key: KEY_AUTOPATROL_ENABLED,
+    // v0.1.528: 既定 ON（未設定=ON）。明示的に false を保存したときだけ OFF。
+    normalize: (raw) => raw !== false,
+    getCheckbox: () => /** @type {HTMLInputElement|null} */ ($('autopatrolEnabled'))
+  })
+);
+
+/**
+ * 自動巡回の状態テキスト（#autopatrolStatus）を storage から更新する。
+ * 訪問数・採取中の配信・待ち件数・直近エラーを 1 行で見せる。
+ */
+/**
+ * 自動補正（オートキャリブレーション）の現在のプロファイル＋メタ。
+ * 較正リングから導いた fit が ready のときだけ profile を持つ。未較正なら null（＝既定係数）。
+ * renderWatchMetaCard から同期参照するため module-level に保持し、
+ * refreshAutopatrolStatusLine（5 秒間隔・較正リングを既に読む）で更新する。
+ * @type {{ profile: import('../lib/concurrentEstimate.js').PlatformProfile|null, info: import('../lib/buildWatchMetaCardAudienceViewModel.js').WatchMetaCalibrationInfo|null }}
+ */
+let _autoCalibration = { profile: null, info: null };
+
+/**
+ * 較正リングの中身から自動補正プロファイルを再計算してキャッシュへ反映する。
+ * 表示（estimated）専用。較正サンプルのロギングは生のまま（フィードバックループ防止）。
+ * @param {unknown} ringBagValue  KEY_CONCURRENT_CALIBRATION_RING_V1 の値
+ */
+function refreshAutoCalibrationProfileCache(ringBagValue) {
+  try {
+    const fit = computeCalibrationFit(ringBagValue, { platform: 'niconico' });
+    const r = buildCalibratedPlatformProfile(NICONICO_PROFILE, fit);
+    _autoCalibration = {
+      profile: r.applied ? r.profile : null,
+      info: {
+        applied: r.applied,
+        basis: r.basis,
+        sampleCount: r.sampleCount,
+        multiplierScale: r.multiplierScale
+      }
+    };
+  } catch {
+    /* 失敗時は前回キャッシュを保持（補正なしでも安全にフォールバック） */
+  }
+}
+
+async function refreshAutopatrolStatusLine() {
+  try {
+    const statusEl = $('autopatrolStatus');
+    const bag = await chrome.storage.local.get([
+      KEY_AUTOPATROL_ENABLED,
+      KEY_AUTOPATROL_STATE,
+      KEY_CONCURRENT_CALIBRATION_RING_V1
+    ]);
+    // 自動補正キャッシュは status 要素の有無に関わらず更新する。
+    refreshAutoCalibrationProfileCache(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]);
+    if (!statusEl) return;
+    const sampleCount = parseCalibrationLog(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]).items.length;
+    const sampleLabel = `記録 ${sampleCount.toLocaleString('ja-JP')} サンプル`;
+    // v0.1.528: 既定 ON（未設定=ON）。明示的に false のときだけ OFF 表示。
+    const enabled = bag[KEY_AUTOPATROL_ENABLED] !== false;
+    if (!enabled) {
+      statusEl.textContent = `OFF（手動視聴の記録は継続）／ ${sampleLabel}`;
+      return;
+    }
+    const st =
+      bag[KEY_AUTOPATROL_STATE] && typeof bag[KEY_AUTOPATROL_STATE] === 'object'
+        ? bag[KEY_AUTOPATROL_STATE]
+        : {};
+    const visited = Math.max(0, Number(st.visitedCount) || 0);
+    const cur =
+      typeof st.currentLiveId === 'string' && st.currentLiveId ? st.currentLiveId : null;
+    const qn = Array.isArray(st.queue) ? st.queue.length : 0;
+    const parts = [`ON・累計 ${visited} 配信`];
+    parts.push(cur ? `採取中 ${cur}` : '次の配信を準備中');
+    parts.push(`待ち ${qn}`);
+    parts.push(sampleLabel);
+    if (st.lastError) parts.push(`※${st.lastError}`);
+    statusEl.textContent = parts.join(' / ');
+  } catch {
+    /* no-op */
+  }
+}
 
 /**
  * @param {unknown} userId
@@ -2491,13 +3948,9 @@ async function appendSelfPostedComment(liveId, rawText) {
   next.push(item);
   while (next.length > MAX_SELF_POSTED_ITEMS) next.shift();
   selfPostedRecentsCache = next;
-  try {
-    await storageSetSafe({
-      [KEY_SELF_POSTED_RECENTS]: { items: next }
-    });
-  } catch {
-    // no-op
-  }
+  void storageSetSafe({
+    [KEY_SELF_POSTED_RECENTS]: { items: next }
+  }).catch(() => {});
 }
 
 /**
@@ -3196,8 +4649,29 @@ const STORY_REACTION_STATE = {
  * story growth グリッドの DOM セル数の上限。コメントが極端に多い放送でも `<img>` を
  * 無制限に作らないための安全弁（超過時は「直近 N 件」だけを描画する＝ウィンドウ表示）。
  * 通常配信（数百件規模）はこの値未満なので従来どおり全件描画され、見た目は変わらない。
+ * 上限値は src/lib/storyGrowthLimits.js（v0.1.539 で 800→360 に引き下げ）。
  */
-const STORY_GROWTH_MAX_CELLS = 800;
+
+/** `.nl-main` スクロール中の重い paint 見送り用（popupMainScrollDefer.js と同 ms）。 */
+let nlMainLastScrollAtMs = 0;
+
+function bindNlMainScrollPerfHook() {
+  const main = /** @type {HTMLElement|null} */ (document.querySelector('.nl-main'));
+  if (!main || main.dataset.nlScrollPerfBound === '1') return;
+  main.dataset.nlScrollPerfBound = '1';
+  main.addEventListener(
+    'scroll',
+    () => {
+      nlMainLastScrollAtMs = Date.now();
+    },
+    { passive: true }
+  );
+}
+
+/** @returns {boolean} */
+function shouldDeferHeavyPopupPaintNow() {
+  return shouldDeferHeavyPopupPaintDuringScroll(nlMainLastScrollAtMs);
+}
 
 const STORY_GROWTH_STATE = {
   liveId: '',
@@ -3261,7 +4735,9 @@ const STORY_SOURCE_STATE = {
   /** nls_comments 由来で当該 liveId のみ（応援レーン userId 集約の入力） */
   storageRowsForCurrentLive: /** @type {PopupCommentEntry[]} */ ([]),
   /** userLaneCandidatesFromStorage の戻り（イミュータブル配列） */
-  laneAggregates: /** @type {readonly unknown[]} */ (Object.freeze([]))
+  laneAggregates: /** @type {readonly unknown[]} */ (Object.freeze([])),
+  /** ギフト・広告投げ主専用列（りんく列とは別） */
+  giftThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([]))
 };
 
 /** initPopup の途中失敗後も DevTools から呼べるよう、読み込み直後に束縛する（観測のみ） */
@@ -3495,19 +4971,35 @@ function bindStoryDetailHoverBridge() {
  * @param {string} liveId
  * @param {'light'|'dark'} colorScheme
  * @param {Array<{ displaySrc: string, meta: { idLine: string, nameLine: string }, profileTier: number, entry: PopupCommentEntry }>} picked
+ * @param {readonly unknown[]} giftPicks ギフト投げ主専用列
  * @param {number} sourceEntryCount STORY_SOURCE_STATE.entries の長さ（picked=0 でもリスト更新で再描画するため）
  */
 function storyUserLaneRenderSignature(
   liveId,
   colorScheme,
   picked,
+  giftPicks,
   sourceEntryCount
 ) {
   const lid = String(liveId || '').trim().toLowerCase();
   const scheme = String(colorScheme || 'light');
+  const gifts = Array.isArray(giftPicks) ? giftPicks : [];
+  const giftParts = gifts.map((p) => {
+    const row = /** @type {{ displaySrc?: unknown, meta?: { idLine?: unknown, nameLine?: unknown }, entry?: PopupCommentEntry }} */ (
+      p
+    );
+    const sid = commentStableId(row.entry);
+    return [
+      sid,
+      String(row.displaySrc || ''),
+      String(row.meta?.idLine || ''),
+      String(row.meta?.nameLine || '')
+    ].join('\u001f');
+  });
+  const giftSeg = giftParts.length ? `\u001eG:${giftParts.join('\u001e')}` : '|G:0';
   if (!picked.length) {
     const n = Math.max(0, Math.floor(Number(sourceEntryCount) || 0));
-    return `${lid}|${scheme}|0|src:${n}`;
+    return `${lid}|${scheme}|0|src:${n}${giftSeg}`;
   }
   const parts = picked.map((p) => {
     const sid = commentStableId(p.entry);
@@ -3519,35 +5011,43 @@ function storyUserLaneRenderSignature(
       String(p.profileTier)
     ].join('\u001f');
   });
-  return `${lid}|${scheme}|${picked.length}\u001e${parts.join('\u001e')}`;
+  return `${lid}|${scheme}|${picked.length}\u001e${parts.join('\u001e')}${giftSeg}`;
 }
 
 function renderStoryUserLane() {
   const stack = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneStack'));
   const laneLink = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLink'));
+  const laneGift = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGift'));
   const laneKonta = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneKonta'));
   const laneTanu = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneTanu'));
   const hintLink = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkHint'));
   const linkWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkWrap'));
+  const giftWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGiftWrap'));
   const guideTop = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideTop'));
   const guideLinesTop = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesTop'));
+  const guideMidGift = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidGift'));
+  const guideLinesMidGift = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidGift'));
   const guideMidKonta = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidKonta'));
   const guideLinesMidKonta = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidKonta'));
   const guideMidTanu = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidTanu'));
   const guideLinesMidTanu = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidTanu'));
   const guideBottom = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideBottom'));
   const guideLinesBottom = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesBottom'));
-  if (!stack || !laneLink || !laneKonta || !laneTanu) return;
+  if (!stack || !laneLink || !laneGift || !laneKonta || !laneTanu) return;
 
   const els = {
     stack,
     laneLink,
+    laneGift,
     laneKonta,
     laneTanu,
     hintLink,
     linkWrap,
+    giftWrap,
     guideTop,
     guideLinesTop,
+    guideMidGift,
+    guideLinesMidGift,
     guideMidKonta,
     guideLinesMidKonta,
     guideMidTanu,
@@ -3558,6 +5058,7 @@ function renderStoryUserLane() {
 
   const faces = {
     faceLink: STORY_GUIDE_FACE_LINK,
+    faceGift: STORY_GUIDE_FACE_GIFT,
     faceKonta: STORY_GUIDE_FACE_KONTA,
     faceTanu: STORY_GUIDE_FACE_TANU
   };
@@ -3734,12 +5235,17 @@ function renderStoryUserLane() {
 
   const buckets = bucketStoryUserLanePicks(candidates, limit);
   const picked = flattenStoryUserLaneBuckets(buckets);
+  const giftPicks = Array.isArray(STORY_SOURCE_STATE.giftThrowerPicks)
+    ? STORY_SOURCE_STATE.giftThrowerPicks
+    : [];
+  buckets.gift = [...giftPicks];
 
   const laneSig = storyUserLaneRenderSignature(
     liveId,
     laneScheme,
     picked,
-    aggList.length
+    giftPicks,
+    entries.length
   );
   if (laneSig === storyUserLaneLastRenderSig) {
     return;
@@ -3751,7 +5257,8 @@ function renderStoryUserLane() {
     return;
   }
 
-  paintStoryUserLaneDomFilled(els, faces, buckets, picked.length, laneDomIo);
+  const laneDisplayedTotal = picked.length + buckets.gift.length;
+  paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo);
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
       window.__NLS_LANE_DIAG__();
@@ -3834,6 +5341,146 @@ function syncInterceptMapDiagFromSnapshot(snap) {
       : -1;
 }
 
+let _storyLanePaintSeq = 0;
+
+/**
+ * ギフト・広告投げ主専用列のタイル候補を組み立てる（りんく列とは別）。
+ *
+ * @param {readonly { userId?: unknown, nickname?: unknown, capturedAt?: unknown }[]} giftUsers
+ * @param {string} liveId
+ * @param {readonly unknown[]} storageCtx
+ * @param {number} limit
+ * @returns {readonly { entryIndex: number, profileTier: number, thumbScore: number, displaySrc: string, title: string, entry: PopupCommentEntry, meta: { idLine: string, nameLine: string } }[]}
+ */
+function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const cap = Math.max(0, Math.floor(Number(limit) || 0));
+  if (!lid || !cap) return Object.freeze([]);
+
+  const broadcasterUid = inferBroadcasterUserIdFromComments(
+    storageCtx,
+    watchMetaCache.snapshot || {}
+  );
+  const viewerUid = String(watchMetaCache.snapshot?.viewerUserId || '').trim();
+  const laneEntries = buildGiftThrowerLaneEntries(giftUsers, { liveId: lid });
+  const lanePickCtx = {
+    yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
+    tvSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
+    anonymousIdenticonEnabled: anonymousIdenticonRuntimeEnabled,
+    anonymousIdenticonDataUrl: ''
+  };
+  const seen = new Set();
+  /** @type {ReturnType<typeof buildStoryGiftThrowerLanePicks>} */
+  const picks = [];
+
+  for (let i = 0; i < laneEntries.length && picks.length < cap; i += 1) {
+    const g = laneEntries[i];
+    const uidRaw = String(g.userId || '').trim();
+    if (!uidRaw) continue;
+    if (!broadcasterUid && /^\d{5,14}$/.test(uidRaw)) continue;
+    const ownPostedForUid = hasOwnPostedEntryForUserId(storageCtx, uidRaw, lid);
+    if (
+      shouldSkipStoryUserLaneCandidateByContamination({
+        candidateUserId: uidRaw,
+        viewerUserId: viewerUid,
+        broadcasterUserId: broadcasterUid,
+        isOwnPosted: ownPostedForUid
+      })
+    ) {
+      continue;
+    }
+    /** @type {PopupCommentEntry} */
+    const e = {
+      id: `nl-gift-lane:${uidRaw}`,
+      liveId: lid,
+      userId: uidRaw,
+      nickname: String(g.nickname || ''),
+      avatarUrl: String(g.avatarUrl || ''),
+      ...(g.avatarObserved ||
+      isAvatarObservedInCommentProfileMap(uidRaw, popupUserCommentProfileMap)
+        ? { avatarObserved: true }
+        : {}),
+      ...(ownPostedForUid ? { selfPosted: true } : {}),
+      text: '',
+      commentNo: ''
+    };
+    const dedupeKey = userLaneDedupeKey({
+      userId: uidRaw,
+      avatarHttpCandidate: '',
+      stableId: ''
+    });
+    if (!dedupeKey || seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    lanePickCtx.anonymousIdenticonDataUrl =
+      getCachedAnonymousIdenticonDataUrl(e?.userId);
+    const httpFromGrowth = storyGrowthAvatarSrcCandidate(e, lid, storageCtx);
+    const row = buildStoryUserLaneCandidateRow(e, i, httpFromGrowth, lanePickCtx);
+    if (!row) continue;
+    const label = storyGrowthDisplayLabel(e, lid) || 'ギフト';
+    const meta = storyUserLaneMetaLines(e, row.httpForLane, dedupeKey);
+    picks.push({
+      entryIndex: row.entryIndex,
+      profileTier: row.profileTier,
+      thumbScore: row.thumbScore,
+      displaySrc: row.displaySrc,
+      title: label,
+      entry: row.entry,
+      meta
+    });
+  }
+  return Object.freeze(picks);
+}
+
+/**
+ * 応援レーンを 1 回だけ描画（ギフト storage 読込後に gift 列を載せ、二重 innerHTML を防ぐ）。
+ *
+ * @param {string} liveId
+ * @param {readonly unknown[]} displayEntries
+ * @param {readonly unknown[]} storageRows
+ */
+async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const seq = ++_storyLanePaintSeq;
+
+  const profileMap =
+    popupUserCommentProfileMap &&
+    typeof popupUserCommentProfileMap === 'object' &&
+    !Array.isArray(popupUserCommentProfileMap)
+      ? popupUserCommentProfileMap
+      : {};
+  if (lid && STORY_SOURCE_STATE.laneAggregates.length) {
+    STORY_SOURCE_STATE.laneAggregates = enrichUserLaneAggregatesWithProfileAndDisplay(
+      STORY_SOURCE_STATE.laneAggregates,
+      displayEntries,
+      profileMap
+    );
+  }
+
+  let giftUsers = [];
+  if (lid) {
+    try {
+      const gk = giftUsersStorageKey(lid);
+      const bag = await chrome.storage.local.get(gk);
+      giftUsers = Array.isArray(bag[gk]) ? bag[gk] : [];
+    } catch {
+      giftUsers = [];
+    }
+  }
+
+  if (seq !== _storyLanePaintSeq) return;
+  if (String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase() !== lid) return;
+
+  const giftLimit = INLINE_MODE ? 24 : 16;
+  STORY_SOURCE_STATE.giftThrowerPicks = buildStoryGiftThrowerLanePicks(
+    giftUsers,
+    lid,
+    storageRows,
+    giftLimit
+  );
+  renderStoryUserLane();
+  renderStoryAvatarDiag();
+}
+
 /**
  * @param {string} liveId
  * @param {PopupCommentEntry[]} displayList アイコン列・ストーリー UI 用（表示専用行を含む）
@@ -3844,6 +5491,7 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
   const list = Array.isArray(displayList) ? displayList : [];
 
   if (STORY_SOURCE_STATE.liveId !== nextLiveId) {
+    resetCelebrationIncrementalScan();
     STORY_SOURCE_STATE.liveId = nextLiveId;
     STORY_GROWTH_STATE.pinnedCommentId = null;
     STORY_GROWTH_STATE.hoverPreviewCommentId = null;
@@ -3871,6 +5519,18 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
       )
     : Object.freeze([]);
 
+  STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze([]);
+  if (nextLiveId) {
+    void paintStoryUserLaneCoalesced(
+      nextLiveId,
+      list,
+      STORY_SOURCE_STATE.storageRowsForCurrentLive
+    );
+  } else {
+    renderStoryUserLane();
+    renderStoryAvatarDiag();
+  }
+
   const pin = STORY_GROWTH_STATE.pinnedCommentId;
   if (pin && !list.some((e) => commentStableId(e) === pin)) {
     STORY_GROWTH_STATE.pinnedCommentId = null;
@@ -3883,8 +5543,10 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
   }
 
   syncGrowthIconSelection(STORY_GROWTH_STATE.root);
-  renderStoryUserLane();
-  renderStoryAvatarDiag();
+  if (!nextLiveId) {
+    renderStoryUserLane();
+    renderStoryAvatarDiag();
+  }
   renderStoryCommentDetailPanel();
 }
 
@@ -4252,6 +5914,24 @@ async function readAllCommentsFromCommentDb(lv) {
   }
 }
 
+/**
+ * HTML/マーケ DL 用。メモリ上の記録済みコメントがあれば storage 読込と競走し、
+ * 遅い IDB/storage 待ちで DL 開始が遅れないよう 2s でメモリ側へフォールバックする。
+ * @param {string} liveId
+ * @returns {Promise<PopupCommentEntry[]>}
+ */
+async function resolveCommentsForHtmlExport(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const memLive = String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase();
+  const memEntries = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
+  const storageP = readAllCommentsForLive(liveId);
+  if (memLive === lid && memEntries.length > 0) {
+    void storageP.catch(() => {});
+    return /** @type {PopupCommentEntry[]} */ (memEntries);
+  }
+  return /** @type {PopupCommentEntry[]} */ (await storageP);
+}
+
 async function readAllCommentsForLive(lv) {
   // v0.1.514: IDB に当該 live のデータがあれば最優先（SW 集約書きの正本）。
   const fromDb = await readAllCommentsFromCommentDb(lv);
@@ -4617,6 +6297,8 @@ function createStoryGrowthCell(isNew, index, accent) {
   const media = document.createElement('span');
   media.className = 'nl-story-growth-cell__media';
   const img = document.createElement('img');
+  img.loading = 'lazy';
+  img.decoding = 'async';
   media.appendChild(img);
   cell.appendChild(media);
   applyStoryGrowthIconAttributes(img, index, isNew, accent);
@@ -4724,6 +6406,15 @@ function syncStoryGrowth(liveId, count, root) {
   if (!root) return;
   bindStoryGrowthInteractions(root);
   ensureStoryGrowthColorSchemeListener();
+
+  if (
+    shouldDeferHeavyPopupPaintNow() &&
+    !changedLive &&
+    target > STORY_GROWTH_STATE.renderedCount
+  ) {
+    STORY_GROWTH_STATE.targetCount = target;
+    return;
+  }
 
   const iconPx = `${resolveStoryIconSize(target)}px`;
   const storyBody = root.closest('.nl-story-body');
@@ -5090,6 +6781,16 @@ function paintOfficialEventBannerCard(snapshot) {
       thumbEl.removeAttribute('src');
     }
   }
+
+  if (rank != null) {
+    const lid = watchPopupLastPaintedLiveId;
+    if (lid && _prevEventBannerRank != null) {
+      void maybeCelebrateFromEventRank(lid, _prevEventBannerRank, rank);
+    }
+    _prevEventBannerRank = rank;
+  } else {
+    _prevEventBannerRank = null;
+  }
 }
 
 /**
@@ -5189,6 +6890,14 @@ async function readOfficialEventDomBundleFromStorage(liveId) {
 /** @param {string} liveId */
 async function refreshOfficialEventDomBundle(liveId) {
   _lastOfficialEventDomBundle = await readOfficialEventDomBundleFromStorage(liveId);
+  const ps = _lastOfficialEventDomBundle?.programStats;
+  const ap =
+    ps && typeof ps.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
+      ? ps.adPoints
+      : null;
+  if (ap != null) {
+    await primeAdPointsCelebrationsFromOfficialTotal(liveId, ap);
+  }
 }
 
 /**
@@ -5239,19 +6948,20 @@ function paintOfficialNicoStatsStrip(snapshot) {
   // niconico 側プレイヤーの「3,266」「1,060」等がリアルタイムで data-value に入っており
   // NDGR field 1〜4 と戦うより読むのが速くて確実。
   const ps = _lastOfficialEventDomBundle?.programStats || null;
+  // watchCount は累計来場。officialViewerCount に載せると同接 direct 判定を壊す（0.1.278）。
   const augmented = ps
     ? {
         ...snapshot,
         ...(typeof ps.watchCount === 'number' && Number.isFinite(ps.watchCount)
-          ? { officialViewerCount: ps.watchCount }
+          ? { viewerCountFromDom: ps.watchCount }
           : null),
         ...(typeof ps.commentCount === 'number' && Number.isFinite(ps.commentCount)
           ? { officialCommentCount: ps.commentCount }
           : null),
-        ...(typeof ps.adPoints === 'number' && Number.isFinite(ps.adPoints)
+        ...(typeof ps.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints > 0
           ? { officialAdPointsNdgr: ps.adPoints }
           : null),
-        ...(typeof ps.giftPoints === 'number' && Number.isFinite(ps.giftPoints)
+        ...(typeof ps.giftPoints === 'number' && Number.isFinite(ps.giftPoints) && ps.giftPoints > 0
           ? { officialGiftPointsNdgr: ps.giftPoints }
           : null)
       }
@@ -5266,6 +6976,16 @@ function paintOfficialNicoStatsStrip(snapshot) {
   applyChip('officialStatNicoStreamAge', digest.streamAge);
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
+
+  const adPtsNum =
+    typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
+      ? ps.adPoints
+      : typeof snapshot?.officialAdPointsNdgr === 'number' &&
+          Number.isFinite(snapshot.officialAdPointsNdgr) &&
+          snapshot.officialAdPointsNdgr >= 0
+        ? snapshot.officialAdPointsNdgr
+        : null;
+  trackAdPointsForCelebration(adPtsNum);
 }
 
 /**
@@ -5325,10 +7045,135 @@ function paintOfficialNdgrGiftCard(snap) {
   if (elEv) elEv.textContent = fmt(ev);
   if (elRank) elRank.textContent = fmt(rk);
   if (elTitle) elTitle.textContent = title || '—';
+  trackAdPointsForCelebration(typeof ap === 'number' ? ap : null);
 }
 
 let _prevConcurrentEstimated = /** @type {number|null} */ (null);
 let _prevViewerCount = /** @type {number|null} */ (null);
+
+/**
+ * content の軽量サマリで snapshot の数値（公式・来場・同接）だけを補完する。
+ * タイトル等は panel 側が空のため、既存 snapshot を上書きしない。
+ *
+ * @param {WatchPageSnapshot|null} snapshot
+ * @param {unknown} panelSummary
+ * @returns {WatchPageSnapshot|null}
+ */
+function mergeWatchSnapshotWithPanelSummary(snapshot, panelSummary) {
+  if (!isPanelLiveSummary(panelSummary)) return snapshot;
+  const fromPanel = watchSnapshotFromPanelSummary(
+    /** @type {ReturnType<import('../lib/panelLiveSummary.js').buildPanelLiveSummary>} */ (
+      panelSummary
+    )
+  );
+  if (!fromPanel) return snapshot;
+  if (!snapshot || typeof snapshot !== 'object') {
+    return /** @type {WatchPageSnapshot} */ (fromPanel);
+  }
+  const out = { ...snapshot };
+  for (const field of [
+    'officialCommentCount',
+    'viewerCountFromDom',
+    'recentActiveUsers',
+    'streamAgeMin',
+    'officialStatsUpdatedAt',
+    'officialStatsFreshnessMs',
+    'officialCommentStatsUpdatedAt',
+    'officialCommentStatsFreshnessMs',
+    'officialViewerIntervalMs',
+    'officialStatisticsCommentsDelta',
+    'officialReceivedCommentsDelta',
+    'officialCommentSampleWindowMs',
+    'officialCaptureRatio'
+  ]) {
+    const value = /** @type {Record<string, unknown>} */ (fromPanel)[field];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      /** @type {Record<string, unknown>} */ (out)[field] = value;
+    }
+  }
+  // 古い panel / snapshot の officialViewerCount:0 は同接 direct を壊すため載せない。
+  const ovc = /** @type {Record<string, unknown>} */ (fromPanel).officialViewerCount;
+  if (
+    typeof ovc === 'number' &&
+    Number.isFinite(ovc) &&
+    ovc > 0
+  ) {
+    out.officialViewerCount = ovc;
+  } else if (ovc === 0 || ovc === null) {
+    delete /** @type {Record<string, unknown>} */ (out).officialViewerCount;
+  }
+  return /** @type {WatchPageSnapshot} */ (out);
+}
+
+/**
+ * content からの NLS_EXPORT_PANEL_METRICS をカードに即反映する。
+ * @param {Record<string, unknown>} summary
+ * @param {string} lv
+ */
+function applyPanelMetricsFromContent(summary, lv) {
+  if (!isPanelLiveSummary(summary, lv)) return;
+  _panelMetricsAppliedForLv = lv;
+  const recorded = Math.max(0, Number(summary.recordedCount) || 0);
+  let snapForCards = mergeWatchSnapshotWithPanelSummary(
+    watchMetaCache.snapshot,
+    summary
+  );
+  if (!snapForCards) {
+    const panelSnap = watchSnapshotFromPanelSummary(summary);
+    if (panelSnap) {
+      snapForCards = /** @type {WatchPageSnapshot} */ (panelSnap);
+      watchMetaCache.snapshot = snapForCards;
+    }
+  } else {
+    watchMetaCache.snapshot = snapForCards;
+  }
+  setCountDisplay(recorded, snapForCards);
+  const arrForMeta =
+    watchMetaCache.lastCommentsArr &&
+    watchMetaCache.lastCommentsArr.lv === lv &&
+    Array.isArray(watchMetaCache.lastCommentsArr.arr)
+      ? /** @type {PopupCommentEntry[]} */ (watchMetaCache.lastCommentsArr.arr)
+      : [];
+  if (snapForCards) {
+    renderWatchMetaCard(snapForCards, arrForMeta);
+  }
+}
+
+/**
+ * snapshot fetch 中でも panel サマリだけ読んで記録/来場/同接カードを更新する。
+ */
+async function applyLightweightPanelSummaryCards() {
+  const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return;
+  if (!hasExtensionContext()) return;
+  const pKey = panelSummaryStorageKey(lid);
+  let raw = null;
+  try {
+    const bag = await readStorageBagWithRetry(
+      () => chrome.storage.local.get(pKey),
+      { attempts: 2, delaysMs: [0, 40], perAttemptTimeoutMs: 400 }
+    );
+    raw = bag[pKey];
+  } catch {
+    return;
+  }
+  if (!isPanelLiveSummary(raw, lid)) return;
+  const recorded = Math.max(0, Number(raw.recordedCount) || 0);
+  const snapForCards = mergeWatchSnapshotWithPanelSummary(
+    watchMetaCache.snapshot,
+    raw
+  );
+  setCountDisplay(recorded, snapForCards);
+  const arrForMeta =
+    watchMetaCache.lastCommentsArr &&
+    watchMetaCache.lastCommentsArr.lv === lid &&
+    Array.isArray(watchMetaCache.lastCommentsArr.arr)
+      ? /** @type {PopupCommentEntry[]} */ (watchMetaCache.lastCommentsArr.arr)
+      : [];
+  if (snapForCards) {
+    renderWatchMetaCard(snapForCards, arrForMeta);
+  }
+}
 
 /**
  * @param {WatchPageSnapshot|null} rawSnapshot watch スナップショット（`programStats` で来場を補完する前）
@@ -5428,7 +7273,11 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
       prevForReactions: {
         viewerCount: _prevViewerCount,
         concurrentEstimated: _prevConcurrentEstimated
-      }
+      },
+      // 自動補正（オートキャリブレーション）: 較正データが十分なら係数プロファイルを適用。
+      // 未較正のあいだは null → 既定係数にフォールバック（挙動互換）。
+      profile: _autoCalibration.profile ?? undefined,
+      calibration: _autoCalibration.info ?? undefined
     }
   );
 
@@ -5883,13 +7732,13 @@ async function triggerBackfillRetry() {
     _backfillRetryStartedAt = Date.now();
     // A 内 hint を即描画（純関数 backfillRecordCardHintDomState が retryStartedAt を見て
     //   dataPhase='retry_started' を返し、トースト文言「ありがとう、もう一度…」を出す）。
-    applyBackfillRecordCardHint({ started: true, rows: 0, done: 0 });
+    void applyBackfillRecordCardHint({ started: true, rows: 0, done: 0 });
     // トースト期間（1.8秒）終了後にもう一度再描画。
     //   進捗 listener が次の onChanged で再描画してくれるが、content が KEY_BACKFILL_PROGRESS を
     //   まだ書いていないなど何も起きないまま 1.8秒経った場合のフォールバック。
     //   null を渡すと started:false 扱いで純関数判定→トースト期間外なら hidden に戻る。
     setTimeout(() => {
-      applyBackfillRecordCardHint(null);
+      void applyBackfillRecordCardHint(null);
     }, 2000);
   } catch {
     /* no-op */
@@ -5941,9 +7790,17 @@ function bindRecordCardBackfillRetryButtonOnce() {
  * 取り込みハートビート（#liveStatCommentsIngest）とは別行なので互いに干渉しない。
  * @param {{ started?: boolean, rows?: number, done?: number|boolean, stopReason?: string }|null} progress
  */
-function applyBackfillRecordCardHint(progress) {
+async function applyBackfillRecordCardHint(progress) {
   const el = /** @type {HTMLElement|null} */ (document.getElementById('liveStatCommentsBackfillHint'));
   if (!el) return;
+  let backfillWaitingOthers = 0;
+  try {
+    const waiting = await listBackfillWaitingLiveIds();
+    const cur = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    backfillWaitingOthers = waiting.filter((id) => id !== cur).length;
+  } catch {
+    backfillWaitingOthers = 0;
+  }
   // v0.1.432: 公式件数を渡し、実質取り切れている（記録が公式の95%以上）partial では出さない。
   const oc = watchMetaCache.snapshot?.officialCommentCount;
   const officialCount = typeof oc === 'number' && Number.isFinite(oc) ? oc : null;
@@ -5975,7 +7832,8 @@ function applyBackfillRecordCardHint(progress) {
           officialCount,
           recordedCount,
           retryStartedAtMs: _backfillRetryStartedAt,
-          nowMs: Date.now()
+          nowMs: Date.now(),
+          backfillWaitingOthers
         })
       : // progress 無しでもトースト期間中なら表示するため、純関数を必ず呼ぶ。
         backfillRecordCardHintDomState(
@@ -5984,7 +7842,8 @@ function applyBackfillRecordCardHint(progress) {
             officialCount,
             recordedCount,
             retryStartedAtMs: _backfillRetryStartedAt,
-            nowMs: Date.now()
+            nowMs: Date.now(),
+            backfillWaitingOthers
           }
         );
   // 外側の wrapper（既存 #liveStatCommentsBackfillHint）の hidden を切替
@@ -6038,11 +7897,14 @@ async function refreshBackfillRecordCardHint(liveId) {
   if (lid !== _backfillHintLiveId) _backfillCaughtUpForLiveId = '';
   _backfillHintLiveId = lid;
   if (!lid) {
-    applyBackfillRecordCardHint(null);
+    void applyBackfillRecordCardHint(null);
     return;
   }
   bindBackfillProgressListenerOnce();
   bindRecordingRecoveryListenerOnce();
+  bindGiftHistoryStorageListenerOnce();
+  bindGiftUsersLaneStorageListenerOnce();
+  bindCommentsCelebrationStorageListenerOnce();
   void refreshRecordingRecoveryHint(lid);
   // caught_up 確定済みの配信なら再表示しない（refresh のたびに「届いてるよ」が出るのを防ぐ）。
   if (_backfillCaughtUpForLiveId === lid) return;
@@ -6061,14 +7923,14 @@ async function refreshBackfillRecordCardHint(liveId) {
       markCaughtUpIfComplete(prog);
       // caught_up フラグが立った場合は「届いてるよ」を再表示しない。
       if (_backfillCaughtUpForLiveId === lid) return;
-      applyBackfillRecordCardHint({
+      void applyBackfillRecordCardHint({
         started: true,
         rows: prog.rows,
         done: prog.done,
         stopReason: prog.stopReason
       });
     } else {
-      applyBackfillRecordCardHint(null); // 押す前は何も出さない（hidden）。
+      void applyBackfillRecordCardHint(null); // 押す前は何も出さない（hidden）。
     }
   } catch {
     /* no-op */
@@ -6146,7 +8008,7 @@ function bindBackfillProgressListenerOnce() {
     // v0.1.463: 既に caught_up 確定済みの配信なら progress 更新を無視してちらちらを防ぐ。
     if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return;
     // v0.1.415: stopReason も渡す（done=1 でも reached_start か途中かで文言を分ける）。
-    applyBackfillRecordCardHint({
+    void applyBackfillRecordCardHint({
       started: true,
       rows: prog.rows,
       done: prog.done,
@@ -6220,6 +8082,115 @@ async function refreshRecordingRecoveryHint(currentLid) {
   } catch {
     /* no-op */
   }
+}
+
+/** 北極星ギフト履歴の直近フルペイントキー（鮮度テキストのみの更新は含めない）。 */
+let _giftHistoryNorthStarPaintKey = '';
+/** 個別投げ一覧パネルの直近 HTML キー。 */
+let _giftHistoryThrowsPanelHtmlKey = '';
+/** 鮮度注記用の最終データ反映時刻（epoch ms）。 */
+let _giftHistoryNorthStarCapturedAtMs = 0;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let _giftHistoryLaneRefreshTimer = null;
+let _giftHistoryLaneRefreshPendingLid = '';
+
+/**
+ * ギフト履歴レーン再描画を短時間でまとめる（storage 連打 + 定期 sync の二重 innerHTML を防ぐ）。
+ * @param {string} liveId
+ */
+function scheduleRefreshNorthStarGiftHistoryLane(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  _giftHistoryLaneRefreshPendingLid = lid;
+  if (_giftHistoryLaneRefreshTimer != null) return;
+  _giftHistoryLaneRefreshTimer = setTimeout(() => {
+    _giftHistoryLaneRefreshTimer = null;
+    const pending = _giftHistoryLaneRefreshPendingLid;
+    _giftHistoryLaneRefreshPendingLid = '';
+    if (pending) void refreshNorthStarGiftHistoryLaneAsync(pending);
+  }, 280);
+}
+
+/**
+ * 「最終更新: ○秒前」だけ差し替え（カード列の innerHTML は触らない）。
+ * @param {HTMLElement} body
+ * @param {string} freshnessNote
+ */
+function patchNorthStarGiftHistoryFreshnessNote(body, freshnessNote) {
+  if (!(body instanceof HTMLElement)) return;
+  const note = String(freshnessNote || '').trim();
+  let el = body.querySelector('.nl-top-support-rank__freshness');
+  if (!note) {
+    el?.remove();
+    return;
+  }
+  const text = `🕒 ${note}`;
+  if (!(el instanceof HTMLElement)) {
+    el = document.createElement('p');
+    el.className = 'nl-top-support-rank__freshness';
+    el.setAttribute('aria-live', 'polite');
+    const anchor = body.querySelector('.nl-top-support-rank__note');
+    if (anchor?.parentNode) anchor.insertAdjacentElement('afterend', el);
+    else body.appendChild(el);
+  }
+  if (el.textContent !== text) el.textContent = text;
+}
+
+/** コメント storage 更新で広告／ギフト演出を即スキャン（heavy 待ち不要）。 */
+let _commentsCelebrationListenerBound = false;
+function bindCommentsCelebrationStorageListenerOnce() {
+  if (_commentsCelebrationListenerBound) return;
+  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged?.addListener) return;
+  _commentsCelebrationListenerBound = true;
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    if (!lid) return;
+    const key = commentsStorageKey(lid);
+    const ch = changes[key];
+    if (!ch) return;
+    const rows = ch.newValue;
+    if (!Array.isArray(rows)) return;
+    runPopupCelebrationCommentScan(rows, lid);
+  });
+}
+
+/** ギフト履歴 storage 更新で北極星レーンを即再描画（履歴タブを開いた直後に追従）。 */
+let _giftHistoryStorageListenerBound = false;
+function bindGiftHistoryStorageListenerOnce() {
+  if (_giftHistoryStorageListenerBound) return;
+  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged?.addListener) return;
+  _giftHistoryStorageListenerBound = true;
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    if (!lid) return;
+    const subKey = giftSubAppHistoryStorageKey(lid);
+    const throwsKey = giftHistoryThrowsStorageKey(lid);
+    if (!changes[subKey] && !changes[throwsKey]) return;
+    scheduleRefreshNorthStarGiftHistoryLane(lid);
+    void renderGiftSubAppHistoryPanel(lid);
+  });
+}
+
+/** ギフト／広告ユーザー storage 更新で応援レーン（りんく列）を即再集約。 */
+let _giftUsersLaneListenerBound = false;
+function bindGiftUsersLaneStorageListenerOnce() {
+  if (_giftUsersLaneListenerBound) return;
+  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged?.addListener) return;
+  _giftUsersLaneListenerBound = true;
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    if (!lid) return;
+    const gk = giftUsersStorageKey(lid);
+    if (!changes[gk]) return;
+    void paintStoryUserLaneCoalesced(
+      lid,
+      STORY_SOURCE_STATE.entries,
+      STORY_SOURCE_STATE.storageRowsForCurrentLive
+    );
+  });
 }
 
 /** KEY_RECORDING_WATCHDOG の onChanged を回復ヒントへ反映（1 回だけ登録）。 */
@@ -6454,22 +8425,56 @@ function syncCharaTrioOverallStateFromDom() {
  * @param {HTMLElement} body
  * @param {{ count?: number }[]} rooms
  * @param {string} unitSuffix
+ * @param {{
+ *   pointsSumAll?: number,
+ *   pointsSumDisplayed?: number,
+ *   officialProgramGiftPts?: number|null
+ * }} [totals]
  */
-function paintNorthStarGiftHistorySummaryGadget(body, rooms, unitSuffix) {
+function paintNorthStarGiftHistorySummaryGadget(body, rooms, unitSuffix, totals = {}) {
   if (!(body instanceof HTMLElement) || body.id !== 'northStarLaneBody-giftHistory') return;
   const summary = document.getElementById('northStarLaneGadgetSummary-giftHistory');
   if (!(summary instanceof HTMLElement)) return;
   const suf = String(unitSuffix || '').trim();
-  let total = 0;
+  let displayed = 0;
   for (const r of Array.isArray(rooms) ? rooms : []) {
     const c = Number(r?.count);
     const n = Math.floor(Number.isFinite(c) ? c : 0);
-    total += Math.max(0, n);
+    displayed += Math.max(0, n);
   }
+  const allPts =
+    typeof totals.pointsSumAll === 'number' && Number.isFinite(totals.pointsSumAll)
+      ? Math.max(0, Math.floor(totals.pointsSumAll))
+      : displayed;
+  const resolved = resolveGiftHistorySummaryPoints({
+    historySumAll: totals.pointsSumAll,
+    historySumDisplayed: totals.pointsSumDisplayed,
+    officialProgramGiftPts: totals.officialProgramGiftPts
+  });
+  const showPts =
+    resolved.usesOfficialSummary
+      ? resolved.summaryPoints
+      : typeof totals.pointsSumDisplayed === 'number' &&
+          Number.isFinite(totals.pointsSumDisplayed)
+        ? Math.max(0, Math.floor(totals.pointsSumDisplayed))
+        : displayed;
   const numEl = summary.querySelector('.nl-north-star-lane__summary-pt-num');
   const unitEl = summary.querySelector('.nl-north-star-lane__summary-pt-unit');
-  if (numEl instanceof HTMLElement) numEl.textContent = String(total);
+  const noteEl = summary.querySelector('.nl-north-star-lane__summary-note');
+  if (numEl instanceof HTMLElement) numEl.textContent = String(showPts);
   if (unitEl instanceof HTMLElement) unitEl.textContent = suf;
+  if (noteEl instanceof HTMLElement) {
+    if (resolved.usesOfficialSummary) {
+      noteEl.textContent =
+        resolved.gapPoints > 0
+          ? `公式番組累計（内訳に履歴未取得 ${resolved.gapPoints.toLocaleString('ja-JP')}pt を含む）`
+          : '公式番組累計（プレイヤー表示と同じ）';
+    } else if (allPts > showPts) {
+      noteEl.textContent = `表示中${rooms.length}名の合計（全${allPts}pt）`;
+    } else {
+      noteEl.textContent = '履歴一覧からの合計';
+    }
+  }
   const img = summary.querySelector('img.nl-north-star-lane__chara');
   if (img instanceof HTMLImageElement) {
     // サマリー表示時は値が出ている前提なので、満面の笑み相当（full）で固定
@@ -6657,7 +8662,8 @@ const NORTH_STAR_BUNDLE_LOADING_LANE_IDS = Object.freeze([
   'adRanking',
   'eventRank',
   'eventScore',
-  'eventBroadcasters'
+  'eventBroadcasters',
+  'eventVotingSupporters'
 ]);
 
 /**
@@ -6886,12 +8892,70 @@ async function computeGiftRankStripRoomsContext(liveId) {
  *   noteText: string;
  *   unitSuffix: string;
  *   ariaLabel: string;
+ *   pointsSumAll?: number;
+ *   pointsSumDisplayed?: number;
+ *   freshnessNote?: string;
  * } | null>}
  */
-async function computeGiftHistoryNorthStarRoomsContext(liveId) {
+/**
+ * @param {string} liveId
+ * @param {{ officialProgramGiftPts?: number|null }} [opts]
+ */
+async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) return null;
+  const officialForPick =
+    typeof opts.officialProgramGiftPts === 'number' &&
+    Number.isFinite(opts.officialProgramGiftPts) &&
+    opts.officialProgramGiftPts >= 0
+      ? Math.floor(opts.officialProgramGiftPts)
+      : null;
   const bundle = _lastOfficialEventDomBundle;
+
+  // --- 源0（最優先）: koken / sub-app 個別履歴（nls_gift_subapp_history_<lv>）。
+  /** @type {{ rooms: any[]; noteText: string; ariaLabel: string; capturedAt: number } | null} */
+  let subAppCtx = null;
+  try {
+    const subKey = giftSubAppHistoryStorageKey(lid);
+    const subBag = await chrome.storage.local.get(subKey);
+    const subRaw = subBag[subKey];
+    if (subRaw && typeof subRaw === 'object' && !Array.isArray(subRaw)) {
+      const vm = buildGiftHistoryNorthStarViewModel(
+        /** @type {{ history?: unknown[] }} */ (subRaw),
+        { maxRooms: GIFT_HISTORY_LANE_MAX, maxThrows: 20 }
+      );
+      if (vm && vm.rooms.length > 0) {
+        const senderN = vm.senderCount;
+        const shownN = vm.rooms.length;
+        const rankCap =
+          shownN < senderN ? `（表示${shownN}名・上位${GIFT_HISTORY_LANE_MAX}まで）` : '';
+        const srcLabel =
+          vm.source === 'koken-api' ? 'koken 公式 API' : 'ギフトサイドバー履歴';
+        subAppCtx = {
+          rooms: vm.rooms.map((r) => {
+            const userKey = String(r.userKey || '');
+            const nickname =
+              (userKey && _nicknameResolveMap.get(userKey)) || String(r.nickname || '');
+            return {
+              userKey,
+              nickname,
+              count: Number(r.count) || 0,
+              avatarUrl: String(r.avatarUrl || '').trim()
+            };
+          }),
+          noteText: `${srcLabel}の個別履歴（history）から送り主別累計pt順。送り主${senderN}名・投げ${vm.throwCount}件${rankCap}（番組累計ポイントとは別指標）`,
+          ariaLabel: 'koken 公式ギフト履歴の送り主別集計',
+          capturedAt: vm.capturedAt,
+          pointsSumAll: vm.pointsSumAll,
+          pointsSumDisplayed: vm.pointsSumDisplayed,
+          throwCount: vm.throwCount,
+          throwsTableHtml: vm.throwsTableHtml
+        };
+      }
+    }
+  } catch {
+    /* no-op */
+  }
 
   // --- 源1+2: iframe 由来（公式サイドバー DOM = bundle.giftHistory / 保存 throws）。
   //   bundle が在ればそれ（タブを開いている間の最新スクレイプ）、無ければ保存 throws。
@@ -6997,7 +9061,68 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
         rooms,
         noteText: `ライブ受信したギフトの送り主別 累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントや貢献度ランキングとは別指標）`,
         ariaLabel: 'ライブ受信ギフトの送り主別 累計ポイントが多い順',
-        latestAt
+        latestAt,
+        pointsSumAll: totalPtSum,
+        throwCount: throwM
+      };
+    }
+  }
+
+  // --- 源0 vs 源3（v0.1.578）: koken API の histories が極端に少ないとき NDGR ライブを優先。
+  if (subAppCtx || liveCtx) {
+    const livePtsSum = liveCtx
+      ? Number(liveCtx.pointsSumAll) ||
+        liveCtx.rooms.reduce((s, r) => s + (Number(r.count) || 0), 0)
+      : 0;
+    const liveThrowM = liveCtx
+      ? Number(liveCtx.throwCount) ||
+        giftEvents.filter((e) => (Number(e?.point) || 0) > 0).length
+      : 0;
+    const subVsLive = pickKokenSubAppVsLiveGiftHistory({
+      subAppAvailable: !!subAppCtx,
+      subAppPointsSum: subAppCtx ? Number(subAppCtx.pointsSumAll) || 0 : 0,
+      subAppThrowCount: subAppCtx ? Number(subAppCtx.throwCount) || 0 : 0,
+      liveAvailable: !!liveCtx,
+      livePointsSum: livePtsSum,
+      liveThrowCount: liveThrowM,
+      officialProgramGiftPts: officialForPick
+    });
+    if (subVsLive === 'subApp' && subAppCtx) {
+      return {
+        rooms: subAppCtx.rooms,
+        noteText: subAppCtx.noteText,
+        unitSuffix: 'pt',
+        ariaLabel: subAppCtx.ariaLabel,
+        pointsSumAll: subAppCtx.pointsSumAll,
+        pointsSumDisplayed: subAppCtx.pointsSumDisplayed,
+        throwsTableHtml: subAppCtx.throwsTableHtml || '',
+        freshnessNote:
+          subAppCtx.capturedAt > 0
+            ? formatCardFreshnessNote(subAppCtx.capturedAt, { autoRefreshing: true })
+            : ''
+      };
+    }
+    if (subVsLive === 'live' && liveCtx) {
+      const liveNote =
+        subAppCtx && Number(subAppCtx.throwCount) > 0
+          ? `${liveCtx.noteText}（koken API は ${Number(subAppCtx.throwCount)} 件のみのためライブ受信を表示）`
+          : liveCtx.noteText;
+      const livePtsDisplayed = liveCtx.rooms.reduce(
+        (s, r) => s + (Number(r.count) || 0),
+        0
+      );
+      return {
+        rooms: liveCtx.rooms,
+        noteText: liveNote,
+        unitSuffix: 'pt',
+        ariaLabel: liveCtx.ariaLabel,
+        pointsSumAll: livePtsSum,
+        pointsSumDisplayed: livePtsDisplayed,
+        throwsTableHtml: subAppCtx?.throwsTableHtml || '',
+        freshnessNote:
+          liveCtx.latestAt > 0
+            ? formatCardFreshnessNote(liveCtx.latestAt, { autoRefreshing: true })
+            : ''
       };
     }
   }
@@ -7055,6 +9180,9 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId) {
  *   beforeNoteHtml?: string;
  *   isNorthStarBody?: boolean;
  *   freshnessNote?: string;
+ *   pointsSumAll?: number;
+ *   pointsSumDisplayed?: number;
+ *   officialProgramGiftPts?: number|null;
  * }} opts
  */
 function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
@@ -7065,7 +9193,8 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
     prependHtml = '',
     beforeNoteHtml = '',
     isNorthStarBody = false,
-    freshnessNote = ''
+    freshnessNote = '',
+    officialProgramGiftPts = null
   } = opts;
   if (!(el instanceof HTMLElement)) return;
   if (isNorthStarBody) {
@@ -7156,7 +9285,11 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
     // 横カードに順位が含まれるため、右列の縦レールで同データを二重表示しない
     clearNorthStarVerticalRailForBody(el);
     if (el.id === 'northStarLaneBody-giftHistory') {
-      paintNorthStarGiftHistorySummaryGadget(el, rooms, unitSuffix);
+      paintNorthStarGiftHistorySummaryGadget(el, rooms, unitSuffix, {
+        pointsSumAll: Number(opts.pointsSumAll),
+        pointsSumDisplayed: Number(opts.pointsSumDisplayed),
+        officialProgramGiftPts
+      });
     }
   }
 }
@@ -7170,7 +9303,9 @@ function refreshNorthStarAdRankingLane() {
   const snap = watchMetaCache.snapshot;
   const body = document.getElementById('northStarLaneBody-adRanking');
   const adRows = Array.isArray(bundle?.adContributionRanking) ? bundle.adContributionRanking : [];
+  const lid = watchPopupLastPaintedLiveId;
   if (adRows.length > 0 && body instanceof HTMLElement) {
+    trackAdAdvertiserCountForCelebration(lid, adRows.length);
     const rooms = officialDomRankingRowsToStripRooms(adRows, { userKeyKind: 'ad' });
     let rankingSum = 0;
     for (const row of adRows) {
@@ -7416,7 +9551,26 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
       const row = raw && typeof raw === 'object' ? raw : {};
       const contribution =
         typeof row.score === 'number' && Number.isFinite(row.score) ? row.score : 0;
-      return { ...row, contribution };
+      // richview のイベントランキング行は a[href] を持たないが、scrape 時にアバター
+      // URL から uid を復元している。記名（uid あり）なら公式ユーザーページ URL に
+      // 変換して、既存 strip の uid リンク経路（officialDomRankingRowsToStripRooms）を
+      // 発火させる＝クリックで配信者ページへ飛べる。
+      // userId 未付与の旧保存データ（v0.1.522 以前）でも、保存済みアイコン URL から
+      // popup 側で uid を復元してリンク化する（再スクレイプ＝ページ再読込を待たない）。
+      let uid = String(row.userId || '').trim();
+      if (!/^\d{1,18}$/.test(uid)) {
+        const am = String(row.thumbnailUrl || '').match(
+          /\/usericon\/\d+\/(\d{2,18})\.(?:jpe?g|png|gif|webp)/i
+        );
+        uid = am ? am[1] : '';
+      }
+      const userPageUrl =
+        typeof row.userPageUrl === 'string' && row.userPageUrl
+          ? row.userPageUrl
+          : /^\d{1,18}$/.test(uid)
+            ? `https://www.nicovideo.jp/user/${uid}`
+            : undefined;
+      return { ...row, contribution, ...(userPageUrl ? { userPageUrl } : {}) };
     });
     const rooms = officialDomRankingRowsToStripRooms(contribRows, { userKeyKind: 'contrib' });
     paintTopSupportRankStyleIntoElement(body, rooms, {
@@ -7431,6 +9585,94 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
 
   // 参加データが無い＝イベント不参加 or 未取得。レーン枠ごと隠して空枠で縦を食わない。
   setNorthStarLaneHidden('eventBroadcasters', true);
+}
+
+/**
+ * 応援者ランキング（イベント投票）レーン。SW が無認証 capi（voting_user_ranking）から取得し
+ * `nls_event_voting_ranking_<lv>` へ保存した行を読んで描画する。貢献度ランキング（ギフトのみ）
+ * とは別指標（イベント投票＝ギフト＋ニコニ広告のスコア）。イベント参加中（rows>0）だけ表示し、
+ * それ以外はレーンごと隠す（普段はクラッタにならない）。
+ * @param {string} liveId
+ */
+async function refreshNorthStarEventVotingSupportersLaneAsync(liveId) {
+  const body = document.getElementById('northStarLaneBody-eventVotingSupporters');
+  if (!(body instanceof HTMLElement)) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) {
+    setNorthStarLaneHidden('eventVotingSupporters', true);
+    return;
+  }
+
+  /** @type {Array<{rank?:number,name?:string,contribution?:number,isAnonymous?:boolean,thumbnailUrl?:string,userPageUrl?:string,accountType?:string}>|null} */
+  let rows = null;
+  try {
+    const vKey = eventVotingRankingStorageKey(lid);
+    const bag = await chrome.storage.local.get([vKey]);
+    const v = bag[vKey];
+    if (v && typeof v === 'object' && Array.isArray(v.rows) && v.rows.length > 0) {
+      rows = v.rows;
+    }
+  } catch {
+    /* no-op */
+  }
+
+  if (rows && rows.length > 0) {
+    setNorthStarLaneHidden('eventVotingSupporters', false);
+    const top = rows.slice(0, 10);
+    const premiumN = top.filter((r) => r && r.accountType === 'premium').length;
+    const rooms = officialDomRankingRowsToStripRooms(top, { userKeyKind: 'contrib' });
+    paintTopSupportRankStyleIntoElement(body, rooms, {
+      noteText: `イベント投票スコア順（ギフト＋ニコニ広告）。上位${rooms.length}名・うちプレミアム${premiumN}名`,
+      unitSuffix: 'pt',
+      ariaLabel: '応援者ランキング（イベント投票）',
+      isNorthStarBody: true
+    });
+    // 各行に会員種別バッジを付与。共有 painter（多レーン共用・テスト多数）を汚さないよう、
+    // このレーン限定で描画後 DOM を index 対応（rooms は top と 1:1・順序保存）で装飾する。
+    decorateEventVotingSupporterAccountBadges(body, top);
+    return;
+  }
+
+  // 投票データが無い＝イベント不参加 or 未取得。レーンごと隠して空枠で縦を食わない。
+  setNorthStarLaneHidden('eventVotingSupporters', true);
+}
+
+/**
+ * 応援者ランキング行へ会員種別バッジ（プレミアム/一般）を付ける。
+ * paintTopSupportRankStyleIntoElement が body.innerHTML を毎回貼り替えるため冪等
+ * （再描画で古いバッジは消え、ここで貼り直す）。rows[i] と list の i 番目は 1:1。
+ * textContent 経由＝XSS 安全。レスポンシブ配慮で小さめの pill（折返し抑止）。
+ *
+ * @param {HTMLElement} body
+ * @param {Array<{accountType?:string}>} rows
+ */
+function decorateEventVotingSupporterAccountBadges(body, rows) {
+  if (!(body instanceof HTMLElement) || !Array.isArray(rows)) return;
+  const list = body.querySelector('.nl-top-support-rank__list');
+  if (!(list instanceof HTMLElement)) return;
+  const lines = list.children;
+  for (let i = 0; i < lines.length && i < rows.length; i += 1) {
+    const row = rows[i];
+    const line = lines[i];
+    if (!row || !(line instanceof HTMLElement)) continue;
+    const nameEl = line.querySelector('.nl-top-support-rank__name');
+    if (!(nameEl instanceof HTMLElement)) continue;
+    if (nameEl.querySelector('.nl-event-voting-badge')) continue;
+    const isPremium = row.accountType === 'premium';
+    const badge = document.createElement('span');
+    badge.className =
+      'nl-event-voting-badge' +
+      (isPremium ? ' nl-event-voting-badge--premium' : ' nl-event-voting-badge--regular');
+    badge.textContent = isPremium ? 'プレミアム' : '一般';
+    badge.title = isPremium ? 'プレミアム会員' : '一般会員';
+    badge.style.cssText =
+      'margin-inline-start:4px;padding:0 5px;border-radius:8px;font-size:9px;font-weight:700;' +
+      'line-height:1.6;white-space:nowrap;vertical-align:middle;' +
+      (isPremium
+        ? 'color:#7a5200;background:linear-gradient(135deg,#ffe6a3,#ffcf5e);'
+        : 'color:#5b6470;background:#e7e9ec;');
+    nameEl.appendChild(badge);
+  }
 }
 
 /**
@@ -7451,24 +9693,114 @@ function setNorthStarLaneHidden(laneId, hidden) {
 }
 
 /**
+ * 北極星ギフト履歴の個別投げ一覧パネル（ランキング body とは別 DOM）。
+ */
+function clearNorthStarGiftThrowsPanel() {
+  const panel = document.getElementById('northStarLaneThrows-giftHistory');
+  if (!(panel instanceof HTMLElement)) return;
+  panel.innerHTML = '';
+  panel.hidden = true;
+  panel.setAttribute('aria-hidden', 'true');
+}
+
+/**
+ * @param {string} html
+ */
+function paintNorthStarGiftThrowsPanel(html) {
+  const panel = document.getElementById('northStarLaneThrows-giftHistory');
+  if (!(panel instanceof HTMLElement)) return;
+  const trimmed = String(html || '').trim();
+  if (!trimmed) {
+    _giftHistoryThrowsPanelHtmlKey = '';
+    clearNorthStarGiftThrowsPanel();
+    return;
+  }
+  if (trimmed === _giftHistoryThrowsPanelHtmlKey) return;
+  _giftHistoryThrowsPanelHtmlKey = trimmed;
+  panel.innerHTML = trimmed;
+  panel.hidden = false;
+  panel.removeAttribute('aria-hidden');
+  bindOnErrorHideHandlersWithin(panel);
+}
+
+/**
  * 北極星 レーン 2 (この番組へのギフト履歴)。履歴起点の集計をランキング表示。
  */
 async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
   const body = document.getElementById('northStarLaneBody-giftHistory');
   if (!(body instanceof HTMLElement)) return;
-  const ctx = await computeGiftHistoryNorthStarRoomsContext(liveId);
+  const lid = String(liveId || '').trim().toLowerCase();
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
+  const officialGiftPts =
+    typeof bundle?.programStats?.giftPoints === 'number' &&
+    Number.isFinite(bundle.programStats.giftPoints)
+      ? bundle.programStats.giftPoints
+      : typeof snap?.officialGiftPointsNdgr === 'number' &&
+          Number.isFinite(snap.officialGiftPointsNdgr)
+        ? snap.officialGiftPointsNdgr
+        : null;
+  syncGiftHistoryHeaderProgramPt(officialGiftPts);
+  const ctxRaw = await computeGiftHistoryNorthStarRoomsContext(liveId, {
+    officialProgramGiftPts: officialGiftPts
+  });
+  const ctx =
+    ctxRaw && ctxRaw.rooms.length > 0
+      ? (() => {
+          const rec = reconcileGiftHistoryNorthStarContext({
+            rooms: ctxRaw.rooms,
+            pointsSumAll: ctxRaw.pointsSumAll,
+            pointsSumDisplayed: ctxRaw.pointsSumDisplayed,
+            officialProgramGiftPts: officialGiftPts,
+            maxRooms: GIFT_HISTORY_LANE_MAX
+          });
+          return {
+            ...ctxRaw,
+            rooms: rec.rooms,
+            pointsSumAll: rec.pointsSumAll,
+            pointsSumDisplayed: rec.pointsSumDisplayed
+          };
+        })()
+      : ctxRaw;
   if (ctx && ctx.rooms.length > 0) {
+    const paintKey = buildGiftHistoryNorthStarPaintKey({
+      liveId: lid,
+      rooms: ctx.rooms,
+      noteText: ctx.noteText,
+      pointsSumAll: ctx.pointsSumAll,
+      pointsSumDisplayed: ctx.pointsSumDisplayed,
+      officialProgramGiftPts: officialGiftPts,
+      throwsTableHtml: ctx.throwsTableHtml || ''
+    });
+    if (paintKey === _giftHistoryNorthStarPaintKey) {
+      syncGiftHistoryHeaderProgramPt(officialGiftPts);
+      patchNorthStarGiftHistoryFreshnessNote(body, ctx.freshnessNote || '');
+      return;
+    }
+    _giftHistoryNorthStarPaintKey = paintKey;
+    _giftHistoryNorthStarCapturedAtMs = Date.now();
     paintTopSupportRankStyleIntoElement(body, ctx.rooms, {
       noteText: ctx.noteText,
       unitSuffix: ctx.unitSuffix,
       ariaLabel: ctx.ariaLabel,
       isNorthStarBody: true,
-      freshnessNote: ctx.freshnessNote || ''
+      freshnessNote: ctx.freshnessNote || '',
+      pointsSumAll: ctx.pointsSumAll,
+      pointsSumDisplayed: ctx.pointsSumDisplayed,
+      officialProgramGiftPts: officialGiftPts
     });
+    if (ctx.throwsTableHtml) {
+      paintNorthStarGiftThrowsPanel(ctx.throwsTableHtml);
+    } else {
+      _giftHistoryThrowsPanelHtmlKey = '';
+      clearNorthStarGiftThrowsPanel();
+    }
     return;
   }
+  _giftHistoryNorthStarPaintKey = '';
+  _giftHistoryThrowsPanelHtmlKey = '';
+  _giftHistoryNorthStarCapturedAtMs = 0;
+  clearNorthStarGiftThrowsPanel();
   const state = determineNorthStarLaneState('giftHistory', { bundle, snap });
   renderNorthStarLane('giftHistory', null, state);
 }
@@ -7788,9 +10120,61 @@ function relocateSupportTimelineForStandaloneWindow() {
   //   インスタンスでは実害が無いため行わない（action popup は別プロセスで初期 DOM のまま）。
 }
 
+/** popup 開時・北極星更新時の koken ギフト履歴同期（マーケ DL と同型）。 */
+/** content 側 koken ギフト API と同周期（履歴タブを開かず自動追従） */
+const KOKEN_GIFT_POPUP_SYNC_MIN_GAP_MS = 10_000;
+/** @type {number} */
+let _kokenGiftPopupSyncLastAt = 0;
+/** @type {boolean} */
+let _kokenGiftPopupSyncInFlight = false;
+
+/**
+ * koken 公式 API で sub-app 履歴を取得し storage にマージ。北極星ギフト履歴レーンを更新。
+ *
+ * @param {string} liveId
+ */
+/**
+ * @param {string} liveId
+ * @param {{ force?: boolean }} [opts] storage 更新直後など gap を無視する
+ */
+async function syncKokenGiftHistoryForPopup(liveId, opts = {}) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return;
+  const now = Date.now();
+  if (_kokenGiftPopupSyncInFlight) return;
+  if (!opts.force && now - _kokenGiftPopupSyncLastAt < KOKEN_GIFT_POPUP_SYNC_MIN_GAP_MS) return;
+  _kokenGiftPopupSyncInFlight = true;
+  _kokenGiftPopupSyncLastAt = now;
+  try {
+    const giftSubKey = giftSubAppHistoryStorageKey(lid);
+    const giftThrowsKey = giftHistoryThrowsStorageKey(lid);
+    const bag = await chrome.storage.local.get([giftSubKey, giftThrowsKey]);
+    const giftSubAppHistoryRaw =
+      bag[giftSubKey] && typeof bag[giftSubKey] === 'object' ? bag[giftSubKey] : null;
+    const jsonPages = await fetchKokenGiftHistoryAllViaExtension(lid);
+    const { subApp, throws } = buildKokenGiftPersistPayload(
+      jsonPages,
+      giftSubAppHistoryRaw,
+      { now: Date.now(), liveId: lid }
+    );
+    /** @type {Record<string, unknown>} */
+    const giftPersist = {};
+    if (subApp) giftPersist[giftSubKey] = subApp;
+    if (throws?.length) giftPersist[giftThrowsKey] = throws;
+    if (Object.keys(giftPersist).length > 0) {
+      await chrome.storage.local.set(giftPersist);
+    }
+  } catch {
+    /* best-effort */
+  } finally {
+    _kokenGiftPopupSyncInFlight = false;
+  }
+}
+
 /** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
 async function refreshAllNorthStarMirrorLanes(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
+  await syncKokenGiftHistoryForPopup(lid);
   await refreshNorthStarContributionRankingLaneAsync(lid);
   await refreshNorthStarGiftHistoryLaneAsync(lid);
   refreshNorthStarProgramPointsLane();
@@ -7798,7 +10182,9 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
   await refreshNorthStarEventCurrentRankLaneAsync(lid);
   refreshNorthStarEventCumulativeScoreLane();
   await refreshNorthStarEventBroadcastersLaneAsync(lid);
+  await refreshNorthStarEventVotingSupportersLaneAsync(lid);
   await refreshSupportActivityTimeline(lid);
+  await maybeCelebrateGiftEventsAfterRefresh(lid);
 }
 
 /**
@@ -7837,10 +10223,30 @@ async function refreshGiftRankStrip(liveId) {
 /**
  * @param {PopupCommentEntry[]} entries
  * @param {string} [liveId] ランキングストリップの再描画キー用
+ * @param {{ rankingProvisional?: boolean }} [renderOpts]
  */
-function renderUserRooms(entries, liveId = '') {
+function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   const ul = /** @type {HTMLUListElement} */ ($('userRoomList'));
   if (!ul) return;
+  const rankingProvisional = renderOpts?.rankingProvisional === true;
+  /** @type {HTMLElement|null} */
+  let provisionalNoteEl = /** @type {HTMLElement|null} */ (
+    document.getElementById('userRoomProvisionalNote')
+  );
+  if (!provisionalNoteEl && ul.parentElement) {
+    provisionalNoteEl = document.createElement('p');
+    provisionalNoteEl.id = 'userRoomProvisionalNote';
+    provisionalNoteEl.className = 'nl-anonymous-identicon-hint nl-user-room-provisional-note';
+    provisionalNoteEl.hidden = true;
+    provisionalNoteEl.setAttribute('data-nl-toolbar-only', '');
+    ul.parentElement.insertBefore(provisionalNoteEl, ul);
+  }
+  if (provisionalNoteEl) {
+    provisionalNoteEl.hidden = !rankingProvisional;
+    provisionalNoteEl.textContent = rankingProvisional
+      ? '直近コメントからの暫定ランキングです。全件読み込み後に更新されます。'
+      : '';
+  }
   const lvPrimed = String(liveId || '').trim().toLowerCase();
   // 同一 lv のコメント更新のたびに 6 レーンをローディングへ戻すと、データ⇔待機が点滅する。
   // liveId が変わったときだけ bundle 反映前の同型シェルを張る。
@@ -7877,6 +10283,7 @@ function renderUserRooms(entries, liveId = '') {
         paintOfficialEventBannerCard(null);
       }
     }
+    void trackBroadcasterFollowerForCelebration(String(liveId || '').trim().toLowerCase());
     const snapMeta = watchMetaCache.snapshot;
     if (snapMeta) {
       renderWatchMetaCard(
@@ -7886,7 +10293,10 @@ function renderUserRooms(entries, liveId = '') {
     }
     syncLiveStatThreeCardsCharLoadingOverlays();
     await refreshGiftRankStrip(liveId);
-    await refreshAllNorthStarMirrorLanes(String(liveId || '').trim().toLowerCase());
+    const northLv = String(liveId || '').trim().toLowerCase();
+    void refreshAllNorthStarMirrorLanes(northLv).then(() => {
+      markWatchPopupLoadPhase('north_star_done', { liveId: northLv });
+    });
     // v0.1.228: ランキング帯の表示状態が確定したあとに prompt を反映。
     await refreshGiftRankingFetchPrompt(liveId);
     // v0.1.405/v0.1.450 (PR4): 過去ログ一括バックフィルの A 内 hint を反映。
@@ -7894,7 +10304,7 @@ function renderUserRooms(entries, liveId = '') {
     await refreshBackfillRecordCardHint(liveId);
   })();
 
-  const list = Array.isArray(entries) ? entries : [];
+  const list = capCommentsForAnalytics(Array.isArray(entries) ? entries : []);
   const latestAt = list.reduce((max, e) => {
     const at = Number(e?.capturedAt || 0);
     return at > max ? at : max;
@@ -8732,6 +11142,7 @@ async function applyUsageTermsGateState() {
  * details が開いているときだけ 1 回スクロール位置を確認・補正する。
  */
 function correctSupportVisualScrollIfOpen() {
+  if (shouldDeferHeavyPopupPaintNow()) return;
   const details = /** @type {HTMLDetailsElement|null} */ (
     document.getElementById('supportVisualDetails')
   );
@@ -9580,7 +11991,8 @@ async function populateStorySourceEntriesFromStorageFallback(opts = {}) {
     ).filter((entry) =>
       !excludeIds.has(String(entry?.userId || '').trim())
     );
-    const displayEntries = buildDisplayCommentEntries(storageRowsForLane, latestLv);
+    const displayEntriesBase = buildDisplayCommentEntries(storageRowsForLane, latestLv);
+    const displayEntries = displayEntriesBase;
     syncStorySourceEntries(latestLv, displayEntries, storageRowsForLane);
     try {
       laneStoreInstance.setCandidates(
@@ -9951,6 +12363,9 @@ async function refresh() {
   // await から戻ってきた paintWatchPopupUi が新しい放送の描画を上書きしないよう、以降の paint は
   // すべて isFreshRefresh() で守る。
   const refreshGen = ++watchPopupRefreshGeneration;
+  popupCelebrationGate.beginPopupRefresh(watchPopupLastPaintedLiveId || '', {
+    refreshSessionKey: String(refreshGen)
+  });
   const isFreshRefresh = () => refreshGen === watchPopupRefreshGeneration;
 
   const liveEl = $('liveId');
@@ -10361,6 +12776,9 @@ async function refresh() {
   }
 
   const lv = extractLiveIdFromUrl(url);
+  if (lv) {
+    resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
+  }
   if (liveEl) {
     liveEl.textContent = lv && !fromActiveTab ? `${lv}（直近の視聴ページ）` : lv || '-';
   }
@@ -10447,11 +12865,31 @@ async function refresh() {
 
   const snapshotKey = `${lv}|${url}|s17`;
   const key = commentsStorageKey(lv);
+  // v0.1.527: 保存系ボタン（HTMLレポート💾／スクショ📷／マーケ📊）を lv 判明のこの時点で
+  //   即有効化する。従来は重い snapshot fetch + 巨大コメント配列の storage 読みが終わって
+  //   paintWatchPopupUi が走るまで（実機で数秒〜十数秒）グレーアウトのままで「watch を開いても
+  //   すぐ押せない」体感だった。クリック時のダウンロード処理は storage をその場で読み直すため、
+  //   先に押せるようにしても安全（dataset は下流の paintWatchPopupUi で再確定＝冪等）。
+  exportBtn.disabled = false;
+  exportBtn.dataset.liveId = lv;
+  exportBtn.dataset.storageKey = key;
+  exportBtn.dataset.watchUrl = url;
+  if (captureBtn) {
+    captureBtn.disabled = false;
+    captureBtn.dataset.watchUrl = url;
+  }
+  {
+    const mktQuickEarly = /** @type {HTMLButtonElement|null} */ ($('exportMarketingQuickBtn'));
+    if (mktQuickEarly) mktQuickEarly.disabled = false;
+    const mktOrigEarly = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
+    if (mktOrigEarly) mktOrigEarly.disabled = false;
+  }
   // v0.1.505: 未畳み込みの新着（テール）も読んで「メイン＋テール」をカウント/集計に使う。
   const tailKey = tailStorageKey(lv);
   // v0.1.508: パネル 0 秒表示用の軽量サマリ（件数・直近コメント）。本体巨大配列の heavy read
   //   が多タブ飽和で timeout しても、これで件数カードと ticker を即描画して「—」固定を防ぐ。
   const summaryKey = summaryStorageKey(lv);
+  const panelSummaryKey = panelSummaryStorageKey(lv);
   const snapshotCacheHit =
     watchMetaCache.key === snapshotKey && watchMetaCache.snapshot != null;
 
@@ -10488,6 +12926,7 @@ async function refresh() {
   //   別 Promise で後追いする。これで「重い配列待ちで popup が空のまま」状態を減らす。
   // v0.1.336: 描画前ゲート（軽量読みは固まりを per-attempt 900ms で失敗扱いにし、
   //   最悪 4 試行で {} に落として描画を続行）。
+  const metricsFromContentPromise = requestPanelMetricsFromWatchTab(url, lv);
   const lightData = await readStorageBagWithRetry(
     () =>
       chrome.storage.local.get([
@@ -10495,11 +12934,18 @@ async function refresh() {
         snapKey,
         tailKey,
         summaryKey,
+        panelSummaryKey,
         commentDbSummaryKey(lv),
         chunkIndexKey(lv)
       ]),
     { attempts: 4, delaysMs: [0, 50, 120, 280], perAttemptTimeoutMs: 900 }
   );
+  void metricsFromContentPromise.then((metricsFromContent) => {
+    if (!metricsFromContent || !isPanelLiveSummary(metricsFromContent, lv)) return;
+    const paintedLv = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    if (paintedLv && paintedLv !== lv) return;
+    applyPanelMetricsFromContent(metricsFromContent, lv);
+  });
   // v0.1.509: チャンク移行済みか（移行済みなら popup は main キーへ一切書き戻さない＝
   //   バックアップ温存。正規化 patch は表示時 profile 再適用で担保される）。
   const lightChunkIndexRaw = /** @type {Record<string, unknown>} */ (lightData)[
@@ -10543,6 +12989,8 @@ async function refresh() {
     Number(cachedHeavy.chunkTotal) === currentChunkTotal &&
     Array.isArray(cachedHeavy.arr) &&
     cachedHeavy.arr.length > 0;
+  /** heavy 全件読み完了前はマイルストーン／ギフト Bahamut の誤爆を抑止 */
+  let watchPopupHeavyCommentsSettled = canReuseHeavyChunkRead;
   // v0.1.509: 本体は追記専用チャンク（無ければ従来 main にフォールバック）から読む。
   //   readStorageBagWithRetry を getMany として渡し、固まり時は {} に落として描画継続する。
   // v0.1.514: IDB モードは拡張オリジン IDB を直接読む（chrome.storage I/O の奪い合いから解放）。
@@ -10575,13 +13023,32 @@ async function refresh() {
         summaryRaw
       )
     : null;
+  const panelSummaryRaw = /** @type {Record<string, unknown>} */ (lightData)[panelSummaryKey];
+  const panelLiveSummary = isPanelLiveSummary(panelSummaryRaw, lv) ? panelSummaryRaw : null;
+  const chunkIndexTotal =
+    commentsChunked && isChunkIndex(lightChunkIndexRaw, lv)
+      ? Math.max(0, Number(/** @type {any} */ (lightChunkIndexRaw).total) || 0)
+      : null;
   // v0.1.514: IDB モードは SW が書いた cdbSummary（total + 直近 N 件）を優先して件数カード・
   //   ticker を 0 秒描画する（従来の nls_csummary は IDB モードでは更新されない）。
-  const summaryRecordedCount = idbMode
+  let summaryRecordedCount = idbMode
     ? Math.max(0, Number(cdbSummary.total) || 0)
     : commentSummary
     ? Math.max(0, Number(commentSummary.recordedCount) || 0)
     : null;
+  if (panelLiveSummary) {
+    const panelRecorded = Math.max(0, Number(panelLiveSummary.recordedCount) || 0);
+    summaryRecordedCount =
+      summaryRecordedCount != null
+        ? Math.max(summaryRecordedCount, panelRecorded)
+        : panelRecorded;
+  }
+  if (chunkIndexTotal != null && chunkIndexTotal > 0) {
+    summaryRecordedCount =
+      summaryRecordedCount != null
+        ? Math.max(summaryRecordedCount, chunkIndexTotal)
+        : chunkIndexTotal;
+  }
   const summaryDisplayRows = idbMode
     ? normalizeTailRowsForDisplay(cdbSummary.recent, lv)
     : commentSummary
@@ -10624,6 +13091,18 @@ async function refresh() {
       String(/** @type {any} */ (cachedSnap).liveId || '').trim().toLowerCase() === lv
     ) {
       watchSnapshot = /** @type {any} */ (cachedSnap);
+      watchMetaCache.snapshot = watchSnapshot;
+    }
+  }
+  if (panelLiveSummary) {
+    if (watchSnapshot == null) {
+      const panelSnap = watchSnapshotFromPanelSummary(panelLiveSummary);
+      if (panelSnap) {
+        watchSnapshot = /** @type {any} */ (panelSnap);
+        watchMetaCache.snapshot = watchSnapshot;
+      }
+    } else {
+      watchSnapshot = mergeWatchSnapshotWithPanelSummary(watchSnapshot, panelLiveSummary);
       watchMetaCache.snapshot = watchSnapshot;
     }
   }
@@ -10755,20 +13234,70 @@ async function refresh() {
       arr,
       watchMetaCache.snapshot || {}
     );
-    const displayEntries = excludeBroadcasterFromCommentEntries(
+    const displayEntriesBase = excludeBroadcasterFromCommentEntries(
       buildDisplayCommentEntries(arr, lv),
       broadcasterUidForCommentExclude
     );
+    const displayEntries = displayEntriesBase;
     STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
-    // v0.1.508: 本体全件が読めているときは displayEntries.length（配信者除外後の表示件数）を、
-    //   まだ読めていない（summary/missing）ときは軽量サマリの記録件数を出して「—」やゼロ表示を防ぐ。
+    // v0.1.596: chunk/IDB 移行済みでは main 配列が古い退避データのことがある。
+    // index/summary total が取れている場合は、それを件数カードの正本として扱う。
     const hasReliableFullArray =
-      commentReadState === 'storage_ok' || commentReadState === 'fallback_cached';
+      commentReadState === 'storage_ok' && !commentsChunked && !idbMode;
     const countToShow =
-      !hasReliableFullArray && summaryRecordedCount != null
-        ? Math.max(summaryRecordedCount, displayEntries.length)
-        : displayEntries.length;
-    setCountDisplay(countToShow, watchSnapshot);
+      summaryRecordedCount != null
+        ? Math.max(summaryRecordedCount, displayEntriesBase.length)
+        : displayEntriesBase.length;
+    const officialChunkTotalForGate =
+      currentChunkTotal != null
+        ? currentChunkTotal
+        : idbMode && summaryRecordedCount != null
+          ? summaryRecordedCount
+          : null;
+    popupCelebrationGate.setCommentLoadPhase({
+      heavySettled: watchPopupHeavyCommentsSettled,
+      recordCount: countToShow,
+      arrayLength: displayEntriesBase.length,
+      officialChunkTotal: officialChunkTotalForGate,
+      hasReliableFullArray
+    });
+    popupCelebrationGate.logCelebrationDebug('gate', {
+      countToShow,
+      arrLength: displayEntriesBase.length,
+      heavySettled: watchPopupHeavyCommentsSettled,
+      canFire: popupCelebrationGate.canFireCelebrations()
+    });
+    runPopupCelebrationCommentScan(arr, lv);
+    const deferCelebrationScans = shouldDeferCelebrationsUntilHeavySettled(
+      !watchPopupHeavyCommentsSettled
+    );
+    if (!deferCelebrationScans && hasReliableFullArray) {
+      void popupCelebrationGate
+        .runAfterPrime(async () => {
+          await ensureCommentMilestonePrimedForCount(lv, countToShow);
+        })
+        .then(() => {
+          if (refreshGen !== watchPopupRefreshGeneration) return;
+          if (!popupCelebrationGate.canFireCelebrations()) return;
+          scanCommentsForNicoadCelebrations(arr, lv, { reliableFull: true });
+          scanCommentsForGiftBahamut(arr, lv, { reliableFull: true });
+          if (popupCelebrationGate.canNoteCommentMilestoneHighWater()) {
+            popupCelebrationGate.logCelebrationDebug('comment_milestone', { countToShow });
+            noteCommentMilestoneHighWater(lv, countToShow);
+          }
+        });
+    }
+    void pollBroadcasterFollowerCountForCelebration(lv);
+    void trackBroadcasterFollowerForCelebration(lv);
+    const snapForCards = mergeWatchSnapshotWithPanelSummary(
+      watchSnapshot,
+      panelLiveSummary
+    );
+    setCountDisplay(countToShow, snapForCards);
+    markWatchPopupLoadPhase('count_card', {
+      countToShow,
+      heavySettled: watchPopupHeavyCommentsSettled
+    });
     void updateIngestHeartbeatDisplay(lv);
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));
     exportBtn.disabled = false;
@@ -10797,23 +13326,43 @@ async function refresh() {
             (Boolean(b) && b === laneLvKey)
           );
         });
-    syncStorySourceEntries(lv, displayEntries, laneFeedEntries);
-    renderUserRooms(laneFeedEntries, lv);
+    const laneFeedPick = selectLaneFeedCommentRows({
+      liveId: lv,
+      primaryEntries: laneFeedEntries,
+      heavySettled: watchPopupHeavyCommentsSettled,
+      panelSummary: panelLiveSummary,
+      commentSummary,
+      cdbSummary
+    });
+    syncStorySourceEntries(lv, displayEntries, laneFeedPick.entries);
+    markWatchPopupLoadPhase(
+      laneFeedPick.provisional ? 'ranking_paint' : 'ranking_full',
+      {
+        rows: laneFeedPick.entries.length,
+        countToShow,
+        provisional: laneFeedPick.provisional
+      }
+    );
+    renderUserRooms(
+      /** @type {PopupCommentEntry[]} */ (laneFeedPick.entries),
+      lv,
+      { rankingProvisional: laneFeedPick.provisional }
+    );
     renderCharacterScene({
       hasWatch: true,
       recording: toggle.checked,
       commentCount: displayEntries.length,
       liveId: lv,
-      snapshot: watchSnapshot
+      snapshot: snapForCards
     });
-    renderWatchMetaCard(watchSnapshot, arr);
+    renderWatchMetaCard(snapForCards, arr);
     // v0.1.503 perf: renderCharacterScene→syncStoryGrowth が source signature 一致時は
     //   既に patch 済み／skip 済み。ここで毎ポーリング無条件に O(N) patch を回すと、
     //   同一サイトの複数 watch タブが 1 プロセスを共有する環境でメインスレッドが固まり
     //   「ページが応答しません」になる。signature が変わった（または DOM セル数がずれた）
     //   ときだけ patch する。querySelectorAll の length は O(セル数=上限以下) で軽い。
     const growthEl = /** @type {HTMLElement|null} */ ($('sceneStoryGrowth'));
-    if (growthEl) {
+    if (growthEl && !shouldDeferHeavyPopupPaintNow()) {
       const renderedImgCount = growthEl.querySelectorAll(
         'img.nl-story-growth-icon'
       ).length;
@@ -10828,7 +13377,7 @@ async function refresh() {
       const baseAv = summarizeStoredCommentAvatarStats(arr);
       const resolvedTotal = countResolvedAvatarEntries(arr, lv).total;
       renderDevMonitorPanel({
-        snapshot: watchSnapshot,
+        snapshot: snapForCards,
         liveId: lv,
         displayCount: displayEntries.length,
         storageCount: arr.length,
@@ -10851,6 +13400,7 @@ async function refresh() {
     if (!Array.isArray(nextArr)) return;
     if (refreshGen !== watchPopupRefreshGeneration) return;
     if (!nextArr.length && arr.length) return;
+    const wasHeavyPending = !watchPopupHeavyCommentsSettled;
     readCommentsOk = true;
     commentReadState = 'storage_ok';
     arr = nextArr;
@@ -10866,12 +13416,20 @@ async function refresh() {
     if (tailDisplayRows.length) {
       arr = /** @type {unknown[]} */ (arr).concat(tailDisplayRows);
     }
+    watchPopupHeavyCommentsSettled = true;
+    if (wasHeavyPending) {
+      _giftBahamutSeededLiveId = '';
+      _giftBahamutSeededEntryCountByLive.delete(lv);
+      _seenGiftCommentKeys.clear();
+    }
     paintWatchPopupUi();
   });
 
   // 放送切替を検知して、直前放送に紐付くキャッシュ（rank strip の再描画抑止キー、
   // 直近コメント数・視聴者数の差分比較用値）を強制リセットする。paintWatchPopupUi より前で
   // 呼ぶことで、最初の描画から新しい放送のデータのみが画面に乗るようにする。
+  popupCelebrationGate.beginPopupRefresh(lv, { refreshSessionKey: String(refreshGen) });
+  resetWatchPopupLoadDiagnostics(lv);
   resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
 
   if (!snapshotCacheHit) {
@@ -11247,6 +13805,8 @@ async function collectDataBackedWatchLvs(openWatchUrls) {
   if (lvs.length === 0 || !hasExtensionContext()) {
     return { candidateUrls: [...new Set(urls)], liveIdsWithData: [] };
   }
+  // 多タブ時は storage.get が詰まりやすいので、開いている watch 数に応じて待ちを伸ばす。
+  const dataBackedLvsTimeoutMs = Math.min(2800, 900 + lvs.length * 350);
   // 各 lv の記録キー / snapshot キーだけを読む（小さく有界）。
   /** @type {string[]} */
   const keys = [];
@@ -11261,7 +13821,7 @@ async function collectDataBackedWatchLvs(openWatchUrls) {
   try {
     bag = await withTimeout(
       chrome.storage.local.get(keys),
-      900,
+      dataBackedLvsTimeoutMs,
       'data_backed_lvs_timeout'
     );
   } catch {
@@ -11432,12 +13992,138 @@ async function triggerReloadWatchTabFromPopup() {
   }
 }
 
+/** watch フレーム走査のキャッシュ（コメント送信のたびに executeScript しない） */
+const WATCH_FRAME_LIST_CACHE_TTL_MS = 45_000;
+/** @type {Map<number, { at: number, ranked: { frameId: number, score: number, text: string, href: string }[] }>} */
+const watchFrameListCacheByTabId = new Map();
+
+/** 直近でコメント送信に成功した frameId（タブごと） */
+/** @type {Map<number, number>} */
+const lastCommentPostFrameByTabId = new Map();
+
+const COMMENT_POST_FRAME_SESSION_KEY = 'nls_comment_post_frame_by_tab_v1';
+
+async function loadLastCommentPostFramesFromSession() {
+  try {
+    const bag = await chrome.storage.session.get(COMMENT_POST_FRAME_SESSION_KEY);
+    const raw = bag[COMMENT_POST_FRAME_SESSION_KEY];
+    if (!raw || typeof raw !== 'object') return;
+    for (const [k, v] of Object.entries(raw)) {
+      const tabId = Number(k);
+      const frameId = Number(v);
+      if (Number.isFinite(tabId) && Number.isFinite(frameId)) {
+        lastCommentPostFrameByTabId.set(tabId, frameId);
+      }
+    }
+  } catch {
+    /* no-op */
+  }
+}
+
+/**
+ * @param {number} tabId
+ * @param {number} frameId
+ */
+async function persistLastCommentPostFrame(tabId, frameId) {
+  lastCommentPostFrameByTabId.set(tabId, frameId);
+  try {
+    const bag = await chrome.storage.session.get(COMMENT_POST_FRAME_SESSION_KEY);
+    const raw =
+      bag[COMMENT_POST_FRAME_SESSION_KEY] &&
+      typeof bag[COMMENT_POST_FRAME_SESSION_KEY] === 'object'
+        ? { .../** @type {Record<string, number>} */ (bag[COMMENT_POST_FRAME_SESSION_KEY]) }
+        : {};
+    raw[String(tabId)] = frameId;
+    await chrome.storage.session.set({ [COMMENT_POST_FRAME_SESSION_KEY]: raw });
+  } catch {
+    /* no-op */
+  }
+}
+
+/**
+ * @param {number} tabId
+ * @param {string} watchUrl
+ * @param {{ scriptTimeoutMs?: number }} [opts]
+ * @returns {Promise<{ frameId: number, score: number, text: string, href: string }[]>}
+ */
+async function getWatchFramesRankedForUrl(tabId, watchUrl, opts = {}) {
+  const now = Date.now();
+  const hit = watchFrameListCacheByTabId.get(tabId);
+  if (hit && now - hit.at < WATCH_FRAME_LIST_CACHE_TTL_MS) {
+    return prioritizeWatchFramesForWatchUrl(hit.ranked, watchUrl);
+  }
+  const pinged = await listWatchFramesViaCommentPing(tabId);
+  const rankedRaw =
+    pinged && pinged.length
+      ? pinged
+      : await listWatchFramesWithInnerText(tabId, opts);
+  watchFrameListCacheByTabId.set(tabId, { at: now, ranked: rankedRaw });
+  return prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
+}
+
+/**
+ * content へ軽量 ping（editor/panel の有無のみ）。失敗時は null でフル走査へ。
+ * @param {number} tabId
+ * @returns {Promise<{ frameId: number, score: number, text: string, href: string }[]|null>}
+ */
+async function listWatchFramesViaCommentPing(tabId) {
+  try {
+    const frames = await chrome.webNavigation.getAllFrames({ tabId });
+    if (!Array.isArray(frames) || !frames.length) return null;
+    const ids = [
+      ...new Set(
+        frames
+          .map((f) => f.frameId)
+          .filter((id) => typeof id === 'number' && Number.isFinite(id))
+      )
+    ];
+    /** @type {{ frameId: number, score: number, text: string, href: string }[]} */
+    const out = [];
+    await Promise.all(
+      ids.map(async (frameId) => {
+        try {
+          const res = await chrome.tabs.sendMessage(
+            tabId,
+            { type: 'NLS_PING_COMMENT_FRAME' },
+            { frameId }
+          );
+          const score =
+            res && typeof res === 'object' && typeof res.score === 'number'
+              ? res.score
+              : 0;
+          if (score > 0) {
+            out.push({
+              frameId,
+              score,
+              text: '',
+              href: String(
+                res && typeof res === 'object' && 'href' in res
+                  ? /** @type {{ href?: unknown }} */ (res).href || ''
+                  : ''
+              )
+            });
+          }
+        } catch {
+          /* Receiving end 等 */
+        }
+      })
+    );
+    if (!out.length) return null;
+    out.sort((a, b) => b.score - a.score);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 全フレームをスコア付けし innerText 断片を返す（about:blank の子フレームも含む）
  * @param {number} tabId
+ * @param {{ scriptTimeoutMs?: number }} [opts]
  * @returns {Promise<{ frameId: number, score: number, text: string, href: string }[]>}
  */
-async function listWatchFramesWithInnerText(tabId) {
+async function listWatchFramesWithInnerText(tabId, opts = {}) {
+  const scriptTimeoutMs = opts.scriptTimeoutMs ?? 8_000;
   try {
     // v0.1.441: chrome.scripting.executeScript は timeout を持たない API。多タブ stall・
     //   タブ suspension・content-script 注入競合等で永久 pending になり得る。これが
@@ -11468,7 +14154,7 @@ async function listWatchFramesWithInnerText(tabId) {
             return { score, text, href };
           }
         }),
-      8_000,
+      scriptTimeoutMs,
       'list_watch_frames_executescript_timeout',
       /** @type {chrome.scripting.InjectionResult[]} */ ([])
     );
@@ -11656,6 +14342,48 @@ async function requestWatchPageSnapshotFromOpenTab(watchUrl, opts = {}) {
 }
 
 /**
+ * watch タブの content メモリからパネル速報を取得（storage 飽和時の初回 paint 用）。
+ * @param {string} watchUrl
+ * @param {string} expectedLv
+ * @returns {Promise<Record<string, unknown>|null>}
+ */
+async function requestPanelMetricsFromWatchTabOnce(watchUrl, expectedLv) {
+  const candidates = await collectWatchTabCandidates(watchUrl);
+  if (!candidates.length) return null;
+  for (const candidate of candidates) {
+    try {
+      const res = await tabsSendMessageWithRetry(
+        candidate.id,
+        { type: PANEL_METRICS_MESSAGE_TYPE },
+        { frameId: 0, maxAttempts: 2, delayMs: 80 }
+      );
+      const metrics = resolvePanelMetricsFromMessageResponse(res, expectedLv);
+      if (metrics) return metrics;
+    } catch {
+      /* 次候補 */
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {string} watchUrl
+ * @param {string} expectedLv
+ * @returns {Promise<Record<string, unknown>|null>}
+ */
+async function requestPanelMetricsFromWatchTab(watchUrl, expectedLv) {
+  try {
+    return await withTimeout(
+      requestPanelMetricsFromWatchTabOnce(watchUrl, expectedLv),
+      PANEL_METRICS_FETCH_TIMEOUT_MS,
+      'panel_metrics_timeout'
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 開いている watch タブへ `NLS_POST_COMMENT` を送る（`prioritizeWatchFramesForWatchUrl` の順で各 frameId を試行）。
  *
  * 失敗モードとユーザー向け文言（調査用）:
@@ -11689,43 +14417,85 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
   }
 
   const prof = createCommentSubmitProfiler();
+  // v0.1.604: フラグ OFF でも総所要を rolling 観測（800ms 超は console.warn）。
+  const totalT0 = performance.now();
+  const postPayload = { type: 'NLS_POST_COMMENT', text: trimmed, fastSubmit: true };
 
   /** @type {string} */
   let lastDetail = '';
+
+  /**
+   * @param {number} tabId
+   * @param {number} frameId
+   * @returns {Promise<{ ok: boolean, error?: string }|null>}
+   */
+  async function tryPostOnFrame(tabId, frameId) {
+    try {
+      prof?.mark(`T1-f${frameId}-send`);
+      const res = await tabsSendMessageWithRetry(tabId, postPayload, {
+        frameId,
+        maxAttempts: frameId === 0 ? 2 : 3,
+        delayMs: frameId === 0 ? 40 : 70
+      });
+      prof?.mark(`T1-f${frameId}-res`);
+      return res && typeof res === 'object' ? res : null;
+    } catch (e) {
+      prof?.mark(`T1-f${frameId}-err`);
+      const msg =
+        e && typeof e === 'object' && 'message' in e
+          ? String(/** @type {{ message?: unknown }} */ (e).message || '')
+          : String(e || '');
+      if (msg) lastDetail = msg;
+      return null;
+    }
+  }
+
   try {
     for (const candidate of candidates) {
+      const tabId = candidate.id;
+      const tried = new Set();
+      /** @type {number[]} */
+      const fastOrder = [];
+      const lastOk = lastCommentPostFrameByTabId.get(tabId);
+      if (typeof lastOk === 'number' && lastOk !== 0) fastOrder.push(lastOk);
+      fastOrder.push(0);
+
       try {
-        const rankedRaw = await listWatchFramesWithInnerText(candidate.id);
-        const ranked = prioritizeWatchFramesForWatchUrl(rankedRaw, watchUrl);
-        const tried = new Set();
-        const tryOrder = [...ranked.map((r) => r.frameId), 0];
-        for (const fid of tryOrder) {
+        for (const fid of fastOrder) {
           if (tried.has(fid)) continue;
           tried.add(fid);
-          try {
-            prof?.mark(`T1-f${fid}-send`);
-            const res = await tabsSendMessageWithRetry(
-              candidate.id,
-              {
-                type: 'NLS_POST_COMMENT',
-                text: trimmed
-              },
-              { frameId: fid, maxAttempts: 5, delayMs: 120 }
-            );
-            prof?.mark(`T1-f${fid}-res`);
-            if (res?.ok) {
-              return { ok: true, error: '' };
-            }
-            if (res && typeof res === 'object' && 'error' in res && res.error) {
-              lastDetail = String(res.error);
-            }
-          } catch (e) {
-            prof?.mark(`T1-f${fid}-err`);
-            const msg =
-              e && typeof e === 'object' && 'message' in e
-                ? String(/** @type {{ message?: unknown }} */ (e).message || '')
-                : String(e || '');
-            if (msg) lastDetail = msg;
+          const res = await tryPostOnFrame(tabId, fid);
+          if (res?.ok) {
+            await persistLastCommentPostFrame(tabId, fid);
+            return { ok: true, error: '' };
+          }
+          if (res?.error) lastDetail = String(res.error);
+          if (lastDetail && !commentPostErrorWarrantsFrameDiscovery(lastDetail)) {
+            break;
+          }
+        }
+
+        if (lastDetail && !commentPostErrorWarrantsFrameDiscovery(lastDetail)) {
+          continue;
+        }
+
+        // v0.1.604: 送信パスのフレーム再探索タイムアウトを 4s → 2.5s に短縮。
+        //   ping 経路が成功すれば即返るので通常パスには影響なし。
+        //   executeScript fallback の最悪値だけが 4s から 2.5s に縮む。
+        const ranked = await getWatchFramesRankedForUrl(tabId, watchUrl, {
+          scriptTimeoutMs: 2_500
+        });
+        for (const fid of [...ranked.map((r) => r.frameId), 0]) {
+          if (tried.has(fid)) continue;
+          tried.add(fid);
+          const res = await tryPostOnFrame(tabId, fid);
+          if (res?.ok) {
+            await persistLastCommentPostFrame(tabId, fid);
+            return { ok: true, error: '' };
+          }
+          if (res?.error) lastDetail = String(res.error);
+          if (lastDetail && !commentPostErrorWarrantsFrameDiscovery(lastDetail)) {
+            break;
           }
         }
       } catch (e) {
@@ -11745,6 +14515,7 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
     };
   } finally {
     prof?.finish('nls-cmt-popup');
+    recordCommentSubmitTotal('nls-cmt-popup', Math.round(performance.now() - totalT0));
   }
 }
 
@@ -11857,6 +14628,289 @@ function yukkuriReportAvatarHtml(dataUrl, fallbackClass, fallbackChar) {
  * @param {string} watchUrl
  * @returns {Promise<string>}
  */
+/**
+ * watch スナップショットの配信者項目と、取得済みプロフィール詳細（storage）を
+ * 1 つの raw オブジェクトにマージする。stored の空値は snapshot を上書きしない。
+ *
+ * @param {any} snapshot
+ * @param {any} stored
+ * @returns {Record<string, unknown>}
+ */
+function mergeBroadcasterProfileRaw(snapshot, stored) {
+  const s = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  /** @type {Record<string, unknown>} */
+  const base = {
+    userId: s.broadcasterUserId,
+    nickname: s.broadcasterName,
+    avatarUrl: s.broadcasterIconUrl,
+    pageUrl: s.broadcasterPageUrl,
+    level: s.broadcasterLevel,
+    startAtText: s.startAtText
+  };
+  if (stored && typeof stored === 'object') {
+    for (const [k, v] of Object.entries(stored)) {
+      if (v === null || v === undefined || v === '') continue;
+      base[k] = v;
+    }
+  }
+  return base;
+}
+
+/**
+ * snapshot＋storage から配信者プロフィールモデルを解決する（取得分のみ）。
+ *
+ * @param {any} snapshot
+ * @param {string} liveId
+ * @returns {Promise<import('../lib/broadcasterProfileCard.js').BroadcasterProfileModel|null>}
+ */
+async function resolveBroadcasterProfileModel(snapshot, liveId) {
+  let stored = null;
+  try {
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (/^lv\d{1,15}$/.test(lid)) {
+      const pk = broadcasterProfileStorageKey(lid);
+      const pbag = await chrome.storage.local.get(pk).catch(() => ({}));
+      stored = pbag && pbag[pk] && typeof pbag[pk] === 'object' ? pbag[pk] : null;
+    }
+  } catch {
+    stored = null;
+  }
+  return normalizeBroadcasterProfileModel(mergeBroadcasterProfileRaw(snapshot, stored));
+}
+
+/**
+ * レポート出力時に未取得の数値 ID コメンターへ nvapi プロフィール（follow 数等）を補完取得する。
+ * @param {{ allNumericCommenters?: any[] }} report
+ * @param {Record<string, import('../lib/commenterFollowCache.js').CommenterFollowEntry>} followMap
+ * @returns {Promise<boolean>} followMap を更新したか
+ */
+async function backfillCommenterFollowProfilesForReport(report, followMap) {
+  const stats = (Array.isArray(report.allNumericCommenters) ? report.allNumericCommenters : [])
+    .map((u) => String(u?.userId || '').trim())
+    .filter((uid) => /^\d{1,18}$/.test(uid));
+  if (!stats.length) return false;
+
+  const toFetch = pickFollowUidsToFetch(stats, followMap, { limit: COMMENTER_FOLLOW_FETCH_BATCH });
+  if (!toFetch.length) return false;
+
+  let touched = false;
+  for (const uid of toFetch) {
+    const resp = await new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid }, (r) => {
+          const le = chrome.runtime.lastError;
+          if (le) return resolve(null);
+          resolve(r);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+    if (!resp || resp.ok !== true || resp.json == null) continue;
+    let profile = null;
+    try {
+      profile = normalizeNicoUserProfileResponse(resp.json);
+    } catch {
+      profile = null;
+    }
+    const entry = commenterFollowEntryFromProfile(profile, Date.now());
+    if (entry && upsertCommenterFollowEntry(followMap, uid, entry)) touched = true;
+    if (toFetch.indexOf(uid) < toFetch.length - 1) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+  if (touched) {
+    await chrome.storage.local.set({ [KEY_COMMENTER_FOLLOW_CACHE]: followMap }).catch(() => {});
+  }
+  return touched;
+}
+
+/**
+ * @param {string} liveId
+ * @returns {Promise<string>}
+ */
+async function resolveBroadcasterUserIdForReport(liveId, report) {
+  const fromReport = String(report?.broadcasterUserId || '').trim();
+  if (/^\d{1,18}$/.test(fromReport)) return fromReport;
+  const fromWatch = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
+  if (/^\d{1,18}$/.test(fromWatch)) return fromWatch;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return '';
+  try {
+    const bag = await chrome.storage.local.get(watchSnapshotStorageKey(lid)).catch(() => ({}));
+    const snap = bag?.[watchSnapshotStorageKey(lid)];
+    const fromSnap = String(snap?.broadcasterUserId || '').trim();
+    if (/^\d{1,18}$/.test(fromSnap)) return fromSnap;
+  } catch {
+    /* best-effort */
+  }
+  return '';
+}
+
+/**
+ * コメンターのフォロー/フォロワー横断キャッシュと配信別スナップショットを読み、
+ * マーケ report の topUsers / allNumericCommenters へ後付けする。`commenterFollowDataset`
+ * に全量行も載せ、JSON 埋め込み・全コメンター表の正本にする。
+ * @param {{ topUsers?: any[], allNumericCommenters?: any[], commenterFollowDataset?: unknown }} report
+ * @param {string} [liveId]
+ * @param {{ cacheOnly?: boolean }} [opts]
+ * @returns {Promise<void>}
+ */
+async function attachCommenterFollowToReport(report, liveId, opts = {}) {
+  const cacheOnly = Boolean(opts?.cacheOnly);
+  try {
+    if (!report) return;
+    const lid = String(liveId || report.liveId || '').trim().toLowerCase();
+    const keys = [KEY_COMMENTER_FOLLOW_CACHE];
+    if (/^lv\d{1,15}$/.test(lid)) keys.push(commenterFollowLiveStorageKey(lid));
+    const bag = await chrome.storage.local.get(keys).catch(() => ({}));
+    const followMap = normalizeCommenterFollowMap(bag?.[KEY_COMMENTER_FOLLOW_CACHE]);
+    if (!cacheOnly) {
+      await backfillCommenterFollowProfilesForReport(report, followMap);
+    }
+    const liveSnapshot = /^lv\d{1,15}$/.test(lid)
+      ? normalizeCommenterFollowLiveSnapshot(bag?.[commenterFollowLiveStorageKey(lid)])
+      : null;
+    if (liveSnapshot) report.commenterFollowDataset = liveSnapshot;
+    report.commenterFollowPriorEntries = followMap;
+
+    const broadcasterUid = await resolveBroadcasterUserIdForReport(lid, report);
+    if (broadcasterUid) report.broadcasterUserId = broadcasterUid;
+
+    /** @type {Map<string, import('../lib/commenterFollowCache.js').CommenterFollowRow>} */
+    const rowByUid = new Map();
+    if (liveSnapshot?.rows?.length) {
+      for (const row of liveSnapshot.rows) rowByUid.set(row.userId, row);
+    }
+
+    const mergeUser = (u) => {
+      if (!u) return;
+      const uid = String(u.userId || '').trim();
+      if (!/^\d{1,18}$/.test(uid)) return;
+      const row = rowByUid.get(uid);
+      if (row) applyFollowFieldsToUser(u, row);
+      applyFollowFieldsToUser(u, followMap[uid]);
+    };
+
+    for (const u of report.allNumericCommenters || []) mergeUser(u);
+    for (const u of report.topUsers || []) mergeUser(u);
+
+    await attachCommenterFollowingListToReport(report, lid, broadcasterUid, {
+      skipNetworkFetch: cacheOnly
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * レポート生成時にフォロー一覧を最大10名まで補完取得し、dataset / coverage を付与する。
+ * @param {{ allNumericCommenters?: any[], commenterFollowDataset?: unknown, commenterFollowingListCache?: Record<string, unknown>, followingListCoverage?: unknown, broadcasterUserId?: string }} report
+ * @param {string} liveId
+ * @param {string} [broadcasterUidHint]
+ * @param {{ skipNetworkFetch?: boolean }} [opts]
+ * @returns {Promise<void>}
+ */
+async function attachCommenterFollowingListToReport(
+  report,
+  liveId,
+  broadcasterUidHint = '',
+  opts = {}
+) {
+  const skipNetworkFetch = Boolean(opts?.skipNetworkFetch);
+  try {
+    if (!report) return;
+    const lid = String(liveId || report.liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+
+    const bag = await chrome.storage.local
+      .get([KEY_COMMENTER_FOLLOWING_LIST_CACHE, commenterFollowLiveStorageKey(lid)])
+      .catch(() => ({}));
+    const followingListMap = normalizeFollowingListMap(bag?.[KEY_COMMENTER_FOLLOWING_LIST_CACHE]);
+    const liveSnapshot =
+      normalizeCommenterFollowLiveSnapshot(bag?.[commenterFollowLiveStorageKey(lid)]) ||
+      (report.commenterFollowDataset
+        ? normalizeCommenterFollowLiveSnapshot(report.commenterFollowDataset)
+        : null);
+
+    const broadcasterUid = String(
+      broadcasterUidHint ||
+        report.broadcasterUserId ||
+        watchMetaCache.snapshot?.broadcasterUserId ||
+        ''
+    ).trim();
+    if (broadcasterUid && !report.broadcasterUserId) report.broadcasterUserId = broadcasterUid;
+
+    /** @type {{ userId: string, commentCount: number }[]} */
+    const stats = (Array.isArray(report.allNumericCommenters) ? report.allNumericCommenters : [])
+      .map((u) => ({
+        userId: String(u?.userId || '').trim(),
+        commentCount: Number(u?.count) || 0
+      }))
+      .filter((u) => /^\d{1,18}$/.test(u.userId))
+      .sort((a, b) => b.commentCount - a.commentCount)
+      .slice(0, COMMENTER_FOLLOWING_LIST_MAX_PER_LIVE);
+
+    const candidateUids = stats.map((s) => s.userId);
+    const toFetch = pickFollowingListUidsToFetch(stats, followingListMap, {
+      limit: Math.max(0, COMMENTER_FOLLOWING_LIST_MAX_PER_LIVE - 3),
+      maxRank: COMMENTER_FOLLOWING_LIST_MAX_PER_LIVE,
+      forceRetryStatuses: ['error', 'login_required']
+    });
+
+    let listTouched = false;
+    if (!skipNetworkFetch) {
+      for (const uid of toFetch) {
+        const resp = await new Promise((resolve) => {
+          try {
+            chrome.runtime.sendMessage({ type: NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE, uid }, (r) => {
+              const le = chrome.runtime.lastError;
+              if (le) return resolve(null);
+              resolve(r);
+            });
+          } catch {
+            resolve(null);
+          }
+        });
+        const entry = buildFollowingListEntryFromFetchResponse(resp, Date.now());
+        if (entry && upsertFollowingListEntry(followingListMap, uid, entry)) {
+          listTouched = true;
+        }
+        if (toFetch.indexOf(uid) < toFetch.length - 1) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+
+      if (listTouched) {
+        await chrome.storage.local
+          .set({ [KEY_COMMENTER_FOLLOWING_LIST_CACHE]: followingListMap })
+          .catch(() => {});
+      }
+    }
+
+    const baseRows = liveSnapshot?.rows?.length
+      ? liveSnapshot.rows
+      : stats.map((s) => ({
+          userId: s.userId,
+          commentCount: s.commentCount,
+          nickname: ''
+        }));
+    const mergedRows = mergeFollowingListIntoRows(baseRows, followingListMap, broadcasterUid);
+    const snapshot = buildCommenterFollowLiveSnapshot(lid, mergedRows, Date.now());
+    if (snapshot) {
+      report.commenterFollowDataset = snapshot;
+      await chrome.storage.local
+        .set({ [commenterFollowLiveStorageKey(lid)]: snapshot })
+        .catch(() => {});
+    }
+
+    report.commenterFollowingListCache = followingListMap;
+    report.followingListCoverage = summarizeFollowingListCoverage(followingListMap, candidateUids);
+  } catch {
+    /* best-effort */
+  }
+}
+
 async function buildHtmlReportDocument(
   comments,
   snapshot,
@@ -11873,7 +14927,6 @@ async function buildHtmlReportDocument(
   const safeBroadcastTitle = escapeHtml(
     snapshot?.broadcastTitle || snapshot?.title || '-'
   );
-  const safeBroadcasterName = escapeHtml(snapshot?.broadcasterName || '-');
   const safeStartAtText = escapeHtml(snapshot?.startAtText || '-');
   // <img src> に流す URL は http/https のみ許可。data:image/svg+xml,<svg onload=...>
   // のような scheme で SVG を仕込まれると、保存 HTML を file:// で開いた瞬間に
@@ -11885,11 +14938,46 @@ async function buildHtmlReportDocument(
     ? snapshot.tags.filter((v) => String(v || '').trim())
     : [];
 
-  const [dataLink, dataKonta, dataTanu] = await Promise.all([
-    fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.link),
-    fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.konta),
-    fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.tanu)
+  const lidForSummary = String(liveId || '').trim().toLowerCase();
+  /** 来場 KPI 用。画像 fetch と並列で IDB 読み（ネットワーク不要・DL 体感を増やさない）。 */
+  const sessionSummaryPromise = /^lv\d{1,15}$/.test(lidForSummary)
+    ? (async () => {
+        try {
+          const db = await openBroadcastSessionSummaryDb();
+          return await listBroadcastSessionSummaryForLive(db, lidForSummary, 200);
+        } catch {
+          return [];
+        }
+      })()
+    : Promise.resolve([]);
+
+  const giftParticipationPromise = /^lv\d{1,15}$/.test(lidForSummary)
+    ? chrome.storage.local
+        .get([giftUsersStorageKey(lidForSummary), `nls_gift_events_${lidForSummary}`])
+        .catch(() => ({}))
+    : Promise.resolve({});
+
+  const reportPrepPromise = Promise.all([
+    /^lv\d{1,15}$/.test(lidForSummary)
+      ? readOfficialEventDomBundleFromStorage(lidForSummary)
+      : Promise.resolve(null),
+    resolveBroadcasterProfileModel(snapshot, liveId),
+    buildYukkuriImageDataUrlMap(),
+    Promise.all([
+      fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.link),
+      fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.konta),
+      fetchExtensionPngAsDataUrl(YUKKURI_REPORT_IMAGES.tanu)
+    ])
   ]);
+
+  const [
+    eventDomBundleForReport,
+    broadcasterProfileModel,
+    yukkuriReportImageMap,
+    [dataLink, dataKonta, dataTanu]
+  ] = await reportPrepPromise;
+  await yieldToBrowserPaint();
+
   const avatarLink = yukkuriReportAvatarHtml(dataLink, 'yukkuri-avatar--link', 'り');
   const avatarKonta = yukkuriReportAvatarHtml(dataKonta, 'yukkuri-avatar--konta', 'こ');
   const avatarTanu = yukkuriReportAvatarHtml(dataTanu, 'yukkuri-avatar--tanu', 'た');
@@ -11902,38 +14990,50 @@ async function buildHtmlReportDocument(
     buildHtmlReportConceptGuideCardHtml(yukkuriAvatars);
   const htmlReportSaveGuideCardHtml =
     buildHtmlReportSaveGuideCardHtml(yukkuriAvatars);
-
-  // ゆっくり解説風の「番組のおさらい」セクションを HTML レポートの先頭に挟む。
-  // niconico DOM から掬った正本値（`nls_event_dom_<lv>`）があれば最終5値・順位・
-  // 上位応援者を読み上げる。無い時はタイトルと締めの挨拶だけの最小構成。
-  /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */
-  let eventDomBundleForReport = null;
-  try {
-    const lid = String(liveId || '').trim().toLowerCase();
-    if (lid) {
-      const key = eventDomStorageKey(lid);
-      const bag = await chrome.storage.local.get(key);
-      const v = bag?.[key];
-      eventDomBundleForReport =
-        v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+  const broadcasterProfileRowsHtml = buildBroadcasterProfileReportRowsHtml(
+    broadcasterProfileModel
+  );
+  // 支援物資・外部リンク（配信ページの noopenerLinks。http/https のみ・最大20件）。
+  const externalLinksHtml = (() => {
+    const links = Array.isArray(snapshot?.noopenerLinks) ? snapshot.noopenerLinks : [];
+    const seen = new Set();
+    const chips = [];
+    for (const l of links) {
+      const href = String(l?.href || '').trim();
+      if (!isHttpOrHttpsUrl(href) || seen.has(href)) continue;
+      seen.add(href);
+      let label = String(l?.text || '').replace(/\s+/g, ' ').trim();
+      if (!label) {
+        try {
+          label = new URL(href).hostname.replace(/^www\./, '');
+        } catch {
+          label = href;
+        }
+      }
+      if (label.length > 60) label = `${label.slice(0, 57)}…`;
+      chips.push(
+        `<a class="tag-chip nl-user-profile-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
+      );
+      if (chips.length >= 20) break;
     }
-  } catch {
-    eventDomBundleForReport = null;
-  }
+    return chips.length
+      ? `<h2 style="margin-top:12px;">支援物資・外部リンク</h2><div class="tag-list">${chips.join('')}</div>`
+      : '';
+  })();
   // 漫画コマ風の「番組のおさらい」セクション。レスポンシブ（clamp + container query）。
   const mangaReportPanels = buildMangaBroadcastPanels({
     bundle: eventDomBundleForReport,
     broadcastTitle: String(snapshot?.broadcastTitle || snapshot?.title || ''),
     broadcasterName: String(snapshot?.broadcasterName || ''),
+    broadcasterUserId: String(
+      broadcasterProfileModel?.userId || snapshot?.broadcasterUserId || ''
+    ),
     recordedCommentCount: Array.isArray(comments) ? comments.length : 0,
     streamAgeMin:
       typeof snapshot?.streamAgeMin === 'number' && snapshot.streamAgeMin >= 0
         ? snapshot.streamAgeMin
         : undefined
   });
-  // HTML レポートはダウンロード後にローカルで開かれるため、相対 path の <img> は
-  // 解決できない。キャラ画像を data URL に焼き込んで埋める。
-  const yukkuriReportImageMap = await buildYukkuriImageDataUrlMap();
   const yukkuriReportHtml = renderMangaBroadcastPanelsHtml(mangaReportPanels, {
     heading: '今回の放送のおさらい・漫画版',
     imageDataUrlMap: yukkuriReportImageMap
@@ -11949,8 +15049,20 @@ async function buildHtmlReportDocument(
   ).trim();
   // 0.1.78: HTML レポート側でも broadcaster icon の取り違えを補正
   // 0.1.172: text 空（ギフト送信のみ等）のユーザーを「ユーザー別件数」から除外
+  const htmlHeavyExport = comments.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD;
   const aggregatedRoomsAll = sanitizeRoomAvatarsForBroadcaster(
-    aggregateCommentsByUser(comments, { requireText: true }),
+    aggregateCommentsByUser(
+      comments,
+      htmlHeavyExport
+        ? {
+            requireText: true,
+            trackCharTotals: true,
+            maxRooms: HTML_REPORT_AGGREGATE_ROOM_CAP,
+            sortByCount: true,
+            sampleMaxEntries: HTML_REPORT_AGGREGATE_SAMPLE_MAX
+          }
+        : { requireText: true }
+    ),
     {
       broadcasterUid: reportBroadcasterUserId,
       broadcasterIconUrl: String(snapshot?.broadcasterIconUrl || '').trim()
@@ -11963,16 +15075,23 @@ async function buildHtmlReportDocument(
     aggregatedRoomsAll,
     reportBroadcasterUserId
   );
+  await yieldToBrowserPaint();
   // 0.1.21 (V): ユーザー別の累計字数（合計コメ字数）を集計テーブルに併記する。
-  // 配信者本人の除外は aggregatedRooms と同じ条件で。
   /** @type {Map<string, number>} */
   const userKeyToTotalChars = new Map();
-  for (const c of comments) {
-    const uid = c?.userId ? String(c.userId).trim() : '';
-    if (reportBroadcasterUserId && uid === reportBroadcasterUserId) continue;
-    const userKey = uid || UNKNOWN_USER_KEY;
-    const len = String(c?.text == null ? '' : c.text).length;
-    userKeyToTotalChars.set(userKey, (userKeyToTotalChars.get(userKey) || 0) + len);
+  if (htmlHeavyExport) {
+    for (const room of aggregatedRooms) {
+      const tc = Number(/** @type {{ totalChars?: number }} */ (room).totalChars);
+      userKeyToTotalChars.set(room.userKey, Number.isFinite(tc) ? tc : 0);
+    }
+  } else {
+    for (const c of comments) {
+      const uid = c?.userId ? String(c.userId).trim() : '';
+      if (reportBroadcasterUserId && uid === reportBroadcasterUserId) continue;
+      const userKey = uid || UNKNOWN_USER_KEY;
+      const len = String(c?.text == null ? '' : c.text).length;
+      userKeyToTotalChars.set(userKey, (userKeyToTotalChars.get(userKey) || 0) + len);
+    }
   }
   const roomRows = aggregatedRooms.map((room) => {
     const label = displayUserLabel(room.userKey, room.nickname);
@@ -12045,6 +15164,70 @@ async function buildHtmlReportDocument(
       )
     : comments;
 
+  const sessionSummaryRows = await sessionSummaryPromise;
+  const participationSummaryReport = aggregateMarketingReport(commentsForReport, liveId, {
+    broadcasterUserId: reportBroadcasterUserId
+  });
+  const audienceGapForReport = analyzeAudienceEngagementGap(
+    {
+      liveId,
+      comments: commentsForReport,
+      samples: sessionSummaryRows,
+      snapshot,
+      visitorCount:
+        eventDomBundleForReport?.programStats?.watchCount ??
+        snapshot?.viewerCountFromDom ??
+        null,
+      officialCommentCount: eventDomBundleForReport?.programStats?.commentCount ?? null
+    },
+    { broadcasterUserId: reportBroadcasterUserId, liveId }
+  );
+  let giftUsersForParticipation = [];
+  let giftEventsForParticipation = [];
+  try {
+    const gKey = giftUsersStorageKey(lidForSummary);
+    const evKey = `nls_gift_events_${lidForSummary}`;
+    const partBag = await giftParticipationPromise;
+    giftUsersForParticipation = Array.isArray(partBag[gKey]) ? partBag[gKey] : [];
+    giftEventsForParticipation = Array.isArray(partBag[evKey]) ? partBag[evKey] : [];
+  } catch {
+    giftUsersForParticipation = [];
+    giftEventsForParticipation = [];
+  }
+  const supportParticipationBase = resolveMarketingSupportParticipationCounts({
+    giftUsers: giftUsersForParticipation,
+    giftEvents: giftEventsForParticipation,
+    adContributionRanking: Array.isArray(eventDomBundleForReport?.adContributionRanking)
+      ? eventDomBundleForReport.adContributionRanking
+      : [],
+    comments: commentsForReport
+  });
+  const supportParticipation = {
+    ...supportParticipationBase,
+    ...supportParticipationPctAgainstVisitors(
+      audienceGapForReport,
+      supportParticipationBase
+    )
+  };
+  const participationLeadHtml = buildAudienceParticipationLeadSectionHtml(
+    audienceGapForReport,
+    participationSummaryReport,
+    {
+      sectionId: 'sec-participation-lead',
+      extraSectionClass: 'card search-item',
+      showDetailLink: false,
+      searchData:
+        '来場 コメント 参加率 来場者 コメントした人 ギフト アイテム 広告',
+      supportParticipation
+    }
+  );
+
+  // v0.1.537: マーケ分析と同型のコメンターフォロー一覧・散布図・CSV を HTML レポートにも載せる。
+  const commenterFollowMarketingReport = participationSummaryReport;
+  const attachFollowPromise = attachCommenterFollowToReport(commenterFollowMarketingReport, liveId, {
+    cacheOnly: true
+  });
+
   // v0.1.469: きらめきの賞 — 単一ランキングを多軸の賞に変える。誰も負けない設計。
   // v0.1.477: returningUserKeys / firstTimeUserKeys を IDB + storage から実際に取得。
   //   過去配信のコメント userId と aggregatedRooms.userKey を照合して判定する。
@@ -12053,7 +15236,11 @@ async function buildHtmlReportDocument(
   let kiramekiFirstTimeUserKeys = [];
   try {
     const lid = String(liveId || '').trim().toLowerCase();
-    if (lid && /^lv\d{1,15}$/.test(lid)) {
+    if (
+      lid &&
+      /^lv\d{1,15}$/.test(lid) &&
+      commentsForReport.length <= HTML_REPORT_HEAVY_COMMENT_THRESHOLD
+    ) {
       // この過去スキャンは「きらめきの賞」かよい/はじまり判定 *専用* の任意処理。
       //   過去配信を全件読むため重く、ヘビーユーザーだと 60s の全体タイムアウト
       //   （html_report_build_timeout）を単独で食い潰していた（marketing は 10 配信
@@ -12118,6 +15305,14 @@ async function buildHtmlReportDocument(
     }
   );
 
+  await attachFollowPromise;
+  const commenterFollowBlock = buildHtmlReportCommenterFollowBlock({
+    report: commenterFollowMarketingReport,
+    identiconResolver: getCachedAnonymousIdenticonDataUrl,
+    broadcasterUserId: reportBroadcasterUserId,
+    exportedAt: exportedAtIso
+  });
+
   /*
    * 0.1.12 (F2 追加): 全コメント一覧の各行にも「最低サムネ」を表示する。
    *   ・ユーザー列に小さい 20px サムネをインライン配置（行高さを増やさず識別性 UP）
@@ -12134,41 +15329,6 @@ async function buildHtmlReportDocument(
     });
     userKeyToResolvedThumb.set(room.userKey, src);
   }
-  const commentRows = commentsForReport.map((c, idx) => {
-    const commentNo = String(c.commentNo || '').trim();
-    const text = String(c.text || '').trim();
-    const userId = c.userId ? String(c.userId) : '';
-    const userKey = userId || UNKNOWN_USER_KEY;
-    // 0.1.13 (I): nickname も渡す。集計テーブル側はずっと渡していたが、全コメント
-    // 一覧の各行は引数を落としていて、ハンドル名（「かんぺい」等）が出ていなかった。
-    // anonymousNicknameFallback 側で「ゲスト」「user XXXX」placeholder は filter する。
-    const userLabel = displayUserLabel(userKey, c.nickname || '');
-    const userLabelHtml = buildUserProfileLinkedLabelHtml(userId, userLabel);
-    const search = escapeAttr(
-      `${commentNo} ${text} ${userId} ${userLabel} ${c.liveId || ''}`.toLowerCase()
-    );
-    // 集計済みマップに無いユーザー（理論上ありえないが念のため）はその場で解決
-    let avatarSrc = userKeyToResolvedThumb.get(userKey);
-    if (avatarSrc === undefined) {
-      avatarSrc = resolveReportUserThumbSrc({
-        userId: userKey,
-        avatarUrl: c.avatarUrl || '',
-        identiconResolver: getCachedAnonymousIdenticonDataUrl
-      });
-    }
-    const avatarInlineHtml = avatarSrc
-      ? `<img class="report-comment-av" src="${escapeAttr(avatarSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
-      : '<span class="report-comment-av report-comment-av--empty"></span>';
-    return `
-      <tr class="search-item" data-search="${search}">
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(commentNo || '-')}</td>
-        <td><span class="report-user-cell">${avatarInlineHtml}<span class="report-user-cell__label">${userLabelHtml}</span></span></td>
-        <td>${escapeHtml(text || '-')}</td>
-        <td>${escapeHtml(formatDateTime(c.capturedAt || 0))}</td>
-      </tr>
-    `;
-  });
 
   // C-7 pure refactor: head 情報テーブルの行ビルダは reportHeadInfoRowsHtml.js に
   //   抽出（linkRows/metaRows/scriptRows/noopenerRows・挙動不変・characterization 済）。
@@ -12210,8 +15370,18 @@ async function buildHtmlReportDocument(
 
   // 0.1.21 (V): CSV ダウンロード用の生 CSV を埋め込む。<pre hidden> の textContent
   // から JS が読み取り Blob 化してダウンロードする（再エスケープ不要）。
-  const reportCommentsCsv = buildReportCommentsCsv(commentsForReport);
+  const reportCommentsCsv =
+    commentsForReport.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD
+      ? ''
+      : buildReportCommentsCsv(commentsForReport);
   const reportCsvFilename = `tsuioku-comments-${liveId || 'unknown'}.csv`;
+  const commentsTableSectionHtml = buildReportCommentsTableSectionHtml({
+    comments: commentsForReport,
+    userKeyToResolvedThumb,
+    identiconResolver: getCachedAnonymousIdenticonDataUrl,
+    formatDateTime,
+    reportCommentsCsv
+  });
 
   const headLinkRows = snapshot ? buildReportLinkRows(snapshot.links) : [];
   const { friendly: friendlyMetas, technical: technicalMetas } =
@@ -12238,9 +15408,11 @@ async function buildHtmlReportDocument(
     const gk = giftUsersStorageKey(lidKey);
     const giftBag = await chrome.storage.local.get(gk);
     const giftUsers = Array.isArray(giftBag[gk]) ? giftBag[gk] : [];
-    const mr = aggregateMarketingReport(comments, lidKey, {
-      broadcasterUserId: reportBroadcasterUserId || undefined
-    });
+    const mr = htmlHeavyExport
+      ? participationSummaryReport
+      : aggregateMarketingReport(comments, lidKey, {
+          broadcasterUserId: reportBroadcasterUserId || undefined
+        });
     const memo = buildReportMemoPayload({
       report: mr,
       comments,
@@ -12327,7 +15499,13 @@ async function buildHtmlReportDocument(
       const headParts = [];
       if (evName) headParts.push(`<p class="event-rank__name">🏆 ${escapeHtml(evName)}</p>`);
       if (self && (self.rank != null || self.score != null)) {
-        const who = self.broadcasterName ? `${escapeHtml(String(self.broadcasterName))}さん` : 'この配信者さん';
+        const selfUid = String(broadcasterProfileModel?.userId || '').trim();
+        const selfNameHtml = self.broadcasterName
+          ? /^\d{1,18}$/.test(selfUid)
+            ? buildUserProfileLinkedLabelHtml(selfUid, String(self.broadcasterName))
+            : escapeHtml(String(self.broadcasterName))
+          : '';
+        const who = self.broadcasterName ? `${selfNameHtml}さん` : 'この配信者さん';
         const rk = self.rank != null ? `現在 <strong>${escapeHtml(String(self.rank))}</strong> 位` : '';
         const sc = self.score != null ? ` 💎 <strong>${escapeHtml(fmtN(self.score))}</strong>` : '';
         headParts.push(`<p class="event-rank__self">${who} ${rk}${sc}</p>`);
@@ -12339,13 +15517,20 @@ async function buildHtmlReportDocument(
       const rowsHtml = rows
         .map((r) => {
           const rank = escapeHtml(String(r.rank));
-          const name = escapeHtml(String(r.name || '名無し'));
+          const rowUid = String(r.userId || '').trim();
+          const rawName = String(r.name || '名無し');
+          const name = /^\d{1,18}$/.test(rowUid)
+            ? buildUserProfileLinkedLabelHtml(rowUid, rawName)
+            : escapeHtml(rawName);
           const score = escapeHtml(fmtN(Number(r.score) || 0));
           // model 側で http/https のみに正規化済み。出力時も二重で scheme 検証（S-2）。
           const thumb = /^https?:\/\//i.test(String(r.thumbnailUrl || '')) ? String(r.thumbnailUrl) : '';
-          const img = thumb
+          const imgInner = thumb
             ? `<img class="event-rank__thumb" src="${escapeAttr(thumb)}" alt="" width="28" height="28" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" />`
             : `<span class="event-rank__thumb event-rank__thumb--none" aria-hidden="true"></span>`;
+          const img = /^\d{1,18}$/.test(rowUid)
+            ? `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(rowUid)}" target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${imgInner}</a>`
+            : imgInner;
           return (
             `<tr>` +
             `<td class="event-rank__rank">${rank}</td>` +
@@ -12434,6 +15619,8 @@ async function buildHtmlReportDocument(
         border: 1px solid var(--panel-border);
         border-radius: 12px;
         padding: 12px;
+        content-visibility: auto;
+        contain-intrinsic-size: auto 320px;
       }
       section.card h2 {
         margin: 0 0 10px;
@@ -12513,7 +15700,40 @@ async function buildHtmlReportDocument(
         color: var(--muted);
         font-size: 11px;
       }
-      html { scroll-behavior: smooth; }
+      .nl-report-comments-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .nl-comment-row {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 36px;
+      }
+      .nl-report-comments-more-wrap {
+        margin: 10px 0 0;
+        text-align: center;
+      }
+      .nl-report-comments-more-btn {
+        cursor: pointer;
+        border: 1px solid #475569;
+        background: #0f172a;
+        color: #cbd5e1;
+        border-radius: 999px;
+        padding: 0.45rem 1rem;
+        font-size: 0.82rem;
+      }
+      .nl-report-comments-more-btn:hover:not(:disabled) {
+        border-color: #93c5fd;
+        color: #f8fafc;
+      }
+      .nl-report-comments-more-btn:disabled {
+        cursor: default;
+        opacity: 0.85;
+      }
+      .report-thumb-grid__cell {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 88px;
+      }
+      html { scroll-behavior: auto; }
       .toc {
         background: var(--panel);
         border: 1px solid var(--panel-border);
@@ -12973,6 +16193,8 @@ async function buildHtmlReportDocument(
       .event-rank__user { font-weight: 600; color: #e2e8f0; }
       .event-rank__score { white-space: nowrap; font-weight: 700; color: #cbd5e1; }
       .event-rank__stale { margin: 6px 0 0; font-size: 0.8rem; color: #93a4be; }
+      ${commenterFollowBlock.css}
+      ${audienceParticipationLeadEmbeddedCss()}
       ${yukkuriReportCss}
     </style>
   </head>
@@ -12983,6 +16205,8 @@ async function buildHtmlReportDocument(
         <p>出力日時: ${escapeHtml(exportedAtJst)} / ISO: ${escapeHtml(exportedAtIso)}</p>
         <p class="mono">watch URL: ${safeWatchUrl}</p>
       </header>
+
+      ${participationLeadHtml}
 
       ${yukkuriReportHtml}
 
@@ -12996,12 +16220,15 @@ async function buildHtmlReportDocument(
       <nav class="toc" aria-label="目次">
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
+          <li><a href="#sec-participation-lead">来場とコメント参加</a></li>
           <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
           ${eventRankingSectionHtml ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
           <li><a href="#sec-user-summary">ユーザー別（しおり集計）</a></li>
           <li><a href="#sec-id-breakdown">内訳統計（ID 種別比率）</a></li>
           ${thumbedUsersSectionHtml ? '<li><a href="#sec-thumb-grid">サムネ付きユーザー一覧</a></li>' : ''}
+          ${commenterFollowBlock.hasDirectory ? '<li><a href="#sec-commenter-follow">数値IDコメンター（フォロー情報）</a></li>' : ''}
+          ${commenterFollowBlock.hasAnalytics ? '<li><a href="#sec-commenter-follow-analytics">フォロー×コメント分析</a></li>' : ''}
           <li><a href="#sec-self-comments">自分のコメント抜粋</a></li>
           <li><a href="#sec-all-comments">保存コメント一覧（CSV ダウンロードあり）</a></li>
           <li><a href="#sec-share-meta">シェア・プレビュー向けの情報</a></li>
@@ -13018,7 +16245,8 @@ async function buildHtmlReportDocument(
             <tbody>
               <tr class="search-item" data-search="${escapeAttr(liveId.toLowerCase())}"><th>liveId</th><td class="mono">${safeLiveId}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcastTitle || '').toLowerCase())}"><th>放送タイトル</th><td>${safeBroadcastTitle}</td></tr>
-              <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcasterName || '').toLowerCase())}"><th>配信者名</th><td>${safeBroadcasterName}</td></tr>
+              <tr class="search-item" data-search="${escapeAttr(String(snapshot?.broadcasterName || '').toLowerCase())}"><th>配信者名</th><td>${broadcasterNameCellHtml(broadcasterProfileModel, snapshot?.broadcasterName || '')}</td></tr>
+              ${broadcasterProfileRowsHtml}
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.startAtText || '').toLowerCase())}"><th>開始時刻（公式表記）</th><td>${safeStartAtText}</td></tr>
               <tr><th>最初の記録コメント</th><td>${escapeHtml(formatTimingDate(reportTiming.firstCapturedAt))}</td></tr>
               <tr><th>最後の記録コメント</th><td>${escapeHtml(formatTimingDate(reportTiming.lastCapturedAt))}</td></tr>
@@ -13028,7 +16256,7 @@ async function buildHtmlReportDocument(
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.url || watchUrl || '').toLowerCase())}"><th>URL</th><td class="mono">${safeWatchUrl}</td></tr>
               <tr class="search-item" data-search="${escapeAttr(String(snapshot?.title || '').toLowerCase())}"><th>Titleタグ</th><td>${safeTitle}</td></tr>
               <tr><th>保存コメント数</th><td>${comments.length}</td></tr>
-              <tr><th>ユーザー別件数</th><td>${aggregateCommentsByUser(comments, { requireText: true }).length}</td></tr>
+              <tr><th>ユーザー別件数</th><td>${aggregatedRooms.length}${htmlHeavyExport ? '（表示は上位ルームのみ）' : ''}</td></tr>
               <tr><th>本文の平均字数</th><td>${reportBody.averageChars}</td></tr>
               <tr><th>本文の中央値字数</th><td>${reportBody.medianChars}</td></tr>
               <tr><th>本文の最大字数</th><td>${reportBody.maxChars}</td></tr>
@@ -13053,6 +16281,7 @@ async function buildHtmlReportDocument(
                   .join('')}</div>`
               : '<div class="mono">取得なし</div>'
           }
+          ${externalLinksHtml}
           ${
             safeSnapshotError
               ? `<div class="warn">${safeSnapshotError}</div>`
@@ -13083,6 +16312,8 @@ async function buildHtmlReportDocument(
         </section>
         ${kiramekiAwardsSectionHtml}
         ${thumbedUsersSectionHtml}
+        ${commenterFollowBlock.directoryHtml}
+        ${commenterFollowBlock.analyticsHtml}
       </div>
       ${htmlReportConceptGuideCardHtml}
       ${htmlReportSaveGuideCardHtml}
@@ -13138,18 +16369,7 @@ async function buildHtmlReportDocument(
         </table>
       </section>
 
-      <section class="card" id="sec-all-comments" style="margin-top:12px;">
-        <h2>保存コメント一覧</h2>
-        <p class="guide-lead">
-          <button type="button" id="nlReportCsvDownloadBtn" class="nl-report-csv-btn">CSV をダウンロード</button>
-          <span class="nl-report-csv-hint">Excel / Google Sheets で開けるのだ（UTF-8 BOM 付き）。</span>
-        </p>
-        <pre id="nlReportCsvData" hidden>${escapeHtml(reportCommentsCsv)}</pre>
-        <table>
-          <thead><tr><th>#</th><th>commentNo</th><th>user</th><th>text</th><th>capturedAt</th></tr></thead>
-          <tbody>${commentRows.join('') || '<tr><td colspan="5">コメントなし</td></tr>'}</tbody>
-        </table>
-      </section>
+      ${commentsTableSectionHtml}
 
       <p class="footer-note">
         このHTMLは「君斗りんくの追憶のきらめき」（開発識別子 nicolivelog）がローカル生成した振り返り用レポートです。ブラウザ内で検索して再利用できます。
@@ -13201,6 +16421,7 @@ async function buildHtmlReportDocument(
         }
       })();
     </script>
+    ${commenterFollowBlock.embedScriptHtml}
   </body>
 </html>`;
 }
@@ -13247,7 +16468,13 @@ async function resolveSnapshotForHtmlExport(watchUrl) {
   // だけでレポートを生成できる設計なので、ここで必ず {snapshot,error} に
   // 正規化して degrade させる（防御的・既存成功時は挙動不変）。
   try {
-    return await requestWatchPageSnapshotFromOpenTab(watchUrl);
+    // v0.1.588: HTML DL ではスナップショット待ちを打ち切り、記録コメント中心で先に
+    //   レポート生成へ進む（retry 込みで十数秒固まるのを防ぐ）。
+    return await withTimeout(
+      requestWatchPageSnapshotFromOpenTab(watchUrl, { maxAttempts: 2, baseDelayMs: 300 }),
+      4500,
+      'html_export_snapshot_timeout'
+    );
   } catch (e) {
     const reason = String(e?.message || e || '').trim();
     return {
@@ -13263,16 +16490,23 @@ async function resolveSnapshotForHtmlExport(watchUrl) {
  * @param {string} liveId
  * @param {string} storageKey
  * @param {string} watchUrl
+ * @param {{ onStage?: (label: string) => void, onDone?: (summary: string) => void }} [opts]
  */
-async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
+async function downloadCommentsHtml(liveId, storageKey, watchUrl, opts = {}) {
+  const onStage = typeof opts.onStage === 'function' ? opts.onStage : () => {};
+  const onDone = typeof opts.onDone === 'function' ? opts.onDone : () => {};
+  const prof = createExportStageProfiler();
   const lidForEvent = String(liveId || '').trim().toLowerCase();
   const eventKey = /^lv\d{1,15}$/.test(lidForEvent) ? eventScoreRankingStorageKey(lidForEvent) : null;
+  onStage('コメント・配信情報を読み込み中…');
+  void buildYukkuriImageDataUrlMap();
   // v0.1.509: 本体は全チャンク＋未畳み込みテールを連結（チャンク移行後対応・テール取りこぼし修正）。
   const [comments, { snapshot, error }, eventBag] = await Promise.all([
-    readAllCommentsForLive(liveId),
+    resolveCommentsForHtmlExport(liveId),
     resolveSnapshotForHtmlExport(watchUrl),
     eventKey ? chrome.storage.local.get(eventKey).catch(() => ({})) : Promise.resolve({})
   ]);
+  prof.mark('read');
   // イベント順位（あれば）。取れない/イベント不参加は null＝レポートでセクションごと省略。
   let eventRankingModel = null;
   try {
@@ -13282,7 +16516,12 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
   } catch {
     eventRankingModel = null;
   }
+  prof.mark('snapshot');
 
+  onStage('レポートを組み立て中…（コメントが多いと数十秒かかります）');
+  const buildTimeoutMs = resolveHtmlReportBuildTimeoutMs(
+    /** @type {PopupCommentEntry[]} */ (comments).length
+  );
   const html = await withTimeout(
     buildHtmlReportDocument(
       /** @type {PopupCommentEntry[]} */ (comments),
@@ -13292,23 +16531,57 @@ async function downloadCommentsHtml(liveId, storageKey, watchUrl) {
       watchUrl,
       eventRankingModel
     ),
-    60_000,
+    buildTimeoutMs,
     'html_report_build_timeout'
   );
+  prof.mark('build_html');
 
-  const blob = new Blob([html], {
-    type: 'text/html;charset=utf-8'
+  const filename = buildHtmlReportDownloadFilename(liveId, {
+    comments: /** @type {PopupCommentEntry[]} */ (comments),
+    snapshot
   });
+  onStage(`ダウンロード開始: ${filename}`);
+  await downloadBlobViaChromeDownloads(
+    new Blob([html], { type: 'text/html;charset=utf-8' }),
+    filename
+  );
+  prof.mark('download');
+  const { summary, rows } = prof.finish('HTML');
+  logExportStageProfileIfEnabled('HTML', rows);
+  onDone(summary);
+}
+
+/**
+ * HTML/マーケレポート用 Blob DL。
+ * chrome.downloads + blob: は「保存前に確認」時にダイアログ既定名が UUID になるため、
+ * `<a download>` を正本にする（0.1.591）。失敗時のみ chrome.downloads にフォールバック。
+ * @param {Blob} blob
+ * @param {string} filename
+ */
+async function downloadBlobViaChromeDownloads(blob, filename) {
+  const anchorRes = triggerAnchorBlobDownload(blob, filename, document);
+  if (anchorRes.ok && anchorRes.blobUrl) {
+    exportBlobRevokeQueue.enqueue(anchorRes.blobUrl);
+    return;
+  }
   const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  a.download = `nicolivelog-${liveId}-${Date.now()}.html`;
-  a.click();
-  // a.click() の直後に同期 revoke すると、巨大 HTML（数万コメント）でブラウザが
-  // ダウンロードを開始する前に URL が無効化されて silent failure になる。
-  // 0.1.31 (AF): 60 秒固定 setTimeout から queue 管理（15 秒 / 同時 3 個）に変更し、
-  // 連続 DL でメモリが滞留する問題を抑止。詳細 src/lib/objectUrlRevokeQueue.js。
-  objectUrlRevokeQueue.enqueue(blobUrl);
+  try {
+    await chrome.downloads.download({
+      url: blobUrl,
+      filename: anchorRes.safeName || filename,
+      saveAs: false,
+      conflictAction: 'uniquify'
+    });
+  } catch {
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = anchorRes.safeName || filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  exportBlobRevokeQueue.enqueue(blobUrl);
 }
 
 /**
@@ -13519,11 +16792,166 @@ function stopInitShadeCharCycle() {
   initShadeSpeaking = null;
 }
 
+/** HTML/マーケ DL 待ちの 3 キャラ吹き出し（init shade とタイマは別管理） */
+let exportWaitCharCycleTimer = null;
+let exportWaitLipTimer = null;
+/** @type {ReturnType<typeof setTimeout>[]} */
+let exportWaitBlinkTimers = [];
+let exportWaitSpeaking = /** @type {string|null} */ (null);
+/** @type {Record<string, HTMLElement>} */
+let exportWaitCharEls = {};
+/** @type {readonly { who: string, name: string, text: string }[]} */
+let exportWaitActiveLines = [];
+
+function exportWaitSetFrame(who, frame) {
+  const el = exportWaitCharEls[who];
+  if (!el) return;
+  const src = initShadeFrameSrc(who, frame);
+  if (src && el.getAttribute('src') !== src) el.setAttribute('src', src);
+}
+
+function exportWaitStopLipSync() {
+  if (exportWaitLipTimer != null) {
+    clearInterval(exportWaitLipTimer);
+    exportWaitLipTimer = null;
+  }
+}
+
+function exportWaitStartLipSync(who) {
+  exportWaitStopLipSync();
+  if (initShadePrefersReducedMotion()) return;
+  exportWaitLipTimer = setInterval(() => {
+    const open = Math.random() < 0.45;
+    exportWaitSetFrame(who, open ? 'talk' : 'idle');
+  }, 160);
+}
+
+function exportWaitClearBlinks() {
+  for (const t of exportWaitBlinkTimers) clearTimeout(t);
+  exportWaitBlinkTimers = [];
+}
+
+function exportWaitScheduleBlink(who) {
+  const delay = 2000 + Math.random() * 2800;
+  const t = setTimeout(() => {
+    if (who !== exportWaitSpeaking) {
+      exportWaitSetFrame(who, 'half');
+      const t2 = setTimeout(() => {
+        if (who !== exportWaitSpeaking) exportWaitSetFrame(who, 'blink');
+      }, 70);
+      const t3 = setTimeout(() => {
+        if (who !== exportWaitSpeaking) exportWaitSetFrame(who, 'half');
+      }, 150);
+      const t4 = setTimeout(() => {
+        if (who !== exportWaitSpeaking) exportWaitSetFrame(who, 'idle');
+      }, 220);
+      exportWaitBlinkTimers.push(t2, t3, t4);
+    }
+    exportWaitScheduleBlink(who);
+  }, delay);
+  exportWaitBlinkTimers.push(t);
+}
+
+function exportWaitApplyLine(line) {
+  if (!line) return;
+  exportWaitSpeaking = line.who;
+  for (const who of ['link', 'konta', 'tanunee']) {
+    const row = document.querySelector(`.nl-export-wait__row[data-who="${who}"]`);
+    const textEl = document.querySelector(`[data-export-wait-text="${who}"]`);
+    if (row instanceof HTMLElement) {
+      row.classList.toggle('is-speaking', who === line.who);
+    }
+    if (textEl instanceof HTMLElement) {
+      textEl.textContent = who === line.who ? line.text : textEl.textContent || '…';
+    }
+    if (who !== line.who) exportWaitSetFrame(who, 'idle');
+  }
+  if (initShadePrefersReducedMotion()) {
+    exportWaitSetFrame(line.who, 'talk');
+  } else {
+    exportWaitStartLipSync(line.who);
+  }
+}
+
+function stopExportWaitCharCycle() {
+  if (exportWaitCharCycleTimer != null) {
+    clearInterval(exportWaitCharCycleTimer);
+    exportWaitCharCycleTimer = null;
+  }
+  exportWaitStopLipSync();
+  exportWaitClearBlinks();
+  exportWaitSpeaking = null;
+}
+
+function startExportWaitCharCycle(lines) {
+  stopExportWaitCharCycle();
+  exportWaitActiveLines = Array.isArray(lines) ? lines : [];
+  exportWaitCharEls = {};
+  for (const el of Array.from(document.querySelectorAll('.nl-export-wait__char'))) {
+    const who = el.getAttribute('data-who');
+    if (who && el instanceof HTMLElement) exportWaitCharEls[who] = el;
+  }
+  if (!exportWaitActiveLines.length || Object.keys(exportWaitCharEls).length === 0) return;
+  let idx = 0;
+  exportWaitApplyLine(exportWaitActiveLines[0]);
+  if (!initShadePrefersReducedMotion()) {
+    for (const who of Object.keys(exportWaitCharEls)) exportWaitScheduleBlink(who);
+  }
+  exportWaitCharCycleTimer = setInterval(() => {
+    const panel = document.getElementById('nlExportWaitPanel');
+    if (!panel || panel.hidden) {
+      stopExportWaitCharCycle();
+      return;
+    }
+    idx = (idx + 1) % exportWaitActiveLines.length;
+    exportWaitApplyLine(exportWaitActiveLines[idx]);
+  }, 2600);
+}
+
+/**
+ * @param {'html'|'marketing'} kind
+ * @param {string} [techHint]
+ */
+function showExportWaitPanel(kind, techHint = '') {
+  const panel = document.getElementById('nlExportWaitPanel');
+  const titleEl = document.getElementById('nlExportWaitTitle');
+  const techEl = document.getElementById('nlExportWaitTech');
+  if (!(panel instanceof HTMLElement)) return;
+  if (titleEl) {
+    titleEl.textContent =
+      kind === 'marketing' ? 'マーケ分析を組み立て中…' : 'レポートを組み立て中…';
+  }
+  if (techEl) techEl.textContent = String(techHint || '').trim();
+  panel.hidden = false;
+  panel.classList.add('is-visible');
+  panel.removeAttribute('aria-hidden');
+  startExportWaitCharCycle(exportWaitLinesForKind(kind));
+}
+
+function hideExportWaitPanel() {
+  stopExportWaitCharCycle();
+  const panel = document.getElementById('nlExportWaitPanel');
+  if (!(panel instanceof HTMLElement)) return;
+  panel.classList.remove('is-visible');
+  panel.hidden = true;
+  panel.setAttribute('aria-hidden', 'true');
+  panel.removeAttribute('aria-busy');
+}
+
+/**
+ * @param {string} text
+ */
+function setExportWaitTechStatus(text) {
+  const techEl = document.getElementById('nlExportWaitTech');
+  if (techEl) techEl.textContent = String(text || '').trim();
+}
+
 function dismissInitialLoadShade() {
   stopInitShadeCharCycle();
   const shade = document.getElementById('nlInitialLoadShade');
   if (!(shade instanceof HTMLElement)) return;
   if (shade.classList.contains('nl-init-shade--done')) return;
+  markWatchPopupLoadPhase('shade_clear');
   // 完了の一拍：フェード前に全員を笑顔にして「できた！」感を残す（Peak-End）。
   try {
     for (const el of Array.from(shade.querySelectorAll('.nl-init-shade__char'))) {
@@ -13574,6 +17002,13 @@ const INLINE_SHADE_DATA_FALLBACK_MS = 10_000;
 
 function inlineWatchPanelHasRealDataForShade() {
   try {
+    const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    if (lid && _panelMetricsAppliedForLv === lid) return true;
+    const liveStatEl = document.getElementById('liveStatComments');
+    if (liveStatEl) {
+      const txt = String(liveStatEl.textContent || '').replace(/[,，]/g, '').trim();
+      if (/^\d+$/.test(txt)) return true;
+    }
     const snap = watchMetaCache && watchMetaCache.snapshot;
     if (!snap) return false;
     // 公式コメント数が数値で入っている＝カードが「—」でなくなる主要シグナル。
@@ -13582,6 +17017,7 @@ function inlineWatchPanelHasRealDataForShade() {
     // 公式数がまだでも、来場/視聴者数が取れていれば実データありとみなす（保険）。
     if (Number.isFinite(Number(snap.viewers))) return true;
     if (Number.isFinite(Number(snap.watchCount))) return true;
+    if (Number.isFinite(Number(snap.viewerCountFromDom))) return true;
     return false;
   } catch {
     return false;
@@ -13625,6 +17061,10 @@ function isHighFrequencyCommentRelatedStorageKey(key) {
   // v0.1.508: 軽量サマリ／テールの更新でも coalesced 再描画を回す（巨大放送では本体配列が
   //   低頻度でしか畳み込まれず、これらが新着の主な更新シグナルになるため）。
   if (/^nls_csummary_/i.test(k)) return true;
+  // v0.1.594: 来場・同接を含むパネル速報（多タブ snapshot 待ちでもカード更新）。
+  if (/^nls_panel_summary_/i.test(k)) return true;
+  // v0.1.595: チャンク index 更新でも件数カードを追従。
+  if (/^nls_cchunk_index_/i.test(k)) return true;
   // v0.1.514: IDB モードの新着シグナルは SW が書く nls_cdb_summary_<lv>。
   if (/^nls_cdb_summary_/i.test(k)) return true;
   if (/^nls_ctail_/i.test(k)) return true;
@@ -14161,6 +17601,7 @@ async function initPopup() {
   } catch {
     /* no-op */
   }
+  void loadLastCommentPostFramesFromSession();
   // feat/multitab-scale-globalcap: 絶対フェイルセーフ。初回 refresh が（多タブで描画スレッドが
   //   枯渇する等で）いつまでも解決しなくても、ローディング幕を必ず一定時間で外す。既存の
   //   dismissInlineShadeWhenDataReady は refresh の finally に依存するため、refresh 自体が
@@ -14177,6 +17618,7 @@ async function initPopup() {
     /* no-op */
   }
   applyResponsivePopupLayout();
+  bindNlMainScrollPerfHook();
   bridgeToolbarPopupToInlinePanel();
   attachCharaTrioSlotClickHandlers();
   attachWatchConcurrentCardCharaNorthStarJump();
@@ -14587,21 +18029,32 @@ async function initPopup() {
     const prm = lastDevMonitorPanelParams;
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     const btn = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
-    const lid = String(prm?.liveId || '').trim();
+    // v0.1.527: ボタンを lv 判明時点で早期有効化したため、devMonitor パネルの params が
+    //   まだ未確定（lastDevMonitorPanelParams=null）でクリックされ得る。その場合は保存ボタンが
+    //   持つ liveId を使う（マーケ集計は liveId から storage を読み直すため prm は liveId だけ必要）。
+    const lid = String(
+      /** @type {any} */ (prm)?.liveId || $('exportJson')?.dataset.liveId || ''
+    ).trim();
     if (!lid) {
       if (stEl) stEl.textContent = 'liveId なし';
       return;
     }
     if (btn) btn.disabled = true;
+    const mktProf = createExportStageProfiler();
+    showExportWaitPanel('marketing');
+    setExportWaitTechStatus('分析中… (1/3) データ取得');
     if (stEl) stEl.textContent = '分析中… (1/3) データ取得';
     try {
       await yieldToBrowserPaint();
       const gKey = giftUsersStorageKey(lid);
+      const giftEventsKey = `nls_gift_events_${lid}`;
+      const giftThrowsKey = giftHistoryThrowsStorageKey(lid);
+      const giftSubKey = giftSubAppHistoryStorageKey(lid);
       // v0.1.509: 本体は全チャンク＋未畳み込みテールを連結（チャンク移行後対応・テール取りこぼし修正）。
       const [commentsRaw, data] = await withTimeout(
         Promise.all([
-          readAllCommentsForLive(lid),
-          chrome.storage.local.get([gKey])
+          resolveCommentsForHtmlExport(lid),
+          chrome.storage.local.get([gKey, giftEventsKey, giftThrowsKey, giftSubKey])
         ]),
         30_000,
         'marketing_storage_timeout'
@@ -14610,33 +18063,49 @@ async function initPopup() {
         Array.isArray(commentsRaw) ? commentsRaw : []
       );
       const giftUsersForMarketing = Array.isArray(data[gKey]) ? data[gKey] : [];
+      const giftEventsForMarketing = Array.isArray(data[giftEventsKey]) ? data[giftEventsKey] : [];
+      const giftHistoryThrowsForMarketing = Array.isArray(data[giftThrowsKey])
+        ? data[giftThrowsKey]
+        : [];
+      const giftSubAppHistoryRaw =
+        data[giftSubKey] && typeof data[giftSubKey] === 'object' ? data[giftSubKey] : null;
       if (comments.length === 0) {
         if (stEl) stEl.textContent = 'コメントが0件です';
+        setExportWaitTechStatus('コメントが0件です');
         if (btn) btn.disabled = false;
+        hideExportWaitPanel();
         return;
       }
+      mktProf.mark('read');
+      const heavyMkt = comments.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD;
       // 0.1.46 (AB): 配信者本人のコメ（合いの手等）を KPI 集計から除外
       const reportBroadcasterUid = String(
         watchMetaCache.snapshot?.broadcasterUserId || ''
       ).trim();
       if (stEl) stEl.textContent = '分析中… (2/3) 集計・画像準備';
+      setExportWaitTechStatus('分析中… (2/3) 集計・画像準備');
       // 集計は件数が多いと数百ms 同期で詰まり、上の status すら描画されず「固まった」
       //   ように見える。重い同期処理の前に 1 フレーム譲ってステータスを確実に出す。
       await yieldToBrowserPaint();
       const report = aggregateMarketingReport(comments, lid, {
         broadcasterUserId: reportBroadcasterUid
       });
+      mktProf.mark('aggregate');
       const maskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
       const maskShare = Boolean(maskEl?.checked);
-      // 0.1.22〜0.1.30: 同接サンプル / 過去配信 / 公式 DOM bundle / ゆっくり画像は互いに独立なので
-      // 直列 await せず Promise.all で並列化（DL 開始までの体感ラグを短縮）。
+      // 0.1.588: フォロー nvapi 補完は DL 前に待たない（キャッシュのみ・数秒短縮）。
+      // 同接 / 過去配信 / bundle / ゆっくり / koken / 配信者プロフィールも並列。
       const [
+        ,
         sessionSummaryRows,
         pastBroadcasts,
         bundleForMkt,
         yukkuriImageMapForMkt,
-        eventRankingForMkt
+        eventRankingForMkt,
+        kokenGiftResp,
+        broadcasterProfileForMkt
       ] = await Promise.all([
+          attachCommenterFollowToReport(report, lid, { cacheOnly: true }),
           (async () => {
             try {
               const db = await openBroadcastSessionSummaryDb();
@@ -14646,10 +18115,12 @@ async function initPopup() {
             }
           })(),
           (async () => {
+            if (heavyMkt) return [];
             try {
               const sumDb = await openBroadcastSessionSummaryDb();
+              const pastLimit = comments.length > 8000 ? 4 : 8;
               const recentLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
-                limit: 10,
+                limit: pastLimit,
                 excludeLiveId: lid
               });
               if (!recentLiveIds.length) return [];
@@ -14686,9 +18157,35 @@ async function initPopup() {
             } catch {
               return null;
             }
-          })()
+          })(),
+          (async () => {
+            try {
+              return await Promise.race([
+                fetchKokenGiftHistoryViaExtension(lid),
+                new Promise((_, reject) => {
+                  setTimeout(() => reject(new Error('koken_fetch_timeout')), 5000);
+                })
+              ]);
+            } catch {
+              return null;
+            }
+          })(),
+          resolveBroadcasterProfileModel(watchMetaCache.snapshot, lid)
         ]);
+      mktProf.mark('parallel_io');
+      const kokenPayload =
+        kokenGiftResp?.ok && kokenGiftResp.json != null
+          ? buildGiftSubAppPayloadFromKokenJson(kokenGiftResp.json, {
+              now: Date.now(),
+              liveId: lid
+            })
+          : null;
+      const giftSubAppHistoryForMarketing = mergeGiftSubAppHistoryPayload(
+        giftSubAppHistoryRaw,
+        kokenPayload
+      );
       if (stEl) stEl.textContent = '分析中… (3/3) HTML生成';
+      setExportWaitTechStatus('分析中… (3/3) HTML生成');
       // HTML 文字列生成（数万コメ・画像 data URL 込み）は最重量の同期処理。直前に
       //   1 フレーム譲り、「(3/3) HTML生成」を描画してから走らせる（体感の固まり解消）。
       await yieldToBrowserPaint();
@@ -14706,33 +18203,69 @@ async function initPopup() {
           watchMetaCache.snapshot?.broadcasterUserId || ''
         ).trim(),
         sessionSummaryRows,
-        commentsForAnalytics: comments,
+        commentsForAnalytics: heavyMkt ? capCommentsForAnalytics(comments) : comments,
         pastBroadcasts,
         giftUsers: giftUsersForMarketing,
+        giftEvents: giftEventsForMarketing,
+        giftHistoryThrows: giftHistoryThrowsForMarketing,
+        giftSubAppHistory: giftSubAppHistoryForMarketing,
         officialEventDomBundle: bundleForMkt,
         broadcastTitle: String(
           watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
         ),
         broadcasterName: String(watchMetaCache.snapshot?.broadcasterName || ''),
+        broadcasterProfile: broadcasterProfileForMkt,
+        noopenerLinks: Array.isArray(watchMetaCache.snapshot?.noopenerLinks)
+          ? watchMetaCache.snapshot.noopenerLinks
+          : [],
         recordedCommentCount: Array.isArray(comments) ? comments.length : 0,
         streamAgeMin:
           typeof watchMetaCache.snapshot?.streamAgeMin === 'number'
             ? watchMetaCache.snapshot.streamAgeMin
             : undefined,
         yukkuriImageDataUrlMap: yukkuriImageMapForMkt,
-        eventRanking: eventRankingForMkt
+        eventRanking: eventRankingForMkt,
+        slimForHeavyExport: heavyMkt
       });
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nicolivelog-marketing-${lid}-${Date.now()}.html`;
-      document.body.appendChild(a);
-      a.click();
-      // 0.1.31 (AF): a.remove は 1 秒で十分・revoke は queue 管理（最大 15 秒）。
-      setTimeout(() => { a.remove(); }, 1000);
-      objectUrlRevokeQueue.enqueue(url);
-      if (stEl) stEl.textContent = `DL完了（${report.totalComments}件 / ${report.uniqueUsers}人）`;
+      mktProf.mark('build_html');
+      const mktFilename = buildMarketingReportDownloadFilename(lid, {
+        comments,
+        snapshot: watchMetaCache.snapshot
+      });
+      if (stEl) stEl.textContent = `DL開始: ${mktFilename}`;
+      await downloadBlobViaChromeDownloads(
+        new Blob([html], { type: 'text/html;charset=utf-8' }),
+        mktFilename
+      );
+      mktProf.mark('download');
+      const mktDone = mktProf.finish('マーケ');
+      logExportStageProfileIfEnabled('マーケ', mktDone.rows);
+      // 0.1.588: storage 書き戻しは DL 開始後に best-effort（DL 待ちを増やさない）。
+      void (async () => {
+        try {
+          /** @type {Record<string, unknown>} */
+          const giftPersist = {};
+          if (giftSubAppHistoryForMarketing) {
+            giftPersist[giftSubKey] = giftSubAppHistoryForMarketing;
+          }
+          if (kokenGiftResp?.ok && kokenGiftResp.json != null) {
+            const throwsRows = normalizeKokenGiftHistoryResponse(kokenGiftResp.json, {
+              now: Date.now()
+            });
+            if (Array.isArray(throwsRows) && throwsRows.length > 0) {
+              giftPersist[giftThrowsKey] = throwsRows;
+            }
+          }
+          if (Object.keys(giftPersist).length > 0) {
+            await chrome.storage.local.set(giftPersist);
+          }
+        } catch {
+          /* best-effort */
+        }
+      })();
+      if (stEl) {
+        stEl.textContent = `${mktDone.summary} · ${report.totalComments}件 / ${report.uniqueUsers}人`;
+      }
     } catch (e) {
       const msg = String(
         e && typeof e === 'object' && 'message' in e
@@ -14761,6 +18294,8 @@ async function initPopup() {
             );
             const maskShare = Boolean(maskEl?.checked);
             const yukkuriImageMapFb = await buildYukkuriImageDataUrlMap();
+            const fbHeavy =
+              fallbackComments.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD;
             const html = buildMarketingDashboardHtml(report, {
               maskShareLabels: maskShare,
               anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
@@ -14770,12 +18305,16 @@ async function initPopup() {
               // fallback 経路では IDB アクセスは諦める（拡張再読み込み中でも分析だけは出す）
               sessionSummaryRows: [],
               commentsForAnalytics: fallbackComments,
+              slimForHeavyExport: fbHeavy,
               giftUsers: [],
               // ゆっくり解説向けに、メモリ上の watchSnapshot からヒントを引く
               broadcastTitle: String(
                 watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
               ),
               broadcasterName: String(watchMetaCache.snapshot?.broadcasterName || ''),
+              broadcasterProfile: normalizeBroadcasterProfileModel(
+                mergeBroadcasterProfileRaw(watchMetaCache.snapshot, null)
+              ),
               recordedCommentCount: Array.isArray(fallbackComments) ? fallbackComments.length : 0,
               streamAgeMin:
                 typeof watchMetaCache.snapshot?.streamAgeMin === 'number'
@@ -14783,16 +18322,14 @@ async function initPopup() {
                   : undefined,
               yukkuriImageDataUrlMap: yukkuriImageMapFb
             });
-            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `nicolivelog-marketing-fallback-${lid || 'unknown'}-${Date.now()}.html`;
-            document.body.appendChild(a);
-            a.click();
-            // 0.1.31 (AF): a.remove は 1 秒・revoke は queue 管理（最大 15 秒）。
-            setTimeout(() => { a.remove(); }, 1000);
-            objectUrlRevokeQueue.enqueue(url);
+            const fbFilename = buildMarketingReportDownloadFilename(
+              lid || String(STORY_SOURCE_STATE.liveId || '').trim(),
+              { comments: fallbackComments, snapshot: watchMetaCache.snapshot }
+            );
+            await downloadBlobViaChromeDownloads(
+              new Blob([html], { type: 'text/html;charset=utf-8' }),
+              fbFilename
+            );
             if (stEl) {
               stEl.textContent =
                 '拡張再読み込み中のためメモリデータでDLしました（開き直して再実行推奨）';
@@ -14818,6 +18355,7 @@ async function initPopup() {
             : `エラー: ${msg}`;
       }
     } finally {
+      hideExportWaitPanel();
       if (btn) btn.disabled = false;
     }
   });
@@ -14924,6 +18462,51 @@ async function initPopup() {
       //
     }
   });
+
+  // 自動巡回（Phase 2b）: ON にすると、配信を見ていない間も SW が放送中の配信を
+  //   背景タブで巡回して同接推定の較正データを貯める。書き込みは SW が storage.onChanged
+  //   で検知して即 ON/OFF（巡回タブの開閉・alarm）する。
+  const autopatrolToggle = /** @type {HTMLInputElement|null} */ ($('autopatrolEnabled'));
+  autopatrolToggle?.addEventListener('change', async () => {
+    const next = autopatrolToggle.checked;
+    try {
+      const ok = await storageSetSafe({ [KEY_AUTOPATROL_ENABLED]: next });
+      if (!ok) {
+        autopatrolToggle.checked = !next;
+        return;
+      }
+      refreshAutopatrolStatusLine();
+    } catch {
+      autopatrolToggle.checked = !next;
+    }
+  });
+  autopatrolToggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  // 較正データのエクスポート/クリア。
+  $('calibrationExportJsonBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void downloadCalibrationData('json');
+  });
+  $('calibrationExportCsvBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void downloadCalibrationData('csv');
+  });
+  $('calibrationClearBtn')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const ok =
+      typeof window !== 'undefined' && typeof window.confirm === 'function'
+        ? window.confirm('貯めた較正データ（数値のみ）を全消去します。よろしいですか？')
+        : true;
+    if (!ok) return;
+    await clearCalibrationData();
+    refreshAutopatrolStatusLine();
+  });
+
+  // 開いている間は状態（訪問数・現在の配信・記録サンプル数）を数秒ごとに更新する。
+  refreshAutopatrolStatusLine();
+  setInterval(refreshAutopatrolStatusLine, 5000);
 
   // 視聴ページの自動表示 ON/OFF：OFF のときはツールバーアイコンを押すまで
   // インラインパネルを出さない（こん太を押す前から勝手に出るのを避ける）。
@@ -15426,14 +19009,33 @@ async function initPopup() {
     const prevPostStatus = postStatus ? postStatus.textContent : '';
     exportBtn.disabled = true;
     exportBtn.setAttribute('aria-busy', 'true');
+    showExportWaitPanel('html');
     if (postStatus) postStatus.textContent = 'HTML レポートを準備しています…';
+    setExportWaitTechStatus('HTML レポートを準備しています…');
     // v0.1.396: context-invalidated のときは案内を残すため、finally の自動復帰を抑止する。
     let keepStatusMessage = false;
     try {
-      await yieldToBrowserPaint();
-      await downloadCommentsHtml(lv, key, watchUrl);
-      if (postStatus) postStatus.textContent = 'ダウンロードを開始しました';
+      await downloadCommentsHtml(lv, key, watchUrl, {
+        onStage: (label) => {
+          if (postStatus) postStatus.textContent = label;
+          setExportWaitTechStatus(label);
+        },
+        onDone: (summary) => {
+          if (postStatus) postStatus.textContent = summary;
+          setExportWaitTechStatus(summary);
+        }
+      });
     } catch (e) {
+      const errMsg = String(
+        e && typeof e === 'object' && 'message' in e
+          ? /** @type {{ message?: unknown }} */ (e).message || e
+          : e || ''
+      );
+      if (/html_report_build_timeout/i.test(errMsg)) {
+        setExportWaitTechStatus(
+          '組み立てがタイムアウトしました。コメント件数が多い場合はしばらく待って再試行してください。'
+        );
+      }
       // v0.1.396: 「拡張の接続が切れた（Extension context invalidated）」ときは、
       //   消える文言だけ出すと「壊れた」と誤解される。即・ワンクリック復帰できるよう
       //   再読み込みバナーを出し、復帰するまで案内を残す。
@@ -15459,6 +19061,7 @@ async function initPopup() {
         }
       }
     } finally {
+      hideExportWaitPanel();
       exportBtn.removeAttribute('aria-busy');
       exportBtn.disabled = false;
       if (!keepStatusMessage) {
@@ -15519,7 +19122,7 @@ async function initPopup() {
     paintCommentComposeUi();
     try {
       if (lvPost && toggle.checked) {
-        await appendSelfPostedComment(lvPost, text);
+        void appendSelfPostedComment(lvPost, text);
         optimisticLogged = true;
       }
       // v0.1.396: context が切れていたら、送信中…固定を解きつつ復帰バナーを出す。
@@ -15535,6 +19138,12 @@ async function initPopup() {
       if (result.ok) {
         if (commentInput) commentInput.value = '';
         COMMENT_KINDNESS_UI_STATE.armedText = '';
+        maybePlaySelfActionCelebration(
+          lvPost || watchPopupLastPaintedLiveId,
+          buildSelfCommentCelebrationSpec({
+            sessionDedupeKey: `self_comment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+          })
+        );
         setCommentPostNotice('コメントを送信しました。', 'success');
         const growthEl = /** @type {HTMLElement|null} */ ($('sceneStoryGrowth'));
         if (growthEl) patchStoryGrowthIconsFromSource(growthEl);
@@ -16277,6 +19886,7 @@ async function initPopup() {
       // renderer を圧迫するのを防ぐ。
       const onStorageChanged = (changes, area) => {
         if (area !== 'local') return;
+        applyCelebrationSideEffectsFromStorageChanges(changes);
         // レジストリ経由のブール設定を一括反映（未登録 key は何もしない）
         popupBooleanSettingsRegistry.dispatchStorageChanges(changes);
         if (changes[KEY_POPUP_FRAME] || changes[KEY_POPUP_FRAME_CUSTOM]) {
@@ -16365,6 +19975,7 @@ async function initPopup() {
   //   tick は document.hidden で背景タブを skip し、in-flight fetch 中は次の tick を
   //   見送る（遅い回線で fetch が重なってメッセージが積み上がるのを防ぐ）。
   const POLL_INTERVAL_MS = INLINE_MODE || INLINE_SIDE_PANEL ? 3_000 : 30_000;
+  const GIFT_HISTORY_AUTO_SYNC_MS = 10_000;
   // setInterval の id を保持し、拡張 context invalidated（chrome://extensions の
   // 再読み込みなど）後はループから抜けて clearInterval する。これがないと、popup
   // を閉じない限り「early return するだけの空 tick」が永続的に走り続けて、
@@ -16383,7 +19994,21 @@ async function initPopup() {
         if (typeof document !== 'undefined' && document.hidden) return;
         // v0.1.392: 短間隔 polling で fetch が重ならないよう、前回の取得がまだ
         //   進行中なら今回の tick は見送る（その fetch がじき新しい値を届ける）。
-        if (watchMetaCache.snapshotFetchActive) return;
+        if (watchMetaCache.snapshotFetchActive) {
+          const lidPoll = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+          const pollUrl =
+            INLINE_OWN_WATCH_URL ||
+            String(exportBtn?.dataset?.watchUrl || '').trim() ||
+            '';
+          if (/^lv\d{1,15}$/.test(lidPoll) && pollUrl) {
+            void requestPanelMetricsFromWatchTab(pollUrl, lidPoll).then((m) => {
+              if (m) applyPanelMetricsFromContent(m, lidPoll);
+            });
+          } else {
+            void applyLightweightPanelSummaryCards();
+          }
+          return;
+        }
         // 0.1.92: stale-while-revalidate パターン。
         //   key だけ無効化して fetch を促し、snapshot 自体は保持して
         //   fetch 中も古い数値を表示し続ける（loading 状態の点滅を防ぐ）。
@@ -16394,13 +20019,41 @@ async function initPopup() {
     )
   );
 
+  /** ギフト履歴: koken API 自動同期（storage 更新時だけ再描画。毎回 innerHTML すると点滅する） */
+  setInterval(() => {
+    if (!hasExtensionContext()) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    void syncKokenGiftHistoryForPopup(lid);
+  }, GIFT_HISTORY_AUTO_SYNC_MS);
+
+  /** 鮮度注記だけ 30 秒ごとに更新（カード列は触らない） */
+  setInterval(() => {
+    if (!hasExtensionContext()) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const body = document.getElementById('northStarLaneBody-giftHistory');
+    if (!(body instanceof HTMLElement)) return;
+    if (body.getAttribute('data-lane-state') !== 'ok') return;
+    if (!Number.isFinite(_giftHistoryNorthStarCapturedAtMs) || _giftHistoryNorthStarCapturedAtMs <= 0) {
+      return;
+    }
+    patchNorthStarGiftHistoryFreshnessNote(
+      body,
+      formatCardFreshnessNote(_giftHistoryNorthStarCapturedAtMs, { autoRefreshing: true })
+    );
+  }, 30_000);
+
   if (INLINE_MODE || INLINE_SIDE_PANEL) {
-    let lastVisibilityRefresh = Date.now();
+    let lastVisibilityRefresh = 0;
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
       if (!hasExtensionContext()) return;
       const now = Date.now();
-      if (now - lastVisibilityRefresh < POLL_INTERVAL_MS) return;
+      // 多タブで background 化中は storage.onChanged を抑止しているため、可視復帰は
+      // 即 catch-up（埋め込みは 400ms、サイドパネルは従来どおり poll 周期）。
+      const visGapMs = INLINE_EMBED_WATCH ? 400 : POLL_INTERVAL_MS;
+      if (now - lastVisibilityRefresh < visGapMs) return;
       lastVisibilityRefresh = now;
       // 0.1.94: 0.1.92 polling 側で snapshot=null を撤去したのに合わせて
       //   visibilitychange でも snapshot を残す（stale-while-revalidate）。

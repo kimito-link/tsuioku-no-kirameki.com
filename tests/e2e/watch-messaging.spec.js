@@ -41,4 +41,40 @@ test.describe('watch タブへの messaging（メインフレーム）', () => {
     const snap = /** @type {{ snapshot?: { liveId?: string|null } }} */ (result).snapshot;
     expect(snap?.liveId).toBe('lv888888888');
   });
+
+  test('NLS_EXPORT_PANEL_METRICS が ok と recordedCount を返す', async ({ context }) => {
+    let sw = context.serviceWorkers()[0];
+    if (!sw) {
+      sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
+    }
+
+    const page = await context.newPage();
+    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+
+    const result = await sw.evaluate(async (tabUrlPattern) => {
+      const tabs = await chrome.tabs.query({ url: tabUrlPattern });
+      const id = tabs[0]?.id;
+      if (!id) return { ok: false, reason: 'no_tab' };
+      try {
+        return await chrome.tabs.sendMessage(
+          id,
+          { type: 'NLS_EXPORT_PANEL_METRICS' },
+          { frameId: 0 }
+        );
+      } catch (e) {
+        return {
+          ok: false,
+          reason:
+            e && typeof e === 'object' && 'message' in e ? String(e.message) : 'send_failed'
+        };
+      }
+    }, E2E_MOCK_ORIGIN_PATTERN);
+
+    expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
+    const metrics = /** @type {{ metrics?: { liveId?: string, recordedCount?: number } }} */ (
+      result
+    ).metrics;
+    expect(metrics?.liveId).toBe('lv888888888');
+    expect(typeof metrics?.recordedCount).toBe('number');
+  });
 });

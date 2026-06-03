@@ -20,6 +20,56 @@
 export const NLS_COMMENT_SUBMIT_PROFILE_FLAG = '__nlsCommentSubmitProfile';
 export const NLS_COMMENT_SUBMIT_LAST_TIMINGS = '__nlsCommentSubmitLastTimings';
 
+/** v0.1.604: 常駐観測の閾値。総所要がこれを超えたら console.warn を出して可視化。 */
+export const NLS_COMMENT_SUBMIT_SLOW_WARN_MS = 800;
+/** 直近 N 件の総所要を保持する rolling buffer 上限。 */
+export const NLS_COMMENT_SUBMIT_HISTORY_MAX = 20;
+/** rolling buffer の globalThis キー。DevTools から読める。 */
+export const NLS_COMMENT_SUBMIT_HISTORY_KEY = '__nlsCommentSubmitTotals';
+
+/**
+ * v0.1.604: 軽量・常駐観測。フラグなしでも総所要 ms を 1 つだけ記録する。
+ * 直近 20 件は globalThis.__nlsCommentSubmitTotals に rolling 保持され、
+ * 平均/最大が即取れる。閾値超は console.warn で目立たせる（ユーザーが
+ * F12 開いたとき「遅さ」が見える化される）。
+ *
+ * 副作用は console と globalThis 1 プロパティのみ。負荷 negligible。
+ *
+ * @param {string} label 例: 'nls-cmt-popup' / 'nls-cmt-content'
+ * @param {number} elapsedMs Math.round 済み総所要
+ */
+export function recordCommentSubmitTotal(label, elapsedMs) {
+  try {
+    const ms = Number(elapsedMs);
+    if (!Number.isFinite(ms) || ms < 0) return;
+    const g = /** @type {Record<string, unknown>} */ (globalThis);
+    /** @type {Array<{label:string,ms:number,at:number}>} */
+    const buf =
+      Array.isArray(g[NLS_COMMENT_SUBMIT_HISTORY_KEY]) &&
+      g[NLS_COMMENT_SUBMIT_HISTORY_KEY].every(
+        (r) => r && typeof r === 'object'
+      )
+        ? /** @type {any} */ (g[NLS_COMMENT_SUBMIT_HISTORY_KEY])
+        : [];
+    buf.push({ label: String(label || ''), ms, at: Date.now() });
+    while (buf.length > NLS_COMMENT_SUBMIT_HISTORY_MAX) buf.shift();
+    g[NLS_COMMENT_SUBMIT_HISTORY_KEY] = buf;
+    if (ms >= NLS_COMMENT_SUBMIT_SLOW_WARN_MS) {
+      try {
+        const recent = buf.slice(-5).map((r) => r.ms);
+        console.warn(
+          `[${label}] slow=${ms}ms (recent5=[${recent.join(',')}]). ` +
+            `DevTools で globalThis.__nlsCommentSubmitProfile=true にして再送信すると区間別の詳細が出ます。`
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+  } catch {
+    /* ignore: 観測の失敗は無視 */
+  }
+}
+
 /** @returns {boolean} */
 export function isCommentSubmitProfileEnabled() {
   try {

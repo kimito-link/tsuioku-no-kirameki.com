@@ -27,6 +27,28 @@ export const KEY_RECORDING_WATCHDOG = 'nls_recording_watchdog_v1';
 /** AI共有・不具合調査用のエラーリング（最大80件・本文はマスク済み・local only） */
 export const KEY_DIAGNOSTICS_ERROR_RING_V1 = 'nls_diagnostics_error_ring_v1';
 
+/**
+ * 同接推定の較正データ（リングバッファ・最大2000件・local only・PII なし）。
+ * 推定算出のたびに throttled で 1 サンプル（A/B/C/D/blend・来場・コメ毎分・経過・
+ * 公式同接があれば誤差）を積む。手動視聴と自動巡回(autopatrol)の両方が同じ器へ書く。
+ * 後から CSV/JSON でエクスポートし、係数（avgSessionMin / perPersonCommentsPerMin /
+ * 倍率）の較正に使う。キャッシュクリアでは消さない（EXTENSION_SOFT_CACHE_STORAGE_KEYS 非対象）。
+ * @see src/lib/concurrentCalibrationLog.js
+ */
+export const KEY_CONCURRENT_CALIBRATION_RING_V1 =
+  'nls_concurrent_calibration_ring_v1';
+
+/**
+ * 自動巡回（Phase 2b）の ON/OFF トグル。true のとき SW が公開ランキングから
+ * 放送中 lv を拾い、背景タブで 1 つずつ短時間開いて較正データを貯める。既定 OFF。
+ * popup が書き込み、background.js が storage.onChanged で即時 ON/OFF する。
+ * @see extension/background.js（Autopatrol セクション）
+ */
+export const KEY_AUTOPATROL_ENABLED = 'nls_autopatrol_enabled_v1';
+
+/** 自動巡回のランタイム状態（queue / visited / 現在タブ / 訪問数 / 最終エラー）。SW が書く。 */
+export const KEY_AUTOPATROL_STATE = 'nls_autopatrol_state_v1';
+
 /** 記録ON時にコメントパネル DOM が見つからない状態の警告（サイト改修の検知用・PII なし） */
 export const KEY_COMMENT_PANEL_STATUS = 'nls_comment_panel_status';
 
@@ -212,6 +234,13 @@ export const KEY_SUPPORT_TIMELINE_OPEN = 'nls_support_timeline_open_v1';
 export const KEY_USAGE_TERMS_ACK = 'nls_usage_terms_ack_v1';
 
 /**
+ * 開示請求モード（v0.1.564）: popup 表示で該当疑いコメントを非表示にし、
+ * 記録は継続したうえで証拠パック（CSV / manifest / readme）を書き出す。
+ * 既定 OFF（raw === true のときだけ ON）。
+ */
+export const KEY_DISCLOSURE_REQUEST_MODE = 'nls_disclosure_request_mode_v1';
+
+/**
  * 将来の PRO / PREMIUM 等のエンタイトルメント（決済連携は別タスク）。
  * 値は `free` | `pro` | `premium` を想定。未設定は free 扱い。
  */
@@ -227,11 +256,36 @@ export const KEY_SELF_POSTED_RECENTS = 'nls_self_posted_recents';
 export const KEY_USER_COMMENT_PROFILE_CACHE = 'nls_user_comment_profile_v1';
 
 /**
+ * v0.1.533: コメンター（数値 userId）のフォロー/フォロワー数・プレミアム・LV を
+ * userId 単位でためる横断キャッシュ（live を跨いで再利用）。レポートで「フォロワー数」を
+ * 出すために使う。レート制限回避のため、巡回ごとに上位 N 名だけを数件ずつ取得し、
+ * TTL 内（既定 24h）は再取得しない。値:
+ *   { [userId]: { followerCount?, followeeCount?, isPremium?, level?, fetchedAt } }
+ * 上限件数を超えたら fetchedAt が古いものから捨てる。キャッシュクリア対象。
+ */
+export const KEY_COMMENTER_FOLLOW_CACHE = 'nls_commenter_follow_v1';
+
+/**
+ * v0.1.541: コメンター（数値 userId）のフォロー先 userId リスト横断キャッシュ。
+ * nvapi /v1/users/{uid}/following/users（非公式・ログイン Cookie 必須）。
+ * 値: { [userId]: { userIds, totalCount?, fetchedAt, status, truncated, pageCount } }
+ */
+export const KEY_COMMENTER_FOLLOWING_LIST_CACHE = 'nls_commenter_following_list_v1';
+
+/**
+ * v0.1.545: 配信ごとのマイルストーン演出済み dedupe キー。
+ * 値: { [liveId]: string[] }（例: comment_100, event_rank_5, gift_10）
+ */
+export const KEY_SUPPORT_CELEBRATION_STATE = 'nls_support_celebration_v1';
+
+/**
  * UI の「キャッシュクリア」で chrome.storage.local から削除するキー。
  * 応援コメント記録（nls_comments_*）・ギフト記録・各種設定は含めない。
  */
 export const EXTENSION_SOFT_CACHE_STORAGE_KEYS = Object.freeze([
-  KEY_USER_COMMENT_PROFILE_CACHE
+  KEY_USER_COMMENT_PROFILE_CACHE,
+  KEY_COMMENTER_FOLLOW_CACHE,
+  KEY_COMMENTER_FOLLOWING_LIST_CACHE
 ]);
 
 /** 視聴ページインラインパネルの幅: 視聴ブロック全幅 or 動画幅のみ */
@@ -537,4 +591,39 @@ export function eventDomStorageKey(liveId) {
 export function giftSubAppHistoryStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();
   return `nls_gift_subapp_history_${id}`;
+}
+
+/**
+ * v0.1.531: 配信者プロフィール（nvapi ユーザー情報＋プロフィールページ解析）の統合結果を保存。
+ * レポートのヘッダーカードに「プレミアム会員・フォロー/フォロワー・LV・配信開始日・
+ * 累計配信日数・欲しいものリスト」等を反映するための専用キー。取得できた項目だけ入る。
+ *
+ *   {
+ *     userId, nickname, avatarUrl, pageUrl, level, isPremium,
+ *     followeeCount, followerCount, broadcastStartDate,
+ *     cumulativeBroadcastDays, wishlistUrl, broadcastRequestEnabled, capturedAt
+ *   }
+ *
+ * @param {string} liveId lv123
+ */
+export function broadcasterProfileStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_broadcaster_profile_${id}`;
+}
+
+/**
+ * v0.1.534: 配信ごとの「数値IDコメンター × フォロー/フォロワー」スナップショット。
+ * 背後巡回で取得できた分を随時更新し、マーケ分析の全量表・JSON 埋め込みの正本にする。
+ *
+ *   {
+ *     liveId, capturedAt,
+ *     totalNumericCommenters, withFollowData,
+ *     rows: [{ userId, commentCount, nickname, followerCount?, followeeCount?, level?, isPremium?, followFetchedAt? }]
+ *   }
+ *
+ * @param {string} liveId lv123
+ */
+export function commenterFollowLiveStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_commenter_follow_live_${id}`;
 }

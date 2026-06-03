@@ -25,6 +25,16 @@ export function buildStoryUserLaneGuideTopHtml(faceLink) {
   );
 }
 
+/** @param {string} faceGift 案内アイコン（ギフト投げ主列） */
+export function buildStoryUserLaneGuideGiftHtml(faceGift) {
+  return storyUserLaneGuideLine(
+    faceGift,
+    escapeHtml(
+      'ギフト列: この放送でギフトや広告を投げた人を、数値ユーザーIDで記録できた順に並べるよ。個人サムネが取れている人はその画像、まだの人はゆっくり画像で表示するよ。'
+    )
+  );
+}
+
 /** @param {string} faceKonta */
 export function buildStoryUserLaneGuideKontaHtml(faceKonta) {
   return storyUserLaneGuideLine(
@@ -94,6 +104,14 @@ export function buildStoryUserLaneEmptyNoteLinkHtml() {
   return storyUserLaneEmptyNoteTwoLines(
     'この段は「数値ユーザーID＋個人サムネがそろった応援」だけが並ぶよ。いまの記録では該当者がいません。',
     '条件を満たす応援が届くと自動で増えます。'
+  );
+}
+
+/** ギフト投げ主段・件数 0 */
+export function buildStoryUserLaneEmptyNoteGiftHtml() {
+  return storyUserLaneEmptyNoteTwoLines(
+    'この段は「ギフトや広告を投げた人」だけが並ぶよ。いまの記録では該当者がいません。',
+    'ギフトや広告が届くと、送り主の数値IDが取れた人から自動で増えます。'
   );
 }
 

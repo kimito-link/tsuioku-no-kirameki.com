@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   INGEST_TIMING,
   SUBMIT_TIMING,
+  SUBMIT_TIMING_FAST,
   MAP_LIMITS,
   HARVEST_TIMING,
   OFFICIAL_GAP_DEEP_TIMING,
@@ -37,18 +38,26 @@ describe('INGEST_TIMING', () => {
 });
 
 describe('SUBMIT_TIMING', () => {
+  const required = [
+    'editorPollTimeoutMs',
+    'editorPollIntervalMs',
+    'reactSettleMs',
+    'buttonPollTimeoutMs',
+    'buttonPollIntervalMs'
+  ];
+
   it('必須キーを全て持つ', () => {
-    const required = [
-      'editorPollTimeoutMs',
-      'editorPollIntervalMs',
-      'reactSettleMs',
-      'buttonPollTimeoutMs',
-      'buttonPollIntervalMs'
-    ];
     for (const key of required) {
       expect(SUBMIT_TIMING).toHaveProperty(key);
       expect(typeof SUBMIT_TIMING[key]).toBe('number');
       expect(SUBMIT_TIMING[key]).toBeGreaterThan(0);
+    }
+  });
+
+  it('SUBMIT_TIMING_FAST も同キーでより短い', () => {
+    for (const key of required) {
+      expect(SUBMIT_TIMING_FAST).toHaveProperty(key);
+      expect(SUBMIT_TIMING_FAST[key]).toBeLessThanOrEqual(SUBMIT_TIMING[key]);
     }
   });
 });

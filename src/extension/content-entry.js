@@ -29,6 +29,8 @@ import {
   KEY_DEEP_HARVEST_QUIET_UI,
   KEY_SELF_POSTED_RECENTS,
   KEY_USER_COMMENT_PROFILE_CACHE,
+  KEY_COMMENTER_FOLLOW_CACHE,
+  KEY_COMMENTER_FOLLOWING_LIST_CACHE,
   KEY_COMMENT_PANEL_STATUS,
   KEY_COMMENT_INGEST_LOG,
   KEY_STORAGE_WRITE_ERROR,
@@ -44,11 +46,14 @@ import {
   KEY_INCREMENTAL_DEDUP_ENABLED,
   KEY_COMMENT_IDB_ENABLED,
   KEY_CDB_OFFSCREEN_ENABLED,
+  KEY_CONCURRENT_CALIBRATION_RING_V1,
   commentsStorageKey,
   giftUsersStorageKey,
   backfillResumeStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
+  broadcasterProfileStorageKey,
+  commenterFollowLiveStorageKey,
   isRecordingEnabled,
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
@@ -98,6 +103,21 @@ import {
   SUMMARY_RECENT_ROWS_MAX
 } from '../lib/commentSummary.js';
 import {
+  buildPanelLiveSummary,
+  panelSummaryStorageKey
+} from '../lib/panelLiveSummary.js';
+import {
+  buildPanelMetricsResponse,
+  PANEL_METRICS_MESSAGE_TYPE
+} from '../lib/panelMetricsExport.js';
+import {
+  setBackfillPriorityLiveId,
+  registerBackfillWaiter,
+  clearBackfillWaiter,
+  BACKFILL_PRIORITY_COOLDOWN_MS,
+  GLOBAL_BACKFILL_ROTATION_MS
+} from '../lib/globalBackfillQueue.js';
+import {
   chunkIndexKey,
   chunkMigratedKey,
   isChunkIndex,
@@ -114,6 +134,26 @@ import {
   upsertUserCommentProfileFromEntry,
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
+import {
+  normalizeCommenterFollowMap,
+  commenterFollowEntryFromProfile,
+  upsertCommenterFollowEntry,
+  isFreshFollowEntry,
+  COMMENTER_FOLLOW_TTL_MS,
+  COMMENTER_FOLLOW_FETCH_BATCH,
+  collectNumericCommentersFromComments,
+  buildCommenterFollowRows,
+  buildCommenterFollowLiveSnapshot,
+  pickFollowUidsToFetch
+} from '../lib/commenterFollowCache.js';
+import {
+  COMMENTER_FOLLOWING_LIST_LIVE_MAX,
+  buildFollowingListEntryFromFetchResponse,
+  mergeFollowingListIntoRows,
+  normalizeFollowingListMap,
+  pickFollowingListUidsToFetch,
+  upsertFollowingListEntry
+} from '../lib/commenterFollowingListCache.js';
 import { mergeGiftUsers } from '../lib/giftRecord.js';
 import {
   collectOfficialEventDomBundle,
@@ -147,10 +187,14 @@ import { scrapeTotalGiftCountList } from '../lib/scrapeTotalGiftCountList.js';
 import { aggregateGiftHistoryThrows } from '../lib/mergeGiftHistoryThrows.js';
 import { resolveGiftRelayStorageLiveId } from '../lib/giftRelayStorageLiveId.js';
 import {
+  COMMENT_SUBMIT_CONFIRM_PROBE_FAST_MS,
   COMMENT_SUBMIT_CONFIRM_PROBE_MS,
   waitUntilEditorReflectsSubmit
 } from '../lib/commentSubmitConfirm.js';
-import { createCommentSubmitProfiler } from '../lib/commentSubmitProfiling.js';
+import {
+  createCommentSubmitProfiler,
+  recordCommentSubmitTotal
+} from '../lib/commentSubmitProfiling.js';
 import { shouldAcceptCommentPostInWatchFrame } from '../lib/watchFrameCommentPostGate.js';
 import { findCommentSubmitButton } from '../lib/commentPostDom.js';
 import {
@@ -246,10 +290,28 @@ import {
   EVENT_PARTICIPATION_FETCH_MESSAGE_TYPE
 } from '../lib/eventParticipationProgramsApi.js';
 import {
+  giftHistoryThrowsStorageKey,
+  buildGiftSubAppPayloadFromDomRelay,
+  buildKokenGiftPersistPayload,
+  mergeGiftSubAppHistoryPayload
+} from '../lib/kokenGiftHistoryApi.js';
+import { fetchKokenGiftHistoryAllViaExtension } from '../lib/kokenGiftHistoryFetchClient.js';
+import {
+  pickAuditionContextFromEntryItems,
+  normalizeAuditionRankingsResponse,
+  normalizeAuditionVotingUserRankingResponse,
+  eventVotingRankingStorageKey,
+  AUDITION_EVENT_RANKING_FETCH_MESSAGE_TYPE
+} from '../lib/auditionEventRankingApi.js';
+import {
   normalizeNicoUserProfileResponse,
   isResolvableNicoUid,
-  NICO_USER_PROFILE_FETCH_MESSAGE_TYPE
+  NICO_USER_PROFILE_FETCH_MESSAGE_TYPE,
+  NICO_USER_PROFILE_PAGE_FETCH_MESSAGE_TYPE
 } from '../lib/nicoUserProfileApi.js';
+import { NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE } from '../lib/nicoUserFollowingApi.js';
+import { extractNicoUserBroadcastStats } from '../lib/nicoUserProfilePage.js';
+import { normalizeBroadcasterProfileModel } from '../lib/broadcasterProfileCard.js';
 import { appendGiftEvents } from '../lib/giftEventStore.js';
 import { resolveGiftSenderBucketKey } from '../lib/giftSenderObservation.js';
 import { resolveWatchPageContext } from '../lib/watchContext.js';
@@ -298,6 +360,15 @@ import {
   pickIsEventParticipating
 } from '../lib/embeddedDataExtract.js';
 import { countRecentActiveUsers } from '../lib/concurrentEstimate.js';
+import {
+  resolveConcurrentFromSnapshot,
+  deriveCommentsPerMinFromSnapshot
+} from '../lib/concurrentResolvedFromSnapshot.js';
+import {
+  buildCalibrationSample,
+  appendCalibrationSample,
+  CALIBRATION_SOURCE
+} from '../lib/concurrentCalibrationLog.js';
 import { summarizeOfficialCommentHistory } from '../lib/officialStatsWindow.js';
 import { buildWatchSnapshotOfficialFields } from '../lib/watchSnapshotOfficialFields.js';
 import { mergeUserIdForEnrichment } from '../lib/userIdPreference.js';
@@ -312,7 +383,10 @@ import {
 } from '../lib/ndgrBackfillCrawl.js';
 import { crawlNdgrForward } from '../lib/ndgrForwardCrawl.js';
 import { computeBackfillFlushThreshold } from '../lib/backfillFlushThreshold.js';
-import { shouldDeferDomHarvestDuringScroll } from '../lib/domHarvestScrollDefer.js';
+import {
+  shouldDeferDomHarvestDuringScroll,
+  shouldDeferVisibleScanDuringScroll
+} from '../lib/domHarvestScrollDefer.js';
 import {
   runIfTabLeader,
   runWhileGlobalLeader,
@@ -341,13 +415,19 @@ import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated 
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
 import {
   parseGiftCommentText,
+  parseNicoadCommentText,
   summarizeGiftComments
 } from '../lib/parseGiftComment.js';
+import { maybePlayViewerNicoadCelebrationFromDomText } from '../lib/contentViewerNicoadCelebration.js';
 import { buildLiveMcpSnapshot } from '../lib/mcpBridge/buildLiveMcpSnapshot.js';
 import { buildMcpMismatchReasons } from '../lib/mcpBridge/buildMcpMismatchReasons.js';
 import { validateLiveMcpSnapshot } from '../lib/mcpBridge/validateLiveMcpSnapshot.js';
 import { trimMapToMax } from '../lib/trimMap.js';
 import { diagnosePersistGate } from '../lib/commentSubmitSteps.js';
+import {
+  NLS_PLAY_WATCH_CELEBRATION,
+  playWatchCelebrationRelay
+} from '../lib/watchCelebrationOverlay.js';
 import {
   STORAGE_OP_TIMED_OUT,
   runStorageOpWithTimeout
@@ -355,6 +435,7 @@ import {
 import {
   INGEST_TIMING,
   SUBMIT_TIMING,
+  SUBMIT_TIMING_FAST,
   MAP_LIMITS,
   HARVEST_TIMING,
   OFFICIAL_GAP_DEEP_TIMING,
@@ -384,7 +465,9 @@ import {
   mergeNdgrBacklogWithCap,
   shouldDeferNdgrFlushUntilLiveId
 } from '../lib/ndgrBacklog.js';
-import { mergeStoredCommentsWithIntercept } from '../lib/mergeStoredCommentsWithIntercept.js';
+// v0.1.606: runInterceptReconcile から「comments key の全件 read/write」を撤去したため
+//   mergeStoredCommentsWithIntercept は本番 hot path で不要になった。
+//   ライブラリ自体は残し(unit test と将来の手動 enrich 用途のため)、import だけ外す。
 import {
   isWatchProgramEndedText,
   shouldRunEndedBulkHarvest
@@ -412,6 +495,13 @@ const DEBOUNCE_MS = INGEST_TIMING.debounceMs;
  * ~この時間後に再開」になる。取りこぼしは NDGR 傍受 + 550ms 定期 scan が回収する。
  */
 const DOM_HARVEST_SCROLL_DEFER_MS = 220;
+/**
+ * deep harvest（仮想リスト全走査）は DOM ハーベストより重い。ユーザーがコメント欄を
+ * 読むためにスクロールしている間は開始・継続とも止め、静止後に再試行する。
+ */
+const DEEP_HARVEST_USER_SCROLL_DEFER_MS = 1500;
+/** 公式/記録がこの規模を超えると 2-pass deep は「ページが応答しません」級になりやすい */
+const DEEP_HARVEST_HEAVY_LIVE_COMMENT_THRESHOLD = 6000;
 const LIVE_POLL_MS = INGEST_TIMING.livePollMs;
 const STATS_POLL_MS = INGEST_TIMING.statsPollMs;
 /** 返信サジェスト等と同様に DOM 更新がテキスト差し替えだけのときの取りこぼし防止 */
@@ -568,6 +658,10 @@ const deepHarvestPipelineStats = {
 let deepHarvestZeroRowRetryBudget = 0;
 /** @type {ReturnType<typeof setTimeout>|null} */
 let deepHarvestZeroRowRetryTimer = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let deepHarvestScrollRetryTimer = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let visibleScanScrollRetryTimer = null;
 /** 直近の persistCommentRowsImpl に渡った行数（0 = 未実行またはスキップ） */
 let lastPersistCommentBatchSize = 0;
 /** @type {string[]} */
@@ -1371,7 +1465,10 @@ async function runInterceptReconcile(entries, users) {
   if (!recording || !liveId || !locationAllowsCommentRecording() || !hasExtensionContext()) {
     return;
   }
-  const lidAtQueue = liveId;
+  // v0.1.606: 旧実装では lidAtQueue = liveId を保持して commentsStorageKey(lidAtQueue)
+  //   の get/set に使っていたが、本パスから巨大配列 read/write を撤去したため不要。
+  //   profile cache(KEY_USER_COMMENT_PROFILE_CACHE)は live 横断の global key なので、
+  //   reconcile 実行中に liveId が変わっても更新は安全(常に最新 profile を残す)。
   const mergedByNo = new Map();
   for (const it of entries) {
     const no = String(it?.no || '').trim();
@@ -1396,28 +1493,26 @@ async function runInterceptReconcile(entries, users) {
   const mergedUsers = [...mergedUsersByUid.values()];
   if (!mergedItems.length && !mergedUsers.length) return;
 
-  const key = commentsStorageKey(lidAtQueue);
-  // v0.1.502: interceptReconcile も persistCommentRowsChain を共有するため、ここの
-  //   unbounded な set がハングすると記録パスごとチェーンを永久ポイズンし得る。
-  //   ガード付き timeout で必ず settle させ、チェーンを解放する（best-effort enrich なので
-  //   timeout 時は今回分を捨て、次回 reconcile で再実行される）。
+  // v0.1.606: runInterceptReconcile から「comments key の全件 read/write」を撤去。
+  //   旧実装(〜v0.1.605)は nls_comments_<lv> を毎回 get → mergeStoredCommentsWithIntercept
+  //   と applyUserCommentProfileMapToEntries で全件 map → set していた。これは長時間
+  //   配信 + 大量コメント(12000 件級)で renderer main thread を 5 秒以上ブロックし
+  //   「ページが応答しません」ダイアログを誘発する真因だった(Codex 調査
+  //    docs/codex-watch-frozen-investigation-v0606.md・容疑 ε)。
+  //   通常 persist path(下方 v0.1.420 周辺)は「過去行 patch は永続化せず popup 側で
+  //   read-time enrich」と明記されており、reconcile は方針と逆行していた。
+  //   修正: profile cache(KEY_USER_COMMENT_PROFILE_CACHE) の upsert/prune だけ行い、
+  //   過去 comments への patch は popup 側の applyUserCommentProfileMapToEntries
+  //   (popup-entry.js:4062, 10013)に委ねる。chunk/tail/incremental dedupe の
+  //   防御策と整合し、毎回 O(N) の structured clone が消える。
+  // v0.1.502: persistCommentRowsChain で直列化＋ guard timeout で必ず settle。
+  //   best-effort なので timeout 時は次回 reconcile で再実行される。
   const job = persistCommentRowsChain.then(() =>
     runStorageOpWithTimeout(async () => {
     const bag = await readStorageBagWithRetry(
-      () => chrome.storage.local.get([key, KEY_USER_COMMENT_PROFILE_CACHE]),
+      () => chrome.storage.local.get([KEY_USER_COMMENT_PROFILE_CACHE]),
       { attempts: 4, delaysMs: [0, 50, 120, 280] }
     );
-    const existing = Array.isArray(bag[key]) ? bag[key] : [];
-    let next = existing;
-    let commentsTouched = false;
-    if (mergedItems.length) {
-      const merged = mergeStoredCommentsWithIntercept(existing, mergedItems);
-      if (merged.patched > 0) {
-        next = merged.next;
-        commentsTouched = true;
-      }
-    }
-
     let profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
     let cacheTouched = false;
     // 0.1.82: 永続キャッシュ書き込み時に broadcaster icon の取り違えを防ぐ
@@ -1435,22 +1530,15 @@ async function runInterceptReconcile(entries, users) {
         cacheTouched = true;
       }
     }
-    const applied = applyUserCommentProfileMapToEntries(next, profileMap);
-    if (applied.patched > 0) {
-      next = applied.next;
-      commentsTouched = true;
-    }
     const pruned = pruneUserCommentProfileMap(profileMap);
     if (Object.keys(pruned).length !== Object.keys(profileMap).length) {
       profileMap = pruned;
       cacheTouched = true;
     }
-    if (!commentsTouched && !cacheTouched) return;
-    /** @type {Record<string, unknown>} */
-    const saveBag = {};
-    if (commentsTouched) saveBag[key] = next;
-    if (cacheTouched) saveBag[KEY_USER_COMMENT_PROFILE_CACHE] = profileMap;
-    await chrome.storage.local.set(saveBag);
+    if (!cacheTouched) return;
+    await chrome.storage.local.set({
+      [KEY_USER_COMMENT_PROFILE_CACHE]: profileMap
+    });
     }, INGEST_TIMING.persistWriteTimeoutMs * 4).catch((err) => {
       if (err === STORAGE_OP_TIMED_OUT) {
         reportSilentErrorToStorage(
@@ -1718,6 +1806,7 @@ function resetOfficialStatsState() {
 function resetOfficialCommentSamplingState() {
   officialCommentHistory.length = 0;
   observedRecordedCommentCount = 0;
+  _lastPanelSummaryRecordedWritten = -1;
 }
 
 /** `#embedded-data` の遅延出現後に programBeginAt を一度だけ埋める（L3 補助） */
@@ -2284,6 +2373,7 @@ window.addEventListener('message', (e) => {
 
   // 1. gift 履歴 (v0.1.216): items を全置換で集計
   const items = Array.isArray(e.data.items) ? e.data.items : [];
+  const totalCountsRelay = Array.isArray(e.data.totalCounts) ? e.data.totalCounts : [];
   if (items.length > 0) {
     const r = aggregateGiftHistoryThrows(items, Date.now());
     if (r.storageTouched) {
@@ -2295,6 +2385,11 @@ window.addEventListener('message', (e) => {
           }
         });
     }
+  }
+  // v0.1.576: 北極星レーン正本（nls_gift_subapp_history）へも反映。従来は throws のみで
+  //   koken API の先頭ページだけが残り、履歴タブを開いても表示が追従しなかった。
+  if (items.length > 0 || totalCountsRelay.length > 0) {
+    void persistGiftSubAppHistoryFromIframeRelay(lid, items, totalCountsRelay);
   }
 
   // 1b. v0.1.306: nicoad iframe が adContributionRanking（広告ランキング）を直接
@@ -6761,6 +6856,7 @@ function startPageFrameLoop() {
     maybeAutoStartBackfill(); // v0.1.418: 自動で過去ログ取り込み（既定 ON・OFF も可）。
     maybeStartNdgrForwardCrawl(); // v0.1.511: 前方向 NDGR 継続取得（opt-in・既定 OFF）。
     maybeRunRecordingStallWatchdog(); // 記録停止の自己診断＋自己回復（公式コメの伸びを独立信号に）。
+    maybeLogConcurrentCalibrationSample(); // 同接推定の較正データを throttled 記録（手動視聴＋自動巡回）。
     persistAiShareFastDiagnostics();
     // 0.1.32 (AG): バックグラウンドで prewarm を skip した分、tick で再 schedule
     // を試みる。visibilitychange は tick を呼ぶので、可視化された瞬間に prewarm
@@ -7257,7 +7353,7 @@ function canPostCommentInThisFrame() {
  * @param {string} rawText
  * @returns {Promise<boolean>}
  */
-async function confirmSubmittedCommentAsync(editor, rawText) {
+async function confirmSubmittedCommentAsync(editor, rawText, opts = {}) {
   const expected = normalizeCommentText(rawText);
   if (!expected) return false;
   return waitUntilEditorReflectsSubmit({
@@ -7269,7 +7365,7 @@ async function confirmSubmittedCommentAsync(editor, rawText) {
           : findCommentEditorElement();
       return normalizeCommentText(readCommentEditorText(currentEditor));
     },
-    probeEndpointsMs: COMMENT_SUBMIT_CONFIRM_PROBE_MS
+    probeEndpointsMs: opts.probeEndpointsMs ?? COMMENT_SUBMIT_CONFIRM_PROBE_MS
   });
 }
 
@@ -7291,9 +7387,10 @@ async function confirmSubmittedCommentAsync(editor, rawText) {
  * 区間マーカーは `src/lib/commentSubmitProfiling.js` の説明に準拠。
  *
  * @param {string} rawText
+ * @param {{ fastSubmit?: boolean }} [opts]
  * @returns {Promise<{ ok: boolean, error?: string }>}
  */
-async function postCommentFromContentAsync(rawText) {
+async function postCommentFromContentAsync(rawText, opts = {}) {
   if (!canPostCommentInThisFrame()) {
     return { ok: false, error: 'コメント欄のあるwatchフレームが見つかりません。' };
   }
@@ -7301,14 +7398,25 @@ async function postCommentFromContentAsync(rawText) {
   if (!text) {
     return { ok: false, error: 'コメントが空です。' };
   }
+  const fastSubmit = Boolean(opts.fastSubmit);
+  const submitTiming = fastSubmit ? SUBMIT_TIMING_FAST : SUBMIT_TIMING;
+  const reactSettleMs = submitTiming.reactSettleMs;
+  const confirmProbes = fastSubmit
+    ? COMMENT_SUBMIT_CONFIRM_PROBE_FAST_MS
+    : COMMENT_SUBMIT_CONFIRM_PROBE_MS;
 
   const prof = createCommentSubmitProfiler();
+  // v0.1.604: フラグ OFF でも総所要を rolling 観測（800ms 超は console.warn）。
+  const totalT0 = performance.now();
   try {
     prof?.mark('T2-editor-poll-start');
-    const editor = await pollUntil(findCommentEditorElement, {
-      timeoutMs: SUBMIT_TIMING.editorPollTimeoutMs,
-      intervalMs: SUBMIT_TIMING.editorPollIntervalMs
-    });
+    let editor = findCommentEditorElement();
+    if (!editor) {
+      editor = await pollUntil(findCommentEditorElement, {
+        timeoutMs: submitTiming.editorPollTimeoutMs,
+        intervalMs: submitTiming.editorPollIntervalMs
+      });
+    }
     prof?.mark('T2-editor-found');
     if (!editor) {
       return {
@@ -7323,16 +7431,20 @@ async function postCommentFromContentAsync(rawText) {
         editor.focus();
       }
       setEditorText(editor, text);
-      await new Promise((r) => {
-        requestAnimationFrame(() => requestAnimationFrame(r));
-      });
-      await new Promise((r) => setTimeout(r, SUBMIT_TIMING.reactSettleMs));
+      if (fastSubmit) {
+        await new Promise((r) => requestAnimationFrame(r));
+      } else {
+        await new Promise((r) => {
+          requestAnimationFrame(() => requestAnimationFrame(r));
+        });
+      }
+      await new Promise((r) => setTimeout(r, reactSettleMs));
       prof?.mark('T3-after-react-settle');
 
       const submitOnce = async () => {
         const btn = await pollUntil(() => findVisibleEnabledSubmitForEditor(editor), {
-          timeoutMs: SUBMIT_TIMING.buttonPollTimeoutMs,
-          intervalMs: SUBMIT_TIMING.buttonPollIntervalMs
+          timeoutMs: submitTiming.buttonPollTimeoutMs,
+          intervalMs: submitTiming.buttonPollIntervalMs
         });
         if (btn) {
           btn.click();
@@ -7350,26 +7462,38 @@ async function postCommentFromContentAsync(rawText) {
       }
       prof?.mark('T4-after-submit-click');
 
-      if (await confirmSubmittedCommentAsync(editor, text)) {
+      if (
+        await confirmSubmittedCommentAsync(editor, text, { probeEndpointsMs: confirmProbes })
+      ) {
         prof?.mark('T5-after-confirm-1');
         return { ok: true };
       }
       prof?.mark('T5-confirm-1-failed');
 
-      if (!(await submitOnce())) {
+      if (!fastSubmit) {
+        if (!(await submitOnce())) {
+          return {
+            ok: false,
+            error:
+              'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
+          };
+        }
+        prof?.mark('T4b-after-second-submit');
+
+        if (
+          await confirmSubmittedCommentAsync(editor, text, { probeEndpointsMs: confirmProbes })
+        ) {
+          prof?.mark('T5-after-confirm-2');
+          return { ok: true };
+        }
+        prof?.mark('T5-confirm-2-failed');
         return {
           ok: false,
           error:
             'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
         };
       }
-      prof?.mark('T4b-after-second-submit');
 
-      if (await confirmSubmittedCommentAsync(editor, text)) {
-        prof?.mark('T5-after-confirm-2');
-        return { ok: true };
-      }
-      prof?.mark('T5-confirm-2-failed');
       return {
         ok: false,
         error:
@@ -7384,6 +7508,7 @@ async function postCommentFromContentAsync(rawText) {
     }
   } finally {
     prof?.finish('nls-cmt-content');
+    recordCommentSubmitTotal('nls-cmt-content', Math.round(performance.now() - totalT0));
   }
 }
 
@@ -7589,6 +7714,101 @@ function bindNativeSelfPostedRecorder() {
     },
     true
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* 同接推定 較正データロガー（Phase 1 配線）                                   */
+/* 推定を算出するたびに A/B/C/D/blend・来場/コメ毎分/経過 等を throttled で      */
+/* chrome.storage.local のリングバッファ（KEY_CONCURRENT_CALIBRATION_RING_V1）  */
+/* へ積む。popup を開いていない背景タブ（自動巡回 b）でも貯まるよう content 側に  */
+/* 置く。throttle/cap/重複間引きは appendCalibrationSample（純関数・テスト済）。  */
+/* PII は積まない（数値・liveId・platform・ts・source のみ）。                    */
+/* ------------------------------------------------------------------ */
+
+/** 較正サンプルの記録を試みる最小間隔（appendCalibrationSample 側 30s と整合）。 */
+const CALIBRATION_LOG_ATTEMPT_INTERVAL_MS = 25000;
+let _lastCalibrationLogAttemptAt = 0;
+let _calibrationLogInFlight = false;
+
+/**
+ * このタブが自動巡回(b)で開かれたかを URL ハッシュのマーカーで判定する。
+ * SW が背景タブを開くとき `#nls_autopatrol=1` を付ける（content は読み取るだけ）。
+ * @returns {boolean}
+ */
+function isAutopatrolTab() {
+  try {
+    return /(?:^|[#&?])nls_autopatrol=1(?:$|[&])/.test(String(window.location.hash || ''));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 同接推定の較正サンプルを 1 件追記する（throttled・best-effort・fire-and-forget）。
+ * 呼び出しは page-frame maintenance tick から（hidden striding 済み）。
+ */
+function maybeLogConcurrentCalibrationSample() {
+  try {
+    // top frame の watch ページのみ（iframe では走らせない）。
+    if (typeof window === 'undefined' || window.self !== window.top) return;
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+    if (_calibrationLogInFlight) return;
+    const now = Date.now();
+    if (now - _lastCalibrationLogAttemptAt < CALIBRATION_LOG_ATTEMPT_INTERVAL_MS) return;
+
+    const lid = extractLiveIdFromUrl(window.location.href) || liveId || '';
+    if (!/^lv\d{1,15}$/.test(String(lid))) return;
+
+    _lastCalibrationLogAttemptAt = now;
+
+    let snapshot = null;
+    try {
+      snapshot = collectWatchPageSnapshot();
+    } catch {
+      snapshot = null;
+    }
+    if (!snapshot) return;
+
+    const resolved = resolveConcurrentFromSnapshot(snapshot, now);
+    if (!resolved || !(Number(resolved.estimated) > 0)) return;
+
+    const sample = buildCalibrationSample({
+      nowMs: now,
+      platform: 'niconico',
+      liveId: lid,
+      source: isAutopatrolTab() ? CALIBRATION_SOURCE.AUTOPATROL : CALIBRATION_SOURCE.MANUAL,
+      resolved,
+      totalVisitors:
+        typeof snapshot.viewerCountFromDom === 'number' ? snapshot.viewerCountFromDom : null,
+      recentActiveUsers:
+        typeof snapshot.recentActiveUsers === 'number' ? snapshot.recentActiveUsers : null,
+      streamAgeMin: typeof snapshot.streamAgeMin === 'number' ? snapshot.streamAgeMin : null,
+      commentsPerMin: deriveCommentsPerMinFromSnapshot(snapshot) ?? null,
+      // ニコ生は公式「同接」を出さないため officialConcurrent は null（来場=累計は別軸）。
+      officialConcurrent: null
+    });
+
+    _calibrationLogInFlight = true;
+    void (async () => {
+      try {
+        const bag = await chrome.storage.local.get(KEY_CONCURRENT_CALIBRATION_RING_V1);
+        const next = appendCalibrationSample(
+          bag[KEY_CONCURRENT_CALIBRATION_RING_V1],
+          sample,
+          { nowMs: now }
+        );
+        if (next) {
+          await chrome.storage.local.set({ [KEY_CONCURRENT_CALIBRATION_RING_V1]: next });
+        }
+      } catch {
+        /* best-effort: 較正データは取りこぼしても害がない */
+      } finally {
+        _calibrationLogInFlight = false;
+      }
+    })();
+  } catch {
+    _calibrationLogInFlight = false;
+  }
 }
 
 /**
@@ -8667,6 +8887,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false;
   }
 
+  if (msg.type === NLS_PLAY_WATCH_CELEBRATION) {
+    if (!isWatchPageMainFrameForMessages()) return false;
+    try {
+      if (!isNicoLiveWatchUrl(window.location.href)) {
+        sendResponse({ ok: false, error: 'not_watch' });
+        return false;
+      }
+      playWatchCelebrationRelay(
+        document,
+        msg.payload,
+        (rel) => chrome.runtime.getURL(String(rel || ''))
+      );
+      sendResponse({ ok: true });
+    } catch (e) {
+      sendResponse({ ok: false, error: String(e?.message || e) });
+    }
+    return false;
+  }
+
   if (msg.type === 'NLS_CAPTURE_SCREENSHOT') {
     if (!isWatchPageMainFrameForMessages()) return;
     void (async () => {
@@ -8715,6 +8954,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'NLS_PING_COMMENT_FRAME') {
+    const hasEditor = Boolean(findCommentEditorElement());
+    const hasPanel = hasWatchCommentPanel();
+    const href = String(window.location.href || '');
+    const score =
+      (hasEditor ? 8_000_000 : 0) +
+      (hasPanel ? 4_000_000 : 0) +
+      (/\/watch\/lv\d+/i.test(href) ? 50_000 : 0);
+    sendResponse({ ok: true, score, href, hasEditor, hasPanel });
+    return true;
+  }
+
   if (msg.type === 'NLS_POST_COMMENT') {
     if (!canPostCommentInThisFrame()) {
       sendResponse({
@@ -8725,7 +8976,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     }
     const text =
       'text' in msg ? String(/** @type {{ text?: unknown }} */ (msg).text || '') : '';
-    void postCommentFromContentAsync(text)
+    const fastSubmit = Boolean(
+      /** @type {{ fastSubmit?: unknown }} */ (msg).fastSubmit
+    );
+    void postCommentFromContentAsync(text, { fastSubmit })
       .then((result) => sendResponse(result))
       .catch((err) =>
         sendResponse({
@@ -8788,6 +9042,31 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             : 'snapshot_error'
       });
     }
+  }
+
+  if (msg.type === PANEL_METRICS_MESSAGE_TYPE) {
+    if (!canExportWatchSnapshotFromThisFrame()) {
+      sendResponse({
+        ok: false,
+        error: 'watchページ以外では取得できません'
+      });
+      return;
+    }
+    syncLiveIdFromLocation();
+    try {
+      const payload = buildPanelSummaryPayloadForCurrentLive();
+      void persistPanelLiveSummaryIfDue(true);
+      sendResponse(buildPanelMetricsResponse(payload));
+    } catch (err) {
+      sendResponse({
+        ok: false,
+        error:
+          err && typeof err === 'object' && 'message' in err
+            ? String(/** @type {{ message?: unknown }} */ (err).message || 'panel_metrics_error')
+            : 'panel_metrics_error'
+      });
+    }
+    return;
   }
 
   if (msg.type === 'NLS_EXPORT_INTERCEPT_CACHE') {
@@ -9558,6 +9837,184 @@ async function seedTailFromMain(lid) {
   tailSeededLiveId = lid;
 }
 
+const PANEL_SUMMARY_WRITE_MIN_MS = 2_000;
+let _lastPanelSummaryWriteAt = 0;
+/** 進捗モニター用: 前回 storage に書いた recorded（変化時のみ force write） */
+let _lastPanelSummaryRecordedWritten = -1;
+/** タブ前面化直後は backfill 再アーム cooldown を短縮 */
+let _backfillPriorityBoostUntil = 0;
+
+/**
+ * @param {number} [nowMs]
+ * @returns {ReturnType<typeof buildPanelLiveSummary>|null}
+ */
+function buildPanelSummaryPayloadForCurrentLive(nowMs = Date.now()) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return null;
+  const WS_STALE_MS = 120_000;
+  /** @type {number|null} */
+  let viewerCountFromDom = null;
+  if (
+    wsViewerCount != null &&
+    wsViewerCountUpdatedAt > 0 &&
+    nowMs - wsViewerCountUpdatedAt < WS_STALE_MS
+  ) {
+    viewerCountFromDom = wsViewerCount;
+  }
+  if (viewerCountFromDom == null) {
+    try {
+      const props = extractEmbeddedDataProps(document);
+      if (props) viewerCountFromDom = pickViewerCountFromEmbeddedData(props);
+    } catch {
+      /* no-op */
+    }
+  }
+  if (viewerCountFromDom == null) {
+    try {
+      viewerCountFromDom = parseLiveViewerCountFromDocument(document);
+    } catch {
+      /* no-op */
+    }
+  }
+  const recentActive = countRecentActiveUsers(activeUserTimestamps, nowMs);
+  const streamAgeMin = resolvePanelSummaryStreamAgeMin(nowMs);
+  const officialCommentSummary = summarizeOfficialCommentHistory({
+    history: officialCommentHistory,
+    nowMs,
+    targetWindowMs:
+      typeof officialViewerIntervalMs === 'number' && officialViewerIntervalMs > 0
+        ? officialViewerIntervalMs
+        : 60_000,
+    minWindowMs: 15_000
+  });
+  const officialFields = buildWatchSnapshotOfficialFields({
+    nowMs,
+    officialViewerCount,
+    officialCommentCount,
+    officialStatsUpdatedAt,
+    officialCommentStatsUpdatedAt,
+    officialViewerIntervalMs,
+    officialCommentSummary,
+    officialAdPointsNdgr,
+    officialGiftPointsNdgr,
+    officialEventGiftScoreNdgr,
+    officialNicoEventRankNdgr,
+    officialNicoEventTitleNdgr,
+    officialNdgrStatsUpdatedAt
+  });
+  const resolved = resolveConcurrentFromSnapshot(
+    {
+      viewerCountFromDom,
+      ...officialFields,
+      recentActiveUsers: recentActive,
+      streamAgeMin
+    },
+    nowMs
+  );
+  return buildPanelLiveSummary({
+    liveId: lid,
+    recordedCount: observedRecordedCommentCount,
+    officialCount: officialFields.officialCommentCount,
+    viewerCountFromDom,
+    officialViewerCount: officialFields.officialViewerCount,
+    concurrentEstimated:
+      typeof resolved.estimated === 'number' && Number.isFinite(resolved.estimated)
+        ? resolved.estimated
+        : null,
+    recentActiveUsers: recentActive,
+    streamAgeMin,
+    officialStatsUpdatedAt: officialFields.officialStatsUpdatedAt,
+    officialStatsFreshnessMs: officialFields.officialStatsFreshnessMs,
+    officialCommentStatsUpdatedAt: officialFields.officialCommentStatsUpdatedAt,
+    officialCommentStatsFreshnessMs: officialFields.officialCommentStatsFreshnessMs,
+    officialViewerIntervalMs: officialFields.officialViewerIntervalMs,
+    officialStatisticsCommentsDelta: officialFields.officialStatisticsCommentsDelta,
+    officialReceivedCommentsDelta: officialFields.officialReceivedCommentsDelta,
+    officialCommentSampleWindowMs: officialFields.officialCommentSampleWindowMs,
+    officialCaptureRatio: officialFields.officialCaptureRatio,
+    lastIngestAt: nowMs,
+    recentRows: recentCommentRing,
+    nowMs
+  });
+}
+
+/**
+ * パネル速報経路でも同接の滞留フォールバックを使えるよう、snapshot 本体と同じ優先順で
+ * 配信経過分を軽量に解決する。
+ * @param {number} nowMs
+ * @returns {number|null}
+ */
+function resolvePanelSummaryStreamAgeMin(nowMs) {
+  try {
+    maybeFillProgramBeginFromEmbeddedData();
+  } catch {
+    // no-op
+  }
+  if (
+    programBeginAtMs != null &&
+    Number.isFinite(programBeginAtMs) &&
+    programBeginAtMs > 0
+  ) {
+    const age = (nowMs - programBeginAtMs) / 60000;
+    if (age >= 0) return Math.round(age);
+  }
+  try {
+    const props = extractEmbeddedDataProps(document);
+    const beginMs = props ? pickProgramBeginAt(props) : null;
+    if (beginMs != null && Number.isFinite(beginMs) && beginMs > 0) {
+      const age = (nowMs - beginMs) / 60000;
+      if (age >= 0) return Math.round(age);
+    }
+  } catch {
+    // no-op
+  }
+  try {
+    const satm = String(document.title || '').match(
+      /(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]*\)\s+(\d{1,2}):(\d{2})/
+    );
+    if (satm) {
+      const d = new Date(+satm[1], +satm[2] - 1, +satm[3], +satm[4], +satm[5]);
+      const age = (nowMs - d.getTime()) / 60000;
+      if (age >= 0 && age < 1440) return Math.round(age);
+    }
+  } catch {
+    // no-op
+  }
+  try {
+    const playerArea =
+      document
+        .querySelector('[class*="player" i], [class*="Player" i], [id*="player" i], video')
+        ?.closest('[class*="player" i], [class*="Player" i], [id*="player" i]') ||
+      document.querySelector('[class*="player" i], [class*="Player" i]');
+    const txt = playerArea?.textContent || '';
+    const pm = txt.match(/(\d{1,2}):(\d{2}):(\d{2})\s*\/\s*\d/);
+    if (pm) return +pm[1] * 60 + +pm[2];
+  } catch {
+    // no-op
+  }
+  return null;
+}
+
+/**
+ * @param {boolean} [force]
+ */
+async function persistPanelLiveSummaryIfDue(force = false) {
+  const now = Date.now();
+  if (!force && now - _lastPanelSummaryWriteAt < PANEL_SUMMARY_WRITE_MIN_MS) return;
+  const payload = buildPanelSummaryPayloadForCurrentLive(now);
+  if (!payload) return;
+  _lastPanelSummaryWriteAt = now;
+  const pKey = panelSummaryStorageKey(liveId);
+  try {
+    await runStorageOpWithTimeout(
+      () => chrome.storage.local.set({ [pKey]: payload }),
+      INGEST_TIMING.persistWriteTimeoutMs
+    );
+  } catch (err) {
+    if (err !== STORAGE_OP_TIMED_OUT) throw err;
+  }
+}
+
 /**
  * バッチ（新規コメント行）をテールへ安く追記し、heartbeat（最終取り込みログ）を更新する。
  * @param {ParsedCommentRow[]} rows
@@ -9604,6 +10061,8 @@ async function bufferRowsToTail(rows) {
     nowMs: now
   });
   const sKey = summaryStorageKey(liveId);
+  const panelPayload = buildPanelSummaryPayloadForCurrentLive(now);
+  const pKey = panelSummaryStorageKey(liveId);
   /** @type {Record<string, unknown>|null} */
   let ingestLogPayload = null;
   try {
@@ -9633,6 +10092,7 @@ async function bufferRowsToTail(rows) {
         chrome.storage.local.set({
           [tKey]: tailRowsBuffer,
           [sKey]: summaryPayload,
+          ...(panelPayload ? { [pKey]: panelPayload } : {}),
           ...(ingestLogPayload ? { [KEY_COMMENT_INGEST_LOG]: ingestLogPayload } : {})
         }),
       INGEST_TIMING.persistWriteTimeoutMs
@@ -11117,9 +11577,84 @@ function cancelPendingDeepHarvest() {
     clearTimeout(deepHarvestTimer);
     deepHarvestTimer = null;
   }
+  if (deepHarvestScrollRetryTimer != null) {
+    clearTimeout(deepHarvestScrollRetryTimer);
+    deepHarvestScrollRetryTimer = null;
+  }
+  if (visibleScanScrollRetryTimer != null) {
+    clearTimeout(visibleScanScrollRetryTimer);
+    visibleScanScrollRetryTimer = null;
+  }
   clearDeepHarvestZeroRowRetrySchedule();
   resetDeepHarvestStabilityFollowUp();
   removeDeepHarvestLoadingUi();
+}
+
+/**
+ * @param {number} [windowMs]
+ * @returns {boolean}
+ */
+function isUserScrollDeferringDomHarvest(windowMs = DOM_HARVEST_SCROLL_DEFER_MS) {
+  return shouldDeferDomHarvestDuringScroll(
+    Date.now(),
+    lastGenuineUserScrollAt,
+    windowMs
+  );
+}
+
+/** @returns {() => boolean} */
+function createDeepHarvestScrollAbort() {
+  return () =>
+    shouldDeferDomHarvestDuringScroll(
+      Date.now(),
+      lastGenuineUserScrollAt,
+      DEEP_HARVEST_USER_SCROLL_DEFER_MS
+    );
+}
+
+/**
+ * スクロール静止後に deep を 1 回だけ再試行する（連打防止）。
+ * @param {{ armStabilityFollowUp?: boolean, stabilityFollowUp?: boolean, force?: boolean }} opts
+ */
+function scheduleDeepHarvestAfterScrollQuiet(opts) {
+  if (deepHarvestScrollRetryTimer != null) {
+    clearTimeout(deepHarvestScrollRetryTimer);
+  }
+  removeDeepHarvestLoadingUi();
+  deepHarvestScrollRetryTimer = setTimeout(() => {
+    deepHarvestScrollRetryTimer = null;
+    if (isUserScrollDeferringDomHarvest(DEEP_HARVEST_USER_SCROLL_DEFER_MS)) {
+      scheduleDeepHarvestAfterScrollQuiet(opts);
+      return;
+    }
+    void runDeepHarvest(opts).catch((err) =>
+      reportSilentErrorToStorage('deepHarvest', err)
+    );
+  }, DEEP_HARVEST_USER_SCROLL_DEFER_MS);
+}
+
+/**
+ * スクロール静止後に visible scan を 1 回だけ再試行する。
+ */
+function scheduleVisibleScanAfterScrollQuiet() {
+  if (visibleScanScrollRetryTimer != null) {
+    clearTimeout(visibleScanScrollRetryTimer);
+  }
+  visibleScanScrollRetryTimer = setTimeout(() => {
+    visibleScanScrollRetryTimer = null;
+    if (
+      shouldDeferVisibleScanDuringScroll(
+        Date.now(),
+        lastGenuineUserScrollAt,
+        lastUserInitiatedScrollAt,
+        INGEST_TIMING.visibleScanScrollDeferMs
+      )
+    ) {
+      scheduleVisibleScanAfterScrollQuiet();
+      return;
+    }
+    scanVisibleCommentsNow();
+  }, INGEST_TIMING.visibleScanScrollDeferMs);
 }
 
 /** @param {string} reason */
@@ -11137,8 +11672,10 @@ function scheduleDeepHarvest(reason) {
     : DEEP_HARVEST_DELAY_MS;
   if (!wantQuietSchedule) {
     removeDeepHarvestLoadingUi();
-  } else {
+  } else if (!isUserScrollDeferringDomHarvest(DEEP_HARVEST_USER_SCROLL_DEFER_MS)) {
     ensureDeepHarvestLoadingUi();
+  } else {
+    removeDeepHarvestLoadingUi();
   }
   deepHarvestTimer = setTimeout(() => {
     deepHarvestTimer = null;
@@ -11220,6 +11757,10 @@ function maybeRetryRankingAcquisitionOnVisible() {
 function onTabVisibleForCommentHarvest() {
   if (document.visibilityState !== 'visible') return;
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  void setBackfillPriorityLiveId(liveId);
+  _backfillPriorityBoostUntil = Date.now() + 120_000;
+  _lastBackfillGapCatchupRearmAt = 0;
+  void persistPanelLiveSummaryIfDue(true);
   // v0.1.497/499: 隠れている間は保存間隔を広めにしているため、コアレッサ内に未保存
   //   バッファが溜まり得る。可視に戻った瞬間に 1 回フラッシュして即座に追いつく。
   try {
@@ -11238,7 +11779,12 @@ function onTabVisibleForCommentHarvest() {
   maybeFetchKokenContribRankingMirrorOnce();
   maybeFetchNicoadContribRankingMirrorOnce();
   maybeFetchEventParticipationMirrorOnce();
-  scanVisibleCommentsNow();
+  maybeFetchKokenGiftHistoryMirrorOnce();
+  maybeFetchAuditionEventRankingMirrorOnce();
+  maybeFetchBroadcasterProfileMirrorOnce();
+  if (!isUserScrollDeferringDomHarvest()) {
+    scanVisibleCommentsNow();
+  }
   const now = Date.now();
   const needsRecovery = shouldForceDeepHarvestRecovery({
     lastCompletedAt: deepHarvestPipelineStats.lastCompletedAt,
@@ -11301,19 +11847,39 @@ async function runDeepHarvest(opts = {}) {
       return;
     }
   }
+  if (isUserScrollDeferringDomHarvest(DEEP_HARVEST_USER_SCROLL_DEFER_MS)) {
+    scheduleDeepHarvestAfterScrollQuiet(opts);
+    return;
+  }
+  const scaleForHeavyLive = Math.max(
+    observedRecordedCommentCount,
+    typeof officialCommentCount === 'number' && Number.isFinite(officialCommentCount)
+      ? officialCommentCount
+      : 0,
+    typeof wsCommentCount === 'number' && Number.isFinite(wsCommentCount)
+      ? wsCommentCount
+      : 0
+  );
+  const heavyLive = scaleForHeavyLive >= DEEP_HARVEST_HEAVY_LIVE_COMMENT_THRESHOLD;
   harvestRunning = true;
   try {
+    const shouldAbort = createDeepHarvestScrollAbort();
     const rows = await harvestVirtualCommentList({
       document,
       extractCommentsFromNode,
       waitMs: DEEP_HARVEST_SCROLL_WAIT_MS,
-      twoPass: !opts.stabilityFollowUp,
+      twoPass: !opts.stabilityFollowUp && !heavyLive,
       twoPassGapMs: DEEP_HARVEST_SECOND_PASS_GAP_MS,
       scrollStepClientHeightRatio: DEEP_HARVEST_SCROLL_STEP_RATIO,
       quietScroll: true,
       respectTyping: false,
-      preferRecentScrollEndFirst: true
+      preferRecentScrollEndFirst: true,
+      shouldAbort
     });
+    if (shouldAbort()) {
+      scheduleDeepHarvestAfterScrollQuiet(opts);
+      return;
+    }
     await persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.DEEP });
     deepHarvestPipelineStats.lastCompletedAt = Date.now();
     deepHarvestPipelineStats.lastRowCount = rows.length;
@@ -11409,6 +11975,17 @@ async function syncCommentHarvestPanelStatus() {
 
 function scanVisibleCommentsNow() {
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  if (
+    shouldDeferVisibleScanDuringScroll(
+      Date.now(),
+      lastGenuineUserScrollAt,
+      lastUserInitiatedScrollAt,
+      INGEST_TIMING.visibleScanScrollDeferMs
+    )
+  ) {
+    scheduleVisibleScanAfterScrollQuiet();
+    return;
+  }
   const panel = findNicoCommentPanel(document);
   const root = panel || findWatchCommentHarvestFallbackRoot(document);
   if (!root) return;
@@ -11629,7 +12206,20 @@ function attachCommentScrollHook() {
     () => {
       if (!recording || !liveId) return;
       clearTimeout(t);
-      t = setTimeout(() => scanVisibleCommentsNow(), INGEST_TIMING.visibleScanDelayMs);
+      t = setTimeout(() => {
+        if (
+          shouldDeferVisibleScanDuringScroll(
+            Date.now(),
+            lastGenuineUserScrollAt,
+            lastUserInitiatedScrollAt,
+            INGEST_TIMING.visibleScanScrollDeferMs
+          )
+        ) {
+          scheduleVisibleScanAfterScrollQuiet();
+          return;
+        }
+        scanVisibleCommentsNow();
+      }, INGEST_TIMING.visibleScanEndDebounceMs);
     },
     { passive: true }
   );
@@ -11811,11 +12401,16 @@ function startRecordingProgressMonitor() {
   const overlay = createDevMonitorOverlay();
   function tickMonitor() {
     try {
+      const recordedNow = Number(observedRecordedCommentCount) || 0;
       samples = pushProgressSample(samples, {
         t: Date.now(),
-        recorded: Number(observedRecordedCommentCount) || 0,
+        recorded: recordedNow,
         official: officialCommentCount
       });
+      if (recordedNow !== _lastPanelSummaryRecordedWritten) {
+        _lastPanelSummaryRecordedWritten = recordedNow;
+        void persistPanelLiveSummaryIfDue(true);
+      }
       const ev = evaluateCommentProgress(samples);
       if (overlay) {
         overlay.update(ev);
@@ -12552,6 +13147,7 @@ async function start() {
             DOM_HARVEST_SCROLL_DEFER_MS
           )
         ) {
+          scheduleVisibleScanAfterScrollQuiet();
           return;
         }
         scanVisibleCommentsNow();
@@ -12698,6 +13294,18 @@ const EVENT_PARTICIPATION_API_MIN_GAP_MS = 10_000;
 let _eventParticipationApiLastAttemptAt = 0;
 /** 1 tick で nvapi に問い合わせる記名 uid の最大数。 */
 const NICO_PROFILE_RESOLVE_BATCH = 3;
+/** follow 専用バッチの再入抑止（nvapi レート制限対策）。 */
+const COMMENTER_FOLLOW_FETCH_MIN_GAP_MS = 8_000;
+/** フォロー一覧専用バッチの再入抑止（1 req が重い）。 */
+const COMMENTER_FOLLOWING_LIST_FETCH_MIN_GAP_MS = 30_000;
+/** @type {number} */
+let _commenterFollowFetchLastAt = 0;
+/** @type {number} */
+let _commenterFollowingListFetchLastAt = 0;
+/** @type {string} */
+let _followingListCountLiveId = '';
+/** @type {number} */
+let _followingListFetchedThisLive = 0;
 /** content 側でも問い合わせ済み uid を覚え、SW LRU と二重に抑制する。 */
 const _nicoProfileResolveAttempted = new Set();
 
@@ -12720,7 +13328,15 @@ function runExternalApiFetchesAsTabLeader(opts = {}) {
     maybeFetchKokenContribRankingMirrorOnce();
     maybeFetchNicoadContribRankingMirrorOnce();
     if (includeEvt) maybeFetchEventParticipationMirrorOnce();
+    // 2026-06-01: ギフト履歴 / イベント💎ランキングも「パネルを開かずに即時取得」する
+    //   無認証 API 経路（koken /histories・audition capi 2 段）。koken/nicoad と同じ
+    //   タブリーダー集約・min-gap 再入抑止・rows>0 のみ書込（fail-soft）。
+    maybeFetchKokenGiftHistoryMirrorOnce();
+    maybeFetchAuditionEventRankingMirrorOnce();
+    maybeFetchBroadcasterProfileMirrorOnce();
     void maybeResolveNamedUserProfilesOnce();
+    void maybeFetchCommenterFollowBatchOnce();
+    void maybeFetchCommenterFollowingListBatchOnce();
   });
 }
 
@@ -12942,6 +13558,313 @@ function maybeFetchEventParticipationMirrorOnce() {
   }
 }
 
+/** koken ギフト履歴 API の再入抑止（FETCH 周期に合わせ 10s）。 */
+const KOKEN_GIFT_HISTORY_API_MIN_GAP_MS = 10_000;
+/** @type {number} */
+let _kokenGiftHistoryApiLastAttemptAt = 0;
+
+/**
+ * 「ギフト履歴もすぐとりたい」（2026-06-01）: koken の個別ギフト履歴を SW 経由で取得し、
+ * 既存の `nls_gift_history_throws_<lv>`（送り主別の累計pt集計）へ保存する。これにより
+ * ギフトタブ（koken iframe）を**開かなくても**ギフト履歴レーンが即時に出る。
+ *
+ * 取得元は koken 公式ギフト履歴 API（api.koken.../userperspective/.../histories）。
+ * DOM scrape 版（NLS_GIFT_HISTORY_FROM_IFRAME）と同じ保存キー・保存形なので popup の
+ * 既存読み取りをそのまま流用。さらに本経路は記名行に**数値 uid** を入れるためリンクが効く。
+ *
+ * 制約は koken/nicoad と同一（iframe 内では走らない・SW 経由 fetch・rows>0 のみ書込＝
+ * fail-soft・liveId echo 一致確認・min-gap 再入抑止・callback 喪失時も次 tick で自己回復）。
+ */
+function maybeFetchKokenGiftHistoryMirrorOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '')
+      .trim()
+      .toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _kokenGiftHistoryApiLastAttemptAt < KOKEN_GIFT_HISTORY_API_MIN_GAP_MS) return;
+    _kokenGiftHistoryApiLastAttemptAt = now;
+    void (async () => {
+      const jsonPages = await fetchKokenGiftHistoryAllViaExtension(lid, {
+        timeoutMs: 8000,
+        maxPages: 15
+      });
+      if (!jsonPages.length) return;
+      const curLid = String(liveId || '')
+        .trim()
+        .toLowerCase();
+      if (curLid !== lid) return;
+      const subKey = giftSubAppHistoryStorageKey(lid);
+      const throwsKey = giftHistoryThrowsStorageKey(lid);
+      try {
+        const bag = await chrome.storage.local.get([subKey, throwsKey]);
+        const prevSub =
+          bag[subKey] && typeof bag[subKey] === 'object' ? bag[subKey] : null;
+        const { subApp, throws } = buildKokenGiftPersistPayload(jsonPages, prevSub, {
+          now: Date.now(),
+          liveId: lid
+        });
+        /** @type {Record<string, unknown>} */
+        const persist = {};
+        if (subApp) persist[subKey] = subApp;
+        if (throws?.length) persist[throwsKey] = throws;
+        if (Object.keys(persist).length === 0) return;
+        await chrome.storage.local.set(persist);
+      } catch (err) {
+        if (!isContextInvalidatedError(err)) {
+          /* best-effort */
+        }
+      }
+    })();
+  } catch {
+    /* no-op: 次 tick で自己回復 */
+  }
+}
+
+/** 配信者プロフィール取得（nvapi + プロフィール HTML）の再入抑止。プロフィールは滅多に変わらない。 */
+const BROADCASTER_PROFILE_API_MIN_GAP_MS = 5 * 60 * 1000;
+/** @type {number} */
+let _broadcasterProfileApiLastAttemptAt = 0;
+
+/**
+ * 配信者プロフィール（プレミアム会員・フォロー/フォロワー・LV・配信開始日・累計配信日数・
+ * 欲しいものリスト等）を取得し、`nls_broadcaster_profile_<lv>` に保存する。レポート2種の
+ * ヘッダーカードがこれを読む。nvapi JSON とプロフィール HTML を SW 経由で並行取得し統合。
+ *
+ * 制約は他経路と同一: top-frame のみ・数値 uid のみ・SW 経由 fetch（SSRF 対策）・liveId echo
+ * 一致確認・min-gap 再入抑止・取得できた項目だけ保存（fail-soft）。
+ */
+function maybeFetchBroadcasterProfileMirrorOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '')
+      .trim()
+      .toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const uid = String(detectBroadcasterUserIdFromDom() || '').trim();
+    if (!isResolvableNicoUid(uid)) return; // 数値 uid（ユーザー/コミュ放送）だけ。運営/業者は対象外
+    const now = Date.now();
+    if (now - _broadcasterProfileApiLastAttemptAt < BROADCASTER_PROFILE_API_MIN_GAP_MS) return;
+    _broadcasterProfileApiLastAttemptAt = now;
+
+    /** @type {Record<string, unknown>} */
+    const merged = { userId: uid };
+    let pending = 2;
+    const finish = () => {
+      pending -= 1;
+      if (pending > 0) return;
+      const curLid = String(liveId || '')
+        .trim()
+        .toLowerCase();
+      if (curLid !== lid) return; // 応答到着までに別 lv へ遷移していたら stale 書込しない
+      const model = normalizeBroadcasterProfileModel(merged);
+      if (!model) return;
+      try {
+        chrome.storage.local
+          .set({
+            [broadcasterProfileStorageKey(lid)]: { ...model, capturedAt: Date.now() }
+          })
+          .catch((err) => {
+            if (!isContextInvalidatedError(err)) {
+              /* best-effort */
+            }
+          });
+      } catch {
+        /* no-op */
+      }
+    };
+
+    // nvapi /v1/users/<id>（LV/プレミアム/フォロー/フォロワー/アイコン/表示名）。
+    chrome.runtime.sendMessage(
+      { type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid },
+      (resp) => {
+        const le = chrome.runtime.lastError;
+        if (le) {
+          finish();
+          return;
+        }
+        try {
+          if (resp && resp.ok === true && resp.json != null) {
+            const p = normalizeNicoUserProfileResponse(resp.json);
+            if (p) Object.assign(merged, p); // nvapi を優先（authoritative）
+          }
+        } catch {
+          /* no-op */
+        }
+        finish();
+      }
+    );
+
+    // プロフィール HTML（配信開始日/累計配信日数/欲しいものリスト/放送リクエスト等の補完）。
+    chrome.runtime.sendMessage(
+      { type: NICO_USER_PROFILE_PAGE_FETCH_MESSAGE_TYPE, uid },
+      (resp) => {
+        const le = chrome.runtime.lastError;
+        if (le) {
+          finish();
+          return;
+        }
+        try {
+          if (
+            resp &&
+            resp.ok === true &&
+            typeof resp.html === 'string' &&
+            resp.html &&
+            typeof DOMParser !== 'undefined'
+          ) {
+            const doc = new DOMParser().parseFromString(resp.html, 'text/html');
+            const stats = extractNicoUserBroadcastStats(doc);
+            for (const [k, v] of Object.entries(stats)) {
+              if (v === null || v === undefined || v === '') continue;
+              // HTML は補完のみ。nvapi で既に取れている項目は上書きしない。
+              if (merged[k] === undefined) merged[k] = v;
+            }
+          }
+        } catch {
+          /* no-op */
+        }
+        finish();
+      }
+    );
+  } catch {
+    /* no-op: 次 tick で自己回復 */
+  }
+}
+
+/** audition イベント💎ランキング API の再入抑止。 */
+const AUDITION_EVENT_RANKING_API_MIN_GAP_MS = 12_000;
+/** @type {number} */
+let _auditionEventRankingApiLastAttemptAt = 0;
+
+/**
+ * 「対象の場所をひらかないとでない」（2026-06-01）: イベント💎ランキングを SW 経由（無認証
+ * capi 2 段 fetch）で取得し、relay と同じ `nls_event_score_ranking_<lv>` へ保存する。これに
+ * より richview iframe（RANK パネル）を**開かなくても**イベントランキングが即時に出る。
+ *
+ * イベント参加中（embedded-data の programAudition.isEnabled）のときだけ走る（非イベント
+ * では entry_items が空＝無駄打ちしない）。selfStatus（自分の順位/差）も entry_items から
+ * 復元し、diffToNext は rankings の 1 つ上の score との差で算出する。
+ *
+ * 制約は koken/nicoad と同一（iframe 内では走らない・SW 経由 fetch・rows>0 のみ書込＝
+ * fail-soft・liveId echo 一致確認・min-gap 再入抑止）。
+ */
+function maybeFetchAuditionEventRankingMirrorOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    if (typeof document === 'undefined') return;
+    const props = extractEmbeddedDataProps(document);
+    if (!pickIsEventParticipating(props)) return; // 非イベントでは出さない
+    const lid = String(liveId || '')
+      .trim()
+      .toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _auditionEventRankingApiLastAttemptAt < AUDITION_EVENT_RANKING_API_MIN_GAP_MS) return;
+    _auditionEventRankingApiLastAttemptAt = now;
+    chrome.runtime.sendMessage(
+      { type: AUDITION_EVENT_RANKING_FETCH_MESSAGE_TYPE, liveId: lid },
+      (resp) => {
+        const le = chrome.runtime.lastError;
+        if (le) return;
+        if (!resp || resp.ok !== true) return;
+        const curLid = String(liveId || '')
+          .trim()
+          .toLowerCase();
+        if (curLid !== lid) return; // 応答到着までに別 lv へ遷移していたら stale 書込しない
+
+        let norm = null;
+        try {
+          norm = normalizeAuditionRankingsResponse(resp.rankingsJson, { max: 10 });
+        } catch {
+          norm = null;
+        }
+        // イベント💎ランキング（rows>0 のときだけ上書き＝fail-soft）。
+        if (norm && Array.isArray(norm.rows) && norm.rows.length > 0) {
+          let ctx = null;
+          try {
+            ctx = pickAuditionContextFromEntryItems(resp.entryItemsJson);
+          } catch {
+            ctx = null;
+          }
+          let selfStatus = null;
+          if (ctx && ctx.selfStatus) {
+            const s = ctx.selfStatus;
+            let diffToNext = null;
+            if (typeof s.rank === 'number' && s.rank > 1 && typeof s.score === 'number') {
+              const above = norm.rows.find((r) => r.rank === s.rank - 1);
+              if (above && typeof above.score === 'number') {
+                const d = above.score - s.score;
+                if (Number.isFinite(d) && d >= 0) diffToNext = d;
+              }
+            }
+            selfStatus = {
+              rank: s.rank,
+              score: s.score,
+              diffToNext,
+              eventName: s.eventName,
+              broadcasterName: s.broadcasterName
+            };
+          }
+          try {
+            chrome.storage.local
+              .set({
+                [eventScoreRankingStorageKey(lid)]: {
+                  rows: norm.rows.slice(0, 10),
+                  selfStatus,
+                  capturedAt: Date.now(),
+                  liveId: lid,
+                  source: 'capi'
+                }
+              })
+              .catch((err) => {
+                if (!isContextInvalidatedError(err)) {
+                  /* best-effort */
+                }
+              });
+          } catch {
+            /* no-op */
+          }
+        }
+
+        // 応援者ランキング（イベント投票・ギフト＋ニコニ広告）。貢献度(ギフトのみ)とは
+        // 別指標。rows>0 のときだけ専用キーへ保存（popup の応援者レーンが読む）。
+        let voting = null;
+        try {
+          voting = normalizeAuditionVotingUserRankingResponse(resp.votingJson, { max: 10 });
+        } catch {
+          voting = null;
+        }
+        if (Array.isArray(voting) && voting.length > 0) {
+          try {
+            chrome.storage.local
+              .set({
+                [eventVotingRankingStorageKey(lid)]: {
+                  rows: voting,
+                  capturedAt: Date.now(),
+                  liveId: lid,
+                  source: 'capi'
+                }
+              })
+              .catch((err) => {
+                if (!isContextInvalidatedError(err)) {
+                  /* best-effort */
+                }
+              });
+          } catch {
+            /* no-op */
+          }
+        }
+      }
+    );
+  } catch {
+    /* no-op: 次 tick で自己回復 */
+  }
+}
+
 /**
  * 記名 uid（コメント/ギフト送信者で判明している数値 uid）を少数ずつ nvapi で解決し、
  * 既存 userCommentProfileCache に nickname/avatarUrl を足す。匿名・合成キーは除外。
@@ -12958,11 +13881,15 @@ async function maybeResolveNamedUserProfilesOnce() {
     const bag = await chrome.storage.local.get([
       commentsKey,
       giftsKey,
-      KEY_USER_COMMENT_PROFILE_CACHE
+      KEY_USER_COMMENT_PROFILE_CACHE,
+      KEY_COMMENTER_FOLLOW_CACHE
     ]);
     const profileMap = normalizeUserCommentProfileMap(
       bag[KEY_USER_COMMENT_PROFILE_CACHE]
     );
+    // フォロー/フォロワー横断キャッシュ（数値 uid キー・TTL 付き）。同じ nvapi 応答から拾う。
+    const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
+    const followNow = Date.now();
     let comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
     const giftUsers = Array.isArray(bag[giftsKey]) ? bag[giftsKey] : [];
 
@@ -12978,7 +13905,12 @@ async function maybeResolveNamedUserProfilesOnce() {
       const hit = profileMap[uid];
       const hasNick = hit && String(hit.nickname || '').trim() !== '';
       const hasAvatar = hit && String(hit.avatarUrl || '').trim() !== '';
-      if (hasNick && hasAvatar) return;
+      // フォロー情報が未取得/TTL 切れなら、nick/avatar が揃っていても候補に入れる
+      // （同じ nvapi 応答で follow も拾える）。
+      const followHit = followMap[uid];
+      const hasFreshFollow =
+        followHit && isFreshFollowEntry(Number(followHit.fetchedAt), followNow, COMMENTER_FOLLOW_TTL_MS);
+      if (hasNick && hasAvatar && hasFreshFollow) return;
       candidates.push(uid);
     };
 
@@ -13020,6 +13952,7 @@ async function maybeResolveNamedUserProfilesOnce() {
       });
 
     let cacheTouched = false;
+    let followTouched = false;
     for (const uid of candidates) {
       _nicoProfileResolveAttempted.add(uid);
       const p = await askOne(uid);
@@ -13027,18 +13960,120 @@ async function maybeResolveNamedUserProfilesOnce() {
       if (upsertUserCommentProfileFromEntry(profileMap, p, broadcasterCtx)) {
         cacheTouched = true;
       }
+      // 同じ nvapi 応答からフォロー/フォロワー/プレミアム/LV を follow キャッシュへ。
+      const followEntry = commenterFollowEntryFromProfile(p, Date.now());
+      if (followEntry && upsertCommenterFollowEntry(followMap, uid, followEntry)) {
+        followTouched = true;
+      }
     }
-    if (!cacheTouched) return;
+    if (!cacheTouched && !followTouched) return;
 
     const curLid = String(liveId || '').trim().toLowerCase();
     if (curLid !== lid) return;
 
-    const pruned = pruneUserCommentProfileMap(profileMap);
-    const applied = applyUserCommentProfileMapToEntries(comments, pruned);
-    if (applied.patched > 0) comments = applied.next;
+    /** @type {Record<string, unknown>} */
+    const save = {};
+    if (cacheTouched) {
+      const pruned = pruneUserCommentProfileMap(profileMap);
+      const applied = applyUserCommentProfileMapToEntries(comments, pruned);
+      if (applied.patched > 0) comments = applied.next;
+      save[KEY_USER_COMMENT_PROFILE_CACHE] = pruned;
+      if (applied.patched > 0) save[commentsKey] = comments;
+    }
+    if (followTouched) {
+      save[KEY_COMMENTER_FOLLOW_CACHE] = followMap;
+    }
+    if (Object.keys(save).length) await chrome.storage.local.set(save);
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      /* best-effort */
+    }
+  }
+}
 
-    const save = { [KEY_USER_COMMENT_PROFILE_CACHE]: pruned };
-    if (applied.patched > 0) save[commentsKey] = comments;
+/**
+ * 数値 ID コメンター全員を対象に、未取得/TTL 切れ分だけ nvapi から follow 情報を
+ * 少数ずつ取得し、横断キャッシュ + 配信別スナップショット（`nls_commenter_follow_live_<lv>`）
+ * を更新する。名前解決（maybeResolveNamedUserProfilesOnce）とは独立した follow 専用経路。
+ */
+async function maybeFetchCommenterFollowBatchOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _commenterFollowFetchLastAt < COMMENTER_FOLLOW_FETCH_MIN_GAP_MS) return;
+    _commenterFollowFetchLastAt = now;
+
+    const commentsKey = commentsStorageKey(lid);
+    const bag = await chrome.storage.local.get([
+      commentsKey,
+      KEY_USER_COMMENT_PROFILE_CACHE,
+      KEY_COMMENTER_FOLLOW_CACHE
+    ]);
+    const comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
+    const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
+    const broadcasterUid = String(detectBroadcasterUserIdFromDom() || broadcasterUidCache || '').trim();
+    const stats = collectNumericCommentersFromComments(comments, {
+      excludeUserId: broadcasterUid
+    });
+    if (!stats.length) return;
+
+    const toFetch = pickFollowUidsToFetch(
+      stats.map((s) => s.userId),
+      followMap,
+      { nowMs: now, limit: COMMENTER_FOLLOW_FETCH_BATCH }
+    );
+
+    const askOne = (uid) =>
+      new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage(
+            { type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid },
+            (resp) => {
+              const le = chrome.runtime.lastError;
+              if (le) return resolve(null);
+              if (!resp || resp.ok !== true || resp.json == null) return resolve(null);
+              try {
+                resolve(normalizeNicoUserProfileResponse(resp.json));
+              } catch {
+                resolve(null);
+              }
+            }
+          );
+        } catch {
+          resolve(null);
+        }
+      });
+
+    let followTouched = false;
+    for (const uid of toFetch) {
+      const p = await askOne(uid);
+      if (!p) continue;
+      const followEntry = commenterFollowEntryFromProfile(p, Date.now());
+      if (followEntry && upsertCommenterFollowEntry(followMap, uid, followEntry)) {
+        followTouched = true;
+      }
+      if (upsertUserCommentProfileFromEntry(profileMap, p, {
+        broadcasterUid: broadcasterUidCache,
+        broadcasterIconUrl: broadcasterIconUrlCache
+      })) {
+        /* nickname も同時に補完（best-effort） */
+      }
+    }
+
+    const curLid = String(liveId || '').trim().toLowerCase();
+    if (curLid !== lid) return;
+
+    const rows = buildCommenterFollowRows(stats, followMap, profileMap);
+    const snapshot = buildCommenterFollowLiveSnapshot(lid, rows, Date.now());
+    if (!snapshot) return;
+
+    /** @type {Record<string, unknown>} */
+    const save = { [commenterFollowLiveStorageKey(lid)]: snapshot };
+    if (followTouched) save[KEY_COMMENTER_FOLLOW_CACHE] = followMap;
     await chrome.storage.local.set(save);
   } catch (err) {
     if (!isContextInvalidatedError(err)) {
@@ -13046,6 +14081,97 @@ async function maybeResolveNamedUserProfilesOnce() {
     }
   }
 }
+
+/**
+ * @param {unknown} resp
+ * @param {number} now
+ * @returns {import('../lib/commenterFollowingListCache.js').CommenterFollowingListEntry|null}
+ */
+function followingListEntryFromFetchResponse(resp, now) {
+  return buildFollowingListEntryFromFetchResponse(resp, now);
+}
+
+/**
+ * 数値 ID コメンター上位から、フォロー先 userId リストを nvapi で少数取得する。
+ * 配信あたり最大 {@link COMMENTER_FOLLOWING_LIST_LIVE_MAX} 名・30秒間隔。
+ */
+async function maybeFetchCommenterFollowingListBatchOnce() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (typeof window !== 'undefined' && window.self !== window.top) return;
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const now = Date.now();
+    if (now - _commenterFollowingListFetchLastAt < COMMENTER_FOLLOWING_LIST_FETCH_MIN_GAP_MS) return;
+    if (lid !== _followingListCountLiveId) {
+      _followingListCountLiveId = lid;
+      _followingListFetchedThisLive = 0;
+    }
+    if (_followingListFetchedThisLive >= COMMENTER_FOLLOWING_LIST_LIVE_MAX) return;
+    _commenterFollowingListFetchLastAt = now;
+
+    const commentsKey = commentsStorageKey(lid);
+    const bag = await chrome.storage.local.get([
+      commentsKey,
+      KEY_USER_COMMENT_PROFILE_CACHE,
+      KEY_COMMENTER_FOLLOW_CACHE,
+      KEY_COMMENTER_FOLLOWING_LIST_CACHE
+    ]);
+    const comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
+    const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
+    const followingListMap = normalizeFollowingListMap(bag[KEY_COMMENTER_FOLLOWING_LIST_CACHE]);
+    const broadcasterUid = String(detectBroadcasterUserIdFromDom() || broadcasterUidCache || '').trim();
+    const stats = collectNumericCommentersFromComments(comments, {
+      excludeUserId: broadcasterUid
+    });
+    if (!stats.length) return;
+
+    const toFetch = pickFollowingListUidsToFetch(stats, followingListMap, { nowMs: now, limit: 1 });
+    if (!toFetch.length) return;
+
+    const uid = toFetch[0];
+    const resp = await new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: NICO_USER_FOLLOWING_FETCH_MESSAGE_TYPE, uid }, (r) => {
+          const le = chrome.runtime.lastError;
+          if (le) return resolve(null);
+          resolve(r);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+
+    _followingListFetchedThisLive += 1;
+    const entry = followingListEntryFromFetchResponse(resp, now);
+    let listTouched = false;
+    if (entry && upsertFollowingListEntry(followingListMap, uid, entry)) {
+      listTouched = true;
+    }
+
+    const curLid = String(liveId || '').trim().toLowerCase();
+    if (curLid !== lid) return;
+
+    const rows = mergeFollowingListIntoRows(
+      buildCommenterFollowRows(stats, followMap, profileMap),
+      followingListMap,
+      broadcasterUid
+    );
+    const snapshot = buildCommenterFollowLiveSnapshot(lid, rows, Date.now());
+    if (!snapshot) return;
+
+    /** @type {Record<string, unknown>} */
+    const save = { [commenterFollowLiveStorageKey(lid)]: snapshot };
+    if (listTouched) save[KEY_COMMENTER_FOLLOWING_LIST_CACHE] = followingListMap;
+    await chrome.storage.local.set(save);
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      /* best-effort */
+    }
+  }
+}
+
 /** @type {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} */
 let lastOfficialEventDomBundle = null;
 /**
@@ -13126,7 +14252,8 @@ function ensureOfficialEventDomObserver() {
     '.rank-num', '[class*="rank-num"]',
     '.gift-history-list', '[class*="gift-history-list"]',
     '.gift-history-list .item', '[class*="gift-history-list"] [class*="item"]',
-    '[data-comment-type="gift"]'
+    '[data-comment-type="gift"]',
+    '[data-comment-type="nicoad"]'
   ].join(', ');
   const trigger = () => {
     if (_officialEventDomObserverTimer) clearTimeout(_officialEventDomObserverTimer);
@@ -13164,6 +14291,41 @@ function ensureOfficialEventDomObserver() {
           ) {
             const parsed = parseGiftCommentText(text);
             if (parsed) recordGiftCommentObservation(parsed, text);
+          }
+          if (
+            text.length < 220 &&
+            /広告しました/i.test(text) &&
+            /pt/i.test(text)
+          ) {
+            const nicoadParsed = parseNicoadCommentText(text);
+            if (nicoadParsed) {
+              const viewer = collectLoggedInViewerProfile(
+                document,
+                window.location.href
+              );
+              maybePlayViewerNicoadCelebrationFromDomText(text, {
+                liveId,
+                viewerNickname: viewer.viewerNickname,
+                viewerUserId: viewer.viewerUserId,
+                resolveImageUrl: (rel) => chrome.runtime.getURL(String(rel || ''))
+              });
+              trigger();
+            }
+          }
+          if (node.matches?.('[data-comment-type="nicoad"]')) {
+            const rowText = String(node.textContent || '').trim();
+            if (rowText) {
+              const viewer = collectLoggedInViewerProfile(
+                document,
+                window.location.href
+              );
+              maybePlayViewerNicoadCelebrationFromDomText(rowText, {
+                liveId,
+                viewerNickname: viewer.viewerNickname,
+                viewerUserId: viewer.viewerUserId,
+                resolveImageUrl: (rel) => chrome.runtime.getURL(String(rel || ''))
+              });
+            }
           }
         } catch { /* no-op */ }
       }
@@ -13808,6 +14970,15 @@ async function runNdgrBackfillOnce() {
     }
   };
   document.addEventListener('visibilitychange', onHidden);
+  const rotationTid = setTimeout(() => {
+    if (_backfillProgress.stopReason) return;
+    _backfillProgress.stopReason = 'rotation_yield';
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, GLOBAL_BACKFILL_ROTATION_MS);
 
   _backfillProgress.seg = 0;
   _backfillProgress.rows = 0;
@@ -14026,13 +15197,18 @@ async function runNdgrBackfillOnce() {
     //   stopReason を立てる（未設定なら aborted 扱い＝popup は「途中/また後で」になる）。
     if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'aborted';
   } finally {
+    clearTimeout(rotationTid);
     // v0.1.431: 正常終了・abort・例外いずれの抜け方でも、バッファに残った取り込み済み行を
     //   必ず吐き出す（per-segment persist をやめてバッチ化したぶん、ここで取りこぼし防止）。
     flushPendingBackfillRows();
     document.removeEventListener('visibilitychange', onHidden);
     if (_backfillAbort === ac) _backfillAbort = null;
+    if (_backfillProgress.stopReason === 'rotation_yield') {
+      _backfillTriedLiveId = '';
+    }
     _backfillProgress.done = 1;
     publishBackfillProgress();
+    void clearBackfillWaiter(String(liveId || '').trim().toLowerCase());
 
     // v0.1.431: 一過性 stop（入口が一時的に見つからない等）なら one-shot guard を一定時間後に
     //   解除し、maintenance tick の maybeAutoStartBackfill が自動で再試行する（UI 案内「少し
@@ -14089,7 +15265,11 @@ function maybeRearmBackfillForGapCatchup() {
     const lid = String(liveId || '').trim();
     if (!/^lv\d{1,15}$/.test(lid.toLowerCase())) return;
     const now = Date.now();
-    if (now - _lastBackfillGapCatchupRearmAt < OFFICIAL_GAP_DEEP_TIMING.cooldownMs) {
+    const gapCooldown =
+      now < _backfillPriorityBoostUntil
+        ? BACKFILL_PRIORITY_COOLDOWN_MS
+        : OFFICIAL_GAP_DEEP_TIMING.cooldownMs;
+    if (now - _lastBackfillGapCatchupRearmAt < gapCooldown) {
       return;
     }
     const official = Number(officialCommentCount);
@@ -14219,7 +15399,15 @@ function maybeAutoStartBackfill() {
   //   ⚠️手動ボタン経路（onChanged で直接 runNdgrBackfillOnce）は gate しない＝押したタブで必ず走る。
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return;
-  void runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, () => runNdgrBackfillOnce());
+  void runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, () => runNdgrBackfillOnce()).then(
+    ({ ran }) => {
+      if (ran) {
+        void clearBackfillWaiter(lid);
+      } else {
+        void registerBackfillWaiter(lid);
+      }
+    }
+  );
 }
 
 // ── v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in 配線 ──────────────
@@ -14643,6 +15831,38 @@ function scanGiftSubAppDomAcrossFrames() {
 }
 
 /**
+ * ギフト iframe リレー（履歴タブ DOM）を nls_gift_subapp_history にマージ保存。
+ *
+ * @param {string} liveId
+ * @param {unknown[]} items
+ * @param {unknown[]} totalCounts
+ */
+async function persistGiftSubAppHistoryFromIframeRelay(liveId, items, totalCounts) {
+  if (!hasExtensionContext()) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return;
+  const domPayload = buildGiftSubAppPayloadFromDomRelay(items, totalCounts, {
+    liveId: lid,
+    now: Date.now()
+  });
+  if (!domPayload) return;
+  const key = giftSubAppHistoryStorageKey(lid);
+  try {
+    const bag = await chrome.storage.local.get(key);
+    const merged = mergeGiftSubAppHistoryPayload(bag?.[key], domPayload);
+    if (!merged) return;
+    await chrome.storage.local.set({ [key]: merged });
+    _giftSubAppHistoryCache.history = merged.history;
+    _giftSubAppHistoryCache.totalCounts = merged.totalCounts;
+    _giftSubAppHistoryCache.lastObservedAt = merged.capturedAt;
+  } catch (err) {
+    if (!isContextInvalidatedError(err)) {
+      /* best-effort */
+    }
+  }
+}
+
+/**
  * v0.1.198: スキャン結果と既存キャッシュをマージして persist する。
  * 「観測がある期間は更新、観測ゼロの期間は古い値を保持」のポリシー。
  */
@@ -14659,12 +15879,32 @@ async function persistGiftSubAppHistoryNow() {
   const cache = _giftSubAppHistoryCache;
   const haveFreshHistory = Array.isArray(fresh.history) && fresh.history.length > 0;
   const haveFreshTotalCounts = Array.isArray(fresh.totalCounts) && fresh.totalCounts.length > 0;
-  // フレッシュに値があるフィールドだけ更新。空でも古い値は消さない
+  // フレッシュに値があるフィールドだけ更新。履歴はマージ（部分スキャンで古い行が消えないように）
   if (haveFreshHistory) {
-    cache.history = fresh.history;
+    const merged = mergeGiftSubAppHistoryPayload(
+      {
+        liveId: lid,
+        capturedAt: cache.lastObservedAt || Date.now(),
+        source: 'dom-scrape',
+        history: cache.history,
+        totalCounts: cache.totalCounts
+      },
+      {
+        liveId: lid,
+        capturedAt: Date.now(),
+        source: 'dom-scrape',
+        history: fresh.history,
+        totalCounts: haveFreshTotalCounts ? fresh.totalCounts : []
+      }
+    );
+    if (merged?.history?.length) {
+      cache.history = merged.history;
+      if (merged.totalCounts.length) cache.totalCounts = merged.totalCounts;
+    } else {
+      cache.history = fresh.history;
+    }
     cache.lastObservedAt = Date.now();
-  }
-  if (haveFreshTotalCounts) {
+  } else if (haveFreshTotalCounts) {
     cache.totalCounts = fresh.totalCounts;
     cache.lastObservedAt = Date.now();
   }
@@ -14890,6 +16130,27 @@ async function persistOfficialEventDomBundleNow() {
         });
         if (staleEvtScoreKeys.length) {
           await chrome.storage.local.remove(staleEvtScoreKeys);
+        }
+      } catch { /* best-effort */ }
+      // 応援者ランキング（イベント投票）キャッシュ（nls_event_voting_ranking_<lv>）も同規約で cleanup
+      try {
+        const EVENT_VOTING_RANKING_TTL_MS = 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const curLid = String(lid || '').trim().toLowerCase();
+        const VOTING_PREFIX = 'nls_event_voting_ranking_';
+        const staleVotingKeys = Object.keys(all).filter((k) => {
+          if (!k.startsWith(VOTING_PREFIX)) return false;
+          const klv = k.slice(VOTING_PREFIX.length);
+          if (klv && curLid && klv === curLid) return false;
+          const v = all[k];
+          const cap =
+            v && typeof v === 'object' && typeof v.capturedAt === 'number'
+              ? v.capturedAt
+              : 0;
+          return cap === 0 || nowMs - cap >= EVENT_VOTING_RANKING_TTL_MS;
+        });
+        if (staleVotingKeys.length) {
+          await chrome.storage.local.remove(staleVotingKeys);
         }
       } catch { /* best-effort */ }
       const nicoadLvs = Object.keys(all)

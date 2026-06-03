@@ -276,6 +276,131 @@ describe('scrapeEventScoreRankingFromRichviewDom', () => {
     expect(scrapeEventScoreRankingFromRichviewDom(document)).toBeNull();
   });
 
+  // 実機 2026-06-01（lv350658954）で確定した「改名後」の DOM 形状。
+  // 行 el69c2m4→e1oms6s84 / 名前 el69c2m1→e1oms6s81 / サムネ el69c2m3→e1oms6s83 /
+  // 敬称 el69c2m0→e1oms6s80。順位 ebq6m481・スコア css-z40gn4 は健在。
+  // 見出しはセクションヘッダ(e1hv4cge5)内、行はその兄弟コンテナにある（heading.parent には行が無い）。
+  // バナー(現在N位)とサポーターランキング(e16w44943)は別サブツリー＝スコープ外であることも併せて検証する。
+  function liveJun2026Page(rows, opts = {}) {
+    const items = rows
+      .map(
+        ({ rank, score, name, thumb }) => `
+        <div class="css-12vetqo e1oms6s84">
+          <div class="css-v0ykr4 ebq6m483">
+            <svg class="css-x"><path></path></svg>
+            <span class="css-89z9eu ebq6m481">${rank}</span><span class="css-v76r9i ebq6m480">位</span>
+          </div>
+          <div class="css-102ycx3 e1oms6s83"${thumb ? ` style="background-image:url(${thumb})"` : ''}></div>
+          <div>
+            <p class="css-1dtdcds e1oms6s82"><span class="css-1ybg0xk e1oms6s81">${name}</span><span class="css-spovqj e1oms6s80">さん</span></p>
+            <div class="css-8zj0aw"><svg class="css-jh4whz"><path></path></svg><p class="css-z40gn4">${String(score).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</p></div>
+          </div>
+        </div>`
+      )
+      .join('');
+    const banner = opts.withBanner
+      ? `
+      <div class="css-x e1awe04q14sec">
+        <h1 class="css-1r66a6v e5sar9i0">参加中のイベント</h1>
+        <h2 class="css-12moxus e1awe04q14">うゆ♡さんを応援しよう！</h2>
+        <div class="css-banner">
+          <span class="css-1kputv7 e1awe04q12">現在</span>
+          <span class="css-ggzujz e1awe04q0">24</span>
+          <span class="css-1oa92lc e1awe04q11">位</span>
+          <p class="css-1qqb6me">762,600</p>
+        </div>
+      </div>`
+      : '';
+    const supporter = opts.withSupporter
+      ? `
+      <div class="css-w7d8dq ef7q2pk4">
+        <h2 class="css-fqzoxb e1gjhmvh10">うゆ♡さんのサポーター</h2>
+        <div class="css-1hz5wm5 e1gjhmvh3">
+          <div class="css-o9iyhf e16w44943">
+            <div class="css-zv4d0p e1abt54u0">1</div>
+            <div class="css-q9a1wl e16w44942"><a class="css-x e16w44941" href="https://www.nicovideo.jp/user/9">サポーターZ</a><span class="e16w44940">さん</span></div>
+            <div class="css-vcb5i6"><svg></svg><p class="css-1d9a3hd">123,456</p></div>
+          </div>
+        </div>
+      </div>`
+      : '';
+    return `
+      <div>
+        ${banner}
+        <div class="css-1ghu3wd ef7q2pk1"><div>
+          <div class="css-1066lcq e1hv4cge5">
+            <h2 class="css-1row0ay e1hv4cge4">イベントランキング</h2>
+            <button class="css-7ozhqr e10ycgko1"><span>更新</span></button>
+          </div>
+          <div class="css-list">${items}</div>
+        </div></div>
+        ${supporter}
+      </div>`;
+  }
+
+  it('★2026-06 改名後★ 構造ベース抽出で 💎 順位・スコア・名前を取得（クラスハッシュ非依存）', () => {
+    document.body.innerHTML = liveJun2026Page([
+      { rank: 1, score: 2016200, name: 'スタイルズ・クラッシュ', thumb: 'https://example.test/1.jpg' },
+      { rank: 2, score: 1599600, name: '小幡友美' },
+      { rank: 3, score: 1478100, name: '砂ちゃん' }
+    ]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(rows).not.toBeNull();
+    expect(rows).toHaveLength(3);
+    expect(rows?.[0]).toMatchObject({ rank: 1, score: 2016200, name: 'スタイルズ・クラッシュ', isAnonymous: false, thumbnailUrl: 'https://example.test/1.jpg' });
+    expect(rows?.[1]).toMatchObject({ rank: 2, score: 1599600, name: '小幡友美', isAnonymous: false });
+    expect(rows?.[2]).toMatchObject({ rank: 3, score: 1478100, name: '砂ちゃん', isAnonymous: false });
+  });
+
+  it('★2026-06 改名後★ バナー(現在24位)・サポーター(e16w44943)が同居してもイベントランキングだけ採る', () => {
+    document.body.innerHTML = liveJun2026Page(
+      [
+        { rank: 1, score: 2016200, name: 'スタイルズ・クラッシュ' },
+        { rank: 2, score: 1599600, name: '小幡友美' }
+      ],
+      { withBanner: true, withSupporter: true }
+    );
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(rows).not.toBeNull();
+    expect(rows).toHaveLength(2);
+    // バナーの 24 位 762,600 やサポーターの 123,456 を拾っていない
+    expect(rows?.map((r) => r.rank)).toEqual([1, 2]);
+    expect(rows?.[0].score).toBe(2016200);
+    expect(rows?.find((r) => r.score === 762600 || r.score === 123456)).toBeUndefined();
+  });
+
+  it('★2026-06 改名後★ 敬称「さん」を名前に含めない', () => {
+    document.body.innerHTML = liveJun2026Page([
+      { rank: 1, score: 100, name: 'ちゅあたん強い' }
+    ]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(rows?.[0].name).toBe('ちゅあたん強い');
+  });
+
+  it('★2026-06 改名後★ 順位が飛べば全体 null（誤値ゼロ）', () => {
+    document.body.innerHTML = liveJun2026Page([
+      { rank: 1, score: 500, name: 'A' },
+      { rank: 3, score: 300, name: 'C' }
+    ]);
+    expect(scrapeEventScoreRankingFromRichviewDom(document)).toBeNull();
+  });
+
+  it('★リンク化★ アバターURLから配信者 userId を復元する（記名のみ）', () => {
+    document.body.innerHTML = liveJun2026Page([
+      {
+        rank: 1,
+        score: 2016200,
+        name: 'スタイルズ・クラッシュ',
+        thumb: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/388/3882670.jpg?1777730694'
+      },
+      { rank: 2, score: 1599600, name: '小幡友美' }
+    ]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(rows?.[0]).toMatchObject({ rank: 1, name: 'スタイルズ・クラッシュ', userId: '3882670' });
+    // アバターが無い行は userId を持たない（推測しない）
+    expect(rows?.[1].userId).toBeUndefined();
+  });
+
   it('Emotion 等のランダムCSSクラス（css-xxx）でも順位・スコアが抽出できれば取得できる', () => {
     document.body.innerHTML = `
       <div>
@@ -399,6 +524,24 @@ describe('computeRichviewEventCheapSig（重い scrape を skip するための�
     document.body.innerHTML = rankingHtml([{ rank: 1, score: 100, name: 'A' }]);
     const before = computeRichviewEventCheapSig(document);
     document.body.innerHTML = rankingHtml([{ rank: 1, score: 200, name: 'A' }]);
+    const after = computeRichviewEventCheapSig(document);
+    expect(after).not.toBe(before);
+  });
+
+  it('★2026-06 改名後★ 見出し起点の構造ベースでもスコア変化を検知できる', () => {
+    const page = (score) => `
+      <div><div class="ef7q2pk1"><div>
+        <div class="e1hv4cge5"><h2 class="e1hv4cge4">イベントランキング</h2></div>
+        <div><div class="e1oms6s84">
+          <div class="ebq6m483"><span class="ebq6m481">1</span><span class="ebq6m480">位</span></div>
+          <div><p class="e1oms6s82"><span class="e1oms6s81">A</span><span class="e1oms6s80">さん</span></p>
+          <div class="css-8zj0aw"><svg></svg><p class="css-z40gn4">${score}</p></div></div>
+        </div></div>
+      </div></div></div>`;
+    document.body.innerHTML = page('100');
+    const before = computeRichviewEventCheapSig(document);
+    expect(before.length).toBeGreaterThan(0);
+    document.body.innerHTML = page('200');
     const after = computeRichviewEventCheapSig(document);
     expect(after).not.toBe(before);
   });

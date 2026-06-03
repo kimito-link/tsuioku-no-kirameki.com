@@ -22,6 +22,7 @@ import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 const KEY_RECORDING = 'nls_recording_enabled';
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 const STORAGE_COMMENTS = 'nls_comments_lv888888888';
+const STORAGE_PANEL_SUMMARY = 'nls_panel_summary_lv888888888';
 const INLINE_HOST_ID = 'nls-inline-popup-host';
 
 /** 起動直後 STALL_MS ミリ秒だけ全 storage.get を DELAY_MS 遅延させる initScript。 */
@@ -65,7 +66,7 @@ test.describe('多タブ storage 競合の基準線（PR0 観測基盤）', () =
 
     await enableInlinePanelAutoshow(context);
     await sw.evaluate(
-      async ({ recordingKey, lastWatchKey, commentsKey, watchUrl }) => {
+      async ({ recordingKey, lastWatchKey, commentsKey, panelSummaryKey, watchUrl }) => {
         // 多タブ contention を強めるため、コメント配列をある程度大きくしておく
         // （read-merge-write のコストを上げる）。
         const rows = Array.from({ length: 200 }, (_, idx) => ({
@@ -79,13 +80,24 @@ test.describe('多タブ storage 競合の基準線（PR0 観測基盤）', () =
         await chrome.storage.local.set({
           [recordingKey]: true,
           [lastWatchKey]: watchUrl,
-          [commentsKey]: rows
+          [commentsKey]: rows,
+          [panelSummaryKey]: {
+            v: 1,
+            liveId: 'lv888888888',
+            recordedCount: rows.length,
+            officialCount: rows.length + 50,
+            viewerCountFromDom: 120,
+            concurrentEstimated: 18,
+            updatedAt: Date.now(),
+            recent: rows.slice(-5)
+          }
         });
       },
       {
         recordingKey: KEY_RECORDING,
         lastWatchKey: KEY_LAST_WATCH_URL,
         commentsKey: STORAGE_COMMENTS,
+        panelSummaryKey: STORAGE_PANEL_SUMMARY,
         watchUrl: MOCK_WATCH
       }
     );
