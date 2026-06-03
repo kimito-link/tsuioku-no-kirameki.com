@@ -36,6 +36,10 @@ export const INGEST_TIMING = /** @type {const} */ ({
   //   完了させ、真に stuck したケースだけ外側ガード（×4=40s）で解放する。
   persistWriteTimeoutMs: 10000,
   visibleScanDelayMs: 380,
+  /** スクロール終了後に visible scan を 1 回だけ走らせる debounce */
+  visibleScanEndDebounceMs: 360,
+  /** visible scan の「スクロール中」見送り窓（deep より短い） */
+  visibleScanScrollDeferMs: 400,
   pageFrameLoopMs: 360,
   /** scroll/resize からのインライン再レイアウトのみ（メンテ処理は走らせない） */
   pageFrameLayoutScrollDebounceMs: 150,
@@ -69,6 +73,27 @@ export const SUBMIT_TIMING = /** @type {const} */ ({
   reactSettleMs: 220,
   buttonPollTimeoutMs: 1200,
   buttonPollIntervalMs: 80
+});
+
+/**
+ * popup 拡張からの fastSubmit（コメント欄は通常既に表示済み）。
+ *
+ * v0.1.604: 最悪値圧縮（ユーザー報告「コメント送信がかなり遅れる」対策）。
+ *   典型パスは「editor 即発見・button 即発見・confirm 即早期 return」で 70-150ms。
+ *   問題は「ニコ生本家の DOM 状態がたまに遅い時に最悪値まで丸ごと待つ」こと。
+ *   典型値は変えず、最悪値だけ控えめに圧縮する:
+ *   - editorPollTimeoutMs:  400 → 250(編集欄は popup 押下時点で既に表示済みが前提)
+ *   - buttonPollTimeoutMs:  700 → 500(送信ボタンも同上、500ms あれば十分)
+ *   - reactSettleMs:         50 →  35(requestAnimationFrame 16.6ms + 35 = 51ms 相当)
+ *   ポーリング間隔は変えない(短くしすぎると CPU 負荷増)。
+ *   合計圧縮: 最悪 -315ms（400-250 + 700-500 + 50-35 = 365ms 減）。
+ */
+export const SUBMIT_TIMING_FAST = /** @type {const} */ ({
+  editorPollTimeoutMs: 250,
+  editorPollIntervalMs: 35,
+  reactSettleMs: 35,
+  buttonPollTimeoutMs: 500,
+  buttonPollIntervalMs: 45
 });
 
 export const MAP_LIMITS = /** @type {const} */ ({

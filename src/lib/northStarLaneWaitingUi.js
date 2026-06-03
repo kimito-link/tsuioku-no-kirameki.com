@@ -279,18 +279,54 @@ export function getNorthStarWaitRotationMessages(laneId, state, elapsedMs) {
         })
       ]);
     }
+    // v0.1.605: イベントランキング / 応援者ランキング は無認証の公式 API から直接取得する設計。
+    //   「配信ページからデータを受け取り中」は DOM scrape 時代の文言で誤情報なので
+    //   ニコニコ公式 API に問い合わせ中であることを正確に伝える。
+    if (lid === 'eventBroadcasters') {
+      return Object.freeze([
+        Object.freeze({
+          badge: 'りんく',
+          line: 'ニコニコの公式から、イベント順位を問い合わせ中だよ。'
+        }),
+        Object.freeze({
+          badge: 'こん太',
+          line: '応答が返ってきたら、ここにランキングを並べるね！'
+        }),
+        Object.freeze({
+          badge: 'たぬ姉',
+          line: 'イベントに出ていない配信だと、ここは空のままになることがあるわよ。'
+        })
+      ]);
+    }
+    if (lid === 'eventVotingSupporters') {
+      return Object.freeze([
+        Object.freeze({
+          badge: 'りんく',
+          line: 'ニコニコの公式から、応援者ランキングを問い合わせ中だよ。'
+        }),
+        Object.freeze({
+          badge: 'こん太',
+          line: 'ギフト＋ニコニ広告のスコア順で、応答が返ったらここに並べるよ！'
+        }),
+        Object.freeze({
+          badge: 'たぬ姉',
+          line: 'イベント参加中の配信だけ、ここに出るわ。'
+        })
+      ]);
+    }
+    // default: 取得経路を断定しない中立的な文言（DOM scrape 時代の「配信ページから」を撤去）。
     return Object.freeze([
       Object.freeze({
         badge: 'りんく',
-        line: '配信ページからデータを受け取り中だよ。ちょっと待ってて。'
+        line: 'いま公式の情報を取りに行っているよ。ちょっと待ってて。'
       }),
       Object.freeze({
         badge: 'こん太',
-        line: '公式の数値がそろったら、ここにどんどん出るはず！'
+        line: '数値がそろったら、ここに並べていくね！'
       }),
       Object.freeze({
         badge: 'たぬ姉',
-        line: '接続と取得の手順を、しっかり確認しているところよ。'
+        line: '受信の手順を、しっかり確認しているところよ。'
       })
     ]);
   }

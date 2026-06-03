@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { shouldDeferDomHarvestDuringScroll } from './domHarvestScrollDefer.js';
+import {
+  shouldDeferDomHarvestDuringScroll,
+  shouldDeferVisibleScanDuringScroll
+} from './domHarvestScrollDefer.js';
 
 describe('shouldDeferDomHarvestDuringScroll', () => {
   it('直近スクロール（窓内）なら見送る', () => {
@@ -36,5 +39,11 @@ describe('shouldDeferDomHarvestDuringScroll', () => {
     expect(shouldDeferDomHarvestDuringScroll(1000, NaN, 220)).toBe(false);
     expect(shouldDeferDomHarvestDuringScroll(1000, 900, NaN)).toBe(false);
     expect(shouldDeferDomHarvestDuringScroll(undefined, 900, 220)).toBe(false);
+  });
+});
+
+describe('shouldDeferVisibleScanDuringScroll', () => {
+  it('スクロールバー由来の lastUserInitiated でも見送る', () => {
+    expect(shouldDeferVisibleScanDuringScroll(1000, 0, 900, 220)).toBe(true);
   });
 });

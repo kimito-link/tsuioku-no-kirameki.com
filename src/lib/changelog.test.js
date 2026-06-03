@@ -8,11 +8,21 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import {
   EXTENSION_CHANGELOG,
   getLatestChangelogEntry,
   compareSemver
 } from './changelog.js';
+
+const manifestVersion = JSON.parse(
+  readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '../../extension/manifest.json'),
+    'utf8'
+  )
+).version;
 
 describe('EXTENSION_CHANGELOG', () => {
   it('frozen array を返す', () => {
@@ -54,8 +64,8 @@ describe('EXTENSION_CHANGELOG', () => {
     expect(new Set(versions).size).toBe(versions.length);
   });
 
-  it('現在の manifest.json バージョン（0.1.521）が先頭にある', () => {
-    expect(EXTENSION_CHANGELOG[0].version).toBe('0.1.521');
+  it('現在の manifest.json バージョンが先頭にある', () => {
+    expect(EXTENSION_CHANGELOG[0].version).toBe(manifestVersion);
   });
 
   it('summary は短い（35 字以内、popup の summary 行で省略しないため）', () => {

@@ -2,7 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractNicoUserIdFromProfileUrl,
-  extractNicoUserProfilePageProfile
+  extractNicoUserProfilePageProfile,
+  extractNicoUserBroadcastStats
 } from './nicoUserProfilePage.js';
 
 describe('extractNicoUserIdFromProfileUrl', () => {
@@ -84,5 +85,46 @@ describe('extractNicoUserProfilePageProfile', () => {
 
     expect(profile?.nickname).toBe('いちこ');
     expect(profile?.avatarUrl).toBe('');
+  });
+});
+
+describe('extractNicoUserBroadcastStats', () => {
+  it('埋め込み server-response JSON から LV/プレミアム/フォロー/フォロワーを取る', () => {
+    document.head.innerHTML = `
+      <meta name="server-response" content='${JSON.stringify({
+        data: {
+          followeeCount: 8,
+          followerCount: 12000,
+          userPage: { user: { isPremium: true, userLevel: { currentLevel: 77 } } }
+        }
+      })}'>
+    `;
+    document.body.innerHTML = '';
+    const stats = extractNicoUserBroadcastStats(document);
+    expect(stats.level).toBe(77);
+    expect(stats.isPremium).toBe(true);
+    expect(stats.followeeCount).toBe(8);
+    expect(stats.followerCount).toBe(12000);
+  });
+
+  it('DOM テキストから配信日数・欲しいものリストを補完できる', () => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = `
+      <p>プレミアム会員</p>
+      <p>フォロワー 3,400</p>
+      <p>累計配信日数 365 日</p>
+      <a href="https://www.amazon.co.jp/hz/wishlist/ls/ABCDEF">欲しいものリスト</a>
+    `;
+    const stats = extractNicoUserBroadcastStats(document);
+    expect(stats.isPremium).toBe(true);
+    expect(stats.followerCount).toBe(3400);
+    expect(stats.cumulativeBroadcastDays).toBe(365);
+    expect(stats.wishlistUrl).toBe('https://www.amazon.co.jp/hz/wishlist/ls/ABCDEF');
+  });
+
+  it('何も取れなければ空オブジェクト', () => {
+    document.head.innerHTML = '';
+    document.body.innerHTML = '<p>ただの本文</p>';
+    expect(extractNicoUserBroadcastStats(document)).toEqual({});
   });
 });

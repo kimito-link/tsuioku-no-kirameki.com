@@ -60,3 +60,56 @@ export function pickGiftHistorySource(p) {
   if (iframeAgeMs > staleMs && liveIsNewer) return 'live';
   return 'iframe';
 }
+
+/**
+ * koken 公式 API（sub-app history）と NDGR ライブ（nls_gift_events）のどちらを
+ * 北極星ギフト履歴レーンに出すか（v0.1.578）。
+ *
+ * sub-app が在っても histories が極端に少ない放送では、API だけだと送り主が 2〜3 件に
+ * 留まり公式累計 pt と大きく乖離する。NDGR ライブの方が pt 合計・投げ件数ともに豊富なら
+ * ライブを優先する（茜子さん配信などの実機報告対策）。hot path 非干渉・読み取り側のみ。
+ *
+ * @param {{
+ *   subAppAvailable: boolean,
+ *   subAppPointsSum: number,
+ *   subAppThrowCount: number,
+ *   liveAvailable: boolean,
+ *   livePointsSum: number,
+ *   liveThrowCount: number,
+ *   officialProgramGiftPts?: number|null,
+ * }} p
+ * @returns {'subApp'|'live'|'none'}
+ */
+export function pickKokenSubAppVsLiveGiftHistory(p) {
+  if (!p || typeof p !== 'object') return 'none';
+  const subOk = p.subAppAvailable === true;
+  const liveOk = p.liveAvailable === true;
+  if (!subOk && !liveOk) return 'none';
+  if (subOk && !liveOk) return 'subApp';
+  if (!subOk && liveOk) return 'live';
+
+  const subPts = Math.max(0, Math.floor(Number(p.subAppPointsSum) || 0));
+  const livePts = Math.max(0, Math.floor(Number(p.livePointsSum) || 0));
+  const subThrows = Math.max(0, Math.floor(Number(p.subAppThrowCount) || 0));
+  const liveThrows = Math.max(0, Math.floor(Number(p.liveThrowCount) || 0));
+
+  const official =
+    typeof p.officialProgramGiftPts === 'number' &&
+    Number.isFinite(p.officialProgramGiftPts) &&
+    p.officialProgramGiftPts > 0
+      ? Math.floor(p.officialProgramGiftPts)
+      : null;
+  if (official != null && subPts > 0 && livePts > 0) {
+    const subGap = Math.abs(subPts - official);
+    const liveGap = Math.abs(livePts - official);
+    if (liveGap + 40 < subGap) return 'live';
+    if (subGap + 40 < liveGap) return 'subApp';
+  }
+
+  if (livePts <= 0) return 'subApp';
+
+  const liveRicherPts = livePts >= subPts + 300 && livePts > subPts * 1.12;
+  const liveRicherThrows = liveThrows >= subThrows + 3 && livePts > subPts;
+  if (liveRicherPts || liveRicherThrows) return 'live';
+  return 'subApp';
+}

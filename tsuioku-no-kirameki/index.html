@@ -8906,6 +8906,7 @@
               <li><strong>冒頭・終盤（四分位）</strong> — 記録の先頭から末尾までの<strong>実時間幅</strong>を4等分し、<strong>最初と最後の区間</strong>にコメントしたユニーク人数と「両方にいた」人数（幅が短すぎる枠では非表示）</li>
               <li><strong>累積コメント数と5分窓</strong> — <strong>緑線＝累積件数</strong>、<strong>紫の破線＝その分を含む直近5分の合計</strong>（勢いの補助線）</li>
               <li><strong>再生位置（vpos）の三分割</strong> — <code>vpos</code> が付いたコメントが<strong>5件以上</strong>あるときだけ、最大を3等分して早・中・遅へ（アーカイブ視聴の補助）</li>
+              <li><strong>ギフト投げ履歴（誰が・何を・いくら）</strong> — マーケ DL 時に <strong>koken 公式 API で一括取得</strong>し、サイドバー「履歴」タブの DOM とマージ。送り主・アイテム・pt・時刻の一覧とアイテム別 ×N（<code>#mkt-gift-ledger</code>）</li>
               <li><strong>末尾の JSON（<code>id="nl-marketing-export-v1"</code>）</strong> — <code>schemaVersion</code> 付きで、表計算や自作スクリプトに渡しやすい形です。<strong>伏せ字で保存したときは JSON 内の表示名もマスク</strong>されます（<a href="#extension-guide-marketing-export">用語⑩</a>）。</li>
             </ul>
             <p class="lp-mkt-explain-lead"><strong>三人で、深掘りの読み方を補足するのだ</strong></p>
@@ -9289,7 +9290,7 @@
             <h2 id="extension-guide-heading">画面の見方（やさしい説明）</h2>
             <p>
               ポップアップや埋め込みパネルには専門的な言葉が出ます。<strong>りんく</strong>が仕組み、<strong>こん太</strong>が使う側の感覚、<strong>たぬ姉</strong>が整理します。
-              くわしく知りたい項目だけ、下のアコーディオンを開いてください。<strong>コメント送信・状態表示</strong>は<a href="#extension-guide-comment-voice">用語⑧</a>、<strong>やさしい注意 POP</strong>は<a href="#extension-guide-kindness-nudge">用語⑨</a>、<strong>マーケ HTML の末尾 JSON</strong>は<a href="#extension-guide-marketing-export">用語⑩</a>です。
+              くわしく知りたい項目だけ、下のアコーディオンを開いてください。<strong>コメント送信・状態表示</strong>は<a href="#extension-guide-comment-voice">用語⑧</a>、<strong>やさしい注意 POP</strong>は<a href="#extension-guide-kindness-nudge">用語⑨</a>、<strong>マーケ HTML の末尾 JSON</strong>は<a href="#extension-guide-marketing-export">用語⑩</a>、<strong>ハラスメント時の証拠整理</strong>は<a href="#extension-guide-disclosure-evidence">用語⑪</a>です。
             </p>
           </div>
 
@@ -9722,6 +9723,45 @@
                     </div>
                     <div class="bubble">
                       KPI・タイムライン・セグメントに加え、<strong>四分位・本文傾向・累積と5分窓・vpos</strong>まわりもレポートに載るのだ。読み方の補足は<a href="#marketing-what-you-can-do">表の読み方</a>と<a href="#marketing-deep-features">分析の深掘り</a>、見本レイアウトは<a href="#marketing-html-preview">HTML の見本</a>なのだ。
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <details class="lp-accordion fade d2" id="extension-guide-disclosure-evidence">
+              <summary class="lp-accordion__summary">
+                <span class="lp-accordion__badge">用語⑪</span>
+                ハラスメント時の記録と開示請求向け証拠パック
+              </summary>
+              <div class="lp-accordion__body">
+                <div class="yukkuri-thread">
+                  <div class="y-row">
+                    <div class="speaker">
+                      <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.png" alt="" width="72" height="72" decoding="async">
+                      <span>たぬ姉</span>
+                    </div>
+                    <div class="bubble">
+                      応援配信中に<strong>誹謗中傷や嫌がらせ</strong>が流れてきたとき、やる気を削がれないよう記録しつつ、必要なら<strong>プロバイダ責任制限法に基づく開示請求</strong>に使える証拠を整理できるのだ。
+                      <strong>ポップアップに目立つスイッチは置かない</strong>方針なのだ — 健全な視聴者まで萎縮しないため、説明はこの LP に載せているのだ。
+                    </div>
+                  </div>
+                  <div class="y-row reverse">
+                    <div class="bubble">
+                      記録は通常どおり続くのだ。該当疑いのコメントは<strong>コメント番号・userId・日時・本文</strong>などを CSV・JSON・特定情報たたき台・manifest にまとめ、各行に <strong>SHA-256</strong> も付くのだ。開示請求に提出する証拠として十分使える形なのだ。
+                    </div>
+                    <div class="speaker">
+                      <img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                      <span>りんく</span>
+                    </div>
+                  </div>
+                  <div class="y-row">
+                    <div class="speaker">
+                      <img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="" width="72" height="72" decoding="async">
+                      <span>こん太</span>
+                    </div>
+                    <div class="bubble">
+                      やさしい注意 POP（<a href="#extension-guide-kindness-nudge">用語⑨</a>）とは別の話なのだ。自分が送るコメントへのソフトな案内で、<strong>受信した嫌がらせへの対処</strong>はこっちの整理なのだ。複雑な案件は弁護士に相談してね。
                     </div>
                   </div>
                 </div>

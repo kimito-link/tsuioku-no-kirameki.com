@@ -23,7 +23,11 @@ export default [
       '.claude/**',
       'build/**',
       'test-results/**',
-      'playwright-report/**'
+      'playwright-report/**',
+      // v0.1.602: ユーザーがバックアップ zip を展開する作業用フォルダ。
+      // 中の dist は minified 出力のため lint 対象にすると 2400+ errors になる。
+      '新しいフォルダー/**',
+      '新しいフォルダー */**'
     ]
   },
   js.configs.recommended,

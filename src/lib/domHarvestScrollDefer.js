@@ -33,3 +33,25 @@ export function shouldDeferDomHarvestDuringScroll(now, lastUserScrollAt, activeW
   if (elapsed < 0) return false;
   return elapsed < win;
 }
+
+/**
+ * visible scan 用: ホイール由来とスクロールバー由来の両方を見る（手動スクロール読み取り）。
+ *
+ * @param {number} now
+ * @param {number} lastGenuineUserScrollAt
+ * @param {number} lastUserInitiatedScrollAt
+ * @param {number} activeWindowMs
+ * @returns {boolean}
+ */
+export function shouldDeferVisibleScanDuringScroll(
+  now,
+  lastGenuineUserScrollAt,
+  lastUserInitiatedScrollAt,
+  activeWindowMs
+) {
+  const last = Math.max(
+    Number(lastGenuineUserScrollAt) || 0,
+    Number(lastUserInitiatedScrollAt) || 0
+  );
+  return shouldDeferDomHarvestDuringScroll(now, last, activeWindowMs);
+}

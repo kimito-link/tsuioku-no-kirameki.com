@@ -472,6 +472,39 @@ export function calcCommentCaptureRatio({
  */
 
 /**
+ * statistics 系の「公式同接」として resolve に渡す値を正規化する。
+ *
+ * v0.1.282 以降 content は累計来場を officialViewerCount に載せないが、
+ * 古い snapshot / panel サマリに `officialViewerCount: 0` が残っていると
+ * officialStatsUpdatedAt だけ新鮮な状態で「同接 0（直接値）」が固定される。
+ * 来場累計が明らかにあるときの 0 は欠測扱いにして fallback へ回す。
+ *
+ * @param {number|null|undefined} officialViewers
+ * @param {number|undefined} totalVisitors
+ * @returns {number|null}
+ */
+export function coerceOfficialConcurrentViewersForResolve(
+  officialViewers,
+  totalVisitors
+) {
+  if (
+    typeof officialViewers !== 'number' ||
+    !Number.isFinite(officialViewers) ||
+    officialViewers < 0
+  ) {
+    return null;
+  }
+  const rounded = Math.round(officialViewers);
+  if (rounded > 0) return rounded;
+  const visitors =
+    typeof totalVisitors === 'number' && Number.isFinite(totalVisitors) && totalVisitors > 0
+      ? totalVisitors
+      : 0;
+  if (visitors > 0) return null;
+  return 0;
+}
+
+/**
  * direct viewers → nowcast → 現行推定 fallback の順で同接表示値を解決する。
  *
  * @param {object} params
@@ -519,10 +552,10 @@ export function resolveConcurrentViewers({
   });
 
   const now = typeof nowMs === 'number' && Number.isFinite(nowMs) ? nowMs : Date.now();
-  const official =
-    typeof officialViewers === 'number' && Number.isFinite(officialViewers) && officialViewers >= 0
-      ? Math.round(officialViewers)
-      : null;
+  const official = coerceOfficialConcurrentViewersForResolve(
+    officialViewers,
+    totalVisitors
+  );
   const updatedAt =
     typeof officialUpdatedAtMs === 'number' && Number.isFinite(officialUpdatedAtMs)
       ? officialUpdatedAtMs

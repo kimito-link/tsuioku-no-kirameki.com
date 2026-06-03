@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { buildMarketingDashboardHtml } from './marketingChartsHtml.js';
+import {
+  buildMarketingDashboardHtml,
+  buildAudienceParticipationLeadSectionHtml
+} from './marketingChartsHtml.js';
 import { aggregateMarketingReport } from './marketingAggregate.js';
+import { analyzeAudienceEngagementGap } from './audienceEngagementGap.js';
 
 /** @returns {import('./marketingAggregate.js').MarketingReport} */
 function minimal() {
@@ -231,6 +235,73 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('@media(max-width:560px)');
   });
 
+  it('ギフト sub-app 履歴を渡すと投げ履歴セクション（誰が・何を・いくら）が含まれる', () => {
+    const html = buildMarketingDashboardHtml(minimal(), {
+      giftSubAppHistory: {
+        history: [
+          {
+            itemName: '提灯',
+            senderName: '名無し',
+            points: 10,
+            time: '2:45:10',
+            thumbnailUrl: 'https://example.com/item.png'
+          },
+          {
+            itemName: '提灯',
+            senderName: '応援さん',
+            points: 30,
+            time: '2:30:33'
+          }
+        ],
+        totalCounts: [{ itemName: '提灯', count: 5, thumbnailUrl: 'https://example.com/item.png' }]
+      }
+    });
+    expect(html).toContain('id="mkt-gift-ledger"');
+    expect(html).toContain('ギフト投げ履歴');
+    expect(html).toContain('誰が・何を・いくら');
+    expect(html).toContain('名無し');
+    expect(html).toContain('提灯');
+    expect(html).toContain('2:45:10');
+    expect(html).toContain('×5');
+    expect(html).toContain('data-label="アイテム"');
+    expect(html).toContain('送り主別（誰が・何を・合計いくら）');
+    expect(html).toContain('送り主別 pt（グラフ）');
+    expect(html).toContain('アイテム別 pt（グラフ）');
+    expect(html).toContain('mkt-gift-chart-table');
+    expect(html).toContain('応援さん');
+    expect(html).toContain('送り主 2 名');
+    expect(html).toContain('data-label="サムネ"');
+    expect(html).toContain('data-label="アカウント"');
+    expect(html).toContain('data-label="ID"');
+    expect(html).toContain('mkt-gift-ledger-item__thumb');
+    expect(html).toContain('example.com/item.png');
+    expect(html).toContain('取得できたサムネ');
+  });
+
+  it('koken API 形式の giftSubAppHistory で投げ履歴に koken 出典が出る', () => {
+    const html = buildMarketingDashboardHtml(minimal(), {
+      giftSubAppHistory: {
+        source: 'koken-api',
+        history: [
+          {
+            itemName: 'わこちゅ',
+            senderName: 'spspspspsp',
+            points: 300,
+            time: '1:51:41',
+            userId: '1532216'
+          }
+        ],
+        totalCounts: [{ itemName: 'わこちゅ', count: 1 }]
+      }
+    });
+    expect(html).toContain('koken 公式 API');
+    expect(html).toContain('koken API');
+    expect(html).toContain('わこちゅ');
+    expect(html).toContain('spspspspsp');
+    expect(html).toContain('1532216');
+    expect(html).toContain('data-label="アカウント"');
+  });
+
   it('コメント・ギフト・広告から応援者ちくらんβセクションを出す', () => {
     const base = Date.now() - 600_000;
     /** @type {import('./commentRecord.js').StoredComment[]} */
@@ -414,6 +485,64 @@ describe('buildMarketingDashboardHtml', () => {
     expect(harness).toContain('data-label="層"');
     expect(harness).toContain('data-label="ゲート"');
     expect(html).toContain('.mkt-harness-layer-table');
+  });
+
+  it('目次直下に来場とコメント参加の先頭ブロックを出す', () => {
+    const base = Date.now() - 900_000;
+    /** @type {import('./commentRecord.js').StoredComment[]} */
+    const comments = [
+      { id: 'a1', liveId: 'lv123', commentNo: '1', text: 'わこつ', userId: 'u1', nickname: 'A', capturedAt: base, vpos: 0, is184: false, selfPosted: false },
+      { id: 'a2', liveId: 'lv123', commentNo: '2', text: '8888', userId: 'u2', nickname: 'B', capturedAt: base + 60_000, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      sessionSummaryRows: [
+        { liveId: 'lv123', capturedAt: base, viewerCountFromDom: 500, officialCommentCount: 2 }
+      ],
+      officialEventDomBundle: /** @type {any} */ ({
+        programStats: { watchCount: 1000, commentCount: 10 }
+      })
+    });
+    expect(html).toContain('id="mkt-participation-lead"');
+    expect(html).toContain('来場と応援参加');
+    expect(html).toContain('来場 1,000 人');
+    expect(html).toContain('アイテムを投げた人');
+    expect(html).toContain('広告をした人');
+    expect(html.indexOf('mkt-participation-lead')).toBeLessThan(html.indexOf('mkt-analysis-skills'));
+  });
+
+  it('buildAudienceParticipationLeadSectionHtml は HTML レポート向けに詳細リンクを省略できる', () => {
+    const base = Date.now() - 900_000;
+    const comments = [
+      { id: 'a1', liveId: 'lv123', commentNo: '1', text: 'hi', userId: 'u1', nickname: 'A', capturedAt: base, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const report = aggregateMarketingReport(comments, 'lv123');
+    const html = buildAudienceParticipationLeadSectionHtml(
+      analyzeAudienceEngagementGap(
+        {
+          liveId: 'lv123',
+          comments,
+          visitorCount: 500,
+          officialCommentCount: 1
+        },
+        { liveId: 'lv123' }
+      ),
+      report,
+      { sectionId: 'sec-participation-lead', showDetailLink: false, extraSectionClass: 'card' }
+    );
+    expect(html).toContain('id="sec-participation-lead"');
+    expect(html).toContain('card mkt-section');
+    expect(html).not.toContain('mkt-audience-gap');
+  });
+
+  it('来場未取得でも先頭ブロックにコメント人数と案内を出す', () => {
+    const html = buildMarketingDashboardHtml(minimal());
+    expect(html).toContain('id="mkt-participation-lead"');
+    expect(html).toContain('来場者数');
+    expect(html).toContain('未取得');
+    expect(html).toContain('コメントした人');
+    expect(html).toContain('アイテムを投げた人');
+    expect(html).toContain('広告をした人');
   });
 
   it('公式来場者数があると来場→コメント変換率セクションを出す', () => {
@@ -811,5 +940,42 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('mkt-rank-av--empty');
     expect(html).not.toContain('https://example.test/real-avatar.jpg');
     expect(html).not.toContain('https://secure-dcdn.cdn.nimg.jp/nicoaccount/');
+  });
+
+  it('興味タグ来場システムコメがあると専用セクションを出す', () => {
+    const base = Date.now() - 600_000;
+    const comments = [
+      {
+        id: 'ia1',
+        liveId: 'lv123',
+        commentNo: '100',
+        text: '「料理」が好きな1人が来場しました',
+        userId: null,
+        capturedAt: base
+      },
+      {
+        id: 'ia2',
+        liveId: 'lv123',
+        commentNo: '101',
+        text: '「雑談」が好きな2人が来場しました',
+        userId: null,
+        capturedAt: base + 60_000
+      },
+      {
+        id: 'u1',
+        liveId: 'lv123',
+        commentNo: '102',
+        text: '通常コメント',
+        userId: 'u1',
+        capturedAt: base + 120_000
+      }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'));
+    expect(html).toContain('id="mkt-interest-arrival"');
+    expect(html).toContain('興味タグ別来場（公式システムコメ）');
+    expect(html).toContain('ニコ公式の集計通知');
+    expect(html).toContain('料理');
+    expect(html).toContain('雑談');
+    expect(html).toContain('来場人数（合算）');
   });
 });

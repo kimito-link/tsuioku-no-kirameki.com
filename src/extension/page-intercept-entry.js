@@ -338,7 +338,10 @@ import {
   function dig(obj, depth) {
     if (!obj || typeof obj !== 'object' || depth > 5) return;
     if (Array.isArray(obj)) {
-      for (let i = 0; i < obj.length && i < 500; i++) dig(obj[i], depth + 1);
+      // v0.1.522: 旧上限 500 だと超大規模配信（視聴者リスト等が 500 件超の JSON）で
+      //   501 件目以降の userId→nickname/icon 学習がスキップされ、DOM 経由コメントの
+      //   uid 補完率が落ちていた。深さ(>5)上限で全体コストは抑えつつ配列幅を 2000 に拡張。
+      for (let i = 0; i < obj.length && i < 2000; i++) dig(obj[i], depth + 1);
       return;
     }
     const { enqueues, learnUsers } = collectInterceptSignalsFromObject(obj);
@@ -401,7 +404,11 @@ import {
    * - 配信切替時 reset
    * 詳細: memory analysis_distributed_dedupe.md / plan_v0239_message_id_dedupe.md
    */
-  const _ndgrDedupe = createNdgrMessageDedupe({ perLiveMax: 4096 });
+  // v0.1.522: perLiveMax を 4096→16384 に拡張。大規模配信（1.6万コメ級）で旧上限だと
+  //   FIFO eviction により「16384 件以上前のコメ」の backward/relay 再送が NDGR 層を
+  //   素通りしうる。最終防衛は DB 層の dkey(commentNo) 重複排除なので保存重複は出ないが、
+  //   素通り分の下流処理を減らすため履歴窓を広げる（短文 messageId 想定で数 MB 程度）。
+  const _ndgrDedupe = createNdgrMessageDedupe({ perLiveMax: 16384 });
 
   /**
    * `/watch/lvXXXXX` / `/embed/lvXXXXX` から liveId を抽出。
@@ -923,11 +930,15 @@ import {
           if ((isBinary || isStream || isNdgr) && clone.body) {
             const reader = clone.body.getReader();
             void (async () => {
+              // v0.1.522: ldAcc を try の外で生成し、stream abort（reader.read 例外）でも
+              //   finally で getStats を必ず記録する。旧コードは正常終了時のみ stats を
+              //   更新していたため、長時間 NDGR ストリームが中断されると droppedBytes 等の
+              //   観測が欠落していた（取得品質の見落とし要因）。
+              const ldAcc = createLengthDelimitedStreamAccumulator({
+                maxPendingBytes: 2_000_000
+              });
               try {
                 const dec = new TextDecoder('utf-8', { fatal: false });
-                const ldAcc = createLengthDelimitedStreamAccumulator({
-                  maxPendingBytes: 2_000_000
-                });
                 for (;;) {
                   const { done, value } = await reader.read();
                   if (done) break;
@@ -945,9 +956,12 @@ import {
                     }
                   }
                 }
-                _ldStreamStats = ldAcc.getStats();
-                publishLdStreamDiag();
-              } catch { /* stream end */ }
+              } catch { /* stream end / abort */ } finally {
+                try {
+                  _ldStreamStats = ldAcc.getStats();
+                  publishLdStreamDiag();
+                } catch { /* diag best-effort */ }
+              }
             })();
           } else {
             try { tryProcess(await clone.arrayBuffer()); } catch { /* no-op */ }

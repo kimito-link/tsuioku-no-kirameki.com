@@ -13,6 +13,7 @@ import {
   yukkuriCharacterImagePath,
   listYukkuriCharacterImagePaths
 } from './yukkuriBroadcastSummary.js';
+import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 
 /**
  * @typedef {'rinku'|'konta'|'tanunee'} MangaCharacter
@@ -24,7 +25,8 @@ import {
  *   expression: MangaExpression,
  *   mouthOpen: boolean,
  *   size: 'big'|'medium'|'small',
- *   line: string
+ *   line: string,
+ *   lineHtml?: string
  * }} MangaDialogue
  *
  * @typedef {{
@@ -49,6 +51,25 @@ function fmtNum(v) {
   return v.toLocaleString('ja-JP');
 }
 
+/** @param {unknown} s @returns {string} HTML 用エスケープ（lineHtml 組み立て用） */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
+}
+
+/**
+ * niconico の userPageUrl / 値から数値 uid を取り出す（無ければ空）。
+ * @param {unknown} value
+ * @returns {string}
+ */
+function uidFromUserPageUrl(value) {
+  const s = String(value == null ? '' : value).trim();
+  if (/^\d{1,18}$/.test(s)) return s;
+  const m = s.match(/\/user\/(\d{1,18})(?:\/|\?|$)/);
+  return m ? m[1] : '';
+}
+
 /** @param {string} s */
 function trimToTitle(s) {
   const t = String(s || '').trim();
@@ -62,6 +83,7 @@ function trimToTitle(s) {
  *   bundle: import('./officialEventDomBundle.js').OfficialEventDomBundle | null,
  *   broadcastTitle?: string,
  *   broadcasterName?: string,
+ *   broadcasterUserId?: string,
  *   recordedCommentCount?: number,
  *   streamAgeMin?: number
  * }} input
@@ -69,6 +91,7 @@ function trimToTitle(s) {
  */
 export function buildMangaBroadcastPanels(input) {
   const bundle = input?.bundle || null;
+  const broadcasterUid = String(input?.broadcasterUserId || '').trim();
   const ws = bundle?.programStats || null;
   const ev = bundle?.eventBanner || null;
   const bal = bundle?.eventBalloon || null;
@@ -93,19 +116,24 @@ export function buildMangaBroadcastPanels(input) {
   {
     const titleSeg = titleRaw ? `「${titleRaw}」` : 'この放送';
     const broadcasterSeg = broadcaster ? `（${broadcaster}さん）` : '';
+    /** @type {MangaDialogue} */
+    const openingDialogue = {
+      character: 'rinku',
+      expression: 'smile',
+      mouthOpen: true,
+      size: 'big',
+      line: `今回の${titleSeg}${broadcasterSeg}、お疲れさまでしたー！`
+    };
+    // 配信者名が数値 uid と紐付くならユーザーページへリンク化（lineHtml）。
+    if (broadcaster && /^\d{1,18}$/.test(broadcasterUid)) {
+      const nameLink = buildUserProfileLinkedLabelHtml(broadcasterUid, `${broadcaster}さん`);
+      openingDialogue.lineHtml = `今回の${esc(titleSeg)}（${nameLink}）、お疲れさまでしたー！`;
+    }
     panels.push({
       sceneId: 'opening',
       caption: '【プロローグ】今回の放送のおさらい',
       bg: 'rinku',
-      dialogues: [
-        {
-          character: 'rinku',
-          expression: 'smile',
-          mouthOpen: true,
-          size: 'big',
-          line: `今回の${titleSeg}${broadcasterSeg}、お疲れさまでしたー！`
-        }
-      ],
+      dialogues: [openingDialogue],
       highlight: null,
       onomatopoeia: 'わいわい〜！'
     });
@@ -219,13 +247,24 @@ export function buildMangaBroadcastPanels(input) {
     const dialogues = [];
     for (let i = 0; i < namedTop.length; i++) {
       const r = namedTop[i];
-      dialogues.push({
+      const nameText = trimToTitle(r.name);
+      const intro = intros[i] || 'ありがとう！';
+      /** @type {MangaDialogue} */
+      const dialogue = {
         character: charRotation[i % 3],
         expression: i === 0 ? 'blink' : 'smile',
         mouthOpen: true,
         size: i === 0 ? 'medium' : 'small',
-        line: `${r.rank}位 ${trimToTitle(r.name)} さん、${fmtNum(r.contribution)} 貢！${intros[i] || 'ありがとう！'}`
-      });
+        line: `${r.rank}位 ${nameText} さん、${fmtNum(r.contribution)} 貢！${intro}`
+      };
+      // 貢献者の userPageUrl から数値 uid が取れたら名前をリンク化（lineHtml）。
+      const rAny = /** @type {any} */ (r);
+      const uid = uidFromUserPageUrl(rAny.userPageUrl || rAny.userId);
+      if (uid) {
+        const nameLink = buildUserProfileLinkedLabelHtml(uid, `${nameText} さん`);
+        dialogue.lineHtml = `${esc(r.rank)}位 ${nameLink}、${esc(fmtNum(r.contribution))} 貢！${esc(intro)}`;
+      }
+      dialogues.push(dialogue);
     }
     /** @type {{value:string,label:string}|null} */
     const hl = namedTop[0]
@@ -308,7 +347,9 @@ export function renderMangaBroadcastPanelsHtml(panels, opts = {}) {
       `<div class="nl-manga-name">${escapeHtmlMin(name)}</div>` +
       `</div>` +
       `<div class="nl-manga-bubble">` +
-      `<p class="nl-manga-bubble__text">${escapeHtmlMin(d.line)}</p>` +
+      // lineHtml は呼び出し側で escape 済みテキスト＋安全な <a>（buildUserProfileLinkedLabelHtml）
+      // だけで組み立てる契約。無ければ従来どおり line を escape して出す。
+      `<p class="nl-manga-bubble__text">${typeof d.lineHtml === 'string' && d.lineHtml ? d.lineHtml : escapeHtmlMin(d.line)}</p>` +
       `</div>` +
       `</div>`
     );
