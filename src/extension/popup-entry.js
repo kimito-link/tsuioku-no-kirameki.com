@@ -9267,6 +9267,15 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
  *   officialProgramGiftPts?: number|null;
  * }} opts
  */
+/**
+ * v0.1.618(改修A+差分): paintTopSupportRankStyleIntoElement が最後に流し込んだ本体 HTML を
+ * 要素ごとに覚えておく。ポーリング(3s/30s)で同じデータを毎回 innerHTML 全置換すると、
+ * 既存ノードが一瞬破棄され「白くなる/出たり消えたり」が起きる(ディープリサーチ web.dev/MDN)。
+ * 前回と同一 HTML なら DOM を一切触らずスキップする(=ちらつき源を断つ)。
+ * @type {WeakMap<HTMLElement, string>}
+ */
+const _topSupportRankLastHtmlByEl = new WeakMap();
+
 function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
   const {
     noteText,
@@ -9347,21 +9356,34 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
   const freshnessHtml = freshnessNote
     ? `<p class="nl-top-support-rank__freshness" aria-live="polite">🕒 ${escapeHtml(freshnessNote)}</p>`
     : '';
-  el.innerHTML =
+  const nextHtml =
     prependHtml +
     (beforeNoteHtml || '') +
     `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
     freshnessHtml +
     `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
-  bindOnErrorHideHandlersWithin(el);
-  const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
-  models.forEach((m, i) => {
-    const img = thumbs[i];
-    if (!(img instanceof HTMLImageElement)) return;
-    if (isHttpOrHttpsUrl(m.thumbSrc)) {
-      storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
-    }
-  });
+  // v0.1.618(改修A+差分): 前回と同一 HTML なら本体 DOM を触らずスキップ(ちらつき源を断つ)。
+  //   変化があるときだけ、<template> でメモリ上に組んでから replaceChildren で**アトミックに
+  //   差し替え**る。innerHTML 全置換と違い「一瞬空(白)」の中間状態が画面に出ない
+  //   (ディープリサーチ: MDN replaceChildren / web.dev)。XSS 安全性は従来同様、生成側の
+  //   escapeHtml/escapeAttr に依存(template.innerHTML はパースのみで実行されない)。
+  //   本体 DOM を貼り替えた時だけ画像 guard を再バインド(貼り替えていないなら不要)。
+  const bodyChanged = !(_topSupportRankLastHtmlByEl.get(el) === nextHtml && el.firstChild);
+  if (bodyChanged) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = nextHtml;
+    el.replaceChildren(tpl.content);
+    _topSupportRankLastHtmlByEl.set(el, nextHtml);
+    bindOnErrorHideHandlersWithin(el);
+    const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
+    models.forEach((m, i) => {
+      const img = thumbs[i];
+      if (!(img instanceof HTMLImageElement)) return;
+      if (isHttpOrHttpsUrl(m.thumbSrc)) {
+        storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
+      }
+    });
+  }
   if (isNorthStarBody) {
     syncNorthStarLaneGadgetFromBodyState(el);
     // 横カードに順位が含まれるため、右列の縦レールで同データを二重表示しない
