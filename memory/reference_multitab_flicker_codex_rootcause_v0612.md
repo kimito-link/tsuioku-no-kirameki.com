@@ -7,9 +7,8 @@ metadata:
 
 # 複数タブ「ローディング点滅」+取得低下 — Codex 真因調査結果(2026-06-03)
 
-レポート正本: `docs/codex-multitab-flicker-investigation-v0612.md`(ただし**末尾が途中で切れている**=
-前セッションのバックグラウンド Codex が session 終了で kill された。エグゼクティブサマリーと容疑α/β/γは完全、
-容疑δは途中まで、`## 修正案`/`## 新規発見`/`## 推奨アクション` は欠落)。
+レポート正本: `docs/codex-multitab-flicker-investigation-v0612.md`(**完全版・260行**。
+当初は末尾切れだったが Codex 完走分が Resilio 同期で揃った。新規発見5件・修正案4案・推奨アクション完備)。
 
 ## 確定した真因(複合・上位3つ)
 
@@ -32,13 +31,22 @@ metadata:
    「ローディング/数字」遷移。最後は `shouldScheduleBackfillTransientRetry`
    (backfillTransientRetry.js:43)の `backward_exhausted` 再試行上限に達し**13%で終了**。
 
-## Codex 推奨の最小修正(2段階・未実装)
+## Codex 修正案(4案・★推奨=案3)
 
-- (a) `triggerBackfillRetry` に **5〜10秒のタブ間共有クールダウン**(session storage)。
-  新ファイル `src/lib/multiTabBackfillRetryCooldown.js`(純関数 helper)。
-- (b) tail/chunk/main 書き込みを `runIfTabLeader('nls-persist-' + lid, ...)` で **leader-only** に。
-  既存 leader 設計(tabLeaderLock.js + GLOBAL_BACKFILL_LOCK / per-lv `nls-backfill-<lv>`)と整合。
-  → 「N → 1 タブで write」に削減。ウルトラC の延長線。v0.1.592 baseline 互換。
+- **案1**(最小手・15-30分): `triggerBackfillRetry` に **5〜10秒のタブ間クールダウン**(session storage)。
+  新 pure module `src/lib/multiTabBackfillRetryCooldown.js`。加えて `maybeAutoRetryBackfillFromProg`
+  (popup-entry.js:7987)が `prog.stopReason` を**読まずに**リトライしている → `rotation_yield`/`aborted`
+  なら retry しないよう修正。popup 側 retry 上限も追加(現在無制限)。**影響範囲 popup-entry.js のみ・表示不変**。
+  → 点滅頻度を 1/N に。
+- **案2**(根治・1-2日): persist(tail/chunk/main)を `runIfTabLeader('nls-persist-'+lid, ...)` で **leader-only** に。
+  follower は in-memory バッファ保持(昇格時 flush)、WS 傍受は全タブ継続(fault-tolerance)。
+  → write 1/N・取得低下(591中79=13%)を 1タブ時 ≒95% に戻す。既存 persist テスト 20+ファイル要全緑。
+- **案3 ★推奨**: 案1+案2 ハイブリッド・段階実装。PR_α(案1)→ ユーザー確認 → PR_β(案2)の2独立PR。
+  案1だけでは取得低下残り、案2だけでは点滅残るので両方必要。
+- **案4**(大改修・3-5日): ウルトラC full deploy(persist集約 + WS dedupe session共有 + 親タブvisibility基準描画)。
+  **一般ユーザー(1-2タブ)には過剰** → Codex 判断「案3で十分」。
+
+実装は全て `tabLeaderLock.js` の延長で可能(ウルトラC への投資が無駄にならない)。v0.1.592 baseline 互換。
 
 ## 既存防御で効いているもの(=真因ではない)
 
