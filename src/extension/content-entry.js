@@ -5162,6 +5162,30 @@ function buildGiftDiagnosticsBundle() {
       document.documentElement?.getAttribute('data-nls-audition-fetch') || 'never',
     nicoadFetchStatus:
       document.documentElement?.getAttribute('data-nls-nicoad-fetch') || 'never',
+    // v0.1.616: 外部 API 直接 fetch（koken/nicoad）の発火・SW 応答の観測。
+    //   「API は満額返るのに popup は取得中」の真因を一点に絞るための診断。
+    //   intervalTicks=0 → interval が回っていない / leaderRan=0 & leaderSkipped>0 →
+    //   このタブはフォロワーで誰も fetch しない谷 / kokenSent>0 だが kokenLastRows=0/null →
+    //   SW が空 or 未応答（kokenLastError/Status を見る）。
+    externalFetchProbe: {
+      intervalTicks: _externalFetchProbe.intervalTicks,
+      leaderRan: _externalFetchProbe.leaderRan,
+      leaderSkipped: _externalFetchProbe.leaderSkipped,
+      kokenSent: _externalFetchProbe.kokenSent,
+      kokenLastOk: _externalFetchProbe.kokenLastOk,
+      kokenLastStatus: _externalFetchProbe.kokenLastStatus,
+      kokenLastRows: _externalFetchProbe.kokenLastRows,
+      kokenLastError: _externalFetchProbe.kokenLastError,
+      kokenLastAgoMs:
+        _externalFetchProbe.kokenLastAgoBase > 0
+          ? Math.max(0, Date.now() - _externalFetchProbe.kokenLastAgoBase)
+          : null,
+      nicoadSent: _externalFetchProbe.nicoadSent,
+      nicoadLastOk: _externalFetchProbe.nicoadLastOk,
+      nicoadLastStatus: _externalFetchProbe.nicoadLastStatus,
+      nicoadLastRows: _externalFetchProbe.nicoadLastRows,
+      nicoadLastError: _externalFetchProbe.nicoadLastError
+    },
     eventDomBundleSummary: (() => {
       const b = lastOfficialEventDomBundle;
       if (!b) return { hasBundle: false };
@@ -13316,6 +13340,45 @@ let _kokenContribApiLastAttemptAt = 0;
 const NICOAD_CONTRIB_API_MIN_GAP_MS = 25_000;
 /** @type {number} */
 let _nicoadContribApiLastAttemptAt = 0;
+
+/**
+ * v0.1.616: 外部 API 直接 fetch（koken/nicoad）の発火・SW 応答を診断に出すための観測カウンタ。
+ * 実機 lv350672510 で「API は満額返るのに popup は取得中」になる真因を一点に絞るため、
+ * 「interval が回ったか / リーダーを取れたか / SW にメッセージを送ったか / SW が何を返したか」
+ * を記録する。診断 JSON の giftDiagnostics.externalFetchProbe に出す。
+ * @type {{
+ *   intervalTicks: number,
+ *   leaderRan: number,
+ *   leaderSkipped: number,
+ *   kokenSent: number,
+ *   kokenLastOk: boolean|null,
+ *   kokenLastStatus: number|null,
+ *   kokenLastRows: number|null,
+ *   kokenLastError: string,
+ *   kokenLastAgoBase: number,
+ *   nicoadSent: number,
+ *   nicoadLastOk: boolean|null,
+ *   nicoadLastStatus: number|null,
+ *   nicoadLastRows: number|null,
+ *   nicoadLastError: string
+ * }}
+ */
+const _externalFetchProbe = {
+  intervalTicks: 0,
+  leaderRan: 0,
+  leaderSkipped: 0,
+  kokenSent: 0,
+  kokenLastOk: null,
+  kokenLastStatus: null,
+  kokenLastRows: null,
+  kokenLastError: '',
+  kokenLastAgoBase: 0,
+  nicoadSent: 0,
+  nicoadLastOk: null,
+  nicoadLastStatus: null,
+  nicoadLastRows: null,
+  nicoadLastError: ''
+};
 /** 参加配信者一覧 API の専用ポーリング間隔（ms）。30s の koken と切り離して遅延を減らす。 */
 const EVENT_PARTICIPATION_API_FETCH_MS = 12_000;
 /** 参加配信者一覧 API の再入抑止（FETCH 周期に合わせ 10s、v0.1.370）。 */
@@ -13354,6 +13417,8 @@ function runExternalApiFetchesAsTabLeader(opts = {}) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return Promise.resolve();
   const includeEvt = opts.includeEventParticipation !== false;
+  // v0.1.616: 観測。interval が実際に fetch 要求まで来たかを数える。
+  _externalFetchProbe.intervalTicks += 1;
   return runIfTabLeader('nls-extfetch-' + lid, () => {
     maybeFetchKokenContribRankingMirrorOnce();
     maybeFetchNicoadContribRankingMirrorOnce();
@@ -13367,6 +13432,12 @@ function runExternalApiFetchesAsTabLeader(opts = {}) {
     void maybeResolveNamedUserProfilesOnce();
     void maybeFetchCommenterFollowBatchOnce();
     void maybeFetchCommenterFollowingListBatchOnce();
+  }).then((r) => {
+    // v0.1.616: 観測。このタブがリーダーとして実行したか（ran=true）／フォロワーで
+    //   スキップしたか（ran=false）を数える。「誰も fetch しない谷」の検出用。
+    if (r && r.ran) _externalFetchProbe.leaderRan += 1;
+    else _externalFetchProbe.leaderSkipped += 1;
+    return r;
   });
 }
 
@@ -13401,19 +13472,31 @@ function maybeFetchKokenContribRankingMirrorOnce() {
     const now = Date.now();
     if (now - _kokenContribApiLastAttemptAt < KOKEN_CONTRIB_API_MIN_GAP_MS) return;
     _kokenContribApiLastAttemptAt = now;
+    // v0.1.616: 観測。SW へメッセージを送った回数。
+    _externalFetchProbe.kokenSent += 1;
+    _externalFetchProbe.kokenLastAgoBase = now;
     chrome.runtime.sendMessage(
       { type: KOKEN_CONTRIB_FETCH_MESSAGE_TYPE, liveId: lid },
       (resp) => {
         // lastError を読まないと unchecked エラーが console に出る。読むだけ。
         const le = chrome.runtime.lastError;
+        // v0.1.616: 観測。SW 応答の素の値を記録（rows 正規化前）。
+        _externalFetchProbe.kokenLastError = le ? String(le.message || le) : '';
+        _externalFetchProbe.kokenLastOk = resp ? resp.ok === true : false;
+        _externalFetchProbe.kokenLastStatus =
+          resp && typeof resp.status === 'number' ? resp.status : null;
         if (le) return;
-        if (!resp || resp.ok !== true || resp.json == null) return;
+        if (!resp || resp.ok !== true || resp.json == null) {
+          _externalFetchProbe.kokenLastRows = 0;
+          return;
+        }
         let rows = null;
         try {
           rows = normalizeKokenRankingResponse(resp.json);
         } catch {
           rows = null;
         }
+        _externalFetchProbe.kokenLastRows = Array.isArray(rows) ? rows.length : 0;
         if (!Array.isArray(rows) || rows.length === 0) return;
         // 応答到着までに別 liveId へ遷移していたら stale 書込しない
         const curLid = String(liveId || '')
@@ -13470,18 +13553,43 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
     const now = Date.now();
     if (now - _nicoadContribApiLastAttemptAt < NICOAD_CONTRIB_API_MIN_GAP_MS) return;
     _nicoadContribApiLastAttemptAt = now;
+    // v0.1.616: 観測。SW へメッセージを送った回数 + 属性も立てる（nicoadFetchStatus が
+    //   never 固定だった setAttribute 未実装バグの修正）。
+    _externalFetchProbe.nicoadSent += 1;
+    try {
+      document.documentElement?.setAttribute('data-nls-nicoad-fetch', 'sent');
+    } catch {
+      /* no-op */
+    }
     chrome.runtime.sendMessage(
       { type: NICOAD_CONTRIB_FETCH_MESSAGE_TYPE, liveId: lid },
       (resp) => {
         const le = chrome.runtime.lastError;
+        // v0.1.616: 観測。
+        _externalFetchProbe.nicoadLastError = le ? String(le.message || le) : '';
+        _externalFetchProbe.nicoadLastOk = resp ? resp.ok === true : false;
+        _externalFetchProbe.nicoadLastStatus =
+          resp && typeof resp.status === 'number' ? resp.status : null;
+        try {
+          document.documentElement?.setAttribute(
+            'data-nls-nicoad-fetch',
+            le ? 'error' : resp && resp.ok === true ? 'ok' : 'empty'
+          );
+        } catch {
+          /* no-op */
+        }
         if (le) return;
-        if (!resp || resp.ok !== true || resp.json == null) return;
+        if (!resp || resp.ok !== true || resp.json == null) {
+          _externalFetchProbe.nicoadLastRows = 0;
+          return;
+        }
         let rows = null;
         try {
           rows = normalizeNicoadRankingResponse(resp.json);
         } catch {
           rows = null;
         }
+        _externalFetchProbe.nicoadLastRows = Array.isArray(rows) ? rows.length : 0;
         if (!Array.isArray(rows) || rows.length === 0) return;
         const curLid = String(liveId || '')
           .trim()
