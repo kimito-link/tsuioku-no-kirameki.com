@@ -47,6 +47,8 @@ describe('reportCommentsTableSection', () => {
       reportCommentsCsv: 'SHOULD-NOT-APPEAR'
     });
     expect(html).toContain('nl-report-comments-heavy-note');
+    expect(html).toContain(`コメントが ${n} 件あるため`);
+    expect(html).toContain(`全 ${n} 件中、先頭 ${HTML_REPORT_COMMENTS_TABLE_INITIAL_ROWS} 件`);
     expect(html).not.toContain('nlReportCsvData');
     expect(html).not.toContain('SHOULD-NOT-APPEAR');
     expect(html).not.toContain('nl-report-comments-overflow-v1');

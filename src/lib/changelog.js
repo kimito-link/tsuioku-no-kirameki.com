@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.614',
+    date: '2026-06-03',
+    summary: 'コメント記録HTMLのheavy保存を安定化',
+    items: Object.freeze([
+      'コメントが多い配信では「きらめきの賞」の本文判定を代表コメントから簡易集計し、HTMLレポート本体の保存を優先するように変更',
+      '保存コメント一覧や総コメント数などの件数表示は実数のまま維持',
+      '軽い配信では従来どおり全コメントを使って賞を判定し、出力内容を変えない'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.613',
     date: '2026-06-03',
     summary: 'マーケ分析レポートの書き出しを高速化（重複計算を解消）',
