@@ -4372,6 +4372,26 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-json', label: '表計算・ツール向け JSON' }
   ];
 
+  // v0.1.613: フォロー×コメント分析と応援者パワー診断は同じ buildCommenterFollowAnalytics を
+  //   別々に呼んでおり(従来は同一 HTML 内で 2 回)、数千コメンターでは重複計算が DL 遅延の原因
+  //   だった。ここで includeSupporterPower=true 込みで 1 回だけ計算し、両セクションに共有する。
+  //   結果は従来 (sectionCommenterFollowAnalytics) の出力 fields の厳密な superset なので互換。
+  //   precomputed を渡さない呼び出し(他テスト等)では各セクションが従来通り内部計算する。
+  const cfaAnalyticsShared = (() => {
+    const ac = Array.isArray(r.allNumericCommenters) ? r.allNumericCommenters : [];
+    if (!ac.length) return null;
+    return buildCommenterFollowAnalytics(ac, {
+      commenterFollowDataset: r.commenterFollowDataset,
+      excludeUserId: broadcasterUserId,
+      priorFollowEntries: r.commenterFollowPriorEntries,
+      followingListMap: r.commenterFollowingListCache,
+      followingListCoverage: r.followingListCoverage,
+      durationMs: Math.max(0, Number(r.durationMinutes) || 0) * 60_000,
+      includeSupporterPower: true,
+      supporterPowerTopN: 10
+    });
+  })();
+
   const bodyHtml = `${sectionFeaturesOverview()}
 __NL_TOC_PLACEHOLDER__
 ${sectionAudienceParticipationLead(audienceGap, r, supportParticipation)}
@@ -4462,8 +4482,8 @@ ${sectionAdviceAfterSegment(r)}
 ${idWrap('mkt-top-users', sectionTopUsers(r, maskShare, identiconResolver, broadcasterUserId))}
 ${sectionAdviceAfterRank(r)}
 ${idWrap('mkt-commenter-follow', sectionCommenterFollowDirectory(r, maskShare, identiconResolver, broadcasterUserId))}
-${sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId)}
-${sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId, undefined, identiconResolver)}
+${sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared })}
+${sectionSupporterPowerDiagnostic(r, maskShare, broadcasterUserId, { precomputedAnalytics: cfaAnalyticsShared }, identiconResolver)}
 ${sectionInterestArrival(r)}
 ${idWrap('mkt-thumb-grid', sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcasterUserId))}
 ${idWrap('mkt-vpos', sectionVposThirds(r))}
@@ -5527,7 +5547,7 @@ function sectionInterestArrival(r) {
  * @param {MarketingReport} r
  * @param {boolean} maskShare
  * @param {string} [broadcasterUserId]
- * @param {{ sectionId?: string, csvButtonId?: string }} [sectionOpts]
+ * @param {{ sectionId?: string, csvButtonId?: string, precomputedAnalytics?: ReturnType<typeof buildCommenterFollowAnalytics> | null }} [sectionOpts]
  */
 function sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId = '', sectionOpts = {}) {
   const sectionId = String(sectionOpts.sectionId || 'mkt-commenter-follow-analytics').trim();
@@ -5540,14 +5560,18 @@ function sectionCommenterFollowAnalytics(r, maskShare, broadcasterUserId = '', s
 </section>`;
   }
 
-  const analytics = buildCommenterFollowAnalytics(allNumericCommenters, {
-    commenterFollowDataset: r.commenterFollowDataset,
-    excludeUserId: broadcasterUserId,
-    priorFollowEntries: r.commenterFollowPriorEntries,
-    followingListMap: r.commenterFollowingListCache,
-    followingListCoverage: r.followingListCoverage,
-    durationMs: Math.max(0, Number(r.durationMinutes) || 0) * 60_000
-  });
+  // v0.1.613: 呼び出し元が precomputedAnalytics を渡してきたらそれを使う(重複計算の回避)。
+  //   渡されなければ従来通り内部で計算する(後方互換)。
+  const analytics =
+    sectionOpts.precomputedAnalytics ||
+    buildCommenterFollowAnalytics(allNumericCommenters, {
+      commenterFollowDataset: r.commenterFollowDataset,
+      excludeUserId: broadcasterUserId,
+      priorFollowEntries: r.commenterFollowPriorEntries,
+      followingListMap: r.commenterFollowingListCache,
+      followingListCoverage: r.followingListCoverage,
+      durationMs: Math.max(0, Number(r.durationMinutes) || 0) * 60_000
+    });
   if (!analytics.rows.length) return '';
 
   const threshold = analytics.thresholds;
@@ -5609,7 +5633,7 @@ ${commenterFollowingListPanelHtml(analytics, r)}
  * @param {MarketingReport} r
  * @param {boolean} maskShare
  * @param {string} [broadcasterUserId]
- * @param {{ sectionId?: string }} [sectionOpts]
+ * @param {{ sectionId?: string, precomputedAnalytics?: ReturnType<typeof buildCommenterFollowAnalytics> | null }} [sectionOpts]
  * @param {((uid: string) => string) | undefined} [identiconResolver]
  * @returns {string}
  */
@@ -5626,16 +5650,22 @@ function sectionSupporterPowerDiagnostic(
 
   // 既存 buildCommenterFollowAnalytics に includeSupporterPower=true で接続
   // (Phase 2-B で追加した opts を使う・完全互換)
-  const analytics = buildCommenterFollowAnalytics(allNumericCommenters, {
-    commenterFollowDataset: r.commenterFollowDataset,
-    excludeUserId: broadcasterUserId,
-    priorFollowEntries: r.commenterFollowPriorEntries,
-    followingListMap: r.commenterFollowingListCache,
-    followingListCoverage: r.followingListCoverage,
-    durationMs: Math.max(0, Number(r.durationMinutes) || 0) * 60_000,
-    includeSupporterPower: true,
-    supporterPowerTopN: 10
-  });
+  // v0.1.613: 呼び出し元が precomputedAnalytics(includeSupporterPower 込み)を渡してきたら
+  //   それを使い、重複計算を避ける。渡されなければ従来通り内部で計算する(後方互換)。
+  const analytics =
+    (sectionOpts.precomputedAnalytics && sectionOpts.precomputedAnalytics.supporterPowerRows
+      ? sectionOpts.precomputedAnalytics
+      : null) ||
+    buildCommenterFollowAnalytics(allNumericCommenters, {
+      commenterFollowDataset: r.commenterFollowDataset,
+      excludeUserId: broadcasterUserId,
+      priorFollowEntries: r.commenterFollowPriorEntries,
+      followingListMap: r.commenterFollowingListCache,
+      followingListCoverage: r.followingListCoverage,
+      durationMs: Math.max(0, Number(r.durationMinutes) || 0) * 60_000,
+      includeSupporterPower: true,
+      supporterPowerTopN: 10
+    });
   if (!analytics.supporterPowerRows || analytics.supporterPowerRows.length === 0) return '';
 
   const summary = analytics.supporterPowerSummary;

@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.613',
+    date: '2026-06-03',
+    summary: 'マーケ分析レポートの書き出しを高速化（重複計算を解消）',
+    items: Object.freeze([
+      'フォロー×コメント分析と応援者パワー診断が同じ集計を別々に計算していたのを、1回だけ計算して共有するように変更',
+      'コメンター数が多い配信ほど、マーケ分析HTMLの書き出しが軽くなる',
+      '表示内容は従来と同じ（計算結果の見た目は変わらない）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.612',
     date: '2026-06-03',
     summary: '応援者パワー診断の表にサムネとniconicoリンクを追加',
