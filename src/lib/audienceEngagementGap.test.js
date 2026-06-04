@@ -85,4 +85,20 @@ describe('analyzeAudienceEngagementGap', () => {
     expect(out.uniqueCommenters).toBe(1);
     expect(out.recordedCommentsPer100Visitors).toBe(1);
   });
+
+  it('匿名(a:hash)もコメントした人数に含める・同一 a:hash は1人', () => {
+    const out = analyzeAudienceEngagementGap({
+      liveId: 'lv1',
+      visitorCount: 100,
+      comments: [
+        { liveId: 'lv1', text: 'c1', userId: 'a:hashA' },
+        { liveId: 'lv1', text: 'c2', userId: 'a:hashA' }, // 同一人物
+        { liveId: 'lv1', text: 'c3', userId: 'a:hashB' },
+        { liveId: 'lv1', text: 'c4', userId: '12345' } // 数値ID
+      ]
+    });
+    // a:hashA(1) + a:hashB(1) + 12345(1) = 3 人(以前は数値の1人だけだった)
+    expect(out.uniqueCommenters).toBe(3);
+    expect(out.recordedCommentCount).toBe(4);
+  });
 });
