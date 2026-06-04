@@ -5486,7 +5486,7 @@ ${commonTable}
  * 興味タグ別来場（公式 generalSystemMessage）。
  * @param {MarketingReport} r
  */
-function sectionInterestArrival(r) {
+export function sectionInterestArrival(r) {
   const summary = r.interestArrivalSummary;
   if (!summary || summary.messageCount <= 0) return '';
 
