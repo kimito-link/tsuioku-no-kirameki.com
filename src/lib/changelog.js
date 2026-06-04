@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.633',
+    date: '2026-06-05',
+    summary: '配信を開いた直後にコメント取得が止まる退行を修正',
+    items: Object.freeze([
+      '配信を開いた直後の約30秒間、過去コメントの取得が止まってしまう不具合を修正',
+      'タブの切り替えや画面の表示・非表示を繰り返しても、続きから自動で取得を再開するように改善'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.632',
     date: '2026-06-05',
     summary: '高速スクロールの白チラつき軽減・状態ページ強化・巡回ボタン・集計修正',

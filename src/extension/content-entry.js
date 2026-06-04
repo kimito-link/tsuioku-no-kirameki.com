@@ -396,6 +396,10 @@ import {
   GLOBAL_FORWARD_LOCK
 } from '../lib/tabLeaderLock.js';
 import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
+import {
+  shouldRearmBackfillAfterVisibility,
+  pruneRecentVisibilityPauses
+} from '../lib/backfillVisibilityRearm.js';
 import { calculateBackfillRetryDelayMs } from '../lib/backfillRetryBackoff.js';
 import {
   isBackfillEnabledFromStorage,
@@ -14970,14 +14974,23 @@ let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
 /**
- * v0.1.624: 直前の `visibility_paused` guard 解除タイムスタンプ。連続 visibilitychange での
- * 無限再起動ループを防ぐクールダウン管理。30秒以内の再解除は無視 → 「タブを戻した最初の1回」
- * だけ続きから掘る挙動を保証(ユーザー実機証言「v0.1.620 では一気に取れた」の再現)。
- * @type {number}
+ * v0.1.633: 直近の `visibility_paused` 発火時刻列（ms・観測窓内のみ保持）。連続 visibilitychange
+ *   での無限再起動ループを「発火回数ベース」で抑制するため、pruneRecentVisibilityPauses で
+ *   間引きながら保持する。
+ *
+ *   旧 v0.1.624 は単一タイムスタンプ + 30秒一律クールダウンだったが、初期値 0 のため
+ *   「開いて最初の hidden で1回 rearm してタイムスタンプを刻み、以後30秒沈黙」という退行を
+ *   起こしていた（実機 lv350679746: 公式947件に対し記録1件・取得率0%）。
+ *   shouldRearmBackfillAfterVisibility（初回保証 + 発火回数ベース）に置き換えて根治する。
+ * @type {number[]}
  */
-let _backfillVisibilityRearmLastAt = 0;
-/** クールダウン期間(ms)。devtools 開閉や focus 移動の連発から守る。 */
-const VISIBILITY_PAUSED_REARM_MIN_MS = 30_000;
+let _backfillRecentVisibilityPauses = [];
+/**
+ * v0.1.633: この liveId で既に一度でも visibility 起因の rearm を許可したか。false の間は
+ *   「初回保証」で必ず再開を許可し、開いた直後の沈黙を作らない。liveId が変わったらリセットする。
+ * @type {string}
+ */
+let _backfillVisibilityRearmedLiveId = '';
 /**
  * v0.1.431: liveId ごとの「一過性 stop での自動リトライ回数」。実機 lv350625305 等で観測＝
  * 過去ログの入口探しが押したタイミングで一過性に空振り(backward_exhausted/no_entry)し、
@@ -15435,16 +15448,36 @@ async function runNdgrBackfillOnce() {
     // v0.1.624: ただし無条件解除は **無限再起動ループ** を作る(visibilitychange の連続発火・
     //   devtools 開閉/focus 移動/popup 開閉等で毎秒級 abort→restart→lastPersistBatch:11 trickle・
     //   「ローディング表示が消えない/重い」=ユーザー実機証言「v0.1.620 では一気に取れた」の真因)。
-    //   クールダウン: 直前の visibility_paused 解除から VISIBILITY_PAUSED_REARM_MIN_MS 経過後のみ
-    //   再起動を許可。これで「visible に戻った最初の1回だけ続きから掘る」設計になる。
+    // v0.1.633: 旧 30秒一律クールダウンには重大な副作用があった ＝ rearm タイムスタンプ初期値 0 の
+    //   ため、開いて最初の hidden で1回だけ rearm してタイムスタンプを刻み、以後30秒は二度と再開
+    //   しない。パネルを開く/フォーカス移動が watch タブ hidden を起こすため、開いた直後30秒が
+    //   完全沈黙＝退行(実機 lv350679746: 公式947件に対し記録1件・取得率0%)。
+    //   → 一律時間クールダウンを「初回保証 + 発火回数ベース抑制」に置換(backfillVisibilityRearm.js)。
+    //     ①この liveId で初めての rearm なら必ず許可(開いた直後の沈黙を作らない)。
+    //     ②2回目以降は観測窓内の visibility_paused が閾値以上(連発ループ)のときだけ抑制。単発は即再開。
     if (_backfillProgress.stopReason === 'visibility_paused') {
       const now = Date.now();
-      if (now - _backfillVisibilityRearmLastAt >= VISIBILITY_PAUSED_REARM_MIN_MS) {
-        _backfillVisibilityRearmLastAt = now;
+      // liveId が切り替わったら初回保証カウンタをリセット(別配信は別物として扱う)。
+      if (_backfillVisibilityRearmedLiveId && _backfillVisibilityRearmedLiveId !== liveId) {
+        _backfillVisibilityRearmedLiveId = '';
+        _backfillRecentVisibilityPauses = [];
+      }
+      _backfillRecentVisibilityPauses = pruneRecentVisibilityPauses(
+        [..._backfillRecentVisibilityPauses, now],
+        now
+      );
+      const hasRearmedThisLive = _backfillVisibilityRearmedLiveId === liveId;
+      if (
+        shouldRearmBackfillAfterVisibility({
+          hasRearmedThisLive,
+          recentPauseTimestamps: _backfillRecentVisibilityPauses
+        })
+      ) {
+        _backfillVisibilityRearmedLiveId = liveId;
         _backfillTriedLiveId = '';
       }
-      // クールダウン中は guard を残したまま=次の maybeAutoStartBackfill tick では起動しない。
-      // クールダウン経過後の visibility_paused 終了で guard が外れる。
+      // 抑制時は guard を残したまま=このターンは起動しない。連発が窓外に抜ければ次の
+      //   visibility_paused 終了で再び許可され、続きから掘り直す(自己回復)。
     }
     _backfillProgress.done = 1;
     publishBackfillProgress();
