@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.634',
+    date: '2026-06-05',
+    summary: '内部: HTMLレポートの自コメ抜粋の組み立てを部品化(見え方は不変)',
+    items: Object.freeze([
+      'HTMLレポートの「自分のコメント抜粋」を作る処理を内部で部品に切り出し、テストで挙動が変わらないことを保証しました(見た目・内容は変わりません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.633',
     date: '2026-06-05',
     summary: '配信を開いた直後にコメント取得が止まる退行を修正',
