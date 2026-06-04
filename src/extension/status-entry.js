@@ -107,30 +107,36 @@ function updateLastUpdateMeta() {
 }
 
 /* ============================================================================
- * lv 列挙
- *   - chrome.storage.local.getKeys() (MV3 Chrome 130+) が使えれば優先
- *   - 使えなければ fastDiag.lives 経由
- *   - それも無ければ last_watch_url から 1 件
+ * lv 列挙(v0.1.630 修正: 「今開いているニコ生タブ」だけに限定)
+ *
+ *   v0.1.629 では nls_panel_summary_<lv> を全部列挙していたが、過去に視聴したものが
+ *   全部残るため 400+ 配信が「視聴中」扱いになる実機問題が出た(ユーザー証言)。
+ *   chrome.tabs.query で実際に開いているタブから lv を抽出する経路を最優先にする。
+ *
+ *   - 経路1: chrome.tabs.query で live.nicovideo.jp/watch/lvXXX のタブから抽出 ← 最優先
+ *   - 経路2: fastDiag.lives(視聴中フラグ付き)
+ *   - 経路3: last_watch_url から 1 件(フォールバック)
  * ========================================================================== */
 
 async function enumerateActiveLives() {
   /** @type {string[]} */
-  let lvList = [];
-  // 経路1: getKeys()
+  const lvList = [];
+  // 経路1: 実際に開いているニコ生 watch タブから lv 抽出
   try {
-    if (typeof chrome.storage.local.getKeys === 'function') {
-      const keys = await chrome.storage.local.getKeys();
-      lvList = keys
-        .filter((k) => typeof k === 'string' && k.startsWith(PANEL_SUMMARY_PREFIX))
-        .map((k) => k.slice(PANEL_SUMMARY_PREFIX.length))
-        .filter((lv) => /^lv\d{1,15}$/.test(lv));
+    const tabs = await chrome.tabs.query({
+      url: ['https://live.nicovideo.jp/watch/*', 'https://sp.live.nicovideo.jp/watch/*']
+    });
+    for (const tab of tabs || []) {
+      const url = String(tab?.url || '');
+      const m = url.match(/\/watch\/(lv\d{1,15})/);
+      if (m) lvList.push(m[1].toLowerCase());
     }
   } catch {
     /* fallthrough */
   }
   if (lvList.length > 0) return uniqLvSorted(lvList);
 
-  // 経路2: fastDiag.lives
+  // 経路2: fastDiag.lives(視聴中タブ由来のキャッシュ)
   try {
     const fastDiag = await loadFastDiagSafe();
     const lives = Array.isArray(fastDiag?.lives) ? fastDiag.lives : [];
