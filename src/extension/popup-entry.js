@@ -622,6 +622,7 @@ import {
 } from '../lib/popupWindowEmptyHeight.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
+import { buildReportSelfPostedRows } from '../lib/reportSelfPostedRowsHtml.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
@@ -16110,19 +16111,9 @@ async function buildHtmlReportDocument(
   const durationLabel = formatBroadcastDurationLabel(reportTiming);
 
   // 0.1.21 (V): 自分のコメント抜粋（自コメだけのテーブル）。
+  // C-7 pure refactor (v0.1.634): 行ビルダを reportSelfPostedRowsHtml.js に抽出（挙動不変・test 済）。
   const selfPostedComments = commentsForReport.filter((c) => Boolean(c?.selfPosted));
-  const selfPostedRows = selfPostedComments.map((c, idx) => {
-    const text = String(c.text || '').trim();
-    const search = escapeAttr(`${idx + 1} ${text} ${c.commentNo || ''}`.toLowerCase());
-    return `
-      <tr class="search-item" data-search="${search}">
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(String(c.commentNo || '-'))}</td>
-        <td>${escapeHtml(text || '-')}</td>
-        <td>${escapeHtml(formatDateTime(c.capturedAt || 0))}</td>
-      </tr>
-    `;
-  });
+  const selfPostedRows = buildReportSelfPostedRows(selfPostedComments, { formatDateTime });
 
   // 0.1.21 (V): CSV ダウンロード用の生 CSV を埋め込む。<pre hidden> の textContent
   // から JS が読み取り Blob 化してダウンロードする（再エスケープ不要）。
