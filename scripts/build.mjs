@@ -61,6 +61,15 @@ const targets = [
     entryPoints: ['src/extension/offscreen-entry.js'],
     outfile: 'extension/dist/offscreen.js',
     target: 'chrome111'
+  },
+  {
+    // v0.1.629: 固定 URL 状態表示ページ(status.html)。chrome.storage.local の既存キーを
+    //   リードオンリーで読み AI 共有用テキスト+JSON を常時最新表示する独立 View。
+    //   popup と独立(13.9k 行の重い初期化を取り込まない)・background SW を起こさない。
+    entryPoints: ['src/extension/status-entry.js'],
+    outfile: 'extension/dist/status.js',
+    target: 'chrome100',
+    define: popupDefine
   }
 ];
 
