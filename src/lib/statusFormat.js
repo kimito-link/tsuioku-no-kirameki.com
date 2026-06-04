@@ -16,6 +16,8 @@
  * @module statusFormat
  */
 
+import { buildPerfDiagLine } from './perfDiag.js';
+
 /**
  * 概要テキスト(配信数・累計記録・公式累計・取得率)を組み立てる。
  * @param {object[]} livesData
@@ -71,6 +73,9 @@ export function buildLiveBlockText(live) {
   if (live.lastIngestAgoMs != null) {
     lines.push(`  最終取り込み ${formatAgo(live.lastIngestAgoMs)}前`);
   }
+  // 複数タブ paint 負荷の診断行(perfDiag があるときだけ)。白フラッシュ原因の見える化。
+  const perfLine = buildPerfDiagLine(live.perfDiag);
+  if (perfLine) lines.push(perfLine);
   return lines.join('\n');
 }
 

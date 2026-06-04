@@ -362,6 +362,7 @@ import {
   isPanelLiveSummary,
   watchSnapshotFromPanelSummary
 } from '../lib/panelLiveSummary.js';
+import { perfDiagStorageKey, buildPerfDiag } from '../lib/perfDiag.js';
 import { listBackfillWaitingLiveIds } from '../lib/globalBackfillQueue.js';
 import {
   PANEL_METRICS_MESSAGE_TYPE,
@@ -975,6 +976,58 @@ let _lastTopSupportRankStripStableKey = null;
  * @type {string}
  */
 let _lastUserRoomsPaintedLiveId = '';
+
+/** perfDiag を最後に storage へ書いた時刻(間引き用)。 */
+let _lastPerfDiagWriteAt = 0;
+/** 視聴中タブ数のキャッシュ(perfDiag 用・5秒ごとに更新)。 */
+let _perfDiagTabCount = /** @type {number|null} */ (null);
+let _perfDiagTabCountAt = 0;
+
+/**
+ * paint 所要 ms 等を nls_perf_diag_<lv> に間引いて書く(白フラッシュ原因の見える化)。
+ * 複数タブの storage 競合を増やさないよう、同 liveId への書き込みは 2 秒に 1 回まで。
+ * fire-and-forget(失敗しても paint を妨げない)。
+ * @param {string} liveId
+ * @param {number} paintMs
+ * @param {number} commentCount
+ * @param {boolean} deferActive
+ */
+function recordPerfDiagThrottled(liveId, paintMs, commentCount, deferActive) {
+  const lv = String(liveId || '').trim().toLowerCase();
+  if (!lv) return;
+  const now = Date.now();
+  if (now - _lastPerfDiagWriteAt < 2000) return;
+  _lastPerfDiagWriteAt = now;
+  // タブ数は 5 秒ごとに更新(tabs.query は毎回呼ぶと地味に重い)。
+  if (now - _perfDiagTabCountAt > 5000) {
+    _perfDiagTabCountAt = now;
+    try {
+      chrome.tabs
+        .query({
+          url: ['https://live.nicovideo.jp/watch/*', 'https://sp.live.nicovideo.jp/watch/*']
+        })
+        .then((tabs) => {
+          _perfDiagTabCount = Array.isArray(tabs) ? tabs.length : null;
+        })
+        .catch(() => {});
+    } catch {
+      /* tabs 権限が無い文脈では null のまま */
+    }
+  }
+  const diag = buildPerfDiag({
+    liveId: lv,
+    tabCount: _perfDiagTabCount,
+    lastPaintAt: now,
+    lastPaintMs: Math.round(paintMs),
+    commentCount,
+    deferActive
+  });
+  try {
+    chrome.storage.local.set({ [perfDiagStorageKey(lv)]: diag }).catch(() => {});
+  } catch {
+    /* context invalidated 時は無視 */
+  }
+}
 
 /**
  * v0.1.246: popup 内で同 user_id を別 nickname で表示する衡突を防ぐ統一 map。
@@ -13887,11 +13940,14 @@ async function refresh() {
     //   既に同 liveId のレーンが描画済みのときに限り、スクロール中は描画を見送る
     //   (growth patch と同じ思想)。スクロールが止まれば次の refresh(最長 3 秒)で塗り直る。
     //   初回/配信切替/未描画(空)のときは見送らず必ず描画する。
+    // 白フラッシュ見える化: ここから renderWatchMetaCard までの重い paint 区間を計測する。
+    const _perfPaintT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const userRoomsUl = /** @type {HTMLElement|null} */ ($('userRoomList'));
     const userRoomsAlreadyPainted =
       !!userRoomsUl &&
       userRoomsUl.childElementCount > 0 &&
       _lastUserRoomsPaintedLiveId === lv;
+    const _perfDeferActive = shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted;
     if (shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted) {
       // スクロール中 & 同 liveId が既に塗ってある: 全消し再構築を見送る(白抜け防止)。
       //   別配信のときは _lastUserRoomsPaintedLiveId !== lv で painted=false になり描画される。
@@ -13906,7 +13962,7 @@ async function refresh() {
     // 白フラッシュ対策(複数タブ): renderCharacterScene も内部で innerHTML='' 系の
     //   重い再構築をする。renderUserRooms と同様、同 liveId が既に塗ってあれば
     //   スクロール中は見送る(初回/配信切替/未描画時は必ず描画)。
-    if (!(shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted)) {
+    if (!_perfDeferActive) {
       renderCharacterScene({
         hasWatch: true,
         recording: toggle.checked,
@@ -13916,6 +13972,16 @@ async function refresh() {
       });
     }
     renderWatchMetaCard(snapForCards, arr);
+    // 白フラッシュ見える化: paint 区間の所要 ms を nls_perf_diag_<lv> に間引き保存。
+    {
+      const _perfPaintT1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      recordPerfDiagThrottled(
+        lv,
+        _perfPaintT1 - _perfPaintT0,
+        displayEntries.length,
+        _perfDeferActive
+      );
+    }
     // v0.1.503 perf: renderCharacterScene→syncStoryGrowth が source signature 一致時は
     //   既に patch 済み／skip 済み。ここで毎ポーリング無条件に O(N) patch を回すと、
     //   同一サイトの複数 watch タブが 1 プロセスを共有する環境でメインスレッドが固まり
