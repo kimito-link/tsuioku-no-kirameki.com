@@ -21,6 +21,12 @@
  */
 
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
+import {
+  buildOverviewText,
+  buildLiveBlockText,
+  formatElapsed,
+  formatAgo
+} from '../lib/statusFormat.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -322,54 +328,6 @@ function summarizeOneLive(lv, summary, snapshot) {
   };
 }
 
-function buildOverviewText(livesData) {
-  if (!livesData.length) return '';
-  const lines = [];
-  const total = livesData.length;
-  let recordedSum = 0;
-  let officialSum = 0;
-  for (const r of livesData) {
-    recordedSum += r.recordedCount || 0;
-    officialSum += r.officialCommentCount || 0;
-  }
-  const ratePct = officialSum > 0 ? Math.round((recordedSum / officialSum) * 100) : null;
-  lines.push(`記録中 ${total} 配信 / 累計 記録 ${recordedSum.toLocaleString('ja-JP')} 件`);
-  if (officialSum > 0) {
-    lines.push(`公式累計 ${officialSum.toLocaleString('ja-JP')} 件 (取得率 ${ratePct}%)`);
-  }
-  return lines.join('\n');
-}
-
-function buildLiveBlockText(live) {
-  const lines = [];
-  const head =
-    `[${live.lv}] ${live.broadcasterName || '(配信者名 不明)'}` +
-    (live.elapsedSec != null ? ` ・ 経過 ${formatElapsed(live.elapsedSec)}` : '');
-  lines.push(head);
-  // v0.1.631: 配信タイトル表示(snapshot から取れた場合のみ)。
-  if (live.title) {
-    lines.push(`  「${live.title}」`);
-  }
-  const numLine =
-    `  記録 ${(live.recordedCount || 0).toLocaleString('ja-JP')}` +
-    (live.officialCommentCount != null
-      ? ` / 公式 ${live.officialCommentCount.toLocaleString('ja-JP')}`
-      : '') +
-    (live.officialRatePct != null ? ` (取得率 ${live.officialRatePct}%)` : '');
-  lines.push(numLine);
-  if (live.watchCount != null) {
-    lines.push(`  来場 ${live.watchCount.toLocaleString('ja-JP')} 人`);
-  }
-  const ptParts = [];
-  if (live.adPoints != null) ptParts.push(`広告 ${live.adPoints.toLocaleString('ja-JP')}pt`);
-  if (live.giftPoints != null) ptParts.push(`ギフト ${live.giftPoints.toLocaleString('ja-JP')}pt`);
-  if (ptParts.length) lines.push('  ' + ptParts.join(' / '));
-  if (live.lastIngestAgoMs != null) {
-    lines.push(`  最終取り込み ${formatAgo(live.lastIngestAgoMs)}前`);
-  }
-  return lines.join('\n');
-}
-
 function buildAiShareFullText({ overviewText, livesData, fastDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
@@ -404,22 +362,6 @@ function numOr(v, dflt) {
 
 function numOrNull(v) {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
-}
-
-function formatElapsed(sec) {
-  if (sec == null || !Number.isFinite(sec) || sec < 0) return '?';
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.floor(sec % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-function formatAgo(ms) {
-  if (ms == null || !Number.isFinite(ms) || ms < 0) return '?';
-  if (ms < 60_000) return `${Math.round(ms / 1000)}秒`;
-  if (ms < 3_600_000) return `${Math.round(ms / 60_000)}分`;
-  return `${Math.round(ms / 3_600_000)}時間`;
 }
 
 /* ============================================================================
