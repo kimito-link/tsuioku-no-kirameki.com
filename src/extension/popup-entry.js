@@ -4714,9 +4714,15 @@ function bindNlMainScrollPerfHook() {
   );
 }
 
-/** @returns {boolean} */
+/**
+ * スクロール直後の重い paint 見送り判定。
+ * 複数タブ(同一プロセス共有)ではメインスレッドが飽和し、180ms の見送りでは
+ * 全消し再構築が間に合わず白フラッシュが残るため、見送り窓を 400ms に広げる。
+ * スクロールが止まれば次の refresh(最長 3 秒)で塗り直るので体感の更新遅れは小さい。
+ * @returns {boolean}
+ */
 function shouldDeferHeavyPopupPaintNow() {
-  return shouldDeferHeavyPopupPaintDuringScroll(nlMainLastScrollAtMs);
+  return shouldDeferHeavyPopupPaintDuringScroll(nlMainLastScrollAtMs, Date.now(), 400);
 }
 
 const STORY_GROWTH_STATE = {
@@ -13897,13 +13903,18 @@ async function refresh() {
       );
       _lastUserRoomsPaintedLiveId = lv;
     }
-    renderCharacterScene({
-      hasWatch: true,
-      recording: toggle.checked,
-      commentCount: displayEntries.length,
-      liveId: lv,
-      snapshot: snapForCards
-    });
+    // 白フラッシュ対策(複数タブ): renderCharacterScene も内部で innerHTML='' 系の
+    //   重い再構築をする。renderUserRooms と同様、同 liveId が既に塗ってあれば
+    //   スクロール中は見送る(初回/配信切替/未描画時は必ず描画)。
+    if (!(shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted)) {
+      renderCharacterScene({
+        hasWatch: true,
+        recording: toggle.checked,
+        commentCount: displayEntries.length,
+        liveId: lv,
+        snapshot: snapForCards
+      });
+    }
     renderWatchMetaCard(snapForCards, arr);
     // v0.1.503 perf: renderCharacterScene→syncStoryGrowth が source signature 一致時は
     //   既に patch 済み／skip 済み。ここで毎ポーリング無条件に O(N) patch を回すと、
