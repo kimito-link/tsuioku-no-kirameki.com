@@ -567,6 +567,7 @@ import {
   summarizeCommentRecordBreakdown,
   formatCommentRecordBreakdownLine
 } from '../lib/commentRecordBreakdown.js';
+import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
 import { STORY_GROWTH_MAX_CELLS } from '../lib/storyGrowthLimits.js';
@@ -2650,7 +2651,8 @@ function paintCommentComposeUi() {
 
 // 0.1.38 (AM): EXTENSION_RELOAD_USER_GUIDE_JA / withCommentSendTroubleshootHint
 // を src/lib/commentSendTroubleshootHint.js に切り出し済み（純粋関数 + 7 ケース TDD）。
-const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
+// v0.1.629: status.html と共有するため定数を ../lib/aiShareFastDiagKey.js に切り出し。
+//   ハードコード文字列は1箇所のみ・両 entry が同じ source of truth を見る。
 
 // 0.1.16 (Q): isExtensionContextInvalidatedError の重複定義を撤去し
 // `../lib/reportSilentError.js#isContextInvalidatedError` に一本化（同名 alias 経由で

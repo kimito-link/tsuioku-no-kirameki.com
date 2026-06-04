@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.629',
+    date: '2026-06-04',
+    summary: '状態表示ページを追加(スクショ撮影/コピペ不要に)',
+    items: Object.freeze([
+      'chrome-extension://[拡張ID]/status.html を開くと、視聴中の全配信の最新速報+診断JSONが2秒ごとに自動更新表示されます(AI共有時のスクショ撮影/コピペ作業が不要に)',
+      'ブックマーク登録すれば1クリックで開けます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.628',
     date: '2026-06-04',
     summary: '記録内訳を常時表示・他経路上書き防止で確実に見えるように',
