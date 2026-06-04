@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.626',
+    date: '2026-06-04',
+    summary: 'HTMLレポートに興味タグ別来場のセクションを追加',
+    items: Object.freeze([
+      'HTMLレポートに「興味タグ別来場」セクションを追加(料理/雑談などのタグからの集客内訳が見られるようになりました・マーケDL HTMLでは既に表示済の集計を流用)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.625',
     date: '2026-06-04',
     summary: '応援者帯が数名で固まる問題を修正(本来10名)',

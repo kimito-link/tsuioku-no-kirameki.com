@@ -560,7 +560,8 @@ import { buildReportMemoPayload } from '../lib/supportGrowthInsights.js';
 import {
   buildMarketingDashboardHtml,
   buildAudienceParticipationLeadSectionHtml,
-  audienceParticipationLeadEmbeddedCss
+  audienceParticipationLeadEmbeddedCss,
+  sectionInterestArrival
 } from '../lib/marketingChartsHtml.js';
 import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
@@ -16822,6 +16823,8 @@ async function buildHtmlReportDocument(
 
       ${participationLeadHtml}
 
+      ${sectionInterestArrival(participationSummaryReport)}
+
       ${yukkuriReportHtml}
 
       ${eventRankingSectionHtml}
@@ -16835,6 +16838,9 @@ async function buildHtmlReportDocument(
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
           <li><a href="#sec-participation-lead">来場とコメント参加</a></li>
+          ${participationSummaryReport?.interestArrivalSummary?.messageCount > 0
+            ? '<li><a href="#mkt-interest-arrival">興味タグ別来場</a></li>'
+            : ''}
           <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
           ${eventRankingSectionHtml ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
