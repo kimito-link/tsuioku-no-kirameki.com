@@ -6875,46 +6875,6 @@ function ensureInlinePlayerObservers() {
   }
 }
 
-/** 省電力プレースホルダ要素の id。 */
-const INLINE_POWER_SAVE_PLACEHOLDER_ID = 'nls-inline-power-save';
-
-/**
- * 裏タブ(省電力中)に出す軽量プレースホルダを1回だけ生成する(冪等)。
- * iframe を作らず getBoundingClientRect も呼ばないため、reflow もメインスレッド負荷も
- * 発生しない。可視に戻ると removeInlinePowerSavePlaceholder で消える。
- */
-function ensureInlinePowerSavePlaceholder() {
-  try {
-    if (document.getElementById(INLINE_POWER_SAVE_PLACEHOLDER_ID)) return;
-    const host = document.getElementById(INLINE_POPUP_HOST_ID);
-    const el = document.createElement('div');
-    el.id = INLINE_POWER_SAVE_PLACEHOLDER_ID;
-    el.setAttribute('aria-hidden', 'true');
-    el.style.cssText =
-      'margin:4px 0;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.5;' +
-      'color:#4b5563;background:linear-gradient(180deg,#fffaf2,#eef9f3);' +
-      'border:1px solid #e5e7eb;text-align:center;';
-    el.textContent = '😴 省電力中(このタブは裏側)。前面に戻すと応援パネルを表示します。';
-    if (host && host.parentElement) {
-      host.parentElement.insertBefore(el, host);
-    } else if (document.body) {
-      document.body.appendChild(el);
-    }
-  } catch {
-    // no-op
-  }
-}
-
-/** 省電力プレースホルダがあれば消す(可視に戻ったとき)。 */
-function removeInlinePowerSavePlaceholder() {
-  try {
-    const el = document.getElementById(INLINE_POWER_SAVE_PLACEHOLDER_ID);
-    if (el && el.parentElement) el.parentElement.removeChild(el);
-  } catch {
-    // no-op
-  }
-}
-
 function startPageFrameLoop() {
   if (pageFrameLoopTimer) return;
 
@@ -6934,14 +6894,8 @@ function startPageFrameLoop() {
       isNicoLiveWatchUrl(window.location.href)
     ) {
       maybeReconnectCommentMutationObserverAfterInlineLayout();
-      // 省電力で裏タブのパネル描画は止めているが、何も無いと「壊れた白い空白」に見える。
-      //   iframe を作らず getBoundingClientRect も呼ばない軽量プレースホルダを1回だけ出し、
-      //   「省電力中・前面に戻すと表示」と正直に伝える(白フラッシュ/多タブ飽和を悪化させない)。
-      ensureInlinePowerSavePlaceholder();
       return;
     }
-    // 可視タブではプレースホルダは不要(本物のパネルが出る)。残っていれば消す。
-    removeInlinePowerSavePlaceholder();
     /*
      * v0.1.407: スクロール詰まりの根治。重い renderPageFrameOverlay（getBoundingClientRect
      * 多数+style 書き=forced reflow）は「要再描画フラグが立っているときだけ」走らせる。
