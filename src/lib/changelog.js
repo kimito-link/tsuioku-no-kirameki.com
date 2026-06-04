@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.623',
+    date: '2026-06-04',
+    summary: '他配信のユーザーがコメント記録に混入する深刻なバグを根治',
+    items: Object.freeze([
+      'タブ切り替えや配信遷移の直前/直後に、別の配信のコメントが今見ている配信の記録に混じってしまう問題を修正しました（NDGR受信時の配信IDを各コメントに焼き込み、保存時に一致しないものを除外）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.622',
     date: '2026-06-04',
     summary: '北極星レーンの「ローディング点滅」を根治',
