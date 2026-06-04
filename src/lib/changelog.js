@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.621',
+    date: '2026-06-04',
+    summary: '過去ログの大量取りこぼし(タブ切替で永久凍結)と診断の嘘を根治',
+    items: Object.freeze([
+      'タブを切り替えただけで過去ログ取得が永久に止まり「公式の数%しか記録できない」深刻な不具合を修正しました（タブを戻すと続きから自動再開します）',
+      '開発者向け診断の「北極星レーンの状態」が常に「取得失敗」と嘘をついていた問題を修正し、実際の取得状況を正しく反映するようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.620',
     date: '2026-06-04',
     summary: 'データが無い配信でのランキングレーン畳みを確実に動作させる修正',
