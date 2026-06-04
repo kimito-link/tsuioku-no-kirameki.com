@@ -982,6 +982,8 @@ let _lastPerfDiagWriteAt = 0;
 /** 視聴中タブ数のキャッシュ(perfDiag 用・5秒ごとに更新)。 */
 let _perfDiagTabCount = /** @type {number|null} */ (null);
 let _perfDiagTabCountAt = 0;
+/** このタブで paintWatchPopupUi の重い paint 区間を実行した累計回数。 */
+let _perfPaintCount = 0;
 
 /**
  * paint 所要 ms 等を nls_perf_diag_<lv> に間引いて書く(白フラッシュ原因の見える化)。
@@ -1020,7 +1022,9 @@ function recordPerfDiagThrottled(liveId, paintMs, commentCount, deferActive) {
     lastPaintAt: now,
     lastPaintMs: Math.round(paintMs),
     commentCount,
-    deferActive
+    deferActive,
+    paintCount: _perfPaintCount,
+    tabVisible: typeof document !== 'undefined' ? !document.hidden : null
   });
   try {
     chrome.storage.local.set({ [perfDiagStorageKey(lv)]: diag }).catch(() => {});
@@ -13941,6 +13945,7 @@ async function refresh() {
     //   (growth patch と同じ思想)。スクロールが止まれば次の refresh(最長 3 秒)で塗り直る。
     //   初回/配信切替/未描画(空)のときは見送らず必ず描画する。
     // 白フラッシュ見える化: ここから renderWatchMetaCard までの重い paint 区間を計測する。
+    _perfPaintCount += 1;
     const _perfPaintT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const userRoomsUl = /** @type {HTMLElement|null} */ ($('userRoomList'));
     const userRoomsAlreadyPainted =
