@@ -37,6 +37,20 @@ const common = {
 
 const popupDefine = { NL_BUILD_ID: JSON.stringify(BUILD_ID), NL_DEV_HOTRELOAD: 'false' };
 
+// status ページのアップロード機能に渡すキー。ソース直書きを避け、環境変数(.env)から注入。
+//   - NL_STATUS_INGEST_KEY: api/status の書き込み認証(x-share-key)
+//   - NL_STATUS_VIEW_TOKEN: 閲覧 URL の ?v= トークン(推測困難な長い文字列)
+//   - NL_STATUS_APP_ORIGIN: 送信先オリジン(既定 https://app.tsuioku-no-kirameki.com)
+// 未設定時は空文字 → 拡張は「未設定」を検知してアップロードボタンを無効表示にする。
+const statusDefine = {
+  ...popupDefine,
+  NL_STATUS_INGEST_KEY: JSON.stringify(process.env.NL_STATUS_INGEST_KEY || ''),
+  NL_STATUS_VIEW_TOKEN: JSON.stringify(process.env.NL_STATUS_VIEW_TOKEN || ''),
+  NL_STATUS_APP_ORIGIN: JSON.stringify(
+    process.env.NL_STATUS_APP_ORIGIN || 'https://app.tsuioku-no-kirameki.com'
+  )
+};
+
 const targets = [
   {
     entryPoints: ['src/extension/page-intercept-entry.js'],
@@ -69,7 +83,15 @@ const targets = [
     entryPoints: ['src/extension/status-entry.js'],
     outfile: 'extension/dist/status.js',
     target: 'chrome100',
-    define: popupDefine
+    define: statusDefine
+  },
+  {
+    // feat/status-web-mobile-share: スマホ閲覧用 status Web 版(app.tsuioku-no-kirameki.com)。
+    //   拡張に依存しない純 Web。api/status から GET した概要 jsonBlob を、拡張の status と
+    //   同じ整形(src/lib/statusFormat.js を共用)で描画する。Vercel 静的配信。
+    entryPoints: ['app/app.js'],
+    outfile: 'app/dist/app.js',
+    target: 'es2020'
   }
 ];
 

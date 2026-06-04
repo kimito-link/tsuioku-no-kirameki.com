@@ -3,7 +3,19 @@
   "buildCommand": null,
   "installCommand": null,
   "outputDirectory": ".",
+  "rewrites": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/app/index.html"
+    }
+  ],
   "redirects": [
-    { "source": "/", "destination": "/tsuioku-no-kirameki/", "permanent": false }
+    {
+      "source": "/",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/",
+      "permanent": false
+    }
   ]
 }
