@@ -83,4 +83,8 @@ describe('buildLiveBlockText', () => {
     const live = { lv: 'lv9', broadcasterName: '', recordedCount: 1 };
     expect(buildLiveBlockText(live)).toBe('[lv9] (配信者名 不明)\n  記録 1');
   });
+  it('endedAt があると見出しに ⚠ 終了 が付く', () => {
+    const live = { lv: 'lv9', broadcasterName: 'A', recordedCount: 1, endedAt: 1700 };
+    expect(buildLiveBlockText(live)).toBe('⚠ 終了 [lv9] A\n  記録 1');
+  });
 });

@@ -48,8 +48,10 @@ export function buildOverviewText(livesData) {
  */
 export function buildLiveBlockText(live) {
   const lines = [];
+  // 配信終了が検知済みなら見出しに ⚠ 終了 を付けて、更新が止まった枠と区別する。
+  const endedMark = live.endedAt ? '⚠ 終了 ' : '';
   const head =
-    `[${live.lv}] ${live.broadcasterName || '(配信者名 不明)'}` +
+    `${endedMark}[${live.lv}] ${live.broadcasterName || '(配信者名 不明)'}` +
     (live.elapsedSec != null ? ` ・ 経過 ${formatElapsed(live.elapsedSec)}` : '');
   lines.push(head);
   // 配信タイトル(snapshot から取れた場合のみ)。

@@ -23,6 +23,7 @@
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { buildOverviewText, buildLiveBlockText } from '../lib/statusFormat.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
+import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -185,6 +186,7 @@ async function loadAllSummaries(lvList) {
     keys.push(PANEL_SUMMARY_PREFIX + lv);
     keys.push(WATCH_SNAPSHOT_PREFIX + lv);
     keys.push(PERF_DIAG_PREFIX + lv);
+    keys.push(LIVE_ENDED_PREFIX + lv);
   }
   try {
     const bag = await chrome.storage.local.get(keys);
@@ -213,7 +215,8 @@ function renderAll({ lvList, summaries, fastDiag }) {
       lv,
       summaries[PANEL_SUMMARY_PREFIX + lv],
       summaries[WATCH_SNAPSHOT_PREFIX + lv],
-      summaries[PERF_DIAG_PREFIX + lv]
+      summaries[PERF_DIAG_PREFIX + lv],
+      summaries[LIVE_ENDED_PREFIX + lv]
     )
   );
 
@@ -272,12 +275,13 @@ function renderAll({ lvList, summaries, fastDiag }) {
  * 集計/整形ヘルパ(純関数寄り・テスト容易)
  * ========================================================================== */
 
-function summarizeOneLive(lv, summary, snapshot, perfDiag) {
+function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   // panel_summary のスキーマは src/lib/panelLiveSummary.js を参照
   // 防御的に optional access のみで読む(型ガード省略でも UI が壊れない設計)
   const s = summary && typeof summary === 'object' ? summary : null;
   const snap = snapshot && typeof snapshot === 'object' ? snapshot : null;
   const diag = isPerfDiag(perfDiag) ? perfDiag : null;
+  const endedAt = isLiveEndedFlag(endedFlag) ? endedFlag.endedAt : null;
   // v0.1.631: 配信者名/タイトル/各種値は snapshot を優先(panel_summary には無いか古い)。
   //   broadcasterName は snapshot にしか無いため必須。
   const broadcasterName = String(
@@ -324,7 +328,8 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag) {
     elapsedSec,
     capturedAt,
     lastIngestAgoMs,
-    perfDiag: diag
+    perfDiag: diag,
+    endedAt
   };
 }
 
