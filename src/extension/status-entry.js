@@ -28,6 +28,12 @@ const REFRESH_INTERVAL_MS = 2000;
 /** panel_summary キーのプレフィックス。 */
 const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
 
+/**
+ * v0.1.631: 配信者名・タイトル・watch/comment 数の正本は nls_watch_snapshot_<lv>。
+ * panel_summary には broadcasterName が無い(空文字)ため、両方読んでマージする。
+ */
+const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
+
 /** 最後に視聴した URL の storage key。 */
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 
@@ -171,7 +177,12 @@ function uniqLvSorted(arr) {
 
 async function loadAllSummaries(lvList) {
   if (!Array.isArray(lvList) || !lvList.length) return {};
-  const keys = lvList.map((lv) => PANEL_SUMMARY_PREFIX + lv);
+  /** @type {string[]} */
+  const keys = [];
+  for (const lv of lvList) {
+    keys.push(PANEL_SUMMARY_PREFIX + lv);
+    keys.push(WATCH_SNAPSHOT_PREFIX + lv);
+  }
   try {
     const bag = await chrome.storage.local.get(keys);
     return bag || {};
@@ -195,7 +206,11 @@ async function loadFastDiagSafe() {
 
 function renderAll({ lvList, summaries, fastDiag }) {
   const livesData = lvList.map((lv) =>
-    summarizeOneLive(lv, summaries[PANEL_SUMMARY_PREFIX + lv])
+    summarizeOneLive(
+      lv,
+      summaries[PANEL_SUMMARY_PREFIX + lv],
+      summaries[WATCH_SNAPSHOT_PREFIX + lv]
+    )
   );
 
   // 概要セクション
@@ -253,18 +268,37 @@ function renderAll({ lvList, summaries, fastDiag }) {
  * 集計/整形ヘルパ(純関数寄り・テスト容易)
  * ========================================================================== */
 
-function summarizeOneLive(lv, summary) {
+function summarizeOneLive(lv, summary, snapshot) {
   // panel_summary のスキーマは src/lib/panelLiveSummary.js を参照
   // 防御的に optional access のみで読む(型ガード省略でも UI が壊れない設計)
   const s = summary && typeof summary === 'object' ? summary : null;
-  const broadcasterName = String(s?.broadcasterName || '');
+  const snap = snapshot && typeof snapshot === 'object' ? snapshot : null;
+  // v0.1.631: 配信者名/タイトル/各種値は snapshot を優先(panel_summary には無いか古い)。
+  //   broadcasterName は snapshot にしか無いため必須。
+  const broadcasterName = String(
+    snap?.broadcasterName || snap?.programProvider?.name || s?.broadcasterName || ''
+  );
+  const title = String(snap?.title || snap?.programTitle || s?.title || '');
   const recordedCount = numOr(s?.recordedCount, 0);
-  const officialCommentCount = numOrNull(s?.officialCommentCount);
-  const watchCount = numOrNull(s?.watchCount);
-  const adPoints = numOrNull(s?.adPoints);
-  const giftPoints = numOrNull(s?.giftPoints);
-  const elapsedSec = numOrNull(s?.elapsedSec);
-  const capturedAt = numOrNull(s?.capturedAt);
+  // 公式コメ数は panel_summary.officialCount にあるが、snapshot.officialCommentCount も
+  //   読みに行く(片方しか入っていないケースに耐える)。
+  const officialCommentCount =
+    numOrNull(s?.officialCount) ?? numOrNull(snap?.officialCommentCount);
+  const watchCount =
+    numOrNull(snap?.officialViewerCount) ??
+    numOrNull(snap?.viewerCountFromDom) ??
+    numOrNull(s?.watchCount);
+  const adPoints = numOrNull(snap?.officialAdPointsNdgr) ?? numOrNull(s?.adPoints);
+  const giftPoints = numOrNull(snap?.officialGiftPointsNdgr) ?? numOrNull(s?.giftPoints);
+  // 経過時間は snapshot.streamAgeMin(分)→秒に変換、無ければ panel_summary.elapsedSec。
+  const elapsedSec =
+    snap && typeof snap.streamAgeMin === 'number' && Number.isFinite(snap.streamAgeMin)
+      ? Math.max(0, Math.floor(snap.streamAgeMin * 60))
+      : numOrNull(s?.elapsedSec);
+  const capturedAt =
+    numOrNull(s?.lastIngestAt) ??
+    numOrNull(s?.capturedAt) ??
+    numOrNull(snap?.officialStatsUpdatedAt);
   const lastIngestAgoMs =
     capturedAt && capturedAt > 0 ? Math.max(0, Date.now() - capturedAt) : null;
   const officialRatePct =
@@ -275,6 +309,7 @@ function summarizeOneLive(lv, summary) {
   return {
     lv,
     broadcasterName,
+    title,
     recordedCount,
     officialCommentCount,
     officialRatePct,
@@ -311,6 +346,10 @@ function buildLiveBlockText(live) {
     `[${live.lv}] ${live.broadcasterName || '(配信者名 不明)'}` +
     (live.elapsedSec != null ? ` ・ 経過 ${formatElapsed(live.elapsedSec)}` : '');
   lines.push(head);
+  // v0.1.631: 配信タイトル表示(snapshot から取れた場合のみ)。
+  if (live.title) {
+    lines.push(`  「${live.title}」`);
+  }
   const numLine =
     `  記録 ${(live.recordedCount || 0).toLocaleString('ja-JP')}` +
     (live.officialCommentCount != null
@@ -471,9 +510,12 @@ function setupStorageChangeListener() {
   try {
     chrome.storage.local.onChanged.addListener((changes) => {
       if (_refreshPausedByUser) return;
-      // panel_summary 変化のみで refresh(高頻度の他キー変化で過剰 refresh しない)
+      // panel_summary / watch_snapshot 変化のみで refresh(高頻度の他キー変化で過剰 refresh しない)
       for (const k of Object.keys(changes)) {
-        if (k.startsWith(PANEL_SUMMARY_PREFIX)) {
+        if (
+          k.startsWith(PANEL_SUMMARY_PREFIX) ||
+          k.startsWith(WATCH_SNAPSHOT_PREFIX)
+        ) {
           refresh().catch(() => {});
           return;
         }

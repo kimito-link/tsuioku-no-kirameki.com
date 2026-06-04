@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.631',
+    date: '2026-06-04',
+    summary: '状態ページに配信者名/タイトル/視聴/pt を表示',
+    items: Object.freeze([
+      'status.html で「配信者名 不明」だった問題を修正(別のキーから配信者名を取得)',
+      '配信タイトル・来場者数・広告pt・ギフトpt・経過時間も表示されるように改善'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.630',
     date: '2026-06-04',
     summary: '状態ページの配信列挙を「今開いているタブ」に限定',
