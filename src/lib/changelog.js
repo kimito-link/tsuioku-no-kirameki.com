@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.624',
+    date: '2026-06-04',
+    summary: '過去ログ取得の無限再起動ループを修正(軽さ復活)',
+    items: Object.freeze([
+      'v0.1.621 で導入したタブ切替後の自動再開が連続発火すると過去ログ取得が毎秒級に小バッチで再起動を繰り返し、「重い・ローディング表示が消えない」体感になっていた問題を修正しました（30秒のクールダウンで「タブを戻した最初の1回だけ続きから掘る」挙動に）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.623',
     date: '2026-06-04',
     summary: '他配信のユーザーがコメント記録に混入する深刻なバグを根治',
