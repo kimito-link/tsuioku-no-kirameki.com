@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.625',
+    date: '2026-06-04',
+    summary: '応援者帯が数名で固まる問題を修正(本来10名)',
+    items: Object.freeze([
+      '記録は数百件あるのに応援者ランキングが数名(1〜5名)しか出ない症状を修正しました（初期表示のキャッシュが空に近いまま再描画スキップされる経路を厳密化）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.624',
     date: '2026-06-04',
     summary: '過去ログ取得の無限再起動ループを修正(軽さ復活)',

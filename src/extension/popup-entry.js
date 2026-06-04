@@ -13456,6 +13456,19 @@ async function refresh() {
     ? Math.max(0, Number(/** @type {any} */ (lightChunkIndexRaw).total) || 0)
     : null;
   const cachedHeavy = watchMetaCache.lastCommentsArr;
+  // v0.1.625: cached arr が currentChunkTotal を「ほぼ全部カバーしている」場合のみ再利用する
+  //   厳密化を追加。従来は chunkTotal が一致するだけで再利用していたが、cached arr が
+  //   初期 paint の短い summary or empty で固まっていて、再 paint も heavy 取得 catch→null
+  //   の経路でスキップされると「5枠だけ表示」が永続化していた(実機 lv350676215・
+  //   記録カードは 716 表示・応援帯は 5名固まり)。80% 以上カバーしていなければ
+  //   cached を捨てて heavy 再読みする(冷スタート扱い)=確実に 716 件で塗り直す。
+  const cachedHeavyCoverageOk =
+    cachedHeavy &&
+    Array.isArray(cachedHeavy.arr) &&
+    cachedHeavy.arr.length > 0 &&
+    (currentChunkTotal == null ||
+      currentChunkTotal === 0 ||
+      cachedHeavy.arr.length >= Math.floor(currentChunkTotal * 0.8));
   const canReuseHeavyChunkRead =
     (idbMode || commentsChunked) &&
     currentChunkTotal != null &&
@@ -13463,7 +13476,8 @@ async function refresh() {
     cachedHeavy.lv === lv &&
     Number(cachedHeavy.chunkTotal) === currentChunkTotal &&
     Array.isArray(cachedHeavy.arr) &&
-    cachedHeavy.arr.length > 0;
+    cachedHeavy.arr.length > 0 &&
+    cachedHeavyCoverageOk;
   /** heavy 全件読み完了前はマイルストーン／ギフト Bahamut の誤爆を抑止 */
   let watchPopupHeavyCommentsSettled = canReuseHeavyChunkRead;
   // v0.1.509: 本体は追記専用チャンク（無ければ従来 main にフォールバック）から読む。
@@ -13874,7 +13888,16 @@ async function refresh() {
     if (watchMetaCache.key !== snapshotKey) return;
     if (!Array.isArray(nextArr)) return;
     if (refreshGen !== watchPopupRefreshGeneration) return;
-    if (!nextArr.length && arr.length) return;
+    // v0.1.625: nextArr が空でも、現 arr が currentChunkTotal を満たしていない
+    //   (cached が短い arr で固まっている)なら skip しない(=空応援帯固まり防止)。
+    //   元の `!nextArr.length && arr.length` ガードは「heavy 経路の一時的な空 resp で
+    //   現状の arr を消さない」用だったが、cached arr 自体が 716件中 5件のような
+    //   ケースをカバー範囲外にしてしまっていた(実機 lv350676215)。
+    const arrCoversTotal =
+      currentChunkTotal == null ||
+      currentChunkTotal === 0 ||
+      arr.length >= Math.floor(currentChunkTotal * 0.8);
+    if (!nextArr.length && arr.length && arrCoversTotal) return;
     const wasHeavyPending = !watchPopupHeavyCommentsSettled;
     readCommentsOk = true;
     commentReadState = 'storage_ok';
