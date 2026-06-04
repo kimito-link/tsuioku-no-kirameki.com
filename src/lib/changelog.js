@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.627',
+    date: '2026-06-04',
+    summary: '記録の内訳併記+興味タグ来場を常時表示で数の納得性向上',
+    items: Object.freeze([
+      '記録カードに「内訳: 通常 N / 興味来場 M / システム X」を併記しました(公式と記録の差の出所が見えます・ギフト/広告は別カウント)',
+      'HTMLレポートの「興味タグ別来場」セクションを 0件のときも痕跡を残すようにしました(目次から辿れるので機能の有無が分かります)',
+      '「○○が好きなN人が来場しました」のパースで前後の全角空白を許容するようにしました(取りこぼし削減)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.626',
     date: '2026-06-04',
     summary: 'HTMLレポートに興味タグ別来場のセクションを追加',

@@ -563,6 +563,10 @@ import {
   audienceParticipationLeadEmbeddedCss,
   sectionInterestArrival
 } from '../lib/marketingChartsHtml.js';
+import {
+  summarizeCommentRecordBreakdown,
+  formatCommentRecordBreakdownLine
+} from '../lib/commentRecordBreakdown.js';
 import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
 import { STORY_GROWTH_MAX_CELLS } from '../lib/storyGrowthLimits.js';
@@ -2176,8 +2180,10 @@ function syncLiveStatThreeCardsCharLoadingOverlays() {
 /**
  * @param {string|number} value 数値は toLocaleString('ja-JP') で表示。未取得時は明示文言。
  * @param {WatchPageSnapshot|null} [watchSnapshot] 公式コメント数の併記用
+ * @param {import('../lib/commentRecordBreakdown.js').CommentRecordBreakdown|null} [breakdown]
+ *   v0.1.627: 記録の内訳(通常/興味来場/システム)。null で行を非表示。
  */
-function setCountDisplay(value, watchSnapshot = null) {
+function setCountDisplay(value, watchSnapshot = null, breakdown = null) {
   /** @type {number|null} */
   let recordedNum = null;
   let text = '';
@@ -2235,6 +2241,21 @@ function setCountDisplay(value, watchSnapshot = null) {
       officialEl.hidden = true;
       officialEl.textContent = '';
       officialEl.removeAttribute('title');
+    }
+  }
+
+  // v0.1.627: 記録の内訳(通常/興味来場/システム)を別 sub 行に表示。
+  //   ユーザー証言「コメント記録の数があわないし、何処に反映されているかわからない」の解消。
+  //   全部 normal のときは行ごと非表示(ノイズ削減)。
+  const breakdownEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsBreakdown'));
+  if (breakdownEl) {
+    const line = breakdown ? formatCommentRecordBreakdownLine(breakdown) : '';
+    if (line) {
+      breakdownEl.hidden = false;
+      breakdownEl.textContent = line;
+    } else {
+      breakdownEl.hidden = true;
+      breakdownEl.textContent = '';
     }
   }
 
@@ -13783,7 +13804,11 @@ async function refresh() {
       watchSnapshot,
       panelLiveSummary
     );
-    setCountDisplay(countToShow, snapForCards);
+    // v0.1.627: 記録の内訳(通常/興味来場/システム)を集計して setCountDisplay に渡す。
+    //   displayEntries はこの paint で実際に表示しているコメント配列=「記録」と意味的に同じ。
+    //   軽量純関数のため毎 paint 計算しても影響なし(N=数百〜数千)。
+    const recordedBreakdown = summarizeCommentRecordBreakdown(displayEntries);
+    setCountDisplay(countToShow, snapForCards, recordedBreakdown);
     markWatchPopupLoadPhase('count_card', {
       countToShow,
       heavySettled: watchPopupHeavyCommentsSettled
@@ -16838,9 +16863,7 @@ async function buildHtmlReportDocument(
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
           <li><a href="#sec-participation-lead">来場とコメント参加</a></li>
-          ${participationSummaryReport?.interestArrivalSummary?.messageCount > 0
-            ? '<li><a href="#mkt-interest-arrival">興味タグ別来場</a></li>'
-            : ''}
+          <li><a href="#mkt-interest-arrival">興味タグ別来場${participationSummaryReport?.interestArrivalSummary?.messageCount > 0 ? '' : '（検出 0件）'}</a></li>
           <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
           ${eventRankingSectionHtml ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
