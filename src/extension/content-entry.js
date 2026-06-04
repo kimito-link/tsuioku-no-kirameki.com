@@ -14950,6 +14950,15 @@ let _backfillTriedLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
 /**
+ * v0.1.624: 直前の `visibility_paused` guard 解除タイムスタンプ。連続 visibilitychange での
+ * 無限再起動ループを防ぐクールダウン管理。30秒以内の再解除は無視 → 「タブを戻した最初の1回」
+ * だけ続きから掘る挙動を保証(ユーザー実機証言「v0.1.620 では一気に取れた」の再現)。
+ * @type {number}
+ */
+let _backfillVisibilityRearmLastAt = 0;
+/** クールダウン期間(ms)。devtools 開閉や focus 移動の連発から守る。 */
+const VISIBILITY_PAUSED_REARM_MIN_MS = 30_000;
+/**
  * v0.1.431: liveId ごとの「一過性 stop での自動リトライ回数」。実機 lv350625305 等で観測＝
  * 過去ログの入口探しが押したタイミングで一過性に空振り(backward_exhausted/no_entry)し、
  * one-shot guard で二度と再試行されず 11% 等で固定されていた（UI も「少し経ってからもう一度」
@@ -15403,8 +15412,19 @@ async function runNdgrBackfillOnce() {
     //   maybeAutoStartBackfill tick で「続きから」自動再開できるようにする。
     //   従来は stopReason='aborted'(15336行 catch 設定値・shouldScheduleBackfillTransientRetry
     //   の set 非該当)で永久凍結していた(実機 lv350670166: 公式4446件中204件のみ記録)。
+    // v0.1.624: ただし無条件解除は **無限再起動ループ** を作る(visibilitychange の連続発火・
+    //   devtools 開閉/focus 移動/popup 開閉等で毎秒級 abort→restart→lastPersistBatch:11 trickle・
+    //   「ローディング表示が消えない/重い」=ユーザー実機証言「v0.1.620 では一気に取れた」の真因)。
+    //   クールダウン: 直前の visibility_paused 解除から VISIBILITY_PAUSED_REARM_MIN_MS 経過後のみ
+    //   再起動を許可。これで「visible に戻った最初の1回だけ続きから掘る」設計になる。
     if (_backfillProgress.stopReason === 'visibility_paused') {
-      _backfillTriedLiveId = '';
+      const now = Date.now();
+      if (now - _backfillVisibilityRearmLastAt >= VISIBILITY_PAUSED_REARM_MIN_MS) {
+        _backfillVisibilityRearmLastAt = now;
+        _backfillTriedLiveId = '';
+      }
+      // クールダウン中は guard を残したまま=次の maybeAutoStartBackfill tick では起動しない。
+      // クールダウン経過後の visibility_paused 終了で guard が外れる。
     }
     _backfillProgress.done = 1;
     publishBackfillProgress();
