@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.630',
+    date: '2026-06-04',
+    summary: '状態ページの配信列挙を「今開いているタブ」に限定',
+    items: Object.freeze([
+      'status.html で過去に視聴した全配信(475件など)が「視聴中」扱いで列挙されていた問題を修正しました(chrome.tabs.query で今開いているニコ生視聴タブからだけ lv を抽出)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.629',
     date: '2026-06-04',
     summary: '状態表示ページを追加(スクショ撮影/コピペ不要に)',
