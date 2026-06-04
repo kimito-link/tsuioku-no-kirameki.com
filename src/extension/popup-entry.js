@@ -969,6 +969,14 @@ let _celebrationStateCache = null;
 let _lastTopSupportRankStripStableKey = null;
 
 /**
+ * 直近に renderUserRooms を完走した liveId。
+ * 高速スクロール中の全消し再描画(白フラッシュ)を、同一配信が既に塗ってあるときだけ
+ * 見送るためのガードに使う。配信切替時は値が変わり、必ず塗り直される。
+ * @type {string}
+ */
+let _lastUserRoomsPaintedLiveId = '';
+
+/**
  * v0.1.246: popup 内で同 user_id を別 nickname で表示する衡突を防ぐ統一 map。
  *
  * 観測された問題（memory `todo_ndgr_username_resolution.md`、lv350462027 v0.1.168）:
@@ -13867,11 +13875,28 @@ async function refresh() {
         provisional: laneFeedPick.provisional
       }
     );
-    renderUserRooms(
-      /** @type {PopupCommentEntry[]} */ (laneFeedPick.entries),
-      lv,
-      { rankingProvisional: laneFeedPick.provisional }
-    );
+    // 白フラッシュ対策(複数タブ): renderUserRooms は冒頭で ul.innerHTML='' の全消し
+    //   →フル再構築をする重い描画。高速スクロール中に走ると、複数タブのメインスレッド
+    //   飽和で再構築が間に合わず、空になった領域が一瞬「白(背景)」として露出する。
+    //   既に同 liveId のレーンが描画済みのときに限り、スクロール中は描画を見送る
+    //   (growth patch と同じ思想)。スクロールが止まれば次の refresh(最長 3 秒)で塗り直る。
+    //   初回/配信切替/未描画(空)のときは見送らず必ず描画する。
+    const userRoomsUl = /** @type {HTMLElement|null} */ ($('userRoomList'));
+    const userRoomsAlreadyPainted =
+      !!userRoomsUl &&
+      userRoomsUl.childElementCount > 0 &&
+      _lastUserRoomsPaintedLiveId === lv;
+    if (shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted) {
+      // スクロール中 & 同 liveId が既に塗ってある: 全消し再構築を見送る(白抜け防止)。
+      //   別配信のときは _lastUserRoomsPaintedLiveId !== lv で painted=false になり描画される。
+    } else {
+      renderUserRooms(
+        /** @type {PopupCommentEntry[]} */ (laneFeedPick.entries),
+        lv,
+        { rankingProvisional: laneFeedPick.provisional }
+      );
+      _lastUserRoomsPaintedLiveId = lv;
+    }
     renderCharacterScene({
       hasWatch: true,
       recording: toggle.checked,
