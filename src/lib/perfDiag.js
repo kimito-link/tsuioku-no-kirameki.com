@@ -38,7 +38,9 @@ function numOrNull(v) {
  *   lastPaintAt?: number|null,
  *   lastPaintMs?: number|null,
  *   commentCount?: number|null,
- *   deferActive?: boolean
+ *   deferActive?: boolean,
+ *   paintCount?: number|null,
+ *   tabVisible?: boolean|null
  * }} [opts]
  * @returns {{
  *   liveId: string,
@@ -46,7 +48,9 @@ function numOrNull(v) {
  *   lastPaintAt: number|null,
  *   lastPaintMs: number|null,
  *   commentCount: number|null,
- *   deferActive: boolean
+ *   deferActive: boolean,
+ *   paintCount: number|null,
+ *   tabVisible: boolean|null
  * }}
  */
 export function buildPerfDiag(opts = {}) {
@@ -56,7 +60,11 @@ export function buildPerfDiag(opts = {}) {
     lastPaintAt: numOrNull(opts.lastPaintAt),
     lastPaintMs: numOrNull(opts.lastPaintMs),
     commentCount: numOrNull(opts.commentCount),
-    deferActive: opts.deferActive === true
+    deferActive: opts.deferActive === true,
+    // 累計 paint 回数(2つ目以降のタブで paint が走っていないと小さいまま)。
+    paintCount: numOrNull(opts.paintCount),
+    // この paint 時にタブが可視だったか(null=不明)。
+    tabVisible: opts.tabVisible == null ? null : opts.tabVisible === true
   };
 }
 
@@ -80,6 +88,8 @@ export function buildPerfDiagLine(diag, nowMs = Date.now()) {
   if (!isPerfDiag(diag)) return '';
   const parts = [];
   if (diag.lastPaintMs != null) parts.push(`paint ${diag.lastPaintMs}ms`);
+  if (diag.paintCount != null) parts.push(`描画${diag.paintCount}回`);
+  if (diag.tabVisible === false) parts.push('裏タブ');
   if (diag.tabCount != null) parts.push(`タブ ${diag.tabCount}`);
   if (diag.commentCount != null) {
     parts.push(`コメント ${diag.commentCount.toLocaleString('ja-JP')}`);

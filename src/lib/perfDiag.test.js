@@ -20,7 +20,9 @@ describe('buildPerfDiag', () => {
       lastPaintAt: 1000,
       lastPaintMs: 85,
       commentCount: 12254,
-      deferActive: true
+      deferActive: true,
+      paintCount: 42,
+      tabVisible: false
     });
     expect(d).toEqual({
       liveId: 'lv9',
@@ -28,7 +30,9 @@ describe('buildPerfDiag', () => {
       lastPaintAt: 1000,
       lastPaintMs: 85,
       commentCount: 12254,
-      deferActive: true
+      deferActive: true,
+      paintCount: 42,
+      tabVisible: false
     });
   });
   it('不正な数値は null・deferActive 既定 false', () => {
@@ -58,10 +62,12 @@ describe('buildPerfDiagLine', () => {
       lastPaintAt: 10_000,
       lastPaintMs: 85,
       commentCount: 12254,
-      deferActive: true
+      deferActive: true,
+      paintCount: 42,
+      tabVisible: false
     });
     expect(buildPerfDiagLine(diag, 15_000)).toBe(
-      '  ⚙ paint 85ms / タブ 2 / コメント 12,254 / 描画見送り中 / 5秒前'
+      '  ⚙ paint 85ms / 描画42回 / 裏タブ / タブ 2 / コメント 12,254 / 描画見送り中 / 5秒前'
     );
   });
   it('perfDiag が無ければ空文字', () => {
