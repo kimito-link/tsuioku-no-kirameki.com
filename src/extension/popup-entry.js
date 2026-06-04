@@ -623,6 +623,7 @@ import {
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
 import { buildReportSelfPostedRows } from '../lib/reportSelfPostedRowsHtml.js';
+import { buildReportFriendlyMetaRows } from '../lib/reportFriendlyMetaRowsHtml.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
@@ -15181,25 +15182,6 @@ function isFriendlyHtmlReportMetaKey(key) {
   return false;
 }
 
-/** @param {string} key */
-function friendlyHtmlReportMetaLabel(key) {
-  const k = String(key || '').toLowerCase().trim();
-  const labels = {
-    description: 'ページ説明（meta）',
-    keywords: 'キーワード（meta）',
-    'og:title': 'シェア用タイトル（Open Graph）',
-    'og:description': 'シェア用説明（Open Graph）',
-    'og:image': 'シェア用画像URL（Open Graph）',
-    'og:url': '正規URL（Open Graph）',
-    'og:site_name': 'サイト名（Open Graph）',
-    'og:type': '種類（Open Graph）',
-    'twitter:title': 'シェア用タイトル（X）',
-    'twitter:description': 'シェア用説明（X）'
-  };
-  if (k.startsWith('twitter:image')) return 'シェア用画像（X）';
-  return labels[k] || key;
-}
-
 /**
  * @param {{ key: string, value: string }[]|undefined} metas
  * @returns {{ friendly: { key: string, value: string }[], technical: { key: string, value: string }[] }}
@@ -16133,15 +16115,9 @@ async function buildHtmlReportDocument(
   const headLinkRows = snapshot ? buildReportLinkRows(snapshot.links) : [];
   const { friendly: friendlyMetas, technical: technicalMetas } =
     partitionMetasForHtmlReport(snapshot?.metas);
-  const friendlyMetaRowsHtml = friendlyMetas.map((v) => {
-    const label = friendlyHtmlReportMetaLabel(v.key);
-    const search = escapeAttr(`${v.key} ${v.value} ${label}`.toLowerCase());
-    return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(label)}</td>
-          <td class="mono">${escapeHtml(v.value || '-')}</td>
-        </tr>`;
-  });
+  // C-7 pure refactor (v0.1.635): 行ビルダ + ラベル変換を reportFriendlyMetaRowsHtml.js に
+  //   抽出（挙動不変・test 済）。friendlyHtmlReportMetaLabel も同梱移設。
+  const friendlyMetaRowsHtml = buildReportFriendlyMetaRows(friendlyMetas);
   const headTechnicalMetaRows = buildReportMetaRows(technicalMetas);
   const headScriptRows = snapshot ? buildReportScriptRows(snapshot.scripts) : [];
   const headNoopenerRows = snapshot
