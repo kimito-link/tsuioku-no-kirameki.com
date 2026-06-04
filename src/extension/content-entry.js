@@ -1276,7 +1276,14 @@ const INTERCEPT_MAP_MAX = MAP_LIMITS.interceptMax;
 let ndgrLastReceivedAt = 0;
 
 /** NDGR 本文 postMessage をデバウンスして storage 書き込み回数を抑える */
-/** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string }[]} */
+/**
+ * v0.1.623: バッファ内の各 row に **取り込み時の liveId** (capturedLid) を焼き込む。
+ * SPA 遷移直後/直前や同一 watch ページ内のサブ NDGR view との取り違えで、
+ * 前 lv の chat が現 liveId の storage(`nls_comments_<lv>`)に書かれる「他配信
+ * ユーザー混入」を構造的に防ぐ(E2 真因確定)。flush 時に現 `liveId` と一致しない
+ * row は drop し、persist パイプライン全体に lv-identity 検証 point を持たせる。
+ * @type {Array<{ commentNo: string, text: string, userId: string|null, nickname?: string, capturedLid: string }>}
+ */
 let ndgrChatRowsPending = [];
 /** @type {ReturnType<typeof setTimeout>|null} */
 let ndgrChatRowsFlushTimer = null;
@@ -1583,6 +1590,18 @@ async function flushNdgrChatRowsBatch(batch) {
     return;
   }
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  // v0.1.623: lv-identity 検証(本丸=他配信ユーザー混入の根治・E2 真因)。
+  //   各 row の capturedLid と現 liveId が一致しないものは drop。
+  //   capturedLid が空(NDGR 受信時に liveId 未確定だった早期 row)は寛容に
+  //   通す(該当配信のものとして扱う)=機能後退ゼロ。古い行(stamp 無し)も寛容。
+  const curLid = String(liveId || '').trim().toLowerCase();
+  const filteredBatch = batch.filter((r) => {
+    if (!r || typeof r !== 'object') return false;
+    const cap = String(r.capturedLid || '').trim().toLowerCase();
+    return !cap || cap === curLid;
+  });
+  if (!filteredBatch.length) return;
+  batch = filteredBatch;
   const byKey = new Map();
   for (const r of batch) {
     if (!r || typeof r !== 'object') continue;
@@ -1631,9 +1650,15 @@ function schedulePersistNdgrChatRows(rows) {
   if (!Array.isArray(rows) || !rows.length) return;
   if (!recording || !locationAllowsCommentRecording()) return;
   ndgrLastReceivedAt = Date.now();
+  // v0.1.623: 各 row に取り込み時の liveId を焼き込む。SPA 遷移直前/直後で
+  //   前 lv の chat が現 storage に紛れ込むのを構造的に防ぐ(E2 真因)。
+  //   liveId 未確定なら空文字で積み、shouldDeferNdgrFlushUntilLiveId 経路に乗せて
+  //   遅延 flush 時に確定 liveId と一致した row だけ persist する。
+  const capturedLid = String(liveId || '').trim().toLowerCase();
+  const stamped = rows.map((r) => ({ ...r, capturedLid }));
   ndgrChatRowsPending = mergeNdgrBacklogWithCap(
     ndgrChatRowsPending,
-    rows,
+    stamped,
     NDGR_PENDING_MAX
   );
   if (ndgrChatRowsPending.length >= NDGR_PENDING_FLUSH_THRESHOLD) {
