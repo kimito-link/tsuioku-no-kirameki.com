@@ -21,12 +21,7 @@
  */
 
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
-import {
-  buildOverviewText,
-  buildLiveBlockText,
-  formatElapsed,
-  formatAgo
-} from '../lib/statusFormat.js';
+import { buildOverviewText, buildLiveBlockText } from '../lib/statusFormat.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -368,7 +363,77 @@ function numOrNull(v) {
  * ボタン
  * ========================================================================== */
 
+/**
+ * ビルド時 define で注入されるアップロード設定(scripts/build.mjs の statusDefine)。
+ *   未注入のローカル/テスト環境でも壊れないよう typeof ガードする。
+ */
+function getUploadConfig() {
+  const ingestKey = typeof NL_STATUS_INGEST_KEY !== 'undefined' ? NL_STATUS_INGEST_KEY : '';
+  const viewToken = typeof NL_STATUS_VIEW_TOKEN !== 'undefined' ? NL_STATUS_VIEW_TOKEN : '';
+  const appOrigin =
+    typeof NL_STATUS_APP_ORIGIN !== 'undefined' && NL_STATUS_APP_ORIGIN
+      ? NL_STATUS_APP_ORIGIN
+      : 'https://app.tsuioku-no-kirameki.com';
+  return { ingestKey, viewToken, appOrigin };
+}
+
+/**
+ * 現在の jsonBlob を app の /api/status へ POST する。
+ *   - host_permissions に app オリジンがあるため CORS 不要。
+ *   - 成功時は閲覧 URL を返す。
+ * @returns {Promise<{ ok: boolean, url?: string, error?: string }>}
+ */
+async function uploadStatusSnapshot() {
+  const { ingestKey, viewToken, appOrigin } = getUploadConfig();
+  if (!ingestKey || !viewToken) {
+    return { ok: false, error: 'キー未設定(ビルド時に NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN を注入してください)' };
+  }
+  const jsonBlob = _lastRenderedBundle?.jsonBlob;
+  if (!jsonBlob) {
+    return { ok: false, error: 'まだ送信できる状態がありません' };
+  }
+  try {
+    const res = await fetch(`${appOrigin}/api/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-share-key': ingestKey },
+      body: JSON.stringify({ ...jsonBlob, v: viewToken })
+    });
+    if (!res.ok) {
+      return { ok: false, error: `送信失敗 (HTTP ${res.status})` };
+    }
+    return { ok: true, url: `${appOrigin}/?v=${encodeURIComponent(viewToken)}` };
+  } catch (err) {
+    return { ok: false, error: '通信エラー: ' + String(err?.message || err) };
+  }
+}
+
 function setupButtons() {
+  const btnUpload = document.getElementById('btnUpload');
+  if (btnUpload) {
+    const { ingestKey, viewToken } = getUploadConfig();
+    const resultEl = document.getElementById('uploadResult');
+    if (!ingestKey || !viewToken) {
+      // キー未注入のビルドではボタンを無効化して誤操作を防ぐ。
+      btnUpload.disabled = true;
+      btnUpload.title = 'スマホ送信キーが未設定のビルドです';
+    } else {
+      btnUpload.addEventListener('click', async () => {
+        btnUpload.disabled = true;
+        const prev = btnUpload.textContent;
+        btnUpload.textContent = '送信中...';
+        const r = await uploadStatusSnapshot();
+        btnUpload.textContent = prev;
+        btnUpload.disabled = false;
+        if (resultEl) {
+          if (r.ok) {
+            resultEl.textContent = `✓ 送信しました。スマホで開く: ${r.url}`;
+          } else {
+            resultEl.textContent = `× ${r.error}`;
+          }
+        }
+      });
+    }
+  }
   const btnSelect = document.getElementById('btnSelectAll');
   if (btnSelect) {
     btnSelect.addEventListener('click', () => {

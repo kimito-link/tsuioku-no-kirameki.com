@@ -19,6 +19,8 @@ export default [
      */
     ignores: [
       'extension/dist/**',
+      // app/dist/** は Web版(app.tsuioku-no-kirameki.com)の esbuild minified 出力。
+      'app/dist/**',
       'node_modules/**',
       '.claude/**',
       'build/**',
@@ -42,7 +44,12 @@ export default [
         // scripts/build.mjs が esbuild --define で popup-entry.js に注入するビルド時刻
         NL_BUILD_ID: 'readonly',
         // esbuild --define で注入する dev フラグ（本番 false / dev watch true）。
-        NL_DEV_HOTRELOAD: 'readonly'
+        NL_DEV_HOTRELOAD: 'readonly',
+        // status の「スマホへ送信」用に esbuild --define で注入するアップロード設定
+        //（.env から。未設定時は空文字 → ボタン無効）。
+        NL_STATUS_INGEST_KEY: 'readonly',
+        NL_STATUS_VIEW_TOKEN: 'readonly',
+        NL_STATUS_APP_ORIGIN: 'readonly'
       }
     },
     rules: {
@@ -58,6 +65,36 @@ export default [
       ecmaVersion: 2022,
       sourceType: 'script',
       globals: { ...browserChrome }
+    }
+  },
+  {
+    // Web版(app.tsuioku-no-kirameki.com)の閲覧ページ。chrome.* には依存しない純ブラウザ。
+    files: ['app/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.browser }
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
+      eqeqeq: ['error', 'smart'],
+      'no-var': 'error',
+      'prefer-const': ['error', { ignoreReadBeforeAssign: true }]
+    }
+  },
+  {
+    // Vercel Serverless Function(Node 実行・process/fetch あり)。
+    files: ['api/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.node, fetch: 'readonly' }
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
+      eqeqeq: ['error', 'smart'],
+      'no-var': 'error',
+      'prefer-const': ['error', { ignoreReadBeforeAssign: true }]
     }
   },
   {
