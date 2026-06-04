@@ -241,10 +241,28 @@ function renderAll({ lvList, summaries, fastDiag }) {
       for (const live of livesData) {
         const pre = document.createElement('pre');
         pre.textContent = buildLiveBlockText(live);
-        const wrap = document.createElement('div');
-        wrap.style.marginBottom = '12px';
-        wrap.appendChild(pre);
-        livesEl.appendChild(wrap);
+        pre.style.margin = '0';
+        // 配信ごとにカード(枠+背景)で囲んで境界を明確にする。
+        //   終了=薄赤 / 裏タブ(省電力)=薄グレー / 現役=通常、で状態を色分け。
+        const card = document.createElement('div');
+        const isEnded = !!live.endedAt;
+        const isBackground = live.perfDiag && live.perfDiag.tabVisible === false;
+        let accent = 'var(--nl-border)';
+        let bg = 'var(--nl-card-bg)';
+        if (isEnded) {
+          accent = '#f0a0a0';
+          bg = 'rgba(240,160,160,0.08)';
+        } else if (isBackground) {
+          accent = '#9ca3af';
+          bg = 'rgba(156,163,175,0.08)';
+        } else {
+          accent = 'var(--nl-accent)';
+        }
+        card.style.cssText =
+          'margin-bottom:12px;padding:10px 12px;border-radius:8px;' +
+          `border:1px solid var(--nl-border);border-left:4px solid ${accent};background:${bg};`;
+        card.appendChild(pre);
+        livesEl.appendChild(card);
       }
     }
   }
