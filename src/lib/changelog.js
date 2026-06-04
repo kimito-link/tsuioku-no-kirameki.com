@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.628',
+    date: '2026-06-04',
+    summary: '記録内訳を常時表示・他経路上書き防止で確実に見えるように',
+    items: Object.freeze([
+      '記録カードの「内訳: 通常 N / 興味来場 M」を、通常コメントだけの配信でも常時表示するようにしました(機能の有無が分かるように)',
+      '他の経路から表示が上書きされて内訳が消える副作用を修正しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.627',
     date: '2026-06-04',
     summary: '記録の内訳併記+興味タグ来場を常時表示で数の納得性向上',

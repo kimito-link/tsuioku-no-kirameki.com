@@ -85,7 +85,7 @@ describe('formatCommentRecordBreakdownLine', () => {
     ).toBe('');
   });
 
-  it('全部 normal なら空文字(行ごと非表示)', () => {
+  it('全部 normal でも「内訳: 通常 N」を表示する(v0.1.628 設計変更・ユーザー納得性)', () => {
     expect(
       formatCommentRecordBreakdownLine({
         total: 100,
@@ -94,7 +94,7 @@ describe('formatCommentRecordBreakdownLine', () => {
         followNotice: 0,
         otherSystem: 0
       })
-    ).toBe('');
+    ).toBe('内訳: 通常 100');
   });
 
   it('興味来場のみ', () => {

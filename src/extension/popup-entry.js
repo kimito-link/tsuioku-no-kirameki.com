@@ -2180,10 +2180,12 @@ function syncLiveStatThreeCardsCharLoadingOverlays() {
 /**
  * @param {string|number} value 数値は toLocaleString('ja-JP') で表示。未取得時は明示文言。
  * @param {WatchPageSnapshot|null} [watchSnapshot] 公式コメント数の併記用
- * @param {import('../lib/commentRecordBreakdown.js').CommentRecordBreakdown|null} [breakdown]
- *   v0.1.627: 記録の内訳(通常/興味来場/システム)。null で行を非表示。
+ * @param {import('../lib/commentRecordBreakdown.js').CommentRecordBreakdown|null|undefined} [breakdown]
+ *   v0.1.627: 記録の内訳(通常/興味来場/システム)。
+ *   v0.1.628: undefined のときは前回表示を保持(他経路の setCountDisplay が breakdown 引数なしで
+ *   呼ばれて DOM を消す副作用を回避)。null を明示すれば行を非表示にできる。
  */
-function setCountDisplay(value, watchSnapshot = null, breakdown = null) {
+function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
   /** @type {number|null} */
   let recordedNum = null;
   let text = '';
@@ -2246,16 +2248,21 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = null) {
 
   // v0.1.627: 記録の内訳(通常/興味来場/システム)を別 sub 行に表示。
   //   ユーザー証言「コメント記録の数があわないし、何処に反映されているかわからない」の解消。
-  //   全部 normal のときは行ごと非表示(ノイズ削減)。
-  const breakdownEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsBreakdown'));
-  if (breakdownEl) {
-    const line = breakdown ? formatCommentRecordBreakdownLine(breakdown) : '';
-    if (line) {
-      breakdownEl.hidden = false;
-      breakdownEl.textContent = line;
-    } else {
-      breakdownEl.hidden = true;
-      breakdownEl.textContent = '';
+  // v0.1.628: breakdown=undefined のときは DOM を一切触らない(前回値保持)。
+  //   他経路(applyPanelMetricsFromContent / applyLightweightPanelSummaryCards 等)が
+  //   breakdown を渡さずに setCountDisplay を呼ぶ → null として扱われ hidden 化される
+  //   副作用を断つ。明示的に null を渡すと従来通り非表示。
+  if (breakdown !== undefined) {
+    const breakdownEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsBreakdown'));
+    if (breakdownEl) {
+      const line = breakdown ? formatCommentRecordBreakdownLine(breakdown) : '';
+      if (line) {
+        breakdownEl.hidden = false;
+        breakdownEl.textContent = line;
+      } else {
+        breakdownEl.hidden = true;
+        breakdownEl.textContent = '';
+      }
     }
   }
 

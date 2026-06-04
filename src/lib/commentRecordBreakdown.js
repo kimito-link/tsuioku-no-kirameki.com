@@ -66,14 +66,15 @@ export function summarizeCommentRecordBreakdown(comments) {
 
 /**
  * 内訳を popup の sub 行用テキストに整形する。0 件カテゴリは省略。
- * 全部 normal の場合は空文字を返す(行ごと非表示にする側で hidden 制御)。
+ * v0.1.628: 「全部 normal なら空文字」設計を撤廃(ユーザー証言「何処に反映されているか
+ *   わからない」)。total > 0 なら常に「内訳: 通常 N」だけでも出して、機能の有無を
+ *   ユーザーが確認できるようにする。
  *
  * @param {CommentRecordBreakdown} breakdown
  * @returns {string}
  */
 export function formatCommentRecordBreakdownLine(breakdown) {
   if (!breakdown || breakdown.total <= 0) return '';
-  if (breakdown.normal === breakdown.total) return '';
   /** @type {string[]} */
   const parts = [];
   if (breakdown.normal > 0) parts.push(`通常 ${breakdown.normal.toLocaleString('ja-JP')}`);
