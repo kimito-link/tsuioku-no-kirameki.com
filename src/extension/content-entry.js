@@ -5823,8 +5823,19 @@ function buildGiftDiagnosticsBundle() {
         officialEventGiftScoreNdgr,
         officialGiftPointsNdgr
       };
+      // v0.1.621: 残課題3根治。bundle/snap だけで判定すると koken/nicoad API 直叩きで
+      //   実際は取れていても adRanking=fetch_error / contributionRanking=iframe_unrendered
+      //   と誤報告され、調査を惑わせていた。fetch 成功時に in-memory にキャッシュした
+      //   rows 配列を渡すことで、純関数側の v0.1.617 で実装済みの ok 判定経路を発火させる。
+      const kokenApiRows = _externalFetchProbe.kokenLastRowsArr;
+      const nicoadApiRows = _externalFetchProbe.nicoadLastRowsArr;
       const stateOf = (laneId) =>
-        determineNorthStarLaneState(laneId, { bundle: b, snap: snapForReason });
+        determineNorthStarLaneState(laneId, {
+          bundle: b,
+          snap: snapForReason,
+          kokenApiRows,
+          nicoadApiRows
+        });
       return {
         '1_貢献度ランキング': {
           state: stateOf('contributionRanking'),
@@ -13373,11 +13384,17 @@ const _externalFetchProbe = {
   kokenLastRows: null,
   kokenLastError: '',
   kokenLastAgoBase: 0,
+  // v0.1.621: 診断 state 純関数 determineNorthStarLaneState に rows 配列を渡すための
+  //   キャッシュ。bundle/snap だけで判定すると koken/nicoad API が実際は取れているのに
+  //   常に fetch_error/iframe_unrendered と誤報告される(残課題3)。fetch 成功時に同期で
+  //   差し替える(in-memory のみ・storage 読みなし=async 化不要)。
+  kokenLastRowsArr: null,
   nicoadSent: 0,
   nicoadLastOk: null,
   nicoadLastStatus: null,
   nicoadLastRows: null,
-  nicoadLastError: ''
+  nicoadLastError: '',
+  nicoadLastRowsArr: null
 };
 /** 参加配信者一覧 API の専用ポーリング間隔（ms）。30s の koken と切り離して遅延を減らす。 */
 const EVENT_PARTICIPATION_API_FETCH_MS = 12_000;
@@ -13488,6 +13505,7 @@ function maybeFetchKokenContribRankingMirrorOnce() {
         if (le) return;
         if (!resp || resp.ok !== true || resp.json == null) {
           _externalFetchProbe.kokenLastRows = 0;
+          _externalFetchProbe.kokenLastRowsArr = null;
           return;
         }
         let rows = null;
@@ -13497,6 +13515,8 @@ function maybeFetchKokenContribRankingMirrorOnce() {
           rows = null;
         }
         _externalFetchProbe.kokenLastRows = Array.isArray(rows) ? rows.length : 0;
+        // v0.1.621: 診断 state 用に rows 配列もキャッシュ(残課題3根治)。
+        _externalFetchProbe.kokenLastRowsArr = Array.isArray(rows) && rows.length > 0 ? rows : null;
         if (!Array.isArray(rows) || rows.length === 0) return;
         // 応答到着までに別 liveId へ遷移していたら stale 書込しない
         const curLid = String(liveId || '')
@@ -13581,6 +13601,7 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
         if (le) return;
         if (!resp || resp.ok !== true || resp.json == null) {
           _externalFetchProbe.nicoadLastRows = 0;
+          _externalFetchProbe.nicoadLastRowsArr = null;
           return;
         }
         let rows = null;
@@ -13590,6 +13611,8 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
           rows = null;
         }
         _externalFetchProbe.nicoadLastRows = Array.isArray(rows) ? rows.length : 0;
+        // v0.1.621: 診断 state 用に rows 配列もキャッシュ(残課題3根治)。
+        _externalFetchProbe.nicoadLastRowsArr = Array.isArray(rows) && rows.length > 0 ? rows : null;
         if (!Array.isArray(rows) || rows.length === 0) return;
         const curLid = String(liveId || '')
           .trim()
@@ -15104,6 +15127,13 @@ async function runNdgrBackfillOnce() {
   _backfillAbort = ac;
   const onHidden = () => {
     if (document.visibilityState === 'hidden') {
+      // v0.1.621: タブ切替による中断は「ユーザー手動停止」と区別するため専用の
+      //   stopReason を立てる。finally で _backfillTriedLiveId を解除し、可視に
+      //   戻った次の maybeAutoStartBackfill tick で「続きから」自動再開する。
+      //   従来は abort → stopReason='aborted' → BACKFILL_TRANSIENT_STOP_REASONS
+      //   非該当 → one-shot guard 永久に外れず公式件数の数%しか記録できない
+      //   永久凍結が発生していた(実機 lv350670166: 4446件中204件のみ記録)。
+      if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'visibility_paused';
       try { ac.abort(); } catch { /* no-op */ }
     }
   };
@@ -15342,6 +15372,13 @@ async function runNdgrBackfillOnce() {
     document.removeEventListener('visibilitychange', onHidden);
     if (_backfillAbort === ac) _backfillAbort = null;
     if (_backfillProgress.stopReason === 'rotation_yield') {
+      _backfillTriedLiveId = '';
+    }
+    // v0.1.621: タブ切替で中断された場合も one-shot guard を解除し、可視に戻った次の
+    //   maybeAutoStartBackfill tick で「続きから」自動再開できるようにする。
+    //   従来は stopReason='aborted'(15336行 catch 設定値・shouldScheduleBackfillTransientRetry
+    //   の set 非該当)で永久凍結していた(実機 lv350670166: 公式4446件中204件のみ記録)。
+    if (_backfillProgress.stopReason === 'visibility_paused') {
       _backfillTriedLiveId = '';
     }
     _backfillProgress.done = 1;
