@@ -294,7 +294,12 @@ export function analyzeAudienceEngagementGap(input, options = {}) {
     const uid = cleanString(row.userId);
     if (broadcasterUserId && uid === broadcasterUserId) continue;
     comments.push(row);
-    if (uid && !uid.startsWith('a:')) unique.add(uid);
+    // コメントした「人数」のユニーク判定。匿名(a:hash)も含める:
+    //   ニコ生は匿名コメントが大多数で、a:hash は同一人物なら同一 ID(anonymousIdenticon が
+    //   同じ hash から決定的にアイコンを作るのと同じ性質)。除外すると「コメントした人」が
+    //   実態(数十人)より桁違いに少なく(数人)出て、Math.max(gap, r.uniqueUsers) 経由の
+    //   サマリ値と矛盾していた。a: も1人として数えることで実数に揃える。
+    if (uid) unique.add(uid);
   }
 
   const samples = Array.isArray(input?.samples) ? input.samples : [];

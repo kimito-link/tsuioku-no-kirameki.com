@@ -2271,7 +2271,15 @@ function formatShortClock(ms) {
  * @param {import('./audienceEngagementGap.js').AudienceEngagementGap} gap
  */
 function resolveCommentParticipation(r, gap) {
-  const uniqueCommenters = Math.max(gap?.uniqueCommenters ?? 0, r?.uniqueUsers ?? 0);
+  // 「コメントした人」のユニーク数は gap.uniqueCommenters(userId ベース・匿名 a:hash 含む)を
+  //   正本にする。以前は Math.max(gap, r.uniqueUsers) だったが、
+  //   - gap が匿名を全除外していたため過小(数人)→ サマリ(Math.max で r 側=数十人)と文章
+  //     (gap 側=数人)が矛盾していた。
+  //   - r.uniqueUsers は userId 空を `anon:commentNo` で別人カウントするため過大になりうる。
+  //   匿名除外を解消した gap.uniqueCommenters を単一の正本にして、サマリと文章を一致させる。
+  //   gap が無い場合のみ r.uniqueUsers にフォールバック。
+  const uniqueCommenters =
+    typeof gap?.uniqueCommenters === 'number' ? gap.uniqueCommenters : r?.uniqueUsers ?? 0;
   const totalVisitors = gap?.totalVisitors ?? 0;
   const commentParticipationPct =
     totalVisitors > 0 ? computeCommentParticipationPct(uniqueCommenters, totalVisitors) : 0;
