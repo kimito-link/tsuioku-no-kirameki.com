@@ -624,6 +624,7 @@ import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
 import { buildReportSelfPostedRows } from '../lib/reportSelfPostedRowsHtml.js';
 import { buildReportFriendlyMetaRows } from '../lib/reportFriendlyMetaRowsHtml.js';
+import { buildReportUserRoomRows } from '../lib/reportUserRoomTableHtml.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
@@ -15832,35 +15833,15 @@ async function buildHtmlReportDocument(
       userKeyToTotalChars.set(userKey, (userKeyToTotalChars.get(userKey) || 0) + len);
     }
   }
-  const roomRows = aggregatedRooms.map((room) => {
-    const label = displayUserLabel(room.userKey, room.nickname);
-    // 数値 ID のときだけ niconico ユーザーページへのリンクで包む
-    // （匿名・ハッシュ・未取得は escapeHtml されたテキストのみ）。
-    const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
-    const totalChars = userKeyToTotalChars.get(room.userKey) || 0;
-    const avgChars = room.count > 0 ? Math.round((totalChars / room.count) * 10) / 10 : 0;
-    const search = escapeAttr(
-      `${label} ${room.nickname || ''} ${room.userKey} ${room.lastText || ''} ${room.count} ${totalChars}`.toLowerCase()
-    );
-    // 0.1.12 (F): 「最低サムネ」を必ず出す。avatarUrl が空でも数値 ID なら
-    // ニコ既定 CDN URL、匿名 a:... なら identicon SVG data URL を使う。
-    const avatarSrc = resolveReportUserThumbSrc({
-      userId: room.userKey,
-      avatarUrl: room.avatarUrl || '',
-      identiconResolver: getCachedAnonymousIdenticonDataUrl
-    });
-    const avatarCell = avatarSrc
-      ? `<img class="report-room-av" src="${escapeAttr(avatarSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
-      : '<span class="report-room-av report-room-av--empty"></span>';
-    return `
-      <tr class="search-item" data-search="${search}">
-        <td>${avatarCell}</td>
-        <td>${labelHtml}</td>
-        <td>${room.count}</td>
-        <td>${totalChars}（平均 ${avgChars}）</td>
-        <td>${escapeHtml(room.lastText || '')}</td>
-      </tr>
-    `;
+  // C-7 pure refactor (v0.1.636): 行ビルダを reportUserRoomTableHtml.js に抽出（挙動不変・test 済）。
+  //   閉包依存4つ（userKeyToTotalChars/displayUserLabel/buildUserProfileLinkedLabelHtml/
+  //   resolveReportUserThumbSrc+identiconResolver）を全て引数化して非決定を排除。
+  const roomRows = buildReportUserRoomRows(aggregatedRooms, {
+    userKeyToTotalChars,
+    displayUserLabel,
+    buildUserProfileLinkedLabelHtml,
+    resolveReportUserThumbSrc,
+    identiconResolver: getCachedAnonymousIdenticonDataUrl
   });
 
   /*

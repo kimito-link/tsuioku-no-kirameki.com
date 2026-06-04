@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.636',
+    date: '2026-06-05',
+    summary: '内部: ユーザー別一覧の組み立てを部品化(見え方は不変)',
+    items: Object.freeze([
+      'HTMLレポートの「ユーザー別の集計一覧」を作る処理を内部で部品に切り出し、テストで挙動が変わらないことを保証しました(見た目・内容は変わりません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.635',
     date: '2026-06-05',
     summary: '内部: HTMLレポートのメタ情報の組み立てを部品化(見え方は不変)',
