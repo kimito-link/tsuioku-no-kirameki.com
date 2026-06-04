@@ -25,6 +25,10 @@ import { buildOverviewText, buildLiveBlockText } from '../lib/statusFormat.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
+import {
+  NEXT_LIVE_REQUEST_TYPE,
+  AUTOPATROL_ENABLED_KEY
+} from '../lib/rankingPatrolMessages.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -479,7 +483,79 @@ async function uploadStatusSnapshot() {
   }
 }
 
+/** 自動巡回トグルボタンの文言を現在の有効状態に合わせる。 */
+async function refreshAutopatrolToggleLabel() {
+  const btn = document.getElementById('btnAutopatrolToggle');
+  if (!btn) return;
+  // background の getAutopatrolEnabled は「!== false」=既定 ON。
+  //   未設定 or true は ON、明示的 false のときだけ OFF として表示を合わせる。
+  let enabled = true;
+  try {
+    const bag = await chrome.storage.local.get(AUTOPATROL_ENABLED_KEY);
+    enabled = bag?.[AUTOPATROL_ENABLED_KEY] !== false;
+  } catch {
+    /* read 失敗時は既定 ON 表示 */
+  }
+  btn.textContent = enabled ? '🔁 自動巡回 ON' : '🔁 自動巡回 OFF';
+  btn.dataset.enabled = enabled ? '1' : '0';
+}
+
+function setupPatrolButtons() {
+  // 「次の上位配信へ」: SW にランキング巡回を1歩進めさせる。
+  const btnNext = document.getElementById('btnNextLive');
+  const resultEl = document.getElementById('patrolResult');
+  if (btnNext) {
+    btnNext.addEventListener('click', async () => {
+      btnNext.disabled = true;
+      const prev = btnNext.textContent;
+      btnNext.textContent = '移動中...';
+      try {
+        const r = await chrome.runtime.sendMessage({ type: NEXT_LIVE_REQUEST_TYPE });
+        if (resultEl) {
+          if (r?.ok) {
+            resultEl.textContent = `⏭ ${r.lv} へ移動しました`;
+          } else if (r?.reason === 'no_more_lives') {
+            resultEl.textContent = '巡回先が見つかりません(少し待つと補充されます)';
+          } else if (r?.reason === 'no_watch_tab_open') {
+            resultEl.textContent = 'ニコ生 watch タブを開いてから押してください';
+          } else {
+            resultEl.textContent = `移動できませんでした (${r?.reason || 'unknown'})`;
+          }
+        }
+      } catch (err) {
+        if (resultEl) resultEl.textContent = '通信エラー: ' + String(err?.message || err);
+      }
+      btnNext.textContent = prev;
+      btnNext.disabled = false;
+    });
+  }
+
+  // 自動巡回 ON/OFF トグル。
+  const btnToggle = document.getElementById('btnAutopatrolToggle');
+  if (btnToggle) {
+    void refreshAutopatrolToggleLabel();
+    btnToggle.addEventListener('click', async () => {
+      btnToggle.disabled = true;
+      try {
+        const bag = await chrome.storage.local.get(AUTOPATROL_ENABLED_KEY);
+        const cur = bag?.[AUTOPATROL_ENABLED_KEY] !== false; // 既定 ON
+        await chrome.storage.local.set({ [AUTOPATROL_ENABLED_KEY]: !cur });
+        await refreshAutopatrolToggleLabel();
+        if (resultEl) {
+          resultEl.textContent = !cur
+            ? '🔁 自動巡回を ON にしました(背景で上位配信を巡回記録)'
+            : '🔁 自動巡回を OFF にしました';
+        }
+      } catch (err) {
+        if (resultEl) resultEl.textContent = '切替に失敗: ' + String(err?.message || err);
+      }
+      btnToggle.disabled = false;
+    });
+  }
+}
+
 function setupButtons() {
+  setupPatrolButtons();
   const btnUpload = document.getElementById('btnUpload');
   if (btnUpload) {
     const { ingestKey, viewToken } = getUploadConfig();

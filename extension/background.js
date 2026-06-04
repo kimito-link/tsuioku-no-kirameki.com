@@ -1435,6 +1435,117 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* 「次の上位配信へ」: ランキング巡回を手動で1歩進める。                */
+/*   status の手動ボタンから呼ばれる。autopatrol の queue/visited を    */
+/*   流用し、未訪問の lv を1つ選んで現在の watch タブを置き換える       */
+/*   （タブを増やさない）。watch タブが無ければ新規タブで開く。         */
+/* ------------------------------------------------------------------ */
+const NEXT_LIVE_REQUEST_MESSAGE_TYPE = 'NLS_NEXT_LIVE_REQUEST';
+
+/** queue/visited から未訪問の次 lv を1つ選ぶ（excludeLv は今いる配信）。 */
+function pickNextPatrolLvInState(st, candidates, excludeLv) {
+  const visitedSet = new Set(st.visited);
+  if (excludeLv) visitedSet.add(String(excludeLv).toLowerCase());
+  const remaining = [];
+  let chosen = null;
+  for (const lv of st.queue) {
+    if (chosen == null && !visitedSet.has(lv)) {
+      chosen = lv;
+      continue;
+    }
+    remaining.push(lv);
+  }
+  if (chosen == null) {
+    const inQueue = new Set(remaining);
+    for (const lv of candidates || []) {
+      if (visitedSet.has(lv) || inQueue.has(lv)) continue;
+      if (chosen == null) {
+        chosen = lv;
+      } else {
+        remaining.push(lv);
+        inQueue.add(lv);
+      }
+    }
+  }
+  st.queue = remaining.slice(0, AUTOPATROL_QUEUE_MAX);
+  if (chosen) {
+    st.visited = st.visited.concat([chosen]).slice(-AUTOPATROL_VISITED_MAX);
+  }
+  return chosen;
+}
+
+async function handleNextLiveRequest() {
+  const st = await loadAutopatrolState();
+  // queue が薄ければ公開ランキングから補充（叩きすぎガード付き）。
+  let candidates = [];
+  const now = Date.now();
+  if (
+    st.queue.length < AUTOPATROL_QUEUE_MIN &&
+    now - (st.lastDiscoverAt || 0) >= AUTOPATROL_DISCOVER_MIN_INTERVAL_MS
+  ) {
+    st.lastDiscoverAt = now;
+    candidates = await discoverOnairLvIds();
+  }
+  // 今いる watch タブ（あれば）を取得。
+  let watchTab = null;
+  try {
+    const tabs = await chrome.tabs.query({
+      url: ['https://live.nicovideo.jp/watch/*', 'https://sp.live.nicovideo.jp/watch/*']
+    });
+    watchTab = Array.isArray(tabs) && tabs.length ? tabs[0] : null;
+  } catch {
+    /* tabs 取得失敗時は新規タブにフォールバック */
+  }
+  const curMatch = String(watchTab?.url || '').match(/\/watch\/(lv\d{5,12})/);
+  const excludeLv = curMatch ? curMatch[1].toLowerCase() : null;
+
+  const lv = pickNextPatrolLvInState(st, candidates, excludeLv);
+  st.updatedAt = now;
+  await saveAutopatrolState(st);
+
+  if (!lv) {
+    return { ok: false, reason: 'no_more_lives' };
+  }
+  const url = AUTOPATROL_WATCH_BASE + lv;
+  try {
+    if (watchTab && watchTab.id != null) {
+      await chrome.tabs.update(watchTab.id, { url, active: true });
+    } else {
+      await chrome.tabs.create({ url, active: true });
+    }
+    return { ok: true, lv };
+  } catch (err) {
+    return { ok: false, reason: 'navigate_failed', error: String(err && err.message) };
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== NEXT_LIVE_REQUEST_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port closed */
+    }
+  };
+  handleNextLiveRequest()
+    .then(reply)
+    .catch((err) => reply({ ok: false, reason: 'internal', error: String(err && err.message) }));
+  return true; // 非同期 sendResponse
+});
+
+/* ------------------------------------------------------------------ */
 /* nicoad（ニコニ広告）貢献度ランキング 無認証 API の CORS バイパス fetch proxy   */
 /* koken と同型。広告ランキングは従来 HTML scrape で取得していたが DOM に uid が   */
 /* 出ず、記名広告主のアカウントリンク/アバターが付かなかった。本 API は記名行に    */
