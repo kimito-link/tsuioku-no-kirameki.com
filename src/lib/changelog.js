@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.622',
+    date: '2026-06-04',
+    summary: '北極星レーンの「ローディング点滅」を根治',
+    items: Object.freeze([
+      'NDGRが停止している配信などで、「取得中…」案内が450ms毎に再描画されて点滅していた問題を修正しました（v0.1.618のアトミック描画を待機UIやイベント順位レーンにも拡張）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.621',
     date: '2026-06-04',
     summary: '過去ログの大量取りこぼし(タブ切替で永久凍結)と診断の嘘を根治',

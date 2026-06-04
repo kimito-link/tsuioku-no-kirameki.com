@@ -8505,6 +8505,9 @@ const northStarLaneWaitFootIntervalByBody = new WeakMap();
 
 function teardownNorthStarLaneWaitingUi(body) {
   if (!(body instanceof HTMLElement)) return;
+  // v0.1.622: 待機UI diff-skip キャッシュも破棄。teardown 後に再 mount が呼ばれたら
+  //   必ずアトミックに描画し直すため(空 DOM のまま同 HTML cache でスキップされる事故防止)。
+  _waitingUiLastByBody.delete(body);
   const tid = northStarLaneWaitIntervalByBody.get(body);
   if (tid != null) {
     clearInterval(tid);
@@ -8588,19 +8591,46 @@ function clearNorthStarLaneWaitStartTimes() {
 }
 
 
+/**
+ * v0.1.622: 待機UI の最後にマウントした完全 HTML を要素ごとに記憶。
+ * NDGR 停止配信などで coalescedRefreshScheduler の 450ms ポーリングが毎回
+ * mountNorthStarLaneWaitingUi を呼ぶと、同じ HTML を innerHTML 全置換で再生成し
+ * <img> 子要素が毎回 load 待ちになり「白フラッシュ」が点滅して見えた(実機
+ * lv350675889 で観測)。前回と同一 HTML+state+stateAttr ならアトミックに DOM 不変で
+ * skip する。paintTopSupportRankStyleIntoElement の _topSupportRankLastHtmlByEl
+ * (v0.1.618)と同型パターン。
+ * @type {WeakMap<HTMLElement, { stateAttr: string, shellHtml: string, guideHtml: string }>}
+ */
+const _waitingUiLastByBody = new WeakMap();
+
 function mountNorthStarLaneWaitingUi(body, laneId, state) {
-  teardownNorthStarLaneWaitingUi(body);
-  body.setAttribute('data-lane-state', String(state || 'not_yet'));
-  body.innerHTML = buildNorthStarLaneWaitingShellHtml(laneId);
+  const stateAttr = String(state || 'not_yet');
+  const shellHtml = buildNorthStarLaneWaitingShellHtml(laneId);
   // v0.1.332: 経過 ms を同期計算（await I/O なし）。閾値超で確定文言へ遷移。
   const elapsedMs = trackNorthStarLaneWaitElapsedMs(laneId, state);
   // v0.1.389: 狭い右レールに詰め込まず、レーン本体の広いスペースで 3 キャラ（りんく/
   //   こん太/たぬ姉）が大きく案内する。本体の `__short` 1 行＋手順図解は撤去し、
   //   キャラガイド（アバター大＋折り返しセリフ＋手順図解）に置換。空きスペース活用。
   const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
-  const waitRoot = body.querySelector('[data-north-star-wait="1"]') || body;
   const diagram = buildNorthStarLaneOpenHintDiagramHtml(laneId);
   const guideHtml = buildNorthStarWaitCharacterGuideHtml(msgs, diagram);
+  // v0.1.622: 前回と同一(stateAttr/shellHtml/guideHtml が全て不変)なら DOM を一切触らず skip。
+  //   point=「同じ案内を 450ms 毎に再描画していた」点滅の根を断つ。
+  const prev = _waitingUiLastByBody.get(body);
+  const unchanged =
+    prev &&
+    prev.stateAttr === stateAttr &&
+    prev.shellHtml === shellHtml &&
+    prev.guideHtml === (guideHtml || '') &&
+    body.firstChild != null;
+  if (unchanged) {
+    // 待機マーカーが残っていれば interval/class も触り直さない(teardown も含めて完全 no-op)。
+    return;
+  }
+  teardownNorthStarLaneWaitingUi(body);
+  body.setAttribute('data-lane-state', stateAttr);
+  body.innerHTML = shellHtml;
+  const waitRoot = body.querySelector('[data-north-star-wait="1"]') || body;
   if (guideHtml) {
     // 1 行＋図解だけのシェルを、全幅キャラガイドへ差し替え
     waitRoot.innerHTML = guideHtml;
@@ -8612,6 +8642,11 @@ function mountNorthStarLaneWaitingUi(body, laneId, state) {
       shortEl.textContent = `${m.badge}：${m.line}`;
     }
   }
+  _waitingUiLastByBody.set(body, {
+    stateAttr,
+    shellHtml,
+    guideHtml: guideHtml || ''
+  });
   // 本体で全幅案内するので、狭い右レールには重複表示しない（空のまま）。
   clearNorthStarVerticalRailForBody(body);
   syncNorthStarLaneGadgetFromBodyState(body);
@@ -8794,6 +8829,12 @@ function applyNorthStarLaneWaitingOrHide(body, laneId, state) {
   mountNorthStarLaneWaitingUi(body, laneId, state);
 }
 
+/**
+ * v0.1.622: renderNorthStarLane の mirror HTML パス用 diff-skip キャッシュ。
+ * @type {WeakMap<HTMLElement, string>}
+ */
+const _renderLaneLastMirrorHtmlByBody = new WeakMap();
+
 function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
   const body = document.getElementById('northStarLaneBody-' + String(laneId || ''));
   if (!(body instanceof HTMLElement)) return;
@@ -8833,7 +8874,13 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
     return;
   }
 
-  body.innerHTML = sanitized;
+  // v0.1.622: 待機UI/paint と同型のアトミック差分スキップ。同一 sanitized HTML を
+  //   ポーリング(450ms)で毎回 innerHTML 全置換していたため、<img>/<iframe> 子要素が
+  //   再 load 待ちで「白フラッシュ」が点滅して見えていた(実機 lv350675889)。
+  if (_renderLaneLastMirrorHtmlByBody.get(body) !== sanitized || !body.firstChild) {
+    body.innerHTML = sanitized;
+    _renderLaneLastMirrorHtmlByBody.set(body, sanitized);
+  }
   body.setAttribute('data-lane-state', 'ok');
   // v0.1.619: rows/mirror が来たら hidden を外して必ず表示(畳みから復帰)。
   setNorthStarLaneHidden(String(laneId || ''), false);
@@ -10190,11 +10237,22 @@ async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
     return;
   }
   teardownNorthStarLaneWaitingUi(body);
-  body.innerHTML = html;
+  // v0.1.622: アトミック差分スキップ。eventRank fallback も 450ms ポーリングで同一 HTML を
+  //   毎回 innerHTML 全置換していたため点滅の一因。
+  if (_eventLaneLastHtmlByBody.get(body) !== html || !body.firstChild) {
+    body.innerHTML = html;
+    _eventLaneLastHtmlByBody.set(body, html);
+  }
   body.setAttribute('data-lane-state', 'ok');
   clearNorthStarVerticalRailForBody(body);
   syncNorthStarLaneGadgetFromBodyState(body);
 }
+
+/**
+ * v0.1.622: eventRank/eventScore レーンの diff-skip キャッシュ。
+ * @type {WeakMap<HTMLElement, string>}
+ */
+const _eventLaneLastHtmlByBody = new WeakMap();
 
 /**
  * v0.1.242: 北極星 レーン 4 (番組累計ポイント) への流し込み。
