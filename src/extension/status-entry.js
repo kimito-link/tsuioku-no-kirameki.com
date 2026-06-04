@@ -24,6 +24,7 @@ import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { buildOverviewText, buildLiveBlockText } from '../lib/statusFormat.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
+import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -236,14 +237,13 @@ function renderAll({ lvList, summaries, fastDiag }) {
       livesEl.textContent =
         '視聴中の配信が見つかりませんでした。ニコ生 watch ページを開いてから戻ってきてください。';
     } else {
+      // 画面が広いとき方眼紙のように横へ並べるグリッド(狭いと1列)。
       livesEl.className = '';
+      livesEl.style.display = 'grid';
+      livesEl.style.gap = '12px';
+      livesEl.style.gridTemplateColumns = 'repeat(auto-fill, minmax(320px, 1fr))';
       livesEl.innerHTML = '';
       for (const live of livesData) {
-        const pre = document.createElement('pre');
-        pre.textContent = buildLiveBlockText(live);
-        pre.style.margin = '0';
-        // 配信ごとにカード(枠+背景)で囲んで境界を明確にする。
-        //   終了=薄赤 / 裏タブ(省電力)=薄グレー / 現役=通常、で状態を色分け。
         const card = document.createElement('div');
         const isEnded = !!live.endedAt;
         const isBackground = live.perfDiag && live.perfDiag.tabVisible === false;
@@ -259,8 +259,15 @@ function renderAll({ lvList, summaries, fastDiag }) {
           accent = 'var(--nl-accent)';
         }
         card.style.cssText =
-          'margin-bottom:12px;padding:10px 12px;border-radius:8px;' +
+          'padding:10px 12px;border-radius:8px;' +
           `border:1px solid var(--nl-border);border-left:4px solid ${accent};background:${bg};`;
+
+        // 健康チェック(5段階・●○)を上部に。数値を読まなくても状態が一目で分かる。
+        card.appendChild(buildHealthCheckEl(live));
+
+        const pre = document.createElement('pre');
+        pre.textContent = buildLiveBlockText(live);
+        pre.style.margin = '0';
         card.appendChild(pre);
         livesEl.appendChild(card);
       }
@@ -292,6 +299,43 @@ function renderAll({ lvList, summaries, fastDiag }) {
 /* ============================================================================
  * 集計/整形ヘルパ(純関数寄り・テスト容易)
  * ========================================================================== */
+
+/**
+ * 健康チェック(5段階 ●○)の DOM を作る。
+ *   取得率 / 描画(白化リスク) / 鮮度 / スクロール軽さ の4指標。
+ *   スコアが低いほど赤め、高いほど緑めに色づけして一目で分かるようにする。
+ * @param {object} live
+ * @returns {HTMLElement}
+ */
+function buildHealthCheckEl(live) {
+  const h = buildLiveHealth(live);
+  const items = [
+    { label: '取得', score: h.capture },
+    { label: '描画', score: h.render },
+    { label: '鮮度', score: h.freshness },
+    { label: '軽さ', score: h.scroll }
+  ];
+  const wrap = document.createElement('div');
+  wrap.style.cssText =
+    'display:flex;flex-wrap:wrap;gap:8px 14px;margin-bottom:8px;' +
+    'padding-bottom:8px;border-bottom:1px dashed var(--nl-border);font-size:11px;';
+  for (const it of items) {
+    const cell = document.createElement('span');
+    cell.style.cssText = 'display:inline-flex;flex-direction:column;align-items:center;gap:1px;';
+    const lab = document.createElement('span');
+    lab.textContent = it.label;
+    lab.style.color = 'var(--nl-text-soft)';
+    const dots = document.createElement('span');
+    dots.textContent = scoreToDots(it.score);
+    // 0-1=赤 / 2-3=黄 / 4-5=緑。
+    dots.style.color = it.score >= 4 ? '#16a34a' : it.score >= 2 ? '#d97706' : '#dc2626';
+    dots.style.letterSpacing = '1px';
+    cell.appendChild(lab);
+    cell.appendChild(dots);
+    wrap.appendChild(cell);
+  }
+  return wrap;
+}
 
 function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   // panel_summary のスキーマは src/lib/panelLiveSummary.js を参照
