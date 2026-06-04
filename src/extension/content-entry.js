@@ -161,6 +161,7 @@ import {
   fetchOfficialEventBannerFromAuditionEmbed
 } from '../lib/officialEventDomBundle.js';
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+import { liveEndedStorageKey, buildLiveEndedFlag } from '../lib/liveEndedFlag.js';
 import {
   scrapeContributionRankingFromDom,
   hasContributionRankingDomSignal,
@@ -1353,6 +1354,25 @@ function maybeRunEndedBulkHarvest() {
   if (now - endedBulkHarvestLastCheckedAt < ENDED_HARVEST_CHECK_MS) return;
   endedBulkHarvestLastCheckedAt = now;
   const endedDetected = detectWatchProgramEndedFromDom();
+  // 配信終了を検知したら status / Web版向けに終了フラグを1回書く(タブを閉じない限り
+  //   tabs.query には残るため、「視聴中」で更新が止まった終了枠を区別できるようにする)。
+  if (endedDetected) {
+    const endedLv = String(liveId || '').trim().toLowerCase();
+    if (/^lv\d{1,15}$/.test(endedLv)) {
+      try {
+        chrome.storage.local
+          .set({
+            [liveEndedStorageKey(endedLv)]: buildLiveEndedFlag({
+              liveId: endedLv,
+              endedAt: now
+            })
+          })
+          .catch(() => {});
+      } catch {
+        /* context invalidated 時は無視 */
+      }
+    }
+  }
   if (
     !shouldRunEndedBulkHarvest({
       recording,
