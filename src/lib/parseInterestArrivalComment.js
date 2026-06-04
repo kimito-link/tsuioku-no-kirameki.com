@@ -12,7 +12,12 @@
  * @typedef {{ tag: string, count: number }} ParsedInterestArrivalComment
  */
 
-const INTEREST_ARRIVAL_RE = /^「(.+?)」が好きな(\d+)人が来場しました$/;
+// v0.1.627: 前後の全角空白(U+3000)・タブ・改行は trim() で落ちないため、
+//   正規表現側で先頭/末尾の空白を許容する。中央は変更しない(誤検知防止)。
+//   全角空白は U+3000 で表記して no-irregular-whitespace を回避する。
+const INTEREST_ARRIVAL_RE = new RegExp(
+  '^[\\u3000\\s]*「(.+?)」が好きな(\\d+)人が来場しました[\\u3000\\s]*$'
+);
 
 /**
  * @param {string} text

@@ -5484,11 +5484,20 @@ ${commonTable}
 
 /**
  * 興味タグ別来場（公式 generalSystemMessage）。
+ *
+ * v0.1.627: 興味タグ来場が 0件のときも痕跡を残す(ユーザーが「機能の有無」を確認できる)。
+ * messageCount > 0 のときは従来通り詳細セクション。0件のときは簡素な notice を返す。
+ *
  * @param {MarketingReport} r
  */
 export function sectionInterestArrival(r) {
   const summary = r.interestArrivalSummary;
-  if (!summary || summary.messageCount <= 0) return '';
+  if (!summary || summary.messageCount <= 0) {
+    return `<section class="mkt-section mkt-section--interest-arrival mkt-section--empty" id="mkt-interest-arrival" aria-label="興味タグ別来場（検出 0件）">
+      <h2>興味タグ別来場</h2>
+      <p class="mkt-section__note">この配信では「○○が好きなN人が来場しました」の通知が検出されませんでした(0件)。配信ジャンルやニコ生側のシステムメッセージ配信状況により出ない配信もあります。</p>
+    </section>`;
+  }
 
   const stats = [
     {

@@ -10141,6 +10141,15 @@
             hidden
             aria-live="polite"
           ></div>
+          <!-- v0.1.627: 記録の内訳(通常コメ/興味来場/システム)を併記。
+               「公式 N / 記録 M」の M の出所が見えるようにユーザー納得性向上。
+               ギフト・広告は persistable で保存時点で除外済=ここには含まれない。 -->
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--breakdown"
+            id="liveStatCommentsBreakdown"
+            hidden
+            title="ギフト・広告は別カウント(下のカード参照)"
+          ></div>
           <!-- v0.1.432: 過去ログ取り込みの状況（入口なし/途中/混雑）を記録カードの位置にも出す。
                v0.1.438: ボタン下と同じ「こん太(キャラ)+ピンク吹き出し」UI に統一（ユーザー指摘・統合性原則）。
                既存ボタン下の #backfillRinku は無変更。ここはもう一つのインスタンス（class 共有 / id は別）。
