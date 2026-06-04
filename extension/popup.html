@@ -329,6 +329,17 @@
         box-shadow: none;
       }
 
+      /*
+       * スクロールコンテナ自身に不透明背景を持たせる（白フラッシュ対策）。
+       * .nl-main は overflow:auto + -webkit-overflow-scrolling:touch でブラウザに
+       * 合成レイヤー昇格されることがあり、高速/慣性スクロールで未ペイントのタイルが
+       * 一瞬「白（下地）」として透ける。body のグラデは .nl-main には乗らないため、
+       * コンテナ側に var(--nl-bg) を敷いて白抜けを防ぐ（inline / action popup 両形態）。
+       */
+      body .nl-main {
+        background: var(--nl-bg);
+      }
+
       html.nl-inline body .nl-main {
         flex: 1 1 auto;
         min-height: 0;
