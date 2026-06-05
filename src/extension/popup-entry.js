@@ -625,6 +625,7 @@ import { formatDateTime } from '../lib/formatDateTime.js';
 import { buildReportSelfPostedRows } from '../lib/reportSelfPostedRowsHtml.js';
 import { buildReportFriendlyMetaRows } from '../lib/reportFriendlyMetaRowsHtml.js';
 import { buildReportUserRoomRows } from '../lib/reportUserRoomTableHtml.js';
+import { shouldRunDevMonitorPaint } from '../lib/devMonitorPaintGate.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
@@ -14007,18 +14008,26 @@ async function refresh() {
       }
     }
 
+    // v0.1.637 スクロール重さ根治 PR1: dev monitor の全件 O(N) 集計 3 本 +
+    //   renderDevMonitorPanel(内部 storage I/O)は、パネル(<details id=devMonitorDetails>)が
+    //   開いているときだけ実行する。通常は折りたたみで閉=この集計は画面に出ないのに毎 450ms
+    //   無条件に走り、1 万件超の配信でスクロール中もメインスレッドを圧迫していた。
+    //   閉時は丸ごとスキップ(O(N)×3 + I/O が消える)。開いた瞬間は toggle リスナーで即再描画。
     {
-      const baseAv = summarizeStoredCommentAvatarStats(arr);
-      const resolvedTotal = countResolvedAvatarEntries(arr, lv).total;
-      renderDevMonitorPanel({
-        snapshot: snapForCards,
-        liveId: lv,
-        displayCount: displayEntries.length,
-        storageCount: arr.length,
-        commentReadState,
-        avatarStats: { ...baseAv, withResolvedAvatar: resolvedTotal },
-        profileGaps: summarizeStoredCommentProfileGaps(arr)
-      });
+      const devMonDetails = /** @type {HTMLDetailsElement|null} */ ($('devMonitorDetails'));
+      if (shouldRunDevMonitorPaint({ panelOpen: devMonDetails?.open === true })) {
+        const baseAv = summarizeStoredCommentAvatarStats(arr);
+        const resolvedTotal = countResolvedAvatarEntries(arr, lv).total;
+        renderDevMonitorPanel({
+          snapshot: snapForCards,
+          liveId: lv,
+          displayCount: displayEntries.length,
+          storageCount: arr.length,
+          commentReadState,
+          avatarStats: { ...baseAv, withResolvedAvatar: resolvedTotal },
+          profileGaps: summarizeStoredCommentProfileGaps(arr)
+        });
+      }
     }
     updateCommentVelocityLine(
       /** @type {PopupCommentEntry[]} */ (displayEntries)
@@ -18497,6 +18506,15 @@ async function initPopup() {
     watchMetaCache.key = '';
     watchMetaCache.snapshot = null;
     safeRefresh();
+  });
+
+  // v0.1.637 スクロール重さ根治 PR1: dev monitor を開いた瞬間に再描画する。
+  //   通常 paint は閉時に集計をスキップする(shouldRunDevMonitorPaint)ので、開いた直後の
+  //   次 450ms ポーリングまで中身が空に見える。toggle で open になったら即 safeRefresh して
+  //   待ち時間ゼロで最新の集計を出す(閉→開の体感を従来どおり保つ)。
+  $('devMonitorDetails')?.addEventListener('toggle', () => {
+    const det = /** @type {HTMLDetailsElement|null} */ ($('devMonitorDetails'));
+    if (det?.open) safeRefresh();
   });
 
   // v0.1.608 Phase 1-C: コメンターのフォロー情報を強制再取得(キャッシュ無視)

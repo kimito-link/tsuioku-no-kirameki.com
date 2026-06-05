@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.637',
+    date: '2026-06-05',
+    summary: '大量コメント時のスクロールを軽くする(第1弾)',
+    items: Object.freeze([
+      '開発者向けの診断パネルを閉じている間は、その重い集計を毎回行わないようにしました。コメントが非常に多い配信でスクロールが重くなる原因の一つを軽くしています(パネルを開いたときの表示内容は変わりません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.636',
     date: '2026-06-05',
     summary: '内部: ユーザー別一覧の組み立てを部品化(見え方は不変)',
