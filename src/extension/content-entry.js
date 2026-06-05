@@ -15172,6 +15172,15 @@ function backfillYieldToPage() {
 const NDGR_BACKFILL_YIELD_EVERY_SEGMENTS = 6;
 
 /**
+ * v0.1.654「一気に取れない」根治: pending バッファを storage へ吐く時間ベース閾値(ms)。
+ * 件数閾値(computeBackfillFlushThreshold)に届かなくても、最後の flush からこの時間を超えたら
+ * 必ず flush する。crawl が高速で大量取得した分が storage に落ちないまま膨らみ、タブ離脱/
+ * visibility 中断で一括消失するのを防ぐ(実機 lv350631410: rows9297 取り切ったのに chunk4951)。
+ * 2.5s は YIELD(6区画)より十分長く flush 回数を抑えつつ、中断損失を直近数秒分に圧縮する。
+ */
+const NDGR_BACKFILL_TIME_FLUSH_MS = 2500;
+
+/**
  * 過去ログ一括バックフィルを 1 回だけ起動する（ワンショット）。
  * 巡回エンジン（crawlNdgrBackward）を実 fetch / 実 sleep で駆動し、yield された
  * 過去 chat を capturedAt 保持で persistCommentRows に流す。
@@ -15309,12 +15318,18 @@ async function runNdgrBackfillOnce() {
   /** @type {ParsedCommentRow[]} */
   let pendingBackfillRows = [];
   let segmentsSinceYield = 0;
+  // v0.1.654「一気に取れない」根治: 最後に pending を storage へ吐いた時刻。crawl が高速で
+  //   大量取得しても、件数閾値(computeBackfillFlushThreshold)に届く前にこの間隔を超えたら
+  //   時間ベースで必ず flush し、storage に落ちていない pending を最小化する。これで watch
+  //   タブ離脱/visibility 中断が来ても、直近に取れた分が確実に残る(中断損失の最小化)。
+  let _lastBackfillFlushAt = Date.now();
   const flushPendingBackfillRows = () => {
     if (!pendingBackfillRows.length) return;
     // ⛔ flushNdgrChatRowsBatch を経由しない（capturedAt 握り潰し回避）。
     //    persistCommentRows → mergeNewComments は capturedAt/vpos を素通しする。
     const batch = pendingBackfillRows;
     pendingBackfillRows = [];
+    _lastBackfillFlushAt = Date.now();
     persistCommentRows(batch, { source: COMMENT_INGEST_SOURCE.BACKFILL });
   };
 
@@ -15438,7 +15453,14 @@ async function runNdgrBackfillOnce() {
       const backfillFlushThreshold = computeBackfillFlushThreshold(
         observedRecordedCommentCount
       );
-      if (pendingBackfillRows.length >= backfillFlushThreshold) {
+      // v0.1.654: 件数閾値に届かなくても、最後の flush から一定時間(2.5s)経っていれば
+      //   時間ベースで flush する。crawl が高速で大量取得しても pending が storage に
+      //   落ちないまま膨らみ、タブ離脱/visibility 中断で一括消失する(=「一気に取れない」
+      //   真因)のを防ぐ。閾値ベース(O(N²)緩和)と時間ベース(中断損失最小化)の併用。
+      const flushByTime =
+        pendingBackfillRows.length > 0 &&
+        Date.now() - _lastBackfillFlushAt >= NDGR_BACKFILL_TIME_FLUSH_MS;
+      if (pendingBackfillRows.length >= backfillFlushThreshold || flushByTime) {
         flushPendingBackfillRows();
         // v0.1.456 レジューム: persist バッチ境界（低頻度）で最古到達 vpos を coalesce 保存。
         //   途中でタブを閉じる/中断しても、次回「もう一度」で続きから再開できる（毎 yield で

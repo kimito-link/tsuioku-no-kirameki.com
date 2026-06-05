@@ -15,8 +15,9 @@ describe('computeBackfillFlushThreshold', () => {
   });
 
   it('保存件数に比例して閾値が伸びる（base と max の間）', () => {
-    expect(computeBackfillFlushThreshold(4000)).toBe(2000);
-    expect(computeBackfillFlushThreshold(10000)).toBe(5000);
+    // v0.1.654: max を 8000→2000 に下げた(中断損失最小化)。base(800)と max(2000)の間を確認。
+    expect(computeBackfillFlushThreshold(2000)).toBe(1000); // floor(2000*0.5)
+    expect(computeBackfillFlushThreshold(3000)).toBe(1500); // floor(3000*0.5)
   });
 
   it('max で頭打ちになる（メモリ保護）', () => {

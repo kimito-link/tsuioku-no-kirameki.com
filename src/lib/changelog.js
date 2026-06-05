@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.654',
+    date: '2026-06-06',
+    summary: '過去ログ取得が途中で止まり一気に取り切れない問題を改善',
+    items: Object.freeze([
+      '過去ログをたくさん取り込んだのに、記録への書き込みが追いつく前に配信を切り替えたりタブを離れたりすると、取り込んだ分の数千件が記録に残らず「途中までしか取れない」状態になることがあったのを改善しました。取り込んだ分をこまめに記録へ書き込むようにして、一気に取り切れるようにしています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.653',
     date: '2026-06-05',
     summary: '「問い合わせ中」などのローディング表示をやめました',
