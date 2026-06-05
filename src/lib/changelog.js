@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.655',
+    date: '2026-06-06',
+    summary: '応援タイムラインの匿名アイコンを識別しやすい模様に',
+    items: Object.freeze([
+      '応援タイムライン(コメント+ギフト)で、アイコン未設定の匿名コメントが全部同じキャラ画像になっていたのを、応援者一覧と同じ「その人ごとに違う幾何学模様アイコン」に変えました。匿名でも誰が誰かを見分けやすくなります(名前やアイコンが設定されている人はこれまで通りその画像です)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.654',
     date: '2026-06-06',
     summary: '過去ログ取得が途中で止まり一気に取り切れない問題を改善',

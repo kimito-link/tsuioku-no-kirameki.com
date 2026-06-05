@@ -67,18 +67,38 @@ describe('buildTimelineRowHtml', () => {
     expect(html).toContain('referrerpolicy="no-referrer"');
   });
 
-  it('アバターなしギフト行は default が無ければ🎁アイコンのみ', () => {
+  it('v0.1.655: アバターなし匿名は userId から identicon を出す(りんく/🎁にしない)', () => {
     const html = buildTimelineRowHtml(gItem({ userId: 'a:x', avatarUrl: '' }));
-    expect(html).toContain('nl-tl-gift__icon');
-    expect(html).not.toContain('nl-tl-gift__avatar');
+    expect(html).toContain('nl-tl-gift__avatar');
+    expect(html).toContain('data:image/svg+xml'); // identicon data URL
   });
 
-  it('アバターなしでも defaultAvatar 指定時はそれを使う', () => {
-    const html = buildTimelineRowHtml(gItem({ userId: 'a:x', avatarUrl: '' }), {
+  it('v0.1.655: コメント行も匿名は identicon(りんくにしない)', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', avatarUrl: '' }));
+    expect(html).toContain('nl-tl-row__avatar');
+    expect(html).toContain('data:image/svg+xml');
+  });
+
+  it('v0.1.655: userId が違えば identicon も違う(見分けられる)', () => {
+    const a = buildTimelineRowHtml(cItem({ userId: 'a:aaa', avatarUrl: '' }));
+    const b = buildTimelineRowHtml(cItem({ userId: 'a:bbb', avatarUrl: '' }));
+    const srcA = a.match(/src="([^"]+)"/)?.[1];
+    const srcB = b.match(/src="([^"]+)"/)?.[1];
+    expect(srcA).toBeTruthy();
+    expect(srcA).not.toBe(srcB);
+  });
+
+  it('v0.1.655: userId も無いときだけ defaultAvatar にフォールバック', () => {
+    const html = buildTimelineRowHtml(gItem({ userId: '', avatarUrl: '' }), {
       defaultAvatar: '/img/tile.png'
     });
-    expect(html).toContain('nl-tl-gift__avatar');
     expect(html).toContain('src="/img/tile.png"');
+  });
+
+  it('記名アバター(avatarUrl)があればそれを優先(identiconにしない)', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', avatarUrl: 'https://x/y.jpg' }));
+    expect(html).toContain('src="https://x/y.jpg"');
+    expect(html).not.toContain('data:image/svg+xml');
   });
 
   it('XSS: テキスト・名前をエスケープ', () => {
