@@ -25,6 +25,7 @@ import { buildOverviewText, buildLiveBlockText } from '../lib/statusFormat.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
+import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
 import {
   NEXT_LIVE_REQUEST_TYPE,
   AUTOPATROL_ENABLED_KEY
@@ -47,6 +48,8 @@ const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 
 /** 自動更新の一時停止フラグ。 */
 let _refreshPausedByUser = false;
+/** v0.1.644: 直近の status refresh エラー(画面の自己診断表示用)。 */
+let _statusLastErrorText = '';
 /** 自動更新タイマー ID。 */
 let _refreshTimerId = /** @type {number|null} */ (null);
 /** 直近 render の結果(コピー/ダウンロード用)。 */
@@ -101,16 +104,45 @@ function startRefreshLoop() {
   }, REFRESH_INTERVAL_MS);
 }
 
+/**
+ * v0.1.644: status の「読み込み中で固まる」を自己診断する。各ステップを timeout 有界化し、
+ *   どこで詰まったか/エラー内容を画面(概要欄+AI共有欄)に書き出す。これでコンソールを開かなくても
+ *   「status が固まった原因」が画面で分かる(ユーザー指摘「コンソールをスクショしなくてもいいように」)。
+ */
 async function refresh() {
+  let step = 'init';
   try {
-    const lvList = await enumerateActiveLives();
-    const summaries = await loadAllSummaries(lvList);
-    const fastDiag = await loadFastDiagSafe();
+    step = 'enumerateActiveLives';
+    const lvList = await runStorageOpWithTimeout(() => enumerateActiveLives(), 8000);
+    step = `loadAllSummaries(${lvList.length}件)`;
+    const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), 8000);
+    step = 'loadFastDiagSafe';
+    const fastDiag = await runStorageOpWithTimeout(() => loadFastDiagSafe(), 8000);
+    step = 'renderAll';
     renderAll({ lvList, summaries, fastDiag });
     updateLastUpdateMeta();
+    _statusLastErrorText = '';
   } catch (err) {
-    console.warn('[status] refresh failed:', err);
-    // 失敗してもページを壊さない: 既存 DOM を維持
+    // どのステップで・何のエラーで止まったかを画面に出す(コンソール不要の自己診断)。
+    const reason = err === STORAGE_OP_TIMED_OUT ? 'タイムアウト(8秒)' : String(err?.message || err);
+    _statusLastErrorText =
+      `⚠ 状態の読み込みでつまずきました\n  つまずいた処理: ${step}\n  原因: ${reason}\n` +
+      `  (記録自体は watch タブ側で継続中です。storage が大きいと status の表示だけ遅れることがあります)`;
+    try {
+      const ovEl = document.getElementById('overviewBody');
+      if (ovEl && /読み込み中/.test(ovEl.textContent || '')) {
+        ovEl.textContent = _statusLastErrorText;
+      }
+      const livesEl = document.getElementById('livesBody');
+      if (livesEl && /読み込み中/.test(livesEl.textContent || '')) {
+        livesEl.className = 'empty-note';
+        livesEl.textContent = `(${step} で停止。再試行します…)`;
+      }
+      // AI 共有欄にも出して、範囲選択コピーで開発者に渡せるように。
+      const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
+      if (ta && !ta.value) ta.value = _statusLastErrorText;
+    } catch { /* no-op */ }
+    console.warn('[status] refresh failed at', step, err);
   }
 }
 

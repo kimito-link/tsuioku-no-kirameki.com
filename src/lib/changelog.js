@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.644',
+    date: '2026-06-05',
+    summary: '状態ページが読み込み中で固まらないように(自己診断)',
+    items: Object.freeze([
+      '状態ページの読み込みが途中で止まったとき、「どの処理でつまずいたか」を画面に表示して8秒で再試行するようにしました。これまでは「読み込み中...」のまま固まることがありました(開発者ツールを開かなくても原因が分かります)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.643',
     date: '2026-06-05',
     summary: '状態ページを取得率(%)中心の表示にしバージョンも併記',
