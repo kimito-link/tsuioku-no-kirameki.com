@@ -542,6 +542,19 @@ async function refreshAutopatrolToggleLabel() {
 }
 
 function setupPatrolButtons() {
+  // v0.1.652: 「コメビュを開く」: 独自コメビュ(comeview.html)を別ウィンドウで開く。
+  //   lv は付けない=comeview 側が nls_last_watch_url から自己解決する(配信切替に追従)。
+  const btnComeview = document.getElementById('btnComeview');
+  if (btnComeview) {
+    btnComeview.addEventListener('click', () => {
+      const url = chrome.runtime.getURL('comeview.html');
+      try {
+        chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
+      } catch {
+        window.open(url, '_blank', 'width=400,height=640');
+      }
+    });
+  }
   // 「次の上位配信へ」: SW にランキング巡回を1歩進めさせる。
   const btnNext = document.getElementById('btnNextLive');
   const resultEl = document.getElementById('patrolResult');

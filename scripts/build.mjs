@@ -86,6 +86,14 @@ const targets = [
     define: statusDefine
   },
   {
+    // v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。読みやすい普段使いの
+    //   独立コメビュ。status と同じく chrome.storage.local の軽量キー(cdb_summary.recent / tail)を
+    //   リードオンリーで読み新着だけ append。popup と独立・SW を起こさない。?obs=1 で透過。
+    entryPoints: ['src/extension/comeview-entry.js'],
+    outfile: 'extension/dist/comeview.js',
+    target: 'chrome100'
+  },
+  {
     // feat/status-web-mobile-share: スマホ閲覧用 status Web 版(app.tsuioku-no-kirameki.com)。
     //   拡張に依存しない純 Web。api/status から GET した概要 jsonBlob を、拡張の status と
     //   同じ整形(src/lib/statusFormat.js を共用)で描画する。Vercel 静的配信。
