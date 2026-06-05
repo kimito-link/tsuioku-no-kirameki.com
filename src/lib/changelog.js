@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.642',
+    date: '2026-06-05',
+    summary: '1つの配信を見ているときは過去ログを一気に取り切るように',
+    items: Object.freeze([
+      '配信を1つだけ見ているときは、過去のコメントを途中で打ち切らず配信開始まで一気に取り切るようにしました。以前のように「開いたらすぐ全部そろう」動作に戻しています(複数の配信を同時に開いているときは、これまでどおり順番に取得します)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.641',
     date: '2026-06-05',
     summary: '内部: 過去ログ取得の入口診断を追加(真因調査用)',

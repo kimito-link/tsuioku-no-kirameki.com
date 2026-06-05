@@ -114,9 +114,11 @@ import {
   setBackfillPriorityLiveId,
   registerBackfillWaiter,
   clearBackfillWaiter,
+  listBackfillWaitingLiveIds,
   BACKFILL_PRIORITY_COOLDOWN_MS,
   GLOBAL_BACKFILL_ROTATION_MS
 } from '../lib/globalBackfillQueue.js';
+import { shouldFireBackfillRotation } from '../lib/backfillRotationGate.js';
 import {
   chunkIndexKey,
   chunkMigratedKey,
@@ -15205,14 +15207,29 @@ async function runNdgrBackfillOnce() {
     }
   };
   document.addEventListener('visibilitychange', onHidden);
+  // v0.1.642 「一気に取れない」退行根治: rotation_yield(90秒強制打ち切り)は「待機している別タブが
+  //   居るとき(=多タブで譲る相手が居るとき)だけ」発火する。単一タブ(実機の大半)では譲る相手が無く、
+  //   90秒で打ち切る理由が無いので発火させず、配信開始まで一気に掘り切る(わんコメ式)。
+  //   重さ(ページが応答しません)対策は backfillYieldToPage(6区画ごと scheduler.yield)が担う。
+  //   多タブ時のみ rotation を残す(v0.1.606 の応答性対策・429防止を温存)。
   const rotationTid = setTimeout(() => {
     if (_backfillProgress.stopReason) return;
-    _backfillProgress.stopReason = 'rotation_yield';
-    try {
-      ac.abort();
-    } catch {
-      /* no-op */
-    }
+    void (async () => {
+      let waitingLiveIds = [];
+      try {
+        waitingLiveIds = await listBackfillWaitingLiveIds();
+      } catch {
+        waitingLiveIds = [];
+      }
+      // 再エントリで既に他の理由で止まっていたら何もしない。
+      if (_backfillProgress.stopReason) return;
+      if (!ac.signal.aborted &&
+          shouldFireBackfillRotation({ waitingLiveIds, selfLiveId: liveId })) {
+        _backfillProgress.stopReason = 'rotation_yield';
+        try { ac.abort(); } catch { /* no-op */ }
+      }
+      // 単一タブ(発火しない)なら abort せず crawl を継続=掘り切る。
+    })();
   }, GLOBAL_BACKFILL_ROTATION_MS);
 
   _backfillProgress.seg = 0;
