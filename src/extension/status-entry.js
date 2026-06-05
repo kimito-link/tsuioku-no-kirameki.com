@@ -63,13 +63,17 @@ bootstrap().catch((err) => {
 });
 
 async function bootstrap() {
-  // ビルド ID 表示(define NL_BUILD_ID 経由・popup と同じ)
+  // バージョン + ビルド ID 表示(popup と同じ `v<version>・build<id>`)。
+  //   v0.1.642: ビルド番号だけだと「今どのバージョンか」が分からず紛らわしいので
+  //   manifest の version も併記する(watch パネルの「ビルド v0.1.642・b...」と揃える)。
   const buildIdEl = document.getElementById('metaBuildId');
   if (buildIdEl) {
     try {
-      buildIdEl.textContent = 'build ' + (typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '?');
+      const ver = String(chrome.runtime.getManifest()?.version || '').trim();
+      const bid = typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '?';
+      buildIdEl.textContent = (ver ? `v${ver} · ` : '') + 'build ' + bid;
     } catch {
-      buildIdEl.textContent = 'build ?';
+      buildIdEl.textContent = 'build ' + (typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '?');
     }
   }
   // 自分の URL を footer に

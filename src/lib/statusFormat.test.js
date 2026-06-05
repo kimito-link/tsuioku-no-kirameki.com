@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildOverviewText,
   buildLiveBlockText,
+  buildCaptureRateLine,
   formatElapsed,
   formatAgo
 } from './statusFormat.js';
@@ -73,7 +74,7 @@ describe('buildLiveBlockText', () => {
     expect(buildLiveBlockText(live)).toBe(
       '[lv123] だるまくん ・ 経過 1:01:01\n' +
         '  「カレー準備」\n' +
-        '  記録 5,255 / 公式 5,205 (取得率 101%)\n' +
+        '  ✅ 取得完了 101% (記録 5,255 / 公式 5,205)\n' +
         '  来場 3,234 人\n' +
         '  広告 19,400pt / ギフト 6,020pt\n' +
         '  最終取り込み 5秒前'
@@ -86,5 +87,41 @@ describe('buildLiveBlockText', () => {
   it('endedAt があると見出しに ⚠ 終了 が付く', () => {
     const live = { lv: 'lv9', broadcasterName: 'A', recordedCount: 1, endedAt: 1700 };
     expect(buildLiveBlockText(live)).toBe('⚠ 終了 [lv9] A\n  記録 1');
+  });
+});
+
+describe('buildCaptureRateLine（%主役・状態ラベル）', () => {
+  it('100%以上は ✅ 取得完了', () => {
+    expect(
+      buildCaptureRateLine({ recordedCount: 7104, officialCommentCount: 7050, officialRatePct: 101 })
+    ).toBe('✅ 取得完了 101% (記録 7,104 / 公式 7,050)');
+    expect(
+      buildCaptureRateLine({ recordedCount: 100, officialCommentCount: 100, officialRatePct: 100 })
+    ).toBe('✅ 取得完了 100% (記録 100 / 公式 100)');
+  });
+
+  it('80〜99%は 🟢 ほぼ取得', () => {
+    expect(
+      buildCaptureRateLine({ recordedCount: 85, officialCommentCount: 100, officialRatePct: 85 })
+    ).toBe('🟢 ほぼ取得 85% (記録 85 / 公式 100)');
+  });
+
+  it('40〜79%は 🟡 取得中', () => {
+    expect(
+      buildCaptureRateLine({ recordedCount: 50, officialCommentCount: 100, officialRatePct: 50 })
+    ).toBe('🟡 取得中 50% (記録 50 / 公式 100)');
+  });
+
+  it('🔴退行検出: 40%未満は 🔴 取得中(公式16%等が赤く目立つ)', () => {
+    expect(
+      buildCaptureRateLine({ recordedCount: 1469, officialCommentCount: 9390, officialRatePct: 16 })
+    ).toBe('🔴 取得中 16% (記録 1,469 / 公式 9,390)');
+  });
+
+  it('取得率が無い(公式未取得)ときは件数のみ', () => {
+    expect(buildCaptureRateLine({ recordedCount: 5 })).toBe('記録 5');
+    expect(
+      buildCaptureRateLine({ recordedCount: 5, officialCommentCount: 100, officialRatePct: null })
+    ).toBe('記録 5 / 公式 100');
   });
 });

@@ -58,13 +58,10 @@ export function buildLiveBlockText(live) {
   if (live.title) {
     lines.push(`  「${live.title}」`);
   }
-  const numLine =
-    `  記録 ${(live.recordedCount || 0).toLocaleString('ja-JP')}` +
-    (live.officialCommentCount != null
-      ? ` / 公式 ${live.officialCommentCount.toLocaleString('ja-JP')}`
-      : '') +
-    (live.officialRatePct != null ? ` (取得率 ${live.officialRatePct}%)` : '');
-  lines.push(numLine);
+  // v0.1.642: 取得率(%)を主役にする。記録/速報/パネルで件数が数件ズレても、
+  //   ユーザーが知りたいのは「全部取れたか=何%か」。状態ラベル付きで%を先頭に出し、
+  //   件数は括弧内の補助に回す(ユーザー指摘「監視htmlは%で見せるべき」)。
+  lines.push('  ' + buildCaptureRateLine(live));
   if (live.watchCount != null) {
     lines.push(`  来場 ${live.watchCount.toLocaleString('ja-JP')} 人`);
   }
@@ -79,6 +76,30 @@ export function buildLiveBlockText(live) {
   const perfLine = buildPerfDiagLine(live.perfDiag);
   if (perfLine) lines.push(perfLine);
   return lines.join('\n');
+}
+
+/**
+ * v0.1.642: 取得率(%)を主役にした1行を組み立てる。状態ラベル + %(大) + 件数(括弧の補助)。
+ *   記録/速報/パネルで件数が数件ズレても「何%取れたか」で「全部取れた」が一目で分かる。
+ *
+ * @param {{ recordedCount?: number, officialCommentCount?: number|null, officialRatePct?: number|null }} live
+ * @returns {string}
+ */
+export function buildCaptureRateLine(live) {
+  const rec = Number(live?.recordedCount) || 0;
+  const off = live?.officialCommentCount;
+  const pct = live?.officialRatePct;
+  const counts =
+    `記録 ${rec.toLocaleString('ja-JP')}` +
+    (off != null ? ` / 公式 ${Number(off).toLocaleString('ja-JP')}` : '');
+  // 取得率が取れないとき(公式件数未取得)は従来どおり件数のみ。
+  if (pct == null || !Number.isFinite(Number(pct))) {
+    return counts;
+  }
+  const p = Number(pct);
+  // 状態ラベル: 100%到達=✅完了 / 80%+=もう少し / それ未満=取得中。
+  const label = p >= 100 ? '✅ 取得完了' : p >= 80 ? '🟢 ほぼ取得' : p >= 40 ? '🟡 取得中' : '🔴 取得中';
+  return `${label} ${p}% (${counts})`;
 }
 
 /**
