@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.650',
+    date: '2026-06-05',
+    summary: '一度見た配信を開き直すと、すぐ全コメントが表示されるように',
+    items: Object.freeze([
+      '視聴中に一度コメントを取り込んだ配信は、ポップアップをいったん閉じてもう一度開いても、待たずにすぐ全コメントが表示されるようにしました。これまでは開くたびに読み込み直していました(取り込み中の新しいコメントはこれまで通り自動で追加されます)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.649',
     date: '2026-06-05',
     summary: 'コメントが多い配信でポップアップのスクロールが重いのを軽くしました',

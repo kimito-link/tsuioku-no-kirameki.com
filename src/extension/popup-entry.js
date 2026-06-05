@@ -573,6 +573,11 @@ import {
   createMonotonicCommentCountState,
   resolveMonotonicCommentCount
 } from '../lib/monotonicCommentCount.js';
+import {
+  SESSION_COMMENT_CACHE_KEY,
+  isSessionCommentCacheFresh,
+  buildSessionCommentCache
+} from '../lib/sessionCommentCache.js';
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
@@ -13645,21 +13650,81 @@ async function refresh() {
   // v0.1.509: 本体は追記専用チャンク（無ければ従来 main にフォールバック）から読む。
   //   readStorageBagWithRetry を getMany として渡し、固まり時は {} に落として描画継続する。
   // v0.1.514: IDB モードは拡張オリジン IDB を直接読む（chrome.storage I/O の奪い合いから解放）。
+  // v0.1.650: JSONキャッシュ即時表示。popup を閉じると in-memory の lastCommentsArr が
+  //   揮発し、再オープンで毎回 IDB 全件 async 読み(2段階paint)に戻っていた(=「開いた瞬間に
+  //   全部・ローディングなし」が効かない真因)。chrome.storage.session に直近 live の全件配列を
+  //   1本 persist しておき、冷スタート(in-memory hit でない)でも版印(currentChunkTotal)が
+  //   一致すれば IDB cursor 全件読みを飛ばして即返す。fresh でなければ従来経路へ素通り=
+  //   hit しなければ 1bit も従来と変わらない純加法。SW 終了で session が消えても従来 IDB 経路に
+  //   自動フォールバック(後退ゼロ)。対象は IDB/chunk モードのみ(版印 currentChunkTotal を持つ)。
+  const trySessionCommentCache =
+    (idbMode || commentsChunked) &&
+    !canReuseHeavyChunkRead &&
+    currentChunkTotal != null;
+  const sessionCachePromise = trySessionCommentCache
+    ? chrome.storage.session
+        .get(SESSION_COMMENT_CACHE_KEY)
+        .then((bag) => {
+          const c = bag && bag[SESSION_COMMENT_CACHE_KEY];
+          return isSessionCommentCacheFresh(c, lv, currentChunkTotal)
+            ? /** @type {unknown[]} */ (/** @type {any} */ (c).arr)
+            : null;
+        })
+        .catch(() => null)
+    : Promise.resolve(null);
+  const readHeavyFromStore = () =>
+    idbMode
+      ? readAllCommentsFromCommentDb(lv)
+          .then((rows) => (Array.isArray(rows) ? rows : []))
+          .catch(() => null)
+      : readChunkedComments(lv, key, (keys) =>
+          readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
+            attempts: 4,
+            delaysMs: [0, 50, 120, 280],
+            perAttemptTimeoutMs: 1500
+          })
+        )
+          .then((r) => (Array.isArray(r.rows) ? r.rows : []))
+          .catch(() => null);
   const heavyDataPromise = canReuseHeavyChunkRead
     ? Promise.resolve(/** @type {unknown[]} */ (cachedHeavy.arr))
-    : idbMode
-    ? readAllCommentsFromCommentDb(lv)
-        .then((rows) => (Array.isArray(rows) ? rows : []))
-        .catch(() => null)
-    : readChunkedComments(lv, key, (keys) =>
-        readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
-          attempts: 4,
-          delaysMs: [0, 50, 120, 280],
-          perAttemptTimeoutMs: 1500
-        })
-      )
-        .then((r) => (Array.isArray(r.rows) ? r.rows : []))
-        .catch(() => null);
+    : sessionCachePromise.then((sessArr) =>
+        Array.isArray(sessArr) && sessArr.length > 0 ? sessArr : readHeavyFromStore()
+      );
+  // v0.1.650: heavy 全件配列を chrome.storage.session に mirror して popup 再オープンを
+  //   跨がせる(「開いた瞬間に全部」の本体)。paint の世代チェック(refreshGen)や再描画の
+  //   early-return とは独立に、heavy 配列が取れた時点で必ず1回 persist する(描画経路に
+  //   依存しないので確実)。IDB/chunk モードかつ currentChunkTotal をほぼ満たす完全配列の
+  //   ときだけ書く(session/summary 由来の短い arr で上書きしない)。fire-and-forget。
+  if ((idbMode || commentsChunked) && currentChunkTotal != null) {
+    void heavyDataPromise
+      .then((heavyArr) => {
+        if (
+          !Array.isArray(heavyArr) ||
+          heavyArr.length === 0 ||
+          !(
+            currentChunkTotal === 0 ||
+            heavyArr.length >= Math.floor(currentChunkTotal * 0.8)
+          )
+        ) {
+          return;
+        }
+        try {
+          void chrome.storage.session
+            .set({
+              [SESSION_COMMENT_CACHE_KEY]: buildSessionCommentCache(
+                lv,
+                currentChunkTotal,
+                heavyArr
+              )
+            })
+            .catch(() => {});
+        } catch {
+          /* session 不可環境(古いChrome等)は無視=従来動作 */
+        }
+      })
+      .catch(() => {});
+  }
   // テールは小さい（最大でも数百件）ので軽量読みで取得し、初回 paint・heavy 再描画の両方で
   //   メイン配列へ concat する（表示専用・書き戻さない）。
   const tailDisplayRows = normalizeTailRowsForDisplay(
