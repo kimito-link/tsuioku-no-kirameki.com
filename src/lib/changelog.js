@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.639',
+    date: '2026-06-05',
+    summary: '大量コメント時のスクロールを軽くする(第3弾)',
+    items: Object.freeze([
+      'スクロール中は、折りたたんで見えていない診断用の集計を一時的に省くようにしました。コメントが多い配信でスクロールがなめらかになります(記録件数の表示や、開いている内容は止まりません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.638',
     date: '2026-06-05',
     summary: '大量コメント時のスクロールを軽くする(第2弾)',
