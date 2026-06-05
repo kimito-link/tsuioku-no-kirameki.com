@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.643',
+    date: '2026-06-05',
+    summary: '状態ページを取得率(%)中心の表示にしバージョンも併記',
+    items: Object.freeze([
+      '状態ページの各配信を「取得率(%)」を主役にした表示に変えました(✅取得完了/🟢ほぼ取得/🟡🔴取得中)。件数が数件ズレても「全部取れたか」が一目で分かります',
+      '状態ページのヘッダにバージョン番号(v0.1.6xx)も表示するようにしました(これまでビルド番号だけで分かりにくかったため)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.642',
     date: '2026-06-05',
     summary: '1つの配信を見ているときは過去ログを一気に取り切るように',
