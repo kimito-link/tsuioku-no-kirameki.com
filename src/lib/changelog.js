@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.640',
+    date: '2026-06-05',
+    summary: '取得スピード(件/秒)を表示し取得停滞を見える化',
+    items: Object.freeze([
+      '1秒あたり何件記録できているか(取得スピード)を診断行に表示するようにしました。0件/秒が続いていれば「取得が止まっている」とすぐ分かります(全部取れているかの確認に役立ちます)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.639',
     date: '2026-06-05',
     summary: '大量コメント時のスクロールを軽くする(第3弾)',

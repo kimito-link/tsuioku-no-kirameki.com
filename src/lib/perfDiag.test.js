@@ -22,7 +22,8 @@ describe('buildPerfDiag', () => {
       commentCount: 12254,
       deferActive: true,
       paintCount: 42,
-      tabVisible: false
+      tabVisible: false,
+      recordRate: 8.5
     });
     expect(d).toEqual({
       liveId: 'lv9',
@@ -32,7 +33,8 @@ describe('buildPerfDiag', () => {
       commentCount: 12254,
       deferActive: true,
       paintCount: 42,
-      tabVisible: false
+      tabVisible: false,
+      recordRate: 8.5
     });
   });
   it('不正な数値は null・deferActive 既定 false', () => {
