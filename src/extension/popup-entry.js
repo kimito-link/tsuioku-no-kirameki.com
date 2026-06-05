@@ -13816,7 +13816,10 @@ async function refresh() {
       STORY_AVATAR_DIAG_STATE.resolvedAvatar = resolvedAvatar.total;
       STORY_AVATAR_DIAG_STATE.resolvedUniqueAvatar = resolvedAvatar.unique;
     }
-    STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(arr, lv);
+    // v0.1.638 スクロール根治 PR2: selfShown は直後(displayEntries 構築後)に
+    //   countOwnPostedEntries(displayEntries, lv) で**必ず上書き**され、その間に一度も
+    //   読まれない dead store だった。arr 全件 O(N) のこの 1 本を削除(挙動完全不変・
+    //   selfShown の最終値は displayEntries 版のまま)。matched id set は 13822 で温まる。
     STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
     STORY_AVATAR_DIAG_STATE.selfPending = countPendingSelfPostedRecentsForLive(lv);
     STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
