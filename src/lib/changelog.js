@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.646',
+    date: '2026-06-05',
+    summary: '来場者数が画面や見るタイミングで違う数字になるのを統一',
+    items: Object.freeze([
+      '状態ページの「来場」が、ときどき「いま見ている人数(同時接続)」の少ない数字に化けて、ポップアップの来場者数とズレることがあったのを直しました。これからは「来場」はいつでも累計の来場者数で統一して表示します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.645',
     date: '2026-06-05',
     summary: 'コメント記録の件数が表示場所ごとにズレないように統一',

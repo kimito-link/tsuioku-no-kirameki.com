@@ -22,6 +22,7 @@
 
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { buildOverviewText, buildLiveBlockText } from '../lib/statusFormat.js';
+import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
@@ -395,10 +396,14 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   //   読みに行く(片方しか入っていないケースに耐える)。
   const officialCommentCount =
     numOrNull(s?.officialCount) ?? numOrNull(snap?.officialCommentCount);
-  const watchCount =
-    numOrNull(snap?.officialViewerCount) ??
-    numOrNull(snap?.viewerCountFromDom) ??
-    numOrNull(s?.watchCount);
+  // v0.1.646: 「来場」は累計来場者数。officialViewerCount は同接(direct)で意味が違うため
+  //   来場枠から外す(これを先頭 fallback にしていたため、同接が取れた瞬間だけ来場が
+  //   同接値=少ない数に化け「5,088 vs 5,164」のズレになっていた)。popup の
+  //   buildWatchMetaCardAudienceViewModel は viewerCountFromDom のみを来場に使う=それに揃える。
+  const watchCount = resolveVisitorCount({
+    viewerCountFromDom: snap?.viewerCountFromDom,
+    panelWatchCount: s?.watchCount
+  });
   const adPoints = numOrNull(snap?.officialAdPointsNdgr) ?? numOrNull(s?.adPoints);
   const giftPoints = numOrNull(snap?.officialGiftPointsNdgr) ?? numOrNull(s?.giftPoints);
   // 経過時間は snapshot.streamAgeMin(分)→秒に変換、無ければ panel_summary.elapsedSec。
