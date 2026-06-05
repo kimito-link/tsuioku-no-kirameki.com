@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.641',
+    date: '2026-06-05',
+    summary: '内部: 過去ログ取得の入口診断を追加(真因調査用)',
+    items: Object.freeze([
+      '過去のコメントが取得できないときの内部の手がかりを記録するようにしました(不具合調査のための内部変更で、見え方は変わりません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.640',
     date: '2026-06-05',
     summary: '取得スピード(件/秒)を表示し取得停滞を見える化',

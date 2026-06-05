@@ -15349,6 +15349,16 @@ async function runNdgrBackfillOnce() {
         //   廃止。globalThis 代入は維持（次に reached_start が出たときの根拠を 1 件保持）。
         try {
           const diag = step.value && /** @type {any} */ (step.value).diagnostics;
+          // v0.1.640 診断: 入口で過去ログが0件になる stop(backward_exhausted/no_entry/rate_limited)の
+          //   crawl/seek 結果を data 属性へ出す(実機で fetch が空か decode 失敗か起動の問題かを特定)。
+          if (diag && (diag.crawl || diag.seek)) {
+            try {
+              document.documentElement.setAttribute(
+                'data-nls-backfill-diag',
+                JSON.stringify({ stop: _backfillProgress.stopReason, crawl: diag.crawl, seek: diag.seek, cands: diag.cands }).slice(0, 700)
+              );
+            } catch { /* no-op */ }
+          }
           if (
             diag &&
             _backfillProgress.stopReason === 'reached_start' &&

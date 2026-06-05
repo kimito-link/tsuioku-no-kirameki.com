@@ -474,9 +474,14 @@ export async function* crawlNdgrBackward(opts) {
    *   診断情報として戻り値に含める。実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を
    *   後追いで特定するためのもの(描画パスには触らない・既存呼出は無視できる optional)。
    * @param {NdgrBackfillStopReason} reason
-   * @param {{ reachedStartChats?: import('./ndgrDecode.js').NdgrChat[], reachedStartPath?: 'main'|'side' }} [diag]
+   * @param {{ reachedStartChats?: import('./ndgrDecode.js').NdgrChat[], reachedStartPath?: 'main'|'side', crawl?: object, seek?: string[], cands?: number[] }} [diag]
    */
   const done = (reason, diag) => ({ stopReason: reason, ...summary(), diagnostics: diag || null });
+
+  /** @type {{ nowBytes: number|null, nowNextAt: number|null }} v0.1.640 診断: crawl 入口の fetch/decode 結果。 */
+  const _crawlDiag = { nowBytes: null, nowNextAt: null };
+  /** @type {string[]} v0.1.640 診断: 入口探索(seekBackwardUri)の各 hop の fetch/decode 結果。 */
+  const _seekDiag = [];
 
   if (!viewBase) return done('no_view_base');
   if (typeof fetchBinary !== 'function') return done('no_view_base');
@@ -486,11 +491,14 @@ export async function* crawlNdgrBackward(opts) {
   // --- 1) ?at=now で現在地点ポインタ（nextAt）を得る ---
   if (isAborted(signal)) return done('aborted');
   const nowRes = await fetchWithThrottle(ctx, buildViewAtUrl(viewBase, 'now'), true);
-  if (nowRes.rateLimited) return done('rate_limited');
-  if (!nowRes.bytes || nowRes.bytes.length === 0) return done('no_entry');
+  // v0.1.640 診断: ?at=now の fetch 結果(ISOLATED world で fetch が通るか・何バイト返るか)。
+  _crawlDiag.nowBytes = nowRes.bytes ? nowRes.bytes.length : (nowRes.rateLimited ? -429 : 0);
+  if (nowRes.rateLimited) return done('rate_limited', { crawl: _crawlDiag });
+  if (!nowRes.bytes || nowRes.bytes.length === 0) return done('no_entry', { crawl: _crawlDiag });
   bytesFetched += nowRes.bytes.length;
   const nowNav = decodeChunkedEntry(nowRes.bytes);
-  if (nowNav.nextAt == null) return done('no_entry');
+  _crawlDiag.nowNextAt = nowNav.nextAt;
+  if (nowNav.nextAt == null) return done('no_entry', { crawl: _crawlDiag });
 
   // --- 2) backward 連鎖の入口 URI（backward.segment.uri）を探す ---
   //   ⭐ 実機で確定（2026-05-27）: 起点は「過去の実時刻」にする。`?at=now` が返す nextAt は
@@ -549,13 +557,14 @@ export async function* crawlNdgrBackward(opts) {
       if (isAborted(signal)) { abend.aborted = true; return { backwardUri: '', previousUris: [] }; }
       if (now() - t0 >= caps.elapsedMs) { abend.aborted = true; return { backwardUri: '', previousUris: [] }; }
       const atUrl = buildViewAtUrl(viewBase, viewAt);
-      if (visited.has(atUrl)) return { backwardUri: '', previousUris: [] };
+      if (visited.has(atUrl)) { if (_seekDiag.length < 30) _seekDiag.push(`h${hop}:visited`); return { backwardUri: '', previousUris: [] }; }
       visited.add(atUrl);
       const entryRes = await fetchWithThrottle(ctx, atUrl, false);
-      if (entryRes.rateLimited) { abend.rateLimited = true; return { backwardUri: '', previousUris: [] }; }
-      if (!entryRes.bytes || entryRes.bytes.length === 0) return { backwardUri: '', previousUris: [] };
+      if (entryRes.rateLimited) { if (_seekDiag.length < 30) _seekDiag.push(`h${hop}:rl`); abend.rateLimited = true; return { backwardUri: '', previousUris: [] }; }
+      if (!entryRes.bytes || entryRes.bytes.length === 0) { if (_seekDiag.length < 30) _seekDiag.push(`h${hop}:empty`); return { backwardUri: '', previousUris: [] }; }
       bytesFetched += entryRes.bytes.length;
       const entryNav = decodeChunkedEntry(entryRes.bytes);
+      if (_seekDiag.length < 30) _seekDiag.push(`h${hop}:b=${entryRes.bytes.length}:bwd=${entryNav.backwardUri ? 'Y' : 'N'}:nx=${entryNav.nextAt}`);
       if (entryNav.backwardUri) {
         return {
           backwardUri: entryNav.backwardUri,
@@ -701,7 +710,7 @@ export async function* crawlNdgrBackward(opts) {
       break;
     }
   }
-  if (!initialBackwardUri) return done('backward_exhausted');
+  if (!initialBackwardUri) return done('backward_exhausted', { crawl: _crawlDiag, seek: _seekDiag.slice(0, 30), cands: seedCandidates.slice(0, 10) });
 
   // === 外側ループ: 「?at={時刻} で backward 連鎖を辿る」を、配信開始に届くまで時刻を
   //   遡らせて繰り返す。1 本の backward 連鎖は時刻区画ごとに next=N で終端する（実機で
