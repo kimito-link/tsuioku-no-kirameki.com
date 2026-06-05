@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.647',
+    date: '2026-06-05',
+    summary: '過去ログを取り切ったのに記録に反映されず途中で止まって見える問題を根治',
+    items: Object.freeze([
+      '長い配信(国会中継・実況などの公式チャンネル含む)で、過去ログを最後まで取り終えているのに、取った分の数千件が記録に書き込まれず「途中までしか取れていない」ように見えることがあったのを直しました。取り終えたら必ず全部を記録に書き切ってから完了するようにしています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.646',
     date: '2026-06-05',
     summary: '来場者数が画面や見るタイミングで違う数字になるのを統一',

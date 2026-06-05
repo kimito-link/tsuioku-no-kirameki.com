@@ -15463,6 +15463,18 @@ async function runNdgrBackfillOnce() {
     // v0.1.431: 正常終了・abort・例外いずれの抜け方でも、バッファに残った取り込み済み行を
     //   必ず吐き出す（per-segment persist をやめてバッチ化したぶん、ここで取りこぼし防止）。
     flushPendingBackfillRows();
+    // v0.1.647: 取りこぼし根治の本命。flushPendingBackfillRows() は persistCommentRows 経由で
+    //   persistCoalescer.enqueue() するだけ＝buffer に積んで setTimeout 遅延 flush を予約する
+    //   非同期スロットル。await しないと、この finally を抜けた直後にタブが hidden/別配信切替で
+    //   crawl が再起動し timer 発火前に buffer が捨てられ、enqueue 済みの数千行が storage に
+    //   書かれずに失われていた（実機 NHK総合 lv350631407: crawl rows=9301/reached_start 完走
+    //   なのに chunk=5218 のみ＝4,073 件取りこぼし。ユーザー証言「一気に取れない」の本筋）。
+    //   完走時に確実に書き切るため、ここで flush を await して storage 反映を保証する。
+    try {
+      await persistCoalescer.flush();
+    } catch {
+      /* flush 失敗は best-effort（次回 backfill / RT 取り込みで回収される） */
+    }
     document.removeEventListener('visibilitychange', onHidden);
     if (_backfillAbort === ac) _backfillAbort = null;
     if (_backfillProgress.stopReason === 'rotation_yield') {
