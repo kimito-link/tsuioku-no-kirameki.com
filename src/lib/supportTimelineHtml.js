@@ -9,6 +9,28 @@
  */
 
 import { formatRelativeTimeJa } from './supportActivityTimeline.js';
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+
+/**
+ * v0.1.655: 応援タイムラインのアバター解決。記名アバター(avatarUrl)があればそれ、
+ *   無ければ userId から決定論的 identicon(幾何学模様)を生成する。これまで匿名は一律
+ *   defaultAvatar(りんく)に倒していたため「りんくだらけ」になっていた。応援者一覧と同じ
+ *   identicon にして、匿名でもユーザーごとに見分けられる(ユーザー実機要望)。userId も
+ *   無いときだけ defaultAvatar にフォールバック。
+ * @param {{ avatarUrl?: unknown, userId?: unknown }} item
+ * @param {string} defaultAvatar
+ * @returns {string}
+ */
+function resolveTimelineAvatar(item, defaultAvatar) {
+  const real = String(item?.avatarUrl || '').trim();
+  if (real) return real;
+  const id = String(item?.userId || '').trim();
+  if (id) {
+    const identicon = anonymousIdenticonDataUrl(id, 64);
+    if (identicon) return identicon;
+  }
+  return defaultAvatar;
+}
 
 /** @param {unknown} s */
 function escapeHtml(s) {
@@ -75,7 +97,7 @@ export function buildTimelineRowHtml(item, opts) {
         : '';
     // v0.1.342: 送信者アバター（あれば）に🎁バッジを重ねて「誰が」を視覚化。
     //   アバターが無い（未設定/匿名）ときは default または🎁のみ。
-    const gAv = String(item.avatarUrl || '').trim() || defaultAvatar;
+    const gAv = resolveTimelineAvatar(item, defaultAvatar);
     const gAvRp = /^https?:\/\//i.test(gAv) ? ' referrerpolicy="no-referrer"' : '';
     const avatarBlock = gAv
       ? `<span class="nl-tl-gift__avatar-wrap">` +
@@ -102,7 +124,7 @@ export function buildTimelineRowHtml(item, opts) {
   // comment
   const name = escapeHtml(item.nickname || '名無し');
   const text = escapeHtml(commentTextShown(item.text, item.commentNo));
-  const av = String(item.avatarUrl || '').trim() || defaultAvatar;
+  const av = resolveTimelineAvatar(item, defaultAvatar);
   const avRp = /^https?:\/\//i.test(av) ? ' referrerpolicy="no-referrer"' : '';
   const avBlock = av
     ? `<img class="nl-tl-row__avatar" src="${escapeAttr(av)}" alt="" decoding="async"${avRp} />`
