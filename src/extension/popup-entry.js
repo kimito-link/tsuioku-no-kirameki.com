@@ -2938,6 +2938,16 @@ const watchMetaCache = {
   lastCommentsArr: null
 };
 
+// v0.1.649 スクロール根治 PR6: displayEntries 構築(buildDisplayCommentEntries +
+//   excludeBroadcaster + inferBroadcasterUserIdFromComments)は arr 全件 O(N)×3 で、
+//   ticker/userRooms 描画に必要なため defer skip できず毎 paint(450ms)走っていた。
+//   会議確定判断「skip 判定は内容署名でなく入力参照(===)」に従い、入力(arr 参照・lv)が
+//   前回と完全一致なら前回結果を再利用する参照等価メモ化。arr は concat/enrich で必ず
+//   新配列参照になる設計なので、後追い昇格があれば arr 参照が変わり自動で再計算される
+//   (署名方式の「更新停止バグ」を構造的に回避)。スクロール中は arr が不変なことが多く効く。
+/** @type {{ arr: unknown[], lv: string, displayEntries: unknown[], broadcasterUid: string|null }|null} */
+let _displayEntriesMemo = null;
+
 // v0.1.398: snapshot fetch ハング耐性 e2e（snapshot-fetch-hang-resilient.spec.js）が、
 //   「fetch が永久ハングしても snapshotFetchActive が永久 true に張り付かない（withTimeout で
 //   必ず finally に到達しリセットされる）」ことを実拡張で観測するための read-only getter。
@@ -13871,6 +13881,12 @@ async function refresh() {
         alreadyPainted
       });
     })();
+    // v0.1.649 スクロール根治 PR5: selfSaved/selfPendingMatched も
+    //   storyAvatarDiagLine(折りたたみ「詳しく見る」内の技術行)でしか読まれず、
+    //   スクロール中は見えない。13875 群(withUid 等)と全く同じ性質なのに defer 対象外で
+    //   毎 paint(450ms)走っていた arr 全件 O(N) ×2 を、同じ diagPaintDeferActive 配下へ移す。
+    //   module 状態なので前回値が残り、詳細を後で開いた時は次の非スクロール paint で最新化。
+    //   selfPending は arr 非依存(recents 由来・軽い)なので defer 外に残す。
     if (!diagPaintDeferActive) {
       STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
       STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
@@ -13878,27 +13894,42 @@ async function refresh() {
       const resolvedAvatar = countResolvedAvatarEntries(arr, lv);
       STORY_AVATAR_DIAG_STATE.resolvedAvatar = resolvedAvatar.total;
       STORY_AVATAR_DIAG_STATE.resolvedUniqueAvatar = resolvedAvatar.unique;
+      // v0.1.638 PR2 の dead store 削除はそのまま(selfShown は displayEntries 版で上書き)。
+      STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
+      STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
     }
-    // v0.1.638 スクロール根治 PR2: selfShown は直後(displayEntries 構築後)に
-    //   countOwnPostedEntries(displayEntries, lv) で**必ず上書き**され、その間に一度も
-    //   読まれない dead store だった。arr 全件 O(N) のこの 1 本を削除(挙動完全不変・
-    //   selfShown の最終値は displayEntries 版のまま)。matched id set は 13822 で温まる。
-    STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
     STORY_AVATAR_DIAG_STATE.selfPending = countPendingSelfPostedRecentsForLive(lv);
-    STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
     // 0.1.100: 配信者本人 user の自コメは「応援コメ」ではないので popup display
     //   経路から除外（story growth grid / 集計件数 / lane / ticker 全部に効く）。
     //   配信者カードは watchMetaCache.snapshot.broadcaster* から別経路で描画されるため
     //   表示情報は失われない。HTML レポート側 (popup-entry.js:7745 周辺) では
     //   既に同等の inline filter が個別コメに適用されている。
-    const broadcasterUidForCommentExclude = inferBroadcasterUserIdFromComments(
-      arr,
-      watchMetaCache.snapshot || {}
-    );
-    const displayEntriesBase = excludeBroadcasterFromCommentEntries(
-      buildDisplayCommentEntries(arr, lv),
-      broadcasterUidForCommentExclude
-    );
+    // v0.1.649 PR6: 入力(arr 参照・lv)が前回 paint と完全一致なら、O(N)×3 の
+    //   displayEntries 構築を skip して前回結果を再利用(参照等価メモ化)。
+    //   arr が新配列(新着/enrich昇格)になったら ref 不一致で必ず再計算=取りこぼしなし。
+    let displayEntriesBase;
+    if (
+      _displayEntriesMemo &&
+      _displayEntriesMemo.arr === arr &&
+      _displayEntriesMemo.lv === lv
+    ) {
+      displayEntriesBase = /** @type {PopupCommentEntry[]} */ (_displayEntriesMemo.displayEntries);
+    } else {
+      const broadcasterUidForCommentExclude = inferBroadcasterUserIdFromComments(
+        arr,
+        watchMetaCache.snapshot || {}
+      );
+      displayEntriesBase = excludeBroadcasterFromCommentEntries(
+        buildDisplayCommentEntries(arr, lv),
+        broadcasterUidForCommentExclude
+      );
+      _displayEntriesMemo = {
+        arr,
+        lv,
+        displayEntries: displayEntriesBase,
+        broadcasterUid: broadcasterUidForCommentExclude
+      };
+    }
     const displayEntries = displayEntriesBase;
     STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
     // v0.1.596: chunk/IDB 移行済みでは main 配列が古い退避データのことがある。

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.649',
+    date: '2026-06-05',
+    summary: 'コメントが多い配信でポップアップのスクロールが重いのを軽くしました',
+    items: Object.freeze([
+      'コメントがとても多い配信で、ポップアップ画面をスクロールするとカクついたり重く感じることがあったのを軽くしました。スクロール中は見えていない集計の計算を後回しにし、表示内容が変わっていないときは計算をやり直さないようにしています(表示の正しさはそのままです)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.648',
     date: '2026-06-05',
     summary: 'スクロールするとランキングが一瞬白くなる(白抜け)のを修正',
