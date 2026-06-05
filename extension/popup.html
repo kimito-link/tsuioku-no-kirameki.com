@@ -4891,17 +4891,23 @@
       .nl-north-star-lane__body[data-lane-state="no_program_gift"]:empty::after {
         content: "(ギフト 0 件)";
       }
+      /* v0.1.656: ローディング文言の全廃(ユーザー実機指摘「API叩けば見れるのに取得待ち・
+         こんなの指定してない」)。iframe_unrendered(=koken/nicoad 公式API直叩きで取れるはず)と
+         not_yet(起動直後)の「取得待ち/取得中…」は、データが来れば各 refresh が描画する=
+         待たせる文言を出さず空のまま(レーンは hide 経路で畳まれる)。空文字 content で ::after を
+         無効化する。データの「無い理由」を伝える文言(未取得/イベント不参加/ギフト0件)は状態説明
+         として残すが、iframe_unrendered は「取れるはずなのに待ち」=誤情報なので消す。 */
       .nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
-        content: "(取得待ち: 公式の一覧がまだ開いていません)";
+        content: "";
       }
       .nl-north-star-lane__body[data-lane-state="event_present_unscrapable"]:empty::after {
         content: "イベント参加中（公式の順位・スコアは取得できていません）";
       }
       .nl-north-star-lane__body[data-lane-state="fetch_error"]:empty::after {
-        content: "(取得エラー)";
+        content: "";
       }
       .nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after {
-        content: "(取得中…)";
+        content: "";
       }
 
       .nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after,
