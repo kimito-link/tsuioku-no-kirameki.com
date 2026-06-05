@@ -569,6 +569,10 @@ import {
   summarizeCommentRecordBreakdown,
   formatCommentRecordBreakdownLine
 } from '../lib/commentRecordBreakdown.js';
+import {
+  createMonotonicCommentCountState,
+  resolveMonotonicCommentCount
+} from '../lib/monotonicCommentCount.js';
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
@@ -915,6 +919,11 @@ function triggerCharaReaction(iconEl, { delta, thresholds, images }) {
 const popupCelebrationGate = createPopupCelebrationGate();
 
 let _prevSupportCount = /** @type {number|null} */ (null);
+
+// v0.1.645: #count / liveStatComments を「同一 lv 内で単調増加」に固定するゲート。
+//   4 経路(panel即時 / panel軽量 / 公式統計 / メイン全件)が別タイミングの生値で
+//   setCountDisplay を呼び合うため数値がズレ・前後していた。最大値=正本で収束させる。
+const _monotonicCommentCountState = createMonotonicCommentCountState();
 
 /** @type {number|null} */
 let _prevMilestoneCommentHighWater = null;
@@ -2290,6 +2299,22 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
       text = recordedNum.toLocaleString('ja-JP');
     } else {
       text = s;
+    }
+  }
+
+  // v0.1.645: 数値表示は同一 lv 内で単調増加に固定する(数値ズレ根治)。
+  //   呼び出し元 4 経路がそれぞれ別ソース・別タイミングの生値を渡すため、
+  //   ここで「これまで表示した最大」に収束させて前後・据え置きを揃える。
+  //   文言(「(未取得)」等)は gate=null で素通し。lv 切替は gate 内でリセット。
+  if (recordedNum != null) {
+    const gated = resolveMonotonicCommentCount(
+      _monotonicCommentCountState,
+      watchPopupLastPaintedLiveId,
+      recordedNum
+    );
+    if (gated != null) {
+      recordedNum = gated;
+      text = gated.toLocaleString('ja-JP');
     }
   }
 
