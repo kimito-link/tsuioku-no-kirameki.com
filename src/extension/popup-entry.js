@@ -106,9 +106,6 @@ import { shouldShowNorthStarLane } from '../lib/northStarLaneVisibility.js';
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
 import {
   isNorthStarLaneWaitingState,
-  buildNorthStarLaneWaitingShellHtml,
-  buildNorthStarLaneOpenHintDiagramHtml,
-  getNorthStarWaitRotationMessages,
   isNorthStarEventLaneWaitTimedOut,
   NORTH_STAR_EVENT_LANE_WAIT_TIMEOUT_MS,
   NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS
@@ -118,7 +115,6 @@ import {
   acquisitionTierFromPct
 } from '../lib/northStarAcquisitionGauge.js';
 import { northStarLaneGadgetCharaPathByTier } from '../lib/northStarLaneGadgetChara.js';
-import { buildNorthStarWaitCharacterGuideHtml } from '../lib/formatNorthStarWaitHintsRailHtml.js';
 import { buildNorthStarAdRankingStatsHtml } from '../lib/buildNorthStarAdRankingStatsHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
@@ -8731,33 +8727,11 @@ function teardownNorthStarLaneWaitingUi(body) {
  */
 const _northStarLaneWaitStartAt = new Map();
 
-/** 現在の watch liveId（snapshot 由来・同期参照のみ）。 */
-function currentNorthStarWaitLiveId() {
-  return String(watchMetaCache.snapshot?.liveId || '').trim().toLowerCase();
-}
 
-/**
- * 当該レーンが待機状態を続けている経過 ms を返す（同期）。初回は now を記録して 0。
- * 待機状態でない state では記録をクリアして undefined（＝メッセージ関数へ渡さない）。
- * @param {string} laneId
- * @param {string} state
- * @returns {number|undefined}
- */
-function trackNorthStarLaneWaitElapsedMs(laneId, state) {
-  const lid = currentNorthStarWaitLiveId();
-  const key = `${lid}|${String(laneId || '')}`;
-  if (!isNorthStarLaneWaitingState(state)) {
-    _northStarLaneWaitStartAt.delete(key);
-    return undefined;
-  }
-  const now = Date.now();
-  const started = _northStarLaneWaitStartAt.get(key);
-  if (typeof started !== 'number') {
-    _northStarLaneWaitStartAt.set(key, now);
-    return 0;
-  }
-  return Math.max(0, now - started);
-}
+// v0.1.653: trackNorthStarLaneWaitElapsedMs(待機経過 ms を記録して待機文言の確定遷移に
+//   使っていた)は、ローディング全廃で待機UIを一切出さなくなったため削除。イベントレーンの
+//   stuck タイムアウト(scheduleNorthStarEventLaneStuckTimeout)は「待機開始時刻が無くても畳む」
+//   分岐(8917相当)で安全に動く=即 hide される。
 
 /** liveId 切替時に待機開始時刻 Map をクリア（新配信の誤確定表示を防ぐ）。 */
 function clearNorthStarLaneWaitStartTimes() {
@@ -8777,54 +8751,10 @@ function clearNorthStarLaneWaitStartTimes() {
  */
 const _waitingUiLastByBody = new WeakMap();
 
-function mountNorthStarLaneWaitingUi(body, laneId, state) {
-  const stateAttr = String(state || 'not_yet');
-  const shellHtml = buildNorthStarLaneWaitingShellHtml(laneId);
-  // v0.1.332: 経過 ms を同期計算（await I/O なし）。閾値超で確定文言へ遷移。
-  const elapsedMs = trackNorthStarLaneWaitElapsedMs(laneId, state);
-  // v0.1.389: 狭い右レールに詰め込まず、レーン本体の広いスペースで 3 キャラ（りんく/
-  //   こん太/たぬ姉）が大きく案内する。本体の `__short` 1 行＋手順図解は撤去し、
-  //   キャラガイド（アバター大＋折り返しセリフ＋手順図解）に置換。空きスペース活用。
-  const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
-  const diagram = buildNorthStarLaneOpenHintDiagramHtml(laneId);
-  const guideHtml = buildNorthStarWaitCharacterGuideHtml(msgs, diagram);
-  // v0.1.622: 前回と同一(stateAttr/shellHtml/guideHtml が全て不変)なら DOM を一切触らず skip。
-  //   point=「同じ案内を 450ms 毎に再描画していた」点滅の根を断つ。
-  const prev = _waitingUiLastByBody.get(body);
-  const unchanged =
-    prev &&
-    prev.stateAttr === stateAttr &&
-    prev.shellHtml === shellHtml &&
-    prev.guideHtml === (guideHtml || '') &&
-    body.firstChild != null;
-  if (unchanged) {
-    // 待機マーカーが残っていれば interval/class も触り直さない(teardown も含めて完全 no-op)。
-    return;
-  }
-  teardownNorthStarLaneWaitingUi(body);
-  body.setAttribute('data-lane-state', stateAttr);
-  body.innerHTML = shellHtml;
-  const waitRoot = body.querySelector('[data-north-star-wait="1"]') || body;
-  if (guideHtml) {
-    // 1 行＋図解だけのシェルを、全幅キャラガイドへ差し替え
-    waitRoot.innerHTML = guideHtml;
-  } else {
-    // フォールバック（メッセージが無い等）: 従来の 1 行表示
-    const shortEl = body.querySelector('.nl-north-star-lane-wait__short');
-    if (shortEl) {
-      const m = msgs.length ? msgs[0] : { badge: 'りんく', line: '取得状況を確認しています。' };
-      shortEl.textContent = `${m.badge}：${m.line}`;
-    }
-  }
-  _waitingUiLastByBody.set(body, {
-    stateAttr,
-    shellHtml,
-    guideHtml: guideHtml || ''
-  });
-  // 本体で全幅案内するので、狭い右レールには重複表示しない（空のまま）。
-  clearNorthStarVerticalRailForBody(body);
-  syncNorthStarLaneGadgetFromBodyState(body);
-}
+// v0.1.653: mountNorthStarLaneWaitingUi(待機UI「問い合わせ中」3キャラ案内を mount する関数)は
+//   ローディング全廃に伴い全呼び出し元が hide(レーンを畳む)に切り替わったため削除した。
+//   待機文言の純関数(northStarLaneWaitingUi.js)は API 互換・テスト用に残置だが、描画経路からは
+//   一切呼ばれない。データ(rows>0)が来たら各 refresh 関数が show して描画する。
 
 /** 直前に「bundle 反映前ローディングシェル」を張った liveId（同一 lv の再描画では張り直さない） */
 let _northStarBundleLoadingShellLiveId = '';
@@ -8883,8 +8813,11 @@ const NORTH_STAR_BUNDLE_LOADING_LANE_IDS = Object.freeze([
 ]);
 
 /**
- * 公式イベント DOM バンドル（storage）反映前に、6 レーンすべてを同型の待機 UI にする。
- * 番組ポイントだけ先に数字が出て「他だけ止まっている」ように見えるのを避ける。
+ * v0.1.653: ローディング全廃。公式イベント DOM バンドル反映前は、6レーンに待機UI
+ *   (「問い合わせ中」3キャラ案内)を出さず**静かに畳む**(ユーザー実機要望「ローディングは
+ *   いらない・無いものは出すな・白くするな」)。データ(rows>0)が来れば各 refresh が show する。
+ *   従来は全レーンに待機UIを一斉mountしていたため、起動直後〜データ無し配信で延々
+ *   ローディングに見えていた=その元凶を断つ。
  *
  * @param {string} liveId
  */
@@ -8894,7 +8827,11 @@ function mountAllNorthStarLanesBundleLoadingUi(liveId) {
   for (const laneId of NORTH_STAR_BUNDLE_LOADING_LANE_IDS) {
     const body = document.getElementById('northStarLaneBody-' + laneId);
     if (!(body instanceof HTMLElement)) continue;
-    mountNorthStarLaneWaitingUi(body, laneId, 'not_yet');
+    teardownNorthStarLaneWaitingUi(body);
+    body.innerHTML = '';
+    clearNorthStarVerticalRailForBody(body);
+    setNorthStarLaneHidden(laneId, true);
+    syncNorthStarLaneGadgetFromBodyState(body);
   }
 }
 
@@ -8977,10 +8914,21 @@ function scheduleNorthStarEventLaneStuckTimeout(liveId) {
  * 出すな」)。データ(rows>0)が来れば各 refresh 関数が show して描画する。
  * @type {ReadonlySet<string>}
  */
+// v0.1.653: ユーザー実機要望「問い合わせ中/取得中/ローディング表示を全廃。記録は手元に
+//   あるのだから開いた瞬間に出せ・白くするな・無いものは静かに隠せ」。従来は一部レーン
+//   (contributionRanking/giftHistory/adRanking)だけ「待機UIを出さず畳む」だったが、イベント系
+//   (eventBroadcasters/eventVotingSupporters)等は待機UI(「公式から問い合わせ中だよ」3キャラ案内)が
+//   残り、データの無い配信で延々ローディングに見えていた。全レーンを「待機中は待機UIを出さず
+//   静かに畳む(データが rows>0 で来たら各 refresh が show)」に統一する=ローディング全廃。
 const NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES = new Set([
   'contributionRanking',
   'giftHistory',
-  'adRanking'
+  'adRanking',
+  'eventBroadcasters',
+  'eventVotingSupporters',
+  'eventScore',
+  'eventRank',
+  'programPoints'
 ]);
 
 /**
@@ -8991,16 +8939,16 @@ const NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES = new Set([
  * @param {string} state not_yet | iframe_unrendered 等
  */
 function applyNorthStarLaneWaitingOrHide(body, laneId, state) {
-  if (NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES.has(laneId)) {
-    // 待機UIを出さず畳む。data-lane-state は診断用に保持しつつ body は空 + hidden。
-    teardownNorthStarLaneWaitingUi(body);
-    body.innerHTML = '';
-    clearNorthStarVerticalRailForBody(body);
-    setNorthStarLaneHidden(laneId, true);
-    syncNorthStarLaneGadgetFromBodyState(body);
-    return;
-  }
-  mountNorthStarLaneWaitingUi(body, laneId, state);
+  // v0.1.653: ローディング全廃。待機状態(not_yet/iframe_unrendered)では待機UI(「問い合わせ中」
+  //   3キャラ案内)を一切出さず、レーンを静かに畳む。データ(rows>0)が来れば各 refresh 関数が
+  //   show して描画する=「開いた瞬間に出る・無い間は隠れる・白くしない」。state は診断用に
+  //   data-lane-state へ保持。引数 state は未使用になったが API 互換のため受ける。
+  void state;
+  teardownNorthStarLaneWaitingUi(body);
+  body.innerHTML = '';
+  clearNorthStarVerticalRailForBody(body);
+  setNorthStarLaneHidden(laneId, true);
+  syncNorthStarLaneGadgetFromBodyState(body);
 }
 
 /**

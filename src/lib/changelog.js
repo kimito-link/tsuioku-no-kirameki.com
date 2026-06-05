@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.653',
+    date: '2026-06-05',
+    summary: '「問い合わせ中」などのローディング表示をやめました',
+    items: Object.freeze([
+      'ギフト履歴・イベント順位・広告ランキングなどの公式情報の枠で、データが来るまで「公式から問い合わせ中だよ」というローディング表示が出ていたのをやめました。データが無い配信ではその枠を静かに隠し、データが来たら黙ってその時に表示します(待たされている感じ・白い空白をなくしました)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.652',
     date: '2026-06-05',
     summary: 'コメントが読みやすく流れる「コメビュ」を追加(別窓・OBS対応)',
