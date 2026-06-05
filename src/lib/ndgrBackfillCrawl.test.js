@@ -1453,7 +1453,9 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     );
 
     expect(result.stopReason).not.toBe('reached_start');
-    expect(result.diagnostics).toBeNull();
+    // v0.1.640 診断(一時): 入口失敗 stop は crawl/seek 診断を載せる(真因特定後に撤去予定)。
+    //   reachedStartChats は依然 reached_start 以外では付かない。
+    expect(result.diagnostics?.reachedStartChats).toBeUndefined();
   });
 });
 
