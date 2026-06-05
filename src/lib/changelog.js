@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.648',
+    date: '2026-06-05',
+    summary: 'スクロールするとランキングが一瞬白くなる(白抜け)のを修正',
+    items: Object.freeze([
+      '応援ランキングなどをスクロールしたときに、表示が一瞬白く抜けてしまうことがあったのを直しました(コメントが多い配信で特に起きていました)。常にちゃんと表示されたままスクロールできます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.647',
     date: '2026-06-05',
     summary: '過去ログを取り切ったのに記録に反映されず途中で止まって見える問題を根治',
