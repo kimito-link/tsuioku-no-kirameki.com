@@ -626,6 +626,7 @@ import { buildReportSelfPostedRows } from '../lib/reportSelfPostedRowsHtml.js';
 import { buildReportFriendlyMetaRows } from '../lib/reportFriendlyMetaRowsHtml.js';
 import { buildReportUserRoomRows } from '../lib/reportUserRoomTableHtml.js';
 import { shouldRunDevMonitorPaint } from '../lib/devMonitorPaintGate.js';
+import { shouldSkipHeavyDiagPaint } from '../lib/diagPaintDeferGate.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
@@ -13807,11 +13808,28 @@ async function refresh() {
 
   function paintWatchPopupUi() {
     syncInterceptMapDiagFromSnapshot(watchSnapshot);
+    // total(=arr.length・O(1))は常時表示「記録している応援コメント N 件です」
+    //   (storyAvatarDiag の compactLead)が依存するので**必ず更新**=スクロール中も止めない。
     STORY_AVATAR_DIAG_STATE.total = arr.length;
-    STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
-    STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
-    STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
-    {
+    // v0.1.639 スクロール根治 PR4: withUid/withAvatar/uniqueAvatar/resolvedAvatar の
+    //   全件 O(N) 集計群は、storyAvatarDiag の折りたたみ「内訳・用語(詳しく見る)」内の技術行
+    //   (formatStoryAvatarDiagLine)と dev monitor(PR1 でゲート済)でしか読まれない。どちらも
+    //   スクロール中は見えない/閉じているので、スクロール中(かつ同 liveId 描画済=初回/配信切替は
+    //   除外)はこの O(N) 群をスキップする。module 状態なので前回値が残る=畳まれた詳細を後で
+    //   開いた時は次の非スクロール paint で最新化される。
+    const diagPaintDeferActive = (() => {
+      const ul = /** @type {HTMLElement|null} */ ($('userRoomList'));
+      const alreadyPainted =
+        !!ul && ul.childElementCount > 0 && _lastUserRoomsPaintedLiveId === lv;
+      return shouldSkipHeavyDiagPaint({
+        scrolling: shouldDeferHeavyPopupPaintNow(),
+        alreadyPainted
+      });
+    })();
+    if (!diagPaintDeferActive) {
+      STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
+      STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
+      STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
       const resolvedAvatar = countResolvedAvatarEntries(arr, lv);
       STORY_AVATAR_DIAG_STATE.resolvedAvatar = resolvedAvatar.total;
       STORY_AVATAR_DIAG_STATE.resolvedUniqueAvatar = resolvedAvatar.unique;
