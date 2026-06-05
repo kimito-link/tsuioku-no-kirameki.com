@@ -363,6 +363,7 @@ import {
   watchSnapshotFromPanelSummary
 } from '../lib/panelLiveSummary.js';
 import { perfDiagStorageKey, buildPerfDiag } from '../lib/perfDiag.js';
+import { computeRecordRate } from '../lib/recordRate.js';
 import { listBackfillWaitingLiveIds } from '../lib/globalBackfillQueue.js';
 import {
   PANEL_METRICS_MESSAGE_TYPE,
@@ -987,6 +988,10 @@ let _lastPerfDiagWriteAt = 0;
 /** 視聴中タブ数のキャッシュ(perfDiag 用・5秒ごとに更新)。 */
 let _perfDiagTabCount = /** @type {number|null} */ (null);
 let _perfDiagTabCountAt = 0;
+/** v0.1.640: 取得スピード(records/sec)算出用の前回サンプル(件数・時刻・liveId)。 */
+let _recordRateLastCount = /** @type {number|null} */ (null);
+let _recordRateLastAt = 0;
+let _recordRateLastLiveId = '';
 /** このタブで paintWatchPopupUi の重い paint 区間を実行した累計回数。 */
 let _perfPaintCount = 0;
 
@@ -1004,6 +1009,20 @@ function recordPerfDiagThrottled(liveId, paintMs, commentCount, deferActive) {
   if (!lv) return;
   const now = Date.now();
   if (now - _lastPerfDiagWriteAt < 2000) return;
+  // v0.1.640: 取得スピード(records/sec)を前回サンプルとの差分で算出(退行=取得停止の自動検出)。
+  //   liveId が変わったら前回値をリセット(別配信の件数を持ち越して負/異常レートにしない)。
+  let recordRate = null;
+  if (_recordRateLastLiveId === lv) {
+    recordRate = computeRecordRate({
+      prevCount: _recordRateLastCount,
+      prevAtMs: _recordRateLastAt,
+      curCount: typeof commentCount === 'number' ? commentCount : null,
+      curAtMs: now
+    });
+  }
+  _recordRateLastLiveId = lv;
+  _recordRateLastCount = typeof commentCount === 'number' ? commentCount : _recordRateLastCount;
+  _recordRateLastAt = now;
   _lastPerfDiagWriteAt = now;
   // タブ数は 5 秒ごとに更新(tabs.query は毎回呼ぶと地味に重い)。
   if (now - _perfDiagTabCountAt > 5000) {
@@ -1029,7 +1048,8 @@ function recordPerfDiagThrottled(liveId, paintMs, commentCount, deferActive) {
     commentCount,
     deferActive,
     paintCount: _perfPaintCount,
-    tabVisible: typeof document !== 'undefined' ? !document.hidden : null
+    tabVisible: typeof document !== 'undefined' ? !document.hidden : null,
+    recordRate
   });
   try {
     chrome.storage.local.set({ [perfDiagStorageKey(lv)]: diag }).catch(() => {});

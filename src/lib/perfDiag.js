@@ -40,7 +40,8 @@ function numOrNull(v) {
  *   commentCount?: number|null,
  *   deferActive?: boolean,
  *   paintCount?: number|null,
- *   tabVisible?: boolean|null
+ *   tabVisible?: boolean|null,
+ *   recordRate?: number|null
  * }} [opts]
  * @returns {{
  *   liveId: string,
@@ -50,7 +51,8 @@ function numOrNull(v) {
  *   commentCount: number|null,
  *   deferActive: boolean,
  *   paintCount: number|null,
- *   tabVisible: boolean|null
+ *   tabVisible: boolean|null,
+ *   recordRate: number|null
  * }}
  */
 export function buildPerfDiag(opts = {}) {
@@ -64,7 +66,9 @@ export function buildPerfDiag(opts = {}) {
     // 累計 paint 回数(2つ目以降のタブで paint が走っていないと小さいまま)。
     paintCount: numOrNull(opts.paintCount),
     // この paint 時にタブが可視だったか(null=不明)。
-    tabVisible: opts.tabVisible == null ? null : opts.tabVisible === true
+    tabVisible: opts.tabVisible == null ? null : opts.tabVisible === true,
+    // v0.1.640: 取得スピード(records/sec)。退行(取得停止)の自動検出用。
+    recordRate: numOrNull(opts.recordRate)
   };
 }
 
@@ -88,6 +92,10 @@ export function buildPerfDiagLine(diag, nowMs = Date.now()) {
   if (!isPerfDiag(diag)) return '';
   const parts = [];
   if (diag.lastPaintMs != null) parts.push(`paint ${diag.lastPaintMs}ms`);
+  // v0.1.640: 取得スピード(records/sec)。0 付近なら取得が止まっている合図。
+  if (diag.recordRate != null) {
+    parts.push(`取得 ${diag.recordRate >= 10 ? Math.round(diag.recordRate) : diag.recordRate.toFixed(1)}件/秒`);
+  }
   if (diag.paintCount != null) parts.push(`描画${diag.paintCount}回`);
   if (diag.tabVisible === false) parts.push('裏タブ');
   if (diag.tabCount != null) parts.push(`タブ ${diag.tabCount}`);
