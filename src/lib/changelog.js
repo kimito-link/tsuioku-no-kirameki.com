@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.652',
+    date: '2026-06-05',
+    summary: 'コメントが読みやすく流れる「コメビュ」を追加(別窓・OBS対応)',
+    items: Object.freeze([
+      'コメントがアイコン付きで1行ずつ読みやすく流れる「コメビュ」を追加しました。状態ページの「💬 コメビュを開く」から別ウィンドウで開けます。配信画面の横に置いたり、OBSのウィンドウキャプチャで配信に乗せたりできます(透過表示にも対応)。まずは見やすさ重視で、にぎやかな演出は今後足していきます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.651',
     date: '2026-06-05',
     summary: '別の配信を開くと過去ログ取得が始まらないことがあるのを修正',
