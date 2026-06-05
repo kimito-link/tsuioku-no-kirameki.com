@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.645',
+    date: '2026-06-05',
+    summary: 'コメント記録の件数が表示場所ごとにズレないように統一',
+    items: Object.freeze([
+      'コメント記録の件数が、見る場所や見たタイミングによって少しずつ違う数字になったり前後に揺れたりしていたのを直しました。同じ配信のあいだは、いちばん多く記録できた件数にそろえて表示します(件数は途中で減りません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.644',
     date: '2026-06-05',
     summary: '状態ページが読み込み中で固まらないように(自己診断)',
