@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.656',
+    date: '2026-06-06',
+    summary: '公式ランキングの「取得待ち」表示を消しました',
+    items: Object.freeze([
+      '貢献度ランキングなどの枠で「(取得待ち: 公式の一覧がまだ開いていません)」「(取得中…)」というローディング文言が出ていたのを消しました。これらは公式APIを直接読みにいけば取れる情報で、待たせる表示は不要でした。データが来たらその枠に黙って表示します(白い空白も出しません)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.655',
     date: '2026-06-06',
     summary: '応援タイムラインの匿名アイコンを識別しやすい模様に',
