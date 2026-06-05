@@ -8122,7 +8122,13 @@ function markCaughtUpIfComplete(prog) {
   // reached_start = 配信開始まで遡り切った = 完全完了。
   if (prog.stopReason === 'reached_start') {
     _backfillCaughtUpForLiveId = _backfillHintLiveId;
-    chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
+    // v0.1.651: 完走時に KEY_BACKFILL_ENABLED をグローバル false にするのを撤去。
+    //   このフラグは lv 別でなくグローバルなので、配信Aを取り切ると false になり、次に
+    //   別の配信Bを開いても過去ログ取得が始まらず「いきなり取れない・4〜5%で止まる」を
+    //   生んでいた(実機 lv350631407 で確定: enabled=false だと delta=0、true に戻すと
+    //   5049→11026件に伸びる)。同じ配信の再取得抑制は lv 別の _backfillCaughtUpForLiveId が
+    //   既に担っており(refreshBackfillRecordCardHint の 8084/8099 ガード)、グローバル enabled を
+    //   落とす必要はない=純粋に有害だったので外す。
     return true;
   }
   // 95%以上取れていれば実質完了。
@@ -8143,7 +8149,8 @@ function markCaughtUpIfComplete(prog) {
     recordedCount >= officialCount * 0.95
   ) {
     _backfillCaughtUpForLiveId = _backfillHintLiveId;
-    chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
+    // v0.1.651: 同上。95%到達でもグローバル KEY_BACKFILL_ENABLED を false にしない
+    //   (別配信に波及して取得が始まらなくなるため)。lv 別 _backfillCaughtUpForLiveId で十分。
     return true;
   }
   return false;

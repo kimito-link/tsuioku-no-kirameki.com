@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.651',
+    date: '2026-06-05',
+    summary: '別の配信を開くと過去ログ取得が始まらないことがあるのを修正',
+    items: Object.freeze([
+      'ある配信の過去ログを最後まで取り切ったあと、別の配信を開くと過去ログの取り込みが始まらず「途中までしか取れない」状態になることがあったのを直しました。一度取り切った配信を無駄に取り直さない仕組みはそのままに、新しく開いた配信ではちゃんと最初から取り込みます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.650',
     date: '2026-06-05',
     summary: '一度見た配信を開き直すと、すぐ全コメントが表示されるように',
