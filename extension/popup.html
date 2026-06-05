@@ -1432,10 +1432,17 @@
         overscroll-behavior: contain;
       }
 
+      /* v0.1.648: スクロールで白くなる(白化)の根治。
+         旧: 北極星レーン群(.nl-north-star-lanes 親)と各レーン(.nl-north-star-lane)にも
+             content-visibility:auto をかけていたが、レーンはコメント数で高さが伸縮するため
+             contain-intrinsic-size:240px のプレースホルダと実高さがズレ、スクロールで画面内に
+             戻る瞬間に実描画が間に合わず「白い隙間」が露出していた(大量コメント配信で顕著・
+             ユーザー実機 18300件で再現)。親+各レーンの二重指定はネストして白化を悪化させる。
+         新: レーンは6個程度で描画スキップの利得が小さい一方、白化リスクが大きいので
+             content-visibility を外して常時描画にする(白化が構造的に起きなくなる)。
+             単発で重い .nl-stats / .nl-support-visual-details は従来どおり省略を残す。 */
       .nl-stats,
-      .nl-support-visual-details,
-      .nl-north-star-lanes,
-      .nl-north-star-lane {
+      .nl-support-visual-details {
         content-visibility: auto;
         contain-intrinsic-size: auto 240px;
       }
