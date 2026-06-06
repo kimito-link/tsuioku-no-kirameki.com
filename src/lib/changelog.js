@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.657',
+    date: '2026-06-06',
+    summary: '過去ログ取得の途中経過を見せず一気に取って完成だけ表示',
+    items: Object.freeze([
+      '過去ログの取り込みは、実は配信を開いてから数秒で一気に取り切っています。それなのに「むかしのコメントまで遡ってるよ」「○%取得中」「もう一度さかのぼり始めるね」と途中経過を実況していたのをやめました。取り込みが終わるまで静かに進め、取り切ったら「集めきったよ」と完成だけ出します(ローディング表示なし)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.656',
     date: '2026-06-06',
     summary: '公式ランキングの「取得待ち」表示を消しました',
