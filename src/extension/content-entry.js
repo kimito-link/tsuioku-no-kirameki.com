@@ -15044,14 +15044,25 @@ let _backfillLastProgressAt = 0;
 function publishBackfillProgress() {
   try {
     const root = document.documentElement;
-    if (!root) return;
-    root.setAttribute(
-      'data-nls-backfill',
-      `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done} stop=${_backfillProgress.stopReason || ''}`
-    );
+    if (root) {
+      // data 属性は常に更新(自己診断・実機検証用・画面には出ない)。
+      root.setAttribute(
+        'data-nls-backfill',
+        `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done} stop=${_backfillProgress.stopReason || ''}`
+      );
+    }
   } catch {
     /* no-op */
   }
+  // v0.1.657「ローディングなしで一気に取る」: 過去ログ取得は単一タブなら数秒で reached_start
+  //   まで一気に掘り切る(2695件で約2.5秒)。なのに従来は毎区画 publishBackfillProgress が
+  //   KEY_BACKFILL_PROGRESS を逐次更新し、popup が「むかしのコメントまで遡ってるよ/2%取得中/
+  //   もう一度さかのぼり始めるね」と途中経過を実況=ユーザー実機「ローディングいらない・一気に
+  //   取れ」の不満の正体。取得は速いのに途中経過を見せていただけだった。
+  //   → popup への進捗橋渡しは【完走(done=1)時だけ】行う。取得中(done=0)は storage を更新せず
+  //   popup は何も受け取らない=「数秒黙って一気に取り、完成だけドンと出す」。完走時に最終値1本だけ
+  //   書くので popup は「集めきったよ」or partial を1回受け取る。
+  if (_backfillProgress.done !== 1) return;
   // v0.1.410: りんく演出用に進捗を storage へも橋渡し（別フレームの popup/パネルが
   //   onChanged で読む）。fire-and-forget・無害失敗は黙殺（setStorageLocalSilent）。
   // v0.1.415: stopReason も橋渡し（done=1 でも reached_start か途中かを popup が区別する）。
