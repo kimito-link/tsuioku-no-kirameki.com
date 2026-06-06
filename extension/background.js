@@ -2338,6 +2338,84 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* 配信者の評判チェック: Google サジェスト取得の CORS バイパス fetch proxy        */
+/* (PR R2・[[reference_broadcaster_reputation_check_from_dns_osint]])           */
+/* suggestqueries.google.com は CORS フリーで JSON を返すが、content/popup から  */
+/* の直 fetch は将来の CSP/CORS 変更に弱い → host_permissions 特権の SW で取得。  */
+/* content/popup は query(文字列)だけ送り、URL は SW が固定 host/path から自作    */
+/* (SSRF面遮断)。契約・正規化は src/lib/googleSuggest.js（lib 側に契約 test）。   */
+/* 取得結果のネガ判定は src/lib/broadcasterReputationKeywords.js（呼び出し側）。 */
+/* ------------------------------------------------------------------ */
+
+// src/lib/googleSuggest.js の GOOGLE_SUGGEST_FETCH_MESSAGE_TYPE / 定数と文字列同期
+// （background は ESM import 不可の手書き成果物。lib 側に契約 test）。
+const GOOGLE_SUGGEST_FETCH_MESSAGE_TYPE = 'NLS_GOOGLE_SUGGEST_FETCH';
+const GOOGLE_SUGGEST_MAX_QUERY_LEN = 100;
+const GOOGLE_SUGGEST_FETCH_TIMEOUT_MS = 6000;
+
+async function fetchGoogleSuggestJson(query) {
+  const q = String(query == null ? '' : query).trim();
+  if (q.length < 1 || q.length > GOOGLE_SUGGEST_MAX_QUERY_LEN) return { ok: false };
+  // 固定 host/path + encodeURIComponent でクエリだけ可変（SSRF面遮断）
+  const url =
+    'https://suggestqueries.google.com/complete/search?client=firefox&hl=ja&q=' +
+    encodeURIComponent(q);
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, GOOGLE_SUGGEST_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit', // 認証不要の公開サジェスト。cookie を送らない
+      cache: 'no-store',
+      signal: ac.signal
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== GOOGLE_SUGGEST_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchGoogleSuggestJson(msg.query)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
+/* ------------------------------------------------------------------ */
 /* ツールバー: ページ内インラインがあれば前面化、なければ popup 窓（src/lib/uiUxOpenStrategy と整合） */
 /* ------------------------------------------------------------------ */
 
