@@ -15527,7 +15527,17 @@ async function runNdgrBackfillOnce() {
     //   → 一律時間クールダウンを「初回保証 + 発火回数ベース抑制」に置換(backfillVisibilityRearm.js)。
     //     ①この liveId で初めての rearm なら必ず許可(開いた直後の沈黙を作らない)。
     //     ②2回目以降は観測窓内の visibility_paused が閾値以上(連発ループ)のときだけ抑制。単発は即再開。
-    if (_backfillProgress.stopReason === 'visibility_paused') {
+    // v0.1.661: aborted も visibility_paused と同じ自動再開対象にする。複数タブ環境で、
+    //   別配信タブの runNdgrBackfillOnce が冒頭(15212)で「前回分を畳む」ため _backfillAbort.abort()
+    //   を呼び、visibilitychange 経由でない abort が catch(15493) で stopReason='aborted' になる。
+    //   aborted は BACKFILL_TRANSIENT_STOP_REASONS 非該当で one-shot guard が外れず固定=複数タブで
+    //   backfill が互いを abort し合い数%で永久凍結(実機 fastDiag lv350689421: タブ2・rows0/seg0/
+    //   aborted・公式1862なのに記録148=8%)。visibility_paused と同じ「初回保証+連発抑制」で
+    //   次の tick から続きを取り直す(無限再起動ループは連発抑制が防ぐ)。
+    if (
+      _backfillProgress.stopReason === 'visibility_paused' ||
+      _backfillProgress.stopReason === 'aborted'
+    ) {
       const now = Date.now();
       // liveId が切り替わったら初回保証カウンタをリセット(別配信は別物として扱う)。
       if (_backfillVisibilityRearmedLiveId && _backfillVisibilityRearmedLiveId !== liveId) {

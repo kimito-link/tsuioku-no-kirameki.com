@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.661',
+    date: '2026-06-06',
+    summary: '複数タブで過去ログ取得が止まるのを自動で再開するように',
+    items: Object.freeze([
+      'ニコ生のタブを2つ以上開いていると、もう片方のタブの取り込みが始まったときに、先のタブの過去ログ取り込みが中断されて数%で止まったままになることがあったのを直しました。中断されても自動で続きを取り直すようにして、複数タブでもちゃんと取り切りに近づきます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.660',
     date: '2026-06-06',
     summary: 'タイムシフトや一部の配信で過去ログが取れない問題を改善',
