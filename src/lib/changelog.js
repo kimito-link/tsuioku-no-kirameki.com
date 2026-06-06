@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.660',
+    date: '2026-06-06',
+    summary: 'タイムシフトや一部の配信で過去ログが取れない問題を改善',
+    items: Object.freeze([
+      'タイムシフト(録画)再生中の配信などで、過去ログの取り込み口が見つからず数%しか取れない(「入口なし」で止まる)ことがあったのを改善しました。配信の開始時刻からいくつもの時点をたどって取り込み口を探すようにし、現在時刻とズレている配信でもちゃんと過去ログを取りにいけるようにしています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.659',
     date: '2026-06-06',
     summary: '状態ページに過去ログ取得の停止理由を表示',
