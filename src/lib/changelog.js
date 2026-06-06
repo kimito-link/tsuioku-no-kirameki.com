@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.659',
+    date: '2026-06-06',
+    summary: '状態ページに過去ログ取得の停止理由を表示',
+    items: Object.freeze([
+      '状態ページ(💬コメビュを開く の近くのページ)に、過去ログの取り込みが「完了したか・どんな理由で止まったか」を表示するようにしました。取り込みが途中で止まったとき、その理由(疎なコメント区間で進めなかった/入口が見つからない/混雑など)が分かるので、うまく取れないときの原因究明に役立ちます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.658',
     date: '2026-06-06',
     summary: '途中(疎なコメント区間)で止まったとき自動で続きを取るように',

@@ -119,8 +119,13 @@ async function refresh() {
     const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), 8000);
     step = 'loadFastDiagSafe';
     const fastDiag = await runStorageOpWithTimeout(() => loadFastDiagSafe(), 8000);
+    step = 'loadBackfillProgress';
+    const backfillProgress = await runStorageOpWithTimeout(
+      () => loadBackfillProgressSafe(),
+      8000
+    );
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag });
+    renderAll({ lvList, summaries, fastDiag, backfillProgress });
     updateLastUpdateMeta();
     _statusLastErrorText = '';
   } catch (err) {
@@ -247,11 +252,33 @@ async function loadFastDiagSafe() {
   }
 }
 
+/**
+ * v0.1.659: 過去ログ取得の診断(stopReason)を読む。「一気に取れない・50%停止」の真因を
+ *   ユーザーが status を開くだけで AI に共有できるように、どの配信が何の理由で止まったかを表示。
+ *   nls_backfill_progress_v1 はグローバル(直近1配信分)。
+ * @returns {Promise<{lid:string, rows:number, done:number, stopReason:string}|null>}
+ */
+async function loadBackfillProgressSafe() {
+  try {
+    const bag = await chrome.storage.local.get('nls_backfill_progress_v1');
+    const p = bag?.['nls_backfill_progress_v1'];
+    if (!p || typeof p !== 'object') return null;
+    return {
+      lid: String(p.lid || ''),
+      rows: Number(p.rows) || 0,
+      done: Number(p.done) || 0,
+      stopReason: String(p.stopReason || '')
+    };
+  } catch {
+    return null;
+  }
+}
+
 /* ============================================================================
  * レンダリング
  * ========================================================================== */
 
-function renderAll({ lvList, summaries, fastDiag }) {
+function renderAll({ lvList, summaries, fastDiag, backfillProgress }) {
   const livesData = lvList.map((lv) =>
     summarizeOneLive(
       lv,
@@ -264,9 +291,18 @@ function renderAll({ lvList, summaries, fastDiag }) {
 
   // 概要セクション
   const overviewText = buildOverviewText(livesData);
+  // v0.1.659: 過去ログ取得の診断(stopReason)を概要に併記。「一気に取れない・50%停止」の真因を
+  //   ユーザーが status を開くだけで AI 共有できる(reached_start=完走 / no_progress=疎区間で停止 /
+  //   backward_exhausted=入口無し / cap_*=上限 / rate_limited=混雑)。
+  const bp = backfillProgress;
+  const backfillLine =
+    bp && bp.lid
+      ? `\n過去ログ取得: [${bp.lid}] ${bp.done === 1 ? '完了' : '取得中'}・取得${bp.rows}件` +
+        (bp.stopReason ? `・停止理由=${bp.stopReason}` : '')
+      : '';
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
-    overviewEl.textContent = overviewText || '視聴中の配信はありません。';
+    overviewEl.textContent = (overviewText || '視聴中の配信はありません。') + backfillLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
