@@ -15567,7 +15567,10 @@ async function runNdgrBackfillOnce() {
         retriedCount: retried,
         maxRetries: NDGR_BACKFILL_TRANSIENT_RETRY_MAX,
         autoEnabled: _backfillAutoEnabled,
-        tabHidden: document.visibilityState === 'hidden'
+        tabHidden: document.visibilityState === 'hidden',
+        // v0.1.658: no_progress でも official に大きく届いていなければ続きから再試行(59%停止救済)。
+        recordedCount: Number(observedRecordedCommentCount) || 0,
+        officialCount: Number(officialCommentCount) || 0
       })
     ) {
       _backfillTransientRetryByLiveId[lidAtFinish] = retried + 1;

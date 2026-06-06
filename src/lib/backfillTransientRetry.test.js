@@ -27,10 +27,34 @@ describe('shouldScheduleBackfillTransientRetry', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'reached_start' })).toBe(false);
   });
 
-  it('やり切り(no_progress / cap_rows / cap_bytes / cap_segments / cap_reseeds)は再試行しない', () => {
-    for (const stopReason of ['no_progress', 'cap_rows', 'cap_reseeds', 'cap_bytes', 'cap_segments']) {
+  it('cap系やり切り(cap_rows / cap_bytes / cap_segments / cap_reseeds)は再試行しない', () => {
+    for (const stopReason of ['cap_rows', 'cap_reseeds', 'cap_bytes', 'cap_segments']) {
       expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason })).toBe(false);
     }
+  });
+
+  it('v0.1.658: no_progress は official件数を渡さないと再試行しない(従来互換)', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'no_progress' })).toBe(false);
+  });
+
+  it('v0.1.658: no_progress でも official に大きく届いてなければ続きから再試行(59%停止救済)', () => {
+    const args = { ...base, stopReason: 'no_progress', recordedCount: 2548, officialCount: 4355 };
+    expect(shouldScheduleBackfillTransientRetry(args)).toBe(true); // 59% < 95%
+  });
+
+  it('v0.1.658: no_progress で official に十分近い(95%超)なら再試行しない(無限ループ防止)', () => {
+    const args = { ...base, stopReason: 'no_progress', recordedCount: 4200, officialCount: 4355 };
+    expect(shouldScheduleBackfillTransientRetry(args)).toBe(false); // 96% >= 95%
+  });
+
+  it('v0.1.658: no_progress でも回数上限に達したら再試行しない', () => {
+    const args = { ...base, stopReason: 'no_progress', recordedCount: 100, officialCount: 4355, retriedCount: 5, maxRetries: 5 };
+    expect(shouldScheduleBackfillTransientRetry(args)).toBe(false);
+  });
+
+  it('v0.1.658: no_progress で official 不明/0 なら再試行しない(誤判定回避)', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'no_progress', recordedCount: 100, officialCount: 0 })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'no_progress', recordedCount: 100 })).toBe(false);
   });
 
   it('時間 cap（cap_elapsed）は続きがある長尺配信向けに再試行する', () => {

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.658',
+    date: '2026-06-06',
+    summary: '途中(疎なコメント区間)で止まったとき自動で続きを取るように',
+    items: Object.freeze([
+      '過去ログの取り込みが、コメントの少ない時間帯で「これ以上さかのぼれない」と判断して途中(例: 59%)で止まることがあったのを改善しました。公式の件数にまだ大きく届いていないときは、その先にもコメントがあるとみて自動で続きを取りにいきます(何もしなくても取り切りに近づきます)。十分取れている配信では無駄な取り直しはしません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.657',
     date: '2026-06-06',
     summary: '過去ログ取得の途中経過を見せず一気に取って完成だけ表示',
