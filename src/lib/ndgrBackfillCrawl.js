@@ -679,8 +679,14 @@ export async function* crawlNdgrBackward(opts) {
   /** @type {number[]} 実際に試す at（秒）。programStart 近傍も末尾に足す。 */
   const seedCandidates = seedLags.map((lag) => nowSec - lag);
   if (programStartSec != null) {
-    // 配信開始の少し後（最初の数十秒）も候補に。ここは確実に backward を持つはず。
-    seedCandidates.push(programStartSec + 60);
+    // v0.1.660: タイムシフト/録画再生では nowSec(現在時刻)が配信の実時間と大きくズレ、
+    //   nowSec-lag の候補が全て「配信時間外」を指して入口が見つからず backward_exhausted に
+    //   なっていた(実機 lv350689631・タイムシフト再生・公式779なのに記録15=2%停止)。
+    //   programStart からの経過時間にわたって複数候補を足し、配信時間内の入口を確実に拾う。
+    //   従来の programStartSec+60 単点だけだと、その時刻の区画にたまたま入口が無いと失敗した。
+    for (const offset of [60, 300, 900, 1800, 3600, 7200, 14400, 28800]) {
+      seedCandidates.push(programStartSec + offset);
+    }
   }
   // v0.1.456 レジューム: 前回到達点(resumeFromVpos)と programStart が分かるとき、候補の
   //   先頭に「配信開始 + 最古オフセット − バッファ」を積む。最優先で前回の続きから掘り始め、
