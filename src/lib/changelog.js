@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.662',
+    date: '2026-06-06',
+    summary: '診断の取り込み内訳で過去ログ分が正しく数えられるよう修正',
+    items: Object.freeze([
+      '不具合調査用の診断情報で、過去ログから取り込んだコメントの件数が「不明(unknown)」に数えられてしまっていたのを、ちゃんと「過去ログ取得」として数えるようにしました。記録される件数そのものには影響しません(調査の精度を上げる内部的な改善です)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.661',
     date: '2026-06-06',
     summary: '複数タブで過去ログ取得が止まるのを自動で再開するように',
