@@ -9652,6 +9652,11 @@ let persistCommentRowsChain = Promise.resolve();
 const _commentIngestSourceCounters = {
   ndgr: 0,
   ndgr_forward: 0,
+  // v0.1.662: backfill(過去ログ遡り取得)キーを追加。従来はこのキーが無く、backfill の persist
+  //   (source: COMMENT_INGEST_SOURCE.BACKFILL)が全て unknown に落ちて診断 commentIngestBySource
+  //   の unknown が肥大していた(実機 fastDiag unknown=7085)。記録自体には影響しないが、診断で
+  //   「過去ログ取得で何件取れたか」を正しく見えるようにする(今後の真因特定の精度向上)。
+  backfill: 0,
   mutation: 0,
   deep: 0,
   visible: 0,
