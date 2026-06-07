@@ -1,0 +1,67 @@
+import { describe, it, expect } from 'vitest';
+import {
+  pickBroadcasterNameForReputation,
+  sanitizeBroadcasterQuery
+} from './pickBroadcasterNameForReputation.js';
+
+describe('sanitizeBroadcasterQuery', () => {
+  it('前後空白を除去する', () => {
+    expect(sanitizeBroadcasterQuery('  配信者A  ')).toBe('配信者A');
+  });
+  it('連続空白を1つにまとめる', () => {
+    expect(sanitizeBroadcasterQuery('配信者  A   B')).toBe('配信者 A B');
+  });
+  it('100文字を超えたら切り詰める', () => {
+    const long = 'あ'.repeat(150);
+    expect(sanitizeBroadcasterQuery(long).length).toBe(100);
+  });
+  it('非文字列は空文字', () => {
+    expect(sanitizeBroadcasterQuery(null)).toBe('');
+    expect(sanitizeBroadcasterQuery(undefined)).toBe('');
+    expect(sanitizeBroadcasterQuery(123)).toBe('');
+  });
+});
+
+describe('pickBroadcasterNameForReputation', () => {
+  it('panel_summary.broadcasterName を優先して返す', () => {
+    const summaries = {
+      'nls_panel_summary_lv123': { broadcasterName: '配信者A', title: '歌枠' }
+    };
+    expect(pickBroadcasterNameForReputation({ summaries, lv: 'lv123' })).toBe('配信者A');
+  });
+
+  it('指定 lv が無ければ任意の broadcasterName を拾う', () => {
+    const summaries = {
+      'nls_panel_summary_lv999': { broadcasterName: '配信者B' }
+    };
+    expect(pickBroadcasterNameForReputation({ summaries, lv: 'lv123' })).toBe('配信者B');
+  });
+
+  it('broadcasterName が空/不明なら空文字 (title では代替しない)', () => {
+    const summaries = {
+      'nls_panel_summary_lv123': { broadcasterName: '', title: '歌枠' }
+    };
+    expect(pickBroadcasterNameForReputation({ summaries, lv: 'lv123' })).toBe('');
+  });
+
+  it('「(配信者名 不明)」のようなプレースホルダは採用しない', () => {
+    const summaries = {
+      'nls_panel_summary_lv123': { broadcasterName: '(配信者名 不明)' }
+    };
+    expect(pickBroadcasterNameForReputation({ summaries, lv: 'lv123' })).toBe('');
+  });
+
+  it('summaries が空/非オブジェクトでも壊れない', () => {
+    expect(pickBroadcasterNameForReputation({ summaries: {}, lv: 'lv1' })).toBe('');
+    expect(pickBroadcasterNameForReputation({ summaries: null, lv: 'lv1' })).toBe('');
+    expect(pickBroadcasterNameForReputation({})).toBe('');
+    expect(pickBroadcasterNameForReputation(null)).toBe('');
+  });
+
+  it('取得した名前は sanitize される', () => {
+    const summaries = {
+      'nls_panel_summary_lv123': { broadcasterName: '  配信者  A  ' }
+    };
+    expect(pickBroadcasterNameForReputation({ summaries, lv: 'lv123' })).toBe('配信者 A');
+  });
+});
