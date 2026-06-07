@@ -131,6 +131,67 @@
         font-size: 13px;
         padding: 12px 0;
       }
+      /* 配信者の評判チェック (PR R3) */
+      .nl-reputation {
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .nl-reputation__head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .nl-reputation__avatar {
+        width: 48px;
+        height: 48px;
+        flex: 0 0 48px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .nl-reputation__headtext {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .nl-reputation__name {
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .nl-reputation__headline {
+        font-size: 13px;
+      }
+      .nl-reputation__query {
+        font-size: 12px;
+        color: var(--nl-text-soft);
+        margin: 6px 0;
+      }
+      .nl-reputation__hits {
+        margin: 6px 0;
+        padding-left: 20px;
+      }
+      .nl-reputation__hit {
+        font-size: 13px;
+        margin: 2px 0;
+      }
+      .nl-reputation__hit--high {
+        color: #ff6b6b;
+        font-weight: 700;
+      }
+      .nl-reputation__hit--medium {
+        color: #ffa94d;
+      }
+      .nl-reputation__hit--low {
+        color: #ffd43b;
+      }
+      .nl-reputation__note {
+        font-size: 12px;
+        color: var(--nl-text-soft);
+        margin-top: 8px;
+      }
     </style>
   </head>
   <body>
