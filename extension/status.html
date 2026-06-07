@@ -143,6 +143,7 @@
 
     <div class="status-buttons">
       <button id="btnComeview" type="button">💬 コメビュを開く</button>
+      <button id="btnReputationCheck" type="button">🔎 配信者の評判チェック</button>
       <button id="btnNextLive" type="button">⏭ 次の上位配信へ</button>
       <button id="btnAutopatrolToggle" type="button">🔁 自動巡回 OFF</button>
       <button id="btnUpload" type="button">📱 スマホへ送信</button>
@@ -163,6 +164,24 @@
     <section class="lane" id="livesLane">
       <h2>視聴中の配信</h2>
       <div id="livesBody" class="empty-note">読み込み中...</div>
+    </section>
+
+    <section class="lane" id="reputationLane" hidden>
+      <h2>🔎 配信者の評判チェック</h2>
+      <div class="status-meta" style="margin-bottom: 8px">
+        配信者名で検索したときのサジェスト（検索候補）を確認します。配信者本人の自己診断用です。
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px">
+        <input
+          id="reputationQuery"
+          type="text"
+          placeholder="配信者名（自動入力されます）"
+          aria-label="評判チェックする配信者名"
+          style="flex: 1; min-width: 200px; padding: 6px 10px"
+        />
+        <button id="btnReputationRun" type="button">チェック</button>
+      </div>
+      <div id="reputationResult" class="empty-note">「チェック」を押すと結果が出るよ。</div>
     </section>
 
     <section class="lane" id="aiShareLane">
