@@ -31,6 +31,17 @@ import {
   NEXT_LIVE_REQUEST_TYPE,
   AUTOPATROL_ENABLED_KEY
 } from '../lib/rankingPatrolMessages.js';
+import {
+  GOOGLE_SUGGEST_FETCH_MESSAGE_TYPE,
+  parseGoogleSuggestResponse,
+  isValidSuggestQuery
+} from '../lib/googleSuggest.js';
+import { analyzeNegativeSuggests } from '../lib/broadcasterReputationKeywords.js';
+import {
+  buildReputationViewModel,
+  buildReputationAlertHtml
+} from '../lib/broadcasterReputationView.js';
+import { pickBroadcasterNameForReputation } from '../lib/pickBroadcasterNameForReputation.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -644,8 +655,102 @@ function setupPatrolButtons() {
   }
 }
 
+/* ============================================================================
+ * 配信者の評判チェック (PR R3 配線 + R4)
+ *   - 配信者名は既存の summaries(snapshot/panel)から自動解決(R4)
+ *   - 「チェック」で SW に Google サジェスト取得を依頼(R2)→ネガ判定(R1)→3キャラ表示(R3)
+ *   - read-only 思想を壊さない: storage write しない・ボタン押下時だけ SW へ依頼
+ * ========================================================================== */
+
+/** summaries バッグから配信者名を自動解決して input に流し込む。 */
+async function autofillBroadcasterName() {
+  try {
+    const lvList = await enumerateActiveLives();
+    const summaries = await loadAllSummaries(lvList);
+    const lv = Array.isArray(lvList) && lvList.length ? lvList[0] : '';
+    const name = pickBroadcasterNameForReputation({ summaries, lv });
+    const input = /** @type {HTMLInputElement|null} */ (
+      document.getElementById('reputationQuery')
+    );
+    if (input && name && !input.value.trim()) input.value = name;
+  } catch {
+    /* 自動入力は best-effort。失敗しても手入力できる。 */
+  }
+}
+
+/** 1つの配信者名で Google サジェストを取得→ネガ判定→3キャラ表示する。 */
+async function runReputationCheck() {
+  const input = /** @type {HTMLInputElement|null} */ (
+    document.getElementById('reputationQuery')
+  );
+  const resultEl = document.getElementById('reputationResult');
+  const btnRun = /** @type {HTMLButtonElement|null} */ (
+    document.getElementById('btnReputationRun')
+  );
+  if (!resultEl) return;
+
+  const query = String(input?.value ?? '').trim();
+  if (!isValidSuggestQuery(query)) {
+    resultEl.className = 'empty-note';
+    resultEl.textContent = '配信者名を入力してね（1〜100文字）。';
+    return;
+  }
+
+  if (btnRun) btnRun.disabled = true;
+  resultEl.className = 'empty-note';
+  resultEl.textContent = 'サジェストを調べているよ…';
+
+  try {
+    const res = await chrome.runtime.sendMessage({
+      type: GOOGLE_SUGGEST_FETCH_MESSAGE_TYPE,
+      query
+    });
+    if (!res || res.ok !== true) {
+      resultEl.className = 'empty-note';
+      resultEl.textContent =
+        'サジェストを取得できませんでした（時間をおいて再度お試しください）。';
+      return;
+    }
+    const suggests = parseGoogleSuggestResponse(res.json);
+    const analyzed = analyzeNegativeSuggests(suggests);
+    const vm = buildReputationViewModel({ query, analyzed });
+    resultEl.className = '';
+    // buildReputationAlertHtml は全入力を escape 済み(lib 側 test で担保)。
+    resultEl.innerHTML = buildReputationAlertHtml(vm);
+  } catch (err) {
+    resultEl.className = 'empty-note';
+    resultEl.textContent = '通信エラー: ' + String(err?.message || err);
+  } finally {
+    if (btnRun) btnRun.disabled = false;
+  }
+}
+
+function setupReputationCheck() {
+  const btnOpen = document.getElementById('btnReputationCheck');
+  const lane = document.getElementById('reputationLane');
+  if (btnOpen && lane) {
+    btnOpen.addEventListener('click', () => {
+      lane.hidden = false;
+      void autofillBroadcasterName();
+      lane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+  const btnRun = document.getElementById('btnReputationRun');
+  if (btnRun) btnRun.addEventListener('click', () => void runReputationCheck());
+  const input = document.getElementById('reputationQuery');
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e instanceof KeyboardEvent && e.key === 'Enter') {
+        e.preventDefault();
+        void runReputationCheck();
+      }
+    });
+  }
+}
+
 function setupButtons() {
   setupPatrolButtons();
+  setupReputationCheck();
   const btnUpload = document.getElementById('btnUpload');
   if (btnUpload) {
     const { ingestKey, viewToken } = getUploadConfig();
