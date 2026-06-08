@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.663',
+    date: '2026-06-06',
+    summary: '複数タブでも過去ログを並行して一気に取れるように(2配信まで)',
+    items: Object.freeze([
+      'ニコ生のタブを複数開いているとき、これまでは1配信ずつ順番に過去ログを取っていたため、各配信の取り込みが遅くなっていました。2配信までは同時に並行して取り込めるようにして、複数タブでも一気に取り切りやすくしました(単一タブのときの動きは変わりません。3配信目以降は従来どおり順番待ちです)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.662',
     date: '2026-06-06',
     summary: '診断の取り込み内訳で過去ログ分が正しく数えられるよう修正',

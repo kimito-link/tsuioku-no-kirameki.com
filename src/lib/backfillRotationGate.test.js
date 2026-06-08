@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { shouldFireBackfillRotation } from './backfillRotationGate.js';
+import {
+  shouldFireBackfillRotation,
+  shouldFireBackfillRotationWithSlots,
+} from './backfillRotationGate.js';
 
 /*
  * rotation_yield(90秒打ち切り)を「待機タブが居る時だけ」発火させる判定。
@@ -49,5 +52,67 @@ describe('shouldFireBackfillRotation', () => {
   it('引数欠落は安全側=発火しない(単一タブ扱い・掘り切る優先)', () => {
     expect(shouldFireBackfillRotation({})).toBe(false);
     expect(shouldFireBackfillRotation(undefined)).toBe(false);
+  });
+});
+
+describe('shouldFireBackfillRotationWithSlots (v0.1.663 並列スロット対応)', () => {
+  it('parallelSlots=1 は既存 shouldFireBackfillRotation とビット同値(v0.1.642温存)', () => {
+    const cases = [
+      { waitingLiveIds: [], selfLiveId: 'lv1' },
+      { waitingLiveIds: ['lv1'], selfLiveId: 'lv1' },
+      { waitingLiveIds: ['lv999'], selfLiveId: 'lv1' },
+      { waitingLiveIds: ['lv1', 'lv999'], selfLiveId: 'lv1' },
+    ];
+    for (const c of cases) {
+      expect(shouldFireBackfillRotationWithSlots({ ...c, parallelSlots: 1 })).toBe(
+        shouldFireBackfillRotation(c)
+      );
+    }
+  });
+
+  it('N=2: 待機タブ1つ(2配信目)はまだ空きスロット→譲らない(両方並走)', () => {
+    expect(
+      shouldFireBackfillRotationWithSlots({
+        waitingLiveIds: ['lv999'],
+        selfLiveId: 'lv1',
+        parallelSlots: 2,
+      })
+    ).toBe(false);
+  });
+
+  it('N=2: 待機タブ2つ(3配信目)で初めて発火(空きスロット無し)', () => {
+    expect(
+      shouldFireBackfillRotationWithSlots({
+        waitingLiveIds: ['lv998', 'lv999'],
+        selfLiveId: 'lv1',
+        parallelSlots: 2,
+      })
+    ).toBe(true);
+  });
+
+  it('N=2: 単一タブ(待機なし)は譲らない', () => {
+    expect(
+      shouldFireBackfillRotationWithSlots({
+        waitingLiveIds: [],
+        selfLiveId: 'lv1',
+        parallelSlots: 2,
+      })
+    ).toBe(false);
+  });
+
+  it('parallelSlots 未指定は1扱い(安全側・従来互換)', () => {
+    expect(
+      shouldFireBackfillRotationWithSlots({ waitingLiveIds: ['lv999'], selfLiveId: 'lv1' })
+    ).toBe(true);
+  });
+
+  it('自分は待機数に数えない・不正lvは無視', () => {
+    expect(
+      shouldFireBackfillRotationWithSlots({
+        waitingLiveIds: ['lv1', '', 'xxx'],
+        selfLiveId: 'lv1',
+        parallelSlots: 2,
+      })
+    ).toBe(false);
   });
 });

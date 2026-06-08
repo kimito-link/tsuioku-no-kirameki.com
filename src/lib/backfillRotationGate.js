@@ -40,3 +40,31 @@ export function shouldFireBackfillRotation(args) {
     .filter((x) => /^lv\d{1,15}$/.test(x) && x !== self);
   return others.length > 0;
 }
+
+/**
+ * v0.1.663: 並列スロット対応版の rotation 判定。
+ *
+ * 従来の shouldFireBackfillRotation は「待機タブが1つでも居れば譲る」だったが、並列度 N の
+ * スロットプール化に伴い「**空きスロットが無い(待機タブ数 >= N)時だけ譲る**」に条件強化する。
+ * N=2 なら、待機タブが1つ(=2配信目)はまだスロットに空きがあるので譲らず両方並走。3配信目
+ * 以降(待機タブ >= 2)で初めて90秒交代を発火する。
+ *
+ * parallelSlots=1 を渡すと others.length >= 1 ＝ 既存 shouldFireBackfillRotation とビット同値
+ * (=単一タブは絶対に譲らない・v0.1.642 を1bitも壊さない)。
+ *
+ * @param {object} args
+ * @param {string[]|null|undefined} args.waitingLiveIds 現在 backfill 待ちの liveId 一覧。
+ * @param {string} args.selfLiveId 自タブの liveId。
+ * @param {number} [args.parallelSlots] 並列度 N(既定 1=従来互換)。
+ * @returns {boolean} true なら rotation を発火(=90秒で譲る)。
+ */
+export function shouldFireBackfillRotationWithSlots(args) {
+  const self = String(args?.selfLiveId || '').trim().toLowerCase();
+  const list = Array.isArray(args?.waitingLiveIds) ? args.waitingLiveIds : [];
+  const slots = Math.max(1, Math.floor(Number(args?.parallelSlots) || 1));
+  const others = list
+    .map((x) => String(x || '').trim().toLowerCase())
+    .filter((x) => /^lv\d{1,15}$/.test(x) && x !== self);
+  // 空きスロットが無い(自分以外の待機タブ数がスロット数以上)時だけ譲る。
+  return others.length >= slots;
+}

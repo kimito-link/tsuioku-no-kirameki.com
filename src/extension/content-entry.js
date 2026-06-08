@@ -118,7 +118,8 @@ import {
   BACKFILL_PRIORITY_COOLDOWN_MS,
   GLOBAL_BACKFILL_ROTATION_MS
 } from '../lib/globalBackfillQueue.js';
-import { shouldFireBackfillRotation } from '../lib/backfillRotationGate.js';
+import { shouldFireBackfillRotationWithSlots } from '../lib/backfillRotationGate.js';
+import { runInBackfillSlot, BACKFILL_PARALLEL_SLOTS } from '../lib/backfillSlotPool.js';
 import {
   chunkIndexKey,
   chunkMigratedKey,
@@ -394,7 +395,6 @@ import {
 import {
   runIfTabLeader,
   runWhileGlobalLeader,
-  GLOBAL_BACKFILL_LOCK,
   GLOBAL_FORWARD_LOCK
 } from '../lib/tabLeaderLock.js';
 import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
@@ -15248,12 +15248,19 @@ async function runNdgrBackfillOnce() {
       }
       // 再エントリで既に他の理由で止まっていたら何もしない。
       if (_backfillProgress.stopReason) return;
+      // v0.1.663: 並列スロット対応。待機タブが「空きスロット数(N)以上」居る時だけ譲る。
+      //   N=2 なら 2配信目(待機1つ)はまだ空きがあるので譲らず並走、3配信目以降だけ発火。
+      //   parallelSlots=1 なら従来の shouldFireBackfillRotation とビット同値(単一タブ温存)。
       if (!ac.signal.aborted &&
-          shouldFireBackfillRotation({ waitingLiveIds, selfLiveId: liveId })) {
+          shouldFireBackfillRotationWithSlots({
+            waitingLiveIds,
+            selfLiveId: liveId,
+            parallelSlots: BACKFILL_PARALLEL_SLOTS
+          })) {
         _backfillProgress.stopReason = 'rotation_yield';
         try { ac.abort(); } catch { /* no-op */ }
       }
-      // 単一タブ(発火しない)なら abort せず crawl を継続=掘り切る。
+      // 単一タブ/空きスロットあり(発火しない)なら abort せず crawl を継続=掘り切る。
     })();
   }, GLOBAL_BACKFILL_ROTATION_MS);
 
@@ -15762,15 +15769,21 @@ function maybeAutoStartBackfill() {
   //   ⚠️手動ボタン経路（onChanged で直接 runNdgrBackfillOnce）は gate しない＝押したタブで必ず走る。
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return;
-  void runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, () => runNdgrBackfillOnce()).then(
-    ({ ran }) => {
-      if (ran) {
-        void clearBackfillWaiter(lid);
-      } else {
-        void registerBackfillWaiter(lid);
-      }
+  // v0.1.663: グローバルロック1本→並列度Nのスロットプールに置換。N本のスロットのうち空き1つを
+  //   取れたタブが走る=N配信まで真に並走、N+1本目以降だけ rotation で待つ(複数タブでも一気に取る)。
+  //   N=1 なら従来の単一グローバルロックと完全同一(巻き戻し可能)。各スロットは runWhileGlobalLeader
+  //   (= Web Locks ifAvailable・fail-open)で取得。crawl は per-tab AbortController で既に並走可能。
+  void runInBackfillSlot(
+    (slotName, fn) => runWhileGlobalLeader(slotName, fn),
+    () => runNdgrBackfillOnce(),
+    { slots: BACKFILL_PARALLEL_SLOTS }
+  ).then(({ ran }) => {
+    if (ran) {
+      void clearBackfillWaiter(lid);
+    } else {
+      void registerBackfillWaiter(lid);
     }
-  );
+  });
 }
 
 // ── v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in 配線 ──────────────
