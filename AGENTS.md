@@ -23,7 +23,8 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 - **拡張 ID**: `cjbabignmmodaickpeckiojjabnlogdb`
 - **公開中**: **0.1.7**（2026-04-23 提出 / 2026-04-29 公開）
 - **直近提出**: **0.1.102**（2026-05-01 23 時台 / 自動公開 ON / 審査結果は要確認）
-- **ローカル開発**: `feature/live-item-throw-by-user` ブランチで **v0.1.168** まで進行中（2026-05-05 時点）。CWS 未提出
+- **次回提出準備済**: **0.1.663**（2026-06-08 ZIP 生成済: `build/tsuioku-no-kirameki-0.1.663.zip` / localhost・開発識別子 除去済 / 説明文・権限理由 反映済 / ダッシュボード貼り付け＋提出はユーザー手動）
+- **ローカル開発**: `feature/broadcaster-reputation-check` ブランチで **v0.1.663** まで進行中（2026-06-08 時点）
 - **CWS Developer Dashboard 入力の正本**: [docs/releases/cws-submission-texts.md](docs/releases/cws-submission-texts.md)
   - 提出時に毎回そこから貼り直す運用（再構築コスト削減）
 - **ホスト権限**: `https://*.nicovideo.jp/*` のみ（`localhost`/`127.0.0.1` は提出版から除外）
