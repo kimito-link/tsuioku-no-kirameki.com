@@ -8608,6 +8608,74 @@
         </div>
       </section>
 
+      <section class="section" id="backfill-instant" aria-labelledby="backfill-instant-heading" data-lp-feature="backfill-instant">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="backfill-instant-heading">過去ログを「開いた瞬間に・一気に・ローディングなし」で取り切る（v0.1.642〜663 で連続根治）</h2>
+            <p>
+              配信を開いたら、<strong>むかしのコメントまで遡って一気に取り切る</strong>のが本来の動きです。「○% 取得中」のような途中経過は出さず、<strong>静かに集めきってから「集めきったよ」と完成だけ</strong>を出します。実は過去ログの取り込みは、配信を開いてから<strong>数秒</strong>で一気に掘り切っています。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>取りこぼしの根治（v0.1.647 / 654）</strong> — たくさん取り込んだのに、記録への書き込みが追いつく前に配信を切り替えたりタブを離れたりすると、取り込んだ数千件が記録に残らないことがありました。こまめに記録へ書き込むようにして、中断しても取りこぼさないようにしました。</p>
+            <p><strong>次の配信でも止まらない（v0.1.651）</strong> — ある配信を取り切ったあと、別の配信を開いても過去ログ取得が始まらず数%で止まる不具合を修正しました。</p>
+            <p><strong>途中で止まっても自動で続ける（v0.1.658）</strong> — コメントが少ない区間でいったん進めなくても、公式の件数にまだ届いていなければ「続きがある」とみて自動でもう一度遡ります。</p>
+            <p><strong>複数タブでも並行して取り切る（v0.1.663）</strong> — ニコ生のタブを複数開いているとき、これまでは1配信ずつ順番でしたが、<strong>2配信までは同時に並行</strong>して取り込めるようにしました（単一タブのときの動きは変わりません）。</p>
+            <p><strong>開いた瞬間に全部表示（v0.1.650）</strong> — 一度見た配信を開き直すと、IDB／セッションキャッシュから<strong>すぐに全コメントが表示</strong>されます（ローディングを待たずにドンと出ます）。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="comeview" aria-labelledby="comeview-heading" data-lp-feature="comeview">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="comeview-heading">コメビュ: 読みやすく流れるコメント表示（別窓・OBS 透過対応／v0.1.652）</h2>
+            <p>
+              コメントが<strong>アイコン付きで1行ずつ読みやすく流れる「コメビュ（KIRAMEKI Comment View）」</strong>を追加しました。配信画面の横に置いたり、<strong>OBS のウィンドウキャプチャで配信画面に重ねたり</strong>できます。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>別ウィンドウで開ける</strong> — 状態ページの「💬 コメビュを開く」から別ウィンドウで起動します。OBS のウィンドウキャプチャ向けに切り離して使えます。</p>
+            <p><strong>OBS 透過モード</strong> — <code>?obs=1</code> で背景を透過し、半透明の黒カード＋白文字＋影で<strong>配信画面に直接重ねられます</strong>。最下部付近のみ自動で追従します。</p>
+            <p><strong>長く開いても軽い</strong> — 全件を読み込み直さず<strong>新着だけを足していく</strong>設計で、延々開いても重くなりにくくしています（直近 50 件を表示）。</p>
+            <p><strong>これから</strong> — まずは見やすさ重視。弾幕のように流れる演出や、3キャラのきらめき演出は今後足していきます。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="status-share" aria-labelledby="status-share-heading" data-lp-feature="status-share">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="status-share-heading">状態ページ: 取得状況をひと目で・診断も共有できる（v0.1.312〜）</h2>
+            <p>
+              <strong>固定 URL の状態ページ</strong>を開くと、視聴中の配信の<strong>最新速報＋診断情報</strong>が自動更新で表示されます。スクリーンショットやコピペの作業なしで、いまの取得状況をそのまま確認・共有できます。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>速報を自動更新</strong> — 視聴中の配信の件数・来場者数などの速報が定期的に自動で更新されます。</p>
+            <p><strong>取り込みの「完了／止まった理由」が分かる（v0.1.659）</strong> — 過去ログの取り込みが完了したか、途中で止まったか、その理由（コメントが少ない区間で進めなかった／入口が見つからない／混雑など）を表示します。うまく取れないときの原因究明に役立ちます。</p>
+            <p><strong>コメビュへの入口</strong> — 状態ページから「💬 コメビュを開く」でコメビュを起動できます。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="supporter-power" aria-labelledby="supporter-power-heading" data-lp-feature="supporter-power">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="supporter-power-heading">応援者パワー診断: 誰がどれだけ支えてくれたかを可視化（v0.1.484〜）</h2>
+            <p>
+              応援コメント・ギフト・常連度などから、<strong>一人ひとりの「応援者パワー」</strong>を 0〜100 点・S/A/B/C/D/E の階級で見える化します。マーケ分析レポートと HTML レポートに表示されます。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>スコアの内訳</strong> — 応援量 45%＋常連度 35%＋外部影響 20% を合算した 0〜100 点で、S/A/B/C/D/E の階級に分けます（v0.1.484）。</p>
+            <p><strong>レポートに反映</strong> — Tier 別の人数バー・階級表・トップ応援者の表を、マーケ分析 HTML と保存レポートに表示します（v0.1.465 / 475）。</p>
+            <p><strong>サムネ＋リンク付き</strong> — トップ応援者の表にユーザーサムネと niconico ユーザーページへのリンクを付け、誰が支えてくれたかをたどれます（v0.1.456）。</p>
+            <p><strong>プライバシー</strong> — 集計はすべてこの PC 内で完結し、視聴者の情報を外部に送ることはありません。</p>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="snapshot-future-comparison" aria-labelledby="snapshot-future-comparison-heading" data-lp-feature="snapshot-future-comparison">
         <div class="shell">
           <div class="section-head fade">
