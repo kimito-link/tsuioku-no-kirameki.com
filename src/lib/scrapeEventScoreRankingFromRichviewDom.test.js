@@ -557,3 +557,77 @@ describe('computeRichviewEventCheapSig（重い scrape を skip するための�
     expect(computeRichviewEventCheapSig(null)).toBe('');
   });
 });
+
+// =====================================================================
+// Antigravity 指摘の3論理バグ回帰テスト（2026-06-08）。
+// 数値の大小・正規表現の弾き方に依存した「静かな」論理バグ。実DOM構造で検証。
+// =====================================================================
+describe('Antigravity 指摘バグ（数値ヒューリスティックの死角）', () => {
+  // 自己ステータスバナー: DOM順は score(css-1qqb6me) → diff(css-1d9a3hd)。
+  function selfBanner({ rank, score, diff }) {
+    const c = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `
+      <div class="css-x ef7q2pk1">
+        <select class="elcxquj20"><option selected>イベントX</option></select>
+        <div class="css-x e1awe04q14">
+          <span class="css-1kputv7 e1awe04q12">現在</span><span class="e1awe04q11">位</span>
+          <span class="e1awe04q10">○○さんを応援しよう！</span>
+          <span class="css-ggzujz e1awe04q0">${rank}</span>
+          <p class="css-1qqb6me">${c(score)}</p>
+          <p class="css-1d9a3hd">${c(diff)}</p>
+        </div>
+      </div>`;
+  }
+  // イベントランキング行（本物構造）: 名前=el69c2m1 / スコア=css-z40gn4。
+  function eventRow({ rank, score, name }) {
+    const c = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `
+      <div class="css-12vetqo el69c2m4">
+        <div class="ebq6m483"><span class="ebq6m481">${rank}</span><span class="ebq6m480">位</span></div>
+        <div class="el69c2m3"></div>
+        <div>
+          <p class="el69c2m2"><span class="el69c2m1">${name}</span><span class="el69c2m0">さん</span></p>
+          <div class="css-8zj0aw"><svg></svg><p class="css-z40gn4">${c(score)}</p></div>
+        </div>
+      </div>`;
+  }
+  function rankingPage(rows) {
+    return `<div class="ef7q2pk1"><div><div class="e1hv4cge5">
+      <h2 class="e1hv4cge4">イベントランキング</h2></div>
+      <div class="css-ezqgwq">${rows.map(eventRow).join('')}</div></div></div>`;
+  }
+
+  // --- BUG1: score < diff(序盤/格上)でも取り違えない ---
+  it('BUG1: 自分のスコア(1,000) < 順位UPまでの差(19,000) でも逆転しない', () => {
+    document.body.innerHTML = selfBanner({ rank: 30, score: 1000, diff: 19000 });
+    const s = scrapeEventSelfStatusFromRichviewDom(document);
+    expect(s).not.toBeNull();
+    expect(s?.score).toBe(1000);       // 大きい方(19000)をスコアにしてはいけない
+    expect(s?.diffToNext).toBe(19000); // 小さい方(1000)を差にしてはいけない
+  });
+
+  it('BUG1: 通常(score > diff)は従来どおり正しい（回帰防止）', () => {
+    document.body.innerHTML = selfBanner({ rank: 2, score: 3453400, diff: 1517300 });
+    const s = scrapeEventSelfStatusFromRichviewDom(document);
+    expect(s?.score).toBe(3453400);
+    expect(s?.diffToNext).toBe(1517300);
+  });
+
+  // --- BUG2: 数字のみユーザー名が消えない ---
+  it('BUG2: 数字のみの名前「777」が名無しにならず保持される', () => {
+    document.body.innerHTML = rankingPage([{ rank: 1, score: 5000, name: '777' }]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(Array.isArray(rows) && rows.length).toBe(1);
+    expect(rows?.[0]?.name).toBe('777');
+    expect(rows?.[0]?.name).not.toBe('名無し');
+  });
+
+  // --- BUG3: 数字ユーザー名がスコアを乗っ取らない ---
+  it('BUG3: 名前「99999999」が実スコア(150)を上書きしない', () => {
+    document.body.innerHTML = rankingPage([{ rank: 1, score: 150, name: '99999999' }]);
+    const rows = scrapeEventScoreRankingFromRichviewDom(document);
+    expect(Array.isArray(rows) && rows.length).toBe(1);
+    expect(rows?.[0]?.score).toBe(150);   // 名前の99999999をスコアにしてはいけない
+    expect(rows?.[0]?.name).toBe('99999999');
+  });
+});

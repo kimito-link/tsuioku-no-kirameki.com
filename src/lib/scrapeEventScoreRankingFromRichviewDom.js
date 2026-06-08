@@ -359,8 +359,11 @@ export function scrapeEventSelfStatusFromRichviewDom(root) {
         const v = parseInt(t.replace(/[^\d]/g, ''), 10);
         if (Number.isFinite(v) && v >= 100) nums.push(v); // 順位の 1-2 桁は拾わない
       }
-      // 累計スコア = 最大、差 = 2 番目（順位UPまでの差はスコアより小さい想定）
-      nums.sort((a, b) => b - a);
+      // 累計スコア = 最初の数値、差 = 2 番目。
+      // Antigravity 指摘バグ修正(2026-06-08): 旧実装は大きい順ソートで「スコア>差」を仮定していたが、
+      // イベント序盤/格上相手では「スコア1,000 / 差19,000」と差の方が大きい状況が普通に起きる。
+      // 実バナーの DOM 出現順は score(css-1qqb6me) → diff(css-1d9a3hd) で安定なので、
+      // 大小でなく出現順で割り当てる(querySelectorAll は文書順を保証)。
       if (nums.length >= 1) score = nums[0];
       if (nums.length >= 2) diffToNext = nums[1];
     }
@@ -448,7 +451,7 @@ function extractEventRankingRowsCore(root) {
     const score = pickScoreInRow(row, iLeaf);
     if (score == null || score <= 0) return null;
 
-    let name = pickNameInRow(row);
+    let name = pickNameInRow(row, iLeaf);
     const isAnonymous = !name || name === '名無し';
     if (!name) name = '名無し';
 
@@ -579,42 +582,79 @@ function hasScoreLeaf(row) {
 }
 
 /**
- * 行内の数値リーフ最大値をスコアとして返す（順位ブロックは除外）。
+ * 行内で「スコアの数値リーフ」を構造的に特定して返す（要素 + 値）。
+ * Antigravity 指摘バグ修正(2026-06-08): 旧実装は「行内の最大数値」をスコアにしていたため、
+ * 「99999999」のような数字ユーザー名が実スコア(例150)を乗っ取っていた(BUG3)。
+ * 💎 svg 隣接 / カンマ区切り表記 を「本物のスコアの印」として優先し、数字名と区別する。
  * @param {HTMLElement} row
- * @param {HTMLElement} iLeaf
- * @returns {number|null}
+ * @param {HTMLElement} iLeaf 順位「位」リーフ（順位ブロックは除外用）
+ * @returns {{ el: HTMLElement, value: number } | null}
  */
-function pickScoreInRow(row, iLeaf) {
+function findScoreLeafInRow(row, iLeaf) {
   const rankBlock = iLeaf.parentElement;
-  /** @type {number|null} */
-  let best = null;
+  /** @type {Array<{el:HTMLElement, value:number, hasComma:boolean, nearGem:boolean}>} */
+  const cands = [];
   for (const el of row.querySelectorAll('*')) {
     if (!(el instanceof HTMLElement) || el.children.length > 0) continue;
     if (el === iLeaf || (rankBlock && rankBlock.contains(el))) continue;
     const t = String(el.textContent || '').trim();
     const cleaned = t.replace(/,/g, '').replace(/[💎pt\s]/giu, '').trim();
-    if (/^\d+$/.test(cleaned)) {
-      const v = parseInt(cleaned, 10);
-      if (v > 0 && (best == null || v > best)) best = v;
-    }
+    if (!/^\d+$/.test(cleaned)) continue;
+    const v = parseInt(cleaned, 10);
+    if (!(v > 0)) continue;
+    const hasComma = t.includes(',');
+    // 💎 svg / pt との隣接 = 本物のスコアの構造的印
+    const parent = el.parentElement;
+    const nearGem = !!parent && (
+      !!parent.querySelector('svg') || /💎|pt/iu.test(parent.textContent || '')
+    );
+    cands.push({ el, value: v, hasComma, nearGem });
   }
-  return best;
+  if (cands.length === 0) return null;
+  // 優先順位: (1)💎/pt隣接 (2)カンマ区切り表記 (3)それも無ければ最大値(従来挙動の保険)。
+  const gem = cands.filter((c) => c.nearGem);
+  if (gem.length) return gem.sort((a, b) => b.value - a.value)[0];
+  const comma = cands.filter((c) => c.hasComma);
+  if (comma.length) return comma.sort((a, b) => b.value - a.value)[0];
+  return cands.sort((a, b) => b.value - a.value)[0];
 }
 
 /**
- * 行内で「数字/位/さん/カンマ数値」でない最長テキストリーフを名前として返す。
+ * 行内のスコア値を返す（順位ブロックは除外）。findScoreLeafInRow に委譲。
  * @param {HTMLElement} row
+ * @param {HTMLElement} iLeaf
+ * @returns {number|null}
+ */
+function pickScoreInRow(row, iLeaf) {
+  const found = findScoreLeafInRow(row, iLeaf);
+  return found ? found.value : null;
+}
+
+/**
+ * 行内の「名前」リーフを返す。
+ * Antigravity 指摘バグ修正(2026-06-08): 旧実装は純粋な数字テキストを名前候補から弾いていたため、
+ * 「777」「12345」等の数字のみユーザー名が消えて「名無し」化していた(BUG2)。
+ * スコアリーフ(構造特定)と順位リーフを除外したうえで、残るテキストリーフから名前を採る
+ * (数字のみでも採用する)。スコア/順位は除外済みなので数字名がスコアと衝突しない。
+ * @param {HTMLElement} row
+ * @param {HTMLElement} [iLeaf] 順位「位」リーフ（あれば順位ブロックとスコアリーフを除外）
  * @returns {string}
  */
-function pickNameInRow(row) {
+function pickNameInRow(row, iLeaf) {
+  const scoreEl = iLeaf ? (findScoreLeafInRow(row, iLeaf)?.el || null) : null;
+  const rankBlock = iLeaf ? iLeaf.parentElement : null;
   let best = '';
   for (const el of row.querySelectorAll('*')) {
     if (!(el instanceof HTMLElement) || el.children.length > 0) continue;
+    if (el === scoreEl) continue;                                  // スコアリーフは名前にしない
+    if (iLeaf && (el === iLeaf || (rankBlock && rankBlock.contains(el)))) continue; // 順位ブロック除外
     const t = String(el.textContent || '').trim();
     if (!t) continue;
     if (t === '位' || t === 'さん' || t === '💎' || t === 'pt' || t === '更新') continue;
     const cleaned = t.replace(/,/g, '').replace(/[💎pt\s]/giu, '').trim();
-    if (/^\d+$/.test(cleaned)) continue;
+    // スコア/順位を除外済なので、数字のみの名前(「777」等)もここで採用する(BUG2修正)。
+    // ただし カンマ付き数値(=スコアの可能性が高い)は名前にしない安全策。
+    if (/^\d+$/.test(cleaned) && t.includes(',')) continue;
     if (t.length > best.length) best = t;
   }
   return normalizeRankerAltName(best);
@@ -707,16 +747,28 @@ function scrapeRealEventRankingRows(root) {
       if (/^\d+$/.test(d)) score = parseInt(d, 10);
     }
     if (score == null) {
+      // Antigravity 指摘バグ修正(BUG3, 2026-06-08): 「行内最大数値」だと数字ユーザー名
+      // (例「99999999」)が実スコアを乗っ取る。名前リーフ(el69c2m1)を除外し、さらに
+      // カンマ付き表記 or 💎/pt 隣接 を本物スコアの印として優先する。
+      /** @type {Array<{value:number, hasComma:boolean, nearGem:boolean}>} */
+      const cands = [];
       for (const el of row.querySelectorAll('p, span, div, strong, b')) {
         if (!(el instanceof HTMLElement) || el.children.length > 0) continue;
         if (rankEl && (el === rankEl || rankEl.contains(el) || el.contains(rankEl))) continue;
+        if (nameEl && (el === nameEl || (nameEl instanceof HTMLElement && nameEl.contains(el)))) continue;
         const t = String(el.textContent || '').trim();
         const cleaned = t.replace(/,/g, '').replace(/[💎pt\s]/giu, '').trim();
-        if (/^\d+$/.test(cleaned)) {
-          const v = parseInt(cleaned, 10);
-          if (Number.isFinite(v) && v > 0 && (score == null || v > score)) score = v;
-        }
+        if (!/^\d+$/.test(cleaned)) continue;
+        const v = parseInt(cleaned, 10);
+        if (!(Number.isFinite(v) && v > 0)) continue;
+        const parent = el.parentElement;
+        const nearGem = !!parent && (!!parent.querySelector('svg') || /💎|pt/iu.test(parent.textContent || ''));
+        cands.push({ value: v, hasComma: t.includes(','), nearGem });
       }
+      const gem = cands.filter((c) => c.nearGem);
+      const comma = cands.filter((c) => c.hasComma);
+      const pool = gem.length ? gem : (comma.length ? comma : cands);
+      if (pool.length) score = pool.sort((a, b) => b.value - a.value)[0].value;
     }
     if (score == null || score <= 0) return null;
 
