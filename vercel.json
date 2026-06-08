@@ -8,14 +8,16 @@
       "source": "/",
       "has": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
       "destination": "/app/index.html"
-    }
-  ],
-  "redirects": [
+    },
     {
       "source": "/",
       "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
-      "destination": "/tsuioku-no-kirameki/",
-      "permanent": false
+      "destination": "/tsuioku-no-kirameki/index.html"
+    },
+    {
+      "source": "/:path((?!tsuioku-no-kirameki/|app/|extension/|api/|_next/).*)",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/:path"
     }
   ]
 }
