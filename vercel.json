@@ -3,7 +3,8 @@
   "buildCommand": null,
   "installCommand": null,
   "outputDirectory": ".",
-  "redirects": [
-    { "source": "/", "destination": "/tsuioku-no-kirameki/", "permanent": false }
+  "rewrites": [
+    { "source": "/", "destination": "/tsuioku-no-kirameki/index.html" },
+    { "source": "/:path((?!tsuioku-no-kirameki/|app/|extension/|api/|_next/).*)", "destination": "/tsuioku-no-kirameki/:path" }
   ]
 }
