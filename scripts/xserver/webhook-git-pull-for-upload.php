@@ -5,13 +5,21 @@
  * 手順:
  * 1. ファイルマネージャの「新規ファイル」または「アップロード」で public_html に置く。
  * 2. 名前を推測されにくいものにリネーム（例: tnk-a7k9m2x1.php）推奨。
- * 3. パネルで「編集」し、下の WEBHOOK_SECRET と REPO_DIR（必要なら POST_PULL_CMD）を書き換える。
+ * 3. パネルで「編集」し、下の WEBHOOK_SECRET と REPO_DIR / PUBLIC_HTML_DIR を書き換える。
  * 4. SSH で REPO_DIR に GitHub から clone 済みであること（未作成なら先に clone）。
  * 5. GitHub Webhook: Payload URL = https://tsuioku-no-kirameki.com/リネーム後.php
  *    Content type = application/json / Secret = WEBHOOK_SECRET と同じ / push のみ。
  *
- * POST_PULL_CMD: LP はリポジトリ内 tsuioku-no-kirameki/ にあるため、pull だけでは public_html が変わらない
- * 場合は rsync の行を有効化（パスは SSH で pwd して合わせる）。--delete は注意して使うこと。
+ * ★ 2026-06-08 修正: privacy.html / robots.txt / sitemap.xml 等が本番で 404 になる
+ *   事故（index.html だけ配信され他のファイルが配置されない）の根治。
+ *   git pull だけでは public_html にサブディレクトリ tsuioku-no-kirameki/ の中身が
+ *   反映されないため、pull 成功後に rsync で tsuioku-no-kirameki/ 配下を public_html に
+ *   同期する。DEPLOY 定数を 'rsync' にすると有効化。
+ *
+ * 安全策:
+ * - rsync に --delete は付けない（public_html の既存ファイル・他サイト資産を消さないため）。
+ *   過去ファイルを確実に消したい場合のみ、運用に慣れてから手動で対応すること。
+ * - PUBLIC_HTML_DIR が空文字や / にならないよう実行前に検証する。
  */
 declare(strict_types=1);
 
@@ -21,15 +29,17 @@ header('Content-Type: text/plain; charset=UTF-8');
 const WEBHOOK_SECRET = 'CHANGE_ME_SECRET';
 /** .git がある clone 先（SSH で pwd して確認） */
 const REPO_DIR = '/home/besttrust/tsuioku-no-kirameki.com/_git/tsuioku-no-kirameki.com';
+/** 本番公開ディレクトリ（index.html が見える場所。SSH で pwd して確認） */
+const PUBLIC_HTML_DIR = '/home/besttrust/tsuioku-no-kirameki.com/public_html';
 const GIT_BIN = '/usr/bin/git';
+const RSYNC_BIN = '/usr/bin/rsync';
 const ALLOWED_REFS = ['refs/heads/master', 'refs/heads/main'];
 /**
- * null = git pull のみ。
- * 公開ディレクトリへ LP を反映する例（パス要確認）:
- * 'rsync -a /home/besttrust/tsuioku-no-kirameki.com/_git/tsuioku-no-kirameki.com/tsuioku-no-kirameki/ /home/besttrust/tsuioku-no-kirameki.com/public_html/'
- * ※ --delete は既存ファイルを消すので、運用に慣れるまでは付けないことを推奨。
+ * デプロイ方式:
+ *   'rsync' = pull 後に REPO_DIR/tsuioku-no-kirameki/ を PUBLIC_HTML_DIR へ rsync（推奨）
+ *   'none'  = git pull のみ（public_html が _git 配下を指す symlink 運用などの場合）
  */
-const POST_PULL_CMD = null;
+const DEPLOY = 'rsync';
 // ==========================================
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -115,14 +125,34 @@ if ($code !== 0) {
 }
 
 $extra = '';
-if (POST_PULL_CMD !== null && POST_PULL_CMD !== '') {
+if (DEPLOY === 'rsync') {
+    // 公開ディレクトリの安全検証（空 / ルート / 短すぎるパスを拒否）
+    $pub = PUBLIC_HTML_DIR;
+    if ($pub === '' || $pub === '/' || strlen($pub) < 10 || !is_dir($pub)) {
+        http_response_code(500);
+        echo "git ok but PUBLIC_HTML_DIR is unsafe or missing: '{$pub}'\n" . $out;
+        exit;
+    }
+
+    // 末尾スラッシュ重要: src 末尾 / で「中身」を、dst へ同期。--delete は付けない。
+    $src = rtrim(REPO_DIR, '/') . '/tsuioku-no-kirameki/';
+    $dst = rtrim($pub, '/') . '/';
+    if (!is_dir($src)) {
+        http_response_code(500);
+        echo "git ok but source dir missing: '{$src}'\n" . $out;
+        exit;
+    }
+
+    $rsync = escapeshellcmd(RSYNC_BIN);
+    $rsyncCmd = "{$rsync} -a " . escapeshellarg($src) . ' ' . escapeshellarg($dst) . ' 2>&1';
+
     $output2 = [];
     $code2 = 0;
-    exec(POST_PULL_CMD . ' 2>&1', $output2, $code2);
-    $extra = "\n--- post ---\n" . implode("\n", $output2);
+    exec($rsyncCmd, $output2, $code2);
+    $extra = "\n--- rsync ---\n" . implode("\n", $output2);
     if ($code2 !== 0) {
         http_response_code(500);
-        echo "git ok but post command failed ({$code2})\n" . $out . $extra;
+        echo "git ok but rsync failed ({$code2})\n" . $out . $extra;
         exit;
     }
 }
