@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.678',
+    date: '2026-06-10',
+    summary: '配信実績を共有できるメディアキットを追加',
+    items: Object.freeze([
+      'クイックツールバーの「メディアキット」から、過去30日・60日・90日の配信実績を1つのHTMLにまとめて保存できるようになりました',
+      'フォロワー・同時視聴者・来場者・コメント・応援者・ギフト・配信頻度を期間ごとに比較できます。取得できていない値は「-」と表示します',
+      '共有用HTMLには視聴者個人のIDや名前を載せず、各指標が公式表示値か追憶の実測値かを脚注で確認できるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.677',
     date: '2026-06-10',
     summary: 'コメビュを新着即時表示とコメピタ対応に',

@@ -617,6 +617,8 @@ import {
   openBroadcastSessionSummaryDb
 } from '../lib/broadcastSessionSummaryDb.js';
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
+import { buildMediaKitStats } from '../lib/mediaKitStats.js';
+import { buildMediaKitHtml } from '../lib/mediaKitHtml.js';
 import {
   buildLastBroadcastReviewView,
   formatLastBroadcastIndicator,
@@ -17441,6 +17443,124 @@ async function downloadBlobViaChromeDownloads(blob, filename) {
   exportBlobRevokeQueue.enqueue(blobUrl);
 }
 
+const MEDIA_KIT_LIVE_LIMIT = 60;
+
+/**
+ * 配信者サムネを共有HTMLへ埋め込める場合だけ raster data URL 化する。
+ * host permission / CORS で読めないURLは空文字へ倒し、HTML側の頭文字表示を使う。
+ * @param {string} rawUrl
+ */
+async function fetchMediaKitBroadcasterIconDataUrl(rawUrl) {
+  const url = String(rawUrl || '').trim();
+  if (/^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(url)) return url;
+  if (!/^https?:\/\//i.test(url)) return '';
+  try {
+    const response = await withTimeout(
+      fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer' }),
+      2500,
+      'media_kit_icon_timeout'
+    );
+    if (!response.ok) return '';
+    const mime = String(response.headers.get('content-type') || '')
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
+    if (!/^image\/(?:png|jpe?g|gif|webp)$/.test(mime)) return '';
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength <= 0 || buffer.byteLength > 2 * 1024 * 1024) return '';
+    return `data:${mime};base64,${arrayBufferToBase64(buffer)}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * broadcast summary IDB と配信単位の軽量 storage だけからメディアキットを作る。
+ * コメント本文・視聴者ID・視聴者名は読み込まない。
+ */
+async function downloadMediaKitHtml() {
+  const nowMs = Date.now();
+  /** @type {IDBDatabase|undefined} */
+  let db;
+  /** @type {string[]} */
+  let liveIds = [];
+  /** @type {unknown[]} */
+  let summaryRows = [];
+  try {
+    db = await openBroadcastSessionSummaryDb();
+    liveIds = await listRecentUniqueBroadcastLiveIds(db, {
+      limit: MEDIA_KIT_LIVE_LIMIT
+    });
+    const rowsByLive = await Promise.all(
+      liveIds.map((liveId) =>
+        listBroadcastSessionSummaryForLive(db, liveId, 200).catch(() => [])
+      )
+    );
+    summaryRows = rowsByLive.flat();
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      /* no-op */
+    }
+  }
+
+  const storageKeys = liveIds.flatMap((liveId) => [
+    broadcasterProfileStorageKey(liveId),
+    `nls_gift_events_${liveId}`
+  ]);
+  const bag = storageKeys.length
+    ? await chrome.storage.local.get(storageKeys)
+    : {};
+  const profileSnapshots = liveIds
+    .map((liveId) => {
+      const key = broadcasterProfileStorageKey(liveId);
+      const value = bag[key];
+      return value && typeof value === 'object'
+        ? { ...value, liveId }
+        : null;
+    })
+    .filter(Boolean);
+  /** @type {Record<string, unknown[]>} */
+  const giftEventsByLive = {};
+  for (const liveId of liveIds) {
+    const value = bag[`nls_gift_events_${liveId}`];
+    if (Array.isArray(value)) giftEventsByLive[liveId] = value;
+  }
+
+  const stats = buildMediaKitStats({
+    summaryRows,
+    profileSnapshots,
+    giftEventsByLive,
+    nowMs,
+    windowsDays: [30, 60, 90]
+  });
+  const broadcasterIconDataUrl = await fetchMediaKitBroadcasterIconDataUrl(
+    stats.broadcaster.iconUrl
+  );
+  const html = buildMediaKitHtml(stats, {
+    generatedAtMs: nowMs,
+    broadcasterIconDataUrl,
+    sourceLiveLimit: MEDIA_KIT_LIVE_LIMIT,
+    sourceLiveLimitReached: liveIds.length >= MEDIA_KIT_LIVE_LIMIT
+  });
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date(nowMs));
+  const filename = `${date}_tsuioku-media-kit.html`;
+  await downloadBlobViaChromeDownloads(
+    new Blob([html], { type: 'text/html;charset=utf-8' }),
+    filename
+  );
+  return {
+    filename,
+    liveCount: stats.windows.find((window) => window.days === 90)?.liveCount || 0
+  };
+}
+
 /**
  * popup / inline の再描画スケジューラ（バグ #4 "コメント数がスムーズに撮れてない" の修正）。
  *
@@ -18957,6 +19077,43 @@ async function initPopup() {
   $('exportMarketingQuickBtn')?.addEventListener('click', () => {
     const original = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
     if (original && !original.disabled) original.click();
+  });
+
+  $('exportMediaKitBtn')?.addEventListener('click', async () => {
+    const btn = /** @type {HTMLButtonElement|null} */ ($('exportMediaKitBtn'));
+    const postStatus = /** @type {HTMLElement|null} */ ($('postStatus'));
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    showExportWaitPanel('marketing');
+    setExportWaitTechStatus('メディアキット用の過去配信データを集計中…');
+    if (postStatus) postStatus.textContent = 'メディアキットを準備しています…';
+    try {
+      await yieldToBrowserPaint();
+      const result = await downloadMediaKitHtml();
+      const done = `メディアキットを保存しました（過去90日 ${result.liveCount}枠）`;
+      setExportWaitTechStatus(done);
+      if (postStatus) postStatus.textContent = done;
+    } catch (error) {
+      if (isExtensionContextInvalidatedError(error)) {
+        renderExtensionContextBanner(true);
+        if (postStatus) {
+          postStatus.textContent =
+            '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります';
+        }
+      } else {
+        const reason = String(error?.message || error || '').trim();
+        if (postStatus) {
+          postStatus.textContent = reason
+            ? `メディアキットの保存に失敗しました: ${reason.slice(0, 100)}`
+            : 'メディアキットの保存に失敗しました';
+        }
+      }
+    } finally {
+      hideExportWaitPanel();
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+    }
   });
 
   $('devMonitorExportMarketingBtn')?.addEventListener('click', async () => {
