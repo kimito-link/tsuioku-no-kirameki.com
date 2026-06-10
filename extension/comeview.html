@@ -155,32 +155,40 @@
         font-size: 14px;
       }
 
-      /* v0.1.666: コメント単位アクション(ホバーで出す・わんコメ同等)。 */
+      /* v0.1.666/669: コメント単位アクション(ホバーで出す・わんコメ同型のモノクロアイコン列)。 */
       .cv-row { position: relative; }
       .cv-actions {
         position: absolute;
-        top: -12px;
-        right: 8px;
+        top: -16px;
+        right: 10px;
         display: none;
-        gap: 2px;
+        gap: 0;
         background: var(--cv-row);
         border: 1px solid var(--cv-border);
-        border-radius: 8px;
-        padding: 2px 4px;
-        box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+        border-radius: 10px;
+        padding: 3px;
+        box-shadow: 0 3px 10px rgb(0 0 0 / 18%);
       }
       .cv-row:hover .cv-actions { display: flex; }
       .cv-actions button {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 28px;
         background: none;
         border: none;
-        font-size: 13px;
-        line-height: 1;
-        padding: 4px 5px;
-        border-radius: 6px;
+        border-radius: 7px;
+        color: var(--cv-sub);
         cursor: pointer;
       }
+      .cv-actions button svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+      }
       .cv-actions button:hover {
-        background: color-mix(in srgb, var(--cv-accent) 14%, transparent);
+        background: color-mix(in srgb, var(--cv-text) 10%, transparent);
+        color: var(--cv-text);
       }
       /* OBS 透過モードはオーバーレイ用途=操作 UI を出さない。 */
       body.is-obs .cv-actions { display: none !important; }

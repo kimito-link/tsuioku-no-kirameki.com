@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.669',
+    date: '2026-06-10',
+    summary: 'コメビュの操作ボタンをすっきりした見た目に',
+    items: Object.freeze([
+      'コメビュでコメントにマウスを載せたときの操作ボタンを、絵文字から単色のアイコンが並ぶコンパクトなツールバーに変えました(行を隠す・この人を非表示・この人の詳細・コピー・ピン留めの順)。読んでいるコメントの邪魔をしない、落ち着いた見た目になっています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.668',
     date: '2026-06-10',
     summary: 'パネルに「💬コメビュ」ボタンを追加',
