@@ -6,6 +6,9 @@ import {
   pickNewComeviewTimelineItems,
   pickAppendedComeviewSnapshotRows,
   selectAppendedComeviewTimelineItems,
+  commentNoOfComeviewRow,
+  filterUnseenComeviewComments,
+  pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from './comeviewInstantRender.js';
 
@@ -171,5 +174,49 @@ describe('isComeviewNearBottom', () => {
     expect(
       isComeviewNearBottom({ scrollTop: 719, clientHeight: 200, scrollHeight: 1000 })
     ).toBe(false);
+  });
+});
+
+describe('v0.1.679 二重表示根治: commentNo ベースの既出遮断', () => {
+  it('既出 commentNo の行を捨てる(無番号行は素通し)', () => {
+    const seen = new Set(['10']);
+    const out = filterUnseenComeviewComments(
+      [
+        { commentNo: 10, text: 'a' },
+        { commentNo: 11, text: 'b' },
+        { text: 'no-number' }
+      ],
+      seen
+    );
+    expect(out.map((r) => r.text)).toEqual(['b', 'no-number']);
+  });
+  it('commentNoOfComeviewRow は commentNo/no を文字列で返す', () => {
+    expect(commentNoOfComeviewRow({ commentNo: 12 })).toBe('12');
+    expect(commentNoOfComeviewRow({ no: 7 })).toBe('7');
+    expect(commentNoOfComeviewRow({})).toBe('');
+  });
+});
+
+describe('pickUnseenComeviewGifts(再キャプチャ重複の遮断)', () => {
+  it('同一内容のギフトが90秒以内に再出現したら捨てる', () => {
+    const seen = new Map();
+    const g = { userId: 'u1', itemName: '花', point: 100, message: '', capturedAt: 1000 };
+    expect(pickUnseenComeviewGifts([g], seen)).toHaveLength(1);
+    const recapture = { ...g, capturedAt: 31000 }; // 30秒後に再キャプチャ
+    expect(pickUnseenComeviewGifts([recapture], seen)).toHaveLength(0);
+  });
+  it('90秒を超えて離れた同一内容は別ギフトとして残す', () => {
+    const seen = new Map();
+    const g = { userId: 'u1', itemName: '花', point: 100, message: '', capturedAt: 1000 };
+    pickUnseenComeviewGifts([g], seen);
+    const later = { ...g, capturedAt: 1000 + 120000 };
+    expect(pickUnseenComeviewGifts([later], seen)).toHaveLength(1);
+  });
+  it('内容が違えば近接でも残す', () => {
+    const seen = new Map();
+    pickUnseenComeviewGifts([{ userId: 'u1', itemName: '花', point: 100, message: '', capturedAt: 1000 }], seen);
+    expect(
+      pickUnseenComeviewGifts([{ userId: 'u2', itemName: '花', point: 100, message: '', capturedAt: 2000 }], seen)
+    ).toHaveLength(1);
   });
 });

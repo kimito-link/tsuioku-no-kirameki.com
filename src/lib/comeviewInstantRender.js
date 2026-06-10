@@ -178,6 +178,68 @@ function comeviewSnapshotRowIdentity(row, kind) {
 }
 
 /**
+ * v0.1.679 二重表示根治: 行の安定識別子。
+ * テール行と正本(IDB)行は同じコメントでも capturedAt / id がズレることがある
+ * (再キャプチャ・IDB autoIncrement)ため、経路を跨いで安定なのは commentNo だけ。
+ * @param {Record<string, unknown>|null|undefined} row 生行 or TimelineItem
+ * @returns {string} commentNo(無ければ '')
+ */
+export function commentNoOfComeviewRow(row) {
+  if (!row || typeof row !== 'object') return '';
+  const source = /** @type {Record<string, unknown>} */ (row);
+  return clippedText(source.commentNo ?? source.no, 40);
+}
+
+/**
+ * commentNo が既出のコメント行を除く(無番号行は素通し=従来挙動)。
+ * @param {readonly Record<string, unknown>[]|unknown} rows
+ * @param {Set<string>} seenNos
+ * @returns {Record<string, unknown>[]}
+ */
+export function filterUnseenComeviewComments(rows, seenNos) {
+  if (!Array.isArray(rows)) return [];
+  const seen = seenNos instanceof Set ? seenNos : new Set();
+  return rows.filter((row) => {
+    const no = commentNoOfComeviewRow(row);
+    return !no || !seen.has(no);
+  });
+}
+
+/**
+ * ギフトの「再キャプチャ重複」を除く。同一内容(uid/アイテム/pt/メッセージ)のギフトが
+ * windowMs 以内に再出現したら重複として捨てる(同じ人が本当に2回投げるのは通常分単位で離れる)。
+ * seenAtBySig は呼び出し側が保持する Map(sig→最後に見た at)。本関数が更新する。
+ * @param {readonly Record<string, unknown>[]|unknown} rows
+ * @param {Map<string, number>} seenAtBySig
+ * @param {number} [windowMs]
+ * @returns {Record<string, unknown>[]}
+ */
+export function pickUnseenComeviewGifts(rows, seenAtBySig, windowMs = 90_000) {
+  if (!Array.isArray(rows)) return [];
+  const seen = seenAtBySig instanceof Map ? seenAtBySig : new Map();
+  const win = Number.isFinite(windowMs) && windowMs >= 0 ? windowMs : 90_000;
+  const fresh = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const source = /** @type {Record<string, unknown>} */ (row);
+    const point = Number(source.point);
+    const sig = JSON.stringify([
+      clippedText(source.userId, 40),
+      clippedText(source.itemName, 120),
+      Number.isFinite(point) && point >= 0 ? Math.floor(point) : 0,
+      clippedText(source.message, 300)
+    ]);
+    const atRaw = Number(source.capturedAt ?? source.at);
+    const at = Number.isFinite(atRaw) ? atRaw : 0;
+    const last = seen.get(sig);
+    if (last != null && Math.abs(at - last) <= win) continue;
+    seen.set(sig, at);
+    fresh.push(row);
+  }
+  return fresh;
+}
+
+/**
  * @param {{scrollTop?:number,clientHeight?:number,scrollHeight?:number}|null|undefined} metrics
  * @param {number} [threshold]
  * @returns {boolean}
