@@ -54,6 +54,29 @@ export function resolveComeviewAvatarUrl(row) {
 }
 
 /**
+ * v0.1.673: 行にプロフィールキャッシュ(nls_user_comment_profile_v1)の名前/サムネを補完する。
+ *   パネルの応援タイムラインで名前・サムネが出るのと同じ情報源をそのまま使う(ユーザー指示
+ *   「むずかしく考えずこのデータをそのまま使えばいい」)。行自身の値があればそれを優先し、
+ *   空のところだけキャッシュで埋める。
+ * @param {{ name?: string, avatar?: string, userId?: string }|null|undefined} row
+ * @param {Record<string, { nickname?: string, avatarUrl?: string }>|null|undefined} profileMap
+ * @returns {any} 補完済みの行(変更不要ならそのまま返す)
+ */
+export function mergeComeviewRowWithProfile(row, profileMap) {
+  if (!row || typeof row !== 'object') return row;
+  const uid = String(row.userId || '').trim();
+  const e =
+    uid && profileMap && typeof profileMap === 'object' ? profileMap[uid] : null;
+  if (!e) return row;
+  const curName = String(row.name || '').trim();
+  const curAvatar = String(row.avatar || '').trim();
+  const name = curName || String(e.nickname || '').trim();
+  const avatar = curAvatar || String(e.avatarUrl || '').trim();
+  if (name === curName && avatar === curAvatar) return row;
+  return { ...row, name, avatar };
+}
+
+/**
  * v0.1.671: ユーザーページ URL(数値 ID のみ。匿名 a:… には公開ページが無い)。
  * 「サムネ・ID・ハンドル・リンクは分かる限りセットで出す」原則のリンク部分。
  * @param {string|null|undefined} userId

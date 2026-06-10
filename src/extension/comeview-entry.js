@@ -22,7 +22,11 @@
  * @module comeview-entry
  */
 
-import { commentDbSummaryKey } from '../lib/storageKeys.js';
+import {
+  commentDbSummaryKey,
+  KEY_USER_COMMENT_PROFILE_CACHE
+} from '../lib/storageKeys.js';
+import { normalizeUserCommentProfileMap } from '../lib/userCommentProfileCache.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { summaryStorageKey } from '../lib/commentSummary.js';
 import {
@@ -34,6 +38,7 @@ import {
   comeviewUserKeyForRow,
   comeviewUserPageUrl,
   resolveComeviewAvatarUrl,
+  mergeComeviewRowWithProfile,
   buildComeviewCopyText,
   normalizeComeviewNgList,
   addComeviewNgEntry,
@@ -75,6 +80,12 @@ const _hiddenIds = new Set();
 let _pinShownId = '';
 /** @type {Record<string,{nickname:string,label:string,memo:string,at:number}>} ユーザーノート(配信を跨いで永続)。 */
 let _userNotes = {};
+/**
+ * @type {Record<string,{nickname?:string,avatarUrl?:string}>}
+ * プロフィールキャッシュ(nls_user_comment_profile_v1)。パネルの応援タイムラインに
+ * 名前・サムネが出るのと同じ情報源をそのまま使う(名前なし行の補完)。
+ */
+let _profileCache = {};
 
 /** URL or storage から対象 lv を解決する。 */
 function resolveLiveIdFromUrl() {
@@ -122,7 +133,8 @@ async function readLightComments(lv) {
       csKey,
       tKey,
       pinKey,
-      COMEVIEW_USER_NOTES_KEY
+      COMEVIEW_USER_NOTES_KEY,
+      KEY_USER_COMMENT_PROFILE_CACHE
     ]);
   } catch {
     return { rows: [], pin: null, notes: null };
@@ -143,7 +155,8 @@ async function readLightComments(lv) {
   return {
     rows: [...recent, ...tail],
     pin,
-    notes: normalizeComeviewUserNotes(bag[COMEVIEW_USER_NOTES_KEY])
+    notes: normalizeComeviewUserNotes(bag[COMEVIEW_USER_NOTES_KEY]),
+    profiles: normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE])
   };
 }
 
@@ -383,6 +396,8 @@ function closePanel() {
  * アーカイブはクリック時だけ一度読む。定期読みはしない(軽さ不変)。
  */
 async function showUserDetail(row) {
+  // 名前/サムネが空ならプロフィールキャッシュで補完(セット原則: 分かる情報は揃えて出す)。
+  row = mergeComeviewRowWithProfile(row, _profileCache) || row;
   const ukey = comeviewUserKeyForRow(row);
   if (!ukey || !_liveId) return;
   const label =
@@ -689,8 +704,9 @@ async function refresh() {
   const countEl = document.getElementById('cvCount');
   if (!listEl) return;
 
-  const { rows: raw, pin, notes } = await readLightComments(_liveId);
+  const { rows: raw, pin, notes, profiles } = await readLightComments(_liveId);
   if (notes) _userNotes = notes; // 他のコメビュ窓で付けた名前も追従する
+  if (profiles) _profileCache = profiles; // パネルと同じプロフィール情報源
   renderPinBar(pin);
   const rows = buildComeviewRows(raw, COMEVIEW_MAX_ROWS);
   const fresh = pickNewComeviewRows(rows, _seenIds);
@@ -707,6 +723,19 @@ async function refresh() {
     }
   }
 
+  // v0.1.673: 名前なしで描画済みの行に、後から届いたプロフィールキャッシュの名前を追い掛け反映
+  //   (タイムラインに出ている名前と同じ情報源。「情報あるのに反映されてない」の根治)。
+  for (const el of [...listEl.querySelectorAll('.cv-row')]) {
+    const d = el.dataset || {};
+    if (d.name || !d.uid) continue;
+    const e = _profileCache[d.uid];
+    const nick = e && e.nickname ? String(e.nickname) : '';
+    if (nick) {
+      el.dataset.name = nick;
+      updateRowIdentity(el);
+    }
+  }
+
   if (fresh.length) {
     const nearBottom =
       listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 80;
@@ -716,7 +745,8 @@ async function refresh() {
       _seenIds.add(r.id);
       // NG ユーザー/隠した行は「見たことにして」描画しない(毎 tick 再判定しない)。
       if (isComeviewRowHidden(r, _ngKeys, _hiddenIds)) continue;
-      frag.appendChild(buildRowEl(r));
+      // 名前/サムネが空ならプロフィールキャッシュ(パネルと同じ情報源)で補完して描画。
+      frag.appendChild(buildRowEl(mergeComeviewRowWithProfile(r, _profileCache)));
       appended += 1;
     }
     if (appended) {
