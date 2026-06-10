@@ -50,9 +50,30 @@
 
 ## Claude Code が止まるとき（Windows・実ログで確認済み）
 
+### 初回セットアップ（このリポを開いたら1回）
+
+```bash
+npm run setup:claude
+```
+
+`defaultMode: bypassPermissions` 入りの `.claude/settings.json` を展開する。**allow だけ**だと Bash が黙って止まることがある。
+
+### 検証コマンド（ハング回避）
+
+| 使う | 使わない |
+|------|----------|
+| `npm run verify:cc` | `npm run verify`（Claude ターミナルでハングしやすい） |
+| `npm run test:cc` | `npx vitest run` をパイプ付きで |
+| `npm run typecheck` | `npx tsc \| tail` / `head` / `grep`（PowerShell で止まる） |
+
+失敗時は `.artifacts/verify-cc.log` を Read する。
+
+### 応答・セッション
+
 1. **禁止**: 応答に `call` / `<invoke name="Bash">` 等を書く → 実行されずスピンしたまま止まる。
-2. **必須**: Bash/Read/Edit はネイティブ **tool_use のみ**。typecheck は `npm run typecheck`（`npx tsc | tail` 禁止）。
+2. **必須**: Bash/Read/Edit はネイティブ **tool_use のみ**。
 3. **長いセッション**（5000+ テスト引き継ぎ等）→ **新チャット** または `/compact`。詳細は `~/.claude/CLAUDE.md`。
+4. **Computer Use / windows sandbox failed** → 実機クリックは Claude-in-Chrome MCP かユーザー手動。sandbox 再試行ループで止まらないよう即打ち切り。
 
 ## 詳細はすべて AGENTS.md と memory/MEMORY.md に
 
