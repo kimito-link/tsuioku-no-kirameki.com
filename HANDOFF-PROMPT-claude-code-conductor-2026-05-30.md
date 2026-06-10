@@ -455,5 +455,3 @@ tools: Bash, Read, Grep, Glob
 - diff が大きすぎる(>1000 行): 重要なファイルに絞ってレビューし、「全件レビューには /batch を推奨」と司令塔に報告
 - 関連 reference が見つからない: その旨を報告して司令塔の指示を仰ぐ
 ```
-</content>
-</invoke>

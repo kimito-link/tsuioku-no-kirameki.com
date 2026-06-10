@@ -48,6 +48,12 @@
 
 ユーザーは Claude Code とだけ対話。**コピペは原理的に発生しない**。
 
+## Claude Code が止まるとき（Windows・実ログで確認済み）
+
+1. **禁止**: 応答に `call` / `<invoke name="Bash">` 等を書く → 実行されずスピンしたまま止まる。
+2. **必須**: Bash/Read/Edit はネイティブ **tool_use のみ**。typecheck は `npm run typecheck`（`npx tsc | tail` 禁止）。
+3. **長いセッション**（5000+ テスト引き継ぎ等）→ **新チャット** または `/compact`。詳細は `~/.claude/CLAUDE.md`。
+
 ## 詳細はすべて AGENTS.md と memory/MEMORY.md に
 
 このファイルは入り口です。**[AGENTS.md](AGENTS.md) を必ず読んでください**。
@@ -56,5 +62,3 @@
 - AGENTS.md §1-3: プロジェクト概要・CWS ステータス・設計判断
 - AGENTS.md §後半: 開発フロー・テスト・PR運用
 - memory/MEMORY.md(`C:\Users\info\.claude\projects\C--Users-info-OneDrive--------Resilio-github-tsuioku-no-kirameki-com\memory\`): セッション横断の知見・直近の真因と修正
-</content>
-</invoke>
