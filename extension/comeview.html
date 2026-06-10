@@ -308,6 +308,156 @@
       }
       body.is-obs .cv-panel { display: none !important; }
 
+      /* v0.1.676: 一覧は POP(パネル)の応援タイムラインと同一描画。popup.html の
+         .nl-tl-* スタイルを移植し、変数だけコメビュ側に橋渡しする(見た目も同じに)。 */
+      :root {
+        --nl-text: var(--cv-text);
+        --nl-muted: var(--cv-sub);
+        --nl-border: var(--cv-border);
+        --nl-surface: var(--cv-row);
+        --nl-accent: var(--cv-accent);
+      }
+      .cv-list { display: flex; flex-direction: column; gap: 2px; }
+      .nl-support-timeline__empty {
+        color: var(--cv-sub);
+        text-align: center;
+        padding: 40px 16px;
+        font-size: 14px;
+      }
+      .nl-tl-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        padding: 3px 6px;
+        border-radius: 7px;
+        font-size: 11px;
+        line-height: 1.3;
+        color: var(--nl-text);
+        text-decoration: none;
+      }
+      .nl-tl-row__avatar {
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        flex: 0 0 auto;
+        object-fit: cover;
+        background: #fff;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 60%, transparent);
+      }
+      .nl-tl-row__name {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 9em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 700;
+        color: var(--nl-muted);
+      }
+      .nl-tl-row__text {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-tl-row--self .nl-tl-row__name {
+        color: var(--nl-accent, #0f8fd8);
+      }
+      .nl-tl-gift {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 8px;
+        font-size: 11px;
+        line-height: 1.3;
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, #ffb020 16%, var(--nl-surface)),
+          color-mix(in srgb, #ff7eb6 12%, var(--nl-surface))
+        );
+        border: 1px solid color-mix(in srgb, #ffb020 38%, var(--nl-border));
+        text-decoration: none;
+        color: var(--nl-text);
+      }
+      .nl-tl-gift__icon {
+        flex: 0 0 auto;
+        font-size: 13px;
+      }
+      .nl-tl-gift__avatar-wrap {
+        position: relative;
+        flex: 0 0 auto;
+        width: 22px;
+        height: 22px;
+      }
+      .nl-tl-gift__avatar {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        object-fit: cover;
+        background: #fff;
+        border: 1px solid color-mix(in srgb, #ffb020 50%, var(--nl-border));
+      }
+      .nl-tl-gift__badge {
+        position: absolute;
+        right: -3px;
+        bottom: -3px;
+        font-size: 9px;
+        line-height: 1;
+        filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
+      }
+      .nl-tl-gift__name {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 8em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 800;
+      }
+      .nl-tl-gift__item {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--nl-muted);
+      }
+      .nl-tl-gift__pt {
+        flex: 0 0 auto;
+        font-weight: 800;
+        color: #b06f00;
+        font-variant-numeric: tabular-nums;
+      }
+      .nl-tl-time {
+        flex: 0 0 auto;
+        margin-left: auto;
+        padding-left: 6px;
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--nl-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      #cvList [data-nl-uid] { cursor: pointer; }
+      #cvList [data-nl-uid]:hover {
+        background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
+      }
+      /* OBS 透過: 行カードだけ読みやすく重ねる(従来の OBS 見た目を踏襲)。 */
+      body.is-obs .nl-tl-row,
+      body.is-obs .nl-tl-gift {
+        background: rgb(0 0 0 / 38%);
+        color: #fff;
+        border-color: transparent;
+        text-shadow: 0 1px 2px rgb(0 0 0 / 70%);
+        font-size: 15px;
+        padding: 8px 10px;
+        border-radius: 10px;
+      }
+      body.is-obs .nl-tl-row__name { color: #8fd6ff; }
+      body.is-obs .nl-tl-gift__pt { color: #ffd479; }
+
       /* v0.1.667: ユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)。 */
       .cv-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
       .cv-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
