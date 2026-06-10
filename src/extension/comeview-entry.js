@@ -32,6 +32,7 @@ import {
 } from '../lib/comeviewRows.js';
 import {
   comeviewUserKeyForRow,
+  resolveComeviewAvatarUrl,
   buildComeviewCopyText,
   normalizeComeviewNgList,
   addComeviewNgEntry,
@@ -537,10 +538,13 @@ function buildRowEl(row) {
   el.dataset.uid = row.userId || '';
   const displayName = resolveComeviewDisplayName(row, _userNotes, ukey);
 
-  if (row.avatar) {
+  // v0.1.670: 本家と同じサムネを出す(取り込み済みURL > userIdから確定パターン生成 >
+  //   匿名は公式の既定アイコン)。色付き丸は画像が無い/読めない時のフォールバックに格下げ。
+  const avatarUrl = resolveComeviewAvatarUrl(row);
+  if (avatarUrl) {
     const img = document.createElement('img');
     img.className = 'cv-avatar';
-    img.src = row.avatar;
+    img.src = avatarUrl;
     img.alt = '';
     img.loading = 'lazy';
     img.onerror = () => {

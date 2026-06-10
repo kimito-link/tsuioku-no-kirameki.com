@@ -13,6 +13,7 @@
 //   - アーカイブ行から特定ユーザーの発言だけを抽出
 
 import { normalizeComeviewRow } from './comeviewRows.js';
+import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 
 /** NG リストの storage キー(配信を跨いで効く・拡張ページからの小さな UI 状態書込)。 */
 export const COMEVIEW_NG_STORAGE_KEY = 'nls_comeview_ng_v1';
@@ -27,6 +28,29 @@ export const COMEVIEW_NG_MAX = 300;
  */
 export function comeviewPinStorageKey(liveId) {
   return `nls_comeview_pin_${String(liveId || '').trim().toLowerCase()}`;
+}
+
+/** 匿名など本家サムネが無いユーザーに出す、ニコニコ公式の既定アイコン。 */
+export const COMEVIEW_DEFAULT_AVATAR_URL =
+  'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
+
+/**
+ * v0.1.670: コメビュの行アイコンを本家と同じサムネに解決する。
+ *   取り込み済みの avatar URL > userId から確定パターン生成(popup と同じ
+ *   deriveAvatarUrlFromUid・v0.1.203 実機確認済) > 匿名(a:…)は公式の既定アイコン。
+ *   いずれも無ければ ''=呼び出し側のフォールバック(色付き丸)に委ねる。
+ * @param {{ avatar?: string, userId?: string }|null|undefined} row
+ * @returns {string}
+ */
+export function resolveComeviewAvatarUrl(row) {
+  if (!row || typeof row !== 'object') return '';
+  const direct = String(row.avatar || '').trim();
+  if (direct) return direct;
+  const uid = String(row.userId || '').trim();
+  const derived = deriveAvatarUrlFromUid(uid);
+  if (derived) return derived;
+  if (uid.startsWith('a:')) return COMEVIEW_DEFAULT_AVATAR_URL;
+  return '';
 }
 
 /**
