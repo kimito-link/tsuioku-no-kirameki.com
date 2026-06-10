@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.677',
+    date: '2026-06-10',
+    summary: 'コメビュを新着即時表示とコメピタ対応に',
+    items: Object.freeze([
+      '新しいコメントやギフトをすぐ下へ追加し、過去のコメントを読んでいる間は勝手に最下部へ戻らないようにしました',
+      'コメントに触れると、行を隠す・その人を非表示・詳細を見る・コピー・コメピタの操作ボタンが出るようになりました',
+      'コメピタで選んだコメントを上部へ固定し、同じ配信の別窓やOBS透過表示にも自動で揃うようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.676',
     date: '2026-06-10',
     summary: 'コメビュをパネルのタイムラインと完全同一に',
