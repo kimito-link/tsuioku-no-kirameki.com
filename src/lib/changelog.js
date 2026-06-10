@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.679',
+    date: '2026-06-10',
+    summary: 'コメビュ即時表示の二重表示バグを修正',
+    items: Object.freeze([
+      '前回の即時表示化(0.1.677)で、すべてのコメントやギフトが2回ずつ表示されることがあったのを直しました。コメント番号(放送内で一意の番号)を使って、表示経路が違っても同じコメントを二度出さないようにしています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.678',
     date: '2026-06-10',
     summary: '配信実績を共有できるメディアキットを追加',

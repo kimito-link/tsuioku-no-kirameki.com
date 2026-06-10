@@ -63,6 +63,9 @@ import {
   pickNewComeviewTimelineItems,
   pickAppendedComeviewSnapshotRows,
   selectAppendedComeviewTimelineItems,
+  commentNoOfComeviewRow,
+  filterUnseenComeviewComments,
+  pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from '../lib/comeviewInstantRender.js';
 
@@ -93,6 +96,43 @@ let _deferredTailRows = null;
 let _deferredGiftRows = null;
 /** @type {Set<string>} 現在 DOM にある TimelineItem.key。 */
 const _renderedKeys = new Set();
+/**
+ * v0.1.679: 表示済みコメントの commentNo(経路を跨いで安定な唯一の識別子)。
+ * テール行と正本(IDB)行は同じコメントでも capturedAt/id がズレて TimelineItem.key が
+ * 一致しないため、key だけの dedupe では二重表示が再発した(実機 lv350720162)。
+ * 上限超過時は古い挿入分から捨てる(Set は挿入順を保つ)。
+ * @type {Set<string>}
+ */
+const _seenCommentNos = new Set();
+const SEEN_COMMENT_NOS_MAX = 8000;
+/** @type {Map<string, number>} ギフト内容sig→最後に見た at(再キャプチャ重複の遮断)。 */
+const _seenGiftAtBySig = new Map();
+const SEEN_GIFT_SIGS_MAX = 2000;
+
+function rememberSeenCommentNo(no) {
+  if (!no) return;
+  _seenCommentNos.add(no);
+  if (_seenCommentNos.size > SEEN_COMMENT_NOS_MAX) {
+    const drop = _seenCommentNos.size - SEEN_COMMENT_NOS_MAX;
+    let i = 0;
+    for (const k of _seenCommentNos) {
+      _seenCommentNos.delete(k);
+      i += 1;
+      if (i >= drop) break;
+    }
+  }
+}
+
+function trimSeenGiftSigs() {
+  if (_seenGiftAtBySig.size <= SEEN_GIFT_SIGS_MAX) return;
+  const drop = _seenGiftAtBySig.size - SEEN_GIFT_SIGS_MAX;
+  let i = 0;
+  for (const k of _seenGiftAtBySig.keys()) {
+    _seenGiftAtBySig.delete(k);
+    i += 1;
+    if (i >= drop) break;
+  }
+}
 /** @type {Map<string, import('../lib/supportActivityTimeline.js').TimelineItem>} */
 const _timelineItemsByKey = new Map();
 let _commentCount = 0;
@@ -761,6 +801,9 @@ async function performFullRefresh(forceBottom) {
   renderPin(bag[pinKey]);
 
   let comments = await readCanonicalComments(lv);
+  // v0.1.679: 正本(IDB)が最新テールよりわずかに遅れることがあるので、テールを
+  //   commentNo dedupe 付きで合流させる(整合リフレッシュで直近行が消えるのを防ぐ)。
+  comments = combineCanonicalComeviewRows(comments, _tailRows);
   if (Object.keys(_profileCache).length) {
     comments = applyUserCommentProfileMapToEntries(comments, _profileCache).next;
   }
@@ -774,6 +817,13 @@ async function performFullRefresh(forceBottom) {
   );
   _commentCount = comments.length;
   renderFullTimeline(timeline, forceBottom);
+  // v0.1.679: 全量描画した行の識別子を「既出」に登録(以後の hot append が二重に足さない)。
+  for (const item of timeline) {
+    if (item.kind === 'gift') continue;
+    rememberSeenCommentNo(commentNoOfComeviewRow(item));
+  }
+  pickUnseenComeviewGifts(_giftRows, _seenGiftAtBySig);
+  trimSeenGiftSigs();
   updateCommentCount();
   _lastReconcileAt = Date.now();
 }
@@ -810,15 +860,22 @@ function processHotSnapshots(nextTail, nextGifts) {
     return;
   }
 
-  const addedComments = pickAppendedComeviewSnapshotRows(
-    _tailRows,
-    tail,
-    'comment'
+  // v0.1.679: スナップショット差分のあとに「経路を跨いだ既出」を遮断する。
+  //   コメント=commentNo(テール/IDB/再キャプチャで唯一安定)・ギフト=内容sig±90秒。
+  //   capturedAt 違いの再キャプチャ複製や、整合リフレッシュ済み行の再appendを防ぐ。
+  const addedComments = filterUnseenComeviewComments(
+    pickAppendedComeviewSnapshotRows(_tailRows, tail, 'comment'),
+    _seenCommentNos
   );
-  const addedGifts = pickAppendedComeviewSnapshotRows(_giftRows, gifts, 'gift');
+  const addedGifts = pickUnseenComeviewGifts(
+    pickAppendedComeviewSnapshotRows(_giftRows, gifts, 'gift'),
+    _seenGiftAtBySig
+  );
+  trimSeenGiftSigs();
   _tailRows = tail;
   _giftRows = gifts;
   if (!addedComments.length && !addedGifts.length) return;
+  for (const row of addedComments) rememberSeenCommentNo(commentNoOfComeviewRow(row));
 
   let profiledTail = tail;
   if (Object.keys(_profileCache).length) {
