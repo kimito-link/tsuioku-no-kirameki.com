@@ -189,3 +189,24 @@ describe('v0.1.671: 表示名をコメビュと統一(匿名は固定番号)', (
     expect(html).toContain('名無し');
   });
 });
+
+describe('v0.1.674: 行クリック用のユーザー詳細データ属性', () => {
+  it('uid 付きコメント行(匿名含む)に data-nl-uid / data-nl-uname が付く', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', nickname: '' }));
+    expect(html).toContain('data-nl-uid="a:x"');
+    expect(html).toMatch(/data-nl-uname="匿名\d{1,3}"/);
+  });
+  it('記名 uid のリンク行にも付く(クリックは詳細を優先する側で制御)', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: '4046119', nickname: 'たろう' }));
+    expect(html).toContain('data-nl-uid="4046119"');
+    expect(html).toContain('data-nl-uname="たろう"');
+  });
+  it('uid 無し行には付かない', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: '', nickname: '' }));
+    expect(html).not.toContain('data-nl-uid');
+  });
+  it('ギフト行にも付く', () => {
+    const html = buildTimelineRowHtml(gItem({ userId: 'a:g', nickname: '' }));
+    expect(html).toContain('data-nl-uid="a:g"');
+  });
+});

@@ -99,6 +99,12 @@ function commentTextShown(text, commentNo) {
 export function buildTimelineRowHtml(item, opts) {
   if (!item || typeof item !== 'object') return '';
   const defaultAvatar = String(opts?.defaultAvatar || '');
+  // v0.1.674: 行クリックでユーザー詳細(わんコメ式・名前付け/ラベル/メモ/発言一覧)を
+  //   ポップアップで開けるよう、uid と表示名をデータ属性で持たせる(匿名にも付けられるのが肝)。
+  const detailUid = String(item.userId || '').trim();
+  const detailAttrs = detailUid
+    ? ` data-nl-uid="${escapeAttr(detailUid)}" data-nl-uname="${escapeAttr(timelineDisplayName(item))}"`
+    : '';
   // 「いつ」の相対時刻（v0.1.341）。空（未来/不正）なら出さない。
   const agoLabel = formatRelativeTimeJa(item.at, opts?.now);
   const agoBlock = agoLabel
@@ -134,9 +140,9 @@ export function buildTimelineRowHtml(item, opts) {
     );
     if (isNumericUid(item.userId)) {
       const href = `https://www.nicovideo.jp/user/${escapeAttr(item.userId)}`;
-      return `<a class="nl-tl-gift" href="${href}" target="_blank" rel="noopener noreferrer" title="${title}">${inner}</a>`;
+      return `<a class="nl-tl-gift" href="${href}" target="_blank" rel="noopener noreferrer" title="${title}"${detailAttrs}>${inner}</a>`;
     }
-    return `<div class="nl-tl-gift" title="${title}">${inner}</div>`;
+    return `<div class="nl-tl-gift" title="${title}"${detailAttrs}>${inner}</div>`;
   }
 
   // comment
@@ -158,9 +164,9 @@ export function buildTimelineRowHtml(item, opts) {
   );
   if (isNumericUid(item.userId)) {
     const href = `https://www.nicovideo.jp/user/${escapeAttr(item.userId)}`;
-    return `<a class="nl-tl-row${selfCls}" href="${href}" target="_blank" rel="noopener noreferrer" title="${title}">${inner}</a>`;
+    return `<a class="nl-tl-row${selfCls}" href="${href}" target="_blank" rel="noopener noreferrer" title="${title}"${detailAttrs}>${inner}</a>`;
   }
-  return `<div class="nl-tl-row${selfCls}" title="${title}">${inner}</div>`;
+  return `<div class="nl-tl-row${selfCls}" title="${title}"${detailAttrs}>${inner}</div>`;
 }
 
 /**

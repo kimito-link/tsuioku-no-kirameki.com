@@ -10439,6 +10439,30 @@ async function refreshSupportActivityTimeline(liveId) {
   const body = $('supportTimelineBody');
   const meta = $('supportTimelineGiftMeta');
   if (!(body instanceof HTMLElement)) return;
+  // v0.1.674: 行クリックでユーザー詳細(わんコメ式・名前付け/ラベル/メモ/発言一覧)を
+  //   コメビュのポップアップ窓で開く。委譲リスナーを1回だけ張る(innerHTML 再描画に耐える)。
+  //   記名 uid 行の <a>(ユーザーページ直行)も詳細側に「↗ユーザーページ」があるため
+  //   preventDefault して詳細を優先する(匿名にも名前を付けられるのが肝)。
+  if (body.dataset.nlUserDetailWired !== '1') {
+    body.dataset.nlUserDetailWired = '1';
+    body.addEventListener('click', (ev) => {
+      const t =
+        ev.target instanceof Element ? ev.target.closest('[data-nl-uid]') : null;
+      if (!t) return;
+      const uid = t.getAttribute('data-nl-uid') || '';
+      if (!uid) return;
+      ev.preventDefault();
+      const uname = t.getAttribute('data-nl-uname') || '';
+      const url = chrome.runtime.getURL(
+        `comeview.html?user=${encodeURIComponent(uid)}&uname=${encodeURIComponent(uname)}`
+      );
+      try {
+        void chrome.windows.create({ url, type: 'popup', width: 420, height: 640 });
+      } catch {
+        window.open(url, '_blank', 'width=420,height=640');
+      }
+    });
+  }
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) {
     // watch 未解決のときはタイムラインを畳んで空に（誤誘導しない）。

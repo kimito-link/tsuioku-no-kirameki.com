@@ -132,6 +132,15 @@ describe('dedupeWeakComeviewRows(別ソース二重表示の除去)', () => {
     ];
     expect(dedupeWeakComeviewRows(rows)).toHaveLength(2);
   });
+  it('同一人物(同uid)の同文 weak 行は最初の1件だけ残す(recent/tail の時刻ズレ二重取り)', () => {
+    const rows = [
+      { id: 'c:a513:くちばし:1000', no: null, name: '', text: 'くちばし', userId: 'a:513', avatar: '', selfPosted: false, capturedAt: 1000 },
+      { id: 'c:a513:くちばし:4000', no: null, name: '', text: 'くちばし', userId: 'a:513', avatar: '', selfPosted: false, capturedAt: 4000 }
+    ];
+    const out = dedupeWeakComeviewRows(rows);
+    expect(out).toHaveLength(1);
+    expect(out[0].capturedAt).toBe(1000);
+  });
   it('素性なし行どうしだけなら残す(重複と断定する材料がない)', () => {
     const rows = [
       { id: 'c::おはよう:1000', no: null, name: '', text: 'おはよう', userId: '', avatar: '', selfPosted: false, capturedAt: 1000 },

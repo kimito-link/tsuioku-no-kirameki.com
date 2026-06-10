@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   resolveComeviewAvatarUrl,
-  COMEVIEW_DEFAULT_AVATAR_URL,
   comeviewUserPageUrl,
   mergeComeviewRowWithProfile,
   comeviewUserKeyForRow,
@@ -148,10 +147,13 @@ describe('resolveComeviewAvatarUrl(本家と同じサムネ解決)', () => {
       'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14317/143172392.jpg'
     );
   });
-  it('匿名(a:…)は公式の既定アイコン', () => {
-    expect(resolveComeviewAvatarUrl({ avatar: '', userId: 'a:XYZ' })).toBe(
-      COMEVIEW_DEFAULT_AVATAR_URL
-    );
+  it('匿名(a:…)はパネルと同じ identicon(同じ人=同じ模様・人ごとに違う)', () => {
+    const a = resolveComeviewAvatarUrl({ avatar: '', userId: 'a:XYZ' });
+    const a2 = resolveComeviewAvatarUrl({ avatar: '', userId: 'a:XYZ' });
+    const b = resolveComeviewAvatarUrl({ avatar: '', userId: 'a:OTHER' });
+    expect(a.startsWith('data:')).toBe(true);
+    expect(a2).toBe(a);
+    expect(b).not.toBe(a);
   });
   it('どちらも無ければ空(呼び出し側フォールバック)', () => {
     expect(resolveComeviewAvatarUrl({ avatar: '', userId: '' })).toBe('');
