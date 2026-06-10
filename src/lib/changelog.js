@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.682',
+    date: '2026-06-10',
+    summary: 'メディアキット生成時のエラーを解消',
+    items: Object.freeze([
+      'メディアキットの保存時に、拡張機能のエラーログへ通信エラー(CORS)が記録されることがあったのを直しました。配信者アイコンの取り込み方法を応援者サムネと同じ方式(公式CDNの直接参照)に統一しています。動作への影響はありませんでした'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.681',
     date: '2026-06-10',
     summary: 'コメビュをわんコメ式の大きく読みやすい表示に',
