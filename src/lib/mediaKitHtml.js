@@ -4,6 +4,8 @@
  */
 
 import { escapeHtml, escapeAttr } from '../shared/html/escape.js';
+import { comeviewAnonLabel } from './comeviewUserNotes.js';
+import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 
 const RASTER_DATA_URL_RE = /^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i;
 
@@ -114,6 +116,106 @@ function broadcasterAvatarHtml(broadcaster, iconDataUrl) {
 }
 
 /**
+ * PR4「応援者が主役」: 応援者の表示名(個人名 > 匿名NNN > ID)。
+ * @param {{ userId?: unknown, name?: unknown }} entry
+ */
+function supporterDisplayName(entry) {
+  const name = String(entry?.name ?? '').trim();
+  if (name) return name;
+  const uid = String(entry?.userId ?? '').trim();
+  const anon = comeviewAnonLabel(uid);
+  if (anon) return anon;
+  return uid ? `ID:${uid}` : '応援者';
+}
+
+/**
+ * 応援者サムネ: 記名uidは公式確定パターンURL(CSPで当該CDNのみ許可)・匿名は頭文字丸。
+ * @param {{ userId?: unknown }} entry
+ * @param {string} displayName
+ */
+function supporterAvatarHtml(entry, displayName) {
+  const uid = String(entry?.userId ?? '').trim();
+  const url = deriveAvatarUrlFromUid(uid);
+  if (url) {
+    return `<img class="s-avatar" src="${escapeAttr(url)}" alt="" width="40" height="40" loading="lazy">`;
+  }
+  const initial = Array.from(displayName || '応')[0] || '応';
+  return `<span class="s-avatar s-avatar--fallback" aria-hidden="true">${escapeHtml(initial)}</span>`;
+}
+
+const SUPPORTER_MEDALS = ['🥇', '🥈', '🥉'];
+
+/**
+ * @param {Array<Record<string, unknown>>} entries
+ * @param {(entry: Record<string, unknown>) => string} valueLabel
+ */
+function supporterListHtml(entries, valueLabel) {
+  if (!entries.length) {
+    return '<p class="s-empty">この期間の記録はまだありません</p>';
+  }
+  return `<ol class="s-list">${entries
+    .map((entry, index) => {
+      const displayName = supporterDisplayName(entry);
+      const medal = SUPPORTER_MEDALS[index] || `${index + 1}`;
+      return (
+        `<li class="s-row">` +
+        `<span class="s-rank">${escapeHtml(medal)}</span>` +
+        supporterAvatarHtml(entry, displayName) +
+        `<span class="s-name">${escapeHtml(displayName)}</span>` +
+        `<span class="s-value">${escapeHtml(valueLabel(entry))}</span>` +
+        `</li>`
+      );
+    })
+    .join('')}</ol>`;
+}
+
+/**
+ * 「この配信を支えた応援者たち」セクション(表彰トーン)。supporters が無ければ空文字。
+ * @param {unknown} supportersRaw
+ */
+function supportersSectionHtml(supportersRaw) {
+  if (!supportersRaw || typeof supportersRaw !== 'object') return '';
+  const supporters = /** @type {{ giftTop?: unknown, commentTop?: unknown, regulars?: unknown }} */ (
+    supportersRaw
+  );
+  const giftTop = Array.isArray(supporters.giftTop) ? supporters.giftTop : [];
+  const commentTop = Array.isArray(supporters.commentTop) ? supporters.commentTop : [];
+  const regulars =
+    supporters.regulars && typeof supporters.regulars === 'object'
+      ? /** @type {{ sampledLives?: unknown, supporters?: unknown, regulars?: unknown, ratio?: unknown }} */ (
+          supporters.regulars
+        )
+      : null;
+  if (!giftTop.length && !commentTop.length) return '';
+
+  const ratio = regulars ? finiteNumber(regulars.ratio) : null;
+  const regularsLine = regulars
+    ? `<p class="s-regulars">🔁 常連さん(2配信以上): <strong>${formatInteger(
+        regulars.regulars
+      )}人</strong> / 集計できた応援者 ${formatInteger(regulars.supporters)}人${
+        ratio != null ? `(${formatDecimal(ratio * 100, 0)}%)` : ''
+      }・直近${formatInteger(regulars.sampledLives)}配信のコメントから</p>`
+    : '';
+
+  return `
+      <section class="supporters">
+        <h2>この配信を支えた応援者たち</h2>
+        <p class="s-lead">配信の熱量をつくっているのは応援者のみなさんです。ニコ生上で公開されている応援(コメント・ギフト)の記録から表彰します。</p>
+        <div class="s-grid">
+          <div class="s-col">
+            <h3>🎁 ギフト応援</h3>
+            ${supporterListHtml(giftTop, (entry) => `${formatInteger(entry.points)} pt・${formatInteger(entry.count)} 件`)}
+          </div>
+          <div class="s-col">
+            <h3>💬 コメント応援</h3>
+            ${supporterListHtml(commentTop, (entry) => `${formatInteger(entry.count)} 件・${formatInteger(entry.liveCount)} 配信`)}
+          </div>
+        </div>
+        ${regularsLine}
+      </section>`;
+}
+
+/**
  * @param {Array<Record<string, unknown>>} windows
  * @param {(window: Record<string, unknown>) => string} formatter
  */
@@ -184,7 +286,7 @@ export function buildMediaKitHtml(stats, options = {}) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https://secure-dcdn.cdn.nimg.jp; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
   <title>${escapeHtml(broadcasterName)} - 追憶メディアキット</title>
   <style>
     :root {
@@ -289,6 +391,22 @@ export function buildMediaKitHtml(stats, options = {}) {
     .sources p { margin: 0 0 8px; }
     .sources ul { margin: 8px 0 0; padding-left: 1.4em; }
     .generated { margin: 18px 0 0; color: var(--nl-sub); font-size: 12px; text-align: right; }
+    .supporters { margin-top: 28px; }
+    .supporters h2 { margin: 0 0 6px; font-size: 20px; }
+    .s-lead { margin: 0 0 14px; color: var(--nl-sub); font-size: 13.5px; }
+    .s-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .s-col { border: 1px solid var(--nl-line); border-radius: 14px; padding: 16px 18px; background: #fff; }
+    .s-col h3 { margin: 0 0 10px; font-size: 15px; }
+    .s-list { list-style: none; margin: 0; padding: 0; }
+    .s-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--nl-line); }
+    .s-row:last-child { border-bottom: 0; }
+    .s-rank { flex: 0 0 1.8em; text-align: center; font-weight: 800; color: var(--nl-sub); }
+    .s-avatar { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--nl-accent-soft); border: 1px solid var(--nl-line); }
+    .s-avatar--fallback { display: grid; place-items: center; color: var(--nl-accent); font-weight: 800; font-size: 17px; }
+    .s-name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+    .s-value { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--nl-sub); font-weight: 700; font-size: 13px; }
+    .s-empty { margin: 0; color: var(--nl-sub); font-size: 13px; }
+    .s-regulars { margin: 14px 2px 0; color: var(--nl-sub); font-size: 13.5px; }
     @media (max-width: 640px) {
       main { width: 100%; margin: 0; border: 0; border-radius: 0; }
       header { align-items: flex-start; padding: 22px 18px; }
@@ -323,6 +441,7 @@ export function buildMediaKitHtml(stats, options = {}) {
           </tbody>
         </table>
       </div>
+      ${supportersSectionHtml(/** @type {any} */ (stats)?.supporters)}
       <aside class="sources">
         <h2>データの出所</h2>
         <p><strong>以下の統計データは、追憶のきらめきが配信中にこのPCへ記録した公式値・実測値です。</strong></p>
@@ -334,7 +453,7 @@ export function buildMediaKitHtml(stats, options = {}) {
           <li>応援者数は各配信で確認できた既知コメント投稿者数の最大値で、期間全体の厳密なユニーク人数ではありません。</li>
           <li>ギフトはこのPCに保存されたギフトイベントのポイント合計と件数です。</li>
           <li>${escapeHtml(limitNote)}</li>
-          <li>視聴者個人のID・名前は、このメディアキットには掲載していません。</li>
+          <li>応援者の表彰は、ニコ生上で公開されているコメント・ギフト情報(オープンデータ)の集計です。コメント応援と常連の集計は処理負荷を抑えるため直近の配信に限っています。</li>
         </ul>
       </aside>
       <p class="generated">生成日時: ${escapeHtml(formatGeneratedAt(generatedAtMs))}（日本時間）</p>

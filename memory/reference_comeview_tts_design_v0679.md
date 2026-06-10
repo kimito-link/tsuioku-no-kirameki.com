@@ -1,4 +1,4 @@
-# コメビュ内蔵読み上げ(TTS) 設計メモ v0.1.679
+# コメビュ内蔵読み上げ(TTS) 設計メモ(bump は実装時点の次版=0.1.681 予定)
 
 司令塔(Claude Code)発・Codex CLI 向け。2026-06-10。
 
@@ -43,7 +43,7 @@
 ## 受け入れ基準
 
 - npm run verify 全緑・新規純関数に vitest テスト
-- bump 0.1.679(manifest/package/changelog.js 先頭・summary 35字以内)
+- bump は実装時点の次版(manifest/package/changelog.js 先頭・summary 35字以内)
 - manifest.json の permissions は**変更しない**こと(speechSynthesis は権限不要)
 - git commit/push はしない(司令塔が実機検証後に行う)
 - 既存機能の後退ゼロ(即時append/ホバーバー/コメピタ/詳細パネル/OBS透過)
