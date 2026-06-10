@@ -8611,7 +8611,7 @@
       <section class="section" id="backfill-instant" aria-labelledby="backfill-instant-heading" data-lp-feature="backfill-instant">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="backfill-instant-heading">過去ログを「開いた瞬間に・一気に・ローディングなし」で取り切る（v0.1.642〜663 で連続根治）</h2>
+            <h2 id="backfill-instant-heading">過去ログを「開いた瞬間に・一気に・ローディングなし」で取り切る（v0.1.642〜682 で連続根治）</h2>
             <p>
               配信を開いたら、<strong>むかしのコメントまで遡って一気に取り切る</strong>のが本来の動きです。「○% 取得中」のような途中経過は出さず、<strong>静かに集めきってから「集めきったよ」と完成だけ</strong>を出します。実は過去ログの取り込みは、配信を開いてから<strong>数秒</strong>で一気に掘り切っています。
             </p>
@@ -8622,6 +8622,8 @@
             <p><strong>途中で止まっても自動で続ける（v0.1.658）</strong> — コメントが少ない区間でいったん進めなくても、公式の件数にまだ届いていなければ「続きがある」とみて自動でもう一度遡ります。</p>
             <p><strong>複数タブでも並行して取り切る（v0.1.663）</strong> — ニコ生のタブを複数開いているとき、これまでは1配信ずつ順番でしたが、<strong>2配信までは同時に並行</strong>して取り込めるようにしました（単一タブのときの動きは変わりません）。</p>
             <p><strong>開いた瞬間に全部表示（v0.1.650）</strong> — 一度見た配信を開き直すと、IDB／セッションキャッシュから<strong>すぐに全コメントが表示</strong>されます（ローディングを待たずにドンと出ます）。</p>
+            <p><strong>長い配信でも最後まで粘る（v0.1.665）</strong> — 3時間級の配信で取り込みが 7割など途中で止まったまま動かなくなることがあったのを根治しました。前進できている限り自動の取り直しを続け、公式の件数に届くまで粘ります。</p>
+            <p><strong>並行取得の安全装置（v0.1.664）</strong> — ページが重くなっているときは並行取り込みを自動で1配信ずつにゆるめ、画面のカクつきを防ぎます（軽くなれば自動で並行に戻ります）。</p>
           </div>
         </div>
       </section>
@@ -8629,16 +8631,35 @@
       <section class="section" id="comeview" aria-labelledby="comeview-heading" data-lp-feature="comeview">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="comeview-heading">コメビュ: 読みやすく流れるコメント表示（別窓・OBS 透過対応／v0.1.652）</h2>
+            <h2 id="comeview-heading">コメビュ: 大きく読みやすく・すぐ動く（別窓・OBS 透過対応／v0.1.652〜681）</h2>
             <p>
-              コメントが<strong>アイコン付きで1行ずつ読みやすく流れる「コメビュ（KIRAMEKI Comment View）」</strong>を追加しました。配信画面の横に置いたり、<strong>OBS のウィンドウキャプチャで配信画面に重ねたり</strong>できます。
+              コメントが<strong>大きなアイコン＋名前＋本文の2行でゆったり読める「コメビュ（KIRAMEKI Comment View）」</strong>。新着は<strong>書き込まれた瞬間に下へ滑り込み</strong>、配信しながら横目で読める「読む道具」に仕上げています。パネルの「💬 コメビュ」ボタンからワンクリックで開けます。
             </p>
           </div>
           <div class="board fade d2">
-            <p><strong>別ウィンドウで開ける</strong> — 状態ページの「💬 コメビュを開く」から別ウィンドウで起動します。OBS のウィンドウキャプチャ向けに切り離して使えます。</p>
-            <p><strong>OBS 透過モード</strong> — <code>?obs=1</code> で背景を透過し、半透明の黒カード＋白文字＋影で<strong>配信画面に直接重ねられます</strong>。最下部付近のみ自動で追従します。</p>
-            <p><strong>長く開いても軽い</strong> — 全件を読み込み直さず<strong>新着だけを足していく</strong>設計で、延々開いても重くなりにくくしています（直近 50 件を表示）。</p>
-            <p><strong>これから</strong> — まずは見やすさ重視。弾幕のように流れる演出や、3キャラのきらめき演出は今後足していきます。</p>
+            <p><strong>大きくて見やすい表示（v0.1.681）</strong> — 1行目に名前と ID、2行目に本文を<strong>切らずに全文</strong>表示。匿名さんも「匿名938」のような固定番号と人ごとに違う模様アイコンで見分けられます。</p>
+            <p><strong>すぐ動く（v0.1.677）</strong> — 新着コメントを<strong>待ち時間ゼロで即時反映</strong>。画面を組み直さず新着だけを足すので、長く開いても軽いままです。</p>
+            <p><strong>コメントごとの操作（v0.1.666〜）</strong> — マウスを載せると<strong>コピー／ピン留め（コメピタ）／この行を隠す／この人を非表示</strong>のボタンが出ます。ピン留めは質問などを画面上部に固定でき、<strong>OBS 窓にも同期表示</strong>されます。</p>
+            <p><strong>匿名さんにもニックネーム（v0.1.667）</strong> — コメントをクリックすると<strong>ユーザー詳細</strong>が開き、ニックネーム・ラベル・メモを付けられます。匿名 ID は人ごとに固定なので、<strong>一度名付ければ次の配信でも同じ名前</strong>で表示。この配信での発言一覧（時刻付き）もさかのぼれます。</p>
+            <p><strong>OBS 透過モード</strong> — <code>?obs=1</code> で背景を透過し、半透明の黒カード＋白文字で<strong>配信画面に直接重ねられます</strong>。</p>
+            <p><strong>これから</strong> — 読み上げ（内蔵 TTS）や、弾幕・3キャラのきらめき演出を順次足していきます。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="media-kit" aria-labelledby="media-kit-heading" data-lp-feature="media-kit">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="media-kit-heading">📣 メディアキット: 配信実績を1ファイルで共有（v0.1.678〜682）</h2>
+            <p>
+              過去 <strong>30日・60日・90日</strong>の配信実績（フォロワー数・獲得フォロワー・平均/最大同時視聴・来場者数・コメント数・チャット率・ギフト・配信頻度）を、<strong>1つの HTML にまとめて保存</strong>できます。スポンサー営業やコラボ打診に、そのまま渡せる<strong>実測データの営業資料</strong>です。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>ワンクリック生成</strong> — パネルの「📣 メディアキット」ボタンを押すだけ。配信中に記録した公式値・実測値から自動で集計します（データの出所も資料内に明記）。</p>
+            <p><strong>応援者の表彰つき（v0.1.680）</strong> — 「この配信を支えた応援者たち」として、<strong>ギフト応援 TOP10・コメント応援 TOP10・常連さんの人数</strong>を名前とサムネ付きで表彰します。配信の熱量をつくる応援者が主役です。</p>
+            <p><strong>サムネ・ID・リンクをセットで</strong> — 配信者ヘッダにはサムネ・ユーザーID・niconico ユーザーページへのリンクを揃えて表示します。</p>
+            <p><strong>取れていない期間は「-」</strong> — データが無い枠は正直に「-」と表示し、数字を誤魔化しません。</p>
           </div>
         </div>
       </section>
