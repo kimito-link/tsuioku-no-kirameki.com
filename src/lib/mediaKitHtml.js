@@ -105,9 +105,10 @@ function safeRasterDataUrl(raw) {
 const REMOTE_ICON_RE = /^https:\/\/secure-dcdn\.cdn\.nimg\.jp\/[^\s"'<>]+$/i;
 
 /**
- * v0.1.682: 配信者アイコンは data URL(あれば) > 公式CDNのhttps URL直接参照 > 頭文字。
+ * v0.1.682: 配信者アイコン(AGENTS.md §3.5 情報セットの原則)。
+ * data URL(あれば) > 公式CDNのhttps URL直接参照 > userId から確定パターン導出 > 頭文字。
  * 拡張側での fetch(CORS エラーの原因)はやめ、応援者サムネと同じ img 直接参照に統一。
- * @param {{ name?: unknown, iconUrl?: unknown }} broadcaster
+ * @param {{ name?: unknown, userId?: unknown, iconUrl?: unknown }} broadcaster
  * @param {unknown} iconDataUrl
  */
 function broadcasterAvatarHtml(broadcaster, iconDataUrl) {
@@ -120,8 +121,21 @@ function broadcasterAvatarHtml(broadcaster, iconDataUrl) {
   if (REMOTE_ICON_RE.test(remote)) {
     return `<img class="avatar" src="${escapeAttr(remote)}" alt="" width="88" height="88" loading="lazy">`;
   }
+  const derived = deriveAvatarUrlFromUid(String(broadcaster?.userId ?? '').trim());
+  if (derived) {
+    return `<img class="avatar" src="${escapeAttr(derived)}" alt="" width="88" height="88" loading="lazy">`;
+  }
   const initial = Array.from(name || '配')[0] || '配';
   return `<div class="avatar avatar--fallback" aria-hidden="true">${escapeHtml(initial)}</div>`;
+}
+
+/**
+ * 数値 uid のユーザーページリンク(情報セットの原則のリンク部分)。匿名は ''。
+ * @param {unknown} userId
+ */
+function nicoUserPageUrl(userId) {
+  const uid = String(userId ?? '').trim();
+  return /^\d{1,18}$/.test(uid) ? `https://www.nicovideo.jp/user/${uid}` : '';
 }
 
 /**
@@ -166,11 +180,16 @@ function supporterListHtml(entries, valueLabel) {
     .map((entry, index) => {
       const displayName = supporterDisplayName(entry);
       const medal = SUPPORTER_MEDALS[index] || `${index + 1}`;
+      // 情報セットの原則: 記名 uid はユーザーページへのリンクも付ける(匿名はリンク先が無いので span)。
+      const pageUrl = nicoUserPageUrl(entry?.userId);
+      const nameHtml = pageUrl
+        ? `<a class="s-name" href="${escapeAttr(pageUrl)}" rel="noopener noreferrer">${escapeHtml(displayName)}</a>`
+        : `<span class="s-name">${escapeHtml(displayName)}</span>`;
       return (
         `<li class="s-row">` +
         `<span class="s-rank">${escapeHtml(medal)}</span>` +
         supporterAvatarHtml(entry, displayName) +
-        `<span class="s-name">${escapeHtml(displayName)}</span>` +
+        nameHtml +
         `<span class="s-value">${escapeHtml(valueLabel(entry))}</span>` +
         `</li>`
       );
@@ -360,6 +379,10 @@ export function buildMediaKitHtml(stats, options = {}) {
     }
     h1 { margin: 0; font-size: clamp(26px, 5vw, 42px); line-height: 1.25; }
     .identity { margin: 4px 0 0; color: var(--nl-sub); overflow-wrap: anywhere; }
+    .identity a { color: var(--nl-accent); font-weight: 700; text-decoration: none; }
+    .identity a:hover { text-decoration: underline; }
+    a.s-name { color: var(--nl-ink); text-decoration: none; }
+    a.s-name:hover { text-decoration: underline; color: var(--nl-accent); }
     .badge {
       display: inline-flex;
       align-items: center;
@@ -431,7 +454,13 @@ export function buildMediaKitHtml(stats, options = {}) {
       <div>
         <p class="eyebrow">追憶メディアキット</p>
         <h1>${escapeHtml(broadcasterName)}</h1>
-        <p class="identity">${broadcasterUserId ? `ニコニコユーザーID: ${escapeHtml(broadcasterUserId)}` : 'ニコニコユーザーID: -'}</p>
+        <p class="identity">${
+          broadcasterUserId
+            ? nicoUserPageUrl(broadcasterUserId)
+              ? `ニコニコユーザーID: <a href="${escapeAttr(nicoUserPageUrl(broadcasterUserId))}" rel="noopener noreferrer">${escapeHtml(broadcasterUserId)}</a>`
+              : `ニコニコユーザーID: ${escapeHtml(broadcasterUserId)}`
+            : 'ニコニコユーザーID: -'
+        }</p>
         <span class="badge" aria-label="追憶のきらめきが記録した実測統計">✓ 追憶のきらめき 実測統計</span>
       </div>
     </header>

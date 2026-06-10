@@ -114,11 +114,16 @@ describe('buildMediaKitHtml', () => {
     expect(doc.body.textContent).toContain('" onmouseover="alert(1)');
   });
 
-  it('外部リソースを参照せず、安全なraster data URLだけ画像に使う', () => {
+  it('画像は data URL か公式CDN(secure-dcdn.cdn.nimg.jp)のみ参照する(v0.1.682 方針)', () => {
     const externalHtml = buildMediaKitHtml(BASE_STATS);
     const externalDoc = parse(externalHtml);
-    expect(externalDoc.querySelector('img')).toBeNull();
+    // 任意の外部URLは使わない(iconUrl が example.test でも uid 導出 or 頭文字に倒す)。
     expect(externalHtml).not.toContain('https://example.test/external.png');
+    for (const img of externalDoc.querySelectorAll('img')) {
+      expect(img.getAttribute('src')).toMatch(
+        /^(data:image\/|https:\/\/secure-dcdn\.cdn\.nimg\.jp\/)/
+      );
+    }
 
     const dataUrl = 'data:image/png;base64,iVBORw0KGgo=';
     const embeddedDoc = parse(
@@ -155,5 +160,32 @@ describe('応援者セクション(PR4)', () => {
   it('supporters が無ければセクションを出さない(後方互換)', () => {
     const html = buildMediaKitHtml(baseStats);
     expect(html).not.toContain('この配信を支えた応援者たち');
+  });
+});
+
+describe('情報セットの原則(AGENTS.md §3.5)', () => {
+  it('配信者ヘッダ: サムネはiconUrl無しでもuserIdから導出し、IDはユーザーページへのリンク', () => {
+    const html = buildMediaKitHtml({
+      windows: [],
+      broadcaster: { name: 'みあ', userId: '96462559', iconUrl: '' }
+    });
+    expect(html).toContain('usericon/s/9646/96462559.jpg');
+    expect(html).toContain('href="https://www.nicovideo.jp/user/96462559"');
+  });
+  it('応援者の記名uidにもユーザーページリンクが付く(匿名はリンク無し)', () => {
+    const html = buildMediaKitHtml({
+      windows: [],
+      broadcaster: { name: 'x', userId: '1', iconUrl: '' },
+      supporters: {
+        giftTop: [
+          { userId: '4046119', name: 'たろう', points: 100, count: 1 },
+          { userId: 'a:XYZ', name: '', points: 50, count: 1 }
+        ],
+        commentTop: [],
+        regulars: null
+      }
+    });
+    expect(html).toContain('href="https://www.nicovideo.jp/user/4046119"');
+    expect(html).not.toContain('https://www.nicovideo.jp/user/a:XYZ');
   });
 });
