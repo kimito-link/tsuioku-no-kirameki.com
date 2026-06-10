@@ -43,25 +43,44 @@ export function isGenericComeviewName(name) {
  */
 export function dedupeWeakComeviewRows(rows) {
   if (!Array.isArray(rows)) return [];
+  /** @type {(a: {capturedAt: number|null}, b: {capturedAt: number|null}) => boolean} */
+  const nearInTime = (a, b) =>
+    a.capturedAt == null ||
+    b.capturedAt == null ||
+    Math.abs(Number(a.capturedAt) - Number(b.capturedAt)) <= 15_000;
   /** @type {Map<string, Array<{ capturedAt: number|null }>>} */
   const strongByText = new Map();
+  /** @type {Map<string, Array<{ capturedAt: number|null }>>} 名前か userId を持つ(=素性のある)行。本文ごとに集める。 */
+  const informedByText = new Map();
   for (const r of rows) {
-    if (!r || r.no == null) continue;
-    const list = strongByText.get(r.text);
-    if (list) list.push(r);
-    else strongByText.set(r.text, [r]);
+    if (!r) continue;
+    if (r.no != null) {
+      const list = strongByText.get(r.text);
+      if (list) list.push(r);
+      else strongByText.set(r.text, [r]);
+    }
+    if (String(r.name || '').trim() || String(r.userId || '').trim()) {
+      const list = informedByText.get(r.text);
+      if (list) list.push(r);
+      else informedByText.set(r.text, [r]);
+    }
   }
   return rows.filter((r) => {
     if (!r) return false;
     if (r.no != null) return true;
-    const cands = strongByText.get(r.text);
-    if (!cands) return true;
-    return !cands.some(
-      (s) =>
-        r.capturedAt == null ||
-        s.capturedAt == null ||
-        Math.abs(Number(s.capturedAt) - Number(r.capturedAt)) <= 15_000
-    );
+    // 弱い行(no 無し): 同文の no 付き行が近くにあれば別ソース重複として捨てる。
+    const strong = strongByText.get(r.text);
+    if (strong && strong.some((s) => nearInTime(r, s))) return false;
+    // v0.1.672: 弱い行どうしの重複。名前も userId も無い「素性なし」行は、同文で素性のある行が
+    //   近くにあれば劣化した重複とみなして捨てる(実機: 「ほねと」行と無名行の同文ペア)。
+    //   素性あり同士(別人のエコー)は残す。
+    const hasIdentity =
+      String(r.name || '').trim() || String(r.userId || '').trim();
+    if (!hasIdentity) {
+      const informed = informedByText.get(r.text);
+      if (informed && informed.some((s) => s !== r && nearInTime(r, s))) return false;
+    }
+    return true;
   });
 }
 
