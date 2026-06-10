@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.672',
+    date: '2026-06-10',
+    summary: 'コメビュの二重表示の残りを根治',
+    items: Object.freeze([
+      '前回の修正後も残っていた二重表示を直しました。①名前ありの行と名前なしの行で同じコメントが2回出るパターン(どちらもコメント番号なし)も重複として畳むようにしました(別の人が同じ文を打つ「エコーコメント」は消しません) ②先に画面に出てしまった重複行が残り続けていたのを、あとから判定が効いた時点で画面からも消すようにしました(件数表示と行数のズレも解消)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.671',
     date: '2026-06-10',
     summary: 'コメビュの二重表示と「匿名」表記の混在を修正',

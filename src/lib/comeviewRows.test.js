@@ -116,6 +116,29 @@ describe('dedupeWeakComeviewRows(別ソース二重表示の除去)', () => {
     ];
     expect(dedupeWeakComeviewRows(rows)).toHaveLength(2);
   });
+  it('素性なし(名前もIDも無い)弱い行は、同文の素性あり行が近くにあれば捨てる', () => {
+    const rows = [
+      { id: 'c:a1:こんにちは:1000', no: null, name: 'ほねと', text: 'こんにちは', userId: 'a:1', avatar: '', selfPosted: false, capturedAt: 1000 },
+      { id: 'c::こんにちは:2000', no: null, name: '', text: 'こんにちは', userId: '', avatar: '', selfPosted: false, capturedAt: 2000 }
+    ];
+    const out = dedupeWeakComeviewRows(rows);
+    expect(out).toHaveLength(1);
+    expect(out[0].name).toBe('ほねと');
+  });
+  it('素性あり同士の同文(別人のエコー)は両方残す', () => {
+    const rows = [
+      { id: 'c:a1:わこつ:1000', no: null, name: 'A', text: 'わこつ', userId: 'a:1', avatar: '', selfPosted: false, capturedAt: 1000 },
+      { id: 'c:a2:わこつ:2000', no: null, name: 'B', text: 'わこつ', userId: 'a:2', avatar: '', selfPosted: false, capturedAt: 2000 }
+    ];
+    expect(dedupeWeakComeviewRows(rows)).toHaveLength(2);
+  });
+  it('素性なし行どうしだけなら残す(重複と断定する材料がない)', () => {
+    const rows = [
+      { id: 'c::おはよう:1000', no: null, name: '', text: 'おはよう', userId: '', avatar: '', selfPosted: false, capturedAt: 1000 },
+      { id: 'c::おはよう:2000', no: null, name: '', text: 'おはよう', userId: '', avatar: '', selfPosted: false, capturedAt: 2000 }
+    ];
+    expect(dedupeWeakComeviewRows(rows)).toHaveLength(2);
+  });
   it('同文でも15秒より離れていれば別コメントとして残す', () => {
     const rows = [
       { id: 'no:1', no: 1, name: '', text: 'こん', userId: 'a:X', avatar: '', selfPosted: false, capturedAt: 1000 },

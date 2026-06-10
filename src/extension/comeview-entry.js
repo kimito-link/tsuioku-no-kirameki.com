@@ -695,6 +695,18 @@ async function refresh() {
   const rows = buildComeviewRows(raw, COMEVIEW_MAX_ROWS);
   const fresh = pickNewComeviewRows(rows, _seenIds);
 
+  // v0.1.672: 弱い行(no 無し)が先に描画され、あとから強い行(NDGR)が来て dedupe で
+  //   消えた場合、DOM に残った古い弱い行を追い掛けて消す(ヘッダ件数と表示行数のズレ・
+  //   二重表示の残骸の解消)。no: 始まりの強い行は触らない(通常の窓回転は pruneOverflow が担う)。
+  const currentIds = new Set(rows.map((r) => r.id));
+  for (const el of [...listEl.querySelectorAll('.cv-row')]) {
+    const id = (el.dataset && el.dataset.id) || '';
+    if ((id.startsWith('c:') || id.startsWith('id:')) && !currentIds.has(id)) {
+      _seenIds.delete(id);
+      el.remove();
+    }
+  }
+
   if (fresh.length) {
     const nearBottom =
       listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 80;
