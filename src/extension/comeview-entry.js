@@ -145,6 +145,23 @@ async function readLightComments(lv) {
   };
 }
 
+/**
+ * v0.1.669: ホバーアクションのモノクロ SVG アイコン(わんコメ同型のすっきりした見た目)。
+ * 固定定数のみ=ユーザー由来文字列は混ぜない(innerHTML 安全)。fill は CSS の currentColor。
+ */
+const CV_ACTION_ICONS = {
+  trash:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-3 6h12v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9zm4 2v9h2v-9h-2zm4 0v9h2v-9h-2z"/></svg>',
+  block:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM4 12a8 8 0 0 1 12.9-6.3L5.7 16.9A7.96 7.96 0 0 1 4 12zm8 8a7.96 7.96 0 0 1-4.9-1.7L18.3 7.1A8 8 0 0 1 12 20z"/></svg>',
+  person:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-3.3 0-8 1.7-8 5v2h16v-2c0-3.3-4.7-5-8-5z"/></svg>',
+  copy:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>',
+  pin:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5l-2 3v2h5v6l1 1 1-1v-6h5v-2l-2-3z"/></svg>'
+};
+
 const AVATAR_COLORS = ['#0f8fd8', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 function avatarColor(seed) {
   let h = 0;
@@ -552,35 +569,37 @@ function buildRowEl(row) {
   // 名前行(ニックネーム/ラベル反映)は共通ロジックで組む(保存時の追い掛け更新と同じ経路)。
   updateRowIdentity(el);
 
-  // ホバーアクション(わんコメ同等+追憶独自)。OBS モードでは CSS で非表示。
+  // ホバーアクション(わんコメ同型のモノクロアイコン列)。OBS モードでは CSS で非表示。
   const actions = document.createElement('div');
   actions.className = 'cv-actions';
-  const mkBtn = (label, title, onClick) => {
+  const mkBtn = (icon, title, onClick) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = label;
+    // アイコンは固定の SVG 定数のみ(ユーザー由来の文字列は入れない)。
+    b.innerHTML = CV_ACTION_ICONS[icon];
     b.title = title;
+    b.setAttribute('aria-label', title);
     b.addEventListener('click', (ev) => {
       ev.stopPropagation();
       onClick();
     });
     actions.appendChild(b);
   };
-  mkBtn('📋', 'コメントをコピー', () => copyTextToClipboard(buildComeviewCopyText(row)));
-  mkBtn('📌', 'ピン留め(全コメビュ窓・OBSにも表示)', () => {
-    persistPin(row);
-    renderPinBar({ id: row.id, name: row.name, text: row.text });
-  });
-  mkBtn('✕', 'この行を隠す(この窓だけ)', () => {
+  mkBtn('trash', 'この行を隠す(この窓だけ)', () => {
     _hiddenIds.add(row.id);
     el.remove();
   });
   if (ukey) {
-    mkBtn('🚫', 'この人のコメントを非表示にする', () => addNg(row));
-    mkBtn('👤', 'この人の詳細(名前付け・ラベル・メモ・発言一覧)', () =>
+    mkBtn('block', 'この人のコメントを非表示にする', () => addNg(row));
+    mkBtn('person', 'この人の詳細(名前付け・ラベル・メモ・発言一覧)', () =>
       void showUserDetail(row)
     );
   }
+  mkBtn('copy', 'コメントをコピー', () => copyTextToClipboard(buildComeviewCopyText(row)));
+  mkBtn('pin', 'ピン留め(全コメビュ窓・OBSにも表示)', () => {
+    persistPin(row);
+    renderPinBar({ id: row.id, name: row.name, text: row.text });
+  });
   el.appendChild(actions);
   return el;
 }
