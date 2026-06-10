@@ -65,23 +65,38 @@ export function dedupeWeakComeviewRows(rows) {
       else informedByText.set(r.text, [r]);
     }
   }
-  return rows.filter((r) => {
-    if (!r) return false;
-    if (r.no != null) return true;
+  /** @type {Map<string, Array<{ capturedAt: number|null }>>} 既に残した弱い行(同一人物+同文)。 */
+  const keptWeakByIdentity = new Map();
+  /** @type {ReturnType<typeof normalizeComeviewRow>[]} */
+  const out = [];
+  for (const r of rows) {
+    if (!r) continue;
+    if (r.no != null) {
+      out.push(r);
+      continue;
+    }
     // 弱い行(no 無し): 同文の no 付き行が近くにあれば別ソース重複として捨てる。
     const strong = strongByText.get(r.text);
-    if (strong && strong.some((s) => nearInTime(r, s))) return false;
-    // v0.1.672: 弱い行どうしの重複。名前も userId も無い「素性なし」行は、同文で素性のある行が
-    //   近くにあれば劣化した重複とみなして捨てる(実機: 「ほねと」行と無名行の同文ペア)。
-    //   素性あり同士(別人のエコー)は残す。
-    const hasIdentity =
-      String(r.name || '').trim() || String(r.userId || '').trim();
-    if (!hasIdentity) {
+    if (strong && strong.some((s) => nearInTime(r, s))) continue;
+    const uid = String(r.userId || '').trim();
+    const name = String(r.name || '').trim();
+    if (!uid && !name) {
+      // v0.1.672: 素性なし行は、同文で素性のある行が近くにあれば劣化重複として捨てる。
       const informed = informedByText.get(r.text);
-      if (informed && informed.some((s) => s !== r && nearInTime(r, s))) return false;
+      if (informed && informed.some((s) => s !== r && nearInTime(r, s))) continue;
+    } else {
+      // v0.1.674: 同一人物(同uid/同名)の同文 weak 行は、recent と tail で capturedAt が
+      //   ズレて id が変わる二重取り(実機: 匿名513「あなたくちばし出てるよ」×2)。
+      //   ±15秒以内なら最初の1件だけ残す(同じ人が本当に連投したケースは通常 no 付きで来る)。
+      const idKey = `${uid || `n:${name}`}|${r.text}`;
+      const kept = keptWeakByIdentity.get(idKey);
+      if (kept && kept.some((s) => nearInTime(r, s))) continue;
+      if (kept) kept.push(r);
+      else keptWeakByIdentity.set(idKey, [r]);
     }
-    return true;
-  });
+    out.push(r);
+  }
+  return out;
 }
 
 /**

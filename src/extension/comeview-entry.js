@@ -119,6 +119,24 @@ function isObsMode() {
   }
 }
 
+/**
+ * v0.1.674: ?user=<uid>(&uname=<表示名>) で起動されたら、そのユーザーの詳細パネルを
+ * 自動で開く(パネルの応援タイムラインの行クリックから飛んでくる)。
+ * uname が自動生成の「匿名NNN」なら持ち込まない(コメビュ側で同じ番号を再生成する)。
+ */
+function resolveDetailRequestFromUrl() {
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const uid = String(sp.get('user') || '').trim();
+    if (!uid || uid.length > 128) return null;
+    let name = String(sp.get('uname') || '').trim();
+    if (/^匿名\d{1,3}$/.test(name)) name = '';
+    return { userId: uid, name };
+  } catch {
+    return null;
+  }
+}
+
 /** 軽量にコメント行(recent + tail)+ピン状態+ユーザーノートを読む。SW を起こさない。 */
 async function readLightComments(lv) {
   if (!lv) return { rows: [], pin: null, notes: null };
@@ -836,6 +854,20 @@ async function main() {
   wireButtons();
   await loadNgList();
   await refresh();
+  // パネルのタイムライン行クリックから ?user= 付きで開かれたら、詳細を自動で開く。
+  const detailReq = resolveDetailRequestFromUrl();
+  if (detailReq) {
+    void showUserDetail({
+      id: '',
+      no: null,
+      name: detailReq.name,
+      text: '',
+      userId: detailReq.userId,
+      avatar: '',
+      selfPosted: false,
+      capturedAt: null
+    });
+  }
   startTimer();
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stopTimer();

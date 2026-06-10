@@ -14,6 +14,7 @@
 
 import { normalizeComeviewRow, isGenericComeviewName } from './comeviewRows.js';
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 
 /** NG リストの storage キー(配信を跨いで効く・拡張ページからの小さな UI 状態書込)。 */
 export const COMEVIEW_NG_STORAGE_KEY = 'nls_comeview_ng_v1';
@@ -49,7 +50,14 @@ export function resolveComeviewAvatarUrl(row) {
   const uid = String(row.userId || '').trim();
   const derived = deriveAvatarUrlFromUid(uid);
   if (derived) return derived;
-  if (uid.startsWith('a:')) return COMEVIEW_DEFAULT_AVATAR_URL;
+  // v0.1.674: 匿名はパネルの応援タイムラインと同じ identicon(ユーザーごとに違う幾何学模様・
+  //   同じ人=同じ模様)。一律グレーの既定アイコンだと「誰が何件書いたか識別できる」特徴が
+  //   死ぬ(ユーザー指摘)。勝手なアレンジをせずパネルと同じ見え方に揃える。
+  if (uid) {
+    const identicon = anonymousIdenticonDataUrl(uid, 64);
+    if (identicon) return identicon;
+    return COMEVIEW_DEFAULT_AVATAR_URL;
+  }
   return '';
 }
 

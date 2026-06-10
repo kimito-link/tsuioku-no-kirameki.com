@@ -5948,6 +5948,13 @@
       a.nl-tl-row:hover {
         background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
       }
+      /* v0.1.674: uid を持つ行はクリックでユーザー詳細(名前付け/メモ/発言一覧)が開ける。 */
+      #supportTimelineBody [data-nl-uid] {
+        cursor: pointer;
+      }
+      #supportTimelineBody [data-nl-uid]:hover {
+        background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
+      }
       .nl-tl-row__avatar {
         width: 20px;
         height: 20px;
