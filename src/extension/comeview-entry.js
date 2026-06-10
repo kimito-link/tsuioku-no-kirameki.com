@@ -46,6 +46,13 @@ import {
   chunkKeysFromIndex,
   isChunkIndex
 } from '../lib/commentChunkStore.js';
+import {
+  normalizeComeviewUserNotes,
+  upsertComeviewUserNote,
+  resolveComeviewDisplayName,
+  formatComeviewTime,
+  COMEVIEW_USER_NOTES_KEY
+} from '../lib/comeviewUserNotes.js';
 
 const REFRESH_INTERVAL_MS = 1200;
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
@@ -64,6 +71,8 @@ let _ngKeys = new Set();
 const _hiddenIds = new Set();
 /** @type {string} 表示中ピンの id(再描画抑止用)。 */
 let _pinShownId = '';
+/** @type {Record<string,{nickname:string,label:string,memo:string,at:number}>} ユーザーノート(配信を跨いで永続)。 */
+let _userNotes = {};
 
 /** URL or storage から対象 lv を解決する。 */
 function resolveLiveIdFromUrl() {
@@ -97,18 +106,24 @@ function isObsMode() {
   }
 }
 
-/** 軽量にコメント行(recent + tail)+ピン状態を読む。SW を起こさない。 */
+/** 軽量にコメント行(recent + tail)+ピン状態+ユーザーノートを読む。SW を起こさない。 */
 async function readLightComments(lv) {
-  if (!lv) return { rows: [], pin: null };
+  if (!lv) return { rows: [], pin: null, notes: null };
   const cdbKey = commentDbSummaryKey(lv);
   const csKey = summaryStorageKey(lv);
   const tKey = tailStorageKey(lv);
   const pinKey = comeviewPinStorageKey(lv);
   let bag = {};
   try {
-    bag = await chrome.storage.local.get([cdbKey, csKey, tKey, pinKey]);
+    bag = await chrome.storage.local.get([
+      cdbKey,
+      csKey,
+      tKey,
+      pinKey,
+      COMEVIEW_USER_NOTES_KEY
+    ]);
   } catch {
-    return { rows: [], pin: null };
+    return { rows: [], pin: null, notes: null };
   }
   const cdb = bag[cdbKey];
   const cs = bag[csKey];
@@ -123,7 +138,11 @@ async function readLightComments(lv) {
       ? pinRaw
       : null;
   // recent(古い→新しい) の後ろに tail(未畳み込み新着) を足す。重複は id で後段 dedupe。
-  return { rows: [...recent, ...tail], pin };
+  return {
+    rows: [...recent, ...tail],
+    pin,
+    notes: normalizeComeviewUserNotes(bag[COMEVIEW_USER_NOTES_KEY])
+  };
 }
 
 const AVATAR_COLORS = ['#0f8fd8', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
@@ -197,6 +216,62 @@ function updateNgButton() {
   const n = _ngList.length;
   btn.textContent = `NG ${n}`;
   btn.style.display = n > 0 ? '' : 'none';
+}
+
+/**
+ * 行の名前部分(表示名+ラベルバッジ)を現在のユーザーノートで組み直す。
+ * 新規描画(buildRowEl)とニックネーム保存時の追い掛け更新が同じ経路を通る。
+ */
+function updateRowIdentity(el) {
+  if (!el || !el.dataset) return;
+  const ukey = el.dataset.ukey || '';
+  const rowLike = { userId: el.dataset.uid || '', name: el.dataset.name || '' };
+  const displayName = resolveComeviewDisplayName(rowLike, _userNotes, ukey);
+  const note = ukey ? _userNotes[ukey] : null;
+  const body = el.querySelector('.cv-body');
+  let nm = el.querySelector('.cv-name');
+  if (!displayName && !(note && note.label)) {
+    if (nm) nm.remove();
+    return;
+  }
+  if (!nm) {
+    if (!body) return;
+    nm = document.createElement('div');
+    nm.className = 'cv-name';
+    body.insertBefore(nm, body.firstChild);
+  }
+  nm.textContent = '';
+  const nmText = document.createElement('span');
+  nmText.className = 'cv-name-text';
+  nmText.textContent = el.classList.contains('is-self')
+    ? `${displayName}（あなた）`
+    : displayName;
+  nm.appendChild(nmText);
+  if (note && note.label) {
+    const chip = document.createElement('span');
+    chip.className = 'cv-label-chip';
+    chip.textContent = note.label;
+    nm.appendChild(chip);
+  }
+}
+
+/**
+ * ユーザーノート(ニックネーム/ラベル/メモ)を保存し、表示中の行へ即反映する。
+ * 匿名(a:… ID)にも付けられる=わんコメ式の肝。storage 経由で他のコメビュ窓にも伝わる。
+ */
+function saveUserNotePatch(ukey, patch) {
+  if (!ukey) return;
+  _userNotes = upsertComeviewUserNote(_userNotes, ukey, patch, Date.now());
+  try {
+    void chrome.storage.local.set({ [COMEVIEW_USER_NOTES_KEY]: _userNotes });
+  } catch {
+    /* no-op */
+  }
+  const listEl = document.getElementById('cvList');
+  if (!listEl) return;
+  for (const el of [...listEl.querySelectorAll('.cv-row')]) {
+    if (el.dataset && el.dataset.ukey === ukey) updateRowIdentity(el);
+  }
 }
 
 /** ピンを storage に書く(同じ配信の全コメビュ窓へ同期)。null で解除。 */
@@ -281,15 +356,68 @@ function closePanel() {
 }
 
 /**
- * 追憶独自「この人の発言だけ」: クリック時だけ全件アーカイブ(チャンク)を一度読み、
- * その人の全コメントを表示する。定期読みはしない(軽さ不変)。
+ * ユーザー詳細パネル(わんコメ式+追憶独自):
+ *   - ニックネーム/ラベル/メモ(配信を跨いで永続・【匿名にも付けられる】=わんコメ式の肝。
+ *     ニコ生の匿名 ID は人ごとに安定しているので、名付ければ次の配信でも同じ名前で出る)
+ *   - ID 表示+コピー
+ *   - この配信での発言一覧(全件アーカイブから・時刻付き)=追憶だけの武器。
+ * アーカイブはクリック時だけ一度読む。定期読みはしない(軽さ不変)。
  */
-async function showUserHistory(row) {
+async function showUserDetail(row) {
   const ukey = comeviewUserKeyForRow(row);
   if (!ukey || !_liveId) return;
-  const label = row.name || row.userId || 'この人';
-  const bodyEl = openPanel(`🕘 ${label} の発言(この配信)`);
+  const label =
+    resolveComeviewDisplayName(row, _userNotes, ukey) || row.userId || 'この人';
+  const bodyEl = openPanel(`👤 ${label}`);
   if (!bodyEl) return;
+
+  // --- ID 行(コピー付き) ---
+  const idLine = document.createElement('div');
+  idLine.className = 'cv-detail-id';
+  const idText = document.createElement('span');
+  idText.textContent = row.userId ? `ID: ${row.userId}` : '(名前のみ・ID なし)';
+  idLine.appendChild(idText);
+  if (row.userId) {
+    const cp = document.createElement('button');
+    cp.type = 'button';
+    cp.className = 'cv-panel-unng';
+    cp.textContent = 'コピー';
+    cp.addEventListener('click', () => copyTextToClipboard(row.userId));
+    idLine.appendChild(cp);
+  }
+  bodyEl.appendChild(idLine);
+
+  // --- ニックネーム/ラベル/メモ(変更したら即保存・行へ即反映) ---
+  const note = _userNotes[ukey] || { nickname: '', label: '', memo: '' };
+  const form = document.createElement('div');
+  form.className = 'cv-detail-form';
+  const mkField = (caption, placeholder, value, field, multiline) => {
+    const wrap = document.createElement('label');
+    wrap.className = 'cv-detail-field';
+    const cap = document.createElement('span');
+    cap.textContent = caption;
+    wrap.appendChild(cap);
+    const input = document.createElement(multiline ? 'textarea' : 'input');
+    if (!multiline) input.type = 'text';
+    input.value = value;
+    input.placeholder = placeholder;
+    input.addEventListener('change', () =>
+      saveUserNotePatch(ukey, { [field]: input.value })
+    );
+    wrap.appendChild(input);
+    form.appendChild(wrap);
+  };
+  mkField(
+    'ニックネーム(表示名を上書き・匿名にも付けられます)',
+    '例: 常連の柿ピーさん',
+    note.nickname,
+    'nickname',
+    false
+  );
+  mkField('ラベル(名前の横にバッジ表示)', '例: 常連 / 初見 / 要注意', note.label, 'label', false);
+  mkField('メモ(自分用・画面には出ません)', '', note.memo, 'memo', true);
+  bodyEl.appendChild(form);
+
   const loading = document.createElement('div');
   loading.className = 'cv-panel-note';
   loading.textContent = 'アーカイブから読み込み中…';
@@ -321,12 +449,12 @@ async function showUserHistory(row) {
 
   const { rows, total } = extractUserCommentRows(rawRows, ukey, 200);
   loading.remove();
-  const note = document.createElement('div');
-  note.className = 'cv-panel-note';
-  note.textContent = total
-    ? `全 ${total} 件${total > rows.length ? `(新しい ${rows.length} 件を表示)` : ''}`
+  const countNote = document.createElement('div');
+  countNote.className = 'cv-panel-note';
+  countNote.textContent = total
+    ? `この配信での発言 全 ${total} 件${total > rows.length ? `(新しい ${rows.length} 件を表示)` : ''}`
     : 'この配信の記録にはまだ発言がありません';
-  bodyEl.appendChild(note);
+  bodyEl.appendChild(countNote);
   const frag = document.createDocumentFragment();
   for (const r of rows) {
     const line = document.createElement('div');
@@ -339,6 +467,10 @@ async function showUserHistory(row) {
     tx.className = 'cv-panel-text';
     tx.textContent = r.text;
     line.appendChild(tx);
+    const tm = document.createElement('span');
+    tm.className = 'cv-panel-time';
+    tm.textContent = formatComeviewTime(r.capturedAt);
+    line.appendChild(tm);
     frag.appendChild(line);
   }
   bodyEl.appendChild(frag);
@@ -383,6 +515,10 @@ function buildRowEl(row) {
   el.dataset.id = row.id;
   const ukey = comeviewUserKeyForRow(row);
   if (ukey) el.dataset.ukey = ukey;
+  // ニックネーム保存時に表示名を追い掛け更新できるよう、元の素性を持たせておく。
+  el.dataset.name = row.name || '';
+  el.dataset.uid = row.userId || '';
+  const displayName = resolveComeviewDisplayName(row, _userNotes, ukey);
 
   if (row.avatar) {
     const img = document.createElement('img');
@@ -394,7 +530,7 @@ function buildRowEl(row) {
       const fb = document.createElement('div');
       fb.className = 'cv-avatar-fallback';
       fb.style.background = avatarColor(row.userId || row.name);
-      fb.textContent = initial(row.name);
+      fb.textContent = initial(displayName || row.name);
       img.replaceWith(fb);
     };
     el.appendChild(img);
@@ -402,23 +538,19 @@ function buildRowEl(row) {
     const fb = document.createElement('div');
     fb.className = 'cv-avatar-fallback';
     fb.style.background = avatarColor(row.userId || row.name);
-    fb.textContent = initial(row.name);
+    fb.textContent = initial(displayName || row.name);
     el.appendChild(fb);
   }
 
   const body = document.createElement('div');
   body.className = 'cv-body';
-  if (row.name) {
-    const nm = document.createElement('div');
-    nm.className = 'cv-name';
-    nm.textContent = row.selfPosted ? `${row.name}（あなた）` : row.name;
-    body.appendChild(nm);
-  }
   const tx = document.createElement('div');
   tx.className = 'cv-text';
   tx.textContent = row.text;
   body.appendChild(tx);
   el.appendChild(body);
+  // 名前行(ニックネーム/ラベル反映)は共通ロジックで組む(保存時の追い掛け更新と同じ経路)。
+  updateRowIdentity(el);
 
   // ホバーアクション(わんコメ同等+追憶独自)。OBS モードでは CSS で非表示。
   const actions = document.createElement('div');
@@ -445,7 +577,9 @@ function buildRowEl(row) {
   });
   if (ukey) {
     mkBtn('🚫', 'この人のコメントを非表示にする', () => addNg(row));
-    mkBtn('🕘', 'この人の発言だけ見る(アーカイブから)', () => void showUserHistory(row));
+    mkBtn('👤', 'この人の詳細(名前付け・ラベル・メモ・発言一覧)', () =>
+      void showUserDetail(row)
+    );
   }
   el.appendChild(actions);
   return el;
@@ -467,7 +601,8 @@ async function refresh() {
   const countEl = document.getElementById('cvCount');
   if (!listEl) return;
 
-  const { rows: raw, pin } = await readLightComments(_liveId);
+  const { rows: raw, pin, notes } = await readLightComments(_liveId);
+  if (notes) _userNotes = notes; // 他のコメビュ窓で付けた名前も追従する
   renderPinBar(pin);
   const rows = buildComeviewRows(raw, COMEVIEW_MAX_ROWS);
   const fresh = pickNewComeviewRows(rows, _seenIds);
