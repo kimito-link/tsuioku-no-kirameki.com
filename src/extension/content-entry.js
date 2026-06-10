@@ -121,6 +121,15 @@ import {
 import { shouldFireBackfillRotationWithSlots } from '../lib/backfillRotationGate.js';
 import { runInBackfillSlot, BACKFILL_PARALLEL_SLOTS } from '../lib/backfillSlotPool.js';
 import {
+  createBackfillThrottleState,
+  updateBackfillThrottleState,
+  resolveEffectiveBackfillSlots
+} from '../lib/backfillSlotAutoThrottle.js';
+import {
+  acquireGlobalFetchToken,
+  reportGlobalFetchResult
+} from '../lib/globalFetchRateLimiter.js';
+import {
   chunkIndexKey,
   chunkMigratedKey,
   isChunkIndex,
@@ -15044,6 +15053,11 @@ const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
 const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '' };
 /** @type {number} バックフィル進捗が最後に動いた時刻 */
 let _backfillLastProgressAt = 0;
+/**
+ * v0.1.6xx PR2: 動的スロットル状態(単一タブ相当への降格判定用)。
+ * メインスレッドの yield 復帰遅延を監視し、重ければ有効スロット数を 1 に絞る。
+ */
+const _backfillThrottleState = createBackfillThrottleState();
 
 /** 進捗を documentElement の data 属性へ反映（popup が読む）。 */
 function publishBackfillProgress() {
@@ -15133,12 +15147,20 @@ async function backfillFetchBinary(url, opts) {
     else opts.signal.addEventListener('abort', onParentAbort, { once: true });
   }
   try {
+    // PR4: セッションストレージ共有トークンバケツで fetch レートを制御する
+    await acquireGlobalFetchToken(ac ? ac.signal : opts?.signal);
+
     const res = await fetch(url, {
       method: 'GET',
       credentials: 'omit', // ⭐ cross-origin（mpn.live）必須。include だと Failed to fetch
       cache: 'no-store',
       signal: ac ? ac.signal : opts?.signal
     });
+
+    // PR4: 429 エラーが出たらレートを落とす、成功なら上げる
+    const is429 = res.status === 429;
+    void reportGlobalFetchResult(res.ok, is429);
+
     const buf = res.ok ? new Uint8Array(await res.arrayBuffer()) : new Uint8Array();
     return { ok: res.ok, status: res.status, bytes: buf };
   } finally {
@@ -15255,7 +15277,7 @@ async function runNdgrBackfillOnce() {
           shouldFireBackfillRotationWithSlots({
             waitingLiveIds,
             selfLiveId: liveId,
-            parallelSlots: BACKFILL_PARALLEL_SLOTS
+            parallelSlots: resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS)
           })) {
         _backfillProgress.stopReason = 'rotation_yield';
         try { ac.abort(); } catch { /* no-op */ }
@@ -15495,7 +15517,9 @@ async function runNdgrBackfillOnce() {
       segmentsSinceYield += 1;
       if (segmentsSinceYield >= NDGR_BACKFILL_YIELD_EVERY_SEGMENTS) {
         segmentsSinceYield = 0;
+        const yieldStart = Date.now();
         await backfillYieldToPage();
+        updateBackfillThrottleState(_backfillThrottleState, Date.now() - yieldStart);
       }
     }
   } catch {
@@ -15773,17 +15797,29 @@ function maybeAutoStartBackfill() {
   //   取れたタブが走る=N配信まで真に並走、N+1本目以降だけ rotation で待つ(複数タブでも一気に取る)。
   //   N=1 なら従来の単一グローバルロックと完全同一(巻き戻し可能)。各スロットは runWhileGlobalLeader
   //   (= Web Locks ifAvailable・fail-open)で取得。crawl は per-tab AbortController で既に並走可能。
-  void runInBackfillSlot(
-    (slotName, fn) => runWhileGlobalLeader(slotName, fn),
-    () => runNdgrBackfillOnce(),
-    { slots: BACKFILL_PARALLEL_SLOTS }
-  ).then(({ ran }) => {
-    if (ran) {
+  // PR3: per-lvロックとNスロットの二段構え。同一放送の多タブ競合（nls_cchunk_index_<lv> race）を防止。
+  //   ⚠️ runIfTabLeader の戻り値 {ran} は「per-lvロックを取れたか」であって fn 内のスロット取得の
+  //   成否ではない(fn の戻り値は捨てられる)。スロット成否は外側の変数 slotRes で受ける。
+  //   per-lvロックを取れなかったタブ(=同一lvの別タブがリーダー)は waiter 登録もしない。
+  //   そのlvの waiter 登録/解除はリーダータブが担う(幽霊待機で他配信に不要な rotation_yield を
+  //   発火させない)。
+  void (async () => {
+    /** @type {{ran: boolean, slotIndex: number}|null} */
+    let slotRes = null;
+    const leader = await runIfTabLeader(`nls-backfill-${lid}`, async () => {
+      slotRes = await runInBackfillSlot(
+        (slotName, fn) => runWhileGlobalLeader(slotName, fn),
+        () => runNdgrBackfillOnce(),
+        { slots: resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS) }
+      );
+    });
+    if (!leader || !leader.ran) return;
+    if (slotRes && slotRes.ran) {
       void clearBackfillWaiter(lid);
     } else {
       void registerBackfillWaiter(lid);
     }
-  });
+  })();
 }
 
 // ── v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in 配線 ──────────────
