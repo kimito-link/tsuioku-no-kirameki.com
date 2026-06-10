@@ -17450,35 +17450,6 @@ async function downloadBlobViaChromeDownloads(blob, filename) {
 const MEDIA_KIT_LIVE_LIMIT = 60;
 
 /**
- * 配信者サムネを共有HTMLへ埋め込める場合だけ raster data URL 化する。
- * host permission / CORS で読めないURLは空文字へ倒し、HTML側の頭文字表示を使う。
- * @param {string} rawUrl
- */
-async function fetchMediaKitBroadcasterIconDataUrl(rawUrl) {
-  const url = String(rawUrl || '').trim();
-  if (/^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(url)) return url;
-  if (!/^https?:\/\//i.test(url)) return '';
-  try {
-    const response = await withTimeout(
-      fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer' }),
-      2500,
-      'media_kit_icon_timeout'
-    );
-    if (!response.ok) return '';
-    const mime = String(response.headers.get('content-type') || '')
-      .split(';')[0]
-      .trim()
-      .toLowerCase();
-    if (!/^image\/(?:png|jpe?g|gif|webp)$/.test(mime)) return '';
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength <= 0 || buffer.byteLength > 2 * 1024 * 1024) return '';
-    return `data:${mime};base64,${arrayBufferToBase64(buffer)}`;
-  } catch {
-    return '';
-  }
-}
-
-/**
  * broadcast summary IDB と配信単位の軽量 storage からメディアキットを作る。
  * PR4(応援者が主役): 応援者セクション用にギフトイベント(全期間lv)と、直近最大12配信の
  * コメント(readAllCommentsForLive・15秒で打ち切り)も集計する。ニコ生上で公開されている
@@ -17580,12 +17551,12 @@ async function downloadMediaKitHtml() {
     profileMap: supporterProfileMap
   });
 
-  const broadcasterIconDataUrl = await fetchMediaKitBroadcasterIconDataUrl(
-    stats.broadcaster.iconUrl
-  );
+  // v0.1.682: 配信者アイコンの fetch→data URL 化を廃止。拡張に host permission の無い
+  //   CDN への fetch は CORS で拒否され、chrome://extensions のエラーログに残っていた
+  //   (実機報告)。応援者サムネと同じ「HTML 側が img で直接参照」(CSP で当該CDNのみ許可)に
+  //   統一する=fetch ゼロでエラーも出ない。manifest 権限は触らない(CWS 審査中)。
   const html = buildMediaKitHtml({ ...stats, supporters }, {
     generatedAtMs: nowMs,
-    broadcasterIconDataUrl,
     sourceLiveLimit: MEDIA_KIT_LIVE_LIMIT,
     sourceLiveLimitReached: liveIds.length >= MEDIA_KIT_LIVE_LIMIT
   });

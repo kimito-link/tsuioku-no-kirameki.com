@@ -101,7 +101,12 @@ function safeRasterDataUrl(raw) {
   return RASTER_DATA_URL_RE.test(value) ? value : '';
 }
 
+/** CSP の img-src で許可している公式CDNのみ(それ以外のURLは頭文字にフォールバック)。 */
+const REMOTE_ICON_RE = /^https:\/\/secure-dcdn\.cdn\.nimg\.jp\/[^\s"'<>]+$/i;
+
 /**
+ * v0.1.682: 配信者アイコンは data URL(あれば) > 公式CDNのhttps URL直接参照 > 頭文字。
+ * 拡張側での fetch(CORS エラーの原因)はやめ、応援者サムネと同じ img 直接参照に統一。
  * @param {{ name?: unknown, iconUrl?: unknown }} broadcaster
  * @param {unknown} iconDataUrl
  */
@@ -110,6 +115,10 @@ function broadcasterAvatarHtml(broadcaster, iconDataUrl) {
   const name = String(broadcaster?.name ?? '').trim();
   if (embedded) {
     return `<img class="avatar" src="${escapeAttr(embedded)}" alt="" width="88" height="88">`;
+  }
+  const remote = String(broadcaster?.iconUrl ?? '').trim();
+  if (REMOTE_ICON_RE.test(remote)) {
+    return `<img class="avatar" src="${escapeAttr(remote)}" alt="" width="88" height="88" loading="lazy">`;
   }
   const initial = Array.from(name || '配')[0] || '配';
   return `<div class="avatar avatar--fallback" aria-hidden="true">${escapeHtml(initial)}</div>`;
