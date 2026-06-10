@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.668',
+    date: '2026-06-10',
+    summary: 'パネルに「💬コメビュ」ボタンを追加',
+    items: Object.freeze([
+      'パネルのボタン列(HTML・マーケ・スクショの並び)に「💬コメビュ」を追加しました。コメントのコピー・ピン留め・非表示・匿名さんへの名前付けができる専用ウィンドウを、状態ページを経由せずワンクリックで開けます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.667',
     date: '2026-06-10',
     summary: 'コメビュに匿名OKのニックネーム・ラベル・メモ',

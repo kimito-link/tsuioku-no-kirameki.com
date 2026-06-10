@@ -20500,6 +20500,18 @@ async function initPopup() {
     void triggerReloadWatchTabFromPopup();
   });
 
+  // v0.1.668: パネルから直接コメビュを開く(従来は状態ページにしか入口が無く、コメント単位の
+  //   操作・名前付け機能に気づけなかった)。lv は付けない=comeview 側が nls_last_watch_url
+  //   から自己解決する(配信切替に追従)。disabled にしない=watch 未接続でも開ける。
+  $('openComeviewBtn')?.addEventListener('click', () => {
+    const url = chrome.runtime.getURL('comeview.html');
+    try {
+      chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
+    } catch {
+      window.open(url, '_blank', 'width=400,height=640');
+    }
+  });
+
   // 0.1.69 (AY): empty state「前回の配信」cards から、その配信を新タブで開く。
   // dataset.watchUrl は applyLastBroadcastReviewToEmptyState() で設定される。
   // hasExtensionContext() が偽ならボタン自体が disabled なので、ここでは
