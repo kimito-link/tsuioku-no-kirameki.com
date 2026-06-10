@@ -45,6 +45,30 @@ export const BACKFILL_GAP_RETRY_STOP_REASONS = new Set(['no_progress']);
 export const BACKFILL_GAP_RETRY_COVERAGE = 0.95;
 
 /**
+ * v0.1.665「長尺配信が71%等で止まったまま」根治: リトライ/再アーム予算(7回/40回)を
+ *   回復してよいかの判定。
+ *
+ * 真因(実機 2026-06-10・公式1263/記録899=71.2%で前面なのに永久停止):
+ *   _backfillTransientRetryByLiveId(上限7)と _backfillGapRearmByLiveId(上限40・36s間隔
+ *   ≒24分ぶん)は liveId 単位の【生涯予算】で、巡回が進捗しても減ったまま戻らなかった。
+ *   3時間級の疎区間配信は「止まる→自動再開→前進→また止まる」を何十回も繰り返すため
+ *   途中で予算が尽き、以後は gap が大きく残っていても二度と自動再開されず固定された。
+ *
+ * 設計: 上限は「連続空振り(全く取れない巡回の繰り返し)」を止めるための予算であって、
+ *   前進している限り消費し続けるべきものではない。rows>0=その巡回で実際に区画を取れた
+ *   なら予算を全回復する。真に取れない配信(入口不全等)は rows=0 の巡回が続くので
+ *   従来どおり 7回/40回で有界=暴走防止は不変。
+ *
+ * @param {object} args
+ * @param {number} args.rowsThisRun この巡回で取得した行数(_backfillProgress.rows)。
+ * @returns {boolean} true なら liveId のリトライ/再アーム予算カウンタを 0 に戻してよい。
+ */
+export function shouldResetBackfillRetryBudgetAfterRun(args) {
+  const rows = Number(args?.rowsThisRun);
+  return Number.isFinite(rows) && rows > 0;
+}
+
+/**
  * バックフィル終了後、一過性 stop として自動リトライをスケジュールすべきかを判定する。
  *
  * @param {object} args

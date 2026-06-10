@@ -406,7 +406,10 @@ import {
   runWhileGlobalLeader,
   GLOBAL_FORWARD_LOCK
 } from '../lib/tabLeaderLock.js';
-import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
+import {
+  shouldScheduleBackfillTransientRetry,
+  shouldResetBackfillRetryBudgetAfterRun
+} from '../lib/backfillTransientRetry.js';
 import {
   shouldRearmBackfillAfterVisibility,
   pruneRecentVisibilityPauses
@@ -15606,6 +15609,16 @@ async function runNdgrBackfillOnce() {
     //   経ってからもう一度」を自動化）。完了/やり切り/中断では再試行しない。タブが今 LIVE を
     //   見ていて自動取り込み ON のときだけ（隠れタブ・OFF では無駄に叩かない）。
     const lidAtFinish = liveId;
+    // v0.1.665: 進捗があった巡回はリトライ/再アーム予算を全回復する。上限(7回/40回)は
+    //   「連続空振り」を止めるための予算であって、長尺・疎区間配信が何度も止まりながら
+    //   前進するときの寿命ではない。生涯予算のままだと3時間級配信で途中に予算が尽き、
+    //   以後は前面でも gap が残ったまま永久に再開されず71%等で固定された(実機 2026-06-10・
+    //   公式1263/記録899)。取れない配信は rows=0 が続き従来どおり有界=暴走防止不変。
+    if (shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: _backfillProgress.rows })) {
+      _backfillTransientRetryByLiveId[lidAtFinish] = 0;
+      const lidTrimmedAtFinish = String(lidAtFinish || '').trim();
+      if (lidTrimmedAtFinish) _backfillGapRearmByLiveId[lidTrimmedAtFinish] = 0;
+    }
     const retried = _backfillTransientRetryByLiveId[lidAtFinish] || 0;
     if (
       shouldScheduleBackfillTransientRetry({

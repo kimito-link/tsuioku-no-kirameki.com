@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   shouldScheduleBackfillTransientRetry,
+  shouldResetBackfillRetryBudgetAfterRun,
   BACKFILL_TRANSIENT_STOP_REASONS
 } from './backfillTransientRetry.js';
 
@@ -103,5 +104,24 @@ describe('shouldScheduleBackfillTransientRetry', () => {
     expect(BACKFILL_TRANSIENT_STOP_REASONS.has('reached_start')).toBe(false);
     expect(BACKFILL_TRANSIENT_STOP_REASONS.has('no_progress')).toBe(false);
     expect(BACKFILL_TRANSIENT_STOP_REASONS.has('backward_exhausted')).toBe(true);
+  });
+});
+
+describe('shouldResetBackfillRetryBudgetAfterRun', () => {
+  it('rows>0(取れた巡回)なら予算を回復してよい', () => {
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: 1 })).toBe(true);
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: 5000 })).toBe(true);
+  });
+
+  it('rows=0(空振り巡回)では回復しない=連続空振りは従来どおり7/40回で有界', () => {
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: 0 })).toBe(false);
+  });
+
+  it('無効値(負/NaN/undefined/文字列)では回復しない', () => {
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: -1 })).toBe(false);
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: NaN })).toBe(false);
+    expect(shouldResetBackfillRetryBudgetAfterRun({})).toBe(false);
+    expect(shouldResetBackfillRetryBudgetAfterRun(null)).toBe(false);
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: 'a' })).toBe(false);
   });
 });
