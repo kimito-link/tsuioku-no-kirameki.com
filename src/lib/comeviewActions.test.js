@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  resolveComeviewAvatarUrl,
+  COMEVIEW_DEFAULT_AVATAR_URL,
   comeviewUserKeyForRow,
   buildComeviewCopyText,
   normalizeComeviewNgList,
@@ -126,6 +128,28 @@ describe('extractUserCommentRows(追憶独自: この人の発言だけ)', () =>
   it('無効入力は空', () => {
     expect(extractUserCommentRows(null, 'u:1')).toEqual({ rows: [], total: 0 });
     expect(extractUserCommentRows(archive, '')).toEqual({ rows: [], total: 0 });
+  });
+});
+
+describe('resolveComeviewAvatarUrl(本家と同じサムネ解決)', () => {
+  it('取り込み済み avatar URL を最優先', () => {
+    expect(resolveComeviewAvatarUrl({ avatar: 'https://x/a.jpg', userId: '99' })).toBe(
+      'https://x/a.jpg'
+    );
+  });
+  it('数値 userId は本家の確定パターンで生成(popup と同じ)', () => {
+    expect(resolveComeviewAvatarUrl({ avatar: '', userId: '143172392' })).toBe(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14317/143172392.jpg'
+    );
+  });
+  it('匿名(a:…)は公式の既定アイコン', () => {
+    expect(resolveComeviewAvatarUrl({ avatar: '', userId: 'a:XYZ' })).toBe(
+      COMEVIEW_DEFAULT_AVATAR_URL
+    );
+  });
+  it('どちらも無ければ空(呼び出し側フォールバック)', () => {
+    expect(resolveComeviewAvatarUrl({ avatar: '', userId: '' })).toBe('');
+    expect(resolveComeviewAvatarUrl(null)).toBe('');
   });
 });
 

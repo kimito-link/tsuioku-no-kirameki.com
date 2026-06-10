@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.670',
+    date: '2026-06-10',
+    summary: 'コメビュのアイコンを本家と同じサムネに',
+    items: Object.freeze([
+      'コメビュのユーザーアイコンが、ニコニコ本家と同じプロフィールサムネで表示されるようになりました。これまでは色付きの丸い頭文字を独自に出していましたが、ユーザーIDから公式のサムネを取得して表示します(匿名さんは公式の既定アイコン。サムネが取得できないときだけ従来の丸が出ます)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.669',
     date: '2026-06-10',
     summary: 'コメビュの操作ボタンをすっきりした見た目に',
