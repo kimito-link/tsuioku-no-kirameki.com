@@ -4,7 +4,7 @@
  * v0.1.676: ユーザー指示「(自前描画をやめて)そのまま一旦は POP にすればいい」に従い、
  *   一覧描画を【パネルの応援タイムラインと同一パイプライン】に置換した。
  *   - データ: readChunkedComments(本体チャンク正本)+テール+gift_events(POP と同じ)
- *   - 名前/サムネ: applyUserCommentProfileMapToEntries+buildSupportTimelineBodyHtml(POP と同じ)
+ *   - 名前/サムネ: applyUserCommentProfileMapToEntries+buildTimelineRowHtml(POP と同じ)
  *   - 見た目: popup.html の .nl-tl-* CSS を移植(POP と同じ)
  *   これにより「コメビュだけ二重表示/名前欠け」の類は構造的に起きない(ソースも描画も同一)。
  *
@@ -31,7 +31,7 @@ import {
 } from '../lib/commentDb.js';
 import { combineCanonicalComeviewRows } from '../lib/comeviewRows.js';
 import { buildSupportActivityTimeline } from '../lib/supportActivityTimeline.js';
-import { buildSupportTimelineBodyHtml } from '../lib/supportTimelineHtml.js';
+import { buildTimelineRowHtml } from '../lib/supportTimelineHtml.js';
 import {
   normalizeUserCommentProfileMap,
   applyUserCommentProfileMapToEntries
@@ -39,6 +39,8 @@ import {
 import {
   comeviewUserKeyForRow,
   comeviewUserPageUrl,
+  comeviewPinStorageKey,
+  buildComeviewCopyText,
   resolveComeviewAvatarUrl,
   mergeComeviewRowWithProfile,
   normalizeComeviewNgList,
@@ -54,20 +56,48 @@ import {
   formatComeviewTime,
   COMEVIEW_USER_NOTES_KEY
 } from '../lib/comeviewUserNotes.js';
+import {
+  comeviewTimelineItemSignature,
+  filterVisibleComeviewTimeline,
+  keepLatestComeviewTimelineItems,
+  pickNewComeviewTimelineItems,
+  pickAppendedComeviewSnapshotRows,
+  selectAppendedComeviewTimelineItems,
+  isComeviewNearBottom
+} from '../lib/comeviewInstantRender.js';
 
 /** POP のタイムラインと同じ既定アバター(extension ルート相対・popup.html と同一)。 */
 const DEFAULT_TILE_IMG =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
 /** POP と同じ表示上限。 */
 const TIMELINE_LIMIT = 120;
-const REFRESH_INTERVAL_MS = 2500;
+const HOT_POLL_INTERVAL_MS = 5000;
+const RECONCILE_INTERVAL_MS = 60_000;
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 
 let _liveId = '';
 let _paused = false;
 let _timer = null;
-/** 再描画スキップ用の入力シグネチャ(変化が無ければ innerHTML を組み直さない)。 */
-let _lastRenderSig = '';
+let _lastReconcileAt = 0;
+let _fullRefreshPromise = null;
+let _fullRefreshRequested = false;
+let _fullRefreshForceBottom = false;
+let _fullRefreshRunning = false;
+/** @type {Array<Record<string, unknown>>} */
+let _tailRows = [];
+/** @type {Array<Record<string, unknown>>} */
+let _giftRows = [];
+/** @type {Array<Record<string, unknown>>|null} */
+let _deferredTailRows = null;
+/** @type {Array<Record<string, unknown>>|null} */
+let _deferredGiftRows = null;
+/** @type {Set<string>} 現在 DOM にある TimelineItem.key。 */
+const _renderedKeys = new Set();
+/** @type {Map<string, import('../lib/supportActivityTimeline.js').TimelineItem>} */
+const _timelineItemsByKey = new Map();
+let _commentCount = 0;
+let _hoverBar = null;
+let _hoverRow = null;
 
 /** @type {Array<{key:string,name:string,at:number}>} ユーザーNG リスト(storage 永続)。 */
 let _ngList = [];
@@ -77,6 +107,27 @@ let _ngKeys = new Set();
 let _userNotes = {};
 /** @type {Record<string,{nickname?:string,avatarUrl?:string}>} プロフィールキャッシュ(POPと同一情報源)。 */
 let _profileCache = {};
+/** @type {Set<string>} 行単位で隠したシグネチャ(この窓だけ・セッション限り)。 */
+const _hiddenSigs = new Set();
+/** @type {string} 表示中ピンの内容(再描画抑止用)。 */
+let _pinShownSig = '';
+
+/**
+ * v0.1.677: ホバーアクション(わんコメ同型)のモノクロ SVG アイコン。
+ * 固定定数のみ=ユーザー由来文字列は混ぜない(innerHTML 安全)。fill は CSS の currentColor。
+ */
+const CV_ACTION_ICONS = {
+  trash:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 2h4v2H4V5h4l1-2zm-3 6h12v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9zm4 2v9h2v-9h-2zm4 0v9h2v-9h-2z"/></svg>',
+  block:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM4 12a8 8 0 0 1 12.9-6.3L5.7 16.9A7.96 7.96 0 0 1 4 12zm8 8a7.96 7.96 0 0 1-4.9-1.7L18.3 7.1A8 8 0 0 1 12 20z"/></svg>',
+  person:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-3.3 0-8 1.7-8 5v2h16v-2c0-3.3-4.7-5-8-5z"/></svg>',
+  copy:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>',
+  pin:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5l-2 3v2h5v6l1 1 1-1v-6h5v-2l-2-3z"/></svg>'
+};
 
 function resolveLiveIdFromUrl() {
   try {
@@ -175,7 +226,7 @@ function setNgList(next) {
   _ngKeys = new Set(next.map((e) => e.key));
   persistNgList();
   updateNgButton();
-  _lastRenderSig = ''; // 次 tick で必ず再描画(NG 反映)
+  void requestFullRefresh();
 }
 
 function addNg(row) {
@@ -451,14 +502,15 @@ function showNgPanel() {
  * @returns {Promise<Array<Record<string, unknown>>>}
  */
 async function readCanonicalComments(lv) {
+  let rows = [];
   if (isCommentDbAvailable()) {
     let db = null;
     try {
       db = await openCommentDb();
       const cnt = await countCommentsForLiveDb(db, lv);
       if (cnt > 0) {
-        const rows = await readAllCommentsFromDb(db, lv);
-        if (Array.isArray(rows) && rows.length) return rows;
+        const dbRows = await readAllCommentsFromDb(db, lv);
+        if (Array.isArray(dbRows) && dbRows.length) rows = dbRows;
       }
     } catch {
       /* fallthrough: chunk 経路へ */
@@ -470,14 +522,15 @@ async function readCanonicalComments(lv) {
       }
     }
   }
-  let rows = [];
-  try {
-    const res = await readChunkedComments(lv, commentsStorageKey(lv), (keys) =>
-      chrome.storage.local.get(keys)
-    );
-    rows = Array.isArray(res.rows) ? res.rows : [];
-  } catch {
-    rows = [];
+  if (!rows.length) {
+    try {
+      const res = await readChunkedComments(lv, commentsStorageKey(lv), (keys) =>
+        chrome.storage.local.get(keys)
+      );
+      rows = Array.isArray(res.rows) ? res.rows : [];
+    } catch {
+      rows = [];
+    }
   }
   try {
     const tKey = tailStorageKey(lv);
@@ -489,82 +542,536 @@ async function readCanonicalComments(lv) {
   return rows;
 }
 
-/** NG 中ユーザーの行を除く(コメント/ギフト共通)。 */
-function filterNgEntries(entries) {
-  if (!_ngKeys.size || !Array.isArray(entries)) return entries;
-  return entries.filter((e) => {
-    if (!e || typeof e !== 'object') return true;
-    const key = comeviewUserKeyForRow({
-      userId: e.userId,
-      name: e.nickname ?? e.name
-    });
-    return !key || !_ngKeys.has(key);
+function updateCommentCount() {
+  const countEl = document.getElementById('cvCount');
+  if (countEl) countEl.textContent = `${_commentCount} 件`;
+}
+
+/**
+ * 現在の全入力を時系列昇順へ統合する。共有 builder の asc+limit は古い側から
+ * limit 件を返すため、ここでは全候補を通してから末尾120件へ絞る。
+ */
+function buildAllComeviewTimeline(comments, gifts) {
+  const commentList = Array.isArray(comments) ? comments : [];
+  const giftList = Array.isArray(gifts) ? gifts : [];
+  return buildSupportActivityTimeline(commentList, giftList, {
+    order: 'asc',
+    limit: Math.max(TIMELINE_LIMIT, commentList.length + giftList.length)
   });
 }
 
-async function refresh() {
-  if (_paused || document.hidden) return;
-  const listEl = document.getElementById('cvList');
-  const countEl = document.getElementById('cvCount');
-  if (!listEl || !_liveId) return;
-  const lv = _liveId;
+function timelineRowHtml(item) {
+  return buildTimelineRowHtml(item, {
+    defaultAvatar: DEFAULT_TILE_IMG,
+    now: Date.now()
+  });
+}
 
+function rememberTimelineElement(element, item, animate) {
+  if (!(element instanceof HTMLElement) || !item?.key) return;
+  element.dataset.cvKey = item.key;
+  if (animate) element.classList.add('cv-row-in');
+  _renderedKeys.add(item.key);
+  _timelineItemsByKey.set(item.key, item);
+}
+
+function forgetTimelineElement(element) {
+  if (!(element instanceof HTMLElement)) return;
+  const key = element.dataset.cvKey || '';
+  if (key) {
+    _renderedKeys.delete(key);
+    _timelineItemsByKey.delete(key);
+  }
+  if (_hoverRow === element) hideHoverBar();
+}
+
+function renderFullTimeline(timeline, forceBottom = false) {
+  const listEl = document.getElementById('cvList');
+  if (!listEl) return;
+  const wasNearBottom =
+    forceBottom ||
+    isComeviewNearBottom({
+      scrollTop: listEl.scrollTop,
+      clientHeight: listEl.clientHeight,
+      scrollHeight: listEl.scrollHeight
+    });
+  const bottomGap = Math.max(
+    0,
+    listEl.scrollHeight - listEl.clientHeight - listEl.scrollTop
+  );
+
+  hideHoverBar();
+  _renderedKeys.clear();
+  _timelineItemsByKey.clear();
+  listEl.innerHTML = timeline.length
+    ? timeline.map((item) => timelineRowHtml(item)).join('')
+    : '<p class="nl-support-timeline__empty">まだコメントもギフトもありません（記録ONで時系列にたまります）</p>';
+
+  const elements = Array.from(listEl.children).filter((element) =>
+    element.matches('.nl-tl-row, .nl-tl-gift')
+  );
+  elements.forEach((element, index) =>
+    rememberTimelineElement(element, timeline[index], false)
+  );
+
+  if (wasNearBottom) {
+    listEl.scrollTop = listEl.scrollHeight;
+  } else {
+    listEl.scrollTop = Math.max(
+      0,
+      listEl.scrollHeight - listEl.clientHeight - bottomGap
+    );
+  }
+}
+
+function appendTimelineItems(items) {
+  const listEl = document.getElementById('cvList');
+  if (!listEl || !items.length) return;
+  const shouldFollow = isComeviewNearBottom({
+    scrollTop: listEl.scrollTop,
+    clientHeight: listEl.clientHeight,
+    scrollHeight: listEl.scrollHeight
+  });
+  const empty = listEl.querySelector('.nl-support-timeline__empty, #cvEmpty');
+  if (empty) empty.remove();
+
+  const fragment = document.createDocumentFragment();
+  for (const item of items) {
+    const template = document.createElement('template');
+    template.innerHTML = timelineRowHtml(item).trim();
+    const element = template.content.firstElementChild;
+    if (!element) continue;
+    rememberTimelineElement(element, item, true);
+    fragment.appendChild(element);
+  }
+  listEl.appendChild(fragment);
+
+  let rows = listEl.querySelectorAll('[data-cv-key]');
+  while (rows.length > TIMELINE_LIMIT) {
+    const oldest = rows[0];
+    forgetTimelineElement(oldest);
+    oldest.remove();
+    rows = listEl.querySelectorAll('[data-cv-key]');
+  }
+  if (shouldFollow) listEl.scrollTop = listEl.scrollHeight;
+}
+
+function normalizePin(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const text = String(raw.text || '').trim().slice(0, 500);
+  if (!text) return null;
+  return {
+    name: String(raw.name || '').trim().slice(0, 200),
+    text,
+    at: Number(raw.at) || 0
+  };
+}
+
+function renderPin(raw) {
+  const pinBar = document.getElementById('cvPinBar');
+  if (!pinBar) return;
+  const pin = normalizePin(raw);
+  const sig = pin ? JSON.stringify(pin) : '';
+  if (sig === _pinShownSig) return;
+  _pinShownSig = sig;
+  pinBar.textContent = '';
+  if (!pin) {
+    pinBar.style.display = 'none';
+    return;
+  }
+
+  const icon = document.createElement('span');
+  icon.className = 'cv-pin-icon';
+  icon.textContent = '📌';
+  pinBar.appendChild(icon);
+
+  const body = document.createElement('div');
+  body.className = 'cv-pin-body';
+  if (pin.name) {
+    const name = document.createElement('span');
+    name.className = 'cv-pin-name';
+    name.textContent = pin.name;
+    body.appendChild(name);
+  }
+  const text = document.createElement('span');
+  text.className = 'cv-pin-text';
+  text.textContent = pin.text;
+  body.appendChild(text);
+  pinBar.appendChild(body);
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'cv-pin-close';
+  close.textContent = '✕';
+  close.title = 'コメピタを解除';
+  close.addEventListener('click', () => {
+    if (!_liveId) return;
+    renderPin(null);
+    try {
+      void chrome.storage.local.remove(comeviewPinStorageKey(_liveId));
+    } catch {
+      /* no-op */
+    }
+  });
+  pinBar.appendChild(close);
+  pinBar.style.display = '';
+}
+
+function savePin(row) {
+  if (!_liveId) return;
+  const pin = normalizePin({
+    name: row.name,
+    text: row.text,
+    at: Date.now()
+  });
+  if (!pin) return;
+  renderPin(pin);
+  try {
+    void chrome.storage.local.set({
+      [comeviewPinStorageKey(_liveId)]: pin
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
+async function performFullRefresh(forceBottom) {
+  if (!_liveId) return;
+  const lv = _liveId;
   const tKey = tailStorageKey(lv);
   const giftKey = `nls_gift_events_${lv}`;
+  const pinKey = comeviewPinStorageKey(lv);
   let bag = {};
   try {
     bag = await chrome.storage.local.get([
       tKey,
       giftKey,
+      pinKey,
       COMEVIEW_USER_NOTES_KEY,
       KEY_USER_COMMENT_PROFILE_CACHE
     ]);
   } catch {
     return;
   }
+
+  _tailRows = Array.isArray(bag[tKey]) ? bag[tKey] : [];
+  _giftRows = Array.isArray(bag[giftKey]) ? bag[giftKey] : [];
   _userNotes = normalizeComeviewUserNotes(bag[COMEVIEW_USER_NOTES_KEY]);
   _profileCache = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
-  const tail = Array.isArray(bag[tKey]) ? bag[tKey] : [];
-  const gifts = Array.isArray(bag[giftKey]) ? bag[giftKey] : [];
-
-  // 本体チャンク(POP と同じ正本)。tick ごとの全読を避けるため、入力が変わった時だけ読む。
-  const lastTail = tail.length ? tail[tail.length - 1] : null;
-  const sig = JSON.stringify([
-    tail.length,
-    lastTail ? lastTail.commentNo ?? lastTail.capturedAt ?? '' : '',
-    gifts.length,
-    Object.keys(_profileCache).length,
-    _ngList.length
-  ]);
-  if (sig === _lastRenderSig) return;
+  renderPin(bag[pinKey]);
 
   let comments = await readCanonicalComments(lv);
   if (Object.keys(_profileCache).length) {
     comments = applyUserCommentProfileMapToEntries(comments, _profileCache).next;
   }
-
-  const timeline = buildSupportActivityTimeline(
-    filterNgEntries(comments),
-    filterNgEntries(gifts),
-    { order: 'desc', limit: TIMELINE_LIMIT }
+  const timeline = keepLatestComeviewTimelineItems(
+    filterVisibleComeviewTimeline(
+      buildAllComeviewTimeline(comments, _giftRows),
+      _ngKeys,
+      _hiddenSigs
+    ),
+    TIMELINE_LIMIT
   );
-  listEl.innerHTML = buildSupportTimelineBodyHtml(timeline, {
-    defaultAvatar: DEFAULT_TILE_IMG,
-    now: Date.now()
+  _commentCount = comments.length;
+  renderFullTimeline(timeline, forceBottom);
+  updateCommentCount();
+  _lastReconcileAt = Date.now();
+}
+
+function requestFullRefresh(forceBottom = false) {
+  _fullRefreshRequested = true;
+  _fullRefreshForceBottom ||= forceBottom;
+  if (_fullRefreshPromise) return _fullRefreshPromise;
+  _fullRefreshPromise = (async () => {
+    while (_fullRefreshRequested) {
+      const nextForceBottom = _fullRefreshForceBottom;
+      _fullRefreshRequested = false;
+      _fullRefreshForceBottom = false;
+      _fullRefreshRunning = true;
+      try {
+        await performFullRefresh(nextForceBottom);
+      } finally {
+        _fullRefreshRunning = false;
+      }
+      await flushDeferredHotSnapshots();
+    }
+  })().finally(() => {
+    _fullRefreshPromise = null;
   });
-  _lastRenderSig = sig;
-  if (countEl) countEl.textContent = `${comments.length} 件`;
+  return _fullRefreshPromise;
+}
+
+function processHotSnapshots(nextTail, nextGifts) {
+  const tail = Array.isArray(nextTail) ? nextTail : [];
+  const gifts = Array.isArray(nextGifts) ? nextGifts : [];
+  if (_paused || document.hidden || _fullRefreshRunning) {
+    _deferredTailRows = tail;
+    _deferredGiftRows = gifts;
+    return;
+  }
+
+  const addedComments = pickAppendedComeviewSnapshotRows(
+    _tailRows,
+    tail,
+    'comment'
+  );
+  const addedGifts = pickAppendedComeviewSnapshotRows(_giftRows, gifts, 'gift');
+  _tailRows = tail;
+  _giftRows = gifts;
+  if (!addedComments.length && !addedGifts.length) return;
+
+  let profiledTail = tail;
+  if (Object.keys(_profileCache).length) {
+    profiledTail = applyUserCommentProfileMapToEntries(tail, _profileCache).next;
+  }
+  const appended = selectAppendedComeviewTimelineItems(
+    buildAllComeviewTimeline(profiledTail, gifts),
+    addedComments,
+    addedGifts
+  );
+  const unseen = pickNewComeviewTimelineItems(appended, _renderedKeys);
+  _commentCount += unseen.filter((item) => item.kind === 'comment').length;
+  appendTimelineItems(
+    filterVisibleComeviewTimeline(unseen, _ngKeys, _hiddenSigs)
+  );
+  updateCommentCount();
+}
+
+async function flushDeferredHotSnapshots() {
+  if (!_deferredTailRows && !_deferredGiftRows) return;
+  const tail = _deferredTailRows || _tailRows;
+  const gifts = _deferredGiftRows || _giftRows;
+  _deferredTailRows = null;
+  _deferredGiftRows = null;
+  processHotSnapshots(tail, gifts);
+}
+
+async function pollHotSnapshots() {
+  if (_paused || document.hidden || !_liveId || _fullRefreshRunning) return;
+  const tKey = tailStorageKey(_liveId);
+  const giftKey = `nls_gift_events_${_liveId}`;
+  try {
+    const bag = await chrome.storage.local.get([tKey, giftKey]);
+    processHotSnapshots(
+      Array.isArray(bag[tKey]) ? bag[tKey] : [],
+      Array.isArray(bag[giftKey]) ? bag[giftKey] : []
+    );
+  } catch {
+    /* 次の onChanged / poll で再試行 */
+  }
+}
+
+async function timerTick() {
+  if (_paused || document.hidden) return;
+  if (Date.now() - _lastReconcileAt >= RECONCILE_INTERVAL_MS) {
+    await requestFullRefresh();
+    return;
+  }
+  await pollHotSnapshots();
 }
 
 function startTimer() {
   if (_timer != null) return;
-  _timer = window.setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
+  _timer = window.setInterval(() => void timerTick(), HOT_POLL_INTERVAL_MS);
 }
 function stopTimer() {
   if (_timer != null) {
     clearInterval(_timer);
     _timer = null;
   }
+}
+
+function hideHoverBar() {
+  if (_hoverBar) {
+    _hoverBar.classList.remove('is-visible');
+    _hoverBar.style.display = 'none';
+  }
+  _hoverRow = null;
+}
+
+function actionDataForTimelineRow(element, item) {
+  const name =
+    element.querySelector('.nl-tl-row__name, .nl-tl-gift__name')?.textContent?.trim() ||
+    String(item?.nickname || '').trim();
+  const userId =
+    element.getAttribute('data-nl-uid') || String(item?.userId || '').trim();
+  let text = '';
+  if (item?.kind === 'gift') {
+    const itemName = String(item.itemName || 'ギフト').trim();
+    const point = Number(item.point) || 0;
+    text = point > 0 ? `${itemName}（${point.toLocaleString('ja-JP')}pt）` : itemName;
+  } else {
+    text =
+      element.querySelector('.nl-tl-row__text')?.textContent?.trim() ||
+      String(item?.text || '').trim();
+  }
+  return {
+    id: String(item?.key || ''),
+    no: item?.kind === 'comment' ? item.commentNo : null,
+    name,
+    text,
+    userId,
+    avatar: String(item?.avatarUrl || ''),
+    selfPosted: item?.selfPosted === true,
+    capturedAt: Number(item?.at) || null
+  };
+}
+
+function positionHoverBar() {
+  if (!_hoverBar || !_hoverRow || !_hoverRow.isConnected) {
+    hideHoverBar();
+    return;
+  }
+  const rect = _hoverRow.getBoundingClientRect();
+  const width = _hoverBar.offsetWidth;
+  const height = _hoverBar.offsetHeight;
+  const left = Math.max(4, Math.min(window.innerWidth - width - 4, rect.right - width - 4));
+  const top = Math.max(4, Math.min(window.innerHeight - height - 4, rect.top + 2));
+  _hoverBar.style.left = `${left}px`;
+  _hoverBar.style.top = `${top}px`;
+}
+
+function showHoverBar(row) {
+  if (isObsMode() || !_hoverBar || !(row instanceof HTMLElement)) return;
+  const key = row.dataset.cvKey || '';
+  const item = _timelineItemsByKey.get(key);
+  if (!item) return;
+  _hoverRow = row;
+  const userId = String(item.userId || '').trim();
+  for (const button of _hoverBar.querySelectorAll('button[data-cv-action]')) {
+    const action = button.dataset.cvAction;
+    button.disabled = (action === 'block' || action === 'person') && !userId;
+  }
+  _hoverBar.style.display = 'flex';
+  _hoverBar.classList.add('is-visible');
+  positionHoverBar();
+}
+
+function createHoverBar() {
+  if (isObsMode() || _hoverBar) return;
+  const bar = document.createElement('div');
+  bar.className = 'cv-hover-actions';
+  bar.setAttribute('role', 'toolbar');
+  bar.setAttribute('aria-label', 'コメント操作');
+  const actions = [
+    ['trash', 'この行を隠す'],
+    ['block', 'この人を非表示'],
+    ['person', 'この人の詳細'],
+    ['copy', '名前と本文をコピー'],
+    ['pin', 'コメピタ']
+  ];
+  for (const [action, label] of actions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.cvAction = action;
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.innerHTML = CV_ACTION_ICONS[action];
+    bar.appendChild(button);
+  }
+  bar.addEventListener('mouseenter', () => {
+    if (_hoverRow) bar.classList.add('is-visible');
+  });
+  bar.addEventListener('mouseleave', (event) => {
+    if (
+      _hoverRow &&
+      event.relatedTarget instanceof Node &&
+      _hoverRow.contains(event.relatedTarget)
+    ) {
+      return;
+    }
+    hideHoverBar();
+  });
+  bar.addEventListener('click', (event) => {
+    const button =
+      event.target instanceof Element
+        ? event.target.closest('button[data-cv-action]')
+        : null;
+    if (!button || button.disabled || !_hoverRow) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const key = _hoverRow.dataset.cvKey || '';
+    const item = _timelineItemsByKey.get(key);
+    if (!item) return;
+    const row = actionDataForTimelineRow(_hoverRow, item);
+    switch (button.dataset.cvAction) {
+      case 'trash': {
+        const sig = comeviewTimelineItemSignature(item);
+        if (sig) _hiddenSigs.add(sig);
+        const target = _hoverRow;
+        forgetTimelineElement(target);
+        target.remove();
+        hideHoverBar();
+        break;
+      }
+      case 'block':
+        addNg(row);
+        hideHoverBar();
+        break;
+      case 'person':
+        void showUserDetail(row);
+        hideHoverBar();
+        break;
+      case 'copy':
+        copyTextToClipboard(buildComeviewCopyText(row));
+        hideHoverBar();
+        break;
+      case 'pin':
+        savePin(row);
+        hideHoverBar();
+        break;
+      default:
+        break;
+    }
+  });
+  document.body.appendChild(bar);
+  _hoverBar = bar;
+}
+
+function wireStorageChanges() {
+  if (!_liveId) return;
+  const tKey = tailStorageKey(_liveId);
+  const giftKey = `nls_gift_events_${_liveId}`;
+  const pinKey = comeviewPinStorageKey(_liveId);
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    if (changes[pinKey]) renderPin(changes[pinKey].newValue);
+    if (changes[COMEVIEW_USER_NOTES_KEY]) {
+      _userNotes = normalizeComeviewUserNotes(
+        changes[COMEVIEW_USER_NOTES_KEY].newValue
+      );
+    }
+    if (changes[KEY_USER_COMMENT_PROFILE_CACHE]) {
+      _profileCache = normalizeUserCommentProfileMap(
+        changes[KEY_USER_COMMENT_PROFILE_CACHE].newValue
+      );
+    }
+    if (changes[COMEVIEW_NG_STORAGE_KEY]) {
+      const next = normalizeComeviewNgList(
+        changes[COMEVIEW_NG_STORAGE_KEY].newValue
+      );
+      if (JSON.stringify(next) !== JSON.stringify(_ngList)) {
+        _ngList = next;
+        _ngKeys = new Set(next.map((entry) => entry.key));
+        updateNgButton();
+        void requestFullRefresh();
+      }
+    }
+    if (changes[tKey] || changes[giftKey]) {
+      processHotSnapshots(
+        changes[tKey]
+          ? Array.isArray(changes[tKey].newValue)
+            ? changes[tKey].newValue
+            : []
+          : _tailRows,
+        changes[giftKey]
+          ? Array.isArray(changes[giftKey].newValue)
+            ? changes[giftKey].newValue
+            : []
+          : _giftRows
+      );
+    }
+  });
 }
 
 function wireButtons() {
@@ -599,6 +1106,14 @@ function wireButtons() {
     btnPause.addEventListener('click', () => {
       _paused = !_paused;
       btnPause.textContent = _paused ? '再開' : '一時停止';
+      if (!_paused) {
+        if (Date.now() - _lastReconcileAt >= RECONCILE_INTERVAL_MS) {
+          void requestFullRefresh();
+        } else {
+          void flushDeferredHotSnapshots();
+          void pollHotSnapshots();
+        }
+      }
     });
   }
   const btnNg = document.getElementById('cvBtnNg');
@@ -609,6 +1124,24 @@ function wireButtons() {
   // 行クリック→ユーザー詳細(POP のタイムラインと同じ data-nl-uid 属性を使う)。
   const listEl = document.getElementById('cvList');
   if (listEl) {
+    listEl.addEventListener('mouseover', (event) => {
+      const row =
+        event.target instanceof Element
+          ? event.target.closest('.nl-tl-row, .nl-tl-gift')
+          : null;
+      if (row && listEl.contains(row)) showHoverBar(row);
+    });
+    listEl.addEventListener('mouseleave', (event) => {
+      if (
+        _hoverBar &&
+        event.relatedTarget instanceof Node &&
+        _hoverBar.contains(event.relatedTarget)
+      ) {
+        return;
+      }
+      hideHoverBar();
+    });
+    listEl.addEventListener('scroll', () => hideHoverBar(), { passive: true });
     listEl.addEventListener('click', (ev) => {
       const t =
         ev.target instanceof Element ? ev.target.closest('[data-nl-uid]') : null;
@@ -616,20 +1149,19 @@ function wireButtons() {
       ev.preventDefault();
       const uid = t.getAttribute('data-nl-uid') || '';
       if (!uid) return;
+      const key = t instanceof HTMLElement ? t.dataset.cvKey || '' : '';
+      const item = _timelineItemsByKey.get(key);
+      if (item) {
+        void showUserDetail(actionDataForTimelineRow(t, item));
+        return;
+      }
       let uname = t.getAttribute('data-nl-uname') || '';
       if (/^匿名\d{1,3}$/.test(uname)) uname = '';
-      void showUserDetail({
-        id: '',
-        no: null,
-        name: uname,
-        text: '',
-        userId: uid,
-        avatar: '',
-        selfPosted: false,
-        capturedAt: null
-      });
+      void showUserDetail({ name: uname, text: '', userId: uid });
     });
   }
+  createHoverBar();
+  window.addEventListener('resize', () => hideHoverBar(), { passive: true });
 }
 
 async function main() {
@@ -639,7 +1171,8 @@ async function main() {
   if (meta) meta.textContent = _liveId ? _liveId : '配信が見つかりません';
   wireButtons();
   await loadNgList();
-  await refresh();
+  wireStorageChanges();
+  await requestFullRefresh(true);
   // パネルのタイムライン行クリックから ?user= 付きで開かれたら、詳細を自動で開く。
   const detailReq = resolveDetailRequestFromUrl();
   if (detailReq) {
@@ -659,7 +1192,12 @@ async function main() {
     if (document.hidden) stopTimer();
     else {
       startTimer();
-      void refresh();
+      if (Date.now() - _lastReconcileAt >= RECONCILE_INTERVAL_MS) {
+        void requestFullRefresh();
+      } else {
+        void flushDeferredHotSnapshots();
+        void pollHotSnapshots();
+      }
     }
   });
 }
