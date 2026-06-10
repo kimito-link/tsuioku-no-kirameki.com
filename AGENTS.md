@@ -147,7 +147,19 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 
 ---
 
-## 9. エージェントへのお願い
+## 9. Claude Code が頻繁に止まるとき（Windows）
+
+1. **初回**: `npm run setup:claude` → `.claude/settings.json` に `defaultMode: bypassPermissions` を入れる。
+2. **検証**: `npm run verify` ではなく **`npm run verify:cc`**（ログ: `.artifacts/verify-cc.log`）。
+3. **単体テスト**: `npm run test:cc`（`vitest` + dot reporter + forks プール）。
+4. **禁止**: 応答本文に XML 風 tool 呼び出しを書く・Unix パイプ（`tail`/`head`/`grep`）を PowerShell で使う。
+5. **長い会話**: 新チャットまたは `/compact`。HANDOFF / MEMORY に要約を書いてから続行。
+
+詳細: [CLAUDE.md](CLAUDE.md) の「Claude Code が止まるとき」。
+
+---
+
+## 10. エージェントへのお願い
 
 - **この AGENTS.md を最初に読むこと**。とくに §3.1「ゆっくり OK」と §3.2「3 キャラの役割」はコピー＆新規生成するコンテンツに波及しやすい
 - **CWS 申請関連のファイル**（`src/images/googlechrom/`, `build/store-listing/` の `description-ja.txt` / `privacy-justifications-ja.txt`）は、仕様・文言を変える際に必ず「審査通過後の差分提出」を意識する
@@ -156,9 +168,9 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 
 ---
 
-## 10. AI ツール役割分担（Claude Code 司令塔アーキテクチャ・2026-05-29 確立）
+## 11. AI ツール役割分担（Claude Code 司令塔アーキテクチャ・2026-05-29 確立）
 
-### 10.1 大原則
+### 11.1 大原則
 
 **ユーザーは Claude Code とだけ会話する**。Claude Code が司令塔として他の AI コーディングツール（Codex CLI / cursor-agent CLI / OpenCode）を呼び出し、結果を読み戻して統合する。
 
@@ -167,7 +179,7 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 - 各ツールの強みを活かしつつ、Claude Max のクレジット消費を分散できる
 - 全ツールが共通の AGENTS.md を読むので、文脈の食い違いが構造的に起きない
 
-### 10.2 役割マトリクス
+### 11.2 役割マトリクス
 
 | 段階 | 担当ツール | 起動方法 | 理由 |
 |---|---|---|---|
@@ -182,7 +194,7 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 | 実機検証（ブラウザ操作） | **Claude Code（Claude-in-Chrome MCP）** | MCP 経由 | **代替不可**（他ツールには無い機能） |
 | MEMORY/reference 更新 | **Claude Code 本体専用** | `Edit` | **他ツールに渡さない**（食い違い防止） |
 
-### 10.3 ツール起動の技術詳細
+### 11.3 ツール起動の技術詳細
 
 #### Codex CLI（インストール済み: `codex-cli 0.128.0`）
 ```bash
@@ -204,14 +216,14 @@ cursor-agent は AGENTS.md と CLAUDE.md の両方を自動読込（[公式仕�
 opencode --model nvidia/deepseek-ai/deepseek-v4-flash ...
 ```
 
-### 10.4 ⛔ やってはいけないこと
+### 11.4 ⛔ やってはいけないこと
 
 - **MEMORY.md を他ツールに編集させる** → Claude Code 専用領域。食い違いリスク
 - **Grok Build / Antigravity を確実な情報なしに組み込む** → 2026-05時点で CLI/MCP対応の一次ソース裏取り未完了。実機検証してから
 - **サブエージェントが別のサブエージェントを呼ぶ**（[公式禁止](https://code.claude.com/docs/en/sub-agents)）→ メイン会話から並列に呼ぶ
 - **同じ作業を複数ツールで重複実装** → 役割を上のマトリクスで固定する
 
-### 10.5 ハンドオフのコピペレス手順
+### 11.5 ハンドオフのコピペレス手順
 
 1. Claude Code が会議結論を `memory/reference_*.md` に書く + ブランチ作成 + push
 2. Claude Code が `.claude/agents/<tool>-impl.md` 呼び出し → サブエージェントが Bash で外部 CLI 起動
@@ -222,7 +234,7 @@ opencode --model nvidia/deepseek-ai/deepseek-v4-flash ...
 
 各ステップで「ファイル経由」のみで情報伝達 → コピペ発生ゼロ。
 
-### 10.6 並列・自動評価（Arena Mode 相当）の実装
+### 11.6 並列・自動評価（Arena Mode 相当）の実装
 
 Claude Code の `/batch` で 5〜30 並列の worktree 実装は既に可能。さらに「複数案を並列実装→自動評価→最良を選ぶ」(Grok Build の Arena Mode に相当する) を実現するには:
 

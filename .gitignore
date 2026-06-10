@@ -13,6 +13,7 @@ nicolivelog-extension-investigation.zip
 .codex-exec-prompt-*.txt
 .codex-task-prompt.txt
 tmp-video-frames/
+.artifacts/
 
 # ユーザーがバックアップ zip を展開する作業用フォルダ（誤コミット防止）
 新しいフォルダー/
