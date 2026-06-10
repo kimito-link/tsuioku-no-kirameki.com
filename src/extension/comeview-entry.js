@@ -32,6 +32,7 @@ import { summaryStorageKey } from '../lib/commentSummary.js';
 import {
   buildComeviewRows,
   pickNewComeviewRows,
+  combineCanonicalComeviewRows,
   COMEVIEW_MAX_ROWS
 } from '../lib/comeviewRows.js';
 import {
@@ -137,16 +138,24 @@ function resolveDetailRequestFromUrl() {
   }
 }
 
-/** 軽量にコメント行(recent + tail)+ピン状態+ユーザーノートを読む。SW を起こさない。 */
+/**
+ * コメント行+ピン状態+ユーザーノートを読む。SW を起こさない。
+ * v0.1.675: 入力源をタイムラインと同じ「確定保存された本体(チャンク)+テール」に統一
+ *   (ユーザー指示「まずは同じにしろ」)。速報リング(recent)は本体と取り込み時刻が
+ *   ズレた重複を生むため、本体が無い起動直後のフォールバックにだけ使う。
+ *   軽さの担保=直近2チャンク(最大~2000行)だけ読む(全件は読まない)。
+ */
 async function readLightComments(lv) {
-  if (!lv) return { rows: [], pin: null, notes: null };
+  if (!lv) return { rows: [], pin: null, notes: null, profiles: null };
   const cdbKey = commentDbSummaryKey(lv);
   const csKey = summaryStorageKey(lv);
   const tKey = tailStorageKey(lv);
   const pinKey = comeviewPinStorageKey(lv);
+  const idxKey = chunkIndexKey(lv);
   let bag = {};
   try {
     bag = await chrome.storage.local.get([
+      idxKey,
       cdbKey,
       csKey,
       tKey,
@@ -155,23 +164,42 @@ async function readLightComments(lv) {
       KEY_USER_COMMENT_PROFILE_CACHE
     ]);
   } catch {
-    return { rows: [], pin: null, notes: null };
+    return { rows: [], pin: null, notes: null, profiles: null };
   }
-  const cdb = bag[cdbKey];
-  const cs = bag[csKey];
-  const recent =
-    (cdb && Array.isArray(cdb.recent) && cdb.recent) ||
-    (cs && Array.isArray(cs.recent) && cs.recent) ||
-    [];
+  // 本体: 直近2チャンク(表示窓50行を確実に賄う)。タイムラインと同じ正本ストア。
+  /** @type {Array<Record<string, unknown>>} */
+  let baseRows = [];
+  try {
+    const index = bag[idxKey];
+    if (isChunkIndex(index, lv)) {
+      const keys = chunkKeysFromIndex(lv, index).slice(-2);
+      if (keys.length) {
+        const cbag = await chrome.storage.local.get(keys);
+        for (const k of keys) {
+          if (Array.isArray(cbag[k])) baseRows.push(...cbag[k]);
+        }
+      }
+    }
+  } catch {
+    baseRows = [];
+  }
+  if (!baseRows.length) {
+    // チャンク未形成(記録直後など)のフォールバックだけ速報リングを使う。
+    const cdb = bag[cdbKey];
+    const cs = bag[csKey];
+    baseRows =
+      (cdb && Array.isArray(cdb.recent) && cdb.recent) ||
+      (cs && Array.isArray(cs.recent) && cs.recent) ||
+      [];
+  }
   const tail = Array.isArray(bag[tKey]) ? bag[tKey] : [];
   const pinRaw = bag[pinKey];
   const pin =
     pinRaw && typeof pinRaw === 'object' && String(pinRaw.text || '').trim()
       ? pinRaw
       : null;
-  // recent(古い→新しい) の後ろに tail(未畳み込み新着) を足す。重複は id で後段 dedupe。
   return {
-    rows: [...recent, ...tail],
+    rows: combineCanonicalComeviewRows(baseRows, tail),
     pin,
     notes: normalizeComeviewUserNotes(bag[COMEVIEW_USER_NOTES_KEY]),
     profiles: normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE])

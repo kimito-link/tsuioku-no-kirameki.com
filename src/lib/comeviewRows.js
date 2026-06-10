@@ -31,6 +31,37 @@ export function isGenericComeviewName(name) {
 }
 
 /**
+ * v0.1.675: コメビュの入力をタイムラインと同じ「確定保存された本体(チャンク)+テール」に
+ *   揃えるための結合純関数。本体は persist 時に commentNo で dedupe 済みの正本。テールは
+ *   本体へ畳み込み済みの行が残っていることがあるので、commentNo が本体に既にある行は捨てる
+ *   (ユーザー指示「まずは(タイムラインと)同じにしろ」=速報リング独自ソースをやめる)。
+ *
+ * @param {Array<Record<string, unknown>>|unknown} baseRows 本体(直近チャンク連結・生行)
+ * @param {Array<Record<string, unknown>>|unknown} tailRows テール(未畳み込み新着・生行)
+ * @returns {Array<Record<string, unknown>>}
+ */
+export function combineCanonicalComeviewRows(baseRows, tailRows) {
+  const base = Array.isArray(baseRows) ? baseRows : [];
+  const tail = Array.isArray(tailRows) ? tailRows : [];
+  const knownNos = new Set();
+  for (const r of base) {
+    if (!r || typeof r !== 'object') continue;
+    const o = /** @type {Record<string, unknown>} */ (r);
+    const no = o.commentNo ?? o.no;
+    const key = no == null ? '' : String(no).trim();
+    if (key) knownNos.add(key);
+  }
+  const extra = tail.filter((r) => {
+    if (!r || typeof r !== 'object') return false;
+    const o = /** @type {Record<string, unknown>} */ (r);
+    const no = o.commentNo ?? o.no;
+    const key = no == null ? '' : String(no).trim();
+    return !key || !knownNos.has(key);
+  });
+  return [...base, ...extra];
+}
+
+/**
  * v0.1.671: 別ソース由来の二重表示を除く純関数。
  *   同じコメントが「commentNo 付き(NDGR 等の強いソース)」と「no 無し(DOM 拾い等の弱いソース)」の
  *   両方で入ってくると、id が異なるため dedupe をすり抜けて2行表示されていた(実機)。

@@ -4,6 +4,7 @@ import {
   normalizeComeviewRow,
   buildComeviewRows,
   pickNewComeviewRows,
+  combineCanonicalComeviewRows,
   dedupeWeakComeviewRows,
   isGenericComeviewName
 } from './comeviewRows.js';
@@ -89,6 +90,32 @@ describe('pickNewComeviewRows', () => {
   it('全部既出なら空', () => {
     const rows = buildComeviewRows([{ no: 1, text: 'a' }]);
     expect(pickNewComeviewRows(rows, new Set(['no:1']))).toEqual([]);
+  });
+});
+
+describe('combineCanonicalComeviewRows(本体チャンク+テールの正本結合)', () => {
+  it('テールのうち commentNo が本体に既にある行は捨てる(畳み込み済み重複)', () => {
+    const base = [
+      { commentNo: 10, text: 'あ', userId: 'a:1' },
+      { commentNo: 11, text: 'い', userId: 'a:2' }
+    ];
+    const tail = [
+      { commentNo: 11, text: 'い', userId: 'a:2' }, // 本体へ畳み込み済み
+      { commentNo: 12, text: 'う', userId: 'a:3' } // 新着
+    ];
+    const out = combineCanonicalComeviewRows(base, tail);
+    expect(out.map((r) => r.commentNo)).toEqual([10, 11, 12]);
+  });
+  it('commentNo の無いテール行は残す(後段の weak dedupe に委ねる)', () => {
+    const out = combineCanonicalComeviewRows(
+      [{ commentNo: 1, text: 'あ' }],
+      [{ text: 'い', userId: 'a:9' }]
+    );
+    expect(out).toHaveLength(2);
+  });
+  it('配列以外の入力に耐える', () => {
+    expect(combineCanonicalComeviewRows(null, null)).toEqual([]);
+    expect(combineCanonicalComeviewRows([{ commentNo: 1, text: 'あ' }], undefined)).toHaveLength(1);
   });
 });
 
