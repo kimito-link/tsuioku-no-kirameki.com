@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.676',
+    date: '2026-06-10',
+    summary: 'コメビュをパネルのタイムラインと完全同一に',
+    items: Object.freeze([
+      'コメビュの一覧表示を、パネルの応援タイムラインとデータも見た目も完全に同じものに置き換えました(独自の表示をやめました)。これで二重表示や名前・アイコンの食い違いは構造的に起きません。コメントやギフトの行をクリックすると、その人の詳細(ニックネーム付け・ラベル・メモ・発言一覧・非表示)が開きます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.675',
     date: '2026-06-10',
     summary: 'コメビュをタイムラインと同じデータ源に統一',
