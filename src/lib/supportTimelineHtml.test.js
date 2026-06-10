@@ -169,3 +169,23 @@ describe('相対時刻（now 渡し・v0.1.341）', () => {
     expect(html).toContain('1分前');
   });
 });
+
+describe('v0.1.671: 表示名をコメビュと統一(匿名は固定番号)', () => {
+  it('名前なし匿名(a:…)は 匿名NNN を表示する(名無しでなく)', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', nickname: '' }));
+    expect(html).toMatch(/匿名\d{1,3}/);
+    expect(html).not.toContain('名無し');
+  });
+  it('汎用名「匿名」も uid があれば固定番号を優先する', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', nickname: '匿名' }));
+    expect(html).toMatch(/匿名\d{1,3}/);
+  });
+  it('個人名はそのまま', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', nickname: 'たろう' }));
+    expect(html).toContain('たろう');
+  });
+  it('uid も名前も無ければ従来どおり 名無し', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: '', nickname: '' }));
+    expect(html).toContain('名無し');
+  });
+});

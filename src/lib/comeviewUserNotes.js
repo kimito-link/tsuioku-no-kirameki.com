@@ -9,6 +9,8 @@
 //
 // このファイルは判定・整形の核ロジックだけ(DOM/storage/chrome.* 非依存・テスト可能)。
 
+import { isGenericComeviewName } from './comeviewRows.js';
+
 /** ユーザーノートの storage キー(配信を跨いで効く)。 */
 export const COMEVIEW_USER_NOTES_KEY = 'nls_comeview_usernotes_v1';
 
@@ -110,8 +112,11 @@ export function resolveComeviewDisplayName(row, notes, userKey) {
     if (nick) return nick;
   }
   const name = String(row.name || '').trim();
-  if (name) return name;
-  return comeviewAnonLabel(String(row.userId || ''));
+  // v0.1.671: 「匿名」等の汎用名は個人名でないので、匿名番号(同じ人=同じ番号)を優先する。
+  if (name && !isGenericComeviewName(name)) return name;
+  const anon = comeviewAnonLabel(String(row.userId || ''));
+  if (anon) return anon;
+  return name;
 }
 
 /**

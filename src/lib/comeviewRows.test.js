@@ -4,6 +4,8 @@ import {
   normalizeComeviewRow,
   buildComeviewRows,
   pickNewComeviewRows,
+  dedupeWeakComeviewRows,
+  isGenericComeviewName
 } from './comeviewRows.js';
 
 describe('normalizeComeviewRow', () => {
@@ -87,5 +89,49 @@ describe('pickNewComeviewRows', () => {
   it('全部既出なら空', () => {
     const rows = buildComeviewRows([{ no: 1, text: 'a' }]);
     expect(pickNewComeviewRows(rows, new Set(['no:1']))).toEqual([]);
+  });
+});
+
+describe('dedupeWeakComeviewRows(別ソース二重表示の除去)', () => {
+  it('no 無し行は、同じ本文の no 付き行が±15秒以内にあれば重複として捨てる', () => {
+    const rows = [
+      { id: 'no:325', no: 325, name: '', text: '友蔵', userId: 'a:X', avatar: '', selfPosted: false, capturedAt: 1000 },
+      { id: 'c::友蔵:3000', no: null, name: '匿名', text: '友蔵', userId: '', avatar: '', selfPosted: false, capturedAt: 3000 }
+    ];
+    const out = dedupeWeakComeviewRows(rows);
+    expect(out).toHaveLength(1);
+    expect(out[0].no).toBe(325);
+  });
+  it('時刻不明の no 無し行も同文 no 付きがあれば重複扱い', () => {
+    const rows = [
+      { id: 'no:1', no: 1, name: '', text: 'あ', userId: 'a:X', avatar: '', selfPosted: false, capturedAt: null },
+      { id: 'c::あ:', no: null, name: '', text: 'あ', userId: '', avatar: '', selfPosted: false, capturedAt: null }
+    ];
+    expect(dedupeWeakComeviewRows(rows)).toHaveLength(1);
+  });
+  it('no 付き同士のエコーコメント(別人の同文)は両方残す', () => {
+    const rows = [
+      { id: 'no:1', no: 1, name: '', text: 'www', userId: 'a:X', avatar: '', selfPosted: false, capturedAt: 1000 },
+      { id: 'no:2', no: 2, name: '', text: 'www', userId: 'a:Y', avatar: '', selfPosted: false, capturedAt: 2000 }
+    ];
+    expect(dedupeWeakComeviewRows(rows)).toHaveLength(2);
+  });
+  it('同文でも15秒より離れていれば別コメントとして残す', () => {
+    const rows = [
+      { id: 'no:1', no: 1, name: '', text: 'こん', userId: 'a:X', avatar: '', selfPosted: false, capturedAt: 1000 },
+      { id: 'c::こん:60000', no: null, name: '', text: 'こん', userId: '', avatar: '', selfPosted: false, capturedAt: 60000 }
+    ];
+    expect(dedupeWeakComeviewRows(rows)).toHaveLength(2);
+  });
+});
+
+describe('isGenericComeviewName', () => {
+  it('匿名/名無しは汎用名', () => {
+    expect(isGenericComeviewName('匿名')).toBe(true);
+    expect(isGenericComeviewName(' 名無し ')).toBe(true);
+  });
+  it('個人名は汎用名でない', () => {
+    expect(isGenericComeviewName('たろう')).toBe(false);
+    expect(isGenericComeviewName('')).toBe(false);
   });
 });

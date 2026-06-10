@@ -12,7 +12,7 @@
 //   - NG リスト(追加/解除/正規化/上限)と行の非表示判定
 //   - アーカイブ行から特定ユーザーの発言だけを抽出
 
-import { normalizeComeviewRow } from './comeviewRows.js';
+import { normalizeComeviewRow, isGenericComeviewName } from './comeviewRows.js';
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 
 /** NG リストの storage キー(配信を跨いで効く・拡張ページからの小さな UI 状態書込)。 */
@@ -54,6 +54,18 @@ export function resolveComeviewAvatarUrl(row) {
 }
 
 /**
+ * v0.1.671: ユーザーページ URL(数値 ID のみ。匿名 a:… には公開ページが無い)。
+ * 「サムネ・ID・ハンドル・リンクは分かる限りセットで出す」原則のリンク部分。
+ * @param {string|null|undefined} userId
+ * @returns {string} 'https://www.nicovideo.jp/user/<id>' または ''
+ */
+export function comeviewUserPageUrl(userId) {
+  const uid = String(userId || '').trim();
+  if (!/^\d{1,18}$/.test(uid)) return '';
+  return `https://www.nicovideo.jp/user/${uid}`;
+}
+
+/**
  * 行からユーザー識別キーを作る。userId 優先・無ければ表示名で代替(ニコ生の匿名は
  * userId が空で name だけのことがある)。どちらも無い行は識別不能('')=NG 対象外。
  * @param {{ userId?: string, name?: string }|null|undefined} row
@@ -64,7 +76,9 @@ export function comeviewUserKeyForRow(row) {
   const uid = String(row.userId || '').trim();
   if (uid) return `u:${uid}`;
   const name = String(row.name || '').trim();
-  if (name) return `n:${name}`;
+  // v0.1.671: 「匿名」「名無し」等の汎用名は個人を識別しない=キーにしない
+  //   (1人をNGしたら全匿名が消える事故の防止)。
+  if (name && !isGenericComeviewName(name)) return `n:${name}`;
   return '';
 }
 
