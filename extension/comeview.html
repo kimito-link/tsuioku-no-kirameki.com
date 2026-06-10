@@ -327,14 +327,45 @@
         background: rgb(0 0 0 / 30%);
         border-color: rgb(143 214 255 / 50%);
       }
+      /* 詳細ヘッダ: サムネ・名前・ID・リンクをセットで(わんコメ同型)。 */
+      .cv-detail-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 2px 0 12px;
+      }
+      .cv-detail-avatar {
+        flex: 0 0 auto;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        object-fit: cover;
+        font-size: 18px;
+      }
+      .cv-detail-head-body { min-width: 0; flex: 1 1 auto; }
+      .cv-detail-name {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .cv-detail-id {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 8px;
         font-size: 12.5px;
         color: var(--cv-sub);
-        margin: 2px 0 10px;
         word-break: break-all;
+      }
+      .cv-ng-avatar {
+        flex: 0 0 auto;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        object-fit: cover;
       }
       .cv-detail-form {
         display: flex;

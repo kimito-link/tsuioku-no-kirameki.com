@@ -10,6 +10,24 @@
 
 import { formatRelativeTimeJa } from './supportActivityTimeline.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { isGenericComeviewName } from './comeviewRows.js';
+import { comeviewAnonLabel } from './comeviewUserNotes.js';
+
+/**
+ * v0.1.671: タイムラインの表示名。コメビュと同じルールに統一する
+ *   (個人名 > 匿名IDの固定番号「匿名938」 > 従来の代替文言)。
+ *   「匿名」「名無し」等の汎用名は個人名でないので、匿名IDがあれば固定番号を優先=
+ *   同じ人を追いやすく、パネルとコメビュで呼び名が食い違わない。
+ * @param {{ nickname?: unknown, userId?: unknown }} item
+ * @returns {string}
+ */
+function timelineDisplayName(item) {
+  const nick = String(item?.nickname || '').trim();
+  if (nick && !isGenericComeviewName(nick)) return nick;
+  const anon = comeviewAnonLabel(String(item?.userId || ''));
+  if (anon) return anon;
+  return nick || '名無し';
+}
 
 /**
  * v0.1.655: 応援タイムラインのアバター解決。記名アバター(avatarUrl)があればそれ、
@@ -88,7 +106,7 @@ export function buildTimelineRowHtml(item, opts) {
     : '';
 
   if (item.kind === 'gift') {
-    const name = escapeHtml(item.nickname || '名無し');
+    const name = escapeHtml(timelineDisplayName(item));
     const itemName = escapeHtml(item.itemName || 'ギフト');
     const pt = escapeHtml(formatPoint(item.point));
     const ptBlock =
@@ -112,7 +130,7 @@ export function buildTimelineRowHtml(item, opts) {
       ptBlock +
       agoBlock;
     const title = escapeAttr(
-      `${item.nickname || '名無し'} が ${item.itemName || 'ギフト'}${Number(item.point) > 0 ? `（${formatPoint(item.point)}pt）` : ''} を贈りました${agoLabel ? `（${agoLabel}）` : ''}`
+      `${timelineDisplayName(item)} が ${item.itemName || 'ギフト'}${Number(item.point) > 0 ? `（${formatPoint(item.point)}pt）` : ''} を贈りました${agoLabel ? `（${agoLabel}）` : ''}`
     );
     if (isNumericUid(item.userId)) {
       const href = `https://www.nicovideo.jp/user/${escapeAttr(item.userId)}`;
@@ -122,7 +140,7 @@ export function buildTimelineRowHtml(item, opts) {
   }
 
   // comment
-  const name = escapeHtml(item.nickname || '名無し');
+  const name = escapeHtml(timelineDisplayName(item));
   const text = escapeHtml(commentTextShown(item.text, item.commentNo));
   const av = resolveTimelineAvatar(item, defaultAvatar);
   const avRp = /^https?:\/\//i.test(av) ? ' referrerpolicy="no-referrer"' : '';
@@ -136,7 +154,7 @@ export function buildTimelineRowHtml(item, opts) {
     `<span class="nl-tl-row__text">${text}</span>` +
     agoBlock;
   const title = escapeAttr(
-    `${item.nickname || '名無し'}：${commentTextShown(item.text, item.commentNo)}${agoLabel ? `（${agoLabel}）` : ''}`
+    `${timelineDisplayName(item)}：${commentTextShown(item.text, item.commentNo)}${agoLabel ? `（${agoLabel}）` : ''}`
   );
   if (isNumericUid(item.userId)) {
     const href = `https://www.nicovideo.jp/user/${escapeAttr(item.userId)}`;

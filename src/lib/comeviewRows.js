@@ -14,6 +14,58 @@
 export const COMEVIEW_MAX_ROWS = 50;
 
 /**
+ * v0.1.671: 「匿名」「名無し」等の汎用プレースホルダ名。これは個人の名前ではないので、
+ *   ユーザー識別キー(NG/名前付け)にも表示名の優先にも使わない(全匿名が1人扱いになる事故と、
+ *   匿名番号が出ない事故の両方を防ぐ)。
+ * @type {ReadonlySet<string>}
+ */
+export const GENERIC_ANON_NAMES = new Set(['匿名', '名無し', '名無しさん', '匿名さん']);
+
+/**
+ * 名前が汎用プレースホルダ(=個人を識別しない)かどうか。
+ * @param {string|null|undefined} name
+ * @returns {boolean}
+ */
+export function isGenericComeviewName(name) {
+  return GENERIC_ANON_NAMES.has(String(name || '').trim());
+}
+
+/**
+ * v0.1.671: 別ソース由来の二重表示を除く純関数。
+ *   同じコメントが「commentNo 付き(NDGR 等の強いソース)」と「no 無し(DOM 拾い等の弱いソース)」の
+ *   両方で入ってくると、id が異なるため dedupe をすり抜けて2行表示されていた(実機)。
+ *   no 無し行は「同じ本文の no 付き行が ±15 秒以内(時刻不明なら同一視)に存在」したら
+ *   同一コメントの重複とみなして捨てる。no 付き同士は本文が同じでも残す
+ *   (エコーコメント=別人の同文は両方 no を持つので誤って消さない)。
+ *
+ * @param {ReturnType<typeof normalizeComeviewRow>[]} rows 正規化済み(昇順)
+ * @returns {ReturnType<typeof normalizeComeviewRow>[]}
+ */
+export function dedupeWeakComeviewRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  /** @type {Map<string, Array<{ capturedAt: number|null }>>} */
+  const strongByText = new Map();
+  for (const r of rows) {
+    if (!r || r.no == null) continue;
+    const list = strongByText.get(r.text);
+    if (list) list.push(r);
+    else strongByText.set(r.text, [r]);
+  }
+  return rows.filter((r) => {
+    if (!r) return false;
+    if (r.no != null) return true;
+    const cands = strongByText.get(r.text);
+    if (!cands) return true;
+    return !cands.some(
+      (s) =>
+        r.capturedAt == null ||
+        s.capturedAt == null ||
+        Math.abs(Number(s.capturedAt) - Number(r.capturedAt)) <= 15_000
+    );
+  });
+}
+
+/**
  * 生コメント行(IDBサマリ recent / tail / PopupCommentEntry いずれの形でも可)から
  * 表示に使う最小フィールドへ正規化する純関数。
  *
@@ -64,8 +116,9 @@ export function buildComeviewRows(rows, max = COMEVIEW_MAX_ROWS) {
     const n = normalizeComeviewRow(r);
     if (n) out.push(n);
   }
-  // 最新 cap 件(末尾)だけ残す。
-  return out.length > cap ? out.slice(out.length - cap) : out;
+  // 別ソース重複(no 付き vs no 無し)を除いてから、最新 cap 件(末尾)だけ残す。
+  const deduped = dedupeWeakComeviewRows(out);
+  return deduped.length > cap ? deduped.slice(deduped.length - cap) : deduped;
 }
 
 /**

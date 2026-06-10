@@ -88,6 +88,13 @@ describe('resolveComeviewDisplayName', () => {
     const out = resolveComeviewDisplayName({ userId: 'a:other', name: '' }, {}, 'u:a:other');
     expect(out).toMatch(/^匿名\d{1,3}$/);
   });
+  it('汎用名「匿名」は uid があれば匿名番号を優先(番号無し「匿名」行の解消)', () => {
+    const out = resolveComeviewDisplayName({ userId: 'a:X', name: '匿名' }, {}, 'u:a:X');
+    expect(out).toMatch(/^匿名\d{1,3}$/);
+  });
+  it('汎用名のみで uid も無ければそのまま出す', () => {
+    expect(resolveComeviewDisplayName({ userId: '', name: '匿名' }, {}, '')).toBe('匿名');
+  });
   it('識別不能な行は空文字', () => {
     expect(resolveComeviewDisplayName({ userId: '123', name: '' }, {}, 'u:123')).toBe('');
     expect(resolveComeviewDisplayName(null, notes, '')).toBe('');

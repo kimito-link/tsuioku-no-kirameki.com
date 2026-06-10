@@ -32,6 +32,7 @@ import {
 } from '../lib/comeviewRows.js';
 import {
   comeviewUserKeyForRow,
+  comeviewUserPageUrl,
   resolveComeviewAvatarUrl,
   buildComeviewCopyText,
   normalizeComeviewNgList,
@@ -389,7 +390,36 @@ async function showUserDetail(row) {
   const bodyEl = openPanel(`👤 ${label}`);
   if (!bodyEl) return;
 
-  // --- ID 行(コピー付き) ---
+  // --- ヘッダ: サムネ・名前・ID・リンクは「分かる限りセット」で出す(原則) ---
+  const head = document.createElement('div');
+  head.className = 'cv-detail-head';
+  const avatarUrl = resolveComeviewAvatarUrl(row);
+  if (avatarUrl) {
+    const av = document.createElement('img');
+    av.className = 'cv-detail-avatar';
+    av.src = avatarUrl;
+    av.alt = '';
+    av.onerror = () => {
+      const fb = document.createElement('div');
+      fb.className = 'cv-avatar-fallback cv-detail-avatar';
+      fb.style.background = avatarColor(row.userId || row.name);
+      fb.textContent = initial(label);
+      av.replaceWith(fb);
+    };
+    head.appendChild(av);
+  } else {
+    const fb = document.createElement('div');
+    fb.className = 'cv-avatar-fallback cv-detail-avatar';
+    fb.style.background = avatarColor(row.userId || row.name);
+    fb.textContent = initial(label);
+    head.appendChild(fb);
+  }
+  const headBody = document.createElement('div');
+  headBody.className = 'cv-detail-head-body';
+  const headName = document.createElement('div');
+  headName.className = 'cv-detail-name';
+  headName.textContent = label;
+  headBody.appendChild(headName);
   const idLine = document.createElement('div');
   idLine.className = 'cv-detail-id';
   const idText = document.createElement('span');
@@ -403,7 +433,25 @@ async function showUserDetail(row) {
     cp.addEventListener('click', () => copyTextToClipboard(row.userId));
     idLine.appendChild(cp);
   }
-  bodyEl.appendChild(idLine);
+  const pageUrl = comeviewUserPageUrl(row.userId);
+  if (pageUrl) {
+    const lk = document.createElement('button');
+    lk.type = 'button';
+    lk.className = 'cv-panel-unng';
+    lk.textContent = '↗ ユーザーページ';
+    lk.title = 'ニコニコのユーザーページを開く';
+    lk.addEventListener('click', () => {
+      try {
+        void chrome.tabs.create({ url: pageUrl });
+      } catch {
+        window.open(pageUrl, '_blank', 'noopener');
+      }
+    });
+    idLine.appendChild(lk);
+  }
+  headBody.appendChild(idLine);
+  head.appendChild(headBody);
+  bodyEl.appendChild(head);
 
   // --- ニックネーム/ラベル/メモ(変更したら即保存・行へ即反映) ---
   const note = _userNotes[ukey] || { nickname: '', label: '', memo: '' };
@@ -509,10 +557,27 @@ function showNgPanel() {
   for (const e of [..._ngList].reverse()) {
     const line = document.createElement('div');
     line.className = 'cv-panel-row';
+    // サムネ・名前・ID はセットで出す(原則)。key 'u:<id>' から userId を復元してサムネ解決。
+    const uid = e.key.startsWith('u:') ? e.key.slice(2) : '';
+    const avatarUrl = resolveComeviewAvatarUrl({ avatar: '', userId: uid });
+    if (avatarUrl) {
+      const av = document.createElement('img');
+      av.className = 'cv-ng-avatar';
+      av.src = avatarUrl;
+      av.alt = '';
+      av.onerror = () => av.remove();
+      line.appendChild(av);
+    }
     const nm = document.createElement('span');
     nm.className = 'cv-panel-text';
-    nm.textContent = e.name || e.key;
+    nm.textContent = e.name || resolveComeviewDisplayName({ userId: uid, name: '' }, {}, '') || e.key;
     line.appendChild(nm);
+    if (uid) {
+      const idSpan = document.createElement('span');
+      idSpan.className = 'cv-panel-time';
+      idSpan.textContent = uid;
+      line.appendChild(idSpan);
+    }
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'cv-panel-unng';

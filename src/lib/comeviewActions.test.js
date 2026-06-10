@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveComeviewAvatarUrl,
   COMEVIEW_DEFAULT_AVATAR_URL,
+  comeviewUserPageUrl,
   comeviewUserKeyForRow,
   buildComeviewCopyText,
   normalizeComeviewNgList,
@@ -19,6 +20,10 @@ describe('comeviewUserKeyForRow', () => {
   });
   it('userId が無ければ名前で代替(匿名コメ対策)', () => {
     expect(comeviewUserKeyForRow({ userId: '', name: 'たろう' })).toBe('n:たろう');
+  });
+  it('汎用名(匿名/名無し)はキーにしない=全匿名が1人扱いになる事故防止', () => {
+    expect(comeviewUserKeyForRow({ userId: '', name: '匿名' })).toBe('');
+    expect(comeviewUserKeyForRow({ userId: '', name: '名無し' })).toBe('');
   });
   it('どちらも無い行は識別不能で空文字', () => {
     expect(comeviewUserKeyForRow({ userId: '', name: '' })).toBe('');
@@ -150,6 +155,17 @@ describe('resolveComeviewAvatarUrl(本家と同じサムネ解決)', () => {
   it('どちらも無ければ空(呼び出し側フォールバック)', () => {
     expect(resolveComeviewAvatarUrl({ avatar: '', userId: '' })).toBe('');
     expect(resolveComeviewAvatarUrl(null)).toBe('');
+  });
+});
+
+describe('comeviewUserPageUrl(情報セット原則のリンク部分)', () => {
+  it('数値 ID はユーザーページ URL', () => {
+    expect(comeviewUserPageUrl('41199319')).toBe('https://www.nicovideo.jp/user/41199319');
+  });
+  it('匿名(a:…)/空は公開ページが無いので空文字', () => {
+    expect(comeviewUserPageUrl('a:XYZ')).toBe('');
+    expect(comeviewUserPageUrl('')).toBe('');
+    expect(comeviewUserPageUrl(null)).toBe('');
   });
 });
 
