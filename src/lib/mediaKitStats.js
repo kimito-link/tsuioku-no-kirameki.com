@@ -3,7 +3,12 @@
  * plain data のみを受け取り、IndexedDB / chrome.* / DOM には依存しない。
  */
 
+import { isGenericComeviewName } from './comeviewRows.js';
+
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** コメント応援の集計対象とする直近配信数の上限(全件読みの負荷cap・脚注に明記する)。 */
+export const MEDIA_KIT_COMMENT_LIVE_CAP = 12;
 
 /** @param {unknown} value */
 function finiteNonNegative(value) {
@@ -315,5 +320,116 @@ export function buildMediaKitStats(input = {}) {
   return {
     windows,
     broadcaster: resolveBroadcaster(summaryRows, profileSnapshots)
+  };
+}
+
+/**
+ * PR4「応援者が主役」: 期間内の応援者(ギフト/コメント)を表彰用に集計する純関数。
+ * ニコ生上で公開されている応援情報(OSINT)の集計であり、隠さず主役として載せる方針
+ * (memory/reference_media_kit_design_v0678.md・ユーザー指示 2026-06-10)。
+ *
+ * @param {{
+ *   liveIds?: string[],
+ *   giftEventsByLive?: Record<string, unknown[]>|Map<string, unknown[]>,
+ *   commentRowsByLive?: Record<string, unknown[]>,
+ *   profileMap?: Record<string, { nickname?: unknown }>,
+ *   topN?: number
+ * }} input
+ * @returns {{
+ *   giftTop: Array<{ userId: string, name: string, points: number, count: number }>,
+ *   commentTop: Array<{ userId: string, name: string, count: number, liveCount: number }>,
+ *   regulars: { sampledLives: number, supporters: number, regulars: number, ratio: number|null }
+ * }}
+ */
+export function buildMediaKitSupporters(input = {}) {
+  const giftEventsByLive = input.giftEventsByLive || {};
+  const commentRowsByLive =
+    input.commentRowsByLive && typeof input.commentRowsByLive === 'object'
+      ? input.commentRowsByLive
+      : {};
+  const profileMap =
+    input.profileMap && typeof input.profileMap === 'object' ? input.profileMap : {};
+  const topNRaw = Math.floor(Number(input.topN));
+  const topN = Number.isFinite(topNRaw) && topNRaw > 0 ? topNRaw : 10;
+
+  /**
+   * 「匿名」等の汎用名は個人名扱いしない(匿名NNN表示はHTML側が uid から導く)。
+   * @param {string} uid
+   * @param {unknown} rawName
+   */
+  const resolveName = (uid, rawName) => {
+    const name = cleanText(rawName);
+    if (name && !isGenericComeviewName(name)) return name;
+    const nick = cleanText(/** @type {any} */ (profileMap[uid])?.nickname);
+    if (nick && !isGenericComeviewName(nick)) return nick;
+    return '';
+  };
+
+  // ── ギフト応援(期間内の全配信ぶん・安価) ──
+  const giftLiveIds = Array.isArray(input.liveIds)
+    ? input.liveIds.map((id) => cleanText(id).toLowerCase()).filter(Boolean)
+    : giftEventsByLive instanceof Map
+      ? [...giftEventsByLive.keys()]
+      : Object.keys(giftEventsByLive);
+  /** @type {Map<string, { userId: string, name: string, points: number, count: number }>} */
+  const giftByUid = new Map();
+  for (const liveId of giftLiveIds) {
+    const { events } = giftEventsForLive(giftEventsByLive, liveId);
+    for (const event of events) {
+      if (!event || typeof event !== 'object') continue;
+      const record = /** @type {{ userId?: unknown, nickname?: unknown, point?: unknown }} */ (event);
+      const uid = cleanText(record.userId);
+      if (!uid) continue;
+      const entry =
+        giftByUid.get(uid) || { userId: uid, name: '', points: 0, count: 0 };
+      entry.points += finiteNonNegative(record.point) || 0;
+      entry.count += 1;
+      const name = resolveName(uid, record.nickname);
+      if (name) entry.name = name;
+      giftByUid.set(uid, entry);
+    }
+  }
+  const giftTop = [...giftByUid.values()]
+    .sort((a, b) => b.points - a.points || b.count - a.count)
+    .slice(0, topN);
+
+  // ── コメント応援(直近最大12配信のサンプル・cap は呼び出し側が適用) ──
+  /** @type {Map<string, { userId: string, name: string, count: number, lives: Set<string> }>} */
+  const commentByUid = new Map();
+  let sampledLives = 0;
+  for (const [liveId, rows] of Object.entries(commentRowsByLive)) {
+    if (!Array.isArray(rows)) continue;
+    sampledLives += 1;
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue;
+      const record = /** @type {{ userId?: unknown, nickname?: unknown, name?: unknown }} */ (row);
+      const uid = cleanText(record.userId);
+      if (!uid) continue;
+      const entry =
+        commentByUid.get(uid) ||
+        { userId: uid, name: '', count: 0, lives: new Set() };
+      entry.count += 1;
+      entry.lives.add(liveId);
+      const name = resolveName(uid, record.nickname ?? record.name);
+      if (name) entry.name = name;
+      commentByUid.set(uid, entry);
+    }
+  }
+  const commentTop = [...commentByUid.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, topN)
+    .map(({ lives, ...rest }) => ({ ...rest, liveCount: lives.size }));
+  const supporters = commentByUid.size;
+  const regulars = [...commentByUid.values()].filter((entry) => entry.lives.size >= 2).length;
+
+  return {
+    giftTop,
+    commentTop,
+    regulars: {
+      sampledLives,
+      supporters,
+      regulars,
+      ratio: supporters > 0 ? regulars / supporters : null
+    }
   };
 }

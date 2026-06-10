@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.680',
+    date: '2026-06-10',
+    summary: 'メディアキットに応援者の表彰セクション',
+    items: Object.freeze([
+      'メディアキットに「この配信を支えた応援者たち」セクションを追加しました。ギフト応援TOP10(累計pt・件数)とコメント応援TOP10(件数・参加配信数)を、名前とサムネ付きの表彰形式で載せます(匿名さんは固定番号表示)。常連さん(2配信以上参加)の人数と割合も出ます',
+      '応援者の表彰は、ニコ生上で公開されているコメント・ギフト情報の集計です(コメント集計は直近の配信が対象)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.679',
     date: '2026-06-10',
     summary: 'コメビュ即時表示の二重表示バグを修正',

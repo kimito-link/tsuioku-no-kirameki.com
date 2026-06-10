@@ -79,7 +79,7 @@ describe('buildMediaKitHtml', () => {
     expect(rowLabels).toContain('ギフト（累計）');
     expect(doc.body.textContent).toContain('累計 4,500 / 配信平均 1,500');
     expect(doc.body.textContent).toContain('18,000 pt / 44 件');
-    expect(doc.body.textContent).toContain('視聴者個人のID・名前は');
+    expect(doc.body.textContent).toContain('公開されているコメント・ギフト情報');
     expect(doc.body.textContent).toContain('最大60枠');
   });
 
@@ -132,5 +132,28 @@ describe('buildMediaKitHtml', () => {
     expect(html).not.toContain('chrome.');
     expect(html).not.toContain('<script');
     expect(html).toContain("default-src 'none'");
+  });
+});
+
+describe('応援者セクション(PR4)', () => {
+  const baseStats = { windows: [], broadcaster: { name: 'テスト配信者', userId: '1', iconUrl: '' } };
+  it('supporters があれば表彰セクションを出す(名前/匿名NNN/サムネURL)', () => {
+    const html = buildMediaKitHtml({
+      ...baseStats,
+      supporters: {
+        giftTop: [{ userId: '4046119', name: 'たろう', points: 700, count: 2 }],
+        commentTop: [{ userId: 'a:XYZ', name: '', count: 10, liveCount: 3 }],
+        regulars: { sampledLives: 12, supporters: 40, regulars: 8, ratio: 0.2 }
+      }
+    });
+    expect(html).toContain('この配信を支えた応援者たち');
+    expect(html).toContain('たろう');
+    expect(html).toContain('usericon/s/404/4046119.jpg');
+    expect(html).toMatch(/匿名\d{1,3}/);
+    expect(html).toContain('常連さん');
+  });
+  it('supporters が無ければセクションを出さない(後方互換)', () => {
+    const html = buildMediaKitHtml(baseStats);
+    expect(html).not.toContain('この配信を支えた応援者たち');
   });
 });

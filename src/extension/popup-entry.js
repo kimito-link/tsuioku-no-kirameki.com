@@ -617,7 +617,11 @@ import {
   openBroadcastSessionSummaryDb
 } from '../lib/broadcastSessionSummaryDb.js';
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
-import { buildMediaKitStats } from '../lib/mediaKitStats.js';
+import {
+  buildMediaKitStats,
+  buildMediaKitSupporters,
+  MEDIA_KIT_COMMENT_LIVE_CAP
+} from '../lib/mediaKitStats.js';
 import { buildMediaKitHtml } from '../lib/mediaKitHtml.js';
 import {
   buildLastBroadcastReviewView,
@@ -17475,8 +17479,10 @@ async function fetchMediaKitBroadcasterIconDataUrl(rawUrl) {
 }
 
 /**
- * broadcast summary IDB と配信単位の軽量 storage だけからメディアキットを作る。
- * コメント本文・視聴者ID・視聴者名は読み込まない。
+ * broadcast summary IDB と配信単位の軽量 storage からメディアキットを作る。
+ * PR4(応援者が主役): 応援者セクション用にギフトイベント(全期間lv)と、直近最大12配信の
+ * コメント(readAllCommentsForLive・15秒で打ち切り)も集計する。ニコ生上で公開されている
+ * 応援情報(OSINT)の集計であり、堂々と表彰として載せる方針(ユーザー指示 2026-06-10)。
  */
 async function downloadMediaKitHtml() {
   const nowMs = Date.now();
@@ -17535,10 +17541,49 @@ async function downloadMediaKitHtml() {
     nowMs,
     windowsDays: [30, 60, 90]
   });
+
+  // PR4: 応援者セクション。コメント全件読みは直近12配信のみ・15秒で打ち切り(取れた分で出す)。
+  /** @type {Record<string, unknown[]>} */
+  const commentRowsByLive = {};
+  try {
+    const commentLives = liveIds.slice(0, MEDIA_KIT_COMMENT_LIVE_CAP);
+    await withTimeout(
+      (async () => {
+        const arrays = await Promise.all(
+          commentLives.map((lid) => readAllCommentsForLive(lid).catch(() => []))
+        );
+        commentLives.forEach((lid, index) => {
+          commentRowsByLive[lid] = Array.isArray(arrays[index]) ? arrays[index] : [];
+        });
+      })(),
+      15_000,
+      'media_kit_supporter_scan_timeout'
+    );
+  } catch {
+    /* 打ち切り: 取れた配信ぶんだけで表彰する */
+  }
+  let supporterProfileMap = popupUserCommentProfileMap;
+  if (!supporterProfileMap || !Object.keys(supporterProfileMap).length) {
+    try {
+      const profBag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
+      supporterProfileMap = normalizeUserCommentProfileMap(
+        profBag[KEY_USER_COMMENT_PROFILE_CACHE]
+      );
+    } catch {
+      supporterProfileMap = {};
+    }
+  }
+  const supporters = buildMediaKitSupporters({
+    liveIds,
+    giftEventsByLive,
+    commentRowsByLive,
+    profileMap: supporterProfileMap
+  });
+
   const broadcasterIconDataUrl = await fetchMediaKitBroadcasterIconDataUrl(
     stats.broadcaster.iconUrl
   );
-  const html = buildMediaKitHtml(stats, {
+  const html = buildMediaKitHtml({ ...stats, supporters }, {
     generatedAtMs: nowMs,
     broadcasterIconDataUrl,
     sourceLiveLimit: MEDIA_KIT_LIVE_LIMIT,

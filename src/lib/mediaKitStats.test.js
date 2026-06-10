@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMediaKitStats } from './mediaKitStats.js';
+import { buildMediaKitStats, buildMediaKitSupporters } from './mediaKitStats.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const MIN = 60 * 1000;
@@ -199,5 +199,52 @@ describe('buildMediaKitStats', () => {
     expect(stats.windows).toHaveLength(1);
     expect(stats.windows[0].liveCount).toBe(1);
     expect(stats.windows[0].comments).toBe(5);
+  });
+});
+
+describe('buildMediaKitSupporters(応援者が主役)', () => {
+  it('ギフトTOPを累計pt順に集計する(匿名uidもそのまま主役)', () => {
+    const out = buildMediaKitSupporters({
+      liveIds: ['lv1', 'lv2'],
+      giftEventsByLive: {
+        lv1: [
+          { userId: '100', nickname: 'たろう', point: 500 },
+          { userId: 'a:XYZ', nickname: '', point: 300 }
+        ],
+        lv2: [{ userId: '100', nickname: 'たろう', point: 200 }]
+      }
+    });
+    expect(out.giftTop[0]).toEqual({ userId: '100', name: 'たろう', points: 700, count: 2 });
+    expect(out.giftTop[1].userId).toBe('a:XYZ');
+    expect(out.giftTop[1].name).toBe('');
+  });
+  it('汎用名「匿名」は個人名にせず profileMap で補完する', () => {
+    const out = buildMediaKitSupporters({
+      liveIds: ['lv1'],
+      giftEventsByLive: { lv1: [{ userId: '5', nickname: '匿名', point: 10 }] },
+      profileMap: { '5': { nickname: '柿ピー' } }
+    });
+    expect(out.giftTop[0].name).toBe('柿ピー');
+  });
+  it('コメントTOPと常連(2配信以上)を直近サンプルから集計する', () => {
+    const out = buildMediaKitSupporters({
+      commentRowsByLive: {
+        lv1: [
+          { userId: 'a:1', nickname: '' },
+          { userId: 'a:1', nickname: '' },
+          { userId: 'a:2', nickname: '' }
+        ],
+        lv2: [{ userId: 'a:1', nickname: '' }]
+      }
+    });
+    expect(out.commentTop[0]).toEqual({ userId: 'a:1', name: '', count: 3, liveCount: 2 });
+    expect(out.regulars).toEqual({ sampledLives: 2, supporters: 2, regulars: 1, ratio: 0.5 });
+  });
+  it('データ無しでも安全な空形を返す', () => {
+    const out = buildMediaKitSupporters({});
+    expect(out.giftTop).toEqual([]);
+    expect(out.commentTop).toEqual([]);
+    expect(out.regulars.supporters).toBe(0);
+    expect(out.regulars.ratio).toBe(null);
   });
 });
