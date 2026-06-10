@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.681',
+    date: '2026-06-10',
+    summary: 'コメビュをわんコメ式の大きく読みやすい表示に',
+    items: Object.freeze([
+      'コメビュの表示を、わんコメと同じ「大きくて読みやすい」2行レイアウトに変えました。1行目に名前とID(薄字)と時刻、2行目に本文を切らずに全文表示します(本文16px)。配信しながら横目で読める「読む道具」としての見やすさを最優先にしています(データや動きはこれまでと同じです)',
+      'OBS透過モードでは本文を最優先にして、IDと時刻は表示しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.680',
     date: '2026-06-10',
     summary: 'メディアキットに応援者の表彰セクション',

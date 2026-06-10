@@ -332,15 +332,22 @@
         padding: 40px 16px;
         font-size: 14px;
       }
+      /* v0.1.681: わんコメ式の大型2行レイアウト(星野ロミ式=設定なしで読める既定値)。
+         データ・行HTMLはPOPと同一のまま、コメビュだけ「読む道具」の見た目にする。
+         1行目=名前+生ID(薄字)+時刻 / 2行目=本文を切らずに全文折り返し。 */
       .nl-tl-row {
-        display: flex;
-        align-items: center;
-        gap: 6px;
+        display: grid;
+        grid-template-columns: auto auto 1fr auto;
+        grid-template-areas:
+          'avatar name uid time'
+          'avatar text text text';
+        column-gap: 12px;
+        row-gap: 2px;
         min-width: 0;
-        padding: 3px 6px;
-        border-radius: 7px;
-        font-size: 11px;
-        line-height: 1.3;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--cv-border);
+        font-size: 16px;
+        line-height: 1.55;
         color: var(--nl-text);
         text-decoration: none;
       }
@@ -348,43 +355,65 @@
       .nl-tl-gift.cv-row-in {
         animation: cvRowIn 220ms ease-out;
       }
+      /* 生ID(データ属性)を名前の横に薄字で出す=情報セット原則(わんコメと同型)。 */
+      .nl-tl-row[data-nl-uid]::after {
+        content: '(' attr(data-nl-uid) ')';
+        grid-area: uid;
+        align-self: center;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--nl-muted);
+        font-size: 11.5px;
+        opacity: 0.75;
+      }
       .nl-tl-row__avatar {
-        width: 20px;
-        height: 20px;
+        grid-area: avatar;
+        align-self: start;
+        width: 36px;
+        height: 36px;
         border-radius: 999px;
-        flex: 0 0 auto;
         object-fit: cover;
         background: #fff;
         border: 1px solid color-mix(in srgb, var(--nl-border) 60%, transparent);
       }
       .nl-tl-row__name {
-        flex: 0 1 auto;
+        grid-area: name;
         min-width: 0;
-        max-width: 9em;
+        max-width: 16em;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         font-weight: 700;
-        color: var(--nl-muted);
+        font-size: 13.5px;
+        color: var(--cv-name);
       }
       .nl-tl-row__text {
-        flex: 1 1 0;
+        grid-area: text;
         min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow: visible;
+        text-overflow: clip;
       }
       .nl-tl-row--self .nl-tl-row__name {
-        color: var(--nl-accent, #0f8fd8);
+        color: var(--cv-self);
       }
       .nl-tl-gift {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        padding: 5px 8px;
-        border-radius: 8px;
-        font-size: 11px;
-        line-height: 1.3;
+        display: grid;
+        grid-template-columns: auto auto 1fr auto;
+        grid-template-areas:
+          'avatar name pt time'
+          'avatar item item item';
+        column-gap: 12px;
+        row-gap: 2px;
+        min-width: 0;
+        margin: 6px 4px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 15px;
+        line-height: 1.5;
         background: linear-gradient(
           90deg,
           color-mix(in srgb, #ffb020 16%, var(--nl-surface)),
@@ -395,18 +424,20 @@
         color: var(--nl-text);
       }
       .nl-tl-gift__icon {
-        flex: 0 0 auto;
-        font-size: 13px;
+        grid-area: avatar;
+        align-self: start;
+        font-size: 24px;
       }
       .nl-tl-gift__avatar-wrap {
+        grid-area: avatar;
         position: relative;
-        flex: 0 0 auto;
-        width: 22px;
-        height: 22px;
+        align-self: start;
+        width: 36px;
+        height: 36px;
       }
       .nl-tl-gift__avatar {
-        width: 22px;
-        height: 22px;
+        width: 36px;
+        height: 36px;
         border-radius: 999px;
         object-fit: cover;
         background: #fff;
@@ -414,40 +445,41 @@
       }
       .nl-tl-gift__badge {
         position: absolute;
-        right: -3px;
-        bottom: -3px;
-        font-size: 9px;
+        right: -4px;
+        bottom: -4px;
+        font-size: 13px;
         line-height: 1;
         filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
       }
       .nl-tl-gift__name {
-        flex: 0 1 auto;
+        grid-area: name;
         min-width: 0;
-        max-width: 8em;
+        max-width: 16em;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         font-weight: 800;
+        font-size: 13.5px;
       }
       .nl-tl-gift__item {
-        flex: 1 1 0;
+        grid-area: item;
         min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        color: var(--nl-muted);
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: var(--nl-text);
       }
       .nl-tl-gift__pt {
-        flex: 0 0 auto;
+        grid-area: pt;
+        justify-self: end;
         font-weight: 800;
         color: #b06f00;
         font-variant-numeric: tabular-nums;
       }
       .nl-tl-time {
-        flex: 0 0 auto;
-        margin-left: auto;
-        padding-left: 6px;
-        font-size: 9px;
+        grid-area: time;
+        justify-self: end;
+        align-self: center;
+        font-size: 11px;
         font-weight: 600;
         color: var(--nl-muted);
         font-variant-numeric: tabular-nums;
@@ -456,19 +488,21 @@
       #cvList [data-nl-uid]:hover {
         background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
       }
-      /* OBS 透過: 行カードだけ読みやすく重ねる(従来の OBS 見た目を踏襲)。 */
+      /* OBS 透過: 行カードだけ読みやすく重ねる(大型2行レイアウトを継承)。 */
       body.is-obs .nl-tl-row,
       body.is-obs .nl-tl-gift {
         background: rgb(0 0 0 / 38%);
         color: #fff;
         border-color: transparent;
         text-shadow: 0 1px 2px rgb(0 0 0 / 70%);
-        font-size: 15px;
-        padding: 8px 10px;
         border-radius: 10px;
+        margin: 4px;
       }
       body.is-obs .nl-tl-row__name { color: #8fd6ff; }
       body.is-obs .nl-tl-gift__pt { color: #ffd479; }
+      /* OBS オーバーレイでは生ID・時刻は出さない(画面を汚さない・本文最優先)。 */
+      body.is-obs .nl-tl-row[data-nl-uid]::after,
+      body.is-obs .nl-tl-time { display: none; }
 
       /* v0.1.667: ユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)。 */
       .cv-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
