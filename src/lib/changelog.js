@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.673',
+    date: '2026-06-10',
+    summary: 'コメビュの名前をパネルと同じ情報源で補完',
+    items: Object.freeze([
+      'パネルの応援タイムラインでは名前が出ているのに、コメビュでは同じ人のコメントに名前が出ないことがあったのを直しました。タイムラインと同じプロフィール情報をコメビュでもそのまま使い、名前やサムネが取れていない行を自動で補完します。あとから名前が判明したときは、表示済みのコメントにもさかのぼって反映されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.672',
     date: '2026-06-10',
     summary: 'コメビュの二重表示の残りを根治',

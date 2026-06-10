@@ -3,6 +3,7 @@ import {
   resolveComeviewAvatarUrl,
   COMEVIEW_DEFAULT_AVATAR_URL,
   comeviewUserPageUrl,
+  mergeComeviewRowWithProfile,
   comeviewUserKeyForRow,
   buildComeviewCopyText,
   normalizeComeviewNgList,
@@ -155,6 +156,35 @@ describe('resolveComeviewAvatarUrl(本家と同じサムネ解決)', () => {
   it('どちらも無ければ空(呼び出し側フォールバック)', () => {
     expect(resolveComeviewAvatarUrl({ avatar: '', userId: '' })).toBe('');
     expect(resolveComeviewAvatarUrl(null)).toBe('');
+  });
+});
+
+describe('mergeComeviewRowWithProfile(パネルと同じプロフィール情報源で補完)', () => {
+  const profiles = {
+    '41312990': { nickname: '∞いっちゃん∞', avatarUrl: 'https://x/icchan.jpg' }
+  };
+  it('名前/サムネが空の行をキャッシュで補完する', () => {
+    const out = mergeComeviewRowWithProfile(
+      { name: '', avatar: '', userId: '41312990' },
+      profiles
+    );
+    expect(out.name).toBe('∞いっちゃん∞');
+    expect(out.avatar).toBe('https://x/icchan.jpg');
+  });
+  it('行自身の値があれば上書きしない', () => {
+    const out = mergeComeviewRowWithProfile(
+      { name: '元の名前', avatar: 'https://x/own.jpg', userId: '41312990' },
+      profiles
+    );
+    expect(out.name).toBe('元の名前');
+    expect(out.avatar).toBe('https://x/own.jpg');
+  });
+  it('キャッシュに無い uid / uid 無しはそのまま返す', () => {
+    const row = { name: '', avatar: '', userId: '999' };
+    expect(mergeComeviewRowWithProfile(row, profiles)).toBe(row);
+    const row2 = { name: '', avatar: '', userId: '' };
+    expect(mergeComeviewRowWithProfile(row2, profiles)).toBe(row2);
+    expect(mergeComeviewRowWithProfile(null, profiles)).toBe(null);
   });
 });
 
