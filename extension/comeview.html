@@ -154,6 +154,151 @@
         padding: 40px 16px;
         font-size: 14px;
       }
+
+      /* v0.1.666: コメント単位アクション(ホバーで出す・わんコメ同等)。 */
+      .cv-row { position: relative; }
+      .cv-actions {
+        position: absolute;
+        top: -12px;
+        right: 8px;
+        display: none;
+        gap: 2px;
+        background: var(--cv-row);
+        border: 1px solid var(--cv-border);
+        border-radius: 8px;
+        padding: 2px 4px;
+        box-shadow: 0 2px 8px rgb(0 0 0 / 12%);
+      }
+      .cv-row:hover .cv-actions { display: flex; }
+      .cv-actions button {
+        background: none;
+        border: none;
+        font-size: 13px;
+        line-height: 1;
+        padding: 4px 5px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .cv-actions button:hover {
+        background: color-mix(in srgb, var(--cv-accent) 14%, transparent);
+      }
+      /* OBS 透過モードはオーバーレイ用途=操作 UI を出さない。 */
+      body.is-obs .cv-actions { display: none !important; }
+
+      /* ピン留めバー(配信者が質問等を固定。OBS 透過窓にも同期表示)。 */
+      .cv-pinbar {
+        flex: 0 0 auto;
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--cv-border);
+        background: color-mix(in srgb, var(--cv-accent) 8%, var(--cv-row));
+        font-size: 14px;
+      }
+      .cv-pin-icon { flex: 0 0 auto; }
+      .cv-pin-body { min-width: 0; flex: 1 1 auto; }
+      .cv-pin-name {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--cv-name);
+        margin-right: 6px;
+      }
+      .cv-pin-text { word-break: break-word; white-space: pre-wrap; }
+      .cv-pin-close {
+        flex: 0 0 auto;
+        background: none;
+        border: none;
+        color: var(--cv-sub);
+        font-size: 13px;
+        cursor: pointer;
+        padding: 2px 4px;
+      }
+      body.is-obs .cv-pinbar {
+        background: rgb(0 0 0 / 55%);
+        color: #fff;
+        border-color: transparent;
+        border-radius: 10px;
+        margin: 4px;
+        text-shadow: 0 1px 2px rgb(0 0 0 / 70%);
+      }
+      body.is-obs .cv-pinbar .cv-pin-name { color: #8fd6ff; }
+      body.is-obs .cv-pin-close { display: none; }
+
+      /* 画面内パネル(この人の発言/NG 管理)。 */
+      .cv-panel {
+        position: absolute;
+        inset: 44px 8px 8px;
+        background: var(--cv-bg);
+        border: 1px solid var(--cv-border);
+        border-radius: 12px;
+        box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
+        display: flex;
+        flex-direction: column;
+        z-index: 20;
+      }
+      .cv-panel-head {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--cv-border);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .cv-panel-head .cv-spacer { flex: 1 1 auto; }
+      .cv-panel-head button {
+        background: var(--cv-row);
+        color: var(--cv-text);
+        border: 1px solid var(--cv-border);
+        border-radius: 8px;
+        padding: 3px 10px;
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      .cv-panel-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 8px 12px 12px;
+      }
+      .cv-panel-note {
+        color: var(--cv-sub);
+        font-size: 12.5px;
+        margin: 4px 0 8px;
+      }
+      .cv-panel-row {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        padding: 5px 2px;
+        border-bottom: 1px dashed var(--cv-border);
+        font-size: 14px;
+      }
+      .cv-panel-no {
+        flex: 0 0 auto;
+        color: var(--cv-sub);
+        font-size: 11.5px;
+        font-variant-numeric: tabular-nums;
+        min-width: 38px;
+      }
+      .cv-panel-text {
+        min-width: 0;
+        flex: 1 1 auto;
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+      .cv-panel-unng {
+        flex: 0 0 auto;
+        background: var(--cv-row);
+        color: var(--cv-text);
+        border: 1px solid var(--cv-border);
+        border-radius: 8px;
+        padding: 2px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      body.is-obs .cv-panel { display: none !important; }
     </style>
   </head>
   <body>
@@ -162,12 +307,22 @@
       <span class="cv-meta" id="cvLiveMeta">—</span>
       <span class="cv-spacer"></span>
       <span class="cv-count" id="cvCount">0 件</span>
+      <button id="cvBtnNg" type="button" title="非表示にした人を管理" style="display: none;">NG 0</button>
       <button id="cvBtnWindow" type="button" title="別ウィンドウで開く">⧉ 別窓</button>
       <button id="cvBtnObs" type="button" title="OBS用の透過表示に切替">OBS透過</button>
       <button id="cvBtnPause" type="button">一時停止</button>
     </div>
+    <div class="cv-pinbar" id="cvPinBar" style="display: none;"></div>
     <div class="cv-list" id="cvList">
       <div class="cv-empty" id="cvEmpty">コメントを待っています…</div>
+    </div>
+    <div class="cv-panel" id="cvPanel" style="display: none;">
+      <div class="cv-panel-head">
+        <span id="cvPanelTitle">—</span>
+        <span class="cv-spacer"></span>
+        <button id="cvPanelClose" type="button">閉じる</button>
+      </div>
+      <div class="cv-panel-body" id="cvPanelBody"></div>
     </div>
     <script src="dist/comeview.js"></script>
   </body>
