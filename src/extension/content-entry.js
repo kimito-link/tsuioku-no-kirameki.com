@@ -15221,24 +15221,27 @@ const NDGR_BACKFILL_YIELD_EVERY_SEGMENTS = 6;
  */
 const NDGR_BACKFILL_TIME_FLUSH_MS = 2500;
 
-/**
- * 過去ログ一括バックフィルを 1 回だけ起動する（ワンショット）。
- * 巡回エンジン（crawlNdgrBackward）を実 fetch / 実 sleep で駆動し、yield された
- * 過去 chat を capturedAt 保持で persistCommentRows に流す。
- * @returns {Promise<void>}
- */
-async function runNdgrBackfillOnce() {
-  if (_backfillTriedLiveId && _backfillTriedLiveId === liveId) return; // 二重起動防止
+/** 過去ログ一括バックフィルを 1 回だけ起動する（ワンショット）。@returns {Promise<void>} */
+async function runNdgrBackfillOnce(ctx = {}) {
+  const {
+    liveIdOverride = liveId,
+    viewBaseOverride = null,        // null なら readNdgrViewBaseUri() を呼ぶ
+    officialCountOverride = null,   // null なら officialCommentCount を使う
+    recordedCountOverride = null,   // null なら observedRecordedCommentCount を使う
+    programBeginAtMsOverride = null, // null なら programBeginAtMs を使う
+    onProgress = null,              // null なら publishBackfillProgress() を呼ぶ
+    onPersist = null,               // null なら persistCommentRows() を呼ぶ
+  } = ctx;
+  if (_backfillTriedLiveId && _backfillTriedLiveId === liveIdOverride) return; // 二重起動防止
   // v0.1.418: 手動ボタン押下（_backfillEnabled）か自動開始 ON（_backfillAutoEnabled・既定）の
   //   どちらかで起動する。両方 OFF（自動を切ってボタンも押していない）のときだけ起動しない。
   if (!_backfillEnabled && !_backfillAutoEnabled) return;
-  if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  if (!recording || !liveIdOverride || !locationAllowsCommentRecording()) return;
   if (!hasExtensionContext()) return;
-  const viewBase = readNdgrViewBaseUri();
+  const viewBase = viewBaseOverride || readNdgrViewBaseUri();
   if (!viewBase) return; // MAIN world がまだ view を観測していない（参加直後等）
-  _backfillTriedLiveId = liveId;
+  _backfillTriedLiveId = liveIdOverride;
 
-  // 前回分があれば畳む。新しい AbortController を立て、タブ非表示で中断する。
   if (_backfillAbort) {
     try { _backfillAbort.abort(); } catch { /* no-op */ }
   }
@@ -15283,7 +15286,7 @@ async function runNdgrBackfillOnce() {
       if (!ac.signal.aborted &&
           shouldFireBackfillRotationWithSlots({
             waitingLiveIds,
-            selfLiveId: liveId,
+            selfLiveId: liveIdOverride,
             parallelSlots: resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS)
           })) {
         _backfillProgress.stopReason = 'rotation_yield';
@@ -15298,18 +15301,16 @@ async function runNdgrBackfillOnce() {
   _backfillProgress.done = 0;
   _backfillProgress.stopReason = '';
   _backfillLastProgressAt = Date.now();
-  publishBackfillProgress();
+  onProgress ? onProgress({ ..._backfillProgress }) : publishBackfillProgress();
 
-  const startMs =
-    programBeginAtMs != null && Number.isFinite(programBeginAtMs) && programBeginAtMs > 0
-      ? programBeginAtMs
-      : null;
+  const _pbMs = programBeginAtMsOverride ?? programBeginAtMs;
+  const startMs = _pbMs != null && Number.isFinite(_pbMs) && _pbMs > 0 ? _pbMs : null;
 
   // v0.1.456 レジューム: 前回この配信で到達した最古コメント vpos を読み、crawl の
   //   resumeFromVpos に渡す。これで「もう一度ためす」や自動リトライが前回の続きから
   //   掘り始め、同じ区画を取り直して dedupe で弾かれる無駄（実機 125→135→143）を解消。
   //   読めない/壊れているときは null＝従来どおり seed 探索から（後方互換）。
-  const resumeKey = liveId ? backfillResumeStorageKey(liveId) : null;
+  const resumeKey = liveIdOverride ? backfillResumeStorageKey(liveIdOverride) : null;
   let resumeFromVpos = null;
   // 自動補充の完全性優先（2026-05-30 真因修正・ユーザー実機 lv350642072 で seg:3/rows:14・76%停止）:
   //   resume は「前回到達した最古 vpos の続きから」掘る最適化だが、過去に配信開始近傍まで届いた
@@ -15321,7 +15322,7 @@ async function runNdgrBackfillOnce() {
   //     （ほぼ埋まっている）ときだけ従来どおり resume で続きを足す。
   const gapForSweep = Math.max(
     0,
-    (Number(officialCommentCount) || 0) - (Number(observedRecordedCommentCount) || 0)
+    (Number(officialCountOverride ?? officialCommentCount) || 0) - (Number(recordedCountOverride ?? observedRecordedCommentCount) || 0)
   );
   // fix/backfill-all-sizes（レビュー会議室・2026-06-01 反映）: forceFullSweep のしきい値は
   //   あえて minGapAbsolute(170) のまま据え置く。ここを小規模向けに下げると、再アームのたびに
@@ -15330,8 +15331,8 @@ async function runNdgrBackfillOnce() {
   //   掘る方が効率的に穴を埋められるので、full sweep は大ギャップ（stale resume の誤完了復旧）
   //   専用のまま残す。約49%停滞の解消は再アーム停止しきい値の実効化（下記）だけで足りる。
   const forceFullSweep =
-    officialCommentCount != null &&
-    Number.isFinite(officialCommentCount) &&
+    (officialCountOverride ?? officialCommentCount) != null &&
+    Number.isFinite((officialCountOverride ?? officialCommentCount)) &&
     gapForSweep >= OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute;
   if (resumeKey && forceFullSweep) {
     // stale resume を破棄して full sweep を保証（次回の自動補充も now から遡れるように）。
@@ -15356,11 +15357,10 @@ async function runNdgrBackfillOnce() {
     if (!resumeKey) return;
     const v = Number(minVpos);
     if (!Number.isFinite(v) || v <= 0) return;
-    // 前回保存値より小さい（より古い）ときだけ更新。
     if (resumeFromVpos != null && v >= resumeFromVpos) return;
     resumeFromVpos = Math.floor(v);
     setStorageLocalSilent({
-      [resumeKey]: { lid: liveId, minVpos: Math.floor(v), ts: Date.now() }
+      [resumeKey]: { lid: liveIdOverride, minVpos: Math.floor(v), ts: Date.now() }
     });
   };
 
@@ -15382,7 +15382,7 @@ async function runNdgrBackfillOnce() {
     const batch = pendingBackfillRows;
     pendingBackfillRows = [];
     _lastBackfillFlushAt = Date.now();
-    persistCommentRows(batch, { source: COMMENT_INGEST_SOURCE.BACKFILL });
+    onPersist ? onPersist(batch) : persistCommentRows(batch, { source: COMMENT_INGEST_SOURCE.BACKFILL });
   };
 
   try {
@@ -15449,7 +15449,7 @@ async function runNdgrBackfillOnce() {
             Array.isArray(diag.reachedStartChats)
           ) {
             const summary = {
-              lid: liveId,
+              lid: liveIdOverride,
               path: diag.reachedStartPath || 'unknown',
               rows: _backfillProgress.rows,
               count: diag.reachedStartChats.length,
@@ -15496,14 +15496,14 @@ async function runNdgrBackfillOnce() {
         _backfillProgress.rows += rows.length;
         _backfillLastProgressAt = Date.now();
       }
-      publishBackfillProgress();
+      onProgress ? onProgress({ ..._backfillProgress }) : publishBackfillProgress();
       // 一定行たまったら 1 回だけ persist（フラッシュ回数を激減＝固まり緩和）。
       // v0.1.xxx: 閾値を「保存済み件数」に応じて動的に引き上げる（computeBackfillFlushThreshold）。
       //   固定 800 行だと巨大放送ほど flush 回数が増え、full-array の read-merge-write（O(N)）が
       //   積み重なって総コスト O(N^2) ＝「応答しません」の主因。保存件数比例で溜めてから書くと
       //   flush 回数が放送サイズに依存せず、メモリは max(8000 行)で頭打ち。dedupe が正確性担保。
       const backfillFlushThreshold = computeBackfillFlushThreshold(
-        observedRecordedCommentCount
+        (recordedCountOverride ?? observedRecordedCommentCount)
       );
       // v0.1.654: 件数閾値に届かなくても、最後の flush から一定時間(2.5s)経っていれば
       //   時間ベースで flush する。crawl が高速で大量取得しても pending が storage に
@@ -15583,7 +15583,7 @@ async function runNdgrBackfillOnce() {
     ) {
       const now = Date.now();
       // liveId が切り替わったら初回保証カウンタをリセット(別配信は別物として扱う)。
-      if (_backfillVisibilityRearmedLiveId && _backfillVisibilityRearmedLiveId !== liveId) {
+      if (_backfillVisibilityRearmedLiveId && _backfillVisibilityRearmedLiveId !== liveIdOverride) {
         _backfillVisibilityRearmedLiveId = '';
         _backfillRecentVisibilityPauses = [];
       }
@@ -15591,28 +15591,26 @@ async function runNdgrBackfillOnce() {
         [..._backfillRecentVisibilityPauses, now],
         now
       );
-      const hasRearmedThisLive = _backfillVisibilityRearmedLiveId === liveId;
+      const hasRearmedThisLive = _backfillVisibilityRearmedLiveId === liveIdOverride;
       if (
         shouldRearmBackfillAfterVisibility({
           hasRearmedThisLive,
           recentPauseTimestamps: _backfillRecentVisibilityPauses
         })
       ) {
-        _backfillVisibilityRearmedLiveId = liveId;
+        _backfillVisibilityRearmedLiveId = liveIdOverride;
         _backfillTriedLiveId = '';
       }
-      // 抑制時は guard を残したまま=このターンは起動しない。連発が窓外に抜ければ次の
-      //   visibility_paused 終了で再び許可され、続きから掘り直す(自己回復)。
     }
     _backfillProgress.done = 1;
-    publishBackfillProgress();
-    void clearBackfillWaiter(String(liveId || '').trim().toLowerCase());
+    onProgress ? onProgress({ ..._backfillProgress }) : publishBackfillProgress();
+    void clearBackfillWaiter(String(liveIdOverride || '').trim().toLowerCase());
 
     // v0.1.431: 一過性 stop（入口が一時的に見つからない等）なら one-shot guard を一定時間後に
     //   解除し、maintenance tick の maybeAutoStartBackfill が自動で再試行する（UI 案内「少し
     //   経ってからもう一度」を自動化）。完了/やり切り/中断では再試行しない。タブが今 LIVE を
     //   見ていて自動取り込み ON のときだけ（隠れタブ・OFF では無駄に叩かない）。
-    const lidAtFinish = liveId;
+    const lidAtFinish = liveIdOverride;
     // v0.1.665: 進捗があった巡回はリトライ/再アーム予算を全回復する。上限(7回/40回)は
     //   「連続空振り」を止めるための予算であって、長尺・疎区間配信が何度も止まりながら
     //   前進するときの寿命ではない。生涯予算のままだと3時間級配信で途中に予算が尽き、
@@ -15632,8 +15630,8 @@ async function runNdgrBackfillOnce() {
         autoEnabled: _backfillAutoEnabled,
         tabHidden: document.visibilityState === 'hidden',
         // v0.1.658: no_progress でも official に大きく届いていなければ続きから再試行(59%停止救済)。
-        recordedCount: Number(observedRecordedCommentCount) || 0,
-        officialCount: Number(officialCommentCount) || 0
+        recordedCount: Number(recordedCountOverride ?? observedRecordedCommentCount) || 0,
+        officialCount: Number(officialCountOverride ?? officialCommentCount) || 0
       })
     ) {
       _backfillTransientRetryByLiveId[lidAtFinish] = retried + 1;
@@ -15643,7 +15641,7 @@ async function runNdgrBackfillOnce() {
       const retryDelayMs = calculateBackfillRetryDelayMs(retried);
       setTimeout(() => {
         // 同じ配信を今も見ていて guard がこの liveId のままなら解除＝次 tick で再起動。
-        if (liveId === lidAtFinish && _backfillTriedLiveId === lidAtFinish) {
+        if (liveIdOverride === lidAtFinish && _backfillTriedLiveId === lidAtFinish) {
           _backfillTriedLiveId = '';
         }
       }, retryDelayMs);
