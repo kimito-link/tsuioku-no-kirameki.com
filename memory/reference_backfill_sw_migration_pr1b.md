@@ -58,12 +58,38 @@
 
 ## 残リスクと対策
 
-- **SW 30秒アイドル死**: fetch ループ中はイベントで生存延長される + `chrome.alarms`（25秒周期）保険。
-  crawl 1 hop ごとに progress 書込 = イベント活動でも延命。
-- **チャンク index 二重書き**: PR1-b-2 で navigator.locks（SW でも使用可）により書込直列化。
-  PR1-b-1 の間は persist を content に送り返すので競合自体が発生しない。
-- **タブが閉じた後の persist 先**(PR1-b-1 の制約): sender タブが閉じると rows を流せない →
-  PR1-b-2 の SW 直書きで解消。PR1-b-1 は「タブ非表示でも進む」までを達成（タブ閉じはまだ）。
+- **SW 30秒アイドル死**: fetch ループ中はイベントで生存延長される。
+  ⚠️ **実機確認済みの穴(2026-06-11)**: crawl lib の no_progress バックオフ睡眠(最大~45秒)中は
+  fetch/メッセージが無く、SW が 30 秒アイドルで死に crawl が finally 不達のまま消える。
+  対策(未実装・次PR): crawl 実行中だけ setInterval(20-25秒)で chrome.runtime.getPlatformInfo()
+  等の安価な拡張 API を self-call してアイドルタイマーをリセット(chrome.alarms は最小30秒で競合)。
+- **チャンク index 二重書き**: 当初案の navigator.locks は不可能と判明(content=ページorigin /
+  SW=拡張origin で lock manager が別)。PR1-b-2 で「SW は正本に直接書かず取り置き staging に書き、
+  content が既存 persist パイプラインへ畳み込む」方式に変更=レースを構造的に排除。
+- **タブが閉じた後の persist 先**: PR1-b-2 の staging で解消済み(実機実証済み)。
+
+## 実機検証結果（2026-06-11・chrome-devtools-mcp・v0.1.690）
+
+1. ✅ **SW crawl 完走**: lv350729261 で rows=45/seg=3/reached_start。rows→タブ送付→既存 persist
+   経由でチャンク正本 55 件。既存進捗キーへの完走ミラーも同値で書込確認。
+2. ✅ **staging(タブ消失時)**: lv350663581 で crawl 中にタブが次番組へ自動遷移(lid 変化)→
+   rows 送付が lid_mismatch で fail → 設計どおり staging へ切替、**1,224 行を reached_start まで
+   取り切って取り置き**(進捗に staged:true)。タブ依存根絶の直接証明。
+3. ✅ **fold-in(畳み込み)**: lv350663581 を開き直した瞬間(0秒)に取り置き 1,224 行が正本チャンクへ
+   畳み込まれ(total=1,422)、取り置きキー削除済み。
+4. ⚠️ **既知制約(v1)**: backward_exhausted(入口問題)時に SW モードはリトライしない
+   (content のワンショット guard が ok:true で立つため再送なし)。既存 content 経路は
+   transient retry 対象。SW モード既定 ON 昇格前に SW 側リトライ移植が必要。
+5. ⚠️ 手動起動(古い viewBase 使い回し)は backward_exhausted になりやすい=viewBase token は
+   鮮度が要る。content 自動起動(ページ load 直後の新鮮な base)は成功。
+
+## SW モード既定 ON 昇格前の必須宿題
+
+1. backward_exhausted 等 transient stop の SW 側リトライ(content の
+   shouldScheduleBackfillTransientRetry 相当)
+2. SW アイドル死対策の keepalive(上記)
+3. グローバルトークンバケツ(429 制御)の SW 移植
+4. PR1-c(visibility 系削除)は上記 3 つと実機安定確認の後
 
 ## 触らないもの（絶対）
 
