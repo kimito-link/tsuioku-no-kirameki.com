@@ -153,6 +153,13 @@ export const NDGR_BACKFILL_NEAR_START_MIN_HITS = 2;
  */
 export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 240;
 
+/**
+ * v0.1.695: 空区画/入口なしリトライの間に挟む小休止（ms）。従来は最大240回を無休で連発し、
+ * 若い配信(序盤が全部空区画)でSW/コンテンツのイベントループとNDGRをリクエスト嵐で圧迫していた
+ * (実機: SWがメッセージ応答不能)。橋渡しの回数・順序は不変・ペースだけ毎秒数件に落とす。
+ */
+export const NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS = 150;
+
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
 
@@ -785,6 +792,10 @@ export async function* crawlNdgrBackward(opts) {
       //   1200s×streak も戻し、46 分級の配信では配信開始を飛び越して programStart に張り付き、
       //   毎回同じ場所＝ no_progress 即終了だった。バケット幅で着実に隣のバケットへ降ろす。
       seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
+      // v0.1.695: 空リトライ間に小休止を挟む。従来は上限240回まで無休で空シークを連発し、
+      //   SW/コンテンツのイベントループとNDGRをリクエスト嵐で圧迫していた(実機: SWがメッセージ
+      //   応答不能)。橋渡しの正しさは不変(回数・順序は同じ)・ペースだけ毎秒数件に落とす。
+      await sleep(NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS);
       continue;
     }
 
@@ -904,6 +915,8 @@ export async function* crawlNdgrBackward(opts) {
       // v0.1.431: 起点を「直前の種より 1 バケット分ずつ」前へ戻す（旧 1200s×streak は配信開始を
       //   飛び越え programStart 張り付き→毎回同じ場所→偽 no_progress だった）。
       seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
+      // v0.1.695: 空リトライ間に小休止（嵐防止・上の同型コメント参照）。
+      await sleep(NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS);
       continue; // 同じ reseed 予算内で次の起点を試す
     }
     // 進めた。最古 vpos を更新し、no-progress 連続カウンタをリセット。

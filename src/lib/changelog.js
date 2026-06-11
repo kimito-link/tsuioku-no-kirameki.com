@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.695',
+    date: '2026-06-12',
+    summary: '取得リトライのリクエスト集中を緩和',
+    items: Object.freeze([
+      '配信序盤の空区間を探し直すとき、休みなくリクエストを連発していたのを小休止を挟むペースに変えました。取得の正しさは変わらず、ブラウザとサーバーへの負荷が下がります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.694',
     date: '2026-06-11',
     summary: 'SW取得の自動再試行と中断耐性を強化',
