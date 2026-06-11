@@ -83,13 +83,27 @@
 5. ⚠️ 手動起動(古い viewBase 使い回し)は backward_exhausted になりやすい=viewBase token は
    鮮度が要る。content 自動起動(ページ load 直後の新鮮な base)は成功。
 
-## SW モード既定 ON 昇格前の必須宿題
+## SW モード既定 ON 昇格前の必須宿題（2026-06-12 更新）
 
-1. backward_exhausted 等 transient stop の SW 側リトライ(content の
-   shouldScheduleBackfillTransientRetry 相当)
-2. SW アイドル死対策の keepalive(上記)
-3. グローバルトークンバケツ(429 制御)の SW 移植
-4. PR1-c(visibility 系削除)は上記 3 つと実機安定確認の後
+1. ✅ SW 側 transient リトライ — v0.1.694(e2dba37a)。既存純関数再利用・上限5・rows>0で予算回復
+2. ✅ SW アイドル死 keepalive — v0.1.694。crawl中+リトライ待機中 20 秒毎 getPlatformInfo
+3. ✅ リクエスト嵐の抑制 — v0.1.695(2a721d31)。空リトライに sleep(150ms) ペーシング
+   （429 トークンバケツ移植は不要と判断: crawl lib 内の 429 backoff(2/4/8s)+ペーシングで足りる。
+   既存 globalFetchRateLimiter は setAccessLevel 未配線で休眠＝起こすと 1-6req/s で一気取りを殺す
+   ので絶対に配線しない）
+4. ⬜ **SW 並列度（最後の壁・2026-06-12 実機で確認）**: SW エンジンは global single-flight のため、
+   巨大配信1本が crawl/橋渡しで SW を最大 cap_elapsed(15分)占有し、他の配信の backfill が
+   待たされる（content 経路は N=2 スロット並列だった）。per-lid 並列(2本)に拡張してから既定 ON。
+5. ⬜ 巨大配信で rows 凍結のまま running が長引くケースの診断（実機 lv350674461: 14,818行で
+   5分以上前進なし・SW は応答可・cap_elapsed で有界）
+6. PR1-c(visibility 系削除)は 4-5 と実機安定確認の後
+
+## 実機検証2（2026-06-12 v0.1.694-695）
+
+- ✅ SW 応答性: v0.1.694 時点では若い配信でメッセージ応答不能（空リトライ嵐）→ v0.1.695 の
+  ペーシングで完全回復（連続ポーリング全応答）
+- ✅ タブ閉じ継続: lv350674461 のタブを閉じても SW crawl が 14,818 行まで継続（大規模実証）
+- ✅ keepalive: 5分超の crawl 継続中も SW 生存
 
 ## 触らないもの（絶対）
 
