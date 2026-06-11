@@ -69,11 +69,14 @@ export function summarizeCommentRecordBreakdown(comments) {
  * v0.1.628: 「全部 normal なら空文字」設計を撤廃(ユーザー証言「何処に反映されているか
  *   わからない」)。total > 0 なら常に「内訳: 通常 N」だけでも出して、機能の有無を
  *   ユーザーが確認できるようにする。
+ * v0.1.685: broadcasterCount を受け取り「配信者 N」を表示。配信者コメントは記録に保存
+ *   されるが表示から除外されるため、countToShow との差がユーザーに不透明だった問題を解消。
  *
  * @param {CommentRecordBreakdown} breakdown
+ * @param {{ broadcasterCount?: number }} [opts]
  * @returns {string}
  */
-export function formatCommentRecordBreakdownLine(breakdown) {
+export function formatCommentRecordBreakdownLine(breakdown, opts = {}) {
   if (!breakdown || breakdown.total <= 0) return '';
   /** @type {string[]} */
   const parts = [];
@@ -86,6 +89,10 @@ export function formatCommentRecordBreakdownLine(breakdown) {
   }
   if (breakdown.otherSystem > 0) {
     parts.push(`システム ${breakdown.otherSystem.toLocaleString('ja-JP')}`);
+  }
+  const bc = Number(opts && opts.broadcasterCount);
+  if (Number.isFinite(bc) && bc > 0) {
+    parts.push(`配信者 ${bc.toLocaleString('ja-JP')}`);
   }
   if (!parts.length) return '';
   return `内訳: ${parts.join(' / ')}`;

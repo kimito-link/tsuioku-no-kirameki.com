@@ -131,4 +131,22 @@ describe('formatCommentRecordBreakdownLine', () => {
     });
     expect(line).toContain('1,450');
   });
+
+  it('broadcasterCount>0 で「配信者 N」を末尾に表示', () => {
+    expect(
+      formatCommentRecordBreakdownLine(
+        { total: 596, normal: 596, interestArrival: 0, followNotice: 0, otherSystem: 0 },
+        { broadcasterCount: 25 }
+      )
+    ).toBe('内訳: 通常 596 / 配信者 25');
+  });
+
+  it('broadcasterCount=0 のとき「配信者」を表示しない', () => {
+    expect(
+      formatCommentRecordBreakdownLine(
+        { total: 100, normal: 100, interestArrival: 0, followNotice: 0, otherSystem: 0 },
+        { broadcasterCount: 0 }
+      )
+    ).toBe('内訳: 通常 100');
+  });
 });

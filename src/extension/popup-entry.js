@@ -2373,16 +2373,13 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
     }
   }
 
-  // v0.1.627: 記録の内訳(通常/興味来場/システム)を別 sub 行に表示。
-  //   ユーザー証言「コメント記録の数があわないし、何処に反映されているかわからない」の解消。
-  // v0.1.628: breakdown=undefined のときは DOM を一切触らない(前回値保持)。
-  //   他経路(applyPanelMetricsFromContent / applyLightweightPanelSummaryCards 等)が
-  //   breakdown を渡さずに setCountDisplay を呼ぶ → null として扱われ hidden 化される
-  //   副作用を断つ。明示的に null を渡すと従来通り非表示。
+  // v0.1.627/628: 記録の内訳を sub 行に表示。breakdown=undefined は DOM 触らない(前回値保持)。
+  // v0.1.685: _broadcasterCount を opts に渡し「配信者 N」を表示。
   if (breakdown !== undefined) {
     const breakdownEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsBreakdown'));
     if (breakdownEl) {
-      const line = breakdown ? formatCommentRecordBreakdownLine(breakdown) : '';
+      const bc = breakdown ? /** @type {any} */ (breakdown)._broadcasterCount : undefined;
+      const line = breakdown ? formatCommentRecordBreakdownLine(breakdown, { broadcasterCount: bc }) : '';
       if (line) {
         breakdownEl.hidden = false;
         breakdownEl.textContent = line;
@@ -14035,10 +14032,10 @@ async function refresh() {
       watchSnapshot,
       panelLiveSummary
     );
-    // v0.1.627: 記録の内訳(通常/興味来場/システム)を集計して setCountDisplay に渡す。
-    //   displayEntries はこの paint で実際に表示しているコメント配列=「記録」と意味的に同じ。
-    //   軽量純関数のため毎 paint 計算しても影響なし(N=数百〜数千)。
+    // v0.1.627: 記録の内訳を集計。v0.1.685: countToShow>displayEntries 差=配信者コメント。
     const recordedBreakdown = summarizeCommentRecordBreakdown(displayEntries);
+    const _broadcasterCount = Math.max(0, countToShow - displayEntriesBase.length);
+    if (_broadcasterCount > 0) recordedBreakdown._broadcasterCount = _broadcasterCount;
     setCountDisplay(countToShow, snapForCards, recordedBreakdown);
     markWatchPopupLoadPhase('count_card', {
       countToShow,
