@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.684',
+    date: '2026-06-11',
+    summary: '新しい配信を開いてもローディングが出ないように',
+    items: Object.freeze([
+      '新しい配信を開いたとき「もう一度さかのぼり始めるね」のメッセージが繰り返し出てしまう問題を直しました。過去ログの取得はバックグラウンドで自動的に続くため、ポップアップ側からの再起動指示を廃止し、取り切ったときだけ結果を表示するようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.683',
     date: '2026-06-11',
     summary: '別タブを開いても過去ログ取得が止まらないように',
