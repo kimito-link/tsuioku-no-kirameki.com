@@ -579,17 +579,14 @@ describe('backfillStuckDiagnosticsSuffix（止まった理由＋残り件数の�
   });
 
   describe('誤完了の可視化（reached_start なのに公式に未達・実機118/595）', () => {
-    // ⭐しきい値は watchdog の reached_start 再 sweep（reachedStartGapOverride）と同じ
-    //   BACKFILL_FALSE_COMPLETION_RATIO(0.5) を使う。「未達と表示するのに自動回復しない」帯を作らない。
-    it('reached_start(done) で記録が公式の半分未満なら未達を診断表示する（実機20%）', () => {
+    // v0.1.685: reached_start 大ギャップは hidden（自動再 sweep 中・黙って取る設計）。
+    //   メッセージを出すとユーザーに「ローディング中」と感じさせる（v0.1.657 設計に反する）。
+    it('reached_start(done) で記録が公式の半分未満は hidden（自動再 sweep に任せる）', () => {
       const s = backfillRecordCardHintDomState(
         { started: true, rows: 118, done: 1, stopReason: 'reached_start' },
         { officialCount: 595, recordedCount: 118 }
       );
-      expect(s.hidden).toBe(false);
-      expect(s.dataPhase).toBe('partial');
-      expect(s.lead).toContain('公式件数に届いていません');
-      expect(s.lead).toContain('（理由: reached_start・残り約477件）');
+      expect(s.hidden).toBe(true);
     });
 
     it('reached_start(done) で記録が公式の50〜95% なら達成扱いで隠す（watchdog と整合・自動回復しない帯を作らない）', () => {
