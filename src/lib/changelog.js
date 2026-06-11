@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.690',
+    date: '2026-06-11',
+    summary: 'SWでの過去ログ取得を試せる切替を追加',
+    items: Object.freeze([
+      '過去ログ取得をService Workerで実行する実験的な切り替え（既定OFF）を追加しました。ONにしない限り従来の取得経路と完全に同じ動作です'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.689',
     date: '2026-06-11',
     summary: 'タブを閉じてもSWが過去ログを取り置きするように',
