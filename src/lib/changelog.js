@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.687',
+    date: '2026-06-11',
+    summary: 'ランキング等のレーンを即時非表示→データで即表示に',
+    items: Object.freeze([
+      'ポップアップを開いた瞬間にランキング・イベント等のレーンが空枠のまま表示される問題を修正しました。データが来るまで枠ごと非表示にし、データが取れた瞬間に表示するようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.686',
     date: '2026-06-11',
     summary: '長時間配信の「届いていません」を黙って取るように',

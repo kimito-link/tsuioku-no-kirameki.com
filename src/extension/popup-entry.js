@@ -10369,6 +10369,7 @@ async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
     _eventLaneLastHtmlByBody.set(body, html);
   }
   body.setAttribute('data-lane-state', 'ok');
+  setNorthStarLaneHidden('eventRank', false);
   clearNorthStarVerticalRailForBody(body);
   syncNorthStarLaneGadgetFromBodyState(body);
 }
