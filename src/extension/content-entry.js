@@ -422,6 +422,10 @@ import {
   isBackfillAutoJustEnabledFromChange
 } from '../lib/backfillOptIn.js';
 import { deriveBackfillCapturedAt } from '../lib/backfillCapturedAt.js';
+import {
+  isSwBackfillStagedForLive,
+  swBackfillStagedKey
+} from '../lib/swBackfillStaging.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
 import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
@@ -9689,18 +9693,9 @@ let _lastSavedCommentsUidStats = {
   withUidPercent: 0
 };
 
-// ===========================================================================
 // v0.1.505: コメント保存テールバッファ（追記式チャンク）
-// ---------------------------------------------------------------------------
-// 従来は毎フラッシュで巨大なメイン配列 nls_comments_<lv> を read→merge→**全件 set** して
-// いた。1 万件超で 1 回の構造化クローン set が重く、同一オリジンの watch タブが共有レンダラ
-// 上で全件 set を撃ち合うと「ページが応答しません」フリーズ＋記録頭打ちを招いた。
-//
-// 対策: 毎フラッシュは新規分だけを小さなテールキー nls_ctail_<lv> へ追記（安い）し、件数/
-// 時間しきい値・タブ非表示・離脱・export 前にだけ既存 persistCommentRowsImpl でメイン配列へ
-// 畳み込む（重い全件 set を低頻度化）。メイン配列の形式・既存 dedupe/merge ロジックは不変。
+// 巨大メイン配列の全件 set を避け、新規分を nls_ctail_<lv> へ追記して低頻度で畳み込む。
 // 詳細・純関数は src/lib/commentTailBuffer.js（単体テスト付き）。
-// ===========================================================================
 
 /** テール seed 済みの liveId（これが現 liveId と違えばメインから seed し直す） */
 let tailSeededLiveId = '';
@@ -9732,28 +9727,14 @@ let liveChunkMigrated = false;
 
 /**
  * v0.1.513: チャンクモードの dedupe をインメモリ・インクリメンタル化するフラグ。
- * ON のとき、毎フラッシュの「全チャンク read + 全件 mergeNewComments（O(N)）」を
- * 「キー集合への照合（O(追加分)）」に置き換える。
- *
- * ⭐fix/persist-plateau（2026-06-01・実機で確定）: 既定 OFF → ON へ変更。
- *   実機（lv350651843・記録13,191/公式13,258）で「ある程度たつと件数が増えなくなる」頭打ちを観測。
- *   真因は、チャンクモードでも本フラグ OFF だと毎フラッシュで readChunkedComments（全13k件 read）+
- *   mergeNewComments（O(N)）が走り、件数が増えるほど 1 フラッシュが重くなって 40 秒ガード
- *   （persistWriteTimeoutMs×4）を超過 → 書き込みが requeue され続け、新着が保存されず件数が固定される
- *   こと（data-nls の persist flush exceeded guard timeout）。インクリメンタル化すると seed は初回 1 回
- *   だけ（以降は chunk index total の一致で全件 read を skip）で、フラッシュ全体が O(追加分) になり
- *   頭打ちが解消する。書き込み側は既に「追加分だけ新チャンク追記」で bounded（planAppendRowsAsChunks）。
- *   単体テストは commentRecord.test.js（冪等・undo ロールバック・複数フラッシュ）でカバー済み。
- *   ⚠️ 明示的に false がセットされている環境だけ従来 O(N) 経路に戻す（緊急時の逃げ道を残す）。
+ * 全チャンク read + O(N) merge を初回 seed 後の O(追加分)照合へ置き換え、頭打ちを防ぐ。
+ * 明示的に false が保存された環境だけ従来経路へ戻す。
  */
 let _incrementalDedupEnabled = true;
 /**
  * fix/idb-offscreen-killswitch（2026-06-01）: IDB+Offscreen 経路（KEY_COMMENT_IDB_ENABLED /
- * KEY_CDB_OFFSCREEN_ENABLED）は実機検証で破綻した。SW⇄Offscreen の append 往復が SW の
- * ライフサイクル（idle 停止）と噛み合わず「Uncaught Error: No SW」を出して append が成立せず、
- * 新規放送で公式 5,417 件中 117 件（約 2%）しか捕捉できなくなった。記録不能は最悪の退化なので、
- * 保存フラグが storage 上で true でも **常に無視**して従来 chrome.storage 経路を使う。
- * 再挑戦（往復に頼らない設計に作り直し）するときに、この定数を false に戻して段階検証する。
+ * KEY_CDB_OFFSCREEN_ENABLED）は SW idle 停止で append が成立しないため常時無効化する。
+ * 保存フラグが true でも従来 chrome.storage 経路を使う。
  * @see storageKeys.js KEY_COMMENT_IDB_ENABLED / KEY_CDB_OFFSCREEN_ENABLED
  */
 const FORCE_DISABLE_COMMENT_IDB_PATH = true;
@@ -10489,11 +10470,8 @@ async function flushBatchViaTail(batch) {
  */
 async function flushCommentTailNow(opts = {}) {
   if (!liveId || tailRowsBuffer.length === 0) return;
-  // v0.1.507: 巨大メインでは hide/pagehide での強制畳み込み（2万件級の構造化クローン）を行わない。
-  //   タブを裏に回した瞬間に巨大放送が一斉に重い畳み込みを始め、共有レンダラを固めて
-  //   「ページが応答しません」を招くのが実機の主因だった。テールは bufferRowsToTail で常に
-  //   永続済みなので、畳み込みを送っても取りこぼさない（次回読み込みの seed がテールを復元する）。
-  //   export 等で確実に畳み込みたいときは force:true を渡す。
+  // 巨大メインは hide/pagehide で強制畳み込みせず、必要時だけ force:true を使う。
+  // テールは永続済みなので次回 seed で復元できる。
   if (!opts.force && tailMainCount >= BIG_MAIN_THRESHOLD) {
     console.debug(
       formatPipelinePhase('compact_skip_big', {
@@ -10517,23 +10495,13 @@ async function flushCommentTailNow(opts = {}) {
 
 const MIN_PERSIST_INTERVAL_MS = INGEST_TIMING.coalescerMinMs;
 const PERSIST_BURST_THRESHOLD = INGEST_TIMING.coalescerBurstThreshold;
-// v0.1.497/498: 同一オリジン（live.nicovideo.jp）の複数 watch タブは Chrome が同一
-//   レンダラープロセス＝同一メインスレッドにまとめる。裏タブが大量コメントの全件
-//   read-merge-write を短間隔で走らせると、見ているタブまで巻き込んで「ページが応答
-//   しません」になる（実機で 443 件の前面タブが、裏の 3 万件タブ起因で固まると確認）。
-//   v0.1.498/499 フリーズ対策 A: 間隔決定を computeLivePersistIntervalMs に委譲する。
-//     フリーズの主因は「件数が多い放送の 1 回の巨大書き込み」なので、間隔は保存済み件数に
-//     比例して伸ばす（書き込みコストにスロットルを比例）。裏タブは前面より広めの帯にする
-//     が「実質ポーズ」はしない＝小さい放送なら裏タブでも数秒間隔で記録が溜まり、マルチ
-//     タブ監視が機能する。巨大放送だけ裏で間隔を大きく伸ばしてフリーズを避ける。
-//   ⚠ v0.1.498 は hidden を一律 1h ポーズにして「裏タブが一切記録しない」回帰を起こした。
+// 複数 watch タブの巨大書込で共有レンダラを固めないよう、保存件数に応じて間隔を伸ばす。
+// hidden も一律停止せず、小規模配信の記録は継続する。
+// 間隔決定は computeLivePersistIntervalMs に集約。
 const persistCoalescer = createPersistCoalescer(
   async (/** @type {ParsedCommentRow[]} */ batch) => {
-    // v0.1.502: チェーンを「必ず settle するガード付き promise」で前進させる。これにより
-    //   万一 persistCommentRowsImpl 内に未有界化の await が残っても、persistCommentRowsChain /
-    //   flushMutex（persistThrottle）が永久ポイズンされない（=「最終取り込み ◯秒前」固定の
-    //   構造的再発防止）。storage の get/set/remove は個別に timeout 済みなので、通常はこの
-    //   ガード（4s×4=16s）に到達する前に impl が早期 return する。
+    // settle 保証付き timeout で persist chain / flush mutex の永久停止を防ぐ。
+    // storage 操作は個別 timeout 済みで、通常はこのガード前に完了する。
     const guarded = persistCommentRowsChain.then(() =>
       runStorageOpWithTimeout(
         () => flushBatchViaTail(batch),
@@ -10566,20 +10534,16 @@ const persistCoalescer = createPersistCoalescer(
       hidden,
       storedCount: observedRecordedCommentCount,
       baseMs: MIN_PERSIST_INTERVAL_MS,
-      // v0.1.510: 追記チャンク化済み（liveChunkMigrated）なら毎フラッシュの書き込みは
-      //   O(追加分)＋有界テールに収まる。件数比例の間引きは旧 O(N) set 対策なので解除し、
-      //   裏の巨大放送でも記録カウントが基本間隔でリアルタイムに伸びるようにする。
-      // v0.1.514: IDB モードは SW への軽量 append のみ＝常に O(追加分) で bounded。
+      // チャンク/IDB は O(追加分)のため、旧 O(N) set 向けの件数比例間引きを解除する。
+      // 裏の巨大放送でも基本間隔で記録を進める。
       boundedWrite: liveChunkMigrated === true || _commentIdbEnabled === true
     });
   },
   PERSIST_BURST_THRESHOLD
 );
 
-// v0.1.498 フリーズ対策 A: 裏タブは保存を実質ポーズするため、未保存バッファがタブ離脱
-//   （閉じる/遷移）時に失われ得る。pagehide でベストエフォートに最後の 1 回をフラッシュ
-//   して取りこぼしを抑える（chrome.storage.local.set は非同期なので完了保証はないが、
-//   SW 側の IndexedDB 自動バックアップと併せた二重の安全網）。
+// pagehide で未保存バッファをベストエフォート flush し、離脱時の取りこぼしを抑える。
+// 非同期書込の完了保証はないため、他の永続化経路と併用する。
 window.addEventListener('pagehide', () => {
   try {
     void persistCoalescer.flush();
@@ -10770,6 +10734,36 @@ function persistCommentRows(rows, opts = {}) {
     _commentIngestSourceCounters.unknown += incBy;
   }
   persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (filtered));
+}
+
+/**
+ * SW が退避した backfill 行を、既存 persist パイプラインへ live ごとに一度だけ畳み込む。
+ * flush 成功前は取り置きを削除せず、失敗時は次回の live オープンで再試行する。
+ */
+async function maybeFoldSwBackfillStaging() {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || _swStagingFoldedForLiveId === lid) return;
+  if (
+    !recording ||
+    !locationAllowsCommentRecording() ||
+    !hasExtensionContext()
+  ) {
+    return;
+  }
+  _swStagingFoldedForLiveId = lid;
+  const key = swBackfillStagedKey(lid);
+  try {
+    const bag = await chrome.storage.local.get(key);
+    const staged = bag?.[key];
+    if (!isSwBackfillStagedForLive(staged, lid)) return;
+    persistCommentRows(staged.rows, {
+      source: COMMENT_INGEST_SOURCE.BACKFILL
+    });
+    await persistCoalescer.flush();
+    await chrome.storage.local.remove(key);
+  } catch {
+    /* flush/read/remove failure: staged payload remains for the next live open */
+  }
 }
 
 /**
@@ -14992,6 +14986,8 @@ let _ndgrDeterministicBackfillEnabled =
   typeof NL_DEV_HOTRELOAD !== 'undefined' && NL_DEV_HOTRELOAD;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
+/** SW backfill 取り置きの畳み込みを開始済みの liveId。 */
+let _swStagingFoldedForLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
 /**
@@ -15732,6 +15728,7 @@ function maybeRearmBackfillForGapCatchup() {
  *   遅れて観測される配信でも、観測でき次第その後の tick で 1 回起動する。
  */
 function maybeAutoStartBackfill() {
+  void maybeFoldSwBackfillStaging();
   if (!_backfillAutoEnabled) return;
   if (!isWatchInlinePanelTopFrame()) return;
   // v0.1.683: hidden タブでも N=2 スロットプールに空きがあれば backfill を起動する。
