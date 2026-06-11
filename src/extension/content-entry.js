@@ -35,6 +35,7 @@ import {
   KEY_COMMENT_INGEST_LOG,
   KEY_STORAGE_WRITE_ERROR,
   KEY_RECORDING_WATCHDOG,
+  KEY_DEV_MONITOR_OVERLAY,
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
   KEY_GIFT_RANKING_LANE_ENABLED,
@@ -12489,12 +12490,10 @@ function startDevHotReload() {
   void pollReloadSignal();
 }
 
-/* ===================== 記録監視メーター（常設） ===================== */
-/* 公式件数と記録件数を定期サンプリングし、達成/停滞/成長を画面左下のオーバーレイ   */
-/* ＋コンソールに出す（件数を凝視しなくて済む）。                                    */
-/* dev / 本番を問わず常に動く。以前は dev 専用ツールに同梱していたため本番ビルドの   */
-/* たびにメーターが消える事故が再発していた（ユーザー報告・2026-06-01）。            */
-/* watch タブの top frame で 1 回だけ起動する。                                      */
+/* ===================== 記録監視メーター ===================== */
+/* 公式/記録件数を定期サンプリングし達成/停滞/成長を判定（watch top frame で1回起動）。
+   v0.1.693: 左下オーバーレイは既定 OFF（「途中経過を見せない」方針）。KEY_DEV_MONITOR_OVERLAY=true
+   の環境だけ表示（デバッグ用）。tick 内の persist 等の実務は表示と無関係に常時動かす。 */
 let _recordingMonitorStarted = false;
 function startRecordingProgressMonitor() {
   if (_recordingMonitorStarted) return;
@@ -12502,7 +12501,17 @@ function startRecordingProgressMonitor() {
 
   let samples = createProgressSamples();
   let lastStatus = '';
-  const overlay = createDevMonitorOverlay();
+  let overlay = null;
+  try {
+    chrome.storage.local
+      .get(KEY_DEV_MONITOR_OVERLAY)
+      .then((bag) => {
+        if (bag && bag[KEY_DEV_MONITOR_OVERLAY] === true) overlay = createDevMonitorOverlay();
+      })
+      .catch(() => {});
+  } catch {
+    /* no-op */
+  }
   function tickMonitor() {
     try {
       const recordedNow = Number(observedRecordedCommentCount) || 0;
