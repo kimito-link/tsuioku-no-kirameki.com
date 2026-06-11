@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.696',
+    date: '2026-06-12',
+    summary: '過去ログ大量取得時の保存欠落を根治',
+    items: Object.freeze([
+      '過去ログを一気に取得したとき、その大部分が保存前に消えてしまう問題を修正しました。取得は完走しているのに記録が4割前後で止まる症状の真因です。大量の取得分は一時バッファ（上限2,000行）を経由させず、直接保存するようにしました',
+      '一時バッファが溢れたときに、消えた行が再取得でも二度と保存されなくなる問題も修正しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.695',
     date: '2026-06-12',
     summary: '取得リトライのリクエスト集中を緩和',
