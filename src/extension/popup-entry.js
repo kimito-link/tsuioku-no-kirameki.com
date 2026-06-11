@@ -8160,17 +8160,13 @@ function markCaughtUpIfComplete(prog) {
 
 /**
  * v0.1.464/v0.1.465: onChanged 経由の progress 更新時に呼ぶ。
- *   caught_up でなければ自動リトライ（triggerBackfillRetry）を起動。
- *   refreshBackfillRecordCardHint（storage.get 経由）からは呼ばない。
- *   理由: popup 開いた瞬間に自動でフラグが立ち、e2e「ボタン前は null」が壊れるため。
- *   自動リトライ本体は content 側 maybeAutoStartBackfill が担う設計。
+ * v0.1.684: triggerBackfillRetry 廃止。content の maybeAutoStartBackfill が自律リトライ
+ *   するため popup からも呼ぶとトーストループが発生する（実機確認）。フラグ更新のみ。
  * @param {{ done?: number, stopReason?: string }} prog
  */
 function maybeAutoRetryBackfillFromProg(prog) {
   if (!prog || prog.done !== 1) return;
-  if (markCaughtUpIfComplete(prog)) return; // caught_up 確定 → リトライ不要
-  // 95%未満の途中停止 → 自動リトライ（onChanged 経由のみ）。
-  triggerBackfillRetry();
+  markCaughtUpIfComplete(prog); // caught_up 確定フラグ更新のみ（リトライしない）
 }
 
 /**
