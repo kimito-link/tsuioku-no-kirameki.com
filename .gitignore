@@ -40,3 +40,10 @@ credentials.json
 
 # CWS Publish API 認証情報(絶対にコミットしない)
 .cws-credentials.json
+
+# 一時作業ディレクトリ・散乱ファイル防止
+tmp-video-frames/
+新しいフォルダー/
+新しいフォルダー */
+test-results/
+playwright-report/
