@@ -58,6 +58,13 @@ const targets = [
     target: 'chrome111'
   },
   {
+    // PR1-b-1: backfill SW エンジン(memory/reference_backfill_sw_migration_pr1b.md)。
+    //   background.js(直書きクラシックSW)が importScripts で読む IIFE バンドル。
+    entryPoints: ['src/extension/backfill-sw-entry.js'],
+    outfile: 'extension/dist/backfill-sw.js',
+    target: 'chrome111'
+  },
+  {
     entryPoints: ['src/extension/content-entry.js'],
     outfile: 'extension/dist/content.js',
     target: 'chrome100'

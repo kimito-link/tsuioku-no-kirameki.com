@@ -6,6 +6,8 @@
  */
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
+// PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
+try { importScripts('dist/backfill-sw.js'); } catch (e) { console.warn('[NLS] backfill-sw load failed', e); } // eslint-disable-line no-undef
 
 const MATCH_PATTERNS = [
   'https://*.nicovideo.jp/*',

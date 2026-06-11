@@ -8858,15 +8858,7 @@ function buildAiSharePageDiagnostics() {
   };
 }
 
-/*
- * 0.1.43 (Y): content.js は manifest.json の all_frames:true で iframe を含む
- *   全フレームに注入される。さらに SPA navigation で再注入されると、トップ
- *   レベルで `chrome.runtime.onMessage.addListener` を呼ぶたびに listener が
- *   累積し、NLS_FOCUS_INLINE_PANEL に複数フレームから応答 → sendResponse の
- *   port が複数解釈されて Chrome が「The message port closed before a response
- *   was received」を投げ、background.js 側が popup window fallback を誤発火
- *   する原因になる。globalThis に bound flag を立てて idempotent にする。
- */
+// all_frames / SPA 再注入で listener が累積しないよう、globalThis で登録を一度に絞る。
 const __NLS_MSG_LISTENER_BOUND_KEY__ = '__NLS_CONTENT_MSG_LISTENER_BOUND__';
 const nlsContentMsgListenerHost =
   typeof globalThis !== 'undefined' ? globalThis : window;
@@ -8884,14 +8876,24 @@ if (!(/** @type {Record<string, unknown>} */ (nlsContentMsgListenerHost))[__NLS_
  * @returns {boolean} 登録できたら true、context 無効で登録を見送ったら false
  */
 function bindContentScriptMessageListener() {
-// v0.1.356: 拡張更新（chrome://extensions の「更新」/再読み込み）の瞬間、古いタブの
-//   content script では chrome.runtime が undefined になる。その間に SPA navigation 等で
-//   ここが再評価されると `chrome.runtime.onMessage` の参照自体が同期 TypeError
-//   （Cannot read properties of undefined (reading 'onMessage')）を投げ、chrome://extensions の
-//   エラー一覧に載って利用者を不安にさせる。実害は無い（古いタブの正常な廃棄）が、
-//   onMessage に触れる前にガードして例外を出さない。promise の reject ではないので
-//   consoleErrorBuffer の unhandledrejection 抑止（v0.1.354）では捕まえられない別経路。
+// 拡張更新で古い context の chrome.runtime が消えた場合は登録を見送る。
 if (!chrome?.runtime?.onMessage?.addListener) return false;
+// PR1-b-1: SW backfill エンジンからの行受信(骨格)。既存 backfill 経路とは独立(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || msg.type !== 'nls_backfill_sw_rows') return false;
+  try {
+    const rows = Array.isArray(msg.rows) ? msg.rows : [];
+    if (rows.length && String(msg.lid || '') === String(liveId || '')) {
+      persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.BACKFILL });
+      sendResponse({ ok: true });
+    } else {
+      sendResponse({ ok: false, reason: rows.length ? 'lid_mismatch' : 'empty' });
+    }
+  } catch (e) {
+    sendResponse({ ok: false, reason: 'persist_error' });
+  }
+  return false; // sendResponse は同期で呼んだ
+});
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!hasExtensionContext()) return;
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return;

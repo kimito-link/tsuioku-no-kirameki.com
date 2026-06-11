@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.688',
+    date: '2026-06-11',
+    summary: '過去ログ取得をSWでも実行できる土台を追加',
+    items: Object.freeze([
+      '過去ログの取得処理をService Workerでも実行できるようにするための土台を追加しました。現在の取得経路は変更していません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.687',
     date: '2026-06-11',
     summary: 'ランキング等のレーンを即時非表示→データで即表示に',
