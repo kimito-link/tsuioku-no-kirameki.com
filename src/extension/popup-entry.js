@@ -2347,10 +2347,14 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
     const oc = watchSnapshot?.officialCommentCount;
     if (typeof oc === 'number' && Number.isFinite(oc) && oc >= 0) {
       officialEl.hidden = false;
+      // v0.1.684: breakdown.normal(通常コメント)優先で公式と比較（配信者コメ除外で正確）。
+      const normalCount = breakdown && typeof breakdown.normal === 'number' ? breakdown.normal : null;
       const recorded =
-        recordedNum != null && Number.isFinite(recordedNum)
-          ? recordedNum
-          : parseInt(String(text).replace(/[,，]/g, ''), 10);
+        normalCount != null
+          ? normalCount
+          : recordedNum != null && Number.isFinite(recordedNum)
+            ? recordedNum
+            : parseInt(String(text).replace(/[,，]/g, ''), 10);
       let line = `公式 ${oc.toLocaleString('ja-JP')} 件`;
       if (!Number.isNaN(recorded) && recorded >= 0 && oc > 0) {
         if (recorded <= oc) {
