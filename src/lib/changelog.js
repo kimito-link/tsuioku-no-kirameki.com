@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.689',
+    date: '2026-06-11',
+    summary: 'タブを閉じてもSWが過去ログを取り置きするように',
+    items: Object.freeze([
+      'タブを閉じてもService Workerが取得済みの過去ログを取り置きし、取得処理を止めずに続けるようにしました',
+      '同じ配信を次に開いたとき、取り置いた過去ログを既存の重複排除・保存処理へ安全に畳み込みます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.688',
     date: '2026-06-11',
     summary: '過去ログ取得をSWでも実行できる土台を追加',
