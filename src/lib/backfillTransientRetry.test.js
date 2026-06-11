@@ -66,6 +66,21 @@ describe('shouldScheduleBackfillTransientRetry', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted' })).toBe(false);
   });
 
+  it('v0.1.692: aborted でも rows=0(1行も取れず一発死)なら回数上限内で再試行する', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 0 })).toBe(true);
+  });
+
+  it('v0.1.692: rows>0 の aborted は再試行しない(ユーザー中断/正常な部分取得を尊重)', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 1 })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 500 })).toBe(false);
+  });
+
+  it('v0.1.692: aborted+rows=0 でも回数上限/auto OFF/hidden では再試行しない', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 0, retriedCount: 5, maxRetries: 5 })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 0, autoEnabled: false })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 0, tabHidden: true })).toBe(false);
+  });
+
   it('自動取り込み OFF なら再試行しない', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, autoEnabled: false })).toBe(false);
   });

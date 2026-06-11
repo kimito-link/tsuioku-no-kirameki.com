@@ -21,7 +21,11 @@
  */
 
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
-import { buildOverviewText, buildLiveBlockText } from '../lib/statusFormat.js';
+import {
+  buildOverviewText,
+  buildLiveBlockText,
+  buildBackfillProgressLine
+} from '../lib/statusFormat.js';
 import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
@@ -267,7 +271,7 @@ async function loadFastDiagSafe() {
  * v0.1.659: 過去ログ取得の診断(stopReason)を読む。「一気に取れない・50%停止」の真因を
  *   ユーザーが status を開くだけで AI に共有できるように、どの配信が何の理由で止まったかを表示。
  *   nls_backfill_progress_v1 はグローバル(直近1配信分)。
- * @returns {Promise<{lid:string, rows:number, done:number, stopReason:string}|null>}
+ * @returns {Promise<{lid:string, rows:number, done:number, stopReason:string, errMsg:string}|null>}
  */
 async function loadBackfillProgressSafe() {
   try {
@@ -278,7 +282,9 @@ async function loadBackfillProgressSafe() {
       lid: String(p.lid || ''),
       rows: Number(p.rows) || 0,
       done: Number(p.done) || 0,
-      stopReason: String(p.stopReason || '')
+      stopReason: String(p.stopReason || ''),
+      // v0.1.692: aborted の真因(crawl 例外メッセージ)。content 側 publishBackfillProgress が保全する。
+      errMsg: String(p.errMsg || '')
     };
   } catch {
     return null;
@@ -305,12 +311,10 @@ function renderAll({ lvList, summaries, fastDiag, backfillProgress }) {
   // v0.1.659: 過去ログ取得の診断(stopReason)を概要に併記。「一気に取れない・50%停止」の真因を
   //   ユーザーが status を開くだけで AI 共有できる(reached_start=完走 / no_progress=疎区間で停止 /
   //   backward_exhausted=入口無し / cap_*=上限 / rate_limited=混雑)。
-  const bp = backfillProgress;
-  const backfillLine =
-    bp && bp.lid
-      ? `\n過去ログ取得: [${bp.lid}] ${bp.done === 1 ? '完了' : '取得中'}・取得${bp.rows}件` +
-        (bp.stopReason ? `・停止理由=${bp.stopReason}` : '')
-      : '';
+  // v0.1.692: 行組み立てを純関数 buildBackfillProgressLine(statusFormat.js)へ移譲。
+  //   aborted の真因(crawl 例外メッセージ errMsg)があれば「・エラー: ...」を併記する。
+  const bpLine = buildBackfillProgressLine(backfillProgress);
+  const backfillLine = bpLine ? `\n${bpLine}` : '';
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
     overviewEl.textContent = (overviewText || '視聴中の配信はありません。') + backfillLine;

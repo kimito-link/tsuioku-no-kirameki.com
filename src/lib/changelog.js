@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.692',
+    date: '2026-06-11',
+    summary: '取得が中断したまま止まる問題の自動回復を追加',
+    items: Object.freeze([
+      '過去ログの取得が1件も取れないまま中断で止まった場合、自動でもう一度取り直すようにしました',
+      '中断したときの理由を状態ページに表示し、原因を調べやすくしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.691',
     date: '2026-06-11',
     summary: '配信序盤の過去ログが0件で止まる問題を修正',
