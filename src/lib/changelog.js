@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.691',
+    date: '2026-06-11',
+    summary: '配信序盤の過去ログが0件で止まる問題を修正',
+    items: Object.freeze([
+      '開始直後の若い配信や短い配信で、過去ログの取得が0件のまま止まることがある問題を修正しました。最初に空の区間に当たっても諦めず、少し前の時刻から取得し直します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.690',
     date: '2026-06-11',
     summary: 'SWでの過去ログ取得を試せる切替を追加',

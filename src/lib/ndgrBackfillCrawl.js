@@ -537,6 +537,12 @@ export async function* crawlNdgrBackward(opts) {
   let lastSeedAtSec = null;
   /** @type {number} v0.1.429: 「古い区画へ進めなかった」連続回数（起点を戻してリトライする）。 */
   let noProgressStreak = 0;
+  /**
+   * @type {boolean} v0.1.691: この巡回で一度でも「より古い区画へ進めた」（madeProgress）か。
+   *   リトライ予算超過時の終了理由の出し分けに使う。一度も chat で前進できていない＝入口問題
+   *   として backward_exhausted を診断付きで正直に報告し、前進歴があれば従来どおり no_progress。
+   */
+  let everMadeProgress = false;
   /** @type {{ rateLimited?: boolean, aborted?: boolean }} ヘルパからの異常通知 */
   const abend = {};
 
@@ -768,7 +774,12 @@ export async function* crawlNdgrBackward(opts) {
       }
       noProgressStreak += 1;
       if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
-        return done('no_progress');
+        // v0.1.691: 一度も chat を取れていない＝入口問題として正直に報告（診断付き）。
+        // 1件でも取れたことがあるなら従来どおり no_progress。
+        return done(
+          everMadeProgress ? 'no_progress' : 'backward_exhausted',
+          { crawl: _crawlDiag, seek: _seekDiag.slice(0, 30), cands: seedCandidates.slice(0, 10) }
+        );
       }
       // v0.1.431: 起点を「直前の種より 1 バケット分ずつ」前へ戻して再探索する。旧実装は
       //   1200s×streak も戻し、46 分級の配信では配信開始を飛び越して programStart に張り付き、
@@ -858,7 +869,9 @@ export async function* crawlNdgrBackward(opts) {
     //   「もう一度」を押しても同じ起点で同じ空区画に落ちて決定的に同じ所で死ぬ（902→907）。
     //   修正: 空区画も「進めなかった」と同じリトライ経路に合流させ、起点をさらに前へ戻して
     //   次の区画を試す（＝空区画を飛び越えて遡り続ける）。リトライ上限を超えたら no_progress。
-    //   reseed===0（初回）で空なら従来通り入口問題＝backward_exhausted。
+    //   v0.1.691: 当時 reseed===0（初回）の空区画だけは即 backward_exhausted とする特例を残して
+    //   いたが、初回 seed がたまたま空区画（若い/短い配信の序盤疎区間）に落ちると一発死するため
+    //   撤去した。初回の空区画も同じリトライ経路に合流させる。
     //
     //   配信開始近傍に到達したら本当の完了。v0.1.434: 単一最小 vpos ではなく「開始近傍
     //   (NEAR_START_VPOS_CS 以内)の vpos が複数あるか」で判定する。運営/system/gift の極小 vpos が
@@ -874,16 +887,19 @@ export async function* crawlNdgrBackward(opts) {
     const madeProgress =
       chainMinVpos != null && (globalMinVpos == null || chainMinVpos < globalMinVpos);
     if (!madeProgress) {
-      // reseed===0（初回）で空区画なら、そもそも入口で何も取れていない＝入口問題。
-      if (reseed === 0 && chainMinVpos == null) {
-        return done('backward_exhausted');
-      }
+      // v0.1.691: 旧「reseed===0 かつ空区画なら即 backward_exhausted」特例はここから撤去（上の
+      //   v0.1.455 コメント参照）。初回の空区画もリトライ経路に合流させる。
       // 進めなかった／空区画だった。即終了せず、起点をさらに前へ戻してリトライする。
       noProgressStreak += 1;
       if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
         // 何度戻しても古い区画に入れない＝ここで諦める。ただし配信開始とは限らないので
         // reached_start とは言わない（『ぜんぶ届いた』を出さない）。
-        return done('no_progress');
+        // v0.1.691: 一度も chat を取れていない＝入口問題として正直に報告（診断付き・
+        //   data-nls-backfill-diag に出る）。1件でも取れたことがあるなら従来どおり no_progress。
+        return done(
+          everMadeProgress ? 'no_progress' : 'backward_exhausted',
+          { crawl: _crawlDiag, seek: _seekDiag.slice(0, 30), cands: seedCandidates.slice(0, 10) }
+        );
       }
       // v0.1.431: 起点を「直前の種より 1 バケット分ずつ」前へ戻す（旧 1200s×streak は配信開始を
       //   飛び越え programStart 張り付き→毎回同じ場所→偽 no_progress だった）。
@@ -892,6 +908,7 @@ export async function* crawlNdgrBackward(opts) {
     }
     // 進めた。最古 vpos を更新し、no-progress 連続カウンタをリセット。
     noProgressStreak = 0;
+    everMadeProgress = true; // v0.1.691: 予算超過時の終了理由出し分け用（前進歴あり）
     globalMinVpos = chainMinVpos;
     // v0.1.434: この「実際に遡れた区画」が開始区画らしかったかを記録。入口が尽きた時（副経路）の
     //   reached_start 判定に使う。単一最小値ではなく開始近傍 vpos の複数性で見るので外れ値に強い。
