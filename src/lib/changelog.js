@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.694',
+    date: '2026-06-11',
+    summary: 'SW取得の自動再試行と中断耐性を強化',
+    items: Object.freeze([
+      'Service Workerでの過去ログ取得が一時的な理由で止まったとき、自動でもう一度取り直すようにしました（回数上限つき）',
+      '取得の待ち時間中にService Workerが寝てしまい取得が消える問題を防ぐ仕組みを追加しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.693',
     date: '2026-06-11',
     summary: '左下の記録監視オーバーレイを既定で非表示に',

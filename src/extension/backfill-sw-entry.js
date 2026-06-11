@@ -10,6 +10,8 @@ import {
   swBackfillStagedKey
 } from '../lib/swBackfillStaging.js';
 import { KEY_BACKFILL_PROGRESS } from '../lib/storageKeys.js';
+import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
+import { calculateBackfillRetryDelayMs } from '../lib/backfillRetryBackoff.js';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const ROW_BATCH_SIZE = 500;
@@ -24,6 +26,28 @@ let crawlState = {
   seg: 0,
   ac: null
 };
+
+// PR1-b-4: SW 側 transient リトライ(lid → 連続リトライ回数)。rows>0 の完走で 0 リセット。
+//   content の _backfillTransientRetryByLiveId 相当(判定は同じ純関数を再利用)。
+const SW_TRANSIENT_RETRY_MAX = 5;
+const _swRetryByLid = {};
+
+// PR1-b-4: crawl中のSWアイドル死対策。バックオフ睡眠中はイベントが無くSWが30秒で死ぬため、
+//   安価な拡張API呼び出しでアイドルタイマーをリセットし続ける(クラシックSWの定石)。
+//   リトライの setTimeout 待機中も維持し、リトライ含め全部終わってから解除する。
+const SW_KEEPALIVE_INTERVAL_MS = 20_000;
+let _swKeepaliveTid = null;
+function ensureSwKeepalive() {
+  if (_swKeepaliveTid != null) return;
+  _swKeepaliveTid = setInterval(() => {
+    try { chrome.runtime.getPlatformInfo(() => {}); } catch { /* no-op */ }
+  }, SW_KEEPALIVE_INTERVAL_MS);
+}
+function stopSwKeepalive() {
+  if (_swKeepaliveTid == null) return;
+  clearInterval(_swKeepaliveTid);
+  _swKeepaliveTid = null;
+}
 
 async function swFetchBinary(url, opts) {
   const ac = new AbortController();
@@ -103,9 +127,11 @@ async function runCrawl({
   programBeginAtMs,
   deterministic,
   tabId,
-  mirrorLegacyProgress
+  mirrorLegacyProgress,
+  officialCount
 }) {
   const ac = new AbortController();
+  ensureSwKeepalive();
   const state = {
     running: true,
     lid,
@@ -252,6 +278,42 @@ async function runCrawl({
     if (crawlState === state) {
       crawlState = { ...state, running: false, ac: null };
     }
+    // PR1-b-4: SW 側 transient リトライ。backward_exhausted 等の一発死は content 側の
+    //   ワンショット guard が立ったまま再送されないため、SW 内で回数上限つきで自動再試行する。
+    //   rows>0 の完走は予算を全回復(v0.1.665 と同思想)。viewBase は初回と同じものを使う
+    //   (鮮度切れで失敗し続けたら回数上限で正直に止まる=許容)。
+    if (state.rows > 0) _swRetryByLid[lid] = 0;
+    const retried = _swRetryByLid[lid] || 0;
+    const shouldRetry = shouldScheduleBackfillTransientRetry({
+      stopReason,
+      retriedCount: retried,
+      maxRetries: SW_TRANSIENT_RETRY_MAX,
+      autoEnabled: true,
+      tabHidden: false,
+      recordedCount: state.rows,
+      officialCount: Number.isFinite(Number(officialCount)) ? Number(officialCount) : 0,
+      rows: state.rows
+    });
+    if (shouldRetry) {
+      _swRetryByLid[lid] = retried + 1;
+      // 指数バックオフ + Full Jitter(content 経路と同じ純関数)。リトライ待機中も keepalive を
+      //   維持しているので setTimeout は SW アイドル死で消えない。
+      const retryDelayMs = calculateBackfillRetryDelayMs(retried);
+      setTimeout(() => {
+        if (crawlState.running) return; // single-flight: 別 crawl 実行中は再実行しない
+        void runCrawl({
+          lid,
+          viewBase,
+          programBeginAtMs,
+          deterministic,
+          tabId,
+          mirrorLegacyProgress,
+          officialCount
+        });
+      }, retryDelayMs);
+    } else {
+      stopSwKeepalive();
+    }
   }
 }
 
@@ -266,7 +328,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       running: crawlState.running,
       lid: crawlState.lid,
       rows: crawlState.rows,
-      seg: crawlState.seg
+      seg: crawlState.seg,
+      retries: _swRetryByLid[crawlState.lid] || 0
     });
     return false;
   }
@@ -289,7 +352,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     programBeginAtMs: msg.programBeginAtMs,
     deterministic: msg.deterministic === true,
     tabId: sender?.tab?.id,
-    mirrorLegacyProgress: msg.mirrorLegacyProgress === true
+    mirrorLegacyProgress: msg.mirrorLegacyProgress === true,
+    officialCount: msg.officialCount ?? null
   });
   return false;
 });
