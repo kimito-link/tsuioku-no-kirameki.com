@@ -15741,9 +15741,8 @@ function maybeAutoStartBackfill() {
   void maybeFoldSwBackfillStaging();
   if (!_backfillAutoEnabled) return;
   if (!isWatchInlinePanelTopFrame()) return;
-  // PR1-b-3: SW backfill モード(実験・既定 OFF)。ON のときは既存経路(スロット/ローカル crawl)を
-  //   起動せず SW エンジンへ起動メッセージを 1 live につき 1 回送る。view base 未観測・SW 未応答は
-  //   ガード未更新のまま次 tick で自然リトライ。OFF 時は従来と完全同一動作。
+  // PR1-b-3: SW backfill モード(実験・既定 OFF)。ON 時は既存経路(スロット/ローカル crawl)を起動せず
+  //   SW へ起動メッセージを 1 live 1 回送る。view base 未観測/SW 未応答は次 tick で自然リトライ。
   if (_backfillSwModeEnabled) {
     const lidSw = String(liveId || '').trim().toLowerCase();
     const decision = shouldTriggerSwBackfill({
@@ -15759,6 +15758,7 @@ function maybeAutoStartBackfill() {
         viewBase: readNdgrViewBaseUri(),
         programBeginAtMs,
         deterministic: _ndgrDeterministicBackfillEnabled,
+        officialCount: Number(officialCommentCount) || null, // PR1-b-4: SW 側リトライの gap 判定用
         mirrorLegacyProgress: true
       }, (res) => {
         if (chrome.runtime.lastError) return; // SW 未応答=次 tick 再試行
