@@ -103,6 +103,22 @@ export function buildCaptureRateLine(live) {
 }
 
 /**
+ * v0.1.692: 過去ログ取得(backfill)の診断行を組み立てる(status 概要併記用)。
+ *   従来 status-entry.js にインライン実装だったものを純関数化。aborted の真因
+ *   (crawl 例外メッセージ errMsg)があれば併記し、status を見るだけで真因調査できるようにする。
+ * @param {{lid?:string, rows?:number, done?:number, stopReason?:string, errMsg?:string}|null|undefined} bp
+ * @returns {string} lid が無ければ ''
+ */
+export function buildBackfillProgressLine(bp) {
+  if (!bp || !bp.lid) return '';
+  return (
+    `過去ログ取得: [${bp.lid}] ${Number(bp.done) === 1 ? '完了' : '取得中'}・取得${Number(bp.rows) || 0}件` +
+    (bp.stopReason ? `・停止理由=${bp.stopReason}` : '') +
+    (bp.errMsg ? `・エラー: ${bp.errMsg}` : '')
+  );
+}
+
+/**
  * 経過秒を `h:mm:ss` / `m:ss` に整形する。
  * @param {number|null|undefined} sec
  * @returns {string} 不正値は '?'

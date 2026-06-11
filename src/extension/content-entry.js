@@ -15055,11 +15055,12 @@ const NDGR_BACKFILL_TRANSIENT_RETRY_MAX = 7;
 // eslint-disable-next-line no-unused-vars
 const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
 /**
- * @type {{ seg: number, rows: number, done: 0|1, stopReason: string }} 進捗（data 属性で可視化）。
+ * @type {{ seg: number, rows: number, done: 0|1, stopReason: string, errMsg: string }} 進捗（data 属性で可視化）。
  * v0.1.415: stopReason を持つ。done=1 でも「本当に配信開始まで到達した（reached_start）」かを
  *   popup 側（backfillRinkuNarration）が区別し、嘘の達成宣言をしないため。
+ * v0.1.692: errMsg を持つ。aborted の真因(crawl 例外メッセージ)を status 診断へ保全する。
  */
-const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '' };
+const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '', errMsg: '' };
 /** @type {number} バックフィル進捗が最後に動いた時刻 */
 let _backfillLastProgressAt = 0;
 /**
@@ -15103,6 +15104,8 @@ function publishBackfillProgress() {
           rows: _backfillProgress.rows,
           done: _backfillProgress.done,
           stopReason: _backfillProgress.stopReason || '',
+          // v0.1.692: aborted の真因(例外メッセージ)を status 診断へ橋渡し(画面文言には出さない)。
+          errMsg: _backfillProgress.stopReason === 'aborted' ? String(_backfillProgress.errMsg || '') : '',
           ts: Date.now()
         }
       },
@@ -15306,6 +15309,7 @@ async function runNdgrBackfillOnce(ctx = {}) {
   _backfillProgress.rows = 0;
   _backfillProgress.done = 0;
   _backfillProgress.stopReason = '';
+  _backfillProgress.errMsg = '';
   _backfillLastProgressAt = Date.now();
   onProgress ? onProgress({ ..._backfillProgress }) : publishBackfillProgress();
 
@@ -15417,7 +15421,12 @@ async function runNdgrBackfillOnce(ctx = {}) {
         //   いたため、time-out/混雑/入口なしで途中終了しても finally が一律 done=1 を立て、
         //   popup が「ぜんぶ届いた」と誤宣言していた（13% で達成宣言→後から増える事象）。
         //   reached_start の時だけ達成、それ以外は正直な文言にするため stopReason を渡す。
-        _backfillProgress.stopReason = String(step.value?.stopReason || '');
+        const genReason = String(step.value?.stopReason || '');
+        // v0.1.692: content 側が先に立てた中断理由(visibility_paused/stalled 等)を generator の
+        //   汎用 'aborted' で潰さない(リトライ系統の判定が壊れる)。実理由はそのまま採用。
+        if (!(genReason === 'aborted' && _backfillProgress.stopReason)) {
+          _backfillProgress.stopReason = genReason;
+        }
         // v0.1.456 レジューム: 終了時に最古到達 vpos を保存（次回「もう一度」で続きから）。
         //   reached_start（配信開始まで到達）で完了したら resume をクリア＝次回はゼロから。
         //   それ以外（no_progress/cap_*/aborted/rate_limited 等）は続きから再開できるよう残す。
@@ -15535,23 +15544,21 @@ async function runNdgrBackfillOnce(ctx = {}) {
         updateBackfillThrottleState(_backfillThrottleState, Date.now() - yieldStart);
       }
     }
-  } catch {
+  } catch (e) {
     /* 巡回失敗はサイレント（best-effort）。RT 取り込みには影響しない */
     // 例外で抜けた＝最後まで遡れていない。reached_start ではないので達成宣言しないよう
     //   stopReason を立てる（未設定なら aborted 扱い＝popup は「途中/また後で」になる）。
     if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'aborted';
+    // v0.1.692: サイレント握り潰しで真因が消えていた。診断用にメッセージを保全(表示経路はdiag/status)。
+    try { _backfillProgress.errMsg = String(e?.message || e || '').slice(0, 120); } catch { /* no-op */ }
   } finally {
     clearTimeout(rotationTid);
     // v0.1.431: 正常終了・abort・例外いずれの抜け方でも、バッファに残った取り込み済み行を
     //   必ず吐き出す（per-segment persist をやめてバッチ化したぶん、ここで取りこぼし防止）。
     flushPendingBackfillRows();
-    // v0.1.647: 取りこぼし根治の本命。flushPendingBackfillRows() は persistCommentRows 経由で
-    //   persistCoalescer.enqueue() するだけ＝buffer に積んで setTimeout 遅延 flush を予約する
-    //   非同期スロットル。await しないと、この finally を抜けた直後にタブが hidden/別配信切替で
-    //   crawl が再起動し timer 発火前に buffer が捨てられ、enqueue 済みの数千行が storage に
-    //   書かれずに失われていた（実機 NHK総合 lv350631407: crawl rows=9301/reached_start 完走
-    //   なのに chunk=5218 のみ＝4,073 件取りこぼし。ユーザー証言「一気に取れない」の本筋）。
-    //   完走時に確実に書き切るため、ここで flush を await して storage 反映を保証する。
+    // v0.1.647: flushPendingBackfillRows() は enqueue+遅延 flush 予約のみ。await しないと finally
+    //   直後の hidden/別配信切替で timer 発火前に buffer が捨てられ数千行消失（実機 lv350631407:
+    //   rows=9301 完走なのに chunk=5218）。完走時に確実に書き切るためここで await する。
     try {
       await persistCoalescer.flush();
     } catch {
@@ -15562,27 +15569,14 @@ async function runNdgrBackfillOnce(ctx = {}) {
     if (_backfillProgress.stopReason === 'rotation_yield') {
       _backfillTriedLiveId = '';
     }
-    // v0.1.621: タブ切替で中断された場合も one-shot guard を解除し、可視に戻った次の
-    //   maybeAutoStartBackfill tick で「続きから」自動再開できるようにする。
-    //   従来は stopReason='aborted'(15336行 catch 設定値・shouldScheduleBackfillTransientRetry
-    //   の set 非該当)で永久凍結していた(実機 lv350670166: 公式4446件中204件のみ記録)。
-    // v0.1.624: ただし無条件解除は **無限再起動ループ** を作る(visibilitychange の連続発火・
-    //   devtools 開閉/focus 移動/popup 開閉等で毎秒級 abort→restart→lastPersistBatch:11 trickle・
-    //   「ローディング表示が消えない/重い」=ユーザー実機証言「v0.1.620 では一気に取れた」の真因)。
-    // v0.1.633: 旧 30秒一律クールダウンには重大な副作用があった ＝ rearm タイムスタンプ初期値 0 の
-    //   ため、開いて最初の hidden で1回だけ rearm してタイムスタンプを刻み、以後30秒は二度と再開
-    //   しない。パネルを開く/フォーカス移動が watch タブ hidden を起こすため、開いた直後30秒が
-    //   完全沈黙＝退行(実機 lv350679746: 公式947件に対し記録1件・取得率0%)。
-    //   → 一律時間クールダウンを「初回保証 + 発火回数ベース抑制」に置換(backfillVisibilityRearm.js)。
-    //     ①この liveId で初めての rearm なら必ず許可(開いた直後の沈黙を作らない)。
-    //     ②2回目以降は観測窓内の visibility_paused が閾値以上(連発ループ)のときだけ抑制。単発は即再開。
-    // v0.1.661: aborted も visibility_paused と同じ自動再開対象にする。複数タブ環境で、
-    //   別配信タブの runNdgrBackfillOnce が冒頭(15212)で「前回分を畳む」ため _backfillAbort.abort()
-    //   を呼び、visibilitychange 経由でない abort が catch(15493) で stopReason='aborted' になる。
-    //   aborted は BACKFILL_TRANSIENT_STOP_REASONS 非該当で one-shot guard が外れず固定=複数タブで
-    //   backfill が互いを abort し合い数%で永久凍結(実機 fastDiag lv350689421: タブ2・rows0/seg0/
-    //   aborted・公式1862なのに記録148=8%)。visibility_paused と同じ「初回保証+連発抑制」で
-    //   次の tick から続きを取り直す(無限再起動ループは連発抑制が防ぐ)。
+    // v0.1.621: タブ切替中断でも one-shot guard を解除し、次 tick で続きから自動再開する。
+    // v0.1.624: ただし無条件解除は無限再起動ループ(visibilitychange 連発で毎秒級 abort→restart)。
+    // v0.1.633: 旧 30秒一律クールダウンは rearm 初期値 0 のせいで開いた直後 30 秒が完全沈黙＝退行
+    //   (実機 lv350679746: 公式947件中記録1件)。→「初回保証 + 発火回数ベース抑制」に置換
+    //   (backfillVisibilityRearm.js: 初回 rearm は必ず許可・2回目以降は連発ループ時だけ抑制)。
+    // v0.1.661: aborted も同じ自動再開対象。複数タブで別配信タブの runNdgrBackfillOnce 冒頭の
+    //   _backfillAbort.abort() が stopReason='aborted' を作り guard が外れず数%で永久凍結した
+    //   (実機 lv350689421: タブ2・rows0/aborted・公式1862中記録148=8%)。詳細は git 履歴参照。
     if (
       _backfillProgress.stopReason === 'visibility_paused' ||
       _backfillProgress.stopReason === 'aborted'
@@ -15637,7 +15631,9 @@ async function runNdgrBackfillOnce(ctx = {}) {
         tabHidden: document.visibilityState === 'hidden',
         // v0.1.658: no_progress でも official に大きく届いていなければ続きから再試行(59%停止救済)。
         recordedCount: Number(recordedCountOverride ?? observedRecordedCommentCount) || 0,
-        officialCount: Number(officialCountOverride ?? officialCommentCount) || 0
+        officialCount: Number(officialCountOverride ?? officialCommentCount) || 0,
+        // v0.1.692: rows=0 の aborted(一発死)を一過性として回数上限つきで自動再試行(放置救済)。
+        rows: Number(_backfillProgress.rows) || 0
       })
     ) {
       _backfillTransientRetryByLiveId[lidAtFinish] = retried + 1;

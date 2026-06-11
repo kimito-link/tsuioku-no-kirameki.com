@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildOverviewText,
   buildLiveBlockText,
+  buildBackfillProgressLine,
   buildCaptureRateLine,
   formatElapsed,
   formatAgo
@@ -123,5 +124,46 @@ describe('buildCaptureRateLine（%主役・状態ラベル）', () => {
     expect(
       buildCaptureRateLine({ recordedCount: 5, officialCommentCount: 100, officialRatePct: null })
     ).toBe('記録 5 / 公式 100');
+  });
+});
+
+describe('buildBackfillProgressLine（v0.1.692 過去ログ取得の診断行）', () => {
+  it('lid が無ければ空文字（行を出さない）', () => {
+    expect(buildBackfillProgressLine(null)).toBe('');
+    expect(buildBackfillProgressLine(undefined)).toBe('');
+    expect(buildBackfillProgressLine({})).toBe('');
+    expect(buildBackfillProgressLine({ lid: '' })).toBe('');
+  });
+
+  it('取得中(done=0)・停止理由なしは従来どおりの行', () => {
+    expect(buildBackfillProgressLine({ lid: 'lv123', rows: 42, done: 0 })).toBe(
+      '過去ログ取得: [lv123] 取得中・取得42件'
+    );
+  });
+
+  it('完了+停止理由は併記（v0.1.659 従来表示と同一）', () => {
+    expect(
+      buildBackfillProgressLine({ lid: 'lv123', rows: 0, done: 1, stopReason: 'aborted' })
+    ).toBe('過去ログ取得: [lv123] 完了・取得0件・停止理由=aborted');
+  });
+
+  it('errMsg があれば「・エラー: ...」を追記（aborted 真因の見える化）', () => {
+    expect(
+      buildBackfillProgressLine({
+        lid: 'lv123',
+        rows: 0,
+        done: 1,
+        stopReason: 'aborted',
+        errMsg: 'TypeError: Failed to fetch'
+      })
+    ).toBe(
+      '過去ログ取得: [lv123] 完了・取得0件・停止理由=aborted・エラー: TypeError: Failed to fetch'
+    );
+  });
+
+  it('errMsg が空文字なら追記しない', () => {
+    expect(
+      buildBackfillProgressLine({ lid: 'lv9', rows: 5, done: 1, stopReason: 'reached_start', errMsg: '' })
+    ).toBe('過去ログ取得: [lv9] 完了・取得5件・停止理由=reached_start');
   });
 });

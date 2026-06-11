@@ -79,6 +79,7 @@ export function shouldResetBackfillRetryBudgetAfterRun(args) {
  * @param {boolean} args.tabHidden タブが現在 hidden か（hidden なら叩かない）。
  * @param {number} [args.recordedCount] v0.1.658: 現在の記録件数（no_progress の gap 判定用）。
  * @param {number} [args.officialCount] v0.1.658: 公式コメント件数（no_progress の gap 判定用）。
+ * @param {number} [args.rows] v0.1.692: この巡回で取得した行数（aborted 一発死の再試行判定用）。
  * @returns {boolean} true なら「一定時間後に one-shot guard を解除して再試行」してよい。
  */
 export function shouldScheduleBackfillTransientRetry(args) {
@@ -99,6 +100,18 @@ export function shouldScheduleBackfillTransientRetry(args) {
     // official に十分近い(95%超)なら取り切ったとみて再試行しない。
     if (rec >= off * BACKFILL_GAP_RETRY_COVERAGE) return false;
     // gap が大きい no_progress は続きがあるとみて再試行(回数上限は守る=無限ループ防止)。
+    if (!Number.isFinite(retriedCount) || !Number.isFinite(maxRetries)) return false;
+    if (retriedCount >= maxRetries) return false;
+    return true;
+  }
+
+  // v0.1.692: aborted は従来一律リトライ対象外だったが、rows=0(その巡回で1行も取れずに死んだ)
+  //   なら一過性の一発死とみて回数上限つきで再試行する(実機: 状態ページ「完了・取得0件・
+  //   停止理由=aborted」のまま放置される事象の救済)。rows>0 の aborted はユーザー操作による
+  //   中断や正常な部分取得の可能性があるので従来どおり再試行しない。rows 未指定(旧呼び出し)も
+  //   従来どおり再試行しない(後方互換)。上限カウンタは既存の retriedCount/maxRetries に乗る。
+  if (stopReason === 'aborted') {
+    if (Number(args?.rows) !== 0) return false;
     if (!Number.isFinite(retriedCount) || !Number.isFinite(maxRetries)) return false;
     if (retriedCount >= maxRetries) return false;
     return true;
