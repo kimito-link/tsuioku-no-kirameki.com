@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.683',
+    date: '2026-06-11',
+    summary: '別タブを開いても過去ログ取得が止まらないように',
+    items: Object.freeze([
+      '過去ログ取得中に別のタブへ移動しても、取得を継続するようにしました。スロットに空きがある(同時に取得中の配信が少ない)ときは、タブが裏になっても掘り切ります。これまでは必ずタブを前面に置かないと止まっていました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.682',
     date: '2026-06-10',
     summary: 'メディアキット生成時のエラーを解消',

@@ -15245,16 +15245,20 @@ async function runNdgrBackfillOnce() {
   const ac = new AbortController();
   _backfillAbort = ac;
   const onHidden = () => {
-    if (document.visibilityState === 'hidden') {
-      // v0.1.621: タブ切替による中断は「ユーザー手動停止」と区別するため専用の
-      //   stopReason を立てる。finally で _backfillTriedLiveId を解除し、可視に
-      //   戻った次の maybeAutoStartBackfill tick で「続きから」自動再開する。
-      //   従来は abort → stopReason='aborted' → BACKFILL_TRANSIENT_STOP_REASONS
-      //   非該当 → one-shot guard 永久に外れず公式件数の数%しか記録できない
-      //   永久凍結が発生していた(実機 lv350670166: 4446件中204件のみ記録)。
+    if (document.visibilityState !== 'hidden') return;
+    // v0.1.683: N=2 スロットプールに空きがあれば hidden でも abort しない。
+    //   空きスロットなし（待機タブ >= N）のときだけ abort して前面タブへの圧迫を防ぐ。
+    //   空きスロットあり = 自分だけ or 並走予算内 → そのまま掘り切る（「一気に取れない」根治）。
+    //   v0.1.621 の visibility_paused は空きなし時のみ立てる（TRANSIENT リトライは維持）。
+    void (async () => {
+      let waitingLiveIds = [];
+      try { waitingLiveIds = await listBackfillWaitingLiveIds(); } catch { /* no-op */ }
+      const effectiveSlots = resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS);
+      const slotsFullyOccupied = waitingLiveIds.length >= effectiveSlots;
+      if (!slotsFullyOccupied) return; // 空きあり → abort しない
       if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'visibility_paused';
       try { ac.abort(); } catch { /* no-op */ }
-    }
+    })();
   };
   document.addEventListener('visibilitychange', onHidden);
   // v0.1.642 「一気に取れない」退行根治: rotation_yield(90秒強制打ち切り)は「待機している別タブが
@@ -15730,14 +15734,10 @@ function maybeRearmBackfillForGapCatchup() {
 function maybeAutoStartBackfill() {
   if (!_backfillAutoEnabled) return;
   if (!isWatchInlinePanelTopFrame()) return;
-  // feat/multitab-scale-globalcap（2026-05-31）: 重いバックフィル（過去ログ一括取り込み）は
-  //   「いま見えているタブ」だけが起動する。裏タブで起動すると、別放送を別タブで開いたときに
-  //   両方が共有レンダラのメインスレッドでフルバックフィルを同時実行し、前面タブごと固める
-  //   （実機: 7,800 件の順調タブが、別放送タブを開いた途端に記録停止）。裏タブは LIVE capture は
-  //   継続するが catch-up は保留し、前面化したら次 tick で再開する（runNdgrBackfillOnce の
-  //   _backfillTriedLiveId は per-live なので昇格後に「続きから」走れる）。
-  //   ※既存の onHidden（runNdgrBackfillOnce 内）が走行中の hidden 化で abort → グローバルロック解放。
-  if (typeof document !== 'undefined' && document.hidden) return;
+  // v0.1.683: hidden タブでも N=2 スロットプールに空きがあれば backfill を起動する。
+  //   N スロット全埋まり（待機タブが N 以上）のときだけ hidden abort し前面タブへの圧迫を防ぐ。
+  //   単一タブや空きスロットがある環境では hidden でも掘り切る（「一気に取れない」根治）。
+  //   ※onHidden（runNdgrBackfillOnce 内）も同様に空きスロットを確認して abort を抑制する。
   // fix/broadcast-bulk-catchup（2026-05-31）: DOM deep harvest のゲートに依存しない専用
   //   ウォッチドッグ。公式件数とのギャップが残る限り guard を解除して続きから自動再開させる。
   maybeRearmBackfillForGapCatchup();
