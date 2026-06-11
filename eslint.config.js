@@ -60,6 +60,16 @@ export default [
     }
   },
   {
+    // max-lines ラチェット: 巨大entryがこれ以上成長しないよう現在値+εで上限固定。
+    // 抽出が進んだら数値を下げること(増やすのは禁止)。
+    files: ['src/extension/popup-entry.js'],
+    rules: { 'max-lines': ['error', { max: 21230, skipBlankLines: false, skipComments: false }] }
+  },
+  {
+    files: ['src/extension/content-entry.js'],
+    rules: { 'max-lines': ['error', { max: 17297, skipBlankLines: false, skipComments: false }] }
+  },
+  {
     files: ['extension/background.js'],
     languageOptions: {
       ecmaVersion: 2022,
