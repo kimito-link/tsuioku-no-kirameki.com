@@ -96,7 +96,9 @@ import {
   appendToTail,
   shouldCompactTail,
   collectCommentNoKeys,
-  BIG_MAIN_THRESHOLD
+  BIG_MAIN_THRESHOLD,
+  TAIL_MAX_ROWS,
+  TAIL_BULK_BYPASS_MIN_ROWS
 } from '../lib/commentTailBuffer.js';
 import {
   summaryStorageKey,
@@ -1068,12 +1070,7 @@ let _nonWatchTickCount = 0;
 const NON_WATCH_HIDE_TICK_THRESHOLD = 5;
 
 /**
- * 0.1.173: ランキング表示の lifetime 観測。診断シートで「いつ何が取れたか」を
- * 1 か所で読めるようにする。globalThis に保持（ホットリロード対応 / SPA でも累積）。
- *
- * 0.1.175: コメント DOM 経由で観測したギフトコメント（sender/item/point）を
- * `giftCommentObservations` に蓄積。NDGR ギフト event を取り逃した番組でも
- * ここから sender 集計が取れる。
+ * ランキング/ギフトコメント観測の lifetime カウンタ（診断用・globalThis 保持で SPA でも累積）。
  *
  * @returns {{
  *   collectAttempts: number,
@@ -3707,18 +3704,9 @@ function ensureInlineHostReflowListener() {
  * その要素の「直後」にホストを置くと、コメント入力バーの下〜列の下に自然に付く（video 直後だけだとバーの上に挟まることがある）。
  * body / documentElement は候補にしない（誤って最外に出さない）。
  *
- * 0.1.64 (AT): 旧スコアリング (aspect <= 3.4 / area <= viewport*0.92) は緩く、
- *   ニコ生 SPA で「視聴行 + コメント欄 + バナー一式」を含む巨大ラッパーがヒット
- *   して、その直後（description / Amazon / 関連配信の直前）にパネルが挿入される
- *   事象が頻発していた。`scoreInlineHostAnchorCandidate` (純粋関数) に切り出し、
- *   video rect とのジオメトリ整合（幅比 0.95–1.6 / 高さ比上限 / top オフセット
- *   上限）まで含めて厳格化した。0.1.63 で below → dock_bottom の応急 migration
- *   を入れているが、本関数の改善で `below` モードを再度推奨できる品質に戻す
- *   下地ができた。詳細は src/lib/inlineHostAnchorScoring.js のヘッダコメント参照。
- *
- *   0.1.109: eligible が複数あるとき **スコア最大**では浅い巨大ラッパーが選ばれ、
- *   関連放送などより下にパネルが付くことがあった。**面積最小**（プレイヤー行に密なブロック）
- *   を優先して選ぶ（pickTightestEligibleAnchorRowIdx）。
+ * 判定は scoreInlineHostAnchorCandidate（純関数・ジオメトリ厳格化）+ 複数 eligible 時は
+ *   面積最小を優先（pickTightestEligibleAnchorRowIdx・巨大ラッパー誤選択防止）。
+ *   経緯は src/lib/inlineHostAnchorScoring.js ヘッダと git 履歴参照。
  * @param {HTMLElement} base
  */
 function findFrameInsertAnchorFromVideo(base) {
@@ -5053,23 +5041,9 @@ function scheduleInlinePanelToolbarFocusPolish() {
 
 /**
  * ツールバーから：ページ内インラインパネルを前面化（スクロール＋ iframe フォーカス）。
- *
- * 0.1.11 (B1): pollUntil で rect ≥ 120×120 を 500ms wait してから scroll/focus。
- * 0.1.15 (M/N): host が DOM に居れば即座に true を返すように変更。理由:
- *   - 旧版は rect が 120×120 になるまで pollUntil で 500ms 待ってから true 返却。
- *     その間 background は応答待ちで blocked。pollUntil が timeout で false 返却
- *     すると background が popup 窓を openOrFocusPopupWindow で開いてしまい、
- *     インラインパネルと popup 窓が「同時に出る」現象になっていた（user 報告 Bug1）。
- *   - close ボタン押下後に display:none された host は rect=0 のまま → pollUntil
- *     timeout → false → popup 窓だけ開いてインラインが「すぐ出ない」体験になる
- *     （user 報告 Bug2）。
- *   - 修正: host が DOM 上に居る（renderPageFrameOverlay で挿入済み or 既存）
- *     なら即座に focused=true 応答。scrollIntoView + iframe.focus は別タスクで
- *     fire-and-forget（pollUntil 内蔵）。応答自体は rect も layout も待たない。
- *
- * 0.1.274+: **同期で boolean を返す**。background の `tabs.sendMessage` が
- *   microtask までブロックされ「こん太を押しても一瞬何も起きない」体感になるのを避ける。
- *   async scrollIntoView / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
+ * host が DOM に居れば**同期で true**を返す（rect/layout を待つと popup 窓が二重に開く
+ * Bug1/2 の再発・「押しても一瞬何も起きない」体感になる）。scroll/focus は
+ * scheduleInlinePanelToolbarFocusPolish に分離して fire-and-forget。詳細は git 履歴。
  *
  * @returns {boolean}
  */
@@ -10126,8 +10100,18 @@ async function bufferRowsToTail(rows) {
     console.debug(formatPipelinePhase('tail_skip', { reason: 'no new rows' }));
     return;
   }
+  const tailLenBefore = tailRowsBuffer.length;
   tailRowsBuffer = appendToTail(tailRowsBuffer, fresh);
   for (const k of keys) tailKnownCommentNoKeys.add(k);
+  // v0.1.696: クランプで古い行が落ちたら、既知キーを生存行から再構築する(毒の解除)。
+  //   落ちた行のキーが残ると同じ行は再取得でも門前払い=永久欠落していた。再構築でmain畳み込み
+  //   済みキーは失うが、その再流入は下流のchunk側dedupeが弾くので正しさは保たれる。
+  if (tailLenBefore + fresh.length > TAIL_MAX_ROWS && tailRowsBuffer.length === TAIL_MAX_ROWS) {
+    tailKnownCommentNoKeys = collectCommentNoKeys(liveId, tailRowsBuffer);
+    console.debug(formatPipelinePhase('tail_clamp_rebuild', {
+      dropped: tailLenBefore + fresh.length - TAIL_MAX_ROWS
+    }));
+  }
   observedRecordedCommentCount = tailMainCount + tailRowsBuffer.length;
 
   // v0.1.508: 直近コメントリングを更新（テール畳み込みと独立。サマリ 0 秒表示用）。
@@ -10449,6 +10433,22 @@ async function flushBatchViaTail(batch) {
   if (tailSeededLiveId !== lid) {
     await seedTailFromMain(lid);
     if (liveId !== lid) return; // 放送が切り替わった
+  }
+  // v0.1.696「一気に取れない」最終真因の根治: backfill等の大口バッチはテール(上限2000)を
+  //   経由させずチャンク追記へ直行する。テールは小さな高頻度RTバッチのO(N)緩和装置で、
+  //   数千行のバーストを通すとクランプで古い行が黙って消え、既知キーだけが残り再取得も
+  //   門前払い=38〜43%で固定(実機 crawl42,078行/保存15,094行で確定)。直行はO(追加分)。
+  //   timeout時はimpl内のrequeueが再投入する(__noRequeueを渡さない)。
+  if (batch.length >= TAIL_BULK_BYPASS_MIN_ROWS) {
+    const result = await persistCommentRowsImpl(batch, {
+      source: 'bulk_bypass',
+      __isCompaction: true
+    });
+    if (liveId === lid && result && result.ok === true && lastImplMainCount >= 0) {
+      tailMainCount = lastImplMainCount;
+      observedRecordedCommentCount = tailMainCount + tailRowsBuffer.length;
+    }
+    return;
   }
   await bufferRowsToTail(batch);
   let hidden = false;
