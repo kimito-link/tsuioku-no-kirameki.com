@@ -160,6 +160,16 @@ export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 240;
  */
 export const NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS = 150;
 
+/**
+ * v0.1.697: 「まだ1行も取れていない(everMadeProgress=false)」crawl の空リトライ予算。
+ * 240回(=3.3h相当のバケット遡行)をペーシング付きで回すと1回のcrawlが分単位になり
+ * 「いっきに取れる」体感を殺す(実機: 今日のNHK実況で5分以上 rows=0)。初回から空のときは
+ * 少数で早期に backward_exhausted を返し、外側の transient リトライ(新鮮な ?at=now から
+ * 再シード)に任せるほうが歴史的に速い(リロード直後のexhausted→retry成功パターン)。
+ * 一度でも取れた後の疎区間橋渡し(68%頭打ち対策)は従来どおり240回を維持する。
+ */
+export const NDGR_BACKFILL_COLD_RETRY_MAX = 12;
+
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
 
@@ -780,9 +790,13 @@ export async function* crawlNdgrBackward(opts) {
         });
       }
       noProgressStreak += 1;
-      if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
+      // v0.1.697: 1行も取れていない crawl は少数(COLD_RETRY_MAX)で早期に見切り、外側の
+      //   transient リトライ(新鮮な seed)に任せる。前進歴ありは従来 240(疎区間橋渡し)。
+      const noEntryBudget = everMadeProgress
+        ? NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX
+        : NDGR_BACKFILL_COLD_RETRY_MAX;
+      if (noProgressStreak > noEntryBudget) {
         // v0.1.691: 一度も chat を取れていない＝入口問題として正直に報告（診断付き）。
-        // 1件でも取れたことがあるなら従来どおり no_progress。
         return done(
           everMadeProgress ? 'no_progress' : 'backward_exhausted',
           { crawl: _crawlDiag, seek: _seekDiag.slice(0, 30), cands: seedCandidates.slice(0, 10) }
@@ -902,11 +916,13 @@ export async function* crawlNdgrBackward(opts) {
       //   v0.1.455 コメント参照）。初回の空区画もリトライ経路に合流させる。
       // 進めなかった／空区画だった。即終了せず、起点をさらに前へ戻してリトライする。
       noProgressStreak += 1;
-      if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
-        // 何度戻しても古い区画に入れない＝ここで諦める。ただし配信開始とは限らないので
-        // reached_start とは言わない（『ぜんぶ届いた』を出さない）。
-        // v0.1.691: 一度も chat を取れていない＝入口問題として正直に報告（診断付き・
-        //   data-nls-backfill-diag に出る）。1件でも取れたことがあるなら従来どおり no_progress。
+      // v0.1.697: 前進歴なしは少数(COLD_RETRY_MAX)で早期見切り(上の同型ガード参照)。
+      const emptyBudget = everMadeProgress
+        ? NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX
+        : NDGR_BACKFILL_COLD_RETRY_MAX;
+      if (noProgressStreak > emptyBudget) {
+        // 何度戻しても古い区画に入れない＝諦める(配信開始とは限らないので reached_start とは
+        // 言わない)。v0.1.691: 前進歴なしは backward_exhausted を診断付きで正直に報告。
         return done(
           everMadeProgress ? 'no_progress' : 'backward_exhausted',
           { crawl: _crawlDiag, seek: _seekDiag.slice(0, 30), cands: seedCandidates.slice(0, 10) }

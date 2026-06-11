@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.697',
+    date: '2026-06-12',
+    summary: '取得開始の高速化と過去ログの実時刻保存',
+    items: Object.freeze([
+      '過去ログ取得が空振りしたとき、長時間探し続けずに早めに仕切り直すようにしました（取得開始までの待ちが大幅に短くなります）',
+      '過去ログのコメントに実際の発言時刻を保存するようにしました。タイムライン等で過去のコメントが正しい時系列に並びます（これまでは保存した瞬間の時刻になっていました）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.696',
     date: '2026-06-12',
     summary: '過去ログ大量取得時の保存欠落を根治',
