@@ -9,6 +9,7 @@ import {
   buildSwBackfillStagedPayload,
   swBackfillStagedKey
 } from '../lib/swBackfillStaging.js';
+import { KEY_BACKFILL_PROGRESS } from '../lib/storageKeys.js';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const ROW_BATCH_SIZE = 500;
@@ -96,7 +97,14 @@ async function writeStagedRows(lid, stagedRows, stopReason) {
   return true;
 }
 
-async function runCrawl({ lid, viewBase, programBeginAtMs, deterministic, tabId }) {
+async function runCrawl({
+  lid,
+  viewBase,
+  programBeginAtMs,
+  deterministic,
+  tabId,
+  mirrorLegacyProgress
+}) {
   const ac = new AbortController();
   const state = {
     running: true,
@@ -212,6 +220,8 @@ async function runCrawl({ lid, viewBase, programBeginAtMs, deterministic, tabId 
     if (stagingWriteTimer != null) clearInterval(stagingWriteTimer);
     if (stagingMode) await maybeWriteStagedRows(true);
     try {
+      // PR1-b-3: mirrorLegacyProgress=true のとき、既存キー(popup/statusの表示経路)にも
+      //   完走時のみミラーを書く(途中経過は書かない=v0.1.657「黙って一気に取り完成だけ表示」方針)。
       await chrome.storage.local.set({
         [KEY_SW_PROGRESS]: {
           lid,
@@ -222,7 +232,19 @@ async function runCrawl({ lid, viewBase, programBeginAtMs, deterministic, tabId 
           src: 'sw',
           ...(stagingMode ? { staged: true } : {}),
           ts: Date.now()
-        }
+        },
+        ...(mirrorLegacyProgress
+          ? {
+              [KEY_BACKFILL_PROGRESS]: {
+                lid,
+                seg: state.seg,
+                rows: state.rows,
+                done: 1,
+                stopReason,
+                ts: Date.now()
+              }
+            }
+          : {})
       });
     } catch {
       /* no-op */
@@ -266,7 +288,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     viewBase,
     programBeginAtMs: msg.programBeginAtMs,
     deterministic: msg.deterministic === true,
-    tabId: sender?.tab?.id
+    tabId: sender?.tab?.id,
+    mirrorLegacyProgress: msg.mirrorLegacyProgress === true
   });
   return false;
 });

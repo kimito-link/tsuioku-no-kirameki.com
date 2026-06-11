@@ -426,6 +426,10 @@ import {
   isSwBackfillStagedForLive,
   swBackfillStagedKey
 } from '../lib/swBackfillStaging.js';
+import {
+  KEY_BACKFILL_SW_MODE,
+  shouldTriggerSwBackfill
+} from '../lib/swBackfillTrigger.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
 import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
@@ -12783,10 +12787,11 @@ async function start() {
     }).catch(() => { /* 既定（手動 OFF・自動 ON）を維持 */ });
   } catch { /* no-op */ }
 
-  // v0.1.511: 前方向 NDGR 継続取得 opt-in flag の初期読み込み（既定 OFF・true 厳密一致のみ有効）。
+  // v0.1.511: 前方向 NDGR / PR1-b-3: SW backfill モード opt-in の初期読み（既定 OFF・true 厳密一致のみ）。
   try {
-    chrome.storage.local.get([KEY_NDGR_FORWARD_ENABLED]).then((bag) => {
+    chrome.storage.local.get([KEY_NDGR_FORWARD_ENABLED, KEY_BACKFILL_SW_MODE]).then((bag) => {
       _ndgrForwardEnabled = !!(bag && bag[KEY_NDGR_FORWARD_ENABLED] === true);
+      _backfillSwModeEnabled = !!(bag && bag[KEY_BACKFILL_SW_MODE] === true);
     }).catch(() => { /* OFF default を維持 */ });
   } catch { /* no-op */ }
 
@@ -12880,6 +12885,11 @@ async function start() {
       } else if (wasEnabled && !_ndgrForwardEnabled && _ndgrForwardAbort) {
         try { _ndgrForwardAbort.abort(); } catch { /* no-op */ }
       }
+    }
+
+    // PR1-b-3: SW backfill モード(実験・既定 OFF)の同期。次の maintenance tick から経路が切り替わる。
+    if (changes[KEY_BACKFILL_SW_MODE]) {
+      _backfillSwModeEnabled = changes[KEY_BACKFILL_SW_MODE].newValue === true;
     }
 
     // v0.1.513: インクリメンタル dedupe flag の同期。OFF→ON / ON→OFF どちらでも、
@@ -14988,17 +14998,15 @@ let _ndgrDeterministicBackfillEnabled =
 let _backfillTriedLiveId = '';
 /** SW backfill 取り置きの畳み込みを開始済みの liveId。 */
 let _swStagingFoldedForLiveId = '';
+/** PR1-b-3: SW backfill モード(実験・既定 OFF)。初期 storage 読み + onChanged で反映。 */
+let _backfillSwModeEnabled = false;
+/** @type {string} SW 起動メッセージ送信済みの liveId（ワンショット guard）。 */
+let _swBackfillTriggeredForLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
 /**
- * v0.1.633: 直近の `visibility_paused` 発火時刻列（ms・観測窓内のみ保持）。連続 visibilitychange
- *   での無限再起動ループを「発火回数ベース」で抑制するため、pruneRecentVisibilityPauses で
- *   間引きながら保持する。
- *
- *   旧 v0.1.624 は単一タイムスタンプ + 30秒一律クールダウンだったが、初期値 0 のため
- *   「開いて最初の hidden で1回 rearm してタイムスタンプを刻み、以後30秒沈黙」という退行を
- *   起こしていた（実機 lv350679746: 公式947件に対し記録1件・取得率0%）。
- *   shouldRearmBackfillAfterVisibility（初回保証 + 発火回数ベース）に置き換えて根治する。
+ * v0.1.633: 直近の `visibility_paused` 発火時刻列（ms）。発火回数ベースで無限再起動ループを抑制
+ *   （旧 v0.1.624 の30秒一律クールダウンは初回 hidden 後30秒沈黙の退行。詳細は git 履歴）。
  * @type {number[]}
  */
 let _backfillRecentVisibilityPauses = [];
@@ -15721,33 +15729,46 @@ function maybeRearmBackfillForGapCatchup() {
 }
 
 /**
- * v0.1.418: 自動開始の試行（maintenance tick から毎周期呼ばれる）。
- *   自動 ON（既定）かつ top frame のときだけ runNdgrBackfillOnce を試す。実際の起動可否
- *   （記録 ON / liveId / view base 観測済み / ワンショット guard）は runNdgrBackfillOnce が
- *   判定するので、ここは「自動が許可されているか」と top frame だけ見て委ねる＝view base が
- *   遅れて観測される配信でも、観測でき次第その後の tick で 1 回起動する。
+ * v0.1.418: 自動開始の試行（maintenance tick から毎周期呼ばれる）。自動 ON かつ top frame の
+ *   ときだけ起動を試し、実際の起動可否（記録 ON / view base / guard）は runNdgrBackfillOnce に委ねる。
  */
 function maybeAutoStartBackfill() {
   void maybeFoldSwBackfillStaging();
   if (!_backfillAutoEnabled) return;
   if (!isWatchInlinePanelTopFrame()) return;
-  // v0.1.683: hidden タブでも N=2 スロットプールに空きがあれば backfill を起動する。
-  //   N スロット全埋まり（待機タブが N 以上）のときだけ hidden abort し前面タブへの圧迫を防ぐ。
-  //   単一タブや空きスロットがある環境では hidden でも掘り切る（「一気に取れない」根治）。
-  //   ※onHidden（runNdgrBackfillOnce 内）も同様に空きスロットを確認して abort を抑制する。
-  // fix/broadcast-bulk-catchup（2026-05-31）: DOM deep harvest のゲートに依存しない専用
-  //   ウォッチドッグ。公式件数とのギャップが残る限り guard を解除して続きから自動再開させる。
+  // PR1-b-3: SW backfill モード(実験・既定 OFF)。ON のときは既存経路(スロット/ローカル crawl)を
+  //   起動せず SW エンジンへ起動メッセージを 1 live につき 1 回送る。view base 未観測・SW 未応答は
+  //   ガード未更新のまま次 tick で自然リトライ。OFF 時は従来と完全同一動作。
+  if (_backfillSwModeEnabled) {
+    const lidSw = String(liveId || '').trim().toLowerCase();
+    const decision = shouldTriggerSwBackfill({
+      swModeEnabled: true,
+      lid: lidSw,
+      viewBase: readNdgrViewBaseUri(),
+      triggeredLiveId: _swBackfillTriggeredForLiveId
+    });
+    if (decision.fire) {
+      chrome.runtime.sendMessage({
+        type: 'nls_backfill_sw_start',
+        lid: lidSw,
+        viewBase: readNdgrViewBaseUri(),
+        programBeginAtMs,
+        deterministic: _ndgrDeterministicBackfillEnabled,
+        mirrorLegacyProgress: true
+      }, (res) => {
+        if (chrome.runtime.lastError) return; // SW 未応答=次 tick 再試行
+        if (res?.ok) _swBackfillTriggeredForLiveId = lidSw;
+        // already_running は別 lv の crawl 中かもしれないのでガードせず次 tick 再試行
+      });
+    }
+    return;
+  }
+  // v0.1.683: hidden でもスロットに空きがあれば起動（N 全埋まり時のみ hidden abort）。
+  // fix/broadcast-bulk-catchup: 公式件数ギャップが残る限り guard を解除して続きから自動再開。
   maybeRearmBackfillForGapCatchup();
-  // v0.1.489: backfill が「動いているはずなのに 0 行のまま」なら一旦 abort して再起動を促す。
-  //   コメント取得が長時間 0 のまま固定される症状の緩和。
-  // fix/broadcast-bulk-catchup（2026-05-31）拡張: rows>0 でも「途中で固まったまま長時間進まない」
-  //   ハング（実機: 記録118/公式595 で 5 分更新なし）を検知して abort→再開させる。done=0 で
-  //   _backfillAbort が残るとウォッチドッグ（done=1 前提）が再開できないため、ここで打ち切って
-  //   finally に done=1 を立てさせ、次 tick で forceFullSweep 付き再開につなげる。
-  // ⭐コードレビュー反映: stall を検知して abort した tick では、その場で再起動しない。
-  //   旧 crawl の finally（done=1/stopReason を無条件に立てる）と同 tick で新 run が並走すると、
-  //   一瞬「完了」が出る/進捗が上書きされる揺れが起きるため。abort 後は return して、次 tick の
-  //   maybeAutoStartBackfill（旧 run の unwind 後・done=1 確定後）に再開を委ねる。
+  // v0.1.489 + fix/broadcast-bulk-catchup: 0行固定/途中ハングを検知したら abort して done=1 を
+  //   立てさせ、次 tick で再開させる（同 tick での再起動は旧 finally と並走して揺れるため return）。
+  //   詳細経緯は git 履歴参照。
   let didStallAbortThisTick = false;
   try {
     const now = Date.now();
@@ -15757,11 +15778,8 @@ function maybeAutoStartBackfill() {
     );
     const noProgressMs =
       _backfillLastProgressAt > 0 ? now - _backfillLastProgressAt : 0;
-    // fix/backfill-all-sizes（レビュー会議室・2026-06-01 反映）: ハング検知の残ギャップしきい値も
-    //   再アーム判定と同じ effectiveMinGap に揃える。ここだけ固定 170 のままだと、小〜中規模で
-    //   gap が [effectiveMinGap, 170) の帯でハングした場合に abort されず（gap<170）、かつ
-    //   再アームも _backfillRunning=true でブロックされ、バックフィルが永久に再開しないデッドロック
-    //   になる（code-reviewer・Gemini が一致で指摘）。
+    // fix/backfill-all-sizes: ハング検知の残ギャップしきい値も再アームと同じ effectiveMinGap に
+    //   揃える（固定170のままだと小〜中規模で永久デッドロック。詳細は git 履歴）。
     const stallEffectiveMinGap = computeEffectiveBackfillRearmMinGap({
       official: officialCommentCount,
       minGapAbsolute: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
@@ -15776,8 +15794,7 @@ function maybeAutoStartBackfill() {
       _backfillProgress.rows === 0 &&
       noProgressMs > 60_000 &&
       gapRemains;
-    // 途中まで取れたが進まなくなったハング: no_progress のバックオフ睡眠（最大 ~45 秒）を
-    //   誤検知しないよう、より長い 150 秒のしきい値で打ち切る。
+    // 途中ハング: no_progress バックオフ睡眠（最大 ~45 秒）の誤検知回避のため 150 秒で打ち切り。
     const stalledMidRun =
       _backfillAbort != null &&
       _backfillProgress.rows > 0 &&
@@ -15794,25 +15811,13 @@ function maybeAutoStartBackfill() {
   }
   // stall abort した tick は、旧 run の finally と競合させないため再起動を次 tick に委ねる。
   if (didStallAbortThisTick) return;
-  // feat/multitab-scale-globalcap（2026-05-31）: 旧 per-liveId ロック（'nls-backfill-<lv>'）は
-  //   「同一放送の多タブ」しか抑えられず、別放送どうしを別タブで開くと各タブが自分のリーダーに
-  //   なって同時にフルバックフィルした。グローバル（ライブ非依存）ロックに変え、全タブ横断で
-  //   「同時に1タブだけ」がバックフィルするよう絞る。lock は crawl 実行中ずっと保持され、
-  //   リーダーが閉じる/前面でなくなって abort すれば Chrome がロック自動解放→次 tick で別タブが昇格。
-  //   fail-open: Web Locks 非対応なら全タブ起動（従来）。
-  //   ⚠️手動ボタン経路（onChanged で直接 runNdgrBackfillOnce）は gate しない＝押したタブで必ず走る。
+  // feat/multitab-scale-globalcap: 別放送どうしの同時フルバックフィルをグローバルロックで抑止。
+  //   fail-open（Web Locks 非対応なら従来動作）。手動ボタン経路は gate しない。詳細は git 履歴。
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return;
-  // v0.1.663: グローバルロック1本→並列度Nのスロットプールに置換。N本のスロットのうち空き1つを
-  //   取れたタブが走る=N配信まで真に並走、N+1本目以降だけ rotation で待つ(複数タブでも一気に取る)。
-  //   N=1 なら従来の単一グローバルロックと完全同一(巻き戻し可能)。各スロットは runWhileGlobalLeader
-  //   (= Web Locks ifAvailable・fail-open)で取得。crawl は per-tab AbortController で既に並走可能。
-  // PR3: per-lvロックとNスロットの二段構え。同一放送の多タブ競合（nls_cchunk_index_<lv> race）を防止。
-  //   ⚠️ runIfTabLeader の戻り値 {ran} は「per-lvロックを取れたか」であって fn 内のスロット取得の
-  //   成否ではない(fn の戻り値は捨てられる)。スロット成否は外側の変数 slotRes で受ける。
-  //   per-lvロックを取れなかったタブ(=同一lvの別タブがリーダー)は waiter 登録もしない。
-  //   そのlvの waiter 登録/解除はリーダータブが担う(幽霊待機で他配信に不要な rotation_yield を
-  //   発火させない)。
+  // v0.1.663: Nスロットプール（N配信まで並走・N=1で従来の単一ロックと同値）。PR3: per-lvロックと
+  //   二段構え。runIfTabLeader の {ran} は per-lv ロック成否のみ＝スロット成否は slotRes で受ける。
+  //   waiter 登録/解除はリーダータブが担う。詳細は git 履歴参照。
   void (async () => {
     /** @type {{ran: boolean, slotIndex: number}|null} */
     let slotRes = null;
@@ -15832,16 +15837,9 @@ function maybeAutoStartBackfill() {
   })();
 }
 
-// ── v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in 配線 ──────────────
-//   狙い（[[前方向NDGR継続取得]]）: page-intercept 傍受 / DOM harvest がページ状態に依存して
-//     desync し「記録 < 本家コメ」のまま止まる症状を、ページに依存しない独立経路で補う。
-//     拡張自身が NDGR view の前方向ポインタ nextAt を long-poll で辿り、新着 segment を取り続ける。
-//   方針:
-//     - リーダータブ1本だけが放送中ずっと走る（runIfTabLeader が crawl の間ロックを保持＝多重起動
-//       なし。fail-open 環境のための再入 guard も下に持つ）。
-//     - backfill（過去ログ）と違い hidden で abort しない（継続取得が目的）。abort は liveId 変化・
-//       記録停止・番組終了・タブ unload のみ。
-//     - 既定 OFF（KEY_NDGR_FORWARD_ENABLED）。実機検証後に別バンプで既定 ON へ昇格する。
+// ── v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in 配線（既定 OFF） ──────────
+//   ページ非依存の独立経路で「記録 < 本家コメ」desync を補う。リーダータブ1本が放送中走り続け、
+//   hidden では abort しない（abort は liveId 変化・記録停止・番組終了・unload のみ）。詳細は git 履歴。
 
 /** @type {boolean} 前方向継続取得が有効か（既定 OFF）。初回 storage 読み込み + onChanged で反映。 */
 let _ndgrForwardEnabled = false;
