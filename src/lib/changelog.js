@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.693',
+    date: '2026-06-11',
+    summary: '左下の記録監視オーバーレイを既定で非表示に',
+    items: Object.freeze([
+      '画面左下に常時表示されていた記録監視（速報）オーバーレイを既定で非表示にしました。診断は状態ページ（status.html）で確認できます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.692',
     date: '2026-06-11',
     summary: '取得が中断したまま止まる問題の自動回復を追加',

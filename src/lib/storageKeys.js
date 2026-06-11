@@ -24,6 +24,9 @@ export const KEY_STORAGE_WRITE_ERROR = 'nls_storage_write_error';
  */
 export const KEY_RECORDING_WATCHDOG = 'nls_recording_watchdog_v1';
 
+/** v0.1.693: 左下の記録監視オーバーレイを表示するか（既定 OFF=非表示・診断は status.html が正） */
+export const KEY_DEV_MONITOR_OVERLAY = 'nls_dev_monitor_overlay_v1';
+
 /** AI共有・不具合調査用のエラーリング（最大80件・本文はマスク済み・local only） */
 export const KEY_DIAGNOSTICS_ERROR_RING_V1 = 'nls_diagnostics_error_ring_v1';
 
