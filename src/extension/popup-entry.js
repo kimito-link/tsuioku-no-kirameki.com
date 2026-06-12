@@ -10431,11 +10431,7 @@ function refreshNorthStarProgramPointsLane() {
 let supportTimelineRefreshEpoch = 0;
 
 /**
- * v0.1.340: 応援タイムライン（コメント＋ギフトを時刻順に1本の流れで）。
- *   既存の comments storage と gift_events storage を読み、純関数で時系列マージして
- *   折り畳みパネルに描画する。OneComme 体験の移植＝「誰がいつ何を投げたか」を物語として読める。
- *   描画ホットパスではなく lane 一括更新の sibling（既に await 連鎖の外）。storage 読みは
- *   best-effort（失敗は空表示）。最新 120 件 cap。
+ * v0.1.340: 応援タイムライン（コメント＋ギフトを時刻順に1本に統合・最新120件cap・best-effort）。
  * @param {string} liveId
  */
 async function refreshSupportActivityTimeline(liveId) {
@@ -10443,10 +10439,8 @@ async function refreshSupportActivityTimeline(liveId) {
   const body = $('supportTimelineBody');
   const meta = $('supportTimelineGiftMeta');
   if (!(body instanceof HTMLElement)) return;
-  // v0.1.674: 行クリックでユーザー詳細(わんコメ式・名前付け/ラベル/メモ/発言一覧)を
-  //   コメビュのポップアップ窓で開く。委譲リスナーを1回だけ張る(innerHTML 再描画に耐える)。
-  //   記名 uid 行の <a>(ユーザーページ直行)も詳細側に「↗ユーザーページ」があるため
-  //   preventDefault して詳細を優先する(匿名にも名前を付けられるのが肝)。
+  // v0.1.674: 行クリックでユーザー詳細をコメビュ窓で開く。委譲リスナーを1回だけ張る
+  //   (innerHTML 再描画に耐える)。記名 uid 行の <a> は preventDefault で詳細を優先。
   if (body.dataset.nlUserDetailWired !== '1') {
     body.dataset.nlUserDetailWired = '1';
     body.addEventListener('click', (ev) => {
@@ -10467,7 +10461,7 @@ async function refreshSupportActivityTimeline(liveId) {
       }
     });
   }
-  // v0.1.705: standalone の下部常設配置は、明示的に閉じている場合も維持する。
+  // v0.1.705: standalone 下部常設配置は閉でも維持(ガード前に呼ぶ)。
   relocateSupportTimelineForStandaloneWindow();
   if (
     details instanceof HTMLDetailsElement &&
@@ -10481,7 +10475,7 @@ async function refreshSupportActivityTimeline(liveId) {
   const myEpoch = supportTimelineRefreshEpoch;
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) {
-    // watch 未解決のときはタイムラインを畳んで空に（誤誘導しない）。
+    // watch 未解決はタイムラインを畳んで空に(誤誘導しない)。
     body.innerHTML = buildSupportTimelineBodyHtml([]);
     if (meta instanceof HTMLElement) meta.hidden = true;
     return;
@@ -10501,9 +10495,7 @@ async function refreshSupportActivityTimeline(liveId) {
     /* best-effort: 空のまま */
   }
 
-  // v0.1.342: ギフト送信者のアバターを、コメント側と同じ解決経路（記名 uid→保存済み/
-  //   nvapi 解決済みアバター）で enrich＝「誰が」を顔で見せる。未解決はそのまま空で渡し、
-  //   描画側が default/🎁 にフォールバックする（純加法・元データ不変）。
+  // v0.1.342: ギフト送信者アバターをコメント側と同じ解決経路で enrich(純加法・元データ不変)。
   const giftEventsEnriched = giftEvents.map((g) => {
     if (!g || typeof g !== 'object') return g;
     if (String(g.avatarUrl || '').trim()) return g;
@@ -10512,10 +10504,8 @@ async function refreshSupportActivityTimeline(liveId) {
     return av ? { ...g, avatarUrl: av } : g;
   });
 
-  // v0.1.522: チャンク移行後は main コメントキーへ書き戻さない設計（保存は生 nickname のまま、
-  //   表示時に profile 再適用で担保）。ユーザーレーンと同様に、応援タイムラインも描画直前に
-  //   プロファイル表示名を再適用し、内部表示名（stamp_* / nicolive_* など）が行に漏れないようにする。
-  //   in-memory キャッシュが未ロードのときは storage から読み直す（描画順に依存しない）。
+  // v0.1.522: 描画直前にプロファイル表示名を再適用(内部表示名 stamp_*/nicolive_* の漏れ防止)。
+  //   in-memory 未ロード時は storage から読み直す(描画順非依存)。
   let timelineProfileMap = popupUserCommentProfileMap;
   if (!timelineProfileMap || !Object.keys(timelineProfileMap).length) {
     try {
@@ -10551,8 +10541,7 @@ async function refreshSupportActivityTimeline(liveId) {
   });
   upgradeAnonymousAvatarImages(body);
   bindOnErrorHideHandlersWithin(body);
-  // 実 http アバターは load guard 経由でフォールバック差し替え（フリッカ防止）。
-  // コメント行アバター + ギフト行送信者アバターの両方。
+  // 実 http アバターは load guard 経由で差し替え(フリッカ防止・コメント/ギフト両行)。
   body
     .querySelectorAll('img.nl-tl-row__avatar, img.nl-tl-gift__avatar')
     .forEach((img) => {
@@ -10575,31 +10564,21 @@ async function refreshSupportActivityTimeline(liveId) {
 }
 
 /**
- * v0.1.343: 応援タイムラインの開閉状態を永続化（単一枠の完成度向上）。
- *   既定は閉じ（普段の表示は不変）。一度開いたら storage に保存し、次回以降・更新後も
- *   開いたままにする。`supportVisualDetails` と同型の軽量版（多フレーム scroll 連携は不要）。
- *   load 時に一度だけ hydrate + toggle リスナ配線（多重配線を guard）。
+ * v0.1.343: 応援タイムラインの開閉状態を永続化(既定閉じ・手動開で保存)。load 時1回 hydrate+配線。
  */
 let supportTimelineOpenWired = false;
 let suppressSupportTimelineTogglePersist = false;
 async function wireSupportTimelineOpenPersistence() {
   const details = /** @type {HTMLDetailsElement|null} */ ($('supportTimelineDetails'));
   if (!(details instanceof HTMLDetailsElement)) return;
-  // hydrate: 保存値が true のときだけ開く（既定 false=閉じ）。
-  // v0.1.345: 別ウィンドウ(standalone window=nl-popup-window)では「キー未設定なら既定で開く」
-  //   ＝配信中の下の空白を応援タイムラインで埋める。⚠️storage は書かない（同一 popup.html を
-  //   読む action popup へ open=true が波及して「普段の表示が変わる」のを防ぐ）。保存値が
-  //   明示 false/true のときはそれを最優先（手動操作を尊重）。
+  // v0.1.345: 別ウィンドウ(nl-popup-window)はキー未設定なら既定オープン(下の空白埋め・storage非書込)。
+  //   明示 false/true は最優先(手動操作尊重)。
   try {
     const bag = await storageGetSafe(KEY_SUPPORT_TIMELINE_OPEN, {});
     const raw = bag[KEY_SUPPORT_TIMELINE_OPEN];
     const isStandaloneWindow = document.documentElement.classList.contains('nl-popup-window');
-    let want;
-    if (raw === true || raw === false) {
-      want = raw; // 明示保存（手動開閉）を最優先
-    } else {
-      want = isStandaloneWindow; // 未設定: 別ウィンドウだけ既定オープン（書き込まない）
-    }
+    // 明示保存(手動開閉)を最優先・未設定は別ウィンドウだけ既定オープン(書き込まない)。
+    const want = raw === true || raw === false ? raw : isStandaloneWindow;
     if (details.open !== want) {
       suppressSupportTimelineTogglePersist = true;
       try {
@@ -10626,12 +10605,8 @@ async function wireSupportTimelineOpenPersistence() {
 }
 
 /**
- * v0.1.345: 別ウィンドウ(standalone window)かつ配信中(=not empty-state)のとき、応援タイムラインを
- *   `.nl-main` 末尾へ移して下部常設にし、ウィンドウ下の空白を埋める。`order` は効かない
- *   （タイムラインは grid セル内＝.nl-main の直接の子ではない）ので DOM 移動が必要（会議結論）。
- *   冪等: 既に `.nl-main` 直下にいれば動かさない（toggle 再発火・スクロール位置リセットを防ぐ）。
- *   action popup / inline では何もしない（普段の表示は不変）。空白埋めの見せ方は CSS が
- *   `html.nl-popup-window:not(.nl-empty-state)` 配下で担う。
+ * v0.1.345: 別ウィンドウ(standalone)かつ配信中は応援TLを `.nl-main` 末尾へ移して下部常設
+ *   (空白埋め・DOM移動が必要・冪等・action popup/inline は no-op)。見せ方は CSS が担う。
  */
 function relocateSupportTimelineForStandaloneWindow() {
   const details = $('supportTimelineDetails');
