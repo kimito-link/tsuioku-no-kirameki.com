@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "君斗りんくの追憶のきらめき",
-  "version": "0.1.697",
+  "version": "0.1.698",
   "description": "ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます（開発識別子: nicolivelog）。",
   "icons": {
     "16": "images/logo/konta-yukkuri-icon-16.png",
@@ -24,6 +24,7 @@
     "https://*.nicovideo.jp/*",
     "https://app.tsuioku-no-kirameki.com/*",
     "https://suggestqueries.google.com/*",
+    "http://127.0.0.1:50021/*",
     "http://127.0.0.1:3456/*",
     "http://localhost:3456/*"
   ],

@@ -68,6 +68,17 @@ import {
   pickUnseenComeviewGifts,
   isComeviewNearBottom
 } from '../lib/comeviewInstantRender.js';
+import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
+import {
+  buildVoiceReadingText,
+  isVoicevoxAlive,
+  listVoicevoxStyleIds,
+  synthesizeVoice
+} from '../lib/voicevoxClient.js';
+import {
+  computeVoiceQueueSpeedBoost,
+  pushVoiceQueue
+} from '../lib/voiceReadQueue.js';
 
 /** POP のタイムラインと同じ既定アバター(extension ルート相対・popup.html と同一)。 */
 const DEFAULT_TILE_IMG =
@@ -77,6 +88,8 @@ const TIMELINE_LIMIT = 120;
 const HOT_POLL_INTERVAL_MS = 5000;
 const RECONCILE_INTERVAL_MS = 60_000;
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
+const VOICE_READING_ENABLED_KEY = 'nls_voice_reading_enabled_v1';
+const VOICE_ASSIGNMENTS_KEY = 'nls_voice_assignments_v1';
 
 let _liveId = '';
 let _paused = false;
@@ -138,6 +151,15 @@ const _timelineItemsByKey = new Map();
 let _commentCount = 0;
 let _hoverBar = null;
 let _hoverRow = null;
+let _voiceReadingEnabled = false;
+let _voiceToggleBusy = false;
+let _voiceStyleIds = [];
+let _voiceAssignments = {};
+let _voiceQueue = [];
+let _voicePlaying = false;
+let _voiceGeneration = 0;
+let _voiceStopCurrent = null;
+let _voiceSkipTimer = null;
 
 /** @type {Array<{key:string,name:string,at:number}>} ユーザーNG リスト(storage 永続)。 */
 let _ngList = [];
@@ -197,6 +219,209 @@ function isObsMode() {
     return new URLSearchParams(window.location.search).get('obs') === '1';
   } catch {
     return false;
+  }
+}
+
+function updateVoiceToggle() {
+  const button = document.getElementById('cvBtnVoice');
+  if (!button) return;
+  button.disabled = _voiceToggleBusy;
+  button.classList.toggle('is-on', _voiceReadingEnabled);
+  button.setAttribute('aria-pressed', String(_voiceReadingEnabled));
+  button.textContent = _voiceReadingEnabled ? '🔊 読み上げ ON' : '🔊 読み上げ OFF';
+}
+
+function setVoiceStatus(message) {
+  const status = document.getElementById('cvVoiceStatus');
+  if (status) status.textContent = String(message || '');
+}
+
+function showVoiceSkipped(count) {
+  const skipped = document.getElementById('cvVoiceSkip');
+  if (!skipped || count <= 0) return;
+  skipped.textContent = `${count}件スキップ`;
+  if (_voiceSkipTimer != null) clearTimeout(_voiceSkipTimer);
+  _voiceSkipTimer = window.setTimeout(() => {
+    skipped.textContent = '';
+    _voiceSkipTimer = null;
+  }, 3000);
+}
+
+function persistVoiceReadingEnabled(enabled) {
+  try {
+    void chrome.storage.local.set({ [VOICE_READING_ENABLED_KEY]: enabled === true });
+  } catch {
+    /* no-op */
+  }
+}
+
+function normalizeVoiceAssignments(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return raw;
+}
+
+function stopVoicePlayback() {
+  _voiceQueue = [];
+  _voiceGeneration += 1;
+  if (typeof _voiceStopCurrent === 'function') _voiceStopCurrent();
+  _voiceStopCurrent = null;
+}
+
+function disableVoiceReading({ persist = true } = {}) {
+  _voiceReadingEnabled = false;
+  _voiceToggleBusy = false;
+  stopVoicePlayback();
+  updateVoiceToggle();
+  if (persist) persistVoiceReadingEnabled(false);
+}
+
+async function enableVoiceReading({ persist = true } = {}) {
+  if (isObsMode() || _voiceToggleBusy) return;
+  _voiceToggleBusy = true;
+  updateVoiceToggle();
+  setVoiceStatus('VOICEVOXを確認中…');
+  const alive = await isVoicevoxAlive();
+  if (!alive) {
+    disableVoiceReading({ persist: true });
+    setVoiceStatus('VOICEVOXが見つかりません(起動してください)');
+    return;
+  }
+
+  _voiceStyleIds = await listVoicevoxStyleIds();
+  _voiceGeneration += 1;
+  _voiceReadingEnabled = true;
+  _voiceToggleBusy = false;
+  setVoiceStatus('');
+  updateVoiceToggle();
+  if (persist) persistVoiceReadingEnabled(true);
+}
+
+function voiceUserKeyForItem(item) {
+  const row = {
+    userId: String(item?.userId || '').trim(),
+    name: String(item?.nickname || '').trim()
+  };
+  return (
+    comeviewUserKeyForRow(row) ||
+    row.userId ||
+    row.name ||
+    'anon'
+  );
+}
+
+async function drainVoiceQueue() {
+  if (_voicePlaying || !_voiceReadingEnabled || isObsMode()) return;
+  _voicePlaying = true;
+  try {
+    while (_voiceReadingEnabled && _voiceQueue.length) {
+      const queueLength = _voiceQueue.length;
+      const item = _voiceQueue.shift();
+      if (!item) continue;
+      const generation = _voiceGeneration;
+      const assigned = resolveVoiceForUser(
+        item.userKey,
+        _voiceAssignments,
+        _voiceStyleIds
+      );
+      const wav = await synthesizeVoice(item.text, {
+        ...assigned,
+        speedOffset:
+          assigned.speedOffset + computeVoiceQueueSpeedBoost(queueLength)
+      });
+      if (
+        !wav ||
+        !_voiceReadingEnabled ||
+        generation !== _voiceGeneration ||
+        isObsMode()
+      ) {
+        continue;
+      }
+
+      let objectUrl = '';
+      try {
+        objectUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+        const audio = new Audio(objectUrl);
+        await new Promise((resolve) => {
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            audio.removeEventListener('ended', finish);
+            audio.removeEventListener('error', finish);
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            objectUrl = '';
+            _voiceStopCurrent = null;
+            resolve();
+          };
+          _voiceStopCurrent = () => {
+            try {
+              audio.pause();
+            } catch {
+              /* no-op */
+            }
+            finish();
+          };
+          audio.addEventListener('ended', finish, { once: true });
+          audio.addEventListener('error', finish, { once: true });
+          try {
+            const playResult = audio.play();
+            if (playResult && typeof playResult.catch === 'function') {
+              void playResult.catch(finish);
+            }
+          } catch {
+            finish();
+          }
+        });
+      } catch {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      }
+    }
+  } finally {
+    _voicePlaying = false;
+    if (_voiceReadingEnabled && _voiceQueue.length) void drainVoiceQueue();
+  }
+}
+
+function enqueueVoiceTimelineItems(items) {
+  if (!_voiceReadingEnabled || isObsMode() || !Array.isArray(items)) return;
+  let droppedCount = 0;
+  for (const item of items) {
+    if (!item || item.kind !== 'comment') continue;
+    const text = buildVoiceReadingText({
+      name: item.nickname,
+      text: item.text
+    });
+    if (!text) continue;
+    const pushed = pushVoiceQueue(
+      _voiceQueue,
+      {
+        userKey: voiceUserKeyForItem(item),
+        text
+      },
+      { max: 5 }
+    );
+    _voiceQueue = pushed.queue;
+    droppedCount += pushed.dropped.length;
+  }
+  if (droppedCount > 0) showVoiceSkipped(droppedCount);
+  if (_voiceQueue.length) void drainVoiceQueue();
+}
+
+async function initializeVoiceReading() {
+  if (isObsMode()) return;
+  let bag = {};
+  try {
+    bag = await chrome.storage.local.get([
+      VOICE_READING_ENABLED_KEY,
+      VOICE_ASSIGNMENTS_KEY
+    ]);
+  } catch {
+    bag = {};
+  }
+  _voiceAssignments = normalizeVoiceAssignments(bag[VOICE_ASSIGNMENTS_KEY]);
+  updateVoiceToggle();
+  if (bag[VOICE_READING_ENABLED_KEY] === true) {
+    await enableVoiceReading({ persist: false });
   }
 }
 
@@ -685,6 +910,7 @@ function appendTimelineItems(items) {
     fragment.appendChild(element);
   }
   listEl.appendChild(fragment);
+  enqueueVoiceTimelineItems(items);
 
   let rows = listEl.querySelectorAll('[data-cv-key]');
   while (rows.length > TIMELINE_LIMIT) {
@@ -1114,6 +1340,24 @@ function wireStorageChanges() {
         void requestFullRefresh();
       }
     }
+    if (!isObsMode() && changes[VOICE_ASSIGNMENTS_KEY]) {
+      _voiceAssignments = normalizeVoiceAssignments(
+        changes[VOICE_ASSIGNMENTS_KEY].newValue
+      );
+    }
+    if (!isObsMode() && changes[VOICE_READING_ENABLED_KEY]) {
+      const nextEnabled = changes[VOICE_READING_ENABLED_KEY].newValue === true;
+      if (!nextEnabled && _voiceReadingEnabled) {
+        disableVoiceReading({ persist: false });
+        setVoiceStatus('');
+      } else if (
+        nextEnabled &&
+        !_voiceReadingEnabled &&
+        !_voiceToggleBusy
+      ) {
+        void enableVoiceReading({ persist: false });
+      }
+    }
     if (changes[tKey] || changes[giftKey]) {
       processHotSnapshots(
         changes[tKey]
@@ -1132,6 +1376,17 @@ function wireStorageChanges() {
 }
 
 function wireButtons() {
+  const btnVoice = document.getElementById('cvBtnVoice');
+  if (btnVoice && !isObsMode()) {
+    btnVoice.addEventListener('click', () => {
+      if (_voiceReadingEnabled) {
+        disableVoiceReading();
+        setVoiceStatus('');
+      } else {
+        void enableVoiceReading();
+      }
+    });
+  }
   const btnWin = document.getElementById('cvBtnWindow');
   if (btnWin) {
     btnWin.addEventListener('click', () => {
@@ -1227,6 +1482,7 @@ async function main() {
   const meta = document.getElementById('cvLiveMeta');
   if (meta) meta.textContent = _liveId ? _liveId : '配信が見つかりません';
   wireButtons();
+  await initializeVoiceReading();
   await loadNgList();
   wireStorageChanges();
   await requestFullRefresh(true);

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.698',
+    date: '2026-06-12',
+    summary: 'コメビュにユーザー別の声で読み上げ機能を追加',
+    items: Object.freeze([
+      'コメビュでVOICEVOXを使った読み上げをONにすると、コメントした人ごとに安定した異なる声で新着コメントを読み上げます',
+      'VOICEVOX利用時は、使用する各キャラクターのクレジット表記ルールに従ってください'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.697',
     date: '2026-06-12',
     summary: '取得開始の高速化と過去ログの実時刻保存',
