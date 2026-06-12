@@ -82,6 +82,10 @@ import {
   mergeRepeatedVoiceItem,
   pushVoiceQueue
 } from '../lib/voiceReadQueue.js';
+import {
+  upgradeAnonymousAvatarImage,
+  upgradeAnonymousAvatarImages
+} from '../lib/avatarPartsComposer.js';
 
 /** POP のタイムラインと同じ既定アバター(extension ルート相対・popup.html と同一)。 */
 const DEFAULT_TILE_IMG =
@@ -634,6 +638,9 @@ async function showUserDetail(row) {
     av.className = 'cv-detail-avatar';
     av.src = avatarUrl;
     av.alt = '';
+    if (avatarUrl.startsWith('data:image/svg+xml') && row.userId) {
+      upgradeAnonymousAvatarImage(av, row.userId, 64);
+    }
     av.onerror = () => {
       const fb = document.createElement('div');
       fb.className = 'cv-avatar-fallback cv-detail-avatar';
@@ -794,6 +801,9 @@ function showNgPanel() {
       av.className = 'cv-ng-avatar';
       av.src = avatarUrl;
       av.alt = '';
+      if (avatarUrl.startsWith('data:image/svg+xml') && uid) {
+        upgradeAnonymousAvatarImage(av, uid, 64);
+      }
       av.onerror = () => av.remove();
       line.appendChild(av);
     }
@@ -941,6 +951,7 @@ function renderFullTimeline(timeline, forceBottom = false) {
   elements.forEach((element, index) =>
     rememberTimelineElement(element, timeline[index], false)
   );
+  upgradeAnonymousAvatarImages(listEl);
 
   if (wasNearBottom) {
     listEl.scrollTop = listEl.scrollHeight;
@@ -973,6 +984,7 @@ function appendTimelineItems(items) {
     fragment.appendChild(element);
   }
   listEl.appendChild(fragment);
+  upgradeAnonymousAvatarImages(listEl);
   enqueueVoiceTimelineItems(items);
 
   let rows = listEl.querySelectorAll('[data-cv-key]');

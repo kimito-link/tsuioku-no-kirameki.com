@@ -71,12 +71,14 @@ describe('buildTimelineRowHtml', () => {
     const html = buildTimelineRowHtml(gItem({ userId: 'a:x', avatarUrl: '' }));
     expect(html).toContain('nl-tl-gift__avatar');
     expect(html).toContain('data:image/svg+xml'); // identicon data URL
+    expect(html).toContain('data-nl-anonymous-avatar-key="a:x"');
   });
 
   it('v0.1.655: コメント行も匿名は identicon(りんくにしない)', () => {
     const html = buildTimelineRowHtml(cItem({ userId: 'a:x', avatarUrl: '' }));
     expect(html).toContain('nl-tl-row__avatar');
     expect(html).toContain('data:image/svg+xml');
+    expect(html).toContain('data-nl-anonymous-avatar-key="a:x"');
   });
 
   it('v0.1.655: userId が違えば identicon も違う(見分けられる)', () => {
@@ -99,6 +101,7 @@ describe('buildTimelineRowHtml', () => {
     const html = buildTimelineRowHtml(cItem({ userId: 'a:x', avatarUrl: 'https://x/y.jpg' }));
     expect(html).toContain('src="https://x/y.jpg"');
     expect(html).not.toContain('data:image/svg+xml');
+    expect(html).not.toContain('data-nl-anonymous-avatar-key');
   });
 
   it('XSS: テキスト・名前をエスケープ', () => {
