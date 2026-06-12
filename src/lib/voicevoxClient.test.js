@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   VOICEVOX_BASE_URL,
+  buildMergedVoiceText,
   buildVoiceReadingText,
   isVoicevoxAlive,
   listVoicevoxStyleIds,
@@ -172,7 +173,83 @@ describe('buildVoiceReadingText', () => {
     expect(Array.from(result)).toHaveLength(60);
   });
 
+  it('最大文字数を省略すると従来どおり本文を60文字にする', () => {
+    expect(
+      buildVoiceReadingText({
+        name: 'りすなー',
+        text: 'あ'.repeat(61)
+      })
+    ).toBe(`りすなー、${'あ'.repeat(60)}`);
+  });
+
+  it('最大文字数40では本文を40文字にする', () => {
+    const result = buildVoiceReadingText(
+      { name: '', text: 'あ'.repeat(60) },
+      { maxChars: 40 }
+    );
+    expect(result).toBe('あ'.repeat(40));
+  });
+
+  it('不正な最大文字数は60へ戻す', () => {
+    expect(
+      buildVoiceReadingText(
+        { name: '', text: 'あ'.repeat(70) },
+        { maxChars: 'invalid' }
+      )
+    ).toBe('あ'.repeat(60));
+    expect(
+      buildVoiceReadingText(
+        { name: '', text: 'あ'.repeat(70) },
+        { maxChars: -1 }
+      )
+    ).toBe('あ'.repeat(60));
+  });
+
+  it('名前は本文の最大文字数に含めない', () => {
+    expect(
+      buildVoiceReadingText(
+        { name: '長い名前'.repeat(20), text: 'あ'.repeat(50) },
+        { maxChars: 40 }
+      )
+    ).toBe(`${'長い名前'.repeat(20)}、${'あ'.repeat(40)}`);
+  });
+
   it('空本文は名前があっても空文字', () => {
     expect(buildVoiceReadingText({ name: 'りすなー', text: '  ' })).toBe('');
+  });
+});
+
+describe('buildMergedVoiceText', () => {
+  it('複数件なら残り件数を末尾へ付ける', () => {
+    expect(
+      buildMergedVoiceText({
+        name: '',
+        body: '8888',
+        count: 4
+      })
+    ).toBe('8888、ほか3件');
+  });
+
+  it('1件なら残り件数を付けない', () => {
+    expect(
+      buildMergedVoiceText({
+        name: 'りすなー',
+        body: 'こんにちは',
+        count: 1
+      })
+    ).toBe('りすなー、こんにちは');
+  });
+
+  it('本文を40文字に切り詰めた後で残り件数を付ける', () => {
+    expect(
+      buildMergedVoiceText(
+        {
+          name: 'りすなー',
+          body: 'あ'.repeat(50),
+          count: 3
+        },
+        { maxChars: 40 }
+      )
+    ).toBe(`りすなー、${'あ'.repeat(40)}、ほか2件`);
   });
 });

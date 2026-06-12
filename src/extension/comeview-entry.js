@@ -70,13 +70,16 @@ import {
 } from '../lib/comeviewInstantRender.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
+  buildMergedVoiceText,
   buildVoiceReadingText,
   isVoicevoxAlive,
   listVoicevoxStyleIds,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
 import {
-  computeVoiceQueueSpeedBoost,
+  computeVoiceCongestion,
+  isVoicePrefetchUsable,
+  mergeRepeatedVoiceItem,
   pushVoiceQueue
 } from '../lib/voiceReadQueue.js';
 
@@ -160,6 +163,11 @@ let _voiceReadNameEnabled = false;
 let _voiceStyleIds = [];
 let _voiceAssignments = {};
 let _voiceQueue = [];
+/**
+ * VOICEVOX はローカルCPUで直列処理されるため、並行プリフェッチは1スロットに固定する。
+ * @type {{ item: any, generation: number, promise: Promise<ArrayBuffer|null> }|null}
+ */
+let _voicePrefetch = null;
 let _voicePlaying = false;
 let _voiceGeneration = 0;
 let _voiceStopCurrent = null;
@@ -275,6 +283,7 @@ function normalizeVoiceAssignments(raw) {
 function stopVoicePlayback() {
   _voiceQueue = [];
   _voiceGeneration += 1;
+  _voicePrefetch = null;
   if (typeof _voiceStopCurrent === 'function') _voiceStopCurrent();
   _voiceStopCurrent = null;
 }
@@ -321,6 +330,31 @@ function voiceUserKeyForItem(item) {
   );
 }
 
+function startVoicePrefetch(generation) {
+  const next = _voiceQueue[0];
+  if (!next || generation !== _voiceGeneration) {
+    _voicePrefetch = null;
+    return;
+  }
+  const congestion = computeVoiceCongestion(_voiceQueue.length);
+  const assigned = resolveVoiceForUser(
+    next.userKey,
+    _voiceAssignments,
+    _voiceStyleIds
+  );
+  _voicePrefetch = {
+    item: next,
+    generation,
+    promise: synthesizeVoice(
+      buildMergedVoiceText(next, { maxChars: congestion.maxChars }),
+      {
+        ...assigned,
+        speedOffset: assigned.speedOffset + congestion.speedBoost
+      }
+    ).catch(() => null)
+  };
+}
+
 async function drainVoiceQueue() {
   if (_voicePlaying || !_voiceReadingEnabled || isObsMode()) return;
   _voicePlaying = true;
@@ -330,16 +364,23 @@ async function drainVoiceQueue() {
       const item = _voiceQueue.shift();
       if (!item) continue;
       const generation = _voiceGeneration;
+      const congestion = computeVoiceCongestion(queueLength);
       const assigned = resolveVoiceForUser(
         item.userKey,
         _voiceAssignments,
         _voiceStyleIds
       );
-      const wav = await synthesizeVoice(item.text, {
-        ...assigned,
-        speedOffset:
-          assigned.speedOffset + computeVoiceQueueSpeedBoost(queueLength)
-      });
+      const prefetch = _voicePrefetch;
+      _voicePrefetch = null;
+      const wav = isVoicePrefetchUsable(prefetch, item, generation)
+        ? await prefetch.promise
+        : await synthesizeVoice(
+            buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
+            {
+              ...assigned,
+              speedOffset: assigned.speedOffset + congestion.speedBoost
+            }
+          );
       if (
         !wav ||
         !_voiceReadingEnabled ||
@@ -349,6 +390,7 @@ async function drainVoiceQueue() {
         continue;
       }
 
+      startVoicePrefetch(generation);
       let objectUrl = '';
       try {
         objectUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
@@ -399,19 +441,25 @@ function enqueueVoiceTimelineItems(items) {
   let droppedCount = 0;
   for (const item of items) {
     if (!item || item.kind !== 'comment') continue;
-    const text = buildVoiceReadingText({
-      // v0.1.699: 名前読みは既定OFF(本文だけ)。ONのときだけ「名前、本文」。
-      name: _voiceReadNameEnabled ? item.nickname : '',
-      text: item.text
-    });
-    if (!text) continue;
+    // v0.1.699: 名前読みは既定OFF(本文だけ)。ONのときだけ「名前、本文」。
+    const name = _voiceReadNameEnabled
+      ? String(item.nickname || '').trim()
+      : '';
+    const body = String(item.text || '').trim();
+    if (!buildVoiceReadingText({ name, text: body })) continue;
+    const candidate = {
+      userKey: voiceUserKeyForItem(item),
+      name,
+      body,
+      count: 1
+    };
+    const merged = mergeRepeatedVoiceItem(_voiceQueue, candidate);
+    _voiceQueue = merged.queue;
+    if (merged.merged) continue;
     const pushed = pushVoiceQueue(
       _voiceQueue,
-      {
-        userKey: voiceUserKeyForItem(item),
-        text
-      },
-      { max: 5 }
+      candidate,
+      { max: 12 }
     );
     _voiceQueue = pushed.queue;
     droppedCount += pushed.dropped.length;

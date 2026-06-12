@@ -168,20 +168,44 @@ export async function synthesizeVoice(text, voice, opts = {}) {
 /**
  * 名前とコメント本文から読み上げ文字列を作る。
  * @param {{ name?: unknown, text?: unknown }|null|undefined} row
+ * @param {{ maxChars?: unknown }} [opts]
  * @returns {string}
  */
-export function buildVoiceReadingText(row) {
+export function buildVoiceReadingText(row, { maxChars = 60 } = {}) {
   const rawText = String(row?.text || '').trim();
   if (!rawText) return '';
+  const rawMaxChars = Number(maxChars);
+  const limit =
+    Number.isFinite(rawMaxChars) && rawMaxChars >= 1
+      ? Math.floor(rawMaxChars)
+      : 60;
   const body = Array.from(
     rawText
       .replace(/(?:https?:\/\/|www\.)[^\s]+/gi, 'URL省略')
       .replace(/\s+/g, ' ')
       .trim()
   )
-    .slice(0, 60)
+    .slice(0, limit)
     .join('');
   if (!body) return '';
   const name = String(row?.name || '').trim();
   return name ? `${name}、${body}` : body;
+}
+
+/**
+ * 集約件数を含む読み上げ文字列を作る。
+ * @param {{ name?: unknown, body?: unknown, count?: unknown }|null|undefined} item
+ * @param {{ maxChars?: unknown }} [opts]
+ * @returns {string}
+ */
+export function buildMergedVoiceText(item, { maxChars } = {}) {
+  const text = buildVoiceReadingText(
+    { name: item?.name, text: item?.body },
+    { maxChars }
+  );
+  if (!text) return '';
+  const rawCount = Number(item?.count);
+  const count =
+    Number.isFinite(rawCount) && rawCount >= 1 ? Math.floor(rawCount) : 1;
+  return count > 1 ? `${text}、ほか${count - 1}件` : text;
 }
