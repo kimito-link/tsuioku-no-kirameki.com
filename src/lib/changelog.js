@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.700',
+    date: '2026-06-12',
+    summary: '匿名アイコンを幾何学模様から優しい顔に変更',
+    items: Object.freeze([
+      '匿名さんのアイコンを、幾何学模様からゆっくり風の優しい丸顔に変えました。肌・髪色・髪型・表情の組み合わせで4,320通り、同じ人はいつも同じ顔です（コメビュ・タイムライン・応援者一覧すべてに反映）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.699',
     date: '2026-06-12',
     summary: '読み上げの名前ON/OFF切替を追加',
