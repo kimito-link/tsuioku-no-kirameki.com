@@ -44,9 +44,12 @@ def build_submission_manifest(dev_manifest: dict, version: str) -> dict:
     m['version'] = version
     # description: 開発識別子サフィックスを落とす（CWS 掲載名は短い方で統一）
     m['description'] = 'ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます。'
-    # hosts: localhost / 127.0.0.1 を外す
+    # hosts: dev サーバ(localhost/127.0.0.1:3456)は外す。
+    #   v0.1.698: VOICEVOX 連携(http://127.0.0.1:50021)はユーザー向け機能なので提出物にも残す
+    #   (ローカル音声合成エンジン連携・理由書 cws-submission-texts.md に記載)。
     m['host_permissions'] = [h for h in m['host_permissions']
-                             if 'localhost' not in h and '127.0.0.1' not in h]
+                             if ('localhost' not in h and '127.0.0.1' not in h)
+                             or ':50021' in h]
     for cs in m.get('content_scripts', []):
         cs['matches'] = [x for x in cs['matches']
                           if 'localhost' not in x and '127.0.0.1' not in x]
@@ -69,6 +72,10 @@ def stage(version: str) -> Path:
     # offscreen.html は chrome.offscreen.createDocument が読む常駐 IDB 書き手のページ
     #   （dist/offscreen.js を参照）。manifest には現れないが提出物に含める必要がある。
     copy_file(EXT_DIR / 'offscreen.html', dest / 'offscreen.html')
+    # v0.1.629/652 で追加された固定URLページ。web_accessible_resources に記載があり
+    #   ボタンから開くため提出物に必須(従来は漏れていてストア版で 404 になっていた)。
+    copy_file(EXT_DIR / 'status.html', dest / 'status.html')
+    copy_file(EXT_DIR / 'comeview.html', dest / 'comeview.html')
     copy_tree(EXT_DIR / 'dist', dest / 'dist')
     # dist/.gitkeep は提出物に不要
     gitkeep = dest / 'dist' / '.gitkeep'
