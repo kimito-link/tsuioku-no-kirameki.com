@@ -90,6 +90,8 @@ const RECONCILE_INTERVAL_MS = 60_000;
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 const VOICE_READING_ENABLED_KEY = 'nls_voice_reading_enabled_v1';
 const VOICE_ASSIGNMENTS_KEY = 'nls_voice_assignments_v1';
+/** v0.1.699: 名前(ハンドルネーム)も読むか。既定OFF=本文だけ読む(ユーザー要望)。 */
+const VOICE_READ_NAME_KEY = 'nls_voice_read_name_enabled_v1';
 
 let _liveId = '';
 let _paused = false;
@@ -153,6 +155,8 @@ let _hoverBar = null;
 let _hoverRow = null;
 let _voiceReadingEnabled = false;
 let _voiceToggleBusy = false;
+/** v0.1.699: 名前読み(既定OFF=本文だけ)。 */
+let _voiceReadNameEnabled = false;
 let _voiceStyleIds = [];
 let _voiceAssignments = {};
 let _voiceQueue = [];
@@ -229,6 +233,14 @@ function updateVoiceToggle() {
   button.classList.toggle('is-on', _voiceReadingEnabled);
   button.setAttribute('aria-pressed', String(_voiceReadingEnabled));
   button.textContent = _voiceReadingEnabled ? '🔊 読み上げ ON' : '🔊 読み上げ OFF';
+  // v0.1.699: 名前読みトグル(読み上げON時だけ表示)。
+  const nameBtn = document.getElementById('cvBtnVoiceName');
+  if (nameBtn) {
+    nameBtn.hidden = !_voiceReadingEnabled;
+    nameBtn.classList.toggle('is-on', _voiceReadNameEnabled);
+    nameBtn.setAttribute('aria-pressed', String(_voiceReadNameEnabled));
+    nameBtn.textContent = _voiceReadNameEnabled ? '名前読み ON' : '名前読み OFF';
+  }
 }
 
 function setVoiceStatus(message) {
@@ -388,7 +400,8 @@ function enqueueVoiceTimelineItems(items) {
   for (const item of items) {
     if (!item || item.kind !== 'comment') continue;
     const text = buildVoiceReadingText({
-      name: item.nickname,
+      // v0.1.699: 名前読みは既定OFF(本文だけ)。ONのときだけ「名前、本文」。
+      name: _voiceReadNameEnabled ? item.nickname : '',
       text: item.text
     });
     if (!text) continue;
@@ -413,12 +426,14 @@ async function initializeVoiceReading() {
   try {
     bag = await chrome.storage.local.get([
       VOICE_READING_ENABLED_KEY,
-      VOICE_ASSIGNMENTS_KEY
+      VOICE_ASSIGNMENTS_KEY,
+      VOICE_READ_NAME_KEY
     ]);
   } catch {
     bag = {};
   }
   _voiceAssignments = normalizeVoiceAssignments(bag[VOICE_ASSIGNMENTS_KEY]);
+  _voiceReadNameEnabled = bag[VOICE_READ_NAME_KEY] === true;
   updateVoiceToggle();
   if (bag[VOICE_READING_ENABLED_KEY] === true) {
     await enableVoiceReading({ persist: false });
@@ -1384,6 +1399,19 @@ function wireButtons() {
         setVoiceStatus('');
       } else {
         void enableVoiceReading();
+      }
+    });
+  }
+  // v0.1.699: 名前読みトグル(既定OFF・読み上げON時のみ表示)。
+  const btnVoiceName = document.getElementById('cvBtnVoiceName');
+  if (btnVoiceName && !isObsMode()) {
+    btnVoiceName.addEventListener('click', () => {
+      _voiceReadNameEnabled = !_voiceReadNameEnabled;
+      updateVoiceToggle();
+      try {
+        void chrome.storage.local.set({ [VOICE_READ_NAME_KEY]: _voiceReadNameEnabled });
+      } catch {
+        /* no-op */
       }
     });
   }
