@@ -101,7 +101,7 @@ const HAIRS = [
 function darken(hex) {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   if (!m) return '#5a4636';
-  const f = (x) => Math.max(0, Math.floor(parseInt(x, 16) * 0.55));
+  const f = (/** @type {string} */ x) => Math.max(0, Math.floor(parseInt(x, 16) * 0.55));
   return `rgb(${f(m[1])},${f(m[2])},${f(m[3])})`;
 }
 
