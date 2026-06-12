@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.703',
+    date: '2026-06-12',
+    summary: '読み上げの待ち時間とコメント取りこぼしを改善',
+    items: Object.freeze([
+      '次のコメント音声を1件だけ先に準備し、読み上げ間の待ち時間を短くしました',
+      '同じ本文の連続投稿を「ほか○件」にまとめ、混雑時は速度と本文長を段階調整して、より多くのコメントを読み上げられるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.702',
     date: '2026-06-12',
     summary: '匿名の顔アイコンを本家タッチへさらに接近',
