@@ -301,6 +301,7 @@ import {
   summarizeTimelineGifts
 } from '../lib/supportActivityTimeline.js';
 import { buildSupportTimelineBodyHtml } from '../lib/supportTimelineHtml.js';
+import { shouldRefreshSupportTimeline } from '../lib/supportTimelineGuard.js';
 import {
   buildAiShareInlinePanelStorageReadback,
   buildInlinePanelStorageSetFailedMessage,
@@ -10427,6 +10428,8 @@ function refreshNorthStarProgramPointsLane() {
   renderNorthStarLane('programPoints', null, state);
 }
 
+let supportTimelineRefreshEpoch = 0;
+
 /**
  * v0.1.340: 応援タイムライン（コメント＋ギフトを時刻順に1本の流れで）。
  *   既存の comments storage と gift_events storage を読み、純関数で時系列マージして
@@ -10464,6 +10467,18 @@ async function refreshSupportActivityTimeline(liveId) {
       }
     });
   }
+  // v0.1.705: standalone の下部常設配置は、明示的に閉じている場合も維持する。
+  relocateSupportTimelineForStandaloneWindow();
+  if (
+    details instanceof HTMLDetailsElement &&
+    !shouldRefreshSupportTimeline({
+      detailsOpen: details.open,
+      isStandaloneWindow: document.documentElement.classList.contains('nl-popup-window')
+    })
+  ) {
+    return;
+  }
+  const myEpoch = supportTimelineRefreshEpoch;
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) {
     // watch 未解決のときはタイムラインを畳んで空に（誤誘導しない）。
@@ -10520,6 +10535,16 @@ async function refreshSupportActivityTimeline(liveId) {
     order: 'desc',
     limit: 120
   });
+  const currentLid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  const detailsStillOpen =
+    !(details instanceof HTMLDetailsElement) || details.open;
+  if (
+    myEpoch !== supportTimelineRefreshEpoch ||
+    !detailsStillOpen ||
+    currentLid !== lid
+  ) {
+    return;
+  }
   body.innerHTML = buildSupportTimelineBodyHtml(timeline, {
     defaultAvatar: STORY_GRID_DEFAULT_TILE_IMG,
     now: Date.now()
@@ -10547,8 +10572,6 @@ async function refreshSupportActivityTimeline(liveId) {
     }
   }
   if (details instanceof HTMLElement) details.hidden = false;
-  // v0.1.345: 別ウィンドウでは下部常設にして空白を埋める（冪等・他文脈は no-op）。
-  relocateSupportTimelineForStandaloneWindow();
 }
 
 /**
@@ -10593,6 +10616,11 @@ async function wireSupportTimelineOpenPersistence() {
   details.addEventListener('toggle', () => {
     if (suppressSupportTimelineTogglePersist) return;
     const open = Boolean(details.open);
+    if (open) {
+      void refreshSupportActivityTimeline(watchPopupLastPaintedLiveId).catch(() => {});
+    } else {
+      supportTimelineRefreshEpoch += 1;
+    }
     void storageSetSafe({ [KEY_SUPPORT_TIMELINE_OPEN]: open }).catch(() => {});
   });
 }
@@ -20973,10 +21001,10 @@ async function initPopup() {
     })
     .finally(() => {
       void (async () => {
+        await wireSupportTimelineOpenPersistence().catch(() => {});
         const refreshDone = safeRefresh();
         await applySupportVisualExpandedFromStorage().catch(() => {});
         wireSupportVisualUi();
-        void wireSupportTimelineOpenPersistence().catch(() => {});
         document.documentElement.setAttribute('data-nl-support-wired', '');
         void applyThumbSelectFromStorage().catch(() => {});
         // registry 登録済みのブール設定を storage から一括同期
