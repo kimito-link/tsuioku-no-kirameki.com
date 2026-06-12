@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.699',
+    date: '2026-06-12',
+    summary: '読み上げの名前ON/OFF切替を追加',
+    items: Object.freeze([
+      'コメビュの読み上げで、ハンドルネームを読むかどうかを切り替えられるようにしました（既定OFF＝本文だけ読みます）。読み上げONのときに「名前読み」ボタンが表示されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.698',
     date: '2026-06-12',
     summary: 'コメビュにユーザー別の声で読み上げ機能を追加',
