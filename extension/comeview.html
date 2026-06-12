@@ -83,8 +83,28 @@
         cursor: pointer;
       }
       .cv-toolbar button:hover { border-color: var(--cv-accent); }
+      .cv-toolbar button.is-on {
+        color: #fff;
+        background: var(--cv-accent);
+        border-color: var(--cv-accent);
+      }
       .cv-toolbar .cv-spacer { flex: 1 1 auto; }
       .cv-count { font-variant-numeric: tabular-nums; }
+      .cv-voice-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .cv-voice-status {
+        max-width: 220px;
+        color: #b54708;
+        line-height: 1.3;
+      }
+      .cv-voice-skip {
+        color: var(--cv-sub);
+        white-space: nowrap;
+      }
+      body.is-obs .cv-voice-controls { display: none !important; }
 
       .cv-list {
         flex: 1 1 auto;
@@ -606,6 +626,11 @@
       <span class="cv-meta" id="cvLiveMeta">—</span>
       <span class="cv-spacer"></span>
       <span class="cv-count" id="cvCount">0 件</span>
+      <span class="cv-voice-controls">
+        <button id="cvBtnVoice" type="button" aria-pressed="false">🔊 読み上げ OFF</button>
+        <span class="cv-voice-status" id="cvVoiceStatus" role="status"></span>
+        <span class="cv-voice-skip" id="cvVoiceSkip" aria-live="polite"></span>
+      </span>
       <button id="cvBtnNg" type="button" title="非表示にした人を管理" style="display: none;">NG 0</button>
       <button id="cvBtnWindow" type="button" title="別ウィンドウで開く">⧉ 別窓</button>
       <button id="cvBtnObs" type="button" title="OBS用の透過表示に切替">OBS透過</button>
