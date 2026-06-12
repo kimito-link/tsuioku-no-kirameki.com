@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.702',
+    date: '2026-06-12',
+    summary: '匿名の顔アイコンを本家タッチへさらに接近',
+    items: Object.freeze([
+      '匿名さんの顔アイコンを改良しました。髪を頭の外側まで膨らむシルエットにし、天使の輪（髪のハイライト）・大きなキラキラの目・けもの耳やアホ毛のアクセントを追加。よりゆっくりキャラらしい見た目になります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.701',
     date: '2026-06-12',
     summary: '匿名の顔アイコンを本家ゆっくりのタッチに',
