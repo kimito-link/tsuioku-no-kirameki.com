@@ -8624,6 +8624,7 @@
             <p><strong>開いた瞬間に全部表示（v0.1.650）</strong> — 一度見た配信を開き直すと、IDB／セッションキャッシュから<strong>すぐに全コメントが表示</strong>されます（ローディングを待たずにドンと出ます）。</p>
             <p><strong>長い配信でも最後まで粘る（v0.1.665）</strong> — 3時間級の配信で取り込みが 7割など途中で止まったまま動かなくなることがあったのを根治しました。前進できている限り自動の取り直しを続け、公式の件数に届くまで粘ります。</p>
             <p><strong>並行取得の安全装置（v0.1.664）</strong> — ページが重くなっているときは並行取り込みを自動で1配信ずつにゆるめ、画面のカクつきを防ぎます（軽くなれば自動で並行に戻ります）。</p>
+            <p><strong>ほぼ100%まで取り切る大幅安定化（v0.1.691〜697）</strong> — 大量取得時に保存前へ消えてしまう欠落を根治し、途中参加でも<strong>過去ログをほぼ100%</strong>記録できるようになりました。取得が中断しても自動でやり直し、空振り時は早めに仕切り直すので取得開始も速くなっています。タブを閉じても取得を続ける Service Worker 基盤も搭載しました（段階導入中）。</p>
           </div>
         </div>
       </section>
@@ -8642,7 +8643,38 @@
             <p><strong>コメントごとの操作（v0.1.666〜）</strong> — マウスを載せると<strong>コピー／ピン留め（コメピタ）／この行を隠す／この人を非表示</strong>のボタンが出ます。ピン留めは質問などを画面上部に固定でき、<strong>OBS 窓にも同期表示</strong>されます。</p>
             <p><strong>匿名さんにもニックネーム（v0.1.667）</strong> — コメントをクリックすると<strong>ユーザー詳細</strong>が開き、ニックネーム・ラベル・メモを付けられます。匿名 ID は人ごとに固定なので、<strong>一度名付ければ次の配信でも同じ名前</strong>で表示。この配信での発言一覧（時刻付き）もさかのぼれます。</p>
             <p><strong>OBS 透過モード</strong> — <code>?obs=1</code> で背景を透過し、半透明の黒カード＋白文字で<strong>配信画面に直接重ねられます</strong>。</p>
-            <p><strong>これから</strong> — 読み上げ（内蔵 TTS）や、弾幕・3キャラのきらめき演出を順次足していきます。</p>
+            <p><strong>これから</strong> — 弾幕・3キャラのきらめき演出を順次足していきます。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="voice-reading" aria-labelledby="voice-reading-heading" data-lp-feature="voice-reading">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="voice-reading-heading">🔊 人ごとに違う声で読み上げ（VOICEVOX 連携／v0.1.698〜699）</h2>
+            <p>
+              コメビュの「🔊 読み上げ」を ON にすると、<strong>コメントした人ごとに違う声</strong>で新着コメントを読み上げます。声はユーザーごとに自動で固定されるので、<strong>同じ常連さんはいつ来ても同じ声</strong>。「声で常連さんがわかる」コメビュです。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>約900通りのユニークボイス</strong> — 無料のローカル音声合成 <strong>VOICEVOX</strong> と連携し、声の種類×高さ×話速の組み合わせで人ごとに声を割り当てます。完全ローカル動作なので音声が外部に送られることはありません。</p>
+            <p><strong>渋滞しない読み上げ</strong> — コメントが速い配信では自動で少し早口になり、溜まりすぎた分は古い順にスキップして追いつきます。</p>
+            <p><strong>名前読みの切り替え（v0.1.699）</strong> — ハンドルネームを読むかどうかを選べます（既定は本文だけ）。</p>
+            <p><strong>ご利用には</strong> — VOICEVOX（無料）を別途インストールして起動しておくだけ。音声を配信に乗せる場合は、使用キャラクターのクレジット表記ルールに従ってください。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="yukkuri-face-avatar" aria-labelledby="yukkuri-face-avatar-heading" data-lp-feature="yukkuri-face-avatar">
+        <div class="shell">
+          <div class="section-head fade">
+            <h2 id="yukkuri-face-avatar-heading">匿名さんもゆっくり風の顔アイコンに（v0.1.700〜701）</h2>
+            <p>
+              アイコンの無い匿名さんにも、<strong>人ごとに違うゆっくり風の優しい顔アイコン</strong>を自動で割り当てます。<strong>同じ人はいつも同じ顔</strong>なので、読み上げの声と合わせて「あの顔のあの声の常連さん」を覚えられます。
+            </p>
+          </div>
+          <div class="board fade d2">
+            <p><strong>数千通りの顔</strong> — 髪色・髪型・表情・ほっぺの組み合わせで人ごとに違う顔を自動生成。男女どちらにも見える優しいタッチで、コメビュ・応援タイムライン・応援者一覧のすべてに反映されます。</p>
           </div>
         </div>
       </section>
