@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.705',
+    date: '2026-06-13',
+    summary: '閉じた応援タイムラインの全件読込を停止',
+    items: Object.freeze([
+      '応援タイムラインを閉じている間は大量のコメントを読み込まないようにし、長時間配信でパネルが固まる問題を改善しました',
+      '応援タイムラインを開いた瞬間に最新の内容を描画し、配信切替や開閉の途中で古い結果が上書きされないようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.704',
     date: '2026-06-13',
     summary: '匿名の顔アバターをパーツ合成へ更新',
