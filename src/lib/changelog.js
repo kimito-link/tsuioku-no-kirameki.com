@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.701',
+    date: '2026-06-12',
+    summary: '匿名の顔アイコンを本家ゆっくりのタッチに',
+    items: Object.freeze([
+      '匿名さんの顔アイコンのタッチを、りんく・こんた・たぬ姉と同じゆっくり画風（太い輪郭・大きな目・ギザギザ前髪・ほっぺ）に寄せました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.700',
     date: '2026-06-12',
     summary: '匿名アイコンを幾何学模様から優しい顔に変更',
