@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.704',
+    date: '2026-06-13',
+    summary: '匿名の顔アバターをパーツ合成へ更新',
+    items: Object.freeze([
+      '匿名さんの顔アバターを、髪型・髪色・目・口・チークの画像パーツを組み合わせる方式へ更新しました。同じ人はいつも同じ顔で表示されます',
+      '読み込み中は従来の顔アイコンをすぐ表示し、パーツの準備ができた時点で新しい顔へ差し替えるため、表示待ちや空白は発生しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.703',
     date: '2026-06-12',
     summary: '読み上げの待ち時間とコメント取りこぼしを改善',

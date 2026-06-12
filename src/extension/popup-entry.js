@@ -1,9 +1,5 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
-import {
-  extractLiveIdFromUrl,
-  isNicoLiveWatchUrl,
-  watchPageUrlsMatchForSnapshot
-} from '../lib/broadcastUrl.js';
+import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
@@ -453,6 +449,7 @@ import {
   resetStoryUserLaneDom
 } from './story/renderStoryUserLaneDom.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+import { upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
 import { buildReportThumbedUsersSectionHtml } from '../lib/reportThumbedUsersSectionHtml.js';
@@ -5240,11 +5237,7 @@ function renderStoryUserLane() {
     faceTanu: STORY_GUIDE_FACE_TANU
   };
 
-  const laneDomIo = {
-    storyAvatarLoadGuard,
-    isHttpOrHttpsUrl,
-    storyTileUsesYukkuriTvStyle
-  };
+  const laneDomIo = { storyAvatarLoadGuard, isHttpOrHttpsUrl, storyTileUsesYukkuriTvStyle, upgradeAnonymousAvatarImage };
 
   const lanePickCtx = {
     yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
@@ -5810,6 +5803,7 @@ function renderStoryCommentDetailPanel() {
     const displayDetail = storyAvatarLoadGuard.pickDisplaySrc(requestedDetail);
     img.src = displayDetail;
     storyAvatarLoadGuard.noteRemoteAttempt(img, requestedDetail);
+    upgradeAnonymousAvatarImageFromFallback(img, entry.userId, requestedDetail, 64);
     img.classList.toggle(
       'nl-story-detail-img--tv-fallback',
       storyTileUsesYukkuriTvStyle(requestedDetail, displayDetail)
@@ -6399,6 +6393,7 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   const displayTile = storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
   storyGrowthImgAssignSrc(img, displayTile);
   storyAvatarLoadGuard.noteRemoteAttempt(img, requestedTile);
+  upgradeAnonymousAvatarImageFromFallback(img, entry?.userId, requestedTile, 64);
   img.classList.toggle(
     'nl-story-growth-icon--tv-fallback',
     storyTileUsesYukkuriTvStyle(requestedTile, displayTile)
@@ -7781,6 +7776,7 @@ function renderTopSupportRankStrip(stripRooms) {
     if (isHttpOrHttpsUrl(m.thumbSrc)) {
       storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
     }
+    upgradeAnonymousAvatarImageFromFallback(img, m.userKey, m.thumbSrc, 64);
   });
 }
 
@@ -9598,6 +9594,7 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
       if (isHttpOrHttpsUrl(m.thumbSrc)) {
         storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
       }
+      upgradeAnonymousAvatarImageFromFallback(img, m.userKey, m.thumbSrc, 64);
     });
   }
   if (isNorthStarBody) {
@@ -10527,6 +10524,7 @@ async function refreshSupportActivityTimeline(liveId) {
     defaultAvatar: STORY_GRID_DEFAULT_TILE_IMG,
     now: Date.now()
   });
+  upgradeAnonymousAvatarImages(body);
   bindOnErrorHideHandlersWithin(body);
   // 実 http アバターは load guard 経由でフォールバック差し替え（フリッカ防止）。
   // コメント行アバター + ギフト行送信者アバターの両方。
@@ -11136,6 +11134,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     if (avImg instanceof HTMLImageElement && isHttpOrHttpsUrl(thumbSrc)) {
       storyAvatarLoadGuard.noteRemoteAttempt(avImg, thumbSrc);
     }
+    if (avImg instanceof HTMLImageElement) upgradeAnonymousAvatarImageFromFallback(avImg, uidForThumb, thumbSrc, 64);
   }
 
   if (rankedRooms.length > visibleRooms.length) {

@@ -37,17 +37,17 @@ function timelineDisplayName(item) {
  *   無いときだけ defaultAvatar にフォールバック。
  * @param {{ avatarUrl?: unknown, userId?: unknown }} item
  * @param {string} defaultAvatar
- * @returns {string}
+ * @returns {{ src: string, upgradeUserKey: string }}
  */
 function resolveTimelineAvatar(item, defaultAvatar) {
   const real = String(item?.avatarUrl || '').trim();
-  if (real) return real;
+  if (real) return { src: real, upgradeUserKey: '' };
   const id = String(item?.userId || '').trim();
   if (id) {
     const identicon = anonymousIdenticonDataUrl(id, 64);
-    if (identicon) return identicon;
+    if (identicon) return { src: identicon, upgradeUserKey: id };
   }
-  return defaultAvatar;
+  return { src: defaultAvatar, upgradeUserKey: '' };
 }
 
 /** @param {unknown} s */
@@ -121,11 +121,14 @@ export function buildTimelineRowHtml(item, opts) {
         : '';
     // v0.1.342: 送信者アバター（あれば）に🎁バッジを重ねて「誰が」を視覚化。
     //   アバターが無い（未設定/匿名）ときは default または🎁のみ。
-    const gAv = resolveTimelineAvatar(item, defaultAvatar);
-    const gAvRp = /^https?:\/\//i.test(gAv) ? ' referrerpolicy="no-referrer"' : '';
-    const avatarBlock = gAv
+    const gAvatar = resolveTimelineAvatar(item, defaultAvatar);
+    const gAvRp = /^https?:\/\//i.test(gAvatar.src) ? ' referrerpolicy="no-referrer"' : '';
+    const gAvUpgrade = gAvatar.upgradeUserKey
+      ? ` data-nl-anonymous-avatar-key="${escapeAttr(gAvatar.upgradeUserKey)}"`
+      : '';
+    const avatarBlock = gAvatar.src
       ? `<span class="nl-tl-gift__avatar-wrap">` +
-        `<img class="nl-tl-gift__avatar" src="${escapeAttr(gAv)}" alt="" decoding="async"${gAvRp} />` +
+        `<img class="nl-tl-gift__avatar" src="${escapeAttr(gAvatar.src)}" alt="" decoding="async"${gAvRp}${gAvUpgrade} />` +
         `<span class="nl-tl-gift__badge" aria-hidden="true">🎁</span>` +
         `</span>`
       : `<span class="nl-tl-gift__icon" aria-hidden="true">🎁</span>`;
@@ -148,10 +151,13 @@ export function buildTimelineRowHtml(item, opts) {
   // comment
   const name = escapeHtml(timelineDisplayName(item));
   const text = escapeHtml(commentTextShown(item.text, item.commentNo));
-  const av = resolveTimelineAvatar(item, defaultAvatar);
-  const avRp = /^https?:\/\//i.test(av) ? ' referrerpolicy="no-referrer"' : '';
-  const avBlock = av
-    ? `<img class="nl-tl-row__avatar" src="${escapeAttr(av)}" alt="" decoding="async"${avRp} />`
+  const avatar = resolveTimelineAvatar(item, defaultAvatar);
+  const avRp = /^https?:\/\//i.test(avatar.src) ? ' referrerpolicy="no-referrer"' : '';
+  const avUpgrade = avatar.upgradeUserKey
+    ? ` data-nl-anonymous-avatar-key="${escapeAttr(avatar.upgradeUserKey)}"`
+    : '';
+  const avBlock = avatar.src
+    ? `<img class="nl-tl-row__avatar" src="${escapeAttr(avatar.src)}" alt="" decoding="async"${avRp}${avUpgrade} />`
     : '';
   const selfCls = item.selfPosted ? ' nl-tl-row--self' : '';
   const inner =
