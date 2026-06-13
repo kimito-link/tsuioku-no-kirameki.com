@@ -53,6 +53,7 @@ import {
   shouldReprimeCommentMilestones
 } from '../lib/watchPopupCelebrationGuard.js';
 import { createPopupCelebrationGate } from '../lib/popupCelebrationGate.js';
+import { nicoadCommentCelebrationKey } from '../lib/nicoadCelebrationKey.js';
 import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.js';
 import {
   fetchKokenGiftHistoryAllViaExtension,
@@ -1811,20 +1812,6 @@ function applyCelebrationSideEffectsFromStorageChanges(changes) {
   if (changes[profileKey]) {
     void trackBroadcasterFollowerForCelebration(lid);
   }
-}
-
-/**
- * @param {unknown} entry
- * @param {string} liveId
- * @returns {string}
- */
-function nicoadCommentCelebrationKey(entry, liveId) {
-  const lid = String(liveId || '').trim().toLowerCase();
-  const no = String(/** @type {{ commentNo?: unknown, id?: unknown }} */ (entry)?.commentNo ?? /** @type {{ id?: unknown }} */ (entry)?.id ?? '').trim();
-  const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
-  if (no) return `${lid}|no:${no}`;
-  const at = Number(/** @type {{ capturedAt?: unknown }} */ (entry)?.capturedAt) || 0;
-  return `${lid}|t:${at}|${text.slice(0, 80)}`;
 }
 
 /**
