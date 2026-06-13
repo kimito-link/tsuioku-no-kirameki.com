@@ -114,3 +114,61 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
   }
   return { speeches, seenKeys: seen, primed: true };
 }
+
+/**
+ * 新着発言者を会場行(venueSeats の入力)へマージする純関数。
+ *
+ * ユーザー方針(2026-06-13)「しゃべった人を席に出して吹かせる」: ニコ生実況は新着が匿名/新規
+ *   ばかりで、全期間集計の常連20席はめったにしゃべらない=吹き出しが出ない。そこで新着発言者を
+ *   「いましゃべった人」として会場行に足し、最終発言時刻を now にすることで buildVenueSeating の
+ *   lastAt 優先ロジックが自動的に上位席へ出す。これで会場が常にしゃべって生きて見える。
+ *
+ * 同一 userId が既に baseRows に居れば lastAt(capturedAt)を now に更新するだけ(重複行を作らない)。
+ * 名前のある発言者はアリーナ席、名前の無い匿名は観客のまま(venueParticipantKey の規約に従う)。
+ *
+ * @param {ReadonlyArray<{userId?: string, name?: string, avatar?: string, capturedAt?: number}>} baseRows
+ * @param {ReadonlyArray<{userId?: string, name?: string, text?: string}>} speeches pickNewVenueSpeech の speeches
+ * @param {number} nowMs 現在時刻(発言を最新に並べるため)
+ * @returns {Array<{userId: string, name: string, avatar: string, text: string, capturedAt: number}>}
+ */
+export function mergeSpeakersIntoVenueRows(baseRows, speeches, nowMs) {
+  const base = Array.isArray(baseRows) ? baseRows : [];
+  const talks = Array.isArray(speeches) ? speeches : [];
+  const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
+
+  /** @type {Map<string, {userId: string, name: string, avatar: string, text: string, capturedAt: number}>} */
+  const byUid = new Map();
+  const out = [];
+  for (const r of base) {
+    if (!r || typeof r !== 'object') continue;
+    const uid = String(r.userId ?? '').trim();
+    const row = {
+      userId: uid,
+      name: String(r.name ?? '').trim(),
+      avatar: String(r.avatar ?? '').trim(),
+      text: String(r.text ?? ''),
+      capturedAt: Number.isFinite(Number(r.capturedAt)) ? Number(r.capturedAt) : 0
+    };
+    out.push(row);
+    if (uid) byUid.set(uid, row);
+  }
+
+  for (const sp of talks) {
+    if (!sp || typeof sp !== 'object') continue;
+    const uid = String(sp.userId ?? '').trim();
+    const name = String(sp.name ?? '').trim();
+    if (!uid && !name) continue;
+    const existing = uid ? byUid.get(uid) : null;
+    if (existing) {
+      // 既に会場に居る人がしゃべった→最終発言を now に更新(上位席へ繰り上がる)。
+      existing.capturedAt = now;
+      if (name && !existing.name) existing.name = name;
+    } else {
+      // 会場に居ない人がしゃべった→新規に席へ(now で最優先)。
+      const row = { userId: uid, name, avatar: '', text: '', capturedAt: now };
+      out.push(row);
+      if (uid) byUid.set(uid, row);
+    }
+  }
+  return out;
+}

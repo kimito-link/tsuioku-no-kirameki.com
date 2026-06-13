@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   venueSpeechKey,
   venueSpeakerKey,
-  pickNewVenueSpeech
+  pickNewVenueSpeech,
+  mergeSpeakersIntoVenueRows
 } from './venueSpeech.js';
 
 describe('venueSpeechKey', () => {
@@ -111,5 +112,40 @@ describe('pickNewVenueSpeech', () => {
     const r = pickNewVenueSpeech(null, { primed: false });
     expect(r.speeches).toEqual([]);
     expect(r.primed).toBe(true);
+  });
+});
+
+describe('mergeSpeakersIntoVenueRows', () => {
+  it('会場に居ない発言者を新規に席へ追加(now で最優先)', () => {
+    const base = [{ userId: 'a', name: 'A', capturedAt: 100 }];
+    const speeches = [{ userId: 'b', name: 'B', text: 'やあ' }];
+    const merged = mergeSpeakersIntoVenueRows(base, speeches, 9999);
+    expect(merged).toHaveLength(2);
+    const b = merged.find((r) => r.userId === 'b');
+    expect(b.capturedAt).toBe(9999);
+    expect(b.name).toBe('B');
+  });
+
+  it('既に居る人がしゃべったら capturedAt を now に更新(重複行を作らない)', () => {
+    const base = [{ userId: 'a', name: 'A', capturedAt: 100 }];
+    const speeches = [{ userId: 'a', name: 'A', text: 'また発言' }];
+    const merged = mergeSpeakersIntoVenueRows(base, speeches, 5000);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].capturedAt).toBe(5000);
+  });
+
+  it('匿名(userIdあり・名前なし)もマージする', () => {
+    const merged = mergeSpeakersIntoVenueRows([], [{ userId: 'x', name: '', text: 'y' }], 7);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].userId).toBe('x');
+  });
+
+  it('userId も name も無い発言者は無視', () => {
+    const merged = mergeSpeakersIntoVenueRows([], [{ text: '名無し' }], 7);
+    expect(merged).toHaveLength(0);
+  });
+
+  it('非配列でも安全', () => {
+    expect(mergeSpeakersIntoVenueRows(null, null, 0)).toEqual([]);
   });
 });
