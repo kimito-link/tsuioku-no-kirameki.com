@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.708',
+    date: '2026-06-13',
+    summary: '会場モードを全画面表示に変更',
+    items: Object.freeze([
+      '「会場モード」を画面全体に広がる表示に変えました。中央に配信、まわりに参加者が並びます',
+      'Escキーや「閉じる」ですぐ元のニコ生に戻れます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.707',
     date: '2026-06-13',
     summary: 'ニコ生に会場モードを追加',

@@ -26,10 +26,14 @@ const VENUE_CSS = `
     color: #f7f7f7;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
+  .nlsb-root.nlsb-is-open {
+    pointer-events: auto;
+  }
   .nlsb-toggle {
     position: absolute;
     right: 16px;
     bottom: 16px;
+    z-index: 3;
     min-height: 34px;
     padding: 7px 12px;
     border: 1px solid rgba(255, 255, 255, 0.22);
@@ -42,7 +46,7 @@ const VENUE_CSS = `
     font: inherit;
     font-size: 13px;
     line-height: 1;
-    transition: bottom 180ms ease, background-color 180ms ease;
+    transition: background-color 180ms ease;
   }
   .nlsb-toggle:hover {
     background: rgba(36, 43, 53, 0.94);
@@ -51,38 +55,127 @@ const VENUE_CSS = `
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
   }
-  .nlsb-root.nlsb-is-open .nlsb-toggle {
-    bottom: 222px;
-  }
-  .nlsb-bar {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    height: 210px;
+  .nlsb-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: grid;
     box-sizing: border-box;
-    padding: 9px 14px 10px;
-    background: rgba(12, 16, 22, 0.9);
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.28);
-    transform: translateY(100%);
+    padding: clamp(52px, 7vh, 76px) clamp(14px, 3vw, 44px) 64px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 24%, rgba(58, 79, 112, 0.34), transparent 38%),
+      linear-gradient(180deg, rgba(7, 10, 16, 0.97), rgba(11, 14, 20, 0.99));
+    opacity: 0;
+    transform: translateY(18px);
     visibility: hidden;
     pointer-events: none;
-    transition: transform 180ms ease, visibility 0s linear 180ms;
+    overscroll-behavior: contain;
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease,
+      visibility 0s linear 180ms;
   }
-  .nlsb-root.nlsb-is-open .nlsb-bar {
+  .nlsb-root.nlsb-is-open .nlsb-stage {
+    opacity: 1;
     transform: translateY(0);
     visibility: visible;
     pointer-events: auto;
     transition-delay: 0s;
   }
+  .nlsb-close {
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    z-index: 2;
+    min-height: 36px;
+    padding: 7px 13px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 999px;
+    background: rgba(18, 23, 31, 0.88);
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+  }
+  .nlsb-close:hover {
+    background: rgba(40, 48, 60, 0.96);
+  }
+  .nlsb-close:focus-visible {
+    outline: 2px solid #8dc8ff;
+    outline-offset: 2px;
+  }
+  .nlsb-stage-layout {
+    display: grid;
+    width: min(1180px, 100%);
+    min-height: 0;
+    margin: 0 auto;
+    grid-template-rows: minmax(170px, 40vh) minmax(0, 1fr);
+    gap: clamp(12px, 2vh, 22px);
+  }
+  .nlsb-center {
+    display: grid;
+    width: min(640px, 86vw);
+    min-height: 0;
+    box-sizing: border-box;
+    place-self: center;
+    align-content: center;
+    gap: 10px;
+    padding: clamp(24px, 5vh, 46px) clamp(22px, 5vw, 58px);
+    overflow: hidden;
+    border: 1px solid rgba(150, 193, 236, 0.34);
+    border-radius: 20px;
+    background:
+      linear-gradient(135deg, rgba(47, 63, 84, 0.92), rgba(19, 26, 37, 0.96)),
+      #151d29;
+    box-shadow:
+      0 24px 70px rgba(0, 0, 0, 0.42),
+      inset 0 0 50px rgba(119, 174, 226, 0.08);
+    text-align: center;
+  }
+  .nlsb-center-label {
+    color: #9fd1ff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+  }
+  .nlsb-center-title {
+    overflow: hidden;
+    font-size: clamp(18px, 2.4vw, 28px);
+    font-weight: 700;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nlsb-center-meta {
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+  }
+  .nlsb-seating {
+    min-height: 0;
+    box-sizing: border-box;
+    overflow: auto;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 16px;
+    background: rgba(9, 13, 19, 0.78);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
   .nlsb-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 24px;
-    margin-bottom: 6px;
+    min-height: 42px;
+    box-sizing: border-box;
+    padding: 9px 14px;
     gap: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(14, 19, 27, 0.96);
   }
   .nlsb-title {
     overflow: hidden;
@@ -99,14 +192,15 @@ const VENUE_CSS = `
   }
   .nlsb-seats {
     position: relative;
-    height: 116px;
+    min-height: 190px;
     box-sizing: border-box;
+    padding: 18px;
   }
   .nlsb-seats.nlsb-mode-packed {
     display: grid;
-    grid-template-columns: repeat(25, minmax(0, 1fr));
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-    gap: 4px 5px;
+    grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
+    grid-auto-rows: 44px;
+    gap: 8px;
   }
   .nlsb-seats.nlsb-mode-vip,
   .nlsb-seats.nlsb-mode-normal {
@@ -215,11 +309,11 @@ const VENUE_CSS = `
     box-sizing: border-box;
     align-items: center;
     gap: 10px;
-    margin-top: 5px;
-    padding: 5px 9px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.035);
+    margin: 0 14px 14px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
   }
   .nlsb-audience-label,
   .nlsb-audience-more {
@@ -255,11 +349,20 @@ const VENUE_CSS = `
     .nlsb-toggle {
       right: 10px;
     }
-    .nlsb-bar {
-      padding-right: 8px;
-      padding-left: 8px;
+    .nlsb-stage {
+      padding-right: 10px;
+      padding-left: 10px;
+    }
+    .nlsb-stage-layout {
+      grid-template-rows: minmax(140px, 34vh) minmax(0, 1fr);
+    }
+    .nlsb-center {
+      width: min(620px, 92vw);
+      border-radius: 14px;
     }
     .nlsb-seats {
+      padding-right: 10px;
+      padding-left: 10px;
       column-gap: 2px;
     }
     .nlsb-seats.nlsb-mode-packed .nlsb-icon {
@@ -276,9 +379,24 @@ const VENUE_CSS = `
       flex-basis: 44px;
     }
   }
+  @media (max-height: 560px) {
+    .nlsb-stage {
+      padding-top: 48px;
+      padding-bottom: 54px;
+    }
+    .nlsb-stage-layout {
+      grid-template-rows: minmax(110px, 30vh) minmax(0, 1fr);
+      gap: 10px;
+    }
+    .nlsb-center {
+      gap: 5px;
+      padding-top: 14px;
+      padding-bottom: 14px;
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .nlsb-toggle,
-    .nlsb-bar {
+    .nlsb-stage {
       transition: none;
     }
   }
@@ -344,19 +462,46 @@ export function mountVenueBarButton() {
 
   const root = document.createElement('div');
   root.id = ROOT_ID;
-  root.className = 'nlsb-root';
+  root.className = 'nlsb-root nlsb-full';
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.className = 'nlsb-toggle';
   toggle.textContent = '🏟 会場モード';
   toggle.setAttribute('aria-expanded', 'false');
-  toggle.setAttribute('aria-controls', 'nlsb-venue-bar');
+  toggle.setAttribute('aria-controls', 'nlsb-venue-stage');
 
-  const bar = document.createElement('section');
-  bar.id = 'nlsb-venue-bar';
-  bar.className = 'nlsb-bar';
-  bar.setAttribute('aria-label', '会場参加者');
+  const stage = document.createElement('section');
+  stage.id = 'nlsb-venue-stage';
+  stage.className = 'nlsb-stage';
+  stage.setAttribute('role', 'dialog');
+  stage.setAttribute('aria-modal', 'true');
+  stage.setAttribute('aria-label', '全画面会場モード');
+  stage.setAttribute('aria-hidden', 'true');
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'nlsb-close';
+  close.textContent = '✕ 閉じる';
+
+  const stageLayout = document.createElement('div');
+  stageLayout.className = 'nlsb-stage-layout';
+
+  const center = document.createElement('div');
+  center.className = 'nlsb-center';
+  const centerLabel = document.createElement('div');
+  centerLabel.className = 'nlsb-center-label';
+  centerLabel.textContent = '配信者ステージ';
+  const centerTitle = document.createElement('div');
+  centerTitle.className = 'nlsb-center-title';
+  centerTitle.textContent = String(document.title || '').trim() || '配信中の番組';
+  const centerMeta = document.createElement('div');
+  centerMeta.className = 'nlsb-center-meta';
+  centerMeta.textContent = liveIdFromPathname();
+  center.append(centerLabel, centerTitle, centerMeta);
+
+  const seating = document.createElement('div');
+  seating.className = 'nlsb-seating';
 
   const header = document.createElement('div');
   header.className = 'nlsb-header';
@@ -406,8 +551,10 @@ export function mountVenueBarButton() {
   audienceMore.hidden = true;
   audience.append(audienceLabel, audienceDots, audienceMore);
 
-  bar.append(header, seatsHost, audience);
-  root.append(toggle, bar);
+  seating.append(header, seatsHost, audience);
+  stageLayout.append(center, seating);
+  stage.append(close, stageLayout);
+  root.append(toggle, stage);
   document.documentElement.appendChild(root);
 
   let open = false;
@@ -415,6 +562,7 @@ export function mountVenueBarButton() {
   let pollTimer = 0;
   let pollInFlight = false;
   let activeLiveId = '';
+  let escapeListening = false;
   /** @type {Map<string, number>} */
   let seatByKey = new Map();
 
@@ -517,6 +665,25 @@ export function mountVenueBarButton() {
     }, POLL_INTERVAL_MS);
   };
 
+  /** @param {KeyboardEvent} event */
+  const onEscapeKey = (event) => {
+    if (event.key !== 'Escape' || !open) return;
+    userChangedOpen = true;
+    setOpen(false, true);
+  };
+
+  const addEscapeListener = () => {
+    if (escapeListening) return;
+    window.addEventListener('keydown', onEscapeKey);
+    escapeListening = true;
+  };
+
+  const removeEscapeListener = () => {
+    if (!escapeListening) return;
+    window.removeEventListener('keydown', onEscapeKey);
+    escapeListening = false;
+  };
+
   /**
    * @param {boolean} nextOpen
    * @param {boolean} persist
@@ -525,8 +692,14 @@ export function mountVenueBarButton() {
     open = nextOpen === true;
     root.classList.toggle('nlsb-is-open', open);
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) startPolling();
-    else stopPolling();
+    stage.setAttribute('aria-hidden', open ? 'false' : 'true');
+    if (open) {
+      addEscapeListener();
+      startPolling();
+    } else {
+      removeEscapeListener();
+      stopPolling();
+    }
     if (persist) {
       void chrome.storage.local.set({ [OPEN_STORAGE_KEY]: open }).catch(() => {});
     }
@@ -536,7 +709,18 @@ export function mountVenueBarButton() {
     userChangedOpen = true;
     setOpen(!open, true);
   });
-  window.addEventListener('pagehide', stopPolling, { once: true });
+  close.addEventListener('click', () => {
+    userChangedOpen = true;
+    setOpen(false, true);
+  });
+  window.addEventListener(
+    'pagehide',
+    () => {
+      stopPolling();
+      removeEscapeListener();
+    },
+    { once: true }
+  );
 
   void chrome.storage.local
     .get(OPEN_STORAGE_KEY)
