@@ -11088,7 +11088,14 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     const thumbRp = isHttpOrHttpsUrl(displayThumb)
       ? ' referrerpolicy="no-referrer"'
       : '';
-    const avatarHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async"${thumbRp}>`;
+    const avatarImgHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async"${thumbRp}>`;
+    // 原則「サムネ・ハンドル・ID はひとかたまり」: 数値 ID はサムネ+名前を同じアンカーで括る。
+    const roomLinkable = !isUnknown && /^\d{1,18}$/.test(String(r.userKey || ''));
+    const aOpen = (cls) => `<a class="${cls}" href="https://www.nicovideo.jp/user/${encodeURIComponent(String(r.userKey))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(label)} のユーザーページを開く">`;
+    const avatarHtml = roomLinkable ? `${aOpen('room-card__id-link')}${avatarImgHtml}</a>` : avatarImgHtml;
+    const nameHtml = roomLinkable
+      ? `${aOpen('room-card__id-link room-name')}${escapeHtml(label)}</a>`
+      : `<span class="room-name" title="${escapeHtml(r.userKey)}">${escapeHtml(label)}</span>`;
     const totalPercent = Math.max(6, Math.min(100, (r.count / maxTotal) * 100));
     const recentPercent =
       r.recentCount > 0 ? Math.max(4, Math.min(100, (r.recentCount / maxRecent) * 100)) : 0;
@@ -11096,38 +11103,18 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     const hint = isUnknown
       ? '<div class="room-hint">投稿者ID未取得のコメントをここにまとめています。</div>'
       : '';
-    li.innerHTML = compactRooms
-      ? `
+    // compact/full は「棒グラフ行の有無」だけ違う。共通部(アバター+名前+プレビュー+hint)を共有。
+    const barRowHtml = compactRooms
+      ? ''
+      : `<div class="room-bar-row"><div class="room-bar-track"><div class="room-bar-total" style="width:${totalPercent.toFixed(2)}%"></div><div class="room-bar-recent" style="width:${recentPercent.toFixed(2)}%"></div></div><span class="room-delta ${r.recentCount > 0 ? 'up' : ''}">${deltaLabel}</span></div>`;
+    const previewHtml = r.lastText ? `<div class="room-preview">${escapeHtml(r.lastText)}</div>` : '';
+    li.innerHTML = `
       <div class="room-card__row">
         ${avatarHtml}
         <div class="room-main">
-          <div class="room-name-row">
-            <span class="room-name" title="${escapeHtml(r.userKey)}">${escapeHtml(label)}</span>
-          </div>
-          ${r.lastText ? `<div class="room-preview">${escapeHtml(r.lastText)}</div>` : ''}
-          ${hint}
-        </div>
-      </div>
-    `
-      : `
-      <div class="room-card__row">
-        ${avatarHtml}
-        <div class="room-main">
-          <div class="room-name-row">
-            <span class="room-name" title="${escapeHtml(r.userKey)}">${escapeHtml(label)}</span>
-          </div>
-          <div class="room-bar-row">
-            <div class="room-bar-track">
-              <div class="room-bar-total" style="width:${totalPercent.toFixed(2)}%"></div>
-              <div class="room-bar-recent" style="width:${recentPercent.toFixed(2)}%"></div>
-            </div>
-            <span class="room-delta ${r.recentCount > 0 ? 'up' : ''}">${deltaLabel}</span>
-          </div>
-          ${
-            r.lastText
-              ? `<div class="room-preview">${escapeHtml(r.lastText)}</div>`
-              : ''
-          }
+          <div class="room-name-row">${nameHtml}</div>
+          ${barRowHtml}
+          ${previewHtml}
           ${hint}
         </div>
       </div>
@@ -20700,14 +20687,17 @@ async function initPopup() {
   // v0.1.668: パネルから直接コメビュを開く(従来は状態ページにしか入口が無く、コメント単位の
   //   操作・名前付け機能に気づけなかった)。lv は付けない=comeview 側が nls_last_watch_url
   //   から自己解決する(配信切替に追従)。disabled にしない=watch 未接続でも開ける。
-  $('openComeviewBtn')?.addEventListener('click', () => {
-    const url = chrome.runtime.getURL('comeview.html');
+  // コメビュを別窓で開く。voice=true なら ?voice=1 を付け読み上げ ON 起動(VOICEVOX 必須)。
+  const openComeviewWindow = (voice) => {
+    const url = chrome.runtime.getURL('comeview.html') + (voice ? '?voice=1' : '');
     try {
       chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
     } catch {
       window.open(url, '_blank', 'width=400,height=640');
     }
-  });
+  };
+  $('openComeviewBtn')?.addEventListener('click', () => openComeviewWindow(false));
+  $('openComeviewVoiceBtn')?.addEventListener('click', () => openComeviewWindow(true));
 
   // 0.1.69 (AY): empty state「前回の配信」cards から、その配信を新タブで開く。
   // dataset.watchUrl は applyLastBroadcastReviewToEmptyState() で設定される。

@@ -487,8 +487,15 @@ async function initializeVoiceReading() {
   _voiceAssignments = normalizeVoiceAssignments(bag[VOICE_ASSIGNMENTS_KEY]);
   _voiceReadNameEnabled = bag[VOICE_READ_NAME_KEY] === true;
   updateVoiceToggle();
-  if (bag[VOICE_READING_ENABLED_KEY] === true) {
-    await enableVoiceReading({ persist: false });
+  // ?voice=1 で起動された(パネルの「読み上げ」ボタン経由)場合は、保存状態に関わらず読み上げON。
+  let forceVoiceOn = false;
+  try {
+    forceVoiceOn = new URLSearchParams(window.location.search).get('voice') === '1';
+  } catch {
+    forceVoiceOn = false;
+  }
+  if (forceVoiceOn || bag[VOICE_READING_ENABLED_KEY] === true) {
+    await enableVoiceReading({ persist: forceVoiceOn });
   }
 }
 

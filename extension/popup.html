@@ -8992,6 +8992,22 @@
         font-size: 10.4px;
       }
 
+      /* サムネ・ハンドル名をひとかたまりのリンクに(数値IDのみ)。下線なし・ホバーで色変化。 */
+      .room-card__id-link {
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+      }
+      a.room-card__id-link.room-name:hover {
+        color: var(--nl-accent, #2f80ed);
+        text-decoration: underline;
+      }
+      .room-card__id-link:focus-visible {
+        outline: 2px solid var(--nl-accent, #2f80ed);
+        outline-offset: 2px;
+        border-radius: 6px;
+      }
+
       .room-preview {
         color: var(--nl-muted);
         font-size: 9.4px;
@@ -11308,6 +11324,17 @@
                 <span class="nl-compose-qbtn__row">
                   <span class="nl-compose-qbtn__emoji" aria-hidden="true">💬</span>
                   <span class="nl-compose-qbtn__word">コメビュ</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                id="openComeviewVoiceBtn"
+                title="読み上げONでコメビュを開く（VOICEVOX が必要）"
+                aria-label="コメントの読み上げをONにした状態でコメビュを別ウィンドウで開きます。読み上げには VOICEVOX が必要です。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">🔊</span>
+                  <span class="nl-compose-qbtn__word">読み上げ</span>
                 </span>
               </button>
             </div>

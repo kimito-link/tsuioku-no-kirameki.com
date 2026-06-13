@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.719',
+    date: '2026-06-13',
+    summary: 'サムネと名前を一体リンクに・読み上げボタン追加',
+    items: Object.freeze([
+      '参加者のサムネイルと名前をまとめて1つのリンクにし、どちらを押してもユーザーページが開くようにしました',
+      'パネルに「🔊 読み上げ」ボタンを追加し、読み上げONの状態でコメビュを開けるようにしました',
+      'ユーザーのサムネイルをより多く取得できるよう、1回に取りに行く人数を増やしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.718',
     date: '2026-06-13',
     summary: '会場を本物のライブ会場っぽく(後方を暗く)',
