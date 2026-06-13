@@ -1,6 +1,10 @@
 export const VOICEVOX_BASE_URL = 'http://127.0.0.1:50021';
 
-/** @typedef {(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>} FetchFn */
+/**
+ * fetch 互換関数。プロキシ経由の buffer 取得は Response 風オブジェクト
+ * ({ ok, status, arrayBuffer }) を返すため、戻り値はそれも許容する。
+ * @typedef {(input: RequestInfo | URL, init?: RequestInit) => Promise<Response | { ok: boolean, status: number, arrayBuffer: () => Promise<ArrayBuffer> }>} FetchFn
+ */
 
 /**
  * @param {unknown} value
@@ -10,6 +14,85 @@ export const VOICEVOX_BASE_URL = 'http://127.0.0.1:50021';
 function positiveTimeout(value, fallback) {
   const timeout = Number(value);
   return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
+}
+
+/**
+ * 拡張ページ(comeview.html / venue.html / popup.html)かどうかを判定する。
+ * 拡張ページは host_permissions で http://127.0.0.1:50021 へ直接 fetch でき、
+ * Background プロキシは不要(AbortSignal タイムアウトも効く)。
+ * Content Script(nicovideo.jp 上)だけプロキシが必要。
+ */
+function isExtensionPage() {
+  try {
+    return (
+      typeof chrome !== 'undefined' &&
+      chrome.runtime &&
+      typeof chrome.runtime.getURL === 'function' &&
+      typeof location !== 'undefined' &&
+      location.protocol === 'chrome-extension:'
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Chrome 拡張の Background 経由で fetch を行い CSP / Mixed Content を回避する。
+ * 拡張ページ(comeview.html 等)では直接 fetch を使う(プロキシ不要・タイムアウトが効く)。
+ * @param {string|URL} url
+ * @param {RequestInit} [init]
+ * @returns {Promise<Response>}
+ */
+async function proxyFetchFn(url, init) {
+  // 拡張ページなら直接 fetch(host_permissions が効く・AbortSignal も動く)
+  if (isExtensionPage()) {
+    return globalThis.fetch(url, init);
+  }
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    return new Promise((resolve, reject) => {
+      const safeInit = { ...init };
+      if ('signal' in safeInit) delete safeInit.signal;
+      chrome.runtime.sendMessage(
+        { type: 'NLS_FETCH_PROXY', url: url.toString(), init: safeInit, wantBuffer: false },
+        (res) => {
+          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          if (!res || res.error) return reject(new Error(res?.error || 'Proxy fetch failed'));
+          resolve(new Response(res.text, { status: res.status }));
+        }
+      );
+    });
+  }
+  return globalThis.fetch(url, init);
+}
+
+/**
+ * ArrayBuffer (音声WAV) を Background 経由で取得する。
+ * 拡張ページでは直接 fetch を使う。プロキシ経由では Response 風オブジェクト
+ * ({ ok, status, arrayBuffer }) を返す(SW から渡る buffer をラップ)。
+ * @param {string|URL} url
+ * @param {RequestInit} [init]
+ * @returns {Promise<Response | { ok: boolean, status: number, arrayBuffer: () => Promise<ArrayBuffer> }>}
+ */
+async function proxyFetchBufferFn(url, init) {
+  if (isExtensionPage()) {
+    return globalThis.fetch(url, init);
+  }
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    return new Promise((resolve, reject) => {
+      const safeInit = { ...init };
+      if ('signal' in safeInit) delete safeInit.signal;
+      chrome.runtime.sendMessage(
+        { type: 'NLS_FETCH_PROXY', url: url.toString(), init: safeInit, wantBuffer: true },
+        (res) => {
+          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          if (!res || res.error) return reject(new Error(res?.error || 'Proxy fetch failed'));
+          const uint8 = new Uint8Array(res.buffer);
+          resolve({ ok: res.ok, status: res.status, arrayBuffer: async () => uint8.buffer });
+        }
+      );
+    });
+  }
+  return globalThis.fetch(url, init);
 }
 
 /**
@@ -48,7 +131,7 @@ async function fetchWithTimeout(fetchFn, url, init, timeoutMs) {
  * @returns {Promise<boolean>}
  */
 export async function isVoicevoxAlive(opts = {}) {
-  const fetchFn = opts.fetchFn || globalThis.fetch;
+  const fetchFn = opts.fetchFn || proxyFetchFn;
   if (typeof fetchFn !== 'function') return false;
   const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
   try {
@@ -82,7 +165,7 @@ export function isWhisperStyleName(styleName) {
  * @returns {Promise<number[]>}
  */
 export async function listVoicevoxStyleIds(opts = {}) {
-  const fetchFn = opts.fetchFn || globalThis.fetch;
+  const fetchFn = opts.fetchFn || proxyFetchFn;
   if (typeof fetchFn !== 'function') return [];
   const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
   try {
@@ -130,7 +213,8 @@ export async function listVoicevoxStyleIds(opts = {}) {
  */
 export async function synthesizeVoice(text, voice, opts = {}) {
   const readingText = String(text || '').trim();
-  const fetchFn = opts.fetchFn || globalThis.fetch;
+  const fetchFn = opts.fetchFn || proxyFetchFn;
+  const fetchBufferFn = opts.fetchFn ? opts.fetchFn : proxyFetchBufferFn;
   if (!readingText || typeof fetchFn !== 'function') return null;
 
   const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
@@ -164,18 +248,21 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     audioQuery.pitchScale = (Number.isFinite(pitchScale) ? pitchScale : 0) + pitchOffset;
     audioQuery.speedScale = (Number.isFinite(speedScale) ? speedScale : 1) + speedOffset;
 
-    const synthesisResponse = await fetchWithTimeout(
-      fetchFn,
-      `${baseUrl}/synthesis?speaker=${encodeURIComponent(String(styleId))}`,
+    const synthesisRes = await fetchWithTimeout(
+      fetchBufferFn,
+      `${baseUrl}/synthesis?speaker=${styleId}`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'audio/wav'
+        },
         body: JSON.stringify(audioQuery)
       },
-      positiveTimeout(opts.synthesisTimeoutMs, 10_000)
+      positiveTimeout(opts.synthesisTimeoutMs, 8000)
     );
-    if (!synthesisResponse || synthesisResponse.ok === false) return null;
-    return await synthesisResponse.arrayBuffer();
+    if (!synthesisRes || synthesisRes.ok === false) return null;
+    return await synthesisRes.arrayBuffer();
   } catch {
     return null;
   }

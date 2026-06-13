@@ -86,6 +86,7 @@ import {
   upgradeAnonymousAvatarImage,
   upgradeAnonymousAvatarImages
 } from '../lib/avatarPartsComposer.js';
+import { isVoiceItemStale } from '../lib/voiceAgeGate.js';
 
 /** POP のタイムラインと同じ既定アバター(extension ルート相対・popup.html と同一)。 */
 const DEFAULT_TILE_IMG =
@@ -176,6 +177,7 @@ let _voicePlaying = false;
 let _voiceGeneration = 0;
 let _voiceStopCurrent = null;
 let _voiceSkipTimer = null;
+let _initialVoicesPrimed = false;
 
 /** @type {Array<{key:string,name:string,at:number}>} ユーザーNG リスト(storage 永続)。 */
 let _ngList = [];
@@ -244,7 +246,7 @@ function updateVoiceToggle() {
   button.disabled = _voiceToggleBusy;
   button.classList.toggle('is-on', _voiceReadingEnabled);
   button.setAttribute('aria-pressed', String(_voiceReadingEnabled));
-  button.textContent = _voiceReadingEnabled ? '🔊 読み上げ ON' : '🔊 読み上げ OFF';
+  button.textContent = _voiceReadingEnabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
   // v0.1.699: 名前読みトグル(読み上げON時だけ表示)。
   const nameBtn = document.getElementById('cvBtnVoiceName');
   if (nameBtn) {
@@ -364,9 +366,35 @@ async function drainVoiceQueue() {
   _voicePlaying = true;
   try {
     while (_voiceReadingEnabled && _voiceQueue.length) {
+      // PR-V2: キュー一括フラッシュ (catch-up drop)
+      const now = Date.now();
+      let allStale = true;
+      for (const qItem of _voiceQueue) {
+        if (!isVoiceItemStale(qItem.enqueuedAt, now, _voiceQueue.length, qItem.priority === 'high').stale) {
+          allStale = false;
+          break;
+        }
+      }
+      if (allStale && _voiceQueue.length > 0) {
+        const dropCount = _voiceQueue.length;
+        _voiceQueue = []; // 全て古い場合は一括で捨てる
+        showVoiceSkipped(dropCount);
+        break;
+      }
+
       const queueLength = _voiceQueue.length;
       const item = _voiceQueue.shift();
       if (!item) continue;
+
+      // PR-V1: 合成前の鮮度ゲート判定
+      const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
+      if (ageCheck.stale) {
+        showVoiceSkipped(1);
+        if (_voicePrefetch && _voicePrefetch.item === item) {
+          _voicePrefetch = null; // prefetch が stale 向けなら破棄
+        }
+        continue; // 読まずに捨てる
+      }
       const generation = _voiceGeneration;
       const congestion = computeVoiceCongestion(queueLength);
       const assigned = resolveVoiceForUser(
@@ -424,7 +452,15 @@ async function drainVoiceQueue() {
           try {
             const playResult = audio.play();
             if (playResult && typeof playResult.catch === 'function') {
-              void playResult.catch(finish);
+              playResult.catch((err) => {
+                if (err && err.name === 'NotAllowedError') {
+                  // リネーム漏れ修正: setVoiceStatus / updateVoiceToggle が正しい関数名。
+                  setVoiceStatus('⚠️ブラウザによりブロックされました。押し直してください');
+                  _voiceReadingEnabled = false;
+                  updateVoiceToggle();
+                }
+                finish();
+              });
             }
           } catch {
             finish();
@@ -444,18 +480,29 @@ function enqueueVoiceTimelineItems(items) {
   if (!_voiceReadingEnabled || isObsMode() || !Array.isArray(items)) return;
   let droppedCount = 0;
   for (const item of items) {
-    if (!item || item.kind !== 'comment') continue;
+    if (!item || (item.kind !== 'comment' && item.kind !== 'gift')) continue;
     // v0.1.699: 名前読みは既定OFF(本文だけ)。ONのときだけ「名前、本文」。
     const name = _voiceReadNameEnabled
       ? String(item.nickname || '').trim()
       : '';
-    const body = String(item.text || '').trim();
+    let body = '';
+    let isHighPriority = false;
+    if (item.kind === 'gift') {
+      isHighPriority = true;
+      const count = item.gift?.count > 1 ? `を${item.gift.count}個` : 'を';
+      body = `ギフト、${item.gift?.name || 'アイテム'}${count}贈りました。${item.gift?.message || ''}`.trim();
+    } else {
+      body = String(item.text || '').trim();
+    }
+
     if (!buildVoiceReadingText({ name, text: body })) continue;
     const candidate = {
       userKey: voiceUserKeyForItem(item),
       name,
       body,
-      count: 1
+      count: 1,
+      enqueuedAt: Date.now(),
+      priority: isHighPriority ? 'high' : 'normal'
     };
     const merged = mergeRepeatedVoiceItem(_voiceQueue, candidate);
     _voiceQueue = merged.queue;
@@ -1130,6 +1177,16 @@ async function performFullRefresh(forceBottom) {
     if (item.kind === 'gift') continue;
     rememberSeenCommentNo(commentNoOfComeviewRow(item));
   }
+
+  if (!_initialVoicesPrimed) {
+    _initialVoicesPrimed = true;
+    if (timeline.length > 0) {
+      // コメビュ起動直後に無音にならないよう、直近3件を読み上げる（primeEmit）
+      const primes = timeline.slice(Math.max(0, timeline.length - 3));
+      enqueueVoiceTimelineItems(primes);
+    }
+  }
+
   pickUnseenComeviewGifts(_giftRows, _seenGiftAtBySig);
   trimSeenGiftSigs();
   updateCommentCount();

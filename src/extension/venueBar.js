@@ -39,6 +39,8 @@ import {
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
+// 別窓化で開閉状態の永続化を一旦停止(1541 はコメントアウト中)。復活に備えキーは残す。
+// eslint-disable-next-line no-unused-vars
 const OPEN_STORAGE_KEY = 'nls_venue_open';
 const AGGREGATE_INTERVAL_MS = 30_000;
 const SPEECH_INTERVAL_MS = 1_500;
@@ -231,7 +233,7 @@ const VENUE_CSS = `
     align-self: end;
     display: grid;
     width: 100%;
-    max-height: 35vh;
+    max-height: 55vh;
     min-height: 0;
     box-sizing: border-box;
     grid-template-areas:
@@ -312,7 +314,7 @@ const VENUE_CSS = `
     flex-direction: column-reverse;
     align-items: stretch;
     justify-content: flex-end;
-    gap: clamp(6px, 1.4vh, 16px);
+    gap: clamp(0px, 0.2vh, 4px);
     min-height: 0;
     box-sizing: border-box;
     padding: clamp(10px, 2vh, 22px) 14px;
@@ -320,10 +322,10 @@ const VENUE_CSS = `
      * 横スクロールバー根絶(ユーザー不満「位置がずれてスクロールバーが出て変な動きで
      * 見えなくなる」): 同時表示人数は selectStableVisibleMembers で行に収まる数に制限済み
      * なので横溢れは起きないが、保険として overflow-x:hidden で横スクロールを構造的に殺す。
-     * 縦も clip(段数が増えても下端 35vh に収め、映像へはみ出さない)。
+     * 縦も clip(段数が増えても下端 35vh に収め、映像へはみ出さない)。 -> 見切れる不満解消のため auto に変更
      */
     overflow-x: hidden;
-    overflow-y: hidden;
+    overflow-y: auto;
     background:
       radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.16), transparent 62%);
     overscroll-behavior: contain;
@@ -340,9 +342,9 @@ const VENUE_CSS = `
     display: flex;
     width: 100%;
     max-width: 100%;
-    flex: 0 0 auto;
-    /* 1段に収まらない時は折り返す(横にはみ出して横スクロールを出さない=ユーザー不満の根治)。 */
-    flex-wrap: wrap;
+    flex: 0 1 auto;
+    /* 縦溢れ防止(見切れ根絶): wrapさせず縮小させて1段に収め、SHOWROOM的な密集感を出す */
+    flex-wrap: nowrap;
     align-items: flex-end;
     justify-content: center;
     box-sizing: border-box;
@@ -356,11 +358,16 @@ const VENUE_CSS = `
   .nlsb-tier[hidden] {
     display: none;
   }
+  .nlsb-seats.nlsb-mode-normal .nlsb-tier {
+    gap: clamp(0px, 0.5vw, 8px);
+  }
   .nlsb-seats.nlsb-mode-vip .nlsb-tier {
     gap: clamp(18px, 3vw, 52px);
   }
-  .nlsb-seats.nlsb-mode-normal .nlsb-tier {
-    gap: clamp(12px, 2vw, 30px);
+  .nlsb-seats.nlsb-mode-normal .nlsb-seat {
+    width: clamp(48px, 8vw, 100px);
+    flex: 0 1 auto;
+    /* justify-content: center で左右余白ができるので、詰める場合はマイナスマージンで重ねるのも手 */
   }
   .nlsb-seats.nlsb-mode-packed .nlsb-tier {
     gap: 8px;
@@ -380,6 +387,20 @@ const VENUE_CSS = `
     overflow: visible;
   }
   .nlsb-seat.nlsb-is-empty {
+    /* display: none; */
+    opacity: 0.12;
+    pointer-events: none;
+    filter: blur(0.5px);
+  }
+  .nlsb-seat.nlsb-is-empty .nlsb-icon {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: transparent;
+    box-shadow: none;
+    background-image: 
+      radial-gradient(circle at 50% 35%, #fff 25%, transparent 26%),
+      radial-gradient(circle at 50% 120%, #fff 55%, transparent 56%);
+  }
+  .nlsb-seat.nlsb-is-empty .nlsb-name {
     display: none;
   }
   .nlsb-seats.nlsb-mode-packed .nlsb-seat {
@@ -391,9 +412,9 @@ const VENUE_CSS = `
   .nlsb-seats.nlsb-mode-vip .nlsb-seat {
     width: clamp(120px, 14vw, 168px);
   }
-  /* 通常(≤30人): 大きめアバターを画面いっぱいに敷き詰める。 */
+  /* 通常(≤30人): 大きめアバターを画面いっぱいに敷き詰める。はみ出し時は縮小させる */
   .nlsb-seats.nlsb-mode-normal .nlsb-seat {
-    width: clamp(84px, 9vw, 120px);
+    width: clamp(48px, 9vw, 120px);
   }
   .nlsb-icon {
     position: relative;
@@ -443,15 +464,19 @@ const VENUE_CSS = `
     white-space: nowrap;
   }
   /* 数値 ID 持ち=クリックでユーザーページへ飛べるリンク。会場は開時のみ操作可能。 */
-  .nlsb-name-link {
+  a.nlsb-seat-link,
+  .nlsb-seat.nlsb-seat-link {
     cursor: pointer;
     pointer-events: auto;
   }
-  .nlsb-name-link:hover {
+  .nlsb-seat-link:hover .nlsb-name {
     color: #bfe1ff;
     text-decoration: underline;
   }
-  .nlsb-name-link:focus-visible {
+  .nlsb-seat-link:hover .nlsb-icon {
+    border-color: rgba(191, 225, 255, 0.6);
+  }
+  .nlsb-seat-link:focus-visible {
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
     border-radius: 3px;
@@ -469,10 +494,10 @@ const VENUE_CSS = `
     text-align: center;
   }
   .nlsb-seats.nlsb-mode-normal .nlsb-icon {
-    width: clamp(64px, 7vw, 92px);
-    height: clamp(64px, 7vw, 92px);
+    width: clamp(32px, 7vw, 92px);
+    height: clamp(32px, 7vw, 92px);
     flex-basis: auto;
-    font-size: clamp(22px, 3vw, 32px);
+    font-size: clamp(14px, 3vw, 32px);
   }
   .nlsb-seats.nlsb-mode-normal .nlsb-name {
     max-width: 100%;
@@ -515,9 +540,6 @@ const VENUE_CSS = `
     max-width: min(30ch, 40vw);
     padding: 9px 13px;
     overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
     border: 1px solid rgba(20, 29, 42, 0.16);
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.97);
@@ -531,7 +553,7 @@ const VENUE_CSS = `
     word-break: break-all;
     pointer-events: none;
     text-shadow: none;
-    transform: translate(-50%, -100%);
+    transform: translateY(-100%);
     white-space: normal;
     animation: nlsb-bubble-pop 160ms ease-out;
     transition: opacity ${BUBBLE_FADE_MS}ms ease;
@@ -539,7 +561,7 @@ const VENUE_CSS = `
   .nlsb-bubble::after {
     position: absolute;
     top: 100%;
-    left: 50%;
+    left: var(--nlsb-bubble-tail-x, 50%);
     width: 0;
     height: 0;
     border: 7px solid transparent;
@@ -553,12 +575,18 @@ const VENUE_CSS = `
   @keyframes nlsb-bubble-pop {
     from {
       opacity: 0;
-      transform: translate(-50%, calc(-100% + 6px)) scale(0.96);
+      transform: translateY(calc(-100% + 6px)) scale(0.96);
     }
     to {
       opacity: 1;
-      transform: translate(-50%, -100%);
+      transform: translateY(-100%);
     }
+  }
+  .nlsb-bubble-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
   }
   .nlsb-empty-message {
     display: none;
@@ -670,6 +698,7 @@ function colorFromKey(key) {
   return `hsl(${(hash >>> 0) % 360}, 68%, 46%)`;
 }
 
+/** @type {string|null} */
 let _forcedLiveId = null;
 
 /**
@@ -693,27 +722,30 @@ function ensureVenueStyle() {
  * @param {number} seatIndex
  */
 function createSeatNode(seatIndex) {
-  const seat = document.createElement('div');
+  const seat = document.createElement('a');
   seat.className = 'nlsb-seat nlsb-is-empty';
   seat.dataset.seatIndex = String(seatIndex);
   seat.setAttribute('aria-hidden', 'true');
+  seat.target = '_blank';
+  seat.rel = 'noopener noreferrer';
+  seat.style.textDecoration = 'none';
+  seat.style.color = 'inherit';
 
-  const icon = document.createElement('span');
+  const icon = document.createElement('div');
   icon.className = 'nlsb-icon';
   const avatar = document.createElement('img');
   avatar.className = 'nlsb-avatar';
   avatar.alt = '';
-  avatar.loading = 'lazy';
+  avatar.decoding = 'async';
+  avatar.referrerPolicy = 'no-referrer';
   avatar.hidden = true;
-  const fallback = document.createElement('span');
+  const fallback = document.createElement('div');
   fallback.className = 'nlsb-icon-fallback';
   icon.append(avatar, fallback);
-  // 原則「サムネ・ハンドルネーム・ID アンカー必須」: 名前はリンク化できる <a> で持つ。
-  //   数値 ID があるときだけ href を入れてユーザーページへ。匿名は href なし(ただの文字)。
-  const name = document.createElement('a');
+  // 原則「サムネ・ハンドルネーム・ID アンカー必須」: 名前は span で持つ。
+  // 親の seat が <a> なので全体がリンクになる。
+  const name = document.createElement('span');
   name.className = 'nlsb-name';
-  name.target = '_blank';
-  name.rel = 'noopener noreferrer';
   seat.append(icon, name);
   avatar.addEventListener('load', () => {
     if (avatar.dataset.avatar !== avatar.getAttribute('src')) return;
@@ -722,10 +754,10 @@ function createSeatNode(seatIndex) {
   });
   avatar.addEventListener('error', () => {
     if (avatar.dataset.avatar !== avatar.getAttribute('src')) return;
-    // http サムネが読めない(dead リンク/403)とき、色アイコンでなくゆっくり顔へ差し替える。
-    //   会場が色アイコンだらけにならず華やかに。差し替え後の data URL は必ず描画できる。
-    const face = avatar.dataset.fallbackFace || '';
-    if (face && avatar.getAttribute('src') !== face) {
+    // http サムネが読めない(設定なし/404)ときは、ニコニコ公式の「設定なし」アイコンを出す。
+    // ユーザー方針「サムネ設定なしはそのままだしたほうがいい」に基づく。
+    const face = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
+    if (avatar.getAttribute('src') !== face) {
       avatar.dataset.avatar = face;
       avatar.src = face;
       avatar.hidden = false;
@@ -834,7 +866,7 @@ export function mountVenueBarButton(options = {}) {
   voiceBtn.type = 'button';
   voiceBtn.className = 'nlsb-comeview-btn nlsb-voice-btn';
   voiceBtn.style.marginLeft = '8px';
-  voiceBtn.textContent = '🔊 読み上げ OFF';
+  voiceBtn.textContent = '🔈 読み上げ: OFF';
   
   const voiceStatus = document.createElement('span');
   voiceStatus.className = 'nlsb-voice-status';
@@ -902,6 +934,17 @@ export function mountVenueBarButton(options = {}) {
   safeArea.className = 'nlsb-safe-area';
   safeArea.setAttribute('aria-hidden', 'true');
 
+  if (isStandalone && liveIdFromPathname()) {
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://live.nicovideo.jp/embed/${liveIdFromPathname()}`;
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    iframe.style.pointerEvents = 'auto'; // 操作可能にする
+    safeArea.appendChild(iframe);
+    safeArea.style.pointerEvents = 'auto';
+  }
+
   // seating は下端のひな壇だけ(header + seats)。
   seating.append(header, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
@@ -916,16 +959,18 @@ export function mountVenueBarButton(options = {}) {
   parent.appendChild(root);
 
   let open = false;
+  // 別窓化リファクタで参照側が外れ書込専用に(復活に備え代入は残す)。
+  // eslint-disable-next-line no-unused-vars
   let userChangedOpen = false;
 
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
-    onToggle: (enabled, readNameEnabled, toggleBusy) => {
+    onToggle: (/** @type {boolean} */ enabled, /** @type {boolean} */ readNameEnabled, /** @type {boolean} */ toggleBusy) => {
       voiceBtn.disabled = toggleBusy;
       voiceBtn.classList.toggle('is-on', enabled);
-      voiceBtn.textContent = enabled ? '🔊 読み上げ ON' : '🔊 読み上げ OFF';
+      voiceBtn.textContent = enabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
     },
-    onStatus: (msg) => {
+    onStatus: (/** @type {string} */ msg) => {
       voiceStatus.textContent = msg;
     },
     onSkip: () => {},
@@ -1022,7 +1067,12 @@ export function mountVenueBarButton(options = {}) {
     if (!text) return;
     const element = document.createElement('div');
     element.className = 'nlsb-bubble';
-    element.textContent = text;
+    
+    const textSpan = document.createElement('span');
+    textSpan.className = 'nlsb-bubble-text';
+    textSpan.textContent = text;
+    element.appendChild(textSpan);
+    
     element.setAttribute('aria-hidden', 'true');
     // 会議確定A: 席ノードでなく最上位レイヤーへ描く(overflow:hidden に切られない)。
     bubbleLayer.appendChild(element);
@@ -1075,6 +1125,7 @@ export function mountVenueBarButton(options = {}) {
     };
     const anchor = bubbleAnchorForSeatRect(rel, BUBBLE_ANCHOR_GAP);
     const h = bubble.element.offsetHeight || 40;
+    const bw = bubble.element.offsetWidth || 160;
     // 既存の表示中吹き出し(自分以外)の占有帯を集めて衝突回避。
     const placed = [];
     for (const b of activeBubbles) {
@@ -1086,10 +1137,19 @@ export function mountVenueBarButton(options = {}) {
       vGap: 8,
       minY: 8
     });
+    
+    // 画面端で見切れないようにX座標をクランプする
+    let targetLeft = anchor.x - bw / 2;
+    const maxLeft = window.innerWidth - bw - 8;
+    if (targetLeft < 8) targetLeft = 8;
+    if (targetLeft > maxLeft) targetLeft = maxLeft;
+    const tailOffset = anchor.x - targetLeft;
+
     bubble._x = anchor.x;
     bubble._y = y;
     bubble._h = h;
-    bubble.element.style.left = `${anchor.x}px`;
+    bubble.element.style.setProperty('--nlsb-bubble-tail-x', `${tailOffset}px`);
+    bubble.element.style.left = `${targetLeft}px`;
     bubble.element.style.top = `${y}px`;
   };
 
@@ -1127,13 +1187,13 @@ export function mountVenueBarButton(options = {}) {
     //   直近発言者は selectStableVisibleMembers で必ず表示に含め、席順は安定(ちらつかない)。
     const seatAreaWidth = seatsHost.clientWidth || window.innerWidth || 1280;
     const seatMinWidth =
-      seating.layoutMode === 'vip' ? 150 : seating.layoutMode === 'normal' ? 104 : 76;
+      seating.layoutMode === 'vip' ? 150 : seating.layoutMode === 'normal' ? 84 : 68;
     const perRow = seatsPerRow(seatAreaWidth - 28, seatMinWidth);
     const visibleSeatCount = resolveVisibleArenaCount({
       totalCount: seating.seats.length,
       perRow,
-      rows: 3,
-      hardCap: 40
+      rows: 6,
+      hardCap: VENUE_FULLSCREEN_MAX_SEATS
     });
     const visibleSeats = selectStableVisibleMembers(
       seating.seats,
@@ -1141,11 +1201,14 @@ export function mountVenueBarButton(options = {}) {
       spokenUserIds,
       (entry) => String(entry?.participant?.userId || entry?.participant?.key || '').trim()
     );
+    const visibleSeatKeys = new Set(visibleSeats.map(entry => entry.participant.key));
+
     // アリーナ席は名前付き + しゃべった匿名(promote)。それ以外の匿名は後方の観客席へ
     // ゆっくり顔で表示し、上限超過分だけ人数で補う。
     const { totalAnonymous } = collectAudienceFaceUserIds(rows, {
       isGenericName: isGenericComeviewName,
-      promoteUserIds: spokenUserIds
+      promoteUserIds: spokenUserIds,
+      excludeKeys: visibleSeatKeys
     });
     title.textContent =
       totalAnonymous > 0
@@ -1166,6 +1229,9 @@ export function mountVenueBarButton(options = {}) {
       node.seat.setAttribute('aria-hidden', 'true');
       node.seat.removeAttribute('title');
       delete node.seat.dataset.tierIndex;
+      if (node.seat.parentElement) {
+        node.seat.parentElement.removeChild(node.seat);
+      }
     }
 
     const tiers = buildVenueTiers(visibleSeats.length);
@@ -1238,14 +1304,12 @@ export function mountVenueBarButton(options = {}) {
         // 原則のリンク部分: 数値 ID があるときだけユーザーページへ飛べるアンカーにする。
         //   匿名(ID なし)は href を外し、ただの文字として見せる(リンク偽装しない)。
         if (pageUrl) {
-          node.name.setAttribute('href', pageUrl);
-          node.name.classList.add('nlsb-name-link');
-          node.name.title = `${displayName} のユーザーページを開く`;
-          node.seat.title = displayName;
+          node.seat.setAttribute('href', pageUrl);
+          node.seat.classList.add('nlsb-seat-link');
+          node.seat.title = `${displayName} のユーザーページを開く`;
         } else {
-          node.name.removeAttribute('href');
-          node.name.classList.remove('nlsb-name-link');
-          node.name.title = '';
+          node.seat.removeAttribute('href');
+          node.seat.classList.remove('nlsb-seat-link');
           node.seat.title = displayName;
         }
         node.seat.classList.remove('nlsb-is-empty');
@@ -1357,14 +1421,18 @@ export function mountVenueBarButton(options = {}) {
         renderSeats(baseRows);
       }
       for (const speech of result.speeches) {
-        showSpeechBubble(speech);
-        voicePlayer.enqueue([{
-          kind: 'comment',
-          userId: speech.userId,
-          nickname: speech.name,
-          key: speech.key,
-          text: speech.body
-        }]);
+        if (voicePlayer.enabled) {
+          voicePlayer.enqueue([{
+            kind: 'comment',
+            userId: speech.userId,
+            nickname: speech.name,
+            key: speech.key,
+            text: speech.text,
+            onPlayStart: () => showSpeechBubble(speech)
+          }]);
+        } else {
+          showSpeechBubble(speech);
+        }
       }
     } catch {
       // 一時的に storage を読めない場合は、基準を進めず次回の軽量ポーリングへ任せる。
@@ -1373,7 +1441,7 @@ export function mountVenueBarButton(options = {}) {
     }
   };
 
-  const handleStorageChange = (changes, areaName) => {
+  const handleStorageChange = (/** @type {any} */ changes, /** @type {string} */ areaName) => {
     if (areaName !== 'local' || !open) return;
     const liveId = liveIdFromPathname();
     if (!liveId) return;
@@ -1473,7 +1541,8 @@ export function mountVenueBarButton(options = {}) {
       resetSpeechTracking();
     }
     if (persist) {
-      void chrome.storage.local.set({ [OPEN_STORAGE_KEY]: open }).catch(() => {});
+      // ユーザー要望により状態を復元しなくなったため、保存も無効化する
+      // void chrome.storage.local.set({ [OPEN_STORAGE_KEY]: open }).catch(() => {});
     }
   };
 
@@ -1499,16 +1568,13 @@ export function mountVenueBarButton(options = {}) {
   if (isStandalone) {
     setOpen(true, false);
   } else {
-    void chrome.storage.local
-      .get(OPEN_STORAGE_KEY)
-      .then((bag) => {
-        if (!userChangedOpen) setOpen(bag?.[OPEN_STORAGE_KEY] === true, false);
-      })
-      .catch(() => {});
+    // ユーザー要望: 「開いた瞬間会場モードになるのやめたほういいかも。過去のなにかをひきずるような」
+    // ページロード時は常に閉じた状態からスタートし、意図して開く形にする。
+    setOpen(false, false);
   }
 }
 
-export function mountVenueStandalone(liveId) {
+export function mountVenueStandalone(/** @type {string} */ liveId) {
   _forcedLiveId = liveId;
   mountVenueBarButton({ standalone: true });
 }

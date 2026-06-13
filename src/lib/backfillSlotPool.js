@@ -68,7 +68,7 @@ export async function runInBackfillSlot(tryAcquire, fn, opts = {}) {
   const names = backfillSlotLockNames(opts.slots);
   for (let i = 0; i < names.length; i += 1) {
     // 各スロットを順に試す。取れた枠で fn を実行し、取れなければ次の枠へ。
-    // eslint-disable-next-line no-await-in-loop
+     
     const res = await tryAcquire(names[i], fn);
     if (res && res.ran) {
       return { ran: true, slotIndex: i };

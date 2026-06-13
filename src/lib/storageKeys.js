@@ -259,6 +259,12 @@ export const KEY_SELF_POSTED_RECENTS = 'nls_self_posted_recents';
 export const KEY_USER_COMMENT_PROFILE_CACHE = 'nls_user_comment_profile_v1';
 
 /**
+ * v0.1.720 PR-T2: ユーザー情報解決（nvapi）のリトライ状態・バックオフ管理。
+ * 値: { [userId]: { status, retryCount, updatedAt, nextRetryAt, httpStatus? } }
+ */
+export const KEY_PROFILE_RESOLVE_STATE = 'nls_profile_resolve_state_v1';
+
+/**
  * v0.1.533: コメンター（数値 userId）のフォロー/フォロワー数・プレミアム・LV を
  * userId 単位でためる横断キャッシュ（live を跨いで再利用）。レポートで「フォロワー数」を
  * 出すために使う。レート制限回避のため、巡回ごとに上位 N 名だけを数件ずつ取得し、

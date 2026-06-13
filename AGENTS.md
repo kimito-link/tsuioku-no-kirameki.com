@@ -85,7 +85,7 @@ src/                   ← LP 側 + 純粋関数ライブラリ
     promo-tile-440x280.jpg       プロモタイル(小)
     marquee-1400x560.jpg         マーキー
 
-tsuioku-no-kirameki/   ← 本番 LP の配信ディレクトリ（GitHub Webhook で XServer に deploy）
+tsuioku-no-kirameki/   ← 本番 LP の配信ディレクトリ（GitHub Webhook で Cloudflare Pages に deploy）
   index.html           ← LP 本体
   privacy.html         ← プライバシーポリシー
   google7e3e79636d884c2.html   Search Console 所有権確認（残置）
@@ -140,7 +140,7 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 
 ## 8. デプロイ / CI
 
-- **LP**: `master` ブランチへ push すると、XServer 側の GitHub Webhook が自動で `tsuioku-no-kirameki/` 配下を本番反映する。ビルド手順は不要
+- **LP**: `master` ブランチへ push すると、Cloudflare Pages の連携が自動で `tsuioku-no-kirameki/` 配下を本番反映する。ビルド手順は不要
 - **拡張 ZIP**: `python scripts/stage-submission.py <version>` で一括生成
   - 生成物: `build/submission-<version>/` と `build/tsuioku-no-kirameki-<version>.zip`
   - スクリプトが自動でやること: (1) dev manifest から localhost / 127.0.0.1 を落とす (2) description の「（開発識別子: nicolivelog）」サフィックスを落とす (3) ホワイトリストで必要な画像だけコピー (4) ZIP 出力前に全エントリがフォワードスラッシュか検証

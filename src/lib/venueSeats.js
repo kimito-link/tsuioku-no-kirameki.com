@@ -63,16 +63,18 @@ export function resolveVenueLayoutMode(arenaCount) {
  *
  * @param {{ userId?: string, name?: string }} row 正規化済み行(normalizeComeviewRow 形)
  * @param {(name: string) => boolean} [isGenericName] 汎用プレースホルダ名判定(comeviewRows から注入)
- * @param {Set<string>|null} [promoteUserIds] しゃべった匿名 userId(名前無しでもアリーナ昇格)
+ * @param {Set<string>|null} [_promoteUserIds] (互換のため残置・現在は未使用)
+ *   2026-06-14 方針変更で「userId があれば promote 有無に関わらずアリーナ」に。引数は呼び出し
+ *   側互換のため残す(位置引数)。
  * @returns {string|null} アリーナ席のキー、または匿名/無名なら null
  */
-export function venueParticipantKey(row, isGenericName, promoteUserIds) {
+export function venueParticipantKey(row, isGenericName, _promoteUserIds) {
   if (!row || typeof row !== 'object') return null;
   const uid = String(row.userId || '').trim();
-  // ユーザー方針(2026-06-13)「しゃべった匿名もアリーナに出して吹かせる」: 発言した匿名は
-  //   userId をキーにアリーナ資格を与える(追憶は匿名を userId でタグ付け/ランキングできる)。
-  //   promoteUserIds に含まれる userId は名前が無くてもアリーナに座れる。
-  if (uid && promoteUserIds instanceof Set && promoteUserIds.has(uid)) {
+  // ユーザー方針(2026-06-14)「匿名もいれたほうが満員感が出る」: 
+  // 匿名(184)でも userId があればアリーナに座れるようにする。
+  // promoteUserIds に限らず userId があればキーを返す。
+  if (uid) {
     return `u:${uid}`;
   }
   const name = String(row.name || '').trim();
@@ -223,16 +225,23 @@ export function assignVenueSeats(ranked, prevSeatByKey, maxSeats = VENUE_MAX_SEA
  * @param {Array<Record<string, unknown>>} rows 正規化済み発言行
  * @param {(name: string) => boolean} [isGenericName]
  * @param {Set<string>|null} [promoteUserIds] しゃべった匿名(アリーナ昇格)は観客から除外
+ * @param {Set<string>|null} [excludeKeys] アリーナに実際に座っている人のキー(観客から除外)
  * @returns {number}
  */
-export function countAnonymousParticipants(rows, isGenericName, promoteUserIds) {
+export function countAnonymousParticipants(rows, isGenericName, promoteUserIds, excludeKeys = null) {
   const list = Array.isArray(rows) ? rows : [];
   const promote = promoteUserIds instanceof Set ? promoteUserIds : null;
   /** @type {Set<string>} */
   const anonUids = new Set();
   let hasUidlessAnon = false;
+  const exclude = excludeKeys instanceof Set ? excludeKeys : null;
   for (const r of list) {
-    if (venueParticipantKey(r, isGenericName, promote)) continue; // アリーナ資格者(昇格含む)は除外
+    const key = venueParticipantKey(r, isGenericName, promote);
+    // アリーナに実際に座っている人(excludeKeys)だけを観客から除外する。
+    // アリーナからあふれた人は観客席に落ちる。
+    if (exclude && key && exclude.has(key)) continue;
+    if (!exclude && key) continue; // 互換性のため excludeKeys がない場合は有資格者を全て除外
+
     const uid = String(r?.userId || '').trim();
     if (uid) anonUids.add(uid);
     else hasUidlessAnon = true;
@@ -252,7 +261,7 @@ export const VENUE_AUDIENCE_FACE_MAX = 120;
  * 直近にしゃべった順(capturedAt 降順)で cap 内に入れる=最近の人を優先表示。
  *
  * @param {Array<Record<string, unknown>>} rows 正規化済み発言行
- * @param {{ isGenericName?: (name: string) => boolean, max?: number, promoteUserIds?: Set<string>|null }} [opts]
+ * @param {{ isGenericName?: (name: string) => boolean, max?: number, promoteUserIds?: Set<string>|null, excludeKeys?: Set<string>|null }} [opts]
  * @returns {{ faceUserIds: string[], totalAnonymous: number }}
  *   faceUserIds=顔を出す匿名 userId(最大 max・直近順) / totalAnonymous=匿名総数(テキスト用)
  */
@@ -264,11 +273,16 @@ export function collectAudienceFaceUserIds(rows, opts = {}) {
     Number.isFinite(opts.max) && opts.max > 0
       ? Math.floor(opts.max)
       : VENUE_AUDIENCE_FACE_MAX;
+  const excludeKeys = opts.excludeKeys instanceof Set ? opts.excludeKeys : null;
   /** @type {Map<string, number>} userId→最終発言時刻(最新を優先表示) */
   const lastAtByUid = new Map();
   let hasUidlessAnon = false;
   for (const r of list) {
-    if (venueParticipantKey(r, isGenericName, promote)) continue; // アリーナ資格者(昇格含む)は観客でない
+    const key = venueParticipantKey(r, isGenericName, promote);
+    // 実際にアリーナに座っている人を観客から除外する(あふれた人は観客席へ)
+    if (excludeKeys && key && excludeKeys.has(key)) continue;
+    if (!excludeKeys && key) continue; // 互換性フォールバック
+
     const uid = String(r?.userId || '').trim();
     if (!uid) {
       hasUidlessAnon = true;
@@ -390,7 +404,8 @@ export function buildVenueTiers(seatCount, opts = {}) {
   else if (n <= frontMax * 2) rowCount = 2;
   else if (n <= frontMax * 4) rowCount = 3;
   else if (n <= frontMax * 7) rowCount = 4;
-  else rowCount = 5;
+  else if (n <= frontMax * 11) rowCount = 5;
+  else rowCount = 6;
 
   // 各段の「重み」: 奥ほど横に広い(後方客席が広がる)ので段が増えるごとに +25%。
   const weights = [];
