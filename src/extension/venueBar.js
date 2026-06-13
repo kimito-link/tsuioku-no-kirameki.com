@@ -7,6 +7,13 @@ const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
 const OPEN_STORAGE_KEY = 'nls_venue_open';
 const POLL_INTERVAL_MS = 1500;
+const AUDIENCE_DOT_MAX = 60;
+const VENUE_LAYOUT_CLASSES = [
+  'nlsb-mode-empty',
+  'nlsb-mode-vip',
+  'nlsb-mode-normal',
+  'nlsb-mode-packed'
+];
 
 /** @typedef {NonNullable<ReturnType<typeof normalizeComeviewRow>>} VenueRow */
 
@@ -45,14 +52,14 @@ const VENUE_CSS = `
     outline-offset: 2px;
   }
   .nlsb-root.nlsb-is-open .nlsb-toggle {
-    bottom: 172px;
+    bottom: 222px;
   }
   .nlsb-bar {
     position: absolute;
     right: 0;
     bottom: 0;
     left: 0;
-    height: 160px;
+    height: 210px;
     box-sizing: border-box;
     padding: 9px 14px 10px;
     background: rgba(12, 16, 22, 0.9);
@@ -91,11 +98,33 @@ const VENUE_CSS = `
     white-space: nowrap;
   }
   .nlsb-seats {
+    position: relative;
+    height: 116px;
+    box-sizing: border-box;
+  }
+  .nlsb-seats.nlsb-mode-packed {
     display: grid;
     grid-template-columns: repeat(25, minmax(0, 1fr));
     grid-template-rows: repeat(2, minmax(0, 1fr));
     gap: 4px 5px;
-    height: 110px;
+  }
+  .nlsb-seats.nlsb-mode-vip,
+  .nlsb-seats.nlsb-mode-normal {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    align-items: center;
+    justify-content: center;
+  }
+  .nlsb-seats.nlsb-mode-vip {
+    gap: 10px 28px;
+  }
+  .nlsb-seats.nlsb-mode-normal {
+    gap: 6px 12px;
+  }
+  .nlsb-seats.nlsb-mode-empty {
+    display: grid;
+    place-items: center;
   }
   .nlsb-seat {
     display: flex;
@@ -107,6 +136,23 @@ const VENUE_CSS = `
   }
   .nlsb-seat.nlsb-is-empty {
     visibility: hidden;
+  }
+  .nlsb-seats.nlsb-mode-vip .nlsb-seat,
+  .nlsb-seats.nlsb-mode-normal .nlsb-seat {
+    flex-direction: column;
+  }
+  .nlsb-seats.nlsb-mode-vip .nlsb-seat {
+    width: 112px;
+    gap: 6px;
+  }
+  .nlsb-seats.nlsb-mode-normal .nlsb-seat {
+    flex: 0 1 72px;
+    gap: 3px;
+  }
+  .nlsb-seats.nlsb-mode-vip .nlsb-seat.nlsb-is-empty,
+  .nlsb-seats.nlsb-mode-normal .nlsb-seat.nlsb-is-empty,
+  .nlsb-seats.nlsb-mode-empty .nlsb-seat {
+    display: none;
   }
   .nlsb-icon {
     display: grid;
@@ -132,6 +178,79 @@ const VENUE_CSS = `
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .nlsb-seats.nlsb-mode-vip .nlsb-icon {
+    width: 64px;
+    height: 64px;
+    flex-basis: 64px;
+    font-size: 24px;
+  }
+  .nlsb-seats.nlsb-mode-vip .nlsb-name {
+    max-width: 112px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+  }
+  .nlsb-seats.nlsb-mode-normal .nlsb-icon {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+    font-size: 16px;
+  }
+  .nlsb-seats.nlsb-mode-normal .nlsb-name {
+    max-width: 72px;
+    text-align: center;
+  }
+  .nlsb-empty-message {
+    display: none;
+    color: rgba(255, 255, 255, 0.52);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+  .nlsb-seats.nlsb-mode-empty .nlsb-empty-message {
+    display: block;
+  }
+  .nlsb-audience {
+    display: flex;
+    min-height: 36px;
+    box-sizing: border-box;
+    align-items: center;
+    gap: 10px;
+    margin-top: 5px;
+    padding: 5px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+  }
+  .nlsb-audience-label,
+  .nlsb-audience-more {
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .nlsb-audience-dots {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 4px;
+  }
+  .nlsb-audience-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+    background: rgba(196, 204, 216, 0.52);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+  .nlsb-audience-dot:nth-child(3n) {
+    background: rgba(159, 170, 186, 0.42);
+  }
+  .nlsb-audience[hidden],
+  .nlsb-audience-dot[hidden],
+  .nlsb-audience-more[hidden] {
+    display: none;
+  }
   @media (max-width: 900px) {
     .nlsb-toggle {
       right: 10px;
@@ -143,14 +262,18 @@ const VENUE_CSS = `
     .nlsb-seats {
       column-gap: 2px;
     }
-    .nlsb-icon {
+    .nlsb-seats.nlsb-mode-packed .nlsb-icon {
       width: 24px;
       height: 24px;
       flex-basis: 24px;
       font-size: 10px;
     }
-    .nlsb-name {
+    .nlsb-seats.nlsb-mode-packed .nlsb-name,
+    .nlsb-seats.nlsb-mode-normal .nlsb-name {
       display: none;
+    }
+    .nlsb-seats.nlsb-mode-normal .nlsb-seat {
+      flex-basis: 44px;
     }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -246,7 +369,7 @@ export function mountVenueBarButton() {
   header.append(title, note);
 
   const seatsHost = document.createElement('div');
-  seatsHost.className = 'nlsb-seats';
+  seatsHost.className = 'nlsb-seats nlsb-mode-empty';
   /** @type {ReturnType<typeof createSeatNode>[]} */
   const seatNodes = [];
   for (let i = 0; i < VENUE_MAX_SEATS; i += 1) {
@@ -255,7 +378,35 @@ export function mountVenueBarButton() {
     seatsHost.appendChild(node.seat);
   }
 
-  bar.append(header, seatsHost);
+  const emptyMessage = document.createElement('div');
+  emptyMessage.className = 'nlsb-empty-message';
+  emptyMessage.textContent = 'まだ名前付きの参加者がいません';
+  seatsHost.appendChild(emptyMessage);
+
+  const audience = document.createElement('div');
+  audience.className = 'nlsb-audience';
+  audience.hidden = true;
+  const audienceLabel = document.createElement('span');
+  audienceLabel.className = 'nlsb-audience-label';
+  audienceLabel.textContent = '観客席';
+  const audienceDots = document.createElement('div');
+  audienceDots.className = 'nlsb-audience-dots';
+  /** @type {HTMLSpanElement[]} */
+  const audienceDotNodes = [];
+  for (let i = 0; i < AUDIENCE_DOT_MAX; i += 1) {
+    const dot = document.createElement('span');
+    dot.className = 'nlsb-audience-dot';
+    dot.hidden = true;
+    dot.setAttribute('aria-hidden', 'true');
+    audienceDotNodes.push(dot);
+    audienceDots.appendChild(dot);
+  }
+  const audienceMore = document.createElement('span');
+  audienceMore.className = 'nlsb-audience-more';
+  audienceMore.hidden = true;
+  audience.append(audienceLabel, audienceDots, audienceMore);
+
+  bar.append(header, seatsHost, audience);
   root.append(toggle, bar);
   document.documentElement.appendChild(root);
 
@@ -276,13 +427,24 @@ export function mountVenueBarButton() {
       isGenericName: isGenericComeviewName
     });
     seatByKey = seating.seatByKey;
+    seatsHost.classList.remove(...VENUE_LAYOUT_CLASSES);
+    seatsHost.classList.add(`nlsb-mode-${seating.layoutMode}`);
     // アリーナ席は名前のある参加者だけ(ユーザー方針: 匿名はアリーナに座らせない)。
-    // 匿名は席に出さず「ほか観客 ◯人」として人数感だけ残す。
+    // 匿名は後方の観客席へ小さなドットとして表示し、人数感だけ残す。
     const anon = seating.anonymousCount || 0;
     title.textContent =
       anon > 0
         ? `会場参加者 ${seating.participantCount}人 ・ ほか観客 ${anon}人`
         : `会場参加者 ${seating.participantCount}人`;
+    audience.hidden = anon === 0;
+    audience.setAttribute('aria-label', `観客席 ${anon}人`);
+    const visibleAudienceDots = Math.min(anon, AUDIENCE_DOT_MAX);
+    for (let i = 0; i < audienceDotNodes.length; i += 1) {
+      audienceDotNodes[i].hidden = i >= visibleAudienceDots;
+    }
+    const remainingAudience = Math.max(0, anon - AUDIENCE_DOT_MAX);
+    audienceMore.hidden = remainingAudience === 0;
+    audienceMore.textContent = remainingAudience > 0 ? `ほか観客 ${remainingAudience}人` : '';
 
     const byIndex = new Map(seating.seats.map((entry) => [entry.seatIndex, entry.participant]));
     for (let i = 0; i < seatNodes.length; i += 1) {
