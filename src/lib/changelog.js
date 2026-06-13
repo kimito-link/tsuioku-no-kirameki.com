@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.715',
+    date: '2026-06-13',
+    summary: '会場モードで配信映像を見せ名前にリンク',
+    items: Object.freeze([
+      '会場モードで配信の映像が中央に見えるようにし、観客席や席が映像を覆わないようにしました',
+      '席が横にはみ出して横スクロールバーが出たり位置がずれる問題を直しました',
+      '参加者の名前をクリックすると、その人のニコニコのユーザーページを開けるようにしました（匿名の人は「匿名◯◯」表示）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.714',
     date: '2026-06-13',
     summary: '読み上げのささやき声を使わないように',

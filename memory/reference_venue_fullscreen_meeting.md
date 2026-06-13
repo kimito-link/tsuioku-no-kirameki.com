@@ -139,3 +139,58 @@ PR1バー版は捨てず、**集計/席割り/状態管理を残し表示コン�
 - 観客顔つき上限を超える配信(数千人)で DOM/描画が重くならないよう上限厳守。
 - 発言跳ねアニメが大量同時発言で gpu 過負荷→同時アニメ数に上限。
 - ギフト演出の初回フラッシュ防止(開いた時点の過去ギフトを一斉に飛ばさない=venueSpeech と同じ思想)。
+
+## 第3回会議の確定(2026-06-13・A=IDアンカー必須/B=映像を見せる/C=切り離し)
+
+全員集合(司令塔Fable風 + deepseek-r1:14b + gpt-oss:20b + Codex gpt-5.5)。3者が核心で完全一致。
+ユーザー要望=①サムネ/ハンドル/IDアンカー必須の原則を会場でも守る ②配信映像が観客席で隠れる
+不満を解消 ③会場を「切り離して別の場所に移動」。
+
+### 決定的な前提(司令塔が実コードで確認)
+- 会場のデータ読みは既に **全て chrome.storage.local.get 経由**(aggregateParticipants /
+  pollSpeech・venueBar.js:1007/1060)。content script 固有 API に依存しない
+  → 別ウィンドウ独立HTMLでも同じ readChunkedComments / userLaneCandidatesFromStorage /
+    enrichVenueRowsWithProfileAvatars / pickNewVenueSpeech をそのまま呼べる。
+- IDアンカー用の純関数 **comeviewUserPageUrl(userId)**(comeviewActions.js:93)が既存
+  =数値IDのみ受理・匿名(a:…)は''。これを汎用libへ移して会場で再利用する。
+
+### 確定A: IDアンカー必須(原則適合)— 最優先
+- 座席を「アバター・表示名・IDリンク」の3要素に。数値IDのみ
+  `https://www.nicovideo.jp/user/<id>`・`target=_blank rel="noopener noreferrer"`。
+- 匿名(a:…)/IDなしはリンクを作らず「匿名NNN」等の安定表示(Codex指摘=観客席の匿名顔も
+  原則上ラベルが要る)。
+- ⚠️.nlsb-root は閉時 pointer-events:none(venueBar.js:41)→開時だけアンカー操作可能に。
+- 将来ドラッグ時は座席全体をハンドルにせずヘッダー限定・a/button からのドラッグ除外。
+- 純関数化: venueUserPageUrl(汎用化した comeviewUserPageUrl)+テスト。
+
+### 確定B: 映像を見せるレイアウト(全員一致)
+- 中央に**映像セーフエリア(約60%×55%)**を確保しUIを置かない。配信者ステージの不透明カードは
+  撤去/小型化。ひな壇は下端 30〜35vh・2〜3段に限定。背景暗幕 0.74〜0.80 を大きく薄く。
+- ⚠️**人数増で縮小すると顔/名前/IDが読めず原則違反→縮小でなく同時表示人数を減らす**(全員一致)。
+  150人は論理保持・同時表示24〜40人・直近発言者を安定周期で入替(純関数で安定選抜=ちらつき防止)。
+- 匿名観客120顔の常時並べをやめ「表示サンプル+総人数」へ。吹き出しは中央映像を覆わずひな壇付近に。
+
+### 確定C: 切り離し = 別ウィンドウ独立 venue.html(全員一致で本命)
+- comeview.html / status.html の独立ページ実績と同型。storage 経由で購読・OBSはWindow Captureで配置可。
+- 同一ページ内ドラッグ移動は「コンパクト表示」の補助に留める(本命でない)。
+- 構成: ①content→SWへ `{type:'NLS_OPEN_VENUE', liveId}` ②SWが
+  `venue.html?lv=<lv>` を chrome.windows.create({type:'popup'}) ③venue.html が既存
+  venueSeats/venueSpeech/venueAvatar を利用 ④初期=チャンク+profile cache ⑤新着=tail を
+  storage.onChanged 購読+30秒で全体整合。
+- ⚠️**最大の罠(Codex発見)**:
+  1. content script から chrome.windows は直接呼べない→**SW経由必須**。
+  2. **現行SWは popup.html 以外の自拡張ページを「孤児」として閉じる(background.js:2491)**
+     →venue.html を識別して閉じない様に直さないと会場窓が即死する。
+  3. IDB更新は storage.onChanged を発火しない→tail/summary を通知源にし定期整合も残す。
+  4. nls_last_watch_url は複数watchタブで競合→入口から必ず ?lv= を渡す。新しい高頻度の巨大な
+     nls_venue_state は不要。
+- OBS: chrome-extension:// は通常の OBS Browser Source では直接読めない(Window Capture推奨)。
+
+### PR分割(司令塔裁定=Codex/gpt-oss案・A→B→C基盤→C本体)
+deepseekはC優先だがCが最も大物(SW改修+新HTML+build)。先にA(原則適合)とB(今すぐ効く
+不満解消)で確実前進→安定した renderer/data source を C基盤で共通化→C本体、が壊れにくい。
+- **PR-A**: 座席にIDアンカー(venueUserPageUrl汎用化+テスト)・匿名ラベル。原則適合。
+- **PR-B**: 映像セーフエリア+同時表示人数制御(安定選抜の純関数+テスト)・暗幕薄く。
+- **PR-C基盤**: 会場 renderer/data source を共通モジュール化+SWのpopup識別改善(孤児閉じ回避)。
+- **PR-C本体**: venue.html 新規・build/提出スクリプト追加・storage購読・SW経由別窓起動。
+- **任意**: 窓位置保存・OBS表示モード・同一ページ内コンパクトパネル。
