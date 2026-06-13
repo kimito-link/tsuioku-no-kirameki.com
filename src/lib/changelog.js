@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.706',
+    date: '2026-06-13',
+    summary: '過去ログ取得を配信ごとに2本並列化',
+    items: Object.freeze([
+      '複数配信の過去ログを同時に2本まで取得し、長い配信がほかの取得を待たせ続けないようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.705',
     date: '2026-06-13',
     summary: '閉じた応援タイムラインの全件読込を停止',

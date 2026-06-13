@@ -12,6 +12,12 @@ import {
 import { KEY_BACKFILL_PROGRESS } from '../lib/storageKeys.js';
 import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
 import { calculateBackfillRetryDelayMs } from '../lib/backfillRetryBackoff.js';
+import { BACKFILL_PARALLEL_SLOTS } from '../lib/backfillSlotPool.js';
+import {
+  normalizeSwLid,
+  resolveSwCrawlStart,
+  resolveSwRetryFire
+} from '../lib/swCrawlSlots.js';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const ROW_BATCH_SIZE = 500;
@@ -19,18 +25,16 @@ const STAGING_WRITE_ROWS = 2_000;
 const STAGING_WRITE_INTERVAL_MS = 2_500;
 const KEY_SW_PROGRESS = 'nls_backfill_sw_progress_v1';
 
-let crawlState = {
-  running: false,
-  lid: '',
-  rows: 0,
-  seg: 0,
-  ac: null
-};
+const crawlRegistry = new Map();
+const pendingRetry = new Map();
+let lastFinished = null;
 
-// PR1-b-4: SW 側 transient リトライ(lid → 連続リトライ回数)。rows>0 の完走で 0 リセット。
+// PR1-b-4: SW 側 transient リトライ(lid → 連続リトライ回数)。rows>0 の完走でキーを削除。
 //   content の _backfillTransientRetryByLiveId 相当(判定は同じ純関数を再利用)。
 const SW_TRANSIENT_RETRY_MAX = 5;
+const SW_RETRY_PENDING_MAX_MS = 10 * 60 * 1000;
 const _swRetryByLid = {};
+let _swRetryEpoch = 0;
 
 // PR1-b-4: crawl中のSWアイドル死対策。バックオフ睡眠中はイベントが無くSWが30秒で死ぬため、
 //   安価な拡張API呼び出しでアイドルタイマーをリセットし続ける(クラシックSWの定石)。
@@ -47,6 +51,13 @@ function stopSwKeepalive() {
   if (_swKeepaliveTid == null) return;
   clearInterval(_swKeepaliveTid);
   _swKeepaliveTid = null;
+}
+function syncSwKeepalive() {
+  if (crawlRegistry.size + pendingRetry.size > 0) {
+    ensureSwKeepalive();
+  } else {
+    stopSwKeepalive();
+  }
 }
 
 async function swFetchBinary(url, opts) {
@@ -129,17 +140,8 @@ async function runCrawl({
   tabId,
   mirrorLegacyProgress,
   officialCount
-}) {
-  const ac = new AbortController();
-  ensureSwKeepalive();
-  const state = {
-    running: true,
-    lid,
-    rows: 0,
-    seg: 0,
-    ac
-  };
-  crawlState = state;
+}, state) {
+  const { ac } = state;
   const batch = [];
   const stagedRows = [];
   let stagingMode = false;
@@ -275,14 +277,21 @@ async function runCrawl({
     } catch {
       /* no-op */
     }
-    if (crawlState === state) {
-      crawlState = { ...state, running: false, ac: null };
-    }
     // PR1-b-4: SW 側 transient リトライ。backward_exhausted 等の一発死は content 側の
     //   ワンショット guard が立ったまま再送されないため、SW 内で回数上限つきで自動再試行する。
     //   rows>0 の完走は予算を全回復(v0.1.665 と同思想)。viewBase は初回と同じものを使う
     //   (鮮度切れで失敗し続けたら回数上限で正直に止まる=許容)。
-    if (state.rows > 0) _swRetryByLid[lid] = 0;
+    // identity guard 付き release、retry schedule、keepalive 同期は await を挟まない同期区間。
+    if (crawlRegistry.get(lid) === state) {
+      crawlRegistry.delete(lid);
+    }
+    lastFinished = { ...state, running: false, ac: null };
+    if (state.rows > 0) {
+      delete _swRetryByLid[lid];
+      const pending = pendingRetry.get(lid);
+      if (pending) clearTimeout(pending.tid);
+      pendingRetry.delete(lid);
+    }
     const retried = _swRetryByLid[lid] || 0;
     const shouldRetry = shouldScheduleBackfillTransientRetry({
       stopReason,
@@ -295,26 +304,88 @@ async function runCrawl({
       rows: state.rows
     });
     if (shouldRetry) {
-      _swRetryByLid[lid] = retried + 1;
-      // 指数バックオフ + Full Jitter(content 経路と同じ純関数)。リトライ待機中も keepalive を
-      //   維持しているので setTimeout は SW アイドル死で消えない。
-      const retryDelayMs = calculateBackfillRetryDelayMs(retried);
-      setTimeout(() => {
-        if (crawlState.running) return; // single-flight: 別 crawl 実行中は再実行しない
-        void runCrawl({
-          lid,
-          viewBase,
-          programBeginAtMs,
-          deterministic,
-          tabId,
-          mirrorLegacyProgress,
-          officialCount
-        });
-      }, retryDelayMs);
-    } else {
-      stopSwKeepalive();
+      scheduleSwRetry({
+        lid,
+        viewBase,
+        programBeginAtMs,
+        deterministic,
+        tabId,
+        mirrorLegacyProgress,
+        officialCount
+      }, Date.now());
     }
+    syncSwKeepalive();
   }
+}
+
+function cancelPendingRetry(lid) {
+  const pending = pendingRetry.get(lid);
+  if (pending) clearTimeout(pending.tid);
+  pendingRetry.delete(lid);
+}
+
+function scheduleSwRetry(crawlArgs, scheduledAt) {
+  const { lid } = crawlArgs;
+  cancelPendingRetry(lid);
+  const retried = _swRetryByLid[lid] || 0;
+  const retryDelayMs = calculateBackfillRetryDelayMs(retried);
+  const epoch = ++_swRetryEpoch;
+  const tid = setTimeout(() => {
+    const pending = pendingRetry.get(lid);
+    if (!pending || pending.epoch !== epoch) return;
+    pendingRetry.delete(lid);
+
+    const resolution = resolveSwRetryFire({
+      runningLids: crawlRegistry.keys(),
+      lid,
+      maxParallel: BACKFILL_PARALLEL_SLOTS,
+      scheduledAt,
+      now: Date.now(),
+      maxPendingMs: SW_RETRY_PENDING_MAX_MS
+    });
+    if (resolution.action === 'reschedule') {
+      scheduleSwRetry(crawlArgs, scheduledAt);
+      syncSwKeepalive();
+      return;
+    }
+    if (resolution.action === 'run') {
+      _swRetryByLid[lid] = retried + 1;
+      startSwCrawl(crawlArgs);
+      return;
+    }
+    syncSwKeepalive();
+  }, retryDelayMs);
+  pendingRetry.set(lid, { tid, epoch, scheduledAt });
+}
+
+function startSwCrawl(crawlArgs) {
+  const lid = normalizeSwLid(crawlArgs?.lid ?? '');
+  const resolution = resolveSwCrawlStart({
+    runningLids: crawlRegistry.keys(),
+    lid,
+    maxParallel: BACKFILL_PARALLEL_SLOTS
+  });
+  if (!resolution.start) return resolution;
+
+  const viewBase = String(crawlArgs?.viewBase || '').trim();
+  if (!/^https?:\/\//i.test(viewBase)) {
+    return { ok: false, start: false, reason: 'no_view_base' };
+  }
+
+  cancelPendingRetry(lid);
+  const state = {
+    running: true,
+    lid,
+    rows: 0,
+    seg: 0,
+    ac: new AbortController()
+  };
+  const normalizedArgs = { ...crawlArgs, lid, viewBase };
+  // 不変条件: resolve から registry.set まで await を挟まない。listener/retry の TOCTOU を防ぐ。
+  crawlRegistry.set(lid, state);
+  syncSwKeepalive();
+  void runCrawl(normalizedArgs, state);
+  return resolution;
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -324,36 +395,40 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'nls_backfill_sw_status') {
+    const requestedLid = normalizeSwLid(msg.lid ?? '');
+    const firstRunning = crawlRegistry.values().next().value || null;
+    const selected = requestedLid
+      ? crawlRegistry.get(requestedLid) ||
+        (lastFinished?.lid === requestedLid
+          ? lastFinished
+          : { running: false, lid: requestedLid, rows: 0, seg: 0 })
+      : firstRunning || lastFinished ||
+        { running: false, lid: '', rows: 0, seg: 0 };
     sendResponse({
-      running: crawlState.running,
-      lid: crawlState.lid,
-      rows: crawlState.rows,
-      seg: crawlState.seg,
-      retries: _swRetryByLid[crawlState.lid] || 0
+      running: selected.running,
+      lid: selected.lid,
+      rows: selected.rows,
+      seg: selected.seg,
+      retries: _swRetryByLid[selected.lid] || 0,
+      crawls: Array.from(crawlRegistry.values(), (state) => ({
+        lid: state.lid,
+        rows: state.rows,
+        seg: state.seg,
+        retries: _swRetryByLid[state.lid] || 0
+      }))
     });
     return false;
   }
 
-  const lid = String(msg.lid || '');
-  if (crawlState.running) {
-    sendResponse({ ok: false, reason: 'already_running' });
-    return false;
-  }
-  const viewBase = String(msg.viewBase || '').trim();
-  if (!/^https?:\/\//i.test(viewBase)) {
-    sendResponse({ ok: false, reason: 'no_view_base' });
-    return false;
-  }
-
-  sendResponse({ ok: true });
-  void runCrawl({
-    lid,
-    viewBase,
+  const result = startSwCrawl({
+    lid: msg.lid,
+    viewBase: msg.viewBase,
     programBeginAtMs: msg.programBeginAtMs,
     deterministic: msg.deterministic === true,
     tabId: sender?.tab?.id,
     mirrorLegacyProgress: msg.mirrorLegacyProgress === true,
     officialCount: msg.officialCount ?? null
   });
+  sendResponse({ ok: result.ok, reason: result.reason });
   return false;
 });
