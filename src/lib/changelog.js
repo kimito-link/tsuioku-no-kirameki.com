@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.718',
+    date: '2026-06-13',
+    summary: '会場を本物のライブ会場っぽく(後方を暗く)',
+    items: Object.freeze([
+      '会場モードの四隅と後方を少し暗くして、空いている所が目立たず満員のライブ会場に見えるようにしました(中央の配信映像はそのまま見えます)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.717',
     date: '2026-06-13',
     summary: '会場のセリフを大きく・隠れないように',
