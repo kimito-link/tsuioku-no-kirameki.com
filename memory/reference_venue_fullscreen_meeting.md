@@ -84,3 +84,58 @@ PR1バー版は捨てず、**集計/席割り/状態管理を残し表示コン�
 - UIガワ/演出実装: Codex(codex-impl)
 - 検証: npm run verify:cc + chrome-devtools-mcp 実機(本家DOM非破壊+負荷)
 - 関連: [[reference_venue_mode_meeting]] [[session-2026-06-13-v0707-venue-mode]]
+
+## 仕上げ会議の確定(2026-06-13 第2回・サムネ/匿名/盛り上がり)
+
+全員集合(司令塔Fable風 + deepseek-r1:14b + Codex調査)。gpt-ossはメモリ競合で空応答→3者で確定。
+実機4不満(サムネ出ない/匿名顔なし/吹き出しタイミング/盛り上がり無し)を潰す。
+
+### 確定1: サムネ反映(真因確定・Explore済み)
+- 真因=会場は userLaneCandidatesFromStorage を呼ぶだけで、パネルが呼ぶ
+  **enrich(プロファイルキャッシュ nls_user_comment_profile_v1 で userId→avatarUrl 補強)を呼んでいない**。
+- 対策=会場集計後に nls_user_comment_profile_v1 を chrome.storage.local.get で読み、各参加者の
+  avatarUrl を補強してから venueRowsFromUserLaneCandidates に渡す。これでパネルと同じサムネが出る。
+- 見せ方: サムネ取れた人は<img>、無い人は anonymousIdenticonDataUrl(userId)のゆっくり顔。
+  前列(手前ひな壇)にサムネ持ちを優先配置(buildVenueSeating の優先度に avatarObserved を加味)。
+- ⚠️avatar取り違えガード(isAvatarUrlForUserId/broadcaster除外)は userLaneCandidatesFromStorage 内で
+  既に効く。会場もそのまま通せば誤った配信者アイコン混入を防げる(壊さない)。
+
+### 確定2: 匿名を観客席に顔つきで(ユーザー要望)
+- 今「アリーナ=名前付き・匿名=顔なしドット」→ **匿名も anonymousIdenticonDataUrl でゆっくり顔**にする。
+- アリーナ(主役=名前付き・大きく前列)と観客席(匿名含む大勢・小さめ・後方)の見せ分けは維持。
+- 性能: 観客は全員(1185人)は無理→**顔つき観客の上限を設ける(例 後方に最大80〜120人ゆっくり顔)**+
+  超過は「ほか観客 N人」テキスト。顔つき観客は data URL(ゆっくり顔)なので追加ネットワークゼロ。
+  in-place更新(プール)で DOM 増やさない。
+
+### 確定3: 吹き出しタイミング
+- 仮説=新着発言者を mergeSpeakersIntoVenueRows で席に足すが、renderSeats(席再描画)と
+  showSpeechBubble(席を seatByKey で探す)の順序/タイミングがズレ、席がまだ無い瞬間に吹き出して
+  宙に浮く or 出ない。実況で ctail が空だと素材が無く出ない問題も併発。
+- 対策=①merge→renderSeats→**次フレーム(rAF)で**席DOM確定後に showSpeechBubble ②ctail空時は
+  cdb_summary.recent を確実にフォールバック ③発言者の席が見つからないときは出さず次回に持ち越し。
+
+### 確定4: 盛り上がり演出(最重要・deepseek案採用+追憶らしさ)
+追憶らしさ=派手すぎず・ゆっくり世界観・軽い(CSS/軽canvas)。優先度順:
+- **A(最優先・軽い)**: 発言が来た席のアバターが**ぴょこっと跳ねる/揺れる**(CSS transform・1回0.4s)。
+  「誰かがしゃべると会場が反応する」最小の生命感。
+- **B**: **盛り上がりメーター**=直近の発言密度(コメント/秒)で会場の明るさ・背景の脈動を変える
+  (背景 radial-gradient の opacity を発言密度に連動・脈動アニメ)。沸いてる感。
+- **C**: ギフト着弾時(nls_gift新着)に**そのアバター→中央ステージへ光/ハートが飛ぶ**+拍手パーティクル
+  (軽canvas 1枚・同時上限)。投げ銭の可視化(会議PR5/6の流用)。
+- **D(後)**: 盛り上がりピークで**スポットライト**が一瞬走る・ペンライト風の光点。
+- 全部 reduced-motion で抑制・閉じたら停止・同時上限で重くしない。
+
+### PR分割(軽くて壊れにくい順・確定)
+- **PR-a**: サムネ反映(enrich配線)+ 匿名を観客席にゆっくり顔(確定1+2)。データの正しさ。純関数で
+  avatar補強アダプタ+テスト。最優先(見た目の土台)。
+- **PR-b**: 吹き出しタイミング修正(確定3・rAF順序+fallback)。
+- **PR-c**: 盛り上がり演出A(発言で跳ねる)+ B(盛り上がりメーター背景)。軽いCSS。
+- **PR-d**: ギフト着弾演出C(canvas・nls_gift新着検知)。
+- **PR-e**: スポットライトD(任意)。
+
+### 見落としリスク(会議集約)
+- enrich でプロファイルキャッシュが巨大だと読みが重い→キーは1本(nls_user_comment_profile_v1)で
+  軽い想定だが実機サイズ確認。
+- 観客顔つき上限を超える配信(数千人)で DOM/描画が重くならないよう上限厳守。
+- 発言跳ねアニメが大量同時発言で gpu 過負荷→同時アニメ数に上限。
+- ギフト演出の初回フラッシュ防止(開いた時点の過去ギフトを一斉に飛ばさない=venueSpeech と同じ思想)。

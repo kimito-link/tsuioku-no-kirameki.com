@@ -3,6 +3,8 @@ import {
   venueParticipantKey,
   collectVenueParticipants,
   countAnonymousParticipants,
+  collectAudienceFaceUserIds,
+  VENUE_AUDIENCE_FACE_MAX,
   resolveVenueLayoutMode,
   venueRowsFromUserLaneCandidates,
   buildVenueTiers,
@@ -92,6 +94,43 @@ describe('collectVenueParticipants', () => {
       { userId: 'a', name: 'A', text: '2', capturedAt: 20 }
     ];
     expect(collectVenueParticipants(rows).map((p) => p.key)).toEqual(['u:b', 'u:a']);
+  });
+});
+
+describe('collectAudienceFaceUserIds', () => {
+  it('匿名(名前なし)の userId を顔つき観客として返す・名前付きは除外', () => {
+    const rows = [
+      { userId: 'a:1', name: '匿名', text: 'x', capturedAt: 10 },
+      { userId: 'a:2', name: '', text: 'y', capturedAt: 20 },
+      { userId: 'named', name: 'A', text: 'z', capturedAt: 30 }
+    ];
+    const r = collectAudienceFaceUserIds(rows, { isGenericName: isGeneric });
+    expect(r.faceUserIds.sort()).toEqual(['a:1', 'a:2']);
+    expect(r.totalAnonymous).toBe(2);
+  });
+
+  it('直近にしゃべった順で max 件に絞る', () => {
+    const rows = [];
+    for (let i = 0; i < 10; i++) {
+      rows.push({ userId: `a:${i}`, name: '', text: 'c', capturedAt: i });
+    }
+    const r = collectAudienceFaceUserIds(rows, { max: 3 });
+    expect(r.faceUserIds).toEqual(['a:9', 'a:8', 'a:7']); // 直近3人
+    expect(r.totalAnonymous).toBe(10); // 総数は全部
+  });
+
+  it('userId なし匿名は総数に1だけ加える(顔は出さない)', () => {
+    const rows = [
+      { name: '匿名', text: 'x', capturedAt: 1 },
+      { userId: 'a:1', name: '', text: 'y', capturedAt: 2 }
+    ];
+    const r = collectAudienceFaceUserIds(rows, { isGenericName: isGeneric });
+    expect(r.faceUserIds).toEqual(['a:1']);
+    expect(r.totalAnonymous).toBe(2);
+  });
+
+  it('既定 cap 定数', () => {
+    expect(VENUE_AUDIENCE_FACE_MAX).toBe(120);
   });
 });
 
