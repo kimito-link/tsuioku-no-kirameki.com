@@ -67,3 +67,43 @@
 - 長期=**サーバ cron 化**(閉じても取り切る)。ただし NDGR の view-uri/著作権の壁は別途
   (既存メモリの結論=まずローカル IDB 即時表示+JSON 入出力で拡張内完結が現実解)。
 - 関連: [[reference_json_cache_instant_display_meeting]] [[reference_comebyu_competitors_and_oauth]]
+
+## 2026-06-14 第2弾: フルリポ surechigai-nico の【実コード】から得た具体パターン
+> github/surechigai-nico(handoff zip でなく実体・.github CI/CD あり)。LiveStateStream/health の
+> 設計を実コードで裏付け。追憶へ転用する実装レベルの知見。
+
+### liveMapBus.ts(Pub/Sub バス)= 追憶 LiveStateStream の元ネタ・実装パターン
+- **2層フォールバック**: 主=Upstash Redis(複数インスタンス跨ぎ)+ fallback=in-process EventEmitter。
+  publish は両方に書く(片方失敗ても必ず流す)。→ 追憶版: 主=runtime.Port + fallback=storage.onChanged。
+- **ring buffer(直近200件)で catch-up**: 新規接続時に recentEvents(sinceMs) で追いつき。
+  → 追憶版: seq欠落時 IDB/tail 再hydrate + ring で軽い catch-up。
+- ⭐**listener を try/catch で隔離**: 「1つの壊れた購読がサーバ全体を落とすのは致命的」→各コール
+  バックを try/catch で囲む。→ 追憶版: 1つの壊れたUI購読(comeview/venue/popup)が全体を落とさない
+  よう各 listener 隔離(会議では出ていなかった重要な堅牢化)。
+- publish は **fire-and-forget**(揮発・応答待たない)。EventEmitter.setMaxListeners(1000)。
+
+### useLiveMapStream.ts(購読フック)= 追憶の各UI購読側の実装パターン
+- **指数バックオフ再接続**(2秒→最大30秒・open でリセット)。→ MV3 SW は30秒で寝るので Port 再接続必須。
+- **catchup イベント(接続時に直近一括)+ live イベント(リアルタイム)の2系統**。
+- ⭐**visibilitychange でタブ hidden→接続close・visible→再接続**。→ 追憶が苦労してる「タブhiddenで
+  停止」と同じ制御。「見えてる時だけストリーム」で省電力。
+- **SSE失敗時は polling が担保**(二重化)。JSON.parse は try/catch で握る。
+
+### yukkuriHealth.ts(ヘルスチェック)= 追憶 status.html 強化の実装パターン
+- ⭐**カバレッジ診断**: total / withName / withAvatar / withBoth / coveragePct(%)。
+  → 追憶版: **まさにサムネ問題の指標**=「参加者中サムネ取得率○%」を status に出せる。サムネ会議
+    (profileResolveState)の効果測定にも直結。
+- ⭐**公開版(detailed:false)と詳細版(detailed:true=admin)を分離**: 公開は env 有無等の弱い情報
+  開示を隠す(攻撃者に技術スタックを教えない)。→ 追憶版: 軽量モード(保存済み診断値)と詳細診断
+  (SW/VOICEVOX 能動 ping)の分離=会議結論と一致。
+- **各診断を try/catch 隔離**(1つのDB失敗が全体を落とさない)+ **エラーに直し方 hint**
+  (テーブル不在→「ensure-…sql を適用」)。→ 追憶版: status の各指標を独立表示+直し方提示。
+- **lastBackfillAt / lastBackfillFailed だけは公開**(UptimeRobot 等が「24h以内に回ったか・失敗が
+  閾値以下か」を外形監視できる最小値)。
+
+### docs/.github(未読・次回深掘り候補)
+- docs/V2-SURECHIGAI-DESIGN.md(v2設計=最新思想)・docs/OPS.md(運用)・CHOKAIGI_RUNBOOK.md(13KB・
+  会期中トラブル対応の実戦索引)。
+- .github/workflows/claude.yml(**Claude を CI で自動化**するワークフロー=追憶の自動レビュー/検証 CI 化の参考)。
+- server/src/lib: aiErrorReport.ts(AIエラー報告)/moderation.ts/visibilityFilter.ts(公開範囲)/
+  yukkuriBackfillState.ts(backfill 状態管理)も追憶に転用候補。
