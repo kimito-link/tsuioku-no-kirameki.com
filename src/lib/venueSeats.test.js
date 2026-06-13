@@ -1,0 +1,168 @@
+import { describe, expect, it } from 'vitest';
+import {
+  venueParticipantKey,
+  collectVenueParticipants,
+  rankVenueParticipants,
+  assignVenueSeats,
+  buildVenueSeating,
+  VENUE_MAX_SEATS,
+  VENUE_FRONT_ROW_SEATS
+} from './venueSeats.js';
+
+const isGeneric = (name) => ['匿名', '名無し'].includes(String(name).trim());
+
+describe('venueParticipantKey', () => {
+  it('userId を最優先キーにする', () => {
+    expect(venueParticipantKey({ userId: '123', name: 'たろう' })).toBe('u:123');
+  });
+  it('userId 無しは個人名をキーにする', () => {
+    expect(venueParticipantKey({ name: 'たろう' })).toBe('n:たろう');
+  });
+  it('汎用プレースホルダ名は会場に並べない(null)', () => {
+    expect(venueParticipantKey({ name: '匿名' }, isGeneric)).toBeNull();
+  });
+  it('userId も名前も無ければ null', () => {
+    expect(venueParticipantKey({ text: 'やあ' })).toBeNull();
+  });
+});
+
+describe('collectVenueParticipants', () => {
+  it('同一参加者をまとめ最終発言と発言数を集計する', () => {
+    const rows = [
+      { userId: 'a', name: 'A', text: 'おはよう', capturedAt: 100 },
+      { userId: 'a', name: 'A', text: 'こんにちは', capturedAt: 300 },
+      { userId: 'b', name: 'B', text: 'やあ', capturedAt: 200 }
+    ];
+    const ps = collectVenueParticipants(rows);
+    expect(ps).toHaveLength(2);
+    const a = ps.find((p) => p.key === 'u:a');
+    expect(a.count).toBe(2);
+    expect(a.lastText).toBe('こんにちは');
+    expect(a.lastAt).toBe(300);
+  });
+
+  it('ギフトフラグを保持する', () => {
+    const rows = [
+      { userId: 'a', name: 'A', text: 'ギフト!', capturedAt: 100, isGift: true }
+    ];
+    expect(collectVenueParticipants(rows)[0].hasGift).toBe(true);
+  });
+
+  it('匿名(汎用名)は除外する', () => {
+    const rows = [
+      { name: '匿名', text: 'x', capturedAt: 1 },
+      { userId: 'a', name: 'A', text: 'y', capturedAt: 2 }
+    ];
+    const ps = collectVenueParticipants(rows, { isGenericName: isGeneric });
+    expect(ps).toHaveLength(1);
+    expect(ps[0].key).toBe('u:a');
+  });
+
+  it('初出順を保つ', () => {
+    const rows = [
+      { userId: 'b', name: 'B', text: '1', capturedAt: 10 },
+      { userId: 'a', name: 'A', text: '2', capturedAt: 20 }
+    ];
+    expect(collectVenueParticipants(rows).map((p) => p.key)).toEqual(['u:b', 'u:a']);
+  });
+});
+
+describe('rankVenueParticipants', () => {
+  it('ギフト参加者を優先し、次に最終発言が新しい順', () => {
+    const ps = [
+      { key: 'u:a', lastAt: 300, count: 1, hasGift: false },
+      { key: 'u:b', lastAt: 100, count: 1, hasGift: true },
+      { key: 'u:c', lastAt: 200, count: 1, hasGift: false }
+    ];
+    expect(rankVenueParticipants(ps).map((p) => p.key)).toEqual(['u:b', 'u:a', 'u:c']);
+  });
+
+  it('maxSeats を超えた静かな参加者は降ろす(入れ替え)', () => {
+    const ps = [
+      { key: 'u:a', lastAt: 300, count: 1, hasGift: false },
+      { key: 'u:b', lastAt: 200, count: 1, hasGift: false },
+      { key: 'u:c', lastAt: 100, count: 1, hasGift: false }
+    ];
+    const ranked = rankVenueParticipants(ps, 2);
+    expect(ranked.map((p) => p.key)).toEqual(['u:a', 'u:b']);
+  });
+});
+
+describe('assignVenueSeats', () => {
+  it('前回の席を維持する(同じ人=同じ席=吹き出しが飛ばない)', () => {
+    const ranked = [
+      { key: 'u:a', lastAt: 300, count: 1, hasGift: false },
+      { key: 'u:b', lastAt: 200, count: 1, hasGift: false }
+    ];
+    const prev = new Map([['u:a', 5], ['u:b', 2]]);
+    const { seatByKey } = assignVenueSeats(ranked, prev, 50);
+    expect(seatByKey.get('u:a')).toBe(5);
+    expect(seatByKey.get('u:b')).toBe(2);
+  });
+
+  it('降りた人の席を新規参加者が埋める(入れ替え)', () => {
+    // 前回 u:a が席0、u:b が席1。今回 u:a が降り u:c が新規参加。
+    const ranked = [
+      { key: 'u:b', lastAt: 300, count: 1, hasGift: false },
+      { key: 'u:c', lastAt: 200, count: 1, hasGift: false }
+    ];
+    const prev = new Map([['u:a', 0], ['u:b', 1]]);
+    const { seatByKey } = assignVenueSeats(ranked, prev, 50);
+    expect(seatByKey.get('u:b')).toBe(1); // 維持
+    expect(seatByKey.get('u:c')).toBe(0); // 空いた席0を埋める
+  });
+
+  it('席は昇順で返る', () => {
+    const ranked = [
+      { key: 'u:a', lastAt: 1, count: 1, hasGift: false },
+      { key: 'u:b', lastAt: 1, count: 1, hasGift: false }
+    ];
+    const prev = new Map([['u:a', 3], ['u:b', 1]]);
+    const { seats } = assignVenueSeats(ranked, prev, 50);
+    expect(seats.map((s) => s.seatIndex)).toEqual([1, 3]);
+  });
+
+  it('prev が範囲外/重複でも安全に再割り当てする', () => {
+    const ranked = [
+      { key: 'u:a', lastAt: 1, count: 1, hasGift: false },
+      { key: 'u:b', lastAt: 1, count: 1, hasGift: false }
+    ];
+    // u:a の前回席が cap 超過(99)→無視して空き席を割り当て
+    const prev = new Map([['u:a', 99], ['u:b', 0]]);
+    const { seatByKey } = assignVenueSeats(ranked, prev, 3);
+    expect(seatByKey.get('u:b')).toBe(0);
+    expect(seatByKey.get('u:a')).toBe(1);
+  });
+});
+
+describe('buildVenueSeating', () => {
+  it('発言行から席割りまで一気通貫し前列フラグを付ける', () => {
+    const rows = [];
+    for (let i = 0; i < 25; i++) {
+      rows.push({ userId: `u${i}`, name: `U${i}`, text: `c${i}`, capturedAt: i });
+    }
+    const { seats, participantCount } = buildVenueSeating(rows, { frontRowSeats: 20 });
+    expect(participantCount).toBe(25);
+    expect(seats).toHaveLength(25);
+    expect(seats.filter((s) => s.isFrontRow)).toHaveLength(20);
+    expect(seats.filter((s) => !s.isFrontRow)).toHaveLength(5);
+  });
+
+  it('seatByKey を次回入力に渡すと席が安定する', () => {
+    const rows1 = [
+      { userId: 'a', name: 'A', text: '1', capturedAt: 10 },
+      { userId: 'b', name: 'B', text: '2', capturedAt: 20 }
+    ];
+    const r1 = buildVenueSeating(rows1);
+    const seatA = r1.seatByKey.get('u:a');
+    // 次フレーム: A がさらに発言(席は変わらないはず)
+    const rows2 = [...rows1, { userId: 'a', name: 'A', text: '3', capturedAt: 30 }];
+    const r2 = buildVenueSeating(rows2, { prevSeatByKey: r1.seatByKey });
+    expect(r2.seatByKey.get('u:a')).toBe(seatA);
+  });
+
+  it('既定の上限と前列定数', () => {
+    expect(VENUE_MAX_SEATS).toBe(50);
+    expect(VENUE_FRONT_ROW_SEATS).toBe(20);
+  });
+});
