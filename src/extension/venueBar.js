@@ -1,12 +1,18 @@
-import { normalizeComeviewRow, isGenericComeviewName } from '../lib/comeviewRows.js';
-import { buildVenueSeating, VENUE_MAX_SEATS } from '../lib/venueSeats.js';
-import { commentDbSummaryKey } from '../lib/storageKeys.js';
-import { tailStorageKey } from '../lib/commentTailBuffer.js';
+import { isGenericComeviewName } from '../lib/comeviewRows.js';
+import {
+  buildVenueSeating,
+  VENUE_FULLSCREEN_MAX_SEATS,
+  venueRowsFromUserLaneCandidates
+} from '../lib/venueSeats.js';
+import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
+import { readChunkedComments } from '../lib/commentChunkStore.js';
+import { commentsStorageKey } from '../lib/storageKeys.js';
+import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
 const OPEN_STORAGE_KEY = 'nls_venue_open';
-const POLL_INTERVAL_MS = 1500;
+const AGGREGATE_INTERVAL_MS = 30_000;
 const AUDIENCE_DOT_MAX = 60;
 const VENUE_LAYOUT_CLASSES = [
   'nlsb-mode-empty',
@@ -15,7 +21,7 @@ const VENUE_LAYOUT_CLASSES = [
   'nlsb-mode-packed'
 ];
 
-/** @typedef {NonNullable<ReturnType<typeof normalizeComeviewRow>>} VenueRow */
+/** @typedef {ReturnType<typeof venueRowsFromUserLaneCandidates>[number]} VenueRow */
 
 const VENUE_CSS = `
   .nlsb-root {
@@ -107,15 +113,15 @@ const VENUE_CSS = `
   }
   .nlsb-stage-layout {
     display: grid;
-    width: min(1180px, 100%);
+    width: min(1500px, 100%);
     min-height: 0;
     margin: 0 auto;
-    grid-template-rows: minmax(170px, 40vh) minmax(0, 1fr);
+    grid-template-rows: minmax(140px, 25vh) minmax(0, 1fr);
     gap: clamp(12px, 2vh, 22px);
   }
   .nlsb-center {
     display: grid;
-    width: min(640px, 86vw);
+    width: min(620px, 86vw);
     min-height: 0;
     box-sizing: border-box;
     place-self: center;
@@ -153,17 +159,23 @@ const VENUE_CSS = `
     letter-spacing: 0.08em;
   }
   .nlsb-seating {
+    display: grid;
     min-height: 0;
     box-sizing: border-box;
-    overflow: auto;
+    grid-template-areas:
+      "header"
+      "audience"
+      "seats";
+    grid-template-rows: auto auto minmax(0, 1fr);
+    overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.11);
     border-radius: 16px;
     background: rgba(9, 13, 19, 0.78);
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
     overscroll-behavior: contain;
-    scrollbar-gutter: stable;
   }
   .nlsb-header {
+    grid-area: header;
     position: sticky;
     top: 0;
     z-index: 1;
@@ -191,17 +203,40 @@ const VENUE_CSS = `
     white-space: nowrap;
   }
   .nlsb-seats {
+    grid-area: seats;
     position: relative;
-    min-height: 190px;
+    min-height: 0;
     box-sizing: border-box;
     padding: 18px;
+    overflow: auto;
+    background:
+      radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.18), transparent 62%),
+      repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.035) 0,
+        rgba(255, 255, 255, 0.035) 1px,
+        transparent 1px,
+        transparent 78px
+      );
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    perspective: clamp(680px, 75vw, 1200px);
+    perspective-origin: 50% 12%;
+    contain: layout paint;
   }
   .nlsb-seats.nlsb-mode-packed {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
-    grid-auto-rows: 44px;
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+    grid-auto-rows: 62px;
+    align-content: start;
+    gap: 10px 8px;
   }
+  /*
+   * 少人数でも会場が埋まって賑わって見えるレイアウト(ユーザー要望「撮影の角度で満員に見せる」)。
+   * 複雑な3D固定グリッドは20人で破綻したので、flex で大きいアバターを画面いっぱいに中央寄せで
+   * 敷き詰める方式に統一。人数が少ないほどアバターを大きく(VIP>normal>packed)、align-content:center
+   * で縦も使い、下半分が真っ黒にならないようにする。
+   */
   .nlsb-seats.nlsb-mode-vip,
   .nlsb-seats.nlsb-mode-normal {
     display: flex;
@@ -209,12 +244,7 @@ const VENUE_CSS = `
     align-content: center;
     align-items: center;
     justify-content: center;
-  }
-  .nlsb-seats.nlsb-mode-vip {
-    gap: 10px 28px;
-  }
-  .nlsb-seats.nlsb-mode-normal {
-    gap: 6px 12px;
+    gap: clamp(14px, 3vh, 40px) clamp(18px, 3vw, 52px);
   }
   .nlsb-seats.nlsb-mode-empty {
     display: grid;
@@ -223,25 +253,25 @@ const VENUE_CSS = `
   .nlsb-seat {
     display: flex;
     min-width: 0;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 6px;
     overflow: hidden;
   }
   .nlsb-seat.nlsb-is-empty {
     visibility: hidden;
   }
-  .nlsb-seats.nlsb-mode-vip .nlsb-seat,
-  .nlsb-seats.nlsb-mode-normal .nlsb-seat {
-    flex-direction: column;
+  .nlsb-seats.nlsb-mode-packed .nlsb-seat {
+    gap: 4px;
   }
+  /* VIP(≤8人): 特大アバターでゆったり=主役感。 */
   .nlsb-seats.nlsb-mode-vip .nlsb-seat {
-    width: 112px;
-    gap: 6px;
+    width: clamp(120px, 14vw, 168px);
   }
+  /* 通常(≤30人): 大きめアバターを画面いっぱいに敷き詰める。 */
   .nlsb-seats.nlsb-mode-normal .nlsb-seat {
-    flex: 0 1 72px;
-    gap: 3px;
+    width: clamp(84px, 9vw, 120px);
   }
   .nlsb-seats.nlsb-mode-vip .nlsb-seat.nlsb-is-empty,
   .nlsb-seats.nlsb-mode-normal .nlsb-seat.nlsb-is-empty,
@@ -249,6 +279,7 @@ const VENUE_CSS = `
     display: none;
   }
   .nlsb-icon {
+    position: relative;
     display: grid;
     width: 28px;
     height: 28px;
@@ -262,6 +293,25 @@ const VENUE_CSS = `
     font-weight: 700;
     line-height: 1;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+  }
+  .nlsb-avatar,
+  .nlsb-icon-fallback {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+  }
+  .nlsb-avatar {
+    display: block;
+    object-fit: cover;
+  }
+  .nlsb-avatar[hidden],
+  .nlsb-icon-fallback[hidden] {
+    display: none;
+  }
+  .nlsb-icon-fallback {
+    display: grid;
+    place-items: center;
   }
   .nlsb-name {
     min-width: 0;
@@ -273,25 +323,36 @@ const VENUE_CSS = `
     white-space: nowrap;
   }
   .nlsb-seats.nlsb-mode-vip .nlsb-icon {
-    width: 64px;
-    height: 64px;
-    flex-basis: 64px;
-    font-size: 24px;
+    width: clamp(96px, 11vw, 132px);
+    height: clamp(96px, 11vw, 132px);
+    flex-basis: auto;
+    font-size: clamp(32px, 4vw, 44px);
   }
   .nlsb-seats.nlsb-mode-vip .nlsb-name {
-    max-width: 112px;
-    font-size: 13px;
+    max-width: 100%;
+    font-size: 15px;
     font-weight: 700;
     text-align: center;
   }
   .nlsb-seats.nlsb-mode-normal .nlsb-icon {
-    width: 40px;
-    height: 40px;
-    flex-basis: 40px;
-    font-size: 16px;
+    width: clamp(64px, 7vw, 92px);
+    height: clamp(64px, 7vw, 92px);
+    flex-basis: auto;
+    font-size: clamp(22px, 3vw, 32px);
   }
   .nlsb-seats.nlsb-mode-normal .nlsb-name {
-    max-width: 72px;
+    max-width: 100%;
+    font-size: 12px;
+    text-align: center;
+  }
+  .nlsb-seats.nlsb-mode-packed .nlsb-icon {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+    font-size: 14px;
+  }
+  .nlsb-seats.nlsb-mode-packed .nlsb-name {
+    max-width: 68px;
     text-align: center;
   }
   .nlsb-empty-message {
@@ -304,16 +365,19 @@ const VENUE_CSS = `
     display: block;
   }
   .nlsb-audience {
+    grid-area: audience;
     display: flex;
     min-height: 36px;
     box-sizing: border-box;
     align-items: center;
     gap: 10px;
-    margin: 0 14px 14px;
+    margin: 10px 14px 0;
     padding: 8px 10px;
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.04);
+    background:
+      linear-gradient(180deg, rgba(104, 129, 160, 0.1), rgba(255, 255, 255, 0.025)),
+      rgba(255, 255, 255, 0.025);
   }
   .nlsb-audience-label,
   .nlsb-audience-more {
@@ -354,7 +418,7 @@ const VENUE_CSS = `
       padding-left: 10px;
     }
     .nlsb-stage-layout {
-      grid-template-rows: minmax(140px, 34vh) minmax(0, 1fr);
+      grid-template-rows: minmax(120px, 22vh) minmax(0, 1fr);
     }
     .nlsb-center {
       width: min(620px, 92vw);
@@ -366,17 +430,17 @@ const VENUE_CSS = `
       column-gap: 2px;
     }
     .nlsb-seats.nlsb-mode-packed .nlsb-icon {
-      width: 24px;
-      height: 24px;
-      flex-basis: 24px;
-      font-size: 10px;
+      width: 32px;
+      height: 32px;
+      flex-basis: 32px;
+      font-size: 11px;
     }
     .nlsb-seats.nlsb-mode-packed .nlsb-name,
     .nlsb-seats.nlsb-mode-normal .nlsb-name {
       display: none;
     }
     .nlsb-seats.nlsb-mode-normal .nlsb-seat {
-      flex-basis: 44px;
+      min-width: 44px;
     }
   }
   @media (max-height: 560px) {
@@ -385,7 +449,7 @@ const VENUE_CSS = `
       padding-bottom: 54px;
     }
     .nlsb-stage-layout {
-      grid-template-rows: minmax(110px, 30vh) minmax(0, 1fr);
+      grid-template-rows: minmax(100px, 22vh) minmax(0, 1fr);
       gap: 10px;
     }
     .nlsb-center {
@@ -396,7 +460,8 @@ const VENUE_CSS = `
   }
   @media (prefers-reduced-motion: reduce) {
     .nlsb-toggle,
-    .nlsb-stage {
+    .nlsb-stage,
+    .nlsb-seat {
       transition: none;
     }
   }
@@ -444,10 +509,28 @@ function createSeatNode(seatIndex) {
 
   const icon = document.createElement('span');
   icon.className = 'nlsb-icon';
+  const avatar = document.createElement('img');
+  avatar.className = 'nlsb-avatar';
+  avatar.alt = '';
+  avatar.loading = 'lazy';
+  avatar.hidden = true;
+  const fallback = document.createElement('span');
+  fallback.className = 'nlsb-icon-fallback';
+  icon.append(avatar, fallback);
   const name = document.createElement('span');
   name.className = 'nlsb-name';
   seat.append(icon, name);
-  return { seat, icon, name };
+  avatar.addEventListener('load', () => {
+    if (avatar.dataset.avatar !== avatar.getAttribute('src')) return;
+    avatar.hidden = false;
+    fallback.hidden = true;
+  });
+  avatar.addEventListener('error', () => {
+    if (avatar.dataset.avatar !== avatar.getAttribute('src')) return;
+    avatar.hidden = true;
+    fallback.hidden = false;
+  });
+  return { seat, icon, avatar, fallback, name };
 }
 
 /**
@@ -510,14 +593,14 @@ export function mountVenueBarButton() {
   title.textContent = '会場参加者 0人';
   const note = document.createElement('div');
   note.className = 'nlsb-note';
-  note.textContent = '発言した参加者を最大50席で表示';
+  note.textContent = '全コメント集計・最大150席';
   header.append(title, note);
 
   const seatsHost = document.createElement('div');
   seatsHost.className = 'nlsb-seats nlsb-mode-empty';
   /** @type {ReturnType<typeof createSeatNode>[]} */
   const seatNodes = [];
-  for (let i = 0; i < VENUE_MAX_SEATS; i += 1) {
+  for (let i = 0; i < VENUE_FULLSCREEN_MAX_SEATS; i += 1) {
     const node = createSeatNode(i);
     seatNodes.push(node);
     seatsHost.appendChild(node.seat);
@@ -559,10 +642,12 @@ export function mountVenueBarButton() {
 
   let open = false;
   let userChangedOpen = false;
-  let pollTimer = 0;
-  let pollInFlight = false;
+  let aggregateTimer = 0;
+  let aggregateInFlight = false;
   let activeLiveId = '';
   let escapeListening = false;
+  /** @type {VenueRow[]} */
+  let baseRows = [];
   /** @type {Map<string, number>} */
   let seatByKey = new Map();
 
@@ -571,6 +656,7 @@ export function mountVenueBarButton() {
    */
   const renderSeats = (rows) => {
     const seating = buildVenueSeating(rows, {
+      maxSeats: VENUE_FULLSCREEN_MAX_SEATS,
       prevSeatByKey: seatByKey,
       isGenericName: isGenericComeviewName
     });
@@ -608,7 +694,30 @@ export function mountVenueBarButton() {
       // 色は userId 優先で生成(同名の別人や匿名でも人ごとに色が変わる)。
       const colorKey = participant.userId || participant.name || participant.key;
       node.icon.style.backgroundColor = colorFromKey(colorKey);
-      node.icon.textContent = Array.from(displayName)[0] || '会';
+      node.fallback.textContent = Array.from(displayName)[0] || '会';
+      const avatarUrl = String(participant.avatar || '').trim();
+      const avatarSrc =
+        avatarUrl || anonymousIdenticonDataUrl(String(participant.userId || '').trim(), 64);
+      if (avatarSrc) {
+        if (node.avatar.dataset.avatar !== avatarSrc) {
+          node.avatar.dataset.avatar = avatarSrc;
+          node.avatar.src = avatarSrc;
+          // data URL(ゆっくり顔・Identicon)は必ず描画できるので load を待たず即表示する。
+          // 外部 http サムネのみ load/error イベントで表示/フォールバックを切り替える。
+          if (avatarSrc.startsWith('data:')) {
+            node.avatar.hidden = false;
+            node.fallback.hidden = true;
+          } else {
+            node.avatar.hidden = true;
+            node.fallback.hidden = false;
+          }
+        }
+      } else {
+        node.avatar.hidden = true;
+        node.fallback.hidden = false;
+        node.avatar.dataset.avatar = '';
+        node.avatar.removeAttribute('src');
+      }
       node.name.textContent = displayName;
       node.seat.title = displayName;
       node.seat.classList.remove('nlsb-is-empty');
@@ -616,53 +725,48 @@ export function mountVenueBarButton() {
     }
   };
 
-  const refreshSeats = async () => {
-    if (!open || pollInFlight) return;
+  const aggregateParticipants = async () => {
+    if (!open || aggregateInFlight) return;
     const liveId = liveIdFromPathname();
     if (!liveId) return;
-    pollInFlight = true;
+    aggregateInFlight = true;
     try {
       if (activeLiveId !== liveId) {
         activeLiveId = liveId;
+        baseRows = [];
         seatByKey = new Map();
+        renderSeats(baseRows);
       }
-      // 入力源は2系統: ①テール nls_ctail_<lv>(ライブ新着・安く追記される・会場向き)
-      //   ②サマリ recent(環境により未生成のことがある)。テールが空ならサマリへフォールバック。
-      const summaryKey = commentDbSummaryKey(liveId);
-      const tailKey = tailStorageKey(liveId);
-      const bag = await chrome.storage.local.get([summaryKey, tailKey]);
-      if (!open) return;
-      const tail = Array.isArray(bag?.[tailKey]) ? bag[tailKey] : [];
-      const summary = /** @type {{ recent?: unknown[] }|undefined} */ (bag?.[summaryKey]);
-      const recent = Array.isArray(summary?.recent) ? summary.recent : [];
-      const source = tail.length > 0 ? tail : recent;
-      /** @type {VenueRow[]} */
-      const rows = [];
-      for (const raw of source) {
-        if (!raw || typeof raw !== 'object') continue;
-        const row = normalizeComeviewRow(/** @type {Record<string, unknown>} */ (raw));
-        if (row) rows.push(row);
-      }
-      renderSeats(rows);
+      const result = await readChunkedComments(
+        liveId,
+        commentsStorageKey(liveId),
+        (keys) => chrome.storage.local.get(keys)
+      );
+      if (!open || liveIdFromPathname() !== liveId) return;
+      const candidates = userLaneCandidatesFromStorage(result.rows, liveId, {
+        requireText: false
+      });
+      baseRows = venueRowsFromUserLaneCandidates(candidates);
+      renderSeats(baseRows);
     } catch {
-      // 拡張更新中など一時的に storage を読めない場合は次回ポーリングへ任せる。
+      // 拡張更新中など一時的に全チャンクを読めない場合は次回集計へ任せる。
     } finally {
-      pollInFlight = false;
+      aggregateInFlight = false;
     }
   };
 
-  const stopPolling = () => {
-    if (!pollTimer) return;
-    clearInterval(pollTimer);
-    pollTimer = 0;
+  const stopAggregation = () => {
+    if (!aggregateTimer) return;
+    clearInterval(aggregateTimer);
+    aggregateTimer = 0;
   };
 
-  const startPolling = () => {
-    if (pollTimer) return;
-    void refreshSeats();
-    pollTimer = window.setInterval(() => {
-      void refreshSeats();
-    }, POLL_INTERVAL_MS);
+  const startAggregation = () => {
+    if (aggregateTimer) return;
+    void aggregateParticipants();
+    aggregateTimer = window.setInterval(() => {
+      void aggregateParticipants();
+    }, AGGREGATE_INTERVAL_MS);
   };
 
   /** @param {KeyboardEvent} event */
@@ -695,10 +799,10 @@ export function mountVenueBarButton() {
     stage.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (open) {
       addEscapeListener();
-      startPolling();
+      startAggregation();
     } else {
       removeEscapeListener();
-      stopPolling();
+      stopAggregation();
     }
     if (persist) {
       void chrome.storage.local.set({ [OPEN_STORAGE_KEY]: open }).catch(() => {});
@@ -716,7 +820,7 @@ export function mountVenueBarButton() {
   window.addEventListener(
     'pagehide',
     () => {
-      stopPolling();
+      stopAggregation();
       removeEscapeListener();
     },
     { once: true }
