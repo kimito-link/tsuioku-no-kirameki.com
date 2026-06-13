@@ -91,9 +91,12 @@
    （429 トークンバケツ移植は不要と判断: crawl lib 内の 429 backoff(2/4/8s)+ペーシングで足りる。
    既存 globalFetchRateLimiter は setAccessLevel 未配線で休眠＝起こすと 1-6req/s で一気取りを殺す
    ので絶対に配線しない）
-4. ⬜ **SW 並列度（最後の壁・2026-06-12 実機で確認）**: SW エンジンは global single-flight のため、
-   巨大配信1本が crawl/橋渡しで SW を最大 cap_elapsed(15分)占有し、他の配信の backfill が
-   待たされる（content 経路は N=2 スロット並列だった）。per-lid 並列(2本)に拡張してから既定 ON。
+4. ✅ **SW 並列度 — v0.1.706(d6bbc2e4+0fe1a35d)で per-lid 並列(N=2)化完了**。設計正本=
+   [[reference_sw_parallel_n2_design]](2視点会議で同lid冪等受理/keepalive導出/epoch retry台帳/
+   identity guard release を確定)。新純関数 swCrawlSlots.js。実機実証(2026-06-13)=2配信並走
+   (crawls[]に2本)・22,268行一気取り・no_slot待機の3本目がスロット空きで自動開始・staging併走、
+   タブ閉じ継続も維持。⚠️並走中はSWイベントループ飽和でメッセージ/evaluate応答が間欠化
+   (一時的・完走で回復・診断時は新しいstatus.htmlタブから照会)。
 5. ⬜ 巨大配信で rows 凍結のまま running が長引くケースの診断（実機 lv350674461: 14,818行で
    5分以上前進なし・SW は応答可・cap_elapsed で有界）
 6. PR1-c(visibility 系削除)は 4-5 と実機安定確認の後
