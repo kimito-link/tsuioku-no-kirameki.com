@@ -25,6 +25,11 @@ import {
   resolveVisibleAudienceCount,
   selectStableVisibleMembers
 } from '../lib/venueViewport.js';
+import {
+  bubbleAnchorForSeatRect,
+  resolveBubbleY,
+  BUBBLE_ANCHOR_GAP
+} from '../lib/venueBubbleLayout.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -34,7 +39,7 @@ const SPEECH_INTERVAL_MS = 1_500;
 const BUBBLE_LIFETIME_MS = 4_000;
 const BUBBLE_FADE_MS = 600;
 const BUBBLE_MAX = 6;
-const BUBBLE_TEXT_MAX = 20;
+const BUBBLE_TEXT_MAX = 36;
 const VENUE_LAYOUT_CLASSES = [
   'nlsb-mode-empty',
   'nlsb-mode-vip',
@@ -458,34 +463,51 @@ const VENUE_CSS = `
     max-width: 68px;
     text-align: center;
   }
+  /*
+   * 会議確定A: 吹き出し専用の最上位レイヤー。席コンテナ(.nlsb-seats overflow:hidden)の
+   * 外・stage 直下に置き、セリフがクリップされない/アバターに潜らない。
+   */
+  .nlsb-bubble-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    overflow: visible;
+    pointer-events: none;
+  }
+  /*
+   * 吹き出し本体。レイヤー基準で left/top を JS が席頭上にセットする。
+   * translate(-50%, -100%) で「指定点が吹き出しの下辺中央」になる。
+   * 会議確定B: font 18px(12px から大幅拡大)・最大2行・読みやすさ最優先(星野ロミ流)。
+   */
   .nlsb-bubble {
     position: absolute;
-    left: 50%;
-    bottom: calc(100% + 8px);
-    z-index: 3;
+    left: 0;
+    top: 0;
+    z-index: 5;
     box-sizing: border-box;
     width: max-content;
-    max-width: min(240px, 28vw);
-    padding: 7px 10px;
-    overflow: visible;
+    max-width: min(30ch, 40vw);
+    padding: 9px 13px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     border: 1px solid rgba(20, 29, 42, 0.16);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.96);
-    color: #17202d;
-    box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1.35;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.97);
+    color: #141d28;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
+    font-size: clamp(16px, 1.4vw, 20px);
+    font-weight: 700;
+    line-height: 1.4;
     opacity: 1;
     overflow-wrap: anywhere;
     pointer-events: none;
     text-shadow: none;
-    transform: translateX(-50%);
+    transform: translate(-50%, -100%);
     white-space: normal;
     animation: nlsb-bubble-pop 160ms ease-out;
-    transition:
-      opacity ${BUBBLE_FADE_MS}ms ease,
-      transform ${BUBBLE_FADE_MS}ms ease;
+    transition: opacity ${BUBBLE_FADE_MS}ms ease;
   }
   .nlsb-bubble::after {
     position: absolute;
@@ -493,23 +515,22 @@ const VENUE_CSS = `
     left: 50%;
     width: 0;
     height: 0;
-    border: 6px solid transparent;
-    border-top-color: rgba(255, 255, 255, 0.96);
+    border: 7px solid transparent;
+    border-top-color: rgba(255, 255, 255, 0.97);
     content: "";
     transform: translateX(-50%);
   }
   .nlsb-bubble.nlsb-is-leaving {
     opacity: 0;
-    transform: translate(-50%, -4px);
   }
   @keyframes nlsb-bubble-pop {
     from {
       opacity: 0;
-      transform: translate(-50%, 5px) scale(0.94);
+      transform: translate(-50%, calc(-100% + 6px)) scale(0.96);
     }
     to {
       opacity: 1;
-      transform: translateX(-50%);
+      transform: translate(-50%, -100%);
     }
   }
   .nlsb-empty-message {
@@ -878,7 +899,12 @@ export function mountVenueBarButton() {
   seating.append(header, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
   stageLayout.append(audience, safeArea, seating, center);
-  stage.append(close, stageLayout);
+  // 吹き出し専用の最上位レイヤー(会議確定A): 席コンテナの overflow:hidden の外に置くことで
+  //   セリフがクリップされず・アバターに潜らない。席の座標を測ってこの上に頭上配置する。
+  const bubbleLayer = document.createElement('div');
+  bubbleLayer.className = 'nlsb-bubble-layer';
+  bubbleLayer.setAttribute('aria-live', 'polite');
+  stage.append(close, stageLayout, bubbleLayer);
   root.append(toggle, stage);
   document.documentElement.appendChild(root);
 
@@ -902,13 +928,13 @@ export function mountVenueBarButton() {
   const spokenUserIds = new Set();
   /** @type {Map<string, number>} */
   let seatByKey = new Map();
-  /** @type {Map<number, { seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean }>} */
+  /** @type {Map<number, { seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }>} */
   const bubbleBySeat = new Map();
-  /** @type {Array<{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean }>} */
+  /** @type {Array<{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }>} */
   const activeBubbles = [];
 
   /**
-   * @param {{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean }} bubble
+   * @param {{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }} bubble
    */
   const removeBubble = (bubble) => {
     if (!bubble || bubble.removed) return;
@@ -958,7 +984,8 @@ export function mountVenueBarButton() {
     element.className = 'nlsb-bubble';
     element.textContent = text;
     element.setAttribute('aria-hidden', 'true');
-    node.seat.appendChild(element);
+    // 会議確定A: 席ノードでなく最上位レイヤーへ描く(overflow:hidden に切られない)。
+    bubbleLayer.appendChild(element);
 
     const bubble = {
       seatIndex,
@@ -969,6 +996,9 @@ export function mountVenueBarButton() {
     };
     bubbleBySeat.set(seatIndex, bubble);
     activeBubbles.push(bubble);
+
+    // 席の座標を測ってレイヤー基準の頭上へ配置。既存吹き出しと重なれば上へ逃がす(衝突回避)。
+    positionBubble(bubble);
 
     const reducedMotion =
       typeof window.matchMedia === 'function' &&
@@ -983,6 +1013,49 @@ export function mountVenueBarButton() {
       bubble.removeTimer = 0;
       removeBubble(bubble);
     }, BUBBLE_LIFETIME_MS);
+  };
+
+  /**
+   * 1つの吹き出しを、対応する席の頭上(レイヤー基準)へ絶対配置する。
+   * 既に表示中の吹き出しと縦に重なる場合は上方向へオフセットして読めるようにする。
+   * @param {{ seatIndex:number, element:HTMLDivElement, removed:boolean, _x?:number, _y?:number, _h?:number }} bubble
+   */
+  const positionBubble = (bubble) => {
+    if (!bubble || bubble.removed) return;
+    const node = seatNodes[bubble.seatIndex];
+    if (!node) return;
+    const layerRect = bubbleLayer.getBoundingClientRect();
+    const seatRect = node.icon.getBoundingClientRect();
+    // レイヤー左上を原点とした席矩形へ変換。
+    const rel = {
+      left: seatRect.left - layerRect.left,
+      top: seatRect.top - layerRect.top,
+      width: seatRect.width,
+      height: seatRect.height
+    };
+    const anchor = bubbleAnchorForSeatRect(rel, BUBBLE_ANCHOR_GAP);
+    const h = bubble.element.offsetHeight || 40;
+    // 既存の表示中吹き出し(自分以外)の占有帯を集めて衝突回避。
+    const placed = [];
+    for (const b of activeBubbles) {
+      if (b === bubble || b.removed || !b._x) continue;
+      placed.push({ x: b._x, y: b._y, h: b._h || 40 });
+    }
+    const y = resolveBubbleY({ x: anchor.x, y: anchor.y, h }, placed, {
+      xThreshold: 130,
+      vGap: 8,
+      minY: 8
+    });
+    bubble._x = anchor.x;
+    bubble._y = y;
+    bubble._h = h;
+    bubble.element.style.left = `${anchor.x}px`;
+    bubble.element.style.top = `${y}px`;
+  };
+
+  /** 表示中の全吹き出しを席座標へ再追従(スクロール/リサイズ/段再描画後)。 */
+  const repositionAllBubbles = () => {
+    for (const b of [...activeBubbles]) positionBubble(b);
   };
 
   /**
@@ -1156,6 +1229,12 @@ export function mountVenueBarButton() {
         node.seat.setAttribute('aria-hidden', 'false');
       }
     }
+    // 席が動いた(段の再描画/表示人数変化)後、表示中の吹き出しを席頭上へ追従させる。
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => repositionAllBubbles());
+    } else {
+      repositionAllBubbles();
+    }
   };
 
   const aggregateParticipants = async () => {
@@ -1295,6 +1374,35 @@ export function mountVenueBarButton() {
     escapeListening = false;
   };
 
+  // リサイズ/スクロールで席の座標が変わったら吹き出しを席頭上へ追従(rAF で間引き)。
+  let reflowRaf = 0;
+  let reflowListening = false;
+  const onBubbleReflow = () => {
+    if (reflowRaf) return;
+    reflowRaf =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame(() => {
+            reflowRaf = 0;
+            repositionAllBubbles();
+          })
+        : 0;
+    if (!reflowRaf) repositionAllBubbles();
+  };
+  const addBubbleReflowListener = () => {
+    if (reflowListening) return;
+    window.addEventListener('resize', onBubbleReflow);
+    window.addEventListener('scroll', onBubbleReflow, true);
+    reflowListening = true;
+  };
+  const removeBubbleReflowListener = () => {
+    if (!reflowListening) return;
+    window.removeEventListener('resize', onBubbleReflow);
+    window.removeEventListener('scroll', onBubbleReflow, true);
+    if (reflowRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(reflowRaf);
+    reflowRaf = 0;
+    reflowListening = false;
+  };
+
   /**
    * @param {boolean} nextOpen
    * @param {boolean} persist
@@ -1306,10 +1414,12 @@ export function mountVenueBarButton() {
     stage.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (open) {
       addEscapeListener();
+      addBubbleReflowListener();
       startAggregation();
       startSpeechPolling();
     } else {
       removeEscapeListener();
+      removeBubbleReflowListener();
       stopAggregation();
       stopSpeechPolling();
       resetSpeechTracking();
