@@ -1,6 +1,7 @@
 import { isGenericComeviewName } from '../lib/comeviewRows.js';
 import {
   buildVenueSeating,
+  buildVenueTiers,
   VENUE_FULLSCREEN_MAX_SEATS,
   venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
@@ -205,9 +206,15 @@ const VENUE_CSS = `
   .nlsb-seats {
     grid-area: seats;
     position: relative;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    /* ひな壇を席エリアの縦中央に寄せる(上の黒い空きを埋め、ステージに近づける)。 */
+    justify-content: center;
+    gap: clamp(10px, 2.4vh, 30px);
     min-height: 0;
     box-sizing: border-box;
-    padding: 18px;
+    padding: clamp(18px, 4vh, 46px) 18px;
     overflow: auto;
     background:
       radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.18), transparent 62%),
@@ -222,29 +229,39 @@ const VENUE_CSS = `
     scrollbar-gutter: stable;
     perspective: clamp(680px, 75vw, 1200px);
     perspective-origin: 50% 12%;
+    transform-style: preserve-3d;
     contain: layout paint;
   }
-  .nlsb-seats.nlsb-mode-packed {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
-    grid-auto-rows: 62px;
-    align-content: start;
-    gap: 10px 8px;
-  }
   /*
-   * 少人数でも会場が埋まって賑わって見えるレイアウト(ユーザー要望「撮影の角度で満員に見せる」)。
-   * 複雑な3D固定グリッドは20人で破綻したので、flex で大きいアバターを画面いっぱいに中央寄せで
-   * 敷き詰める方式に統一。人数が少ないほどアバターを大きく(VIP>normal>packed)、align-content:center
-   * で縦も使い、下半分が真っ黒にならないようにする。
+   * 前列を下、後列を上に積むひな壇。段数と人数は buildVenueTiers が決め、
+   * transform は奥行きの補助だけにするため reduced-motion でも段組みは崩れない。
    */
-  .nlsb-seats.nlsb-mode-vip,
-  .nlsb-seats.nlsb-mode-normal {
+  .nlsb-tier {
     display: flex;
-    flex-wrap: wrap;
-    align-content: center;
-    align-items: center;
+    width: max-content;
+    min-width: 100%;
+    flex: 0 0 auto;
+    align-items: flex-end;
     justify-content: center;
-    gap: clamp(14px, 3vh, 40px) clamp(18px, 3vw, 52px);
+    box-sizing: border-box;
+    transform-origin: 50% 100%;
+    transform-style: preserve-3d;
+    transform:
+      translateY(var(--nlsb-tier-y, 0))
+      translateZ(var(--nlsb-tier-z, 0))
+      scale(var(--nlsb-tier-scale, 1));
+  }
+  .nlsb-tier[hidden] {
+    display: none;
+  }
+  .nlsb-seats.nlsb-mode-vip .nlsb-tier {
+    gap: clamp(18px, 3vw, 52px);
+  }
+  .nlsb-seats.nlsb-mode-normal .nlsb-tier {
+    gap: clamp(12px, 2vw, 30px);
+  }
+  .nlsb-seats.nlsb-mode-packed .nlsb-tier {
+    gap: 8px;
   }
   .nlsb-seats.nlsb-mode-empty {
     display: grid;
@@ -260,9 +277,11 @@ const VENUE_CSS = `
     overflow: hidden;
   }
   .nlsb-seat.nlsb-is-empty {
-    visibility: hidden;
+    display: none;
   }
   .nlsb-seats.nlsb-mode-packed .nlsb-seat {
+    width: 68px;
+    flex: 0 0 68px;
     gap: 4px;
   }
   /* VIP(≤8人): 特大アバターでゆったり=主役感。 */
@@ -272,11 +291,6 @@ const VENUE_CSS = `
   /* 通常(≤30人): 大きめアバターを画面いっぱいに敷き詰める。 */
   .nlsb-seats.nlsb-mode-normal .nlsb-seat {
     width: clamp(84px, 9vw, 120px);
-  }
-  .nlsb-seats.nlsb-mode-vip .nlsb-seat.nlsb-is-empty,
-  .nlsb-seats.nlsb-mode-normal .nlsb-seat.nlsb-is-empty,
-  .nlsb-seats.nlsb-mode-empty .nlsb-seat {
-    display: none;
   }
   .nlsb-icon {
     position: relative;
@@ -427,7 +441,13 @@ const VENUE_CSS = `
     .nlsb-seats {
       padding-right: 10px;
       padding-left: 10px;
-      column-gap: 2px;
+    }
+    .nlsb-seats.nlsb-mode-packed .nlsb-tier {
+      gap: 4px;
+    }
+    .nlsb-seats.nlsb-mode-packed .nlsb-seat {
+      width: 54px;
+      flex-basis: 54px;
     }
     .nlsb-seats.nlsb-mode-packed .nlsb-icon {
       width: 32px;
@@ -463,6 +483,9 @@ const VENUE_CSS = `
     .nlsb-stage,
     .nlsb-seat {
       transition: none;
+    }
+    .nlsb-tier {
+      transform: none;
     }
   }
 `;
@@ -598,12 +621,22 @@ export function mountVenueBarButton() {
 
   const seatsHost = document.createElement('div');
   seatsHost.className = 'nlsb-seats nlsb-mode-empty';
+  /** @type {HTMLDivElement[]} */
+  const tierNodes = [];
+  for (let i = 0; i < 5; i += 1) {
+    const tier = document.createElement('div');
+    tier.className = 'nlsb-tier';
+    tier.dataset.tierIndex = String(i);
+    tier.hidden = true;
+    tierNodes.push(tier);
+    seatsHost.appendChild(tier);
+  }
   /** @type {ReturnType<typeof createSeatNode>[]} */
   const seatNodes = [];
   for (let i = 0; i < VENUE_FULLSCREEN_MAX_SEATS; i += 1) {
     const node = createSeatNode(i);
     seatNodes.push(node);
-    seatsHost.appendChild(node.seat);
+    tierNodes[0].appendChild(node.seat);
   }
 
   const emptyMessage = document.createElement('div');
@@ -680,48 +713,76 @@ export function mountVenueBarButton() {
     audienceMore.hidden = remainingAudience === 0;
     audienceMore.textContent = remainingAudience > 0 ? `ほか観客 ${remainingAudience}人` : '';
 
-    const byIndex = new Map(seating.seats.map((entry) => [entry.seatIndex, entry.participant]));
-    for (let i = 0; i < seatNodes.length; i += 1) {
-      const node = seatNodes[i];
-      const participant = byIndex.get(i);
-      if (!participant) {
-        node.seat.classList.add('nlsb-is-empty');
-        node.seat.setAttribute('aria-hidden', 'true');
-        node.seat.removeAttribute('title');
+    for (const node of seatNodes) {
+      node.seat.classList.add('nlsb-is-empty');
+      node.seat.setAttribute('aria-hidden', 'true');
+      node.seat.removeAttribute('title');
+      delete node.seat.dataset.tierIndex;
+    }
+
+    const tiers = buildVenueTiers(seating.seats.length);
+    for (let i = 0; i < tierNodes.length; i += 1) {
+      const tierNode = tierNodes[i];
+      const tier = tiers[i];
+      tierNode.hidden = !tier;
+      if (!tier) {
+        tierNode.style.removeProperty('--nlsb-tier-y');
+        tierNode.style.removeProperty('--nlsb-tier-z');
+        tierNode.style.removeProperty('--nlsb-tier-scale');
         continue;
       }
-      const displayName = String(participant.name || '').trim() || `会場${i + 1}`;
-      // 色は userId 優先で生成(同名の別人や匿名でも人ごとに色が変わる)。
-      const colorKey = participant.userId || participant.name || participant.key;
-      node.icon.style.backgroundColor = colorFromKey(colorKey);
-      node.fallback.textContent = Array.from(displayName)[0] || '会';
-      const avatarUrl = String(participant.avatar || '').trim();
-      const avatarSrc =
-        avatarUrl || anonymousIdenticonDataUrl(String(participant.userId || '').trim(), 64);
-      if (avatarSrc) {
-        if (node.avatar.dataset.avatar !== avatarSrc) {
-          node.avatar.dataset.avatar = avatarSrc;
-          node.avatar.src = avatarSrc;
-          // data URL(ゆっくり顔・Identicon)は必ず描画できるので load を待たず即表示する。
-          // 外部 http サムネのみ load/error イベントで表示/フォールバックを切り替える。
-          if (avatarSrc.startsWith('data:')) {
-            node.avatar.hidden = false;
-            node.fallback.hidden = true;
-          } else {
-            node.avatar.hidden = true;
-            node.fallback.hidden = false;
+      const translateY = -Math.round(tier.depth * 18);
+      const translateZ = -Math.round(tier.depth * 72);
+      tierNode.style.setProperty('--nlsb-tier-y', `${translateY}px`);
+      tierNode.style.setProperty('--nlsb-tier-z', `${translateZ}px`);
+      tierNode.style.setProperty('--nlsb-tier-scale', String(tier.scale));
+    }
+
+    let seatCursor = 0;
+    for (const tier of tiers) {
+      const tierNode = tierNodes[tier.rowIndex];
+      for (let tierSeatIndex = 0; tierSeatIndex < tier.count; tierSeatIndex += 1) {
+        const entry = seating.seats[seatCursor];
+        seatCursor += 1;
+        if (!entry) continue;
+        const node = seatNodes[entry.seatIndex];
+        const participant = entry.participant;
+        tierNode.appendChild(node.seat);
+        node.seat.dataset.tierIndex = String(tier.rowIndex);
+        const i = entry.seatIndex;
+        const displayName = String(participant.name || '').trim() || `会場${i + 1}`;
+        // 色は userId 優先で生成(同名の別人や匿名でも人ごとに色が変わる)。
+        const colorKey = participant.userId || participant.name || participant.key;
+        node.icon.style.backgroundColor = colorFromKey(colorKey);
+        node.fallback.textContent = Array.from(displayName)[0] || '会';
+        const avatarUrl = String(participant.avatar || '').trim();
+        const avatarSrc =
+          avatarUrl || anonymousIdenticonDataUrl(String(participant.userId || '').trim(), 64);
+        if (avatarSrc) {
+          if (node.avatar.dataset.avatar !== avatarSrc) {
+            node.avatar.dataset.avatar = avatarSrc;
+            node.avatar.src = avatarSrc;
+            // data URL(ゆっくり顔・Identicon)は必ず描画できるので load を待たず即表示する。
+            // 外部 http サムネのみ load/error イベントで表示/フォールバックを切り替える。
+            if (avatarSrc.startsWith('data:')) {
+              node.avatar.hidden = false;
+              node.fallback.hidden = true;
+            } else {
+              node.avatar.hidden = true;
+              node.fallback.hidden = false;
+            }
           }
+        } else {
+          node.avatar.hidden = true;
+          node.fallback.hidden = false;
+          node.avatar.dataset.avatar = '';
+          node.avatar.removeAttribute('src');
         }
-      } else {
-        node.avatar.hidden = true;
-        node.fallback.hidden = false;
-        node.avatar.dataset.avatar = '';
-        node.avatar.removeAttribute('src');
+        node.name.textContent = displayName;
+        node.seat.title = displayName;
+        node.seat.classList.remove('nlsb-is-empty');
+        node.seat.setAttribute('aria-hidden', 'false');
       }
-      node.name.textContent = displayName;
-      node.seat.title = displayName;
-      node.seat.classList.remove('nlsb-is-empty');
-      node.seat.setAttribute('aria-hidden', 'false');
     }
   };
 

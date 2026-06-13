@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.710',
+    date: '2026-06-13',
+    summary: '会場モードを立体的なひな壇表示に',
+    items: Object.freeze([
+      '会場モードの参加者を、手前が大きく奥が小さいひな壇のように立体的に並べました',
+      '人数に応じて段数が変わり、少人数でもライブ会場のように見えます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.709',
     date: '2026-06-13',
     summary: '会場モードに参加者全員を表示',
