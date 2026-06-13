@@ -5,6 +5,7 @@ import {
   countAnonymousParticipants,
   resolveVenueLayoutMode,
   venueRowsFromUserLaneCandidates,
+  buildVenueTiers,
   VENUE_FULLSCREEN_MAX_SEATS,
   rankVenueParticipants,
   assignVenueSeats,
@@ -244,5 +245,54 @@ describe('venueRowsFromUserLaneCandidates', () => {
   it('非配列や不正要素を安全に無視する', () => {
     expect(venueRowsFromUserLaneCandidates(null)).toEqual([]);
     expect(venueRowsFromUserLaneCandidates([null, {}, { userId: ' ' }])).toEqual([]);
+  });
+});
+
+describe('buildVenueTiers', () => {
+  it('0人は空', () => {
+    expect(buildVenueTiers(0)).toEqual([]);
+  });
+
+  it('少人数(<=8)は1段・手前スケール1.0', () => {
+    const t = buildVenueTiers(5);
+    expect(t).toHaveLength(1);
+    expect(t[0].count).toBe(5);
+    expect(t[0].scale).toBe(1);
+    expect(t[0].depth).toBe(0);
+  });
+
+  it('人数が増えると段数が増える', () => {
+    expect(buildVenueTiers(8)).toHaveLength(1);
+    expect(buildVenueTiers(16)).toHaveLength(2);
+    expect(buildVenueTiers(30)).toHaveLength(3);
+    expect(buildVenueTiers(50)).toHaveLength(4);
+    expect(buildVenueTiers(150)).toHaveLength(5);
+  });
+
+  it('全段の合計人数が入力と一致する(取りこぼし/水増しなし)', () => {
+    for (const n of [3, 9, 17, 31, 55, 99, 150]) {
+      const total = buildVenueTiers(n).reduce((a, t) => a + t.count, 0);
+      expect(total).toBe(n);
+    }
+  });
+
+  it('手前ほど大きく奥ほど小さい(scaleが単調減少)', () => {
+    const t = buildVenueTiers(30);
+    for (let i = 1; i < t.length; i += 1) {
+      expect(t[i].scale).toBeLessThan(t[i - 1].scale);
+    }
+    // 最奥は minScale 付近(ほどよく立体=既定0.62)
+    expect(t[t.length - 1].scale).toBeCloseTo(0.62, 5);
+  });
+
+  it('奥の段ほど横に広い(後方客席が広がる)', () => {
+    const t = buildVenueTiers(30);
+    // 前列より最奥のほうが席数が多い(重み +25%/段)
+    expect(t[t.length - 1].count).toBeGreaterThanOrEqual(t[0].count);
+  });
+
+  it('minScale を指定できる', () => {
+    const t = buildVenueTiers(30, { minScale: 0.4 });
+    expect(t[t.length - 1].scale).toBeCloseTo(0.4, 5);
   });
 });
