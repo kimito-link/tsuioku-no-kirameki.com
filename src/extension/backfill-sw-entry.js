@@ -351,6 +351,8 @@ function scheduleSwRetry(crawlArgs, scheduledAt) {
     if (resolution.action === 'run') {
       _swRetryByLid[lid] = retried + 1;
       startSwCrawl(crawlArgs);
+      // 成功時は startSwCrawl 内の sync と冪等。万一 start が早期 return した場合の止め忘れ防御。
+      syncSwKeepalive();
       return;
     }
     syncSwKeepalive();
