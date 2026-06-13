@@ -31,6 +31,13 @@ export const KEY_DEV_MONITOR_OVERLAY = 'nls_dev_monitor_overlay_v1';
 export const KEY_DIAGNOSTICS_ERROR_RING_V1 = 'nls_diagnostics_error_ring_v1';
 
 /**
+ * v0.1.725: 描画(paint)コストの軽量リングバッファ(paintPerfLog)。
+ * popup が paintWatchPopupUi の所要 ms を本番でも記録し、status/diag で「重い瞬間」を数値で読む
+ * (星野メソッド「速度はデザインの一部・中で測って外で読む」/ Karpathy「推測でなく実測」)。local only。
+ */
+export const KEY_PAINT_PERF_RING_V1 = 'nls_paint_perf_ring_v1';
+
+/**
  * 同接推定の較正データ（リングバッファ・最大2000件・local only・PII なし）。
  * 推定算出のたびに throttled で 1 サンプル（A/B/C/D/blend・来場・コメ毎分・経過・
  * 公式同接があれば誤差）を積む。手動視聴と自動巡回(autopatrol)の両方が同じ器へ書く。
@@ -548,6 +555,17 @@ export function commentsStorageKey(liveId) {
 export function watchSnapshotStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();
   return `nls_watch_snapshot_${id}`;
+}
+
+/**
+ * v0.1.725: サムネ取得カバレッジの軽量サマリ({thumbPct,total,withAvatar})。
+ * popup が computeAcquisitionPercents の結果を書き、status.html が読んで「サムネ取得率○%」を出す
+ * (星野ロミ yukkuriHealth 流の coverage 可視化)。snapshot を触らない最小経路。
+ * @param {string} liveId lv123
+ */
+export function avatarCoverageStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_avatar_coverage_${id}`;
 }
 
 /** @param {string} liveId lv123 */

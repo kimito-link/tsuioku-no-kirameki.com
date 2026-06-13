@@ -167,6 +167,7 @@ import {
   commentDbSummaryKey,
   CDB_BROADCAST_CHANNEL,
   watchSnapshotStorageKey,
+  KEY_PAINT_PERF_RING_V1,
   giftUsersStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
@@ -637,6 +638,7 @@ import { buildReportFriendlyMetaRows } from '../lib/reportFriendlyMetaRowsHtml.j
 import { buildReportUserRoomRows } from '../lib/reportUserRoomTableHtml.js';
 import { shouldRunDevMonitorPaint } from '../lib/devMonitorPaintGate.js';
 import { shouldSkipHeavyDiagPaint } from '../lib/diagPaintDeferGate.js';
+import { createPaintPerfRecorder } from '../lib/paintPerfLog.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
@@ -2953,6 +2955,11 @@ const watchMetaCache = {
 //   (署名方式の「更新停止バグ」を構造的に回避)。スクロール中は arr が不変なことが多く効く。
 /** @type {{ arr: unknown[], lv: string, displayEntries: unknown[], broadcasterUid: string|null }|null} */
 let _displayEntriesMemo = null;
+
+// v0.1.725: paint コストを軽量記録(星野「中で測って外で読む」)。状態/間引きは lib に内包。
+const recordPaintPerf = createPaintPerfRecorder({
+  persist: (ring) => { try { void chrome.storage.local.set({ [KEY_PAINT_PERF_RING_V1]: ring }).catch(() => {}); } catch { /* ctx 切れ */ } }
+});
 
 // v0.1.398: snapshot fetch ハング耐性 e2e（snapshot-fetch-hang-resilient.spec.js）が、
 //   「fetch が永久ハングしても snapshotFetchActive が永久 true に張り付かない（withTimeout で
@@ -14393,7 +14400,11 @@ async function refresh() {
     setArr: (next) => {
       arr = next;
     },
-    paint: () => paintWatchPopupUi()
+    paint: () => {
+      const t0 = performance.now(); // 定期 paint の所要 ms を実測(挙動不変・計測のみ)
+      paintWatchPopupUi();
+      recordPaintPerf(performance.now() - t0, Array.isArray(arr) ? arr.length : 0);
+    }
   });
   void maybeFlushBroadcastSessionSummarySample({
     liveId: lv,
