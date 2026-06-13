@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.707',
+    date: '2026-06-13',
+    summary: 'ニコ生に会場モードを追加',
+    items: Object.freeze([
+      'ニコ生の配信ページ下部に「会場モード」を追加しました。発言した参加者がアバターで並び、人数に応じて見た目が変わります（少人数はVIP風に大きく表示）',
+      '匿名の参加者は後方の観客席としてまとめて表示し、会場のにぎわいを出します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.706',
     date: '2026-06-13',
     summary: '過去ログ取得を配信ごとに2本並列化',
