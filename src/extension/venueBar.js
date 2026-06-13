@@ -3,7 +3,6 @@ import {
   buildVenueSeating,
   buildVenueTiers,
   collectAudienceFaceUserIds,
-  VENUE_AUDIENCE_FACE_MAX,
   VENUE_FULLSCREEN_MAX_SEATS,
   venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
@@ -22,7 +21,6 @@ import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
 import {
   seatsPerRow,
   resolveVisibleArenaCount,
-  resolveVisibleAudienceCount,
   selectStableVisibleMembers
 } from '../lib/venueViewport.js';
 import {
@@ -30,6 +28,7 @@ import {
   resolveBubbleY,
   BUBBLE_ANCHOR_GAP
 } from '../lib/venueBubbleLayout.js';
+import { drawCrowdOnCanvas } from '../lib/crowdRasterizer.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -164,8 +163,8 @@ const VENUE_CSS = `
   }
   /*
    * 会議確定B(2026-06-13): 中央に「映像セーフエリア」を確保して配信映像を見せる。
-   *   上端=観客帯(コンパクト1行)、中央=何も置かない空き(映像が透ける)、下端=ひな壇。
-   *   観客帯とひな壇を画面の上下に逃がし、中央 1fr を空けることで映像が常に見える。
+   *   上端=なし(背景の光の海)、中央=何も置かない空き(映像が透ける)、下端=ひな壇。
+   *   ひな壇を画面の下に逃がし、中央 1fr を空けることで映像が常に見える。
    */
   .nlsb-stage-layout {
     position: relative;
@@ -175,9 +174,8 @@ const VENUE_CSS = `
     height: 100%;
     min-height: 0;
     margin: 0 auto;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto;
     grid-template-areas:
-      "audience"
       "safe"
       "seating";
     gap: clamp(8px, 1.5vh, 16px);
@@ -523,6 +521,7 @@ const VENUE_CSS = `
     line-height: 1.4;
     opacity: 1;
     overflow-wrap: anywhere;
+    word-break: break-all;
     pointer-events: none;
     text-shadow: none;
     transform: translate(-50%, -100%);
@@ -563,65 +562,20 @@ const VENUE_CSS = `
   .nlsb-seats.nlsb-mode-empty .nlsb-empty-message {
     display: block;
   }
-  /*
-   * 観客席は画面最上部のコンパクトな1行帯にする(会議確定B「映像を覆わない・1〜2行」)。
-   * flex-wrap を切って 1 行に固定し、はみ出しは overflow:hidden でクリップ。高さが伸びて
-   * 映像を覆うことが構造的に起きない。残りは「ほか観客 N 人」テキストで示す。
-   */
-  .nlsb-audience {
-    grid-area: audience;
-    align-self: start;
-    display: flex;
-    height: 44px;
-    box-sizing: border-box;
-    align-items: center;
-    gap: 10px;
-    margin: 0;
-    padding: 5px 12px;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 10px;
-    /* 観客帯も薄く=上の映像を透けさせる。 */
-    background:
-      linear-gradient(180deg, rgba(104, 129, 160, 0.1), rgba(255, 255, 255, 0.02)),
-      rgba(9, 13, 19, 0.26);
-    pointer-events: auto;
-  }
-  .nlsb-audience-label,
-  .nlsb-audience-more {
-    flex: 0 0 auto;
-    color: rgba(255, 255, 255, 0.62);
-    font-size: 10px;
-    white-space: nowrap;
-  }
-  .nlsb-audience-dots {
-    display: flex;
-    min-width: 0;
-    flex: 1;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 4px;
-    overflow: hidden;
-  }
-  .nlsb-audience-dot {
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
-    border-radius: 50%;
-    background: rgba(196, 204, 216, 0.2);
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
-    overflow: hidden;
-  }
-  .nlsb-audience-face {
-    display: block;
+  .nlsb-crowd-canvas {
+    position: absolute;
+    bottom: 0;
+    left: 0;
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: clamp(200px, 40vh, 350px);
+    z-index: 0; /* ひな壇(.nlsb-seating z:1)の裏 */
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1200ms ease-in-out;
+    mix-blend-mode: screen; /* サイリウムを美しく光らせる */
   }
-  .nlsb-audience[hidden],
-  .nlsb-audience-dot[hidden],
-  .nlsb-audience-more[hidden] {
-    display: none;
+  .nlsb-crowd-canvas.nlsb-is-visible {
+    opacity: 1;
   }
   @media (max-width: 900px) {
     .nlsb-toggle {
@@ -709,10 +663,13 @@ function colorFromKey(key) {
   return `hsl(${(hash >>> 0) % 360}, 68%, 46%)`;
 }
 
+let _forcedLiveId = null;
+
 /**
  * @returns {string}
  */
 function liveIdFromPathname() {
+  if (_forcedLiveId) return _forcedLiveId;
   const match = String(location.pathname || '').match(/^\/watch\/(lv\d{1,15})(?:\/|$)/i);
   return match ? match[1].toLowerCase() : '';
 }
@@ -776,11 +733,14 @@ function createSeatNode(seatIndex) {
 
 /**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
+ * @param {{ standalone?: boolean }} options
  */
-export function mountVenueBarButton() {
+export function mountVenueBarButton(options = {}) {
+  const isStandalone = !!options.standalone;
   if (!liveIdFromPathname()) return;
   if (document.getElementById(ROOT_ID)) return;
-  if (!document.documentElement) return;
+  const parent = isStandalone ? document.body : document.documentElement;
+  if (!parent) return;
 
   ensureVenueStyle();
 
@@ -808,8 +768,22 @@ export function mountVenueBarButton() {
   close.className = 'nlsb-close';
   close.textContent = '✕ 閉じる';
 
+  if (isStandalone) {
+    toggle.style.display = 'none';
+    close.style.display = 'none';
+    // スタンドアロン時は背景を黒系に塗り、映像セーフエリアを確保
+    root.style.background = '#0a0b0c';
+  }
+
+  const crowdCanvas = document.createElement('canvas');
+  crowdCanvas.className = 'nlsb-crowd-canvas';
+  // 高画質すぎると重いので適度な解像度に固定（CSSで画面幅に引き伸ばす）
+  crowdCanvas.width = 1200;
+  crowdCanvas.height = 350;
+
   const stageLayout = document.createElement('div');
   stageLayout.className = 'nlsb-stage-layout';
+  stageLayout.appendChild(crowdCanvas); // 背景として配置
 
   const center = document.createElement('div');
   center.className = 'nlsb-center';
@@ -848,10 +822,35 @@ export function mountVenueBarButton() {
       // 拡張コンテキスト切れ等は黙って無視(次回クリックで再試行)。
     }
   });
+
+  let venueWindowBtn = null;
+  if (!isStandalone) {
+    venueWindowBtn = document.createElement('button');
+    venueWindowBtn.type = 'button';
+    venueWindowBtn.className = 'nlsb-comeview-btn'; // スタイル流用
+    venueWindowBtn.textContent = '↗ 別窓化';
+    venueWindowBtn.title = '会場モードを別ウィンドウ(OBS等用)で開く';
+    venueWindowBtn.style.marginLeft = '8px';
+    venueWindowBtn.addEventListener('click', () => {
+      try {
+        chrome.runtime.sendMessage({ type: 'NLS_OPEN_VENUE', liveId: liveIdFromPathname() });
+        // 別窓化したらインライン版は一旦閉じる
+        userChangedOpen = true;
+        setOpen(false, true);
+      } catch {
+        /* no-op */
+      }
+    });
+  }
+
   const note = document.createElement('div');
   note.className = 'nlsb-note';
   note.textContent = '全コメント集計・最大150席';
-  headerRight.append(comeviewBtn, note);
+  if (venueWindowBtn) {
+    headerRight.append(comeviewBtn, venueWindowBtn, note);
+  } else {
+    headerRight.append(comeviewBtn, note);
+  }
   header.append(title, headerRight);
 
   const seatsHost = document.createElement('div');
@@ -879,47 +878,15 @@ export function mountVenueBarButton() {
   emptyMessage.textContent = 'まだ名前付きの参加者がいません';
   seatsHost.appendChild(emptyMessage);
 
-  const audience = document.createElement('div');
-  audience.className = 'nlsb-audience';
-  audience.hidden = true;
-  const audienceLabel = document.createElement('span');
-  audienceLabel.className = 'nlsb-audience-label';
-  audienceLabel.textContent = '観客席';
-  const audienceDots = document.createElement('div');
-  audienceDots.className = 'nlsb-audience-dots';
-  /** @type {HTMLSpanElement[]} */
-  const audienceDotNodes = [];
-  /** @type {HTMLImageElement[]} */
-  const audienceFaceNodes = [];
-  for (let i = 0; i < VENUE_AUDIENCE_FACE_MAX; i += 1) {
-    const dot = document.createElement('span');
-    dot.className = 'nlsb-audience-dot';
-    dot.hidden = true;
-    dot.setAttribute('aria-hidden', 'true');
-    const face = document.createElement('img');
-    face.className = 'nlsb-audience-face';
-    face.alt = '';
-    face.loading = 'lazy';
-    face.setAttribute('aria-hidden', 'true');
-    dot.appendChild(face);
-    audienceDotNodes.push(dot);
-    audienceFaceNodes.push(face);
-    audienceDots.appendChild(dot);
-  }
-  const audienceMore = document.createElement('span');
-  audienceMore.className = 'nlsb-audience-more';
-  audienceMore.hidden = true;
-  audience.append(audienceLabel, audienceDots, audienceMore);
-
   // 中央の映像セーフエリア(UI を置かず、配信映像を常に見せる)。
   const safeArea = document.createElement('div');
   safeArea.className = 'nlsb-safe-area';
   safeArea.setAttribute('aria-hidden', 'true');
 
-  // seating は下端のひな壇だけ(header + seats)。観客帯は最上部・映像は中央。
+  // seating は下端のひな壇だけ(header + seats)。
   seating.append(header, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
-  stageLayout.append(audience, safeArea, seating, center);
+  stageLayout.append(crowdCanvas, safeArea, seating, center);
   // 吹き出し専用の最上位レイヤー(会議確定A): 席コンテナの overflow:hidden の外に置くことで
   //   セリフがクリップされず・アバターに潜らない。席の座標を測ってこの上に頭上配置する。
   const bubbleLayer = document.createElement('div');
@@ -927,7 +894,7 @@ export function mountVenueBarButton() {
   bubbleLayer.setAttribute('aria-live', 'polite');
   stage.append(close, stageLayout, bubbleLayer);
   root.append(toggle, stage);
-  document.documentElement.appendChild(root);
+  parent.appendChild(root);
 
   let open = false;
   let userChangedOpen = false;
@@ -1124,7 +1091,7 @@ export function mountVenueBarButton() {
     );
     // アリーナ席は名前付き + しゃべった匿名(promote)。それ以外の匿名は後方の観客席へ
     // ゆっくり顔で表示し、上限超過分だけ人数で補う。
-    const { faceUserIds, totalAnonymous } = collectAudienceFaceUserIds(rows, {
+    const { totalAnonymous } = collectAudienceFaceUserIds(rows, {
       isGenericName: isGenericComeviewName,
       promoteUserIds: spokenUserIds
     });
@@ -1132,34 +1099,15 @@ export function mountVenueBarButton() {
       totalAnonymous > 0
         ? `会場参加者 ${seating.participantCount}人 ・ ほか観客 ${totalAnonymous}人`
         : `会場参加者 ${seating.participantCount}人`;
-    audience.hidden = totalAnonymous === 0;
-    audience.setAttribute('aria-label', `観客席 ${totalAnonymous}人`);
-    // 観客帯は最上部の 1 行に収める(映像を覆わない)。1 行に入る数だけ顔を出し、残りは人数表示。
-    const audienceAreaWidth = audienceDots.clientWidth || (window.innerWidth || 1280) * 0.7;
-    const audiencePerRow = seatsPerRow(audienceAreaWidth, 34);
-    const audienceCap = resolveVisibleAudienceCount({
-      totalFaces: faceUserIds.length,
-      perRow: audiencePerRow,
-      rows: 1,
-      hardCap: audienceDotNodes.length
-    });
-    const visibleAudienceFaces = Math.min(faceUserIds.length, audienceCap, audienceDotNodes.length);
-    for (let i = 0; i < audienceDotNodes.length; i += 1) {
-      const uid = i < visibleAudienceFaces ? faceUserIds[i] : '';
-      const dot = audienceDotNodes[i];
-      const face = audienceFaceNodes[i];
-      dot.hidden = !uid;
-      if (uid && face.dataset.userId !== uid) {
-        face.dataset.userId = uid;
-        face.src = anonymousIdenticonDataUrl(uid, 32);
-      } else if (!uid && face.dataset.userId) {
-        delete face.dataset.userId;
-        face.removeAttribute('src');
-      }
+    // PR-C1: 人数ラスタライザ Canvas (Antigravity Enhanced)
+    if (totalAnonymous > 0) {
+      crowdCanvas.classList.add('nlsb-is-visible');
+      // liveId をシードとして安定描画
+      const seed = Array.from(activeLiveId).reduce((hash, char) => (hash << 5) - hash + char.charCodeAt(0), 0);
+      drawCrowdOnCanvas(crowdCanvas, totalAnonymous, seed);
+    } else {
+      crowdCanvas.classList.remove('nlsb-is-visible');
     }
-    const remainingAudience = Math.max(0, totalAnonymous - visibleAudienceFaces);
-    audienceMore.hidden = remainingAudience === 0;
-    audienceMore.textContent = remainingAudience > 0 ? `ほか観客 ${remainingAudience}人` : '';
 
     for (const node of seatNodes) {
       node.seat.classList.add('nlsb-is-empty');
@@ -1211,10 +1159,12 @@ export function mountVenueBarButton() {
         node.fallback.textContent = Array.from(displayName)[0] || '会';
         const avatarUrl = String(participant.avatar || '').trim();
         const uidForFace = String(participant.userId || '').trim();
+        const isNumericUid = /^\d{2,15}$/.test(uidForFace);
+        const derivedAvatar = isNumericUid ? `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${Math.floor(Number(uidForFace) / 10000)}/${uidForFace}.jpg` : '';
         const yukkuriFace = uidForFace ? anonymousIdenticonDataUrl(uidForFace, 64) : '';
         // http サムネが読めなかったときの差し替え先(ゆっくり顔)を席に持たせる。
         node.avatar.dataset.fallbackFace = yukkuriFace;
-        const avatarSrc = avatarUrl || yukkuriFace;
+        const avatarSrc = avatarUrl || derivedAvatar || yukkuriFace;
         if (avatarSrc) {
           if (node.avatar.dataset.avatar !== avatarSrc) {
             node.avatar.dataset.avatar = avatarSrc;
@@ -1362,10 +1312,23 @@ export function mountVenueBarButton() {
     }
   };
 
+  const handleStorageChange = (changes, areaName) => {
+    if (areaName !== 'local' || !open) return;
+    const liveId = liveIdFromPathname();
+    if (!liveId) return;
+    const tailKey = tailStorageKey(liveId);
+    const summaryKey = commentDbSummaryKey(liveId);
+    if (changes[tailKey] || changes[summaryKey]) void pollSpeech();
+    if (changes[summaryKey]) void aggregateParticipants();
+  };
+
   const stopSpeechPolling = () => {
     if (!speechTimer) return;
     clearInterval(speechTimer);
     speechTimer = 0;
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+    }
   };
 
   const startSpeechPolling = () => {
@@ -1374,6 +1337,9 @@ export function mountVenueBarButton() {
     speechTimer = window.setInterval(() => {
       void pollSpeech();
     }, SPEECH_INTERVAL_MS);
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener(handleStorageChange);
+    }
   };
 
   /** @param {KeyboardEvent} event */
@@ -1469,10 +1435,19 @@ export function mountVenueBarButton() {
     { once: true }
   );
 
-  void chrome.storage.local
-    .get(OPEN_STORAGE_KEY)
-    .then((bag) => {
-      if (!userChangedOpen) setOpen(bag?.[OPEN_STORAGE_KEY] === true, false);
-    })
-    .catch(() => {});
+  if (isStandalone) {
+    setOpen(true, false);
+  } else {
+    void chrome.storage.local
+      .get(OPEN_STORAGE_KEY)
+      .then((bag) => {
+        if (!userChangedOpen) setOpen(bag?.[OPEN_STORAGE_KEY] === true, false);
+      })
+      .catch(() => {});
+  }
+}
+
+export function mountVenueStandalone(liveId) {
+  _forcedLiveId = liveId;
+  mountVenueBarButton({ standalone: true });
 }
