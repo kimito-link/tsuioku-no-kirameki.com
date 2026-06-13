@@ -72,8 +72,9 @@ npm run setup:claude
 
 1. **禁止**: 応答に `call` / `<invoke name="Bash">` 等を書く → 実行されずスピンしたまま止まる。
 2. **必須**: Bash/Read/Edit はネイティブ **tool_use のみ**。
-3. **長いセッション**（5000+ テスト引き継ぎ等）→ **新チャット** または `/compact`。詳細は `~/.claude/CLAUDE.md`。
-4. **Computer Use / windows sandbox failed** → 実機クリックは Claude-in-Chrome MCP かユーザー手動。sandbox 再試行ループで止まらないよう即打ち切り。
+3. **禁止**: `.claude/agents/*.md` に `<invoke>` / `<content>` / `<parameter>` 等の tool-call 断片を保存しない。`npm run setup:claude` は混入済み断片を自動除去する。
+4. **長いセッション**（5000+ テスト引き継ぎ等）→ **新チャット** または `/compact`。詳細は `~/.claude/CLAUDE.md`。
+5. **Computer Use / windows sandbox failed** → 実機クリックは Claude-in-Chrome MCP かユーザー手動。sandbox 再試行ループで止まらないよう即打ち切り。
 
 ## 詳細はすべて AGENTS.md と memory/MEMORY.md に
 

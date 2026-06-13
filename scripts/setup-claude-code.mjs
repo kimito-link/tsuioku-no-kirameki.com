@@ -12,6 +12,25 @@ const ROOT = process.cwd();
 const dir = path.join(ROOT, '.claude');
 const target = path.join(dir, 'settings.json');
 const example = path.join(dir, 'settings.json.example');
+const agentsDir = path.join(dir, 'agents');
+const TOOL_MARKUP_LINE_RE =
+  /^\s*<\/?(?:content|invoke|parameter|tool_use|function_calls?)\b[^>]*>\s*$/gim;
+
+function repairAgentDefinitions() {
+  if (!fs.existsSync(agentsDir)) return;
+  for (const entry of fs.readdirSync(agentsDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+    const agentPath = path.join(agentsDir, entry.name);
+    const current = fs.readFileSync(agentPath, 'utf8');
+    const repaired = current
+      .replace(TOOL_MARKUP_LINE_RE, '')
+      .replace(/\r?\n{3,}$/g, '\n');
+    if (repaired !== current) {
+      fs.writeFileSync(agentPath, repaired, 'utf8');
+      console.log('Removed invalid tool markup:', agentPath);
+    }
+  }
+}
 
 if (!fs.existsSync(example)) {
   console.error('missing .claude/settings.json.example');
@@ -19,6 +38,7 @@ if (!fs.existsSync(example)) {
 }
 
 fs.mkdirSync(dir, { recursive: true });
+repairAgentDefinitions();
 const next = fs.readFileSync(example, 'utf8');
 if (fs.existsSync(target)) {
   const cur = fs.readFileSync(target, 'utf8');
