@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.709',
+    date: '2026-06-13',
+    summary: '会場モードに参加者全員を表示',
+    items: Object.freeze([
+      '会場モードに、その配信で発言した参加者をゆっくり顔アバターで全員表示するようにしました',
+      '人数が少なくてもアバターを大きく並べ、会場がにぎやかに見えるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.708',
     date: '2026-06-13',
     summary: '会場モードを全画面表示に変更',
