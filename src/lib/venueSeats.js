@@ -27,13 +27,14 @@ export const VENUE_FULLSCREEN_MAX_SEATS = 150;
 export const VENUE_FRONT_ROW_SEATS = 20;
 
 /**
- * VIP モードの上限人数(これ以下なら大アイコンで「VIP感」を出す)。
- * ユーザー方針(2026-06-13)「5人で見れてVIP感でるみたいな」。
+ * VIP モードの上限人数(これ以下なら特大アイコンで「VIP感」を出す)。
+ * ユーザー方針(2026-06-13)「5人で見れてVIP感」「人数が少ない時は大きさ・配置を変えて」。
+ * 少人数ほど大きく見せて会場のスカスカを防ぐため 8 人まで VIP(特大)扱い。
  */
-export const VENUE_VIP_MAX = 5;
+export const VENUE_VIP_MAX = 8;
 
-/** 通常モードの上限人数(これ超で満員=小サイズぎっしり)。 */
-export const VENUE_NORMAL_MAX = 20;
+/** 通常モードの上限人数(これ超で満員=小サイズぎっしり)。少人数を大きく見せるため 30 まで通常(大)。 */
+export const VENUE_NORMAL_MAX = 30;
 
 /**
  * アリーナ人数に応じて会場のレイアウトモードを決める純関数。
