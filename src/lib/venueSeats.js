@@ -14,8 +14,14 @@
 //
 // 軽さの肝: DOM を増やし続けない。席数は固定上限、参加者超過は入れ替えで吸収する。
 
-/** 会場に並べる最大席数(comeviewRows の 50 件 cap に整合)。 */
+/** 会場に並べる最大席数(comeviewRows の 50 件 cap に整合・下端バー時代の既定)。 */
 export const VENUE_MAX_SEATS = 50;
+
+/**
+ * 全画面会場モードのアリーナ最大席数(PR3)。全員は論理席だが DOM 化/描画はこの上限まで。
+ * 会議確定「全員に論理席・表示は ~150 席」。超過は入れ替え制で吸収する。
+ */
+export const VENUE_FULLSCREEN_MAX_SEATS = 150;
 
 /** 前列(リッチ canvas アバターを割り当てる)席数。残りは軽量アイコン。 */
 export const VENUE_FRONT_ROW_SEATS = 20;
@@ -254,4 +260,34 @@ export function buildVenueSeating(rows, opts = {}) {
     anonymousCount: countAnonymousParticipants(rows, opts.isGenericName),
     layoutMode: resolveVenueLayoutMode(participants.length)
   };
+}
+
+/**
+ * userLaneCandidatesFromStorage の出力(全チャンク集計済み参加者)を、会場席の入力行へ変換する純関数。
+ *
+ * PR3: 会場モードの入力を「生コメント(ctail・素性薄い)」から「全コメント集計(サムネ/ゆっくり顔
+ *   つき・匿名含む全参加者)」へ切り替えるためのアダプタ。userLaneCandidate は
+ *   {userId, nickname, avatarUrl, avatarObserved, liveId, _laneSortAt} 形。
+ *   これを collectVenueParticipants が食える {userId, name, avatar, capturedAt} 形へ写す。
+ *
+ * @param {ReadonlyArray<{userId?: string, nickname?: string, avatarUrl?: string, _laneSortAt?: number}>} candidates
+ * @returns {Array<{userId: string, name: string, avatar: string, text: string, capturedAt: number}>}
+ */
+export function venueRowsFromUserLaneCandidates(candidates) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  const out = [];
+  for (const c of list) {
+    if (!c || typeof c !== 'object') continue;
+    const userId = String(c.userId || '').trim();
+    if (!userId) continue;
+    out.push({
+      userId,
+      name: String(c.nickname || '').trim(),
+      avatar: String(c.avatarUrl || '').trim(),
+      // userLane 集計は本文を保持しないので空。会場席は名前/サムネで成立する(吹き出しは別経路)。
+      text: '',
+      capturedAt: Number.isFinite(Number(c._laneSortAt)) ? Number(c._laneSortAt) : 0
+    });
+  }
+  return out;
 }

@@ -4,6 +4,8 @@ import {
   collectVenueParticipants,
   countAnonymousParticipants,
   resolveVenueLayoutMode,
+  venueRowsFromUserLaneCandidates,
+  VENUE_FULLSCREEN_MAX_SEATS,
   rankVenueParticipants,
   assignVenueSeats,
   buildVenueSeating,
@@ -217,5 +219,30 @@ describe('buildVenueSeating', () => {
   it('既定の上限と前列定数', () => {
     expect(VENUE_MAX_SEATS).toBe(50);
     expect(VENUE_FRONT_ROW_SEATS).toBe(20);
+    expect(VENUE_FULLSCREEN_MAX_SEATS).toBe(150);
+  });
+});
+
+describe('venueRowsFromUserLaneCandidates', () => {
+  it('userLane集計の出力を会場行へ変換する(名前ありはアリーナ・匿名は観客)', () => {
+    const candidates = [
+      { userId: '100', nickname: 'たろう', avatarUrl: 'https://x/a.png', _laneSortAt: 300 },
+      { userId: '200', nickname: '', avatarUrl: 'https://x/b.png', _laneSortAt: 200 }, // 匿名(名前なし)
+      { userId: '', nickname: 'ゴースト', _laneSortAt: 100 } // userId 無し=除外
+    ];
+    const rows = venueRowsFromUserLaneCandidates(candidates);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ userId: '100', name: 'たろう', avatar: 'https://x/a.png', capturedAt: 300 });
+    expect(rows[1]).toMatchObject({ userId: '200', name: '', capturedAt: 200 });
+
+    // 会場席に流すと: 名前ありはアリーナ、名前なしは観客に分離される
+    const seating = buildVenueSeating(rows, { maxSeats: VENUE_FULLSCREEN_MAX_SEATS });
+    expect(seating.participantCount).toBe(1); // たろうのみアリーナ
+    expect(seating.anonymousCount).toBe(1); // userId 200 の匿名
+  });
+
+  it('非配列や不正要素を安全に無視する', () => {
+    expect(venueRowsFromUserLaneCandidates(null)).toEqual([]);
+    expect(venueRowsFromUserLaneCandidates([null, {}, { userId: ' ' }])).toEqual([]);
   });
 });
