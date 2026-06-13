@@ -33,6 +33,31 @@ describe('venueParticipantKey', () => {
     expect(venueParticipantKey({ userId: '999', name: '匿名' }, isGeneric)).toBeNull();
     expect(venueParticipantKey({ userId: '999' })).toBeNull();
   });
+  it('promoteUserIds の匿名は名前無しでもアリーナ資格(しゃべった匿名を席に)', () => {
+    const promote = new Set(['a:xyz']);
+    expect(venueParticipantKey({ userId: 'a:xyz', name: '' }, isGeneric, promote)).toBe('u:a:xyz');
+    expect(venueParticipantKey({ userId: 'a:other', name: '' }, isGeneric, promote)).toBeNull();
+  });
+});
+
+describe('buildVenueSeating promoteUserIds', () => {
+  it('しゃべった匿名(promote)はアリーナ席・観客カウントから除外', () => {
+    const rows = [
+      { userId: 'a:talker', name: '', text: 'やあ', capturedAt: 30 },
+      { userId: 'a:silent', name: '', text: 'x', capturedAt: 20 },
+      { userId: 'named', name: 'A', text: 'y', capturedAt: 10 }
+    ];
+    const r = buildVenueSeating(rows, {
+      isGenericName: isGeneric,
+      promoteUserIds: new Set(['a:talker'])
+    });
+    // アリーナ: named + a:talker(promote)= 2人
+    expect(r.participantCount).toBe(2);
+    // 観客: a:silent のみ
+    expect(r.anonymousCount).toBe(1);
+    // a:talker の席キーが存在する(吹き出し可能)
+    expect(r.seatByKey.has('u:a:talker')).toBe(true);
+  });
 });
 
 describe('countAnonymousParticipants', () => {

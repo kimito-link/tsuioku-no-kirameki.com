@@ -83,9 +83,15 @@ const VENUE_CSS = `
     box-sizing: border-box;
     padding: clamp(52px, 7vh, 76px) clamp(14px, 3vw, 44px) 64px;
     overflow: hidden;
+    /*
+     * ユーザー方針「真っ暗にしないで・ちゃんと会場が映る」: 背景を半透明にして後ろのニコ生
+     * 映像を薄く透けさせ「配信が映る」感を出す。上にステージ照明(スポット)・下に会場床の
+     * 温かい光を重ね、真っ黒でなく明るいライブ会場に見せる。
+     */
     background:
-      radial-gradient(circle at 50% 24%, rgba(58, 79, 112, 0.34), transparent 38%),
-      linear-gradient(180deg, rgba(7, 10, 16, 0.97), rgba(11, 14, 20, 0.99));
+      radial-gradient(ellipse 60% 38% at 50% 16%, rgba(120, 165, 224, 0.30), transparent 70%),
+      radial-gradient(ellipse 90% 50% at 50% 100%, rgba(150, 120, 200, 0.20), transparent 72%),
+      linear-gradient(180deg, rgba(18, 24, 38, 0.74), rgba(24, 22, 40, 0.80));
     opacity: 0;
     transform: translateY(18px);
     visibility: hidden;
@@ -782,6 +788,10 @@ export function mountVenueBarButton() {
   let escapeListening = false;
   /** @type {VenueRow[]} */
   let baseRows = [];
+  // ユーザー方針「しゃべった匿名もアリーナに出して吹かせる」: 発言した userId を蓄積し、
+  //   buildVenueSeating の promoteUserIds に渡して匿名でも席に座らせ吹き出させる。
+  /** @type {Set<string>} */
+  const spokenUserIds = new Set();
   /** @type {Map<string, number>} */
   let seatByKey = new Map();
   /** @type {Map<number, { seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean }>} */
@@ -885,15 +895,17 @@ export function mountVenueBarButton() {
     const seating = buildVenueSeating(rows, {
       maxSeats: VENUE_FULLSCREEN_MAX_SEATS,
       prevSeatByKey: seatByKey,
-      isGenericName: isGenericComeviewName
+      isGenericName: isGenericComeviewName,
+      promoteUserIds: spokenUserIds
     });
     seatByKey = seating.seatByKey;
     seatsHost.classList.remove(...VENUE_LAYOUT_CLASSES);
     seatsHost.classList.add(`nlsb-mode-${seating.layoutMode}`);
-    // アリーナ席は名前のある参加者だけ(ユーザー方針: 匿名はアリーナに座らせない)。
-    // 匿名は後方の固定プールへゆっくり顔で表示し、上限超過分だけ人数で補う。
+    // アリーナ席は名前付き + しゃべった匿名(promote)。それ以外の匿名は後方の観客席へ
+    // ゆっくり顔で表示し、上限超過分だけ人数で補う。
     const { faceUserIds, totalAnonymous } = collectAudienceFaceUserIds(rows, {
-      isGenericName: isGenericComeviewName
+      isGenericName: isGenericComeviewName,
+      promoteUserIds: spokenUserIds
     });
     title.textContent =
       totalAnonymous > 0
@@ -1002,6 +1014,7 @@ export function mountVenueBarButton() {
         activeLiveId = liveId;
         baseRows = [];
         seatByKey = new Map();
+        spokenUserIds.clear(); // 別配信の昇格匿名を持ち越さない
         renderSeats(baseRows);
       }
       const result = await readChunkedComments(
@@ -1067,7 +1080,9 @@ export function mountVenueBarButton() {
       const summary = /** @type {{ recent?: unknown }|undefined} */ (bag?.[summaryKey]);
       const recentRows = Array.isArray(summary?.recent) ? summary.recent : [];
       const rows = tailRows.length > 0 ? tailRows : recentRows;
-      const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 8 });
+      // primeEmit: 会場を開いた瞬間に直近3件を吹き出す(過疎番組でも会場が喋って見える)。
+      //   2回目以降は primed 済みなので新着だけ。過去ログ一斉飛びは起きない。
+      const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 8, primeEmit: 3 });
       speechState = {
         seenKeys: result.seenKeys,
         primed: result.primed
@@ -1076,6 +1091,12 @@ export function mountVenueBarButton() {
       //   先に席を作り直す(buildVenueSeating が capturedAt=now で上位席へ出す)。その後で
       //   吹き出しを出すと、しゃべった人の席が必ず存在するので吹き出しが宙に浮かない。
       if (result.speeches.length > 0) {
+        // しゃべった人(匿名含む)の userId を昇格集合へ。次の renderSeats でアリーナ席に座り
+        //   吹き出しが席の頭上に出る(ニコ生実況は匿名主体なのでこれが無いと吹き出さない)。
+        for (const speech of result.speeches) {
+          const uid = String(speech.userId || '').trim();
+          if (uid) spokenUserIds.add(uid);
+        }
         baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, Date.now());
         renderSeats(baseRows);
       }

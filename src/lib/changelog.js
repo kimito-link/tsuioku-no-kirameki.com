@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.713',
+    date: '2026-06-13',
+    summary: '会場モードを明るくして発言を吹き出し表示',
+    items: Object.freeze([
+      '会場モードの背景を明るくし、配信の映像が透けて見えるようにしました',
+      'コメントした人が会場の席に出て、頭上に吹き出しが表示されるようにしました（匿名の人も含む）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.712',
     date: '2026-06-13',
     summary: '会場モードに本物のアイコンと観客を表示',

@@ -43,6 +43,31 @@ describe('pickNewVenueSpeech', () => {
     expect(r.seenKeys.has('no:2')).toBe(true);
   });
 
+  it('primeEmit 指定で初回に直近N件だけ吹き出す(過疎番組対策)', () => {
+    const rows = [
+      { commentNo: 1, userId: 'a', name: 'A', text: '古い1' },
+      { commentNo: 2, userId: 'b', name: 'B', text: '古い2' },
+      { commentNo: 3, userId: 'c', name: 'C', text: '直近1' },
+      { commentNo: 4, userId: 'd', name: 'D', text: '直近2' }
+    ];
+    const r = pickNewVenueSpeech(rows, { primed: false }, { primeEmit: 2 });
+    // 直近2件(no:3,4)だけ吹き出す。古い2件は吹き出さない。
+    expect(r.speeches.map((s) => s.key)).toEqual(['no:3', 'no:4']);
+    expect(r.primed).toBe(true);
+    // 古い分は seen 済み=二度と出ない
+    expect(r.seenKeys.has('no:1')).toBe(true);
+    expect(r.seenKeys.has('no:2')).toBe(true);
+  });
+
+  it('primeEmit 後の2回目は新着だけ(直近分は再度出ない)', () => {
+    const rows1 = [{ commentNo: 1, userId: 'a', name: 'A', text: '直近' }];
+    const s1 = pickNewVenueSpeech(rows1, { primed: false }, { primeEmit: 3 });
+    expect(s1.speeches).toHaveLength(1); // 初回に直近1件
+    const rows2 = [...rows1, { commentNo: 2, userId: 'b', name: 'B', text: '新着' }];
+    const s2 = pickNewVenueSpeech(rows2, s1, { primeEmit: 3 });
+    expect(s2.speeches.map((x) => x.key)).toEqual(['no:2']); // 新着だけ・直近1件は再出しない
+  });
+
   it('2回目以降は新着だけ吹き出す', () => {
     const rows1 = [{ commentNo: 1, userId: 'a', name: 'A', text: '過去' }];
     const s1 = pickNewVenueSpeech(rows1, { primed: false });
