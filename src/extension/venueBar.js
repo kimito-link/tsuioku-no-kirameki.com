@@ -91,14 +91,14 @@ const VENUE_CSS = `
     padding: clamp(52px, 7vh, 76px) clamp(14px, 3vw, 44px) 64px;
     overflow: hidden;
     /*
-     * ユーザー方針「真っ暗にしないで・ちゃんと会場が映る」: 背景を半透明にして後ろのニコ生
-     * 映像を薄く透けさせ「配信が映る」感を出す。上にステージ照明(スポット)・下に会場床の
-     * 温かい光を重ね、真っ黒でなく明るいライブ会場に見せる。
+     * ユーザー方針(2026-06-13 強)「配信の画面と実際の画面にスモークをかけないで・ちゃんと
+     * 見たい」: 全面を覆う暗幕(linear-gradient)を撤去。背景は透明にして、後ろのニコ生映像と
+     * 本家UIをそのまま見せる。会場の雰囲気は上端・下端の淡いステージ照明だけで出し、中央の
+     * 映像にはかけない(上下のグラデは画面端で transparent に消えるので映像本体は素通し)。
      */
     background:
-      radial-gradient(ellipse 60% 38% at 50% 16%, rgba(120, 165, 224, 0.30), transparent 70%),
-      radial-gradient(ellipse 90% 50% at 50% 100%, rgba(150, 120, 200, 0.20), transparent 72%),
-      linear-gradient(180deg, rgba(18, 24, 38, 0.74), rgba(24, 22, 40, 0.80));
+      radial-gradient(ellipse 70% 24% at 50% 0%, rgba(120, 165, 224, 0.16), transparent 70%),
+      radial-gradient(ellipse 90% 26% at 50% 100%, rgba(150, 120, 200, 0.14), transparent 72%);
     opacity: 0;
     transform: translateY(18px);
     visibility: hidden;
@@ -155,9 +155,14 @@ const VENUE_CSS = `
       "safe"
       "seating";
     gap: clamp(8px, 1.5vh, 16px);
-    pointer-events: none;
+    /*
+     * 親は pointer-events:auto のまま(none にすると実マウスのヒットテストが親で止まり、
+     * 子の <a> リンクが「クリックできない」になる=ユーザー不満の原因だった)。
+     * 中央の映像を触りたいときは下の .nlsb-safe-area だけ none で透過させる。
+     */
+    pointer-events: auto;
   }
-  /* 中央の映像セーフエリア: UI を一切置かない。クリックも透過して映像/本家UIを触れる。 */
+  /* 中央の映像セーフエリア: UI を一切置かず、クリックを透過して映像/本家UIを直接触れる。 */
   .nlsb-safe-area {
     grid-area: safe;
     min-height: 0;
@@ -203,10 +208,11 @@ const VENUE_CSS = `
       "seats";
     grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.11);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
-    background: rgba(9, 13, 19, 0.62);
-    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+    /* スモークを薄く: 名前が読める最低限の暗さだけ残し、下の映像を極力透けさせる。 */
+    background: rgba(9, 13, 19, 0.28);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
     overscroll-behavior: contain;
     pointer-events: auto;
   }
@@ -223,7 +229,7 @@ const VENUE_CSS = `
     padding: 7px 14px;
     gap: 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(14, 19, 27, 0.9);
+    background: rgba(14, 19, 27, 0.55);
   }
   .nlsb-title {
     overflow: hidden;
@@ -237,6 +243,36 @@ const VENUE_CSS = `
     color: rgba(255, 255, 255, 0.62);
     font-size: 10px;
     white-space: nowrap;
+  }
+  .nlsb-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 0 0 auto;
+  }
+  /* コメビュ起動ボタン(会場ヘッダー右)。読み上げ付きコメントビューアを別窓で開く。 */
+  .nlsb-comeview-btn {
+    flex: 0 0 auto;
+    min-height: 28px;
+    padding: 4px 11px;
+    border: 1px solid rgba(141, 200, 255, 0.4);
+    border-radius: 999px;
+    background: rgba(30, 41, 56, 0.7);
+    color: #cfe6ff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: auto;
+  }
+  .nlsb-comeview-btn:hover {
+    background: rgba(48, 64, 86, 0.92);
+    border-color: rgba(141, 200, 255, 0.6);
+  }
+  .nlsb-comeview-btn:focus-visible {
+    outline: 2px solid #8dc8ff;
+    outline-offset: 2px;
   }
   .nlsb-seats {
     grid-area: seats;
@@ -503,9 +539,10 @@ const VENUE_CSS = `
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 10px;
+    /* 観客帯も薄く=上の映像を透けさせる。 */
     background:
-      linear-gradient(180deg, rgba(104, 129, 160, 0.12), rgba(255, 255, 255, 0.03)),
-      rgba(9, 13, 19, 0.5);
+      linear-gradient(180deg, rgba(104, 129, 160, 0.1), rgba(255, 255, 255, 0.02)),
+      rgba(9, 13, 19, 0.26);
     pointer-events: auto;
   }
   .nlsb-audience-label,
@@ -753,10 +790,27 @@ export function mountVenueBarButton() {
   const title = document.createElement('div');
   title.className = 'nlsb-title';
   title.textContent = '会場参加者 0人';
+  // ヘッダー右側: コメビュ起動ボタン + 集計メモ。
+  const headerRight = document.createElement('div');
+  headerRight.className = 'nlsb-header-right';
+  const comeviewBtn = document.createElement('button');
+  comeviewBtn.type = 'button';
+  comeviewBtn.className = 'nlsb-comeview-btn';
+  comeviewBtn.textContent = '💬 コメビュ';
+  comeviewBtn.title = '読み上げ付きコメントビューア(別ウィンドウ)を開く';
+  comeviewBtn.addEventListener('click', () => {
+    // content script は chrome.windows を直接呼べないので SW へ依頼(status.html と同経路)。
+    try {
+      chrome.runtime.sendMessage({ type: 'NLS_OPEN_COMEVIEW', liveId: liveIdFromPathname() });
+    } catch {
+      // 拡張コンテキスト切れ等は黙って無視(次回クリックで再試行)。
+    }
+  });
   const note = document.createElement('div');
   note.className = 'nlsb-note';
   note.textContent = '全コメント集計・最大150席';
-  header.append(title, note);
+  headerRight.append(comeviewBtn, note);
+  header.append(title, headerRight);
 
   const seatsHost = document.createElement('div');
   seatsHost.className = 'nlsb-seats nlsb-mode-empty';

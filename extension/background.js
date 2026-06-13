@@ -1548,6 +1548,47 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* v0.1.716: 会場モード(content script)から「コメビュを開く」要求を受けて、SW が  */
+/*   comeview.html を別ウィンドウ popup で開く。content script は chrome.windows を  */
+/*   直接呼べない(会議 Codex 指摘)ので SW 経由。status.html の btnComeview と同型。 */
+/*   ?lv= を付けて配信を固定(comeview 側は無指定なら nls_last_watch_url で自己解決)。*/
+/* ------------------------------------------------------------------ */
+const OPEN_COMEVIEW_MESSAGE_TYPE = 'NLS_OPEN_COMEVIEW';
+const COMEVIEW_LV_RE = /^lv\d{1,15}$/;
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== OPEN_COMEVIEW_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  const reply = (v) => {
+    try {
+      sendResponse(v);
+    } catch {
+      /* port closed */
+    }
+  };
+  // lv は content から渡る生値。固定リテラル path に正規化済み lv だけ載せる(injection 面遮断)。
+  const lv = COMEVIEW_LV_RE.test(String(msg.liveId || '')) ? String(msg.liveId) : '';
+  const base = chrome.runtime.getURL('comeview.html');
+  const url = lv ? `${base}?lv=${lv}` : base;
+  (async () => {
+    try {
+      await chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
+      reply({ ok: true });
+    } catch (err) {
+      reply({ ok: false, error: String(err && err.message) });
+    }
+  })();
+  return true; // 非同期 sendResponse
+});
+
+/* ------------------------------------------------------------------ */
 /* nicoad（ニコニ広告）貢献度ランキング 無認証 API の CORS バイパス fetch proxy   */
 /* koken と同型。広告ランキングは従来 HTML scrape で取得していたが DOM に uid が   */
 /* 出ず、記名広告主のアカウントリンク/アバターが付かなかった。本 API は記名行に    */
