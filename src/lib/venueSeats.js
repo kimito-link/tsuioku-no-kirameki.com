@@ -292,3 +292,69 @@ export function venueRowsFromUserLaneCandidates(candidates) {
   }
   return out;
 }
+
+/**
+ * ひな壇(スタンド席)の段組みを決める純関数。
+ *
+ * ユーザー方針(2026-06-13)「ライブ会場の3D感=ひな壇スタンド席・ほどよく立体的」。
+ *   客席後方から見た構図で、前列(段0)を手前=大きく、奥の段ほど小さく配置する。
+ *   人数に応じて段数が増え、奥の段ほど横に広い(後方の客席が広がる)ので、少人数でも
+ *   満員に見える。前回の固定グリッドが20人で破綻した反省=人数で段組みを動的に決める。
+ *
+ * 立体感は段ごとの scale(手前1.0→奥 minScale)と depth(0..1・CSS が translateZ/Y に使う)で表す。
+ * このファイルは数値モデルだけ(CSS/DOM 非依存)。実際の transform は venueBar 側が depth/scale から作る。
+ *
+ * @param {number} seatCount アリーナに座る参加者数(名前付き)
+ * @param {{ minScale?: number, maxPerFrontRow?: number }} [opts]
+ *   minScale=最奥段のスケール(既定0.62=ほどよく立体)、maxPerFrontRow=前列の最大人数(既定8)
+ * @returns {Array<{ rowIndex: number, count: number, scale: number, depth: number }>}
+ *   段配列(手前=rowIndex 0)。count=その段の席数、scale=拡大率、depth=0(手前)..1(最奥)
+ */
+export function buildVenueTiers(seatCount, opts = {}) {
+  const n = Math.max(0, Math.floor(Number(seatCount) || 0));
+  if (n === 0) return [];
+  const minScale =
+    Number.isFinite(opts.minScale) && opts.minScale > 0 && opts.minScale <= 1
+      ? opts.minScale
+      : 0.62;
+  const frontMax =
+    Number.isFinite(opts.maxPerFrontRow) && opts.maxPerFrontRow > 0
+      ? Math.floor(opts.maxPerFrontRow)
+      : 8;
+
+  // 段数を人数で決める(~frontMax=1段, 倍々に近いペースで増やし最大5段)。
+  let rowCount;
+  if (n <= frontMax) rowCount = 1;
+  else if (n <= frontMax * 2) rowCount = 2;
+  else if (n <= frontMax * 4) rowCount = 3;
+  else if (n <= frontMax * 7) rowCount = 4;
+  else rowCount = 5;
+
+  // 各段の「重み」: 奥ほど横に広い(後方客席が広がる)ので段が増えるごとに +25%。
+  const weights = [];
+  let weightSum = 0;
+  for (let r = 0; r < rowCount; r += 1) {
+    const w = 1 + r * 0.25;
+    weights.push(w);
+    weightSum += w;
+  }
+
+  // 人数を重みで各段へ配分(端数は手前から詰める)。
+  const counts = weights.map((w) => Math.floor((n * w) / weightSum));
+  let assigned = counts.reduce((a, b) => a + b, 0);
+  let idx = 0;
+  while (assigned < n) {
+    counts[idx % rowCount] += 1;
+    assigned += 1;
+    idx += 1;
+  }
+
+  const tiers = [];
+  for (let r = 0; r < rowCount; r += 1) {
+    if (counts[r] <= 0) continue;
+    const depth = rowCount === 1 ? 0 : r / (rowCount - 1);
+    const scale = 1 - (1 - minScale) * depth;
+    tiers.push({ rowIndex: r, count: counts[r], scale, depth });
+  }
+  return tiers;
+}
