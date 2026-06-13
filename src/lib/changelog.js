@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.712',
+    date: '2026-06-13',
+    summary: '会場モードに本物のアイコンと観客を表示',
+    items: Object.freeze([
+      '会場モードの参加者に、取得できている人は本物のサムネイル画像を表示するようにしました',
+      '匿名の観客もゆっくり顔で観客席に並べ、会場がにぎやかに見えるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.711',
     date: '2026-06-13',
     summary: '会場モードで発言を吹き出し表示',

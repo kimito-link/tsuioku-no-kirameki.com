@@ -29,10 +29,10 @@ function isHttpUrl(u) {
  *
  * これでパネルと同じ「サムネ取れた人は実サムネ・無い人は空(=会場側でゆっくり顔生成)」になる。
  *
- * @param {ReadonlyArray<{userId?: string, name?: string, avatar?: string, capturedAt?: number}>} rows
+ * @param {ReadonlyArray<{userId?: string, name?: string, avatar?: string, text?: string, capturedAt?: number}>} rows
  * @param {Record<string, { avatarUrl?: unknown }>|null|undefined} profileMap
  *   KEY_USER_COMMENT_PROFILE_CACHE の値(userId→{nickname, avatarUrl})
- * @returns {Array<{userId: string, name: string, avatar: string, capturedAt: number, avatarObserved: boolean}>}
+ * @returns {Array<{userId: string, name: string, avatar: string, text: string, capturedAt: number, avatarObserved: boolean}>}
  *   avatarObserved=実 http サムネが補強できた行は true(席の前列優先などに使える)
  */
 export function enrichVenueRowsWithProfileAvatars(rows, profileMap) {
@@ -58,7 +58,14 @@ export function enrichVenueRowsWithProfileAvatars(rows, profileMap) {
         observed = true;
       }
     }
-    out.push({ userId, name, avatar, capturedAt, avatarObserved: observed });
+    out.push({
+      userId,
+      name,
+      avatar,
+      text: String(r.text || ''),
+      capturedAt,
+      avatarObserved: observed
+    });
   }
   return out;
 }

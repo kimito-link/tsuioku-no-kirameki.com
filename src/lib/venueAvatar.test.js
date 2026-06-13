@@ -47,7 +47,7 @@ describe('enrichVenueRowsWithProfileAvatars', () => {
   it('非配列・不正要素を安全に無視', () => {
     expect(enrichVenueRowsWithProfileAvatars(null, {})).toEqual([]);
     expect(enrichVenueRowsWithProfileAvatars([null, {}], null)).toEqual([
-      { userId: '', name: '', avatar: '', capturedAt: 0, avatarObserved: false }
+      { userId: '', name: '', avatar: '', text: '', capturedAt: 0, avatarObserved: false }
     ]);
   });
 });
