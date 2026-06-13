@@ -50,7 +50,7 @@ export function venueSpeakerKey(row) {
  * @param {ReadonlyArray<Record<string, unknown>>} rows ライブ新着コメント(昇順=古い→新しい想定)
  * @param {{ seenKeys?: Set<string>|null, primed?: boolean }} state
  *   seenKeys=既に処理済みのコメントキー集合 / primed=初回シード済みか(false なら初回=吹き出さない)
- * @param {{ maxEmit?: number }} [opts] maxEmit=1回の抽出で返す最大件数(同時多発の洪水を防ぐ・既定8)
+ * @param {{ maxEmit?: number, primeEmit?: number }} [opts] maxEmit=1回の抽出で返す最大件数(同時多発の洪水を防ぐ・既定8)/ primeEmit=初回に出す直近件数(既定0=初回無音)
  * @returns {{
  *   speeches: Array<{ key: string, speakerKey: string, userId: string, name: string, text: string }>,
  *   seenKeys: Set<string>,
@@ -62,6 +62,11 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const maxEmit =
     Number.isFinite(opts.maxEmit) && opts.maxEmit > 0 ? Math.floor(opts.maxEmit) : 8;
+  // primeEmit: 初回(会場を開いた瞬間)に出す「直近 N 件」。0 なら従来どおり初回は無音。
+  //   過疎番組でも開いた瞬間に最近の発言が数個ポンと出て「会場が喋ってる」感を出す。
+  //   過去ログ全部が一斉に飛ぶ事故は防ぐ(直近 N 件だけ)。
+  const primeEmit =
+    Number.isFinite(opts.primeEmit) && opts.primeEmit > 0 ? Math.floor(opts.primeEmit) : 0;
   const seen = state.seenKeys instanceof Set ? new Set(state.seenKeys) : new Set();
   const wasPrimed = state.primed === true;
 
@@ -76,13 +81,23 @@ export function pickNewVenueSpeech(rows, state = {}, opts = {}) {
     speakable.push({ row: r, key, text });
   }
 
-  // 初回(未シード): 一切吹き出さず、いま見えている全キーを「既知」として覚えるだけ。
+  // 初回(未シード): 既存キーは「既知」として覚える。ただし直近 primeEmit 件だけは
+  //   seen に入れず後続の fresh 抽出に回して吹き出す(過疎番組の寂しさ対策)。
+  let primeSet = null;
   if (!wasPrimed) {
-    for (const s of speakable) seen.add(s.key);
-    return { speeches: [], seenKeys: seen, primed: true };
+    primeSet = new Set(
+      speakable.slice(Math.max(0, speakable.length - primeEmit)).map((s) => s.key)
+    );
+    for (const s of speakable) {
+      if (primeSet.has(s.key)) continue; // 直近 N 件は seen に入れない(吹き出す)
+      seen.add(s.key);
+    }
+    if (primeEmit <= 0) {
+      return { speeches: [], seenKeys: seen, primed: true };
+    }
   }
 
-  // 2回目以降: まだ見ていないキーだけを新着として返す。
+  // 2回目以降(or 初回の直近 N 件): まだ見ていないキーだけを新着として返す。
   /** @type {Array<{ key: string, speakerKey: string, userId: string, name: string, text: string }>} */
   const fresh = [];
   for (const s of speakable) {

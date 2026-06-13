@@ -63,15 +63,22 @@ export function resolveVenueLayoutMode(arenaCount) {
  *
  * @param {{ userId?: string, name?: string }} row 正規化済み行(normalizeComeviewRow 形)
  * @param {(name: string) => boolean} [isGenericName] 汎用プレースホルダ名判定(comeviewRows から注入)
+ * @param {Set<string>|null} [promoteUserIds] しゃべった匿名 userId(名前無しでもアリーナ昇格)
  * @returns {string|null} アリーナ席のキー、または匿名/無名なら null
  */
-export function venueParticipantKey(row, isGenericName) {
+export function venueParticipantKey(row, isGenericName, promoteUserIds) {
   if (!row || typeof row !== 'object') return null;
+  const uid = String(row.userId || '').trim();
+  // ユーザー方針(2026-06-13)「しゃべった匿名もアリーナに出して吹かせる」: 発言した匿名は
+  //   userId をキーにアリーナ資格を与える(追憶は匿名を userId でタグ付け/ランキングできる)。
+  //   promoteUserIds に含まれる userId は名前が無くてもアリーナに座れる。
+  if (uid && promoteUserIds instanceof Set && promoteUserIds.has(uid)) {
+    return `u:${uid}`;
+  }
   const name = String(row.name || '').trim();
-  // アリーナ資格は「個人を識別できる名前があること」。名前が無い/汎用名はアリーナに座らない。
+  // 通常のアリーナ資格は「個人を識別できる名前があること」。名前が無い/汎用名はアリーナに座らない。
   if (!name) return null;
   if (typeof isGenericName === 'function' && isGenericName(name)) return null;
-  const uid = String(row.userId || '').trim();
   return uid ? `u:${uid}` : `n:${name}`;
 }
 
@@ -80,18 +87,19 @@ export function venueParticipantKey(row, isGenericName) {
  * 同一参加者はまとめ、最終発言・最新本文・発言数・ギフト有無を持つ。
  *
  * @param {Array<{ userId?: string, name?: string, text?: string, avatar?: string, capturedAt?: number|null, isGift?: boolean }>} rows
- * @param {{ isGenericName?: (name: string) => boolean }} [opts]
+ * @param {{ isGenericName?: (name: string) => boolean, promoteUserIds?: Set<string>|null }} [opts]
  * @returns {Array<{ key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, firstAt: number }>}
  *   参加者配列(初出順=安定。席割りはこの順を尊重しつつ優先度で並べ替える)
  */
 export function collectVenueParticipants(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const isGenericName = opts.isGenericName;
+  const promoteUserIds = opts.promoteUserIds instanceof Set ? opts.promoteUserIds : null;
   /** @type {Map<string, { key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, firstAt: number, order: number }>} */
   const byKey = new Map();
   let order = 0;
   for (const r of list) {
-    const key = venueParticipantKey(r, isGenericName);
+    const key = venueParticipantKey(r, isGenericName, promoteUserIds);
     if (!key) continue;
     const at = Number.isFinite(Number(r?.capturedAt)) ? Number(r.capturedAt) : 0;
     const text = String(r?.text ?? '').trim();
@@ -214,15 +222,17 @@ export function assignVenueSeats(ranked, prevSeatByKey, maxSeats = VENUE_MAX_SEA
  *
  * @param {Array<Record<string, unknown>>} rows 正規化済み発言行
  * @param {(name: string) => boolean} [isGenericName]
+ * @param {Set<string>|null} [promoteUserIds] しゃべった匿名(アリーナ昇格)は観客から除外
  * @returns {number}
  */
-export function countAnonymousParticipants(rows, isGenericName) {
+export function countAnonymousParticipants(rows, isGenericName, promoteUserIds) {
   const list = Array.isArray(rows) ? rows : [];
+  const promote = promoteUserIds instanceof Set ? promoteUserIds : null;
   /** @type {Set<string>} */
   const anonUids = new Set();
   let hasUidlessAnon = false;
   for (const r of list) {
-    if (venueParticipantKey(r, isGenericName)) continue; // アリーナ資格者はここで除外
+    if (venueParticipantKey(r, isGenericName, promote)) continue; // アリーナ資格者(昇格含む)は除外
     const uid = String(r?.userId || '').trim();
     if (uid) anonUids.add(uid);
     else hasUidlessAnon = true;
@@ -242,13 +252,14 @@ export const VENUE_AUDIENCE_FACE_MAX = 120;
  * 直近にしゃべった順(capturedAt 降順)で cap 内に入れる=最近の人を優先表示。
  *
  * @param {Array<Record<string, unknown>>} rows 正規化済み発言行
- * @param {{ isGenericName?: (name: string) => boolean, max?: number }} [opts]
+ * @param {{ isGenericName?: (name: string) => boolean, max?: number, promoteUserIds?: Set<string>|null }} [opts]
  * @returns {{ faceUserIds: string[], totalAnonymous: number }}
  *   faceUserIds=顔を出す匿名 userId(最大 max・直近順) / totalAnonymous=匿名総数(テキスト用)
  */
 export function collectAudienceFaceUserIds(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const isGenericName = opts.isGenericName;
+  const promote = opts.promoteUserIds instanceof Set ? opts.promoteUserIds : null;
   const max =
     Number.isFinite(opts.max) && opts.max > 0
       ? Math.floor(opts.max)
@@ -257,7 +268,7 @@ export function collectAudienceFaceUserIds(rows, opts = {}) {
   const lastAtByUid = new Map();
   let hasUidlessAnon = false;
   for (const r of list) {
-    if (venueParticipantKey(r, isGenericName)) continue; // アリーナ資格者は観客でない
+    if (venueParticipantKey(r, isGenericName, promote)) continue; // アリーナ資格者(昇格含む)は観客でない
     const uid = String(r?.userId || '').trim();
     if (!uid) {
       hasUidlessAnon = true;
@@ -283,7 +294,8 @@ export function collectAudienceFaceUserIds(rows, opts = {}) {
  *   prevSeatByKey?: Map<string, number>|Record<string, number>,
  *   maxSeats?: number,
  *   frontRowSeats?: number,
- *   isGenericName?: (name: string) => boolean
+ *   isGenericName?: (name: string) => boolean,
+ *   promoteUserIds?: Set<string>|null
  * }} [opts]
  * @returns {{
  *   seats: Array<{ seatIndex: number, isFrontRow: boolean, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
@@ -296,14 +308,19 @@ export function collectAudienceFaceUserIds(rows, opts = {}) {
 export function buildVenueSeating(rows, opts = {}) {
   const maxSeats = Number.isFinite(opts.maxSeats) ? opts.maxSeats : VENUE_MAX_SEATS;
   const frontRow = Number.isFinite(opts.frontRowSeats) ? opts.frontRowSeats : VENUE_FRONT_ROW_SEATS;
-  const participants = collectVenueParticipants(rows, { isGenericName: opts.isGenericName });
+  // promoteUserIds: しゃべった匿名 userId(名前無しでもアリーナに座らせて吹き出させる)。
+  const promoteUserIds = opts.promoteUserIds instanceof Set ? opts.promoteUserIds : null;
+  const participants = collectVenueParticipants(rows, {
+    isGenericName: opts.isGenericName,
+    promoteUserIds
+  });
   const ranked = rankVenueParticipants(participants, maxSeats);
   const { seats, seatByKey } = assignVenueSeats(ranked, opts.prevSeatByKey, maxSeats);
   return {
     seats: seats.map((s) => ({ ...s, isFrontRow: s.seatIndex < frontRow })),
     seatByKey,
     participantCount: participants.length,
-    anonymousCount: countAnonymousParticipants(rows, opts.isGenericName),
+    anonymousCount: countAnonymousParticipants(rows, opts.isGenericName, promoteUserIds),
     layoutMode: resolveVenueLayoutMode(participants.length)
   };
 }
