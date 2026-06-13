@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.717',
+    date: '2026-06-13',
+    summary: '会場のセリフを大きく・隠れないように',
+    items: Object.freeze([
+      '会場モードの吹き出し(セリフ)がアバターの下に隠れたり重なって見えなくなる問題を直しました',
+      '吹き出しの文字を大きくし、長いコメントも読みやすくしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.716',
     date: '2026-06-13',
     summary: '会場の名前リンクを押せるように・スモーク撤去',
