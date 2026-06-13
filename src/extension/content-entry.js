@@ -5,6 +5,7 @@ import {
   isNicoLiveWatchUrl,
   isNicoVideoJpHost
 } from '../lib/broadcastUrl.js';
+import { mountVenueBarButton } from './venueBar.js';
 import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -12643,10 +12644,10 @@ function createDevMonitorOverlay() {
     return null;
   }
 }
-
 async function start() {
   if (!hasExtensionContext()) return;
   if (!shouldRunWatchContentInThisFrame()) return;
+  if (isWatchInlinePanelTopFrame()) mountVenueBarButton();
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
   await readCommentPanelAutoRestoreFromStorage();
@@ -12685,7 +12686,6 @@ async function start() {
     }
   }
   bindNativeSelfPostedRecorder();
-
   // 記録監視メーターは dev / 本番を問わず常設（top frame で 1 回）。
   //   以前は dev 専用ツールに同梱していたため、本番ビルドのたびにメーターが消える
   //   事故が再発していた（ユーザー報告・2026-06-01）。常設化して恒久対処。

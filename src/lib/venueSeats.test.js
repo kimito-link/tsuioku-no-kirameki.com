@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   venueParticipantKey,
   collectVenueParticipants,
+  countAnonymousParticipants,
+  resolveVenueLayoutMode,
   rankVenueParticipants,
   assignVenueSeats,
   buildVenueSeating,
@@ -18,11 +20,33 @@ describe('venueParticipantKey', () => {
   it('userId 無しは個人名をキーにする', () => {
     expect(venueParticipantKey({ name: 'たろう' })).toBe('n:たろう');
   });
-  it('汎用プレースホルダ名は会場に並べない(null)', () => {
+  it('汎用プレースホルダ名はアリーナに座らない(null)', () => {
     expect(venueParticipantKey({ name: '匿名' }, isGeneric)).toBeNull();
   });
-  it('userId も名前も無ければ null', () => {
-    expect(venueParticipantKey({ text: 'やあ' })).toBeNull();
+  it('名前が無ければ userId があってもアリーナに座らない(匿名扱い)', () => {
+    // ユーザー方針「匿名はアリーナじゃないみたいなのがいい」: userId 付き匿名も席に出さない。
+    expect(venueParticipantKey({ userId: '999', name: '匿名' }, isGeneric)).toBeNull();
+    expect(venueParticipantKey({ userId: '999' })).toBeNull();
+  });
+});
+
+describe('countAnonymousParticipants', () => {
+  it('匿名は userId 単位でユニークに数える', () => {
+    const rows = [
+      { userId: 'x', name: '匿名', text: '1' },
+      { userId: 'x', name: '匿名', text: '2' }, // 同じ匿名ID連投=1人
+      { userId: 'y', name: '匿名', text: '3' },
+      { userId: 'a', name: 'A', text: '4' } // 名前あり=アリーナ=匿名に数えない
+    ];
+    expect(countAnonymousParticipants(rows, isGeneric)).toBe(2);
+  });
+  it('userId 無し匿名は最大1人ぶんだけ加える(水増ししない)', () => {
+    const rows = [
+      { name: '匿名', text: '1' },
+      { name: '名無し', text: '2' },
+      { text: '3' }
+    ];
+    expect(countAnonymousParticipants(rows, isGeneric)).toBe(1);
   });
 });
 
@@ -48,9 +72,10 @@ describe('collectVenueParticipants', () => {
     expect(collectVenueParticipants(rows)[0].hasGift).toBe(true);
   });
 
-  it('匿名(汎用名)は除外する', () => {
+  it('匿名(汎用名)はアリーナ参加者から除外する', () => {
     const rows = [
       { name: '匿名', text: 'x', capturedAt: 1 },
+      { userId: 'b', name: '匿名', text: 'z', capturedAt: 3 }, // userId付き匿名も除外
       { userId: 'a', name: 'A', text: 'y', capturedAt: 2 }
     ];
     const ps = collectVenueParticipants(rows, { isGenericName: isGeneric });
@@ -64,6 +89,22 @@ describe('collectVenueParticipants', () => {
       { userId: 'a', name: 'A', text: '2', capturedAt: 20 }
     ];
     expect(collectVenueParticipants(rows).map((p) => p.key)).toEqual(['u:b', 'u:a']);
+  });
+});
+
+describe('resolveVenueLayoutMode', () => {
+  it('人数でモードが切り替わる(empty/vip/normal/packed)', () => {
+    expect(resolveVenueLayoutMode(0)).toBe('empty');
+    expect(resolveVenueLayoutMode(1)).toBe('vip');
+    expect(resolveVenueLayoutMode(5)).toBe('vip');
+    expect(resolveVenueLayoutMode(6)).toBe('normal');
+    expect(resolveVenueLayoutMode(20)).toBe('normal');
+    expect(resolveVenueLayoutMode(21)).toBe('packed');
+    expect(resolveVenueLayoutMode(50)).toBe('packed');
+  });
+  it('不正値は empty に丸める', () => {
+    expect(resolveVenueLayoutMode(-3)).toBe('empty');
+    expect(resolveVenueLayoutMode(NaN)).toBe('empty');
   });
 });
 
@@ -159,6 +200,18 @@ describe('buildVenueSeating', () => {
     const rows2 = [...rows1, { userId: 'a', name: 'A', text: '3', capturedAt: 30 }];
     const r2 = buildVenueSeating(rows2, { prevSeatByKey: r1.seatByKey });
     expect(r2.seatByKey.get('u:a')).toBe(seatA);
+  });
+
+  it('名前ありはアリーナ席・匿名は anonymousCount に分離する', () => {
+    const rows = [
+      { userId: 'a', name: 'A', text: '1', capturedAt: 10 },
+      { userId: 'x', name: '匿名', text: '2', capturedAt: 20 },
+      { userId: 'y', name: '匿名', text: '3', capturedAt: 30 }
+    ];
+    const r = buildVenueSeating(rows, { isGenericName: isGeneric });
+    expect(r.seats).toHaveLength(1); // アリーナは A のみ
+    expect(r.participantCount).toBe(1);
+    expect(r.anonymousCount).toBe(2); // 匿名2人(x, y)
   });
 
   it('既定の上限と前列定数', () => {
