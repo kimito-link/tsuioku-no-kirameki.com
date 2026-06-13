@@ -7,13 +7,20 @@ import {
 } from '../lib/venueSeats.js';
 import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
-import { commentsStorageKey } from '../lib/storageKeys.js';
+import { commentDbSummaryKey, commentsStorageKey } from '../lib/storageKeys.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+import { tailStorageKey } from '../lib/commentTailBuffer.js';
+import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows } from '../lib/venueSpeech.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
 const OPEN_STORAGE_KEY = 'nls_venue_open';
 const AGGREGATE_INTERVAL_MS = 30_000;
+const SPEECH_INTERVAL_MS = 1_500;
+const BUBBLE_LIFETIME_MS = 4_000;
+const BUBBLE_FADE_MS = 600;
+const BUBBLE_MAX = 6;
+const BUBBLE_TEXT_MAX = 20;
 const AUDIENCE_DOT_MAX = 60;
 const VENUE_LAYOUT_CLASSES = [
   'nlsb-mode-empty',
@@ -268,13 +275,14 @@ const VENUE_CSS = `
     place-items: center;
   }
   .nlsb-seat {
+    position: relative;
     display: flex;
     min-width: 0;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    overflow: hidden;
+    overflow: visible;
   }
   .nlsb-seat.nlsb-is-empty {
     display: none;
@@ -368,6 +376,60 @@ const VENUE_CSS = `
   .nlsb-seats.nlsb-mode-packed .nlsb-name {
     max-width: 68px;
     text-align: center;
+  }
+  .nlsb-bubble {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    z-index: 3;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(240px, 28vw);
+    padding: 7px 10px;
+    overflow: visible;
+    border: 1px solid rgba(20, 29, 42, 0.16);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #17202d;
+    box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    opacity: 1;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+    text-shadow: none;
+    transform: translateX(-50%);
+    white-space: normal;
+    animation: nlsb-bubble-pop 160ms ease-out;
+    transition:
+      opacity ${BUBBLE_FADE_MS}ms ease,
+      transform ${BUBBLE_FADE_MS}ms ease;
+  }
+  .nlsb-bubble::after {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border: 6px solid transparent;
+    border-top-color: rgba(255, 255, 255, 0.96);
+    content: "";
+    transform: translateX(-50%);
+  }
+  .nlsb-bubble.nlsb-is-leaving {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+  @keyframes nlsb-bubble-pop {
+    from {
+      opacity: 0;
+      transform: translate(-50%, 5px) scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%);
+    }
   }
   .nlsb-empty-message {
     display: none;
@@ -481,11 +543,15 @@ const VENUE_CSS = `
   @media (prefers-reduced-motion: reduce) {
     .nlsb-toggle,
     .nlsb-stage,
-    .nlsb-seat {
+    .nlsb-seat,
+    .nlsb-bubble {
       transition: none;
     }
     .nlsb-tier {
       transform: none;
+    }
+    .nlsb-bubble {
+      animation: none;
     }
   }
 `;
@@ -677,12 +743,111 @@ export function mountVenueBarButton() {
   let userChangedOpen = false;
   let aggregateTimer = 0;
   let aggregateInFlight = false;
+  let speechTimer = 0;
+  let speechInFlight = false;
+  let speechGeneration = 0;
+  let speechLiveId = '';
+  /** @type {{ seenKeys: Set<string>|null, primed: boolean }} */
+  let speechState = { seenKeys: null, primed: false };
   let activeLiveId = '';
   let escapeListening = false;
   /** @type {VenueRow[]} */
   let baseRows = [];
   /** @type {Map<string, number>} */
   let seatByKey = new Map();
+  /** @type {Map<number, { seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean }>} */
+  const bubbleBySeat = new Map();
+  /** @type {Array<{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean }>} */
+  const activeBubbles = [];
+
+  /**
+   * @param {{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean }} bubble
+   */
+  const removeBubble = (bubble) => {
+    if (!bubble || bubble.removed) return;
+    bubble.removed = true;
+    if (bubble.fadeTimer) clearTimeout(bubble.fadeTimer);
+    if (bubble.removeTimer) clearTimeout(bubble.removeTimer);
+    if (bubbleBySeat.get(bubble.seatIndex) === bubble) {
+      bubbleBySeat.delete(bubble.seatIndex);
+    }
+    const index = activeBubbles.indexOf(bubble);
+    if (index >= 0) activeBubbles.splice(index, 1);
+    bubble.element.remove();
+  };
+
+  const clearBubbles = () => {
+    for (const bubble of [...activeBubbles]) removeBubble(bubble);
+  };
+
+  /**
+   * @param {string} text
+   * @returns {string}
+   */
+  const truncateBubbleText = (text) => {
+    const chars = Array.from(String(text || '').trim());
+    if (chars.length <= BUBBLE_TEXT_MAX) return chars.join('');
+    return `${chars.slice(0, BUBBLE_TEXT_MAX).join('')}…`;
+  };
+
+  /**
+   * @param {{ speakerKey: string, text: string }} speech
+   */
+  const showSpeechBubble = (speech) => {
+    const seatIndex = seatByKey.get(speech.speakerKey);
+    if (typeof seatIndex !== 'number' || !Number.isInteger(seatIndex)) return;
+    const node = seatNodes[seatIndex];
+    if (!node || node.seat.classList.contains('nlsb-is-empty')) return;
+
+    const previous = bubbleBySeat.get(seatIndex);
+    if (previous) removeBubble(previous);
+    while (activeBubbles.length >= BUBBLE_MAX) {
+      removeBubble(activeBubbles[0]);
+    }
+
+    const text = truncateBubbleText(speech.text);
+    if (!text) return;
+    const element = document.createElement('div');
+    element.className = 'nlsb-bubble';
+    element.textContent = text;
+    element.setAttribute('aria-hidden', 'true');
+    node.seat.appendChild(element);
+
+    const bubble = {
+      seatIndex,
+      element,
+      fadeTimer: 0,
+      removeTimer: 0,
+      removed: false
+    };
+    bubbleBySeat.set(seatIndex, bubble);
+    activeBubbles.push(bubble);
+
+    const reducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reducedMotion) {
+      bubble.fadeTimer = window.setTimeout(() => {
+        bubble.fadeTimer = 0;
+        if (!bubble.removed) element.classList.add('nlsb-is-leaving');
+      }, BUBBLE_LIFETIME_MS - BUBBLE_FADE_MS);
+    }
+    bubble.removeTimer = window.setTimeout(() => {
+      bubble.removeTimer = 0;
+      removeBubble(bubble);
+    }, BUBBLE_LIFETIME_MS);
+  };
+
+  /**
+   * 配信切替・再オープン時に過去ログを再生しないよう、純関数へ渡す基準を未シードへ戻す。
+   * @param {string} [nextLiveId]
+   */
+  const resetSpeechTracking = (nextLiveId = '') => {
+    speechGeneration += 1;
+    speechLiveId = nextLiveId;
+    speechState = { seenKeys: null, primed: false };
+    clearBubbles();
+  };
 
   /**
    * @param {VenueRow[]} rows
@@ -830,6 +995,63 @@ export function mountVenueBarButton() {
     }, AGGREGATE_INTERVAL_MS);
   };
 
+  const pollSpeech = async () => {
+    if (!open || speechInFlight) return;
+    const liveId = liveIdFromPathname();
+    if (!liveId) return;
+    if (speechLiveId !== liveId) resetSpeechTracking(liveId);
+    const generation = speechGeneration;
+    const tailKey = tailStorageKey(liveId);
+    const summaryKey = commentDbSummaryKey(liveId);
+    speechInFlight = true;
+    try {
+      const bag = await chrome.storage.local.get([tailKey, summaryKey]);
+      if (
+        !open ||
+        generation !== speechGeneration ||
+        speechLiveId !== liveId ||
+        liveIdFromPathname() !== liveId
+      ) {
+        return;
+      }
+      const tailRows = Array.isArray(bag?.[tailKey]) ? bag[tailKey] : [];
+      const summary = /** @type {{ recent?: unknown }|undefined} */ (bag?.[summaryKey]);
+      const recentRows = Array.isArray(summary?.recent) ? summary.recent : [];
+      const rows = tailRows.length > 0 ? tailRows : recentRows;
+      const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 8 });
+      speechState = {
+        seenKeys: result.seenKeys,
+        primed: result.primed
+      };
+      // ユーザー方針「しゃべった人を席に出して吹かせる」: 新着発言者を会場行にマージして
+      //   先に席を作り直す(buildVenueSeating が capturedAt=now で上位席へ出す)。その後で
+      //   吹き出しを出すと、しゃべった人の席が必ず存在するので吹き出しが宙に浮かない。
+      if (result.speeches.length > 0) {
+        baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, Date.now());
+        renderSeats(baseRows);
+      }
+      for (const speech of result.speeches) showSpeechBubble(speech);
+    } catch {
+      // 一時的に storage を読めない場合は、基準を進めず次回の軽量ポーリングへ任せる。
+    } finally {
+      speechInFlight = false;
+    }
+  };
+
+  const stopSpeechPolling = () => {
+    if (!speechTimer) return;
+    clearInterval(speechTimer);
+    speechTimer = 0;
+  };
+
+  const startSpeechPolling = () => {
+    if (speechTimer) return;
+    void pollSpeech();
+    speechTimer = window.setInterval(() => {
+      void pollSpeech();
+    }, SPEECH_INTERVAL_MS);
+  };
+
   /** @param {KeyboardEvent} event */
   const onEscapeKey = (event) => {
     if (event.key !== 'Escape' || !open) return;
@@ -861,9 +1083,12 @@ export function mountVenueBarButton() {
     if (open) {
       addEscapeListener();
       startAggregation();
+      startSpeechPolling();
     } else {
       removeEscapeListener();
       stopAggregation();
+      stopSpeechPolling();
+      resetSpeechTracking();
     }
     if (persist) {
       void chrome.storage.local.set({ [OPEN_STORAGE_KEY]: open }).catch(() => {});
@@ -882,6 +1107,8 @@ export function mountVenueBarButton() {
     'pagehide',
     () => {
       stopAggregation();
+      stopSpeechPolling();
+      resetSpeechTracking();
       removeEscapeListener();
     },
     { once: true }

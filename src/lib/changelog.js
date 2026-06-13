@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.711',
+    date: '2026-06-13',
+    summary: '会場モードで発言を吹き出し表示',
+    items: Object.freeze([
+      '会場モードで、コメントすると発言者が席に出て頭上に吹き出しが表示されるようにしました',
+      '会場を開いた直後に過去のコメントが一斉に流れないようにしています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.710',
     date: '2026-06-13',
     summary: '会場モードを立体的なひな壇表示に',
