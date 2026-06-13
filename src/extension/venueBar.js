@@ -18,6 +18,13 @@ import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows } from '../lib/venueSpeech.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
+import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
+import {
+  seatsPerRow,
+  resolveVisibleArenaCount,
+  resolveVisibleAudienceCount,
+  selectStableVisibleMembers
+} from '../lib/venueViewport.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -131,33 +138,34 @@ const VENUE_CSS = `
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
   }
+  /*
+   * 会議確定B(2026-06-13): 中央に「映像セーフエリア」を確保して配信映像を見せる。
+   *   上端=観客帯(コンパクト1行)、中央=何も置かない空き(映像が透ける)、下端=ひな壇。
+   *   観客帯とひな壇を画面の上下に逃がし、中央 1fr を空けることで映像が常に見える。
+   */
   .nlsb-stage-layout {
     display: grid;
     width: min(1500px, 100%);
+    height: 100%;
     min-height: 0;
     margin: 0 auto;
-    grid-template-rows: minmax(140px, 25vh) minmax(0, 1fr);
-    gap: clamp(12px, 2vh, 22px);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "audience"
+      "safe"
+      "seating";
+    gap: clamp(8px, 1.5vh, 16px);
+    pointer-events: none;
   }
-  .nlsb-center {
-    display: grid;
-    width: min(620px, 86vw);
+  /* 中央の映像セーフエリア: UI を一切置かない。クリックも透過して映像/本家UIを触れる。 */
+  .nlsb-safe-area {
+    grid-area: safe;
     min-height: 0;
-    box-sizing: border-box;
-    place-self: center;
-    align-content: center;
-    gap: 10px;
-    padding: clamp(24px, 5vh, 46px) clamp(22px, 5vw, 58px);
-    overflow: hidden;
-    border: 1px solid rgba(150, 193, 236, 0.34);
-    border-radius: 20px;
-    background:
-      linear-gradient(135deg, rgba(47, 63, 84, 0.92), rgba(19, 26, 37, 0.96)),
-      #151d29;
-    box-shadow:
-      0 24px 70px rgba(0, 0, 0, 0.42),
-      inset 0 0 50px rgba(119, 174, 226, 0.08);
-    text-align: center;
+    pointer-events: none;
+  }
+  /* 配信者ステージカードは映像を覆うので撤去(中央は映像そのものを見せる)。 */
+  .nlsb-center {
+    display: none;
   }
   .nlsb-center-label {
     color: #9fd1ff;
@@ -178,21 +186,29 @@ const VENUE_CSS = `
     font-size: 12px;
     letter-spacing: 0.08em;
   }
+  /*
+   * 会場席は画面下端のひな壇だけにする(中央の映像セーフエリアは空ける)。高さは
+   * 下端 max 35vh に制限し、配信映像を覆わない(会議確定B「ひな壇は下端 30〜35vh」)。
+   */
   .nlsb-seating {
+    grid-area: seating;
+    align-self: end;
     display: grid;
+    width: 100%;
+    max-height: 35vh;
     min-height: 0;
     box-sizing: border-box;
     grid-template-areas:
       "header"
-      "audience"
       "seats";
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.11);
     border-radius: 16px;
-    background: rgba(9, 13, 19, 0.78);
+    background: rgba(9, 13, 19, 0.62);
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
     overscroll-behavior: contain;
+    pointer-events: auto;
   }
   .nlsb-header {
     grid-area: header;
@@ -202,12 +218,12 @@ const VENUE_CSS = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 42px;
+    min-height: 38px;
     box-sizing: border-box;
-    padding: 9px 14px;
+    padding: 7px 14px;
     gap: 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(14, 19, 27, 0.96);
+    background: rgba(14, 19, 27, 0.9);
   }
   .nlsb-title {
     overflow: hidden;
@@ -228,24 +244,22 @@ const VENUE_CSS = `
     display: flex;
     flex-direction: column-reverse;
     align-items: stretch;
-    /* ひな壇を席エリアの縦中央に寄せる(上の黒い空きを埋め、ステージに近づける)。 */
-    justify-content: center;
-    gap: clamp(10px, 2.4vh, 30px);
+    justify-content: flex-end;
+    gap: clamp(6px, 1.4vh, 16px);
     min-height: 0;
     box-sizing: border-box;
-    padding: clamp(18px, 4vh, 46px) 18px;
-    overflow: auto;
+    padding: clamp(10px, 2vh, 22px) 14px;
+    /*
+     * 横スクロールバー根絶(ユーザー不満「位置がずれてスクロールバーが出て変な動きで
+     * 見えなくなる」): 同時表示人数は selectStableVisibleMembers で行に収まる数に制限済み
+     * なので横溢れは起きないが、保険として overflow-x:hidden で横スクロールを構造的に殺す。
+     * 縦も clip(段数が増えても下端 35vh に収め、映像へはみ出さない)。
+     */
+    overflow-x: hidden;
+    overflow-y: hidden;
     background:
-      radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.18), transparent 62%),
-      repeating-linear-gradient(
-        0deg,
-        rgba(255, 255, 255, 0.035) 0,
-        rgba(255, 255, 255, 0.035) 1px,
-        transparent 1px,
-        transparent 78px
-      );
+      radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.16), transparent 62%);
     overscroll-behavior: contain;
-    scrollbar-gutter: stable;
     perspective: clamp(680px, 75vw, 1200px);
     perspective-origin: 50% 12%;
     transform-style: preserve-3d;
@@ -257,9 +271,11 @@ const VENUE_CSS = `
    */
   .nlsb-tier {
     display: flex;
-    width: max-content;
-    min-width: 100%;
+    width: 100%;
+    max-width: 100%;
     flex: 0 0 auto;
+    /* 1段に収まらない時は折り返す(横にはみ出して横スクロールを出さない=ユーザー不満の根治)。 */
+    flex-wrap: wrap;
     align-items: flex-end;
     justify-content: center;
     box-sizing: border-box;
@@ -348,13 +364,30 @@ const VENUE_CSS = `
     place-items: center;
   }
   .nlsb-name {
+    display: block;
+    max-width: 100%;
     min-width: 0;
     overflow: hidden;
     color: rgba(255, 255, 255, 0.9);
     font-size: 10px;
     line-height: 1.2;
+    text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* 数値 ID 持ち=クリックでユーザーページへ飛べるリンク。会場は開時のみ操作可能。 */
+  .nlsb-name-link {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .nlsb-name-link:hover {
+    color: #bfe1ff;
+    text-decoration: underline;
+  }
+  .nlsb-name-link:focus-visible {
+    outline: 2px solid #8dc8ff;
+    outline-offset: 2px;
+    border-radius: 3px;
   }
   .nlsb-seats.nlsb-mode-vip .nlsb-icon {
     width: clamp(96px, 11vw, 132px);
@@ -452,24 +485,33 @@ const VENUE_CSS = `
   .nlsb-seats.nlsb-mode-empty .nlsb-empty-message {
     display: block;
   }
+  /*
+   * 観客席は画面最上部のコンパクトな1行帯にする(会議確定B「映像を覆わない・1〜2行」)。
+   * flex-wrap を切って 1 行に固定し、はみ出しは overflow:hidden でクリップ。高さが伸びて
+   * 映像を覆うことが構造的に起きない。残りは「ほか観客 N 人」テキストで示す。
+   */
   .nlsb-audience {
     grid-area: audience;
+    align-self: start;
     display: flex;
-    min-height: 36px;
+    height: 44px;
     box-sizing: border-box;
     align-items: center;
     gap: 10px;
-    margin: 10px 14px 0;
-    padding: 8px 10px;
+    margin: 0;
+    padding: 5px 12px;
+    overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 10px;
     background:
-      linear-gradient(180deg, rgba(104, 129, 160, 0.1), rgba(255, 255, 255, 0.025)),
-      rgba(255, 255, 255, 0.025);
+      linear-gradient(180deg, rgba(104, 129, 160, 0.12), rgba(255, 255, 255, 0.03)),
+      rgba(9, 13, 19, 0.5);
+    pointer-events: auto;
   }
   .nlsb-audience-label,
   .nlsb-audience-more {
-    color: rgba(255, 255, 255, 0.58);
+    flex: 0 0 auto;
+    color: rgba(255, 255, 255, 0.62);
     font-size: 10px;
     white-space: nowrap;
   }
@@ -477,14 +519,15 @@ const VENUE_CSS = `
     display: flex;
     min-width: 0;
     flex: 1;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 3px 4px;
+    gap: 4px;
+    overflow: hidden;
   }
   .nlsb-audience-dot {
-    width: 32px;
-    height: 32px;
-    flex: 0 0 32px;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
     border-radius: 50%;
     background: rgba(196, 204, 216, 0.2);
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
@@ -622,8 +665,12 @@ function createSeatNode(seatIndex) {
   const fallback = document.createElement('span');
   fallback.className = 'nlsb-icon-fallback';
   icon.append(avatar, fallback);
-  const name = document.createElement('span');
+  // 原則「サムネ・ハンドルネーム・ID アンカー必須」: 名前はリンク化できる <a> で持つ。
+  //   数値 ID があるときだけ href を入れてユーザーページへ。匿名は href なし(ただの文字)。
+  const name = document.createElement('a');
   name.className = 'nlsb-name';
+  name.target = '_blank';
+  name.rel = 'noopener noreferrer';
   seat.append(icon, name);
   avatar.addEventListener('load', () => {
     if (avatar.dataset.avatar !== avatar.getAttribute('src')) return;
@@ -768,8 +815,15 @@ export function mountVenueBarButton() {
   audienceMore.hidden = true;
   audience.append(audienceLabel, audienceDots, audienceMore);
 
-  seating.append(header, seatsHost, audience);
-  stageLayout.append(center, seating);
+  // 中央の映像セーフエリア(UI を置かず、配信映像を常に見せる)。
+  const safeArea = document.createElement('div');
+  safeArea.className = 'nlsb-safe-area';
+  safeArea.setAttribute('aria-hidden', 'true');
+
+  // seating は下端のひな壇だけ(header + seats)。観客帯は最上部・映像は中央。
+  seating.append(header, seatsHost);
+  // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
+  stageLayout.append(audience, safeArea, seating, center);
   stage.append(close, stageLayout);
   root.append(toggle, stage);
   document.documentElement.appendChild(root);
@@ -901,6 +955,25 @@ export function mountVenueBarButton() {
     seatByKey = seating.seatByKey;
     seatsHost.classList.remove(...VENUE_LAYOUT_CLASSES);
     seatsHost.classList.add(`nlsb-mode-${seating.layoutMode}`);
+    // 会議確定B(横スクロール根絶+映像セーフエリア): 論理席は維持しつつ、同時表示は
+    //   行に収まる数に絞る。縮小でなく表示人数を減らす(名前/ID/サムネを潰さない)。
+    //   直近発言者は selectStableVisibleMembers で必ず表示に含め、席順は安定(ちらつかない)。
+    const seatAreaWidth = seatsHost.clientWidth || window.innerWidth || 1280;
+    const seatMinWidth =
+      seating.layoutMode === 'vip' ? 150 : seating.layoutMode === 'normal' ? 104 : 76;
+    const perRow = seatsPerRow(seatAreaWidth - 28, seatMinWidth);
+    const visibleSeatCount = resolveVisibleArenaCount({
+      totalCount: seating.seats.length,
+      perRow,
+      rows: 3,
+      hardCap: 40
+    });
+    const visibleSeats = selectStableVisibleMembers(
+      seating.seats,
+      visibleSeatCount,
+      spokenUserIds,
+      (entry) => String(entry?.participant?.userId || entry?.participant?.key || '').trim()
+    );
     // アリーナ席は名前付き + しゃべった匿名(promote)。それ以外の匿名は後方の観客席へ
     // ゆっくり顔で表示し、上限超過分だけ人数で補う。
     const { faceUserIds, totalAnonymous } = collectAudienceFaceUserIds(rows, {
@@ -913,7 +986,16 @@ export function mountVenueBarButton() {
         : `会場参加者 ${seating.participantCount}人`;
     audience.hidden = totalAnonymous === 0;
     audience.setAttribute('aria-label', `観客席 ${totalAnonymous}人`);
-    const visibleAudienceFaces = Math.min(faceUserIds.length, audienceDotNodes.length);
+    // 観客帯は最上部の 1 行に収める(映像を覆わない)。1 行に入る数だけ顔を出し、残りは人数表示。
+    const audienceAreaWidth = audienceDots.clientWidth || (window.innerWidth || 1280) * 0.7;
+    const audiencePerRow = seatsPerRow(audienceAreaWidth, 34);
+    const audienceCap = resolveVisibleAudienceCount({
+      totalFaces: faceUserIds.length,
+      perRow: audiencePerRow,
+      rows: 1,
+      hardCap: audienceDotNodes.length
+    });
+    const visibleAudienceFaces = Math.min(faceUserIds.length, audienceCap, audienceDotNodes.length);
     for (let i = 0; i < audienceDotNodes.length; i += 1) {
       const uid = i < visibleAudienceFaces ? faceUserIds[i] : '';
       const dot = audienceDotNodes[i];
@@ -938,7 +1020,7 @@ export function mountVenueBarButton() {
       delete node.seat.dataset.tierIndex;
     }
 
-    const tiers = buildVenueTiers(seating.seats.length);
+    const tiers = buildVenueTiers(visibleSeats.length);
     for (let i = 0; i < tierNodes.length; i += 1) {
       const tierNode = tierNodes[i];
       const tier = tiers[i];
@@ -960,7 +1042,7 @@ export function mountVenueBarButton() {
     for (const tier of tiers) {
       const tierNode = tierNodes[tier.rowIndex];
       for (let tierSeatIndex = 0; tierSeatIndex < tier.count; tierSeatIndex += 1) {
-        const entry = seating.seats[seatCursor];
+        const entry = visibleSeats[seatCursor];
         seatCursor += 1;
         if (!entry) continue;
         const node = seatNodes[entry.seatIndex];
@@ -968,7 +1050,13 @@ export function mountVenueBarButton() {
         tierNode.appendChild(node.seat);
         node.seat.dataset.tierIndex = String(tier.rowIndex);
         const i = entry.seatIndex;
-        const displayName = String(participant.name || '').trim() || `会場${i + 1}`;
+        const uid = String(participant.userId || '').trim();
+        const pageUrl = nicoUserPageUrl(uid);
+        // 名前: 本名があれば本名・無ければ匿名は「匿名NNN」で安定表示(顔だけにしない=原則)。
+        const rawName = String(participant.name || '').trim();
+        const displayName =
+          rawName ||
+          (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${i + 1}`));
         // 色は userId 優先で生成(同名の別人や匿名でも人ごとに色が変わる)。
         const colorKey = participant.userId || participant.name || participant.key;
         node.icon.style.backgroundColor = colorFromKey(colorKey);
@@ -997,7 +1085,19 @@ export function mountVenueBarButton() {
           node.avatar.removeAttribute('src');
         }
         node.name.textContent = displayName;
-        node.seat.title = displayName;
+        // 原則のリンク部分: 数値 ID があるときだけユーザーページへ飛べるアンカーにする。
+        //   匿名(ID なし)は href を外し、ただの文字として見せる(リンク偽装しない)。
+        if (pageUrl) {
+          node.name.setAttribute('href', pageUrl);
+          node.name.classList.add('nlsb-name-link');
+          node.name.title = `${displayName} のユーザーページを開く`;
+          node.seat.title = displayName;
+        } else {
+          node.name.removeAttribute('href');
+          node.name.classList.remove('nlsb-name-link');
+          node.name.title = '';
+          node.seat.title = displayName;
+        }
         node.seat.classList.remove('nlsb-is-empty');
         node.seat.setAttribute('aria-hidden', 'false');
       }

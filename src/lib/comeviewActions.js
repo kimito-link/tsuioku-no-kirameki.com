@@ -15,6 +15,7 @@
 import { normalizeComeviewRow, isGenericComeviewName } from './comeviewRows.js';
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { nicoUserPageUrl } from './nicoUserPage.js';
 
 /** NG リストの storage キー(配信を跨いで効く・拡張ページからの小さな UI 状態書込)。 */
 export const COMEVIEW_NG_STORAGE_KEY = 'nls_comeview_ng_v1';
@@ -91,9 +92,8 @@ export function mergeComeviewRowWithProfile(row, profileMap) {
  * @returns {string} 'https://www.nicovideo.jp/user/<id>' または ''
  */
 export function comeviewUserPageUrl(userId) {
-  const uid = String(userId || '').trim();
-  if (!/^\d{1,18}$/.test(uid)) return '';
-  return `https://www.nicovideo.jp/user/${uid}`;
+  // 単一ソース化: 汎用 lib(会場/コメビュ共有)へ委譲。挙動は従来どおり。
+  return nicoUserPageUrl(userId);
 }
 
 /**
