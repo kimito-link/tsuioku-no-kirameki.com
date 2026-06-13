@@ -13485,8 +13485,8 @@ const EVENT_PARTICIPATION_API_FETCH_MS = 12_000;
 const EVENT_PARTICIPATION_API_MIN_GAP_MS = 10_000;
 /** @type {number} */
 let _eventParticipationApiLastAttemptAt = 0;
-/** 1 tick で nvapi に問い合わせる記名 uid の最大数。 */
-const NICO_PROFILE_RESOLVE_BATCH = 3;
+/** 1 tick で nvapi に問い合わせる記名 uid の最大数(サムネ会議: 3→8。直列 await・429 で下げる)。 */
+const NICO_PROFILE_RESOLVE_BATCH = 8;
 /** follow 専用バッチの再入抑止（nvapi レート制限対策）。 */
 const COMMENTER_FOLLOW_FETCH_MIN_GAP_MS = 8_000;
 /** フォロー一覧専用バッチの再入抑止（1 req が重い）。 */
