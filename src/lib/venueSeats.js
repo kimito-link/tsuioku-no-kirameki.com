@@ -21,22 +21,51 @@ export const VENUE_MAX_SEATS = 50;
 export const VENUE_FRONT_ROW_SEATS = 20;
 
 /**
- * 参加者の安定キーを決める。userId があればそれを最優先(再接続でも同一人物)。
- * 無ければ個人を識別する name(汎用プレースホルダは除く)を使う。どちらも無ければ null
- * (=会場には並べない。匿名の塊を1人扱いにalso/全匿名がバラける事故の両方を防ぐ)。
+ * VIP モードの上限人数(これ以下なら大アイコンで「VIP感」を出す)。
+ * ユーザー方針(2026-06-13)「5人で見れてVIP感でるみたいな」。
+ */
+export const VENUE_VIP_MAX = 5;
+
+/** 通常モードの上限人数(これ超で満員=小サイズぎっしり)。 */
+export const VENUE_NORMAL_MAX = 20;
+
+/**
+ * アリーナ人数に応じて会場のレイアウトモードを決める純関数。
+ * 少人数を埋め草にせず特別感に変える(SHOWROOM にない追憶独自の体験)。
+ *
+ * @param {number} arenaCount アリーナ席に座る名前付き参加者の数
+ * @returns {'empty'|'vip'|'normal'|'packed'}
+ *   empty=0人 / vip=1..5(大アイコン) / normal=6..20(中) / packed=21+(小・ぎっしり)
+ */
+export function resolveVenueLayoutMode(arenaCount) {
+  const n = Math.max(0, Math.floor(Number(arenaCount) || 0));
+  if (n === 0) return 'empty';
+  if (n <= VENUE_VIP_MAX) return 'vip';
+  if (n <= VENUE_NORMAL_MAX) return 'normal';
+  return 'packed';
+}
+
+/**
+ * アリーナ席(会場の前に座る参加者)の安定キーを決める純関数。
+ *
+ * ユーザー方針(2026-06-13)「匿名はアリーナじゃないみたいなのがいい」: SHOWROOM のアリーナ席は
+ *   名前のある人が座り、匿名は別枠の観客。だから **名前のある人だけ**にキーを返す。
+ *   名前が無い/汎用プレースホルダ(匿名・名無し)はアリーナに座らせず null を返す
+ *   (= venueBar 側で「ほか観客 ◯人」に集約する)。
+ * キーは userId があれば userId(再接続でも同一人物・同名の別人も区別)、無ければ name。
  *
  * @param {{ userId?: string, name?: string }} row 正規化済み行(normalizeComeviewRow 形)
  * @param {(name: string) => boolean} [isGenericName] 汎用プレースホルダ名判定(comeviewRows から注入)
- * @returns {string|null}
+ * @returns {string|null} アリーナ席のキー、または匿名/無名なら null
  */
 export function venueParticipantKey(row, isGenericName) {
   if (!row || typeof row !== 'object') return null;
-  const uid = String(row.userId || '').trim();
-  if (uid) return `u:${uid}`;
   const name = String(row.name || '').trim();
+  // アリーナ資格は「個人を識別できる名前があること」。名前が無い/汎用名はアリーナに座らない。
   if (!name) return null;
   if (typeof isGenericName === 'function' && isGenericName(name)) return null;
-  return `n:${name}`;
+  const uid = String(row.userId || '').trim();
+  return uid ? `u:${uid}` : `n:${name}`;
 }
 
 /**
@@ -132,7 +161,6 @@ export function assignVenueSeats(ranked, prevSeatByKey, maxSeats = VENUE_MAX_SEA
       ? prevSeatByKey
       : new Map(Object.entries(prevSeatByKey || {}).map(([k, v]) => [k, Number(v)]));
 
-  const keepKeys = new Set(list.map((p) => p.key));
   /** @type {Map<string, number>} */
   const seatByKey = new Map();
   const usedSeats = new Set();
@@ -169,7 +197,30 @@ export function assignVenueSeats(ranked, prevSeatByKey, maxSeats = VENUE_MAX_SEA
     seats.push({ seatIndex, participant: p });
   }
   seats.sort((a, b) => a.seatIndex - b.seatIndex);
-  return { seats, seatByKey, keepKeys };
+  return { seats, seatByKey };
+}
+
+/**
+ * アリーナに座らない匿名(名前なし/汎用名)の概算人数を数える純関数。
+ * userId があれば userId 単位でユニークに数え(同じ匿名IDの連投は1人)、userId が無い行は
+ * 識別不能なので「最大1人ぶん」だけ加える(無名連投を全部別人として水増ししない)。
+ *
+ * @param {Array<Record<string, unknown>>} rows 正規化済み発言行
+ * @param {(name: string) => boolean} [isGenericName]
+ * @returns {number}
+ */
+export function countAnonymousParticipants(rows, isGenericName) {
+  const list = Array.isArray(rows) ? rows : [];
+  /** @type {Set<string>} */
+  const anonUids = new Set();
+  let hasUidlessAnon = false;
+  for (const r of list) {
+    if (venueParticipantKey(r, isGenericName)) continue; // アリーナ資格者はここで除外
+    const uid = String(r?.userId || '').trim();
+    if (uid) anonUids.add(uid);
+    else hasUidlessAnon = true;
+  }
+  return anonUids.size + (hasUidlessAnon ? 1 : 0);
 }
 
 /**
@@ -185,7 +236,9 @@ export function assignVenueSeats(ranked, prevSeatByKey, maxSeats = VENUE_MAX_SEA
  * @returns {{
  *   seats: Array<{ seatIndex: number, isFrontRow: boolean, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
  *   seatByKey: Map<string, number>,
- *   participantCount: number
+ *   participantCount: number,
+ *   anonymousCount: number,
+ *   layoutMode: 'empty'|'vip'|'normal'|'packed'
  * }}
  */
 export function buildVenueSeating(rows, opts = {}) {
@@ -197,6 +250,8 @@ export function buildVenueSeating(rows, opts = {}) {
   return {
     seats: seats.map((s) => ({ ...s, isFrontRow: s.seatIndex < frontRow })),
     seatByKey,
-    participantCount: participants.length
+    participantCount: participants.length,
+    anonymousCount: countAnonymousParticipants(rows, opts.isGenericName),
+    layoutMode: resolveVenueLayoutMode(participants.length)
   };
 }
