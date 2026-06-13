@@ -230,6 +230,51 @@ export function countAnonymousParticipants(rows, isGenericName) {
   return anonUids.size + (hasUidlessAnon ? 1 : 0);
 }
 
+/** 観客席に「顔つきで」並べる匿名の最大人数(これ超は人数テキストで補う)。性能上限。 */
+export const VENUE_AUDIENCE_FACE_MAX = 120;
+
+/**
+ * 観客席にゆっくり顔で並べる匿名参加者の userId 一覧を返す純関数。
+ *
+ * 仕上げ会議の確定2「匿名も観客席に顔つきで」: アリーナ(名前付き)に座らない匿名でも
+ * userId があれば anonymousIdenticonDataUrl(userId) でゆっくり顔を出せる。観客席を顔なし
+ * ドットでなく顔つきにする。ただし全員(数千)は重いので最大 cap、超過は人数テキストで補う。
+ * 直近にしゃべった順(capturedAt 降順)で cap 内に入れる=最近の人を優先表示。
+ *
+ * @param {Array<Record<string, unknown>>} rows 正規化済み発言行
+ * @param {{ isGenericName?: (name: string) => boolean, max?: number }} [opts]
+ * @returns {{ faceUserIds: string[], totalAnonymous: number }}
+ *   faceUserIds=顔を出す匿名 userId(最大 max・直近順) / totalAnonymous=匿名総数(テキスト用)
+ */
+export function collectAudienceFaceUserIds(rows, opts = {}) {
+  const list = Array.isArray(rows) ? rows : [];
+  const isGenericName = opts.isGenericName;
+  const max =
+    Number.isFinite(opts.max) && opts.max > 0
+      ? Math.floor(opts.max)
+      : VENUE_AUDIENCE_FACE_MAX;
+  /** @type {Map<string, number>} userId→最終発言時刻(最新を優先表示) */
+  const lastAtByUid = new Map();
+  let hasUidlessAnon = false;
+  for (const r of list) {
+    if (venueParticipantKey(r, isGenericName)) continue; // アリーナ資格者は観客でない
+    const uid = String(r?.userId || '').trim();
+    if (!uid) {
+      hasUidlessAnon = true;
+      continue;
+    }
+    const at = Number.isFinite(Number(r?.capturedAt)) ? Number(r.capturedAt) : 0;
+    const prev = lastAtByUid.get(uid);
+    if (prev == null || at >= prev) lastAtByUid.set(uid, at);
+  }
+  const totalAnonymous = lastAtByUid.size + (hasUidlessAnon ? 1 : 0);
+  const faceUserIds = Array.from(lastAtByUid.entries())
+    .sort((a, b) => b[1] - a[1]) // 直近にしゃべった順
+    .slice(0, max)
+    .map(([uid]) => uid);
+  return { faceUserIds, totalAnonymous };
+}
+
 /**
  * 発言行配列から会場の席割りまでを一気に行う高水準純関数(エントリ実装が呼ぶ)。
  *
