@@ -8,7 +8,17 @@
  */
 export function pushVoiceQueue(queue, item, { max = 5 } = {}) {
   const current = Array.isArray(queue) ? [...queue] : [];
-  current.push(item);
+  if (item && typeof item === 'object' && /** @type {{priority?: string}} */ (item).priority === 'high') {
+    // PR-V3: ギフト等優先アイテムは通常アイテムの前に割り込む
+    const insertIdx = current.findIndex(x => !x || typeof x !== 'object' || /** @type {{priority?: string}} */ (x).priority !== 'high');
+    if (insertIdx < 0) {
+      current.push(item);
+    } else {
+      current.splice(insertIdx, 0, item);
+    }
+  } else {
+    current.push(item);
+  }
   const rawMax = Number(max);
   const limit = Number.isFinite(rawMax) ? Math.max(0, Math.floor(rawMax)) : 5;
   const dropCount = Math.max(0, current.length - limit);

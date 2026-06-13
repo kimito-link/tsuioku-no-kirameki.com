@@ -1588,6 +1588,40 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true; // 非同期 sendResponse
 });
 
+const OPEN_VENUE_MESSAGE_TYPE = 'NLS_OPEN_VENUE';
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== OPEN_VENUE_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  const reply = (v) => {
+    try {
+      sendResponse(v);
+    } catch {
+      /* port closed */
+    }
+  };
+  const lv = COMEVIEW_LV_RE.test(String(msg.liveId || '')) ? String(msg.liveId) : '';
+  const base = chrome.runtime.getURL('venue.html');
+  const url = lv ? `${base}?lv=${lv}` : base;
+  (async () => {
+    try {
+      // 映像セーフエリア＋ひな壇を確保するため、少し広めのウィンドウで開く
+      await chrome.windows.create({ url, type: 'popup', width: 1000, height: 720 });
+      reply({ ok: true });
+    } catch (err) {
+      reply({ ok: false, error: String(err && err.message) });
+    }
+  })();
+  return true; // 非同期 sendResponse
+});
+
 /* ------------------------------------------------------------------ */
 /* nicoad（ニコニ広告）貢献度ランキング 無認証 API の CORS バイパス fetch proxy   */
 /* koken と同型。広告ランキングは従来 HTML scrape で取得していたが DOM に uid が   */
@@ -2508,7 +2542,15 @@ async function closeAllOurExtensionPopupWindows() {
       for (const t of tabs) {
         const u = String(t?.pendingUrl || t?.url || '');
         if (u.startsWith(extPrefix)) {
-          ours = true;
+          const base = u.split('?')[0].split('#')[0];
+          // 独立ウィンドウ(venue/comeview/status)は孤児掃除から保護する。
+          const isStandalone = 
+            base === chrome.runtime.getURL('venue.html') ||
+            base === chrome.runtime.getURL('comeview.html') ||
+            base === chrome.runtime.getURL('status.html');
+          if (!isStandalone) {
+            ours = true;
+          }
           break;
         }
       }
@@ -2550,6 +2592,7 @@ async function focusOurExtensionPopupOrCleanupOrphans() {
       const tabs = w.tabs || [];
       let hostsPopupHtml = false;
       let hostsOurExt = false;
+      let hostsStandalone = false;
       for (const t of tabs) {
         const u = String(t?.pendingUrl || t?.url || '');
         if (!u.startsWith(extPrefix)) continue;
@@ -2560,8 +2603,18 @@ async function focusOurExtensionPopupOrCleanupOrphans() {
           hostsPopupHtml = true;
           break;
         }
+        const isStandalone = 
+          base === chrome.runtime.getURL('venue.html') ||
+          base === chrome.runtime.getURL('comeview.html') ||
+          base === chrome.runtime.getURL('status.html');
+        if (isStandalone) {
+          hostsStandalone = true;
+          break;
+        }
       }
       if (!hostsOurExt) continue;
+      // 独立ウィンドウはシングルトン管理の対象外として無視(閉じない/updateしない)
+      if (hostsStandalone) continue;
       if (hostsPopupHtml && !reused) {
         // 正常な popup を 1 つだけ再利用（複数あれば 2 つ目以降は孤児扱いで掃除）
         try {
@@ -2859,9 +2912,10 @@ async function handleBrowserActionClick(tab) {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
   if (msg.type === 'NLS_FOCUS_INLINE_PANEL_FROM_POPUP') {
+    if (!sender || sender.id !== chrome.runtime.id) return undefined;
     void (async () => {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -2986,3 +3040,46 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   void doDevReloadGo();
   return undefined;
 });
+
+// v0.1.723: Proxy fetch for VOICEVOX to bypass CSP/mixed-content in content scripts
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== 'NLS_FETCH_PROXY') return undefined;
+  // セキュリティ: 自拡張のみ許可(他の onMessage handler と同じガード)
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  // SSRF 防止: VOICEVOX ローカルホスト(host_permissions に列挙済み)のみ通す
+  let targetUrl;
+  try {
+    targetUrl = new URL(String(msg.url || ''));
+  } catch {
+    sendResponse({ error: 'Invalid URL' });
+    return true;
+  }
+  const allowed =
+    (targetUrl.hostname === '127.0.0.1' && targetUrl.port === '50021') ||
+    (targetUrl.hostname === '127.0.0.1' && targetUrl.port === '3456') ||
+    (targetUrl.hostname === 'localhost' && targetUrl.port === '3456');
+  if (!allowed) {
+    sendResponse({ error: 'URL not allowed' });
+    return true;
+  }
+  fetch(msg.url, msg.init)
+    .then(res => {
+      if (msg.wantBuffer) {
+        return res.arrayBuffer().then(buf => ({
+          ok: res.ok,
+          status: res.status,
+          buffer: Array.from(new Uint8Array(buf))
+        }));
+      } else {
+        return res.text().then(text => ({
+          ok: res.ok,
+          status: res.status,
+          text
+        }));
+      }
+    })
+    .then(data => sendResponse(data))
+    .catch(err => sendResponse({ error: err.message }));
+  return true; // async
+});
+

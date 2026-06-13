@@ -101,6 +101,11 @@ const targets = [
     target: 'chrome100'
   },
   {
+    entryPoints: ['src/extension/venue-entry.js'],
+    outfile: 'extension/dist/venue.js',
+    target: 'chrome100'
+  },
+  {
     // feat/status-web-mobile-share: スマホ閲覧用 status Web 版(app.tsuioku-no-kirameki.com)。
     //   拡張に依存しない純 Web。api/status から GET した概要 jsonBlob を、拡張の status と
     //   同じ整形(src/lib/statusFormat.js を共用)で描画する。Vercel 静的配信。

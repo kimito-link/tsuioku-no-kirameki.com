@@ -1,0 +1,173 @@
+/**
+ * crowdRasterizer.js
+ * 人数ラスタライザ Canvas (Antigravity Enhanced Version)
+ * 決定的乱数を用いて、奥ほど小さく、曲面状に群衆を敷き詰めます。
+ * 【Antigravity 特別演出】: 単なるシルエットではなく、観客が色とりどりの
+ * サイリウム（ペンライト）を振っている「光の海」を表現し、圧倒的なライブ感を演出します。
+ * 遠くの観客は暗闇に溶け込み（空気遠近法）、近景の光は強く輝きます。
+ */
+
+// 決定的乱数 (Xorshift32)
+/** @param {any} state */
+function xorshift32(state) {
+  let x = state || 1;
+  x ^= x << 13;
+  x ^= x >>> 17;
+  x ^= x << 5;
+  return x >>> 0;
+}
+
+// 観客のシルエットベース色（空気遠近法でさらに調整されます）
+const SILHOUETTES = [
+  { type: 'round' },
+  { type: 'square' }
+];
+
+// サイリウム（ペンライト）の厳選された鮮やかなカラーパレット
+const LIGHTSTICK_COLORS = [
+  '#ff3366', // ピンクレッド
+  '#33ccff', // シアン
+  '#ffcc00', // イエロー
+  '#66ff66', // エメラルドグリーン
+  '#cc66ff', // パープル
+  '#ff8833', // オレンジ
+  '#ffffff'  // ホワイト
+];
+
+/**
+ * サイリウムを持った観客を描画
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x
+ * @param {number} y
+ * @param {number} size
+ * @param {number} depth
+ * @param {string} spriteType
+ * @param {string} lightColor
+ */
+function drawAudience(ctx, x, y, size, depth, spriteType, lightColor) {
+  // 空気遠近法：奥 (depth ~ 0) ほど暗闇 (背景) に溶け込む
+  // 手前 (depth ~ 1) は元の明るさを維持
+  const alpha = 0.2 + depth * 0.8;
+  const lightness = Math.floor(10 + depth * 25);
+  
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = `rgb(${lightness}, ${lightness + 5}, ${lightness + 15})`;
+  
+  // 1. シルエットの描画
+  ctx.beginPath();
+  if (spriteType === 'round') {
+    // 丸っこい頭部
+    ctx.arc(x, y - size * 0.5, size * 0.45, 0, Math.PI * 2);
+    // 肩幅
+    ctx.moveTo(x - size * 0.7, y + size * 0.4);
+    ctx.quadraticCurveTo(x, y - size * 0.2, x + size * 0.7, y + size * 0.4);
+    ctx.lineTo(x + size * 0.7, y + size);
+    ctx.lineTo(x - size * 0.7, y + size);
+  } else {
+    // 四角っぽい頭部
+    ctx.roundRect(x - size * 0.4, y - size, size * 0.8, size * 0.9, size * 0.2);
+    // 肩幅
+    ctx.moveTo(x - size * 0.6, y + size * 0.5);
+    ctx.lineTo(x, y - size * 0.1);
+    ctx.lineTo(x + size * 0.6, y + size * 0.5);
+    ctx.lineTo(x + size * 0.6, y + size);
+    ctx.lineTo(x - size * 0.6, y + size);
+  }
+  ctx.fill();
+
+  // 2. サイリウム（ペンライト）の描画
+  // 腕の位置（ランダムな揺らぎを表現するため x, y から少しずらす）
+  const stickX = x + size * 0.4;
+  const stickY = y - size * 0.2;
+  const stickLength = size * 0.8;
+  const stickWidth = Math.max(1.5, size * 0.15);
+
+  // ペンライトの芯（白く輝く部分）
+  ctx.globalAlpha = depth * 0.9 + 0.1; 
+  ctx.lineCap = 'round';
+  ctx.lineWidth = stickWidth;
+  ctx.strokeStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(stickX, stickY);
+  ctx.lineTo(stickX + size * 0.1, stickY - stickLength);
+  ctx.stroke();
+
+  // ペンライトの光彩（Glow）
+  ctx.globalAlpha = depth * 0.6 + 0.1;
+  ctx.lineWidth = stickWidth * 3;
+  ctx.strokeStyle = lightColor;
+  ctx.stroke();
+  
+  // さらに広い光彩（加算合成風にぼかす）
+  ctx.globalCompositeOperation = 'screen';
+  ctx.globalAlpha = depth * 0.3;
+  ctx.lineWidth = stickWidth * 6;
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'source-over'; // リセット
+}
+
+/**
+ * キャンバスに群衆（光の海）を描画する
+ * @param {HTMLCanvasElement} canvas
+ * @param {number} count 描画する人数
+ * @param {number} seed シード値（liveIdのハッシュなどを想定）
+ */
+export function drawCrowdOnCanvas(canvas, count, seed = 12345) {
+  const ctx = canvas.getContext('2d', { alpha: true });
+  if (!ctx) return;
+
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  if (count <= 0) return;
+
+  // パフォーマンス確保のため最大 2048 人（ブラウザ描画限界の安全圏）
+  const maxDraw = Math.min(count, 2048);
+  let rngState = (seed + count) >>> 0;
+
+  const positions = [];
+  
+  // 1. 全員の座標とプロパティを決定（曲面ドーム状のアリーナ配置）
+  for (let i = 0; i < maxDraw; i++) {
+    rngState = xorshift32(rngState);
+    const r = rngState / 0xffffffff;
+
+    // 奥(0.0) 〜 手前(1.0)
+    // 奥に行くほど人数密度が高いため、depth の分布を調整 (Math.pow で奥に偏らせる)
+    const normalizedIndex = i / maxDraw;
+    const depth = 1.0 - Math.pow(normalizedIndex, 0.6); 
+    
+    rngState = xorshift32(rngState);
+    const angleRng = (rngState / 0xffffffff);
+    
+    // 左右位置（中央に少し集まりつつ、画面外まで広がる）
+    const xPos = w * 0.5 + (angleRng - 0.5) * w * 1.8; 
+    
+    // Y座標の曲面計算（アリーナのすり鉢状の座席を表現）
+    const xDist = Math.abs((xPos - w * 0.5) / (w * 0.5));
+    const curveY = Math.pow(xDist, 1.5) * depth * h * 0.3; // 端ほど上に上がる
+
+    // 基本Y座標 + 曲面カーブ + 少しのランダムな揺らぎ
+    const yPos = (depth * h * 0.85) - curveY + (r * h * 0.15) + (h * 0.1); 
+    
+    // 手前ほど大きく、奥は極小
+    const size = Math.max(2, 5 + depth * 35); 
+
+    rngState = xorshift32(rngState);
+    const spriteType = SILHOUETTES[rngState % SILHOUETTES.length].type;
+    
+    rngState = xorshift32(rngState);
+    const lightColor = LIGHTSTICK_COLORS[rngState % LIGHTSTICK_COLORS.length];
+
+    positions.push({ x: xPos, y: yPos, size, depth, spriteType, lightColor });
+  }
+
+  // 2. Y座標（奥から手前）でソートして描画順を決定（Z-ソート）
+  positions.sort((a, b) => a.y - b.y);
+
+  // 3. 描画実行
+  for (const p of positions) {
+    drawAudience(ctx, p.x, p.y, p.size, p.depth, p.spriteType, p.lightColor);
+  }
+}

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 // @ts-nocheck — content script; DOM/Chrome API が広く any 相当
 import {
   extractLiveIdFromDom,
@@ -60,7 +61,8 @@ import {
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
   normalizeInlinePanelPlacement,
-  normalizeInlineFloatingAnchor
+  normalizeInlineFloatingAnchor,
+  KEY_PROFILE_RESOLVE_STATE
 } from '../lib/storageKeys.js';
 import {
   pickLargestVisibleVideo,
@@ -150,6 +152,12 @@ import {
   upsertUserCommentProfileFromEntry,
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
+import {
+  recordProfileResult,
+  shouldResolveProfile,
+  pruneProfileResolveMap
+} from '../lib/profileResolveState.js';
+import { deriveAvatarUrlFromUid } from '../lib/deriveAvatarUrlFromUid.js';
 import {
   normalizeCommenterFollowMap,
   commenterFollowEntryFromProfile,
@@ -13499,8 +13507,6 @@ let _commenterFollowingListFetchLastAt = 0;
 let _followingListCountLiveId = '';
 /** @type {number} */
 let _followingListFetchedThisLive = 0;
-/** content 側でも問い合わせ済み uid を覚え、SW LRU と二重に抑制する。 */
-const _nicoProfileResolveAttempted = new Set();
 
 /**
  * PR1-b（多タブ集約）: 外部 API fetch（koken/nicoad/profile/参加者）を、同一 liveId を
@@ -14126,11 +14132,13 @@ async function maybeResolveNamedUserProfilesOnce() {
       commentsKey,
       giftsKey,
       KEY_USER_COMMENT_PROFILE_CACHE,
-      KEY_COMMENTER_FOLLOW_CACHE
+      KEY_COMMENTER_FOLLOW_CACHE,
+      KEY_PROFILE_RESOLVE_STATE
     ]);
     const profileMap = normalizeUserCommentProfileMap(
       bag[KEY_USER_COMMENT_PROFILE_CACHE]
     );
+    let resolveStateMap = bag[KEY_PROFILE_RESOLVE_STATE] || {};
     // フォロー/フォロワー横断キャッシュ（数値 uid キー・TTL 付き）。同じ nvapi 応答から拾う。
     const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
     const followNow = Date.now();
@@ -14145,7 +14153,8 @@ async function maybeResolveNamedUserProfilesOnce() {
       if (!uid || seen.has(uid)) return;
       seen.add(uid);
       if (!isResolvableNicoUid(uid)) return;
-      if (_nicoProfileResolveAttempted.has(uid)) return;
+      const { shouldResolve } = shouldResolveProfile(resolveStateMap, uid, followNow);
+      if (!shouldResolve) return;
       const hit = profileMap[uid];
       const hasNick = hit && String(hit.nickname || '').trim() !== '';
       const hasAvatar = hit && String(hit.avatarUrl || '').trim() !== '';
@@ -14181,25 +14190,37 @@ async function maybeResolveNamedUserProfilesOnce() {
             { type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid },
             (resp) => {
               const le = chrome.runtime.lastError;
-              if (le) return resolve(null);
-              if (!resp || resp.ok !== true || resp.json == null) return resolve(null);
+              if (le) return resolve({ profile: null, status: null });
+              if (!resp) return resolve({ profile: null, status: null });
+              if (resp.ok !== true || resp.json == null) {
+                return resolve({ profile: null, status: resp.status });
+              }
               try {
-                resolve(normalizeNicoUserProfileResponse(resp.json));
+                resolve({ profile: normalizeNicoUserProfileResponse(resp.json), status: resp.status || 200 });
               } catch {
-                resolve(null);
+                resolve({ profile: null, status: resp.status || 200 });
               }
             }
           );
         } catch {
-          resolve(null);
+          resolve({ profile: null, status: null });
         }
       });
 
     let cacheTouched = false;
     let followTouched = false;
+    let resolveStateTouched = false;
     for (const uid of candidates) {
-      _nicoProfileResolveAttempted.add(uid);
-      const p = await askOne(uid);
+      const { profile: p, status } = await askOne(uid);
+      
+      resolveStateMap = recordProfileResult(resolveStateMap, uid, status, Date.now());
+      resolveStateTouched = true;
+
+      // v0.1.720: 即時生成 CDN URL のフォールバック (プロフ取得後、avatarUrlがなければ補完)
+      if (p && !p.avatarUrl && typeof p.userId === 'string' && /^[0-9]+$/.test(p.userId)) {
+        p.avatarUrl = deriveAvatarUrlFromUid(p.userId);
+      }
+
       if (!p) continue;
       if (upsertUserCommentProfileFromEntry(profileMap, p, broadcasterCtx)) {
         cacheTouched = true;
@@ -14210,13 +14231,20 @@ async function maybeResolveNamedUserProfilesOnce() {
         followTouched = true;
       }
     }
-    if (!cacheTouched && !followTouched) return;
+    if (!cacheTouched && !followTouched && !resolveStateTouched) return;
 
     const curLid = String(liveId || '').trim().toLowerCase();
     if (curLid !== lid) return;
 
+    if (resolveStateTouched) {
+      resolveStateMap = pruneProfileResolveMap(resolveStateMap, Date.now());
+    }
+
     /** @type {Record<string, unknown>} */
     const save = {};
+    if (resolveStateTouched) {
+      save[KEY_PROFILE_RESOLVE_STATE] = resolveStateMap;
+    }
     if (cacheTouched) {
       const pruned = pruneUserCommentProfileMap(profileMap);
       const applied = applyUserCommentProfileMapToEntries(comments, pruned);

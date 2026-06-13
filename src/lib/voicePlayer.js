@@ -1,3 +1,5 @@
+// @ts-nocheck — VoicePlayer は依存注入(deps)クラス。型は呼び出し側の配線で担保。
+//   comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
 import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js';
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import {
@@ -158,6 +160,9 @@ export class VoicePlayer {
         }
         if (allStale && this.queue.length > 0) {
           const dropCount = this.queue.length;
+          for (const dropped of this.queue) {
+            if (typeof dropped.onPlayStart === 'function') dropped.onPlayStart();
+          }
           this.queue = [];
           this._showSkipped(dropCount);
           break;
@@ -169,6 +174,7 @@ export class VoicePlayer {
 
         const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
         if (ageCheck.stale) {
+          if (typeof item.onPlayStart === 'function') item.onPlayStart();
           this._showSkipped(1);
           if (this.prefetch && this.prefetch.item === item) {
             this.prefetch = null;
@@ -194,6 +200,7 @@ export class VoicePlayer {
             );
 
         if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
+          if (typeof item.onPlayStart === 'function') item.onPlayStart();
           continue;
         }
 
@@ -226,14 +233,22 @@ export class VoicePlayer {
             audio.addEventListener('error', finish, { once: true });
             try {
               const playResult = audio.play();
+              if (typeof item.onPlayStart === 'function') item.onPlayStart();
               if (playResult && typeof playResult.catch === 'function') {
-                playResult.catch(finish);
+                playResult.catch((err) => {
+                  if (err && err.name === 'NotAllowedError') {
+                    this.onStatus('⚠️ブラウザにより音声がブロックされました。ボタンを押し直してください');
+                    this.disable({ persist: false });
+                  }
+                  finish();
+                });
               }
             } catch {
               finish();
             }
           });
         } catch {
+          if (typeof item.onPlayStart === 'function') item.onPlayStart();
           if (objectUrl) this.revokeObjectURL(objectUrl);
         }
       }
@@ -269,16 +284,26 @@ export class VoicePlayer {
         body,
         count: 1,
         enqueuedAt: Date.now(),
-        priority: isHighPriority ? 'high' : 'normal'
+        priority: isHighPriority ? 'high' : 'normal',
+        onPlayStart: item.onPlayStart
       };
       
       const merged = mergeRepeatedVoiceItem(this.queue, candidate);
       this.queue = merged.queue;
-      if (merged.merged) continue;
+      if (merged.merged) {
+        if (typeof candidate.onPlayStart === 'function') candidate.onPlayStart();
+        continue;
+      }
       
       const pushed = pushVoiceQueue(this.queue, candidate, { max: 12 });
       this.queue = pushed.queue;
-      droppedCount += pushed.dropped.length;
+      
+      if (pushed.dropped && pushed.dropped.length > 0) {
+        for (const dropped of pushed.dropped) {
+          if (typeof dropped.onPlayStart === 'function') dropped.onPlayStart();
+        }
+        droppedCount += pushed.dropped.length;
+      }
     }
     
     if (droppedCount > 0) this._showSkipped(droppedCount);

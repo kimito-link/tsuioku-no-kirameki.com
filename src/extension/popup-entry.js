@@ -7622,25 +7622,24 @@ function renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText) 
  *
  * @param {ParentNode | null | undefined} root
  */
-function bindOnErrorHideHandlersWithin(root) {
+function bindOnErrorHandlersWithin(root) {
   if (!root || typeof root.querySelectorAll !== 'function') return;
-  const imgs = root.querySelectorAll('img[data-on-error-hide="1"]');
+  const imgs = root.querySelectorAll('img[data-on-error-hide="1"], img[data-on-error-fallback="blank"]');
   imgs.forEach((node) => {
     if (!(node instanceof HTMLImageElement)) return;
     // 二重バインド防止（再描画でも一度だけ）
-    if (node.dataset.nlOnErrorHideBound === '1') return;
-    node.dataset.nlOnErrorHideBound = '1';
-    node.addEventListener(
-      'error',
-      () => {
-        try {
-          node.style.visibility = 'hidden';
-        } catch {
-          // no-op
-        }
-      },
-      { once: true }
-    );
+    if (node.dataset.nlOnErrorBound === '1') return;
+    node.dataset.nlOnErrorBound = '1';
+
+    if (node.dataset.onErrorHide === '1') {
+      node.addEventListener('error', () => {
+        try { node.style.visibility = 'hidden'; } catch { /* ignore */ }
+      }, { once: true });
+    } else if (node.dataset.onErrorFallback === 'blank') {
+      node.addEventListener('error', () => {
+        try { node.src = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg'; } catch { /* ignore */ }
+      }, { once: true });
+    }
   });
 }
 
@@ -7703,7 +7702,7 @@ function renderTopSupportRankStrip(stripRooms) {
     strip.innerHTML =
       `<p class="nl-top-support-rank__note">まだ応援コメントがありません。まずは配信者のフォローから。</p>` +
       `<div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
-    bindOnErrorHideHandlersWithin(strip);
+    bindOnErrorHandlersWithin(strip);
     return;
   }
   strip.hidden = false;
@@ -7769,7 +7768,7 @@ function renderTopSupportRankStrip(stripRooms) {
    */
   const listInner = `${casterTileHtml}${html}`;
   strip.innerHTML = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
-  bindOnErrorHideHandlersWithin(strip);
+  bindOnErrorHandlersWithin(strip);
   const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
   models.forEach((m, i) => {
     const img = thumbs[i];
@@ -9587,7 +9586,7 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
     tpl.innerHTML = nextHtml;
     el.replaceChildren(tpl.content);
     _topSupportRankLastHtmlByEl.set(el, nextHtml);
-    bindOnErrorHideHandlersWithin(el);
+    bindOnErrorHandlersWithin(el);
     const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
     models.forEach((m, i) => {
       const img = thumbs[i];
@@ -10188,7 +10187,7 @@ function paintNorthStarGiftThrowsPanel(html) {
   panel.innerHTML = trimmed;
   panel.hidden = false;
   panel.removeAttribute('aria-hidden');
-  bindOnErrorHideHandlersWithin(panel);
+  bindOnErrorHandlersWithin(panel);
 }
 
 /**
@@ -10540,7 +10539,7 @@ async function refreshSupportActivityTimeline(liveId) {
     now: Date.now()
   });
   upgradeAnonymousAvatarImages(body);
-  bindOnErrorHideHandlersWithin(body);
+  bindOnErrorHandlersWithin(body);
   // 実 http アバターは load guard 経由で差し替え(フリッカ防止・コメント/ギフト両行)。
   body
     .querySelectorAll('img.nl-tl-row__avatar, img.nl-tl-gift__avatar')
@@ -11088,7 +11087,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     const thumbRp = isHttpOrHttpsUrl(displayThumb)
       ? ' referrerpolicy="no-referrer"'
       : '';
-    const avatarImgHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async"${thumbRp}>`;
+    const avatarImgHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async" data-on-error-fallback="blank"${thumbRp}>`;
     // 原則「サムネ・ハンドル・ID はひとかたまり」: 数値 ID はサムネ+名前を同じアンカーで括る。
     const roomLinkable = !isUnknown && /^\d{1,18}$/.test(String(r.userKey || ''));
     const aOpen = (cls) => `<a class="${cls}" href="https://www.nicovideo.jp/user/${encodeURIComponent(String(r.userKey))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(label)} のユーザーページを開く">`;

@@ -33,7 +33,7 @@ export function buildCommentTickerLatestHtml(input) {
 
   const rowInnerHtml =
     `<span class="nl-ticker-latest__row">` +
-    `<img class="nl-ticker-latest__avatar" alt="" src="${escapeHtml(avatarSrc)}">` +
+    `<img class="nl-ticker-latest__avatar" alt="" src="${escapeHtml(avatarSrc)}" data-on-error-fallback="blank">` +
     labelHtml +
     `<span class="nl-ticker-latest__text">${escapeHtml(textShown)}</span>` +
     `</span>`;

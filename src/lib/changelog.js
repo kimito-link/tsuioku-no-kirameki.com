@@ -26,6 +26,25 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.723',
+    date: '2026-06-14',
+    summary: 'VOICEVOX読み上げの接続修正・会場の空席表示修正',
+    items: Object.freeze([
+      'コメビュや会場モードでVOICEVOXが起動中でも「見つかりません」と表示されることがあった問題を直しました',
+      '会場モードで選ばれていない空席が前列に並んでしまい、選ばれた人のサムネが見えにくくなる問題を直しました',
+      '読み上げの通信を安全に行うための内部改善をしました'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.721',
+    date: '2026-06-13',
+    summary: '別窓の会場モードに映像を表示・読み上げボタンが確実に出るよう修正',
+    items: Object.freeze([
+      '別窓で開いた会場モードの中央に、ニコ生の配信映像（公式埋め込みプレイヤー）が表示されるようにしました',
+      '会場モードの「🔊 読み上げ」ボタンが表示されないことがあった問題を修正しました（内部の更新適用漏れを修正）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.720',
     date: '2026-06-13',
     summary: '会場モードのバグ修正と音声読み上げ機能の統合',

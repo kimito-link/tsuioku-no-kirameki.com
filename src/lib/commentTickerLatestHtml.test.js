@@ -21,7 +21,7 @@ describe('buildCommentTickerLatestHtml', () => {
       userPageHref: 'https://www.nicovideo.jp/user/123'
     });
     expect(html).toBe(
-      '<a class="nl-ticker-item nl-ticker-latest nl-ticker-latest--linkable" aria-live="polite" href="https://www.nicovideo.jp/user/123" target="_blank" rel="noopener noreferrer"><span class="nl-ticker-latest__row"><img class="nl-ticker-latest__avatar" alt="" src="https://example.com/a.png"><span class="nl-ticker-latest__name">たろう</span><span class="nl-ticker-latest__colon">：</span><span class="nl-ticker-latest__text">こんにちは</span></span></a>'
+      '<a class="nl-ticker-item nl-ticker-latest nl-ticker-latest--linkable" aria-live="polite" href="https://www.nicovideo.jp/user/123" target="_blank" rel="noopener noreferrer"><span class="nl-ticker-latest__row"><img class="nl-ticker-latest__avatar" alt="" src="https://example.com/a.png" data-on-error-fallback="blank"><span class="nl-ticker-latest__name">たろう</span><span class="nl-ticker-latest__colon">：</span><span class="nl-ticker-latest__text">こんにちは</span></span></a>'
     );
     const root = parse(html);
     const a = root.querySelector('a.nl-ticker-latest--linkable');
