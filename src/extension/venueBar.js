@@ -95,6 +95,8 @@ const VENUE_CSS = `
     box-sizing: border-box;
     padding: clamp(52px, 7vh, 76px) clamp(14px, 3vw, 44px) 64px;
     overflow: hidden;
+    /* FX(ビネット等)の mix-blend を中央映像へ漏らさないため独立スタッキング(会議確定)。 */
+    isolation: isolate;
     /*
      * ユーザー方針(2026-06-13 強)「配信の画面と実際の画面にスモークをかけないで・ちゃんと
      * 見たい」: 全面を覆う暗幕(linear-gradient)を撤去。背景は透明にして、後ろのニコ生映像と
@@ -120,6 +122,23 @@ const VENUE_CSS = `
     visibility: visible;
     pointer-events: auto;
     transition-delay: 0s;
+  }
+  /*
+   * 後方ビネット(ライブ演出会議 確定①・プロの「空席を闇に沈める」術のWeb再現)。
+   * ⚠️ユーザー方針「中央の配信映像にスモークをかけない」を厳守: 中央は大きく transparent で
+   * くり抜き、暗くするのは【四隅】と【下端の席エリア後方】だけ。これで空席/隙間が闇に溶けて
+   * 「奥まで満員」に見えつつ、配信映像(中央セーフエリア)は素通しのまま。
+   * pointer-events:none でクリック透過・吹き出しレイヤー(z5)より下(z0)。
+   */
+  .nlsb-stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 78% 64% at 50% 46%, transparent 52%, rgba(2, 4, 10, 0.55) 100%),
+      linear-gradient(to bottom, transparent 64%, rgba(2, 4, 12, 0.5) 100%);
   }
   .nlsb-close {
     position: absolute;
@@ -149,6 +168,8 @@ const VENUE_CSS = `
    *   観客帯とひな壇を画面の上下に逃がし、中央 1fr を空けることで映像が常に見える。
    */
   .nlsb-stage-layout {
+    position: relative;
+    z-index: 1;
     display: grid;
     width: min(1500px, 100%);
     height: 100%;
