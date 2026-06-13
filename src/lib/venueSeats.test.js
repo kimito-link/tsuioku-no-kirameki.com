@@ -98,11 +98,11 @@ describe('resolveVenueLayoutMode', () => {
   it('人数でモードが切り替わる(empty/vip/normal/packed)', () => {
     expect(resolveVenueLayoutMode(0)).toBe('empty');
     expect(resolveVenueLayoutMode(1)).toBe('vip');
-    expect(resolveVenueLayoutMode(5)).toBe('vip');
-    expect(resolveVenueLayoutMode(6)).toBe('normal');
-    expect(resolveVenueLayoutMode(20)).toBe('normal');
-    expect(resolveVenueLayoutMode(21)).toBe('packed');
-    expect(resolveVenueLayoutMode(50)).toBe('packed');
+    expect(resolveVenueLayoutMode(8)).toBe('vip');
+    expect(resolveVenueLayoutMode(9)).toBe('normal');
+    expect(resolveVenueLayoutMode(30)).toBe('normal');
+    expect(resolveVenueLayoutMode(31)).toBe('packed');
+    expect(resolveVenueLayoutMode(150)).toBe('packed');
   });
   it('不正値は empty に丸める', () => {
     expect(resolveVenueLayoutMode(-3)).toBe('empty');
