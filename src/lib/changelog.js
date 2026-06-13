@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.716',
+    date: '2026-06-13',
+    summary: '会場の名前リンクを押せるように・スモーク撤去',
+    items: Object.freeze([
+      '会場モードで参加者の名前をクリックできなかった不具合を直しました',
+      '配信の映像や本家の画面にかかっていた暗いスモークを薄くし、ちゃんと見えるようにしました',
+      '会場モードから読み上げ付きコメントビューア(コメビュ)を開けるボタンを追加しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.715',
     date: '2026-06-13',
     summary: '会場モードで配信映像を見せ名前にリンク',
