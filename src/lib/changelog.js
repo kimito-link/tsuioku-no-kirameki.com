@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.724',
+    date: '2026-06-14',
+    summary: 'コメビュが配信切替に追従・読み上げの無音を解消',
+    items: Object.freeze([
+      'コメビュ(別窓)が、視聴中の配信が切り替わっても古い配信を見続けて新着コメントが流れず読み上げもされなくなる問題を直しました。配信が変わると自動で新しい配信に追従します(?lv= で配信を固定して開いた窓はそのまま)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.723',
     date: '2026-06-14',
     summary: 'VOICEVOX読み上げの接続修正・会場の空席表示修正',
