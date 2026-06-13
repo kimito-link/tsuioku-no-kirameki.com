@@ -232,6 +232,33 @@ async function resolveLiveIdFromStorage() {
   return '';
 }
 
+/** ?lv= で配信を明示指定して開かれたか(明示なら配信切替に追従しない=固定窓)。 */
+let _explicitLiveId = false;
+
+/**
+ * 配信切替に追従して別の lv へ切り替える(?lv= 明示で開いた窓は追従しない)。
+ * 真因(2026-06-14): comeview を ?lv= 無しで開くと開いた瞬間の lv で固定され、watch タブが
+ *   別配信へ移っても古い配信を見続け、新着が来ず「読み上げされない/コメントが流れない」になっていた。
+ *   星野メソッド(摩擦ゼロ・自動追従)に従い、nls_last_watch_url の変化で自動的に新配信へ切替える。
+ * @param {string} nextLiveId
+ */
+async function switchToLiveId(nextLiveId) {
+  const lv = String(nextLiveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lv) || lv === _liveId) return;
+  _liveId = lv;
+  const meta = document.getElementById('cvLiveMeta');
+  if (meta) meta.textContent = _liveId;
+  // 前配信の表示・既読・読み上げキューをリセットして新配信を一から読む。
+  _renderedKeys.clear();
+  _seenCommentNos.clear();
+  _seenGiftAtBySig.clear();
+  _tailRows = [];
+  _giftRows = [];
+  _voiceQueue = [];
+  _voiceGeneration += 1;
+  await requestFullRefresh(true);
+}
+
 function isObsMode() {
   try {
     return new URLSearchParams(window.location.search).get('obs') === '1';
@@ -1457,6 +1484,12 @@ function wireStorageChanges() {
   const pinKey = comeviewPinStorageKey(_liveId);
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local') return;
+    // 配信切替に追従(?lv= 明示窓は固定)。watch タブが別配信へ移ったら自動で新配信を読む。
+    if (!_explicitLiveId && changes[KEY_LAST_WATCH_URL]) {
+      const url = String(changes[KEY_LAST_WATCH_URL].newValue || '');
+      const m = url.toLowerCase().match(/lv\d{1,15}/);
+      if (m && m[0] !== _liveId) void switchToLiveId(m[0]);
+    }
     if (changes[pinKey]) renderPin(changes[pinKey].newValue);
     if (changes[COMEVIEW_USER_NOTES_KEY]) {
       _userNotes = normalizeComeviewUserNotes(
@@ -1630,7 +1663,9 @@ function wireButtons() {
 
 async function main() {
   if (isObsMode()) document.body.classList.add('is-obs');
-  _liveId = resolveLiveIdFromUrl() || (await resolveLiveIdFromStorage());
+  const urlLiveId = resolveLiveIdFromUrl();
+  _explicitLiveId = !!urlLiveId; // ?lv= 明示窓は配信切替に追従しない(固定窓)
+  _liveId = urlLiveId || (await resolveLiveIdFromStorage());
   const meta = document.getElementById('cvLiveMeta');
   if (meta) meta.textContent = _liveId ? _liveId : '配信が見つかりません';
   wireButtons();
