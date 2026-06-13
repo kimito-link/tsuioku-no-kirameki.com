@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.714',
+    date: '2026-06-13',
+    summary: '読み上げのささやき声を使わないように',
+    items: Object.freeze([
+      'コメント読み上げで、ささやき声（小さく聞き取りにくい声）を使わないようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.713',
     date: '2026-06-13',
     summary: '会場モードを明るくして発言を吹き出し表示',

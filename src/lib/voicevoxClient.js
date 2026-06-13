@@ -65,6 +65,19 @@ export async function isVoicevoxAlive(opts = {}) {
 }
 
 /**
+ * VOICEVOX のスタイル名が「ささやき声」系か判定する純関数。
+ * ユーザー方針(2026-06-13)「ささやくような声は入れない方がいい」: ささやき/ウィスパー系は
+ *   小さく聞き取りにくいので読み上げの声候補から外す。
+ *
+ * @param {unknown} styleName VOICEVOX speaker.styles[].name(例「ノーマル」「ささやき」)
+ * @returns {boolean}
+ */
+export function isWhisperStyleName(styleName) {
+  const name = String(styleName || '');
+  return /ささやき|囁き|ウィスパ|whisper/i.test(name);
+}
+
+/**
  * @param {{ fetchFn?: FetchFn, timeoutMs?: number, baseUrl?: string }} [opts]
  * @returns {Promise<number[]>}
  */
@@ -91,6 +104,9 @@ export async function listVoicevoxStyleIds(opts = {}) {
       for (const style of speaker.styles) {
         const id = Number(style?.id);
         if (!Number.isInteger(id) || id < 0 || seen.has(id)) continue;
+        // ユーザー方針(2026-06-13)「ささやくような声は入れない方がいい」:
+        //   VOICEVOX の「ささやき」「ウィスパー」スタイルは小さく聞き取りにくいので読み上げ候補から除外。
+        if (isWhisperStyleName(style?.name)) continue;
         seen.add(id);
         ids.push(id);
       }

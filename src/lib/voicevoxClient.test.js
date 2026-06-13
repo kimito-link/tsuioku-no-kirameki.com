@@ -4,6 +4,7 @@ import {
   buildMergedVoiceText,
   buildVoiceReadingText,
   isVoicevoxAlive,
+  isWhisperStyleName,
   listVoicevoxStyleIds,
   synthesizeVoice
 } from './voicevoxClient.js';
@@ -51,6 +52,33 @@ describe('listVoicevoxStyleIds', () => {
   it('不正レスポンスや失敗は空配列', async () => {
     const fetchFn = vi.fn().mockResolvedValue({ ok: false });
     await expect(listVoicevoxStyleIds({ fetchFn })).resolves.toEqual([]);
+  });
+
+  it('ささやき/ウィスパー系スタイルは除外する(ユーザー方針)', async () => {
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { styles: [{ id: 0, name: 'ノーマル' }, { id: 3, name: 'ささやき' }] },
+        { styles: [{ id: 5, name: 'ウィスパー' }, { id: 8, name: 'あまあま' }] }
+      ]
+    });
+    // ささやき(3)とウィスパー(5)は除外され、ノーマル(0)とあまあま(8)だけ残る
+    await expect(listVoicevoxStyleIds({ fetchFn })).resolves.toEqual([0, 8]);
+  });
+});
+
+describe('isWhisperStyleName', () => {
+  it('ささやき/囁き/ウィスパー/whisper を含む名前は true', () => {
+    expect(isWhisperStyleName('ささやき')).toBe(true);
+    expect(isWhisperStyleName('囁き')).toBe(true);
+    expect(isWhisperStyleName('ウィスパー')).toBe(true);
+    expect(isWhisperStyleName('Whisper')).toBe(true);
+  });
+  it('通常スタイル名は false', () => {
+    expect(isWhisperStyleName('ノーマル')).toBe(false);
+    expect(isWhisperStyleName('あまあま')).toBe(false);
+    expect(isWhisperStyleName('')).toBe(false);
+    expect(isWhisperStyleName(null)).toBe(false);
   });
 });
 
