@@ -29,6 +29,13 @@ import {
   BUBBLE_ANCHOR_GAP
 } from '../lib/venueBubbleLayout.js';
 import { drawCrowdOnCanvas } from '../lib/crowdRasterizer.js';
+import { VoicePlayer } from '../lib/voicePlayer.js';
+import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
+import {
+  isVoicevoxAlive,
+  listVoicevoxStyleIds,
+  synthesizeVoice
+} from '../lib/voicevoxClient.js';
 
 const ROOT_ID = 'nlsb-venue-root';
 const STYLE_ID = 'nlsb-venue-style';
@@ -823,6 +830,18 @@ export function mountVenueBarButton(options = {}) {
     }
   });
 
+  const voiceBtn = document.createElement('button');
+  voiceBtn.type = 'button';
+  voiceBtn.className = 'nlsb-comeview-btn nlsb-voice-btn';
+  voiceBtn.style.marginLeft = '8px';
+  voiceBtn.textContent = '🔊 読み上げ OFF';
+  
+  const voiceStatus = document.createElement('span');
+  voiceStatus.className = 'nlsb-voice-status';
+  voiceStatus.style.marginLeft = '8px';
+  voiceStatus.style.fontSize = '12px';
+  voiceStatus.style.color = '#7a828e';
+
   let venueWindowBtn = null;
   if (!isStandalone) {
     venueWindowBtn = document.createElement('button');
@@ -847,9 +866,9 @@ export function mountVenueBarButton(options = {}) {
   note.className = 'nlsb-note';
   note.textContent = '全コメント集計・最大150席';
   if (venueWindowBtn) {
-    headerRight.append(comeviewBtn, venueWindowBtn, note);
+    headerRight.append(comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note);
   } else {
-    headerRight.append(comeviewBtn, note);
+    headerRight.append(comeviewBtn, voiceBtn, voiceStatus, note);
   }
   header.append(title, headerRight);
 
@@ -898,6 +917,39 @@ export function mountVenueBarButton(options = {}) {
 
   let open = false;
   let userChangedOpen = false;
+
+  const voicePlayer = new VoicePlayer({
+    storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
+    onToggle: (enabled, readNameEnabled, toggleBusy) => {
+      voiceBtn.disabled = toggleBusy;
+      voiceBtn.classList.toggle('is-on', enabled);
+      voiceBtn.textContent = enabled ? '🔊 読み上げ ON' : '🔊 読み上げ OFF';
+    },
+    onStatus: (msg) => {
+      voiceStatus.textContent = msg;
+    },
+    onSkip: () => {},
+    isObsMode: () => {
+      return (window.name || '').includes('OBS') || window.location.search.includes('obs=');
+    },
+    audioConstructor: typeof window !== 'undefined' ? window.Audio : null,
+    createObjectURL: typeof URL !== 'undefined' ? URL.createObjectURL.bind(URL) : null,
+    revokeObjectURL: typeof URL !== 'undefined' ? URL.revokeObjectURL.bind(URL) : null,
+    fetchVoicevoxAlive: isVoicevoxAlive,
+    fetchVoiceStyleIds: listVoicevoxStyleIds,
+    fetchSynthesizeVoice: synthesizeVoice,
+    resolveVoice: resolveVoiceForUser
+  });
+  
+  voiceBtn.addEventListener('click', () => {
+    if (voicePlayer.enabled) {
+      voicePlayer.disable();
+    } else {
+      voicePlayer.enable();
+    }
+  });
+  
+  void voicePlayer.initialize();
   let aggregateTimer = 0;
   let aggregateInFlight = false;
   let speechTimer = 0;
@@ -1304,7 +1356,16 @@ export function mountVenueBarButton(options = {}) {
         baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, Date.now());
         renderSeats(baseRows);
       }
-      for (const speech of result.speeches) showSpeechBubble(speech);
+      for (const speech of result.speeches) {
+        showSpeechBubble(speech);
+        voicePlayer.enqueue([{
+          kind: 'comment',
+          userId: speech.userId,
+          nickname: speech.name,
+          key: speech.key,
+          text: speech.body
+        }]);
+      }
     } catch {
       // 一時的に storage を読めない場合は、基準を進めず次回の軽量ポーリングへ任せる。
     } finally {

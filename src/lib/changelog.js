@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.720',
+    date: '2026-06-13',
+    summary: '会場モードのバグ修正と音声読み上げ機能の統合',
+    items: Object.freeze([
+      '会場モードにVOICEVOX音声読み上げ機能（吹き出し連動）を追加しました',
+      '会場モードで吹き出しテキストが見切れる不具合を修正しました',
+      '会場モードで一般ユーザーのサムネが出ない不具合を修正しました',
+      '会場モードを別窓にした際に吹き出しが出なくなる不具合を修正しました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.719',
     date: '2026-06-13',
     summary: 'サムネと名前を一体リンクに・読み上げボタン追加',
