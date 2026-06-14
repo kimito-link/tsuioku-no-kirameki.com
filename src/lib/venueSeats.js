@@ -88,16 +88,16 @@ export function venueParticipantKey(row, isGenericName, _promoteUserIds) {
  * 正規化済み発言行の配列(昇順=古い→新しい)から、会場参加者を集計する純関数。
  * 同一参加者はまとめ、最終発言・最新本文・発言数・ギフト有無を持つ。
  *
- * @param {Array<{ userId?: string, name?: string, text?: string, avatar?: string, capturedAt?: number|null, isGift?: boolean }>} rows
+ * @param {Array<{ userId?: string, name?: string, text?: string, avatar?: string, capturedAt?: number|null, isGift?: boolean, preCount?: number, preHasGift?: boolean, preGiftCount?: number }>} rows
  * @param {{ isGenericName?: (name: string) => boolean, promoteUserIds?: Set<string>|null }} [opts]
- * @returns {Array<{ key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, firstAt: number }>}
+ * @returns {Array<{ key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number }>}
  *   参加者配列(初出順=安定。席割りはこの順を尊重しつつ優先度で並べ替える)
  */
 export function collectVenueParticipants(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const isGenericName = opts.isGenericName;
   const promoteUserIds = opts.promoteUserIds instanceof Set ? opts.promoteUserIds : null;
-  /** @type {Map<string, { key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, firstAt: number, order: number }>} */
+  /** @type {Map<string, { key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number, order: number }>} */
   const byKey = new Map();
   let order = 0;
   for (const r of list) {
@@ -105,14 +105,20 @@ export function collectVenueParticipants(rows, opts = {}) {
     if (!key) continue;
     const at = Number.isFinite(Number(r?.capturedAt)) ? Number(r.capturedAt) : 0;
     const text = String(r?.text ?? '').trim();
+    // 集約済み入力(userLane candidate 経由)は出現回数=1でも実発言数を preCount で持つ。
+    //   preCount があればそれを「この行が表す発言数」として加算する(生コメント経路は1ずつ)。
+    const preCount = Number.isFinite(Number(r?.preCount)) ? Math.max(1, Math.floor(Number(r.preCount))) : 1;
+    const preHasGift = r?.preHasGift === true || !!r?.isGift;
+    const preGiftCount = Number.isFinite(Number(r?.preGiftCount)) ? Math.max(0, Math.floor(Number(r.preGiftCount))) : 0;
     const existing = byKey.get(key);
     if (existing) {
-      existing.count += 1;
+      existing.count += preCount;
+      existing.giftCount += preGiftCount;
       if (at >= existing.lastAt) {
         existing.lastAt = at;
         if (text) existing.lastText = text;
       }
-      if (r?.isGift) existing.hasGift = true;
+      if (preHasGift) existing.hasGift = true;
       const uid = String(r?.userId || '').trim();
       if (uid && !existing.userId) existing.userId = uid;
       const name = String(r?.name || '').trim();
@@ -128,8 +134,9 @@ export function collectVenueParticipants(rows, opts = {}) {
         lastText: text,
         lastAt: at,
         firstAt: at,
-        count: 1,
-        hasGift: !!r?.isGift,
+        count: preCount,
+        hasGift: preHasGift,
+        giftCount: preGiftCount,
         order: order++
       });
     }
@@ -184,8 +191,12 @@ export function resolveVenueRegularScore(participant, opts = {}) {
   return Math.max(0, Math.min(100, score));
 }
 
-/** VIP(常連・大応援)として席を光らせる既定スコア閾値。これ以上で光る。 */
-export const VENUE_VIP_REGULAR_SCORE_THRESHOLD = 45;
+/**
+ * VIP(常連・大応援)として席を光らせる既定スコア閾値。これ以上で光る。
+ * v0.1.734 実機検証で 45 だと 20 コメント以上必要=普通の配信で誰も光らなかった。
+ *   30 に下げて「7コメ以上の常連 or ギフトを送った人」が光るように(実機で 0→複数席へ)。
+ */
+export const VENUE_VIP_REGULAR_SCORE_THRESHOLD = 30;
 
 /** 同時に光らせる VIP 席の既定上限(光りすぎて特別感が薄れるのを防ぐ)。 */
 export const VENUE_VIP_REGULAR_MAX = 8;
@@ -479,11 +490,17 @@ export function buildVenueSeating(rows, opts = {}) {
  *
  * PR3: 会場モードの入力を「生コメント(ctail・素性薄い)」から「全コメント集計(サムネ/ゆっくり顔
  *   つき・匿名含む全参加者)」へ切り替えるためのアダプタ。userLaneCandidate は
- *   {userId, nickname, avatarUrl, avatarObserved, liveId, _laneSortAt} 形。
- *   これを collectVenueParticipants が食える {userId, name, avatar, capturedAt} 形へ写す。
+ *   {userId, nickname, avatarUrl, avatarObserved, liveId, commentCount, giftCount, _laneSortAt} 形。
+ *   これを collectVenueParticipants が食える {userId, name, avatar, capturedAt, ...} 形へ写す。
  *
- * @param {ReadonlyArray<{userId?: string, nickname?: string, avatarUrl?: string, _laneSortAt?: number}>} candidates
- * @returns {Array<{userId: string, name: string, avatar: string, text: string, capturedAt: number}>}
+ * v0.1.734 VIP常連光らせ修正: candidate は既にユーザー単位で集約済み(1人=1行)なので、この
+ *   adapter を通すと collectVenueParticipants の出現回数カウントは全員 count=1 になり、VIP
+ *   スコアが閾値に届かず誰も光らなかった。candidate が持つ実発言数(commentCount)/ギフト回数
+ *   (giftCount)を preCount/preHasGift/preGiftCount として持たせ、collectVenueParticipants が
+ *   出現回数の代わりにこれを使えるようにする(本物の常連度がスコアに乗る)。
+ *
+ * @param {ReadonlyArray<{userId?: string, nickname?: string, avatarUrl?: string, commentCount?: number, giftCount?: number, _laneSortAt?: number}>} candidates
+ * @returns {Array<{userId: string, name: string, avatar: string, text: string, capturedAt: number, preCount?: number, preHasGift?: boolean, preGiftCount?: number}>}
  */
 export function venueRowsFromUserLaneCandidates(candidates) {
   const list = Array.isArray(candidates) ? candidates : [];
@@ -492,13 +509,19 @@ export function venueRowsFromUserLaneCandidates(candidates) {
     if (!c || typeof c !== 'object') continue;
     const userId = String(c.userId || '').trim();
     if (!userId) continue;
+    const preCount = Math.max(1, Math.floor(Number(c.commentCount) || 0) || 1);
+    const giftCount = Math.max(0, Math.floor(Number(c.giftCount) || 0));
     out.push({
       userId,
       name: String(c.nickname || '').trim(),
       avatar: String(c.avatarUrl || '').trim(),
       // userLane 集計は本文を保持しないので空。会場席は名前/サムネで成立する(吹き出しは別経路)。
       text: '',
-      capturedAt: Number.isFinite(Number(c._laneSortAt)) ? Number(c._laneSortAt) : 0
+      capturedAt: Number.isFinite(Number(c._laneSortAt)) ? Number(c._laneSortAt) : 0,
+      // 集約済みの実数(VIP常連光らせのスコア用)。collectVenueParticipants が拾う。
+      preCount,
+      preHasGift: giftCount > 0,
+      preGiftCount: giftCount
     });
   }
   return out;
