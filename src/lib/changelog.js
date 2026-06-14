@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.736',
+    date: '2026-06-14',
+    summary: '会場が埋まらない問題を改善（表示席数を増やした）',
+    items: Object.freeze([
+      '人が大勢いる配信でも会場の下半分しか埋まらず空いて見えていた問題を改善しました。同時に表示する席数を増やし（50〜200人規模で約40席→最大75席以上）、ひな壇がしっかり埋まるようにしました',
+      '300人以上の配信では最大150席まで表示して満員の会場に見えるようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.735',
     date: '2026-06-14',
     summary: '診断の「サムネ持ち」数が実際の席表示と一致するように修正',

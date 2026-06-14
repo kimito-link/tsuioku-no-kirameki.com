@@ -34,15 +34,21 @@ export function seatsPerRow(availableWidthPx, seatMinWidthPx) {
  *   ごく一部しか出ず満席感が出ない。人数が増えるほど表示席も増やす(満員の会場に見せる)。
  *   会議合意 hardCap ≈ clamp(base, floor(total*ratio), max)。3モデルが total*0.2 系で一致。
  *
+ * 2026-06-14 実機検証(populated 会場・lv350656591/144人)で判明: 旧 base40/ratio0.2 だと
+ *   50〜200人の配信で常に上限40に張り付き、8段ひな壇のうち4段しか埋まらず「会場が埋まらない」
+ *   (672px の客席に272px しか中身が無い)。grid が許す席数まで出すべき。base60/ratio0.5 に上げ、
+ *   実際の頭打ちは resolveVisibleArenaCount の byGrid(perRow×段数)に任せる(横溢れは出ない)。
+ *   144人→72・300人以上→150(満席)。max150 は描画性能の天井。
+ *
  * @param {number} total 論理参加者数
  * @param {{ base?: number, ratio?: number, max?: number }} [opts]
- *   base=下限(少人数でもこの席数は確保・既定40) / ratio=人数比(既定0.2) / max=絶対上限(既定150=席プール)
+ *   base=下限(少人数でもこの席数は確保・既定60) / ratio=人数比(既定0.5) / max=絶対上限(既定150=席プール)
  * @returns {number}
  */
 export function resolveDynamicArenaCap(total, opts = {}) {
   const n = Math.max(0, Math.floor(Number(total) || 0));
-  const base = Math.max(1, Math.floor(Number(opts.base ?? 40)));
-  const ratio = Number(opts.ratio ?? 0.2) > 0 ? Number(opts.ratio ?? 0.2) : 0.2;
+  const base = Math.max(1, Math.floor(Number(opts.base ?? 60)));
+  const ratio = Number(opts.ratio ?? 0.5) > 0 ? Number(opts.ratio ?? 0.5) : 0.5;
   const max = Math.max(base, Math.floor(Number(opts.max ?? 150)));
   const byRatio = Math.floor(n * ratio);
   return Math.min(max, Math.max(base, byRatio));

@@ -33,25 +33,29 @@ describe('resolveVisibleArenaCount', () => {
     // perRow=8 段3 => 24 が上限(150席あっても24しか出さない)
     expect(resolveVisibleArenaCount({ totalCount: 150, perRow: 8, rows: 3, hardCap: 40 })).toBe(24);
   });
-  it('hardCap 未指定なら人数連動(満席感): 大人数で40超まで伸びる', () => {
-    // 405人・広い行(perRow20×段8=160)→ 動的cap=floor(405*0.2)=81 で頭打ち
-    expect(resolveVisibleArenaCount({ totalCount: 405, perRow: 20, rows: 8 })).toBe(81);
-    // 少人数は従来どおり下限40まで確保(perRow×rows が十分あれば total)
+  it('hardCap 未指定なら人数連動(満席感): 大人数で満席へ・grid が頭打ち', () => {
+    // 405人・広い行(perRow20×段8=160)→ 動的cap=min(150,max(60,floor(405*0.5=202)))=150
+    expect(resolveVisibleArenaCount({ totalCount: 405, perRow: 20, rows: 8 })).toBe(150);
+    // 少人数は total まで(perRow×rows が十分あれば全員)
     expect(resolveVisibleArenaCount({ totalCount: 30, perRow: 20, rows: 8 })).toBe(30);
+    // v0.1.736 実機修正: 144人は grid(perRow12×8=96)が頭打ち。cap72 でなく grid 96 でなく
+    //   total と byGrid と cap の最小=min(144, 96, 72)=72(cap が grid 未満ならそれ・8段埋まる)
+    expect(resolveVisibleArenaCount({ totalCount: 144, perRow: 12, rows: 8 })).toBe(72);
   });
 });
 
 describe('resolveDynamicArenaCap', () => {
-  it('clamp(40, floor(total*0.2), 150)', () => {
-    expect(resolveDynamicArenaCap(0)).toBe(40); // 下限
-    expect(resolveDynamicArenaCap(100)).toBe(40); // 100*0.2=20 < 40 → 40
-    expect(resolveDynamicArenaCap(405)).toBe(81); // 405*0.2=81
-    expect(resolveDynamicArenaCap(1000)).toBe(150); // 1000*0.2=200 > 150 → 150
+  it('clamp(60, floor(total*0.5), 150)', () => {
+    expect(resolveDynamicArenaCap(0)).toBe(60); // 下限
+    expect(resolveDynamicArenaCap(100)).toBe(60); // 100*0.5=50 < 60 → 60
+    expect(resolveDynamicArenaCap(144)).toBe(72); // 144*0.5=72
+    expect(resolveDynamicArenaCap(300)).toBe(150); // 300*0.5=150
+    expect(resolveDynamicArenaCap(1000)).toBe(150); // 1000*0.5=500 > 150 → 150
   });
   it('opts で base/ratio/max を上書きできる', () => {
-    expect(resolveDynamicArenaCap(405, { ratio: 0.1 })).toBe(40); // 40.5→40, base40
-    expect(resolveDynamicArenaCap(405, { max: 60 })).toBe(60); // 81 > 60 → 60
-    expect(resolveDynamicArenaCap(405, { base: 100 })).toBe(100); // 81 < 100 → 100
+    expect(resolveDynamicArenaCap(405, { ratio: 0.1 })).toBe(60); // 40.5→40 < base60 → 60
+    expect(resolveDynamicArenaCap(405, { max: 80 })).toBe(80); // 202 > 80 → 80
+    expect(resolveDynamicArenaCap(100, { base: 120 })).toBe(120); // 50 < 120 → 120
   });
 });
 
