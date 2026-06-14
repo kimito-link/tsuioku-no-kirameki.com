@@ -12,6 +12,7 @@ import {
   rankVenueParticipants,
   assignVenueSeats,
   buildVenueSeating,
+  hasRealThumbnail,
   VENUE_MAX_SEATS,
   VENUE_FRONT_ROW_SEATS
 } from './venueSeats.js';
@@ -206,6 +207,42 @@ describe('rankVenueParticipants', () => {
     const ranked = rankVenueParticipants(ps, 2);
     expect(ranked.map((p) => p.key)).toEqual(['u:a', 'u:b']);
   });
+
+  it('実サムネ持ちをギフトより最優先(サムネ持ちを前列に)', () => {
+    const ps = [
+      // 匿名だがギフト持ち(従来は最優先だった)
+      { key: 'u:a', avatar: '', lastAt: 300, count: 5, hasGift: true },
+      // 実サムネ持ちだがギフトなし・発言も古い
+      { key: 'u:b', avatar: 'https://example.com/b.png', lastAt: 100, count: 1, hasGift: false }
+    ];
+    // 実サムネ持ち u:b が先頭に来る(ギフトより優先)。
+    expect(rankVenueParticipants(ps).map((p) => p.key)).toEqual(['u:b', 'u:a']);
+  });
+
+  it('実サムネ同士は従来順(ギフト→最新→発言数)を維持', () => {
+    const ps = [
+      { key: 'u:a', avatar: 'https://e/a.png', lastAt: 300, count: 1, hasGift: false },
+      { key: 'u:b', avatar: 'https://e/b.png', lastAt: 100, count: 1, hasGift: true },
+      { key: 'u:c', avatar: 'https://e/c.png', lastAt: 200, count: 1, hasGift: false }
+    ];
+    expect(rankVenueParticipants(ps).map((p) => p.key)).toEqual(['u:b', 'u:a', 'u:c']);
+  });
+});
+
+describe('hasRealThumbnail', () => {
+  it('http(s) URL は実サムネ', () => {
+    expect(hasRealThumbnail('https://example.com/a.png')).toBe(true);
+    expect(hasRealThumbnail('http://example.com/a.png')).toBe(true);
+    expect(hasRealThumbnail('HTTPS://EXAMPLE.COM/A.PNG')).toBe(true);
+  });
+  it('空 / data: / blob: / 相対パスは実サムネではない', () => {
+    expect(hasRealThumbnail('')).toBe(false);
+    expect(hasRealThumbnail('data:image/png;base64,AAAA')).toBe(false);
+    expect(hasRealThumbnail('blob:https://example.com/x')).toBe(false);
+    expect(hasRealThumbnail('/img/a.png')).toBe(false);
+    expect(hasRealThumbnail(null)).toBe(false);
+    expect(hasRealThumbnail(undefined)).toBe(false);
+  });
 });
 
 describe('assignVenueSeats', () => {
@@ -232,6 +269,36 @@ describe('assignVenueSeats', () => {
     expect(seatByKey.get('u:c')).toBe(0); // 空いた席0を埋める
   });
 
+  it('frontRow 予約: 匿名の前列 prev を破棄し実サムネ持ちに前列を譲る', () => {
+    // 前回、匿名 anon が前列席0を占有。今回 ランク上位の実サムネ持ち real が登場。
+    const ranked = [
+      { key: 'real', avatar: 'https://e/r.png', lastAt: 100, count: 1, hasGift: false },
+      { key: 'anon', avatar: '', lastAt: 90, count: 1, hasGift: false }
+    ];
+    const prev = new Map([['anon', 0]]); // 匿名が前列席0 を prev で持っている
+    const { seatByKey } = assignVenueSeats(ranked, prev, 50, 1); // frontRow=1
+    // 匿名の前列 prev(0)は破棄され、実サムネ持ちが前列席0 を取る。
+    expect(seatByKey.get('real')).toBe(0);
+    // 匿名はアリーナに残るが後列(>= frontRow=1)へ。
+    expect(seatByKey.get('anon')).toBeGreaterThanOrEqual(1);
+  });
+
+  it('frontRow 予約: 実サムネ持ちの前列 prev は維持される(飛ばさない)', () => {
+    const ranked = [
+      { key: 'real', avatar: 'https://e/r.png', lastAt: 100, count: 1, hasGift: false }
+    ];
+    const prev = new Map([['real', 0]]);
+    const { seatByKey } = assignVenueSeats(ranked, prev, 50, 5);
+    expect(seatByKey.get('real')).toBe(0); // 実サムネ持ちの前列は維持
+  });
+
+  it('frontRow=0 なら従来挙動(予約なし・匿名も前列 prev 維持)', () => {
+    const ranked = [{ key: 'anon', avatar: '', lastAt: 1, count: 1, hasGift: false }];
+    const prev = new Map([['anon', 0]]);
+    const { seatByKey } = assignVenueSeats(ranked, prev, 50, 0);
+    expect(seatByKey.get('anon')).toBe(0); // frontRow=0 なら破棄しない
+  });
+
   it('席は昇順で返る', () => {
     const ranked = [
       { key: 'u:a', lastAt: 1, count: 1, hasGift: false },
@@ -256,16 +323,41 @@ describe('assignVenueSeats', () => {
 });
 
 describe('buildVenueSeating', () => {
-  it('発言行から席割りまで一気通貫し前列フラグを付ける', () => {
+  it('発言行から席割りまで一気通貫し前列フラグを付ける(実サムネ持ちが前列)', () => {
+    // 2026-06-14 方針「サムネ持ちを前列に優先」: 実サムネ(http)持ちを前列、匿名は後列。
     const rows = [];
     for (let i = 0; i < 25; i++) {
-      rows.push({ userId: `u${i}`, name: `U${i}`, text: `c${i}`, capturedAt: i });
+      // 偶数番だけ実サムネ(http avatar)を持たせる → 13人が前列候補。
+      const avatar = i % 2 === 0 ? `https://example.com/a${i}.png` : '';
+      rows.push({ userId: `u${i}`, name: `U${i}`, avatar, text: `c${i}`, capturedAt: i });
     }
     const { seats, participantCount } = buildVenueSeating(rows, { frontRowSeats: 20 });
     expect(participantCount).toBe(25);
     expect(seats).toHaveLength(25);
-    expect(seats.filter((s) => s.isFrontRow)).toHaveLength(20);
-    expect(seats.filter((s) => !s.isFrontRow)).toHaveLength(5);
+    // 実サムネ持ち13人 ≤ frontRow(20) なので全員前列、匿名12人は後列に流れる。
+    const front = seats.filter((s) => s.isFrontRow);
+    const back = seats.filter((s) => !s.isFrontRow);
+    expect(front).toHaveLength(13);
+    expect(back).toHaveLength(12);
+    // 前列は全員実サムネ持ち、後列は全員匿名(実サムネなし)であること。
+    expect(front.every((s) => /^https?:\/\//.test(s.participant.avatar))).toBe(true);
+    expect(back.every((s) => !/^https?:\/\//.test(s.participant.avatar))).toBe(true);
+  });
+
+  it('実サムネ持ちが前列、匿名はアリーナに残るが後列へ(満員感を保つ)', () => {
+    const rows = [
+      { userId: 'anon1', name: '匿名1', avatar: '', text: 'x', capturedAt: 1 },
+      { userId: 'anon2', name: '匿名2', avatar: '', text: 'y', capturedAt: 2 },
+      { userId: 'real1', name: 'リアル', avatar: 'https://example.com/r.png', text: 'z', capturedAt: 3 }
+    ];
+    const { seats } = buildVenueSeating(rows, { frontRowSeats: 1 });
+    const realSeat = seats.find((s) => s.participant.userId === 'real1');
+    // 実サムネ持ちは前列(seatIndex < frontRow=1 → seatIndex 0)。
+    expect(realSeat.seatIndex).toBe(0);
+    expect(realSeat.isFrontRow).toBe(true);
+    // 匿名2人はアリーナに残る(=席を持つ)が後列。
+    expect(seats).toHaveLength(3);
+    expect(seats.filter((s) => !s.isFrontRow)).toHaveLength(2);
   });
 
   it('seatByKey を次回入力に渡すと席が安定する', () => {
