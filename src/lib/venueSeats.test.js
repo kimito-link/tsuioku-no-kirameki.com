@@ -14,6 +14,9 @@ import {
   assignVenueSeats,
   buildVenueSeating,
   hasRealThumbnail,
+  deriveNicoUserIconUrl,
+  resolveVenueEffectiveAvatar,
+  participantHasEffectiveThumbnail,
   resolveVenueRegularScore,
   selectVenueVipRegularKeys,
   VENUE_VIP_REGULAR_SCORE_THRESHOLD,
@@ -61,6 +64,31 @@ describe('buildVenueSeating promoteUserIds', () => {
     expect(r.anonymousCount).toBe(0);
     expect(r.seatByKey.has('u:a:talker')).toBe(true);
     expect(r.seatByKey.has('u:a:silent')).toBe(true);
+  });
+});
+
+describe('deriveNicoUserIconUrl / effective avatar (診断サムネ0人の修正 v0.1.735)', () => {
+  it('数値 userId からアカウントアイコン URL を導出', () => {
+    const url = deriveNicoUserIconUrl('123456789');
+    expect(url).toContain('nicoaccount/usericon');
+    expect(url).toContain('123456789.jpg');
+    expect(hasRealThumbnail(url)).toBe(true);
+  });
+  it('匿名(数値でない/空)は空文字', () => {
+    expect(deriveNicoUserIconUrl('')).toBe('');
+    expect(deriveNicoUserIconUrl('abc')).toBe('');
+    expect(deriveNicoUserIconUrl(null)).toBe('');
+  });
+  it('stored avatar(http)を最優先・無ければ userId 由来', () => {
+    expect(resolveVenueEffectiveAvatar({ avatar: 'https://x/y.jpg', userId: '999' })).toBe('https://x/y.jpg');
+    expect(resolveVenueEffectiveAvatar({ avatar: '', userId: '123456' })).toContain('123456.jpg');
+    expect(resolveVenueEffectiveAvatar({ avatar: 'data:image/svg', userId: '' })).toBe('');
+  });
+  it('participantHasEffectiveThumbnail: 数値userIdの人はサムネ持ち扱い(席表示と一致)', () => {
+    // これが修正の核: avatar 空でも数値 userId があれば席ではアイコンが出る=サムネ持ち。
+    expect(participantHasEffectiveThumbnail({ avatar: '', userId: '12345678' })).toBe(true);
+    expect(participantHasEffectiveThumbnail({ avatar: '', userId: '' })).toBe(false);
+    expect(participantHasEffectiveThumbnail({ avatar: 'https://a/b.jpg', userId: '' })).toBe(true);
   });
 });
 

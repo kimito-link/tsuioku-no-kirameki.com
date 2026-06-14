@@ -158,6 +158,45 @@ export function hasRealThumbnail(avatar) {
 }
 
 /**
+ * 数値 userId から niconico アカウントアイコンの URL を導出する純関数。
+ * 匿名(数値でない/空)は '' を返す。venueBar の描画と診断(roster)で同じ式を使い、
+ * 「席ではサムネが出てるのに診断ではサムネ持ち0」という不整合を防ぐ正本。
+ *
+ * @param {unknown} userId
+ * @returns {string} アイコン URL、または匿名で ''
+ */
+export function deriveNicoUserIconUrl(userId) {
+  const uid = String(userId || '').trim();
+  if (!/^\d{2,15}$/.test(uid)) return '';
+  return `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${Math.floor(Number(uid) / 10000)}/${uid}.jpg`;
+}
+
+/**
+ * 参加者の「実効サムネ URL」を返す純関数。stored avatar(http)を最優先、無ければ数値 userId
+ * から導出したアカウントアイコン。どちらも無ければ ''(=匿名・ゆっくり顔扱い)。
+ *
+ * @param {{ avatar?: string, userId?: string }} participant
+ * @returns {string}
+ */
+export function resolveVenueEffectiveAvatar(participant) {
+  const p = participant && typeof participant === 'object' ? participant : {};
+  const stored = String(p.avatar || '').trim();
+  if (hasRealThumbnail(stored)) return stored;
+  return deriveNicoUserIconUrl(p.userId);
+}
+
+/**
+ * 参加者が「実効サムネを持つ(顔写真席になれる)」かを返す純関数。
+ * stored avatar が http、または数値 userId でアイコン導出できる人=true。
+ *
+ * @param {{ avatar?: string, userId?: string }} participant
+ * @returns {boolean}
+ */
+export function participantHasEffectiveThumbnail(participant) {
+  return hasRealThumbnail(resolveVenueEffectiveAvatar(participant));
+}
+
+/**
  * 会場ローカルの「常連・大応援」スコア(0..100)を返す純関数(VIP光らせ判定の素)。
  *
  * 2026-06-14 ユーザー方針(星野アイデア会議2)「VIP常連を光らせる(giftSum + supportCount スコア)」:

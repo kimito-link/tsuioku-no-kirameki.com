@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.735',
+    date: '2026-06-14',
+    summary: '診断の「サムネ持ち」数が実際の席表示と一致するように修正',
+    items: Object.freeze([
+      '会場メンバー一覧（診断）で、席にはアイコンが表示されているのに「サムネ持ち 0人」と出ていた不具合を直しました。数字のユーザーIDから表示されるアカウントアイコンも「サムネ持ち」として正しく数えるようにしました',
+      'サムネ優遇（席を少し大きく明るく見せる演出）も同じ判定に統一し、席の見た目と診断の数字がずれないようにしました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.734',
     date: '2026-06-14',
     summary: '常連・応援者の金色オーラが正しく点くように修正',
