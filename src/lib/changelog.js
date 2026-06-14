@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.739',
+    date: '2026-06-14',
+    summary: '常連・応援者の金色オーラが実際に点くように改善',
+    items: Object.freeze([
+      '常連さんや応援者の席を金色に光らせる演出が、実際の配信ではほとんど点いていなかった問題を直しました。「その配信でよく発言している人・ギフトを送ってくれた人」の上位の方が、配信の規模に関わらずきちんと光るようになりました',
+      '光るのは上位の方（最大8人）だけなので、特別感はそのままです。ギフトを送ってくれた方は確実に光ります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.738',
     date: '2026-06-14',
     summary: '診断パネルを閉じやすく＋掴めるカーソルの誤解を解消',

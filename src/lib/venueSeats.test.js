@@ -126,35 +126,55 @@ describe('resolveVenueRegularScore (VIP常連光らせの素スコア)', () => {
   });
 });
 
-describe('selectVenueVipRegularKeys (光らせる席の選抜)', () => {
-  it('閾値以上のスコアの人だけを選ぶ', () => {
+describe('selectVenueVipRegularKeys (相対評価=上位N人 v0.1.739)', () => {
+  it('実データ相当(発言1〜5回)でも上位が必ず光る(絶対閾値で全員0になる退行の根治)', () => {
+    // 実機: 名前付きは1〜5回が大多数。旧 score>=30 だと全員光らず。相対なら上位が光る。
     const participants = [
-      { key: 'u:regular', count: 30, hasGift: true }, // 高スコア
-      { key: 'u:quiet', count: 1, hasGift: false } // 低スコア
+      { key: 'u:a', count: 5, hasGift: false },
+      { key: 'u:b', count: 4, hasGift: false },
+      { key: 'u:c', count: 3, hasGift: false },
+      { key: 'u:d', count: 1, hasGift: false },
+      { key: 'u:e', count: 1, hasGift: false }
     ];
-    const keys = selectVenueVipRegularKeys(participants);
-    expect(keys.has('u:regular')).toBe(true);
-    expect(keys.has('u:quiet')).toBe(false);
+    const keys = selectVenueVipRegularKeys(participants, { max: 3 });
+    expect(keys.size).toBe(3); // 上位3人が光る(絶対閾値時代は0)
+    expect(keys.has('u:a')).toBe(true);
+    expect(keys.has('u:b')).toBe(true);
+    expect(keys.has('u:c')).toBe(true);
+  });
+  it('ギフト送信者はスコアが高く必ず上位入り', () => {
+    const participants = [
+      { key: 'u:talker', count: 5, hasGift: false },
+      { key: 'u:gifter', count: 1, hasGift: true }, // 1コメだがギフトで高スコア
+      { key: 'u:quiet', count: 2, hasGift: false }
+    ];
+    const keys = selectVenueVipRegularKeys(participants, { max: 2 });
+    expect(keys.has('u:gifter')).toBe(true); // ギフトは必ず
+    expect(keys.has('u:talker')).toBe(true);
   });
   it('上限 max を超えては光らせない(特別感を保つ)', () => {
     const participants = Array.from({ length: 20 }, (_, i) => ({
       key: `u:${i}`,
-      count: 40,
-      hasGift: true
+      count: 5,
+      hasGift: false
     }));
-    const keys = selectVenueVipRegularKeys(participants, { max: 3 });
-    expect(keys.size).toBe(3);
+    const keys = selectVenueVipRegularKeys(participants, { max: 8 });
+    expect(keys.size).toBe(8);
   });
   it('スコア降順で上位が選ばれる', () => {
     const participants = [
-      { key: 'u:low', count: 3, hasGift: false },
+      { key: 'u:low', count: 1, hasGift: false },
       { key: 'u:high', count: 40, hasGift: true },
-      { key: 'u:mid', count: 10, hasGift: true }
+      { key: 'u:mid', count: 5, hasGift: false }
     ];
-    const keys = selectVenueVipRegularKeys(participants, { max: 2, threshold: 0 });
+    const keys = selectVenueVipRegularKeys(participants, { max: 2 });
     expect(keys.has('u:high')).toBe(true);
     expect(keys.has('u:mid')).toBe(true);
     expect(keys.has('u:low')).toBe(false);
+  });
+  it('発言0・ギフト無し(score 0)は上位枠が空いていても光らない(最低バー)', () => {
+    const participants = [{ key: 'u:zero', count: 0, hasGift: false }];
+    expect(selectVenueVipRegularKeys(participants, { max: 8 }).size).toBe(0);
   });
   it('key の無い参加者は無視・空配列で空集合', () => {
     expect(selectVenueVipRegularKeys([]).size).toBe(0);
@@ -177,8 +197,8 @@ describe('venueRowsFromUserLaneCandidates が実発言数を運ぶ(VIP光らせ�
     expect(rows[0].preCount).toBe(30);
     expect(rows[1].preHasGift).toBe(true);
     expect(rows[2].preCount).toBe(1);
-    // この rows で席を作ると常連とギフト主は光り、通りすがりは光らない。
-    const r = buildVenueSeating(rows, { isGenericName: isGeneric });
+    // 相対評価=上位2人。常連(30コメ)とギフト主が上位、通りすがり(1コメ)は枠外。
+    const r = buildVenueSeating(rows, { isGenericName: isGeneric, vipRegularMax: 2 });
     const seatOf = (k) => r.seats.find((s) => s.participant.key === k);
     expect(seatOf('u:regular').isVipRegular).toBe(true);
     expect(seatOf('u:gifter').isVipRegular).toBe(true);
@@ -213,19 +233,25 @@ describe('collectVenueParticipants preCount 集約', () => {
 });
 
 describe('buildVenueSeating の isVipRegular フラグ', () => {
-  it('常連・大応援の席に isVipRegular=true が付く', () => {
+  it('相対評価: 上位枠が埋まると下位の常連は光らない(常連>通りすがりの順位)', () => {
     const rows = [];
-    // u:regular: 多発言+ギフトで高スコア
+    // u:regular: 多発言+ギフトで最高スコア
     for (let i = 0; i < 30; i += 1) {
       rows.push({ userId: 'regular', name: '常連さん', text: `c${i}`, capturedAt: i, isGift: i === 0 });
     }
-    // u:quiet: 1回だけ
+    // 中位の人を max ぶん埋めて、通りすがりが上位枠に入れない状況を作る
+    for (let u = 0; u < 8; u += 1) {
+      for (let i = 0; i < 5; i += 1) {
+        rows.push({ userId: 'mid' + u, name: '常連' + u, text: `m${i}`, capturedAt: 50 + i });
+      }
+    }
+    // u:quiet: 1回だけ(最下位)
     rows.push({ userId: 'quiet', name: '通りすがり', text: 'こんにちは', capturedAt: 100 });
-    const r = buildVenueSeating(rows, { isGenericName: isGeneric });
+    const r = buildVenueSeating(rows, { isGenericName: isGeneric, vipRegularMax: 8 });
     const regularSeat = r.seats.find((s) => s.participant.key === 'u:regular');
     const quietSeat = r.seats.find((s) => s.participant.key === 'u:quiet');
-    expect(regularSeat.isVipRegular).toBe(true);
-    expect(quietSeat.isVipRegular).toBe(false);
+    expect(regularSeat.isVipRegular).toBe(true); // 最高スコア=必ず光る
+    expect(quietSeat.isVipRegular).toBe(false); // 上位8枠が埋まり光らない
   });
   it('vipRegular:false で全席 false(無効化・後方互換)', () => {
     const rows = [];
