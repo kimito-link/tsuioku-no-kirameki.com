@@ -994,7 +994,10 @@ export function mountVenueBarButton(options = {}) {
     }
   });
   
-  void voicePlayer.initialize();
+  // 会場モードは開いたら「いきなり読み上げ上がる」のがユーザー期待(comeview の ?voice=1 相当)。
+  //   保存状態に関わらず自動 ON。OBS 透過モードは VoicePlayer 内で isObsMode により enable を
+  //   スキップするので forceOn を渡しても安全(無音オーバーレイのまま)。
+  void voicePlayer.initialize({ forceOn: true });
   let aggregateTimer = 0;
   let aggregateInFlight = false;
   let speechTimer = 0;

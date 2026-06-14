@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.727',
+    date: '2026-06-14',
+    summary: '会場モードを開いたら読み上げが自動でONに',
+    items: Object.freeze([
+      '会場モードを開いたとき、読み上げが自動でONになるようにしました。これまでは一度手動でONにしないと読み上げが始まらず「会場を開いたのに声が出ない」状態でした。直近のコメントから読み始め、以降の新着コメントを読み上げます。止めたいときは会場バーの読み上げボタンでOFFにできます(OBS透過モードは無音のまま)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.726',
     date: '2026-06-14',
     summary: '会場モードの読み上げが始まらない問題を修正',
