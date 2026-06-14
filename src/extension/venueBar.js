@@ -1485,8 +1485,10 @@ export function mountVenueBarButton(options = {}) {
     //   行に収まる数に絞る。縮小でなく表示人数を減らす(名前/ID/サムネを潰さない)。
     //   直近発言者は selectStableVisibleMembers で必ず表示に含め、席順は安定(ちらつかない)。
     const seatAreaWidth = seatsHost.clientWidth || window.innerWidth || 1280;
+    // v0.1.737 実機修正: 実効幅は席幅+gap。68/84 だと gap ぶん足りず1席多く詰めて横溢れ
+    //   (893>882で見切れ)。gap+余白を見込んだ実効幅にして 1 行に確実に収める。
     const seatMinWidth =
-      seating.layoutMode === 'vip' ? 150 : seating.layoutMode === 'normal' ? 84 : 68;
+      seating.layoutMode === 'vip' ? 158 : seating.layoutMode === 'normal' ? 92 : 76;
     const perRow = seatsPerRow(seatAreaWidth - 28, seatMinWidth);
     // 2026-06-14 会議(満席感): hardCap を外し人数連動(resolveDynamicArenaCap)で上限を伸ばす。
     //   段数も 6→8 に増やして大人数の客席を奥へ広げる。perRow*8 と動的cap の小さい方で頭打ち。
@@ -1546,7 +1548,9 @@ export function mountVenueBarButton(options = {}) {
       }
     }
 
-    const tiers = buildVenueTiers(visibleSeats.length);
+    // v0.1.737 実機修正: 各段が1行に収まる席数(perRow)を超えないよう maxPerRow を渡す。
+    //   これが無いと後段が横にはみ出し overflow-x:hidden で見切れ、会場が埋まって見えない。
+    const tiers = buildVenueTiers(visibleSeats.length, { maxPerRow: perRow });
     for (let i = 0; i < tierNodes.length; i += 1) {
       const tierNode = tierNodes[i];
       const tier = tiers[i];
