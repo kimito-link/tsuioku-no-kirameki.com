@@ -11,14 +11,7 @@
  * @typedef {{ seatIndex: number, participant: RosterParticipant }} RosterSeat
  */
 
-/**
- * アバター文字列が実サムネ(http顔写真)か。venueSeats.hasRealThumbnail と同判定。
- * @param {unknown} avatar
- * @returns {boolean}
- */
-function isHttpThumb(avatar) {
-  return /^https?:\/\//i.test(String(avatar || '').trim());
-}
+import { participantHasEffectiveThumbnail } from './venueSeats.js';
 
 /**
  * 会場の名簿(誰がどこにいるか)を表データ化する純関数。
@@ -44,7 +37,9 @@ export function buildVenueRoster(input = {}) {
   const rows = allSeats.map((s) => {
     const p = s?.participant || {};
     const key = String(p.key || p.userId || '').trim();
-    const hasThumb = isHttpThumb(p.avatar);
+    // 席の描画と同じ実効サムネ判定(stored avatar か 数値userId 由来アイコン)。
+    //   participant.avatar だけ見ると、席ではアイコンが出てるのに診断で0人になる不整合が出る。
+    const hasThumb = participantHasEffectiveThumbnail(p);
     return {
       seatIndex: Number(s?.seatIndex) || 0,
       userId: String(p.userId || '').trim(),

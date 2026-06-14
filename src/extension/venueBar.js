@@ -4,6 +4,7 @@ import {
   buildVenueTiers,
   collectAudienceFaceUserIds,
   hasRealThumbnail,
+  deriveNicoUserIconUrl,
   VENUE_FULLSCREEN_MAX_SEATS,
   venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
@@ -1588,8 +1589,7 @@ export function mountVenueBarButton(options = {}) {
         node.fallback.textContent = Array.from(displayName)[0] || '会';
         const avatarUrl = String(participant.avatar || '').trim();
         const uidForFace = String(participant.userId || '').trim();
-        const isNumericUid = /^\d{2,15}$/.test(uidForFace);
-        const derivedAvatar = isNumericUid ? `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${Math.floor(Number(uidForFace) / 10000)}/${uidForFace}.jpg` : '';
+        const derivedAvatar = deriveNicoUserIconUrl(uidForFace);
         const yukkuriFace = uidForFace ? anonymousIdenticonDataUrl(uidForFace, 64) : '';
         // http サムネが読めなかったときの差し替え先(ゆっくり顔)を席に持たせる。
         node.avatar.dataset.fallbackFace = yukkuriFace;
@@ -1627,7 +1627,12 @@ export function mountVenueBarButton(options = {}) {
         node.seat.setAttribute('aria-hidden', 'false');
         // 2026-06-14 会議(サムネ優遇強化): 実サムネ(http顔写真)持ちは少し大きく明るく見せて
         //   常連さんを引き立てる。ゆっくり顔/匿名は通常表示。CSS .nlsb-seat-vip が適用。
-        node.seat.classList.toggle('nlsb-seat-vip', hasRealThumbnail(avatarUrl));
+        //   v0.1.735: stored avatar だけでなく数値userId由来アイコンも「サムネ持ち」扱い
+        //   (席ではアイコンが出てるのに優遇されない不整合を解消・診断の数とも一致)。
+        node.seat.classList.toggle(
+          'nlsb-seat-vip',
+          hasRealThumbnail(avatarUrl) || hasRealThumbnail(derivedAvatar)
+        );
         // 2026-06-14 星野アイデア会議2(VIP常連光らせ): 発言数+ギフトで算出した会場ローカルの
         //   常連・応援スコアが高い席を金色オーラで光らせる。実サムネ有無(.nlsb-seat-vip)とは
         //   独立=「顔がある人」でなく「支えてる人」を引き立てる。上限つきで特別感を保つ。
