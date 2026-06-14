@@ -50,5 +50,14 @@ node scripts/cws-publish.mjs build/tsuioku-no-kirameki-<version>.zip --publish
 ```
 
 ※ ストア説明文の変更はAPIの items では更新できない(掲載情報はダッシュボード手動)。
-   説明文を変えた回だけ、ダッシュボードで「詳細な説明」を
+   説明文を変えた回だけ、ダッシュボードの「詳細な説明」を
    docs/releases/cws-store-listing.md から貼り直す。
+
+   ⚠️ この貼り直しは **ユーザーの手動操作が必須**。Claude(Claude-in-Chrome MCP)では
+   **不可能**=CWS の管理画面(chrome.google.com 配下のギャラリー)は Chrome ポリシーで
+   "The extensions gallery cannot be scripted" となり、screenshot も read_page も
+   一切ブロックされる(2026-06-14 に実際に試して全ブロックを確認)。
+   → ZIP のアップロード+審査提出だけが Publish API で全自動。説明文貼り替えはユーザーが手動で:
+   1. https://chrome.google.com/webstore/devconsole をブラウザで開く
+   2. 拡張(item cjbabignmmodaickpeckiojjabnlogdb)→「ストアの掲載情報」→「詳細な説明」
+   3. cws-store-listing.md の「<version> 提出時に貼る本文」を全文貼り替え → 保存 → 審査送信
