@@ -98,8 +98,15 @@ export class VoicePlayer {
     this.toggleBusy = true;
     this._emitToggle();
     this.onStatus('VOICEVOXを確認中…');
-    
-    const alive = await this.fetchVoicevoxAlive();
+
+    // 2026-06-14: 会場モード(content script・SW プロキシ経由)では MV3 SW のコールド起床で
+    //   初回の生存確認がタイムアウトしやすい。初回失敗時に1回だけ再試行する(SW が起きた後の
+    //   2回目はほぼ通る)。VOICEVOX が本当に未起動なら2回とも失敗して従来どおり案内を出す。
+    let alive = await this.fetchVoicevoxAlive();
+    if (!alive) {
+      this.onStatus('VOICEVOXに接続中…(起動直後は数秒かかります)');
+      alive = await this.fetchVoicevoxAlive();
+    }
     if (!alive) {
       this.disable({ persist: true });
       this.onStatus('VOICEVOXが見つかりません(起動してください)');

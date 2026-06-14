@@ -127,6 +127,24 @@ async function fetchWithTimeout(fetchFn, url, init, timeoutMs) {
 }
 
 /**
+ * VOICEVOX 生存確認のデフォルトタイムアウトを文脈で決める。
+ *
+ * 2026-06-14 真因(3モデル会議全員一致+実コード検証): 会場モード下端バーは
+ *   nicovideo.jp/watch 上の content script で、VOICEVOX へは background SW プロキシ経由で
+ *   叩く。MV3 の SW はコールド起床するため「sendMessage 往復 + SW 起床 + /version 応答」が
+ *   1500ms を超えやすく、isVoicevoxAlive が false→「VOICEVOX が見つかりません」で読み上げが
+ *   始まらなかった(comeview は拡張ページ=直接 fetch で速いから動いていた=非対称の正体)。
+ *   そこでプロキシ経路は既定タイムアウトを長め(5000ms)にする。直接 fetch(拡張ページ)は
+ *   従来どおり 1500ms。明示 timeoutMs があればそれを最優先(後方互換)。
+ *
+ * @param {boolean} viaProxy content script からプロキシ経由で叩くか
+ * @returns {number}
+ */
+export function defaultVoicevoxAliveTimeoutMs(viaProxy) {
+  return viaProxy ? 5000 : 1500;
+}
+
+/**
  * @param {{ fetchFn?: FetchFn, timeoutMs?: number, baseUrl?: string }} [opts]
  * @returns {Promise<boolean>}
  */
@@ -134,12 +152,15 @@ export async function isVoicevoxAlive(opts = {}) {
   const fetchFn = opts.fetchFn || proxyFetchFn;
   if (typeof fetchFn !== 'function') return false;
   const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
+  // 明示 timeoutMs が無ければ、プロキシ経由(content script)は長め・直接 fetch は短め。
+  const viaProxy = !opts.fetchFn && !isExtensionPage();
+  const fallbackTimeout = defaultVoicevoxAliveTimeoutMs(viaProxy);
   try {
     const response = await fetchWithTimeout(
       fetchFn,
       `${baseUrl}/version`,
       { method: 'GET' },
-      positiveTimeout(opts.timeoutMs, 1500)
+      positiveTimeout(opts.timeoutMs, fallbackTimeout)
     );
     return response?.ok !== false;
   } catch {

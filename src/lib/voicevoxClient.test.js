@@ -3,6 +3,7 @@ import {
   VOICEVOX_BASE_URL,
   buildMergedVoiceText,
   buildVoiceReadingText,
+  defaultVoicevoxAliveTimeoutMs,
   isVoicevoxAlive,
   isWhisperStyleName,
   listVoicevoxStyleIds,
@@ -34,6 +35,16 @@ describe('isVoicevoxAlive', () => {
     const pending = isVoicevoxAlive({ fetchFn, timeoutMs: 10 });
     await vi.advanceTimersByTimeAsync(10);
     await expect(pending).resolves.toBe(false);
+  });
+});
+
+describe('defaultVoicevoxAliveTimeoutMs', () => {
+  it('プロキシ経由(content script)は長め 5000ms', () => {
+    // 会場モード(SW プロキシ経由)は MV3 SW コールド起床で遅いので長め。
+    expect(defaultVoicevoxAliveTimeoutMs(true)).toBe(5000);
+  });
+  it('直接 fetch(拡張ページ)は従来どおり 1500ms', () => {
+    expect(defaultVoicevoxAliveTimeoutMs(false)).toBe(1500);
   });
 });
 
