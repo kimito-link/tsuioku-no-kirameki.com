@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.728',
+    date: '2026-06-14',
+    summary: '会場モードを人数に応じて満席感アップ',
+    items: Object.freeze([
+      '会場モードで、参加者が多い人気配信ほど会場が満員に見えるようにしました。これまでは最大40席までしか出ませんでしたが、人数に応じて表示席数を増やし（最大150席）、ひな壇も最大8段に広げ、奥の段ほど小さく密に並べて「満員の客席」を演出します。手前の席は読める大きさを保っています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.727',
     date: '2026-06-14',
     summary: '会場モードを開いたら読み上げが自動でONに',

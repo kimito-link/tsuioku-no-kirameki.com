@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   seatsPerRow,
   resolveVisibleArenaCount,
+  resolveDynamicArenaCap,
   resolveVisibleAudienceCount,
   selectStableVisibleMembers
 } from './venueViewport.js';
@@ -30,6 +31,26 @@ describe('resolveVisibleArenaCount', () => {
   it('横はみ出しを防ぐ: perRow を超える列にはしない', () => {
     // perRow=8 段3 => 24 が上限(150席あっても24しか出さない)
     expect(resolveVisibleArenaCount({ totalCount: 150, perRow: 8, rows: 3, hardCap: 40 })).toBe(24);
+  });
+  it('hardCap 未指定なら人数連動(満席感): 大人数で40超まで伸びる', () => {
+    // 405人・広い行(perRow20×段8=160)→ 動的cap=floor(405*0.2)=81 で頭打ち
+    expect(resolveVisibleArenaCount({ totalCount: 405, perRow: 20, rows: 8 })).toBe(81);
+    // 少人数は従来どおり下限40まで確保(perRow×rows が十分あれば total)
+    expect(resolveVisibleArenaCount({ totalCount: 30, perRow: 20, rows: 8 })).toBe(30);
+  });
+});
+
+describe('resolveDynamicArenaCap', () => {
+  it('clamp(40, floor(total*0.2), 150)', () => {
+    expect(resolveDynamicArenaCap(0)).toBe(40); // 下限
+    expect(resolveDynamicArenaCap(100)).toBe(40); // 100*0.2=20 < 40 → 40
+    expect(resolveDynamicArenaCap(405)).toBe(81); // 405*0.2=81
+    expect(resolveDynamicArenaCap(1000)).toBe(150); // 1000*0.2=200 > 150 → 150
+  });
+  it('opts で base/ratio/max を上書きできる', () => {
+    expect(resolveDynamicArenaCap(405, { ratio: 0.1 })).toBe(40); // 40.5→40, base40
+    expect(resolveDynamicArenaCap(405, { max: 60 })).toBe(60); // 81 > 60 → 60
+    expect(resolveDynamicArenaCap(405, { base: 100 })).toBe(100); // 81 < 100 → 100
   });
 });
 

@@ -8,6 +8,7 @@ import {
   resolveVenueLayoutMode,
   venueRowsFromUserLaneCandidates,
   buildVenueTiers,
+  resolveVenueTierMinScale,
   VENUE_FULLSCREEN_MAX_SEATS,
   rankVenueParticipants,
   assignVenueSeats,
@@ -416,6 +417,19 @@ describe('venueRowsFromUserLaneCandidates', () => {
   });
 });
 
+describe('resolveVenueTierMinScale', () => {
+  it('人数が増えるほど最奥段が小さく密に(満席感)', () => {
+    expect(resolveVenueTierMinScale(10)).toBe(0.62);
+    expect(resolveVenueTierMinScale(16)).toBe(0.62);
+    expect(resolveVenueTierMinScale(64)).toBe(0.58);
+    expect(resolveVenueTierMinScale(150)).toBe(0.54);
+    expect(resolveVenueTierMinScale(405)).toBe(0.5);
+  });
+  it('下限 0.50 を割らない(顔が潰れすぎない)', () => {
+    expect(resolveVenueTierMinScale(99999)).toBe(0.5);
+  });
+});
+
 describe('buildVenueTiers', () => {
   it('0人は空', () => {
     expect(buildVenueTiers(0)).toEqual([]);
@@ -429,13 +443,15 @@ describe('buildVenueTiers', () => {
     expect(t[0].depth).toBe(0);
   });
 
-  it('人数が増えると段数が増える(最大6段)', () => {
+  it('人数が増えると段数が増える(最大8段・2026-06-14 満席感で6→8)', () => {
     expect(buildVenueTiers(8)).toHaveLength(1);
     expect(buildVenueTiers(16)).toHaveLength(2);
     expect(buildVenueTiers(30)).toHaveLength(3);
     expect(buildVenueTiers(50)).toHaveLength(4);
     expect(buildVenueTiers(88)).toHaveLength(5);
-    expect(buildVenueTiers(150)).toHaveLength(6);
+    expect(buildVenueTiers(128)).toHaveLength(6); // <= 8*16
+    expect(buildVenueTiers(170)).toHaveLength(7); // <= 8*22
+    expect(buildVenueTiers(300)).toHaveLength(8); // それ超は8段
   });
 
   it('全段の合計人数が入力と一致する(取りこぼし/水増しなし)', () => {
@@ -450,8 +466,10 @@ describe('buildVenueTiers', () => {
     for (let i = 1; i < t.length; i += 1) {
       expect(t[i].scale).toBeLessThan(t[i - 1].scale);
     }
-    // 最奥は minScale 付近(ほどよく立体=既定0.62)
-    expect(t[t.length - 1].scale).toBeCloseTo(0.62, 5);
+    // 最奥は人数連動 minScale(30人 → 0.58)。明示 minScale を渡せば従来値も使える。
+    expect(t[t.length - 1].scale).toBeCloseTo(0.58, 5);
+    const t62 = buildVenueTiers(30, { minScale: 0.62 });
+    expect(t62[t62.length - 1].scale).toBeCloseTo(0.62, 5);
   });
 
   it('奥の段ほど横に広い(後方客席が広がる)', () => {
