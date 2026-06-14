@@ -241,30 +241,50 @@ export const VENUE_VIP_REGULAR_SCORE_THRESHOLD = 30;
 export const VENUE_VIP_REGULAR_MAX = 8;
 
 /**
+ * 「光る最低バー」スコア。これ未満は上位でも光らせない(完全に静かな会場で1コメの人が
+ * 光る事故を防ぐ)。0 超=発言1回以上 or ギフトで候補になる。発言1回(score~10)は超える。
+ */
+export const VENUE_VIP_REGULAR_MIN_SCORE = 1;
+
+/**
  * 会場参加者のうち「光らせる VIP(常連・大応援)」のキー集合を返す純関数。
- * スコア閾値以上の参加者を score 降順に並べ、上限 max 件まで採用する(特別感のため絞る)。
+ *
+ * 2026-06-15 設計変更(無料LLM会議 deepseek-r1/gpt-oss 一致・実機検証で根治):
+ *   旧実装は「絶対閾値(発言7回相当=score>=30)以上」だったが、実際のニコ生では席に座る
+ *   名前付きユーザーの発言は1〜5回が大多数で7回以上はほぼ居らず、誰も光らなかった
+ *   (heavy commenter の多くは匿名=userId 無しで席にも座れない)。
+ *   そこで【相対評価=その配信のスコア上位 max 人】に変更。最低バー(minScore)だけ設け、
+ *   それを超える人の中から上位 max 人を光らせる。ギフト送信者は score が高く自然に上位入り。
+ *   これで「どんな配信でも常連・応援者の上位が必ず一目で分かる」(光りすぎは max で防ぐ)。
  *
  * @param {ReturnType<typeof collectVenueParticipants>} participants
- * @param {{ threshold?: number, max?: number, commentCap?: number, giftPointsCap?: number }} [opts]
- * @returns {Set<string>} 光らせる参加者の key 集合
+ * @param {{ max?: number, minScore?: number, commentCap?: number, giftPointsCap?: number, threshold?: number }} [opts]
+ *   max=光らせる上限人数(既定8) / minScore=光る最低バー(既定1=発言1回以上 or ギフト)。
+ *   threshold は後方互換のため受けるが、指定時は minScore として扱う(絶対閾値運用に戻せる)。
+ * @returns {Set<string>} 光らせる参加者の key 集合(相対評価・上位 max 人)
  */
 export function selectVenueVipRegularKeys(participants, opts = {}) {
   const list = Array.isArray(participants) ? participants : [];
-  const threshold =
-    Number.isFinite(opts.threshold) && opts.threshold >= 0
-      ? opts.threshold
-      : VENUE_VIP_REGULAR_SCORE_THRESHOLD;
   const max =
     Number.isFinite(opts.max) && opts.max > 0
       ? Math.floor(opts.max)
       : VENUE_VIP_REGULAR_MAX;
+  // 後方互換: 旧 threshold 指定は最低バーとして扱う(テスト/絶対運用の互換)。
+  const minScore =
+    Number.isFinite(opts.minScore) && opts.minScore >= 0
+      ? opts.minScore
+      : Number.isFinite(opts.threshold) && opts.threshold >= 0
+        ? opts.threshold
+        : VENUE_VIP_REGULAR_MIN_SCORE;
   const scored = [];
   for (const p of list) {
     if (!p || typeof p.key !== 'string' || !p.key) continue;
     const score = resolveVenueRegularScore(p, opts);
-    if (score >= threshold) scored.push({ key: p.key, score, count: Number(p.count) || 0 });
+    if (score >= minScore && score > 0) {
+      scored.push({ key: p.key, score, count: Number(p.count) || 0 });
+    }
   }
-  // score 降順 → 同点は発言数降順 → key で deterministic に。
+  // score 降順 → 同点は発言数降順 → key で deterministic に。上位 max 人を採用(相対評価)。
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     if (b.count !== a.count) return b.count - a.count;
