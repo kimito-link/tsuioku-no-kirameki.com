@@ -412,6 +412,24 @@ export function venueRowsFromUserLaneCandidates(candidates) {
 }
 
 /**
+ * 人数連動でひな壇の最奥段スケールを決める純関数(満席感・密度LOD)。
+ *
+ * 2026-06-14 会議(無料LLM4体・星野ロミ思想): 人数が増えるほど奥の段を小さく密にして
+ *   「満員の客席」に見せる。ただし下げすぎると顔が潰れるので 0.50 を下限に段階的に。
+ *   ~16人=0.62(従来)・~64人=0.58・~150人=0.54・それ超=0.50。
+ *
+ * @param {number} total アリーナ席数
+ * @returns {number} 最奥段の scale(0.50〜0.62)
+ */
+export function resolveVenueTierMinScale(total) {
+  const n = Math.max(0, Math.floor(Number(total) || 0));
+  if (n <= 16) return 0.62;
+  if (n <= 64) return 0.58;
+  if (n <= 150) return 0.54;
+  return 0.5;
+}
+
+/**
  * ひな壇(スタンド席)の段組みを決める純関数。
  *
  * ユーザー方針(2026-06-13)「ライブ会場の3D感=ひな壇スタンド席・ほどよく立体的」。
@@ -431,23 +449,29 @@ export function venueRowsFromUserLaneCandidates(candidates) {
 export function buildVenueTiers(seatCount, opts = {}) {
   const n = Math.max(0, Math.floor(Number(seatCount) || 0));
   if (n === 0) return [];
+  // 2026-06-14 会議(満席感・密度LOD): minScale 未指定なら人数連動で最奥段を小さくして
+  //   奥の客席を密に見せる(手前は読める大きさを保つ)。会議合意 405人規模で奥 ~0.55。
+  //   16席まで0.62(従来) → 多いほど 0.50 まで段階的に下げる。明示 minScale があればそれ優先。
   const minScale =
     Number.isFinite(opts.minScale) && opts.minScale > 0 && opts.minScale <= 1
       ? opts.minScale
-      : 0.62;
+      : resolveVenueTierMinScale(n);
   const frontMax =
     Number.isFinite(opts.maxPerFrontRow) && opts.maxPerFrontRow > 0
       ? Math.floor(opts.maxPerFrontRow)
       : 8;
 
-  // 段数を人数で決める(~frontMax=1段, 倍々に近いペースで増やし最大5段)。
+  // 段数を人数で決める(~frontMax=1段, 倍々に近いペースで増やす)。
+  // 2026-06-14 会議(満席感): 大人数で段を増やして奥に客席を広げる。上限 6→8 段。
   let rowCount;
   if (n <= frontMax) rowCount = 1;
   else if (n <= frontMax * 2) rowCount = 2;
   else if (n <= frontMax * 4) rowCount = 3;
   else if (n <= frontMax * 7) rowCount = 4;
   else if (n <= frontMax * 11) rowCount = 5;
-  else rowCount = 6;
+  else if (n <= frontMax * 16) rowCount = 6;
+  else if (n <= frontMax * 22) rowCount = 7;
+  else rowCount = 8;
 
   // 各段の「重み」: 奥ほど横に広い(後方客席が広がる)ので段が増えるごとに +25%。
   const weights = [];

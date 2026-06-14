@@ -28,22 +28,49 @@ export function seatsPerRow(availableWidthPx, seatMinWidthPx) {
 }
 
 /**
+ * 人数連動で「同時表示の上限席数」を動的に決める純関数(星野ロミ式・密度可視化)。
+ *
+ * 2026-06-14 会議(無料LLM4体・星野ロミ思想)確定: 人気配信(405人規模)で固定上限40だと
+ *   ごく一部しか出ず満席感が出ない。人数が増えるほど表示席も増やす(満員の会場に見せる)。
+ *   会議合意 hardCap ≈ clamp(base, floor(total*ratio), max)。3モデルが total*0.2 系で一致。
+ *
+ * @param {number} total 論理参加者数
+ * @param {{ base?: number, ratio?: number, max?: number }} [opts]
+ *   base=下限(少人数でもこの席数は確保・既定40) / ratio=人数比(既定0.2) / max=絶対上限(既定150=席プール)
+ * @returns {number}
+ */
+export function resolveDynamicArenaCap(total, opts = {}) {
+  const n = Math.max(0, Math.floor(Number(total) || 0));
+  const base = Math.max(1, Math.floor(Number(opts.base ?? 40)));
+  const ratio = Number(opts.ratio ?? 0.2) > 0 ? Number(opts.ratio ?? 0.2) : 0.2;
+  const max = Math.max(base, Math.floor(Number(opts.max ?? 150)));
+  const byRatio = Math.floor(n * ratio);
+  return Math.min(max, Math.max(base, byRatio));
+}
+
+/**
  * 映像セーフエリアを守りつつ同時表示するアリーナ席数を決める。
  * 「横にはみ出さない列数 × 段数」を上限に、論理人数で頭打ちする。
  * これにより横スクロールが構造的に出ない & 映像を覆う面積を一定に保つ。
+ *
+ * 2026-06-14: hardCap 未指定なら resolveDynamicArenaCap(total) で人数連動の上限を使う
+ *   (満席感を出す)。明示 hardCap があればそれを最優先(後方互換)。
  *
  * @param {object} opts
  * @param {number} opts.totalCount 論理参加者数(全員)
  * @param {number} opts.perRow 1行に収まる席数(seatsPerRow の結果)
  * @param {number} [opts.rows=3] ひな壇の段数(会議確定 2〜3 段)
- * @param {number} [opts.hardCap=40] 同時表示の絶対上限(会議確定 24〜40)
+ * @param {number} [opts.hardCap] 同時表示の絶対上限(未指定なら人数連動)
  * @returns {number} 同時表示する席数
  */
 export function resolveVisibleArenaCount(opts) {
   const total = Math.max(0, Math.floor(Number(opts?.totalCount) || 0));
   const perRow = Math.max(1, Math.floor(Number(opts?.perRow) || 1));
   const rows = Math.max(1, Math.floor(Number(opts?.rows ?? 3)));
-  const hardCap = Math.max(1, Math.floor(Number(opts?.hardCap ?? 40)));
+  const hardCap =
+    opts?.hardCap != null
+      ? Math.max(1, Math.floor(Number(opts.hardCap)))
+      : resolveDynamicArenaCap(total);
   const byGrid = perRow * rows;
   return Math.min(total, byGrid, hardCap);
 }

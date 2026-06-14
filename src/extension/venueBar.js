@@ -1192,11 +1192,12 @@ export function mountVenueBarButton(options = {}) {
     const seatMinWidth =
       seating.layoutMode === 'vip' ? 150 : seating.layoutMode === 'normal' ? 84 : 68;
     const perRow = seatsPerRow(seatAreaWidth - 28, seatMinWidth);
+    // 2026-06-14 会議(満席感): hardCap を外し人数連動(resolveDynamicArenaCap)で上限を伸ばす。
+    //   段数も 6→8 に増やして大人数の客席を奥へ広げる。perRow*8 と動的cap の小さい方で頭打ち。
     const visibleSeatCount = resolveVisibleArenaCount({
       totalCount: seating.seats.length,
       perRow,
-      rows: 6,
-      hardCap: VENUE_FULLSCREEN_MAX_SEATS
+      rows: 8
     });
     const visibleSeats = selectStableVisibleMembers(
       seating.seats,
