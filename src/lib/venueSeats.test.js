@@ -638,6 +638,26 @@ describe('buildVenueTiers', () => {
     }
   });
 
+  it('maxPerRow: どの段も上限を超えない(横はみ出し=見切れ防止 v0.1.737)', () => {
+    // 実機: 75席を maxPerRow なしだと後段が20席になり横溢れ→overflow-x:hidden で見切れていた。
+    for (const [n, perRow] of [[75, 12], [40, 10], [150, 14], [96, 13]]) {
+      const tiers = buildVenueTiers(n, { maxPerRow: perRow });
+      const counts = tiers.map((t) => t.count);
+      expect(Math.max(...counts)).toBeLessThanOrEqual(perRow);
+      // 8段×perRow に収まる人数なら取りこぼし無し
+      if (n <= 8 * perRow) {
+        expect(counts.reduce((a, b) => a + b, 0)).toBe(n);
+      }
+    }
+  });
+
+  it('maxPerRow 無し(既定)は従来通り後段が広がる(後方互換)', () => {
+    const tiers = buildVenueTiers(75);
+    const counts = tiers.map((t) => t.count);
+    // 既定では最後段が前段より多い(横幅は呼び出し側が面倒見る前提の旧挙動)
+    expect(Math.max(...counts)).toBeGreaterThan(12);
+  });
+
   it('手前ほど大きく奥ほど小さい(scaleが単調減少)', () => {
     const t = buildVenueTiers(30);
     for (let i = 1; i < t.length; i += 1) {

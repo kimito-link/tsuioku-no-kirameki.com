@@ -596,8 +596,9 @@ export function resolveVenueTierMinScale(total) {
  * このファイルは数値モデルだけ(CSS/DOM 非依存)。実際の transform は venueBar 側が depth/scale から作る。
  *
  * @param {number} seatCount アリーナに座る参加者数(名前付き)
- * @param {{ minScale?: number, maxPerFrontRow?: number }} [opts]
- *   minScale=最奥段のスケール(既定0.62=ほどよく立体)、maxPerFrontRow=前列の最大人数(既定8)
+ * @param {{ minScale?: number, maxPerFrontRow?: number, maxPerRow?: number }} [opts]
+ *   minScale=最奥段のスケール(既定0.62=ほどよく立体)、maxPerFrontRow=前列の最大人数(既定8)、
+ *   maxPerRow=1段に入れる席数の上限(横はみ出し防止・既定 無制限。venueBar が seatsPerRow を渡す)
  * @returns {Array<{ rowIndex: number, count: number, scale: number, depth: number }>}
  *   段配列(手前=rowIndex 0)。count=その段の席数、scale=拡大率、depth=0(手前)..1(最奥)
  */
@@ -615,6 +616,13 @@ export function buildVenueTiers(seatCount, opts = {}) {
     Number.isFinite(opts.maxPerFrontRow) && opts.maxPerFrontRow > 0
       ? Math.floor(opts.maxPerFrontRow)
       : 8;
+  // 2026-06-14 実機修正(v0.1.737): 1行に収まる席数の上限。これを超えて段に席を入れると
+  //   横にはみ出して overflow-x:hidden で切れて見えなくなる(=会場が埋まって見えない+
+  //   見切れた席に届かない)。venueBar が seatsPerRow から実測値を渡す。未指定なら実質無制限。
+  const maxPerRow =
+    Number.isFinite(opts.maxPerRow) && opts.maxPerRow > 0
+      ? Math.floor(opts.maxPerRow)
+      : Infinity;
 
   // 段数を人数で決める(~frontMax=1段, 倍々に近いペースで増やす)。
   // 2026-06-14 会議(満席感): 大人数で段を増やして奥に客席を広げる。上限 6→8 段。
@@ -627,6 +635,13 @@ export function buildVenueTiers(seatCount, opts = {}) {
   else if (n <= frontMax * 16) rowCount = 6;
   else if (n <= frontMax * 22) rowCount = 7;
   else rowCount = 8;
+
+  // maxPerRow がある場合: 全段(最大8)× maxPerRow に収まらないと横溢れする。
+  //   収まるよう段数を増やす(8段で頭打ち=それ以上は描画上限で間引かれている前提)。
+  const ROW_HARD_MAX = 8;
+  if (Number.isFinite(maxPerRow)) {
+    while (rowCount < ROW_HARD_MAX && rowCount * maxPerRow < n) rowCount += 1;
+  }
 
   // 各段の「重み」: 奥ほど横に広い(後方客席が広がる)ので段が増えるごとに +25%。
   const weights = [];
@@ -645,6 +660,32 @@ export function buildVenueTiers(seatCount, opts = {}) {
     counts[idx % rowCount] += 1;
     assigned += 1;
     idx += 1;
+  }
+
+  // 2026-06-14 実機修正: どの段も maxPerRow を超えないよう、溢れた席を後段へ繰り越す。
+  //   後段も満杯なら前段から詰め直す。これで横はみ出し(見切れ)が構造的に出ない。
+  if (Number.isFinite(maxPerRow)) {
+    for (let r = 0; r < rowCount; r += 1) {
+      if (counts[r] <= maxPerRow) continue;
+      let overflow = counts[r] - maxPerRow;
+      counts[r] = maxPerRow;
+      // まず後段の空きへ、足りなければ前段の空きへ。
+      for (let t = r + 1; t < rowCount && overflow > 0; t += 1) {
+        const room = maxPerRow - counts[t];
+        if (room <= 0) continue;
+        const move = Math.min(room, overflow);
+        counts[t] += move;
+        overflow -= move;
+      }
+      for (let t = 0; t < rowCount && overflow > 0; t += 1) {
+        const room = maxPerRow - counts[t];
+        if (room <= 0) continue;
+        const move = Math.min(room, overflow);
+        counts[t] += move;
+        overflow -= move;
+      }
+      // 全段満杯で収まらない分は描画上限超過=ここでは捨てる(visibleSeatCount 側で防がれる想定)。
+    }
   }
 
   const tiers = [];

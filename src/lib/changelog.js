@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.737',
+    date: '2026-06-14',
+    summary: '会場の後列が画面外で見切れる不具合を修正',
+    items: Object.freeze([
+      '会場のひな壇の後ろの段が、横にはみ出して画面の外で見切れていた不具合を直しました。各段が画面幅に収まる席数になり、観客がきれいに整列して並ぶようになりました',
+      'これにより、せっかく表示している席が端で切れて見えない問題が解消され、会場がより自然に埋まって見えます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.736',
     date: '2026-06-14',
     summary: '会場が埋まらない問題を改善（表示席数を増やした）',
