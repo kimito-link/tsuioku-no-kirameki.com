@@ -31,6 +31,7 @@ import {
   updateVenueDrag,
   endVenueDrag
 } from '../lib/venueDragScroll.js';
+import { buildVenueRoster, formatVenueRosterSummary } from '../lib/venueRoster.js';
 import {
   bubbleAnchorForSeatRect,
   resolveBubbleY,
@@ -65,6 +66,20 @@ const VENUE_LAYOUT_CLASSES = [
 
 /** ひな壇の段 DOM を用意する数。buildVenueTiers の最大段数(8)に一致させること。 */
 const VENUE_MAX_TIER_NODES = 8;
+
+/**
+ * 診断パネル等で表示名を innerHTML に差し込む前に HTML エスケープする。
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 /** @typedef {ReturnType<typeof venueRowsFromUserLaneCandidates>[number]} VenueRow */
 
@@ -406,6 +421,86 @@ const VENUE_CSS = `
   .nlsb-seats.nlsb-is-grabbing {
     cursor: grabbing;
     user-select: none;
+  }
+  /* 診断: メンバー一覧パネル(モーダル風)。会場の上に重ねて出す。 */
+  .nlsb-roster-panel {
+    position: absolute;
+    top: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(560px, 92vw);
+    max-height: 72vh;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    background: rgba(18, 22, 30, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    color: #eef1f6;
+    font-size: 13px;
+    overflow: hidden;
+  }
+  .nlsb-roster-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .nlsb-roster-close {
+    background: transparent;
+    border: none;
+    color: #eef1f6;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 8px;
+  }
+  .nlsb-roster-summary {
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #b9c2d0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .nlsb-roster-list {
+    overflow-y: auto;
+    padding: 6px 0;
+  }
+  .nlsb-roster-row {
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 14px;
+  }
+  .nlsb-roster-row:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .nlsb-roster-seat {
+    color: #8b94a3;
+    font-variant-numeric: tabular-nums;
+  }
+  .nlsb-roster-who {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nlsb-roster-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 11px;
+  }
+  .nlsb-roster-badge.thumb { background: rgba(255, 200, 90, 0.25); color: #ffd66f; }
+  .nlsb-roster-badge.gift { background: rgba(120, 200, 255, 0.22); color: #9fd4ff; }
+  .nlsb-roster-badge.on { background: rgba(120, 220, 140, 0.22); color: #9fe6af; }
+  .nlsb-roster-badge.off { background: rgba(255, 255, 255, 0.08); color: #99a2b0; }
+  .nlsb-roster-empty {
+    padding: 24px 14px;
+    text-align: center;
+    color: #99a2b0;
   }
   .nlsb-seat.nlsb-is-empty {
     /* display: none; */
@@ -878,6 +973,13 @@ export function mountVenueBarButton(options = {}) {
   // ヘッダー右側: コメビュ起動ボタン + 集計メモ。
   const headerRight = document.createElement('div');
   headerRight.className = 'nlsb-header-right';
+  // 診断: 今会場にいるメンバー一覧ボタン(AIも人間も検証用・誰が顔付き席/点描か)。
+  const rosterBtn = document.createElement('button');
+  rosterBtn.type = 'button';
+  rosterBtn.className = 'nlsb-comeview-btn';
+  rosterBtn.textContent = '👥 一覧';
+  rosterBtn.title = '今この会場にいるメンバーの一覧(診断)を開く';
+  rosterBtn.addEventListener('click', () => toggleRosterPanel());
   const comeviewBtn = document.createElement('button');
   comeviewBtn.type = 'button';
   comeviewBtn.className = 'nlsb-comeview-btn';
@@ -928,9 +1030,9 @@ export function mountVenueBarButton(options = {}) {
   note.className = 'nlsb-note';
   note.textContent = '全コメント集計・最大150席';
   if (venueWindowBtn) {
-    headerRight.append(comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note);
+    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note);
   } else {
-    headerRight.append(comeviewBtn, voiceBtn, voiceStatus, note);
+    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, note);
   }
   header.append(title, headerRight);
 
@@ -1026,7 +1128,11 @@ export function mountVenueBarButton(options = {}) {
   const bubbleLayer = document.createElement('div');
   bubbleLayer.className = 'nlsb-bubble-layer';
   bubbleLayer.setAttribute('aria-live', 'polite');
-  stage.append(close, stageLayout, bubbleLayer);
+  // 診断: メンバー一覧パネル(モーダル風)。DOM はここで作り、描画関数は下(lastRosterInput 宣言後)で定義。
+  const rosterPanel = document.createElement('div');
+  rosterPanel.className = 'nlsb-roster-panel';
+  rosterPanel.hidden = true;
+  stage.append(close, stageLayout, bubbleLayer, rosterPanel);
   root.append(toggle, stage);
   parent.appendChild(root);
 
@@ -1082,6 +1188,50 @@ export function mountVenueBarButton(options = {}) {
   let escapeListening = false;
   /** @type {VenueRow[]} */
   let baseRows = [];
+  // 診断シート(メンバー一覧ボタン)用: renderSeats が最新の席割りをここに保存する。
+  /** @type {{ allSeats: any[], visibleSeats: any[], audienceCount: number }} */
+  let lastRosterInput = { allSeats: [], visibleSeats: [], audienceCount: 0 };
+
+  // 診断パネルの描画/開閉。buildVenueRoster(純関数・テスト済)で誰が顔付き席/点描かを表にする。
+  const renderRosterPanel = () => {
+    const roster = buildVenueRoster(lastRosterInput);
+    const summaryLine = formatVenueRosterSummary(roster.summary);
+    const head =
+      `<div class="nlsb-roster-head">` +
+      `<strong>会場メンバー一覧（診断）</strong>` +
+      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">×</button>` +
+      `</div>` +
+      `<div class="nlsb-roster-summary">${escapeHtml(summaryLine)}</div>`;
+    const rowsHtml = roster.rows
+      .map((r) => {
+        const who = r.name || (r.userId ? `id:${r.userId}` : '匿名');
+        const badges =
+          (r.hasThumb ? '<span class="nlsb-roster-badge thumb">サムネ</span>' : '') +
+          (r.isGift ? '<span class="nlsb-roster-badge gift">ギフト</span>' : '') +
+          (r.visible
+            ? '<span class="nlsb-roster-badge on">表示中</span>'
+            : '<span class="nlsb-roster-badge off">隠れ</span>');
+        return (
+          `<div class="nlsb-roster-row">` +
+          `<span class="nlsb-roster-seat">#${r.seatIndex + 1}</span>` +
+          `<span class="nlsb-roster-who">${escapeHtml(who)}</span>` +
+          `<span class="nlsb-roster-badges">${badges}</span>` +
+          `</div>`
+        );
+      })
+      .join('');
+    rosterPanel.innerHTML =
+      head +
+      `<div class="nlsb-roster-list">${rowsHtml || '<div class="nlsb-roster-empty">まだ誰もいません</div>'}</div>`;
+    const closeBtn = rosterPanel.querySelector('.nlsb-roster-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => toggleRosterPanel(false));
+  };
+  /** @param {boolean} [force] */
+  const toggleRosterPanel = (force) => {
+    const next = typeof force === 'boolean' ? force : rosterPanel.hidden;
+    if (next) renderRosterPanel();
+    rosterPanel.hidden = !next;
+  };
   // ユーザー方針「しゃべった匿名もアリーナに出して吹かせる」: 発言した userId を蓄積し、
   //   buildVenueSeating の promoteUserIds に渡して匿名でも席に座らせ吹き出させる。
   /** @type {Set<string>} */
@@ -1295,6 +1445,12 @@ export function mountVenueBarButton(options = {}) {
       promoteUserIds: spokenUserIds,
       excludeKeys: visibleSeatKeys
     });
+    // 診断シート(メンバー一覧ボタン)用に最新の席割りを保持。誰が顔付き席/点描かを data 化する。
+    lastRosterInput = {
+      allSeats: seating.seats,
+      visibleSeats,
+      audienceCount: totalAnonymous
+    };
     title.textContent =
       totalAnonymous > 0
         ? `会場参加者 ${seating.participantCount}人 ・ ほか観客 ${totalAnonymous}人`
