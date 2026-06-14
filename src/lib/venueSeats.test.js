@@ -138,6 +138,52 @@ describe('selectVenueVipRegularKeys (光らせる席の選抜)', () => {
   });
 });
 
+describe('venueRowsFromUserLaneCandidates が実発言数を運ぶ(VIP光らせ実機修正 v0.1.734)', () => {
+  it('candidate の commentCount/giftCount が preCount/preHasGift に写り、スコアに乗る', () => {
+    const candidates = [
+      { userId: 'regular', nickname: '常連', avatarUrl: '', commentCount: 30, giftCount: 0, _laneSortAt: 100 },
+      { userId: 'gifter', nickname: 'ギフト主', avatarUrl: '', commentCount: 2, giftCount: 3, _laneSortAt: 90 },
+      { userId: 'passerby', nickname: '通りすがり', avatarUrl: '', commentCount: 1, giftCount: 0, _laneSortAt: 80 }
+    ];
+    const rows = venueRowsFromUserLaneCandidates(candidates);
+    expect(rows[0].preCount).toBe(30);
+    expect(rows[1].preHasGift).toBe(true);
+    expect(rows[2].preCount).toBe(1);
+    // この rows で席を作ると常連とギフト主は光り、通りすがりは光らない。
+    const r = buildVenueSeating(rows, { isGenericName: isGeneric });
+    const seatOf = (k) => r.seats.find((s) => s.participant.key === k);
+    expect(seatOf('u:regular').isVipRegular).toBe(true);
+    expect(seatOf('u:gifter').isVipRegular).toBe(true);
+    expect(seatOf('u:passerby').isVipRegular).toBe(false);
+  });
+  it('回帰: candidate に commentCount が無い旧データでも壊れない(count=1 既定)', () => {
+    const rows = venueRowsFromUserLaneCandidates([{ userId: 'x', nickname: 'X', _laneSortAt: 1 }]);
+    expect(rows[0].preCount).toBe(1);
+    expect(rows[0].preHasGift).toBe(false);
+  });
+});
+
+describe('collectVenueParticipants preCount 集約', () => {
+  it('preCount を出現回数の代わりに加算する(集約済み入力)', () => {
+    const rows = [
+      { userId: 'a', name: 'A', preCount: 12, preHasGift: false, capturedAt: 5 }
+    ];
+    const [p] = collectVenueParticipants(rows);
+    expect(p.count).toBe(12);
+    expect(p.hasGift).toBe(false);
+  });
+  it('生コメント経路(preCount 無し)は従来通り1ずつ数える', () => {
+    const rows = [
+      { userId: 'a', name: 'A', text: '1', capturedAt: 1 },
+      { userId: 'a', name: 'A', text: '2', capturedAt: 2 },
+      { userId: 'a', name: 'A', text: '3', isGift: true, capturedAt: 3 }
+    ];
+    const [p] = collectVenueParticipants(rows);
+    expect(p.count).toBe(3);
+    expect(p.hasGift).toBe(true);
+  });
+});
+
 describe('buildVenueSeating の isVipRegular フラグ', () => {
   it('常連・大応援の席に isVipRegular=true が付く', () => {
     const rows = [];
