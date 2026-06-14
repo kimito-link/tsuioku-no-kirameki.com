@@ -41,7 +41,13 @@ export class VoicePlayer {
   get VOICE_ASSIGNMENTS_KEY() { return 'nls_voice_assignments_v1'; }
   get VOICE_READ_NAME_KEY() { return 'nls_voice_read_name_enabled_v1'; }
 
-  async initialize() {
+  /**
+   * @param {{ forceOn?: boolean }} [opts]
+   *   forceOn=true なら保存状態に関わらず読み上げを自動 ON にする(会場モードを開いたら
+   *   「いきなり読み上げ上がる」ユーザー期待のため。comeview の ?voice=1 相当)。
+   *   このとき persist:true で storage にも ON を残し、以後も復元される。
+   */
+  async initialize(opts = {}) {
     if (this.isObsMode()) return;
     let bag = {};
     try {
@@ -58,11 +64,13 @@ export class VoicePlayer {
     const rawAssignments = bag[this.VOICE_ASSIGNMENTS_KEY];
     this.assignments = (!rawAssignments || typeof rawAssignments !== 'object' || Array.isArray(rawAssignments)) ? {} : rawAssignments;
     this.readNameEnabled = bag[this.VOICE_READ_NAME_KEY] === true;
-    
+
     this._emitToggle();
 
-    if (bag[this.VOICE_READING_ENABLED_KEY] === true) {
-      await this.enable({ persist: false });
+    const forceOn = opts.forceOn === true;
+    if (forceOn || bag[this.VOICE_READING_ENABLED_KEY] === true) {
+      // forceOn のときは storage にも残す(persist:true)。保存復元のときは false(既存挙動維持)。
+      await this.enable({ persist: forceOn });
     }
   }
 

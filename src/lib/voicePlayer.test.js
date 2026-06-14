@@ -41,6 +41,21 @@ describe('VoicePlayer', () => {
     expect(player.enabled).toBe(false);
   });
 
+  it('forceOn なら保存状態 false でも自動 ON にし storage に残す(会場モード)', async () => {
+    // 保存状態は未設定(=OFF)だが forceOn で自動 ON にする。
+    mockStorage.get = vi.fn().mockResolvedValue({});
+    await player.initialize({ forceOn: true });
+    expect(player.enabled).toBe(true);
+    // forceOn は persist:true なので storage に ON を残す(以後も復元される)。
+    expect(mockStorage.set).toHaveBeenCalledWith({ 'nls_voice_reading_enabled_v1': true });
+  });
+
+  it('forceOn でも OBS モードなら自動 ON しない(無音オーバーレイ維持)', async () => {
+    player.isObsMode = () => true;
+    await player.initialize({ forceOn: true });
+    expect(player.enabled).toBe(false);
+  });
+
   it('enables voice reading', async () => {
     const onToggle = vi.fn();
     player.onToggle = onToggle;
