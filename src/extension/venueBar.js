@@ -38,6 +38,12 @@ import {
   BUBBLE_ANCHOR_GAP
 } from '../lib/venueBubbleLayout.js';
 import { drawCrowdOnCanvas } from '../lib/crowdRasterizer.js';
+import {
+  resolveVenueHeatLevel,
+  heatLevelToWarmColor,
+  heatLevelToGlowOpacity,
+  heatLevelToLabel
+} from '../lib/venueHeat.js';
 import { VoicePlayer } from '../lib/voicePlayer.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
@@ -137,9 +143,21 @@ const VENUE_CSS = `
      * 本家UIをそのまま見せる。会場の雰囲気は上端・下端の淡いステージ照明だけで出し、中央の
      * 映像にはかけない(上下のグラデは画面端で transparent に消えるので映像本体は素通し)。
      */
+    /*
+     * 2026-06-14 星野アイデア会議2「熱量の色温度」: 下端(客席)の照明色をコメント速度連動で
+     * 注入する。--nlsb-heat-color(涼=青紫→暖=オレンジ)/ --nlsb-heat-opacity(過疎=ほぼ透明→
+     * 怒涛=濃い)を JS が更新。映像中央は素通しのまま(下端だけ色温度が変わる)。
+     * 既定は涼色・薄めにして未設定時も従来の雰囲気を壊さない。
+     */
+    --nlsb-heat-color: rgb(120, 130, 200);
+    --nlsb-heat-opacity: 0.12;
     background:
       radial-gradient(ellipse 70% 24% at 50% 0%, rgba(120, 165, 224, 0.16), transparent 70%),
-      radial-gradient(ellipse 90% 26% at 50% 100%, rgba(150, 120, 200, 0.14), transparent 72%);
+      radial-gradient(
+        ellipse 96% 30% at 50% 100%,
+        color-mix(in srgb, var(--nlsb-heat-color) calc(var(--nlsb-heat-opacity) * 100%), transparent),
+        transparent 74%
+      );
     opacity: 0;
     transform: translateY(18px);
     visibility: hidden;
@@ -148,7 +166,8 @@ const VENUE_CSS = `
     transition:
       opacity 180ms ease,
       transform 180ms ease,
-      visibility 0s linear 180ms;
+      visibility 0s linear 180ms,
+      background 800ms ease;
   }
   .nlsb-root.nlsb-is-open .nlsb-stage {
     opacity: 1;
@@ -1422,6 +1441,20 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
+   * 2026-06-14 星野アイデア会議2「熱量の色温度」: 直近コメントの速さから会場照明の色温度を更新。
+   *   過疎=涼しい青紫、怒涛=熱いオレンジ。映像中央は素通しのまま下端(客席)だけ色が変わる。
+   *   stage に CSS 変数を注入するだけ(色/不透明度の補間と速度→熱量の正規化は純関数 venueHeat)。
+   * @param {Array<{ capturedAt?: number|null }>} commentRows 直近コメント行(capturedAt 付き)
+   */
+  const applyVenueHeat = (commentRows) => {
+    const level = resolveVenueHeatLevel(commentRows, { now: Date.now() });
+    stage.style.setProperty('--nlsb-heat-color', heatLevelToWarmColor(level));
+    stage.style.setProperty('--nlsb-heat-opacity', String(heatLevelToGlowOpacity(level)));
+    // 任意: 盛り上がり具合を支援技術/ツールチップ向けに持たせる(視覚に依存しない情報)。
+    stage.setAttribute('data-nls-heat', heatLevelToLabel(level));
+  };
+
+  /**
    * @param {VenueRow[]} rows
    */
   const renderSeats = (rows) => {
@@ -1675,6 +1708,8 @@ export function mountVenueBarButton(options = {}) {
       const summary = /** @type {{ recent?: unknown }|undefined} */ (bag?.[summaryKey]);
       const recentRows = Array.isArray(summary?.recent) ? summary.recent : [];
       const rows = tailRows.length > 0 ? tailRows : recentRows;
+      // 熱量の色温度: コメントが来ない時もこの poll は回る(窓が空けば level 0 へ自然に冷める)。
+      applyVenueHeat(rows);
       // primeEmit: 会場を開いた瞬間に直近3件を吹き出す(過疎番組でも会場が喋って見える)。
       //   2回目以降は primed 済みなので新着だけ。過去ログ一斉飛びは起きない。
       const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 8, primeEmit: 3 });
