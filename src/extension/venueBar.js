@@ -541,6 +541,33 @@ const VENUE_CSS = `
     box-shadow: 0 0 6px rgba(255, 200, 90, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
     z-index: 2;
   }
+  /* 2026-06-14 星野アイデア会議2(VIP常連光らせ): 発言数+ギフトのスコアが高い「支えてる人」を
+     金色オーラでやわらかく脈動させて引き立てる。実サムネ優遇(.nlsb-seat-vip)と独立=
+     ゆっくり顔/匿名の常連でも光る。やりすぎない上品な範囲(2.4秒の緩い脈動)。 */
+  .nlsb-seat.nlsb-seat-regular .nlsb-icon {
+    border-color: rgba(255, 226, 150, 0.95);
+    box-shadow: 0 0 10px 2px rgba(255, 196, 84, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    animation: nlsb-vip-glow 2.4s ease-in-out infinite;
+    z-index: 3;
+  }
+  /* 実サムネ常連は両方付くので、scale はサムネ側を活かしつつオーラを重ねる。 */
+  .nlsb-seat.nlsb-seat-vip.nlsb-seat-regular .nlsb-icon {
+    transform: scale(1.12);
+  }
+  @keyframes nlsb-vip-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 8px 1px rgba(255, 196, 84, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    }
+    50% {
+      box-shadow: 0 0 14px 4px rgba(255, 210, 110, 0.92), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-seat.nlsb-seat-regular .nlsb-icon {
+      animation: none;
+    }
+  }
   .nlsb-icon {
     position: relative;
     display: grid;
@@ -1558,6 +1585,10 @@ export function mountVenueBarButton(options = {}) {
         // 2026-06-14 会議(サムネ優遇強化): 実サムネ(http顔写真)持ちは少し大きく明るく見せて
         //   常連さんを引き立てる。ゆっくり顔/匿名は通常表示。CSS .nlsb-seat-vip が適用。
         node.seat.classList.toggle('nlsb-seat-vip', hasRealThumbnail(avatarUrl));
+        // 2026-06-14 星野アイデア会議2(VIP常連光らせ): 発言数+ギフトで算出した会場ローカルの
+        //   常連・応援スコアが高い席を金色オーラで光らせる。実サムネ有無(.nlsb-seat-vip)とは
+        //   独立=「顔がある人」でなく「支えてる人」を引き立てる。上限つきで特別感を保つ。
+        node.seat.classList.toggle('nlsb-seat-regular', !!entry.isVipRegular);
       }
     }
     // 席が動いた(段の再描画/表示人数変化)後、表示中の吹き出しを席頭上へ追従させる。

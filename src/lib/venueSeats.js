@@ -151,6 +151,79 @@ export function hasRealThumbnail(avatar) {
 }
 
 /**
+ * 会場ローカルの「常連・大応援」スコア(0..100)を返す純関数(VIP光らせ判定の素)。
+ *
+ * 2026-06-14 ユーザー方針(星野アイデア会議2)「VIP常連を光らせる(giftSum + supportCount スコア)」:
+ *   応援者パワー診断(supporterPowerScoring.js)はフォロワー/レベル等の重い外部データが要るが、
+ *   会場の描画ループはそれを安定して持たない。ここでは **会場が確実に持つ素材だけ**で軽く出す:
+ *     - count(その配信での発言数=常連度) を log 正規化(連投で青天井にしない)
+ *     - hasGift(ギフトを送った=大応援) を加点
+ *     - giftPoints(あれば=ギフト総ポイント) を log 正規化で更に加点(任意・無くても成立)
+ *   score = 100 * (0.55*commentNorm + 0.30*giftFlag + 0.15*giftPointsNorm)。
+ *   実サムネ有無(.nlsb-seat-vip)とは独立の軸=「顔がある人」でなく「支えてる人」を光らせる。
+ *
+ * @param {{ count?: number, hasGift?: boolean, giftPoints?: number }} participant
+ * @param {{ commentCap?: number, giftPointsCap?: number }} [opts]
+ *   commentCap=発言数の正規化上限(既定40・これ以上は頭打ち) / giftPointsCap=ポイント上限(既定5000)
+ * @returns {number} 0..100 の常連・応援スコア
+ */
+export function resolveVenueRegularScore(participant, opts = {}) {
+  const p = participant && typeof participant === 'object' ? participant : {};
+  const count = Math.max(0, Math.floor(Number(p.count) || 0));
+  const giftPoints = Math.max(0, Number(p.giftPoints) || 0);
+  const commentCap =
+    Number.isFinite(opts.commentCap) && opts.commentCap > 0 ? opts.commentCap : 40;
+  const giftPointsCap =
+    Number.isFinite(opts.giftPointsCap) && opts.giftPointsCap > 0 ? opts.giftPointsCap : 5000;
+  /** @param {number} v */
+  const log1p = (v) => Math.log(1 + Math.max(0, v));
+  const commentNorm = Math.min(1, log1p(count) / log1p(commentCap));
+  const giftFlag = p.hasGift ? 1 : 0;
+  const giftPointsNorm = giftPoints > 0 ? Math.min(1, log1p(giftPoints) / log1p(giftPointsCap)) : 0;
+  const score = 100 * (0.55 * commentNorm + 0.3 * giftFlag + 0.15 * giftPointsNorm);
+  return Math.max(0, Math.min(100, score));
+}
+
+/** VIP(常連・大応援)として席を光らせる既定スコア閾値。これ以上で光る。 */
+export const VENUE_VIP_REGULAR_SCORE_THRESHOLD = 45;
+
+/** 同時に光らせる VIP 席の既定上限(光りすぎて特別感が薄れるのを防ぐ)。 */
+export const VENUE_VIP_REGULAR_MAX = 8;
+
+/**
+ * 会場参加者のうち「光らせる VIP(常連・大応援)」のキー集合を返す純関数。
+ * スコア閾値以上の参加者を score 降順に並べ、上限 max 件まで採用する(特別感のため絞る)。
+ *
+ * @param {ReturnType<typeof collectVenueParticipants>} participants
+ * @param {{ threshold?: number, max?: number, commentCap?: number, giftPointsCap?: number }} [opts]
+ * @returns {Set<string>} 光らせる参加者の key 集合
+ */
+export function selectVenueVipRegularKeys(participants, opts = {}) {
+  const list = Array.isArray(participants) ? participants : [];
+  const threshold =
+    Number.isFinite(opts.threshold) && opts.threshold >= 0
+      ? opts.threshold
+      : VENUE_VIP_REGULAR_SCORE_THRESHOLD;
+  const max =
+    Number.isFinite(opts.max) && opts.max > 0
+      ? Math.floor(opts.max)
+      : VENUE_VIP_REGULAR_MAX;
+  const scored = [];
+  for (const p of list) {
+    if (!p || typeof p.key !== 'string' || !p.key) continue;
+    const score = resolveVenueRegularScore(p, opts);
+    if (score >= threshold) scored.push({ key: p.key, score, count: Number(p.count) || 0 });
+  }
+  // score 降順 → 同点は発言数降順 → key で deterministic に。
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.count !== a.count) return b.count - a.count;
+    return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+  });
+  return new Set(scored.slice(0, max).map((s) => s.key));
+}
+
+/**
  * 参加者を会場の優先度で並べ、最大 maxSeats 件に絞る純関数(入れ替え制)。
  * 優先度(2026-06-14 ユーザー方針「サムネ持ちを前列に優先」で①を追加):
  *   ①実サムネ持ち(名前+顔)を最優先 → 前列(手前・大きい段)へ。
@@ -351,10 +424,15 @@ export function collectAudienceFaceUserIds(rows, opts = {}) {
  *   maxSeats?: number,
  *   frontRowSeats?: number,
  *   isGenericName?: (name: string) => boolean,
- *   promoteUserIds?: Set<string>|null
+ *   promoteUserIds?: Set<string>|null,
+ *   vipRegular?: boolean,
+ *   vipRegularThreshold?: number,
+ *   vipRegularMax?: number,
+ *   vipRegularCommentCap?: number,
+ *   vipRegularGiftPointsCap?: number
  * }} [opts]
  * @returns {{
- *   seats: Array<{ seatIndex: number, isFrontRow: boolean, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
+ *   seats: Array<{ seatIndex: number, isFrontRow: boolean, isVipRegular: boolean, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
  *   seatByKey: Map<string, number>,
  *   participantCount: number,
  *   anonymousCount: number,
@@ -372,8 +450,23 @@ export function buildVenueSeating(rows, opts = {}) {
   });
   const ranked = rankVenueParticipants(participants, maxSeats);
   const { seats, seatByKey } = assignVenueSeats(ranked, opts.prevSeatByKey, maxSeats, frontRow);
+  // VIP(常連・大応援)光らせ判定は全参加者でスコアリングしてから席へ印を付ける。
+  //   vipRegular:false(既定) で無効化可(後方互換)。明示 opts で閾値/上限を上書きできる。
+  const vipRegularKeys =
+    opts.vipRegular === false
+      ? new Set()
+      : selectVenueVipRegularKeys(participants, {
+          threshold: opts.vipRegularThreshold,
+          max: opts.vipRegularMax,
+          commentCap: opts.vipRegularCommentCap,
+          giftPointsCap: opts.vipRegularGiftPointsCap
+        });
   return {
-    seats: seats.map((s) => ({ ...s, isFrontRow: s.seatIndex < frontRow })),
+    seats: seats.map((s) => ({
+      ...s,
+      isFrontRow: s.seatIndex < frontRow,
+      isVipRegular: vipRegularKeys.has(s.participant.key)
+    })),
     seatByKey,
     participantCount: participants.length,
     anonymousCount: countAnonymousParticipants(rows, opts.isGenericName, promoteUserIds),
