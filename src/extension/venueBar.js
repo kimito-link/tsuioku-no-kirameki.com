@@ -3,6 +3,7 @@ import {
   buildVenueSeating,
   buildVenueTiers,
   collectAudienceFaceUserIds,
+  hasRealThumbnail,
   VENUE_FULLSCREEN_MAX_SEATS,
   venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
@@ -21,8 +22,15 @@ import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
 import {
   seatsPerRow,
   resolveVisibleArenaCount,
+  resolveVenueMaxHeightVh,
   selectStableVisibleMembers
 } from '../lib/venueViewport.js';
+import {
+  initVenueDragState,
+  beginVenueDrag,
+  updateVenueDrag,
+  endVenueDrag
+} from '../lib/venueDragScroll.js';
 import {
   bubbleAnchorForSeatRect,
   resolveBubbleY,
@@ -233,7 +241,9 @@ const VENUE_CSS = `
     align-self: end;
     display: grid;
     width: 100%;
-    max-height: 55vh;
+    /* 2026-06-14 会議(表示領域拡大): 高さを人数連動で可変。少人数は低く映像を広く見せ、
+       満員は高くして客席を奥まで見せる。JS が --nlsb-venue-max-h を人数で注入(既定55vh)。 */
+    max-height: var(--nlsb-venue-max-h, 55vh);
     min-height: 0;
     box-sizing: border-box;
     grid-template-areas:
@@ -326,6 +336,10 @@ const VENUE_CSS = `
      */
     overflow-x: hidden;
     overflow-y: auto;
+    /* 2026-06-14 会議(摩擦ゼロUI): 会場は左ドラッグでパンできる=grab カーソルで掴めると示す。
+       席リンク(.nlsb-seat-link)上はリンクカーソルを優先(下のセレクタで上書き)。 */
+    cursor: grab;
+    touch-action: pan-y;
     background:
       radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.16), transparent 62%);
     overscroll-behavior: contain;
@@ -386,6 +400,10 @@ const VENUE_CSS = `
     gap: 6px;
     overflow: visible;
   }
+  .nlsb-seats.nlsb-is-grabbing {
+    cursor: grabbing;
+    user-select: none;
+  }
   .nlsb-seat.nlsb-is-empty {
     /* display: none; */
     opacity: 0.12;
@@ -415,6 +433,15 @@ const VENUE_CSS = `
   /* 通常(≤30人): 大きめアバターを画面いっぱいに敷き詰める。はみ出し時は縮小させる */
   .nlsb-seats.nlsb-mode-normal .nlsb-seat {
     width: clamp(48px, 9vw, 120px);
+  }
+  /* 2026-06-14 会議(サムネ優遇強化): 実サムネ持ちを少し大きく明るく・上品な金縁で引き立てる。
+     やりすぎない範囲(1.12倍・明るさ+8%)。匿名/ゆっくり顔は通常のまま。 */
+  .nlsb-seat.nlsb-seat-vip .nlsb-icon {
+    transform: scale(1.12);
+    filter: brightness(1.08);
+    border-color: rgba(255, 214, 120, 0.9);
+    box-shadow: 0 0 6px rgba(255, 200, 90, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    z-index: 2;
   }
   .nlsb-icon {
     position: relative;
@@ -929,6 +956,46 @@ export function mountVenueBarButton(options = {}) {
   emptyMessage.textContent = 'まだ名前付きの参加者がいません';
   seatsHost.appendChild(emptyMessage);
 
+  // 2026-06-14 会議(星野ロミ・摩擦ゼロUI): 会場を左ドラッグでパン(縦スクロール)できるように。
+  //   純ロジックは venueDragScroll(テスト済)。ここは pointer イベントの薄い配線だけ。
+  //   ドラッグ判定(moved)が立ったら席リンクの click を1回だけ抑止し、誤遷移を防ぐ。
+  let venueDrag = initVenueDragState();
+  const venueDragMaxScroll = () => Math.max(0, seatsHost.scrollHeight - seatsHost.clientHeight);
+  seatsHost.addEventListener('pointerdown', (e) => {
+    // 左ボタンのみ。スクロールバー上のドラッグは OS に任せる(配信操作を邪魔しない)。
+    if (e.button !== 0) return;
+    venueDrag = beginVenueDrag(e.clientY, seatsHost.scrollTop);
+    seatsHost.classList.add('nlsb-is-grabbing');
+  });
+  seatsHost.addEventListener('pointermove', (e) => {
+    if (!venueDrag.active) return;
+    const r = updateVenueDrag(venueDrag, e.clientY, venueDragMaxScroll());
+    venueDrag = r.state;
+    if (venueDrag.moved) {
+      seatsHost.scrollTop = r.scrollTop;
+      // ドラッグ中はテキスト選択を避ける。
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+    }
+  });
+  const endVenueDragHandler = () => {
+    const { state, wasDrag } = endVenueDrag(venueDrag);
+    venueDrag = state;
+    seatsHost.classList.remove('nlsb-is-grabbing');
+    if (wasDrag) {
+      // 直後の click(席リンク)を1回だけ飲み込む(ドラッグで指を離した位置のリンクへ飛ばない)。
+      /** @param {Event} ev */
+      const swallow = (ev) => {
+        ev.stopPropagation();
+        if (typeof ev.preventDefault === 'function') ev.preventDefault();
+        seatsHost.removeEventListener('click', swallow, true);
+      };
+      seatsHost.addEventListener('click', swallow, true);
+    }
+  };
+  seatsHost.addEventListener('pointerup', endVenueDragHandler);
+  seatsHost.addEventListener('pointerleave', endVenueDragHandler);
+  seatsHost.addEventListener('pointercancel', endVenueDragHandler);
+
   // 中央の映像セーフエリア(UI を置かず、配信映像を常に見せる)。
   const safeArea = document.createElement('div');
   safeArea.className = 'nlsb-safe-area';
@@ -1185,6 +1252,15 @@ export function mountVenueBarButton(options = {}) {
     seatByKey = seating.seatByKey;
     seatsHost.classList.remove(...VENUE_LAYOUT_CLASSES);
     seatsHost.classList.add(`nlsb-mode-${seating.layoutMode}`);
+    // 2026-06-14 会議(表示領域拡大): 会場の最大高さを人数連動で注入。少人数は低く映像を広く、
+    //   満員は高く客席を奥まで。.nlsb-seating(=seatsHost の親)の var(--nlsb-venue-max-h) を更新。
+    const seatingHostEl = seatsHost.parentElement;
+    if (seatingHostEl) {
+      seatingHostEl.style.setProperty(
+        '--nlsb-venue-max-h',
+        `${resolveVenueMaxHeightVh(seating.participantCount)}vh`
+      );
+    }
     // 会議確定B(横スクロール根絶+映像セーフエリア): 論理席は維持しつつ、同時表示は
     //   行に収まる数に絞る。縮小でなく表示人数を減らす(名前/ID/サムネを潰さない)。
     //   直近発言者は selectStableVisibleMembers で必ず表示に含め、席順は安定(ちらつかない)。
@@ -1318,6 +1394,9 @@ export function mountVenueBarButton(options = {}) {
         }
         node.seat.classList.remove('nlsb-is-empty');
         node.seat.setAttribute('aria-hidden', 'false');
+        // 2026-06-14 会議(サムネ優遇強化): 実サムネ(http顔写真)持ちは少し大きく明るく見せて
+        //   常連さんを引き立てる。ゆっくり顔/匿名は通常表示。CSS .nlsb-seat-vip が適用。
+        node.seat.classList.toggle('nlsb-seat-vip', hasRealThumbnail(avatarUrl));
       }
     }
     // 席が動いた(段の再描画/表示人数変化)後、表示中の吹き出しを席頭上へ追従させる。

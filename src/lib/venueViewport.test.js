@@ -3,6 +3,7 @@ import {
   seatsPerRow,
   resolveVisibleArenaCount,
   resolveDynamicArenaCap,
+  resolveVenueMaxHeightVh,
   resolveVisibleAudienceCount,
   selectStableVisibleMembers
 } from './venueViewport.js';
@@ -51,6 +52,19 @@ describe('resolveDynamicArenaCap', () => {
     expect(resolveDynamicArenaCap(405, { ratio: 0.1 })).toBe(40); // 40.5→40, base40
     expect(resolveDynamicArenaCap(405, { max: 60 })).toBe(60); // 81 > 60 → 60
     expect(resolveDynamicArenaCap(405, { base: 100 })).toBe(100); // 81 < 100 → 100
+  });
+});
+
+describe('resolveVenueMaxHeightVh', () => {
+  it('人数が増えるほど会場が高くなる(満席感・映像セーフエリアは控えめ)', () => {
+    expect(resolveVenueMaxHeightVh(5)).toBe(48);
+    expect(resolveVenueMaxHeightVh(16)).toBe(48);
+    expect(resolveVenueMaxHeightVh(64)).toBe(56);
+    expect(resolveVenueMaxHeightVh(150)).toBe(64);
+    expect(resolveVenueMaxHeightVh(405)).toBe(72);
+  });
+  it('上限 72vh を超えない(映像を覆いすぎない)', () => {
+    expect(resolveVenueMaxHeightVh(99999)).toBe(72);
   });
 });
 

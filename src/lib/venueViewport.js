@@ -49,6 +49,24 @@ export function resolveDynamicArenaCap(total, opts = {}) {
 }
 
 /**
+ * 会場(ひな壇)の最大高さ(vh)を人数連動で決める純関数(表示領域の可変拡大)。
+ *
+ * 2026-06-14 会議(無料LLM4体): 少人数は会場を低くして配信映像を広く見せ、人気配信(大人数)は
+ *   会場を高くして客席を奥まで見せる(満席感)。映像セーフエリアを潰さないため上限は控えめ。
+ *   ~16人=48vh・~64人=56vh・~150人=64vh・それ超=72vh。
+ *
+ * @param {number} total 論理参加者数
+ * @returns {number} 最大高さ(vh単位の数値)
+ */
+export function resolveVenueMaxHeightVh(total) {
+  const n = Math.max(0, Math.floor(Number(total) || 0));
+  if (n <= 16) return 48;
+  if (n <= 64) return 56;
+  if (n <= 150) return 64;
+  return 72;
+}
+
+/**
  * 映像セーフエリアを守りつつ同時表示するアリーナ席数を決める。
  * 「横にはみ出さない列数 × 段数」を上限に、論理人数で頭打ちする。
  * これにより横スクロールが構造的に出ない & 映像を覆う面積を一定に保つ。
