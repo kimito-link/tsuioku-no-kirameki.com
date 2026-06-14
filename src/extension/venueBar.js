@@ -375,8 +375,10 @@ const VENUE_CSS = `
     overflow-x: hidden;
     overflow-y: auto;
     /* 2026-06-14 会議(摩擦ゼロUI): 会場は左ドラッグでパンできる=grab カーソルで掴めると示す。
-       席リンク(.nlsb-seat-link)上はリンクカーソルを優先(下のセレクタで上書き)。 */
-    cursor: grab;
+       席リンク(.nlsb-seat-link)上はリンクカーソルを優先(下のセレクタで上書き)。
+       v0.1.738: パンできる(縦に溢れている)時だけ grab を出す=掴めるのに動かない誤解を防ぐ。
+       全席が画面に収まる時は通常カーソル。.nlsb-can-pan を renderSeats が溢れ時に付与。 */
+    cursor: default;
     touch-action: pan-y;
     background:
       radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.16), transparent 62%);
@@ -438,6 +440,9 @@ const VENUE_CSS = `
     gap: 6px;
     overflow: visible;
   }
+  .nlsb-seats.nlsb-can-pan {
+    cursor: grab;
+  }
   .nlsb-seats.nlsb-is-grabbing {
     cursor: grabbing;
     user-select: none;
@@ -469,13 +474,27 @@ const VENUE_CSS = `
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   }
   .nlsb-roster-close {
-    background: transparent;
-    border: none;
+    /* v0.1.738: 当たり判定を広げ(36x36)確実に押せるように。背景を薄く付けて存在を明示。 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    min-height: 36px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
     color: #eef1f6;
     font-size: 20px;
     line-height: 1;
     cursor: pointer;
     padding: 2px 8px;
+  }
+  .nlsb-roster-close:hover {
+    background: rgba(255, 255, 255, 0.16);
+  }
+  .nlsb-roster-close:focus-visible {
+    outline: 2px solid #8dc8ff;
+    outline-offset: 2px;
   }
   .nlsb-roster-summary {
     padding: 8px 14px;
@@ -1277,11 +1296,29 @@ export function mountVenueBarButton(options = {}) {
     const closeBtn = rosterPanel.querySelector('.nlsb-roster-close');
     if (closeBtn) closeBtn.addEventListener('click', () => toggleRosterPanel(false));
   };
+  // v0.1.738: 診断パネルの外側(会場ステージ)をクリックしたら閉じる(× が反応しない時の保険)。
+  //   パネル内部のクリックは閉じない。リスナーは開いている間だけ張る(開くクリック自身で
+  //   即閉じしないよう、次のtickで張る)。
+  /** @param {MouseEvent} event */
+  const onRosterOutsideClick = (event) => {
+    if (rosterPanel.hidden) return;
+    const target = /** @type {Node|null} */ (event.target);
+    if (target && rosterPanel.contains(target)) return; // パネル内は維持
+    toggleRosterPanel(false);
+  };
   /** @param {boolean} [force] */
   const toggleRosterPanel = (force) => {
     const next = typeof force === 'boolean' ? force : rosterPanel.hidden;
     if (next) renderRosterPanel();
     rosterPanel.hidden = !next;
+    if (next) {
+      // 開いたクリックが即座に外側判定されないよう、次tickでリスナーを張る。
+      setTimeout(() => {
+        if (!rosterPanel.hidden) stage.addEventListener('click', onRosterOutsideClick);
+      }, 0);
+    } else {
+      stage.removeEventListener('click', onRosterOutsideClick);
+    }
   };
   // ユーザー方針「しゃべった匿名もアリーナに出して吹かせる」: 発言した userId を蓄積し、
   //   buildVenueSeating の promoteUserIds に渡して匿名でも席に座らせ吹き出させる。
@@ -1644,10 +1681,20 @@ export function mountVenueBarButton(options = {}) {
       }
     }
     // 席が動いた(段の再描画/表示人数変化)後、表示中の吹き出しを席頭上へ追従させる。
+    //   併せて「パン可能(縦に溢れている)」かを判定して grab カーソルの出し分けを更新する。
+    //   v0.1.738: 全席が画面に収まる時は grab を出さない(掴めるのに動かない誤解を防ぐ)。
+    const updatePanAffordance = () => {
+      const canPan = seatsHost.scrollHeight > seatsHost.clientHeight + 2;
+      seatsHost.classList.toggle('nlsb-can-pan', canPan);
+    };
     if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => repositionAllBubbles());
+      requestAnimationFrame(() => {
+        repositionAllBubbles();
+        updatePanAffordance();
+      });
     } else {
       repositionAllBubbles();
+      updatePanAffordance();
     }
   };
 
@@ -1803,6 +1850,12 @@ export function mountVenueBarButton(options = {}) {
   /** @param {KeyboardEvent} event */
   const onEscapeKey = (event) => {
     if (event.key !== 'Escape' || !open) return;
+    // v0.1.738: 診断パネルが開いていれば、まずそれだけ閉じる(会場ごと閉じない)。
+    //   × が反応しない時の確実な代替手段(ユーザー報告対策)。
+    if (!rosterPanel.hidden) {
+      toggleRosterPanel(false);
+      return;
+    }
     userChangedOpen = true;
     setOpen(false, true);
   };

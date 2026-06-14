@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.738',
+    date: '2026-06-14',
+    summary: '診断パネルを閉じやすく＋掴めるカーソルの誤解を解消',
+    items: Object.freeze([
+      '会場メンバー一覧（診断）の閉じるボタンを大きくし、Escキーやパネルの外側をクリックでも閉じられるようにしました（閉じにくかった問題への対策）',
+      '会場が画面内に収まっていて動かせないときは「掴めるカーソル（手のマーク）」を出さないようにしました（掴めるのに動かない、という誤解を防ぎます）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.737',
     date: '2026-06-14',
     summary: '会場の後列が画面外で見切れる不具合を修正',
