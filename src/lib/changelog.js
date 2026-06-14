@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.725',
+    date: '2026-06-14',
+    summary: '会場モードでサムネ付きの人を前列に・匿名は後列へ',
+    items: Object.freeze([
+      '会場モードで、サムネ(顔写真)とハンドルネームがある人を会場の前列(手前・大きい段)に優先して並べるようにしました。匿名の人はこれまでどおり会場に残りますが後ろの段に並びます(満員感はそのまま)。これまではサムネのある人も匿名も同じ列に混在していました'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.724',
     date: '2026-06-14',
     summary: 'コメビュが配信切替に追従・読み上げの無音を解消',

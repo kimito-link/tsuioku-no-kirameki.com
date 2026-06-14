@@ -140,9 +140,22 @@ export function collectVenueParticipants(rows, opts = {}) {
 }
 
 /**
+ * アバター文字列が「実サムネ(http(s) で取得できる本物の顔)」かを判定する純関数。
+ * 空文字 / data:(匿名のゆっくり顔フォールバック) / blob: などは実サムネではない。
+ *
+ * @param {unknown} avatar
+ * @returns {boolean}
+ */
+export function hasRealThumbnail(avatar) {
+  return /^https?:\/\//i.test(String(avatar || '').trim());
+}
+
+/**
  * 参加者を会場の優先度で並べ、最大 maxSeats 件に絞る純関数(入れ替え制)。
- * 優先度: ①ギフト参加者を優先 ②最終発言が新しい順。超過分は「降ろす」(=会場から外す)。
- * これにより活発な人・ギフトをくれた人が会場に残り、静かになった人から入れ替わる。
+ * 優先度(2026-06-14 ユーザー方針「サムネ持ちを前列に優先」で①を追加):
+ *   ①実サムネ持ち(名前+顔)を最優先 → 前列(手前・大きい段)へ。
+ *   ②ギフト参加者を優先 ③最終発言が新しい順 ④発言数。超過分は「降ろす」(=会場から外す)。
+ * これで実サムネ持ちが手前に集まり、匿名(ゆっくり顔)はアリーナに残しつつ後列へ流れる。
  *
  * @param {ReturnType<typeof collectVenueParticipants>} participants
  * @param {number} [maxSeats]
@@ -152,6 +165,9 @@ export function rankVenueParticipants(participants, maxSeats = VENUE_MAX_SEATS) 
   const list = Array.isArray(participants) ? participants.slice() : [];
   const cap = Number.isFinite(maxSeats) && maxSeats > 0 ? Math.floor(maxSeats) : VENUE_MAX_SEATS;
   list.sort((a, b) => {
+    const aReal = hasRealThumbnail(a.avatar);
+    const bReal = hasRealThumbnail(b.avatar);
+    if (aReal !== bReal) return aReal ? -1 : 1;
     if (!!b.hasGift !== !!a.hasGift) return b.hasGift ? 1 : -1;
     if (b.lastAt !== a.lastAt) return b.lastAt - a.lastAt;
     return b.count - a.count;
@@ -164,15 +180,25 @@ export function rankVenueParticipants(participants, maxSeats = VENUE_MAX_SEATS) 
  * 既存の席をそのまま使わせ、新しく入った参加者には空いた席を埋めさせる純関数。
  * これで「同じ人=同じ席」が保たれ、アバターと吹き出しの位置がフレーム毎に飛ばない。
  *
+ * 2026-06-14 ユーザー方針「サムネ持ちを前列に優先」:
+ *   ranked は既に実サムネ持ちが先頭(rankVenueParticipants)。だが席が sticky だと
+ *   先に座った匿名が前列(seatIndex < frontRow)を占有し続け、後から判明した実サムネ持ちが
+ *   前列に入れない。そこで **前列席の prev 維持は実サムネ持ちだけに許可**し、匿名(実サムネ
+ *   なし)の前列 prev は破棄してステップ2でランク上位の実サムネ持ちに前列を埋めさせる。
+ *   匿名はアリーナに残るが(満員感)後列の空席へ流れる。frontRow=0 なら従来挙動(予約なし)。
+ *
  * @param {ReturnType<typeof rankVenueParticipants>} ranked 会場に残る参加者(rankVenueParticipants 出力)
  * @param {Map<string, number>|Record<string, number>} [prevSeatByKey] 前回の key→seatIndex
  * @param {number} [maxSeats]
+ * @param {number} [frontRow] 前列席数(これ未満の seatIndex は実サムネ持ち専用に予約。0=予約なし)
  * @returns {{ seats: Array<{ seatIndex: number, participant: ReturnType<typeof collectVenueParticipants>[number] }>, seatByKey: Map<string, number> }}
  *   seats=席インデックス昇順の確定割り当て / seatByKey=今回の key→seatIndex(次回入力に渡す)
  */
-export function assignVenueSeats(ranked, prevSeatByKey, maxSeats = VENUE_MAX_SEATS) {
+export function assignVenueSeats(ranked, prevSeatByKey, maxSeats = VENUE_MAX_SEATS, frontRow = 0) {
   const list = Array.isArray(ranked) ? ranked : [];
   const cap = Number.isFinite(maxSeats) && maxSeats > 0 ? Math.floor(maxSeats) : VENUE_MAX_SEATS;
+  const front =
+    Number.isFinite(frontRow) && frontRow > 0 ? Math.min(Math.floor(frontRow), cap) : 0;
   const prev =
     prevSeatByKey instanceof Map
       ? prevSeatByKey
@@ -183,6 +209,8 @@ export function assignVenueSeats(ranked, prevSeatByKey, maxSeats = VENUE_MAX_SEA
   const usedSeats = new Set();
 
   // 1) 会場に残る参加者のうち、前回の席を持っている人はその席を維持する。
+  //    ただし前列席(< front)は実サムネ持ち専用に予約。匿名の前列 prev は維持しない
+  //    (= 2) で実サムネ持ちが前列を埋める。匿名は後列へ流れる)。
   for (const p of list) {
     const prevSeat = prev.get(p.key);
     if (
@@ -191,19 +219,33 @@ export function assignVenueSeats(ranked, prevSeatByKey, maxSeats = VENUE_MAX_SEA
       prevSeat < cap &&
       !usedSeats.has(prevSeat)
     ) {
+      if (front > 0 && prevSeat < front && !hasRealThumbnail(p.avatar)) {
+        continue; // 匿名の前列 prev は破棄(前列は実サムネ持ちのために空ける)
+      }
       seatByKey.set(p.key, prevSeat);
       usedSeats.add(prevSeat);
     }
   }
-  // 2) 席未確定の参加者に、空いている最小席を割り当てる(降りた人の席を埋める=入れ替え)。
-  let nextFree = 0;
+  // 2) 席未確定の参加者に席を割り当てる(降りた人の席を埋める=入れ替え)。
+  //    実サムネ持ちは前列の空席を最小から、匿名は前列を飛ばして後列の空席を埋める。
+  //    これでランク上位の実サムネ持ちが手前に集まり、匿名はアリーナ後方へ。
+  let nextFreeFront = 0;
+  let nextFreeBack = front;
   for (const p of list) {
     if (seatByKey.has(p.key)) continue;
-    while (nextFree < cap && usedSeats.has(nextFree)) nextFree += 1;
-    if (nextFree >= cap) break;
-    seatByKey.set(p.key, nextFree);
-    usedSeats.add(nextFree);
-    nextFree += 1;
+    let seat = -1;
+    if (front > 0 && hasRealThumbnail(p.avatar)) {
+      while (nextFreeFront < front && usedSeats.has(nextFreeFront)) nextFreeFront += 1;
+      if (nextFreeFront < front) seat = nextFreeFront;
+    }
+    if (seat < 0) {
+      // 前列が満席 or 匿名 → 後列(>= front)の最小空席へ。front=0 なら全席が「後列」扱い。
+      while (nextFreeBack < cap && usedSeats.has(nextFreeBack)) nextFreeBack += 1;
+      if (nextFreeBack < cap) seat = nextFreeBack;
+    }
+    if (seat < 0) break; // 満席
+    seatByKey.set(p.key, seat);
+    usedSeats.add(seat);
   }
 
   /** @type {Array<{ seatIndex: number, participant: ReturnType<typeof collectVenueParticipants>[number] }>} */
@@ -329,7 +371,7 @@ export function buildVenueSeating(rows, opts = {}) {
     promoteUserIds
   });
   const ranked = rankVenueParticipants(participants, maxSeats);
-  const { seats, seatByKey } = assignVenueSeats(ranked, opts.prevSeatByKey, maxSeats);
+  const { seats, seatByKey } = assignVenueSeats(ranked, opts.prevSeatByKey, maxSeats, frontRow);
   return {
     seats: seats.map((s) => ({ ...s, isFrontRow: s.seatIndex < frontRow })),
     seatByKey,
