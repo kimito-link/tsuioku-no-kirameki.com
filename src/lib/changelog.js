@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.733',
+    date: '2026-06-14',
+    summary: '大人数の会場でも軽く動くように描画を最適化',
+    items: Object.freeze([
+      '1000人を超えるような大規模な配信でも会場モードが軽く動くように、観客の群衆描画を最適化しました（人数に応じて演出の重さを自動で調整します）',
+      '観客の人数が変わらないときは群衆の描き直しをスキップするようにして、無駄な処理を減らしました。満員の見た目はそのままです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.732',
     date: '2026-06-14',
     summary: '会場の照明がコメントの勢いで色温度を変える',

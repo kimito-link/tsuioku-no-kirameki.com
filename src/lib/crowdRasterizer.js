@@ -7,6 +7,33 @@
  * 遠くの観客は暗闇に溶け込み（空気遠近法）、近景の光は強く輝きます。
  */
 
+/**
+ * 2026-06-14 星野アイデア会議2「1000人超で退避強化」:
+ *   群衆描画は1スプライトあたりシルエット+ペンライト3パス(うち1つは screen 合成の広いグロー)
+ *   と重く、人数連動で renderSeats 毎に最大2048体を再描画すると大規模配信で重い。
+ *   そこで人数帯で「描画予算」を純関数で決める:
+ *     - spriteCap: 実際に描く体数。一定数を超えると視覚情報がほぼ増えない(重なる)ので
+ *       上限を段階的に抑える(密度は depth 分布で維持=満員感は落とさない)。
+ *     - glow: 最重量パス(広い screen 合成グロー)を出すか。高人数では切って軽くする。
+ *     - lightStick: ペンライト自体を描くか(極大人数ではシルエットだけ=最軽量)。
+ * これは数値モデルだけ(canvas 非依存・テスト可能)。drawCrowdOnCanvas が受け取って従う。
+ *
+ * @param {number} count 観客(匿名)概算人数
+ * @returns {{ spriteCap: number, glow: boolean, lightStick: boolean }}
+ */
+export function resolveCrowdRenderPlan(count) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  if (n <= 0) return { spriteCap: 0, glow: false, lightStick: false };
+  // ~600 までは全部+フル演出(従来の見た目を維持)。
+  if (n <= 600) return { spriteCap: n, glow: true, lightStick: true };
+  // 600〜1000: 全部描くが広いグローは切る(芯+中グローは残し雰囲気維持)。
+  if (n <= 1000) return { spriteCap: n, glow: false, lightStick: true };
+  // 1000〜2048: 体数を 1000 に抑え(重なりで見た目差は小)・グローなし。
+  if (n <= 2048) return { spriteCap: 1000, glow: false, lightStick: true };
+  // 2048 超(超大規模): シルエットのみ・体数 800 で最軽量(光の海は密度で表現)。
+  return { spriteCap: 800, glow: false, lightStick: false };
+}
+
 // 決定的乱数 (Xorshift32)
 /** @param {any} state */
 function xorshift32(state) {
@@ -43,8 +70,11 @@ const LIGHTSTICK_COLORS = [
  * @param {number} depth
  * @param {string} spriteType
  * @param {string} lightColor
+ * @param {{ glow?: boolean, lightStick?: boolean }} [detail] 描画予算(高人数で重いパスを省く)
  */
-function drawAudience(ctx, x, y, size, depth, spriteType, lightColor) {
+function drawAudience(ctx, x, y, size, depth, spriteType, lightColor, detail = {}) {
+  const wantStick = detail.lightStick !== false;
+  const wantGlow = detail.glow !== false;
   // 空気遠近法：奥 (depth ~ 0) ほど暗闇 (背景) に溶け込む
   // 手前 (depth ~ 1) は元の明るさを維持
   const alpha = 0.2 + depth * 0.8;
@@ -75,7 +105,8 @@ function drawAudience(ctx, x, y, size, depth, spriteType, lightColor) {
   }
   ctx.fill();
 
-  // 2. サイリウム（ペンライト）の描画
+  // 2. サイリウム（ペンライト）の描画(高人数では省いてシルエットのみ=最軽量)
+  if (!wantStick) return;
   // 腕の位置（ランダムな揺らぎを表現するため x, y から少しずらす）
   const stickX = x + size * 0.4;
   const stickY = y - size * 0.2;
@@ -83,7 +114,7 @@ function drawAudience(ctx, x, y, size, depth, spriteType, lightColor) {
   const stickWidth = Math.max(1.5, size * 0.15);
 
   // ペンライトの芯（白く輝く部分）
-  ctx.globalAlpha = depth * 0.9 + 0.1; 
+  ctx.globalAlpha = depth * 0.9 + 0.1;
   ctx.lineCap = 'round';
   ctx.lineWidth = stickWidth;
   ctx.strokeStyle = '#ffffff';
@@ -97,8 +128,9 @@ function drawAudience(ctx, x, y, size, depth, spriteType, lightColor) {
   ctx.lineWidth = stickWidth * 3;
   ctx.strokeStyle = lightColor;
   ctx.stroke();
-  
-  // さらに広い光彩（加算合成風にぼかす）
+
+  // さらに広い光彩（加算合成風にぼかす）= 最重量パス。高人数では省く。
+  if (!wantGlow) return;
   ctx.globalCompositeOperation = 'screen';
   ctx.globalAlpha = depth * 0.3;
   ctx.lineWidth = stickWidth * 6;
@@ -122,8 +154,11 @@ export function drawCrowdOnCanvas(canvas, count, seed = 12345) {
 
   if (count <= 0) return;
 
-  // パフォーマンス確保のため最大 2048 人（ブラウザ描画限界の安全圏）
-  const maxDraw = Math.min(count, 2048);
+  // 2026-06-14「1000人超で退避強化」: 人数帯で描画予算を決め、重い演出パスと体数を抑える。
+  const plan = resolveCrowdRenderPlan(count);
+  const maxDraw = Math.max(0, Math.min(count, plan.spriteCap));
+  if (maxDraw <= 0) return;
+  const detail = { glow: plan.glow, lightStick: plan.lightStick };
   let rngState = (seed + count) >>> 0;
 
   const positions = [];
@@ -168,6 +203,6 @@ export function drawCrowdOnCanvas(canvas, count, seed = 12345) {
 
   // 3. 描画実行
   for (const p of positions) {
-    drawAudience(ctx, p.x, p.y, p.size, p.depth, p.spriteType, p.lightColor);
+    drawAudience(ctx, p.x, p.y, p.size, p.depth, p.spriteType, p.lightColor, detail);
   }
 }

@@ -1232,6 +1232,10 @@ export function mountVenueBarButton(options = {}) {
   let speechState = { seenKeys: null, primed: false };
   let activeLiveId = '';
   let escapeListening = false;
+  // 退避強化(1000人超): 群衆 canvas は seed+人数が同じなら描画結果が同じ純粋関数なので、
+  //   観客数が変わらない限り 1.5s 毎の再描画をスキップ(重い描画を無駄打ちしない)。
+  let lastCrowdCount = -1;
+  let lastCrowdSeed = NaN;
   /** @type {VenueRow[]} */
   let baseRows = [];
   // 診断シート(メンバー一覧ボタン)用: renderSeats が最新の席割りをここに保存する。
@@ -1520,9 +1524,15 @@ export function mountVenueBarButton(options = {}) {
       crowdCanvas.classList.add('nlsb-is-visible');
       // liveId をシードとして安定描画
       const seed = Array.from(activeLiveId).reduce((hash, char) => (hash << 5) - hash + char.charCodeAt(0), 0);
-      drawCrowdOnCanvas(crowdCanvas, totalAnonymous, seed);
+      // 退避強化: 同じ人数+同じ seed なら描画結果は同一(純粋)→再描画を省いて重い canvas を温存。
+      if (totalAnonymous !== lastCrowdCount || seed !== lastCrowdSeed) {
+        drawCrowdOnCanvas(crowdCanvas, totalAnonymous, seed);
+        lastCrowdCount = totalAnonymous;
+        lastCrowdSeed = seed;
+      }
     } else {
       crowdCanvas.classList.remove('nlsb-is-visible');
+      lastCrowdCount = -1;
     }
 
     for (const node of seatNodes) {
