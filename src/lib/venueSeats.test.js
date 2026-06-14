@@ -14,6 +14,10 @@ import {
   assignVenueSeats,
   buildVenueSeating,
   hasRealThumbnail,
+  resolveVenueRegularScore,
+  selectVenueVipRegularKeys,
+  VENUE_VIP_REGULAR_SCORE_THRESHOLD,
+  VENUE_VIP_REGULAR_MAX,
   VENUE_MAX_SEATS,
   VENUE_FRONT_ROW_SEATS
 } from './venueSeats.js';
@@ -57,6 +61,105 @@ describe('buildVenueSeating promoteUserIds', () => {
     expect(r.anonymousCount).toBe(0);
     expect(r.seatByKey.has('u:a:talker')).toBe(true);
     expect(r.seatByKey.has('u:a:silent')).toBe(true);
+  });
+});
+
+describe('resolveVenueRegularScore (VIP常連光らせの素スコア)', () => {
+  it('発言0・ギフト無しは 0', () => {
+    expect(resolveVenueRegularScore({ count: 0, hasGift: false })).toBe(0);
+  });
+  it('発言数が増えるほどスコアが上がる(単調・頭打ち)', () => {
+    const a = resolveVenueRegularScore({ count: 1 });
+    const b = resolveVenueRegularScore({ count: 10 });
+    const c = resolveVenueRegularScore({ count: 40 });
+    expect(b).toBeGreaterThan(a);
+    expect(c).toBeGreaterThan(b);
+    // commentCap=40 で頭打ち=それ以上は伸びが鈍る(青天井でない)
+    const d = resolveVenueRegularScore({ count: 400 });
+    expect(d).toBeLessThanOrEqual(100);
+    expect(d - c).toBeLessThan(c - b); // 伸びは逓減
+  });
+  it('ギフトを送ると大きく加点される(同じ発言数でも光りやすい)', () => {
+    const noGift = resolveVenueRegularScore({ count: 5, hasGift: false });
+    const gift = resolveVenueRegularScore({ count: 5, hasGift: true });
+    expect(gift).toBeGreaterThan(noGift);
+    // giftFlag は 0.30 の重み=30点ぶん
+    expect(gift - noGift).toBeCloseTo(30, 0);
+  });
+  it('giftPoints があれば更に加点(任意・無くても成立)', () => {
+    const flagOnly = resolveVenueRegularScore({ count: 5, hasGift: true });
+    const withPoints = resolveVenueRegularScore({ count: 5, hasGift: true, giftPoints: 5000 });
+    expect(withPoints).toBeGreaterThan(flagOnly);
+  });
+  it('0..100 にクランプされ・不正入力は 0', () => {
+    expect(resolveVenueRegularScore(null)).toBe(0);
+    expect(resolveVenueRegularScore({ count: -5, giftPoints: -100 })).toBe(0);
+    expect(resolveVenueRegularScore({ count: 9999, hasGift: true, giftPoints: 9e9 })).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('selectVenueVipRegularKeys (光らせる席の選抜)', () => {
+  it('閾値以上のスコアの人だけを選ぶ', () => {
+    const participants = [
+      { key: 'u:regular', count: 30, hasGift: true }, // 高スコア
+      { key: 'u:quiet', count: 1, hasGift: false } // 低スコア
+    ];
+    const keys = selectVenueVipRegularKeys(participants);
+    expect(keys.has('u:regular')).toBe(true);
+    expect(keys.has('u:quiet')).toBe(false);
+  });
+  it('上限 max を超えては光らせない(特別感を保つ)', () => {
+    const participants = Array.from({ length: 20 }, (_, i) => ({
+      key: `u:${i}`,
+      count: 40,
+      hasGift: true
+    }));
+    const keys = selectVenueVipRegularKeys(participants, { max: 3 });
+    expect(keys.size).toBe(3);
+  });
+  it('スコア降順で上位が選ばれる', () => {
+    const participants = [
+      { key: 'u:low', count: 3, hasGift: false },
+      { key: 'u:high', count: 40, hasGift: true },
+      { key: 'u:mid', count: 10, hasGift: true }
+    ];
+    const keys = selectVenueVipRegularKeys(participants, { max: 2, threshold: 0 });
+    expect(keys.has('u:high')).toBe(true);
+    expect(keys.has('u:mid')).toBe(true);
+    expect(keys.has('u:low')).toBe(false);
+  });
+  it('key の無い参加者は無視・空配列で空集合', () => {
+    expect(selectVenueVipRegularKeys([]).size).toBe(0);
+    expect(selectVenueVipRegularKeys([{ count: 99, hasGift: true }]).size).toBe(0);
+  });
+  it('既定の定数が公開されている', () => {
+    expect(VENUE_VIP_REGULAR_SCORE_THRESHOLD).toBeGreaterThan(0);
+    expect(VENUE_VIP_REGULAR_MAX).toBeGreaterThan(0);
+  });
+});
+
+describe('buildVenueSeating の isVipRegular フラグ', () => {
+  it('常連・大応援の席に isVipRegular=true が付く', () => {
+    const rows = [];
+    // u:regular: 多発言+ギフトで高スコア
+    for (let i = 0; i < 30; i += 1) {
+      rows.push({ userId: 'regular', name: '常連さん', text: `c${i}`, capturedAt: i, isGift: i === 0 });
+    }
+    // u:quiet: 1回だけ
+    rows.push({ userId: 'quiet', name: '通りすがり', text: 'こんにちは', capturedAt: 100 });
+    const r = buildVenueSeating(rows, { isGenericName: isGeneric });
+    const regularSeat = r.seats.find((s) => s.participant.key === 'u:regular');
+    const quietSeat = r.seats.find((s) => s.participant.key === 'u:quiet');
+    expect(regularSeat.isVipRegular).toBe(true);
+    expect(quietSeat.isVipRegular).toBe(false);
+  });
+  it('vipRegular:false で全席 false(無効化・後方互換)', () => {
+    const rows = [];
+    for (let i = 0; i < 30; i += 1) {
+      rows.push({ userId: 'regular', name: '常連', text: `c${i}`, capturedAt: i, isGift: true });
+    }
+    const r = buildVenueSeating(rows, { isGenericName: isGeneric, vipRegular: false });
+    expect(r.seats.every((s) => s.isVipRegular === false)).toBe(true);
   });
 });
 

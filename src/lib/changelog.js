@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.731',
+    date: '2026-06-14',
+    summary: '会場モードで常連・応援者の席を金色に光らせる',
+    items: Object.freeze([
+      '会場モードで、よく発言してくれる常連さんやギフトを送ってくれた応援者の席を、やわらかい金色のオーラで光らせるようにしました。誰が会場を支えてくれているか一目で分かります',
+      '光るのは上位の人だけ（光りすぎて特別感が薄れないように人数を絞っています）。サムネの有無に関わらず、ゆっくり顔の常連さんも光ります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.730',
     date: '2026-06-14',
     summary: '会場モードに「メンバー一覧」ボタン＋窮屈表示を修正',
