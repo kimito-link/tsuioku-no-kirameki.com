@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.732',
+    date: '2026-06-14',
+    summary: '会場の照明がコメントの勢いで色温度を変える',
+    items: Object.freeze([
+      'コメントの流れが速いほど会場の照明があたたかいオレンジ色に、静かなときは落ち着いた青色になります。場の盛り上がり（熱量）が照明の色温度で伝わります',
+      '色が乗るのは下端の客席エリアだけで、配信映像の中央はこれまで通りそのまま見えます。動きを抑える設定（prefers-reduced-motion）にも配慮しています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.731',
     date: '2026-06-14',
     summary: '会場モードで常連・応援者の席を金色に光らせる',
