@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.730',
+    date: '2026-06-14',
+    summary: '会場モードに「メンバー一覧」ボタン＋窮屈表示を修正',
+    items: Object.freeze([
+      '会場モードのヘッダーに「👥 一覧」ボタンを追加しました。今この会場に誰がいるか（名前・サムネの有無・表示中か）を一覧で確認できます',
+      'たくさんの人が並ぶときに会場が逆に窮屈になっていた表示の不具合を直しました（ひな壇の段組みが正しく広がるように）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.729',
     date: '2026-06-14',
     summary: '会場モード: サムネ優遇・領域拡大・ドラッグ移動',
