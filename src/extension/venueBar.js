@@ -63,6 +63,9 @@ const VENUE_LAYOUT_CLASSES = [
   'nlsb-mode-packed'
 ];
 
+/** ひな壇の段 DOM を用意する数。buildVenueTiers の最大段数(8)に一致させること。 */
+const VENUE_MAX_TIER_NODES = 8;
+
 /** @typedef {ReturnType<typeof venueRowsFromUserLaneCandidates>[number]} VenueRow */
 
 const VENUE_CSS = `
@@ -935,7 +938,9 @@ export function mountVenueBarButton(options = {}) {
   seatsHost.className = 'nlsb-seats nlsb-mode-empty';
   /** @type {HTMLDivElement[]} */
   const tierNodes = [];
-  for (let i = 0; i < 5; i += 1) {
+  // 2026-06-14 修正: buildVenueTiers の最大段数(8)ぶん tierNode を用意する。
+  //   以前は5個固定で、純関数を8段にしても6〜8段目が描画されず5段に詰め込まれて窮屈だった。
+  for (let i = 0; i < VENUE_MAX_TIER_NODES; i += 1) {
     const tier = document.createElement('div');
     tier.className = 'nlsb-tier';
     tier.dataset.tierIndex = String(i);
