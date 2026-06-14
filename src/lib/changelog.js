@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.726',
+    date: '2026-06-14',
+    summary: '会場モードの読み上げが始まらない問題を修正',
+    items: Object.freeze([
+      '会場モード(配信ページ下の会場バー)で読み上げボタンを押しても「VOICEVOXが見つかりません」と出て読み上げが始まらないことがある問題を直しました。VOICEVOXは起動しているのに、配信ページからの接続確認が一瞬で打ち切られて失敗していたのが原因です。接続確認の待ち時間を延ばし、初回失敗時に自動でもう一度試すようにしました(コメビュ別窓は元々問題ありませんでした)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.725',
     date: '2026-06-14',
     summary: '会場モードでサムネ付きの人を前列に・匿名は後列へ',
