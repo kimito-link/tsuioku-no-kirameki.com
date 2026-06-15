@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.749',
+    date: '2026-06-15',
+    summary: '若い配信の過去ログが途中で諦めて止まる不具合を改善',
+    items: Object.freeze([
+      '始まったばかりの配信などで、序盤にコメントの無い時間が続くと、その先にコメントがあっても過去ログの取得を途中で諦めて止まってしまうことがあったのを改善しました。序盤の空白を跨いで、しっかり遡って一挙取得できるようになります',
+      '本当にコメントの無い配信は今まで通り数秒で見切るので、待たされません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.748',
     date: '2026-06-15',
     summary: '3キャラを配信画面のまわりに移動＋コメント反映を速く',

@@ -702,6 +702,56 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('reached_start');
   });
 
+  it('若い配信の序盤が空区画で 20 連続続いても、cold 予算内なら跨いで取り切る（backward_exhausted で諦めない・実機「598件残して止まる」根治）', async () => {
+    // ⛔ 真因（実機 2026-06-15・あやりん配信 17%=124/727 で「過去ログは今は遡れませんでした
+    //   (backward_exhausted・残り約598件)」）: 若い配信は序盤に「コメントの無い空区画」が連続
+    //   しがち。旧 COLD_RETRY_MAX=12（everMadeProgress=false の予算）では、序盤の空区画が
+    //   12 連続を超えると、その先に本物のコメントがあっても届く前に backward_exhausted で諦め、
+    //   598 件を残して止まっていた。
+    //   修正: cold 予算を空区画の典型長を跨げる値に引き上げる。これは「12 連続では届かず・
+    //   引き上げ後なら届く」ことを担保するため、20 連続の『空区画(vpos 無し=進めない)』を置く。
+    const PROGRAM_START = 1000;
+    const NOW_SEC = 100_000;
+    const SEED = NOW_SEC - NDGR_BACKFILL_SEED_LAG_SEC;
+    const BK_TAIL = 'https://mpn.live.nicovideo.jp/data/backward/v4/YOUNG_TAIL';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(NOW_SEC));
+    // 初回 seed の入口は空区画（vpos 無し=一度も前進できない＝everMadeProgress=false のまま）。
+    map.set(atUrl(SEED), viewEntryBytes({ backwardUri: `${BK_TAIL}_seed` }));
+    map.set(`${BK_TAIL}_seed`, packedSegmentBytes([{ no: 99, content: '【運営】', name: 'sys' }]));
+    // 再シードを 20 連続で空区画（vpos 無し）にする。旧 COLD=12 ならここで backward_exhausted。
+    let at = SEED - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+    for (let k = 0; k < 20; k += 1) {
+      const uri = `${BK_TAIL}_empty_${at}`;
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
+      map.set(uri, packedSegmentBytes([{ no: 100 + k, content: '【運営】', name: 'sys' }])); // vpos 無し
+      at -= NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+    }
+    // 21 個目の再シードで、ようやく本物のコメント(vpos あり)に届く＝ここから前進できる。
+    map.set(atUrl(at), viewEntryBytes({ backwardUri: `${BK_TAIL}_data` }));
+    map.set(
+      `${BK_TAIL}_data`,
+      packedSegmentBytes([{ no: 7, content: 'やっとコメント', name: 'u', vpos: 5000 }])
+    );
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => NOW_SEC * 1000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 20 連続の空区画を跨いで本物のコメント(no=7)に届く＝598件を残して諦めない。
+    expect(chatsAll.map((c) => c.no)).toContain(7);
+    expect(result.stopReason).not.toBe('backward_exhausted');
+  });
+
   it('再シードで入口が見つからなくても vpos が序盤まで程遠いなら reached_start にしない（v0.1.430・32%停止の主因）', async () => {
     // ⛔ 高速・大量配信で 32% 等で止まる主因: 再シード時刻が区画の隙間に落ち「入口が見つからない」
     //   ＝旧実装は即 reached_start としていたが、まだ vpos=60000(=600秒地点)で序盤まで程遠い。
