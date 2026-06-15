@@ -830,6 +830,20 @@ export async function* crawlNdgrBackward(opts) {
      *   chat 配列を chainLooksLikeStreamStart に渡せるようにする。再シードのたびにリセット（1 区画ぶん）。
      */
     const chainChats = [];
+    // v0.1.759「一気取得をパイプライン化」: 内側 backward チェーンは next.uri が現区画の復号バイト内に
+    //   ある連結リストなので「同一チェーンを N 本並列 fetch」は不可能(N+1 の URI は N を取得+復号する
+    //   まで分からない)。だが【1区画だけ先読み】はできる: ある区画を復号して nextUri が分かったら、
+    //   その区画を consumer に yield する【前】に nextUri の fetch を起動(await しない)しておく。
+    //   すると次区画の gap(15ms)+RTT が、consumer 側の persist/scheduler.yield(content-entry の
+    //   flushPendingBackfillRows/saveBackfillResume/backfillYieldToPage=区画あたり数十〜100ms)と
+    //   【重なって】消える。直列だと fetch→decode→yield(persist)→sleep→fetch…と毎区画 RTT+gap が
+    //   むき出しだったのが、先読みで「次の fetch は consumer 処理中に進む」=「ローディング無しで一気」
+    //   体感に近づく。レートは変えない(gap/backoff そのまま=429 リスク不変)・取りこぼし無し(同じ区画を
+    //   同じ順で辿る・visited/cap/abort は consume 直前に必ず再チェック)。
+    /** @type {Promise<{ bytes: Uint8Array|null, rateLimited: boolean }>|null} 次区画の先読み fetch。 */
+    let prefetch = null;
+    /** @type {string} 先読み中の URI(consume 直前の visited/重複チェック用)。 */
+    let prefetchUri = '';
     for (;;) {
       if (isAborted(signal)) return done('aborted');
       if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
@@ -838,7 +852,14 @@ export async function* crawlNdgrBackward(opts) {
       if (visited.has(backwardUri)) break; // この区画は辿り終えた
       visited.add(backwardUri);
 
-      const bwRes = await fetchWithThrottle(ctx, backwardUri, false);
+      // 先読み済みなら await して受け取る。未先読み(チェーン先頭)なら cold fetch。
+      //   先読みは backwardUri と同じ URI を辿る約束なので、prefetchUri 不一致時のみ cold へ退避。
+      const bwRes =
+        prefetch && prefetchUri === backwardUri
+          ? await prefetch
+          : await fetchWithThrottle(ctx, backwardUri, false);
+      prefetch = null;
+      prefetchUri = '';
       if (bwRes.rateLimited) return done('rate_limited');
       if (!bwRes.bytes || bwRes.bytes.length === 0) break; // この区画終わり
       bytesFetched += bwRes.bytes.length;
@@ -849,6 +870,25 @@ export async function* crawlNdgrBackward(opts) {
       const chats = [];
       for (const r of results) {
         if (r && Array.isArray(r.chats) && r.chats.length) chats.push(...r.chats);
+      }
+
+      // ⚡ 先読み起動: 次区画の URI が分かり、まだ辿っていない区画で、かつ「この区画を yield しても
+      //   どの cap にも掛からず次へ進む」ことが確定しているときだけ、yield(consumer の persist)前に
+      //   fetch を起動しておく(await しない)。gap+RTT を consumer 処理と重ねるのが pipeline の肝。
+      //   ⚠️cap_rows は yield 後に rowsSeen で判定されるので、ここで「この区画ぶんを足すと rows cap に
+      //   達するか」を先回りで見て、達するなら先読みしない(=停止する区画の次を無駄 fetch しない。
+      //   既存テスト『rows cap で止まったら次区画を取りに行かない』を守る)。終端(next=N)/visited も対象外。
+      const willStopOnRows = rowsSeen + chats.length >= caps.rows;
+      if (
+        nextUri &&
+        !visited.has(nextUri) &&
+        !isAborted(signal) &&
+        bytesFetched < caps.bytes &&
+        segmentsFetched < caps.segments &&
+        !willStopOnRows
+      ) {
+        prefetchUri = nextUri;
+        prefetch = fetchWithThrottle(ctx, nextUri, false);
       }
 
       if (chats.length) {
