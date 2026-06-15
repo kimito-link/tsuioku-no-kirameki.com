@@ -67,18 +67,41 @@ describe('buildTimelineRowHtml', () => {
     expect(html).toContain('referrerpolicy="no-referrer"');
   });
 
-  it('アバターなしギフト行は default が無ければ🎁アイコンのみ', () => {
+  it('v0.1.655: アバターなし匿名は userId から identicon を出す(りんく/🎁にしない)', () => {
     const html = buildTimelineRowHtml(gItem({ userId: 'a:x', avatarUrl: '' }));
-    expect(html).toContain('nl-tl-gift__icon');
-    expect(html).not.toContain('nl-tl-gift__avatar');
+    expect(html).toContain('nl-tl-gift__avatar');
+    expect(html).toContain('data:image/svg+xml'); // identicon data URL
+    expect(html).toContain('data-nl-anonymous-avatar-key="a:x"');
   });
 
-  it('アバターなしでも defaultAvatar 指定時はそれを使う', () => {
-    const html = buildTimelineRowHtml(gItem({ userId: 'a:x', avatarUrl: '' }), {
+  it('v0.1.655: コメント行も匿名は identicon(りんくにしない)', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', avatarUrl: '' }));
+    expect(html).toContain('nl-tl-row__avatar');
+    expect(html).toContain('data:image/svg+xml');
+    expect(html).toContain('data-nl-anonymous-avatar-key="a:x"');
+  });
+
+  it('v0.1.655: userId が違えば identicon も違う(見分けられる)', () => {
+    const a = buildTimelineRowHtml(cItem({ userId: 'a:aaa', avatarUrl: '' }));
+    const b = buildTimelineRowHtml(cItem({ userId: 'a:bbb', avatarUrl: '' }));
+    const srcA = a.match(/src="([^"]+)"/)?.[1];
+    const srcB = b.match(/src="([^"]+)"/)?.[1];
+    expect(srcA).toBeTruthy();
+    expect(srcA).not.toBe(srcB);
+  });
+
+  it('v0.1.655: userId も無いときだけ defaultAvatar にフォールバック', () => {
+    const html = buildTimelineRowHtml(gItem({ userId: '', avatarUrl: '' }), {
       defaultAvatar: '/img/tile.png'
     });
-    expect(html).toContain('nl-tl-gift__avatar');
     expect(html).toContain('src="/img/tile.png"');
+  });
+
+  it('記名アバター(avatarUrl)があればそれを優先(identiconにしない)', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', avatarUrl: 'https://x/y.jpg' }));
+    expect(html).toContain('src="https://x/y.jpg"');
+    expect(html).not.toContain('data:image/svg+xml');
+    expect(html).not.toContain('data-nl-anonymous-avatar-key');
   });
 
   it('XSS: テキスト・名前をエスケープ', () => {
@@ -147,5 +170,46 @@ describe('相対時刻（now 渡し・v0.1.341）', () => {
       { now }
     );
     expect(html).toContain('1分前');
+  });
+});
+
+describe('v0.1.671: 表示名をコメビュと統一(匿名は固定番号)', () => {
+  it('名前なし匿名(a:…)は 匿名NNN を表示する(名無しでなく)', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', nickname: '' }));
+    expect(html).toMatch(/匿名\d{1,3}/);
+    expect(html).not.toContain('名無し');
+  });
+  it('汎用名「匿名」も uid があれば固定番号を優先する', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', nickname: '匿名' }));
+    expect(html).toMatch(/匿名\d{1,3}/);
+  });
+  it('個人名はそのまま', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', nickname: 'たろう' }));
+    expect(html).toContain('たろう');
+  });
+  it('uid も名前も無ければ従来どおり 名無し', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: '', nickname: '' }));
+    expect(html).toContain('名無し');
+  });
+});
+
+describe('v0.1.674: 行クリック用のユーザー詳細データ属性', () => {
+  it('uid 付きコメント行(匿名含む)に data-nl-uid / data-nl-uname が付く', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: 'a:x', nickname: '' }));
+    expect(html).toContain('data-nl-uid="a:x"');
+    expect(html).toMatch(/data-nl-uname="匿名\d{1,3}"/);
+  });
+  it('記名 uid のリンク行にも付く(クリックは詳細を優先する側で制御)', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: '4046119', nickname: 'たろう' }));
+    expect(html).toContain('data-nl-uid="4046119"');
+    expect(html).toContain('data-nl-uname="たろう"');
+  });
+  it('uid 無し行には付かない', () => {
+    const html = buildTimelineRowHtml(cItem({ userId: '', nickname: '' }));
+    expect(html).not.toContain('data-nl-uid');
+  });
+  it('ギフト行にも付く', () => {
+    const html = buildTimelineRowHtml(gItem({ userId: 'a:g', nickname: '' }));
+    expect(html).toContain('data-nl-uid="a:g"');
   });
 });

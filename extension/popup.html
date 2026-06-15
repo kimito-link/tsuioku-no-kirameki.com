@@ -329,6 +329,17 @@
         box-shadow: none;
       }
 
+      /*
+       * スクロールコンテナ自身に不透明背景を持たせる（白フラッシュ対策）。
+       * .nl-main は overflow:auto + -webkit-overflow-scrolling:touch でブラウザに
+       * 合成レイヤー昇格されることがあり、高速/慣性スクロールで未ペイントのタイルが
+       * 一瞬「白（下地）」として透ける。body のグラデは .nl-main には乗らないため、
+       * コンテナ側に var(--nl-bg) を敷いて白抜けを防ぐ（inline / action popup 両形態）。
+       */
+      body .nl-main {
+        background: var(--nl-bg);
+      }
+
       html.nl-inline body .nl-main {
         flex: 1 1 auto;
         min-height: 0;
@@ -1421,10 +1432,17 @@
         overscroll-behavior: contain;
       }
 
+      /* v0.1.648: スクロールで白くなる(白化)の根治。
+         旧: 北極星レーン群(.nl-north-star-lanes 親)と各レーン(.nl-north-star-lane)にも
+             content-visibility:auto をかけていたが、レーンはコメント数で高さが伸縮するため
+             contain-intrinsic-size:240px のプレースホルダと実高さがズレ、スクロールで画面内に
+             戻る瞬間に実描画が間に合わず「白い隙間」が露出していた(大量コメント配信で顕著・
+             ユーザー実機 18300件で再現)。親+各レーンの二重指定はネストして白化を悪化させる。
+         新: レーンは6個程度で描画スキップの利得が小さい一方、白化リスクが大きいので
+             content-visibility を外して常時描画にする(白化が構造的に起きなくなる)。
+             単発で重い .nl-stats / .nl-support-visual-details は従来どおり省略を残す。 */
       .nl-stats,
-      .nl-support-visual-details,
-      .nl-north-star-lanes,
-      .nl-north-star-lane {
+      .nl-support-visual-details {
         content-visibility: auto;
         contain-intrinsic-size: auto 240px;
       }
@@ -4873,17 +4891,23 @@
       .nl-north-star-lane__body[data-lane-state="no_program_gift"]:empty::after {
         content: "(ギフト 0 件)";
       }
+      /* v0.1.656: ローディング文言の全廃(ユーザー実機指摘「API叩けば見れるのに取得待ち・
+         こんなの指定してない」)。iframe_unrendered(=koken/nicoad 公式API直叩きで取れるはず)と
+         not_yet(起動直後)の「取得待ち/取得中…」は、データが来れば各 refresh が描画する=
+         待たせる文言を出さず空のまま(レーンは hide 経路で畳まれる)。空文字 content で ::after を
+         無効化する。データの「無い理由」を伝える文言(未取得/イベント不参加/ギフト0件)は状態説明
+         として残すが、iframe_unrendered は「取れるはずなのに待ち」=誤情報なので消す。 */
       .nl-north-star-lane__body[data-lane-state="iframe_unrendered"]:empty::after {
-        content: "(取得待ち: 公式の一覧がまだ開いていません)";
+        content: "";
       }
       .nl-north-star-lane__body[data-lane-state="event_present_unscrapable"]:empty::after {
         content: "イベント参加中（公式の順位・スコアは取得できていません）";
       }
       .nl-north-star-lane__body[data-lane-state="fetch_error"]:empty::after {
-        content: "(取得エラー)";
+        content: "";
       }
       .nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after {
-        content: "(取得中…)";
+        content: "";
       }
 
       .nl-north-star-lane__body[data-lane-state="not_yet"]:empty::after,
@@ -5922,6 +5946,13 @@
         text-decoration: none;
       }
       a.nl-tl-row:hover {
+        background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
+      }
+      /* v0.1.674: uid を持つ行はクリックでユーザー詳細(名前付け/メモ/発言一覧)が開ける。 */
+      #supportTimelineBody [data-nl-uid] {
+        cursor: pointer;
+      }
+      #supportTimelineBody [data-nl-uid]:hover {
         background: color-mix(in srgb, var(--nl-accent, #0f8fd8) 8%, transparent);
       }
       .nl-tl-row__avatar {
@@ -8961,6 +8992,22 @@
         font-size: 10.4px;
       }
 
+      /* サムネ・ハンドル名をひとかたまりのリンクに(数値IDのみ)。下線なし・ホバーで色変化。 */
+      .room-card__id-link {
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+      }
+      a.room-card__id-link.room-name:hover {
+        color: var(--nl-accent, #2f80ed);
+        text-decoration: underline;
+      }
+      .room-card__id-link:focus-visible {
+        outline: 2px solid var(--nl-accent, #2f80ed);
+        outline-offset: 2px;
+        border-radius: 6px;
+      }
+
       .room-preview {
         color: var(--nl-muted);
         font-size: 9.4px;
@@ -10141,6 +10188,15 @@
             hidden
             aria-live="polite"
           ></div>
+          <!-- v0.1.627: 記録の内訳(通常コメ/興味来場/システム)を併記。
+               「公式 N / 記録 M」の M の出所が見えるようにユーザー納得性向上。
+               ギフト・広告は persistable で保存時点で除外済=ここには含まれない。 -->
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--breakdown"
+            id="liveStatCommentsBreakdown"
+            hidden
+            title="ギフト・広告は別カウント(下のカード参照)"
+          ></div>
           <!-- v0.1.432: 過去ログ取り込みの状況（入口なし/途中/混雑）を記録カードの位置にも出す。
                v0.1.438: ボタン下と同じ「こん太(キャラ)+ピンク吹き出し」UI に統一（ユーザー指摘・統合性原則）。
                既存ボタン下の #backfillRinku は無変更。ここはもう一つのインスタンス（class 共有 / id は別）。
@@ -10505,10 +10561,10 @@
               ></aside>
             </div>
           </div>
-          <div class="nl-north-star-lane" data-lane="contributionRanking">
+          <div class="nl-north-star-lane" data-lane="contributionRanking" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">貢献度ランキング</p>
-              <p class="nl-north-star-lane__sublabel">公式の貢献度ランキングは niconico の koken 別アプリ側で描画され、それが開いた時だけ鏡で反映します（広告ランキングは常時取得）。</p>
+              <p class="nl-north-star-lane__sublabel">ニコニコ公式のギフト貢献度ランキング（上位）を表示します。ギフトがまだ少ない配信では空のことがあります。</p>
             </div>
             <div class="nl-north-star-lane__shell">
               <div class="nl-north-star-lane__gadget" data-nl-acq-mode="indeterminate">
@@ -10544,7 +10600,7 @@
             </div>
           </div>
           <div class="nl-north-star-gift-stack" aria-label="ギフト指標">
-            <div class="nl-north-star-lane" data-lane="giftHistory">
+            <div class="nl-north-star-lane" data-lane="giftHistory" hidden>
             <div class="nl-north-star-lane__heading nl-north-star-lane__heading--with-pt">
               <p class="nl-north-star-lane__label">この番組へのギフト履歴<span
                   class="nl-north-star-lane__program-pt is-placeholder"
@@ -10618,7 +10674,7 @@
               aria-label="個別ギフト投げ一覧"
             ></div>
           </div>
-            <div class="nl-north-star-lane" data-lane="programPoints">
+            <div class="nl-north-star-lane" data-lane="programPoints" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">番組累計ポイント</p>
               <p class="nl-north-star-lane__sublabel">
@@ -10659,7 +10715,7 @@
             </div>
           </div>
           </div>
-          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="adRanking">
+          <div class="nl-north-star-lane nl-north-star-lane--full" data-lane="adRanking" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">広告ランキング</p>
               <p class="nl-north-star-lane__sublabel">ニコニ広告の貢献度ランキングです（ギフト貢献度とは別系統）。</p>
@@ -10697,7 +10753,7 @@
               ></aside>
             </div>
           </div>
-          <div class="nl-north-star-lane" data-lane="eventRank">
+          <div class="nl-north-star-lane" data-lane="eventRank" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">イベント現在順位</p>
               <p class="nl-north-star-lane__sublabel">配信者本人がイベントで何位かを表示します（公式表示が取れないときは NDGR 推定で「目安」表示）。ギフト貢献者一覧は上のレーンを参照。</p>
@@ -10735,7 +10791,7 @@
               ></aside>
             </div>
           </div>
-          <div class="nl-north-star-lane" data-lane="eventScore">
+          <div class="nl-north-star-lane" data-lane="eventScore" hidden>
             <div class="nl-north-star-lane__heading">
               <p class="nl-north-star-lane__label">イベント累計スコア</p>
               <p class="nl-north-star-lane__sublabel">イベント参加中のときだけ意味を持つ累計です。</p>
@@ -11226,6 +11282,17 @@
               </button>
               <button
                 type="button"
+                id="exportMediaKitBtn"
+                title="共有用メディアキットHTMLを保存"
+                aria-label="共有用メディアキットHTMLを保存。過去30日・60日・90日の配信実績をまとめてダウンロードします。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">📣</span>
+                  <span class="nl-compose-qbtn__word">メディアキット</span>
+                </span>
+              </button>
+              <button
+                type="button"
                 id="captureScreenshot"
                 disabled
                 title="画面を1枚保存"
@@ -11246,6 +11313,28 @@
                 <span class="nl-compose-qbtn__row">
                   <span class="nl-compose-qbtn__emoji" aria-hidden="true">↻</span>
                   <span class="nl-compose-qbtn__word">再読み込み</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                id="openComeviewBtn"
+                title="コメビュを別ウィンドウで開く（コピー・ピン留め・非表示・名前付けはこちら）"
+                aria-label="コメビュを別ウィンドウで開く。コメントのコピー・ピン留め・非表示・匿名さんへの名前付けができる専用ウィンドウです。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">💬</span>
+                  <span class="nl-compose-qbtn__word">コメビュ</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                id="openComeviewVoiceBtn"
+                title="読み上げONでコメビュを開く（VOICEVOX が必要）"
+                aria-label="コメントの読み上げをONにした状態でコメビュを別ウィンドウで開きます。読み上げには VOICEVOX が必要です。"
+              >
+                <span class="nl-compose-qbtn__row">
+                  <span class="nl-compose-qbtn__emoji" aria-hidden="true">🔊</span>
+                  <span class="nl-compose-qbtn__word">読み上げ</span>
                 </span>
               </button>
             </div>

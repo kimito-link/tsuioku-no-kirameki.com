@@ -22,6 +22,8 @@ import { isAvatarObservedInCommentProfileMap } from './popupAvatarResolver.js';
  *   avatarUrl: string,
  *   avatarObserved: boolean,
  *   liveId: string,
+ *   commentCount?: number,
+ *   giftCount?: number,
  *   _laneSortAt?: number
  * }} UserLaneCandidateFromStorage
  */
@@ -158,6 +160,15 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
 
     const lastCapturedAt = Math.max(0, ...chronological.map(rowCapturedAt));
 
+    // 会場 VIP常連光らせ(v0.1.734)用: このユーザーの実発言数とギフト回数を持たせる。
+    //   これが無いと venue 側で全員 count=1 扱いになりスコアが閾値に届かず誰も光らない。
+    const commentCount = chronological.length;
+    let giftCount = 0;
+    for (const g of chronological) {
+      const gg = /** @type {{ isGift?: unknown, gift?: unknown, kind?: unknown }} */ (g);
+      if (gg.isGift === true || gg.gift != null || gg.kind === 'gift') giftCount += 1;
+    }
+
     const outLiveId = useLidForOutput
       ? lidNorm
       : rowLiveId(newestFirst[0] || chronological[chronological.length - 1] || {});
@@ -168,6 +179,8 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
       avatarUrl,
       avatarObserved: observed,
       liveId: outLiveId,
+      commentCount,
+      giftCount,
       _laneSortAt: lastCapturedAt
     });
   }
@@ -181,7 +194,10 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
         nickname: row.nickname,
         avatarUrl: row.avatarUrl,
         avatarObserved: row.avatarObserved,
-        liveId: row.liveId
+        liveId: row.liveId,
+        commentCount: row.commentCount,
+        giftCount: row.giftCount,
+        _laneSortAt: row._laneSortAt
       })
     )
   );

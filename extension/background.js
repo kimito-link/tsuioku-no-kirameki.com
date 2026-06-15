@@ -6,6 +6,8 @@
  */
 
 // @ts-nocheck — service worker; Chrome API と動的インデックスが多く checkJs コストが高い
+// PR1-b-1: backfill SW エンジン(ビルド産物)。既存コードは無改修(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
+try { importScripts('dist/backfill-sw.js'); } catch (e) { console.warn('[NLS] backfill-sw load failed', e); } // eslint-disable-line no-undef
 
 const MATCH_PATTERNS = [
   'https://*.nicovideo.jp/*',
@@ -1435,6 +1437,192 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* 「次の上位配信へ」: ランキング巡回を手動で1歩進める。                */
+/*   status の手動ボタンから呼ばれる。autopatrol の queue/visited を    */
+/*   流用し、未訪問の lv を1つ選んで現在の watch タブを置き換える       */
+/*   （タブを増やさない）。watch タブが無ければ新規タブで開く。         */
+/* ------------------------------------------------------------------ */
+const NEXT_LIVE_REQUEST_MESSAGE_TYPE = 'NLS_NEXT_LIVE_REQUEST';
+
+/** queue/visited から未訪問の次 lv を1つ選ぶ（excludeLv は今いる配信）。 */
+function pickNextPatrolLvInState(st, candidates, excludeLv) {
+  const visitedSet = new Set(st.visited);
+  if (excludeLv) visitedSet.add(String(excludeLv).toLowerCase());
+  const remaining = [];
+  let chosen = null;
+  for (const lv of st.queue) {
+    if (chosen == null && !visitedSet.has(lv)) {
+      chosen = lv;
+      continue;
+    }
+    remaining.push(lv);
+  }
+  if (chosen == null) {
+    const inQueue = new Set(remaining);
+    for (const lv of candidates || []) {
+      if (visitedSet.has(lv) || inQueue.has(lv)) continue;
+      if (chosen == null) {
+        chosen = lv;
+      } else {
+        remaining.push(lv);
+        inQueue.add(lv);
+      }
+    }
+  }
+  st.queue = remaining.slice(0, AUTOPATROL_QUEUE_MAX);
+  if (chosen) {
+    st.visited = st.visited.concat([chosen]).slice(-AUTOPATROL_VISITED_MAX);
+  }
+  return chosen;
+}
+
+async function handleNextLiveRequest() {
+  const st = await loadAutopatrolState();
+  // queue が薄ければ公開ランキングから補充（叩きすぎガード付き）。
+  let candidates = [];
+  const now = Date.now();
+  if (
+    st.queue.length < AUTOPATROL_QUEUE_MIN &&
+    now - (st.lastDiscoverAt || 0) >= AUTOPATROL_DISCOVER_MIN_INTERVAL_MS
+  ) {
+    st.lastDiscoverAt = now;
+    candidates = await discoverOnairLvIds();
+  }
+  // 今いる watch タブ（あれば）を取得。
+  let watchTab = null;
+  try {
+    const tabs = await chrome.tabs.query({
+      url: ['https://live.nicovideo.jp/watch/*', 'https://sp.live.nicovideo.jp/watch/*']
+    });
+    watchTab = Array.isArray(tabs) && tabs.length ? tabs[0] : null;
+  } catch {
+    /* tabs 取得失敗時は新規タブにフォールバック */
+  }
+  const curMatch = String(watchTab?.url || '').match(/\/watch\/(lv\d{5,12})/);
+  const excludeLv = curMatch ? curMatch[1].toLowerCase() : null;
+
+  const lv = pickNextPatrolLvInState(st, candidates, excludeLv);
+  st.updatedAt = now;
+  await saveAutopatrolState(st);
+
+  if (!lv) {
+    return { ok: false, reason: 'no_more_lives' };
+  }
+  const url = AUTOPATROL_WATCH_BASE + lv;
+  try {
+    if (watchTab && watchTab.id != null) {
+      await chrome.tabs.update(watchTab.id, { url, active: true });
+    } else {
+      await chrome.tabs.create({ url, active: true });
+    }
+    return { ok: true, lv };
+  } catch (err) {
+    return { ok: false, reason: 'navigate_failed', error: String(err && err.message) };
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== NEXT_LIVE_REQUEST_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port closed */
+    }
+  };
+  handleNextLiveRequest()
+    .then(reply)
+    .catch((err) => reply({ ok: false, reason: 'internal', error: String(err && err.message) }));
+  return true; // 非同期 sendResponse
+});
+
+/* ------------------------------------------------------------------ */
+/* v0.1.716: 会場モード(content script)から「コメビュを開く」要求を受けて、SW が  */
+/*   comeview.html を別ウィンドウ popup で開く。content script は chrome.windows を  */
+/*   直接呼べない(会議 Codex 指摘)ので SW 経由。status.html の btnComeview と同型。 */
+/*   ?lv= を付けて配信を固定(comeview 側は無指定なら nls_last_watch_url で自己解決)。*/
+/* ------------------------------------------------------------------ */
+const OPEN_COMEVIEW_MESSAGE_TYPE = 'NLS_OPEN_COMEVIEW';
+const COMEVIEW_LV_RE = /^lv\d{1,15}$/;
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== OPEN_COMEVIEW_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  const reply = (v) => {
+    try {
+      sendResponse(v);
+    } catch {
+      /* port closed */
+    }
+  };
+  // lv は content から渡る生値。固定リテラル path に正規化済み lv だけ載せる(injection 面遮断)。
+  const lv = COMEVIEW_LV_RE.test(String(msg.liveId || '')) ? String(msg.liveId) : '';
+  const base = chrome.runtime.getURL('comeview.html');
+  const url = lv ? `${base}?lv=${lv}` : base;
+  (async () => {
+    try {
+      await chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
+      reply({ ok: true });
+    } catch (err) {
+      reply({ ok: false, error: String(err && err.message) });
+    }
+  })();
+  return true; // 非同期 sendResponse
+});
+
+const OPEN_VENUE_MESSAGE_TYPE = 'NLS_OPEN_VENUE';
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== OPEN_VENUE_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  const reply = (v) => {
+    try {
+      sendResponse(v);
+    } catch {
+      /* port closed */
+    }
+  };
+  const lv = COMEVIEW_LV_RE.test(String(msg.liveId || '')) ? String(msg.liveId) : '';
+  const base = chrome.runtime.getURL('venue.html');
+  const url = lv ? `${base}?lv=${lv}` : base;
+  (async () => {
+    try {
+      // 映像セーフエリア＋ひな壇を確保するため、少し広めのウィンドウで開く
+      await chrome.windows.create({ url, type: 'popup', width: 1000, height: 720 });
+      reply({ ok: true });
+    } catch (err) {
+      reply({ ok: false, error: String(err && err.message) });
+    }
+  })();
+  return true; // 非同期 sendResponse
+});
+
+/* ------------------------------------------------------------------ */
 /* nicoad（ニコニ広告）貢献度ランキング 無認証 API の CORS バイパス fetch proxy   */
 /* koken と同型。広告ランキングは従来 HTML scrape で取得していたが DOM に uid が   */
 /* 出ず、記名広告主のアカウントリンク/アバターが付かなかった。本 API は記名行に    */
@@ -2227,6 +2415,84 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* 配信者の評判チェック: Google サジェスト取得の CORS バイパス fetch proxy        */
+/* (PR R2・[[reference_broadcaster_reputation_check_from_dns_osint]])           */
+/* suggestqueries.google.com は CORS フリーで JSON を返すが、content/popup から  */
+/* の直 fetch は将来の CSP/CORS 変更に弱い → host_permissions 特権の SW で取得。  */
+/* content/popup は query(文字列)だけ送り、URL は SW が固定 host/path から自作    */
+/* (SSRF面遮断)。契約・正規化は src/lib/googleSuggest.js（lib 側に契約 test）。   */
+/* 取得結果のネガ判定は src/lib/broadcasterReputationKeywords.js（呼び出し側）。 */
+/* ------------------------------------------------------------------ */
+
+// src/lib/googleSuggest.js の GOOGLE_SUGGEST_FETCH_MESSAGE_TYPE / 定数と文字列同期
+// （background は ESM import 不可の手書き成果物。lib 側に契約 test）。
+const GOOGLE_SUGGEST_FETCH_MESSAGE_TYPE = 'NLS_GOOGLE_SUGGEST_FETCH';
+const GOOGLE_SUGGEST_MAX_QUERY_LEN = 100;
+const GOOGLE_SUGGEST_FETCH_TIMEOUT_MS = 6000;
+
+async function fetchGoogleSuggestJson(query) {
+  const q = String(query == null ? '' : query).trim();
+  if (q.length < 1 || q.length > GOOGLE_SUGGEST_MAX_QUERY_LEN) return { ok: false };
+  // 固定 host/path + encodeURIComponent でクエリだけ可変（SSRF面遮断）
+  const url =
+    'https://suggestqueries.google.com/complete/search?client=firefox&hl=ja&q=' +
+    encodeURIComponent(q);
+  const ac = new AbortController();
+  const timer = setTimeout(() => {
+    try {
+      ac.abort();
+    } catch {
+      /* no-op */
+    }
+  }, GOOGLE_SUGGEST_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'omit', // 認証不要の公開サジェスト。cookie を送らない
+      cache: 'no-store',
+      signal: ac.signal
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
+    return { ok: res.ok, status: res.status, json };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== GOOGLE_SUGGEST_FETCH_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try {
+      sendResponse({ ok: false });
+    } catch {
+      /* no-op */
+    }
+    return false;
+  }
+  let answered = false;
+  const reply = (v) => {
+    if (answered) return;
+    answered = true;
+    try {
+      sendResponse(v);
+    } catch {
+      /* port already closed: best-effort */
+    }
+  };
+  fetchGoogleSuggestJson(msg.query)
+    .then(reply)
+    .catch(() => reply({ ok: false }));
+  return true; // 非同期 sendResponse のため message channel を保持
+});
+
+/* ------------------------------------------------------------------ */
 /* ツールバー: ページ内インラインがあれば前面化、なければ popup 窓（src/lib/uiUxOpenStrategy と整合） */
 /* ------------------------------------------------------------------ */
 
@@ -2276,7 +2542,15 @@ async function closeAllOurExtensionPopupWindows() {
       for (const t of tabs) {
         const u = String(t?.pendingUrl || t?.url || '');
         if (u.startsWith(extPrefix)) {
-          ours = true;
+          const base = u.split('?')[0].split('#')[0];
+          // 独立ウィンドウ(venue/comeview/status)は孤児掃除から保護する。
+          const isStandalone = 
+            base === chrome.runtime.getURL('venue.html') ||
+            base === chrome.runtime.getURL('comeview.html') ||
+            base === chrome.runtime.getURL('status.html');
+          if (!isStandalone) {
+            ours = true;
+          }
           break;
         }
       }
@@ -2318,6 +2592,7 @@ async function focusOurExtensionPopupOrCleanupOrphans() {
       const tabs = w.tabs || [];
       let hostsPopupHtml = false;
       let hostsOurExt = false;
+      let hostsStandalone = false;
       for (const t of tabs) {
         const u = String(t?.pendingUrl || t?.url || '');
         if (!u.startsWith(extPrefix)) continue;
@@ -2328,8 +2603,18 @@ async function focusOurExtensionPopupOrCleanupOrphans() {
           hostsPopupHtml = true;
           break;
         }
+        const isStandalone = 
+          base === chrome.runtime.getURL('venue.html') ||
+          base === chrome.runtime.getURL('comeview.html') ||
+          base === chrome.runtime.getURL('status.html');
+        if (isStandalone) {
+          hostsStandalone = true;
+          break;
+        }
       }
       if (!hostsOurExt) continue;
+      // 独立ウィンドウはシングルトン管理の対象外として無視(閉じない/updateしない)
+      if (hostsStandalone) continue;
       if (hostsPopupHtml && !reused) {
         // 正常な popup を 1 つだけ再利用（複数あれば 2 つ目以降は孤児扱いで掃除）
         try {
@@ -2627,9 +2912,10 @@ async function handleBrowserActionClick(tab) {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
   if (msg.type === 'NLS_FOCUS_INLINE_PANEL_FROM_POPUP') {
+    if (!sender || sender.id !== chrome.runtime.id) return undefined;
     void (async () => {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -2754,3 +3040,46 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   void doDevReloadGo();
   return undefined;
 });
+
+// v0.1.723: Proxy fetch for VOICEVOX to bypass CSP/mixed-content in content scripts
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== 'NLS_FETCH_PROXY') return undefined;
+  // セキュリティ: 自拡張のみ許可(他の onMessage handler と同じガード)
+  if (!sender || sender.id !== chrome.runtime.id) return undefined;
+  // SSRF 防止: VOICEVOX ローカルホスト(host_permissions に列挙済み)のみ通す
+  let targetUrl;
+  try {
+    targetUrl = new URL(String(msg.url || ''));
+  } catch {
+    sendResponse({ error: 'Invalid URL' });
+    return true;
+  }
+  const allowed =
+    (targetUrl.hostname === '127.0.0.1' && targetUrl.port === '50021') ||
+    (targetUrl.hostname === '127.0.0.1' && targetUrl.port === '3456') ||
+    (targetUrl.hostname === 'localhost' && targetUrl.port === '3456');
+  if (!allowed) {
+    sendResponse({ error: 'URL not allowed' });
+    return true;
+  }
+  fetch(msg.url, msg.init)
+    .then(res => {
+      if (msg.wantBuffer) {
+        return res.arrayBuffer().then(buf => ({
+          ok: res.ok,
+          status: res.status,
+          buffer: Array.from(new Uint8Array(buf))
+        }));
+      } else {
+        return res.text().then(text => ({
+          ok: res.ok,
+          status: res.status,
+          text
+        }));
+      }
+    })
+    .then(data => sendResponse(data))
+    .catch(err => sendResponse({ error: err.message }));
+  return true; // async
+});
+

@@ -2271,7 +2271,15 @@ function formatShortClock(ms) {
  * @param {import('./audienceEngagementGap.js').AudienceEngagementGap} gap
  */
 function resolveCommentParticipation(r, gap) {
-  const uniqueCommenters = Math.max(gap?.uniqueCommenters ?? 0, r?.uniqueUsers ?? 0);
+  // 「コメントした人」のユニーク数は gap.uniqueCommenters(userId ベース・匿名 a:hash 含む)を
+  //   正本にする。以前は Math.max(gap, r.uniqueUsers) だったが、
+  //   - gap が匿名を全除外していたため過小(数人)→ サマリ(Math.max で r 側=数十人)と文章
+  //     (gap 側=数人)が矛盾していた。
+  //   - r.uniqueUsers は userId 空を `anon:commentNo` で別人カウントするため過大になりうる。
+  //   匿名除外を解消した gap.uniqueCommenters を単一の正本にして、サマリと文章を一致させる。
+  //   gap が無い場合のみ r.uniqueUsers にフォールバック。
+  const uniqueCommenters =
+    typeof gap?.uniqueCommenters === 'number' ? gap.uniqueCommenters : r?.uniqueUsers ?? 0;
   const totalVisitors = gap?.totalVisitors ?? 0;
   const commentParticipationPct =
     totalVisitors > 0 ? computeCommentParticipationPct(uniqueCommenters, totalVisitors) : 0;
@@ -5484,11 +5492,20 @@ ${commonTable}
 
 /**
  * 興味タグ別来場（公式 generalSystemMessage）。
+ *
+ * v0.1.627: 興味タグ来場が 0件のときも痕跡を残す(ユーザーが「機能の有無」を確認できる)。
+ * messageCount > 0 のときは従来通り詳細セクション。0件のときは簡素な notice を返す。
+ *
  * @param {MarketingReport} r
  */
-function sectionInterestArrival(r) {
+export function sectionInterestArrival(r) {
   const summary = r.interestArrivalSummary;
-  if (!summary || summary.messageCount <= 0) return '';
+  if (!summary || summary.messageCount <= 0) {
+    return `<section class="mkt-section mkt-section--interest-arrival mkt-section--empty" id="mkt-interest-arrival" aria-label="興味タグ別来場（検出 0件）">
+      <h2>興味タグ別来場</h2>
+      <p class="mkt-section__note">この配信では「○○が好きなN人が来場しました」の通知が検出されませんでした(0件)。配信ジャンルやニコ生側のシステムメッセージ配信状況により出ない配信もあります。</p>
+    </section>`;
+  }
 
   const stats = [
     {

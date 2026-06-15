@@ -148,6 +148,8 @@ export function pickSupportGrowthTileWithOptionalIdenticon(
     const data = String(identiconOpts.anonymousIdenticonDataUrl || '').trim();
     if (data) return data;
   }
+  // 注: pickSupportGrowthFallbackTileSrc が数値ID→公式CDN usericon を既に導出する
+  //   (niconicoDefaultUserIconUrl)。数値IDのサムネはここで CDN URL になる。匿名のみ識別アイコン/既定。
   return pickSupportGrowthFallbackTileSrc(
     userId,
     httpCandidate,

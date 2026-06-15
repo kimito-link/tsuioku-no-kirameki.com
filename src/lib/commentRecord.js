@@ -88,10 +88,14 @@ function randomId() {
 }
 
 /**
- * @param {{ liveId: string, commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean }} p
+ * @param {{ liveId: string, commentNo?: string, text: string, userId?: string|null, nickname?: string, avatarUrl?: string|null, avatarObserved?: boolean, vpos?: number|null, accountStatus?: number|null, is184?: boolean, capturedAt?: number }} p
  */
 export function createCommentEntry(p) {
-  const capturedAt = Date.now();
+  // v0.1.697: 呼び出し元が実時刻(backfillの配信開始+vpos由来等)を持っていればそれを保存する。
+  //   従来は常に Date.now() 上書きで、過去ログが全部「保存した瞬間」の時刻になり
+  //   タイムライン/時系列表示が実時刻に並ばなかった(v0.1.411「素通し」設計の復元)。
+  const capRaw = Number(p.capturedAt);
+  const capturedAt = Number.isFinite(capRaw) && capRaw > 0 ? capRaw : Date.now();
   const text = normalizeCommentText(p.text);
   const commentNo = String(p.commentNo ?? '').trim();
   const liveId = String(p.liveId || '').trim().toLowerCase();
@@ -408,7 +412,8 @@ export function mergeNewComments(liveId, existing, incoming) {
       avatarObserved: row.avatarObserved || false,
       vpos: row.vpos,
       accountStatus: row.accountStatus,
-      is184: row.is184
+      is184: row.is184,
+      capturedAt: row.capturedAt // v0.1.697: 実時刻を素通し(無効なら entry 側で now)
     });
     added.push(entry);
     next.push(entry);
@@ -521,7 +526,8 @@ export function mergeNewCommentsIncremental(liveId, state, incoming) {
       avatarObserved: row.avatarObserved || false,
       vpos: row.vpos,
       accountStatus: row.accountStatus,
-      is184: row.is184
+      is184: row.is184,
+      capturedAt: row.capturedAt // v0.1.697: 実時刻を素通し(無効なら entry 側で now)
     });
     added.push(entry);
     if (!commentNo) {

@@ -9,6 +9,46 @@
  */
 
 import { formatRelativeTimeJa } from './supportActivityTimeline.js';
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { isGenericComeviewName } from './comeviewRows.js';
+import { comeviewAnonLabel } from './comeviewUserNotes.js';
+
+/**
+ * v0.1.671: タイムラインの表示名。コメビュと同じルールに統一する
+ *   (個人名 > 匿名IDの固定番号「匿名938」 > 従来の代替文言)。
+ *   「匿名」「名無し」等の汎用名は個人名でないので、匿名IDがあれば固定番号を優先=
+ *   同じ人を追いやすく、パネルとコメビュで呼び名が食い違わない。
+ * @param {{ nickname?: unknown, userId?: unknown }} item
+ * @returns {string}
+ */
+function timelineDisplayName(item) {
+  const nick = String(item?.nickname || '').trim();
+  if (nick && !isGenericComeviewName(nick)) return nick;
+  const anon = comeviewAnonLabel(String(item?.userId || ''));
+  if (anon) return anon;
+  return nick || '名無し';
+}
+
+/**
+ * v0.1.655: 応援タイムラインのアバター解決。記名アバター(avatarUrl)があればそれ、
+ *   無ければ userId から決定論的 identicon(幾何学模様)を生成する。これまで匿名は一律
+ *   defaultAvatar(りんく)に倒していたため「りんくだらけ」になっていた。応援者一覧と同じ
+ *   identicon にして、匿名でもユーザーごとに見分けられる(ユーザー実機要望)。userId も
+ *   無いときだけ defaultAvatar にフォールバック。
+ * @param {{ avatarUrl?: unknown, userId?: unknown }} item
+ * @param {string} defaultAvatar
+ * @returns {{ src: string, upgradeUserKey: string }}
+ */
+function resolveTimelineAvatar(item, defaultAvatar) {
+  const real = String(item?.avatarUrl || '').trim();
+  if (real) return { src: real, upgradeUserKey: '' };
+  const id = String(item?.userId || '').trim();
+  if (id) {
+    const identicon = anonymousIdenticonDataUrl(id, 64);
+    if (identicon) return { src: identicon, upgradeUserKey: id };
+  }
+  return { src: defaultAvatar, upgradeUserKey: '' };
+}
 
 /** @param {unknown} s */
 function escapeHtml(s) {
@@ -59,6 +99,12 @@ function commentTextShown(text, commentNo) {
 export function buildTimelineRowHtml(item, opts) {
   if (!item || typeof item !== 'object') return '';
   const defaultAvatar = String(opts?.defaultAvatar || '');
+  // v0.1.674: 行クリックでユーザー詳細(わんコメ式・名前付け/ラベル/メモ/発言一覧)を
+  //   ポップアップで開けるよう、uid と表示名をデータ属性で持たせる(匿名にも付けられるのが肝)。
+  const detailUid = String(item.userId || '').trim();
+  const detailAttrs = detailUid
+    ? ` data-nl-uid="${escapeAttr(detailUid)}" data-nl-uname="${escapeAttr(timelineDisplayName(item))}"`
+    : '';
   // 「いつ」の相対時刻（v0.1.341）。空（未来/不正）なら出さない。
   const agoLabel = formatRelativeTimeJa(item.at, opts?.now);
   const agoBlock = agoLabel
@@ -66,7 +112,7 @@ export function buildTimelineRowHtml(item, opts) {
     : '';
 
   if (item.kind === 'gift') {
-    const name = escapeHtml(item.nickname || '名無し');
+    const name = escapeHtml(timelineDisplayName(item));
     const itemName = escapeHtml(item.itemName || 'ギフト');
     const pt = escapeHtml(formatPoint(item.point));
     const ptBlock =
@@ -75,11 +121,14 @@ export function buildTimelineRowHtml(item, opts) {
         : '';
     // v0.1.342: 送信者アバター（あれば）に🎁バッジを重ねて「誰が」を視覚化。
     //   アバターが無い（未設定/匿名）ときは default または🎁のみ。
-    const gAv = String(item.avatarUrl || '').trim() || defaultAvatar;
-    const gAvRp = /^https?:\/\//i.test(gAv) ? ' referrerpolicy="no-referrer"' : '';
-    const avatarBlock = gAv
+    const gAvatar = resolveTimelineAvatar(item, defaultAvatar);
+    const gAvRp = /^https?:\/\//i.test(gAvatar.src) ? ' referrerpolicy="no-referrer"' : '';
+    const gAvUpgrade = gAvatar.upgradeUserKey
+      ? ` data-nl-anonymous-avatar-key="${escapeAttr(gAvatar.upgradeUserKey)}"`
+      : '';
+    const avatarBlock = gAvatar.src
       ? `<span class="nl-tl-gift__avatar-wrap">` +
-        `<img class="nl-tl-gift__avatar" src="${escapeAttr(gAv)}" alt="" decoding="async"${gAvRp} />` +
+        `<img class="nl-tl-gift__avatar" src="${escapeAttr(gAvatar.src)}" alt="" decoding="async"${gAvRp}${gAvUpgrade} />` +
         `<span class="nl-tl-gift__badge" aria-hidden="true">🎁</span>` +
         `</span>`
       : `<span class="nl-tl-gift__icon" aria-hidden="true">🎁</span>`;
@@ -90,22 +139,25 @@ export function buildTimelineRowHtml(item, opts) {
       ptBlock +
       agoBlock;
     const title = escapeAttr(
-      `${item.nickname || '名無し'} が ${item.itemName || 'ギフト'}${Number(item.point) > 0 ? `（${formatPoint(item.point)}pt）` : ''} を贈りました${agoLabel ? `（${agoLabel}）` : ''}`
+      `${timelineDisplayName(item)} が ${item.itemName || 'ギフト'}${Number(item.point) > 0 ? `（${formatPoint(item.point)}pt）` : ''} を贈りました${agoLabel ? `（${agoLabel}）` : ''}`
     );
     if (isNumericUid(item.userId)) {
       const href = `https://www.nicovideo.jp/user/${escapeAttr(item.userId)}`;
-      return `<a class="nl-tl-gift" href="${href}" target="_blank" rel="noopener noreferrer" title="${title}">${inner}</a>`;
+      return `<a class="nl-tl-gift" href="${href}" target="_blank" rel="noopener noreferrer" title="${title}"${detailAttrs}>${inner}</a>`;
     }
-    return `<div class="nl-tl-gift" title="${title}">${inner}</div>`;
+    return `<div class="nl-tl-gift" title="${title}"${detailAttrs}>${inner}</div>`;
   }
 
   // comment
-  const name = escapeHtml(item.nickname || '名無し');
+  const name = escapeHtml(timelineDisplayName(item));
   const text = escapeHtml(commentTextShown(item.text, item.commentNo));
-  const av = String(item.avatarUrl || '').trim() || defaultAvatar;
-  const avRp = /^https?:\/\//i.test(av) ? ' referrerpolicy="no-referrer"' : '';
-  const avBlock = av
-    ? `<img class="nl-tl-row__avatar" src="${escapeAttr(av)}" alt="" decoding="async"${avRp} />`
+  const avatar = resolveTimelineAvatar(item, defaultAvatar);
+  const avRp = /^https?:\/\//i.test(avatar.src) ? ' referrerpolicy="no-referrer"' : '';
+  const avUpgrade = avatar.upgradeUserKey
+    ? ` data-nl-anonymous-avatar-key="${escapeAttr(avatar.upgradeUserKey)}"`
+    : '';
+  const avBlock = avatar.src
+    ? `<img class="nl-tl-row__avatar" src="${escapeAttr(avatar.src)}" alt="" decoding="async"${avRp}${avUpgrade} />`
     : '';
   const selfCls = item.selfPosted ? ' nl-tl-row--self' : '';
   const inner =
@@ -114,13 +166,13 @@ export function buildTimelineRowHtml(item, opts) {
     `<span class="nl-tl-row__text">${text}</span>` +
     agoBlock;
   const title = escapeAttr(
-    `${item.nickname || '名無し'}：${commentTextShown(item.text, item.commentNo)}${agoLabel ? `（${agoLabel}）` : ''}`
+    `${timelineDisplayName(item)}：${commentTextShown(item.text, item.commentNo)}${agoLabel ? `（${agoLabel}）` : ''}`
   );
   if (isNumericUid(item.userId)) {
     const href = `https://www.nicovideo.jp/user/${escapeAttr(item.userId)}`;
-    return `<a class="nl-tl-row${selfCls}" href="${href}" target="_blank" rel="noopener noreferrer" title="${title}">${inner}</a>`;
+    return `<a class="nl-tl-row${selfCls}" href="${href}" target="_blank" rel="noopener noreferrer" title="${title}"${detailAttrs}>${inner}</a>`;
   }
-  return `<div class="nl-tl-row${selfCls}" title="${title}">${inner}</div>`;
+  return `<div class="nl-tl-row${selfCls}" title="${title}"${detailAttrs}>${inner}</div>`;
 }
 
 /**

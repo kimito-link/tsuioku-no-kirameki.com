@@ -24,8 +24,18 @@ export const KEY_STORAGE_WRITE_ERROR = 'nls_storage_write_error';
  */
 export const KEY_RECORDING_WATCHDOG = 'nls_recording_watchdog_v1';
 
+/** v0.1.693: 左下の記録監視オーバーレイを表示するか（既定 OFF=非表示・診断は status.html が正） */
+export const KEY_DEV_MONITOR_OVERLAY = 'nls_dev_monitor_overlay_v1';
+
 /** AI共有・不具合調査用のエラーリング（最大80件・本文はマスク済み・local only） */
 export const KEY_DIAGNOSTICS_ERROR_RING_V1 = 'nls_diagnostics_error_ring_v1';
+
+/**
+ * v0.1.725: 描画(paint)コストの軽量リングバッファ(paintPerfLog)。
+ * popup が paintWatchPopupUi の所要 ms を本番でも記録し、status/diag で「重い瞬間」を数値で読む
+ * (星野メソッド「速度はデザインの一部・中で測って外で読む」/ Karpathy「推測でなく実測」)。local only。
+ */
+export const KEY_PAINT_PERF_RING_V1 = 'nls_paint_perf_ring_v1';
 
 /**
  * 同接推定の較正データ（リングバッファ・最大2000件・local only・PII なし）。
@@ -254,6 +264,12 @@ export const KEY_SELF_POSTED_RECENTS = 'nls_self_posted_recents';
 
 /** userId 単位の表示名・個人サムネ URL（弱い既定アイコン以外）の永続キャッシュ */
 export const KEY_USER_COMMENT_PROFILE_CACHE = 'nls_user_comment_profile_v1';
+
+/**
+ * v0.1.720 PR-T2: ユーザー情報解決（nvapi）のリトライ状態・バックオフ管理。
+ * 値: { [userId]: { status, retryCount, updatedAt, nextRetryAt, httpStatus? } }
+ */
+export const KEY_PROFILE_RESOLVE_STATE = 'nls_profile_resolve_state_v1';
 
 /**
  * v0.1.533: コメンター（数値 userId）のフォロー/フォロワー数・プレミアム・LV を
@@ -539,6 +555,17 @@ export function commentsStorageKey(liveId) {
 export function watchSnapshotStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();
   return `nls_watch_snapshot_${id}`;
+}
+
+/**
+ * v0.1.725: サムネ取得カバレッジの軽量サマリ({thumbPct,total,withAvatar})。
+ * popup が computeAcquisitionPercents の結果を書き、status.html が読んで「サムネ取得率○%」を出す
+ * (星野ロミ yukkuriHealth 流の coverage 可視化)。snapshot を触らない最小経路。
+ * @param {string} liveId lv123
+ */
+export function avatarCoverageStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_avatar_coverage_${id}`;
 }
 
 /** @param {string} liveId lv123 */

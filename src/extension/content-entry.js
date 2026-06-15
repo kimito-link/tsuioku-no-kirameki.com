@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 // @ts-nocheck — content script; DOM/Chrome API が広く any 相当
 import {
   extractLiveIdFromDom,
@@ -5,6 +6,7 @@ import {
   isNicoLiveWatchUrl,
   isNicoVideoJpHost
 } from '../lib/broadcastUrl.js';
+import { mountVenueBarButton } from './venueBar.js';
 import {
   KEY_AUTO_BACKUP_STATE,
   KEY_INLINE_PANEL_WIDTH_MODE,
@@ -35,6 +37,7 @@ import {
   KEY_COMMENT_INGEST_LOG,
   KEY_STORAGE_WRITE_ERROR,
   KEY_RECORDING_WATCHDOG,
+  KEY_DEV_MONITOR_OVERLAY,
   KEY_THUMB_AUTO,
   KEY_THUMB_INTERVAL_MS,
   KEY_GIFT_RANKING_LANE_ENABLED,
@@ -58,7 +61,8 @@ import {
   isDeepHarvestQuietUiEnabled,
   normalizeInlinePanelWidthMode,
   normalizeInlinePanelPlacement,
-  normalizeInlineFloatingAnchor
+  normalizeInlineFloatingAnchor,
+  KEY_PROFILE_RESOLVE_STATE
 } from '../lib/storageKeys.js';
 import {
   pickLargestVisibleVideo,
@@ -95,7 +99,9 @@ import {
   appendToTail,
   shouldCompactTail,
   collectCommentNoKeys,
-  BIG_MAIN_THRESHOLD
+  BIG_MAIN_THRESHOLD,
+  TAIL_MAX_ROWS,
+  TAIL_BULK_BYPASS_MIN_ROWS
 } from '../lib/commentTailBuffer.js';
 import {
   summaryStorageKey,
@@ -114,9 +120,21 @@ import {
   setBackfillPriorityLiveId,
   registerBackfillWaiter,
   clearBackfillWaiter,
+  listBackfillWaitingLiveIds,
   BACKFILL_PRIORITY_COOLDOWN_MS,
   GLOBAL_BACKFILL_ROTATION_MS
 } from '../lib/globalBackfillQueue.js';
+import { shouldFireBackfillRotationWithSlots } from '../lib/backfillRotationGate.js';
+import { runInBackfillSlot, BACKFILL_PARALLEL_SLOTS } from '../lib/backfillSlotPool.js';
+import {
+  createBackfillThrottleState,
+  updateBackfillThrottleState,
+  resolveEffectiveBackfillSlots
+} from '../lib/backfillSlotAutoThrottle.js';
+import {
+  acquireGlobalFetchToken,
+  reportGlobalFetchResult
+} from '../lib/globalFetchRateLimiter.js';
 import {
   chunkIndexKey,
   chunkMigratedKey,
@@ -134,6 +152,12 @@ import {
   upsertUserCommentProfileFromEntry,
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
+import {
+  recordProfileResult,
+  shouldResolveProfile,
+  pruneProfileResolveMap
+} from '../lib/profileResolveState.js';
+import { deriveAvatarUrlFromUid } from '../lib/deriveAvatarUrlFromUid.js';
 import {
   normalizeCommenterFollowMap,
   commenterFollowEntryFromProfile,
@@ -161,6 +185,7 @@ import {
   fetchOfficialEventBannerFromAuditionEmbed
 } from '../lib/officialEventDomBundle.js';
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+import { liveEndedStorageKey, buildLiveEndedFlag } from '../lib/liveEndedFlag.js';
 import {
   scrapeContributionRankingFromDom,
   hasContributionRankingDomSignal,
@@ -296,6 +321,7 @@ import {
   mergeGiftSubAppHistoryPayload
 } from '../lib/kokenGiftHistoryApi.js';
 import { fetchKokenGiftHistoryAllViaExtension } from '../lib/kokenGiftHistoryFetchClient.js';
+import { shouldRunExternalFetchWhileHidden } from '../lib/hiddenTabExternalFetchGate.js';
 import {
   pickAuditionContextFromEntryItems,
   normalizeAuditionRankingsResponse,
@@ -390,10 +416,16 @@ import {
 import {
   runIfTabLeader,
   runWhileGlobalLeader,
-  GLOBAL_BACKFILL_LOCK,
   GLOBAL_FORWARD_LOCK
 } from '../lib/tabLeaderLock.js';
-import { shouldScheduleBackfillTransientRetry } from '../lib/backfillTransientRetry.js';
+import {
+  shouldScheduleBackfillTransientRetry,
+  shouldResetBackfillRetryBudgetAfterRun
+} from '../lib/backfillTransientRetry.js';
+import {
+  shouldRearmBackfillAfterVisibility,
+  pruneRecentVisibilityPauses
+} from '../lib/backfillVisibilityRearm.js';
 import { calculateBackfillRetryDelayMs } from '../lib/backfillRetryBackoff.js';
 import {
   isBackfillEnabledFromStorage,
@@ -402,6 +434,14 @@ import {
   isBackfillAutoJustEnabledFromChange
 } from '../lib/backfillOptIn.js';
 import { deriveBackfillCapturedAt } from '../lib/backfillCapturedAt.js';
+import {
+  isSwBackfillStagedForLive,
+  swBackfillStagedKey
+} from '../lib/swBackfillStaging.js';
+import {
+  KEY_BACKFILL_SW_MODE,
+  shouldTriggerSwBackfill
+} from '../lib/swBackfillTrigger.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
 import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
@@ -1039,12 +1079,7 @@ let _nonWatchTickCount = 0;
 const NON_WATCH_HIDE_TICK_THRESHOLD = 5;
 
 /**
- * 0.1.173: ランキング表示の lifetime 観測。診断シートで「いつ何が取れたか」を
- * 1 か所で読めるようにする。globalThis に保持（ホットリロード対応 / SPA でも累積）。
- *
- * 0.1.175: コメント DOM 経由で観測したギフトコメント（sender/item/point）を
- * `giftCommentObservations` に蓄積。NDGR ギフト event を取り逃した番組でも
- * ここから sender 集計が取れる。
+ * ランキング/ギフトコメント観測の lifetime カウンタ（診断用・globalThis 保持で SPA でも累積）。
  *
  * @returns {{
  *   collectAttempts: number,
@@ -1275,7 +1310,14 @@ const INTERCEPT_MAP_MAX = MAP_LIMITS.interceptMax;
 let ndgrLastReceivedAt = 0;
 
 /** NDGR 本文 postMessage をデバウンスして storage 書き込み回数を抑える */
-/** @type {{ commentNo: string, text: string, userId: string|null, nickname?: string }[]} */
+/**
+ * v0.1.623: バッファ内の各 row に **取り込み時の liveId** (capturedLid) を焼き込む。
+ * SPA 遷移直後/直前や同一 watch ページ内のサブ NDGR view との取り違えで、
+ * 前 lv の chat が現 liveId の storage(`nls_comments_<lv>`)に書かれる「他配信
+ * ユーザー混入」を構造的に防ぐ(E2 真因確定)。flush 時に現 `liveId` と一致しない
+ * row は drop し、persist パイプライン全体に lv-identity 検証 point を持たせる。
+ * @type {Array<{ commentNo: string, text: string, userId: string|null, nickname?: string, capturedLid: string }>}
+ */
 let ndgrChatRowsPending = [];
 /** @type {ReturnType<typeof setTimeout>|null} */
 let ndgrChatRowsFlushTimer = null;
@@ -1345,6 +1387,25 @@ function maybeRunEndedBulkHarvest() {
   if (now - endedBulkHarvestLastCheckedAt < ENDED_HARVEST_CHECK_MS) return;
   endedBulkHarvestLastCheckedAt = now;
   const endedDetected = detectWatchProgramEndedFromDom();
+  // 配信終了を検知したら status / Web版向けに終了フラグを1回書く(タブを閉じない限り
+  //   tabs.query には残るため、「視聴中」で更新が止まった終了枠を区別できるようにする)。
+  if (endedDetected) {
+    const endedLv = String(liveId || '').trim().toLowerCase();
+    if (/^lv\d{1,15}$/.test(endedLv)) {
+      try {
+        chrome.storage.local
+          .set({
+            [liveEndedStorageKey(endedLv)]: buildLiveEndedFlag({
+              liveId: endedLv,
+              endedAt: now
+            })
+          })
+          .catch(() => {});
+      } catch {
+        /* context invalidated 時は無視 */
+      }
+    }
+  }
   if (
     !shouldRunEndedBulkHarvest({
       recording,
@@ -1582,6 +1643,18 @@ async function flushNdgrChatRowsBatch(batch) {
     return;
   }
   if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  // v0.1.623: lv-identity 検証(本丸=他配信ユーザー混入の根治・E2 真因)。
+  //   各 row の capturedLid と現 liveId が一致しないものは drop。
+  //   capturedLid が空(NDGR 受信時に liveId 未確定だった早期 row)は寛容に
+  //   通す(該当配信のものとして扱う)=機能後退ゼロ。古い行(stamp 無し)も寛容。
+  const curLid = String(liveId || '').trim().toLowerCase();
+  const filteredBatch = batch.filter((r) => {
+    if (!r || typeof r !== 'object') return false;
+    const cap = String(r.capturedLid || '').trim().toLowerCase();
+    return !cap || cap === curLid;
+  });
+  if (!filteredBatch.length) return;
+  batch = filteredBatch;
   const byKey = new Map();
   for (const r of batch) {
     if (!r || typeof r !== 'object') continue;
@@ -1630,9 +1703,15 @@ function schedulePersistNdgrChatRows(rows) {
   if (!Array.isArray(rows) || !rows.length) return;
   if (!recording || !locationAllowsCommentRecording()) return;
   ndgrLastReceivedAt = Date.now();
+  // v0.1.623: 各 row に取り込み時の liveId を焼き込む。SPA 遷移直前/直後で
+  //   前 lv の chat が現 storage に紛れ込むのを構造的に防ぐ(E2 真因)。
+  //   liveId 未確定なら空文字で積み、shouldDeferNdgrFlushUntilLiveId 経路に乗せて
+  //   遅延 flush 時に確定 liveId と一致した row だけ persist する。
+  const capturedLid = String(liveId || '').trim().toLowerCase();
+  const stamped = rows.map((r) => ({ ...r, capturedLid }));
   ndgrChatRowsPending = mergeNdgrBacklogWithCap(
     ndgrChatRowsPending,
-    rows,
+    stamped,
     NDGR_PENDING_MAX
   );
   if (ndgrChatRowsPending.length >= NDGR_PENDING_FLUSH_THRESHOLD) {
@@ -3634,18 +3713,9 @@ function ensureInlineHostReflowListener() {
  * その要素の「直後」にホストを置くと、コメント入力バーの下〜列の下に自然に付く（video 直後だけだとバーの上に挟まることがある）。
  * body / documentElement は候補にしない（誤って最外に出さない）。
  *
- * 0.1.64 (AT): 旧スコアリング (aspect <= 3.4 / area <= viewport*0.92) は緩く、
- *   ニコ生 SPA で「視聴行 + コメント欄 + バナー一式」を含む巨大ラッパーがヒット
- *   して、その直後（description / Amazon / 関連配信の直前）にパネルが挿入される
- *   事象が頻発していた。`scoreInlineHostAnchorCandidate` (純粋関数) に切り出し、
- *   video rect とのジオメトリ整合（幅比 0.95–1.6 / 高さ比上限 / top オフセット
- *   上限）まで含めて厳格化した。0.1.63 で below → dock_bottom の応急 migration
- *   を入れているが、本関数の改善で `below` モードを再度推奨できる品質に戻す
- *   下地ができた。詳細は src/lib/inlineHostAnchorScoring.js のヘッダコメント参照。
- *
- *   0.1.109: eligible が複数あるとき **スコア最大**では浅い巨大ラッパーが選ばれ、
- *   関連放送などより下にパネルが付くことがあった。**面積最小**（プレイヤー行に密なブロック）
- *   を優先して選ぶ（pickTightestEligibleAnchorRowIdx）。
+ * 判定は scoreInlineHostAnchorCandidate（純関数・ジオメトリ厳格化）+ 複数 eligible 時は
+ *   面積最小を優先（pickTightestEligibleAnchorRowIdx・巨大ラッパー誤選択防止）。
+ *   経緯は src/lib/inlineHostAnchorScoring.js ヘッダと git 履歴参照。
  * @param {HTMLElement} base
  */
 function findFrameInsertAnchorFromVideo(base) {
@@ -4980,23 +5050,9 @@ function scheduleInlinePanelToolbarFocusPolish() {
 
 /**
  * ツールバーから：ページ内インラインパネルを前面化（スクロール＋ iframe フォーカス）。
- *
- * 0.1.11 (B1): pollUntil で rect ≥ 120×120 を 500ms wait してから scroll/focus。
- * 0.1.15 (M/N): host が DOM に居れば即座に true を返すように変更。理由:
- *   - 旧版は rect が 120×120 になるまで pollUntil で 500ms 待ってから true 返却。
- *     その間 background は応答待ちで blocked。pollUntil が timeout で false 返却
- *     すると background が popup 窓を openOrFocusPopupWindow で開いてしまい、
- *     インラインパネルと popup 窓が「同時に出る」現象になっていた（user 報告 Bug1）。
- *   - close ボタン押下後に display:none された host は rect=0 のまま → pollUntil
- *     timeout → false → popup 窓だけ開いてインラインが「すぐ出ない」体験になる
- *     （user 報告 Bug2）。
- *   - 修正: host が DOM 上に居る（renderPageFrameOverlay で挿入済み or 既存）
- *     なら即座に focused=true 応答。scrollIntoView + iframe.focus は別タスクで
- *     fire-and-forget（pollUntil 内蔵）。応答自体は rect も layout も待たない。
- *
- * 0.1.274+: **同期で boolean を返す**。background の `tabs.sendMessage` が
- *   microtask までブロックされ「こん太を押しても一瞬何も起きない」体感になるのを避ける。
- *   async scrollIntoView / iframe.focus は `scheduleInlinePanelToolbarFocusPolish` に分離。
+ * host が DOM に居れば**同期で true**を返す（rect/layout を待つと popup 窓が二重に開く
+ * Bug1/2 の再発・「押しても一瞬何も起きない」体感になる）。scroll/focus は
+ * scheduleInlinePanelToolbarFocusPolish に分離して fire-and-forget。詳細は git 履歴。
  *
  * @returns {boolean}
  */
@@ -5161,6 +5217,30 @@ function buildGiftDiagnosticsBundle() {
       document.documentElement?.getAttribute('data-nls-audition-fetch') || 'never',
     nicoadFetchStatus:
       document.documentElement?.getAttribute('data-nls-nicoad-fetch') || 'never',
+    // v0.1.616: 外部 API 直接 fetch（koken/nicoad）の発火・SW 応答の観測。
+    //   「API は満額返るのに popup は取得中」の真因を一点に絞るための診断。
+    //   intervalTicks=0 → interval が回っていない / leaderRan=0 & leaderSkipped>0 →
+    //   このタブはフォロワーで誰も fetch しない谷 / kokenSent>0 だが kokenLastRows=0/null →
+    //   SW が空 or 未応答（kokenLastError/Status を見る）。
+    externalFetchProbe: {
+      intervalTicks: _externalFetchProbe.intervalTicks,
+      leaderRan: _externalFetchProbe.leaderRan,
+      leaderSkipped: _externalFetchProbe.leaderSkipped,
+      kokenSent: _externalFetchProbe.kokenSent,
+      kokenLastOk: _externalFetchProbe.kokenLastOk,
+      kokenLastStatus: _externalFetchProbe.kokenLastStatus,
+      kokenLastRows: _externalFetchProbe.kokenLastRows,
+      kokenLastError: _externalFetchProbe.kokenLastError,
+      kokenLastAgoMs:
+        _externalFetchProbe.kokenLastAgoBase > 0
+          ? Math.max(0, Date.now() - _externalFetchProbe.kokenLastAgoBase)
+          : null,
+      nicoadSent: _externalFetchProbe.nicoadSent,
+      nicoadLastOk: _externalFetchProbe.nicoadLastOk,
+      nicoadLastStatus: _externalFetchProbe.nicoadLastStatus,
+      nicoadLastRows: _externalFetchProbe.nicoadLastRows,
+      nicoadLastError: _externalFetchProbe.nicoadLastError
+    },
     eventDomBundleSummary: (() => {
       const b = lastOfficialEventDomBundle;
       if (!b) return { hasBundle: false };
@@ -5798,8 +5878,19 @@ function buildGiftDiagnosticsBundle() {
         officialEventGiftScoreNdgr,
         officialGiftPointsNdgr
       };
+      // v0.1.621: 残課題3根治。bundle/snap だけで判定すると koken/nicoad API 直叩きで
+      //   実際は取れていても adRanking=fetch_error / contributionRanking=iframe_unrendered
+      //   と誤報告され、調査を惑わせていた。fetch 成功時に in-memory にキャッシュした
+      //   rows 配列を渡すことで、純関数側の v0.1.617 で実装済みの ok 判定経路を発火させる。
+      const kokenApiRows = _externalFetchProbe.kokenLastRowsArr;
+      const nicoadApiRows = _externalFetchProbe.nicoadLastRowsArr;
       const stateOf = (laneId) =>
-        determineNorthStarLaneState(laneId, { bundle: b, snap: snapForReason });
+        determineNorthStarLaneState(laneId, {
+          bundle: b,
+          snap: snapForReason,
+          kokenApiRows,
+          nicoadApiRows
+        });
       return {
         '1_貢献度ランキング': {
           state: stateOf('contributionRanking'),
@@ -8759,15 +8850,7 @@ function buildAiSharePageDiagnostics() {
   };
 }
 
-/*
- * 0.1.43 (Y): content.js は manifest.json の all_frames:true で iframe を含む
- *   全フレームに注入される。さらに SPA navigation で再注入されると、トップ
- *   レベルで `chrome.runtime.onMessage.addListener` を呼ぶたびに listener が
- *   累積し、NLS_FOCUS_INLINE_PANEL に複数フレームから応答 → sendResponse の
- *   port が複数解釈されて Chrome が「The message port closed before a response
- *   was received」を投げ、background.js 側が popup window fallback を誤発火
- *   する原因になる。globalThis に bound flag を立てて idempotent にする。
- */
+// all_frames / SPA 再注入で listener が累積しないよう、globalThis で登録を一度に絞る。
 const __NLS_MSG_LISTENER_BOUND_KEY__ = '__NLS_CONTENT_MSG_LISTENER_BOUND__';
 const nlsContentMsgListenerHost =
   typeof globalThis !== 'undefined' ? globalThis : window;
@@ -8785,14 +8868,24 @@ if (!(/** @type {Record<string, unknown>} */ (nlsContentMsgListenerHost))[__NLS_
  * @returns {boolean} 登録できたら true、context 無効で登録を見送ったら false
  */
 function bindContentScriptMessageListener() {
-// v0.1.356: 拡張更新（chrome://extensions の「更新」/再読み込み）の瞬間、古いタブの
-//   content script では chrome.runtime が undefined になる。その間に SPA navigation 等で
-//   ここが再評価されると `chrome.runtime.onMessage` の参照自体が同期 TypeError
-//   （Cannot read properties of undefined (reading 'onMessage')）を投げ、chrome://extensions の
-//   エラー一覧に載って利用者を不安にさせる。実害は無い（古いタブの正常な廃棄）が、
-//   onMessage に触れる前にガードして例外を出さない。promise の reject ではないので
-//   consoleErrorBuffer の unhandledrejection 抑止（v0.1.354）では捕まえられない別経路。
+// 拡張更新で古い context の chrome.runtime が消えた場合は登録を見送る。
 if (!chrome?.runtime?.onMessage?.addListener) return false;
+// PR1-b-1: SW backfill エンジンからの行受信(骨格)。既存 backfill 経路とは独立(設計正本: memory/reference_backfill_sw_migration_pr1b.md)
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || msg.type !== 'nls_backfill_sw_rows') return false;
+  try {
+    const rows = Array.isArray(msg.rows) ? msg.rows : [];
+    if (rows.length && String(msg.lid || '') === String(liveId || '')) {
+      persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.BACKFILL });
+      sendResponse({ ok: true });
+    } else {
+      sendResponse({ ok: false, reason: rows.length ? 'lid_mismatch' : 'empty' });
+    }
+  } catch (e) {
+    sendResponse({ ok: false, reason: 'persist_error' });
+  }
+  return false; // sendResponse は同期で呼んだ
+});
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!hasExtensionContext()) return;
   if (!msg || typeof msg !== 'object' || !('type' in msg)) return;
@@ -9565,6 +9658,11 @@ let persistCommentRowsChain = Promise.resolve();
 const _commentIngestSourceCounters = {
   ndgr: 0,
   ndgr_forward: 0,
+  // v0.1.662: backfill(過去ログ遡り取得)キーを追加。従来はこのキーが無く、backfill の persist
+  //   (source: COMMENT_INGEST_SOURCE.BACKFILL)が全て unknown に落ちて診断 commentIngestBySource
+  //   の unknown が肥大していた(実機 fastDiag unknown=7085)。記録自体には影響しないが、診断で
+  //   「過去ログ取得で何件取れたか」を正しく見えるようにする(今後の真因特定の精度向上)。
+  backfill: 0,
   mutation: 0,
   deep: 0,
   visible: 0,
@@ -9583,18 +9681,9 @@ let _lastSavedCommentsUidStats = {
   withUidPercent: 0
 };
 
-// ===========================================================================
 // v0.1.505: コメント保存テールバッファ（追記式チャンク）
-// ---------------------------------------------------------------------------
-// 従来は毎フラッシュで巨大なメイン配列 nls_comments_<lv> を read→merge→**全件 set** して
-// いた。1 万件超で 1 回の構造化クローン set が重く、同一オリジンの watch タブが共有レンダラ
-// 上で全件 set を撃ち合うと「ページが応答しません」フリーズ＋記録頭打ちを招いた。
-//
-// 対策: 毎フラッシュは新規分だけを小さなテールキー nls_ctail_<lv> へ追記（安い）し、件数/
-// 時間しきい値・タブ非表示・離脱・export 前にだけ既存 persistCommentRowsImpl でメイン配列へ
-// 畳み込む（重い全件 set を低頻度化）。メイン配列の形式・既存 dedupe/merge ロジックは不変。
+// 巨大メイン配列の全件 set を避け、新規分を nls_ctail_<lv> へ追記して低頻度で畳み込む。
 // 詳細・純関数は src/lib/commentTailBuffer.js（単体テスト付き）。
-// ===========================================================================
 
 /** テール seed 済みの liveId（これが現 liveId と違えばメインから seed し直す） */
 let tailSeededLiveId = '';
@@ -9626,28 +9715,14 @@ let liveChunkMigrated = false;
 
 /**
  * v0.1.513: チャンクモードの dedupe をインメモリ・インクリメンタル化するフラグ。
- * ON のとき、毎フラッシュの「全チャンク read + 全件 mergeNewComments（O(N)）」を
- * 「キー集合への照合（O(追加分)）」に置き換える。
- *
- * ⭐fix/persist-plateau（2026-06-01・実機で確定）: 既定 OFF → ON へ変更。
- *   実機（lv350651843・記録13,191/公式13,258）で「ある程度たつと件数が増えなくなる」頭打ちを観測。
- *   真因は、チャンクモードでも本フラグ OFF だと毎フラッシュで readChunkedComments（全13k件 read）+
- *   mergeNewComments（O(N)）が走り、件数が増えるほど 1 フラッシュが重くなって 40 秒ガード
- *   （persistWriteTimeoutMs×4）を超過 → 書き込みが requeue され続け、新着が保存されず件数が固定される
- *   こと（data-nls の persist flush exceeded guard timeout）。インクリメンタル化すると seed は初回 1 回
- *   だけ（以降は chunk index total の一致で全件 read を skip）で、フラッシュ全体が O(追加分) になり
- *   頭打ちが解消する。書き込み側は既に「追加分だけ新チャンク追記」で bounded（planAppendRowsAsChunks）。
- *   単体テストは commentRecord.test.js（冪等・undo ロールバック・複数フラッシュ）でカバー済み。
- *   ⚠️ 明示的に false がセットされている環境だけ従来 O(N) 経路に戻す（緊急時の逃げ道を残す）。
+ * 全チャンク read + O(N) merge を初回 seed 後の O(追加分)照合へ置き換え、頭打ちを防ぐ。
+ * 明示的に false が保存された環境だけ従来経路へ戻す。
  */
 let _incrementalDedupEnabled = true;
 /**
  * fix/idb-offscreen-killswitch（2026-06-01）: IDB+Offscreen 経路（KEY_COMMENT_IDB_ENABLED /
- * KEY_CDB_OFFSCREEN_ENABLED）は実機検証で破綻した。SW⇄Offscreen の append 往復が SW の
- * ライフサイクル（idle 停止）と噛み合わず「Uncaught Error: No SW」を出して append が成立せず、
- * 新規放送で公式 5,417 件中 117 件（約 2%）しか捕捉できなくなった。記録不能は最悪の退化なので、
- * 保存フラグが storage 上で true でも **常に無視**して従来 chrome.storage 経路を使う。
- * 再挑戦（往復に頼らない設計に作り直し）するときに、この定数を false に戻して段階検証する。
+ * KEY_CDB_OFFSCREEN_ENABLED）は SW idle 停止で append が成立しないため常時無効化する。
+ * 保存フラグが true でも従来 chrome.storage 経路を使う。
  * @see storageKeys.js KEY_COMMENT_IDB_ENABLED / KEY_CDB_OFFSCREEN_ENABLED
  */
 const FORCE_DISABLE_COMMENT_IDB_PATH = true;
@@ -10034,8 +10109,18 @@ async function bufferRowsToTail(rows) {
     console.debug(formatPipelinePhase('tail_skip', { reason: 'no new rows' }));
     return;
   }
+  const tailLenBefore = tailRowsBuffer.length;
   tailRowsBuffer = appendToTail(tailRowsBuffer, fresh);
   for (const k of keys) tailKnownCommentNoKeys.add(k);
+  // v0.1.696: クランプで古い行が落ちたら、既知キーを生存行から再構築する(毒の解除)。
+  //   落ちた行のキーが残ると同じ行は再取得でも門前払い=永久欠落していた。再構築でmain畳み込み
+  //   済みキーは失うが、その再流入は下流のchunk側dedupeが弾くので正しさは保たれる。
+  if (tailLenBefore + fresh.length > TAIL_MAX_ROWS && tailRowsBuffer.length === TAIL_MAX_ROWS) {
+    tailKnownCommentNoKeys = collectCommentNoKeys(liveId, tailRowsBuffer);
+    console.debug(formatPipelinePhase('tail_clamp_rebuild', {
+      dropped: tailLenBefore + fresh.length - TAIL_MAX_ROWS
+    }));
+  }
   observedRecordedCommentCount = tailMainCount + tailRowsBuffer.length;
 
   // v0.1.508: 直近コメントリングを更新（テール畳み込みと独立。サマリ 0 秒表示用）。
@@ -10358,6 +10443,22 @@ async function flushBatchViaTail(batch) {
     await seedTailFromMain(lid);
     if (liveId !== lid) return; // 放送が切り替わった
   }
+  // v0.1.696「一気に取れない」最終真因の根治: backfill等の大口バッチはテール(上限2000)を
+  //   経由させずチャンク追記へ直行する。テールは小さな高頻度RTバッチのO(N)緩和装置で、
+  //   数千行のバーストを通すとクランプで古い行が黙って消え、既知キーだけが残り再取得も
+  //   門前払い=38〜43%で固定(実機 crawl42,078行/保存15,094行で確定)。直行はO(追加分)。
+  //   timeout時はimpl内のrequeueが再投入する(__noRequeueを渡さない)。
+  if (batch.length >= TAIL_BULK_BYPASS_MIN_ROWS) {
+    const result = await persistCommentRowsImpl(batch, {
+      source: 'bulk_bypass',
+      __isCompaction: true
+    });
+    if (liveId === lid && result && result.ok === true && lastImplMainCount >= 0) {
+      tailMainCount = lastImplMainCount;
+      observedRecordedCommentCount = tailMainCount + tailRowsBuffer.length;
+    }
+    return;
+  }
   await bufferRowsToTail(batch);
   let hidden = false;
   try {
@@ -10383,11 +10484,8 @@ async function flushBatchViaTail(batch) {
  */
 async function flushCommentTailNow(opts = {}) {
   if (!liveId || tailRowsBuffer.length === 0) return;
-  // v0.1.507: 巨大メインでは hide/pagehide での強制畳み込み（2万件級の構造化クローン）を行わない。
-  //   タブを裏に回した瞬間に巨大放送が一斉に重い畳み込みを始め、共有レンダラを固めて
-  //   「ページが応答しません」を招くのが実機の主因だった。テールは bufferRowsToTail で常に
-  //   永続済みなので、畳み込みを送っても取りこぼさない（次回読み込みの seed がテールを復元する）。
-  //   export 等で確実に畳み込みたいときは force:true を渡す。
+  // 巨大メインは hide/pagehide で強制畳み込みせず、必要時だけ force:true を使う。
+  // テールは永続済みなので次回 seed で復元できる。
   if (!opts.force && tailMainCount >= BIG_MAIN_THRESHOLD) {
     console.debug(
       formatPipelinePhase('compact_skip_big', {
@@ -10411,23 +10509,13 @@ async function flushCommentTailNow(opts = {}) {
 
 const MIN_PERSIST_INTERVAL_MS = INGEST_TIMING.coalescerMinMs;
 const PERSIST_BURST_THRESHOLD = INGEST_TIMING.coalescerBurstThreshold;
-// v0.1.497/498: 同一オリジン（live.nicovideo.jp）の複数 watch タブは Chrome が同一
-//   レンダラープロセス＝同一メインスレッドにまとめる。裏タブが大量コメントの全件
-//   read-merge-write を短間隔で走らせると、見ているタブまで巻き込んで「ページが応答
-//   しません」になる（実機で 443 件の前面タブが、裏の 3 万件タブ起因で固まると確認）。
-//   v0.1.498/499 フリーズ対策 A: 間隔決定を computeLivePersistIntervalMs に委譲する。
-//     フリーズの主因は「件数が多い放送の 1 回の巨大書き込み」なので、間隔は保存済み件数に
-//     比例して伸ばす（書き込みコストにスロットルを比例）。裏タブは前面より広めの帯にする
-//     が「実質ポーズ」はしない＝小さい放送なら裏タブでも数秒間隔で記録が溜まり、マルチ
-//     タブ監視が機能する。巨大放送だけ裏で間隔を大きく伸ばしてフリーズを避ける。
-//   ⚠ v0.1.498 は hidden を一律 1h ポーズにして「裏タブが一切記録しない」回帰を起こした。
+// 複数 watch タブの巨大書込で共有レンダラを固めないよう、保存件数に応じて間隔を伸ばす。
+// hidden も一律停止せず、小規模配信の記録は継続する。
+// 間隔決定は computeLivePersistIntervalMs に集約。
 const persistCoalescer = createPersistCoalescer(
   async (/** @type {ParsedCommentRow[]} */ batch) => {
-    // v0.1.502: チェーンを「必ず settle するガード付き promise」で前進させる。これにより
-    //   万一 persistCommentRowsImpl 内に未有界化の await が残っても、persistCommentRowsChain /
-    //   flushMutex（persistThrottle）が永久ポイズンされない（=「最終取り込み ◯秒前」固定の
-    //   構造的再発防止）。storage の get/set/remove は個別に timeout 済みなので、通常はこの
-    //   ガード（4s×4=16s）に到達する前に impl が早期 return する。
+    // settle 保証付き timeout で persist chain / flush mutex の永久停止を防ぐ。
+    // storage 操作は個別 timeout 済みで、通常はこのガード前に完了する。
     const guarded = persistCommentRowsChain.then(() =>
       runStorageOpWithTimeout(
         () => flushBatchViaTail(batch),
@@ -10460,20 +10548,16 @@ const persistCoalescer = createPersistCoalescer(
       hidden,
       storedCount: observedRecordedCommentCount,
       baseMs: MIN_PERSIST_INTERVAL_MS,
-      // v0.1.510: 追記チャンク化済み（liveChunkMigrated）なら毎フラッシュの書き込みは
-      //   O(追加分)＋有界テールに収まる。件数比例の間引きは旧 O(N) set 対策なので解除し、
-      //   裏の巨大放送でも記録カウントが基本間隔でリアルタイムに伸びるようにする。
-      // v0.1.514: IDB モードは SW への軽量 append のみ＝常に O(追加分) で bounded。
+      // チャンク/IDB は O(追加分)のため、旧 O(N) set 向けの件数比例間引きを解除する。
+      // 裏の巨大放送でも基本間隔で記録を進める。
       boundedWrite: liveChunkMigrated === true || _commentIdbEnabled === true
     });
   },
   PERSIST_BURST_THRESHOLD
 );
 
-// v0.1.498 フリーズ対策 A: 裏タブは保存を実質ポーズするため、未保存バッファがタブ離脱
-//   （閉じる/遷移）時に失われ得る。pagehide でベストエフォートに最後の 1 回をフラッシュ
-//   して取りこぼしを抑える（chrome.storage.local.set は非同期なので完了保証はないが、
-//   SW 側の IndexedDB 自動バックアップと併せた二重の安全網）。
+// pagehide で未保存バッファをベストエフォート flush し、離脱時の取りこぼしを抑える。
+// 非同期書込の完了保証はないため、他の永続化経路と併用する。
 window.addEventListener('pagehide', () => {
   try {
     void persistCoalescer.flush();
@@ -10664,6 +10748,36 @@ function persistCommentRows(rows, opts = {}) {
     _commentIngestSourceCounters.unknown += incBy;
   }
   persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (filtered));
+}
+
+/**
+ * SW が退避した backfill 行を、既存 persist パイプラインへ live ごとに一度だけ畳み込む。
+ * flush 成功前は取り置きを削除せず、失敗時は次回の live オープンで再試行する。
+ */
+async function maybeFoldSwBackfillStaging() {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || _swStagingFoldedForLiveId === lid) return;
+  if (
+    !recording ||
+    !locationAllowsCommentRecording() ||
+    !hasExtensionContext()
+  ) {
+    return;
+  }
+  _swStagingFoldedForLiveId = lid;
+  const key = swBackfillStagedKey(lid);
+  try {
+    const bag = await chrome.storage.local.get(key);
+    const staged = bag?.[key];
+    if (!isSwBackfillStagedForLive(staged, lid)) return;
+    persistCommentRows(staged.rows, {
+      source: COMMENT_INGEST_SOURCE.BACKFILL
+    });
+    await persistCoalescer.flush();
+    await chrome.storage.local.remove(key);
+  } catch {
+    /* flush/read/remove failure: staged payload remains for the next live open */
+  }
 }
 
 /**
@@ -12385,12 +12499,10 @@ function startDevHotReload() {
   void pollReloadSignal();
 }
 
-/* ===================== 記録監視メーター（常設） ===================== */
-/* 公式件数と記録件数を定期サンプリングし、達成/停滞/成長を画面左下のオーバーレイ   */
-/* ＋コンソールに出す（件数を凝視しなくて済む）。                                    */
-/* dev / 本番を問わず常に動く。以前は dev 専用ツールに同梱していたため本番ビルドの   */
-/* たびにメーターが消える事故が再発していた（ユーザー報告・2026-06-01）。            */
-/* watch タブの top frame で 1 回だけ起動する。                                      */
+/* ===================== 記録監視メーター ===================== */
+/* 公式/記録件数を定期サンプリングし達成/停滞/成長を判定（watch top frame で1回起動）。
+   v0.1.693: 左下オーバーレイは既定 OFF（「途中経過を見せない」方針）。KEY_DEV_MONITOR_OVERLAY=true
+   の環境だけ表示（デバッグ用）。tick 内の persist 等の実務は表示と無関係に常時動かす。 */
 let _recordingMonitorStarted = false;
 function startRecordingProgressMonitor() {
   if (_recordingMonitorStarted) return;
@@ -12398,7 +12510,17 @@ function startRecordingProgressMonitor() {
 
   let samples = createProgressSamples();
   let lastStatus = '';
-  const overlay = createDevMonitorOverlay();
+  let overlay = null;
+  try {
+    chrome.storage.local
+      .get(KEY_DEV_MONITOR_OVERLAY)
+      .then((bag) => {
+        if (bag && bag[KEY_DEV_MONITOR_OVERLAY] === true) overlay = createDevMonitorOverlay();
+      })
+      .catch(() => {});
+  } catch {
+    /* no-op */
+  }
   function tickMonitor() {
     try {
       const recordedNow = Number(observedRecordedCommentCount) || 0;
@@ -12530,10 +12652,10 @@ function createDevMonitorOverlay() {
     return null;
   }
 }
-
 async function start() {
   if (!hasExtensionContext()) return;
   if (!shouldRunWatchContentInThisFrame()) return;
+  if (isWatchInlinePanelTopFrame()) mountVenueBarButton();
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
   await readCommentPanelAutoRestoreFromStorage();
@@ -12572,7 +12694,6 @@ async function start() {
     }
   }
   bindNativeSelfPostedRecorder();
-
   // 記録監視メーターは dev / 本番を問わず常設（top frame で 1 回）。
   //   以前は dev 専用ツールに同梱していたため、本番ビルドのたびにメーターが消える
   //   事故が再発していた（ユーザー報告・2026-06-01）。常設化して恒久対処。
@@ -12683,10 +12804,11 @@ async function start() {
     }).catch(() => { /* 既定（手動 OFF・自動 ON）を維持 */ });
   } catch { /* no-op */ }
 
-  // v0.1.511: 前方向 NDGR 継続取得 opt-in flag の初期読み込み（既定 OFF・true 厳密一致のみ有効）。
+  // v0.1.511: 前方向 NDGR / PR1-b-3: SW backfill モード opt-in の初期読み（既定 OFF・true 厳密一致のみ）。
   try {
-    chrome.storage.local.get([KEY_NDGR_FORWARD_ENABLED]).then((bag) => {
+    chrome.storage.local.get([KEY_NDGR_FORWARD_ENABLED, KEY_BACKFILL_SW_MODE]).then((bag) => {
       _ndgrForwardEnabled = !!(bag && bag[KEY_NDGR_FORWARD_ENABLED] === true);
+      _backfillSwModeEnabled = !!(bag && bag[KEY_BACKFILL_SW_MODE] === true);
     }).catch(() => { /* OFF default を維持 */ });
   } catch { /* no-op */ }
 
@@ -12780,6 +12902,11 @@ async function start() {
       } else if (wasEnabled && !_ndgrForwardEnabled && _ndgrForwardAbort) {
         try { _ndgrForwardAbort.abort(); } catch { /* no-op */ }
       }
+    }
+
+    // PR1-b-3: SW backfill モード(実験・既定 OFF)の同期。次の maintenance tick から経路が切り替わる。
+    if (changes[KEY_BACKFILL_SW_MODE]) {
+      _backfillSwModeEnabled = changes[KEY_BACKFILL_SW_MODE].newValue === true;
     }
 
     // v0.1.513: インクリメンタル dedupe flag の同期。OFF→ON / ON→OFF どちらでも、
@@ -13238,14 +13365,43 @@ async function start() {
       setInterval(() => {
         if (stopContentIntervalsIfContextInvalidated()) return;
         if (!recording || !liveId) return;
-        if (
-          typeof document !== 'undefined' &&
-          document.visibilityState === 'hidden'
-        ) {
+        // v0.1.616: 非可視タブでの fetch スキップを「未取得のときだけは叩く」に緩和。
+        //   貢献度ランキング等は無認証 API 直接 fetch 済みだが、ここで非可視を一律 return
+        //   していたため、視聴者が別タブにフォーカスを移すと koken/gift が永久に「取得中」
+        //   のまま固まっていた（実機 lv350673796 で真因確定）。可視は従来どおり常時 fetch、
+        //   非可視は「koken 貢献度 or ギフト履歴が storage に未取得」のときだけ一度取りにいく。
+        //   取れたら裏では叩かない（リソース最小）。リーダー1タブ集約済みでストーム無し。
+        const hidden =
+          typeof document !== 'undefined' && document.visibilityState === 'hidden';
+        if (!hidden) {
+          // PR1-b: koken/nicoad/profile はタブ間リーダー1つだけが叩く（多タブ集約）。
+          void runExternalApiFetchesAsTabLeader({ includeEventParticipation: false });
           return;
         }
-        // PR1-b: koken/nicoad/profile はタブ間リーダー1つだけが叩く（多タブ集約）。
-        void runExternalApiFetchesAsTabLeader({ includeEventParticipation: false });
+        const lid = String(liveId || '').trim().toLowerCase();
+        if (!/^lv\d{1,15}$/.test(lid)) return;
+        try {
+          chrome.storage.local
+            .get([kokenContribStorageKey(lid), giftSubAppHistoryStorageKey(lid)])
+            .then((bag) => {
+              const kokenAcquired = !!(bag && bag[kokenContribStorageKey(lid)]);
+              const giftAcquired = !!(bag && bag[giftSubAppHistoryStorageKey(lid)]);
+              if (
+                shouldRunExternalFetchWhileHidden({
+                  tabHidden: true,
+                  targetsAcquired: [kokenAcquired, giftAcquired]
+                }) &&
+                String(liveId || '').trim().toLowerCase() === lid // 応答までに遷移していない
+              ) {
+                void runExternalApiFetchesAsTabLeader({ includeEventParticipation: false });
+              }
+            })
+            .catch(() => {
+              /* best-effort: storage 不可なら今回はスキップ（可視復帰 or 次 tick で回復） */
+            });
+        } catch {
+          /* no-op: context 消失等 */
+        }
       }, KOKEN_CONTRIB_API_FETCH_MS)
     )
   );
@@ -13286,14 +13442,59 @@ let _kokenContribApiLastAttemptAt = 0;
 const NICOAD_CONTRIB_API_MIN_GAP_MS = 25_000;
 /** @type {number} */
 let _nicoadContribApiLastAttemptAt = 0;
+
+/**
+ * v0.1.616: 外部 API 直接 fetch（koken/nicoad）の発火・SW 応答を診断に出すための観測カウンタ。
+ * 実機 lv350672510 で「API は満額返るのに popup は取得中」になる真因を一点に絞るため、
+ * 「interval が回ったか / リーダーを取れたか / SW にメッセージを送ったか / SW が何を返したか」
+ * を記録する。診断 JSON の giftDiagnostics.externalFetchProbe に出す。
+ * @type {{
+ *   intervalTicks: number,
+ *   leaderRan: number,
+ *   leaderSkipped: number,
+ *   kokenSent: number,
+ *   kokenLastOk: boolean|null,
+ *   kokenLastStatus: number|null,
+ *   kokenLastRows: number|null,
+ *   kokenLastError: string,
+ *   kokenLastAgoBase: number,
+ *   nicoadSent: number,
+ *   nicoadLastOk: boolean|null,
+ *   nicoadLastStatus: number|null,
+ *   nicoadLastRows: number|null,
+ *   nicoadLastError: string
+ * }}
+ */
+const _externalFetchProbe = {
+  intervalTicks: 0,
+  leaderRan: 0,
+  leaderSkipped: 0,
+  kokenSent: 0,
+  kokenLastOk: null,
+  kokenLastStatus: null,
+  kokenLastRows: null,
+  kokenLastError: '',
+  kokenLastAgoBase: 0,
+  // v0.1.621: 診断 state 純関数 determineNorthStarLaneState に rows 配列を渡すための
+  //   キャッシュ。bundle/snap だけで判定すると koken/nicoad API が実際は取れているのに
+  //   常に fetch_error/iframe_unrendered と誤報告される(残課題3)。fetch 成功時に同期で
+  //   差し替える(in-memory のみ・storage 読みなし=async 化不要)。
+  kokenLastRowsArr: null,
+  nicoadSent: 0,
+  nicoadLastOk: null,
+  nicoadLastStatus: null,
+  nicoadLastRows: null,
+  nicoadLastError: '',
+  nicoadLastRowsArr: null
+};
 /** 参加配信者一覧 API の専用ポーリング間隔（ms）。30s の koken と切り離して遅延を減らす。 */
 const EVENT_PARTICIPATION_API_FETCH_MS = 12_000;
 /** 参加配信者一覧 API の再入抑止（FETCH 周期に合わせ 10s、v0.1.370）。 */
 const EVENT_PARTICIPATION_API_MIN_GAP_MS = 10_000;
 /** @type {number} */
 let _eventParticipationApiLastAttemptAt = 0;
-/** 1 tick で nvapi に問い合わせる記名 uid の最大数。 */
-const NICO_PROFILE_RESOLVE_BATCH = 3;
+/** 1 tick で nvapi に問い合わせる記名 uid の最大数(サムネ会議: 3→8。直列 await・429 で下げる)。 */
+const NICO_PROFILE_RESOLVE_BATCH = 8;
 /** follow 専用バッチの再入抑止（nvapi レート制限対策）。 */
 const COMMENTER_FOLLOW_FETCH_MIN_GAP_MS = 8_000;
 /** フォロー一覧専用バッチの再入抑止（1 req が重い）。 */
@@ -13306,8 +13507,6 @@ let _commenterFollowingListFetchLastAt = 0;
 let _followingListCountLiveId = '';
 /** @type {number} */
 let _followingListFetchedThisLive = 0;
-/** content 側でも問い合わせ済み uid を覚え、SW LRU と二重に抑制する。 */
-const _nicoProfileResolveAttempted = new Set();
 
 /**
  * PR1-b（多タブ集約）: 外部 API fetch（koken/nicoad/profile/参加者）を、同一 liveId を
@@ -13324,6 +13523,8 @@ function runExternalApiFetchesAsTabLeader(opts = {}) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return Promise.resolve();
   const includeEvt = opts.includeEventParticipation !== false;
+  // v0.1.616: 観測。interval が実際に fetch 要求まで来たかを数える。
+  _externalFetchProbe.intervalTicks += 1;
   return runIfTabLeader('nls-extfetch-' + lid, () => {
     maybeFetchKokenContribRankingMirrorOnce();
     maybeFetchNicoadContribRankingMirrorOnce();
@@ -13337,6 +13538,12 @@ function runExternalApiFetchesAsTabLeader(opts = {}) {
     void maybeResolveNamedUserProfilesOnce();
     void maybeFetchCommenterFollowBatchOnce();
     void maybeFetchCommenterFollowingListBatchOnce();
+  }).then((r) => {
+    // v0.1.616: 観測。このタブがリーダーとして実行したか（ran=true）／フォロワーで
+    //   スキップしたか（ran=false）を数える。「誰も fetch しない谷」の検出用。
+    if (r && r.ran) _externalFetchProbe.leaderRan += 1;
+    else _externalFetchProbe.leaderSkipped += 1;
+    return r;
   });
 }
 
@@ -13371,19 +13578,34 @@ function maybeFetchKokenContribRankingMirrorOnce() {
     const now = Date.now();
     if (now - _kokenContribApiLastAttemptAt < KOKEN_CONTRIB_API_MIN_GAP_MS) return;
     _kokenContribApiLastAttemptAt = now;
+    // v0.1.616: 観測。SW へメッセージを送った回数。
+    _externalFetchProbe.kokenSent += 1;
+    _externalFetchProbe.kokenLastAgoBase = now;
     chrome.runtime.sendMessage(
       { type: KOKEN_CONTRIB_FETCH_MESSAGE_TYPE, liveId: lid },
       (resp) => {
         // lastError を読まないと unchecked エラーが console に出る。読むだけ。
         const le = chrome.runtime.lastError;
+        // v0.1.616: 観測。SW 応答の素の値を記録（rows 正規化前）。
+        _externalFetchProbe.kokenLastError = le ? String(le.message || le) : '';
+        _externalFetchProbe.kokenLastOk = resp ? resp.ok === true : false;
+        _externalFetchProbe.kokenLastStatus =
+          resp && typeof resp.status === 'number' ? resp.status : null;
         if (le) return;
-        if (!resp || resp.ok !== true || resp.json == null) return;
+        if (!resp || resp.ok !== true || resp.json == null) {
+          _externalFetchProbe.kokenLastRows = 0;
+          _externalFetchProbe.kokenLastRowsArr = null;
+          return;
+        }
         let rows = null;
         try {
           rows = normalizeKokenRankingResponse(resp.json);
         } catch {
           rows = null;
         }
+        _externalFetchProbe.kokenLastRows = Array.isArray(rows) ? rows.length : 0;
+        // v0.1.621: 診断 state 用に rows 配列もキャッシュ(残課題3根治)。
+        _externalFetchProbe.kokenLastRowsArr = Array.isArray(rows) && rows.length > 0 ? rows : null;
         if (!Array.isArray(rows) || rows.length === 0) return;
         // 応答到着までに別 liveId へ遷移していたら stale 書込しない
         const curLid = String(liveId || '')
@@ -13440,18 +13662,46 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
     const now = Date.now();
     if (now - _nicoadContribApiLastAttemptAt < NICOAD_CONTRIB_API_MIN_GAP_MS) return;
     _nicoadContribApiLastAttemptAt = now;
+    // v0.1.616: 観測。SW へメッセージを送った回数 + 属性も立てる（nicoadFetchStatus が
+    //   never 固定だった setAttribute 未実装バグの修正）。
+    _externalFetchProbe.nicoadSent += 1;
+    try {
+      document.documentElement?.setAttribute('data-nls-nicoad-fetch', 'sent');
+    } catch {
+      /* no-op */
+    }
     chrome.runtime.sendMessage(
       { type: NICOAD_CONTRIB_FETCH_MESSAGE_TYPE, liveId: lid },
       (resp) => {
         const le = chrome.runtime.lastError;
+        // v0.1.616: 観測。
+        _externalFetchProbe.nicoadLastError = le ? String(le.message || le) : '';
+        _externalFetchProbe.nicoadLastOk = resp ? resp.ok === true : false;
+        _externalFetchProbe.nicoadLastStatus =
+          resp && typeof resp.status === 'number' ? resp.status : null;
+        try {
+          document.documentElement?.setAttribute(
+            'data-nls-nicoad-fetch',
+            le ? 'error' : resp && resp.ok === true ? 'ok' : 'empty'
+          );
+        } catch {
+          /* no-op */
+        }
         if (le) return;
-        if (!resp || resp.ok !== true || resp.json == null) return;
+        if (!resp || resp.ok !== true || resp.json == null) {
+          _externalFetchProbe.nicoadLastRows = 0;
+          _externalFetchProbe.nicoadLastRowsArr = null;
+          return;
+        }
         let rows = null;
         try {
           rows = normalizeNicoadRankingResponse(resp.json);
         } catch {
           rows = null;
         }
+        _externalFetchProbe.nicoadLastRows = Array.isArray(rows) ? rows.length : 0;
+        // v0.1.621: 診断 state 用に rows 配列もキャッシュ(残課題3根治)。
+        _externalFetchProbe.nicoadLastRowsArr = Array.isArray(rows) && rows.length > 0 ? rows : null;
         if (!Array.isArray(rows) || rows.length === 0) return;
         const curLid = String(liveId || '')
           .trim()
@@ -13882,11 +14132,13 @@ async function maybeResolveNamedUserProfilesOnce() {
       commentsKey,
       giftsKey,
       KEY_USER_COMMENT_PROFILE_CACHE,
-      KEY_COMMENTER_FOLLOW_CACHE
+      KEY_COMMENTER_FOLLOW_CACHE,
+      KEY_PROFILE_RESOLVE_STATE
     ]);
     const profileMap = normalizeUserCommentProfileMap(
       bag[KEY_USER_COMMENT_PROFILE_CACHE]
     );
+    let resolveStateMap = bag[KEY_PROFILE_RESOLVE_STATE] || {};
     // フォロー/フォロワー横断キャッシュ（数値 uid キー・TTL 付き）。同じ nvapi 応答から拾う。
     const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
     const followNow = Date.now();
@@ -13901,7 +14153,8 @@ async function maybeResolveNamedUserProfilesOnce() {
       if (!uid || seen.has(uid)) return;
       seen.add(uid);
       if (!isResolvableNicoUid(uid)) return;
-      if (_nicoProfileResolveAttempted.has(uid)) return;
+      const { shouldResolve } = shouldResolveProfile(resolveStateMap, uid, followNow);
+      if (!shouldResolve) return;
       const hit = profileMap[uid];
       const hasNick = hit && String(hit.nickname || '').trim() !== '';
       const hasAvatar = hit && String(hit.avatarUrl || '').trim() !== '';
@@ -13937,25 +14190,37 @@ async function maybeResolveNamedUserProfilesOnce() {
             { type: NICO_USER_PROFILE_FETCH_MESSAGE_TYPE, uid },
             (resp) => {
               const le = chrome.runtime.lastError;
-              if (le) return resolve(null);
-              if (!resp || resp.ok !== true || resp.json == null) return resolve(null);
+              if (le) return resolve({ profile: null, status: null });
+              if (!resp) return resolve({ profile: null, status: null });
+              if (resp.ok !== true || resp.json == null) {
+                return resolve({ profile: null, status: resp.status });
+              }
               try {
-                resolve(normalizeNicoUserProfileResponse(resp.json));
+                resolve({ profile: normalizeNicoUserProfileResponse(resp.json), status: resp.status || 200 });
               } catch {
-                resolve(null);
+                resolve({ profile: null, status: resp.status || 200 });
               }
             }
           );
         } catch {
-          resolve(null);
+          resolve({ profile: null, status: null });
         }
       });
 
     let cacheTouched = false;
     let followTouched = false;
+    let resolveStateTouched = false;
     for (const uid of candidates) {
-      _nicoProfileResolveAttempted.add(uid);
-      const p = await askOne(uid);
+      const { profile: p, status } = await askOne(uid);
+      
+      resolveStateMap = recordProfileResult(resolveStateMap, uid, status, Date.now());
+      resolveStateTouched = true;
+
+      // v0.1.720: 即時生成 CDN URL のフォールバック (プロフ取得後、avatarUrlがなければ補完)
+      if (p && !p.avatarUrl && typeof p.userId === 'string' && /^[0-9]+$/.test(p.userId)) {
+        p.avatarUrl = deriveAvatarUrlFromUid(p.userId);
+      }
+
       if (!p) continue;
       if (upsertUserCommentProfileFromEntry(profileMap, p, broadcasterCtx)) {
         cacheTouched = true;
@@ -13966,13 +14231,20 @@ async function maybeResolveNamedUserProfilesOnce() {
         followTouched = true;
       }
     }
-    if (!cacheTouched && !followTouched) return;
+    if (!cacheTouched && !followTouched && !resolveStateTouched) return;
 
     const curLid = String(liveId || '').trim().toLowerCase();
     if (curLid !== lid) return;
 
+    if (resolveStateTouched) {
+      resolveStateMap = pruneProfileResolveMap(resolveStateMap, Date.now());
+    }
+
     /** @type {Record<string, unknown>} */
     const save = {};
+    if (resolveStateTouched) {
+      save[KEY_PROFILE_RESOLVE_STATE] = resolveStateMap;
+    }
     if (cacheTouched) {
       const pruned = pruneUserCommentProfileMap(profileMap);
       const applied = applyUserCommentProfileMapToEntries(comments, pruned);
@@ -14761,8 +15033,26 @@ let _ndgrDeterministicBackfillEnabled =
   typeof NL_DEV_HOTRELOAD !== 'undefined' && NL_DEV_HOTRELOAD;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
+/** SW backfill 取り置きの畳み込みを開始済みの liveId。 */
+let _swStagingFoldedForLiveId = '';
+/** PR1-b-3: SW backfill モード(実験・既定 OFF)。初期 storage 読み + onChanged で反映。 */
+let _backfillSwModeEnabled = false;
+/** @type {string} SW 起動メッセージ送信済みの liveId（ワンショット guard）。 */
+let _swBackfillTriggeredForLiveId = '';
 /** @type {AbortController|null} 進行中の巡回。タブ非表示 / SPA 遷移で abort。 */
 let _backfillAbort = null;
+/**
+ * v0.1.633: 直近の `visibility_paused` 発火時刻列（ms）。発火回数ベースで無限再起動ループを抑制
+ *   （旧 v0.1.624 の30秒一律クールダウンは初回 hidden 後30秒沈黙の退行。詳細は git 履歴）。
+ * @type {number[]}
+ */
+let _backfillRecentVisibilityPauses = [];
+/**
+ * v0.1.633: この liveId で既に一度でも visibility 起因の rearm を許可したか。false の間は
+ *   「初回保証」で必ず再開を許可し、開いた直後の沈黙を作らない。liveId が変わったらリセットする。
+ * @type {string}
+ */
+let _backfillVisibilityRearmedLiveId = '';
 /**
  * v0.1.431: liveId ごとの「一過性 stop での自動リトライ回数」。実機 lv350625305 等で観測＝
  * 過去ログの入口探しが押したタイミングで一過性に空振り(backward_exhausted/no_entry)し、
@@ -14802,26 +15092,43 @@ const NDGR_BACKFILL_TRANSIENT_RETRY_MAX = 7;
 // eslint-disable-next-line no-unused-vars
 const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
 /**
- * @type {{ seg: number, rows: number, done: 0|1, stopReason: string }} 進捗（data 属性で可視化）。
+ * @type {{ seg: number, rows: number, done: 0|1, stopReason: string, errMsg: string }} 進捗（data 属性で可視化）。
  * v0.1.415: stopReason を持つ。done=1 でも「本当に配信開始まで到達した（reached_start）」かを
  *   popup 側（backfillRinkuNarration）が区別し、嘘の達成宣言をしないため。
+ * v0.1.692: errMsg を持つ。aborted の真因(crawl 例外メッセージ)を status 診断へ保全する。
  */
-const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '' };
+const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '', errMsg: '' };
 /** @type {number} バックフィル進捗が最後に動いた時刻 */
 let _backfillLastProgressAt = 0;
+/**
+ * v0.1.6xx PR2: 動的スロットル状態(単一タブ相当への降格判定用)。
+ * メインスレッドの yield 復帰遅延を監視し、重ければ有効スロット数を 1 に絞る。
+ */
+const _backfillThrottleState = createBackfillThrottleState();
 
 /** 進捗を documentElement の data 属性へ反映（popup が読む）。 */
 function publishBackfillProgress() {
   try {
     const root = document.documentElement;
-    if (!root) return;
-    root.setAttribute(
-      'data-nls-backfill',
-      `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done} stop=${_backfillProgress.stopReason || ''}`
-    );
+    if (root) {
+      // data 属性は常に更新(自己診断・実機検証用・画面には出ない)。
+      root.setAttribute(
+        'data-nls-backfill',
+        `seg=${_backfillProgress.seg} rows=${_backfillProgress.rows} done=${_backfillProgress.done} stop=${_backfillProgress.stopReason || ''}`
+      );
+    }
   } catch {
     /* no-op */
   }
+  // v0.1.657「ローディングなしで一気に取る」: 過去ログ取得は単一タブなら数秒で reached_start
+  //   まで一気に掘り切る(2695件で約2.5秒)。なのに従来は毎区画 publishBackfillProgress が
+  //   KEY_BACKFILL_PROGRESS を逐次更新し、popup が「むかしのコメントまで遡ってるよ/2%取得中/
+  //   もう一度さかのぼり始めるね」と途中経過を実況=ユーザー実機「ローディングいらない・一気に
+  //   取れ」の不満の正体。取得は速いのに途中経過を見せていただけだった。
+  //   → popup への進捗橋渡しは【完走(done=1)時だけ】行う。取得中(done=0)は storage を更新せず
+  //   popup は何も受け取らない=「数秒黙って一気に取り、完成だけドンと出す」。完走時に最終値1本だけ
+  //   書くので popup は「集めきったよ」or partial を1回受け取る。
+  if (_backfillProgress.done !== 1) return;
   // v0.1.410: りんく演出用に進捗を storage へも橋渡し（別フレームの popup/パネルが
   //   onChanged で読む）。fire-and-forget・無害失敗は黙殺（setStorageLocalSilent）。
   // v0.1.415: stopReason も橋渡し（done=1 でも reached_start か途中かを popup が区別する）。
@@ -14834,6 +15141,8 @@ function publishBackfillProgress() {
           rows: _backfillProgress.rows,
           done: _backfillProgress.done,
           stopReason: _backfillProgress.stopReason || '',
+          // v0.1.692: aborted の真因(例外メッセージ)を status 診断へ橋渡し(画面文言には出さない)。
+          errMsg: _backfillProgress.stopReason === 'aborted' ? String(_backfillProgress.errMsg || '') : '',
           ts: Date.now()
         }
       },
@@ -14887,12 +15196,20 @@ async function backfillFetchBinary(url, opts) {
     else opts.signal.addEventListener('abort', onParentAbort, { once: true });
   }
   try {
+    // PR4: セッションストレージ共有トークンバケツで fetch レートを制御する
+    await acquireGlobalFetchToken(ac ? ac.signal : opts?.signal);
+
     const res = await fetch(url, {
       method: 'GET',
       credentials: 'omit', // ⭐ cross-origin（mpn.live）必須。include だと Failed to fetch
       cache: 'no-store',
       signal: ac ? ac.signal : opts?.signal
     });
+
+    // PR4: 429 エラーが出たらレートを落とす、成功なら上げる
+    const is429 = res.status === 429;
+    void reportGlobalFetchResult(res.ok, is429);
+
     const buf = res.ok ? new Uint8Array(await res.arrayBuffer()) : new Uint8Array();
     return { ok: res.ok, status: res.status, bytes: buf };
   } finally {
@@ -14942,61 +15259,105 @@ function backfillYieldToPage() {
 const NDGR_BACKFILL_YIELD_EVERY_SEGMENTS = 6;
 
 /**
- * 過去ログ一括バックフィルを 1 回だけ起動する（ワンショット）。
- * 巡回エンジン（crawlNdgrBackward）を実 fetch / 実 sleep で駆動し、yield された
- * 過去 chat を capturedAt 保持で persistCommentRows に流す。
- * @returns {Promise<void>}
+ * v0.1.654「一気に取れない」根治: pending バッファを storage へ吐く時間ベース閾値(ms)。
+ * 件数閾値(computeBackfillFlushThreshold)に届かなくても、最後の flush からこの時間を超えたら
+ * 必ず flush する。crawl が高速で大量取得した分が storage に落ちないまま膨らみ、タブ離脱/
+ * visibility 中断で一括消失するのを防ぐ(実機 lv350631410: rows9297 取り切ったのに chunk4951)。
+ * 2.5s は YIELD(6区画)より十分長く flush 回数を抑えつつ、中断損失を直近数秒分に圧縮する。
  */
-async function runNdgrBackfillOnce() {
-  if (_backfillTriedLiveId && _backfillTriedLiveId === liveId) return; // 二重起動防止
+const NDGR_BACKFILL_TIME_FLUSH_MS = 2500;
+
+/** 過去ログ一括バックフィルを 1 回だけ起動する（ワンショット）。@returns {Promise<void>} */
+async function runNdgrBackfillOnce(ctx = {}) {
+  const {
+    liveIdOverride = liveId,
+    viewBaseOverride = null,        // null なら readNdgrViewBaseUri() を呼ぶ
+    officialCountOverride = null,   // null なら officialCommentCount を使う
+    recordedCountOverride = null,   // null なら observedRecordedCommentCount を使う
+    programBeginAtMsOverride = null, // null なら programBeginAtMs を使う
+    onProgress = null,              // null なら publishBackfillProgress() を呼ぶ
+    onPersist = null,               // null なら persistCommentRows() を呼ぶ
+  } = ctx;
+  if (_backfillTriedLiveId && _backfillTriedLiveId === liveIdOverride) return; // 二重起動防止
   // v0.1.418: 手動ボタン押下（_backfillEnabled）か自動開始 ON（_backfillAutoEnabled・既定）の
   //   どちらかで起動する。両方 OFF（自動を切ってボタンも押していない）のときだけ起動しない。
   if (!_backfillEnabled && !_backfillAutoEnabled) return;
-  if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+  if (!recording || !liveIdOverride || !locationAllowsCommentRecording()) return;
   if (!hasExtensionContext()) return;
-  const viewBase = readNdgrViewBaseUri();
+  const viewBase = viewBaseOverride || readNdgrViewBaseUri();
   if (!viewBase) return; // MAIN world がまだ view を観測していない（参加直後等）
-  _backfillTriedLiveId = liveId;
+  _backfillTriedLiveId = liveIdOverride;
 
-  // 前回分があれば畳む。新しい AbortController を立て、タブ非表示で中断する。
   if (_backfillAbort) {
     try { _backfillAbort.abort(); } catch { /* no-op */ }
   }
   const ac = new AbortController();
   _backfillAbort = ac;
   const onHidden = () => {
-    if (document.visibilityState === 'hidden') {
+    if (document.visibilityState !== 'hidden') return;
+    // v0.1.683: N=2 スロットプールに空きがあれば hidden でも abort しない。
+    //   空きスロットなし（待機タブ >= N）のときだけ abort して前面タブへの圧迫を防ぐ。
+    //   空きスロットあり = 自分だけ or 並走予算内 → そのまま掘り切る（「一気に取れない」根治）。
+    //   v0.1.621 の visibility_paused は空きなし時のみ立てる（TRANSIENT リトライは維持）。
+    void (async () => {
+      let waitingLiveIds = [];
+      try { waitingLiveIds = await listBackfillWaitingLiveIds(); } catch { /* no-op */ }
+      const effectiveSlots = resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS);
+      const slotsFullyOccupied = waitingLiveIds.length >= effectiveSlots;
+      if (!slotsFullyOccupied) return; // 空きあり → abort しない
+      if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'visibility_paused';
       try { ac.abort(); } catch { /* no-op */ }
-    }
+    })();
   };
   document.addEventListener('visibilitychange', onHidden);
+  // v0.1.642 「一気に取れない」退行根治: rotation_yield(90秒強制打ち切り)は「待機している別タブが
+  //   居るとき(=多タブで譲る相手が居るとき)だけ」発火する。単一タブ(実機の大半)では譲る相手が無く、
+  //   90秒で打ち切る理由が無いので発火させず、配信開始まで一気に掘り切る(わんコメ式)。
+  //   重さ(ページが応答しません)対策は backfillYieldToPage(6区画ごと scheduler.yield)が担う。
+  //   多タブ時のみ rotation を残す(v0.1.606 の応答性対策・429防止を温存)。
   const rotationTid = setTimeout(() => {
     if (_backfillProgress.stopReason) return;
-    _backfillProgress.stopReason = 'rotation_yield';
-    try {
-      ac.abort();
-    } catch {
-      /* no-op */
-    }
+    void (async () => {
+      let waitingLiveIds = [];
+      try {
+        waitingLiveIds = await listBackfillWaitingLiveIds();
+      } catch {
+        waitingLiveIds = [];
+      }
+      // 再エントリで既に他の理由で止まっていたら何もしない。
+      if (_backfillProgress.stopReason) return;
+      // v0.1.663: 並列スロット対応。待機タブが「空きスロット数(N)以上」居る時だけ譲る。
+      //   N=2 なら 2配信目(待機1つ)はまだ空きがあるので譲らず並走、3配信目以降だけ発火。
+      //   parallelSlots=1 なら従来の shouldFireBackfillRotation とビット同値(単一タブ温存)。
+      if (!ac.signal.aborted &&
+          shouldFireBackfillRotationWithSlots({
+            waitingLiveIds,
+            selfLiveId: liveIdOverride,
+            parallelSlots: resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS)
+          })) {
+        _backfillProgress.stopReason = 'rotation_yield';
+        try { ac.abort(); } catch { /* no-op */ }
+      }
+      // 単一タブ/空きスロットあり(発火しない)なら abort せず crawl を継続=掘り切る。
+    })();
   }, GLOBAL_BACKFILL_ROTATION_MS);
 
   _backfillProgress.seg = 0;
   _backfillProgress.rows = 0;
   _backfillProgress.done = 0;
   _backfillProgress.stopReason = '';
+  _backfillProgress.errMsg = '';
   _backfillLastProgressAt = Date.now();
-  publishBackfillProgress();
+  onProgress ? onProgress({ ..._backfillProgress }) : publishBackfillProgress();
 
-  const startMs =
-    programBeginAtMs != null && Number.isFinite(programBeginAtMs) && programBeginAtMs > 0
-      ? programBeginAtMs
-      : null;
+  const _pbMs = programBeginAtMsOverride ?? programBeginAtMs;
+  const startMs = _pbMs != null && Number.isFinite(_pbMs) && _pbMs > 0 ? _pbMs : null;
 
   // v0.1.456 レジューム: 前回この配信で到達した最古コメント vpos を読み、crawl の
   //   resumeFromVpos に渡す。これで「もう一度ためす」や自動リトライが前回の続きから
   //   掘り始め、同じ区画を取り直して dedupe で弾かれる無駄（実機 125→135→143）を解消。
   //   読めない/壊れているときは null＝従来どおり seed 探索から（後方互換）。
-  const resumeKey = liveId ? backfillResumeStorageKey(liveId) : null;
+  const resumeKey = liveIdOverride ? backfillResumeStorageKey(liveIdOverride) : null;
   let resumeFromVpos = null;
   // 自動補充の完全性優先（2026-05-30 真因修正・ユーザー実機 lv350642072 で seg:3/rows:14・76%停止）:
   //   resume は「前回到達した最古 vpos の続きから」掘る最適化だが、過去に配信開始近傍まで届いた
@@ -15008,7 +15369,7 @@ async function runNdgrBackfillOnce() {
   //     （ほぼ埋まっている）ときだけ従来どおり resume で続きを足す。
   const gapForSweep = Math.max(
     0,
-    (Number(officialCommentCount) || 0) - (Number(observedRecordedCommentCount) || 0)
+    (Number(officialCountOverride ?? officialCommentCount) || 0) - (Number(recordedCountOverride ?? observedRecordedCommentCount) || 0)
   );
   // fix/backfill-all-sizes（レビュー会議室・2026-06-01 反映）: forceFullSweep のしきい値は
   //   あえて minGapAbsolute(170) のまま据え置く。ここを小規模向けに下げると、再アームのたびに
@@ -15017,8 +15378,8 @@ async function runNdgrBackfillOnce() {
   //   掘る方が効率的に穴を埋められるので、full sweep は大ギャップ（stale resume の誤完了復旧）
   //   専用のまま残す。約49%停滞の解消は再アーム停止しきい値の実効化（下記）だけで足りる。
   const forceFullSweep =
-    officialCommentCount != null &&
-    Number.isFinite(officialCommentCount) &&
+    (officialCountOverride ?? officialCommentCount) != null &&
+    Number.isFinite((officialCountOverride ?? officialCommentCount)) &&
     gapForSweep >= OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute;
   if (resumeKey && forceFullSweep) {
     // stale resume を破棄して full sweep を保証（次回の自動補充も now から遡れるように）。
@@ -15043,11 +15404,10 @@ async function runNdgrBackfillOnce() {
     if (!resumeKey) return;
     const v = Number(minVpos);
     if (!Number.isFinite(v) || v <= 0) return;
-    // 前回保存値より小さい（より古い）ときだけ更新。
     if (resumeFromVpos != null && v >= resumeFromVpos) return;
     resumeFromVpos = Math.floor(v);
     setStorageLocalSilent({
-      [resumeKey]: { lid: liveId, minVpos: Math.floor(v), ts: Date.now() }
+      [resumeKey]: { lid: liveIdOverride, minVpos: Math.floor(v), ts: Date.now() }
     });
   };
 
@@ -15057,13 +15417,19 @@ async function runNdgrBackfillOnce() {
   /** @type {ParsedCommentRow[]} */
   let pendingBackfillRows = [];
   let segmentsSinceYield = 0;
+  // v0.1.654「一気に取れない」根治: 最後に pending を storage へ吐いた時刻。crawl が高速で
+  //   大量取得しても、件数閾値(computeBackfillFlushThreshold)に届く前にこの間隔を超えたら
+  //   時間ベースで必ず flush し、storage に落ちていない pending を最小化する。これで watch
+  //   タブ離脱/visibility 中断が来ても、直近に取れた分が確実に残る(中断損失の最小化)。
+  let _lastBackfillFlushAt = Date.now();
   const flushPendingBackfillRows = () => {
     if (!pendingBackfillRows.length) return;
     // ⛔ flushNdgrChatRowsBatch を経由しない（capturedAt 握り潰し回避）。
     //    persistCommentRows → mergeNewComments は capturedAt/vpos を素通しする。
     const batch = pendingBackfillRows;
     pendingBackfillRows = [];
-    persistCommentRows(batch, { source: COMMENT_INGEST_SOURCE.BACKFILL });
+    _lastBackfillFlushAt = Date.now();
+    onPersist ? onPersist(batch) : persistCommentRows(batch, { source: COMMENT_INGEST_SOURCE.BACKFILL });
   };
 
   try {
@@ -15092,7 +15458,12 @@ async function runNdgrBackfillOnce() {
         //   いたため、time-out/混雑/入口なしで途中終了しても finally が一律 done=1 を立て、
         //   popup が「ぜんぶ届いた」と誤宣言していた（13% で達成宣言→後から増える事象）。
         //   reached_start の時だけ達成、それ以外は正直な文言にするため stopReason を渡す。
-        _backfillProgress.stopReason = String(step.value?.stopReason || '');
+        const genReason = String(step.value?.stopReason || '');
+        // v0.1.692: content 側が先に立てた中断理由(visibility_paused/stalled 等)を generator の
+        //   汎用 'aborted' で潰さない(リトライ系統の判定が壊れる)。実理由はそのまま採用。
+        if (!(genReason === 'aborted' && _backfillProgress.stopReason)) {
+          _backfillProgress.stopReason = genReason;
+        }
         // v0.1.456 レジューム: 終了時に最古到達 vpos を保存（次回「もう一度」で続きから）。
         //   reached_start（配信開始まで到達）で完了したら resume をクリア＝次回はゼロから。
         //   それ以外（no_progress/cap_*/aborted/rate_limited 等）は続きから再開できるよう残す。
@@ -15114,13 +15485,23 @@ async function runNdgrBackfillOnce() {
         //   廃止。globalThis 代入は維持（次に reached_start が出たときの根拠を 1 件保持）。
         try {
           const diag = step.value && /** @type {any} */ (step.value).diagnostics;
+          // v0.1.640 診断: 入口で過去ログが0件になる stop(backward_exhausted/no_entry/rate_limited)の
+          //   crawl/seek 結果を data 属性へ出す(実機で fetch が空か decode 失敗か起動の問題かを特定)。
+          if (diag && (diag.crawl || diag.seek)) {
+            try {
+              document.documentElement.setAttribute(
+                'data-nls-backfill-diag',
+                JSON.stringify({ stop: _backfillProgress.stopReason, crawl: diag.crawl, seek: diag.seek, cands: diag.cands }).slice(0, 700)
+              );
+            } catch { /* no-op */ }
+          }
           if (
             diag &&
             _backfillProgress.stopReason === 'reached_start' &&
             Array.isArray(diag.reachedStartChats)
           ) {
             const summary = {
-              lid: liveId,
+              lid: liveIdOverride,
               path: diag.reachedStartPath || 'unknown',
               rows: _backfillProgress.rows,
               count: diag.reachedStartChats.length,
@@ -15167,16 +15548,23 @@ async function runNdgrBackfillOnce() {
         _backfillProgress.rows += rows.length;
         _backfillLastProgressAt = Date.now();
       }
-      publishBackfillProgress();
+      onProgress ? onProgress({ ..._backfillProgress }) : publishBackfillProgress();
       // 一定行たまったら 1 回だけ persist（フラッシュ回数を激減＝固まり緩和）。
       // v0.1.xxx: 閾値を「保存済み件数」に応じて動的に引き上げる（computeBackfillFlushThreshold）。
       //   固定 800 行だと巨大放送ほど flush 回数が増え、full-array の read-merge-write（O(N)）が
       //   積み重なって総コスト O(N^2) ＝「応答しません」の主因。保存件数比例で溜めてから書くと
       //   flush 回数が放送サイズに依存せず、メモリは max(8000 行)で頭打ち。dedupe が正確性担保。
       const backfillFlushThreshold = computeBackfillFlushThreshold(
-        observedRecordedCommentCount
+        (recordedCountOverride ?? observedRecordedCommentCount)
       );
-      if (pendingBackfillRows.length >= backfillFlushThreshold) {
+      // v0.1.654: 件数閾値に届かなくても、最後の flush から一定時間(2.5s)経っていれば
+      //   時間ベースで flush する。crawl が高速で大量取得しても pending が storage に
+      //   落ちないまま膨らみ、タブ離脱/visibility 中断で一括消失する(=「一気に取れない」
+      //   真因)のを防ぐ。閾値ベース(O(N²)緩和)と時間ベース(中断損失最小化)の併用。
+      const flushByTime =
+        pendingBackfillRows.length > 0 &&
+        Date.now() - _lastBackfillFlushAt >= NDGR_BACKFILL_TIME_FLUSH_MS;
+      if (pendingBackfillRows.length >= backfillFlushThreshold || flushByTime) {
         flushPendingBackfillRows();
         // v0.1.456 レジューム: persist バッチ境界（低頻度）で最古到達 vpos を coalesce 保存。
         //   途中でタブを閉じる/中断しても、次回「もう一度」で続きから再開できる（毎 yield で
@@ -15188,33 +15576,88 @@ async function runNdgrBackfillOnce() {
       segmentsSinceYield += 1;
       if (segmentsSinceYield >= NDGR_BACKFILL_YIELD_EVERY_SEGMENTS) {
         segmentsSinceYield = 0;
+        const yieldStart = Date.now();
         await backfillYieldToPage();
+        updateBackfillThrottleState(_backfillThrottleState, Date.now() - yieldStart);
       }
     }
-  } catch {
+  } catch (e) {
     /* 巡回失敗はサイレント（best-effort）。RT 取り込みには影響しない */
     // 例外で抜けた＝最後まで遡れていない。reached_start ではないので達成宣言しないよう
     //   stopReason を立てる（未設定なら aborted 扱い＝popup は「途中/また後で」になる）。
     if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'aborted';
+    // v0.1.692: サイレント握り潰しで真因が消えていた。診断用にメッセージを保全(表示経路はdiag/status)。
+    try { _backfillProgress.errMsg = String(e?.message || e || '').slice(0, 120); } catch { /* no-op */ }
   } finally {
     clearTimeout(rotationTid);
     // v0.1.431: 正常終了・abort・例外いずれの抜け方でも、バッファに残った取り込み済み行を
     //   必ず吐き出す（per-segment persist をやめてバッチ化したぶん、ここで取りこぼし防止）。
     flushPendingBackfillRows();
+    // v0.1.647: flushPendingBackfillRows() は enqueue+遅延 flush 予約のみ。await しないと finally
+    //   直後の hidden/別配信切替で timer 発火前に buffer が捨てられ数千行消失（実機 lv350631407:
+    //   rows=9301 完走なのに chunk=5218）。完走時に確実に書き切るためここで await する。
+    try {
+      await persistCoalescer.flush();
+    } catch {
+      /* flush 失敗は best-effort（次回 backfill / RT 取り込みで回収される） */
+    }
     document.removeEventListener('visibilitychange', onHidden);
     if (_backfillAbort === ac) _backfillAbort = null;
     if (_backfillProgress.stopReason === 'rotation_yield') {
       _backfillTriedLiveId = '';
     }
+    // v0.1.621: タブ切替中断でも one-shot guard を解除し、次 tick で続きから自動再開する。
+    // v0.1.624: ただし無条件解除は無限再起動ループ(visibilitychange 連発で毎秒級 abort→restart)。
+    // v0.1.633: 旧 30秒一律クールダウンは rearm 初期値 0 のせいで開いた直後 30 秒が完全沈黙＝退行
+    //   (実機 lv350679746: 公式947件中記録1件)。→「初回保証 + 発火回数ベース抑制」に置換
+    //   (backfillVisibilityRearm.js: 初回 rearm は必ず許可・2回目以降は連発ループ時だけ抑制)。
+    // v0.1.661: aborted も同じ自動再開対象。複数タブで別配信タブの runNdgrBackfillOnce 冒頭の
+    //   _backfillAbort.abort() が stopReason='aborted' を作り guard が外れず数%で永久凍結した
+    //   (実機 lv350689421: タブ2・rows0/aborted・公式1862中記録148=8%)。詳細は git 履歴参照。
+    if (
+      _backfillProgress.stopReason === 'visibility_paused' ||
+      _backfillProgress.stopReason === 'aborted'
+    ) {
+      const now = Date.now();
+      // liveId が切り替わったら初回保証カウンタをリセット(別配信は別物として扱う)。
+      if (_backfillVisibilityRearmedLiveId && _backfillVisibilityRearmedLiveId !== liveIdOverride) {
+        _backfillVisibilityRearmedLiveId = '';
+        _backfillRecentVisibilityPauses = [];
+      }
+      _backfillRecentVisibilityPauses = pruneRecentVisibilityPauses(
+        [..._backfillRecentVisibilityPauses, now],
+        now
+      );
+      const hasRearmedThisLive = _backfillVisibilityRearmedLiveId === liveIdOverride;
+      if (
+        shouldRearmBackfillAfterVisibility({
+          hasRearmedThisLive,
+          recentPauseTimestamps: _backfillRecentVisibilityPauses
+        })
+      ) {
+        _backfillVisibilityRearmedLiveId = liveIdOverride;
+        _backfillTriedLiveId = '';
+      }
+    }
     _backfillProgress.done = 1;
-    publishBackfillProgress();
-    void clearBackfillWaiter(String(liveId || '').trim().toLowerCase());
+    onProgress ? onProgress({ ..._backfillProgress }) : publishBackfillProgress();
+    void clearBackfillWaiter(String(liveIdOverride || '').trim().toLowerCase());
 
     // v0.1.431: 一過性 stop（入口が一時的に見つからない等）なら one-shot guard を一定時間後に
     //   解除し、maintenance tick の maybeAutoStartBackfill が自動で再試行する（UI 案内「少し
     //   経ってからもう一度」を自動化）。完了/やり切り/中断では再試行しない。タブが今 LIVE を
     //   見ていて自動取り込み ON のときだけ（隠れタブ・OFF では無駄に叩かない）。
-    const lidAtFinish = liveId;
+    const lidAtFinish = liveIdOverride;
+    // v0.1.665: 進捗があった巡回はリトライ/再アーム予算を全回復する。上限(7回/40回)は
+    //   「連続空振り」を止めるための予算であって、長尺・疎区間配信が何度も止まりながら
+    //   前進するときの寿命ではない。生涯予算のままだと3時間級配信で途中に予算が尽き、
+    //   以後は前面でも gap が残ったまま永久に再開されず71%等で固定された(実機 2026-06-10・
+    //   公式1263/記録899)。取れない配信は rows=0 が続き従来どおり有界=暴走防止不変。
+    if (shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: _backfillProgress.rows })) {
+      _backfillTransientRetryByLiveId[lidAtFinish] = 0;
+      const lidTrimmedAtFinish = String(lidAtFinish || '').trim();
+      if (lidTrimmedAtFinish) _backfillGapRearmByLiveId[lidTrimmedAtFinish] = 0;
+    }
     const retried = _backfillTransientRetryByLiveId[lidAtFinish] || 0;
     if (
       shouldScheduleBackfillTransientRetry({
@@ -15222,7 +15665,12 @@ async function runNdgrBackfillOnce() {
         retriedCount: retried,
         maxRetries: NDGR_BACKFILL_TRANSIENT_RETRY_MAX,
         autoEnabled: _backfillAutoEnabled,
-        tabHidden: document.visibilityState === 'hidden'
+        tabHidden: document.visibilityState === 'hidden',
+        // v0.1.658: no_progress でも official に大きく届いていなければ続きから再試行(59%停止救済)。
+        recordedCount: Number(recordedCountOverride ?? observedRecordedCommentCount) || 0,
+        officialCount: Number(officialCountOverride ?? officialCommentCount) || 0,
+        // v0.1.692: rows=0 の aborted(一発死)を一過性として回数上限つきで自動再試行(放置救済)。
+        rows: Number(_backfillProgress.rows) || 0
       })
     ) {
       _backfillTransientRetryByLiveId[lidAtFinish] = retried + 1;
@@ -15232,7 +15680,7 @@ async function runNdgrBackfillOnce() {
       const retryDelayMs = calculateBackfillRetryDelayMs(retried);
       setTimeout(() => {
         // 同じ配信を今も見ていて guard がこの liveId のままなら解除＝次 tick で再起動。
-        if (liveId === lidAtFinish && _backfillTriedLiveId === lidAtFinish) {
+        if (liveIdOverride === lidAtFinish && _backfillTriedLiveId === lidAtFinish) {
           _backfillTriedLiveId = '';
         }
       }, retryDelayMs);
@@ -15314,36 +15762,46 @@ function maybeRearmBackfillForGapCatchup() {
 }
 
 /**
- * v0.1.418: 自動開始の試行（maintenance tick から毎周期呼ばれる）。
- *   自動 ON（既定）かつ top frame のときだけ runNdgrBackfillOnce を試す。実際の起動可否
- *   （記録 ON / liveId / view base 観測済み / ワンショット guard）は runNdgrBackfillOnce が
- *   判定するので、ここは「自動が許可されているか」と top frame だけ見て委ねる＝view base が
- *   遅れて観測される配信でも、観測でき次第その後の tick で 1 回起動する。
+ * v0.1.418: 自動開始の試行（maintenance tick から毎周期呼ばれる）。自動 ON かつ top frame の
+ *   ときだけ起動を試し、実際の起動可否（記録 ON / view base / guard）は runNdgrBackfillOnce に委ねる。
  */
 function maybeAutoStartBackfill() {
+  void maybeFoldSwBackfillStaging();
   if (!_backfillAutoEnabled) return;
   if (!isWatchInlinePanelTopFrame()) return;
-  // feat/multitab-scale-globalcap（2026-05-31）: 重いバックフィル（過去ログ一括取り込み）は
-  //   「いま見えているタブ」だけが起動する。裏タブで起動すると、別放送を別タブで開いたときに
-  //   両方が共有レンダラのメインスレッドでフルバックフィルを同時実行し、前面タブごと固める
-  //   （実機: 7,800 件の順調タブが、別放送タブを開いた途端に記録停止）。裏タブは LIVE capture は
-  //   継続するが catch-up は保留し、前面化したら次 tick で再開する（runNdgrBackfillOnce の
-  //   _backfillTriedLiveId は per-live なので昇格後に「続きから」走れる）。
-  //   ※既存の onHidden（runNdgrBackfillOnce 内）が走行中の hidden 化で abort → グローバルロック解放。
-  if (typeof document !== 'undefined' && document.hidden) return;
-  // fix/broadcast-bulk-catchup（2026-05-31）: DOM deep harvest のゲートに依存しない専用
-  //   ウォッチドッグ。公式件数とのギャップが残る限り guard を解除して続きから自動再開させる。
+  // PR1-b-3: SW backfill モード(実験・既定 OFF)。ON 時は既存経路(スロット/ローカル crawl)を起動せず
+  //   SW へ起動メッセージを 1 live 1 回送る。view base 未観測/SW 未応答は次 tick で自然リトライ。
+  if (_backfillSwModeEnabled) {
+    const lidSw = String(liveId || '').trim().toLowerCase();
+    const decision = shouldTriggerSwBackfill({
+      swModeEnabled: true,
+      lid: lidSw,
+      viewBase: readNdgrViewBaseUri(),
+      triggeredLiveId: _swBackfillTriggeredForLiveId
+    });
+    if (decision.fire) {
+      chrome.runtime.sendMessage({
+        type: 'nls_backfill_sw_start',
+        lid: lidSw,
+        viewBase: readNdgrViewBaseUri(),
+        programBeginAtMs,
+        deterministic: _ndgrDeterministicBackfillEnabled,
+        officialCount: Number(officialCommentCount) || null, // PR1-b-4: SW 側リトライの gap 判定用
+        mirrorLegacyProgress: true
+      }, (res) => {
+        if (chrome.runtime.lastError) return; // SW 未応答=次 tick 再試行
+        if (res?.ok) _swBackfillTriggeredForLiveId = lidSw;
+        // already_running は別 lv の crawl 中かもしれないのでガードせず次 tick 再試行
+      });
+    }
+    return;
+  }
+  // v0.1.683: hidden でもスロットに空きがあれば起動（N 全埋まり時のみ hidden abort）。
+  // fix/broadcast-bulk-catchup: 公式件数ギャップが残る限り guard を解除して続きから自動再開。
   maybeRearmBackfillForGapCatchup();
-  // v0.1.489: backfill が「動いているはずなのに 0 行のまま」なら一旦 abort して再起動を促す。
-  //   コメント取得が長時間 0 のまま固定される症状の緩和。
-  // fix/broadcast-bulk-catchup（2026-05-31）拡張: rows>0 でも「途中で固まったまま長時間進まない」
-  //   ハング（実機: 記録118/公式595 で 5 分更新なし）を検知して abort→再開させる。done=0 で
-  //   _backfillAbort が残るとウォッチドッグ（done=1 前提）が再開できないため、ここで打ち切って
-  //   finally に done=1 を立てさせ、次 tick で forceFullSweep 付き再開につなげる。
-  // ⭐コードレビュー反映: stall を検知して abort した tick では、その場で再起動しない。
-  //   旧 crawl の finally（done=1/stopReason を無条件に立てる）と同 tick で新 run が並走すると、
-  //   一瞬「完了」が出る/進捗が上書きされる揺れが起きるため。abort 後は return して、次 tick の
-  //   maybeAutoStartBackfill（旧 run の unwind 後・done=1 確定後）に再開を委ねる。
+  // v0.1.489 + fix/broadcast-bulk-catchup: 0行固定/途中ハングを検知したら abort して done=1 を
+  //   立てさせ、次 tick で再開させる（同 tick での再起動は旧 finally と並走して揺れるため return）。
+  //   詳細経緯は git 履歴参照。
   let didStallAbortThisTick = false;
   try {
     const now = Date.now();
@@ -15353,11 +15811,8 @@ function maybeAutoStartBackfill() {
     );
     const noProgressMs =
       _backfillLastProgressAt > 0 ? now - _backfillLastProgressAt : 0;
-    // fix/backfill-all-sizes（レビュー会議室・2026-06-01 反映）: ハング検知の残ギャップしきい値も
-    //   再アーム判定と同じ effectiveMinGap に揃える。ここだけ固定 170 のままだと、小〜中規模で
-    //   gap が [effectiveMinGap, 170) の帯でハングした場合に abort されず（gap<170）、かつ
-    //   再アームも _backfillRunning=true でブロックされ、バックフィルが永久に再開しないデッドロック
-    //   になる（code-reviewer・Gemini が一致で指摘）。
+    // fix/backfill-all-sizes: ハング検知の残ギャップしきい値も再アームと同じ effectiveMinGap に
+    //   揃える（固定170のままだと小〜中規模で永久デッドロック。詳細は git 履歴）。
     const stallEffectiveMinGap = computeEffectiveBackfillRearmMinGap({
       official: officialCommentCount,
       minGapAbsolute: OFFICIAL_GAP_DEEP_TIMING.minGapAbsolute,
@@ -15372,8 +15827,7 @@ function maybeAutoStartBackfill() {
       _backfillProgress.rows === 0 &&
       noProgressMs > 60_000 &&
       gapRemains;
-    // 途中まで取れたが進まなくなったハング: no_progress のバックオフ睡眠（最大 ~45 秒）を
-    //   誤検知しないよう、より長い 150 秒のしきい値で打ち切る。
+    // 途中ハング: no_progress バックオフ睡眠（最大 ~45 秒）の誤検知回避のため 150 秒で打ち切り。
     const stalledMidRun =
       _backfillAbort != null &&
       _backfillProgress.rows > 0 &&
@@ -15390,36 +15844,35 @@ function maybeAutoStartBackfill() {
   }
   // stall abort した tick は、旧 run の finally と競合させないため再起動を次 tick に委ねる。
   if (didStallAbortThisTick) return;
-  // feat/multitab-scale-globalcap（2026-05-31）: 旧 per-liveId ロック（'nls-backfill-<lv>'）は
-  //   「同一放送の多タブ」しか抑えられず、別放送どうしを別タブで開くと各タブが自分のリーダーに
-  //   なって同時にフルバックフィルした。グローバル（ライブ非依存）ロックに変え、全タブ横断で
-  //   「同時に1タブだけ」がバックフィルするよう絞る。lock は crawl 実行中ずっと保持され、
-  //   リーダーが閉じる/前面でなくなって abort すれば Chrome がロック自動解放→次 tick で別タブが昇格。
-  //   fail-open: Web Locks 非対応なら全タブ起動（従来）。
-  //   ⚠️手動ボタン経路（onChanged で直接 runNdgrBackfillOnce）は gate しない＝押したタブで必ず走る。
+  // feat/multitab-scale-globalcap: 別放送どうしの同時フルバックフィルをグローバルロックで抑止。
+  //   fail-open（Web Locks 非対応なら従来動作）。手動ボタン経路は gate しない。詳細は git 履歴。
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return;
-  void runWhileGlobalLeader(GLOBAL_BACKFILL_LOCK, () => runNdgrBackfillOnce()).then(
-    ({ ran }) => {
-      if (ran) {
-        void clearBackfillWaiter(lid);
-      } else {
-        void registerBackfillWaiter(lid);
-      }
+  // v0.1.663: Nスロットプール（N配信まで並走・N=1で従来の単一ロックと同値）。PR3: per-lvロックと
+  //   二段構え。runIfTabLeader の {ran} は per-lv ロック成否のみ＝スロット成否は slotRes で受ける。
+  //   waiter 登録/解除はリーダータブが担う。詳細は git 履歴参照。
+  void (async () => {
+    /** @type {{ran: boolean, slotIndex: number}|null} */
+    let slotRes = null;
+    const leader = await runIfTabLeader(`nls-backfill-${lid}`, async () => {
+      slotRes = await runInBackfillSlot(
+        (slotName, fn) => runWhileGlobalLeader(slotName, fn),
+        () => runNdgrBackfillOnce(),
+        { slots: resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS) }
+      );
+    });
+    if (!leader || !leader.ran) return;
+    if (slotRes && slotRes.ran) {
+      void clearBackfillWaiter(lid);
+    } else {
+      void registerBackfillWaiter(lid);
     }
-  );
+  })();
 }
 
-// ── v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in 配線 ──────────────
-//   狙い（[[前方向NDGR継続取得]]）: page-intercept 傍受 / DOM harvest がページ状態に依存して
-//     desync し「記録 < 本家コメ」のまま止まる症状を、ページに依存しない独立経路で補う。
-//     拡張自身が NDGR view の前方向ポインタ nextAt を long-poll で辿り、新着 segment を取り続ける。
-//   方針:
-//     - リーダータブ1本だけが放送中ずっと走る（runIfTabLeader が crawl の間ロックを保持＝多重起動
-//       なし。fail-open 環境のための再入 guard も下に持つ）。
-//     - backfill（過去ログ）と違い hidden で abort しない（継続取得が目的）。abort は liveId 変化・
-//       記録停止・番組終了・タブ unload のみ。
-//     - 既定 OFF（KEY_NDGR_FORWARD_ENABLED）。実機検証後に別バンプで既定 ON へ昇格する。
+// ── v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）の opt-in 配線（既定 OFF） ──────────
+//   ページ非依存の独立経路で「記録 < 本家コメ」desync を補う。リーダータブ1本が放送中走り続け、
+//   hidden では abort しない（abort は liveId 変化・記録停止・番組終了・unload のみ）。詳細は git 履歴。
 
 /** @type {boolean} 前方向継続取得が有効か（既定 OFF）。初回 storage 読み込み + onChanged で反映。 */
 let _ndgrForwardEnabled = false;

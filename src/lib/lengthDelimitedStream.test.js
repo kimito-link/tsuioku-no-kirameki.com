@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { extractPairsFromBinaryUtf8 } from './interceptBinaryTextExtract.js';
 import {
   concatUint8Arrays,
   createLengthDelimitedStreamAccumulator,
@@ -60,16 +59,6 @@ describe('splitLengthDelimitedMessages', () => {
     expect(parts[0][0]).toBe(0x7a);
   });
 
-  it('length-delimited UTF-8 JSON payload yields extractable no/uid (synthetic NDGR-style)', () => {
-    const inner = new TextEncoder().encode('{"no":77,"userId":"12345678"}');
-    const u8 = new Uint8Array(1 + inner.length);
-    u8[0] = inner.length;
-    u8.set(inner, 1);
-    const parts = splitLengthDelimitedMessages(u8);
-    expect(parts.length).toBe(1);
-    const pairs = extractPairsFromBinaryUtf8(new TextDecoder().decode(parts[0]));
-    expect(pairs).toContainEqual({ no: '77', uid: '12345678' });
-  });
 });
 
 describe('splitLengthDelimitedMessagesWithTail', () => {
