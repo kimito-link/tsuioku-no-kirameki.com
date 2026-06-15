@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   shouldFireBackfillRotation,
   shouldFireBackfillRotationWithSlots,
+  shouldYieldBackfillSlotToPriority,
 } from './backfillRotationGate.js';
 
 /*
@@ -114,5 +115,105 @@ describe('shouldFireBackfillRotationWithSlots (v0.1.663 並列スロット対応
         parallelSlots: 2,
       })
     ).toBe(false);
+  });
+});
+
+describe('shouldYieldBackfillSlotToPriority (v0.1.751 視聴中タブ優先スロット)', () => {
+  // 真因(実機 2026-06-15 lv350759040・歌枠34%停滞): 視聴中(前面)タブの backfill が、別配信の
+  //   裏タブにスロットを食われて飢餓。setBackfillPriorityLiveId は視聴中 lv を storage.session に
+  //   記すが、スロット取得はそれを見ていなかった。この純関数で「自分は視聴中(優先) lv ではなく、
+  //   別の新鮮な優先 lv が今スロットを待っている/スロット満杯」のとき裏タブが譲るべきと判定する。
+
+  const base = {
+    selfLiveId: 'lv200',
+    priorityLiveId: 'lv100',
+    priorityIsFresh: true,
+    amIVisible: false,
+    waitingLiveIds: ['lv100'],
+    parallelSlots: 1,
+  };
+
+  it('🔴飢餓根治: 裏タブ・別の新鮮な優先lvがスロット待ち・スロット満杯→譲る', () => {
+    expect(shouldYieldBackfillSlotToPriority(base)).toBe(true);
+  });
+
+  it('前面のままの裏タブ(別ウィンドウ・visible)でも、優先lvが別なら譲る', () => {
+    expect(shouldYieldBackfillSlotToPriority({ ...base, amIVisible: true })).toBe(true);
+  });
+
+  it('N=2でも優先lv待ち+別の待機でスロット満杯なら譲る', () => {
+    expect(
+      shouldYieldBackfillSlotToPriority({
+        ...base,
+        parallelSlots: 2,
+        waitingLiveIds: ['lv100', 'lv150'],
+      })
+    ).toBe(true);
+  });
+
+  it('自分が優先(視聴中)lv本人なら絶対に譲らない(自分自身に譲らない)', () => {
+    expect(
+      shouldYieldBackfillSlotToPriority({
+        ...base,
+        selfLiveId: 'lv100',
+        amIVisible: true,
+        waitingLiveIds: [],
+      })
+    ).toBe(false);
+  });
+
+  it('同一lvの2タブ(別の優先lvが存在しない)→譲らない(per-lvロックに委ねる)', () => {
+    expect(
+      shouldYieldBackfillSlotToPriority({
+        ...base,
+        selfLiveId: 'lv100',
+        priorityLiveId: 'lv100',
+        waitingLiveIds: ['lv100'],
+      })
+    ).toBe(false);
+  });
+
+  it('優先lvが期限切れ(120秒超)→譲らない(閉じた視聴タブが裏を永久ブロックしない)', () => {
+    expect(shouldYieldBackfillSlotToPriority({ ...base, priorityIsFresh: false })).toBe(false);
+  });
+
+  it('空きスロットがある(優先lvが待機に居らず others<slots)→譲らない(優先タブは空きを取れる・無駄abort防止)', () => {
+    expect(
+      shouldYieldBackfillSlotToPriority({
+        ...base,
+        parallelSlots: 2,
+        waitingLiveIds: [], // 優先lvは待機列に居ない=まだブロックされていない
+      })
+    ).toBe(false);
+  });
+
+  it('N=1後方互換: 優先lv無し→譲らない / 別の新鮮な優先lv+スロット満杯→譲る', () => {
+    expect(
+      shouldYieldBackfillSlotToPriority({ ...base, priorityLiveId: null, waitingLiveIds: [] })
+    ).toBe(false);
+    expect(
+      shouldYieldBackfillSlotToPriority({ ...base, parallelSlots: 1, waitingLiveIds: ['lv100'] })
+    ).toBe(true);
+  });
+
+  it('優先lvが不正/空→譲らない(fail-open)', () => {
+    expect(shouldYieldBackfillSlotToPriority({ ...base, priorityLiveId: '' })).toBe(false);
+    expect(shouldYieldBackfillSlotToPriority({ ...base, priorityLiveId: 'xxx' })).toBe(false);
+    expect(shouldYieldBackfillSlotToPriority({ ...base, priorityLiveId: null })).toBe(false);
+  });
+
+  it('大文字/前後空白の lv は正規化して比較', () => {
+    expect(
+      shouldYieldBackfillSlotToPriority({ ...base, priorityLiveId: '  LV100  ', waitingLiveIds: ['LV100'] })
+    ).toBe(true);
+    // 正規化後に self==priority になる場合は譲らない
+    expect(
+      shouldYieldBackfillSlotToPriority({ ...base, selfLiveId: '  LV100 ', priorityLiveId: 'lv100' })
+    ).toBe(false);
+  });
+
+  it('引数欠落は安全側=譲らない(視聴中タブ巻き込み防止・fail-open)', () => {
+    expect(shouldYieldBackfillSlotToPriority({})).toBe(false);
+    expect(shouldYieldBackfillSlotToPriority(undefined)).toBe(false);
   });
 });

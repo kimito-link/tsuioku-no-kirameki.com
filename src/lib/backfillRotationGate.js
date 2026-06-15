@@ -68,3 +68,55 @@ export function shouldFireBackfillRotationWithSlots(args) {
   // 空きスロットが無い(自分以外の待機タブ数がスロット数以上)時だけ譲る。
   return others.length >= slots;
 }
+
+/**
+ * v0.1.751「視聴中タブが裏タブにスロットを食われ飢餓(歌枠34%停滞)」根治: 自タブの backfill が、
+ * 別配信を視聴中(前面/優先)のタブにスロットを譲るべきかを判定する純関数。
+ *
+ * 真因(実機 2026-06-15 lv350759040): onTabVisibleForCommentHarvest が視聴中 lv を
+ *   setBackfillPriorityLiveId で storage.session に記録するが、スロット取得(runInBackfillSlot)も
+ *   既存の rotation/onHidden 譲り判定も「どの lv が優先(視聴中)か」を見ておらず、裏タブが
+ *   スロットを握り続けて視聴中タブの backfill を飢餓させていた(34%で「いっきにとれない」)。
+ *
+ * 設計(storage を読まない純関数=呼び出し側が priority/waiter/visible を渡す。TDD・単体テスト可):
+ *   「自分は優先 lv 本人ではなく、別の【新鮮な】優先 lv が今スロットを待っている/スロットが満杯」
+ *   のときだけ true(=自タブは開始を見送る or 走行中なら譲る)。視聴中タブ本人は優先 lv なので
+ *   条件②で必ず除外され、絶対に自分自身に譲らない。空きスロットがあるなら優先タブは素直に空きを
+ *   取れるので譲る必要は無い(無駄 abort 防止)。優先 lv が 120秒で期限切れ(priorityIsFresh=false)
+ *   なら、閉じた/離れた視聴タブが裏 backfill を永久ブロックしないよう譲らない。
+ *
+ * @param {object} args
+ * @param {string} args.selfLiveId 自タブの liveId。
+ * @param {string|null|undefined} args.priorityLiveId 現在の視聴中(優先) lv
+ *   (readBackfillPriorityLiveId().liveId)。無/期限切れなら null/''。
+ * @param {boolean} args.priorityIsFresh 優先記録が 120秒の有効期間内か
+ *   (呼び出し側が now - at < 120_000 を計算して渡す)。
+ * @param {boolean} args.amIVisible 自タブが現在 visible か(document.visibilityState==='visible')。
+ * @param {string[]|null|undefined} args.waitingLiveIds backfill 待ちの liveId 一覧
+ *   (listBackfillWaitingLiveIds の結果)。
+ * @param {number} [args.parallelSlots] 並列度 N(既定 1=従来互換)。
+ * @returns {boolean} true なら「優先(視聴中)タブのために自タブはスロットを譲る/開始を見送る」。
+ */
+export function shouldYieldBackfillSlotToPriority(args) {
+  if (!args) return false;
+  // ① 優先記録が新鮮で、かつ有効な lv であること(期限切れ/無は譲らない=裏を永久ブロックしない)。
+  if (!args.priorityIsFresh) return false;
+  const priority = String(args.priorityLiveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(priority)) return false;
+  // ② 自分が優先(視聴中)lv 本人なら絶対に譲らない(自分自身に譲らない=視聴中タブ巻き込み防止)。
+  const self = String(args.selfLiveId || '').trim().toLowerCase();
+  if (self === priority) return false;
+  // ③ 優先タブが実際にブロックされている時だけ譲る: 優先 lv が待機列に居る、または
+  //    自分以外の待機タブがスロット数以上で満杯(=空きが無く優先タブが取れない)。空きがあるなら
+  //    優先タブは素直に空きスロットを取れるので、ここで裏 backfill を abort する必要は無い(無駄 abort・
+  //    スラッシング防止)。amIVisible は将来の調整余地として受け取るが、②で視聴中タブは既に除外済み。
+  const list = Array.isArray(args.waitingLiveIds) ? args.waitingLiveIds : [];
+  const normalized = list
+    .map((x) => String(x || '').trim().toLowerCase())
+    .filter((x) => /^lv\d{1,15}$/.test(x));
+  const slots = Math.max(1, Math.floor(Number(args.parallelSlots) || 1));
+  const others = normalized.filter((x) => x !== self);
+  const priorityIsWaiting = normalized.includes(priority);
+  const slotsFull = others.length >= slots;
+  return priorityIsWaiting || slotsFull;
+}
