@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.744',
+    date: '2026-06-15',
+    summary: 'サムネ(顔写真)持ちの人が会場で一目で特別に見えるように',
+    items: Object.freeze([
+      '会場モードで、実際の顔写真アイコンを持っている人が、ひと目で「特別」だと分かるようにしました。これまでは少しだけ大きく明るくしていましたが差が小さく分かりにくかったので、はっきり大きく＋金色の縁で際立たせるようにしました',
+      '動かさず「大きさと金縁」で見せるので、うるさくならず上品なまま、誰がサムネ持ちかが直感的に伝わります'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.743',
     date: '2026-06-15',
     summary: '観客が呼吸し盛り上がると一斉に揺れる＋連続で喋る席が輝く',
