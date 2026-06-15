@@ -2387,7 +2387,16 @@ export function mountVenueBarButton(options = {}) {
     if (!liveId) return;
     const tailKey = tailStorageKey(liveId);
     const summaryKey = commentDbSummaryKey(liveId);
-    if (changes[tailKey] || changes[summaryKey]) void pollSpeech();
+    // v0.1.756 リアルタイム完璧化(ユーザー洞察: コメビュは速い→同じ経路に): コメビュ comeview は
+    //   onChanged の newValue を【その場で直接】処理して速い。会場はここで pollSpeech(非同期の
+    //   storage.local.get 再取得=1往復の遅延)していた。tail が変わったら newValue を直接
+    //   processSpeechRows へ渡し、再取得を省いて即座に吹き出し/読み上げする(コメビュと同経路)。
+    if (changes[tailKey] && Array.isArray(changes[tailKey].newValue)) {
+      processSpeechRows(/** @type {Array<Record<string, any>>} */ (changes[tailKey].newValue));
+    } else if (changes[tailKey] || changes[summaryKey]) {
+      // tail が無い(summary だけ等)時は従来どおり storage から読む保険。
+      void pollSpeech();
+    }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。
     //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に
     //   なる(=開いた瞬間0人で30秒待ち)再現性の低さがあった。チャンク/インデックス/サマリの
