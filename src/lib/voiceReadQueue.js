@@ -74,6 +74,11 @@ export function isVoicePrefetchUsable(prefetch, item, generation) {
 
 /**
  * 待機件数に応じた読み上げ速度と本文上限を返す。
+ *
+ * v0.1.755 リアルタイム完璧化(星野ロミ会議): 合成が実時間に追いつかない時、待つのでなく
+ *   【速度を上げて本文を短く】して消化を速め、遅延を溜めない。会議結論「speedScale を上げて
+ *   合成時間短縮(1.0→1.4で約30%短縮)」を取り込み、より早い段階(2件)から効かせ、最大ブーストも
+ *   引き上げる(0.5→0.8)。これで「今喋ってること」に追いつき続ける。本文上限も詰まり時は短く。
  * @param {unknown} queueLength
  * @returns {{ speedBoost: number, maxChars: number }}
  */
@@ -81,9 +86,10 @@ export function computeVoiceCongestion(queueLength) {
   const rawLength = Number(queueLength);
   const length =
     Number.isFinite(rawLength) && rawLength >= 0 ? Math.floor(rawLength) : 0;
-  if (length >= 8) return { speedBoost: 0.5, maxChars: 40 };
-  if (length >= 5) return { speedBoost: 0.3, maxChars: 40 };
-  if (length >= 3) return { speedBoost: 0.15, maxChars: 60 };
+  if (length >= 8) return { speedBoost: 0.8, maxChars: 30 };
+  if (length >= 5) return { speedBoost: 0.5, maxChars: 40 };
+  if (length >= 3) return { speedBoost: 0.3, maxChars: 50 };
+  if (length >= 2) return { speedBoost: 0.15, maxChars: 60 };
   return { speedBoost: 0, maxChars: 60 };
 }
 

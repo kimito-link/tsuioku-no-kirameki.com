@@ -188,52 +188,38 @@ describe('isVoicePrefetchUsable', () => {
   });
 });
 
-describe('computeVoiceCongestion', () => {
-  it('境界件数ごとに速度と本文上限を返す', () => {
-    expect(computeVoiceCongestion(2)).toEqual({
-      speedBoost: 0,
-      maxChars: 60
-    });
-    expect(computeVoiceCongestion(3)).toEqual({
-      speedBoost: 0.15,
-      maxChars: 60
-    });
-    expect(computeVoiceCongestion(4)).toEqual({
-      speedBoost: 0.15,
-      maxChars: 60
-    });
-    expect(computeVoiceCongestion(5)).toEqual({
-      speedBoost: 0.3,
-      maxChars: 40
-    });
-    expect(computeVoiceCongestion(7)).toEqual({
-      speedBoost: 0.3,
-      maxChars: 40
-    });
-    expect(computeVoiceCongestion(8)).toEqual({
-      speedBoost: 0.5,
-      maxChars: 40
-    });
+describe('computeVoiceCongestion (v0.1.755 リアルタイム化=早く強くブースト)', () => {
+  it('境界件数ごとに速度と本文上限を返す(2件から効く・最大0.8)', () => {
+    expect(computeVoiceCongestion(1)).toEqual({ speedBoost: 0, maxChars: 60 });
+    // v0.1.755: 2件から速度ブースト開始(旧は3件から)=溜まる前に消化を速める。
+    expect(computeVoiceCongestion(2)).toEqual({ speedBoost: 0.15, maxChars: 60 });
+    expect(computeVoiceCongestion(3)).toEqual({ speedBoost: 0.3, maxChars: 50 });
+    expect(computeVoiceCongestion(4)).toEqual({ speedBoost: 0.3, maxChars: 50 });
+    expect(computeVoiceCongestion(5)).toEqual({ speedBoost: 0.5, maxChars: 40 });
+    expect(computeVoiceCongestion(7)).toEqual({ speedBoost: 0.5, maxChars: 40 });
+    // v0.1.755: 8件以上は最大ブースト 0.8・本文30字に詰めて一気に消化。
+    expect(computeVoiceCongestion(8)).toEqual({ speedBoost: 0.8, maxChars: 30 });
   });
 
-  it('4件では60字で5件から40字になる', () => {
-    expect(computeVoiceCongestion(4).maxChars).toBe(60);
+  it('詰まるほど本文上限が短くなる(消化を速める)', () => {
+    expect(computeVoiceCongestion(1).maxChars).toBe(60);
+    expect(computeVoiceCongestion(3).maxChars).toBe(50);
     expect(computeVoiceCongestion(5).maxChars).toBe(40);
+    expect(computeVoiceCongestion(8).maxChars).toBe(30);
+  });
+
+  it('ブーストは単調増加(詰まるほど速く=遅延を溜めない)', () => {
+    const lens = [0, 1, 2, 3, 5, 8, 20];
+    for (let i = 1; i < lens.length; i++) {
+      expect(computeVoiceCongestion(lens[i]).speedBoost)
+        .toBeGreaterThanOrEqual(computeVoiceCongestion(lens[i - 1]).speedBoost);
+    }
   });
 
   it('負数や不正値は0件として扱う', () => {
-    expect(computeVoiceCongestion(-1)).toEqual({
-      speedBoost: 0,
-      maxChars: 60
-    });
-    expect(computeVoiceCongestion('invalid')).toEqual({
-      speedBoost: 0,
-      maxChars: 60
-    });
-    expect(computeVoiceCongestion(Infinity)).toEqual({
-      speedBoost: 0,
-      maxChars: 60
-    });
+    expect(computeVoiceCongestion(-1)).toEqual({ speedBoost: 0, maxChars: 60 });
+    expect(computeVoiceCongestion('invalid')).toEqual({ speedBoost: 0, maxChars: 60 });
+    expect(computeVoiceCongestion(Infinity)).toEqual({ speedBoost: 0, maxChars: 60 });
   });
 });
 
@@ -242,23 +228,27 @@ describe('computeVoiceQueueSpeedBoost', () => {
     expect(computeVoiceQueueSpeedBoost(0)).toBe(0);
   });
 
-  it('2件までは加速しない', () => {
-    expect(computeVoiceQueueSpeedBoost(2)).toBe(0);
+  it('v0.1.755: 1件までは加速しない', () => {
+    expect(computeVoiceQueueSpeedBoost(1)).toBe(0);
   });
 
-  it('3件から4件は+0.15', () => {
-    expect(computeVoiceQueueSpeedBoost(3)).toBe(0.15);
-    expect(computeVoiceQueueSpeedBoost(4)).toBe(0.15);
+  it('v0.1.755: 2件から加速開始(+0.15)=溜まる前に消化を速める', () => {
+    expect(computeVoiceQueueSpeedBoost(2)).toBe(0.15);
   });
 
-  it('5件から7件は+0.3', () => {
-    expect(computeVoiceQueueSpeedBoost(5)).toBe(0.3);
-    expect(computeVoiceQueueSpeedBoost(7)).toBe(0.3);
+  it('v0.1.755: 3〜4件は+0.3', () => {
+    expect(computeVoiceQueueSpeedBoost(3)).toBe(0.3);
+    expect(computeVoiceQueueSpeedBoost(4)).toBe(0.3);
   });
 
-  it('8件以上は+0.5', () => {
-    expect(computeVoiceQueueSpeedBoost(8)).toBe(0.5);
-    expect(computeVoiceQueueSpeedBoost(20)).toBe(0.5);
+  it('v0.1.755: 5〜7件は+0.5', () => {
+    expect(computeVoiceQueueSpeedBoost(5)).toBe(0.5);
+    expect(computeVoiceQueueSpeedBoost(7)).toBe(0.5);
+  });
+
+  it('v0.1.755: 8件以上は最大+0.8(一気に消化)', () => {
+    expect(computeVoiceQueueSpeedBoost(8)).toBe(0.8);
+    expect(computeVoiceQueueSpeedBoost(20)).toBe(0.8);
   });
 
   it('負数や不正値は0件として扱う', () => {
