@@ -9,7 +9,24 @@ import {
   venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
 import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
-import { readChunkedComments, chunkIndexKey } from '../lib/commentChunkStore.js';
+import { readChunkedComments, chunkIndexKey, chunkStorageKey, isChunkIndex } from '../lib/commentChunkStore.js';
+import { selectNewChunkSeqs, mergeUserLaneAggregates } from '../lib/venueIncrementalAggregate.js';
+import {
+  touchRoster,
+  pruneRoster,
+  rosterToVenueRows,
+  hydrateRosterFromCandidates,
+  VENUE_ROSTER_WINDOW_MS,
+  VENUE_ROSTER_VIP_WINDOW_MS,
+  VENUE_ROSTER_MAX_SEATS
+} from '../lib/venueLiveRoster.js';
+
+/**
+ * v0.1.754 ロールバック用キルスイッチ: false にすると会場は v0.1.754 差分集計(storage 30秒経路)へ
+ * 全面フォールバック(ストリーム駆動在席を無効化)。standalone(venue.html)は別コンテキストで
+ * onLiveComments が来ないため常に false 扱い(下の rosterDriven 初期化で !isStandalone と合成)。
+ */
+const VENUE_ROSTER_ENABLED = true;
 import { resolveDisplayRows } from '../lib/venueDisplayRows.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
 import { buildVenueResidents } from '../lib/venueResidents.js';
@@ -1403,6 +1420,24 @@ export function mountVenueBarButton(options = {}) {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   /** @type {VenueRow[]} */
   let baseRows = [];
+  // v0.1.754 3時間安定化: 参加者集計のインクリメンタル状態。チャンクは append-only なので一度
+  //   集約した seq の結果は不変=未処理 seq だけ読んで既存集約へマージすれば全件再読みと同じ総数に。
+  /** @type {number[]} 既に集約済みのチャンク seq(この配信で) */
+  let aggregatedChunkSeqs = [];
+  /** @type {import('../lib/userLaneCandidatesFromStorage.js').UserLaneCandidateFromStorage[]} 累積集約候補(userId 単位) */
+  let aggregatedCandidates = [];
+  // v0.1.754 ストリーム駆動在席: onLiveComments で通過毎に touch する in-memory 在席 Map。
+  //   storage 全集計(30秒毎 O(N))の代わり=3時間でも O(席数) 一定。standalone は onLiveComments が
+  //   来ないので rosterDriven=false で従来の storage 経路へ degrade。VENUE_ROSTER_ENABLED でロールバック可。
+  /** @type {Map<string, import('../lib/venueLiveRoster.js').RosterEntry>} */
+  const liveRoster = new Map();
+  // ストリーム駆動で在席を回すか。standalone(venue.html=onLiveComments 来ない)は必ず false で
+  //   従来の storage 経路へ degrade。VENUE_ROSTER_ENABLED=false で全面ロールバック(静的判定=const)。
+  const rosterDriven = VENUE_ROSTER_ENABLED && !isStandalone;
+  /** @type {number} rAF id(描画集約) */
+  let rosterCommitRaf = 0;
+  /** @type {number} 沈黙中も退席を反映する軽量 prune タイマー */
+  let rosterPruneTimer = 0;
   // 「空っぽ・途中で消える」根治(v0.1.745+): 直近の非空表示行を保持し、集計/poll が一瞬0件や
   //   storage 失敗で来ても会場を空で再描画しない(resolveDisplayRows・前状態保持)。配信切替で破棄。
   /** @type {VenueRow[]} */
@@ -1661,6 +1696,7 @@ export function mountVenueBarButton(options = {}) {
     // 前状態保持(lastGood)も破棄: 配信切替/閉じる時は前配信の参加者を持ち越さない(INV-3)。
     lastGoodRows = [];
     hasRenderedNonEmpty = false;
+    liveRoster.clear(); // v0.1.754: 在席も持ち越さない(再オープンで storage から再 hydrate)
     clearBubbles();
   };
 
@@ -2023,27 +2059,60 @@ export function mountVenueBarButton(options = {}) {
         baseRows = [];
         seatByKey = new Map();
         spokenUserIds.clear(); // 別配信の昇格匿名を持ち越さない
+        aggregatedChunkSeqs = []; // v0.1.754: 別配信の集約状態を持ち越さない
+        aggregatedCandidates = [];
+        liveRoster.clear(); // v0.1.754: 別配信の在席を持ち越さない
         // 配信切替は意図的な空表示(前配信を持ち越さない)。clearDisplay で lastGood も破棄。
         clearDisplay();
       }
-      // storage 読みを 8秒で有界化(status-entry と同値)。stall しても次回集計へ任せ会場は前状態維持。
-      const result = await runStorageOpWithTimeout(
-        () =>
-          readChunkedComments(liveId, commentsStorageKey(liveId), (keys) =>
-            chrome.storage.local.get(keys)
-          ),
+      // v0.1.754 3時間安定化: まず安いインデックス1キーだけ読む。チャンク化済みなら【新規 seq の
+      //   チャンクだけ】読んで差分集約→既存集約へマージ(O(新規分))。全件再読み(O(N)・数万件で
+      //   メインスレッド圧迫・8秒timeout超で会場停止)をやめる。チャンクは append-only なので等価。
+      const idxKey = chunkIndexKey(liveId);
+      const idxBag = await runStorageOpWithTimeout(
+        () => chrome.storage.local.get(idxKey),
         8000
       );
       if (!open || liveIdFromPathname() !== liveId) return;
-      // v0.1.740 実機バグ根治: requireText:true で「実際にコメントした人(本文あり)」だけを
-      //   会場参加者にする。requireText:false だと本文が空でDOMでアバターだけ観測された人
-      //   (=コメントしていない配信者本人など)が「匿名NNN」として会場に混入していた。
-      //   ギフト/広告は保存時点で別扱い(コメント記録に含まれない)ため、この変更で応援者が
-      //   落ちることはない。
-      const candidates = userLaneCandidatesFromStorage(result.rows, liveId, {
-        requireText: true
-      });
-      baseRows = venueRowsFromUserLaneCandidates(candidates);
+      const index = idxBag ? idxBag[idxKey] : null;
+      // v0.1.740: requireText:true で「実際にコメントした人(本文あり)」だけを参加者にする
+      //   (本文空でアバターだけ観測=配信者本人等の匿名混入を防ぐ・ギフトは別扱いで影響なし)。
+      const LANE_OPTS = { requireText: true };
+      if (isChunkIndex(index, liveId) && Array.isArray(/** @type {any} */ (index).seqs)) {
+        // --- チャンク化済み: 差分(新規 seq)だけ集約してマージ ---
+        const allSeqs = /** @type {number[]} */ (/** @type {any} */ (index).seqs);
+        const newSeqs = selectNewChunkSeqs(allSeqs, aggregatedChunkSeqs);
+        if (newSeqs.length > 0) {
+          const keys = newSeqs.map((seq) => chunkStorageKey(liveId, seq));
+          const bag = await runStorageOpWithTimeout(
+            () => chrome.storage.local.get(keys),
+            8000
+          );
+          if (!open || liveIdFromPathname() !== liveId) return;
+          /** @type {unknown[]} */
+          let newRows = [];
+          for (const key of keys) {
+            const part = bag ? bag[key] : null;
+            if (Array.isArray(part)) newRows = newRows.concat(part);
+          }
+          const newCandidates = userLaneCandidatesFromStorage(newRows, liveId, LANE_OPTS);
+          aggregatedCandidates = mergeUserLaneAggregates(aggregatedCandidates, newCandidates);
+          aggregatedChunkSeqs = aggregatedChunkSeqs.concat(newSeqs);
+        }
+        baseRows = venueRowsFromUserLaneCandidates(aggregatedCandidates);
+      } else {
+        // --- 未チャンク化(従来 main・小規模/移行前): 従来どおり全件読み(件数が小さいので安全) ---
+        const result = await runStorageOpWithTimeout(
+          () =>
+            readChunkedComments(liveId, commentsStorageKey(liveId), (keys) =>
+              chrome.storage.local.get(keys)
+            ),
+          8000
+        );
+        if (!open || liveIdFromPathname() !== liveId) return;
+        const candidates = userLaneCandidatesFromStorage(result.rows, liveId, LANE_OPTS);
+        baseRows = venueRowsFromUserLaneCandidates(candidates);
+      }
       // パネルと同じ低頻度キャッシュで実サムネを補強し、会場だけ顔が欠ける差をなくす。
       const profileBag = await runStorageOpWithTimeout(
         () => chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE),
@@ -2083,13 +2152,47 @@ export function mountVenueBarButton(options = {}) {
 
   const stopAggregation = () => {
     clearAggregateBurst();
+    if (rosterPruneTimer) { clearInterval(rosterPruneTimer); rosterPruneTimer = 0; }
+    if (rosterCommitRaf && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(rosterCommitRaf);
+    }
+    rosterCommitRaf = 0;
     if (!aggregateTimer) return;
     clearInterval(aggregateTimer);
     aggregateTimer = 0;
   };
 
   const startAggregation = () => {
-    if (aggregateTimer) return;
+    if (aggregateTimer || rosterPruneTimer) return;
+    if (rosterDriven) {
+      // v0.1.754 ストリーム駆動: storage は「開いた瞬間の catch-up を1回」だけ。aggregateParticipants
+      //   が aggregatedCandidates(チャンク差分集計)を満たした後、それで在席を hydrate し、以降は
+      //   onLiveComments のストリームに任せる(30秒の全集計ループは回さない=3時間でも軽い)。
+      void (async () => {
+        await aggregateParticipants(); // 1回だけ(チャンク差分読み)
+        if (!open || !rosterDriven) return;
+        hydrateRosterFromCandidates(liveRoster, aggregatedCandidates, {
+          maxSeats: VENUE_ROSTER_MAX_SEATS
+        });
+        scheduleRosterCommit();
+      })();
+      // 沈黙中も退席を席へ反映する軽量 prune(全集計でなく O(席数) の掃除のみ)。
+      rosterPruneTimer = window.setInterval(() => {
+        if (!open || !rosterDriven) return;
+        const before = liveRoster.size;
+        pruneRoster(liveRoster, Date.now(), {
+          windowMs: VENUE_ROSTER_WINDOW_MS,
+          vipWindowMs: VENUE_ROSTER_VIP_WINDOW_MS,
+          maxSeats: VENUE_ROSTER_MAX_SEATS
+        });
+        if (liveRoster.size !== before) {
+          baseRows = rosterToVenueRows(liveRoster);
+          commitDisplay(baseRows);
+        }
+      }, 5_000);
+      return;
+    }
+    // --- standalone(venue.html)/ロールバック: 従来の storage 集計経路(不変) ---
     void aggregateParticipants();
     // v0.1.741 安定化(100回やっても出る): 開いた直後はコメント記録がまだ storage に
     //   書かれている途中のことがある。1回きりの集計+30秒間隔だと「開いた瞬間0人で待たされる」
@@ -2134,10 +2237,15 @@ export function mountVenueBarButton(options = {}) {
         const uid = String(speech.userId || '').trim();
         if (uid) spokenUserIds.add(uid);
       }
-      baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, Date.now());
-      // commitDisplay 経由で lastGood を更新(発言者マージ結果は常に非空=新鮮データ扱い)。
-      //   こうすると次の集計が一瞬0件でも、この発言者を含む表示が前状態として維持される。
-      commitDisplay(baseRows);
+      // v0.1.754: ストリーム駆動時は在席 Map(liveRoster)が唯一の席ソース=ここで baseRows を
+      //   書かない(二重書き込み防止)。席は onLiveComments→scheduleRosterCommit が更新する。
+      //   非ストリーム(standalone/rollback)は従来どおり発言者マージで席を即更新。
+      if (!rosterDriven) {
+        baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, Date.now());
+        // commitDisplay 経由で lastGood を更新(発言者マージ結果は常に非空=新鮮データ扱い)。
+        //   こうすると次の集計が一瞬0件でも、この発言者を含む表示が前状態として維持される。
+        commitDisplay(baseRows);
+      }
     }
     for (const speech of result.speeches) {
       // 吹き出しは「しゃべった瞬間」に必ず出す。音声(VOICEVOX)とは切り離す。
@@ -2158,6 +2266,27 @@ export function mountVenueBarButton(options = {}) {
     }
   };
 
+  // v0.1.754 ストリーム駆動在席: 在席 Map の変更を rAF で集約して席へ反映。コメント怒涛でも
+  //   1フレーム1回の renderSeats に間引く(buildVenueSeating の prevSeatByKey で席は安定・軽い)。
+  const scheduleRosterCommit = () => {
+    if (rosterCommitRaf) return;
+    const run = () => {
+      rosterCommitRaf = 0;
+      if (!open || !rosterDriven) return;
+      pruneRoster(liveRoster, Date.now(), {
+        windowMs: VENUE_ROSTER_WINDOW_MS,
+        vipWindowMs: VENUE_ROSTER_VIP_WINDOW_MS,
+        maxSeats: VENUE_ROSTER_MAX_SEATS
+      });
+      baseRows = rosterToVenueRows(liveRoster);
+      commitDisplay(baseRows); // keep-last-good + renderSeats(prevSeatByKey で安定)
+    };
+    rosterCommitRaf =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame(run)
+        : (run(), 0);
+  };
+
   // v0.1.752 リアルタイム化: 録画側(content-entry.js persistCommentRows)が新着コメントを
   //   in-memory で即流すフック。storage 往復(~1.5秒のコアレッサ)を待たず吹き出す。
   //   commentNo を持つ行だけに絞る=後から storage 経路で来る同じコメントと venueSpeechKey が
@@ -2174,7 +2303,13 @@ export function mountVenueBarButton(options = {}) {
     if (speechLiveId !== cur) resetSpeechTracking(cur); // pollSpeech と同じ追従
     const feedRows = liveFeedSpeechRows(rows);
     if (feedRows.length === 0) return;
-    processSpeechRows(feedRows);
+    processSpeechRows(feedRows); // 吹き出し/読み上げ(従来どおり)
+    // v0.1.754: 在席は「通過した瞬間に touch」。storage 集計を待たない=3時間でも O(席数)。
+    //   touchRoster が requireText/userId を内部で守る(匿名/本文空は席に入れない・v0.1.740)。
+    if (!rosterDriven) return;
+    const now = Date.now();
+    for (const r of feedRows) touchRoster(liveRoster, r, now);
+    scheduleRosterCommit();
   };
 
   const pollSpeech = async () => {
@@ -2226,6 +2361,9 @@ export function mountVenueBarButton(options = {}) {
     //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に
     //   なる(=開いた瞬間0人で30秒待ち)再現性の低さがあった。チャンク/インデックス/サマリの
     //   いずれかが変わったら再集計し、コメントが書かれ次第ほぼ即座に会場へ反映する。
+    // v0.1.754: ストリーム駆動時は在席を onLiveComments が更新する=storage チャンク変化での
+    //   全集計(O(N))は回さない(これが3時間で重くなる元凶だった)。standalone/rollback のみ従来の再集計。
+    if (rosterDriven) return;
     const idxKey = chunkIndexKey(liveId);
     const chunkPrefix = `nls_cchunk_${liveId}`;
     let chunkChanged = false;
