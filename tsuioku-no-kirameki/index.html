@@ -5832,11 +5832,26 @@
         background:#0a0b0c;line-height:0
       }
       .venue-demo__frame video,.venue-demo__frame img{display:block;width:100%;height:auto}
+      .venue-demo__sound{
+        position:absolute;right:10px;bottom:10px;z-index:3;
+        display:inline-flex;align-items:center;gap:6px;
+        min-height:38px;padding:7px 14px;
+        border:1px solid rgba(255,214,120,.55);border-radius:999px;
+        background:rgba(18,22,30,.82);color:#ffe6a0;
+        font:inherit;font-size:.82rem;font-weight:700;cursor:pointer;
+        backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+        box-shadow:0 4px 14px rgba(0,0,0,.4);transition:background .15s,border-color .15s
+      }
+      .venue-demo__sound:hover{background:rgba(40,48,60,.94);border-color:rgba(255,214,120,.85)}
+      .venue-demo__sound:focus-visible{outline:2px solid #8dc8ff;outline-offset:2px}
+      .venue-demo__sound[aria-pressed="true"]{background:rgba(255,200,90,.22);border-color:rgba(255,214,120,.95)}
       .venue-demo__cap{
         margin:10px 4px 0;font-size:.82rem;line-height:var(--lh-tight);
         color:var(--ink-soft,rgba(255,255,255,.7));text-align:center
       }
       .venue-demo__cap strong{color:var(--accent,#ffd66f)}
+      .venue-demo__cap-voice{display:inline-block;margin-top:4px;color:rgba(255,230,160,.92)}
+      .venue-demo__cap-credit{display:inline-block;margin-top:2px;font-size:.7rem;color:rgba(255,255,255,.5)}
     </style>
   </head>
   <body>
@@ -8652,15 +8667,19 @@
             </p>
             <figure class="venue-demo fade d1">
               <div class="venue-demo__frame">
-                <video
+                <video id="venue-demo-video"
                   src="images/venue/venue-mode.mp4"
                   poster="images/venue/venue-poster.jpg"
                   width="600" height="820"
                   autoplay loop muted playsinline preload="metadata"
-                  aria-label="会場モードの実機デモ：観客のアバターがペンライトを振り、コメントが吹き出しで出て、常連さんの席が金色に光る様子"></video>
+                  aria-label="会場モードの実機デモ：観客のアバターがペンライトを振り、コメントが吹き出しで出て、常連さんの席が金色に光る様子。読み上げの声つき（音声オフで再生中）"></video>
+                <button type="button" id="venue-demo-sound" class="venue-demo__sound" aria-pressed="false"
+                  aria-label="読み上げの声を聞く（音声オン）">🔈 <span class="venue-demo__sound-label">声を聞く</span></button>
               </div>
               <figcaption class="venue-demo__cap">
-                実機の会場モード。<strong>観客が並んでペンライトを振り</strong>、しゃべると<strong>吹き出し</strong>が出て、<strong>常連さん・応援してくれた人の席が金色に光ります</strong>。ひとりの配信でも「満員の会場でみんなと観ている」気持ちに。
+                実機の会場モード。<strong>観客が並んでペンライトを振り</strong>、しゃべると<strong>吹き出し</strong>が出て、<strong>常連さん・応援してくれた人の席が金色に光ります</strong>。ひとりの配信でも「満員の会場でみんなと観ている」気持ちに。<br>
+                <span class="venue-demo__cap-voice">🔈「声を聞く」を押すと、<strong>人ごとに違う声の読み上げ</strong>（VOICEVOX 連携）を体験できます。</span><br>
+                <span class="venue-demo__cap-credit">この動画の音声は VOICEVOX（ずんだもん／四国めたん／春日部つむぎ／雨晴はう）で生成しています。</span>
               </figcaption>
             </figure>
           </div>
@@ -10847,6 +10866,43 @@
           { rootMargin: '80px 0px 40px 0px', threshold: 0 }
         );
         io.observe(host);
+      })();
+    </script>
+    <script>
+      // 会場デモ動画の「声を聞く」トグル。autoplay はミュート必須なので、クリックで音声を有効化。
+      // 同時に LP の BGM が鳴っていれば一時停止して音が重ならないようにする。
+      (function () {
+        var video = document.getElementById('venue-demo-video');
+        var btn = document.getElementById('venue-demo-sound');
+        if (!video || !btn) return;
+        var label = btn.querySelector('.venue-demo__sound-label');
+        function setOn(on) {
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          btn.firstChild.textContent = on ? '🔊 ' : '🔈 ';
+          if (label) label.textContent = on ? '声オン' : '声を聞く';
+          btn.setAttribute('aria-label', on ? '読み上げの声をミュート' : '読み上げの声を聞く（音声オン）');
+        }
+        btn.addEventListener('click', function () {
+          var turningOn = video.muted;
+          if (turningOn) {
+            // BGM が鳴っていたら止める（音の重なり防止）
+            try {
+              var bgm = document.getElementById('lp-bgm');
+              if (bgm && !bgm.paused) bgm.pause();
+            } catch (e) {}
+            video.muted = false;
+            video.currentTime = 0;
+            var p = video.play();
+            if (p && typeof p.catch === 'function') p.catch(function () {});
+          } else {
+            video.muted = true;
+          }
+          setOn(turningOn);
+        });
+        // 動画外をクリック等で勝手にミュートが戻った場合に表示を同期
+        video.addEventListener('volumechange', function () {
+          setOn(!video.muted);
+        });
       })();
     </script>
   </body>
