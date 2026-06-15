@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>君斗りんく 状態 (AI共有用)</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --nl-bg: #fffaf2;
+        --nl-text: #1f2937;
+        --nl-text-soft: #4b5563;
+        --nl-border: #e5e7eb;
+        --nl-card-bg: #ffffff;
+        --nl-accent: #ec4899;
+        --nl-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --nl-bg: #111827;
+          --nl-text: #f3f4f6;
+          --nl-text-soft: #9ca3af;
+          --nl-border: #374151;
+          --nl-card-bg: #1f2937;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--nl-bg);
+        color: var(--nl-text);
+        font-family:
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'Hiragino Sans',
+          'Yu Gothic',
+          sans-serif;
+        margin: 0;
+        padding: 16px;
+        max-width: 100ch;
+        margin-inline: auto;
+        line-height: 1.5;
+      }
+      header.status-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: baseline;
+        border-bottom: 1px solid var(--nl-border);
+        padding-bottom: 10px;
+        margin-bottom: 14px;
+      }
+      header.status-header h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .status-meta {
+        color: var(--nl-text-soft);
+        font-size: 13px;
+        font-family: var(--nl-mono);
+      }
+      .status-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .status-buttons button {
+        background: var(--nl-card-bg);
+        color: var(--nl-text);
+        border: 1px solid var(--nl-border);
+        padding: 6px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      .status-buttons button:hover {
+        border-color: var(--nl-accent);
+      }
+      section.lane {
+        background: var(--nl-card-bg);
+        border: 1px solid var(--nl-border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+      }
+      section.lane h2 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      section.lane pre {
+        margin: 0;
+        font-family: var(--nl-mono);
+        font-size: 12.5px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      section.lane details {
+        margin-top: 6px;
+      }
+      section.lane details summary {
+        cursor: pointer;
+        color: var(--nl-text-soft);
+        font-size: 12px;
+      }
+      textarea#aiShareText {
+        width: 100%;
+        min-height: 220px;
+        font-family: var(--nl-mono);
+        font-size: 12px;
+        background: var(--nl-card-bg);
+        color: var(--nl-text);
+        border: 1px solid var(--nl-border);
+        border-radius: 6px;
+        padding: 10px;
+        line-height: 1.4;
+      }
+      footer.status-footer {
+        margin-top: 18px;
+        padding-top: 10px;
+        border-top: 1px solid var(--nl-border);
+        font-size: 12px;
+        color: var(--nl-text-soft);
+        font-family: var(--nl-mono);
+      }
+      .empty-note {
+        color: var(--nl-text-soft);
+        font-size: 13px;
+        padding: 12px 0;
+      }
+      /* 配信者の評判チェック (PR R3) */
+      .nl-reputation {
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .nl-reputation__head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .nl-reputation__avatar {
+        width: 48px;
+        height: 48px;
+        flex: 0 0 48px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .nl-reputation__headtext {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .nl-reputation__name {
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .nl-reputation__headline {
+        font-size: 13px;
+      }
+      .nl-reputation__query {
+        font-size: 12px;
+        color: var(--nl-text-soft);
+        margin: 6px 0;
+      }
+      .nl-reputation__hits {
+        margin: 6px 0;
+        padding-left: 20px;
+      }
+      .nl-reputation__hit {
+        font-size: 13px;
+        margin: 2px 0;
+      }
+      .nl-reputation__hit--high {
+        color: #ff6b6b;
+        font-weight: 700;
+      }
+      .nl-reputation__hit--medium {
+        color: #ffa94d;
+      }
+      .nl-reputation__hit--low {
+        color: #ffd43b;
+      }
+      .nl-reputation__note {
+        font-size: 12px;
+        color: var(--nl-text-soft);
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="status-header">
+      <h1>君斗りんく 状態</h1>
+      <span class="status-meta" id="metaBuildId">build —</span>
+      <span class="status-meta" id="metaLastUpdate">最終更新 —</span>
+      <span class="status-meta" id="metaAutoRefresh">自動更新: 2秒</span>
+    </header>
+
+    <div class="status-buttons">
+      <button id="btnComeview" type="button">💬 コメビュを開く</button>
+      <button id="btnReputationCheck" type="button">🔎 配信者の評判チェック</button>
+      <button id="btnNextLive" type="button">⏭ 次の上位配信へ</button>
+      <button id="btnAutopatrolToggle" type="button">🔁 自動巡回 OFF</button>
+      <button id="btnUpload" type="button">📱 スマホへ送信</button>
+      <button id="btnSelectAll" type="button">全部選択 (Ctrl+A→Ctrl+C)</button>
+      <button id="btnCopy" type="button">クリップボードへコピー</button>
+      <button id="btnDownload" type="button">JSON ダウンロード</button>
+      <button id="btnTogglePause" type="button">自動更新を一時停止</button>
+    </div>
+
+    <div class="status-meta" id="uploadResult" style="margin-bottom: 12px"></div>
+    <div class="status-meta" id="patrolResult" style="margin-bottom: 12px"></div>
+
+    <section class="lane" id="overviewLane">
+      <h2>概要</h2>
+      <pre id="overviewBody" class="empty-note">読み込み中...</pre>
+    </section>
+
+    <section class="lane" id="livesLane">
+      <h2>視聴中の配信</h2>
+      <div id="livesBody" class="empty-note">読み込み中...</div>
+    </section>
+
+    <section class="lane" id="reputationLane" hidden>
+      <h2>🔎 配信者の評判チェック</h2>
+      <div class="status-meta" style="margin-bottom: 8px">
+        配信者名で検索したときのサジェスト（検索候補）を確認します。配信者本人の自己診断用です。
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px">
+        <input
+          id="reputationQuery"
+          type="text"
+          placeholder="配信者名（自動入力されます）"
+          aria-label="評判チェックする配信者名"
+          style="flex: 1; min-width: 200px; padding: 6px 10px"
+        />
+        <button id="btnReputationRun" type="button">チェック</button>
+      </div>
+      <div id="reputationResult" class="empty-note">「チェック」を押すと結果が出るよ。</div>
+    </section>
+
+    <section class="lane" id="aiShareLane">
+      <h2>🤖 AI に貼る用テキスト (範囲選択→Ctrl+C)</h2>
+      <textarea
+        id="aiShareText"
+        readonly
+        spellcheck="false"
+        aria-label="AI 共有用のプレーンテキスト"
+      ></textarea>
+    </section>
+
+    <footer class="status-footer">
+      <div>このページの URL: <span id="statusPageUrl">—</span></div>
+      <div>
+        ブックマーク登録: Ctrl+D で「君斗りんく 状態」として保存できます。
+      </div>
+    </footer>
+
+    <script src="dist/status.js"></script>
+  </body>
+</html>

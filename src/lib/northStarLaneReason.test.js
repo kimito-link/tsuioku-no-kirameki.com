@@ -372,4 +372,83 @@ describe('event_present_unscrapable（v0.1.282 参加検出・実機 lv350558940
       })
     ).toBe('ok');
   });
+
+  describe('v0.1.617: API 直叩き rows を考慮（問い合わせ中を出さない）', () => {
+    const snap = { liveId: 'lv1' };
+
+    it('contributionRanking: kokenApiRows>0 なら bundle 空でも ok', () => {
+      expect(
+        determineNorthStarLaneState('contributionRanking', {
+          bundle: {},
+          snap,
+          kokenApiRows: [{ rank: 1, name: 'SEM', contribution: 250000 }]
+        })
+      ).toBe('ok');
+    });
+
+    it('contributionRanking: kokenApiRows 空 + bundle 空なら従来どおり iframe_unrendered', () => {
+      expect(
+        determineNorthStarLaneState('contributionRanking', {
+          bundle: {},
+          snap,
+          kokenApiRows: []
+        })
+      ).toBe('iframe_unrendered');
+    });
+
+    it('contributionRanking: kokenApiRows 省略なら旧ロジックと完全同一（後方互換）', () => {
+      expect(
+        determineNorthStarLaneState('contributionRanking', { bundle: {}, snap })
+      ).toBe('iframe_unrendered');
+      expect(
+        determineNorthStarLaneState('contributionRanking', {
+          bundle: { contributionRanking: [{ rank: 1 }] },
+          snap
+        })
+      ).toBe('ok');
+    });
+
+    it('adRanking: nicoadApiRows>0 なら bundle 空でも ok（fetch_error を出さない）', () => {
+      expect(
+        determineNorthStarLaneState('adRanking', {
+          bundle: {},
+          snap,
+          nicoadApiRows: [{ rank: 1, name: '広告主', contribution: 10000 }]
+        })
+      ).toBe('ok');
+    });
+
+    it('adRanking: nicoadApiRows 空 + bundle 空なら従来どおり fetch_error', () => {
+      expect(
+        determineNorthStarLaneState('adRanking', {
+          bundle: {},
+          snap,
+          nicoadApiRows: []
+        })
+      ).toBe('fetch_error');
+    });
+
+    it('adRanking: nicoadApiRows 省略なら旧ロジックと完全同一（後方互換）', () => {
+      expect(determineNorthStarLaneState('adRanking', { bundle: {}, snap })).toBe(
+        'fetch_error'
+      );
+      expect(
+        determineNorthStarLaneState('adRanking', {
+          bundle: { adContributionRanking: [{ rank: 1 }] },
+          snap
+        })
+      ).toBe('ok');
+    });
+
+    it('API rows が非配列（不正値）なら無視して従来ロジック（暴発防止）', () => {
+      expect(
+        determineNorthStarLaneState('contributionRanking', {
+          bundle: {},
+          snap,
+          // @ts-expect-error 故意に型外
+          kokenApiRows: 'x'
+        })
+      ).toBe('iframe_unrendered');
+    });
+  });
 });

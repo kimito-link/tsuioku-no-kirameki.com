@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>君斗りんく 状態(スマホ閲覧)</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --nl-bg: #fffaf2;
+        --nl-text: #1f2937;
+        --nl-text-soft: #4b5563;
+        --nl-border: #e5e7eb;
+        --nl-card-bg: #ffffff;
+        --nl-accent: #ec4899;
+        --nl-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --nl-bg: #111827;
+          --nl-text: #f3f4f6;
+          --nl-text-soft: #9ca3af;
+          --nl-border: #374151;
+          --nl-card-bg: #1f2937;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--nl-bg);
+        color: var(--nl-text);
+        font-family:
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'Hiragino Sans',
+          'Yu Gothic',
+          sans-serif;
+        margin: 0;
+        padding: 14px;
+        max-width: 48ch;
+        margin-inline: auto;
+        line-height: 1.5;
+      }
+      header.status-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: baseline;
+        border-bottom: 1px solid var(--nl-border);
+        padding-bottom: 10px;
+        margin-bottom: 14px;
+      }
+      header.status-header h1 {
+        margin: 0;
+        font-size: 17px;
+      }
+      .status-meta {
+        color: var(--nl-text-soft);
+        font-size: 13px;
+        font-family: var(--nl-mono);
+      }
+      section.lane {
+        background: var(--nl-card-bg);
+        border: 1px solid var(--nl-border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+      }
+      section.lane h2 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      section.lane pre {
+        margin: 0;
+        font-family: var(--nl-mono);
+        font-size: 12.5px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .live-block {
+        margin-bottom: 12px;
+      }
+      footer.status-footer {
+        margin-top: 18px;
+        padding-top: 10px;
+        border-top: 1px solid var(--nl-border);
+        font-size: 12px;
+        color: var(--nl-text-soft);
+        font-family: var(--nl-mono);
+      }
+      .empty-note {
+        color: var(--nl-text-soft);
+        font-size: 13px;
+        padding: 12px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="status-header">
+      <h1>君斗りんく 状態</h1>
+      <span class="status-meta" id="metaLastUpdate">最終更新 —</span>
+    </header>
+
+    <section class="lane" id="overviewLane">
+      <h2>概要</h2>
+      <pre id="overviewBody" class="empty-note">読み込み中...</pre>
+    </section>
+
+    <section class="lane" id="livesLane">
+      <h2>視聴中の配信</h2>
+      <div id="livesBody" class="empty-note">読み込み中...</div>
+    </section>
+
+    <footer class="status-footer">
+      <div id="statusNote">
+        PC の拡張から「スマホへ送信」した時点の状態を表示しています。
+      </div>
+    </footer>
+
+    <script src="dist/app.js"></script>
+  </body>
+</html>

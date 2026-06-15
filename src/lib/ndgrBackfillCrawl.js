@@ -153,6 +153,23 @@ export const NDGR_BACKFILL_NEAR_START_MIN_HITS = 2;
  */
 export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 240;
 
+/**
+ * v0.1.695: 空区画/入口なしリトライの間に挟む小休止（ms）。従来は最大240回を無休で連発し、
+ * 若い配信(序盤が全部空区画)でSW/コンテンツのイベントループとNDGRをリクエスト嵐で圧迫していた
+ * (実機: SWがメッセージ応答不能)。橋渡しの回数・順序は不変・ペースだけ毎秒数件に落とす。
+ */
+export const NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS = 150;
+
+/**
+ * v0.1.697: 「まだ1行も取れていない(everMadeProgress=false)」crawl の空リトライ予算。
+ * 240回(=3.3h相当のバケット遡行)をペーシング付きで回すと1回のcrawlが分単位になり
+ * 「いっきに取れる」体感を殺す(実機: 今日のNHK実況で5分以上 rows=0)。初回から空のときは
+ * 少数で早期に backward_exhausted を返し、外側の transient リトライ(新鮮な ?at=now から
+ * 再シード)に任せるほうが歴史的に速い(リロード直後のexhausted→retry成功パターン)。
+ * 一度でも取れた後の疎区間橋渡し(68%頭打ち対策)は従来どおり240回を維持する。
+ */
+export const NDGR_BACKFILL_COLD_RETRY_MAX = 12;
+
 /** 429/403 を受けたときの backoff 待機列（ms）。これを使い切ったら巡回中断。 */
 export const NDGR_BACKFILL_BACKOFF_MS = Object.freeze([2_000, 4_000, 8_000]);
 
@@ -474,9 +491,14 @@ export async function* crawlNdgrBackward(opts) {
    *   診断情報として戻り値に含める。実機で「40%なのに『ぜんぶ届いた』」誤判定の真因を
    *   後追いで特定するためのもの(描画パスには触らない・既存呼出は無視できる optional)。
    * @param {NdgrBackfillStopReason} reason
-   * @param {{ reachedStartChats?: import('./ndgrDecode.js').NdgrChat[], reachedStartPath?: 'main'|'side' }} [diag]
+   * @param {{ reachedStartChats?: import('./ndgrDecode.js').NdgrChat[], reachedStartPath?: 'main'|'side', crawl?: object, seek?: string[], cands?: number[] }} [diag]
    */
   const done = (reason, diag) => ({ stopReason: reason, ...summary(), diagnostics: diag || null });
+
+  /** @type {{ nowBytes: number|null, nowNextAt: number|null }} v0.1.640 診断: crawl 入口の fetch/decode 結果。 */
+  const _crawlDiag = { nowBytes: null, nowNextAt: null };
+  /** @type {string[]} v0.1.640 診断: 入口探索(seekBackwardUri)の各 hop の fetch/decode 結果。 */
+  const _seekDiag = [];
 
   if (!viewBase) return done('no_view_base');
   if (typeof fetchBinary !== 'function') return done('no_view_base');
@@ -486,11 +508,14 @@ export async function* crawlNdgrBackward(opts) {
   // --- 1) ?at=now で現在地点ポインタ（nextAt）を得る ---
   if (isAborted(signal)) return done('aborted');
   const nowRes = await fetchWithThrottle(ctx, buildViewAtUrl(viewBase, 'now'), true);
-  if (nowRes.rateLimited) return done('rate_limited');
-  if (!nowRes.bytes || nowRes.bytes.length === 0) return done('no_entry');
+  // v0.1.640 診断: ?at=now の fetch 結果(ISOLATED world で fetch が通るか・何バイト返るか)。
+  _crawlDiag.nowBytes = nowRes.bytes ? nowRes.bytes.length : (nowRes.rateLimited ? -429 : 0);
+  if (nowRes.rateLimited) return done('rate_limited', { crawl: _crawlDiag });
+  if (!nowRes.bytes || nowRes.bytes.length === 0) return done('no_entry', { crawl: _crawlDiag });
   bytesFetched += nowRes.bytes.length;
   const nowNav = decodeChunkedEntry(nowRes.bytes);
-  if (nowNav.nextAt == null) return done('no_entry');
+  _crawlDiag.nowNextAt = nowNav.nextAt;
+  if (nowNav.nextAt == null) return done('no_entry', { crawl: _crawlDiag });
 
   // --- 2) backward 連鎖の入口 URI（backward.segment.uri）を探す ---
   //   ⭐ 実機で確定（2026-05-27）: 起点は「過去の実時刻」にする。`?at=now` が返す nextAt は
@@ -529,6 +554,12 @@ export async function* crawlNdgrBackward(opts) {
   let lastSeedAtSec = null;
   /** @type {number} v0.1.429: 「古い区画へ進めなかった」連続回数（起点を戻してリトライする）。 */
   let noProgressStreak = 0;
+  /**
+   * @type {boolean} v0.1.691: この巡回で一度でも「より古い区画へ進めた」（madeProgress）か。
+   *   リトライ予算超過時の終了理由の出し分けに使う。一度も chat で前進できていない＝入口問題
+   *   として backward_exhausted を診断付きで正直に報告し、前進歴があれば従来どおり no_progress。
+   */
+  let everMadeProgress = false;
   /** @type {{ rateLimited?: boolean, aborted?: boolean }} ヘルパからの異常通知 */
   const abend = {};
 
@@ -549,13 +580,14 @@ export async function* crawlNdgrBackward(opts) {
       if (isAborted(signal)) { abend.aborted = true; return { backwardUri: '', previousUris: [] }; }
       if (now() - t0 >= caps.elapsedMs) { abend.aborted = true; return { backwardUri: '', previousUris: [] }; }
       const atUrl = buildViewAtUrl(viewBase, viewAt);
-      if (visited.has(atUrl)) return { backwardUri: '', previousUris: [] };
+      if (visited.has(atUrl)) { if (_seekDiag.length < 30) _seekDiag.push(`h${hop}:visited`); return { backwardUri: '', previousUris: [] }; }
       visited.add(atUrl);
       const entryRes = await fetchWithThrottle(ctx, atUrl, false);
-      if (entryRes.rateLimited) { abend.rateLimited = true; return { backwardUri: '', previousUris: [] }; }
-      if (!entryRes.bytes || entryRes.bytes.length === 0) return { backwardUri: '', previousUris: [] };
+      if (entryRes.rateLimited) { if (_seekDiag.length < 30) _seekDiag.push(`h${hop}:rl`); abend.rateLimited = true; return { backwardUri: '', previousUris: [] }; }
+      if (!entryRes.bytes || entryRes.bytes.length === 0) { if (_seekDiag.length < 30) _seekDiag.push(`h${hop}:empty`); return { backwardUri: '', previousUris: [] }; }
       bytesFetched += entryRes.bytes.length;
       const entryNav = decodeChunkedEntry(entryRes.bytes);
+      if (_seekDiag.length < 30) _seekDiag.push(`h${hop}:b=${entryRes.bytes.length}:bwd=${entryNav.backwardUri ? 'Y' : 'N'}:nx=${entryNav.nextAt}`);
       if (entryNav.backwardUri) {
         return {
           backwardUri: entryNav.backwardUri,
@@ -670,8 +702,14 @@ export async function* crawlNdgrBackward(opts) {
   /** @type {number[]} 実際に試す at（秒）。programStart 近傍も末尾に足す。 */
   const seedCandidates = seedLags.map((lag) => nowSec - lag);
   if (programStartSec != null) {
-    // 配信開始の少し後（最初の数十秒）も候補に。ここは確実に backward を持つはず。
-    seedCandidates.push(programStartSec + 60);
+    // v0.1.660: タイムシフト/録画再生では nowSec(現在時刻)が配信の実時間と大きくズレ、
+    //   nowSec-lag の候補が全て「配信時間外」を指して入口が見つからず backward_exhausted に
+    //   なっていた(実機 lv350689631・タイムシフト再生・公式779なのに記録15=2%停止)。
+    //   programStart からの経過時間にわたって複数候補を足し、配信時間内の入口を確実に拾う。
+    //   従来の programStartSec+60 単点だけだと、その時刻の区画にたまたま入口が無いと失敗した。
+    for (const offset of [60, 300, 900, 1800, 3600, 7200, 14400, 28800]) {
+      seedCandidates.push(programStartSec + offset);
+    }
   }
   // v0.1.456 レジューム: 前回到達点(resumeFromVpos)と programStart が分かるとき、候補の
   //   先頭に「配信開始 + 最古オフセット − バッファ」を積む。最優先で前回の続きから掘り始め、
@@ -701,7 +739,7 @@ export async function* crawlNdgrBackward(opts) {
       break;
     }
   }
-  if (!initialBackwardUri) return done('backward_exhausted');
+  if (!initialBackwardUri) return done('backward_exhausted', { crawl: _crawlDiag, seek: _seekDiag.slice(0, 30), cands: seedCandidates.slice(0, 10) });
 
   // === 外側ループ: 「?at={時刻} で backward 連鎖を辿る」を、配信開始に届くまで時刻を
   //   遡らせて繰り返す。1 本の backward 連鎖は時刻区画ごとに next=N で終端する（実機で
@@ -752,13 +790,26 @@ export async function* crawlNdgrBackward(opts) {
         });
       }
       noProgressStreak += 1;
-      if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
-        return done('no_progress');
+      // v0.1.697: 1行も取れていない crawl は少数(COLD_RETRY_MAX)で早期に見切り、外側の
+      //   transient リトライ(新鮮な seed)に任せる。前進歴ありは従来 240(疎区間橋渡し)。
+      const noEntryBudget = everMadeProgress
+        ? NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX
+        : NDGR_BACKFILL_COLD_RETRY_MAX;
+      if (noProgressStreak > noEntryBudget) {
+        // v0.1.691: 一度も chat を取れていない＝入口問題として正直に報告（診断付き）。
+        return done(
+          everMadeProgress ? 'no_progress' : 'backward_exhausted',
+          { crawl: _crawlDiag, seek: _seekDiag.slice(0, 30), cands: seedCandidates.slice(0, 10) }
+        );
       }
       // v0.1.431: 起点を「直前の種より 1 バケット分ずつ」前へ戻して再探索する。旧実装は
       //   1200s×streak も戻し、46 分級の配信では配信開始を飛び越して programStart に張り付き、
       //   毎回同じ場所＝ no_progress 即終了だった。バケット幅で着実に隣のバケットへ降ろす。
       seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
+      // v0.1.695: 空リトライ間に小休止を挟む。従来は上限240回まで無休で空シークを連発し、
+      //   SW/コンテンツのイベントループとNDGRをリクエスト嵐で圧迫していた(実機: SWがメッセージ
+      //   応答不能)。橋渡しの正しさは不変(回数・順序は同じ)・ペースだけ毎秒数件に落とす。
+      await sleep(NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS);
       continue;
     }
 
@@ -843,7 +894,9 @@ export async function* crawlNdgrBackward(opts) {
     //   「もう一度」を押しても同じ起点で同じ空区画に落ちて決定的に同じ所で死ぬ（902→907）。
     //   修正: 空区画も「進めなかった」と同じリトライ経路に合流させ、起点をさらに前へ戻して
     //   次の区画を試す（＝空区画を飛び越えて遡り続ける）。リトライ上限を超えたら no_progress。
-    //   reseed===0（初回）で空なら従来通り入口問題＝backward_exhausted。
+    //   v0.1.691: 当時 reseed===0（初回）の空区画だけは即 backward_exhausted とする特例を残して
+    //   いたが、初回 seed がたまたま空区画（若い/短い配信の序盤疎区間）に落ちると一発死するため
+    //   撤去した。初回の空区画も同じリトライ経路に合流させる。
     //
     //   配信開始近傍に到達したら本当の完了。v0.1.434: 単一最小 vpos ではなく「開始近傍
     //   (NEAR_START_VPOS_CS 以内)の vpos が複数あるか」で判定する。運営/system/gift の極小 vpos が
@@ -859,24 +912,32 @@ export async function* crawlNdgrBackward(opts) {
     const madeProgress =
       chainMinVpos != null && (globalMinVpos == null || chainMinVpos < globalMinVpos);
     if (!madeProgress) {
-      // reseed===0（初回）で空区画なら、そもそも入口で何も取れていない＝入口問題。
-      if (reseed === 0 && chainMinVpos == null) {
-        return done('backward_exhausted');
-      }
+      // v0.1.691: 旧「reseed===0 かつ空区画なら即 backward_exhausted」特例はここから撤去（上の
+      //   v0.1.455 コメント参照）。初回の空区画もリトライ経路に合流させる。
       // 進めなかった／空区画だった。即終了せず、起点をさらに前へ戻してリトライする。
       noProgressStreak += 1;
-      if (noProgressStreak > NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX) {
-        // 何度戻しても古い区画に入れない＝ここで諦める。ただし配信開始とは限らないので
-        // reached_start とは言わない（『ぜんぶ届いた』を出さない）。
-        return done('no_progress');
+      // v0.1.697: 前進歴なしは少数(COLD_RETRY_MAX)で早期見切り(上の同型ガード参照)。
+      const emptyBudget = everMadeProgress
+        ? NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX
+        : NDGR_BACKFILL_COLD_RETRY_MAX;
+      if (noProgressStreak > emptyBudget) {
+        // 何度戻しても古い区画に入れない＝諦める(配信開始とは限らないので reached_start とは
+        // 言わない)。v0.1.691: 前進歴なしは backward_exhausted を診断付きで正直に報告。
+        return done(
+          everMadeProgress ? 'no_progress' : 'backward_exhausted',
+          { crawl: _crawlDiag, seek: _seekDiag.slice(0, 30), cands: seedCandidates.slice(0, 10) }
+        );
       }
       // v0.1.431: 起点を「直前の種より 1 バケット分ずつ」前へ戻す（旧 1200s×streak は配信開始を
       //   飛び越え programStart 張り付き→毎回同じ場所→偽 no_progress だった）。
       seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
+      // v0.1.695: 空リトライ間に小休止（嵐防止・上の同型コメント参照）。
+      await sleep(NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS);
       continue; // 同じ reseed 予算内で次の起点を試す
     }
     // 進めた。最古 vpos を更新し、no-progress 連続カウンタをリセット。
     noProgressStreak = 0;
+    everMadeProgress = true; // v0.1.691: 予算超過時の終了理由出し分け用（前進歴あり）
     globalMinVpos = chainMinVpos;
     // v0.1.434: この「実際に遡れた区画」が開始区画らしかったかを記録。入口が尽きた時（副経路）の
     //   reached_start 判定に使う。単一最小値ではなく開始近傍 vpos の複数性で見るので外れ値に強い。

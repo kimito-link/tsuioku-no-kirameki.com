@@ -1,8 +1,15 @@
+import os from 'node:os';
 import { defineConfig } from 'vitest/config';
+
+const maxWorkers = Math.max(1, Math.min(4, os.cpus()?.length || 4));
 
 export default defineConfig({
   test: {
     environment: 'node',
+    // Windows + Claude Code ターミナルで threads プールがハングして見える退行対策
+    pool: 'forks',
+    maxWorkers,
+    fileParallelism: maxWorkers > 1,
     include: [
       'src/**/*.test.js',
       // アーキテクチャレベルの不変条件（レイヤ依存など）は

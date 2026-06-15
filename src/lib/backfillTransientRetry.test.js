@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   shouldScheduleBackfillTransientRetry,
+  shouldResetBackfillRetryBudgetAfterRun,
   BACKFILL_TRANSIENT_STOP_REASONS
 } from './backfillTransientRetry.js';
 
@@ -27,10 +28,34 @@ describe('shouldScheduleBackfillTransientRetry', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'reached_start' })).toBe(false);
   });
 
-  it('やり切り(no_progress / cap_rows / cap_bytes / cap_segments / cap_reseeds)は再試行しない', () => {
-    for (const stopReason of ['no_progress', 'cap_rows', 'cap_reseeds', 'cap_bytes', 'cap_segments']) {
+  it('cap系やり切り(cap_rows / cap_bytes / cap_segments / cap_reseeds)は再試行しない', () => {
+    for (const stopReason of ['cap_rows', 'cap_reseeds', 'cap_bytes', 'cap_segments']) {
       expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason })).toBe(false);
     }
+  });
+
+  it('v0.1.658: no_progress は official件数を渡さないと再試行しない(従来互換)', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'no_progress' })).toBe(false);
+  });
+
+  it('v0.1.658: no_progress でも official に大きく届いてなければ続きから再試行(59%停止救済)', () => {
+    const args = { ...base, stopReason: 'no_progress', recordedCount: 2548, officialCount: 4355 };
+    expect(shouldScheduleBackfillTransientRetry(args)).toBe(true); // 59% < 95%
+  });
+
+  it('v0.1.658: no_progress で official に十分近い(95%超)なら再試行しない(無限ループ防止)', () => {
+    const args = { ...base, stopReason: 'no_progress', recordedCount: 4200, officialCount: 4355 };
+    expect(shouldScheduleBackfillTransientRetry(args)).toBe(false); // 96% >= 95%
+  });
+
+  it('v0.1.658: no_progress でも回数上限に達したら再試行しない', () => {
+    const args = { ...base, stopReason: 'no_progress', recordedCount: 100, officialCount: 4355, retriedCount: 5, maxRetries: 5 };
+    expect(shouldScheduleBackfillTransientRetry(args)).toBe(false);
+  });
+
+  it('v0.1.658: no_progress で official 不明/0 なら再試行しない(誤判定回避)', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'no_progress', recordedCount: 100, officialCount: 0 })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'no_progress', recordedCount: 100 })).toBe(false);
   });
 
   it('時間 cap（cap_elapsed）は続きがある長尺配信向けに再試行する', () => {
@@ -39,6 +64,21 @@ describe('shouldScheduleBackfillTransientRetry', () => {
 
   it('意図的中断(aborted)は再試行しない（タブ非表示などユーザー起因）', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted' })).toBe(false);
+  });
+
+  it('v0.1.692: aborted でも rows=0(1行も取れず一発死)なら回数上限内で再試行する', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 0 })).toBe(true);
+  });
+
+  it('v0.1.692: rows>0 の aborted は再試行しない(ユーザー中断/正常な部分取得を尊重)', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 1 })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 500 })).toBe(false);
+  });
+
+  it('v0.1.692: aborted+rows=0 でも回数上限/auto OFF/hidden では再試行しない', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 0, retriedCount: 5, maxRetries: 5 })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 0, autoEnabled: false })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 0, tabHidden: true })).toBe(false);
   });
 
   it('自動取り込み OFF なら再試行しない', () => {
@@ -79,5 +119,24 @@ describe('shouldScheduleBackfillTransientRetry', () => {
     expect(BACKFILL_TRANSIENT_STOP_REASONS.has('reached_start')).toBe(false);
     expect(BACKFILL_TRANSIENT_STOP_REASONS.has('no_progress')).toBe(false);
     expect(BACKFILL_TRANSIENT_STOP_REASONS.has('backward_exhausted')).toBe(true);
+  });
+});
+
+describe('shouldResetBackfillRetryBudgetAfterRun', () => {
+  it('rows>0(取れた巡回)なら予算を回復してよい', () => {
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: 1 })).toBe(true);
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: 5000 })).toBe(true);
+  });
+
+  it('rows=0(空振り巡回)では回復しない=連続空振りは従来どおり7/40回で有界', () => {
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: 0 })).toBe(false);
+  });
+
+  it('無効値(負/NaN/undefined/文字列)では回復しない', () => {
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: -1 })).toBe(false);
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: NaN })).toBe(false);
+    expect(shouldResetBackfillRetryBudgetAfterRun({})).toBe(false);
+    expect(shouldResetBackfillRetryBudgetAfterRun(null)).toBe(false);
+    expect(shouldResetBackfillRetryBudgetAfterRun({ rowsThisRun: 'a' })).toBe(false);
   });
 });

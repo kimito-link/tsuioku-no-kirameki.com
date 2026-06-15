@@ -406,15 +406,11 @@ export function backfillRecordCardHintDomState(progress, opts = {}) {
 
   const phase = backfillNarrationPhase(progress);
 
-  // 誤完了の可視化（fix/broadcast-bulk-catchup・2026-05-31）:
-  //   reached_start 等で done/done_empty（＝「配信のはじめまで届いた」）と判定されたのに、
-  //   実記録が公式件数に遠く届いていない場合は「ぜんぶ届いた」ではなく未達を診断表示する。
-  //   実機で 記録118/公式595(20%) のまま自動回復しない放送の原因（stopReason）を、利用者が
-  //   見たまま報告できるようにする。
-  //   ⭐しきい値は watchdog の reached_start 再 sweep（reachedStartGapOverride）と同じ
-  //     BACKFILL_FALSE_COMPLETION_RATIO(0.5) を使う。これにより「未達と表示するのに自動回復
-  //     しない」帯（旧: カード 0.95 / 再 sweep 0.5）の不整合を解消する。50〜95% の near-complete な
-  //     reached_start は AGENTS §3.3 を尊重して静観（達成扱い・カードには出さない）。
+  // v0.1.685: reached_start 誤完了（大ギャップ）は黙って隠す。
+  //   content の shouldRearmBackfillForOfficialGap が自動再 sweep するため、popup でメッセージを
+  //   出すとユーザーに「ローディング中」と感じさせる（v0.1.657「完成だけドンと出す」設計に反する）。
+  //   50%未満でも「取得中」として扱い、自動再 sweep が終わって 50%以上になったら表示する。
+  //   ※本当に自動回復しない(maxRearms 超過等)場合は partial 表示が出る(stopReason が変わる)。
   if (phase === 'done' || phase === 'done_empty') {
     const official = Number(opts && opts.officialCount);
     const recorded = Number(opts && opts.recordedCount);
@@ -425,12 +421,7 @@ export function backfillRecordCardHintDomState(progress, opts = {}) {
       recorded >= 0 &&
       recorded < official * BACKFILL_FALSE_COMPLETION_RATIO
     ) {
-      const suffix = backfillStuckDiagnosticsSuffix(progress, opts);
-      return {
-        hidden: false,
-        dataPhase: 'partial',
-        lead: `過去ログが公式件数に届いていません${suffix}`
-      };
+      return { hidden: true, dataPhase: '', lead: '' };
     }
   }
 

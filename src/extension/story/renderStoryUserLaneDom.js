@@ -43,7 +43,8 @@ import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCo
  * @typedef {{
  *   storyAvatarLoadGuard: { pickDisplaySrc: (s: string) => string, noteRemoteAttempt: (img: HTMLImageElement, requested: string) => void },
  *   isHttpOrHttpsUrl: (u: unknown) => boolean,
- *   storyTileUsesYukkuriTvStyle: (requested: string, display: string) => boolean
+ *   storyTileUsesYukkuriTvStyle: (requested: string, display: string) => boolean,
+ *   upgradeAnonymousAvatarImage?: (img: HTMLImageElement, userKey: string, sizePx?: number) => unknown
  * }} StoryUserLaneDomIo
  */
 
@@ -169,6 +170,13 @@ function fillLaneTier(el, items, io) {
     img.decoding = 'async';
     if (io.isHttpOrHttpsUrl(img.src)) {
       img.referrerPolicy = 'no-referrer';
+    }
+    if (
+      fullUid &&
+      requestedLane.startsWith('data:image/svg+xml') &&
+      typeof io.upgradeAnonymousAvatarImage === 'function'
+    ) {
+      io.upgradeAnonymousAvatarImage(img, fullUid, 64);
     }
 
     const metaEl = document.createElement('span');

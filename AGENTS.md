@@ -23,7 +23,8 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 - **拡張 ID**: `cjbabignmmodaickpeckiojjabnlogdb`
 - **公開中**: **0.1.7**（2026-04-23 提出 / 2026-04-29 公開）
 - **直近提出**: **0.1.102**（2026-05-01 23 時台 / 自動公開 ON / 審査結果は要確認）
-- **ローカル開発**: `feature/live-item-throw-by-user` ブランチで **v0.1.168** まで進行中（2026-05-05 時点）。CWS 未提出
+- **次回提出準備済**: **0.1.663**（2026-06-08 ZIP 生成済: `build/tsuioku-no-kirameki-0.1.663.zip` / localhost・開発識別子 除去済 / 説明文・権限理由 反映済 / ダッシュボード貼り付け＋提出はユーザー手動）
+- **ローカル開発**: `feature/broadcaster-reputation-check` ブランチで **v0.1.663** まで進行中（2026-06-08 時点）
 - **CWS Developer Dashboard 入力の正本**: [docs/releases/cws-submission-texts.md](docs/releases/cws-submission-texts.md)
   - 提出時に毎回そこから貼り直す運用（再構築コスト削減）
 - **ホスト権限**: `https://*.nicovideo.jp/*` のみ（`localhost`/`127.0.0.1` は提出版から除外）
@@ -56,6 +57,17 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 - 内部識別子 `nicolivelog` は `manifest.json` の description に **含めない**
 - CWS ストア掲載上の名称は `君斗りんくの追憶のきらめき` で統一
 
+### 3.5 ユーザー情報セットの原則（2026-06-10 ユーザー確立・全UI共通）
+- **人が画面に出る場所では「サムネ・ID・ハンドルネーム・リンク」を分かる限りセットで出す。**
+  ID だけ・名前だけ・頭文字アイコンだけの中途半端な表示は原則違反。
+  - サムネが直接取れないときは userId から公式確定パターンで導出する
+    （`deriveAvatarUrlFromUid`: `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/<uid/10000>/<uid>.jpg`）
+  - 数値 uid には `https://www.nicovideo.jp/user/<uid>` へのリンクを付ける
+  - 匿名（`a:` 始まり uid）は安定番号「匿名NNN」+ identicon で**識別できる形**で出す（一律グレー化は禁止）
+- **ニコ生上で公開されている応援情報（コメント/ギフト）は OSINT として堂々と載せる。応援者は主役**
+  （隠す対象ではない・表彰として扱う）。境界線は非公開情報・追跡的プロファイリングのみ。
+- 本家（ニコニコ公式）で見える表現を独自表現で勝手に置き換えない（独自フォールバックは本家の情報が無い時だけ）。
+
 ---
 
 ## 4. ファイル配置のルール
@@ -73,7 +85,7 @@ src/                   ← LP 側 + 純粋関数ライブラリ
     promo-tile-440x280.jpg       プロモタイル(小)
     marquee-1400x560.jpg         マーキー
 
-tsuioku-no-kirameki/   ← 本番 LP の配信ディレクトリ（GitHub Webhook で XServer に deploy）
+tsuioku-no-kirameki/   ← 本番 LP の配信ディレクトリ（GitHub Webhook で Cloudflare Pages に deploy）
   index.html           ← LP 本体
   privacy.html         ← プライバシーポリシー
   google7e3e79636d884c2.html   Search Console 所有権確認（残置）
@@ -128,14 +140,26 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 
 ## 8. デプロイ / CI
 
-- **LP**: `master` ブランチへ push すると、XServer 側の GitHub Webhook が自動で `tsuioku-no-kirameki/` 配下を本番反映する。ビルド手順は不要
+- **LP**: `master` ブランチへ push すると、Cloudflare Pages の連携が自動で `tsuioku-no-kirameki/` 配下を本番反映する。ビルド手順は不要
 - **拡張 ZIP**: `python scripts/stage-submission.py <version>` で一括生成
   - 生成物: `build/submission-<version>/` と `build/tsuioku-no-kirameki-<version>.zip`
   - スクリプトが自動でやること: (1) dev manifest から localhost / 127.0.0.1 を落とす (2) description の「（開発識別子: nicolivelog）」サフィックスを落とす (3) ホワイトリストで必要な画像だけコピー (4) ZIP 出力前に全エントリがフォワードスラッシュか検証
 
 ---
 
-## 9. エージェントへのお願い
+## 9. Claude Code が頻繁に止まるとき（Windows）
+
+1. **初回**: `npm run setup:claude` → `.claude/settings.json` に `defaultMode: bypassPermissions` を入れる。
+2. **検証**: `npm run verify` ではなく **`npm run verify:cc`**（ログ: `.artifacts/verify-cc.log`）。
+3. **単体テスト**: `npm run test:cc`（`vitest` + dot reporter + forks プール）。
+4. **禁止**: 応答本文に XML 風 tool 呼び出しを書く・Unix パイプ（`tail`/`head`/`grep`）を PowerShell で使う。
+5. **長い会話**: 新チャットまたは `/compact`。HANDOFF / MEMORY に要約を書いてから続行。
+
+詳細: [CLAUDE.md](CLAUDE.md) の「Claude Code が止まるとき」。
+
+---
+
+## 10. エージェントへのお願い
 
 - **この AGENTS.md を最初に読むこと**。とくに §3.1「ゆっくり OK」と §3.2「3 キャラの役割」はコピー＆新規生成するコンテンツに波及しやすい
 - **CWS 申請関連のファイル**（`src/images/googlechrom/`, `build/store-listing/` の `description-ja.txt` / `privacy-justifications-ja.txt`）は、仕様・文言を変える際に必ず「審査通過後の差分提出」を意識する
@@ -144,9 +168,9 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 
 ---
 
-## 10. AI ツール役割分担（Claude Code 司令塔アーキテクチャ・2026-05-29 確立）
+## 11. AI ツール役割分担（Claude Code 司令塔アーキテクチャ・2026-05-29 確立）
 
-### 10.1 大原則
+### 11.1 大原則
 
 **ユーザーは Claude Code とだけ会話する**。Claude Code が司令塔として他の AI コーディングツール（Codex CLI / cursor-agent CLI / OpenCode）を呼び出し、結果を読み戻して統合する。
 
@@ -155,7 +179,7 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 - 各ツールの強みを活かしつつ、Claude Max のクレジット消費を分散できる
 - 全ツールが共通の AGENTS.md を読むので、文脈の食い違いが構造的に起きない
 
-### 10.2 役割マトリクス
+### 11.2 役割マトリクス
 
 | 段階 | 担当ツール | 起動方法 | 理由 |
 |---|---|---|---|
@@ -170,7 +194,7 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 | 実機検証（ブラウザ操作） | **Claude Code（Claude-in-Chrome MCP）** | MCP 経由 | **代替不可**（他ツールには無い機能） |
 | MEMORY/reference 更新 | **Claude Code 本体専用** | `Edit` | **他ツールに渡さない**（食い違い防止） |
 
-### 10.3 ツール起動の技術詳細
+### 11.3 ツール起動の技術詳細
 
 #### Codex CLI（インストール済み: `codex-cli 0.128.0`）
 ```bash
@@ -192,14 +216,14 @@ cursor-agent は AGENTS.md と CLAUDE.md の両方を自動読込（[公式仕�
 opencode --model nvidia/deepseek-ai/deepseek-v4-flash ...
 ```
 
-### 10.4 ⛔ やってはいけないこと
+### 11.4 ⛔ やってはいけないこと
 
 - **MEMORY.md を他ツールに編集させる** → Claude Code 専用領域。食い違いリスク
 - **Grok Build / Antigravity を確実な情報なしに組み込む** → 2026-05時点で CLI/MCP対応の一次ソース裏取り未完了。実機検証してから
 - **サブエージェントが別のサブエージェントを呼ぶ**（[公式禁止](https://code.claude.com/docs/en/sub-agents)）→ メイン会話から並列に呼ぶ
 - **同じ作業を複数ツールで重複実装** → 役割を上のマトリクスで固定する
 
-### 10.5 ハンドオフのコピペレス手順
+### 11.5 ハンドオフのコピペレス手順
 
 1. Claude Code が会議結論を `memory/reference_*.md` に書く + ブランチ作成 + push
 2. Claude Code が `.claude/agents/<tool>-impl.md` 呼び出し → サブエージェントが Bash で外部 CLI 起動
@@ -210,7 +234,7 @@ opencode --model nvidia/deepseek-ai/deepseek-v4-flash ...
 
 各ステップで「ファイル経由」のみで情報伝達 → コピペ発生ゼロ。
 
-### 10.6 並列・自動評価（Arena Mode 相当）の実装
+### 11.6 並列・自動評価（Arena Mode 相当）の実装
 
 Claude Code の `/batch` で 5〜30 並列の worktree 実装は既に可能。さらに「複数案を並列実装→自動評価→最良を選ぶ」(Grok Build の Arena Mode に相当する) を実現するには:
 
@@ -221,3 +245,34 @@ Claude Code main → 複数の `.claude/agents/judge-*.md` を並列起動
 ```
 
 これは今日の作業で既に実践している「ネガティブコントロール + 複数仮説評価」の自動化版。
+
+## 12. 実装前ゲート（plan 先行・暴走再発防止・2026-06-14 確立）
+
+> 背景: 「走りながら考える」で暴走しクラッシュした実例があった。星野ロミ式 / Karpathy 4原則 /
+> 会議P0(Codex)が同じ方向を指す。出典 memory/reference_ai_general_rules_learnings.md。
+
+### 12.1 着手前ゲート（複数ファイル・状態・storage・messaging・backfill・権限変更は必須）
+
+- 複数ファイル/状態管理/storage/messaging/backfill/権限変更は**必ず Plan 先行**(EnterPlanMode)。
+- 探索中は **Read/Grep/git diff のみ**。Plan が承認されるまで編集・build・version bump を禁止。
+- Plan には **目的・非目的・変更ファイル・状態遷移・失敗時 rollback・検証手順**を書く。
+- Plan に無いファイル変更が必要になったら**停止して Plan を更新**(勝手に広げない)。
+- 例外=「**1ファイル・10行未満・挙動不変**」の文言/typo 修正だけ。
+
+### 12.2 実装中の規律（Karpathy 4原則）
+
+1. **コードの前に考える**: 前提を明示し曖昧なら止まる。**推測実装を避ける**(実機/コードで真因を確認してから直す)。
+2. **シンプルに**: 依頼以上を足さない(過剰設計・過剰抽象化をしない)。
+3. **外科的に変更**: 無関係な「ついで修正」をしない。既存部品を検索して再利用(重複実装しない)。
+4. **検証可能に**: 1単位ごとに対象 test を実行。test/typecheck/build が壊れたら**追加実装を停止**して直す。
+
+### 12.3 星野メソッド(UX判断の軸)
+
+- **摩擦ゼロ**: 待機・無音・「見つかりません」で止めるのは悪。楽観的に始めダメなら静かにフォールバック+次の一手。
+- **行動誘発**: 「次にどうすればいいか」を提示。**速度至上主義**(待たせない・開いた瞬間に出す)。
+
+### 12.4 コミット/検証/復帰
+
+- dist 生成・version bump・commit・push・Chrome reload は**明示依頼後**に行う。
+- version は changelog 先頭と整合させる(追跡できないバージョンを**でっち上げない**)。
+- **クラッシュ後は git diff と承認済み Plan を読み直してから再開**(推測で作業を続けない)。

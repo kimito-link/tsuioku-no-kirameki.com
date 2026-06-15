@@ -4,7 +4,20 @@
   "installCommand": null,
   "outputDirectory": ".",
   "rewrites": [
-    { "source": "/", "destination": "/tsuioku-no-kirameki/index.html" },
-    { "source": "/:path((?!tsuioku-no-kirameki/|app/|extension/|api/|_next/).*)", "destination": "/tsuioku-no-kirameki/:path" }
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/app/index.html"
+    },
+    {
+      "source": "/",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/index.html"
+    },
+    {
+      "source": "/:path((?!tsuioku-no-kirameki/|app/|extension/|api/|_next/).*)",
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/tsuioku-no-kirameki/:path"
+    }
   ]
 }

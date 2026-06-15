@@ -22,8 +22,18 @@ export const BACKFILL_FLUSH_BASE_ROWS = 800;
 /** 保存済み件数に対する成長係数（保存 N 件のとき N*係数 行たまるまで待つ）。 */
 export const BACKFILL_FLUSH_GROWTH = 0.5;
 
-/** バッファに溜める上限（メモリ保護。これを超えたら必ず flush）。 */
-export const BACKFILL_FLUSH_MAX_ROWS = 8000;
+/**
+ * バッファに溜める上限（これを超えたら必ず flush）。
+ *
+ * v0.1.654「一気に取れない」根治: 旧 8000 は O(N²) 緩和のため大きく取っていたが、
+ *   crawl が高速で大量取得した分(最大 8000 行)が pending バッファに溜まったまま、
+ *   storage へ書く前に watch タブ離脱 / visibility 変化で content script が止まると
+ *   一括で失われていた(実機 lv350631410: crawl rows=9297 取り切ったのに chunk=4951 で
+ *   53% 停止・約 4300 行が pending のまま消失=「一気に取れない」の真因)。上限を 2000 に
+ *   下げ、中断時の最大損失を 8000→2000 行に圧縮する。flush 回数は増えるが、保存件数比例の
+ *   成長係数(growth)は維持しているので O(N²) には戻らない(大規模放送でも growth 側が支配的)。
+ */
+export const BACKFILL_FLUSH_MAX_ROWS = 2000;
 
 /**
  * 保存済みコメント件数から、次に flush するまでの最小バッファ行数を返す。

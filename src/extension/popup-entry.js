@@ -1,9 +1,5 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
-import {
-  extractLiveIdFromUrl,
-  isNicoLiveWatchUrl,
-  watchPageUrlsMatchForSnapshot
-} from '../lib/broadcastUrl.js';
+import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
@@ -57,6 +53,7 @@ import {
   shouldReprimeCommentMilestones
 } from '../lib/watchPopupCelebrationGuard.js';
 import { createPopupCelebrationGate } from '../lib/popupCelebrationGate.js';
+import { nicoadCommentCelebrationKey } from '../lib/nicoadCelebrationKey.js';
 import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.js';
 import {
   fetchKokenGiftHistoryAllViaExtension,
@@ -98,14 +95,14 @@ import {
   buildNorthStarScoreFallbackHtml,
   buildNorthStarProgramPointsFallbackHtml
 } from '../lib/northStarFallbackHtml.js';
-import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+import {
+  determineNorthStarLaneState,
+  hasEventParticipationSignal
+} from '../lib/northStarLaneReason.js';
 import { shouldShowNorthStarLane } from '../lib/northStarLaneVisibility.js';
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
 import {
   isNorthStarLaneWaitingState,
-  buildNorthStarLaneWaitingShellHtml,
-  buildNorthStarLaneOpenHintDiagramHtml,
-  getNorthStarWaitRotationMessages,
   isNorthStarEventLaneWaitTimedOut,
   NORTH_STAR_EVENT_LANE_WAIT_TIMEOUT_MS,
   NORTH_STAR_EVENT_LANE_TIMEOUT_TARGETS
@@ -115,7 +112,6 @@ import {
   acquisitionTierFromPct
 } from '../lib/northStarAcquisitionGauge.js';
 import { northStarLaneGadgetCharaPathByTier } from '../lib/northStarLaneGadgetChara.js';
-import { buildNorthStarWaitCharacterGuideHtml } from '../lib/formatNorthStarWaitHintsRailHtml.js';
 import { buildNorthStarAdRankingStatsHtml } from '../lib/buildNorthStarAdRankingStatsHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 import {
@@ -172,6 +168,7 @@ import {
   commentDbSummaryKey,
   CDB_BROADCAST_CHANNEL,
   watchSnapshotStorageKey,
+  KEY_PAINT_PERF_RING_V1,
   giftUsersStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
@@ -306,6 +303,7 @@ import {
   summarizeTimelineGifts
 } from '../lib/supportActivityTimeline.js';
 import { buildSupportTimelineBodyHtml } from '../lib/supportTimelineHtml.js';
+import { shouldRefreshSupportTimeline } from '../lib/supportTimelineGuard.js';
 import {
   buildAiShareInlinePanelStorageReadback,
   buildInlinePanelStorageSetFailedMessage,
@@ -359,6 +357,8 @@ import {
   isPanelLiveSummary,
   watchSnapshotFromPanelSummary
 } from '../lib/panelLiveSummary.js';
+import { perfDiagStorageKey, buildPerfDiag } from '../lib/perfDiag.js';
+import { computeRecordRate } from '../lib/recordRate.js';
 import { listBackfillWaitingLiveIds } from '../lib/globalBackfillQueue.js';
 import {
   PANEL_METRICS_MESSAGE_TYPE,
@@ -452,6 +452,7 @@ import {
   resetStoryUserLaneDom
 } from './story/renderStoryUserLaneDom.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+import { upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
 import { buildReportThumbedUsersSectionHtml } from '../lib/reportThumbedUsersSectionHtml.js';
@@ -557,8 +558,23 @@ import { buildReportMemoPayload } from '../lib/supportGrowthInsights.js';
 import {
   buildMarketingDashboardHtml,
   buildAudienceParticipationLeadSectionHtml,
-  audienceParticipationLeadEmbeddedCss
+  audienceParticipationLeadEmbeddedCss,
+  sectionInterestArrival
 } from '../lib/marketingChartsHtml.js';
+import {
+  summarizeCommentRecordBreakdown,
+  formatCommentRecordBreakdownLine
+} from '../lib/commentRecordBreakdown.js';
+import {
+  createMonotonicCommentCountState,
+  resolveMonotonicCommentCount
+} from '../lib/monotonicCommentCount.js';
+import {
+  SESSION_COMMENT_CACHE_KEY,
+  isSessionCommentCacheFresh,
+  buildSessionCommentCache
+} from '../lib/sessionCommentCache.js';
+import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
 import { STORY_GROWTH_MAX_CELLS } from '../lib/storyGrowthLimits.js';
@@ -602,6 +618,12 @@ import {
 } from '../lib/broadcastSessionSummaryDb.js';
 import { listRecentUniqueBroadcastLiveIds } from '../lib/recentBroadcastLiveIds.js';
 import {
+  buildMediaKitStats,
+  buildMediaKitSupporters,
+  MEDIA_KIT_COMMENT_LIVE_CAP
+} from '../lib/mediaKitStats.js';
+import { buildMediaKitHtml } from '../lib/mediaKitHtml.js';
+import {
   buildLastBroadcastReviewView,
   formatLastBroadcastIndicator,
   loadLastBroadcastSummary
@@ -612,6 +634,12 @@ import {
 } from '../lib/popupWindowEmptyHeight.js';
 import { createObjectUrlRevokeQueue } from '../lib/objectUrlRevokeQueue.js';
 import { formatDateTime } from '../lib/formatDateTime.js';
+import { buildReportSelfPostedRows } from '../lib/reportSelfPostedRowsHtml.js';
+import { buildReportFriendlyMetaRows } from '../lib/reportFriendlyMetaRowsHtml.js';
+import { buildReportUserRoomRows } from '../lib/reportUserRoomTableHtml.js';
+import { shouldRunDevMonitorPaint } from '../lib/devMonitorPaintGate.js';
+import { shouldSkipHeavyDiagPaint } from '../lib/diagPaintDeferGate.js';
+import { createPaintPerfRecorder } from '../lib/paintPerfLog.js';
 import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
@@ -900,6 +928,11 @@ const popupCelebrationGate = createPopupCelebrationGate();
 
 let _prevSupportCount = /** @type {number|null} */ (null);
 
+// v0.1.645: #count / liveStatComments を「同一 lv 内で単調増加」に固定するゲート。
+//   4 経路(panel即時 / panel軽量 / 公式統計 / メイン全件)が別タイミングの生値で
+//   setCountDisplay を呼び合うため数値がズレ・前後していた。最大値=正本で収束させる。
+const _monotonicCommentCountState = createMonotonicCommentCountState();
+
 /** @type {number|null} */
 let _prevMilestoneCommentHighWater = null;
 
@@ -958,6 +991,89 @@ let _celebrationStateCache = null;
 
 /** @type {string|null} */
 let _lastTopSupportRankStripStableKey = null;
+
+/**
+ * 直近に renderUserRooms を完走した liveId。
+ * 高速スクロール中の全消し再描画(白フラッシュ)を、同一配信が既に塗ってあるときだけ
+ * 見送るためのガードに使う。配信切替時は値が変わり、必ず塗り直される。
+ * @type {string}
+ */
+let _lastUserRoomsPaintedLiveId = '';
+
+/** perfDiag を最後に storage へ書いた時刻(間引き用)。 */
+let _lastPerfDiagWriteAt = 0;
+/** 視聴中タブ数のキャッシュ(perfDiag 用・5秒ごとに更新)。 */
+let _perfDiagTabCount = /** @type {number|null} */ (null);
+let _perfDiagTabCountAt = 0;
+/** v0.1.640: 取得スピード(records/sec)算出用の前回サンプル(件数・時刻・liveId)。 */
+let _recordRateLastCount = /** @type {number|null} */ (null);
+let _recordRateLastAt = 0;
+let _recordRateLastLiveId = '';
+/** このタブで paintWatchPopupUi の重い paint 区間を実行した累計回数。 */
+let _perfPaintCount = 0;
+
+/**
+ * paint 所要 ms 等を nls_perf_diag_<lv> に間引いて書く(白フラッシュ原因の見える化)。
+ * 複数タブの storage 競合を増やさないよう、同 liveId への書き込みは 2 秒に 1 回まで。
+ * fire-and-forget(失敗しても paint を妨げない)。
+ * @param {string} liveId
+ * @param {number} paintMs
+ * @param {number} commentCount
+ * @param {boolean} deferActive
+ */
+function recordPerfDiagThrottled(liveId, paintMs, commentCount, deferActive) {
+  const lv = String(liveId || '').trim().toLowerCase();
+  if (!lv) return;
+  const now = Date.now();
+  if (now - _lastPerfDiagWriteAt < 2000) return;
+  // v0.1.640: 取得スピード(records/sec)を前回サンプルとの差分で算出(退行=取得停止の自動検出)。
+  //   liveId が変わったら前回値をリセット(別配信の件数を持ち越して負/異常レートにしない)。
+  let recordRate = null;
+  if (_recordRateLastLiveId === lv) {
+    recordRate = computeRecordRate({
+      prevCount: _recordRateLastCount,
+      prevAtMs: _recordRateLastAt,
+      curCount: typeof commentCount === 'number' ? commentCount : null,
+      curAtMs: now
+    });
+  }
+  _recordRateLastLiveId = lv;
+  _recordRateLastCount = typeof commentCount === 'number' ? commentCount : _recordRateLastCount;
+  _recordRateLastAt = now;
+  _lastPerfDiagWriteAt = now;
+  // タブ数は 5 秒ごとに更新(tabs.query は毎回呼ぶと地味に重い)。
+  if (now - _perfDiagTabCountAt > 5000) {
+    _perfDiagTabCountAt = now;
+    try {
+      chrome.tabs
+        .query({
+          url: ['https://live.nicovideo.jp/watch/*', 'https://sp.live.nicovideo.jp/watch/*']
+        })
+        .then((tabs) => {
+          _perfDiagTabCount = Array.isArray(tabs) ? tabs.length : null;
+        })
+        .catch(() => {});
+    } catch {
+      /* tabs 権限が無い文脈では null のまま */
+    }
+  }
+  const diag = buildPerfDiag({
+    liveId: lv,
+    tabCount: _perfDiagTabCount,
+    lastPaintAt: now,
+    lastPaintMs: Math.round(paintMs),
+    commentCount,
+    deferActive,
+    paintCount: _perfPaintCount,
+    tabVisible: typeof document !== 'undefined' ? !document.hidden : null,
+    recordRate
+  });
+  try {
+    chrome.storage.local.set({ [perfDiagStorageKey(lv)]: diag }).catch(() => {});
+  } catch {
+    /* context invalidated 時は無視 */
+  }
+}
 
 /**
  * v0.1.246: popup 内で同 user_id を別 nickname で表示する衡突を防ぐ統一 map。
@@ -1699,20 +1815,6 @@ function applyCelebrationSideEffectsFromStorageChanges(changes) {
 }
 
 /**
- * @param {unknown} entry
- * @param {string} liveId
- * @returns {string}
- */
-function nicoadCommentCelebrationKey(entry, liveId) {
-  const lid = String(liveId || '').trim().toLowerCase();
-  const no = String(/** @type {{ commentNo?: unknown, id?: unknown }} */ (entry)?.commentNo ?? /** @type {{ id?: unknown }} */ (entry)?.id ?? '').trim();
-  const text = String(/** @type {{ text?: unknown }} */ (entry)?.text ?? '').trim();
-  if (no) return `${lid}|no:${no}`;
-  const at = Number(/** @type {{ capturedAt?: unknown }} */ (entry)?.capturedAt) || 0;
-  return `${lid}|t:${at}|${text.slice(0, 80)}`;
-}
-
-/**
  * ギフト/広告のシステムコメントが視聴者本人の操作かを、取れる範囲で保守的に判定する。
  * @param {unknown} entry
  * @param {string} parsedSender
@@ -2172,8 +2274,12 @@ function syncLiveStatThreeCardsCharLoadingOverlays() {
 /**
  * @param {string|number} value 数値は toLocaleString('ja-JP') で表示。未取得時は明示文言。
  * @param {WatchPageSnapshot|null} [watchSnapshot] 公式コメント数の併記用
+ * @param {import('../lib/commentRecordBreakdown.js').CommentRecordBreakdown|null|undefined} [breakdown]
+ *   v0.1.627: 記録の内訳(通常/興味来場/システム)。
+ *   v0.1.628: undefined のときは前回表示を保持(他経路の setCountDisplay が breakdown 引数なしで
+ *   呼ばれて DOM を消す副作用を回避)。null を明示すれば行を非表示にできる。
  */
-function setCountDisplay(value, watchSnapshot = null) {
+function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
   /** @type {number|null} */
   let recordedNum = null;
   let text = '';
@@ -2187,6 +2293,22 @@ function setCountDisplay(value, watchSnapshot = null) {
       text = recordedNum.toLocaleString('ja-JP');
     } else {
       text = s;
+    }
+  }
+
+  // v0.1.645: 数値表示は同一 lv 内で単調増加に固定する(数値ズレ根治)。
+  //   呼び出し元 4 経路がそれぞれ別ソース・別タイミングの生値を渡すため、
+  //   ここで「これまで表示した最大」に収束させて前後・据え置きを揃える。
+  //   文言(「(未取得)」等)は gate=null で素通し。lv 切替は gate 内でリセット。
+  if (recordedNum != null) {
+    const gated = resolveMonotonicCommentCount(
+      _monotonicCommentCountState,
+      watchPopupLastPaintedLiveId,
+      recordedNum
+    );
+    if (gated != null) {
+      recordedNum = gated;
+      text = gated.toLocaleString('ja-JP');
     }
   }
 
@@ -2212,10 +2334,14 @@ function setCountDisplay(value, watchSnapshot = null) {
     const oc = watchSnapshot?.officialCommentCount;
     if (typeof oc === 'number' && Number.isFinite(oc) && oc >= 0) {
       officialEl.hidden = false;
+      // v0.1.684: breakdown.normal(通常コメント)優先で公式と比較（配信者コメ除外で正確）。
+      const normalCount = breakdown && typeof breakdown.normal === 'number' ? breakdown.normal : null;
       const recorded =
-        recordedNum != null && Number.isFinite(recordedNum)
-          ? recordedNum
-          : parseInt(String(text).replace(/[,，]/g, ''), 10);
+        normalCount != null
+          ? normalCount
+          : recordedNum != null && Number.isFinite(recordedNum)
+            ? recordedNum
+            : parseInt(String(text).replace(/[,，]/g, ''), 10);
       let line = `公式 ${oc.toLocaleString('ja-JP')} 件`;
       if (!Number.isNaN(recorded) && recorded >= 0 && oc > 0) {
         if (recorded <= oc) {
@@ -2231,6 +2357,23 @@ function setCountDisplay(value, watchSnapshot = null) {
       officialEl.hidden = true;
       officialEl.textContent = '';
       officialEl.removeAttribute('title');
+    }
+  }
+
+  // v0.1.627/628: 記録の内訳を sub 行に表示。breakdown=undefined は DOM 触らない(前回値保持)。
+  // v0.1.685: _broadcasterCount を opts に渡し「配信者 N」を表示。
+  if (breakdown !== undefined) {
+    const breakdownEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsBreakdown'));
+    if (breakdownEl) {
+      const bc = breakdown ? /** @type {any} */ (breakdown)._broadcasterCount : undefined;
+      const line = breakdown ? formatCommentRecordBreakdownLine(breakdown, { broadcasterCount: bc }) : '';
+      if (line) {
+        breakdownEl.hidden = false;
+        breakdownEl.textContent = line;
+      } else {
+        breakdownEl.hidden = true;
+        breakdownEl.textContent = '';
+      }
     }
   }
 
@@ -2618,7 +2761,8 @@ function paintCommentComposeUi() {
 
 // 0.1.38 (AM): EXTENSION_RELOAD_USER_GUIDE_JA / withCommentSendTroubleshootHint
 // を src/lib/commentSendTroubleshootHint.js に切り出し済み（純粋関数 + 7 ケース TDD）。
-const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
+// v0.1.629: status.html と共有するため定数を ../lib/aiShareFastDiagKey.js に切り出し。
+//   ハードコード文字列は1箇所のみ・両 entry が同じ source of truth を見る。
 
 // 0.1.16 (Q): isExtensionContextInvalidatedError の重複定義を撤去し
 // `../lib/reportSilentError.js#isContextInvalidatedError` に一本化（同名 alias 経由で
@@ -2788,6 +2932,21 @@ const watchMetaCache = {
   /** @type {{ lv: string, arr: unknown[], chunkTotal: number|null }|null} */
   lastCommentsArr: null
 };
+
+// v0.1.649 スクロール根治 PR6: displayEntries 構築(buildDisplayCommentEntries +
+//   excludeBroadcaster + inferBroadcasterUserIdFromComments)は arr 全件 O(N)×3 で、
+//   ticker/userRooms 描画に必要なため defer skip できず毎 paint(450ms)走っていた。
+//   会議確定判断「skip 判定は内容署名でなく入力参照(===)」に従い、入力(arr 参照・lv)が
+//   前回と完全一致なら前回結果を再利用する参照等価メモ化。arr は concat/enrich で必ず
+//   新配列参照になる設計なので、後追い昇格があれば arr 参照が変わり自動で再計算される
+//   (署名方式の「更新停止バグ」を構造的に回避)。スクロール中は arr が不変なことが多く効く。
+/** @type {{ arr: unknown[], lv: string, displayEntries: unknown[], broadcasterUid: string|null }|null} */
+let _displayEntriesMemo = null;
+
+// v0.1.725: paint コストを軽量記録(星野「中で測って外で読む」)。状態/間引きは lib に内包。
+const recordPaintPerf = createPaintPerfRecorder({
+  persist: (ring) => { try { void chrome.storage.local.set({ [KEY_PAINT_PERF_RING_V1]: ring }).catch(() => {}); } catch { /* ctx 切れ */ } }
+});
 
 // v0.1.398: snapshot fetch ハング耐性 e2e（snapshot-fetch-hang-resilient.spec.js）が、
 //   「fetch が永久ハングしても snapshotFetchActive が永久 true に張り付かない（withTimeout で
@@ -4672,9 +4831,15 @@ function bindNlMainScrollPerfHook() {
   );
 }
 
-/** @returns {boolean} */
+/**
+ * スクロール直後の重い paint 見送り判定。
+ * 複数タブ(同一プロセス共有)ではメインスレッドが飽和し、180ms の見送りでは
+ * 全消し再構築が間に合わず白フラッシュが残るため、見送り窓を 400ms に広げる。
+ * スクロールが止まれば次の refresh(最長 3 秒)で塗り直るので体感の更新遅れは小さい。
+ * @returns {boolean}
+ */
 function shouldDeferHeavyPopupPaintNow() {
-  return shouldDeferHeavyPopupPaintDuringScroll(nlMainLastScrollAtMs);
+  return shouldDeferHeavyPopupPaintDuringScroll(nlMainLastScrollAtMs, Date.now(), 400);
 }
 
 const STORY_GROWTH_STATE = {
@@ -5067,11 +5232,7 @@ function renderStoryUserLane() {
     faceTanu: STORY_GUIDE_FACE_TANU
   };
 
-  const laneDomIo = {
-    storyAvatarLoadGuard,
-    isHttpOrHttpsUrl,
-    storyTileUsesYukkuriTvStyle
-  };
+  const laneDomIo = { storyAvatarLoadGuard, isHttpOrHttpsUrl, storyTileUsesYukkuriTvStyle, upgradeAnonymousAvatarImage };
 
   const lanePickCtx = {
     yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
@@ -5637,6 +5798,7 @@ function renderStoryCommentDetailPanel() {
     const displayDetail = storyAvatarLoadGuard.pickDisplaySrc(requestedDetail);
     img.src = displayDetail;
     storyAvatarLoadGuard.noteRemoteAttempt(img, requestedDetail);
+    upgradeAnonymousAvatarImageFromFallback(img, entry.userId, requestedDetail, 64);
     img.classList.toggle(
       'nl-story-detail-img--tv-fallback',
       storyTileUsesYukkuriTvStyle(requestedDetail, displayDetail)
@@ -6226,6 +6388,7 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   const displayTile = storyAvatarLoadGuard.pickDisplaySrc(requestedTile);
   storyGrowthImgAssignSrc(img, displayTile);
   storyAvatarLoadGuard.noteRemoteAttempt(img, requestedTile);
+  upgradeAnonymousAvatarImageFromFallback(img, entry?.userId, requestedTile, 64);
   img.classList.toggle(
     'nl-story-growth-icon--tv-fallback',
     storyTileUsesYukkuriTvStyle(requestedTile, displayTile)
@@ -7453,25 +7616,24 @@ function renderRoomHeatSummary(totalRecent, activeUsers, heatPercent, heatText) 
  *
  * @param {ParentNode | null | undefined} root
  */
-function bindOnErrorHideHandlersWithin(root) {
+function bindOnErrorHandlersWithin(root) {
   if (!root || typeof root.querySelectorAll !== 'function') return;
-  const imgs = root.querySelectorAll('img[data-on-error-hide="1"]');
+  const imgs = root.querySelectorAll('img[data-on-error-hide="1"], img[data-on-error-fallback="blank"]');
   imgs.forEach((node) => {
     if (!(node instanceof HTMLImageElement)) return;
     // 二重バインド防止（再描画でも一度だけ）
-    if (node.dataset.nlOnErrorHideBound === '1') return;
-    node.dataset.nlOnErrorHideBound = '1';
-    node.addEventListener(
-      'error',
-      () => {
-        try {
-          node.style.visibility = 'hidden';
-        } catch {
-          // no-op
-        }
-      },
-      { once: true }
-    );
+    if (node.dataset.nlOnErrorBound === '1') return;
+    node.dataset.nlOnErrorBound = '1';
+
+    if (node.dataset.onErrorHide === '1') {
+      node.addEventListener('error', () => {
+        try { node.style.visibility = 'hidden'; } catch { /* ignore */ }
+      }, { once: true });
+    } else if (node.dataset.onErrorFallback === 'blank') {
+      node.addEventListener('error', () => {
+        try { node.src = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg'; } catch { /* ignore */ }
+      }, { once: true });
+    }
   });
 }
 
@@ -7534,7 +7696,7 @@ function renderTopSupportRankStrip(stripRooms) {
     strip.innerHTML =
       `<p class="nl-top-support-rank__note">まだ応援コメントがありません。まずは配信者のフォローから。</p>` +
       `<div class="nl-top-support-rank__list" role="list">${casterTileHtml}</div>`;
-    bindOnErrorHideHandlersWithin(strip);
+    bindOnErrorHandlersWithin(strip);
     return;
   }
   strip.hidden = false;
@@ -7600,7 +7762,7 @@ function renderTopSupportRankStrip(stripRooms) {
    */
   const listInner = `${casterTileHtml}${html}`;
   strip.innerHTML = `<p class="nl-top-support-rank__note">記録内・ユーザー別の応援件数が多い順です。</p><div class="nl-top-support-rank__list" role="list">${listInner}</div>`;
-  bindOnErrorHideHandlersWithin(strip);
+  bindOnErrorHandlersWithin(strip);
   const thumbs = strip.querySelectorAll('img.nl-top-support-rank__thumb');
   models.forEach((m, i) => {
     const img = thumbs[i];
@@ -7608,6 +7770,7 @@ function renderTopSupportRankStrip(stripRooms) {
     if (isHttpOrHttpsUrl(m.thumbSrc)) {
       storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
     }
+    upgradeAnonymousAvatarImageFromFallback(img, m.userKey, m.thumbSrc, 64);
   });
 }
 
@@ -7952,7 +8115,13 @@ function markCaughtUpIfComplete(prog) {
   // reached_start = 配信開始まで遡り切った = 完全完了。
   if (prog.stopReason === 'reached_start') {
     _backfillCaughtUpForLiveId = _backfillHintLiveId;
-    chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
+    // v0.1.651: 完走時に KEY_BACKFILL_ENABLED をグローバル false にするのを撤去。
+    //   このフラグは lv 別でなくグローバルなので、配信Aを取り切ると false になり、次に
+    //   別の配信Bを開いても過去ログ取得が始まらず「いきなり取れない・4〜5%で止まる」を
+    //   生んでいた(実機 lv350631407 で確定: enabled=false だと delta=0、true に戻すと
+    //   5049→11026件に伸びる)。同じ配信の再取得抑制は lv 別の _backfillCaughtUpForLiveId が
+    //   既に担っており(refreshBackfillRecordCardHint の 8084/8099 ガード)、グローバル enabled を
+    //   落とす必要はない=純粋に有害だったので外す。
     return true;
   }
   // 95%以上取れていれば実質完了。
@@ -7973,7 +8142,8 @@ function markCaughtUpIfComplete(prog) {
     recordedCount >= officialCount * 0.95
   ) {
     _backfillCaughtUpForLiveId = _backfillHintLiveId;
-    chrome.storage.local.set({ [KEY_BACKFILL_ENABLED]: false }).catch(() => {});
+    // v0.1.651: 同上。95%到達でもグローバル KEY_BACKFILL_ENABLED を false にしない
+    //   (別配信に波及して取得が始まらなくなるため)。lv 別 _backfillCaughtUpForLiveId で十分。
     return true;
   }
   return false;
@@ -7981,17 +8151,13 @@ function markCaughtUpIfComplete(prog) {
 
 /**
  * v0.1.464/v0.1.465: onChanged 経由の progress 更新時に呼ぶ。
- *   caught_up でなければ自動リトライ（triggerBackfillRetry）を起動。
- *   refreshBackfillRecordCardHint（storage.get 経由）からは呼ばない。
- *   理由: popup 開いた瞬間に自動でフラグが立ち、e2e「ボタン前は null」が壊れるため。
- *   自動リトライ本体は content 側 maybeAutoStartBackfill が担う設計。
+ * v0.1.684: triggerBackfillRetry 廃止。content の maybeAutoStartBackfill が自律リトライ
+ *   するため popup からも呼ぶとトーストループが発生する（実機確認）。フラグ更新のみ。
  * @param {{ done?: number, stopReason?: string }} prog
  */
 function maybeAutoRetryBackfillFromProg(prog) {
   if (!prog || prog.done !== 1) return;
-  if (markCaughtUpIfComplete(prog)) return; // caught_up 確定 → リトライ不要
-  // 95%未満の途中停止 → 自動リトライ（onChanged 経由のみ）。
-  triggerBackfillRetry();
+  markCaughtUpIfComplete(prog); // caught_up 確定フラグ更新のみ（リトライしない）
 }
 
 /**
@@ -8502,6 +8668,9 @@ const northStarLaneWaitFootIntervalByBody = new WeakMap();
 
 function teardownNorthStarLaneWaitingUi(body) {
   if (!(body instanceof HTMLElement)) return;
+  // v0.1.622: 待機UI diff-skip キャッシュも破棄。teardown 後に再 mount が呼ばれたら
+  //   必ずアトミックに描画し直すため(空 DOM のまま同 HTML cache でスキップされる事故防止)。
+  _waitingUiLastByBody.delete(body);
   const tid = northStarLaneWaitIntervalByBody.get(body);
   if (tid != null) {
     clearInterval(tid);
@@ -8551,33 +8720,11 @@ function teardownNorthStarLaneWaitingUi(body) {
  */
 const _northStarLaneWaitStartAt = new Map();
 
-/** 現在の watch liveId（snapshot 由来・同期参照のみ）。 */
-function currentNorthStarWaitLiveId() {
-  return String(watchMetaCache.snapshot?.liveId || '').trim().toLowerCase();
-}
 
-/**
- * 当該レーンが待機状態を続けている経過 ms を返す（同期）。初回は now を記録して 0。
- * 待機状態でない state では記録をクリアして undefined（＝メッセージ関数へ渡さない）。
- * @param {string} laneId
- * @param {string} state
- * @returns {number|undefined}
- */
-function trackNorthStarLaneWaitElapsedMs(laneId, state) {
-  const lid = currentNorthStarWaitLiveId();
-  const key = `${lid}|${String(laneId || '')}`;
-  if (!isNorthStarLaneWaitingState(state)) {
-    _northStarLaneWaitStartAt.delete(key);
-    return undefined;
-  }
-  const now = Date.now();
-  const started = _northStarLaneWaitStartAt.get(key);
-  if (typeof started !== 'number') {
-    _northStarLaneWaitStartAt.set(key, now);
-    return 0;
-  }
-  return Math.max(0, now - started);
-}
+// v0.1.653: trackNorthStarLaneWaitElapsedMs(待機経過 ms を記録して待機文言の確定遷移に
+//   使っていた)は、ローディング全廃で待機UIを一切出さなくなったため削除。イベントレーンの
+//   stuck タイムアウト(scheduleNorthStarEventLaneStuckTimeout)は「待機開始時刻が無くても畳む」
+//   分岐(8917相当)で安全に動く=即 hide される。
 
 /** liveId 切替時に待機開始時刻 Map をクリア（新配信の誤確定表示を防ぐ）。 */
 function clearNorthStarLaneWaitStartTimes() {
@@ -8585,34 +8732,22 @@ function clearNorthStarLaneWaitStartTimes() {
 }
 
 
-function mountNorthStarLaneWaitingUi(body, laneId, state) {
-  teardownNorthStarLaneWaitingUi(body);
-  body.setAttribute('data-lane-state', String(state || 'not_yet'));
-  body.innerHTML = buildNorthStarLaneWaitingShellHtml(laneId);
-  // v0.1.332: 経過 ms を同期計算（await I/O なし）。閾値超で確定文言へ遷移。
-  const elapsedMs = trackNorthStarLaneWaitElapsedMs(laneId, state);
-  // v0.1.389: 狭い右レールに詰め込まず、レーン本体の広いスペースで 3 キャラ（りんく/
-  //   こん太/たぬ姉）が大きく案内する。本体の `__short` 1 行＋手順図解は撤去し、
-  //   キャラガイド（アバター大＋折り返しセリフ＋手順図解）に置換。空きスペース活用。
-  const msgs = getNorthStarWaitRotationMessages(laneId, state, elapsedMs);
-  const waitRoot = body.querySelector('[data-north-star-wait="1"]') || body;
-  const diagram = buildNorthStarLaneOpenHintDiagramHtml(laneId);
-  const guideHtml = buildNorthStarWaitCharacterGuideHtml(msgs, diagram);
-  if (guideHtml) {
-    // 1 行＋図解だけのシェルを、全幅キャラガイドへ差し替え
-    waitRoot.innerHTML = guideHtml;
-  } else {
-    // フォールバック（メッセージが無い等）: 従来の 1 行表示
-    const shortEl = body.querySelector('.nl-north-star-lane-wait__short');
-    if (shortEl) {
-      const m = msgs.length ? msgs[0] : { badge: 'りんく', line: '取得状況を確認しています。' };
-      shortEl.textContent = `${m.badge}：${m.line}`;
-    }
-  }
-  // 本体で全幅案内するので、狭い右レールには重複表示しない（空のまま）。
-  clearNorthStarVerticalRailForBody(body);
-  syncNorthStarLaneGadgetFromBodyState(body);
-}
+/**
+ * v0.1.622: 待機UI の最後にマウントした完全 HTML を要素ごとに記憶。
+ * NDGR 停止配信などで coalescedRefreshScheduler の 450ms ポーリングが毎回
+ * mountNorthStarLaneWaitingUi を呼ぶと、同じ HTML を innerHTML 全置換で再生成し
+ * <img> 子要素が毎回 load 待ちになり「白フラッシュ」が点滅して見えた(実機
+ * lv350675889 で観測)。前回と同一 HTML+state+stateAttr ならアトミックに DOM 不変で
+ * skip する。paintTopSupportRankStyleIntoElement の _topSupportRankLastHtmlByEl
+ * (v0.1.618)と同型パターン。
+ * @type {WeakMap<HTMLElement, { stateAttr: string, shellHtml: string, guideHtml: string }>}
+ */
+const _waitingUiLastByBody = new WeakMap();
+
+// v0.1.653: mountNorthStarLaneWaitingUi(待機UI「問い合わせ中」3キャラ案内を mount する関数)は
+//   ローディング全廃に伴い全呼び出し元が hide(レーンを畳む)に切り替わったため削除した。
+//   待機文言の純関数(northStarLaneWaitingUi.js)は API 互換・テスト用に残置だが、描画経路からは
+//   一切呼ばれない。データ(rows>0)が来たら各 refresh 関数が show して描画する。
 
 /** 直前に「bundle 反映前ローディングシェル」を張った liveId（同一 lv の再描画では張り直さない） */
 let _northStarBundleLoadingShellLiveId = '';
@@ -8671,8 +8806,11 @@ const NORTH_STAR_BUNDLE_LOADING_LANE_IDS = Object.freeze([
 ]);
 
 /**
- * 公式イベント DOM バンドル（storage）反映前に、6 レーンすべてを同型の待機 UI にする。
- * 番組ポイントだけ先に数字が出て「他だけ止まっている」ように見えるのを避ける。
+ * v0.1.653: ローディング全廃。公式イベント DOM バンドル反映前は、6レーンに待機UI
+ *   (「問い合わせ中」3キャラ案内)を出さず**静かに畳む**(ユーザー実機要望「ローディングは
+ *   いらない・無いものは出すな・白くするな」)。データ(rows>0)が来れば各 refresh が show する。
+ *   従来は全レーンに待機UIを一斉mountしていたため、起動直後〜データ無し配信で延々
+ *   ローディングに見えていた=その元凶を断つ。
  *
  * @param {string} liveId
  */
@@ -8682,7 +8820,11 @@ function mountAllNorthStarLanesBundleLoadingUi(liveId) {
   for (const laneId of NORTH_STAR_BUNDLE_LOADING_LANE_IDS) {
     const body = document.getElementById('northStarLaneBody-' + laneId);
     if (!(body instanceof HTMLElement)) continue;
-    mountNorthStarLaneWaitingUi(body, laneId, 'not_yet');
+    teardownNorthStarLaneWaitingUi(body);
+    body.innerHTML = '';
+    clearNorthStarVerticalRailForBody(body);
+    setNorthStarLaneHidden(laneId, true);
+    syncNorthStarLaneGadgetFromBodyState(body);
   }
 }
 
@@ -8758,6 +8900,56 @@ function scheduleNorthStarEventLaneStuckTimeout(liveId) {
  * @param {string|null|undefined} mirrorHtml
  * @param {string} [fallbackState]
  */
+/**
+ * v0.1.619: 無認証 koken/nicoad 公式 API 直叩きに移行済みで「手元のタブ操作で取れる」ものが
+ * 無くなったレーン。データが無い/未取得のとき、待機UI(「取得中…」キャラ案内)を出さず
+ * **レーンごと静かに畳む**(イベントレーンと同じ思想・ユーザー実機要望「出すべきでないものは
+ * 出すな」)。データ(rows>0)が来れば各 refresh 関数が show して描画する。
+ * @type {ReadonlySet<string>}
+ */
+// v0.1.653: ユーザー実機要望「問い合わせ中/取得中/ローディング表示を全廃。記録は手元に
+//   あるのだから開いた瞬間に出せ・白くするな・無いものは静かに隠せ」。従来は一部レーン
+//   (contributionRanking/giftHistory/adRanking)だけ「待機UIを出さず畳む」だったが、イベント系
+//   (eventBroadcasters/eventVotingSupporters)等は待機UI(「公式から問い合わせ中だよ」3キャラ案内)が
+//   残り、データの無い配信で延々ローディングに見えていた。全レーンを「待機中は待機UIを出さず
+//   静かに畳む(データが rows>0 で来たら各 refresh が show)」に統一する=ローディング全廃。
+const NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES = new Set([
+  'contributionRanking',
+  'giftHistory',
+  'adRanking',
+  'eventBroadcasters',
+  'eventVotingSupporters',
+  'eventScore',
+  'eventRank',
+  'programPoints'
+]);
+
+/**
+ * 待機状態のレーンを「待機UIを出して見せる」か「畳んで隠す」かを決める共通処理。
+ * API 直叩き系(上記 set)は待機UIを出さず hide。それ以外は従来どおり待機UIを mount。
+ * @param {HTMLElement} body
+ * @param {string} laneId
+ * @param {string} state not_yet | iframe_unrendered 等
+ */
+function applyNorthStarLaneWaitingOrHide(body, laneId, state) {
+  // v0.1.653: ローディング全廃。待機状態(not_yet/iframe_unrendered)では待機UI(「問い合わせ中」
+  //   3キャラ案内)を一切出さず、レーンを静かに畳む。データ(rows>0)が来れば各 refresh 関数が
+  //   show して描画する=「開いた瞬間に出る・無い間は隠れる・白くしない」。state は診断用に
+  //   data-lane-state へ保持。引数 state は未使用になったが API 互換のため受ける。
+  void state;
+  teardownNorthStarLaneWaitingUi(body);
+  body.innerHTML = '';
+  clearNorthStarVerticalRailForBody(body);
+  setNorthStarLaneHidden(laneId, true);
+  syncNorthStarLaneGadgetFromBodyState(body);
+}
+
+/**
+ * v0.1.622: renderNorthStarLane の mirror HTML パス用 diff-skip キャッシュ。
+ * @type {WeakMap<HTMLElement, string>}
+ */
+const _renderLaneLastMirrorHtmlByBody = new WeakMap();
+
 function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
   const body = document.getElementById('northStarLaneBody-' + String(laneId || ''));
   if (!(body instanceof HTMLElement)) return;
@@ -8769,8 +8961,11 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
     const st =
       typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
     body.setAttribute('data-lane-state', st);
-    if (isNorthStarLaneWaitingState(st)) {
-      mountNorthStarLaneWaitingUi(body, String(laneId || ''), st);
+    if (isNorthStarLaneWaitingState(st) || NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES.has(String(laneId || ''))) {
+      // waiting state (not_yet/iframe_unrendered) も、API直叩き系(fetch_error/no_program_gift等)も
+      // 同じ hide パスを通す。fetch_error は WAITING_STATES 外なので従来は else 側に落ちて
+      // 待機UIが残っていた (v0.1.620 修正)。
+      applyNorthStarLaneWaitingOrHide(body, String(laneId || ''), st);
     } else {
       body.innerHTML = '';
       clearNorthStarVerticalRailForBody(body);
@@ -8784,8 +8979,8 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
     const st =
       typeof fallbackState === 'string' && fallbackState ? fallbackState : 'missing';
     body.setAttribute('data-lane-state', st);
-    if (isNorthStarLaneWaitingState(st)) {
-      mountNorthStarLaneWaitingUi(body, String(laneId || ''), st);
+    if (isNorthStarLaneWaitingState(st) || NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES.has(String(laneId || ''))) {
+      applyNorthStarLaneWaitingOrHide(body, String(laneId || ''), st);
     } else {
       body.innerHTML = '';
       clearNorthStarVerticalRailForBody(body);
@@ -8794,8 +8989,16 @@ function renderNorthStarLane(laneId, mirrorHtml, fallbackState) {
     return;
   }
 
-  body.innerHTML = sanitized;
+  // v0.1.622: 待機UI/paint と同型のアトミック差分スキップ。同一 sanitized HTML を
+  //   ポーリング(450ms)で毎回 innerHTML 全置換していたため、<img>/<iframe> 子要素が
+  //   再 load 待ちで「白フラッシュ」が点滅して見えていた(実機 lv350675889)。
+  if (_renderLaneLastMirrorHtmlByBody.get(body) !== sanitized || !body.firstChild) {
+    body.innerHTML = sanitized;
+    _renderLaneLastMirrorHtmlByBody.set(body, sanitized);
+  }
   body.setAttribute('data-lane-state', 'ok');
+  // v0.1.619: rows/mirror が来たら hidden を外して必ず表示(畳みから復帰)。
+  setNorthStarLaneHidden(String(laneId || ''), false);
   clearNorthStarVerticalRailForBody(body);
   syncNorthStarLaneGadgetFromBodyState(body);
 }
@@ -8864,6 +9067,17 @@ async function resolveOfficialContributionRankingRows(liveId) {
     }
   }
 
+  // v0.1.616: 観測。popup が koken storage を読めた件数を記録（書込成功＋読込経路の確認）。
+  //   content の externalFetchProbe.kokenLastRows と突き合わせれば、storage 書込/読込/
+  //   liveId 不一致のどこで切れたかが分かる。
+  _northStarRenderProbe.contribResolveCalls += 1;
+  try {
+    const ks = /** @type {any} */ (kokenStorage);
+    _northStarRenderProbe.lastContribResolveRows =
+      ks && Array.isArray(ks.rows) ? ks.rows.length : 0;
+  } catch {
+    _northStarRenderProbe.lastContribResolveRows = -2;
+  }
   return resolveContributionRankingRowsFromSources({
     kokenStorage,
     domBundle: _lastOfficialEventDomBundle,
@@ -9253,6 +9467,15 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
  *   officialProgramGiftPts?: number|null;
  * }} opts
  */
+/**
+ * v0.1.618(改修A+差分): paintTopSupportRankStyleIntoElement が最後に流し込んだ本体 HTML を
+ * 要素ごとに覚えておく。ポーリング(3s/30s)で同じデータを毎回 innerHTML 全置換すると、
+ * 既存ノードが一瞬破棄され「白くなる/出たり消えたり」が起きる(ディープリサーチ web.dev/MDN)。
+ * 前回と同一 HTML なら DOM を一切触らずスキップする(=ちらつき源を断つ)。
+ * @type {WeakMap<HTMLElement, string>}
+ */
+const _topSupportRankLastHtmlByEl = new WeakMap();
+
 function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
   const {
     noteText,
@@ -9268,6 +9491,12 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
   if (isNorthStarBody) {
     teardownNorthStarLaneWaitingUi(el);
     el.setAttribute('data-lane-state', 'ok');
+    // v0.1.619: データ(rows)が来たので、空のとき畳んでいた hidden を必ず外して表示する
+    //   (NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES の畳みからの復帰)。lane id は body id 由来。
+    {
+      const laneIdFromBody = String(el.id || '').replace(/^northStarLaneBody-/, '');
+      if (laneIdFromBody) setNorthStarLaneHidden(laneIdFromBody, false);
+    }
     // 応援／ギフト帯と同じ「横スクロールのカード列」見せ方（#topSupportRankStrip と同型クラス）
     // 北極星は .nl-north-star-lane__shell が grid（左ガジェット | 本体 | 右レール）。
     // span-cards は grid-column:1/-1 で本体だけ全幅化し、aside が次段へ落ちて
@@ -9333,21 +9562,35 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
   const freshnessHtml = freshnessNote
     ? `<p class="nl-top-support-rank__freshness" aria-live="polite">🕒 ${escapeHtml(freshnessNote)}</p>`
     : '';
-  el.innerHTML =
+  const nextHtml =
     prependHtml +
     (beforeNoteHtml || '') +
     `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
     freshnessHtml +
     `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
-  bindOnErrorHideHandlersWithin(el);
-  const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
-  models.forEach((m, i) => {
-    const img = thumbs[i];
-    if (!(img instanceof HTMLImageElement)) return;
-    if (isHttpOrHttpsUrl(m.thumbSrc)) {
-      storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
-    }
-  });
+  // v0.1.618(改修A+差分): 前回と同一 HTML なら本体 DOM を触らずスキップ(ちらつき源を断つ)。
+  //   変化があるときだけ、<template> でメモリ上に組んでから replaceChildren で**アトミックに
+  //   差し替え**る。innerHTML 全置換と違い「一瞬空(白)」の中間状態が画面に出ない
+  //   (ディープリサーチ: MDN replaceChildren / web.dev)。XSS 安全性は従来同様、生成側の
+  //   escapeHtml/escapeAttr に依存(template.innerHTML はパースのみで実行されない)。
+  //   本体 DOM を貼り替えた時だけ画像 guard を再バインド(貼り替えていないなら不要)。
+  const bodyChanged = !(_topSupportRankLastHtmlByEl.get(el) === nextHtml && el.firstChild);
+  if (bodyChanged) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = nextHtml;
+    el.replaceChildren(tpl.content);
+    _topSupportRankLastHtmlByEl.set(el, nextHtml);
+    bindOnErrorHandlersWithin(el);
+    const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
+    models.forEach((m, i) => {
+      const img = thumbs[i];
+      if (!(img instanceof HTMLImageElement)) return;
+      if (isHttpOrHttpsUrl(m.thumbSrc)) {
+        storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
+      }
+      upgradeAnonymousAvatarImageFromFallback(img, m.userKey, m.thumbSrc, 64);
+    });
+  }
   if (isNorthStarBody) {
     syncNorthStarLaneGadgetFromBodyState(el);
     // 横カードに順位が含まれるため、右列の縦レールで同データを二重表示しない
@@ -9366,7 +9609,7 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
  * 北極星 +α 広告ランキング。`adContributionRanking` を応援帯と同型のランキングで表示し、
  * 無いときは鏡 HTML → reason 判定の順。
  */
-function refreshNorthStarAdRankingLane() {
+async function refreshNorthStarAdRankingLane() {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
   const body = document.getElementById('northStarLaneBody-adRanking');
@@ -9415,7 +9658,68 @@ function refreshNorthStarAdRankingLane() {
     renderNorthStarLane('adRanking', mirrorHtml);
     return;
   }
-  const state = determineNorthStarLaneState('adRanking', { bundle, snap });
+  // v0.1.617: bundle に広告行が無くても、nicoad API 直叩きが storage に rows を書いていれば
+  //   それを使って描画する。bundle 経由(readOfficialEventDomBundleFromStorage のマージ)は
+  //   stale bundle / 取得タイミングのずれで null になることがあり(実機 staleDomBundleSuspected)、
+  //   「API 直叩きで10件取れているのに広告レーンが fetch_error(問い合わせ中相当)」が起きていた。
+  //   ここで nicoad API storage を直接読んで、取れていれば ok 描画・state も ok にする。
+  const lidForApi = String(lid || '').trim().toLowerCase();
+  let nicoadApiRows = null;
+  let nicoadApiCapturedAt = null;
+  if (/^lv\d{1,15}$/.test(lidForApi) && body instanceof HTMLElement) {
+    try {
+      const apiKey = `nls_nicoad_api_ranking_${lidForApi}`;
+      const apiBag = await chrome.storage.local.get([apiKey]);
+      const apiVal = apiBag?.[apiKey];
+      if (
+        apiVal &&
+        typeof apiVal === 'object' &&
+        String(apiVal.liveId || '').trim().toLowerCase() === lidForApi &&
+        Array.isArray(apiVal.rows) &&
+        apiVal.rows.length > 0
+      ) {
+        nicoadApiRows = apiVal.rows;
+        nicoadApiCapturedAt =
+          typeof apiVal.capturedAt === 'number' ? apiVal.capturedAt : null;
+      }
+    } catch {
+      /* best-effort: storage 読めなければ従来の bundle 判定へ */
+    }
+  }
+  if (nicoadApiRows && body instanceof HTMLElement) {
+    trackAdAdvertiserCountForCelebration(lid, nicoadApiRows.length);
+    const rooms = officialDomRankingRowsToStripRooms(nicoadApiRows, { userKeyKind: 'ad' });
+    let rankingSum = 0;
+    for (const row of nicoadApiRows) {
+      const c = Number(row?.contribution);
+      if (Number.isFinite(c) && c > 0) rankingSum += c;
+    }
+    const ps = bundle?.programStats || null;
+    const programAdPts =
+      typeof ps?.adPoints === 'number' && Number.isFinite(ps.adPoints) && ps.adPoints >= 0
+        ? ps.adPoints
+        : typeof snap?.officialAdPointsNdgr === 'number' &&
+            Number.isFinite(snap.officialAdPointsNdgr) &&
+            snap.officialAdPointsNdgr >= 0
+          ? snap.officialAdPointsNdgr
+          : null;
+    const beforeNoteHtml = buildNorthStarAdRankingStatsHtml({
+      programAdPts,
+      rankingContributionSum: rankingSum,
+      rankingRowCount: nicoadApiRows.length
+    });
+    paintTopSupportRankStyleIntoElement(body, rooms, {
+      noteText:
+        'ニコニ広告の貢献度ランキング（公式ページ相当）。画面上部の累計ptなどと、各行の「貢」は指標や期間が異なり一致しないことがあります',
+      unitSuffix: '貢',
+      ariaLabel: '広告ランキング',
+      beforeNoteHtml,
+      isNorthStarBody: true,
+      freshnessNote: formatCardFreshnessNote(nicoadApiCapturedAt, { autoRefreshing: true })
+    });
+    return;
+  }
+  const state = determineNorthStarLaneState('adRanking', { bundle, snap, nicoadApiRows });
   renderNorthStarLane('adRanking', null, state);
 }
 
@@ -9652,7 +9956,11 @@ async function refreshNorthStarEventBroadcastersLaneAsync(liveId) {
   }
 
   // 参加データが無い＝イベント不参加 or 未取得。レーン枠ごと隠して空枠で縦を食わない。
-  setNorthStarLaneHidden('eventBroadcasters', true);
+  // v0.1.617: hide と同時に待機UI(「ニコニコの公式から問い合わせ中」)を撤去する。
+  //   従来は hidden 属性で CSS 非表示にするだけで body 内に not_yet 待機UIが残り、
+  //   hide が効く前のフレームや再描画の競合で「問い合わせ中」がちらっと見えていた
+  //   (実機 red team 指摘)。data-lane-state も明示更新して診断とも整合させる。
+  hideAndClearNorthStarEventLane('eventBroadcasters', body);
 }
 
 /**
@@ -9667,7 +9975,7 @@ async function refreshNorthStarEventVotingSupportersLaneAsync(liveId) {
   if (!(body instanceof HTMLElement)) return;
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) {
-    setNorthStarLaneHidden('eventVotingSupporters', true);
+    hideAndClearNorthStarEventLane('eventVotingSupporters', body);
     return;
   }
 
@@ -9702,7 +10010,8 @@ async function refreshNorthStarEventVotingSupportersLaneAsync(liveId) {
   }
 
   // 投票データが無い＝イベント不参加 or 未取得。レーンごと隠して空枠で縦を食わない。
-  setNorthStarLaneHidden('eventVotingSupporters', true);
+  // v0.1.617: hide と同時に待機UIを撤去（「問い合わせ中」ちらつき防止・上の eventBroadcasters と同様）。
+  hideAndClearNorthStarEventLane('eventVotingSupporters', body);
 }
 
 /**
@@ -9761,6 +10070,90 @@ function setNorthStarLaneHidden(laneId, hidden) {
 }
 
 /**
+ * v0.1.617: イベント系レーン(eventBroadcasters / eventVotingSupporters)を「非参加で畳む」
+ * とき、hidden 属性を付けるだけでなく **body 内の待機UI(「ニコニコの公式から問い合わせ中」)を
+ * 撤去** し、data-lane-state を非待機(no_event)へ更新する。
+ *
+ * 従来は setNorthStarLaneHidden(true) で CSS 非表示にするだけで、body 内に not_yet の待機UIが
+ * 残ったままだった。hide が効く前のフレームや再描画の競合(重い配信で render が完了せず次 render が
+ * 走る)で「問い合わせ中」キャラ案内がちらっと見える原因になっていた(実機 red team 指摘)。
+ * これらは無認証 API 直叩き経路なので、rows が無い＝非参加が確定＝待機UIは不要。
+ *
+ * @param {string} laneId
+ * @param {HTMLElement} body 当該レーンの northStarLaneBody-<laneId>
+ */
+function hideAndClearNorthStarEventLane(laneId, body) {
+  setNorthStarLaneHidden(laneId, true);
+  if (body instanceof HTMLElement) {
+    // 待機UIの interval/クラスを止め、body の中身(待機キャラ案内)を空にする。
+    teardownNorthStarLaneWaitingUi(body);
+    if (body.querySelector('[data-north-star-wait="1"]')) {
+      body.innerHTML = '';
+    }
+    body.setAttribute('data-lane-state', 'no_event');
+  }
+}
+
+/**
+ * v0.1.617: イベント系2レーン(eventBroadcasters / eventVotingSupporters)を、
+ * 「イベント非参加が確定しているなら即・確実に畳む」。
+ *
+ * refreshAllNorthStarMirrorLanes の**最初**に呼ぶ。重いギフト同期や後続レーンの storage 読みで
+ * 連鎖が遅延/中断しても、非参加配信で「ニコニコの公式から問い合わせ中」キャラ案内が出続ける
+ * 問題を断つ(ユーザー実機指摘・福引券目標の単発配信 lv350672510)。
+ *
+ * 「参加シグナル」が1つでもあれば**触らない**(従来の描画関数 refreshNorthStarEventBroadcasters/
+ * VotingSupportersLaneAsync に委ねる＝参加中はちゃんと出す・機能後退ゼロ)。判定材料:
+ *   - イベントスコア storage(nls_event_score_ranking_<lv>)に rows
+ *   - イベント投票 storage(nls_event_voting_ranking_<lv>)に rows
+ *   - bundle.eventRanking / eventBanner / eventBalloon(公式バナー/バルーン痕跡)
+ *   - NDGR 由来のイベント参加シグナル(snapshot 経由・hasEventParticipationSignal)
+ * これらが**全て無い**ときだけ、両レーンを hide+待機UI撤去する。
+ *
+ * @param {string} liveId
+ */
+async function hideNorthStarEventLanesIfNotParticipating(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return;
+  const bundle = _lastOfficialEventDomBundle;
+  const snap = watchMetaCache.snapshot;
+  // bundle / NDGR 由来の参加痕跡(同期判定)。
+  const bundleEventRows =
+    Array.isArray(bundle?.eventRanking) && bundle.eventRanking.length > 0;
+  const participatingByBundleOrNdgr =
+    bundleEventRows || hasEventParticipationSignal(bundle, snap);
+  // storage 由来の参加痕跡(イベントスコア/投票に rows があれば参加中)。
+  let participatingByStorage = false;
+  try {
+    const sKey = eventScoreRankingStorageKey(lid);
+    const vKey = eventVotingRankingStorageKey(lid);
+    const bag = await chrome.storage.local.get([sKey, vKey]);
+    const sv = bag?.[sKey];
+    const vv = bag?.[vKey];
+    const sRows = sv && typeof sv === 'object' && Array.isArray(sv.rows) && sv.rows.length > 0;
+    const vRows = vv && typeof vv === 'object' && Array.isArray(vv.rows) && vv.rows.length > 0;
+    participatingByStorage = !!(sRows || vRows);
+  } catch {
+    /* storage 読めない時は判定を保守的に(=畳まない)＝従来描画に委ねる */
+    participatingByStorage = true;
+  }
+  if (participatingByBundleOrNdgr || participatingByStorage) {
+    return; // 参加シグナルあり＝触らない(従来の描画関数が出す)
+  }
+  // 参加シグナル皆無＝非参加確定。両レーンを即畳む。
+  const ebBody = document.getElementById('northStarLaneBody-eventBroadcasters');
+  const evBody = document.getElementById('northStarLaneBody-eventVotingSupporters');
+  hideAndClearNorthStarEventLane(
+    'eventBroadcasters',
+    ebBody instanceof HTMLElement ? ebBody : /** @type {any} */ (null)
+  );
+  hideAndClearNorthStarEventLane(
+    'eventVotingSupporters',
+    evBody instanceof HTMLElement ? evBody : /** @type {any} */ (null)
+  );
+}
+
+/**
  * 北極星ギフト履歴の個別投げ一覧パネル（ランキング body とは別 DOM）。
  */
 function clearNorthStarGiftThrowsPanel() {
@@ -9788,7 +10181,7 @@ function paintNorthStarGiftThrowsPanel(html) {
   panel.innerHTML = trimmed;
   panel.hidden = false;
   panel.removeAttribute('aria-hidden');
-  bindOnErrorHideHandlersWithin(panel);
+  bindOnErrorHandlersWithin(panel);
 }
 
 /**
@@ -9960,11 +10353,23 @@ async function refreshNorthStarEventCurrentRankLaneAsync(_liveId) {
     return;
   }
   teardownNorthStarLaneWaitingUi(body);
-  body.innerHTML = html;
+  // v0.1.622: アトミック差分スキップ。eventRank fallback も 450ms ポーリングで同一 HTML を
+  //   毎回 innerHTML 全置換していたため点滅の一因。
+  if (_eventLaneLastHtmlByBody.get(body) !== html || !body.firstChild) {
+    body.innerHTML = html;
+    _eventLaneLastHtmlByBody.set(body, html);
+  }
   body.setAttribute('data-lane-state', 'ok');
+  setNorthStarLaneHidden('eventRank', false);
   clearNorthStarVerticalRailForBody(body);
   syncNorthStarLaneGadgetFromBodyState(body);
 }
+
+/**
+ * v0.1.622: eventRank/eventScore レーンの diff-skip キャッシュ。
+ * @type {WeakMap<HTMLElement, string>}
+ */
+const _eventLaneLastHtmlByBody = new WeakMap();
 
 /**
  * v0.1.242: 北極星 レーン 4 (番組累計ポイント) への流し込み。
@@ -10016,12 +10421,10 @@ function refreshNorthStarProgramPointsLane() {
   renderNorthStarLane('programPoints', null, state);
 }
 
+let supportTimelineRefreshEpoch = 0;
+
 /**
- * v0.1.340: 応援タイムライン（コメント＋ギフトを時刻順に1本の流れで）。
- *   既存の comments storage と gift_events storage を読み、純関数で時系列マージして
- *   折り畳みパネルに描画する。OneComme 体験の移植＝「誰がいつ何を投げたか」を物語として読める。
- *   描画ホットパスではなく lane 一括更新の sibling（既に await 連鎖の外）。storage 読みは
- *   best-effort（失敗は空表示）。最新 120 件 cap。
+ * v0.1.340: 応援タイムライン（コメント＋ギフトを時刻順に1本に統合・最新120件cap・best-effort）。
  * @param {string} liveId
  */
 async function refreshSupportActivityTimeline(liveId) {
@@ -10029,9 +10432,43 @@ async function refreshSupportActivityTimeline(liveId) {
   const body = $('supportTimelineBody');
   const meta = $('supportTimelineGiftMeta');
   if (!(body instanceof HTMLElement)) return;
+  // v0.1.674: 行クリックでユーザー詳細をコメビュ窓で開く。委譲リスナーを1回だけ張る
+  //   (innerHTML 再描画に耐える)。記名 uid 行の <a> は preventDefault で詳細を優先。
+  if (body.dataset.nlUserDetailWired !== '1') {
+    body.dataset.nlUserDetailWired = '1';
+    body.addEventListener('click', (ev) => {
+      const t =
+        ev.target instanceof Element ? ev.target.closest('[data-nl-uid]') : null;
+      if (!t) return;
+      const uid = t.getAttribute('data-nl-uid') || '';
+      if (!uid) return;
+      ev.preventDefault();
+      const uname = t.getAttribute('data-nl-uname') || '';
+      const url = chrome.runtime.getURL(
+        `comeview.html?user=${encodeURIComponent(uid)}&uname=${encodeURIComponent(uname)}`
+      );
+      try {
+        void chrome.windows.create({ url, type: 'popup', width: 420, height: 640 });
+      } catch {
+        window.open(url, '_blank', 'width=420,height=640');
+      }
+    });
+  }
+  // v0.1.705: standalone 下部常設配置は閉でも維持(ガード前に呼ぶ)。
+  relocateSupportTimelineForStandaloneWindow();
+  if (
+    details instanceof HTMLDetailsElement &&
+    !shouldRefreshSupportTimeline({
+      detailsOpen: details.open,
+      isStandaloneWindow: document.documentElement.classList.contains('nl-popup-window')
+    })
+  ) {
+    return;
+  }
+  const myEpoch = supportTimelineRefreshEpoch;
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) {
-    // watch 未解決のときはタイムラインを畳んで空に（誤誘導しない）。
+    // watch 未解決はタイムラインを畳んで空に(誤誘導しない)。
     body.innerHTML = buildSupportTimelineBodyHtml([]);
     if (meta instanceof HTMLElement) meta.hidden = true;
     return;
@@ -10051,9 +10488,7 @@ async function refreshSupportActivityTimeline(liveId) {
     /* best-effort: 空のまま */
   }
 
-  // v0.1.342: ギフト送信者のアバターを、コメント側と同じ解決経路（記名 uid→保存済み/
-  //   nvapi 解決済みアバター）で enrich＝「誰が」を顔で見せる。未解決はそのまま空で渡し、
-  //   描画側が default/🎁 にフォールバックする（純加法・元データ不変）。
+  // v0.1.342: ギフト送信者アバターをコメント側と同じ解決経路で enrich(純加法・元データ不変)。
   const giftEventsEnriched = giftEvents.map((g) => {
     if (!g || typeof g !== 'object') return g;
     if (String(g.avatarUrl || '').trim()) return g;
@@ -10062,10 +10497,8 @@ async function refreshSupportActivityTimeline(liveId) {
     return av ? { ...g, avatarUrl: av } : g;
   });
 
-  // v0.1.522: チャンク移行後は main コメントキーへ書き戻さない設計（保存は生 nickname のまま、
-  //   表示時に profile 再適用で担保）。ユーザーレーンと同様に、応援タイムラインも描画直前に
-  //   プロファイル表示名を再適用し、内部表示名（stamp_* / nicolive_* など）が行に漏れないようにする。
-  //   in-memory キャッシュが未ロードのときは storage から読み直す（描画順に依存しない）。
+  // v0.1.522: 描画直前にプロファイル表示名を再適用(内部表示名 stamp_*/nicolive_* の漏れ防止)。
+  //   in-memory 未ロード時は storage から読み直す(描画順非依存)。
   let timelineProfileMap = popupUserCommentProfileMap;
   if (!timelineProfileMap || !Object.keys(timelineProfileMap).length) {
     try {
@@ -10085,13 +10518,23 @@ async function refreshSupportActivityTimeline(liveId) {
     order: 'desc',
     limit: 120
   });
+  const currentLid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  const detailsStillOpen =
+    !(details instanceof HTMLDetailsElement) || details.open;
+  if (
+    myEpoch !== supportTimelineRefreshEpoch ||
+    !detailsStillOpen ||
+    currentLid !== lid
+  ) {
+    return;
+  }
   body.innerHTML = buildSupportTimelineBodyHtml(timeline, {
     defaultAvatar: STORY_GRID_DEFAULT_TILE_IMG,
     now: Date.now()
   });
-  bindOnErrorHideHandlersWithin(body);
-  // 実 http アバターは load guard 経由でフォールバック差し替え（フリッカ防止）。
-  // コメント行アバター + ギフト行送信者アバターの両方。
+  upgradeAnonymousAvatarImages(body);
+  bindOnErrorHandlersWithin(body);
+  // 実 http アバターは load guard 経由で差し替え(フリッカ防止・コメント/ギフト両行)。
   body
     .querySelectorAll('img.nl-tl-row__avatar, img.nl-tl-gift__avatar')
     .forEach((img) => {
@@ -10111,36 +10554,24 @@ async function refreshSupportActivityTimeline(liveId) {
     }
   }
   if (details instanceof HTMLElement) details.hidden = false;
-  // v0.1.345: 別ウィンドウでは下部常設にして空白を埋める（冪等・他文脈は no-op）。
-  relocateSupportTimelineForStandaloneWindow();
 }
 
 /**
- * v0.1.343: 応援タイムラインの開閉状態を永続化（単一枠の完成度向上）。
- *   既定は閉じ（普段の表示は不変）。一度開いたら storage に保存し、次回以降・更新後も
- *   開いたままにする。`supportVisualDetails` と同型の軽量版（多フレーム scroll 連携は不要）。
- *   load 時に一度だけ hydrate + toggle リスナ配線（多重配線を guard）。
+ * v0.1.343: 応援タイムラインの開閉状態を永続化(既定閉じ・手動開で保存)。load 時1回 hydrate+配線。
  */
 let supportTimelineOpenWired = false;
 let suppressSupportTimelineTogglePersist = false;
 async function wireSupportTimelineOpenPersistence() {
   const details = /** @type {HTMLDetailsElement|null} */ ($('supportTimelineDetails'));
   if (!(details instanceof HTMLDetailsElement)) return;
-  // hydrate: 保存値が true のときだけ開く（既定 false=閉じ）。
-  // v0.1.345: 別ウィンドウ(standalone window=nl-popup-window)では「キー未設定なら既定で開く」
-  //   ＝配信中の下の空白を応援タイムラインで埋める。⚠️storage は書かない（同一 popup.html を
-  //   読む action popup へ open=true が波及して「普段の表示が変わる」のを防ぐ）。保存値が
-  //   明示 false/true のときはそれを最優先（手動操作を尊重）。
+  // v0.1.345: 別ウィンドウ(nl-popup-window)はキー未設定なら既定オープン(下の空白埋め・storage非書込)。
+  //   明示 false/true は最優先(手動操作尊重)。
   try {
     const bag = await storageGetSafe(KEY_SUPPORT_TIMELINE_OPEN, {});
     const raw = bag[KEY_SUPPORT_TIMELINE_OPEN];
     const isStandaloneWindow = document.documentElement.classList.contains('nl-popup-window');
-    let want;
-    if (raw === true || raw === false) {
-      want = raw; // 明示保存（手動開閉）を最優先
-    } else {
-      want = isStandaloneWindow; // 未設定: 別ウィンドウだけ既定オープン（書き込まない）
-    }
+    // 明示保存(手動開閉)を最優先・未設定は別ウィンドウだけ既定オープン(書き込まない)。
+    const want = raw === true || raw === false ? raw : isStandaloneWindow;
     if (details.open !== want) {
       suppressSupportTimelineTogglePersist = true;
       try {
@@ -10157,17 +10588,18 @@ async function wireSupportTimelineOpenPersistence() {
   details.addEventListener('toggle', () => {
     if (suppressSupportTimelineTogglePersist) return;
     const open = Boolean(details.open);
+    if (open) {
+      void refreshSupportActivityTimeline(watchPopupLastPaintedLiveId).catch(() => {});
+    } else {
+      supportTimelineRefreshEpoch += 1;
+    }
     void storageSetSafe({ [KEY_SUPPORT_TIMELINE_OPEN]: open }).catch(() => {});
   });
 }
 
 /**
- * v0.1.345: 別ウィンドウ(standalone window)かつ配信中(=not empty-state)のとき、応援タイムラインを
- *   `.nl-main` 末尾へ移して下部常設にし、ウィンドウ下の空白を埋める。`order` は効かない
- *   （タイムラインは grid セル内＝.nl-main の直接の子ではない）ので DOM 移動が必要（会議結論）。
- *   冪等: 既に `.nl-main` 直下にいれば動かさない（toggle 再発火・スクロール位置リセットを防ぐ）。
- *   action popup / inline では何もしない（普段の表示は不変）。空白埋めの見せ方は CSS が
- *   `html.nl-popup-window:not(.nl-empty-state)` 配下で担う。
+ * v0.1.345: 別ウィンドウ(standalone)かつ配信中は応援TLを `.nl-main` 末尾へ移して下部常設
+ *   (空白埋め・DOM移動が必要・冪等・action popup/inline は no-op)。見せ方は CSS が担う。
  */
 function relocateSupportTimelineForStandaloneWindow() {
   const details = $('supportTimelineDetails');
@@ -10239,20 +10671,91 @@ async function syncKokenGiftHistoryForPopup(liveId, opts = {}) {
   }
 }
 
+/**
+ * v0.1.616: popup 側の北極星描画経路の可観測化。content の externalFetchProbe で
+ * 「取得は完璧(koken 69件等)」と確定したのに popup のレーンが描画されない真因を
+ * 一点に絞るための診断。診断 JSON の popup.northStarRenderProbe に出す。
+ * @type {{
+ *   refreshAllStarted: number,
+ *   refreshAllCompleted: number,
+ *   lastGiftSyncMs: number,
+ *   lastContribResolveRows: number,
+ *   contribResolveCalls: number,
+ *   lastReachedLane: string,
+ *   lastError: string,
+ *   lastRunAtBase: number
+ * }}
+ */
+const _northStarRenderProbe = {
+  refreshAllStarted: 0,
+  refreshAllCompleted: 0,
+  lastGiftSyncMs: -1,
+  lastContribResolveRows: -1,
+  contribResolveCalls: 0,
+  lastReachedLane: '',
+  lastError: '',
+  lastRunAtBase: 0
+};
+
 /** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
 async function refreshAllNorthStarMirrorLanes(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
-  await syncKokenGiftHistoryForPopup(lid);
-  await refreshNorthStarContributionRankingLaneAsync(lid);
-  await refreshNorthStarGiftHistoryLaneAsync(lid);
-  refreshNorthStarProgramPointsLane();
-  refreshNorthStarAdRankingLane();
-  await refreshNorthStarEventCurrentRankLaneAsync(lid);
-  refreshNorthStarEventCumulativeScoreLane();
-  await refreshNorthStarEventBroadcastersLaneAsync(lid);
-  await refreshNorthStarEventVotingSupportersLaneAsync(lid);
-  await refreshSupportActivityTimeline(lid);
-  await maybeCelebrateGiftEventsAfterRefresh(lid);
+  // v0.1.616: 観測。どこまで到達したか（先頭の重いギフト同期で詰まる仮説の検証）。
+  _northStarRenderProbe.refreshAllStarted += 1;
+  _northStarRenderProbe.lastRunAtBase = Date.now();
+  _northStarRenderProbe.lastReachedLane = 'start';
+  _northStarRenderProbe.lastError = '';
+  try {
+    // v0.1.617: イベント系2レーンの「非参加なら即・確実に畳む」を連鎖の**最初**に行う。
+    //   重いギフト同期(実機9.4秒)や後続レーンの storage 読みで連鎖が遅延/中断しても、
+    //   イベント非参加レーンが「ニコニコの公式から問い合わせ中」を出し続ける問題を断つ。
+    //   イベント参加シグナルが無ければ event 2レーンを hide+待機UI撤去。参加中(rows あり/
+    //   bundle.eventBanner 等)なら従来の描画関数に委ねる(ここでは触らない)。
+    await hideNorthStarEventLanesIfNotParticipating(lid);
+    const giftSyncStart = Date.now();
+    // v0.1.617: ギフト履歴の SW 全ページ取得(実機9.4秒)はレーン描画をブロックしない。
+    //   非ブロック(fire-and-forget)にして、ギフト履歴レーンは storage を別途読む既存経路に委ねる。
+    void syncKokenGiftHistoryForPopup(lid)
+      .then(() => {
+        _northStarRenderProbe.lastGiftSyncMs = Math.max(0, Date.now() - giftSyncStart);
+      })
+      .catch(() => {
+        /* best-effort */
+      });
+    _northStarRenderProbe.lastReachedLane = 'after_gift_sync';
+    await refreshNorthStarContributionRankingLaneAsync(lid);
+    _northStarRenderProbe.lastReachedLane = 'after_contrib';
+    await refreshNorthStarGiftHistoryLaneAsync(lid);
+    _northStarRenderProbe.lastReachedLane = 'after_gift_history';
+    refreshNorthStarProgramPointsLane();
+    await refreshNorthStarAdRankingLane();
+    _northStarRenderProbe.lastReachedLane = 'after_ad';
+    await refreshNorthStarEventCurrentRankLaneAsync(lid);
+    refreshNorthStarEventCumulativeScoreLane();
+    await refreshNorthStarEventBroadcastersLaneAsync(lid);
+    await refreshNorthStarEventVotingSupportersLaneAsync(lid);
+    _northStarRenderProbe.lastReachedLane = 'after_event_lanes';
+    // v0.1.617: 北極星レーン(ランキング系)の確定描画はここで完了とみなす。
+    //   応援タイムライン / ギフト祝祭は「別DOM領域」で、かつ refreshSupportActivityTimeline は
+    //   readAllCommentsForLive で全コメント(実機9400件超)を読む激重処理。これを直列 await
+    //   していたため、重い配信で refreshAllNorthStarMirrorLanes が完了せず(診断 Completed:0)、
+    //   レーン描画が安定しない/ちらつく + v0.1.615 の event hide も確定しない真因になっていた。
+    //   → タイムライン/祝祭は非ブロック(fire-and-forget)に分離。各々 try/catch を内蔵する
+    //   ので失敗してもレーン描画(=既に完了済み)を巻き込まない。
+    _northStarRenderProbe.lastReachedLane = 'done';
+    _northStarRenderProbe.refreshAllCompleted += 1;
+    void refreshSupportActivityTimeline(lid).catch(() => {
+      /* best-effort: タイムライン描画失敗はレーン描画と独立 */
+    });
+    void maybeCelebrateGiftEventsAfterRefresh(lid).catch(() => {
+      /* best-effort */
+    });
+  } catch (e) {
+    _northStarRenderProbe.lastError = String(
+      (e && /** @type {any} */ (e).message) || e || 'unknown'
+    ).slice(0, 200);
+    throw e;
+  }
 }
 
 /**
@@ -10578,7 +11081,14 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     const thumbRp = isHttpOrHttpsUrl(displayThumb)
       ? ' referrerpolicy="no-referrer"'
       : '';
-    const avatarHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async"${thumbRp}>`;
+    const avatarImgHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async" data-on-error-fallback="blank"${thumbRp}>`;
+    // 原則「サムネ・ハンドル・ID はひとかたまり」: 数値 ID はサムネ+名前を同じアンカーで括る。
+    const roomLinkable = !isUnknown && /^\d{1,18}$/.test(String(r.userKey || ''));
+    const aOpen = (cls) => `<a class="${cls}" href="https://www.nicovideo.jp/user/${encodeURIComponent(String(r.userKey))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(label)} のユーザーページを開く">`;
+    const avatarHtml = roomLinkable ? `${aOpen('room-card__id-link')}${avatarImgHtml}</a>` : avatarImgHtml;
+    const nameHtml = roomLinkable
+      ? `${aOpen('room-card__id-link room-name')}${escapeHtml(label)}</a>`
+      : `<span class="room-name" title="${escapeHtml(r.userKey)}">${escapeHtml(label)}</span>`;
     const totalPercent = Math.max(6, Math.min(100, (r.count / maxTotal) * 100));
     const recentPercent =
       r.recentCount > 0 ? Math.max(4, Math.min(100, (r.recentCount / maxRecent) * 100)) : 0;
@@ -10586,38 +11096,18 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     const hint = isUnknown
       ? '<div class="room-hint">投稿者ID未取得のコメントをここにまとめています。</div>'
       : '';
-    li.innerHTML = compactRooms
-      ? `
+    // compact/full は「棒グラフ行の有無」だけ違う。共通部(アバター+名前+プレビュー+hint)を共有。
+    const barRowHtml = compactRooms
+      ? ''
+      : `<div class="room-bar-row"><div class="room-bar-track"><div class="room-bar-total" style="width:${totalPercent.toFixed(2)}%"></div><div class="room-bar-recent" style="width:${recentPercent.toFixed(2)}%"></div></div><span class="room-delta ${r.recentCount > 0 ? 'up' : ''}">${deltaLabel}</span></div>`;
+    const previewHtml = r.lastText ? `<div class="room-preview">${escapeHtml(r.lastText)}</div>` : '';
+    li.innerHTML = `
       <div class="room-card__row">
         ${avatarHtml}
         <div class="room-main">
-          <div class="room-name-row">
-            <span class="room-name" title="${escapeHtml(r.userKey)}">${escapeHtml(label)}</span>
-          </div>
-          ${r.lastText ? `<div class="room-preview">${escapeHtml(r.lastText)}</div>` : ''}
-          ${hint}
-        </div>
-      </div>
-    `
-      : `
-      <div class="room-card__row">
-        ${avatarHtml}
-        <div class="room-main">
-          <div class="room-name-row">
-            <span class="room-name" title="${escapeHtml(r.userKey)}">${escapeHtml(label)}</span>
-          </div>
-          <div class="room-bar-row">
-            <div class="room-bar-track">
-              <div class="room-bar-total" style="width:${totalPercent.toFixed(2)}%"></div>
-              <div class="room-bar-recent" style="width:${recentPercent.toFixed(2)}%"></div>
-            </div>
-            <span class="room-delta ${r.recentCount > 0 ? 'up' : ''}">${deltaLabel}</span>
-          </div>
-          ${
-            r.lastText
-              ? `<div class="room-preview">${escapeHtml(r.lastText)}</div>`
-              : ''
-          }
+          <div class="room-name-row">${nameHtml}</div>
+          ${barRowHtml}
+          ${previewHtml}
           ${hint}
         </div>
       </div>
@@ -10627,6 +11117,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     if (avImg instanceof HTMLImageElement && isHttpOrHttpsUrl(thumbSrc)) {
       storyAvatarLoadGuard.noteRemoteAttempt(avImg, thumbSrc);
     }
+    if (avImg instanceof HTMLImageElement) upgradeAnonymousAvatarImageFromFallback(avImg, uidForThumb, thumbSrc, 64);
   }
 
   if (rankedRooms.length > visibleRooms.length) {
@@ -13097,6 +13588,19 @@ async function refresh() {
     ? Math.max(0, Number(/** @type {any} */ (lightChunkIndexRaw).total) || 0)
     : null;
   const cachedHeavy = watchMetaCache.lastCommentsArr;
+  // v0.1.625: cached arr が currentChunkTotal を「ほぼ全部カバーしている」場合のみ再利用する
+  //   厳密化を追加。従来は chunkTotal が一致するだけで再利用していたが、cached arr が
+  //   初期 paint の短い summary or empty で固まっていて、再 paint も heavy 取得 catch→null
+  //   の経路でスキップされると「5枠だけ表示」が永続化していた(実機 lv350676215・
+  //   記録カードは 716 表示・応援帯は 5名固まり)。80% 以上カバーしていなければ
+  //   cached を捨てて heavy 再読みする(冷スタート扱い)=確実に 716 件で塗り直す。
+  const cachedHeavyCoverageOk =
+    cachedHeavy &&
+    Array.isArray(cachedHeavy.arr) &&
+    cachedHeavy.arr.length > 0 &&
+    (currentChunkTotal == null ||
+      currentChunkTotal === 0 ||
+      cachedHeavy.arr.length >= Math.floor(currentChunkTotal * 0.8));
   const canReuseHeavyChunkRead =
     (idbMode || commentsChunked) &&
     currentChunkTotal != null &&
@@ -13104,27 +13608,88 @@ async function refresh() {
     cachedHeavy.lv === lv &&
     Number(cachedHeavy.chunkTotal) === currentChunkTotal &&
     Array.isArray(cachedHeavy.arr) &&
-    cachedHeavy.arr.length > 0;
+    cachedHeavy.arr.length > 0 &&
+    cachedHeavyCoverageOk;
   /** heavy 全件読み完了前はマイルストーン／ギフト Bahamut の誤爆を抑止 */
   let watchPopupHeavyCommentsSettled = canReuseHeavyChunkRead;
   // v0.1.509: 本体は追記専用チャンク（無ければ従来 main にフォールバック）から読む。
   //   readStorageBagWithRetry を getMany として渡し、固まり時は {} に落として描画継続する。
   // v0.1.514: IDB モードは拡張オリジン IDB を直接読む（chrome.storage I/O の奪い合いから解放）。
+  // v0.1.650: JSONキャッシュ即時表示。popup を閉じると in-memory の lastCommentsArr が
+  //   揮発し、再オープンで毎回 IDB 全件 async 読み(2段階paint)に戻っていた(=「開いた瞬間に
+  //   全部・ローディングなし」が効かない真因)。chrome.storage.session に直近 live の全件配列を
+  //   1本 persist しておき、冷スタート(in-memory hit でない)でも版印(currentChunkTotal)が
+  //   一致すれば IDB cursor 全件読みを飛ばして即返す。fresh でなければ従来経路へ素通り=
+  //   hit しなければ 1bit も従来と変わらない純加法。SW 終了で session が消えても従来 IDB 経路に
+  //   自動フォールバック(後退ゼロ)。対象は IDB/chunk モードのみ(版印 currentChunkTotal を持つ)。
+  const trySessionCommentCache =
+    (idbMode || commentsChunked) &&
+    !canReuseHeavyChunkRead &&
+    currentChunkTotal != null;
+  const sessionCachePromise = trySessionCommentCache
+    ? chrome.storage.session
+        .get(SESSION_COMMENT_CACHE_KEY)
+        .then((bag) => {
+          const c = bag && bag[SESSION_COMMENT_CACHE_KEY];
+          return isSessionCommentCacheFresh(c, lv, currentChunkTotal)
+            ? /** @type {unknown[]} */ (/** @type {any} */ (c).arr)
+            : null;
+        })
+        .catch(() => null)
+    : Promise.resolve(null);
+  const readHeavyFromStore = () =>
+    idbMode
+      ? readAllCommentsFromCommentDb(lv)
+          .then((rows) => (Array.isArray(rows) ? rows : []))
+          .catch(() => null)
+      : readChunkedComments(lv, key, (keys) =>
+          readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
+            attempts: 4,
+            delaysMs: [0, 50, 120, 280],
+            perAttemptTimeoutMs: 1500
+          })
+        )
+          .then((r) => (Array.isArray(r.rows) ? r.rows : []))
+          .catch(() => null);
   const heavyDataPromise = canReuseHeavyChunkRead
     ? Promise.resolve(/** @type {unknown[]} */ (cachedHeavy.arr))
-    : idbMode
-    ? readAllCommentsFromCommentDb(lv)
-        .then((rows) => (Array.isArray(rows) ? rows : []))
-        .catch(() => null)
-    : readChunkedComments(lv, key, (keys) =>
-        readStorageBagWithRetry(() => chrome.storage.local.get(keys), {
-          attempts: 4,
-          delaysMs: [0, 50, 120, 280],
-          perAttemptTimeoutMs: 1500
-        })
-      )
-        .then((r) => (Array.isArray(r.rows) ? r.rows : []))
-        .catch(() => null);
+    : sessionCachePromise.then((sessArr) =>
+        Array.isArray(sessArr) && sessArr.length > 0 ? sessArr : readHeavyFromStore()
+      );
+  // v0.1.650: heavy 全件配列を chrome.storage.session に mirror して popup 再オープンを
+  //   跨がせる(「開いた瞬間に全部」の本体)。paint の世代チェック(refreshGen)や再描画の
+  //   early-return とは独立に、heavy 配列が取れた時点で必ず1回 persist する(描画経路に
+  //   依存しないので確実)。IDB/chunk モードかつ currentChunkTotal をほぼ満たす完全配列の
+  //   ときだけ書く(session/summary 由来の短い arr で上書きしない)。fire-and-forget。
+  if ((idbMode || commentsChunked) && currentChunkTotal != null) {
+    void heavyDataPromise
+      .then((heavyArr) => {
+        if (
+          !Array.isArray(heavyArr) ||
+          heavyArr.length === 0 ||
+          !(
+            currentChunkTotal === 0 ||
+            heavyArr.length >= Math.floor(currentChunkTotal * 0.8)
+          )
+        ) {
+          return;
+        }
+        try {
+          void chrome.storage.session
+            .set({
+              [SESSION_COMMENT_CACHE_KEY]: buildSessionCommentCache(
+                lv,
+                currentChunkTotal,
+                heavyArr
+              )
+            })
+            .catch(() => {});
+        } catch {
+          /* session 不可環境(古いChrome等)は無視=従来動作 */
+        }
+      })
+      .catch(() => {});
+  }
   // テールは小さい（最大でも数百件）ので軽量読みで取得し、初回 paint・heavy 再描画の両方で
   //   メイン配列へ concat する（表示専用・書き戻さない）。
   const tailDisplayRows = normalizeTailRowsForDisplay(
@@ -13328,32 +13893,73 @@ async function refresh() {
 
   function paintWatchPopupUi() {
     syncInterceptMapDiagFromSnapshot(watchSnapshot);
+    // total(=arr.length・O(1))は常時表示「記録している応援コメント N 件です」
+    //   (storyAvatarDiag の compactLead)が依存するので**必ず更新**=スクロール中も止めない。
     STORY_AVATAR_DIAG_STATE.total = arr.length;
-    STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
-    STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
-    STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
-    {
+    // v0.1.639 スクロール根治 PR4: withUid/withAvatar/uniqueAvatar/resolvedAvatar の
+    //   全件 O(N) 集計群は、storyAvatarDiag の折りたたみ「内訳・用語(詳しく見る)」内の技術行
+    //   (formatStoryAvatarDiagLine)と dev monitor(PR1 でゲート済)でしか読まれない。どちらも
+    //   スクロール中は見えない/閉じているので、スクロール中(かつ同 liveId 描画済=初回/配信切替は
+    //   除外)はこの O(N) 群をスキップする。module 状態なので前回値が残る=畳まれた詳細を後で
+    //   開いた時は次の非スクロール paint で最新化される。
+    const diagPaintDeferActive = (() => {
+      const ul = /** @type {HTMLElement|null} */ ($('userRoomList'));
+      const alreadyPainted =
+        !!ul && ul.childElementCount > 0 && _lastUserRoomsPaintedLiveId === lv;
+      return shouldSkipHeavyDiagPaint({
+        scrolling: shouldDeferHeavyPopupPaintNow(),
+        alreadyPainted
+      });
+    })();
+    // v0.1.649 スクロール根治 PR5: selfSaved/selfPendingMatched も
+    //   storyAvatarDiagLine(折りたたみ「詳しく見る」内の技術行)でしか読まれず、
+    //   スクロール中は見えない。13875 群(withUid 等)と全く同じ性質なのに defer 対象外で
+    //   毎 paint(450ms)走っていた arr 全件 O(N) ×2 を、同じ diagPaintDeferActive 配下へ移す。
+    //   module 状態なので前回値が残り、詳細を後で開いた時は次の非スクロール paint で最新化。
+    //   selfPending は arr 非依存(recents 由来・軽い)なので defer 外に残す。
+    if (!diagPaintDeferActive) {
+      STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
+      STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
+      STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
       const resolvedAvatar = countResolvedAvatarEntries(arr, lv);
       STORY_AVATAR_DIAG_STATE.resolvedAvatar = resolvedAvatar.total;
       STORY_AVATAR_DIAG_STATE.resolvedUniqueAvatar = resolvedAvatar.unique;
+      // v0.1.638 PR2 の dead store 削除はそのまま(selfShown は displayEntries 版で上書き)。
+      STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
+      STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
     }
-    STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(arr, lv);
-    STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
     STORY_AVATAR_DIAG_STATE.selfPending = countPendingSelfPostedRecentsForLive(lv);
-    STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
     // 0.1.100: 配信者本人 user の自コメは「応援コメ」ではないので popup display
     //   経路から除外（story growth grid / 集計件数 / lane / ticker 全部に効く）。
     //   配信者カードは watchMetaCache.snapshot.broadcaster* から別経路で描画されるため
     //   表示情報は失われない。HTML レポート側 (popup-entry.js:7745 周辺) では
     //   既に同等の inline filter が個別コメに適用されている。
-    const broadcasterUidForCommentExclude = inferBroadcasterUserIdFromComments(
-      arr,
-      watchMetaCache.snapshot || {}
-    );
-    const displayEntriesBase = excludeBroadcasterFromCommentEntries(
-      buildDisplayCommentEntries(arr, lv),
-      broadcasterUidForCommentExclude
-    );
+    // v0.1.649 PR6: 入力(arr 参照・lv)が前回 paint と完全一致なら、O(N)×3 の
+    //   displayEntries 構築を skip して前回結果を再利用(参照等価メモ化)。
+    //   arr が新配列(新着/enrich昇格)になったら ref 不一致で必ず再計算=取りこぼしなし。
+    let displayEntriesBase;
+    if (
+      _displayEntriesMemo &&
+      _displayEntriesMemo.arr === arr &&
+      _displayEntriesMemo.lv === lv
+    ) {
+      displayEntriesBase = /** @type {PopupCommentEntry[]} */ (_displayEntriesMemo.displayEntries);
+    } else {
+      const broadcasterUidForCommentExclude = inferBroadcasterUserIdFromComments(
+        arr,
+        watchMetaCache.snapshot || {}
+      );
+      displayEntriesBase = excludeBroadcasterFromCommentEntries(
+        buildDisplayCommentEntries(arr, lv),
+        broadcasterUidForCommentExclude
+      );
+      _displayEntriesMemo = {
+        arr,
+        lv,
+        displayEntries: displayEntriesBase,
+        broadcasterUid: broadcasterUidForCommentExclude
+      };
+    }
     const displayEntries = displayEntriesBase;
     STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(displayEntries, lv);
     // v0.1.596: chunk/IDB 移行済みでは main 配列が古い退避データのことがある。
@@ -13409,7 +14015,11 @@ async function refresh() {
       watchSnapshot,
       panelLiveSummary
     );
-    setCountDisplay(countToShow, snapForCards);
+    // v0.1.627: 記録の内訳を集計。v0.1.685: countToShow>displayEntries 差=配信者コメント。
+    const recordedBreakdown = summarizeCommentRecordBreakdown(displayEntries);
+    const _broadcasterCount = Math.max(0, countToShow - displayEntriesBase.length);
+    if (_broadcasterCount > 0) recordedBreakdown._broadcasterCount = _broadcasterCount;
+    setCountDisplay(countToShow, snapForCards, recordedBreakdown);
     markWatchPopupLoadPhase('count_card', {
       countToShow,
       heavySettled: watchPopupHeavyCommentsSettled
@@ -13459,19 +14069,55 @@ async function refresh() {
         provisional: laneFeedPick.provisional
       }
     );
-    renderUserRooms(
-      /** @type {PopupCommentEntry[]} */ (laneFeedPick.entries),
-      lv,
-      { rankingProvisional: laneFeedPick.provisional }
-    );
-    renderCharacterScene({
-      hasWatch: true,
-      recording: toggle.checked,
-      commentCount: displayEntries.length,
-      liveId: lv,
-      snapshot: snapForCards
-    });
+    // 白フラッシュ対策(複数タブ): renderUserRooms は冒頭で ul.innerHTML='' の全消し
+    //   →フル再構築をする重い描画。高速スクロール中に走ると、複数タブのメインスレッド
+    //   飽和で再構築が間に合わず、空になった領域が一瞬「白(背景)」として露出する。
+    //   既に同 liveId のレーンが描画済みのときに限り、スクロール中は描画を見送る
+    //   (growth patch と同じ思想)。スクロールが止まれば次の refresh(最長 3 秒)で塗り直る。
+    //   初回/配信切替/未描画(空)のときは見送らず必ず描画する。
+    // 白フラッシュ見える化: ここから renderWatchMetaCard までの重い paint 区間を計測する。
+    _perfPaintCount += 1;
+    const _perfPaintT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const userRoomsUl = /** @type {HTMLElement|null} */ ($('userRoomList'));
+    const userRoomsAlreadyPainted =
+      !!userRoomsUl &&
+      userRoomsUl.childElementCount > 0 &&
+      _lastUserRoomsPaintedLiveId === lv;
+    const _perfDeferActive = shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted;
+    if (shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted) {
+      // スクロール中 & 同 liveId が既に塗ってある: 全消し再構築を見送る(白抜け防止)。
+      //   別配信のときは _lastUserRoomsPaintedLiveId !== lv で painted=false になり描画される。
+    } else {
+      renderUserRooms(
+        /** @type {PopupCommentEntry[]} */ (laneFeedPick.entries),
+        lv,
+        { rankingProvisional: laneFeedPick.provisional }
+      );
+      _lastUserRoomsPaintedLiveId = lv;
+    }
+    // 白フラッシュ対策(複数タブ): renderCharacterScene も内部で innerHTML='' 系の
+    //   重い再構築をする。renderUserRooms と同様、同 liveId が既に塗ってあれば
+    //   スクロール中は見送る(初回/配信切替/未描画時は必ず描画)。
+    if (!_perfDeferActive) {
+      renderCharacterScene({
+        hasWatch: true,
+        recording: toggle.checked,
+        commentCount: displayEntries.length,
+        liveId: lv,
+        snapshot: snapForCards
+      });
+    }
     renderWatchMetaCard(snapForCards, arr);
+    // 白フラッシュ見える化: paint 区間の所要 ms を nls_perf_diag_<lv> に間引き保存。
+    {
+      const _perfPaintT1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      recordPerfDiagThrottled(
+        lv,
+        _perfPaintT1 - _perfPaintT0,
+        displayEntries.length,
+        _perfDeferActive
+      );
+    }
     // v0.1.503 perf: renderCharacterScene→syncStoryGrowth が source signature 一致時は
     //   既に patch 済み／skip 済み。ここで毎ポーリング無条件に O(N) patch を回すと、
     //   同一サイトの複数 watch タブが 1 プロセスを共有する環境でメインスレッドが固まり
@@ -13489,18 +14135,26 @@ async function refresh() {
       }
     }
 
+    // v0.1.637 スクロール重さ根治 PR1: dev monitor の全件 O(N) 集計 3 本 +
+    //   renderDevMonitorPanel(内部 storage I/O)は、パネル(<details id=devMonitorDetails>)が
+    //   開いているときだけ実行する。通常は折りたたみで閉=この集計は画面に出ないのに毎 450ms
+    //   無条件に走り、1 万件超の配信でスクロール中もメインスレッドを圧迫していた。
+    //   閉時は丸ごとスキップ(O(N)×3 + I/O が消える)。開いた瞬間は toggle リスナーで即再描画。
     {
-      const baseAv = summarizeStoredCommentAvatarStats(arr);
-      const resolvedTotal = countResolvedAvatarEntries(arr, lv).total;
-      renderDevMonitorPanel({
-        snapshot: snapForCards,
-        liveId: lv,
-        displayCount: displayEntries.length,
-        storageCount: arr.length,
-        commentReadState,
-        avatarStats: { ...baseAv, withResolvedAvatar: resolvedTotal },
-        profileGaps: summarizeStoredCommentProfileGaps(arr)
-      });
+      const devMonDetails = /** @type {HTMLDetailsElement|null} */ ($('devMonitorDetails'));
+      if (shouldRunDevMonitorPaint({ panelOpen: devMonDetails?.open === true })) {
+        const baseAv = summarizeStoredCommentAvatarStats(arr);
+        const resolvedTotal = countResolvedAvatarEntries(arr, lv).total;
+        renderDevMonitorPanel({
+          snapshot: snapForCards,
+          liveId: lv,
+          displayCount: displayEntries.length,
+          storageCount: arr.length,
+          commentReadState,
+          avatarStats: { ...baseAv, withResolvedAvatar: resolvedTotal },
+          profileGaps: summarizeStoredCommentProfileGaps(arr)
+        });
+      }
     }
     updateCommentVelocityLine(
       /** @type {PopupCommentEntry[]} */ (displayEntries)
@@ -13515,7 +14169,16 @@ async function refresh() {
     if (watchMetaCache.key !== snapshotKey) return;
     if (!Array.isArray(nextArr)) return;
     if (refreshGen !== watchPopupRefreshGeneration) return;
-    if (!nextArr.length && arr.length) return;
+    // v0.1.625: nextArr が空でも、現 arr が currentChunkTotal を満たしていない
+    //   (cached が短い arr で固まっている)なら skip しない(=空応援帯固まり防止)。
+    //   元の `!nextArr.length && arr.length` ガードは「heavy 経路の一時的な空 resp で
+    //   現状の arr を消さない」用だったが、cached arr 自体が 716件中 5件のような
+    //   ケースをカバー範囲外にしてしまっていた(実機 lv350676215)。
+    const arrCoversTotal =
+      currentChunkTotal == null ||
+      currentChunkTotal === 0 ||
+      arr.length >= Math.floor(currentChunkTotal * 0.8);
+    if (!nextArr.length && arr.length && arrCoversTotal) return;
     const wasHeavyPending = !watchPopupHeavyCommentsSettled;
     readCommentsOk = true;
     commentReadState = 'storage_ok';
@@ -13724,7 +14387,11 @@ async function refresh() {
     setArr: (next) => {
       arr = next;
     },
-    paint: () => paintWatchPopupUi()
+    paint: () => {
+      const t0 = performance.now(); // 定期 paint の所要 ms を実測(挙動不変・計測のみ)
+      paintWatchPopupUi();
+      recordPaintPerf(performance.now() - t0, Array.isArray(arr) ? arr.length : 0);
+    }
   });
   void maybeFlushBroadcastSessionSummarySample({
     liveId: lv,
@@ -14656,25 +15323,6 @@ function isFriendlyHtmlReportMetaKey(key) {
   return false;
 }
 
-/** @param {string} key */
-function friendlyHtmlReportMetaLabel(key) {
-  const k = String(key || '').toLowerCase().trim();
-  const labels = {
-    description: 'ページ説明（meta）',
-    keywords: 'キーワード（meta）',
-    'og:title': 'シェア用タイトル（Open Graph）',
-    'og:description': 'シェア用説明（Open Graph）',
-    'og:image': 'シェア用画像URL（Open Graph）',
-    'og:url': '正規URL（Open Graph）',
-    'og:site_name': 'サイト名（Open Graph）',
-    'og:type': '種類（Open Graph）',
-    'twitter:title': 'シェア用タイトル（X）',
-    'twitter:description': 'シェア用説明（X）'
-  };
-  if (k.startsWith('twitter:image')) return 'シェア用画像（X）';
-  return labels[k] || key;
-}
-
 /**
  * @param {{ key: string, value: string }[]|undefined} metas
  * @returns {{ friendly: { key: string, value: string }[], technical: { key: string, value: string }[] }}
@@ -15325,35 +15973,15 @@ async function buildHtmlReportDocument(
       userKeyToTotalChars.set(userKey, (userKeyToTotalChars.get(userKey) || 0) + len);
     }
   }
-  const roomRows = aggregatedRooms.map((room) => {
-    const label = displayUserLabel(room.userKey, room.nickname);
-    // 数値 ID のときだけ niconico ユーザーページへのリンクで包む
-    // （匿名・ハッシュ・未取得は escapeHtml されたテキストのみ）。
-    const labelHtml = buildUserProfileLinkedLabelHtml(room.userKey, label);
-    const totalChars = userKeyToTotalChars.get(room.userKey) || 0;
-    const avgChars = room.count > 0 ? Math.round((totalChars / room.count) * 10) / 10 : 0;
-    const search = escapeAttr(
-      `${label} ${room.nickname || ''} ${room.userKey} ${room.lastText || ''} ${room.count} ${totalChars}`.toLowerCase()
-    );
-    // 0.1.12 (F): 「最低サムネ」を必ず出す。avatarUrl が空でも数値 ID なら
-    // ニコ既定 CDN URL、匿名 a:... なら identicon SVG data URL を使う。
-    const avatarSrc = resolveReportUserThumbSrc({
-      userId: room.userKey,
-      avatarUrl: room.avatarUrl || '',
-      identiconResolver: getCachedAnonymousIdenticonDataUrl
-    });
-    const avatarCell = avatarSrc
-      ? `<img class="report-room-av" src="${escapeAttr(avatarSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
-      : '<span class="report-room-av report-room-av--empty"></span>';
-    return `
-      <tr class="search-item" data-search="${search}">
-        <td>${avatarCell}</td>
-        <td>${labelHtml}</td>
-        <td>${room.count}</td>
-        <td>${totalChars}（平均 ${avgChars}）</td>
-        <td>${escapeHtml(room.lastText || '')}</td>
-      </tr>
-    `;
+  // C-7 pure refactor (v0.1.636): 行ビルダを reportUserRoomTableHtml.js に抽出（挙動不変・test 済）。
+  //   閉包依存4つ（userKeyToTotalChars/displayUserLabel/buildUserProfileLinkedLabelHtml/
+  //   resolveReportUserThumbSrc+identiconResolver）を全て引数化して非決定を排除。
+  const roomRows = buildReportUserRoomRows(aggregatedRooms, {
+    userKeyToTotalChars,
+    displayUserLabel,
+    buildUserProfileLinkedLabelHtml,
+    resolveReportUserThumbSrc,
+    identiconResolver: getCachedAnonymousIdenticonDataUrl
   });
 
   /*
@@ -15586,19 +16214,9 @@ async function buildHtmlReportDocument(
   const durationLabel = formatBroadcastDurationLabel(reportTiming);
 
   // 0.1.21 (V): 自分のコメント抜粋（自コメだけのテーブル）。
+  // C-7 pure refactor (v0.1.634): 行ビルダを reportSelfPostedRowsHtml.js に抽出（挙動不変・test 済）。
   const selfPostedComments = commentsForReport.filter((c) => Boolean(c?.selfPosted));
-  const selfPostedRows = selfPostedComments.map((c, idx) => {
-    const text = String(c.text || '').trim();
-    const search = escapeAttr(`${idx + 1} ${text} ${c.commentNo || ''}`.toLowerCase());
-    return `
-      <tr class="search-item" data-search="${search}">
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(String(c.commentNo || '-'))}</td>
-        <td>${escapeHtml(text || '-')}</td>
-        <td>${escapeHtml(formatDateTime(c.capturedAt || 0))}</td>
-      </tr>
-    `;
-  });
+  const selfPostedRows = buildReportSelfPostedRows(selfPostedComments, { formatDateTime });
 
   // 0.1.21 (V): CSV ダウンロード用の生 CSV を埋め込む。<pre hidden> の textContent
   // から JS が読み取り Blob 化してダウンロードする（再エスケープ不要）。
@@ -15618,15 +16236,9 @@ async function buildHtmlReportDocument(
   const headLinkRows = snapshot ? buildReportLinkRows(snapshot.links) : [];
   const { friendly: friendlyMetas, technical: technicalMetas } =
     partitionMetasForHtmlReport(snapshot?.metas);
-  const friendlyMetaRowsHtml = friendlyMetas.map((v) => {
-    const label = friendlyHtmlReportMetaLabel(v.key);
-    const search = escapeAttr(`${v.key} ${v.value} ${label}`.toLowerCase());
-    return `
-        <tr class="search-item" data-search="${search}">
-          <td>${escapeHtml(label)}</td>
-          <td class="mono">${escapeHtml(v.value || '-')}</td>
-        </tr>`;
-  });
+  // C-7 pure refactor (v0.1.635): 行ビルダ + ラベル変換を reportFriendlyMetaRowsHtml.js に
+  //   抽出（挙動不変・test 済）。friendlyHtmlReportMetaLabel も同梱移設。
+  const friendlyMetaRowsHtml = buildReportFriendlyMetaRows(friendlyMetas);
   const headTechnicalMetaRows = buildReportMetaRows(technicalMetas);
   const headScriptRows = snapshot ? buildReportScriptRows(snapshot.scripts) : [];
   const headNoopenerRows = snapshot
@@ -16440,6 +17052,8 @@ async function buildHtmlReportDocument(
 
       ${participationLeadHtml}
 
+      ${sectionInterestArrival(participationSummaryReport)}
+
       ${yukkuriReportHtml}
 
       ${eventRankingSectionHtml}
@@ -16453,6 +17067,7 @@ async function buildHtmlReportDocument(
         <h2 class="toc__heading">目次（クリックで該当セクションへ）</h2>
         <ol class="toc__list">
           <li><a href="#sec-participation-lead">来場とコメント参加</a></li>
+          <li><a href="#mkt-interest-arrival">興味タグ別来場${participationSummaryReport?.interestArrivalSummary?.messageCount > 0 ? '' : '（検出 0件）'}</a></li>
           <li><a href="#sec-next-memo">りんく達の次枠メモ</a></li>
           ${eventRankingSectionHtml ? '<li><a href="#sec-event-ranking">イベント順位</a></li>' : ''}
           <li><a href="#sec-overview">概要・サムネ・タグ</a></li>
@@ -16814,6 +17429,136 @@ async function downloadBlobViaChromeDownloads(blob, filename) {
     a.remove();
   }
   exportBlobRevokeQueue.enqueue(blobUrl);
+}
+
+const MEDIA_KIT_LIVE_LIMIT = 60;
+
+/**
+ * broadcast summary IDB と配信単位の軽量 storage からメディアキットを作る。
+ * PR4(応援者が主役): 応援者セクション用にギフトイベント(全期間lv)と、直近最大12配信の
+ * コメント(readAllCommentsForLive・15秒で打ち切り)も集計する。ニコ生上で公開されている
+ * 応援情報(OSINT)の集計であり、堂々と表彰として載せる方針(ユーザー指示 2026-06-10)。
+ */
+async function downloadMediaKitHtml() {
+  const nowMs = Date.now();
+  /** @type {IDBDatabase|undefined} */
+  let db;
+  /** @type {string[]} */
+  let liveIds = [];
+  /** @type {unknown[]} */
+  let summaryRows = [];
+  try {
+    db = await openBroadcastSessionSummaryDb();
+    liveIds = await listRecentUniqueBroadcastLiveIds(db, {
+      limit: MEDIA_KIT_LIVE_LIMIT
+    });
+    const rowsByLive = await Promise.all(
+      liveIds.map((liveId) =>
+        listBroadcastSessionSummaryForLive(db, liveId, 200).catch(() => [])
+      )
+    );
+    summaryRows = rowsByLive.flat();
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      /* no-op */
+    }
+  }
+
+  const storageKeys = liveIds.flatMap((liveId) => [
+    broadcasterProfileStorageKey(liveId),
+    `nls_gift_events_${liveId}`
+  ]);
+  const bag = storageKeys.length
+    ? await chrome.storage.local.get(storageKeys)
+    : {};
+  const profileSnapshots = liveIds
+    .map((liveId) => {
+      const key = broadcasterProfileStorageKey(liveId);
+      const value = bag[key];
+      return value && typeof value === 'object'
+        ? { ...value, liveId }
+        : null;
+    })
+    .filter(Boolean);
+  /** @type {Record<string, unknown[]>} */
+  const giftEventsByLive = {};
+  for (const liveId of liveIds) {
+    const value = bag[`nls_gift_events_${liveId}`];
+    if (Array.isArray(value)) giftEventsByLive[liveId] = value;
+  }
+
+  const stats = buildMediaKitStats({
+    summaryRows,
+    profileSnapshots,
+    giftEventsByLive,
+    nowMs,
+    windowsDays: [30, 60, 90]
+  });
+
+  // PR4: 応援者セクション。コメント全件読みは直近12配信のみ・15秒で打ち切り(取れた分で出す)。
+  /** @type {Record<string, unknown[]>} */
+  const commentRowsByLive = {};
+  try {
+    const commentLives = liveIds.slice(0, MEDIA_KIT_COMMENT_LIVE_CAP);
+    await withTimeout(
+      (async () => {
+        const arrays = await Promise.all(
+          commentLives.map((lid) => readAllCommentsForLive(lid).catch(() => []))
+        );
+        commentLives.forEach((lid, index) => {
+          commentRowsByLive[lid] = Array.isArray(arrays[index]) ? arrays[index] : [];
+        });
+      })(),
+      15_000,
+      'media_kit_supporter_scan_timeout'
+    );
+  } catch {
+    /* 打ち切り: 取れた配信ぶんだけで表彰する */
+  }
+  let supporterProfileMap = popupUserCommentProfileMap;
+  if (!supporterProfileMap || !Object.keys(supporterProfileMap).length) {
+    try {
+      const profBag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
+      supporterProfileMap = normalizeUserCommentProfileMap(
+        profBag[KEY_USER_COMMENT_PROFILE_CACHE]
+      );
+    } catch {
+      supporterProfileMap = {};
+    }
+  }
+  const supporters = buildMediaKitSupporters({
+    liveIds,
+    giftEventsByLive,
+    commentRowsByLive,
+    profileMap: supporterProfileMap
+  });
+
+  // v0.1.682: 配信者アイコンの fetch→data URL 化を廃止。拡張に host permission の無い
+  //   CDN への fetch は CORS で拒否され、chrome://extensions のエラーログに残っていた
+  //   (実機報告)。応援者サムネと同じ「HTML 側が img で直接参照」(CSP で当該CDNのみ許可)に
+  //   統一する=fetch ゼロでエラーも出ない。manifest 権限は触らない(CWS 審査中)。
+  const html = buildMediaKitHtml({ ...stats, supporters }, {
+    generatedAtMs: nowMs,
+    sourceLiveLimit: MEDIA_KIT_LIVE_LIMIT,
+    sourceLiveLimitReached: liveIds.length >= MEDIA_KIT_LIVE_LIMIT
+  });
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date(nowMs));
+  const filename = `${date}_tsuioku-media-kit.html`;
+  await downloadBlobViaChromeDownloads(
+    new Blob([html], { type: 'text/html;charset=utf-8' }),
+    filename
+  );
+  return {
+    filename,
+    liveCount: stats.windows.find((window) => window.days === 90)?.liveCount || 0
+  };
 }
 
 /**
@@ -17411,6 +18156,30 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
         } catch {
           return null;
         }
+      })(),
+      // v0.1.616: 北極星描画経路の観測。content は取得完璧(koken 69件)なのに popup の
+      //   レーンが空の真因を一点に絞る。
+      //   refreshAllStarted>0 & refreshAllCompleted=0 → 途中で詰まる/throw（lastReachedLane
+      //   /lastError を見る）。lastContribResolveRows=0 で content kokenLastRows>0 →
+      //   storage 書込失敗 or liveId 不一致 or popup が別 storage を読んでいる。
+      northStarRenderProbe: (() => {
+        try {
+          return {
+            refreshAllStarted: _northStarRenderProbe.refreshAllStarted,
+            refreshAllCompleted: _northStarRenderProbe.refreshAllCompleted,
+            lastGiftSyncMs: _northStarRenderProbe.lastGiftSyncMs,
+            lastContribResolveRows: _northStarRenderProbe.lastContribResolveRows,
+            contribResolveCalls: _northStarRenderProbe.contribResolveCalls,
+            lastReachedLane: _northStarRenderProbe.lastReachedLane,
+            lastError: _northStarRenderProbe.lastError,
+            lastRunAgoMs:
+              _northStarRenderProbe.lastRunAtBase > 0
+                ? Math.max(0, Date.now() - _northStarRenderProbe.lastRunAtBase)
+                : null
+          };
+        } catch {
+          return null;
+        }
       })()
     },
     content: null,
@@ -18000,6 +18769,15 @@ async function initPopup() {
     safeRefresh();
   });
 
+  // v0.1.637 スクロール重さ根治 PR1: dev monitor を開いた瞬間に再描画する。
+  //   通常 paint は閉時に集計をスキップする(shouldRunDevMonitorPaint)ので、開いた直後の
+  //   次 450ms ポーリングまで中身が空に見える。toggle で open になったら即 safeRefresh して
+  //   待ち時間ゼロで最新の集計を出す(閉→開の体感を従来どおり保つ)。
+  $('devMonitorDetails')?.addEventListener('toggle', () => {
+    const det = /** @type {HTMLDetailsElement|null} */ ($('devMonitorDetails'));
+    if (det?.open) safeRefresh();
+  });
+
   // v0.1.608 Phase 1-C: コメンターのフォロー情報を強制再取得(キャッシュ無視)
   $('devMonitorForceRefetchCommenterFollowBtn')?.addEventListener('click', async () => {
     const btn = /** @type {HTMLButtonElement|null} */ (
@@ -18299,6 +19077,43 @@ async function initPopup() {
   $('exportMarketingQuickBtn')?.addEventListener('click', () => {
     const original = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
     if (original && !original.disabled) original.click();
+  });
+
+  $('exportMediaKitBtn')?.addEventListener('click', async () => {
+    const btn = /** @type {HTMLButtonElement|null} */ ($('exportMediaKitBtn'));
+    const postStatus = /** @type {HTMLElement|null} */ ($('postStatus'));
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    showExportWaitPanel('marketing');
+    setExportWaitTechStatus('メディアキット用の過去配信データを集計中…');
+    if (postStatus) postStatus.textContent = 'メディアキットを準備しています…';
+    try {
+      await yieldToBrowserPaint();
+      const result = await downloadMediaKitHtml();
+      const done = `メディアキットを保存しました（過去90日 ${result.liveCount}枠）`;
+      setExportWaitTechStatus(done);
+      if (postStatus) postStatus.textContent = done;
+    } catch (error) {
+      if (isExtensionContextInvalidatedError(error)) {
+        renderExtensionContextBanner(true);
+        if (postStatus) {
+          postStatus.textContent =
+            '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります';
+        }
+      } else {
+        const reason = String(error?.message || error || '').trim();
+        if (postStatus) {
+          postStatus.textContent = reason
+            ? `メディアキットの保存に失敗しました: ${reason.slice(0, 100)}`
+            : 'メディアキットの保存に失敗しました';
+        }
+      }
+    } finally {
+      hideExportWaitPanel();
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+    }
   });
 
   $('devMonitorExportMarketingBtn')?.addEventListener('click', async () => {
@@ -19866,6 +20681,21 @@ async function initPopup() {
     void triggerReloadWatchTabFromPopup();
   });
 
+  // v0.1.668: パネルから直接コメビュを開く(従来は状態ページにしか入口が無く、コメント単位の
+  //   操作・名前付け機能に気づけなかった)。lv は付けない=comeview 側が nls_last_watch_url
+  //   から自己解決する(配信切替に追従)。disabled にしない=watch 未接続でも開ける。
+  // コメビュを別窓で開く。voice=true なら ?voice=1 を付け読み上げ ON 起動(VOICEVOX 必須)。
+  const openComeviewWindow = (voice) => {
+    const url = chrome.runtime.getURL('comeview.html') + (voice ? '?voice=1' : '');
+    try {
+      chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
+    } catch {
+      window.open(url, '_blank', 'width=400,height=640');
+    }
+  };
+  $('openComeviewBtn')?.addEventListener('click', () => openComeviewWindow(false));
+  $('openComeviewVoiceBtn')?.addEventListener('click', () => openComeviewWindow(true));
+
   // 0.1.69 (AY): empty state「前回の配信」cards から、その配信を新タブで開く。
   // dataset.watchUrl は applyLastBroadcastReviewToEmptyState() で設定される。
   // hasExtensionContext() が偽ならボタン自体が disabled なので、ここでは
@@ -20133,10 +20963,10 @@ async function initPopup() {
     })
     .finally(() => {
       void (async () => {
+        await wireSupportTimelineOpenPersistence().catch(() => {});
         const refreshDone = safeRefresh();
         await applySupportVisualExpandedFromStorage().catch(() => {});
         wireSupportVisualUi();
-        void wireSupportTimelineOpenPersistence().catch(() => {});
         document.documentElement.setAttribute('data-nl-support-wired', '');
         void applyThumbSelectFromStorage().catch(() => {});
         // registry 登録済みのブール設定を storage から一括同期

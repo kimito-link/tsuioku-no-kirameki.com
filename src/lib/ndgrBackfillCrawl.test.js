@@ -504,6 +504,149 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('reached_start');
   });
 
+  it('初回(reseed===0)の backward 連鎖が空区画でも一発 backward_exhausted で死なず、再シードで遡る（v0.1.691・若い/短い配信の一発停止根治）', async () => {
+    // ⛔ 真因（実機 lv350729693・開始5.5分の配信で seg=0 rows=0 backward_exhausted）:
+    //   v0.1.455 は reseed>0 の空区画を「リトライ経路に合流」に直したが、reseed===0（初回）にだけ
+    //   「空区画なら即 backward_exhausted」の特例が残っていた。初回 seed の backward 連鎖が
+    //   たまたま空区画（配信序盤のコメント疎区間・運営コメントだけの区画）に落ちると、リトライ
+    //   せず 0 件で死ぬ。同じ配信が時間経過後は完走する＝入口でなくタイミング問題。
+    //   修正: 初回の空区画も v0.1.455 と同じリトライ経路（1 バケット前へ再シード）に合流させる。
+    const PROGRAM_START = 1000;
+    const BK_EMPTY = 'https://mpn.live.nicovideo.jp/data/backward/v4/FIRST_EMPTY';
+    const BK_OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/FIRST_OLD';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 初回 seed(910) の連鎖は「vpos を 1 件も持たない区画」（運営コメントだけ）。
+    //   修正前はここで即 backward_exhausted（rows 実質 0 のまま終了）だった。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_EMPTY }));
+    map.set(BK_EMPTY, packedSegmentBytes([{ no: 99, content: '【運営】お知らせ', name: 'sys' }])); // vpos 省略
+    // 1 バケット前(860)への再シードで配信開始区画（低 vpos 複数）に届く。
+    map.set(atUrl(860), viewEntryBytes({ backwardUri: BK_OLD }));
+    map.set(
+      BK_OLD,
+      packedSegmentBytes([
+        { no: 5, content: '配信序盤', name: 'u', vpos: 80 },
+        { no: 6, content: 'はじまった', name: 'u2', vpos: 200 }
+      ])
+    );
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 初回の空区画で諦めず飛び越え、配信序盤(no=5,6)まで遡って完走する。
+    expect(chatsAll.map((c) => c.no)).toContain(5);
+    expect(chatsAll.map((c) => c.no)).toContain(6);
+    expect(result.stopReason).toBe('reached_start');
+    expect(result.rowsSeen).toBeGreaterThan(0);
+  });
+
+  it('初回が空区画で、全リトライでも入口が見つからなければ backward_exhausted（v0.1.691・無限ループせず・診断付き）', async () => {
+    // 初回 seed の連鎖が空区画 → リトライ経路に合流するが、以降どの再シード時刻にも入口が無い。
+    //   一度も chat で前進できていない＝入口問題なので no_progress でなく backward_exhausted を
+    //   正直に報告する（診断付き＝data-nls-backfill-diag に出る）。リトライ上限で必ず終わる。
+    const PROGRAM_START = 1000;
+    const BK_EMPTY = 'https://mpn.live.nicovideo.jp/data/backward/v4/ALL_EMPTY';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_EMPTY }));
+    map.set(BK_EMPTY, packedSegmentBytes([{ no: 99, content: '【運営】', name: 'sys' }])); // vpos 無し
+    // 再シード先は全部未登録（404）＝入口が永遠に見つからない。
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 一度も前進できていない＝入口問題として backward_exhausted（嘘の no_progress を出さない）。
+    expect(result.stopReason).toBe('backward_exhausted');
+    // 診断付き（719 行の入口失敗 return と同形・data-nls-backfill-diag に出る）。
+    expect(result.diagnostics).toBeTruthy();
+    expect(Array.isArray(result.diagnostics.cands)).toBe(true);
+    expect(result.diagnostics.reachedStartChats).toBeUndefined();
+  });
+
+  it('初回が空区画で、リトライ先も全部空区画ならリトライ上限後に backward_exhausted（v0.1.691・空区画予算経路）', async () => {
+    // 入口は毎回見つかるが、どの区画も vpos を持たない（chat で一度も前進できない）ケース。
+    //   リトライ上限(240)を使い切ったら、everMadeProgress=false なので no_progress でなく
+    //   backward_exhausted を診断付きで報告する。
+    const PROGRAM_START = 1000;
+    const BK_E0 = 'https://mpn.live.nicovideo.jp/data/backward/v4/EBUDGET_0';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_E0 }));
+    map.set(BK_E0, packedSegmentBytes([{ no: 99, content: '【運営】', name: 'sys' }])); // vpos 無し
+    // 再シード(860 から 50 ずつ降りる)も全部「vpos 無しの空区画」を返す。
+    let at = 860;
+    for (let k = 0; k < 245; k += 1) {
+      const uri = `https://mpn.live.nicovideo.jp/data/backward/v4/EBUDGET_${at}`;
+      map.set(atUrl(at), viewEntryBytes({ backwardUri: uri }));
+      map.set(uri, packedSegmentBytes([{ no: 100 + k, content: '【運営】', name: 'sys' }])); // vpos 無し
+      at -= NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC;
+    }
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    expect(result.stopReason).toBe('backward_exhausted');
+    expect(result.diagnostics).toBeTruthy();
+  });
+
+  it('途中まで取れてから進めなくなったら従来どおり no_progress（v0.1.691・前進歴ありの維持確認）', async () => {
+    // 初回の連鎖で vpos=60000 まで前進（everMadeProgress=true）した後、再シード先に入口が
+    //   見つからなくなる。前進歴があるので backward_exhausted でなく従来どおり no_progress。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/EVER_A';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // 再シード先は全部未登録（404）＝以降は前進できない。
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { result, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    expect(chatsAll.map((c) => c.no)).toEqual([50]);
+    expect(result.stopReason).toBe('no_progress');
+  });
+
   it('長い疎区間/幅広バケットが 30 連続でも、橋渡し予算(240)内なら配信開始まで遡り切る（fix/ndgr-no-progress-bridge・実機68%頭打ち no_progress の真因解消）', async () => {
     // ⛔ 真因（実機 2026-06-01・歌枠/ギフト多め・data-nls-backfill = seg=16 rows=5102 stop=no_progress・
     //   記録が公式の約68%で頭打ち）: 旧上限 12（12×50秒=10分）では、歌枠の長い間奏/雑談など
@@ -1242,7 +1385,14 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     const map = new Map();
     map.set(atUrl('now'), nowEntryBytes(1000));
     map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
-    map.set(BK0, packedSegmentBytes([{ no: 1, content: 'g', name: 'u' }])); // next 無し
+    // v0.1.691: 旧フィクスチャ（vpos 無し 1 件・next 無し）は「初回空区画の一発
+    //   backward_exhausted」で偶然 3 fetch で終わっていた。特例撤去で空区画はリトライ合流する
+    //   ようになったため、開始近傍 vpos 複数で reached_start 即完了させ、gap 検証の意図
+    //   （1回目 gap なし・2回目以降 gap あり＝計2回）を維持する。
+    map.set(BK0, packedSegmentBytes([
+      { no: 1, content: 'g', name: 'u', vpos: 50 },
+      { no: 2, content: 'g2', name: 'u2', vpos: 120 }
+    ])); // next 無し・開始区画らしさで即 reached_start
 
     const { fetchBinary } = makeFetchFromMap(map);
     const { sleep, slept } = makeNoopSleep();
@@ -1453,7 +1603,9 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     );
 
     expect(result.stopReason).not.toBe('reached_start');
-    expect(result.diagnostics).toBeNull();
+    // v0.1.640 診断(一時): 入口失敗 stop は crawl/seek 診断を載せる(真因特定後に撤去予定)。
+    //   reachedStartChats は依然 reached_start 以外では付かない。
+    expect(result.diagnostics?.reachedStartChats).toBeUndefined();
   });
 });
 
