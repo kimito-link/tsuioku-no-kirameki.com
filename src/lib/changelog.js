@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.745',
+    date: '2026-06-15',
+    summary: '会場で吹き出しが出ないことがある不具合を修正',
+    items: Object.freeze([
+      '会場モードで、読み上げがONなのにVOICEVOXが起動していないとき、コメントの吹き出しが出なくなる不具合を直しました。吹き出しは音声とは関係なく、コメントした瞬間に必ず出るようにしました',
+      'VOICEVOXが無くても会場は今まで通り賑やかに（吹き出しが出るように）なります。音声は、VOICEVOXが起動していれば従来どおり読み上げます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.744',
     date: '2026-06-15',
     summary: 'サムネ(顔写真)持ちの人が会場で一目で特別に見えるように',

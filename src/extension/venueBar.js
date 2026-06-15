@@ -1970,17 +1970,20 @@ export function mountVenueBarButton(options = {}) {
         renderSeats(baseRows);
       }
       for (const speech of result.speeches) {
+        // 吹き出しは「しゃべった瞬間」に必ず出す。音声(VOICEVOX)とは切り離す。
+        //   旧実装は読み上げON時に onPlayStart(声の再生開始)で吹き出していたが、VOICEVOXが
+        //   無い/起動していないと声が鳴らず onPlayStart が呼ばれない→吹き出しが永久に出ない
+        //   バグだった(ユーザー実機で発覚)。会場の既定は読み上げ自動ONなので踏みやすい。
+        //   吹き出しは視覚要素なので音声の成否に依存させない。声は鳴るなら別途鳴る。
+        showSpeechBubble(speech);
         if (voicePlayer.enabled) {
           voicePlayer.enqueue([{
             kind: 'comment',
             userId: speech.userId,
             nickname: speech.name,
             key: speech.key,
-            text: speech.text,
-            onPlayStart: () => showSpeechBubble(speech)
+            text: speech.text
           }]);
-        } else {
-          showSpeechBubble(speech);
         }
       }
     } catch {
