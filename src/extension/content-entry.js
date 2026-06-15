@@ -15835,7 +15835,16 @@ function maybeAutoStartBackfill() {
       gapRemains;
     if (stalledEmpty || stalledMidRun) {
       _backfillProgress.stopReason = 'stalled';
-      _backfillTriedLiveId = '';
+      // v0.1.750「半分(47%)で stalled 固着」根治: 入口で0行のまま固まった stalledEmpty は、
+      //   ここで guard を即解除すると次 tick が同じ遅い cold-seek へ即再入し、また60秒で
+      //   stalled→即再入＝tight な無限ループになる(rows=0 のまま半分で固着の真因)。rows=0 の
+      //   stalled は backfillTransientRetry が一過性入口失敗として backoff(指数+ジッタ)つきで
+      //   再試行に乗せる(v0.1.750)ので、ここでは guard を保持し、finally の transient リトライに
+      //   再入を一任する(=少し待って新鮮な ?at=now から仕切り直す)。一方 stalledMidRun(rows>0)は
+      //   既に前進があり resumeFromVpos で続きから再開すべきなので、従来どおり即 guard 解除する。
+      if (!stalledEmpty) {
+        _backfillTriedLiveId = '';
+      }
       try { _backfillAbort?.abort(); } catch { /* no-op */ }
       didStallAbortThisTick = true;
     }

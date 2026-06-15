@@ -117,6 +117,26 @@ export function shouldScheduleBackfillTransientRetry(args) {
     return true;
   }
 
+  // v0.1.750「半分(47%)で stalled 固着」根治: stalled は従来どちらの STOP_REASONS 集合にも無く、
+  //   ここまで素通りして false=再試行しなかった。だが stalled は content 側 60秒ウォッチドッグが
+  //   「巡回は走っている(_backfillAbort!=null=スロット確保済)のに seg=0/rows=0 のまま入口で固まる」
+  //   ときに立てる stop で、まさに【一過性の入口失敗】である(真因: cold-seek が遅い NDGR で
+  //   COLD_RETRY_MAX 予算を回し切る前に 60秒を超え、clean な backward_exhausted を立てる前に
+  //   abort される)。再試行に乗っていなかったため、ウォッチドッグの素の _backfillTriedLiveId=''
+  //   再入が同じ遅い cold-seek を反復＝60秒ごとの無限ループ・rows=0 のまま半分で固着していた。
+  //   aborted+rows=0(v0.1.692) と同型に扱う: rows=0(1行も取れず入口で固着)だけを一過性とみて
+  //   backoff(指数+ジッタ)+回数上限つきで再試行に乗せる。これで「同じ場所を即再入」でなく
+  //   「少し待って新鮮な ?at=now から仕切り直す」になり、tight な 60秒ループを断つ。
+  //   rows>0 の stalledMidRun(途中ハング)は既に前進があり resumeFromVpos / gap-catchup で
+  //   続きから再開されるので、ここで二重に予算消費させない(rows!=0 は false)。rows 未指定(旧
+  //   呼び出し)も後方互換で false。上限は既存 retriedCount/maxRetries に乗る=暴走防止は不変。
+  if (stopReason === 'stalled') {
+    if (Number(args?.rows) !== 0) return false;
+    if (!Number.isFinite(retriedCount) || !Number.isFinite(maxRetries)) return false;
+    if (retriedCount >= maxRetries) return false;
+    return true;
+  }
+
   if (!BACKFILL_TRANSIENT_STOP_REASONS.has(stopReason)) return false;
   // cap_elapsed は「長尺配信で時間が足りなかっただけ」なので回数制限なしで続ける。
   // 他の一過性 stop（入口探し失敗等）は上限を守って無限ループを防ぐ。

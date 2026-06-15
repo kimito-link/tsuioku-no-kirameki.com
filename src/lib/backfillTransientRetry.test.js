@@ -81,6 +81,31 @@ describe('shouldScheduleBackfillTransientRetry', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'aborted', rows: 0, tabHidden: true })).toBe(false);
   });
 
+  it('v0.1.750: stalled でも rows=0(入口で0行固着→60秒ウォッチドッグ)なら回数上限内で再試行する', () => {
+    // 真因: cold-seek が遅い NDGR で 60秒を超え、watchdog が backward_exhausted を立てる前に
+    //   stopReason='stalled' で abort。stalled は従来どちらの STOP_REASONS にも無く再試行されず、
+    //   watchdog の素の _backfillTriedLiveId='' 再入で同じ cold-seek を反復＝60秒ごとの無限ループ。
+    //   aborted+rows=0(v0.1.692) と同じく一過性の入口失敗として backoff つきで再試行に乗せる。
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'stalled', rows: 0 })).toBe(true);
+  });
+
+  it('v0.1.750: rows>0 の stalled(途中ハング)は transient リトライ対象外(resume 経路に委ねる)', () => {
+    // stalledMidRun(rows>0)は既に前進があり resumeFromVpos / gap-catchup で続きから再開される。
+    //   ここで二重に retry 予算を消費させない(最小の一手=入口0行固着の無限ループだけ断つ)。
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'stalled', rows: 1 })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'stalled', rows: 500 })).toBe(false);
+  });
+
+  it('v0.1.750: stalled は rows 未指定(旧呼び出し)なら再試行しない(後方互換)', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'stalled' })).toBe(false);
+  });
+
+  it('v0.1.750: stalled+rows=0 でも回数上限/auto OFF/hidden では再試行しない', () => {
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'stalled', rows: 0, retriedCount: 7, maxRetries: 7 })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'stalled', rows: 0, autoEnabled: false })).toBe(false);
+    expect(shouldScheduleBackfillTransientRetry({ ...base, stopReason: 'stalled', rows: 0, tabHidden: true })).toBe(false);
+  });
+
   it('自動取り込み OFF なら再試行しない', () => {
     expect(shouldScheduleBackfillTransientRetry({ ...base, autoEnabled: false })).toBe(false);
   });
