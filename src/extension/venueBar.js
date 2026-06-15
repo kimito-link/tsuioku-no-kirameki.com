@@ -18,6 +18,12 @@ import {
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows } from '../lib/venueSpeech.js';
+import {
+  updateSpeechStreak,
+  pruneSpeechStreaks,
+  streakGlowStage,
+  streakBubbleLifetimeMs
+} from '../lib/venueSpeechStreak.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
 import {
@@ -627,6 +633,28 @@ const VENUE_CSS = `
   }
   @media (prefers-reduced-motion: reduce) {
     .nlsb-seat.nlsb-seat-speaking .nlsb-icon {
+      animation: none;
+    }
+  }
+  /* v0.1.743 「会話の連鎖」(会議の最大多数決の本命・弱点A/C): 同じ人が短い間隔で続けて喋ると、
+     その席が段階的に暖色(コーラル)で輝き、連続するほど強く速く脈動する=「溜まっていく感」。
+     金色オーラ(.nlsb-seat-regular=支えてる人)とは別軸の「いま盛り上げてる人」を引き立てる。
+     data-streak=1..4 を JS が席に付け、段階ごとに色の強さ/脈動速度が上がる。発言が途切れると
+     prune で data-streak が外れて自然に消える。*/
+  .nlsb-seat[data-streak] .nlsb-icon {
+    box-shadow: 0 0 9px 2px rgba(255, 138, 92, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    animation: nlsb-seat-streak 1.4s ease-in-out infinite;
+    z-index: 4;
+  }
+  .nlsb-seat[data-streak="2"] .nlsb-icon { box-shadow: 0 0 11px 3px rgba(255, 132, 86, 0.72), inset 0 0 0 1px rgba(0, 0, 0, 0.12); animation-duration: 1.2s; }
+  .nlsb-seat[data-streak="3"] .nlsb-icon { box-shadow: 0 0 13px 4px rgba(255, 120, 80, 0.82), inset 0 0 0 1px rgba(0, 0, 0, 0.12); animation-duration: 1.0s; }
+  .nlsb-seat[data-streak="4"] .nlsb-icon { box-shadow: 0 0 16px 5px rgba(255, 108, 74, 0.92), inset 0 0 0 1px rgba(0, 0, 0, 0.12); animation-duration: 0.85s; }
+  @keyframes nlsb-seat-streak {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.18); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-seat[data-streak] .nlsb-icon {
       animation: none;
     }
   }
@@ -1273,6 +1301,9 @@ export function mountVenueBarButton(options = {}) {
   let speechLiveId = '';
   /** @type {{ seenKeys: Set<string>|null, primed: boolean }} */
   let speechState = { seenKeys: null, primed: false };
+  // 「会話の連鎖」(v0.1.743+): 発言者キー→{連続数,最終発言時刻}。連続発言で席が継続的に輝く。
+  /** @type {Map<string, { count: number, lastAt: number }>} */
+  const speechStreaks = new Map();
   let activeLiveId = '';
   let escapeListening = false;
   // 退避強化(1000人超): 群衆 canvas は seed+人数が同じなら描画結果が同じ純粋関数なので、
@@ -1412,6 +1443,16 @@ export function mountVenueBarButton(options = {}) {
     node.seat.classList.add('nlsb-seat-speaking');
     window.setTimeout(() => node.seat.classList.remove('nlsb-seat-speaking'), 650);
 
+    // v0.1.743 「会話の連鎖」: 同じ人が短い間隔で続けて喋ったら席が継続的に輝く(溜まっていく感)。
+    //   段階(0..STREAK_MAX-1)を data 属性で席に持たせ、CSS が段階ごとに暖色グローを強める。
+    const streak = updateSpeechStreak(speechStreaks, speech.speakerKey, Date.now());
+    const stage = streakGlowStage(streak.count);
+    if (stage > 0) {
+      node.seat.dataset.streak = String(stage);
+    } else {
+      delete node.seat.dataset.streak;
+    }
+
     const previous = bubbleBySeat.get(seatIndex);
     if (previous) removeBubble(previous);
     while (activeBubbles.length >= BUBBLE_MAX) {
@@ -1445,6 +1486,8 @@ export function mountVenueBarButton(options = {}) {
     // 席の座標を測ってレイヤー基準の頭上へ配置。既存吹き出しと重なれば上へ逃がす(衝突回避)。
     positionBubble(bubble);
 
+    // v0.1.743 「会話の連鎖」: 連続発言中の吹き出しは少し長く残し、会話が途切れない印象に。
+    const lifetimeMs = streakBubbleLifetimeMs(streak.count, BUBBLE_LIFETIME_MS);
     const reducedMotion =
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1452,12 +1495,12 @@ export function mountVenueBarButton(options = {}) {
       bubble.fadeTimer = window.setTimeout(() => {
         bubble.fadeTimer = 0;
         if (!bubble.removed) element.classList.add('nlsb-is-leaving');
-      }, BUBBLE_LIFETIME_MS - BUBBLE_FADE_MS);
+      }, lifetimeMs - BUBBLE_FADE_MS);
     }
     bubble.removeTimer = window.setTimeout(() => {
       bubble.removeTimer = 0;
       removeBubble(bubble);
-    }, BUBBLE_LIFETIME_MS);
+    }, lifetimeMs);
   };
 
   /**
@@ -1521,6 +1564,7 @@ export function mountVenueBarButton(options = {}) {
     speechGeneration += 1;
     speechLiveId = nextLiveId;
     speechState = { seenKeys: null, primed: false };
+    speechStreaks.clear();
     clearBubbles();
   };
 
@@ -1767,6 +1811,17 @@ export function mountVenueBarButton(options = {}) {
         //   常連・応援スコアが高い席を金色オーラで光らせる。実サムネ有無(.nlsb-seat-vip)とは
         //   独立=「顔がある人」でなく「支えてる人」を引き立てる。上限つきで特別感を保つ。
         node.seat.classList.toggle('nlsb-seat-regular', !!entry.isVipRegular);
+        // v0.1.743 「会話の連鎖」: 連続発言中の人の席は段階的に輝く。renderSeats は席を作り直す
+        //   ので、ストリーク状態(speechStreaks=正本)から段階を復元して data-streak に反映する。
+        //   これで再描画をまたいでも「溜まっていく感」が消えない。発言が途切れたら prune で消える。
+        const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
+        const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
+        const seatStreakStage = streakEntry ? streakGlowStage(streakEntry.count) : 0;
+        if (seatStreakStage > 0) {
+          node.seat.dataset.streak = String(seatStreakStage);
+        } else {
+          delete node.seat.dataset.streak;
+        }
       }
     }
     // 席が動いた(段の再描画/表示人数変化)後、表示中の吹き出しを席頭上へ追従させる。
@@ -1890,6 +1945,8 @@ export function mountVenueBarButton(options = {}) {
       const rows = tailRows.length > 0 ? tailRows : recentRows;
       // 熱量の色温度: コメントが来ない時もこの poll は回る(窓が空けば level 0 へ自然に冷める)。
       applyVenueHeat(rows);
+      // 「会話の連鎖」: 発言が途切れた人のストリークを掃除(席のグローが自然に消える)。
+      pruneSpeechStreaks(speechStreaks, Date.now());
       // primeEmit: 会場を開いた瞬間に直近3件を吹き出す(過疎番組でも会場が喋って見える)。
       //   2回目以降は primed 済みなので新着だけ。過去ログ一斉飛びは起きない。
       const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 8, primeEmit: 3 });
