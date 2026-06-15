@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.743',
+    date: '2026-06-15',
+    summary: '会場の観客が「生きている」ように呼吸し、盛り上がると一斉に揺れるように',
+    items: Object.freeze([
+      '会場の後ろに並ぶ観客たちが、静かなときはゆっくり呼吸するようにそよぎ、盛り上がるとペンライトを一斉に（同期して）揺らすようになりました。コメントが来ない時間でも会場が止まって見えず「みんなで一緒に観ている」気配が続きます',
+      'この演出は会場の盛り上がり（コメントの勢い）に自動で連動します。設定は不要です。動きを抑える設定（prefers-reduced-motion）には配慮しています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.742',
     date: '2026-06-15',
     summary: '誰かがコメントすると会場の席がふわっと反応するように',

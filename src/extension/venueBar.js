@@ -1279,6 +1279,18 @@ export function mountVenueBarButton(options = {}) {
   //   観客数が変わらない限り 1.5s 毎の再描画をスキップ(重い描画を無駄打ちしない)。
   let lastCrowdCount = -1;
   let lastCrowdSeed = NaN;
+  // 「生きている会場」(2026-06-15 会議+査読研究): 観客が静かな時は呼吸でそよぎ、盛り上がると
+  //   同期して揺れる。renderSeats が現在の観客数/seed を、applyVenueHeat が heatLevel を更新し、
+  //   アニメループ(rAF・約18fps)が drawCrowdOnCanvas を {timeMs,heatLevel} 付きで再描画する。
+  let crowdAnimCount = 0;
+  let crowdAnimSeed = 0;
+  let crowdHeatLevel = 0;
+  /** @type {number} */
+  let crowdRaf = 0;
+  let crowdLastDrawMs = 0;
+  const crowdReducedMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   /** @type {VenueRow[]} */
   let baseRows = [];
   // 診断シート(メンバー一覧ボタン)用: renderSeats が最新の席割りをここに保存する。
@@ -1524,6 +1536,47 @@ export function mountVenueBarButton(options = {}) {
     stage.style.setProperty('--nlsb-heat-opacity', String(heatLevelToGlowOpacity(level)));
     // 任意: 盛り上がり具合を支援技術/ツールチップ向けに持たせる(視覚に依存しない情報)。
     stage.setAttribute('data-nls-heat', heatLevelToLabel(level));
+    // 「生きている会場」: この盛り上がりで観客の揺れの速さ/大きさが決まる。
+    crowdHeatLevel = level;
+  };
+
+  /** 単調増加の時刻(ms)。performance.now があれば使う。 */
+  const nowMs = () =>
+    typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : Date.now();
+
+  /**
+   * 「生きている会場」アニメループ。観客 canvas を約18fpsで再描画し、観客を呼吸・同期させる。
+   * reduced-motion / 観客0 / 閉じてる時は走らない(無駄な描画ゼロ)。
+   */
+  const crowdMotionTick = () => {
+    crowdRaf = 0;
+    if (!open || crowdReducedMotion || crowdAnimCount <= 0) return;
+    const t = nowMs();
+    // ~18fps(55ms)に間引き。重い canvas を毎フレーム描かない(大規模配信でも安全)。
+    if (t - crowdLastDrawMs >= 55) {
+      crowdLastDrawMs = t;
+      drawCrowdOnCanvas(crowdCanvas, crowdAnimCount, crowdAnimSeed, {
+        timeMs: t,
+        heatLevel: crowdHeatLevel
+      });
+    }
+    if (typeof requestAnimationFrame === 'function') {
+      crowdRaf = requestAnimationFrame(crowdMotionTick);
+    }
+  };
+
+  const startCrowdMotion = () => {
+    if (crowdReducedMotion || crowdRaf || !open || crowdAnimCount <= 0) return;
+    if (typeof requestAnimationFrame !== 'function') return;
+    crowdLastDrawMs = 0;
+    crowdRaf = requestAnimationFrame(crowdMotionTick);
+  };
+
+  const stopCrowdMotion = () => {
+    if (crowdRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(crowdRaf);
+    crowdRaf = 0;
   };
 
   /**
@@ -1594,15 +1647,21 @@ export function mountVenueBarButton(options = {}) {
       crowdCanvas.classList.add('nlsb-is-visible');
       // liveId をシードとして安定描画
       const seed = Array.from(activeLiveId).reduce((hash, char) => (hash << 5) - hash + char.charCodeAt(0), 0);
-      // 退避強化: 同じ人数+同じ seed なら描画結果は同一(純粋)→再描画を省いて重い canvas を温存。
+      crowdAnimCount = totalAnonymous;
+      crowdAnimSeed = seed;
+      // 退避強化: 同じ人数+同じ seed なら静止描画は同一(純粋)→再描画を省く。ただし動きを付ける
+      //   場合はアニメループ側が毎フレーム描くので、ここでは「初回/人数変化時の即時1枚」を担う。
       if (totalAnonymous !== lastCrowdCount || seed !== lastCrowdSeed) {
-        drawCrowdOnCanvas(crowdCanvas, totalAnonymous, seed);
+        drawCrowdOnCanvas(crowdCanvas, totalAnonymous, seed, crowdReducedMotion ? null : { timeMs: nowMs(), heatLevel: crowdHeatLevel });
         lastCrowdCount = totalAnonymous;
         lastCrowdSeed = seed;
       }
+      startCrowdMotion();
     } else {
       crowdCanvas.classList.remove('nlsb-is-visible');
       lastCrowdCount = -1;
+      crowdAnimCount = 0;
+      stopCrowdMotion();
     }
 
     for (const node of seatNodes) {
@@ -1988,6 +2047,7 @@ export function mountVenueBarButton(options = {}) {
       removeBubbleReflowListener();
       stopAggregation();
       stopSpeechPolling();
+      stopCrowdMotion();
       resetSpeechTracking();
     }
     if (persist) {
@@ -2009,6 +2069,7 @@ export function mountVenueBarButton(options = {}) {
     () => {
       stopAggregation();
       stopSpeechPolling();
+      stopCrowdMotion();
       resetSpeechTracking();
       removeEscapeListener();
     },
