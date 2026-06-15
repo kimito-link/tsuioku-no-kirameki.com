@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.756',
+    date: '2026-06-16',
+    summary: '会場の反映をコメビュ並みに速い経路へ統一',
+    items: Object.freeze([
+      '会場の吹き出し・読み上げが、コメントの変化を受け取ってからもう一度保存庫を読み直していたため、別窓のコメビュより一拍遅れていたのを直しました。コメビュと同じく「変化したコメントをその場で直接」処理するようにし、最新コメントが届いた瞬間に会場へ反映されます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.755',
     date: '2026-06-16',
     summary: '会場の吹き出し・読み上げのリアルタイム性を強化',
