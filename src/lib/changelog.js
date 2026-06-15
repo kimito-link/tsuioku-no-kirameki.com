@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.752',
+    date: '2026-06-15',
+    summary: '会場の吹き出し・読み上げをリアルタイムに',
+    items: Object.freeze([
+      '会場モードの吹き出しと読み上げが、コメントの保存を待ってから（約1.5秒遅れて）出ていたのを、コメントが届いた瞬間に出るよう直しました。会場の発言が画面のコメントとほぼ同時に、リアルタイムで反映されます',
+      '同じコメントが二重に吹き出さないよう重複を防いでいます。会場を別ウインドウ（OBS用）で開いている場合は従来どおり動きます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.751',
     date: '2026-06-15',
     summary: '今見ている配信の過去ログ取得を優先するように',

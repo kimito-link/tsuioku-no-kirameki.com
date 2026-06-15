@@ -3,7 +3,8 @@ import {
   venueSpeechKey,
   venueSpeakerKey,
   pickNewVenueSpeech,
-  mergeSpeakersIntoVenueRows
+  mergeSpeakersIntoVenueRows,
+  liveFeedSpeechRows
 } from './venueSpeech.js';
 
 describe('venueSpeechKey', () => {
@@ -172,5 +173,69 @@ describe('mergeSpeakersIntoVenueRows', () => {
 
   it('非配列でも安全', () => {
     expect(mergeSpeakersIntoVenueRows(null, null, 0)).toEqual([]);
+  });
+});
+
+describe('liveFeedSpeechRows (v0.1.752 リアルタイム吹き出しの安全フィルタ)', () => {
+  // リアルタイム経路(persistCommentRows の in-memory tap)は commentNo を持つ行だけに絞る。
+  //   理由: 同じコメントが後から storage 経路でも届く。両経路でキーが一致しないと二度吹き出す。
+  //   commentNo を持つ行は両経路とも venueSpeechKey='no:<commentNo>' で一致=dedup が効く。
+  //   commentNo を持たない行(DOM harvest で no 未取得等)は storage 経路に任せる(従来どおり)。
+  it('commentNo を持つ行だけ通す', () => {
+    const rows = [
+      { commentNo: 42, userId: 'a', nickname: 'A', text: 'hi' },
+      { userId: 'b', text: 'no が無い' },
+      { no: 7, userId: 'c', text: 'no エイリアスも可' }
+    ];
+    const out = liveFeedSpeechRows(rows);
+    expect(out).toHaveLength(2);
+    expect(out.map((r) => venueSpeechKey(r))).toEqual(['no:42', 'no:7']);
+  });
+
+  it('commentNo を持たない行だけなら空(=storage 経路に委ねる)', () => {
+    expect(liveFeedSpeechRows([{ userId: 'a', text: 'x' }, { text: 'y' }])).toEqual([]);
+  });
+
+  it('非配列・空・null は安全に空配列', () => {
+    expect(liveFeedSpeechRows(null)).toEqual([]);
+    expect(liveFeedSpeechRows(undefined)).toEqual([]);
+    expect(liveFeedSpeechRows([])).toEqual([]);
+  });
+
+  it('commentNo が空文字/空白も除外(無効キーを作らない)', () => {
+    const out = liveFeedSpeechRows([
+      { commentNo: '', userId: 'a', text: 'x' },
+      { commentNo: '   ', userId: 'b', text: 'y' },
+      { commentNo: 99, userId: 'c', text: 'z' }
+    ]);
+    expect(out.map((r) => venueSpeechKey(r))).toEqual(['no:99']);
+  });
+});
+
+describe('クロスソース dedup 不変条件(リアルタイム経路→storage経路で二度吹き出さない)', () => {
+  // 設計の要: 同じコメントがライブ tap(~T+0)と storage poll(~T+1.5s)の両方で届くが、
+  //   両経路が共有する speechState.seenKeys により2度目は弾かれ、吹き出しは1回だけ。
+  it('同一commentNoがライブ経路→storage経路で来ても吹き出しは1回だけ', () => {
+    // prime(初回シードで空) → ライブ到着 → 同じコメントの storage 形(name付き)到着
+    const s0 = pickNewVenueSpeech([], { primed: false });
+
+    // ライブ経路: ParsedCommentRow 形(nickname 持ち・name 無し)
+    const liveRow = { commentNo: 42, userId: 'u1', nickname: 'A', text: 'やあ', capturedAt: 123 };
+    const s1 = pickNewVenueSpeech([liveRow], s0);
+    expect(s1.speeches.map((x) => x.key)).toEqual(['no:42']); // ライブで1回吹く
+
+    // storage 経路: summary.recent 形(name 持ち・余分フィールド)同一 commentNo
+    const storageRow = { commentNo: 42, id: 'abc', userId: 'u1', name: 'A', text: 'やあ', capturedAt: 123 };
+    const s2 = pickNewVenueSpeech([storageRow], s1);
+    expect(s2.speeches).toHaveLength(0); // 2度目は seenKeys で弾く=二重吹き出し無し
+  });
+
+  it('venueSpeechKey はライブ形(nickname)と storage形(name)で同一キー(no:N)', () => {
+    const live = { commentNo: 42, userId: 'u1', nickname: 'A', text: 'やあ' };
+    const stored = { commentNo: 42, id: 'abc', userId: 'u1', name: 'A', text: 'やあ', capturedAt: 9 };
+    expect(venueSpeechKey(live)).toBe('no:42');
+    expect(venueSpeechKey(stored)).toBe('no:42');
+    // no エイリアスも同一
+    expect(venueSpeechKey({ no: 42 })).toBe('no:42');
   });
 });
