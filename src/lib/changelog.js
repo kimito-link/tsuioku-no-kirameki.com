@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.742',
+    date: '2026-06-15',
+    summary: '誰かがコメントすると会場の席がふわっと反応するように',
+    items: Object.freeze([
+      '会場モードで、誰かがコメントした瞬間にその人の席がふわっと一度だけ反応するようにしました。吹き出しが出るだけでなく「会場が一人ひとりの発言に反応する」ことで、みんなで一緒に過ごしている感がより伝わります',
+      '反応は0.6秒の控えめな演出です。動きを抑える設定（prefers-reduced-motion）には配慮しています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.741',
     date: '2026-06-15',
     summary: '会場を開いた瞬間ちゃんと人が出るように安定化',
