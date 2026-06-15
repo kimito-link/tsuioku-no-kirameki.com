@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.741',
+    date: '2026-06-15',
+    summary: '会場を開いた瞬間ちゃんと人が出るように安定化',
+    items: Object.freeze([
+      '会場モードを開いたとき、参加者が出るまで最大30秒待たされたり、開くたびに出たり出なかったりすることがあったのを安定化しました。開いた直後に何度か素早く読み直し、コメントが記録され次第すぐ会場に反映します',
+      'コメントが新しく書き込まれたら会場をすぐ更新するようにしました（以前は一部の更新を取りこぼして会場が古いまま/空のことがありました）'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.740',
     date: '2026-06-15',
     summary: 'コメントしていない配信者本人が会場に出る不具合を修正',
