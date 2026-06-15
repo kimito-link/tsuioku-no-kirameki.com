@@ -276,3 +276,29 @@ Claude Code main → 複数の `.claude/agents/judge-*.md` を並列起動
 - dist 生成・version bump・commit・push・Chrome reload は**明示依頼後**に行う。
 - version は changelog 先頭と整合させる(追跡できないバージョンを**でっち上げない**)。
 - **クラッシュ後は git diff と承認済み Plan を読み直してから再開**(推測で作業を続けない)。
+
+### 12.5 バージョン bump の粒度と「ユーザー反映」(2026-06-15 明文化)
+
+**粒度=1つの意味ある変更=patch 1つ上げる**(`0.1.749→750→751…`)。バグ根治・機能追加・UX 改善など
+「ユーザーに説明できる単位」ごとに分ける。複数の無関係な修正を1バンプに混ぜない(履歴と changelog が
+追えなくなる)。逆に、1ファイル・挙動不変の typo 修正だけならバンプ不要。
+
+**bump 3点セット(必ず同期・`npm run verify:bump` が機械チェック):**
+- `extension/manifest.json` の `version`
+- `package.json` の `version`
+- `src/lib/changelog.js` 先頭エントリ(`version` 一致・`summary` は **35字以内**・`items` は配布物の
+  ユーザー向け説明)
+
+**⚠️ push しただけではユーザーの Chrome に届かない(最重要・§10 の「1セット」)。**
+司令塔(Claude Code)が build+commit+push した後、**ユーザー側で次の3手順を踏んで初めて反映**される:
+1. ローカルリポを **git pull**(最新 `extension/dist/` を取得)
+2. `chrome://extensions` で拡張を **リロード/更新**
+3. **開いているニコ生 watch タブを F5(再読込)** ← これを忘れると古い content script が
+   `Extension context invalidated` で会場が固まる(v0.1.753 で「再読込してね」案内を出すようにした)
+
+→ **トーンの両立**: 普段は「拡張更新+watch タブ F5 で反映されます(タイミングは任意)」程度に
+**1行だけ**添える(箇条書きで毎回突きつけない=ユーザーは手順攻めを嫌う・memory
+`feedback_no_manual_verification.md`/`feedback_extension_bump_flow.md`)。ただし **ユーザーが
+「反映されない/固まる/古いまま」と困っている時、または明示的に手順を聞いた時**は、上の3手順を
+明確に提示してよい(2026-06-15 にユーザーが手順を質問したのが実例)。コードの bump はこまめに
+やっても、3手順を踏むまで体感は変わらない点だけは外さない。
