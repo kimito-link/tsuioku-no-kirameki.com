@@ -190,6 +190,43 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.segmentsFetched).toBe(2);
   });
 
+  it('v0.1.759 パイプライン: 次区画を yield 前に先読みする(gap+RTTをconsumer処理と重ねる)', async () => {
+    // BK0→BK1→BK2 の3区画チェーン。先読みありなら、consumer が BK0 の event を受け取った【時点】で
+    //   既に BK1 の fetch が起動済み(=consumer の persist と重なる)。先読み無し(旧直列)だと BK1 は
+    //   consumer が次の .next() を呼ぶまで fetch されない。calls を yield 境界で覗いて先読みを実証する。
+    const BK0 = `https://mpn.live.nicovideo.jp/data/backward/v4/PF0`;
+    const BK1 = `https://mpn.live.nicovideo.jp/data/backward/v4/PF1`;
+    const BK2 = `https://mpn.live.nicovideo.jp/data/backward/v4/PF2`;
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+    map.set(BK0, packedSegmentBytes([{ no: 50, content: 'a', name: 'u1' }], BK1));
+    map.set(BK1, packedSegmentBytes([{ no: 30, content: 'b', name: 'u2' }], BK2));
+    map.set(BK2, packedSegmentBytes([{ no: 10, content: 'c', name: 'u3' }])); // next 無し
+
+    const { fetchBinary, calls } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const gen = crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 });
+
+    // 1個目の event(BK0)を受け取る。
+    const first = await gen.next();
+    expect(first.done).toBe(false);
+    expect(first.value.chats.map((c) => c.no)).toEqual([50]);
+    // ⚡ 先読みの証拠: BK0 を受け取った【この時点】で BK1 は既に fetch 済み(yield 前に起動した)。
+    expect(calls).toContain(BK1);
+
+    // 2個目(BK1)を受け取ると、その時点で BK2 も先読み済み。
+    const second = await gen.next();
+    expect(second.value.chats.map((c) => c.no)).toEqual([30]);
+    expect(calls).toContain(BK2);
+
+    // 最後まで回しても取りこぼし無し・順序維持(直列と同じ結果)。
+    const rest = await drain(gen);
+    expect(rest.result.stopReason).toBe('backward_exhausted');
+    const allNos = [50, 30].concat(rest.chatsAll.map((c) => c.no));
+    expect(allNos).toEqual([50, 30, 10]);
+  });
+
   it('同一 backward URI に戻されても無限ループせず安全に停止し、1 回だけ取り込む', async () => {
     const SELF = `https://mpn.live.nicovideo.jp/data/backward/v4/SELF_LOOP`;
 
