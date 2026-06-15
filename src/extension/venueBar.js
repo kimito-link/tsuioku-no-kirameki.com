@@ -9,7 +9,7 @@ import {
   venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
 import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
-import { readChunkedComments } from '../lib/commentChunkStore.js';
+import { readChunkedComments, chunkIndexKey } from '../lib/commentChunkStore.js';
 import {
   commentDbSummaryKey,
   commentsStorageKey,
@@ -1742,7 +1742,15 @@ export function mountVenueBarButton(options = {}) {
     }
   };
 
+  /** @type {number[]} */
+  let aggregateBurstTimers = [];
+  const clearAggregateBurst = () => {
+    for (const t of aggregateBurstTimers) clearTimeout(t);
+    aggregateBurstTimers = [];
+  };
+
   const stopAggregation = () => {
+    clearAggregateBurst();
     if (!aggregateTimer) return;
     clearInterval(aggregateTimer);
     aggregateTimer = 0;
@@ -1751,6 +1759,18 @@ export function mountVenueBarButton(options = {}) {
   const startAggregation = () => {
     if (aggregateTimer) return;
     void aggregateParticipants();
+    // v0.1.741 安定化(100回やっても出る): 開いた直後はコメント記録がまだ storage に
+    //   書かれている途中のことがある。1回きりの集計+30秒間隔だと「開いた瞬間0人で待たされる」
+    //   再現性の低さが出る。開いて数秒は短間隔でバースト再集計し、データが書かれ次第すぐ会場へ
+    //   反映する(storage.onChanged 経由でも来るが、初期化タイミングの取りこぼしを確実に拾う保険)。
+    clearAggregateBurst();
+    for (const delay of [400, 1000, 2000, 3500, 5500, 8000]) {
+      aggregateBurstTimers.push(
+        window.setTimeout(() => {
+          if (open) void aggregateParticipants();
+        }, delay)
+      );
+    }
     aggregateTimer = window.setInterval(() => {
       void aggregateParticipants();
     }, AGGREGATE_INTERVAL_MS);
@@ -1829,7 +1849,20 @@ export function mountVenueBarButton(options = {}) {
     const tailKey = tailStorageKey(liveId);
     const summaryKey = commentDbSummaryKey(liveId);
     if (changes[tailKey] || changes[summaryKey]) void pollSpeech();
-    if (changes[summaryKey]) void aggregateParticipants();
+    // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。
+    //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に
+    //   なる(=開いた瞬間0人で30秒待ち)再現性の低さがあった。チャンク/インデックス/サマリの
+    //   いずれかが変わったら再集計し、コメントが書かれ次第ほぼ即座に会場へ反映する。
+    const idxKey = chunkIndexKey(liveId);
+    const chunkPrefix = `nls_cchunk_${liveId}`;
+    let chunkChanged = false;
+    for (const k in changes) {
+      if (k === idxKey || k === summaryKey || (k.indexOf(chunkPrefix) === 0)) {
+        chunkChanged = true;
+        break;
+      }
+    }
+    if (chunkChanged) void aggregateParticipants();
   };
 
   const stopSpeechPolling = () => {
