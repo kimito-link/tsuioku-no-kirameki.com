@@ -21,6 +21,7 @@ import {
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
+import { isContextInvalidatedError } from '../lib/reportSilentError.js';
 import {
   updateSpeechStreak,
   pruneSpeechStreaks,
@@ -1065,6 +1066,21 @@ function createSeatNode(seatIndex) {
 }
 
 /**
+ * v0.1.753: 拡張コンテキストが有効か(content-entry.js の hasExtensionContext と同義)。
+ * 拡張を更新/リロードすると、開きっぱなしの古いタブの content script は
+ * 「Extension context invalidated」状態になり chrome.* が全失敗する。chrome.runtime.id が
+ * undefined 化するのを唯一の検知点として、storage 呼び出しが throw する前に先回りで判定する。
+ * @returns {boolean}
+ */
+function hasVenueExtensionContext() {
+  try {
+    return Boolean(chrome?.runtime?.id && chrome?.storage?.local);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * ニコ生 watch ページに独立 fixed レイヤーの会場モード UI を1個だけ追加する。
  * @param {{ standalone?: boolean }} options
  */
@@ -1995,6 +2011,9 @@ export function mountVenueBarButton(options = {}) {
 
   const aggregateParticipants = async () => {
     if (!open || aggregateInFlight) return;
+    // v0.1.753: 拡張更新後の古いタブは chrome.* が全失敗する。storage を叩く前に先回りで検知し、
+    //   無限リトライを止めて再読み込み案内を出す(黙って凍結しない)。
+    if (!hasVenueExtensionContext()) { markContextInvalidated(); return; }
     const liveId = liveIdFromPathname();
     if (!liveId) return;
     aggregateInFlight = true;
@@ -2039,6 +2058,12 @@ export function mountVenueBarButton(options = {}) {
       // commitDisplay 経由=空(0件)なら前回の非空表示を維持し、会場を空で再描画しない。
       commitDisplay(baseRows);
     } catch (err) {
+      // v0.1.753: 拡張更新後の context invalidated は「一時的に読めない」ではなく恒久失敗。
+      //   黙って前状態維持の無限リトライをやめ、ページ再読み込み案内を出してループを止める。
+      if (isContextInvalidatedError(err) || !hasVenueExtensionContext()) {
+        markContextInvalidated();
+        return;
+      }
       // storage timeout / 拡張更新中など一時的に読めない場合は前状態を維持し次回集計へ任せる。
       if (err !== STORAGE_OP_TIMED_OUT) {
         // 想定外エラーも会場は前状態維持(空再描画しない)。ログだけ残す。
@@ -2154,6 +2179,8 @@ export function mountVenueBarButton(options = {}) {
 
   const pollSpeech = async () => {
     if (!open || speechInFlight) return;
+    // v0.1.753: 拡張更新後の古いタブは chrome.storage が全失敗する。先回りで検知して停止+案内。
+    if (!hasVenueExtensionContext()) { markContextInvalidated(); return; }
     const liveId = liveIdFromPathname();
     if (!liveId) return;
     if (speechLiveId !== liveId) resetSpeechTracking(liveId);
@@ -2176,7 +2203,12 @@ export function mountVenueBarButton(options = {}) {
       const recentRows = Array.isArray(summary?.recent) ? summary.recent : [];
       const rows = tailRows.length > 0 ? tailRows : recentRows;
       processSpeechRows(rows);
-    } catch {
+    } catch (err) {
+      // v0.1.753: context invalidated(拡張更新後の古いタブ)は恒久失敗→停止+案内。
+      if (isContextInvalidatedError(err) || !hasVenueExtensionContext()) {
+        markContextInvalidated();
+        return;
+      }
       // 一時的に storage を読めない場合は、基準を進めず次回の軽量ポーリングへ任せる。
     } finally {
       speechInFlight = false;
@@ -2213,6 +2245,23 @@ export function mountVenueBarButton(options = {}) {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
       chrome.storage.onChanged.removeListener(handleStorageChange);
     }
+  };
+
+  // v0.1.753: 拡張更新後の古いタブ(Extension context invalidated)で、会場が黙って凍結する
+  //   のをやめ、ユーザーに「ページ再読み込み」を促す。chrome.* は全失敗するので集計/発話/群衆の
+  //   全ループを止め(無効コンテキストへの無限リトライ停止)、ヘッダーに案内を1度だけ出す。
+  //   復旧は content script の再起動が必要=ページ再読込のみ(この古いタブからは自己回復不能)。
+  let _contextInvalidated = false;
+  const markContextInvalidated = () => {
+    if (_contextInvalidated) return; // 1度だけ
+    _contextInvalidated = true;
+    try { stopAggregation(); } catch { /* no-op */ }
+    try { stopSpeechPolling(); } catch { /* no-op */ }
+    try { stopCrowdMotion(); } catch { /* no-op */ }
+    try {
+      title.textContent = '⚠ 拡張が更新されました。ページを再読み込み(F5)してください';
+      title.style.color = '#ffcf66';
+    } catch { /* no-op */ }
   };
 
   const startSpeechPolling = () => {
