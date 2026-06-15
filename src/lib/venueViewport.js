@@ -169,3 +169,25 @@ export function selectStableVisibleMembers(ordered, visibleCount, recentlySpoken
   picked.sort((a, b) => a - b);
   return picked.map((i) => list[i]);
 }
+
+/**
+ * 「実サムネ持ちを先頭へ」安定パーティション(2026-06-15 ユーザー実機「サムネ持ちが最前列に
+ * 来てない」根治)。tier 充填は配列の先頭から手前段に入るので、サムネ持ちを先頭に集めると
+ * 必ず最前列(大きい段)から埋まる。group 内は元順を維持=同入力なら同出力でちらつかない。
+ *
+ * @template T
+ * @param {T[]} list 表示する席エントリ配列(元順=安定済みの想定)
+ * @param {(entry: T) => boolean} hasThumb 実サムネ持ちか判定する述語
+ * @returns {T[]} サムネ持ち→それ以外 の順に並べ替えた新配列(各 group 内は元順維持)
+ */
+export function partitionThumbnailFirst(list, hasThumb) {
+  const arr = Array.isArray(list) ? list : [];
+  const pred = typeof hasThumb === 'function' ? hasThumb : () => false;
+  const withThumb = [];
+  const without = [];
+  for (const entry of arr) {
+    if (pred(entry)) withThumb.push(entry);
+    else without.push(entry);
+  }
+  return [...withThumb, ...without];
+}

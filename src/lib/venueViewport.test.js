@@ -5,7 +5,8 @@ import {
   resolveDynamicArenaCap,
   resolveVenueMaxHeightVh,
   resolveVisibleAudienceCount,
-  selectStableVisibleMembers
+  selectStableVisibleMembers,
+  partitionThumbnailFirst
 } from './venueViewport.js';
 
 describe('seatsPerRow', () => {
@@ -113,5 +114,45 @@ describe('selectStableVisibleMembers', () => {
   it('空配列・cap0は空', () => {
     expect(selectStableVisibleMembers([], 5)).toEqual([]);
     expect(selectStableVisibleMembers(rows, 0)).toEqual([]);
+  });
+});
+
+describe('partitionThumbnailFirst (サムネ持ちを最前列段へ・ちらつき防止)', () => {
+  const e = (id, thumb) => ({ id, thumb });
+  const hasThumb = (x) => !!x.thumb;
+
+  it('サムネ持ちが先頭・それ以外が後ろ', () => {
+    const list = [e('a', false), e('b', true), e('c', false), e('d', true)];
+    const out = partitionThumbnailFirst(list, hasThumb);
+    expect(out.map((x) => x.id)).toEqual(['b', 'd', 'a', 'c']);
+  });
+
+  it('group 内は元順を維持(決定的・同入力→同出力=ちらつかない)', () => {
+    const list = [e('a', true), e('b', false), e('c', true), e('d', false), e('e', true)];
+    const o1 = partitionThumbnailFirst(list, hasThumb);
+    const o2 = partitionThumbnailFirst(list, hasThumb);
+    expect(o1.map((x) => x.id)).toEqual(['a', 'c', 'e', 'b', 'd']);
+    expect(o2.map((x) => x.id)).toEqual(o1.map((x) => x.id)); // 決定的
+  });
+
+  it('全員サムネ持ち/全員なしでも順序を保つ', () => {
+    const allThumb = [e('a', true), e('b', true)];
+    expect(partitionThumbnailFirst(allThumb, hasThumb).map((x) => x.id)).toEqual(['a', 'b']);
+    const noThumb = [e('a', false), e('b', false)];
+    expect(partitionThumbnailFirst(noThumb, hasThumb).map((x) => x.id)).toEqual(['a', 'b']);
+  });
+
+  it('入力を破壊しない・新配列を返す', () => {
+    const list = [e('a', false), e('b', true)];
+    const out = partitionThumbnailFirst(list, hasThumb);
+    expect(list.map((x) => x.id)).toEqual(['a', 'b']); // 元配列は不変
+    expect(out).not.toBe(list);
+  });
+
+  it('不正入力(非配列・述語なし)で例外を投げない', () => {
+    expect(partitionThumbnailFirst(null, hasThumb)).toEqual([]);
+    const list = [e('a', true), e('b', false)];
+    // 述語なしは全員「サムネ無し」扱い=元順のまま
+    expect(partitionThumbnailFirst(list, undefined).map((x) => x.id)).toEqual(['a', 'b']);
   });
 });

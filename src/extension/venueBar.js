@@ -33,7 +33,8 @@ import {
   seatsPerRow,
   resolveVisibleArenaCount,
   resolveVenueMaxHeightVh,
-  selectStableVisibleMembers
+  selectStableVisibleMembers,
+  partitionThumbnailFirst
 } from '../lib/venueViewport.js';
 import {
   initVenueDragState,
@@ -68,7 +69,9 @@ const STYLE_ID = 'nlsb-venue-style';
 // eslint-disable-next-line no-unused-vars
 const OPEN_STORAGE_KEY = 'nls_venue_open';
 const AGGREGATE_INTERVAL_MS = 30_000;
-const SPEECH_INTERVAL_MS = 1_500;
+// 北極星「コメントがリアルタイムでちゃんと出る」: poll を 1.5→0.8秒に上げて取りこぼし/遅延を減らす
+//   (storage.onChanged のイベント駆動と並走するハートビート)。会議(無料LLM)一致。
+const SPEECH_INTERVAL_MS = 800;
 const BUBBLE_LIFETIME_MS = 4_000;
 const BUBBLE_FADE_MS = 600;
 const BUBBLE_MAX = 6;
@@ -307,53 +310,45 @@ const VENUE_CSS = `
     overscroll-behavior: contain;
     pointer-events: auto;
   }
-  /* 3キャラ常駐(りんく・こん太・たぬ姉): 最前列中央の手前に常に居て、会場が無人/ローディングに
-     見えない最後の砦。実参加者の席とは別レイヤー(カウントにも含めない)。映像は隠さない(下端のみ)。 */
+  /* 3キャラ常駐(りんく・こん太・たぬ姉): 配信画面の「まわり(左右の縁)」に出す。会場の席とは
+     重ねない=満員でも邪魔にしない(ユーザー実機指摘の根治)。3人が画面を囲んで一緒に観てる感。
+     stageLayout 全面を覆う透明レイヤー・pointer-events:none で映像/クリック/席リンクを邪魔しない。 */
   .nlsb-residents {
     position: absolute;
-    left: 50%;
-    bottom: 6px;
-    transform: translateX(-50%);
-    z-index: 6; /* 席(z<5)より手前・吹き出しレイヤー(最上位)より下 */
-    display: flex;
-    gap: 14px;
-    align-items: flex-end;
-    pointer-events: none; /* 配信操作・席リンクを邪魔しない */
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
   }
   .nlsb-resident {
+    position: absolute;
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 46px;
+    width: clamp(40px, 4.4vw, 64px);
   }
+  /* 配置: りんく=左上・たぬ姉=左下(縦に2人)・こん太=右中央。映像の左右の縁に寄せ中央は空ける。 */
+  .nlsb-resident-rinku   { left: 6px;  top: 8%; }
+  .nlsb-resident-tanunee { left: 6px;  top: 34%; }
+  .nlsb-resident-konta   { right: 6px; top: 18%; }
   .nlsb-resident-img {
-    width: 42px;
-    height: 42px;
+    width: 100%;
+    height: auto;
     object-fit: contain;
     /* 実視聴者と区別する金色の光。reduced-motion でも静的グローは残す。 */
-    filter: drop-shadow(0 0 6px rgba(255, 206, 96, 0.9)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+    filter: drop-shadow(0 0 6px rgba(255, 206, 96, 0.9)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
     animation: nlsb-resident-glow 2.8s ease-in-out infinite;
-  }
-  /* 金色の台座(楕円グラデ)で「特別な存在＝会場の案内役」を一目で。 */
-  .nlsb-resident::after {
-    content: "";
-    width: 40px;
-    height: 9px;
-    margin-top: -2px;
-    border-radius: 50%;
-    background: radial-gradient(ellipse at center, rgba(255, 206, 96, 0.6), rgba(255, 206, 96, 0) 70%);
   }
   .nlsb-resident-name {
     margin-top: 1px;
     font-size: 10px;
     font-weight: 700;
     color: #ffe7b0;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
     white-space: nowrap;
   }
   @keyframes nlsb-resident-glow {
-    0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 206, 96, 0.7)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
-    50% { filter: drop-shadow(0 0 9px rgba(255, 220, 120, 1)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+    0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 206, 96, 0.7)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
+    50% { filter: drop-shadow(0 0 9px rgba(255, 220, 120, 1)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
   }
   @media (prefers-reduced-motion: reduce) {
     .nlsb-resident-img { animation: none; }
@@ -1300,10 +1295,12 @@ export function mountVenueBarButton(options = {}) {
   residentsLayer.className = 'nlsb-residents';
   residentsLayer.setAttribute('aria-hidden', 'false');
 
-  // seating は下端のひな壇だけ(header + seats + 常駐3キャラ)。
-  seating.append(header, seatsHost, residentsLayer);
+  // seating は下端のひな壇だけ(header + seats)。
+  seating.append(header, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
-  stageLayout.append(crowdCanvas, safeArea, seating, center);
+  // 3キャラ常駐は配信画面の「まわり(左右の縁)」に出す(会場の席とは重ねない=邪魔にしない)。
+  //   stageLayout 基準=映像セーフエリアの高さに合わせて左右に配置できる。
+  stageLayout.append(crowdCanvas, safeArea, seating, center, residentsLayer);
   // 吹き出し専用の最上位レイヤー(会議確定A): 席コンテナの overflow:hidden の外に置くことで
   //   セリフがクリップされず・アバターに潜らない。席の座標を測ってこの上に頭上配置する。
   const bubbleLayer = document.createElement('div');
@@ -1582,6 +1579,14 @@ export function mountVenueBarButton(options = {}) {
     if (!bubble || bubble.removed) return;
     const node = seatNodes[bubble.seatIndex];
     if (!node) return;
+    // 保険(PR3): 段の再描画中など席ノードが一瞬 DOM から外れていると getBoundingClientRect が
+    //   0 を返し、吹き出しが画面外へ飛んで消えて見える。未接続なら座標計算せず一時的に隠す
+    //   (remove はしない=次の reposition で席が戻れば再表示)。PR1 で席消失自体が激減したが念のため。
+    if (!node.seat.isConnected || !node.icon.isConnected) {
+      bubble.element.style.visibility = 'hidden';
+      return;
+    }
+    bubble.element.style.visibility = '';
     const layerRect = bubbleLayer.getBoundingClientRect();
     const seatRect = node.icon.getBoundingClientRect();
     // レイヤー左上を原点とした席矩形へ変換。
@@ -1803,17 +1808,14 @@ export function mountVenueBarButton(options = {}) {
     //   サムネ持ちが少数+席churn のとき手前段に集まりきらず、奥段に散らばっていた(実機計測で
     //   VIPが tier0/3/4 に散在)。ここで「実サムネ持ちを先頭へ」安定パーティションし、tier 充填が
     //   必ず手前段(tier0=大きい段)からサムネ持ちで埋まるようにする。group 内は元順維持=ちらつかない。
-    /** @param {{ participant?: { avatar?: string, userId?: string } }} entry */
+    /** @param {any} entry 席エントリ(visibleSeatsRaw の要素)。any で T 推論を妨げない。 */
     const seatHasRealThumb = (entry) => {
       const p = entry?.participant || {};
       const avatarUrl = String(p.avatar || '').trim();
       const derived = deriveNicoUserIconUrl(String(p.userId || '').trim());
       return hasRealThumbnail(avatarUrl) || hasRealThumbnail(derived);
     };
-    const visibleSeats = [
-      ...visibleSeatsRaw.filter(seatHasRealThumb),
-      ...visibleSeatsRaw.filter((e) => !seatHasRealThumb(e))
-    ];
+    const visibleSeats = partitionThumbnailFirst(visibleSeatsRaw, seatHasRealThumb);
     const visibleSeatKeys = new Set(visibleSeats.map(entry => entry.participant.key));
 
     // アリーナ席は名前付き + しゃべった匿名(promote)。それ以外の匿名は後方の観客席へ
