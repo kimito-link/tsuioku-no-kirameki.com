@@ -7,6 +7,8 @@
  * 遠くの観客は暗闇に溶け込み（空気遠近法）、近景の光は強く輝きます。
  */
 
+import { resolveCrowdMotionProfile, resolveCrowdSpriteMotion } from './venueCrowdMotion.js';
+
 /**
  * 2026-06-14 星野アイデア会議2「1000人超で退避強化」:
  *   群衆描画は1スプライトあたりシルエット+ペンライト3パス(うち1つは screen 合成の広いグロー)
@@ -71,18 +73,23 @@ const LIGHTSTICK_COLORS = [
  * @param {string} spriteType
  * @param {string} lightColor
  * @param {{ glow?: boolean, lightStick?: boolean }} [detail] 描画予算(高人数で重いパスを省く)
+ * @param {{ swayRad?: number, breathe?: number }} [motion] 動き(同期した揺れ・呼吸)。省略時は静止=従来挙動。
  */
-function drawAudience(ctx, x, y, size, depth, spriteType, lightColor, detail = {}) {
+function drawAudience(ctx, x, y, size, depth, spriteType, lightColor, detail = {}, motion = {}) {
   const wantStick = detail.lightStick !== false;
   const wantGlow = detail.glow !== false;
+  const swayRad = Number(motion.swayRad) || 0;
+  // 呼吸: 体全体を上下にごく僅か動かす(motion.breathe は size=1 基準の係数, 上が負)。
+  const breatheY = (Number(motion.breathe) || 0) * size;
+  y += breatheY;
   // 空気遠近法：奥 (depth ~ 0) ほど暗闇 (背景) に溶け込む
   // 手前 (depth ~ 1) は元の明るさを維持
   const alpha = 0.2 + depth * 0.8;
   const lightness = Math.floor(10 + depth * 25);
-  
+
   ctx.globalAlpha = alpha;
   ctx.fillStyle = `rgb(${lightness}, ${lightness + 5}, ${lightness + 15})`;
-  
+
   // 1. シルエットの描画
   ctx.beginPath();
   if (spriteType === 'round') {
@@ -113,6 +120,15 @@ function drawAudience(ctx, x, y, size, depth, spriteType, lightColor, detail = {
   const stickLength = size * 0.8;
   const stickWidth = Math.max(1.5, size * 0.15);
 
+  // ペンライト先端: 根元(stickX,stickY)から上へ。motion.swayRad ぶん根元を軸に回す
+  //   (全員共通位相で回すと「同期した波」になる=co-presence の核)。静止時 swayRad=0 で従来挙動。
+  const baseDX = size * 0.1; // 元の僅かな傾き(0時のデフォルト)
+  const baseDY = -stickLength;
+  const cos = Math.cos(swayRad);
+  const sin = Math.sin(swayRad);
+  const tipX = stickX + (baseDX * cos - baseDY * sin);
+  const tipY = stickY + (baseDX * sin + baseDY * cos);
+
   // ペンライトの芯（白く輝く部分）
   ctx.globalAlpha = depth * 0.9 + 0.1;
   ctx.lineCap = 'round';
@@ -120,7 +136,7 @@ function drawAudience(ctx, x, y, size, depth, spriteType, lightColor, detail = {
   ctx.strokeStyle = '#ffffff';
   ctx.beginPath();
   ctx.moveTo(stickX, stickY);
-  ctx.lineTo(stickX + size * 0.1, stickY - stickLength);
+  ctx.lineTo(tipX, tipY);
   ctx.stroke();
 
   // ペンライトの光彩（Glow）
@@ -143,8 +159,11 @@ function drawAudience(ctx, x, y, size, depth, spriteType, lightColor, detail = {
  * @param {HTMLCanvasElement} canvas
  * @param {number} count 描画する人数
  * @param {number} seed シード値（liveIdのハッシュなどを想定）
+ * @param {{ timeMs?: number, heatLevel?: number }} [anim] アニメーション(同期した揺れ・呼吸)。
+ *   省略時は静止=従来挙動(描画結果は count+seed だけで決まり再描画を省略できる)。
+ *   timeMs=単調増加時刻 / heatLevel=盛り上がり0..1(揺れの速さ・大きさを決める)。
  */
-export function drawCrowdOnCanvas(canvas, count, seed = 12345) {
+export function drawCrowdOnCanvas(canvas, count, seed = 12345, anim = null) {
   const ctx = canvas.getContext('2d', { alpha: true });
   if (!ctx) return;
 
@@ -160,6 +179,10 @@ export function drawCrowdOnCanvas(canvas, count, seed = 12345) {
   if (maxDraw <= 0) return;
   const detail = { glow: plan.glow, lightStick: plan.lightStick };
   let rngState = (seed + count) >>> 0;
+
+  // アニメーション(同期した揺れ・呼吸)。anim 省略時は静止=従来挙動。
+  const motionProfile = anim ? resolveCrowdMotionProfile(anim.heatLevel ?? 0) : null;
+  const timeMs = anim ? (Number(anim.timeMs) || 0) : 0;
 
   const positions = [];
   
@@ -195,7 +218,10 @@ export function drawCrowdOnCanvas(canvas, count, seed = 12345) {
     rngState = xorshift32(rngState);
     const lightColor = LIGHTSTICK_COLORS[rngState % LIGHTSTICK_COLORS.length];
 
-    positions.push({ x: xPos, y: yPos, size, depth, spriteType, lightColor });
+    // 揺れの個体位相は横位置由来(安定)。盛り上がり時に左右へ波が伝わるように見える。
+    const unitPhase = (xPos / w + 2) % 1;
+
+    positions.push({ x: xPos, y: yPos, size, depth, spriteType, lightColor, unitPhase });
   }
 
   // 2. Y座標（奥から手前）でソートして描画順を決定（Z-ソート）
@@ -203,6 +229,9 @@ export function drawCrowdOnCanvas(canvas, count, seed = 12345) {
 
   // 3. 描画実行
   for (const p of positions) {
-    drawAudience(ctx, p.x, p.y, p.size, p.depth, p.spriteType, p.lightColor, detail);
+    const motion = motionProfile
+      ? resolveCrowdSpriteMotion(timeMs, p.unitPhase, motionProfile)
+      : undefined;
+    drawAudience(ctx, p.x, p.y, p.size, p.depth, p.spriteType, p.lightColor, detail, motion);
   }
 }
