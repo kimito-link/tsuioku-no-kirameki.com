@@ -5852,6 +5852,21 @@
       .venue-demo__cap strong{color:var(--accent,#ffd66f)}
       .venue-demo__cap-voice{display:inline-block;margin-top:4px;color:rgba(255,230,160,.92)}
       .venue-demo__cap-credit{display:inline-block;margin-top:2px;font-size:.7rem;color:rgba(255,255,255,.5)}
+      .venue-gallery{
+        display:grid;grid-template-columns:1fr;gap:18px;
+        max-width:760px;margin:18px auto 4px
+      }
+      @media (min-width:760px){.venue-gallery{grid-template-columns:1fr 1fr}}
+      .venue-gallery__item{margin:0}
+      .venue-gallery__item video{
+        display:block;width:100%;height:auto;border-radius:12px;
+        box-shadow:0 8px 26px rgba(0,0,0,.34);background:#0b0e13
+      }
+      .venue-gallery__cap{
+        margin:8px 2px 0;font-size:.78rem;line-height:var(--lh-tight);
+        color:var(--ink-soft,rgba(255,255,255,.7));text-align:left
+      }
+      .venue-gallery__cap strong{color:var(--accent,#ffd66f)}
     </style>
   </head>
   <body>
@@ -8661,7 +8676,7 @@
       <section class="section" id="venue" aria-labelledby="venue-heading" data-lp-feature="venue">
         <div class="shell">
           <div class="section-head fade">
-            <h2 id="venue-heading">🎪 会場モード: 配信を「ライブ会場」に — みんなで<strong>一緒に過ごしている感</strong>（観客が並ぶ・しゃべると吹き出し・常連さんが光る・読み上げ／v0.1.707〜739）</h2>
+            <h2 id="venue-heading">🎪 会場モード: 配信を「ライブ会場」に — みんなで<strong>一緒に過ごしている感</strong>（観客が並ぶ・しゃべると吹き出し・常連さんが光る・読み上げ／v0.1.707〜744）</h2>
             <p>
               配信ページの下に、コメントした人たちが<strong>アバターで並ぶ「ライブ会場」</strong>が現れます。SHOWROOM のような会場感を、ごちゃごちゃさせず整理して出す、追憶のきらめき独自の体験です。配信を見ながら、ひとりで見ていても<strong>「みんなで一緒に過ごしている」空気</strong>をそのまま感じられます。
             </p>
@@ -8682,12 +8697,33 @@
                 <span class="venue-demo__cap-credit">この動画の音声は VOICEVOX（ずんだもん／四国めたん／春日部つむぎ／雨晴はう）で生成しています。</span>
               </figcaption>
             </figure>
+            <div class="venue-gallery fade d2">
+              <figure class="venue-gallery__item">
+                <video src="images/venue/venue-living-overview.mp4"
+                  poster="images/venue/venue-living-overview.jpg"
+                  width="900" height="374"
+                  autoplay loop muted playsinline preload="metadata"
+                  aria-label="満員の会場モードの実機映像。たくさんの観客アバターが並び、サムネ（顔写真）を持つ人は大きく金色の縁で際立ち、観客がそよぐように動いて会場全体が生きて見える様子。"></video>
+                <figcaption class="venue-gallery__cap"><strong>満員の「生きている会場」（v0.1.743〜744）</strong><br>実機の大規模配信（観客2500人超）。<strong>サムネ（顔写真）を持つ人がひと目で分かる大きさ＋金色の縁</strong>で際立ち、<strong>観客は静かなときも呼吸するようにそよぎ、盛り上がると一斉に揺れます</strong>。コメントが来ない時間でも「みんなで一緒に観ている」気配が続きます。</figcaption>
+              </figure>
+              <figure class="venue-gallery__item">
+                <video src="images/venue/venue-living-vip.mp4"
+                  poster="images/venue/venue-living-vip.jpg"
+                  width="900" height="330"
+                  autoplay loop muted playsinline preload="metadata"
+                  aria-label="会場モードの前列のアップ。顔写真アイコンを持つ人が大きく金色の縁で並び、コメントが吹き出しで出ている様子。"></video>
+                <figcaption class="venue-gallery__cap"><strong>サムネ持ちの人が前列で特別に（v0.1.744）</strong><br>前列のアップ。<strong>本物の顔写真アイコンを持つ人を、はっきり大きく＋金色の縁</strong>で際立たせます。動かさず「大きさと金縁」で見せるので、うるさくならず上品なまま、誰が会場を支えているかが直感的に伝わります。</figcaption>
+              </figure>
+            </div>
           </div>
           <div class="board fade d2">
             <p><strong>しゃべった人が前に出て吹き出す</strong> — 発言した人（匿名でも）が会場の前方に座り、コメントが<strong>頭上の吹き出し</strong>で出ます。ニコ生の実況は匿名の人が主役なので、匿名さんもちゃんと会場に参加して見えます。</p>
             <p><strong>サムネ付きの人を前列に（v0.1.725）</strong> — 顔写真とハンドルネームのある人を会場の<strong>前列（手前・大きい段）</strong>に並べ、匿名の人は後ろの段へ。満員感は保ちつつ、常連さんが手前で目立ちます。</p>
             <p><strong>人数で会場が変わる</strong> — 5人なら特大アイコンで VIP 感、増えるほどひな壇が立体的に広がって「満員の会場」に。少人数でもスカスカに見えない設計です。</p>
             <p><strong>常連さん・応援者が金色に光る（v0.1.739）</strong> — その配信で<strong>よく発言してくれる常連さん</strong>や<strong>ギフトを送ってくれた人</strong>の席を、やわらかい<strong>金色のオーラ</strong>でそっと光らせます（上位の方だけ）。誰が会場を支えてくれているか、ひと目で伝わります。</p>
+            <p><strong>サムネ持ちが一目で特別に（v0.1.744）</strong> — <strong>本物の顔写真アイコンを持つ人を、はっきり大きく＋金色の縁</strong>で際立たせます。これまでは差が小さく分かりにくかったのを、<strong>「大きさと金縁」だけ</strong>で（動かさず上品に）一目で伝わるようにしました。</p>
+            <p><strong>会場が「生きている」（v0.1.743）</strong> — 観客たちが、<strong>静かなときはゆっくり呼吸するようにそよぎ、盛り上がるとペンライトを一斉に（同期して）揺らします</strong>。コメントが来ない時間でも会場が止まって見えず、「みんなで一緒に観ている」気配が続きます。</p>
+            <p><strong>連続で喋る人の席が輝く（v0.1.743）</strong> — 同じ人が短い間隔で続けてコメントすると、<strong>その席が暖色でだんだん強く輝きます</strong>。ひとつひとつの発言が孤立せず、会話が続いている雰囲気になります。</p>
             <p><strong>本物のサムネ＋ゆっくり顔</strong> — アイコンが設定されている人は実サムネ、匿名さんには人ごとに違う優しい顔を自動で割り当て。後方の観客席にも顔つきで並びます。</p>
             <p><strong>会場モードでも読み上げ（v0.1.726〜727）</strong> — 会場を開くと読み上げが<strong>自動で ON</strong>。VOICEVOX 連携で、しゃべった人のコメントを人ごとに違う声で読み上げます。会場バーのボタンで OFF にもできます。</p>
             <p><strong>別窓化・OBS 対応</strong> — 会場モードは<strong>別ウィンドウ</strong>でも開けるので、OBS のウィンドウキャプチャで配信画面に重ねられます。</p>
