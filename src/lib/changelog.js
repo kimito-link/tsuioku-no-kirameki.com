@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.753',
+    date: '2026-06-15',
+    summary: '拡張更新後に会場が固まる時、再読込を案内',
+    items: Object.freeze([
+      '拡張機能を更新した後、開いたままの配信タブで会場モードが黙って固まってしまうこと（吹き出し・読み上げ・参加者集計が止まる）があったのを改善しました。固まったと分からず待ち続けることがなくなります',
+      'この状態を検知したら、会場に「拡張が更新されました。ページを再読み込み（F5）してください」と表示し、無駄な再試行を止めます。ページを再読み込みすれば元どおり動きます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.752',
     date: '2026-06-15',
     summary: '会場の吹き出し・読み上げをリアルタイムに',
