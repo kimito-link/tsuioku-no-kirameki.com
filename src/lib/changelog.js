@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.757',
+    date: '2026-06-16',
+    summary: '会場の吹き出し読み飛ばし・音声だけ出る不具合を根治',
+    items: Object.freeze([
+      '会場で、声(読み上げ)は出ているのに吹き出しが出ない・たまに吹き出しを読み飛ばす、という不具合を根治しました。しゃべった人を吹き出しの直前に必ず席へ座らせるようにし、声と吹き出しが必ずセットで同時に出ます',
+      '満員(150席超)などで席に座れなかった人の発言も、観客エリアにちゃんと吹き出すようにしました。誰の発言も取りこぼさず表示します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.756',
     date: '2026-06-16',
     summary: '会場の反映をコメビュ並みに速い経路へ統一',

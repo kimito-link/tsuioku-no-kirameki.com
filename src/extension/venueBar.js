@@ -1517,9 +1517,9 @@ export function mountVenueBarButton(options = {}) {
   const spokenUserIds = new Set();
   /** @type {Map<string, number>} */
   let seatByKey = new Map();
-  /** @type {Map<number, { seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }>} */
+  /** @type {Map<number|string, { bubbleKey?: number|string, seatIndex: number, fallbackAnchor?: {x:number,y:number}|null, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }>} */
   const bubbleBySeat = new Map();
-  /** @type {Array<{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }>} */
+  /** @type {Array<{ bubbleKey?: number|string, seatIndex: number, fallbackAnchor?: {x:number,y:number}|null, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }>} */
   const activeBubbles = [];
 
   // v0.1.755 リアルタイム完璧化: 吹き出しの「流速(件/秒)」を直近窓で測り、寿命を可変にする
@@ -1542,19 +1542,46 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
-   * @param {{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }} bubble
+   * @param {{ bubbleKey?: number|string, seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }} bubble
    */
   const removeBubble = (bubble) => {
     if (!bubble || bubble.removed) return;
     bubble.removed = true;
     if (bubble.fadeTimer) clearTimeout(bubble.fadeTimer);
     if (bubble.removeTimer) clearTimeout(bubble.removeTimer);
-    if (bubbleBySeat.get(bubble.seatIndex) === bubble) {
-      bubbleBySeat.delete(bubble.seatIndex);
+    const key = bubble.bubbleKey != null ? bubble.bubbleKey : bubble.seatIndex;
+    if (bubbleBySeat.get(key) === bubble) {
+      bubbleBySeat.delete(key);
     }
     const index = activeBubbles.indexOf(bubble);
     if (index >= 0) activeBubbles.splice(index, 1);
     bubble.element.remove();
+  };
+
+  /**
+   * v0.1.757: 席が無い発言者(150席溢れの観客・名前のみ匿名)の吹き出しを置く決定座標。
+   * speakerKey のハッシュで毎回同じ位置(同じ人は同じ場所)・会場の下端(客席)領域に散らす。
+   * 席が後で出来れば次回の発言は席の頭上に戻る。bubbleLayer 基準のローカル座標(px)。
+   * @param {string} speakerKey
+   * @returns {{ x: number, y: number }}
+   */
+  const crowdBubbleAnchor = (speakerKey) => {
+    let h = 2166136261;
+    const s = String(speakerKey || '');
+    for (let i = 0; i < s.length; i += 1) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const frac = ((h >>> 0) % 1000) / 1000; // 0..1 決定的
+    let w = 800;
+    let bottom = 560;
+    try {
+      const r = bubbleLayer.getBoundingClientRect();
+      if (r && r.width > 0) w = r.width;
+      if (r && r.height > 0) bottom = r.height - 80; // 下端の客席帯
+    } catch { /* no-op */ }
+    const x = Math.round(40 + frac * Math.max(80, w - 200));
+    return { x, y: Math.max(40, bottom) };
   };
 
   const clearBubbles = () => {
@@ -1576,55 +1603,60 @@ export function mountVenueBarButton(options = {}) {
    */
   const showSpeechBubble = (speech) => {
     const seatIndex = seatByKey.get(speech.speakerKey);
-    if (typeof seatIndex !== 'number' || !Number.isInteger(seatIndex)) return;
-    const node = seatNodes[seatIndex];
-    if (!node || node.seat.classList.contains('nlsb-is-empty')) return;
+    const hasSeat = typeof seatIndex === 'number' && Number.isInteger(seatIndex);
+    const node = hasSeat ? seatNodes[seatIndex] : null;
+    // v0.1.757「音声だけ出て吹き出し出ない/読み飛ばし」根治(会議): 席が無い発言者(150席溢れの観客・
+    //   名前のみ匿名等)でも、黙って return せず【観客領域の決定座標(speakerKey ハッシュ)】に吹き出す。
+    //   声は席非依存で必ず鳴るので、吹き出しも席非依存で必ず出して対称にする(v0.1.745の精神)。
+    const seatUsable = hasSeat && node && !node.seat.classList.contains('nlsb-is-empty');
 
-    // v0.1.742 co-presence: 発言した席を一度だけふわっと反応させる(会場が発言に気づく演出)。
-    //   class を付け直すため一旦外して reflow→再付与で、連続発言でも毎回アニメが走る。
-    node.seat.classList.remove('nlsb-seat-speaking');
-    void node.seat.offsetWidth; // reflow を強制してアニメーションを再起動
-    node.seat.classList.add('nlsb-seat-speaking');
-    window.setTimeout(() => node.seat.classList.remove('nlsb-seat-speaking'), 650);
-
-    // v0.1.743 「会話の連鎖」: 同じ人が短い間隔で続けて喋ったら席が継続的に輝く(溜まっていく感)。
-    //   段階(0..STREAK_MAX-1)を data 属性で席に持たせ、CSS が段階ごとに暖色グローを強める。
     const streak = updateSpeechStreak(speechStreaks, speech.speakerKey, Date.now());
-    const stage = streakGlowStage(streak.count);
-    if (stage > 0) {
-      node.seat.dataset.streak = String(stage);
-    } else {
-      delete node.seat.dataset.streak;
+    if (seatUsable) {
+      // v0.1.742 co-presence: 発言した席を一度だけふわっと反応させる(会場が発言に気づく演出)。
+      node.seat.classList.remove('nlsb-seat-speaking');
+      void node.seat.offsetWidth; // reflow を強制してアニメーションを再起動
+      node.seat.classList.add('nlsb-seat-speaking');
+      window.setTimeout(() => node.seat.classList.remove('nlsb-seat-speaking'), 650);
+
+      // v0.1.743 「会話の連鎖」: 同じ人が短い間隔で続けて喋ったら席が継続的に輝く。
+      const streakStage = streakGlowStage(streak.count);
+      if (streakStage > 0) node.seat.dataset.streak = String(streakStage);
+      else delete node.seat.dataset.streak;
     }
 
-    const previous = bubbleBySeat.get(seatIndex);
+    const text = truncateBubbleText(speech.text);
+    if (!text) return;
+    // 吹き出しのキー: 席があれば seatIndex(number)、無ければ speakerKey 由来(席番号と衝突しない string)。
+    const bubbleKey = seatUsable ? seatIndex : `nf:${speech.speakerKey}`;
+    const previous = bubbleBySeat.get(bubbleKey);
     if (previous) removeBubble(previous);
     while (activeBubbles.length >= BUBBLE_MAX) {
       removeBubble(activeBubbles[0]);
     }
 
-    const text = truncateBubbleText(speech.text);
-    if (!text) return;
     const element = document.createElement('div');
     element.className = 'nlsb-bubble';
-    
+
     const textSpan = document.createElement('span');
     textSpan.className = 'nlsb-bubble-text';
     textSpan.textContent = text;
     element.appendChild(textSpan);
-    
+
     element.setAttribute('aria-hidden', 'true');
     // 会議確定A: 席ノードでなく最上位レイヤーへ描く(overflow:hidden に切られない)。
     bubbleLayer.appendChild(element);
 
     const bubble = {
-      seatIndex,
+      bubbleKey,
+      seatIndex: seatUsable ? seatIndex : -1,
+      // 席が無い発言者は観客領域の決定座標(speakerKey ハッシュで毎回同じ位置)へ。
+      fallbackAnchor: seatUsable ? null : crowdBubbleAnchor(speech.speakerKey),
       element,
       fadeTimer: 0,
       removeTimer: 0,
       removed: false
     };
-    bubbleBySeat.set(seatIndex, bubble);
+    bubbleBySeat.set(bubbleKey, bubble);
     activeBubbles.push(bubble);
 
     // 席の座標を測ってレイヤー基準の頭上へ配置。既存吹き出しと重なれば上へ逃がす(衝突回避)。
@@ -1654,30 +1686,38 @@ export function mountVenueBarButton(options = {}) {
   /**
    * 1つの吹き出しを、対応する席の頭上(レイヤー基準)へ絶対配置する。
    * 既に表示中の吹き出しと縦に重なる場合は上方向へオフセットして読めるようにする。
-   * @param {{ seatIndex:number, element:HTMLDivElement, removed:boolean, _x?:number, _y?:number, _h?:number }} bubble
+   * v0.1.757: 席が無い発言者(fallbackAnchor あり)は席矩形でなくその決定座標へ置く。
+   * @param {{ seatIndex:number, fallbackAnchor?:{x:number,y:number}|null, element:HTMLDivElement, removed:boolean, _x?:number, _y?:number, _h?:number }} bubble
    */
   const positionBubble = (bubble) => {
     if (!bubble || bubble.removed) return;
-    const node = seatNodes[bubble.seatIndex];
-    if (!node) return;
-    // 保険(PR3): 段の再描画中など席ノードが一瞬 DOM から外れていると getBoundingClientRect が
-    //   0 を返し、吹き出しが画面外へ飛んで消えて見える。未接続なら座標計算せず一時的に隠す
-    //   (remove はしない=次の reposition で席が戻れば再表示)。PR1 で席消失自体が激減したが念のため。
-    if (!node.seat.isConnected || !node.icon.isConnected) {
-      bubble.element.style.visibility = 'hidden';
-      return;
+    /** @type {{x:number,y:number}} レイヤー基準の吹き出しアンカー(席下端中央 or 観客フォールバック)。 */
+    let anchor;
+    const node = bubble.seatIndex >= 0 ? seatNodes[bubble.seatIndex] : null;
+    if (node) {
+      // 保険(PR3): 段の再描画中など席ノードが一瞬 DOM から外れていると getBoundingClientRect が
+      //   0 を返し、吹き出しが画面外へ飛んで消えて見える。未接続なら座標計算せず一時的に隠す。
+      if (!node.seat.isConnected || !node.icon.isConnected) {
+        bubble.element.style.visibility = 'hidden';
+        return;
+      }
+      bubble.element.style.visibility = '';
+      const layerRect = bubbleLayer.getBoundingClientRect();
+      const seatRect = node.icon.getBoundingClientRect();
+      const rel = {
+        left: seatRect.left - layerRect.left,
+        top: seatRect.top - layerRect.top,
+        width: seatRect.width,
+        height: seatRect.height
+      };
+      anchor = bubbleAnchorForSeatRect(rel, BUBBLE_ANCHOR_GAP);
+    } else if (bubble.fallbackAnchor) {
+      // 席無し: 観客領域の決定座標へ(席矩形が無いので衝突回避だけ後段で効かせる)。
+      bubble.element.style.visibility = '';
+      anchor = bubble.fallbackAnchor;
+    } else {
+      return; // 席も座標も無い=描けない(従来どおり)
     }
-    bubble.element.style.visibility = '';
-    const layerRect = bubbleLayer.getBoundingClientRect();
-    const seatRect = node.icon.getBoundingClientRect();
-    // レイヤー左上を原点とした席矩形へ変換。
-    const rel = {
-      left: seatRect.left - layerRect.left,
-      top: seatRect.top - layerRect.top,
-      width: seatRect.width,
-      height: seatRect.height
-    };
-    const anchor = bubbleAnchorForSeatRect(rel, BUBBLE_ANCHOR_GAP);
     const h = bubble.element.offsetHeight || 40;
     const bw = bubble.element.offsetWidth || 160;
     // 既存の表示中吹き出し(自分以外)の占有帯を集めて衝突回避。
@@ -2268,13 +2308,22 @@ export function mountVenueBarButton(options = {}) {
         const uid = String(speech.userId || '').trim();
         if (uid) spokenUserIds.add(uid);
       }
-      // v0.1.754: ストリーム駆動時は在席 Map(liveRoster)が唯一の席ソース=ここで baseRows を
-      //   書かない(二重書き込み防止)。席は onLiveComments→scheduleRosterCommit が更新する。
-      //   非ストリーム(standalone/rollback)は従来どおり発言者マージで席を即更新。
-      if (!rosterDriven) {
-        baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, Date.now());
-        // commitDisplay 経由で lastGood を更新(発言者マージ結果は常に非空=新鮮データ扱い)。
-        //   こうすると次の集計が一瞬0件でも、この発言者を含む表示が前状態として維持される。
+      // v0.1.757「読み飛ばし/音声だけ出て吹き出し出ない」根治(会議7体): showSpeechBubble は
+      //   発言者の席(seatByKey)が無いと黙って return する。一方 voicePlayer は席非依存で必ず鳴る
+      //   =非対称。v0.1.754 で rosterDriven 時に発言者の即着席を skip し席更新を rAF に分離したため、
+      //   この同 tick の showSpeechBubble 時に新発言者の席が未作成→吹き出しドロップ(回帰)。
+      //   対策: rosterDriven でも【発言者だけは showSpeechBubble の前に同期で在席へ touch し、席を
+      //   同期 commit】して必ず座らせる(発言→即着席→吹き出し)。rAF コミットは通常更新用に残す。
+      const nowMs = Date.now();
+      if (rosterDriven) {
+        for (const speech of result.speeches) {
+          touchRoster(liveRoster, { userId: speech.userId, name: speech.name, text: speech.text }, nowMs);
+        }
+        baseRows = rosterToVenueRows(liveRoster);
+        commitDisplay(baseRows); // 同期で renderSeats→seatByKey 更新(吹き出しが席を見つけられる)
+      } else {
+        // 非ストリーム(standalone/rollback)は従来どおり発言者マージで席を即更新。
+        baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, nowMs);
         commitDisplay(baseRows);
       }
     }
