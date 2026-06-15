@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.747',
+    date: '2026-06-15',
+    summary: '会場にりんく・こん太・たぬ姉が常駐するように',
+    items: Object.freeze([
+      '会場モードを開いた瞬間から、りんく・こん太・たぬ姉の3人が会場の最前列中央に「案内役」として常にいるようにしました。コメントがまだ少ない時間でも会場が無人に見えず、開いてすぐ賑やかな雰囲気になります',
+      '3人は金色の光と台座で特別な存在として表示します（会場参加者の人数には含めません）。動きを抑える設定（prefers-reduced-motion）には配慮しています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.746',
     date: '2026-06-15',
     summary: '会場がたまに空っぽ/ローディングになる不具合を根治',

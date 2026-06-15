@@ -12,6 +12,7 @@ import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStor
 import { readChunkedComments, chunkIndexKey } from '../lib/commentChunkStore.js';
 import { resolveDisplayRows } from '../lib/venueDisplayRows.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
+import { buildVenueResidents } from '../lib/venueResidents.js';
 import {
   commentDbSummaryKey,
   commentsStorageKey,
@@ -297,6 +298,7 @@ const VENUE_CSS = `
       "seats";
     grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden;
+    position: relative; /* 3キャラ常駐レイヤー(.nlsb-residents)の絶対配置の基準 */
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     /* スモークを薄く: 名前が読める最低限の暗さだけ残し、下の映像を極力透けさせる。 */
@@ -304,6 +306,57 @@ const VENUE_CSS = `
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
     overscroll-behavior: contain;
     pointer-events: auto;
+  }
+  /* 3キャラ常駐(りんく・こん太・たぬ姉): 最前列中央の手前に常に居て、会場が無人/ローディングに
+     見えない最後の砦。実参加者の席とは別レイヤー(カウントにも含めない)。映像は隠さない(下端のみ)。 */
+  .nlsb-residents {
+    position: absolute;
+    left: 50%;
+    bottom: 6px;
+    transform: translateX(-50%);
+    z-index: 6; /* 席(z<5)より手前・吹き出しレイヤー(最上位)より下 */
+    display: flex;
+    gap: 14px;
+    align-items: flex-end;
+    pointer-events: none; /* 配信操作・席リンクを邪魔しない */
+  }
+  .nlsb-resident {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 46px;
+  }
+  .nlsb-resident-img {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    /* 実視聴者と区別する金色の光。reduced-motion でも静的グローは残す。 */
+    filter: drop-shadow(0 0 6px rgba(255, 206, 96, 0.9)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+    animation: nlsb-resident-glow 2.8s ease-in-out infinite;
+  }
+  /* 金色の台座(楕円グラデ)で「特別な存在＝会場の案内役」を一目で。 */
+  .nlsb-resident::after {
+    content: "";
+    width: 40px;
+    height: 9px;
+    margin-top: -2px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(255, 206, 96, 0.6), rgba(255, 206, 96, 0) 70%);
+  }
+  .nlsb-resident-name {
+    margin-top: 1px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #ffe7b0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    white-space: nowrap;
+  }
+  @keyframes nlsb-resident-glow {
+    0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 206, 96, 0.7)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+    50% { filter: drop-shadow(0 0 9px rgba(255, 220, 120, 1)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-resident-img { animation: none; }
   }
   .nlsb-header {
     grid-area: header;
@@ -1240,8 +1293,15 @@ export function mountVenueBarButton(options = {}) {
     safeArea.style.pointerEvents = 'auto';
   }
 
-  // seating は下端のひな壇だけ(header + seats)。
-  seating.append(header, seatsHost);
+  // 3キャラ常駐レイヤー(ユーザーアイデア): 会場を開いた瞬間から りんく・こん太・たぬ姉 が
+  //   最前列中央に居て、集計が一瞬0件でも「無人/ローディング」に見えない最後の砦。
+  //   seating 配下の専用固定レイヤー=seating パイプライン(参加者カウント)とは独立。
+  const residentsLayer = document.createElement('div');
+  residentsLayer.className = 'nlsb-residents';
+  residentsLayer.setAttribute('aria-hidden', 'false');
+
+  // seating は下端のひな壇だけ(header + seats + 常駐3キャラ)。
+  seating.append(header, seatsHost, residentsLayer);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
   stageLayout.append(crowdCanvas, safeArea, seating, center);
   // 吹き出し専用の最上位レイヤー(会議確定A): 席コンテナの overflow:hidden の外に置くことで
@@ -1655,6 +1715,36 @@ export function mountVenueBarButton(options = {}) {
     lastGoodRows = [];
     hasRenderedNonEmpty = false;
     renderSeats([]);
+  };
+
+  let residentsRendered = false;
+  /**
+   * 3キャラ常駐(りんく・こん太・たぬ姉)を最前列中央に描く。会場を開いた瞬間に集計を待たず
+   * 1回呼ぶ=開いた直後から必ず誰かが居る。画像は拡張URLに解決。読み込み失敗は名札のみへ。
+   */
+  const renderResidents = () => {
+    if (residentsRendered) return;
+    const resolveUrl =
+      typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function'
+        ? /** @param {string} rel */ (rel) => chrome.runtime.getURL(rel)
+        : /** @param {string} rel */ (rel) => rel;
+    const residents = buildVenueResidents(resolveUrl);
+    residentsLayer.textContent = '';
+    for (const r of residents) {
+      const cell = document.createElement('div');
+      cell.className = `nlsb-resident nlsb-resident-${r.id}`;
+      const img = document.createElement('img');
+      img.className = 'nlsb-resident-img';
+      img.src = r.imgSrc;
+      img.alt = `${r.name}(会場の案内役)`;
+      img.addEventListener('error', () => { img.style.display = 'none'; });
+      const label = document.createElement('div');
+      label.className = 'nlsb-resident-name';
+      label.textContent = r.name;
+      cell.append(img, label);
+      residentsLayer.appendChild(cell);
+    }
+    residentsRendered = true;
   };
 
   /**
@@ -2171,6 +2261,8 @@ export function mountVenueBarButton(options = {}) {
     if (open) {
       addEscapeListener();
       addBubbleReflowListener();
+      // 3キャラ常駐: 集計を待たず先に描く=開いた瞬間から必ず誰かが居る(無人に見せない)。
+      renderResidents();
       startAggregation();
       startSpeechPolling();
     } else {
