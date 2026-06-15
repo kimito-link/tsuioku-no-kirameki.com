@@ -10,6 +10,8 @@ import {
 } from '../lib/venueSeats.js';
 import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
 import { readChunkedComments, chunkIndexKey } from '../lib/commentChunkStore.js';
+import { resolveDisplayRows } from '../lib/venueDisplayRows.js';
+import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
 import {
   commentDbSummaryKey,
   commentsStorageKey,
@@ -1326,6 +1328,12 @@ export function mountVenueBarButton(options = {}) {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   /** @type {VenueRow[]} */
   let baseRows = [];
+  // 「空っぽ・途中で消える」根治(v0.1.745+): 直近の非空表示行を保持し、集計/poll が一瞬0件や
+  //   storage 失敗で来ても会場を空で再描画しない(resolveDisplayRows・前状態保持)。配信切替で破棄。
+  /** @type {VenueRow[]} */
+  let lastGoodRows = [];
+  // 一度でも非空を描いたか(renderSeats の保険ガード用)。配信切替の意図的クリアと区別する。
+  let hasRenderedNonEmpty = false;
   // 診断シート(メンバー一覧ボタン)用: renderSeats が最新の席割りをここに保存する。
   /** @type {{ allSeats: any[], visibleSeats: any[], audienceCount: number }} */
   let lastRosterInput = { allSeats: [], visibleSeats: [], audienceCount: 0 };
@@ -1567,6 +1575,9 @@ export function mountVenueBarButton(options = {}) {
     speechLiveId = nextLiveId;
     speechState = { seenKeys: null, primed: false };
     speechStreaks.clear();
+    // 前状態保持(lastGood)も破棄: 配信切替/閉じる時は前配信の参加者を持ち越さない(INV-3)。
+    lastGoodRows = [];
+    hasRenderedNonEmpty = false;
     clearBubbles();
   };
 
@@ -1626,15 +1637,43 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
+   * 表示行を「新鮮優先・空なら前回保持」で確定してから席を描く(空っぽ・消える根治の入口)。
+   * 集計/poll はここを通すことで、一瞬0件や storage 失敗でも会場が空で再描画されない。
+   * @param {VenueRow[]} incoming 今回の集計/マージ結果(空になりうる)
+   */
+  const commitDisplay = (incoming) => {
+    const resolved = resolveDisplayRows(incoming, lastGoodRows);
+    lastGoodRows = resolved.nextLastGood;
+    renderSeats(resolved.rows);
+  };
+
+  /**
+   * 表示行をクリアして会場を空に戻す(配信切替など意図的な空表示専用)。
+   * 通常の集計/poll は commitDisplay を使うこと(空再描画しない)。
+   */
+  const clearDisplay = () => {
+    lastGoodRows = [];
+    hasRenderedNonEmpty = false;
+    renderSeats([]);
+  };
+
+  /**
    * @param {VenueRow[]} rows
    */
   const renderSeats = (rows) => {
-    const seating = buildVenueSeating(rows, {
+    // 保険ガード: 一度でも非空を描いた後に空入力が来たら無視する(空っぽ・消えるの二重防御)。
+    //   意図的クリア(配信切替)は clearDisplay 経由で hasRenderedNonEmpty=false にしてから通す。
+    const incomingRows = Array.isArray(rows) ? rows : [];
+    if (incomingRows.length === 0 && hasRenderedNonEmpty) {
+      return;
+    }
+    const seating = buildVenueSeating(incomingRows, {
       maxSeats: VENUE_FULLSCREEN_MAX_SEATS,
       prevSeatByKey: seatByKey,
       isGenericName: isGenericComeviewName,
       promoteUserIds: spokenUserIds
     });
+    if (seating.participantCount > 0) hasRenderedNonEmpty = true;
     seatByKey = seating.seatByKey;
     seatsHost.classList.remove(...VENUE_LAYOUT_CLASSES);
     seatsHost.classList.add(`nlsb-mode-${seating.layoutMode}`);
@@ -1663,12 +1702,28 @@ export function mountVenueBarButton(options = {}) {
       perRow,
       rows: 8
     });
-    const visibleSeats = selectStableVisibleMembers(
+    const visibleSeatsRaw = selectStableVisibleMembers(
       seating.seats,
       visibleSeatCount,
       spokenUserIds,
       (entry) => String(entry?.participant?.userId || entry?.participant?.key || '').trim()
     );
+    // v0.1.745 ユーザー実機「サムネ持ちが最前列に来てない・大きくなってない」根治:
+    //   visibleSeats は seatIndex 順で、後段の tier 充填もこの順。前列予約(frontRow)だけでは
+    //   サムネ持ちが少数+席churn のとき手前段に集まりきらず、奥段に散らばっていた(実機計測で
+    //   VIPが tier0/3/4 に散在)。ここで「実サムネ持ちを先頭へ」安定パーティションし、tier 充填が
+    //   必ず手前段(tier0=大きい段)からサムネ持ちで埋まるようにする。group 内は元順維持=ちらつかない。
+    /** @param {{ participant?: { avatar?: string, userId?: string } }} entry */
+    const seatHasRealThumb = (entry) => {
+      const p = entry?.participant || {};
+      const avatarUrl = String(p.avatar || '').trim();
+      const derived = deriveNicoUserIconUrl(String(p.userId || '').trim());
+      return hasRealThumbnail(avatarUrl) || hasRealThumbnail(derived);
+    };
+    const visibleSeats = [
+      ...visibleSeatsRaw.filter(seatHasRealThumb),
+      ...visibleSeatsRaw.filter((e) => !seatHasRealThumb(e))
+    ];
     const visibleSeatKeys = new Set(visibleSeats.map(entry => entry.participant.key));
 
     // アリーナ席は名前付き + しゃべった匿名(promote)。それ以外の匿名は後方の観客席へ
@@ -1855,12 +1910,16 @@ export function mountVenueBarButton(options = {}) {
         baseRows = [];
         seatByKey = new Map();
         spokenUserIds.clear(); // 別配信の昇格匿名を持ち越さない
-        renderSeats(baseRows);
+        // 配信切替は意図的な空表示(前配信を持ち越さない)。clearDisplay で lastGood も破棄。
+        clearDisplay();
       }
-      const result = await readChunkedComments(
-        liveId,
-        commentsStorageKey(liveId),
-        (keys) => chrome.storage.local.get(keys)
+      // storage 読みを 8秒で有界化(status-entry と同値)。stall しても次回集計へ任せ会場は前状態維持。
+      const result = await runStorageOpWithTimeout(
+        () =>
+          readChunkedComments(liveId, commentsStorageKey(liveId), (keys) =>
+            chrome.storage.local.get(keys)
+          ),
+        8000
       );
       if (!open || liveIdFromPathname() !== liveId) return;
       // v0.1.740 実機バグ根治: requireText:true で「実際にコメントした人(本文あり)」だけを
@@ -1873,16 +1932,24 @@ export function mountVenueBarButton(options = {}) {
       });
       baseRows = venueRowsFromUserLaneCandidates(candidates);
       // パネルと同じ低頻度キャッシュで実サムネを補強し、会場だけ顔が欠ける差をなくす。
-      const profileBag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
+      const profileBag = await runStorageOpWithTimeout(
+        () => chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE),
+        8000
+      );
       if (!open || liveIdFromPathname() !== liveId) return;
       const profileMap =
         /** @type {Record<string, { avatarUrl?: unknown }>|null} */ (
           profileBag?.[KEY_USER_COMMENT_PROFILE_CACHE] || null
         );
       baseRows = enrichVenueRowsWithProfileAvatars(baseRows, profileMap);
-      renderSeats(baseRows);
-    } catch {
-      // 拡張更新中など一時的に全チャンクを読めない場合は次回集計へ任せる。
+      // commitDisplay 経由=空(0件)なら前回の非空表示を維持し、会場を空で再描画しない。
+      commitDisplay(baseRows);
+    } catch (err) {
+      // storage timeout / 拡張更新中など一時的に読めない場合は前状態を維持し次回集計へ任せる。
+      if (err !== STORAGE_OP_TIMED_OUT) {
+        // 想定外エラーも会場は前状態維持(空再描画しない)。ログだけ残す。
+        console.warn('[venue] aggregate failed; keeping last good', err);
+      }
     } finally {
       aggregateInFlight = false;
     }
@@ -1967,7 +2034,9 @@ export function mountVenueBarButton(options = {}) {
           if (uid) spokenUserIds.add(uid);
         }
         baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, Date.now());
-        renderSeats(baseRows);
+        // commitDisplay 経由で lastGood を更新(発言者マージ結果は常に非空=新鮮データ扱い)。
+        //   こうすると次の集計が一瞬0件でも、この発言者を含む表示が前状態として維持される。
+        commitDisplay(baseRows);
       }
       for (const speech of result.speeches) {
         // 吹き出しは「しゃべった瞬間」に必ず出す。音声(VOICEVOX)とは切り離す。
