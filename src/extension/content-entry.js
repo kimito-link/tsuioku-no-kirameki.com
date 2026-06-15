@@ -118,13 +118,17 @@ import {
 } from '../lib/panelMetricsExport.js';
 import {
   setBackfillPriorityLiveId,
+  readBackfillPriorityLiveId,
   registerBackfillWaiter,
   clearBackfillWaiter,
   listBackfillWaitingLiveIds,
   BACKFILL_PRIORITY_COOLDOWN_MS,
   GLOBAL_BACKFILL_ROTATION_MS
 } from '../lib/globalBackfillQueue.js';
-import { shouldFireBackfillRotationWithSlots } from '../lib/backfillRotationGate.js';
+import {
+  shouldFireBackfillRotationWithSlots,
+  shouldYieldBackfillSlotToPriority
+} from '../lib/backfillRotationGate.js';
 import { runInBackfillSlot, BACKFILL_PARALLEL_SLOTS } from '../lib/backfillSlotPool.js';
 import {
   createBackfillThrottleState,
@@ -15304,7 +15308,12 @@ async function runNdgrBackfillOnce(ctx = {}) {
       try { waitingLiveIds = await listBackfillWaitingLiveIds(); } catch { /* no-op */ }
       const effectiveSlots = resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS);
       const slotsFullyOccupied = waitingLiveIds.length >= effectiveSlots;
-      if (!slotsFullyOccupied) return; // 空きあり → abort しない
+      // v0.1.751: hidden で空きが無いとき(従来)に加え、別配信を視聴中(優先)のタブが待っている時も
+      //   譲る(歌枠34%飢餓根治)。視聴中タブ本人は純関数で除外=自分自身に譲らない。fail-open。
+      const yieldToWatched = await shouldYieldBackfillToWatchedTab(
+        String(liveIdOverride || '').trim().toLowerCase()
+      );
+      if (!slotsFullyOccupied && !yieldToWatched) return; // 空きあり&優先譲り不要 → abort しない
       if (!_backfillProgress.stopReason) _backfillProgress.stopReason = 'visibility_paused';
       try { ac.abort(); } catch { /* no-op */ }
     })();
@@ -15329,12 +15338,20 @@ async function runNdgrBackfillOnce(ctx = {}) {
       // v0.1.663: 並列スロット対応。待機タブが「空きスロット数(N)以上」居る時だけ譲る。
       //   N=2 なら 2配信目(待機1つ)はまだ空きがあるので譲らず並走、3配信目以降だけ発火。
       //   parallelSlots=1 なら従来の shouldFireBackfillRotation とビット同値(単一タブ温存)。
+      // v0.1.751: 加えて、別配信を視聴中(前面/優先)のタブにスロットを譲るべき時も rotation_yield で
+      //   降りる(連続 visible な裏ウィンドウは onHidden が発火しないため、90秒以内にここで明け渡す)。
+      //   stopReason='rotation_yield' は _backfillTriedLiveId='' で clean に再アーム=tight ループ無し。
+      const yieldToWatched = await shouldYieldBackfillToWatchedTab(
+        String(liveIdOverride || '').trim().toLowerCase()
+      );
+      if (_backfillProgress.stopReason) return; // await 中に別理由で止まっていたら触らない
       if (!ac.signal.aborted &&
-          shouldFireBackfillRotationWithSlots({
-            waitingLiveIds,
-            selfLiveId: liveIdOverride,
-            parallelSlots: resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS)
-          })) {
+          (yieldToWatched ||
+            shouldFireBackfillRotationWithSlots({
+              waitingLiveIds,
+              selfLiveId: liveIdOverride,
+              parallelSlots: resolveEffectiveBackfillSlots(_backfillThrottleState, BACKFILL_PARALLEL_SLOTS)
+            }))) {
         _backfillProgress.stopReason = 'rotation_yield';
         try { ac.abort(); } catch { /* no-op */ }
       }
@@ -15762,6 +15779,38 @@ function maybeRearmBackfillForGapCatchup() {
 }
 
 /**
+ * v0.1.751「視聴中タブが裏タブにスロットを食われ飢餓(歌枠34%停滞)」根治の中核: 自タブ(lid)が、
+ * 別配信を視聴中(前面/優先)のタブに backfill スロットを譲るべきかを storage.session の
+ * 優先 lv・待機列から判定する。純関数 shouldYieldBackfillSlotToPriority に I/O 結果を渡すだけの
+ * 薄いラッパ。storage.session 不可/失敗時は fail-open(false=従来動作)。hot path には置かない
+ * (maintenance tick / visibilitychange / 90秒 rotation timer の既に storage.session を読む箇所からのみ呼ぶ)。
+ * @param {string} lid 自タブの正規化済み liveId。
+ * @returns {Promise<boolean>} true なら視聴中タブのためにスロットを譲る/開始を見送る。
+ */
+async function shouldYieldBackfillToWatchedTab(lid) {
+  try {
+    let prio = null;
+    let waiting = [];
+    try { prio = await readBackfillPriorityLiveId(); } catch { prio = null; }
+    try { waiting = await listBackfillWaitingLiveIds(); } catch { waiting = []; }
+    return shouldYieldBackfillSlotToPriority({
+      selfLiveId: lid,
+      priorityLiveId: prio ? prio.liveId : null,
+      priorityIsFresh: prio ? Date.now() - prio.at < 120_000 : false,
+      amIVisible:
+        typeof document === 'undefined' || document.visibilityState === 'visible',
+      waitingLiveIds: waiting,
+      parallelSlots: resolveEffectiveBackfillSlots(
+        _backfillThrottleState,
+        BACKFILL_PARALLEL_SLOTS
+      )
+    });
+  } catch {
+    return false; // fail-open: 判定不能なら従来どおり(視聴中タブを巻き込まない)
+  }
+}
+
+/**
  * v0.1.418: 自動開始の試行（maintenance tick から毎周期呼ばれる）。自動 ON かつ top frame の
  *   ときだけ起動を試し、実際の起動可否（記録 ON / view base / guard）は runNdgrBackfillOnce に委ねる。
  */
@@ -15861,6 +15910,14 @@ function maybeAutoStartBackfill() {
   //   二段構え。runIfTabLeader の {ran} は per-lv ロック成否のみ＝スロット成否は slotRes で受ける。
   //   waiter 登録/解除はリーダータブが担う。詳細は git 履歴参照。
   void (async () => {
+    // v0.1.751: 別配信を視聴中(前面/優先)のタブが居てスロットが満杯なら、裏タブの自分は
+    //   このtickの起動を見送り、待機列に名乗りを上げて視聴中タブにスロットを譲る(歌枠34%飢餓根治)。
+    //   開始ゲートなので走行中の crawl を abort せず=tight ループにならない。次 maintenance tick で再評価。
+    //   視聴中(優先)タブ本人は純関数②で除外され絶対に見送らない。fail-open(判定不能は従来動作)。
+    if (await shouldYieldBackfillToWatchedTab(lid)) {
+      void registerBackfillWaiter(lid);
+      return;
+    }
     /** @type {{ran: boolean, slotIndex: number}|null} */
     let slotRes = null;
     const leader = await runIfTabLeader(`nls-backfill-${lid}`, async () => {
