@@ -607,6 +607,29 @@ const VENUE_CSS = `
       animation: none;
     }
   }
+  /* v0.1.742 一緒に過ごしている感(co-presence): 誰かがコメントした瞬間、その人の席が
+     ふわっと一度だけ反応する。吹き出しだけでなく「会場が一人ひとりの発言に反応する」ことで
+     一緒にいる感を強める(星野式・摩擦ゼロ=自動・設定不要)。0.6秒で1回だけ・上品に。 */
+  .nlsb-seat.nlsb-seat-speaking .nlsb-icon {
+    animation: nlsb-seat-speak 0.6s ease-out;
+  }
+  @keyframes nlsb-seat-speak {
+    0% {
+      transform: scale(1);
+    }
+    35% {
+      transform: scale(1.18);
+      filter: brightness(1.15);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-seat.nlsb-seat-speaking .nlsb-icon {
+      animation: none;
+    }
+  }
   .nlsb-icon {
     position: relative;
     display: grid;
@@ -1369,6 +1392,13 @@ export function mountVenueBarButton(options = {}) {
     if (typeof seatIndex !== 'number' || !Number.isInteger(seatIndex)) return;
     const node = seatNodes[seatIndex];
     if (!node || node.seat.classList.contains('nlsb-is-empty')) return;
+
+    // v0.1.742 co-presence: 発言した席を一度だけふわっと反応させる(会場が発言に気づく演出)。
+    //   class を付け直すため一旦外して reflow→再付与で、連続発言でも毎回アニメが走る。
+    node.seat.classList.remove('nlsb-seat-speaking');
+    void node.seat.offsetWidth; // reflow を強制してアニメーションを再起動
+    node.seat.classList.add('nlsb-seat-speaking');
+    window.setTimeout(() => node.seat.classList.remove('nlsb-seat-speaking'), 650);
 
     const previous = bubbleBySeat.get(seatIndex);
     if (previous) removeBubble(previous);
