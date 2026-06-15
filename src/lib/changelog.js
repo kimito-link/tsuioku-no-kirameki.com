@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.758',
+    date: '2026-06-16',
+    summary: '視聴中タブの過去ログ取得が2%で止まる回帰を根治',
+    items: Object.freeze([
+      '今見ている配信の過去コメント一括取得が、2%ほどで止まってほとんど進まないことがある不具合を根治しました。視聴中(前面)のタブが、裏で動いていた別の配信に取得枠を譲り続けてしまうのが原因でした',
+      '前面で見ているタブは毎回「自分が最優先」と宣言し、自分の過去ログ取得を絶対に手放さないようにしました。これで単一タブでも最後まで一気に遡れます'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.757',
     date: '2026-06-16',
     summary: '会場の吹き出し読み飛ばし・音声だけ出る不具合を根治',

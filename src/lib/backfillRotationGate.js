@@ -92,6 +92,10 @@ export function shouldFireBackfillRotationWithSlots(args) {
  * @param {boolean} args.priorityIsFresh 優先記録が 120秒の有効期間内か
  *   (呼び出し側が now - at < 120_000 を計算して渡す)。
  * @param {boolean} args.amIVisible 自タブが現在 visible か(document.visibilityState==='visible')。
+ * @param {boolean} [args.amIForeground] 自タブが【前面(focused)】か(document.hasFocus())。
+ *   v0.1.758: true なら無条件に譲らない(前面=ユーザーが今見ている配信のbackfillを手放さない)。
+ *   visibilityState は別ウィンドウの裏 visible タブも true になり得るため、前面を一意に表す
+ *   hasFocus を使う。未指定は従来動作(②以降の判定)。
  * @param {string[]|null|undefined} args.waitingLiveIds backfill 待ちの liveId 一覧
  *   (listBackfillWaitingLiveIds の結果)。
  * @param {number} [args.parallelSlots] 並列度 N(既定 1=従来互換)。
@@ -99,6 +103,16 @@ export function shouldFireBackfillRotationWithSlots(args) {
  */
 export function shouldYieldBackfillSlotToPriority(args) {
   if (!args) return false;
+  // ⓪ v0.1.758「単一視聴タブが2%固着」回帰の根治: 自分が【前面(focused)】なら絶対に譲らない。
+  //   v0.1.751 は条件②(self===priority)だけで視聴中タブを守るつもりだったが、それは
+  //   「視聴中タブが必ず自分を priority に記録できている」前提に依存する。実機では単一タブが
+  //   2時間 visible のまま開きっぱなしだと visibilitychange が再発火せず自分を priority に
+  //   再アサートできず、storage.session に居座る別 lv が priority のままになり self!=priority で
+  //   永久に譲り続けた(記録2%)。前面タブ=ユーザーが今まさに見ている配信なので、その backfill を
+  //   別 lv に明け渡してはならない。amIForeground は呼び出し側が document.hasFocus() を渡す
+  //   (visibilityState は別ウィンドウの裏タブも visible になり得て前面を一意に判別できないため、
+  //   "本当に前面の1タブ"を表す hasFocus を使う)。未指定/不明は従来動作(②以降)に委ねる。
+  if (args.amIForeground === true) return false;
   // ① 優先記録が新鮮で、かつ有効な lv であること(期限切れ/無は譲らない=裏を永久ブロックしない)。
   if (!args.priorityIsFresh) return false;
   const priority = String(args.priorityLiveId || '').trim().toLowerCase();

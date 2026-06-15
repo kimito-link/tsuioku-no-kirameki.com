@@ -216,4 +216,47 @@ describe('shouldYieldBackfillSlotToPriority (v0.1.751 視聴中タブ優先ス�
     expect(shouldYieldBackfillSlotToPriority({})).toBe(false);
     expect(shouldYieldBackfillSlotToPriority(undefined)).toBe(false);
   });
+
+  // v0.1.758「単一視聴タブが記録2%で固着」回帰の根治(2026-06-16):
+  //   v0.1.751 は「条件②(self===priority)で視聴中タブは除外済み」と仮定して amIVisible を未使用にした。
+  //   だがその仮定は【自分が前面でも、storage.session の priority lv が"別の lv"だと self!=priority に
+  //   なり譲り続ける】ケースで破綻する。単一タブが2時間 visible のまま開きっぱなしだと visibilitychange が
+  //   再発火せず自分を priority に再アサートできず、別 lv が居座って前面タブの backfill が永久に
+  //   見送られた(実機 先生.18: 記録47/公式1,794=2%)。
+  //   根治: amIForeground===true(document.hasFocus())なら無条件に譲らない=前面タブは自分の
+  //   backfill を絶対に手放さない。hidden/裏タブの「別の新鮮な優先lvに譲る」(34%飢餓根治)は不変。
+  describe('🔴v0.1.758 回帰根治: 前面(focused)タブは絶対に譲らない', () => {
+    it('前面タブは、別の新鮮な優先lvがスロット待ち+満杯でも譲らない(2%固着の根治)', () => {
+      expect(
+        shouldYieldBackfillSlotToPriority({
+          selfLiveId: 'lv200',
+          priorityLiveId: 'lv100', // 別 lv が priority に居座る(visibilitychange 未発火で自分を再アサート不能)
+          priorityIsFresh: true,
+          amIVisible: true,
+          amIForeground: true, // ← 自分が前面=ユーザーが今見ている配信
+          waitingLiveIds: ['lv100', 'lv150'],
+          parallelSlots: 1,
+        })
+      ).toBe(false);
+    });
+
+    it('前面でない(裏ウィンドウ/別タブ)なら従来どおり別の新鮮な優先lvに譲る(34%飢餓根治を壊さない)', () => {
+      expect(
+        shouldYieldBackfillSlotToPriority({
+          selfLiveId: 'lv200',
+          priorityLiveId: 'lv100',
+          priorityIsFresh: true,
+          amIVisible: true, // 別ウィンドウで visible でも
+          amIForeground: false, // ← 前面ではない=譲る
+          waitingLiveIds: ['lv100'],
+          parallelSlots: 1,
+        })
+      ).toBe(true);
+    });
+
+    it('amIForeground 未指定は従来動作(②以降)に委ねる=v0.1.751 を1bitも壊さない', () => {
+      // 既存の base(amIForeground 無し)は従来どおり判定される。
+      expect(shouldYieldBackfillSlotToPriority(base)).toBe(true);
+    });
+  });
 });

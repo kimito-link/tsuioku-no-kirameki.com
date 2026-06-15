@@ -15815,6 +15815,14 @@ async function shouldYieldBackfillToWatchedTab(lid) {
       priorityIsFresh: prio ? Date.now() - prio.at < 120_000 : false,
       amIVisible:
         typeof document === 'undefined' || document.visibilityState === 'visible',
+      // v0.1.758「単一視聴タブが2%で固着」根治: 前面(focused)タブは絶対に譲らない。
+      //   visibilityState だけだと別ウィンドウの裏 visible タブと区別できず、自分を priority に
+      //   再アサートできていない単一視聴タブが別 lv に永久に譲る回帰を踏む。hasFocus は
+      //   「本当に今前面の1タブ」を一意に表すので、これで視聴中タブの飢餓を断つ。
+      amIForeground:
+        typeof document === 'undefined' ||
+        typeof document.hasFocus !== 'function' ||
+        document.hasFocus(),
       waitingLiveIds: waiting,
       parallelSlots: resolveEffectiveBackfillSlots(
         _backfillThrottleState,
@@ -15834,6 +15842,31 @@ function maybeAutoStartBackfill() {
   void maybeFoldSwBackfillStaging();
   if (!_backfillAutoEnabled) return;
   if (!isWatchInlinePanelTopFrame()) return;
+  // v0.1.758「単一視聴タブが2%で固着」根治(根底): 前面(focused)で記録中の視聴タブは、毎 tick 自分を
+  //   backfill の優先 lv に再アサートする。v0.1.751 は優先 lv の記録を onTabVisibleForCommentHarvest
+  //   (visibilitychange)だけに頼っていたため、2時間 visible のまま開きっぱなしの単一タブは自分を
+  //   priority に保てず、storage.session に居座る別 lv に永久に譲っていた(記録2%)。ここで毎 tick
+  //   再アサートすれば、ユーザーが今見ている配信(=前面タブ)が常に priority を所有し self===priority に
+  //   なる=絶対に飢餓しない。裏に回した大型配信タブは前面でないので再アサートせず、前面の視聴タブに
+  //   正しく譲る(34%飢餓根治は不変)。document.hasFocus() が無い環境は visibilityState で代替。
+  try {
+    const fg =
+      typeof document === 'undefined' ||
+      (typeof document.hasFocus === 'function'
+        ? document.hasFocus()
+        : document.visibilityState === 'visible');
+    if (
+      fg &&
+      recording &&
+      liveId &&
+      locationAllowsCommentRecording() &&
+      (typeof document === 'undefined' || document.visibilityState !== 'hidden')
+    ) {
+      void setBackfillPriorityLiveId(String(liveId || '').trim().toLowerCase());
+    }
+  } catch {
+    /* no-op: 優先再アサート失敗は致命ではない(従来動作に degrade) */
+  }
   // PR1-b-3: SW backfill モード(実験・既定 OFF)。ON 時は既存経路(スロット/ローカル crawl)を起動せず
   //   SW へ起動メッセージを 1 live 1 回送る。view base 未観測/SW 未応答は次 tick で自然リトライ。
   if (_backfillSwModeEnabled) {
