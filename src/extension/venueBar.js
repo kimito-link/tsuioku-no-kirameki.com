@@ -577,14 +577,16 @@ const VENUE_CSS = `
   .nlsb-seats.nlsb-mode-normal .nlsb-seat {
     width: clamp(48px, 9vw, 120px);
   }
-  /* 2026-06-14 会議(サムネ優遇強化): 実サムネ持ちを少し大きく明るく・上品な金縁で引き立てる。
-     やりすぎない範囲(1.12倍・明るさ+8%)。匿名/ゆっくり顔は通常のまま。 */
+  /* 2026-06-15 星野ロミ会議(サムネ優遇を"一目で特別"に): 1.12倍では脳が比較を要求し
+     ノイズとして処理される(ユーザー実機「特別になってない」)→倍率の"断絶"を作る。
+     会議7体一致=scale 1.45(28→約40px)で「大きい=重要」を本能で認識させる。金縁を太く
+     はっきり+明るさ+12%。脈動は付けない(止まった大きさ=存在そのもの・上品さを保つ)。 */
   .nlsb-seat.nlsb-seat-vip .nlsb-icon {
-    transform: scale(1.12);
-    filter: brightness(1.08);
-    border-color: rgba(255, 214, 120, 0.9);
-    box-shadow: 0 0 6px rgba(255, 200, 90, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    z-index: 2;
+    transform: scale(1.45);
+    filter: brightness(1.12);
+    border-color: rgba(255, 220, 130, 1);
+    box-shadow: 0 0 0 2px rgba(255, 206, 96, 0.95), 0 0 12px 2px rgba(255, 190, 70, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+    z-index: 5;
   }
   /* 2026-06-14 星野アイデア会議2(VIP常連光らせ): 発言数+ギフトのスコアが高い「支えてる人」を
      金色オーラでやわらかく脈動させて引き立てる。実サムネ優遇(.nlsb-seat-vip)と独立=
@@ -595,9 +597,9 @@ const VENUE_CSS = `
     animation: nlsb-vip-glow 2.4s ease-in-out infinite;
     z-index: 3;
   }
-  /* 実サムネ常連は両方付くので、scale はサムネ側を活かしつつオーラを重ねる。 */
+  /* 実サムネ常連は両方付くので、scale はサムネ側(大きい方)を活かしつつ金オーラを重ねる。 */
   .nlsb-seat.nlsb-seat-vip.nlsb-seat-regular .nlsb-icon {
-    transform: scale(1.12);
+    transform: scale(1.45);
   }
   @keyframes nlsb-vip-glow {
     0%,
