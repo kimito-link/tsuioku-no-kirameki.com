@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.740',
+    date: '2026-06-15',
+    summary: 'コメントしていない配信者本人が会場に出る不具合を修正',
+    items: Object.freeze([
+      '会場モードに、コメントしていない配信者ご本人が「匿名◯◯」として出てしまう不具合を直しました。会場に並ぶのは「実際にコメントした人」だけになります',
+      '会場の参加者は本文コメントのある人で判定するようにしました（アイコンだけ画面に映った人は会場に入りません）。ギフト・広告の応援は別で扱うため影響しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.739',
     date: '2026-06-14',
     summary: '常連・応援者の金色オーラが実際に点くように改善',

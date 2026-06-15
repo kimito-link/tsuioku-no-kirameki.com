@@ -1717,8 +1717,13 @@ export function mountVenueBarButton(options = {}) {
         (keys) => chrome.storage.local.get(keys)
       );
       if (!open || liveIdFromPathname() !== liveId) return;
+      // v0.1.740 実機バグ根治: requireText:true で「実際にコメントした人(本文あり)」だけを
+      //   会場参加者にする。requireText:false だと本文が空でDOMでアバターだけ観測された人
+      //   (=コメントしていない配信者本人など)が「匿名NNN」として会場に混入していた。
+      //   ギフト/広告は保存時点で別扱い(コメント記録に含まれない)ため、この変更で応援者が
+      //   落ちることはない。
       const candidates = userLaneCandidatesFromStorage(result.rows, liveId, {
-        requireText: false
+        requireText: true
       });
       baseRows = venueRowsFromUserLaneCandidates(candidates);
       // パネルと同じ低頻度キャッシュで実サムネを補強し、会場だけ顔が欠ける差をなくす。
