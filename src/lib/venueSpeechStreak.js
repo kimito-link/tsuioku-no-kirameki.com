@@ -100,3 +100,25 @@ export function streakBubbleLifetimeMs(count, baseMs) {
   // 連続1回ごとに +500ms、ただし base*2 で頭打ち(出っぱなしを防ぐ)。
   return Math.min(base * 2, base + (c - 1) * 500);
 }
+
+/** 流速可変寿命の下限(ms)。これ以上短くしない=速すぎても一瞬で読めなくならない。 */
+export const BUBBLE_FLOW_LIFETIME_MIN_MS = 1200;
+
+/**
+ * v0.1.755 リアルタイム完璧化(星野ロミ会議): コメント流速に応じて吹き出し寿命を可変にする純関数。
+ *   遅い配信は base のまま長く残し、速い配信(人気・洪水)は短命にして次々入れ替え、画面が
+ *   古い吹き出しで埋まって「今」が見えなくなるのを防ぐ。会議結論 lifetime = base/sqrt(rate) を採用
+ *   (rate=直近のコメント/秒)。下限 BUBBLE_FLOW_LIFETIME_MIN_MS で頭打ち=速すぎても読める。
+ *   rate<=1 は base(過疎番組は長く・摩擦ゼロで賑やかさ維持)。
+ *
+ * @param {number} commentsPerSec 直近のコメント流速(件/秒)
+ * @param {number} baseMs 基準寿命(BUBBLE_LIFETIME_MS)
+ * @returns {number} 吹き出し寿命(ms)
+ */
+export function resolveBubbleFlowLifetimeMs(commentsPerSec, baseMs) {
+  const base = Number.isFinite(Number(baseMs)) && baseMs > 0 ? Number(baseMs) : 4000;
+  const rate = Number(commentsPerSec);
+  if (!Number.isFinite(rate) || rate <= 1) return base;
+  const scaled = base / Math.sqrt(rate);
+  return Math.max(BUBBLE_FLOW_LIFETIME_MIN_MS, Math.round(scaled));
+}

@@ -43,7 +43,8 @@ import {
   updateSpeechStreak,
   pruneSpeechStreaks,
   streakGlowStage,
-  streakBubbleLifetimeMs
+  streakBubbleLifetimeMs,
+  resolveBubbleFlowLifetimeMs
 } from '../lib/venueSpeechStreak.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
@@ -92,7 +93,11 @@ const AGGREGATE_INTERVAL_MS = 30_000;
 const SPEECH_INTERVAL_MS = 800;
 const BUBBLE_LIFETIME_MS = 4_000;
 const BUBBLE_FADE_MS = 600;
-const BUBBLE_MAX = 6;
+// v0.1.755 リアルタイム完璧化: 同時表示数を 6→12 に拡大。洪水時に「出してすぐ最古を消す」で
+//   一瞬しか見えない問題を緩和(寿命は流速可変で短くするので画面は埋まり続けない)。
+const BUBBLE_MAX = 12;
+// 吹き出し流速(件/秒)を測る短い窓。寿命可変(速いほど短命)の入力。
+const BUBBLE_FLOW_WINDOW_MS = 3_000;
 const BUBBLE_TEXT_MAX = 36;
 const VENUE_LAYOUT_CLASSES = [
   'nlsb-mode-empty',
@@ -1517,6 +1522,25 @@ export function mountVenueBarButton(options = {}) {
   /** @type {Array<{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }>} */
   const activeBubbles = [];
 
+  // v0.1.755 リアルタイム完璧化: 吹き出しの「流速(件/秒)」を直近窓で測り、寿命を可変にする
+  //   (速いほど短命=画面が古い吹き出しで埋まり「今」が見えなくなるのを防ぐ)。
+  /** @type {number[]} 直近の吹き出し時刻(ms)。窓外は捨てる。 */
+  let bubbleFlowTimestamps = [];
+  /** @param {number} nowMs */
+  const recordBubbleFlow = (nowMs) => {
+    bubbleFlowTimestamps.push(nowMs);
+    const cutoff = nowMs - BUBBLE_FLOW_WINDOW_MS;
+    if (bubbleFlowTimestamps.length > 256 || bubbleFlowTimestamps[0] < cutoff) {
+      bubbleFlowTimestamps = bubbleFlowTimestamps.filter((t) => t >= cutoff);
+    }
+  };
+  /** @param {number} nowMs @returns {number} 直近窓のコメント/秒 */
+  const currentBubbleFlowPerSec = (nowMs) => {
+    const cutoff = nowMs - BUBBLE_FLOW_WINDOW_MS;
+    const n = bubbleFlowTimestamps.filter((t) => t >= cutoff).length;
+    return (n / BUBBLE_FLOW_WINDOW_MS) * 1000;
+  };
+
   /**
    * @param {{ seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }} bubble
    */
@@ -1606,8 +1630,12 @@ export function mountVenueBarButton(options = {}) {
     // 席の座標を測ってレイヤー基準の頭上へ配置。既存吹き出しと重なれば上へ逃がす(衝突回避)。
     positionBubble(bubble);
 
-    // v0.1.743 「会話の連鎖」: 連続発言中の吹き出しは少し長く残し、会話が途切れない印象に。
-    const lifetimeMs = streakBubbleLifetimeMs(streak.count, BUBBLE_LIFETIME_MS);
+    // v0.1.755 リアルタイム完璧化: 流速可変の基準寿命(速い配信は短命=次々入れ替え、過疎は長く)。
+    //   その上で連続発言の人は少し長く残す(会話の連鎖)。max で「連続発言は流速可変より短くしない」。
+    const now = Date.now();
+    recordBubbleFlow(now);
+    const flowBase = resolveBubbleFlowLifetimeMs(currentBubbleFlowPerSec(now), BUBBLE_LIFETIME_MS);
+    const lifetimeMs = Math.max(flowBase, streakBubbleLifetimeMs(streak.count, flowBase));
     const reducedMotion =
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2222,7 +2250,10 @@ export function mountVenueBarButton(options = {}) {
     pruneSpeechStreaks(speechStreaks, Date.now());
     // primeEmit: 会場を開いた瞬間に直近3件を吹き出す(過疎番組でも会場が喋って見える)。
     //   2回目以降は primed 済みなので新着だけ。過去ログ一斉飛びは起きない。
-    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 8, primeEmit: 3 });
+    // v0.1.755 リアルタイム完璧化: maxEmit 8→24。洪水時に「9件目以降の新着を取りこぼす」のを防ぐ
+    //   (会議結論=取りこぼさず全部通す)。同時表示数は BUBBLE_MAX(12)+流速可変寿命で抑えるので
+    //   画面は埋まり続けない。24 は1ポーリング/1バーストの現実的上限(初回フラッシュは primeEmit で別管理)。
+    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 24, primeEmit: 3 });
     speechState = {
       seenKeys: result.seenKeys,
       primed: result.primed

@@ -98,9 +98,24 @@ if (E) members.push({ label: 'gemini-2.5-flash', run: () => geminiChat('gemini-2
 // OpenRouter は無料枠で 429 が出やすい=予備の1票(reference-free-cloud-llm-apis.md)。
 const OR = 'https://openrouter.ai/api/v1/chat/completions';
 if (O) members.push({ label: 'openrouter/gpt-oss-120b', run: () => openaiChat(OR, O, 'openai/gpt-oss-120b:free', { reasoning_effort: 'low' }) });
-// ローカル(オフライン保険・別頭脳)。重いものは少数に絞る。
-members.push({ label: 'local/gpt-oss:20b', run: () => ollamaChat('gpt-oss:20b') });
-members.push({ label: 'local/qwen3.5:9b', run: () => ollamaChat('qwen3.5:9b') });
+// ローカル(オフライン保険・別頭脳・無料無制限)。ユーザー要望「無料LLM全部使え=コスパ良く良い物」
+//   に応え、インストール済みの多様な系統(gpt-oss/qwen/deepseek/gemma/hermes)を全員集合させる。
+//   存在しないモデルは ollama が即エラー→該当票が FAILED になるだけ(他は止めない)。
+//   MEETING_LOCAL_MODELS=csv で上書き可。既定は実機にある主要モデル。
+const LOCAL_DEFAULT = [
+  'gpt-oss:20b',
+  'qwen3.5:9b',
+  'qwen3:14b',
+  'deepseek-r1:14b',
+  'gemma4:31b',
+  'qwen2.5:14b',
+  'hermes3:8b'
+];
+const localModels = (process.env.MEETING_LOCAL_MODELS || LOCAL_DEFAULT.join(','))
+  .split(',').map((s) => s.trim()).filter(Boolean);
+for (const m of localModels) {
+  members.push({ label: `local/${m}`, run: () => ollamaChat(m) });
+}
 
 console.error(`会議メンバー ${members.length}体に並列で問い合わせ中...\n`);
 const t0 = Date.now();
