@@ -20,7 +20,7 @@ import {
 } from '../lib/storageKeys.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
-import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows } from '../lib/venueSpeech.js';
+import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
 import {
   updateSpeechStreak,
   pruneSpeechStreaks,
@@ -1070,10 +1070,12 @@ function createSeatNode(seatIndex) {
  */
 export function mountVenueBarButton(options = {}) {
   const isStandalone = !!options.standalone;
-  if (!liveIdFromPathname()) return;
-  if (document.getElementById(ROOT_ID)) return;
+  // v0.1.752: 未マウント時も呼び出し側が null チェック不要なよう no-op API を返す。
+  const NOOP_API = { onLiveComments: () => {} };
+  if (!liveIdFromPathname()) return NOOP_API;
+  if (document.getElementById(ROOT_ID)) return NOOP_API;
   const parent = isStandalone ? document.body : document.documentElement;
-  if (!parent) return;
+  if (!parent) return NOOP_API;
 
   ensureVenueStyle();
 
@@ -2081,6 +2083,75 @@ export function mountVenueBarButton(options = {}) {
     }, AGGREGATE_INTERVAL_MS);
   };
 
+  // v0.1.752: storage poll とリアルタイム live feed の両方が通る共通処理。引数 rows から
+  //   新着発言を抽出(pickNewVenueSpeech)→席へマージ→吹き出し+読み上げ。両経路が同じ
+  //   speechState.seenKeys を共有するので、同じコメントが poll と live で来ても1回だけ吹く。
+  /** @param {Array<Record<string, any>>} rows */
+  const processSpeechRows = (rows) => {
+    // 熱量の色温度: コメントが来ない時もこの poll は回る(窓が空けば level 0 へ自然に冷める)。
+    applyVenueHeat(rows);
+    // 「会話の連鎖」: 発言が途切れた人のストリークを掃除(席のグローが自然に消える)。
+    pruneSpeechStreaks(speechStreaks, Date.now());
+    // primeEmit: 会場を開いた瞬間に直近3件を吹き出す(過疎番組でも会場が喋って見える)。
+    //   2回目以降は primed 済みなので新着だけ。過去ログ一斉飛びは起きない。
+    const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 8, primeEmit: 3 });
+    speechState = {
+      seenKeys: result.seenKeys,
+      primed: result.primed
+    };
+    // ユーザー方針「しゃべった人を席に出して吹かせる」: 新着発言者を会場行にマージして
+    //   先に席を作り直す(buildVenueSeating が capturedAt=now で上位席へ出す)。その後で
+    //   吹き出しを出すと、しゃべった人の席が必ず存在するので吹き出しが宙に浮かない。
+    if (result.speeches.length > 0) {
+      // しゃべった人(匿名含む)の userId を昇格集合へ。次の renderSeats でアリーナ席に座り
+      //   吹き出しが席の頭上に出る(ニコ生実況は匿名主体なのでこれが無いと吹き出さない)。
+      for (const speech of result.speeches) {
+        const uid = String(speech.userId || '').trim();
+        if (uid) spokenUserIds.add(uid);
+      }
+      baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, Date.now());
+      // commitDisplay 経由で lastGood を更新(発言者マージ結果は常に非空=新鮮データ扱い)。
+      //   こうすると次の集計が一瞬0件でも、この発言者を含む表示が前状態として維持される。
+      commitDisplay(baseRows);
+    }
+    for (const speech of result.speeches) {
+      // 吹き出しは「しゃべった瞬間」に必ず出す。音声(VOICEVOX)とは切り離す。
+      //   旧実装は読み上げON時に onPlayStart(声の再生開始)で吹き出していたが、VOICEVOXが
+      //   無い/起動していないと声が鳴らず onPlayStart が呼ばれない→吹き出しが永久に出ない
+      //   バグだった(ユーザー実機で発覚)。会場の既定は読み上げ自動ONなので踏みやすい。
+      //   吹き出しは視覚要素なので音声の成否に依存させない。声は鳴るなら別途鳴る。
+      showSpeechBubble(speech);
+      if (voicePlayer.enabled) {
+        voicePlayer.enqueue([{
+          kind: 'comment',
+          userId: speech.userId,
+          nickname: speech.name,
+          key: speech.key,
+          text: speech.text
+        }]);
+      }
+    }
+  };
+
+  // v0.1.752 リアルタイム化: 録画側(content-entry.js persistCommentRows)が新着コメントを
+  //   in-memory で即流すフック。storage 往復(~1.5秒のコアレッサ)を待たず吹き出す。
+  //   commentNo を持つ行だけに絞る=後から storage 経路で来る同じコメントと venueSpeechKey が
+  //   一致し seenKeys で dedup される(二重吹き出し防止)。会場が閉じている/別配信なら何もしない。
+  //   throw しても録画パイプラインを壊さないよう、呼び出し側(content)で try/catch する。
+  /**
+   * @param {string} incomingLiveId
+   * @param {ReadonlyArray<Record<string, unknown>>} rows
+   */
+  const onLiveComments = (incomingLiveId, rows) => {
+    if (!open) return; // 閉じている間は何もしない(開いた時に pollSpeech が storage から再シード)
+    const cur = liveIdFromPathname();
+    if (!cur || cur !== incomingLiveId) return; // 配信切替中の遅延コールバックは捨てる
+    if (speechLiveId !== cur) resetSpeechTracking(cur); // pollSpeech と同じ追従
+    const feedRows = liveFeedSpeechRows(rows);
+    if (feedRows.length === 0) return;
+    processSpeechRows(feedRows);
+  };
+
   const pollSpeech = async () => {
     if (!open || speechInFlight) return;
     const liveId = liveIdFromPathname();
@@ -2104,49 +2175,7 @@ export function mountVenueBarButton(options = {}) {
       const summary = /** @type {{ recent?: unknown }|undefined} */ (bag?.[summaryKey]);
       const recentRows = Array.isArray(summary?.recent) ? summary.recent : [];
       const rows = tailRows.length > 0 ? tailRows : recentRows;
-      // 熱量の色温度: コメントが来ない時もこの poll は回る(窓が空けば level 0 へ自然に冷める)。
-      applyVenueHeat(rows);
-      // 「会話の連鎖」: 発言が途切れた人のストリークを掃除(席のグローが自然に消える)。
-      pruneSpeechStreaks(speechStreaks, Date.now());
-      // primeEmit: 会場を開いた瞬間に直近3件を吹き出す(過疎番組でも会場が喋って見える)。
-      //   2回目以降は primed 済みなので新着だけ。過去ログ一斉飛びは起きない。
-      const result = pickNewVenueSpeech(rows, speechState, { maxEmit: 8, primeEmit: 3 });
-      speechState = {
-        seenKeys: result.seenKeys,
-        primed: result.primed
-      };
-      // ユーザー方針「しゃべった人を席に出して吹かせる」: 新着発言者を会場行にマージして
-      //   先に席を作り直す(buildVenueSeating が capturedAt=now で上位席へ出す)。その後で
-      //   吹き出しを出すと、しゃべった人の席が必ず存在するので吹き出しが宙に浮かない。
-      if (result.speeches.length > 0) {
-        // しゃべった人(匿名含む)の userId を昇格集合へ。次の renderSeats でアリーナ席に座り
-        //   吹き出しが席の頭上に出る(ニコ生実況は匿名主体なのでこれが無いと吹き出さない)。
-        for (const speech of result.speeches) {
-          const uid = String(speech.userId || '').trim();
-          if (uid) spokenUserIds.add(uid);
-        }
-        baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, Date.now());
-        // commitDisplay 経由で lastGood を更新(発言者マージ結果は常に非空=新鮮データ扱い)。
-        //   こうすると次の集計が一瞬0件でも、この発言者を含む表示が前状態として維持される。
-        commitDisplay(baseRows);
-      }
-      for (const speech of result.speeches) {
-        // 吹き出しは「しゃべった瞬間」に必ず出す。音声(VOICEVOX)とは切り離す。
-        //   旧実装は読み上げON時に onPlayStart(声の再生開始)で吹き出していたが、VOICEVOXが
-        //   無い/起動していないと声が鳴らず onPlayStart が呼ばれない→吹き出しが永久に出ない
-        //   バグだった(ユーザー実機で発覚)。会場の既定は読み上げ自動ONなので踏みやすい。
-        //   吹き出しは視覚要素なので音声の成否に依存させない。声は鳴るなら別途鳴る。
-        showSpeechBubble(speech);
-        if (voicePlayer.enabled) {
-          voicePlayer.enqueue([{
-            kind: 'comment',
-            userId: speech.userId,
-            nickname: speech.name,
-            key: speech.key,
-            text: speech.text
-          }]);
-        }
-      }
+      processSpeechRows(rows);
     } catch {
       // 一時的に storage を読めない場合は、基準を進めず次回の軽量ポーリングへ任せる。
     } finally {
@@ -2308,6 +2337,11 @@ export function mountVenueBarButton(options = {}) {
     // ページロード時は常に閉じた状態からスタートし、意図して開く形にする。
     setOpen(false, false);
   }
+
+  // v0.1.752: 録画側(content-entry.js)が新着コメントを in-memory で即流すための API を返す。
+  //   watch タブの content script は同一コンテキストなので storage 往復を待たず吹き出せる。
+  //   別コンテキストの standalone venue.html は呼ばれず、従来どおり pollSpeech のみで動く(無害)。
+  return { onLiveComments };
 }
 
 export function mountVenueStandalone(/** @type {string} */ liveId) {

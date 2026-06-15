@@ -587,6 +587,13 @@ const DEEP_HARVEST_ZERO_ROW_RETRY_DELAY_MS = 1600;
 /** 定期 quiet deep は既定 1-pass。この間隔ごとに 2-pass で仮想リスト取りこぼしを回収する */
 const PERIODIC_DEEP_FULL_TWO_PASS_EVERY = 2;
 let periodicDeepWeakPassTick = 0;
+/**
+ * v0.1.752 会場リアルタイム化: mountVenueBarButton が返す API({ onLiveComments })。
+ * persistCommentRows が新着コメントを storage 往復を待たず会場へ即流すために保持する。
+ * 未マウント時は null(タップは optional chaining + try/catch で無害)。
+ * @type {{ onLiveComments: (liveId: string, rows: ReadonlyArray<Record<string, unknown>>) => void }|null}
+ */
+let _venueApi = null;
 /** 長めの待ちのあいだ、オリジナルキャラクターりんくで「読み込み中」と示す（web_accessible と一致させる） */
 const DEEP_HARVEST_LOADING_HOST_ID = 'nl-deep-harvest-loading';
 const DEEP_HARVEST_LOADING_IMG_PATH =
@@ -10752,6 +10759,15 @@ function persistCommentRows(rows, opts = {}) {
     _commentIngestSourceCounters.unknown += incBy;
   }
   persistCoalescer.enqueue(/** @type {ParsedCommentRow[]} */ (filtered));
+  // v0.1.752 会場リアルタイム化: 会場(同一 content script)へ新着を in-memory で即流す。
+  //   storage 往復(persistCoalescer ~1.5秒)を待たず吹き出す。会場側が commentNo 持ち行に絞り、
+  //   後から storage 経路で来る同じコメントとは seenKeys で dedup される(二重吹き出し無し)。
+  //   会場の処理が throw しても録画パイプラインを壊さないよう try/catch で握りつぶす(fail-safe)。
+  try {
+    _venueApi?.onLiveComments?.(liveId, filtered);
+  } catch {
+    /* no-op: 会場通知の失敗はコメント記録に影響させない */
+  }
 }
 
 /**
@@ -12659,7 +12675,7 @@ function createDevMonitorOverlay() {
 async function start() {
   if (!hasExtensionContext()) return;
   if (!shouldRunWatchContentInThisFrame()) return;
-  if (isWatchInlinePanelTopFrame()) mountVenueBarButton();
+  if (isWatchInlinePanelTopFrame()) _venueApi = mountVenueBarButton();
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
   await readCommentPanelAutoRestoreFromStorage();

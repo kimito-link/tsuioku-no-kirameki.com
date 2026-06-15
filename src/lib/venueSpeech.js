@@ -45,6 +45,34 @@ export function venueSpeakerKey(row) {
 }
 
 /**
+ * v0.1.752 リアルタイム吹き出しの安全フィルタ: ライブ経路(persistCommentRows の in-memory tap)
+ * で会場へ流す行を「commentNo を持つ行だけ」に絞る純関数。
+ *
+ * 設計(クロスソース二重吹き出し防止): 同じコメントは後から storage 経路(pollSpeech)でも届く。
+ *   両経路で venueSpeechKey が一致しないと2度吹き出す。commentNo を持つ行は両経路とも
+ *   `no:<commentNo>` で一致し、共有する speechState.seenKeys で2度目が弾かれる(=1回だけ)。
+ *   commentNo を持たない行(DOM harvest で no 未取得等)は合成キー(c:uid:text:cap)になり、
+ *   後から storage 側が commentNo を得ると `no:` 形に化けてキーがずれ二重吹き出しになりうる。
+ *   それを避けるため、ライブ経路は commentNo 確定行だけに限定し、未確定行は従来どおり storage
+ *   経路に委ねる(リアルタイムの主役 NDGR_FORWARD は commentNo を必ず持つので体感は損なわない)。
+ *
+ * @param {ReadonlyArray<Record<string, unknown>>} rows
+ * @returns {Array<Record<string, unknown>>} commentNo(または no エイリアス)を持つ行だけ
+ */
+export function liveFeedSpeechRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  const out = [];
+  for (const r of rows) {
+    if (!r || typeof r !== 'object') continue;
+    const no = r.commentNo ?? r.no;
+    if (no == null) continue;
+    if (!String(no).trim()) continue;
+    out.push(r);
+  }
+  return out;
+}
+
+/**
  * 新着発言を抽出する純関数。
  *
  * @param {ReadonlyArray<Record<string, unknown>>} rows ライブ新着コメント(昇順=古い→新しい想定)
