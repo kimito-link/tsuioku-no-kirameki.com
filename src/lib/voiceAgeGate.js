@@ -1,37 +1,53 @@
 /**
  * 読み上げアイテムが鮮度切れかどうか判定する純関数。
  *
- * v0.1.755 リアルタイム完璧化(星野ロミ会議・無料LLM全員集合): VOICEVOX 合成が実時間に
- *   追いつかずキューが詰まると、読み上げが実際のコメントから何十秒も遅れる(=「読み上げがだめ」
- *   の本命)。会議結論「最新優先・古い未合成は破棄・リアルタイム=今喋ってることだけ聞こえる」に
- *   沿って鮮度しきい値を【積極的に短く】する。少し溜まったら即座に古いものを捨て、常に直近の
- *   コメントだけを読む。ギフト等の高優先は確実に読みたいので長めを維持。
+ * v0.1.755 リアルタイム完璧化(星野ロミ会議): 合成が実時間に追いつかない時、古い未合成を破棄して
+ *   「今喋ってること」だけ聞こえるようにする狙いで鮮度しきい値を積極短縮した。
+ * v0.1.773 でさらに短縮(1800ms / backlog 1200ms)→「吹き出しは出るが音声がゼロ」回帰を生み、
+ *   v0.1.781 で 2500ms / backlog 1200ms@3件 に戻して暫定回避。
+ *
+ * v0.1.782 わんコメ(OneComme 9.0.2)解析を踏まえた再設計:
+ *   実バイナリ解析で、わんコメは読み上げの破棄を【件数ゲート1本(limitQueue=10 超で最古を捨てる)】で
+ *   やっており、時間(鮮度)ゲートを一切持たないことが判明(reference_onecomme_asar_decode_2026-06-16)。
+ *   件数ゲートだけでもラグは「キュー長 × 1本の再生時間」で有界になり、溢れたら必ず最古から捨てる=
+ *   常に直近コメントが読まれ、かつ絶対にゼロ音声にならない。我々の v0.1.773 ゼロ音声回帰は、件数ゲートに
+ *   加えて時間ゲートを再生1本ぶん(1〜3秒)より短く効かせ、再生待ち中に全部 stale 化させたのが原因=
+ *   【時間ゲートの罠】。
+ *
+ *   そこで本再設計では:
+ *     ・リアルタイム維持(古いものを捨てて今に追従)は【件数ゲート(pushVoiceQueue の最古drop)】が主軸。
+ *       キュー上限を 12→8 に下げ、わんコメ同様にラグを小さく保つ(voicePlayer 側で変更)。
+ *     ・この時間ゲートは【安全網】に格下げ。タブ凍結(visibilitychange でスロットリング)等で
+ *       本当に何秒も放置された item だけを落とす高いしきい値にし、「再生順を待っているだけ」の item は
+ *       絶対に落とさない。backlog 短縮(再生1本ぶんを下回る罠)は撤廃する。
  *
  * @param {number} enqueuedAt - enqueue時のDate.now()
  * @param {number} now - 現在時刻
- * @param {number} queueLength - 現在のキュー長
+ * @param {number} queueLength - 現在のキュー長(後方互換のため受け取るが安全網しきい値は一定)
  * @param {boolean} [isHighPriority=false] - ギフトなど確実に読みたいアイテムか
  * @returns {{ stale: boolean, reason: string }}
  */
 
 /**
- * 通常コメントの鮮度しきい値(ms・キューが空いている時)。これを超えたら読まずに捨てる。
- * v0.1.781 回帰修正: v0.1.773 で 1800ms へ縮めたが、これが「吹き出しは出るが音声が全く出ない」回帰を
- *   生んだ。1件の読み上げ(合成+再生)は普通に1〜3秒かかるため、しきい値が再生時間を下回ると、
- *   2件目以降が【自分の再生順が来る前に】必ず stale 化して全部捨てられ、結果ゼロ音声になる。
- *   再生1本ぶんを下回らない 2500ms に戻す(v0.1.773 以前の実績値)。
+ * 通常コメントの安全網しきい値(ms)。これを超えた=タブ凍結等で本当に放置された item だけ捨てる。
+ * v0.1.782: リアルタイム維持は件数ゲート(最古drop)が担うので、時間ゲートは「再生順を待っているだけ」の
+ *   item を絶対に落とさない高さ(8秒)にする。キュー上限8 × 再生1本(~1秒)≒最大でも数秒の待ちは通す。
+ *   これより低くすると再生待ち中の stale 化でゼロ音声に戻るため、二度と再生1本ぶんを下回らせない。
  */
-export const VOICE_STALE_MS_NORMAL = 2500;
-/** バックログがある時(queueLength >= VOICE_STALE_BACKLOG_QUEUE)の短縮しきい値(ms)。 */
-export const VOICE_STALE_MS_BACKLOG = 1200;
+export const VOICE_STALE_MS_NORMAL = 8000;
 /**
- * この件数以上溜まったら短縮しきい値に切り替えてドロップを加速(リアルタイム維持)。
- * v0.1.781: 2→3 に戻す。queue=2 で 1200ms に縮めると、再生待ち1本(1〜3秒)で常に stale 化し
- *   音声が全く出なくなる(ゼロ音声回帰)。3件以上溜まった時だけ加速する実績値に戻す。
+ * v0.1.782: backlog 短縮は撤廃(=通常しきい値と同値)。件数ゲートがリアルタイム維持を担うため、
+ *   時間ゲートをキュー長で短縮する必要がなくなった。後方互換のため定数は残すが NORMAL と同値にする。
+ *   旧 export を参照するコードを壊さないための互換シム。
  */
-export const VOICE_STALE_BACKLOG_QUEUE = 3;
+export const VOICE_STALE_MS_BACKLOG = 8000;
+/**
+ * v0.1.782: 件数しきい値は実質無効化(到達不能な大きさ)。backlog 短縮を撤廃したので、
+ *   どのキュー長でも通常(安全網)しきい値が使われる。後方互換のため残置。
+ */
+export const VOICE_STALE_BACKLOG_QUEUE = Number.POSITIVE_INFINITY;
 /** ギフト等の高優先は確実に読みたいので長め(ms)。 */
-export const VOICE_STALE_MS_HIGH_PRIORITY = 6000;
+export const VOICE_STALE_MS_HIGH_PRIORITY = 10000;
 
 /**
  * @param {number} enqueuedAt - enqueue時のDate.now()
@@ -58,10 +74,12 @@ export function isVoiceItemStale(enqueuedAt, now, queueLength, isHighPriority = 
     return { stale: false, reason: '' };
   }
 
-  // 通常コメント: 基本 2.5秒。少しでも溜まったら(3件以上)1.2秒に短縮してドロップを加速し、
-  //   常に「今」のコメントだけを読む(リアルタイム=溜まった古い読み上げを聞かせない)。
-  const thresholdMs =
-    queueLength >= VOICE_STALE_BACKLOG_QUEUE ? VOICE_STALE_MS_BACKLOG : VOICE_STALE_MS_NORMAL;
+  // v0.1.782: 通常コメントは安全網しきい値(8秒)一本。リアルタイム維持は件数ゲート
+  //   (pushVoiceQueue の最古drop)が担うので、ここで再生待ちの item を落とすことはしない。
+  //   backlog 短縮(再生1本ぶんを下回るとゼロ音声になる罠)は撤廃。queueLength は後方互換で
+  //   受け取るが、しきい値はキュー長に依存しない(VOICE_STALE_BACKLOG_QUEUE=Infinity のため
+  //   下の比較は常に NORMAL を選ぶ。明示のため NORMAL を直接使う)。
+  const thresholdMs = VOICE_STALE_MS_NORMAL;
   if (ageMs > thresholdMs) {
     return { stale: true, reason: `age ${ageMs}ms > ${thresholdMs}ms (q: ${queueLength})` };
   }

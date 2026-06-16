@@ -381,7 +381,11 @@ export class VoicePlayer {
         continue;
       }
       
-      const pushed = pushVoiceQueue(this.queue, candidate, { max: 12 });
+      // v0.1.782: わんコメ(OneComme limitQueue=10)に倣い、リアルタイム維持の主軸を
+      //   【件数ゲート(最古drop)】に置く。上限を 12→8 に下げ、ラグを「8件 × 再生1本」に有界化。
+      //   溢れたら最古から捨てる=常に直近コメントが読まれ、絶対にゼロ音声にならない。時間ゲート
+      //   (voiceAgeGate)は安全網(8秒・タブ凍結放置だけ落とす)に格下げ済み。
+      const pushed = pushVoiceQueue(this.queue, candidate, { max: 8 });
       this.queue = pushed.queue;
       
       if (pushed.dropped && pushed.dropped.length > 0) {
