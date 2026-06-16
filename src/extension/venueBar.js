@@ -241,26 +241,19 @@ const VENUE_CSS = `
       radial-gradient(ellipse 78% 64% at 50% 46%, transparent 52%, rgba(2, 4, 10, 0.55) 100%),
       linear-gradient(to bottom, transparent 64%, rgba(2, 4, 12, 0.5) 100%);
   }
-  .nlsb-close {
-    position: absolute;
-    top: 16px;
-    right: 18px;
-    z-index: 2;
-    min-height: 36px;
-    padding: 7px 13px;
-    border: 1px solid rgba(255, 255, 255, 0.24);
-    border-radius: 999px;
-    background: rgba(18, 23, 31, 0.88);
-    color: #fff;
-    cursor: pointer;
-    font: inherit;
-    font-size: 13px;
+  /* v0.1.772: 閉じるは右上隅(absolute)でなくヘッダー右端の他ボタンと並べる(nlsb-comeview-btn 流用)。
+     閉じる専用に薄赤の見た目を上書きして「閉じる」と分かりやすくする。 */
+  .nlsb-close-btn {
+    border-color: rgba(255, 150, 150, 0.45);
+    background: rgba(60, 30, 34, 0.7);
+    color: #ffd2cf;
   }
-  .nlsb-close:hover {
-    background: rgba(40, 48, 60, 0.96);
+  .nlsb-close-btn:hover {
+    background: rgba(90, 40, 46, 0.92);
+    border-color: rgba(255, 170, 170, 0.7);
   }
-  .nlsb-close:focus-visible {
-    outline: 2px solid #8dc8ff;
+  .nlsb-close-btn:focus-visible {
+    outline: 2px solid #ffb4a2;
     outline-offset: 2px;
   }
   /* v0.1.770 VOICEVOX 起動待ちの「楽しいローディング」(会議 2026-06-16):
@@ -1171,8 +1164,12 @@ export function mountVenueBarButton(options = {}) {
 
   const close = document.createElement('button');
   close.type = 'button';
-  close.className = 'nlsb-close';
+  // v0.1.772 ユーザー指摘「閉じるは会場モードの近く(=ヘッダー)に無いとわかりにくい」:
+  //   右上隅の absolute 配置(nlsb-close)をやめ、ヘッダー右端に他のボタンと並べる(nlsb-comeview-btn
+  //   スタイル流用)。nlsb-close-btn は閉じる専用の見た目(薄赤)を当てるための追加クラス。
+  close.className = 'nlsb-comeview-btn nlsb-close-btn';
   close.textContent = '✕ 閉じる';
+  close.title = '会場モードを閉じます';
 
   // v0.1.770 ユーザー要望「会場モードの閉じるボタンも会場のタブにつけて」:
   //   別窓化した会場タブ(standalone=venue.html)にも閉じるボタンを出す。インライン版は会場を畳むだけ
@@ -1281,10 +1278,12 @@ export function mountVenueBarButton(options = {}) {
   const note = document.createElement('div');
   note.className = 'nlsb-note';
   note.textContent = '全コメント集計・最大150席';
+  // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
+  //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note);
+    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note, close);
   } else {
-    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, note);
+    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, note, close);
   }
   header.append(title, headerRight);
 
@@ -1393,7 +1392,7 @@ export function mountVenueBarButton(options = {}) {
   const rosterPanel = document.createElement('div');
   rosterPanel.className = 'nlsb-roster-panel';
   rosterPanel.hidden = true;
-  stage.append(close, stageLayout, bubbleLayer, rosterPanel);
+  stage.append(stageLayout, bubbleLayer, rosterPanel);
   root.append(toggle, stage);
   parent.appendChild(root);
 
