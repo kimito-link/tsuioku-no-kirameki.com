@@ -2017,6 +2017,35 @@ export function mountVenueBarButton(options = {}) {
     }
   };
 
+  // v0.1.778: NDGR構造化ギフトevent(StoredGiftEvent: {userId,itemName,point,capturedAt})からの投げ。
+  //   ギフトコメント本文(maybeThrowGiftFromSpeech)が来ない配信でも、これが確実な一次トリガ。
+  //   onChanged は配列全体が来るので、既に投げた event を seen で除外して新着だけ投げる。
+  /** @type {Set<string>} */
+  const thrownGiftEventKeys = new Set();
+  /** @param {Array<Record<string, any>>} events */
+  const handleNewGiftEvents = (events) => {
+    if (!open || !Array.isArray(events)) return;
+    for (const ev of events) {
+      if (!ev || typeof ev !== 'object') continue;
+      const uid = String(ev.userId || '').trim();
+      const item = String(ev.itemName || '').trim();
+      const point = Number(ev.point) || 0;
+      const key = `${uid}|${ev.capturedAt || ''}|${item}|${point}`;
+      if (thrownGiftEventKeys.has(key)) continue;
+      thrownGiftEventKeys.add(key);
+      // seen 集合の暴走防止(直近のみ保持)。
+      if (thrownGiftEventKeys.size > 400) {
+        const arr = [...thrownGiftEventKeys];
+        thrownGiftEventKeys.clear();
+        for (const k of arr.slice(-200)) thrownGiftEventKeys.add(k);
+      }
+      const proj = resolveGiftProjectile({ item, point }, 'gift');
+      // 起点: 席キーは venueSpeakerKey/venueParticipantKey と同じ `u:${uid}` 形にする
+      //   (raw uid だと seatByKey に当たらず常に crowdBubbleAnchor へ落ちる)。
+      if (proj) launchGiftThrow(uid ? `u:${uid}` : '', proj);
+    }
+  };
+
   /**
    * 1つの吹き出しを、対応する席の頭上(レイヤー基準)へ絶対配置する。
    * 既に表示中の吹き出しと縦に重なる場合は上方向へオフセットして読めるようにする。
@@ -2813,6 +2842,13 @@ export function mountVenueBarButton(options = {}) {
     } else if (changes[tailKey] || changes[summaryKey]) {
       // tail が無い(summary だけ等)時は従来どおり storage から読む保険。
       void pollSpeech();
+    }
+    // v0.1.778: NDGR構造化ギフトevent(nls_gift_events_<lv>)の新着を投げ演出の主トリガにする。
+    //   ギフトコメント本文は来ないことがある(NDGR仕様・診断 gifts:0 でも giftPoints あり)ので、
+    //   構造化 event(userId/itemName/point を直接持つ)を一次ソースにする方が確実。
+    const giftEventsKey = `nls_gift_events_${liveId}`;
+    if (changes[giftEventsKey] && Array.isArray(changes[giftEventsKey].newValue)) {
+      handleNewGiftEvents(/** @type {Array<Record<string, any>>} */ (changes[giftEventsKey].newValue));
     }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。
     //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に
