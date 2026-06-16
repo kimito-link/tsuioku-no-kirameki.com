@@ -183,7 +183,7 @@ export function parseBackfillHeartbeat(raw) {
  *   now: number,
  *   swAlreadyCrawling: boolean,  // SW registry にこの lid の crawl が在るか
  *   hasForegroundTab: boolean,   // この lid の前面(focused)タブが居るか(SW が tabs.query で判定)
- *   enabled?: boolean,           // KEY_BACKFILL_BG_KICK_ENABLED(既定 true 扱い)
+ *   enabled?: boolean,           // KEY_BACKFILL_BG_KICK_ENABLED(v0.1.796 で既定 OFF=明示 true のみ)
  *   maxStaleMs?: number,
  *   minGap?: number
  * }} args
@@ -196,11 +196,12 @@ export function shouldSwKickBackfillForLive({
   now,
   swAlreadyCrawling,
   hasForegroundTab,
-  enabled = true,
+  enabled = false,
   maxStaleMs = BACKFILL_HEARTBEAT_STALE_MS,
   minGap = BACKFILL_HEARTBEAT_MIN_GAP
 }) {
-  if (enabled === false) return { kick: false, reason: 'disabled' };
+  // v0.1.796: 既定 OFF(opt-in)。明示 true のときだけ kick を許す(記録保護)。
+  if (enabled !== true) return { kick: false, reason: 'disabled' };
   // parseBackfillHeartbeat は生値も parse 済みも同じ形に正規化する(冪等)ので両対応で渡せる。
   const hb = parseBackfillHeartbeat(heartbeat);
   if (!hb) return { kick: false, reason: 'no_hb' };

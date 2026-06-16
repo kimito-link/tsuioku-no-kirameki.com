@@ -1439,12 +1439,14 @@ async function runBackfillBgKickTick() {
     if (!globalThis.__nlsSwBackfill || typeof globalThis.__nlsSwBackfill.startSwCrawl !== 'function') {
       return; // SW crawl エンジン未ロード=従来動作(content 経路のみ)
     }
-    let enabled = true;
+    // v0.1.796: 既定 OFF(明示 true のみ ON)。実機で v0.1.795 反映後に記録が止まった報告→SW 背面 crawl が
+    //   共有 storage/SW を圧迫し記録 IDB append を巻き込んだ疑い。記録(コア機能)保護のため opt-in に格下げ。
+    let enabled = false;
     try {
       const bag = await chrome.storage.local.get(KEY_BACKFILL_BG_KICK_ENABLED);
-      enabled = bag[KEY_BACKFILL_BG_KICK_ENABLED] !== false; // 既定 ON
+      enabled = bag[KEY_BACKFILL_BG_KICK_ENABLED] === true; // 既定 OFF
     } catch {
-      enabled = true;
+      enabled = false;
     }
     if (!enabled) return;
 

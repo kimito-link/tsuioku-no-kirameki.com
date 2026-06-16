@@ -464,7 +464,8 @@ import {
   backfillHeartbeatKey,
   buildBackfillHeartbeat,
   mergeHeartbeatLidIndex,
-  KEY_BACKFILL_HEARTBEAT_INDEX
+  KEY_BACKFILL_HEARTBEAT_INDEX,
+  KEY_BACKFILL_BG_KICK_ENABLED
 } from '../lib/backfillHeartbeat.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
@@ -13083,9 +13084,15 @@ async function start() {
   //   に戻す。KEY_NDGR_FORWARD_ENABLED を明示 true にすればオプトインで常時 ON を選べる(=true 厳密一致で復活)。
   //   PR1-b-3 SW backfill モードも従来どおり既定 OFF(true 厳密一致)。
   try {
-    chrome.storage.local.get([KEY_NDGR_FORWARD_ENABLED, KEY_BACKFILL_SW_MODE]).then((bag) => {
+    chrome.storage.local.get([
+      KEY_NDGR_FORWARD_ENABLED,
+      KEY_BACKFILL_SW_MODE,
+      KEY_BACKFILL_BG_KICK_ENABLED
+    ]).then((bag) => {
       _ndgrForwardEnabled = !!(bag && bag[KEY_NDGR_FORWARD_ENABLED] === true);
       _backfillSwModeEnabled = !!(bag && bag[KEY_BACKFILL_SW_MODE] === true);
+      // v0.1.796: 背面 backfill kick は明示 true のみ ON(既定 OFF・記録保護)。
+      _backfillBgKickEnabled = !!(bag && bag[KEY_BACKFILL_BG_KICK_ENABLED] === true);
     }).catch(() => { /* 既定 OFF を維持(取得失敗時も常時 forward は走らせない) */ });
   } catch { /* no-op */ }
 
@@ -13185,6 +13192,11 @@ async function start() {
     // PR1-b-3: SW backfill モード(実験・既定 OFF)の同期。次の maintenance tick から経路が切り替わる。
     if (changes[KEY_BACKFILL_SW_MODE]) {
       _backfillSwModeEnabled = changes[KEY_BACKFILL_SW_MODE].newValue === true;
+    }
+
+    // v0.1.796: 背面 backfill kick(既定 OFF)の同期。true でハートビート書き込みが復活(次 tick から)。
+    if (changes[KEY_BACKFILL_BG_KICK_ENABLED]) {
+      _backfillBgKickEnabled = changes[KEY_BACKFILL_BG_KICK_ENABLED].newValue === true;
     }
 
     // v0.1.513: インクリメンタル dedupe flag の同期。OFF→ON / ON→OFF どちらでも、
@@ -15311,6 +15323,11 @@ let _ndgrDeterministicBackfillEnabled =
   typeof NL_DEV_HOTRELOAD !== 'undefined' && NL_DEV_HOTRELOAD;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
+/** v0.1.796: 背面 backfill kick(v0.1.795)の有効化。⚠️【既定 OFF へ変更】=実機で v0.1.795 反映後に
+ *  記録が止まった報告→SW 背面 crawl が共有 storage/SW を圧迫して記録 IDB append を巻き込んだ疑い。
+ *  記録(コア機能)を守るため opt-in(明示 true のみ)に格下げ。true でハートビート書き込みも SW kick も復活。
+ *  KEY_BACKFILL_BG_KICK_ENABLED の初期 storage 読み + onChanged で反映。 */
+let _backfillBgKickEnabled = false;
 /** PR1-b-3: SW backfill モード(実験・既定 OFF)。初期 storage 読み + onChanged で反映。 */
 let _backfillSwModeEnabled = false;
 /** @type {string} SW 起動メッセージ送信済みの liveId（ワンショット guard）。 */
@@ -16117,6 +16134,9 @@ const BACKFILL_HEARTBEAT_WRITE_MIN_MS = 15_000;
  */
 function writeBackfillHeartbeat() {
   try {
+    // v0.1.796: 既定 OFF。明示 ON のときだけハートビートを書く(記録ホットパスに storage 書き込みを
+    //   足さない=v0.1.795 反映後の記録停止の疑いを断つ)。OFF なら SW kick も走らない(SW 側も既定 OFF)。
+    if (!_backfillBgKickEnabled) return;
     if (!hasExtensionContext()) return;
     if (!recording || !liveId || !locationAllowsCommentRecording()) return;
     const viewBase = readNdgrViewBaseUri();
