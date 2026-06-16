@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.792",
+  "version": "0.1.793",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
@@ -16,6 +16,7 @@
     "setup:claude": "node scripts/setup-claude-code.mjs",
     "build": "node scripts/build.mjs",
     "build:watch": "node scripts/build-watch.mjs",
+    "feature-map": "node scripts/feature-map.mjs",
     "test:e2e": "npm run build && node scripts/run-e2e.mjs",
     "test:e2e:headed": "npm run build && node scripts/run-e2e.mjs --headed",
     "test:e2e:smoke": "npm run build && node scripts/run-e2e.mjs --headed tests/e2e/smoke.spec.js",

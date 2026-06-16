@@ -79,6 +79,12 @@ function rowCapturedAt(row) {
  *     コメ記録に焼き込まれた avatarUrl のうち、broadcaster icon と一致する URL は
  *     viewer (uid !== broadcasterUid) には紐付けず破棄する。
  *     未指定時はガード掛けず（false positive 回避）。
+ *   ⚠️ broadcaster ガードを効かせるには `broadcasterUid` と `broadcasterIconUrl` を【両方】渡す。
+ *     片方だけでは `Boolean(uid && iconUrl) = false` で guard が無効になる（意図的な設計）。
+ *     これらの値の正本経路は src/lib/broadcastContext.js: content-entry.js が
+ *     `nls_live_broadcaster_ctx_v1` に書き、venueBar.js 等が storage から読んで渡す。
+ *     opts を省略・片方だけ渡すと、配信者アイコン付きの匿名行が会場/レーンに混入する既知バグ
+ *     (v0.1.793) が再発する。DOM から直接取る案は standalone(venue.html) で content が動かず使えない。
  * @returns {readonly Readonly<UserLaneCandidateFromStorage>[]}
  */
 export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
