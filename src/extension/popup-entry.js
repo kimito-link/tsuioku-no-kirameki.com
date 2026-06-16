@@ -294,7 +294,8 @@ import { NICONICO_PROFILE } from '../lib/concurrentEstimate.js';
 import {
   // v0.1.450 (PR4): backfillRinkuNarration は B 用 #backfillRinku 描画関数で使われていたが、
   //   B 廃止により未使用化。A 内 hint は backfillRecordCardHintDomState のみで完結する。
-  backfillRecordCardHintDomState
+  backfillRecordCardHintDomState,
+  resolveOfficialComparisonDisplay
 } from '../lib/backfillRinkuNarration.js';
 import { buildPlacementQuickbarModel } from '../lib/inlinePlacementQuickbar.js';
 import { effectiveInlinePanelPlacement } from '../lib/inlinePanelLayout.js';
@@ -2344,10 +2345,14 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
             : parseInt(String(text).replace(/[,，]/g, ''), 10);
       let line = `公式 ${oc.toLocaleString('ja-JP')} 件`;
       if (!Number.isNaN(recorded) && recorded >= 0 && oc > 0) {
-        if (recorded <= oc) {
-          line += ` · 記録は公式の約${Math.round((recorded / oc) * 100)}%`;
-        } else {
+        if (recorded > oc) {
           line += ' · 記録が先行（公式表示の更新待ちのことがあります）';
+        } else {
+          // v0.1.763(A): 中途半端な「約N%」をやめ backfill 状態に応じた正直な状態名を出す(無ければ従来％)。
+          const bf = _backfillStateForOfficial && _backfillStateForOfficial.lid === _backfillHintLiveId ? _backfillStateForOfficial : null;
+          const disp = bf ? resolveOfficialComparisonDisplay({ officialCount: oc, recordedCount: recorded, backfillRunning: bf.running, backfillStarted: bf.started, backfillStopReason: bf.stopReason }) : null;
+          if (disp && disp.mode !== 'hidden' && disp.text) line += ` · ${disp.text}`;
+          else if (!disp) line += ` · 記録は公式の約${Math.round((recorded / oc) * 100)}%`;
         }
       }
       officialEl.textContent = line;
@@ -8037,25 +8042,18 @@ async function applyBackfillRecordCardHint(progress) {
   }
 }
 
-/**
- * v0.1.450 (PR4): A 内 hint の現在 lv を保持（progress listener のスコープ用）。
- *   旧 _backfillPromptLiveId からリネーム（B 廃止に伴う命名整理）。
- */
+/** v0.1.450 (PR4): A 内 hint の現在 lv を保持（progress listener のスコープ用）。 */
 let _backfillHintLiveId = '';
+// v0.1.763: 公式比較行を正直な状態にするための直近 backfill 状態(onChanged で更新)。
+/** @type {{ lid: string, running: boolean, started: boolean, stopReason: string }|null} */
+let _backfillStateForOfficial = null;
 
-/**
- * v0.1.463: caught_up（記録が公式の95%以上）に一度達したら、同じ配信で
- *   progress が更新されても自動リトライ・再描画ちらちらを起こさないフラグ。
- *   配信切り替わり（_backfillHintLiveId 更新）でリセット。
- */
+/** v0.1.463: caught_up(記録>=公式95%)到達後の再リトライ/再描画ちらちら抑止。配信切替でリセット。 */
 let _backfillCaughtUpForLiveId = '';
 
 /**
  * v0.1.450 (PR4): A 内 hint の表示制御。lid を受け取り、必要なら復元 + listener bind。
- *   旧 refreshBackfillFetchPrompt（B 用）の代替。B 廃止に伴い記録カード hint だけを面倒見る。
- *   ・lid 無し: hint を hidden に倒し、listener も bind しない
- *   ・lid あり: listener を bind し、直近進捗があれば復元（押す前は idle のまま）
- *   ・自動取り込みトグルの hydrate は本流（line 9624 周辺）に任せる（B 由来の二重 hydrate は廃止）
+ *   lid 無し=hint hidden+listener bind しない / lid あり=bind し直近進捗があれば復元。
  * @param {string} liveId
  */
 async function refreshBackfillRecordCardHint(liveId) {
@@ -8175,6 +8173,8 @@ function bindBackfillProgressListenerOnce() {
     if (!prog) return;
     // 表示中の配信の進捗だけ反映（別タブ/別配信の進捗で上書きしない）。
     if (String(prog.lid || '').toLowerCase() !== _backfillHintLiveId) return;
+    // v0.1.763: 公式比較行を正直な状態にするため直近 backfill 状態を保持(setCountDisplay が読む)。
+    _backfillStateForOfficial = { lid: _backfillHintLiveId, running: !(prog.done === 1 || prog.done === true), started: true, stopReason: String(prog.stopReason || '') };
     // v0.1.463: 既に caught_up 確定済みの配信なら progress 更新を無視してちらちらを防ぐ。
     if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return;
     // v0.1.415: stopReason も渡す（done=1 でも reached_start か途中かで文言を分ける）。
