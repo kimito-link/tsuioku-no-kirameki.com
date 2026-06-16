@@ -570,6 +570,8 @@ import {
   createMonotonicCommentCountState,
   resolveMonotonicCommentCount
 } from '../lib/monotonicCommentCount.js';
+import { createBroadcasterCountState, resolveBroadcasterExcludedCount } from '../lib/broadcasterExcludedCount.js';
+import { buildOwnPostedUserIdSet } from '../lib/ownPostedUserIdSet.js';
 import {
   SESSION_COMMENT_CACHE_KEY,
   isSessionCommentCacheFresh,
@@ -933,6 +935,9 @@ let _prevSupportCount = /** @type {number|null} */ (null);
 //   4 経路(panel即時 / panel軽量 / 公式統計 / メイン全件)が別タイミングの生値で
 //   setCountDisplay を呼び合うため数値がズレ・前後していた。最大値=正本で収束させる。
 const _monotonicCommentCountState = createMonotonicCommentCountState();
+
+// v0.1.774: 見出しから配信者本人のコメントを除き公式と同基準に(broadcasterExcludedCount.js・テスト済)。
+const _broadcasterCountState = createBroadcasterCountState();
 
 /** @type {number|null} */
 let _prevMilestoneCommentHighWater = null;
@@ -2276,9 +2281,8 @@ function syncLiveStatThreeCardsCharLoadingOverlays() {
  * @param {string|number} value 数値は toLocaleString('ja-JP') で表示。未取得時は明示文言。
  * @param {WatchPageSnapshot|null} [watchSnapshot] 公式コメント数の併記用
  * @param {import('../lib/commentRecordBreakdown.js').CommentRecordBreakdown|null|undefined} [breakdown]
- *   v0.1.627: 記録の内訳(通常/興味来場/システム)。
- *   v0.1.628: undefined のときは前回表示を保持(他経路の setCountDisplay が breakdown 引数なしで
- *   呼ばれて DOM を消す副作用を回避)。null を明示すれば行を非表示にできる。
+ *   記録の内訳(通常/興味来場/システム)。undefined=前回表示を保持(引数なし呼び出しの DOM 消し副作用回避)・
+ *   null=行を非表示。
  */
 function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
   /** @type {number|null} */
@@ -2289,18 +2293,21 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
     text = value.toLocaleString('ja-JP');
   } else {
     const s = String(value ?? '');
-    if (/^\d+$/.test(s.trim())) {
-      recordedNum = Number(s.trim());
-      text = recordedNum.toLocaleString('ja-JP');
-    } else {
-      text = s;
-    }
+    if (/^\d+$/.test(s.trim())) { recordedNum = Number(s.trim()); text = recordedNum.toLocaleString('ja-JP'); }
+    else { text = s; }
   }
 
-  // v0.1.645: 数値表示は同一 lv 内で単調増加に固定する(数値ズレ根治)。
-  //   呼び出し元 4 経路がそれぞれ別ソース・別タイミングの生値を渡すため、
-  //   ここで「これまで表示した最大」に収束させて前後・据え置きを揃える。
-  //   文言(「(未取得)」等)は gate=null で素通し。lv 切替は gate 内でリセット。
+  // v0.1.774: 見出しから配信者本人のコメント分を差し引き公式と同基準に(純関数=テスト済)。breakdown=null は
+  //   記憶リセット/_broadcasterCount で確定/無ければ記憶流用。込みで固まったゲート max は rebaseGateBy ぶん下げる。
+  const bcBkd = breakdown === null ? null : (breakdown && typeof (/** @type {any} */ (breakdown)._broadcasterCount) === 'number' ? /** @type {any} */ (breakdown)._broadcasterCount : undefined);
+  const bcRes = resolveBroadcasterExcludedCount(_broadcasterCountState, watchPopupLastPaintedLiveId, recordedNum, bcBkd);
+  if (bcRes.rebaseGateBy > 0 && _monotonicCommentCountState.lv === String(watchPopupLastPaintedLiveId ?? '').trim().toLowerCase() && _monotonicCommentCountState.max > 0) {
+    _monotonicCommentCountState.max = Math.max(0, _monotonicCommentCountState.max - bcRes.rebaseGateBy);
+  }
+  if (recordedNum != null && bcRes.displayCount != null) { recordedNum = bcRes.displayCount; text = recordedNum.toLocaleString('ja-JP'); }
+
+  // v0.1.645: 数値表示は同一 lv 内で単調増加に固定(数値ズレ根治)。4経路の別ソース別タイミングの
+  //   生値を「これまで表示した最大」に収束。文言は gate=null で素通し・lv 切替は gate 内でリセット。
   if (recordedNum != null) {
     const gated = resolveMonotonicCommentCount(
       _monotonicCommentCountState,
@@ -2337,12 +2344,8 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
       officialEl.hidden = false;
       // v0.1.684: breakdown.normal(通常コメント)優先で公式と比較（配信者コメ除外で正確）。
       const normalCount = breakdown && typeof breakdown.normal === 'number' ? breakdown.normal : null;
-      const recorded =
-        normalCount != null
-          ? normalCount
-          : recordedNum != null && Number.isFinite(recordedNum)
-            ? recordedNum
-            : parseInt(String(text).replace(/[,，]/g, ''), 10);
+      const recorded = normalCount != null ? normalCount
+        : (recordedNum != null && Number.isFinite(recordedNum) ? recordedNum : parseInt(String(text).replace(/[,，]/g, ''), 10));
       let line = `公式 ${oc.toLocaleString('ja-JP')} 件`;
       if (!Number.isNaN(recorded) && recorded >= 0 && oc > 0) {
         if (recorded > oc) {
@@ -2365,8 +2368,7 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
     }
   }
 
-  // v0.1.627/628: 記録の内訳を sub 行に表示。breakdown=undefined は DOM 触らない(前回値保持)。
-  // v0.1.685: _broadcasterCount を opts に渡し「配信者 N」を表示。
+  // v0.1.627/628/685: 記録の内訳 sub 行。undefined=DOM 触らない(前回値保持)・_broadcasterCount で「配信者 N」。
   if (breakdown !== undefined) {
     const breakdownEl = /** @type {HTMLElement|null} */ ($('liveStatCommentsBreakdown'));
     if (breakdownEl) {
@@ -2382,10 +2384,7 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
     }
   }
 
-  const num =
-    recordedNum != null && Number.isFinite(recordedNum)
-      ? recordedNum
-      : parseInt(String(text).replace(/[,，]/g, ''), 10);
+  const num = recordedNum != null && Number.isFinite(recordedNum) ? recordedNum : parseInt(String(text).replace(/[,，]/g, ''), 10);
   if (!Number.isNaN(num) && _prevSupportCount != null && num > _prevSupportCount) {
     const card = document.getElementById('supportVisualLiveCard');
     const icon = card?.querySelector(':scope > img.nl-live-stat-icon');
@@ -4178,34 +4177,9 @@ function isOwnPostedSupportComment(entry, liveId, entries = STORY_SOURCE_STATE.e
   );
 }
 
-/**
- * りんく段候補（レーン集約）や上位ランク集約のように、元コメントではなく
- * 「userId でまとめた集約エントリ」に対して isOwnPosted を判定する場合、
- * popupEntryStableId では一致しない合成 id が付くため、個別エントリ id での
- * 一致検査は必ず false になる。代わりに list 側の同一 userId のエントリのうち
- * いずれかが自己投稿なら own-posted とみなす。
- *
- * @param {PopupCommentEntry[]|null|undefined} entries
- * @param {string} userId
- * @param {string} liveId
- * @returns {boolean}
- */
-function hasOwnPostedEntryForUserId(entries, userId, liveId) {
-  const uid = String(userId || '').trim();
-  if (!uid) return false;
-  const list = Array.isArray(entries) ? entries : [];
-  if (!list.length) return false;
-  const lid = String(liveId || STORY_SOURCE_STATE.liveId || '').trim().toLowerCase();
-  if (!lid) return false;
-  let matchedIdsLazy = /** @type {Set<string>|null} */ (null);
-  for (const entry of list) {
-    if (String(entry?.userId || '').trim() !== uid) continue;
-    if (entry?.selfPosted) return true;
-    if (!matchedIdsLazy) matchedIdsLazy = getOwnPostedMatchedIdSet(list, lid);
-    if (matchedIdsLazy.has(popupEntryStableId(entry, lid))) return true;
-  }
-  return false;
-}
+// v0.1.773: hasOwnPostedEntryForUserId は廃止。集約ごとに storageCtx 全件を走査する O(集約×N) で
+//   popup メインスレッドを塞ぐ性能問題だったため、buildOwnPostedUserIdSet で事前に1パス集合化し、
+//   各ループは O(1) の has() で判定する(りんく列・ギフト列とも)。
 
 /** 永続プロファイルキャッシュ（refresh ごとに再読込） */
 let popupUserCommentProfileMap = /** @type {null|Record<string, { nickname?: string, avatarUrl?: string, updatedAt: number }>} */ (
@@ -5280,6 +5254,15 @@ function renderStoryUserLane() {
     storageCtx,
     watchMetaCache.snapshot || {}
   );
+  // v0.1.773 性能: own-posted な userId 集合をループ前に【1回だけ】作る。以前は集約ごとに
+  //   hasOwnPostedEntryForUserId が storageCtx 全件を走査し O(集約数 × N)=描画ガード手前で毎 paint
+  //   実行され、長時間・大量コメントで popup メインスレッドを塞ぎ「送信が遅い(18s)」一因だった。
+  //   matchedIds は getOwnPostedMatchedIdSet でメモ化済み。ループ内は has() の O(1) に落とす。
+  const ownPostedUidSet = buildOwnPostedUserIdSet(
+    storageCtx,
+    getOwnPostedMatchedIdSet(storageCtx, liveId),
+    (entry) => popupEntryStableId(entry, String(liveId || '').trim().toLowerCase())
+  );
 
   /** @type {{ entryIndex: number, profileTier: number, thumbScore: number, displaySrc: string, title: string, entry: PopupCommentEntry, meta: { idLine: string, nameLine: string } }[]} */
   const candidates = [];
@@ -5301,12 +5284,11 @@ function renderStoryUserLane() {
      * この状態では匿名段だけに倒す。
      */
     if (!broadcasterUid && /^\d{5,14}$/.test(uidRaw)) continue;
-    // 集約エントリは合成 id なので、`isOwnPostedSupportComment` の id 一致検査は
-    // 必ず false になり、viewer uid と一致する自分のコメントまで contamination
-    // guard で除外されてしまう（= りんくレーンに自コメが出ない）。
-    // 同一 userId の storage エントリに1件でも self-posted があるなら own-posted
-    // 扱いし、synthetic `e.selfPosted = true` を立てて下流にも正しく伝える。
-    const ownPostedForUid = hasOwnPostedEntryForUserId(storageCtx, uidRaw, liveId);
+    // 集約エントリは合成 id なので、`isOwnPostedSupportComment` の id 一致検査は必ず false になり、
+    // viewer uid と一致する自コメまで contamination guard で除外される(= りんくレーンに自コメが出ない)。
+    // 同一 userId の storage エントリに1件でも self-posted があれば own-posted 扱い。
+    // v0.1.773: 集約ごとの全件走査をやめ、事前計算した ownPostedUidSet の O(1) 参照に置換。
+    const ownPostedForUid = ownPostedUidSet.has(uidRaw);
     /** @type {PopupCommentEntry} */
     const e = {
       id: `nl-lane:${uidRaw}`,
@@ -5532,6 +5514,12 @@ function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
     watchMetaCache.snapshot || {}
   );
   const viewerUid = String(watchMetaCache.snapshot?.viewerUserId || '').trim();
+  // v0.1.773 性能: own-posted userId 集合を1回だけ作り、ループ内は O(1) 参照(りんく列と同様)。
+  const giftOwnPostedUidSet = buildOwnPostedUserIdSet(
+    storageCtx,
+    getOwnPostedMatchedIdSet(storageCtx, lid),
+    (entry) => popupEntryStableId(entry, lid)
+  );
   const laneEntries = buildGiftThrowerLaneEntries(giftUsers, { liveId: lid });
   const lanePickCtx = {
     yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
@@ -5548,7 +5536,7 @@ function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
     const uidRaw = String(g.userId || '').trim();
     if (!uidRaw) continue;
     if (!broadcasterUid && /^\d{5,14}$/.test(uidRaw)) continue;
-    const ownPostedForUid = hasOwnPostedEntryForUserId(storageCtx, uidRaw, lid);
+    const ownPostedForUid = giftOwnPostedUidSet.has(uidRaw);
     if (
       shouldSkipStoryUserLaneCandidateByContamination({
         candidateUserId: uidRaw,
