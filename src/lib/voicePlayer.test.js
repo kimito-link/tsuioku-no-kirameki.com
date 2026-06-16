@@ -88,15 +88,30 @@ describe('VoicePlayer', () => {
     expect(player.enabled).toBe(true);
   });
 
-  it('2回とも alive-check 失敗なら無効化して案内を出す(VOICEVOX 未起動)', async () => {
+  it('2回とも alive-check 失敗なら無効化して notfound を通知(VOICEVOX 未起動)', async () => {
     const aliveProbe = vi.fn().mockResolvedValue(false);
     player.fetchVoicevoxAlive = aliveProbe;
-    const onStatus = vi.fn();
-    player.onStatus = onStatus;
+    // v0.1.770: 起動待ちの状態は onLoadingState が所有(表示は遅延ガード付きの driver 側)。
+    const states = [];
+    player.onLoadingState = (s) => states.push(s);
     await player.enable({ persist: false });
     expect(aliveProbe).toHaveBeenCalledTimes(2); // 初回 + リトライ1回
     expect(player.enabled).toBe(false);
-    expect(onStatus).toHaveBeenLastCalledWith('VOICEVOXが見つかりません(起動してください)');
+    // checking → connecting(再試行) → (disable で idle) → notfound の順。最後は notfound。
+    expect(states[0]).toBe('checking');
+    expect(states).toContain('connecting');
+    expect(states[states.length - 1]).toBe('notfound');
+  });
+
+  it('成功時は checking→ready を通知する', async () => {
+    player.fetchVoicevoxAlive = vi.fn().mockResolvedValue(true);
+    player.fetchVoiceStyleIds = vi.fn().mockResolvedValue([0]);
+    const states = [];
+    player.onLoadingState = (s) => states.push(s);
+    await player.enable({ persist: false });
+    expect(player.enabled).toBe(true);
+    expect(states[0]).toBe('checking');
+    expect(states[states.length - 1]).toBe('ready');
   });
 
   describe('v0.1.768 合成パイプライン深さ(先読み深化)', () => {

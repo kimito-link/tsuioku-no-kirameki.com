@@ -14,6 +14,10 @@ export class VoicePlayer {
     this.storage = deps.storage;
     this.onToggle = deps.onToggle || (() => {});
     this.onStatus = deps.onStatus || (() => {});
+    // v0.1.770: VOICEVOX 起動待ちの「楽しいローディング」用。状態を渡し、表示層が遅延ガード
+    //   付きで演出する(reference_voice_loading_delight_meeting_2026-06-16.md)。未配線なら no-op。
+    //   onStatus(テキスト)も従来どおり呼ぶので既存表示は壊れない。
+    this.onLoadingState = deps.onLoadingState || (() => {});
     this.onSkip = deps.onSkip || (() => {});
     this.isObsMode = deps.isObsMode || (() => false);
     this.audioConstructor = deps.audioConstructor;
@@ -98,6 +102,7 @@ export class VoicePlayer {
     this.enabled = false;
     this.toggleBusy = false;
     this.stop();
+    this.onLoadingState('idle');
     this._emitToggle();
     if (persist && this.storage) {
       this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: false }).catch(() => {});
@@ -108,19 +113,21 @@ export class VoicePlayer {
     if (this.isObsMode() || this.toggleBusy) return;
     this.toggleBusy = true;
     this._emitToggle();
-    this.onStatus('VOICEVOXを確認中…');
+    // v0.1.770: 起動待ちの表示は onLoadingState(状態)が所有する(遅延ガードで一瞬成功はチラつかせない)。
+    //   onStatus(テキスト)は audio ブロック警告など臨時メッセージ専用に残す。
+    this.onLoadingState('checking');
 
     // 2026-06-14: 会場モード(content script・SW プロキシ経由)では MV3 SW のコールド起床で
     //   初回の生存確認がタイムアウトしやすい。初回失敗時に1回だけ再試行する(SW が起きた後の
     //   2回目はほぼ通る)。VOICEVOX が本当に未起動なら2回とも失敗して従来どおり案内を出す。
     let alive = await this.fetchVoicevoxAlive();
     if (!alive) {
-      this.onStatus('VOICEVOXに接続中…(起動直後は数秒かかります)');
+      this.onLoadingState('connecting');
       alive = await this.fetchVoicevoxAlive();
     }
     if (!alive) {
       this.disable({ persist: true });
-      this.onStatus('VOICEVOXが見つかりません(起動してください)');
+      this.onLoadingState('notfound');
       return;
     }
 
@@ -128,7 +135,7 @@ export class VoicePlayer {
     this.generation += 1;
     this.enabled = true;
     this.toggleBusy = false;
-    this.onStatus('');
+    this.onLoadingState('ready');
     this._emitToggle();
     if (persist && this.storage) {
       this.storage.set({ [this.VOICE_READING_ENABLED_KEY]: true }).catch(() => {});
