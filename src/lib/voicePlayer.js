@@ -275,6 +275,9 @@ export class VoicePlayer {
               if (objectUrl) this.revokeObjectURL(objectUrl);
               objectUrl = '';
               this.stopCurrent = null;
+              // v0.1.771: 再生が終わった(ended/error/stop)→ 吹き出しに「読み上げ終了」を通知。
+              //   これで「声がまだ喋っているのに吹き出しが先に消える」をゼロにできる。
+              if (typeof item.onAudioEnd === 'function') item.onAudioEnd();
               resolve();
             };
             this.stopCurrent = () => {
@@ -286,6 +289,9 @@ export class VoicePlayer {
             try {
               const playResult = audio.play();
               if (typeof item.onPlayStart === 'function') item.onPlayStart();
+              // v0.1.771: 実際に再生が始まった瞬間だけ通知(drop/merge/失敗では呼ばれない)。
+              //   吹き出しはここで speaking になり、onAudioEnd まで消えない。
+              if (typeof item.onAudioStart === 'function') item.onAudioStart();
               if (playResult && typeof playResult.catch === 'function') {
                 playResult.catch((err) => {
                   if (err && err.name === 'NotAllowedError') {
@@ -337,7 +343,12 @@ export class VoicePlayer {
         count: 1,
         enqueuedAt: Date.now(),
         priority: isHighPriority ? 'high' : 'normal',
-        onPlayStart: item.onPlayStart
+        // onPlayStart: 「item が消費された(再生/破棄/merge/失敗)」= resolved 信号(後方互換)。
+        onPlayStart: item.onPlayStart,
+        // v0.1.771: 吹き出しを読み上げに連動させるため、実際の再生開始/終了だけを通知する。
+        //   onAudioStart は audio.play() が実際に走ったときだけ・onAudioEnd は再生終了(ended/error/stop)時。
+        onAudioStart: item.onAudioStart,
+        onAudioEnd: item.onAudioEnd
       };
       
       const merged = mergeRepeatedVoiceItem(this.queue, candidate);

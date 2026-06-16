@@ -76,6 +76,30 @@ describe('VoicePlayer', () => {
     expect(player.queue.length).toBe(0);
   });
 
+  it('v0.1.771: 実再生時に onAudioStart→onAudioEnd を通知する(吹き出しを読み上げに連動)', async () => {
+    await player.enable({ persist: false });
+    const onAudioStart = vi.fn();
+    const onAudioEnd = vi.fn();
+    player.enqueue([{ kind: 'comment', userId: 'u1', nickname: 'A', text: 'Hello', onAudioStart, onAudioEnd }]);
+    await new Promise(r => setTimeout(r, 50));
+    expect(onAudioStart).toHaveBeenCalledTimes(1);
+    expect(onAudioEnd).toHaveBeenCalledTimes(1); // mockAudio が ended を即発火
+  });
+
+  it('v0.1.771: 合成に失敗して鳴らなかった item は onAudioStart を呼ばない(resolved のみ)', async () => {
+    // 合成が null を返す(=WAV が得られず再生に到達しない)。
+    player.fetchSynthesizeVoice = vi.fn().mockResolvedValue(null);
+    await player.enable({ persist: false });
+    const onAudioStart = vi.fn();
+    const onAudioEnd = vi.fn();
+    const onPlayStart = vi.fn(); // resolved(消費)信号は来る
+    player.enqueue([{ kind: 'comment', userId: 'u2', nickname: 'B', text: 'x', onAudioStart, onAudioEnd, onPlayStart }]);
+    await new Promise(r => setTimeout(r, 50));
+    expect(onAudioStart).not.toHaveBeenCalled();
+    expect(onAudioEnd).not.toHaveBeenCalled();
+    expect(onPlayStart).toHaveBeenCalled(); // 消費されたことは通知される
+  });
+
   it('初回 alive-check 失敗でも1回リトライして成功すれば有効化する(SWコールド起床対策)', async () => {
     // 1回目 false(SW 寝てる)→ 2回目 true(SW 起きた)を模す。
     const aliveProbe = vi
