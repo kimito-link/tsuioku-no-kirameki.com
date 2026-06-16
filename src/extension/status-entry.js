@@ -117,7 +117,11 @@ function startRefreshLoop() {
   _refreshTimerId = window.setInterval(() => {
     if (_refreshPausedByUser) return;
     if (document.hidden) return;
-    refresh().catch((err) => console.warn('[status] refresh err', err));
+    // v0.1.785: storage stall(storage_op_timeout)は status の自己診断 UI に画面表示済みで
+    //   グレースフルに degrade する想定内の事象。console.warn は chrome://extensions のエラー欄に
+    //   収集され「これ見てどうすればいいの?」を生むため console.debug に下げる(v0.1.776 と同方針=
+    //   行動につながらない警告を目立つ場所に出さない)。実エラーは画面の概要欄/AI共有欄で確認できる。
+    refresh().catch((err) => console.debug('[status] refresh err', err));
   }, REFRESH_INTERVAL_MS);
 }
 
@@ -164,7 +168,10 @@ async function refresh() {
       const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
       if (ta && !ta.value) ta.value = _statusLastErrorText;
     } catch { /* no-op */ }
-    console.warn('[status] refresh failed at', step, err);
+    // v0.1.785: timeout(storage_op_timeout)は上で _statusLastErrorText として画面に出し、記録自体は
+    //   watch タブ側で継続している想定内の degrade。console.warn は chrome://extensions のエラー欄を
+    //   汚し「どうすれば?」を生むため console.debug に下げる(DevTools verbose でのみ確認可・v0.1.776 と同方針)。
+    console.debug('[status] refresh failed at', step, err);
   }
 }
 
