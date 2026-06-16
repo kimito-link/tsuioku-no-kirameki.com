@@ -104,7 +104,11 @@ async function bootstrap() {
   setupVisibilityHandler();
   setupStorageChangeListener();
 
-  await refresh();
+  // v0.1.797「status が重くて開かない」根治: 初回は短い timeout(1500ms)で走らせ、storage が
+  //   混雑していても最大 ~1.5秒で degrade 表示に切り替える(=「開かない」を作らない)。await せず
+  //   即 startRefreshLoop に進むので、ページ操作(ボタン等)は最初からブロックされない。短時間で
+  //   取れれば通常表示、取れなければ「混雑中・記録は別途継続」を出し、2秒ごとの通常更新が後で埋める。
+  void refresh({ timeoutMs: 1500 });
   startRefreshLoop();
 }
 
@@ -130,30 +134,46 @@ function startRefreshLoop() {
  *   どこで詰まったか/エラー内容を画面(概要欄+AI共有欄)に書き出す。これでコンソールを開かなくても
  *   「status が固まった原因」が画面で分かる(ユーザー指摘「コンソールをスクショしなくてもいいように」)。
  */
-async function refresh() {
+/**
+ * @param {{ timeoutMs?: number }} [opts]
+ *   timeoutMs: 各 storage read の有界化上限。v0.1.797: 初回(first paint)は短く(1500ms)して
+ *   storage stall でも「重くて開かない」を作らず即 degrade 表示する。通常更新は 8000ms のまま。
+ */
+async function refresh(opts = {}) {
+  const tmo = Number.isFinite(Number(opts.timeoutMs)) && Number(opts.timeoutMs) > 0
+    ? Number(opts.timeoutMs)
+    : 8000;
   let step = 'init';
   try {
     step = 'enumerateActiveLives';
-    const lvList = await runStorageOpWithTimeout(() => enumerateActiveLives(), 8000);
+    const lvList = await runStorageOpWithTimeout(() => enumerateActiveLives(), tmo);
     step = `loadAllSummaries(${lvList.length}件)`;
-    const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), 8000);
+    const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), tmo);
     step = 'loadFastDiagSafe';
-    const fastDiag = await runStorageOpWithTimeout(() => loadFastDiagSafe(), 8000);
+    const fastDiag = await runStorageOpWithTimeout(() => loadFastDiagSafe(), tmo);
     step = 'loadBackfillProgress';
     const backfillProgress = await runStorageOpWithTimeout(
       () => loadBackfillProgressSafe(),
-      8000
+      tmo
     );
     step = 'renderAll';
     renderAll({ lvList, summaries, fastDiag, backfillProgress });
     updateLastUpdateMeta();
     _statusLastErrorText = '';
   } catch (err) {
-    // どのステップで・何のエラーで止まったかを画面に出す(コンソール不要の自己診断)。
-    const reason = err === STORAGE_OP_TIMED_OUT ? 'タイムアウト(8秒)' : String(err?.message || err);
-    _statusLastErrorText =
-      `⚠ 状態の読み込みでつまずきました\n  つまずいた処理: ${step}\n  原因: ${reason}\n` +
-      `  (記録自体は watch タブ側で継続中です。storage が大きいと status の表示だけ遅れることがあります)`;
+    // v0.1.797: timeout は「ストレージ混雑(記録は別途継続)」の想定内 degrade=不安にさせない文言に。
+    //   それ以外の実エラーだけ「つまずいた処理」を出す(自己診断)。どちらも 2秒ごとの通常更新が後で埋める。
+    const timedOut = err === STORAGE_OP_TIMED_OUT;
+    if (timedOut) {
+      _statusLastErrorText =
+        `⏳ ストレージが混雑していて状態の読み込みに少し時間がかかっています。\n` +
+        `  記録自体は各 watch タブ側で続いています(止まっていません)。\n` +
+        `  数秒ごとに自動で再読み込みします。このまま少しお待ちください。`;
+    } else {
+      _statusLastErrorText =
+        `⚠ 状態の読み込みでつまずきました\n  つまずいた処理: ${step}\n  原因: ${String(err?.message || err)}\n` +
+        `  (記録自体は watch タブ側で継続中です。storage が大きいと status の表示だけ遅れることがあります)`;
+    }
     try {
       const ovEl = document.getElementById('overviewBody');
       if (ovEl && /読み込み中/.test(ovEl.textContent || '')) {
@@ -162,11 +182,13 @@ async function refresh() {
       const livesEl = document.getElementById('livesBody');
       if (livesEl && /読み込み中/.test(livesEl.textContent || '')) {
         livesEl.className = 'empty-note';
-        livesEl.textContent = `(${step} で停止。再試行します…)`;
+        livesEl.textContent = timedOut
+          ? '(ストレージ混雑中… 自動で再読み込みします)'
+          : `(${step} で停止。再試行します…)`;
       }
-      // AI 共有欄にも出して、範囲選択コピーで開発者に渡せるように。
+      // AI 共有欄にも出して、範囲選択コピーで開発者に渡せるように(実エラー時のみ)。
       const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
-      if (ta && !ta.value) ta.value = _statusLastErrorText;
+      if (ta && !ta.value && !timedOut) ta.value = _statusLastErrorText;
     } catch { /* no-op */ }
     // v0.1.785: timeout(storage_op_timeout)は上で _statusLastErrorText として画面に出し、記録自体は
     //   watch タブ側で継続している想定内の degrade。console.warn は chrome://extensions のエラー欄を
