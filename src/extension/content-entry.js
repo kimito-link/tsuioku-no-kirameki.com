@@ -1211,6 +1211,21 @@ function recordGiftCommentObservation(parsed, rawText) {
     entry.rank = parsed.rank;
   }
   _d.giftCommentObservations.set(key, entry);
+  // v0.1.780: 会場の投げ演出は nls_gift_events_<lv> を主トリガにするが、NDGR 構造化 gift event は
+  //   配信によって来ない(実機 gifts:0・giftPoints はある)。DOM スキャンで拾えたギフトコメントも
+  //   同じ storage へ append し、会場が確実に投げられるようにする(唯一拾えている経路を会場へ流す)。
+  //   userId は gift コメントからは取れない(名無しが多い)→空のまま=会場側は crowdBubbleAnchor 起点。
+  if (liveId && hasExtensionContext()) {
+    const eventsKey = `nls_gift_events_${liveId}`;
+    chrome.storage.local.get(eventsKey).then((bag) => {
+      const existing = Array.isArray(bag[eventsKey]) ? bag[eventsKey] : [];
+      const incoming = [{ userId: '', nickname: parsed.sender, itemName: parsed.item, point: parsed.point }];
+      const { next, storageTouched } = appendGiftEvents(existing, incoming, Date.now());
+      if (storageTouched) {
+        chrome.storage.local.set({ [eventsKey]: next }).catch(() => {});
+      }
+    }).catch((err) => reportSilentErrorToStorage('gift-events-domscan', err));
+  }
   if (_d.giftCommentObservations.size > 500) {
     // v0.1.353: 全コピー+全ソートで最古 drop 件を削っていたのを、Map の挿入順走査に置換。
     //   このエントリは insert-once（更新なし）で firstObservedAt=挿入時刻のため、
