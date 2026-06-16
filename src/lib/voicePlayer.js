@@ -98,6 +98,24 @@ export class VoicePlayer {
     this.stopCurrent = null;
   }
 
+  /**
+   * v0.1.773 長時間ラグ対策: 待機中のキューだけを破棄して「今」へリセットする。
+   *   再生中の1本は止めない(stop と違い不協和を出さない)。タブが裏に回って drain が
+   *   スロットリングされ溜まった backlog を、可視復帰時に一掃して定常ラグの蓄積を断つ。
+   *   破棄した item には onPlayStart(=消費=resolved)を通知し、吹き出し側の状態整合を保つ。
+   * @returns {number} 破棄した件数
+   */
+  flushPendingQueue() {
+    const dropped = this.queue;
+    this.queue = [];
+    this.prefetches.clear();
+    for (const item of dropped) {
+      if (item && typeof item.onPlayStart === 'function') item.onPlayStart();
+    }
+    if (dropped.length > 0) this._showSkipped(dropped.length);
+    return dropped.length;
+  }
+
   disable({ persist = true } = {}) {
     this.enabled = false;
     this.toggleBusy = false;

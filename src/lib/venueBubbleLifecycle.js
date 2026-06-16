@@ -20,10 +20,11 @@ export const BUBBLE_VOICE_AFTERGLOW_MS = 500;
 /**
  * 読み上げONのとき、pending(合成待ち)の吹き出しを最低これだけは残す床(ms)。
  * 合成→再生開始までの遅れで「声が鳴り始める前に吹き出しが流速寿命で消える」隙間を塞ぐ。
- * voiceAgeGate の通常しきい値(2500ms)に合わせる: それより遅い音声はそもそも stale で鳴らない
- *  =鳴る音声なら必ずこの床の内側で onAudioStart が来て speaking に切り替わり、以後は消えない。
+ * voiceAgeGate の通常しきい値(VOICE_STALE_MS_NORMAL)に合わせる: それより遅い音声はそもそも
+ *  stale で鳴らない=鳴る音声なら必ずこの床の内側で onAudioStart が来て speaking に切り替わる。
+ * v0.1.773: 鮮度ゲート短縮(2500→1800ms)に追従して床も 1800ms へ(鳴らない声を待ち続けない)。
  */
-export const BUBBLE_PENDING_VOICE_FLOOR_MS = 2500;
+export const BUBBLE_PENDING_VOICE_FLOOR_MS = 1800;
 
 /**
  * 表示直後(pending)の寿命を返す純関数。読み上げONなら合成遅れに備えて床を効かせる。

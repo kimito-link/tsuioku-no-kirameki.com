@@ -915,6 +915,19 @@ const VENUE_CSS = `
   .nlsb-bubble.nlsb-is-leaving {
     opacity: 0;
   }
+  /* v0.1.773 軽い同期: 読み上げが鳴り始めた瞬間に一度だけ淡く光らせ「声＝この吹き出し」を結ぶ。
+     上品に1回だけ(派手すぎ厳禁)。即時表示は変えない=即時性は維持。 */
+  .nlsb-bubble.nlsb-bubble-voiced {
+    animation: nlsb-bubble-voiced 620ms ease-out;
+  }
+  @keyframes nlsb-bubble-voiced {
+    0% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34), 0 0 0 0 rgba(141, 200, 255, 0.55); }
+    40% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34), 0 0 0 5px rgba(141, 200, 255, 0.32); }
+    100% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34), 0 0 0 0 rgba(141, 200, 255, 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-bubble.nlsb-bubble-voiced { animation: none; }
+  }
   @keyframes nlsb-bubble-pop {
     from {
       opacity: 0;
@@ -1808,6 +1821,9 @@ export function mountVenueBarButton(options = {}) {
     if (bubble.fadeTimer) { clearTimeout(bubble.fadeTimer); bubble.fadeTimer = 0; }
     if (bubble.removeTimer) { clearTimeout(bubble.removeTimer); bubble.removeTimer = 0; }
     bubble.element.classList.remove('nlsb-is-leaving');
+    // v0.1.773 軽い同期: 声が鳴り始めた瞬間に吹き出しを一度だけ強調(視聴覚を結びつけ「同時」と
+    //   感じさせる)。吹き出しは即時のまま=即時性は犠牲にしない(会議の(A)全面同期は不採用)。
+    bubble.element.classList.add('nlsb-bubble-voiced');
     if (bubble.speakingCapTimer) clearTimeout(bubble.speakingCapTimer);
     bubble.speakingCapTimer = window.setTimeout(() => {
       bubble.speakingCapTimer = 0;
@@ -2773,6 +2789,15 @@ export function mountVenueBarButton(options = {}) {
     },
     { once: true }
   );
+
+  // v0.1.773 長時間ラグ対策(会議): タブが裏に回ると setTimeout/合成がスロットリングされ、
+  //   復帰時に古い読み上げ backlog が溜まったまま=「今」から大きく遅れて喋り出す。可視復帰時に
+  //   待機中の読み上げキューを一掃して「今」へリセットする(再生中の1本は止めない)。
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!open || !voicePlayer.enabled) return;
+    try { voicePlayer.flushPendingQueue(); } catch { /* no-op */ }
+  });
 
   if (isStandalone) {
     setOpen(true, false);
