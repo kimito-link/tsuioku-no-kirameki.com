@@ -87,6 +87,7 @@ import {
   upgradeAnonymousAvatarImages
 } from '../lib/avatarPartsComposer.js';
 import { isVoiceItemStale } from '../lib/voiceAgeGate.js';
+import { runStorageOpWithTimeout } from '../lib/storageOpTimeout.js';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
@@ -100,6 +101,12 @@ const DEFAULT_TILE_IMG =
 const TIMELINE_LIMIT = 120;
 const HOT_POLL_INTERVAL_MS = 5000;
 const RECONCILE_INTERVAL_MS = 60_000;
+/**
+ * v0.1.784: performFullRefresh の storage/IDB read を有界化する上限(ms)。これを超えて settle
+ *   しない read は storage stall とみなし reject させ、_fullRefreshRunning の張り付き(=コメビュ凍結)
+ *   を防ぐ。RECONCILE_INTERVAL_MS(60s)より十分短くし、次の tick で自然に再試行される範囲にする。
+ */
+const FULL_REFRESH_STORAGE_TIMEOUT_MS = 8000;
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 const VOICE_READING_ENABLED_KEY = 'nls_voice_reading_enabled_v1';
 const VOICE_ASSIGNMENTS_KEY = 'nls_voice_assignments_v1';
@@ -1246,13 +1253,24 @@ async function performFullRefresh(forceBottom) {
   const pinKey = comeviewPinStorageKey(lv);
   let bag = {};
   try {
-    bag = await chrome.storage.local.get([
-      tKey,
-      giftKey,
-      pinKey,
-      COMEVIEW_USER_NOTES_KEY,
-      KEY_USER_COMMENT_PROFILE_CACHE
-    ]);
+    // v0.1.784 コメビュ凍結の根治: performFullRefresh は requestFullRefresh の while ループ内で
+    //   _fullRefreshRunning=true を張る間に走る。共有 chrome.storage.local(単一 LevelDB)が複数
+    //   watch タブの巨大 read-merge-write で stall すると、この get の await が【reject でなく
+    //   永久 pending】になり得る(memory storage stall spiral と同根)。try/catch は reject しか
+    //   拾えないため、pending だと performFullRefresh が settle せず _fullRefreshRunning が true に
+    //   張り付き→processHotSnapshots が常に defer→新着コメントが永久に描画されない(=コメビュ凍結)。
+    //   そこで storage read を有界化し、hang したら timeout で reject させ catch→return させる。
+    //   次の timerTick(RECONCILE/hot poll)で自然に再試行され、stall が解ければ復帰する。
+    bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get([
+        tKey,
+        giftKey,
+        pinKey,
+        COMEVIEW_USER_NOTES_KEY,
+        KEY_USER_COMMENT_PROFILE_CACHE
+      ]),
+      FULL_REFRESH_STORAGE_TIMEOUT_MS
+    );
   } catch {
     return;
   }
@@ -1263,7 +1281,19 @@ async function performFullRefresh(forceBottom) {
   _profileCache = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
   renderPin(bag[pinKey]);
 
-  let comments = await readCanonicalComments(lv);
+  // v0.1.784: 正本読み(IDB countCommentsForLiveDb/readAllCommentsFromDb + chunk get + tail get)も
+  //   同じ stall で hang し得る。readCanonicalComments 内の try/catch は reject しか拾わないため、
+  //   ここでも有界化して hang を reject に変える。timeout 時は空扱いで描画は進める(テール合流で
+  //   直近は出る)→ _fullRefreshRunning を解放することを最優先にする。
+  let comments = [];
+  try {
+    comments = await runStorageOpWithTimeout(
+      () => readCanonicalComments(lv),
+      FULL_REFRESH_STORAGE_TIMEOUT_MS
+    );
+  } catch {
+    comments = [];
+  }
   // v0.1.679: 正本(IDB)が最新テールよりわずかに遅れることがあるので、テールを
   //   commentNo dedupe 付きで合流させる(整合リフレッシュで直近行が消えるのを防ぐ)。
   comments = combineCanonicalComeviewRows(comments, _tailRows);
