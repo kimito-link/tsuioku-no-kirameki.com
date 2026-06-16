@@ -413,6 +413,10 @@ import {
   BACKFILL_FOREGROUND_FETCH_GAP_MS,
   BACKFILL_FOREGROUND_EMPTY_RESEED_PAUSE_MS
 } from '../lib/ndgrBackfillCrawl.js';
+import {
+  shouldActivateForwardForDeadEntry,
+  FORWARD_REACTIVATION_STALE_MS
+} from '../lib/forwardReactivation.js';
 import { crawlNdgrForward } from '../lib/ndgrForwardCrawl.js';
 import { computeBackfillFlushThreshold } from '../lib/backfillFlushThreshold.js';
 import {
@@ -15892,6 +15896,44 @@ function maybeAutoStartBackfill() {
     }
   } catch {
     /* no-op: 優先再アサート失敗は致命ではない(従来動作に degrade) */
+  }
+  // v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」(会議全会一致+司令塔裏取り):
+  //   受動傍受(プレイヤーの NDGR fetch 横取り)はプレイヤー依存の単一障害点。プレイヤーの NDGR が切れると
+  //   新しい view token が観測されず、backfill は古い死んだ token で 0件 backward_exhausted を繰り返し
+  //   「再接続待ち」のまま増えない(実機 fastDiag: 受信11分前・seg:0 rows:0・取り込み0件)。
+  //   ここで「入口が死んでいる」と純判定したときだけ拡張独自の forward crawl(?at=now→nextAt long-poll)を
+  //   起動する。forward の fetch は page-intercept を通り observeNdgrViewUri→最新 token を維持するので、
+  //   backfill は新鮮な入口を取り戻す(自己持続)。段階導入の (a)on-demand=止まった時だけ(常時ON=(b)は
+  //   実機検証後)。判定は無駄打ちしない最小条件(forwardReactivation.js・TDD)。前面+記録中タブのみ。
+  try {
+    if (
+      !_ndgrForwardEnabled && // 既に ON なら何もしない(ON 後は forward が入口を維持)
+      recording &&
+      liveId &&
+      locationAllowsCommentRecording() &&
+      (typeof document === 'undefined' || document.visibilityState !== 'hidden') &&
+      (typeof document === 'undefined' ||
+        typeof document.hasFocus !== 'function' ||
+        document.hasFocus()) &&
+      shouldActivateForwardForDeadEntry({
+        ndgrLastReceivedAgoMs:
+          ndgrLastReceivedAt > 0 ? Date.now() - ndgrLastReceivedAt : Number.POSITIVE_INFINITY,
+        staleThresholdMs: FORWARD_REACTIVATION_STALE_MS,
+        backfillStopReason: String(_backfillProgress.stopReason || ''),
+        backfillSegThisRun: Number(_backfillProgress.seg) || 0,
+        backfillRowsThisRun: Number(_backfillProgress.rows) || 0,
+        recordedCount: Number(observedRecordedCommentCount) || 0,
+        officialCount: Number(officialCommentCount) || 0,
+        forwardAlreadyRunning: _ndgrForwardAbort != null
+      })
+    ) {
+      // 入口が死んでいる=能動再取得を起動。forward は前面のみ/全タブ横断1本/hidden で abort/429 backoff
+      //   共用なので負荷は有界。KEY_NDGR_FORWARD_ENABLED で恒久ロールバック可(キルスイッチ温存)。
+      _ndgrForwardEnabled = true;
+      maybeStartNdgrForwardCrawl();
+    }
+  } catch {
+    /* no-op: 能動再取得の起動失敗は致命ではない(従来動作に degrade) */
   }
   // PR1-b-3: SW backfill モード(実験・既定 OFF)。ON 時は既存経路(スロット/ローカル crawl)を起動せず
   //   SW へ起動メッセージを 1 live 1 回送る。view base 未観測/SW 未応答は次 tick で自然リトライ。
