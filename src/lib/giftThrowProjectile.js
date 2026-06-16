@@ -5,9 +5,12 @@
  * 会議(reference_gift_throw_meeting_2026-06-16.md)の収束案を実装する土台。
  *
  * 設計(裏取り済み):
- *   - ギフトに公式アイコンURLは無い → アイテム名テキスト + 絵文字で視覚化(🎁 / 💰)。
- *   - 点火はギフト/広告の【コメント本文パース】で行う(parseGiftCommentText/parseNicoadCommentText)。
- *     row.kind フィールドは comment 経路に無いため頼らない。
+ *   - ギフトには公式サムネ画像がある(v0.1.783・わんコメ OneComme 9.0.2 解析で確定):
+ *       https://secure-dcdn.cdn.nimg.jp/nicoad/res/nage/thumbnail/{item_id}.png
+ *     item_id が取れれば投げ物を【実画像】にする(取れない時は従来の絵文字+アイテム名テキスト)。
+ *     ※ item_id は NDGR 構造化ギフトevent(StoredGiftEvent)経路でのみ取れる。コメント本文パース
+ *       経路は item_id を持たないので従来どおり絵文字+テキスト。
+ *   - 点火はギフト/広告の【コメント本文パース】 + NDGR event + DOMスキャンの3経路(venueBar 側)。
  *   - 軌道は CSS アニメ(GPU)。JS は起点/着弾の差分を --dx/--dy で渡すだけ=毎フレーム計算しない。
  *   - 性能最優先: 同時表示数の上限を超えたら投げを捨てる(プール/上限は venueBar 側が DOM 管理)。
  */
@@ -16,8 +19,13 @@
 export const GIFT_THROW_MAX_CONCURRENT = 8;
 /** 着弾アーチの高さ(px・放物線の頂点オフセット)。 */
 export const GIFT_THROW_ARC_LIFT_PX = 90;
-/** ポイント帯ごとの飛行時間(ms)。大きいギフトは少しゆっくり見せる。 */
-export const GIFT_THROW_DURATION_MS = Object.freeze({ small: 1100, medium: 1300, large: 1500, mega: 1800 });
+/**
+ * ポイント帯ごとの飛行時間(ms)。大きいギフトは少しゆっくり見せる。
+ * v0.1.783: 「一瞬で見えない」改善で全帯を延長(着弾バーストの余韻ぶん含む)。
+ */
+export const GIFT_THROW_DURATION_MS = Object.freeze({ small: 1500, medium: 1750, large: 2050, mega: 2400 });
+/** ニコ生ギフトサムネ画像 CDN ベース(v0.1.783・わんコメ解析で確定)。 */
+export const GIFT_THUMBNAIL_BASE = 'https://secure-dcdn.cdn.nimg.jp/nicoad/res/nage/thumbnail/';
 
 /**
  * @typedef {{
@@ -26,9 +34,25 @@ export const GIFT_THROW_DURATION_MS = Object.freeze({ small: 1100, medium: 1300,
  *   label: string,
  *   point: number,
  *   tier: 'small'|'medium'|'large'|'mega',
- *   durationMs: number
+ *   durationMs: number,
+ *   imageUrl: string
  * }} GiftThrowProjectile
  */
+
+/**
+ * ギフト item_id から公式サムネ画像 URL を組む純関数(v0.1.783)。
+ * item_id は ASCII 英数 + `_` `-` の slug 形式(ndgrDecode の looksLikeValidGiftItemId と同基準)。
+ * URL に乗せて安全な形だけ許容し、不正値は ''(=画像なし=絵文字フォールバック)を返す。
+ * @param {unknown} itemId
+ * @returns {string} 画像 URL または ''
+ */
+export function resolveGiftImageUrl(itemId) {
+  const s = String(itemId ?? '').trim();
+  if (!s) return '';
+  // 先頭英字・英数 _ - のみ・3〜80文字(ndgrDecode の looksLikeValidGiftItemId と同基準)。
+  if (!/^[a-zA-Z][a-zA-Z0-9_-]{2,79}$/.test(s)) return '';
+  return `${GIFT_THUMBNAIL_BASE}${s}.png`;
+}
 
 /** ポイント→帯(giftBahamut と同じ閾値で揃える)。 @param {unknown} point */
 function tierFromPoints(point) {
@@ -49,7 +73,8 @@ function clampLabel(s, max = 14) {
 /**
  * パース済みギフト/広告から投げ物の見た目モデルを作る純関数。
  *
- * @param {{ sender?: string, item?: string, point?: number }} parsed
+ * @param {{ sender?: string, item?: string, point?: number, itemId?: string }} parsed
+ *   itemId(任意・NDGR event 経路のみ)があれば実画像 URL を imageUrl に乗せる。
  * @param {'gift'|'ad'} kind
  * @returns {GiftThrowProjectile|null} 無効(item空のギフト/point<=0)なら null。
  */
@@ -66,7 +91,8 @@ export function resolveGiftProjectile(parsed, kind) {
       label: `${point.toLocaleString('ja-JP')}pt`,
       point,
       tier,
-      durationMs
+      durationMs,
+      imageUrl: '' // 広告は投げ物画像なし(絵文字+ptで見せる)
     };
   }
   // gift
@@ -78,7 +104,8 @@ export function resolveGiftProjectile(parsed, kind) {
     label: clampLabel(item),
     point,
     tier,
-    durationMs
+    durationMs,
+    imageUrl: resolveGiftImageUrl(parsed.itemId) // item_id があれば実画像・無ければ ''
   };
 }
 
