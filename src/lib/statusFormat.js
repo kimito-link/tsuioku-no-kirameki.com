@@ -82,7 +82,15 @@ export function buildLiveBlockText(live) {
  * v0.1.642: 取得率(%)を主役にした1行を組み立てる。状態ラベル + %(大) + 件数(括弧の補助)。
  *   記録/速報/パネルで件数が数件ズレても「何%取れたか」で「全部取れた」が一目で分かる。
  *
- * @param {{ recordedCount?: number, officialCommentCount?: number|null, officialRatePct?: number|null }} live
+ * v0.1.791(ユーザー要望「追いつく途中で壊れてると不安になる・告知があれば親切」):
+ *   配信【放送中】に取得率が低いのは、過去ログを遡って取得中(バックフィル)の【正常な途中経過】で
+ *   あって異常ではない。なのに従来は終了済みの「取りこぼし」と同じ 🔴 を出していて不安にさせた。
+ *   そこで放送中(endedAt 無し)×低%は 🔴 でなく「⏳ 追いつき中」にし、後ろに「(過去のコメントを
+ *   取得中)」の一言を添える。放送終了済み(endedAt あり)×低%は本当の取りこぼしなので従来どおり
+ *   🔴 のまま(=ここは不安になって正しい)。endedAt 未指定なら従来挙動(後方互換)。
+ *
+ * @param {{ recordedCount?: number, officialCommentCount?: number|null,
+ *   officialRatePct?: number|null, endedAt?: number|null }} live
  * @returns {string}
  */
 export function buildCaptureRateLine(live) {
@@ -97,9 +105,17 @@ export function buildCaptureRateLine(live) {
     return counts;
   }
   const p = Number(pct);
-  // 状態ラベル: 100%到達=✅完了 / 80%+=もう少し / それ未満=取得中。
-  const label = p >= 100 ? '✅ 取得完了' : p >= 80 ? '🟢 ほぼ取得' : p >= 40 ? '🟡 取得中' : '🔴 取得中';
-  return `${label} ${p}% (${counts})`;
+  // 放送中かどうか: endedAt が無い(=まだ配信中)なら、低%は追いつき途中の正常状態。
+  const isLive = !(live && live.endedAt);
+  // 状態ラベル: 100%到達=✅完了 / 80%+=もう少し / 40%+=取得中。
+  //   40%未満は、放送中なら「⏳ 追いつき中」(正常)・終了済みなら「🔴 取得中」(取りこぼし)。
+  if (p >= 100) return `✅ 取得完了 ${p}% (${counts})`;
+  if (p >= 80) return `🟢 ほぼ取得 ${p}% (${counts})`;
+  if (p >= 40) return `🟡 取得中 ${p}% (${counts})`;
+  if (isLive) {
+    return `⏳ 追いつき中 ${p}% (${counts})・過去のコメントを取得中`;
+  }
+  return `🔴 取得中 ${p}% (${counts})`;
 }
 
 /**

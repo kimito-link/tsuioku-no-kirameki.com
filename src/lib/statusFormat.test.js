@@ -166,9 +166,21 @@ describe('buildCaptureRateLine（%主役・状態ラベル）', () => {
     ).toBe('🟡 取得中 50% (記録 50 / 公式 100)');
   });
 
-  it('🔴退行検出: 40%未満は 🔴 取得中(公式16%等が赤く目立つ)', () => {
+  it('v0.1.791: 放送中(endedAt無し)の40%未満は ⏳ 追いつき中(過去ログ取得中の正常状態)', () => {
+    // 配信中の低%は、過去ログを遡って取得中(バックフィル)の途中=異常でない。
     expect(
-      buildCaptureRateLine({ recordedCount: 1469, officialCommentCount: 9390, officialRatePct: 16 })
+      buildCaptureRateLine({ recordedCount: 97, officialCommentCount: 557, officialRatePct: 17 })
+    ).toBe('⏳ 追いつき中 17% (記録 97 / 公式 557)・過去のコメントを取得中');
+  });
+
+  it('🔴退行検出: 放送終了済み(endedAtあり)の40%未満は 🔴 取得中(本当の取りこぼし)', () => {
+    expect(
+      buildCaptureRateLine({
+        recordedCount: 1469,
+        officialCommentCount: 9390,
+        officialRatePct: 16,
+        endedAt: 1781631782697
+      })
     ).toBe('🔴 取得中 16% (記録 1,469 / 公式 9,390)');
   });
 
