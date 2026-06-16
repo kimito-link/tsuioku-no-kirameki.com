@@ -486,7 +486,7 @@ import {
   //   ニコ生プレイヤーが叩く `api/view/v4` を傍受した時に、その base URL と観測回数を
   //   data 属性へ一度だけ露出して、実機 PoC（?at=過去 が本当に遡れるか）の足場にする。
   //   ⛔ ここでは「観測（属性に出す）」だけで、自前 fetch も巡回も行わない（hot path 非干渉）。
-  const _ndgrViewUri = { base: '', count: 0 };
+  const _ndgrViewUri = { base: '', firstBase: '', count: 0 };
   /** @param {string} rawUrl */
   function observeNdgrViewUri(rawUrl) {
     try {
@@ -496,8 +496,19 @@ import {
       const base = u.split('?')[0];
       if (!base) return;
       _ndgrViewUri.count += 1;
-      // 初回観測の base を保持（同一配信中は不変。複数来ても最初の view を基点とする）。
-      if (!_ndgrViewUri.base) _ndgrViewUri.base = base;
+      // v0.1.762「途中で止まって%が残る」根治(実機 fastDiag で確定):
+      //   旧実装は「初回観測の base を保持（同一配信中は不変）」と仮定して if(!base) で固定して
+      //   いた。だが NDGR の view endpoint URL は配信中に【ローテーションする】(実機 fastDiag の
+      //   interceptFetchLog に同一 lv で /view/v4/{tokenA} と {tokenB} の2種類)。固定すると、
+      //   数分後にプレイヤーが新 token に移っても backfill は【最初の古い token】に ?at=now を
+      //   叩き続け、entry が返らず backwardUri 無し → seg:0 backward_exhausted を再開上限まで
+      //   繰り返して 0 件 → 過去ログが 14%/32% 等で止まり「取り込み中」が残る(NDGR切断=
+      //   ndgrLastReceivedAgo 11分・ndgr:337 はリアルタイムだけ生存)。
+      //   修正: 観測のたびに【最新の view base に更新】する。リアルタイム経路が最新 token で
+      //   現に受信できている(ndgr:337)のが、最新 token が有効である証拠=安全。初回 base は
+      //   診断用に firstBase として別途残す。
+      if (!_ndgrViewUri.firstBase) _ndgrViewUri.firstBase = base;
+      _ndgrViewUri.base = base; // 常に最新へ更新(古い token で遡れず止まるのを根治)
       const root = document.documentElement;
       if (!root) return;
       root.setAttribute('data-nls-ndgr-view-uri', _ndgrViewUri.base.slice(0, 300));
