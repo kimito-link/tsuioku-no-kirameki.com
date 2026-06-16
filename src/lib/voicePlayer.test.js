@@ -98,4 +98,81 @@ describe('VoicePlayer', () => {
     expect(player.enabled).toBe(false);
     expect(onStatus).toHaveBeenLastCalledWith('VOICEVOXが見つかりません(起動してください)');
   });
+
+  describe('v0.1.768 合成パイプライン深さ(先読み深化)', () => {
+    /** 合成を保留できる Deferred を作る(同時 in-flight 数を観測するため)。 */
+    function makeGatedSynth() {
+      const calls = [];
+      let maxConcurrent = 0;
+      let inFlight = 0;
+      const fn = vi.fn(() => {
+        inFlight += 1;
+        maxConcurrent = Math.max(maxConcurrent, inFlight);
+        let resolveFn;
+        const promise = new Promise((res) => {
+          resolveFn = () => {
+            inFlight -= 1;
+            res(new ArrayBuffer(8));
+          };
+        });
+        calls.push({ resolveFn });
+        return promise;
+      });
+      return { fn, calls, get maxConcurrent() { return maxConcurrent; } };
+    }
+
+    it('再生中にバックログがあると先頭1件だけでなく複数件を並行で先行合成する', async () => {
+      const gated = makeGatedSynth();
+      player.fetchSynthesizeVoice = gated.fn;
+      // 音声は ended を手動で起こす(再生中の状態を保てるように)。
+      const endedHandlers = [];
+      mockAudio.addEventListener = vi.fn((event, cb) => {
+        if (event === 'ended') endedHandlers.push(cb);
+      });
+      await player.enable({ persist: false });
+
+      // 6件まとめて投入=詰まり気味(深さ3になるべき文脈)。
+      player.enqueue(
+        Array.from({ length: 6 }, (_, i) => ({
+          kind: 'comment',
+          userId: `u${i}`,
+          nickname: `n${i}`,
+          text: `comment ${i}`
+        }))
+      );
+      // マイクロタスクを回して先読みが起動するのを待つ。
+      await new Promise((r) => setTimeout(r, 20));
+
+      // 旧実装(深さ1)なら同時 in-flight は最大2(現在+先読み1)。
+      // 新実装(深さ最大3)なら3件以上が同時に合成される。
+      expect(gated.maxConcurrent).toBeGreaterThanOrEqual(3);
+
+      // 後始末: 保留中の合成を全て解決し、再生も全て ended にして drain を終わらせる。
+      for (const c of gated.calls) c.resolveFn();
+      while (endedHandlers.length) endedHandlers.shift()();
+      await new Promise((r) => setTimeout(r, 20));
+      for (const c of gated.calls) c.resolveFn?.();
+      while (endedHandlers.length) endedHandlers.shift()();
+    });
+
+    it('落ち着いている時(1件のみ)は1件だけ合成し無駄打ちしない', async () => {
+      const gated = makeGatedSynth();
+      player.fetchSynthesizeVoice = gated.fn;
+      const endedHandlers = [];
+      mockAudio.addEventListener = vi.fn((event, cb) => {
+        if (event === 'ended') endedHandlers.push(cb);
+      });
+      await player.enable({ persist: false });
+
+      player.enqueue([{ kind: 'comment', userId: 'u0', nickname: 'n0', text: 'solo' }]);
+      await new Promise((r) => setTimeout(r, 20));
+
+      // 待機1件=深さは pending(=1) で頭打ち=同時1件だけ。
+      expect(gated.maxConcurrent).toBe(1);
+
+      for (const c of gated.calls) c.resolveFn();
+      while (endedHandlers.length) endedHandlers.shift()();
+      await new Promise((r) => setTimeout(r, 20));
+    });
+  });
 });
