@@ -700,4 +700,36 @@ describe('resolveOfficialComparisonDisplay（v0.1.763: 中途半端な％をや�
     });
     expect(r.mode).toBe('complete');
   });
+
+  // v0.1.764: 「％がまだ出てる・約束が守られてない」根治。backfill 状態が popup に届いていない
+  //   (KEY_BACKFILL_PROGRESS は done=1 時しか書かれず走行/再アーム中は null)ケースでも％を出さない。
+  it('🔴状態不明+記録中の生放送=％でなく「取り込み中」(約12%固定の根治)', () => {
+    // 実機 v0.1.763: 公式695/記録80(=12%)・走行中で progress 未着=state 無しで「約12%」が出ていた。
+    const r = resolveOfficialComparisonDisplay({
+      officialCount: 695,
+      recordedCount: 80,
+      recordingActive: true
+      // backfillRunning/Started/StopReason は未指定(=popup に届いていない)
+    });
+    expect(r.mode).toBe('fetching');
+    expect(r.text).not.toMatch(/%|％/); // ％は二度と出さない
+  });
+
+  it('状態不明+記録中でも実質達成なら complete(取り込み中とは言わない)', () => {
+    const r = resolveOfficialComparisonDisplay({
+      officialCount: 500,
+      recordedCount: 490,
+      recordingActive: true
+    });
+    expect(r.mode).toBe('complete');
+  });
+
+  it('状態不明+記録OFF(recordingActive 無し)は hidden(タイムシフト等を壊さない)', () => {
+    const r = resolveOfficialComparisonDisplay({
+      officialCount: 500,
+      recordedCount: 80
+      // recordingActive 無し
+    });
+    expect(r.mode).toBe('hidden');
+  });
 });

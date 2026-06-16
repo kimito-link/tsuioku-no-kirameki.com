@@ -302,7 +302,8 @@ export function backfillRecordCardHint(progress, opts = {}) {
  *   recordedCount?: number|null,   // dedupe 後の実記録総数(記録カードの値)。
  *   backfillRunning?: boolean,     // backfill が今走っているか(romiDebug.backfill.running)。
  *   backfillStopReason?: string,   // 直近の停止理由。
- *   backfillStarted?: boolean      // backfill を一度でも起動したか。
+ *   backfillStarted?: boolean,     // backfill を一度でも起動したか。
+ *   recordingActive?: boolean      // v0.1.764: 記録中の生放送か。状態不明でも％でなく「取り込み中」既定に。
  * }} args
  * @returns {{ mode: 'complete'|'fetching'|'stalled'|'hidden', text: string }}
  *   mode=complete: 実質達成(静かに肯定・％でなく状態名) / fetching: 取り込み中(まだ走行・進捗あり) /
@@ -351,7 +352,14 @@ export function resolveOfficialComparisonDisplay(args) {
     // まだ走っている=進捗中。％でなく「取り込み中」状態名(数字で不安にさせない)。
     return { mode: 'fetching', text: '過去ログを取り込み中…' };
   }
-  // 起動前/判定不能=静かに(比較行は公式件数だけ)。
+  // v0.1.764: backfill 状態が popup に届いていない(KEY_BACKFILL_PROGRESS は done=1 時しか書かれない=
+  //   走行中/再アーム中は null)ケースでも、記録中(recordingActive)の生放送なら backfill は働いている/
+  //   働こうとしている。ここで従来の「約N%」へフォールバックしていたのが、ユーザーの「％がまだ出てる・
+  //   約束が守られてない」の正体。％は二度と出さず「取り込み中」を既定にする(実質達成は上で complete)。
+  if (args && args.recordingActive) {
+    return { mode: 'fetching', text: '過去ログを取り込み中…' };
+  }
+  // 記録OFF/タイムシフト等(backfill 文脈でない)=静かに(比較行は公式件数だけ)。
   return { mode: 'hidden', text: '' };
 }
 
