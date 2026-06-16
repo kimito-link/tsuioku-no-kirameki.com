@@ -2348,11 +2348,11 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
         if (recorded > oc) {
           line += ' · 記録が先行（公式表示の更新待ちのことがあります）';
         } else {
-          // v0.1.763(A): 中途半端な「約N%」をやめ backfill 状態に応じた正直な状態名を出す(無ければ従来％)。
+          // v0.1.764(A仕上げ): 「約N%」は二度と出さない。状態が popup に届いていなくても(走行/再アーム中は
+          //   KEY_BACKFILL_PROGRESS 未着=null)、記録中の生放送(recordingActive)なら「取り込み中」を既定に。
           const bf = _backfillStateForOfficial && _backfillStateForOfficial.lid === _backfillHintLiveId ? _backfillStateForOfficial : null;
-          const disp = bf ? resolveOfficialComparisonDisplay({ officialCount: oc, recordedCount: recorded, backfillRunning: bf.running, backfillStarted: bf.started, backfillStopReason: bf.stopReason }) : null;
-          if (disp && disp.mode !== 'hidden' && disp.text) line += ` · ${disp.text}`;
-          else if (!disp) line += ` · 記録は公式の約${Math.round((recorded / oc) * 100)}%`;
+          const disp = resolveOfficialComparisonDisplay({ officialCount: oc, recordedCount: recorded, backfillRunning: bf ? bf.running : false, backfillStarted: bf ? bf.started : false, backfillStopReason: bf ? bf.stopReason : '', recordingActive: !!_backfillHintLiveId });
+          if (disp.mode !== 'hidden' && disp.text) line += ` · ${disp.text}`;
         }
       }
       officialEl.textContent = line;
