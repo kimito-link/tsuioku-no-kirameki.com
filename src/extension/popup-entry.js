@@ -572,6 +572,7 @@ import {
 } from '../lib/monotonicCommentCount.js';
 import { createBroadcasterCountState, resolveBroadcasterExcludedCount } from '../lib/broadcasterExcludedCount.js';
 import { buildOwnPostedUserIdSet } from '../lib/ownPostedUserIdSet.js';
+import { appendViewerSelfLaneAggregate } from '../lib/viewerSelfLaneAggregate.js';
 import {
   SESSION_COMMENT_CACHE_KEY,
   isSessionCommentCacheFresh,
@@ -5223,7 +5224,7 @@ function renderStoryUserLane() {
   const entries = Array.isArray(STORY_SOURCE_STATE.entries)
     ? STORY_SOURCE_STATE.entries
     : [];
-  const aggList = Array.isArray(STORY_SOURCE_STATE.laneAggregates)
+  let aggList = Array.isArray(STORY_SOURCE_STATE.laneAggregates)
     ? STORY_SOURCE_STATE.laneAggregates
     : [];
   const storageCtx = STORY_SOURCE_STATE.storageRowsForCurrentLive.length
@@ -5254,15 +5255,28 @@ function renderStoryUserLane() {
     storageCtx,
     watchMetaCache.snapshot || {}
   );
-  // v0.1.773 性能: own-posted な userId 集合をループ前に【1回だけ】作る。以前は集約ごとに
-  //   hasOwnPostedEntryForUserId が storageCtx 全件を走査し O(集約数 × N)=描画ガード手前で毎 paint
-  //   実行され、長時間・大量コメントで popup メインスレッドを塞ぎ「送信が遅い(18s)」一因だった。
+  // v0.1.773 性能: own-posted な userId 集合をループ前に1回だけ作る(旧 hasOwnPostedEntryForUserId は
+  //   集約ごとに storageCtx 全件走査=O(集約×N)で描画ガード手前で毎 paint 実行され送信18sの一因)。
   //   matchedIds は getOwnPostedMatchedIdSet でメモ化済み。ループ内は has() の O(1) に落とす。
   const ownPostedUidSet = buildOwnPostedUserIdSet(
     storageCtx,
     getOwnPostedMatchedIdSet(storageCtx, liveId),
     (entry) => popupEntryStableId(entry, String(liveId || '').trim().toLowerCase())
   );
+
+  // v0.1.775: 自分のコメントは匿名で流れアイコン列に出ない。取得済みの視聴者プロフィール(数値ID+
+  //   個人アイコン)で「自分」の合成集約を足し、投稿済みなら実 ID/アイコンで出す(own-posted 集合へも追加)。
+  const selfLane = appendViewerSelfLaneAggregate(aggList, {
+    viewerUserId: viewerUid,
+    viewerNickname: String(watchMetaCache.snapshot?.viewerNickname || '').trim(),
+    viewerAvatarUrl: String(watchMetaCache.snapshot?.viewerAvatarUrl || '').trim(),
+    liveId,
+    ownPostedCount: countOwnPostedEntries(storageCtx, liveId),
+    nowMs: Date.now(),
+    isHttpUrl: isHttpOrHttpsUrl
+  });
+  aggList = selfLane.aggregates;
+  if (selfLane.viewerUserId) ownPostedUidSet.add(selfLane.viewerUserId);
 
   /** @type {{ entryIndex: number, profileTier: number, thumbScore: number, displaySrc: string, title: string, entry: PopupCommentEntry, meta: { idLine: string, nameLine: string } }[]} */
   const candidates = [];
@@ -5278,17 +5292,14 @@ function renderStoryUserLane() {
     );
     const uidRaw = String(agg?.userId || '').trim();
     if (!uidRaw) continue;
-    /*
-     * 配信者IDが確定できない状態で numeric userId 段を出すと、配信者本人や
-     * watch 周辺ユーザーを「応援者」と誤表示する。誤表示を避けるため、
-     * この状態では匿名段だけに倒す。
-     */
-    if (!broadcasterUid && /^\d{5,14}$/.test(uidRaw)) continue;
     // 集約エントリは合成 id なので、`isOwnPostedSupportComment` の id 一致検査は必ず false になり、
     // viewer uid と一致する自コメまで contamination guard で除外される(= りんくレーンに自コメが出ない)。
     // 同一 userId の storage エントリに1件でも self-posted があれば own-posted 扱い。
     // v0.1.773: 集約ごとの全件走査をやめ、事前計算した ownPostedUidSet の O(1) 参照に置換。
     const ownPostedForUid = ownPostedUidSet.has(uidRaw);
+    // 配信者ID未確定で numeric userId 段を出すと配信者/周辺ユーザーを誤表示するので匿名段に倒す。
+    // v0.1.775: own-posted(=自分)は確実に本人なので numeric でも通す(自分をアイコン列に出す)。
+    if (!broadcasterUid && !ownPostedForUid && /^\d{5,14}$/.test(uidRaw)) continue;
     /** @type {PopupCommentEntry} */
     const e = {
       id: `nl-lane:${uidRaw}`,
