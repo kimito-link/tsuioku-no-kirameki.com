@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.788',
+    date: '2026-06-17',
+    summary: 'ページ固まりの計測範囲を広げ原因特定をより確実に',
+    items: Object.freeze([
+      '前バージョンで入れた「画面が固まる原因の計測」の対象を、コメントの取り込み処理(画面のコメント欄を読み取る処理)にも広げました。これにより、次に画面が固まったときに、どの処理が原因かをより確実に突き止められます。動作や表示は変わりません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.787',
     date: '2026-06-17',
     summary: '画面が固まる原因の計測を追加+重い診断ビルドを空き時間へ',
