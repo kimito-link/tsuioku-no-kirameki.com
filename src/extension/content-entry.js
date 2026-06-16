@@ -11000,16 +11000,19 @@ let _swStagingFoldLastCheckAt = 0;
 const SW_STAGING_FOLD_CHECK_MIN_MS = 10_000;
 /** v0.1.795: 同時実行ガード(前回の畳み込みが await 中に次 tick が重ならないように)。 */
 let _swStagingFoldInFlight = false;
+/** v0.1.797: 背面 kick OFF 時の畳み込みを live ごと1回に戻すための latch(記録ホットパスに
+ *  10秒ごとの storage 読みを足さない=v0.1.795 反映後の記録停止の疑いを断つ)。 */
+let _swStagingFoldedForLiveId = '';
 
 /**
  * SW が退避した backfill 行を、既存 persist パイプラインへ畳み込む。
  *
  * v0.1.795: かつては「live ごとに一度だけ」(latch)だったが、SW alarm 駆動で背面 backfill が
- *   走行中ずっと staging を書き続けるようになったため、【繰り返し】畳み込めるよう作り替える。
- *   key を読み→畳み込み→remove するので、SW が新たに staging を書いた分だけ毎回拾える。
- *   storage 読みを毎 tick(360ms)叩かないよう時間 throttle(10秒)+ 同時実行ガードを付ける。
- *   staging が無いときは remove せず素通し(空読みのコストだけ・stall を増やさない)。
- *   flush 成功前は取り置きを削除せず、失敗時は次回チェックで再試行する(取りこぼし無し)。
+ *   走行中ずっと staging を書き続けるようになったため、【繰り返し】畳み込めるよう作り替えた。
+ * v0.1.797: 背面 kick が OFF(既定)のときは SW が staging を書かない→繰り返しチェックは無駄な
+ *   storage 読みを記録ホットパスに足すだけ。OFF のときは v0.1.795 以前と同じ【live ごと1回】の
+ *   latch に戻し(残置 staging の取りこぼしだけ防ぐ)、ON のときだけ 10秒ごとの繰り返しチェックに
+ *   する。これで記録(コア機能)に余計な I/O を足さない。
  */
 async function maybeFoldSwBackfillStaging() {
   const lid = String(liveId || '').trim().toLowerCase();
@@ -11022,9 +11025,16 @@ async function maybeFoldSwBackfillStaging() {
     return;
   }
   if (_swStagingFoldInFlight) return;
-  const now = Date.now();
-  if (now - _swStagingFoldLastCheckAt < SW_STAGING_FOLD_CHECK_MIN_MS) return;
-  _swStagingFoldLastCheckAt = now;
+  if (_backfillBgKickEnabled) {
+    // ON: 走行中に SW が staging を書き続けるので 10秒ごとに繰り返しチェック。
+    const now = Date.now();
+    if (now - _swStagingFoldLastCheckAt < SW_STAGING_FOLD_CHECK_MIN_MS) return;
+    _swStagingFoldLastCheckAt = now;
+  } else {
+    // OFF(既定): SW は staging を書かない。残置分だけを live ごと1回だけ拾う(記録 I/O を増やさない)。
+    if (_swStagingFoldedForLiveId === lid) return;
+    _swStagingFoldedForLiveId = lid;
+  }
   _swStagingFoldInFlight = true;
   const key = swBackfillStagedKey(lid);
   try {
