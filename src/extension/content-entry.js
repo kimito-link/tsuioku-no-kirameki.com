@@ -15863,6 +15863,16 @@ function maybeAutoStartBackfill() {
       (typeof document === 'undefined' || document.visibilityState !== 'hidden')
     ) {
       void setBackfillPriorityLiveId(String(liveId || '').trim().toLowerCase());
+      // v0.1.760「長尺が23%等で止まる(6h45m)」根治(根底・v0.1.758 と同型の disease):
+      //   gap-catchup の再アーム間隔は通常 cooldownMs=36秒だが、_backfillPriorityBoostUntil が
+      //   新鮮な間だけ 5秒(BACKFILL_PRIORITY_COOLDOWN_MS)に短縮される。その boost を立てるのは
+      //   onTabVisibleForCommentHarvest(=visibilitychange)だけ=2時間 visible のまま開きっぱなしの
+      //   単一タブでは boost が 120秒で失効し、以後 36秒間隔でしか続きを遡れない。長尺は1巡回で
+      //   遡り切れず何度も続きから再開するため、36秒×多数回=数時間かけても途中(23%)で止まって
+      //   見える。前面で記録中のタブは「今ユーザーが見ている配信」なので、毎 tick boost を更新し
+      //   再アームを 5秒間隔に保つ=続きから素早く一気に追いつく。裏/非前面タブは更新しないので
+      //   従来どおり 36秒(負荷/暴走を増やさない)。boost は記録予算でなくクールダウン短縮のみ。
+      _backfillPriorityBoostUntil = Date.now() + 120_000;
     }
   } catch {
     /* no-op: 優先再アサート失敗は致命ではない(従来動作に degrade) */
