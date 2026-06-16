@@ -71,4 +71,17 @@ describe('resolveMonotonicCommentCount', () => {
     expect(resolveMonotonicCommentCount(s, 'lv1', 5)).toBe(5);
     expect(resolveMonotonicCommentCount(s, 'lv1', 0)).toBe(5); // 0に戻さない
   });
+
+  it('state を直接 lv=\'\'/max=0 に書き換えるとリセットとして機能する(resetOfficialCommentSamplingState の配線を担保)', () => {
+    const s = createMonotonicCommentCountState();
+    // 同一配信で値を積んだ後
+    resolveMonotonicCommentCount(s, 'lv1', 500);
+    expect(s.max).toBe(500);
+    // 配信切替/リセット時に content-entry.js は lv=''/max=0 を直書きする
+    s.lv = '';
+    s.max = 0;
+    // リセット後: 同一 lv でも低い値から正しく再開する
+    expect(resolveMonotonicCommentCount(s, 'lv1', 3)).toBe(3);
+    expect(s.max).toBe(3);
+  });
 });

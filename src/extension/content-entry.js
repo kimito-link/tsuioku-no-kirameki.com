@@ -71,6 +71,10 @@ import {
 import { addThumbBlob, countThumbsForLive, isIndexedDbAvailable } from '../lib/thumbDb.js';
 import { createDevReloadState, applyDevReloadSignal } from '../lib/devReloadSignal.js';
 import {
+  createMonotonicCommentCountState,
+  resolveMonotonicCommentCount
+} from '../lib/monotonicCommentCount.js';
+import {
   evaluateRecordingStall,
   pickStallRecoveryActions,
   RECORDING_STALL_RECOVERY_COOLDOWN_MS
@@ -696,6 +700,28 @@ const officialViewerIntervals = [];
 const officialCommentHistory = [];
 /** @type {number} */
 let observedRecordedCommentCount = 0;
+// v0.1.792「記録が増えて減る」根治: observedRecordedCommentCount は内部ロジック(バックフィルの
+//   gap 計算・ストール判定・テール compaction)が【生の実件数】を必要とするため単調化できない
+//   (過去最大に固定すると gap/stall が壊れる)。そこで正本変数は生のままにし、【表示用サマリに
+//   渡す瞬間だけ】同一配信内で後退させない単調ゲート(既存 monotonicCommentCount)を通す。
+//   6経路の絶対代入が非同期に別正本(テール/IDB/chunk)を見て上書き合戦し、後着の小さい値が
+//   表示を後退させていた症状を、表示層でだけ吸収する(内部ロジックは不変=安全)。
+const _recordedDisplayMonotonicState = createMonotonicCommentCountState();
+/**
+ * 表示用サマリに出すコメント件数を、同一配信内で後退させない値に解決する。
+ * 内部ロジック用の observedRecordedCommentCount(生値)は変えない。lv が変われば
+ *   resolveMonotonicCommentCount が自動でリセットする(別配信)。
+ * @param {string} lid
+ * @returns {number}
+ */
+function recordedCountForDisplay(lid) {
+  const gated = resolveMonotonicCommentCount(
+    _recordedDisplayMonotonicState,
+    lid,
+    observedRecordedCommentCount
+  );
+  return typeof gated === 'number' ? gated : observedRecordedCommentCount;
+}
 /** WebSocket schedule メッセージから取得した配信開始時刻 (epoch ms) */
 /** @type {number|null} */
 let programBeginAtMs = null;
@@ -1973,6 +1999,11 @@ function resetOfficialCommentSamplingState() {
   officialCommentHistory.length = 0;
   observedRecordedCommentCount = 0;
   _lastPanelSummaryRecordedWritten = -1;
+  // v0.1.792: 表示用の単調ゲートも明示クリア。配信切替/非watch遷移で生件数が 0 から積み直す
+  //   とき、古い max が残って嘘の件数を出すのを防ぐ(単調化の罠回避)。lv 変化時は
+  //   resolveMonotonicCommentCount が自動リセットするが、同一 lv で 0 へ戻る経路に備えここでも消す。
+  _recordedDisplayMonotonicState.lv = '';
+  _recordedDisplayMonotonicState.max = 0;
 }
 
 /** `#embedded-data` の遅延出現後に programBeginAt を一度だけ埋める（L3 補助） */
@@ -10166,7 +10197,7 @@ function buildPanelSummaryPayloadForCurrentLive(nowMs = Date.now()) {
   );
   return buildPanelLiveSummary({
     liveId: lid,
-    recordedCount: observedRecordedCommentCount,
+    recordedCount: recordedCountForDisplay(lid),
     officialCount: officialFields.officialCommentCount,
     viewerCountFromDom,
     officialViewerCount: officialFields.officialViewerCount,
@@ -10314,7 +10345,7 @@ async function bufferRowsToTail(rows) {
   //   テール set と同じ 1 回の安い set にまとめて書く（多タブでも巨大配列 I/O を増やさない）。
   const summaryPayload = buildCommentSummary({
     liveId,
-    recordedCount: observedRecordedCommentCount,
+    recordedCount: recordedCountForDisplay(liveId),
     officialCount:
       officialCommentCount != null && Number.isFinite(officialCommentCount)
         ? officialCommentCount
