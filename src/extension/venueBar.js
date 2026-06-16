@@ -438,38 +438,60 @@ const VENUE_CSS = `
     z-index: 7; /* 吹き出し(z5)・常駐(z6)より前=投げ物は最前面で映像へ飛ぶ */
     display: none;
     align-items: center;
-    gap: 3px;
-    padding: 2px 7px;
+    gap: 4px;
+    padding: 3px 9px;
     border-radius: 999px;
-    background: rgba(20, 24, 32, 0.78);
+    background: rgba(20, 24, 32, 0.82);
     color: #fff;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     white-space: nowrap;
     pointer-events: none;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
     will-change: transform, opacity;
-    mix-blend-mode: screen; /* 中央映像を隠しすぎない */
+    /* v0.1.783: テキスト投げ物のみ screen 合成(中央映像を隠しすぎない)。
+       実画像(is-image)は写真調なので screen を外し、はっきり見せる。 */
+    mix-blend-mode: screen;
     transform: translate(-50%, -50%);
+  }
+  /* v0.1.783: 実画像の投げ物。pill 背景を消して画像そのものを大きく飛ばす。 */
+  .nlsb-gift-proj.is-image {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    mix-blend-mode: normal;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+  }
+  .nlsb-gift-proj-img {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    display: block;
   }
   .nlsb-gift-proj.is-flying {
     display: inline-flex;
-    animation: nlsb-gift-fly var(--nlsb-gift-dur, 1300ms) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+    animation: nlsb-gift-fly var(--nlsb-gift-dur, 1500ms) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
   }
-  .nlsb-gift-proj-emoji { font-size: 16px; }
+  .nlsb-gift-proj-emoji { font-size: 18px; }
+  /* v0.1.783「一瞬で見えない」改善: 着弾(70%)で一度大きく見せて(バースト)から、
+     余韻を残してフェード。以前は終端で scale(0.45)+opacity0 に縮んで消え、見る間もなかった。 */
   @keyframes nlsb-gift-fly {
-    0%   { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
-    12%  { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
-    55%  { transform: translate(calc(-50% + var(--nlsb-gift-mx)), calc(-50% + var(--nlsb-gift-my))) scale(1.12) rotate(8deg); opacity: 1; }
-    100% { transform: translate(calc(-50% + var(--nlsb-gift-dx)), calc(-50% + var(--nlsb-gift-dy))) scale(0.45) rotate(-6deg); opacity: 0; }
+    0%   { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+    10%  { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+    55%  { transform: translate(calc(-50% + var(--nlsb-gift-mx)), calc(-50% + var(--nlsb-gift-my))) scale(1.14) rotate(7deg); opacity: 1; }
+    72%  { transform: translate(calc(-50% + var(--nlsb-gift-dx)), calc(-50% + var(--nlsb-gift-dy))) scale(1.35) rotate(-3deg); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--nlsb-gift-dx)), calc(-50% + var(--nlsb-gift-dy))) scale(1.05) rotate(-2deg); opacity: 0; }
   }
   @media (prefers-reduced-motion: reduce) {
     .nlsb-gift-proj.is-flying {
-      animation: nlsb-gift-fade var(--nlsb-gift-dur, 1300ms) ease-out forwards;
+      animation: nlsb-gift-fade var(--nlsb-gift-dur, 1500ms) ease-out forwards;
     }
+    /* reduced-motion: 飛ばさず、着弾点でふわっと出して消える(余韻は残す)。 */
     @keyframes nlsb-gift-fade {
-      0% { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
-      100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+      0%   { transform: translate(calc(-50% + var(--nlsb-gift-dx)), calc(-50% + var(--nlsb-gift-dy))) scale(1); opacity: 0; }
+      20%  { transform: translate(calc(-50% + var(--nlsb-gift-dx)), calc(-50% + var(--nlsb-gift-dy))) scale(1); opacity: 0.95; }
+      80%  { transform: translate(calc(-50% + var(--nlsb-gift-dx)), calc(-50% + var(--nlsb-gift-dy))) scale(1); opacity: 0.95; }
+      100% { transform: translate(calc(-50% + var(--nlsb-gift-dx)), calc(-50% + var(--nlsb-gift-dy))) scale(1); opacity: 0; }
     }
   }
   .nlsb-header {
@@ -1955,7 +1977,7 @@ export function mountVenueBarButton(options = {}) {
   };
   /**
    * @param {string} speakerKey
-   * @param {{ kind:string, emoji:string, label:string, durationMs:number }} proj
+   * @param {{ kind:string, emoji:string, label:string, durationMs:number, imageUrl?:string }} proj
    */
   const launchGiftThrow = (speakerKey, proj) => {
     if (!proj || !open) return;
@@ -1970,12 +1992,38 @@ export function mountVenueBarButton(options = {}) {
     const target = giftThrowTarget();
     const path = resolveGiftThrowPath(origin, target);
     el.innerHTML = '';
-    const emoji = document.createElement('span');
-    emoji.className = 'nlsb-gift-proj-emoji';
-    emoji.textContent = proj.emoji;
-    const label = document.createElement('span');
-    label.textContent = proj.label;
-    el.append(emoji, label);
+    // v0.1.783: item_id があれば実画像を投げ物に。読み込み失敗時は絵文字へフォールバック。
+    //   画像は写真調なので mix-blend:screen を外す(is-image クラスで CSS 切替)。
+    const imageUrl = String(proj.imageUrl || '');
+    el.classList.toggle('is-image', Boolean(imageUrl));
+    if (imageUrl) {
+      const img = document.createElement('img');
+      img.className = 'nlsb-gift-proj-img';
+      img.alt = '';
+      img.decoding = 'async';
+      img.loading = 'eager';
+      // 失敗したら画像をやめて絵文字+ラベルに差し替え(欠け画像を出さない)。
+      img.addEventListener('error', () => {
+        el.classList.remove('is-image');
+        img.remove();
+        const emoji = document.createElement('span');
+        emoji.className = 'nlsb-gift-proj-emoji';
+        emoji.textContent = proj.emoji;
+        const label = document.createElement('span');
+        label.textContent = proj.label;
+        el.prepend(label);
+        el.prepend(emoji);
+      }, { once: true });
+      img.src = imageUrl;
+      el.append(img);
+    } else {
+      const emoji = document.createElement('span');
+      emoji.className = 'nlsb-gift-proj-emoji';
+      emoji.textContent = proj.emoji;
+      const label = document.createElement('span');
+      label.textContent = proj.label;
+      el.append(emoji, label);
+    }
     el.style.left = `${path.startX}px`;
     el.style.top = `${path.startY}px`;
     el.style.setProperty('--nlsb-gift-dx', `${path.dx}px`);
@@ -1986,7 +2034,8 @@ export function mountVenueBarButton(options = {}) {
     giftProjActive += 1;
     const recycle = () => {
       el.removeEventListener('animationend', recycle);
-      el.classList.remove('is-flying');
+      // v0.1.783: is-flying と is-image を両方落とす(プール再利用時に画像用スタイルが残らないよう)。
+      el.classList.remove('is-flying', 'is-image');
       el.style.cssText = '';
       el.textContent = '';
       giftProjActive = Math.max(0, giftProjActive - 1);
@@ -2030,6 +2079,8 @@ export function mountVenueBarButton(options = {}) {
       const uid = String(ev.userId || '').trim();
       const item = String(ev.itemName || '').trim();
       const point = Number(ev.point) || 0;
+      // v0.1.783: NDGR event 経路は item_id を持つ → 実画像で投げられる。
+      const itemId = String(ev.itemId || '').trim();
       const key = `${uid}|${ev.capturedAt || ''}|${item}|${point}`;
       if (thrownGiftEventKeys.has(key)) continue;
       thrownGiftEventKeys.add(key);
@@ -2039,7 +2090,7 @@ export function mountVenueBarButton(options = {}) {
         thrownGiftEventKeys.clear();
         for (const k of arr.slice(-200)) thrownGiftEventKeys.add(k);
       }
-      const proj = resolveGiftProjectile({ item, point }, 'gift');
+      const proj = resolveGiftProjectile({ item, point, itemId }, 'gift');
       // 起点: 席キーは venueSpeakerKey/venueParticipantKey と同じ `u:${uid}` 形にする
       //   (raw uid だと seatByKey に当たらず常に crowdBubbleAnchor へ落ちる)。
       if (proj) launchGiftThrow(uid ? `u:${uid}` : '', proj);

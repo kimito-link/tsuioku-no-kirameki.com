@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveGiftProjectile,
   resolveGiftThrowPath,
+  resolveGiftImageUrl,
   canLaunchGiftThrow,
   GIFT_THROW_MAX_CONCURRENT,
   GIFT_THROW_ARC_LIFT_PX,
-  GIFT_THROW_DURATION_MS
+  GIFT_THROW_DURATION_MS,
+  GIFT_THUMBNAIL_BASE
 } from './giftThrowProjectile.js';
 
 describe('resolveGiftProjectile', () => {
@@ -42,6 +44,47 @@ describe('resolveGiftProjectile', () => {
   it('壊れた入力は null', () => {
     expect(resolveGiftProjectile(null, 'gift')).toBeNull();
     expect(resolveGiftProjectile(undefined, 'ad')).toBeNull();
+  });
+
+  it('v0.1.783: itemId があれば imageUrl に実画像 URL が乗る(NDGR event 経路)', () => {
+    const p = resolveGiftProjectile({ item: 'バスケットボール', point: 10, itemId: 'ball_basketball' }, 'gift');
+    expect(p.imageUrl).toBe(`${GIFT_THUMBNAIL_BASE}ball_basketball.png`);
+  });
+
+  it('v0.1.783: itemId が無い/不正なギフトは imageUrl が空(絵文字フォールバック)', () => {
+    expect(resolveGiftProjectile({ item: 'x', point: 10 }, 'gift').imageUrl).toBe('');
+    expect(resolveGiftProjectile({ item: 'x', point: 10, itemId: '' }, 'gift').imageUrl).toBe('');
+    // nx:/system: prefix や日本語本文は URL に乗せない(誤検知の混入防止)。
+    expect(resolveGiftProjectile({ item: 'x', point: 10, itemId: 'nx:gift:show' }, 'gift').imageUrl).toBe('');
+    expect(resolveGiftProjectile({ item: 'x', point: 10, itemId: '応援' }, 'gift').imageUrl).toBe('');
+  });
+
+  it('v0.1.783: 広告は imageUrl 常に空', () => {
+    expect(resolveGiftProjectile({ point: 100 }, 'ad').imageUrl).toBe('');
+  });
+
+  it('v0.1.783: duration を延長(着弾が一瞬で消えない)', () => {
+    expect(GIFT_THROW_DURATION_MS.small).toBeGreaterThanOrEqual(1500);
+    expect(GIFT_THROW_DURATION_MS.mega).toBeGreaterThan(GIFT_THROW_DURATION_MS.small);
+  });
+});
+
+describe('resolveGiftImageUrl', () => {
+  it('slug 形式の item_id は CDN URL を返す', () => {
+    expect(resolveGiftImageUrl('stamp_thanks')).toBe(`${GIFT_THUMBNAIL_BASE}stamp_thanks.png`);
+    expect(resolveGiftImageUrl('heart')).toBe(`${GIFT_THUMBNAIL_BASE}heart.png`);
+    expect(resolveGiftImageUrl('  ball_basketball  ')).toBe(`${GIFT_THUMBNAIL_BASE}ball_basketball.png`);
+  });
+
+  it('不正な item_id は空(URL に乗せない)', () => {
+    expect(resolveGiftImageUrl('')).toBe('');
+    expect(resolveGiftImageUrl(null)).toBe('');
+    expect(resolveGiftImageUrl(undefined)).toBe('');
+    expect(resolveGiftImageUrl('ab')).toBe(''); // 短すぎ(3文字未満)
+    expect(resolveGiftImageUrl('1leading_digit')).toBe(''); // 先頭が数字
+    expect(resolveGiftImageUrl('nx:gift:show')).toBe(''); // event type 混入
+    expect(resolveGiftImageUrl('応援メガホン')).toBe(''); // 日本語(chat本文の誤検知)
+    expect(resolveGiftImageUrl('a'.repeat(81))).toBe(''); // 長すぎ
   });
 });
 
