@@ -12830,12 +12830,18 @@ async function start() {
     }).catch(() => { /* 既定（手動 OFF・自動 ON）を維持 */ });
   } catch { /* no-op */ }
 
-  // v0.1.511: 前方向 NDGR / PR1-b-3: SW backfill モード opt-in の初期読み（既定 OFF・true 厳密一致のみ）。
+  // v0.1.767「最終系(b): forward 常時ON」: 前方向 NDGR 継続取得を【既定 ON】にする(ユーザー「あとから
+  //   取れるけど遅れる感じ」根治)。受動傍受(プレイヤー依存)をやめ、拡張が切れる前から自分で NDGR を
+  //   引き続けることで token を常に新鮮に保ち、過去ログが構造的に止まらない+遅延が縮む(会議全会一致の
+  //   最終系)。既定 ON だが KEY_NDGR_FORWARD_ENABLED を明示 false にすればキルスイッチで OFF(=true 厳密
+  //   一致でなく『!== false』。仕様変更で壊れたら false にして受動傍受へ degrade)。起動の実ガード
+  //   (前面のみ/全タブ横断1本/hidden abort/429 backoff)は maybeStartNdgrForwardCrawl が担う=常時ONでも
+  //   負荷は有界。PR1-b-3 SW backfill モードは従来どおり既定 OFF(true 厳密一致)。
   try {
     chrome.storage.local.get([KEY_NDGR_FORWARD_ENABLED, KEY_BACKFILL_SW_MODE]).then((bag) => {
-      _ndgrForwardEnabled = !!(bag && bag[KEY_NDGR_FORWARD_ENABLED] === true);
+      _ndgrForwardEnabled = !(bag && bag[KEY_NDGR_FORWARD_ENABLED] === false);
       _backfillSwModeEnabled = !!(bag && bag[KEY_BACKFILL_SW_MODE] === true);
-    }).catch(() => { /* OFF default を維持 */ });
+    }).catch(() => { /* 既定 ON を維持(取得失敗時も forward は走らせる) */ });
   } catch { /* no-op */ }
 
   // v0.1.513 / fix/persist-plateau: チャンクモード dedupe のインメモリ・インクリメンタル化（既定 ON）。
@@ -12918,11 +12924,12 @@ async function start() {
         changes[KEY_NDGR_DETERMINISTIC_BACKFILL].newValue === true;
     }
 
-    // v0.1.511: 前方向 NDGR 継続取得 opt-in。OFF→ON の立ち上がりで即起動（次 tick を待たない）。
-    //   ON→OFF は走行中の crawl を abort して止める。
+    // v0.1.511/767: 前方向 NDGR 継続取得。OFF→ON の立ち上がりで即起動（次 tick を待たない）。
+    //   ON→OFF は走行中の crawl を abort して止める。v0.1.767 最終系(b)= 既定 ON なので、明示 false
+    //   のときだけ OFF（キルスイッチ）。それ以外（true / 未設定相当の値）は ON。
     if (changes[KEY_NDGR_FORWARD_ENABLED]) {
       const wasEnabled = _ndgrForwardEnabled;
-      _ndgrForwardEnabled = changes[KEY_NDGR_FORWARD_ENABLED].newValue === true;
+      _ndgrForwardEnabled = changes[KEY_NDGR_FORWARD_ENABLED].newValue !== false;
       if (!wasEnabled && _ndgrForwardEnabled) {
         maybeStartNdgrForwardCrawl();
       } else if (wasEnabled && !_ndgrForwardEnabled && _ndgrForwardAbort) {
@@ -16057,8 +16064,10 @@ function maybeAutoStartBackfill() {
 //   ページ非依存の独立経路で「記録 < 本家コメ」desync を補う。リーダータブ1本が放送中走り続け、
 //   hidden では abort しない（abort は liveId 変化・記録停止・番組終了・unload のみ）。詳細は git 履歴。
 
-/** @type {boolean} 前方向継続取得が有効か（既定 OFF）。初回 storage 読み込み + onChanged で反映。 */
-let _ndgrForwardEnabled = false;
+/** @type {boolean} 前方向継続取得が有効か。v0.1.767 最終系(b): 既定 ON(切れる前から自分で NDGR を
+ *   引き続け token を新鮮に保つ→過去ログが止まらない+遅延が縮む)。KEY_NDGR_FORWARD_ENABLED を明示
+ *   false にすればキルスイッチで OFF。初回 storage 読み込み + onChanged で反映。 */
+let _ndgrForwardEnabled = true;
 /** @type {AbortController|null} 進行中の前方向 crawl（liveId 変化 / 記録停止 / unload で abort）。 */
 let _ndgrForwardAbort = null;
 /** @type {string} 現在 crawl を走らせている liveId（fail-open 環境での多重起動 guard）。 */
