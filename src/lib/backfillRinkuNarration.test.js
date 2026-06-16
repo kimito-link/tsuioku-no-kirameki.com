@@ -6,6 +6,7 @@ import {
   backfillRecordCardHint,
   backfillRecordCardHintDomState,
   backfillStuckDiagnosticsSuffix,
+  resolveOfficialComparisonDisplay,
   BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT
 } from './backfillRinkuNarration.js';
 
@@ -615,5 +616,88 @@ describe('backfillStuckDiagnosticsSuffix（止まった理由＋残り件数の�
       );
       expect(s.hidden).toBe(true);
     });
+  });
+});
+
+describe('resolveOfficialComparisonDisplay（v0.1.763: 中途半端な％をやめ正直な状態に）', () => {
+  it('🔴実機の核: 接続切れで止まり0件 backward_exhausted=「約6%」でなく「再接続待ち」状態に', () => {
+    // 実機 lv350762947: 公式1302・記録414(=32%)で running:false stopReason:backward_exhausted。
+    //   止まっているのに％+「取り込み中」を出していた=最悪UX。これを stalled(正直)に。
+    const r = resolveOfficialComparisonDisplay({
+      officialCount: 1302,
+      recordedCount: 414,
+      backfillRunning: false,
+      backfillStarted: true,
+      backfillStopReason: 'backward_exhausted'
+    });
+    expect(r.mode).toBe('stalled');
+    expect(r.text).not.toMatch(/%|％/); // 中途半端な％は出さない
+    expect(r.text).toContain('接続'); // 接続が戻れば続きを取ると正直に
+  });
+
+  it('実質達成(記録>=公式95%)=％でなく静かな肯定(数字で煽らない)', () => {
+    const r = resolveOfficialComparisonDisplay({
+      officialCount: 529,
+      recordedCount: 543, // 実機 いちこ: 記録が公式以上(103%)
+      backfillRunning: false,
+      backfillStarted: true,
+      backfillStopReason: 'reached_start'
+    });
+    expect(r.mode).toBe('complete');
+    expect(r.text).not.toMatch(/%|％/);
+    expect(r.text).toContain('取り込み済み');
+  });
+
+  it('まだ走行中=「取り込み中」状態名(％で不安にさせない)', () => {
+    const r = resolveOfficialComparisonDisplay({
+      officialCount: 1000,
+      recordedCount: 200,
+      backfillRunning: true,
+      backfillStarted: true,
+      backfillStopReason: ''
+    });
+    expect(r.mode).toBe('fetching');
+    expect(r.text).not.toMatch(/%|％/);
+  });
+
+  it('no_entry/rate_limited/no_progress/aborted で止まったら全部 stalled(正直に再試行案内)', () => {
+    for (const reason of ['no_entry', 'no_view_base', 'rate_limited', 'no_progress', 'aborted', 'stalled']) {
+      const r = resolveOfficialComparisonDisplay({
+        officialCount: 1000,
+        recordedCount: 60,
+        backfillRunning: false,
+        backfillStarted: true,
+        backfillStopReason: reason
+      });
+      expect(r.mode, `reason=${reason}`).toBe('stalled');
+    }
+  });
+
+  it('公式不明/0なら hidden(比較を出さない)', () => {
+    expect(resolveOfficialComparisonDisplay({ officialCount: null }).mode).toBe('hidden');
+    expect(resolveOfficialComparisonDisplay({ officialCount: 0 }).mode).toBe('hidden');
+    expect(resolveOfficialComparisonDisplay({}).mode).toBe('hidden');
+  });
+
+  it('起動前(started=false)は hidden(まだ何も言わない)', () => {
+    const r = resolveOfficialComparisonDisplay({
+      officialCount: 500,
+      recordedCount: 0,
+      backfillRunning: false,
+      backfillStarted: false,
+      backfillStopReason: ''
+    });
+    expect(r.mode).toBe('hidden');
+  });
+
+  it('実質達成は stalled な stopReason でも complete を優先(取れてるのに再試行案内を出さない)', () => {
+    const r = resolveOfficialComparisonDisplay({
+      officialCount: 1000,
+      recordedCount: 980, // 98%=実質達成
+      backfillRunning: false,
+      backfillStarted: true,
+      backfillStopReason: 'no_entry'
+    });
+    expect(r.mode).toBe('complete');
   });
 });

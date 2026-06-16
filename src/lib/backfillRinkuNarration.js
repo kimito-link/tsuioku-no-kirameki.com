@@ -282,6 +282,80 @@ export function backfillRecordCardHint(progress, opts = {}) {
 }
 
 /**
+ * v0.1.763「％という概念がおかしい・止まってるのに取り込み中と出る・じゃなきゃ繰り返す」(ユーザー)
+ *   根治(A案・会議全会一致の次点): 公式件数との比較行に出す表示を、誤解を招く「約N%」でなく
+ *   【正直な状態】に切り替える純関数。
+ *
+ * 背景(実機 fastDiag で確定): 過去ログ取得(backfill)は NDGR の入口(view base)が配信中に
+ *   ローテーションし、接続が切れると古い入口で 0 件のまま backward_exhausted で止まる。
+ *   それでも記録カードは「記録は公式の約6%」のように中途半端な％を出し、かつ「取り込み中」と
+ *   進行中を装っていた=「止まってるのに進んでるように見える」最悪 UX。％は配信中ずっと増える
+ *   公式(statistics.comments=gift/system 等も含む)が分母で、達成不能な見かけの数字でもある。
+ *
+ * 方針(A): ％は「本当に取り切れている(実質達成)」ときだけ静かに肯定で示し、それ以外は
+ *   ％を出さず「取り込み中／少し待つと続きを取ります(再試行)」という正直な状態名にする。
+ *   止まっているのに「取り込み中」とは言わない。Nielsen Norman #1 Visibility of System Status /
+ *   Instagram "You're all caught up" の定石(数字でなく状態名)。
+ *
+ * @param {{
+ *   officialCount?: number|null,   // 公式コメント数(statistics.comments)。分母。
+ *   recordedCount?: number|null,   // dedupe 後の実記録総数(記録カードの値)。
+ *   backfillRunning?: boolean,     // backfill が今走っているか(romiDebug.backfill.running)。
+ *   backfillStopReason?: string,   // 直近の停止理由。
+ *   backfillStarted?: boolean      // backfill を一度でも起動したか。
+ * }} args
+ * @returns {{ mode: 'complete'|'fetching'|'stalled'|'hidden', text: string }}
+ *   mode=complete: 実質達成(静かに肯定・％でなく状態名) / fetching: 取り込み中(まだ走行・進捗あり) /
+ *   stalled: 止まっている(接続待ち/再試行・正直に) / hidden: 比較を出さない(公式不明等)。
+ *   呼び出し側は text を officialEl に「公式 N 件 · {text}」の形で出す。
+ */
+export function resolveOfficialComparisonDisplay(args) {
+  const official = Number(args && args.officialCount);
+  if (!Number.isFinite(official) || official <= 0) {
+    return { mode: 'hidden', text: '' };
+  }
+  const recorded = Number(args && args.recordedCount);
+  const rec = Number.isFinite(recorded) && recorded >= 0 ? recorded : 0;
+
+  // 実質達成(記録が公式の 95% 以上 or 記録が公式以上)=％でなく静かな肯定。公式は配信中増え続け
+  //   gift/system 差で数件ズレるので「約100%」と数字で煽らず「最新まで取り込み済み」と状態名で。
+  if (rec >= official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO) {
+    return { mode: 'complete', text: '最新まで取り込み済み ✨' };
+  }
+
+  const running = !!(args && args.backfillRunning);
+  const started = !!(args && args.backfillStarted);
+  const reason = String((args && args.backfillStopReason) || '');
+  // 「止まっている」= 走っておらず、入口なし/遡り切り(0件)/中断系で終わっている。
+  //   接続切れ・古い入口で 0 件 backward_exhausted もここ(=正直に再試行中と出す)。
+  const stalledReasons = new Set([
+    'no_entry',
+    'no_view_base',
+    'backward_exhausted',
+    'rate_limited',
+    'no_progress',
+    'aborted',
+    'stalled',
+    'rotation_yield',
+    'visibility_paused'
+  ]);
+  if (!running && started && stalledReasons.has(reason)) {
+    // 中途半端な％は出さない。止まっているのに「取り込み中」とも言わない。接続が戻れば
+    //   自動で続きから取り切る設計(content 側の transient retry / gap-catchup)に合わせた文言。
+    return {
+      mode: 'stalled',
+      text: '過去ログを遡り中（接続が戻りしだい続きを取り込みます）'
+    };
+  }
+  if (running) {
+    // まだ走っている=進捗中。％でなく「取り込み中」状態名(数字で不安にさせない)。
+    return { mode: 'fetching', text: '過去ログを取り込み中…' };
+  }
+  // 起動前/判定不能=静かに(比較行は公式件数だけ)。
+  return { mode: 'hidden', text: '' };
+}
+
+/**
  * 診断用: 取り込みが途中で止まったときに、止まった理由(stopReason)と公式件数との
  * 残りギャップを「人が読める短い接尾辞」にして返す純関数。
  *
