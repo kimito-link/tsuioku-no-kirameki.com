@@ -63,17 +63,22 @@ describe('recordCommentSubmitTotal', () => {
     expect(buf[0].ms).toBe(3); // 0,1,2 が落ちて 3 から残る
   });
 
-  it(`${NLS_COMMENT_SUBMIT_SLOW_WARN_MS}ms 以上なら console.warn が出る`, () => {
+  it(`${NLS_COMMENT_SUBMIT_SLOW_WARN_MS}ms 以上なら console.debug が出る(拡張エラー欄には出さない)`, () => {
+    // v0.1.776: chrome://extensions のエラー欄を汚さないよう warn ではなく debug に下げた。
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
     recordCommentSubmitTotal('nls-cmt-popup', NLS_COMMENT_SUBMIT_SLOW_WARN_MS);
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toMatch(/slow=\d+ms/);
+    expect(warn).not.toHaveBeenCalled();
+    expect(debug).toHaveBeenCalledTimes(1);
+    expect(String(debug.mock.calls[0][0])).toMatch(/slow=\d+ms/);
   });
 
-  it('閾値未満なら warn は出ない', () => {
+  it('閾値未満なら debug も warn も出ない', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
     recordCommentSubmitTotal('nls-cmt-popup', NLS_COMMENT_SUBMIT_SLOW_WARN_MS - 1);
     expect(warn).not.toHaveBeenCalled();
+    expect(debug).not.toHaveBeenCalled();
   });
 
   it('不正な値は無視（負数・NaN）', () => {

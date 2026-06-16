@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.776',
+    date: '2026-06-16',
+    summary: 'コメント送信の計測警告を拡張エラー欄に出さないように',
+    items: Object.freeze([
+      'コメント送信に少し時間がかかったときに chrome://extensions のエラー欄へ計測の警告(slow=…ms)が出ていたのをやめました。これは不具合ではなく「送信にかかった時間」を記録する計測ログで、見ても操作のしようがなく不安を与えるだけだったため、拡張のエラー欄には出さず、必要なとき開発者ツールでのみ確認できる形(debug ログ)に下げました。送信そのものの速さは前バージョンの改善で十数秒→1秒前後に短縮済みです'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.775',
     date: '2026-06-16',
     summary: '自分のコメントを応援アイコン列にも表示',

@@ -56,8 +56,11 @@ export function recordCommentSubmitTotal(label, elapsedMs) {
     g[NLS_COMMENT_SUBMIT_HISTORY_KEY] = buf;
     if (ms >= NLS_COMMENT_SUBMIT_SLOW_WARN_MS) {
       try {
+        // v0.1.776: console.warn は chrome://extensions のエラー欄に出てユーザーを不安にさせ、かつ
+        //   行動につながらない(「見てどうすればいい?」)。console.debug に下げて拡張エラー欄へは出さず、
+        //   必要時だけ DevTools の verbose で確認できるようにする。履歴は globalThis に従来どおり残す。
         const recent = buf.slice(-5).map((r) => r.ms);
-        console.warn(
+        console.debug(
           `[${label}] slow=${ms}ms (recent5=[${recent.join(',')}]). ` +
             `DevTools で globalThis.__nlsCommentSubmitProfile=true にして再送信すると区間別の詳細が出ます。`
         );
