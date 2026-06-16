@@ -321,7 +321,14 @@ function renderAll({ lvList, summaries, fastDiag, backfillProgress }) {
   //   backward_exhausted=入口無し / cap_*=上限 / rate_limited=混雑)。
   // v0.1.692: 行組み立てを純関数 buildBackfillProgressLine(statusFormat.js)へ移譲。
   //   aborted の真因(crawl 例外メッセージ errMsg)があれば「・エラー: ...」を併記する。
-  const bpLine = buildBackfillProgressLine(backfillProgress);
+  // v0.1.794: 進捗キー(nls_backfill_progress_v1)は content が完走時だけ書くため、長時間/複数配信では
+  //   走行中ずっと backfillProgress=null=この行が空になり「過去ログを取っている気配が出ない」。
+  //   記録中×放送中(endedAt無し)×未達(取得率<100)の配信があれば「取り込み中…」のフォールバックを
+  //   出す(popup の v0.1.764 と対称・数字は出さず不安にさせない)。判定は livesData から行う。
+  const catchingUp = livesData.some(
+    (lv) => !lv.endedAt && lv.recordedCount > 0 && (lv.officialRatePct == null || lv.officialRatePct < 100)
+  );
+  const bpLine = buildBackfillProgressLine(backfillProgress, { catchingUp });
   const backfillLine = bpLine ? `\n${bpLine}` : '';
   // v0.1.766(ユーザー要望「概要にレーン状況も入れたい」): 公式値レーン(北極星レーン)の状況を
   //   概要に併記。「レーンが出ていない時」を status を見るだけで分かる。視聴中の配信のみ取得可能

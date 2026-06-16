@@ -122,16 +122,36 @@ export function buildCaptureRateLine(live) {
  * v0.1.692: 過去ログ取得(backfill)の診断行を組み立てる(status 概要併記用)。
  *   従来 status-entry.js にインライン実装だったものを純関数化。aborted の真因
  *   (crawl 例外メッセージ errMsg)があれば併記し、status を見るだけで真因調査できるようにする。
+ *
+ * v0.1.794: backfill 進捗キー(nls_backfill_progress_v1)は content が【完走(done=1)時だけ】書く
+ *   (v0.1.657「短時間は静かに一気に取る」設計)。だが長時間/複数配信では完走まで時間がかかり、
+ *   その間 bp=null=この行が空になり「過去ログを取り込んでいる気配が status に出ない」=ユーザーの
+ *   「一気に取れる前提が出ていない」(=完成がドンと出る気配が無い)不安の正体。
+ *   → popup は v0.1.764 で「null でも記録中なら『取り込み中…』」のフォールバックを持つが status は
+ *   非対称で未対応だった。ここで status にも同等のフォールバックを入れる(会議4役一致・案B)。
+ *   bp が無くても opts.catchingUp=true(記録中×放送中×未達の配信がある)なら取り込み中を出す。
+ *   v0.1.657 の短時間体験は壊さない=短時間配信は数秒で完走し catchingUp が立つ前に done=1 になる。
+ *
  * @param {{lid?:string, rows?:number, done?:number, stopReason?:string, errMsg?:string}|null|undefined} bp
- * @returns {string} lid が無ければ ''
+ * @param {{catchingUp?: boolean}} [opts]
+ *   catchingUp: bp が null/未完了でも「記録中で放送中・まだ取り切っていない配信がある」=取り込み中
+ *   とみなしてフォールバック行を出す。呼び出し側(status-entry.js)が livesData から判定して渡す。
+ * @returns {string} 出すものが無ければ ''
  */
-export function buildBackfillProgressLine(bp) {
-  if (!bp || !bp.lid) return '';
-  return (
-    `過去ログ取得: [${bp.lid}] ${Number(bp.done) === 1 ? '完了' : '取得中'}・取得${Number(bp.rows) || 0}件` +
-    (bp.stopReason ? `・停止理由=${bp.stopReason}` : '') +
-    (bp.errMsg ? `・エラー: ${bp.errMsg}` : '')
-  );
+export function buildBackfillProgressLine(bp, opts) {
+  if (bp && bp.lid) {
+    return (
+      `過去ログ取得: [${bp.lid}] ${Number(bp.done) === 1 ? '完了' : '取得中'}・取得${Number(bp.rows) || 0}件` +
+      (bp.stopReason ? `・停止理由=${bp.stopReason}` : '') +
+      (bp.errMsg ? `・エラー: ${bp.errMsg}` : '')
+    );
+  }
+  // 進捗キーがまだ書かれていない(走行中/完走前)が、記録中×放送中×未達の配信があるなら、
+  //   「黙って空」でなく「取り込み中」と伝える(数字は出さない=不安にさせない・v0.1.791 と同思想)。
+  if (opts && opts.catchingUp) {
+    return '過去ログ取得: 取り込み中…（過去のコメントをさかのぼって取得しています）';
+  }
+  return '';
 }
 
 /**
