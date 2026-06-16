@@ -409,7 +409,9 @@ import {
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import {
   crawlNdgrBackward,
-  crawlNdgrBackwardDeterministic
+  crawlNdgrBackwardDeterministic,
+  BACKFILL_FOREGROUND_FETCH_GAP_MS,
+  BACKFILL_FOREGROUND_EMPTY_RESEED_PAUSE_MS
 } from '../lib/ndgrBackfillCrawl.js';
 import { crawlNdgrForward } from '../lib/ndgrForwardCrawl.js';
 import { computeBackfillFlushThreshold } from '../lib/backfillFlushThreshold.js';
@@ -15475,12 +15477,26 @@ async function runNdgrBackfillOnce(ctx = {}) {
       : crawlNdgrBackward;
     // 決定論エンジンは vpos を停止/到達判定に使わないため、旧 vpos resume は旧エンジン限定。
     const crawlResumeFromVpos = _ndgrDeterministicBackfillEnabled ? null : resumeFromVpos;
+    // v0.1.761「20分配信でも43%・%が見える=一気でない」根治(会議#1=seek/reseedの無駄時間が律速):
+    //   前面(視聴中)タブは速度最優先で、fetch 間 gap と空区画 pause を短縮する。これにより、
+    //   過去を遡るたびの seek(最大20hop)+空区画リトライの【待ち時間】が縮み、同じ区画を同じ順で
+    //   取りつつ「一気に」終わる(=% が見える時間が消える)。裏/非前面タブは従来値(嵐防止・429回避)。
+    //   ⚠️取得する区画・順序・件数は不変=取りこぼし無し。429/403 backoff は別系統で不変。
+    const isForegroundWatchTab =
+      typeof document === 'undefined' ||
+      typeof document.hasFocus !== 'function' ||
+      (document.hasFocus() && document.visibilityState !== 'hidden');
     const gen = crawlBackward({
       viewBase,
       fetchBinary: backfillFetchBinary,
       programStartSec: startMs != null ? Math.floor(startMs / 1000) : null,
       // v0.1.456 レジューム: 前回到達点から続きを掘る（無ければ null＝従来の seed 探索）。
       resumeFromVpos: crawlResumeFromVpos,
+      // v0.1.761: 前面タブは gap 15→6ms・空区画 pause 150→24ms(速度最優先)。裏は既定(15/150)。
+      fetchGapMs: isForegroundWatchTab ? BACKFILL_FOREGROUND_FETCH_GAP_MS : undefined,
+      emptyReseedPauseMs: isForegroundWatchTab
+        ? BACKFILL_FOREGROUND_EMPTY_RESEED_PAUSE_MS
+        : undefined,
       signal: ac.signal
     });
 

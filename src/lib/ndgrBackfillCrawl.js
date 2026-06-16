@@ -161,6 +161,17 @@ export const NDGR_BACKFILL_NO_PROGRESS_RETRY_MAX = 240;
 export const NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS = 150;
 
 /**
+ * v0.1.761「20分配信でも43%・%が見える=一気でない」根治(会議#1=seek/reseed の無駄時間が律速):
+ * 前面(視聴中)タブ向けの【速度最優先】値。過去を遡るたびの seek(最大20hop の fetch)+空区画リトライの
+ * 【待ち時間】を縮め、同じ区画を同じ順で取りつつ「一気に」終わらせる(=% が見える時間を消す)。
+ * fetch gap は NDGRClient 参考実装(10ms)よりやや速い 6ms、空区画 pause は 150→24ms。裏/非前面タブは
+ * 従来値(15/150ms=嵐防止・429回避)を維持。⚠️取得する区画・順序・件数は不変=取りこぼし無し。
+ * 429/403 backoff(NDGR_BACKFILL_BACKOFF_MS)は別系統なので、混雑時はこの値に関係なく自動減速する。
+ */
+export const BACKFILL_FOREGROUND_FETCH_GAP_MS = 6;
+export const BACKFILL_FOREGROUND_EMPTY_RESEED_PAUSE_MS = 24;
+
+/**
  * v0.1.697: 「まだ1行も取れていない(everMadeProgress=false)」crawl の空リトライ予算。
  * 240回(=3.3h相当のバケット遡行)をペーシング付きで回すと1回のcrawlが分単位になり
  * 「いっきに取れる」体感を殺す(実機: 今日のNHK実況で5分以上 rows=0)。初回から空のときは
@@ -438,6 +449,8 @@ export function chainLooksLikeStreamStart(chats, opts) {
  * @param {() => number} [opts.now] 経過時間計測用。既定は Date.now。
  * @param {Partial<NdgrBackfillCaps>} [opts.caps] 上限の上書き。
  * @param {number} [opts.fetchGapMs] fetch 間の待機 ms。
+ * @param {number} [opts.emptyReseedPauseMs] v0.1.761: 空区画/入口なしリトライ間の小休止 ms。
+ *   前面タブは速度最優先で短く(BACKFILL_FOREGROUND_EMPTY_RESEED_PAUSE_MS)、裏は既定 150。
  * @param {number|null} [opts.programStartSec] 配信開始の unixtime（秒）。区画終端での
  *   再シード時刻を「配信開始 + 最古コメント vpos」で精密に算出するのに使う。不明なら
  *   固定窓で後退する（精度は落ちるが動作する）。
@@ -473,6 +486,14 @@ export async function* crawlNdgrBackward(opts) {
     typeof opts?.fetchGapMs === 'number' && opts.fetchGapMs >= 0
       ? opts.fetchGapMs
       : NDGR_BACKFILL_FETCH_GAP_MS;
+  // v0.1.761「20分配信でも43%・%が見える=一気でない」根治(会議#1=seek/reseedの無駄時間が律速):
+  //   空区画/入口なしリトライ間の小休止。前面(視聴中)タブは速度最優先で短く、裏タブは従来の
+  //   150ms(嵐防止)に保てるよう呼び出し側から差し替え可能にする。fetch の gap(gapMs)同様 opt 化。
+  //   ⚠️取得する区画・順序・件数は不変(待ち時間だけ)。429/403 backoff(NDGR_BACKFILL_BACKOFF_MS)は別系統で不変。
+  const emptyReseedPauseMs =
+    typeof opts?.emptyReseedPauseMs === 'number' && opts.emptyReseedPauseMs >= 0
+      ? opts.emptyReseedPauseMs
+      : NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS;
   const signal = opts?.signal;
 
   let segmentsFetched = 0;
@@ -818,7 +839,7 @@ export async function* crawlNdgrBackward(opts) {
       // v0.1.695: 空リトライ間に小休止を挟む。従来は上限240回まで無休で空シークを連発し、
       //   SW/コンテンツのイベントループとNDGRをリクエスト嵐で圧迫していた(実機: SWがメッセージ
       //   応答不能)。橋渡しの正しさは不変(回数・順序は同じ)・ペースだけ毎秒数件に落とす。
-      await sleep(NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS);
+      await sleep(emptyReseedPauseMs);
       continue;
     }
 
@@ -981,7 +1002,7 @@ export async function* crawlNdgrBackward(opts) {
       //   飛び越え programStart 張り付き→毎回同じ場所→偽 no_progress だった）。
       seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
       // v0.1.695: 空リトライ間に小休止（嵐防止・上の同型コメント参照）。
-      await sleep(NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS);
+      await sleep(emptyReseedPauseMs);
       continue; // 同じ reseed 予算内で次の起点を試す
     }
     // 進めた。最古 vpos を更新し、no-progress 連続カウンタをリセット。

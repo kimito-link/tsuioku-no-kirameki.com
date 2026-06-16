@@ -8,7 +8,10 @@ import {
   NDGR_BACKFILL_BACKOFF_MS,
   NDGR_BACKFILL_SEED_LAG_SEC,
   NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC,
-  NDGR_BACKFILL_NEAR_START_VPOS_CS
+  NDGR_BACKFILL_NEAR_START_VPOS_CS,
+  NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS,
+  BACKFILL_FOREGROUND_FETCH_GAP_MS,
+  BACKFILL_FOREGROUND_EMPTY_RESEED_PAUSE_MS
 } from './ndgrBackfillCrawl.js';
 
 // テストは now を固定（1_000_000ms）注入する。seed は floor(now/1000) - SEED_LAG_SEC。
@@ -1488,6 +1491,42 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     // ?at=now（1回目・gap無し）→ ?at=1000 View（gap）→ BK0（gap）。gap=600 が 2 回。
     const gaps = slept.filter((ms) => ms === 600);
     expect(gaps.length).toBe(2);
+  });
+
+  it('v0.1.761: emptyReseedPauseMs を渡すと空区画リトライの小休止がその値になる(前面タブ高速化)', async () => {
+    // BK0 に開始近傍でない通常コメント(no=50,vpos大)→ next=N。reseed すると seek が空(View無し)で
+    //   no-progress に合流し emptyReseedPauseMs を sleep する。配信開始近傍でないので reached_start に
+    //   即倒れず、少なくとも1回はリトライ pause を踏む。
+    const BK0 = `https://mpn.live.nicovideo.jp/data/backward/v4/PAUSE0`;
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+    // vpos 大(開始近傍でない)=reached_start にならない→ reseed して空 seek→no-progress pause を踏む。
+    map.set(BK0, packedSegmentBytes([{ no: 50, content: 'x', name: 'u1', vpos: 90000 }]));
+    // 以降の reseed 起点(?at=...)は map 未登録=404(空)で seek が backwardUri 無し→no-progress 合流。
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep, slept } = makeNoopSleep();
+    await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        emptyReseedPauseMs: 24 // 前面タブの速度最優先値
+      })
+    );
+
+    // 空区画リトライの小休止が 24ms になっている(従来の 150ms ではない)。
+    expect(slept).toContain(24);
+    expect(slept).not.toContain(NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS); // 150 は踏まない
+  });
+
+  it('v0.1.761: 前面タブ高速化の定数が想定値', () => {
+    // 取得する区画・順序・件数は不変=待ち時間だけ。429/403 backoff は別系統で不変。
+    expect(BACKFILL_FOREGROUND_FETCH_GAP_MS).toBe(6);
+    expect(BACKFILL_FOREGROUND_EMPTY_RESEED_PAUSE_MS).toBe(24);
+    expect(NDGR_BACKFILL_EMPTY_RESEED_PAUSE_MS).toBe(150); // 裏タブ既定は不変
   });
 
   it('デフォルト定数が想定値（長尺配信を最後まで遡れる値）', () => {
