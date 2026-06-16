@@ -4,9 +4,62 @@ import {
   buildLiveBlockText,
   buildBackfillProgressLine,
   buildCaptureRateLine,
+  buildLaneStatusLine,
   formatElapsed,
   formatAgo
 } from './statusFormat.js';
+
+describe('buildLaneStatusLine (v0.1.766 概要にレーン状況)', () => {
+  it('出ているレーンは ✅件数、取得中は ⏳、無し(no_event/no_program_gift)は省く', () => {
+    const lanes = {
+      '1_貢献度ランキング': { state: 'ok', count: 10 },
+      '+α_広告ランキング': { state: 'ok', count: 0, foundCountLifetime: 0 },
+      '2_ギフト履歴': { state: 'no_program_gift', count: 0 },
+      '4_番組累計ポイント': { state: 'ok', ndgrValue: 3350 },
+      '3_イベント累計スコア': { state: 'no_event', value: null },
+      '5_イベント現在順位': { state: 'iframe_unrendered', value: null }
+    };
+    const line = buildLaneStatusLine(lanes);
+    expect(line).toContain('公式値レーン:');
+    expect(line).toContain('貢献度:✅10');
+    expect(line).toContain('番組pt:✅3350');
+    expect(line).toContain('E順位:⏳取得中');
+    expect(line).toContain('広告:空'); // ok だが 0=空
+    // この配信に無し(no_event/no_program_gift)はノイズにせず省く。
+    expect(line).not.toContain('ギフト履歴');
+    expect(line).not.toContain('Eスコア');
+  });
+
+  it('全部「この配信に無し」なら空文字(概要を散らかさない)', () => {
+    const lanes = {
+      '3_イベント累計スコア': { state: 'no_event' },
+      '5_イベント現在順位': { state: 'no_event' },
+      '2_ギフト履歴': { state: 'no_program_gift' }
+    };
+    expect(buildLaneStatusLine(lanes)).toBe('');
+  });
+
+  it('レーンが「取得中」で揃っている=出ていない時が一目で分かる', () => {
+    const lanes = {
+      '1_貢献度ランキング': { state: 'iframe_unrendered' },
+      '+α_広告ランキング': { state: 'iframe_unrendered' }
+    };
+    const line = buildLaneStatusLine(lanes);
+    expect(line).toBe('公式値レーン: 貢献度:⏳取得中 / 広告:⏳取得中');
+  });
+
+  it('null/不正/空オブジェクトは空文字(fail-safe)', () => {
+    expect(buildLaneStatusLine(null)).toBe('');
+    expect(buildLaneStatusLine(undefined)).toBe('');
+    expect(buildLaneStatusLine({})).toBe('');
+    expect(buildLaneStatusLine('x')).toBe('');
+  });
+
+  it('想定外の state はそのまま ⚠ 付きで出す(気づけるように)', () => {
+    const line = buildLaneStatusLine({ '1_貢献度ランキング': { state: 'weird_new_state' } });
+    expect(line).toContain('貢献度:⚠weird_new_state');
+  });
+});
 
 describe('formatElapsed', () => {
   it('h:mm:ss を 1 時間以上で出す', () => {

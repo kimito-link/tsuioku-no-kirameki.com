@@ -24,7 +24,8 @@ import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
-  buildBackfillProgressLine
+  buildBackfillProgressLine,
+  buildLaneStatusLine
 } from '../lib/statusFormat.js';
 import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
@@ -315,9 +316,15 @@ function renderAll({ lvList, summaries, fastDiag, backfillProgress }) {
   //   aborted の真因(crawl 例外メッセージ errMsg)があれば「・エラー: ...」を併記する。
   const bpLine = buildBackfillProgressLine(backfillProgress);
   const backfillLine = bpLine ? `\n${bpLine}` : '';
+  // v0.1.766(ユーザー要望「概要にレーン状況も入れたい」): 公式値レーン(北極星レーン)の状況を
+  //   概要に併記。「レーンが出ていない時」を status を見るだけで分かる。視聴中の配信のみ取得可能
+  //   (fastDiag.content.giftDiagnostics の「北極星レーン」)なので、取れたときだけ1行足す。
+  const laneStr = buildLaneStatusLine(fastDiag?.content?.giftDiagnostics?.['北極星レーン']);
+  const laneLine = laneStr ? `\n${laneStr}` : '';
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
-    overviewEl.textContent = (overviewText || '視聴中の配信はありません。') + backfillLine;
+    overviewEl.textContent =
+      (overviewText || '視聴中の配信はありません。') + backfillLine + laneLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -499,6 +506,9 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag }) {
   if (overviewText) {
     lines.push('### 概要');
     lines.push(overviewText);
+    // v0.1.766: 概要に公式値レーン(北極星レーン)の状況も併記(視聴中の配信のみ)。
+    const laneStr = buildLaneStatusLine(fastDiag?.content?.giftDiagnostics?.['北極星レーン']);
+    if (laneStr) lines.push(laneStr);
     lines.push('');
   }
   if (livesData.length) {
