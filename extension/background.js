@@ -956,6 +956,7 @@ async function migrateClearStaleSelfPostedOnce(previousVersion) {
 chrome.runtime.onInstalled.addListener((details) => {
   ensureToolbarOpensPopupNotSidePanel();
   void ensureAutoBackupAlarm();
+  void ensureBackfillBgKickAlarm();
   void (async () => {
     await migrateFloatingPanelToDockProfileOnce();
     await migrateBelowPanelToDockProfileOnce();
@@ -1011,6 +1012,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onStartup.addListener(() => {
   ensureToolbarOpensPopupNotSidePanel();
   void ensureAutoBackupAlarm();
+  void ensureBackfillBgKickAlarm();
   void migrateFloatingPanelToDockProfileOnce();
   void migrateBelowPanelToDockProfileOnce();
   void injectIntoExistingTabs();
@@ -1024,6 +1026,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
   if (alarm?.name === AUTOPATROL_ALARM) {
     void runAutopatrolTick();
+    return;
+  }
+  if (alarm?.name === BACKFILL_BG_KICK_ALARM) {
+    void runBackfillBgKickTick();
   }
 });
 
@@ -1332,6 +1338,171 @@ async function resumeAutopatrolIfEnabled() {
     void runAutopatrolTick();
   } catch {
     /* no-op */
+  }
+}
+
+/* ================================================================== */
+/* v0.1.795: 背面(全タブ裏)でも過去ログ backfill を取り切る SW alarm kick        */
+/*                                                                      */
+/* 真因(council/backfill-background-tabs-SYNTHESIS.md): backfill は content の    */
+/*   setInterval tick と crawl 内 setTimeout だけで駆動され、Chrome が背面タブの */
+/*   タイマーを間引く(1/分)ため全タブ裏だと seed すら取れず seg:0 のまま止まる。  */
+/*   chrome.alarms は間引き/凍結に強い。ここで content が書いたハートビート       */
+/*   (nls_backfill_hb_<lid>)を読み、前面タブが居ない配信だけ既存 SW crawl エンジン */
+/*   で掘る。SW crawl は tabId 無し→staging に退避→content が畳み込む。           */
+/*   退行ゼロ: 前面タブが居る配信は kick しない(v0.1.758 前面優先は不変)。        */
+/*                                                                      */
+/* 判定の純ロジックは src/lib/backfillHeartbeat.js(契約 test 付き)。background は  */
+/* ESM import 不可なのでキー式/しきい値/判定をミラー(lib 側 test が drift 検知)。 */
+/* ================================================================== */
+
+const BACKFILL_BG_KICK_ALARM = 'nls_backfill_bg_kick';
+/** alarm 周期(分)。Chrome 最小 0.5 分=30秒。背面 backfill は遅くて良いので 1 分で十分。 */
+const BACKFILL_BG_KICK_MINUTES = 1;
+// src/lib/backfillHeartbeat.js のミラー(lib 側 test が文字列/しきい値の drift を検知)。
+const BACKFILL_HEARTBEAT_KEY_PREFIX = 'nls_backfill_hb_';
+const KEY_BACKFILL_HEARTBEAT_INDEX = 'nls_backfill_hb_lids_v1';
+const KEY_BACKFILL_BG_KICK_ENABLED = 'nls_backfill_bg_kick_enabled_v1';
+const BACKFILL_HEARTBEAT_STALE_MS = 6 * 60 * 1000;
+const BACKFILL_HEARTBEAT_MIN_GAP = 30;
+const BACKFILL_BG_LV_RE = /^lv\d{1,15}$/;
+
+async function ensureBackfillBgKickAlarm() {
+  try {
+    const existing = await chrome.alarms.get(BACKFILL_BG_KICK_ALARM);
+    if (existing) return;
+    chrome.alarms.create(BACKFILL_BG_KICK_ALARM, {
+      delayInMinutes: BACKFILL_BG_KICK_MINUTES,
+      periodInMinutes: BACKFILL_BG_KICK_MINUTES
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
+/**
+ * src/lib/backfillHeartbeat.js の shouldSwKickBackfillForLive を SW 用にミラーした純判定。
+ * 戻り値: kick=true なら背面 crawl を起動して良い。lib 側 test が分岐の正本。
+ */
+function shouldSwKickBackfillForLiveLocal({
+  heartbeat,
+  now,
+  swAlreadyCrawling,
+  hasForegroundTab,
+  enabled
+}) {
+  if (enabled === false) return { kick: false, reason: 'disabled' };
+  const hb = heartbeat && typeof heartbeat === 'object' ? heartbeat : null;
+  if (!hb || hb.v !== 1) return { kick: false, reason: 'no_hb' };
+  const lid = String(hb.lid || '').trim().toLowerCase();
+  if (!BACKFILL_BG_LV_RE.test(lid)) return { kick: false, reason: 'bad_lid' };
+  const viewBase = String(hb.viewBase || '').trim();
+  if (!/^https?:\/\//i.test(viewBase)) return { kick: false, reason: 'no_view_base' };
+  const nowMs = Number(now);
+  const ts = Number(hb.ts) || 0;
+  if (Number.isFinite(nowMs) && ts > 0 && nowMs - ts > BACKFILL_HEARTBEAT_STALE_MS) {
+    return { kick: false, reason: 'stale_hb' };
+  }
+  if (hasForegroundTab === true) return { kick: false, reason: 'foreground_present' };
+  if (swAlreadyCrawling === true) return { kick: false, reason: 'already_crawling' };
+  const official = hb.officialCount;
+  if (official != null && Number.isFinite(Number(official))) {
+    const recorded = Math.max(0, Number(hb.recordedCount) || 0);
+    const gap = Math.max(0, Number(official) - recorded);
+    if (gap < BACKFILL_HEARTBEAT_MIN_GAP) return { kick: false, reason: 'no_gap' };
+  }
+  return { kick: true, reason: 'ok' };
+}
+
+/** 今「前面(focused window の active)」になっている watch タブの lid 集合を返す。 */
+async function foregroundWatchLiveIds() {
+  const out = new Set();
+  try {
+    const tabs = await chrome.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+      url: 'https://*.nicovideo.jp/*'
+    });
+    for (const tab of tabs) {
+      const m = String(tab?.url || '').toLowerCase().match(/watch\/(lv\d{1,15})/);
+      if (m) out.add(m[1]);
+    }
+  } catch {
+    /* no-op: 判定不能は「前面なし」に倒す=背面 kick を許す(取りこぼし優先) */
+  }
+  return out;
+}
+
+/** alarm 駆動の背面 backfill kick(1 tick)。全 hb を見て、掘るべき配信だけ SW crawl を起こす。 */
+async function runBackfillBgKickTick() {
+  try {
+    if (!globalThis.__nlsSwBackfill || typeof globalThis.__nlsSwBackfill.startSwCrawl !== 'function') {
+      return; // SW crawl エンジン未ロード=従来動作(content 経路のみ)
+    }
+    let enabled = true;
+    try {
+      const bag = await chrome.storage.local.get(KEY_BACKFILL_BG_KICK_ENABLED);
+      enabled = bag[KEY_BACKFILL_BG_KICK_ENABLED] !== false; // 既定 ON
+    } catch {
+      enabled = true;
+    }
+    if (!enabled) return;
+
+    // get(null)(全件・大きいと stall 誘発)を避け、content が維持する索引(小配列)→該当 hb だけ get する。
+    const idxBag = await chrome.storage.local.get(KEY_BACKFILL_HEARTBEAT_INDEX);
+    const lids = Array.isArray(idxBag[KEY_BACKFILL_HEARTBEAT_INDEX])
+      ? idxBag[KEY_BACKFILL_HEARTBEAT_INDEX]
+          .map((x) => String(x || '').trim().toLowerCase())
+          .filter((x) => BACKFILL_BG_LV_RE.test(x))
+      : [];
+    if (!lids.length) return;
+    const hbKeys = lids.map((lid) => `${BACKFILL_HEARTBEAT_KEY_PREFIX}${lid}`);
+    const all = await chrome.storage.local.get(hbKeys);
+
+    const fgLids = await foregroundWatchLiveIds();
+    const runningLids = new Set(
+      (typeof globalThis.__nlsSwBackfill.runningLids === 'function'
+        ? globalThis.__nlsSwBackfill.runningLids()
+        : []
+      ).map((x) => String(x || '').trim().toLowerCase())
+    );
+    const now = Date.now();
+
+    for (const key of hbKeys) {
+      const hb = all[key];
+      const lid = hb && typeof hb === 'object' ? String(hb.lid || '').trim().toLowerCase() : '';
+      const decision = shouldSwKickBackfillForLiveLocal({
+        heartbeat: hb,
+        now,
+        swAlreadyCrawling: lid ? runningLids.has(lid) : false,
+        hasForegroundTab: lid ? fgLids.has(lid) : false,
+        enabled
+      });
+      if (!decision.kick) continue;
+      try {
+        // tabId 無し=staging 経路。startSwCrawl は内部スロット(slots=2)で並列を有界化する。
+        globalThis.__nlsSwBackfill.startSwCrawl({
+          lid,
+          viewBase: String(hb.viewBase || '').trim(),
+          programBeginAtMs:
+            hb.programBeginAtMs != null && Number.isFinite(Number(hb.programBeginAtMs))
+              ? Number(hb.programBeginAtMs)
+              : null,
+          deterministic: hb.deterministic === true,
+          tabId: undefined,
+          mirrorLegacyProgress: false,
+          officialCount:
+            hb.officialCount != null && Number.isFinite(Number(hb.officialCount))
+              ? Number(hb.officialCount)
+              : null
+        });
+        runningLids.add(lid); // 同 tick 内の二重起動防止
+      } catch {
+        /* 1 配信の起動失敗は他を止めない */
+      }
+    }
+  } catch {
+    /* best-effort: 次の alarm で立て直す */
   }
 }
 

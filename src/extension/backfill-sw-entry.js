@@ -434,3 +434,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   sendResponse({ ok: result.ok, reason: result.reason });
   return false;
 });
+
+// v0.1.795: IIFE バンドルは export を SW グローバルへ出さないので、background.js(手書きSW)が
+//   alarm(nls_backfill_bg_kick)から直接呼べるよう必要 API を self に公開する。
+//   tabId 無しで startSwCrawl すると sendRowsToTab が即失敗→staging に切替→storage に退避され、
+//   content が maybeFoldSwBackfillStaging で畳み込む(=背面/凍結タブでも行が失われない)。
+//   crawlRegistry のキー一覧は「今 SW が掘っている lid」=alarm 側の二重起動 guard に使う。
+try {
+  // @ts-ignore — SW グローバル(self)。テスト/非SW 環境では globalThis にぶら下げる。
+  (self || globalThis).__nlsSwBackfill = {
+    startSwCrawl,
+    runningLids: () => Array.from(crawlRegistry.keys())
+  };
+} catch {
+  /* no-op: グローバル公開不可な環境では従来どおり message 経路のみ */
+}

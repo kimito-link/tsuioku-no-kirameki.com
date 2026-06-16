@@ -460,6 +460,12 @@ import {
   KEY_BACKFILL_SW_MODE,
   shouldTriggerSwBackfill
 } from '../lib/swBackfillTrigger.js';
+import {
+  backfillHeartbeatKey,
+  buildBackfillHeartbeat,
+  mergeHeartbeatLidIndex,
+  KEY_BACKFILL_HEARTBEAT_INDEX
+} from '../lib/backfillHeartbeat.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
 import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
@@ -10987,13 +10993,26 @@ function persistCommentRows(rows, opts = {}) {
   }
 }
 
+/** v0.1.795: SW staging 畳み込みの最終チェック時刻(過剰な storage 読みを抑制)。 */
+let _swStagingFoldLastCheckAt = 0;
+/** v0.1.795: staging 畳み込みの最小チェック間隔(ms)。SW alarm は1分粒度なので 10秒で十分。 */
+const SW_STAGING_FOLD_CHECK_MIN_MS = 10_000;
+/** v0.1.795: 同時実行ガード(前回の畳み込みが await 中に次 tick が重ならないように)。 */
+let _swStagingFoldInFlight = false;
+
 /**
- * SW が退避した backfill 行を、既存 persist パイプラインへ live ごとに一度だけ畳み込む。
- * flush 成功前は取り置きを削除せず、失敗時は次回の live オープンで再試行する。
+ * SW が退避した backfill 行を、既存 persist パイプラインへ畳み込む。
+ *
+ * v0.1.795: かつては「live ごとに一度だけ」(latch)だったが、SW alarm 駆動で背面 backfill が
+ *   走行中ずっと staging を書き続けるようになったため、【繰り返し】畳み込めるよう作り替える。
+ *   key を読み→畳み込み→remove するので、SW が新たに staging を書いた分だけ毎回拾える。
+ *   storage 読みを毎 tick(360ms)叩かないよう時間 throttle(10秒)+ 同時実行ガードを付ける。
+ *   staging が無いときは remove せず素通し(空読みのコストだけ・stall を増やさない)。
+ *   flush 成功前は取り置きを削除せず、失敗時は次回チェックで再試行する(取りこぼし無し)。
  */
 async function maybeFoldSwBackfillStaging() {
   const lid = String(liveId || '').trim().toLowerCase();
-  if (!lid || _swStagingFoldedForLiveId === lid) return;
+  if (!lid) return;
   if (
     !recording ||
     !locationAllowsCommentRecording() ||
@@ -11001,7 +11020,11 @@ async function maybeFoldSwBackfillStaging() {
   ) {
     return;
   }
-  _swStagingFoldedForLiveId = lid;
+  if (_swStagingFoldInFlight) return;
+  const now = Date.now();
+  if (now - _swStagingFoldLastCheckAt < SW_STAGING_FOLD_CHECK_MIN_MS) return;
+  _swStagingFoldLastCheckAt = now;
+  _swStagingFoldInFlight = true;
   const key = swBackfillStagedKey(lid);
   try {
     const bag = await chrome.storage.local.get(key);
@@ -11013,7 +11036,9 @@ async function maybeFoldSwBackfillStaging() {
     await persistCoalescer.flush();
     await chrome.storage.local.remove(key);
   } catch {
-    /* flush/read/remove failure: staged payload remains for the next live open */
+    /* flush/read/remove failure: staged payload remains for the next check */
+  } finally {
+    _swStagingFoldInFlight = false;
   }
 }
 
@@ -15286,8 +15311,6 @@ let _ndgrDeterministicBackfillEnabled =
   typeof NL_DEV_HOTRELOAD !== 'undefined' && NL_DEV_HOTRELOAD;
 /** @type {string} 既に巡回を起動した liveId（ワンショット guard）。 */
 let _backfillTriedLiveId = '';
-/** SW backfill 取り置きの畳み込みを開始済みの liveId。 */
-let _swStagingFoldedForLiveId = '';
 /** PR1-b-3: SW backfill モード(実験・既定 OFF)。初期 storage 読み + onChanged で反映。 */
 let _backfillSwModeEnabled = false;
 /** @type {string} SW 起動メッセージ送信済みの liveId（ワンショット guard）。 */
@@ -16081,6 +16104,67 @@ async function shouldYieldBackfillToWatchedTab(lid) {
   }
 }
 
+/** v0.1.795: backfill ハートビートの最終書き込み時刻(過剰書き込み抑制)。 */
+let _backfillHeartbeatLastWriteAt = 0;
+/** ハートビート書き込みの最小間隔(ms)。前面 tick は 360ms だが hb は SW alarm(1分)が読むだけ
+ *  なので 15秒に1回で十分。storage 書き込みを増やしすぎない(stall spiral 回避)。 */
+const BACKFILL_HEARTBEAT_WRITE_MIN_MS = 15_000;
+
+/**
+ * v0.1.795: 記録中の配信の「背面でも掘って良い材料」(viewBase 等)を storage に書く。
+ * SW alarm(nls_backfill_bg_kick)がこれを読み、前面タブが居ない配信だけ SW crawl で掘る。
+ * 軽量(1配信1キー)・throttle 付き・fail-open(失敗は従来動作に degrade=記録/RT を止めない)。
+ */
+function writeBackfillHeartbeat() {
+  try {
+    if (!hasExtensionContext()) return;
+    if (!recording || !liveId || !locationAllowsCommentRecording()) return;
+    const viewBase = readNdgrViewBaseUri();
+    if (!viewBase) return; // DOM 未観測(参加直後等)=書かない。次 tick で再試行。
+    const now = Date.now();
+    if (now - _backfillHeartbeatLastWriteAt < BACKFILL_HEARTBEAT_WRITE_MIN_MS) return;
+    _backfillHeartbeatLastWriteAt = now;
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    // 前面(focused)判定は v0.1.758 と同じ規約(hasFocus 優先・無ければ visibility)。
+    const foreground =
+      typeof document === 'undefined' ||
+      (typeof document.hasFocus === 'function'
+        ? document.hasFocus()
+        : document.visibilityState === 'visible');
+    const hb = buildBackfillHeartbeat({
+      lid,
+      viewBase,
+      programBeginAtMs,
+      officialCount: officialCommentCount,
+      recordedCount: observedRecordedCommentCount,
+      deterministic: _ndgrDeterministicBackfillEnabled,
+      foreground,
+      now
+    });
+    setStorageLocalSilent({ [backfillHeartbeatKey(lid)]: hb });
+    // 索引(小配列)を更新: SW が get(null) 全件走査(stall 誘発)を避け索引→該当 hb だけ get できる。
+    //   読み→マージ→書きは throttle 内(15秒に1回)なので storage 負荷は無視できる。
+    void (async () => {
+      try {
+        const bag = await chrome.storage.local.get(KEY_BACKFILL_HEARTBEAT_INDEX);
+        const next = mergeHeartbeatLidIndex(bag?.[KEY_BACKFILL_HEARTBEAT_INDEX], lid);
+        const prev = Array.isArray(bag?.[KEY_BACKFILL_HEARTBEAT_INDEX])
+          ? bag[KEY_BACKFILL_HEARTBEAT_INDEX]
+          : [];
+        // 末尾(最近書いた lid)が既に自分なら書き直さない(無駄 write 抑制)。
+        if (next[next.length - 1] !== prev[prev.length - 1] || next.length !== prev.length) {
+          setStorageLocalSilent({ [KEY_BACKFILL_HEARTBEAT_INDEX]: next });
+        }
+      } catch {
+        /* no-op: 索引更新失敗は致命でない */
+      }
+    })();
+  } catch {
+    /* no-op: ハートビート書き込み失敗は致命でない(SW kick が無いだけ=従来動作) */
+  }
+}
+
 /**
  * v0.1.418: 自動開始の試行（maintenance tick から毎周期呼ばれる）。自動 ON かつ top frame の
  *   ときだけ起動を試し、実際の起動可否（記録 ON / view base / guard）は runNdgrBackfillOnce に委ねる。
@@ -16124,6 +16208,15 @@ function maybeAutoStartBackfill() {
   } catch {
     /* no-op: 優先再アサート失敗は致命ではない(従来動作に degrade) */
   }
+  // v0.1.795「全タブ裏で backfill が rows:0 のまま止まる」根治(会議4役一致+司令塔裏取り):
+  //   背面タブは setInterval/setTimeout が間引かれ(1/分)、backfill crawl が seed すら取れず
+  //   seg:0/running:true のまま固まる。SW は chrome.alarms(間引きに強い)で起き、既存の SW crawl
+  //   エンジンで背面の配信を掘れるが、viewBase は watch ページの DOM 属性で storage に無いため
+  //   SW が単独で起動できない。ここで recording 中の配信の viewBase 等をハートビートとして storage に
+  //   書き、SW alarm がそれを読んで【前面タブが居ない配信だけ】掘る(v0.1.758 前面優先は不変)。
+  //   tick に乗せるのは「背面でも tick は間引かれつつ最低限は回る」+「前面では従来経路が速いので
+  //   背面 kick は不要」だから。書き込みは軽量(1配信1キー)で storage stall を増やさない。
+  writeBackfillHeartbeat();
   // v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」(会議全会一致+司令塔裏取り):
   //   受動傍受(プレイヤーの NDGR fetch 横取り)はプレイヤー依存の単一障害点。プレイヤーの NDGR が切れると
   //   新しい view token が観測されず、backfill は古い死んだ token で 0件 backward_exhausted を繰り返し
