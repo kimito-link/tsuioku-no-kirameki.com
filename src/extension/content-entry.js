@@ -237,6 +237,10 @@ import {
 import { collectLoggedInViewerProfile } from '../lib/watchPageViewerProfile.js';
 import { shouldAssociateAvatarWithUser } from '../lib/avatarBroadcasterGuard.js';
 import {
+  KEY_LIVE_BROADCASTER_CTX,
+  buildBroadcasterCtxForWrite
+} from '../lib/broadcastContext.js';
+import {
   closestHarvestableNicoCommentRow,
   extractCommentsFromNode,
   NICO_USER_ICON_IMG_LAZY_ATTRS
@@ -8347,6 +8351,21 @@ function collectWatchPageSnapshot() {
   // 0.1.76: ギフト演出 DOM での avatar 取り違え対策。snapshot 構築のたびに
   // module-level cache を更新して、後続の interceptedAvatars.set ガードで参照する。
   broadcasterIconUrlCache = broadcasterIconUrl;
+
+  // v0.1.793「配信者サムネが会場に匿名混入」根治: broadcaster の uid+iconUrl を storage に
+  //   公開し、別バンドルの venueBar.js(inline / standalone) が読んで userLaneCandidatesFromStorage の
+  //   broadcasterGuard を有効化できるようにする。これが無いと venueBar は broadcaster を知る経路が
+  //   無く guard が常に無効=配信者アイコン付きの匿名行が会場に座る。経路の正本は broadcastContext.js。
+  //   uid は別関数(detectBroadcasterUserIdFromDom)が確定するのでここで取り直して両値そろえて書く。
+  const _broadcasterCtxForWrite = buildBroadcasterCtxForWrite({
+    uid: detectBroadcasterUserIdFromDom(),
+    iconUrl: broadcasterIconUrl,
+    liveId: String(liveId || '').trim(),
+    nowMs: Date.now()
+  });
+  if (_broadcasterCtxForWrite) {
+    setStorageLocalSilent({ [KEY_LIVE_BROADCASTER_CTX]: _broadcasterCtxForWrite }, { warn: false });
+  }
 
   const thumbnailUrl = toAbsoluteUrl(
     clean(metaGet(metaMap, ['og:image', 'twitter:image']))

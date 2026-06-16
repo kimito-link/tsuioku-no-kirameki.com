@@ -9,6 +9,11 @@ import {
   venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
 import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
+import {
+  KEY_LIVE_BROADCASTER_CTX,
+  normalizeBroadcasterCtx,
+  isBroadcasterCtxUsableForGuard
+} from '../lib/broadcastContext.js';
 import { readChunkedComments, chunkIndexKey, chunkStorageKey, isChunkIndex } from '../lib/commentChunkStore.js';
 import { selectNewChunkSeqs, mergeUserLaneAggregates } from '../lib/venueIncrementalAggregate.js';
 import {
@@ -2596,9 +2601,36 @@ export function mountVenueBarButton(options = {}) {
       );
       if (!open || liveIdFromPathname() !== liveId) return;
       const index = idxBag ? idxBag[idxKey] : null;
-      // v0.1.740: requireText:true で「実際にコメントした人(本文あり)」だけを参加者にする
-      //   (本文空でアバターだけ観測=配信者本人等の匿名混入を防ぐ・ギフトは別扱いで影響なし)。
-      const LANE_OPTS = { requireText: true };
+      // ⚠️ LANE_OPTS チェックリスト(新しい opts を足したら下の userLaneCandidatesFromStorage 呼び出し
+      //   2 箇所すべてに渡ること):
+      //   - requireText      : 本文ありの行だけ参加者にする(v0.1.740・配信者の本文空行混入を弾く)
+      //   - broadcasterUid    : 配信者の数値 userId(下で storage から読む)
+      //   - broadcasterIconUrl: 配信者アイコン URL(同上)
+      //   broadcasterUid と broadcasterIconUrl は【両方そろって初めて】guard が有効になる
+      //   (userLaneCandidatesFromStorage 内 Boolean(uid && iconUrl))。片方欠けると guard 無効=
+      //   配信者アイコン付きの匿名行が会場に座る既知バグ(v0.1.793)が再発する。
+      // v0.1.793: broadcaster ctx を storage(content-entry が書く)から読み LANE_OPTS に混ぜる。
+      //   inline も standalone(venue.html)も storage 経由で取れる(content の変数は別バンドルで届かない)。
+      //   経路の正本は src/lib/broadcastContext.js。ctx は補助情報なので、読めなくても(timeout 等)
+      //   guard 無効で集計は続ける(局所 catch で握りつぶす=会場本体を止めない)。
+      let _bcCtx = normalizeBroadcasterCtx(null);
+      try {
+        const _bcBag = await runStorageOpWithTimeout(
+          () => chrome.storage.local.get(KEY_LIVE_BROADCASTER_CTX),
+          3000
+        );
+        if (!open || liveIdFromPathname() !== liveId) return;
+        _bcCtx = normalizeBroadcasterCtx(_bcBag?.[KEY_LIVE_BROADCASTER_CTX]);
+      } catch {
+        // broadcaster ctx が読めなくても会場は止めない(guard 無効のまま集計続行)。
+      }
+      const _bcUsable = isBroadcasterCtxUsableForGuard(_bcCtx, liveId);
+      // v0.1.740: requireText:true で「実際にコメントした人(本文あり)」だけを参加者にする。
+      const LANE_OPTS = {
+        requireText: true,
+        broadcasterUid: _bcUsable ? _bcCtx.uid : '',
+        broadcasterIconUrl: _bcUsable ? _bcCtx.iconUrl : ''
+      };
       if (isChunkIndex(index, liveId) && Array.isArray(/** @type {any} */ (index).seqs)) {
         // --- チャンク化済み: 差分(新規 seq)だけ集約してマージ ---
         const allSeqs = /** @type {number[]} */ (/** @type {any} */ (index).seqs);
