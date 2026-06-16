@@ -22,11 +22,25 @@ import {
 } from '../lib/venueLiveRoster.js';
 
 /**
- * v0.1.754 ロールバック用キルスイッチ: false にすると会場は v0.1.754 差分集計(storage 30秒経路)へ
- * 全面フォールバック(ストリーム駆動在席を無効化)。standalone(venue.html)は別コンテキストで
- * onLiveComments が来ないため常に false 扱い(下の rosterDriven 初期化で !isStandalone と合成)。
+ * 会場の参加者ソース切替。
+ *
+ * v0.1.789 「レーンを鏡のように映す」へ統一(ユーザー指摘=本体のサムネを鏡映するのと同じく、会場は
+ *   レーンをそのまま映せばよい): false にすると content inline 会場も standalone と同じ
+ *   「レーン集約(userLaneCandidatesFromStorage→venueRowsFromUserLaneCandidates)を鏡映する」経路に
+ *   統一される。
+ *
+ * 経緯: v0.1.754 で「3時間でも O(席数) 一定」の性能対策として content inline 会場だけを
+ *   ストリーム駆動 roster(独自の在席 Map)に切り替えた。だが roster は ①userId 必須(ニコ生は匿名
+ *   主体なので数値ID の人しか座らない) ②4分窓(VIP 15分・応援しても黙ると退席) のため、レーン
+ *   (全セッション累積・サムネ持ちが並ぶ)と人が一致せず「レーンにいる応援者が会場にいない」乖離を
+ *   生んだ。性能の心配は既に解決済み=レーン集約経路は v0.1.754 で【差分(新規 seq)だけ集約してマージ】
+ *   = O(追加分)になっており、storage 変化時トリガ(near-realtime)+30秒 backstop で軽い。よって
+ *   roster は不要な二重実装。レーン正本を鏡映する1経路に統一する(=会場は常にレーンと同じ人)。
+ *
+ * true に戻すと v0.1.754 のストリーム駆動 roster へロールバック可(キルスイッチ温存)。
+ * standalone(venue.html)は onLiveComments が来ないため元から false 扱い(rosterDriven=!isStandalone と合成)。
  */
-const VENUE_ROSTER_ENABLED = true;
+const VENUE_ROSTER_ENABLED = false;
 import { resolveDisplayRows } from '../lib/venueDisplayRows.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
 import { buildVenueResidents } from '../lib/venueResidents.js';
