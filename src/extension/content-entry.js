@@ -483,6 +483,11 @@ import {
   runStorageOpWithTimeout
 } from '../lib/storageOpTimeout.js';
 import {
+  createLongTaskState,
+  recordLongTask,
+  summarizeLongTasks
+} from '../lib/longTaskTracker.js';
+import {
   INGEST_TIMING,
   SUBMIT_TIMING,
   SUBMIT_TIMING_FAST,
@@ -2685,6 +2690,65 @@ const pageFrameState = {
 let pageFrameOverlayRenderDeferred = false;
 /** @type {number|null} */
 let pageFrameLoopTimer = null;
+
+// 2026-06-17「ページが応答しません」(同期メインスレッドブロック)の真因特定用。
+//   PerformanceObserver(longtask)で 50ms 超の占有を実測し、最長/直近を fastDiag に出す。
+//   _longTaskMarker は「今 content script が何をしているか」のラベル。runMarkedSync で区間を囲み、
+//   その区間中に longtask が発火したら marker が attribution として残る=どの処理が重いか分かる。
+let _longTaskState = createLongTaskState();
+let _longTaskMarker = 'idle';
+/** @type {PerformanceObserver|null} */
+let _longTaskObserver = null;
+
+/**
+ * 同期処理を marker 付きで実行する。実行中に longtask が観測されたら、その marker が
+ * 重い処理の attribution として記録される(=真因特定)。throw は握りつぶさず素通し。
+ * @template T
+ * @param {string} marker
+ * @param {() => T} fn
+ * @returns {T}
+ */
+function runMarkedSync(marker, fn) {
+  const prev = _longTaskMarker;
+  _longTaskMarker = String(marker || 'unknown');
+  try {
+    return fn();
+  } finally {
+    _longTaskMarker = prev;
+  }
+}
+
+/** PerformanceObserver(longtask) を1回だけ登録する。未対応ブラウザでは no-op。 */
+function startLongTaskObserver() {
+  if (_longTaskObserver) return;
+  try {
+    if (typeof PerformanceObserver !== 'function') return;
+    const supported = PerformanceObserver.supportedEntryTypes;
+    if (Array.isArray(supported) && !supported.includes('longtask')) return;
+    _longTaskObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        // longtask の attribution は containerType 等(クロスオリジン iframe は "unknown")。
+        //   どの iframe/同一ドキュメントかの粗い手がかり。主信号は _longTaskMarker(自前)。
+        let attribution = '';
+        try {
+          const at = /** @type {any} */ (entry).attribution;
+          if (Array.isArray(at) && at[0]) {
+            attribution = String(at[0].name || at[0].containerType || '').slice(0, 60);
+          }
+        } catch { /* no-op */ }
+        _longTaskState = recordLongTask(_longTaskState, {
+          durationMs: entry.duration,
+          atMs: Math.round(entry.startTime),
+          marker: _longTaskMarker,
+          attribution
+        });
+      }
+    });
+    _longTaskObserver.observe({ entryTypes: ['longtask'] });
+  } catch {
+    _longTaskObserver = null;
+  }
+}
 /** scroll レイアウト用 rAF スロットル / resize 用デバウンス（invalidate 時に cancel） */
 /** @type {ReturnType<typeof setTimeout>|null} */
 let pageFrameLayoutDebounceTimer = null;
@@ -6185,6 +6249,10 @@ function buildAiShareFastDiagnosticsPayload() {
       recentRenderErrors: nlsInlinePanelRenderErrors.slice()
     },
     pageFrameLoopTimerActive: Boolean(pageFrameLoopTimer),
+    // 2026-06-17「ページが応答しません」(同期メインスレッドブロック)の真因特定用。
+    //   PerformanceObserver(longtask)で実測した最長/直近タスクと、その時 content が走らせていた
+    //   marker(区間名)。top[].attribution(=marker)が「数秒ブロックの発生源」を事実で指す。
+    longTasks: summarizeLongTasks(_longTaskState),
     romiDebug: {
       recording,
       liveId: String(liveId || ''),
@@ -6366,6 +6434,27 @@ function sanitizeWatchUrlForDiag(rawHref) {
     return `${u.origin}${u.pathname}`.slice(0, 500);
   } catch {
     return s.split('?')[0].split('#')[0].slice(0, 500);
+  }
+}
+
+// 2026-06-17: fastDiag ビルドを idle 時間へ逃がす。多重スケジュール防止フラグ付き。
+let _fastDiagIdleScheduled = false;
+function scheduleFastDiagPersistIdle() {
+  if (_fastDiagIdleScheduled) return;
+  _fastDiagIdleScheduled = true;
+  const run = () => {
+    _fastDiagIdleScheduled = false;
+    runMarkedSync('persistAiShareFastDiagnostics', persistAiShareFastDiagnostics);
+  };
+  try {
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(run, { timeout: 2000 });
+    } else {
+      setTimeout(run, 0);
+    }
+  } catch {
+    // スケジュール自体が失敗したら同期で実行(従来挙動へフォールバック)。
+    run();
   }
 }
 
@@ -6958,6 +7047,9 @@ function ensureInlinePlayerObservers() {
 function startPageFrameLoop() {
   if (pageFrameLoopTimer) return;
 
+  // 2026-06-17: longtask 計測を開始(同期メインスレッドブロックの真因特定)。1回だけ登録。
+  startLongTaskObserver();
+
   function tickPageFrameLayoutFromInterval() {
     if (!hasExtensionContext()) return;
     /*
@@ -7012,13 +7104,16 @@ function startPageFrameLoop() {
     } else {
       hiddenPageFrameMaintenancePhase = 0;
     }
-    maybeRunEndedBulkHarvest();
-    maybeOfficialGapQuietDeepHarvest();
-    maybeAutoStartBackfill(); // v0.1.418: 自動で過去ログ取り込み（既定 ON・OFF も可）。
-    maybeStartNdgrForwardCrawl(); // v0.1.511: 前方向 NDGR 継続取得（opt-in・既定 OFF）。
-    maybeRunRecordingStallWatchdog(); // 記録停止の自己診断＋自己回復（公式コメの伸びを独立信号に）。
-    maybeLogConcurrentCalibrationSample(); // 同接推定の較正データを throttled 記録（手動視聴＋自動巡回）。
-    persistAiShareFastDiagnostics();
+    // 2026-06-17: 各区間を marker で囲み、longtask(同期数秒占有)が出たらどの処理かを特定する。
+    runMarkedSync('endedBulkHarvest', maybeRunEndedBulkHarvest);
+    runMarkedSync('officialGapQuietDeepHarvest', maybeOfficialGapQuietDeepHarvest);
+    runMarkedSync('autoStartBackfill', maybeAutoStartBackfill); // v0.1.418: 自動で過去ログ取り込み。
+    runMarkedSync('ndgrForwardCrawl', maybeStartNdgrForwardCrawl); // v0.1.511: 前方向 NDGR 継続取得。
+    runMarkedSync('recordingStallWatchdog', maybeRunRecordingStallWatchdog); // 記録停止の自己診断＋自己回復。
+    runMarkedSync('concurrentCalibration', maybeLogConcurrentCalibrationSample); // 同接推定の較正データ。
+    // 2026-06-17: 重い fastDiag ビルド(histogram/sample/lv列)は idle 時間へ逃がし、毎 tick(360ms)の
+    //   同期パスから外す。requestIdleCallback 非対応は setTimeout(0) フォールバック。機能不変。
+    scheduleFastDiagPersistIdle();
     // 0.1.32 (AG): バックグラウンドで prewarm を skip した分、tick で再 schedule
     // を試みる。visibilitychange は tick を呼ぶので、可視化された瞬間に prewarm
     // が再開する（schedulePrewarmInlinePopupIframe は done flag で idempotent）。
@@ -8754,6 +8849,10 @@ function buildAiSharePageDiagnostics() {
       recentRenderErrors: nlsInlinePanelRenderErrors.slice()
     },
     pageFrameLoopTimerActive: Boolean(pageFrameLoopTimer),
+    // 2026-06-17「ページが応答しません」(同期メインスレッドブロック)の真因特定用。
+    //   PerformanceObserver(longtask)で実測した最長/直近タスクと、その時 content が走らせていた
+    //   marker(区間名)。top[].attribution(=marker)が「数秒ブロックの発生源」を事実で指す。
+    longTasks: summarizeLongTasks(_longTaskState),
     romiDebug: {
       recording,
       liveId: String(liveId || ''),
